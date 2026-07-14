@@ -386,4 +386,13 @@ Object.assign(window.__AI_I18N_EN__, {
     bxs_decide_nonsales: 'Non-sales',
     bxs_decide_busy: 'Working…',
     bxs_flip_to_sales: 'Mark as sales',
+    field_shadow_workpaper: 'Shadow workpaper',
+    pkg_signed_done: 'Marked ready to sign · {actor}',
+    pkg_frozen_hint: 'Frozen',
+    pkg_export_no_entries: 'No shadow entries to export yet',
+    pkg_return_reason_prompt: 'Enter a reason for sending back (required)',
+    pkg_returned_done: 'Sent back — reruns from the reconcile step',
+    err_workorder_no_shadow_entries: 'No shadow entries to export yet',
+    err_workorder_archived_readonly: 'This order is frozen and can no longer be changed',
+    err_workorder_run_in_progress: 'The order is running, please try again shortly',
 });

@@ -533,6 +533,7 @@ class AiPkgRenderPureTests(unittest.TestCase):
                 "pp30_draft",
                 "ledger_workpaper",
                 "bank_workpaper",
+                "shadow_workpaper",
                 "missing_doc_memo",
                 "evidence_index",
             ],

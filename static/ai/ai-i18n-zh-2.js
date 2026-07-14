@@ -353,4 +353,13 @@ Object.assign(window.__AI_I18N_ZH__, {
     bxs_decide_nonsales: '非销售',
     bxs_decide_busy: '处理中…',
     bxs_flip_to_sales: '标记为销售',
+    field_shadow_workpaper: '影子底稿',
+    pkg_signed_done: '已标记待签 · {actor}',
+    pkg_frozen_hint: '已冻结',
+    pkg_export_no_entries: '暂无影子分录可导出',
+    pkg_return_reason_prompt: '请填写退回原因(必填)',
+    pkg_returned_done: '已退回,从对账步重跑',
+    err_workorder_no_shadow_entries: '暂无影子分录可导出',
+    err_workorder_archived_readonly: '工单已冻结,不能再改',
+    err_workorder_run_in_progress: '工单正在跑,请稍候再试',
 });

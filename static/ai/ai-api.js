@@ -283,6 +283,17 @@
                     )
                     .then(attachmentResponse(kind));
             },
+            // 影子分录导出 Express xlsx(M1-3KEY 键二):附件路,同 downloadDeliverable(GET 带
+            // 鉴权头,<a href> 发不了自定义头,调用方拿 blob 自建 object URL)。文件名走
+            // attachmentResponse(客户名_账期 在 filename*);无影子分录后端 404 no_shadow_entries。
+            downloadEntriesExport: function (orderId) {
+                return root
+                    .fetch(
+                        '/api/workorder/orders/' + encodeURIComponent(orderId) + '/entries-export',
+                        { headers: authHeaders() }
+                    )
+                    .then(attachmentResponse('entries.xlsx'));
+            },
             // 原图直出(W3 审核队列 / W5 证据回链):鉴权头是 Bearer,<img src> 发不了自定义头,
             // 调用方拿 blob 自建 object URL 挂 <img>(同 console.js 导出下载的 fetch+blob 先例)。
             getItemImageBlob: function (orderId, itemId) {

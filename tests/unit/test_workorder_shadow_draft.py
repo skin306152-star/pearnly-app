@@ -198,7 +198,7 @@ def _reconcile_done_with_shadow(shadow_payload):
 
 
 class ApiShadowProjectionTests(unittest.TestCase):
-    """读侧投影 api._shadow_draft:闸开有底稿→dict,闸关/无数据/异常残影→None 诚实降级。"""
+    """读侧投影 api.shadow_draft:闸开有底稿→dict,闸关/无数据/异常残影→None 诚实降级。"""
 
     def _shadow_payload(self):
         result = workorder_shadow_adapter.build_shadow(
@@ -212,17 +212,17 @@ class ApiShadowProjectionTests(unittest.TestCase):
 
     def test_projection_returns_shadow_when_present(self):
         events = [_reconcile_done_with_shadow(self._shadow_payload())]
-        out = api._shadow_draft(events)
+        out = api.shadow_draft(events)
         self.assertIsNotNone(out)
         self.assertIn("trial_balance", out)
 
     def test_projection_none_when_no_reconcile_done(self):
-        self.assertIsNone(api._shadow_draft([]))
+        self.assertIsNone(api.shadow_draft([]))
 
     def test_projection_none_on_skipped_residue(self):
         # _run_shadow_draft 异常残影缺 trial_balance → 诚实 None。
         events = [_reconcile_done_with_shadow({"note": "shadow_draft_skipped", "error": "X"})]
-        self.assertIsNone(api._shadow_draft(events))
+        self.assertIsNone(api.shadow_draft(events))
 
 
 class PackageShadowDeliverableTests(unittest.TestCase):

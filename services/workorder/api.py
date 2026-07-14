@@ -194,7 +194,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "blocked_reasons": blocked,
         "numbers": _numbers(events),
         "bank_recon": _bank_recon(events, items),
-        "shadow_draft": _shadow_draft(events),
+        "shadow_draft": shadow_draft(events),
         "financials": _financials(events),
         "sales_corroboration": sales_aggregate.corroboration_for_detail(
             events, items, classified=classified
@@ -250,8 +250,8 @@ def _overlay_bank_decisions(recon: dict, events: list[dict]) -> dict:
     return dict(recon, review=review)
 
 
-def _shadow_draft(events: list[dict]) -> Optional[dict]:
-    """R5 影子底稿三件套只读投影(F3 影子底稿视图读侧)。
+def shadow_draft(events: list[dict]) -> Optional[dict]:
+    """R5 影子底稿三件套只读投影(F3 影子底稿视图读侧 + M1-3KEY 键二分录导出)。
 
     从 reconcile 步 step_done 回放里深取 gates.r5_shadow——闸关(无 r5_shadow 键)/ 尚未跑到
     reconcile / 引擎异常降级(_run_shadow_draft 的 except 落 {error,note:shadow_draft_skipped}

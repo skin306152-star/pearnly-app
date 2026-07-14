@@ -375,4 +375,13 @@ Object.assign(window.__AI_I18N_TH__, {
     bxs_decide_nonsales: 'ไม่ใช่ขาย',
     bxs_decide_busy: 'กำลังดำเนินการ…',
     bxs_flip_to_sales: 'ทำเครื่องหมายเป็นขาย',
+    field_shadow_workpaper: 'ใบงานร่างบัญชีคู่',
+    pkg_signed_done: 'ทำเครื่องหมายรอเซ็นแล้ว · {actor}',
+    pkg_frozen_hint: 'ถูกแช่แข็งแล้ว',
+    pkg_export_no_entries: 'ยังไม่มีรายการบัญชีร่างให้ส่งออก',
+    pkg_return_reason_prompt: 'กรุณากรอกเหตุผลในการส่งกลับ (จำเป็น)',
+    pkg_returned_done: 'ส่งกลับแล้ว — จะรันใหม่ตั้งแต่ขั้นกระทบยอด',
+    err_workorder_no_shadow_entries: 'ยังไม่มีรายการบัญชีร่างให้ส่งออก',
+    err_workorder_archived_readonly: 'งานนี้ถูกแช่แข็งแล้ว แก้ไขไม่ได้',
+    err_workorder_run_in_progress: 'งานกำลังรันอยู่ กรุณาลองใหม่อีกครั้ง',
 });

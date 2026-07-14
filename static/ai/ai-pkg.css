@@ -137,14 +137,26 @@
   line-height: 1.7;
 }
 
-/* M1 降级区(电子签/推送 Express/退回工单未接——状态诚实,按钮禁用 + 提示条)。 */
-.pkg-downgrade {
-  margin-top: 17px;
+/* 三键出口区(M1-3KEY:确认待签 / 导出 Express / 退回工单)。禁用键靠 :disabled 变淡,
+ * 状态说明走 title;notice 行按 ok/err 上色(四态诚实:动作有回执/报错,不静默)。 */
+.pkg-actions {
+  padding: 18px 4px 6px;
 }
-.pkg-downgrade-note {
-  font-size: 11.5px;
-  color: var(--mut);
-  margin-top: 9px;
+.pkg-action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pkg-action-note {
+  font-size: 12px;
+  margin-top: 10px;
+  line-height: 1.6;
+}
+.pkg-action-note.ok {
+  color: var(--good);
+}
+.pkg-action-note.err {
+  color: var(--danger);
 }
 
 /* ---- 证据模态框(v4 .mask/.modal/.ev-row 1:1)---- */

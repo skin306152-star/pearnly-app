@@ -16,9 +16,21 @@
         'pp30_draft',
         'ledger_workpaper',
         'bank_workpaper',
+        'shadow_workpaper',
         'missing_doc_memo',
         'evidence_index',
     ];
+
+    // 交付包页三键的工单状态词(engine.STATUS_*):review 态可签批/退回,archive=已冻结只读。
+    var STATUS_REVIEW = 'review';
+    var STATUS_FROZEN = 'archive';
+
+    // 键二「导出分录到 Express」可用信号:工单有配平的影子分录(shadow_draft 是 order_detail
+    // 对 gates.r5_shadow 的只读投影,无影子/未跑到 reconcile 时为 null)。
+    function hasShadowEntries(detail) {
+        var sd = (detail || {}).shadow_draft;
+        return !!(sd && (sd.entries || []).length);
+    }
 
     // 证据条目的文件名 → 能不能当票据照片直接用查看器打开(状态诚实:xlsx/pdf 等非图片
     // 文件不装模作样塞进 <img>,那只会碎图——铺满率≥0.8 的视觉验收血泪教训)。
@@ -211,40 +223,71 @@
             esc(at('pkg_files_title')) +
             '</h3></div><div class="bd"><div class="pkg-files">' +
             rows +
-            '</div>' +
-            degradeHtml() +
-            '</div></div>'
+            '</div></div></div>'
         );
     }
 
-    // ---- M1 降级区(电子签/推 Express/退回工单未接——状态诚实,不给假按钮点了没反应) ----
-    function degradeHtml() {
-        var btn = function (labelKey) {
-            return (
-                '<button class="btn" disabled title="' +
-                esc(at('pkg_not_available')) +
-                '">' +
-                esc(at(labelKey)) +
-                '</button>'
-            );
-        };
+    // ---- 三键出口区(M1-3KEY:确认待签 / 导出 Express / 退回工单) ----
+    // 键一/键三 = review 态且未冻结才可点;冻结后禁用并提示「已冻结」。键二 = 有影子分录即可
+    // 导(冻结单也能导,读侧派生)。签批成功后本键翻「已标记待签 · 签批人」态(同审核收件箱
+    // 先例:用当前登录态展示名,不回读服务端)。状态诚实:按钮禁用带 title 说明为何不可点。
+    function actionBtnHtml(action, labelKey, opts) {
+        opts = opts || {};
         return (
-            '<div class="pkg-downgrade">' +
-            '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
-            btn('pkg_sign_btn') +
-            btn('pkg_export_btn') +
-            btn('pkg_return_btn') +
+            '<button class="btn' +
+            (opts.pri ? ' pri' : '') +
+            '" type="button" data-action="' +
+            action +
+            '"' +
+            (opts.disabled ? ' disabled' : '') +
+            (opts.titleKey ? ' title="' + esc(at(opts.titleKey)) + '"' : '') +
+            '>' +
+            esc(at(labelKey)) +
+            '</button>'
+        );
+    }
+
+    function actionsHtml(ctx) {
+        var detail = ctx.detail || {};
+        var frozen = detail.status === STATUS_FROZEN;
+        var reviewable = detail.status === STATUS_REVIEW && !frozen;
+        var entries = hasShadowEntries(detail);
+        var frozenTitle = frozen ? 'pkg_frozen_hint' : null;
+
+        var signBtn = ctx.signed
+            ? '<button class="btn pri" type="button" disabled>' +
+              esc(at('pkg_signed_done', { actor: ctx.signedActor || '' })) +
+              '</button>'
+            : actionBtnHtml('pkg-sign', 'pkg_sign_btn', {
+                  pri: true,
+                  disabled: !reviewable || ctx.signing,
+                  titleKey: frozenTitle,
+              });
+        var exportBtn = actionBtnHtml('pkg-export', 'pkg_export_btn', {
+            disabled: !entries || ctx.exporting,
+            titleKey: entries ? null : 'pkg_export_no_entries',
+        });
+        var returnBtn = actionBtnHtml('pkg-return', 'pkg_return_btn', {
+            disabled: !reviewable || ctx.returning,
+            titleKey: frozenTitle,
+        });
+
+        var notice = ctx.notice
+            ? '<p class="pkg-action-note ' +
+              esc(ctx.notice.type) +
+              '">' +
+              esc(ctx.notice.text) +
+              '</p>'
+            : '';
+        return (
+            '<div class="panel"><div class="bd pkg-actions">' +
+            '<div class="pkg-action-row">' +
+            signBtn +
+            exportBtn +
+            returnBtn +
             '</div>' +
-            '<p class="pkg-downgrade-note">' +
-            esc(at('pkg_downgrade_t')) +
-            ': ' +
-            esc(at('pkg_sign_btn')) +
-            ' · ' +
-            esc(at('pkg_export_btn')) +
-            ' · ' +
-            esc(at('pkg_return_btn')) +
-            '</p>' +
-            '</div>'
+            notice +
+            '</div></div>'
         );
     }
 
@@ -256,7 +299,7 @@
         var pp30Card = ctx.pp30
             ? pp30CardHtml(ctx.pp30.numbers || {}, ctx.calcOpen, (ctx.detail || {}).status)
             : blockedHtml(ctx.detail);
-        return pp30Card + filesListHtml(ctx.deliverables, ctx.downloading);
+        return pp30Card + filesListHtml(ctx.deliverables, ctx.downloading) + actionsHtml(ctx);
     }
 
     // ---- 证据模态框(v4 .mask/.modal/.ev-row 1:1;点验回链:数字 → 证据行 → 原图,≤2 击) ----
@@ -344,6 +387,8 @@
         pp30CardHtml: pp30CardHtml,
         blockedHtml: blockedHtml,
         filesListHtml: filesListHtml,
+        actionsHtml: actionsHtml,
+        hasShadowEntries: hasShadowEntries,
         evidModalHtml: evidModalHtml,
     };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

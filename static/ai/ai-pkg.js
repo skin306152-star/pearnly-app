@@ -34,7 +34,25 @@
             calcOpen: false,
             downloading: null,
             evid: null, // {numKey, label, entry, selectedItemId} | null
+            // 三键(M1-3KEY)出口态:signed 后本键翻「已标记待签」;exporting/signing/returning
+            // 是各自请求在途的防重入闸;notice = {type:'ok'|'err', text} 出口动作的人话回执/报错。
+            signed: false,
+            signedActor: '',
+            signing: false,
+            exporting: false,
+            returning: false,
+            notice: null,
         };
+    }
+
+    // 签批人展示名:同 ai-review.js 先例,用当前登录态展示名(不回读服务端 actor)——
+    // 邮箱前缀 → JWT 名 → sub 短八位,绝不拼 "user:<uuid>" 糊脸。
+    function currentActorLabel() {
+        return AI.format.actorLabel(null, localStorage.getItem('mrpilot_token'));
+    }
+
+    function errNotice(err) {
+        return { type: 'err', text: at(AI.api.mapApiErrorKey(err && err.code)) };
     }
 
     function findDeliverable(kind) {
@@ -52,6 +70,12 @@
             pp30: findDeliverable('pp30_draft'),
             calcOpen: S.calcOpen,
             downloading: S.downloading,
+            signed: S.signed,
+            signedActor: S.signedActor,
+            signing: S.signing,
+            exporting: S.exporting,
+            returning: S.returning,
+            notice: S.notice,
         });
         renderEvidModal();
     }
@@ -184,6 +208,88 @@
             });
     }
 
+    // ============ 三键出口(M1-3KEY) ============
+
+    // 键一「确认无误,标记待签」= 既有 POST /review(复核签批,append-only);成功翻「已标记
+    // 待签 · 签批人」态。SoD 422 / 冻结 409 走 errNotice 人话直出(与审核收件箱同端点同语义)。
+    function signOff() {
+        if (S.signed || S.signing) return;
+        var session = S;
+        S.signing = true;
+        S.notice = null;
+        render();
+        S.api
+            .reviewSignoff(S.orderId, '')
+            .then(function () {
+                if (S !== session) return;
+                S.signed = true;
+                S.signedActor = currentActorLabel();
+            })
+            .catch(function (err) {
+                if (S !== session) return;
+                S.notice = errNotice(err);
+            })
+            .then(function () {
+                if (S !== session) return;
+                S.signing = false;
+                render();
+            });
+    }
+
+    // 键二「导出分录到 Express」= GET /entries-export(读侧派生 xlsx),拿 blob 触发下载。
+    // 无影子分录后端 404 no_shadow_entries → errNotice(前端按钮本已按信号 disabled,兜底提示)。
+    function exportEntries() {
+        if (S.exporting) return;
+        var session = S;
+        S.exporting = true;
+        S.notice = null;
+        render();
+        S.api
+            .downloadEntriesExport(S.orderId)
+            .then(function (r) {
+                if (S !== session) return;
+                AI.api.saveBlob(r);
+            })
+            .catch(function (err) {
+                if (S !== session) return;
+                S.notice = errNotice(err);
+            })
+            .then(function () {
+                if (S !== session) return;
+                S.exporting = false;
+                render();
+            });
+    }
+
+    // 键三「退回工单」= reason 必填(500 上限对齐后端)→ 既有 POST /review-reject。成功后状态
+    // 翻 running,重拉详情整页重渲染(键随新状态禁用)。run_in_progress 409 → errNotice 人话。
+    function returnOrder() {
+        if (S.returning) return;
+        var reason = (window.prompt(at('pkg_return_reason_prompt')) || '').trim();
+        if (!reason) return; // 取消 / 空:不发请求
+        var session = S;
+        S.returning = true;
+        S.notice = null;
+        render();
+        S.api
+            .reviewReject(S.orderId, reason.slice(0, 500))
+            .then(function () {
+                if (S !== session) return;
+                S.returning = false;
+                // 退回使工单重开:此前的「已标记待签」标记随之作废,不留一个矛盾的旧签批态。
+                S.signed = false;
+                S.signedActor = '';
+                S.notice = { type: 'ok', text: at('pkg_returned_done') };
+                loadDetail();
+            })
+            .catch(function (err) {
+                if (S !== session) return;
+                S.returning = false;
+                S.notice = errNotice(err);
+                render();
+            });
+    }
+
     // ============ 事件接线 ============
 
     function onClick(e) {
@@ -194,6 +300,9 @@
         else if (a === 'pkg-calc') toggleCalc();
         else if (a === 'pkg-download') download(el.getAttribute('data-kind'));
         else if (a === 'pkg-go-intake') gotoIntake();
+        else if (a === 'pkg-sign') signOff();
+        else if (a === 'pkg-export') exportEntries();
+        else if (a === 'pkg-return') returnOrder();
     }
 
     function onKeydown(e) {

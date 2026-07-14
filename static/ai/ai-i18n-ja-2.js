@@ -383,4 +383,13 @@ Object.assign(window.__AI_I18N_JA__, {
     bxs_decide_nonsales: '非売上',
     bxs_decide_busy: '処理中…',
     bxs_flip_to_sales: '売上としてマーク',
+    field_shadow_workpaper: 'シャドー仕訳ワークペーパー',
+    pkg_signed_done: '署名待ちにしました · {actor}',
+    pkg_frozen_hint: '凍結済み',
+    pkg_export_no_entries: '出力できるシャドー仕訳がまだありません',
+    pkg_return_reason_prompt: '差し戻しの理由を入力してください(必須)',
+    pkg_returned_done: '差し戻しました — 消込ステップから再実行します',
+    err_workorder_no_shadow_entries: '出力できるシャドー仕訳がまだありません',
+    err_workorder_archived_readonly: 'このワークオーダーは凍結済みで変更できません',
+    err_workorder_run_in_progress: 'ワークオーダーの実行中です。しばらくして再試行してください',
 });

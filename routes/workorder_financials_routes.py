@@ -35,11 +35,16 @@ from fastapi.responses import FileResponse, Response
 from core import db
 from core.route_helpers import content_disposition, lang_or_default
 from routes.workorder_routes import _C_VIEW, _authorize, _client_name_for_order, _load_order
+from services.accounting import bridge_store
 from services.fileconv import pdf_out, xlsx_out
 from services.reports.financials_pdf import build_financials_convert_result
-from services.workorder import api, storage
+from services.workorder import api, entries_export, storage, store
 
 router = APIRouter()
+
+# 键二导出翻码固定按 Express 桥(coa_erp_bridge · erp_type='express')。MR.ERP 分录导出桥
+# 就绪但语料未到,不在此列(方案「不做」节)——按钮语义单指 Express,不给一个选而无实的 erp_type。
+_EXPRESS_ERP_TYPE = "express"
 
 _DELIVERABLE_LABEL_TH = {
     "pp30_draft": "แบบร่าง ภ.พ.30",
@@ -49,6 +54,7 @@ _DELIVERABLE_LABEL_TH = {
     "evidence_index": "ดัชนีหลักฐาน",
     "financials_report": "งบการเงิน",
     "shadow_workpaper": "ใบงานร่างบัญชีคู่",
+    "entries_export": "รายการบัญชี Express",
 }
 
 
@@ -146,5 +152,45 @@ async def download_financials_report(
     return Response(
         content=content,
         media_type=media_type,
+        headers={"Content-Disposition": content_disposition(display_name, fallback_name)},
+    )
+
+
+@router.get("/api/workorder/orders/{work_order_id}/entries-export")
+async def export_entries(work_order_id: str, request: Request):
+    """影子分录导出 Express xlsx(M1-3KEY 键二 · 只读派生)。事件回放取 gates.r5_shadow(不
+    重算不落库),coa 码经 coa_erp_bridge(express)翻 Express 码——桥缺码留空 + 标 unmapped,
+    禁臆造。冻结单可导(读侧派生,故走 _load_order 不走只读闸)。无影子分录 → 404
+    workorder.no_shadow_entries(前端按钮 disabled + 人话)。"""
+    user, tenant_id = _authorize(request, _C_VIEW)
+    with db.get_cursor() as cur:
+        wo = _load_order(cur, request, user, tenant_id, work_order_id)
+        ws_id = wo["workspace_client_id"]
+        events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+        shadow = api.shadow_draft(events)  # events→dict 只读投影(同 order_detail,不重算)
+        bridge = bridge_store.load_bridge(
+            cur, tenant_id=tenant_id, workspace_client_id=ws_id, erp_type=_EXPRESS_ERP_TYPE
+        )
+        erp_types = bridge_store.list_erp_types(cur, tenant_id=tenant_id, workspace_client_id=ws_id)
+        client_name = _client_name_for_order(
+            cur, tenant_id=tenant_id, user_id=str(user["id"]), workspace_client_id=ws_id
+        )
+    if not shadow or not shadow.get("entries"):
+        raise HTTPException(404, detail="workorder.no_shadow_entries")
+    period = wo.get("period") or ""
+    content = entries_export.build_entries_xlsx(
+        shadow,
+        bridge,
+        bridge_configured=_EXPRESS_ERP_TYPE in erp_types,
+        period=period,
+        client_name=client_name,
+    )
+    display_name = _deliverable_download_name(
+        "entries_export", f"entries_{period}.xlsx", client_name=client_name, period=period
+    )
+    fallback_name = f"entries_{work_order_id}.xlsx"
+    return Response(
+        content=content,
+        media_type=entries_export.XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": content_disposition(display_name, fallback_name)},
     )

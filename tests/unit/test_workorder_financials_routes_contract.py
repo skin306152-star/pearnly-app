@@ -48,10 +48,14 @@ _DELIVERABLE_PATHS = (
 )
 
 
+_ENTRIES_EXPORT_PATH = "/api/workorder/orders/{work_order_id}/entries-export"
+
+
 class RouteContractTests(unittest.TestCase):
     def test_registered(self):
         paths = {getattr(r, "path", None) for r in financials_router.routes}
         self.assertIn("/api/workorder/orders/{work_order_id}/financials/download", paths)
+        self.assertIn(_ENTRIES_EXPORT_PATH, paths)
         for p in _DELIVERABLE_PATHS:
             self.assertIn(p, paths)
 
@@ -60,8 +64,17 @@ class RouteContractTests(unittest.TestCase):
 
         paths = {getattr(r, "path", None) for r in app.app.routes}
         self.assertIn("/api/workorder/orders/{work_order_id}/financials/download", paths)
+        self.assertIn(_ENTRIES_EXPORT_PATH, paths)
         for p in _DELIVERABLE_PATHS:
             self.assertIn(p, paths)
+
+    def test_registered_in_agent_registry(self):
+        import json
+        from pathlib import Path
+
+        reg = json.loads(Path("docs/agent/agent_registry.json").read_text(encoding="utf-8"))
+        # 键二新端点并进已登记模块 workorder_financials_routes(每模块一桶),无需新桶。
+        self.assertIn("workorder_financials_routes", reg)
 
 
 class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
@@ -203,6 +216,67 @@ class DeliverablesPermCodeTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(expected=expected):
                 got = await self._perm_code_used(coro)
                 self.assertEqual(got, expected)
+
+
+class EntriesExportTests(unittest.IsolatedAsyncioTestCase):
+    """键二导出端点(entries-export · 只读派生 xlsx):无影子 → 404;冻结单可导(走 _load_order
+    非只读闸);权限细码 tax.filing.view;桥缺码不臆造由 test_workorder_entries_export 覆盖。"""
+
+    def _wire(self, wo):
+        return (
+            mock.patch.object(wfr, "_authorize", return_value=(_USER, "t-1")),
+            mock.patch.object(wfr, "_load_order", return_value=wo),
+            mock.patch.object(wfr, "db", _FakeDB()),
+            mock.patch.object(wfr.store, "list_events", return_value=[]),
+            mock.patch.object(wfr.bridge_store, "load_bridge", return_value={}),
+            mock.patch.object(wfr.bridge_store, "list_erp_types", return_value=[]),
+            mock.patch.object(wfr, "_client_name_for_order", return_value="Sister Makeup"),
+        )
+
+    async def test_no_shadow_entries_is_404(self):
+        for p in self._wire(dict(_WO)):
+            self.enterContext(p)
+        with mock.patch.object(wfr.api, "shadow_draft", return_value=None):
+            with self.assertRaises(HTTPException) as ctx:
+                await wfr.export_entries("wo-1", mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.detail, "workorder.no_shadow_entries")
+
+    async def test_frozen_order_still_exportable(self):
+        shadow = _golden_shadow_payload()
+        frozen = dict(_WO, status="archive")
+        for p in self._wire(frozen):
+            self.enterContext(p)
+        with mock.patch.object(wfr.api, "shadow_draft", return_value=shadow):
+            resp = await wfr.export_entries("wo-1", mock.Mock())
+        self.assertEqual(resp.media_type, wfr.entries_export.XLSX_MEDIA_TYPE)
+        self.assertGreater(len(resp.body), 100)
+        self.assertIn("2569-05", resp.headers["content-disposition"])
+
+    async def test_perm_code_is_view(self):
+        seen: list[str] = []
+        for p in self._wire(dict(_WO)):
+            self.enterContext(p)
+        with (
+            mock.patch.object(
+                wfr,
+                "_authorize",
+                side_effect=lambda req, perm: (seen.append(perm), (_USER, "t-1"))[1],
+            ),
+            mock.patch.object(wfr.api, "shadow_draft", return_value=None),
+        ):
+            with self.assertRaises(HTTPException):
+                await wfr.export_entries("wo-1", mock.Mock())
+        self.assertEqual(seen, [wfr._C_VIEW])
+
+
+def _golden_shadow_payload() -> dict:
+    return workorder_shadow_adapter.build_shadow(
+        purchase_entries=[{"net": Decimal("1000"), "vat": Decimal("70"), "grand": Decimal("1070")}],
+        sales_amount=Decimal("5000"),
+        output_vat=Decimal("350"),
+        period="2569-05",
+    ).as_gate_payload()
 
 
 if __name__ == "__main__":

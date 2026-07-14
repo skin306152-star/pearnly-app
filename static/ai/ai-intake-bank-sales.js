@@ -16,6 +16,13 @@
 (function () {
     'use strict';
 
+    // decideRow/run 两处失败回调同款「映射 API 错误码 → 可译 key,查不到译名就兜底
+    // err_generic」判据,抽出避免逐字重复。
+    function errKey(err) {
+        var key = AI.api.mapApiErrorKey(err && err.code);
+        return key !== 'err_generic' && at(key) !== key ? key : 'err_generic';
+    }
+
     function create(getS, render) {
         function refreshOrder(session) {
             return session.api.getOrder(session.orderId).then(function (detail) {
@@ -50,9 +57,7 @@
                 .catch(function (err) {
                     if (getS() !== session) return;
                     session.bankSalesUi.rowBusy[fingerprint] = false;
-                    var key = AI.api.mapApiErrorKey(err && err.code);
-                    session.bankSalesUi.rowErr[fingerprint] =
-                        key !== 'err_generic' && at(key) !== key ? key : 'err_generic';
+                    session.bankSalesUi.rowErr[fingerprint] = errKey(err);
                     render();
                 });
         }
@@ -74,9 +79,7 @@
                 .catch(function (err) {
                     if (getS() !== session) return;
                     session.bankSalesUi.runBusy = false;
-                    var key = AI.api.mapApiErrorKey(err && err.code);
-                    session.bankSalesUi.runErrKey =
-                        key !== 'err_generic' && at(key) !== key ? key : 'err_generic';
+                    session.bankSalesUi.runErrKey = errKey(err);
                     render();
                 });
         }

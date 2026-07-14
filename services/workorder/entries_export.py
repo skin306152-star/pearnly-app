@@ -106,9 +106,9 @@ def _write_header(ws, r_idx: int) -> None:
 
 def _write_totals(ws, r_idx: int, trial_balance: dict) -> None:
     ws.cell(row=r_idx, column=1, value="รวม (合计)").font = _TOTAL_FONT
-    for field, code in (("debit", "debit"), ("credit", "credit")):
+    for field in ("debit", "credit"):
         c_idx = next(i for i, (_l, f) in enumerate(_COLUMNS, start=1) if f == field)
-        cell = ws.cell(row=r_idx, column=c_idx, value=float(_dec(trial_balance.get(code))))
+        cell = ws.cell(row=r_idx, column=c_idx, value=float(_dec(trial_balance.get(field))))
         cell.number_format = "#,##0.00"
         cell.font = _TOTAL_FONT
         cell.alignment = _RIGHT

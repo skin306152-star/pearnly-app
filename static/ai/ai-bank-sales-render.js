@@ -130,9 +130,6 @@
     function money(v) {
         return v == null || v === '' ? '—' : root.AI.format.money(v);
     }
-    function pctText(ratio) {
-        return ratio == null ? '—' : (ratio * 100).toFixed(1) + '%';
-    }
 
     // 三张流水行清单共用折叠外壳(视觉照抄 ai-recon-render.js 的 .brx-section/.brx-fold,
     // 逻辑不跨模块引用——sectionHtml 在那边未导出,各管各的小函数比强行共享更省心)。
@@ -249,7 +246,7 @@
         var lines = rows
             .map(function (r) {
                 var labelKey = r.kind === 'edc' ? 'bxs_crosscheck_edc' : 'bxs_crosscheck_invoice';
-                var pct = pctText(r.ratio);
+                var pct = root.AI.format.pct(r.ratio);
                 var chip = r.warn
                     ? '<span class="chip w">' +
                       esc(at('bxs_crosscheck_diff_warn', { pct: pct })) +
@@ -337,7 +334,7 @@
                 at('bxs_degrade_s', {
                     breaks: cov.chain_breaks,
                     amount: money(cov.unexplained_inflow),
-                    pct: pctText(toNum(cov.inflow_gap_ratio)),
+                    pct: root.AI.format.pct(cov.inflow_gap_ratio),
                 })
             ) +
             '</span></div>' +

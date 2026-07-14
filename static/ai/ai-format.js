@@ -31,6 +31,13 @@
         return sign + '฿' + parts.join('.');
     }
 
+    // 比率(0.925 或其字符串形态)→ 百分比串("92.5%"),解不出/非有限 → "—"。
+    // ai-bank-sales-render.js 的 pctText 与 ai-corrob.js 的 pct 曾各自定义同一实现,收敛于此。
+    function pct(ratio) {
+        var n = parseFloat(ratio);
+        return isFinite(n) ? (n * 100).toFixed(1) + '%' : '—';
+    }
+
     // 账期 "2569-05" → 佛历年 + 月份(zh 文案;th/en/ja 由调用方套 i18n 月名,这里只拆结构)。
     function splitPeriod(period) {
         var m = /^(\d{4})-(\d{2})$/.exec(String(period || ''));
@@ -167,6 +174,7 @@
     var api = {
         parseAmount: parseAmount,
         money: money,
+        pct: pct,
         splitPeriod: splitPeriod,
         statusChip: statusChip,
         chipHtml: chipHtml,

@@ -16,7 +16,6 @@ from __future__ import annotations
 from services.workorder import api, store
 from services.workorder.steps import bank_sales_suggest as engine
 
-_EVT_DECISION = "human_decision"
 _VERDICTS = frozenset({engine.SALES, engine.NON_SALES, engine.PENDING})
 
 
@@ -40,7 +39,7 @@ def record_bank_sales_decision(
         tenant_id=tenant_id,
         work_order_id=work_order_id,
         step=engine.STEP,
-        event_type=_EVT_DECISION,
+        event_type=engine.EVT_HUMAN_DECISION,
         payload={engine.HUMAN_ROW_KEY: fingerprint, engine.HUMAN_VERDICT_KEY: verdict},
         actor=actor,
     )

@@ -28,6 +28,7 @@ from decimal import Decimal, InvalidOperation
 
 from services.sales_agg import vat
 from services.workorder import kinds
+from services.workorder.steps import sales_aggregate
 
 _EVT_BANK_PARSED = "item_bank_parsed"
 _EVT_CLASSIFIED = "item_classified"
@@ -36,6 +37,9 @@ STEP = "reconcile"
 # 行级建议/裁决事件与载荷键(brain / routes / api 共用单一事实源,防各打各的字符串)。
 EVT_SUGGESTED = "bank_sales_suggested"
 SUGGEST_DEDUPE_PREFIX = "bank_sales_suggest"
+# 行级人裁事件类型:本特性事件词汇单一事实源,bank_sales_review.py 从此处 import,
+# 不再各自重声明同一个字面量。
+EVT_HUMAN_DECISION = "human_decision"
 HUMAN_ROW_KEY = "bank_sales_row"  # human_decision 里标「这是一条银行行级销项裁决」的行指纹键
 HUMAN_VERDICT_KEY = "sales_verdict"
 
@@ -67,8 +71,9 @@ _CANCEL_KEYWORDS = ("ยกเลิก", "คืนเงิน", "ปรับ
 _ZERO = Decimal("0")
 
 # 覆盖判定容差与阈值(打回 R1:判据来自数据内在证据,阈值写明依据)。
-# 余额链恒等式容差:分位舍入口径,与 sales_aggregate._CONSERV_TOL(T0 抽查)同一条 0.02。
-_CHAIN_TOL = Decimal("0.02")
+# 余额链恒等式容差:分位舍入口径,与 sales_aggregate.CONSERV_TOL(T0 抽查)同一条常量对象,
+# 不按值复制——两处口径改动必然同步。
+_CHAIN_TOL = sales_aggregate.CONSERV_TOL
 # 无解释入账占比上限:超过即覆盖不可信、建议降级。取 2% 与方案 §三.3 交叉佐证差异黄灯
 # 同一条材料性线——入账缺口把含税合计系统性拉偏超 2%,÷1.07 的建议值就出了会计可接受
 # 误差,不该再以「可用建议」形态出现。金标真形态(64% 捕获)实测 11.6%,远超此线。
@@ -92,12 +97,18 @@ def _fmt(value: Decimal) -> str:
     return format(value, "f")
 
 
-def parsed_rows_from_events(events: list) -> list[dict]:
-    """item_bank_parsed 事件 → 规范化流水行(纯函数,读侧与人裁/大脑共用同一份行集与指纹)。
+def _replay_rows(events: list) -> list[dict]:
+    """item_bank_parsed 事件 → 归一化流水行(唯一回放口,parsed_rows_from_events/
+    coverage_check 都从这一份派生,不各自重扫一遍 events)。
 
     行指纹 = 日期|带符号金额|同键序号(方案:日期+金额+序号)。同 (日期,金额) 多行靠序号消歧,
     序号按事件追加序 + 行内序确定——重跑/续跑指纹恒定。同 item_id 多事件取首条(与
     reconcile_bank._replay_parsed_banks「首件在先」一致,续跑重放不双计)。
+
+    余额链恒等式(balance[i] = balance[i-1] + deposit[i] − withdrawal[i])按 item 内行序核对,
+    结果随行内联携带:chain_verified(True=链对上/False=断链/None=首行或缺 balance 验不了)、
+    chain_delta(断链时的带符号差额,verdict 见上)、balance_ok(解析器自带的守恒红旗原样透传)。
+    覆盖判定(coverage_check)由这份携带信息聚合,不再另开一遍循环重算。
     """
     out: list[dict] = []
     seen_items: set = set()
@@ -110,6 +121,7 @@ def parsed_rows_from_events(events: list) -> list[dict]:
         if item_id is None or item_id in seen_items:
             continue
         seen_items.add(item_id)
+        prev_balance = None
         for raw in payload.get("rows") or []:
             deposit = _dec(raw.get("deposit"))
             withdrawal = _dec(raw.get("withdrawal"))
@@ -118,6 +130,13 @@ def parsed_rows_from_events(events: list) -> list[dict]:
             key = (date, signed)
             seq = seq_counter.get(key, 0)
             seq_counter[key] = seq + 1
+            balance = _dec(raw["balance"]) if raw.get("balance") is not None else None
+            chain_verified = None
+            chain_delta = None
+            if prev_balance is not None and balance is not None:
+                chain_delta = balance - (prev_balance + deposit - withdrawal)
+                chain_verified = abs(chain_delta) <= _CHAIN_TOL
+            prev_balance = balance
             out.append(
                 {
                     "fingerprint": f"{date}|{signed}|{seq}",
@@ -125,13 +144,34 @@ def parsed_rows_from_events(events: list) -> list[dict]:
                     "deposit": deposit,
                     "withdrawal": withdrawal,
                     "description": str(raw.get("description") or ""),
+                    "balance_ok": raw.get("balance_ok"),
+                    "chain_verified": chain_verified,
+                    "chain_delta": chain_delta,
                 }
             )
     return out
 
 
-def coverage_check(events: list) -> dict:
-    """流水覆盖可信度判定(打回 R1 根治 · 纯函数 · 判据=数据内在证据)。
+def _public_row(r: dict) -> dict:
+    """_replay_rows 一行 → 对外公开形状(锁定原 5 键:fingerprint/date/deposit/withdrawal/
+    description)。覆盖判定专用的余额链信息(balance_ok/chain_verified/chain_delta)留在
+    _replay_rows 内部,不外泄进这份公开投影。"""
+    return {
+        "fingerprint": r["fingerprint"],
+        "date": r["date"],
+        "deposit": r["deposit"],
+        "withdrawal": r["withdrawal"],
+        "description": r["description"],
+    }
+
+
+def parsed_rows_from_events(events: list) -> list[dict]:
+    """item_bank_parsed 事件 → 规范化流水行(纯函数,读侧与人裁/大脑共用同一份行集与指纹)。"""
+    return [_public_row(r) for r in _replay_rows(events)]
+
+
+def _coverage_from_rows(rows: list[dict]) -> dict:
+    """_replay_rows 结果 → 覆盖可信度判定(打回 R1 根治 · 判据=数据内在证据)。
 
     KBANK 流水行自带余额链(K1a/E1 守恒校验件在库):同一件(页)内相邻两行必满足
     balance[i] = balance[i-1] + deposit[i] − withdrawal[i]。OCR 漏行时链在漏点断裂,且断点
@@ -144,42 +184,25 @@ def coverage_check(events: list) -> dict:
     但探到了就必须降级;balance 缺失的行验不了链(verified_pairs 如实报告证据基数),
     行级 balance_ok=False(解析器自己的守恒红旗)一并计数供读侧呈现。
     """
-    verified = breaks = flagged = total_rows = 0
-    unexplained_in = unexplained_out = captured_dep = _ZERO
-    seen_items: set = set()
-    for e in events:
-        if e.get("event_type") != _EVT_BANK_PARSED:
-            continue
-        payload = e.get("payload") or {}
-        item_id = payload.get("item_id")
-        if item_id is None or item_id in seen_items:
-            continue
-        seen_items.add(item_id)
-        prev_balance = None
-        for raw in payload.get("rows") or []:
-            total_rows += 1
-            deposit = _dec(raw.get("deposit"))
-            withdrawal = _dec(raw.get("withdrawal"))
-            captured_dep += deposit
-            if raw.get("balance_ok") is False:
-                flagged += 1
-            balance = _dec(raw["balance"]) if raw.get("balance") is not None else None
-            if prev_balance is not None and balance is not None:
-                delta = balance - (prev_balance + deposit - withdrawal)
-                if abs(delta) <= _CHAIN_TOL:
-                    verified += 1
-                else:
-                    breaks += 1
-                    if delta > 0:
-                        unexplained_in += delta
-                    else:
-                        unexplained_out += -delta
-            prev_balance = balance
+    verified = sum(1 for r in rows if r["chain_verified"] is True)
+    breaks = sum(1 for r in rows if r["chain_verified"] is False)
+    flagged = sum(1 for r in rows if r["balance_ok"] is False)
+    captured_dep = sum((r["deposit"] for r in rows), _ZERO)
+    # 无解释入/出账只计断链行(chain_verified is False)——容差内的舍入残差(verified 行)
+    # 不算「无解释」,否则每一分位舍入都会污染这两个合计(与原实现同口径)。
+    unexplained_in = sum(
+        (r["chain_delta"] for r in rows if r["chain_verified"] is False and r["chain_delta"] > 0),
+        _ZERO,
+    )
+    unexplained_out = sum(
+        (-r["chain_delta"] for r in rows if r["chain_verified"] is False and r["chain_delta"] < 0),
+        _ZERO,
+    )
     denominator = captured_dep + unexplained_in
     ratio = unexplained_in / denominator if denominator > _ZERO else _ZERO
     return {
         "reliable": ratio <= _INFLOW_GAP_MAX,
-        "row_count": total_rows,
+        "row_count": len(rows),
         "verified_pairs": verified,
         "chain_breaks": breaks,
         "unexplained_inflow": _fmt(unexplained_in),
@@ -187,6 +210,11 @@ def coverage_check(events: list) -> dict:
         "inflow_gap_ratio": _fmt(ratio.quantize(Decimal("0.0001"))),
         "balance_flagged_rows": flagged,
     }
+
+
+def coverage_check(events: list) -> dict:
+    """流水覆盖可信度判定(纯函数,对外形状不变)。见 _coverage_from_rows 顶注。"""
+    return _coverage_from_rows(_replay_rows(events))
 
 
 def _has_keyword(text: str, keywords) -> bool:
@@ -255,7 +283,7 @@ def human_overlay(events: list) -> dict:
     照 evidence.bank_recon_decisions 同款纪律)。非法 verdict 忽略(不落无效态)。"""
     out: dict = {}
     for e in events:
-        if e.get("event_type") != "human_decision":
+        if e.get("event_type") != EVT_HUMAN_DECISION:
             continue
         payload = e.get("payload") or {}
         fp = payload.get(HUMAN_ROW_KEY)
@@ -277,11 +305,12 @@ def suggest(events: list) -> dict:
               入账额求和成含税合计,÷1.07(vat.split_gross 金标口径)得税前销售额 + 销项税。
     逐行带指纹/来源/原因,前端据此渲染确认清单、税局据此逐行回答。
     """
-    rows = parsed_rows_from_events(events)
-    if not rows:
+    replay = _replay_rows(events)
+    if not replay:
         return {"applicable": False, "reason": "no_bank_rows"}
+    rows = [_public_row(r) for r in replay]
 
-    coverage = coverage_check(events)
+    coverage = _coverage_from_rows(replay)
     strong = edc_settlement_keys(events)
     brain = brain_overlay(events)
     human = human_overlay(events)
@@ -351,17 +380,18 @@ def pending_rows(events: list) -> list[dict]:
     """仍待大脑分类的入账行(规则=待定 且 无大脑建议/人裁 且 未问过)。bank_sales_brain.run
     据此只对未决行调大脑(已有结果不重调),读侧与 suggest 同一份行集/指纹,不各算一遍。
     覆盖降级时恒空:建议值本就不出,分类结果无处可用,不烧一分大脑钱(补料重解析后自然恢复)。"""
-    rows = parsed_rows_from_events(events)
-    if not rows or not coverage_check(events)["reliable"]:
+    replay = _replay_rows(events)
+    if not replay or not _coverage_from_rows(replay)["reliable"]:
         return []
     strong = edc_settlement_keys(events)
     human = human_overlay(events)
     asked = suggested_fingerprints(events)
     out: list[dict] = []
-    for row in rows:
-        fp = row["fingerprint"]
+    for r in replay:
+        fp = r["fingerprint"]
         if fp in human or fp in asked:
             continue
+        row = _public_row(r)
         rule_verdict, _ = classify_row(row, strong)
         if rule_verdict == PENDING:
             out.append(row)

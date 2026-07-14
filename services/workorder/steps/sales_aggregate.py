@@ -36,7 +36,10 @@ _CORROBORATION_KEYS = (
 )
 
 # 守恒抽查容差(与 T0 抽查同口径 0.02):|vat − net×7%| 与 |net+vat − 含税| 超此即点名。
+# 公开别名 CONSERV_TOL 供跨模块引用同一常量对象(bank_sales_suggest._CHAIN_TOL 同一条线),
+# 不按值复制。
 _CONSERV_TOL = Decimal("0.02")
+CONSERV_TOL = _CONSERV_TOL
 _ZERO = Decimal("0")
 # 转正门槛(方案 §4.2):覆盖率 ≥98% 才够格当权威。此处仅用于呈现态判绿,不做真转正(MC1-c.2)。
 _COVERAGE_PROMOTE = Decimal("0.98")

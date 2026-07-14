@@ -60,10 +60,6 @@
     function money(v) {
         return v == null || v === '' ? '—' : root.AI.format.money(v);
     }
-    function pct(coverage) {
-        var n = parseFloat(coverage);
-        return isFinite(n) ? (n * 100).toFixed(1) + '%' : '—';
-    }
 
     function line(label, value) {
         return (
@@ -87,7 +83,7 @@
                 '<span class="crb-gap">' +
                     money(crb.gap_net) +
                     '</span> · ' +
-                    esc(at('crb_coverage', { pct: pct(crb.coverage) }))
+                    esc(at('crb_coverage', { pct: root.AI.format.pct(crb.coverage) }))
             )
         );
     }

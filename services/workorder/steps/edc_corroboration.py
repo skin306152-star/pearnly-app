@@ -117,19 +117,9 @@ def corroboration_from_events(events: list, classified: Optional[dict] = None) -
 def corroboration_for_detail(events: list, classified: Optional[dict] = None) -> Optional[dict]:
     """读侧写读归一(F6/A2 同款):优先消费 reconcile 落库的 gates.r2_edc_corroboration
     冻结值;未跑到 reconcile 时回退现算。冻结与现算核心钱字段分叉 → 以冻结值为准并标
-    stale=True,诚实呈现「这是交付那一刻的值」,不静默糊成一个数。"""
+    stale=True,诚实呈现「这是交付那一刻的值」,不静默糊成一个数。归一逻辑与 c.1
+    (sales_aggregate)共用 evidence.frozen_or_live_corroboration,不各写一份。"""
     live = corroboration_from_events(events, classified)
-    frozen = _frozen(events)
-    if frozen is None:
-        return live
-    if live is not None and any(frozen.get(k) != live.get(k) for k in _COMPARE_KEYS):
-        return dict(frozen, stale=True)
-    return frozen
-
-
-def _frozen(events: list) -> Optional[dict]:
-    payload = evidence.replay_step_done(events, _RECON_STEP)
-    if not payload:
-        return None
-    frozen = (payload.get("gates") or {}).get(GATE_KEY)
-    return frozen if isinstance(frozen, dict) else None
+    return evidence.frozen_or_live_corroboration(
+        events, step=_RECON_STEP, gate_key=GATE_KEY, live=live, compare_keys=_COMPARE_KEYS
+    )

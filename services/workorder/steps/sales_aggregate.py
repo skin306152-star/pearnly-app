@@ -147,28 +147,16 @@ def corroboration_for_detail(events: list, items: list, classified: dict | None 
 
     冻结值在场且与现算分叉(算法演进,或 reconcile 后又补了人工销项)→ 以冻结值为准并标
     stale=True:诚实呈现「这是交付那一刻的值,现算已不同」,不静默糊成一个数。无 sales_doc
-    件两路都 None,前端不渲染佐证卡(现状诚实)。冻结与现算在数据未变时逐字节一致由单测锁死。"""
+    件两路都 None,前端不渲染佐证卡(现状诚实)。冻结与现算在数据未变时逐字节一致由单测锁死。
+    归一逻辑与 SA-2b(edc_corroboration)共用 evidence.frozen_or_live_corroboration,不各写一份。"""
     live = corroboration_from_events(events, items, classified=classified)
-    frozen = _frozen_corroboration(events)
-    if frozen is None:
-        return live
-    if live is not None and not _corroboration_agrees(frozen, live):
-        return dict(frozen, stale=True)
-    return frozen
-
-
-def _frozen_corroboration(events: list):
-    """reconcile 步 step_done 落库的 gates.r2_sales_corroboration(无则 None)。"""
-    payload = evidence.replay_step_done(events, _RECON_STEP)
-    if not payload:
-        return None
-    frozen = (payload.get("gates") or {}).get("r2_sales_corroboration")
-    return frozen if isinstance(frozen, dict) else None
-
-
-def _corroboration_agrees(frozen: dict, live: dict) -> bool:
-    """冻结值与现算在核心钱字段上是否一致(JSON 串值精确比对)。"""
-    return all(frozen.get(k) == live.get(k) for k in _CORROBORATION_KEYS)
+    return evidence.frozen_or_live_corroboration(
+        events,
+        step=_RECON_STEP,
+        gate_key="r2_sales_corroboration",
+        live=live,
+        compare_keys=_CORROBORATION_KEYS,
+    )
 
 
 def corroboration_from_events(events: list, items: list, classified: dict | None = None):

@@ -42,6 +42,30 @@ def replay_step_done(events: list[dict], step: str) -> Optional[dict]:
     return payload
 
 
+def frozen_or_live_corroboration(
+    events: list[dict],
+    *,
+    step: str,
+    gate_key: str,
+    live: Optional[dict],
+    compare_keys: tuple,
+) -> Optional[dict]:
+    """佐证读侧写读归一通用范式(c.1 销项逐票佐证 / SA-2b EDC 聚合佐证同款):优先消费
+    step 落库的 step_done.gates[gate_key] 冻结值;未跑到该步时回退现算 live。
+
+    冻结值在场且与现算在 compare_keys 核心钱字段上分叉(算法演进,或 reconcile 后又
+    补料)→ 以冻结值为准并标 stale=True,诚实呈现「这是交付那一刻的值」,不静默糊成
+    一个数。两处调用方共用同一份归一逻辑,不各写一份。"""
+    payload = replay_step_done(events, step)
+    frozen = (payload.get("gates") or {}).get(gate_key) if payload else None
+    frozen = frozen if isinstance(frozen, dict) else None
+    if frozen is None:
+        return live
+    if live is not None and any(frozen.get(k) != live.get(k) for k in compare_keys):
+        return dict(frozen, stale=True)
+    return frozen
+
+
 def bank_recon_from_step_done(payload: Optional[dict]) -> Optional[dict]:
     """从 reconcile 步 step_done 的 payload 深取 R3 银行对账 recon(gates.r3_bank.recon)。
 

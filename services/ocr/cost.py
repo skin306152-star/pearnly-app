@@ -28,8 +28,8 @@ MODEL_PRICES_PER_M_USD = {
     "gemini-2.5-flash-lite": (0.10, 0.40),
     "gemini-2.5-flash": (0.30, 2.50),
     # OpenAI(taxops.verdict 工单大脑影子车道)· 2025-08 发布时官方公开价。
-    # TODO key 到手后对官方价表复核再钉死(与 routing_matrix 车道同 PR 改)。
-    "gpt-5-mini": (0.25, 2.00),
+    # 2026-07-14 OpenRouter 实价核实($1/$6·三臂摸底考同日钉死)。
+    "openai/gpt-5.6-luna": (1.00, 6.00),
 }
 
 # 旧常量名保留(pipeline re-export 契约):按历史档位口径取值的别名。

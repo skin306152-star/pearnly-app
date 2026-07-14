@@ -38,11 +38,11 @@ def _key() -> str:
 
 
 # 工单大脑影子车道(routing_matrix 的 taxops.verdict · brain_shadow 裁决预判):独立 env,
-# 不与通用 flash/best 档互相牵动(改 OCR/对话档不许连坐工单大脑,契约测试锁死)。默认
-# gpt-5-mini 是占位:key 到手后按 /v1/models 实况 + 官方价钉死,同 PR 改
-# routing_matrix.EXPECTED_DEFAULT_ROUTES 与 services/ocr/cost.py 价表。
+# 不与通用 flash/best 档互相牵动(改 OCR/对话档不许连坐工单大脑,契约测试锁死)。
+# gpt-5.6-luna=2026-07-14 三臂摸底考钉死(66 题同卷方向 96.8%,完胜 nano/gemini-3.5),
+# OpenRouter 命名带 openai/ 前缀;换模型同 PR 改 routing_matrix 与 cost 价表。
 TAXOPS_VERDICT_TIER = "taxops_verdict"
-_TAXOPS_DEFAULT_MODEL = "gpt-5-mini"
+_TAXOPS_DEFAULT_MODEL = "openai/gpt-5.6-luna"
 
 
 def taxops_verdict_model() -> str:

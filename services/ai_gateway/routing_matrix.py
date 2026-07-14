@@ -61,9 +61,11 @@ _OCR_TIERS: Tuple[str, ...] = ("flash", "flash_lite", "fallback", "escalate")
 EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "agent.brain": Route("gemini-2.5-flash", "global"),
     "agent.best": Route("gemini-3.5-flash", "asia-southeast1"),
-    # 工单大脑影子(brain_shadow 裁决预判):OpenAI 直连,无 Vertex 区域概念。默认 gpt-5-mini
+    # 工单大脑影子(brain_shadow 裁决预判):经 OpenRouter(OPENAI_BASE_URL 覆写),无 Vertex
+    # 区域概念。gpt-5.6-luna=2026-07-14 三臂摸底考钉死(方向 96.8%/金额 3⁄4·完胜 nano 33.9%
+    # 与 gemini-3.5 61.3%·$1/$6),考卷 tests/e2e/_artifacts/brain_shadow/。
     # 为占位——key 到手后按 /v1/models 实况 + 官方价钉死,同 PR 改本表与 ocr/cost.py 价表。
-    "taxops.verdict": Route("gpt-5-mini", "", "openai"),
+    "taxops.verdict": Route("openai/gpt-5.6-luna", "", "openai"),
     "knowledge.embedding": Route("gemini-embedding-001", "asia-southeast1"),
     "ocr.direct35.flash": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.direct35.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),

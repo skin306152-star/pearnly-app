@@ -19,8 +19,8 @@ import threading
 import uuid
 from typing import Callable, Optional
 
-from core import db
-from services.workorder import engine, store, storage
+from core import db, feature_flags
+from services.workorder import brain_shadow, engine, store, storage
 from services.workorder.steps import real_handlers
 
 logger = logging.getLogger(__name__)
@@ -171,6 +171,16 @@ def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) 
             cursor_factory=lambda: db.get_cursor(commit=True),
         )
         out = engine.run_work_order(ctx, handlers=real_handlers())
+        # 落 review 后大脑影子出建议。整块自吞异常:影子(含开游标)任何炸法都不许把
+        # 已成功的 run 翻成 run_failed(闸关零动作,run_shadow 内部另有一层隔离)。
+        if out.completed and feature_flags.pearnly_ai_brain_shadow_enabled_for(str(tenant_id)):
+            try:
+                with db.get_cursor(commit=True) as cur:
+                    brain_shadow.run_shadow(
+                        cur, tenant_id=str(tenant_id), work_order_id=str(work_order_id)
+                    )
+            except Exception:  # noqa: BLE001 — 影子是佐证不是主路径
+                logger.warning("[workorder-runner] brain shadow skipped", exc_info=True)
         result = {
             "completed": out.completed,
             "status": out.status,

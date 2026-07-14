@@ -7,9 +7,13 @@
 """
 
 import datetime
+import os
+import tempfile
 import unittest
 from decimal import Decimal
+from unittest import mock
 
+from services.ai_gateway import attribution
 from services.recon.bank_recon_types import StatementRow
 from services.workorder.engine import StepContext
 from services.workorder.steps import reconcile, reconcile_bank
@@ -262,6 +266,64 @@ class BankParseCheckpointTests(unittest.TestCase):
         self.assertEqual(
             out2.payload["gates"]["r3_bank"]["recon"], out1.payload["gates"]["r3_bank"]["recon"]
         )
+
+
+class BankParseCostAttributionTests(unittest.TestCase):
+    """R3 银行流水 OCR 成本归因(L2-ATTR):_default_parse_bank_file 在发起解析前设请求级归因
+    (task=workorder_bank_parse + 本租户 + 工单 trace),让管线深处的 ocr.layer2 落账记到客户
+    头上,而非现状 tenant=NULL;归因请求级、跑完即清不泄漏(照 classify._ocr_safe 范式)。"""
+
+    def test_parse_sets_attribution_task_tenant_trace_and_resets(self):
+        seen = {}
+
+        def _spy_impl(data, filename, *, tenant_id=None):
+            # 在管线落点被调用的当刻抓归因态(等价 transport._observe 读到的 current())。
+            seen["attr"] = attribution.current()
+            seen["tenant_kwarg"] = tenant_id
+            return {"ok": True, "rows": []}
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
+            tf.write(b"\xff\xd8\xff")  # 任意字节,解析被桩替换不真读图
+            path = tf.name
+        self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
+
+        item = {"id": "b9", "kind": "bank_statement", "status": "ok", "file_ref": path}
+        ctx = StepContext(cur=None, tenant_id="t-1", work_order_id="wo-1", store=None, data={})
+
+        with mock.patch("services.recon.bank_recon_v2._parse_bank_statement_impl", _spy_impl):
+            reconcile_bank._default_parse_bank_file(ctx, item)
+
+        self.assertEqual(seen["attr"]["task"], "workorder_bank_parse")
+        self.assertEqual(seen["attr"]["tenant_id"], "t-1")
+        self.assertEqual(seen["attr"]["trace_id"], "wo-1")
+        self.assertEqual(seen["tenant_kwarg"], "t-1")  # 解析行为契约不变(tenant 仍逐调用透传)
+        # 请求级归因跑完即清,不泄漏到后续调用。
+        self.assertIsNone(attribution.current())
+
+    def test_attribution_reset_even_when_parse_raises(self):
+        def _boom(data, filename, *, tenant_id=None):
+            raise RuntimeError("parse blew up")
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
+            tf.write(b"\xff\xd8\xff")
+            path = tf.name
+        self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
+
+        item = {"id": "b9", "kind": "bank_statement", "status": "ok", "file_ref": path}
+        ctx = StepContext(cur=None, tenant_id="t-1", work_order_id="wo-1", store=None, data={})
+
+        with mock.patch("services.recon.bank_recon_v2._parse_bank_statement_impl", _boom):
+            with self.assertRaises(RuntimeError):
+                reconcile_bank._default_parse_bank_file(ctx, item)
+        # finally 里 reset:异常路径也不把归因泄漏给下一件/下一步。
+        self.assertIsNone(attribution.current())
+
+    def test_no_file_ref_sets_no_attribution(self):
+        # 无 file_ref 早返回,不进解析、不设归因(不无谓污染上下文)。
+        ctx = StepContext(cur=None, tenant_id="t-1", work_order_id="wo-1", store=None, data={})
+        rows = reconcile_bank._default_parse_bank_file(ctx, {"id": "b9", "file_ref": None})
+        self.assertEqual(rows, [])
+        self.assertIsNone(attribution.current())
 
 
 if __name__ == "__main__":

@@ -19,12 +19,19 @@ from pathlib import Path
 from typing import Optional
 
 from core import feature_flags
+from services.ai_gateway import attribution
 from services.recon.bank_recon_types import StatementRow
 from services.workorder.engine import StepContext
 from services.workorder.steps import checkpoint
 
 _STEP = "reconcile"
 _EVT_BANK_PARSED = "item_bank_parsed"
+
+# R3 银行流水解析走统一 OCR 管线(document_type=bank_statement),管线深处按内部标签
+# (task=ocr.layer2·tenant 空)打点。归因到本 task 让这段成本记到客户账套头上,与主站散单
+# 银行对账、classify 的进项 OCR 各自分账(名字诚实:银行件在 classify 已被 sort 归堆跳过,
+# 到这里是首次也是唯一一次 OCR,非「复核升级」)。
+_BANK_OCR_TASK = "workorder_bank_parse"
 
 
 def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> Optional[dict]:
@@ -148,15 +155,26 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
 
     单测注入替身(reconcile_bank._parse_bank_file = fake),本函数不在测试里跑 → 不触真解析/
     付费。无 file_ref / 解析失败 → 空列表(佐证层不因单件坏料中断,该件如实解出零行)。
+
+    成本归因:解析深处走统一 OCR 管线,不设归因则落 ai_usage 的 task=ocr.layer2·tenant 空。
+    在真正发起解析的本函数体内设归因(contextvars 线程本地——_checkpointed_rows 串行逐件调,
+    此处即执行线程;管线内多页并发经 copy_context 承接),finally 清,照 classify._ocr_safe 先例。
+    只改成本记给谁的标签,解析行为/返回数据一字不动。
     """
     file_ref = item.get("file_ref")
     if not file_ref:
         return []
     from services.recon.bank_recon_v2 import _parse_bank_statement_impl
 
-    data = Path(file_ref).read_bytes()
-    parsed = _parse_bank_statement_impl(data, Path(file_ref).name, tenant_id=ctx.tenant_id)
-    return list(parsed.get("rows") or []) if parsed.get("ok") else []
+    token = attribution.set_attribution(
+        _BANK_OCR_TASK, tenant_id=str(ctx.tenant_id), trace_id=str(ctx.work_order_id)
+    )
+    try:
+        data = Path(file_ref).read_bytes()
+        parsed = _parse_bank_statement_impl(data, Path(file_ref).name, tenant_id=ctx.tenant_id)
+        return list(parsed.get("rows") or []) if parsed.get("ok") else []
+    finally:
+        attribution.reset_attribution(token)
 
 
 # 注入点:模块级绑定,测试用 reconcile_bank._xxx = fake 替换(同 classify/reconcile 惯例)。

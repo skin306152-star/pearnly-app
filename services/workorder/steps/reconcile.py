@@ -113,6 +113,11 @@ def run(ctx: StepContext) -> StepResult:
     corroboration = _run_invoice_aggregate(items, classified, r2)
     if corroboration is not None:
         result_gates["r2_sales_corroboration"] = corroboration
+    # R2 销项 EDC 聚合佐证(SA-2b):edc_settlement 件的结算快照 → SA-1 聚合(唯一算法,
+    # 只 import 不重写)+ 对 R2 权威值覆盖率。同样纯佐证——不落申报数,零 EDC 件不挂键。
+    edc = _run_edc_aggregate(events, r2)
+    if edc is not None:
+        result_gates["r2_edc_corroboration"] = edc
     # R5 影子底稿(pearnly_ai_shadow_draft 闸)。闸关:_run_shadow_draft 返 None,gates 逐字节维持
     # 现状(无 r5_shadow 键)。闸开:把 R1 已裁分录 + R2 聚合销项过纯函数复式引擎产出三件套影子
     # 底稿,佐证层挂 r5_shadow——绝不 stuck、绝不阻断 package(影子只算不落法定表)。
@@ -187,6 +192,25 @@ def _run_invoice_aggregate(items: list[dict], classified: dict, r2: dict) -> dic
         )
     except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
         return {"error": f"{type(exc).__name__}", "note": "invoice_aggregate_skipped"}
+
+
+def _run_edc_aggregate(events: list[dict], r2: dict) -> dict | None:
+    """R2 销项 EDC 聚合佐证(SA-2b):事件流回放 edc 快照 → SA-1 聚合 → 覆盖率佐证。
+    佐证层单点隔离——任何异常收进 note 不上抛,绝不拖垮出包。零 EDC 件 → None(调用方
+    不挂 r2_edc_corroboration 键,存量工单 payload 逐字节维持改前现状)。"""
+    from services.workorder.steps import edc_corroboration
+
+    try:
+        payloads = edc_corroboration.payloads_from_events(events)
+        if not payloads:
+            return None
+        return edc_corroboration.build_corroboration(
+            edc_corroboration.aggregate_report(payloads),
+            authoritative_net=r2["sales_amount"],
+            authoritative_vat=r2["output_vat"],
+        )
+    except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
+        return {"error": f"{type(exc).__name__}", "note": "edc_aggregate_skipped"}
 
 
 def _run_shadow_draft(ctx: StepContext, r1: dict, r2: dict) -> dict | None:

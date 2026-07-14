@@ -23,7 +23,7 @@ from services.workorder import (
     store,
     wht_signals,
 )
-from services.workorder.steps import sales_aggregate
+from services.workorder.steps import edc_corroboration, sales_aggregate
 from services.workorder.steps import sort as sort_step
 from services.workspace import tax_profile_store
 
@@ -198,6 +198,9 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "financials": _financials(events),
         "sales_corroboration": sales_aggregate.corroboration_for_detail(
             events, items, classified=classified
+        ),
+        "edc_corroboration": edc_corroboration.corroboration_for_detail(
+            events, classified=classified
         ),
         "deliverables": [
             {"kind": d["kind"], "numbers": d.get("numbers") or {}} for d in deliverables

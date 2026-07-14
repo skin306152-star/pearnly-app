@@ -190,15 +190,22 @@ def corroboration_from_events(events: list, items: list, classified: dict | None
     money_list = [m for m in money_list if m]
     if not money_list:
         return None
-    reads = {
-        iid: rec["payload"]["sales_read"]
-        for iid, rec in classified.items()
-        if rec["payload"].get("kind") == kinds.SALES_SUMMARY and rec["payload"].get("sales_read")
-    }
-    r2 = reconcile_gates.aggregate_sales(reads)
+    r2 = authoritative_sales(classified)
     agg = aggregate_invoice_sales(money_list)
     return build_corroboration(
         agg,
         authoritative_net=str(r2["sales_amount"]) if r2["used"] else None,
         authoritative_vat=str(r2["output_vat"]) if r2["used"] else None,
     )
+
+
+def authoritative_sales(classified: dict) -> dict:
+    """R2 权威销项现算(读侧投影共用):sales_summary 件的 sales_read 直读聚合,返回
+    reconcile_gates.aggregate_sales 结果({used, sales_amount, output_vat})。c.1 逐票佐证
+    与 SA-2 EDC 聚合佐证(edc_corroboration)共用这一份取数,不各自重放一遍事件流。"""
+    reads = {
+        iid: rec["payload"]["sales_read"]
+        for iid, rec in classified.items()
+        if rec["payload"].get("kind") == kinds.SALES_SUMMARY and rec["payload"].get("sales_read")
+    }
+    return reconcile_gates.aggregate_sales(reads)

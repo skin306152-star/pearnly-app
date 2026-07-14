@@ -1,3746 +1,3746 @@
 {
- "_doc": "金标工单 a6dde2ce(SM 2569-05)12 条 item_bank_parsed 的脱敏快照:只留 date/deposit/withdrawal/balance/balance_ok(描述/账号/对手方/文件名全剥离)。真形态守门用——OCR 仅捕获 ~64% 入账行(589,922.06 / 底稿 920,575.84),余额链断 65 处、无解释入账 77,733.79,倒推引擎必须落覆盖异常降级,不得输出可用建议(SA-3a 打回 R1)。",
- "events": [
-  {
-   "id": 1,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-01",
-    "rows": [
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 433044.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 433494.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 433944.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 434394.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 434844.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 435294.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 435744.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 436184.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 436644.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 437094.0,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 437934.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 438384.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 4380.0,
-      "withdrawal": 0.0,
-      "balance": 439224.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 443604.89,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 444054.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 444504.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 444954.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 445794.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 446244.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 446694.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 447144.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 447594.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 448044.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 448494.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 448944.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 40.0,
-      "withdrawal": 0.0,
-      "balance": 449394.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 450234.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 450684.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 451134.88,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 451584.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 452034.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 452484.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 452934.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 453774.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 454614.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 1090.0,
-      "withdrawal": 0.0,
-      "balance": 455064.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 1430.0,
-      "withdrawal": 0.0,
-      "balance": 456154.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 457584.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 458424.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 458874.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 459324.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 459774.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 460224.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 460674.99,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 2,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-02",
-    "rows": [
-     {
-      "date": "2026-05-09",
-      "deposit": 1620.0,
-      "withdrawal": 0.0,
-      "balance": 462294.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 463134.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 463584.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 464034.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 464874.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 465324.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 465774.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 436224.08,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 467264.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 467714.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 468164.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 468614.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 469064.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 469514.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 469964.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 470414.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 471254.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 471704.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 472544.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 472994.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 473834.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 474284.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 474734.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 475574.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 476024.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 449.9,
-      "withdrawal": 0.0,
-      "balance": 476474.89,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 477314.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 477764.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 478604.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 479054.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 479504.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 480344.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 481384.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 481834.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 482224.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 482284.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 482734.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 483184.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 483634.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 484084.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 484534.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 485374.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 485824.99,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 3,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-03",
-    "rows": [
-     {
-      "date": "2026-05-17",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 363345.6,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 650.0,
-      "withdrawal": 0.0,
-      "balance": 363995.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 640.0,
-      "withdrawal": 0.0,
-      "balance": 364635.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 364985.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 50.0,
-      "withdrawal": 0.0,
-      "balance": 365035.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 1520.0,
-      "withdrawal": 0.0,
-      "balance": 366555.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 366905.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 367745.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 368095.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 368835.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 371235.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 1920.0,
-      "withdrawal": 0.0,
-      "balance": 373155.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 1330.0,
-      "withdrawal": 0.0,
-      "balance": 374485.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 1330.0,
-      "withdrawal": 0.0,
-      "balance": 375815.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 376165.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 376515.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-17",
-      "deposit": 2970.7,
-      "withdrawal": 0.0,
-      "balance": 379486.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 379936.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 1420.0,
-      "withdrawal": 0.0,
-      "balance": 381356.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 381746.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 290.0,
-      "withdrawal": 0.0,
-      "balance": 382036.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 382096.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 0.0,
-      "withdrawal": 840.0,
-      "balance": 381256.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 381996.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 382346.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 383086.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 383436.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 384176.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 384626.36,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 0.0,
-      "withdrawal": 41697.9,
-      "balance": 342928.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 343278.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 344018.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 344368.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 344818.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 345268.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 346008.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 346458.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 1290.0,
-      "withdrawal": 0.0,
-      "balance": 347748.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-19",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 348138.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-18",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 348878.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-20",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 349618.46,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 4,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-04",
-    "rows": [
-     {
-      "date": "2023-05-12",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 457313.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 458153.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 458603.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 1430.0,
-      "withdrawal": 0.0,
-      "balance": 460033.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 460873.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 1620.0,
-      "withdrawal": 0.0,
-      "balance": 462493.5,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 463333.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 464172.52,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 464623.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 465463.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 467653.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 468493.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 466303.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 466753.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 467203.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 469333.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 470173.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 471013.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 471853.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 472303.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 3010.0,
-      "withdrawal": 0.0,
-      "balance": 475313.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 477813.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 7500.0,
-      "withdrawal": 0.0,
-      "balance": 485313.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 486153.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 486993.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 487833.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 488673.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 489513.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 1690.0,
-      "withdrawal": 0.0,
-      "balance": 491103.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 492033.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-12",
-      "deposit": 0.0,
-      "withdrawal": 9549.87,
-      "balance": 482483.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 483323.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 1430.0,
-      "withdrawal": 0.0,
-      "balance": 484753.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 485203.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 1230.0,
-      "withdrawal": 0.0,
-      "balance": 486433.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 487273.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 466113.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 1230.0,
-      "withdrawal": 0.0,
-      "balance": 489343.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 490183.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 490243.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-13",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 490693.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 491533.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 494033.66,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 5,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-05",
-    "rows": [
-     {
-      "date": "2020-05-20",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 350068.4,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 350518.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 350968.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 351418.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 351868.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 352708.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 353158.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 353608.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 354058.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 354898.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 355638.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 356088.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 356538.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 356988.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 357438.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 358178.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 358628.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 359078.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 359468.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 0.0,
-      "withdrawal": 1500.0,
-      "balance": 357968.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 358318.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 359158.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2020-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 359608.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 360448.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 360898.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 0.0,
-      "withdrawal": 840.0,
-      "balance": 360058.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 362458.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 363298.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 7200.0,
-      "withdrawal": 0.0,
-      "balance": 370498.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 370948.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 3400.0,
-      "withdrawal": 0.0,
-      "balance": 374348.48,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 376748.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 377198.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 2010.0,
-      "withdrawal": 0.0,
-      "balance": 379208.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 379658.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 380108.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 380558.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 380948.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 381398.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 381458.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 381908.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 382358.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 384758.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2021-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 385208.46,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 6,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-06",
-    "rows": [
-     {
-      "date": "2023-05-14",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 494033.66,
-      "balance_ok": null
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 494423.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 494873.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 4328.0,
-      "withdrawal": 0.0,
-      "balance": 499201.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 499591.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 500431.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 500881.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 503381.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 503831.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 506331.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 506781.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 50.0,
-      "withdrawal": 0.0,
-      "balance": 506921.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 507671.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-14",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 508121.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 508571.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 509411.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 511911.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 512751.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 513591.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 514041.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 3400.0,
-      "withdrawal": 0.0,
-      "balance": 517441.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 0.0,
-      "withdrawal": 390.0,
-      "balance": 517051.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 522851.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 523691.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 4800.0,
-      "withdrawal": 0.0,
-      "balance": 528491.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 528941.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 529781.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 0.0,
-      "withdrawal": 390.0,
-      "balance": 529391.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 529781.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 529641.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-15",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 530681.66,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 2220.0,
-      "withdrawal": 0.0,
-      "balance": 532901.65,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 0.0,
-      "withdrawal": 2100.0,
-      "balance": 530801.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 4800.0,
-      "withdrawal": 0.0,
-      "balance": 535601.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 538001.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 0.0,
-      "withdrawal": 95123.0,
-      "balance": 442878.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 445278.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 0.0,
-      "withdrawal": 840.0,
-      "balance": 444438.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 0.0,
-      "withdrawal": 95123.0,
-      "balance": 349315.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 350155.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-16",
-      "deposit": 3400.0,
-      "withdrawal": 0.0,
-      "balance": 353555.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-17",
-      "deposit": 3400.0,
-      "withdrawal": 0.0,
-      "balance": 356955.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-17",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 359355.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-17",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 359805.66,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-17",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 360845.56,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 7,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-07",
-    "rows": [
-     {
-      "date": "2026-05-10",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 555838.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 1620.0,
-      "withdrawal": 0.0,
-      "balance": 557458.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 557908.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 558298.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 558358.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 559198.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 1230.0,
-      "withdrawal": 0.0,
-      "balance": 560428.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 560878.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 561326.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 0.0,
-      "withdrawal": 100000.0,
-      "balance": 461328.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 0.0,
-      "withdrawal": 100000.0,
-      "balance": 361323.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 361778.53,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 5000.0,
-      "withdrawal": 0.0,
-      "balance": 366778.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 367228.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 367678.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 368128.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 368968.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 369358.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 370198.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 371038.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 371488.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 371938.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 372388.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 372838.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 373288.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 374128.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 374578.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 375028.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 375478.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 375928.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 39375.0,
-      "withdrawal": 0.0,
-      "balance": 415303.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 416343.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 416793.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 417243.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 418083.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 418533.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 418983.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 419823.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 420273.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 420723.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 421173.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 422013.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 422463.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-11",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 424963.53,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 8,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-08",
-    "rows": [
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 486664.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 487114.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 487564.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 488014.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 1230.0,
-      "withdrawal": 0.0,
-      "balance": 489244.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 489694.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 490084.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 490924.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 1090.0,
-      "withdrawal": 0.0,
-      "balance": 492014.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 492074.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 493754.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 494204.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 494654.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 495104.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 495554.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 496004.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 1230.0,
-      "withdrawal": 0.0,
-      "balance": 497234.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 497684.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 498524.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 501024.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 501804.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 502314.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 503154.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 7178.0,
-      "withdrawal": 0.0,
-      "balance": 510332.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 510782.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 511622.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 512072.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 512522.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 9745.54,
-      "withdrawal": 0.0,
-      "balance": 522268.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 522718.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 523558.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 524398.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 524848.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 525298.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 526138.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 526588.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 527628.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 528078.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 528918.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 529368.53,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-10",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 529878.53,
-      "balance_ok": false
-     }
-    ]
-   }
-  },
-  {
-   "id": 9,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-09",
-    "rows": [
-     {
-      "date": "2026-05-01",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 411489.52,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-02",
-      "deposit": 0.0,
-      "withdrawal": 9700.0,
-      "balance": 401789.52,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-02",
-      "deposit": 0.0,
-      "withdrawal": 50000.0,
-      "balance": 351789.52,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-02",
-      "deposit": 0.0,
-      "withdrawal": 50000.0,
-      "balance": 301789.52,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-02",
-      "deposit": 0.0,
-      "withdrawal": 20329.37,
-      "balance": 281460.15,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-03",
-      "deposit": 2420.0,
-      "withdrawal": 0.0,
-      "balance": 283880.15,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-03",
-      "deposit": 15000.0,
-      "withdrawal": 0.0,
-      "balance": 298880.15,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-03",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 299330.15,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-03",
-      "deposit": 3497.0,
-      "withdrawal": 0.0,
-      "balance": 302827.15,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-03",
-      "deposit": 14124.03,
-      "withdrawal": 0.0,
-      "balance": 316951.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 1240.0,
-      "withdrawal": 0.0,
-      "balance": 318191.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 25000.0,
-      "withdrawal": 0.0,
-      "balance": 343191.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 2019.0,
-      "withdrawal": 0.0,
-      "balance": 345210.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 347710.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 350210.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 0.0,
-      "withdrawal": 10571.0,
-      "balance": 339639.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 340679.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 3400.0,
-      "withdrawal": 0.0,
-      "balance": 346100.18,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 0.0,
-      "withdrawal": 5500.0,
-      "balance": 340600.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 650.0,
-      "withdrawal": 0.0,
-      "balance": 338520.18,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 341020.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 342060.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-04",
-      "deposit": 650.0,
-      "withdrawal": 0.0,
-      "balance": 342710.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 0.0,
-      "withdrawal": 9000.0,
-      "balance": 341210.18,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 341660.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 342700.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 3400.0,
-      "withdrawal": 0.0,
-      "balance": 346100.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 348600.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1290.0,
-      "withdrawal": 0.0,
-      "balance": 349890.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 250.0,
-      "withdrawal": 0.0,
-      "balance": 350140.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 760.0,
-      "withdrawal": 0.0,
-      "balance": 350900.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1000.0,
-      "withdrawal": 0.0,
-      "balance": 351900.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 410.0,
-      "withdrawal": 0.0,
-      "balance": 352310.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 650.0,
-      "withdrawal": 0.0,
-      "balance": 352960.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 70.0,
-      "withdrawal": 0.0,
-      "balance": 353030.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 410.0,
-      "withdrawal": 0.0,
-      "balance": 353440.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 353890.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 356390.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1000.0,
-      "withdrawal": 0.0,
-      "balance": 357390.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 410.0,
-      "withdrawal": 0.0,
-      "balance": 357800.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1888.0,
-      "withdrawal": 0.0,
-      "balance": 359689.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 2500.0,
-      "withdrawal": 0.0,
-      "balance": 362188.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1250.0,
-      "withdrawal": 0.0,
-      "balance": 363438.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1250.0,
-      "withdrawal": 0.0,
-      "balance": 364688.18,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-05",
-      "deposit": 1190.0,
-      "withdrawal": 0.0,
-      "balance": 365878.18,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 10,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-10",
-    "rows": [
-     {
-      "date": "2023-05-08",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 363104.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 363554.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 364004.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 364454.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 364904.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 365354.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 365744.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 366194.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 1050.0,
-      "withdrawal": 0.0,
-      "balance": 367244.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 367694.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 368144.0,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 368594.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 369434.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 369824.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 370274.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 370724.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 371174.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 371624.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 372074.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 372524.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 372974.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-28",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 373424.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 374264.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 374714.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 375164.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 375614.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 376064.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 375574.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 376964.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-08",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 377414.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 1820.0,
-      "withdrawal": 0.0,
-      "balance": 379234.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 1430.0,
-      "withdrawal": 0.0,
-      "balance": 380134.99,
-      "balance_ok": false
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 380584.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 1430.0,
-      "withdrawal": 0.0,
-      "balance": 382014.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 382464.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 382914.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 383364.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 1090.0,
-      "withdrawal": 0.0,
-      "balance": 384454.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 384904.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 385354.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 386194.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 386644.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2023-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 387484.99,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 11,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-11",
-    "rows": [
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 413144.89,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 413534.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 413984.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 414434.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 414884.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 415334.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 416174.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 416624.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 417074.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 417914.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 417974.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 418034.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 418484.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 418934.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 419384.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 419834.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 420284.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 420674.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 421124.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 421574.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 422024.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 422474.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 422924.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 423374.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 423824.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 424274.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 424724.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 980.0,
-      "withdrawal": 0.0,
-      "balance": 425704.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 426154.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 426604.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 427054.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 427444.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 427894.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 427954.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 428404.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 428854.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 429304.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 429754.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 650.0,
-      "withdrawal": 0.0,
-      "balance": 430404.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 430854.89,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 431694.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 432144.99,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-09",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 432594.99,
-      "balance_ok": true
-     }
-    ]
-   }
-  },
-  {
-   "id": 12,
-   "event_type": "item_bank_parsed",
-   "payload": {
-    "item_id": "bank-12",
-    "rows": [
-     {
-      "date": "2026-05-21",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 385058.46,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 386108.46,
-      "balance_ok": false
-     },
-     {
-      "date": "2026-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 386558.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-26",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 387008.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 387748.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 388198.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 388648.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 389098.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 391498.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 391948.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 392398.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 392848.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 390.0,
-      "withdrawal": 0.0,
-      "balance": 393238.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 395638.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 398038.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 2400.0,
-      "withdrawal": 0.0,
-      "balance": 400438.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 400888.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 900.0,
-      "withdrawal": 0.0,
-      "balance": 401788.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 680.0,
-      "withdrawal": 0.0,
-      "balance": 402468.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 402528.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-22",
-      "deposit": 3400.0,
-      "withdrawal": 0.0,
-      "balance": 405928.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 406378.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 650.0,
-      "withdrawal": 0.0,
-      "balance": 407028.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 350.0,
-      "withdrawal": 0.0,
-      "balance": 407378.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 0.0,
-      "withdrawal": 33787.0,
-      "balance": 373591.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 20000.0,
-      "withdrawal": 0.0,
-      "balance": 393591.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 1680.0,
-      "withdrawal": 0.0,
-      "balance": 395271.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 740.0,
-      "withdrawal": 0.0,
-      "balance": 396011.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 1680.0,
-      "withdrawal": 0.0,
-      "balance": 397691.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 1040.0,
-      "withdrawal": 0.0,
-      "balance": 398731.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 20000.0,
-      "withdrawal": 0.0,
-      "balance": 418731.46,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-23",
-      "deposit": 7526.89,
-      "withdrawal": 0.0,
-      "balance": 426258.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 426708.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 427158.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 650.0,
-      "withdrawal": 0.0,
-      "balance": 427808.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 428258.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 428708.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 20000.0,
-      "withdrawal": 0.0,
-      "balance": 448708.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 60.0,
-      "withdrawal": 0.0,
-      "balance": 448768.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 0.0,
-      "withdrawal": 90000.0,
-      "balance": 358768.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 3000.0,
-      "withdrawal": 0.0,
-      "balance": 361768.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 840.0,
-      "withdrawal": 0.0,
-      "balance": 362608.35,
-      "balance_ok": true
-     },
-     {
-      "date": "2026-05-24",
-      "deposit": 450.0,
-      "withdrawal": 0.0,
-      "balance": 363058.35,
-      "balance_ok": true
-     }
-    ]
-   }
-  }
- ]
+  "_doc": "金标工单 a6dde2ce(SM 2569-05)12 条 item_bank_parsed 的脱敏快照:只留 date/deposit/withdrawal/balance/balance_ok(描述/账号/对手方/文件名全剥离)。真形态守门用——OCR 仅捕获 ~64% 入账行(589,922.06 / 底稿 920,575.84),余额链断 65 处、无解释入账 77,733.79,倒推引擎必须落覆盖异常降级,不得输出可用建议(SA-3a 打回 R1)。",
+  "events": [
+    {
+      "id": 1,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-01",
+        "rows": [
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 433044.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 433494.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 433944.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 434394.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 434844.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 435294.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 435744.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 436184.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 436644.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 437094.0,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 437934.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 438384.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 4380.0,
+            "withdrawal": 0.0,
+            "balance": 439224.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 443604.89,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 444054.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 444504.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 444954.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 445794.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 446244.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 446694.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 447144.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 447594.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 448044.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 448494.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 448944.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 40.0,
+            "withdrawal": 0.0,
+            "balance": 449394.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 450234.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 450684.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 451134.88,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 451584.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 452034.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 452484.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 452934.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 453774.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 454614.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 1090.0,
+            "withdrawal": 0.0,
+            "balance": 455064.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 1430.0,
+            "withdrawal": 0.0,
+            "balance": 456154.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 457584.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 458424.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 458874.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 459324.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 459774.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 460224.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 460674.99,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-02",
+        "rows": [
+          {
+            "date": "2026-05-09",
+            "deposit": 1620.0,
+            "withdrawal": 0.0,
+            "balance": 462294.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 463134.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 463584.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 464034.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 464874.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 465324.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 465774.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 436224.08,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 467264.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 467714.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 468164.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 468614.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 469064.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 469514.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 469964.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 470414.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 471254.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 471704.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 472544.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 472994.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 473834.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 474284.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 474734.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 475574.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 476024.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 449.9,
+            "withdrawal": 0.0,
+            "balance": 476474.89,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 477314.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 477764.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 478604.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 479054.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 479504.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 480344.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 481384.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 481834.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 482224.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 482284.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 482734.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 483184.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 483634.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 484084.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 484534.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 485374.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 485824.99,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-03",
+        "rows": [
+          {
+            "date": "2026-05-17",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 363345.6,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 650.0,
+            "withdrawal": 0.0,
+            "balance": 363995.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 640.0,
+            "withdrawal": 0.0,
+            "balance": 364635.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 364985.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 50.0,
+            "withdrawal": 0.0,
+            "balance": 365035.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 1520.0,
+            "withdrawal": 0.0,
+            "balance": 366555.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 366905.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 367745.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 368095.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 368835.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 371235.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 1920.0,
+            "withdrawal": 0.0,
+            "balance": 373155.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 1330.0,
+            "withdrawal": 0.0,
+            "balance": 374485.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 1330.0,
+            "withdrawal": 0.0,
+            "balance": 375815.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 376165.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 376515.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-17",
+            "deposit": 2970.7,
+            "withdrawal": 0.0,
+            "balance": 379486.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 379936.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 1420.0,
+            "withdrawal": 0.0,
+            "balance": 381356.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 381746.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 290.0,
+            "withdrawal": 0.0,
+            "balance": 382036.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 382096.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 0.0,
+            "withdrawal": 840.0,
+            "balance": 381256.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 381996.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 382346.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 383086.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 383436.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 384176.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 384626.36,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 0.0,
+            "withdrawal": 41697.9,
+            "balance": 342928.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 343278.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 344018.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 344368.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 344818.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 345268.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 346008.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 346458.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 1290.0,
+            "withdrawal": 0.0,
+            "balance": 347748.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-19",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 348138.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-18",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 348878.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-20",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 349618.46,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-04",
+        "rows": [
+          {
+            "date": "2023-05-12",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 457313.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 458153.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 458603.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 1430.0,
+            "withdrawal": 0.0,
+            "balance": 460033.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 460873.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 1620.0,
+            "withdrawal": 0.0,
+            "balance": 462493.5,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 463333.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 464172.52,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 464623.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 465463.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 467653.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 468493.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 466303.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 466753.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 467203.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 469333.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 470173.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 471013.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 471853.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 472303.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 3010.0,
+            "withdrawal": 0.0,
+            "balance": 475313.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 477813.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 7500.0,
+            "withdrawal": 0.0,
+            "balance": 485313.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 486153.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 486993.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 487833.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 488673.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 489513.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 1690.0,
+            "withdrawal": 0.0,
+            "balance": 491103.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 492033.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-12",
+            "deposit": 0.0,
+            "withdrawal": 9549.87,
+            "balance": 482483.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 483323.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 1430.0,
+            "withdrawal": 0.0,
+            "balance": 484753.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 485203.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 1230.0,
+            "withdrawal": 0.0,
+            "balance": 486433.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 487273.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 466113.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 1230.0,
+            "withdrawal": 0.0,
+            "balance": 489343.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 490183.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 490243.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-13",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 490693.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 491533.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 494033.66,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-05",
+        "rows": [
+          {
+            "date": "2020-05-20",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 350068.4,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 350518.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 350968.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 351418.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 351868.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 352708.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 353158.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 353608.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 354058.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 354898.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 355638.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 356088.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 356538.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 356988.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 357438.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 358178.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 358628.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 359078.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 359468.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 0.0,
+            "withdrawal": 1500.0,
+            "balance": 357968.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 358318.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 359158.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2020-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 359608.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 360448.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 360898.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 0.0,
+            "withdrawal": 840.0,
+            "balance": 360058.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 362458.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 363298.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 7200.0,
+            "withdrawal": 0.0,
+            "balance": 370498.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 370948.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 3400.0,
+            "withdrawal": 0.0,
+            "balance": 374348.48,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 376748.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 377198.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 2010.0,
+            "withdrawal": 0.0,
+            "balance": 379208.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 379658.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 380108.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 380558.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 380948.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 381398.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 381458.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 381908.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 382358.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 384758.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2021-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 385208.46,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-06",
+        "rows": [
+          {
+            "date": "2023-05-14",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 494033.66,
+            "balance_ok": null
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 494423.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 494873.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 4328.0,
+            "withdrawal": 0.0,
+            "balance": 499201.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 499591.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 500431.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 500881.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 503381.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 503831.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 506331.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 506781.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 50.0,
+            "withdrawal": 0.0,
+            "balance": 506921.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 507671.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-14",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 508121.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 508571.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 509411.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 511911.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 512751.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 513591.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 514041.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 3400.0,
+            "withdrawal": 0.0,
+            "balance": 517441.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 0.0,
+            "withdrawal": 390.0,
+            "balance": 517051.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 522851.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 523691.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 4800.0,
+            "withdrawal": 0.0,
+            "balance": 528491.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 528941.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 529781.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 0.0,
+            "withdrawal": 390.0,
+            "balance": 529391.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 529781.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 529641.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-15",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 530681.66,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 2220.0,
+            "withdrawal": 0.0,
+            "balance": 532901.65,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 0.0,
+            "withdrawal": 2100.0,
+            "balance": 530801.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 4800.0,
+            "withdrawal": 0.0,
+            "balance": 535601.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 538001.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 0.0,
+            "withdrawal": 95123.0,
+            "balance": 442878.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 445278.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 0.0,
+            "withdrawal": 840.0,
+            "balance": 444438.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 0.0,
+            "withdrawal": 95123.0,
+            "balance": 349315.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 350155.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-16",
+            "deposit": 3400.0,
+            "withdrawal": 0.0,
+            "balance": 353555.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-17",
+            "deposit": 3400.0,
+            "withdrawal": 0.0,
+            "balance": 356955.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-17",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 359355.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-17",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 359805.66,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-17",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 360845.56,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-07",
+        "rows": [
+          {
+            "date": "2026-05-10",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 555838.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 1620.0,
+            "withdrawal": 0.0,
+            "balance": 557458.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 557908.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 558298.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 558358.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 559198.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 1230.0,
+            "withdrawal": 0.0,
+            "balance": 560428.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 560878.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 561326.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 0.0,
+            "withdrawal": 100000.0,
+            "balance": 461328.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 0.0,
+            "withdrawal": 100000.0,
+            "balance": 361323.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 361778.53,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 5000.0,
+            "withdrawal": 0.0,
+            "balance": 366778.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 367228.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 367678.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 368128.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 368968.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 369358.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 370198.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 371038.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 371488.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 371938.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 372388.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 372838.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 373288.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 374128.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 374578.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 375028.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 375478.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 375928.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 39375.0,
+            "withdrawal": 0.0,
+            "balance": 415303.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 416343.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 416793.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 417243.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 418083.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 418533.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 418983.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 419823.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 420273.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 420723.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 421173.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 422013.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 422463.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-11",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 424963.53,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-08",
+        "rows": [
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 486664.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 487114.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 487564.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 488014.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 1230.0,
+            "withdrawal": 0.0,
+            "balance": 489244.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 489694.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 490084.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 490924.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 1090.0,
+            "withdrawal": 0.0,
+            "balance": 492014.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 492074.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 493754.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 494204.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 494654.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 495104.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 495554.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 496004.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 1230.0,
+            "withdrawal": 0.0,
+            "balance": 497234.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 497684.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 498524.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 501024.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 501804.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 502314.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 503154.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 7178.0,
+            "withdrawal": 0.0,
+            "balance": 510332.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 510782.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 511622.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 512072.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 512522.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 9745.54,
+            "withdrawal": 0.0,
+            "balance": 522268.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 522718.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 523558.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 524398.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 524848.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 525298.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 526138.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 526588.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 527628.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 528078.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 528918.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 529368.53,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-10",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 529878.53,
+            "balance_ok": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-09",
+        "rows": [
+          {
+            "date": "2026-05-01",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 411489.52,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-02",
+            "deposit": 0.0,
+            "withdrawal": 9700.0,
+            "balance": 401789.52,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-02",
+            "deposit": 0.0,
+            "withdrawal": 50000.0,
+            "balance": 351789.52,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-02",
+            "deposit": 0.0,
+            "withdrawal": 50000.0,
+            "balance": 301789.52,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-02",
+            "deposit": 0.0,
+            "withdrawal": 20329.37,
+            "balance": 281460.15,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-03",
+            "deposit": 2420.0,
+            "withdrawal": 0.0,
+            "balance": 283880.15,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-03",
+            "deposit": 15000.0,
+            "withdrawal": 0.0,
+            "balance": 298880.15,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-03",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 299330.15,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-03",
+            "deposit": 3497.0,
+            "withdrawal": 0.0,
+            "balance": 302827.15,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-03",
+            "deposit": 14124.03,
+            "withdrawal": 0.0,
+            "balance": 316951.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 1240.0,
+            "withdrawal": 0.0,
+            "balance": 318191.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 25000.0,
+            "withdrawal": 0.0,
+            "balance": 343191.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 2019.0,
+            "withdrawal": 0.0,
+            "balance": 345210.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 347710.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 350210.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 0.0,
+            "withdrawal": 10571.0,
+            "balance": 339639.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 340679.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 3400.0,
+            "withdrawal": 0.0,
+            "balance": 346100.18,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 0.0,
+            "withdrawal": 5500.0,
+            "balance": 340600.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 650.0,
+            "withdrawal": 0.0,
+            "balance": 338520.18,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 341020.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 342060.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-04",
+            "deposit": 650.0,
+            "withdrawal": 0.0,
+            "balance": 342710.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 0.0,
+            "withdrawal": 9000.0,
+            "balance": 341210.18,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 341660.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 342700.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 3400.0,
+            "withdrawal": 0.0,
+            "balance": 346100.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 348600.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1290.0,
+            "withdrawal": 0.0,
+            "balance": 349890.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 250.0,
+            "withdrawal": 0.0,
+            "balance": 350140.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 760.0,
+            "withdrawal": 0.0,
+            "balance": 350900.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1000.0,
+            "withdrawal": 0.0,
+            "balance": 351900.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 410.0,
+            "withdrawal": 0.0,
+            "balance": 352310.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 650.0,
+            "withdrawal": 0.0,
+            "balance": 352960.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 70.0,
+            "withdrawal": 0.0,
+            "balance": 353030.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 410.0,
+            "withdrawal": 0.0,
+            "balance": 353440.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 353890.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 356390.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1000.0,
+            "withdrawal": 0.0,
+            "balance": 357390.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 410.0,
+            "withdrawal": 0.0,
+            "balance": 357800.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1888.0,
+            "withdrawal": 0.0,
+            "balance": 359689.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 2500.0,
+            "withdrawal": 0.0,
+            "balance": 362188.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1250.0,
+            "withdrawal": 0.0,
+            "balance": 363438.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1250.0,
+            "withdrawal": 0.0,
+            "balance": 364688.18,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-05",
+            "deposit": 1190.0,
+            "withdrawal": 0.0,
+            "balance": 365878.18,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-10",
+        "rows": [
+          {
+            "date": "2023-05-08",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 363104.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 363554.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 364004.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 364454.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 364904.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 365354.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 365744.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 366194.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 1050.0,
+            "withdrawal": 0.0,
+            "balance": 367244.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 367694.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 368144.0,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 368594.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 369434.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 369824.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 370274.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 370724.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 371174.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 371624.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 372074.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 372524.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 372974.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-28",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 373424.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 374264.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 374714.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 375164.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 375614.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 376064.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 375574.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 376964.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-08",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 377414.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 1820.0,
+            "withdrawal": 0.0,
+            "balance": 379234.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 1430.0,
+            "withdrawal": 0.0,
+            "balance": 380134.99,
+            "balance_ok": false
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 380584.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 1430.0,
+            "withdrawal": 0.0,
+            "balance": 382014.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 382464.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 382914.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 383364.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 1090.0,
+            "withdrawal": 0.0,
+            "balance": 384454.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 384904.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 385354.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 386194.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 386644.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2023-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 387484.99,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-11",
+        "rows": [
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 413144.89,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 413534.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 413984.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 414434.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 414884.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 415334.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 416174.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 416624.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 417074.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 417914.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 417974.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 418034.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 418484.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 418934.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 419384.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 419834.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 420284.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 420674.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 421124.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 421574.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 422024.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 422474.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 422924.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 423374.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 423824.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 424274.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 424724.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 980.0,
+            "withdrawal": 0.0,
+            "balance": 425704.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 426154.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 426604.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 427054.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 427444.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 427894.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 427954.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 428404.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 428854.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 429304.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 429754.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 650.0,
+            "withdrawal": 0.0,
+            "balance": 430404.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 430854.89,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 431694.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 432144.99,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-09",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 432594.99,
+            "balance_ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "event_type": "item_bank_parsed",
+      "payload": {
+        "item_id": "bank-12",
+        "rows": [
+          {
+            "date": "2026-05-21",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 385058.46,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 386108.46,
+            "balance_ok": false
+          },
+          {
+            "date": "2026-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 386558.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-26",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 387008.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 387748.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 388198.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 388648.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 389098.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 391498.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 391948.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 392398.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 392848.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 390.0,
+            "withdrawal": 0.0,
+            "balance": 393238.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 395638.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 398038.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 2400.0,
+            "withdrawal": 0.0,
+            "balance": 400438.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 400888.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 900.0,
+            "withdrawal": 0.0,
+            "balance": 401788.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 680.0,
+            "withdrawal": 0.0,
+            "balance": 402468.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 402528.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-22",
+            "deposit": 3400.0,
+            "withdrawal": 0.0,
+            "balance": 405928.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 406378.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 650.0,
+            "withdrawal": 0.0,
+            "balance": 407028.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 350.0,
+            "withdrawal": 0.0,
+            "balance": 407378.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 0.0,
+            "withdrawal": 33787.0,
+            "balance": 373591.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 20000.0,
+            "withdrawal": 0.0,
+            "balance": 393591.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 1680.0,
+            "withdrawal": 0.0,
+            "balance": 395271.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 740.0,
+            "withdrawal": 0.0,
+            "balance": 396011.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 1680.0,
+            "withdrawal": 0.0,
+            "balance": 397691.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 1040.0,
+            "withdrawal": 0.0,
+            "balance": 398731.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 20000.0,
+            "withdrawal": 0.0,
+            "balance": 418731.46,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-23",
+            "deposit": 7526.89,
+            "withdrawal": 0.0,
+            "balance": 426258.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 426708.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 427158.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 650.0,
+            "withdrawal": 0.0,
+            "balance": 427808.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 428258.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 428708.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 20000.0,
+            "withdrawal": 0.0,
+            "balance": 448708.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 60.0,
+            "withdrawal": 0.0,
+            "balance": 448768.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 0.0,
+            "withdrawal": 90000.0,
+            "balance": 358768.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 3000.0,
+            "withdrawal": 0.0,
+            "balance": 361768.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 840.0,
+            "withdrawal": 0.0,
+            "balance": 362608.35,
+            "balance_ok": true
+          },
+          {
+            "date": "2026-05-24",
+            "deposit": 450.0,
+            "withdrawal": 0.0,
+            "balance": 363058.35,
+            "balance_ok": true
+          }
+        ]
+      }
+    }
+  ]
 }

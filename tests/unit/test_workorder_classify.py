@@ -299,6 +299,79 @@ class ClassifyImageTests(unittest.TestCase):
         self.assertEqual(len(store.events), events_after_first)
 
 
+class EdcSettlementClassifyTests(unittest.TestCase):
+    """SA-2a:EDC 结算票归堆落 ok + edc 快照事件(字段逐一对齐 sales_agg/model.py 契约)。"""
+
+    ENTRIES = [("บริษัท ซิสเตอร์ ตัวอย่าง จำกัด", "legal"), ("Sister Makeup", "exact")]
+
+    def setUp(self):
+        for name, fake in (
+            ("_resolve_own_tax_id", lambda ctx: OWN_TAX),
+            ("_resolve_own_names", lambda ctx: list(self.ENTRIES)),
+            ("_m1_enabled", lambda ctx: True),
+        ):
+            prev = getattr(classify, name)
+            setattr(classify, name, fake)
+            self.addCleanup(setattr, classify, name, prev)
+        self.addCleanup(setattr, classify, "_ocr_image", classify._default_ocr_image)
+
+    def test_settlement_slip_ok_with_contract_aligned_snapshot(self):
+        item = _item("i1", "/in/IMG_2582.jpg")
+        store = FakeItemStore([item])
+        classify._ocr_image = lambda path: {
+            "document_type": "other",
+            "date": "2026-05-25",
+            "seller_name": "SISTER MAKEUP SAPHAN SUNG , BKK",
+            "subtotal": "540.00",
+            "vat": "0.00",
+            "total_amount": "540.00",
+            "payment_method": "qr",
+            "notes": "SETTLEMENT SUCCESSFUL\nHOST: THAIQR\nTID# 62608078\nBATCH# 000186",
+        }
+
+        out = classify.run(_ctx(store))
+
+        self.assertEqual(out.payload["bins"], {"edc_settlement": 1})
+        self.assertEqual(out.payload["flagged"], 0)
+        row = store.by_id("i1")
+        self.assertEqual(row["kind"], "edc_settlement")
+        self.assertEqual(row["status"], "ok")
+        self.assertIsNone(row["flag_reason"])
+        evt = store.classified("i1")
+        # edc 快照独立于 money(money 是银行对账候选料源,结算票混入会被 E1 双配)。
+        self.assertNotIn("money", evt)
+        self.assertEqual(
+            evt["edc"],
+            {
+                "settle_date": "2026-05-25",
+                "gross_amount": "540.00",
+                "fee_amount": None,
+                "net_amount": None,
+                "batch_no": "000186",
+                "terminal_id": "62608078",
+            },
+        )
+
+    def test_snapshot_without_footer_leaves_anchors_empty(self):
+        item = _item("i1", "/in/IMG_2595.jpg")
+        store = FakeItemStore([item])
+        classify._ocr_image = lambda path: {
+            "document_type": "other",
+            "date": "2026-05-10",
+            "seller_name": "SISTER MAKEUP SAPHAN SUNG, BKK",
+            "total_amount": "39375.00",
+            "vat": "",
+            "notes": "SETTLEMENT SUCCESSFUL",
+        }
+
+        classify.run(_ctx(store))
+
+        edc = store.classified("i1")["edc"]
+        self.assertEqual(edc["gross_amount"], "39375.00")
+        self.assertEqual(edc["batch_no"], "")
+        self.assertEqual(edc["terminal_id"], "")
+
+
 class ClassifySalesSummaryTests(unittest.TestCase):
     def setUp(self):
         classify._resolve_own_tax_id = lambda ctx: OWN_TAX

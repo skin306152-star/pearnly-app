@@ -18,6 +18,7 @@ BANK_STATEMENT = "bank_statement"  # 银行流水(R3 佐证件,不进税额)
 NON_TAX = "non_tax"  # 无税务要素,排除
 DUPLICATE = "duplicate"  # 票面级重复件,排除
 GL_LEDGER = "gl_ledger"  # 上传 GL 台账(F2 影子对平佐证件,不进税额;T4a 新增)
+EDC_SETTLEMENT = "edc_settlement"  # EDC 日终结算票(SA-2 销项聚合佐证件,不进税额)
 
 ALL_KINDS = (
     UNKNOWN,
@@ -27,4 +28,5 @@ ALL_KINDS = (
     NON_TAX,
     DUPLICATE,
     GL_LEDGER,
+    EDC_SETTLEMENT,
 )

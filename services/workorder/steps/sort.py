@@ -37,6 +37,10 @@ _BANK_HEADER_KW = ("ถอน", "ฝาก", "ยอดคงเหลือ", "
 _GL_NAME_KW = ("สมุดแยกประเภท", "แยกประเภท")
 _GL_ASCII_RE = re.compile(r"(?<![a-z])gl(?![a-z])")
 
+# EDC 日终结算票标记(SA-2a):只有商户自己机器的日切汇总打印 SETTLEMENT 独立词——单笔
+# SALE 支付条(BATCH/TRACE/APPR 脚注)和银行 Statement 页都没有,词边界防 Statement 误粘。
+_EDC_SETTLEMENT_RE = re.compile(r"(?<![a-z])settlement(?![a-z])")
+
 # 正文判银行用的词表:复用银行签名表(泰/英各家行名)+ 通用「ธนาคาร(银行)」。
 # 文件名判银行走 _bank_from_filename(ASCII 词边界);IMG_xxxx 无名照片走这里的内容判。
 _BANK_TEXT_KEYWORDS = {kw.lower() for kws in _BANK_SIGNATURES.values() for kw in kws} | {"ธนาคาร"}
@@ -164,6 +168,8 @@ def bin_ocr_fields(
     """图片过 OCR 后归堆 → (kind, flag_reason)。classify 步(T4)拿到票面字段后调。
 
     支付/订单截图与「无 VAT 且两头税号都没有」的票据 = 无税务要素 → non_tax 留原因。
+    EDC 日终结算票(SETTLEMENT 独立词 + 无税票结构 + 毛额可解 + 商户名命中本账套名集)
+    → edc_settlement,佐证件不进税额(SA-2a,判据详见 _is_edc_settlement)。
     银行流水页(正文出现行名且无 VAT 税票结构)→ bank_statement,不进方向判据、不进数学闸。
     有税务要素的按税号锚点判向:自家==买方 → purchase_invoice;自家==卖方 → 自动归本方销项
     堆 sales_doc(status=flagged 留人工过目 · MC1-c.1,替代此前判死为 unknown 的 sales_direction_
@@ -181,6 +187,21 @@ def bin_ocr_fields(
     seller = clean_tax_id(f.get("seller_tax") or f.get("seller_tax_id"))
     buyer = clean_tax_id(f.get("buyer_tax") or f.get("buyer_tax_id"))
     has_vat = _has_vat(f)
+    own = clean_tax_id(own_tax_id)
+
+    # own_names(名集)是别名闸开时的新路;缺省 own_name 是闸关的现状路,行为逐字节不变。
+    if own_names is not None:
+        entries = list(own_names)
+        conflict = _NameConflict(own=own, seller=seller, buyer=buyer)
+    else:
+        entries = [(own_name, "legal")] if own_name else []
+        conflict = None
+
+    # EDC 日终结算票(SA-2a):先于支付凭证排除判——结算票的 OCR document_type 散落在
+    # payment_evidence/other/receipt 三种,判据靠票面特征不靠 dtype。认不出的原样走后面
+    # 的现状路(宁窄勿宽,错归堆=错进销项聚合)。
+    if _is_edc_settlement(f, seller=seller, buyer=buyer, has_vat=has_vat, entries=entries):
+        return (kinds.EDC_SETTLEMENT, None)
 
     # 支付/订单截图:确定无税务要素,先排除,免得被下面的银行/方向判据接管。
     if dtype in ("payment_evidence", "order_evidence"):
@@ -194,7 +215,6 @@ def bin_ocr_fields(
     if not has_vat and not seller and not buyer:
         return (kinds.NON_TAX, f"no_tax_elements:{dtype}")
 
-    own = clean_tax_id(own_tax_id)
     match_seller = bool(seller) and seller == own
     match_buyer = bool(buyer) and buyer == own
     if match_buyer and not match_seller:
@@ -202,17 +222,43 @@ def bin_ocr_fields(
     if match_seller and not match_buyer:
         return (decisions.SALES_DOC, decisions.SALES_DOC_REVIEW)
 
-    # own_names(名集)是别名闸开时的新路;缺省 own_name 是闸关的现状路,行为逐字节不变。
-    if own_names is not None:
-        entries = list(own_names)
-        conflict = _NameConflict(own=own, seller=seller, buyer=buyer)
-    else:
-        entries = [(own_name, "legal")] if own_name else []
-        conflict = None
     by_name = _direction_by_name(f, entries, conflict=conflict)
     if by_name:
         return by_name
     return (kinds.UNKNOWN, decisions.DIRECTION_AMBIGUOUS)
+
+
+def _is_edc_settlement(f: dict, *, seller: str, buyer: str, has_vat: bool, entries) -> bool:
+    """EDC 日终结算票(merchant copy)四联判据,全中才归堆(SA-2a · 宁窄勿宽):
+
+    ① 无税票结构:无 VAT 且两头无干净税号——结算票不带税务要素,带了就不是裸结算票;
+    ② SETTLEMENT 独立词(notes/invoice_number):日切汇总才打印;单笔 SALE 支付条只有
+       BATCH/TRACE/APPR 脚注(它是某张销售小票的收款凭证,归堆会与税票/结算双计),
+       银行 Statement 页词形不同,词边界挡误粘;
+    ③ 毛额可解(>0):解不出毛额的结算票对销项聚合无用,留在现状排除队列;
+    ④ 商户名命中本账套名集:结算票只在自家收单机打印,名锚防串客户料。按 substring
+       门槛(≥6)比对——票面商户名带分店/城市后缀(如 SISTER MAKEUP SAPHAN SUNG, BKK),
+       exact 别名对不上;①②③ 已把面收窄,此处放宽不回宽整体。
+    """
+    if has_vat or seller or buyer:
+        return False
+    blob = " ".join(str(f.get(k) or "") for k in ("notes", "invoice_number")).lower()
+    if not _EDC_SETTLEMENT_RE.search(blob):
+        return False
+    if not _edc_gross_usable(f):
+        return False
+    merchant = f.get("seller_name")
+    return any(_company_name_match(name, merchant, "substring") for name, _mode in entries)
+
+
+def _edc_gross_usable(f: dict) -> bool:
+    """结算毛额可解:total_amount(缺则 subtotal)能转正数。与 classify._edc_fields 的
+    取值序一致——判「可归堆」与「归堆后快照什么」必须看同一个数。"""
+    try:
+        raw = str(f.get("total_amount") or f.get("subtotal") or "").replace(",", "").strip()
+        return bool(raw) and Decimal(raw) > 0
+    except InvalidOperation:
+        return False
 
 
 def _mentions_bank(fields: dict) -> bool:

@@ -261,18 +261,20 @@ class ConservationWithGlTests(unittest.TestCase):
 
 
 class KindsSingleSourceTests(unittest.TestCase):
-    """kind 词汇表收口:全集 7 值唯一,消费端常量与 kinds.py 同源(散字面量回潮在此翻红)。"""
+    """kind 词汇表收口:全集 8 值唯一,消费端常量与 kinds.py 同源(散字面量回潮在此翻红)。"""
 
     def test_all_kinds_complete_and_unique(self):
-        self.assertEqual(len(kinds.ALL_KINDS), 7)
-        self.assertEqual(len(set(kinds.ALL_KINDS)), 7)
+        self.assertEqual(len(kinds.ALL_KINDS), 8)
+        self.assertEqual(len(set(kinds.ALL_KINDS)), 8)
         self.assertIn(kinds.GL_LEDGER, kinds.ALL_KINDS)
+        self.assertIn(kinds.EDC_SETTLEMENT, kinds.ALL_KINDS)
 
     def test_consumers_share_the_vocabulary(self):
         self.assertIs(reconcile._PURCHASE, kinds.PURCHASE_INVOICE)
         self.assertIs(reconcile._SALES, kinds.SALES_SUMMARY)
         self.assertIs(reconcile._BANK, kinds.BANK_STATEMENT)
         self.assertIs(conservation._KIND_GL, kinds.GL_LEDGER)
+        self.assertIs(conservation._KIND_EDC, kinds.EDC_SETTLEMENT)
         self.assertIs(conservation._KIND_PURCHASE, kinds.PURCHASE_INVOICE)
         self.assertIs(evidence._KIND_SALES, kinds.SALES_SUMMARY)
 

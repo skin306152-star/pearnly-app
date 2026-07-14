@@ -22,6 +22,7 @@ reconcile/人审,金标 IMG_2647 必须落在这条路径而非被吃掉)。
 from __future__ import annotations
 
 import os
+import re
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
@@ -123,6 +124,7 @@ def run(ctx: StepContext) -> StepResult:
                 kind=upd["kind"],
                 status=upd["status"],
                 money=outcome.get("money"),
+                edc=outcome.get("edc"),
                 ocr_engine=engine_ver,
             )
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
@@ -198,10 +200,10 @@ def _ocr_in_order(images: list[dict], tenant_id: str):
         pool.shutdown(wait=False, cancel_futures=True)
 
 
-def _emit_classified(ctx, item, *, kind, status, money, sales_read=None, ocr_engine=None):
+def _emit_classified(ctx, item, *, kind, status, money, sales_read=None, edc=None, ocr_engine=None):
     """落一条 item_classified 证据事件。payload 带 item_id/kind/status,进项另带票面 money,
-    销项直读另带 sales_read,OCR 件另带 ocr_engine(管线版本)——reconcile/冻结据此回放,不依赖
-    同进程 ctx.data(续跑不丢)。
+    销项直读另带 sales_read,EDC 结算票另带 edc 快照(SA-2b 聚合回放的唯一持久源),OCR 件
+    另带 ocr_engine(管线版本)——reconcile/冻结据此回放,不依赖同进程 ctx.data(续跑不丢)。
 
     dedupe_key 锚到 item:同件重放(并发接管/异常续跑)命中事件唯一约束不重记,守恒不被撑破。"""
     payload = {"item_id": item["id"], "kind": kind, "status": status}
@@ -209,6 +211,8 @@ def _emit_classified(ctx, item, *, kind, status, money, sales_read=None, ocr_eng
         payload["money"] = money
     if sales_read is not None:
         payload["sales_read"] = sales_read
+    if edc is not None:
+        payload["edc"] = edc
     if ocr_engine:
         payload["ocr_engine"] = ocr_engine
     ctx.store.append_event(
@@ -276,7 +280,10 @@ def _classify_from_ocr(
         reason or ""
     ).startswith(("direction_ambiguous", "sales_direction_unhandled"))
     money = _money_fields(fields) if capture_money else None
-    return {"kind": kind, "flagged": status == "flagged", "update": upd, "money": money}
+    # EDC 结算票快照走独立 payload 键(不进 money):money 是银行对账候选/R1 回放的料源,
+    # 结算票混进去会被 E1 当票据候选双配(它已由 SA-1 的 EDC↔银行专线对账)。
+    edc = _edc_fields(fields) if kind == kinds.EDC_SETTLEMENT else None
+    return {"kind": kind, "flagged": status == "flagged", "update": upd, "money": money, "edc": edc}
 
 
 def _money_fields(fields: dict) -> dict:
@@ -294,6 +301,32 @@ def _money_fields(fields: dict) -> dict:
         "seller_tax": fields.get("seller_tax"),
         "invoice_date": fields.get("date"),
         "vendor": fields.get("seller_name"),
+    }
+
+
+# KBANK 系结算票脚注里的批次/终端号(BATCH# 000186 / TID:62608078 两种写法都在真料出现过)。
+_EDC_BATCH_RE = re.compile(r"batch\s*[#:]?\s*(\d{3,})", re.IGNORECASE)
+_EDC_TID_RE = re.compile(r"tid\s*[#:]?\s*(\d{4,})", re.IGNORECASE)
+
+
+def _edc_fields(fields: dict) -> dict:
+    """EDC 结算票快照(进 item_classified 事件,SA-2b 回放喂 sales_agg 聚合)。字段逐字段
+    对齐 services/sales_agg/model.py::EdcSettlement 输入契约(settle_date/gross_amount/
+    fee_amount/net_amount/batch_no/terminal_id),不另造形状。
+
+    KBANK 商户联结算票不印手续费/净额 → 两者恒 None 如实缺失(SA-1 对毛额缺失显式点名、
+    绝不静默归 0,net+fee 齐才回推);批次/终端号从 notes 脚注拾取,拾不到留空——SA-1
+    无锚不算去重指纹,不硬造。这里只搬 OCR 原值,Decimal 化交聚合层。"""
+    notes = str(fields.get("notes") or "")
+    batch = _EDC_BATCH_RE.search(notes)
+    tid = _EDC_TID_RE.search(notes)
+    return {
+        "settle_date": fields.get("date"),
+        "gross_amount": fields.get("total_amount") or fields.get("subtotal"),
+        "fee_amount": None,
+        "net_amount": None,
+        "batch_no": batch.group(1) if batch else "",
+        "terminal_id": tid.group(1) if tid else "",
     }
 
 

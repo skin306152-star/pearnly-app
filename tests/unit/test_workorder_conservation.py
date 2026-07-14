@@ -34,6 +34,7 @@ class BucketPartitionTests(unittest.TestCase):
             _item("p_recalc", "purchase_invoice", status="flagged", flag_reason="amount_math_fail"),
             _item("s1", "sales_summary", status="ok"),
             _item("bank1", "bank_statement", status="pending"),
+            _item("edc1", "edc_settlement", status="ok"),
             _item("nt", "non_tax", status="excluded", flag_reason="no_tax_elements:x"),
             _item("dup", "duplicate", status="excluded", flag_reason="duplicate_of:p_ok"),
             _item("p_excl", "purchase_invoice", status="flagged", flag_reason="amount_math_fail"),
@@ -69,7 +70,7 @@ class BucketPartitionTests(unittest.TestCase):
         ids = {k: {it["id"] for it in v} for k, v in b.items()}
         self.assertEqual(ids[c.INPUT_COUNTED], {"p_ok", "p_face", "p_recalc", "dir_buy"})
         self.assertEqual(ids[c.SALES_MATERIAL], {"s1"})
-        self.assertEqual(ids[c.BANK], {"bank1"})
+        self.assertEqual(ids[c.BANK], {"bank1", "edc1"})
         self.assertEqual(ids[c.EXCLUDED], {"nt", "dup", "p_excl", "dir_nt"})
         self.assertEqual(ids[c.SALES_REASSIGNED], {"dir_sell"})
         self.assertEqual(ids[c.WAIVED], {"waived1"})

@@ -297,6 +297,93 @@ class NameAnchorFallbackTests(unittest.TestCase):
         self.assertEqual((kind, reason), ("unknown", "direction_ambiguous"))
 
 
+class EdcSettlementBinTests(unittest.TestCase):
+    """SA-2a EDC 归堆咬人测试:真料形状(SM 5月 vertex OCR 探针原值)命中 + 近邻票据零误归。"""
+
+    # 名集锚:法定泰文名 + 会计确认的英文商号别名(exact)——EDC 判据按 substring 门槛比对。
+    ENTRIES = [("บริษัท ซิสเตอร์ เมคอัพ จำกัด", "legal"), ("Sister Makeup", "exact")]
+
+    def _bin(self, fields, entries=None):
+        return sort_step.bin_ocr_fields(
+            fields, own_tax_id=OWN_TAX, own_names=self.ENTRIES if entries is None else entries
+        )
+
+    def _settlement_fields(self, **over):
+        # IMG_2582 探针原值:日终结算票,notes 打印 SETTLEMENT + BATCH/TID 脚注。
+        fields = {
+            "document_type": "other",
+            "is_not_invoice": True,
+            "date": "2026-05-25",
+            "seller_name": "SISTER MAKEUP SAPHAN SUNG , BKK",
+            "subtotal": "540.00",
+            "vat": "0.00",
+            "total_amount": "540.00",
+            "payment_method": "qr",
+            "notes": "SETTLEMENT SUCCESSFUL\nHOST: THAIQR\nTID# 62608078\nBATCH# 000186",
+        }
+        fields.update(over)
+        return fields
+
+    def test_settlement_slip_bins_edc(self):
+        self.assertEqual(self._bin(self._settlement_fields()), ("edc_settlement", None))
+
+    def test_settlement_word_in_invoice_number_also_hits(self):
+        # IMG_2585 形状:notes 只有 "SETTLEMENT",批次号被读进 invoice_number。
+        fields = self._settlement_fields(notes="SETTLEMENT", invoice_number="000178")
+        self.assertEqual(self._bin(fields), ("edc_settlement", None))
+
+    def test_per_transaction_sale_slip_not_edc(self):
+        # IMG_2565 形状:单笔 SALE 支付条(BATCH/TRACE/APPR 脚注,无 SETTLEMENT)——它是某张
+        # 销售小票的收款凭证,归堆会与税票双计 → 维持 payment_evidence 排除现状。
+        fields = self._settlement_fields(
+            document_type="payment_evidence",
+            notes="BATCH:000187 TIME:16:26:52 TRACE:001263 APPR:592256",
+            total_amount="2728.00",
+        )
+        self.assertEqual(self._bin(fields), ("non_tax", "no_tax_elements:payment_evidence"))
+
+    def test_bank_statement_print_not_edc(self):
+        # IMG_2485 形状:K BIZ 流水打印页,"Statement" 词形不同(词边界),卖方名=银行。
+        fields = {
+            "document_type": "payment_evidence",
+            "seller_name": "ธนาคารกสิกรไทย",
+            "total_amount": "362264.36",
+            "vat": "",
+            "notes": "รายการเดินบัญชี / Statement",
+        }
+        kind, _reason = self._bin(fields)
+        self.assertNotEqual(kind, "edc_settlement")
+
+    def test_tax_invoice_mentioning_settlement_not_edc(self):
+        # 真税票(带 VAT/税号)哪怕备注出现 settlement 也走方向判据,不进佐证堆。
+        fields = {
+            "document_type": "tax_invoice",
+            "vat": "70.00",
+            "seller_tax": OTHER_TAX,
+            "buyer_tax": OWN_TAX,
+            "notes": "settlement ref 123",
+            "total_amount": "1070.00",
+        }
+        self.assertEqual(self._bin(fields), ("purchase_invoice", None))
+
+    def test_merchant_name_mismatch_falls_through(self):
+        # 商户名对不上本账套名集(串了别家客户的结算票)→ 维持现状排除,绝不污染本户销项聚合。
+        fields = self._settlement_fields(seller_name="ANOTHER SHOP LADPRAO, BKK")
+        self.assertEqual(self._bin(fields), ("non_tax", "no_tax_elements:other"))
+
+    def test_unparseable_gross_falls_through(self):
+        fields = self._settlement_fields(total_amount="", subtotal="")
+        self.assertEqual(self._bin(fields), ("non_tax", "no_tax_elements:other"))
+
+    def test_legacy_single_name_path_without_alias_falls_through(self):
+        # 闸关单名路(own_names=None):泰文法定名对不上 ASCII 商户名 → 现状不变(诚实漏归,
+        # 不为归堆率放宽)。
+        kind, reason = sort_step.bin_ocr_fields(
+            self._settlement_fields(), own_tax_id=OWN_TAX, own_name=OWN_NAME
+        )
+        self.assertEqual((kind, reason), ("non_tax", "no_tax_elements:other"))
+
+
 class CompanyNameNormalizeTests(unittest.TestCase):
     def test_normalize_strips_affixes_and_whitespace(self):
         a = sort_step._normalize_company_name("บริษัท ซิสเตอร์ ตัวอย่าง จำกัด")

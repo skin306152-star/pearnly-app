@@ -813,7 +813,7 @@ class RecordReviewSignoffTests(_ApiTestBase):
         self.store.events = [
             {"event_type": "human_decision", "actor": "user:1", "payload": {"item_id": "a"}}
         ]
-        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=False):
+        with mock.patch.object(api.feature_flags, "pearnly_ai_sod_enabled_for", return_value=False):
             evt = api.record_review_signoff(
                 None, tenant_id="t-1", work_order_id="wo-1", actor="user:1", note="ok"
             )
@@ -827,7 +827,7 @@ class RecordReviewSignoffTests(_ApiTestBase):
         self.store.events = [
             {"event_type": "human_decision", "actor": "user:1", "payload": {"item_id": "a"}}
         ]
-        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=True):
+        with mock.patch.object(api.feature_flags, "pearnly_ai_sod_enabled_for", return_value=True):
             with self.assertRaises(api.WorkOrderApiError) as ctx:
                 api.record_review_signoff(
                     None, tenant_id="t-1", work_order_id="wo-1", actor="user:1"
@@ -839,14 +839,14 @@ class RecordReviewSignoffTests(_ApiTestBase):
         self.store.events = [
             {"event_type": "human_decision", "actor": "user:1", "payload": {"item_id": "a"}}
         ]
-        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=True):
+        with mock.patch.object(api.feature_flags, "pearnly_ai_sod_enabled_for", return_value=True):
             evt = api.record_review_signoff(
                 None, tenant_id="t-1", work_order_id="wo-1", actor="user:2"
             )
         self.assertEqual(evt["event_type"], "review_signoff")
 
     def test_overlong_note_rejected(self):
-        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=False):
+        with mock.patch.object(api.feature_flags, "pearnly_ai_sod_enabled_for", return_value=False):
             with self.assertRaises(api.WorkOrderApiError) as ctx:
                 api.record_review_signoff(
                     None,
@@ -889,7 +889,7 @@ class OpenOrderObligationWiringTests(_ApiTestBase):
 
     def test_gate_closed_generates_nothing(self):
         with (
-            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=False),
+            mock.patch.object(api.feature_flags, "pearnly_ai_m1_enabled_for", return_value=False),
             mock.patch.object(api.tax_profile_store, "get_profile") as get_profile,
             mock.patch.object(api.obligation_engine, "generate_obligations") as generate,
             mock.patch.object(api.obligation_engine, "materialize_obligations") as materialize,
@@ -907,7 +907,7 @@ class OpenOrderObligationWiringTests(_ApiTestBase):
         # D1-2:开单接线扫当期 WHT 真信号(独立只读游标),透传给引擎。
         signals = {"wht_juristic": True, "has_any_material": True}
         with (
-            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(api.feature_flags, "pearnly_ai_m1_enabled_for", return_value=True),
             mock.patch.object(
                 api.tax_profile_store, "get_profile", return_value=profile
             ) as get_profile,
@@ -940,7 +940,7 @@ class OpenOrderObligationWiringTests(_ApiTestBase):
 
     def test_generation_failure_does_not_block_open_order(self):
         with (
-            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(api.feature_flags, "pearnly_ai_m1_enabled_for", return_value=True),
             mock.patch.object(
                 api.tax_profile_store, "get_profile", side_effect=RuntimeError("boom")
             ),
@@ -950,7 +950,7 @@ class OpenOrderObligationWiringTests(_ApiTestBase):
 
     def test_missing_profile_skips_generation_without_error(self):
         with (
-            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(api.feature_flags, "pearnly_ai_m1_enabled_for", return_value=True),
             mock.patch.object(api.tax_profile_store, "get_profile", return_value=None),
             mock.patch.object(api.obligation_engine, "generate_obligations") as generate,
         ):

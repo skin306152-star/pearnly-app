@@ -176,14 +176,10 @@ def _bound(ctx: StepContext, cur: Any):
         ctx.cur = prev
 
 
-def _completed_steps(ctx: StepContext, unit: Callable) -> set:
-    """从事件流推导已完成步——续跑/幂等的唯一依据。按追加序(= 发生序)回放:step_done 记
-    完成,step_reopened(驳回重做)撤销完成、令该步重跑;后续再落 step_done 又记回。无
-    step_reopened 时行为与「step_done 存在即完成」逐字节一致(存量续跑/幂等不变)。"""
-    with unit(ctx) as cur, _bound(ctx, cur):
-        events = ctx.store.list_events(
-            ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
-        )
+def done_steps_from_events(events: list) -> set:
+    """事件流 → 已完成步集合(纯函数,续跑/幂等/搁浅料自愈共用单一事实源)。按追加序
+    (= 发生序)回放:step_done 记完成,step_reopened(驳回重做)撤销完成、令该步重跑;后续
+    再落 step_done 又记回。无 step_reopened 时与「step_done 存在即完成」逐字节一致。"""
     done: set = set()
     for e in events:
         etype = e["event_type"]
@@ -192,6 +188,15 @@ def _completed_steps(ctx: StepContext, unit: Callable) -> set:
         elif etype == EVT_REOPENED:
             done.discard(e["step"])
     return done
+
+
+def _completed_steps(ctx: StepContext, unit: Callable) -> set:
+    """从事件流推导已完成步——续跑/幂等的唯一依据(取事件后交 done_steps_from_events 归约)。"""
+    with unit(ctx) as cur, _bound(ctx, cur):
+        events = ctx.store.list_events(
+            ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
+        )
+    return done_steps_from_events(events)
 
 
 def reopen_steps_from(step: str) -> tuple:

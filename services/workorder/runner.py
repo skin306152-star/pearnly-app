@@ -174,13 +174,8 @@ def _heal_stranded_material(cur, tenant_id: str, work_order_id: str, items: list
     wo = store.get_work_order(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     if not wo or wo.get("status") not in (engine.STATUS_STUCK, engine.STATUS_RUNNING):
         return ()
-    done: set = set()
-    for e in store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id):
-        if e["event_type"] == engine.EVT_DONE:
-            done.add(e["step"])
-        elif e["event_type"] == engine.EVT_REOPENED:
-            done.discard(e["step"])
-    if "classify" not in done:
+    events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+    if "classify" not in engine.done_steps_from_events(events):
         return ()
     reopened = engine.reopen_steps_from("sort")
     for step in reopened:

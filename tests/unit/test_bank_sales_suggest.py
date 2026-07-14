@@ -1,0 +1,333 @@
+# -*- coding: utf-8 -*-
+"""SA-3a 银行流水倒推销项引擎守门(services/workorder/steps/bank_sales_suggest.py)。
+
+纯函数三层漏斗(确定性剔除/强信号 → 大脑 overlay → 人裁 overlay)+ ÷1.07 金标(SM 5月会计
+底稿分组 918,894.77 → 858,780.16 + 60,114.61 逐字)+ 行指纹幂等/latest-wins/闸关无键/现金型
+诚实降级 + 覆盖可信度(打回 R1:余额链断点量化缺口,64% 捕获真形态必须降级不得出建议值)。
+钱数只由确定性代码算,大脑只碰分类——本套锁死这条硬闸的边界。
+"""
+
+from __future__ import annotations
+
+import json
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from services.workorder import api
+from services.workorder.steps import bank_sales_suggest as bss
+from tests.unit._workorder_fakes import WorkOrderFakeStoreBase
+
+# 金标工单真 12 事件的脱敏快照(只留钱数/余额,64% 捕获形态)——覆盖降级守门唯一夹具。
+_COVERAGE_FIXTURE = Path(__file__).with_name("_golden_bank_sales_coverage.json")
+
+
+def _dep(date, amount, desc="รับโอนเงิน", balance=None):
+    return {
+        "date": date,
+        "deposit": amount,
+        "withdrawal": 0.0,
+        "description": desc,
+        "balance": balance,
+    }
+
+
+def _wd(date, amount, desc="Transfer Withdrawal", balance=None):
+    return {
+        "date": date,
+        "deposit": 0.0,
+        "withdrawal": amount,
+        "description": desc,
+        "balance": balance,
+    }
+
+
+def _bank_event(rows, item_id="i1", eid=1):
+    return {
+        "id": eid,
+        "event_type": "item_bank_parsed",
+        "payload": {"item_id": item_id, "rows": rows},
+    }
+
+
+def _human(fp, verdict, eid):
+    return {
+        "id": eid,
+        "event_type": "human_decision",
+        "payload": {bss.HUMAN_ROW_KEY: fp, bss.HUMAN_VERDICT_KEY: verdict},
+    }
+
+
+def _brain(fp, verdict, eid, valid=True):
+    return {
+        "id": eid,
+        "event_type": bss.EVT_SUGGESTED,
+        "payload": {"fingerprint": fp, "verdict": verdict, "valid": valid},
+    }
+
+
+class DeterministicFunnelTests(unittest.TestCase):
+    def test_not_applicable_without_bank_rows(self):
+        self.assertEqual(bss.suggest([]), {"applicable": False, "reason": "no_bank_rows"})
+
+    def test_withdrawal_and_zero_and_fee_and_cancel_excluded(self):
+        events = [
+            _bank_event(
+                [
+                    _dep("2569-05-01", 1000.0),  # 入账无强信号 → 待定
+                    _wd("2569-05-01", 500.0),  # 转出 → 非销售
+                    {"date": "2569-05-01", "deposit": 0.0, "withdrawal": 0.0, "description": "B/F"},
+                    _dep("2569-05-02", 838.93, "ค่าธรรมเนียม"),  # 手续费关键词 → 非销售
+                    _dep("2569-05-02", 200.0, "ยกเลิกรายการ"),  # 取消关键词 → 非销售
+                ]
+            )
+        ]
+        result = bss.suggest(events)
+        self.assertTrue(result["applicable"])
+        self.assertEqual(result["counts"], {"sales": 0, "non_sales": 4, "pending": 1, "total": 5})
+        by_reason = {r["reason"] for r in result["rows"] if r["verdict"] == bss.NON_SALES}
+        self.assertEqual(by_reason, {bss.R_WITHDRAWAL, bss.R_ZERO, bss.R_FEE, bss.R_CANCEL})
+        self.assertEqual(result["gross_total"], "0")
+
+    def test_edc_settlement_match_is_deterministic_sale(self):
+        # 漏斗第 1 层「必是销售」:入账 (日期,毛额) 命中 EDC 结算单快照。
+        events = [
+            _bank_event([_dep("2569-05-10", 5000.0)]),
+            {
+                "id": 2,
+                "event_type": "item_classified",
+                "payload": {
+                    "item_id": "edc1",
+                    "kind": "edc_settlement",
+                    "edc": {"settle_date": "2569-05-10", "gross_amount": "5000.00"},
+                },
+            },
+        ]
+        result = bss.suggest(events)
+        self.assertEqual(result["counts"]["sales"], 1)
+        row = result["rows"][0]
+        self.assertEqual(
+            (row["verdict"], row["reason"], row["source"]),
+            (bss.SALES, bss.R_MATCHED_SETTLEMENT, bss.SRC_RULE),
+        )
+        self.assertEqual(result["gross_total"], "5000.0")
+
+
+class OverlayPrecedenceTests(unittest.TestCase):
+    def test_brain_overlay_classifies_pending_row(self):
+        events = [_bank_event([_dep("2569-05-01", 1000.0)])]
+        fp = bss.parsed_rows_from_events(events)[0]["fingerprint"]
+        result = bss.suggest(events + [_brain(fp, bss.SALES, eid=2)])
+        self.assertEqual(result["counts"]["sales"], 1)
+        self.assertEqual(result["rows"][0]["source"], bss.SRC_BRAIN)
+        self.assertEqual(result["gross_total"], "1000.0")
+
+    def test_invalid_brain_suggestion_does_not_classify(self):
+        events = [_bank_event([_dep("2569-05-01", 1000.0)])]
+        fp = bss.parsed_rows_from_events(events)[0]["fingerprint"]
+        result = bss.suggest(events + [_brain(fp, bss.SALES, eid=2, valid=False)])
+        self.assertEqual(result["counts"]["pending"], 1)
+
+    def test_human_overrides_brain_and_rule_latest_wins(self):
+        events = [_bank_event([_dep("2569-05-01", 1000.0)])]
+        fp = bss.parsed_rows_from_events(events)[0]["fingerprint"]
+        # 大脑判销售 → 人裁先判非销售 → 人裁改回销售(latest-wins)。
+        stream = events + [
+            _brain(fp, bss.SALES, eid=2),
+            _human(fp, bss.NON_SALES, eid=3),
+            _human(fp, bss.SALES, eid=4),
+        ]
+        result = bss.suggest(stream)
+        self.assertEqual(result["rows"][0]["source"], bss.SRC_HUMAN)
+        self.assertEqual(result["counts"]["sales"], 1)
+        self.assertEqual(result["gross_total"], "1000.0")
+
+
+class FingerprintTests(unittest.TestCase):
+    def test_identical_date_amount_rows_get_distinct_fingerprints(self):
+        events = [_bank_event([_dep("2569-05-01", 450.0), _dep("2569-05-01", 450.0)])]
+        rows = bss.parsed_rows_from_events(events)
+        self.assertNotEqual(rows[0]["fingerprint"], rows[1]["fingerprint"])
+        # 裁决只作用于被点名那条,另一条不受牵连。
+        result = bss.suggest(events + [_human(rows[0]["fingerprint"], bss.SALES, eid=2)])
+        self.assertEqual(result["counts"], {"sales": 1, "non_sales": 0, "pending": 1, "total": 2})
+
+    def test_same_item_replayed_twice_not_double_counted(self):
+        rows = [_dep("2569-05-01", 1000.0)]
+        events = [_bank_event(rows, item_id="i1", eid=1), _bank_event(rows, item_id="i1", eid=2)]
+        self.assertEqual(len(bss.parsed_rows_from_events(events)), 1)
+
+
+class GoldenWorksheetTests(unittest.TestCase):
+    """IMG_2481 会计底稿分组金标:四组销售 + 手续费 + 取消,人裁 overlay 模拟会计分组。
+    行带完整余额链(逐对守恒)——完整行数据路径必须通过覆盖判定并出三数逐字(打回 R1 #3)。"""
+
+    def _worksheet_events(self):
+        rows = [
+            _dep("2569-05-31", "347418.00", "รายได้ค่าบริการ", balance="447418.00"),
+            _dep("2569-05-31", "397721.00", "รายได้ขายสินค้า", balance="845139.00"),
+            _dep("2569-05-31", "36400.00", "รายได้", balance="881539.00"),
+            _dep("2569-05-31", "137355.77", "มี Slip", balance="1018894.77"),
+            # 手续费转出 → 确定性非销售
+            _wd("2569-05-31", "838.93", "ค่าธรรมเนียม", balance="1018055.84"),
+            # 取消关键词 → 确定性非销售
+            _dep("2569-05-31", "2520.00", "ยกเลิก", balance="1020575.84"),
+        ]
+        return [_bank_event(rows)]
+
+    def test_golden_918894_77_split(self):
+        events = self._worksheet_events()
+        parsed = bss.parsed_rows_from_events(events)
+        overlay = [
+            _human(r["fingerprint"], bss.SALES, eid=100 + i)
+            for i, r in enumerate(parsed)
+            if r["deposit"] > 0 and "ยกเลิก" not in r["description"]
+        ]
+        result = bss.suggest(events + overlay)
+        self.assertTrue(result["reliable"])
+        self.assertEqual(result["coverage"]["verified_pairs"], 5)
+        self.assertEqual(result["coverage"]["chain_breaks"], 0)
+        self.assertEqual(result["gross_total"], "918894.77")
+        self.assertEqual(result["sales_amount"], "858780.16")
+        self.assertEqual(result["output_vat"], "60114.61")
+        self.assertEqual(result["counts"], {"sales": 4, "non_sales": 2, "pending": 0, "total": 6})
+
+
+class CoverageDegradeTests(unittest.TestCase):
+    """覆盖可信度守门(打回 R1):余额链断点量化无解释入账,显著缺口 → 降级不出建议值。"""
+
+    def test_real_golden_12_events_shape_must_degrade(self):
+        # 金标工单真 12 事件(64% 捕获):链断 65 处、无解释入账 77,733.79(占证据入账 11.6%)。
+        # 引擎必须降级——三个建议值键一个都不许出,这正是 R1 抓到的「自信地错」形态。
+        events = json.loads(_COVERAGE_FIXTURE.read_text(encoding="utf-8"))["events"]
+        result = bss.suggest(events)
+        self.assertTrue(result["applicable"])
+        self.assertFalse(result["reliable"])
+        self.assertEqual(result["degrade_reason"], bss.DEGRADE_COVERAGE)
+        for key in ("gross_total", "sales_amount", "output_vat", "pending_count"):
+            self.assertNotIn(key, result)
+        cov = result["coverage"]
+        self.assertEqual(cov["row_count"], 519)
+        self.assertEqual(cov["chain_breaks"], 65)
+        self.assertEqual(cov["unexplained_inflow"], "77733.79")
+        # 降级时不烧大脑钱:未决行恒空,run 端点问 0 题。
+        self.assertEqual(bss.pending_rows(events), [])
+
+    def test_large_unexplained_inflow_degrades(self):
+        # 两行间余额跳 +5000 但行上入账只有 100:漏行净入账 4900,远超 2% 线 → 降级。
+        events = [
+            _bank_event(
+                [
+                    _dep("2569-05-01", "100.00", balance="1100.00"),
+                    _dep("2569-05-02", "100.00", balance="6100.00"),
+                ]
+            )
+        ]
+        result = bss.suggest(events)
+        self.assertFalse(result["reliable"])
+        self.assertEqual(result["coverage"]["unexplained_inflow"], "4900.00")
+        self.assertNotIn("sales_amount", result)
+
+    def test_rounding_delta_within_tolerance_stays_reliable(self):
+        events = [
+            _bank_event(
+                [
+                    _dep("2569-05-01", 100.0, balance=1100.0),
+                    _dep("2569-05-02", 100.0, balance=1200.01),  # 0.01 分位舍入,不算断链
+                ]
+            )
+        ]
+        result = bss.suggest(events)
+        self.assertTrue(result["reliable"])
+        self.assertEqual(result["coverage"]["verified_pairs"], 1)
+        self.assertIn("gross_total", result)
+
+    def test_no_balance_data_reports_zero_verified_pairs(self):
+        # 无余额列的行验不了链:无断链证据 → 不降级,但 verified_pairs=0 如实报告证据基数
+        # (读侧可见「这份建议没有余额链背书」,探不到 ≠ 没有,证据面诚实)。
+        events = [_bank_event([_dep("2569-05-01", 100.0), _dep("2569-05-02", 200.0)])]
+        result = bss.suggest(events)
+        self.assertTrue(result["reliable"])
+        self.assertEqual(result["coverage"]["verified_pairs"], 0)
+        self.assertEqual(result["coverage"]["chain_breaks"], 0)
+
+
+class PendingRowsTests(unittest.TestCase):
+    def test_pending_excludes_decided_and_already_suggested(self):
+        events = [
+            _bank_event(
+                [_dep("2569-05-01", 100.0), _dep("2569-05-02", 200.0), _dep("2569-05-03", 300.0)]
+            )
+        ]
+        rows = bss.parsed_rows_from_events(events)
+        stream = events + [
+            _human(rows[0]["fingerprint"], bss.NON_SALES, eid=2),  # 人裁过
+            _brain(rows[1]["fingerprint"], bss.SALES, eid=3),  # 大脑问过
+        ]
+        pend = bss.pending_rows(stream)
+        self.assertEqual([r["fingerprint"] for r in pend], [rows[2]["fingerprint"]])
+
+    def test_cannot_judge_suggestion_not_reasked(self):
+        events = [_bank_event([_dep("2569-05-01", 100.0)])]
+        fp = bss.parsed_rows_from_events(events)[0]["fingerprint"]
+        # 认怂建议(verdict=cannot_judge)仍算「问过」,不重问(读侧该行仍待定)。
+        stream = events + [_brain(fp, bss.CANNOT_JUDGE, eid=2)]
+        self.assertEqual(bss.pending_rows(stream), [])
+        self.assertEqual(bss.suggest(stream)["counts"]["pending"], 1)
+
+
+class _DetailStore(WorkOrderFakeStoreBase):
+    def __init__(self, events):
+        super().__init__()
+        self.events = events
+
+    def _on_event_appended(self, row):
+        self.events.append(row)
+
+    def get_work_order(self, cur, *, tenant_id, work_order_id):
+        return {
+            "id": "wo-1",
+            "tenant_id": tenant_id,
+            "workspace_client_id": 7,
+            "period": "2569-05",
+            "intent": "monthly_vat",
+            "status": "stuck",
+            "current_step": "reconcile",
+        }
+
+    def list_items(self, cur, *, tenant_id, work_order_id, status=None):
+        return []
+
+    def list_events(self, cur, *, tenant_id, work_order_id):
+        return [dict(e) for e in self.events]
+
+    def list_deliverables(self, cur, *, tenant_id, work_order_id):
+        return []
+
+
+class OrderDetailGateTests(unittest.TestCase):
+    """硬闸:闸关 order_detail 无 bank_sales_suggestion 键(逐字节维持现状);闸开才挂键。"""
+
+    def setUp(self):
+        self._orig = api.store
+        api.store = _DetailStore([_bank_event([_dep("2569-05-01", 1070.0)])])
+        self.addCleanup(setattr, api, "store", self._orig)
+
+    def test_gate_off_has_no_key(self):
+        with mock.patch.object(
+            api.feature_flags, "pearnly_ai_bank_sales_suggest_enabled_for", return_value=False
+        ):
+            detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertNotIn("bank_sales_suggestion", detail)
+
+    def test_gate_on_attaches_projection(self):
+        with mock.patch.object(
+            api.feature_flags, "pearnly_ai_bank_sales_suggest_enabled_for", return_value=True
+        ):
+            detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIn("bank_sales_suggestion", detail)
+        self.assertTrue(detail["bank_sales_suggestion"]["applicable"])
+
+
+if __name__ == "__main__":
+    unittest.main()

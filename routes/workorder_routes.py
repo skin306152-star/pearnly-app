@@ -139,6 +139,7 @@ def _raise_from_api_error(e: "api.WorkOrderApiError") -> None:
         "workorder.not_found",
         "workorder.item_not_found",
         "workorder.bank_recon_tx_not_found",
+        "workorder.bank_sales_row_not_found",
     ):
         raise HTTPException(404, detail=e.code)
     status = 409 if e.code in _CONFLICT_CODES else 422

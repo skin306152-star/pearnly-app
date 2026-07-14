@@ -107,6 +107,13 @@ PEARNLY_AI_BANK_RECON_KEY = "pearnly_ai_bank_recon"
 # package——影子只算不落法定表)。按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);
 # 消费在 services/workorder/steps/reconcile.py。
 PEARNLY_AI_SHADOW_DRAFT_KEY = "pearnly_ai_shadow_draft"
+# 银行流水倒推销项建议闸(SA-3a · 建议层):默认关 fail-closed。关 = order_detail 无
+# bank_sales_suggestion 键、bank-sales/run·decide 端点 404、倒推引擎不跑,现有人工填销项路径
+# 逐字节不变;开 = 从工单事件流的银行流水行倒推销项建议(逐行销售/非销售/待定分类 + 含税
+# 合计 ÷1.07 税前销售额/VAT · 只建议不落申报数,人在环)。钱数只由确定性代码算,大脑只判
+# 「这行是不是销售」。按 tenant 判定(单所整体开/关,与 pearnly_ai_shadow_draft 同款);消费在
+# services/workorder/steps/bank_sales_suggest.py(引擎/投影)+ bank_sales_brain.py(大脑分类)。
+PEARNLY_AI_BANK_SALES_SUGGEST_KEY = "pearnly_ai_bank_sales_suggest"
 # 工单大脑影子闸(裁决预判/审核建议 · brain_shadow):默认关 fail-closed。关 = run_shadow
 # 直接 no-op(零构题/零网关调用/零落库,零支出);开 = 对 flagged 未裁项影子出建议,唯一
 # 落点 brain_shadow_log(只建议不落账,业务表写路径 grep 为零)。按 tenant 判定(单所整体
@@ -310,3 +317,15 @@ def pearnly_ai_shadow_draft_enabled_for(tenant_id: Optional[str]) -> bool:
     tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_SHADOW_DRAFT_KEY, tenant_id, "pearnly_ai_shadow_draft_enabled_for")
+
+
+def pearnly_ai_bank_sales_suggest_enabled_for(tenant_id: Optional[str]) -> bool:
+    """银行流水倒推销项建议闸(SA-3a)。关 = order_detail 无 bank_sales_suggestion 键、端点 404、
+    引擎不跑(现有人工填销项逐字节不变);开 = 出倒推建议(只建议不落申报数)。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_shadow_draft 同款);超管在平台后台把该事务所
+    tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(
+        PEARNLY_AI_BANK_SALES_SUGGEST_KEY, tenant_id, "pearnly_ai_bank_sales_suggest_enabled_for"
+    )

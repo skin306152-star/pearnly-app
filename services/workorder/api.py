@@ -13,7 +13,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
 
-from core.feature_flags import pearnly_ai_m1_enabled_for, pearnly_ai_sod_enabled_for
+from core import feature_flags
 from services.workorder import (
     decisions,
     evidence,
@@ -23,7 +23,7 @@ from services.workorder import (
     store,
     wht_signals,
 )
-from services.workorder.steps import edc_corroboration, sales_aggregate
+from services.workorder.steps import bank_sales_suggest, edc_corroboration, sales_aggregate
 from services.workorder.steps import sort as sort_step
 from services.workspace import tax_profile_store
 
@@ -93,7 +93,7 @@ def open_order(
         period=period,
         intent=intent,
     )
-    if pearnly_ai_m1_enabled_for(tenant_id, None):
+    if feature_flags.pearnly_ai_m1_enabled_for(tenant_id, None):
         _generate_obligations_on_open(
             cur,
             tenant_id=tenant_id,
@@ -181,7 +181,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     needs, blocked = _halt_info(events, wo["status"])
     # item_classified 回放同一请求只算一次,喂给 flagged/进度/佐证三个读侧投影(纯参数下沉)。
     classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
-    return {
+    detail = {
         "id": wo["id"],
         "workspace_client_id": wo["workspace_client_id"],
         "period": wo["period"],
@@ -206,6 +206,10 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
             {"kind": d["kind"], "numbers": d.get("numbers") or {}} for d in deliverables
         ],
     }
+    # SA-3a 倒推销项建议:闸关则不挂键(order_detail 逐字节维持现状,现有人工填销项路径不变)。
+    if feature_flags.pearnly_ai_bank_sales_suggest_enabled_for(tenant_id):
+        detail["bank_sales_suggestion"] = bank_sales_suggest.suggest(events)
+    return detail
 
 
 def bank_recon_raw(events: list[dict]) -> Optional[dict]:
@@ -455,7 +459,7 @@ def record_review_signoff(
     含 actor,一人一条,latest-wins)。"""
     events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     violation = sod.reviewer_violation(
-        events, actor, enforced=pearnly_ai_sod_enabled_for(tenant_id)
+        events, actor, enforced=feature_flags.pearnly_ai_sod_enabled_for(tenant_id)
     )
     if violation:
         raise WorkOrderApiError(violation)

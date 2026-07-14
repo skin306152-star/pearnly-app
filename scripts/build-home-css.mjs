@@ -7,9 +7,10 @@
 //
 // 用法: node scripts/build-home-css.mjs
 
+import fs from 'fs';
 import path from 'path';
 import { transform } from 'esbuild';
-import { readSource, writeDist } from './build-lib.mjs';
+import { ROOT, readSource, writeDist } from './build-lib.mjs';
 
 const HOME_CSS = [
     'home-01-base.css',
@@ -221,8 +222,21 @@ async function buildOne(list, out) {
     writeDist(out, code);
 }
 
+// 自托管字体(UI-Canon v5 §6.6 · Sarabun woff2)源在 static/ai/fonts/,部署只拾
+// dist,而 vite emptyOutDir 每次清空 static/dist —— 故随 CSS 打包一并复制回 dist。
+function copyFonts() {
+    const srcDir = path.join(ROOT, 'static/ai/fonts');
+    const outDir = path.join(ROOT, 'static/dist/fonts');
+    fs.mkdirSync(outDir, { recursive: true });
+    for (const f of fs.readdirSync(srcDir).filter((n) => n.endsWith('.woff2'))) {
+        fs.copyFileSync(path.join(srcDir, f), path.join(outDir, f));
+        console.log(`✅ static/dist/fonts/${f}`);
+    }
+}
+
 async function main() {
     for (const b of BUNDLES) await buildOne(b.list, b.out);
+    copyFonts();
 }
 
 main().catch((e) => {

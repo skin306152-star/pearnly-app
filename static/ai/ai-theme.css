@@ -6,6 +6,22 @@
   padding: 0;
   box-sizing: border-box;
 }
+/* UI-Canon v5 §6.6 · 泰文官方正体 Sarabun 自托管(OFL·源 services/export/fonts 同族,
+ * woff2 落 static/dist/fonts —— webhook 部署只拾 dist,build 时从 static/ai/fonts 复制)。 */
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/dist/fonts/Sarabun-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/static/dist/fonts/Sarabun-Bold.woff2') format('woff2');
+}
 :root {
   --paper: #f4f1e8;
   --surface: #fdfbf6;
@@ -33,8 +49,13 @@
   --crit-line: #e8ccbd;
   --sh-card: 0 1px 2px rgba(80, 66, 32, 0.05), 0 2px 8px rgba(80, 66, 32, 0.04);
   --sh-pop: 0 2px 6px rgba(80, 66, 32, 0.09), 0 16px 40px rgba(80, 66, 32, 0.12);
+  /* v5 §6.6 字体令牌:泰文 Sarabun 第一优先(Leelawadee UI 回落);界面栈拉丁保持
+   * Inter/Segoe,中文接系统正体,泰文兜底 Sarabun;衬线只准品牌位(logo/金额大数)。 */
   --serif: Georgia, 'Times New Roman', serif;
-  --thai: 'Leelawadee UI', 'Sarabun', system-ui, sans-serif;
+  --thai: 'Sarabun', 'Leelawadee UI', system-ui, sans-serif;
+  --font-ui:
+    'Inter', 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', 'Sarabun',
+    'Leelawadee UI', sans-serif;
 
   /* v5(UI-Canon-v5 §一)——值逐字节抄设计稿,组件层只准 var() 引用。 */
   /* 强调色 · 赤陶橙(主 CTA/聚焦环/关键交互) */
@@ -67,7 +88,7 @@
   --hair3: #f1ede1;
 }
 body {
-  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', var(--thai);
+  font-family: var(--font-ui);
   background: var(--paper);
   color: var(--ink);
   font-size: 13.5px;
@@ -88,6 +109,14 @@ button {
     animation: none !important;
   }
 }
-.num {
+/* v5 §6.6 · 金额与表格数字一律 tabular-nums:.num 惯例推满,含金额的备注/缺口行
+ * 一并兜住(组件层散写的同名声明保持,这条聚合规则只兜漏挂处)。 */
+.num,
+.note,
+.fin-note,
+.sdw-note,
+.crb-gap,
+.crb-needs,
+.rv-vat-row {
   font-variant-numeric: tabular-nums;
 }

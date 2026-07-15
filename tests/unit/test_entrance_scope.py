@@ -51,9 +51,14 @@ class EntranceOfCodeTests(unittest.TestCase):
         self.assertEqual(entrance_of_code("tax.filing.view"), frozenset({"main", "ai"}))
 
     def test_shared_business_prefixes_span_main_and_pos(self):
-        # POS 商户也做采购进货/销售开票/盘点/收料 → 共用,两门都放行
-        for code in ("sales.doc.view", "purchase.doc.create", "inv.view", "intake.upload"):
+        # POS 商户也做销售开票/盘点/收料 → 共用,两门都放行
+        for code in ("sales.doc.view", "inv.view", "intake.upload"):
             self.assertEqual(entrance_of_code(code), frozenset({"main", "pos"}), code)
+
+    def test_purchase_prefix_spans_main_pos_and_ai(self):
+        # 采购/供应商数据跨会计/POS/AI 三方共用(AI 客户画像供应商档案 ai-profile.js → purchase.*)
+        for code in ("purchase.doc.view", "purchase.doc.create", "purchase.supplier.manage"):
+            self.assertEqual(entrance_of_code(code), frozenset({"main", "pos", "ai"}), code)
 
     def test_accounting_only_prefixes_are_main_only(self):
         # 做账/对账/知识库/应收 = 会计主壳专属(POS/AI 壳无这些菜单)
@@ -87,6 +92,13 @@ class EntranceScopeDenyTests(unittest.TestCase):
             self.assertEqual(_entrance_deny(_user(entry="pos"), "sales.doc.view"), "")
             self.assertEqual(_entrance_deny(_user(entry="main"), "sales.doc.view"), "")
             self.assertEqual(_entrance_deny(_user(entry="pos"), "inv.view"), "")
+
+    def test_gate_on_ai_entry_allowed_purchase(self):
+        # AI 客户画像供应商档案(ai-profile.js → /api/purchase/supplier-profiles)走 purchase.* 码,
+        # purchase 映射含 ai → ai-entry 打 purchase.* 放行(否则开闸误伤 AI 工作台)
+        with _scope(True):
+            self.assertEqual(_entrance_deny(_user(entry="ai"), "purchase.doc.view"), "")
+            self.assertEqual(_entrance_deny(_user(entry="ai"), "purchase.supplier.manage"), "")
 
     def test_gate_on_accounting_code_denies_pos(self):
         # 做账/对账是会计专属:pos-entry 打 acct.*/recon.* → 拒

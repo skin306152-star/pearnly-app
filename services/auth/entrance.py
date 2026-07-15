@@ -28,7 +28,10 @@ ALL_ENTRANCES = (MAIN, POS, AI)
 # 权限码前缀 → 允许的登录入口【集合】(Phase3 API 作用域闸的判据 · 按前缀判、不按 URL 判:
 # tax_profile_routes 是 AI 接口却寄生 /api/workspace 路径)。一码可跨多门——业务功能被多个壳
 # 共用,不能一码归一门(2026-07-16 查证坐实):
-#   - sales/purchase/inv/intake = {main, pos}:POS 商户也做采购进货 / 销售开票 / 盘点 / 收料。
+#   - sales/inv/intake = {main, pos}:POS 商户也做销售开票 / 盘点 / 收料。
+#   - purchase = {main, pos, ai}:采购/供应商数据跨会计/POS/AI 三方共用(AI 工作台客户画像
+#     供应商档案 ai-profile.js → /api/purchase/supplier-profiles GET/PUT/DELETE 也调 purchase.* 码,
+#     AI 处理进项发票天然要读写供应商档案)。
 #   - tax = {main, ai}:会计主壳报税中心(src/home/tax-*.ts → /api/tax/filings·settings)与
 #     AI SPA 工单(static/ai/ai-api*.js → /api/workorder,四权分立映射 tax.filing.*)都调 tax.* 码。
 #   - acct/recon/kb/ar = {main}:做账/对账/知识库/应收是会计主壳专属,POS/AI 壳无这些菜单
@@ -44,7 +47,7 @@ _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
     "kb": frozenset({MAIN}),
     "ar": frozenset({MAIN}),
     "sales": frozenset({MAIN, POS}),
-    "purchase": frozenset({MAIN, POS}),
+    "purchase": frozenset({MAIN, POS, AI}),  # AI 客户画像供应商档案(ai-profile.js)也调 purchase.*
     "inv": frozenset({MAIN, POS}),
     "intake": frozenset({MAIN, POS}),
 }

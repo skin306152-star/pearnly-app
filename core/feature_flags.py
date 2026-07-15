@@ -276,17 +276,23 @@ def pos_provision_lock_enabled_for(tenant_id: Optional[str]) -> bool:
 
 
 def entrance_gate_enabled_for(tenant_id: Optional[str]) -> bool:
-    """登录入口准入门(各是各的)总闸/回退开关。关 = 不拦任何门都通(现状);
-    开 = 未被授权该入口的账号从该门登录按账号密码错误拒。按 tenant 判定;测稳后 rollout=all。
+    """登录入口准入门(各是各的)总闸/回退开关 · 已验收开闸(2026-07-16)→ 全租户恒开(测完就全开)。
+
+    6 个真账号从各自门登录推导入口集均含该门·无锁(开闸安全)。这是已上线的产品行为,不再走
+    platform_settings allowlist 灰度;要整体停用改这一行回
+    `return _enabled(ENTRANCE_GATE_KEY, tenant_id, "entrance_gate_enabled_for")`(20s 部署急停)。
     """
-    return _enabled(ENTRANCE_GATE_KEY, tenant_id, "entrance_gate_enabled_for")
+    return True
 
 
 def entrance_api_scope_enabled_for(tenant_id: Optional[str]) -> bool:
-    """入口级 API 纵深隔离闸(Phase3)。关 = API 不卡 token.entry 作用域(现状零变化);
-    开 = token.entry 不在码允许入口集则拒。与 entrance_gate(登录准入)独立放量。按 tenant 判定。
+    """入口级 API 纵深隔离闸(Phase3)· 已验收开闸(2026-07-16)→ 全租户恒开(测完就全开)。
+
+    purchase 映射已补 ai(客户画像供应商档案),静态核三壳(main/pos/ai)正常调用全放行。这是已
+    上线的产品行为,不再走 platform_settings allowlist 灰度;要整体停用改这一行回
+    `return _enabled(ENTRANCE_API_SCOPE_KEY, tenant_id, "entrance_api_scope_enabled_for")`(20s 部署急停)。
     """
-    return _enabled(ENTRANCE_API_SCOPE_KEY, tenant_id, "entrance_api_scope_enabled_for")
+    return True
 
 
 def pearnly_ai_sod_enabled_for(tenant_id: Optional[str]) -> bool:

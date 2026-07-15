@@ -35,10 +35,13 @@ class CheckOrderTests(unittest.TestCase):
         self.assertTrue(allowed)
 
     def test_cashier_role_limited_to_cashier_codes(self):
+        # 收银员从 pos 门登录(entry='pos'),入口作用域闸恒开下与 pos.*/共用码天然匹配
         with mock.patch.object(deps, "_pos_token_payload", _no_pos_token):
-            allowed, _ = deps._check(None, _user(role="cashier"), "pos.sale.operate")
+            allowed, _ = deps._check(None, _user(role="cashier", entry="pos"), "pos.sale.operate")
             self.assertTrue(allowed)
-            allowed, reason = deps._check(None, _user(role="cashier"), "sales.doc.view")
+            allowed, reason = deps._check(
+                None, _user(role="cashier", entry="pos"), "sales.doc.view"
+            )
         self.assertFalse(allowed)
         self.assertEqual(reason, "pos_token_out_of_scope")
 
@@ -55,7 +58,9 @@ class CheckOrderTests(unittest.TestCase):
             mock.patch.object(deps, "_module_disabled", return_value=True),
             mock.patch.object(deps, "_cached_authz", return_value=owner_authz),
         ):
-            allowed, reason = deps._check(None, _user(role="owner"), "pos.admin.manage")
+            allowed, reason = deps._check(
+                None, _user(role="owner", entry="pos"), "pos.admin.manage"
+            )
         self.assertFalse(allowed)
         self.assertEqual(reason, "module_disabled")
 

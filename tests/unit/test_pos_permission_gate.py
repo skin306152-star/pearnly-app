@@ -110,13 +110,20 @@ class PosWorkspaceGateTests(unittest.TestCase):
 
 class RequirePermPosMatrixTests(unittest.TestCase):
     def test_cashier_allowed_on_cashier_code(self):
-        cashier = {"tenant_id": "t", "id": "c", "role": "cashier", "is_super_admin": False}
+        # 收银员 token 天然 entry=pos(pos_auth 合成)· 入口作用域闸恒开下与 pos.* 码匹配
+        cashier = {
+            "tenant_id": "t",
+            "id": "c",
+            "role": "cashier",
+            "is_super_admin": False,
+            "entry": "pos",
+        }
         with mock.patch("core.pos_api.pos_auth", return_value=cashier):
             user = deps.require_perm_pos(_Req(), "pos.sale.operate")
         self.assertEqual(user["id"], "c")
 
     def test_owner_codes_allowed(self):
-        owner = {"tenant_id": "t", "id": "u", "role": "owner"}
+        owner = {"tenant_id": "t", "id": "u", "role": "owner", "entry": "pos"}
         with _gate(owner, *ALL_CODES):
             tid, uid = deps.require_perm_pos_tid(_Req(), "pos.admin.manage")
         self.assertEqual((tid, uid), ("t", "u"))

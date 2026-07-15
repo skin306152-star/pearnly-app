@@ -316,6 +316,7 @@ class SelfCapActionWiringTests(unittest.TestCase):
         "workspace_client_id": 7,
         "role": "cashier",
         "is_super_admin": False,
+        "entry": "pos",  # 收银员 token 天然 entry=pos(pos_auth 合成)· 入口作用域闸恒开下须匹配
     }
 
     def _run(self, *, action, caps, write_fn):
@@ -432,6 +433,7 @@ class GatedWriteTests(unittest.TestCase):
         "workspace_client_id": 7,
         "role": "cashier",
         "is_super_admin": False,
+        "entry": "pos",  # 收银员 token 天然 entry=pos(pos_auth 合成)· 入口作用域闸恒开下须匹配
     }
 
     def _run(self, *, gate_on, write_fn):

@@ -184,6 +184,20 @@ class VatReconTasksStoreTests(unittest.TestCase):
         with boom_cursor():
             self.assertEqual(vrt.delete_vat_recon_tasks_older_than(30, TENANT, USER), (0, []))
 
+    def test_delete_older_than_global_same_shape_no_tenant_scope(self):
+        # ENC-c janitor 用:全租户版 · 复用同一 7 天(可变 days)判定,不按 tenant/user 限定。
+        cur = FakeCursor(
+            fetchall=[{"excel_path": "/a.xlsx"}, {"excel_path": None}, {"excel_path": "/b.xlsx"}]
+        )
+        with patch_cursor(cur):
+            n, paths = vrt.delete_vat_recon_tasks_older_than_global(7)
+        self.assertEqual(n, 3)
+        self.assertEqual(paths, ["/a.xlsx", "/b.xlsx"])
+        self.assertNotIn("tenant_id", cur.all_sql())
+        self.assertNotIn("user_id", cur.all_sql())
+        with boom_cursor():
+            self.assertEqual(vrt.delete_vat_recon_tasks_older_than_global(7), (0, []))
+
     def test_kpi_coerces_ints(self):
         cur = FakeCursor(fetchone={"this_month": "4", "running": None, "done": 2, "failed": "1"})
         with patch_cursor(cur):

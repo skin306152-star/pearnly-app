@@ -98,6 +98,10 @@ class OcrJobsWorkerBypass(unittest.TestCase):
     def test_gc_old(self):
         self._assert_bypass(store.gc_old)
 
+    def test_get_status_map(self):
+        # ENC-c janitor:跨租户批量状态查询,同样必须 bypass。
+        self._assert_bypass(store.get_status_map, ["11111111-1111-1111-1111-111111111111"])
+
 
 if __name__ == "__main__":
     unittest.main()

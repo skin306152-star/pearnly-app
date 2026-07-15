@@ -258,6 +258,30 @@ def delete_vat_recon_tasks_older_than(days: int, tenant_id, user_id: str):
         return 0, []
 
 
+def delete_vat_recon_tasks_older_than_global(days: int):
+    """ENC-c janitor 全量版:同 delete_vat_recon_tasks_older_than 的 7 天判定(created_at)·
+    不按 tenant/user 限定 —— 后台清扫覆盖全部租户,原手动端点(单用户触发)保留不动。
+
+    bypass:后台 janitor 跨租户扫描,无 HTTP 单租户上下文。返回 (deleted_count, excel_paths[])。
+    """
+    try:
+        with db.get_cursor_rls(bypass=True, commit=True) as cur:
+            cur.execute(
+                """
+                DELETE FROM vat_recon_tasks
+                WHERE created_at < NOW() - (%s || ' days')::interval
+                RETURNING excel_path
+                """,
+                (str(int(days)),),
+            )
+            rows = cur.fetchall()
+            paths = [r["excel_path"] for r in rows if r.get("excel_path")]
+            return len(rows), paths
+    except Exception as e:
+        logger.error(f"delete_vat_recon_tasks_older_than_global failed: {e}")
+        return 0, []
+
+
 def get_vat_recon_tasks_kpi(tenant_id, user_id: str, workspace_client_id=None):
     """本月 KPI: total / running / done / failed(PO-6c:再叠套账过滤 rollout-safe)"""
     ws_sql, ws_params = _ws_clause(workspace_client_id)

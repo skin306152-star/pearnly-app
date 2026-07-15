@@ -71,6 +71,22 @@ class VatReconTasksRlsContractTests(unittest.TestCase):
         self.assertEqual(calls[0].get("user_id"), "usr-1")
 
 
+class VatReconTasksJanitorRlsContractTests(unittest.TestCase):
+    """ENC-c janitor 的全租户清扫版必须 bypass=True(跨租户后台扫描,无 HTTP 单租户上下文),
+    与用户手动触发的 delete_vat_recon_tasks_older_than(带 tenant/user scope)刻意不同。"""
+
+    def test_delete_older_than_global_uses_bypass(self):
+        calls, fake = _capture()
+        with (
+            mock.patch("core.db.get_cursor_rls", fake),
+            mock.patch("core.db.get_cursor", side_effect=AssertionError("must use get_cursor_rls")),
+        ):
+            store.delete_vat_recon_tasks_older_than_global(7)
+        self.assertTrue(calls[0].get("bypass"))
+        self.assertIsNone(calls[0].get("tenant_id"))
+        self.assertIsNone(calls[0].get("user_id"))
+
+
 class GlVatTaskRlsContractTests(unittest.TestCase):
     """gl_vat_task 同 tenant_or_user 模板;delete 此前只有 user_id,新增 tenant_id 参数,
     否则 tenant 拥有的任务在 RLS 下不可见、删 0 行。"""

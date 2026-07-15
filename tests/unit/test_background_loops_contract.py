@@ -26,6 +26,7 @@ class BackgroundLoopsContractTests(unittest.TestCase):
             "run_recovery_tick",
             "run_accounting_posting_failure_tick",
             "run_line_ocr_job_tick",
+            "run_stage_janitor_tick",
             "email_ingest_loop",
             "run_email_ingest_tick",
         ):
@@ -39,7 +40,27 @@ class BackgroundLoopsContractTests(unittest.TestCase):
         self.assertTrue(inspect.iscoroutinefunction(bl.run_recovery_tick))
         self.assertTrue(inspect.iscoroutinefunction(bl.run_accounting_posting_failure_tick))
         self.assertTrue(inspect.iscoroutinefunction(bl.run_line_ocr_job_tick))
+        self.assertTrue(inspect.iscoroutinefunction(bl.run_stage_janitor_tick))
         self.assertTrue(inspect.iscoroutinefunction(bl.run_email_ingest_tick))
+
+    def test_recovery_tick_tolerates_stage_janitor_crash(self):
+        # ENC-c:janitor 搭 run_recovery_tick 便车 · run_once 炸了不能拖垮整条 recovery 链路
+        # (其它 tick 仍要跑完)· try/except 挂点在 run_recovery_tick,同 acct/line_ocr 先例。
+        from services.ops import stage_janitor
+
+        called = {"n": 0}
+        orig = stage_janitor.run_once
+
+        def _boom():
+            called["n"] += 1
+            raise RuntimeError("boom")
+
+        stage_janitor.run_once = _boom
+        try:
+            asyncio.run(bl.run_recovery_tick())  # 不应 raise
+        finally:
+            stage_janitor.run_once = orig
+        self.assertEqual(called["n"], 1)
 
     def test_startup_uses_single_source_loops(self):
         # REFACTOR-WA-B1 R5:lifespan(起这两条 loop)已抽到 services/startup.py

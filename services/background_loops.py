@@ -189,6 +189,10 @@ async def run_recovery_tick():
         await auto_open.run_tick()
     except Exception as e:
         logger.warning(f"[workorder_auto_open] tick failed: {e}")
+    try:
+        await run_stage_janitor_tick()
+    except Exception as e:
+        logger.warning(f"[stage_janitor] tick failed: {e}")
     from services.workorder import reaper
 
     # run_tick 自吞异常(挂点安全在 reaper 内部保证),与 erp_retry_loop 开场的调用点一致裸调。
@@ -207,6 +211,15 @@ async def run_line_ocr_job_tick():
     from services.ocr import line_ocr_jobs
 
     await line_ocr_jobs.process_due(limit=3)
+
+
+async def run_stage_janitor_tick():
+    """ENC-c · recon_jobs/ocr_jobs 暂存目录 + vat_recon 老产物清扫(搭 recovery tick 便车)。"""
+    import asyncio as _asyncio
+
+    from services.ops import stage_janitor
+
+    await _asyncio.to_thread(stage_janitor.run_once)
 
 
 async def email_ingest_loop():

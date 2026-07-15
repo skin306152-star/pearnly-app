@@ -299,6 +299,33 @@ class GetTests(unittest.TestCase):
             self.assertIsNone(rj.get("j1"))
 
 
+class GetStatusMapTests(unittest.TestCase):
+    """ENC-c janitor 用:批量取暂存目录名(job_id)对应的 status。"""
+
+    def test_empty_ids_short_circuits_without_db(self):
+        with patch_cursor_raises():
+            self.assertEqual(rj.get_status_map([]), {})
+
+    def test_dedupes_and_returns_map(self):
+        cur = FakeCursor(
+            fetchall=[{"id": "j1", "status": "done"}, {"id": "j2", "status": "running"}]
+        )
+        with patch_cursor(cur):
+            out = rj.get_status_map(["j1", "j1", "j2"])
+        self.assertEqual(out, {"j1": "done", "j2": "running"})
+        self.assertIn("ANY(%s::uuid[])", cur.last_sql)
+
+    def test_missing_ids_absent_from_result(self):
+        cur = FakeCursor(fetchall=[{"id": "j1", "status": "done"}])
+        with patch_cursor(cur):
+            out = rj.get_status_map(["j1", "orphan-id"])
+        self.assertEqual(out, {"j1": "done"})
+
+    def test_exception_returns_empty_dict(self):
+        with patch_cursor_raises():
+            self.assertEqual(rj.get_status_map(["j1"]), {})
+
+
 class GcOldTests(unittest.TestCase):
     def test_returns_rowcount_and_passes_days(self):
         cur = FakeCursor(rowcount=5)

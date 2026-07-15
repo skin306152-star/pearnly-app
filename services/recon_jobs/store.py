@@ -448,6 +448,27 @@ def get(
         return None
 
 
+def get_status_map(job_ids: List[str]) -> Dict[str, str]:
+    """批量取多个 job 的 status(ENC-c janitor 用)· 只返回存在的 id(不存在的 id 不出现在结果里,
+    调用方按此判定『job 行不存在』= 孤儿暂存目录)。
+
+    bypass:后台 janitor 跨租户扫暂存目录(无 HTTP 单租户上下文),同 claim_next/reclaim_stale 先例。
+    """
+    ids = sorted({str(x) for x in (job_ids or []) if x})
+    if not ids:
+        return {}
+    try:
+        with get_cursor_rls(bypass=True) as cur:
+            cur.execute(
+                "SELECT id, status FROM recon_jobs WHERE id = ANY(%s::uuid[])",
+                (ids,),
+            )
+            return {str(r["id"]): r["status"] for r in (cur.fetchall() or [])}
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"get_status_map failed: {e}")
+        return {}
+
+
 def gc_old(done_days: int = 7, failed_days: int = 30) -> int:
     """清理老任务记录(暂存文件由工人单独清)· 返回删除行数。"""
     try:

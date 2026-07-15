@@ -198,12 +198,7 @@ document.addEventListener('click', () => {
 setupDropdown('lang-dropdown', (item: any) => applyLang(item.dataset.lang));
 
 // 路由表抽 route-table.ts(纯数据 · 控本文件行数):加新页改那边,这里只消费。
-import {
-    VALID_ROUTES,
-    ROUTE_LOADERS,
-    POS_ENTRY_ROUTES,
-    MAIN_ENTRY_ROUTES,
-} from './route-table.js';
+import { VALID_ROUTES, ROUTE_LOADERS, POS_ENTRY_ROUTES, MAIN_ENTRY_ROUTES } from './route-table.js';
 
 // Phase3 入口守卫(各是各的 · 纯 UX;后端 _check 是真边界):跨壳深链回落当前入口首页。
 // 仅在 window._entry 明确为 'pos'/'main' 时生效(旧会话为空 → 不拦,向后兼容);两壳共用 /

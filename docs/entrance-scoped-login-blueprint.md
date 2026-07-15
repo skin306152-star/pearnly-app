@@ -100,8 +100,16 @@ preboot 遮罩误伤 → 入口壳不新增 preboot、复用现有门时序；mo
 `agent_registry.json`（lint-agent 硬门）+ 配 contract 测试；建表走 alembic 禁 services `ensure_`。
 e2e 凭据只在 env，CI 无凭据下 01/13/15/24/25 全 skip（改坏真登录 CI 绿也发现不了，只本地炸）。
 
-## 7. 状态
+## 7. 状态 · ★全上线并激活（2026-07-16 · CI 全绿）
 
-- Phase 1 后端 + 前端已落地、单测绿、build 出 dist、headless 验收进行/通过。**未 push（等 Zihao 真机门）**。
-- Phase 2 / Phase 3 待办。
-- `entrance_gate` 默认关 → 即便部署也零行为变化，直到 Zihao 真机点头 `rollout=all` 放量。
+| 批 | commit | 内容 | CI |
+|---|---|---|---|
+| Phase 1 | `27511487` | token entry claim + 登录准入门 + 壳认服务器 entry + /pos 删劫持 | ✅ |
+| Phase 3 | `1c5350c6` `0c6040c5` | API 作用域闸(码→入口集合) + 前端路由守卫 + 封影子活体 | ✅ |
+| 激活 | `eb7a8b99` | 两闸 `return True` + purchase 补 ai | ✅ |
+| Phase 2 | `dfc95956` | tenant_entrances 表 + 双轨回落 + 发放钩子 + 回填脚本 | ✅ |
+
+- **两闸已开**（`entrance_gate` 登录准入 + `entrance_api_scope` API 隔离）→ "各是各的"生效中。
+- **急停**：改 `core/feature_flags.py` 两函数回 `return _enabled(...)`（20s 部署）。
+- **遗留手动步（需 prod 写权 · 可选）**：prod `alembic upgrade`（建 tenant_entrances 表）+ `python scripts/backfill_tenant_entrances.py --apply`（回填），才从推导切显式表。**不做也不影响**——`authorized_entrances` 表缺失时永远走推导，行为一致。
+- 已验证不锁账号：6 个已知真账号从各自门登录推导入口集均含该门（prod 只读库核实）。

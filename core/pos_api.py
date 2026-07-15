@@ -150,6 +150,7 @@ def _pos_token_subject(request: Request) -> Optional[dict]:
         "display_name": payload.get("display_name"),
         "role": "cashier",
         "is_super_admin": False,
+        "entry": "pos",  # 收银员会话天然属 pos 入口(Phase3 API 作用域按此归类)
     }
 
 

@@ -39,10 +39,15 @@ def _modules_view(cur, tenant_id: str) -> dict:
 
 @router.get("/modules")
 async def api_get_modules(request: Request):
-    """当前租户开了哪些模块(含默认回落)+ 业态。前端导航/路由按此显隐。"""
+    """当前租户开了哪些模块(含默认回落)+ 业态 + 会话入口。前端导航/路由按此显隐/定壳。"""
+    from core.auth import entry_of_request
+
     tid, _uid = require_tenant(request)
     with db.get_cursor_rls(tid) as cur:
-        return ok(_modules_view(cur, tid))
+        view = _modules_view(cur, tid)
+    # 会话入口权威下发:壳由 token.entry 定,前端不再猜 per-browser localStorage(根治串壳)。
+    view["entry"] = entry_of_request(request)
+    return ok(view)
 
 
 @router.put("/onboarding")

@@ -65,11 +65,14 @@ class PosLoginPageContentTests(unittest.TestCase):
         self.assertIn("mrpilot_token", POS_LOGIN_HTML)
         self.assertIn("/home", POS_LOGIN_HTML)
 
-    def test_old_cashier_device_redirect_guard(self):
-        # 老收银设备兼容:本机存过 pos_store_token(键名与收银台 SPA 精确一致)→ 跳 /cashier。
-        self.assertIn("pos_store_token", POS_LOGIN_HTML)
-        self.assertIn("/cashier", POS_LOGIN_HTML)
-        self.assertIn("location.replace", POS_LOGIN_HTML)
+    def test_no_pos_store_token_hijack(self):
+        # 2026-07-16:/pos 已是老板后台,收银设备的家在 /cashier(设备扫店铺码绑定)。
+        # 旧收银台域名时代的"存过 pos_store_token 即 location.replace('/cashier')"劫持已移除
+        # ——老板浏览器残留令牌会被误劫持(无痕能进、正常浏览器被弹收银台)。防它被加回:
+        # 剥掉注释后页面不得再有设备令牌/收银台跳转逻辑。
+        self.assertNotIn("pos_store_token", POS_LOGIN_HTML)
+        self.assertNotIn("location.replace", POS_LOGIN_HTML)
+        self.assertNotIn("/cashier", POS_LOGIN_HTML)
 
 
 class PosLoginRouteContractTests(unittest.TestCase):

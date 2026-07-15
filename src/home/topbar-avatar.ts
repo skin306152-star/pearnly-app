@@ -227,6 +227,12 @@
                         } catch (_) {
                             /* silent · localStorage 私模/配额 */
                         }
+                        try {
+                            // 入口提示登出即清:壳的权威是 token.entry,登出后不留旧门痕迹
+                            localStorage.removeItem('pearnly_entry');
+                        } catch (_) {
+                            /* silent · localStorage 私模/配额 */
+                        }
                         window.location.href = window.loginUrl!();
                     });
                     break;

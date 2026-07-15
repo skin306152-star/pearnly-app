@@ -40,6 +40,9 @@ class LoginRequest(BaseModel):
     remember_me: bool = False
     # v109.3.2 · 兼容前端简写
     remember: Optional[bool] = None
+    # 登录入口(会话级):main=会计站 / pos=收银老板后台 / ai=Pearnly AI。各登录页带上,
+    # 决定 token.entry 与准入校验。缺省/旧客户端 → main(天然归会计站)。
+    entry: Optional[str] = None
 
     def is_remember(self) -> bool:
         if self.remember is not None:
@@ -121,6 +124,14 @@ async def login(req: LoginRequest, request: Request):
         except Exception as e:
             logger.warning(f"[auth] 校验账户过期失败: {e}")
 
+    # 入口准入(各是各的):未被授权该门的账号,当作账号密码错误拒(不泄漏、无指向文案)。
+    # 不计入失败锁定计数(避免用错门把真账号锁死 / 有效用户名撞门 DoS);超管任意门放行、
+    # 回退闸关时不拦 —— 判据全在 services.auth.entrance。
+    from services.auth.entrance import login_entrance_allowed
+
+    if not login_entrance_allowed(req.entry, user):
+        raise HTTPException(401, detail="auth.invalid_credentials")
+
     db.update_last_login(str(user["id"]))
     # v118.11 · plan=NULL 防御兜底 · 防止 token payload 含 None 导致后续验证异常
     _safe_plan = user.get("plan") or "free"
@@ -132,6 +143,7 @@ async def login(req: LoginRequest, request: Request):
         role=user.get("role") or "owner",
         is_super_admin=bool(user.get("is_super_admin")),
         remember_me=req.is_remember(),
+        entry=req.entry or "main",
     )
     # 登录成功 · 清空失败记录(commit=True:清除也要落库,否则下次仍按旧失败数误锁)
     try:

@@ -252,7 +252,7 @@
             const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, remember }),
+                body: JSON.stringify({ username, password, remember, entry: 'main' }),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.access_token) {

@@ -132,10 +132,24 @@ function resolvePreset(
     return original;
 }
 
-function apply(modules: Record<string, ModuleFlag>, businessType?: string | null): void {
+function apply(
+    modules: Record<string, ModuleFlag>,
+    businessType?: string | null,
+    entry?: string | null
+): void {
     // 单一事实源:退出登录按壳分流(topbar-avatar)靠它决定落 /pos 还是 /login。
     window._businessType = businessType || '';
-    window._entry = localStorage.getItem('pearnly_entry') || '';
+    // 会话入口权威来源 = 服务器按 token.entry 下发(根治串壳:不再猜 per-browser localStorage)。
+    // 缺失(旧后端/旧 token)→ 回落 localStorage 提示;再无则空 → 由 businessType 兜底(向后兼容)。
+    window._entry = entry || localStorage.getItem('pearnly_entry') || '';
+    // 自愈 pre-auth 登录页提示:让 pearnly_entry 收敛到权威 entry(下次冷启动/退出弹对门)。
+    if (entry) {
+        try {
+            localStorage.setItem('pearnly_entry', entry);
+        } catch (_) {
+            /* silent · localStorage 私模/配额 */
+        }
+    }
     const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
     const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
     const on = (k: string) => !!(modules[k] && modules[k].enabled);
@@ -194,7 +208,7 @@ async function applyModuleNav() {
     try {
         const body = await apiGet('/api/me/modules');
         const data = (body && body.data) || {};
-        apply(data.modules || {}, data.business_type);
+        apply(data.modules || {}, data.business_type, data.entry);
         if (data.needs_onboarding) {
             maybeAutoOnboard(data); // 新注册 → 引导向导(末步=选套账)
         } else if (

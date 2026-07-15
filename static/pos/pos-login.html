@@ -11,9 +11,10 @@
   toLowerCase() 只是锦上添花(与发放侧存储归一小写观感一致),删了也不影响命中 ——
   别的登录门(/ai /earn)不要照抄前端小写化,后端已兜底。
 
-  老收银设备兼容:head 最前的 guard 若本机存过 pos_store_token(键名与收银台 SPA 精确一致)
-  即 location.replace 到 /cashier。鉴权零新增:打主站 POST /api/login,拿 access_token 后按
-  主站同款 localStorage['mrpilot_token'] 落地进 /home。
+  /pos = 老板后台登录门(entry='pos')。鉴权零新增:打主站 POST /api/login 带 entry='pos',拿
+  access_token 后按主站同款 localStorage['mrpilot_token'] 落地进 /home。收银设备的家在 /cashier
+  (设备扫店铺码绑定,pos_store_token),与本页无关——本页不再按残留店铺令牌劫持跳转(旧收银台
+  域名时代的迁移拐杖,已随 /cashier 独立而移除:老板浏览器残留令牌会被误劫持,收银设备直开 /cashier)。
   配色对齐 static/pos/pos.css 的 --accent / --accent-d 令牌(POS Purple v2)· 改令牌两处同步。
 -->
 <html lang="zh">
@@ -22,17 +23,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>POS · Pearnly</title>
     <meta name="robots" content="noindex,nofollow" />
-    <script>
-      // 老收银设备接回:本机存过收银台设备绑定凭据 → 直接进收银台新家 /cashier(不闪登录页)。
-      // 放在 head 最前、渲染 body 前执行,键名与收银台 SPA(pos.js STORE_TOKEN_KEY)精确一致。
-      (function () {
-        try {
-          if (localStorage.getItem('pos_store_token')) {
-            location.replace('/cashier' + location.search);
-          }
-        } catch (e) {}
-      })();
-    </script>
     <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <style>
@@ -333,7 +323,7 @@
             var r = await fetch('/api/login', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: acct, password: pw, remember: true }),
+              body: JSON.stringify({ username: acct, password: pw, remember: true, entry: 'pos' }),
             });
             var data = await r.json().catch(function () {
               return {};

@@ -240,6 +240,12 @@
                         return;
                     }
                     root.localStorage.setItem('mrpilot_token', data.access_token);
+                    // 入口提示(pre-auth 冷启动/退出用):AI 门。壳权威仍是 token.entry='ai'。
+                    try {
+                        root.localStorage.setItem('pearnly_entry', 'ai');
+                    } catch (_) {
+                        /* silent */
+                    }
                     if (typeof opts.onSuccess === 'function') opts.onSuccess(data);
                 })
                 .catch(function (err) {

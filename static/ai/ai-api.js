@@ -131,6 +131,7 @@
                     username: username,
                     password: password,
                     remember: !!remember,
+                    entry: 'ai',
                 });
             },
             // 邀请制门面判别用:token 有效性探针(非闸接口)——工单闸 404 时借它分辨"未登录/

@@ -130,6 +130,9 @@ PEARNLY_AI_LINE_INTAKE_KEY = "pearnly_ai_line_intake"
 # 按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);消费在
 # services/notification/workorder_notify.py。
 PEARNLY_AI_RUN_NOTIFY_KEY = "pearnly_ai_run_notify"
+# 登录入口准入门(各是各的)· 回退开关。关 = 不拦,任何门都通(上线前/回退=现状);
+# 开 = 未被授权该入口的账号从该门登录,按账号密码错误拒登。按 tenant 判定。测稳后 rollout=all。
+ENTRANCE_GATE_KEY = "entrance_gate"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -266,6 +269,13 @@ def pos_provision_lock_enabled_for(tenant_id: Optional[str]) -> bool:
     按 tenant 判定;放行判据(存量豁免 / 授权 / 订阅)在 entitlements.pos_provision_allowed。
     """
     return _enabled(POS_PROVISION_LOCK_KEY, tenant_id, "pos_provision_lock_enabled_for")
+
+
+def entrance_gate_enabled_for(tenant_id: Optional[str]) -> bool:
+    """登录入口准入门(各是各的)总闸/回退开关。关 = 不拦任何门都通(现状);
+    开 = 未被授权该入口的账号从该门登录按账号密码错误拒。按 tenant 判定;测稳后 rollout=all。
+    """
+    return _enabled(ENTRANCE_GATE_KEY, tenant_id, "entrance_gate_enabled_for")
 
 
 def pearnly_ai_sod_enabled_for(tenant_id: Optional[str]) -> bool:

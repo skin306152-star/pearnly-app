@@ -25,6 +25,10 @@ JWT_REMEMBER_DAYS = int(os.environ.get("JWT_REMEMBER_DAYS", "7"))
 POS_TOKEN_TTL_HOURS = 12  # POS 收银员 token 有效期(离线缓存窗口 · docs/pos/04 §1)
 POS_STORE_TOKEN_TTL_DAYS = 365  # 设备店铺令牌(绑定一次长期用 · docs/pos/04 §1b)
 
+# 登录入口(会话级)· token 烙 entry claim,壳与准入都认它,取代 per-browser localStorage 猜测。
+# main=会计站(自由注册即得) · pos=收银老板后台 · ai=Pearnly AI。未知值一律收敛回 main。
+VALID_ENTRIES = ("main", "pos", "ai")
+
 
 def _jwt_secret() -> str:
     s = os.environ.get("JWT_SECRET", "").strip()
@@ -73,11 +77,14 @@ def create_access_token(
     role: str = "owner",
     is_super_admin: bool = False,
     remember_me: bool = False,
+    entry: str = "main",
 ) -> str:
     """生成最小声明 JWT。
 
     身份、租户、角色、套餐每次从 DB 取最新值,不再塞进浏览器可解码的 token 里。
     remember_me=True → 默认 7 天;否则默认 12 小时。两者均可用 env 覆盖。
+    entry=会话入口(main/pos/ai)· 决定登录后落哪个壳、Phase3 起还锁 API 作用域;
+    默认 main 使孤儿签发点(OAuth/LINE/LIFF/注册自动登录)天然归会计站。
     """
     # v118.32.5.5.10 · 1 账号 1 设备:每次签发新 jti · 注册为 active_jti · 旧 jti 自动失效
     jti = str(uuid.uuid4())
@@ -89,6 +96,7 @@ def create_access_token(
         "sub": user_id,
         "jti": jti,
         "typ": "access",
+        "entry": entry if entry in VALID_ENTRIES else "main",
         "iat": now,
         "exp": expires_at,
     }
@@ -314,6 +322,11 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
     except Exception as _e:
         logger.warning(f"[active_tenant] override skip: {_e}")
 
+    # 会话入口:token 的 entry claim 透传到 user 上下文(壳/准入的权威来源)。
+    # user 是从 DB 重建的,payload 自定义 claim 不会自动带入 → 必须显式复制这一行,
+    # 否则下游 require_perm/壳全读不到 entry。老 token 无此 claim → 回落 main(向后兼容)。
+    user["entry"] = payload.get("entry") or "main"
+
     # REFACTOR-WA-B6 part2 · 鉴权成功后绑定日志上下文(本请求后续日志带 user/tenant)·
     # 纯加观测 0 逻辑改 · try 兜底确保绝不影响鉴权结果(日志失败不能踢用户)
     try:
@@ -324,6 +337,21 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
         pass
 
     return user
+
+
+def entry_of_request(request: Request) -> str:
+    """从 Bearer token 读会话入口(main/pos/ai)· 壳/导航据此定壳。无/坏 token → main。
+    收银员/设备 token(typ pos/pos_store)天然归 pos;access token 读 entry claim(老 token 缺
+    → main)。纯解码不查库,供 /api/me/modules 等把权威 entry 下发给前端(前端不再猜 localStorage)。
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return "main"
+    payload = decode_access_token(auth[7:].strip()) or {}
+    if payload.get("typ") in ("pos", "pos_store"):
+        return "pos"
+    entry = payload.get("entry")
+    return entry if entry in VALID_ENTRIES else "main"
 
 
 def get_client_ip(request: Request) -> str:

@@ -72,8 +72,20 @@ const PREVIEW_OK = {
 
 const COMMIT_OK = {
     results: [
-        { row_index: 0, name: 'บริษัท อัลฟ่า จำกัด', tax_id: '0105546015062', status: 'created', id: 101 },
-        { row_index: 1, name: 'บริษัท เบต้า จำกัด', tax_id: '0105551000027', status: 'created', id: 102 },
+        {
+            row_index: 0,
+            name: 'บริษัท อัลฟ่า จำกัด',
+            tax_id: '0105546015062',
+            status: 'created',
+            id: 101,
+        },
+        {
+            row_index: 1,
+            name: 'บริษัท เบต้า จำกัด',
+            tax_id: '0105551000027',
+            status: 'created',
+            id: 102,
+        },
         {
             row_index: 2,
             name: 'บริษัท ซ้ำ จำกัด',
@@ -214,7 +226,12 @@ test.describe('IN-0d · 客户名录批量导入(本地 stub 真浏览器)', () 
             parseBody: {
                 ...PREVIEW_OK,
                 preview: [
-                    { row_index: 0, name: '', status: 'error', reason: 'client_import.err_missing_name' },
+                    {
+                        row_index: 0,
+                        name: '',
+                        status: 'error',
+                        reason: 'client_import.err_missing_name',
+                    },
                 ],
                 valid_count: 0,
                 skip_count: 0,

@@ -2361,7 +2361,7 @@
         const slipBtn = t.slip_path
             ? '<button class="btn btn-ghost btn-sm" onclick="__admTopupSlip(' +
               t.id +
-              ', \'' +
+              ", '" +
               _esc(t.slip_path) +
               '\')">' +
               _esc(_t('adm-topup-view-slip')) +

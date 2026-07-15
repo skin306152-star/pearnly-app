@@ -59,10 +59,37 @@ def entrance_of_code(code: str) -> Optional[frozenset[str]]:
 
 
 def authorized_entrances(tenant_id: Optional[str], user_id: Optional[str]) -> Set[str]:
-    """推导该租户/账号被授权的入口集(Phase1 推导版)。"""
+    """该租户/账号被授权的入口集。Phase2 双轨:显式表 tenant_entrances 有行 → 采信表;
+    表未建/该租户无行/任何异常 → 回落 Phase1 推导。
+
+    过渡期设计:prod 不自动跑迁移,tenant_entrances 表暂不存在 → 永远走推导,登录行为与
+    Phase1 逐字节一致;prod 手动 alembic upgrade 建表 + scripts/backfill_tenant_entrances.py
+    回填后,表侧有行才切表(发放侧注册/开 POS/邀请 AI 也已顺带写表,新数据自然落表)。
+    """
     if not tenant_id:
         return {MAIN}  # 无租户兜底(已建号账号理论上必有 tenant)
 
+    table_ents = _entrances_from_table(tenant_id)
+    if table_ents:
+        return table_ents
+    return _derive_entrances(tenant_id, user_id)
+
+
+def _entrances_from_table(tenant_id: str) -> Set[str]:
+    """读显式表;表缺失/无行/异常一律返空集(交由调用方回落推导),绝不因此抛错锁登录。"""
+    try:
+        from core import db
+        from services.auth import entrance_store
+
+        with db.get_cursor() as cur:
+            return entrance_store.list_entrances(cur, tenant_id)
+    except Exception as e:  # noqa: BLE001 · 表未建(prod 过渡期)/基建抖动 → 静默回落推导
+        logger.debug("[entrance] table read miss · fall back to derivation: %s", e)
+        return set()
+
+
+def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
+    """Phase1 推导版:business_type 非 pos_only=main / pos 模块开=pos / 在 m1 名单=ai。"""
     ents: Set[str] = set()
     from core import db
     from services.modules import store

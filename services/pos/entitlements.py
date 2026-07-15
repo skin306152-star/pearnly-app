@@ -198,6 +198,8 @@ def grant(
 
     apply_preset(cur, tenant_id=str(tenant_id), business_type="pos_only")
 
+    _grant_entrance(cur, str(tenant_id), granted_by)
+
     _write_buyout_audit(
         cur,
         tenant_id=tenant_id,
@@ -284,7 +286,20 @@ def transfer(
     from services.modules.presets import apply_preset
 
     apply_preset(cur, tenant_id=str(to_tenant_id), business_type="pos_only")
+    _grant_entrance(cur, str(to_tenant_id), transferred_by)
     return ent
+
+
+# ── 授权入口集显式表(Phase2)· 开通即授权 pos 入口 ─────────────────────
+def _grant_entrance(cur, tenant_id: str, granted_by: Optional[str]) -> None:
+    """开通/转移成功后顺带写 tenant_entrances(pos)。失败只 log 不 raise、不回滚主发放
+    (读侧 authorized_entrances 表缺行会回落推导,零行为影响)。"""
+    try:
+        from services.auth import entrance_store
+
+        entrance_store.grant_entrance(cur, tenant_id, entrance_store.POS, granted_by)
+    except Exception as e:  # noqa: BLE001 · 入口表写失败不阻断开通主流程
+        logger.warning(f"[entrance] pos grant_entrance skip: {e}")
 
 
 # ── 上限执行(store / cashier)· 只卡持有效授权的租户 ────────────────

@@ -125,6 +125,11 @@ PEARNLY_AI_BRAIN_SHADOW_KEY = "pearnly_ai_brain_shadow"
 # 按 tenant 判定;消费在 services/line_binding/line_intake_staging.py(收料)与
 # line_client_bind_intake.py(群绑定形态)。
 PEARNLY_AI_LINE_INTAKE_KEY = "pearnly_ai_line_intake"
+# 工单跑批结果 LINE 通知闸(IN-0c):默认关 fail-closed。关 = advance() 收尾零发送零台账写,
+# 现状不变;开 = 跑完/卡住/缺料时给发起人(该次 run_requested 的 actor)推一条 LINE 提醒。
+# 按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);消费在
+# services/notification/workorder_notify.py。
+PEARNLY_AI_RUN_NOTIFY_KEY = "pearnly_ai_run_notify"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -317,6 +322,15 @@ def pearnly_ai_shadow_draft_enabled_for(tenant_id: Optional[str]) -> bool:
     tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_SHADOW_DRAFT_KEY, tenant_id, "pearnly_ai_shadow_draft_enabled_for")
+
+
+def pearnly_ai_run_notify_enabled_for(tenant_id: Optional[str]) -> bool:
+    """工单跑批结果 LINE 通知闸(IN-0c)。关 = advance() 收尾零发送零台账写。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);超管在平台后台把该
+    事务所 tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(PEARNLY_AI_RUN_NOTIFY_KEY, tenant_id, "pearnly_ai_run_notify_enabled_for")
 
 
 def pearnly_ai_bank_sales_suggest_enabled_for(tenant_id: Optional[str]) -> bool:

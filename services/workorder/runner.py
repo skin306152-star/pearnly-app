@@ -260,13 +260,15 @@ def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) 
             "status": out.status,
             "stopped_at": out.stopped_at,
         }
-        _finish(tenant_id, work_order_id, EVT_RUN_FINISHED, result)
+        event = _finish(tenant_id, work_order_id, EVT_RUN_FINISHED, result)
+        _notify_run_outcome(tenant_id, work_order_id, event)
         return result
     except (
         Exception
     ) as e:  # noqa: BLE001 - 后台任务:异常落 run_failed 认账 + finally 释放租约,不静默死
         logger.exception(f"[workorder-runner] advance {work_order_id} failed")
-        _finish(tenant_id, work_order_id, EVT_RUN_FAILED, {"error": str(e)[:200]})
+        event = _finish(tenant_id, work_order_id, EVT_RUN_FAILED, {"error": str(e)[:200]})
+        _notify_run_outcome(tenant_id, work_order_id, event)
         return {"error": str(e)[:200]}
     finally:
         # 无论成功/异常都释放租约(供另一终端接管)+ 解进程内去重锁。异常时 finish 已落
@@ -288,14 +290,15 @@ def _release_lease(tenant_id: str, work_order_id: str, lease_owner: str | None) 
         logger.warning(f"[workorder-runner] release-lease {work_order_id} failed: {e}")
 
 
-def _finish(tenant_id: str, work_order_id: str, event_type: str, result: dict) -> None:
+def _finish(tenant_id: str, work_order_id: str, event_type: str, result: dict) -> Optional[dict]:
     """收尾台账:成功落 run_finished、异常落 run_failed(event_type 由调用方按结局定)。
     run_failed 同事务把状态落到 stuck(MC2-A1 ③):崩掉的 run 不许把 status 留在 running
     对 UI 谎称「AI 在做」——事件与状态列一起提交,词取 engine 权威常量不臆造。
-    best-effort:落库失败只记日志,不牵连 finally 的租约释放(诚实收尾优先于事件必达)。"""
+    best-effort:落库失败只记日志,不牵连 finally 的租约释放(诚实收尾优先于事件必达)。
+    返回落库的事件行(供 IN-0c 通知取 event id 做去重键);落库失败返 None。"""
     try:
         with db.get_cursor(commit=True) as cur:
-            store.append_event(
+            event = store.append_event(
                 cur,
                 tenant_id=tenant_id,
                 work_order_id=work_order_id,
@@ -311,5 +314,23 @@ def _finish(tenant_id: str, work_order_id: str, event_type: str, result: dict) -
                     work_order_id=work_order_id,
                     status=engine.STATUS_STUCK,
                 )
+        return event
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[workorder-runner] finish-event {work_order_id} failed: {e}")
+        return None
+
+
+def _notify_run_outcome(tenant_id: str, work_order_id: str, run_event: Optional[dict]) -> None:
+    """跑批收尾通知会计(IN-0c)挂点:通知是增益面,任何故障绝不牵连已经跑完的结果——
+    这里再包一层 try/except(workorder_notify.notify_run_outcome 自身也吞异常,双保险)。"""
+    if not run_event:
+        return
+    try:
+        from services.notification import workorder_notify
+
+        with db.get_cursor() as cur:
+            order = store.get_work_order(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+        if order:
+            workorder_notify.notify_run_outcome(order, run_event["id"])
+    except Exception:  # noqa: BLE001 - 通知任何故障不得影响跑批结果
+        logger.warning("[workorder-runner] run outcome notify skipped", exc_info=True)

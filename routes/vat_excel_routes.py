@@ -12,9 +12,10 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Form
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse
 
 from core import db
+from core import file_crypto
 from core import workspace_context as wc
 from core.auth import get_current_user_from_request
 from core.route_helpers import content_disposition as _content_disposition
@@ -47,18 +48,26 @@ from services.vat.vat_excel_helpers import _require_user, _user_key, _tenant_use
 
 
 def _save_excel_file(tenant_id, task_id: str, xlsx_bytes: bytes) -> Optional[str]:
-    """把 xlsx bytes 写到磁盘 · 返回 path · 失败返回 None"""
+    """把 xlsx bytes 写到磁盘(按开关加密)· 返回 path · 失败返回 None"""
     try:
         folder_key = str(tenant_id) if tenant_id else "no_tenant"
         folder = os.path.join(EXCEL_STORE_DIR, folder_key)
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, f"{task_id}.xlsx")
         with open(path, "wb") as f:
-            f.write(xlsx_bytes)
+            f.write(file_crypto.maybe_seal(xlsx_bytes))
         return path
     except Exception as e:
         logger.error(f"[vex] save_excel_file failed: {e}")
         return None
+
+
+def _read_excel_file(path: str) -> Optional[bytes]:
+    """读回对账 xlsx(双轨解密):密文解回明文,存量明文原样返;缺失返 None。"""
+    if not path or not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        return file_crypto.unseal(f.read())
 
 
 # ════ /check — 前端探测(兼容旧版 · 全网开放后直接返回 allowed=True) ════
@@ -341,15 +350,16 @@ async def download_task(task_id: str, request: Request):
     lang = task.get("lang") or "th"
     excel_path = task.get("excel_path")
 
-    # 热存文件存在 → 直接 serve
-    if excel_path and os.path.exists(excel_path):
+    # 热存文件存在 → 解密后直接 serve(FileResponse 会直吐密文,故读回解密走 StreamingResponse)
+    hot_bytes = _read_excel_file(excel_path)
+    if hot_bytes is not None:
         client_name = (task.get("client_name") or "client")[:20]
         period = task.get("period") or "unknown"
         fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
         fname = f"{fname_prefix}_{client_name}_{period}.xlsx"
         fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
-        return FileResponse(
-            excel_path,
+        return StreamingResponse(
+            io.BytesIO(hot_bytes),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": _content_disposition(fname_clean, "vat_recon.xlsx")},
         )

@@ -33,7 +33,7 @@ from core import feature_flags
 from services.ai_gateway import attribution
 from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
-from services.workorder import decisions, evidence, kinds
+from services.workorder import decisions, evidence, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import checkpoint, ocr_ledger
 from services.workorder.steps import sort as sort_step
@@ -455,7 +455,7 @@ def _default_ocr_image(path: str) -> dict:
     from services.ocr.entrypoints import run_pipeline_for_file
     from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
 
-    data = Path(path).read_bytes()
+    data = storage.read_bytes(path)  # 落盘密文解回明文再喂 OCR(双轨读)
     result = run_pipeline_for_file(data, Path(path).name, api_key=None, document_type="invoice")
     legacy = pipeline_result_to_legacy_dict(result)
     pages = legacy.get("pages") or []
@@ -472,7 +472,7 @@ def _default_ocr_image(path: str) -> dict:
 
 def _default_read_sales_summary(path: str) -> dict:
     """真实现:xlsx 字节交给 summary_import.parse.parse_table 直读(纯函数,零成本)。"""
-    data = Path(path).read_bytes()
+    data = storage.read_bytes(path)  # 落盘密文解回明文再解析(双轨读)
     return parse_table(data, filename=Path(path).name)
 
 

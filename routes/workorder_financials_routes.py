@@ -27,10 +27,11 @@ core.route_helpers,交付物 kind → 人读短名(泰文,与内部 markdown 标
 
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 
 from core import db
 from core.route_helpers import content_disposition, lang_or_default
@@ -107,8 +108,11 @@ async def download_deliverable(work_order_id: str, kind: str, request: Request):
     download_name = _deliverable_download_name(
         kind, path.name, client_name=client_name, period=wo.get("period") or ""
     )
-    return FileResponse(
-        str(path),
+    # 落盘密文经 storage.read_bytes 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return Response(
+        content=storage.read_bytes(path),
+        media_type=media_type,
         headers={"Content-Disposition": content_disposition(download_name, path.name)},
     )
 

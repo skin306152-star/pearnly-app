@@ -33,8 +33,9 @@ def _normalize_specs(raw) -> list[tuple[Path, str]]:
 
 
 def fingerprint(path: Path) -> str:
-    """文件级去重指纹:`file:` + 字节 sha256(与 classify 的票面级 `doc:` 指纹不同名字空间)。"""
-    return "file:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    """文件级去重指纹:`file:` + 明文字节 sha256(与 classify 的票面级 `doc:` 不同名字空间)。
+    经 storage.read_bytes 双轨解密:落盘密文在此解回明文,查重身份与加密前逐字节一致。"""
+    return "file:" + hashlib.sha256(storage.read_bytes(path)).hexdigest()
 
 
 def register_file(ctx: StepContext, path: Path, source: str = _DEFAULT_SOURCE) -> dict:

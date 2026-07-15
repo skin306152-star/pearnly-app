@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from services.workorder import storage
+
 KIND_FINANCIALS = "financials_report"
 
 
@@ -140,8 +142,9 @@ def _write(out_dir: Path, fin: dict, numbers: dict) -> tuple[str, dict]:
         *_trial_balance_lines(tb),
         *_not_wired_lines(fin),
     ]
-    path = out_dir / "financials_report.md"
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path = storage.write_artifact_bytes(
+        out_dir / "financials_report.md", "\n".join(lines).encode("utf-8")
+    )
     snapshot = {
         "period": period,
         "bs_balanced": bool(bs.get("balanced")),

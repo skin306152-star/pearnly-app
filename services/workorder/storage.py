@@ -17,6 +17,8 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from core import file_crypto
+
 _BASE = os.environ.get("WORKORDER_STORAGE_DIR", "/opt/mrpilot/storage/workorders")
 
 _MATERIALS = "materials"
@@ -89,8 +91,23 @@ def save_material(
     dest_dir.mkdir(parents=True, exist_ok=True)
     base = f"{uuid.uuid4().hex}{_NAME_SEP}{stem}" if stem else uuid.uuid4().hex
     path = dest_dir / f"{base}{ext}"
-    path.write_bytes(content)
+    path.write_bytes(file_crypto.maybe_seal(content))
     return path
+
+
+def write_artifact_bytes(path: Path, content: bytes) -> Path:
+    """交付物落盘统一出口(package/pnd_prep/financials/archive 共用):按开关加密后写盘。
+    落盘布局由调用方定(版本段目录已建),本函数只管「加密收口」这一件事。"""
+    Path(path).write_bytes(file_crypto.maybe_seal(content))
+    return Path(path)
+
+
+def read_bytes(path) -> bytes:
+    """工单存储取盘统一出口:读盘 + 双轨解密(密文解开,存量明文原样返)。
+
+    dedupe/freeze 的明文 sha256 语义靠这层:密文在此解回明文再算哈希。文件不存在照 Path
+    行为抛 OSError(调用方各自处理,与加密前一致)。"""
+    return file_crypto.unseal(Path(path).read_bytes())
 
 
 def resolve_within_order(tenant_id: str, work_order_id: str, artifact_path: str) -> Optional[Path]:

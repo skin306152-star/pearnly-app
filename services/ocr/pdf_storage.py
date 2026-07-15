@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
+from core import file_crypto
+
 logger = logging.getLogger(__name__)
 
 PDF_STORAGE_BASE = os.environ.get("PDF_STORAGE_DIR", "/opt/mrpilot/storage/pdfs")
@@ -45,11 +47,21 @@ def save_bytes(user_id: str, content: bytes, suffix: str = ".bin") -> Tuple[Opti
         rel = f"{user_short}/{ym}/{uuid.uuid4().hex}{safe}"
         abs_path = Path(PDF_STORAGE_BASE) / rel
         abs_path.parent.mkdir(parents=True, exist_ok=True)
-        abs_path.write_bytes(content)
+        # size 记明文长度(计费/展示口径不变),盘上按开关落密文。
+        abs_path.write_bytes(file_crypto.maybe_seal(content))
         return rel, len(content)
     except Exception as e:
         logger.error(f"❌ save_bytes failed · user={user_id} · err={e}")
         return None, 0
+
+
+def read_bytes(rel_path: str) -> Optional[bytes]:
+    """按相对路径取留底原文(双轨解密):密文解回明文,存量明文原样返;缺失/越界返 None。
+    票图打包/凭证外呼/归档导出等一切消费方经此取字节,不再裸 read_bytes 拿到密文。"""
+    p = get_pdf_abs_path(rel_path)
+    if not p or not p.exists():
+        return None
+    return file_crypto.unseal(p.read_bytes())
 
 
 def get_pdf_abs_path(rel_path: str) -> Optional[Path]:

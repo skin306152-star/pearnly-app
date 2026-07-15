@@ -132,8 +132,7 @@ def _dec_str(v) -> str:
 
 def _write_md(out_dir: Path, name: str, lines: list[str]) -> Path:
     path = out_dir / name
-    path.write_text("\n".join(lines), encoding="utf-8")
-    return path
+    return storage.write_artifact_bytes(path, "\n".join(lines).encode("utf-8"))
 
 
 def _bullets(title: str, rows: list[str]) -> list[str]:

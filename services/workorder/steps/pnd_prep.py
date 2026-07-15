@@ -30,7 +30,7 @@ from services.tax import pnd_keying_sheet, rdprep
 from services.tax.aggregate import PND3 as _TABLE_PND3
 from services.tax.aggregate import PND53 as _TABLE_PND53
 from services.tax.aggregate import pnd as aggregate_pnd
-from services.workorder import obligation_engine
+from services.workorder import obligation_engine, storage
 
 logger = logging.getLogger(__name__)
 
@@ -392,8 +392,7 @@ def _write_keying_xlsx(
     filename = pnd_keying_sheet.build_filename(
         form=form, nid=client["tax_id"], tax_year_be=tax_year, tax_month=tax_month
     )
-    path = out_dir / filename
-    path.write_bytes(payload)
+    path = storage.write_artifact_bytes(out_dir / filename, payload)
     row_totals = pnd_keying_sheet.totals(rows)
     return str(path), {
         "payee_count": len(payees),
@@ -405,8 +404,8 @@ def _write_keying_xlsx(
 
 
 def _write_txt(out_dir: Path, filename: str, text: str, **numbers) -> tuple[str, dict]:
-    path = out_dir / filename
     payload = text.encode("utf-8")  # 官方 §7 CR/LF 定长契约:走字节写盘,避开文本模式换行翻译
-    path.write_bytes(payload)
+    path = storage.write_artifact_bytes(out_dir / filename, payload)
+    # txt_sha256 记明文哈希(RD Prep 内容指纹),与盘上密文无关。
     numbers["txt_sha256"] = hashlib.sha256(payload).hexdigest()
     return str(path), numbers

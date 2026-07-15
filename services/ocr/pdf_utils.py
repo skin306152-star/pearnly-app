@@ -63,7 +63,22 @@ def render_page_png(path: str, page: int = 1, dpi: int = 144) -> Optional[Tuple[
         PDF) — the caller turns None into a 404/422 rather than serving a broken
         image. total page count lets the front-end page through multi-page PDFs
         (一份 PDF 装多张发票时翻页看每一页).
+
+    留底加密后不再用这个路径入口(密文喂 fitz 会炸);history 走 read_bytes 解密后调
+    render_page_png_bytes。此入口留给明文/临时文件与既有单测。
     """
+    try:
+        with open(path, "rb") as fh:
+            return render_page_png_bytes(fh.read(), page=page, dpi=dpi)
+    except OSError as e:
+        logger.error("pdf_utils: cannot open PDF: %s", e)
+        return None
+
+
+def render_page_png_bytes(
+    pdf_bytes: bytes, page: int = 1, dpi: int = 144
+) -> Optional[Tuple[bytes, int]]:
+    """同 render_page_png,但吃已在内存的 PDF 字节——留底走加密后,调用方先解密再渲染,不落临时明文盘。"""
     try:
         import fitz  # PyMuPDF
     except ImportError as e:  # pragma: no cover
@@ -72,7 +87,7 @@ def render_page_png(path: str, page: int = 1, dpi: int = 144) -> Optional[Tuple[
 
     doc = None
     try:
-        doc = fitz.open(path)
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         if doc.page_count == 0:
             return None
         total = doc.page_count

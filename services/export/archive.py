@@ -136,8 +136,7 @@ def _read_image(image_ref: Optional[str]) -> Optional[bytes]:
     try:
         from services.ocr import pdf_storage
 
-        p = pdf_storage.get_pdf_abs_path(image_ref)
-        return p.read_bytes() if p and p.exists() else None
+        return pdf_storage.read_bytes(image_ref)  # 双轨解密:密文解回明文供归档导出
     except Exception:  # noqa: BLE001
         return None
 

@@ -129,12 +129,11 @@ def _all_bill_refs(cur, *, tenant_id, workspace_client_id, doc_id) -> list:
 
 def _append_ref(target: "fitz.Document", ref: str) -> bool:
     """把一张票图(图片或 PDF)落盘文件 append 进 target。成功→True。"""
-    abs_path = pdf_storage.get_pdf_abs_path(ref)
-    if not abs_path or not abs_path.exists():
-        return False
     try:
-        data = abs_path.read_bytes()
+        data = pdf_storage.read_bytes(ref)  # 双轨解密:密文解回明文再拼进整月凭证 PDF
     except OSError:
+        return False
+    if data is None:
         return False
     try:
         if data[:5] == b"%PDF-":

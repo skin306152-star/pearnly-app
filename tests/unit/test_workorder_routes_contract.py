@@ -561,7 +561,9 @@ class ItemImageTests(unittest.IsolatedAsyncioTestCase):
                     self.enterContext(p)
                 resp = await wr.get_item_image("wo-1", "it-1", mock.Mock())
         self.assertEqual(resp.media_type, "image/jpeg")
-        self.assertEqual(resp.path, str(img))
+        # 密文经 storage.read_bytes 解回明文再出流(off 态=原字节);下载名进 Content-Disposition。
+        self.assertEqual(resp.body, b"jpeg-bytes")
+        self.assertIn("IMG_2647.jpg", resp.headers["content-disposition"])
 
 
 class AutoAdvanceTests(unittest.IsolatedAsyncioTestCase):

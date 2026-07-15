@@ -19,6 +19,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Optional
 
+from core import file_crypto
 from services.workorder import evidence, sod, storage
 
 # 规则版本:裁决词汇(decisions.py)/守恒·勾稽闸逻辑变更时人工 bump,钉进每份冻结 manifest。
@@ -68,12 +69,13 @@ def dumps_manifest(manifest: dict) -> str:
 
 
 def compute_source_hash(path: Optional[Path]) -> Optional[str]:
-    """现算源文件 sha256;path 为 None(越界/已解析失败)或读不到 → None(交给闸点名)。"""
+    """现算源文件明文 sha256(命门:加密后仍是明文哈希,查重/冻结身份不变)。path 为 None
+    (越界/已解析失败)、读不到、或密文损坏无法解回明文 → None(交给闸点名/verify 判缺)。"""
     if path is None:
         return None
     try:
-        return sha256_of_bytes(Path(path).read_bytes())
-    except OSError:
+        return sha256_of_bytes(storage.read_bytes(path))
+    except (OSError, file_crypto.FileCryptoError):
         return None
 
 

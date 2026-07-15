@@ -20,11 +20,15 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
-from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
+from core.route_helpers import (
+    assert_owns_workspace,
+    authorize_pearnly_ai,
+    content_disposition,
+)
 from services.authz.deps import check_workspace_scope
 from services.workorder import api, archive, engine, runner, storage, store
 from services.workorder.steps import intake
@@ -367,7 +371,12 @@ async def get_item_image(work_order_id: str, item_id: str, request: Request):
     download_name = (
         item.get("original_name") or storage.original_name_of(item.get("file_ref")) or path.name
     )
-    return FileResponse(str(path), media_type=media_type, filename=download_name)
+    # 落盘密文经 storage.read_bytes 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
+    return Response(
+        content=storage.read_bytes(path),
+        media_type=media_type,
+        headers={"Content-Disposition": content_disposition(download_name, path.name)},
+    )
 
 
 @router.post("/api/workorder/orders/{work_order_id}/review")

@@ -21,6 +21,7 @@ from typing import Optional
 from core import feature_flags
 from services.ai_gateway import attribution
 from services.recon.bank_recon_types import StatementRow
+from services.workorder import storage
 from services.workorder.engine import StepContext
 from services.workorder.steps import checkpoint
 
@@ -170,7 +171,7 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
         _BANK_OCR_TASK, tenant_id=str(ctx.tenant_id), trace_id=str(ctx.work_order_id)
     )
     try:
-        data = Path(file_ref).read_bytes()
+        data = storage.read_bytes(file_ref)  # 落盘密文解回明文再解析(双轨读)
         parsed = _parse_bank_statement_impl(data, Path(file_ref).name, tenant_id=ctx.tenant_id)
         return list(parsed.get("rows") or []) if parsed.get("ok") else []
     finally:

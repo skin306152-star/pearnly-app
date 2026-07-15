@@ -107,7 +107,7 @@ def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dic
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / freeze.MANIFEST_FILENAME
     # 唯一序列化出口(R1:真库事件行的 datetime 裁决时间戳直接 json.dumps 会 TypeError)。
-    path.write_text(freeze.dumps_manifest(manifest), encoding="utf-8")
+    storage.write_artifact_bytes(path, freeze.dumps_manifest(manifest).encode("utf-8"))
 
     summary = _manifest_summary(manifest)
     store.upsert_deliverable(
@@ -139,7 +139,7 @@ def _load_manifest(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]
             resolved = storage.resolve_within_order(tenant_id, work_order_id, d["artifact_path"])
             target = resolved or Path(d["artifact_path"])
             try:
-                return json.loads(Path(target).read_text(encoding="utf-8"))
+                return json.loads(storage.read_bytes(target).decode("utf-8"))
             except OSError:
                 return None
     return None

@@ -20,7 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from core import feature_flags
-from services.workorder import decisions, kinds
+from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import reconcile_bank
 from services.workorder.steps import reconcile_gates as gates
@@ -328,7 +328,7 @@ def _default_shadow_gl_rows(ctx: StepContext) -> dict:
     for it in gl_items:
         name = Path(it.get("file_ref") or "").name or str(it.get("id"))
         try:
-            parsed = gl_adapter.parse_gl_bytes(Path(it["file_ref"]).read_bytes(), name)
+            parsed = gl_adapter.parse_gl_bytes(storage.read_bytes(it["file_ref"]), name)
         except gl_adapter.GlUploadParseError as exc:
             failures.append(f"{name}: {exc}")
             continue

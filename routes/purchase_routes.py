@@ -351,17 +351,18 @@ async def api_bill_image(
         )
     if not ref:
         raise PosError("purchase.unexpected", 404, detail="no_bill_image")
-    from services.ocr import pdf_storage
-
-    abs_path = pdf_storage.get_pdf_abs_path(ref)
-    if not abs_path or not abs_path.exists():
-        raise PosError("purchase.unexpected", 404, detail="bill_image_missing")
     import mimetypes
 
-    from fastapi.responses import FileResponse
+    from fastapi.responses import Response
 
-    media = mimetypes.guess_type(str(abs_path))[0] or "image/jpeg"
-    return FileResponse(path=str(abs_path), media_type=media)
+    from services.ocr import pdf_storage
+
+    # 落盘密文经 pdf_storage.read_bytes 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
+    data = pdf_storage.read_bytes(ref)
+    if data is None:
+        raise PosError("purchase.unexpected", 404, detail="bill_image_missing")
+    media = mimetypes.guess_type(ref)[0] or "image/jpeg"
+    return Response(content=data, media_type=media)
 
 
 @router.post("/docs/{doc_id}/attachments")
@@ -397,19 +398,25 @@ async def api_proof_pdf(token: str):
     """本月凭证打包 PDF 下载(C-1)· token=时效签名(tenant+ws+period+落盘 rel+exp)鉴权,不走登录态。
 
     token 失效/伪造 → 403;落盘文件缺失 → 404;有效 → attachment 下载。"""
-    from fastapi.responses import FileResponse
+    from fastapi.responses import Response
 
+    from core.route_helpers import content_disposition
     from services.export import proof_pdf
     from services.ocr import pdf_storage
 
     body = proof_pdf.verify_token(token)
     if not body:
         raise PosError("purchase.unexpected", 403, detail="bad_token")
-    abs_path = pdf_storage.get_pdf_abs_path(body.get("r") or "")
-    if not abs_path or not abs_path.exists():
+    # 落盘密文经 pdf_storage.read_bytes 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
+    data = pdf_storage.read_bytes(body.get("r") or "")
+    if data is None:
         raise PosError("purchase.unexpected", 404, detail="proof_missing")
     fname = f"proof-{body.get('w')}-{body.get('p')}.pdf"
-    return FileResponse(path=str(abs_path), media_type="application/pdf", filename=fname)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition(fname, "proof.pdf")},
+    )
 
 
 @router.get("/summary")

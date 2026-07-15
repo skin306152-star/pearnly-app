@@ -20,6 +20,8 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from core import file_crypto
+
 logger = logging.getLogger(__name__)
 
 _BASE = os.environ.get("LINE_INTAKE_STORAGE_DIR", "/opt/mrpilot/storage/line_intake")
@@ -94,7 +96,7 @@ def _save_to_disk(tenant_id: str, workspace_client_id, content: bytes, msg: dict
         dest_dir = Path(_BASE) / str(tenant_id).replace("-", "")[:8] / str(int(workspace_client_id))
         dest_dir.mkdir(parents=True, exist_ok=True)
         path = dest_dir / f"{uuid.uuid4().hex}{ext}"
-        path.write_bytes(content)
+        path.write_bytes(file_crypto.maybe_seal(content))
         return str(path)
     except Exception:
         logger.warning("[line_intake_staging] 落盘失败", exc_info=True)

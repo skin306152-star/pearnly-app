@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+from core import file_crypto
 from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from services.knowledge.contract import HostProvider, Identity, OcrHistoryRow
@@ -67,11 +68,11 @@ class MainHostProvider(HostProvider):
     def storage_put(self, key: str, data: bytes) -> str:
         path = _safe_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
+        path.write_bytes(file_crypto.maybe_seal(data))
         return key
 
     def storage_get(self, key: str) -> bytes:
-        return _safe_path(key).read_bytes()
+        return file_crypto.unseal(_safe_path(key).read_bytes())
 
     def storage_delete(self, key: str) -> None:
         _safe_path(key).unlink(missing_ok=True)

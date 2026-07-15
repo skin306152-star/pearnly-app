@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core import workspace_context as wc
 from services.ocr import pdf_storage
-from services.ocr.pdf_utils import render_page_png
+from services.ocr.pdf_utils import render_page_png_bytes
 from core.db import (
     commit_staged_ocr_history,
     delete_ocr_history_with_pdf_paths,
@@ -270,7 +270,9 @@ async def history_delete(record_id: str, request: Request):
 # v114 · PDF 留底下载接口 · 用户可下载自己识别过的原 PDF
 @router.get("/api/history/{record_id}/pdf")
 async def history_pdf_download(record_id: str, request: Request):
-    from fastapi.responses import FileResponse
+    from fastapi.responses import Response
+
+    from core.route_helpers import content_disposition
 
     user = get_current_user_from_request(request)
     _check_history_access(user)
@@ -282,16 +284,17 @@ async def history_pdf_download(record_id: str, request: Request):
     )
     if not info:
         raise HTTPException(404, detail="history.pdf_not_found")
-    abs_path = pdf_storage.get_pdf_abs_path(info["pdf_storage_path"])
-    if not abs_path or not abs_path.exists():
+    # 落盘密文经 pdf_storage.read_bytes 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
+    data = pdf_storage.read_bytes(info["pdf_storage_path"])
+    if data is None:
         raise HTTPException(404, detail="history.pdf_missing")
     fn = info.get("filename") or "invoice.pdf"
     if not fn.lower().endswith(".pdf"):
         fn = fn + ".pdf"
-    return FileResponse(
-        path=str(abs_path),
+    return Response(
+        content=data,
         media_type="application/pdf",
-        filename=fn,
+        headers={"Content-Disposition": content_disposition(fn, "invoice.pdf")},
     )
 
 
@@ -315,10 +318,11 @@ async def history_page_png(record_id: str, page: int, request: Request):
     )
     if not info:
         raise HTTPException(404, detail="history.pdf_not_found")
-    abs_path = pdf_storage.get_pdf_abs_path(info["pdf_storage_path"])
-    if not abs_path or not abs_path.exists():
+    # 先解密再从字节渲染(留底加密后不能把密文路径直喂 fitz)。
+    data = pdf_storage.read_bytes(info["pdf_storage_path"])
+    if data is None:
         raise HTTPException(404, detail="history.pdf_missing")
-    rendered = render_page_png(str(abs_path), page=page)
+    rendered = render_page_png_bytes(data, page=page)
     if rendered is None:
         raise HTTPException(422, detail="history.render_failed")
     png, total_pages = rendered

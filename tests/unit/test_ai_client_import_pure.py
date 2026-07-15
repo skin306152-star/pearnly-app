@@ -69,9 +69,7 @@ class ChipAndReasonKeyTests(unittest.TestCase):
                 m.errKeyFor(null),
             ]));
             """)
-        self.assertEqual(
-            out, ["err_workspace_tax_id_duplicate", "err_generic", "err_generic"]
-        )
+        self.assertEqual(out, ["err_workspace_tax_id_duplicate", "err_generic", "err_generic"])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -123,14 +121,23 @@ class PreviewTableHtmlTests(unittest.TestCase):
 
     def test_shows_row_name_and_tax_id(self):
         html = self._render(
-            json.dumps([{"row_index": 0, "name": "ACME Co Ltd", "tax_id": "0105546015062", "status": "valid"}])
+            json.dumps(
+                [
+                    {
+                        "row_index": 0,
+                        "name": "ACME Co Ltd",
+                        "tax_id": "0105546015062",
+                        "status": "valid",
+                    }
+                ]
+            )
         )
         self.assertIn("ACME Co Ltd", html)
         self.assertIn("0105546015062", html)
 
     def test_valid_row_gets_green_chip(self):
         html = self._render(json.dumps([{"row_index": 0, "name": "ACME", "status": "valid"}]))
-        self.assertIn('chip g', html)
+        self.assertIn("chip g", html)
         self.assertIn("client_import_status_valid", html)
 
     def test_skip_row_shows_neutral_chip_and_reason(self):
@@ -147,16 +154,23 @@ class PreviewTableHtmlTests(unittest.TestCase):
                 ]
             )
         )
-        self.assertIn('chip n', html)
+        self.assertIn("chip n", html)
         self.assertIn("err_workspace_tax_id_duplicate", html)
 
     def test_error_row_shows_red_chip_and_reason(self):
         html = self._render(
             json.dumps(
-                [{"row_index": 2, "name": "", "status": "error", "reason": "client_import.err_missing_name"}]
+                [
+                    {
+                        "row_index": 2,
+                        "name": "",
+                        "status": "error",
+                        "reason": "client_import.err_missing_name",
+                    }
+                ]
             )
         )
-        self.assertIn('chip b', html)
+        self.assertIn("chip b", html)
         self.assertIn("err_client_import_err_missing_name", html)
 
     def test_counts_chip_row_shows_valid_skip_error_tallies(self):
@@ -165,8 +179,18 @@ class PreviewTableHtmlTests(unittest.TestCase):
                 [
                     {"row_index": 0, "name": "A", "status": "valid"},
                     {"row_index": 1, "name": "B", "status": "valid"},
-                    {"row_index": 2, "name": "C", "status": "skip", "reason": "workspace.tax_id_duplicate"},
-                    {"row_index": 3, "name": "", "status": "error", "reason": "client_import.err_missing_name"},
+                    {
+                        "row_index": 2,
+                        "name": "C",
+                        "status": "skip",
+                        "reason": "workspace.tax_id_duplicate",
+                    },
+                    {
+                        "row_index": 3,
+                        "name": "",
+                        "status": "error",
+                        "reason": "client_import.err_missing_name",
+                    },
                 ]
             )
         )
@@ -177,7 +201,14 @@ class PreviewTableHtmlTests(unittest.TestCase):
     def test_confirm_button_disabled_when_zero_valid_rows(self):
         html = self._render(
             json.dumps(
-                [{"row_index": 0, "name": "", "status": "error", "reason": "client_import.err_missing_name"}]
+                [
+                    {
+                        "row_index": 0,
+                        "name": "",
+                        "status": "error",
+                        "reason": "client_import.err_missing_name",
+                    }
+                ]
             )
         )
         self.assertIn('data-action="ci-confirm" disabled', html)
@@ -199,8 +230,18 @@ class ResultCardHtmlTests(unittest.TestCase):
                 [
                     {"row_index": 0, "name": "A", "status": "created", "id": 1},
                     {"row_index": 1, "name": "B", "status": "created", "id": 2},
-                    {"row_index": 2, "name": "C", "status": "skip", "reason": "workspace.tax_id_duplicate"},
-                    {"row_index": 3, "name": "", "status": "error", "reason": "client_import.err_missing_name"},
+                    {
+                        "row_index": 2,
+                        "name": "C",
+                        "status": "skip",
+                        "reason": "workspace.tax_id_duplicate",
+                    },
+                    {
+                        "row_index": 3,
+                        "name": "",
+                        "status": "error",
+                        "reason": "client_import.err_missing_name",
+                    },
                 ]
             )
         )
@@ -209,8 +250,10 @@ class ResultCardHtmlTests(unittest.TestCase):
         self.assertIn("client_import_result_error_n:1", html)
 
     def test_created_row_gets_green_chip(self):
-        html = self._render(json.dumps([{"row_index": 0, "name": "A", "status": "created", "id": 1}]))
-        self.assertIn('chip g', html)
+        html = self._render(
+            json.dumps([{"row_index": 0, "name": "A", "status": "created", "id": 1}])
+        )
+        self.assertIn("chip g", html)
         self.assertIn("client_import_status_created", html)
 
 

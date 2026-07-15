@@ -95,6 +95,53 @@ class DownloadDeliverableFilenameTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("pp30_draft.md", disp)
         self.assertNotIn("2569-06", disp)
 
+    async def test_download_logs_deliverable_audit_and_is_fail_open(self):
+        """ENC-b:成功下载恰记一条 file.deliverable_downloaded;审计写挂不阻断下载。"""
+        req = mock.Mock()
+        req.headers = {"X-Forwarded-For": "1.2.3.4", "User-Agent": "ua"}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pp30_draft.md"
+            path.write_text("x", encoding="utf-8")
+            patches = _common_patches(
+                db=_FakeDB(client={"name": "Sister Makeup"}), artifact_path="pp30_draft.md"
+            )
+            with contextlib.ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                stack.enter_context(
+                    mock.patch.object(wfr.storage, "resolve_within_order", return_value=path)
+                )
+                log_mock = stack.enter_context(
+                    mock.patch("services.audit.store.insert_operation_log")
+                )
+                await wfr.download_deliverable("wo-1", "pp30_draft", req)
+        log_mock.assert_called_once()
+        kw = log_mock.call_args.kwargs
+        self.assertEqual(kw["action"], "file.deliverable_downloaded")
+        self.assertEqual(kw["target_id"], "pp30_draft")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pp30_draft.md"
+            path.write_text("x", encoding="utf-8")
+            patches = _common_patches(
+                db=_FakeDB(client={"name": "Sister Makeup"}), artifact_path="pp30_draft.md"
+            )
+            with contextlib.ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                stack.enter_context(
+                    mock.patch.object(wfr.storage, "resolve_within_order", return_value=path)
+                )
+                stack.enter_context(
+                    mock.patch(
+                        "services.audit.store.insert_operation_log",
+                        side_effect=RuntimeError("boom"),
+                    )
+                )
+                resp = await wfr.download_deliverable("wo-1", "pp30_draft", req)
+        # 审计写挂(insert_operation_log 抛错)不阻断下载:文件仍正常吐出(客户名+账期命中)。
+        self.assertIn("2569-06", resp.headers["content-disposition"])
+
 
 if __name__ == "__main__":
     unittest.main()

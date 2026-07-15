@@ -29,6 +29,7 @@ from core.route_helpers import (
     authorize_pearnly_ai,
     content_disposition,
 )
+from services.audit import file_access as audit_file_access
 from services.authz.deps import check_workspace_scope
 from services.workorder import api, archive, engine, runner, storage, store
 from services.workorder.steps import intake
@@ -372,8 +373,21 @@ async def get_item_image(work_order_id: str, item_id: str, request: Request):
         item.get("original_name") or storage.original_name_of(item.get("file_ref")) or path.name
     )
     # 落盘密文经 storage.read_bytes 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
+    content = storage.read_bytes(path)
+    audit_file_access.log_user_file_access(
+        request,
+        user,
+        audit_file_access.MATERIAL_VIEWED,
+        target_type="workorder_item",
+        target_id=item_id,
+        details={
+            "kind": "material_image",
+            "ref": item.get("file_ref"),
+            "work_order_id": work_order_id,
+        },
+    )
     return Response(
-        content=storage.read_bytes(path),
+        content=content,
         media_type=media_type,
         headers={"Content-Disposition": content_disposition(download_name, path.name)},
     )

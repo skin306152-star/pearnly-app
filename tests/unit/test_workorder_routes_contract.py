@@ -548,6 +548,8 @@ class ItemImageTests(unittest.IsolatedAsyncioTestCase):
 
         from routes import workorder_routes as wr
 
+        req = mock.Mock()
+        req.headers = {"X-Forwarded-For": "1.2.3.4", "User-Agent": "ua"}
         with tempfile.TemporaryDirectory() as td:
             img = Path(td) / "IMG_2647.jpg"
             img.write_bytes(b"jpeg-bytes")
@@ -556,14 +558,44 @@ class ItemImageTests(unittest.IsolatedAsyncioTestCase):
                     wr.store, "get_item", return_value={"id": "it-1", "file_ref": str(img)}
                 ),
                 mock.patch.object(wr.storage, "resolve_within_order", return_value=img),
+                mock.patch("services.audit.store.insert_operation_log") as log_mock,
             ):
                 for p in self._patches(wr):
                     self.enterContext(p)
-                resp = await wr.get_item_image("wo-1", "it-1", mock.Mock())
+                resp = await wr.get_item_image("wo-1", "it-1", req)
         self.assertEqual(resp.media_type, "image/jpeg")
         # 密文经 storage.read_bytes 解回明文再出流(off 态=原字节);下载名进 Content-Disposition。
         self.assertEqual(resp.body, b"jpeg-bytes")
         self.assertIn("IMG_2647.jpg", resp.headers["content-disposition"])
+        # ENC-b:取件恰记一条 file.material_viewed 审计(字段齐)。
+        log_mock.assert_called_once()
+        kw = log_mock.call_args.kwargs
+        self.assertEqual(kw["action"], "file.material_viewed")
+        self.assertEqual(kw["tenant_id"], "t-1")
+        self.assertEqual(kw["target_id"], "it-1")
+
+    async def test_image_view_audit_failure_is_fail_open(self):
+        import tempfile
+        from pathlib import Path
+
+        from routes import workorder_routes as wr
+
+        with tempfile.TemporaryDirectory() as td:
+            img = Path(td) / "IMG_2647.jpg"
+            img.write_bytes(b"jpeg-bytes")
+            with (
+                mock.patch.object(
+                    wr.store, "get_item", return_value={"id": "it-1", "file_ref": str(img)}
+                ),
+                mock.patch.object(wr.storage, "resolve_within_order", return_value=img),
+                mock.patch(
+                    "services.audit.store.insert_operation_log", side_effect=RuntimeError("boom")
+                ),
+            ):
+                for p in self._patches(wr):
+                    self.enterContext(p)
+                resp = await wr.get_item_image("wo-1", "it-1", mock.Mock())
+        self.assertEqual(resp.body, b"jpeg-bytes")
 
 
 class AutoAdvanceTests(unittest.IsolatedAsyncioTestCase):

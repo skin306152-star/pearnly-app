@@ -39,12 +39,16 @@ class BackfillError(Exception):
 
 
 def _default_roots() -> list[Path]:
-    """prod 默认落盘树(env 覆盖):workorders / pdfs / line_intake / vat_recon。"""
+    """prod 默认落盘树(env 覆盖):workorders / pdfs / line_intake / vat_recon / slips。
+
+    slips(ENC-b):存量搬家由 scripts/ops/migrate_slips_dir.py 一次性做(routes/static/slips
+    → 本目录);搬完之后的常驻加密回填(FILE_ENC_MODE=on 时)走本工具同一套幂等逻辑。"""
     return [
         Path(os.environ.get("WORKORDER_STORAGE_DIR", "/opt/mrpilot/storage/workorders")),
         Path(os.environ.get("PDF_STORAGE_DIR", "/opt/mrpilot/storage/pdfs")),
         Path(os.environ.get("LINE_INTAKE_STORAGE_DIR", "/opt/mrpilot/storage/line_intake")),
         Path(os.environ.get("VAT_RECON_STORAGE_DIR", "/opt/mrpilot/uploads/vat_recon")),
+        Path(os.environ.get("SLIPS_STORAGE_ROOT", "/opt/mrpilot/storage")) / "slips",
     ]
 
 

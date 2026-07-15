@@ -23,10 +23,12 @@ import logging
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
 from core import workspace_context as wc
+from services.audit import file_access as audit_file_access
 from services.ocr import pdf_storage
 from services.ocr.pdf_utils import render_page_png_bytes
 from core.db import (
@@ -38,7 +40,7 @@ from core.db import (
     update_ocr_history_pages,
 )
 from core.auth import get_current_user_from_request
-from core.route_helpers import _plan_permissions, _tid
+from core.route_helpers import _plan_permissions, _tid, content_disposition
 from services.exceptions.exception_checks import _async_run_exception_checks, _parse_money
 from services.ocr_history.posting_manual import (
     _ITEM_TYPE_VALUES,
@@ -267,13 +269,21 @@ async def history_delete(record_id: str, request: Request):
     return {"ok": True}
 
 
+def _log_pdf_view(request: Request, user: dict, record_id: str, kind: str, **extra) -> None:
+    """留底 PDF/页图取件审计(两端点共用,收敛重复调用样板)。"""
+    audit_file_access.log_user_file_access(
+        request,
+        user,
+        audit_file_access.OCR_PDF_VIEWED,
+        target_type="ocr_history",
+        target_id=record_id,
+        details={"kind": kind, **extra},
+    )
+
+
 # v114 · PDF 留底下载接口 · 用户可下载自己识别过的原 PDF
 @router.get("/api/history/{record_id}/pdf")
 async def history_pdf_download(record_id: str, request: Request):
-    from fastapi.responses import Response
-
-    from core.route_helpers import content_disposition
-
     user = get_current_user_from_request(request)
     _check_history_access(user)
     # 同 page.png · 单条复核按归属授权 · 不叠加活跃套账软过滤(否则对手方票 404)
@@ -291,6 +301,7 @@ async def history_pdf_download(record_id: str, request: Request):
     fn = info.get("filename") or "invoice.pdf"
     if not fn.lower().endswith(".pdf"):
         fn = fn + ".pdf"
+    _log_pdf_view(request, user, record_id, "pdf")
     return Response(
         content=data,
         media_type="application/pdf",
@@ -307,8 +318,6 @@ async def history_page_png(record_id: str, page: int, request: Request):
     而非活跃套账,套用列表用的套账软过滤会把刚上传的票挡成 404。归属校验已足够,
     且用户切套账本就能看到自己全部记录。
     """
-    from fastapi.responses import Response
-
     user = get_current_user_from_request(request)
     _check_history_access(user)
     info = get_history_pdf_info(
@@ -326,6 +335,7 @@ async def history_page_png(record_id: str, page: int, request: Request):
     if rendered is None:
         raise HTTPException(422, detail="history.render_failed")
     png, total_pages = rendered
+    _log_pdf_view(request, user, record_id, "page_png", page=page)
     return Response(
         content=png,
         media_type="image/png",

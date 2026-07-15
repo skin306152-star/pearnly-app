@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.pos_api import PosError, ok
 from routes.purchase_common import auth_member, gate, resolve_ws, uid as _uid
+from services.audit import file_access as audit_file_access
 from services.purchase import attachment_files
 from services.purchase import correct as correct_svc
 from services.purchase import documents as documents_svc
@@ -342,7 +343,7 @@ async def api_bill_image(
     idx: int = Query(0),
 ):
     """票图原图(拍票留底)· 鉴权 + 套账边界 · 落盘文件流式返回。idx=第几张(多图相册)。"""
-    _, tid = auth_member(request, "purchase.doc.view")
+    user, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -362,6 +363,14 @@ async def api_bill_image(
     if data is None:
         raise PosError("purchase.unexpected", 404, detail="bill_image_missing")
     media = mimetypes.guess_type(ref)[0] or "image/jpeg"
+    audit_file_access.log_user_file_access(
+        request,
+        user,
+        audit_file_access.BILL_IMAGE_VIEWED,
+        target_type="purchase_doc",
+        target_id=doc_id,
+        details={"kind": "bill_image", "ref": ref, "idx": idx},
+    )
     return Response(content=data, media_type=media)
 
 
@@ -394,12 +403,10 @@ async def api_delete_attachment(
 
 
 @router.get("/proof-pdf/{token}")
-async def api_proof_pdf(token: str):
+async def api_proof_pdf(token: str, request: Request):
     """本月凭证打包 PDF 下载(C-1)· token=时效签名(tenant+ws+period+落盘 rel+exp)鉴权,不走登录态。
 
     token 失效/伪造 → 403;落盘文件缺失 → 404;有效 → attachment 下载。"""
-    from fastapi.responses import Response
-
     from core.route_helpers import content_disposition
     from services.export import proof_pdf
     from services.ocr import pdf_storage
@@ -412,6 +419,16 @@ async def api_proof_pdf(token: str):
     if data is None:
         raise PosError("purchase.unexpected", 404, detail="proof_missing")
     fname = f"proof-{body.get('w')}-{body.get('p')}.pdf"
+    # 时效签名 token 路不走登录态:actor 记 token 主体,details 标 via=signed_token(方案 §四)。
+    audit_file_access.log_file_access(
+        request,
+        action=audit_file_access.BILL_IMAGE_VIEWED,
+        tenant_id=body.get("t"),
+        actor_username="signed_token",
+        target_type="purchase_proof_pdf",
+        target_id=str(body.get("w")),
+        details={"kind": "proof_pdf", "via": "signed_token", "period": body.get("p")},
+    )
     return Response(
         content=data,
         media_type="application/pdf",

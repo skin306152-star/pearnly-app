@@ -14,6 +14,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from core.auth import get_current_user_from_request
+from services.audit import file_access as audit_file_access
 from services.imaging import image_store
 
 logger = logging.getLogger("mr-pilot")
@@ -52,6 +53,7 @@ async def api_upload_image(request: Request, file: UploadFile = File(...)):
 @router.get("/image/{tenant_id}/{name}")
 async def api_get_image(tenant_id: str, name: str, request: Request):
     """取图:登录 + 只能取本租户的图(uuid 文件名 + 沙盒路径双保险)。"""
+    user = get_current_user_from_request(request)
     tid = _require_tenant(request)
     if tid != tenant_id:
         raise HTTPException(404, detail="uploads.not_found")
@@ -59,6 +61,14 @@ async def api_get_image(tenant_id: str, name: str, request: Request):
     if not path:
         raise HTTPException(404, detail="uploads.not_found")
     ext = path.suffix.lstrip(".").lower()
+    audit_file_access.log_user_file_access(
+        request,
+        user,
+        audit_file_access.IMAGE_VIEWED,
+        target_type="upload_image",
+        target_id=name,
+        details={"kind": "product_image"},
+    )
     return FileResponse(
         str(path),
         media_type=image_store.media_type_for(ext),

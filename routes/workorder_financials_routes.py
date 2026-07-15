@@ -37,6 +37,7 @@ from core import db
 from core.route_helpers import content_disposition, lang_or_default
 from routes.workorder_routes import _C_VIEW, _authorize, _client_name_for_order, _load_order
 from services.accounting import bridge_store
+from services.audit import file_access as audit_file_access
 from services.fileconv import pdf_out, xlsx_out
 from services.reports.financials_pdf import build_financials_convert_result
 from services.workorder import api, entries_export, storage, store
@@ -110,8 +111,17 @@ async def download_deliverable(work_order_id: str, kind: str, request: Request):
     )
     # 落盘密文经 storage.read_bytes 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    content = storage.read_bytes(path)
+    audit_file_access.log_user_file_access(
+        request,
+        user,
+        audit_file_access.DELIVERABLE_DOWNLOADED,
+        target_type="deliverable",
+        target_id=kind,
+        details={"kind": kind, "ref": artifact, "work_order_id": work_order_id},
+    )
     return Response(
-        content=storage.read_bytes(path),
+        content=content,
         media_type=media_type,
         headers={"Content-Disposition": content_disposition(download_name, path.name)},
     )
@@ -153,6 +163,14 @@ async def download_financials_report(
         "financials_report", f"financials_{period}{ext}", client_name=client_name, period=period
     )
     fallback_name = f"financials_{work_order_id}{ext}"
+    audit_file_access.log_user_file_access(
+        request,
+        user,
+        audit_file_access.DELIVERABLE_DOWNLOADED,
+        target_type="deliverable",
+        target_id="financials_report",
+        details={"kind": "financials_report", "format": format, "work_order_id": work_order_id},
+    )
     return Response(
         content=content,
         media_type=media_type,
@@ -193,6 +211,14 @@ async def export_entries(work_order_id: str, request: Request):
         "entries_export", f"entries_{period}.xlsx", client_name=client_name, period=period
     )
     fallback_name = f"entries_{work_order_id}.xlsx"
+    audit_file_access.log_user_file_access(
+        request,
+        user,
+        audit_file_access.DELIVERABLE_DOWNLOADED,
+        target_type="deliverable",
+        target_id="entries_export",
+        details={"kind": "entries_export", "work_order_id": work_order_id},
+    )
     return Response(
         content=content,
         media_type=entries_export.XLSX_MEDIA_TYPE,

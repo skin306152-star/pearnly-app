@@ -39,6 +39,7 @@ TOPUP_PATHS = {
     ("GET", "/api/admin/credits/topup/requests"),
     ("POST", "/api/admin/credits/topup/approve/{request_id}"),
     ("POST", "/api/admin/credits/topup/reject/{request_id}"),
+    ("GET", "/api/admin/credits/topup/slip/{request_id}"),  # ENC-b · 鉴权取件端点
 }
 
 

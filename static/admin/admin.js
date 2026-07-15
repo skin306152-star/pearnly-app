@@ -2359,7 +2359,9 @@
         const sub = _esc([t.username, t.email].filter(Boolean).join(' · '));
         const amt = _fmt(t.amount_thb || 0, 2);
         const slipBtn = t.slip_path
-            ? '<button class="btn btn-ghost btn-sm" onclick="__admTopupSlip(\'' +
+            ? '<button class="btn btn-ghost btn-sm" onclick="__admTopupSlip(' +
+              t.id +
+              ', \'' +
               _esc(t.slip_path) +
               '\')">' +
               _esc(_t('adm-topup-view-slip')) +
@@ -2422,9 +2424,25 @@
         );
     }
 
-    window.__admTopupSlip = function (slipPath) {
-        const url = '/static/' + slipPath; // slip_path 形如 "slips/123.jpg"
-        const isPdf = /\.pdf$/i.test(slipPath);
+    // ENC-b:老 /static/slips/... 无鉴权且已 404(2026-06-03 目录重组起)· 改走鉴权取件端点
+    // (超管专属,同 admin_topup_list/approve/reject 一组鉴权),blob URL 用完即撤销。
+    window.__admTopupSlip = async function (requestId, slipPath) {
+        const isPdf = /\.pdf$/i.test(slipPath || '');
+        const tok = localStorage.getItem('mrpilot_token');
+        let url;
+        try {
+            const r = await fetch('/api/admin/credits/topup/slip/' + requestId, {
+                headers: { Authorization: 'Bearer ' + tok },
+            });
+            if (!r.ok) {
+                _toast(_t('adm-action-fail'), 'error');
+                return;
+            }
+            url = URL.createObjectURL(await r.blob());
+        } catch (e) {
+            _toast(_t('adm-action-fail'), 'error');
+            return;
+        }
         const ov = document.createElement('div');
         ov.style.cssText =
             'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10001;display:flex;align-items:center;justify-content:center;padding:30px;cursor:pointer';
@@ -2433,7 +2451,10 @@
               url +
               '" style="width:90%;height:90%;border:0;border-radius:8px;background:#fff"></iframe>'
             : '<img src="' + url + '" style="max-width:100%;max-height:100%;border-radius:8px">';
-        ov.addEventListener('click', () => ov.remove());
+        ov.addEventListener('click', () => {
+            ov.remove();
+            URL.revokeObjectURL(url);
+        });
         document.body.appendChild(ov);
     };
 

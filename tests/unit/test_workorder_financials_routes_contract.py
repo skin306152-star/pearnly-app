@@ -77,6 +77,14 @@ class RouteContractTests(unittest.TestCase):
         self.assertIn("workorder_financials_routes", reg)
 
 
+def _audit_req():
+    """log_user_file_access 真读 request.headers(IP/UA)· 裸 mock.Mock() 会在
+    _get_client_ip 内因 Mock 不可下标而短路进 fail-open,测不出真调用——故配好 headers dict。"""
+    req = mock.Mock()
+    req.headers = {"X-Forwarded-For": "1.2.3.4", "User-Agent": "ua"}
+    return req
+
+
 class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
     def _wire(self):
         return (
@@ -111,9 +119,10 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
             p3,
             mock.patch.object(wfr.api, "financials_projection", return_value=_golden_financials()),
             mock.patch.object(wfr, "_client_name_for_order", return_value="Sister Makeup"),
+            mock.patch("services.audit.store.insert_operation_log") as log_mock,
         ):
             resp = await wfr.download_financials_report(
-                "wo-1", mock.Mock(), format="pdf", lang="th"
+                "wo-1", _audit_req(), format="pdf", lang="th"
             )
         self.assertEqual(resp.media_type, "application/pdf")
         self.assertTrue(bytes(resp.body).startswith(b"%PDF"))
@@ -122,6 +131,9 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
         # RFC 5987:泰文原名走 filename*=UTF-8''<percent-encoded>,不是裸塞进 filename=。
         self.assertIn("filename*=UTF-8''", disp)
         self.assertIn("financials_wo-1.pdf", disp)  # ASCII fallback
+        # ENC-b:交付物下载恰记一条 file.deliverable_downloaded。
+        log_mock.assert_called_once()
+        self.assertEqual(log_mock.call_args.kwargs["action"], "file.deliverable_downloaded")
 
     async def test_xlsx_success(self):
         p1, p2, p3 = self._wire()
@@ -131,9 +143,10 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
             p3,
             mock.patch.object(wfr.api, "financials_projection", return_value=_golden_financials()),
             mock.patch.object(wfr, "_client_name_for_order", return_value="Sister Makeup"),
+            mock.patch("services.audit.store.insert_operation_log"),
         ):
             resp = await wfr.download_financials_report(
-                "wo-1", mock.Mock(), format="xlsx", lang="th"
+                "wo-1", _audit_req(), format="xlsx", lang="th"
             )
         self.assertEqual(
             resp.media_type,
@@ -150,12 +163,30 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
             p3,
             mock.patch.object(wfr.api, "financials_projection", return_value=_golden_financials()),
             mock.patch.object(wfr, "_client_name_for_order", return_value=""),
+            mock.patch("services.audit.store.insert_operation_log"),
         ):
             resp = await wfr.download_financials_report(
-                "wo-1", mock.Mock(), format="pdf", lang="th"
+                "wo-1", _audit_req(), format="pdf", lang="th"
             )
         disp = resp.headers["content-disposition"]
         self.assertIn("financials_2569-05.pdf", disp)
+
+    async def test_audit_failure_is_fail_open(self):
+        p1, p2, p3 = self._wire()
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch.object(wfr.api, "financials_projection", return_value=_golden_financials()),
+            mock.patch.object(wfr, "_client_name_for_order", return_value="Sister Makeup"),
+            mock.patch(
+                "services.audit.store.insert_operation_log", side_effect=RuntimeError("boom")
+            ),
+        ):
+            resp = await wfr.download_financials_report(
+                "wo-1", _audit_req(), format="pdf", lang="th"
+            )
+        self.assertTrue(bytes(resp.body).startswith(b"%PDF"))
 
 
 class DeliverablesGuardTests(unittest.IsolatedAsyncioTestCase):
@@ -247,11 +278,18 @@ class EntriesExportTests(unittest.IsolatedAsyncioTestCase):
         frozen = dict(_WO, status="archive")
         for p in self._wire(frozen):
             self.enterContext(p)
-        with mock.patch.object(wfr.api, "shadow_draft", return_value=shadow):
-            resp = await wfr.export_entries("wo-1", mock.Mock())
+        with (
+            mock.patch.object(wfr.api, "shadow_draft", return_value=shadow),
+            mock.patch("services.audit.store.insert_operation_log") as log_mock,
+        ):
+            resp = await wfr.export_entries("wo-1", _audit_req())
         self.assertEqual(resp.media_type, wfr.entries_export.XLSX_MEDIA_TYPE)
         self.assertGreater(len(resp.body), 100)
         self.assertIn("2569-05", resp.headers["content-disposition"])
+        # ENC-b:键二导出恰记一条 file.deliverable_downloaded。
+        log_mock.assert_called_once()
+        self.assertEqual(log_mock.call_args.kwargs["action"], "file.deliverable_downloaded")
+        self.assertEqual(log_mock.call_args.kwargs["target_id"], "entries_export")
 
     async def test_perm_code_is_view(self):
         seen: list[str] = []

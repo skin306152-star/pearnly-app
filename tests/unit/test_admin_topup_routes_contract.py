@@ -26,6 +26,7 @@ class AdminTopupRouteContractTests(unittest.TestCase):
             ("GET", "/api/admin/credits/topup/requests"),
             ("POST", "/api/admin/credits/topup/approve/{request_id}"),
             ("POST", "/api/admin/credits/topup/reject/{request_id}"),
+            ("GET", "/api/admin/credits/topup/slip/{request_id}"),  # ENC-b · slip 鉴权取件
         }:
             self.assertIn(needed, got, f"缺失充值审核路由 {needed} · Earn 后台会再次看不到充值审核")
 
@@ -36,6 +37,7 @@ class AdminTopupRouteContractTests(unittest.TestCase):
         self.assertIn("/api/admin/credits/topup/requests", paths)
         self.assertIn("/api/admin/credits/topup/approve/{request_id}", paths)
         self.assertIn("/api/admin/credits/topup/reject/{request_id}", paths)
+        self.assertIn("/api/admin/credits/topup/slip/{request_id}", paths)
 
 
 if __name__ == "__main__":

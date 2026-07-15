@@ -6,15 +6,19 @@ POST /api/credits/topup/{request,upload-slip} · GET /api/credits/topup/history 
 from __future__ import annotations
 
 import logging
+import mimetypes
 import os
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _require_super_admin
+from services.audit import file_access as audit_file_access
 from services.authz.deps import is_owner_role
+from services.billing import slip_storage
 
 logger = logging.getLogger("mr-pilot")
 
@@ -33,8 +37,11 @@ def send_topup_approved_email(tenant_id, amount_thb, new_balance):
 # ============================================================
 
 
-async def _verify_slip_with_slipok(slip_abs_path: str, expected_amount_thb: float) -> dict:
-    """验证泰国转账截图. ok=None → 未配置key, 走人工审核; ok=False → 验证未通过; ok=True → 自动approve."""
+async def _verify_slip_with_slipok(slip_rel_path: str, expected_amount_thb: float) -> dict:
+    """验证泰国转账截图. ok=None → 未配置key, 走人工审核; ok=False → 验证未通过; ok=True → 自动approve.
+
+    slip_rel_path 是落盘相对路径("slips/123.jpg"),经 slip_storage.read_slip 解密读字节
+    (落盘已加密,不能再裸 open 读密文喂外呼)。"""
     import httpx as _httpx
 
     api_key = os.environ.get("SLIPOK_API_KEY", "")
@@ -42,14 +49,15 @@ async def _verify_slip_with_slipok(slip_abs_path: str, expected_amount_thb: floa
     if not api_key or not branch_id:
         return {"ok": None, "error": "SLIPOK_API_KEY/SLIPOK_BRANCH_ID not configured"}
     try:
-        fname = os.path.basename(slip_abs_path)
+        fname = os.path.basename(slip_rel_path)
         mime = (
             "image/png"
             if fname.endswith(".png")
             else "application/pdf" if fname.endswith(".pdf") else "image/jpeg"
         )
-        with open(slip_abs_path, "rb") as f:
-            file_data = f.read()
+        file_data = slip_storage.read_slip(slip_rel_path)
+        if file_data is None:
+            return {"ok": None, "error": "slip file missing after write"}
         async with _httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
                 f"https://api.slipok.com/api/line/apikey/{branch_id}",
@@ -151,21 +159,18 @@ async def credits_topup_upload_slip(
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(413, detail="topup.file_too_large")
-    slips_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "slips")
-    os.makedirs(slips_dir, exist_ok=True)
     fname = (file.filename or "slip.jpg").lower()
     ext = ".png" if fname.endswith(".png") else ".pdf" if fname.endswith(".pdf") else ".jpg"
     slip_filename = f"{request_id}{ext}"
-    slip_abs = os.path.join(slips_dir, slip_filename)
-    with open(slip_abs, "wb") as fp:
-        fp.write(content)
+    slip_rel = f"slips/{slip_filename}"
+    slip_storage.write_slip(slip_rel, content)
     with db.get_cursor(commit=True) as cur:
         cur.execute(
             "UPDATE topup_requests SET slip_path = %s WHERE id = %s",
-            (f"slips/{slip_filename}", request_id),
+            (slip_rel, request_id),
         )
     # ── SlipOK 自动验证 ──────────────────────────────────────────
-    slipok = await _verify_slip_with_slipok(slip_abs, expected_amount)
+    slipok = await _verify_slip_with_slipok(slip_rel, expected_amount)
     if slipok.get("ok") is True:
         verified_amount = slipok["verified_amount"]
         ref = slipok.get("transaction_id", "")
@@ -203,7 +208,7 @@ async def credits_topup_upload_slip(
                 "ok": True,
                 "auto_approved": True,
                 "balance_thb": new_balance,
-                "slip_path": f"slips/{slip_filename}",
+                "slip_path": slip_rel,
             }
         except Exception as e:
             logger.error(f"SlipOK auto-approve DB error: {e}")
@@ -346,3 +351,35 @@ async def admin_topup_reject(request_id: int, body: _AdminTopupRejectBody, reque
             (admin_id, body.note, request_id),
         )
     return {"ok": True}
+
+
+@router.get("/api/admin/credits/topup/slip/{request_id}")
+async def admin_topup_slip(request_id: int, request: Request):
+    """充值截图取件(超管审核台专用,鉴权对齐同组 admin_topup_list/approve/reject)。
+
+    老 `/static/slips/...` URL 已随 2026-06-03 目录重组 404(且形态无鉴权),本端点是唯一
+    在场取件口:落盘经 slip_storage 加密收口,取件经 read_slip 解密,零裸文件暴露。"""
+    admin = _require_super_admin(request)
+    with db.get_cursor() as cur:
+        cur.execute("SELECT tenant_id, slip_path FROM topup_requests WHERE id = %s", (request_id,))
+        row = cur.fetchone()
+    if not row or not row.get("slip_path"):
+        raise HTTPException(404, detail="topup.slip_not_found")
+    data = slip_storage.read_slip(row["slip_path"])
+    if data is None:
+        raise HTTPException(404, detail="topup.slip_not_found")
+    media_type = mimetypes.guess_type(row["slip_path"])[0] or "application/octet-stream"
+    # tenant_id 记被查看资料所属的客户租户(非超管自身租户——超管本不挂靠任何租户);
+    # actor 字段才是这次操作的人(admin)。
+    audit_file_access.log_file_access(
+        request,
+        action=audit_file_access.SLIP_VIEWED,
+        tenant_id=str(row["tenant_id"]) if row.get("tenant_id") else None,
+        actor_user_id=str(admin["id"]) if admin.get("id") else None,
+        actor_username=admin.get("username"),
+        actor_is_super=True,
+        target_type="topup_request",
+        target_id=str(request_id),
+        details={"kind": "slip", "ref": row["slip_path"]},
+    )
+    return Response(content=data, media_type=media_type)

@@ -1,6 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-07-15 凌晨 · ★夜航自主批:SA-3 银行倒推销项 + M1 三键 + L2 归因 + UI 记债 + 简化角 全收官)
+## 当前状态卡(2026-07-15 白天 · ★ENC 附件加密+访问审计 + IN-0 收料口现实化启动 · 上线盯 CI)
+
+- **push `9aed703d..2a0037f3` 8 commit(fetch 核实已上远端·webhook 自动部署·FILE_ENC_MODE 默认 off=prod 零行为变化)·CI 盯梢中(run 29393815089)。**
+- **ENC 批**:信封加密层 `core/file_crypto.py`(每文件随机 DEK+版本头+双轨读·默认 off·`PEARNLY_FILE_KMS_KEY` 独立密钥·sha256/dedupe_key/freeze_manifest 保明文哈希)收口 17 写入点/全读取点+存量 backfill 脚本+守门闸(ENC-a·打回R1补真库全链);全取件端点接 operation_logs 访问审计(fail-open·零新表)+slips 搬进加密存储修 6-03 遗留 404(ENC-b);recon_jobs/ocr_jobs 暂存 janitor(清 prod 45 残留)+email 假加密 base64 堵 fail-fast(ENC-c)。
+- **IN-0 批**:工单跑完/卡住 LINE 通知会计(IN-0c·闸 `pearnly_ai_run_notify` 默认关·消息零金额·通知故障不牵连跑批)+客户名录 Excel 批量导入(IN-0d·共用单建端点校验 `_create_validated_client`·三态诚实·真机截图)。**剩 IN-0a/b(zip/HEIC/密码PDF/文件夹拖入/队列续传)+乱料验收包=下次**。
+- **★ ENC-d prod 加密启用=下次开工(高敏未做)**:配 KEK→`FILE_ENC_MODE=on`→先 `migrate_slips_dir.py`→再 `encrypt_storage_backfill.py`→`--verify` 0 明文;KEK 丢=文件全废须抄进密码管理。
+- **★ SA3R 银行照片 64% 尸检订正**:真因=分类器 `sort.py:207` payment_evidence 短路误踢对账单 6 续页,**非 OCR 漏行**(换 GPT A/B 已取消);方案定稿 `设计稿\SA3R-...方案`;**守门样本不用等**(金标数据已有真 PromptPay `IMG_2571`/EDC `IMG_2565,2567`);排 ENC 后。
+- **简化角记债**:`file_crypto.seal_to_path/unseal_from_path` 抽 3 处 `write_bytes(maybe_seal)` 重复,下次动加密线收。
+- **等 Zihao**:SM 全科目 GL(内测门 I)。
+- **换窗交接(唯一入口)**:`桌面 pearnly ai\交接-2026-07-15-ENC加密与IN0收料口.md`。
+
+---
+
+## 上一窗状态卡(2026-07-15 凌晨 · ★夜航自主批:SA-3 银行倒推销项 + M1 三键 + L2 归因 + UI 记债 + 简化角 全收官)
 
 - **SA-3 上线**(`96e96669`/`07f6c500`+收尾):倒推引擎三层漏斗+确认卡 UI;打回 R1 根治「自信地错」=余额链覆盖硬闸(真 12 事件 64% 捕获→降级不出建议值·守门测试钉死);底稿金标 918,894.77→858,780.16+60,114.61 逐字;闸 `pearnly_ai_bank_sales_suggest` 默认关,prod 零行为变化。
 - **L2 归因**(`5cd925ff`):事实订正=12 条 NULL 行实为 R3 银行件首次 OCR,task=`workorder_bank_parse` 归客户账套。**M1 三键**(`db86bff4`):签批/退回接既有端点,导出分录 Express xlsx(桥缺码 unmapped 禁臆造·金标 1,426,319.52 配平);影子底稿补入包内清单。**UI 记债四条**(`0f317daf`)+**简化角六修**(`38a27cc2`)。

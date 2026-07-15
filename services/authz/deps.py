@@ -63,6 +63,27 @@ def _cached_authz(request: Optional[Request], user: dict, cur=None) -> Authz:
     return authz
 
 
+def _entrance_scope_deny(user: dict, code: str) -> str:
+    """入口作用域闸(Phase3 · 各是各的):token.entry 不在码允许的入口集 → 拒。
+
+    码可跨多门共用(entrance_of_code 返集合:sales/purchase/inv/intake={main,pos}、
+    tax={main,ai}…)。中性横切码(返 None)短路放行,否则 /api/me 系列 bootstrap 全崩;
+    entrance_api_scope 关(默认)= 不拦,现状零变化。返回 deny_reason("" = 放行)。
+    """
+    from services.auth.entrance import entrance_of_code
+
+    code_entrances = entrance_of_code(code)
+    if code_entrances is None:
+        return ""
+    from core.feature_flags import entrance_api_scope_enabled_for
+
+    if not entrance_api_scope_enabled_for(user.get("tenant_id")):
+        return ""
+    if (user.get("entry") or "main") not in code_entrances:
+        return "entrance_scope"
+    return ""
+
+
 def _module_disabled(user: dict, code: str) -> bool:
     mod = module_of(code)
     if mod is None:
@@ -80,6 +101,11 @@ def _check(request: Request, user: dict, code: str) -> tuple[bool, str]:
         return False, "unknown_code"
     if user.get("is_super_admin"):
         return True, ""
+    # 入口作用域(各是各的):main 会话 token 打不进 pos/ai 码,反之亦然(闸开时)。超管上面已短路
+    # 天然豁免;收银员 entry='pos' 与 pos.* 天然匹配不回归;中性横切码短路放行(见 _entrance_scope_deny)。
+    ent_reason = _entrance_scope_deny(user, code)
+    if ent_reason:
+        return False, ent_reason
     # POS 双令牌主体到这里必已是 role=cashier(typ=pos 由 pos_auth 合成;typ=pos_store
     # 进不了用户鉴权早 401)——不再额外解一次 JWT。
     if user.get("role") == "cashier":

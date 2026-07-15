@@ -50,6 +50,44 @@ export const VALID_ROUTES = [
     'tax-settings',
 ];
 
+// Phase3 入口守卫(各是各的 · 纯 UX 层)· 壳专属路由集。跨壳深链——pos-entry 手敲会计路由 /
+// main-entry 手敲纯 POS 路由——回落到当前入口首页(FIRM→dashboard,POS→inventory)。两壳共用路由
+// (clients/company/products/采购/销售/dashboard/settings 等)不列 = 中性放行。后端
+// services/authz/deps._check 才是真边界,此处只减少用户误入空壳的摩擦。
+export const POS_ENTRY_ROUTES = new Set<string>([
+    'inventory',
+    'sales-report',
+    'pos-sales-log',
+    'pos-audit',
+    'pos-cashiers',
+    'pos-tables',
+    'pos-payment',
+    'pos-sheets',
+    'pos-onboarding',
+]);
+
+export const MAIN_ENTRY_ROUTES = new Set<string>([
+    'vouchers',
+    'acct-review',
+    'acct-accounts',
+    'acct-settings',
+    'acct-bank',
+    'acct-manual',
+    'acct-books',
+    'tax-center',
+    'tax-pp30',
+    'tax-pnd',
+    'tax-settings',
+    'dms-intake',
+    'history',
+    'push-logs',
+    'reconcile',
+    'exceptions',
+    'integrations',
+    'templates',
+    'api-keys',
+]);
+
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
 export const ROUTE_LOADERS: Record<string, string> = {
     settings: 'renderSettings',

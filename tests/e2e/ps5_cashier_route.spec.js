@@ -97,10 +97,14 @@ test('② /pos 无绑定凭据 → 老板后台登录页(无 Google/LINE/注册)
     await page.screenshot({ path: path.join(ART, 'pos_owner_login.png'), fullPage: true });
 });
 
-test('③ /pos 带绑定凭据 → 接回 /cashier', async ({ page }) => {
+test('③ /pos 不再被残留店铺令牌劫持', async ({ page }) => {
+    // /pos 现为老板后台登录页 · 删掉了「残留 pos_store_token 即劫持跳 /cashier」守卫
+    // (老板浏览器残留令牌会被误劫持;收银设备的家在 /cashier,设备直开)。带伪造
+    // pos_store_token 访问 /pos 应停在 /pos 登录页,不跳 /cashier。
     await page.goto(`${BASE}/pos`, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.setItem('pos_store_token', 'FORGED-STORE-TOKEN'));
     await page.goto(`${BASE}/pos`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
-    expect(page.url().endsWith('/cashier')).toBeTruthy();
+    expect(page.url()).toContain('/pos');
+    expect(page.url().endsWith('/cashier')).toBeFalsy();
 });

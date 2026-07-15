@@ -133,6 +133,10 @@ PEARNLY_AI_RUN_NOTIFY_KEY = "pearnly_ai_run_notify"
 # 登录入口准入门(各是各的)· 回退开关。关 = 不拦,任何门都通(上线前/回退=现状);
 # 开 = 未被授权该入口的账号从该门登录,按账号密码错误拒登。按 tenant 判定。测稳后 rollout=all。
 ENTRANCE_GATE_KEY = "entrance_gate"
+# 入口级 API 纵深隔离闸(Phase3)· 与登录准入(entrance_gate)分开控,各自独立放量。关 = API
+# 不按 token.entry 卡作用域(现状);开 = token.entry 不在码允许入口集则拒(403/PosError)。
+# 按 tenant 判定;消费在 services/authz/deps._entrance_scope_deny。默认关,测稳后 rollout=all。
+ENTRANCE_API_SCOPE_KEY = "entrance_api_scope"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -276,6 +280,13 @@ def entrance_gate_enabled_for(tenant_id: Optional[str]) -> bool:
     开 = 未被授权该入口的账号从该门登录按账号密码错误拒。按 tenant 判定;测稳后 rollout=all。
     """
     return _enabled(ENTRANCE_GATE_KEY, tenant_id, "entrance_gate_enabled_for")
+
+
+def entrance_api_scope_enabled_for(tenant_id: Optional[str]) -> bool:
+    """入口级 API 纵深隔离闸(Phase3)。关 = API 不卡 token.entry 作用域(现状零变化);
+    开 = token.entry 不在码允许入口集则拒。与 entrance_gate(登录准入)独立放量。按 tenant 判定。
+    """
+    return _enabled(ENTRANCE_API_SCOPE_KEY, tenant_id, "entrance_api_scope_enabled_for")
 
 
 def pearnly_ai_sod_enabled_for(tenant_id: Optional[str]) -> bool:

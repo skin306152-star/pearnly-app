@@ -101,6 +101,28 @@ class LoginEntryPointsWriteEntryMarkTests(unittest.TestCase):
         self.assertIn("localStorage.setItem('pearnly_entry', 'main')", text)
 
 
+class RouteToEntryGuardTests(unittest.TestCase):
+    """Phase3 各是各的 · core-boot.ts:routeTo 跨壳深链回落当前入口首页(纯 UX 守卫)。"""
+
+    def test_route_to_applies_entry_guard(self):
+        # routeTo 必调入口守卫(pos-entry 手敲会计路由 / main-entry 手敲纯 POS 路由回落)
+        text = _read("src/home/core-boot.ts")
+        self.assertIn("_entryGuardRoute", text)
+        self.assertIn("route = _entryGuardRoute(route)", text)
+
+    def test_guard_only_active_when_entry_known(self):
+        # 仅 window._entry 明确 pos/main 时生效;空(旧会话)不拦,向后兼容
+        text = _read("src/home/core-boot.ts")
+        self.assertIn("entry === 'pos'", text)
+        self.assertIn("entry === 'main'", text)
+
+    def test_route_table_declares_entry_route_sets(self):
+        # 壳专属路由集在 route-table.ts(共用路由不列 = 中性放行)
+        text = _read("src/home/route-table.ts")
+        self.assertIn("POS_ENTRY_ROUTES", text)
+        self.assertIn("MAIN_ENTRY_ROUTES", text)
+
+
 class GlobalsDeclareEntryTests(unittest.TestCase):
     def test_window_entry_declared(self):
         text = _read("src/types/globals.d.ts")

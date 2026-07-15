@@ -15,19 +15,21 @@ from pydantic import BaseModel, Field
 from core import db
 from core.pos_api import PosError, ok, require_workspace_access
 from services.authz.deps import require_perm_pos_tid
-from services.modules import store as modules_store
 from services.pos import onboarding as onboarding_svc
 
 router = APIRouter(prefix="/api/pos/admin", tags=["pos-modules"])
 
 
+# ── 自助模块管理已封死(Phase3 · 各是各的):功能跟登录入口走,不再逐模块自选。
+# PUT 是「自助逐模块 toggle」影子活体(与「入口定功能」直接冲突);GET 读侧与 business-presets
+# 孤悬端点均零前端消费者(grep 为证),一并封。保留路由壳返 403,不动 app 注册。开通向导只走
+# onboarding-state(读)+ 运营侧 presets.apply_preset(写),不经这三个端点。
+
+
 @router.get("/modules")
 async def api_get_modules(request: Request):
-    """全模块开关视图(老板设置页用 · 含默认回落 + config)。"""
-    tid, _uid = require_perm_pos_tid(request, "settings.modules.manage")
-    with db.get_cursor_rls(tid) as cur:
-        modules = modules_store.get_modules(cur, tenant_id=tid)
-    return ok({"modules": modules})
+    """已封死:自助模块开关读侧废弃(零前端消费者)。"""
+    raise PosError("pos.forbidden", 403)
 
 
 class SetModuleRequest(BaseModel):
@@ -38,20 +40,8 @@ class SetModuleRequest(BaseModel):
 
 @router.put("/modules")
 async def api_set_module(req: SetModuleRequest, request: Request):
-    """开/关单模块(关=隐藏不删数据)。未知 module_key → pos.line_invalid(422)。"""
-    tid, _uid = require_perm_pos_tid(request, "settings.modules.manage")
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        try:
-            updated = modules_store.set_module(
-                cur,
-                tenant_id=tid,
-                module_key=req.module_key,
-                enabled=req.enabled,
-                config=req.config,
-            )
-        except ValueError as e:
-            raise PosError("pos.line_invalid", 422, detail=str(e)) from e
-    return ok({"module": updated})
+    """已封死:自助逐模块 toggle 影子活体(与「入口定功能」冲突,禁自助开通)。"""
+    raise PosError("pos.forbidden", 403)
 
 
 @router.get("/onboarding-state")
@@ -68,6 +58,5 @@ async def api_onboarding_state(request: Request, workspace_client_id: int = Quer
 
 @router.get("/business-presets")
 async def api_business_presets(request: Request):
-    """业态预设(业态 → 能力块清单)· 给开通向导渲染选项。"""
-    require_perm_pos_tid(request, "settings.modules.manage")
-    return ok({"presets": onboarding_svc.BUSINESS_PRESETS})
+    """已封死:业态预设孤悬端点(零前端消费者)。"""
+    raise PosError("pos.forbidden", 403)

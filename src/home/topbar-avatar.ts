@@ -218,17 +218,9 @@
                             : undefined
                     ).finally(function () {
                         try {
+                            // 入口提示(pearnly_entry)登出即清:壳的权威是 token.entry,不留旧门痕迹。
                             localStorage.removeItem('mrpilot_token');
-                        } catch (_) {
-                            /* silent · localStorage 私模/配额 */
-                        }
-                        try {
                             localStorage.removeItem('mrpilot_user');
-                        } catch (_) {
-                            /* silent · localStorage 私模/配额 */
-                        }
-                        try {
-                            // 入口提示登出即清:壳的权威是 token.entry,登出后不留旧门痕迹
                             localStorage.removeItem('pearnly_entry');
                         } catch (_) {
                             /* silent · localStorage 私模/配额 */

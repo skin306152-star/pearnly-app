@@ -198,7 +198,22 @@ document.addEventListener('click', () => {
 setupDropdown('lang-dropdown', (item: any) => applyLang(item.dataset.lang));
 
 // 路由表抽 route-table.ts(纯数据 · 控本文件行数):加新页改那边,这里只消费。
-import { VALID_ROUTES, ROUTE_LOADERS } from './route-table.js';
+import {
+    VALID_ROUTES,
+    ROUTE_LOADERS,
+    POS_ENTRY_ROUTES,
+    MAIN_ENTRY_ROUTES,
+} from './route-table.js';
+
+// Phase3 入口守卫(各是各的 · 纯 UX;后端 _check 是真边界):跨壳深链回落当前入口首页。
+// 仅在 window._entry 明确为 'pos'/'main' 时生效(旧会话为空 → 不拦,向后兼容);两壳共用 /
+// 无法判定归属的路由不在两集 → 放行。
+function _entryGuardRoute(route: string): string {
+    const entry = window._entry;
+    if (entry === 'pos' && MAIN_ENTRY_ROUTES.has(route)) return 'inventory';
+    if (entry === 'main' && POS_ENTRY_ROUTES.has(route)) return 'dashboard';
+    return route;
+}
 
 // 员工首个可见业务路由(首页=计费面板对员工隐藏后落脚 · firm→录入工作台 · 兜底 dms-intake)。
 function _employeeHomeRoute(): string {
@@ -213,6 +228,7 @@ function _employeeHomeRoute(): string {
 function routeTo(route?: any) {
     // REFACTOR-C1 · 老 admin/admin-users/admin-cost 路由已下线(超管走独立 /admin SPA)· 落到 ocr
     if (!VALID_ROUTES.includes(route)) route = 'dms-intake';
+    route = _entryGuardRoute(route); // Phase3 各是各的:跨壳深链回落当前入口首页
     // 首页=计费/订阅/余额,员工看不到钱(permissions.shouldHideMoney)→ 落其业务首页。
     if (route === 'dashboard' && typeof window.isEmployee === 'function' && window.isEmployee())
         route = _employeeHomeRoute();

@@ -25,6 +25,35 @@ POS = "pos"
 AI = "ai"
 ALL_ENTRANCES = (MAIN, POS, AI)
 
+# 权限码前缀 → 允许的登录入口【集合】(Phase3 API 作用域闸的判据 · 按前缀判、不按 URL 判:
+# tax_profile_routes 是 AI 接口却寄生 /api/workspace 路径)。一码可跨多门——业务功能被多个壳
+# 共用,不能一码归一门(2026-07-16 查证坐实):
+#   - sales/purchase/inv/intake = {main, pos}:POS 商户也做采购进货 / 销售开票 / 盘点 / 收料。
+#   - tax = {main, ai}:会计主壳报税中心(src/home/tax-*.ts → /api/tax/filings·settings)与
+#     AI SPA 工单(static/ai/ai-api*.js → /api/workorder,四权分立映射 tax.filing.*)都调 tax.* 码。
+#   - acct/recon/kb/ar = {main}:做账/对账/知识库/应收是会计主壳专属,POS/AI 壳无这些菜单
+#     (AI 工单内部对账走 tax.filing.* 码,不走 recon.*)。
+#   - pos = {pos}:收银专属。
+# 未列前缀(team/billing/ownership/settings/audit/field 等横切中性码)与未知前缀 → None(中性,
+# 不归任何入口,_check 里短路放行,否则登录 bootstrap 的 /api/me 系列全崩)。
+_ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
+    "pos": frozenset({POS}),
+    "tax": frozenset({MAIN, AI}),
+    "acct": frozenset({MAIN}),
+    "recon": frozenset({MAIN}),
+    "kb": frozenset({MAIN}),
+    "ar": frozenset({MAIN}),
+    "sales": frozenset({MAIN, POS}),
+    "purchase": frozenset({MAIN, POS}),
+    "inv": frozenset({MAIN, POS}),
+    "intake": frozenset({MAIN, POS}),
+}
+
+
+def entrance_of_code(code: str) -> Optional[frozenset[str]]:
+    """该权限码允许哪些登录入口(main/pos/ai 的集合);横切中性码/未知前缀返 None(不归任何入口)。"""
+    return _ENTRANCE_BY_PREFIX.get(code.split(".", 1)[0])
+
 
 def authorized_entrances(tenant_id: Optional[str], user_id: Optional[str]) -> Set[str]:
     """推导该租户/账号被授权的入口集(Phase1 推导版)。"""

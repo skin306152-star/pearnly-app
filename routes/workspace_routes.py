@@ -176,15 +176,16 @@ def _pos_single_store_blocked(tenant_id: Optional[str]) -> bool:
         return int((cur.fetchone() or {}).get("n") or 0) >= 1
 
 
-@router.post("/api/workspace/clients")
-async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
-    """新建账套主体。仅老板/超管(建账套主体是重大操作 · 区别于建买方)。
+def _create_validated_client(
+    req: WorkspaceClientCreate, user: dict, tenant_id: Optional[str], *, dry_run: bool = False
+) -> Optional[int]:
+    """建账套主体的校验 + 落库核心体(单建端点 与 IN-0d 批量导入共用同一段实现,
+    禁止第二套判定逻辑)。校验不过 raise HTTPException(单建端点直接透传给调用方;
+    导入路由逐行 try/except 转成行级三态)。
 
-    注意:Pearnly 不在 ERP 内自动创建账套公司,这里只是在 Pearnly 侧登记一个工作台
-    主体,并可绑定到一个**已存在**的 ERP endpoint。
+    dry_run=True 只跑校验、不落库(导入「预览」复用同一判定口径,零副作用)——
+    校验全过时返回 None(无 id 可给,调用方按"未抛异常"判 valid)。
     """
-    user = require_perm(request, "settings.workspace.manage")
-    tenant_id = _tid(user)
     # POS 一号一店(Zihao 2026-07-12 拍板):pos_only 已有套账 → 禁止再建(照本文件既有
     # 错误抛法 · HTTPException+detail code · 与下方 tax_id_duplicate 同款,前端 apiClient
     # 读 err.detail 映射四语,不用 PosError 信封)。
@@ -205,6 +206,8 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
         and db.tax_id_in_use(str(user["id"]), tenant_id, req.tax_id)
     ):
         raise HTTPException(422, detail="workspace.tax_id_duplicate")
+    if dry_run:
+        return None
     wid = db.create_workspace_client(
         str(user["id"]),
         tenant_id,
@@ -221,6 +224,19 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     )
     if not wid:
         raise HTTPException(400, detail="workspace.create_failed")
+    return wid
+
+
+@router.post("/api/workspace/clients")
+async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
+    """新建账套主体。仅老板/超管(建账套主体是重大操作 · 区别于建买方)。
+
+    注意:Pearnly 不在 ERP 内自动创建账套公司,这里只是在 Pearnly 侧登记一个工作台
+    主体,并可绑定到一个**已存在**的 ERP endpoint。
+    """
+    user = require_perm(request, "settings.workspace.manage")
+    tenant_id = _tid(user)
+    wid = _create_validated_client(req, user, tenant_id)
     _log_op(
         request,
         user,

@@ -1,0 +1,40 @@
+/*
+ * ai-client-import.css · IN-0d 客户名录批量导入模态(布局细节)
+ *
+ * 模态外壳复用 .pkg-mask/.pkg-modal(ai-pkg.css),上传区复用 .dropzone/.dz-*
+ * (ai-intake.css),表格复用 .mx-scroll/.mx-table(ai-matrix.css),状态徽章复用
+ * .chip.g/.n/.b(ai-shell.css)。本文件只补三处没有的布局细节:计数条/操作按钮行/
+ * 行内错误原因文案。全走 var() 令牌,零硬编码色值。
+ */
+.ci-counts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.ci-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.ci-reason {
+  display: block;
+  font-size: 11px;
+  color: var(--mut);
+  margin-top: 3px;
+}
+.ci-result-hd {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+@media (max-width: 640px) {
+  .ci-actions {
+    flex-direction: column-reverse;
+  }
+  .ci-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

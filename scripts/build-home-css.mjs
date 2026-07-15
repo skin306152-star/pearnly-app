@@ -203,6 +203,10 @@ const AI_CSS = [
     // .chead/.ctabs/.cview(ai-client.css)、.pr-setup-row/.pr-lb(ai-payroll.css)、
     // .pkg-files/.pfile(ai-pkg.css)、.view-toggle/.vt-btn(ai-matrix.css)——零新增文件。
     'ai/ai-clients.css',
+    // ai-client-import.css(IN-0d · 客户名录批量导入模态)只补计数条/操作按钮行/行内错误
+    // 原因文案三处布局细节,模态外壳/上传区/表格/徽章全复用既有 .pkg-*/.dropzone/.dz-*/
+    // .mx-table/.chip,排最后即可,与其余视图互斥显示,层叠顺序对彼此零影响。
+    'ai/ai-client-import.css',
 ];
 
 const BUNDLES = [

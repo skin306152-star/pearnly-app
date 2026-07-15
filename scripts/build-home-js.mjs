@@ -85,6 +85,9 @@ const BUNDLES = [
             // 排在 ai-api.js 之前(apiFactory() 到调用时才读 AI.apiPayroll,不是加载时),
             // 紧邻放置是"同属后端调用薄层"的语义分组。
             'ai/ai-api-payroll.js',
+            // ai-api-client-import.js(IN-0d · 客户名录导入 parse/commit 两端点,拆自
+            // ai-api.js·单文件<500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
+            'ai/ai-api-client-import.js',
             // ai-api-review.js(MC1-b2 · 审核收件箱 + 签批闭环七端点,拆自 ai-api.js·单文件
             // <500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-review.js',
@@ -196,6 +199,12 @@ const BUNDLES = [
             // ai-client-new.js(N1-P0-1 ·「+新建客户」模态,依赖 AI.state/api/router)只需
             // 排在 ai-clients.js(load() 里调 AI.clientNew.wireButton)之前。
             'ai/ai-client-new.js',
+            // ai-client-import-render.js(IN-0d · 客户名录批量导入纯逻辑+HTML,依赖
+            // AI.state)排在 ai-client-import.js(挂载/上传/预览/确认编排,依赖
+            // AI.clientImportRender)之前,两者都在 ai-clients.js(load() 里调
+            // AI.clientImport.wireButton)之前——同 ai-client-new.js 先例。
+            'ai/ai-client-import-render.js',
+            'ai/ai-client-import.js',
             'ai/ai-clients.js',
             'ai/ai-client-archive-render.js',
             'ai/ai-client-archive.js',

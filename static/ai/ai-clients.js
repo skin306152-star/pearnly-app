@@ -51,9 +51,19 @@
         window.location.hash = AI.router.buildClientArchiveHash(clientId, 'profile');
     }
 
+    // IN-0d:批量导入建了 N 个客户,场景是"一次进几十个",不是单客户旅程——留在
+    // 目录页刷新列表(重拉矩阵),不像单建那样跳去某一个客户的档案页。
+    function onClientsImported() {
+        S.api.getTaxProfileMatrix().then(function (matrix) {
+            S.matrix = matrix;
+            renderList();
+        });
+    }
+
     function load(api) {
         S.api = api;
         AI.clientNew.wireButton(api, onClientCreated);
+        AI.clientImport.wireButton(api, onClientsImported);
         if (!body().querySelector('.cl-list')) body().innerHTML = AI.state.loadingHtml();
         return api
             .getTaxProfileMatrix()

@@ -38,6 +38,7 @@
   "billing_subscription_routes": "B",
   "billing_topup_routes": "B",
   "categories_routes": "B",
+  "client_import_routes": "B",
   "client_pool_routes": "C",
   "clients_routes": "B",
   "console_invite_routes": "C",

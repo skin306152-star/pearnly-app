@@ -168,6 +168,9 @@ from routes.rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税
 from routes.workspace_routes import (
     router as workspace_router,
 )  # B4 · workspace 账套主体(非破坏) · 2026-05-25
+from routes.client_import_routes import (
+    router as client_import_router,
+)  # IN-0d · 客户名录 Excel 批量导入(parse/commit) · 2026-07-15
 from routes.workorder_routes import (
     router as workorder_router,
 )  # M1-B1 · Pearnly AI 工单制 API(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-09
@@ -360,6 +363,7 @@ app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)
 app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)
 app.include_router(workspace_router)  # B4 · workspace 账套主体读写(非破坏 · 2026-05-25)
+app.include_router(client_import_router)  # IN-0d · 客户名录批量导入(parse/commit) · 2026-07-15
 app.include_router(workorder_router)  # M1-B1 · Pearnly AI 工单制 API(pearnly_ai_m1 闸 · 2026-07-09)
 app.include_router(workorder_financials_router)  # N1 · 月度报表 PDF/Excel 下载 · 2026-07-13
 app.include_router(workorder_review_router)  # MC1-b1 · 审核队列与签批闭环 · 2026-07-13

@@ -165,12 +165,8 @@ from routes.email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
 from routes.rd_routes import router as rd_router  # REFACTOR-B1 · 泰国 RD 税务 4 路由 · 2026-05-25
-from routes.workspace_routes import (
-    router as workspace_router,
-)  # B4 · workspace 账套主体(非破坏) · 2026-05-25
-from routes.client_import_routes import (
-    router as client_import_router,
-)  # IN-0d · 客户名录 Excel 批量导入(parse/commit) · 2026-07-15
+from routes.workspace_routes import router as workspace_router  # B4 · workspace 账套主体
+from routes.client_import_routes import router as client_import_router  # IN-0d 客户名录批量导入
 from routes.workorder_routes import (
     router as workorder_router,
 )  # M1-B1 · Pearnly AI 工单制 API(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-09

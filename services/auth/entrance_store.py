@@ -11,12 +11,25 @@ try/except 回落推导,是 Phase2 的安全设计(见 services/auth/entrance.au
 
 from __future__ import annotations
 
+import logging
 from typing import Optional, Set
 
-MAIN = "main"
-POS = "pos"
-AI = "ai"
-_VALID = frozenset({MAIN, POS, AI})
+from services.auth.entrance import AI, ALL_ENTRANCES, MAIN, POS
+
+# 入口常量单一事实源在 entrance.py；此处 re-export 供发放侧(entrance_store.MAIN/POS/AI)沿用。
+__all__ = [
+    "MAIN",
+    "POS",
+    "AI",
+    "grant_entrance",
+    "grant_entrance_safe",
+    "list_entrances",
+    "revoke_entrance",
+]
+
+logger = logging.getLogger(__name__)
+
+_VALID = frozenset(ALL_ENTRANCES)
 
 
 def grant_entrance(cur, tenant_id: str, entrance: str, granted_by: Optional[str] = None) -> None:
@@ -46,3 +59,23 @@ def revoke_entrance(cur, tenant_id: str, entrance: str) -> None:
         "DELETE FROM tenant_entrances WHERE tenant_id = %s::uuid AND entrance = %s",
         (str(tenant_id), entrance),
     )
+
+
+def grant_entrance_safe(entrance, tenant_id, granted_by=None, *, cur=None, context=""):
+    """发放侧统一入口授予 · 失败只 log 不 raise(发放主流程不因入口表写失败回滚)。
+
+    cur=None 时自开 get_cursor(commit=True);传入则复用调用方事务(与调用方同原子)。
+    无 tenant_id(个人套账无租户)→ 跳过:登录准入只按 tenant_id 读表,无 tenant 不落行。
+    """
+    if not tenant_id:
+        return
+    try:
+        if cur is not None:
+            grant_entrance(cur, tenant_id, entrance, granted_by)
+        else:
+            from core import db
+
+            with db.get_cursor(commit=True) as c:
+                grant_entrance(c, tenant_id, entrance, granted_by)
+    except Exception as e:  # noqa: BLE001 · 入口表写失败不阻断发放主流程
+        logger.warning("[entrance] %s grant_entrance skip: %s", context or entrance, e)

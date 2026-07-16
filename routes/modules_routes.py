@@ -16,7 +16,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, ok, require_tenant
+from core.pos_api import PosError, ok, pos_auth
 from services.authz.deps import require_perm_pos_tid
 from services.modules import presets, store
 
@@ -40,13 +40,15 @@ def _modules_view(cur, tenant_id: str) -> dict:
 @router.get("/modules")
 async def api_get_modules(request: Request):
     """当前租户开了哪些模块(含默认回落)+ 业态 + 会话入口。前端导航/路由按此显隐/定壳。"""
-    from core.auth import entry_of_request
-
-    tid, _uid = require_tenant(request)
+    user = pos_auth(request)
+    tid = user.get("tenant_id")
+    if not tid:
+        raise PosError("pos.forbidden", 403)
+    tid = str(tid)
     with db.get_cursor_rls(tid) as cur:
         view = _modules_view(cur, tid)
-    # 会话入口权威下发:壳由 token.entry 定,前端不再猜 per-browser localStorage(根治串壳)。
-    view["entry"] = entry_of_request(request)
+    # 会话入口权威下发:壳由 token.entry 定(pos_auth 已随主体带出),前端不再猜 localStorage。
+    view["entry"] = user.get("entry") or "main"
     return ok(view)
 
 

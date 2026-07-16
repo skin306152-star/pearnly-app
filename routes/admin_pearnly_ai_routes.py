@@ -33,6 +33,7 @@ from core import db
 from core.feature_flags import PEARNLY_AI_M1_KEY
 from core.route_helpers import _check_password_strength, _log_op, _require_super_admin
 from services.auth.account_provision import resolve_account_identifier
+from services.auth.entrance_store import AI, grant_entrance_safe
 from services.platform_settings import store as platform_settings_store
 from services.tenant.owner_users import create_owner_user
 
@@ -65,21 +66,6 @@ def _subject_id(user: dict) -> str:
     个人套账(无 tenant)退回 user_id。这是唯一判据来源,不许在别处另写一份。"""
     tenant_id = user.get("tenant_id")
     return str(tenant_id) if tenant_id else str(user["id"])
-
-
-def _grant_ai_entrance(tenant_id: str | None, granted_by: str | None) -> None:
-    """邀请成功后顺带写授权入口集显式表(Phase2 · ai 入口)。自开事务;失败只 log 不 raise
-    (读侧 authorized_entrances 表缺行会回落推导——名单仍是 ai 准入的推导来源,零行为影响)。
-    个人套账(无 tenant)不写:登录准入只按 tenant_id 读表。"""
-    if not tenant_id:
-        return
-    try:
-        from services.auth import entrance_store
-
-        with db.get_cursor(commit=True) as cur:
-            entrance_store.grant_entrance(cur, tenant_id, entrance_store.AI, granted_by)
-    except Exception as e:  # noqa: BLE001 · 入口表写失败不阻断邀请主流程
-        logger.warning(f"[entrance] ai grant_entrance skip: {e}")
 
 
 def _generate_temp_password() -> str:
@@ -209,7 +195,9 @@ async def pearnly_ai_invite(request: Request, body: InviteBody):
     if existing:
         subject_id = _subject_id(existing)
         platform_settings_store.add_to_allowlist(PEARNLY_AI_M1_KEY, subject_id)
-        _grant_ai_entrance(existing.get("tenant_id"), str(admin.get("id")) if admin else None)
+        grant_entrance_safe(
+            AI, existing.get("tenant_id"), str(admin.get("id")) if admin else None, context="ai"
+        )
         _log_op(
             request,
             admin,
@@ -251,7 +239,7 @@ async def pearnly_ai_invite(request: Request, body: InviteBody):
             cur.execute("UPDATE users SET email = %s WHERE id = %s", (identity["email"], user_id))
 
     platform_settings_store.add_to_allowlist(PEARNLY_AI_M1_KEY, tenant_id)
-    _grant_ai_entrance(tenant_id, str(admin.get("id")) if admin else None)
+    grant_entrance_safe(AI, tenant_id, str(admin.get("id")) if admin else None, context="ai")
     _log_op(
         request,
         admin,

@@ -53,6 +53,14 @@ _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
 }
 
 
+# registry 里 module_of=None 的横切中性前缀(未归任何入口 · entrance_of_code 返 None 短路放行)。
+# 与 _ENTRANCE_BY_PREFIX 互补:test_entrance_scope 断言 registry 每个码前缀二者必居其一,防新增
+# 模块前缀漏分类导致 entrance_of_code 静默 fail-open。仅服务测试断言,不进 entrance_of_code 运行判定。
+_NEUTRAL_PREFIXES: frozenset[str] = frozenset(
+    {"team", "billing", "ownership", "settings", "audit", "field"}
+)
+
+
 def entrance_of_code(code: str) -> Optional[frozenset[str]]:
     """该权限码允许哪些登录入口(main/pos/ai 的集合);横切中性码/未知前缀返 None(不归任何入口)。"""
     return _ENTRANCE_BY_PREFIX.get(code.split(".", 1)[0])

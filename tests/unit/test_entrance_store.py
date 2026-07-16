@@ -115,57 +115,72 @@ class DualTrackTests(unittest.TestCase):
         self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main"})
 
 
-class WriteHookWiringTests(unittest.TestCase):
-    """三处发放成功后确实调了 grant_entrance(至少:钩子在场、入口值正确)。"""
+class GrantEntranceSafeTests(unittest.TestCase):
+    """集中式 grant_entrance_safe:复用调用方 cur / 自开提交事务 / 无 tenant 跳过 / 失败不 raise。"""
 
-    def test_pos_grant_hook_writes_pos(self):
-        from services.pos import entitlements
-
+    def test_uses_caller_cursor_when_given(self):
         cur = _FakeCursor()
         with mock.patch("services.auth.entrance_store.grant_entrance") as grant:
-            entitlements._grant_entrance(cur, "t1", "admin-1")
-            grant.assert_called_once_with(cur, "t1", entrance_store.POS, "admin-1")
+            entrance_store.grant_entrance_safe(
+                entrance_store.POS, "t1", "admin-1", cur=cur, context="pos"
+            )
+        grant.assert_called_once_with(cur, "t1", entrance_store.POS, "admin-1")
 
-    def test_pos_hook_failure_does_not_raise(self):
-        from services.pos import entitlements
-
-        with mock.patch(
-            "services.auth.entrance_store.grant_entrance", side_effect=RuntimeError("boom")
-        ):
-            # 入口表写失败只 log 不阻断开通主流程
-            entitlements._grant_entrance(_FakeCursor(), "t1", None)
-
-    def test_ai_invite_hook_writes_ai_for_tenant(self):
-        import routes.admin_pearnly_ai_routes as ai_routes
+    def test_self_opens_committing_transaction_when_no_cursor(self):
+        opened = {}
 
         @contextmanager
         def _gc(commit=False):
-            yield _FakeCursor()
+            opened["commit"] = commit
+            yield "SELF-CUR"
 
         with (
             mock.patch("core.db.get_cursor", _gc),
             mock.patch("services.auth.entrance_store.grant_entrance") as grant,
         ):
-            ai_routes._grant_ai_entrance("t1", "admin-1")
-            grant.assert_called_once()
-            self.assertEqual(grant.call_args[0][2], entrance_store.AI)
+            entrance_store.grant_entrance_safe(entrance_store.AI, "t1", context="ai")
+        self.assertTrue(opened["commit"])
+        grant.assert_called_once_with("SELF-CUR", "t1", entrance_store.AI, None)
 
-    def test_ai_invite_hook_skips_when_no_tenant(self):
-        import routes.admin_pearnly_ai_routes as ai_routes
-
+    def test_skips_when_no_tenant(self):
+        # 个人套账(无 tenant)不落行 —— 登录准入只按 tenant_id 读表
         with mock.patch("services.auth.entrance_store.grant_entrance") as grant:
-            ai_routes._grant_ai_entrance(None, "admin-1")
-            grant.assert_not_called()
+            entrance_store.grant_entrance_safe(entrance_store.AI, None, context="ai")
+        grant.assert_not_called()
 
-    def test_signup_grants_main(self):
-        # signup_core 钩子在场:_ensure_tenant_for_new_user 内调 grant_entrance(main)
+    def test_failure_does_not_raise(self):
+        with mock.patch(
+            "services.auth.entrance_store.grant_entrance", side_effect=RuntimeError("boom")
+        ):
+            # 入口表写失败只 log 不阻断发放主流程
+            entrance_store.grant_entrance_safe(entrance_store.MAIN, "t1", cur=_FakeCursor())
+
+
+class WriteHookWiringTests(unittest.TestCase):
+    """三处发放点确实经 grant_entrance_safe 写对应入口(源码契约 · 防钩子被摘)。"""
+
+    def test_pos_grant_and_transfer_wire_pos(self):
+        import inspect
+
+        from services.pos import entitlements
+
+        for fn in (entitlements.grant, entitlements.transfer):
+            self.assertIn("grant_entrance_safe(POS", inspect.getsource(fn), fn.__name__)
+
+    def test_signup_wires_main(self):
         import inspect
 
         from services.auth import signup_core
 
         src = inspect.getsource(signup_core._ensure_tenant_for_new_user)
-        self.assertIn("grant_entrance", src)
-        self.assertIn("entrance_store.MAIN", src)
+        self.assertIn("grant_entrance_safe(MAIN", src)
+
+    def test_ai_invite_wires_ai(self):
+        import inspect
+
+        import routes.admin_pearnly_ai_routes as ai_routes
+
+        self.assertIn("grant_entrance_safe(AI", inspect.getsource(ai_routes.pearnly_ai_invite))
 
 
 class BackfillScriptTests(unittest.TestCase):

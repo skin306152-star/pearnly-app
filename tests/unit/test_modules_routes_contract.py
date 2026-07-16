@@ -43,8 +43,10 @@ class ModulesRoutesContractTests(unittest.TestCase):
         # onboarding 须走 settings.modules.manage(owner/admin · 挡会计/录入/收银员)
         src = inspect.getsource(modules_routes.api_onboarding)
         self.assertIn('require_perm_pos_tid(request, "settings.modules.manage")', src)
-        # 读接口用 require_tenant(任意已登录主体)
-        self.assertIn("require_tenant", inspect.getsource(modules_routes.api_get_modules))
+        # 读接口用 pos_auth(任意已登录主体 · 一次解 token 拿 tenant+entry);无 tenant → pos.forbidden
+        get_src = inspect.getsource(modules_routes.api_get_modules)
+        self.assertIn("pos_auth(request)", get_src)
+        self.assertIn("pos.forbidden", get_src)
 
     def test_onboarding_locked_to_firm(self):
         # 业态自选已下架:非 firm 一律 platform.business_type_locked(唯一合法调用 =

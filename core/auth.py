@@ -30,6 +30,11 @@ POS_STORE_TOKEN_TTL_DAYS = 365  # 设备店铺令牌(绑定一次长期用 · do
 VALID_ENTRIES = ("main", "pos", "ai")
 
 
+def _normalize_entry(entry: str) -> str:
+    """未知/缺失入口一律收敛回 main(孤儿签发点与老 token 的向后兼容默认)。"""
+    return entry if entry in VALID_ENTRIES else "main"
+
+
 def _jwt_secret() -> str:
     s = os.environ.get("JWT_SECRET", "").strip()
     if not s or len(s) < 16:
@@ -96,7 +101,7 @@ def create_access_token(
         "sub": user_id,
         "jti": jti,
         "typ": "access",
-        "entry": entry if entry in VALID_ENTRIES else "main",
+        "entry": _normalize_entry(entry),
         "iat": now,
         "exp": expires_at,
     }
@@ -337,21 +342,6 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
         pass
 
     return user
-
-
-def entry_of_request(request: Request) -> str:
-    """从 Bearer token 读会话入口(main/pos/ai)· 壳/导航据此定壳。无/坏 token → main。
-    收银员/设备 token(typ pos/pos_store)天然归 pos;access token 读 entry claim(老 token 缺
-    → main)。纯解码不查库,供 /api/me/modules 等把权威 entry 下发给前端(前端不再猜 localStorage)。
-    """
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return "main"
-    payload = decode_access_token(auth[7:].strip()) or {}
-    if payload.get("typ") in ("pos", "pos_store"):
-        return "pos"
-    entry = payload.get("entry")
-    return entry if entry in VALID_ENTRIES else "main"
 
 
 def get_client_ip(request: Request) -> str:

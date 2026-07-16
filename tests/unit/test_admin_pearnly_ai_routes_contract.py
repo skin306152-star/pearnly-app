@@ -225,7 +225,7 @@ class InviteExistingUserTests(unittest.TestCase):
             mock.patch.object(
                 admin_pearnly_ai_routes.platform_settings_store, "add_to_allowlist"
             ) as m_add,
-            mock.patch.object(admin_pearnly_ai_routes, "_grant_ai_entrance"),
+            mock.patch.object(admin_pearnly_ai_routes, "grant_entrance_safe"),
             mock.patch.object(admin_pearnly_ai_routes, "_log_op") as m_log,
         ):
             r = self.client.post(
@@ -248,7 +248,7 @@ class InviteExistingUserTests(unittest.TestCase):
             mock.patch.object(
                 admin_pearnly_ai_routes.platform_settings_store, "add_to_allowlist"
             ) as m_add,
-            mock.patch.object(admin_pearnly_ai_routes, "_grant_ai_entrance"),
+            mock.patch.object(admin_pearnly_ai_routes, "grant_entrance_safe"),
             mock.patch.object(admin_pearnly_ai_routes, "_log_op") as m_log,
         ):
             r = self.client.post("/api/admin/pearnly-ai/invite", json={"username_or_email": "solo"})
@@ -332,7 +332,7 @@ class InviteCreateAccountTests(unittest.TestCase):
             ) as m_add,
             mock.patch.object(admin_pearnly_ai_routes.db, "get_cursor") as m_cur,
             # 授权入口集写钩子(Phase2)自开游标,有独立测试;此处屏蔽以纯验「非邮箱不落 users.email」。
-            mock.patch.object(admin_pearnly_ai_routes, "_grant_ai_entrance"),
+            mock.patch.object(admin_pearnly_ai_routes, "grant_entrance_safe"),
             mock.patch.object(admin_pearnly_ai_routes, "_log_op"),
         ):
             r = self.client.post(

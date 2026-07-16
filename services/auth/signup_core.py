@@ -478,14 +478,11 @@ def _ensure_tenant_for_new_user(
         except Exception as _e_mb:
             logger.warning(f"[authz] signup create_membership skip: {_e_mb}")
 
-        # 授权入口集显式表(Phase2):自由注册账号天然是 main 入口 → 顺带写 tenant_entrances。
-        # 失败不阻塞注册(读侧 authorized_entrances 表缺行会回落推导,零行为影响)。
-        try:
-            from services.auth import entrance_store
+        # 授权入口集显式表(Phase2):自由注册账号天然是 main 入口 → 顺带写 tenant_entrances
+        # (共用 grant_entrance_safe:失败只 log 不阻塞注册,读侧表缺行回落推导零影响)。
+        from services.auth.entrance_store import MAIN, grant_entrance_safe
 
-            entrance_store.grant_entrance(cur, str(new_tenant_id), entrance_store.MAIN)
-        except Exception as _e_ent:
-            logger.warning(f"[entrance] signup grant_entrance(main) skip: {_e_ent}")
+        grant_entrance_safe(MAIN, str(new_tenant_id), cur=cur, context="signup")
         logger.info(
             f"[v118.26.2.5 ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. plan={plan} quota={monthly_quota}"
         )

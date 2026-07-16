@@ -17,8 +17,10 @@ from unittest import mock
 
 os.environ.setdefault("JWT_SECRET", "test-secret-key-of-sufficient-length")
 
+from services.auth import entrance as entrance_mod  # noqa: E402
 from services.auth.entrance import entrance_of_code  # noqa: E402
 from services.authz import deps  # noqa: E402
+from services.authz.registry import ALL_CODES  # noqa: E402
 from services.authz.resolver import Authz  # noqa: E402
 
 
@@ -79,6 +81,20 @@ class EntranceOfCodeTests(unittest.TestCase):
 
     def test_unknown_prefix_is_neutral(self):
         self.assertIsNone(entrance_of_code("made.up.code"))
+
+    def test_no_unclassified_registry_prefix(self):
+        """registry 每个权限码前缀必须落进 _ENTRANCE_BY_PREFIX(限入口)或 _NEUTRAL_PREFIXES
+        (横切中性)。漏分类 → entrance_of_code 静默返 None → 该码 fail-open 不受作用域限制
+        (altitude 审出的唯一软肋)。新增模块前缀漏补此处 = 测试红,不再靠人记。"""
+        prefixes = {code.split(".", 1)[0] for code in ALL_CODES}
+        classified = set(entrance_mod._ENTRANCE_BY_PREFIX) | entrance_mod._NEUTRAL_PREFIXES
+        missing = prefixes - classified
+        self.assertEqual(
+            missing,
+            set(),
+            f"新前缀 {sorted(missing)} 未分类会 fail-open;去 services/auth/entrance.py 补进 "
+            "_ENTRANCE_BY_PREFIX(限入口)或 _NEUTRAL_PREFIXES(横切中性)",
+        )
 
 
 class EntranceScopeDenyTests(unittest.TestCase):

@@ -31,7 +31,11 @@ _TAXID_LEN = 13
 
 
 def _clean(tax_id: Optional[str]) -> str:
-    """只留数字(与 sort.clean_tax_id 同口径:剥空格/横线/杂字)。"""
+    """只留数字(剥空格/横线/杂字),保留任意长度。
+
+    ⚠️ 不用 recon.field_clean.clean_tax_id:那个剥完必须恰好 13 位否则返 ''——本闸要拿
+    「漏一位/多一位」的错长候选去算编辑距离,压成 '' 会让这类笔误直接消失,闸就废了。
+    """
     return "".join(ch for ch in str(tax_id or "") if ch.isdigit())
 
 
@@ -60,14 +64,15 @@ def _distance_label(registered: str, suspected: str) -> str:
     """给上层拼人话文案用的距离类型(仅粗分,精确措辞由 i18n 层定)。"""
     if len(registered) == len(suspected):
         diff = [i for i in range(len(registered)) if registered[i] != suspected[i]]
-        if len(diff) == 2 and diff[1] == diff[0] + 1:
-            if (
-                registered[diff[0]] == suspected[diff[1]]
-                and registered[diff[1]] == suspected[diff[0]]
-            ):
-                return "transposition"  # 相邻换位(本案)
         if len(diff) == 1:
             return "substitution"  # 单字错
+        if (
+            len(diff) == 2
+            and diff[1] == diff[0] + 1
+            and registered[diff[0]] == suspected[diff[1]]
+            and registered[diff[1]] == suspected[diff[0]]
+        ):
+            return "transposition"  # 相邻换位(本案)
     return "edit"  # 漏位/多位/两处小错
 
 
@@ -103,21 +108,17 @@ def suspect_registered_typo(
     if registered_hits > _REGISTERED_HIT_TOLERANCE:
         return None  # 登记税号锚得上足够多票 = 没录错,别打扰
 
-    best: Optional[TaxIdTypoSuspicion] = None
-    for cand, n in counts.items():
-        if cand == reg or n < _MIN_DOC_SUPPORT:
-            continue
-        dist = _damerau_levenshtein(reg, cand)
-        if not (1 <= dist <= _MAX_EDIT_DISTANCE):
-            continue
-        cur = TaxIdTypoSuspicion(
-            registered=reg,
-            suspected=cand,
-            doc_count=n,
-            distance=dist,
-            kind=_distance_label(reg, cand),
-        )
-        # 择优:支持度高者先;并列取距离近者(更像笔误)。
-        if best is None or (cur.doc_count, -cur.distance) > (best.doc_count, -best.distance):
-            best = cur
-    return best
+    cands = [
+        (cand, n, dist)
+        for cand, n in counts.items()
+        if cand != reg
+        and n >= _MIN_DOC_SUPPORT
+        and 1 <= (dist := _damerau_levenshtein(reg, cand)) <= _MAX_EDIT_DISTANCE
+    ]
+    if not cands:
+        return None
+    # 择优:支持度高者先;并列取距离近者(更像笔误)。只给赢家建对象。
+    cand, n, dist = max(cands, key=lambda c: (c[1], -c[2]))
+    return TaxIdTypoSuspicion(
+        registered=reg, suspected=cand, doc_count=n, distance=dist, kind=_distance_label(reg, cand)
+    )

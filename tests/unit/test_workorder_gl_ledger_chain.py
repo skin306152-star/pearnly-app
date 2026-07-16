@@ -23,6 +23,9 @@ class FakeStore:
     def __init__(self, items, events=None):
         self.items = items
         self.events = list(events or [])
+        # 对齐真库事件形状:events 表行必有自增 id(evidence.replay_items_by_type 依赖)。
+        for n, evt in enumerate(self.events, start=1):
+            evt.setdefault("id", n)
 
     def reset_quota_deferred_items(self, cur, *, tenant_id, work_order_id, flag_reason):
         # R1 quota 待补复位:这些用例不造 quota 待补件,空实现(诚实无可复位)。
@@ -44,6 +47,8 @@ class FakeStore:
         return list(self.events)
 
     def append_event(self, cur, **kw):
+        # 对齐真库事件形状:events 表行必有自增 id(evidence.replay_items_by_type 依赖)。
+        kw.setdefault("id", len(self.events) + 1)
         self.events.append(kw)
 
 

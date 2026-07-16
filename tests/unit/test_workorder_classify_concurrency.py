@@ -117,7 +117,12 @@ class ClassifyConcurrencyTests(unittest.TestCase):
         self.addCleanup(setattr, classify, "_resolve_own_name", classify._default_resolve_own_name)
         self.addCleanup(setattr, classify, "_m1_enabled", classify._default_m1_enabled)
         self.addCleanup(setattr, classify, "_ocr_image", classify._default_ocr_image)
-        self._env = mock.patch.dict(os.environ, {"PEARNLY_WORKORDER_OCR_CONCURRENCY": "4"})
+        # 关成本封顶:本类锁的是逐件检查点/并发去重,成本回查(独立短事务)会另加游标往返,
+        # 与「每件一事务」计数无关,置 0 隔离掉(封顶自有 test_workorder_ocr_cost_cap 守门)。
+        self._env = mock.patch.dict(
+            os.environ,
+            {"PEARNLY_WORKORDER_OCR_CONCURRENCY": "4", "PEARNLY_WORKORDER_OCR_COST_CAP_THB": "0"},
+        )
         self._env.start()
         self.addCleanup(self._env.stop)
 

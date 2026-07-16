@@ -164,8 +164,9 @@ def run(ctx: StepContext) -> StepResult:
         if outcome["flagged"]:
             flagged += 1
         # 达成本封顶即停止投料:未处理件留 pending,生成器收尾取消在队未起的 OCR(白烧至多一窗)。
-        # 复用件零成本不触发封顶回查;仅真烧 OCR 的件回查台账(检查点子事务退出后 ctx.cur 已还原)。
-        if reused_from is None and cost_cap is not None and cost_cap.exceeded(ctx):
+        # 复用件零成本不触发封顶回查;exceeded 内部走独立短事务读台账,读完即释放锁(绝不在步事务
+        # 里攥 ai_usage 锁,见 ocr_cost_cap 死锁根因)。
+        if reused_from is None and cost_cap is not None and cost_cap.exceeded():
             cost_capped = True
             break
 

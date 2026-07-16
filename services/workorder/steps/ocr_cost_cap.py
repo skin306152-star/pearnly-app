@@ -5,8 +5,11 @@
 workorder_classify,trace_id=item_id)。达 cap 即停止投料——已处理件保留、未处理件留
 pending、run 落 stuck 点名 ocr_cost_cap_exceeded(诚实待续,人工 /run 重给预算)。
 
-台账回查一律用调用方当前绑定的游标(ctx.cur:classify 步事务 / 逐件检查点子事务),不另
-开连接——避免逐件多一个事务往返,也不破坏「每件一个独立事务」不变式。
+⚠️ 台账回查必须走【独立短事务】,读完即提交释放锁,绝不在长活步事务(ctx.cur)里攥
+ai_usage 的 ACCESS SHARE 锁——否则主线程等首张 OCR future 期间锁不释放,与 worker 线程首写
+ai_usage 触发的 RLS-enable ALTER(要 ACCESS EXCLUSIVE)循环互等成死锁(R1-R1 金标真跑
+实锤:本地新库/进程首写场景必现)。每件一次短 SELECT 往返开销可接受(本来每件就有一次
+OCR 网络调用)。无 cursor_factory(内存测试/CLI 单事务、无并发)才复用 ctx.cur。
 
 预算基线语义(与 reaper 自动重跑「人工重置」同哲学):
   - 人工 / 自驱 run(owner 非 reaper:)→ 基线=起跑时台账已花,故本次可再花整 cap。
@@ -43,32 +46,41 @@ def from_ctx(ctx, item_ids: list):
     if cap <= 0 or not item_ids:
         return None
     owner = (ctx.data.get("run_lease") or {}).get("owner") or ""
-    cost_cap = CostCap(list(item_ids), cap=cap, reset_baseline=not str(owner).startswith("reaper:"))
-    cost_cap.prime(ctx)
+    reset_baseline = not str(owner).startswith("reaper:")
+    cost_cap = CostCap(ctx, list(item_ids), cap=cap, reset_baseline=reset_baseline)
+    cost_cap.prime()
     return cost_cap
 
 
 class CostCap:
-    """本工单 OCR 累计成本的封顶判据。spent 每次从 ai_usage 台账回查(单一事实源),用
-    ctx.cur 现有游标读,不另开事务。"""
+    """本工单 OCR 累计成本的封顶判据。spent 每次从 ai_usage 台账回查(独立短事务,读完即释放锁)。"""
 
-    def __init__(self, item_ids: list, *, cap: float, reset_baseline: bool):
+    def __init__(self, ctx, item_ids: list, *, cap: float, reset_baseline: bool):
+        self._ctx = ctx
         self._item_ids = item_ids
         self._cap = cap
         self._reset = reset_baseline
         self._baseline = 0.0
 
-    def prime(self, ctx) -> None:
+    def prime(self) -> None:
         """回查预算基线(人工/自驱 run 用起跑已花;reaper 续跑基线=0 卡累计绝对值)。"""
         if self._reset:
-            self._baseline = self._spent(ctx)
+            self._baseline = self._spent()
 
-    def exceeded(self, ctx) -> bool:
+    def exceeded(self) -> bool:
         """本次跑批已花(台账累计 − 基线)是否达到 cap。"""
-        return (self._spent(ctx) - self._baseline) >= self._cap
+        return (self._spent() - self._baseline) >= self._cap
 
-    def _spent(self, ctx) -> float:
-        total = ctx.store.sum_workorder_ocr_cost(
-            ctx.cur, tenant_id=ctx.tenant_id, item_ids=self._item_ids
-        )
-        return float(total or 0.0)
+    def _spent(self) -> float:
+        ctx = self._ctx
+        # 独立短事务读台账,读完即提交释放 ai_usage 锁(见模块 docstring 的死锁根因)。
+        # 无 factory(内存测试/CLI 单事务、无并发)才复用 ctx.cur。
+        if ctx.cursor_factory is not None:
+            with ctx.cursor_factory() as cur:
+                return _sum(ctx, cur, self._item_ids)
+        return _sum(ctx, ctx.cur, self._item_ids)
+
+
+def _sum(ctx, cur, item_ids: list) -> float:
+    total = ctx.store.sum_workorder_ocr_cost(cur, tenant_id=ctx.tenant_id, item_ids=item_ids)
+    return float(total or 0.0)

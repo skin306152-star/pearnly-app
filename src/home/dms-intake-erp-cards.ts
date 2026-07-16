@@ -1,6 +1,6 @@
 // ============================================================
 // 录入工作台 · 上下文 ERP 连接卡(按任务)
-// 发票/收据录入 → MR.ERP(财务)+ Express;身份证→DMS 客户 → MR.ERP DMS。
+// 发票/收据录入 与 汇总表批量建单 → MR.ERP(财务)+ Express。
 // 卡片显示连接状态 + 启用/停用开关 · 点「配置」开对应连接向导。
 // 启用/停用是「同批票据不误投多个 ERP」的闸:停用 → 第四步推送面板不显示该端点、
 //   自动推送后端也按 enabled=TRUE 过滤(services/erp/push_store.list_erp_endpoints)。
@@ -14,26 +14,23 @@ interface ErpCardDef {
     adapter: string; // 与 endpoint.adapter 匹配 · 也是开向导的 key
 }
 
-// 任务 → 该任务上下文相关的 ERP。发票走财务两家;身份证走 DMS。
+// 任务 → 该任务上下文相关的 ERP。发票与汇总表批量落点同(两家财务 ERP)·
+// 建成的 ocr_history 走同一推送链路。
 const TASK_CARDS: Record<string, ErpCardDef[]> = {
     invoice: [
         { key: 'mrerp', name: 'MR.ERP', adapter: 'mrerp' },
         { key: 'express', name: 'Express', adapter: 'express' },
     ],
-    // 汇总表批量建单落点与发票同(两家财务 ERP)· 建成的 ocr_history 走同一推送链路。
     summary_batch: [
         { key: 'mrerp', name: 'MR.ERP', adapter: 'mrerp' },
         { key: 'express', name: 'Express', adapter: 'express' },
     ],
-    identity: [{ key: 'mrerp_dms', name: 'MR.ERP DMS', adapter: 'mrerp_dms' }],
 };
 
 const ICONS: Record<string, string> = {
     mrerp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="22" height="22"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2.6"/></svg>',
     express:
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="22" height="22"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 18v2m8-2v2"/></svg>',
-    mrerp_dms:
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="22" height="22"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.1"/><path d="M6 16c.7-1.4 1.9-2.1 3-2.1s2.3.7 3 2.1M14 10h4M14 14h4"/></svg>',
 };
 
 type WinBridge = {
@@ -59,12 +56,8 @@ function isEnabled(ep: EpRec | null): boolean {
     return !!ep && ep.enabled !== false;
 }
 
-// 推送方式:发票 ERP 看 auto_push;DMS 的自动标志在 config.id_card_auto_push
-// (adapter=mrerp_dms 的 auto_push 后端强制 false·防误投,见 erp_endpoints_routes)。
+// 推送方式:发票/汇总表 ERP 看 auto_push。
 function isAutoPush(ep: EpRec): boolean {
-    if (String(ep.adapter || '').toLowerCase() === 'mrerp_dms') {
-        return (ep.config || {}).id_card_auto_push === true;
-    }
     return ep.auto_push === true;
 }
 
@@ -122,7 +115,6 @@ function openWizardFor(adapter: string, ep: unknown): void {
     };
     if (adapter === 'mrerp') w._mrerpOpenWizard?.(ep || null);
     else if (adapter === 'express') w.ExpressWizard?.open?.(ep || null);
-    else if (adapter === 'mrerp_dms') w._mrerpDmsOpenWizard?.(ep || null);
 }
 
 async function toggleEndpoint(card: HTMLElement): Promise<void> {

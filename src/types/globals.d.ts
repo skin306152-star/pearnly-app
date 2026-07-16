@@ -232,7 +232,6 @@ interface Window {
     _rerenderExceptions?: () => void;
     loadLearnedRules?: () => void;
     activateIntegrationsLogsTab?: () => void;
-    setErpLogAdapter?: (adapter: string) => void;
     closeIntegrationDrawer?: () => void;
     maybeShowOnboarding?: LegacyBridge;
     __accessLogSearchTimer?: ReturnType<typeof setTimeout>;

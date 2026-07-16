@@ -1,7 +1,8 @@
 // Pearnly E2E · 22 录入工作台「上下文 ERP 连接卡」守门
 // ============================================================
 // ERP 连接卡按任务上下文出现在录入工作台(src/home/dms-intake-erp-cards.ts):
-//   发票/收据录入 → MR.ERP(财务)+ Express 两卡;身份证→DMS 客户 → MR.ERP DMS 一卡。
+//   发票/收据录入 与 汇总表→批量建单 → MR.ERP(财务)+ Express 两卡。
+//   身份证→DMS 已搬独立入口 /dms · 主站任务选择器不再提供(本 spec 锁其不回潮)。
 // 本 spec 锁「按任务联动 + 卡片在场」(确定性 · 不烧 OCR · 不依赖已配 ERP:未连接也渲染)。
 // 点击开向导的行为走人工 live 验(依赖真端点/凭据),不进 CI。
 // ============================================================
@@ -18,7 +19,7 @@ test.describe('录入工作台 · 上下文 ERP 连接卡', () => {
         await ensureStorageState(browser);
     });
 
-    test('发票任务露 MR.ERP + Express;切身份证露 MR.ERP DMS', async ({ page }) => {
+    test('发票任务露 MR.ERP + Express;身份证已下架;切汇总表仍两卡', async ({ page }) => {
         const guard = attachConsoleGuard(page);
         await enterApp(page);
         await openRoute(page, 'dms-intake');
@@ -44,13 +45,22 @@ test.describe('录入工作台 · 上下文 ERP 连接卡', () => {
             'Express 卡有动作按钮'
         ).toBeVisible();
 
-        // 切「身份证→DMS 客户」任务 → 只剩 MR.ERP DMS 一卡
-        await page.locator('.dx-opt[data-task="identity"]').click();
+        // 身份证→DMS 已搬独立入口 /dms · 主站任务选择器不再提供(防回潮)· DMS 卡不再渲染
+        await expect(page.locator('.dx-opt[data-task="identity"]'), '身份证任务已下架').toHaveCount(
+            0
+        );
         await expect(
             zone.locator('.dx-erp-card[data-erp="mrerp_dms"]'),
-            'MR.ERP DMS 卡在场'
+            'MR.ERP DMS 卡不再渲染'
+        ).toHaveCount(0);
+
+        // 切「汇总表→批量建单」任务 → 落点同发票(财务两卡)
+        await page.locator('.dx-opt[data-task="summary_batch"]').click();
+        await expect(
+            zone.locator('.dx-erp-card[data-erp="mrerp"]'),
+            '汇总表任务 MR.ERP 卡在场'
         ).toBeVisible();
-        await expect(zone.locator('.dx-erp-card'), '身份证任务一卡').toHaveCount(1);
+        await expect(zone.locator('.dx-erp-card'), '汇总表任务两卡').toHaveCount(2);
 
         assertNoConsoleErrors(expect, guard);
     });

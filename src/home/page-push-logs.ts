@@ -44,7 +44,6 @@
                         <select id="erp-logs-business-select" class="erp-logs-erp-select" aria-label="business">
                             <option value="" data-i18n="erp-logs-biz-all">全部业务</option>
                             <option value="invoice" data-i18n="erp-logs-biz-invoice">发票 / 单据</option>
-                            <option value="id_card" data-i18n="erp-logs-biz-idcard">身份证订车</option>
                         </select>
                         <select id="erp-logs-erp-select" class="erp-logs-erp-select" aria-label="ERP">
                             <option value="" data-i18n="erp-logs-erp-all">全部 ERP</option>

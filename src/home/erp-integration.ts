@@ -23,10 +23,9 @@
 import { _erpExcAccountFix, _erpExcBindSubject, _erpExcEnsureClients } from './erp-exc-actions.js';
 
 let _logFilter = { key: 'all', val: '' };
-// DMS 推送可视化闭环(Zihao 2026-06-01)· ERP 系统筛选 = 下拉(adapter)· 独立于 status/trigger chip ·
-// 选中 mrerp_dms(身份证订车)时表头/行切到 DMS 字段(订车单号/客户)· 不再用发票字段框。
+// ERP 系统筛选 = 下拉(adapter)· 独立于 status/trigger chip 组合。
 let _erpAdapter = '';
-let _erpLogBusiness = ''; // 业务类型下拉(全部业务 / id_card / invoice)
+let _erpLogBusiness = ''; // 业务类型下拉(全部业务 / invoice)
 let _erpLogKeyword = ''; // 日志搜索(单据号 / 卖方)
 // 分页(与识别记录/访问日志同款)· 换筛选/搜索回第一页,翻页/刷新保留当前页。
 let _logPage = 0;
@@ -60,7 +59,8 @@ async function _ensureErpSelectOptions() {
         const opts: { val: string; label: string }[] = [];
         (eps as any[]).forEach((e) => {
             const ad = (((e && e.adapter) || '') as string).toLowerCase();
-            if (!ad || seen.has(ad)) return;
+            // DMS(身份证订车)已搬独立入口 /dms · 主站推送日志不再呈现该适配器
+            if (!ad || ad === 'mrerp_dms' || seen.has(ad)) return;
             seen.add(ad);
             opts.push({ val: ad, label: (e && e.name) || ad });
         });
@@ -109,7 +109,9 @@ async function loadErpLogs(silent?: boolean) {
             return;
         }
         const data = await resp.json();
-        const items = data.items || [];
+        const rawItems = data.items || [];
+        // DMS(身份证订车)推送已搬独立入口 /dms · 主站推送日志恒排除(历史行不删库,仅不呈现)
+        const items = rawItems.filter((l: any) => l.push_type !== 'id_card');
         _logTotal = data.total || 0;
         // 有「推送中(pending)」行 → 4s 后静默再拉一次 · 让状态原地翻成 ✓/✗(2026-05-26)·
         // 无 pending 或离开页面(下次 listEl 不在直接 return)即自动停。
@@ -127,8 +129,8 @@ async function loadErpLogs(silent?: boolean) {
             }, 4000);
         }
         if (items.length === 0) {
-            // 末页删空后 offset 越界 → 回退一页重拉(不留空页)。
-            if (_logTotal > 0 && _logPage > 0) {
+            // 整页无可呈现行 · 仅当原始页也为空(真到末页)才回退,避免整页 DMS 行触发回退循环。
+            if (rawItems.length === 0 && _logTotal > 0 && _logPage > 0) {
                 _logPage--;
                 loadErpLogs(silent);
                 return;
@@ -438,11 +440,3 @@ async function retryPushLog(logId: any) {
 // ============================================================
 window.loadErpLogs = loadErpLogs;
 window.retryPushLog = retryPushLog;
-// 深链:外部(如录入工作台身份证「查看记录」)按 adapter 筛推送日志(如 mrerp_dms)· 设值+同步下拉UI+刷新
-window.setErpLogAdapter = function (adapter: string) {
-    _erpAdapter = adapter || '';
-    const sel = document.getElementById('erp-logs-erp-select') as HTMLSelectElement | null;
-    if (sel) sel.value = _erpAdapter;
-    _logPage = 0;
-    loadErpLogs();
-};

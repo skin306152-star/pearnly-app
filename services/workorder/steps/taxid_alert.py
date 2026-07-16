@@ -27,17 +27,13 @@ def collect_doc_tax_ids(events: list[dict]) -> list[str]:
 
     从 item_classified 事件的 money 快照取(reconcile 回放的同一持久源,续跑安全):自家为卖方
     的销项票 seller_tax=自家、自家为买方的进项票 buyer_tax=自家,登记税号敲错时这个真税号会在
-    够多张票上反复出现,正是守护闸要抓的锚。同 item 多条取最后一条(latest-wins,反映最新识别)。"""
-    latest_money: dict = {}
-    for e in events:
-        if e.get("event_type") != _EVT_CLASSIFIED:
-            continue
-        payload = e.get("payload") or {}
-        item_id, money = payload.get("item_id"), payload.get("money")
-        if item_id and money:
-            latest_money[item_id] = money
+    够多张票上反复出现,正是守护闸要抓的锚。按 item latest-wins 归并复用 evidence 的统一回放
+    (与 reconcile/purchase_dedup 同一份逻辑,不各写一份),不重搓 dedupe。"""
     out: list[str] = []
-    for money in latest_money.values():
+    for rec in evidence.replay_items_by_type(events, _EVT_CLASSIFIED).values():
+        money = (rec.get("payload") or {}).get("money")
+        if not money:
+            continue
         for key in ("seller_tax", "buyer_tax"):
             value = money.get(key)
             if value:

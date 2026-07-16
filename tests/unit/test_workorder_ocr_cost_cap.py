@@ -29,12 +29,29 @@ class _SumStore:
         return val
 
 
+class _ShortTxn:
+    """假独立短事务:enter 给一个游标、exit 即提交释放锁(封顶预算读走的形态)。"""
+
+    def __enter__(self):
+        return object()
+
+    def __exit__(self, *a):
+        return False
+
+
 def _ctx(store, *, owner=None):
-    # cursor_factory=None:无并发的内存/CLI 单事务场景走复用 ctx.cur 分支(算术用例用)。
+    # 带 cursor_factory:封顶预算读走独立短事务(真实路径恒有 factory,算术用例照此建)。
     data = {}
     if owner is not None:
         data["run_lease"] = {"owner": owner, "ttl_seconds": 180}
-    return StepContext(cur=object(), tenant_id="t-1", work_order_id="wo-1", store=store, data=data)
+    return StepContext(
+        cur=object(),
+        tenant_id="t-1",
+        work_order_id="wo-1",
+        store=store,
+        data=data,
+        cursor_factory=_ShortTxn,
+    )
 
 
 class EnvDefaultsTests(unittest.TestCase):
@@ -56,6 +73,18 @@ class FromCtxTests(unittest.TestCase):
     def test_none_when_cap_disabled(self):
         os.environ["PEARNLY_WORKORDER_OCR_COST_CAP_THB"] = "0"
         self.assertIsNone(ocr_cost_cap.from_ctx(_ctx(_SumStore([0])), ["i1"]))
+
+    def test_none_when_no_cursor_factory(self):
+        # 无 cursor_factory:预算读无法走独立短事务(攥长锁会死锁),故封顶整体不启用——
+        # cap>0 且有料也返 None,把死锁风险从源头挡掉(见 ocr_cost_cap 模块 docstring)。
+        ctx = StepContext(
+            cur=object(),
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            store=_SumStore([50.0]),
+            data={"run_lease": {"owner": "run:u1", "ttl_seconds": 180}},
+        )
+        self.assertIsNone(ocr_cost_cap.from_ctx(ctx, ["i1"]))
 
     def test_human_run_resets_baseline_fresh_budget(self):
         # 人工/自驱 run(owner 非 reaper:):基线=起跑已花(50),本次可再花整 cap(100)。

@@ -313,6 +313,7 @@ _REEXPORTS = {
         "update_history_official_name",
         "get_history_pdf_info",
         "find_ocr_by_hash",
+        "find_ocr_by_hashes",
         "check_duplicate_invoice",
         "_extract_summary_fields",
     ],

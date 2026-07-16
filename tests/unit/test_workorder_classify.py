@@ -589,11 +589,22 @@ class ClassifyCostCapTests(unittest.TestCase):
         self.addCleanup(setattr, classify, "_resolve_own_name", classify._default_resolve_own_name)
         self.addCleanup(setattr, classify, "_ocr_image", classify._default_ocr_image)
 
+    def _capped_ctx(self, store):
+        # 封顶只在带 cursor_factory 的按步提交形态启用(预算读走独立短事务,免攥长锁死锁)。
+        return StepContext(
+            cur=None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            store=store,
+            data={},
+            cursor_factory=_UnitCM,
+        )
+
     def test_cost_cap_stucks_and_leaves_rest_pending_then_resumes(self):
         items = [_item(f"i{k}", f"/in/{k}.jpg") for k in range(3)]
         # 人工 run 基线读一次(0),之后 item0→60(<100)、item1→130(>=100 停投料)。
         store = _CostStore(items, sums=[0.0, 60.0, 130.0])
-        out = classify.run(_ctx(store))
+        out = classify.run(self._capped_ctx(store))
 
         self.assertEqual(out.status, "stuck")
         self.assertIn("ocr_cost_cap_exceeded", out.reasons)
@@ -604,7 +615,7 @@ class ClassifyCostCapTests(unittest.TestCase):
 
         # 续跑放宽预算(台账不再长)→ 剩余件跑完。
         os.environ["PEARNLY_WORKORDER_OCR_COST_CAP_THB"] = "100000"
-        out2 = classify.run(_ctx(store))
+        out2 = classify.run(self._capped_ctx(store))
         self.assertEqual(out2.status, "ok")
         self.assertEqual(store.by_id("i2")["status"], "ok")
 

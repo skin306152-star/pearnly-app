@@ -121,6 +121,21 @@ class WorkspaceReadFilterTests(unittest.TestCase):
         self.assertIn("workspace_client_id = %s", cur.all_sql)
         self.assertIn(5, cur.all_params)
 
+    def test_find_by_hashes_strict_workspace_scoped(self):
+        # 批量版 strict_workspace:严格同账套过滤(跨客户绝不串,与单查逐字节同口径)。
+        cur = _run(
+            queries.find_ocr_by_hashes,
+            user_id="u1",
+            file_hashes=["abc", "def"],
+            tenant_id="t1",
+            workspace_client_id=5,
+            strict_workspace=True,
+        )
+        self.assertIn("file_hash = ANY(%s)", cur.all_sql)
+        self.assertIn("workspace_client_id = %s", cur.all_sql)
+        self.assertIn(5, cur.all_params)
+        self.assertIn(["abc", "def"], cur.all_params)
+
     def test_check_duplicate_with_workspace_adds_filter(self):
         # 第 1 层(invoice_no 命中分支)带过滤
         cur = _run(

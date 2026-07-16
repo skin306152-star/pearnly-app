@@ -4,7 +4,7 @@
 纯编排:取 pending 料 → 跨单去重复用(ocr_reuse)/ 调注入的 OCR/直读入口 → 用
 sort.bin_ocr_fields 归堆、purchase_dedup 算票面级指纹查单内重复票 → update_item 落堆/落
 状态 → 末尾 taxid_alert 守护税号错录。真 OCR/直读入口通过模块级函数注入(_ocr_image /
-_read_sales_summary / _resolve_own_tax_id / _find_ocr_by_hash),默认绑生产实现,单测全部
+_read_sales_summary / _resolve_own_tax_id / _find_ocr_by_hashes),默认绑生产实现,单测全部
 patch 掉——本文件测试不碰任何 API key,不触发真实付费调用(硬约束)。
 
 诚实三态:OCR 报警(_needs_review/_validation_warnings)或直读解不出表 → 该件
@@ -94,10 +94,10 @@ def run(ctx: StepContext) -> StepResult:
     # R2B 跨单去重:调 OCR 前按文件哈希查同租户+同账套的既有识别读数,命中且带完整闸字段即复用
     # (零 OCR、零 ai_usage),item 照常归堆、事件标 ocr_reused_from——跨客户绝不串、老记录缺闸字段
     # 不复用照常烧(省钱绝不吞报警)。
-    reused = ocr_reuse.resolve(images, history_owner, finder=_find_ocr_by_hash) if images else {}
-    # 查重表先从已提交事件重建再叠加本次批:逐件提交后 kill 中断,已落库原件不在 pending 里,
-    # 内存从空建会让其复件漏判 duplicate → R1 双计(C1 打回单 R1 的静默钱洞)。重建保证
-    # 中断续跑对查重的裁决与不中断跑逐字节一致。
+    reused = ocr_reuse.resolve(images, history_owner, finder=_find_ocr_by_hashes) if images else {}
+    # 查重表先从已提交事件重建再叠加本次批:逐件提交后 kill 中断,已落库原件不在 pending 里,内存
+    # 从空建会让复件漏判 duplicate → R1 双计(C1 静默钱洞)。这是【循环前已提交】种子快照,与末尾
+    # taxid_alert 的【循环后】快照是两个时点、不可合并(合用会漏本轮票面税号 → 守护闸失灵)。
     seen_purchase_fp: dict[str, str] = (
         purchase_dedup.replay_seen_fingerprints(ctx) if images else {}
     )
@@ -201,8 +201,8 @@ def run(ctx: StepContext) -> StepResult:
                 )
                 reads[item["id"]] = parsed
 
-    # R4 税号错录守护闸:分类跑完跨料聚合票面税号,登记税号疑似录错则落工单级警示事件
-    # (order_detail.alerts 据此弹「票上都是 X,登记 Y,改吗?」)。纯读+落一条警示,不碰钱/堆。
+    # R4 税号错录守护闸:分类跑完跨料聚合票面税号(内部【循环后】重取事件流,须含本轮新落的
+    # item_classified,与上方 seen_purchase_fp 循环前种子分读)→ 疑似录错落工单级警示。纯读不碰钱/堆。
     taxid_alert.flag_if_suspected(ctx, own_tax_id)
     return StepResult.ok(bins=bins, flagged=flagged, sales_summary_reads=reads)
 
@@ -476,12 +476,12 @@ def _default_read_sales_summary(path: str) -> dict:
     return parse_table(data, filename=Path(path).name)
 
 
-def _default_find_ocr_by_hash(**kwargs) -> Optional[dict]:
-    """真实现:按文件哈希查同租户+严格同账套的既有识别读数(R2B 跨单去重)。strict_workspace
-    钉死,跨客户绝不串(未归属 NULL 行不认)。单测 patch 掉,不触真库。"""
-    from services.ocr_history import queries
+def _default_find_ocr_by_hashes(**kwargs) -> dict:
+    """真实现:按整批文件哈希一次查回同租户+严格同账套的既有识别读数(R2B 跨单去重)。
+    strict_workspace 钉死,跨客户绝不串(未归属 NULL 行不认)。单测 patch 掉,不触真库。"""
+    from services.ocr_history import hash_dedup
 
-    return queries.find_ocr_by_hash(strict_workspace=True, **kwargs)
+    return hash_dedup.find_ocr_by_hashes(strict_workspace=True, **kwargs)
 
 
 # 注入点:模块级绑定,测试用 classify._xxx = fake 替换,不改调用方代码。
@@ -494,4 +494,4 @@ _m1_enabled = _default_m1_enabled
 _stmt_regroup_enabled = _default_stmt_regroup_enabled
 _ocr_image = _default_ocr_image
 _read_sales_summary = _default_read_sales_summary
-_find_ocr_by_hash = _default_find_ocr_by_hash
+_find_ocr_by_hashes = _default_find_ocr_by_hashes

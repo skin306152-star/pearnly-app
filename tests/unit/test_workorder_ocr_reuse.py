@@ -75,25 +75,27 @@ class ResolveTests(unittest.TestCase):
     def test_hit_with_complete_gate_is_reusable(self):
         rec = {"id": "h-1", "pages": [_page({"vat": "7.00"})]}
         got = ocr_reuse.resolve(
-            [{"id": "i1", "dedupe_key": "file:h"}], self._OWNER, finder=lambda **k: rec
+            [{"id": "i1", "dedupe_key": "file:h"}], self._OWNER, finder=lambda **k: {"h": rec}
         )
         self.assertEqual(got["i1"]["history_id"], "h-1")
         self.assertEqual(got["i1"]["fields"]["vat"], "7.00")
 
     def test_scope_is_strict_same_workspace(self):
         seen = {}
-        ocr_reuse.resolve(
-            [{"id": "i1", "dedupe_key": "file:h"}],
-            self._OWNER,
-            finder=lambda **k: seen.update(k),
-        )
+
+        def _finder(**k):
+            seen.update(k)
+            return {}
+
+        ocr_reuse.resolve([{"id": "i1", "dedupe_key": "file:h"}], self._OWNER, finder=_finder)
         self.assertEqual(seen["workspace_client_id"], 7)
         self.assertEqual(seen["tenant_id"], "t-1")
+        self.assertEqual(seen["file_hashes"], ["h"])  # 整批哈希一次查回(非逐件 file_hash)
 
     def test_incomplete_gate_not_reused(self):
         rec = {"id": "h-1", "pages": [_page({"vat": "7"}, drop="_validation_warnings")]}
         got = ocr_reuse.resolve(
-            [{"id": "i1", "dedupe_key": "file:h"}], self._OWNER, finder=lambda **k: rec
+            [{"id": "i1", "dedupe_key": "file:h"}], self._OWNER, finder=lambda **k: {"h": rec}
         )
         self.assertEqual(got, {})
 
@@ -203,7 +205,7 @@ class ClassifyReuseIntegration(unittest.TestCase):
             "_m1_enabled",
             "_resolve_history_owner",
             "_record_ocr_history",
-            "_find_ocr_by_hash",
+            "_find_ocr_by_hashes",
             "_ocr_image",
         )
         saved = {n: getattr(classify, n) for n in names}
@@ -222,7 +224,7 @@ class ClassifyReuseIntegration(unittest.TestCase):
         classify._ocr_image = lambda path: self.ocr_calls.append(path) or dict(self._CACHED_FIELDS)
 
     def _run(self, finder):
-        classify._find_ocr_by_hash = finder
+        classify._find_ocr_by_hashes = finder
         store = _ReuseStore(
             [
                 {
@@ -242,21 +244,21 @@ class ClassifyReuseIntegration(unittest.TestCase):
         return {"id": "h-cached", "pages": [_page(self._CACHED_FIELDS, **page_kw)]}
 
     def test_reuse_zero_ocr_and_event_marked(self):
-        store = self._run(finder=lambda **k: self._cached_record())
+        store = self._run(finder=lambda **k: {"hh": self._cached_record()})
         self.assertEqual(self.ocr_calls, [])  # 复用件绝不触 OCR(零 ai_usage)
         evt = next(e for e in store.events if e["event_type"] == "item_classified")
         self.assertEqual(evt["payload"]["ocr_reused_from"], "h-cached")
         self.assertEqual(store.items[0]["kind"], "purchase_invoice")  # 照常归堆
 
     def test_cross_client_miss_falls_back_to_ocr(self):
-        # 严格作用域下跨客户查不到 → finder 返 None → 照常 OCR,事件不标复用。
-        store = self._run(finder=lambda **k: None)
+        # 严格作用域下跨客户查不到 → 批查返空 → 照常 OCR,事件不标复用。
+        store = self._run(finder=lambda **k: {})
         self.assertEqual(self.ocr_calls, ["/in/a.jpg"])
         evt = next(e for e in store.events if e["event_type"] == "item_classified")
         self.assertNotIn("ocr_reused_from", evt["payload"])
 
     def test_stale_record_missing_gate_not_reused(self):
-        store = self._run(finder=lambda **k: self._cached_record(drop="_confidence_band"))
+        store = self._run(finder=lambda **k: {"hh": self._cached_record(drop="_confidence_band")})
         self.assertEqual(self.ocr_calls, ["/in/a.jpg"])  # 缺闸字段 → 照常 OCR
 
 

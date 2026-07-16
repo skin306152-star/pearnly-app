@@ -114,6 +114,13 @@ PEARNLY_AI_SHADOW_DRAFT_KEY = "pearnly_ai_shadow_draft"
 # 「这行是不是销售」。按 tenant 判定(单所整体开/关,与 pearnly_ai_shadow_draft 同款);消费在
 # services/workorder/steps/bank_sales_suggest.py(引擎/投影)+ bank_sales_brain.py(大脑分类)。
 PEARNLY_AI_BANK_SALES_SUGGEST_KEY = "pearnly_ai_bank_sales_suggest"
+# 对账单续页回收闸(SA3R-a · 分类正确性修复):默认关 fail-closed。关 = classify 归堆逐字节
+# 维持现状(被 OCR 误判 payment_evidence 的对账单续页照旧踢 non_tax);开 = 命中银行名且命中
+# 对账单标题白名单的续页救回 bank_statement(收窄双条件,真付款截图不误吸)。与 SA-3 倒推建议
+# 闸(pearnly_ai_bank_sales_suggest)分开控——回收是分类层修复,金标过验后独立放量。按 tenant
+# 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);消费在
+# services/workorder/steps/classify.py(传 stmt_regroup 给 sort.bin_ocr_fields)。
+PEARNLY_AI_STMT_REGROUP_KEY = "pearnly_ai_stmt_regroup"
 # 工单大脑影子闸(裁决预判/审核建议 · brain_shadow):默认关 fail-closed。关 = run_shadow
 # 直接 no-op(零构题/零网关调用/零落库,零支出);开 = 对 flagged 未裁项影子出建议,唯一
 # 落点 brain_shadow_log(只建议不落账,业务表写路径 grep 为零)。按 tenant 判定(单所整体
@@ -386,3 +393,13 @@ def pearnly_ai_bank_sales_suggest_enabled_for(tenant_id: Optional[str]) -> bool:
     return _enabled(
         PEARNLY_AI_BANK_SALES_SUGGEST_KEY, tenant_id, "pearnly_ai_bank_sales_suggest_enabled_for"
     )
+
+
+def pearnly_ai_stmt_regroup_enabled_for(tenant_id: Optional[str]) -> bool:
+    """对账单续页回收闸(SA3R-a)。关 = classify 归堆逐字节维持现状(续页照旧踢 non_tax);
+    开 = 命中银行名 + 对账单标题的续页救回 bank_statement。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_sales_suggest 同款);fail-closed 在
+    _enabled 内部(基建抖动绝不误开回收路)。
+    """
+    return _enabled(PEARNLY_AI_STMT_REGROUP_KEY, tenant_id, "pearnly_ai_stmt_regroup_enabled_for")

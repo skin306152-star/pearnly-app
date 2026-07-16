@@ -41,6 +41,20 @@ _GL_ASCII_RE = re.compile(r"(?<![a-z])gl(?![a-z])")
 # SALE 支付条(BATCH/TRACE/APPR 脚注)和银行 Statement 页都没有,词边界防 Statement 误粘。
 _EDC_SETTLEMENT_RE = re.compile(r"(?<![a-z])settlement(?![a-z])")
 
+# 对账单标题白名单(SA3R-a):整月对账单页印的报表抬头,真付款截图/转账凭证不印。用于把被
+# OCR 误判 payment_evidence 的对账单续页救回 bank_statement(闸 pearnly_ai_stmt_regroup)。
+# 词表从金标 KBANK 18 页与真付款样本对撞得出(见 SA3R 侦察单/方案):真 K PLUS 转账截图的
+# notes 是动作词(รายงานการโอนเงิน/Thai QR Payment/BATCH… 脚注),不含这些报表抬头;边界模糊页
+# (如 รายงานการโอนเงิน)有意不进白名单=不救回,交第 2 层自报总数闸兜(方案 §二)。
+_STMT_TITLE_KEYWORDS = (
+    "รายการเดินบัญชี",  # 存折/流水标题(passbook/statement listing)
+    "ความเคลื่อนไหวทางบัญชี",  # 账户动态报表(account movement)
+    "เคลื่อนไหวบัญชีเงินฝาก",  # 储蓄账户动态(deposit-account movement)
+    "statement of account",  # 英文对账单标题(通用,别家行英文页兜底)
+)
+# 标题只落在报表抬头相关字段,不扫全票面(与 _mentions_bank 的宽域故意分开:标题要窄)。
+_STMT_TITLE_FIELDS = ("notes", "document_type", "category")
+
 # 正文判银行用的词表:复用银行签名表(泰/英各家行名)+ 通用「ธนาคาร(银行)」。
 # 文件名判银行走 _bank_from_filename(ASCII 词边界);IMG_xxxx 无名照片走这里的内容判。
 _BANK_TEXT_KEYWORDS = {kw.lower() for kws in _BANK_SIGNATURES.values() for kw in kws} | {"ธนาคาร"}
@@ -163,7 +177,7 @@ def run(ctx: StepContext) -> StepResult:
 
 
 def bin_ocr_fields(
-    fields: dict, *, own_tax_id, own_name=None, own_names=None
+    fields: dict, *, own_tax_id, own_name=None, own_names=None, stmt_regroup=False
 ) -> tuple[str, Optional[str]]:
     """图片过 OCR 后归堆 → (kind, flag_reason)。classify 步(T4)拿到票面字段后调。
 
@@ -202,6 +216,15 @@ def bin_ocr_fields(
     # 的现状路(宁窄勿宽,错归堆=错进销项聚合)。
     if _is_edc_settlement(f, seller=seller, buyer=buyer, has_vat=has_vat, entries=entries):
         return (kinds.EDC_SETTLEMENT, None)
+
+    # 对账单续页救回(SA3R-a · 闸 pearnly_ai_stmt_regroup,由 classify 传入 stmt_regroup)。整月
+    # 对账单的续页(满纸转账行、无账号表头)OCR 常把 document_type 判成 payment_evidence,会在
+    # 下面的短路支被当「无税务要素」踢掉——尸检实锤金标 KBANK 18 页里 6 页这样丢失。收窄双条件
+    # 救回:命中银行名(_mentions_bank)且命中对账单标题白名单(_is_statement_title)→ bank_statement。
+    # 真付款截图 notes 是动作词不含报表抬头,双条件保它仍归 non_tax(守门测试锁零误吸)。排在
+    # payment_evidence 短路之前才拦得住;闸关(默认 stmt_regroup=False)不进此支,逐字节维持现状。
+    if stmt_regroup and not has_vat and _mentions_bank(f) and _is_statement_title(f):
+        return (kinds.BANK_STATEMENT, None)
 
     # 支付/订单截图:确定无税务要素,先排除,免得被下面的银行/方向判据接管。
     if dtype in ("payment_evidence", "order_evidence"):
@@ -274,6 +297,13 @@ def _mentions_bank(fields: dict) -> bool:
         elif kw in blob:
             return True
     return False
+
+
+def _is_statement_title(fields: dict) -> bool:
+    """报表抬头字段里出现对账单标题白名单词(SA3R-a)。只扫 _STMT_TITLE_FIELDS(notes/
+    document_type/category),不扫全票面——标题判据要窄,配合 _mentions_bank 双锁防误吸真付款截图。"""
+    blob = " ".join(str(fields.get(k) or "") for k in _STMT_TITLE_FIELDS).lower()
+    return any(kw.lower() in blob for kw in _STMT_TITLE_KEYWORDS)
 
 
 @dataclass(frozen=True)

@@ -74,6 +74,7 @@ def run(ctx: StepContext) -> StepResult:
     else:
         own_name = _resolve_own_name(ctx)
         own_names = None
+    stmt_regroup = _stmt_regroup_enabled(ctx)  # SA3R-a 对账单续页回收闸,详见传入的 bin_ocr_fields
 
     bins: dict[str, int] = {}
     flagged = 0
@@ -98,6 +99,7 @@ def run(ctx: StepContext) -> StepResult:
             own_name=own_name,
             own_names=own_names,
             seen=seen_purchase_fp,
+            stmt_regroup=stmt_regroup,
         )
         upd = outcome["update"]
         engine_ver = ocr.get("_ocr_engine") if isinstance(ocr, dict) else None
@@ -234,6 +236,7 @@ def _classify_from_ocr(
     own_name: Optional[str],
     own_names=None,
     seen: dict,
+    stmt_regroup: bool = False,
 ) -> dict:
     """已取到 OCR(fields dict 或异常):归堆 → 购票查重 → 闸报警。异常只连坐这一件。
 
@@ -244,7 +247,11 @@ def _classify_from_ocr(
     fields = ocr
 
     kind, bin_reason = sort_step.bin_ocr_fields(
-        fields, own_tax_id=own_tax_id, own_name=own_name, own_names=own_names
+        fields,
+        own_tax_id=own_tax_id,
+        own_name=own_name,
+        own_names=own_names,
+        stmt_regroup=stmt_regroup,
     )
 
     if kind == kinds.PURCHASE_INVOICE:
@@ -443,6 +450,11 @@ def _default_m1_enabled(ctx: StepContext) -> bool:
     return feature_flags.pearnly_ai_m1_enabled_for(ctx.tenant_id, None)
 
 
+def _default_stmt_regroup_enabled(ctx: StepContext) -> bool:
+    """对账单续页回收闸(pearnly_ai_stmt_regroup · SA3R-a)。按 tenant 判定;fail-closed 内部。"""
+    return feature_flags.pearnly_ai_stmt_regroup_enabled_for(ctx.tenant_id)
+
+
 def _default_ocr_image(path: str) -> dict:
     """真实现:调生产 OCR 管线(services.ocr.entrypoints.run_pipeline_for_file)。
 
@@ -483,5 +495,6 @@ _resolve_own_names = _default_resolve_own_names
 _resolve_history_owner = ocr_ledger.resolve_owner
 _record_ocr_history = ocr_ledger.record
 _m1_enabled = _default_m1_enabled
+_stmt_regroup_enabled = _default_stmt_regroup_enabled
 _ocr_image = _default_ocr_image
 _read_sales_summary = _default_read_sales_summary

@@ -238,6 +238,92 @@ class BankContentDetectionTests(unittest.TestCase):
         self.assertEqual((kind, reason), ("non_tax", "no_tax_elements:other"))
 
 
+class StatementRegroupTests(unittest.TestCase):
+    """SA3R-a 对账单续页回收判据(stmt_regroup 闸)。夹具取自金标 KBANK 工单 a6dde2ce 里被 OCR
+    误判 payment_evidence 的真页 + 同工单真付款样本(document_type/seller_name/notes 逐字段真值)。
+    锁三条:① 命中银行名+对账单标题的续页,闸开救回 bank_statement;② 边界页(银行名在、标题
+    不在)与真付款样本零误吸(闸开仍 non_tax);③ 闸关(默认)逐字节维持现状。"""
+
+    # 5 张被误判 payment_evidence 的对账单续页(真 notes)。IMG_2487 是边界页:notes 是动作词
+    # (รายงานการโอนเงิน)不是报表抬头,有意不进白名单——它 seller_name 也是银行名,正是「银行名
+    # 在场但标题不在」的最强反例,锁死单靠 _mentions_bank 会误吸、必须叠标题判据。
+    _STMT_PAGES = {
+        "IMG_2485": "รายการเดินบัญชี / Statement",
+        "IMG_2492": "รายงานความเคลื่อนไหวทางบัญชี (Statement)",
+        "IMG_2494": "รายงานแสดงรายการเคลื่อนไหวบัญชีเงินฝากออมทรัพย์",
+        "IMG_2500": "รายการเดินบัญชีเงินฝากออมทรัพย์",
+    }
+    _BOUNDARY_NOTES = "รายงานการโอนเงิน / รับฝากเงิน"  # IMG_2487 边界页
+    # 6 张同工单真付款样本(seller_name=商户自己名,notes=EDC 脚注/QR/结算,均不提银行)。
+    _PAYMENT_SAMPLES = {
+        "IMG_2565": "BATCH:000187 TIME:16:26:52 TRACE:001263 APPR:592256",
+        "IMG_2567": "BATCH:000187 TIME:16:33:21 TID:62608078 MID:401017358317001 TRACE:001264",
+        "IMG_2571": "Thai QR Payment PROMPTPAY MERCHANT COPY",
+        "IMG_2581": "Thai QR Payment",
+        "IMG_2583": "BATCH:000186 TIME:16:19:47 TRACE:001262 APPR:592238",
+        "IMG_2606": "SETTLEMENT SUCCESSFUL\nPROMPTPAY",
+    }
+
+    def _stmt_page(self, notes):
+        return {
+            "document_type": "payment_evidence",
+            "seller_name": "ธนาคารกสิกรไทย",
+            "notes": notes,
+        }
+
+    def _payment(self, notes):
+        return {
+            "document_type": "payment_evidence",
+            "seller_name": "SISTER MAKEUP SAPHAN SUNG , BKK",
+            "notes": notes,
+        }
+
+    def test_flag_on_regroups_statement_continuation_pages(self):
+        for name, notes in self._STMT_PAGES.items():
+            with self.subTest(page=name):
+                kind, reason = sort_step.bin_ocr_fields(
+                    self._stmt_page(notes), own_tax_id=OWN_TAX, stmt_regroup=True
+                )
+                self.assertEqual((kind, reason), ("bank_statement", None))
+
+    def test_flag_off_leaves_continuation_pages_as_non_tax(self):
+        # 闸关(默认)= 逐字节现状:续页照旧被 payment_evidence 短路踢 non_tax。
+        for name, notes in self._STMT_PAGES.items():
+            with self.subTest(page=name):
+                kind, reason = sort_step.bin_ocr_fields(self._stmt_page(notes), own_tax_id=OWN_TAX)
+                self.assertEqual((kind, reason), ("non_tax", "no_tax_elements:payment_evidence"))
+
+    def test_boundary_page_bank_name_but_no_title_not_regrouped(self):
+        # 边界页:银行名在场但 notes 非报表抬头 → 闸开也不救回(交第 2 层安全网),证标题判据是硬门。
+        kind, reason = sort_step.bin_ocr_fields(
+            self._stmt_page(self._BOUNDARY_NOTES), own_tax_id=OWN_TAX, stmt_regroup=True
+        )
+        self.assertEqual((kind, reason), ("non_tax", "no_tax_elements:payment_evidence"))
+
+    def test_real_payment_samples_zero_false_capture(self):
+        # 真付款样本闸开仍全数 non_tax(零误吸):它们不提银行,_mentions_bank 这道门先挡住。
+        for name, notes in self._PAYMENT_SAMPLES.items():
+            with self.subTest(sample=name):
+                kind, _ = sort_step.bin_ocr_fields(
+                    self._payment(notes), own_tax_id=OWN_TAX, stmt_regroup=True
+                )
+                self.assertEqual(kind, "non_tax")
+
+    def test_statement_page_with_vat_not_regrouped(self):
+        # 带 VAT 税票结构即便印银行名+标题也不回收(not has_vat 硬门,防真税票误判流水)。
+        kind, _ = sort_step.bin_ocr_fields(
+            {
+                "document_type": "payment_evidence",
+                "seller_name": "ธนาคารกสิกรไทย",
+                "notes": "รายการเดินบัญชี",
+                "vat": "70.00",
+            },
+            own_tax_id=OWN_TAX,
+            stmt_regroup=True,
+        )
+        self.assertNotEqual(kind, "bank_statement")
+
+
 class NameAnchorFallbackTests(unittest.TestCase):
     def test_missing_buyer_tax_but_buyer_name_matches_own_is_purchase(self):
         kind, reason = sort_step.bin_ocr_fields(

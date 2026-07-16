@@ -99,6 +99,9 @@ reportlab
 # === 图像 ===
 # ============================================================
 Pillow==12.3.0
+# iPhone HEIC/HEIF → JPEG 转换(services/workorder/intake_prep · 收料预处理)· 懒加载,
+# 只在遇到 HEIC 上传时 import;bundled libheif,无需系统装库。
+pillow-heif==1.4.0
 # 销项 PromptPay 付款二维码(services/sales/promptpay.py · §L1)· 用 Pillow 出 PNG
 qrcode==8.2
 

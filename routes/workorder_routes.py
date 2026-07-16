@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-import os
-from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -31,7 +29,7 @@ from core.route_helpers import (
 )
 from services.audit import file_access as audit_file_access
 from services.authz.deps import check_workspace_scope
-from services.workorder import api, archive, engine, runner, storage, store
+from services.workorder import api, archive, engine, intake_prep, runner, storage, store
 from services.workorder.steps import intake
 
 router = APIRouter()
@@ -317,35 +315,47 @@ async def add_materials(
     request: Request,
     background: BackgroundTasks,
     files: list[UploadFile] = File(...),
+    password: Optional[str] = Form(None),
 ):
-    """补料:multipart 上传,落盘到工单目录并登记成 work_order_items(走 intake 幂等指纹)。
-    登记成功后引擎自动续跑(P-7):新料直接进 intake→classify,用户不必手点 /run。"""
+    """补料:multipart 上传,预处理(zip/HEIC/密码 PDF/损坏)后落盘并登记成 work_order_items
+    (走 intake 幂等指纹)。登记成功后引擎自动续跑(P-7):新料直接进 intake→classify,不必手点 /run。
+
+    密码 PDF 随传 password 参数即当场解开;不传则 422 pdf_password_required 要密码(密码只用于
+    解密,不留存)。整批先读+校验齐全再落盘,任一件不合规=整批拒且盘上零孤儿。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")
     with db.get_cursor() as cur:  # 先验归属,再落盘(不给未授权请求写磁盘的机会)
         _load_mutable_order(cur, request, user, tenant_id, work_order_id)
 
-    saved: list[Path] = []
+    # 段一:整批读入 + 预处理(不落盘)。封顶读法:最多读上限+1 字节,超限即 413。段内抛错=盘上零残留。
+    pairs = []
     for upload in files:
-        # 照 uploads_routes 的封顶读法:最多读上限+1 字节,超限即拒,不把超大文件整读进内存。
         content = await upload.read(_MAX_MATERIAL_BYTES + 1)
         if len(content) > _MAX_MATERIAL_BYTES:
             raise HTTPException(413, detail="workorder.file_too_large")
-        if not content:
-            continue
-        suffix = os.path.splitext(upload.filename or "")[1].lower() or ".bin"
-        saved.append(
-            storage.save_material(
-                tenant_id, work_order_id, content, suffix, original_name=upload.filename
-            )
-        )
+        pairs.append((upload.filename, content))
+    try:
+        prepared = intake_prep.normalize_batch(pairs, password=password)
+    except intake_prep.IntakePrepError as e:
+        # 结构化 422:{code, message(四语), ...逐件点名 context}。
+        raise HTTPException(
+            422, detail={"code": e.code, "message": e.message_map(), **e.context}
+        ) from e
 
+    # 段二:落盘 + 登记(单事务)。register=False 的是留证原件(HEIC 源),落盘不登记进 items。
     registered = []
     with db.get_cursor(commit=True) as cur:
         ctx = engine.StepContext(cur=cur, tenant_id=tenant_id, work_order_id=work_order_id)
-        for path in saved:
+        for nf in prepared:
+            path = storage.save_material(
+                tenant_id, work_order_id, nf.content, nf.suffix, original_name=nf.original_name
+            )
+            if not nf.register:
+                continue
             item = intake.register_file(ctx, path, "upload")
+            if item.get("file_ref") != str(path):
+                storage.remove_material(path)  # 去重收敛到既有 item → 清刚落盘的重复件
             registered.append({"item_id": item["id"], "file_ref": item["file_ref"]})
     if registered:
         _auto_advance(background, tenant_id, work_order_id, user)

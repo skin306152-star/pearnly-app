@@ -288,6 +288,35 @@ class _FakeUpload:
         return self._content if size < 0 else self._content[:size]
 
 
+def _valid_jpeg() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), (1, 2, 3)).save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+def _encrypted_pdf(password: str) -> bytes:
+    import io
+
+    import fitz
+    from pypdf import PdfReader, PdfWriter
+
+    doc = fitz.open()
+    doc.new_page()
+    base = doc.tobytes()
+    doc.close()
+    writer = PdfWriter()
+    for page in PdfReader(io.BytesIO(base)).pages:
+        writer.add_page(page)
+    writer.encrypt(password)
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
 class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
     """C3 拍板2 闸点表落地:每个端点传给 require_perm 的细码与方案表逐一对齐。_authorize
     是每个端点的第一句,只需它成功即可捕获传入的码——之后无论下游怎么炸都不影响本测试
@@ -406,13 +435,15 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
     async def test_within_limits_still_registers(self):
         from routes import workorder_routes as wr
 
-        ok_file = _FakeUpload(b"bytes", filename="a.jpg")
+        # 合法 JPEG(真 magic)——伪扩展名闸开后 b"bytes" 之类会被 422 拒,故用真图。
+        ok_file = _FakeUpload(_valid_jpeg(), filename="a.jpg")
+        saved_ref = "/m/a.jpg"  # save_material 回值与 register 回的 file_ref 对齐 → 不触发孤儿清
         with (
-            mock.patch.object(wr.storage, "save_material", return_value=mock.Mock()) as save,
+            mock.patch.object(wr.storage, "save_material", return_value=saved_ref) as save,
             mock.patch.object(
                 wr.intake,
                 "register_file",
-                return_value={"id": "it-1", "file_ref": "/m/a.jpg"},
+                return_value={"id": "it-1", "file_ref": saved_ref},
             ),
         ):
             for p in self._patches(wr):
@@ -420,6 +451,68 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
             out = await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[ok_file])
         self.assertEqual(out["count"], 1)
         save.assert_called_once()
+
+    async def test_empty_file_maps_422_named(self):
+        from routes import workorder_routes as wr
+
+        empty = _FakeUpload(b"", filename="blank.jpg")
+        with mock.patch.object(wr.storage, "save_material") as save:
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[empty])
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn("empty_file", ctx.exception.detail["code"])
+        self.assertEqual(ctx.exception.detail["filename"], "blank.jpg")
+        save.assert_not_called()
+
+    async def test_fake_extension_batch_leaves_zero_orphans(self):
+        # 一批里第二件是伪扩展名 → 整批 422,且第一件(合法)也不落盘(先校验后落盘)。
+        from routes import workorder_routes as wr
+
+        good = _FakeUpload(_valid_jpeg(), filename="ok.jpg")
+        bad = _FakeUpload(b"totally not an image", filename="fake.jpg")
+        with mock.patch.object(wr.storage, "save_material") as save:
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[good, bad])
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn("fake_extension", ctx.exception.detail["code"])
+        save.assert_not_called()  # 零孤儿:任一件不合规,合法件也不落盘
+
+    async def test_password_pdf_requires_password_422(self):
+        from routes import workorder_routes as wr
+
+        enc = _FakeUpload(_encrypted_pdf("1234"), filename="bank.pdf")
+        with mock.patch.object(wr.storage, "save_material") as save:
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[enc], password=None)
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn("pdf_password_required", ctx.exception.detail["code"])
+        self.assertEqual(set(ctx.exception.detail["message"]), {"th", "en", "zh", "ja"})
+        save.assert_not_called()
+
+    async def test_dedupe_hit_cleans_orphan(self):
+        # 去重命中(register 回的 file_ref ≠ 刚落盘 path)→ 清刚落盘的重复件。
+        from routes import workorder_routes as wr
+
+        dup = _FakeUpload(_valid_jpeg(), filename="dup.jpg")
+        with (
+            mock.patch.object(wr.storage, "save_material", return_value="/m/new.jpg") as save,
+            mock.patch.object(
+                wr.intake, "register_file", return_value={"id": "it-9", "file_ref": "/m/old.jpg"}
+            ),
+            mock.patch.object(wr.storage, "remove_material") as clean,
+        ):
+            for p in self._patches(wr):
+                self.enterContext(p)
+            out = await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[dup])
+        self.assertEqual(out["count"], 1)
+        save.assert_called_once()
+        clean.assert_called_once()  # 新落盘件被清
 
 
 class ArchivedReadonlyGuardTests(unittest.IsolatedAsyncioTestCase):
@@ -651,17 +744,21 @@ class AutoAdvanceTests(unittest.IsolatedAsyncioTestCase):
     async def test_materials_success_schedules_advance(self):
         from routes import workorder_routes as wr
 
+        saved_ref = "/m/a.jpg"  # save 回值与 register 回的 file_ref 对齐 → 不触发孤儿清
         with (
-            mock.patch.object(wr.storage, "save_material", return_value=mock.Mock()),
+            mock.patch.object(wr.storage, "save_material", return_value=saved_ref),
             mock.patch.object(
-                wr.intake, "register_file", return_value={"id": "it-1", "file_ref": "/m/a.jpg"}
+                wr.intake, "register_file", return_value={"id": "it-1", "file_ref": saved_ref}
             ),
             mock.patch.object(wr, "_schedule_advance", return_value=True) as sched,
         ):
             for p in self._base(wr):
                 self.enterContext(p)
             out = await wr.add_materials(
-                "wo-1", mock.Mock(), mock.Mock(), files=[_FakeUpload(b"bytes", filename="a.jpg")]
+                "wo-1",
+                mock.Mock(),
+                mock.Mock(),
+                files=[_FakeUpload(_valid_jpeg(), filename="a.jpg")],
             )
         self.assertEqual(out["count"], 1)
         sched.assert_called_once()

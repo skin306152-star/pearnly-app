@@ -72,6 +72,9 @@ storage/
 
 tests/fixtures/*
 !tests/fixtures/front_desk_intent_golden.json
+!tests/fixtures/__init__.py
+# 乱料验收包(IN-0a 常设制度):进料口守门资产,须入库
+!tests/fixtures/messy_intake_pack/
 tests/pipeline-results.json
 tests/pipeline-results-before-fix.json
 tests/pipeline-benchmark-*.json

@@ -129,8 +129,11 @@ pillow==12.3.0
     # via
     #   -r requirements.txt
     #   pdfplumber
+    #   pillow-heif
     #   qrcode
     #   reportlab
+pillow-heif==1.4.0
+    # via -r requirements.txt
 playwright==1.60.0
     # via -r requirements.txt
 proto-plus==1.28.0

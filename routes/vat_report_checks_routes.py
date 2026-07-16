@@ -12,6 +12,10 @@ from services.vat.vat_report_parser import parse_vat_report
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/vat_report_checks", tags=["vat-report-checks"])
 
+# 上传封顶,与工单收料同口径(routes/workorder_routes._MAX_MATERIAL_BYTES = 20MB):销项报告
+# 是单份 PDF/Excel,远小于此;封顶防超大文件整读进内存打爆(此前 report.read() 无上限)。
+_MAX_REPORT_BYTES = 20 * 1024 * 1024
+
 
 @router.post("/run")
 async def run_report_checks_endpoint(request: Request, report: UploadFile = File(...)):
@@ -19,7 +23,10 @@ async def run_report_checks_endpoint(request: Request, report: UploadFile = File
     user = _require_user(request)
     api_key = _user_key(user)
 
-    file_bytes = await report.read()
+    # 封顶读法:最多读上限+1 字节,超限即 413,不把超大文件整读进内存。
+    file_bytes = await report.read(_MAX_REPORT_BYTES + 1)
+    if len(file_bytes) > _MAX_REPORT_BYTES:
+        raise HTTPException(413, "报告文件过大 · 单文件不超过 20MB")
     parsed = parse_vat_report(file_bytes, report.filename or "report.pdf", api_key=api_key)
     if not parsed.get("ok"):
         raise HTTPException(422, parsed.get("error") or "报告解析失败")

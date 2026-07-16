@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import uuid
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import Optional
 
 from core import file_crypto
+
+logger = logging.getLogger(__name__)
 
 _BASE = os.environ.get("WORKORDER_STORAGE_DIR", "/opt/mrpilot/storage/workorders")
 
@@ -100,6 +103,15 @@ def write_artifact_bytes(path: Path, content: bytes) -> Path:
     落盘布局由调用方定(版本段目录已建),本函数只管「加密收口」这一件事。"""
     Path(path).write_bytes(file_crypto.maybe_seal(content))
     return Path(path)
+
+
+def remove_material(path) -> None:
+    """删一件落盘料(去重命中后清刚落盘的重复件)。尽力而为:删不掉只 warning 不抛,最坏留一个
+    不被引用的小文件,不翻已成功的登记。"""
+    try:
+        Path(path).unlink(missing_ok=True)
+    except OSError:
+        logger.warning("remove_material failed for %s (registration already committed)", path)
 
 
 def read_bytes(path) -> bytes:

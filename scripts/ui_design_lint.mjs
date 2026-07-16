@@ -12,9 +12,12 @@ const MODE_UPDATE = process.argv.includes('--update-baseline');
 
 // 'static' 已含 'static/pos',单列会让 static/pos/* 被走两遍(基线双计含水分)→ 只留 'static'。
 const ROOTS = ['src/home', 'static'];
-// 设计系统"实物源/令牌定义"文件——允许裸 hex(它们就是令牌来源),扫描时跳过 hex 检查
+// 设计系统"实物源/令牌定义"文件——允许裸 hex(它们就是令牌来源),扫描时跳过 hex 检查。
+// dms-shell.css / dms-intake.css 是 /dms 独立 SPA 的令牌源:该 SPA 只加载自身 bundle,不接
+// 主站 emerald 令牌基建,:root / .dmsx 块里的 hex 即令牌定义本身(文件头注释「走 TOKEN_CSS
+// 白名单」),与 ai-theme.css/console-theme.css 同类,故一并豁免 hex 检查(其余检查照常)。
 const TOKEN_SOURCE =
-    /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css|console-theme\.css|home-48-recon-redesign\.css|ai-theme\.css/i;
+    /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css|console-theme\.css|home-48-recon-redesign\.css|ai-theme\.css|dms-shell\.css|dms-intake\.css/i;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|_mock|\.map$/i;
 // vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体),不是 Pearnly 应用设计
 // 系统的一部分,且成百上千个 minified 文件无法逐个加标记 → 只能按目录整块排除。

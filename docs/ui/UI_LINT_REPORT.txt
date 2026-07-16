@@ -1,11 +1,11 @@
-# UI 设计合规扫描报告 · 441 个源文件全扫
+# UI 设计合规扫描报告 · 460 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
      1  static\admin\admin.css
         └ 521: color: #2563eb;
      1  static\admin\admin.js
-        └ 318: google_vision: { label: 'Google Vision', color: '#2563EB' },
+        └ 322: google_vision: { label: 'Google Vision', color: '#2563EB' },
      1  static\pos\pos-data.js
         └ 349: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
@@ -95,14 +95,14 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 319: 'tn-status-overdraft': '⚠ 透支',
-        └ 361: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 352: 'tn-status-overdraft': '⚠ 透支',
+        └ 394: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
      5  static\admin\admin.js
-        └ 1845: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
-        └ 1912: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
+        └ 1849: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
+        └ 1916: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
         └ 308: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
@@ -123,8 +123,6 @@
         └ 345: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
         └ 92: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
-     1  src\home\dms-intake.ts
-        └ 80: '<div class="dx-file"><div class="dx-file-ic">📄</div>' +
      1  src\home\erp-log-card.ts
         └ 82: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
@@ -144,7 +142,9 @@
      1  src\home\sales-wizard-io.ts
         └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
      1  static\admin\admin.html
-        └ 865: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+        └ 883: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+     1  static\dms\dms-intake.js
+        └ 56: '<div class="dx-file"><div class="dx-file-ic">📄</div><div class="dx-file-c"><b>' +
      1  static\home-09-badges-locks.css
         └ 147: content: "🔒";
      1  static\home-14-gemini-admin.css
@@ -160,8 +160,8 @@
         └ 168: max-width: 520px;
         └ 173: max-width: 420px;
      5  static\admin\admin.js
-        └ 1660: '<div class="cpw-forgot-modal" style="max-width:420px">' +
-        └ 1726: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1664: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1730: '<div class="cpw-forgot-modal" style="max-width:420px">' +
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
@@ -241,10 +241,6 @@
         └ 12: <div class="modal" style="max-width: 420px;">
      1  src\home\core.ts
         └ 185: '<div style="background:var(--card);border-radius:14px;padding:32px 24px 24px;max-width:36
-     1  src\home\dms-intake-confirm.ts
-        └ 261: '<div class="modal dmsx" style="max-width:480px"><div class="modal-head"><b>' +
-     1  src\home\erp-mrerp-dms-connect.ts
-        └ 193: 'background:var(--card,#fff);border-radius:14px;max-width:440px;width:100%;' +
      1  src\home\knowledge-fab.ts
         └ 46: .kb-card-top .ws{font-size:11px;color:var(--ink-2,#555);background:rgba(255,255,255,.6);bo
      1  src\home\line-email-modal.ts
@@ -265,6 +261,10 @@
         └ 222: `<div class="rs-pop" style="max-width:460px;">` +
      1  src\home\sales-wizard.ts
         └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+     1  static\dms\dms-connect.js
+        └ 125: '<div class="dms-wizard" role="dialog" aria-modal="true" style="background:var(--card);bor
+     1  static\dms\dms-intake-confirm.js
+        └ 298: '<div class="modal dmsx" style="max-width:480px"><div class="modal-head"><b>' +
      1  static\erp-mrerp-connect.js
         └ 895: '<div class="mrerp-wizard" style="max-width:520px">' +
      1  static\home-06-responsive-rd.css
@@ -387,10 +387,10 @@
         └ 1208: 'time-min-ago-suffix': ' 分钟前',
         └ 1209: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 443: 'time-hours-ago': '{n} 小时前',
-        └ 444: 'time-days-ago': '{n} 天前',
+        └ 476: 'time-hours-ago': '{n} 小时前',
+        └ 477: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 885(59 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 872(59 文件)
    157  static\home-18-admin-users.css
     86  static\pos\pos.css
     68  static\admin\admin.js
@@ -409,7 +409,6 @@
     15  static\pos\pos.html
     12  static\home-40-sales-wizard.css
     12  static\landing\landing-tour.js
-    11  static\home-49-dms-intake.css
     10  static\landing\landing-tour.css
      9  src\home\sales-account.ts
      9  src\home\sales-wizard-steps.ts
@@ -424,7 +423,6 @@
      6  static\home-37-html-inline.css
      6  static\landing\auth-sso.css
      4  src\home\core.ts
-     4  src\home\erp-mrerp-dms-connect.ts
      4  src\home\line-panel.ts
      4  static\erp-mrerp-connect.js
      3  static\landing\auth-modal.css
@@ -433,20 +431,22 @@
      3  static\pos\pos-data.js
      2  src\home\bank-recon-drawer.ts
      2  src\home\bank-recon-picker.ts
-     2  src\home\dms-intake-confirm.ts
      2  src\home\history-drawer.ts
      2  src\home\line-email-modal.ts
+     2  static\dms\dms-intake-confirm.js
      2  static\home-10-push-logs.css
      2  static\landing\mascot-effects.css
      1  src\home\clients-buyer.ts
      1  src\home\clients-helpers.ts
      1  src\home\confirm-modal.ts
-     1  src\home\dms-intake.ts
      1  src\home\erp-exceptions-edit.ts
      1  src\home\inventory.ts
      1  src\home\knowledge-documents.ts
      1  src\home\knowledge-fab.ts
      1  src\home\notifications.ts
      1  src\home\purchase-list.ts
+     1  static\dms\dms-connect.js
+     1  static\dms\dms-gate.css
+     1  static\dms\dms-intake.js
      1  static\home-15-team-folder.css
      1  static\landing\landing-interactions.css

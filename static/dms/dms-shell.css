@@ -108,7 +108,7 @@ body {
   background: var(--card);
   color: var(--ink);
   border-radius: 14px;
-  max-width: 480px;
+  max-width: min(480px, 100%);
   width: 100%;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
   max-height: 90vh;

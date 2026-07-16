@@ -985,7 +985,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 9px;
   text-align: left;
-  max-width: 720px;
+  max-width: min(720px, 100%);
   margin: 0 auto;
 }
 .dmsx .dx-sitem {

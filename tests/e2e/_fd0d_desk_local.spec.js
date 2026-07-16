@@ -59,7 +59,10 @@ function contractResponse(id, fileCount) {
 
 // deskFeedStatus: 200(闸开,feed 拉取返回空流)| 404(闸关,探针即失败)。
 // interpretSuggestion: interpret 端点固定回这份建议(测试按场景各自定制)。
-async function bootDesk(page, { lang = 'zh', deskFeedStatus = 200, interpretSuggestion = null } = {}) {
+async function bootDesk(
+    page,
+    { lang = 'zh', deskFeedStatus = 200, interpretSuggestion = null } = {}
+) {
     await page.route('**/api/workorder/orders**', (r) =>
         r.fulfill({ contentType: 'application/json', body: '{"orders":[]}' })
     );
@@ -163,7 +166,10 @@ test.describe('FD-0d · 总台(#/desk)本地 stub 真浏览器', () => {
         await page.click('[data-action="desk-send"]');
         await expect(page.locator('.fd-inventory')).toBeVisible();
         await expect(page.locator('.fd-inv-total')).toContainText('25');
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, '01-inventory.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '01-inventory.png'),
+            fullPage: true,
+        });
     });
 
     test('说目标 → 合同卡 → 人点下拉改客户(非 AI 建议)→ 确认开工 → 进度卡 + 真建工单', async ({
@@ -194,12 +200,21 @@ test.describe('FD-0d · 总台(#/desk)本地 stub 真浏览器', () => {
 
         await expect(page.locator('.fd-progress')).toBeVisible();
         await expect(page.locator('a.btn.sm[href*="/client/9/wo"]')).toBeVisible();
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, '02-contract-progress.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '02-contract-progress.png'),
+            fullPage: true,
+        });
     });
 
     test('大脑降级 → 降级卡 + 手动开单可用(不经大脑真开工单)', async ({ page }) => {
         await bootDesk(page, {
-            interpretSuggestion: { degraded: true, intent: null, client_suggestion: null, period: null, reason: 'brain_timeout' },
+            interpretSuggestion: {
+                degraded: true,
+                intent: null,
+                client_suggestion: null,
+                period: null,
+                reason: 'brain_timeout',
+            },
         });
         await page.setInputFiles('#fdFileInput', fileList('deg', 2));
         await page.locator('#fdUtteranceInput').fill('this month vat');
@@ -219,7 +234,10 @@ test.describe('FD-0d · 总台(#/desk)本地 stub 真浏览器', () => {
         ]);
         expect(JSON.parse(confirmReq.postData() || '{}').intent).toBe('monthly_vat');
         await expect(page.locator('.fd-progress')).toBeVisible();
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, '04-manual-open-worked.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '04-manual-open-worked.png'),
+            fullPage: true,
+        });
     });
 
     for (const lang of ['th', 'en', 'ja']) {
@@ -245,9 +263,14 @@ test.describe('FD-0d · 总台(#/desk)本地 stub 真浏览器', () => {
         await expect(page.locator('#v-desk')).toHaveClass(/\bon\b/);
         const overflow = await page.evaluate(() => document.body.scrollWidth - window.innerWidth);
         expect(overflow, '#/desk 手机视口不该出横向滚动').toBeLessThanOrEqual(1);
-        const sticky = await page.locator('.fd-composer').evaluate((el) => getComputedStyle(el).position);
+        const sticky = await page
+            .locator('.fd-composer')
+            .evaluate((el) => getComputedStyle(el).position);
         expect(sticky).toBe('sticky');
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, '06-mobile-390.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '06-mobile-390.png'),
+            fullPage: true,
+        });
     });
 
     test('闸关:侧栏项不显示,直接深链 #/desk 静默落回工作台', async ({ page }) => {
@@ -256,7 +279,10 @@ test.describe('FD-0d · 总台(#/desk)本地 stub 真浏览器', () => {
         await expect(page.locator('#v-desk')).not.toHaveClass(/\bon\b/);
         await expect(page.locator('#v-dashboard')).toHaveClass(/\bon\b/);
         await expect(page).toHaveURL(/#\/$|#$/);
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, '07-gate-closed.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '07-gate-closed.png'),
+            fullPage: true,
+        });
     });
 
     test('闸关:工作台其余功能逐字节不受影响(矩阵仍是默认首页)', async ({ page }) => {

@@ -110,7 +110,7 @@ test('有权限:守护卡显文案 + 一键改按钮,点击真发 PATCH+realign'
     // 真按钮(非假门),有背景色(btn pri)。
     const btn = page.locator('.rv-taxid-alert button.btn.pri');
     await expect(btn).toBeVisible();
-    const bg = await btn.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const bg = await btn.evaluate((el) => window.getComputedStyle(el).backgroundColor);
     expect(bg).not.toBe('rgba(0, 0, 0, 0)');
     await page.screenshot({ path: path.join(ART, 'canmanage_card.png'), fullPage: true });
 

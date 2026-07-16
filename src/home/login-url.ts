@@ -8,6 +8,7 @@
 export function loginUrl(): string {
     if (!window._entry) window._entry = localStorage.getItem('pearnly_entry') || '';
     if (window._entry === 'pos') return '/pos';
+    if (window._entry === 'dms') return '/dms';
     if (window._entry === 'main') return '/login';
     return window._businessType === 'pos_only' ? '/pos' : '/login';
 }

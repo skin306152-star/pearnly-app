@@ -80,15 +80,31 @@ class LoginUrlEntryPriorityTests(unittest.TestCase):
         text = _read("src/home/login-url.ts")
         self.assertIn("localStorage.getItem('pearnly_entry')", text)
 
+    def test_dms_entry_routes_to_dms(self):
+        # 批2:DMS 独立入口——entry='dms' 退出/重登必落回 /dms(与 pos 分支同款),
+        # 别把 DMS 邀请制商户甩去会计站登录页。
+        text = _read("src/home/login-url.ts")
+        self.assertIn("window._entry === 'dms'", text)
+        dms_idx = text.find("window._entry === 'dms'")
+        fallback_idx = text.find("_businessType === 'pos_only'")
+        self.assertGreater(dms_idx, -1, "loginUrl 没读 window._entry==='dms'")
+        self.assertLess(dms_idx, fallback_idx, "dms 判据必须先于业态回落判据")
+
     def test_home_preboot_gate_routes_by_entry(self):
         # home.html 头部 preboot 门(无 token 即踢)比 main.js 早跑,曾硬编码 /login——
         # 零 token 冷设备(退出后/换机)根本到不了 loginUrl(),POS 设备照样被甩会计站
         # (2026-07-13 真浏览器剧本1抓出)。锁:落点必须按 pearnly_entry 分流。
         text = _read("home.html")
         self.assertIn(
-            "location.replace(localStorage.getItem('pearnly_entry')==='pos'?'/pos':'/login')",
+            "location.replace(localStorage.getItem('pearnly_entry')==='pos'?'/pos':localStorage.getItem('pearnly_entry')==='dms'?'/dms':'/login')",
             text,
         )
+
+    def test_home_preboot_gate_has_dms_branch(self):
+        # 批2:零 token 冷设备 + pearnly_entry==='dms' → 直落 /dms(preboot 早于 main.js,
+        # 与 pos 分支同款物理拷贝;改 login-url.ts 的 dms 分支必同步此处)。
+        text = _read("home.html")
+        self.assertIn("localStorage.getItem('pearnly_entry')==='dms'?'/dms'", text)
 
 
 class LoginEntryPointsWriteEntryMarkTests(unittest.TestCase):

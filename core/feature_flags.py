@@ -137,6 +137,11 @@ ENTRANCE_GATE_KEY = "entrance_gate"
 # 不按 token.entry 卡作用域(现状);开 = token.entry 不在码允许入口集则拒(403/PosError)。
 # 按 tenant 判定;消费在 services/authz/deps._entrance_scope_deny。默认关,测稳后 rollout=all。
 ENTRANCE_API_SCOPE_KEY = "entrance_api_scope"
+# 目标驱动前门闸(FD-0 · 万能投料口):默认关 fail-closed。关 = /api/ai/front-desk/* 四端点
+# 一律 404、#/desk 不渲染(/ai 与今天逐字节一致);开 = 前门总台生效(草稿合同/盘点/确认开工单)。
+# 双闸:pearnly_ai_m1 在场才有效(组合闸,同 pearnly_ai_line_intake 先例)。按 tenant 判定;
+# 消费在 routes/front_desk_routes.py。默认关,测稳后 rollout=all。
+PEARNLY_AI_FRONT_DESK_KEY = "pearnly_ai_front_desk"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -322,6 +327,17 @@ def pearnly_ai_line_intake_enabled_for(tenant_id: Optional[str]) -> bool:
     if not pearnly_ai_m1_enabled_for(tenant_id, None):
         return False
     return _enabled(PEARNLY_AI_LINE_INTAKE_KEY, tenant_id, "pearnly_ai_line_intake_enabled_for")
+
+
+def pearnly_ai_front_desk_enabled_for(tenant_id: Optional[str]) -> bool:
+    """目标驱动前门闸(FD-0)。关 = 前门四端点 404、总台不渲染,/ai 现状逐字节不变。
+
+    双闸:pearnly_ai_m1 在场才有效(组合闸,同 pearnly_ai_line_intake);任一关或异常均
+    fail-closed。按 tenant 判定(单所整体开/关);超管在平台后台把 tenant_id 加进 allowlist 即灰度。
+    """
+    if not pearnly_ai_m1_enabled_for(tenant_id, None):
+        return False
+    return _enabled(PEARNLY_AI_FRONT_DESK_KEY, tenant_id, "pearnly_ai_front_desk_enabled_for")
 
 
 def pearnly_ai_bank_recon_enabled_for(tenant_id: Optional[str]) -> bool:

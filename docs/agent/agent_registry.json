@@ -66,6 +66,7 @@
   "erp_mappings_routes": "C",
   "erp_push_log_routes": "B",
   "exceptions_routes": "B",
+  "front_desk_routes": "C",
   "export_routes": {
     "bucket": "A",
     "agent": "exempt:file-export",

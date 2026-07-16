@@ -175,6 +175,7 @@ from routes.workorder_financials_routes import (
 )  # N1 · 月度报表 PDF/Excel 下载(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-13
 from routes.workorder_review_routes import router as workorder_review_router  # MC1-b1
 from routes.workorder_bank_sales_routes import router as workorder_bank_sales_router  # SA-3a
+from routes.front_desk_routes import router as front_desk_router  # FD-0a · 目标驱动前门
 from routes.tax_profile_routes import (
     router as tax_profile_router,
 )  # B2-e · 税务画像/别名/义务清单 API(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-10
@@ -364,9 +365,8 @@ app.include_router(workorder_router)  # M1-B1 · Pearnly AI 工单制 API(pearnl
 app.include_router(workorder_financials_router)  # N1 · 月度报表 PDF/Excel 下载 · 2026-07-13
 app.include_router(workorder_review_router)  # MC1-b1 · 审核队列与签批闭环 · 2026-07-13
 app.include_router(workorder_bank_sales_router)  # SA-3a · 银行流水倒推销项建议 · 2026-07-14
-app.include_router(
-    tax_profile_router
-)  # B2-e · 税务画像/别名/义务清单 API(pearnly_ai_m1 闸 · 2026-07-10)
+app.include_router(front_desk_router)  # FD-0a · 目标驱动前门(m1+front_desk 双闸) · 2026-07-16
+app.include_router(tax_profile_router)  # B2-e · 税务画像/别名/义务清单(m1 闸) · 2026-07-10
 app.include_router(
     client_pool_router
 )  # D2-S8+S9 · LINE 待问客户池会计端 API(pearnly_ai_m1+client_pool 双闸 · 2026-07-11)

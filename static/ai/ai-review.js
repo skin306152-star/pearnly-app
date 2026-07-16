@@ -45,6 +45,13 @@
             rerunState: 'idle',
             blockedInfo: null,
             rerunProgress: null, // classify 步逐件进度快照 {step,processed,total} · R2F-R3 #5
+            // R4 税号错录守护卡:alerts=order_detail.alerts;wsClientId=账套主体 id(改税号目标);
+            // canManage=settings.workspace.manage 探针结果(按钮显隐);realignBusy/Err=一键改状态。
+            alerts: [],
+            wsClientId: order.workspace_client_id || null,
+            canManage: false,
+            realignBusy: false,
+            realignErr: false,
         };
     }
 
@@ -53,6 +60,16 @@
     }
 
     // ============ 渲染 ============
+
+    // R4 税号错录守护卡:两个视图(逐票 card / 走完 done)都在顶部注入,不打断裁决键盘流。
+    function injectTaxidAlert(container) {
+        var html = AI.reviewRender.taxidAlertHtml(S.alerts, {
+            canManage: S.canManage,
+            busy: S.realignBusy,
+            errKey: S.realignErr,
+        });
+        if (html) container.insertAdjacentHTML('afterbegin', html);
+    }
 
     function renderCurrent() {
         var container = body();
@@ -68,6 +85,7 @@
             editValue: S.editValue,
             pool: S.poolHandle.forItem(entry.item_id),
         });
+        injectTaxidAlert(container);
         if (S.editing) {
             var input = $('rvVatInput');
             if (input) {
@@ -84,6 +102,7 @@
         var container = body();
         if (!S.queue.length && !S.sessionDecided) {
             container.innerHTML = AI.reviewRender.emptyOkHtml();
+            injectTaxidAlert(container);
             return;
         }
         container.innerHTML = AI.reviewRender.clearedHtml(
@@ -93,6 +112,7 @@
             S.blockedInfo,
             S.rerunProgress
         );
+        injectTaxidAlert(container);
     }
 
     // ============ 原图(生产同款查看器,AI.viewer 接手拖拽/缩放/旋转/全屏)============
@@ -362,6 +382,56 @@
         renderCurrent();
     }
 
+    // ============ R4 税号错录守护卡:一键改正 + 重锚 ============
+
+    // settings.workspace.manage 探针(复用 can-create 端点,同 ai-client-new 先例):成功=有权限,
+    // 显真按钮;失败(403 等)保持无按钮的诚实降级文案。探到再重渲染当前视图,不阻塞首屏。
+    function probeCanManage(session) {
+        S.api
+            .canCreateWorkspaceClient()
+            .then(function () {
+                if (S !== session) return;
+                S.canManage = true;
+                if (S.mode === 'card') renderCurrent();
+                else renderDone();
+            })
+            .catch(function () {}); // 无权限=保持降级文案,不喧哗
+    }
+
+    // 一键改正:先改账套主体税号(既有 PATCH),成功后触发工单重锚(后端自驱重跑,有跨单去重
+    // 零 OCR 成本),进入轮询直到重判完成 → 跳交付包 / 回队列。任一步失败保住已裁决,只提示重试。
+    function doRealign() {
+        if (S.realignBusy || !S.alerts.length || !S.canManage) return;
+        var a = S.alerts[0];
+        if (a.type !== 'taxid_typo_suspected' || !S.wsClientId) return;
+        var session = S;
+        S.realignBusy = true;
+        S.realignErr = false;
+        if (S.mode === 'card') renderCurrent();
+        else renderDone();
+        S.api
+            .updateWorkspaceClient(S.wsClientId, { tax_id: a.suspected })
+            .then(function () {
+                return S.api.realignTaxid(S.orderId, a.registered, a.suspected);
+            })
+            .then(function () {
+                if (S !== session) return;
+                S.alerts = []; // 已改并重锚,撤卡
+                S.realignBusy = false;
+                S.rerunState = 'waiting'; // 重锚触发引擎自驱重跑,进轮询(有去重通常很快)
+                S.blockedInfo = null;
+                renderDone();
+                pollAfterRun(session, 0);
+            })
+            .catch(function () {
+                if (S !== session) return;
+                S.realignBusy = false;
+                S.realignErr = true;
+                if (S.mode === 'card') renderCurrent();
+                else renderDone();
+            });
+    }
+
     // ============ 键盘 + 点击委托 ============
 
     function onKeydown(e) {
@@ -443,6 +513,7 @@
         else if (action === 'rv-rerun') startRerun();
         else if (action === 'rv-back-to-queue') backToQueue();
         else if (action === 'rv-refresh-status') refreshStatus();
+        else if (action === 'rv-taxid-realign') doRealign();
         else if (action === 'rv-goto-pkg') {
             window.location.hash = AI.router.buildClientHash(S.clientId, 'pkg');
         }
@@ -467,7 +538,11 @@
                 S.queue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
                 S.idx = 0;
                 S.mode = 'card';
+                S.alerts = detail.alerts || [];
+                if (detail.workspace_client_id) S.wsClientId = detail.workspace_client_id;
                 renderCurrent();
+                // 有守护卡才探 settings.workspace.manage(按钮显隐 · 探到再重渲染,不阻塞首屏)。
+                if (S.alerts.length) probeCanManage(S);
             })
             .catch(function () {
                 body().innerHTML = AI.state.errorHtml({

@@ -430,11 +430,47 @@
         if (el) el.parentNode.removeChild(el);
     }
 
+    // R4 税号错录守护卡:守护闸判「登记税号疑似录错」时弹「票上都是 X,登记 Y」+ 一键改正重锚
+    // (有 settings.workspace.manage 权限走按钮;无权限诚实降级提示找老板改,不摆假按钮)。
+    // 同账套通常只一个税号嫌疑,一次呈现一张;非该类型 alert 不渲染(通用投影的向后兼容)。
+    function taxidAlertHtml(alerts, opts) {
+        if (!alerts || !alerts.length) return '';
+        var a = alerts[0];
+        if (a.type !== 'taxid_typo_suspected') return '';
+        opts = opts || {};
+        var msg = esc(
+            at('rv_taxid_alert_msg', { suspected: a.suspected, registered: a.registered })
+        );
+        var action;
+        if (!opts.canManage) {
+            action = '<span class="rv-taxid-hint">' + esc(at('rv_taxid_need_manager')) + '</span>';
+        } else if (opts.busy) {
+            action = '<button class="btn pri" disabled>' + esc(at('rv_taxid_fixing')) + '</button>';
+        } else {
+            action =
+                '<button class="btn pri" data-action="rv-taxid-realign">' +
+                esc(at('rv_taxid_fix_btn')) +
+                '</button>';
+        }
+        var err = opts.errKey
+            ? '<div class="rv-taxid-err">' + esc(at('rv_taxid_fix_fail')) + '</div>'
+            : '';
+        return (
+            '<div class="rv-taxid-alert" role="alert"><div class="rv-taxid-msg">' +
+            msg +
+            '</div>' +
+            action +
+            err +
+            '</div>'
+        );
+    }
+
     window.AI = window.AI || {};
     window.AI.reviewRender = {
         cardHtml: cardHtml,
         emptyOkHtml: emptyOkHtml,
         clearedHtml: clearedHtml,
+        taxidAlertHtml: taxidAlertHtml,
         toastHtml: toastHtml,
         showToast: showToast,
         hideToast: hideToast,

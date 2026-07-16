@@ -168,6 +168,12 @@ window.__AI_I18N_EN__ = {
     rv_rerun_waiting: 'Re-running…',
     rv_still_blocked: 'Some items still need a decision, back to queue',
     rv_decision_failed: 'Item {n} failed to save, reverted — please retry',
+    rv_taxid_alert_msg:
+        'Documents repeatedly show {suspected}, but this account is registered as {registered} — the registered tax ID may be mistyped.',
+    rv_taxid_fix_btn: 'Fix to doc tax ID · re-run',
+    rv_taxid_fixing: 'Re-anchoring…',
+    rv_taxid_need_manager: 'Ask an owner / admin to correct the tax ID in account settings',
+    rv_taxid_fix_fail: 'Fix failed, please retry',
     err_workorder_decision_invalid: 'That decision was invalid, please retry',
     err_workorder_item_not_found: 'This item does not belong to this order',
     err_workorder_item_image_not_found: 'Could not load the original image',

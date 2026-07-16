@@ -169,6 +169,12 @@ window.__AI_I18N_JA__ = {
     rv_rerun_waiting: '再実行中…',
     rv_still_blocked: 'まだ未判断の項目があります。キューに戻ります',
     rv_decision_failed: '{n}件目の保存に失敗しました。元に戻しました。再試行してください',
+    rv_taxid_alert_msg:
+        '書類には {suspected} が繰り返し出ますが、このアカウントの登録は {registered} です — 登録税番号の入力ミスの可能性があります。',
+    rv_taxid_fix_btn: '書類の税番号に修正・再実行',
+    rv_taxid_fixing: '再アンカー中…',
+    rv_taxid_need_manager: 'オーナー / 管理者にアカウント設定で税番号の修正を依頼してください',
+    rv_taxid_fix_fail: '修正に失敗しました。再試行してください',
     err_workorder_decision_invalid: 'この判断は無効です。再試行してください',
     err_workorder_item_not_found: 'この項目はこのワークオーダーに属していません',
     err_workorder_item_image_not_found: '原本画像を読み込めません',

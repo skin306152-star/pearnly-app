@@ -417,6 +417,34 @@
   margin: 4px auto 14px;
   line-height: 1.7;
 }
+/* R4 税号错录守护卡:守护闸点名「登记税号疑似录错」的警示 + 一键改正重锚(按钮复用 .btn.pri)。 */
+.rv-taxid-alert {
+  max-width: min(560px, 100%);
+  margin: 0 auto 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--warn-line);
+  border-radius: 10px;
+  background: var(--warn-soft);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.rv-taxid-msg {
+  flex: 1 1 240px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.rv-taxid-hint {
+  font-size: 12px;
+  color: var(--mut);
+}
+.rv-taxid-err {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--crit);
+}
 
 @media (max-width: 960px) {
   .chead {

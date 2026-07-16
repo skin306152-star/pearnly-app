@@ -435,9 +435,21 @@
             createWorkspaceClient: function (body) {
                 return call('POST', '/api/workspace/clients', body);
             },
-            // 按钮显隐探针(state honesty:没权限不给一个点了才 403 的假门)。
+            // 按钮显隐探针(state honesty:没权限不给一个点了才 403 的假门)。settings.workspace.manage
+            // 专属——税号错录守护卡的「一键改」按钮显隐复用它(能建客户=能改账套税号)。
             canCreateWorkspaceClient: function () {
                 return call('GET', '/api/workspace/clients/can-create');
+            },
+            // R4 税号重锚:先改账套主体税号(既有 PATCH),再触发工单重锚重跑(realignTaxid)。
+            updateWorkspaceClient: function (id, body) {
+                return call('PATCH', '/api/workspace/clients/' + encodeURIComponent(id), body);
+            },
+            realignTaxid: function (orderId, registered, suspected) {
+                return call(
+                    'POST',
+                    '/api/workorder/orders/' + encodeURIComponent(orderId) + '/realign-taxid',
+                    { registered: registered, suspected: suspected }
+                );
             },
             // MC1-b0(2026-07-13):税号直查带出注册名(建客户模态)。复用主站现成端点
             // GET /api/workspace/tax-lookup(routes/workspace_routes.py::workspace_tax_lookup ·

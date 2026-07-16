@@ -167,6 +167,12 @@ window.__AI_I18N_TH__ = {
     rv_rerun_waiting: 'กำลังรันใหม่…',
     rv_still_blocked: 'ยังมีรายการค้างตัดสิน กลับไปที่คิวต่อ',
     rv_decision_failed: 'รายการที่ {n} บันทึกไม่สำเร็จ คืนค่าเดิมแล้ว กรุณาลองใหม่',
+    rv_taxid_alert_msg:
+        'บนใบเอกสารมักพบ {suspected} แต่บัญชีลูกค้าลงทะเบียนเป็น {registered} — เลขผู้เสียภาษีที่ลงทะเบียนอาจกรอกผิด',
+    rv_taxid_fix_btn: 'แก้เป็นเลขบนใบเอกสาร · รันใหม่',
+    rv_taxid_fixing: 'กำลังปรับ…',
+    rv_taxid_need_manager: 'โปรดให้เจ้าของ / แอดมินแก้เลขผู้เสียภาษีในตั้งค่าบัญชีลูกค้า',
+    rv_taxid_fix_fail: 'แก้ไขไม่สำเร็จ กรุณาลองใหม่',
     err_workorder_decision_invalid: 'การตัดสินนี้ไม่ถูกต้อง กรุณาลองใหม่',
     err_workorder_item_not_found: 'รายการนี้ไม่ได้อยู่ในงานนี้',
     err_workorder_item_image_not_found: 'อ่านภาพต้นฉบับไม่ได้',

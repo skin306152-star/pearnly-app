@@ -58,8 +58,13 @@ test.afterAll(() => {
 });
 
 // materialsHandler(route, request) 每个用例注入自己的 addMaterials 剧本(密码/网络失败/
-// 成功次序);缺省即空成功(不测上传结果的用例够用)。
-async function bootIntake(page, { lang = 'en', materialsHandler, orderNeeds = [] } = {}) {
+// 成功次序);缺省即空成功(不测上传结果的用例够用)。seedQueue 供续传横幅用例在导航前
+// 塞一份 localStorage 队列残留(同 mrpilot_token/lang 一起进 addInitScript,不必另开
+// 一份路由 mock)。
+async function bootIntake(
+    page,
+    { lang = 'en', materialsHandler, orderNeeds = [], seedQueue } = {}
+) {
     await page.route('**/api/**', async (route) => {
         const req = route.request();
         const url = new URL(req.url());
@@ -100,11 +105,12 @@ async function bootIntake(page, { lang = 'en', materialsHandler, orderNeeds = []
         return route.fulfill({ contentType: 'application/json', body: '{}' });
     });
     await page.addInitScript(
-        ([l]) => {
+        ([l, seed]) => {
             window.localStorage.setItem('mrpilot_token', 'tok-in0b');
             window.localStorage.setItem('mrpilot_lang', l);
+            if (seed) window.localStorage.setItem('pearnly_ai_intake_queue_wo-1', seed);
         },
-        [lang]
+        [lang, seedQueue ? JSON.stringify(seedQueue) : null]
     );
     await page.goto(`${BASE}/static/dist/ai.html#/client/c1/intake`);
     await page.waitForSelector('#v-client.on', { timeout: 15000 });
@@ -116,6 +122,21 @@ function multipartField(body, field) {
     const re = new RegExp(`name="${field}"\\r?\\n\\r?\\n([^\\r\\n]*)`);
     const m = re.exec(body || '');
     return m ? m[1] : null;
+}
+
+// pdf_password_required 422 剧本(供跳过/四语/手机三个用例复用,message 内容对断言无关)。
+function passwordRequiredRoute(route) {
+    return route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: JSON.stringify({
+            detail: {
+                code: 'workorder.intake.pdf_password_required',
+                message: { en: 'Password required', zh: '需要密码', th: 'x', ja: 'x' },
+                filename: 'password_protected.pdf',
+            },
+        }),
+    });
 }
 
 test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
@@ -294,20 +315,7 @@ test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
     });
 
     test('密码 PDF → 跳过 → 该件转拒收,不阻塞流程', async ({ page }) => {
-        await bootIntake(page, {
-            materialsHandler: (route) =>
-                route.fulfill({
-                    status: 422,
-                    contentType: 'application/json',
-                    body: JSON.stringify({
-                        detail: {
-                            code: 'workorder.intake.pdf_password_required',
-                            message: { en: 'Password required', zh: '', th: '', ja: '' },
-                            filename: 'password_protected.pdf',
-                        },
-                    }),
-                }),
-        });
+        await bootIntake(page, { materialsHandler: passwordRequiredRoute });
         await page.setInputFiles('#ikFileInput', path.join(FIXTURES, 'password_protected.pdf'));
         await page.click('[data-action="ik-upload"]');
         await expect(page.locator('.pw-card')).toBeVisible({ timeout: 8000 });
@@ -366,52 +374,16 @@ test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
     });
 
     test('刷新后续传横幅:localStorage 残留队列 → 提示继续/忽略', async ({ page }) => {
-        await page.addInitScript(() => {
-            window.localStorage.setItem('mrpilot_token', 'tok-in0b');
-            window.localStorage.setItem('mrpilot_lang', 'en');
-            window.localStorage.setItem(
-                'pearnly_ai_intake_queue_wo-1',
-                JSON.stringify({
-                    orderId: 'wo-1',
-                    total: 5,
-                    doneNames: ['a.jpg'],
-                    pendingNames: ['b.jpg', 'c.jpg'],
-                    failedNames: ['d.jpg'],
-                    ts: Date.now(),
-                })
-            );
+        await bootIntake(page, {
+            seedQueue: {
+                orderId: 'wo-1',
+                total: 5,
+                doneNames: ['a.jpg'],
+                pendingNames: ['b.jpg', 'c.jpg'],
+                failedNames: ['d.jpg'],
+                ts: Date.now(),
+            },
         });
-        await page.route('**/api/**', async (route) => {
-            const url = new URL(route.request().url());
-            const p = url.pathname;
-            if (p === '/api/workorder/orders' && route.request().method() === 'GET') {
-                return route.fulfill({
-                    contentType: 'application/json',
-                    body: JSON.stringify({ orders: [{ id: 'wo-1', period: '2569-05' }] }),
-                });
-            }
-            if (p === '/api/workorder/orders/wo-1') {
-                return route.fulfill({
-                    contentType: 'application/json',
-                    body: JSON.stringify({
-                        id: 'wo-1',
-                        status: 'stuck',
-                        needs: [],
-                        numbers: {},
-                        flagged: [],
-                    }),
-                });
-            }
-            if (p === '/api/workspace/clients/c1') {
-                return route.fulfill({
-                    contentType: 'application/json',
-                    body: JSON.stringify({ client: { id: 'c1', name: 'Test Client' } }),
-                });
-            }
-            return route.fulfill({ contentType: 'application/json', body: '{}' });
-        });
-        await page.goto(`${BASE}/static/dist/ai.html#/client/c1/intake`);
-        await page.waitForSelector('#v-client.on', { timeout: 15000 });
 
         const banner = page.locator('.resume-card');
         await expect(banner).toBeVisible({ timeout: 8000 });
@@ -435,21 +407,7 @@ test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
 
     for (const lang of ['th', 'zh', 'ja']) {
         test(`四语(${lang}):盘点条/密码卡文案非原始 key`, async ({ page }) => {
-            await bootIntake(page, {
-                lang,
-                materialsHandler: (route) =>
-                    route.fulfill({
-                        status: 422,
-                        contentType: 'application/json',
-                        body: JSON.stringify({
-                            detail: {
-                                code: 'workorder.intake.pdf_password_required',
-                                message: { en: 'x', zh: 'x', th: 'x', ja: 'x' },
-                                filename: 'password_protected.pdf',
-                            },
-                        }),
-                    }),
-            });
+            await bootIntake(page, { lang, materialsHandler: passwordRequiredRoute });
             await page.setInputFiles('#ikFileInput', path.join(FIXTURES, 'password_protected.pdf'));
             await page.click('[data-action="ik-upload"]');
             await expect(page.locator('.pw-card')).toBeVisible({ timeout: 8000 });
@@ -471,20 +429,7 @@ test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
         // 缺陷(整改前先量基线,不越权代修·只修本单报告范围内的问题)。这里断言 IN-0b
         // 新增的密码卡/盘点条渲染后不比这个基线多出溢出,而不是断言全局零溢出。
         await page.setViewportSize({ width: 390, height: 844 });
-        await bootIntake(page, {
-            materialsHandler: (route) =>
-                route.fulfill({
-                    status: 422,
-                    contentType: 'application/json',
-                    body: JSON.stringify({
-                        detail: {
-                            code: 'workorder.intake.pdf_password_required',
-                            message: { en: 'Password required', zh: '', th: '', ja: '' },
-                            filename: 'password_protected.pdf',
-                        },
-                    }),
-                }),
-        });
+        await bootIntake(page, { materialsHandler: passwordRequiredRoute });
         const baseline = await page.evaluate(() => document.body.scrollWidth - window.innerWidth);
 
         await page.setInputFiles('#ikFileInput', path.join(FIXTURES, 'password_protected.pdf'));

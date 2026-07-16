@@ -32,6 +32,11 @@
     // 绑定(不然每轮登录都在同一批按钮上叠一份监听器)。内容更新(姓名/头像)每次都照跑。
     var chromeWired = false;
 
+    // 总台闸(pearnly_ai_front_desk · FD-0d)独立于 m1,状态三态:null=探针进行中,
+    // true/false=已知。navDesk 在 ai.html 里默认 style="display:none"(闸关时与今天的
+    // /ai 逐字节一致的默认态),探针成功才摘掉——不是等探针才决定要不要塞进 DOM。
+    var deskGateOpen = null;
+
     // 左下角用户块(v5 §五3):显示登录用户名,取不到整块藏(状态诚实,不摆假占位)。
     function setFootUser(name) {
         var foot = $('footUser');
@@ -90,6 +95,9 @@
         $('navTodo').addEventListener('click', function () {
             window.location.hash = AI.router.buildPoolHash();
         });
+        $('navDesk').addEventListener('click', function () {
+            window.location.hash = AI.router.buildDeskHash();
+        });
         $('navVatcheck').addEventListener('click', function () {
             window.location.hash = AI.router.buildVatcheckHash();
         });
@@ -115,6 +123,7 @@
     var CRUMB_LABEL_KEY = {
         dashboard: 'crumb_dash',
         pool: 'nav_todo',
+        desk: 'nav_desk',
         vatcheck: 'nav_vatcheck',
         fileconv: 'nav_fileconv',
         payroll: 'nav_payroll',
@@ -165,6 +174,15 @@
     var prevRouteName = null;
 
     function onRoute(api, route) {
+        // 闸关(或探针明确回 404)时 #/desk 当未知路由处理——落回工作台,不留一条到
+        // 不存在功能的死链(同施工总册 §3.4「闸关 = 路由不渲染」)。探针仍在途
+        // (deskGateOpen===null)时不抢跑:先按工作台兜底,真正的挂载/跳转交给
+        // enterApp() 的探针 .then/.catch 回调(afterDeskProbe,处理"直接深链 #/desk"
+        // 早于探针落地的时序)。
+        if (route.name === 'desk' && deskGateOpen === false) {
+            window.location.hash = AI.router.buildDashboardHash();
+            return;
+        }
         if (prevRouteName === 'dashboard' && route.name !== 'dashboard') {
             dashScrollY = window.scrollY;
         }
@@ -177,6 +195,7 @@
         $('v-dashboard').classList.toggle('on', route.name === 'dashboard');
         $('v-client').classList.toggle('on', route.name === 'client');
         $('v-pool').classList.toggle('on', route.name === 'pool');
+        $('v-desk').classList.toggle('on', route.name === 'desk' && deskGateOpen !== false);
         $('v-vatcheck').classList.toggle('on', route.name === 'vatcheck');
         $('v-fileconv').classList.toggle('on', route.name === 'fileconv');
         $('v-payroll').classList.toggle('on', route.name === 'payroll');
@@ -186,6 +205,7 @@
         $('v-settings').classList.toggle('on', route.name === 'settings');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
         $('navTodo').classList.toggle('on', route.name === 'pool');
+        $('navDesk').classList.toggle('on', route.name === 'desk');
         $('navVatcheck').classList.toggle('on', route.name === 'vatcheck');
         $('navFileconv').classList.toggle('on', route.name === 'fileconv');
         $('navPayroll').classList.toggle('on', route.name === 'payroll');
@@ -198,6 +218,15 @@
         if (route.name === 'pool') {
             window.scrollTo(0, 0);
             AI.pool.mount(api);
+            return;
+        }
+        if (route.name === 'desk') {
+            if (deskGateOpen === true) {
+                window.scrollTo(0, 0);
+                AI.desk.mount(api);
+            }
+            // deskGateOpen === null(探针未落地):不挂载——afterDeskProbe() 落地后
+            // 若仍停在 #/desk 会补挂载或补跳转,这里留空不是遗漏。
             return;
         }
         if (route.name === 'vatcheck') {
@@ -276,9 +305,35 @@
         $('gateRoot').classList.add('on');
     }
 
+    // 总台闸探针(GET .../feed?limit=1):非阻塞——不拖慢其余视图的首屏(m1 闸探针
+    // 已在 boot() 里挡过一次登录门,这里只决定"总台这一个功能露不露脸")。resolve 时若
+    // 用户仍停在 #/desk(直接深链或探针慢于路由触发的时序),补上挂载/跳转——onRoute
+    // 里 desk 分支对 deskGateOpen===null 不作为,交给这里兜底。
+    function afterDeskProbe(api, open) {
+        deskGateOpen = open;
+        $('navDesk').style.display = open ? '' : 'none';
+        var current = AI.router.parseHash(window.location.hash);
+        if (current.name !== 'desk') return;
+        if (open) {
+            $('v-desk').classList.add('on');
+            window.scrollTo(0, 0);
+            AI.desk.mount(api);
+        } else {
+            window.location.hash = AI.router.buildDashboardHash();
+        }
+    }
+
     function enterApp(api) {
         showShell();
         renderChrome(api);
+        deskGateOpen = null;
+        api.getDeskFeed(null, 1)
+            .then(function () {
+                afterDeskProbe(api, true);
+            })
+            .catch(function () {
+                afterDeskProbe(api, false);
+            });
         // 二次进入(门面登出/登录闭环)可能已订阅过一次——先退订再订阅,防止 hashchange
         // 监听器逐轮叠加(每次都多触发一遍 onRoute,状态越切越花)。
         if (routerUnsubscribe) routerUnsubscribe();

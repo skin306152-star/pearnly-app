@@ -54,6 +54,10 @@
         // 「待我处理」(D2-S8 客户池·跨客户会计队列):独立顶层路由,不挂在某个客户的
         // 四视图之下(client-pool 是按客户分组的会计工作队列,不是单客户 tab)。
         if (h === '/pool') return { name: 'pool' };
+        // 总台(FD-0d · 目标驱动前门):对话式投料+说目标,独立顶层路由。闸
+        // (pearnly_ai_front_desk)关时 ai.js 的 onRoute 把这个路由名当未知路由处理
+        // (落回工作台),路由解析本身不读闸——纯函数不碰运行时状态。
+        if (h === '/desk') return { name: 'desk' };
         // 「销项税报告三查」(N1 · 顶层独立工具):上传一份报告文件即可查,不依赖任何
         // 客户/工单上下文,同 /pool 一样是独立顶层路由。
         if (h === '/vatcheck') return { name: 'vatcheck' };
@@ -118,6 +122,10 @@
         return '#/pool';
     }
 
+    function buildDeskHash() {
+        return '#/desk';
+    }
+
     function buildVatcheckHash() {
         return '#/vatcheck';
     }
@@ -170,6 +178,7 @@
         buildDashboardHash: buildDashboardHash,
         buildBoardHash: buildBoardHash,
         buildPoolHash: buildPoolHash,
+        buildDeskHash: buildDeskHash,
         buildVatcheckHash: buildVatcheckHash,
         buildFileconvHash: buildFileconvHash,
         buildPayrollHash: buildPayrollHash,

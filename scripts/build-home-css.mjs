@@ -207,6 +207,11 @@ const AI_CSS = [
     // 原因文案三处布局细节,模态外壳/上传区/表格/徽章全复用既有 .pkg-*/.dropzone/.dz-*/
     // .mx-table/.chip,排最后即可,与其余视图互斥显示,层叠顺序对彼此零影响。
     'ai/ai-client-import.css',
+    // ai-desk.css(FD-0d · 总台 #/desk)复用 ai-intake.css 的 .dropzone/.dz-*/.file-strip/
+    // .fchip/.intake-err 上传区原子 + ai-shell.css 的 .panel/.chip/.btn,只补对话流布局
+    // (上下文条/消息卡/输入条 sticky)这块总台独有的 .fd-* 结构,排最后即可,与其余
+    // 视图互斥显示,层叠顺序对彼此零影响。
+    'ai/ai-desk.css',
 ];
 
 const BUNDLES = [

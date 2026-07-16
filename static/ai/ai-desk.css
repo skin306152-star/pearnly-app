@@ -1,0 +1,256 @@
+/* Pearnly AI · ai-desk.css · 总台(#/desk · FD-0d)对话流布局。配色/间距按 var() 令牌
+ * (ai-theme.css),ui_design_lint 拦裸 hex。上传区/文件条复用 ai-intake.css 的
+ * dropzone/dz 系(.file-strip/.fchip/.intake-err),这里只补总台特有的布局。 */
+
+.fd-context-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.fd-context-bar select {
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border: 1px solid var(--hair2);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  min-width: 200px;
+  max-width: 100%;
+}
+
+.fd-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+  max-width: min(720px, 100%);
+}
+
+.fd-card .hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 15px 20px 12px;
+}
+.fd-card .hd h3 {
+  font-size: 14.5px;
+}
+
+.fd-welcome .fd-lead {
+  color: var(--ink2);
+  font-size: 13.5px;
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+.fd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fd-chip {
+  cursor: pointer;
+  border: 1px solid var(--hair2);
+  background: var(--surface2);
+}
+.fd-chip:hover {
+  border-color: var(--sage);
+  background: var(--sage-soft);
+}
+
+.fd-inv-total {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.fd-inv-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.fd-inv-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 10px;
+  background: var(--surface2);
+  border-radius: 8px;
+}
+.fd-inv-count {
+  font-variant-numeric: tabular-nums;
+}
+.fd-inv-note {
+  font-size: 12px;
+  color: var(--mut);
+  margin-bottom: 8px;
+}
+.fd-inv-prompt {
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+
+.fd-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.fd-lb {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--mut);
+  font-weight: 600;
+  flex: 1;
+  min-width: 160px;
+}
+.fd-lb select {
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--hair2);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+}
+.fd-suggest-note {
+  font-size: 12px;
+  color: var(--sage-deep);
+  background: var(--sage-soft);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+}
+
+.fd-needs,
+.fd-delivers {
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+.fd-needs b,
+.fd-delivers b {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--mut);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.fd-need-list,
+.fd-deliver-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fd-need-list li.ok {
+  color: var(--good);
+}
+.fd-need-list li.missing {
+  color: var(--crit);
+}
+
+.fd-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fd-rejected {
+  border-color: var(--crit-line);
+}
+.fd-enabled-list {
+  margin-top: 8px;
+  padding-left: 18px;
+}
+.fd-enabled-list li {
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.fd-degraded {
+  border-color: var(--warn-line);
+}
+.fd-degraded .bd p {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+
+.fd-progress-note {
+  font-size: 13px;
+  color: var(--ink2);
+  margin-bottom: 10px;
+}
+
+.fd-dismissed-note {
+  font-size: 12.5px;
+  color: var(--mut);
+}
+
+.fd-manual-hint {
+  font-size: 12px;
+  color: var(--mut);
+  margin-bottom: 12px;
+}
+
+.fd-composer {
+  position: sticky;
+  bottom: 0;
+  background: var(--paper);
+  padding-top: 10px;
+  max-width: min(720px, 100%);
+}
+.fd-dropzone {
+  min-height: 120px;
+  margin-bottom: 10px;
+}
+.fd-input-row {
+  display: flex;
+  gap: 8px;
+}
+.fd-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--hair2);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+}
+.fd-manual-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--mut);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+.fd-manual-link:hover {
+  color: var(--ink2);
+}
+
+@media (max-width: 640px) {
+  .fd-feed,
+  .fd-composer {
+    max-width: 100%;
+  }
+  .fd-context-bar select {
+    min-width: 0;
+    width: 100%;
+  }
+  .fd-row {
+    flex-direction: column;
+  }
+  .fd-lb {
+    min-width: 0;
+  }
+}

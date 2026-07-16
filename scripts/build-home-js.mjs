@@ -88,6 +88,9 @@ const BUNDLES = [
             // ai-api-client-import.js(IN-0d · 客户名录导入 parse/commit 两端点,拆自
             // ai-api.js·单文件<500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-client-import.js',
+            // ai-api-desk.js(FD-0d · 前门四端点:建草稿/解析/确认/消息流,拆自 ai-api.js·
+            // 单文件<500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
+            'ai/ai-api-desk.js',
             // ai-api-review.js(MC1-b2 · 审核收件箱 + 签批闭环七端点,拆自 ai-api.js·单文件
             // <500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-review.js',
@@ -193,6 +196,16 @@ const BUNDLES = [
             'ai/ai-payroll-render.js',
             'ai/ai-payroll-annual-render.js',
             'ai/ai-payroll.js',
+            // ai-desk-render.js(FD-0d · 总台 #/desk 消息卡纯逻辑+HTML,依赖 AI.state/format/
+            // board)排在 ai-desk-compose-render.js(输入区/手动开单面板拼装,拆自前者·单
+            // 文件<500 铁律,依赖 AI.deskRender 的 clientOptionsHtml/periodOptionsHtml/
+            // intentOptionsHtml/confirmReady/feedHtml)之前,两者都在 ai-desk.js(编排:
+            // 上传/送出/确认/手动兜底,依赖 AI.intakeRender.validateFiles/mergeFiles + 上面
+            // 两个 render 模块)与 ai.js(onRoute 用 AI.desk.mount + 闸探针控制侧栏项显隐)
+            // 之前——同 ai-vatcheck/ai-payroll 先例(顶层独立视图)。
+            'ai/ai-desk-render.js',
+            'ai/ai-desk-compose-render.js',
+            'ai/ai-desk.js',
             'ai/ai-client.js',
             // EN-clients(2026-07-13)· 客户目录/单客户档案页/报表中心/设置——三个侧栏占位
             // 收口转正。ai-clients-render.js(目录纯拼装,依赖 AI.matrixRender.BADGE_CHIP)

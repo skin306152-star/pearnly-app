@@ -472,6 +472,7 @@
             AI.apiPayroll.create(root, authHeaders, handleResponse, attachmentResponse)
         );
         Object.assign(base, AI.apiClientImport.create(root, authHeaders, handleResponse, call));
+        Object.assign(base, AI.apiDesk.create(root, authHeaders, handleResponse, call));
         return Object.assign(
             base,
             AI.apiReview.create(root, authHeaders, handleResponse, call, queryString)

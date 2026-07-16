@@ -368,7 +368,13 @@ def confirm(cur, *, tenant_id: str, contract_id: str, actor: str) -> dict:
 
 
 def public_view(contract: dict, files: Optional[list] = None) -> dict[str, Any]:
-    """合同 → 前端安全视图(消息流/合同卡渲染用)。附件只暴露展示字段,不吐 file_ref 绝对路径。"""
+    """合同 → 前端安全视图(消息流/合同卡渲染用)。附件只暴露展示字段,不吐 file_ref 绝对路径。
+
+    brain_suggestion 随出(FD-0d 补·前端刷新重建合同卡的唯一持久化来源):draft 态下
+    workspace_client_id/period/intent 三列要等人点确认才落(见 confirm()),故 interpret
+    刚给出的建议只活在这个 jsonb 字段里——不透出,合同卡在浏览器刷新后无法重建,
+    违反"消息流不建聊天表,靠服务端重建"的设计前提(施工总册 §2.2)。内容只含闭集
+    intent/客户 id/期间三个非敏感建议字段(interpret.py 已引用校验),透出零风险。"""
     out = {
         "id": str(contract["id"]),
         "workspace_client_id": contract.get("workspace_client_id"),
@@ -377,6 +383,7 @@ def public_view(contract: dict, files: Optional[list] = None) -> dict[str, Any]:
         "status": contract.get("status"),
         "deliverables": contract.get("deliverables") or [],
         "work_order_id": contract.get("work_order_id") and str(contract["work_order_id"]),
+        "brain_suggestion": contract.get("brain_suggestion") or {},
     }
     if files is not None:
         out["files"] = [

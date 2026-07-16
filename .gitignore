@@ -70,7 +70,8 @@ Thumbs.db
 payments/
 storage/
 
-tests/fixtures/
+tests/fixtures/*
+!tests/fixtures/front_desk_intent_golden.json
 tests/pipeline-results.json
 tests/pipeline-results-before-fix.json
 tests/pipeline-benchmark-*.json

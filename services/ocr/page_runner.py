@@ -16,7 +16,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
 
-from . import gemini_models, image_first, totals_rescue
+from . import escalation_budget, gemini_models, image_first, totals_rescue
 from .confidence import check_field_in_l1_text, find_field_min_word_conf
 from .gl_balance_chain import repair_gl_document
 from .layer1_vision import extract_from_image_bytes as _l1_extract_image
@@ -245,6 +245,13 @@ def _process_one_page(
         and image_bytes
     )
 
+    # R1 回落封顶:非 image-first 的 L3 视觉回落(贵模型 · 约 3×)受跑批级 per-run 配额约束。
+    # 配额用尽 → 跳过回落,该页走既有诚实路径(needs_review 交人审);未设配额(单张 OCR/主站
+    # 散单等非跑批路径)= try_escalate 恒 True,行为逐字节不变。模型选择/路由表/判读/prompt 一字不改。
+    l3_budget_denied = l3_eligible and not image_first_on and not escalation_budget.try_escalate()
+    if l3_budget_denied:
+        l3_eligible = False
+
     if image_first_on:
         try:
             res = image_first.run(
@@ -341,6 +348,12 @@ def _process_one_page(
                 needs_manual_review = True
             else:
                 raise
+
+    if l3_budget_denied:
+        # 回落配额用尽:该页没升贵模型,如实标 needs_review(与 L3_quota 跳过同款诚实路径)。
+        needs_manual_review = True
+        error_msg = error_msg or "L3 skipped: run fallback budget exhausted"
+        layer_chain = [l1_layer_name, "L2", "L3_skipped_budget"]
 
     total_ms = int((time.time() - t_total) * 1000)
     # 分段耗时(一行可 grep · 自带 request_id):定位 OCR 慢在哪层(L1 vision / L2 structure /

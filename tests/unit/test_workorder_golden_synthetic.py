@@ -127,6 +127,13 @@ class FakeStore:
         self.items.append(row)
         return dict(row)
 
+    def reset_quota_deferred_items(self, cur, *, tenant_id, work_order_id, flag_reason):
+        # R1 quota 待补复位:这些用例不造 quota 待补件,空实现(诚实无可复位)。
+        return 0
+
+    def sum_workorder_ocr_cost(self, cur, *, tenant_id, item_ids):
+        return 0.0
+
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         rows = [it for it in self.items if it["work_order_id"] == work_order_id]
         if status is not None:

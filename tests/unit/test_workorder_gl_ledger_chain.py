@@ -24,6 +24,13 @@ class FakeStore:
         self.items = items
         self.events = list(events or [])
 
+    def reset_quota_deferred_items(self, cur, *, tenant_id, work_order_id, flag_reason):
+        # R1 quota 待补复位:这些用例不造 quota 待补件,空实现(诚实无可复位)。
+        return 0
+
+    def sum_workorder_ocr_cost(self, cur, *, tenant_id, item_ids):
+        return 0.0
+
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         return [dict(it) for it in self.items if status is None or it["status"] == status]
 

@@ -454,6 +454,32 @@ def list_deliverables(cur, *, tenant_id: str, work_order_id: str) -> list[dict]:
     return [dict(r) for r in cur.fetchall()]
 
 
+def sum_workorder_ocr_cost(cur, *, tenant_id: str, item_ids: list) -> float:
+    """本工单 classify 的 OCR 累计成本(ai_usage.cost_thb Σ · 单一事实源;trace_id=item_id 由
+    classify._ocr_safe 打点)。R1 成本封顶从台账回查用;无行(无 OCR/被裁剪)返 0.0。"""
+    if not item_ids:
+        return 0.0
+    cur.execute(
+        "SELECT COALESCE(SUM(cost_thb), 0) AS c FROM ai_usage "
+        "WHERE tenant_id = %s AND task = 'workorder_classify' AND trace_id = ANY(%s)",
+        (tenant_id, list(item_ids)),
+    )
+    row = cur.fetchone()
+    val = row["c"] if isinstance(row, dict) else row[0]
+    return float(val or 0.0)
+
+
+def reset_quota_deferred_items(cur, *, tenant_id: str, work_order_id: str, flag_reason: str) -> int:
+    """把指定 flag_reason 的 flagged 件复位回 pending 并清 reason(R1 quota 待补 · 续跑重试)。
+    只动该 reason 的件,不碰其它人审 flagged;返回复位件数。"""
+    cur.execute(
+        "UPDATE work_order_items SET status = 'pending', flag_reason = NULL, updated_at = now() "
+        "WHERE tenant_id = %s AND work_order_id = %s AND status = 'flagged' AND flag_reason = %s",
+        (tenant_id, work_order_id, flag_reason),
+    )
+    return cur.rowcount
+
+
 def ocr_models_for_items(cur, *, tenant_id: str, item_ids: list) -> list:
     """本工单 classify 用过的模型名(C-1 ai_usage 归因单一事实源,只读不双写;trace_id=
     item_id 由 classify._ocr_safe 打点)。冻结 manifest 模型版本轴的取数口——查询归 DAL,

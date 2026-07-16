@@ -40,6 +40,13 @@ class _Store:
         self._order = [it["id"] for it in items]
         self.events = []
 
+    def reset_quota_deferred_items(self, cur, *, tenant_id, work_order_id, flag_reason):
+        # R1 quota 待补复位:这些用例不造 quota 待补件,空实现(诚实无可复位)。
+        return 0
+
+    def sum_workorder_ocr_cost(self, cur, *, tenant_id, item_ids):
+        return 0.0
+
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         return [
             dict(self.items[i])
@@ -135,9 +142,10 @@ class ClassifyConcurrencyTests(unittest.TestCase):
         # 守恒:6 张进项全部归堆一次,Σ桶 = 件数。
         self.assertEqual(sum(out.payload["bins"].values()), 6)
         self.assertEqual(out.payload["bins"], {"purchase_invoice": 6})
-        # 逐件检查点:每件一个独立事务单元 enter+commit(6 对)。
-        self.assertEqual(unit_log.count("enter"), 6)
-        self.assertEqual(unit_log.count("commit"), 6)
+        # 逐件检查点:每件一个独立事务单元 enter+commit(6 对)+ 1 个 quota 待补复位前置事务
+        # (R1:起手复位上次 quota 待补件,独立提交避免与逐件子事务争锁)= 7 对,零回滚。
+        self.assertEqual(unit_log.count("enter"), 7)
+        self.assertEqual(unit_log.count("commit"), 7)
         self.assertEqual(unit_log.count("rollback"), 0)
         # 每件恰一条 item_classified(不因并发翻倍),且带 item 锚 dedupe_key。
         classified = [e for e in store.events if e["event_type"] == "item_classified"]
@@ -225,6 +233,13 @@ class _TxnStore:
     def __init__(self, dbo, fail_on=None):
         self.dbo = dbo
         self.fail_on = fail_on
+
+    def reset_quota_deferred_items(self, cur, *, tenant_id, work_order_id, flag_reason):
+        # R1 quota 待补复位:这些用例不造 quota 待补件,空实现(诚实无可复位)。
+        return 0
+
+    def sum_workorder_ocr_cost(self, cur, *, tenant_id, item_ids):
+        return 0.0
 
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         return [dict(r) for r in self.dbo.items.values() if status is None or r["status"] == status]

@@ -22,7 +22,6 @@ reconcile/人审,金标 IMG_2647 必须落在这条路径而非被吃掉)。
 from __future__ import annotations
 
 import os
-import re
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
@@ -31,13 +30,17 @@ from typing import Optional
 
 from core import feature_flags
 from services.ai_gateway import attribution
+from services.ocr import escalation_budget
 from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
 from services.workorder import decisions, evidence, kinds, storage
 from services.workorder.engine import StepContext, StepResult
-from services.workorder.steps import checkpoint, ocr_ledger
+from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_snapshots
 from services.workorder.steps import sort as sort_step
 from services.workspace import client_alias_store
+
+# quota 待补件的 flag_reason(续跑起手复位这些件回 pending 重试;单一事实源在此)。
+_QUOTA_FLAG = "ocr_error:quota"
 
 # 工单 OCR 成本归因 task(落 ai_usage,与主站散单 OCR 台账分得开,见 C-1 §5)。
 _OCR_TASK = "workorder_classify"
@@ -62,6 +65,7 @@ _MATH_HINTS = ("小计", "总额", "行和", "vat", "折", "mismatch", "不平",
 
 def run(ctx: StepContext) -> StepResult:
     """给 pending 的图片/PDF 过 OCR 归堆去重,给 pending 的销项 xlsx 直读。"""
+    _reset_quota_deferred(ctx)  # R1:先于取 pending,把上次 quota 待补件复位回 pending 一起重烧
     pending = ctx.store.list_items(
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id, status="pending"
     )
@@ -91,7 +95,25 @@ def run(ctx: StepContext) -> StepResult:
     # 内存从空建会让其复件漏判 duplicate → R1 双计(C1 打回单 R1 的静默钱洞)。重建保证
     # 中断续跑对查重的裁决与不中断跑逐字节一致。
     seen_purchase_fp: dict[str, str] = _replay_seen_fingerprints(ctx) if images else {}
-    for item, ocr in _ocr_in_order(images, ctx.tenant_id):
+    # R1:配额退避+全局降速协调器 / 贵模型回落跑批级配额(用尽走诚实路径)/ 成本封顶(达 cap 停投料)。
+    governor = ocr_quota.QuotaGovernor() if images else None
+    budget = escalation_budget.new_budget(ocr_cost_cap.fallback_limit()) if images else None
+    cost_cap = ocr_cost_cap.from_ctx(ctx, [it["id"] for it in images])
+    quota_deferred = 0
+    cost_capped = False
+    for item, ocr in _ocr_in_order(images, ctx.tenant_id, governor=governor, budget=budget):
+        # 撞配额且退避用尽:不落终局证据(留续跑重烧,免 dedupe 锁死错值),挂 quota 待补,整步 stuck 待续。
+        if isinstance(ocr, Exception) and ocr_quota.is_quota_error(ocr):
+            with checkpoint.item_scope(ctx):
+                ctx.store.update_item(
+                    ctx.cur,
+                    tenant_id=ctx.tenant_id,
+                    item_id=item["id"],
+                    status="flagged",
+                    flag_reason=_QUOTA_FLAG,
+                )
+            quota_deferred += 1
+            continue
         outcome = _classify_from_ocr(
             item,
             ocr,
@@ -103,23 +125,17 @@ def run(ctx: StepContext) -> StepResult:
         )
         upd = outcome["update"]
         engine_ver = ocr.get("_ocr_engine") if isinstance(ocr, dict) else None
-        # 件 1:每件 OCR 落库时双写 ocr_history(识别台账,主站据此看得见工单侧识别)——
-        # 独立自管事务(insert 自开 RLS 游标),失败/无归属只留 NULL,绝不拖垮 classify。
-        # ai_usage 成本归因已在 _ocr_safe 记过,这里只搬 OCR 读值不重复计费。
+        # 件 1:每件 OCR 落库时双写 ocr_history(识别台账),失败/无归属只留 NULL,绝不拖垮 classify。
         history_id = (
             _record_ocr_history(item, ocr, history_owner) if isinstance(ocr, dict) else None
         )
-        # 只在真拿到 history_id 时才传 ocr_history_id(否则不传):无归属/无双写的路径 update_item
-        # 调用与件 1 前逐字节一致,存量 NULL 不被回填。
         link = {"ocr_history_id": history_id} if history_id else {}
         with checkpoint.item_scope(ctx):
             ctx.store.update_item(
                 ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **link, **upd
             )
-            # 归堆即落 item_classified 事件:进项票带票面钱字段。这条事件是 reconcile 回放金额的
-            # 唯一持久源(证据链 + 断点续跑),classify 不算钱,只把票面原值落进证据流。dedupe_key
-            # 锚到 item:并发接管(过期租约被另一进程续跑)重放同件也只落一条,守恒不被撑破。
-            # ocr_engine=OCR 管线版本(冻结 manifest 的模型版本自证据流取,不依赖 ai_usage 表)。
+            # 归堆即落 item_classified 事件(reconcile 回放金额的唯一持久源);dedupe_key 锚到 item,
+            # 并发接管重放同件只落一条,守恒不被撑破。ocr_engine=管线版本(冻结 manifest 取)。
             _emit_classified(
                 ctx,
                 item,
@@ -132,6 +148,17 @@ def run(ctx: StepContext) -> StepResult:
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
         if outcome["flagged"]:
             flagged += 1
+        # 达成本封顶即停止投料:未处理件留 pending,生成器收尾取消在队未起的 OCR(白烧至多一窗)。
+        # 用 ctx.cur(检查点子事务退出后已还原为步事务游标)回查台账,不另开连接。
+        if cost_cap is not None and cost_cap.exceeded(ctx):
+            cost_capped = True
+            break
+
+    # 撞配额待补 / 成本封顶:整步 stuck 诚实待续(未处理件留 pending,人工 /run 重给预算)。
+    if quota_deferred:
+        return StepResult.stuck([f"ocr_quota_deferred:{quota_deferred}"])
+    if cost_capped:
+        return StepResult.stuck(["ocr_cost_cap_exceeded"])
 
     reads: dict[str, dict] = dict(ctx.data.get("sales_summary_reads") or {})
     for item in pending:
@@ -161,45 +188,59 @@ def run(ctx: StepContext) -> StepResult:
     return StepResult.ok(bins=bins, flagged=flagged, sales_summary_reads=reads)
 
 
-def _ocr_safe(item: dict, tenant_id: str):
-    """取一件 OCR,单件隔离:异常原样返回(不抛,不拖垮整批)。成本按 _OCR_TASK + 本租户归因
-    落 ai_usage(在本 worker 线程内设归因——ThreadPool 子线程起始上下文为空,主线程设了不算)。"""
+def _ocr_safe(item: dict, tenant_id: str, governor=None, budget=None):
+    """取一件 OCR,单件隔离 + 配额退避。成本按 _OCR_TASK + 本租户归因落 ai_usage(在本 worker
+    线程内设——ThreadPool 子线程起始上下文为空,主线程设了不算)。budget 同款 per-worker 播种:
+    贵模型回落跑批级配额跨并发件全局递减(见 escalation_budget)。撞 quota 的退避在 ocr_quota。"""
     token = attribution.set_attribution(
         _OCR_TASK, tenant_id=str(tenant_id), trace_id=str(item.get("id") or "")
     )
+    btoken = escalation_budget.set_budget(budget) if budget is not None else None
     try:
-        return _ocr_image(item["file_ref"])
-    except Exception as exc:  # noqa: BLE001 - 单件隔离,绝不拖垮整步
-        return exc
+        return ocr_quota.fetch_with_retry(lambda: _ocr_image(item["file_ref"]), governor=governor)
     finally:
+        if btoken is not None:
+            escalation_budget.reset_budget(btoken)
         attribution.reset_attribution(token)
 
 
-def _ocr_in_order(images: list[dict], tenant_id: str):
+def _ocr_in_order(images: list[dict], tenant_id: str, *, governor=None, budget=None):
     """并发取 OCR、按输入原序 yield (item, ocr_or_exc)。并发上限见 _ocr_concurrency;
     ≤1 或单件走串行(免线程池开销,单测同步好断言)。原序消费保证下游查重/落库确定性。
 
-    窗口式提交(2n)而非整批:消费方中途异常/生成器提前关闭时,排队未起跑的直接取消、
-    在飞的不等(shutdown(wait=False)),失败立即上抛;白烧的 OCR 至多一个窗口,不是整批。"""
+    窗口式提交(2n)而非整批:消费方中途异常/生成器提前关闭时(如成本封顶 break),排队未起跑的
+    直接取消、在飞的不等(shutdown(wait=False));白烧的 OCR 至多一个窗口,不是整批。"""
     n = _ocr_concurrency()
     if n <= 1 or len(images) <= 1:
         for it in images:
-            yield it, _ocr_safe(it, tenant_id)
+            yield it, _ocr_safe(it, tenant_id, governor, budget)
         return
     pool = ThreadPoolExecutor(max_workers=n, thread_name_prefix="wo-classify-ocr")
     window: deque = deque()
     rest = iter(images)
     try:
         for it in islice(rest, n * 2):
-            window.append((it, pool.submit(_ocr_safe, it, tenant_id)))
+            window.append((it, pool.submit(_ocr_safe, it, tenant_id, governor, budget)))
         while window:
             item, fut = window.popleft()
             follow = next(rest, None)
             if follow is not None:
-                window.append((follow, pool.submit(_ocr_safe, follow, tenant_id)))
+                window.append((follow, pool.submit(_ocr_safe, follow, tenant_id, governor, budget)))
             yield item, fut.result()
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
+
+
+def _reset_quota_deferred(ctx: StepContext) -> None:
+    """续跑起手把上次 quota 待补件(flagged, ocr_error:quota)复位回 pending 供重烧(它们当时未落
+    终局证据事件,dedupe_key 不会锁死错值,重烧与不中断跑等价)。走独立提交事务(有 factory 时)
+    释放行锁,免与后续 item_scope 逐件子事务互等自死锁。"""
+    kw = dict(tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id, flag_reason=_QUOTA_FLAG)
+    if ctx.cursor_factory is None:
+        ctx.store.reset_quota_deferred_items(ctx.cur, **kw)
+    else:
+        with ctx.cursor_factory() as cur:
+            ctx.store.reset_quota_deferred_items(cur, **kw)
 
 
 def _emit_classified(ctx, item, *, kind, status, money, sales_read=None, edc=None, ocr_engine=None):
@@ -242,7 +283,10 @@ def _classify_from_ocr(
 
     OCR 调用本身在 _ocr_safe(可并发)完成,这里是纯裁决(主线程逐件、原序执行 → 查重确定性)。"""
     if isinstance(ocr, Exception):
-        upd = {"status": "flagged", "kind": None, "flag_reason": f"ocr_error:{type(ocr).__name__}"}
+        # 撞配额(退避已在 _ocr_safe 用尽)归一到 ocr_error:quota,让 run() 走 quota 待补/续跑路;
+        # 其余 OCR 异常按类型名如实点名,单件隔离不拖垮整步。
+        detail = "quota" if ocr_quota.is_quota_error(ocr) else type(ocr).__name__
+        upd = {"status": "flagged", "kind": None, "flag_reason": f"ocr_error:{detail}"}
         return {"kind": kinds.UNKNOWN, "flagged": True, "update": upd, "money": None}
     fields = ocr
 
@@ -286,55 +330,11 @@ def _classify_from_ocr(
     capture_money = kind in (kinds.PURCHASE_INVOICE, decisions.SALES_DOC) or (
         reason or ""
     ).startswith(("direction_ambiguous", "sales_direction_unhandled"))
-    money = _money_fields(fields) if capture_money else None
+    money = ocr_snapshots.money_fields(fields) if capture_money else None
     # EDC 结算票快照走独立 payload 键(不进 money):money 是银行对账候选/R1 回放的料源,
     # 结算票混进去会被 E1 当票据候选双配(它已由 SA-1 的 EDC↔银行专线对账)。
-    edc = _edc_fields(fields) if kind == kinds.EDC_SETTLEMENT else None
+    edc = ocr_snapshots.edc_fields(fields) if kind == kinds.EDC_SETTLEMENT else None
     return {"kind": kind, "flagged": status == "flagged", "update": upd, "money": money, "edc": edc}
-
-
-def _money_fields(fields: dict) -> dict:
-    """票面钱字段快照(进 item_classified 事件,供 reconcile 回放合计/试算)。Decimal 交给
-    reconcile,这里只搬 OCR 原值不做换算——净额/税额/含税额 + 票号税号做证据溯源。
-
-    date/seller_name 是 E1 银行对账候选的日期/供应商锚(佐证层),纯附加字段,不参与 R1/R2
-    税额计算(reconcile_gates 只读 subtotal/vat/total_amount)——缺失即为 None,对已有金标零影响。
-    """
-    return {
-        "subtotal": fields.get("subtotal"),
-        "vat": fields.get("vat"),
-        "total_amount": fields.get("total_amount"),
-        "invoice_number": fields.get("invoice_number"),
-        "seller_tax": fields.get("seller_tax"),
-        "invoice_date": fields.get("date"),
-        "vendor": fields.get("seller_name"),
-    }
-
-
-# KBANK 系结算票脚注里的批次/终端号(BATCH# 000186 / TID:62608078 两种写法都在真料出现过)。
-_EDC_BATCH_RE = re.compile(r"batch\s*[#:]?\s*(\d{3,})", re.IGNORECASE)
-_EDC_TID_RE = re.compile(r"tid\s*[#:]?\s*(\d{4,})", re.IGNORECASE)
-
-
-def _edc_fields(fields: dict) -> dict:
-    """EDC 结算票快照(进 item_classified 事件,SA-2b 回放喂 sales_agg 聚合)。字段逐字段
-    对齐 services/sales_agg/model.py::EdcSettlement 输入契约(settle_date/gross_amount/
-    fee_amount/net_amount/batch_no/terminal_id),不另造形状。
-
-    KBANK 商户联结算票不印手续费/净额 → 两者恒 None 如实缺失(SA-1 对毛额缺失显式点名、
-    绝不静默归 0,net+fee 齐才回推);批次/终端号从 notes 脚注拾取,拾不到留空——SA-1
-    无锚不算去重指纹,不硬造。这里只搬 OCR 原值,Decimal 化交聚合层。"""
-    notes = str(fields.get("notes") or "")
-    batch = _EDC_BATCH_RE.search(notes)
-    tid = _EDC_TID_RE.search(notes)
-    return {
-        "settle_date": fields.get("date"),
-        "gross_amount": fields.get("total_amount") or fields.get("subtotal"),
-        "fee_amount": None,
-        "net_amount": None,
-        "batch_no": batch.group(1) if batch else "",
-        "terminal_id": tid.group(1) if tid else "",
-    }
 
 
 def _classify_summary(item: dict) -> tuple:

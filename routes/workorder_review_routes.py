@@ -30,11 +30,16 @@ from routes.workorder_routes import (
     _load_mutable_order,
     _raise_from_api_error,
 )
-from services.workorder import api, bank_recon_review, obligation_engine, review
+from services.workorder import api, bank_recon_review, obligation_engine, review, taxid_realign
 
 router = APIRouter()
 
 _SEVERITIES = ("crit", "warn")
+
+
+class RealignTaxidIn(BaseModel):
+    registered: str = Field(..., max_length=40, description="登记的(疑似错的)税号")
+    suspected: str = Field(..., max_length=40, description="票上反复出现的(疑似对的)税号")
 
 
 class BatchDecisionsIn(BaseModel):
@@ -154,6 +159,34 @@ async def decide_bank_recon(work_order_id: str, req: BankReconDecideIn, request:
         except api.WorkOrderApiError as e:
             _raise_from_api_error(e)
     return {"ok": True, "event_id": evt["id"]}
+
+
+@router.post("/api/workorder/orders/{work_order_id}/realign-taxid")
+async def realign_taxid(
+    work_order_id: str, req: RealignTaxidIn, request: Request, background: BackgroundTasks
+):
+    """税号重锚(R4):守护闸点名「登记税号疑似录错」,会计已把账套登记税号改成票上真税号
+    (既有 PATCH)后紧接调此,把本单无裁决的方向不明件重置回 pending 并重跑 classify 重判
+    (有跨单去重零 OCR 成本)——已裁决件绝不动。与驳回重做同族(重置 + 重开步 + 自驱重跑)。
+
+    权限 settings.workspace.manage(改账套主体税号同款,仅老板/超管)。落库成功后引擎自动
+    续跑(P-7),用户不必手点 /run。"""
+    user, tenant_id = _authorize(request, "settings.workspace.manage")
+    with db.get_cursor(commit=True) as cur:
+        _load_mutable_order(cur, request, user, tenant_id, work_order_id)
+        try:
+            out = taxid_realign.realign(
+                cur,
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                registered=req.registered,
+                suspected=req.suspected,
+                actor=f"user:{user['id']}",
+            )
+        except api.WorkOrderApiError as e:
+            _raise_from_api_error(e)
+    _auto_advance(background, tenant_id, work_order_id, user)
+    return {"ok": True, **out}
 
 
 @router.post("/api/workorder/orders/{work_order_id}/self-review-declare")

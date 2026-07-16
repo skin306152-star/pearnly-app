@@ -20,6 +20,14 @@ from services.workorder import decisions, kinds, verdict
 _EVT_DONE = "step_done"
 _EVT_CLASSIFIED = "item_classified"
 _EVT_DECISION = "human_decision"
+
+# 工单级警示事件词汇(单一事实源 · 禁散落字符串,C4 臆造词血泪)。taxid_alert 落 suspected,
+# api.realign_taxid 落 realign;alerts_projection 回放这两词成通用警示投影(今后其它工单级
+# 警示复用同一形状)。前端无法 import,ai-review-render.js 旁有同步注释。
+EVT_TAXID_TYPO_SUSPECTED = "taxid_typo_suspected"
+EVT_TAXID_REALIGN_REQUESTED = "taxid_realign_requested"
+# 警示投影逐字段契约(前端警示卡按此渲染)。
+_ALERT_FIELDS = ("registered", "suspected", "doc_count", "distance", "kind")
 _KIND_PURCHASE = kinds.PURCHASE_INVOICE
 _KIND_SALES = kinds.SALES_SUMMARY
 _KIND_UNKNOWN = kinds.UNKNOWN
@@ -99,6 +107,26 @@ def replay_items_by_type(events: list[dict], event_type: str) -> dict:
                 "at": e.get("created_at"),
             }
     return out
+
+
+def alerts_projection(events: list[dict]) -> list[dict]:
+    """工单级警示通用投影(R4 · order_detail.alerts 读侧)。回放 taxid_typo_suspected 为
+    警示卡数据;被同 (registered, suspected) 的 taxid_realign_requested 解除的不再呈现
+    (会计确认改税号并重锚后,旧嫌疑落幕,不再打扰)。
+
+    通用形状 {type, ...五字段},今后其它工单级警示(如缺票/期间不符)可复用同一投影键与
+    前端渲染位。同一嫌疑只出一张卡(dict 按键覆盖),按落库序 latest-wins。"""
+    suspicions: dict = {}
+    resolved: set = set()
+    for e in events:
+        etype = e["event_type"]
+        payload = e.get("payload") or {}
+        if etype == EVT_TAXID_TYPO_SUSPECTED:
+            key = (payload.get("registered"), payload.get("suspected"))
+            suspicions[key] = {"type": etype, **{k: payload.get(k) for k in _ALERT_FIELDS}}
+        elif etype == EVT_TAXID_REALIGN_REQUESTED:
+            resolved.add((payload.get("registered"), payload.get("suspected")))
+    return [a for key, a in suspicions.items() if key not in resolved]
 
 
 def flagged_projection(

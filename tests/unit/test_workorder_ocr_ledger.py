@@ -87,8 +87,35 @@ class RecordTests(unittest.TestCase):
         self.assertEqual(kw["tenant_id"], "t-1")
         self.assertEqual(kw["source"], "workorder_classify")
         self.assertEqual(kw["source_ref"], "i1")
-        # 内部下划线字段被剥掉,只留真读值。
+        # 内部下划线字段从 fields 剥掉,只留真读值。
         self.assertEqual(kw["pages"][0]["fields"], {"total_amount": "107.00", "vat": "7.00"})
+
+    def test_double_writes_file_hash_and_gate_fields(self):
+        # R2B:补 file_hash(剥 file: 前缀)+ pages[0] 平存闸字段(复用路重建 OCR 读数用)。
+        owner = {"user_id": "u-9", "workspace_client_id": 7, "tenant_id": "t-1"}
+        item = {"id": "i1", "file_ref": "/in/a.jpg", "dedupe_key": "file:deadbeef"}
+        fields = {
+            "vat": "7.00",
+            "_validation_warnings": ["小计不平"],
+            "_needs_review": True,
+            "_confidence_band": "mid",
+            "_ocr_engine": "v9",
+        }
+        with mock.patch("core.db.insert_ocr_history", return_value="h-1") as ins:
+            ocr_ledger.record(item, fields, owner)
+        kw = ins.call_args.kwargs
+        self.assertEqual(kw["file_hash"], "deadbeef")
+        page = kw["pages"][0]
+        self.assertEqual(page["_validation_warnings"], ["小计不平"])
+        self.assertTrue(page["_needs_review"])
+        self.assertEqual(page["_confidence_band"], "mid")
+        self.assertEqual(page["_ocr_engine"], "v9")
+
+    def test_non_file_dedupe_key_no_hash(self):
+        owner = {"user_id": "u-9", "workspace_client_id": 7, "tenant_id": "t-1"}
+        with mock.patch("core.db.insert_ocr_history", return_value="h-1") as ins:
+            ocr_ledger.record({"id": "i1", "dedupe_key": "manual:x"}, {"vat": "7"}, owner)
+        self.assertIsNone(ins.call_args.kwargs["file_hash"])
 
     def test_insert_failure_degrades_to_none(self):
         owner = {"user_id": "u-9", "workspace_client_id": 7, "tenant_id": "t-1"}

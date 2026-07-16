@@ -190,6 +190,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "current_step": wo["current_step"],
         "progress": _classify_progress(wo, items, classified),
         "flagged": evidence.flagged_projection(items, events, classified=classified),
+        "alerts": evidence.alerts_projection(events),
         "needs": needs,
         "blocked_reasons": blocked,
         "numbers": _numbers(events),
@@ -250,35 +251,25 @@ def _overlay_bank_decisions(recon: dict, events: list[dict]) -> dict:
     return dict(recon, review=review)
 
 
-def shadow_draft(events: list[dict]) -> Optional[dict]:
-    """R5 影子底稿三件套只读投影(F3 影子底稿视图读侧 + M1-3KEY 键二分录导出)。
-
-    从 reconcile 步 step_done 回放里深取 gates.r5_shadow——闸关(无 r5_shadow 键)/ 尚未跑到
-    reconcile / 引擎异常降级(_run_shadow_draft 的 except 落 {error,note:shadow_draft_skipped}
-    残影,缺 trial_balance)一律诚实给 None,不拼一份假底稿充数(状态诚实优先于"看着有内容")。"""
+def _gate_projection(events: list[dict], *, gate_key: str, required_key: str) -> Optional[dict]:
+    """从 reconcile 步 step_done 深取某佐证 gate 的只读投影:闸关(无该键)/ 尚未跑到 reconcile /
+    引擎异常降级残影(缺 required_key)一律诚实给 None,不拼假数据充数(状态诚实优先于"看着有
+    内容")。R5 影子底稿(shadow_draft)与 R6 报表(_financials)共用此深取范式,不各写一份。"""
     payload = evidence.replay_step_done(events, _DECISION_STEP)
-    if not payload:
-        return None
-    shadow = (payload.get("gates") or {}).get("r5_shadow")
-    if not isinstance(shadow, dict) or "trial_balance" not in shadow:
-        return None
-    return shadow
+    gate = (payload.get("gates") or {}).get(gate_key) if payload else None
+    return gate if isinstance(gate, dict) and required_key in gate else None
+
+
+def shadow_draft(events: list[dict]) -> Optional[dict]:
+    """R5 影子底稿三件套只读投影(F3 影子底稿视图读侧 + M1-3KEY 键二分录导出)。深取
+    gates.r5_shadow;降级残影缺 trial_balance → None(_run_shadow_draft 的 skipped 残影不充数)。"""
+    return _gate_projection(events, gate_key="r5_shadow", required_key="trial_balance")
 
 
 def _financials(events: list[dict]) -> Optional[dict]:
-    """R6 月度报表三件套只读投影(G1b 报表包视图读侧)。
-
-    从 reconcile 步 step_done 回放里深取 gates.r6_financials——闸关(无 r6_financials 键)/
-    影子跳过(无科目余额可算)/ 尚未跑到 reconcile / 引擎异常降级(_run_shadow_financials 的
-    except 落 {error,note:financials_skipped} 残影,缺 balance_sheet)一律诚实给 None,不拼一份
-    假报表充数(状态诚实优先于"看着有内容")。"""
-    payload = evidence.replay_step_done(events, _DECISION_STEP)
-    if not payload:
-        return None
-    fin = (payload.get("gates") or {}).get("r6_financials")
-    if not isinstance(fin, dict) or "balance_sheet" not in fin:
-        return None
-    return fin
+    """R6 月度报表三件套只读投影(G1b 报表包视图读侧)。深取 gates.r6_financials;闸关/影子跳过/
+    降级残影缺 balance_sheet → None(_run_shadow_financials 的 skipped 残影不充数)。"""
+    return _gate_projection(events, gate_key="r6_financials", required_key="balance_sheet")
 
 
 def financials_projection(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:

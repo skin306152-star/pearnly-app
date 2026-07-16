@@ -16,6 +16,9 @@ def money_fields(fields: dict) -> dict:
 
     date/seller_name 是 E1 银行对账候选的日期/供应商锚(佐证层),纯附加字段,不参与 R1/R2
     税额计算(reconcile_gates 只读 subtotal/vat/total_amount)——缺失即为 None,对已有金标零影响。
+
+    buyer_tax 同为纯佐证附加(R4 税号守护闸跨料聚合票面税号用:自家为买方的进项票上,买方
+    税号反复出现即锚回真登记税号)——reconcile 不读它,加键对钱面零影响。
     """
     return {
         "subtotal": fields.get("subtotal"),
@@ -23,6 +26,7 @@ def money_fields(fields: dict) -> dict:
         "total_amount": fields.get("total_amount"),
         "invoice_number": fields.get("invoice_number"),
         "seller_tax": fields.get("seller_tax"),
+        "buyer_tax": fields.get("buyer_tax") or fields.get("buyer_tax_id"),
         "invoice_date": fields.get("date"),
         "vendor": fields.get("seller_name"),
     }

@@ -307,6 +307,7 @@ def find_ocr_by_hash(
     max_age_hours: int = 24 * 30,
     tenant_id: Optional[str] = None,
     workspace_client_id: Optional[int] = None,
+    strict_workspace: bool = False,
 ) -> Optional[dict]:
     """
     按文件哈希查最近的识别结果。
@@ -320,6 +321,8 @@ def find_ocr_by_hash(
     if not file_hash:
         return None
     ws_sql, ws_params = _workspace_clause(workspace_client_id)
+    if strict_workspace and workspace_client_id is not None:  # R2B 严格同账套,跨客户绝不串
+        ws_sql, ws_params = " AND workspace_client_id = %s", (int(workspace_client_id),)
     hours = int(max_age_hours)
     if tenant_id:
         scope_sql = "user_id IN (SELECT id FROM users WHERE tenant_id = %s)"

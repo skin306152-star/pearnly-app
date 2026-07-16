@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """classify 步:进项票过 OCR 归堆去重,销项汇总表直读(任务包 §5 步 3)。
 
-纯编排:取 pending 料 → 调注入的 OCR/直读入口 → 用 sort.bin_ocr_fields 归堆、
-totals.dedupe_key 算票面级指纹查重复票 → update_item 落堆/落状态。真 OCR/直读
-入口通过模块级函数注入(_ocr_image / _read_sales_summary / _resolve_own_tax_id),
-默认绑生产实现,单测全部 patch 掉——本文件测试不碰任何 API key,不触发真实
-付费调用(硬约束)。
+纯编排:取 pending 料 → 跨单去重复用(ocr_reuse)/ 调注入的 OCR/直读入口 → 用
+sort.bin_ocr_fields 归堆、purchase_dedup 算票面级指纹查单内重复票 → update_item 落堆/落
+状态 → 末尾 taxid_alert 守护税号错录。真 OCR/直读入口通过模块级函数注入(_ocr_image /
+_read_sales_summary / _resolve_own_tax_id / _find_ocr_by_hash),默认绑生产实现,单测全部
+patch 掉——本文件测试不碰任何 API key,不触发真实付费调用(硬约束)。
 
 诚实三态:OCR 报警(_needs_review/_validation_warnings)或直读解不出表 → 该件
 flagged + flag_reason,绝不静默吞;单件 OCR 异常只连坐该件(ocr_error),不拖垮
@@ -31,11 +31,11 @@ from typing import Optional
 from core import feature_flags
 from services.ai_gateway import attribution
 from services.ocr import escalation_budget
-from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
-from services.workorder import decisions, evidence, kinds, storage
+from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
-from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_snapshots
+from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_reuse
+from services.workorder.steps import ocr_snapshots, purchase_dedup, taxid_alert
 from services.workorder.steps import sort as sort_step
 from services.workspace import client_alias_store
 
@@ -91,17 +91,29 @@ def run(ctx: StepContext) -> StepResult:
     # 与串行逐字节一致;每件独立事务提交(有 cursor_factory 时),跑批中途被杀只丢在飞的
     # 那几件,已落库件不重烧(断点续跑从未处理件继续)。
     images = [it for it in pending if it["kind"] == kinds.UNKNOWN]
+    # R2B 跨单去重:调 OCR 前按文件哈希查同租户+同账套的既有识别读数,命中且带完整闸字段即复用
+    # (零 OCR、零 ai_usage),item 照常归堆、事件标 ocr_reused_from——跨客户绝不串、老记录缺闸字段
+    # 不复用照常烧(省钱绝不吞报警)。
+    reused = ocr_reuse.resolve(images, history_owner, finder=_find_ocr_by_hash) if images else {}
     # 查重表先从已提交事件重建再叠加本次批:逐件提交后 kill 中断,已落库原件不在 pending 里,
     # 内存从空建会让其复件漏判 duplicate → R1 双计(C1 打回单 R1 的静默钱洞)。重建保证
     # 中断续跑对查重的裁决与不中断跑逐字节一致。
-    seen_purchase_fp: dict[str, str] = _replay_seen_fingerprints(ctx) if images else {}
+    seen_purchase_fp: dict[str, str] = (
+        purchase_dedup.replay_seen_fingerprints(ctx) if images else {}
+    )
     # R1:配额退避+全局降速协调器 / 贵模型回落跑批级配额(用尽走诚实路径)/ 成本封顶(达 cap 停投料)。
     governor = ocr_quota.QuotaGovernor() if images else None
     budget = escalation_budget.new_budget(ocr_cost_cap.fallback_limit()) if images else None
     cost_cap = ocr_cost_cap.from_ctx(ctx, [it["id"] for it in images])
     quota_deferred = 0
     cost_capped = False
-    for item, ocr in _ocr_in_order(images, ctx.tenant_id, governor=governor, budget=budget):
+    # 复用件直接给缓存 fields(reused_from=源 history_id),其余走并发 OCR;原序消费保查重确定性。
+    ocr_stream = ocr_reuse.stream(
+        images,
+        reused,
+        lambda batch: _ocr_in_order(batch, ctx.tenant_id, governor=governor, budget=budget),
+    )
+    for item, ocr, reused_from in ocr_stream:
         # 撞配额且退避用尽:不落终局证据(留续跑重烧,免 dedupe 锁死错值),挂 quota 待补,整步 stuck 待续。
         if isinstance(ocr, Exception) and ocr_quota.is_quota_error(ocr):
             with checkpoint.item_scope(ctx):
@@ -126,6 +138,7 @@ def run(ctx: StepContext) -> StepResult:
         upd = outcome["update"]
         engine_ver = ocr.get("_ocr_engine") if isinstance(ocr, dict) else None
         # 件 1:每件 OCR 落库时双写 ocr_history(识别台账),失败/无归属只留 NULL,绝不拖垮 classify。
+        # 复用路同样双写一条本工单台账行(引用同 file_hash,不重复计费),主站看得见工单侧识别。
         history_id = (
             _record_ocr_history(item, ocr, history_owner) if isinstance(ocr, dict) else None
         )
@@ -135,7 +148,8 @@ def run(ctx: StepContext) -> StepResult:
                 ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **link, **upd
             )
             # 归堆即落 item_classified 事件(reconcile 回放金额的唯一持久源);dedupe_key 锚到 item,
-            # 并发接管重放同件只落一条,守恒不被撑破。ocr_engine=管线版本(冻结 manifest 取)。
+            # 并发接管重放同件只落一条,守恒不被撑破。ocr_engine=管线版本(冻结 manifest 取);
+            # reused_from=复用源 history_id(证据链可溯,标明本件读数复用而非新烧)。
             _emit_classified(
                 ctx,
                 item,
@@ -144,13 +158,14 @@ def run(ctx: StepContext) -> StepResult:
                 money=outcome.get("money"),
                 edc=outcome.get("edc"),
                 ocr_engine=engine_ver,
+                reused_from=reused_from,
             )
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
         if outcome["flagged"]:
             flagged += 1
         # 达成本封顶即停止投料:未处理件留 pending,生成器收尾取消在队未起的 OCR(白烧至多一窗)。
-        # 用 ctx.cur(检查点子事务退出后已还原为步事务游标)回查台账,不另开连接。
-        if cost_cap is not None and cost_cap.exceeded(ctx):
+        # 复用件零成本不触发封顶回查;仅真烧 OCR 的件回查台账(检查点子事务退出后 ctx.cur 已还原)。
+        if reused_from is None and cost_cap is not None and cost_cap.exceeded(ctx):
             cost_capped = True
             break
 
@@ -185,6 +200,9 @@ def run(ctx: StepContext) -> StepResult:
                 )
                 reads[item["id"]] = parsed
 
+    # R4 税号错录守护闸:分类跑完跨料聚合票面税号,登记税号疑似录错则落工单级警示事件
+    # (order_detail.alerts 据此弹「票上都是 X,登记 Y,改吗?」)。纯读+落一条警示,不碰钱/堆。
+    taxid_alert.flag_if_suspected(ctx, own_tax_id)
     return StepResult.ok(bins=bins, flagged=flagged, sales_summary_reads=reads)
 
 
@@ -243,10 +261,13 @@ def _reset_quota_deferred(ctx: StepContext) -> None:
             ctx.store.reset_quota_deferred_items(cur, **kw)
 
 
-def _emit_classified(ctx, item, *, kind, status, money, sales_read=None, edc=None, ocr_engine=None):
+def _emit_classified(
+    ctx, item, *, kind, status, money, sales_read=None, edc=None, ocr_engine=None, reused_from=None
+):
     """落一条 item_classified 证据事件。payload 带 item_id/kind/status,进项另带票面 money,
     销项直读另带 sales_read,EDC 结算票另带 edc 快照(SA-2b 聚合回放的唯一持久源),OCR 件
     另带 ocr_engine(管线版本)——reconcile/冻结据此回放,不依赖同进程 ctx.data(续跑不丢)。
+    reused_from(R2B):本件读数复用自哪条 ocr_history(证据链可溯),新烧件为 None 不挂键。
 
     dedupe_key 锚到 item:同件重放(并发接管/异常续跑)命中事件唯一约束不重记,守恒不被撑破。"""
     payload = {"item_id": item["id"], "kind": kind, "status": status}
@@ -258,6 +279,8 @@ def _emit_classified(ctx, item, *, kind, status, money, sales_read=None, edc=Non
         payload["edc"] = edc
     if ocr_engine:
         payload["ocr_engine"] = ocr_engine
+    if reused_from:
+        payload["ocr_reused_from"] = reused_from
     ctx.store.append_event(
         ctx.cur,
         tenant_id=ctx.tenant_id,
@@ -299,7 +322,7 @@ def _classify_from_ocr(
     )
 
     if kind == kinds.PURCHASE_INVOICE:
-        fp = _purchase_fingerprint(fields)
+        fp = purchase_dedup.purchase_fingerprint(fields)
         hit = seen.get(fp) if fp else None
         if hit:
             upd = {
@@ -346,42 +369,6 @@ def _classify_summary(item: dict) -> tuple:
     if not parsed.get("rows"):
         return None, "summary_unparseable"
     return parsed, None
-
-
-def _purchase_fingerprint(fields: dict) -> Optional[str]:
-    """票面级查重指纹(任务包 §5:税号|票号|含税合计,复用 purchase.totals.dedupe_key)。"""
-    digest = dedupe_key(
-        supplier_tax=fields.get("seller_tax"),
-        doc_no=fields.get("invoice_number"),
-        grand_total=fields.get("total_amount") or fields.get("subtotal"),
-    )
-    return f"doc:{digest}" if digest else None
-
-
-def _replay_seen_fingerprints(ctx: StepContext) -> dict[str, str]:
-    """从已提交 item_classified 事件重建进项查重表 {指纹: 原件文件名}。
-
-    指纹三要素(seller_tax/invoice_number/total_amount)都在事件的 money 快照里,与在跑时
-    对 OCR fields 算指纹同源同值;文件名从 items 表按 item_id 回查(duplicate_of:{name} 的
-    展示口径不变)。只认 kind=purchase_invoice(方向票/复件事件无 money 或非该 kind,天然
-    跳过——与在跑时只为进项票种表的语义一致)。首个持有者在先(事件按落库序,复件不覆写)。"""
-    events = ctx.store.list_events(
-        ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
-    )
-    classified = evidence.replay_items_by_type(events, "item_classified")
-    if not classified:
-        return {}
-    items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
-    ref_by_id = {it["id"]: it.get("file_ref") for it in items}
-    seen: dict[str, str] = {}
-    for item_id, rec in classified.items():
-        payload = rec["payload"]
-        if payload.get("kind") != kinds.PURCHASE_INVOICE:
-            continue
-        fp = _purchase_fingerprint(payload.get("money") or {})
-        if fp and fp not in seen:
-            seen[fp] = Path(ref_by_id.get(item_id) or "").name
-    return seen
 
 
 def _gate_reason(fields: dict) -> Optional[str]:
@@ -488,6 +475,14 @@ def _default_read_sales_summary(path: str) -> dict:
     return parse_table(data, filename=Path(path).name)
 
 
+def _default_find_ocr_by_hash(**kwargs) -> Optional[dict]:
+    """真实现:按文件哈希查同租户+严格同账套的既有识别读数(R2B 跨单去重)。strict_workspace
+    钉死,跨客户绝不串(未归属 NULL 行不认)。单测 patch 掉,不触真库。"""
+    from services.ocr_history import queries
+
+    return queries.find_ocr_by_hash(strict_workspace=True, **kwargs)
+
+
 # 注入点:模块级绑定,测试用 classify._xxx = fake 替换,不改调用方代码。
 _resolve_own_tax_id = _default_resolve_own_tax_id
 _resolve_own_name = _default_resolve_own_name
@@ -498,3 +493,4 @@ _m1_enabled = _default_m1_enabled
 _stmt_regroup_enabled = _default_stmt_regroup_enabled
 _ocr_image = _default_ocr_image
 _read_sales_summary = _default_read_sales_summary
+_find_ocr_by_hash = _default_find_ocr_by_hash

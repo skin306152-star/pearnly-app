@@ -53,15 +53,36 @@ def resolve_owner(ctx) -> Optional[dict]:
     }
 
 
+def _file_hash_of(item: dict) -> Optional[str]:
+    """从 item.dedupe_key 剥 `file:` 前缀取明文字节 sha256(intake.fingerprint 口径)。
+    非 file: 前缀(如人工填的销项件)→ None,不双写哈希(R2B 跨单去重靠此列查得回来)。"""
+    dk = str(item.get("dedupe_key") or "")
+    prefix = "file:"
+    return dk[len(prefix) :] if dk.startswith(prefix) else None
+
+
 def record(item: dict, fields: dict, owner: Optional[dict]) -> Optional[str]:
     """一件 OCR 读值 → 一条 ocr_history 识别台账,返回 history_id 供回填 item。
 
     owner=None(未绑客户/无 owner)或写库失败 → None,item.ocr_history_id 如实留 NULL,绝不拖垮
     classify。pages.fields 剥内部下划线字段,与事件流 item_classified 的钱字段同源同值
-    (classify._money_fields 取的也是这份 fields)。insert_ocr_history 自管 RLS 事务。"""
+    (classify._money_fields 取的也是这份 fields)。insert_ocr_history 自管 RLS 事务。
+
+    R2B 跨单去重双写:补 file_hash(供 find_ocr_by_hash 查回复用)+ pages[0] 平存闸字段
+    (_validation_warnings/_needs_review/_confidence_band/_ocr_engine,加键不改 fields)——
+    复用路重建 OCR 读数含闸报警能力,老记录缺这几键即判「不可复用」照常 OCR,诚实不吞报警。"""
     if not owner:
         return None
     clean = {k: v for k, v in (fields or {}).items() if not str(k).startswith("_")}
+    page = {
+        "fields": clean,
+        "is_copy": False,
+        "is_duplicate": False,
+        "_validation_warnings": list(fields.get("_validation_warnings") or []),
+        "_needs_review": bool(fields.get("_needs_review")),
+        "_confidence_band": fields.get("_confidence_band"),
+        "_ocr_engine": fields.get("_ocr_engine"),
+    }
     name = item.get("original_name") or Path(item.get("file_ref") or "").name or "workorder-item"
     try:
         from core import db
@@ -70,9 +91,10 @@ def record(item: dict, fields: dict, owner: Optional[dict]) -> Optional[str]:
             user_id=owner["user_id"],
             filename=name,
             page_count=1,
-            pages=[{"fields": clean, "is_copy": False, "is_duplicate": False}],
+            pages=[page],
             confidence=fields.get("_confidence_band") or "high",
             elapsed_ms=0,
+            file_hash=_file_hash_of(item),
             source="workorder_classify",
             source_ref=str(item.get("id")),
             tenant_id=owner.get("tenant_id"),

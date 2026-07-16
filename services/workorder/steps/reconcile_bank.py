@@ -23,7 +23,7 @@ from services.ai_gateway import attribution
 from services.recon.bank_recon_types import StatementRow
 from services.workorder import storage
 from services.workorder.engine import StepContext
-from services.workorder.steps import checkpoint
+from services.workorder.steps import checkpoint, stmt_totals
 
 _STEP = "reconcile"
 _EVT_BANK_PARSED = "item_bank_parsed"
@@ -45,6 +45,11 @@ def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> O
 
     try:
         rows = _checkpointed_rows(ctx, banks)
+        # 自报总数窄读(SA3R-b · 只在 SA-3 建议闸开时补,没人消费就不烧那次读):对账单页 1 表头
+        # 印的 N 页/รวมฝาก+รวมถอน 笔数没进存储层,补一次锚页目标读落 bank_statement_totals 事件,
+        # coverage_check 据此判缺整页。fail-open 于 stmt_totals 内部,绝不阻断 R3/package。
+        if _stmt_totals_enabled(ctx):
+            stmt_totals.emit_from_banks(ctx, banks)
         statement_txs = [adapter.tx_from_statement_row(r) for r in rows]
         candidates = adapter.candidates_from_events(events)
         result = adapter.reconcile_workorder(statement_txs, candidates)
@@ -151,6 +156,12 @@ def _default_bank_recon_enabled(ctx: StepContext) -> bool:
     return feature_flags.pearnly_ai_bank_recon_enabled_for(ctx.tenant_id)
 
 
+def _default_stmt_totals_enabled(ctx: StepContext) -> bool:
+    """自报总数窄读闸(SA3R-b)。复用 SA-3 建议闸(pearnly_ai_bank_sales_suggest)——只有它消费
+    coverage 的缺料判据,别处开着白读白花钱。按 tenant 判定;fail-closed 在 feature_flags 内部。"""
+    return feature_flags.pearnly_ai_bank_sales_suggest_enabled_for(ctx.tenant_id)
+
+
 def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
     """默认单件银行流水解析:读 file_ref 字节 → 生产 bank_recon 解析器 → StatementRow 列表。
 
@@ -180,4 +191,5 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
 
 # 注入点:模块级绑定,测试用 reconcile_bank._xxx = fake 替换(同 classify/reconcile 惯例)。
 _bank_recon_enabled = _default_bank_recon_enabled
+_stmt_totals_enabled = _default_stmt_totals_enabled
 _parse_bank_file = _default_parse_bank_file

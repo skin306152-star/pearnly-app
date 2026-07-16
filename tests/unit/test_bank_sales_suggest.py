@@ -66,6 +66,18 @@ def _brain(fp, verdict, eid, valid=True):
     }
 
 
+def _totals_event(*, pages=None, deposits=None, withdrawals=None):
+    """锚页自报总数事件(SA3R-b):对账单页 1 印的 N 页 / รวมฝาก+รวมถอน 笔数。"""
+    return {
+        "event_type": bss.stmt_totals.EVT_STMT_TOTALS,
+        "payload": {
+            "total_pages": pages,
+            "deposit_count": deposits,
+            "withdrawal_count": withdrawals,
+        },
+    }
+
+
 class DeterministicFunnelTests(unittest.TestCase):
     def test_not_applicable_without_bank_rows(self):
         self.assertEqual(bss.suggest([]), {"applicable": False, "reason": "no_bank_rows"})
@@ -212,6 +224,53 @@ class CoverageDegradeTests(unittest.TestCase):
         self.assertEqual(cov["unexplained_inflow"], "77733.79")
         # 降级时不烧大脑钱:未决行恒空,run 端点问 0 题。
         self.assertEqual(bss.pending_rows(events), [])
+
+    def test_golden_12_pages_vs_self_reported_18_names_missing_6(self):
+        # SA3R-b 安全网:金标真形态归到 12 页 519 行,页 1 自报 18 页 / 728+33=761 笔。补上自报
+        # 总数事件后,coverage 从「页内链断」升级为点名「缺整页」——这正是尸检暴露的 SA-3 盲区
+        # (12 页时页内链完好会误判 reliable,漏 6 页 330k 入账无人察觉)。
+        events = json.loads(_COVERAGE_FIXTURE.read_text(encoding="utf-8"))["events"]
+        events = events + [_totals_event(pages=18, deposits=728, withdrawals=33)]
+        result = bss.suggest(events)
+        self.assertFalse(result["reliable"])
+        self.assertEqual(result["degrade_reason"], bss.DEGRADE_INCOMPLETE)
+        stmt = result["coverage"]["statement"]
+        self.assertTrue(stmt["incomplete"])
+        self.assertEqual(stmt["expected_pages"], 18)
+        self.assertEqual(stmt["parsed_pages"], 12)
+        self.assertEqual(stmt["missing_pages"], 6)
+        self.assertEqual(stmt["expected_rows"], 761)
+        self.assertEqual(stmt["parsed_rows"], 519)
+        self.assertEqual(stmt["missing_rows"], 242)
+        # 缺料话术四语齐 + 抬到顶层供缺料卡直接渲染;建议值三键一个不出。
+        self.assertEqual(set(result["message"]), {"th", "en", "zh", "ja"})
+        self.assertIn("18", result["message"]["zh"])
+        for key in ("gross_total", "sales_amount", "output_vat"):
+            self.assertNotIn(key, result)
+        self.assertEqual(bss.pending_rows(events), [])
+
+    def test_self_reported_totals_all_present_stays_reliable(self):
+        # 页数与笔数都对得上 → 不判 incomplete;链也无异常 → 建议值照出(自报总数不误伤完整对账单)。
+        events = [
+            _bank_event(
+                [
+                    _dep("2569-05-01", 100.0, balance=1100.0),
+                    _dep("2569-05-02", 100.0, balance=1200.0),
+                ],
+                item_id="i1",
+            ),
+            _totals_event(pages=1, deposits=2, withdrawals=0),
+        ]
+        result = bss.suggest(events)
+        self.assertTrue(result["reliable"])
+        self.assertFalse(result["coverage"]["statement"]["incomplete"])
+        self.assertIn("gross_total", result)
+
+    def test_no_totals_event_shape_byte_identical(self):
+        # 无自报总数事件(闸关/非对账单场景)→ coverage 不挂 statement 块,行为逐字节现状。
+        events = [_bank_event([_dep("2569-05-01", 100.0, balance=1100.0)])]
+        cov = bss.coverage_check(events)
+        self.assertNotIn("statement", cov)
 
     def test_large_unexplained_inflow_degrades(self):
         # 两行间余额跳 +5000 但行上入账只有 100:漏行净入账 4900,远超 2% 线 → 降级。

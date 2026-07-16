@@ -108,6 +108,15 @@ def parse_gl_bytes(data: bytes, filename: str) -> dict:
         return {"rows": rows, "row_issues": issues}
 
     if ext in _SHEET_EXTS:
+        from services.accounting import express_gl_adapter
+
+        # Express GLJNLIT csv(表头 VOUCHER/ACCNUM/TRNTYP)走专用适配器;其余 csv/xlsx 原路不改。
+        if express_gl_adapter.is_express_gl(data, filename):
+            rows, issues = express_gl_adapter.parse_express_gl_csv(data, filename)
+            if not rows:
+                raise GlUploadParseError("no_express_gl_rows")
+            return {"rows": rows, "row_issues": issues}
+
         from services.recon.bank_gl_excel import parse_gl_excel
 
         parsed = parse_gl_excel(data, filename)

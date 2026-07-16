@@ -45,8 +45,11 @@
 
         // 响应外壳统一处理:非 2xx → 抛带 code/status 的 Error(调用方 mapApiErrorKey 取文案),
         // 2xx → 解出 JSON。JSON/multipart 请求共用同一份,不各拼一套错误契约。detail 多数是
-        // 裸字符串 key,但 payroll output 端点的「无该期数据」故意回结构化 {code,message}
-        // (routes/payroll_routes.py)——两种形态都取得到 code,不新开一条错误处理分叉。
+        // 裸字符串 key,但 payroll output 端点的「无该期数据」、收料预处理(IN-0a)故意回
+        // 结构化 {code,message:{th,en,zh,ja},filename,...}(routes/payroll_routes.py /
+        // services/workorder/intake_prep.py)——两种形态都取得到 code,不新开一条错误处理
+        // 分叉。err.detail 原样透传结构化对象(裸字符串 detail 时为 undefined),供收料
+        // 队列(ai-intake-queue.js)逐件点名 filename + 直出后端四语 message,不再自翻一遍。
         function handleResponse(r) {
             return r
                 .json()
@@ -63,6 +66,7 @@
                         var err = new Error(String(code));
                         err.status = r.status;
                         err.code = code;
+                        if (detail && typeof detail === 'object') err.detail = detail;
                         throw err;
                     }
                     return j;
@@ -199,15 +203,18 @@
                     body
                 );
             },
-            // 补料上传(W4):multipart。<fetch> 发 FormData 时不能手设 Content-Type
-            // (要让浏览器带 multipart boundary),故不走 call()。413 等结构化错误同源经
-            // handleResponse 抛出,调用方 mapApiErrorKey 取四语文案。
-            addMaterials: function (orderId, files) {
+            // 补料上传(W4 + IN-0b 密码 PDF):multipart。<fetch> 发 FormData 时不能手设
+            // Content-Type(要让浏览器带 multipart boundary),故不走 call()。password 可选
+            // (IN-0a 扩展的 Form 字段,整批同一密码,只用于解密不落盘)——不传则密码 PDF
+            // 422 pdf_password_required。结构化 422 经 handleResponse 抛出并挂 err.detail
+            // (code/message/filename),调用方(ai-intake-queue.js)逐件点名。
+            addMaterials: function (orderId, files, password) {
                 var token = getToken();
                 var headers = {};
                 if (token) headers.Authorization = 'Bearer ' + token;
                 var fd = new FormData();
                 for (var i = 0; i < files.length; i++) fd.append('files', files[i]);
+                if (password) fd.append('password', password);
                 return root
                     .fetch('/api/workorder/orders/' + encodeURIComponent(orderId) + '/materials', {
                         method: 'POST',

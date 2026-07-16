@@ -111,6 +111,11 @@ const BUNDLES = [
             'ai/ai-review-pool.js',
             'ai/ai-review.js',
             'ai/ai-intake-render.js',
+            // ai-intake-manifest.js(IN-0b · 文件夹展平/队列态/盘点条+密码卡+续传横幅
+            // 纯逻辑+HTML,依赖 AI.state)排在 ai-intake-render.js 之后即可——intakeHtml()
+            // 只在渲染调用时才引用 AI.intakeManifest.*,不在加载期解析,顺序要求同其余
+            // render 模块一样宽松;紧邻放置是"同属收料视图"的语义分组。
+            'ai/ai-intake-manifest.js',
             // ai-bank-sales-render.js(SA-3b · 银行流水倒推销项建议卡纯逻辑+HTML,依赖
             // AI.state/format)排在 ai-intake.js 之前——收料 tab 缺 sales_summary 时,
             // needsCardHtml() 直接内嵌调用 AI.bankSalesRender.cardHtml(),不另开 mount。
@@ -118,6 +123,11 @@ const BUNDLES = [
             // 只需排在 ai-intake.js(mount() 里用 AI.intakeBankSales.create())之前。
             'ai/ai-bank-sales-render.js',
             'ai/ai-intake-bank-sales.js',
+            // ai-intake-queue.js(IN-0b · 文件夹递归展开+批级隔离重试+密码串行+队列态
+            // 持久化的联网编排,拆自 ai-intake.js·单文件<500 行铁律,同 ai-intake-bank-sales.js
+            // 先例)依赖 AI.api/AI.intakeRender.splitBatches/AI.intakeManifest(均已在上面),
+            // 只需排在 ai-intake.js(mount() 里用 AI.intakeQueue.create())之前。
+            'ai/ai-intake-queue.js',
             'ai/ai-intake.js',
             'ai/ai-pkg-render.js',
             'ai/ai-pkg.js',

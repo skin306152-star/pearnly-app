@@ -472,6 +472,223 @@ class AiIntakeRenderPureTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiIntakeManifestPureTests(unittest.TestCase):
+    """IN-0b 收料诚实化(static/ai/ai-intake-manifest.js)的纯逻辑守门:文件夹拖入递归
+    展平(含任意深度子目录 + 不支持件拒收点名)、zip 解出件数估算、队列态序列化/恢复。
+    HTML 拼装(盘点条/密码卡/续传横幅)另见 AiIntakeManifestHtmlTests(stub at()/AI.state)。
+    """
+
+    _MODULE = json.dumps(str(AI_DIR / "ai-intake-manifest.js"))
+
+    def test_flatten_file_tree_recurses_nested_subdirectories(self):
+        # A1:文件夹拖入含任意深度子目录——两层子目录里的合规件都要展平出来。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const tree = {{
+                isDir: true, name: 'client_may', children: [
+                    {{isDir: false, name: 'a.jpg', size: 100}},
+                    {{isDir: true, name: 'sub', children: [
+                        {{isDir: false, name: 'b.pdf', size: 200}},
+                        {{isDir: true, name: 'deeper', children: [
+                            {{isDir: false, name: 'c.png', size: 50}},
+                        ]}},
+                    ]}},
+                ],
+            }};
+            const flat = r.flattenFileTree(tree);
+            process.stdout.write(JSON.stringify(flat.files.map((f) => f.name).sort()));
+            """)
+        self.assertEqual(out, ["a.jpg", "b.pdf", "c.png"])
+
+    def test_flatten_file_tree_rejects_empty_and_unsupported_leaves(self):
+        # 0 字节 → reason_empty;扩展名不在白名单(.docx)→ reason_unsupported;不静默吞。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const tree = [
+                {{isDir: false, name: 'empty.jpg', size: 0}},
+                {{isDir: false, name: 'notes.docx', size: 500}},
+                {{isDir: false, name: 'ok.pdf', size: 500}},
+            ];
+            const flat = r.flattenFileTree(tree);
+            process.stdout.write(JSON.stringify({{
+                files: flat.files.map((f) => f.name),
+                rejected: flat.rejected,
+            }}));
+            """)
+        self.assertEqual(
+            out,
+            {
+                "files": ["ok.pdf"],
+                "rejected": [
+                    {"name": "empty.jpg", "reasonKey": "intake_reason_empty"},
+                    {"name": "notes.docx", "reasonKey": "intake_reason_unsupported"},
+                ],
+            },
+        )
+
+    def test_classify_folder_entry_allows_zip_and_heic(self):
+        # IN-0a 已支持 zip 展开 + HEIC 转换,folder-drop 白名单须同口径放行,不能拦成
+        # "不支持格式"(那是伪扩展名/损坏留给后端权威判定的两类之外的类别)。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            process.stdout.write(JSON.stringify([
+                r.classifyFolderEntry({{name: 'bank.zip', size: 10}}).ok,
+                r.classifyFolderEntry({{name: 'photo.heic', size: 10}}).ok,
+                r.classifyFolderEntry({{name: 'readme.txt', size: 10}}).ok,
+            ]));
+            """)
+        self.assertEqual(out, [True, True, False])
+
+    def test_zip_expanded_count_estimates_extras_beyond_one_to_one(self):
+        # 一批里非 zip 输入件必产出恰好 1 个登记项;超出部分即 zip 展开贡献。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const batch = [{{name: 'a.jpg'}}, {{name: 'bank.zip'}}];
+            process.stdout.write(JSON.stringify([
+                r.zipExpandedCount(batch, 6),
+                r.zipExpandedCount([{{name: 'a.jpg'}}, {{name: 'b.jpg'}}], 2),
+                r.zipExpandedCount(batch, 0),
+            ]));
+            """)
+        self.assertEqual(out, [5, 0, 0])
+
+    def test_serialize_and_parse_queue_state_round_trips(self):
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const state = {{
+                orderId: 'wo-1', total: 3,
+                doneNames: ['a.jpg'], pendingNames: ['b.jpg', 'c.jpg'],
+                failedNames: [], ts: 111,
+            }};
+            const parsed = r.parseQueueState(r.serializeQueueState(state));
+            process.stdout.write(JSON.stringify(parsed));
+            """)
+        self.assertEqual(
+            out,
+            {
+                "orderId": "wo-1",
+                "total": 3,
+                "doneNames": ["a.jpg"],
+                "pendingNames": ["b.jpg", "c.jpg"],
+                "failedNames": [],
+                "ts": 111,
+            },
+        )
+
+    def test_parse_queue_state_rejects_garbage(self):
+        # 刷新续传横幅读到损坏/无关的 localStorage 值不能崩,诚实当"没有可续传的队列"。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            process.stdout.write(JSON.stringify([
+                r.parseQueueState(null), r.parseQueueState('not json'),
+                r.parseQueueState('{{}}'), r.parseQueueState('{{"orderId":42}}').orderId,
+            ]));
+            """)
+        self.assertEqual(out, [None, None, None, "42"])
+
+    def test_has_resumable_queue_true_only_with_leftover_names(self):
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const done = {{orderId: 'x', total: 2, doneNames: ['a','b'], pendingNames: [], failedNames: []}};
+            const partial = {{orderId: 'x', total: 2, doneNames: ['a'], pendingNames: ['b'], failedNames: []}};
+            process.stdout.write(JSON.stringify([
+                r.hasResumableQueue(null), r.hasResumableQueue(done), r.hasResumableQueue(partial),
+            ]));
+            """)
+        self.assertEqual(out, [False, False, True])
+
+
+def _intake_at_stub():
+    # 同 test_ai_client_import_pure.py::_at_stub 先例:非恒等 at(),证明 HTML 里真出现了
+    # 翻译后的文案而不是原样漏 key;AII18N.lang 供 reasonText() 挑后端四语 message。
+    return """
+        global.window = global;
+        global.AII18N = { lang: 'en' };
+        global.at = function (key, vars) {
+            var s = '[' + key + ']';
+            if (vars) Object.keys(vars).forEach((k) => { s += ':' + vars[k]; });
+            return s;
+        };
+        global.AI = { state: { esc: function (s) { return String(s == null ? '' : s); } } };
+    """
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiIntakeManifestHtmlTests(unittest.TestCase):
+    """盘点条/密码卡/续传横幅 HTML 拼装各态(stub at()/AI.state.esc,同
+    ai-client-import-render.js 的 PreviewTableHtmlTests 先例)——不是只测数据结构,
+    断言真出现在 HTML 字符串里的文件名/计数/拒收原因。"""
+
+    _MODULE = json.dumps(str(AI_DIR / "ai-intake-manifest.js"))
+
+    def _render(self, expr: str) -> str:
+        return _run_node(f"""
+            {_intake_at_stub()}
+            require({self._MODULE});
+            process.stdout.write(JSON.stringify({expr}));
+            """)
+
+    def test_manifest_html_empty_when_nothing_happened_yet(self):
+        # 不假成功:零收进/零拒收/零 zip 解出时不渲染任何盘点条壳。
+        html = self._render(
+            "global.AI.intakeManifest.manifestHtml({accepted: 0, rejected: [], zipExpanded: 0})"
+        )
+        self.assertEqual(html, "")
+
+    def test_manifest_html_shows_accepted_and_rejected_reason(self):
+        html = self._render(
+            "global.AI.intakeManifest.manifestHtml({accepted: 3, "
+            "rejected: [{name: 'bad.docx', reasonKey: 'intake_reason_unsupported'}], "
+            "zipExpanded: 0})"
+        )
+        self.assertIn("chip g", html)
+        self.assertIn("3", html)
+        self.assertIn("bad.docx", html)
+        self.assertIn("[intake_reason_unsupported]", html)
+
+    def test_manifest_html_shows_server_message_in_current_lang(self):
+        # IN-0a 契约:后端 message 四语内嵌,前端直出当前语言不再自翻。
+        html = self._render(
+            "global.AI.intakeManifest.manifestHtml({accepted: 0, "
+            "rejected: [{name: 'bank.pdf', "
+            "message: {th: 'ผิดพลาด', en: 'Corrupt file', zh: '文件损坏', ja: '破損'}}], "
+            "zipExpanded: 2})"
+        )
+        self.assertIn("Corrupt file", html)
+        self.assertNotIn("ผิดพลาด", html)
+
+    def test_password_card_html_shows_filename_and_wrong_hint(self):
+        html = self._render(
+            "global.AI.intakeManifest.passwordCardHtml("
+            "{filename: 'statement.pdf', errKey: 'wrong'})"
+        )
+        self.assertIn("statement.pdf", html)
+        self.assertIn("[intake_pw_wrong]", html)
+        self.assertIn("ik-pw-submit", html)
+        self.assertIn("ik-pw-skip", html)
+
+    def test_password_card_html_empty_when_no_card(self):
+        html = self._render("global.AI.intakeManifest.passwordCardHtml(null)")
+        self.assertEqual(html, "")
+
+    def test_resume_banner_html_empty_when_nothing_pending(self):
+        html = self._render(
+            "global.AI.intakeManifest.resumeBannerHtml("
+            "{orderId: 'x', total: 2, doneNames: ['a','b'], pendingNames: [], failedNames: []})"
+        )
+        self.assertEqual(html, "")
+
+    def test_resume_banner_html_shows_remaining_count(self):
+        html = self._render(
+            "global.AI.intakeManifest.resumeBannerHtml("
+            "{orderId: 'x', total: 5, doneNames: ['a'], pendingNames: ['b','c'], "
+            "failedNames: ['d']})"
+        )
+        self.assertIn("ik-resume-pick", html)
+        self.assertIn("ik-resume-dismiss", html)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiPkgRenderPureTests(unittest.TestCase):
     """交付包视图(W5)的纯函数守门:证据文件名是否可当图片打开(状态诚实,xlsx/pdf 等
     非图片文件不硬塞进查看器碎图)、应缴/留抵展示口径(负数=留抵,取绝对值,不 clamp)。

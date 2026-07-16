@@ -342,6 +342,9 @@
     // 收料主视图。needsSales 时补料卡置顶;上传区 + 进料口并列;末尾重新跑面。
     // 银行流水倒推卡(SA-3b)排在人工填销项表单之上——cardHtml 闸关/无数据时自己返回空串,
     // needsCardHtml() 的既有人工表单标记不受影响(逐字节不变)。
+    // IN-0b 四件套(续传横幅/密码供钥卡/盘点条/失败批横幅)全部委托 AI.intakeManifest 拼装
+    // (该模块零数据时各自返回空串,不额外分支)——续传横幅+密码卡置顶(需要用户先决断的
+    // 事排前面),盘点条+失败批横幅收尾(投料结束后的诚实总结)。
     function intakeHtml(ctx) {
         var bankSales = ctx.needsSales
             ? root.AI.bankSalesRender.cardHtml(
@@ -352,17 +355,22 @@
               )
             : '';
         var needs = ctx.needsSales ? bankSales + needsCardHtml(ctx) : '';
+        var im = root.AI.intakeManifest;
         return (
             '<div class="intake-body">' +
             '<p class="intake-lead">' +
             esc(at('intake_lead')) +
             '</p>' +
+            im.resumeBannerHtml(ctx.resumeBanner) +
+            im.passwordCardHtml(ctx.passwordCard) +
             needs +
             '<div class="intake-grid">' +
             dropzoneHtml(ctx) +
             channelsHtml() +
             '</div>' +
             rerunHtml(ctx) +
+            im.manifestHtml(ctx.manifest) +
+            im.failedBatchesHtml(ctx.failedBatches) +
             '</div>'
         );
     }

@@ -425,4 +425,25 @@ Object.assign(window.__AI_I18N_JA__, {
     err_client_import_err_missing_name: '顧客名が未入力です',
     err_client_import_err_bad_tax_id: '税番号の形式が不正です(13桁の数字である必要があります)',
     err_client_import_err_generic: 'この行の登録に失敗しました。確認して再試行してください',
+    // IN-0b · 受け入れの正直な集計(フォルダドロップ / キュー再開 / PDF パスワードカード)
+    intake_reason_empty: '空のファイル(0 バイト)',
+    intake_reason_unsupported: '対応していないファイル形式',
+    intake_reason_skipped: 'スキップしました(パスワード未入力)',
+    intake_pw_title: '「{name}」にはパスワードが必要です',
+    intake_pw_hint:
+        'この PDF はパスワードで保護されています。パスワードを入力して解除するか、このファイルをスキップしてください。',
+    intake_pw_input_ph: 'PDF のパスワード',
+    intake_pw_submit: '解除してアップロード',
+    intake_pw_skip: 'このファイルをスキップ',
+    intake_pw_wrong: 'パスワードが正しくありません。もう一度お試しください',
+    intake_manifest_title: '今回の受け入れ集計',
+    intake_manifest_accepted_n: '{n} 件を受け入れ',
+    intake_manifest_rejected_n: '{n} 件を拒否',
+    intake_manifest_zip_n: 'zip から {n} 件を展開',
+    intake_resume_body:
+        '前回のアップロードが中断されました——{total} 件中 {n} 件が未完了です。該当ファイルを選び直して続行してください。',
+    intake_resume_continue: 'アップロードを続行',
+    intake_resume_dismiss: '閉じる',
+    intake_failed_batch_n: 'ネットワークの問題で {n} 件が失敗しました',
+    intake_retry_failed: '失敗したファイルを再試行',
 });

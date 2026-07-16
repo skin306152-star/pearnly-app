@@ -429,4 +429,25 @@ Object.assign(window.__AI_I18N_EN__, {
     err_client_import_err_missing_name: 'Client name is missing',
     err_client_import_err_bad_tax_id: 'Tax ID format is invalid (should be 13 digits)',
     err_client_import_err_generic: 'This row failed to import, please check and retry',
+    // IN-0b · honest intake manifest (folder drop / queue resume / PDF password card).
+    intake_reason_empty: 'Empty file (0 bytes)',
+    intake_reason_unsupported: 'Unsupported file type',
+    intake_reason_skipped: 'Skipped (no password provided)',
+    intake_pw_title: 'Password needed for "{name}"',
+    intake_pw_hint:
+        'This PDF is password-protected. Enter the password to unlock it, or skip this file.',
+    intake_pw_input_ph: 'PDF password',
+    intake_pw_submit: 'Unlock and upload',
+    intake_pw_skip: 'Skip this file',
+    intake_pw_wrong: 'Incorrect password, please try again',
+    intake_manifest_title: 'Intake summary',
+    intake_manifest_accepted_n: '{n} accepted',
+    intake_manifest_rejected_n: '{n} rejected',
+    intake_manifest_zip_n: '{n} extracted from zip',
+    intake_resume_body:
+        'Your last upload was interrupted — {n} of {total} files did not finish. Reselect them to continue.',
+    intake_resume_continue: 'Continue upload',
+    intake_resume_dismiss: 'Dismiss',
+    intake_failed_batch_n: '{n} files failed due to a network issue',
+    intake_retry_failed: 'Retry failed files',
 });

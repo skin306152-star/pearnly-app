@@ -25,6 +25,7 @@
     var wired = false;
     var fileInput = null; // 持久隐藏文件选择器(单例,不随 render 重建 → File 不丢)
     var bankSales = null; // AI.intakeBankSales 实例,mount() 时装配一次,取当前 S 靠 getS()
+    var intakeQueue = null; // AI.intakeQueue 实例(IN-0b 队列/密码/失败批),同上装配一次
 
     function body() {
         return $('cv-intake');
@@ -54,6 +55,14 @@
             // 建议本体不落在这里——始终读 S.order.bank_sales_suggestion(getOrder 回放)。
             bankSalesUi: AI.bankSalesRender.freshUiState(),
             bankSalesPrefill: null, // 「采用建议值」一次性预填 {sales, vat},render() 消费后清空
+            // IN-0b 收料诚实化四件套的会话态(联网时序在 ai-intake-queue.js,这里只存
+            // 渲染要用的快照):manifest 是本次挂载以来的累计盘点(收进/拒收/zip 解出),
+            // passwordCard 非空即弹供钥卡,failedBatches 是网络级失败待重试的批,
+            // resumeBanner 是 mount() 时读到的上次未完成队列(用户决断前保持只读)。
+            manifest: { accepted: 0, rejected: [], zipExpanded: 0 },
+            passwordCard: null,
+            failedBatches: [],
+            resumeBanner: null,
         };
     }
 
@@ -82,6 +91,10 @@
             salesValue: readVal('ikSales'),
             vatValue: readVal('ikVat'),
             noteValue: readVal('ikNote'),
+            manifest: S.manifest,
+            passwordCard: S.passwordCard,
+            failedBatches: S.failedBatches,
+            resumeBanner: S.resumeBanner,
         };
     }
 
@@ -105,6 +118,10 @@
             }
             var input = $('ikSales');
             if (input) input.focus();
+        }
+        if (S.passwordCard) {
+            var pwInput = $('ikPwInput');
+            if (pwInput) pwInput.focus();
         }
     }
 
@@ -165,54 +182,28 @@
     }
 
     // 一次选中可能撞 prod nginx client_max_body_size(G1 真机:25 张 ~55MB 单请求挂死)——
-    // 按总体积/张数切成若干批(AI.intakeRender.splitBatches),顺序逐批调 addMaterials,
-    // 复用同一份 session 判活;全批成功才算成功,某批失败即停,已传批次不重试不回滚。
+    // 联网时序(按批切分/隔离重试/密码串行/失败批不拦后续批/队列态持久化,A10/A11)全在
+    // ai-intake-queue.js 的 create(getS, render) 工厂里(同 bankSales 拆分先例),本文件
+    // 只管 DOM 状态过户。
     function upload() {
         if (S.uploading || !S.files.length) return;
-        var session = S;
-        var batches = AI.intakeRender.splitBatches(S.files);
-        S.uploading = true;
-        S.uploadErrKey = null;
-        S.uploadDone = 0;
-        S.uploadTotal = S.files.length;
-        S.uploadBatchIndex = 0;
-        S.uploadBatchTotal = batches.length;
-        render();
-        uploadNextBatch(session, batches, 0);
+        var files = S.files;
+        S.files = [];
+        S.resumeBanner = null;
+        intakeQueue.upload(files);
     }
 
-    function uploadNextBatch(session, batches, index) {
-        if (S !== session) return;
-        S.uploadBatchIndex = index + 1;
-        render();
-        var batch = batches[index];
-        S.api
-            .addMaterials(S.orderId, batch)
-            .then(function () {
-                if (S !== session) return;
-                S.uploadDone += batch.length;
-                if (index + 1 < batches.length) {
-                    uploadNextBatch(session, batches, index + 1);
-                    return;
-                }
-                S.uploading = false;
-                S.files = [];
-                S.dirty = true;
-                S.rerunErrKey = null;
-                render();
-            })
-            .catch(function (err) {
-                if (S !== session) return;
-                S.uploading = false;
-                // 失败批 + 尚未发出的后续批留在 S.files 里(已成功批不放回)——重试/清空按
-                // 剩下的来,不会把刚落库成功的那部分又送一遍(写操作幂等,拒绝重复登记材料)。
-                S.files = batches.slice(index).reduce(function (acc, b) {
-                    return acc.concat(b);
-                }, []);
-                var key = AI.api.mapApiErrorKey(err && err.code);
-                S.uploadErrKey = at(key) !== key ? key : 'err_generic';
-                render();
-            });
+    // ============ 续传横幅(A10/A11 · 刷新后接续) ============
+
+    function resumePick() {
+        S.resumeBanner = null;
+        pickFiles();
+    }
+
+    // ============ 密码 PDF 供钥卡(IN-0b) ============
+
+    function submitPassword() {
+        intakeQueue.submitPassword(readVal('ikPwInput'));
     }
 
     // ============ 人工填销项 ============
@@ -347,6 +338,10 @@
         else if (a === 'ik-open-form') openForm();
         else if (a === 'ik-form-cancel') cancelForm();
         else if (a === 'ik-rerun') startRerun();
+        else if (a === 'ik-pw-skip') intakeQueue.skipPassword();
+        else if (a === 'ik-resume-pick') resumePick();
+        else if (a === 'ik-resume-dismiss') intakeQueue.resumeDismiss();
+        else if (a === 'ik-retry-failed') intakeQueue.retryFailedBatches();
         else if (a === 'bxs-fold') bankSales.toggleFold(el.getAttribute('data-kind'));
         else if (a === 'bxs-decide') {
             bankSales.decideRow(el.getAttribute('data-fp'), el.getAttribute('data-verdict'));
@@ -358,6 +353,9 @@
         if (e.target && e.target.id === 'ikSalesForm') {
             e.preventDefault();
             submitForm();
+        } else if (e.target && e.target.id === 'ikPwForm') {
+            e.preventDefault();
+            submitPassword();
         }
     }
 
@@ -393,11 +391,29 @@
         if (dz) dz.classList.remove('over');
     }
 
+    // 文件夹拖入(A1):dataTransfer.items 里任一条目是目录(webkitGetAsEntry().isDirectory)
+    // 才走递归展开路——纯文件多选拖拽维持原有 dataTransfer.files 直传路径不变(零回归)。
+    // 展开出的支持文件并入既有 mergeFiles 流;文件夹里的不支持件即时记进盘点条拒收清单
+    // (不静默吞),不等上传发生才知道。
     function onDrop(e) {
         var dz = e.target.closest && e.target.closest('#ikDrop');
         if (!dz) return;
         e.preventDefault();
         dz.classList.remove('over');
+        var items = e.dataTransfer && e.dataTransfer.items;
+        if (items && items.length && AI.intakeQueue.hasDirectoryEntry(items)) {
+            AI.intakeQueue.walkDataTransferItems(items).then(function (result) {
+                if (!result) return;
+                if (result.rejected.length) {
+                    S.manifest.rejected = S.manifest.rejected.concat(result.rejected);
+                }
+                // setFiles() 在空列表时早退不渲染(见其顶注)——全被拒收的文件夹仍要把
+                // 盘点条的新拒收项画出来,不能因为没有一件合规就悄悄不吭声。
+                if (result.files.length) setFiles(result.files);
+                else render();
+            });
+            return;
+        }
         if (e.dataTransfer && e.dataTransfer.files) setFiles(e.dataTransfer.files);
     }
 
@@ -425,8 +441,17 @@
 
     function mount(api, order, clientId) {
         S = freshState(api, order, clientId);
+        // 续传横幅(A10/A11):上次投料若刷新前还有未完成/失败的文件名,读出来提示——
+        // 只在真有残留时挂(hasResumableQueue 过滤掉早已全部完成、只是没被清干净的态)。
+        var prior = AI.intakeQueue.loadQueueState(order.id);
+        S.resumeBanner = AI.intakeManifest.hasResumableQueue(prior) ? prior : null;
         if (!bankSales) {
             bankSales = AI.intakeBankSales.create(function () {
+                return S;
+            }, render);
+        }
+        if (!intakeQueue) {
+            intakeQueue = AI.intakeQueue.create(function () {
                 return S;
             }, render);
         }

@@ -9,6 +9,7 @@ env:
   OPENAI_BEST_MODEL   best 档模型名(未配置回落 flash 档)
   OPENAI_EMBED_MODEL  embedding 模型名(chat 模型不能 embed·未配置 → 当不可用)
   TAXOPS_BRAIN_MODEL  taxops_verdict 档模型名(工单大脑影子车道·有内置默认,见下)
+  TAXOPS_INTENT_MODEL taxops_intent 档模型名(前门意图解析车道·独立旋钮·默认同 verdict,见下)
 
 请求一律带 store:false:数据边界——不让 OpenAI 侧留存请求/响应用于其产品功能。
 """
@@ -50,10 +51,23 @@ def taxops_verdict_model() -> str:
     return (os.environ.get("TAXOPS_BRAIN_MODEL") or "").strip() or _TAXOPS_DEFAULT_MODEL
 
 
+# 前门意图解析车道(routing_matrix 的 taxops.intent · front_desk.interpret 把用户目标归成闭集
+# 意图/客户/期间建议):独立 env 旋钮,与 verdict/OCR/对话档互不牵动(契约测试锁死)。默认同
+# verdict(luna)——同一 OpenRouter 模型,换任一车道只改各自旋钮 + 同 PR 改 routing_matrix/cost。
+TAXOPS_INTENT_TIER = "taxops_intent"
+
+
+def taxops_intent_model() -> str:
+    """taxops.intent 车道模型名(env 覆写 > 内置默认·默认同 verdict)。routing_matrix 引用此函数。"""
+    return (os.environ.get("TAXOPS_INTENT_MODEL") or "").strip() or _TAXOPS_DEFAULT_MODEL
+
+
 def _model(tier: str) -> str:
     """抽象档位 → 具体模型(集中此处·业务/文档不出现型号名·通用档无内置默认)。"""
     if tier == TAXOPS_VERDICT_TIER:
         return taxops_verdict_model()
+    if tier == TAXOPS_INTENT_TIER:
+        return taxops_intent_model()
     flash = os.environ.get("OPENAI_FLASH_MODEL", "").strip()
     best = os.environ.get("OPENAI_BEST_MODEL", "").strip() or flash
     return best if tier in ("best", "fallback") else flash

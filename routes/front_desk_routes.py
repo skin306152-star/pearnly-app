@@ -134,24 +134,35 @@ async def create_contract(
 
 @router.post("/api/ai/front-desk/interpret")
 async def interpret_goal(req: InterpretIn, request: Request):
-    """utterance → 大脑意图/客户/期间建议。FD-0a 桩:恒返 degraded(前端出降级卡)。
-    落 utterance 到草稿供 FD-0b 实装重放;解析阶段零写业务表(桩不调网关不落 ai_usage)。"""
+    """utterance → 大脑意图/客户/期间建议(taxops.intent 车道)。降级/闸关/异常 → degraded=True。
+
+    大脑解析零写业务表——interpret 只只读客户名录做引用校验;这里把 utterance + 建议落**草稿**
+    合同(合同卡刷新可服务端重建·消息流不建聊天表),执行永远等 confirm 端点人点确认。
+    """
     user, tenant_id = _authorize(request, _C_PREPARE)
     contract_store.ensure_once()
     utterance = (req.utterance or "")[:_MAX_UTTERANCE]
 
-    with db.get_cursor(commit=True) as cur:
+    with db.get_cursor() as cur:
         contract = contract_store.get_contract(
             cur, tenant_id=tenant_id, contract_id=req.contract_id
         )
-        if not contract:
-            raise HTTPException(404, detail="front_desk.contract_not_found")
-        if utterance and contract["status"] == contract_store.STATUS_DRAFT:
-            contract_store.update_draft(
-                cur, tenant_id=tenant_id, contract_id=req.contract_id, utterance_raw=utterance
-            )
+    if not contract:
+        raise HTTPException(404, detail="front_desk.contract_not_found")
 
+    # 解析(interpret 自取名录并全程 fail-closed;绝不上抛,故不与手动开单共享故障面)。
     suggestion = interpret.interpret(utterance, tenant_id=tenant_id, contract_id=req.contract_id)
+
+    # 落草稿:utterance + 大脑建议(仅 draft 态可改·降级不覆盖既有建议)。
+    if contract["status"] == contract_store.STATUS_DRAFT:
+        with db.get_cursor(commit=True) as cur:
+            contract_store.update_draft(
+                cur,
+                tenant_id=tenant_id,
+                contract_id=req.contract_id,
+                utterance_raw=utterance or None,
+                brain_suggestion=None if suggestion["degraded"] else suggestion,
+            )
     return {"contract_id": req.contract_id, "suggestion": suggestion}
 
 

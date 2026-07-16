@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Dict, NamedTuple, Tuple
 
-from services.ai_gateway.providers.openai import taxops_verdict_model
+from services.ai_gateway.providers.openai import taxops_intent_model, taxops_verdict_model
 from services.ai_gateway.providers.selfhost import _model as _selfhost_model
 from services.ai_gateway.providers.vertex import _embed_model, _location, _location_for_model
 from services.ocr import engine_policy, gemini_models
@@ -37,6 +37,7 @@ class Route(NamedTuple):
 ROUTE_ENV_VARS: Tuple[str, ...] = (
     "AGENT_BRAIN_MODEL",
     "TAXOPS_BRAIN_MODEL",
+    "TAXOPS_INTENT_MODEL",
     "OCR_FLASH_MODEL",
     "OCR_FLASHLITE_MODEL",
     "OCR_FALLBACK_MODEL",
@@ -66,6 +67,9 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     # 与 gemini-3.5 61.3%·$1/$6),考卷 tests/e2e/_artifacts/brain_shadow/。
     # 为占位——key 到手后按 /v1/models 实况 + 官方价钉死,同 PR 改本表与 ocr/cost.py 价表。
     "taxops.verdict": Route("openai/gpt-5.6-luna", "", "openai"),
+    # 前门意图解析(front_desk.interpret):独立旋钮 TAXOPS_INTENT_MODEL,默认同 verdict(luna)。
+    # 与 verdict 各是各的车道——改意图档不连坐裁决档/对话档/OCR,反向亦然(契约测试锁死)。
+    "taxops.intent": Route("openai/gpt-5.6-luna", "", "openai"),
     "knowledge.embedding": Route("gemini-embedding-001", "asia-southeast1"),
     "ocr.direct35.flash": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.direct35.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
@@ -96,6 +100,7 @@ def resolve_routes() -> "OrderedDict[str, Route]":
     routes["agent.brain"] = _route(gemini_models.brain())
     routes["agent.best"] = _route(gemini_models.best())
     routes["taxops.verdict"] = Route(taxops_verdict_model(), "", "openai")
+    routes["taxops.intent"] = Route(taxops_intent_model(), "", "openai")
     routes["knowledge.embedding"] = Route(_embed_model(), _location())
     for mode in engine_policy.CONCRETE_MODES:
         # 后端覆盖档(selfhost):不走 Gemini 档位解析,四档同映射到自托管 VLM,无区域。

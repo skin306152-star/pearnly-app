@@ -65,6 +65,22 @@ class RoutingMatrixContractTests(unittest.TestCase):
             routes = rm.resolve_routes()
         self.assertEqual(routes["taxops.verdict"], rm.EXPECTED_DEFAULT_ROUTES["taxops.verdict"])
 
+    def test_taxops_intent_model_env_moves_only_intent_lane(self):
+        # 前门意图车道独立旋钮:改它只动 taxops.intent,不许连坐裁决/对话/OCR 任何档
+        with scrubbed_env(TAXOPS_INTENT_MODEL="gpt-9.9-test"):
+            diff = rm.diff_from_defaults(rm.resolve_routes())
+        self.assertEqual(set(diff), {"taxops.intent"})
+        exp, act = diff["taxops.intent"]
+        self.assertEqual(act.model, "gpt-9.9-test")
+        self.assertEqual(act.backend, "openai")
+        self.assertEqual(exp.backend, "openai")
+
+    def test_verdict_and_agent_env_leave_taxops_intent_untouched(self):
+        # 反向隔离:改裁决大脑档 / 对话大脑档都不许挪前门意图车道
+        with scrubbed_env(TAXOPS_BRAIN_MODEL="gpt-9.9-test", AGENT_BRAIN_MODEL="gemini-9.9-test"):
+            routes = rm.resolve_routes()
+        self.assertEqual(routes["taxops.intent"], rm.EXPECTED_DEFAULT_ROUTES["taxops.intent"])
+
     def test_vertex_location_env_does_not_move_brain(self):
         # VERTEX_LOCATION 只该挪非 global-only 模型(3.5/embedding);大脑(2.5 前缀)不动
         with scrubbed_env(VERTEX_LOCATION="us-central1"):

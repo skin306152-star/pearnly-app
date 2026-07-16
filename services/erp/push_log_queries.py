@@ -107,6 +107,7 @@ def list_push_logs(
     offset: int = 0,
     keyword: Optional[str] = None,
     push_type: Optional[str] = None,
+    exclude_push_type: Optional[str] = None,
     tenant_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """查询推送日志(P2-B 折叠版),支持按 history/endpoint/status/trigger/adapter 过滤.
@@ -174,6 +175,17 @@ def list_push_logs(
                 outer.append(
                     "(COALESCE(LOWER(e.adapter),'') <> 'mrerp_dms' AND COALESCE(l.trigger,'') <> 'id_card')"
                 )
+            # exclude_push_type:排除某业务类型(主站推送日志排身份证订车行——DMS 已搬独立
+            # 入口 /dms)。判据与 push_type 同一分类源(adapter=mrerp_dms 或 trigger=id_card)、
+            # 取其否定,故排 id_card 与 push_type='invoice' 恒等。count/列表共用 outer,一处
+            # append 两查同条件(单一事实源)。值在路由层白名单,不拼进 SQL(无注入面)。
+            # 与 push_type 叠加时按 AND 生效(互斥值同用即空集,行为可预期)。
+            if exclude_push_type == "id_card":
+                outer.append(
+                    "(COALESCE(LOWER(e.adapter),'') <> 'mrerp_dms' AND COALESCE(l.trigger,'') <> 'id_card')"
+                )
+            elif exclude_push_type == "invoice":
+                outer.append("(LOWER(e.adapter) = 'mrerp_dms' OR l.trigger = 'id_card')")
             # 关键字搜索(草稿「搜索单据号、客户或任务」)· 单据号 / 卖方
             if keyword:
                 outer.append("(l.invoice_no ILIKE %s OR l.seller_name ILIKE %s)")

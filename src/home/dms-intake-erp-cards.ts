@@ -15,16 +15,14 @@ interface ErpCardDef {
 }
 
 // 任务 → 该任务上下文相关的 ERP。发票与汇总表批量落点同(两家财务 ERP)·
-// 建成的 ocr_history 走同一推送链路。
+// 建成的 ocr_history 走同一推送链路,故两任务共用同一组卡(FINANCE_CARDS)。
+const FINANCE_CARDS: ErpCardDef[] = [
+    { key: 'mrerp', name: 'MR.ERP', adapter: 'mrerp' },
+    { key: 'express', name: 'Express', adapter: 'express' },
+];
 const TASK_CARDS: Record<string, ErpCardDef[]> = {
-    invoice: [
-        { key: 'mrerp', name: 'MR.ERP', adapter: 'mrerp' },
-        { key: 'express', name: 'Express', adapter: 'express' },
-    ],
-    summary_batch: [
-        { key: 'mrerp', name: 'MR.ERP', adapter: 'mrerp' },
-        { key: 'express', name: 'Express', adapter: 'express' },
-    ],
+    invoice: FINANCE_CARDS,
+    summary_batch: FINANCE_CARDS,
 };
 
 const ICONS: Record<string, string> = {

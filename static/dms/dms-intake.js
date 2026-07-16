@@ -415,7 +415,7 @@
             return showStep(3, 'dx-s-confirm');
         }
         renderUpload();
-        showStep(S.step === 1 ? 1 : 1, 'dx-s-upload');
+        showStep(1, 'dx-s-upload');
     }
 
     function mountIntake() {

@@ -53,10 +53,10 @@
             getMe: function () {
                 return call('GET', '/api/me');
             },
-            // 门禁探针:轻量 DMS 端点(仅府级列表)。401=未登录/失效;404=闸关;403=非 dms 入口;
-            // 400=守卫已过但未配端点(新号首登正常态,boot 放行进壳落设置页)。
+            // 门禁探针:后端 /api/dms/session 只跑入口守卫、无业务副作用。
+            // 200=进壳;401=未登录/失效;404=闸关;403=非 dms 入口(语义由守卫天然给出)。
             probe: function () {
-                return call('GET', '/api/dms/geo?level=provinces');
+                return call('GET', '/api/dms/session');
             },
             // 推送记录:恒按 mrerp_dms 适配器筛(记录页只呈现身份证 → DMS 的推送)。
             pushLogs: function (limit) {

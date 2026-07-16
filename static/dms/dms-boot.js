@@ -1,7 +1,7 @@
 /* Pearnly DMS · 启动入口(闸判定 + i18n 应用 + 壳导航)· 移植 /ai boot 范式。
- * 闸行为:启动调 DMS 轻探针(GET /api/dms/geo?level=provinces),就地渲染两种门面——
+ * 闸行为:启动调门禁探针(GET /api/dms/session · 只跑入口守卫),就地渲染两种门面——
  *   无 token 或 401 → 登录卡;token 有效但探针 404/403(未受邀/非 dms 入口)→ 邀请制提示。
- * 通过闸的用户走三视图工作台(录入 / 记录 / 设置)。 */
+ * 通过闸的用户走双视图工作台(录入 / 记录);连接配置在录入页底部连接卡内,不设独立面。 */
 (function (root) {
     'use strict';
     var $ = function (id) {
@@ -31,7 +31,7 @@
     // ── 视图切换 ──
     function mountView(name) {
         currentView = name;
-        ['intake', 'records', 'settings'].forEach(function (v) {
+        ['intake', 'records'].forEach(function (v) {
             var sec = $('dms-view-' + v);
             if (sec) sec.classList.toggle('on', v === name);
         });
@@ -42,22 +42,8 @@
             root.DX.mountIntake();
         } else if (name === 'records') {
             root.DXRECORDS.mount('#dms-view-records');
-        } else if (name === 'settings') {
-            renderSettings();
         }
         window.scrollTo(0, 0);
-    }
-
-    function renderSettings() {
-        var host = $('dms-view-settings');
-        if (!host) return;
-        host.innerHTML =
-            '<div class="dms-page"><div class="dms-page-head"><h1>' +
-            root.escapeHtml(root.dt('dms-set-title')) +
-            '</h1><p>' +
-            root.escapeHtml(root.dt('dms-set-sub')) +
-            '</p></div><div id="dms-set-card"></div></div>';
-        root.DXCONNECT.mount('#dms-set-card');
     }
 
     function wireChrome() {
@@ -162,13 +148,6 @@
                 if (err && err.status === 401) {
                     localStorage.removeItem('mrpilot_token');
                     showLogin();
-                    return;
-                }
-                // 400(dms.no_endpoint)= 守卫已过、只是还没配 DMS 端点——新邀请号首登的
-                // 正常态。落设置页配端点,别误判成未受邀(否则永远进不了壳去配 = 死锁)。
-                if (err && err.status === 400) {
-                    currentView = 'settings';
-                    enterApp();
                     return;
                 }
                 resolveGateClosed(api);

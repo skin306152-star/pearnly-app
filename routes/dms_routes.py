@@ -28,7 +28,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
 from core.feature_flags import dms_portal_enabled_for, entrance_api_scope_enabled_for
-from services.auth.entrance import DMS, MAIN
+from services.auth.entrance import DMS
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from core.auth import get_current_user_from_request
@@ -55,7 +55,7 @@ def _authorize(request: Request) -> Dict[str, Any]:
     user_id = str(user["id"]) if user.get("id") else None
     if not dms_portal_enabled_for(tenant_id, user_id):
         raise HTTPException(404, detail="dms.not_found")
-    if entrance_api_scope_enabled_for(tenant_id) and (user.get("entry") or MAIN) != DMS:
+    if entrance_api_scope_enabled_for(tenant_id) and user.get("entry") != DMS:
         raise HTTPException(403, detail="authz.forbidden")
     _check_push_access(user)
     return user
@@ -64,6 +64,18 @@ def _authorize(request: Request) -> Dict[str, Any]:
 # 端点解析/字段整形与 LINE 侧共用(services/erp/dms_id_ocr · 2026-07-02 抽出)。
 _resolve_dms_endpoint = _id_ocr.resolve_dms_endpoint
 _editable_id_card = _id_ocr.editable_id_card
+
+
+@router.get("/api/dms/session")
+async def dms_session(request: Request):
+    """壳的门禁探针:只跑 _authorize,不碰上游/数据库。
+
+    /dms boot 启动时靠它判能否进壳——200=放行进壳,401/403/404 语义由 _authorize
+    天然给出(失效/非 dms 入口/闸关)。刻意不做业务副作用:别的路由(尤其 geo)别学
+    这里拿业务端点当探针——geo 会解析端点 + 打上游 MR.ERP 全省列表(冷会话触发完整
+    Playwright 登录)只为丢弃结果,且业务 400 会被误当门禁信号。"""
+    _authorize(request)
+    return {"ok": True}
 
 
 # ════════════════════════════════════════════════════════════════════════

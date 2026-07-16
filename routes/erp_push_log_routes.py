@@ -247,9 +247,13 @@ async def erp_logs(
     offset: int = 0,
     keyword: Optional[str] = None,
     push_type: Optional[str] = None,
+    exclude_push_type: Optional[str] = None,
 ):
     """批 3 改动 6 (v118.34.34) · 新增 adapter 参数 · 让前端按 ERP 类型筛日志.
-    + 草稿对齐:keyword 搜索(单据号/卖方)· push_type 业务类型(全部业务下拉)。"""
+    + 草稿对齐:keyword 搜索(单据号/卖方)· push_type 业务类型(全部业务下拉)。
+    + exclude_push_type:主站推送日志排身份证订车行(DMS 已搬独立入口 /dms)· 后端剔除
+      让 total 诚实(前端不再 .filter 造成「共 N 条」虚高)。/dms 记录页走 adapter=mrerp_dms
+      仍能看到 id_card 行,故不能全局硬剔——只在调用方显式传参时排除。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     return db.list_push_logs(
@@ -263,6 +267,9 @@ async def erp_logs(
         offset=max(0, offset),
         keyword=keyword.strip() if keyword else None,
         push_type=push_type if push_type in ("id_card", "invoice") else None,
+        exclude_push_type=(
+            exclude_push_type if exclude_push_type in ("id_card", "invoice") else None
+        ),
         tenant_id=_tid(user),
     )
 

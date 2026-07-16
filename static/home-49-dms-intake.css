@@ -23,7 +23,7 @@
 .dmsx .dx-task-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .dmsx .dx-task-h b{font-size:13px}
 .dmsx .dx-task-h span{font-size:10px;color:var(--ink2)}
-.dmsx .dx-task-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.dmsx .dx-task-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .dmsx .dx-opt{min-height:70px;border:1px solid var(--dx-line);border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;background:var(--card);cursor:pointer}
 .dmsx .dx-opt.active{border-color:var(--dx-brand);background:var(--bg)}
 .dmsx .dx-opt-ic{width:40px;height:40px;border-radius:13px;background:var(--dx-brand-soft);color:var(--dx-brand);display:grid;place-items:center}

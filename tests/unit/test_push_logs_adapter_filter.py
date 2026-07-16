@@ -202,5 +202,62 @@ class AdapterFilterCombinedWithStatusTests(unittest.TestCase):
             self.assertIn("auto", params_str)
 
 
+class ExcludePushTypeShapeTests(unittest.TestCase):
+    """exclude_push_type · 主站推送日志排身份证订车行(DMS 已搬 /dms)· total 诚实.
+
+    判据与 push_type 同源(adapter=mrerp_dms 或 trigger=id_card)取否定,COUNT + main
+    两条同拼(否则「共 N 条」含隐藏行虚高)。/dms 记录页走 adapter 参数、不传 exclude,
+    仍能看到 id_card 行——故这里只在显式传参时才排,默认不动老 behavior.
+    """
+
+    # 排 id_card = push_type='invoice' 的等价否定式(单一判据源)。
+    _EXCLUDE_IDCARD_SQL = "COALESCE(LOWER(e.adapter),'') <> 'mrerp_dms'"
+
+    def _run(self, **kwargs):
+        cur = _MockCursor()
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cur)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cur)),
+        ):
+            db.list_push_logs("user-Z", **kwargs)
+        return cur
+
+    def test_no_exclude_default_behavior(self):
+        cur = self._run()
+        for sql, _ in cur.executed:
+            self.assertNotIn(self._EXCLUDE_IDCARD_SQL, sql)
+
+    def test_exclude_id_card_adds_negation_to_count_and_main(self):
+        cur = self._run(exclude_push_type="id_card")
+        self.assertGreaterEqual(len(cur.executed), 2)  # COUNT + main
+        for sql, _ in cur.executed:
+            self.assertIn(
+                self._EXCLUDE_IDCARD_SQL,
+                sql,
+                "排 id_card 的否定式必须同时进 COUNT 和主查询(total 才诚实)",
+            )
+            self.assertIn("<> 'id_card'", sql)
+
+    def test_exclude_invoice_is_inverse_predicate(self):
+        cur = self._run(exclude_push_type="invoice")
+        for sql, _ in cur.executed:
+            self.assertIn("LOWER(e.adapter) = 'mrerp_dms' OR l.trigger = 'id_card'", sql)
+
+    def test_exclude_stacks_with_adapter_filter(self):
+        # /dms 记录页口径:adapter=mrerp_dms 不传 exclude → 仍看 id_card(见类注释)。
+        # 主站口径:两者可并存,exclude 与 adapter 各自 AND 生效、互不吞没。
+        cur = self._run(adapter_filter="mrerp", exclude_push_type="id_card")
+        for sql, params in cur.executed:
+            self.assertIn("LOWER(e.adapter) = LOWER(%s)", sql)
+            self.assertIn(self._EXCLUDE_IDCARD_SQL, sql)
+            self.assertIn("mrerp", [str(p) for p in params])
+
+    def test_user_id_still_scoped(self):
+        cur = self._run(exclude_push_type="id_card")
+        for sql, params in cur.executed:
+            self.assertIn("user_id = %s", sql)
+            self.assertIn("user-Z", [str(p) for p in params])
+
+
 if __name__ == "__main__":
     unittest.main()

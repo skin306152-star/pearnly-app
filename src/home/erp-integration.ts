@@ -101,6 +101,8 @@ async function loadErpLogs(silent?: boolean) {
         if (_erpAdapter) params.set('adapter', _erpAdapter);
         if (_erpLogBusiness) params.set('push_type', _erpLogBusiness);
         if (_erpLogKeyword) params.set('keyword', _erpLogKeyword);
+        // DMS 订车推送已搬独立入口 /dms · 后端剔除该业务行(不再前端 .filter)让 total 诚实。
+        params.set('exclude_push_type', 'id_card');
         const resp = await fetch(`/api/erp/logs?${params}`, {
             headers: { Authorization: 'Bearer ' + token },
         });
@@ -109,9 +111,7 @@ async function loadErpLogs(silent?: boolean) {
             return;
         }
         const data = await resp.json();
-        const rawItems = data.items || [];
-        // DMS(身份证订车)推送已搬独立入口 /dms · 主站推送日志恒排除(历史行不删库,仅不呈现)
-        const items = rawItems.filter((l: any) => l.push_type !== 'id_card');
+        const items = data.items || [];
         _logTotal = data.total || 0;
         // 有「推送中(pending)」行 → 4s 后静默再拉一次 · 让状态原地翻成 ✓/✗(2026-05-26)·
         // 无 pending 或离开页面(下次 listEl 不在直接 return)即自动停。

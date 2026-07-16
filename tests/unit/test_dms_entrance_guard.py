@@ -8,6 +8,7 @@
 patch 三个消费面(get_user / 两闸),不碰真库(照 test_dms_billing_gate 范式)。
 """
 
+import asyncio
 import os
 import unittest
 from unittest import mock
@@ -60,6 +61,37 @@ class DmsEntranceGuardTest(unittest.TestCase):
         p1, p2, p3 = _patch(user, portal=True, scope=False)
         with p1, p2, p3:
             self.assertIs(dms._authorize(object()), user)
+
+
+class DmsSessionProbeTest(unittest.TestCase):
+    """/api/dms/session 门禁探针:只跑 _authorize,状态码语义由守卫天然给出;
+    过闸返 {"ok": True}(纯门禁,无业务副作用/DB)。"""
+
+    def test_portal_closed_returns_404(self):
+        user = {"id": "u1", "tenant_id": "t1", "entry": "dms"}
+        p1, p2, p3 = _patch(user, portal=False, scope=True)
+        with p1, p2, p3, self.assertRaises(dms.HTTPException) as ctx:
+            asyncio.run(dms.dms_session(object()))
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    def test_main_entry_token_forbidden_403(self):
+        user = {"id": "u1", "tenant_id": "t1", "entry": "main"}
+        p1, p2, p3 = _patch(user, portal=True, scope=True)
+        with p1, p2, p3, self.assertRaises(dms.HTTPException) as ctx:
+            asyncio.run(dms.dms_session(object()))
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_dms_entry_token_returns_ok(self):
+        user = {"id": "u1", "tenant_id": "t1", "entry": "dms"}
+        p1, p2, p3 = _patch(user, portal=True, scope=True)
+        with p1, p2, p3:
+            self.assertEqual(asyncio.run(dms.dms_session(object())), {"ok": True})
+
+    def test_super_admin_returns_ok(self):
+        user = {"id": "adm", "is_super_admin": True, "entry": "main"}
+        p1, p2, p3 = _patch(user, portal=False, scope=False)
+        with p1, p2, p3:
+            self.assertEqual(asyncio.run(dms.dms_session(object())), {"ok": True})
 
 
 if __name__ == "__main__":

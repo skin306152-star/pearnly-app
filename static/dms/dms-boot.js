@@ -164,6 +164,13 @@
                     showLogin();
                     return;
                 }
+                // 400(dms.no_endpoint)= 守卫已过、只是还没配 DMS 端点——新邀请号首登的
+                // 正常态。落设置页配端点,别误判成未受邀(否则永远进不了壳去配 = 死锁)。
+                if (err && err.status === 400) {
+                    currentView = 'settings';
+                    enterApp();
+                    return;
+                }
                 resolveGateClosed(api);
             });
     }

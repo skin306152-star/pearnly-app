@@ -53,7 +53,8 @@
             getMe: function () {
                 return call('GET', '/api/me');
             },
-            // 门禁探针:轻量 DMS 端点(仅府级列表)。401=未登录/失效;404=闸关;403=非 dms 入口。
+            // 门禁探针:轻量 DMS 端点(仅府级列表)。401=未登录/失效;404=闸关;403=非 dms 入口;
+            // 400=守卫已过但未配端点(新号首登正常态,boot 放行进壳落设置页)。
             probe: function () {
                 return call('GET', '/api/dms/geo?level=provinces');
             },

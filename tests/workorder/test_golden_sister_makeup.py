@@ -152,6 +152,10 @@ class GoldenSisterMakeupTests(unittest.TestCase):
         # runner 在入口点建列;金标直调引擎,这里显式建一次(独立事务,幂等)才能跑 classify 的
         # 带 dedupe_key 落事件,否则 append_event 撞「列不存在」。
         store.ensure_runtime()
+        # 本 harness 是「单大事务(无 cursor_factory)+真并发 OCR+真库」形态——成本封顶的
+        # ctx.cur 回落读会把 ai_usage 锁攥进长事务,与 worker 首写触发的 RLS ALTER 互等死锁
+        # (R1-R1 实锤)。金标验税数不验封顶(封顶有专测),这里关掉恢复 R1 前验证过的形态。
+        os.environ["PEARNLY_WORKORDER_OCR_COST_CAP_THB"] = "0"
         cls.db, cls.store, cls.engine = db, store, engine
         # 函数直接存类属性会走描述符协议绑成方法(self 误作首参 TypeError),staticmethod
         # 保住「self.real_handlers() 取到的就是原函数」。

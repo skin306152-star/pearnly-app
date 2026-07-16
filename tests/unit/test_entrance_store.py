@@ -155,6 +155,24 @@ class GrantEntranceSafeTests(unittest.TestCase):
             # 入口表写失败只 log 不阻断发放主流程
             entrance_store.grant_entrance_safe(entrance_store.MAIN, "t1", cur=_FakeCursor())
 
+    def test_shared_cursor_failure_rolls_back_to_savepoint(self):
+        # 表未建(prod 过渡期)失败必须滚回保存点,不废调用方事务——否则建号/注册
+        # 主链后续语句全数 InFailedSqlTransaction,吞异常也救不回来。
+        cur = _FakeCursor()
+        with mock.patch(
+            "services.auth.entrance_store.grant_entrance", side_effect=RuntimeError("no table")
+        ):
+            entrance_store.grant_entrance_safe(entrance_store.MAIN, "t1", cur=cur)
+        sqls = [sql for sql, _ in cur.calls]
+        self.assertEqual(sqls, ["SAVEPOINT entrance_grant", "ROLLBACK TO SAVEPOINT entrance_grant"])
+
+    def test_shared_cursor_success_releases_savepoint(self):
+        cur = _FakeCursor()
+        with mock.patch("services.auth.entrance_store.grant_entrance"):
+            entrance_store.grant_entrance_safe(entrance_store.POS, "t1", cur=cur)
+        sqls = [sql for sql, _ in cur.calls]
+        self.assertEqual(sqls, ["SAVEPOINT entrance_grant", "RELEASE SAVEPOINT entrance_grant"])
+
 
 class WriteHookWiringTests(unittest.TestCase):
     """三处发放点确实经 grant_entrance_safe 写对应入口(源码契约 · 防钩子被摘)。"""

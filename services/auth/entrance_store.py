@@ -71,7 +71,15 @@ def grant_entrance_safe(entrance, tenant_id, granted_by=None, *, cur=None, conte
         return
     try:
         if cur is not None:
-            grant_entrance(cur, tenant_id, entrance, granted_by)
+            # 共享事务:失败必须滚回保存点。只吞异常救不了已废事务——表未建时
+            # 调用方后续语句全数 InFailedSqlTransaction,建号/注册整链 500。
+            cur.execute("SAVEPOINT entrance_grant")
+            try:
+                grant_entrance(cur, tenant_id, entrance, granted_by)
+            except Exception:
+                cur.execute("ROLLBACK TO SAVEPOINT entrance_grant")
+                raise
+            cur.execute("RELEASE SAVEPOINT entrance_grant")
         else:
             from core import db
 

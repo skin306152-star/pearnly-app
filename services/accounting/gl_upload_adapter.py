@@ -117,6 +117,15 @@ def parse_gl_bytes(data: bytes, filename: str) -> dict:
                 raise GlUploadParseError("no_express_gl_rows")
             return {"rows": rows, "row_issues": issues}
 
+        from services.accounting import mrerp_gl_adapter
+
+        # MR.ERP 分类账 xlsx(逐科目分组·表头 วันที่/สมุด/เดบิต/เครดิต)走专用适配器;非 MR.ERP xlsx 原路不改。
+        if mrerp_gl_adapter.is_mrerp_gl(data, filename):
+            rows, issues = mrerp_gl_adapter.parse_mrerp_gl_xlsx(data, filename)
+            if not rows:
+                raise GlUploadParseError("no_mrerp_gl_rows")
+            return {"rows": rows, "row_issues": issues}
+
         from services.recon.bank_gl_excel import parse_gl_excel
 
         parsed = parse_gl_excel(data, filename)

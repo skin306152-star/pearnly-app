@@ -41,23 +41,13 @@ def generate_one_time_password() -> str:
             return pw
 
 
-def validate_custom_password(password: str) -> None:
-    """超管自定义密码策略校验:与 /api/auth/reset_password 同口径(≥8 · 含字母和数字)。
-
-    不合格抛 ValueError('password_too_short' | 'password_too_weak'),路由翻 422 结构化人话。
-    """
-    if not password or len(password) < 8:
-        raise ValueError("password_too_short")
-    if not (any(c.isalpha() for c in password) and any(c.isdigit() for c in password)):
-        raise ValueError("password_too_weak")
-
-
 def resolve_password(custom: str | None) -> str:
-    """发放/重置共用的密码决策:传了自定义就校验后用它,留空自动生成强随机。"""
-    if custom:
-        validate_custom_password(custom)
-        return custom
-    return generate_one_time_password()
+    """发放/重置共用的密码决策:传了自定义就原样用,留空自动生成强随机。
+
+    超管口不设强度闸(2026-07-16 拍板):这里发的是转交客户的临时凭据,超管自定
+    随意;终端用户自助改密/重置的强度闸(_check_password_strength)不受影响。
+    """
+    return custom if custom else generate_one_time_password()
 
 
 def validate_username(username: str) -> None:

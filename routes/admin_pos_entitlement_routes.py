@@ -244,21 +244,16 @@ async def provision_pos_account(request: Request, body: ProvisionBody):
             )
         except ValueError as e:
             code = str(e)
-            if code in ("password_too_short", "password_too_weak"):
-                status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
-                detail = f"account.{code}"
-            elif code in (
+            if code in (
                 "email_invalid",
                 "username_invalid",
                 "account_missing",
                 "tenant_provision_failed",
             ):
                 status_code = status.HTTP_400_BAD_REQUEST
-                detail = f"pos.provision_{code}"
             else:
                 status_code = status.HTTP_409_CONFLICT
-                detail = f"pos.provision_{code}"
-            raise HTTPException(status_code, detail=detail) from e
+            raise HTTPException(status_code, detail=f"pos.provision_{code}") from e
     # 审计:带 existed/账号/租户/授权码 —— 刻意不带 initial_password(不落日志)。
     _log_op(
         request,
@@ -286,7 +281,7 @@ async def reset_pos_account_password(request: Request, body: ResetPasswordBody):
     范围=账号所属租户持 pos_entitlement(任意 status)且账号是该租户成员;范围外(主站自由
     注册用户/超管/不存在邮箱)一律 404 不区分缘由(防枚举)。通用超管改密端点历史上因账户
     接管风险被砍 410(勘察修复台账 #1),不许复活——范围判定在 services/pos/provision。
-    密码可选自定义(策略不合格 422);回显一次,审计与日志绝不含密码本体。
+    密码可选自定义(超管口不设强度闸,留空自动生成);回显一次,审计与日志绝不含密码本体。
     """
     user = _require_super_admin(request)
     with db.get_cursor(commit=True) as cur:
@@ -294,13 +289,10 @@ async def reset_pos_account_password(request: Request, body: ResetPasswordBody):
             res = pos_provision.reset_pos_account_password(
                 cur, account=body.account, password=body.password
             )
-        except ValueError as e:
-            code = str(e)
-            if code in ("password_too_short", "password_too_weak"):
-                raise HTTPException(
-                    status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"account.{code}"
-                ) from e
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="pos.reset_not_available") from e
+        except ValueError:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, detail="pos.reset_not_available"
+            ) from None
     # 审计:谁给谁重置了密码(操作人 + 目标账号)—— 刻意不带密码本体。
     _log_op(
         request,

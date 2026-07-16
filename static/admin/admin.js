@@ -3512,11 +3512,7 @@
             if (host)
                 host.innerHTML = _posPwOnceHtml(account, r.new_password, 'adm-pos-reset-copy');
         } catch (e) {
-            const msg =
-                String(e && e.message).indexOf('422') >= 0
-                    ? _t('adm-pos-pw-policy')
-                    : _t('adm-pos-reset-fail');
-            _toast(msg, 'error');
+            _toast(_t('adm-pos-reset-fail'), 'error');
         }
     }
 
@@ -3593,11 +3589,7 @@
             _posLoadStatus(account);
             _posRenderList();
         } catch (e) {
-            const msg =
-                String(e && e.message).indexOf('422') >= 0
-                    ? _t('adm-pos-pw-policy')
-                    : _t('adm-pos-prov-fail');
-            _toast(msg, 'error');
+            _toast(_t('adm-pos-prov-fail'), 'error');
         }
     }
 
@@ -3846,7 +3838,6 @@
 
     function _aiErrorKey(err) {
         const detail = (err && err.detail) || '';
-        if (detail.indexOf('pwd.') === 0) return 'adm-ai-pwd-too-weak';
         return _AI_ERROR_KEYS[detail] || 'adm-load-fail';
     }
 

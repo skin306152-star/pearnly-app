@@ -2,9 +2,9 @@
 """services/pos/provision 发放账号一条龙 + 发放制账号重置密码契约(PS-5 · 不连库 · 打桩 DB 层)。
 
 覆盖验收:①新账号(用户名或邮箱)→ 建号 + 建租户 + grant 一条龙 + 回显初始密码;②已存在
-账号 → 走既有租户开通路(不建号 · 不碰凭据 · 不回显密码);③初始密码满足强度(≥8 · 含字母
-和数字)且【绝不落日志】;④非法账号标识早拒不碰 DB;⑤自定义密码三分支(过校验用它 / 不
-合格拒 / 留空随机);⑥重置严格限发放制账号(租户持 pos_entitlement + 成员归属),主站普通
+账号 → 走既有租户开通路(不建号 · 不碰凭据 · 不回显密码);③随机初始密码满足强度(≥8 ·
+含字母和数字)且【绝不落日志】;④非法账号标识早拒不碰 DB;⑤自定义密码原样生效(超管口
+不设强度闸 · 留空随机);⑥重置严格限发放制账号(租户持 pos_entitlement + 成员归属),主站普通
 用户/超管/不存在账号一律 not_in_scope(路由翻 404 防枚举)。"""
 
 import unittest
@@ -140,17 +140,12 @@ class ProvisionOrchestrationTests(unittest.TestCase):
         self.assertEqual(res["initial_password"], "Custom1234")
         self.hash.assert_called_once_with("Custom1234")
 
-    def test_custom_password_policy_rejected(self):
+    def test_custom_password_any_value_accepted(self):
+        # 超管口不设强度闸:短/纯字母/纯数字都原样生效。
         mock.patch.object(provision, "find_login_user", return_value=None).start()
-        with self.assertRaises(ValueError) as short:
-            provision.provision_pos_account(object(), account="new@example.com", password="Ab1")
-        self.assertEqual(str(short.exception), "password_too_short")
-        with self.assertRaises(ValueError) as weak:
-            provision.provision_pos_account(
-                object(), account="new@example.com", password="onlyletters"
-            )
-        self.assertEqual(str(weak.exception), "password_too_weak")
-        self.create.assert_not_called()  # 校验早拒 · 不建号
+        for pw in ("Ab1", "onlyletters", "12345678"):
+            res = provision.provision_pos_account(object(), account="new@example.com", password=pw)
+            self.assertEqual(res["initial_password"], pw)
 
     def test_blank_password_falls_back_to_random(self):
         mock.patch.object(provision, "find_login_user", return_value=None).start()
@@ -227,13 +222,12 @@ class ResetPosAccountPasswordTests(unittest.TestCase):
             object(), account="shop@example.com", password="Custom1234"
         )
         self.assertEqual(res["new_password"], "Custom1234")
-        # ②不合格拒(短/弱)
-        for bad, code in (("Ab1", "password_too_short"), ("onlyletters", "password_too_weak")):
-            with self.assertRaises(ValueError) as e:
-                provision.reset_pos_account_password(
-                    object(), account="shop@example.com", password=bad
-                )
-            self.assertEqual(str(e.exception), code)
+        # ②超管口不设强度闸:短/纯字母也原样生效
+        for pw in ("Ab1", "onlyletters"):
+            res_weak = provision.reset_pos_account_password(
+                object(), account="shop@example.com", password=pw
+            )
+            self.assertEqual(res_weak["new_password"], pw)
         # ③留空走随机
         res2 = provision.reset_pos_account_password(
             object(), account="shop@example.com", password=None
@@ -384,15 +378,14 @@ class AccountProvisionDalTests(unittest.TestCase):
         self.assertIn("WHERE id = %s", cur.sql)
         self.assertEqual(cur.params, ("hash:z", "uid-9"))
 
-    def test_validate_custom_password_policy(self):
-        # 与 /api/auth/reset_password 同口径:≥8 · 含字母和数字
-        with self.assertRaises(ValueError):
-            account_provision.validate_custom_password("Ab1")
-        with self.assertRaises(ValueError):
-            account_provision.validate_custom_password("onlyletters")
-        with self.assertRaises(ValueError):
-            account_provision.validate_custom_password("12345678")
-        account_provision.validate_custom_password("Custom1234")  # 合格不抛
+    def test_resolve_password_passthrough_and_random_fallback(self):
+        # 超管口不设强度闸:自定义原样透传;留空才生成强随机(≥8 · 字母+数字)。
+        for pw in ("Ab1", "onlyletters", "12345678"):
+            self.assertEqual(account_provision.resolve_password(pw), pw)
+        generated = account_provision.resolve_password(None)
+        self.assertGreaterEqual(len(generated), 8)
+        self.assertTrue(any(c.isalpha() for c in generated))
+        self.assertTrue(any(c.isdigit() for c in generated))
 
 
 if __name__ == "__main__":

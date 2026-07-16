@@ -49,12 +49,12 @@ def provision_pos_account(
     """发放 POS 账号一条龙。调用方负责 commit(建号/建租户/grant 同一事务)。
 
     account 支持任意用户名或邮箱(resolve_account_identifier 归一);用户名大小写不敏感、
-    存储归一小写,登录按 username 走(邮箱非必填)。password 可选:传了(过策略校验)就作
-    初始密码,留空自动生成强随机;账号已存在时不改密(existed 路不碰凭据,要改走重置密码流)。
-    返回 {existed, user_id, tenant_id, grant_code, initial_password, username};
-    initial_password 仅【新建账号】非 None(一次性回显,自定义的也回显)。
+    存储归一小写,登录按 username 走(邮箱非必填)。password 可选:传了就原样作初始密码
+    (超管口不设强度闸),留空自动生成强随机;账号已存在时不改密(existed 路不碰凭据,
+    要改走重置密码流)。返回 {existed, user_id, tenant_id, grant_code, initial_password,
+    username};initial_password 仅【新建账号】非 None(一次性回显,自定义的也回显)。
     账号标识非法 → ValueError('email_invalid' | 'username_invalid' | 'account_missing');
-    密码不合格 → ValueError('password_too_*');建租户失败 → ValueError(由路由翻错误码)。
+    建租户失败 → ValueError(由路由翻错误码)。
     """
     ident = resolve_account_identifier(account)
     amount = _DEFAULT_AMOUNT_THB if amount_paid_thb is None else amount_paid_thb
@@ -117,7 +117,7 @@ def reset_pos_account_password(cur, *, account: str, password: str | None = None
     ValueError('not_in_scope'),路由统一翻 404 不区分缘由(防枚举)。历史上通用超管改密
     端点因账户接管风险被砍 410(勘察修复台账 #1),此处绝不复活通用口。
 
-    password 可选:传了(过策略校验)就用它,留空自动生成强随机。返回
+    password 可选:传了就原样用它(超管口不设强度闸),留空自动生成强随机。返回
     {user_id, account, new_password};明文只出现在返回值里,绝不写日志(调用方审计也不得带)。
     """
     try:

@@ -9,7 +9,7 @@ tenant_id 写 tenant_id,没有才退回 user_id——写反了闸永远判不中
 
 reset-password(Z1-c)额外钉死:仅限 allowlist 名单内 subject(不复活已被砍掉的
 通用超管改密 /api/admin/users/{id}/reset-password);自定义密码走
-_check_password_strength 同一把尺子,弱密码 422、留空落回随机一次性密码。
+超管自定义密码原样生效(超管口不设强度闸),留空落回随机一次性密码。
 """
 
 import contextlib
@@ -572,18 +572,35 @@ class ResetPasswordTests(unittest.TestCase):
         self.assertEqual(r.json()["initial_password"], "Zihao2026x")
         m_reset.assert_called_once_with("user-orphan", "Zihao2026x")
 
-    def test_reset_password_weak_custom_password_422(self):
-        """弱密码在反解目标用户之前就该被拒 —— 不合格直接 422,不用打 DB。"""
-        with mock.patch.object(
-            admin_pearnly_ai_routes.platform_settings_store,
-            "is_allowlisted",
-            return_value=True,
+    def test_reset_password_weak_custom_password_accepted(self):
+        """超管口不设强度闸:纯数字/短密码也原样生效(留空才落回随机强密码)。"""
+        cur = _OneRowCursor(None)
+        with (
+            mock.patch.object(
+                admin_pearnly_ai_routes.platform_settings_store,
+                "is_allowlisted",
+                return_value=True,
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db,
+                "find_user_by_id",
+                return_value={"id": "user-orphan", "username": "solo", "tenant_id": None},
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "reset_user_password", return_value=True
+            ) as m_reset,
+            mock.patch.object(admin_pearnly_ai_routes, "_log_op"),
         ):
             r = self.client.post(
                 "/api/admin/pearnly-ai/reset-password",
                 json={"subject_id": "user-orphan", "password": "12345678"},
             )
-        self.assertEqual(r.status_code, 422)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["initial_password"], "12345678")
+        m_reset.assert_called_once_with("user-orphan", "12345678")
 
     def test_reset_password_blank_falls_back_to_random_strong_password(self):
         cur = _OneRowCursor(None)

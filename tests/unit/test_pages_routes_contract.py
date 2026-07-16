@@ -45,6 +45,9 @@ EXPECTED = {
     # M1-W2 新增:Pearnly AI SPA 友好路由(照 /console 先例 · 出 static/dist/ai.html)
     ("GET", "/ai"),
     ("GET", "/ai/{rest:path}"),
+    # 批2 新增:Pearnly DMS SPA 友好路由(照 /ai 先例 · 出 static/dist/dms.html)
+    ("GET", "/dms"),
+    ("GET", "/dms/{rest:path}"),
     ("GET", "/reset"),
     ("GET", "/terms"),
     ("GET", "/privacy"),
@@ -53,7 +56,7 @@ EXPECTED = {
 
 class PagesRoutesContractTests(unittest.TestCase):
     def test_router_registers_expected_routes(self):
-        """21 条路由 path+method 契约 · 防搬迁丢路由 / 改 URL"""
+        """路由 path+method 契约(集合全等)· 防搬迁丢路由 / 改 URL"""
         got = set()
         for r in router.routes:
             for m in getattr(r, "methods", set()) or set():
@@ -94,6 +97,9 @@ class PagesRoutesContractTests(unittest.TestCase):
         ai = "static/dist/ai.html"
         self.assertEqual(asyncio.run(pages_routes.ai_page()).path, ai)
         self.assertEqual(asyncio.run(pages_routes.ai_layout_page("client/1/wo")).path, ai)
+        dms = "static/dist/dms.html"
+        self.assertEqual(asyncio.run(pages_routes.dms_page()).path, dms)
+        self.assertEqual(asyncio.run(pages_routes.dms_layout_page("records")).path, dms)
 
     def test_v1_aliases_delegate_to_base(self):
         """v1_health / v1_contact 委托给本模块 health / contact · 单一来源"""

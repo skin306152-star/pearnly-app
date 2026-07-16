@@ -212,6 +212,19 @@ async def ai_layout_page(rest: str):
     return FileResponse("static/dist/ai.html", headers=_NO_CACHE)
 
 
+# Pearnly DMS SPA(身份证 → DMS 客户 · 邀请制独立入口)· 照 /ai 先例:友好路由指向打包壳,
+# 鉴权/闸判定在前端 dms-boot.js 跑(无 token/失效 → 登录卡;DMS 闸 404/403 → 邀请制提示)。
+# 后端 /api/dms/* 四端点按 token.entry='dms' 隔离(超管除外),闸 dms_portal 默认关。
+@router.get("/dms", response_class=HTMLResponse)
+async def dms_page():
+    return FileResponse("static/dist/dms.html", headers=_NO_CACHE)
+
+
+@router.get("/dms/{rest:path}", response_class=HTMLResponse)
+async def dms_layout_page(rest: str):
+    return FileResponse("static/dist/dms.html", headers=_NO_CACHE)
+
+
 # POS 老板后台专属登录页(PS-5 · 主域路径 /pos · pos.pearnly.com 子域方案已废弃)。
 # 只有账号+密码(账号=用户名或邮箱),无 Google/LINE/注册。页头 guard:本机存过收银台绑定凭据(pos_store_token)→
 # 即跳 /cashier;否则渲染老板登录页。收银台 SPA 迁至 /cashier(见上)。不碰根路由 `/`(脸 0 门户在改)。

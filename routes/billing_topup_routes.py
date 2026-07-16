@@ -181,25 +181,16 @@ async def credits_topup_upload_slip(
                     review_note=%s, amount_thb=%s WHERE id=%s""",
                     (f"SlipOK auto-approved · ref={ref}", verified_amount, request_id),
                 )
-                cur.execute(
-                    """INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
-                    ON CONFLICT (tenant_id) DO UPDATE
-                    SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
-                    RETURNING balance_thb""",
-                    (tid, verified_amount, verified_amount),
-                )
-                new_balance = float(cur.fetchone()["balance_thb"])
-                cur.execute(
-                    """INSERT INTO credit_transactions
-                    (tenant_id, user_id, type, amount_thb, balance_after, description)
-                    VALUES (%s::uuid, %s::uuid, 'topup', %s, %s, %s)""",
-                    (
-                        tid,
-                        uid,
-                        verified_amount,
-                        new_balance,
-                        f"SlipOK自动充值 · #{request_id} · ref={ref}",
-                    ),
+                # 余额+台账走 canonical 记账口(不手写 UPDATE 余额 · 铁律 #26)。
+                new_balance = float(
+                    db.grant_credits(
+                        cur,
+                        tenant_id=tid,
+                        user_id=uid,
+                        amount_thb=verified_amount,
+                        txn_type="topup",
+                        description=f"SlipOK自动充值 · #{request_id} · ref={ref}",
+                    )
                 )
             logger.info(
                 f"[topup] SlipOK auto-approved #{request_id} ฿{verified_amount} tenant={tid[:8]}"
@@ -311,19 +302,16 @@ async def admin_topup_approve(request_id: int, body: _AdminTopupApproveBody, req
             reviewed_at=NOW(), review_note=%s, amount_thb=%s WHERE id=%s""",
             (admin_id, body.note, amt, request_id),
         )
-        cur.execute(
-            """INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s, %s)
-            ON CONFLICT (tenant_id) DO UPDATE
-            SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW()
-            RETURNING balance_thb""",
-            (tid, amt, amt),
-        )
-        new_balance = float(cur.fetchone()["balance_thb"])
-        cur.execute(
-            """INSERT INTO credit_transactions
-            (tenant_id, user_id, type, amount_thb, balance_after, description)
-            VALUES (%s, %s, 'topup', %s, %s, %s)""",
-            (tid, admin_id, amt, new_balance, f"充值审核通过 · 申请#{request_id}"),
+        # 余额+台账走 canonical 记账口(不手写 UPDATE 余额 · 铁律 #26)。
+        new_balance = float(
+            db.grant_credits(
+                cur,
+                tenant_id=tid,
+                user_id=admin_id,
+                amount_thb=amt,
+                txn_type="topup",
+                description=f"充值审核通过 · 申请#{request_id}",
+            )
         )
     # Task 5 · 通知 tenant owner(失败不影响主流程)
     try:

@@ -67,6 +67,39 @@ def _debit_balance(cur, tenant_id, cost: _Dec) -> _Dec:
     return new_bal
 
 
+def grant_credits(cur, *, tenant_id, user_id, amount_thb, txn_type: str, description: str) -> _Dec:
+    """给租户余额加值 + 记一行 credit_transactions(账实一致 · 单事务)。
+
+    _debit_balance 的贷方对偶——「加余额」的 canonical 记账口:tenant_credits ON CONFLICT
+    upsert 加值 + 台账行(balance_after 取加后余额),与充值审核通过同一形态。手写 UPDATE
+    余额而不落台账会让钱账对不上(铁律 #26),一切充值/赠额都走这里。调用方须在 commit 游标
+    事务内;amount_thb 走 Decimal 计价(不用 float)。返回加后余额。
+    """
+    amt = _Dec(str(amount_thb))
+    cur.execute(
+        "INSERT INTO tenant_credits (tenant_id, balance_thb) VALUES (%s::uuid, %s) "
+        "ON CONFLICT (tenant_id) DO UPDATE "
+        "SET balance_thb = tenant_credits.balance_thb + %s, updated_at = NOW() "
+        "RETURNING balance_thb",
+        (str(tenant_id), str(amt), str(amt)),
+    )
+    new_balance = _Dec(str(cur.fetchone()["balance_thb"]))
+    cur.execute(
+        "INSERT INTO credit_transactions "
+        "(tenant_id, user_id, type, amount_thb, balance_after, description) "
+        "VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s)",
+        (
+            str(tenant_id),
+            str(user_id) if user_id else None,
+            txn_type,
+            str(amt),
+            str(new_balance),
+            description,
+        ),
+    )
+    return new_balance
+
+
 # ⚠️ 循环 import 处理:
 # db.py 文件尾 `from services.billing.charge import charge_ocr` 在自己模块体内 ·
 # 若本模块顶部 `import db` · 单独跑 services.billing.charge 时:

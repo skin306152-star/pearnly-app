@@ -234,6 +234,20 @@ class InviteExistingUserTests(unittest.TestCase):
         self.assertEqual(m_log.call_args.kwargs.get("target_type"), "tenant")
         self.assertEqual(m_log.call_args.kwargs.get("target_id"), "tenant-9")
 
+    def test_invite_existing_user_does_not_grant_credit(self):
+        """H:存量号只加名单,不动余额(别给已有号乱加钱)。"""
+        existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
+        with (
+            mock.patch.object(admin_dms_routes.db, "find_user_by_username", return_value=existing),
+            mock.patch.object(admin_dms_routes.platform_settings_store, "add_to_allowlist"),
+            mock.patch.object(admin_dms_routes, "grant_entrance_safe"),
+            mock.patch.object(admin_dms_routes, "_log_op"),
+            mock.patch.object(admin_dms_routes.db, "grant_credits") as m_grant,
+        ):
+            r = self.client.post("/api/admin/dms/invite", json={"username_or_email": "member1"})
+        self.assertEqual(r.status_code, 200)
+        m_grant.assert_not_called()
+
     def test_invite_existing_user_without_tenant_falls_back_to_user_id(self):
         existing = {"id": "user-orphan", "tenant_id": None, "username": "solo"}
         with (
@@ -278,6 +292,7 @@ class InviteCreateAccountTests(unittest.TestCase):
                 "get_cursor",
                 lambda *a, **k: _cursor_cm(_SeqCursor([[]])),
             ),
+            mock.patch.object(admin_dms_routes.db, "grant_credits"),
             mock.patch.object(
                 admin_dms_routes.platform_settings_store, "add_to_allowlist"
             ) as m_add,
@@ -308,7 +323,8 @@ class InviteCreateAccountTests(unittest.TestCase):
         self.assertNotIn(pwd, str(m_log.call_args))
 
     def test_invite_unknown_plain_username_creates_account(self):
-        """自由邀请制:任意用户名直接建号,不强制邮箱;非邮箱不写 users.email(不跑 UPDATE 游标)。"""
+        """自由邀请制:任意用户名直接建号,不强制邮箱;非邮箱不写 users.email(不跑 email UPDATE)。"""
+        rec = _SeqCursor([[]])
         with (
             mock.patch.object(admin_dms_routes.db, "find_user_by_username", return_value=None),
             mock.patch.object(
@@ -319,7 +335,8 @@ class InviteCreateAccountTests(unittest.TestCase):
             mock.patch.object(
                 admin_dms_routes.platform_settings_store, "add_to_allowlist"
             ) as m_add,
-            mock.patch.object(admin_dms_routes.db, "get_cursor") as m_cur,
+            mock.patch.object(admin_dms_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(rec)),
+            mock.patch.object(admin_dms_routes.db, "grant_credits") as m_grant_credits,
             mock.patch.object(admin_dms_routes, "grant_entrance_safe"),
             mock.patch.object(admin_dms_routes, "_log_op"),
         ):
@@ -332,7 +349,42 @@ class InviteCreateAccountTests(unittest.TestCase):
         self.assertEqual(body["username"], "plainusername")
         self.assertEqual(m_create.call_args.kwargs["username"], "plainusername")
         m_add.assert_called_once_with("dms_portal", "new-tenant")
-        m_cur.assert_not_called()  # 非邮箱不落 users.email
+        # 非邮箱:不跑 users.email UPDATE(录到的 SQL 里不该有 email 更新)。
+        self.assertFalse(
+            any("UPDATE users SET email" in (sql or "") for sql, _ in rec.queries),
+            "非邮箱用户名不该更新 users.email",
+        )
+        # 但初始额度照发(开箱即能识别)。
+        m_grant_credits.assert_called_once()
+
+    def test_invite_creates_account_grants_initial_credit(self):
+        """H:新号开箱发初始额度(否则余额 0 被身份证识别余额闸 402 恒拦)。
+        走 canonical 记账口 db.grant_credits · 正额 adjustment(不计 topup 收入 KPI)。"""
+        with (
+            mock.patch.object(admin_dms_routes.db, "find_user_by_username", return_value=None),
+            mock.patch.object(
+                admin_dms_routes,
+                "create_owner_user",
+                return_value={"ok": True, "user_id": "new-user", "tenant_id": "new-tenant"},
+            ),
+            mock.patch.object(
+                admin_dms_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(_SeqCursor([[]]))
+            ),
+            mock.patch.object(admin_dms_routes.db, "grant_credits") as m_grant,
+            mock.patch.object(admin_dms_routes.platform_settings_store, "add_to_allowlist"),
+            mock.patch.object(admin_dms_routes, "grant_entrance_safe"),
+            mock.patch.object(admin_dms_routes, "_log_op"),
+        ):
+            r = self.client.post(
+                "/api/admin/dms/invite", json={"username_or_email": "fresh@example.com"}
+            )
+        self.assertEqual(r.status_code, 200)
+        m_grant.assert_called_once()
+        kw = m_grant.call_args.kwargs
+        self.assertEqual(kw["tenant_id"], "new-tenant")
+        self.assertEqual(kw["txn_type"], "adjustment")
+        self.assertEqual(kw["amount_thb"], admin_dms_routes._DMS_INITIAL_CREDIT_THB)
+        self.assertGreater(kw["amount_thb"], 0)  # 正额 → 余额闸能过
 
     def test_invite_username_exists_race_returns_409(self):
         with (

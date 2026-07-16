@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import secrets
 import string
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -41,6 +42,12 @@ router = APIRouter()
 _DEFAULT_QUOTA = 100
 _PASSWORD_LEN = 14
 _PASSWORD_GEN_ATTEMPTS = 50
+
+# 新邀请号开箱额度:身份证识别走 credits 余额闸(get_billing_status_combined 只认
+# tenant_credits.balance_thb / 订阅 · 不读 tenants.monthly_quota),新建号余额 0 会被 402
+# 恒拦。发等值余额让新号能真识别 ~100 张:100 张 × ฿1.50/页(PDF tier1 页价) = ฿150。
+# 走 credits 记账口(db.grant_credits · type=adjustment 不计入 topup 收入 KPI)。
+_DMS_INITIAL_CREDIT_THB = Decimal("150")
 
 
 class InviteBody(BaseModel):
@@ -229,6 +236,19 @@ async def dms_invite(request: Request, body: InviteBody):
     if identity["is_email"]:
         with db.get_cursor(commit=True) as cur:
             cur.execute("UPDATE users SET email = %s WHERE id = %s", (identity["email"], user_id))
+
+    # 开箱初始额度:新号余额 0 会被身份证识别的余额闸 402 恒拦(发出去一张都识别不了)。
+    # 只在新建号分支发(存量号不动余额);建号本身不可重入(同名再邀走上面 existing 分支),
+    # 故天然幂等,不会重复发。记账走 db.grant_credits(不手写 UPDATE 余额 · 铁律 #26)。
+    with db.get_cursor(commit=True) as cur:
+        db.grant_credits(
+            cur,
+            tenant_id=tenant_id,
+            user_id=str(admin.get("id")) if admin else None,
+            amount_thb=_DMS_INITIAL_CREDIT_THB,
+            txn_type="adjustment",
+            description="dms_portal invite 初始额度",
+        )
 
     platform_settings_store.add_to_allowlist(DMS_PORTAL_KEY, tenant_id)
     grant_entrance_safe(DMS, tenant_id, str(admin.get("id")) if admin else None, context="dms")

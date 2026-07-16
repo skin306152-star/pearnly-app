@@ -383,7 +383,12 @@ _REEXPORTS = {
         "_bkk_year_month",
         ("_EXEMPT_CACHE", "_EXEMPT_CACHE_V21"),
     ],
-    "services.billing.charge": ["charge_ocr", "_excel_char_count_estimate", "charge_ocr_async"],
+    "services.billing.charge": [
+        "charge_ocr",
+        "_excel_char_count_estimate",
+        "charge_ocr_async",
+        "grant_credits",
+    ],
     "services.billing.credits_schema": ["ensure_credits_tables", "ensure_tenant_credits"],
     "services.membership.schema": ["ensure_membership_tables"],
     "services.users.columns": [

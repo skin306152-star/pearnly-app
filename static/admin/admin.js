@@ -158,6 +158,7 @@
         if (p === '/admin/agent' || p === '/admin/agent/') return 'agent';
         if (p === '/admin/pos' || p === '/admin/pos/') return 'pos';
         if (p === '/admin/pearnly-ai' || p === '/admin/pearnly-ai/') return 'pearnly-ai';
+        if (p === '/admin/dms' || p === '/admin/dms/') return 'dms';
         return 'cost';
     }
 
@@ -172,6 +173,7 @@
             agent: 'page-admin-agent',
             pos: 'page-admin-pos',
             'pearnly-ai': 'page-admin-pearnly-ai',
+            dms: 'page-admin-dms',
         };
         Object.keys(pages).forEach(function (r) {
             const el = document.getElementById(pages[r]);
@@ -191,6 +193,7 @@
         if (route === 'agent') _renderAgentPage();
         if (route === 'pos') _renderPosPage();
         if (route === 'pearnly-ai') _renderPearlyAiPage();
+        if (route === 'dms') _renderDmsPage();
     }
 
     function _bindSidebar() {
@@ -285,6 +288,7 @@
                 else if (_r === 'agent') _renderAgentPage();
                 else if (_r === 'pos') _renderPosPage();
                 else if (_r === 'pearnly-ai') _renderPearlyAiPage();
+                else if (_r === 'dms') _renderDmsPage();
                 else _renderCostPage();
             });
         });
@@ -3906,6 +3910,198 @@
         const flagLine = document.getElementById('adm-ai-flag-line');
         if (flagLine) flagLine.textContent = _aiFlagText(d.flag);
         _renderAiList(d.allowlist);
+    }
+
+    // ============ DMS 订车入口邀请管理页(照 Pearnly AI 邀请页范式) ============
+    function _dmsFlagText(flag) {
+        flag = flag || {};
+        const on = flag.enabled ? _t('adm-dms-flag-on') : _t('adm-dms-flag-off');
+        const rollout =
+            flag.rollout === 'all'
+                ? _t('adm-dms-flag-rollout-all')
+                : _t('adm-dms-flag-rollout-allowlist');
+        return on + ' · ' + rollout;
+    }
+
+    function _renderDmsList(rows) {
+        const host = document.getElementById('adm-dms-list');
+        if (!host) return;
+        if (!rows || !rows.length) {
+            host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-dms-list-empty')) + '</div>';
+            return;
+        }
+        host.innerHTML = rows
+            .map(function (r) {
+                const who =
+                    r.subject_type === 'unknown'
+                        ? _t('adm-dms-list-unknown')
+                        : _esc(r.username || r.email || r.subject_id);
+                const meta = [
+                    r.company_name,
+                    r.joined_at ? new Date(r.joined_at).toLocaleString() : '',
+                ]
+                    .filter(Boolean)
+                    .map(_esc)
+                    .join(' · ');
+                return (
+                    '<div class="adm-ai-list-row">' +
+                    '<span class="adm-ai-list-who"><span class="adm-ai-list-name">' +
+                    who +
+                    '</span><span class="adm-ai-list-meta">' +
+                    meta +
+                    '</span></span>' +
+                    '<span class="adm-ai-list-actions">' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-dms-reset="' +
+                    _esc(r.subject_id) +
+                    '" data-adm-dms-reset-who="' +
+                    _esc(r.username || r.email || r.subject_id) +
+                    '">' +
+                    _esc(_t('adm-dms-reset-btn')) +
+                    '</button>' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-dms-revoke="' +
+                    _esc(r.subject_id) +
+                    '">' +
+                    _esc(_t('adm-dms-revoke-btn')) +
+                    '</button>' +
+                    '</span>' +
+                    '</div>'
+                );
+            })
+            .join('');
+        host.querySelectorAll('[data-adm-dms-revoke]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const ok = await _admConfirm(_t('adm-dms-revoke-confirm'), {
+                    title: _t('adm-dms-revoke-btn'),
+                    okText: _t('adm-dms-revoke-btn'),
+                    danger: true,
+                });
+                if (!ok) return;
+                try {
+                    await _adminFetch('/api/admin/dms/revoke', {
+                        method: 'POST',
+                        body: { subject_id: btn.dataset.admDmsRevoke },
+                    });
+                    _renderDmsPage();
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+        });
+        host.querySelectorAll('[data-adm-dms-reset]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const who = btn.dataset.admDmsResetWho || btn.dataset.admDmsReset;
+                const pwd = await _admPrompt(_t('adm-dms-reset-confirm').replace('{n}', who), {
+                    placeholder: _t('adm-dms-invite-pwd-ph'),
+                    okText: _t('adm-dms-reset-btn'),
+                });
+                if (pwd === null) return;
+                const trimmed = pwd.trim();
+                try {
+                    const r = await _adminFetch('/api/admin/dms/reset-password', {
+                        method: 'POST',
+                        body: trimmed
+                            ? { subject_id: btn.dataset.admDmsReset, password: trimmed }
+                            : { subject_id: btn.dataset.admDmsReset },
+                    });
+                    _toast(_t('adm-dms-reset-ok'), 'success');
+                    _showDmsPassword(r.initial_password, r.username);
+                } catch (e) {
+                    _toast(_t(_dmsErrorKey(e)), 'error');
+                }
+            });
+        });
+    }
+
+    function _showDmsPassword(pwd, username) {
+        const box = document.getElementById('adm-dms-pwd-box');
+        const input = document.getElementById('adm-dms-pwd-value');
+        if (!box || !input) return;
+        input.value = pwd;
+        const forLine = document.getElementById('adm-dms-pwd-for');
+        if (forLine)
+            forLine.textContent = username
+                ? _t('adm-dms-pwd-for-label').replace('{n}', username)
+                : '';
+        box.hidden = false;
+    }
+
+    // 错误按 err.detail(后端 HTTPException detail)精确分流 · invite/reset 两组 detail 不相交,共用一张表。
+    const _DMS_ERROR_KEYS = {
+        'admin.dms_not_invited': 'adm-dms-reset-not-invited',
+        'admin.dms_subject_unknown': 'adm-dms-reset-subject-unknown',
+        'admin.username_exists': 'adm-dms-invite-username-exists',
+    };
+
+    function _dmsErrorKey(err) {
+        const detail = (err && err.detail) || '';
+        return _DMS_ERROR_KEYS[detail] || 'adm-load-fail';
+    }
+
+    async function _renderDmsPage() {
+        const btn = document.getElementById('adm-dms-invite-btn');
+        const input = document.getElementById('adm-dms-invite-input');
+        const pwInput = document.getElementById('adm-dms-invite-password');
+        if (!btn || !input) return;
+        if (!btn.__bound) {
+            btn.__bound = true;
+            const go = async function () {
+                const raw = (input.value || '').trim();
+                if (!raw) return;
+                const pwd = (pwInput && pwInput.value.trim()) || '';
+                try {
+                    const r = await _adminFetch('/api/admin/dms/invite', {
+                        method: 'POST',
+                        body: pwd
+                            ? { username_or_email: raw, password: pwd }
+                            : { username_or_email: raw },
+                    });
+                    input.value = '';
+                    if (pwInput) pwInput.value = '';
+                    if (r.created_account) {
+                        _toast(_t('adm-dms-invite-created-ok'), 'success');
+                        _showDmsPassword(r.initial_password, r.username);
+                    } else {
+                        _toast(_t('adm-dms-invite-existing-ok'), 'success');
+                    }
+                    _renderDmsPage();
+                } catch (e) {
+                    _toast(_t(_dmsErrorKey(e)), 'error');
+                }
+            };
+            btn.addEventListener('click', go);
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') go();
+            });
+            document
+                .getElementById('adm-dms-pwd-copy')
+                ?.addEventListener('click', async function () {
+                    const val = document.getElementById('adm-dms-pwd-value');
+                    if (!val || !val.value) return;
+                    val.select();
+                    try {
+                        await navigator.clipboard.writeText(val.value);
+                    } catch (_) {}
+                    _toast(_t('adm-dms-pwd-copied'), 'success');
+                });
+            document.getElementById('adm-dms-pwd-close')?.addEventListener('click', function () {
+                const box = document.getElementById('adm-dms-pwd-box');
+                const val = document.getElementById('adm-dms-pwd-value');
+                const forLine = document.getElementById('adm-dms-pwd-for');
+                if (box) box.hidden = true;
+                if (val) val.value = '';
+                if (forLine) forLine.textContent = '';
+            });
+        }
+        let d;
+        try {
+            d = await _adminFetch('/api/admin/dms/overview');
+        } catch (e) {
+            _toast(_t('adm-load-fail'), 'error');
+            return;
+        }
+        const flagLine = document.getElementById('adm-dms-flag-line');
+        if (flagLine) flagLine.textContent = _dmsFlagText(d.flag);
+        _renderDmsList(d.allowlist);
     }
 
     // ============ Agent 助手观测页 ============

@@ -283,6 +283,24 @@
           </svg>
           <span data-i18n="adm-sidebar-pearnly-ai">Pearnly AI 邀请</span>
         </a>
+        <a class="admin-layout-nav-item" data-admin-route="dms" href="/admin/dms">
+          <svg
+            viewBox="0 0 20 20"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 12l1.5-4.5A2 2 0 016.4 6h7.2a2 2 0 011.9 1.5L17 12v4h-2v-2H5v2H3z" />
+            <circle cx="6.5" cy="14" r="1" />
+            <circle cx="13.5" cy="14" r="1" />
+          </svg>
+          <span data-i18n="adm-sidebar-dms">DMS 邀请</span>
+        </a>
       </aside>
 
       <main class="admin-layout-main">
@@ -1288,13 +1306,113 @@
             <div id="adm-ai-list"></div>
           </div>
         </section>
+
+        <section class="page" id="page-admin-dms">
+          <div class="page-head">
+            <div class="page-head-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M4 14l1.8-5.4A2.5 2.5 0 018.2 7h7.6a2.5 2.5 0 012.4 1.6L20 14v5h-2.5v-2.5h-11V19H4z"
+                />
+                <circle cx="8" cy="16.5" r="1.3" />
+                <circle cx="16" cy="16.5" r="1.3" />
+              </svg>
+            </div>
+            <div class="page-head-text">
+              <h1 class="page-title" data-i18n="adm-dms-title">DMS 邀请管理</h1>
+              <div class="page-subtitle" data-i18n="adm-dms-sub">
+                发放 MR.ERP DMS 订车入口 · 已有账号直接加名单 · 新客户建号并生成一次性密码
+              </div>
+            </div>
+          </div>
+
+          <div class="cost-section" style="margin-top: 24px">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-dms-flag-title">闸状态</h3>
+              <span class="cost-section-hint" data-i18n="adm-dms-flag-hint"
+                >只读展示 · 总闸/灰度策略切换请去「全局设置」</span
+              >
+            </div>
+            <div class="adm-ai-flag-line" id="adm-dms-flag-line">—</div>
+          </div>
+
+          <div class="cost-section">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-dms-invite-title">邀请</h3>
+              <span class="cost-section-hint" data-i18n="adm-dms-invite-hint"
+                >填已有账号直接加名单;不存在的用户名自动建号(任意字符,不强制邮箱)</span
+              >
+            </div>
+            <div class="adm-set-add">
+              <input
+                type="text"
+                id="adm-dms-invite-input"
+                data-i18n-placeholder="adm-dms-invite-ph"
+                placeholder="用户名或邮箱(新客户请填邮箱)"
+              />
+              <input
+                type="text"
+                id="adm-dms-invite-password"
+                data-i18n-placeholder="adm-dms-invite-pwd-ph"
+                placeholder="密码(留空自动生成)"
+              />
+              <button
+                class="btn btn-primary btn-sm"
+                id="adm-dms-invite-btn"
+                data-i18n="adm-dms-invite-btn"
+              >
+                邀请
+              </button>
+            </div>
+            <div id="adm-dms-pwd-box" class="adm-ai-pwd-box" hidden>
+              <div class="adm-ai-pwd-warn" data-i18n="adm-dms-pwd-warn">
+                初始密码仅显示一次 · 请立即复制转告客户 · 关闭后无法再查看
+              </div>
+              <div class="adm-ai-pwd-for" id="adm-dms-pwd-for"></div>
+              <div class="adm-ai-pwd-row">
+                <input type="text" id="adm-dms-pwd-value" class="adm-ai-pwd-value" readonly />
+                <button
+                  class="btn btn-ghost btn-sm"
+                  id="adm-dms-pwd-copy"
+                  data-i18n="adm-dms-pwd-copy"
+                >
+                  复制
+                </button>
+                <button
+                  class="btn btn-primary btn-sm"
+                  id="adm-dms-pwd-close"
+                  data-i18n="adm-dms-pwd-close"
+                >
+                  我已保存,关闭
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="cost-section" id="adm-dms-list-section">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-dms-list-title">名单</h3>
+              <span class="cost-section-hint" data-i18n="adm-dms-list-hint"
+                >灰度名单 · 收回不删账号</span
+              >
+            </div>
+            <div id="adm-dms-list"></div>
+          </div>
+        </section>
       </main>
     </div>
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/admin/admin-i18n.js?v=11891006"></script>
+    <script src="/static/admin/admin-i18n.js?v=11916001"></script>
 
-    <script src="/static/admin/admin.js?v=11891007" defer></script>
+    <script src="/static/admin/admin.js?v=11916002" defer></script>
   </body>
 </html>

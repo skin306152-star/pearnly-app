@@ -220,8 +220,10 @@ class PeriodOptionsTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class NeedsOpenControlTests(unittest.TestCase):
-    """开单控件显隐判据(A3 prod 实锤修复):判「当期没有工单」不是「从未有单」——
-    此前只判 entry.order 存在与否,历史账期开单在永远有旧单的真实客户上不可达。"""
+    """开单控件显隐判据(R2F-R3 拍板:常显)。此前判「当期没有工单」(A3 修复版)仍挡住
+    "当期已有单、想再开/核对别的历史账期"这个真实场景——卡片上无处可点,只能绕去客户
+    档案页。选中已有期由后端 open_work_order 幂等打开既有单,不会重复建单,故拿掉一切
+    判断,任何卡片状态都恒显开单控件。"""
 
     def test_no_order_shows_control(self):
         out = _run_node(f"""
@@ -230,14 +232,14 @@ class NeedsOpenControlTests(unittest.TestCase):
             """)
         self.assertTrue(out)
 
-    def test_current_period_order_hides_control(self):
+    def test_current_period_order_still_shows_control(self):
         out = _run_node(f"""
             const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
             process.stdout.write(JSON.stringify(b.needsOpenControl(
                 {{order: {{period: '2569-05'}}}}, '2569-05'
             )));
             """)
-        self.assertFalse(out)
+        self.assertTrue(out)
 
     def test_historical_order_only_still_shows_control(self):
         out = _run_node(f"""

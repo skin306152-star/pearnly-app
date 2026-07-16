@@ -171,6 +171,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     ca_tab_history: '工单历史',
     ca_history_empty_t: '还没有工单',
     ca_history_empty_s: '该客户尚未开过工单',
+    ca_history_open_hint: '开一个账期的工单',
     reports_pick_client: '选择客户',
     reports_client_label: '客户',
     reports_period_label: '账期',

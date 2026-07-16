@@ -117,22 +117,19 @@
         return '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' + inner + '</svg>';
     }
 
-    // 上传中/失败时的批次进度后缀——分批(BATCH_MAX_BYTES/BATCH_MAX_FILES)对用户不透明,
-    // 单批就不拼数字(没必要的噪声);多批才拼「已传/共几张、第几批」,数字+分隔符不夹外语词,
-    // 不新增 i18n 键(复用既有 intake_uploading/错误文案原句,后面加纯数字进度)。
+    // 上传中/失败时的真进度后缀(R2F-R3 #4):不论单批多批都拼「已传/共几张」——此前
+    // 单批(BATCH_MAX_FILES=20 以内)不拼数字纯转圈,单批一样有真实的"已传 X / 总 N"
+    // 可报(uploadDone 由每批 addMaterials 结算后累加,单批时就是 0→N 一步到位,但那一步
+    // 也是真数不是假动画)。分批(BATCH_MAX_BYTES/BATCH_MAX_FILES 触顶才切批)时额外拼
+    // 「第几批」,数字+分隔符不夹外语词,不新增 i18n 键(复用既有 intake_uploading/
+    // 错误文案原句,后面加纯数字进度)。
     function batchProgressSuffix(ctx) {
-        if (!ctx.uploadBatchTotal || ctx.uploadBatchTotal <= 1) return '';
-        return (
-            ' (' +
-            (ctx.uploadDone || 0) +
-            '/' +
-            (ctx.uploadTotal || 0) +
-            ' · ' +
-            (ctx.uploadBatchIndex || 0) +
-            '/' +
-            ctx.uploadBatchTotal +
-            ')'
-        );
+        if (!ctx.uploadTotal) return '';
+        var s = ' (' + (ctx.uploadDone || 0) + '/' + ctx.uploadTotal;
+        if (ctx.uploadBatchTotal > 1) {
+            s += ' · ' + (ctx.uploadBatchIndex || 0) + '/' + ctx.uploadBatchTotal;
+        }
+        return s + ')';
     }
 
     // 拖拽/点选上传区。四态:idle(空)/ 已选文件 / 上传中 / 刚传完(引导重新跑)。
@@ -312,13 +309,28 @@
         );
     }
 
-    // 补料后「重新跑」面(idle → 按钮;waiting → 禁用转述;错 → 人话 + 重试)。
+    // 补料后「重新跑」面:idle → 按钮;waiting → 禁用转述(有 classify 进度就报「识别中
+    // X/N」而不是空转的省略号,R2F-R3 #5);轮询次数用尽 → 诚实说"仍在后台跑"+手动刷新钮
+    // (不假装失败,也不装作没事发生);错 → 人话 + 重试(409"正在跑"也走这条,同时仍在
+    // 轮询,不是终态)。
     function rerunHtml(ctx) {
-        if (!ctx.dirty && ctx.rerunState !== 'waiting') return '';
+        if (!ctx.dirty && ctx.rerunState !== 'waiting' && !ctx.rerunTimedOut) return '';
         var inner;
-        if (ctx.rerunState === 'waiting') {
+        if (ctx.rerunTimedOut) {
             inner =
-                '<button class="btn pri" disabled>' + esc(at('intake_rerun_waiting')) + '</button>';
+                '<p class="intake-err">' +
+                esc(at('wo_run_timeout_hint')) +
+                '</p><button class="btn" data-action="ik-refresh-status">' +
+                esc(at('wo_refresh_btn')) +
+                '</button>';
+        } else if (ctx.rerunState === 'waiting') {
+            var waitingLabel = ctx.rerunProgress
+                ? at('wo_classify_progress', {
+                      done: ctx.rerunProgress.processed,
+                      total: ctx.rerunProgress.total,
+                  })
+                : at('intake_rerun_waiting');
+            inner = '<button class="btn pri" disabled>' + esc(waitingLabel) + '</button>';
         } else {
             inner =
                 '<button class="btn pri" data-action="ik-rerun">' +

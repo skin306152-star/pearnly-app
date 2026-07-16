@@ -187,6 +187,7 @@ Object.assign(window.__AI_I18N_JA__, {
     ca_tab_history: 'ワークオーダー履歴',
     ca_history_empty_t: 'まだワークオーダーがありません',
     ca_history_empty_s: 'この顧客はまだワークオーダーを開いていません',
+    ca_history_open_hint: '任意の会計期間のワークオーダーを開く',
     reports_pick_client: '顧客を選択',
     reports_client_label: '顧客',
     reports_period_label: '申告期間',

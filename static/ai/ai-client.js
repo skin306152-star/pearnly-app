@@ -286,7 +286,15 @@
         VIEWS.forEach(function (v) {
             var el = $('tab' + v.charAt(0).toUpperCase() + v.slice(1));
             el.onclick = function () {
-                window.location.hash = AI.router.buildClientHash(S.clientId, v);
+                // R2F-R3:tab 切换必须带上当前选中账期,否则新 hash 丢 ?period=——
+                // 刷新时 mount() 走"不同客户"分支重新 periodIndexOf(null) 落回最新期,
+                // 账期角标就会跟切走前实际展示的那期对不上(见 periodIndexOf 注释)。
+                var order = currentOrder();
+                window.location.hash = AI.router.buildClientHash(
+                    S.clientId,
+                    v,
+                    order ? order.period : undefined
+                );
             };
         });
     }

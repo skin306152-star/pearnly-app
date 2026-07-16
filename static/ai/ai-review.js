@@ -44,6 +44,7 @@
             mode: 'card', // 'card' | 'done'
             rerunState: 'idle',
             blockedInfo: null,
+            rerunProgress: null, // classify 步逐件进度快照 {step,processed,total} · R2F-R3 #5
         };
     }
 
@@ -89,7 +90,8 @@
             S.sessionDecided,
             S.sessionCorrected,
             S.rerunState,
-            S.blockedInfo
+            S.blockedInfo,
+            S.rerunProgress
         );
     }
 
@@ -276,6 +278,7 @@
         var session = S; // 快照——重跑是长链路(网络 + 轮询),切走后续段一律不认。
         S.rerunState = 'waiting';
         S.blockedInfo = null;
+        S.rerunProgress = null;
         renderDone();
         S.api
             .runOrder(S.orderId)
@@ -283,18 +286,30 @@
                 if (S !== session) return; // 已切走
                 pollAfterRun(session, 0);
             })
-            .catch(function () {
+            .catch(function (err) {
                 if (S !== session) return; // 已切走
+                var errKey = AI.api.mapApiErrorKey(err && err.code);
+                // 409(工单已在跑):不是失败,是我们来晚了——继续轮询,只是带上
+                // "正在跑"专属文案(同 ai-intake.js::startRerun 先例)。
+                if (errKey === 'err_workorder_run_in_progress') {
+                    S.blockedInfo = { reasons: [at(errKey)], hasQueue: false };
+                    renderDone();
+                    pollAfterRun(session, 0);
+                    return;
+                }
                 S.rerunState = 'idle';
-                S.blockedInfo = { reasons: [at('err_generic')], hasQueue: false };
+                S.blockedInfo = { reasons: [at(errKey)], hasQueue: false };
                 renderDone();
             });
     }
 
     function pollAfterRun(session, count) {
         if (count >= POLL_MAX_TRIES) {
+            // 轮询次数用尽不等于"仍卡住需要你判断"(那是 rv_still_blocked 的语义)——
+            // 大概率只是引擎还在后台跑,比 1 分钟慢。诚实区分开,给手动刷新钮
+            // (timedOut,R2F-R3 #5),不跟真实的"缺料/需裁决"混成一句话。
             S.rerunState = 'idle';
-            S.blockedInfo = { reasons: [], hasQueue: S.queue.length > 0 };
+            S.blockedInfo = { reasons: [], hasQueue: S.queue.length > 0, timedOut: true };
             renderDone();
             return;
         }
@@ -304,6 +319,10 @@
                 .getOrder(S.orderId)
                 .then(function (detail) {
                     if (S !== session) return; // 已切走
+                    if (detail.progress && detail.progress.step === 'classify') {
+                        S.rerunProgress = detail.progress;
+                        renderDone();
+                    }
                     var freshQueue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
                     var hasNumbers = Object.keys(detail.numbers || {}).length > 0;
                     if (detail.status !== 'stuck' || !freshQueue.length || hasNumbers) {
@@ -325,6 +344,15 @@
                     pollAfterRun(session, count + 1);
                 });
         }, POLL_INTERVAL_MS);
+    }
+
+    // 轮询超时后的手动"刷新查看"(R2F-R3 #5,同 ai-intake.js::refreshAfterTimeout 先例):
+    // 重新起一轮完整轮询,不是点一下只探一次就又撒手。
+    function refreshStatus() {
+        if (S.rerunState === 'waiting') return;
+        S.rerunState = 'waiting';
+        renderDone();
+        pollAfterRun(S, 0);
     }
 
     function backToQueue() {
@@ -414,6 +442,7 @@
         else if (action === 'rv-pool-pick') stageToPool(el.getAttribute('data-qtype'));
         else if (action === 'rv-rerun') startRerun();
         else if (action === 'rv-back-to-queue') backToQueue();
+        else if (action === 'rv-refresh-status') refreshStatus();
         else if (action === 'rv-goto-pkg') {
             window.location.hash = AI.router.buildClientHash(S.clientId, 'pkg');
         }

@@ -186,6 +186,7 @@ Object.assign(window.__AI_I18N_EN__, {
     ca_tab_history: 'Work order history',
     ca_history_empty_t: 'No work orders yet',
     ca_history_empty_s: 'This client has not had a work order opened yet',
+    ca_history_open_hint: 'Open a work order for a specific period',
     reports_pick_client: 'Select a client',
     reports_client_label: 'Client',
     reports_period_label: 'Period',

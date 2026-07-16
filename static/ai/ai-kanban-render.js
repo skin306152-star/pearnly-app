@@ -45,13 +45,12 @@
         );
     }
 
-    function cardHtml(entry, optsHtml, currentPeriod) {
+    function cardHtml(entry, optsHtml) {
         var hotClass = entry.column === 'review' ? ' hot' : '';
         var summaryText = at(entry.summary.key, entry.summary.vars);
-        // 判据是「当期没有工单」不是「从未有单」——见 AI.board.needsOpenControl 注释。
-        var openBtn = AI.board.needsOpenControl(entry, currentPeriod)
-            ? openOrderHtml(entry.client.id, optsHtml)
-            : '';
+        // R2F-R3:开单控件恒显——见 AI.board.needsOpenControl 注释(不再判「当期是否
+        // 已有单」,任何卡片都能就地开/打开任意历史账期单,选中已有期后端幂等回既有单)。
+        var openBtn = openOrderHtml(entry.client.id, optsHtml);
         // tabindex=0:卡片 Tab 可达(Enter/空格触发同点击,见 wireBoard);
         // title:名称/摘要窄卡被省略号截断时悬停可看全文(Canon §6.2)。
         // P0-2:卡片携带的工单期(entry.order 是该客户最新一期,可能不是当月)——点卡
@@ -81,11 +80,11 @@
         );
     }
 
-    function columnHtml(col, items, optsHtml, currentPeriod) {
+    function columnHtml(col, items, optsHtml) {
         var body = items.length
             ? items
                   .map(function (entry) {
-                      return cardHtml(entry, optsHtml, currentPeriod);
+                      return cardHtml(entry, optsHtml);
                   })
                   .join('')
             : '<div class="kempty">' + esc(at('col_empty')) + '</div>';
@@ -106,13 +105,10 @@
     // entry: { client, order, detail, column, unknownStatus, summary }
     function renderBoard(container, groups) {
         var optsHtml = periodOptionsHtml();
-        // currentPeriod 整块看板算一次(同 optsHtml 的收敛理由,见 a19c8eef),各卡片
-        // 复用同一值,不在每卡重算 currentPeriodBE()。
-        var currentPeriod = AI.board.currentPeriodBE();
         container.innerHTML =
             '<div class="kanban">' +
             AI.board.COLUMNS.map(function (col) {
-                return columnHtml(col, groups[col.key] || [], optsHtml, currentPeriod);
+                return columnHtml(col, groups[col.key] || [], optsHtml);
             }).join('') +
             '</div>';
     }

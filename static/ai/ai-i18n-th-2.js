@@ -182,6 +182,7 @@ Object.assign(window.__AI_I18N_TH__, {
     ca_tab_history: 'ประวัติใบงาน',
     ca_history_empty_t: 'ยังไม่มีใบงาน',
     ca_history_empty_s: 'ลูกค้ารายนี้ยังไม่เคยเปิดใบงาน',
+    ca_history_open_hint: 'เปิดใบงานของงวดใดงวดหนึ่ง',
     reports_pick_client: 'เลือกลูกค้า',
     reports_client_label: 'ลูกค้า',
     reports_period_label: 'งวดบัญชี',

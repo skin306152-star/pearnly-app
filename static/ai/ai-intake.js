@@ -51,6 +51,8 @@
             dirty: false, // 本会话补过料(上传或人工填)→ 亮出「重新跑」
             rerunState: 'idle',
             rerunErrKey: null,
+            rerunProgress: null, // classify 步逐件进度快照 {step,processed,total} · R2F-R3 #5
+            rerunTimedOut: false, // 轮询次数用尽仍未收口(仍在后台跑)· R2F-R3 #5
             // 银行流水倒推销项(SA-3b):折叠/行级裁决/预判 三区确认清单的纯 UI 态,
             // 建议本体不落在这里——始终读 S.order.bank_sales_suggestion(getOrder 回放)。
             bankSalesUi: AI.bankSalesRender.freshUiState(),
@@ -84,6 +86,8 @@
             dirty: S.dirty,
             rerunState: S.rerunState,
             rerunErrKey: S.rerunErrKey,
+            rerunProgress: S.rerunProgress,
+            rerunTimedOut: S.rerunTimedOut,
             bankSalesSuggestion: S.order && S.order.bank_sales_suggestion,
             bankSalesUi: S.bankSalesUi,
             salesCorrob: S.order && S.order.sales_corroboration,
@@ -261,6 +265,8 @@
         var session = S;
         S.rerunState = 'waiting';
         S.rerunErrKey = null;
+        S.rerunProgress = null;
+        S.rerunTimedOut = false;
         render();
         S.api
             .runOrder(S.orderId)
@@ -268,17 +274,30 @@
                 if (S !== session) return;
                 pollAfterRun(session, 0);
             })
-            .catch(function () {
+            .catch(function (err) {
                 if (S !== session) return;
+                var errKey = AI.api.mapApiErrorKey(err && err.code);
+                // 409(工单已在跑,如另一标签页触发):不是失败,是我们来晚了——仍然
+                // 继续轮询进度,只是带上"正在跑"专属文案而不是让用户干等一个死按钮。
+                if (errKey === 'err_workorder_run_in_progress') {
+                    S.rerunErrKey = errKey;
+                    render();
+                    pollAfterRun(session, 0);
+                    return;
+                }
                 S.rerunState = 'idle';
-                S.rerunErrKey = 'err_generic';
+                S.rerunErrKey = errKey;
                 render();
             });
     }
 
     function pollAfterRun(session, count) {
         if (count >= POLL_MAX_TRIES) {
+            // 轮询次数用尽不等于跑完/跑失败——真实情况通常是引擎还在后台处理,只是
+            // 比 30 次 × 2 秒(1 分钟)慢。诚实说"仍在后台跑",给手动刷新钮,不假装
+            // 已收口也不再无声空转(R2F-R3 #5)。
             S.rerunState = 'idle';
+            S.rerunTimedOut = true;
             render();
             return;
         }
@@ -288,6 +307,10 @@
                 .getOrder(S.orderId)
                 .then(function (detail) {
                     if (S !== session) return;
+                    if (detail.progress && detail.progress.step === 'classify') {
+                        S.rerunProgress = detail.progress;
+                        render();
+                    }
                     routeAfter(detail, session, count);
                 })
                 .catch(function () {
@@ -295,6 +318,16 @@
                     pollAfterRun(session, count + 1);
                 });
         }, POLL_INTERVAL_MS);
+    }
+
+    // 轮询超时后的手动"刷新查看"(R2F-R3 #5):重新从头计一轮轮询,不是单次探一下就撒手
+    // ——用户点了就该看到跟原生重新跑一样的实时进度,不是又一次即时死按钮。
+    function refreshAfterTimeout() {
+        if (S.rerunState === 'waiting') return;
+        S.rerunState = 'waiting';
+        S.rerunTimedOut = false;
+        render();
+        pollAfterRun(S, 0);
     }
 
     function routeAfter(detail, session, count) {
@@ -338,6 +371,7 @@
         else if (a === 'ik-open-form') openForm();
         else if (a === 'ik-form-cancel') cancelForm();
         else if (a === 'ik-rerun') startRerun();
+        else if (a === 'ik-refresh-status') refreshAfterTimeout();
         else if (a === 'ik-pw-skip') intakeQueue.skipPassword();
         else if (a === 'ik-resume-pick') resumePick();
         else if (a === 'ik-resume-dismiss') intakeQueue.resumeDismiss();

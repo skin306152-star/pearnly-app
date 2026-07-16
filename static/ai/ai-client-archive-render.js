@@ -77,6 +77,28 @@
         );
     }
 
+    // 开任意历史账期单(R2F-R3 #2):复用看板同一套账期下拉(AI.board.periodOptions)+
+    // 同一份开单文案(card_period_select_label/card_open_order),点击落 ai-client-archive.js
+    // 的 openHistoryPeriodOrder——调既有 createOrder(),后端幂等,选已有期直接打开该单。
+    function historyOpenHtml() {
+        return (
+            '<div class="panel"><div class="bd">' +
+            '<p class="needs-sub">' +
+            esc(at('ca_history_open_hint')) +
+            '</p><div class="kopen">' +
+            '<select class="period-sel" data-role="ca-period-select" aria-label="' +
+            esc(at('card_period_select_label')) +
+            '">' +
+            root.AI.state.optionsHtml(root.AI.board.periodOptions(), null, function (p) {
+                return p;
+            }) +
+            '</select>' +
+            '<button type="button" class="btn sm" data-action="ca-open-period-order">' +
+            esc(at('card_open_order')) +
+            '</button></div></div></div>'
+        );
+    }
+
     function historyRowHtml(order) {
         return (
             '<div class="dlv-line" data-action="ca-open-order" data-order-period="' +
@@ -90,15 +112,22 @@
         );
     }
 
+    // R2F-R3 #2:开单入口置顶,不论该客户历史列表空或非空都要出现——空态(尚未开过任何
+    // 单)恰恰最需要它,不能只在有历史行时才给入口。
     function historyListHtml(orders) {
         var sorted = sortOrdersByPeriodDesc(orders);
+        var openCtl = historyOpenHtml();
         if (!sorted.length) {
-            return AI.state.emptyHtml({
-                title: at('ca_history_empty_t'),
-                sub: at('ca_history_empty_s'),
-            });
+            return (
+                openCtl +
+                AI.state.emptyHtml({
+                    title: at('ca_history_empty_t'),
+                    sub: at('ca_history_empty_s'),
+                })
+            );
         }
         return (
+            openCtl +
             '<div class="panel"><div class="bd">' +
             sorted.map(historyRowHtml).join('') +
             '</div></div>'

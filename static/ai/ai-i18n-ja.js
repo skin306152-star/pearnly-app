@@ -78,6 +78,10 @@ window.__AI_I18N_JA__ = {
     wo_step: '現在のステップ',
     wo_flagged: '要判断項目',
     wo_needs: '不足資料',
+    wo_classify_progress: '認識中 {done}/{total}',
+    wo_run_timeout_hint:
+        'バックグラウンドでまだ処理中です。他の作業をしてから戻って更新してご確認ください',
+    wo_refresh_btn: '更新して確認',
     intake_empty_t: 'まずこの期間のワークオーダーを作成',
     intake_empty_s: '作成後に資料の投入・売上補完・照合ができます。',
     intake_lead:

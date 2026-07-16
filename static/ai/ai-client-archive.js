@@ -99,6 +99,33 @@
         else if (S.tab === 'history') loadHistoryTab();
     }
 
+    // R2F-R3 #2:工单历史区顶部的账期选择器 + 开单钮——调既有 createOrder()
+    // (workspace_client_id/period/intent 同 ai-client.js::openFirstOrder 的零数据首跑
+    // 口径),后端 open_work_order 幂等,选已有期直接打开该单不会重复建单。开完跳到
+    // 该单的工单 tab(同历史行点击的落点一致)。
+    function openHistoryPeriodOrder(btn) {
+        if (btn.disabled) return;
+        var select = $('v-client-archive').querySelector('[data-role="ca-period-select"]');
+        var period = select ? select.value : null;
+        if (!period) return;
+        var idleLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = at('card_open_order_busy');
+        S.api
+            .createOrder({
+                workspace_client_id: Number(S.clientId),
+                period: period,
+                intent: 'monthly_vat',
+            })
+            .then(function () {
+                window.location.hash = AI.router.buildClientHash(S.clientId, 'wo', period);
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.textContent = idleLabel;
+            });
+    }
+
     function onClick(e) {
         var tabBtn = e.target.closest('[data-tab]');
         if (tabBtn) {
@@ -106,6 +133,11 @@
                 S.clientId,
                 tabBtn.getAttribute('data-tab')
             );
+            return;
+        }
+        var openPeriodBtn = e.target.closest('[data-action="ca-open-period-order"]');
+        if (openPeriodBtn) {
+            openHistoryPeriodOrder(openPeriodBtn);
             return;
         }
         var orderRow = e.target.closest('[data-action="ca-open-order"]');

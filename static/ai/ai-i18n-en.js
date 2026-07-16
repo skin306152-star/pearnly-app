@@ -78,6 +78,9 @@ window.__AI_I18N_EN__ = {
     wo_step: 'Current step',
     wo_flagged: 'Flagged items',
     wo_needs: 'Missing items',
+    wo_classify_progress: 'Recognizing {done}/{total}',
+    wo_run_timeout_hint: 'Still running in the background — step away and refresh later to check',
+    wo_refresh_btn: 'Refresh',
     intake_empty_t: 'Open this period first',
     intake_empty_s: 'Once the work order is open you can drop in files, add sales, and reconcile.',
     intake_lead:

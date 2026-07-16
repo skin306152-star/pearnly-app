@@ -328,16 +328,32 @@
         );
     }
 
-    // 队列走完(契约 §4)。blockedInfo: {reasons:[], hasQueue} | null;rerunState: 'idle'|'waiting'。
-    function clearedHtml(n, m, rerunState, blockedInfo) {
+    // 队列走完(契约 §4)。blockedInfo: {reasons:[], hasQueue, timedOut?} | null;
+    // rerunState: 'idle'|'waiting';rerunProgress: classify 步 {processed,total} | null
+    // (R2F-R3 #5:等待态有真进度就报「识别中 X/N」,轮询超时诚实说"仍在后台跑"而不是
+    // 让 blockedInfo 空 reasons 的沉默态冒充"卡住需要你判断")。
+    function clearedHtml(n, m, rerunState, blockedInfo, rerunProgress) {
+        var waitingLabel = rerunProgress
+            ? at('wo_classify_progress', {
+                  done: rerunProgress.processed,
+                  total: rerunProgress.total,
+              })
+            : at('rv_rerun_waiting');
         var btn =
             rerunState === 'waiting'
-                ? '<button class="btn pri" disabled>' + esc(at('rv_rerun_waiting')) + '</button>'
+                ? '<button class="btn pri" disabled>' + esc(waitingLabel) + '</button>'
                 : '<button class="btn pri" data-action="rv-rerun">' +
                   esc(at('rv_rerun')) +
                   '</button>';
         var blocked = '';
-        if (blockedInfo) {
+        if (blockedInfo && blockedInfo.timedOut) {
+            blocked =
+                '<p class="rv-blocked">' +
+                esc(at('wo_run_timeout_hint')) +
+                '</p><button class="btn sm" data-action="rv-refresh-status">' +
+                esc(at('wo_refresh_btn')) +
+                '</button>';
+        } else if (blockedInfo) {
             blocked =
                 '<p class="rv-blocked">' +
                 esc(at('rv_still_blocked')) +

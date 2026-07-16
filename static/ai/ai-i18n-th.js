@@ -78,6 +78,9 @@ window.__AI_I18N_TH__ = {
     wo_step: 'ขั้นตอนปัจจุบัน',
     wo_flagged: 'รายการรอตัดสินใจ',
     wo_needs: 'รายการที่ขาด',
+    wo_classify_progress: 'กำลังอ่าน {done}/{total}',
+    wo_run_timeout_hint: 'ยังทำงานอยู่เบื้องหลัง ไปทำอย่างอื่นก่อนแล้วกลับมารีเฟรชดูผลได้',
+    wo_refresh_btn: 'รีเฟรชดูผล',
     intake_empty_t: 'เปิดงานของงวดนี้ก่อน',
     intake_empty_s: 'เปิดงานแล้วจึงส่งเอกสาร เติมยอดขาย และกระทบยอดได้',
     intake_lead:

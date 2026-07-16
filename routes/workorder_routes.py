@@ -250,8 +250,25 @@ async def run_order(work_order_id: str, request: Request, background: Background
     with db.get_cursor() as cur:  # 冻结只读闸 + 归属校验先行(读侧),再抢租约推进
         wo = _load_mutable_order(cur, request, user, tenant_id, work_order_id)
     if not _schedule_advance(background, tenant_id, work_order_id, user):
-        raise HTTPException(409, detail="workorder.run_in_progress")
+        # 抢不到租约=已有 run 在跑:409 带「正在跑」结构化体(F6 病历:409 无信息像死机)。
+        raise HTTPException(409, detail=_run_in_progress_detail(tenant_id, work_order_id))
     return {"queued": True, "status": wo["status"]}
+
+
+def _run_in_progress_detail(tenant_id: str, work_order_id: str) -> dict:
+    """/run 撞租约的结构化体(R1):code + 可轮询工单号 + 当前租约持有者(best-effort;进度/到期由前端轮询 GET /orders/{id} 取,查不到留 None 绝不翻 5xx)。"""
+    owner = None
+    try:
+        with db.get_cursor() as cur:
+            holder = store.run_lease_holder(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+        owner = (holder or {}).get("run_lease_owner")
+    except Exception:  # noqa: BLE001 - 附加进度 best-effort,失败不牵连 409 本身
+        logger.warning("run-in-progress lease lookup skipped for %s", work_order_id)
+    return {
+        "code": "workorder.run_in_progress",
+        "work_order_id": work_order_id,
+        "run_lease": {"owner": owner} if owner else None,
+    }
 
 
 @router.post("/api/workorder/orders/{work_order_id}/decisions")

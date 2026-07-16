@@ -136,13 +136,22 @@ class RunLeaseRouteTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(wr.store, "acquire_run_lease", return_value=False),
             mock.patch.object(wr.store, "append_event") as append,
+            mock.patch.object(
+                wr.store,
+                "run_lease_holder",
+                return_value={"run_lease_owner": "run:busy", "run_lease_expires_at": None},
+            ),
         ):
             for p in self._patches(wr):
                 self.enterContext(p)
             with self.assertRaises(HTTPException) as ctx:
                 await wr.run_order("wo-1", mock.Mock(), mock.Mock())
         self.assertEqual(ctx.exception.status_code, 409)
-        self.assertEqual(ctx.exception.detail, "workorder.run_in_progress")
+        # R1:409 带「正在跑」结构化信息(code + 可轮询进度锚 + 租约持有者),不再是裸字符串。
+        detail = ctx.exception.detail
+        self.assertEqual(detail["code"], "workorder.run_in_progress")
+        self.assertEqual(detail["work_order_id"], "wo-1")
+        self.assertEqual(detail["run_lease"]["owner"], "run:busy")
         append.assert_not_called()  # 抢不到就不落 run_requested、不排后台
 
     async def test_lease_acquired_queues_advance_with_owner(self):

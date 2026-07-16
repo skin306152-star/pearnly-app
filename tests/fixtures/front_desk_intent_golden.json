@@ -1,7 +1,7 @@
 {
-  "status": "draft",
+  "status": "final",
   "schema_version": 1,
-  "note": "FD-0c 意图金标考卷·施工子代理起草·定稿权在主窗(事实资产,逐句审+补真实场景句)。utterance 力求口语(LINE 会计对话体),含泰式佛历期间缩写(如 มิ.ย.69)。period_hint 为原文线索,规范期间(YYYY-MM)由判卷 CLI 的 parse_period_hint(hint, today) 在判卷时现算,不在此固化(避免草拟日期成为过期锚点)。",
+  "note": "FD-0c 意图金标考卷·2026-07-16 主窗逐句审定稿(FD-0e 真调 42 题:开放意图命中 100%/引用 100%,唯一争议 #042 按裁决改注 payroll_filing)。utterance 力求口语(LINE 会计对话体),含泰式佛历期间缩写(如 มิ.ย.69)。period_hint 为原文线索,规范期间(YYYY-MM)由判卷 CLI 的 parse_period_hint(hint, today) 在判卷时现算,不在此固化(避免草拟日期成为过期锚点)。",
   "closed_intents": [
     "monthly_vat",
     "bank_match",
@@ -434,9 +434,9 @@
       "utterance": "帮我把上个月的1ก年度工资汇总表整理一下",
       "client_hint": null,
       "period_hint": "上个月",
-      "expect_intent": "unsupported",
+      "expect_intent": "payroll_filing",
       "expect_client_id": null,
-      "note": "1ก 年度工资聚合·roadmap 内(场景表#17)但 FD-0/1 闭集尚未挂此意图·应诚实拒绝而非误配 payroll_filing"
+      "note": "1ก 年度工资聚合确属工资族,识别为 payroll_filing 正确(FD-0e 主窗裁决 2026-07-16);该意图 enabled=False 由合同层拒绝卡兜底不误执行——族识别与是否开放分层,金标只考族识别"
     }
   ]
 }

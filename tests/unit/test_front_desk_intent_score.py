@@ -172,8 +172,8 @@ class GoldenFixtureShapeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.golden = json.loads(_GOLDEN_PATH.read_text(encoding="utf-8"))
 
-    def test_status_is_draft(self):
-        self.assertEqual(self.golden["status"], "draft")
+    def test_status_is_final(self):
+        self.assertEqual(self.golden["status"], "final")
 
     def test_at_least_40_cases_and_10_reject(self):
         cases = self.golden["cases"]

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -36,7 +37,37 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--out", required=True, help="交付包输出目录")
     p.add_argument("--tenant-id", help="租户 UUID(缺省从匹配到的客户账套推导)")
     p.add_argument("--decide", action="append", default=[], help="item_id:decision[:k=v,...]")
+    p.add_argument(
+        "--watch",
+        action="store_true",
+        help="跑批期间每 3 秒只读打印实时步位/已识别张数(观测用,不改跑批逻辑)",
+    )
     return p.parse_args()
+
+
+def _watch_progress(tenant_id: str, work_order_id: str, stop: threading.Event) -> None:
+    """独立只读连接轮询 current_step + item_classified 事件数,滚动打印真实进度。
+
+    只读、与引擎的按步事务互不干扰(引擎每进一步先独立提交 current_step,故这里能立刻看到);
+    任何查询异常都吞掉继续下一轮——观测层绝不拖累跑批。
+    """
+    last = None
+    while not stop.wait(3.0):
+        try:
+            with db.get_cursor() as cur:
+                wo = store.get_work_order(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+                events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+        except Exception:
+            continue
+        if not wo:
+            continue
+        classified = sum(1 for e in events if e.get("event_type") == "item_classified")
+        line = (
+            f"  … {wo['status']}/{wo['current_step']} · 已识别 {classified} 张 · 事件 {len(events)}"
+        )
+        if line != last:  # 只在变化时打,避免刷屏
+            print(line, flush=True)
+            last = line
 
 
 def _resolve_client(cur, *, client: str, tenant_id: str) -> dict:
@@ -136,8 +167,30 @@ def main() -> int:
         data=data,
         cursor_factory=lambda: db.get_cursor(commit=True),
     )
-    out = engine.run_work_order(ctx, handlers=real_handlers())
-    return _print_outcome(out, ctx)
+    if not args.watch:
+        out = engine.run_work_order(ctx, handlers=real_handlers())
+        return _print_outcome(out, ctx)
+
+    # --watch:引擎跑后台线程,主线程只读轮询打印实时进度,引擎结束即收尾。
+    result: dict = {}
+    stop = threading.Event()
+
+    def _run() -> None:
+        try:
+            result["out"] = engine.run_work_order(ctx, handlers=real_handlers())
+        except BaseException as e:  # 让主线程看到崩因,不静默吞
+            result["err"] = e
+        finally:
+            stop.set()
+
+    worker = threading.Thread(target=_run, daemon=True)
+    print(f"▶ 跑批开始(工单 {wo['id']})· 每 3 秒刷新真实进度:", flush=True)
+    worker.start()
+    _watch_progress(tenant_id, wo["id"], stop)
+    worker.join()
+    if "err" in result:
+        raise result["err"]
+    return _print_outcome(result["out"], ctx)
 
 
 if __name__ == "__main__":

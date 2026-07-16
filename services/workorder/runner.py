@@ -39,12 +39,24 @@ _inflight: set = set()
 
 
 def run_lease_ttl_seconds() -> int:
-    """/run 租约有效期(秒)。默认 1800:远大于一次全量跑批(并发化后目标 <6 分钟),又能在
-    进程猝死后自动过期让另一终端接管。env PEARNLY_WORKORDER_RUN_LEASE_TTL 覆写。"""
+    """/run 租约有效期(秒)。默认 180:持约进程按 run_heartbeat_seconds() 周期续租,健康
+    跑批永不耗穿;进程猝死后至多 TTL 秒租约过期,reaper 即认死接管(把「30 分钟盲区」压到
+    ~3 分钟)。TTL 与心跳间隔留 ≥3 倍裕量,单次心跳丢失不误判死。env
+    PEARNLY_WORKORDER_RUN_LEASE_TTL 覆写(可调回激进值)。"""
     try:
-        return max(60, int(os.environ.get("PEARNLY_WORKORDER_RUN_LEASE_TTL", "1800")))
+        return max(30, int(os.environ.get("PEARNLY_WORKORDER_RUN_LEASE_TTL", "180")))
     except ValueError:
-        return 1800
+        return 180
+
+
+def run_heartbeat_seconds() -> int:
+    """跑批持约进程的心跳续租间隔(秒)。默认 60:配 180s TTL = 3 次心跳裕量,单次 DB 抖动
+    丢一拍不至于误判死。逐件检查点按此间隔节流续约(见 steps/checkpoint.renew_lease),避免每
+    件都打一次 UPDATE。env PEARNLY_WORKORDER_RUN_HEARTBEAT_SECONDS 覆写。"""
+    try:
+        return max(1, int(os.environ.get("PEARNLY_WORKORDER_RUN_HEARTBEAT_SECONDS", "60")))
+    except ValueError:
+        return 60
 
 
 def request_run(
@@ -226,8 +238,13 @@ def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) 
         }
         if lease_owner:
             # 逐件检查点心跳的料(classify._item_scope 顺带续约,MC2-A1 ④):只有持约的 run
-            # 才续,直调(CLI/测试)不涉租约也就没有心跳。
-            data["run_lease"] = {"owner": lease_owner, "ttl_seconds": run_lease_ttl_seconds()}
+            # 才续,直调(CLI/测试)不涉租约也就没有心跳。heartbeat_seconds 令检查点按间隔
+            # 节流续约(短 TTL 下把判死压到分钟级,又不每件打一次 UPDATE)。
+            data["run_lease"] = {
+                "owner": lease_owner,
+                "ttl_seconds": run_lease_ttl_seconds(),
+                "heartbeat_seconds": run_heartbeat_seconds(),
+            }
         ctx = engine.StepContext(
             cur=None,
             tenant_id=str(tenant_id),

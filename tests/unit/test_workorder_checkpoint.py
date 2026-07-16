@@ -86,8 +86,46 @@ class ItemScopeTests(unittest.TestCase):
     def test_renew_noop_without_lease_owner(self):
         store = _RecordStore()
         ctx = _Ctx(cur="c", store=store, data={})  # 无 run_lease(直调/CLI)
-        checkpoint.renew_lease(ctx, "c")
+        checkpoint.renew_lease(ctx)
         self.assertEqual(store.renewals, [])
+
+    def test_heartbeat_throttled_by_interval(self):
+        # R1:配了 heartbeat_seconds 就按间隔节流——同一窗口内第二件检查点不再打续租 UPDATE,
+        # 隔了间隔才续(短 TTL 下少打无谓 UPDATE,仍保 ≥3 次心跳裕量)。
+        store = _RecordStore()
+
+        @contextmanager
+        def factory():
+            yield _FakeCursor()
+
+        ctx = _Ctx(
+            store=store,
+            cursor_factory=factory,
+            data={"run_lease": {"owner": "run:x", "ttl_seconds": 180, "heartbeat_seconds": 60}},
+        )
+        with checkpoint.item_scope(ctx):
+            pass
+        with checkpoint.item_scope(ctx):  # 紧接第二件:未到间隔,不续
+            pass
+        self.assertEqual(len(store.renewals), 1)  # 只首拍续了一次
+
+    def test_heartbeat_failure_does_not_kill_run(self):
+        # R1 硬门:心跳单次失败(DB 抖动)只吞掉记日志,绝不把异常抛给跑批主线程。
+        class _BoomStore:
+            def renew_run_lease(self, *a, **k):
+                raise RuntimeError("db blip")
+
+        @contextmanager
+        def factory():
+            yield _FakeCursor()
+
+        ctx = _Ctx(
+            store=_BoomStore(),
+            cursor_factory=factory,
+            data={"run_lease": {"owner": "run:x", "ttl_seconds": 180}},
+        )
+        with checkpoint.item_scope(ctx):  # 不抛,item_scope 正常退出
+            pass
 
 
 if __name__ == "__main__":

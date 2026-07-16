@@ -180,5 +180,31 @@ class ConfirmReadyTests(unittest.TestCase):
         self.assertFalse(out)
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class SuggestionPeriodBETests(unittest.TestCase):
+    """interpret 建议期间(公历)→ 佛历下拉值换算:纪年接缝,换算不进选项集按无建议返 null。"""
+
+    def _conv(self, period, periods):
+        return _run_node(f"""
+            const d = require({json.dumps(DESK)});
+            process.stdout.write(JSON.stringify(d.suggestionPeriodBE(
+                {json.dumps(period)}, {json.dumps(periods)}
+            )));
+            """)
+
+    def test_gregorian_converts_to_be(self):
+        self.assertEqual(self._conv("2026-06", ["2569-07", "2569-06"]), "2569-06")
+
+    def test_already_be_passes_through(self):
+        self.assertEqual(self._conv("2569-06", ["2569-07", "2569-06"]), "2569-06")
+
+    def test_not_in_options_returns_null(self):
+        self.assertIsNone(self._conv("2020-01", ["2569-07", "2569-06"]))
+
+    def test_malformed_returns_null(self):
+        self.assertIsNone(self._conv("06/2569", ["2569-06"]))
+        self.assertIsNone(self._conv(None, ["2569-06"]))
+
+
 if __name__ == "__main__":
     unittest.main()

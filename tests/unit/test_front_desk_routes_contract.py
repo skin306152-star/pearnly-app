@@ -104,5 +104,37 @@ class DisabledIntentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 422)
 
 
+class BadPeriodTests(unittest.IsolatedAsyncioTestCase):
+    """期间必须是佛历 YYYY-MM(工单全链纪年)——公历/畸形值 422 fail-fast,不开错税期工单。"""
+
+    async def _confirm(self, period):
+        with (
+            mock.patch.object(fr, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
+            mock.patch.object(
+                fr.feature_flags, "pearnly_ai_front_desk_enabled_for", return_value=True
+            ),
+        ):
+            await fr.confirm_contract(
+                fr.ConfirmIn(
+                    contract_id="c1",
+                    workspace_client_id=7,
+                    period=period,
+                    intent="monthly_vat",
+                ),
+                mock.Mock(),
+            )
+
+    async def test_confirm_rejects_gregorian_period_422(self):
+        with self.assertRaises(HTTPException) as ctx:
+            await self._confirm("2026-06")
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.detail["code"], "front_desk.bad_period")
+
+    async def test_confirm_rejects_bad_month_422(self):
+        with self.assertRaises(HTTPException) as ctx:
+            await self._confirm("2569-13")
+        self.assertEqual(ctx.exception.status_code, 422)
+
+
 if __name__ == "__main__":
     unittest.main()

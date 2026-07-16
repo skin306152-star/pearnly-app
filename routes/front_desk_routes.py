@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -40,6 +41,14 @@ _MAX_FILE_BYTES = 20 * 1024 * 1024
 _MAX_FILES = 50
 _MAX_UTTERANCE = 2000  # §3.3:超长截断,单次解析预算 ~1-2k token
 _NOT_FOUND = "front_desk.not_found"
+# 工单账期全链是佛历 "YYYY-MM"(interpret 建议是公历,换算在前端接缝);这里 fail-fast
+# 拦格式漂移,防止混纪年期间开出错税期的工单。
+_PERIOD_BE_RE = re.compile(r"^25\d{2}-(0[1-9]|1[0-2])$")
+
+
+def _require_period_be(period: str) -> None:
+    if not _PERIOD_BE_RE.fullmatch(period):
+        raise HTTPException(422, detail={"code": "front_desk.bad_period", "period": period})
 
 
 class InterpretIn(BaseModel):
@@ -86,6 +95,8 @@ async def create_contract(
     user, tenant_id = _authorize(request, _C_PREPARE)
     if len(files) > _MAX_FILES:
         raise HTTPException(413, detail="front_desk.too_many_files")
+    if period is not None:
+        _require_period_be(period)
     contract_store.ensure_once()  # 首用自愈建表(独立事务,先于下面的写事务)
 
     # 段一:读入 + 封顶(不落盘)。给了客户 id 则先验归属(不给未授权请求写盘的机会)。
@@ -172,6 +183,7 @@ async def confirm_contract(req: ConfirmIn, request: Request):
 
     意图未开放(闭集内但 enabled=False)→ 422 intent_not_enabled(诚实拒,不装懂)。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
+    _require_period_be(req.period)
     if not intents.is_enabled(req.intent):
         raise HTTPException(
             422, detail={"code": "front_desk.intent_not_enabled", "intent": req.intent}

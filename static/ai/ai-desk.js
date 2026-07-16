@@ -218,7 +218,7 @@
                             suggestion.client_suggestion != null
                                 ? String(suggestion.client_suggestion)
                                 : S.contextClientId || '',
-                        period: suggestion.period || periods[0],
+                        period: R().suggestionPeriodBE(suggestion.period, periods) || periods[0],
                         intent: suggestion.intent,
                     },
                 };

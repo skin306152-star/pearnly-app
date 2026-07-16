@@ -134,6 +134,17 @@
         return { kind: 'empty', contract: contract };
     }
 
+    // interpret 的规范期间是公历 YYYY-MM(大脑层口径 · FD-0b),工单/账期下拉全链是佛历
+    // "YYYY-MM"——两套纪年在这一接缝换算。换算结果不在给定选项集(过久远/未来)按无建议
+    // 处理返回 null,交调用方回落,绝不把公历值塞进佛历选择态(会显示与提交分叉)。
+    function suggestionPeriodBE(period, periods) {
+        var m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period || '');
+        if (!m) return null;
+        var y = Number(m[1]);
+        var be = (y < 2400 ? y + 543 : y) + '-' + m[2];
+        return (periods || []).indexOf(be) >= 0 ? be : null;
+    }
+
     var pure = {
         INTENT_META: INTENT_META,
         ENABLED_INTENT_IDS: ENABLED_INTENT_IDS,
@@ -141,6 +152,7 @@
         needCoverage: needCoverage,
         confirmReady: confirmReady,
         deriveCard: deriveCard,
+        suggestionPeriodBE: suggestionPeriodBE,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -464,6 +476,7 @@
         needCoverage: needCoverage,
         confirmReady: confirmReady,
         deriveCard: deriveCard,
+        suggestionPeriodBE: suggestionPeriodBE,
         clientOptionsHtml: clientOptionsHtml,
         periodOptionsHtml: periodOptionsHtml,
         intentOptionsHtml: intentOptionsHtml,

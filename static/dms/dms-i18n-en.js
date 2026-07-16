@@ -204,6 +204,7 @@ window.__DMS_I18N_EN__ = {
     'dms-err-err_dms_unexpected': 'Something went wrong, please try again',
     'dms-err-err_id_card_required_fields':
         'Could not read the ID number or name. Retry with a clearer image',
+    err_auth_invalid_credentials: 'Incorrect username or password',
     err_generic: 'Something went wrong, please try again',
     gate_welcome_title: 'Welcome back',
     gate_welcome_sub: 'Sign in to keep registering DMS customers',

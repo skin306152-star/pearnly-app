@@ -198,6 +198,7 @@ window.__DMS_I18N_ZH__ = {
     'dms-err-err_dms_template': '获取订车单模板失败',
     'dms-err-err_dms_unexpected': '推送出现问题,请稍后重试',
     'dms-err-err_id_card_required_fields': '未读到身份证号或姓名,请确认图片清晰后重试',
+    err_auth_invalid_credentials: '用户名或密码错误',
     err_generic: '出了点问题，请重试',
     gate_welcome_title: '欢迎回来',
     gate_welcome_sub: '登录以继续录入 DMS 客户',

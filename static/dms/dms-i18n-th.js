@@ -199,6 +199,7 @@ window.__DMS_I18N_TH__ = {
     'dms-err-err_dms_template': 'ดึงแม่แบบใบจองไม่สำเร็จ',
     'dms-err-err_dms_unexpected': 'เกิดข้อผิดพลาด กรุณาลองใหม่',
     'dms-err-err_id_card_required_fields': 'อ่านเลขบัตรหรือชื่อไม่ได้ กรุณาลองใหม่ด้วยภาพที่ชัดเจน',
+    err_auth_invalid_credentials: 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง',
     err_generic: 'เกิดข้อผิดพลาด กรุณาลองใหม่',
     gate_welcome_title: 'ยินดีต้อนรับกลับ',
     gate_welcome_sub: 'เข้าสู่ระบบเพื่อบันทึกลูกค้า DMS ต่อ',

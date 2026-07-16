@@ -201,6 +201,7 @@ window.__DMS_I18N_JA__ = {
     'dms-err-err_dms_unexpected': '問題が発生しました。もう一度お試しください',
     'dms-err-err_id_card_required_fields':
         'ID番号または氏名を読み取れません。鮮明な画像で再試行してください',
+    err_auth_invalid_credentials: 'ユーザー名またはパスワードが正しくありません',
     err_generic: '問題が発生しました。再試行してください',
     gate_welcome_title: 'おかえりなさい',
     gate_welcome_sub: 'サインインして DMS 顧客登録を続けましょう',

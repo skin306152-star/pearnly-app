@@ -32,10 +32,8 @@ _TAXID_LEN = 13
 
 def _clean(tax_id: Optional[str]) -> str:
     """只留数字(剥空格/横线/杂字),保留任意长度。
-
     ⚠️ 不用 recon.field_clean.clean_tax_id:那个剥完必须恰好 13 位否则返 ''——本闸要拿
-    「漏一位/多一位」的错长候选去算编辑距离,压成 '' 会让这类笔误直接消失,闸就废了。
-    """
+    「漏一位/多一位」的错长候选去算编辑距离,压成 '' 会让笔误直接消失,闸就废了。"""
     return "".join(ch for ch in str(tax_id or "") if ch.isdigit())
 
 

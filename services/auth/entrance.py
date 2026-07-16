@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """登录入口(会话级)准入 —— 「各是各的」的授权判据单一事实源。
 
-一套账号被授权从哪些门登录(main / pos / ai)。登录时校验「这个门是否在授权集」,
+一套账号被授权从哪些门登录(main / pos / ai / dms)。登录时校验「这个门是否在授权集」,
 不在即当作账号密码错误拒登(不泄漏账号存在、无「去别处登录」指向文案)。
 
 授权来源(Phase1 从现有数据推导 · Phase2 将换成读 tenant_entrances 表,只改本模块):
   - main : 业态非 pos_only(会计站自由注册的账号天然是 main;pos_only 是 Earn 直建的纯收银租户)
   - pos  : 开通了 pos 模块(Earn 发放)
   - ai   : 在 pearnly_ai_m1 白名单(Earn 邀请)
+  - dms  : 在 dms_portal 白名单(Earn 邀请 · MR.ERP 身份证订车单入口)
 
 超管任意门放行(平台运营);回退闸 entrance_gate 关时一律不拦(上线前/回退=现状,任何门都通);
 推导异常一律 fail-open —— 登录可用性优先,绝不因基建抖动把人锁在门外(与 auth.py 改密比对同款容错)。
@@ -23,7 +24,8 @@ logger = logging.getLogger(__name__)
 MAIN = "main"
 POS = "pos"
 AI = "ai"
-ALL_ENTRANCES = (MAIN, POS, AI)
+DMS = "dms"
+ALL_ENTRANCES = (MAIN, POS, AI, DMS)
 
 # 权限码前缀 → 允许的登录入口【集合】(Phase3 API 作用域闸的判据 · 按前缀判、不按 URL 判:
 # tax_profile_routes 是 AI 接口却寄生 /api/workspace 路径)。一码可跨多门——业务功能被多个壳
@@ -97,7 +99,7 @@ def _entrances_from_table(tenant_id: str) -> Set[str]:
 
 
 def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
-    """Phase1 推导版:business_type 非 pos_only=main / pos 模块开=pos / 在 m1 名单=ai。"""
+    """Phase1 推导版:business_type 非 pos_only=main / pos 模块开=pos / m1 名单=ai / dms_portal 名单=dms。"""
     ents: Set[str] = set()
     from core import db
     from services.modules import store
@@ -108,10 +110,12 @@ def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
         if store.is_enabled(cur, tenant_id=tenant_id, module_key="pos"):
             ents.add(POS)
 
-    from core.feature_flags import pearnly_ai_m1_enabled_for
+    from core.feature_flags import dms_portal_enabled_for, pearnly_ai_m1_enabled_for
 
     if pearnly_ai_m1_enabled_for(tenant_id, user_id):
         ents.add(AI)
+    if dms_portal_enabled_for(tenant_id, user_id):
+        ents.add(DMS)
     return ents
 
 

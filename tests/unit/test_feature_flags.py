@@ -56,6 +56,35 @@ class PearnlyAiM1EnabledForTests(unittest.TestCase):
             self.assertFalse(feature_flags.pearnly_ai_m1_enabled_for("t1", "u1"))
 
 
+class DmsPortalEnabledForTests(unittest.TestCase):
+    """DMS 订车单入口邀请闸:tenant-first,默认关(现状 /dms 门不授权 + 四端点 404)。"""
+
+    def test_tenant_id_takes_priority_over_user_id(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user", return_value=True
+        ) as m:
+            self.assertTrue(feature_flags.dms_portal_enabled_for("t1", "u1"))
+            m.assert_called_once_with(feature_flags.DMS_PORTAL_KEY, "t1")
+
+    def test_falls_back_to_user_id_when_no_tenant(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user", return_value=True
+        ) as m:
+            self.assertTrue(feature_flags.dms_portal_enabled_for(None, "u1"))
+            m.assert_called_once_with(feature_flags.DMS_PORTAL_KEY, "u1")
+
+    def test_defaults_closed_no_setting_row(self):
+        with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
+            self.assertFalse(feature_flags.dms_portal_enabled_for("t1", "u1"))
+
+    def test_store_raises_fails_closed(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user",
+            side_effect=RuntimeError("boom"),
+        ):
+            self.assertFalse(feature_flags.dms_portal_enabled_for("t1", "u1"))
+
+
 class PearnlyAiSodEnabledForTests(unittest.TestCase):
     """C3 · 工单 SoD 强制闸:按 tenant 判定,默认关(现状单人流不变)。"""
 

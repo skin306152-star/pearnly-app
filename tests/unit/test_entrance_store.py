@@ -48,6 +48,12 @@ class EntranceStoreTests(unittest.TestCase):
         entrance_store.grant_entrance(cur, "t1", "pos", granted_by="admin-9")
         self.assertEqual(cur.calls[0][1], ("t1", "pos", "admin-9"))
 
+    def test_grant_accepts_dms(self):
+        # dms 是第 4 个合法入口(ALL_ENTRANCES 已含),grant 不再拒
+        cur = _FakeCursor()
+        entrance_store.grant_entrance(cur, "t1", entrance_store.DMS, granted_by="admin-9")
+        self.assertEqual(cur.calls[0][1], ("t1", "dms", "admin-9"))
+
     def test_grant_rejects_unknown_entrance(self):
         cur = _FakeCursor()
         with self.assertRaises(ValueError):
@@ -237,6 +243,19 @@ class MigrationImportTests(unittest.TestCase):
         spec.loader.exec_module(mod)
         self.assertEqual(mod.revision, "0078_tenant_entrances")
         self.assertEqual(mod.down_revision, "0077_brain_shadow_log")
+        self.assertTrue(hasattr(mod, "upgrade"))
+        self.assertTrue(hasattr(mod, "downgrade"))
+
+    def test_dms_check_migration_imports(self):
+        import importlib.util
+
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        path = os.path.join(root, "alembic", "versions", "0080_tenant_entrances_dms.py")
+        spec = importlib.util.spec_from_file_location("mig_0080_tenant_entrances_dms", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        self.assertEqual(mod.revision, "0080_tenant_entrances_dms")
+        self.assertEqual(mod.down_revision, "0079_front_desk_contracts")
         self.assertTrue(hasattr(mod, "upgrade"))
         self.assertTrue(hasattr(mod, "downgrade"))
 

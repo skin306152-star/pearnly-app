@@ -22,12 +22,13 @@ def _cursor_ctx():
 
 
 class AuthorizedEntrancesTests(unittest.TestCase):
-    def _derive(self, *, business_type, pos_on, ai_on):
+    def _derive(self, *, business_type, pos_on, ai_on, dms_on=False):
         with (
             mock.patch("core.db.get_cursor", _cursor_ctx()),
             mock.patch("services.modules.store.get_business_type", return_value=business_type),
             mock.patch("services.modules.store.is_enabled", return_value=pos_on),
             mock.patch("core.feature_flags.pearnly_ai_m1_enabled_for", return_value=ai_on),
+            mock.patch("core.feature_flags.dms_portal_enabled_for", return_value=dms_on),
         ):
             return entrance.authorized_entrances("t1", "u1")
 
@@ -39,10 +40,15 @@ class AuthorizedEntrancesTests(unittest.TestCase):
         self.assertEqual(ents, {"pos"})
         self.assertNotIn("main", ents)
 
+    def test_dms_portal_invitee_gets_dms(self) -> None:
+        ents = self._derive(business_type="firm", pos_on=False, ai_on=False, dms_on=True)
+        self.assertIn("dms", ents)
+        self.assertEqual(ents, {"main", "dms"})
+
     def test_multi_line_account_holds_all(self) -> None:
         self.assertEqual(
-            self._derive(business_type="firm", pos_on=True, ai_on=True),
-            {"main", "pos", "ai"},
+            self._derive(business_type="firm", pos_on=True, ai_on=True, dms_on=True),
+            {"main", "pos", "ai", "dms"},
         )
 
     def test_no_tenant_falls_back_to_main(self) -> None:

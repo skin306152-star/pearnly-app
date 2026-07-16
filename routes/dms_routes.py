@@ -27,6 +27,8 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
+from core.feature_flags import dms_portal_enabled_for, entrance_api_scope_enabled_for
+from services.auth.entrance import DMS, MAIN
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from core.auth import get_current_user_from_request
@@ -35,6 +37,29 @@ from routes.erp_routes_access import _check_push_access
 logger = logging.getLogger("mr-pilot")
 
 router = APIRouter()
+
+
+def _authorize(request: Request) -> Dict[str, Any]:
+    """DMS 入口守卫(四端点统一)· 登录 + dms_portal 邀请闸 + 入口作用域 + plan 推送闸。
+
+    这些路由无权限码,入口作用域闸(authz/deps._check)按码前缀判、管不到它们,故守卫放本地:
+      - dms_portal 关 → 404(fail-closed · 不泄漏功能存在,照 workorder M1 闸先例);
+      - entrance_api_scope 开(现恒 True)且 token.entry != dms → 403(语义对齐
+        deps._entrance_scope_deny:main/pos/ai 会话打不进 /api/dms);判定用 entrance.DMS 常量。
+    禁碰 services/erp 服务层:LINE 侧 DMS 推送直调服务层,不能被路由层闸连坐。
+    """
+    user = get_current_user_from_request(request)
+    if user.get("is_super_admin"):
+        return user  # 超管任意门放行(平台运营)
+    tenant_id = str(user["tenant_id"]) if user.get("tenant_id") else None
+    user_id = str(user["id"]) if user.get("id") else None
+    if not dms_portal_enabled_for(tenant_id, user_id):
+        raise HTTPException(404, detail="dms.not_found")
+    if entrance_api_scope_enabled_for(tenant_id) and (user.get("entry") or MAIN) != DMS:
+        raise HTTPException(403, detail="authz.forbidden")
+    _check_push_access(user)
+    return user
+
 
 # 端点解析/字段整形与 LINE 侧共用(services/erp/dms_id_ocr · 2026-07-02 抽出)。
 _resolve_dms_endpoint = _id_ocr.resolve_dms_endpoint
@@ -75,8 +100,7 @@ async def dms_id_card_recognize(
 ):
     """步1:身份证 OCR + 查 DMS 是否已有该客户 + 地址级联/称谓/订车主档。
     不写任何东西 · 喂给前端可编辑面板。"""
-    user = get_current_user_from_request(request)
-    _check_push_access(user)
+    user = _authorize(request)
     ep, ocr, elapsed = await _ocr_id_card(request, file, endpoint_id, user)
     resp: Dict[str, Any] = {
         "ok": True,
@@ -105,8 +129,7 @@ async def dms_id_card_recognize(
 @router.post("/api/dms/customer-fields")
 async def dms_customer_fields(request: Request):
     """载入指定 DMS 客户全字段(相似场景选定候选后填充全字段表单/比对)。"""
-    user = get_current_user_from_request(request)
-    _check_push_access(user)
+    user = _authorize(request)
     body = await request.json()
     customer_id = str(body.get("customer_id") or "").strip()
     if not customer_id:
@@ -129,8 +152,7 @@ async def dms_geo(
     """地址四级联动选项(面板改地址时按需取)。"""
     if level not in ("provinces", "districts", "subdistricts", "zipcodes"):
         raise HTTPException(400, detail="dms.bad_geo_level")
-    user = get_current_user_from_request(request)
-    _check_push_access(user)
+    user = _authorize(request)
     ep = _resolve_dms_endpoint(user["id"], endpoint_id)
     if not ep:
         raise HTTPException(400, detail="dms.no_endpoint")
@@ -141,8 +163,7 @@ async def dms_geo(
 async def dms_id_card_push(request: Request):
     """步2:面板编辑后的字段 → 建/改 DMS 客户(覆盖/新建)→ 写 erp_push_logs。
     只写客户库(ลูกค้า)· 不建订车单。"""
-    user = get_current_user_from_request(request)
-    _check_push_access(user)
+    user = _authorize(request)
     body = await request.json()
     fields = body.get("fields") or {}
     mode = (body.get("mode") or "create").strip()

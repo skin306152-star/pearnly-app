@@ -70,6 +70,12 @@ AGENT_RECALL_KEY = "agent_recall_nudge"
 # 已登记的泰文名。判定域 = 账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回
 # user_id · 与 workspace_clients 其余隔离口径一致),不是单个用户。
 PEARNLY_AI_M1_KEY = "pearnly_ai_m1"
+# DMS 订车单入口邀请闸(MR.ERP 身份证→客户库 · 照 pearnly_ai_m1 邀请制范式):默认关
+# fail-closed。关 = /dms 门不授权(登录准入推导不含 dms)、/api/dms/* 四端点 404;开 = 被邀请
+# 租户从 /dms 门登录得该入口 + 四端点放行。判定域=账套主体归属(有 tenant_id 走 tenant 共享闸,
+# 个人套账退回 user_id · 与 pearnly_ai_m1 同口径)。消费在 services/auth/entrance._derive_entrances
+# (登录准入)与 routes/dms_routes._authorize(API 守卫)。
+DMS_PORTAL_KEY = "dms_portal"
 # POS 退货/作废店长授权闸(PS-1 · 防内盗):默认关。关 → 退货/作废路由逐字节走历史
 # (任何持效 POS 令牌的收银员都能退,现网 metta 行为不变);开 → 操作者须持 pos.refund.approve,
 # 收银员无此码 → 必须店长 PIN 覆盖(校验店长确有该码)才放行,并把授权人写进审计。
@@ -259,6 +265,14 @@ def pearnly_ai_m1_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) 
     状态,跟其余 workspace_clients 隔离口径一致);个人套账(无 tenant)退回 user_id。
     """
     return _enabled(PEARNLY_AI_M1_KEY, tenant_id or user_id, "pearnly_ai_m1_enabled_for")
+
+
+def dms_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
+    """DMS 订车单入口邀请闸。关 = /dms 门不授权、四端点 404(现状零变化)。
+
+    按账套主体归属判定(有 tenant_id 用 tenant · 个人套账退回 user_id),与 pearnly_ai_m1 同口径。
+    """
+    return _enabled(DMS_PORTAL_KEY, tenant_id or user_id, "dms_portal_enabled_for")
 
 
 def pos_refund_approval_enabled_for(tenant_id: Optional[str]) -> bool:

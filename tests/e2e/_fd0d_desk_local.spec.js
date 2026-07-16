@@ -82,11 +82,11 @@ async function bootDesk(
     let contractSeq = 0;
     await page.route('**/api/ai/front-desk/contracts', async (r) => {
         const req = r.request();
-        let fileCount = 0;
+        let fileCount;
         try {
             const body = req.postData() || '';
             fileCount = (body.match(/name="files"/g) || []).length;
-        } catch (e) {
+        } catch {
             fileCount = 0;
         }
         contractSeq += 1;

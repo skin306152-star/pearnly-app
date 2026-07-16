@@ -1,5 +1,7 @@
 # Express Push · 工程总纲(PM 主导 · 施工窗口先读这页)
 
+> ⚠️ **2026-07-15 companion 源码已迁 GitHub**:本页及所有子文档里写的 `D:\pearnly-companion`(旧 U 盘/本地路径)**一律作废**。companion 源码现在 = 私有仓 **`https://github.com/skin306152-star/pearnly-companion`**(master + feature 分支 + 标签;RPA 变体 = 该仓 `feature/express-rpa` 分支,不是独立仓)。要改 companion:先 `git clone` 该仓,本地改 → `git push`。prod 部署仍走 `packaging/release.ps1`(scp,未改成拉 GitHub)。详见记忆 companion-reliability-1128-and-source-location。
+
 > PM:Claude(Opus 4.8)。Owner:skin3。施工模式:PM 出施工单 → 施工窗口实现 → PM 验收 → 发下一棒,直到闭环。
 > 五字要求(Owner 定):**简单 · 方便 · 快捷 · 精准 · 兜底**。
 > 设计定稿:`01-ui-design-brief.md` + `prototype.html`(可双击看交互)。本页是真相与边界,冲突时以本页为准。

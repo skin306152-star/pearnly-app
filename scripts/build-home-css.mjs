@@ -214,6 +214,10 @@ const AI_CSS = [
     'ai/ai-desk.css',
 ];
 
+// Pearnly DMS SPA:壳令牌/原子/门面在前(dms-shell.css 定义 :root 令牌),身份证向导内容区
+// 样式在后(dms-intake.css · .dmsx 按前者令牌解析)。固化 dms.html 引用顺序。
+const DMS_CSS = ['dms/dms-shell.css', 'dms/dms-gate.css', 'dms/dms-intake.css'];
+
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },
     { list: ADMIN_CSS, out: 'static/dist/admin.css' },
@@ -221,6 +225,7 @@ const BUNDLES = [
     { list: CONSOLE_CSS, out: 'static/dist/console.css' },
     { list: POS_CSS, out: 'static/dist/pos.css' },
     { list: AI_CSS, out: 'static/dist/ai.css' },
+    { list: DMS_CSS, out: 'static/dist/dms.css' },
 ];
 
 async function buildOne(list, out) {

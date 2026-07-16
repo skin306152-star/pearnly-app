@@ -1,0 +1,1394 @@
+/* Pearnly DMS · 身份证向导内容区样式(作用域 .dmsx)· 移植自主站 home-49-dms-intake.css
+   的 identity 子集:去发票/收据(原 223-311)与汇总表批量建单(原 401-457)两块任务样式,
+   保留卡片/步骤条/上传/匹配/比对/全字段/决策/成功/模态/上下文 ERP 卡。令牌名沿用主站,
+   由 dms-shell.css 的 :root 提供(--brand/--card/--ink/--line/--bg/--btn-blue/--amber-*)。 */
+/* home-49-dms-intake.css · 录入工作台(身份证→DMS 客户)4 步向导
+   设计稿 pearnly_identity_from_recognition_redesign.html 原样移植 · 作用域 .dmsx 防污染
+   (裸 hex 同 POS 概念稿走 TOKEN_CSS 白名单)。只取内容区样式,app 外壳复用主程序。 */
+.dmsx {
+  --dx-brand: var(--brand);
+  --dx-brand-strong: var(--brand-hover, var(--dx-brand-strong));
+  --dx-brand-soft: var(--accent-soft, var(--dx-brand-soft));
+  --dx-brand-faint: var(--bg);
+  --dx-card: var(--card);
+  --dx-text: var(--ink);
+  --dx-muted: var(--ink2);
+  --dx-subtle: var(--ink2);
+  --dx-line: var(--line);
+  --dx-line-strong: var(--line);
+  --dx-green: #2aa971;
+  --dx-green-soft: color-mix(in srgb, #2aa971 14%, var(--card));
+  --dx-amber: #c98a1e;
+  --dx-amber-soft: color-mix(in srgb, #c98a1e 16%, var(--card));
+  --dx-amber-line: #c98a1e;
+  --dx-red: #d6586a;
+  --dx-red-soft: color-mix(in srgb, #d6586a 14%, var(--card));
+  --dx-blue: #5a78e0;
+  --dx-blue-soft: color-mix(in srgb, #5a78e0 14%, var(--card));
+  --dx-warm: color-mix(in srgb, #c98a1e 8%, var(--card));
+  --dx-shadow: 0 12px 32px rgba(44, 31, 88, 0.1);
+  color: var(--dx-text);
+}
+.dmsx * {
+  box-sizing: border-box;
+}
+.dmsx .dx-wrap {
+  max-width: none;
+  margin: 0;
+  padding: 4px 0 96px;
+}
+
+/* 卡片 / 任务选择 */
+.dmsx .dx-card {
+  background: var(--card);
+  border: 1px solid var(--dx-line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--dx-shadow);
+}
+.dmsx .dx-task {
+  padding: 16px 16px 12px;
+  margin-bottom: 16px;
+}
+.dmsx .dx-task-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dmsx .dx-task-h b {
+  font-size: 13px;
+}
+.dmsx .dx-task-h span {
+  font-size: 10px;
+  color: var(--ink2);
+}
+.dmsx .dx-task-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.dmsx .dx-opt {
+  min-height: 70px;
+  border: 1px solid var(--dx-line);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  background: var(--card);
+  cursor: pointer;
+}
+.dmsx .dx-opt.active {
+  border-color: var(--dx-brand);
+  background: var(--bg);
+}
+.dmsx .dx-opt-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--dx-brand-soft);
+  color: var(--dx-brand);
+  display: grid;
+  place-items: center;
+}
+.dmsx .dx-opt-c b {
+  display: block;
+  font-size: 14px;
+}
+.dmsx .dx-opt-c span {
+  display: block;
+  font-size: 11px;
+  color: var(--ink2);
+  margin-top: 4px;
+}
+.dmsx .dx-opt-sel {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--dx-line-strong);
+  display: grid;
+  place-items: center;
+}
+.dmsx .dx-opt.active .dx-opt-sel {
+  background: var(--dx-brand);
+  border-color: var(--dx-brand);
+  color: #fff;
+}
+.dmsx .dx-opt.active .dx-opt-sel:before {
+  content: '\2713';
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* flow 头 + stepper */
+.dmsx .dx-flow-h {
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--dx-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dmsx .dx-flow-h b {
+  font-size: 14px;
+}
+.dmsx .dx-flow-h p {
+  font-size: 11px;
+  color: var(--ink2);
+  margin: 5px 0 0;
+}
+.dmsx .dx-stepper {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--dx-line);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.dmsx .dx-step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  position: relative;
+}
+.dmsx .dx-step:not(:last-child):after {
+  content: '';
+  position: absolute;
+  left: 36px;
+  right: 6px;
+  top: 14px;
+  height: 1px;
+  background: var(--line);
+}
+.dmsx .dx-step-no {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink2);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 900;
+  z-index: 1;
+}
+.dmsx .dx-step-c {
+  z-index: 1;
+  background: var(--card);
+  padding-right: 8px;
+}
+.dmsx .dx-step-c b {
+  display: block;
+  font-size: 10px;
+}
+.dmsx .dx-step-c span {
+  display: block;
+  font-size: 9px;
+  color: var(--ink2);
+  margin-top: 2px;
+}
+.dmsx .dx-step.active .dx-step-no {
+  background: var(--dx-brand);
+  color: #fff;
+}
+.dmsx .dx-step.done .dx-step-no {
+  background: var(--dx-green-soft);
+  color: var(--dx-green);
+}
+
+/* 状态切换 */
+.dmsx .dx-state {
+  display: none;
+  padding: 16px;
+}
+.dmsx .dx-state.active {
+  display: block;
+}
+.dmsx .dx-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+}
+.dmsx .dx-panel {
+  border: 1px solid var(--dx-line);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 14px;
+}
+.dmsx .dx-panel-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+.dmsx .dx-panel-h b {
+  font-size: 12px;
+}
+.dmsx .dx-panel-h span {
+  font-size: 9px;
+  color: var(--ink2);
+}
+.dmsx .dx-side {
+  display: grid;
+  gap: 10px;
+}
+.dmsx .dx-side-box {
+  border: 1px solid var(--dx-line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 12px;
+}
+.dmsx .dx-side-box b {
+  display: block;
+  font-size: 11px;
+}
+.dmsx .dx-side-box ul {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: var(--ink2);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.dmsx .dx-side-box p {
+  font-size: 10px;
+  color: var(--ink2);
+  line-height: 1.55;
+  margin: 6px 0 0;
+}
+
+/* 上传 · 框 skin(虚线 / hover / over / 整框可点)统一走 .up-dz(home-55)· 此处只留布局 */
+.dmsx .dx-drop {
+  min-height: 230px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 16px;
+}
+.dmsx .dx-drop-g {
+  width: 54px;
+  height: 54px;
+  border-radius: 17px;
+  background: var(--dx-brand-soft);
+  color: var(--dx-brand);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+  font-size: 22px;
+  font-weight: 900;
+}
+.dmsx .dx-drop h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.dmsx .dx-drop p {
+  font-size: 11px;
+  color: var(--ink2);
+  line-height: 1.6;
+  margin: 7px 0 12px;
+}
+.dmsx .dx-hint {
+  font-size: 10px;
+  color: var(--ink2);
+}
+.dmsx .dx-file {
+  border: 1px solid var(--dx-line);
+  border-radius: 12px;
+  padding: 11px 12px;
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+.dmsx .dx-file-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--dx-brand-soft);
+  color: var(--dx-brand);
+  display: grid;
+  place-items: center;
+}
+.dmsx .dx-file-c b {
+  display: block;
+  font-size: 12px;
+  word-break: break-all;
+}
+.dmsx .dx-file-c span {
+  display: block;
+  font-size: 10px;
+  color: var(--ink2);
+  margin-top: 4px;
+}
+.dmsx .dx-scan {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.dmsx .dx-chip {
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 10px;
+}
+.dmsx .dx-chip label {
+  display: block;
+  font-size: 9px;
+  color: var(--ink2);
+}
+.dmsx .dx-chip strong {
+  display: block;
+  font-size: 11px;
+  margin-top: 5px;
+  word-break: break-all;
+}
+.dmsx .dx-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--dx-line);
+  padding-top: 14px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.dmsx .dx-note {
+  font-size: 10px;
+  color: var(--ink2);
+}
+.dmsx .dx-note b {
+  color: var(--ink);
+}
+
+/* searching */
+.dmsx .dx-searching {
+  text-align: center;
+  padding: 56px 20px;
+}
+.dmsx .dx-spin {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 4px solid var(--dx-brand-soft);
+  border-top-color: var(--dx-brand);
+  animation: dxspin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes dxspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dmsx .dx-searching h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.dmsx .dx-searching p {
+  font-size: 10px;
+  color: var(--ink2);
+  margin: 6px 0 14px;
+}
+.dmsx .dx-schips {
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.dmsx .dx-schip {
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink2);
+  padding: 6px 9px;
+  font-size: 9px;
+}
+
+/* match banner + 候选 */
+.dmsx .dx-rbanner {
+  border: 1px solid var(--dx-green);
+  background: var(--dx-green-soft);
+  border-radius: 13px;
+  padding: 12px 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dmsx .dx-rbanner.similar {
+  border-color: var(--dx-amber-line);
+  background: var(--dx-warm);
+}
+.dmsx .dx-rbanner.none {
+  border-color: var(--dx-blue);
+  background: var(--dx-blue-soft);
+}
+.dmsx .dx-rsym {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--dx-green-soft);
+  color: var(--dx-green);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  flex: 0 0 auto;
+}
+.dmsx .dx-rbanner.similar .dx-rsym {
+  background: var(--dx-amber-soft);
+  color: var(--dx-amber);
+}
+.dmsx .dx-rbanner.none .dx-rsym {
+  background: var(--dx-blue-soft);
+  color: var(--dx-blue);
+}
+.dmsx .dx-rc {
+  flex: 1;
+  min-width: 0;
+}
+.dmsx .dx-rc b {
+  display: block;
+  font-size: 12px;
+}
+.dmsx .dx-rc p {
+  font-size: 10px;
+  line-height: 1.55;
+  margin: 4px 0 0;
+  color: var(--ink2);
+}
+.dmsx .dx-rbanner.similar .dx-rc p {
+  color: var(--ink2);
+}
+.dmsx .dx-rbanner.none .dx-rc p {
+  color: var(--ink2);
+}
+.dmsx .dx-cands {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dmsx .dx-cand {
+  border: 1px solid var(--dx-line);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+.dmsx .dx-cand.active {
+  border-color: var(--dx-brand);
+  background: var(--bg);
+}
+.dmsx .dx-cand-av {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--dx-blue-soft);
+  color: var(--dx-blue);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+}
+.dmsx .dx-cand-c b {
+  display: block;
+  font-size: 11px;
+}
+.dmsx .dx-cand-c span {
+  display: block;
+  font-size: 9px;
+  color: var(--ink2);
+  margin-top: 4px;
+}
+.dmsx .dx-radio {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  border: 1px solid var(--dx-line-strong);
+  display: grid;
+  place-items: center;
+}
+.dmsx .dx-cand.active .dx-radio:after {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dx-brand);
+}
+.dmsx .dx-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* tabs */
+.dmsx .dx-tabs {
+  height: 46px;
+  border-bottom: 1px solid var(--dx-line);
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 0 3px;
+  margin-bottom: 12px;
+}
+.dmsx .dx-tab {
+  height: 46px;
+  border: 0;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 0 2px 12px;
+  position: relative;
+  cursor: pointer;
+}
+.dmsx .dx-tab.active {
+  color: var(--ink);
+}
+.dmsx .dx-tab.active:after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--btn-blue);
+}
+.dmsx .dx-tabview {
+  display: none;
+}
+.dmsx .dx-tabview.active {
+  display: block;
+}
+
+/* compare 表 */
+.dmsx .dx-cmp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+  flex-wrap: wrap;
+}
+.dmsx .dx-cmp-top b {
+  font-size: 12px;
+}
+.dmsx .dx-cmp-act {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.dmsx .dx-cmp {
+  border: 1px solid var(--dx-line);
+  border-radius: 13px;
+  overflow: hidden;
+}
+.dmsx .dx-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr 92px 120px;
+  min-height: 46px;
+  border-bottom: 1px solid var(--dx-line);
+  font-size: 10px;
+  align-items: stretch;
+}
+.dmsx .dx-row:last-child {
+  border-bottom: 0;
+}
+.dmsx .dx-row.head {
+  background: var(--bg);
+  color: var(--ink2);
+  font-weight: 800;
+  min-height: 38px;
+}
+.dmsx .dx-cell {
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.dmsx .dx-cell + .dx-cell {
+  border-left: 1px solid var(--dx-line);
+}
+.dmsx .dx-row.diff {
+  background: var(--dx-warm);
+}
+.dmsx .dx-row.diff .dx-cell.val {
+  background: var(--dx-amber-soft);
+}
+.dmsx .dx-dbadge,
+.dmsx .dx-sbadge {
+  border-radius: 999px;
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: 800;
+}
+.dmsx .dx-dbadge {
+  background: var(--dx-amber-soft);
+  color: var(--dx-amber);
+}
+.dmsx .dx-sbadge {
+  background: var(--dx-green-soft);
+  color: var(--dx-green);
+}
+.dmsx .dx-pick {
+  display: flex;
+  gap: 5px;
+}
+.dmsx .dx-pick button {
+  height: 26px;
+  border: 1px solid var(--dx-line);
+  border-radius: 7px;
+  background: var(--card);
+  padding: 0 7px;
+  font-size: 9px;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.dmsx .dx-pick button.active {
+  background: var(--dx-brand);
+  border-color: var(--dx-brand);
+  color: #fff;
+}
+
+/* 全字段表单 */
+.dmsx .dx-fsec {
+  border: 1px solid var(--dx-line);
+  border-radius: 13px;
+  padding: 13px;
+  margin-bottom: 11px;
+}
+.dmsx .dx-fsec-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+.dmsx .dx-fsec-h b {
+  font-size: 12px;
+}
+.dmsx .dx-fsec-h .sub {
+  font-size: 9px;
+  color: var(--ink2);
+  margin-top: 4px;
+}
+.dmsx .dx-fgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.dmsx .dx-field {
+  min-width: 0;
+}
+.dmsx .dx-field.full {
+  grid-column: 1/-1;
+}
+.dmsx .dx-field label {
+  display: block;
+  font-size: 9px;
+  color: var(--ink2);
+  margin-bottom: 6px;
+  font-weight: 750;
+}
+.dmsx .dx-in,
+.dmsx .dx-sel {
+  width: 100%;
+  height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--dx-line-strong);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  outline: 0;
+  font-size: 11px;
+}
+.dmsx .dx-in.detected {
+  background: var(--dx-brand-soft);
+}
+.dmsx .dx-in.changed,
+.dmsx .dx-sel.changed {
+  background: var(--dx-amber-soft);
+  border-color: var(--dx-amber-line);
+}
+.dmsx .dx-in.ro {
+  background: var(--bg);
+  color: var(--ink2);
+}
+.dmsx .dx-addr-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 9px;
+  color: var(--ink2);
+}
+.dmsx .dx-switch {
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.dmsx .dx-switch:after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 2px;
+  top: 2px;
+  border-radius: 50%;
+  background: var(--card);
+  transition: 0.15s;
+}
+.dmsx .dx-switch.on {
+  background: var(--dx-brand);
+}
+.dmsx .dx-switch.on:after {
+  left: 16px;
+}
+/* 分组折叠(F·全字段表单按分组折叠) */
+.dmsx .dx-fsec-h {
+  cursor: pointer;
+  min-height: 44px;
+}
+.dmsx .dx-fsec-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dmsx .dx-fsec-caret {
+  display: grid;
+  place-items: center;
+  color: var(--ink2);
+  transition: transform 0.18s;
+  flex: 0 0 auto;
+}
+.dmsx .dx-fsec.open .dx-fsec-caret {
+  transform: rotate(180deg);
+}
+.dmsx .dx-fsec-body {
+  display: none;
+}
+.dmsx .dx-fsec.open .dx-fsec-body {
+  display: block;
+}
+
+/* 比对卡片(手机端:一字段一卡片;桌面隐藏,用表格) */
+.dmsx .dx-cmp-cards {
+  display: none;
+}
+.dmsx .dx-cmp-sub {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink2);
+  margin: 14px 2px 8px;
+}
+.dmsx .dx-ccard {
+  border: 1px solid var(--dx-line);
+  border-radius: 12px;
+  padding: 11px;
+  margin-bottom: 9px;
+}
+.dmsx .dx-ccard.diff {
+  background: var(--dx-warm);
+  border-color: var(--dx-amber-line);
+}
+.dmsx .dx-ccard-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+.dmsx .dx-ccard-h b {
+  font-size: 12px;
+}
+.dmsx .dx-ccard-v {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+.dmsx .dx-ccard-v > div {
+  background: var(--card);
+  border: 1px solid var(--dx-line);
+  border-radius: 9px;
+  padding: 8px;
+}
+.dmsx .dx-ccard.diff .dx-ccard-v > div {
+  background: var(--dx-amber-soft);
+  border-color: var(--dx-amber-line);
+}
+.dmsx .dx-ccard-v label {
+  display: block;
+  font-size: 8px;
+  color: var(--ink2);
+  margin-bottom: 3px;
+}
+.dmsx .dx-ccard-v strong {
+  font-size: 11px;
+  word-break: break-word;
+}
+
+/* 决策卡 / 警告 / footer */
+.dmsx .dx-decision {
+  margin-top: 14px;
+}
+.dmsx .dx-decision h3 {
+  font-size: 12px;
+  margin: 0 0 9px;
+}
+.dmsx .dx-dgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.dmsx .dx-dcard {
+  border: 1px solid var(--dx-line);
+  border-radius: 13px;
+  padding: 12px;
+  cursor: pointer;
+  position: relative;
+}
+.dmsx .dx-dcard.active {
+  border-color: var(--dx-brand);
+  background: var(--bg);
+}
+.dmsx .dx-dcard.rec:before {
+  content: attr(data-rec);
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  border-radius: 999px;
+  background: var(--dx-green-soft);
+  color: var(--dx-green);
+  padding: 3px 6px;
+  font-size: 8px;
+  font-weight: 800;
+}
+.dmsx .dx-dic {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--dx-brand-soft);
+  color: var(--dx-brand);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+.dmsx .dx-dcard.danger .dx-dic {
+  background: var(--dx-amber-soft);
+  color: var(--dx-amber);
+}
+.dmsx .dx-dcard b {
+  display: block;
+  font-size: 11px;
+}
+.dmsx .dx-dcard p {
+  font-size: 9px;
+  color: var(--ink2);
+  line-height: 1.5;
+  margin: 5px 0 0;
+}
+.dmsx .dx-warn {
+  border: 1px solid var(--dx-amber-line);
+  background: var(--dx-amber-soft);
+  border-radius: 12px;
+  padding: 11px;
+  font-size: 10px;
+  color: var(--dx-amber);
+  line-height: 1.55;
+  margin-top: 10px;
+  display: none;
+}
+.dmsx .dx-warn.show {
+  display: block;
+}
+.dmsx .dx-foot {
+  border-top: 1px solid var(--dx-line);
+  margin-top: 14px;
+  padding-top: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dmsx .dx-nomatch {
+  border: 1px solid var(--dx-blue);
+  background: var(--dx-blue-soft);
+  border-radius: 14px;
+  padding: 17px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.dmsx .dx-nomatch-ic {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: var(--dx-blue-soft);
+  color: var(--dx-blue);
+  display: grid;
+  place-items: center;
+  font-size: 21px;
+  font-weight: 900;
+  margin: 0 auto 10px;
+}
+.dmsx .dx-nomatch h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.dmsx .dx-nomatch p {
+  font-size: 10px;
+  color: var(--ink2);
+  line-height: 1.55;
+  margin: 6px 0 0;
+}
+
+/* success */
+.dmsx .dx-success {
+  text-align: center;
+  padding: 26px;
+}
+.dmsx .dx-suc-ic {
+  width: 56px;
+  height: 56px;
+  border-radius: 17px;
+  background: var(--dx-green-soft);
+  color: var(--dx-green);
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  font-weight: 900;
+  margin: 0 auto 12px;
+}
+.dmsx .dx-success h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.dmsx .dx-success > p {
+  font-size: 11px;
+  color: var(--ink2);
+  margin: 6px 0 15px;
+}
+.dmsx .dx-sgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  text-align: left;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.dmsx .dx-sitem {
+  background: var(--bg);
+  border-radius: 11px;
+  padding: 11px;
+}
+.dmsx .dx-sitem label {
+  display: block;
+  font-size: 9px;
+  color: var(--ink2);
+}
+.dmsx .dx-sitem strong {
+  display: block;
+  font-size: 11px;
+  margin-top: 5px;
+  word-break: break-all;
+}
+.dmsx .dx-sact {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+/* 按钮(复用主程序 .btn · 仅补主色/小号变体作用域) */
+.dmsx .btn.primary {
+  background: var(--dx-brand);
+  border-color: var(--dx-brand);
+  color: #fff;
+}
+.dmsx .btn.primary:hover {
+  background: var(--dx-brand-strong);
+}
+.dmsx .btn.small {
+  height: 31px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.dmsx .btn.danger {
+  color: var(--dx-red);
+}
+.dmsx .dx-badge {
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 9px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.dmsx .dx-badge.green {
+  background: var(--dx-green-soft);
+  color: var(--dx-green);
+}
+.dmsx .dx-badge.amber {
+  background: var(--dx-amber-soft);
+  color: var(--dx-amber);
+}
+.dmsx .dx-badge.blue {
+  background: var(--dx-blue-soft);
+  color: var(--dx-blue);
+}
+
+/* 确认弹窗(站内 .modal) */
+.dmsx .dx-mlist {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 7px;
+}
+.dmsx .dx-mlist li {
+  font-size: 10px;
+  color: var(--ink2);
+  background: var(--bg);
+  border-radius: 9px;
+  padding: 9px;
+}
+
+@media (max-width: 980px) {
+  .dmsx .dx-two,
+  .dmsx .dx-task-grid,
+  .dmsx .dx-dgrid,
+  .dmsx .dx-fgrid,
+  .dmsx .dx-sgrid,
+  .dmsx .dx-ogrid {
+    grid-template-columns: 1fr;
+  }
+  .dmsx .dx-scan,
+  .dmsx .dx-review-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dmsx .dx-rgrid,
+  .dmsx .dx-rgrid.image-left {
+    grid-template-columns: 1fr;
+  }
+  .dmsx .dx-rgrid.image-left .dx-fields,
+  .dmsx .dx-rgrid.image-left .dx-imgcard {
+    order: 0;
+  }
+  .dmsx .dx-imgcard .pv-viewer {
+    height: 380px;
+  }
+  .dmsx .dx-stepper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dmsx .dx-step:not(:last-child):after {
+    display: none;
+  }
+  .dmsx .dx-cmp {
+    overflow: auto;
+  }
+  .dmsx .dx-row {
+    min-width: 680px;
+  }
+}
+
+/* ===== 手机端完整重做(F·15 条)· ≤700 320~430 ===== */
+@media (max-width: 700px) {
+  .dmsx .dx-wrap {
+    padding: 2px 0 92px;
+  }
+  .dmsx .dx-card {
+    border-radius: 14px;
+  }
+  .dmsx .dx-state {
+    padding: 13px;
+  }
+  .dmsx .dx-flow-h {
+    flex-wrap: wrap;
+  }
+  .dmsx .dx-flow-h #dx-records {
+    order: 3;
+  }
+  /* 1) 简洁步骤条:只显当前步「第 N/4 步 + 步骤名」· 不横挤四项 */
+  .dmsx .dx-stepper {
+    display: flex;
+    grid-template-columns: none;
+    gap: 0;
+    padding: 11px 14px;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dmsx .dx-stepper:after {
+    content: attr(data-frac);
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--ink2);
+    white-space: nowrap;
+    margin-left: 8px;
+  }
+  .dmsx .dx-step {
+    display: none;
+  }
+  .dmsx .dx-step.active {
+    display: flex;
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+  .dmsx .dx-step:after {
+    display: none !important;
+  }
+  .dmsx .dx-step.active .dx-step-no {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+  }
+  .dmsx .dx-step.active .dx-step-c b {
+    font-size: 12px;
+  }
+  .dmsx .dx-step.active .dx-step-c span {
+    font-size: 10px;
+  }
+  /* 2) 任务卡纵向、点击区足够大 */
+  .dmsx .dx-opt {
+    min-height: 60px;
+  }
+  /* 3) 宽比对表 → 一字段一卡片 */
+  .dmsx .dx-cmp,
+  .dmsx .dx-cmp-top .dx-cmp-act {
+  }
+  .dmsx .dx-cmp {
+    display: none;
+  }
+  .dmsx .dx-cmp-cards {
+    display: block;
+  }
+  /* 4) 全字段分组折叠已就绪 · 加大标题点击区 */
+  .dmsx .dx-fsec-h {
+    min-height: 50px;
+    padding: 2px 0;
+  }
+  /* 5) 底部固定操作栏 */
+  .dmsx .dx-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    border-radius: 0;
+    background: var(--card);
+    border-top: 1px solid var(--dx-line);
+    padding: 9px 12px calc(9px + env(safe-area-inset-bottom));
+    z-index: 40;
+    box-shadow: 0 -8px 22px rgba(0, 0, 0, 0.1);
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .dmsx .dx-foot .dx-note {
+    display: none;
+  }
+  .dmsx .dx-foot > div:last-child {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+  }
+  .dmsx .dx-foot .btn {
+    flex: 1;
+  }
+  /* 6) 点击区 ≥44px · 不依赖 hover */
+  .dmsx .btn {
+    min-height: 44px;
+  }
+  .dmsx .btn.small {
+    min-height: 38px;
+  }
+  .dmsx .dx-pick {
+    gap: 6px;
+  }
+  .dmsx .dx-pick button {
+    flex: 1;
+    min-height: 40px;
+    font-size: 11px;
+  }
+  .dmsx .dx-tab {
+    min-height: 46px;
+    font-size: 12px;
+  }
+  .dmsx .dx-cand {
+    min-height: 56px;
+  }
+  /* 7) 上传:拍照/相册/文件按钮平铺 */
+  .dmsx .dx-up-btns {
+    flex-direction: column;
+  }
+  .dmsx .dx-up-btns .btn {
+    width: 100%;
+  }
+  .dmsx .dx-drop {
+    min-height: 200px;
+    padding: 18px 14px;
+  }
+  /* 发票复核/导出网格收单列 */
+  .dmsx .dx-review-grid,
+  .dmsx .dx-scan {
+    grid-template-columns: 1fr;
+  }
+  .dmsx .dx-frow {
+    grid-template-columns: 34px 1fr auto;
+  }
+  .dmsx .dx-frow .dx-fstatus {
+    grid-column: 1/-1;
+    text-align: left;
+  }
+  .dmsx .dx-erp {
+    grid-template-columns: 34px 1fr auto;
+  }
+  /* 决策卡/成功网格单列 */
+  .dmsx .dx-dgrid,
+  .dmsx .dx-sgrid {
+    grid-template-columns: 1fr;
+  }
+  .dmsx .dx-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dmsx .dx-bar > div:last-child {
+    display: flex;
+    gap: 8px;
+  }
+  .dmsx .dx-bar .btn {
+    flex: 1;
+  }
+}
+
+/* context ERP connect cards on dms-intake (hover-zoom entry cards) */
+.dmsx .dx-erp-cards-zone {
+  margin-top: 16px;
+}
+.dmsx .dx-erp-cards-zone:empty {
+  display: none;
+}
+.dmsx .dx-erp-h {
+  font-size: 12px;
+  color: var(--ink2);
+  font-weight: 600;
+  margin: 0 2px 10px;
+}
+.dmsx .dx-erp-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.dmsx .dx-erp-card {
+  border: 1px solid var(--dx-line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  background: var(--card);
+  cursor: pointer;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease,
+    border-color 0.14s ease;
+}
+.dmsx .dx-erp-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.1);
+  border-color: var(--dx-brand);
+}
+.dmsx .dx-erp-card:focus-visible {
+  outline: 2px solid var(--dx-brand);
+  outline-offset: 2px;
+}
+.dmsx .dx-erp-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--dx-brand-soft);
+  color: var(--dx-brand);
+  display: grid;
+  place-items: center;
+}
+.dmsx .dx-erp-info {
+  min-width: 0;
+}
+.dmsx .dx-erp-info b {
+  display: block;
+  font-size: 14px;
+}
+.dmsx .dx-erp-status {
+  display: block;
+  font-size: 11px;
+  color: var(--ink2);
+  margin-top: 4px;
+}
+.dmsx .dx-erp-card.is-connected .dx-erp-status {
+  color: var(--dx-green);
+}
+.dmsx .dx-erp-cta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dx-brand);
+  white-space: nowrap;
+  padding: 7px 14px;
+  border: 1px solid var(--dx-brand);
+  border-radius: 10px;
+  background: var(--dx-brand-soft);
+}
+.dmsx .dx-erp-card.is-connected .dx-erp-cta {
+  color: var(--ink2);
+  border-color: var(--dx-line);
+  background: var(--card);
+}
+.dmsx .dx-erp-card {
+  cursor: default;
+}
+.dmsx .dx-erp-card.is-disabled {
+  opacity: 0.72;
+}
+.dmsx .dx-erp-card.is-disabled .dx-erp-status {
+  color: var(--ink2);
+}
+.dmsx .dx-erp-acts {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dmsx .dx-erp-cta {
+  cursor: pointer;
+}
+.dmsx .dx-erp-toggle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  padding: 7px 12px;
+  border: 1px solid var(--dx-line);
+  border-radius: 10px;
+  background: var(--card);
+  cursor: pointer;
+}
+.dmsx .dx-erp-toggle:hover {
+  border-color: var(--dx-brand);
+  color: var(--dx-brand);
+}
+@media (max-width: 700px) {
+  .dmsx .dx-erp-row {
+    grid-template-columns: 1fr;
+  }
+}

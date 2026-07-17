@@ -375,6 +375,38 @@ async function verifyLineCardWidths(browser) {
             'px'
     );
 
+    // C3) 已绑定态(desktop):restructure 后 boundBodyHtml/boundActionHtml 两条新分支
+    // 之前没截过图——解绑按钮应同样落进标题行、同款紧凑 pill,不该悄悄裂开。
+    const boundCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const boundPage = await boundCtx.newPage();
+    await boundPage.addInitScript(() => {
+        localStorage.setItem('mrpilot_token', 'faketoken');
+        localStorage.setItem('mrpilot_lang', 'th');
+    });
+    await boundPage.route('**/api/dms/session', (route) => route.fulfill({ json: { ok: true } }));
+    await boundPage.route('**/api/erp/endpoints', (route) =>
+        route.fulfill({ json: { items: [] } })
+    );
+    await boundPage.route('**/api/dms/line/binding', (route) =>
+        route.fulfill({
+            json: { bound: true, display_name: 'Somchai (LINE)', bound_at: '2026-07-15T03:00:00Z' },
+        })
+    );
+    await boundPage.goto(`http://localhost:${PORT}/static/dist/dms.html`);
+    await boundPage.waitForSelector('#dms-line-unbind-btn', { timeout: 8000 });
+    const unbindBox = await boundPage.locator('#dms-line-unbind-btn').boundingBox();
+    assert(
+        unbindBox.width <= 200,
+        'bound-state unbind button is compact pill, got ' + unbindBox.width
+    );
+    const unbindColor = await boundPage
+        .locator('#dms-line-unbind-btn')
+        .evaluate((el) => getComputedStyle(el).color);
+    assert(unbindColor === 'rgb(214, 88, 106)', 'unbind stays red-tinted, got ' + unbindColor);
+    await shot(boundPage, '12-desktop-1280-line-card-bound-state.png');
+    await boundCtx.close();
+    console.log('  bound-state desktop unbind button width=' + unbindBox.width.toFixed(0) + 'px');
+
     console.log('Part C: PASS');
 }
 

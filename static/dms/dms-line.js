@@ -58,12 +58,17 @@
         return m + ':' + (s < 10 ? '0' : '') + s;
     }
 
-    function shell(inner) {
+    // 卡片是 title/body/action 三区 grid(见 dms-intake.css):动作按钮(生成绑定码/
+    // 解绑)独立于内容流之外,桌面端搬到标题同一行右侧(贴近 MR.ERP DMS 卡 icon+
+    // info+acts 布局),手机端仍按行堆叠在最下方——纯 CSS 换区,DOM 结构不用按视口分叉。
+    function shell(bodyHtml, actionHtml) {
         return (
             '<div class="dms-line-card"><div class="dms-line-h">' +
             esc(t('dms-line-title')) +
+            '</div><div class="dms-line-body">' +
+            bodyHtml +
             '</div>' +
-            inner +
+            (actionHtml || '') +
             '</div>'
         );
     }
@@ -88,7 +93,7 @@
             '</a>'
         );
     }
-    function unboundHtml() {
+    function unboundBodyHtml() {
         var expired = S.expiresAt && !remainLabel(S.expiresAt);
         var codeZone = S.code
             ? '<div class="dms-line-code' +
@@ -108,13 +113,17 @@
             friendLinkHtml() +
             '<div id="dms-line-code-zone" class="dms-line-code-zone">' +
             codeZone +
-            '</div>' +
-            '<button type="button" class="btn primary dms-line-gen" id="dms-line-gen-btn">' +
+            '</div>'
+        );
+    }
+    function unboundActionHtml() {
+        return (
+            '<button type="button" class="btn primary dms-line-gen dms-line-action" id="dms-line-gen-btn">' +
             esc(t(S.code ? 'dms-line-regenerate' : 'dms-line-gen-btn')) +
             '</button>'
         );
     }
-    function boundHtml() {
+    function boundBodyHtml() {
         return (
             '<div class="dms-line-bound"><div class="dms-line-bname">' +
             esc(S.row.display_name || '') +
@@ -122,8 +131,12 @@
             esc(t('dms-line-bound-since')) +
             ' ' +
             esc(fmtDate(S.row.bound_at)) +
-            '</div></div>' +
-            '<button type="button" class="btn dms-line-unbind" id="dms-line-unbind-btn">' +
+            '</div></div>'
+        );
+    }
+    function boundActionHtml() {
+        return (
+            '<button type="button" class="btn dms-line-unbind dms-line-action" id="dms-line-unbind-btn">' +
             esc(t('dms-line-unbind-btn')) +
             '</button>'
         );
@@ -131,15 +144,21 @@
 
     function render() {
         if (!_host) return;
-        var inner =
-            S.phase === 'loading'
-                ? loadingHtml()
-                : S.phase === 'error'
-                  ? errorHtml()
-                  : S.phase === 'bound'
-                    ? boundHtml()
-                    : unboundHtml();
-        _host.innerHTML = shell(inner);
+        var bodyHtml, actionHtml;
+        if (S.phase === 'loading') {
+            bodyHtml = loadingHtml();
+            actionHtml = '';
+        } else if (S.phase === 'error') {
+            bodyHtml = errorHtml();
+            actionHtml = '';
+        } else if (S.phase === 'bound') {
+            bodyHtml = boundBodyHtml();
+            actionHtml = boundActionHtml();
+        } else {
+            bodyHtml = unboundBodyHtml();
+            actionHtml = unboundActionHtml();
+        }
+        _host.innerHTML = shell(bodyHtml, actionHtml);
         wire();
         if (S.phase === 'unbound' && S.expiresAt) startCountdown();
     }

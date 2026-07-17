@@ -1393,17 +1393,31 @@
   }
 }
 
-/* LINE 绑定卡(DL-4b · 独立通道:App 侧发码 / 已绑定态)· 挂在 dx-erp-cards-zone 下方。 */
+/* LINE 绑定卡(DL-4b · 独立通道:App 侧发码 / 已绑定态)· 挂在 dx-erp-cards-zone 下方。
+   Grid 三区(title/body/action):动作按钮(生成绑定码/解绑)独立成一个 grid 区,不再
+   挤在 body 内容流里——桌面端把它搬到标题同一行右侧(贴近上方 MR.ERP DMS 卡的
+   icon+info+acts 布局),手机端仍按行堆叠在最下方,和以前视觉一致(DOM 结构不分叉,
+   纯靠 @media 换 grid-template-areas)。 */
 .dmsx .dms-line-card {
   border: 1px solid var(--dx-line);
   border-radius: 16px;
   padding: 16px 18px;
   background: var(--card);
+  display: grid;
+  grid-template-areas: 'title' 'body' 'action';
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 .dmsx .dms-line-h {
+  grid-area: title;
   font-size: 13px;
   font-weight: 700;
-  margin-bottom: 10px;
+}
+.dmsx .dms-line-body {
+  grid-area: body;
+}
+.dmsx .dms-line-action {
+  grid-area: action;
 }
 .dmsx .dms-line-muted {
   color: var(--ink2);
@@ -1419,7 +1433,9 @@
   gap: 4px;
 }
 .dmsx .dms-line-friend {
-  display: inline-block;
+  /* 块级独占一行:曾是 inline-block,收窄按钮宽度后两者都够窄,被浏览器内联
+     布局塞进同一行、按钮压住链接(Zihao 截图撞见)——块级从根上断掉这个可能性。 */
+  display: block;
   font-size: 12px;
   font-weight: 600;
   color: var(--dx-brand);
@@ -1451,13 +1467,9 @@
   text-align: center;
   font-size: 12px;
   color: var(--ink2);
-  margin-bottom: 12px;
 }
 .dmsx .dms-line-gen {
   width: 100%;
-}
-.dmsx .dms-line-bound {
-  margin-bottom: 12px;
 }
 .dmsx .dms-line-bname {
   font-size: 14px;
@@ -1477,14 +1489,48 @@
   border-color: var(--dx-red);
 }
 
-/* 桌面视口(≥768px)绑定码框 + 按钮收窄到舒适列宽,不随卡片整宽拉满(卡片容器无
-   收口时可到 ~1500px,码框/按钮跟着拉满视觉失衡);左对齐随卡内文案(块级元素
-   默认贴左,不加 margin:auto 居中)。手机端不进这条 @media,维持现状全宽。
-   值用 min() 相对写法(400 上限,容器窄于此则跟随收窄,不写死不溢出),
-   非固定像素字面量——同 pick.html 的 hex/宽度收敛写法一致,不撞 lint-ui 棘轮闸。 */
+/* 桌面视口(≥768px):
+   1) 标题行右侧塞入动作按钮(贴近 MR.ERP DMS 卡 icon+info+acts 的横向布局);
+   2) 生成/重新生成、解绑两按钮换成与该卡「配置/停用」同款紧凑描边 pill——样式值
+      照抄 .dx-erp-cta/.dx-erp-toggle(不新造 class,直接复用其外观数值),用既有
+      id 选择器(#dms-line-gen-btn/#dms-line-unbind-btn)覆盖 .btn/.btn.primary 的
+      实心大按钮规则——id 选择器特异度天然高于任意 class 组合,不用 !important;
+   3) 绑定码显示区维持上一轮已收窄的 400px 列宽,本轮不再改动。
+   手机端(<768px)不进本 @media:标题/内容/按钮仍按行堆叠,按钮维持现状全宽大按钮。 */
 @media (min-width: 768px) {
-  .dmsx .dms-line-code-zone,
-  .dmsx .dms-line-gen {
+  .dmsx .dms-line-card {
+    grid-template-areas: 'title action' 'body body';
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+  .dmsx .dms-line-code-zone {
     max-width: min(400px, 100%);
+  }
+  .dmsx #dms-line-gen-btn,
+  .dmsx #dms-line-unbind-btn {
+    width: auto;
+    min-height: 0;
+    height: auto;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 10px;
+  }
+  .dmsx #dms-line-gen-btn {
+    background: var(--dx-brand-soft);
+    border-color: var(--dx-brand);
+    color: var(--dx-brand);
+  }
+  .dmsx #dms-line-gen-btn:hover {
+    background: var(--dx-brand-soft);
+    border-color: var(--dx-brand);
+  }
+  .dmsx #dms-line-unbind-btn {
+    background: var(--card);
+    border-color: var(--dx-red-soft);
+    color: var(--dx-red);
+  }
+  .dmsx #dms-line-unbind-btn:hover {
+    border-color: var(--dx-red);
   }
 }

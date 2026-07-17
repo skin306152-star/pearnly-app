@@ -309,10 +309,19 @@
         );
     }
 
-    // 补料后「重新跑」面:idle → 按钮;waiting → 禁用转述(有 classify 进度就报「识别中
-    // X/N」而不是空转的省略号,R2F-R3 #5);轮询次数用尽 → 诚实说"仍在后台跑"+手动刷新钮
-    // (不假装失败,也不装作没事发生);错 → 人话 + 重试(409"正在跑"也走这条,同时仍在
-    // 轮询,不是终态)。
+    // classify(逐张识别)/ reconcile(逐张读对账单)两步共用的等待态进度文案——谁在跑显谁
+    // 的真数字(J-1/J-9),同 ai-review-render.js::progressLabel 同一判据(两处渲染层各自
+    // 独立、无跨模块依赖,故不抽共享文件——纯 HTML 拼装层照 ai-format.js 之外先例保持薄)。
+    function progressLabel(progress) {
+        var key = progress.step === 'reconcile' ? 'wo_bank_progress' : 'wo_classify_progress';
+        return at(key, { done: progress.processed, total: progress.total });
+    }
+
+    // 补料后「重新跑」面:idle → 按钮;waiting → 禁用转述(有真进度就报「识别中/读对账单
+    // X/N」而不是空转的省略号,R2F-R3 #5)+「去工单页看进度→」引导(J-2/J-14:上传收齐
+    // 自动开跑后不再让用户干瞪眼,给一个"去哪看"的出口);轮询次数用尽 → 诚实说"仍在
+    // 后台跑"+手动刷新钮(不假装失败,也不装作没事发生);错 → 人话 + 重试(409"正在跑"
+    // 也走这条,同时仍在轮询,不是终态)。
     function rerunHtml(ctx) {
         if (!ctx.dirty && ctx.rerunState !== 'waiting' && !ctx.rerunTimedOut) return '';
         var inner;
@@ -325,12 +334,15 @@
                 '</button>';
         } else if (ctx.rerunState === 'waiting') {
             var waitingLabel = ctx.rerunProgress
-                ? at('wo_classify_progress', {
-                      done: ctx.rerunProgress.processed,
-                      total: ctx.rerunProgress.total,
-                  })
+                ? progressLabel(ctx.rerunProgress)
                 : at('intake_rerun_waiting');
-            inner = '<button class="btn pri" disabled>' + esc(waitingLabel) + '</button>';
+            inner =
+                '<button class="btn pri" disabled>' +
+                esc(waitingLabel) +
+                '</button>' +
+                '<button class="btn sm" data-action="ik-goto-wo">' +
+                esc(at('intake_goto_wo')) +
+                '</button>';
         } else {
             inner =
                 '<button class="btn pri" data-action="ik-rerun">' +

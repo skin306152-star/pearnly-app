@@ -282,6 +282,69 @@ class ClassifyProgressTests(_ApiTestBase):
         self.assertIsNone(detail["progress"])
 
 
+class BankProgressTests(_ApiTestBase):
+    """J-B:reconcile 步银行流水逐件进度(detail.bank_progress),同 ClassifyProgressTests
+    的现算范式——只在工单正卡在 reconcile 步且有银行件时给 {processed,total}。"""
+
+    def _bank_items(self):
+        return [
+            {
+                "id": f"bank-{i}",
+                "work_order_id": "wo-1",
+                "kind": "bank_statement",
+                "status": "pending",
+                "flag_reason": None,
+                "file_ref": f"/x/stmt_{i}.pdf",
+            }
+            for i in range(3)
+        ] + [
+            # 进项票不过银行解析,不计入 total
+            {
+                "id": "inv-1",
+                "work_order_id": "wo-1",
+                "kind": "purchase_invoice",
+                "status": "ok",
+                "flag_reason": None,
+                "file_ref": "/x/inv.jpg",
+            }
+        ]
+
+    def test_progress_counts_parsed_banks_during_reconcile(self):
+        self.store.wo["current_step"] = "reconcile"
+        self.store.items = self._bank_items()
+        self.store.events = [
+            {
+                "id": 1,
+                "step": "reconcile",
+                "event_type": "item_bank_parsed",
+                "payload": {"item_id": "bank-0", "rows": []},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertEqual(detail["bank_progress"], {"step": "reconcile", "processed": 1, "total": 3})
+
+    def test_no_bank_progress_outside_reconcile(self):
+        self.store.wo["current_step"] = "classify"
+        self.store.items = self._bank_items()
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["bank_progress"])
+
+    def test_no_bank_progress_when_no_bank_items(self):
+        self.store.wo["current_step"] = "reconcile"
+        self.store.items = [
+            {
+                "id": "inv-1",
+                "work_order_id": "wo-1",
+                "kind": "purchase_invoice",
+                "status": "ok",
+                "flag_reason": None,
+                "file_ref": "/x/inv.jpg",
+            }
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["bank_progress"])
+
+
 class BankReconTests(_ApiTestBase):
     """E2 契约:order_detail 的 bank_recon 字段只读投影 gates.r3_bank.recon(闸开+有
     recon 才带四清单,闸关/无流水/未跑到 reconcile/引擎异常降级一律诚实 None)。"""

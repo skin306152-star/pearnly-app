@@ -24,6 +24,24 @@
         return v;
     }
 
+    // stuck 单是否真有待人裁决的审核队列(J-12:看板别把"卡住但队列已判完/没队列"的单
+    // 也塞进「等你审」——点进去空的,状态词骗人)。借道 root.AI.reviewQueue(同 money()
+    // 的 root.AI.format 借道先例),未加载(脱管单测未 require 它)时保守当"有待审"处理,
+    // 不能悄悄把真实场景判没——判定错的方向必须是"多分去等你审"而不是反过来漏判。
+    function _hasPendingReviewQueue(detail) {
+        var flagged = _arr(detail, 'flagged');
+        if (!flagged.length) return false;
+        if (
+            root &&
+            root.AI &&
+            root.AI.reviewQueue &&
+            typeof root.AI.reviewQueue.filterPurchaseQueue === 'function'
+        ) {
+            return root.AI.reviewQueue.filterPurchaseQueue(flagged).length > 0;
+        }
+        return true;
+    }
+
     // v4 §2 kanban 五列固定顺序与色标(UI-Canon-v4 §5·1:1 抄 .dot 类名,禁自配色)。
     var COLUMNS = [
         { key: 'materials', dot: 'n', titleKey: 'col_materials' },
@@ -55,10 +73,13 @@
                 return { column: 'working' };
             case 'stuck':
                 if (needs.length > 0) return { column: 'materials' };
-                // 没有逐条 needs(看板首屏用 list 端点批量拉,不逐条拉 detail)——stuck 本质
-                // 是需要人看,保守分到「等你审」,不假装能细分出缺料/挂起(blocked_reasons
-                // 与此兜底同值,不再单独判断)。
-                return { column: 'review' };
+                // J-12 根治:只有真有待人裁决的审核队列(flagged 里的进项票/方向不明票,
+                // 同 W3 审核队列口径)才归「等你审」——此前只看 blocked_reasons 非空就分
+                // 去这一列,漏了"卡住但队列已判完/根本没有队列条目"这种真实场景(点进去
+                // 空的,状态词骗人)。没有逐条 detail(看板首屏用 list 端点批量拉)时
+                // _hasPendingReviewQueue 保守当"有待审"不误判成"没事"。
+                if (_hasPendingReviewQueue(detail)) return { column: 'review' };
+                return { column: 'materials' };
             case 'review':
                 return { column: 'sign' };
             case 'archive':

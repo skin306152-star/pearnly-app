@@ -182,6 +182,19 @@
   animation: ai-fade var(--dur-base) var(--ease);
 }
 
+/* 工单页跑批中真进度(J-1/J-9/J-B):classify/reconcile 逐件「X/N」,不是死转的省略号。 */
+.wo-progress {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--sage-deep);
+  margin: 0 0 10px;
+}
+/* 引导链②(J-B):stuck 有票待裁决 / review 待签批时的「去待我处理」出口——
+ * 就是一个 .btn.sm,不另起卡面,只管跟上面内容留出呼吸距。 */
+.wo-guide {
+  margin-top: 14px;
+}
+
 /* 工单视图:管线摘要 + 关键数字(真数据 · order_detail) */
 .wosum {
   display: grid;
@@ -457,5 +470,24 @@
   }
   .rv-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* N-5:窄视口(手机 390)5 个 tab 按钮不折行/不缩窄,.ctabs 的 inline-flex 天然内容宽度
+ * 会顶出页面横向溢出 66px(#clientTabs 是既有巨石,IN-0b 验收已实测量出基线)。修法是
+ * 让 .ctabs 自己横向可滚(触控可达,不丢任何一个 tab),不是页面 body 横向溢出——两者
+ * 效果都是"看不到裁切",但只有前者不会顶穿整页布局把旁边内容也带偏。 */
+@media (max-width: 480px) {
+  .ctabs {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ctabs::-webkit-scrollbar {
+    display: none;
+  }
+  .ctabs button {
+    flex: 0 0 auto;
   }
 }

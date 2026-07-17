@@ -378,6 +378,7 @@ Object.assign(window.__AI_I18N_TH__, {
     bxs_flip_to_sales: 'ทำเครื่องหมายเป็นขาย',
     field_shadow_workpaper: 'ใบงานร่างบัญชีคู่',
     pkg_signed_done: 'ทำเครื่องหมายรอเซ็นแล้ว · {actor}',
+    pkg_goto_signoff: 'ไปเซ็นอนุมัติ →',
     pkg_frozen_hint: 'ถูกแช่แข็งแล้ว',
     pkg_export_no_entries: 'ยังไม่มีรายการบัญชีร่างให้ส่งออก',
     pkg_return_reason_prompt: 'กรุณากรอกเหตุผลในการส่งกลับ (จำเป็น)',

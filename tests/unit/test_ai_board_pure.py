@@ -46,21 +46,54 @@ class MapOrderToColumnTests(unittest.TestCase):
             """)
         self.assertEqual(out, {"column": "materials"})
 
-    def test_stuck_with_blocked_reasons_goes_review(self):
+    def test_stuck_with_blocked_reasons_but_no_flagged_queue_goes_materials(self):
+        # J-12 根治:blocked_reasons 非空不再单独决定"等你审"——没有 flagged 队列条目
+        # (卡住但没有真的待裁决票)该落「等资料/卡住」语义列(materials),不是"等你审"
+        # (此前会把这种单塞进等你审列,点进去审核队列却空的,状态词骗人)。
         out = _run_node(f"""
             const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
             process.stdout.write(JSON.stringify(
-                b.mapOrderToColumn({{status: 'stuck'}}, {{needs: [], blocked_reasons: ['reconcile.input_vat_mismatch']}})
+                b.mapOrderToColumn({{status: 'stuck'}}, {{needs: [], blocked_reasons: ['reconcile.input_vat_mismatch'], flagged: []}})
+            ));
+            """)
+        self.assertEqual(out, {"column": "materials"})
+
+    def test_stuck_with_pending_purchase_flagged_goes_review(self):
+        # 真有待裁决进项票(flagged 命中 W3 队列口径)才归「等你审」。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(
+                b.mapOrderToColumn(
+                    {{status: 'stuck'}},
+                    {{needs: [], blocked_reasons: [], flagged: [{{item_id: 'it-1', kind: 'purchase_invoice'}}]}}
+                )
             ));
             """)
         self.assertEqual(out, {"column": "review"})
 
-    def test_stuck_without_detail_degrades_to_review(self):
+    def test_stuck_with_flagged_all_already_decided_goes_materials(self):
+        # flagged 条目存在但已全部裁决(非进项票/非方向不明票)不算真队列——同上归 materials。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(
+                b.mapOrderToColumn(
+                    {{status: 'stuck'}},
+                    {{needs: [], blocked_reasons: [], flagged: [{{item_id: 'it-1', kind: 'sales_summary'}}]}}
+                )
+            ));
+            """)
+        self.assertEqual(out, {"column": "materials"})
+
+    def test_stuck_without_detail_degrades_to_materials(self):
+        # 没有逐条 detail(看板首屏用 list 端点批量拉,不是本单元测试关心的性能优化,只
+        # 关心诚实降级)——没数据不等于"有事要审",不再乐观地塞进等你审列。
         out = _run_node(f"""
             const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
             process.stdout.write(JSON.stringify(b.mapOrderToColumn({{status: 'stuck'}})));
             """)
-        self.assertEqual(out, {"column": "review"})
+        self.assertEqual(out, {"column": "materials"})
 
     def test_review_status_goes_sign_column(self):
         out = _run_node(f"""

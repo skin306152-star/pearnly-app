@@ -13,7 +13,16 @@
     var VIEWS = AI.router.VIEWS;
 
     // 模块作用域态:每个标签页各自一份 JS 运行时,天然不跨标签共享(无需额外隔离逻辑)。
-    var S = { api: null, clientId: null, view: null, client: null, orders: [], periodIdx: 0 };
+    var S = {
+        api: null,
+        clientId: null,
+        view: null,
+        client: null,
+        orders: [],
+        periodIdx: 0,
+        deepLinkPeriod: null, // J-B/J-8:深链带的 ?period=,零工单空态开单控件据此默认(而非恒回当月)
+    };
+    var woPoll = null; // 工单页自动刷新轮询句柄(J-B/J-10):离开 wo 视图/换单/归档终态时停
 
     function esc(s) {
         return AI.state.esc(s);
@@ -101,17 +110,18 @@
         );
     }
 
-    function openFirstOrder() {
-        var btn = $('cv-wo').querySelector('[data-action="wo-open-first"]');
+    // 开单 + 重拉订单列表 + 定位到新开的那期(wo 空态「开当期工单」/ intake 空态「开单账期
+    // 选择器」共用同一段联网时序,只是各自的按钮态字/落定期不同)。
+    function createOrderAndReload(period, btn, idleLabel, onDone) {
         if (btn) {
             if (btn.disabled) return;
             btn.disabled = true;
-            btn.textContent = at('wo_open_first_busy');
+            btn.textContent = at('card_open_order_busy');
         }
         S.api
             .createOrder({
                 workspace_client_id: Number(S.clientId),
-                period: AI.board.currentPeriodBE(),
+                period: period,
                 intent: 'monthly_vat',
             })
             .then(function () {
@@ -119,79 +129,184 @@
             })
             .then(function (r) {
                 S.orders = AI.clientArchiveRender.sortOrdersByPeriodDesc(r.orders);
-                S.periodIdx = 0;
+                S.periodIdx = periodIndexOf(period);
                 renderPeriodPicker();
-                renderWo();
+                if (onDone) onDone();
             })
             .catch(function () {
                 if (btn) {
                     btn.disabled = false;
-                    btn.textContent = at('wo_open_first_btn');
+                    btn.textContent = idleLabel;
                 }
             });
+    }
+
+    function openFirstOrder() {
+        var btn = $('cv-wo').querySelector('[data-action="wo-open-first"]');
+        createOrderAndReload(AI.board.currentPeriodBE(), btn, at('wo_open_first_btn'), renderWo);
+    }
+
+    // 零工单空态的开单账期选择器(J-8/J-B):默认账期不再恒回当月——深链带了 ?period=
+    // (如从看板/客户档案页历史点进来)就该默认那一期,否则用户正在跑的是 2569-05、
+    // 控件却默认冒出 2569-07,点错一次就多开一张不该开的工单。default 落最新已知深链
+    // 期,没有才回落当月(既有行为不变)。
+    function intakeEmptyHtml() {
+        var defaultPeriod = S.deepLinkPeriod || AI.board.currentPeriodBE();
+        var optsHtml = AI.state.optionsHtml(AI.board.periodOptions(), defaultPeriod, function (p) {
+            return p;
+        });
+        return (
+            AI.state.emptyHtml({ title: at('intake_empty_t'), sub: at('intake_empty_s') }) +
+            '<div class="kopen"><select class="period-sel" id="ikEmptyPeriodSel" aria-label="' +
+            esc(at('card_period_select_label')) +
+            '">' +
+            optsHtml +
+            '</select><button type="button" class="btn pri" data-action="intake-open-order">' +
+            esc(at('card_open_order')) +
+            '</button></div>'
+        );
+    }
+
+    function openIntakeOrder() {
+        var container = $('cv-intake');
+        var sel = container.querySelector('#ikEmptyPeriodSel');
+        var period = (sel && sel.value) || AI.board.currentPeriodBE();
+        var btn = container.querySelector('[data-action="intake-open-order"]');
+        createOrderAndReload(period, btn, at('card_open_order'), renderIntake);
+    }
+
+    // classify(逐张识别)/ reconcile(逐张读对账单)两步共用的进度文案,谁在跑显谁的真数字
+    // (J-1/J-9),同 ai-intake-render.js::progressLabel 同一判据(渲染层各自独立不抽共享)。
+    function woProgressLabel(progress) {
+        var key = progress.step === 'reconcile' ? 'wo_bank_progress' : 'wo_classify_progress';
+        return at(key, { done: progress.processed, total: progress.total });
+    }
+
+    // 引导链②(J-B):stuck 单有真待裁决票、或已到 review 待签批,工单页给「去待我处理」出口
+    // ——N 用真数字,不臆造。stuck 用同 W3/看板同一份进项待裁决队列判据(AI.reviewQueue,
+    // 不重造第二套认定);review(TERMINAL_STATUS,待人审签批)本身就是一件事,记 1。
+    function woGuidanceCount(d) {
+        if (d.status === 'stuck') return AI.reviewQueue.filterPurchaseQueue(d.flagged || []).length;
+        if (d.status === 'review') return 1;
+        return 0;
+    }
+
+    function woSummaryHtml(d) {
+        var numKeys = Object.keys(d.numbers || {});
+        var cells = numKeys
+            .map(function (k) {
+                var v = (d.numbers || {})[k];
+                // N-3 修复:prior_period_check 是对象({status:...}),不能走通用
+                // esc(v) 路径(会字面显示 [object Object])——单独映射成人话文案。
+                var display =
+                    k === 'prior_period_check'
+                        ? AI.format.priorPeriodCheckText(v)
+                        : /vat|amount|due/.test(k)
+                          ? AI.format.money(v)
+                          : esc(v);
+                return (
+                    '<div class="cell"><div class="lb">' +
+                    esc(AI.format.fieldLabel(k)) +
+                    '</div><div class="v num">' +
+                    display +
+                    '</div></div>'
+                );
+            })
+            .join('');
+        var needs = (d.needs || [])
+            .map(function (n) {
+                return '<div class="ni">' + esc(n) + '</div>';
+            })
+            .join('');
+        // 归档单不再谎报「当前步骤: review」(清单 #6):状态胶囊(status_archive)
+        // 已交代「已归档」,步骤注记只在流程未收口时显示。
+        var stepNote =
+            d.status === 'archive'
+                ? ''
+                : '<span class="note">' +
+                  esc(at('wo_step')) +
+                  ': ' +
+                  esc(d.current_step) +
+                  '</span>';
+        var progress = d.progress || d.bank_progress;
+        var progressLine = progress
+            ? '<p class="wo-progress">' + esc(woProgressLabel(progress)) + '</p>'
+            : '';
+        var guideCount = woGuidanceCount(d);
+        var guidance =
+            guideCount > 0
+                ? '<div class="wo-guide"><button type="button" class="btn sm" data-action="wo-goto-pool">' +
+                  esc(at('wo_todo_banner', { n: guideCount })) +
+                  '</button></div>'
+                : '';
+        return (
+            '<div class="panel"><div class="hd"><h3>' +
+            esc(at('tab_wo')) +
+            ' ' +
+            AI.format.chipHtml(d.status, d) +
+            stepNote +
+            '</h3></div><div class="bd">' +
+            progressLine +
+            (cells ? '<div class="wosum">' + cells + '</div>' : '') +
+            (needs ? '<div class="needs-list">' + needs + '</div>' : '') +
+            guidance +
+            '</div></div>'
+        );
+    }
+
+    // 工单页活着就自动刷(J-10):5s 一轮只重画顶部摘要(chip/进度/需料/引导条)——不重挂
+    // corrob/recon/shadow/financials 子件,那些各自持有自己的展开态/模态框,每 5s 强拆
+    // 会把用户正在看的东西震掉,超出这次要修的范围。maxTries 传 Infinity:这不是"重跑后
+    // 盯一阵"的有限等待,是"页面开着就该一直活"的常驻刷新,没有到期就装死的道理;归档
+    // (终态)后自己停,数字不会再变(archive.py 只读收口)。
+    function startWoPoll(order) {
+        var session = S;
+        stopWoPoll();
+        woPoll = AI.poll.create({
+            maxTries: Infinity,
+            fetch: function () {
+                return session.api.getOrder(order.id);
+            },
+            onTick: function (d) {
+                if (S !== session || S.view !== 'wo') return;
+                if (!currentOrder() || currentOrder().id !== order.id) return;
+                var panel = $('woSummaryPanel');
+                if (panel) panel.innerHTML = woSummaryHtml(d);
+                if (d.status === 'archive') stopWoPoll();
+            },
+        });
+        woPoll.start();
+    }
+
+    function stopWoPoll() {
+        if (woPoll) {
+            woPoll.stop();
+            woPoll = null;
+        }
     }
 
     function renderWo() {
         var body = $('cv-wo');
         var order = currentOrder();
+        stopWoPoll();
         if (!order) {
             body.innerHTML = woEmptyHtml();
             return;
         }
         body.innerHTML = AI.state.loadingHtml();
+        var session = S;
         S.api
             .getOrder(order.id)
             .then(function (d) {
-                var numKeys = Object.keys(d.numbers || {});
-                var cells = numKeys
-                    .map(function (k) {
-                        var v = (d.numbers || {})[k];
-                        // N-3 修复:prior_period_check 是对象({status:...}),不能走通用
-                        // esc(v) 路径(会字面显示 [object Object])——单独映射成人话文案。
-                        var display =
-                            k === 'prior_period_check'
-                                ? AI.format.priorPeriodCheckText(v)
-                                : /vat|amount|due/.test(k)
-                                  ? AI.format.money(v)
-                                  : esc(v);
-                        return (
-                            '<div class="cell"><div class="lb">' +
-                            esc(AI.format.fieldLabel(k)) +
-                            '</div><div class="v num">' +
-                            display +
-                            '</div></div>'
-                        );
-                    })
-                    .join('');
-                var needs = (d.needs || [])
-                    .map(function (n) {
-                        return '<div class="ni">' + esc(n) + '</div>';
-                    })
-                    .join('');
-                // 归档单不再谎报「当前步骤: review」(清单 #6):状态胶囊(status_archive)
-                // 已交代「已归档」,步骤注记只在流程未收口时显示。
-                var stepNote =
-                    d.status === 'archive'
-                        ? ''
-                        : '<span class="note">' +
-                          esc(at('wo_step')) +
-                          ': ' +
-                          esc(d.current_step) +
-                          '</span>';
+                if (S !== session || S.view !== 'wo') return; // 已切走
+                if (!currentOrder() || currentOrder().id !== order.id) return; // 已切期/切客户
                 body.innerHTML =
-                    '<div class="panel"><div class="hd"><h3>' +
-                    esc(at('tab_wo')) +
-                    ' ' +
-                    AI.format.chipHtml(d.status, d) +
-                    stepNote +
-                    '</h3></div><div class="bd">' +
-                    (cells ? '<div class="wosum">' + cells + '</div>' : '') +
-                    (needs ? '<div class="needs-list">' + needs + '</div>' : '') +
-                    '</div></div>' +
+                    '<div id="woSummaryPanel"></div>' +
                     '<div id="corrobRoot"></div>' +
                     '<div id="brxRoot"></div>' +
                     '<div id="shadowRoot"></div>' +
                     '<div id="financialsRoot"></div>';
+                $('woSummaryPanel').innerHTML = woSummaryHtml(d);
                 // 销项佐证区(MC1-c.1 / SA-2b):同一次 getOrder() 已带回 sales_corroboration
                 // 与 edc_corroboration,两卡并排渲染,不再二次请求。
                 AI.corrob.mount(d.sales_corroboration, $('corrobRoot'), d.edc_corroboration);
@@ -201,8 +316,10 @@
                 AI.shadow.mount(d.shadow_draft, $('shadowRoot'));
                 // 月度报表包区(G1b):同一次 getOrder() 已带回 financials,不再二次请求。
                 AI.financials.mount(d.financials, $('financialsRoot'));
+                if (d.status !== 'archive') startWoPoll(order);
             })
             .catch(function () {
+                if (S !== session) return;
                 body.innerHTML = AI.state.errorHtml({
                     title: at('error_t'),
                     sub: at('error_s'),
@@ -216,10 +333,7 @@
     function renderIntake() {
         var order = currentOrder();
         if (!order) {
-            $('cv-intake').innerHTML = AI.state.emptyHtml({
-                title: at('intake_empty_t'),
-                sub: at('intake_empty_s'),
-            });
+            $('cv-intake').innerHTML = intakeEmptyHtml();
             return;
         }
         AI.intake.mount(S.api, order, S.clientId);
@@ -274,6 +388,14 @@
         };
         $('cv-wo').addEventListener('click', function (e) {
             if (e.target.closest('[data-action="wo-open-first"]')) openFirstOrder();
+            // 引导链②(J-B):工单页「有 N 件事等你」→ 待我处理聚合队列(D2-S8/MC1-b2,
+            // 同看板 col_review「等你审」跳的同一个地方,不另造第二个"审核入口")。
+            else if (e.target.closest('[data-action="wo-goto-pool"]')) {
+                window.location.hash = AI.router.buildPoolHash();
+            }
+        });
+        $('cv-intake').addEventListener('click', function (e) {
+            if (e.target.closest('[data-action="intake-open-order"]')) openIntakeOrder();
         });
         $('periodBtn').onclick = function () {
             $('periodMenu').classList.toggle('on');
@@ -322,7 +444,10 @@
         }
         if (S.clientId === clientId) {
             // 同客户内的深链切期(如工单历史点了另一行):orders 已在手,直接定位,
-            // 不重新拉一遍客户身份(同分支既有的"只切 tab 不重拉"精神一致)。
+            // 不重新拉一遍客户身份(同分支既有的"只切 tab 不重拉"精神一致)。J-8:period
+            // 带了就更新记住的深链期(覆盖上一次),没带则沿用同客户会话内已记住的那份
+            // (换 tab 常常不重新带 period,不该把刚深链进来的期悄悄忘掉)。
+            if (period) S.deepLinkPeriod = period;
             if (period && S.orders.length) S.periodIdx = periodIndexOf(period);
             renderTabs();
             renderPeriodPicker();
@@ -333,6 +458,7 @@
         S.client = null;
         S.orders = [];
         S.periodIdx = 0;
+        S.deepLinkPeriod = period || null; // 换客户:不带 period 就不留上一个客户的深链期
         renderHeader();
         renderTabs();
         ['intake', 'wo', 'review', 'pkg', 'profile'].forEach(function (v) {

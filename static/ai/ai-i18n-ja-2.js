@@ -386,6 +386,7 @@ Object.assign(window.__AI_I18N_JA__, {
     bxs_flip_to_sales: '売上としてマーク',
     field_shadow_workpaper: 'シャドー仕訳ワークペーパー',
     pkg_signed_done: '署名待ちにしました · {actor}',
+    pkg_goto_signoff: '署名へ進む →',
     pkg_frozen_hint: '凍結済み',
     pkg_export_no_entries: '出力できるシャドー仕訳がまだありません',
     pkg_return_reason_prompt: '差し戻しの理由を入力してください(必須)',

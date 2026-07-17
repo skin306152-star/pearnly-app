@@ -81,6 +81,10 @@ const BUNDLES = [
             'ai/ai-format.js',
             'ai/ai-router.js',
             'ai/ai-state.js',
+            // ai-poll.js(J-B · 共享轮询器:5s 间隔 + 终态即停 + 页面隐藏时暂停,零依赖)
+            // 只需排在四个消费者(ai-intake.js/ai-review.js/ai-dashboard.js/ai-client.js)
+            // 之前,紧邻 ai-state.js 是"同属零依赖基础设施"的语义分组。
+            'ai/ai-poll.js',
             // ai-api-payroll.js(工资表 H1b 五端点,拆自 ai-api.js·单文件<500 铁律)只需
             // 排在 ai-api.js 之前(apiFactory() 到调用时才读 AI.apiPayroll,不是加载时),
             // 紧邻放置是"同属后端调用薄层"的语义分组。

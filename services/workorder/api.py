@@ -35,6 +35,7 @@ _DECISIONS = (decisions.FACE_VALUE, decisions.RECALC, decisions.EXCLUDE)
 _DECISION_STEP = "reconcile"
 _EVT_DECISION = "human_decision"
 _EVT_CLASSIFIED = "item_classified"
+_EVT_BANK_PARSED = "item_bank_parsed"
 _EVT_NEEDS = "step_needs"
 _EVT_STUCK = "step_stuck"
 _STATUS_STUCK = "stuck"
@@ -181,6 +182,8 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     needs, blocked = _halt_info(events, wo["status"])
     # item_classified 回放同一请求只算一次,喂给 flagged/进度/佐证三个读侧投影(纯参数下沉)。
     classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
+    # item_bank_parsed 回放同上(J-B:reconcile 步银行流水逐件进度,同 classified 的现算范式)。
+    bank_parsed = evidence.replay_items_by_type(events, _EVT_BANK_PARSED)
     detail = {
         "id": wo["id"],
         "workspace_client_id": wo["workspace_client_id"],
@@ -189,6 +192,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "status": wo["status"],
         "current_step": wo["current_step"],
         "progress": _classify_progress(wo, items, classified),
+        "bank_progress": _bank_progress(wo, items, bank_parsed),
         "flagged": evidence.flagged_projection(items, events, classified=classified),
         "alerts": evidence.alerts_projection(events) + evidence.amount_read_suggestions(events),
         "needs": needs,
@@ -299,6 +303,19 @@ def _classify_progress(wo: dict, items: list[dict], classified: dict) -> Optiona
         return None
     processed = sum(1 for iid in image_ids if iid in classified)
     return {"step": "classify", "processed": processed, "total": len(image_ids)}
+
+
+def _bank_progress(wo: dict, items: list[dict], bank_parsed: dict) -> Optional[dict]:
+    """reconcile 步银行流水逐件进度(J-B:分批传料期间前端「读对账单 X/N」,同
+    _classify_progress 的现算范式——只在工单正卡在 reconcile 步时给一份 {processed,total},
+    其余步返 None。bank_parsed 是调用方已回放好的 item_bank_parsed 索引,不建新状态表。"""
+    if wo.get("current_step") != "reconcile":
+        return None
+    bank_ids = {it["id"] for it in items if it.get("kind") == kinds.BANK_STATEMENT}
+    if not bank_ids:
+        return None
+    processed = sum(1 for iid in bank_ids if iid in bank_parsed)
+    return {"step": "reconcile", "processed": processed, "total": len(bank_ids)}
 
 
 def _halt_info(events: list[dict], status: str) -> tuple[list, list]:

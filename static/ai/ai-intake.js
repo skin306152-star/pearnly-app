@@ -9,8 +9,13 @@
  * 采用建议值四个动作的网络编排拆到 ai-intake-bank-sales.js(单文件<500 行铁律),本文件
  * 只在 mount() 时用 bankSales.create(getS, render) 接上,onClick 里转发 data-action。
  *
- * 依赖 window.AI.state/api/router/intakeRender/bankSalesRender/intakeBankSales 与全局 at(),
- * 排在它们之后、ai-client.js 之前加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。
+ * 依赖 window.AI.state/api/router/intakeRender/bankSalesRender/intakeBankSales/poll 与全局
+ * at(),排在它们之后、ai-client.js 之前加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。
+ *
+ * J-B(2026-07-17):补料落盘后不再要求用户手点「重新跑」——这一趟选中的文件(可能被
+ * splitBatches 切成多批顺序上传)全部落定、且真有新料落盘才自动续跑一次(收齐才开跑,
+ * 不是每批落盘各触发一次);手动「重新跑」按钮仍保留兜底,不锁死。轮询收编进共享的
+ * AI.poll(N-6 债:此前与 ai-review.js 各写一份 pollAfterRun,逐字节重复)。
  */
 (function () {
     'use strict';
@@ -18,14 +23,13 @@
     var $ = function (id) {
         return document.getElementById(id);
     };
-    var POLL_INTERVAL_MS = 2000;
-    var POLL_MAX_TRIES = 30;
 
     var S = null;
     var wired = false;
     var fileInput = null; // 持久隐藏文件选择器(单例,不随 render 重建 → File 不丢)
     var bankSales = null; // AI.intakeBankSales 实例,mount() 时装配一次,取当前 S 靠 getS()
     var intakeQueue = null; // AI.intakeQueue 实例(IN-0b 队列/密码/失败批),同上装配一次
+    var runPoll = null; // 当前重跑轮询的 AI.poll 句柄(mount()/换会话时先停旧的再起新的)
 
     function body() {
         return $('cv-intake');
@@ -192,9 +196,24 @@
     function upload() {
         if (S.uploading || !S.files.length) return;
         var files = S.files;
+        var session = S;
+        var acceptedBefore = S.manifest.accepted;
         S.files = [];
         S.resumeBanner = null;
-        intakeQueue.upload(files);
+        intakeQueue.upload(files).then(function () {
+            maybeAutoRun(session, acceptedBefore);
+        });
+    }
+
+    // 收齐才开跑(J-B):intakeQueue.upload() 的 promise 要这一趟切出的全部批次(splitBatches)
+    // 顺序落盘/拒收/失败都settle 才 resolve——不是每批各触发一次,是这一趟收尾才判一次。
+    // 真有新料落盘(accepted 比这一趟开始前多)才自动续跑;一张没落盘(全部拒收/网络失败)
+    // 不必空跑一次引擎。手动「重新跑」按钮仍在(rerunHtml),中途/事后用户自己点不受影响。
+    function maybeAutoRun(session, acceptedBefore) {
+        if (S !== session) return;
+        if (session.rerunState === 'waiting') return; // 已经在跑(如失败批重试触发第二趟)
+        if (session.manifest.accepted <= acceptedBefore) return;
+        startRerun();
     }
 
     // ============ 续传横幅(A10/A11 · 刷新后接续) ============
@@ -258,7 +277,7 @@
             });
     }
 
-    // ============ 补料后重新跑 + 轮询(照 ai-review.js §4 判活范式) ============
+    // ============ 补料后重新跑 + 轮询(共享 AI.poll,同 ai-review.js §4 判活范式) ========
 
     function startRerun() {
         if (S.rerunState === 'waiting') return;
@@ -272,17 +291,17 @@
             .runOrder(S.orderId)
             .then(function () {
                 if (S !== session) return;
-                pollAfterRun(session, 0);
+                runPollFor(session);
             })
             .catch(function (err) {
                 if (S !== session) return;
                 var errKey = AI.api.mapApiErrorKey(err && err.code);
-                // 409(工单已在跑,如另一标签页触发):不是失败,是我们来晚了——仍然
-                // 继续轮询进度,只是带上"正在跑"专属文案而不是让用户干等一个死按钮。
+                // 409(工单已在跑,如另一标签页/收齐自动开跑触发):不是失败,是我们来晚了
+                // ——仍然继续轮询进度,只是带上"正在跑"专属文案而不是让用户干等一个死按钮。
                 if (errKey === 'err_workorder_run_in_progress') {
                     S.rerunErrKey = errKey;
                     render();
-                    pollAfterRun(session, 0);
+                    runPollFor(session);
                     return;
                 }
                 S.rerunState = 'idle';
@@ -291,33 +310,39 @@
             });
     }
 
-    function pollAfterRun(session, count) {
-        if (count >= POLL_MAX_TRIES) {
-            // 轮询次数用尽不等于跑完/跑失败——真实情况通常是引擎还在后台处理,只是
-            // 比 30 次 × 2 秒(1 分钟)慢。诚实说"仍在后台跑",给手动刷新钮,不假装
-            // 已收口也不再无声空转(R2F-R3 #5)。
-            S.rerunState = 'idle';
-            S.rerunTimedOut = true;
-            render();
-            return;
-        }
-        setTimeout(function () {
-            if (S !== session) return;
-            S.api
-                .getOrder(S.orderId)
-                .then(function (detail) {
-                    if (S !== session) return;
-                    if (detail.progress && detail.progress.step === 'classify') {
-                        S.rerunProgress = detail.progress;
-                        render();
-                    }
-                    routeAfter(detail, session, count);
-                })
-                .catch(function () {
-                    if (S !== session) return;
-                    pollAfterRun(session, count + 1);
-                });
-        }, POLL_INTERVAL_MS);
+    // 换会话/重复触发时先停旧轮询再起新的(runPoll 是模块作用域单例,同一时间只该有一份
+    // 定时器在跑)。
+    function runPollFor(session) {
+        if (runPoll) runPoll.stop();
+        runPoll = AI.poll.create({
+            fetch: function () {
+                return session.api.getOrder(session.orderId);
+            },
+            onTick: function (detail) {
+                if (S !== session) return;
+                // classify(逐张识别)与 reconcile(逐张读对账单)两步的真进度,谁在跑显谁,
+                // 不空转省略号(J-1/J-9)。
+                var progress = detail.progress || detail.bank_progress;
+                if (progress) {
+                    S.rerunProgress = progress;
+                    render();
+                }
+            },
+            isTerminal: function (detail) {
+                if (S !== session) return true; // 已切走会话,静默收口,不做任何副作用
+                return routeAfter(detail, session);
+            },
+            onTimeout: function () {
+                if (S !== session) return;
+                // 轮询次数用尽不等于跑完/跑失败——真实情况通常是引擎还在后台处理,只是
+                // 比预算的时间窗慢。诚实说"仍在后台跑",给手动刷新钮,不假装已收口也
+                // 不再无声空转(R2F-R3 #5)。
+                S.rerunState = 'idle';
+                S.rerunTimedOut = true;
+                render();
+            },
+        });
+        runPoll.start();
     }
 
     // 轮询超时后的手动"刷新查看"(R2F-R3 #5):重新从头计一轮轮询,不是单次探一下就撒手
@@ -327,10 +352,11 @@
         S.rerunState = 'waiting';
         S.rerunTimedOut = false;
         render();
-        pollAfterRun(S, 0);
+        runPollFor(S);
     }
 
-    function routeAfter(detail, session, count) {
+    // 一次轮询拿到的 detail → 是否终态(true=停轮询,调用方已在这里做完全部导航/呈现副作用)。
+    function routeAfter(detail, session) {
         var hasNumbers = Object.keys(detail.numbers || {}).length > 0;
         // 进项队列口径与 W3 审核队列同一份判定(ai-review-queue.js):flagged 进项票 +
         // 方向不明票(kind=unknown/flag_reason=direction_ambiguous)都算未定,不能只认
@@ -338,13 +364,13 @@
         var purchaseQueue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
         // 算到数(compute 出 tax_due)或已过 stuck → 去交付包看结果。
         if (hasNumbers || detail.status !== 'stuck') {
-            window.location.hash = AI.router.buildClientHash(S.clientId, 'pkg');
-            return;
+            window.location.hash = AI.router.buildClientHash(session.clientId, 'pkg');
+            return true;
         }
         // 仍 stuck 但改成缺进项裁决 → 去审核队列(补料把销项道打通了,卡点前移到进项)。
         if (purchaseQueue.length) {
-            window.location.hash = AI.router.buildClientHash(S.clientId, 'review');
-            return;
+            window.location.hash = AI.router.buildClientHash(session.clientId, 'review');
+            return true;
         }
         // 仍 stuck 且给了具体卡点/缺料原因 → 停下来诚实呈现,别空转。
         var reasons = [].concat(detail.blocked_reasons || [], detail.needs || []);
@@ -354,9 +380,25 @@
             S.rerunState = 'idle';
             S.rerunErrKey = null;
             render();
-            return;
+            return true;
         }
-        pollAfterRun(session, count + 1);
+        return false;
+    }
+
+    // 引导链①(J-B):自动/手动开跑落定后,收料页给「去工单页看进度」的出口——工单页
+    // 是唯一能同时看到 classify/reconcile 两段进度 + stuck/review 引导条的地方。
+    function gotoWorkorder() {
+        window.location.hash = AI.router.buildClientHash(S.clientId, 'wo');
+    }
+
+    // 网络级失败批重试成功也算「真有新料落盘」,同 upload() 一样收编进收齐才开跑判断
+    // ——不然用户点了重试、料确实传上去了,却还得再多点一次「重新跑」。
+    function retryFailed() {
+        var session = S;
+        var acceptedBefore = S.manifest.accepted;
+        intakeQueue.retryFailedBatches().then(function () {
+            maybeAutoRun(session, acceptedBefore);
+        });
     }
 
     // ============ 事件接线(容器委托,只挂一次) ============
@@ -372,10 +414,11 @@
         else if (a === 'ik-form-cancel') cancelForm();
         else if (a === 'ik-rerun') startRerun();
         else if (a === 'ik-refresh-status') refreshAfterTimeout();
+        else if (a === 'ik-goto-wo') gotoWorkorder();
         else if (a === 'ik-pw-skip') intakeQueue.skipPassword();
         else if (a === 'ik-resume-pick') resumePick();
         else if (a === 'ik-resume-dismiss') intakeQueue.resumeDismiss();
-        else if (a === 'ik-retry-failed') intakeQueue.retryFailedBatches();
+        else if (a === 'ik-retry-failed') retryFailed();
         else if (a === 'bxs-fold') bankSales.toggleFold(el.getAttribute('data-kind'));
         else if (a === 'bxs-decide') {
             bankSales.decideRow(el.getAttribute('data-fp'), el.getAttribute('data-verdict'));
@@ -488,6 +531,12 @@
             intakeQueue = AI.intakeQueue.create(function () {
                 return S;
             }, render);
+        }
+        // 换单/换客户挂载新会话:旧会话的轮询没有存在意义(isTerminal/onTick 虽已靠 S!==
+        // session 卫哨自认失效,但让它继续空转到超时才停也没必要,当场收掉更干净)。
+        if (runPoll) {
+            runPoll.stop();
+            runPoll = null;
         }
         wireOnce();
         loadDetail();

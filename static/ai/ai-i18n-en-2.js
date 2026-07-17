@@ -389,6 +389,7 @@ Object.assign(window.__AI_I18N_EN__, {
     bxs_flip_to_sales: 'Mark as sales',
     field_shadow_workpaper: 'Shadow workpaper',
     pkg_signed_done: 'Marked ready to sign · {actor}',
+    pkg_goto_signoff: 'Go sign off →',
     pkg_frozen_hint: 'Frozen',
     pkg_export_no_entries: 'No shadow entries to export yet',
     pkg_return_reason_prompt: 'Enter a reason for sending back (required)',

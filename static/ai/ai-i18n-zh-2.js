@@ -356,6 +356,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     bxs_flip_to_sales: '标记为销售',
     field_shadow_workpaper: '影子底稿',
     pkg_signed_done: '已标记待签 · {actor}',
+    pkg_goto_signoff: '去签批 →',
     pkg_frozen_hint: '已冻结',
     pkg_export_no_entries: '暂无影子分录可导出',
     pkg_return_reason_prompt: '请填写退回原因(必填)',

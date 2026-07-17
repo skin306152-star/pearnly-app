@@ -79,6 +79,8 @@ window.__AI_I18N_JA__ = {
     wo_flagged: '要判断項目',
     wo_needs: '不足資料',
     wo_classify_progress: '認識中 {done}/{total}',
+    wo_bank_progress: '通帳を読み取り中 {done}/{total}',
+    wo_todo_banner: '{n} 件対応待ちです。やることリストへ →',
     wo_run_timeout_hint:
         'バックグラウンドでまだ処理中です。他の作業をしてから戻って更新してご確認ください',
     wo_refresh_btn: '更新して確認',
@@ -121,6 +123,7 @@ window.__AI_I18N_JA__ = {
     intake_rerun: '資料補完完了、再実行 →',
     intake_rerun_waiting: 'AIが再処理中…',
     intake_rerun_hint: '資料が揃いました。再実行してAIに計算を続けさせます。',
+    intake_goto_wo: '作業ページで進捗を見る →',
     err_workorder_file_too_large: '1ファイルは20MB未満にしてください',
     pkg_empty_t: 'まだ提出物がありません',
     pkg_empty_s: 'ワークオーダーがパッケージ段階に達すると表示されます。',

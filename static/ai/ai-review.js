@@ -5,8 +5,9 @@
  * A 采纳票面 / E 改数(仅 VAT)/ X 剔除,乐观标终态 + 失败回滚(§2);裁决完只引导重新跑,
  * 不在前端重估 R1(§4,别重造算钱逻辑);四态 + 空队列好事态(§6)。
  *
- * 依赖 window.AI.state/format/api/viewer/reviewQueue/reviewRender 与全局 at(),故必须排在
- * 它们之后加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。
+ * 依赖 window.AI.state/format/api/viewer/reviewQueue/reviewRender/poll 与全局 at(),故必须
+ * 排在它们之后加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。轮询收编进共享的
+ * AI.poll(J-B · N-6 债:此前与 ai-intake.js 各写一份 pollAfterRun,逐字节重复)。
  */
 (function () {
     'use strict';
@@ -14,11 +15,10 @@
     var $ = function (id) {
         return document.getElementById(id);
     };
-    var POLL_INTERVAL_MS = 2000;
-    var POLL_MAX_TRIES = 30;
 
     var S = null;
     var wired = false; // 照 ai-client.js chromeWired 先例:监听器只挂一次,不随每次 mount 重挂。
+    var runPoll = null; // 当前重跑轮询的 AI.poll 句柄(mount()/换会话时先停旧的再起新的)
 
     // 本次刚提交的裁决没有服务端 actor 回显(响应体只有 event_id),用当前登录态的展示名
     // 占位(AI.format.actorLabel 回落链:邮箱前缀 → sub 短八位)——不再拼 "user:<uuid>"
@@ -304,7 +304,7 @@
             .runOrder(S.orderId)
             .then(function () {
                 if (S !== session) return; // 已切走
-                pollAfterRun(session, 0);
+                runPollFor(session);
             })
             .catch(function (err) {
                 if (S !== session) return; // 已切走
@@ -314,7 +314,7 @@
                 if (errKey === 'err_workorder_run_in_progress') {
                     S.blockedInfo = { reasons: [at(errKey)], hasQueue: false };
                     renderDone();
-                    pollAfterRun(session, 0);
+                    runPollFor(session);
                     return;
                 }
                 S.rerunState = 'idle';
@@ -323,47 +323,58 @@
             });
     }
 
-    function pollAfterRun(session, count) {
-        if (count >= POLL_MAX_TRIES) {
-            // 轮询次数用尽不等于"仍卡住需要你判断"(那是 rv_still_blocked 的语义)——
-            // 大概率只是引擎还在后台跑,比 1 分钟慢。诚实区分开,给手动刷新钮
-            // (timedOut,R2F-R3 #5),不跟真实的"缺料/需裁决"混成一句话。
-            S.rerunState = 'idle';
-            S.blockedInfo = { reasons: [], hasQueue: S.queue.length > 0, timedOut: true };
-            renderDone();
-            return;
+    // fetch/onTick/isTerminal 三段式收在一处(AI.poll 收编·N-6 债:此前与 ai-intake.js
+    // 各写一份手写 setTimeout 链,逐字节重复)。换会话/重复触发时先停旧轮询再起新的。
+    function runPollFor(session) {
+        if (runPoll) runPoll.stop();
+        runPoll = AI.poll.create({
+            fetch: function () {
+                return session.api.getOrder(session.orderId);
+            },
+            onTick: function (detail) {
+                if (S !== session) return;
+                // classify(逐张识别)与 reconcile(逐张读对账单)两步的真进度,谁在跑显谁,
+                // 不空转省略号(J-1/J-9)。
+                var progress = detail.progress || detail.bank_progress;
+                if (progress) {
+                    S.rerunProgress = progress;
+                    renderDone();
+                }
+            },
+            isTerminal: function (detail) {
+                if (S !== session) return true; // 已切走会话,静默收口,不做任何副作用
+                return routeAfter(detail, session);
+            },
+            onTimeout: function () {
+                if (S !== session) return;
+                // 轮询次数用尽不等于"仍卡住需要你判断"(那是 rv_still_blocked 的语义)——
+                // 大概率只是引擎还在后台跑,比预算的时间窗慢。诚实区分开,给手动刷新钮
+                // (timedOut,R2F-R3 #5),不跟真实的"缺料/需裁决"混成一句话。
+                S.rerunState = 'idle';
+                S.blockedInfo = { reasons: [], hasQueue: S.queue.length > 0, timedOut: true };
+                renderDone();
+            },
+        });
+        runPoll.start();
+    }
+
+    // 一次轮询拿到的 detail → 是否终态(true=停轮询,调用方已在这里做完全部导航/呈现副作用)。
+    function routeAfter(detail, session) {
+        var freshQueue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
+        var hasNumbers = Object.keys(detail.numbers || {}).length > 0;
+        if (detail.status !== 'stuck' || !freshQueue.length || hasNumbers) {
+            window.location.hash = AI.router.buildClientHash(session.clientId, 'pkg');
+            return true;
         }
-        setTimeout(function () {
-            if (S !== session) return; // 已切走·每个轮询 tick 开头判活
-            S.api
-                .getOrder(S.orderId)
-                .then(function (detail) {
-                    if (S !== session) return; // 已切走
-                    if (detail.progress && detail.progress.step === 'classify') {
-                        S.rerunProgress = detail.progress;
-                        renderDone();
-                    }
-                    var freshQueue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
-                    var hasNumbers = Object.keys(detail.numbers || {}).length > 0;
-                    if (detail.status !== 'stuck' || !freshQueue.length || hasNumbers) {
-                        window.location.hash = AI.router.buildClientHash(S.clientId, 'pkg');
-                        return;
-                    }
-                    var reasons = [].concat(detail.blocked_reasons || [], detail.needs || []);
-                    if (reasons.length) {
-                        S.queue = freshQueue;
-                        S.rerunState = 'idle';
-                        S.blockedInfo = { reasons: reasons, hasQueue: freshQueue.length > 0 };
-                        renderDone();
-                        return;
-                    }
-                    pollAfterRun(session, count + 1);
-                })
-                .catch(function () {
-                    if (S !== session) return; // 已切走
-                    pollAfterRun(session, count + 1);
-                });
-        }, POLL_INTERVAL_MS);
+        var reasons = [].concat(detail.blocked_reasons || [], detail.needs || []);
+        if (reasons.length) {
+            S.queue = freshQueue;
+            S.rerunState = 'idle';
+            S.blockedInfo = { reasons: reasons, hasQueue: freshQueue.length > 0 };
+            renderDone();
+            return true;
+        }
+        return false;
     }
 
     // 轮询超时后的手动"刷新查看"(R2F-R3 #5,同 ai-intake.js::refreshAfterTimeout 先例):
@@ -372,7 +383,7 @@
         if (S.rerunState === 'waiting') return;
         S.rerunState = 'waiting';
         renderDone();
-        pollAfterRun(S, 0);
+        runPollFor(S);
     }
 
     function backToQueue() {
@@ -421,7 +432,7 @@
                 S.rerunState = 'waiting'; // 重锚触发引擎自驱重跑,进轮询(有去重通常很快)
                 S.blockedInfo = null;
                 renderDone();
-                pollAfterRun(session, 0);
+                runPollFor(session);
             })
             .catch(function () {
                 if (S !== session) return;
@@ -531,6 +542,12 @@
     function mount(api, order, clientId) {
         S = freshState(api, order, clientId);
         body().innerHTML = AI.state.loadingHtml();
+        // 换单/换客户挂载新会话:旧会话的轮询没有存在意义(isTerminal/onTick 虽已靠 S!==
+        // session 卫哨自认失效,但让它继续空转到超时才停也没必要,当场收掉更干净)。
+        if (runPoll) {
+            runPoll.stop();
+            runPoll = null;
+        }
         wireOnce();
         api.getOrder(order.id)
             .then(function (detail) {

@@ -254,9 +254,14 @@
         var entries = hasShadowEntries(detail);
         var frozenTitle = frozen ? 'pkg_frozen_hint' : null;
 
+        // 引导链③(J-B):标记待签后按钮变灰,旁边给「去签批 →」出口——同工单页②同一个
+        // 待我处理聚合队列(该单接下来的复核/冻结动作也在那里发生,不是原地死胡同)。
         var signBtn = ctx.signed
             ? '<button class="btn pri" type="button" disabled>' +
               esc(at('pkg_signed_done', { actor: ctx.signedActor || '' })) +
+              '</button>' +
+              '<button class="btn sm" type="button" data-action="pkg-goto-pool">' +
+              esc(at('pkg_goto_signoff')) +
               '</button>'
             : actionBtnHtml('pkg-sign', 'pkg_sign_btn', {
                   pri: true,

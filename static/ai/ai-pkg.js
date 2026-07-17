@@ -303,6 +303,9 @@
         else if (a === 'pkg-sign') signOff();
         else if (a === 'pkg-export') exportEntries();
         else if (a === 'pkg-return') returnOrder();
+        else if (a === 'pkg-goto-pool') {
+            window.location.hash = AI.router.buildPoolHash();
+        }
     }
 
     function onKeydown(e) {

@@ -251,7 +251,10 @@
     //
     // 同 ai-intake-bank-sales.js 的 create(getS, render) 先例(单文件<500 行铁律拆分,
     // 不是独立视图):getS() 取当前会话态(换客户/换单时旧回调靠 getS() !== session 卫哨
-    // 自认失效,不污染新会话),render() 是 ai-intake.js 的重绘函数。
+    // 自认失效,不污染新会话),render() 是 ai-intake.js 的重绘函数。upload()/
+    // retryFailedBatches() 都返回 run() 的 promise(J-B「收齐才开跑」):调用方
+    // (ai-intake.js)据此在*这一趟*选中的文件(可能被 splitBatches 切成多批,逐批顺序
+    // 落盘)全部落定后才决定要不要自动续跑——不是每批落盘各触发一次,是这一趟收尾才判一次。
 
     function create(getS, render) {
         function runQueue(files) {
@@ -263,7 +266,7 @@
             session.uploadBatchIndex = 0;
             session.uploadBatchTotal = AI.intakeRender.splitBatches(files).length;
             render();
-            run(session.api, session.orderId, files, {
+            return run(session.api, session.orderId, files, {
                 onBatchStart: function (index, total) {
                     if (getS() !== session) return;
                     session.uploadBatchIndex = index;
@@ -318,14 +321,16 @@
         }
 
         // 网络级失败批(非内容拒收)一键只重传这些批,不牵连已成功/已确认拒收的件。
+        // 返回 runQueue() 的 promise(同 upload 先例)供调用方判断这趟重试是否真落了新料,
+        // 决定要不要收编进「收齐才开跑」的自动续跑判断。
         function retryFailedBatches() {
             var session = getS();
-            if (!session.failedBatches.length || session.uploading) return;
+            if (!session.failedBatches.length || session.uploading) return Promise.resolve();
             var files = session.failedBatches.reduce(function (acc, b) {
                 return acc.concat(b.files);
             }, []);
             session.failedBatches = [];
-            runQueue(files);
+            return runQueue(files);
         }
 
         function resumeDismiss() {

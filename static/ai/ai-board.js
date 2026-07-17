@@ -7,7 +7,7 @@
  *   summarizeCard(order, detail)    → 卡片摘要行的 i18n key + 变量
  *   currentPeriodBE(date)           → 公历日期换算佛历账期 "YYYY-MM"(开单默认账期)
  *   periodOptions(count, date)      → 开单可选账期列表(当月在前,往前 count-1 个月)
- *   needsOpenControl()              → 卡片是否要渲染开单控件(R2F 起恒真,见下)
+ *   needsDetail(status)             → 该状态的卡是否需逐单拉 detail 才能诚实渲染
  * COLUMNS 是五列的规范表(key + 顺序 + 列头圆点色),ai-kanban-render.js 渲染与
  * ai-dashboard.js 分组初始化都从这里派生,不各自维护第二份列清单。
  *
@@ -152,14 +152,11 @@
         return out;
     }
 
-    // 开单控件是否要出现在卡片上(R2F-R3 拍板:常显)。此前判据「当期没有工单才显」
-    // (A3 修复版:entry.order 存在但不是本期也算「没有」)仍挡住一个真实场景——当期已
-    // 开过单的客户,想再核对/补开别的历史账期,卡片上无处可点,只能绕去客户档案页。
-    // 选择器本身已含全部可选账期(periodOptions),选中已有单的期 = 后端
-    // open_work_order 的 ON CONFLICT DO UPDATE 幂等打开既有单,不会重复建单——常显不
-    // 存在"误建重复工单"的风险,故拿掉判断,任何卡片都给账期选择器 + 开单钮。
-    function needsOpenControl() {
-        return true;
+    // 哪些状态的卡必须逐单拉 detail 才能诚实渲染:stuck/review 读 blocked_reasons/
+    // flagged,collecting 读 needs(缺什么)——判定贴着 mapOrderToColumn/summarizeCard
+    // 这张规范表放,消费方(ai-dashboard.js)只调谓词,不各自镜像一份状态清单。
+    function needsDetail(status) {
+        return status === 'stuck' || status === 'review' || status === 'collecting';
     }
 
     var api = {
@@ -169,7 +166,7 @@
         pendingReviewCount: pendingReviewCount,
         currentPeriodBE: currentPeriodBE,
         periodOptions: periodOptions,
-        needsOpenControl: needsOpenControl,
+        needsDetail: needsDetail,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

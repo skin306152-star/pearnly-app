@@ -33,13 +33,6 @@
         return root.AI.state.esc(s);
     }
 
-    // classify(逐张识别)/ reconcile(逐张读对账单)两步共用的进度文案,谁在跑显谁的真数字
-    // (J-1/J-9),同 ai-intake-render.js::progressLabel 同一判据(渲染层各自独立不抽共享)。
-    function woProgressLabel(progress) {
-        var key = progress.step === 'reconcile' ? 'wo_bank_progress' : 'wo_classify_progress';
-        return at(key, { done: progress.processed, total: progress.total });
-    }
-
     function cellsHtml(d) {
         return Object.keys(d.numbers || {})
             .map(function (k) {
@@ -128,7 +121,9 @@
                   })
                 : '';
         var progressLine = progress
-            ? '<p class="wo-progress">' + esc(woProgressLabel(progress) + lastActive) + '</p>'
+            ? '<p class="wo-progress">' +
+              esc(root.AI.format.progressLabel(progress) + lastActive) +
+              '</p>'
             : '';
         return (
             '<div class="panel"><div class="hd"><h3>' +

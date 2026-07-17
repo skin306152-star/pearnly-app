@@ -371,8 +371,8 @@
             render();
             return true;
         }
-        var view = decision.kind === 'review' ? 'review' : decision.kind === 'pkg' ? 'pkg' : 'wo';
-        window.location.hash = AI.router.buildClientHash(session.clientId, view);
+        // 走到这里 kind 只剩 review/pkg/wo,恰与 buildClientHash 的 view 值同名,直接用。
+        window.location.hash = AI.router.buildClientHash(session.clientId, decision.kind);
         return true;
     }
 

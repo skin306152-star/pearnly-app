@@ -43,6 +43,30 @@
     // /ai 逐字节一致的默认态),探针成功才摘掉——不是等探针才决定要不要塞进 DOM。
     var deskGateOpen = null;
 
+    // 「待你处理」胶囊共享取数(simplify 收口):此前矩阵/看板各持一份逐字相同的实现,
+    // matrix↔board 纯 UI 切换也各重打一遍 review-queue 刷同一枚基本不变的胶囊。收成
+    // 一份 + 15s TTL——胶囊归共享头部(切子视图 DOM 不销毁),短窗内直接用上次的数;
+    // 拉不到显 '—' 不臆造。计数口径仍在 AI.board.pendingReviewCount(review+stuck)。
+    var pendingStat = { at: 0, value: null };
+    function loadPendingStat(api) {
+        var el = $('statPendingV');
+        if (pendingStat.value != null && Date.now() - pendingStat.at < 15000) {
+            el.textContent = pendingStat.value;
+            return;
+        }
+        api.getReviewQueue()
+            .then(function (queue) {
+                pendingStat.at = Date.now();
+                pendingStat.value = String(AI.board.pendingReviewCount(queue));
+                el.textContent = pendingStat.value;
+            })
+            .catch(function () {
+                el.textContent = '—';
+            });
+    }
+    window.AI = window.AI || {};
+    window.AI.loadPendingStat = loadPendingStat;
+
     // 左下角用户块(v5 §五3):显示登录用户名,取不到整块藏(状态诚实,不摆假占位)。
     function setFootUser(name) {
         var foot = $('footUser');

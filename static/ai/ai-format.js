@@ -180,6 +180,17 @@
         return stepKey;
     }
 
+    // classify(逐张识别)/ reconcile(逐张读对账单)的进度文案(simplify 收口:此前
+    // intake/review/wo 三个渲染层各持一份逐字相同的实现,key 映射漂移无人守——收归这里,
+    // 与 stepLabel 同居,node 单测覆盖)。
+    function progressLabel(progress) {
+        var key = progress.step === 'reconcile' ? 'wo_bank_progress' : 'wo_classify_progress';
+        if (root && typeof root.at === 'function') {
+            return root.at(key, { done: progress.processed, total: progress.total });
+        }
+        return key;
+    }
+
     // 最后活动相对时间(S2):<60s 秒 / <60min 分 / <24h 时 / 其余天,n 向下取整;时钟
     // 偏差出的负差归零(显「0 秒前」比负数诚实);iso 解析不出回空串,调用方据此整段不渲染。
     function relAgo(iso, nowMs) {
@@ -211,6 +222,7 @@
         actorDisplay: actorDisplay,
         fieldLabel: fieldLabel,
         stepLabel: stepLabel,
+        progressLabel: progressLabel,
         relAgo: relAgo,
         priorPeriodCheckStatus: priorPeriodCheckStatus,
         priorPeriodCheckText: priorPeriodCheckText,

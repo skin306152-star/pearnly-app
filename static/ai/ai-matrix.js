@@ -34,7 +34,7 @@
 
     // 客户数/AI 处理中仍从矩阵响应现算;「待你处理」不再按「至少一格 pending_review 的
     // 客户数」推——该口径与 #/pool 实测同屏打架(2026-07-17:矩阵数出 0,pool 里却躺着
-    // 1 张 stuck 单,用户不知道信谁),废除,改与 #/pool 同源(loadPendingStat)。
+    // 1 张 stuck 单,用户不知道信谁),废除,改与 #/pool 同源(AI.loadPendingStat 共享取数)。
     function renderStats(matrix) {
         var running = {};
         (matrix.cells || []).forEach(function (c) {
@@ -44,18 +44,6 @@
         $('statRunningV').textContent = String(Object.keys(running).length);
         $('sumPeriodV').textContent = matrix.period || '—';
         $('sumPeriod').style.display = '';
-    }
-
-    // 「待你处理」胶囊与 #/pool 同一数据源(review-queue),计数口径在
-    // AI.board.pendingReviewCount。拉不到显 '—' 不臆造。
-    function loadPendingStat(api) {
-        api.getReviewQueue()
-            .then(function (queue) {
-                $('statPendingV').textContent = String(AI.board.pendingReviewCount(queue));
-            })
-            .catch(function () {
-                $('statPendingV').textContent = '—';
-            });
     }
 
     function periodOptionsHtml(selected) {
@@ -225,7 +213,7 @@
 
     function load(api) {
         S.api = api;
-        loadPendingStat(api);
+        AI.loadPendingStat(api);
         var body = $('matrixBody');
         if (!body.querySelector('.mx-table')) body.innerHTML = AI.state.loadingHtml();
         return api

@@ -339,19 +339,14 @@
         );
     }
 
-    // classify(逐张识别)/ reconcile(逐张读对账单)两步共用的等待态进度文案——谁在跑显谁
-    // 的真数字(J-1/J-9),同 ai-intake-render.js::progressLabel 同一判据。
-    function progressLabel(progress) {
-        var key = progress.step === 'reconcile' ? 'wo_bank_progress' : 'wo_classify_progress';
-        return at(key, { done: progress.processed, total: progress.total });
-    }
-
     // 队列走完(契约 §4)。blockedInfo: {reasons:[], hasQueue, timedOut?} | null;
     // rerunState: 'idle'|'waiting';rerunProgress: {step,processed,total} | null(R2F-R3 #5:
     // 等待态有真进度就报「识别中/读对账单 X/N」,轮询超时诚实说"仍在后台跑"而不是让
     // blockedInfo 空 reasons 的沉默态冒充"卡住需要你判断")。
     function clearedHtml(n, m, rerunState, blockedInfo, rerunProgress) {
-        var waitingLabel = rerunProgress ? progressLabel(rerunProgress) : at('rv_rerun_waiting');
+        var waitingLabel = rerunProgress
+            ? AI.format.progressLabel(rerunProgress)
+            : at('rv_rerun_waiting');
         var btn =
             rerunState === 'waiting'
                 ? '<button class="btn pri" disabled>' + esc(waitingLabel) + '</button>'

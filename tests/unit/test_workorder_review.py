@@ -123,8 +123,9 @@ class ReviewQueueTests(unittest.TestCase):
         )
 
     def test_running_order_projected_but_its_flagged_items_stay_out_of_feed(self):
-        # running 工单出现在 clients/orders 投影(带 current_step/updated_at 供前端灰卡),
-        # 但它的票不交给 review_feed.enrich 现算——引擎在重算,人不该同时裁它的票。
+        # running 工单出现在 clients/orders 投影(带 current_step/updated_at 供前端灰卡);
+        # 「票不进 feed」的规则收在 review_feed.enrich 内(simplify 收口)——编排层把
+        # 全量 orders 原样交给 enrich,不替 feed 削名单。
         rows = [
             _row(),
             _row(
@@ -152,8 +153,20 @@ class ReviewQueueTests(unittest.TestCase):
         self.assertEqual(run["status"], "running")
         self.assertEqual(run["current_step"], "compute")
         self.assertEqual(run["updated_at"], "2026-06-01T00:00:00+00:00")
-        self.assertEqual(captured["order_ids"], ["wo-1"])
+        self.assertEqual(captured["order_ids"], ["wo-1", "wo-run"])
         self.assertEqual(out["flagged_items"], [])
+
+    def test_enrich_skips_running_orders_internally(self):
+        # 规则在 feed 自己手里:全 running 时 enrich 内部过滤后为空,不碰库直接回空 feed
+        # (引擎在重算,票不给人裁,SoD 投影也不挂)。
+        out = review.review_feed.enrich(
+            None,
+            tenant_id="t-1",
+            orders=[{"work_order_id": "wo-run", "status": "running", "flagged_total": 2}],
+            actor=None,
+            sod_enforced=False,
+        )
+        self.assertEqual(out, [])
 
     def test_query_params_wire_filters(self):
         cur = FakeCur([])

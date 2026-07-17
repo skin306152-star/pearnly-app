@@ -116,13 +116,11 @@ def review_queue(
         ),
     )
     orders = _group_rows([dict(r) for r in cur.fetchall()], severity)
-    # running 工单的票不进 flagged feed(契约 B 只要求工单卡可见):引擎正在重算这些件,
-    # 人此刻裁它的票会跟重跑互相踩(重跑落新 flagged/改判,此刻的裁决对错未定)。enrich
-    # 的 SoD 投影一并跳过——running 卡不渲染任何签批动作,投影无消费方。
+    # running 工单的票不进 feed、SoD 投影不挂——规则收在 review_feed.enrich 内。
     flagged_items = review_feed.enrich(
         cur,
         tenant_id=tenant_id,
-        orders=[o for o in orders if o["status"] != engine.STATUS_RUNNING],
+        orders=orders,
         actor=actor,
         sod_enforced=sod_enforced,
         severity=severity,

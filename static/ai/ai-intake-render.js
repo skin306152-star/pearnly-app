@@ -351,14 +351,6 @@
         );
     }
 
-    // classify(逐张识别)/ reconcile(逐张读对账单)两步共用的等待态进度文案——谁在跑显谁
-    // 的真数字(J-1/J-9),同 ai-review-render.js::progressLabel 同一判据(两处渲染层各自
-    // 独立、无跨模块依赖,故不抽共享文件——纯 HTML 拼装层照 ai-format.js 之外先例保持薄)。
-    function progressLabel(progress) {
-        var key = progress.step === 'reconcile' ? 'wo_bank_progress' : 'wo_classify_progress';
-        return at(key, { done: progress.processed, total: progress.total });
-    }
-
     // 补料后「重新跑」面:idle → 按钮;waiting → 禁用转述(有真进度就报「识别中/读对账单
     // X/N」而不是空转的省略号,R2F-R3 #5)+「去工单页看进度→」引导(J-2/J-14:上传收齐
     // 自动开跑后不再让用户干瞪眼,给一个"去哪看"的出口);轮询次数用尽 → 诚实说"仍在
@@ -376,7 +368,7 @@
                 '</button>';
         } else if (ctx.rerunState === 'waiting') {
             var waitingLabel = ctx.rerunProgress
-                ? progressLabel(ctx.rerunProgress)
+                ? root.AI.format.progressLabel(ctx.rerunProgress)
                 : at('intake_rerun_waiting');
             inner =
                 '<button class="btn pri" disabled>' +

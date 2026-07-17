@@ -252,36 +252,17 @@ class PeriodOptionsTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
-class NeedsOpenControlTests(unittest.TestCase):
-    """开单控件显隐判据(R2F-R3 拍板:常显)。此前判「当期没有工单」(A3 修复版)仍挡住
-    "当期已有单、想再开/核对别的历史账期"这个真实场景——卡片上无处可点,只能绕去客户
-    档案页。选中已有期由后端 open_work_order 幂等打开既有单,不会重复建单,故拿掉一切
-    判断,任何卡片状态都恒显开单控件。"""
+class NeedsDetailTests(unittest.TestCase):
+    """哪些状态的卡必须逐单拉 detail(stuck/review 读 blocked/flagged,collecting 读
+    needs)——谓词与 mapOrderToColumn/summarizeCard 同居规范表,消费方不各自镜像。"""
 
-    def test_no_order_shows_control(self):
+    def test_needy_statuses_and_others(self):
         out = _run_node(f"""
             const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
-            process.stdout.write(JSON.stringify(b.needsOpenControl({{order: null}}, '2569-05')));
+            process.stdout.write(JSON.stringify(['stuck','review','collecting','running','archive']
+                .map(b.needsDetail)));
             """)
-        self.assertTrue(out)
-
-    def test_current_period_order_still_shows_control(self):
-        out = _run_node(f"""
-            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
-            process.stdout.write(JSON.stringify(b.needsOpenControl(
-                {{order: {{period: '2569-05'}}}}, '2569-05'
-            )));
-            """)
-        self.assertTrue(out)
-
-    def test_historical_order_only_still_shows_control(self):
-        out = _run_node(f"""
-            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
-            process.stdout.write(JSON.stringify(b.needsOpenControl(
-                {{order: {{period: '2568-06'}}}}, '2569-05'
-            )));
-            """)
-        self.assertTrue(out)
+        self.assertEqual(out, [True, True, True, False, False])
 
 
 if __name__ == "__main__":

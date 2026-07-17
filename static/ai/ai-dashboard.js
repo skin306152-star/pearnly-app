@@ -28,7 +28,7 @@
 
     // 「待你处理」不再数本视图 status=stuck 的订单——该口径与 #/pool 实测同屏打架
     // (2026-07-17:两边一个 0 一个 1,用户不知道信谁),废除,改与 #/pool 同源
-    // (loadPendingStat,口径在 AI.board.pendingReviewCount)。
+    // (AI.loadPendingStat 共享取数,口径在 AI.board.pendingReviewCount)。
     function renderStats(clients, orders) {
         $('statClientsV').textContent = String(clients.length);
         var running = orders.filter(function (o) {
@@ -39,16 +39,6 @@
         $('sumPeriod').style.display = 'none';
     }
 
-    function loadPendingStat(api) {
-        api.getReviewQueue()
-            .then(function (queue) {
-                $('statPendingV').textContent = String(AI.board.pendingReviewCount(queue));
-            })
-            .catch(function () {
-                $('statPendingV').textContent = '—'; // 拉不到不臆造
-            });
-    }
-
     // 只对「每客户最新一期」里 status=stuck(区分缺料/挂起)或 review(读 tax_due)的那些
     // 订单批量拉 detail——数量上界 = 看板会显示的卡片数,不对全量历史订单做 N+1。单条失败
     // (权限/网络)不拖垮全表:该条退化为"没有 detail"走 mapOrderToColumn/summarizeCard
@@ -57,7 +47,7 @@
         // collecting 也拉 detail(2026-07-17 S4):此前 collecting 卡 detail=null,摘要
         // 永远只报账期——「等待中不知等什么」实测根因;detail.needs 接通后卡片能点名缺什么。
         var needDetail = latestOrders.filter(function (o) {
-            return o.status === 'stuck' || o.status === 'review' || o.status === 'collecting';
+            return AI.board.needsDetail(o.status);
         });
         if (!needDetail.length) return Promise.resolve({});
         return Promise.all(
@@ -182,7 +172,7 @@
 
     function load(api) {
         lastApi = api;
-        loadPendingStat(api);
+        AI.loadPendingStat(api);
         var body = $('dashBody');
         // 防闪烁(Canon §7):重载(开单后刷新/回到本视图)保留旧看板直到新数据到,
         // 骨架屏只在还没有任何看板时出——不给用户看「内容→骨架→内容」的跳变。

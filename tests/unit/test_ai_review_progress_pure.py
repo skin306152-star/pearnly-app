@@ -5,8 +5,8 @@ tests/unit/test_ai_review_progress_pure.py
 
 MC2-A3 裁决后进度轮询状态机纯函数守门:static/ai/ai-review-progress.js 的指数退避排期
 (有限次数封顶)、基线快照、落定判据。S3(2026-07-17)语义翻新:读模型连 running 一起
-下发,「消失=在跑」作废——落定 = 基线工单全部以非 running 状态重现,且队列里没有任何
-running 工单。同 test_ai_review_queue_pure.py 先例,真 node 直接 require 源文件断言输出。
+下发,「消失=在跑」作废——落定 = 基线工单全部以非 running 状态重现于队列;基线外的
+running 不绑架轮询(simplify 收口)。同 test_ai_review_queue_pure.py 先例,真 node 断言。
 """
 
 from __future__ import annotations
@@ -61,9 +61,9 @@ class SettledTests(unittest.TestCase):
             """)
         self.assertFalse(out)
 
-    def test_not_settled_while_any_order_still_running(self):
-        # S3:读模型下发 running——基线工单以 running 在场 = 引擎还在跑,未落定;
-        # 基线外冒出的 running(裁决连带重跑别的单)同样压住轮询不放。
+    def test_not_settled_while_a_baseline_order_still_running(self):
+        # S3+simplify 收口:落定只看**基线内**是否仍有 running——基线工单 running 在场
+        # 未落定;租户里与本次无关的基线外长跑单(stranger)不绑架轮询,空基线直接落定。
         out = _run_node(f"""
             const p = require({_MOD});
             const watched = {{clients:[{{orders:[
@@ -76,7 +76,7 @@ class SettledTests(unittest.TestCase):
                 p.settled(stranger, {{}}),
             ]));
             """)
-        self.assertEqual(out, [False, False])
+        self.assertEqual(out, [False, True])
 
     def test_settled_when_all_watched_orders_reappear_not_running(self):
         out = _run_node(f"""

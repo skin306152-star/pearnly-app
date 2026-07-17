@@ -35,20 +35,19 @@
         return map;
     }
 
-    // 是否可以停止轮询:基线里每张工单都以非 running 状态重现于队列,且队列里没有任何
-    // running 工单(裁决可能连带引擎重跑基线外的单,它在场就还有货没跑完)。
+    // 是否可以停止轮询:基线里每张工单都重现于队列,且**基线内**没有仍在 running 的单。
+    // 只看基线不看全队列(simplify 收口):租户里一张与本次裁决无关的长跑单若被全队列
+    // 扫描抓住,每个进 #/pool 的用户都会把退避预算烧到封顶——无关单不该绑架轮询;
+    // 真死跑由后端心跳判死(180s)翻 stuck 收口,不靠前端多轮几发。
     function settled(queue, baselineMap) {
         var now = {};
-        var anyRunning = false;
         ((queue && queue.clients) || []).forEach(function (c) {
             (c.orders || []).forEach(function (o) {
                 now[o.work_order_id] = o.status;
-                if (o.status === 'running') anyRunning = true;
             });
         });
-        if (anyRunning) return false;
         return Object.keys(baselineMap || {}).every(function (id) {
-            return Object.prototype.hasOwnProperty.call(now, id);
+            return Object.prototype.hasOwnProperty.call(now, id) && now[id] !== 'running';
         });
     }
 

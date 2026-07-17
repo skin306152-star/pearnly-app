@@ -211,6 +211,13 @@
         if (S.refreshTimer) clearTimeout(S.refreshTimer);
         var session = S;
         S.refreshTimer = setTimeout(function () {
+            if (S !== session) return;
+            // 后台标签不打端点(simplify 收口:N 个隐藏标签各自 40 发是纯浪费)——只续
+            // 定时器不发请求、不耗退避次数,回前台后下一跳自然补上。
+            if (document.hidden) {
+                scheduleNextPoll();
+                return;
+            }
             S.api.getReviewQueue().then(function (data) {
                 if (S !== session) return;
                 S.queue = data;

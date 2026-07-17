@@ -155,6 +155,18 @@ class AiFormatTests(unittest.TestCase):
             """)
         self.assertEqual(out, [2, 0, 0])
 
+    def test_progress_label_maps_step_to_key_with_counts(self):
+        # simplify 收口:此前 intake/review/wo 三渲染层各持一份逐字相同实现,收归 ai-format。
+        out = _run_node(f"""
+            global.at = (k, v) => k + ':' + v.done + '/' + v.total;
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.progressLabel({{step: 'reconcile', processed: 3, total: 10}}),
+                f.progressLabel({{step: 'classify', processed: 6, total: 8}}),
+            ]));
+            """)
+        self.assertEqual(out, ["wo_bank_progress:3/10", "wo_classify_progress:6/8"])
+
     def test_chip_html_renders_span_and_shares_stuck_override(self):
         out = _run_node(f"""
             global.at = (k) => ({{status_running: 'AI 在做', chip_needs_materials: '缺料'}})[k] || k;

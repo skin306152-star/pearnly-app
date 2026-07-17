@@ -396,6 +396,82 @@ class FieldLabelTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class StepLabelTests(unittest.TestCase):
+    """stepLabel(S2 §2):engine.py::STEPS 的步骤 key → 人话标签,同 fieldLabel 的
+    「查不到回退原值」范式——未知步骤原样显示,不假装认识。"""
+
+    def test_known_step_uses_injected_lookup(self):
+        out = _run_node(f"""
+            global.at = (k) => (k === 'step_reconcile' ? '银行对账' : k);
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify(f.stepLabel('reconcile')));
+            """)
+        self.assertEqual(out, "银行对账")
+
+    def test_unknown_step_falls_back_to_raw_key(self):
+        out = _run_node(f"""
+            global.at = (k) => k;
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify(f.stepLabel('some_future_step')));
+            """)
+        self.assertEqual(out, "some_future_step")
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class RelAgoTests(unittest.TestCase):
+    """relAgo(S2 §4):最后活动相对时间。单位换挡(<60s/<60min/<24h/天)与 n 向下取整
+    是这里守的重点;stub at() 回显 key:n,断言换挡与数值同时命中。"""
+
+    def test_unit_thresholds_and_floor(self):
+        out = _run_node(f"""
+            global.at = (k, vars) => k + ':' + vars.n;
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            const base = Date.parse('2026-07-17T00:00:00Z');
+            const iso = '2026-07-17T00:00:00Z';
+            process.stdout.write(JSON.stringify([
+                f.relAgo(iso, base + 59 * 1000),
+                f.relAgo(iso, base + 61 * 1000),
+                f.relAgo(iso, base + 25 * 3600 * 1000),
+            ]));
+            """)
+        self.assertEqual(out, ["time_ago_s:59", "time_ago_m:1", "time_ago_d:1"])
+
+    def test_invalid_iso_returns_empty_string(self):
+        out = _run_node(f"""
+            global.at = (k, vars) => k + ':' + vars.n;
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.relAgo('not-a-date', Date.now()), f.relAgo(null, Date.now()),
+            ]));
+            """)
+        self.assertEqual(out, ["", ""])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiClientWoRenderPureTests(unittest.TestCase):
+    """工单页状态头引导计数(S2 §1,ai-client-wo-render.js 拆分产物):stuck 只数未判票
+    (与审核页同一份 splitByDecision 判据,注入真 ai-review-queue.js 不造第二套);
+    review 记 1(签批一件事);其余状态 0。"""
+
+    def test_guidance_count_by_status(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const w = require({json.dumps(str(AI_DIR / "ai-client-wo-render.js"))});
+            const flagged = [
+                {{item_id: 'a', kind: 'purchase_invoice'}},
+                {{item_id: 'b', kind: 'purchase_invoice'}},
+                {{item_id: 'c', kind: 'purchase_invoice', decision: 'face_value'}},
+            ];
+            process.stdout.write(JSON.stringify([
+                w.guidanceCount({{status: 'stuck', flagged: flagged}}, q),
+                w.guidanceCount({{status: 'review', flagged: []}}, q),
+                w.guidanceCount({{status: 'collecting', flagged: flagged}}, q),
+            ]));
+            """)
+        self.assertEqual(out, [2, 1, 0])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiIntakeRenderPureTests(unittest.TestCase):
     """收料视图(W4)的纯校验守门:金额解析(非负、两位小数、去千分位)、销项 payload 构造、
     上传前端预检(单文件 20MB;总张数不设上限,交给 splitBatches 分批)。HTML 拼装依赖

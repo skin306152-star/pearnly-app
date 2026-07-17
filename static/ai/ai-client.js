@@ -44,7 +44,8 @@
     }
 
     function renderHeader() {
-        var name = S.client ? S.client.name : S.clientId;
+        // 身份未拉到时回落占位符,不拿裸 clientId 冒充客户名(S2 §6 · 真跑实测加载态糊数字)。
+        var name = S.client ? S.client.name : '…';
         $('clientName').textContent = name;
         $('clientAvatar').textContent = (name || '?').trim().slice(0, 1).toUpperCase();
         // 面包屑尾节点补真实客户名(清单 #6):setCrumb 在路由时先挂「客户」占位
@@ -175,85 +176,6 @@
         createOrderAndReload(period, btn, at('card_open_order'), renderIntake);
     }
 
-    // classify(逐张识别)/ reconcile(逐张读对账单)两步共用的进度文案,谁在跑显谁的真数字
-    // (J-1/J-9),同 ai-intake-render.js::progressLabel 同一判据(渲染层各自独立不抽共享)。
-    function woProgressLabel(progress) {
-        var key = progress.step === 'reconcile' ? 'wo_bank_progress' : 'wo_classify_progress';
-        return at(key, { done: progress.processed, total: progress.total });
-    }
-
-    // 引导链②(J-B):stuck 单有真待裁决票、或已到 review 待签批,工单页给「去待我处理」出口
-    // ——N 用真数字,不臆造。stuck 用同 W3/看板同一份进项待裁决队列判据(AI.reviewQueue,
-    // 不重造第二套认定);review(TERMINAL_STATUS,待人审签批)本身就是一件事,记 1。
-    function woGuidanceCount(d) {
-        if (d.status === 'stuck') return AI.reviewQueue.filterPurchaseQueue(d.flagged || []).length;
-        if (d.status === 'review') return 1;
-        return 0;
-    }
-
-    function woSummaryHtml(d) {
-        var numKeys = Object.keys(d.numbers || {});
-        var cells = numKeys
-            .map(function (k) {
-                var v = (d.numbers || {})[k];
-                // N-3 修复:prior_period_check 是对象({status:...}),不能走通用
-                // esc(v) 路径(会字面显示 [object Object])——单独映射成人话文案。
-                var display =
-                    k === 'prior_period_check'
-                        ? AI.format.priorPeriodCheckText(v)
-                        : /vat|amount|due/.test(k)
-                          ? AI.format.money(v)
-                          : esc(v);
-                return (
-                    '<div class="cell"><div class="lb">' +
-                    esc(AI.format.fieldLabel(k)) +
-                    '</div><div class="v num">' +
-                    display +
-                    '</div></div>'
-                );
-            })
-            .join('');
-        var needs = (d.needs || [])
-            .map(function (n) {
-                return '<div class="ni">' + esc(n) + '</div>';
-            })
-            .join('');
-        // 归档单不再谎报「当前步骤: review」(清单 #6):状态胶囊(status_archive)
-        // 已交代「已归档」,步骤注记只在流程未收口时显示。
-        var stepNote =
-            d.status === 'archive'
-                ? ''
-                : '<span class="note">' +
-                  esc(at('wo_step')) +
-                  ': ' +
-                  esc(d.current_step) +
-                  '</span>';
-        var progress = d.progress || d.bank_progress;
-        var progressLine = progress
-            ? '<p class="wo-progress">' + esc(woProgressLabel(progress)) + '</p>'
-            : '';
-        var guideCount = woGuidanceCount(d);
-        var guidance =
-            guideCount > 0
-                ? '<div class="wo-guide"><button type="button" class="btn sm" data-action="wo-goto-pool">' +
-                  esc(at('wo_todo_banner', { n: guideCount })) +
-                  '</button></div>'
-                : '';
-        return (
-            '<div class="panel"><div class="hd"><h3>' +
-            esc(at('tab_wo')) +
-            ' ' +
-            AI.format.chipHtml(d.status, d) +
-            stepNote +
-            '</h3></div><div class="bd">' +
-            progressLine +
-            (cells ? '<div class="wosum">' + cells + '</div>' : '') +
-            (needs ? '<div class="needs-list">' + needs + '</div>' : '') +
-            guidance +
-            '</div></div>'
-        );
-    }
-
     // 工单页活着就自动刷(J-10):5s 一轮只重画顶部摘要(chip/进度/需料/引导条)——不重挂
     // corrob/recon/shadow/financials 子件,那些各自持有自己的展开态/模态框,每 5s 强拆
     // 会把用户正在看的东西震掉,超出这次要修的范围。maxTries 传 Infinity:这不是"重跑后
@@ -271,7 +193,7 @@
                 if (S !== session || S.view !== 'wo') return;
                 if (!currentOrder() || currentOrder().id !== order.id) return;
                 var panel = $('woSummaryPanel');
-                if (panel) panel.innerHTML = woSummaryHtml(d);
+                if (panel) panel.innerHTML = AI.clientWoRender.woSummaryHtml(d, S.clientId);
                 if (d.status === 'archive') stopWoPoll();
             },
         });
@@ -306,7 +228,7 @@
                     '<div id="brxRoot"></div>' +
                     '<div id="shadowRoot"></div>' +
                     '<div id="financialsRoot"></div>';
-                $('woSummaryPanel').innerHTML = woSummaryHtml(d);
+                $('woSummaryPanel').innerHTML = AI.clientWoRender.woSummaryHtml(d, S.clientId);
                 // 销项佐证区(MC1-c.1 / SA-2b):同一次 getOrder() 已带回 sales_corroboration
                 // 与 edc_corroboration,两卡并排渲染,不再二次请求。
                 AI.corrob.mount(d.sales_corroboration, $('corrobRoot'), d.edc_corroboration);

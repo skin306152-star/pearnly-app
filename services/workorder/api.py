@@ -195,6 +195,9 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "intent": wo["intent"],
         "status": wo["status"],
         "current_step": wo["current_step"],
+        # running 期间逐件心跳续约都会刷 updated_at(run_leases.renew_run_lease)——对外即
+        # 「最后活动时间」,前端工单页据此判 AI 死活。原样透传,序列化交给框架(同其余字段)。
+        "last_active_at": wo["updated_at"],
         "progress": wo_progress.classify_progress(wo, items, classified),
         "bank_progress": wo_progress.bank_progress(wo, items, bank_parsed),
         "flagged": evidence.flagged_projection(items, events, classified=classified),

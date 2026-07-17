@@ -352,6 +352,7 @@ class _DetailStore(WorkOrderFakeStoreBase):
             "intent": "monthly_vat",
             "status": "stuck",
             "current_step": "reconcile",
+            "updated_at": "2026-07-17T08:30:00+07:00",
         }
 
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):

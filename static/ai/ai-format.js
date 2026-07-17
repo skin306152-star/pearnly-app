@@ -171,6 +171,35 @@
         return key;
     }
 
+    // 引擎步骤 key(services/workorder/engine.py::STEPS)→ 四语人话短标签(S2:工单页
+    // 此前裸显 classify/reconcile 英文键)。同 fieldLabel 的「查不到回退原值」范式。
+    function stepLabel(stepKey) {
+        var lookupKey = 'step_' + stepKey;
+        if (root && typeof root.at === 'function') {
+            var label = root.at(lookupKey);
+            if (label !== lookupKey) return label;
+        }
+        return stepKey;
+    }
+
+    // 最后活动相对时间(S2):<60s 秒 / <60min 分 / <24h 时 / 其余天,n 向下取整;时钟
+    // 偏差出的负差归零(显「0 秒前」比负数诚实);iso 解析不出回空串,调用方据此整段不渲染。
+    function relAgo(iso, nowMs) {
+        var t = Date.parse(String(iso || ''));
+        if (!isFinite(t)) return '';
+        var sec = Math.max(0, Math.floor((Number(nowMs) - t) / 1000));
+        var unit =
+            sec < 60
+                ? { key: 'time_ago_s', n: sec }
+                : sec < 3600
+                  ? { key: 'time_ago_m', n: Math.floor(sec / 60) }
+                  : sec < 86400
+                    ? { key: 'time_ago_h', n: Math.floor(sec / 3600) }
+                    : { key: 'time_ago_d', n: Math.floor(sec / 86400) };
+        if (root && typeof root.at === 'function') return root.at(unit.key, { n: unit.n });
+        return unit.key;
+    }
+
     var api = {
         parseAmount: parseAmount,
         money: money,
@@ -183,6 +212,8 @@
         actorLabel: actorLabel,
         actorDisplay: actorDisplay,
         fieldLabel: fieldLabel,
+        stepLabel: stepLabel,
+        relAgo: relAgo,
         priorPeriodCheckStatus: priorPeriodCheckStatus,
         priorPeriodCheckText: priorPeriodCheckText,
     };

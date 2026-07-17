@@ -26,6 +26,7 @@ class _FakeStore(WorkOrderFakeStoreBase):
             "intent": "monthly_vat",
             "status": "stuck",
             "current_step": "reconcile",
+            "updated_at": "2026-07-17T08:30:00+07:00",
         }
         self.events = []  # 详情测试预置的夹具事件流(与下面的 self.appended 分开)
         self.deliverables = []
@@ -156,6 +157,13 @@ class OrderDetailTests(_ApiTestBase):
 
     def test_unknown_order_returns_none(self):
         self.assertIsNone(api.order_detail(None, tenant_id="t-1", work_order_id="ghost"))
+
+    def test_detail_carries_last_active_at_from_row_updated_at(self):
+        # S2 §4:running 心跳续约每次都刷 updated_at——详情以 last_active_at 出线,
+        # 前端工单页据此显示「最后活动 N 分钟前」判 AI 死活。
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIn("last_active_at", detail)
+        self.assertEqual(detail["last_active_at"], self.store.wo["updated_at"])
 
     def test_amount_read_suggestion_surfaces_in_alerts(self):
         # J-13:进项票三数内部不自洽(IN26-00575:净+税=含税却 净×7%≠税)→ alerts 挂确定性

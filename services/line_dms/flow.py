@@ -1,0 +1,446 @@
+# -*- coding: utf-8 -*-
+"""DMS LINE 对话流状态机(DL-3):拍身份证 + 输手机号 → 三分支 → 确认 → 写客户档。
+
+确定性状态机,零自由文本理解。会话态存 dms_line_sessions(store.set/get/clear_session)。
+state ∈ collecting(集料)/ reviewing(候审)。绑定用户的 image/text/postback 事件由
+webhook 转进这里;未绑定与绑定码路径不经此。
+
+时序:重活(OCR/DMS 登录/写库)一律 asyncio.to_thread 离开事件循环(铁律#10),
+且 webhook 入口 spawn 后台任务 + start_loading + push 结果,不占 reply token(照
+line_image_ocr 范式)。fields 键形状与网页确认页(static/dms)同一词表——身份键取自
+_IDENTITY_MAP、地址键取自 _ADDR_MAP,绝不自造键名。
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import re
+import secrets
+from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qs
+
+from core import db
+from services.erp import dms_id_ocr as _id_ocr
+from services.erp import erp_dms_intake as _dms_intake
+from services.line_binding import line_client
+from services.line_dms import cards, draft, store
+
+logger = logging.getLogger(__name__)
+
+_CHANNEL = "dms"
+_PHONE_RE = re.compile(r"^0\d{8,9}$")
+_RESET_WORD = "เริ่มใหม่"
+
+# 建单/新建时写满的地址块键(与网页 dms-intake-core.js 的 ADDR_KEYS 逐键同形)。
+_ADDR_BLOCK_KEYS = (
+    "house_no",
+    "building",
+    "floor",
+    "room",
+    "village",
+    "moo",
+    "soi",
+    "road",
+    "province_id",
+    "district_id",
+    "subdistrict_id",
+    "zipcode_id",
+)
+# 新建客户的身份字段键(与网页 create 分支 fields 同形)。
+_CREATE_ID_KEYS = ("prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone")
+
+_thr = asyncio.to_thread
+
+
+# ── webhook 入口(thin · spawn 后台) ────────────────────────────────────────
+def _spawn(coro) -> None:
+    """把重活挂到事件循环后台跑,不阻塞 webhook 200 响应。异常吞掉只记日志。"""
+
+    async def _guard():
+        try:
+            await coro
+        except Exception:
+            logger.exception("[line_dms.flow] background task failed")
+
+    try:
+        asyncio.get_running_loop().create_task(_guard())
+    except RuntimeError:
+        logger.warning("[line_dms.flow] no running loop; drop background task")
+
+
+def handle_image(binding: dict, line_user_id: str, reply_token: str, message_id: str) -> None:
+    """绑定用户发图片(collecting):后台下载 + 身份证 OCR。"""
+    if message_id:
+        _spawn(process_image(binding, line_user_id, message_id))
+
+
+async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: str) -> None:
+    """绑定用户发文字:เริ่มใหม่ 重置 / 手机号 / 其余按当前态追料。"""
+    tenant = binding["tenant_id"]
+    if text == _RESET_WORD:
+        await _thr(store.clear_session, tenant, line_user_id)
+        _reply(reply_token, cards.TXT_RESET)
+        return
+
+    if _PHONE_RE.match(text):
+        payload = await _merge_session(
+            binding, line_user_id, {"phone": text}, keep=("id_card", "endpoint_id")
+        )
+        if payload.get("id_card"):
+            _spawn(
+                _run_dedup(
+                    binding,
+                    line_user_id,
+                    None,
+                    payload["id_card"],
+                    text,
+                    payload.get("endpoint_id"),
+                )
+            )
+        else:
+            _reply(reply_token, cards.TXT_ASK_CARD)
+        return
+
+    _reply(reply_token, _nudge(await _thr(store.get_session, tenant, line_user_id)))
+
+
+async def handle_postback(
+    binding: dict, line_user_id: str, reply_token: str, postback: dict
+) -> None:
+    """确认按钮(postback):核对 nonce → 清 nonce(防双写)→ 分支执行。"""
+    tenant = binding["tenant_id"]
+    pb = {k: v[0] for k, v in parse_qs(postback.get("data") or "").items()}
+    action = pb.get("action")
+
+    if action == cards.ACT_RESET:
+        await _thr(store.clear_session, tenant, line_user_id)
+        _reply(reply_token, cards.TXT_RESET)
+        return
+
+    sess = await _thr(store.get_session, tenant, line_user_id)
+    payload = (sess or {}).get("payload") or {}
+
+    if action == cards.ACT_KEEP:
+        await _thr(store.clear_session, tenant, line_user_id)
+        _reply(reply_token, cards.TXT_KEEP)
+        return
+
+    # 写动作:会话须在 reviewing 且 nonce 吻合;不符/过期 → 过期话术,绝不写。
+    if not sess or sess.get("state") != "reviewing" or not payload.get("nonce"):
+        _reply(reply_token, cards.TXT_EXPIRED)
+        return
+    if pb.get("nonce") != payload.get("nonce"):
+        _reply(reply_token, cards.TXT_EXPIRED)
+        return
+    # 先清 nonce 再执行:同一 nonce 的第二次点击此后必然 mismatch(防双击双写)。
+    await _thr(store.set_session, tenant, line_user_id, "reviewing", {**payload, "nonce": None})
+
+    if action == cards.ACT_CREATE:
+        _spawn(_write_create(binding, line_user_id, payload))
+    elif action == cards.ACT_UPDATE:
+        _spawn(_write_update(binding, line_user_id, payload))
+    elif action == cards.ACT_PICK:
+        cid = pb.get("cid") or ""
+        valid = {str(c.get("customer_id")) for c in (payload.get("candidates") or [])}
+        if cid not in valid:
+            _reply(reply_token, cards.TXT_EXPIRED)
+            return
+        _spawn(_write_claim(binding, line_user_id, payload, cid))
+    else:
+        _reply(reply_token, cards.TXT_EXPIRED)
+
+
+# ── collecting:OCR ─────────────────────────────────────────────────────────
+async def process_image(binding: dict, line_user_id: str, message_id: str) -> None:
+    """下载 + 身份证 OCR(计费走真实用户行)。成功存 id_card;齐料自动查重。"""
+    tenant, user_id = binding["tenant_id"], binding["user_id"]
+    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+
+    user = await _thr(db.find_user_by_id, user_id)
+    if not user:
+        _push(line_user_id, cards.TXT_NO_ENDPOINT)
+        return
+    content = await _thr(line_client.download_message_content, message_id, channel=_CHANNEL)
+    if not content:
+        _push(line_user_id, cards.TXT_BLURRY)
+        return
+
+    try:
+        ep, ocr, _ = await _thr(
+            _id_ocr.recognize_id_card, user, content, f"line_{message_id}.jpg", "", None
+        )
+    except _id_ocr.DmsOcrError as e:
+        _push(line_user_id, _ocr_error_text(e))
+        return
+
+    if ocr.get("needs_review"):
+        # 读不清 / 校验位对不上 → 打回重拍,列缺失项;不查重(C6)。
+        _push(line_user_id, _blurry_text(ocr.get("missing_fields") or []))
+        return
+
+    id_card = _id_ocr.editable_id_card(ocr["id_card"])
+    payload = await _merge_session(
+        binding,
+        line_user_id,
+        {"id_card": id_card, "endpoint_id": str(ep.get("id") or "")},
+        keep=("phone",),
+    )
+    if payload.get("phone"):
+        await _run_dedup(
+            binding, line_user_id, ep, id_card, payload["phone"], str(ep.get("id") or "")
+        )
+    else:
+        _push(line_user_id, cards.TXT_ASK_PHONE)
+
+
+# ── collecting → reviewing:查重四分支 ──────────────────────────────────────
+async def _run_dedup(
+    binding: dict,
+    line_user_id: str,
+    ep: Optional[dict],
+    id_card: dict,
+    phone: str,
+    endpoint_id: Optional[str],
+) -> None:
+    tenant, user_id = binding["tenant_id"], binding["user_id"]
+    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    if ep is None:
+        ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
+    if not ep:
+        _push(line_user_id, cards.TXT_NO_ENDPOINT)
+        return
+
+    full_name = id_card.get("name") or ""
+    res = await _thr(
+        _dms_intake.recognize_lookup_mrerp_dms,
+        ep,
+        people_id=id_card.get("people_id", ""),
+        name=full_name,
+        ocr_address=id_card.get("address") or {},
+    )
+    if not res.get("ok"):
+        fr = res.get("error_friendly") or {}
+        _push(line_user_id, fr.get("th") or cards.TXT_LOOKUP_FAIL)
+        return
+
+    scenario = res.get("scenario")
+    field_diffs = res.get("field_diffs") or []
+    geo = res.get("geo") or {}
+    draft_vals = draft.build_draft(id_card, geo, res.get("prefixes") or [], phone)
+    summary = draft.build_summary(draft_vals, geo)
+
+    if scenario == "exact" and not field_diffs:
+        _push(line_user_id, cards.TXT_SAME)  # 零写入
+        await _thr(store.clear_session, tenant, line_user_id)
+        return
+
+    nonce = secrets.token_hex(8)
+    base = {
+        "draft": draft_vals,
+        "summary": summary,
+        "endpoint_id": str(ep.get("id") or ""),
+        "nonce": nonce,
+    }
+
+    if scenario == "none":
+        payload = {**base, "scenario": "none", "field_diffs": []}
+        card = cards.new_customer_card(summary, nonce)
+    elif scenario == "exact":
+        has_admin = draft.has_admin_creds(ep)
+        payload = {
+            **base,
+            "scenario": "exact_diff",
+            "customer_id": res["match"]["customer_id"],
+            "field_diffs": field_diffs,
+            "has_admin": has_admin,
+        }
+        card = cards.diff_card(draft.display_diffs(field_diffs, geo), has_admin, nonce)
+    else:  # similar
+        cands = [
+            {
+                "customer_id": str(c.get("customer_id") or ""),
+                "cuscode": c.get("cuscode", ""),
+                "name": c.get("name", ""),
+                "people_id": c.get("people_id", ""),
+            }
+            for c in (res.get("candidates") or [])
+        ]
+        payload = {**base, "scenario": "similar", "candidates": cands, "field_diffs": []}
+        card = cards.candidates_card(cands, nonce)
+
+    await _thr(store.set_session, tenant, line_user_id, "reviewing", payload)
+    _push_card(line_user_id, card)
+
+
+# ── reviewing → 执行写档 ────────────────────────────────────────────────────
+async def _write_create(binding: dict, line_user_id: str, payload: dict) -> None:
+    draft = payload.get("draft") or {}
+    fields = {k: draft.get(k, "") for k in _CREATE_ID_KEYS}
+    block = {k: draft.get(k, "") for k in _ADDR_BLOCK_KEYS}
+    addresses = {"": dict(block), "_ct": dict(block), "_sd": dict(block)}
+    await _execute(
+        binding,
+        line_user_id,
+        payload,
+        mode="create",
+        customer_id=None,
+        fields=fields,
+        addresses=addresses,
+        field_diffs=[],
+    )
+
+
+async def _write_update(binding: dict, line_user_id: str, payload: dict) -> None:
+    draft = payload.get("draft") or {}
+    field_diffs = payload.get("field_diffs") or []
+    # 只写变了的字段 + people_id/name 必填项;未变字段不进 fields → 保留 DMS 现值。
+    fields = {"people_id": draft.get("people_id", ""), "name": draft.get("name", "")}
+    for d in field_diffs:
+        fields[d["field"]] = d.get("new", "")
+    await _execute(
+        binding,
+        line_user_id,
+        payload,
+        mode="overwrite",
+        customer_id=payload.get("customer_id"),
+        fields=fields,
+        addresses=None,
+        field_diffs=field_diffs,
+    )
+
+
+async def _write_claim(binding: dict, line_user_id: str, payload: dict, customer_id: str) -> None:
+    # 相似认领:无 diff(未与该候选逐字段比对),最小写入 people_id/name 认领到所选客户。
+    draft = payload.get("draft") or {}
+    fields = {"people_id": draft.get("people_id", ""), "name": draft.get("name", "")}
+    await _execute(
+        binding,
+        line_user_id,
+        payload,
+        mode="overwrite",
+        customer_id=customer_id,
+        fields=fields,
+        addresses=None,
+        field_diffs=[],
+    )
+
+
+async def _execute(
+    binding: dict,
+    line_user_id: str,
+    payload: dict,
+    *,
+    mode: str,
+    customer_id: Optional[str],
+    fields: Dict[str, Any],
+    addresses: Optional[Dict[str, Dict[str, Any]]],
+    field_diffs: List[dict],
+) -> None:
+    tenant, user_id = binding["tenant_id"], binding["user_id"]
+    name = str(fields.get("name") or "")
+    people_id = str(fields.get("people_id") or "")
+    await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+
+    ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, payload.get("endpoint_id"))
+    if not ep:
+        _push(line_user_id, cards.TXT_NO_ENDPOINT)
+        return
+
+    result = await _thr(
+        _dms_intake.push_idcard_fields_mrerp_dms,
+        ep,
+        fields=fields,
+        mode=mode,
+        customer_id=customer_id,
+        addresses=addresses,
+    )
+    success = bool(result.get("success"))
+    # 记录页按 adapter 显示 · LINE 推的也要出现:push_type(trigger 位)保持 'id_card',
+    # request_body.trigger='line_dms' 标源、带 field_diffs 快照(与网页 /push 同一台账)。
+    request_body = {
+        "adapter": "mrerp_dms",
+        "trigger": "line_dms",
+        "mode": mode,
+        "people_id_tail": people_id[-4:],
+        "field_diffs": field_diffs,
+    }
+    await _thr(
+        db.insert_push_log,
+        user_id,
+        str(ep["id"]),
+        None,
+        result.get("customer_id") or "",
+        name,
+        None,
+        "success" if success else "failed",
+        200 if success else 0,
+        request_body,
+        json.dumps(result.get("response_body") or {}, ensure_ascii=False),
+        result.get("error_code"),
+        1,
+        result.get("elapsed_ms", 0),
+        "id_card",
+    )
+
+    if success:
+        _push(line_user_id, cards.receipt_text(result.get("customer_id") or "", name, mode))
+        await _thr(store.clear_session, tenant, line_user_id)
+    elif result.get("error_code") == "ERR_DMS_ADMIN_AUTH":
+        _push(line_user_id, cards.TXT_ADMIN_AUTH_FAIL)  # 不谎称已自动通知
+    else:
+        fr = result.get("error_friendly") or {}
+        _push(line_user_id, fr.get("th") or cards.TXT_SAVE_FAIL)
+
+
+# ── 会话/文案小工具 ─────────────────────────────────────────────────────────
+async def _merge_session(binding: dict, line_user_id: str, add: dict, keep: tuple) -> dict:
+    """并入新料到 collecting 会话:只保留 keep 的旧键(丢弃 reviewing 残留 nonce/diffs)。"""
+    tenant = binding["tenant_id"]
+    sess = await _thr(store.get_session, tenant, line_user_id)
+    old = (sess or {}).get("payload") or {}
+    payload = {k: old.get(k) for k in keep if old.get(k)}
+    payload.update(add)
+    await _thr(store.set_session, tenant, line_user_id, "collecting", payload)
+    return payload
+
+
+def _nudge(sess: Optional[dict]) -> str:
+    if not sess:
+        return cards.TXT_INTRO
+    if sess.get("state") == "reviewing":
+        return cards.TXT_PICK_ABOVE
+    payload = sess.get("payload") or {}
+    if payload.get("id_card") and not payload.get("phone"):
+        return cards.TXT_ASK_PHONE
+    if payload.get("phone") and not payload.get("id_card"):
+        return cards.TXT_ASK_CARD
+    return cards.TXT_NEED_BOTH
+
+
+def _blurry_text(missing: List[str]) -> str:
+    labels = [cards.FIELD_LABELS_TH.get(m) for m in missing if cards.FIELD_LABELS_TH.get(m)]
+    if not labels:
+        return cards.TXT_BLURRY
+    return cards.TXT_BLURRY + " (" + ", ".join(labels) + ")"
+
+
+def _ocr_error_text(e: _id_ocr.DmsOcrError) -> str:
+    if e.code == "dms.no_endpoint":
+        return cards.TXT_NO_ENDPOINT
+    return cards.TXT_BLURRY
+
+
+# ── LINE 出口(全走 dms channel) ────────────────────────────────────────────
+def _reply(reply_token: str, text: str) -> None:
+    if reply_token:
+        line_client.reply_text(reply_token, text, channel=_CHANNEL)
+
+
+def _push(line_user_id: str, text: str) -> None:
+    line_client.push_text(line_user_id, text, channel=_CHANNEL)
+
+
+def _push_card(line_user_id: str, card: dict) -> None:
+    line_client.push_messages(line_user_id, [card], channel=_CHANNEL)

@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from core.feature_flags import dms_line_enabled_for
 from services.line_binding import line_client
-from services.line_dms import store
+from services.line_dms import flow, store
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +84,35 @@ async def _handle_dms_event(ev: dict) -> None:
             store.unbind_by_line_user(line_user_id)  # 静默,LINE 不许回复 unfollow
         return
 
+    if ev_type == "postback":
+        # 确认按钮只对已绑用户有意义(会话态挂在绑定租户下);未绑的 postback 忽略。
+        if binding:
+            await flow.handle_postback(binding, line_user_id, reply_token, ev.get("postback") or {})
+        return
+
     if ev_type == "message":
         msg = ev.get("message") or {}
-        if msg.get("type") != "text":
+        if binding:
+            await _handle_bound_message(binding, line_user_id, reply_token, msg)
+        elif msg.get("type") == "text":
+            await _handle_dms_text(line_user_id, reply_token, (msg.get("text") or "").strip())
+
+
+async def _handle_bound_message(
+    binding: dict, line_user_id: str, reply_token: str, msg: dict
+) -> None:
+    """已绑用户的消息 → 身份证对话流(DL-3)。解绑命令仍就地处理(不进流程)。"""
+    mtype = msg.get("type")
+    if mtype == "image":
+        flow.handle_image(binding, line_user_id, reply_token, msg.get("id"))
+        return
+    if mtype == "text":
+        text = (msg.get("text") or "").strip()
+        if text == _UNBIND_CMD:
+            store.unbind_by_line_user(line_user_id)
+            _reply(reply_token, _MSG_UNBOUND)
             return
-        await _handle_dms_text(line_user_id, reply_token, (msg.get("text") or "").strip())
+        await flow.handle_text(binding, line_user_id, reply_token, text)
 
 
 async def _handle_dms_bind_code(line_user_id: str, reply_token: str, code: str) -> None:

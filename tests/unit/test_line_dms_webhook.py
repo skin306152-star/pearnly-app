@@ -196,17 +196,14 @@ class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
         reply.assert_not_called()
 
     async def test_e4_bound_user_gated_by_bound_tenant(self):
-        """E4:已绑用户事件仍按其绑定租户判闸(不走窥码路)。"""
+        """E4:已绑用户事件仍按其绑定租户判闸(不走窥码路);文字转 DL-3 对话流。"""
         gate = mock.Mock(return_value=True)
+        binding = {"tenant_id": "T", "user_id": "u1"}
         with (
-            mock.patch.object(
-                w.store,
-                "get_binding_by_line_user",
-                return_value={"tenant_id": "T", "user_id": "u1"},
-            ),
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=binding),
             mock.patch.object(w.store, "peek_bind_code_tenant") as peek,
             mock.patch.object(w, "dms_line_enabled_for", gate),
-            mock.patch.object(w.line_client, "reply_text") as reply,
+            mock.patch.object(w.flow, "handle_text") as h_txt,
         ):
             await w._handle_dms_event(
                 {
@@ -218,7 +215,7 @@ class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
             )
         peek.assert_not_called()  # 已绑用户不走窥码路
         gate.assert_called_once_with("T", "u1")  # 按绑定租户判
-        self.assertEqual(reply.call_args.args[1], w._MSG_GUIDE)
+        h_txt.assert_called_once_with(binding, "L1", "rt", "สวัสดี")  # 转对话流
 
     async def test_e5_expired_code_gate_open_replies_bad(self):
         """E5:闸对该租户开着时,过期/已用码 → BIND_BAD。"""
@@ -247,6 +244,82 @@ class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
         consume.assert_not_called()
         gate.assert_not_called()  # 租户判不出 → 连闸都不问
         reply.assert_not_called()
+
+
+class BoundUserFlowRoutingTests(unittest.IsolatedAsyncioTestCase):
+    """DL-3:已绑用户的 image/text/postback 转 flow;闸关一切静默(C7)。"""
+
+    _BOUND = {"tenant_id": "T1", "user_id": "U1"}
+
+    def _ev(self, message=None, postback=None, etype="message"):
+        ev = {"type": etype, "source": {"userId": "L1"}, "replyToken": "rt"}
+        if message is not None:
+            ev["message"] = message
+        if postback is not None:
+            ev["postback"] = postback
+        return ev
+
+    async def test_c7_gate_closed_bound_user_all_silent(self):
+        """C7:绑定用户 + 闸关 → image/text/postback 全静默,不进 flow。"""
+        for ev in (
+            self._ev(message={"type": "image", "id": "M1"}),
+            self._ev(message={"type": "text", "text": "0812345678"}),
+            self._ev(postback={"data": "action=create_new"}, etype="postback"),
+        ):
+            with (
+                mock.patch.object(w.store, "get_binding_by_line_user", return_value=self._BOUND),
+                mock.patch.object(w, "dms_line_enabled_for", return_value=False),
+                mock.patch.object(w.flow, "handle_image") as h_img,
+                mock.patch.object(w.flow, "handle_text") as h_txt,
+                mock.patch.object(w.flow, "handle_postback") as h_pb,
+                mock.patch.object(w.line_client, "reply_text") as reply,
+            ):
+                await w._handle_dms_event(ev)
+            h_img.assert_not_called()
+            h_txt.assert_not_called()
+            h_pb.assert_not_called()
+            reply.assert_not_called()
+
+    async def test_bound_image_routes_to_flow(self):
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=self._BOUND),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.flow, "handle_image") as h_img,
+        ):
+            await w._handle_dms_event(self._ev(message={"type": "image", "id": "M1"}))
+        h_img.assert_called_once_with(self._BOUND, "L1", "rt", "M1")
+
+    async def test_bound_text_routes_to_flow(self):
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=self._BOUND),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.flow, "handle_text") as h_txt,
+        ):
+            await w._handle_dms_event(self._ev(message={"type": "text", "text": "0812345678"}))
+        h_txt.assert_called_once_with(self._BOUND, "L1", "rt", "0812345678")
+
+    async def test_bound_unbind_command_short_circuits_flow(self):
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=self._BOUND),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.store, "unbind_by_line_user", return_value=True) as unbind,
+            mock.patch.object(w.flow, "handle_text") as h_txt,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._ev(message={"type": "text", "text": w._UNBIND_CMD}))
+        unbind.assert_called_once_with("L1")
+        h_txt.assert_not_called()
+        self.assertEqual(reply.call_args.args[1], w._MSG_UNBOUND)
+
+    async def test_bound_postback_routes_to_flow(self):
+        pb = {"data": "action=create_new&nonce=abc"}
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=self._BOUND),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.flow, "handle_postback") as h_pb,
+        ):
+            await w._handle_dms_event(self._ev(postback=pb, etype="postback"))
+        h_pb.assert_called_once_with(self._BOUND, "L1", "rt", pb)
 
 
 if __name__ == "__main__":

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import secrets
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs
@@ -25,7 +24,7 @@ from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
 from services.line_dms import _out, booking_flow, cards, draft, edit_flow, store
-from services.line_dms._out import _CHANNEL, PHONE_RE as _PHONE_RE, _push, _reply, _thr
+from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,9 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
         await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
         return
 
-    if _PHONE_RE.match(text):
+    # 号码透传:ERP 是权威,它吃什么送什么,不在 Pearnly 写死格式(Zihao 拍板)。
+    # 含数字即视为号码(纯路由判据,区分号码与闲聊);格式对错由 DMS 保存时裁决。
+    if any(ch.isdigit() for ch in text):
         payload = await _merge_session(
             binding, line_user_id, {"phone": text}, keep=("id_card", "endpoint_id"), sess=sess
         )
@@ -90,12 +91,6 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
             )
         else:
             _reply(reply_token, cards.TXT_ASK_CARD)
-        return
-
-    # 像在输号码但格式不对(纯数字/带横线)→ 点明规则,不许只复读「请输手机号」
-    # (实测:用户连输 12345678/968301310 被静默拒,误以为系统坏了)。
-    if re.fullmatch(r"[\d\- ]{6,}", text):
-        _reply(reply_token, cards.TXT_BAD_PHONE_FORMAT)
         return
 
     _reply(reply_token, _nudge(sess))

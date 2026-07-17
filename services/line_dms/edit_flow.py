@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional, Tuple
 from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
 from services.line_binding import line_client
 from services.line_dms import cards, store
-from services.line_dms._out import _CHANNEL, PHONE_RE, _reply, _thr
+from services.line_dms._out import _CHANNEL, _reply, _thr
 
 EDIT_ACTIONS = frozenset({cards.ACT_EDIT, cards.ACT_EDIT_FIELD, cards.ACT_EDIT_CANCEL})
 
@@ -125,7 +125,8 @@ def _validate(field: Optional[str], text: str) -> Tuple[str, str]:
                 pass
         return "", cards.TXT_EDIT_BAD_BIRTHDAY
     if field == "phone":
-        return (v, "") if PHONE_RE.match(v) else ("", cards.TXT_EDIT_BAD_PHONE)
+        # 透传:ERP 吃什么送什么;含数字即收,格式由 DMS 裁决(Zihao 拍板)。
+        return (v, "") if any(c.isdigit() for c in v) else ("", cards.TXT_EDIT_BAD_PHONE)
     if field == "name" or field in _ADDR_FIELDS:
         return (v, "") if v else ("", cards.TXT_EDIT_EMPTY)
     return "", cards.TXT_EDIT_EMPTY

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 
 from services.line_binding import line_client
 
@@ -17,9 +16,6 @@ logger = logging.getLogger(__name__)
 
 _CHANNEL = "dms"
 _thr = asyncio.to_thread
-
-# 泰国手机号(0 开头 9-10 位)· flow 收料与 edit_flow 修正共用同一条规则。
-PHONE_RE = re.compile(r"^0\d{8,9}$")
 
 
 def make_spawn(tag: str):

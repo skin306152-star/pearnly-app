@@ -426,7 +426,7 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             await flow.handle_postback(
                 _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce2, "phone")
             )
-            await flow.handle_text(_BINDING, _LUID, "rt", "12345")  # 非 0xxxxxxxxx
+            await flow.handle_text(_BINDING, _LUID, "rt", "ไม่มีเบอร์")  # 零数字才打回(透传语义)
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_EDIT_BAD_PHONE)
             self.assertEqual(env.session()["state"], "editing")
 
@@ -545,18 +545,21 @@ class OcrErrorTextTests(unittest.TestCase):
         self.assertEqual(flow._ocr_error_text(self._err("dms.no_endpoint")), cards.TXT_NO_ENDPOINT)
 
 
-class PhoneFormatHintTests(unittest.IsolatedAsyncioTestCase):
-    """数字串格式不对必须点明规则,不许复读追问(实测连输错号误判系统坏)。"""
+class PhonePassthroughTests(unittest.IsolatedAsyncioTestCase):
+    """号码透传:ERP 吃什么送什么,Pearnly 不写死格式(Zihao 拍板);含数字即视为号码。"""
 
-    async def test_invalid_digits_get_format_hint(self):
+    async def test_any_digit_text_captured_as_phone(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
         sess = {"state": "collecting", "payload": {"id_card": {"people_id": "x"}}}
         with (
             mock.patch.object(flow.store, "get_session", return_value=sess),
-            mock.patch.object(flow, "_reply") as rep,
+            mock.patch.object(flow, "_merge_session", new_callable=mock.AsyncMock) as merge,
+            mock.patch.object(flow, "_spawn"),
+            mock.patch.object(flow, "_reply"),
         ):
+            merge.return_value = {"id_card": {"people_id": "x"}, "phone": "12345678"}
             await flow.handle_text(binding, "L1", "rt", "12345678")
-        rep.assert_called_once_with("rt", cards.TXT_BAD_PHONE_FORMAT)
+        self.assertEqual(merge.call_args.args[2], {"phone": "12345678"})
 
     async def test_non_digit_text_still_nudges(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}

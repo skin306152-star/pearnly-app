@@ -469,7 +469,7 @@
  * 保导航可用不整栏消失(v4 原 960px 直接 display:none 已被该新增铁律取代)。 */
 @media (max-width: 1100px) {
   .side {
-    width: 58px;
+    width: 64px;
   }
   .brand {
     justify-content: center;
@@ -477,14 +477,26 @@
   }
   .brand .word,
   .snav .lbl,
-  .snav a span,
   .snav a .n,
   .side .foot small {
     display: none;
   }
+  /* 触屏没有 hover,title 兜底白给(2026-07-17 复测)——图标下压一行小字标签,
+   * 超长省略;64px 栏宽刚好放下最长的「销项税报告三查」前几字。 */
   .snav a {
+    flex-direction: column;
     justify-content: center;
-    padding: 11px 0;
+    gap: 3px;
+    padding: 9px 2px;
+  }
+  .snav a span {
+    display: block;
+    font-size: 9.5px;
+    line-height: 1.1;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .side .foot {
     justify-content: center;

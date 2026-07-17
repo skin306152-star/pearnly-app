@@ -471,15 +471,21 @@
   .rv-grid {
     grid-template-columns: 1fr;
   }
-  /* 手机裁决区吸底(S3 §7):图票对照占满首屏时三键别跟着滚没——照 ai-desk.css
-   * .fd-composer 先例,--paper 垫底防透字。宽屏零改动。 */
+  /* 手机裁决区吸底(S3 §7,复测修订):sticky 真机没钉住(y=824 半截在视口外),
+   * 改 fixed 直接钉视口底——不受祖先布局摆布,留 iOS 安全区;内容区垫底防遮挡。 */
+  .rv-grid {
+    padding-bottom: 96px;
+  }
   .rv-actions {
-    position: sticky;
+    position: fixed;
+    left: 0;
+    right: 0;
     bottom: 0;
+    justify-content: center;
     background: var(--paper);
-    padding: 10px 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--hair);
-    z-index: 5;
+    z-index: 40;
   }
 }
 

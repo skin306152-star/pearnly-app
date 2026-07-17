@@ -241,11 +241,22 @@
         window.scrollTo(0, scrollByRoute[scrollKeyOf(route)] || 0);
     }
 
-    // pool/client 异步渲染:内容未撑起时 scrollTo 无效(clamp 回 0),双 rAF 等首帧再恢复。
+    // pool/client 异步渲染:内容未撑起时 scrollTo 无效(clamp 回 0)。双 rAF 只够同步
+    // 首帧,审核页队列是慢一拍的网络载入(2026-07-17 复测:手机返回审核仍回顶)——改
+    // 有限重试:到位即停,重试窗内用户已自己滚动(scrollY 离开 0)也停,不抢方向盘。
     function restoreScrollAfterPaint(route) {
+        var target = scrollByRoute[scrollKeyOf(route)] || 0;
+        if (!target) return;
+        var delays = [250, 700, 1500];
+        function attempt(i) {
+            if (Math.abs(window.scrollY - target) <= 4) return;
+            if (i > 0 && window.scrollY > 4) return;
+            window.scrollTo(0, target);
+            if (i < delays.length) setTimeout(attempt, delays[i], i + 1);
+        }
         requestAnimationFrame(function () {
             requestAnimationFrame(function () {
-                restoreScroll(route);
+                attempt(0);
             });
         });
     }

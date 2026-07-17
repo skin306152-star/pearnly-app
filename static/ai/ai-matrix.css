@@ -83,15 +83,19 @@
   background: var(--surface);
   box-shadow: var(--sh-card);
 }
-/* 右缘渐隐(2026-07-17):提示右边还有列可滑——手机上第三列之后纯靠猜。画在滚动容器
- * 上,随内容滚动淡出;初始位(最需要提示时)恒可见。 */
-.mx-scroll::after {
+/* 右缘渐隐(2026-07-17 复测修订):挂在不滚动的外壳上(画在滚动容器里会随内容一起
+ * 滚走,真机上等于没有)——外壳恒对准视口右缘,只要还有列没露头提示就一直在。 */
+.mx-scrollwrap {
+  position: relative;
+}
+.mx-scrollwrap::after {
   content: '';
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   width: 28px;
+  border-radius: 0 14px 14px 0;
   pointer-events: none;
   background: linear-gradient(to right, transparent, var(--paper));
 }

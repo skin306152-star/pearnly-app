@@ -296,17 +296,27 @@
         );
     }
 
-    // 空态指路(§6 死路批 · 2026-07-17):告诉人「报表从哪来」还得给「资料从哪进」——
-    // order_detail 自带 workspace_client_id/period,借它拼收料深链;detail 还没到手
-    // (极端时序)不硬造链接。
+    // 空态指路(§6 死路批 · 2026-07-17,复测修订):按真实阻塞分叉——还有未判票时
+    // 报表出不来的原因是「票没判完」,指去审核(带真数);没有未判票才指收料。判据与
+    // 工单页 banner 同一份(reviewQueue.splitByDecision),不另造第二套。detail 还没
+    // 到手(极端时序)不硬造链接。
     function emptyIntakeLinkHtml(detail) {
         var d = detail || {};
         if (d.workspace_client_id == null) return '';
+        var undecided = root.AI.reviewQueue.splitByDecision(
+            root.AI.reviewQueue.filterPurchaseQueue(d.flagged || [])
+        ).undecided.length;
+        var href = root.AI.router.buildClientHash(
+            d.workspace_client_id,
+            undecided > 0 ? 'review' : 'intake',
+            d.period
+        );
+        var label = undecided > 0 ? at('wo_todo_review', { n: undecided }) : at('wo_goto_intake');
         return (
             '<p class="note" style="text-align:center;margin-top:8px"><a href="' +
-            esc(root.AI.router.buildClientHash(d.workspace_client_id, 'intake', d.period)) +
+            href +
             '">' +
-            esc(at('wo_goto_intake')) +
+            esc(label) +
             '</a></p>'
         );
     }

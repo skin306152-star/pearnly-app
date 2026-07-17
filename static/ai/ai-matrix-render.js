@@ -185,7 +185,7 @@
             })
             .join('');
         return (
-            '<div class="mx-scroll"><table class="mx-table">' +
+            '<div class="mx-scrollwrap"><div class="mx-scroll"><table class="mx-table">' +
             '<thead>' +
             head +
             '</thead><tbody>' +

@@ -130,7 +130,11 @@
         if (ctx.uploadBatchTotal > 1) {
             s += ' · ' + (ctx.uploadBatchIndex || 0) + '/' + ctx.uploadBatchTotal;
         }
-        if (ctx.uploadBytesPct != null) s += ' · ' + ctx.uploadBytesPct + '%';
+        // <100 才拼:100% 是当前批已送达、服务端校验落盘中的窗口,挂着会被读成
+        // 「全部传完」(2026-07-17 复测),此时只留已结算计数更诚实。
+        if (ctx.uploadBytesPct != null && ctx.uploadBytesPct < 100) {
+            s += ' · ' + ctx.uploadBytesPct + '%';
+        }
         return s + ')';
     }
 

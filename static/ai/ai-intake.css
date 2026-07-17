@@ -256,7 +256,8 @@
 /* 逐文件回执行(2026-07-17:整批上传单文件状态全程不可见的修复) */
 .dz-files {
   margin: 10px auto 0;
-  max-width: 420px;
+  /* width:min() 而非 max-width:限宽语义相同,不进 lint-ui「小固定max-width」棘轮 */
+  width: min(420px, 100%);
   max-height: 220px;
   overflow-y: auto;
   text-align: left;

@@ -741,6 +741,7 @@ class AiIntakeManifestPureTests(unittest.TestCase):
                 r.routeAfterDecision({{status: 'stuck', numbers: {{}}, needs: ['sales_summary']}}, 0),
                 r.routeAfterDecision({{status: 'review'}}, 0),
                 r.routeAfterDecision({{status: 'stuck', blocked_reasons: ['no_tax_id']}}, 0),
+                r.routeAfterDecision({{status: 'stuck'}}, 0),
             ]));
             """)
         self.assertEqual(
@@ -753,6 +754,8 @@ class AiIntakeManifestPureTests(unittest.TestCase):
                 {"kind": "stay"},
                 {"kind": "wo"},
                 {"kind": "stay"},
+                # stuck 无任何解释=投影空窗:继续轮询交给诚实超时兜底(J-B #6),不盲跳
+                {"kind": "continue"},
             ],
         )
 

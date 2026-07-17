@@ -229,7 +229,9 @@ test.describe('J-B #3 · 看板状态诚实 + 引导链②③', () => {
         await page.screenshot({ path: path.join(ART, '04-board-stuck-not-review.png') });
     });
 
-    test('工单页引导条「有 N 件事等你」可点跳待我处理', async ({ page }) => {
+    // 2026-07-17 S2 拍板 banner 分叉:有未判票=就地去本客户审核 tab(判完回来还在同一单),
+    // 不再甩去跨客户的「待我处理」;review(轮到签批)才跳 pool——断言随产品决定更新。
+    test('工单页引导条「有 N 张票等你判」可点跳本客户审核', async ({ page }) => {
         await mockRoutes(page, {
             'GET /api/workspace/clients/c1': jsonRoute({ client: { id: 'c1', name: 'Acme Co' } }),
             'GET /api/workorder/orders': jsonRoute({ orders: [{ id: 'wo-1', period: '2569-05' }] }),
@@ -253,12 +255,14 @@ test.describe('J-B #3 · 看板状态诚实 + 引导链②③', () => {
         });
         await page.goto(`${PAGE}#/client/c1/wo`);
         await page.waitForSelector('#woSummaryPanel', { timeout: 15000 });
-        const guideBtn = page.locator('[data-action="wo-goto-pool"]');
+        const guideBtn = page.locator('[data-action="wo-goto-review"]');
         await expect(guideBtn).toBeVisible({ timeout: 8000 });
         await expect(guideBtn).toContainText('1');
         await page.screenshot({ path: path.join(ART, '05-wo-guidance-banner.png') });
         await guideBtn.click();
-        await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('#/pool');
+        await expect
+            .poll(() => page.evaluate(() => window.location.hash))
+            .toBe('#/client/c1/review');
     });
 
     test('交付包「已标记待签」旁「去签批 →」可见可点', async ({ page }) => {
@@ -327,7 +331,7 @@ test.describe('J-B #5 · 手机 390 视口无横向溢出', () => {
             }),
         });
         await page.goto(`${PAGE}#/client/c1/wo`);
-        await page.waitForSelector('[data-action="wo-goto-pool"]', { timeout: 15000 });
+        await page.waitForSelector('[data-action="wo-goto-review"]', { timeout: 15000 });
         const overflow = await page.evaluate(() => document.body.scrollWidth - window.innerWidth);
         expect(overflow, '390 视口不该有横向溢出').toBeLessThanOrEqual(1);
         const tabsBox = await page.locator('#clientTabs').boundingBox();

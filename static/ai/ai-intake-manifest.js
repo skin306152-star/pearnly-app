@@ -132,6 +132,9 @@
             (detail && detail.needs) || []
         );
         if (reasons.length) return { kind: 'stay' };
+        // stuck 但读模型还没给出任何解释(待判票/缺料/卡点全空)= 状态与投影间的短暂
+        // 空窗:继续轮询,让轮询超时的诚实文案兜底(R2F-R3 #5 · J-B #6),不盲跳。
+        if (st === 'stuck') return { kind: 'continue' };
         return { kind: 'wo' };
     }
 

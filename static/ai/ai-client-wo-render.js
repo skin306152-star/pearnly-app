@@ -75,7 +75,7 @@
         }
         if (guideCount > 0) {
             return (
-                '<div class="wo-guide"><a class="btn sm" href="' +
+                '<div class="wo-guide"><a class="btn sm" data-action="wo-goto-review" href="' +
                 esc(root.AI.router.buildClientHash(clientId, 'review', d.period)) +
                 '">' +
                 esc(at('wo_todo_review', { n: guideCount })) +

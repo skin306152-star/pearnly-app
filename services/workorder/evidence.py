@@ -26,6 +26,9 @@ _EVT_DECISION = "human_decision"
 # 警示复用同一形状)。前端无法 import,ai-review-render.js 旁有同步注释。
 EVT_TAXID_TYPO_SUSPECTED = "taxid_typo_suspected"
 EVT_TAXID_REALIGN_REQUESTED = "taxid_realign_requested"
+# 确定性读数解歧建议(J-13):进项票三数内部不自洽时,反解出的唯一自洽建议值,挂进 alerts 供
+# 前端改数入口预填(消费在 J-C 批)。建议永不落库——采纳仍走人工改数裁决端点。
+EVT_AMOUNT_READ_SUGGESTED = "amount_read_suggested"
 # 警示投影逐字段契约(前端警示卡按此渲染)。
 _ALERT_FIELDS = ("registered", "suspected", "doc_count", "distance", "kind")
 _KIND_PURCHASE = kinds.PURCHASE_INVOICE
@@ -127,6 +130,41 @@ def alerts_projection(events: list[dict]) -> list[dict]:
         elif etype == EVT_TAXID_REALIGN_REQUESTED:
             resolved.add((payload.get("registered"), payload.get("suspected")))
     return [a for key, a in suspicions.items() if key not in resolved]
+
+
+def amount_read_suggestions(events: list[dict]) -> list[dict]:
+    """确定性读数解歧建议投影(J-13 · order_detail.alerts 读侧,与 alerts_projection 同挂 alerts)。
+
+    扫进项票 item_classified 的票面三数,对内部不自洽者跑 amount_disambig 求唯一自洽建议,产出
+    警示卡数据(前端改数入口预填,消费在 J-C 批)。纯读侧现算、零落库——建议永不进 R1/R2/试算,
+    采纳仍走既有人工改数裁决端点。多解/无解的票不出建议(宁缺勿滥,判定收口在 amount_disambig)。"""
+    from services.workorder.steps import amount_disambig
+
+    out: list[dict] = []
+    for item_id, rec in replay_items_by_type(events, _EVT_CLASSIFIED).items():
+        payload = rec.get("payload") or {}
+        if payload.get("kind") != _KIND_PURCHASE:
+            continue
+        money = payload.get("money") or {}
+        suggestion = amount_disambig.suggest(
+            money.get("subtotal"), money.get("vat"), money.get("total_amount")
+        )
+        if suggestion is None:
+            continue
+        out.append(
+            {
+                "type": EVT_AMOUNT_READ_SUGGESTED,
+                "item_id": item_id,
+                "invoice_number": money.get("invoice_number"),
+                "ocr": {
+                    "net": money.get("subtotal"),
+                    "vat": money.get("vat"),
+                    "grand": money.get("total_amount"),
+                },
+                "suggestion": {k: str(v) for k, v in suggestion.items()},
+            }
+        )
+    return out
 
 
 def flagged_projection(

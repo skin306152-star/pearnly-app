@@ -157,6 +157,59 @@ class OrderDetailTests(_ApiTestBase):
     def test_unknown_order_returns_none(self):
         self.assertIsNone(api.order_detail(None, tenant_id="t-1", work_order_id="ghost"))
 
+    def test_amount_read_suggestion_surfaces_in_alerts(self):
+        # J-13:进项票三数内部不自洽(IN26-00575:净+税=含税却 净×7%≠税)→ alerts 挂确定性
+        # 读数解歧建议(税/含税各纠 1 位 9↔0),供前端改数入口预填。建议为纯读侧现算,不落库。
+        self.store.events = [
+            {
+                "id": "evt-1",
+                "step": "classify",
+                "event_type": "item_classified",
+                "payload": {
+                    "item_id": "it-1",
+                    "kind": "purchase_invoice",
+                    "status": "flagged",
+                    "money": {
+                        "subtotal": "58048.35",
+                        "vat": "4060.05",
+                        "total_amount": "62108.40",
+                        "invoice_number": "IN26-00575",
+                    },
+                },
+            }
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        suggestions = [a for a in detail["alerts"] if a["type"] == "amount_read_suggested"]
+        self.assertEqual(len(suggestions), 1)
+        self.assertEqual(suggestions[0]["invoice_number"], "IN26-00575")
+        self.assertEqual(
+            suggestions[0]["suggestion"],
+            {"net": "58129.35", "vat": "4069.05", "grand": "62198.40"},
+        )
+
+    def test_self_consistent_purchase_yields_no_amount_alert(self):
+        # 自洽进项票不产建议(无假阳性),alerts 不含 amount_read_suggested。
+        self.store.events = [
+            {
+                "id": "evt-2",
+                "step": "classify",
+                "event_type": "item_classified",
+                "payload": {
+                    "item_id": "it-1",
+                    "kind": "purchase_invoice",
+                    "status": "ok",
+                    "money": {
+                        "subtotal": "54240.00",
+                        "vat": "3796.80",
+                        "total_amount": "58036.80",
+                        "invoice_number": "HS6905001",
+                    },
+                },
+            }
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertFalse(any(a["type"] == "amount_read_suggested" for a in detail["alerts"]))
+
 
 class ClassifyProgressTests(_ApiTestBase):
     """P-4 逐件进度:classify 期间 detail.progress 给 processed/total(从事件流现算),

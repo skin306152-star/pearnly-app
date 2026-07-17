@@ -94,13 +94,23 @@ def resolve_input_vat(
     total = ZERO
     unresolved: list[str] = []
     entries: list[dict] = []
+
+    def _count(it: dict, money: dict, eff: Optional[dict]) -> None:
+        """采信一张票:累计税额、把票据标签(票号/原文件名)钉进分录供 R4 点名到票。"""
+        if eff is None:
+            return
+        nonlocal total
+        total += eff["vat"]
+        eff["label"] = _label(it, money)
+        entries.append(eff)
+
     for it in purchases:
         money = classified.get(it["id"]) or {}
         if it["status"] == "ok":
             if not money:
                 unresolved.append(f"{_label(it, money)}: 缺 item_classified 金额事件")
                 continue
-            eff = _effective(money)
+            _count(it, money, _effective(money))
         else:  # flagged:查人工裁决
             dec = decisions.get(it["id"])
             if not dec:
@@ -108,25 +118,13 @@ def resolve_input_vat(
                     f"{_label(it, money)}: flagged({it.get('flag_reason')}) 无人工裁决"
                 )
                 continue
-            eff = _apply_decision(it, money, dec, unresolved)
-            if eff is None:
-                continue
-        total += eff["vat"]
-        entries.append(eff)
+            _count(it, money, _apply_decision(it, money, dec, unresolved))
     for it in ambiguous or []:
-        eff = _apply_direction(
-            it, classified.get(it["id"]) or {}, decisions.get(it["id"]), unresolved
-        )
-        if eff is None:
-            continue
-        total += eff["vat"]
-        entries.append(eff)
+        money = classified.get(it["id"]) or {}
+        _count(it, money, _apply_direction(it, money, decisions.get(it["id"]), unresolved))
     for it in sales_docs or []:
-        eff = _apply_sales_doc(it, classified.get(it["id"]) or {}, decisions.get(it["id"]))
-        if eff is None:
-            continue
-        total += eff["vat"]
-        entries.append(eff)
+        money = classified.get(it["id"]) or {}
+        _count(it, money, _apply_sales_doc(it, money, decisions.get(it["id"])))
     return {"total": total, "unresolved": unresolved, "entries": entries}
 
 
@@ -240,14 +238,28 @@ def trial_balance(purchase_entries: list[dict], sales_amount: Decimal, output_va
 
     销项两侧恒等自平;不平只可能来自某张进项票 含税≠净+税(票面自身对不上,classify 的
     净×7% 闸抓不到这一等式)——即 M0 试算真正拦的是这类票面内部不自洽,非重算业务金额。
+
+    offenders 逐票点名 净+税≠含税 的进项分录({label, diff}),让停机原因指到具体票而非只报
+    总差额(J 闸实锤:Zihao 撞过只知总差 0.05、不知哪张)。diff=净+税−含税(带符号,示方向)。
     """
     debit = ZERO
     credit = ZERO
+    offenders: list[dict] = []
     for e in purchase_entries:
-        debit += e["net"] + e["vat"]
+        net_plus_vat = e["net"] + e["vat"]
+        debit += net_plus_vat
         credit += e["grand"]
+        gap = net_plus_vat - e["grand"]
+        if gap != ZERO:
+            offenders.append({"label": e.get("label") or "?", "diff": gap})
     gross = sales_amount + output_vat
     debit += gross
     credit += gross
     diff = (debit - credit).copy_abs()
-    return {"balanced": diff <= TOL, "debit": debit, "credit": credit, "diff": diff}
+    return {
+        "balanced": diff <= TOL,
+        "debit": debit,
+        "credit": credit,
+        "diff": diff,
+        "offenders": offenders,
+    }

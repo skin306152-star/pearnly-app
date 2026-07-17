@@ -376,6 +376,25 @@ class R4TrialBalanceTests(unittest.TestCase):
         self.assertEqual(out.status, "stuck")
         self.assertTrue(any("trial_balance_unbalanced" in r for r in out.reasons))
 
+    def test_unbalanced_stuck_names_offending_ticket(self):
+        # J-11:不平时逐票点名(票号/原文件名 + 差额),总差额行仍保留。IMG_2647 场景:
+        # 净 58048.40 + 税 4060.05 = 62108.45 ≠ 含税 62108.40,差 +0.05(净+税−含税)。
+        items = [_pi("p1", file="a.jpg"), _pi("x", file="IMG_2647.jpg")]
+        events = [
+            _money_evt("p1", net="1000.00", vat="70.00", grand="1070.00"),
+            _money_evt("x", net="58048.40", vat="4060.05", grand="62108.40", inv="IN26-00575"),
+            _sales_evt(),
+        ]
+        out = reconcile.run(_ctx(FakeStore(items, events)))
+        self.assertEqual(out.status, "stuck")
+        # 点名行:含违规票的票号且带差额;自洽的 p1 不点名。
+        named = [r for r in out.reasons if "IN26-00575" in r]
+        self.assertEqual(len(named), 1)
+        self.assertIn("0.05", named[0])
+        self.assertFalse(any("a.jpg" in r for r in out.reasons))
+        # 总差额行仍在末尾(逐字节维持现状)。
+        self.assertTrue(out.reasons[-1].startswith("trial_balance_unbalanced"))
+
 
 class IdempotencyTests(unittest.TestCase):
     def test_rerun_yields_same_result(self):

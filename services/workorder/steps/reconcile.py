@@ -86,12 +86,15 @@ def run(ctx: StepContext) -> StepResult:
         if recon is not None:
             r3["recon"] = recon
 
-    # R4 试算平衡(纯函数)
+    # R4 试算平衡(纯函数)。不平时先逐票点名 净+税≠含税 的进项票(票号/原文件名 + 差额),
+    # 末尾保留总差额行——停机原因指到具体票,不再只报一个总差让人肉翻照片(J 闸实锤)。
     tb = gates.trial_balance(r1["entries"], r2["sales_amount"], r2["output_vat"])
     if not tb["balanced"]:
-        return StepResult.stuck(
-            [f"trial_balance_unbalanced: 借={tb['debit']} 贷={tb['credit']} 差={tb['diff']}"]
+        reasons = [f"{o['label']}: 票面净+税≠含税 差{o['diff']}" for o in tb["offenders"]]
+        reasons.append(
+            f"trial_balance_unbalanced: 借={tb['debit']} 贷={tb['credit']} 差={tb['diff']}"
         )
+        return StepResult.stuck(reasons)
 
     purchase_amount = sum((e["net"] for e in r1["entries"]), gates.ZERO)
     result_gates = {

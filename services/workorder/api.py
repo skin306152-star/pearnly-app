@@ -190,7 +190,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "current_step": wo["current_step"],
         "progress": _classify_progress(wo, items, classified),
         "flagged": evidence.flagged_projection(items, events, classified=classified),
-        "alerts": evidence.alerts_projection(events),
+        "alerts": evidence.alerts_projection(events) + evidence.amount_read_suggestions(events),
         "needs": needs,
         "blocked_reasons": blocked,
         "numbers": _numbers(events),

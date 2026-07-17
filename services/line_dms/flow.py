@@ -436,9 +436,15 @@ def _blurry_text(missing: List[str]) -> str:
 
 
 def _ocr_error_text(e: _id_ocr.DmsOcrError) -> str:
+    """按真实原因回话(状态诚实):余额/配置/系统错各说各的,只有真读不清才叫重拍。
+    实案:฿0 余额的 402 曾被统一说成「拍不清」,清晰卡也被打回,误导排障。"""
     if e.code == "dms.no_endpoint":
         return cards.TXT_NO_ENDPOINT
-    return cards.TXT_BLURRY
+    if e.code == "insufficient_balance":
+        return cards.TXT_NO_CREDIT
+    if e.code in ("ocr.id_card_unreadable", "ocr.empty_file", "ocr.file_too_large"):
+        return cards.TXT_BLURRY
+    return cards.TXT_SYSTEM_ERROR
 
 
 # ── LINE 出口(全走 dms channel · _reply/_push 见 _out) ──────────────────────

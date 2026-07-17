@@ -520,3 +520,26 @@ def _card_has_text(card, text):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OcrErrorTextTests(unittest.TestCase):
+    """402/系统错不许说成「拍不清」(状态诚实 · ฿0 余额实案)。"""
+
+    def _err(self, code, status=400):
+        return flow._id_ocr.DmsOcrError(code, status, {"code": code})
+
+    def test_insufficient_balance_says_credit_not_blurry(self):
+        self.assertEqual(
+            flow._ocr_error_text(self._err("insufficient_balance", 402)), cards.TXT_NO_CREDIT
+        )
+
+    def test_system_failure_says_system_not_blurry(self):
+        self.assertEqual(flow._ocr_error_text(self._err("ocr.failed", 500)), cards.TXT_SYSTEM_ERROR)
+
+    def test_unreadable_still_blurry(self):
+        self.assertEqual(
+            flow._ocr_error_text(self._err("ocr.id_card_unreadable", 422)), cards.TXT_BLURRY
+        )
+
+    def test_no_endpoint_unchanged(self):
+        self.assertEqual(flow._ocr_error_text(self._err("dms.no_endpoint")), cards.TXT_NO_ENDPOINT)

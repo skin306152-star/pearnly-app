@@ -543,3 +543,27 @@ class OcrErrorTextTests(unittest.TestCase):
 
     def test_no_endpoint_unchanged(self):
         self.assertEqual(flow._ocr_error_text(self._err("dms.no_endpoint")), cards.TXT_NO_ENDPOINT)
+
+
+class PhoneFormatHintTests(unittest.IsolatedAsyncioTestCase):
+    """数字串格式不对必须点明规则,不许复读追问(实测连输错号误判系统坏)。"""
+
+    async def test_invalid_digits_get_format_hint(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        sess = {"state": "collecting", "payload": {"id_card": {"people_id": "x"}}}
+        with (
+            mock.patch.object(flow.store, "get_session", return_value=sess),
+            mock.patch.object(flow, "_reply") as rep,
+        ):
+            await flow.handle_text(binding, "L1", "rt", "12345678")
+        rep.assert_called_once_with("rt", cards.TXT_BAD_PHONE_FORMAT)
+
+    async def test_non_digit_text_still_nudges(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        sess = {"state": "collecting", "payload": {"id_card": {"people_id": "x"}}}
+        with (
+            mock.patch.object(flow.store, "get_session", return_value=sess),
+            mock.patch.object(flow, "_reply") as rep,
+        ):
+            await flow.handle_text(binding, "L1", "rt", "สวัสดี")
+        rep.assert_called_once_with("rt", cards.TXT_ASK_PHONE)

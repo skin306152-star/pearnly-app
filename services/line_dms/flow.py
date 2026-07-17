@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import secrets
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs
@@ -89,6 +90,12 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
             )
         else:
             _reply(reply_token, cards.TXT_ASK_CARD)
+        return
+
+    # 像在输号码但格式不对(纯数字/带横线)→ 点明规则,不许只复读「请输手机号」
+    # (实测:用户连输 12345678/968301310 被静默拒,误以为系统坏了)。
+    if re.fullmatch(r"[\d\- ]{6,}", text):
+        _reply(reply_token, cards.TXT_BAD_PHONE_FORMAT)
         return
 
     _reply(reply_token, _nudge(sess))

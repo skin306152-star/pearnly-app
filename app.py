@@ -203,9 +203,8 @@ from routes.erp_agent import (  # Express Push · 本地 Agent 出站拉取 + to
 from routes.companion_installer_routes import (  # Express Push · 小助手安装包下载
     router as companion_installer_router,
 )
-from routes.dms_routes import (  # MR.ERP DMS 汽车销售 · 身份证→订车单 1 路由 · 2026-05-31
-    router as dms_router,
-)
+from routes.dms_routes import router as dms_router  # MR.ERP DMS · 身份证→订车单
+from routes.dms_pick_routes import router as dms_pick_router  # DL-4a · DMS 车辆选择面板
 from routes.line_dms_webhook_routes import router as line_dms_webhook_router  # DMS 独立 OA
 from routes.admin_users_routes import router as admin_users_router  # B1 · 超管 15 路由
 
@@ -377,6 +376,7 @@ app.include_router(erp_router)  # REFACTOR-B1 · ERP 推送 15 路由(2026-05-25
 app.include_router(erp_agent_router)  # Express Push · 本地 Agent 出站拉取 + token 4 路由
 app.include_router(companion_installer_router)  # Express Push · 小助手安装包下载
 app.include_router(dms_router)  # MR.ERP DMS · 身份证→订车单 1 路由(2026-05-31)
+app.include_router(dms_pick_router)  # DL-4a · DMS 车辆选择面板 4 路由(token 闸 · 无登录)
 app.include_router(line_dms_webhook_router)  # DL-1 · DMS 独立 LINE OA webhook 1 路由
 app.include_router(admin_users_router)  # REFACTOR-B1 · 超管用户/员工 15 路由(2026-05-25)
 app.include_router(history_router)  # REFACTOR-B1 · OCR 历史 11 路由(含 assign_client)(2026-05-25)

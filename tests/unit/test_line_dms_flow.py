@@ -131,6 +131,13 @@ class _Env:
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
         p(flow, "_spawn", side_effect=self.spawned.append)
+
+        # 客户档落定后 flow 委托 booking_flow.offer_pick(DL-4a 选车入口);此处存 DL-3 客户
+        # 写档语义,offer_pick 桩成「消费 reviewing 会话」——订车阶段本身在 test_line_dms_booking。
+        async def _offer(binding, luid, **kw):
+            self.store.clear_session(str(binding["tenant_id"]), luid)
+
+        self.offer = p(flow.booking_flow, "offer_pick", side_effect=_offer)
         self.reply = p(flow.line_client, "reply_text")
         self.push_text = p(flow.line_client, "push_text")
         self.push_msgs = p(flow.line_client, "push_messages")

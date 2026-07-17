@@ -47,6 +47,7 @@
   "console_roles_routes": "C",
   "console_team_routes": "C",
   "dms_routes": "B",
+  "dms_pick_routes": "D",
   "email_ingest_routes": "B",
   "erp_agent": "D",
   "erp_endpoints_routes": "C",

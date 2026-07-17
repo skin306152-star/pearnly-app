@@ -40,6 +40,17 @@ ACT_UPDATE = "update"
 ACT_KEEP = "keep"
 ACT_RESET = "reset"
 ACT_PICK = "pick"
+# 订车阶段(DL-4a):选车面板落定后的预览确认(booking_flow 侧 dispatch)。
+ACT_CONFIRM_BOOKING = "confirm_booking"
+ACT_CANCEL_BOOKING = "cancel_booking"
+
+# 订车阶段文案与按钮(DL-4a)
+BTN_PICK_CAR = "เลือกรถ (จองรถ)"
+BTN_CONFIRM_BOOKING = "ยืนยันจอง"
+BTN_CANCEL_BOOKING = "ยกเลิก"
+TXT_PICK_INTRO = "บันทึกข้อมูลลูกค้าเรียบร้อย ต้องการเปิดใบจองรถให้ลูกค้าท่านนี้หรือไม่ กดปุ่มด้านล่างเพื่อเลือกรถ"
+TXT_BOOKING_CANCELLED = "ยกเลิกการจองแล้ว"
+TXT_BOOKING_FAIL = "สร้างใบจองไม่สำเร็จ กรุณาลองใหม่"
 
 FIELD_LABELS_TH: Dict[str, str] = {
     "prefix_id": "คำนำหน้า",
@@ -203,3 +214,59 @@ def receipt_text(customer_id: str, name: str, mode: str) -> str:
     """写档成功回执:客户码 + 姓名 + 做了什么(诚实告知实际动作)。"""
     action = "สร้างลูกค้าใหม่" if mode == "create" else "อัปเดตข้อมูลลูกค้า"
     return f"บันทึกสำเร็จ · {action}\nรหัสลูกค้า: {customer_id or '—'}\nชื่อ: {name or '—'}"
+
+
+# ── 订车阶段(DL-4a) ────────────────────────────────────────────────────
+def pick_button_message(pick_url: str) -> Dict[str, Any]:
+    """客户档落定后推的选车入口:URI 按钮跳车辆选择面板(带签名 token)。"""
+    return {
+        "type": "flex",
+        "altText": BTN_PICK_CAR,
+        "contents": {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [{"type": "text", "text": TXT_PICK_INTRO, "size": "sm", "wrap": True}],
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "height": "sm",
+                        "action": {"type": "uri", "label": BTN_PICK_CAR, "uri": pick_url},
+                    }
+                ],
+            },
+        },
+    }
+
+
+def booking_review_card(preview: Dict[str, str], nonce: str) -> Dict[str, Any]:
+    """选车提交后的订车预览:客户五要素 + 车型/颜色/价格/顾问/交车日 + [ยืนยันจอง][ยกเลิก]。"""
+    rows = [
+        _kv_row("ลูกค้า", preview.get("customer_name", "")),
+        _kv_row("เลขบัตร", preview.get("people_id", "")),
+        _kv_row("รุ่นรถ", preview.get("car", "")),
+        _kv_row("สี", preview.get("paint", "")),
+        _kv_row("ราคา", preview.get("price", "")),
+        _kv_row("ที่ปรึกษา", preview.get("advisor", "")),
+        _kv_row("วันที่ส่งมอบ", preview.get("delivery_date_be", "")),
+    ]
+    footer = [
+        _btn(BTN_CONFIRM_BOOKING, _data(ACT_CONFIRM_BOOKING, nonce=nonce), "primary"),
+        _btn(BTN_CANCEL_BOOKING, _data(ACT_CANCEL_BOOKING), "secondary"),
+    ]
+    return _bubble("ยืนยันการจองรถ", rows, footer, "ยืนยันการจองรถ")
+
+
+def booking_receipt_text(booking_no: str, car: str, delivery_date_be: str) -> str:
+    """订车成功回执:BK 单号 + 车型 + 交车日。"""
+    return (
+        f"เปิดใบจองสำเร็จ\nเลขที่ใบจอง: {booking_no or '—'}\n"
+        f"รุ่นรถ: {car or '—'}\nวันที่ส่งมอบ: {delivery_date_be or '—'}"
+    )

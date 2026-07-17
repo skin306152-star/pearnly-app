@@ -205,6 +205,44 @@ def create_pos_store_token(
     return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
+DMS_PICK_SCOPE = "dms_pick"
+DMS_PICK_TTL_MINUTES = 15
+
+
+def create_dms_pick_token(
+    *,
+    tenant_id: str,
+    line_user_id: str,
+    endpoint_id: str,
+    nonce: str,
+    ttl_minutes: int = DMS_PICK_TTL_MINUTES,
+) -> str:
+    """DMS 车辆选择面板的一次性签名 token(DL-4a)。
+
+    面板无登录会话,凭此 token 认身份。scope='dms_pick' 与 access token 区隔;nonce 绑
+    LINE 会话态,submit 成功即轮换使旧 token 失效。复用同一 JWT 密钥/算法(禁自造加密)。
+    """
+    now = datetime.now(timezone.utc)
+    payload = {
+        "scope": DMS_PICK_SCOPE,
+        "tenant_id": str(tenant_id),
+        "line_user_id": str(line_user_id),
+        "endpoint_id": str(endpoint_id),
+        "nonce": str(nonce),
+        "iat": now,
+        "exp": now + timedelta(minutes=int(ttl_minutes)),
+    }
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
+def decode_dms_pick_token(token: str) -> Optional[Dict[str, Any]]:
+    """校验并解出 dms_pick token 的声明。scope 不符/过期/坏签名 → None(fail-closed)。"""
+    payload = decode_access_token(token)
+    if not payload or payload.get("scope") != DMS_PICK_SCOPE:
+        return None
+    return payload
+
+
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     """解码 JWT 令牌"""
     try:

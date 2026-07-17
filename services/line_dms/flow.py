@@ -25,7 +25,7 @@ from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
-from services.line_dms import cards, draft, store
+from services.line_dms import booking_flow, cards, draft, store
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,11 @@ async def handle_postback(
     pb = {k: v[0] for k, v in parse_qs(postback.get("data") or "").items()}
     action = pb.get("action")
 
+    # 订车阶段(DL-4a)的预览确认/取消归 booking_flow(客户档写档动作留本文件)。
+    if action in booking_flow.BOOKING_ACTIONS:
+        await booking_flow.handle_postback(binding, line_user_id, reply_token, action, pb)
+        return
+
     if action == cards.ACT_RESET:
         await _thr(store.clear_session, tenant, line_user_id)
         _reply(reply_token, cards.TXT_RESET)
@@ -123,8 +128,15 @@ async def handle_postback(
     payload = (sess or {}).get("payload") or {}
 
     if action == cards.ACT_KEEP:
-        await _thr(store.clear_session, tenant, line_user_id)
         _reply(reply_token, cards.TXT_KEEP)
+        d = payload.get("draft") or {}
+        await booking_flow.offer_pick(
+            binding,
+            line_user_id,
+            endpoint_id=str(payload.get("endpoint_id") or ""),
+            customer_id=str(payload.get("customer_id") or ""),
+            draft=d,
+        )
         return
 
     # 写动作:会话须在 reviewing 且 nonce 吻合;不符/过期 → 过期话术,绝不写。
@@ -233,7 +245,13 @@ async def _run_dedup(
 
     if scenario == "exact" and not field_diffs:
         _push(line_user_id, cards.TXT_SAME)  # 零写入
-        await _thr(store.clear_session, tenant, line_user_id)
+        await booking_flow.offer_pick(
+            binding,
+            line_user_id,
+            endpoint_id=str(ep.get("id") or ""),
+            customer_id=str((res.get("match") or {}).get("customer_id") or ""),
+            draft=draft_vals,
+        )
         return
 
     nonce = secrets.token_hex(8)
@@ -386,7 +404,14 @@ async def _execute(
 
     if success:
         _push(line_user_id, cards.receipt_text(result.get("customer_id") or "", name, mode))
-        await _thr(store.clear_session, tenant, line_user_id)
+        await booking_flow.offer_pick(
+            binding,
+            line_user_id,
+            endpoint_id=str(payload.get("endpoint_id") or ""),
+            customer_id=str(result.get("customer_id") or ""),
+            draft=payload.get("draft") or {},
+            name=name,
+        )
     elif result.get("error_code") == "ERR_DMS_ADMIN_AUTH":
         _push(line_user_id, cards.TXT_ADMIN_AUTH_FAIL)  # 不谎称已自动通知
     else:

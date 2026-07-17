@@ -98,6 +98,7 @@
   "line_account_merge_routes": "D",
   "line_binding_routes": "D",
   "line_card_image_routes": "D",
+  "line_dms_webhook_routes": "D",
   "line_liff_routes": "D",
   "line_webhook_routes": "D",
   "login_routes": "D",

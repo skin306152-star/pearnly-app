@@ -31,6 +31,7 @@ from core.feature_flags import dms_portal_enabled_for, entrance_api_scope_enable
 from services.auth.entrance import DMS
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
+from services.line_dms import store as line_dms_store
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
 
@@ -233,3 +234,54 @@ async def dms_id_card_push(request: Request):
             "error_friendly": result.get("error_friendly"),
         },
     }
+
+
+# ════════════════════════════════════════════════════════════════════════
+# DMS 独立 LINE 通道绑定(DL-1)· App 侧发码 / 查绑定 / 解绑,与 webhook 对接。
+# 全走 _authorize(dms_portal 闸 + 入口作用域);绑定表隔离在 services/line_dms。
+# ════════════════════════════════════════════════════════════════════════
+
+
+def _tenant_user(user: Dict[str, Any]) -> tuple[str, str]:
+    """从鉴权后的 user 取 (tenant_id, user_id)。绑定表 tenant_id NOT NULL → 无租户拒。"""
+    tenant_id = str(user["tenant_id"]) if user.get("tenant_id") else None
+    user_id = str(user["id"]) if user.get("id") else None
+    if not tenant_id or not user_id:
+        raise HTTPException(400, detail="dms.no_tenant")
+    return tenant_id, user_id
+
+
+@router.post("/api/dms/line/bind-code")
+async def dms_line_bind_code(request: Request):
+    """发 6 位 LINE 绑定码(用户在 DMS LINE OA 发该码完成绑定)。"""
+    user = _authorize(request)
+    tenant_id, user_id = _tenant_user(user)
+    out = await asyncio.to_thread(line_dms_store.generate_bind_code, tenant_id, user_id)
+    if not out:
+        raise HTTPException(500, detail="dms.bind_code_failed")
+    return {"code": out["code"], "expires_at": out["expires_at"]}
+
+
+@router.get("/api/dms/line/binding")
+async def dms_line_binding(request: Request):
+    """查当前用户的 DMS LINE 绑定状态。"""
+    user = _authorize(request)
+    _, user_id = _tenant_user(user)
+    row = await asyncio.to_thread(line_dms_store.get_binding_by_user, user_id)
+    if not row:
+        return {"bound": False, "display_name": None, "bound_at": None}
+    bound_at = row.get("bound_at")
+    return {
+        "bound": True,
+        "display_name": row.get("display_name"),
+        "bound_at": bound_at.isoformat() if hasattr(bound_at, "isoformat") else bound_at,
+    }
+
+
+@router.delete("/api/dms/line/binding")
+async def dms_line_unbind(request: Request):
+    """解绑当前用户的 DMS LINE 账号。"""
+    user = _authorize(request)
+    _, user_id = _tenant_user(user)
+    ok = await asyncio.to_thread(line_dms_store.unbind_by_user, user_id)
+    return {"ok": bool(ok)}

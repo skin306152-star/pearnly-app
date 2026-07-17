@@ -59,17 +59,31 @@ def pick_lang_from_line_event(ev: dict) -> str:
     return "th"
 
 
-def _get_channel_secret() -> str:
-    s = os.environ.get("LINE_CHANNEL_SECRET", "").strip()
+# 多产品共用同一套 LINE 客户端:老会计站走 'default'(现有 env),独立产品(DMS)走
+# 自己的 channel env。不传 channel 时逐字节等同历史行为(default 键映回原 env 名)。
+_CHANNEL_ENV = {
+    "default": ("LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"),
+    "dms": ("LINE_DMS_CHANNEL_SECRET", "LINE_DMS_CHANNEL_ACCESS_TOKEN"),
+}
+
+
+def _channel_env_names(channel: str) -> tuple[str, str]:
+    return _CHANNEL_ENV.get(channel) or _CHANNEL_ENV["default"]
+
+
+def _get_channel_secret(channel: str = "default") -> str:
+    name = _channel_env_names(channel)[0]
+    s = os.environ.get(name, "").strip()
     if not s:
-        logger.warning("LINE_CHANNEL_SECRET 未设置")
+        logger.warning(f"{name} 未设置")
     return s
 
 
-def _get_channel_token() -> str:
-    s = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
+def _get_channel_token(channel: str = "default") -> str:
+    name = _channel_env_names(channel)[1]
+    s = os.environ.get(name, "").strip()
     if not s:
-        logger.warning("LINE_CHANNEL_ACCESS_TOKEN 未设置")
+        logger.warning(f"{name} 未设置")
     return s
 
 
@@ -78,12 +92,13 @@ def _get_channel_token() -> str:
 # ============================================================
 
 
-def verify_signature(body: bytes, signature: str) -> bool:
+def verify_signature(body: bytes, signature: str, *, channel: str = "default") -> bool:
     """
     校验 LINE webhook 请求合法性。
     算法:HMAC-SHA256(body, channel_secret) → base64 → 对比 X-Line-Signature
+    channel:凭据 profile('default'=老会计站,'dms'=独立 DMS 产品)。
     """
-    secret = _get_channel_secret()
+    secret = _get_channel_secret(channel)
     if not secret or not signature:
         return False
     try:
@@ -105,18 +120,22 @@ def verify_signature(body: bytes, signature: str) -> bool:
 # ============================================================
 
 
-def reply_text(reply_token: str, text: str) -> bool:
+def reply_text(reply_token: str, text: str, *, channel: str = "default") -> bool:
     """用 replyToken 回复纯文字(replyToken 一次性 · 60 秒内用)"""
-    return _reply_messages(reply_token, [{"type": "text", "text": text[:5000]}])
+    return _reply_messages(reply_token, [{"type": "text", "text": text[:5000]}], channel=channel)
 
 
-def reply_messages(reply_token: str, messages: List[Dict[str, Any]]) -> bool:
+def reply_messages(
+    reply_token: str, messages: List[Dict[str, Any]], *, channel: str = "default"
+) -> bool:
     """回复多条消息(最多 5 条)"""
-    return _reply_messages(reply_token, messages[:5])
+    return _reply_messages(reply_token, messages[:5], channel=channel)
 
 
-def _reply_messages(reply_token: str, messages: List[Dict[str, Any]]) -> bool:
-    token = _get_channel_token()
+def _reply_messages(
+    reply_token: str, messages: List[Dict[str, Any]], *, channel: str = "default"
+) -> bool:
+    token = _get_channel_token(channel)
     if not token or not reply_token:
         return False
     url = "https://api.line.me/v2/bot/message/reply"
@@ -156,9 +175,9 @@ def _reply_messages(reply_token: str, messages: List[Dict[str, Any]]) -> bool:
 # ============================================================
 
 
-def push_text(to_line_user_id: str, text: str) -> bool:
+def push_text(to_line_user_id: str, text: str, *, channel: str = "default") -> bool:
     """用 userId 主动推送文字(绑定完成通知 / 异常提醒用)"""
-    token = _get_channel_token()
+    token = _get_channel_token(channel)
     if not token or not to_line_user_id:
         return False
     url = "https://api.line.me/v2/bot/message/push"
@@ -185,13 +204,15 @@ def push_text(to_line_user_id: str, text: str) -> bool:
         return False
 
 
-def start_loading(to_line_user_id: str, loading_seconds: int = 20) -> bool:
+def start_loading(
+    to_line_user_id: str, loading_seconds: int = 20, *, channel: str = "default"
+) -> bool:
     """显示「正在输入…」转圈动画(1:1 聊天 · ≤60s · docs/smart-intake/15 §2)。
 
     收图/调 L2 前立即调,识别完发结果即自动消失。loadingSeconds 取 5 的倍数(API 约束)。
     尽力而为,失败不抛(不得阻塞主流程)。
     """
-    token = _get_channel_token()
+    token = _get_channel_token(channel)
     if not token or not to_line_user_id:
         return False
     secs = max(5, min(60, (int(loading_seconds) // 5) * 5 or 5))
@@ -233,9 +254,11 @@ def create_rich_menu(payload: Dict[str, Any]) -> Optional[str]:
         return None
 
 
-def push_messages(to_line_user_id: str, messages: List[Dict[str, Any]]) -> bool:
+def push_messages(
+    to_line_user_id: str, messages: List[Dict[str, Any]], *, channel: str = "default"
+) -> bool:
     """用 userId 主动推送消息列表(Flex 卡 / 多消息)· OCR 异步结果用(镜像 push_text)。"""
-    token = _get_channel_token()
+    token = _get_channel_token(channel)
     if not token or not to_line_user_id or not messages:
         return False
     url = "https://api.line.me/v2/bot/message/push"
@@ -260,9 +283,11 @@ def push_messages(to_line_user_id: str, messages: List[Dict[str, Any]]) -> bool:
 # ============================================================
 
 
-def _send_messages_meta(url: str, payload_obj: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _send_messages_meta(
+    url: str, payload_obj: Dict[str, Any], *, channel: str = "default"
+) -> List[Dict[str, Any]]:
     """POST 发消息并解析 LINE 返回的 sentMessages(含每条消息 id)。失败 → []。"""
-    token = _get_channel_token()
+    token = _get_channel_token(channel)
     if not token:
         return []
     req = urllib.request.Request(
@@ -291,7 +316,7 @@ def _send_messages_meta(url: str, payload_obj: Dict[str, Any]) -> List[Dict[str,
 
 
 def reply_messages_with_meta(
-    reply_token: str, messages: List[Dict[str, Any]]
+    reply_token: str, messages: List[Dict[str, Any]], *, channel: str = "default"
 ) -> List[Dict[str, Any]]:
     """reply 多条消息,返回 sentMessages [{id, quoteToken}](与 messages 同序)。失败 → []。"""
     if not reply_token or not messages:
@@ -299,11 +324,12 @@ def reply_messages_with_meta(
     return _send_messages_meta(
         "https://api.line.me/v2/bot/message/reply",
         {"replyToken": reply_token, "messages": messages[:5]},
+        channel=channel,
     )
 
 
 def push_messages_with_meta(
-    to_line_user_id: str, messages: List[Dict[str, Any]]
+    to_line_user_id: str, messages: List[Dict[str, Any]], *, channel: str = "default"
 ) -> List[Dict[str, Any]]:
     """push 多条消息,返回 sentMessages [{id, quoteToken}](与 messages 同序)。失败 → []。"""
     if not to_line_user_id or not messages:
@@ -311,6 +337,7 @@ def push_messages_with_meta(
     return _send_messages_meta(
         "https://api.line.me/v2/bot/message/push",
         {"to": to_line_user_id, "messages": messages[:5]},
+        channel=channel,
     )
 
 
@@ -319,13 +346,13 @@ def push_messages_with_meta(
 # ============================================================
 
 
-def get_user_profile(line_user_id: str) -> Optional[Dict[str, Any]]:
+def get_user_profile(line_user_id: str, *, channel: str = "default") -> Optional[Dict[str, Any]]:
     """
     获取 LINE 用户资料。
     返回:{displayName, userId, pictureUrl, statusMessage} 或 None
     只有 Bot 的好友才能查到 · 其他返回 404
     """
-    token = _get_channel_token()
+    token = _get_channel_token(channel)
     if not token or not line_user_id:
         return None
     url = f"https://api.line.me/v2/bot/profile/{line_user_id}"
@@ -353,9 +380,9 @@ def get_user_profile(line_user_id: str) -> Optional[Dict[str, Any]]:
 # ============================================================
 
 
-def download_message_content(message_id: str) -> Optional[bytes]:
+def download_message_content(message_id: str, *, channel: str = "default") -> Optional[bytes]:
     """下载图片 / 视频 / 音频消息的原始字节"""
-    token = _get_channel_token()
+    token = _get_channel_token(channel)
     if not token or not message_id:
         return None
     url = f"https://api-data.line.me/v2/bot/message/{message_id}/content"

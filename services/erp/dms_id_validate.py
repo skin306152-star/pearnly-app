@@ -12,15 +12,18 @@ from __future__ import annotations
 _THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
 
 
+def normalize_thai_id(s: str) -> str:
+    """去噪归一:泰文数字→ASCII、去空格/连字符。存库/查重前用它拿规范值。"""
+    return str(s or "").translate(_THAI_DIGITS).replace(" ", "").replace("-", "")
+
+
 def is_valid_thai_id(s: str) -> bool:
     """13 位泰国公民号 mod-11 校验:前 12 位按权重 13..2 加权求和,
     check = (11 - (sum % 11)) % 10,须等于第 13 位。
 
     容忍空格/连字符/泰文数字;去噪后非「恰好 13 位纯数字」一律 False。
     """
-    if not s:
-        return False
-    digits = str(s).translate(_THAI_DIGITS).replace(" ", "").replace("-", "")
+    digits = normalize_thai_id(s)
     # isascii()+isdigit() 一起用才锁死 0-9(单 isdigit 会放行其它 Unicode 数字)。
     if len(digits) != 13 or not (digits.isascii() and digits.isdigit()):
         return False

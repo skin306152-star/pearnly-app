@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import secrets
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs
@@ -25,11 +24,10 @@ from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
 from services.line_dms import _out, booking_flow, cards, draft, edit_flow, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _thr
+from services.line_dms._out import _CHANNEL, PHONE_RE as _PHONE_RE, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
-_PHONE_RE = re.compile(r"^0\d{8,9}$")
 _RESET_WORD = "เริ่มใหม่"
 
 # 建单/新建时写满的地址块键(与网页 dms-intake-core.js 的 ADDR_KEYS 逐键同形)。
@@ -76,7 +74,7 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
 
     if _PHONE_RE.match(text):
         payload = await _merge_session(
-            binding, line_user_id, {"phone": text}, keep=("id_card", "endpoint_id")
+            binding, line_user_id, {"phone": text}, keep=("id_card", "endpoint_id"), sess=sess
         )
         if payload.get("id_card"):
             _spawn(
@@ -402,10 +400,14 @@ async def _execute(
 
 
 # ── 会话/文案小工具 ─────────────────────────────────────────────────────────
-async def _merge_session(binding: dict, line_user_id: str, add: dict, keep: tuple) -> dict:
-    """并入新料到 collecting 会话:只保留 keep 的旧键(丢弃 reviewing 残留 nonce/diffs)。"""
+async def _merge_session(
+    binding: dict, line_user_id: str, add: dict, keep: tuple, sess: Optional[dict] = None
+) -> dict:
+    """并入新料到 collecting 会话:只保留 keep 的旧键(丢弃 reviewing 残留 nonce/diffs)。
+    调用方已读过会话可经 sess 传入,免二次读。"""
     tenant = binding["tenant_id"]
-    sess = await _thr(store.get_session, tenant, line_user_id)
+    if sess is None:
+        sess = await _thr(store.get_session, tenant, line_user_id)
     old = (sess or {}).get("payload") or {}
     payload = {k: old.get(k) for k in keep if old.get(k)}
     payload.update(add)

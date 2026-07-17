@@ -18,17 +18,17 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
-from services.erp.dms_id_validate import is_valid_thai_id
+from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
 from services.line_binding import line_client
 from services.line_dms import cards, store
-from services.line_dms._out import _CHANNEL, _reply, _thr
+from services.line_dms._out import _CHANNEL, PHONE_RE, _reply, _thr
 
 EDIT_ACTIONS = frozenset({cards.ACT_EDIT, cards.ACT_EDIT_FIELD, cards.ACT_EDIT_CANCEL})
 
 _ADDR_FIELDS = ("house_no", "moo", "soi", "road")
-_EDITABLE_FIELDS = ("name", "people_id", "birthday_be", "phone") + _ADDR_FIELDS
+# 可改字段以卡片菜单为唯一真值源——菜单里有的准入必须放行,防两处清单漂移。
+_EDITABLE_FIELDS = tuple(key for key, _ in cards.EDIT_FIELDS)
 
-_PHONE_RE = re.compile(r"^0\d{8,9}$")
 _BIRTHDAY_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
 _MIN_BE_YEAR = 2400
 
@@ -113,16 +113,19 @@ def _validate(field: Optional[str], text: str) -> Tuple[str, str]:
     """返回 (cleaned, error_text)。error_text 非空 = 打回。"""
     v = (text or "").strip()
     if field == "people_id":
-        norm = v.replace(" ", "").replace("-", "")
-        if len(norm) == 13 and norm.isascii() and norm.isdigit() and is_valid_thai_id(norm):
-            return norm, ""
-        return "", cards.TXT_EDIT_BAD_ID
+        norm = normalize_thai_id(v)
+        return (norm, "") if is_valid_thai_id(norm) else ("", cards.TXT_EDIT_BAD_ID)
     if field == "birthday_be":
+        # 真日历校验(45/99/2569 这类不存在的日期正是 OCR 典型误读);年段按佛历。
         if _BIRTHDAY_RE.match(v) and _MIN_BE_YEAR <= int(v[6:10]) <= _current_be_year():
-            return v, ""
+            try:
+                datetime.strptime(v[:6] + "2000", "%d/%m/%Y")
+                return v, ""
+            except ValueError:
+                pass
         return "", cards.TXT_EDIT_BAD_BIRTHDAY
     if field == "phone":
-        return (v, "") if _PHONE_RE.match(v) else ("", cards.TXT_EDIT_BAD_PHONE)
+        return (v, "") if PHONE_RE.match(v) else ("", cards.TXT_EDIT_BAD_PHONE)
     if field == "name" or field in _ADDR_FIELDS:
         return (v, "") if v else ("", cards.TXT_EDIT_EMPTY)
     return "", cards.TXT_EDIT_EMPTY

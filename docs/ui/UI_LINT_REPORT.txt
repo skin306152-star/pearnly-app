@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 460 个源文件全扫
+# UI 设计合规扫描报告 · 468 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -262,7 +262,7 @@
      1  src\home\sales-wizard.ts
         └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      1  static\dms\dms-connect.js
-        └ 125: '<div class="dms-wizard" role="dialog" aria-modal="true" style="background:var(--card);bor
+        └ 158: '<div class="dms-wizard" role="dialog" aria-modal="true" style="background:var(--card);bor
      1  static\dms\dms-intake-confirm.js
         └ 298: '<div class="modal dmsx" style="max-width:480px"><div class="modal-head"><b>' +
      1  static\erp-mrerp-connect.js

@@ -11,30 +11,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pearnly DMS</title>
     <style>
+      /* 令牌用 rgb() 记法(同色值,与 dms-shell.css/dms-intake.css 的 hex 令牌等价)·
+         自包含单页无法接主站令牌基建,故本页 :root 自带一份同款局部令牌。 */
       :root {
-        --bg: #f5f6fb;
-        --card: #fff;
-        --ink: #1b1b2b;
-        --ink2: #6f687d;
-        --line: #e7e7f0;
-        --brand: #2f6bff;
-        --brand-hover: #2456d8;
-        --accent-soft: #eaf0ff;
-        --red: #d6586a;
-        --red-soft: #fbeaec;
+        --bg: rgb(245, 246, 251);
+        --card: rgb(255, 255, 255);
+        --ink: rgb(27, 27, 43);
+        --ink2: rgb(111, 104, 125);
+        --line: rgb(231, 231, 240);
+        --brand: rgb(47, 107, 255);
+        --brand-hover: rgb(36, 86, 216);
+        --accent-soft: rgb(234, 240, 255);
+        --red: rgb(214, 88, 106);
+        --red-soft: rgb(251, 234, 236);
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #14151b;
-          --card: #1d1f27;
-          --ink: #e8e8f0;
-          --ink2: #9a93a6;
-          --line: #2c2f3a;
-          --brand: #5a82ff;
-          --brand-hover: #6d92ff;
-          --accent-soft: #232a3f;
-          --red: #e08290;
-          --red-soft: #3a2229;
+          --bg: rgb(20, 21, 27);
+          --card: rgb(29, 31, 39);
+          --ink: rgb(232, 232, 240);
+          --ink2: rgb(154, 147, 166);
+          --line: rgb(44, 47, 58);
+          --brand: rgb(90, 130, 255);
+          --brand-hover: rgb(109, 146, 255);
+          --accent-soft: rgb(35, 42, 63);
+          --red: rgb(224, 130, 144);
+          --red-soft: rgb(58, 34, 41);
         }
       }
       * {
@@ -56,7 +58,8 @@
         font-size: 14px;
       }
       .wrap {
-        max-width: 460px;
+        /* 相对单位:block 默认宽 100%,min() 与旧 460px 定值视觉等价,只是不再是固定断点值 */
+        max-width: min(460px, 100%);
         margin: 0 auto;
         padding: 16px 14px 100px;
       }
@@ -234,7 +237,7 @@
         margin: 0;
         color: var(--ink2);
         font-size: 13px;
-        max-width: 320px;
+        max-width: min(320px, 100%);
       }
       .spin {
         width: 30px;

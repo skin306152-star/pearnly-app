@@ -204,6 +204,35 @@ class BrowserSession:
                 pass
         self._ctx = self._browser = self._page = self._pw = None
 
+    def new_isolated_page(self, *, extra_secrets: Optional[List[str]] = None):
+        """Open a second browser CONTEXT (isolated cookie jar) + page on the
+        SAME already-running browser/Playwright instance.
+
+        Never starts a second sync_playwright(): doing that inside a request's
+        worker thread dead-locks ("Sync API inside the asyncio loop"). This is
+        the seam for a second login (e.g. an admin credential set) whose DMS
+        session must NOT share cookies with this session's page — context-level
+        isolation guarantees the two logins can't bleed into each other.
+
+        Returns (context, page); the caller owns closing the returned context.
+        Secrets in `extra_secrets` are merged into the redaction filter so the
+        second session's creds never reach logs either."""
+        if self._browser is None:
+            raise RuntimeError("BrowserSession used outside `with` block")
+        if extra_secrets:
+            install_redact_filter(
+                logger, list(self.redact_strings) + [s for s in extra_secrets if s]
+            )
+        ctx = self._browser.new_context(
+            viewport={"width": self.viewport_width, "height": self.viewport_height},
+            locale=self.locale,
+            accept_downloads=True,
+        )
+        ctx.add_init_script(SDPT_INIT_SCRIPT)
+        page = ctx.new_page()
+        page.on("dialog", self._on_dialog)
+        return ctx, page
+
     def _on_dialog(self, dialog) -> None:
         msg = (dialog.message or "")[:500]
         self._dialogs.append(f"[{dialog.type}] {msg}")

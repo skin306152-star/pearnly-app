@@ -151,7 +151,9 @@ class MrerpDmsAdapter:
         self.slow_mo_ms = max(0, int(slow_mo_ms))
         self._session: Optional[BrowserSession] = None
         self._logged_in = False
-        self._admin_session: Optional[BrowserSession] = None
+        # admin 会话不再自开浏览器:复用用户会话的同一 Browser,只多开一个隔离 context。
+        self._admin_ctx: Any = None
+        self._admin_page: Any = None
         self._admin_logged_in = False
 
     @property
@@ -209,12 +211,13 @@ class MrerpDmsAdapter:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        if self._admin_session is not None:
+        if self._admin_ctx is not None:
             try:
-                self._admin_session.__exit__(exc_type, exc, tb)
+                self._admin_ctx.close()
             except Exception:
                 pass
-        self._admin_session = None
+        self._admin_ctx = None
+        self._admin_page = None
         self._admin_logged_in = False
         if self._session is not None:
             self._session.__exit__(exc_type, exc, tb)
@@ -239,29 +242,26 @@ class MrerpDmsAdapter:
     def _admin_writer_transport(self) -> PlaywrightTransport:
         """懒起 admin 会话并返回其 transport(首次写操作时触发)。"""
         self._ensure_admin_session()
-        assert self._admin_session is not None  # _ensure 成功后必非空
-        return PlaywrightTransport(self._admin_session.page.context.request)
+        assert self._admin_page is not None  # _ensure 成功后必非空
+        return PlaywrightTransport(self._admin_page.context.request)
 
     def _ensure_admin_session(self) -> None:
-        """独立浏览器上下文登录 admin 凭据组(隔离 cookie,不碰用户读会话)。
+        """在用户会话【同一个】运行中的 Browser 上多开一个隔离 context 登录 admin
+        凭据组 —— 绝不在同线程再起第二个 sync_playwright(那会死锁:"Sync API
+        inside the asyncio loop")。context 级隔离保证 admin 与 user 登录态不互串。
         admin 登录失败 → MrerpDmsAdminAuthError(路由映射 ERR_DMS_ADMIN_AUTH)。"""
         if self._admin_logged_in:
             return
         if not self.has_admin_creds:
             raise MrerpDmsTechnicalError("admin session requested without admin credentials")
+        if self._session is None:
+            raise MrerpDmsTechnicalError("admin session requested outside `with` block")
         secrets = [self._admin_password]
         if len(self._admin_username) >= 3:
             secrets.append(self._admin_username)
-        self._admin_session = BrowserSession(
-            headless=self.headless,
-            screenshot_dir=self.screenshot_dir,
-            redact_strings=secrets,
-            slow_mo_ms=self.slow_mo_ms,
-        ).__enter__()
+        self._admin_ctx, self._admin_page = self._session.new_isolated_page(extra_secrets=secrets)
         try:
-            self._perform_login(
-                self._admin_session.page, self._admin_username, self._admin_password
-            )
+            self._perform_login(self._admin_page, self._admin_username, self._admin_password)
         except MrerpDmsAuthError as e:
             raise MrerpDmsAdminAuthError(f"DMS admin credential login failed: {e}")
         self._admin_logged_in = True

@@ -273,12 +273,118 @@ async function verifyDmsSpa(browser) {
     console.log('Part B: PASS');
 }
 
+// 共用 stub:门禁通过 + 一个已配 admin 的 mrerp_dms 端点 + LINE 未绑定态。
+async function stubDmsSpaRoutes(page) {
+    await page.addInitScript(() => {
+        localStorage.setItem('mrpilot_token', 'faketoken');
+        localStorage.setItem('mrpilot_lang', 'th');
+    });
+    await page.route('**/api/dms/session', (route) => route.fulfill({ json: { ok: true } }));
+    await page.route('**/api/erp/endpoints', (route) =>
+        route.fulfill({
+            json: {
+                items: [
+                    {
+                        id: 'ep1',
+                        adapter: 'mrerp_dms',
+                        enabled: true,
+                        config: { id_card_auto_push: true, admin_username_enc: 'gAAAAA-fake' },
+                    },
+                ],
+            },
+        })
+    );
+    await page.route('**/api/dms/line/binding', (route) =>
+        route.fulfill({ json: { bound: false, display_name: null, bound_at: null } })
+    );
+    await page.route('**/api/dms/line/bind-code', (route) => {
+        const exp = new Date(Date.now() + 9 * 60000 + 59000).toISOString();
+        route.fulfill({ json: { code: '482913', expires_at: exp } });
+    });
+}
+
+// ── Part C: R1 追加 · LINE 绑定卡桌面端(≥768px)收窄验证(1280 宽)+ 手机端(390)不变复核。
+async function verifyLineCardWidths(browser) {
+    console.log('== Part C: LINE card width (desktop narrow / mobile unchanged) ==');
+
+    // C1) 桌面 1280×900:卡片本身跟着宽容器拉满,但码框 + 按钮应收窄到 <=400px 列宽。
+    const deskCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const deskPage = await deskCtx.newPage();
+    await stubDmsSpaRoutes(deskPage);
+    await deskPage.goto(`http://localhost:${PORT}/static/dist/dms.html`);
+    await deskPage.waitForSelector('.dms-line-card', { timeout: 8000 });
+    await deskPage.locator('#dms-line-gen-btn').click();
+    await deskPage.waitForSelector('.dms-line-code', { timeout: 5000 });
+
+    const cardBox = await deskPage.locator('.dms-line-card').boundingBox();
+    const zoneBox = await deskPage.locator('#dms-line-code-zone').boundingBox();
+    const genBox = await deskPage.locator('#dms-line-gen-btn').boundingBox();
+    assert(
+        cardBox.width > 600,
+        'desktop card itself is wide (unconstrained), got ' + cardBox.width
+    );
+    assert(
+        zoneBox.width <= 410,
+        'code zone narrowed to ~400px column on desktop, got ' + zoneBox.width
+    );
+    assert(
+        genBox.width <= 410,
+        'regenerate button narrowed to ~400px column on desktop, got ' + genBox.width
+    );
+    // 左对齐随卡内文案:码框左边不应比卡片本身左边内边距差太多(不是被居中推到中间)。
+    assert(
+        zoneBox.x - cardBox.x < 40,
+        'code zone stays left-aligned with card padding, offset=' + (zoneBox.x - cardBox.x)
+    );
+    await shot(deskPage, '10-desktop-1280-line-card-narrowed.png');
+    await deskCtx.close();
+    console.log(
+        '  desktop: card=' +
+            cardBox.width.toFixed(0) +
+            'px, code-zone=' +
+            zoneBox.width.toFixed(0) +
+            'px, button=' +
+            genBox.width.toFixed(0) +
+            'px'
+    );
+
+    // C2) 手机 390×844:同一套 stub,确认没有被桌面 @media 误伤,依旧全宽贴满卡片。
+    const mobCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const mobPage = await mobCtx.newPage();
+    await stubDmsSpaRoutes(mobPage);
+    await mobPage.goto(`http://localhost:${PORT}/static/dist/dms.html`);
+    await mobPage.waitForSelector('.dms-line-card', { timeout: 8000 });
+    await mobPage.locator('#dms-line-gen-btn').click();
+    await mobPage.waitForSelector('.dms-line-code', { timeout: 5000 });
+    const mobCardBox = await mobPage.locator('.dms-line-card').boundingBox();
+    const mobZoneBox = await mobPage.locator('#dms-line-code-zone').boundingBox();
+    assert(
+        mobZoneBox.width > mobCardBox.width - 40,
+        'mobile code zone still fills the card (unaffected by desktop @media), zone=' +
+            mobZoneBox.width +
+            ' card=' +
+            mobCardBox.width
+    );
+    await shot(mobPage, '11-mobile-390-line-card-unchanged.png');
+    await mobCtx.close();
+    console.log(
+        '  mobile: card=' +
+            mobCardBox.width.toFixed(0) +
+            'px, code-zone=' +
+            mobZoneBox.width.toFixed(0) +
+            'px'
+    );
+
+    console.log('Part C: PASS');
+}
+
 (async () => {
     const server = serve();
     const browser = await chromium.launch();
     try {
         await verifyPickPanel(browser);
         await verifyDmsSpa(browser);
+        await verifyLineCardWidths(browser);
         console.log('\nALL DL-4b CHECKS PASSED');
     } finally {
         await browser.close();

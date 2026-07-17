@@ -106,7 +106,7 @@
             esc(t('dms-line-step3')) +
             '</li></ol>' +
             friendLinkHtml() +
-            '<div id="dms-line-code-zone">' +
+            '<div id="dms-line-code-zone" class="dms-line-code-zone">' +
             codeZone +
             '</div>' +
             '<button type="button" class="btn primary dms-line-gen" id="dms-line-gen-btn">' +

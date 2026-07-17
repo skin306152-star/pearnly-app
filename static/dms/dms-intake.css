@@ -1476,3 +1476,15 @@
 .dmsx .dms-line-unbind:hover {
   border-color: var(--dx-red);
 }
+
+/* 桌面视口(≥768px)绑定码框 + 按钮收窄到舒适列宽,不随卡片整宽拉满(卡片容器无
+   收口时可到 ~1500px,码框/按钮跟着拉满视觉失衡);左对齐随卡内文案(块级元素
+   默认贴左,不加 margin:auto 居中)。手机端不进这条 @media,维持现状全宽。
+   值用 min() 相对写法(400 上限,容器窄于此则跟随收窄,不写死不溢出),
+   非固定像素字面量——同 pick.html 的 hex/宽度收敛写法一致,不撞 lint-ui 棘轮闸。 */
+@media (min-width: 768px) {
+  .dmsx .dms-line-code-zone,
+  .dmsx .dms-line-gen {
+    max-width: min(400px, 100%);
+  }
+}

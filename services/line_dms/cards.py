@@ -33,6 +33,29 @@ BTN_RESTART = "เริ่มใหม่"
 BTN_UPDATE = "อัปเดตข้อมูล"
 BTN_KEEP = "ใช้ข้อมูลเดิม"
 BTN_NEW_CUSTOMER = "ลูกค้าใหม่"
+BTN_EDIT = "แก้ไข"
+BTN_EDIT_CANCEL = "ยกเลิก"
+
+# 逐字段修正(DL-6):可改字段与地道泰文标签(顺序 = quick reply 呈现顺序)。
+# 地理四级 id(จังหวัด/อำเภอ/ตำบล/รหัสไปรษณีย์)不进此表——改地址文本后由既有级联匹配重解。
+EDIT_FIELDS = (
+    ("name", "ชื่อ-นามสกุล"),
+    ("people_id", "เลขบัตรประชาชน"),
+    ("birthday_be", "วันเกิด"),
+    ("phone", "เบอร์โทร"),
+    ("house_no", "บ้านเลขที่"),
+    ("moo", "หมู่"),
+    ("soi", "ซอย"),
+    ("road", "ถนน"),
+)
+_EDIT_LABELS = dict(EDIT_FIELDS)
+
+TXT_EDIT_PICK = "ต้องการแก้ไขข้อมูลใด"
+TXT_EDIT_CANCELLED = "ยกเลิกการแก้ไขแล้ว"
+TXT_EDIT_BAD_ID = "เลขบัตรประชาชนไม่ถูกต้อง กรุณาพิมพ์เลข 13 หลักให้ถูกต้อง"
+TXT_EDIT_BAD_BIRTHDAY = "วันเกิดไม่ถูกต้อง กรุณาพิมพ์เป็น วว/ดด/ปปปป (พ.ศ.)"
+TXT_EDIT_BAD_PHONE = "เบอร์โทรไม่ถูกต้อง กรุณาพิมพ์เบอร์ 9-10 หลักขึ้นต้นด้วย 0"
+TXT_EDIT_EMPTY = "กรุณาพิมพ์ข้อมูลให้ครบถ้วน"
 
 # 动作名(flow 侧 dispatch 用同一常量,避免拼写漂移)
 ACT_CREATE = "create_new"
@@ -40,6 +63,10 @@ ACT_UPDATE = "update"
 ACT_KEEP = "keep"
 ACT_RESET = "reset"
 ACT_PICK = "pick"
+# 逐字段修正(DL-6):卡上 [แก้ไข] 开菜单 → 选字段 → 收新值 → 重跑查重。
+ACT_EDIT = "edit"
+ACT_EDIT_FIELD = "edit_field"
+ACT_EDIT_CANCEL = "edit_cancel"
 # 订车阶段(DL-4a):选车面板落定后的预览确认(booking_flow 侧 dispatch)。
 ACT_CONFIRM_BOOKING = "confirm_booking"
 ACT_CANCEL_BOOKING = "cancel_booking"
@@ -73,6 +100,28 @@ _MAX_CANDIDATES = 4  # 候选卡按钮上限(LINE bubble 体积约束)
 def _data(action: str, **kw: str) -> str:
     """postback data 编码:action + 可选 nonce/cid。querystring 稳定可核对。"""
     return urlencode({"action": action, **{k: v for k, v in kw.items() if v}})
+
+
+def _qr_item(label: str, data: str) -> Dict[str, Any]:
+    """quick reply 动作项(postback · data 编码 action+nonce+field)。"""
+    return {
+        "type": "action",
+        "action": {"type": "postback", "label": label, "data": data, "displayText": label},
+    }
+
+
+def edit_menu_message(nonce: str) -> Dict[str, Any]:
+    """[แก้ไข] 展开的字段选择(quick reply)· 每项带 field 键 + 当前 nonce,末项取消。"""
+    items = [
+        _qr_item(label, _data(ACT_EDIT_FIELD, nonce=nonce, field=key)) for key, label in EDIT_FIELDS
+    ]
+    items.append(_qr_item(BTN_EDIT_CANCEL, _data(ACT_EDIT_CANCEL, nonce=nonce)))
+    return {"type": "text", "text": TXT_EDIT_PICK, "quickReply": {"items": items}}
+
+
+def edit_prompt(field: str) -> str:
+    """选中字段后的输入提示:พิมพ์ค่าใหม่ของ<字段名>。"""
+    return f"พิมพ์ค่าใหม่ของ{_EDIT_LABELS.get(field, field)}"
 
 
 def _btn(label: str, data: str, style: str = "primary") -> Dict[str, Any]:
@@ -142,6 +191,7 @@ def new_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
     ]
     footer = [
         _btn(BTN_SAVE_NEW, _data(ACT_CREATE, nonce=nonce), "primary"),
+        _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),
         _btn(BTN_RESTART, _data(ACT_RESET), "secondary"),
     ]
     return _bubble("ลูกค้าใหม่ ยืนยันข้อมูลเพื่อบันทึก", rows, footer, "ยืนยันบันทึกลูกค้าใหม่")
@@ -190,6 +240,7 @@ def diff_card(display_diffs: List[Dict[str, str]], has_admin: bool, nonce: str) 
                 "wrap": True,
             }
         )
+    footer.append(_btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"))
     footer.append(_btn(BTN_KEEP, _data(ACT_KEEP), "secondary"))
     return _bubble("พบข้อมูลเดิม มีบางส่วนไม่ตรงกัน", rows, footer, "พบข้อมูลลูกค้าที่ต่างกัน")
 

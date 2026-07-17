@@ -24,7 +24,7 @@ from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
-from services.line_dms import _out, booking_flow, cards, draft, store
+from services.line_dms import _out, booking_flow, cards, draft, edit_flow, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
@@ -64,9 +64,14 @@ def handle_image(binding: dict, line_user_id: str, message_id: str) -> None:
 async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: str) -> None:
     """绑定用户发文字:เริ่มใหม่ 重置 / 手机号 / 其余按当前态追料。"""
     tenant = binding["tenant_id"]
-    if text == _RESET_WORD:
+    if text == _RESET_WORD:  # 全局重置优先于 editing 态
         await _thr(store.clear_session, tenant, line_user_id)
         _reply(reply_token, cards.TXT_RESET)
+        return
+
+    sess = await _thr(store.get_session, tenant, line_user_id)
+    if (sess or {}).get("state") == "editing":  # 逐字段修正:下一条文本 = 新值
+        await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
         return
 
     if _PHONE_RE.match(text):
@@ -88,7 +93,7 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
             _reply(reply_token, cards.TXT_ASK_CARD)
         return
 
-    _reply(reply_token, _nudge(await _thr(store.get_session, tenant, line_user_id)))
+    _reply(reply_token, _nudge(sess))
 
 
 async def handle_postback(
@@ -111,6 +116,11 @@ async def handle_postback(
 
     sess = await _thr(store.get_session, tenant, line_user_id)
     payload = (sess or {}).get("payload") or {}
+
+    # 逐字段修正(DL-6):开菜单/选字段/取消。nonce 只校验不消费,写档仍由下方 consume_nonce 守卫。
+    if action in edit_flow.EDIT_ACTIONS:
+        await edit_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
+        return
 
     if action == cards.ACT_KEEP:
         _reply(reply_token, cards.TXT_KEEP)
@@ -244,6 +254,9 @@ async def _run_dedup(
         "endpoint_id": str(ep.get("id") or ""),
         "nonce": nonce,
         "field_diffs": [],  # 默认无差异;exact_diff 分支覆写为真实 diffs。
+        # 逐字段修正(DL-6)按此重跑查重:留原始 id_card/phone 作重放源,改值后回灌此路。
+        "id_card": id_card,
+        "phone": phone,
     }
 
     if scenario == "none":

@@ -47,12 +47,17 @@
                 return call('POST', '/api/ai/front-desk/confirm', body);
             },
             // 重建消息流(该租户按客户筛的合同倒序)。limit 缺省 50,同后端默认口径。
-            // clientId 传 null/undefined 时不筛(全租户),也用作闸探针(GET limit=1)。
+            // clientId 传 null/undefined 时不筛(全租户)。
             getDeskFeed: function (clientId, limit) {
                 var qs = '?limit=' + encodeURIComponent(limit || 50);
                 if (clientId != null && clientId !== '')
                     qs += '&client_id=' + encodeURIComponent(clientId);
                 return call('GET', '/api/ai/front-desk/feed' + qs);
+            },
+            // 闸探针专用(S4 · 2026-07-17):/status 不走闸 404,闸关也回 {enabled:false}——
+            // 此前拿 feed 当探针,闸关用户每开一次 /ai 就往 console 砸一条 404。
+            getDeskStatus: function () {
+                return call('GET', '/api/ai/front-desk/status');
             },
         };
     }

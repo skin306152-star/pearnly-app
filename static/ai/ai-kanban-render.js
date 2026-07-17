@@ -51,14 +51,11 @@
     function cardHtml(entry, options) {
         var hotClass = entry.column === 'review' ? ' hot' : '';
         var summaryText = at(entry.summary.key, entry.summary.vars);
-        // R2F-R3:开单控件恒显——见 AI.board.needsOpenControl 注释(不再判「当期是否
-        // 已有单」,任何卡片都能就地开/打开任意历史账期单,选中已有期后端幂等回既有单)。
-        // J-8:默认选中期跟卡片自己的工单账期走,不是恒定当月。
-        var openBtn = openOrderHtml(
-            entry.client.id,
-            options,
-            entry.order ? entry.order.period : null
-        );
+        // 2026-07-17 Zihao 真机实测拍板(推翻 R2F-R3「常显」):本期已有工单的卡不再渲染
+        // 账期下拉+开单——活工单卡上挂开单控件像在邀请再开一张,实测点出第二张单的困惑;
+        // 补开历史月的入口是客户档案 → 工单历史(既有),不缺路。无本期工单的卡保留控件,
+        // 开单默认当月(periodOptions 首项)。
+        var openBtn = entry.order ? '' : openOrderHtml(entry.client.id, options, null);
         // tabindex=0:卡片 Tab 可达(Enter/空格触发同点击,见 wireBoard);
         // title:名称/摘要窄卡被省略号截断时悬停可看全文(Canon §6.2)。
         // P0-2:卡片携带的工单期(entry.order 是该客户最新一期,可能不是当月)——点卡

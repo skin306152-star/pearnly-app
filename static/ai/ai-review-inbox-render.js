@@ -19,9 +19,24 @@
 
     // ============ 待审工单卡(签批闭环三步按钮化) ============
 
+    // 浏览器本地今天(YYYY-MM-DD):逾期是展示级判断非钱路径,不追时区精度(§5 拍板)。
+    function localTodayIso() {
+        var t = new Date();
+        return (
+            t.getFullYear() +
+            '-' +
+            ('0' + (t.getMonth() + 1)).slice(-2) +
+            '-' +
+            ('0' + t.getDate()).slice(-2)
+        );
+    }
+
+    // 到期日 < 今天标红(Canon §三:到期压力是「要你处理」的必带件,此前逾期无任何视觉)。
     function dueLine(order) {
         var d = order.next_due_efiling || order.next_due_paper;
-        return d ? esc(at('riq_wo_due', { date: d })) : esc(at('riq_wo_due_none'));
+        if (!d) return esc(at('riq_wo_due_none'));
+        var txt = esc(at('riq_wo_due', { date: d }));
+        return String(d) < localTodayIso() ? '<span class="riq-overdue">' + txt + '</span>' : txt;
     }
 
     // 徽章数只数未决件(清单 #4):裁决落库不改 item.status,引擎重跑前 count 不掉,照显总数
@@ -93,11 +108,13 @@
         ui = ui || {};
         var blocked = order.status !== 'review'; // stuck(还有待裁决)不给签批,避免签个空
         var gate = sodGate(order, ui);
+        // 按钮层级(§5 · 2026-07-17):高频动作「复核通过」当主态;「签批冻结」是低频
+        // 收尾动作,降回普通钮——此前主态挂在冻结上,把人往终局动作上引。逻辑零改动。
         var signoffBtn = ui.signedNote
             ? '<span class="chip g">' + esc(ui.signedNote) + '</span>'
             : gate.hideSignoff
               ? ''
-              : '<button type="button" class="btn sm" data-action="riq-signoff" data-wo="' +
+              : '<button type="button" class="btn sm pri" data-action="riq-signoff" data-wo="' +
                 order.work_order_id +
                 '"' +
                 (blocked || ui.signoffBusy ? ' disabled' : '') +
@@ -108,7 +125,7 @@
             ? '<span class="chip g">' + esc(ui.archivedNote) + '</span>'
             : !gate.archiveAllowed
               ? ''
-              : '<button type="button" class="btn sm pri" data-action="riq-archive" data-wo="' +
+              : '<button type="button" class="btn sm" data-action="riq-archive" data-wo="' +
                 order.work_order_id +
                 '"' +
                 (blocked || ui.archiveBusy ? ' disabled' : '') +
@@ -326,6 +343,16 @@
             .join('');
     }
 
+    // 分组头人话副行(§5 · 2026-07-17):黑话组名(勾稽红灯/方向不明…)下补一句大白话
+    // 说清「为什么要人管 + 该干什么」。flag_reason 可能带冒号后缀(band 等),同
+    // flagReasonKey 取冒号前段;词典没这条(如 ocr_error)整行不渲染,不硬编。
+    function groupExplHtml(flagReason) {
+        var key = 'riq_expl_' + String(flagReason || '').split(':')[0];
+        var text = at(key);
+        if (text === key) return '';
+        return '<div class="riq-expl">' + esc(text) + '</div>';
+    }
+
     function groupHtml(group, ui, archivedIds) {
         ui = ui || {};
         archivedIds = archivedIds || {};
@@ -347,6 +374,7 @@
             esc(group.flagReason) +
             '">' +
             groupHeaderHtml(group, canBulk, ui.busy, actionableCount) +
+            groupExplHtml(group.flagReason) +
             '<div class="bd"><div class="riq-items">' +
             itemsHtml +
             '</div>' +

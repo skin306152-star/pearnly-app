@@ -213,24 +213,53 @@
 
     function applyFilters(container, matrix, activeFilters, searchQuery) {
         var todayIso = new Date().toISOString().slice(0, 10);
+        var visible = 0;
         container.querySelectorAll('.mx-row').forEach(function (row) {
             var clientId = row.getAttribute('data-client-id');
             var name = row.getAttribute('data-name') || '';
             var matchesSearch = !searchQuery || name.indexOf(searchQuery) >= 0;
             var matchesFilter = rowMatchesFilters(matrix, clientId, activeFilters, todayIso);
-            row.style.display = matchesSearch && matchesFilter ? '' : 'none';
+            var show = matchesSearch && matchesFilter;
+            row.style.display = show ? '' : 'none';
+            if (show) visible += 1;
         });
+        renderNoResults(container, visible);
     }
 
-    // 事件委托:点客户名/整行导航进客户页;点格子里的按钮(有工单的格子)同样导航
-    // (进客户页比在矩阵里深挖单张义务更符合"矩阵是总览,细节在客户页"的分工);
-    // checkbox 变化交调用方(ai-matrix.js)算勾选合计,这里只负责不让它冒泡触发导航。
+    // 筛选/搜索命中 0 行时表格只剩一排表头,像坏了(2026-07-17 实测):表格容器后补一块
+    // 标准空态 + 「清除筛选」按钮(清理逻辑在 ai-matrix.js::clearAllFilters);有结果时
+    // 移除。没有 .mx-table(客户为 0 走整块空态)不注入,免得两个空态叠着。
+    function renderNoResults(container, visibleCount) {
+        var existing = container.querySelector('.mx-noresults');
+        if (visibleCount > 0 || !container.querySelector('.mx-table')) {
+            if (existing) existing.remove();
+            return;
+        }
+        if (existing) return;
+        var node = document.createElement('div');
+        node.className = 'mx-noresults';
+        node.innerHTML =
+            AI.state.emptyHtml({ title: at('mx_no_results'), sub: at('mx_no_results_sub') }) +
+            '<button type="button" class="btn sm" data-action="clear-filters">' +
+            esc(at('mx_clear_filters')) +
+            '</button>';
+        container.appendChild(node);
+    }
+
+    // 事件委托:点客户名/格子按钮/整行任意处都导航进客户页(进客户页比在矩阵里深挖
+    // 单张义务更符合"矩阵是总览,细节在客户页"的分工);checkbox 列整格豁免——勾选
+    // 批量开单不能顺手把人导航走。checkbox 变化交调用方(ai-matrix.js)算勾选合计。
     function wireTable(container, onOpenClient, onCheckChange) {
         container.addEventListener('click', function (e) {
-            if (e.target.closest('.mx-check')) return;
+            if (e.target.closest('input[type="checkbox"], .mx-check-cell')) return;
             var trigger = e.target.closest('[data-action="open-client"],[data-action="open-cell"]');
-            if (!trigger) return;
-            onOpenClient(trigger.getAttribute('data-client-id'));
+            if (trigger) {
+                onOpenClient(trigger.getAttribute('data-client-id'));
+                return;
+            }
+            // 兜底:整行可点(2026-07-17 实测——客户名以外的大片行面积点了没反应,像死的)。
+            var row = e.target.closest('.mx-row');
+            if (row) onOpenClient(row.getAttribute('data-client-id'));
         });
         container.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter' && e.key !== ' ') return;

@@ -32,30 +32,30 @@
         return (window.AII18N && window.AII18N.lang) || 'zh';
     }
 
-    // 统计卡三格从矩阵响应现算,不额外拉 listOrders(matrix.cells 已含 order_status)——
-    // 待你处理=至少一格 pending_review 的客户数,AI 处理中=至少一格 in_progress 的客户数,
-    // 与看板子视图(ai-dashboard.js)的定义各自独立现算,口径不强求逐字节一致(两个
-    // 子视图统计对象不同:看板按"最新一期一张单"计,矩阵按"本期任一义务格子"计)。
+    // 客户数/AI 处理中仍从矩阵响应现算;「待你处理」不再按「至少一格 pending_review 的
+    // 客户数」推——该口径与 #/pool 实测同屏打架(2026-07-17:矩阵数出 0,pool 里却躺着
+    // 1 张 stuck 单,用户不知道信谁),废除,改与 #/pool 同源(loadPendingStat)。
     function renderStats(matrix) {
-        var byClient = {};
+        var running = {};
         (matrix.cells || []).forEach(function (c) {
-            var s =
-                byClient[c.client_id] ||
-                (byClient[c.client_id] = { pending: false, running: false });
-            if (c.badge === 'pending_review') s.pending = true;
-            if (c.badge === 'in_progress') s.running = true;
-        });
-        var pending = 0;
-        var running = 0;
-        Object.keys(byClient).forEach(function (k) {
-            if (byClient[k].pending) pending++;
-            if (byClient[k].running) running++;
+            if (c.badge === 'in_progress') running[c.client_id] = true;
         });
         $('statClientsV').textContent = String((matrix.clients || []).length);
-        $('statPendingV').textContent = String(pending);
-        $('statRunningV').textContent = String(running);
+        $('statRunningV').textContent = String(Object.keys(running).length);
         $('sumPeriodV').textContent = matrix.period || '—';
         $('sumPeriod').style.display = '';
+    }
+
+    // 「待你处理」胶囊与 #/pool 同一数据源(review-queue),计数口径在
+    // AI.board.pendingReviewCount。拉不到显 '—' 不臆造。
+    function loadPendingStat(api) {
+        api.getReviewQueue()
+            .then(function (queue) {
+                $('statPendingV').textContent = String(AI.board.pendingReviewCount(queue));
+            })
+            .catch(function () {
+                $('statPendingV').textContent = '—';
+            });
     }
 
     function periodOptionsHtml(selected) {
@@ -145,6 +145,22 @@
                 $('matrixPeriodMenu').classList.remove('on');
             }
         });
+        // Esc 关下拉(§2 死路批):点外面能关,键盘也得能关。
+        document.addEventListener('keydown', function (e) {
+            var menu = $('matrixPeriodMenu');
+            if (e.key === 'Escape' && menu.classList.contains('on')) menu.classList.remove('on');
+        });
+    }
+
+    // 空态「清除筛选」:S.filters、筛选 chip 高亮、搜索框三处一起清——只清数据态留着
+    // 高亮 chip 就是状态撒谎。
+    function clearAllFilters() {
+        S.filters = [];
+        document.querySelectorAll('#matrixFilters .mf-chip').forEach(function (btn) {
+            btn.classList.remove('on');
+        });
+        $('searchInput').value = '';
+        applyFiltersAndSearch();
     }
 
     function runBulkOpen() {
@@ -199,6 +215,9 @@
                 },
                 updateBulkButton
             );
+            body.addEventListener('click', function (e) {
+                if (e.target.closest('[data-action="clear-filters"]')) clearAllFilters();
+            });
             S.wired = true;
         }
         updateBulkButton();
@@ -206,6 +225,7 @@
 
     function load(api) {
         S.api = api;
+        loadPendingStat(api);
         var body = $('matrixBody');
         if (!body.querySelector('.mx-table')) body.innerHTML = AI.state.loadingHtml();
         return api

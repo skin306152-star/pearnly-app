@@ -103,6 +103,18 @@
 .riq-group-hd h3 {
   flex-wrap: wrap;
 }
+/* 分组头人话副行(§5 · 2026-07-17):一句大白话说清这组为什么要人管,小字弱化不抢层级。 */
+.riq-expl {
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.5;
+  padding: 6px 20px 0;
+}
+/* 逾期红标(Canon §三:到期压力是「要你处理」的必带件)。 */
+.riq-overdue {
+  color: var(--crit);
+  font-weight: 600;
+}
 .riq-group-bulk {
   font-size: 12px;
 }

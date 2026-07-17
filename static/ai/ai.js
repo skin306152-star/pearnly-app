@@ -25,6 +25,12 @@
         document.querySelectorAll('[data-at-ph]').forEach(function (el) {
             el.placeholder = at(el.getAttribute('data-at-ph'));
         });
+        // 手机窄栏侧栏只剩图标没有字:title 回填让悬停/长按至少知道是什么。语言切换走
+        // 整页 reload(ai-settings.js)重进 boot() → 本函数,四语都跟得上。
+        document.querySelectorAll('.snav a').forEach(function (a) {
+            var span = a.querySelector('span');
+            if (span && span.textContent) a.title = span.textContent;
+        });
     }
 
     // Z1-a 之前 boot() 只跑一次,renderChrome() 的 addEventListener 从不重复挂载;现在
@@ -115,6 +121,19 @@
         $('vtBoard').addEventListener('click', function () {
             window.location.hash = AI.router.buildBoardHash();
         });
+        // 顶部统计胶囊可点(2026-07-17 死点击批):数字指到哪就跳到哪——待你处理 →
+        // #/pool、客户数 → 客户目录、AI 处理中 → 看板;账期胶囊纯展示不挂。
+        wirePillClick('statPendingV', AI.router.buildPoolHash);
+        wirePillClick('statClientsV', AI.router.buildClientsHash);
+        wirePillClick('statRunningV', AI.router.buildBoardHash);
+    }
+
+    function wirePillClick(valueId, buildHash) {
+        var pill = $(valueId).closest('.sum-pill');
+        if (!pill) return;
+        pill.addEventListener('click', function () {
+            window.location.hash = buildHash();
+        });
     }
 
     // 顶层独立视图(与工作台平级)→ 面包屑只显示栏目名(v5 §五2:不再假装挂在
@@ -142,28 +161,42 @@
         return '<span class="cur">' + label + '</span>';
     }
 
+    // 面包屑按来路(2026-07-17 Zihao 实测拍板):从工作台/待我处理点进客户页,根段却写死
+    // 「客户」,点回去落到没来过的客户目录。onRoute 记住来路 hub,客户两页的根段 label
+    // 与回跳都跟它走;深链/刷新无 prev 保持默认客户目录。
+    var clientOriginHub = 'clients';
+
+    function crumbHub() {
+        if (clientOriginHub === 'dashboard') {
+            return { label: at('nav_dash'), hash: AI.router.buildDashboardHash() };
+        }
+        if (clientOriginHub === 'pool') {
+            return { label: at('nav_todo'), hash: AI.router.buildPoolHash() };
+        }
+        return { label: at('nav_clients'), hash: AI.router.buildClientsHash() };
+    }
+
     function setCrumb(route) {
         var crumb = $('crumb');
         if (route.name === 'client-archive') {
+            var hub = crumbHub();
             crumb.innerHTML =
-                '<a data-back-clients>' +
-                at('nav_clients') +
-                '</a> / ' +
-                crumbCur(at('crumb_archive'));
-            wireBack(crumb.querySelector('[data-back-clients]'), AI.router.buildClientsHash());
+                '<a data-back-hub>' + hub.label + '</a> / ' + crumbCur(at('crumb_archive'));
+            wireBack(crumb.querySelector('[data-back-hub]'), hub.hash);
             return;
         }
         if (route.name === 'client') {
             // 客户名异步到手:同客户回访 crumbName 即刻给真名,首访先挂「客户」占位,
             // ai-client.js 拉到身份后补写 #crumbClientCur(用户数据,必须转义)。
+            var clientHub = crumbHub();
             var known = window.AI.client && AI.client.crumbName(route.clientId);
             crumb.innerHTML =
-                '<a data-back-clients>' +
-                at('nav_clients') +
+                '<a data-back-hub>' +
+                clientHub.label +
                 '</a> / <span class="cur" id="crumbClientCur">' +
                 AI.state.esc(known || at('title_client')) +
                 '</span>';
-            wireBack(crumb.querySelector('[data-back-clients]'), AI.router.buildClientsHash());
+            wireBack(crumb.querySelector('[data-back-hub]'), clientHub.hash);
             return;
         }
         crumb.innerHTML = crumbCur(at(CRUMB_LABEL_KEY[route.name] || 'crumb_dash'));
@@ -207,6 +240,17 @@
         // 离开客户池页收它的一次性 toast(不挂在 v-pool 子树里,同 pkg 证据模态框先例)。
         if (prevRoute && prevRoute.name === 'pool' && route.name !== 'pool' && window.AI.pool) {
             AI.pool.onLeave();
+        }
+        // 进客户两页时记来路 hub(见 clientOriginHub 注释);客户页内部互跳(client 与
+        // client-archive 之间/切 tab)不改写,保持最初的来路。
+        if (
+            (route.name === 'client' || route.name === 'client-archive') &&
+            prevRoute &&
+            (prevRoute.name === 'dashboard' ||
+                prevRoute.name === 'pool' ||
+                prevRoute.name === 'clients')
+        ) {
+            clientOriginHub = prevRoute.name;
         }
         prevRoute = route;
         setCrumb(route);
@@ -323,10 +367,12 @@
         $('gateRoot').classList.add('on');
     }
 
-    // 总台闸探针(GET .../feed?limit=1):非阻塞——不拖慢其余视图的首屏(m1 闸探针
-    // 已在 boot() 里挡过一次登录门,这里只决定"总台这一个功能露不露脸")。resolve 时若
-    // 用户仍停在 #/desk(直接深链或探针慢于路由触发的时序),补上挂载/跳转——onRoute
-    // 里 desk 分支对 deskGateOpen===null 不作为,交给这里兜底。
+    // 总台闸探针(GET .../front-desk/status):非阻塞——不拖慢其余视图的首屏(m1 闸探针
+    // 已在 boot() 里挡过一次登录门,这里只决定"总台这一个功能露不露脸")。此前拿 feed 当
+    // 探针,闸关=404 打进 console,每次打开 /ai 一条报错噪音(2026-07-17)——status 不走
+    // 闸 404,闸关也回 200 {enabled:false}。resolve 时若用户仍停在 #/desk(直接深链或探针
+    // 慢于路由触发的时序),补上挂载/跳转——onRoute 里 desk 分支对 deskGateOpen===null
+    // 不作为,交给这里兜底。
     function afterDeskProbe(api, open) {
         deskGateOpen = open;
         $('navDesk').style.display = open ? '' : 'none';
@@ -345,12 +391,12 @@
         showShell();
         renderChrome(api);
         deskGateOpen = null;
-        api.getDeskFeed(null, 1)
-            .then(function () {
-                afterDeskProbe(api, true);
+        api.getDeskStatus()
+            .then(function (resp) {
+                afterDeskProbe(api, resp.enabled === true);
             })
             .catch(function () {
-                afterDeskProbe(api, false);
+                afterDeskProbe(api, false); // 探针失败仍 fail-closed
             });
         // 二次进入(门面登出/登录闭环)可能已订阅过一次——先退订再订阅,防止 hashchange
         // 监听器逐轮叠加(每次都多触发一遍 onRoute,状态越切越花)。

@@ -58,16 +58,14 @@
         archive: { cls: 's', key: 'status_archive' },
     };
 
-    // status(+可选 detail)→ 状态胶囊 {cls, key}。stuck 且逐条 needs 非空时是缺料的具体
-    // 子态——看板卡片与客户详情页此前各自手判「是不是缺料」,同一张工单两处文案能对不上;
-    // 统一收进这一处,谁传了 detail 谁就拿到诚实的子态,不传就退化成通用 stuck 胶囊。
+    // status(+可选 detail)→ 状态胶囊 {cls, key}。stuck/collecting 且逐条 needs 非空时是
+    // 缺料的具体子态——看板卡片与客户详情页此前各自手判「是不是缺料」,同一张工单两处文案
+    // 能对不上;统一收进这一处,谁传了 detail 谁就拿到诚实的子态,不传就退化成通用胶囊。
+    // collecting 纳入(2026-07-17 S4):此前 collecting 只给通用「等资料」,缺什么全靠猜,
+    // 与看板「等资料」列名对齐同走缺料胶囊。
     function statusChip(status, detail) {
-        if (
-            status === 'stuck' &&
-            detail &&
-            Array.isArray(detail.needs) &&
-            detail.needs.length > 0
-        ) {
+        var canBeNeedy = status === 'stuck' || status === 'collecting';
+        if (canBeNeedy && detail && Array.isArray(detail.needs) && detail.needs.length > 0) {
             return { cls: 'w', key: 'chip_needs_materials' };
         }
         return STATUS_MAP[status] || { cls: 'n', key: 'status_unknown' };

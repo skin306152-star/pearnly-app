@@ -296,10 +296,28 @@
         );
     }
 
+    // 空态指路(§6 死路批 · 2026-07-17):告诉人「报表从哪来」还得给「资料从哪进」——
+    // order_detail 自带 workspace_client_id/period,借它拼收料深链;detail 还没到手
+    // (极端时序)不硬造链接。
+    function emptyIntakeLinkHtml(detail) {
+        var d = detail || {};
+        if (d.workspace_client_id == null) return '';
+        return (
+            '<p class="note" style="text-align:center;margin-top:8px"><a href="' +
+            esc(root.AI.router.buildClientHash(d.workspace_client_id, 'intake', d.period)) +
+            '">' +
+            esc(at('wo_goto_intake')) +
+            '</a></p>'
+        );
+    }
+
     // ---- 整页(交付物为空 → 复用既有 pkg_empty 四态空态,不重造一份文案) ----
     function pageHtml(ctx) {
         if (!ctx.deliverables || !ctx.deliverables.length) {
-            return root.AI.state.emptyHtml({ title: at('pkg_empty_t'), sub: at('pkg_empty_s') });
+            return (
+                root.AI.state.emptyHtml({ title: at('pkg_empty_t'), sub: at('pkg_empty_s') }) +
+                emptyIntakeLinkHtml(ctx.detail)
+            );
         }
         var pp30Card = ctx.pp30
             ? pp30CardHtml(ctx.pp30.numbers || {}, ctx.calcOpen, (ctx.detail || {}).status)

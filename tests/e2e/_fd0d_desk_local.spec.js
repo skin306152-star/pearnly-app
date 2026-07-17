@@ -2,7 +2,8 @@
 // _h1b_payroll_local.spec.js 范式)
 // ============================================================
 // python http.server 静态服 static/dist/ai.html + page.route stub /api/**:闸探针 200 →
-// 进工作台;GET /api/ai/front-desk/feed 双作总台闸探针(limit=1)与消息流拉取(limit=50)。
+// 进工作台;总台闸探针走 GET /api/ai/front-desk/status(2026-07-17 S4:不走闸 404,
+// 闸关回 {enabled:false},feed 只剩消息流职责——此前 feed 双作探针,闸关刷 console 404)。
 // 验收:两批拖拽合批盘点计数对 → 说目标出合同卡 → 人点下拉改客户(不是 AI 建议的那个)→
 // 确认开工真建工单 → 进度卡;大脑降级 → 降级卡 + 手动开单真开工单;四语切换无缺词;
 // 手机 390 单列/sticky 输入区/无横溢;闸关 → 侧栏项不显示 + #/desk 静默落回工作台。
@@ -57,7 +58,8 @@ function contractResponse(id, fileCount) {
     };
 }
 
-// deskFeedStatus: 200(闸开,feed 拉取返回空流)| 404(闸关,探针即失败)。
+// deskFeedStatus: 200(闸开,feed 拉取返回空流)| 404(闸关:status 探针回
+// {enabled:false},feed 端点本身 404)。
 // interpretSuggestion: interpret 端点固定回这份建议(测试按场景各自定制)。
 async function bootDesk(
     page,
@@ -68,6 +70,13 @@ async function bootDesk(
     );
     await page.route('**/api/workspace/clients**', (r) =>
         r.fulfill({ contentType: 'application/json', body: JSON.stringify(CLIENTS) })
+    );
+    // 2026-07-17 S4:闸探针换 /status(不走闸 404)——闸开关都回 200,开关态在 enabled 里。
+    await page.route('**/api/ai/front-desk/status**', (r) =>
+        r.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ enabled: deskFeedStatus === 200 }),
+        })
     );
     await page.route('**/api/ai/front-desk/feed**', (r) => {
         if (deskFeedStatus !== 200) {

@@ -3,7 +3,7 @@
 Object.assign(window.__AI_I18N_TH__, {
     fin_title: 'ชุดรายงานประจำเดือน',
     fin_disabled_t: 'ยังไม่ได้สร้างชุดรายงาน',
-    fin_disabled_s: 'งานนี้ยังไม่เปิดใช้ชุดรายงาน หรือยังไม่ถึงขั้นตอนกระทบยอด',
+    fin_disabled_s: 'ไม่ต้องทำอะไร สร้างอัตโนมัติเมื่อคำนวณภาษีเสร็จ',
     fin_period_label: 'งวด {period}',
     fin_balanced_chip: 'ยอดตรงกัน',
     fin_unbalanced_chip: 'มีส่วนต่าง',
@@ -283,7 +283,7 @@ Object.assign(window.__AI_I18N_TH__, {
     riq_receipt_done: 'แนบใบเสร็จแล้ว',
     riq_self_declared: 'ประกาศตรวจทานคนเดียวแล้ว',
     riq_self_declare_btn: 'ประกาศโหมดคนเดียว',
-    riq_self_declare_hint: 'สำนักงานไม่มีผู้ตรวจทานอิสระ?',
+    riq_self_declare_hint: 'ไม่มีคนที่สองตรวจทาน? ใช้「ประกาศคนเดียว」บันทึกแทน',
     riq_wo_needs_review: 'ยังมีรายการผิดปกติค้างตัดสิน กรุณาตัดสินให้หมดก่อนลงนามปิดงาน',
     riq_reject_reason_label: 'เหตุผลการตีกลับ (จำเป็น)',
     riq_reject_reason_required: 'กรุณากรอกเหตุผลการตีกลับ',
@@ -306,6 +306,12 @@ Object.assign(window.__AI_I18N_TH__, {
     riq_bulk_result: 'สำเร็จ {ok} · ล้มเหลว {fail}',
     riq_view_img_btn: 'ดูต้นฉบับ',
     riq_item_frozen: 'ปิดงานแล้ว · อ่านอย่างเดียว',
+    // S4 · คำอธิบายหัวกลุ่มเป็นภาษาคน(flag_reason → หนึ่งประโยค;ไม่มีในพจนานุกรม = ไม่แสดง)
+    riq_expl_amount_math_fail: 'ยอดในใบกำกับขัดกันเอง AI ไม่บันทึกอัตโนมัติ ต้องให้คุณตัดสิน',
+    riq_expl_direction_ambiguous: 'แยกไม่ออกว่าเป็นซื้อหรือขาย กรุณาระบุ',
+    riq_expl_ocr_low_confidence: 'AI อ่านได้แต่ไม่มั่นใจ ช่วยตรวจดู',
+    riq_expl_ocr_validation_warning: 'ตัวเลขบางตัวอาจอ่านผิด เทียบกับรูปต้นฉบับ',
+    riq_expl_sales_doc_review: 'ดูเหมือนใบกำกับขายของลูกค้าเอง กด S เพื่อยืนยันเป็นขาย',
 
     // J-C · ความจำคิวตรวจสอบ(ยังไม่ตัดสินก่อน/พับที่ตัดสินแล้ว)+ ยืนยันเป็นชุด +
     // ค่าเสนอแนะจาก J-A

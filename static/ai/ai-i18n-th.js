@@ -73,7 +73,6 @@ window.__AI_I18N_TH__ = {
     error_s: 'เครือข่ายหรือระบบขัดข้องชั่วคราว ลองใหม่อีกครั้ง',
     retry: 'ลองใหม่',
     back_dash: 'กลับแดชบอร์ด',
-    client_readonly_note: 'ล็อกลูกค้านี้แล้ว（หน้านี้ไม่มีตัวสลับ）',
     period_label: 'งวด',
     period_empty: 'ลูกค้านี้ยังไม่มีงาน',
     tab_intake: 'รับเอกสาร',
@@ -146,7 +145,7 @@ window.__AI_I18N_TH__ = {
     intake_goto_wo: 'ไปดูความคืบหน้าที่หน้างาน →',
     err_workorder_file_too_large: 'ไฟล์เดียวต้องไม่เกิน 20MB',
     pkg_empty_t: 'ยังไม่มีเอกสารส่งมอบ',
-    pkg_empty_s: 'เมื่องานถึงขั้นตอนชุดส่งมอบ จะแสดงที่นี่',
+    pkg_empty_s: 'เมื่อเอกสารครบ ตัดสินครบ คำนวณภาษีเสร็จ รายงานจะมาอยู่ที่นี่',
     err_generic: 'เกิดข้อผิดพลาด กรุณาลองใหม่',
     err_workorder_not_found: 'ไม่พบงานนี้หรือไม่มีสิทธิ์',
     err_workspace_not_found: 'ไม่พบลูกค้านี้หรือไม่มีสิทธิ์',
@@ -349,6 +348,9 @@ window.__AI_I18N_TH__ = {
     matrix_empty_s: 'สร้างลูกค้าในหน้า「ลูกค้า」แล้วจะแสดงที่นี่',
     matrix_due_label: 'ครบกำหนด {date}',
     matrix_checkbox_aria: 'เลือก {name} เพื่อเปิดงานหลายรายการ',
+    mx_no_results: 'ไม่พบรายการ',
+    mx_no_results_sub: 'ลองเปลี่ยนหรือล้างตัวกรอง',
+    mx_clear_filters: 'ล้างตัวกรอง',
     obligations_title: 'ภาระภาษีงวดนี้',
     obligations_period_label: 'งวด',
     obligations_empty_s:
@@ -412,7 +414,8 @@ window.__AI_I18N_TH__ = {
     // E2 · กระทบยอดธนาคาร (หน้ารายละเอียดงาน มุมมอง wo)
     brx_title: 'กระทบยอดธนาคาร',
     brx_disabled_t: 'ยังไม่เปิดใช้งานกระทบยอดธนาคาร',
-    brx_disabled_s: 'งานนี้ยังไม่เปิดกระทบยอดธนาคาร หรือยังไม่ได้รับ statement ธนาคาร',
+    brx_disabled_s:
+        'ยังไม่มีรายการธนาคาร อัปโหลดสเตทเมนต์ที่ช่องรับเอกสาร เมื่อถึงขั้นกระทบยอดจะแสดงที่นี่',
     brx_ok_chip: 'กระทบยอดครบแล้ว',
     brx_diff_chip: 'มีส่วนต่าง',
     brx_diff_net: 'ส่วนต่างสุทธิ {net}',
@@ -441,7 +444,7 @@ window.__AI_I18N_TH__ = {
     // F3 · ร่างบัญชีเงา (หน้ารายละเอียดงาน มุมมอง wo)
     shadow_title: 'ร่างบัญชีเงา',
     shadow_disabled_t: 'ยังไม่สร้างร่างบัญชีเงา',
-    shadow_disabled_s: 'งานนี้ยังไม่เปิดใช้ร่างบัญชีเงา หรือยังไม่ถึงขั้นตอนกระทบยอด',
+    shadow_disabled_s: 'ไม่ต้องทำอะไร จะสร้างอัตโนมัติเมื่อถึงขั้นกระทบยอด',
     shadow_balanced_chip: 'ยอดตรงกัน',
     shadow_unbalanced_chip: 'มีส่วนต่าง',
     shadow_diff_note: 'ส่วนต่าง {diff}',

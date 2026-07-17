@@ -4,8 +4,7 @@
 Object.assign(window.__AI_I18N_EN__, {
     fin_title: 'Monthly Report Package',
     fin_disabled_t: 'Report package not generated',
-    fin_disabled_s:
-        'This work order has not enabled the report package, or has not reached the reconcile step',
+    fin_disabled_s: 'Nothing to do — generated automatically once tax is computed.',
     fin_period_label: 'Period {period}',
     fin_balanced_chip: 'Balanced',
     fin_unbalanced_chip: 'Out of balance',
@@ -292,7 +291,8 @@ Object.assign(window.__AI_I18N_EN__, {
     riq_receipt_done: 'Receipt attached',
     riq_self_declared: 'Solo review declared',
     riq_self_declare_btn: 'Declare solo review',
-    riq_self_declare_hint: 'No independent reviewer at your firm?',
+    riq_self_declare_hint:
+        'No second reviewer at the firm? Use "solo declaration" to proceed with an audit trail.',
     riq_wo_needs_review: 'Flagged items still pending — clear them before signing off',
     riq_reject_reason_label: 'Reject reason (required)',
     riq_reject_reason_required: 'Please enter a reject reason',
@@ -315,6 +315,14 @@ Object.assign(window.__AI_I18N_EN__, {
     riq_bulk_result: '{ok} succeeded · {fail} failed',
     riq_view_img_btn: 'View original',
     riq_item_frozen: 'Frozen · read-only',
+    // S4 · plain-language sub-line under each flag group (unknown reason → no sub-line)
+    riq_expl_amount_math_fail:
+        "The amounts on this document don't add up, so AI won't book it automatically — your call.",
+    riq_expl_direction_ambiguous: "Can't tell if this is a purchase or a sale — please pick one.",
+    riq_expl_ocr_low_confidence: 'AI read it but with low confidence — please double-check.',
+    riq_expl_ocr_validation_warning: 'A number may be misread — compare with the original image.',
+    riq_expl_sales_doc_review:
+        "Looks like your client's own sales invoice — press S to confirm as sales.",
 
     // J-C · review queue memory (undecided-first / decided folding) + bulk confirm +
     // J-A suggested value echo

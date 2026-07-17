@@ -34,6 +34,17 @@
   font-size: 12.5px;
   color: var(--ink);
 }
+/* 可点统计胶囊(2026-07-17 死点击批):数字指到哪就跳到哪,hover 轻染;账期胶囊不挂。 */
+.sum-pill-link {
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.sum-pill-link:hover {
+  border-color: var(--hair2);
+  background: var(--surface2);
+}
 .search {
   display: flex;
   align-items: center;
@@ -244,6 +255,13 @@
   }
   .kopen .period-sel {
     min-height: 40px;
+  }
+}
+/* 手机(≤640px)五列纵向堆叠(2026-07-17 实测:390 宽下客户在第三列要横滑才看得见
+ * 且无任何提示)。641px 以上维持五列横排不动。 */
+@media (max-width: 640px) {
+  .kanban {
+    grid-template-columns: 1fr;
   }
 }
 /* v4 的 .kadd(列尾「+ 收料/补料」入口)在本次没有落地——收料视图挂在客户独立页内

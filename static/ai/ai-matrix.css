@@ -76,11 +76,24 @@
 
 /* 表格容器:宽内容(义务列多时)容器内横滑,页面级零横向滚动(Canon §6.1/§6.2)。 */
 .mx-scroll {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--hair);
   border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--sh-card);
+}
+/* 右缘渐隐(2026-07-17):提示右边还有列可滑——手机上第三列之后纯靠猜。画在滚动容器
+ * 上,随内容滚动淡出;初始位(最需要提示时)恒可见。 */
+.mx-scroll::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--paper));
 }
 .mx-table {
   border-collapse: collapse;
@@ -168,6 +181,15 @@
 }
 .mx-cell {
   text-align: center;
+}
+/* 整行可点(2026-07-17 死点击批):行任意处点击都进客户页,指针给出可点暗示。 */
+.mx-row {
+  cursor: pointer;
+}
+/* 筛选/搜索 0 结果空态(state-block 自带居中,这里只对齐按钮与留白)。 */
+.mx-noresults {
+  text-align: center;
+  padding-bottom: 18px;
 }
 .mx-cellbtn {
   border: none;

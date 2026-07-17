@@ -116,6 +116,45 @@ class AiFormatTests(unittest.TestCase):
             ],
         )
 
+    def test_status_chip_collecting_with_needs_shows_missing_materials(self):
+        # S4(2026-07-17):collecting 卡此前 detail=null,摘要永远只报账期(「等待中不知
+        # 等什么」实测根因)——detail 接通后缺料子态与「等资料」列名对齐;无 detail 仍回
+        # 通用 collecting 胶囊,不臆造缺料。
+        out = _run_node(f"""
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.statusChip('collecting'),
+                f.statusChip('collecting', {{needs: []}}),
+                f.statusChip('collecting', {{needs: ['bank_statement']}}),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"cls": "n", "key": "status_collecting"},
+                {"cls": "n", "key": "status_collecting"},
+                {"cls": "w", "key": "chip_needs_materials"},
+            ],
+        )
+
+    def test_pending_review_count_matches_pool_scope(self):
+        # S4(2026-07-17):顶部「待你处理」胶囊与 #/pool 同源——review/stuck 计入,
+        # running/collecting/archive 不计;缺形(空/缺 clients/缺 orders)一律 0。
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            const queue = {{clients: [
+                {{orders: [{{status: 'review'}}, {{status: 'stuck'}}, {{status: 'running'}}]}},
+                {{orders: [{{status: 'collecting'}}, {{status: 'archive'}}]}},
+                {{}},
+            ]}};
+            process.stdout.write(JSON.stringify([
+                b.pendingReviewCount(queue),
+                b.pendingReviewCount(null),
+                b.pendingReviewCount({{}}),
+            ]));
+            """)
+        self.assertEqual(out, [2, 0, 0])
+
     def test_chip_html_renders_span_and_shares_stuck_override(self):
         out = _run_node(f"""
             global.at = (k) => ({{status_running: 'AI 在做', chip_needs_materials: '缺料'}})[k] || k;

@@ -81,6 +81,25 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(ctx.exception.status_code, 404)
 
 
+class StatusProbeTests(unittest.IsolatedAsyncioTestCase):
+    """S4(2026-07-17):/status 探针不走闸 404——闸关也 200 {enabled:false},console 零噪音。"""
+
+    async def _status(self, enabled):
+        with (
+            mock.patch.object(fr, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
+            mock.patch.object(
+                fr.feature_flags, "pearnly_ai_front_desk_enabled_for", return_value=enabled
+            ),
+        ):
+            return await fr.get_status(mock.Mock())
+
+    async def test_gate_closed_returns_enabled_false_not_404(self):
+        self.assertEqual(await self._status(False), {"enabled": False})
+
+    async def test_gate_open_returns_enabled_true(self):
+        self.assertEqual(await self._status(True), {"enabled": True})
+
+
 class DisabledIntentTests(unittest.IsolatedAsyncioTestCase):
     """闸开但确认未开放/闭集外意图 → 422(诚实拒,不装懂 · 不开工单)。"""
 

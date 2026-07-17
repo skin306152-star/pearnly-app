@@ -117,6 +117,19 @@
         return { key: 'card_period_only', vars: { p: order.period } };
     }
 
+    // 顶部「待你处理」胶囊的计数(2026-07-17 S4):review-queue 里 status 为 review/stuck
+    // 的工单数——与 #/pool 同一数据源同一口径。不含 running(那是 AI 的事不是人的)。
+    // 矩阵/看板此前各自从格子/订单推的两套口径与 pool 数字实测同屏 0 vs 1 打架,废除。
+    function pendingReviewCount(queue) {
+        var n = 0;
+        ((queue || {}).clients || []).forEach(function (c) {
+            (c.orders || []).forEach(function (o) {
+                if (o.status === 'review' || o.status === 'stuck') n += 1;
+            });
+        });
+        return n;
+    }
+
     // 公历 Date → 佛历账期 "YYYY-MM"(泰国会计年 = 公历年 + 543)。不传 date 用当下时刻。
     function currentPeriodBE(date) {
         var d = date instanceof Date && !isNaN(date.getTime()) ? date : new Date();
@@ -153,6 +166,7 @@
         COLUMNS: COLUMNS,
         mapOrderToColumn: mapOrderToColumn,
         summarizeCard: summarizeCard,
+        pendingReviewCount: pendingReviewCount,
         currentPeriodBE: currentPeriodBE,
         periodOptions: periodOptions,
         needsOpenControl: needsOpenControl,

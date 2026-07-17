@@ -327,6 +327,11 @@
                 $('periodMenu').classList.remove('on');
             }
         });
+        // Esc 关账期下拉(§2 死路批,与矩阵 wirePeriodToggle 同款):点外面能关,键盘也得能关。
+        document.addEventListener('keydown', function (e) {
+            var menu = $('periodMenu');
+            if (e.key === 'Escape' && menu.classList.contains('on')) menu.classList.remove('on');
+        });
         VIEWS.forEach(function (v) {
             var el = $('tab' + v.charAt(0).toUpperCase() + v.slice(1));
             el.onclick = function () {

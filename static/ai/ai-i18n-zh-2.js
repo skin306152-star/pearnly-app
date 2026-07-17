@@ -3,7 +3,7 @@
 Object.assign(window.__AI_I18N_ZH__, {
     fin_title: '月度报表包',
     fin_disabled_t: '报表包未生成',
-    fin_disabled_s: '该工单未开启报表包，或尚未跑到对账步骤',
+    fin_disabled_s: '不用管它——税一算完自动生成',
     fin_period_label: '账期 {period}',
     fin_balanced_chip: '已配平',
     fin_unbalanced_chip: '存在差异',
@@ -265,7 +265,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_receipt_done: '已挂回执',
     riq_self_declared: '已声明单人复核',
     riq_self_declare_btn: '单人模式声明',
-    riq_self_declare_hint: '所内没有独立复核人？',
+    riq_self_declare_hint: '所内没有第二个人复核?用「单人声明」留痕代复核',
     riq_wo_needs_review: '还有异常票据待裁决，清空后才能签批冻结',
     riq_reject_reason_label: '驳回原因（必填）',
     riq_reject_reason_required: '请填写驳回原因',
@@ -288,6 +288,12 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_bulk_result: '{ok} 张成功 · {fail} 张失败',
     riq_view_img_btn: '查看原图',
     riq_item_frozen: '已冻结 · 只读',
+    // S4 · 分组头人话副行(flag_reason → 一句大白话;词典没有的 reason 不渲染副行)
+    riq_expl_amount_math_fail: '票面三个金额互相对不上,AI 不敢自动记,需要你定夺',
+    riq_expl_direction_ambiguous: '看不出是买进还是卖出的票,请你点一下方向',
+    riq_expl_ocr_low_confidence: 'AI 读出来了但把握不大,过目确认一下',
+    riq_expl_ocr_validation_warning: '某个数字可能读错了,对照原图看一眼',
+    riq_expl_sales_doc_review: '这看起来是你客户自己开出去的销售票,按 S 确认归销项',
 
     // J-C · 审核队列操作记忆(未判优先/已判折叠)+ 批量确认 + J-A 建议值改数回显
     rv_counter: '未判 {k} / 共 {n}',

@@ -73,7 +73,6 @@ window.__AI_I18N_JA__ = {
     error_s: 'ネットワークまたはサービスが一時的に利用できません。再試行してください。',
     retry: '再試行',
     back_dash: 'ダッシュボードへ戻る',
-    client_readonly_note: '顧客は固定済み（このページに切替はありません）',
     period_label: '期間',
     period_empty: 'この顧客のワークオーダーはまだありません',
     tab_intake: '受領',
@@ -147,7 +146,7 @@ window.__AI_I18N_JA__ = {
     intake_goto_wo: '作業ページで進捗を見る →',
     err_workorder_file_too_large: '1ファイルは20MB未満にしてください',
     pkg_empty_t: 'まだ提出物がありません',
-    pkg_empty_s: 'ワークオーダーがパッケージ段階に達すると表示されます。',
+    pkg_empty_s: '資料が揃い、判断と税計算が終わるとここにレポート一式が表示されます。',
     err_generic: '問題が発生しました。再試行してください',
     err_workorder_not_found: 'ワークオーダーが見つからないか権限がありません',
     err_workspace_not_found: '顧客が見つからないか権限がありません',
@@ -357,6 +356,9 @@ window.__AI_I18N_JA__ = {
     matrix_empty_s: '「顧客」ページで登録すると、ここに表示されます。',
     matrix_due_label: '期限 {date}',
     matrix_checkbox_aria: '{name} を一括作成の対象として選択',
+    mx_no_results: '該当なし',
+    mx_no_results_sub: 'フィルターを変更するか解除してください',
+    mx_clear_filters: 'フィルター解除',
     obligations_title: '当期の義務',
     obligations_period_label: '期間',
     obligations_empty_s:
@@ -421,7 +423,8 @@ window.__AI_I18N_JA__ = {
     // E2 · 銀行照合(工単詳細 wo ビュー)
     brx_title: '銀行照合',
     brx_disabled_t: '銀行照合は利用できません',
-    brx_disabled_s: 'この工単では銀行照合が未設定か、銀行明細がまだ届いていません',
+    brx_disabled_s:
+        '銀行明細がまだありません。受付にアップロードすると照合ステップで自動表示されます。',
     brx_ok_chip: '照合済み',
     brx_diff_chip: '差異あり',
     brx_diff_net: '純差額 {net}',
@@ -450,7 +453,7 @@ window.__AI_I18N_JA__ = {
     // F3 · シャドー草稿(工単詳細 wo ビュー)
     shadow_title: 'シャドー草稿',
     shadow_disabled_t: 'シャドー草稿は未生成です',
-    shadow_disabled_s: 'この工単ではシャドー草稿が無効か、まだ照合ステップに達していません',
+    shadow_disabled_s: '操作不要。照合ステップで自動生成されます。',
     shadow_balanced_chip: '貸借一致',
     shadow_unbalanced_chip: '差異あり',
     shadow_diff_note: '差額 {diff}',

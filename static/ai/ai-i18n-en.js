@@ -73,7 +73,6 @@ window.__AI_I18N_EN__ = {
     error_s: 'Network or service unavailable. Please retry.',
     retry: 'Retry',
     back_dash: 'Back to dashboard',
-    client_readonly_note: 'Client locked (no switcher on this page)',
     period_label: 'Period',
     period_empty: 'No work orders for this client yet',
     tab_intake: 'Intake',
@@ -147,7 +146,8 @@ window.__AI_I18N_EN__ = {
     intake_goto_wo: 'View progress on the work order →',
     err_workorder_file_too_large: 'Each file must be under 20MB',
     pkg_empty_t: 'No deliverables yet',
-    pkg_empty_s: 'They will appear once the work order reaches the package step.',
+    pkg_empty_s:
+        'Once documents are in, calls are made and tax is computed, the report package appears here.',
     err_generic: 'Something went wrong, please retry',
     err_workorder_not_found: 'Work order not found or no access',
     err_workspace_not_found: 'Client not found or no access',
@@ -353,6 +353,9 @@ window.__AI_I18N_EN__ = {
     matrix_empty_s: 'Clients you create on the Clients page will appear here.',
     matrix_due_label: 'Due {date}',
     matrix_checkbox_aria: 'Select {name} for bulk order opening',
+    mx_no_results: 'No results',
+    mx_no_results_sub: 'Try changing or clearing the filters',
+    mx_clear_filters: 'Clear filters',
     obligations_title: 'Obligations this period',
     obligations_period_label: 'Period',
     obligations_empty_s:
@@ -418,7 +421,7 @@ window.__AI_I18N_EN__ = {
     brx_title: 'Bank reconciliation',
     brx_disabled_t: 'Bank reconciliation not available',
     brx_disabled_s:
-        "This work order hasn't enabled bank reconciliation, or no bank statement has arrived yet",
+        'No bank statement yet — upload it in Intake; this appears automatically at the reconcile step.',
     brx_ok_chip: 'Reconciled',
     brx_diff_chip: 'Discrepancy found',
     brx_diff_net: 'Net difference {net}',
@@ -448,8 +451,7 @@ window.__AI_I18N_EN__ = {
     // F3 · Shadow draft (work order detail, wo view)
     shadow_title: 'Shadow draft',
     shadow_disabled_t: 'Shadow draft not generated',
-    shadow_disabled_s:
-        "This work order hasn't enabled shadow draft, or hasn't reached the reconcile step yet",
+    shadow_disabled_s: 'Nothing to do — generated automatically at the reconcile step.',
     shadow_balanced_chip: 'Balanced',
     shadow_unbalanced_chip: 'Discrepancy found',
     shadow_diff_note: 'Difference {diff}',

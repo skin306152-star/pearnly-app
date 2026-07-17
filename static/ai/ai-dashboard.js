@@ -26,18 +26,27 @@
         return byClient;
     }
 
+    // 「待你处理」不再数本视图 status=stuck 的订单——该口径与 #/pool 实测同屏打架
+    // (2026-07-17:两边一个 0 一个 1,用户不知道信谁),废除,改与 #/pool 同源
+    // (loadPendingStat,口径在 AI.board.pendingReviewCount)。
     function renderStats(clients, orders) {
         $('statClientsV').textContent = String(clients.length);
-        var pending = orders.filter(function (o) {
-            return o.status === 'stuck';
-        }).length;
         var running = orders.filter(function (o) {
             return o.status === 'running';
         }).length;
-        $('statPendingV').textContent = String(pending);
         $('statRunningV').textContent = String(running);
         // 看板统计跨期现算(每客户最新一期),没有单一账期可言——账期 pill 只归矩阵。
         $('sumPeriod').style.display = 'none';
+    }
+
+    function loadPendingStat(api) {
+        api.getReviewQueue()
+            .then(function (queue) {
+                $('statPendingV').textContent = String(AI.board.pendingReviewCount(queue));
+            })
+            .catch(function () {
+                $('statPendingV').textContent = '—'; // 拉不到不臆造
+            });
     }
 
     // 只对「每客户最新一期」里 status=stuck(区分缺料/挂起)或 review(读 tax_due)的那些
@@ -45,8 +54,10 @@
     // (权限/网络)不拖垮全表:该条退化为"没有 detail"走 mapOrderToColumn/summarizeCard
     // 的保守降级分支,不中断其它卡片渲染。
     function loadDetailsForCards(api, latestOrders) {
+        // collecting 也拉 detail(2026-07-17 S4):此前 collecting 卡 detail=null,摘要
+        // 永远只报账期——「等待中不知等什么」实测根因;detail.needs 接通后卡片能点名缺什么。
         var needDetail = latestOrders.filter(function (o) {
-            return o.status === 'stuck' || o.status === 'review';
+            return o.status === 'stuck' || o.status === 'review' || o.status === 'collecting';
         });
         if (!needDetail.length) return Promise.resolve({});
         return Promise.all(
@@ -133,15 +144,45 @@
         input.value = '';
         input.oninput = function () {
             var q = input.value.trim().toLowerCase();
+            var visible = 0;
             document.querySelectorAll('#dashBody .kcard').forEach(function (el) {
                 var name = el.getAttribute('data-name') || '';
-                el.style.display = !q || name.indexOf(q) >= 0 ? '' : 'none';
+                var show = !q || name.indexOf(q) >= 0;
+                el.style.display = show ? '' : 'none';
+                if (show) visible += 1;
             });
+            renderSearchEmpty(visible);
         };
+    }
+
+    // 搜索命中 0 卡时看板只剩五个空列,像坏了(2026-07-17 实测,同矩阵空表头):看板
+    // 容器后补标准空态 + 清除按钮(看板没有筛选 chip,这里的「清除」只清搜索框)。
+    function renderSearchEmpty(visibleCount) {
+        var body = $('dashBody');
+        var existing = body.querySelector('.mx-noresults');
+        if (visibleCount > 0 || !body.querySelector('.kanban')) {
+            if (existing) existing.remove();
+            return;
+        }
+        if (existing) return;
+        var node = document.createElement('div');
+        node.className = 'mx-noresults';
+        node.innerHTML =
+            AI.state.emptyHtml({ title: at('mx_no_results'), sub: at('mx_no_results_sub') }) +
+            '<button type="button" class="btn sm" data-action="clear-filters">' +
+            AI.state.esc(at('mx_clear_filters')) +
+            '</button>';
+        node.querySelector('[data-action="clear-filters"]').onclick = function () {
+            var input = $('searchInput');
+            input.value = '';
+            if (input.oninput) input.oninput();
+        };
+        body.appendChild(node);
     }
 
     function load(api) {
         lastApi = api;
+        loadPendingStat(api);
         var body = $('dashBody');
         // 防闪烁(Canon §7):重载(开单后刷新/回到本视图)保留旧看板直到新数据到,
         // 骨架屏只在还没有任何看板时出——不给用户看「内容→骨架→内容」的跳变。

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """Pearnly AI · 目标驱动前门(FD-0a)HTTP API:合同 + 盘点 + 路由骨架(不含大脑)。
 
-四端点(施工总册 §3.1):
+五端点(施工总册 §3.1 四端点 + S4 探针):
   POST /api/ai/front-desk/contracts   建草稿合同 + 暂存投料(出盘点摘要)
   POST /api/ai/front-desk/interpret   utterance → 大脑建议(FD-0a 桩:恒返 degraded)
   POST /api/ai/front-desk/confirm     人点确认:开工单 + 经 intake.register_file 入料
   GET  /api/ai/front-desk/feed        重建消息流(合同倒序)
+  GET  /api/ai/front-desk/status      闸态探针(不走闸 404,见 get_status 顶注)
 
 全组挂 `pearnly_ai_front_desk`(tenant 级默认关 · fail-closed · 叠加 pearnly_ai_m1):闸关时
 一律 404 —— 对存量用户等于不存在,/ai 与今天逐字节一致。编排薄:合同存储/状态机/入料在
@@ -216,6 +217,16 @@ async def confirm_contract(req: ConfirmIn, request: Request):
         except contract_store.FrontDeskError as e:
             _raise_front_desk(e)
     return {"ok": True, **out}
+
+
+@router.get("/api/ai/front-desk/status")
+async def get_status(request: Request):
+    """探针专用(S4 · 2026-07-17):总台闸开关状态,不走闸 404。
+
+    此前前端拿 feed 当探针,闸关=404 打进 console——每次打开 /ai 一条报错噪音。登录 + m1
+    鉴权照同文件其它端点(authorize_pearnly_ai),front_desk 闸态作为数据返回。"""
+    _user, tenant_id = authorize_pearnly_ai(request, _C_VIEW, not_found=_NOT_FOUND)
+    return {"enabled": bool(feature_flags.pearnly_ai_front_desk_enabled_for(tenant_id))}
 
 
 @router.get("/api/ai/front-desk/feed")

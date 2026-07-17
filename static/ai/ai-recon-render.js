@@ -212,6 +212,16 @@
     // ui: {open:{auto,review,missing,unmatched}, missing:{idx:{busy,done,errKey}}}
     function pageHtml(bankRecon, ui, clientId) {
         if (!bankRecon) {
+            // 死卡指路(§6 死路批 · 2026-07-17):文案说了「传对账单」就得给入口。period
+            // 没有进到本渲染层(mount 只带 clientId),深链退化不带期 → ai-client.js 落最新期。
+            var intakeLink =
+                clientId != null
+                    ? '<p class="note" style="text-align:center;margin-top:8px"><a href="' +
+                      esc(root.AI.router.buildClientHash(clientId, 'intake')) +
+                      '">' +
+                      esc(at('wo_goto_intake')) +
+                      '</a></p>'
+                    : '';
             return (
                 '<div class="panel"><div class="hd"><h3>' +
                 esc(at('brx_title')) +
@@ -220,6 +230,7 @@
                     title: at('brx_disabled_t'),
                     sub: at('brx_disabled_s'),
                 }) +
+                intakeLink +
                 '</div></div>'
             );
         }

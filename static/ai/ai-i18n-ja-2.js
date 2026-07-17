@@ -4,8 +4,7 @@
 Object.assign(window.__AI_I18N_JA__, {
     fin_title: '月次レポートパッケージ',
     fin_disabled_t: 'レポートパッケージ未生成',
-    fin_disabled_s:
-        'このワークオーダーはレポートパッケージが未有効化、または照合ステップに未到達です',
+    fin_disabled_s: '操作不要。税計算が終わると自動生成されます。',
     fin_period_label: '期間 {period}',
     fin_balanced_chip: '一致',
     fin_unbalanced_chip: '差異あり',
@@ -289,7 +288,7 @@ Object.assign(window.__AI_I18N_JA__, {
     riq_receipt_done: '受領書を添付しました',
     riq_self_declared: '単独レビューを宣言済み',
     riq_self_declare_btn: '単独モードを宣言',
-    riq_self_declare_hint: '事務所に独立したレビュー担当者がいませんか？',
+    riq_self_declare_hint: '所内に二人目の確認者がいない場合は「単独宣言」で記録を残して進めます。',
     riq_wo_needs_review: 'まだ未処理の異常票があります。先に片付けてから署名してください',
     riq_reject_reason_label: '差し戻し理由（必須）',
     riq_reject_reason_required: '差し戻し理由を入力してください',
@@ -312,6 +311,12 @@ Object.assign(window.__AI_I18N_JA__, {
     riq_bulk_result: '成功 {ok} 件 · 失敗 {fail} 件',
     riq_view_img_btn: '原本を見る',
     riq_item_frozen: '凍結済み · 読み取り専用',
+    // S4 · グループ見出し下の平易な説明行(flag_reason → 一文;辞書に無い reason は非表示)
+    riq_expl_amount_math_fail: '金額が合わないため AI は自動記帳しません。判断してください。',
+    riq_expl_direction_ambiguous: '仕入か売上か判別できません。指定してください。',
+    riq_expl_ocr_low_confidence: 'AI の読取に自信がありません。確認してください。',
+    riq_expl_ocr_validation_warning: '数字を読み違えた可能性があります。原本と照合してください。',
+    riq_expl_sales_doc_review: '顧客自身の売上票のようです。S で売上として確定。',
 
     // J-C · 審査キューの操作記憶(未処理優先/判定済み折りたたみ)+ 一括確認 +
     // J-A 提案値の反映

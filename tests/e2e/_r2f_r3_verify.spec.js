@@ -71,8 +71,11 @@ function jsonRoute(body, status) {
         });
 }
 
-test.describe('R2F #1 · 看板开单控件常显', () => {
-    test('客户当期已有单,卡片仍有账期下拉 + 开单入口;选中当期幂等打开既有单', async ({ page }) => {
+test.describe('R2F #1 → S4 · 看板开单控件收敛', () => {
+    // 2026-07-17 S4 拍板:推翻 R3「常显」——活工单卡挂开单控件=邀请误开第二张(真机实测
+    // 困惑),本期已有工单的卡不再渲染账期下拉+开单;无本期工单的卡保留,开单默认当月。
+    // 补开历史月入口=客户档案 → 工单历史(既有,R2F #2 仍覆盖)。
+    test('有单卡不渲染开单控件;无单卡保留且开单递当月', async ({ page }) => {
         const period = currentPeriodBE();
         let createCalls = [];
         await mockRoutes(page, {
@@ -80,39 +83,39 @@ test.describe('R2F #1 · 看板开单控件常显', () => {
                 orders: [{ id: 'wo-1', workspace_client_id: 'c1', period, status: 'collecting' }],
             }),
             'GET /api/workspace/clients': jsonRoute({
-                clients: [{ id: 'c1', name: 'Acme Co', tax_id: '0105551234567' }],
+                clients: [
+                    { id: 'c1', name: 'Acme Co', tax_id: '0105551234567' },
+                    { id: 'c2', name: 'Beta Ltd', tax_id: '0105557654321' },
+                ],
             }),
             'POST /api/workorder/orders': async (route, req) => {
                 const body = req.postDataJSON();
                 createCalls.push(body);
                 return route.fulfill({
                     contentType: 'application/json',
-                    body: JSON.stringify({ id: 'wo-1', period: body.period, status: 'collecting' }),
+                    body: JSON.stringify({ id: 'wo-2', period: body.period, status: 'collecting' }),
                 });
             },
         });
         await page.goto(`${PAGE}#/board`);
         await page.waitForSelector('.kcard', { timeout: 15000 });
 
-        // 断言 1:控件在「当期已有单」的卡片上仍然存在(此前判据会隐藏它)。
-        const card = page.locator('.kcard').first();
-        const openCtl = card.locator('.kopen');
+        // 有单卡(c1):无 .kopen,卡片本体仍可点进客户页(控件收敛不收敛导航)。
+        const withOrder = page.locator('.kcard[data-client-id="c1"]');
+        await expect(withOrder).toBeVisible();
+        await expect(withOrder.locator('.kopen')).toHaveCount(0);
+
+        // 无单卡(c2):控件保留,默认账期=当月(periodOptions 首项),开单递当月。
+        const openCtl = page.locator('.kcard[data-client-id="c2"] .kopen');
         await expect(openCtl).toBeVisible();
         const select = openCtl.locator('[data-role="period-select"]');
-        const btn = openCtl.locator('[data-action="open-order"]');
-        await expect(select).toBeVisible();
-        await expect(btn).toBeVisible();
-        // 默认选中项 = 当月(periodOptions 当月排第一,原生 select 不设 selected 走默认首项)。
         await expect(select).toHaveValue(period);
-        await page.screenshot({ path: path.join(ART, '01-board-control-always-on.png') });
+        await page.screenshot({ path: path.join(ART, '01-board-control-converged.png') });
 
-        // 断言:选中已有期点「开单」→ 后端幂等打开既有单(前端只管把 period 原样递给
-        // createOrder,幂等由后端 ON CONFLICT DO UPDATE 保证,这里断言前端确实把当期
-        // 递过去了,不是漏传或传错)。
-        await btn.click();
+        await openCtl.locator('[data-action="open-order"]').click();
         await expect.poll(() => createCalls.length, { timeout: 8000 }).toBeGreaterThan(0);
         expect(createCalls[0].period).toBe(period);
-        expect(createCalls[0].workspace_client_id).toBe('c1');
+        expect(createCalls[0].workspace_client_id).toBe('c2');
         expect(createCalls[0].intent).toBe('monthly_vat');
     });
 });

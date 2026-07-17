@@ -150,6 +150,10 @@ const AI_CSS = [
     // 排在 ai-dashboard.css 之后即可(矩阵/看板是同一工作台页的两个互斥子视图)。
     'ai/ai-matrix.css',
     'ai/ai-client.css',
+    // ai-review-jc.css(J-C · 客户页审核队列已判折叠/批量确认横幅/建议值三字段改数表单)
+    // 只补这三块 J-C 独有的 .rv-* 细节,吃 ai-client.css 已有的 .rv-edit/.rv-vat-input/
+    // .chip 原子,排在其后即可;ai-client.css 已逼近 500 行预算线,新增样式不再塞进去。
+    'ai/ai-review-jc.css',
     'ai/ai-intake.css',
     // ai-bank-sales.css(SA-3b · 收料 tab 银行流水倒推销项确认清单)吃 ai-recon.css 的
     // .brx-* 折叠列表原子 + ai-fileconv.css 的 .fc-banner 降级横幅 + ai-shell.css 的

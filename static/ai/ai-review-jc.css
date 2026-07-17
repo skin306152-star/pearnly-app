@@ -1,0 +1,76 @@
+/*
+ * Pearnly AI · ai-review-jc.css · 客户页审核队列(J-C)已判折叠 / 批量确认 / 建议值改数
+ *
+ * 三块都吃 ai-client.css 已有的 .rv-edit/.rv-vat-input/.btn/.chip 原子,只补这里独有的
+ * 布局细节;ai-client.css 已逼近 500 行预算线,新增样式不再塞进去(同 ai-clients.css 等
+ * "只补细节"先例)。收件箱异常票据区的已判折叠(.riq-decided-group)在 ai-review-inbox.css,
+ * 不在本文件(riq-* 命名空间归那个文件管)。
+ */
+
+/* 已判票折叠分组(原生 <details>,不写手工 toggle 状态)。 */
+.rv-decided-group {
+  max-width: min(560px, 100%);
+  margin: 14px auto 0;
+}
+.rv-decided-group summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--mut);
+  padding: 8px 4px;
+}
+.rv-decided-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+}
+.rv-decided-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--surface2);
+  font-size: 12px;
+}
+.rv-decided-row-file {
+  font-weight: 600;
+  color: var(--ink);
+}
+.rv-decided-row-by {
+  color: var(--mut);
+  flex: 1 1 auto;
+}
+
+/* 批量确认横幅(客户页版「全部按建议处理」,复用收件箱同一套端点)。 */
+.rv-bulk-banner {
+  max-width: min(560px, 100%);
+  margin: 0 auto 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* J-A 建议值三字段改数(净额/VAT/含税同一表单,预填建议值 + 琥珀提示)。 */
+.rv-suggest-note {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--warn-line);
+  border-radius: 9px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rv-suggest-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .rv-suggest-fields {
+    grid-template-columns: 1fr;
+  }
+}

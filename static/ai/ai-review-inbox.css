@@ -112,6 +112,19 @@
   flex-direction: column;
   gap: 12px;
 }
+/* 已判票折叠(J-C):原生 <details>,展开后仍是同一份 .riq-items 卡片列表。 */
+.riq-decided-group {
+  margin-top: 14px;
+}
+.riq-decided-group summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--mut);
+  padding: 6px 2px;
+}
+.riq-decided-group .riq-items {
+  padding-top: 10px;
+}
 .riq-item {
   border: 1px solid var(--hair);
   border-radius: 12px;

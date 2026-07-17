@@ -73,19 +73,129 @@
 
     // 一次按键 → POST /decisions 的 body(契约 §2)。金额票:A 采纳 / E 改数 / X 剔除;
     // 方向票:P 进项 / S 销项 / X 非税(assign_kind)。recalc 缺合法 VAT 时返回 null——调用方
-    // 不发请求,就地提示「请填有效 VAT」。
-    function buildDecisionPayload(itemId, action, vatRaw) {
+    // 不发请求,就地提示「请填有效 VAT」。fullValues(J-C · J-A 建议值三字段改数态)传入才走
+    // net/vat/grand_total 三字段路径,省略走现状单字段路径,不破坏既有调用方/测试。VAT 必填
+    // (reconcile_gates.py 的权威校验底线);net/grand_total 留空则不带这两个键,后端按票面
+    // 等式自行兜底(reconcile_gates.py L64-66:net 缺省从 vat 反推,grand 缺省 = net+vat)。
+    function buildDecisionPayload(itemId, action, vatRaw, fullValues) {
         if (action === 'accept') return { item_id: itemId, decision: 'face_value' };
         if (action === 'exclude') return { item_id: itemId, decision: 'exclude' };
         if (_ASSIGN_KIND[action]) {
             return { item_id: itemId, decision: 'assign_kind', kind: _ASSIGN_KIND[action] };
         }
         if (action === 'recalc') {
+            if (fullValues) {
+                var v = parseVat(fullValues.vat);
+                if (!v) return null;
+                var values = { vat: v };
+                var net = parseVat(fullValues.net);
+                if (net) values.net = net;
+                var grand = parseVat(fullValues.grand);
+                if (grand) values.grand_total = grand;
+                return { item_id: itemId, decision: 'recalc', values: values };
+            }
             var vat = parseVat(vatRaw);
             if (!vat) return null;
             return { item_id: itemId, decision: 'recalc', values: { vat: vat } };
         }
         return null;
+    }
+
+    // 该票是否已有裁决(latest-wins:session-local 乐观态优先于后端已落库的裁决)。
+    // J-C 未判/已判两分与计数器都靠它判断,单一事实源不各写一套 truthy 判断。
+    function isDecided(entry, local) {
+        return !!((local && local.decision) || (entry && entry.decision));
+    }
+
+    // 未判/已判两分(J-C · 客户页队列记忆修复 + 收件箱异常票据折叠共用):localByItem 缺省
+    // 只用 entry.decision(后端已落库的最新裁决)——客户页队列 mount 时会话尚无 local,分流
+    // 只算一次把主聚焦流收窄到真正待办的票(本次会话新裁决靠 undecidedCount 动态扣减计数器,
+    // 不改数组结构,详见 ai-review.js::revisitDecided);收件箱每次渲染都传 session-local
+    // (ai-review-inbox-render.js::groupHtml),两处共用同一份判断,不各写一套。
+    function splitByDecision(queue, localByItem) {
+        localByItem = localByItem || {};
+        var undecided = [],
+            decided = [];
+        (queue || []).forEach(function (e) {
+            (isDecided(e, localByItem[e.item_id]) ? decided : undecided).push(e);
+        });
+        return { undecided: undecided, decided: decided };
+    }
+
+    // 计数器「未判 k / 共 n」的 k(J-C):localByItem 是当前会话乐观态(item_id -> {decision}),
+    // 与 isDecided 同一份判断口径,不重复写一套 truthy 逻辑。
+    function undecidedCount(queue, localByItem) {
+        localByItem = localByItem || {};
+        return (queue || []).filter(function (e) {
+            return !isDecided(e, localByItem[e.item_id]);
+        }).length;
+    }
+
+    // J-A 建议值消费(J-C):order_detail.alerts 里按 item_id 取确定性读数解歧建议(J-13,
+    // 每 item_id 至多一条)。找不到返回 null——调用方据此诚实回退现状单字段改数表单。
+    function suggestionForItem(alerts, itemId) {
+        return (
+            (alerts || []).filter(function (a) {
+                return a.type === 'amount_read_suggested' && a.item_id === itemId;
+            })[0] || null
+        );
+    }
+
+    // 改数(E)态的编辑起始值(J-C):有 J-A 建议(amount_read_suggested)→ 三字段建议表单
+    // 初值(命中的人工改值优先于建议,例如改判场景);无建议 → 现状单字段初值(回落 OCR
+    // 读数)。纯函数,ai-review.js::startEdit 只需把结果塞进 S.editSuggestion/S.editValue/
+    // S.editSuggestValues,不在编排层重复这段判断。
+    function editStartValues(alerts, entry, priorDecision) {
+        var suggestion = suggestionForItem(alerts, entry.item_id);
+        var priorVat =
+            priorDecision &&
+            priorDecision.decision === 'recalc' &&
+            priorDecision.values &&
+            priorDecision.values.vat;
+        if (!suggestion) {
+            return {
+                suggestion: null,
+                editValue: priorVat || (entry.ocr_read || {}).vat || '',
+                suggestValues: null,
+            };
+        }
+        var priorValues =
+            (priorDecision && priorDecision.decision === 'recalc' && priorDecision.values) || {};
+        return {
+            suggestion: suggestion,
+            editValue: null,
+            suggestValues: {
+                net: priorValues.net || suggestion.suggestion.net,
+                vat: priorVat || suggestion.suggestion.vat,
+                grand: priorValues.grand_total || suggestion.suggestion.grand,
+            },
+        };
+    }
+
+    // 批量模板的 decision 词 → decide() 用的 ui action 词(ai-review.js::_stateForAction
+    // 复用同一张映射,不为批量另写一套终态标签)。bulkDecisionTemplate 目前只可能产出
+    // face_value/exclude/recalc(verdict.py 的 suggested_decision 策略),留 'assign' 兜底
+    // 以防未来策略扩面到方向裁决。
+    var _DECISION_TO_ACTION = { face_value: 'accept', exclude: 'exclude', recalc: 'recalc' };
+    function actionOfDecision(template) {
+        return (template && _DECISION_TO_ACTION[template.decision]) || 'assign';
+    }
+
+    // 改数裁决值 vs OCR 原读数比对(J-C · fieldRows「最新裁决值 + 已人工修正」徽标用):
+    // effectiveDecision.values 里有该键且与原读数不同 → 已人工修正;没有该键(如仍是老单
+    // 字段裁决只填了 vat)→ 诚实回落原读数,不假装其余字段被改过。
+    function decidedValue(effectiveDecision, key, fallback) {
+        var values =
+            effectiveDecision &&
+            effectiveDecision.decision === 'recalc' &&
+            effectiveDecision.values;
+        var value = values && values[key] != null ? values[key] : fallback;
+        var corrected = !!(
+            values &&
+            values[key] != null &&
+            String(values[key]) !== String(fallback)
+        );
+        return { value: value, corrected: corrected };
     }
 
     // 该票最新裁决({decision, values, actor, at} | null)→ chip 的 i18n key。
@@ -152,6 +262,13 @@
         fileName: fileName,
         suggestQuestionType: suggestQuestionType,
         buildStagePayload: buildStagePayload,
+        isDecided: isDecided,
+        splitByDecision: splitByDecision,
+        undecidedCount: undecidedCount,
+        suggestionForItem: suggestionForItem,
+        editStartValues: editStartValues,
+        actionOfDecision: actionOfDecision,
+        decidedValue: decidedValue,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

@@ -313,6 +313,17 @@ Object.assign(window.__AI_I18N_JA__, {
     riq_view_img_btn: '原本を見る',
     riq_item_frozen: '凍結済み · 読み取り専用',
 
+    // J-C · 審査キューの操作記憶(未処理優先/判定済み折りたたみ)+ 一括確認 +
+    // J-A 提案値の反映
+    rv_counter: '未処理 {k} / 全{n}件',
+    rv_manually_corrected: '手動修正済み',
+    rv_decided_group_summary: '判定済み {n} 件（展開して再判定可）',
+    rv_decided_row: '{actor} が判定 · {result}',
+    rv_revisit_btn: '再判定',
+    rv_suggest_note: 'AIが票面の等式から推算した値です。原本画像で必ず確認してください。',
+    rv_bulk_confirm_msg:
+        'この同種{n}件にAIの提案どおり一括で処理しますか？1件ずつ確定され、一括での取り消しはできません。',
+
     // MC1-b2 · 判定根拠テンプレート(narrative_key の命名は
     // services/workorder/verdict.py と手動で対応 · パラメータは同ファイルの
     // 各 _*_params ビルダー由来)

@@ -289,6 +289,16 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_view_img_btn: '查看原图',
     riq_item_frozen: '已冻结 · 只读',
 
+    // J-C · 审核队列操作记忆(未判优先/已判折叠)+ 批量确认 + J-A 建议值改数回显
+    rv_counter: '未判 {k} / 共 {n}',
+    rv_manually_corrected: '已人工修正',
+    rv_decided_group_summary: '已裁 {n} 张（展开可改判）',
+    rv_decided_row: '已由 {actor} 判 · {result}',
+    rv_revisit_btn: '改判',
+    rv_suggest_note: 'AI 按票面等式推算，请核对原图',
+    rv_bulk_confirm_msg:
+        '确认对这 {n} 张同类票全部按 AI 建议处理？会逐张裁决落库，无法一次性撤销。',
+
     // MC1-b2 · 判据人话模板(narrative_key 命名空间随 services/workorder/verdict.py
     // 手工对齐,params 见该文件各 _*_params 构造器)
     verdict_amount_math_fail:

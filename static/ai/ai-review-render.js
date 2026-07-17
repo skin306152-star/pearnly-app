@@ -72,24 +72,31 @@
         );
     }
 
+    // 一个金额字段的显示值(J-C · IMG_2647 尸检:收件箱此前硬传 null effectiveDecision,
+    // 改数后卡片仍显旧 OCR 读数)。corrected(与原读数不同的人工改值)加「已人工修正」徽标 +
+    // 原读数小字旁注;未改的字段就是原读数本身,不挂徽标(状态诚实,不制造假阳性)。
+    function correctedCell(field) {
+        return (
+            money(field.value) +
+            (field.corrected
+                ? ' <span class="chip w">' + esc(at('rv_manually_corrected')) + '</span>'
+                : '')
+        );
+    }
+
     // 契约 §5:改判过的票再进队列,表格要显 decision.values(裁决数),不是干等一行
-    // 「已由谁判」小字却还摆着 AI 原读数误导人。recalc 时 VAT 行主显裁决值,原 OCR 读数
-    // 降级成同格小字旁注;face_value/exclude 就是原读数本身,不用另显。
+    // 「已由谁判」小字却还摆着 AI 原读数误导人。net/vat/grand_total 三字段各自独立比对
+    // (J-A 建议值三字段改数态落地后,不再只有 VAT 能被人工改过);face_value/exclude
+    // 就是原读数本身,不用另显。
     function fieldRows(read, effectiveDecision) {
         read = read || {};
-        var vatMain = read.vat;
-        var vatNote = '';
-        if (
-            effectiveDecision &&
-            effectiveDecision.decision === 'recalc' &&
-            effectiveDecision.values &&
-            effectiveDecision.values.vat
-        ) {
-            vatMain = effectiveDecision.values.vat;
-            if (String(vatMain) !== String(read.vat)) {
-                vatNote = '<br><small>AI ' + money(read.vat) + '</small>';
-            }
-        }
+        var net = AI.reviewQueue.decidedValue(effectiveDecision, 'net', read.subtotal);
+        var vat = AI.reviewQueue.decidedValue(effectiveDecision, 'vat', read.vat);
+        var grand = AI.reviewQueue.decidedValue(
+            effectiveDecision,
+            'grand_total',
+            read.total_amount
+        );
         return (
             '<tr><td class="lb">' +
             esc(at('rv_field_supplier')) +
@@ -99,18 +106,17 @@
             '<tr><td class="lb">' +
             esc(at('rv_field_net')) +
             '</td><td class="vl num">' +
-            money(read.subtotal) +
+            correctedCell(net) +
             '</td></tr>' +
             '<tr class="rv-vat-row"><td class="lb">' +
             esc(at('rv_field_vat_face')) +
             '</td><td class="vl num" id="rvVatDisplay">' +
-            money(vatMain) +
-            vatNote +
+            correctedCell(vat) +
             '</td></tr>' +
             '<tr><td class="lb">' +
             esc(at('rv_field_total')) +
             '</td><td class="vl num">' +
-            money(read.total_amount) +
+            correctedCell(grand) +
             '</td></tr>' +
             '<tr><td class="lb">' +
             esc(at('rv_field_invno')) +
@@ -246,25 +252,30 @@
             ? '<div class="rv-dir-note">' + esc(at('rv_dir_prompt')) + '</div>'
             : '';
         var actionsHtml = ctx.editing ? '' : isDir ? directionActions() : amountActions();
+        // J-A 建议值消费(J-C):amount_math_fail 票若投影带解歧建议,改数态升级成三字段
+        // (net/vat/grand_total)预填建议值 + 琥珀标注;无建议票维持现状单字段表单
+        // (ai-review-suggest-render.js 拆出,单文件<500 铁律同 ai-review-pool.js 先例)。
         var editHtml = ctx.editing
-            ? '<div class="rv-edit" id="rvEdit">' +
-              '<label class="rv-edit-lb" for="rvVatInput">' +
-              esc(at('rv_field_vat_face')) +
-              '</label>' +
-              // editValue 必经 startEdit 赋值(entry.ocr_read.vat 或先前裁决值,至少是
-              // 空串)才会进这个分支——editing 为 true 时它不会是 null,不用再兜底。
-              '<input class="rv-vat-input num" id="rvVatInput" inputmode="decimal" value="' +
-              esc(ctx.editValue) +
-              '">' +
-              '<div class="rv-edit-hint">' +
-              esc(at('rv_edit_hint')) +
-              '</div>' +
-              (ctx.editErr
-                  ? '<div class="rv-edit-err" id="rvEditErr">' +
-                    esc(at('rv_edit_vat_required')) +
-                    '</div>'
-                  : '') +
-              '</div>'
+            ? ctx.editSuggestion
+                ? AI.reviewSuggest.editFormHtml(ctx)
+                : '<div class="rv-edit" id="rvEdit">' +
+                  '<label class="rv-edit-lb" for="rvVatInput">' +
+                  esc(at('rv_field_vat_face')) +
+                  '</label>' +
+                  // editValue 必经 startEdit 赋值(entry.ocr_read.vat 或先前裁决值,至少是
+                  // 空串)才会进这个分支——editing 为 true 时它不会是 null,不用再兜底。
+                  '<input class="rv-vat-input num" id="rvVatInput" inputmode="decimal" value="' +
+                  esc(ctx.editValue) +
+                  '">' +
+                  '<div class="rv-edit-hint">' +
+                  esc(at('rv_edit_hint')) +
+                  '</div>' +
+                  (ctx.editErr
+                      ? '<div class="rv-edit-err" id="rvEditErr">' +
+                        esc(at('rv_edit_vat_required')) +
+                        '</div>'
+                      : '') +
+                  '</div>'
             : '';
         var poolHtml = ctx.editing ? '' : poolPanelHtml(ctx.pool);
         return (
@@ -291,10 +302,10 @@
             esc(at('rv_ai_read')) +
             ' ' +
             statusChip(entry, ctx.local) +
-            '<span class="note" style="margin-left:auto">' +
-            (ctx.idx + 1) +
-            ' / ' +
-            ctx.total +
+            // 计数器改「未判 k / 共 n」(J-C):不再是卡在队列里第几张的 idx+1/total——
+            // 已判折叠出主流程后 idx 不再等于"审到第几张",诚实报剩余待办数才有意义。
+            '<span class="note" id="rvCounter" style="margin-left:auto">' +
+            esc(at('rv_counter', { k: ctx.undecidedRemaining, n: ctx.totalCount })) +
             '</span></h3></div>' +
             '<div class="bd">' +
             dirNote +

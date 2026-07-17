@@ -32,13 +32,18 @@
             api: api,
             orderId: order.id,
             clientId: clientId,
-            queue: [],
+            queue: [], // 未判票(J-C · 只有这些走单张聚焦流,已判票分流进 decidedEntries)
+            decidedEntries: [], // 已判票(mount 时 entry.decision 已有值),折叠分组只读展示
+            totalCount: 0, // 计数器「未判 k / 共 n」的 n = queue.length + decidedEntries.length(mount 时定,不随会话变)
             idx: 0,
             local: {}, // item_id -> {state: 'pending'|'accepted'|'recalc'|'excluded'|'assigned'|'failed', decision}
             poolHandle: AI.reviewPool.create(), // D2-S9 · 推 LINE 待问状态机(ai-review-pool.js)
+            bulkHandle: AI.reviewBulk.create(), // J-C · 全部按建议处理批量确认状态机(ai-review-bulk.js)
             editing: false,
             editErr: false,
             editValue: null,
+            editSuggestion: null, // J-A 建议值消费(J-C):当前编辑票命中的 amount_read_suggested 投影(无则 null)
+            editSuggestValues: null, // 建议三字段编辑值 {net, vat, grand}(仅 editSuggestion 非空时用)
             sessionDecided: 0,
             sessionCorrected: 0,
             mode: 'card', // 'card' | 'done'
@@ -61,14 +66,26 @@
 
     // ============ 渲染 ============
 
-    // R4 税号错录守护卡:两个视图(逐票 card / 走完 done)都在顶部注入,不打断裁决键盘流。
-    function injectTaxidAlert(container) {
-        var html = AI.reviewRender.taxidAlertHtml(S.alerts, {
-            canManage: S.canManage,
-            busy: S.realignBusy,
-            errKey: S.realignErr,
-        });
+    // 队列顶部 chrome(J-C):批量确认横幅(算未判队列里能一键处理的同类组)+ R4 税号错录
+    // 守护卡,两者都在顶部注入、不打断裁决键盘流。合成一段字符串一次插入而非各自
+    // insertAdjacentHTML('afterbegin')——后者多次调用会反序(每次都插到容器最前面)。
+    function injectChrome(container) {
+        var groups = S.bulkHandle.bulkableGroups(S.queue, S.local);
+        var html =
+            AI.reviewFoldRender.bulkBannerHtml(groups, S.bulkHandle.state().busyFlag) +
+            AI.reviewRender.taxidAlertHtml(S.alerts, {
+                canManage: S.canManage,
+                busy: S.realignBusy,
+                errKey: S.realignErr,
+            });
         if (html) container.insertAdjacentHTML('afterbegin', html);
+    }
+
+    // 已判票折叠分组(J-C):挪出主聚焦流的已判票在卡片下方常驻可见,展开可逐张改判
+    // (ai-review-fold-render.js::decidedGroupHtml,点击走 revisitDecided)。
+    function injectDecidedGroup(container) {
+        var html = AI.reviewFoldRender.decidedGroupHtml(S.decidedEntries);
+        if (html) container.insertAdjacentHTML('beforeend', html);
     }
 
     function renderCurrent() {
@@ -79,13 +96,17 @@
             entry: entry,
             idx: S.idx,
             total: S.queue.length,
+            undecidedRemaining: AI.reviewQueue.undecidedCount(S.queue, S.local),
+            totalCount: S.totalCount,
             local: S.local[entry.item_id],
             editing: S.editing,
             editErr: S.editErr,
             editValue: S.editValue,
+            editSuggestion: S.editSuggestion,
+            editSuggestValues: S.editSuggestValues,
             pool: S.poolHandle.forItem(entry.item_id),
         });
-        injectTaxidAlert(container);
+        injectChrome(container);
         if (S.editing) {
             var input = $('rvVatInput');
             if (input) {
@@ -93,6 +114,7 @@
                 input.select();
             }
         }
+        injectDecidedGroup(container);
         attachImage(entry);
         preloadNext();
     }
@@ -100,9 +122,9 @@
     function renderDone() {
         S.mode = 'done';
         var container = body();
-        if (!S.queue.length && !S.sessionDecided) {
+        if (!S.queue.length && !S.sessionDecided && !S.decidedEntries.length) {
             container.innerHTML = AI.reviewRender.emptyOkHtml();
-            injectTaxidAlert(container);
+            injectChrome(container);
             return;
         }
         container.innerHTML = AI.reviewRender.clearedHtml(
@@ -112,7 +134,8 @@
             S.blockedInfo,
             S.rerunProgress
         );
-        injectTaxidAlert(container);
+        injectChrome(container);
+        injectDecidedGroup(container);
     }
 
     // ============ 原图(生产同款查看器,AI.viewer 接手拖拽/缩放/旋转/全屏)============
@@ -168,8 +191,26 @@
     function decide(action) {
         var entry = S.queue[S.idx];
         if (!entry) return;
-        var vatRaw = action === 'recalc' ? $('rvVatInput') && $('rvVatInput').value : null;
-        var payload = AI.reviewQueue.buildDecisionPayload(entry.item_id, action, vatRaw);
+        // J-A 三字段建议值改数态(J-C):S.editSuggestion 命中时读 rvNetInput/rvGrandInput
+        // 一并提交;否则维持现状单字段(只读 rvVatInput)。
+        var vatRaw =
+            action === 'recalc' && !S.editSuggestion
+                ? $('rvVatInput') && $('rvVatInput').value
+                : null;
+        var fullValues =
+            action === 'recalc' && S.editSuggestion
+                ? {
+                      net: $('rvNetInput') && $('rvNetInput').value,
+                      vat: $('rvVatInput') && $('rvVatInput').value,
+                      grand: $('rvGrandInput') && $('rvGrandInput').value,
+                  }
+                : null;
+        var payload = AI.reviewQueue.buildDecisionPayload(
+            entry.item_id,
+            action,
+            vatRaw,
+            fullValues
+        );
         if (!payload) {
             S.editErr = true;
             renderCurrent();
@@ -182,6 +223,8 @@
         S.editing = false;
         S.editErr = false;
         S.editValue = null;
+        S.editSuggestion = null;
+        S.editSuggestValues = null;
         S.sessionDecided += 1;
         if (action === 'recalc') S.sessionCorrected += 1;
         advanceFocus();
@@ -264,9 +307,12 @@
         S.editErr = false;
         var entry = S.queue[S.idx];
         var decided = (S.local[entry.item_id] && S.local[entry.item_id].decision) || entry.decision;
-        var prior =
-            decided && decided.decision === 'recalc' && decided.values && decided.values.vat;
-        S.editValue = prior || (entry.ocr_read || {}).vat || '';
+        // J-A 建议值消费(J-C):AI.reviewQueue.editStartValues 决定单字段/三字段两种起始态
+        // (纯函数,判断逻辑不在编排层重复)。
+        var vals = AI.reviewQueue.editStartValues(S.alerts, entry, decided);
+        S.editSuggestion = vals.suggestion;
+        S.editValue = vals.editValue;
+        S.editSuggestValues = vals.suggestValues;
         renderCurrent();
     }
 
@@ -274,7 +320,59 @@
         S.editing = false;
         S.editErr = false;
         S.editValue = null;
+        S.editSuggestion = null;
+        S.editSuggestValues = null;
         renderCurrent();
+    }
+
+    // ============ 已判折叠分组:改判(J-C) ============
+
+    // 从折叠分组把该票挪回未判队列最前并立刻聚焦——复用同一套 A/E/X 裁决(latest-wins),
+    // 不重造第二套改判路径;entry.decision 仍在(旧裁决),卡片正常显示旧结果 + 可再裁决。
+    function revisitDecided(itemId) {
+        var pos = -1;
+        for (var i = 0; i < S.decidedEntries.length; i++) {
+            if (S.decidedEntries[i].item_id === itemId) {
+                pos = i;
+                break;
+            }
+        }
+        if (pos < 0) return;
+        var entry = S.decidedEntries.splice(pos, 1)[0];
+        S.queue.unshift(entry);
+        S.idx = 0;
+        S.mode = 'card';
+        renderCurrent();
+    }
+
+    // ============ 批量确认「全部按建议处理」(J-C) ============
+
+    function runBulk(flagReason) {
+        var group = S.bulkHandle.bulkableGroups(S.queue, S.local).filter(function (g) {
+            return g.flagReason === flagReason;
+        })[0];
+        if (!group) return;
+        var session = S; // 快照——网络落地时若已切走(S 已指向新会话)一律不认。
+        S.bulkHandle.confirmAndRun(S.api, S.orderId, group, function (res) {
+            if (S !== session) return;
+            if (res) {
+                var template = S.bulkHandle.state().lastTemplate;
+                var action = AI.reviewQueue.actionOfDecision(template);
+                (res.results || []).forEach(function (row) {
+                    if (!row.ok) return;
+                    setLocal(row.item_id, {
+                        state: _stateForAction(action),
+                        decision: Object.assign(
+                            { actor: currentActorLabel(), at: new Date().toISOString() },
+                            template
+                        ),
+                    });
+                });
+                S.sessionDecided += res.ok_count || 0;
+            }
+            if (S.mode === 'card') renderCurrent();
+            else renderDone();
+        });
     }
 
     // ============ 导航(↑↓←→,只移焦点不裁决) ============
@@ -525,6 +623,8 @@
         else if (action === 'rv-back-to-queue') backToQueue();
         else if (action === 'rv-refresh-status') refreshStatus();
         else if (action === 'rv-taxid-realign') doRealign();
+        else if (action === 'rv-revisit') revisitDecided(el.getAttribute('data-item'));
+        else if (action === 'rv-bulk-run') runBulk(el.getAttribute('data-flag'));
         else if (action === 'rv-goto-pkg') {
             window.location.hash = AI.router.buildClientHash(S.clientId, 'pkg');
         }
@@ -552,7 +652,13 @@
         api.getOrder(order.id)
             .then(function (detail) {
                 if (!S || S.orderId !== order.id) return; // 已切走
-                S.queue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
+                // 未判/已判两分(J-C):主聚焦流只走未判票,已判票折叠(见 injectDecidedGroup)。
+                var split = AI.reviewQueue.splitByDecision(
+                    AI.reviewQueue.filterPurchaseQueue(detail.flagged || [])
+                );
+                S.queue = split.undecided;
+                S.decidedEntries = split.decided;
+                S.totalCount = split.undecided.length + split.decided.length;
                 S.idx = 0;
                 S.mode = 'card';
                 S.alerts = detail.alerts || [];

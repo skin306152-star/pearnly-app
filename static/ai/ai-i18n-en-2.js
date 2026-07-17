@@ -316,6 +316,18 @@ Object.assign(window.__AI_I18N_EN__, {
     riq_view_img_btn: 'View original',
     riq_item_frozen: 'Frozen · read-only',
 
+    // J-C · review queue memory (undecided-first / decided folding) + bulk confirm +
+    // J-A suggested value echo
+    rv_counter: '{k} pending / {n} total',
+    rv_manually_corrected: 'Manually corrected',
+    rv_decided_group_summary: '{n} decided (expand to revise)',
+    rv_decided_row: 'Decided by {actor} · {result}',
+    rv_revisit_btn: 'Revise',
+    rv_suggest_note:
+        'AI inferred this from the invoice equation — please verify against the original image.',
+    rv_bulk_confirm_msg:
+        'Apply the AI-suggested decision to all {n} similar items? Each item is decided individually and this cannot be undone in one step.',
+
     // MC1-b2 · verdict narrative templates (narrative_key namespace aligned by hand with
     // services/workorder/verdict.py; params come from that file's _*_params builders)
     verdict_amount_math_fail:

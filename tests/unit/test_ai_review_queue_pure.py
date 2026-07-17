@@ -274,5 +274,223 @@ class FileNameTests(unittest.TestCase):
         self.assertEqual(out, ["IMG_2647.JPG", "IMG_2648.JPG", "", ""])
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class RecalcFullValuesTests(unittest.TestCase):
+    # J-C · J-A 建议值三字段改数(net/vat/grand_total),vatRaw 省略走 fullValues 路径。
+    def test_full_values_carries_all_three_fields(self):
+        out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(q.buildDecisionPayload('it1', 'recalc', null, {{
+                net: '58129.35', vat: '4069.05', grand: '62198.40',
+            }})));
+            """)
+        self.assertEqual(
+            out,
+            {
+                "item_id": "it1",
+                "decision": "recalc",
+                "values": {"vat": "4069.05", "net": "58129.35", "grand_total": "62198.40"},
+            },
+        )
+
+    def test_full_values_missing_vat_returns_null(self):
+        out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(
+                q.buildDecisionPayload('it1', 'recalc', null, {{net: '100', vat: '', grand: '107'}})
+            ));
+            """)
+        self.assertIsNone(out)
+
+    def test_full_values_optional_net_grand_omitted_when_blank(self):
+        # net/grand 留空 → 不带这两个键,后端按票面等式自行兜底,不假装被改过。
+        out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(
+                q.buildDecisionPayload('it1', 'recalc', null, {{net: '', vat: '4069.05', grand: ''}})
+            ));
+            """)
+        self.assertEqual(
+            out, {"item_id": "it1", "decision": "recalc", "values": {"vat": "4069.05"}}
+        )
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class IsDecidedTests(unittest.TestCase):
+    def test_local_decision_or_entry_decision_either_counts(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify([
+                q.isDecided({{item_id: 'a'}}, null),
+                q.isDecided({{item_id: 'a', decision: {{decision: 'face_value'}}}}, null),
+                q.isDecided({{item_id: 'a'}}, {{decision: {{decision: 'recalc'}}}}),
+            ]));
+            """)
+        self.assertEqual(out, [False, True, True])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class SplitByDecisionTests(unittest.TestCase):
+    def test_splits_undecided_and_decided_by_entry_decision(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const queue = [
+                {{item_id: 'a'}},
+                {{item_id: 'b', decision: {{decision: 'face_value'}}}},
+                {{item_id: 'c'}},
+            ];
+            const split = q.splitByDecision(queue);
+            process.stdout.write(JSON.stringify([
+                split.undecided.map(x => x.item_id), split.decided.map(x => x.item_id),
+            ]));
+            """)
+        self.assertEqual(out, [["a", "c"], ["b"]])
+
+    def test_local_by_item_also_counts_as_decided(self):
+        # 收件箱折叠共用同一份判断:session-local 乐观态也要挪进 decided。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const queue = [{{item_id: 'a'}}, {{item_id: 'b'}}];
+            const local = {{a: {{decision: {{decision: 'exclude'}}}}}};
+            const split = q.splitByDecision(queue, local);
+            process.stdout.write(JSON.stringify([
+                split.undecided.map(x => x.item_id), split.decided.map(x => x.item_id),
+            ]));
+            """)
+        self.assertEqual(out, [["b"], ["a"]])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class UndecidedCountTests(unittest.TestCase):
+    def test_counts_only_entries_without_any_decision(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const queue = [{{item_id: 'a'}}, {{item_id: 'b'}}, {{item_id: 'c'}}];
+            const local = {{b: {{decision: {{decision: 'face_value'}}}}}};
+            process.stdout.write(JSON.stringify(q.undecidedCount(queue, local)));
+            """)
+        self.assertEqual(out, 2)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class SuggestionForItemTests(unittest.TestCase):
+    def test_matches_by_type_and_item_id(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const alerts = [
+                {{type: 'taxid_typo_suspected', item_id: 'x'}},
+                {{type: 'amount_read_suggested', item_id: 'it1', suggestion: {{vat: '4069.05'}}}},
+            ];
+            process.stdout.write(JSON.stringify(q.suggestionForItem(alerts, 'it1')));
+            """)
+        self.assertEqual(
+            out,
+            {"type": "amount_read_suggested", "item_id": "it1", "suggestion": {"vat": "4069.05"}},
+        )
+
+    def test_no_match_returns_null(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(q.suggestionForItem([], 'it1')));
+            """)
+        self.assertIsNone(out)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class EditStartValuesTests(unittest.TestCase):
+    def test_no_suggestion_falls_back_to_single_field_state(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const entry = {{item_id: 'it1', ocr_read: {{vat: '100.00'}}}};
+            process.stdout.write(JSON.stringify(q.editStartValues([], entry, null)));
+            """)
+        self.assertEqual(out, {"suggestion": None, "editValue": "100.00", "suggestValues": None})
+
+    def test_suggestion_prefills_three_fields(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const entry = {{item_id: 'it1', ocr_read: {{vat: '4060.05'}}}};
+            const alerts = [{{
+                type: 'amount_read_suggested', item_id: 'it1',
+                suggestion: {{net: '58129.35', vat: '4069.05', grand: '62198.40'}},
+            }}];
+            const v = q.editStartValues(alerts, entry, null);
+            process.stdout.write(JSON.stringify([v.suggestion !== null, v.editValue, v.suggestValues]));
+            """)
+        self.assertEqual(
+            out,
+            [True, None, {"net": "58129.35", "vat": "4069.05", "grand": "62198.40"}],
+        )
+
+    def test_prior_recalc_values_win_over_suggestion(self):
+        # 改判场景:人工已改过的值优先于建议值(不覆盖已裁决的选择)。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const entry = {{item_id: 'it1', ocr_read: {{vat: '4060.05'}}}};
+            const alerts = [{{
+                type: 'amount_read_suggested', item_id: 'it1',
+                suggestion: {{net: '58129.35', vat: '4069.05', grand: '62198.40'}},
+            }}];
+            const prior = {{decision: 'recalc', values: {{net: '58200.00', vat: '4074.00', grand_total: '62274.00'}}}};
+            const v = q.editStartValues(alerts, entry, prior);
+            process.stdout.write(JSON.stringify(v.suggestValues));
+            """)
+        self.assertEqual(out, {"net": "58200.00", "vat": "4074.00", "grand": "62274.00"})
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class ActionOfDecisionTests(unittest.TestCase):
+    def test_maps_known_decisions_and_falls_back_to_assign(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify([
+                q.actionOfDecision({{decision: 'face_value'}}),
+                q.actionOfDecision({{decision: 'exclude'}}),
+                q.actionOfDecision({{decision: 'recalc'}}),
+                q.actionOfDecision({{decision: 'assign_kind', kind: 'purchase_invoice'}}),
+                q.actionOfDecision(null),
+            ]));
+            """)
+        self.assertEqual(out, ["accept", "exclude", "recalc", "assign", "assign"])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class DecidedValueTests(unittest.TestCase):
+    def test_no_effective_decision_falls_back_uncorrected(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(q.decidedValue(null, 'vat', '100.00')));
+            """)
+        self.assertEqual(out, {"value": "100.00", "corrected": False})
+
+    def test_recalc_value_differing_from_fallback_is_corrected(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const decision = {{decision: 'recalc', values: {{vat: '4069.05'}}}};
+            process.stdout.write(JSON.stringify(q.decidedValue(decision, 'vat', '4060.05')));
+            """)
+        self.assertEqual(out, {"value": "4069.05", "corrected": True})
+
+    def test_recalc_missing_key_falls_back_uncorrected(self):
+        # 老单字段裁决只填了 vat——net/grand_total 键不存在,诚实回落原读数,不假装改过。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const decision = {{decision: 'recalc', values: {{vat: '4069.05'}}}};
+            process.stdout.write(JSON.stringify(q.decidedValue(decision, 'net', '58048.40')));
+            """)
+        self.assertEqual(out, {"value": "58048.40", "corrected": False})
+
+    def test_recalc_value_equal_to_fallback_is_not_corrected(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const decision = {{decision: 'recalc', values: {{vat: '100.00'}}}};
+            process.stdout.write(JSON.stringify(q.decidedValue(decision, 'vat', '100.00')));
+            """)
+        self.assertEqual(out, {"value": "100.00", "corrected": False})
+
+
 if __name__ == "__main__":
     unittest.main()

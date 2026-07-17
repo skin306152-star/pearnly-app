@@ -247,150 +247,8 @@
     }
 
     // ============ 异常票据(跨工单按 flag_reason 分组的裁决卡三件套) ============
-    // 读值表格复用 ai-review-render.js 的 fieldRows(传 null effectiveDecision 走原读数
-    // 路径)——收件箱裁决卡与单工单人审卡是同一张五行读值表,不再各拼一份。
-
-    // 判据人话:narrative_key 有值走 i18n 模板,否则诚实回退 flag_reason 原文(verdict.py
-    // 顶注约定 + ai-review-verdict.js narrativeOf)。
-    function narrativeHtml(item) {
-        var n = AI.reviewVerdict.narrativeOf(item.verdict_hint, item.flag_reason);
-        var text = n.key ? at(n.key, n.vars) : n.fallbackText;
-        return '<p class="riq-narrative">' + esc(text) + '</p>';
-    }
-
-    function confidenceChipHtml(item) {
-        var c = (item.verdict_hint && item.verdict_hint.confidence) || 'low';
-        return (
-            '<span class="chip ' +
-            AI.reviewVerdict.confidenceChipClass(c) +
-            '">' +
-            esc(at(AI.reviewVerdict.confidenceLabelKey(c))) +
-            '</span>'
-        );
-    }
-
-    function itemStatusHtml(local) {
-        if (!local) return '';
-        if (local.state === 'pending')
-            return '<span class="chip w">' + esc(at('rv_chip_pending')) + '</span>';
-        if (local.state === 'failed') {
-            return (
-                '<span class="chip b">' +
-                esc(local.errKey ? at(local.errKey) : at('err_generic')) +
-                '</span>'
-            );
-        }
-        return '';
-    }
-
-    // 一张 flagged 件的裁决动作行:方向票(kind=sales_doc / flag_reason 前缀命中方向)
-    // 走 P/S/N;其余(金额/OCR 质量类)走 Accept/Edit(内联改数)/Exclude——键位/文案取
-    // ai-review-render.js 的按钮定义表(同一份,data-action 前缀参数化成 riq-*),只是
-    // 脱离单卡聚焦,改成组内行内按钮(btn sm + data-item)。
-    function itemActionsHtml(item, itemUi) {
-        itemUi = itemUi || {};
-        var isDir = AI.reviewQueue.isDirectionTicket(item);
-        if (isDir) {
-            return (
-                '<div class="riq-item-actions">' +
-                actionRowHtml(AI.reviewRender.DIRECTION_ACTION_DEFS, item.item_id) +
-                viewImgBtn(item) +
-                '</div>'
-            );
-        }
-        if (itemUi.editing) {
-            return (
-                '<div class="riq-item-actions riq-item-recalc">' +
-                '<input class="riq-vat-input" type="text" inputmode="decimal" data-item="' +
-                item.item_id +
-                '" value="' +
-                esc(itemUi.editValue || '') +
-                '">' +
-                actionBtn({ action: 'riq-recalc-submit', key: 'rv_key_edit', kbd: 'Enter' }, item) +
-                (itemUi.editErr
-                    ? '<span class="riq-item-err">' + esc(at('rv_edit_vat_required')) + '</span>'
-                    : '') +
-                '</div>'
-            );
-        }
-        return (
-            '<div class="riq-item-actions">' +
-            actionRowHtml(AI.reviewRender.AMOUNT_ACTION_DEFS, item.item_id) +
-            viewImgBtn(item) +
-            '</div>'
-        );
-    }
-
-    function actionBtn(def, item) {
-        return AI.reviewRender.actionButton(def, {
-            actionPrefix: 'riq-',
-            btnClass: 'btn sm',
-            itemId: item.item_id,
-        });
-    }
-
-    function actionRowHtml(defs, itemId) {
-        return defs
-            .map(function (def) {
-                return actionBtn(def, { item_id: itemId });
-            })
-            .join('');
-    }
-
-    function viewImgBtn(item) {
-        if (!item.file_ref) return '';
-        return (
-            '<button type="button" class="btn sm" data-action="riq-view-img" data-wo="' +
-            item.work_order_id +
-            '" data-item="' +
-            item.item_id +
-            '">' +
-            esc(at('riq_view_img_btn')) +
-            '</button>'
-        );
-    }
-
-    // 裁决卡三件套:读值(fldt)/判据人话(riq-narrative)/置信度徽标(chip)——三者都是
-    // isVisible 断言的直接对象,不藏进折叠面板。冻结单的件(frozen)收起全部裁决钮改只读
-    // 徽章(清单 #3 · 四态诚实:后端 archive 只读闸会拒,UI 不许先摆出可点的样子),
-    // 原图查看是只读动作照留。
-    function itemCardHtml(item, itemUi, local, frozen) {
-        var doneChip =
-            local && local.state && local.state !== 'pending' && local.state !== 'failed'
-                ? '<span class="chip g">' + esc(at('rv_chip_accepted')) + '</span>'
-                : '';
-        var actionsHtml = frozen
-            ? '<div class="riq-item-actions"><span class="chip s">' +
-              esc(at('riq_item_frozen')) +
-              '</span>' +
-              viewImgBtn(item) +
-              '</div>'
-            : itemActionsHtml(item, itemUi || {});
-        return (
-            '<div class="riq-item" data-item="' +
-            item.item_id +
-            '">' +
-            '<div class="riq-item-hd">' +
-            '<span class="riq-item-file">' +
-            esc(AI.reviewQueue.fileName(item.file_ref)) +
-            '</span>' +
-            confidenceChipHtml(item) +
-            itemStatusHtml(local) +
-            doneChip +
-            '<span class="note" style="margin-left:auto">' +
-            esc(item.client_name) +
-            ' · ' +
-            esc(item.period) +
-            '</span>' +
-            '</div>' +
-            '<table class="fldt riq-fldt">' +
-            AI.reviewRender.fieldRows(item.ocr_read, null) +
-            '</table>' +
-            narrativeHtml(item) +
-            actionsHtml +
-            '</div>'
-        );
-    }
+    // 逐张裁决卡的拼装(读值/判据人话/置信度徽标/动作行)拆到 ai-review-inbox-item-render.js
+    // (单文件<500 铁律),本文件只管分组头 + 已判折叠的编排。
 
     // actionableCount = 组内未冻结件数:批量/排除按钮只对它们生效,全冻结的组两钮都收,
     // 头部只留只读徽章(不给「60 张待批量」的假承诺)。
@@ -440,6 +298,17 @@
         );
     }
 
+    // 已判项折叠(J-C):isDecided 两分,未判照旧摊开;已判挪进 <details>,展开仍是同一张
+    // 裁决卡(AI.reviewInboxItem.card,Accept/Edit/Exclude latest-wins 改判照旧可点),
+    // 默认收起不占屏。
+    function cardsOf(items, ui, archivedIds) {
+        return items
+            .map(function (item) {
+                return AI.reviewInboxItem.card(item, ui, archivedIds);
+            })
+            .join('');
+    }
+
     function groupHtml(group, ui, archivedIds) {
         ui = ui || {};
         archivedIds = archivedIds || {};
@@ -447,16 +316,15 @@
             return !archivedIds[item.work_order_id];
         }).length;
         var canBulk = AI.reviewVerdict.groupCanBulk(group.items);
-        var itemsHtml = group.items
-            .map(function (item) {
-                return itemCardHtml(
-                    item,
-                    ui.itemUi && ui.itemUi[item.item_id],
-                    ui.local && ui.local[item.item_id],
-                    !!archivedIds[item.work_order_id]
-                );
-            })
-            .join('');
+        var split = AI.reviewQueue.splitByDecision(group.items, ui.local);
+        var itemsHtml = cardsOf(split.undecided, ui, archivedIds);
+        var decidedHtml = split.decided.length
+            ? '<details class="riq-decided-group"><summary>' +
+              esc(at('rv_decided_group_summary', { n: split.decided.length })) +
+              '</summary><div class="riq-items">' +
+              cardsOf(split.decided, ui, archivedIds) +
+              '</div></details>'
+            : '';
         return (
             '<div class="panel riq-group" data-flag="' +
             esc(group.flagReason) +
@@ -464,7 +332,9 @@
             groupHeaderHtml(group, canBulk, ui.busy, actionableCount) +
             '<div class="bd"><div class="riq-items">' +
             itemsHtml +
-            '</div></div></div>'
+            '</div>' +
+            decidedHtml +
+            '</div></div>'
         );
     }
 

@@ -114,8 +114,19 @@ const BUNDLES = [
             // 排在 ai-review-queue.js 之后即可(同属人审判据的纯函数分组),
             // ai-review-inbox-render.js(用它拼裁决卡三件套)之前。
             'ai/ai-review-verdict.js',
+            // ai-review-suggest-render.js(J-C · J-A 建议值三字段改数表单纯 HTML,依赖
+            // AI.state)排在 ai-review-render.js 之前——cardHtml 的 editHtml 分支调用
+            // AI.reviewSuggest.editFormHtml。ai-review-fold-render.js(J-C · 已判折叠分组 +
+            // 批量确认横幅纯 HTML,依赖 AI.state/format/reviewQueue)与前者互不依赖,同属
+            // "卡片之外的队列 chrome"分组,紧邻放置即可,都在 ai-review.js(注入两者)之前。
+            'ai/ai-review-suggest-render.js',
+            'ai/ai-review-fold-render.js',
             'ai/ai-review-render.js',
             'ai/ai-review-pool.js',
+            // ai-review-bulk.js(J-C ·「全部按建议处理」批量确认状态机,依赖 AI.reviewQueue/
+            // reviewVerdict/api,均已在上面)只需排在 ai-review.js(挂 S.bulkHandle)之前,
+            // 同 ai-review-pool.js 先例。
+            'ai/ai-review-bulk.js',
             'ai/ai-review.js',
             'ai/ai-intake-render.js',
             // ai-intake-manifest.js(IN-0b · 文件夹展平/队列态/盘点条+密码卡+续传横幅
@@ -170,11 +181,15 @@ const BUNDLES = [
             // ai-review-progress.js(MC2-A3 · 裁决后进度轮询状态机纯函数,零依赖)排在
             // ai-review-inbox.js(用它排期轮询)之前即可。
             'ai/ai-review-progress.js',
+            // ai-review-inbox-item-render.js(J-C · 单张裁决卡拼装,拆自 -inbox-render.js·
+            // 单文件<500 铁律,依赖 AI.state/format/reviewQueue/reviewVerdict/reviewRender
+            // 均已在上面)排在 -inbox-render.js(groupHtml 用它拼组内卡片)之前。
             // 审核收件箱聚合页(MC1-b2 · 接管 #/pool,方案见 ai-review-inbox.js 顶注)四文件:
             // -render.js(纯 HTML,依赖 AI.state/format/reviewQueue/reviewVerdict 均已在上面)、
             // -signoff.js(工单卡签批闭环状态机,依赖 AI.api)、-flagged.js(异常票据分组+
             // 批量/逐张裁决状态机,依赖 AI.reviewQueue/reviewVerdict/api)三者互不依赖,
             // 只需都排在 -inbox.js(编排,依赖前三者 + AI.clientPool,后者已在上面)之前。
+            'ai/ai-review-inbox-item-render.js',
             'ai/ai-review-inbox-render.js',
             'ai/ai-review-inbox-signoff.js',
             'ai/ai-review-inbox-flagged.js',

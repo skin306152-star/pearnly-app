@@ -251,10 +251,14 @@
             if (mask) mask.remove();
         }
 
+        // J-C:已判项(item.decision 或 session-local 已定)折叠进 <details>,E 键跳转不该
+        // 落到一张收起的卡上——同 isDecided 口径,不只看 session-local(否则回到刚打开的
+        // 收件箱,上次会话已裁的票仍会被当"未判"抢焦点)。
         function firstUndecidedItem(group) {
             return group.items.filter(function (it) {
                 var local = groupUiFor(group.flagReason).local[it.item_id];
-                return !local || local.state === 'failed';
+                if (local && local.state === 'failed') return true;
+                return !AI.reviewQueue.isDecided(it, local);
             })[0];
         }
 

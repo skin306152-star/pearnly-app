@@ -130,5 +130,124 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
         reply.assert_not_called()  # unfollow 无回复
 
 
+class BindCodeGateOrderingTests(unittest.IsolatedAsyncioTestCase):
+    """R1 闸序缺陷根治:未绑用户的绑定码须按「码所属租户」判闸,不能拿 None 判。
+
+    dms_line_enabled_for 用 side_effect 模拟 allowlist 灰度(仅名单内租户 True),坐实闸对
+    未绑用户提交的码按其真实租户放行/拒绝。
+    """
+
+    def _code_event(self, code="123456"):
+        return {
+            "type": "message",
+            "source": {"userId": "L1"},
+            "replyToken": "rt",
+            "message": {"type": "text", "text": code},
+        }
+
+    async def test_e1_allowlisted_tenant_valid_code_binds(self):
+        """E1:allowlist 名单内租户 T 的有效码 → 核销 + 建绑定 + BIND_OK。"""
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(w.store, "peek_bind_code_tenant", return_value="T"),
+            mock.patch.object(w, "dms_line_enabled_for", side_effect=lambda t, u: t == "T"),
+            mock.patch.object(
+                w.store, "consume_bind_code", return_value={"tenant_id": "T", "user_id": "u1"}
+            ) as consume,
+            mock.patch.object(
+                w.line_client, "get_user_profile", return_value={"displayName": "Som"}
+            ),
+            mock.patch.object(w.store, "create_or_update_binding", return_value=True) as create,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event())
+        consume.assert_called_once_with("123456")
+        create.assert_called_once_with("T", "u1", "L1", display_name="Som")
+        self.assertEqual(reply.call_args.args[1], w._MSG_BIND_OK)
+
+    async def test_e2_offlist_tenant_code_not_burned_zero_reply(self):
+        """E2:名单外租户 T2 的有效码 → 零回复、consume 不被调用(码不被烧,used_at 保持空)。"""
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(w.store, "peek_bind_code_tenant", return_value="T2"),
+            mock.patch.object(w, "dms_line_enabled_for", side_effect=lambda t, u: t == "T"),
+            mock.patch.object(w.store, "consume_bind_code") as consume,
+            mock.patch.object(w.store, "create_or_update_binding") as create,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event())
+        consume.assert_not_called()  # 闸对该租户关 → 不核销 → 码不烧
+        create.assert_not_called()
+        reply.assert_not_called()  # 不泄漏功能存在
+
+    async def test_e3_gate_globally_off_zero_burn_zero_reply(self):
+        """E3:闸整体 enabled=False(对任何租户皆关)→ 零核销零绑定零回复。"""
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(w.store, "peek_bind_code_tenant", return_value="T"),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=False),
+            mock.patch.object(w.store, "consume_bind_code") as consume,
+            mock.patch.object(w.store, "create_or_update_binding") as create,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event())
+        consume.assert_not_called()
+        create.assert_not_called()
+        reply.assert_not_called()
+
+    async def test_e4_bound_user_gated_by_bound_tenant(self):
+        """E4:已绑用户事件仍按其绑定租户判闸(不走窥码路)。"""
+        gate = mock.Mock(return_value=True)
+        with (
+            mock.patch.object(
+                w.store,
+                "get_binding_by_line_user",
+                return_value={"tenant_id": "T", "user_id": "u1"},
+            ),
+            mock.patch.object(w.store, "peek_bind_code_tenant") as peek,
+            mock.patch.object(w, "dms_line_enabled_for", gate),
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(
+                {
+                    "type": "message",
+                    "source": {"userId": "L1"},
+                    "replyToken": "rt",
+                    "message": {"type": "text", "text": "สวัสดี"},
+                }
+            )
+        peek.assert_not_called()  # 已绑用户不走窥码路
+        gate.assert_called_once_with("T", "u1")  # 按绑定租户判
+        self.assertEqual(reply.call_args.args[1], w._MSG_GUIDE)
+
+    async def test_e5_expired_code_gate_open_replies_bad(self):
+        """E5:闸对该租户开着时,过期/已用码 → BIND_BAD。"""
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(w.store, "peek_bind_code_tenant", return_value="T"),
+            mock.patch.object(w, "dms_line_enabled_for", side_effect=lambda t, u: t == "T"),
+            mock.patch.object(w.store, "consume_bind_code", return_value=None),
+            mock.patch.object(w.store, "create_or_update_binding") as create,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event())
+        create.assert_not_called()
+        self.assertEqual(reply.call_args.args[1], w._MSG_BIND_BAD)
+
+    async def test_e5_junk_code_unresolvable_zero_reply(self):
+        """E5:判不出租户归属的垃圾 6 位数字 → 零回复(fail-closed)。"""
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
+            mock.patch.object(w.store, "peek_bind_code_tenant", return_value=None),
+            mock.patch.object(w, "dms_line_enabled_for") as gate,
+            mock.patch.object(w.store, "consume_bind_code") as consume,
+            mock.patch.object(w.line_client, "reply_text") as reply,
+        ):
+            await w._handle_dms_event(self._code_event("000000"))
+        consume.assert_not_called()
+        gate.assert_not_called()  # 租户判不出 → 连闸都不问
+        reply.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

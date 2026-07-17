@@ -153,6 +153,37 @@ def consume_bind_code(code: str) -> Optional[dict]:
         return None
 
 
+def peek_bind_code_tenant(code: str) -> Optional[str]:
+    """窥探绑定码所属租户(不核销 · 不动 used_at)· 供「先按码定租户判闸再决定是否核销」。
+
+    未绑用户提交码时 webhook 无租户上下文,须先知道码归谁才能按该租户判 dms_line 闸——否则
+    allowlist 灰度下 tenant=None 恒判关会静默吞码。命中(不论未用/已用/过期)→ tenant_id 串;
+    无此码(判不出归属)→ None(fail-closed)。owner 连接(webhook 无登录态)。
+    """
+    from core import db
+
+    try:
+        code = (code or "").strip()
+        if len(code) != 6 or not code.isdigit():
+            return None
+
+        def _run():
+            with db.get_cursor() as cur:
+                cur.execute(
+                    "SELECT tenant_id FROM line_dms_binding_codes WHERE code = %s LIMIT 1",
+                    (code,),
+                )
+                return cur.fetchone()
+
+        row = _with_heal(_run)
+        if not row or row.get("tenant_id") is None:
+            return None
+        return str(row["tenant_id"])
+    except Exception as e:
+        logger.error(f"[line_dms] peek_bind_code_tenant failed: {e}")
+        return None
+
+
 # ── 绑定 ─────────────────────────────────────────────────────────────────
 
 

@@ -95,6 +95,27 @@ class ConsumeBindCodeTests(unittest.TestCase):
             self.assertIsNone(store.consume_bind_code("654321"))
 
 
+class PeekBindCodeTenantTests(unittest.TestCase):
+    def test_bad_format_skips_db(self):
+        with _patch_via_db(FakeCursor(fetchone={"tenant_id": "t"})):
+            self.assertIsNone(store.peek_bind_code_tenant("12345"))  # 5 位
+            self.assertIsNone(store.peek_bind_code_tenant("abcdef"))
+
+    def test_hit_returns_tenant_without_burning(self):
+        """命中即返回租户,SQL 只 SELECT 不 UPDATE used_at(窥码不烧)。"""
+        cur = FakeCursor(fetchone={"tenant_id": "t9"})
+        with _patch_via_db(cur):
+            self.assertEqual(store.peek_bind_code_tenant("654321"), "t9")
+        sql = cur.all_sql()
+        self.assertIn("SELECT tenant_id FROM line_dms_binding_codes", sql)
+        self.assertNotIn("UPDATE", sql)
+        self.assertNotIn("used_at", sql)
+
+    def test_no_row_none(self):
+        with _patch_via_db(FakeCursor(fetchone=None)):
+            self.assertIsNone(store.peek_bind_code_tenant("654321"))
+
+
 class CreateBindingTests(unittest.TestCase):
     def test_conflict_line_bound_other_rejected(self):
         cur = FakeCursor(fetchone_seq=[{"user_id": "other"}])

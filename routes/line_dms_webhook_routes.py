@@ -48,8 +48,11 @@ def _reply(reply_token: str, text: str) -> None:
 async def _handle_dms_event(ev: dict) -> None:
     """单个 DMS LINE 事件处理:闸 → follow/text/unfollow 分发。
 
-    闸判定域按事件所属租户(已绑用户从绑定拿 tenant/user;follow/未绑用户无租户 →
-    全局 user_id=None 判)。闸关 → 直接 return(零回复,fail-closed)。
+    闸判定域必须在「能知道租户是谁」之后:
+      · 已绑用户 → 按其绑定租户判(E4)。
+      · 未绑用户提交 6 位绑定码 → 先窥码定租户按该租户判闸(不能拿 None 判,否则 allowlist
+        灰度下有效码被静默吞掉)——见 _handle_dms_bind_code。
+      · 其余未绑事件(follow/解绑/引导)无从得知租户,按 None 判(fail-closed,现状保留)。
     """
     ev_type = ev.get("type")
     src = ev.get("source") or {}
@@ -57,6 +60,16 @@ async def _handle_dms_event(ev: dict) -> None:
     reply_token = ev.get("replyToken")
 
     binding = store.get_binding_by_line_user(line_user_id) if line_user_id else None
+
+    # 未绑用户的绑定码:闸判定域是「码所属租户」,须在核销前按码判闸。
+    if not binding and ev_type == "message":
+        msg = ev.get("message") or {}
+        if msg.get("type") == "text":
+            text = (msg.get("text") or "").strip()
+            if len(text) == 6 and text.isdigit():
+                await _handle_dms_bind_code(line_user_id, reply_token, text)
+                return
+
     tenant_id = binding.get("tenant_id") if binding else None
     user_id = binding.get("user_id") if binding else None
     if not dms_line_enabled_for(tenant_id, user_id):
@@ -76,6 +89,35 @@ async def _handle_dms_event(ev: dict) -> None:
         if msg.get("type") != "text":
             return
         await _handle_dms_text(line_user_id, reply_token, (msg.get("text") or "").strip())
+
+
+async def _handle_dms_bind_code(line_user_id: str, reply_token: str, code: str) -> None:
+    """未绑用户提交 6 位码:先窥码定租户按其判闸(闸序缺陷根治),闸开才核销 + 绑定。
+
+    闸对码所属租户关(或判不出租户归属的垃圾码)→ 零回复零核销:不泄漏功能存在,也不烧掉
+    名单外租户的码(其码在 TTL 内待该租户进名单后仍可用)。闸开且码过期/已用 → 回 BIND_BAD。
+    """
+    if not line_user_id:
+        return
+
+    tenant_id = store.peek_bind_code_tenant(code)
+    if not tenant_id:
+        return  # 判不出租户归属(垃圾码)→ fail-closed 零回复
+    if not dms_line_enabled_for(tenant_id, None):
+        return  # 闸对该租户关 → 零回复、不核销(不泄漏、不烧他人码)
+
+    ident = store.consume_bind_code(code)
+    if not ident:
+        _reply(reply_token, _MSG_BIND_BAD)  # 过期/已用(闸开着才回)
+        return
+    profile = line_client.get_user_profile(line_user_id, channel=_CHANNEL) or {}
+    ok = store.create_or_update_binding(
+        ident["tenant_id"],
+        ident["user_id"],
+        line_user_id,
+        display_name=profile.get("displayName"),
+    )
+    _reply(reply_token, _MSG_BIND_OK if ok else _MSG_BIND_BAD)
 
 
 async def _handle_dms_text(line_user_id: str, reply_token: str, text: str) -> None:

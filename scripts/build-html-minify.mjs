@@ -83,6 +83,9 @@ const TARGETS = [
     { src: 'static/ai/ai.html', out: 'static/dist/ai.html' },
     // Pearnly DMS SPA(身份证 → DMS 客户 · 邀请制独立入口):逻辑 JS 合 dist/dms.js · CSS 合 dist/dms.css。
     { src: 'static/dms/dms.html', out: 'static/dist/dms.html' },
+    // DMS 车辆选择面板(DL-4b · 一次性 token · LINE 内嵌打开):自包含单文件(内联 CSS+JS),
+    // 不进 dms.js/dms.css bundle——独立压缩即可,壳读 routes/dms_pick_routes.py 的 _PICK_PAGE。
+    { src: 'static/dms/pick.html', out: 'static/dist/dms-pick.html' },
     // Earn 平台超管后台(路由 /admin/*)· SPA 外壳收口(admin JS/CSS 仍独立 · 超管页防抄需求低)。
     { src: 'static/admin/admin.html', out: 'static/dist/admin.html' },
     // Earn 超管登录页(路由 /earn)· 原内联 routes/earn_login_page.py 常量 → 挪成可读源 + dist 产物。

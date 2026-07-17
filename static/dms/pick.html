@@ -1,0 +1,753 @@
+<!doctype html>
+<!--
+  Pearnly DMS · 车辆选择面板(DL-4b)· 自包含单文件(内联 CSS+JS,不进 dms.js bundle)。
+  一次性 token 面板:LINE 侧发 /dms-pick?t= 链接,无登录会话,凭 t 调三 API
+  (routes/dms_pick_routes.py)。流程:读数据 → 选车 → 联动颜色 → 选顾问/交车日 → 提交 →
+  成功屏回 LINE 确认。手机优先(390px),内联四语小词典(默认 th,读 mrpilot_lang)。
+-->
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pearnly DMS</title>
+    <style>
+      :root {
+        --bg: #f5f6fb;
+        --card: #fff;
+        --ink: #1b1b2b;
+        --ink2: #6f687d;
+        --line: #e7e7f0;
+        --brand: #2f6bff;
+        --brand-hover: #2456d8;
+        --accent-soft: #eaf0ff;
+        --red: #d6586a;
+        --red-soft: #fbeaec;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #14151b;
+          --card: #1d1f27;
+          --ink: #e8e8f0;
+          --ink2: #9a93a6;
+          --line: #2c2f3a;
+          --brand: #5a82ff;
+          --brand-hover: #6d92ff;
+          --accent-soft: #232a3f;
+          --red: #e08290;
+          --red-soft: #3a2229;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          'Sarabun',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          'Noto Sans Thai',
+          sans-serif;
+        font-size: 14px;
+      }
+      .wrap {
+        max-width: 460px;
+        margin: 0 auto;
+        padding: 16px 14px 100px;
+      }
+      .hd {
+        padding: 6px 2px 14px;
+      }
+      .hd b {
+        display: block;
+        font-size: 17px;
+      }
+      .hd span {
+        display: block;
+        font-size: 12px;
+        color: var(--ink2);
+        margin-top: 3px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 14px;
+      }
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        color: var(--ink2);
+        font-weight: 700;
+      }
+      .inp {
+        width: 100%;
+        height: 44px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--bg);
+        color: var(--ink);
+        font-size: 14px;
+      }
+      .inp:focus {
+        outline: 2px solid var(--brand);
+        outline-offset: -1px;
+      }
+      .list {
+        max-height: 300px;
+        overflow: auto;
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 52px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--bg);
+        cursor: pointer;
+        text-align: left;
+      }
+      .row.on {
+        border-color: var(--brand);
+        background: var(--accent-soft);
+      }
+      .row .rt {
+        min-width: 0;
+      }
+      .row b {
+        display: block;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .row small {
+        color: var(--ink2);
+        font-size: 11px;
+      }
+      .row .price {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--brand);
+        white-space: nowrap;
+      }
+      .muted {
+        color: var(--ink2);
+        font-size: 12px;
+        padding: 10px 2px;
+      }
+      label.f {
+        display: block;
+        margin-bottom: 12px;
+      }
+      label.f span {
+        display: block;
+        font-size: 12px;
+        color: var(--ink2);
+        margin-bottom: 6px;
+      }
+      label.f small {
+        display: block;
+        color: var(--ink2);
+        font-size: 10px;
+        margin-top: 4px;
+      }
+      select.inp {
+        appearance: auto;
+      }
+      .foot {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--card);
+        border-top: 1px solid var(--line);
+        padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+      }
+      .btn {
+        width: 100%;
+        min-height: 48px;
+        border: none;
+        border-radius: 12px;
+        background: var(--brand);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: var(--brand-hover);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .btn.ghost {
+        background: var(--card);
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+      .state {
+        min-height: 60vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 10px;
+        padding: 24px;
+      }
+      .state .ic {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 26px;
+      }
+      .state.err .ic {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+      .state.ok .ic {
+        background: var(--accent-soft);
+        color: var(--brand);
+      }
+      .state h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .state p {
+        margin: 0;
+        color: var(--ink2);
+        font-size: 13px;
+        max-width: 320px;
+      }
+      .spin {
+        width: 30px;
+        height: 30px;
+        border: 3px solid var(--line);
+        border-top-color: var(--brand);
+        border-radius: 50%;
+        animation: sp 0.8s linear infinite;
+      }
+      @keyframes sp {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .err-banner {
+        background: var(--red-soft);
+        color: var(--red);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      (function () {
+        'use strict';
+
+        var DICT = {
+          th: {
+            title: 'เลือกรุ่นรถและสี',
+            loading: 'กำลังโหลดข้อมูล…',
+            searchPh: 'ค้นหารุ่น/รหัสรถ',
+            carsH: 'เลือกรุ่นรถ',
+            noCars: 'ยังไม่มีรายการรถ กรุณาติดต่อพนักงานขาย',
+            paintsH: 'เลือกสี',
+            loadingPaints: 'กำลังโหลดสี…',
+            noPaints: 'ไม่มีสีให้เลือกสำหรับรุ่นนี้ กรุณาติดต่อพนักงานขาย',
+            pickCarFirst: 'เลือกรุ่นรถก่อนเพื่อดูสี',
+            advisorH: 'ที่ปรึกษาการขาย',
+            dateH: 'วันที่รับรถ (พ.ศ.)',
+            dateHint: 'รูปแบบ วว/ดด/ปปปป เช่น 01/08/2568',
+            dateBad: 'รูปแบบวันที่ไม่ถูกต้อง กรุณากรอก วว/ดด/ปปปป',
+            submit: 'ยืนยันการเลือก',
+            submitting: 'กำลังบันทึก…',
+            successTitle: 'เลือกเรียบร้อย',
+            successMsg: 'เลือกเรียบร้อย กลับไปยืนยันใน LINE',
+            errExpiredTitle: 'ลิงก์หมดอายุ',
+            errExpired: 'ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว กรุณากลับไปที่ LINE แล้วขอลิงก์ใหม่',
+            errNotFoundTitle: 'ยังไม่เปิดใช้งาน',
+            errNotFound: 'ฟีเจอร์นี้ยังไม่เปิดใช้งานสำหรับบัญชีนี้',
+            errGenericTitle: 'เกิดข้อผิดพลาด',
+            errGeneric: 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่',
+            errNetwork: 'เชื่อมต่อไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่',
+            errBadSelection: 'ตัวเลือกไม่ถูกต้อง กรุณาเลือกใหม่อีกครั้ง',
+            retry: 'ลองใหม่',
+            priceUnit: 'บาท',
+          },
+          zh: {
+            title: '选择车型和颜色',
+            loading: '正在加载数据…',
+            searchPh: '搜索车型/车号',
+            carsH: '选择车型',
+            noCars: '暂无车型可选,请联系销售顾问',
+            paintsH: '选择颜色',
+            loadingPaints: '正在加载颜色…',
+            noPaints: '该车型暂无可选颜色,请联系销售顾问',
+            pickCarFirst: '请先选择车型以查看颜色',
+            advisorH: '销售顾问',
+            dateH: '交车日期(佛历)',
+            dateHint: '格式 日/月/年,如 01/08/2568',
+            dateBad: '日期格式不正确,请填 日/月/年',
+            submit: '确认选择',
+            submitting: '正在提交…',
+            successTitle: '选择完成',
+            successMsg: '选择完成,请回到 LINE 确认',
+            errExpiredTitle: '链接已过期',
+            errExpired: '此链接已过期或已被使用,请回到 LINE 重新获取链接',
+            errNotFoundTitle: '功能未开通',
+            errNotFound: '该账号尚未开通此功能',
+            errGenericTitle: '出错了',
+            errGeneric: '数据加载失败,请重试',
+            errNetwork: '网络连接失败,请检查网络后重试',
+            errBadSelection: '选择无效,请重新选择',
+            retry: '重试',
+            priceUnit: '泰铢',
+          },
+          en: {
+            title: 'Choose vehicle & color',
+            loading: 'Loading…',
+            searchPh: 'Search model/code',
+            carsH: 'Choose a model',
+            noCars: 'No vehicles available. Please contact your sales advisor.',
+            paintsH: 'Choose a color',
+            loadingPaints: 'Loading colors…',
+            noPaints: 'No colors available for this model. Please contact your sales advisor.',
+            pickCarFirst: 'Pick a model first to see colors',
+            advisorH: 'Sales advisor',
+            dateH: 'Delivery date (Buddhist era)',
+            dateHint: 'Format dd/mm/yyyy, e.g. 01/08/2568',
+            dateBad: 'Invalid date format, please use dd/mm/yyyy',
+            submit: 'Confirm selection',
+            submitting: 'Saving…',
+            successTitle: 'All set',
+            successMsg: 'Selection saved — go back to LINE to confirm',
+            errExpiredTitle: 'Link expired',
+            errExpired:
+              'This link has expired or was already used. Please go back to LINE and request a new one.',
+            errNotFoundTitle: 'Not enabled',
+            errNotFound: 'This feature is not enabled for this account.',
+            errGenericTitle: 'Something went wrong',
+            errGeneric: 'Could not load data. Please try again.',
+            errNetwork: 'Connection failed. Please check your network and try again.',
+            errBadSelection: 'Invalid selection. Please choose again.',
+            retry: 'Retry',
+            priceUnit: 'THB',
+          },
+          ja: {
+            title: '車種とカラーを選択',
+            loading: '読み込み中…',
+            searchPh: '車種名/コードで検索',
+            carsH: '車種を選択',
+            noCars: '選べる車種がありません。営業担当にご連絡ください。',
+            paintsH: 'カラーを選択',
+            loadingPaints: 'カラーを読み込み中…',
+            noPaints: 'この車種に選べるカラーがありません。営業担当にご連絡ください。',
+            pickCarFirst: '先に車種を選ぶとカラーが表示されます',
+            advisorH: '営業担当',
+            dateH: '納車日(仏暦)',
+            dateHint: '形式 日/月/年 例 01/08/2568',
+            dateBad: '日付の形式が正しくありません。日/月/年で入力してください',
+            submit: '選択を確定',
+            submitting: '送信中…',
+            successTitle: '完了しました',
+            successMsg: '選択が完了しました。LINE に戻って確認してください',
+            errExpiredTitle: 'リンクの有効期限切れ',
+            errExpired:
+              'このリンクは期限切れか、すでに使用されています。LINE に戻って新しいリンクを取得してください。',
+            errNotFoundTitle: '未有効化',
+            errNotFound: 'このアカウントではこの機能が有効になっていません。',
+            errGenericTitle: 'エラーが発生しました',
+            errGeneric: 'データを読み込めませんでした。もう一度お試しください。',
+            errNetwork: '接続に失敗しました。ネットワークを確認して再試行してください。',
+            errBadSelection: '選択が無効です。もう一度選び直してください。',
+            retry: '再試行',
+            priceUnit: 'バーツ',
+          },
+        };
+        var SUPPORTED = ['zh', 'th', 'en', 'ja'];
+        var lang = 'th';
+        try {
+          var saved = localStorage.getItem('mrpilot_lang') || '';
+          if (SUPPORTED.indexOf(saved) >= 0) lang = saved;
+        } catch (e) {
+          /* localStorage 不可用(隐私模式)· 落回默认 th */
+        }
+        var T = DICT[lang] || DICT.th;
+
+        function esc(s) {
+          return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+        var app = document.getElementById('app');
+        var t = new URLSearchParams(location.search).get('t') || '';
+
+        // ── 状态容器(单一事实源) ──
+        var S = {
+          customer: null,
+          cars: [],
+          advisors: [],
+          defaults: {},
+          filter: '',
+          carId: '',
+          paints: [],
+          paintsLoading: false,
+          paintId: '',
+          advisorId: '',
+          deliveryDate: '',
+          submitting: false,
+          submitErr: '',
+        };
+
+        function api(path) {
+          return fetch(path).then(function (r) {
+            return r
+              .json()
+              .catch(function () {
+                return {};
+              })
+              .then(function (data) {
+                if (r.ok) return data;
+                return Promise.reject({ status: r.status, data: data });
+              });
+          });
+        }
+
+        function stateScreen(kind, title, msg, opts) {
+          opts = opts || {};
+          app.innerHTML =
+            '<div class="state ' +
+            kind +
+            '">' +
+            (kind === 'loading'
+              ? '<div class="spin"></div>'
+              : '<div class="ic">' + (kind === 'ok' ? '✓' : '!') + '</div>') +
+            '<h2>' +
+            esc(title) +
+            '</h2><p>' +
+            esc(msg) +
+            '</p>' +
+            (opts.retry
+              ? '<button class="btn ghost" id="ss-retry" style="width:auto;padding:0 20px">' +
+                esc(T.retry) +
+                '</button>'
+              : '') +
+            '</div>';
+          if (opts.retry) {
+            document.getElementById('ss-retry').addEventListener('click', opts.retry);
+          }
+        }
+
+        // ── 数据加载 ──
+        function loadData() {
+          stateScreen('loading', T.loading, '');
+          api('/api/dms/pick/data?t=' + encodeURIComponent(t))
+            .then(function (d) {
+              S.customer = d.customer || {};
+              S.cars = d.cars || [];
+              S.advisors = d.advisors || [];
+              S.defaults = d.defaults || {};
+              S.advisorId = String(
+                S.defaults.advisor_id || (S.advisors[0] && S.advisors[0][0]) || ''
+              );
+              S.deliveryDate = String(S.defaults.delivery_date_be || '');
+              renderForm();
+            })
+            .catch(function (err) {
+              handleLoadError(err);
+            });
+        }
+        function handleLoadError(err) {
+          var status = err && err.status;
+          if (status === 401) {
+            stateScreen('err', T.errExpiredTitle, T.errExpired);
+          } else if (status === 404) {
+            stateScreen('err', T.errNotFoundTitle, T.errNotFound);
+          } else if (status) {
+            stateScreen('err', T.errGenericTitle, T.errGeneric, { retry: loadData });
+          } else {
+            stateScreen('err', T.errGenericTitle, T.errNetwork, { retry: loadData });
+          }
+        }
+
+        // ── 车型/颜色/表单渲染 ──
+        function carRowHtml(row) {
+          var id = String(row[0]);
+          var code = row[1] ? String(row[1]) : '';
+          var name = row[2] ? String(row[2]) : '';
+          var price = carPrice(row);
+          return (
+            '<button type="button" class="row' +
+            (S.carId === id ? ' on' : '') +
+            '" data-car="' +
+            esc(id) +
+            '"><div class="rt"><b>' +
+            esc((code + ' ' + name).trim()) +
+            '</b></div>' +
+            (price
+              ? '<span class="price">' + esc(price) + ' ' + esc(T.priceUnit) + '</span>'
+              : '') +
+            '</button>'
+          );
+        }
+        function carPrice(row) {
+          var v = row && row.length > 16 ? row[16] : null;
+          if (!v) return '';
+          var n = Number(String(v).replace(/,/g, ''));
+          if (!isFinite(n) || n <= 0) return '';
+          return n.toLocaleString('en-US');
+        }
+        function filteredCars() {
+          var q = S.filter.trim().toLowerCase();
+          if (!q) return S.cars;
+          return S.cars.filter(function (r) {
+            return (String(r[1] || '') + ' ' + String(r[2] || '')).toLowerCase().indexOf(q) >= 0;
+          });
+        }
+        function paintsSectionHtml() {
+          if (!S.carId) return '<p class="muted">' + esc(T.pickCarFirst) + '</p>';
+          if (S.paintsLoading) return '<p class="muted">' + esc(T.loadingPaints) + '</p>';
+          if (!S.paints.length) return '<p class="muted">' + esc(T.noPaints) + '</p>';
+          return (
+            '<div class="list" style="max-height:220px">' +
+            S.paints
+              .map(function (row) {
+                var id = String(row[0]);
+                var label = (row[1] ? String(row[1]) + ' ' : '') + (row[2] || '');
+                return (
+                  '<button type="button" class="row' +
+                  (S.paintId === id ? ' on' : '') +
+                  '" data-paint="' +
+                  esc(id) +
+                  '"><div class="rt"><b>' +
+                  esc(label.trim() || id) +
+                  '</b></div></button>'
+                );
+              })
+              .join('') +
+            '</div>'
+          );
+        }
+        function advisorOptionsHtml() {
+          return S.advisors
+            .map(function (row) {
+              var id = String(row[0]);
+              var label = (row[1] ? String(row[1]) + ' ' : '') + (row[2] || '');
+              return (
+                '<option value="' +
+                esc(id) +
+                '"' +
+                (S.advisorId === id ? ' selected' : '') +
+                '>' +
+                esc(label.trim() || id) +
+                '</option>'
+              );
+            })
+            .join('');
+        }
+        function canSubmit() {
+          return !!(
+            S.carId &&
+            S.paintId &&
+            S.advisorId &&
+            validDate(S.deliveryDate) &&
+            !S.submitting
+          );
+        }
+        function validDate(v) {
+          var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(v || '').trim());
+          if (!m) return false;
+          var d = Number(m[1]),
+            mo = Number(m[2]),
+            y = Number(m[3]);
+          return d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2400 && y <= 2700;
+        }
+
+        function renderForm() {
+          var cars = filteredCars();
+          app.innerHTML =
+            '<div class="wrap"><div class="hd"><b>' +
+            esc(T.title) +
+            '</b>' +
+            (S.customer && S.customer.name ? '<span>' + esc(S.customer.name) + '</span>' : '') +
+            '</div>' +
+            (S.submitErr ? '<div class="err-banner">' + esc(S.submitErr) + '</div>' : '') +
+            '<div class="card"><h3>' +
+            esc(T.carsH) +
+            '</h3><input class="inp" id="pk-search" placeholder="' +
+            esc(T.searchPh) +
+            '" value="' +
+            esc(S.filter) +
+            '">' +
+            (cars.length
+              ? '<div class="list" id="pk-cars">' + cars.map(carRowHtml).join('') + '</div>'
+              : '<p class="muted">' + esc(T.noCars) + '</p>') +
+            '</div>' +
+            '<div class="card"><h3>' +
+            esc(T.paintsH) +
+            '</h3><div id="pk-paints">' +
+            paintsSectionHtml() +
+            '</div></div>' +
+            '<div class="card"><h3>' +
+            esc(T.advisorH) +
+            '</h3><select class="inp" id="pk-advisor">' +
+            advisorOptionsHtml() +
+            '</select></div>' +
+            '<div class="card"><label class="f"><span>' +
+            esc(T.dateH) +
+            '</span><input class="inp" id="pk-date" value="' +
+            esc(S.deliveryDate) +
+            '" inputmode="numeric" placeholder="วว/ดด/ปปปป"><small>' +
+            esc(T.dateHint) +
+            '</small></label></div>' +
+            '</div>' +
+            '<div class="foot"><button class="btn" id="pk-submit"' +
+            (canSubmit() ? '' : ' disabled') +
+            '>' +
+            esc(S.submitting ? T.submitting : T.submit) +
+            '</button></div>';
+          wireForm();
+        }
+
+        function wireForm() {
+          var search = document.getElementById('pk-search');
+          if (search)
+            search.addEventListener('input', function () {
+              S.filter = search.value;
+              renderForm();
+              document.getElementById('pk-search').focus();
+              document.getElementById('pk-search').selectionStart =
+                document.getElementById('pk-search').value.length;
+            });
+          var carsZone = document.getElementById('pk-cars');
+          if (carsZone)
+            carsZone.addEventListener('click', function (e) {
+              var btn = e.target.closest('[data-car]');
+              if (!btn) return;
+              selectCar(btn.getAttribute('data-car'));
+            });
+          var paintsZone = document.getElementById('pk-paints');
+          paintsZone.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-paint]');
+            if (!btn) return;
+            S.paintId = btn.getAttribute('data-paint');
+            renderForm();
+          });
+          var advisor = document.getElementById('pk-advisor');
+          if (advisor)
+            advisor.addEventListener('change', function () {
+              S.advisorId = advisor.value;
+            });
+          var date = document.getElementById('pk-date');
+          if (date)
+            date.addEventListener('input', function () {
+              S.deliveryDate = date.value;
+              document.getElementById('pk-submit').disabled = !canSubmit();
+            });
+          document.getElementById('pk-submit').addEventListener('click', onSubmit);
+        }
+
+        function selectCar(carId) {
+          if (S.carId === carId) return;
+          S.carId = carId;
+          S.paintId = '';
+          S.paints = [];
+          S.paintsLoading = true;
+          renderForm();
+          api(
+            '/api/dms/pick/paints?t=' +
+              encodeURIComponent(t) +
+              '&car_id=' +
+              encodeURIComponent(carId)
+          )
+            .then(function (d) {
+              if (S.carId !== carId) return; // 用户已切换车型,丢弃过期响应
+              S.paints = d.paints || [];
+              S.paintsLoading = false;
+              renderForm();
+            })
+            .catch(function (err) {
+              if (S.carId !== carId) return;
+              S.paintsLoading = false;
+              S.paints = [];
+              renderForm();
+              if (err && err.status === 401) handleLoadError(err);
+            });
+        }
+
+        function onSubmit() {
+          if (!canSubmit()) return;
+          if (!validDate(S.deliveryDate)) {
+            S.submitErr = T.dateBad;
+            return renderForm();
+          }
+          S.submitting = true;
+          S.submitErr = '';
+          renderForm();
+          fetch('/api/dms/pick/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              t: t,
+              car_id: S.carId,
+              paint_id: S.paintId,
+              advisor_id: S.advisorId,
+              delivery_date_be: S.deliveryDate,
+            }),
+          })
+            .then(function (r) {
+              return r
+                .json()
+                .catch(function () {
+                  return {};
+                })
+                .then(function (data) {
+                  if (r.ok) return data;
+                  return Promise.reject({ status: r.status, data: data });
+                });
+            })
+            .then(function () {
+              stateScreen('ok', T.successTitle, T.successMsg);
+            })
+            .catch(function (err) {
+              S.submitting = false;
+              var status = err && err.status;
+              if (status === 401) return handleLoadError(err);
+              if (status === 422) S.submitErr = T.errBadSelection;
+              else if (status) S.submitErr = T.errGeneric;
+              else S.submitErr = T.errNetwork;
+              renderForm();
+            });
+        }
+
+        loadData();
+      })();
+    </script>
+  </body>
+</html>

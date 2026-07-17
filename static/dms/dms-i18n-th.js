@@ -239,4 +239,31 @@ window.__DMS_I18N_TH__ = {
     'dms-rec-mode-create': 'สร้างใหม่',
     'dms-rec-mode-update': 'อัปเดต',
     'dms-rec-mode-overwrite': 'เขียนทับ',
+    // DL-4b · แอดมินสองช่อง(สำหรับแก้ไขข้อมูลลูกค้า)
+    'dms-wizard-admin-title': 'บัญชีแอดมิน (สำหรับแก้ไขข้อมูลลูกค้า)',
+    'dms-wizard-admin-desc':
+        'ใช้เฉพาะตอนแก้ไขข้อมูลลูกค้าใน DMS เท่านั้น ไม่บังคับกรอก เว้นว่างได้',
+    'dms-wizard-admin-user': 'ชื่อผู้ใช้แอดมิน',
+    'dms-wizard-admin-pass': 'รหัสผ่านแอดมิน',
+    'dms-wizard-admin-configured': 'กำหนดค่าแล้ว เว้นว่างเพื่อไม่เปลี่ยน',
+    'dms-card-admin-badge': 'แอดมิน ✓',
+    // DL-4b · การ์ดเชื่อมต่อ LINE (ช่องทางแยกจาก DMS)
+    'dms-line-title': 'เชื่อมต่อ LINE',
+    'dms-line-loading': 'กำลังตรวจสอบสถานะ…',
+    'dms-line-error': 'โหลดสถานะไม่สำเร็จ กรุณาลองใหม่',
+    'dms-line-retry': 'ลองใหม่',
+    'dms-line-step1': '1. เพิ่มเพื่อน Pearnly DMS ใน LINE',
+    'dms-line-step2': '2. กดสร้างรหัสเชื่อมต่อด้านล่าง',
+    'dms-line-step3': '3. ส่งรหัสนั้นในแชท LINE เพื่อยืนยันตัวตน',
+    'dms-line-addfriend': 'เพิ่มเพื่อน Pearnly DMS ใน LINE',
+    'dms-line-gen-btn': 'สร้างรหัสเชื่อมต่อ',
+    'dms-line-regenerate': 'สร้างรหัสใหม่',
+    'dms-line-expires': 'หมดอายุใน',
+    'dms-line-expired': 'รหัสหมดอายุแล้ว กรุณาสร้างใหม่',
+    'dms-line-gen-fail': 'สร้างรหัสไม่สำเร็จ กรุณาลองใหม่',
+    'dms-line-bound-since': 'เชื่อมต่อเมื่อ',
+    'dms-line-unbind-btn': 'ยกเลิกการเชื่อมต่อ',
+    'dms-line-unbind-confirm':
+        'ยกเลิกการเชื่อมต่อ LINE นี้หรือไม่? จะไม่สามารถรับการแจ้งเตือนผ่าน LINE ได้จนกว่าจะเชื่อมต่อใหม่',
+    'dms-line-unbind-fail': 'ยกเลิกการเชื่อมต่อไม่สำเร็จ กรุณาลองใหม่',
 };

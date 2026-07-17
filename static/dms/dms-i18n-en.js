@@ -244,4 +244,31 @@ window.__DMS_I18N_EN__ = {
     'dms-rec-mode-create': 'Create',
     'dms-rec-mode-update': 'Update',
     'dms-rec-mode-overwrite': 'Overwrite',
+    // DL-4b · admin credential pair (for editing customer records)
+    'dms-wizard-admin-title': 'Admin account (for editing customer records)',
+    'dms-wizard-admin-desc':
+        'Only used to edit existing DMS customer records. Optional — leave blank to skip.',
+    'dms-wizard-admin-user': 'Admin username',
+    'dms-wizard-admin-pass': 'Admin password',
+    'dms-wizard-admin-configured': 'Already set — leave blank to keep unchanged',
+    'dms-card-admin-badge': 'Admin ✓',
+    // DL-4b · LINE binding card (separate channel from the DMS connection itself)
+    'dms-line-title': 'Connect LINE',
+    'dms-line-loading': 'Checking status…',
+    'dms-line-error': 'Could not load status. Please try again.',
+    'dms-line-retry': 'Retry',
+    'dms-line-step1': '1. Add Pearnly DMS as a LINE friend',
+    'dms-line-step2': '2. Tap Generate code below',
+    'dms-line-step3': '3. Send that code in the LINE chat to verify',
+    'dms-line-addfriend': 'Add Pearnly DMS on LINE',
+    'dms-line-gen-btn': 'Generate connect code',
+    'dms-line-regenerate': 'Generate new code',
+    'dms-line-expires': 'Expires in',
+    'dms-line-expired': 'Code expired. Please generate a new one.',
+    'dms-line-gen-fail': 'Could not generate a code. Please try again.',
+    'dms-line-bound-since': 'Connected since',
+    'dms-line-unbind-btn': 'Disconnect',
+    'dms-line-unbind-confirm':
+        'Disconnect this LINE account? You will stop receiving LINE notifications until you connect again.',
+    'dms-line-unbind-fail': 'Could not disconnect. Please try again.',
 };

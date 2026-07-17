@@ -1392,3 +1392,87 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* LINE 绑定卡(DL-4b · 独立通道:App 侧发码 / 已绑定态)· 挂在 dx-erp-cards-zone 下方。 */
+.dmsx .dms-line-card {
+  border: 1px solid var(--dx-line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: var(--card);
+}
+.dmsx .dms-line-h {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.dmsx .dms-line-muted {
+  color: var(--ink2);
+  font-size: 12px;
+  margin: 4px 0 10px;
+}
+.dmsx .dms-line-steps {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--ink2);
+  display: grid;
+  gap: 4px;
+}
+.dmsx .dms-line-friend {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dx-brand);
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+.dmsx .dms-line-friend:hover {
+  text-decoration: underline;
+}
+.dmsx .dms-line-code-zone:empty {
+  display: none;
+}
+.dmsx .dms-line-code {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  text-align: center;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--dx-brand-soft);
+  color: var(--dx-brand);
+  margin-bottom: 6px;
+}
+.dmsx .dms-line-code.expired {
+  background: var(--dx-line);
+  color: var(--ink2);
+}
+.dmsx .dms-line-countdown {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink2);
+  margin-bottom: 12px;
+}
+.dmsx .dms-line-gen {
+  width: 100%;
+}
+.dmsx .dms-line-bound {
+  margin-bottom: 12px;
+}
+.dmsx .dms-line-bname {
+  font-size: 14px;
+  font-weight: 700;
+}
+.dmsx .dms-line-bmeta {
+  font-size: 11px;
+  color: var(--ink2);
+  margin-top: 3px;
+}
+.dmsx .dms-line-unbind {
+  width: 100%;
+  color: var(--dx-red);
+  border-color: var(--dx-red-soft);
+}
+.dmsx .dms-line-unbind:hover {
+  border-color: var(--dx-red);
+}

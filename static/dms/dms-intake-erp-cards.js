@@ -21,6 +21,10 @@
     function isAutoPush(ep) {
         return (ep.config || {}).id_card_auto_push === true;
     }
+    // 已配管理员账密(DL-4b · 只用于客户档改写);值恒为密文,只判是否存在。
+    function hasAdmin(ep) {
+        return !!(ep.config || {}).admin_username_enc;
+    }
 
     function cardHtml() {
         return (
@@ -50,7 +54,8 @@
                 st.textContent =
                     T('dx-erp-connected') +
                     ' · ' +
-                    T(isAutoPush(ep) ? 'dx-erp-mode-auto' : 'dx-erp-mode-manual');
+                    T(isAutoPush(ep) ? 'dx-erp-mode-auto' : 'dx-erp-mode-manual') +
+                    (hasAdmin(ep) ? ' · ' + T('dms-card-admin-badge') : '');
         }
         if (!acts) return;
         if (!ep) {

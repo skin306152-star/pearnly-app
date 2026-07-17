@@ -16,9 +16,9 @@ from services.workorder import progress
 
 class ClassifyProgressTests(unittest.TestCase):
     def _images(self):
-        return [
-            {"id": f"img-{i}", "file_ref": f"/x/IMG_{i}.jpg"} for i in range(3)
-        ] + [{"id": "xlsx-1", "file_ref": "/x/sales.xlsx"}]
+        return [{"id": f"img-{i}", "file_ref": f"/x/IMG_{i}.jpg"} for i in range(3)] + [
+            {"id": "xlsx-1", "file_ref": "/x/sales.xlsx"}
+        ]
 
     def test_counts_classified_images_during_classify_step(self):
         out = progress.classify_progress(

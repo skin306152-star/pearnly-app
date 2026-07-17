@@ -220,14 +220,27 @@ test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
         await page.screenshot({ path: path.join(ARTIFACT_DIR, '01-folder-rejected-precheck.png') });
 
         await page.click('[data-action="ik-upload"]');
-        const chips = page.locator('.manifest-card .chip');
-        await expect(chips.first()).toBeVisible({ timeout: 8000 });
-        const chipText = await page.locator('.manifest-card .ci-counts').innerText();
-        expect(chipText).toContain('15'); // 收进 15 件
-        expect(chipText).toContain('2'); // 拒收 2 件(empty + docx)
-        const rows = await page.locator('.manifest-card .mx-table tr').allInnerTexts();
-        expect(rows.some((r) => r.includes('empty.jpg'))).toBe(true);
-        expect(rows.some((r) => r.includes('notes.docx'))).toBe(true);
+        // 时序修法(J-B R2 打回·真诊断非产品坏):拖拽预检阶段(点上传前)盘点条已经在显示
+        // 2 件拒收的 chip,`chips.first()` 一开始就满足可见——不是"上传落定"的可靠信号。
+        // 落盘 15 件是异步(POST /materials resolve 才回填 manifest.accepted),原来紧跟着的
+        // 一次性 innerText() 读在网络慢/CI 更挤时能在 accepted 回填前抢先读到「0 accepted」
+        // (400ms 人工延迟本地稳定复现 5/5 次·加浏询等待后 5/5 次绿,证明产品数据本身对,
+        // 纯粹是断言没等异步落定)。改自愈轮询断言直接等最终态,不改产品代码。
+        const ciCounts = page.locator('.manifest-card .ci-counts');
+        await expect(ciCounts).toContainText('15', { timeout: 8000 }); // 收进 15 件
+        await expect(ciCounts).toContainText('2', { timeout: 8000 }); // 拒收 2 件(empty + docx)
+        await expect
+            .poll(
+                async () => {
+                    const rows = await page.locator('.manifest-card .mx-table tr').allInnerTexts();
+                    return {
+                        empty: rows.some((r) => r.includes('empty.jpg')),
+                        docx: rows.some((r) => r.includes('notes.docx')),
+                    };
+                },
+                { timeout: 8000 }
+            )
+            .toEqual({ empty: true, docx: true });
         await page.screenshot({ path: path.join(ARTIFACT_DIR, '02-folder-manifest-final.png') });
     });
 

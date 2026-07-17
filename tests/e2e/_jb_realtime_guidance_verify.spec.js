@@ -67,6 +67,24 @@ function syntheticFiles(n) {
     }));
 }
 
+// 迁移自 _r2f_r3_progress_verify.spec.js(R2 打回 #3:该文件不是"非 CI 用例",CI 的
+// npx playwright test 全量跑 tests/e2e/*.spec.js,它就在里面,断言已随 AI.poll 改造
+// (2s→5s 间隔 / 30 次→24 次上限)失效——断言原样搬进本文件、更新新数值口径,原文件删除。
+const FIXTURES = path.join(__dirname, '..', 'fixtures', 'messy_intake_pack');
+
+// 后端 409 结构化响应体(routes/workorder_routes.py::_run_in_progress_detail 逐字段对齐)。
+function runInProgressBody(workOrderId) {
+    return {
+        detail: {
+            code: 'workorder.run_in_progress',
+            work_order_id: workOrderId,
+            status: 'running',
+            current_step: 'classify',
+            run_lease: null,
+        },
+    };
+}
+
 test.describe('J-B #1 · 收齐才开跑', () => {
     test('分批上传:第一批落定不触发 run,末批落定才触发一次', async ({ page }) => {
         test.setTimeout(30000);
@@ -319,5 +337,189 @@ test.describe('J-B #5 · 手机 390 视口无横向溢出', () => {
             path: path.join(ART, '08-mobile-390-no-overflow.png'),
             fullPage: true,
         });
+    });
+});
+
+test.describe('J-B #6 · 迁移自 R2F-R3(409 接线 + classify 进度 + 轮询超时诚实)', () => {
+    test('收料页:409 显示专属"正在跑"文案且继续轮询;classify 进度显示「识别中 X/N」', async ({
+        page,
+    }) => {
+        test.setTimeout(30000);
+        let runCalls = 0;
+        let pollCalls = 0;
+        await mockRoutes(page, {
+            'GET /api/workspace/clients/c1': jsonRoute({ client: { id: 'c1', name: 'Acme Co' } }),
+            'GET /api/workorder/orders': jsonRoute({ orders: [{ id: 'wo-1', period: '2569-05' }] }),
+            'GET /api/workorder/orders/wo-1': async (route) => {
+                pollCalls += 1;
+                if (pollCalls === 1) {
+                    return route.fulfill({
+                        contentType: 'application/json',
+                        body: JSON.stringify({
+                            id: 'wo-1',
+                            status: 'collecting',
+                            needs: [],
+                            numbers: {},
+                            flagged: [],
+                        }),
+                    });
+                }
+                const processed = Math.min(pollCalls - 1, 5);
+                return route.fulfill({
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'wo-1',
+                        status: 'stuck',
+                        current_step: 'classify',
+                        progress: { step: 'classify', processed, total: 8 },
+                        needs: [],
+                        blocked_reasons: [],
+                        numbers: {},
+                        flagged: [],
+                    }),
+                });
+            },
+            'POST /api/workorder/orders/wo-1/materials': jsonRoute({
+                registered: [{ item_id: 'a' }],
+                count: 1,
+            }),
+            'POST /api/workorder/orders/wo-1/run': async (route) => {
+                runCalls += 1;
+                if (runCalls === 1) {
+                    return route.fulfill({
+                        status: 409,
+                        contentType: 'application/json',
+                        body: JSON.stringify(runInProgressBody('wo-1')),
+                    });
+                }
+                return route.fulfill({
+                    contentType: 'application/json',
+                    body: JSON.stringify({ queued: true, status: 'running' }),
+                });
+            },
+        });
+
+        await page.goto(`${PAGE}#/client/c1/intake`);
+        await page.waitForSelector('#ikDrop', { timeout: 15000 });
+        await page.setInputFiles('#ikFileInput', path.join(FIXTURES, 'normal_receipt.jpg'));
+        // 收齐才开跑(J-B):upload() 落定后自动触发 startRerun(),不必再手点「重新跑」
+        // ——ik-rerun 按钮只在 idle 态渲染,自动续跑直接跳过 idle 落到 waiting/409 态,
+        // 旧测试手点这步已经不成立(元素压根不出现),等 .rerun-card 直接进等待态即可。
+        await page.click('[data-action="ik-upload"]');
+        // 409 专属文案(非通用 err_generic)立即可见——不是终态,按钮仍是等待态(继续轮询)。
+        const rerunCard = page.locator('.rerun-card');
+        await expect(rerunCard).toContainText('running', { timeout: 8000 });
+        await expect(rerunCard.locator('button[disabled]')).toBeVisible();
+        await page.screenshot({ path: path.join(ART, '09-intake-409-run-in-progress.png') });
+
+        // AI.poll 默认 5s 一轮(J-B 改造前是 2s)——等真进度数字出现在等待态按钮文案里。
+        await expect(rerunCard).toContainText(/\d+\/8/, { timeout: 8000 });
+        await page.screenshot({ path: path.join(ART, '10-intake-classify-progress.png') });
+    });
+
+    test('收料页:轮询次数用尽诚实显示"仍在后台跑" + 手动刷新钮可用', async ({ page }) => {
+        // AI.poll 默认 intervalMs=5000 × maxTries=24 = 120s 才耗尽——page.clock.runFor/
+        // fastForward 试过都追不上"这一轮 fetch(真 mock 往返)落定才排下一轮定时器"的链式
+        // 调度(虚拟时钟只接管 setTimeout/Date,route 的 mock 响应仍走真 CDP 往返,两者没对
+        // 齐,runFor 卡在第一轮不再推进——实测证据见收尾报告)。这里就真等,不弄虚的。
+        test.setTimeout(150000);
+        await mockRoutes(page, {
+            'GET /api/workspace/clients/c1': jsonRoute({ client: { id: 'c1', name: 'Acme Co' } }),
+            'GET /api/workorder/orders': jsonRoute({ orders: [{ id: 'wo-1', period: '2569-05' }] }),
+            'GET /api/workorder/orders/wo-1': jsonRoute({
+                id: 'wo-1',
+                status: 'stuck',
+                current_step: 'classify',
+                needs: [],
+                blocked_reasons: [],
+                numbers: {},
+                flagged: [],
+            }),
+            'POST /api/workorder/orders/wo-1/materials': jsonRoute({
+                registered: [{ item_id: 'a' }],
+                count: 1,
+            }),
+            'POST /api/workorder/orders/wo-1/run': jsonRoute({ queued: true, status: 'running' }),
+        });
+
+        await page.goto(`${PAGE}#/client/c1/intake`);
+        await page.waitForSelector('#ikDrop', { timeout: 15000 });
+        await page.setInputFiles('#ikFileInput', path.join(FIXTURES, 'normal_receipt.jpg'));
+        // 收齐才开跑(J-B):upload() 落定即自动触发续跑,不必手点 ik-rerun(同上一用例注释)。
+        await page.click('[data-action="ik-upload"]');
+        await expect(page.locator('.rerun-body button[disabled]')).toBeVisible({ timeout: 8000 });
+
+        // 真等 24 轮 × 5s = 120s 耗尽——不假装收口也不能无声挂着不给反馈。
+        const rerunCard = page.locator('.rerun-card');
+        await expect(page.locator('[data-action="ik-refresh-status"]')).toBeVisible({
+            timeout: 130000,
+        });
+        await expect(rerunCard).not.toContainText('err_generic');
+        await page.screenshot({ path: path.join(ART, '11-poll-timeout-honest.png') });
+
+        // 手动刷新钮点了确实重新起一轮轮询(转回等待态,不是死按钮)。
+        await page.click('[data-action="ik-refresh-status"]');
+        await expect(rerunCard.locator('button[disabled]')).toBeVisible({ timeout: 3000 });
+        await page.screenshot({ path: path.join(ART, '12-manual-refresh-resumes-poll.png') });
+    });
+
+    test('审核队列:裁决后重新跑撞 409:专属"正在跑"文案而非通用错误', async ({ page }) => {
+        test.setTimeout(30000);
+        let runCalls = 0;
+        await mockRoutes(page, {
+            'GET /api/workspace/clients/c1': jsonRoute({ client: { id: 'c1', name: 'Acme Co' } }),
+            'GET /api/workorder/orders': jsonRoute({
+                orders: [{ id: 'wo-r1', period: '2569-05' }],
+            }),
+            'GET /api/workorder/orders/wo-r1': jsonRoute({
+                id: 'wo-r1',
+                status: 'stuck',
+                needs: [],
+                numbers: {},
+                flagged: [
+                    {
+                        item_id: 'i1',
+                        file_ref: 'f1.jpg',
+                        kind: 'purchase_invoice',
+                        flag_reason: 'validation_fail',
+                        ocr_read: {
+                            seller_tax: '0105551234567',
+                            subtotal: '100.00',
+                            vat: '7.00',
+                            total_amount: '107.00',
+                            invoice_number: 'IV-1',
+                        },
+                        decision: null,
+                        verdict_hint: { severity: 'crit' },
+                    },
+                ],
+            }),
+            'POST /api/workorder/orders/wo-r1/decisions': jsonRoute({ ok: true }),
+            'POST /api/workorder/orders/wo-r1/run': async (route) => {
+                runCalls += 1;
+                if (runCalls === 1) {
+                    return route.fulfill({
+                        status: 409,
+                        contentType: 'application/json',
+                        body: JSON.stringify(runInProgressBody('wo-r1')),
+                    });
+                }
+                return route.fulfill({
+                    contentType: 'application/json',
+                    body: JSON.stringify({ queued: true, status: 'running' }),
+                });
+            },
+        });
+
+        await page.goto(`${PAGE}#/client/c1/review`);
+        await page.waitForSelector('[data-action="rv-accept"]', { timeout: 15000 });
+        await page.click('[data-action="rv-accept"]');
+        await expect(page.locator('[data-action="rv-rerun"]')).toBeVisible({ timeout: 8000 });
+
+        await page.click('[data-action="rv-rerun"]');
+        const doneCard = page.locator('.rv-done');
+        await expect(doneCard).toContainText('running', { timeout: 3000 });
+        await expect(doneCard.locator('button[disabled]')).toBeVisible();
+        await page.screenshot({ path: path.join(ART, '13-review-409-run-in-progress.png') });
     });
 });

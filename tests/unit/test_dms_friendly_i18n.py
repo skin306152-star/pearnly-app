@@ -45,6 +45,13 @@ class TestDmsFriendlyI18n(unittest.TestCase):
         self.assertTrue(d["ja"].strip())
         self.assertNotEqual(d["ja"], d["en"])
 
+    def test_admin_auth_code_present_five_langs_ja_not_english(self):
+        d = erp_push._DMS_FRIENDLY["ERR_DMS_ADMIN_AUTH"]
+        for lang in ("zh", "en", "th", "zh_TW", "ja"):
+            self.assertIn(lang, d, f"ERR_DMS_ADMIN_AUTH missing {lang}")
+            self.assertTrue(str(d[lang]).strip(), f"ERR_DMS_ADMIN_AUTH.{lang} empty")
+        self.assertNotEqual(d["ja"], d["en"])  # 真日文,非英文兜底
+
     def test_unknown_code_falls_back_to_unexpected_with_ja(self):
         d = erp_push._dms_friendly("ERR_SOMETHING_NOT_DEFINED")
         self.assertEqual(d, erp_push._DMS_FRIENDLY["ERR_UNEXPECTED"])

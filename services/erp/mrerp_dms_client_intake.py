@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import html
 import re
-from typing import Any, Dict, List, Optional
+from contextlib import contextmanager
+from typing import Any, Dict, Iterator, List, Optional
 
 from services.erp.mrerp_dms_client_base import DMSClientError
 
@@ -170,6 +171,35 @@ class DMSClientIntakeMixin:
         三套地址分别写;不给则用 fields 里的单套地址写满三处(向后兼容)。"""
         if mode not in ("create", "overwrite"):
             raise DMSClientError(f"bad save mode: {mode!r}", "ERR_DMS_CUSTOMER_SAVE")
+        with self._writer_session():
+            return self._save_customer_locked(
+                fields=fields, mode=mode, customer_id=customer_id, addresses=addresses
+            )
+
+    @contextmanager
+    def _writer_session(self) -> Iterator[None]:
+        """客户档写操作(建/改)走 admin 凭据组会话(配了 admin 时);读操作不受影响。
+        没配 admin(_resolve_admin_transport → None)则原样用当前会话 —— 单凭据路径
+        逐字节不变。整段写流程(含载表单/复核读)都在同一会话内一致。"""
+        admin = self._resolve_admin_transport()
+        if admin is None:
+            yield
+            return
+        prev = self.transport
+        self.transport = admin
+        try:
+            yield
+        finally:
+            self.transport = prev
+
+    def _save_customer_locked(
+        self,
+        *,
+        fields: Dict[str, Any],
+        mode: str,
+        customer_id: Optional[str] = None,
+        addresses: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> str:
         # 幂等:一个身份证 = DMS 一个客户(编号/身份证号唯一)。create 前先按身份证号查,
         # 已存在则转更新它 —— 修「撞客户编号重复」+ 自愈「建了客户但订车失败」后的重推。
         if mode == "create":

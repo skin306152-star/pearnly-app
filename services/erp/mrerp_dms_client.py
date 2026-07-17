@@ -42,7 +42,20 @@ from services.erp.mrerp_dms_client_intake import DMSClientIntakeMixin
 
 
 class DMSClient(DMSClientOpsMixin, DMSClientFormsMixin, DMSClientIntakeMixin):
-    def __init__(self, transport: Any, base_url: str):
+    def __init__(self, transport: Any, base_url: str, *, admin_transport: Any = None):
         # base_url ends with /dms/
         self.transport = transport
         self.base_url = base_url.rstrip("/") + "/"
+        # 凭据组:配了 admin(admin_transport 非 None)时,客户档写操作走它;读操作不变。
+        # 可为已建好的 transport,或一个零参工厂(生产侧懒登录,避免只读也起 admin 会话)。
+        self._admin_transport = admin_transport
+        self._admin_transport_cached: Any = None
+
+    def _resolve_admin_transport(self) -> Any:
+        """惰性解析 admin 凭据组 transport(工厂只调一次)。未配 → None。"""
+        src = self._admin_transport
+        if src is None:
+            return None
+        if self._admin_transport_cached is None:
+            self._admin_transport_cached = src() if callable(src) else src
+        return self._admin_transport_cached

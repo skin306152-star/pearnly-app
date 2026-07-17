@@ -50,6 +50,12 @@ class MrerpDmsAuthError(RuntimeError):
     """DMS login bounced — bad credentials / not approved. NOT retryable."""
 
 
+class MrerpDmsAdminAuthError(MrerpDmsAuthError):
+    """The admin credential-set login bounced. Distinct from the user-session
+    auth error so the route surfaces ERR_DMS_ADMIN_AUTH (admin creds wrong,
+    not the user's). Subclasses MrerpDmsAuthError — catch this one first."""
+
+
 class MrerpDmsTechnicalError(RuntimeError):
     """Network / Playwright / missing-selector failure. Retryable upstream."""
 
@@ -123,6 +129,8 @@ class MrerpDmsAdapter:
         system_url: str,
         username: str,
         password: str,
+        admin_username: Optional[str] = None,
+        admin_password: Optional[str] = None,
         headless: bool = True,
         screenshot_dir: Optional[Path] = None,
         slow_mo_ms: int = 0,
@@ -134,11 +142,21 @@ class MrerpDmsAdapter:
         self.login_url, self.base_url = self._normalize_urls(system_url)
         self._username = username
         self._password = password
+        # 凭据组:配了 admin(两者都有)时,客户档写操作走一个独立的 admin 登录会话
+        # (隔离 cookie,不动用户读会话);缺任一即无 admin,行为与单凭据逐字节一致。
+        self._admin_username = (admin_username or "").strip() or None
+        self._admin_password = admin_password or None
         self.headless = headless
         self.screenshot_dir = Path(screenshot_dir) if screenshot_dir else None
         self.slow_mo_ms = max(0, int(slow_mo_ms))
         self._session: Optional[BrowserSession] = None
         self._logged_in = False
+        self._admin_session: Optional[BrowserSession] = None
+        self._admin_logged_in = False
+
+    @property
+    def has_admin_creds(self) -> bool:
+        return bool(self._admin_username and self._admin_password)
 
     @staticmethod
     def _normalize_urls(system_url: str):
@@ -191,6 +209,13 @@ class MrerpDmsAdapter:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
+        if self._admin_session is not None:
+            try:
+                self._admin_session.__exit__(exc_type, exc, tb)
+            except Exception:
+                pass
+        self._admin_session = None
+        self._admin_logged_in = False
         if self._session is not None:
             self._session.__exit__(exc_type, exc, tb)
         self._session = None
@@ -206,7 +231,40 @@ class MrerpDmsAdapter:
         return PlaywrightTransport(self._page.context.request)
 
     def _client(self) -> DMSClient:
-        return DMSClient(self._transport(), self.base_url)
+        # 读操作走用户会话;客户档写操作在配了 admin 时懒切到 admin 会话。工厂(而非
+        # 现成 transport)保证纯读路径永不起 admin 浏览器。
+        admin = self._admin_writer_transport if self.has_admin_creds else None
+        return DMSClient(self._transport(), self.base_url, admin_transport=admin)
+
+    def _admin_writer_transport(self) -> PlaywrightTransport:
+        """懒起 admin 会话并返回其 transport(首次写操作时触发)。"""
+        self._ensure_admin_session()
+        assert self._admin_session is not None  # _ensure 成功后必非空
+        return PlaywrightTransport(self._admin_session.page.context.request)
+
+    def _ensure_admin_session(self) -> None:
+        """独立浏览器上下文登录 admin 凭据组(隔离 cookie,不碰用户读会话)。
+        admin 登录失败 → MrerpDmsAdminAuthError(路由映射 ERR_DMS_ADMIN_AUTH)。"""
+        if self._admin_logged_in:
+            return
+        if not self.has_admin_creds:
+            raise MrerpDmsTechnicalError("admin session requested without admin credentials")
+        secrets = [self._admin_password]
+        if len(self._admin_username) >= 3:
+            secrets.append(self._admin_username)
+        self._admin_session = BrowserSession(
+            headless=self.headless,
+            screenshot_dir=self.screenshot_dir,
+            redact_strings=secrets,
+            slow_mo_ms=self.slow_mo_ms,
+        ).__enter__()
+        try:
+            self._perform_login(
+                self._admin_session.page, self._admin_username, self._admin_password
+            )
+        except MrerpDmsAuthError as e:
+            raise MrerpDmsAdminAuthError(f"DMS admin credential login failed: {e}")
+        self._admin_logged_in = True
 
     def session_cookies(self) -> list:
         """登录态 cookie · 供交互层缓存做只读级联提速(避免每次 dropdown 重登录)。"""
@@ -233,8 +291,15 @@ class MrerpDmsAdapter:
         """
         if self._logged_in:
             return
-        page = self._page
+        self._perform_login(self._page, self._username, self._password)
+        self._logged_in = True
 
+    def _perform_login(self, page, username: str, password: str) -> None:
+        """Drive the timing-critical DMS login on `page` with the given creds.
+        Returns on success (navigated off index.php); raises MrerpDmsAuthError
+        on rejection / no completion. Holds no per-session state so both the
+        user session and the admin credential-set session reuse it.
+        """
         # Capture the checklogin.php verdict directly — DMS reports login
         # rejection via an in-page custom modal (bshdlal), NOT a native alert,
         # so reading the server response is the only reliable signal. Body:
@@ -255,8 +320,8 @@ class MrerpDmsAdapter:
             page.wait_for_selector(
                 "#btnlogin", state="visible", timeout=self.DEFAULT_PAGE_TIMEOUT_MS
             )
-            page.fill("#txtusers", self._username)
-            page.fill("#txtpasswords", self._password)
+            page.fill("#txtusers", username)
+            page.fill("#txtpasswords", password)
 
             attempts = 3
             per_attempt_ms = max(5000, self.LOGIN_TIMEOUT_MS // attempts)
@@ -274,8 +339,7 @@ class MrerpDmsAdapter:
                 waited = 0
                 while waited < per_attempt_ms:
                     if "index.php" not in page.url:
-                        self._logged_in = True
-                        return
+                        return  # navigated into the authenticated area
                     body = captured["body"]
                     if body:
                         self._classify_login_body(body)  # raises on rejection

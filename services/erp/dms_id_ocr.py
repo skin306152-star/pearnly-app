@@ -129,6 +129,21 @@ def _billing_gate(user: Dict[str, Any]) -> Dict[str, Any]:
         return {"is_exempt": False, "subscription": None}
 
 
+def _flag_bad_id_checksum(ocr: Dict[str, Any]) -> None:
+    """身份证号 mod-11 校验位对不上 → 标 needs_review、missing_fields 追加
+    'people_id_checksum'(不抛错:校验只降信心,人复核定夺)。空号已由上游
+    OCR 归一列进 missing,这里只管「读满 13 位但校验位错」的情形。"""
+    from services.erp.dms_id_validate import is_valid_thai_id
+
+    pid = str((ocr.get("id_card") or {}).get("people_id") or "").strip()
+    if not pid or is_valid_thai_id(pid):
+        return
+    ocr["needs_review"] = True
+    missing = ocr.setdefault("missing_fields", [])
+    if "people_id_checksum" not in missing:
+        missing.append("people_id_checksum")
+
+
 def recognize_id_card(
     user: Dict[str, Any],
     content: bytes,
@@ -176,6 +191,7 @@ def recognize_id_card(
             },
         )
     elapsed = int((time.time() - t0) * 1000)
+    _flag_bad_id_checksum(ocr)
     try:
         db.charge_ocr_async(
             str(user.get("id")), _tid(user), "pdf", 1, None, f"DMS id-card OCR · {filename}"

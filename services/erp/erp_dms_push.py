@@ -72,6 +72,13 @@ _DMS_FRIENDLY = {
         "zh_TW": "連線 DMS 逾時或網路異常 · 請稍後重試",
         "ja": "DMS への接続がタイムアウトまたはネットワーク異常です · しばらくしてから再試行してください",
     },
+    "ERR_DMS_ADMIN_AUTH": {
+        "zh": "DMS 管理员凭据登录失败 · 请检查管理员用户名和密码",
+        "en": "DMS admin credential login failed — check the admin username and password",
+        "th": "เข้าสู่ระบบด้วยบัญชีผู้ดูแล DMS ไม่สำเร็จ — ตรวจสอบชื่อผู้ใช้และรหัสผ่านผู้ดูแล",
+        "zh_TW": "DMS 管理員憑證登入失敗 · 請檢查管理員使用者名稱和密碼",
+        "ja": "DMS 管理者資格情報でのログインに失敗しました · 管理者のユーザー名とパスワードをご確認ください",
+    },
     "ERR_DMS_CUSTOMER_SAVE": {
         "zh": "保存客户到 DMS 失败 · 请检查字段后重试",
         "en": "Failed to save the customer to DMS — check the fields and retry",
@@ -133,6 +140,39 @@ def _dms_resolve_creds(cfg: Dict[str, Any]):
     return plain_user, plain_pass, enc_user, enc_pass
 
 
+def _dms_resolve_admin_creds(cfg: Dict[str, Any]):
+    """admin 凭据组解析,与 _dms_resolve_creds 同一 ciphertext-in-plaintext 启发式。
+    未配 admin 时四值皆空。"""
+    plain_user = (cfg.get("admin_username") or "").strip()
+    plain_pass = cfg.get("admin_password") or ""
+    enc_user = (cfg.get("admin_username_enc") or "").strip()
+    enc_pass = cfg.get("admin_password_enc") or ""
+    try:
+        from core.kms_helper import is_encrypted as _is_enc
+
+        if plain_user and _is_enc(plain_user) and not enc_user:
+            enc_user, plain_user = plain_user, ""
+        if plain_pass and _is_enc(plain_pass) and not enc_pass:
+            enc_pass, plain_pass = plain_pass, ""
+    except ImportError:
+        pass
+    return plain_user, plain_pass, enc_user, enc_pass
+
+
+def _dms_admin_kwargs(cfg: Dict[str, Any]) -> Dict[str, str]:
+    """把 admin 凭据组解析成传给适配器的明文 kwargs。没配 admin → {}(单凭据路径
+    逐字节不变)。加密态就地解密(ValueError/ImportError 交由外层 build 兜成
+    ERR_CRED_DECRYPT/ERR_KMS_MISSING)。"""
+    plain_user, plain_pass, enc_user, enc_pass = _dms_resolve_admin_creds(cfg)
+    if plain_user and plain_pass:
+        return {"admin_username": plain_user, "admin_password": plain_pass}
+    if enc_user and enc_pass:
+        from core.kms_helper import decrypt_str
+
+        return {"admin_username": decrypt_str(enc_user), "admin_password": decrypt_str(enc_pass)}
+    return {}
+
+
 def _build_mrerp_dms_adapter(cfg: Dict[str, Any]):
     """Construct a MrerpDmsAdapter from endpoint config (plain or encrypted
     creds). Returns (adapter, None) or (None, fail_dict)."""
@@ -147,9 +187,14 @@ def _build_mrerp_dms_adapter(cfg: Dict[str, Any]):
     if not ((plain_user and plain_pass) or (enc_user and enc_pass)):
         return None, {"error_code": "ERR_NO_CREDS", "raw": "username/password missing"}
     try:
+        admin_kwargs = _dms_admin_kwargs(cfg)
         if plain_user and plain_pass:
             adapter = MrerpDmsAdapter(
-                system_url=system_url, username=plain_user, password=plain_pass, headless=True
+                system_url=system_url,
+                username=plain_user,
+                password=plain_pass,
+                headless=True,
+                **admin_kwargs,
             )
         else:
             adapter = MrerpDmsAdapter.from_encrypted(
@@ -157,6 +202,7 @@ def _build_mrerp_dms_adapter(cfg: Dict[str, Any]):
                 encrypted_username=enc_user,
                 encrypted_password=enc_pass,
                 headless=True,
+                **admin_kwargs,
             )
         return adapter, None
     except ImportError as e:

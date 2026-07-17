@@ -125,7 +125,13 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
             try:
                 from core.kms_helper import encrypt_str, is_encrypted
 
-                for fld in ("username_enc", "password_enc"):
+                # admin 两键(admin_*_enc)走同一加密清单(双凭据分权 · 单一来源防漂移)。
+                for fld in (
+                    "username_enc",
+                    "password_enc",
+                    "admin_username_enc",
+                    "admin_password_enc",
+                ):
                     v = config.get(fld)
                     if v and isinstance(v, str) and not is_encrypted(v):
                         config[fld] = encrypt_str(v)
@@ -245,7 +251,13 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
             try:
                 from core.kms_helper import encrypt_str, is_encrypted
 
-                for fld in ("username_enc", "password_enc"):
+                # admin 两键(admin_*_enc)镜像 POST 路由,纳入同一加密清单。
+                for fld in (
+                    "username_enc",
+                    "password_enc",
+                    "admin_username_enc",
+                    "admin_password_enc",
+                ):
                     v = new_cfg.get(fld)
                     if v and isinstance(v, str) and not is_encrypted(v):
                         new_cfg[fld] = encrypt_str(v)

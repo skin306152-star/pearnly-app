@@ -19,6 +19,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
+from services.erp.dms_customer_diff import diff_customer_fields
 from services.erp.erp_dms_push import (
     _build_mrerp_dms_adapter,
     _dms_friendly,
@@ -100,7 +101,11 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
     if build_err:
         return _err(build_err["error_code"], build_err["raw"])
     try:
-        from services.erp.mrerp_dms_adapter import MrerpDmsAuthError, MrerpDmsTechnicalError
+        from services.erp.mrerp_dms_adapter import (
+            MrerpDmsAdminAuthError,
+            MrerpDmsAuthError,
+            MrerpDmsTechnicalError,
+        )
         from services.erp.mrerp_dms_client_base import DMSClientError
 
         try:
@@ -109,6 +114,9 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
                 out = fn(adapter._client(), adapter)
                 _cookies_put(endpoint, adapter.session_cookies(), adapter.base_url)
                 return out
+        except MrerpDmsAdminAuthError as e:
+            # admin 凭据组登录失败(≠ 用户会话)— 子类必须先于基类捕获。
+            return _err("ERR_DMS_ADMIN_AUTH", f"{type(e).__name__}: {e}")
         except MrerpDmsAuthError as e:
             return _err("ERR_DMS_AUTH", f"{type(e).__name__}: {e}")
         except MrerpDmsTechnicalError as e:
@@ -142,6 +150,23 @@ def _score_candidates(
         out.append({**r, "score": round(score * 100)})
     out.sort(key=lambda x: x["score"], reverse=True)
     return out
+
+
+def _incoming_for_diff(name: str, addr, resolved) -> Dict[str, str]:
+    """身份证识别侧的「新值」侧,喂 diff_customer_fields。地址取解析后的 master id
+    (与 DMS current_fields 同口径,可比);prefix/birthday/phone 此入口无信息,
+    缺键即不参与 diff。"""
+    return {
+        "name": name,
+        "house_no": addr.house_no,
+        "moo": addr.moo,
+        "soi": addr.soi,
+        "road": addr.road,
+        "province_id": resolved.province_id,
+        "district_id": resolved.district_id,
+        "subdistrict_id": resolved.subdistrict_id,
+        "zipcode_id": resolved.zipcode_id,
+    }
 
 
 def recognize_lookup_mrerp_dms(
@@ -194,6 +219,7 @@ def recognize_lookup_mrerp_dms(
         if look["found"]:
             scenario = "exact"
             fields = look["fields"]
+            field_diffs = diff_customer_fields(fields, _incoming_for_diff(name, addr, resolved))
             candidates = [
                 {
                     "customer_id": look["customer_id"],
@@ -204,6 +230,7 @@ def recognize_lookup_mrerp_dms(
                 }
             ]
         else:
+            field_diffs = []
             rows = cl.search_customers_detailed(name) if (name or "").strip() else []
             candidates = _score_candidates(rows, people_id=people_id, name=name or "")
             scenario = "similar" if candidates else "none"
@@ -216,6 +243,7 @@ def recognize_lookup_mrerp_dms(
                 "customer_id": look["customer_id"],
                 "current_fields": look["fields"],
             },
+            "field_diffs": field_diffs,
             "candidates": candidates,
             "geo": geo,
             "prefixes": cl._select_options(form_html, "selprefix"),

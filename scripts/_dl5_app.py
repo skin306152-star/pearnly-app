@@ -104,8 +104,11 @@ def _patch_ocr() -> None:
         staged = json.loads(C.OCR_INJECT.read_text(encoding="utf-8"))
         result = {"id_card": staged["id_card"]}
         real_flag(result)  # real mod-11 checksum → sets needs_review for G4
-        _record("ocr_injected", people_id=staged["id_card"].get("people_id"),
-                needs_review=bool(result.get("needs_review")))
+        _record(
+            "ocr_injected",
+            people_id=staged["id_card"].get("people_id"),
+            needs_review=bool(result.get("needs_review")),
+        )
         return ep, result, 0
 
     ocr.recognize_id_card = fake_recognize

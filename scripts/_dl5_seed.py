@@ -13,7 +13,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.environ.setdefault("DATABASE_URL", "postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly")
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly"
+)
 
 from scripts import _dl5_common as C  # noqa: E402
 
@@ -56,9 +58,7 @@ def _seed_endpoint() -> str:
         # user session (single-cred). Isolates the admin-writer defect.
         cfg.pop("admin_username", None)
         cfg.pop("admin_password", None)
-    eid = db.create_erp_endpoint(
-        C.USER_ID, C.ENDPOINT_NAME, "mrerp_dms", cfg, is_default=True
-    )
+    eid = db.create_erp_endpoint(C.USER_ID, C.ENDPOINT_NAME, "mrerp_dms", cfg, is_default=True)
     if not eid:
         raise RuntimeError("create_erp_endpoint failed")
     return eid

@@ -29,8 +29,14 @@ os.environ.setdefault("JWT_SECRET", "dl5-e2e-jwt-secret-please-32chars-long")
 
 from scripts import _dl5_common as C  # noqa: E402
 from scripts._dl5_drive import (  # noqa: E402
-    RESULTS, record, save, http_get, reset_conversation, clear_session,
-    nonce_of, push_logs_by_mode,
+    RESULTS,
+    record,
+    save,
+    http_get,
+    reset_conversation,
+    clear_session,
+    nonce_of,
+    push_logs_by_mode,
 )
 
 
@@ -44,7 +50,8 @@ def exact_and_pick_setup():
     b0 = C.outbox_len()
     C.post_webhook([C.ev_text(code)])
     _, bind = C.wait_outbox(
-        lambda r: r["kind"] == "reply_text" and "เชื่อมต่อสำเร็จ" in r["text"], since=b0, timeout=15)
+        lambda r: r["kind"] == "reply_text" and "เชื่อมต่อสำเร็จ" in r["text"], since=b0, timeout=15
+    )
     record("G1b", "bind code → BIND_OK (real webhook)", bool(bind), f"bind_ok={bool(bind)}")
 
     creates_before = len(push_logs_by_mode("create"))
@@ -52,29 +59,42 @@ def exact_and_pick_setup():
     C.set_ocr(C.id_card_g1())
     b = C.outbox_len()
     C.post_webhook([C.ev_image()])
-    C.wait_outbox(lambda r: r["kind"] == "push_text" and "เบอร์โทร" in r["text"], since=b, timeout=60)
+    C.wait_outbox(
+        lambda r: r["kind"] == "push_text" and "เบอร์โทร" in r["text"], since=b, timeout=60
+    )
     b2 = C.outbox_len()
     C.post_webhook([C.ev_text(C.PHONE)])
     _, same = C.wait_outbox(
-        lambda r: r["kind"] == "push_text" and "ข้อมูลตรงกัน" in r["text"], since=b2, timeout=120)
+        lambda r: r["kind"] == "push_text" and "ข้อมูลตรงกัน" in r["text"], since=b2, timeout=120
+    )
     _, pick = C.wait_outbox(
         lambda r: r["kind"] == "push_messages"
         and any(d.startswith("URI::") and "dms-pick" in d for d in C.flex_buttons(r)),
-        since=b2, timeout=120)
+        since=b2,
+        timeout=120,
+    )
     save("g2_exact_outbox.json", C.read_outbox()[b2:])
 
     rb = C.lookup(C.PID_GOOD)
     f = rb.get("fields") or {}
-    unchanged = (f.get("house_no") == C.ADDR_G1["house_no"]
-                 and f.get("name") == C.FULL_NAME and f.get("phone") == C.PHONE
-                 and f.get("birthday_be") == C.BIRTHDAY_BE)
-    no_write = (len(push_logs_by_mode("create")) == creates_before
-                and len(push_logs_by_mode("overwrite")) == over_before)
+    unchanged = (
+        f.get("house_no") == C.ADDR_G1["house_no"]
+        and f.get("name") == C.FULL_NAME
+        and f.get("phone") == C.PHONE
+        and f.get("birthday_be") == C.BIRTHDAY_BE
+    )
+    no_write = (
+        len(push_logs_by_mode("create")) == creates_before
+        and len(push_logs_by_mode("overwrite")) == over_before
+    )
     save("g2_readback.json", rb)
-    record("G2", "idempotent exact-match (data matches, zero write)",
-           bool(same) and unchanged and no_write,
-           f"TXT_SAME={bool(same)} readback_unchanged={unchanged} no_write={no_write} cid={rb.get('customer_id')}",
-           ["g2_exact_outbox.json", "g2_readback.json"])
+    record(
+        "G2",
+        "idempotent exact-match (data matches, zero write)",
+        bool(same) and unchanged and no_write,
+        f"TXT_SAME={bool(same)} readback_unchanged={unchanged} no_write={no_write} cid={rb.get('customer_id')}",
+        ["g2_exact_outbox.json", "g2_readback.json"],
+    )
 
     if not pick:
         return None
@@ -106,27 +126,37 @@ def booking(token):
         br.close()
 
     st, _ = http_get(f"/api/dms/pick/data?t={token}")
-    record("G7", "one-time pick token replay after submit → 401",
-           st == 401, f"replay /api/dms/pick/data → HTTP {st} (expect 401)",
-           ["g5_3_success.png"])
+    record(
+        "G7",
+        "one-time pick token replay after submit → 401",
+        st == 401,
+        f"replay /api/dms/pick/data → HTTP {st} (expect 401)",
+        ["g5_3_success.png"],
+    )
 
     _, review = C.wait_outbox(
         lambda r: r["kind"] == "push_messages"
         and any(d.startswith("action=confirm_booking") for d in C.flex_buttons(r)),
-        since=0, timeout=60)
+        since=0,
+        timeout=60,
+    )
     if not review:
         return record("G5", "booking", False, "no booking_review card after submit")
     save("g5_booking_review_card.json", review)
     nonce = nonce_of(
-        [d for d in C.flex_buttons(review) if d.startswith("action=confirm_booking")][0])
+        [d for d in C.flex_buttons(review) if d.startswith("action=confirm_booking")][0]
+    )
 
     b = C.outbox_len()
     C.post_webhook([C.ev_postback(f"action=confirm_booking&nonce={nonce}")])
     _, rcpt = C.wait_outbox(
-        lambda r: r["kind"] == "push_text" and "เปิดใบจองสำเร็จ" in r["text"], since=b, timeout=180)
+        lambda r: r["kind"] == "push_text" and "เปิดใบจองสำเร็จ" in r["text"], since=b, timeout=180
+    )
     if not rcpt:
         save("g5_after_confirm_outbox.json", C.read_outbox()[b:])
-        return record("G5", "booking", False, "no booking receipt", ["g5_after_confirm_outbox.json"])
+        return record(
+            "G5", "booking", False, "no booking receipt", ["g5_after_confirm_outbox.json"]
+        )
     save("g5_booking_receipt.json", rcpt)
     booking_no = ""
     for ln in rcpt["text"].splitlines():
@@ -137,11 +167,21 @@ def booking(token):
     save("g5_booking_readback.json", {"booking_no": booking_no, "search_booking_id": found})
     save("g5_push_logs_booking.json", blogs)
     ok = bool(booking_no) and bool(found) and any(x["status"] == "success" for x in blogs)
-    record("G5", "booking (pick car→color→confirm→BK, real)", ok,
-           f"booking_no={booking_no} search_hit={found} booking_log={bool(blogs)}",
-           ["g5_1_car_list.png", "g5_2_paints.png", "g5_3_success.png",
-            "g5_booking_review_card.json", "g5_booking_receipt.json",
-            "g5_booking_readback.json", "g5_push_logs_booking.json"])
+    record(
+        "G5",
+        "booking (pick car→color→confirm→BK, real)",
+        ok,
+        f"booking_no={booking_no} search_hit={found} booking_log={bool(blogs)}",
+        [
+            "g5_1_car_list.png",
+            "g5_2_paints.png",
+            "g5_3_success.png",
+            "g5_booking_review_card.json",
+            "g5_booking_receipt.json",
+            "g5_booking_readback.json",
+            "g5_push_logs_booking.json",
+        ],
+    )
 
 
 def diff_detection():
@@ -153,12 +193,17 @@ def diff_detection():
     C.set_ocr(C.id_card_g3())
     b = C.outbox_len()
     C.post_webhook([C.ev_image()])
-    C.wait_outbox(lambda r: r["kind"] == "push_text" and "เบอร์โทร" in r["text"], since=b, timeout=60)
+    C.wait_outbox(
+        lambda r: r["kind"] == "push_text" and "เบอร์โทร" in r["text"], since=b, timeout=60
+    )
     b2 = C.outbox_len()
     C.post_webhook([C.ev_text(C.PHONE)])
     _, card = C.wait_outbox(
-        lambda r: r["kind"] == "push_messages" and "พบข้อมูลเดิม" in json.dumps(r, ensure_ascii=False),
-        since=b2, timeout=120)
+        lambda r: r["kind"] == "push_messages"
+        and "พบข้อมูลเดิม" in json.dumps(r, ensure_ascii=False),
+        since=b2,
+        timeout=120,
+    )
     if not card:
         save("g3_after_phone_outbox.json", C.read_outbox()[b2:])
         return record("G3", "diff detection", False, "no diff card", ["g3_after_phone_outbox.json"])
@@ -173,10 +218,14 @@ def diff_detection():
         texts = [t.get("text", "") for t in diff_rows[0].get("contents", [])]
         old_new = " | ".join(texts)
     ok = len(diff_rows) == 1 and (C.ADDR_G1["house_no"] in old_new) and (C.HOUSE_NO_G3 in old_new)
-    record("G3", "diff detection (exactly 1 = house_no old→new)", ok,
-           f"diff_rows={len(diff_rows)} content='{old_new}' update_button_shown={has_update_btn} "
-           f"(single-cred withholds it; admin path crashes → LINE update BLOCKED)",
-           ["g3_diff_card.json"])
+    record(
+        "G3",
+        "diff detection (exactly 1 = house_no old→new)",
+        ok,
+        f"diff_rows={len(diff_rows)} content='{old_new}' update_button_shown={has_update_btn} "
+        f"(single-cred withholds it; admin path crashes → LINE update BLOCKED)",
+        ["g3_diff_card.json"],
+    )
 
 
 def overwrite_write_contract():
@@ -190,18 +239,30 @@ def overwrite_write_contract():
     cfg.pop("admin_password", None)
     ep = {"id": "dl5-overwrite", "config": cfg}
     fields = {"people_id": C.PID_GOOD, "name": C.FULL_NAME, "house_no": C.HOUSE_NO_G3}
-    r = push_idcard_fields_mrerp_dms(ep, fields=fields, mode="overwrite", customer_id="107",
-                                     addresses=None)
+    r = push_idcard_fields_mrerp_dms(
+        ep, fields=fields, mode="overwrite", customer_id="107", addresses=None
+    )
     time.sleep(1)
     rb = C.lookup(C.PID_GOOD)
     f = rb.get("fields") or {}
-    save("g3b_overwrite_readback.json", {"write": {k: r.get(k) for k in ("ok", "success", "customer_id")},
-                                         "fields": f})
-    ok = (r.get("success") and f.get("house_no") == C.HOUSE_NO_G3
-          and f.get("birthday_be") == C.BIRTHDAY_BE and str(f.get("province_id")) == "1")
-    record("G3b", "overwrite write contract (direct, user session)", bool(ok),
-           f"write_ok={r.get('success')} house_no={f.get('house_no')} birthday={f.get('birthday_be')} "
-           f"province_id={f.get('province_id')}", ["g3b_overwrite_readback.json"])
+    save(
+        "g3b_overwrite_readback.json",
+        {"write": {k: r.get(k) for k in ("ok", "success", "customer_id")}, "fields": f},
+    )
+    ok = (
+        r.get("success")
+        and f.get("house_no") == C.HOUSE_NO_G3
+        and f.get("birthday_be") == C.BIRTHDAY_BE
+        and str(f.get("province_id")) == "1"
+    )
+    record(
+        "G3b",
+        "overwrite write contract (direct, user session)",
+        bool(ok),
+        f"write_ok={r.get('success')} house_no={f.get('house_no')} birthday={f.get('birthday_be')} "
+        f"province_id={f.get('province_id')}",
+        ["g3b_overwrite_readback.json"],
+    )
 
 
 def main():

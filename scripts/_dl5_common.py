@@ -43,8 +43,8 @@ DMS_CFG = {
 }
 
 # ── people ids ──────────────────────────────────────────────────────────────
-PID_GOOD = "1101700998118"   # valid mod-11 checksum, absent from DMS at seed time
-PID_BAD = "1101700998119"    # last digit flipped → checksum fails (G4)
+PID_GOOD = "1101700998118"  # valid mod-11 checksum, absent from DMS at seed time
+PID_BAD = "1101700998119"  # last digit flipped → checksum fails (G4)
 
 NAME_FIRST = "ดีแอลห้า"
 NAME_LAST = "ทดสอบพเนิร์ลลี่"

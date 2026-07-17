@@ -55,6 +55,7 @@ class PickRoutesTests(unittest.TestCase):
         p(pr, "dms_line_enabled_for", return_value=True)
         p(pr._id_ocr, "resolve_dms_endpoint", return_value=_EP)
         p(pr.masters_cache, "get_masters", return_value=_MASTERS)
+        p(pr.masters_cache, "read_fresh_masters", return_value=_MASTERS)  # submit 只读缓存校验(S7)
         p(pr.masters_cache, "get_paints", return_value=_PAINTS)
         self.push = p(pr.line_client, "push_messages")
 

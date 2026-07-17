@@ -85,6 +85,22 @@ def _with_heal(fn):
         return fn()
 
 
+def _dal(label: str, default):
+    """DAL 兜底套件:跑 fn(经 _with_heal 建表重试一次),异常记 error 返 default。
+
+    webhook 无人接错 → 失败软降级不抛。业务函数只留 SQL 与结果整形。用法 `_dal(label, dft)(fn)`。
+    """
+
+    def run(fn):
+        try:
+            return _with_heal(fn)
+        except Exception as e:
+            logger.error(f"[line_dms] {label} failed: {e}")
+            return default
+
+    return run
+
+
 # ── 绑定码 ────────────────────────────────────────────────────────────────
 
 
@@ -95,31 +111,27 @@ def generate_bind_code(tenant_id, user_id, ttl_minutes: int = DEFAULT_CODE_TTL_M
     """
     from core import db
 
-    try:
-        code = f"{secrets.randbelow(900000) + 100000}"
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=int(ttl_minutes))
+    code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=int(ttl_minutes))
 
-        def _run():
-            with db.get_cursor(commit=True) as cur:
-                cur.execute(
-                    "UPDATE line_dms_binding_codes SET used_at = now() "
-                    "WHERE user_id = %s AND used_at IS NULL",
-                    (str(user_id),),
-                )
-                cur.execute(
-                    "INSERT INTO line_dms_binding_codes (code, tenant_id, user_id, expires_at) "
-                    "VALUES (%s, %s, %s, %s) RETURNING code, expires_at",
-                    (code, str(tenant_id), str(user_id), expires_at),
-                )
-                return cur.fetchone()
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE line_dms_binding_codes SET used_at = now() "
+                "WHERE user_id = %s AND used_at IS NULL",
+                (str(user_id),),
+            )
+            cur.execute(
+                "INSERT INTO line_dms_binding_codes (code, tenant_id, user_id, expires_at) "
+                "VALUES (%s, %s, %s, %s) RETURNING code, expires_at",
+                (code, str(tenant_id), str(user_id), expires_at),
+            )
+            return cur.fetchone()
 
-        row = _with_heal(_run)
-        if not row:
-            return None
-        return {"code": row["code"], "expires_at": row["expires_at"].isoformat()}
-    except Exception as e:
-        logger.error(f"[line_dms] generate_bind_code failed: {e}")
+    row = _dal("generate_bind_code", None)(_run)
+    if not row:
         return None
+    return {"code": row["code"], "expires_at": row["expires_at"].isoformat()}
 
 
 def consume_bind_code(code: str) -> Optional[dict]:
@@ -129,28 +141,24 @@ def consume_bind_code(code: str) -> Optional[dict]:
     """
     from core import db
 
-    try:
-        code = (code or "").strip()
-        if len(code) != 6 or not code.isdigit():
-            return None
-
-        def _run():
-            with db.get_cursor(commit=True) as cur:
-                cur.execute(
-                    "UPDATE line_dms_binding_codes SET used_at = now() "
-                    "WHERE code = %s AND used_at IS NULL AND expires_at > now() "
-                    "RETURNING tenant_id, user_id",
-                    (code,),
-                )
-                return cur.fetchone()
-
-        row = _with_heal(_run)
-        if not row:
-            return None
-        return {"tenant_id": str(row["tenant_id"]), "user_id": str(row["user_id"])}
-    except Exception as e:
-        logger.error(f"[line_dms] consume_bind_code failed: {e}")
+    code = (code or "").strip()
+    if len(code) != 6 or not code.isdigit():
         return None
+
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE line_dms_binding_codes SET used_at = now() "
+                "WHERE code = %s AND used_at IS NULL AND expires_at > now() "
+                "RETURNING tenant_id, user_id",
+                (code,),
+            )
+            return cur.fetchone()
+
+    row = _dal("consume_bind_code", None)(_run)
+    if not row:
+        return None
+    return {"tenant_id": str(row["tenant_id"]), "user_id": str(row["user_id"])}
 
 
 def peek_bind_code_tenant(code: str) -> Optional[str]:
@@ -162,26 +170,22 @@ def peek_bind_code_tenant(code: str) -> Optional[str]:
     """
     from core import db
 
-    try:
-        code = (code or "").strip()
-        if len(code) != 6 or not code.isdigit():
-            return None
-
-        def _run():
-            with db.get_cursor() as cur:
-                cur.execute(
-                    "SELECT tenant_id FROM line_dms_binding_codes WHERE code = %s LIMIT 1",
-                    (code,),
-                )
-                return cur.fetchone()
-
-        row = _with_heal(_run)
-        if not row or row.get("tenant_id") is None:
-            return None
-        return str(row["tenant_id"])
-    except Exception as e:
-        logger.error(f"[line_dms] peek_bind_code_tenant failed: {e}")
+    code = (code or "").strip()
+    if len(code) != 6 or not code.isdigit():
         return None
+
+    def _run():
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT tenant_id FROM line_dms_binding_codes WHERE code = %s LIMIT 1",
+                (code,),
+            )
+            return cur.fetchone()
+
+    row = _dal("peek_bind_code_tenant", None)(_run)
+    if not row or row.get("tenant_id") is None:
+        return None
+    return str(row["tenant_id"])
 
 
 # ── 绑定 ─────────────────────────────────────────────────────────────────
@@ -196,39 +200,34 @@ def create_or_update_binding(
     """
     from core import db
 
-    try:
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "SELECT user_id FROM line_dms_bindings WHERE line_user_id = %s LIMIT 1",
+                (line_user_id,),
+            )
+            row = cur.fetchone()
+            if row and str(row["user_id"]) != str(user_id):
+                logger.warning(
+                    f"[line_dms] LINE {line_user_id} 已绑 user {row['user_id']}·拒绑 {user_id}"
+                )
+                return False
+            cur.execute(
+                "DELETE FROM line_dms_bindings WHERE user_id = %s AND line_user_id != %s",
+                (str(user_id), line_user_id),
+            )
+            cur.execute(
+                "INSERT INTO line_dms_bindings "
+                "(line_user_id, tenant_id, user_id, display_name, last_active_at) "
+                "VALUES (%s, %s, %s, %s, now()) "
+                "ON CONFLICT (line_user_id) DO UPDATE SET "
+                "  tenant_id = EXCLUDED.tenant_id, user_id = EXCLUDED.user_id, "
+                "  display_name = EXCLUDED.display_name, last_active_at = now()",
+                (line_user_id, str(tenant_id), str(user_id), display_name),
+            )
+            return True
 
-        def _run():
-            with db.get_cursor(commit=True) as cur:
-                cur.execute(
-                    "SELECT user_id FROM line_dms_bindings WHERE line_user_id = %s LIMIT 1",
-                    (line_user_id,),
-                )
-                row = cur.fetchone()
-                if row and str(row["user_id"]) != str(user_id):
-                    logger.warning(
-                        f"[line_dms] LINE {line_user_id} 已绑 user {row['user_id']}·拒绑 {user_id}"
-                    )
-                    return False
-                cur.execute(
-                    "DELETE FROM line_dms_bindings WHERE user_id = %s AND line_user_id != %s",
-                    (str(user_id), line_user_id),
-                )
-                cur.execute(
-                    "INSERT INTO line_dms_bindings "
-                    "(line_user_id, tenant_id, user_id, display_name, last_active_at) "
-                    "VALUES (%s, %s, %s, %s, now()) "
-                    "ON CONFLICT (line_user_id) DO UPDATE SET "
-                    "  tenant_id = EXCLUDED.tenant_id, user_id = EXCLUDED.user_id, "
-                    "  display_name = EXCLUDED.display_name, last_active_at = now()",
-                    (line_user_id, str(tenant_id), str(user_id), display_name),
-                )
-                return True
-
-        return bool(_with_heal(_run))
-    except Exception as e:
-        logger.error(f"[line_dms] create_or_update_binding failed: {e}")
-        return False
+    return bool(_dal("create_or_update_binding", False)(_run))
 
 
 def get_binding_by_line_user(line_user_id: str) -> Optional[dict]:
@@ -238,61 +237,46 @@ def get_binding_by_line_user(line_user_id: str) -> Optional[dict]:
     if not line_user_id:
         return None
 
-    try:
+    def _run():
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT tenant_id, user_id, display_name, bound_at "
+                "FROM line_dms_bindings WHERE line_user_id = %s LIMIT 1",
+                (line_user_id,),
+            )
+            return cur.fetchone()
 
-        def _run():
-            with db.get_cursor() as cur:
-                cur.execute(
-                    "SELECT tenant_id, user_id, display_name, bound_at "
-                    "FROM line_dms_bindings WHERE line_user_id = %s LIMIT 1",
-                    (line_user_id,),
-                )
-                return cur.fetchone()
-
-        row = _with_heal(_run)
-        return _binding_dict(row, line_user_id) if row else None
-    except Exception as e:
-        logger.error(f"[line_dms] get_binding_by_line_user failed: {e}")
-        return None
+    row = _dal("get_binding_by_line_user", None)(_run)
+    return _binding_dict(row, line_user_id) if row else None
 
 
 def get_binding_by_user(user_id: str) -> Optional[dict]:
     """按 Pearnly user 查绑定(App 侧「已绑?」用)。无 → None。"""
     from core import db
 
-    try:
+    def _run():
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT line_user_id, tenant_id, display_name, bound_at "
+                "FROM line_dms_bindings WHERE user_id = %s LIMIT 1",
+                (str(user_id),),
+            )
+            return cur.fetchone()
 
-        def _run():
-            with db.get_cursor() as cur:
-                cur.execute(
-                    "SELECT line_user_id, tenant_id, display_name, bound_at "
-                    "FROM line_dms_bindings WHERE user_id = %s LIMIT 1",
-                    (str(user_id),),
-                )
-                return cur.fetchone()
-
-        row = _with_heal(_run)
-        return dict(row) if row else None
-    except Exception as e:
-        logger.error(f"[line_dms] get_binding_by_user failed: {e}")
-        return None
+    row = _dal("get_binding_by_user", None)(_run)
+    return dict(row) if row else None
 
 
 def unbind_by_user(user_id: str) -> bool:
     """App 侧主动解绑。"""
     from core import db
 
-    try:
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute("DELETE FROM line_dms_bindings WHERE user_id = %s", (str(user_id),))
+            return True
 
-        def _run():
-            with db.get_cursor(commit=True) as cur:
-                cur.execute("DELETE FROM line_dms_bindings WHERE user_id = %s", (str(user_id),))
-                return True
-
-        return bool(_with_heal(_run))
-    except Exception as e:
-        logger.error(f"[line_dms] unbind_by_user failed: {e}")
-        return False
+    return bool(_dal("unbind_by_user", False)(_run))
 
 
 def unbind_by_line_user(line_user_id: str) -> bool:
@@ -302,19 +286,12 @@ def unbind_by_line_user(line_user_id: str) -> bool:
     if not line_user_id:
         return False
 
-    try:
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute("DELETE FROM line_dms_bindings WHERE line_user_id = %s", (line_user_id,))
+            return cur.rowcount > 0
 
-        def _run():
-            with db.get_cursor(commit=True) as cur:
-                cur.execute(
-                    "DELETE FROM line_dms_bindings WHERE line_user_id = %s", (line_user_id,)
-                )
-                return cur.rowcount > 0
-
-        return bool(_with_heal(_run))
-    except Exception as e:
-        logger.error(f"[line_dms] unbind_by_line_user failed: {e}")
-        return False
+    return bool(_dal("unbind_by_line_user", False)(_run))
 
 
 def _binding_dict(row, line_user_id: str) -> dict:
@@ -398,3 +375,19 @@ def clear_session(tenant_id, line_user_id: str) -> None:
         _with_heal(_run)
     except Exception as e:
         logger.warning(f"[line_dms] clear_session failed: {e}")
+
+
+def consume_nonce(tenant_id, line_user_id: str, expect_state: str, nonce: str) -> Optional[dict]:
+    """确认执行守卫:会话须在 expect_state 且 payload.nonce 吻合 nonce → 原子清 nonce
+    并返回 payload;态不符 / 无会话 / 无 nonce / 不吻合 → None(绝不写)。
+
+    token 一次性:清 nonce 后同一 nonce 的二次确认必然 mismatch(防双击双写 / 双建单)。
+    """
+    sess = get_session(tenant_id, line_user_id)
+    payload = (sess or {}).get("payload") or {}
+    if not sess or sess.get("state") != expect_state:
+        return None
+    if not payload.get("nonce") or payload.get("nonce") != nonce:
+        return None
+    set_session(tenant_id, line_user_id, expect_state, {**payload, "nonce": None})
+    return payload

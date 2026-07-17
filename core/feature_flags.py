@@ -80,7 +80,7 @@ DMS_PORTAL_KEY = "dms_portal"
 # 关 = /api/line/dms/webhook 收到事件一律 200 静默零回复、DMS 侧 /api/dms/line/* 绑定端点
 # 判定域内不放行(现状零变化,老会计站 OA 逐字节不受影响);开 = 被邀请租户可从 DMS LINE OA
 # 绑定 + 收发。判定域=账套主体归属(有 tenant_id 走 tenant · 个人套账退回 user_id),与
-# dms_portal 同口径。消费在 routes/line_dms_webhook_routes(webhook)与 routes/dms_routes(绑定端点)。
+# dms_portal 同口径。消费在 routes/line_dms_webhook_routes(webhook)与 routes/dms_pick_routes(选车面板闸)。
 DMS_LINE_KEY = "dms_line"
 # POS 退货/作废店长授权闸(PS-1 · 防内盗):默认关。关 → 退货/作废路由逐字节走历史
 # (任何持效 POS 令牌的收银员都能退,现网 metta 行为不变);开 → 操作者须持 pos.refund.approve,

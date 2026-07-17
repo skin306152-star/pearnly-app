@@ -16,7 +16,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from core.feature_flags import dms_line_enabled_for
-from services.line_binding import line_client
+from services.line_binding import line_client, line_webhook_dedup
 from services.line_dms import flow, store
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ async def _handle_bound_message(
     """已绑用户的消息 → 身份证对话流(DL-3)。解绑命令仍就地处理(不进流程)。"""
     mtype = msg.get("type")
     if mtype == "image":
-        flow.handle_image(binding, line_user_id, reply_token, msg.get("id"))
+        flow.handle_image(binding, line_user_id, msg.get("id"))
         return
     if mtype == "text":
         text = (msg.get("text") or "").strip()
@@ -145,23 +145,12 @@ async def _handle_dms_bind_code(line_user_id: str, reply_token: str, code: str) 
 
 
 async def _handle_dms_text(line_user_id: str, reply_token: str, text: str) -> None:
-    """DMS 文字消息:6 位码核销绑定 / 解绑命令 / 其余引导一句。"""
-    if not line_user_id:
-        return
+    """未绑用户文字:解绑命令 / 其余引导一句。
 
-    if len(text) == 6 and text.isdigit():
-        ident = store.consume_bind_code(text)
-        if not ident:
-            _reply(reply_token, _MSG_BIND_BAD)
-            return
-        profile = line_client.get_user_profile(line_user_id, channel=_CHANNEL) or {}
-        ok = store.create_or_update_binding(
-            ident["tenant_id"],
-            ident["user_id"],
-            line_user_id,
-            display_name=profile.get("displayName"),
-        )
-        _reply(reply_token, _MSG_BIND_OK if ok else _MSG_BIND_BAD)
+    6 位绑定码在闸前已被 _handle_dms_event 窥码路由进 _handle_dms_bind_code(按码所属租户
+    判闸再核销),不会走到这里 —— 故本函数只处理解绑与引导。
+    """
+    if not line_user_id:
         return
 
     if text == _UNBIND_CMD:
@@ -189,6 +178,14 @@ async def line_dms_webhook(request: Request):
 
     for ev in payload.get("events") or []:
         try:
+            # LINE at-least-once 重投:按 webhookEventId 原子判重,重投整个事件跳过。
+            # DMS 事件驱动 OCR/建单(烧钱且不可逆)→ 重跑比丢一条伤害大,at-most-once 更稳。
+            if line_webhook_dedup.seen_before(ev.get("webhookEventId")):
+                logger.info(
+                    "[line_dms_webhook] duplicate event skipped id=%s",
+                    str(ev.get("webhookEventId"))[:24],
+                )
+                continue
             await _handle_dms_event(ev)
         except Exception as e:
             logger.error(f"[line_dms_webhook] 事件处理异常: {e}")

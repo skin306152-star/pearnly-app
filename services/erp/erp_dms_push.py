@@ -121,13 +121,16 @@ def _dms_friendly(code: str) -> Dict[str, str]:
     return _DMS_FRIENDLY.get(code, _DMS_FRIENDLY["ERR_UNEXPECTED"])
 
 
-def _dms_resolve_creds(cfg: Dict[str, Any]):
+def _dms_resolve_creds(cfg: Dict[str, Any], prefix: str = ""):
     """Return (plain_user, plain_pass, enc_user, enc_pass) applying the same
-    ciphertext-in-plaintext-field heuristic as test_mrerp_endpoint."""
-    plain_user = (cfg.get("username") or "").strip()
-    plain_pass = cfg.get("password") or ""
-    enc_user = (cfg.get("username_enc") or "").strip()
-    enc_pass = cfg.get("password_enc") or ""
+    ciphertext-in-plaintext-field heuristic as test_mrerp_endpoint.
+
+    prefix='' resolves the primary creds; prefix='admin_' the admin creds group
+    (four empties when admin is unconfigured)."""
+    plain_user = (cfg.get(f"{prefix}username") or "").strip()
+    plain_pass = cfg.get(f"{prefix}password") or ""
+    enc_user = (cfg.get(f"{prefix}username_enc") or "").strip()
+    enc_pass = cfg.get(f"{prefix}password_enc") or ""
     try:
         from core.kms_helper import is_encrypted as _is_enc
 
@@ -141,22 +144,8 @@ def _dms_resolve_creds(cfg: Dict[str, Any]):
 
 
 def _dms_resolve_admin_creds(cfg: Dict[str, Any]):
-    """admin 凭据组解析,与 _dms_resolve_creds 同一 ciphertext-in-plaintext 启发式。
-    未配 admin 时四值皆空。"""
-    plain_user = (cfg.get("admin_username") or "").strip()
-    plain_pass = cfg.get("admin_password") or ""
-    enc_user = (cfg.get("admin_username_enc") or "").strip()
-    enc_pass = cfg.get("admin_password_enc") or ""
-    try:
-        from core.kms_helper import is_encrypted as _is_enc
-
-        if plain_user and _is_enc(plain_user) and not enc_user:
-            enc_user, plain_user = plain_user, ""
-        if plain_pass and _is_enc(plain_pass) and not enc_pass:
-            enc_pass, plain_pass = plain_pass, ""
-    except ImportError:
-        pass
-    return plain_user, plain_pass, enc_user, enc_pass
+    """admin 凭据组解析(= _dms_resolve_creds 的 'admin_' 前缀特例)。draft.has_admin_creds 依赖此名。"""
+    return _dms_resolve_creds(cfg, "admin_")
 
 
 def _dms_admin_kwargs(cfg: Dict[str, Any]) -> Dict[str, str]:

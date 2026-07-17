@@ -121,12 +121,16 @@ async def dms_pick_submit(request: Request):
     advisor_id = str(body.get("advisor_id") or "")
     delivery_be = str(body.get("delivery_date_be") or "")
 
-    masters = await asyncio.to_thread(masters_cache.get_masters, ep)
+    # 只读缓存校验:能提交的 id 必来自 data/paints 已暖的缓存 → 不触发冷抓(消灭请求内双登录)。
+    # 缓存缺失/过期 → 422 让面板重开。paints 复用同一 blob,免二次 _read。
+    masters = await asyncio.to_thread(masters_cache.read_fresh_masters, ep)
+    if not masters:
+        raise HTTPException(422, detail="dms_pick.bad_selection")
     car_row = _find_row(masters.get("cars"), car_id)
     advisor_row = _find_row(masters.get("advisors"), advisor_id)
     if not car_row or not advisor_row:
         raise HTTPException(422, detail="dms_pick.bad_selection")
-    paints = await asyncio.to_thread(masters_cache.get_paints, ep, car_id)
+    paints = await asyncio.to_thread(masters_cache.get_paints, ep, car_id, masters)
     paint_row = _find_row(paints, paint_id)
     if not paint_row:
         raise HTTPException(422, detail="dms_pick.bad_selection")

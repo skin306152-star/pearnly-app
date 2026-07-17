@@ -11,7 +11,6 @@ nonce 二次防重(照 flow 范式:先清 nonce 再执行,同一 nonce 二次点
 
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import json
 import logging
@@ -21,31 +20,17 @@ from typing import Any, Dict
 from core import auth, db
 from services.erp import dms_id_ocr as _id_ocr
 from services.line_binding import line_client
-from services.line_dms import cards, masters_cache, store
+from services.line_dms import _out, cards, masters_cache, store
+from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
-_CHANNEL = "dms"
 _PICK_URL = "https://pearnly.com/dms-pick"
 
 BOOKING_ACTIONS = frozenset({cards.ACT_CONFIRM_BOOKING, cards.ACT_CANCEL_BOOKING})
 
-_thr = asyncio.to_thread
-
-
-def _spawn(coro) -> None:
-    """把重活挂到事件循环后台跑(照 flow._spawn)。异常吞掉只记日志。"""
-
-    async def _guard():
-        try:
-            await coro
-        except Exception:
-            logger.exception("[line_dms.booking] background task failed")
-
-    try:
-        asyncio.get_running_loop().create_task(_guard())
-    except RuntimeError:
-        logger.warning("[line_dms.booking] no running loop; drop background task")
+# 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
+_spawn = _out.make_spawn("line_dms.booking")
 
 
 # ── 客户档落定 → 选车入口 ────────────────────────────────────────────────
@@ -102,18 +87,14 @@ async def handle_postback(
         _reply(reply_token, cards.TXT_BOOKING_CANCELLED)
         return
 
-    sess = await _thr(store.get_session, tenant, line_user_id)
-    payload = (sess or {}).get("payload") or {}
-    if not sess or sess.get("state") != "booking_review" or not payload.get("nonce"):
-        _reply(reply_token, cards.TXT_EXPIRED)
-        return
-    if pb.get("nonce") != payload.get("nonce"):
-        _reply(reply_token, cards.TXT_EXPIRED)
-        return
-    # 先清 nonce 再执行:同一 nonce 二次点击此后必 mismatch(防双建单)。
-    await _thr(
-        store.set_session, tenant, line_user_id, "booking_review", {**payload, "nonce": None}
+    # 确认守卫(booking_review 态 + nonce 吻合)原子清 nonce 并回 payload;不符/过期 → 过期
+    # 话术、绝不建单。清 nonce 后同一 nonce 二次点击此后必 mismatch(防双建单)。
+    payload = await _thr(
+        store.consume_nonce, tenant, line_user_id, "booking_review", pb.get("nonce")
     )
+    if payload is None:
+        _reply(reply_token, cards.TXT_EXPIRED)
+        return
     _spawn(_execute_booking(binding, line_user_id, payload))
 
 
@@ -236,13 +217,3 @@ def _log_booking(user_id: str, ep: dict, payload: dict, result: dict) -> None:
         0,
         "id_card",
     )
-
-
-# ── LINE 出口(全走 dms channel) ────────────────────────────────────────
-def _reply(reply_token: str, text: str) -> None:
-    if reply_token:
-        line_client.reply_text(reply_token, text, channel=_CHANNEL)
-
-
-def _push(line_user_id: str, text: str) -> None:
-    line_client.push_text(line_user_id, text, channel=_CHANNEL)

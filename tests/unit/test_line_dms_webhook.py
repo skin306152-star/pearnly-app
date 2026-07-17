@@ -45,6 +45,33 @@ class SignatureIsolationTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 400)
 
 
+class DedupTests(unittest.TestCase):
+    """S1:LINE at-least-once 重投同一 webhookEventId → 事件只处理一次(防双跑 OCR / 双计费)。"""
+
+    def test_redelivered_event_processed_once(self):
+        body = (
+            b'{"events":['
+            b'{"webhookEventId":"E9","type":"follow","source":{"userId":"L1"},"replyToken":"rt"},'
+            b'{"webhookEventId":"E9","type":"follow","source":{"userId":"L1"},"replyToken":"rt2"}'
+            b"]}"
+        )
+        with mock.patch.dict(os.environ, {"LINE_DMS_CHANNEL_SECRET": "dms-sec"}, clear=False):
+            with (
+                mock.patch.object(
+                    w.line_webhook_dedup, "seen_before", side_effect=[False, True]
+                ) as seen,
+                mock.patch.object(w, "_handle_dms_event") as handle,
+            ):
+                resp = _client().post(
+                    "/api/line/dms/webhook",
+                    content=body,
+                    headers={"x-line-signature": _sign(body, "dms-sec")},
+                )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(seen.call_count, 2)
+        handle.assert_called_once()  # 第二投(重投)被 dedup 跳过,handler 不二次执行
+
+
 class GateClosedSilentTests(unittest.TestCase):
     def test_valid_dms_sig_gate_closed_200_zero_reply(self):
         """B3:闸关 + 正确 dms 签名 → 200 且 reply spy 零调用。"""
@@ -68,36 +95,6 @@ class GateClosedSilentTests(unittest.TestCase):
 
 
 class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
-    async def test_valid_code_creates_binding_and_replies_ok(self):
-        """B4:闸开 + 6 位有效码 → consume + create_or_update_binding(tenant/user 对)+ 成功回执。"""
-        with (
-            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
-            mock.patch.object(
-                w.store, "consume_bind_code", return_value={"tenant_id": "t1", "user_id": "u1"}
-            ),
-            mock.patch.object(
-                w.line_client, "get_user_profile", return_value={"displayName": "Som"}
-            ),
-            mock.patch.object(w.store, "create_or_update_binding", return_value=True) as create,
-            mock.patch.object(w.line_client, "reply_text") as reply,
-        ):
-            await w._handle_dms_text("L1", "rt", "123456")
-        create.assert_called_once_with("t1", "u1", "L1", display_name="Som")
-        self.assertEqual(reply.call_args.args[1], w._MSG_BIND_OK)
-        self.assertEqual(reply.call_args.kwargs.get("channel"), "dms")
-
-    async def test_invalid_code_replies_resend(self):
-        """B4:无效/过期码 → 不建绑定 + 重发码提示。"""
-        with (
-            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
-            mock.patch.object(w.store, "consume_bind_code", return_value=None),
-            mock.patch.object(w.store, "create_or_update_binding") as create,
-            mock.patch.object(w.line_client, "reply_text") as reply,
-        ):
-            await w._handle_dms_text("L1", "rt", "654321")
-        create.assert_not_called()
-        self.assertEqual(reply.call_args.args[1], w._MSG_BIND_BAD)
-
     async def test_unbind_command(self):
         with (
             mock.patch.object(w.store, "unbind_by_line_user", return_value=True) as unbind,
@@ -287,7 +284,7 @@ class BoundUserFlowRoutingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(w.flow, "handle_image") as h_img,
         ):
             await w._handle_dms_event(self._ev(message={"type": "image", "id": "M1"}))
-        h_img.assert_called_once_with(self._BOUND, "L1", "rt", "M1")
+        h_img.assert_called_once_with(self._BOUND, "L1", "M1")
 
     async def test_bound_text_routes_to_flow(self):
         with (

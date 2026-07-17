@@ -13,7 +13,6 @@ _IDENTITY_MAP、地址键取自 _ADDR_MAP,绝不自造键名。
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -25,11 +24,11 @@ from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
-from services.line_dms import booking_flow, cards, draft, store
+from services.line_dms import _out, booking_flow, cards, draft, store
+from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
 
-_CHANNEL = "dms"
 _PHONE_RE = re.compile(r"^0\d{8,9}$")
 _RESET_WORD = "เริ่มใหม่"
 
@@ -51,26 +50,12 @@ _ADDR_BLOCK_KEYS = (
 # 新建客户的身份字段键(与网页 create 分支 fields 同形)。
 _CREATE_ID_KEYS = ("prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone")
 
-_thr = asyncio.to_thread
+# 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
+_spawn = _out.make_spawn("line_dms.flow")
 
 
 # ── webhook 入口(thin · spawn 后台) ────────────────────────────────────────
-def _spawn(coro) -> None:
-    """把重活挂到事件循环后台跑,不阻塞 webhook 200 响应。异常吞掉只记日志。"""
-
-    async def _guard():
-        try:
-            await coro
-        except Exception:
-            logger.exception("[line_dms.flow] background task failed")
-
-    try:
-        asyncio.get_running_loop().create_task(_guard())
-    except RuntimeError:
-        logger.warning("[line_dms.flow] no running loop; drop background task")
-
-
-def handle_image(binding: dict, line_user_id: str, reply_token: str, message_id: str) -> None:
+def handle_image(binding: dict, line_user_id: str, message_id: str) -> None:
     """绑定用户发图片(collecting):后台下载 + 身份证 OCR。"""
     if message_id:
         _spawn(process_image(binding, line_user_id, message_id))
@@ -139,15 +124,12 @@ async def handle_postback(
         )
         return
 
-    # 写动作:会话须在 reviewing 且 nonce 吻合;不符/过期 → 过期话术,绝不写。
-    if not sess or sess.get("state") != "reviewing" or not payload.get("nonce"):
+    # 写动作:确认守卫(reviewing 态 + nonce 吻合)原子清 nonce 并回 payload;不符/过期 →
+    # 过期话术、绝不写。清 nonce 后同一 nonce 的第二次点击此后必然 mismatch(防双击双写)。
+    payload = await _thr(store.consume_nonce, tenant, line_user_id, "reviewing", pb.get("nonce"))
+    if payload is None:
         _reply(reply_token, cards.TXT_EXPIRED)
         return
-    if pb.get("nonce") != payload.get("nonce"):
-        _reply(reply_token, cards.TXT_EXPIRED)
-        return
-    # 先清 nonce 再执行:同一 nonce 的第二次点击此后必然 mismatch(防双击双写)。
-    await _thr(store.set_session, tenant, line_user_id, "reviewing", {**payload, "nonce": None})
 
     if action == cards.ACT_CREATE:
         _spawn(_write_create(binding, line_user_id, payload))
@@ -159,7 +141,8 @@ async def handle_postback(
         if cid not in valid:
             _reply(reply_token, cards.TXT_EXPIRED)
             return
-        _spawn(_write_claim(binding, line_user_id, payload, cid))
+        # 相似认领 = 无 diff 的 overwrite,认领到所选 customer_id;走 _write_update 特例(S9)。
+        _spawn(_write_update(binding, line_user_id, {**payload, "customer_id": cid}))
     else:
         _reply(reply_token, cards.TXT_EXPIRED)
 
@@ -260,10 +243,11 @@ async def _run_dedup(
         "summary": summary,
         "endpoint_id": str(ep.get("id") or ""),
         "nonce": nonce,
+        "field_diffs": [],  # 默认无差异;exact_diff 分支覆写为真实 diffs。
     }
 
     if scenario == "none":
-        payload = {**base, "scenario": "none", "field_diffs": []}
+        payload = {**base, "scenario": "none"}
         card = cards.new_customer_card(summary, nonce)
     elif scenario == "exact":
         has_admin = draft.has_admin_creds(ep)
@@ -285,7 +269,7 @@ async def _run_dedup(
             }
             for c in (res.get("candidates") or [])
         ]
-        payload = {**base, "scenario": "similar", "candidates": cands, "field_diffs": []}
+        payload = {**base, "scenario": "similar", "candidates": cands}
         card = cards.candidates_card(cands, nonce)
 
     await _thr(store.set_session, tenant, line_user_id, "reviewing", payload)
@@ -294,9 +278,9 @@ async def _run_dedup(
 
 # ── reviewing → 执行写档 ────────────────────────────────────────────────────
 async def _write_create(binding: dict, line_user_id: str, payload: dict) -> None:
-    draft = payload.get("draft") or {}
-    fields = {k: draft.get(k, "") for k in _CREATE_ID_KEYS}
-    block = {k: draft.get(k, "") for k in _ADDR_BLOCK_KEYS}
+    d = payload.get("draft") or {}
+    fields = {k: d.get(k, "") for k in _CREATE_ID_KEYS}
+    block = {k: d.get(k, "") for k in _ADDR_BLOCK_KEYS}
     addresses = {"": dict(block), "_ct": dict(block), "_sd": dict(block)}
     await _execute(
         binding,
@@ -311,12 +295,13 @@ async def _write_create(binding: dict, line_user_id: str, payload: dict) -> None
 
 
 async def _write_update(binding: dict, line_user_id: str, payload: dict) -> None:
-    draft = payload.get("draft") or {}
+    d = payload.get("draft") or {}
     field_diffs = payload.get("field_diffs") or []
     # 只写变了的字段 + people_id/name 必填项;未变字段不进 fields → 保留 DMS 现值。
-    fields = {"people_id": draft.get("people_id", ""), "name": draft.get("name", "")}
-    for d in field_diffs:
-        fields[d["field"]] = d.get("new", "")
+    # 相似认领(S9)= 空 field_diffs + payload.customer_id 指向所选候选,天然落回本路径。
+    fields = {"people_id": d.get("people_id", ""), "name": d.get("name", "")}
+    for diff in field_diffs:
+        fields[diff["field"]] = diff.get("new", "")
     await _execute(
         binding,
         line_user_id,
@@ -326,22 +311,6 @@ async def _write_update(binding: dict, line_user_id: str, payload: dict) -> None
         fields=fields,
         addresses=None,
         field_diffs=field_diffs,
-    )
-
-
-async def _write_claim(binding: dict, line_user_id: str, payload: dict, customer_id: str) -> None:
-    # 相似认领:无 diff(未与该候选逐字段比对),最小写入 people_id/name 认领到所选客户。
-    draft = payload.get("draft") or {}
-    fields = {"people_id": draft.get("people_id", ""), "name": draft.get("name", "")}
-    await _execute(
-        binding,
-        line_user_id,
-        payload,
-        mode="overwrite",
-        customer_id=customer_id,
-        fields=fields,
-        addresses=None,
-        field_diffs=[],
     )
 
 
@@ -457,15 +426,6 @@ def _ocr_error_text(e: _id_ocr.DmsOcrError) -> str:
     return cards.TXT_BLURRY
 
 
-# ── LINE 出口(全走 dms channel) ────────────────────────────────────────────
-def _reply(reply_token: str, text: str) -> None:
-    if reply_token:
-        line_client.reply_text(reply_token, text, channel=_CHANNEL)
-
-
-def _push(line_user_id: str, text: str) -> None:
-    line_client.push_text(line_user_id, text, channel=_CHANNEL)
-
-
+# ── LINE 出口(全走 dms channel · _reply/_push 见 _out) ──────────────────────
 def _push_card(line_user_id: str, card: dict) -> None:
     line_client.push_messages(line_user_id, [card], channel=_CHANNEL)

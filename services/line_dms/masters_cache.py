@@ -140,12 +140,28 @@ def get_masters(endpoint: Dict[str, Any]) -> Dict[str, Any]:
     return fresh
 
 
-def get_paints(endpoint: Dict[str, Any], car_id: str) -> List[list]:
-    """某车型的颜色主档(惰性)。已缓存直接回;否则登录抓 + 并入 paints_by_car 落缓存。"""
+def read_fresh_masters(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """只读缓存主档(<12h),绝不触发登录冷抓。miss / 过期 → None。
+
+    submit 校验用:能被提交的选项必来自 data/paints 端点已暖的缓存,请求内再冷抓 = 多余的
+    二次登录 → 宁可 None 让面板重开(dms_pick.bad_selection)。"""
+    cached = _read(str(endpoint.get("id") or ""))
+    if cached and cached["age_seconds"] < CACHE_TTL_SECONDS:
+        return cached["masters"]
+    return None
+
+
+def get_paints(
+    endpoint: Dict[str, Any], car_id: str, masters: Optional[Dict[str, Any]] = None
+) -> List[list]:
+    """某车型的颜色主档(惰性)。已缓存直接回;否则登录抓 + 并入 paints_by_car 落缓存。
+
+    传入 masters(调用方同请求已读的 blob)则复用之,省一次 _read。"""
     eid = str(endpoint.get("id") or "")
     car_id = str(car_id or "")
-    cached = _read(eid)
-    masters = (cached["masters"] if cached else {}) or {}
+    if masters is None:
+        cached = _read(eid)
+        masters = (cached["masters"] if cached else {}) or {}
     pbc = dict(masters.get("paints_by_car") or {})
     if car_id in pbc:
         return pbc[car_id]

@@ -230,7 +230,9 @@ test('客户页队列:390×844 移动端无横溢', async ({ page }) => {
     await page.goto(`${PAGE}#/client/5/review?period=2569-05`);
     await expect(page.locator('#rvCounter')).toBeVisible({ timeout: 15000 });
     const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+        () =>
+            window.document.documentElement.scrollWidth >
+            window.document.documentElement.clientWidth + 1
     );
     expect(overflow).toBe(false);
     await page.screenshot({ path: path.join(ART, '03-mobile-390.png'), fullPage: true });

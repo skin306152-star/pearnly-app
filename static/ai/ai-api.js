@@ -203,26 +203,6 @@
                     body
                 );
             },
-            // 补料上传(W4 + IN-0b 密码 PDF):multipart。<fetch> 发 FormData 时不能手设
-            // Content-Type(要让浏览器带 multipart boundary),故不走 call()。password 可选
-            // (IN-0a 扩展的 Form 字段,整批同一密码,只用于解密不落盘)——不传则密码 PDF
-            // 422 pdf_password_required。结构化 422 经 handleResponse 抛出并挂 err.detail
-            // (code/message/filename),调用方(ai-intake-queue.js)逐件点名。
-            addMaterials: function (orderId, files, password) {
-                var token = getToken();
-                var headers = {};
-                if (token) headers.Authorization = 'Bearer ' + token;
-                var fd = new FormData();
-                for (var i = 0; i < files.length; i++) fd.append('files', files[i]);
-                if (password) fd.append('password', password);
-                return root
-                    .fetch('/api/workorder/orders/' + encodeURIComponent(orderId) + '/materials', {
-                        method: 'POST',
-                        headers: headers,
-                        body: fd,
-                    })
-                    .then(handleResponse);
-            },
             // 销项税报告三查(N1-a · routes/vat_report_checks_routes.py):multipart 单文件上传,
             // 同 addMaterials 不能走 call()(要让浏览器带 multipart boundary)。响应即三查结果,
             // 不经 callEnvelope(该端点裸对象出线,无信封)。
@@ -485,6 +465,7 @@
         );
         Object.assign(base, AI.apiClientImport.create(root, authHeaders, handleResponse, call));
         Object.assign(base, AI.apiDesk.create(root, authHeaders, handleResponse, call));
+        Object.assign(base, AI.apiUpload.create(root, authHeaders));
         return Object.assign(
             base,
             AI.apiReview.create(root, authHeaders, handleResponse, call, queryString)

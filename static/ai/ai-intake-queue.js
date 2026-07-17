@@ -125,7 +125,7 @@
     // 两段法契约(IN-0a):单批 422 时该批零落盘,故拿掉点名的那一件重传其余是安全的
     // ——不会把已落盘的成功件又送一遍。密码类错误串行转给 onPasswordNeeded 决议
     // (Promise 挂起等用户输入/跳过,不影响其它已排队批次的先后顺序)。
-    function handleReject(api, orderId, files, detail, onOutcome, onPasswordNeeded) {
+    function handleReject(api, orderId, files, detail, onOutcome, onPasswordNeeded, onProgress) {
         var idx = -1;
         for (var i = 0; i < files.length; i++) {
             if (files[i].name === detail.filename) {
@@ -151,7 +151,8 @@
                         [culprit],
                         decision.password,
                         onOutcome,
-                        onPasswordNeeded
+                        onPasswordNeeded,
+                        onProgress
                     );
                 }
                 onOutcome({
@@ -166,21 +167,29 @@
             settled = Promise.resolve();
         }
         return settled.then(function () {
-            return runBatch(api, orderId, rest, null, onOutcome, onPasswordNeeded);
+            return runBatch(api, orderId, rest, null, onOutcome, onPasswordNeeded, onProgress);
         });
     }
 
-    function runBatch(api, orderId, files, password, onOutcome, onPasswordNeeded) {
+    function runBatch(api, orderId, files, password, onOutcome, onPasswordNeeded, onProgress) {
         if (!files.length) return Promise.resolve();
         return api
-            .addMaterials(orderId, files, password)
+            .addMaterials(orderId, files, password, onProgress)
             .then(function (res) {
                 onOutcome({ type: 'success', files: files, count: (res && res.count) || 0 });
             })
             .catch(function (err) {
                 var detail = err && err.detail;
                 if (detail && typeof detail === 'object' && detail.code) {
-                    return handleReject(api, orderId, files, detail, onOutcome, onPasswordNeeded);
+                    return handleReject(
+                        api,
+                        orderId,
+                        files,
+                        detail,
+                        onOutcome,
+                        onPasswordNeeded,
+                        onProgress
+                    );
                 }
                 onOutcome({
                     type: 'network_fail',
@@ -237,8 +246,16 @@
             // 每批独立 try:某批网络失败只把该批记进 failedBatches,链条继续跑下一批
             // (单批失败不停后续批 · A10/A11)。
             chain = chain.then(function () {
-                handlers.onBatchStart && handlers.onBatchStart(i + 1, batches.length);
-                return runBatch(api, orderId, batch, null, settle, handlers.onPasswordNeeded);
+                handlers.onBatchStart && handlers.onBatchStart(i + 1, batches.length, batch);
+                return runBatch(
+                    api,
+                    orderId,
+                    batch,
+                    null,
+                    settle,
+                    handlers.onPasswordNeeded,
+                    handlers.onByteProgress
+                );
             });
         });
         return chain.then(function () {
@@ -261,17 +278,33 @@
             var session = getS();
             session.uploading = true;
             session.uploadErrKey = null;
+            // uploadDone=已结算件数(成功+拒收+网络失败),不是仅成功数——进度条不再冻在 0。
             session.uploadDone = 0;
             session.uploadTotal = files.length;
             session.uploadBatchIndex = 0;
             session.uploadBatchTotal = AI.intakeRender.splitBatches(files).length;
+            session.uploadBytesPct = null;
+            session.perFile = AI.intakeManifest.initPerFile(files);
             render();
             return run(session.api, session.orderId, files, {
-                onBatchStart: function (index, total) {
+                onBatchStart: function (index, total, batchFiles) {
                     if (getS() !== session) return;
                     session.uploadBatchIndex = index;
                     session.uploadBatchTotal = total;
+                    session.uploadBytesPct = null;
+                    session.perFile = AI.intakeManifest.markUploadingPerFile(
+                        session.perFile,
+                        batchFiles
+                    );
                     render();
+                },
+                onByteProgress: function (loaded, total) {
+                    if (getS() !== session) return;
+                    var pct = total > 0 ? Math.floor((loaded / total) * 100) : null;
+                    if (pct !== session.uploadBytesPct) {
+                        session.uploadBytesPct = pct;
+                        render();
+                    }
                 },
                 onPasswordNeeded: function (file, detail) {
                     return new Promise(function (resolve) {
@@ -292,6 +325,7 @@
                 },
                 onOutcome: function (evt) {
                     if (getS() !== session) return;
+                    session.perFile = AI.intakeManifest.applyOutcomeToPerFile(session.perFile, evt);
                     if (evt.type === 'success') {
                         session.uploadDone += evt.files.length;
                         session.manifest.accepted += evt.count;
@@ -300,12 +334,14 @@
                             evt.count
                         );
                     } else if (evt.type === 'reject') {
+                        session.uploadDone += 1;
                         session.manifest.rejected.push({
                             name: evt.name,
                             message: evt.message,
                             reasonKey: evt.reasonKey,
                         });
                     } else if (evt.type === 'network_fail') {
+                        session.uploadDone += evt.files.length;
                         session.failedBatches.push({ files: evt.files });
                     }
                     session.passwordCard = null;

@@ -98,6 +98,9 @@ const BUNDLES = [
             // ai-api-review.js(MC1-b2 · 审核收件箱 + 签批闭环七端点,拆自 ai-api.js·单文件
             // <500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-review.js',
+            // ai-api-upload.js(S1 · 收料上传 XHR 进度薄层,拆自 ai-api.js·单文件<500
+            // 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
+            'ai/ai-api-upload.js',
             'ai/ai-api.js',
             // ai-gate.js(Z1-a 登录卡/邀请制门面)只依赖 AI.state.esc(可选)与全局 at()/
             // atSetLang,排在 ai-state.js/ai-api.js 之后、ai.js(boot 调 AI.gate.mountLogin/

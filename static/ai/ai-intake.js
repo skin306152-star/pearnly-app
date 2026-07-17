@@ -84,6 +84,8 @@
             uploadTotal: S.uploadTotal,
             uploadBatchIndex: S.uploadBatchIndex,
             uploadBatchTotal: S.uploadBatchTotal,
+            uploadBytesPct: S.uploadBytesPct,
+            perFile: S.perFile,
             formOpen: S.formOpen,
             formErr: S.formErr,
             submitting: S.submitting,
@@ -357,24 +359,11 @@
 
     // 一次轮询拿到的 detail → 是否终态(true=停轮询,调用方已在这里做完全部导航/呈现副作用)。
     function routeAfter(detail, session) {
-        var hasNumbers = Object.keys(detail.numbers || {}).length > 0;
-        // 进项队列口径与 W3 审核队列同一份判定(ai-review-queue.js):flagged 进项票 +
-        // 方向不明票(kind=unknown/flag_reason=direction_ambiguous)都算未定,不能只认
-        // kind===purchase_invoice 漏掉方向票,否则续跑卡在方向票时收料页无处可去。
-        var purchaseQueue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
-        // 算到数(compute 出 tax_due)或已过 stuck → 去交付包看结果。
-        if (hasNumbers || detail.status !== 'stuck') {
-            window.location.hash = AI.router.buildClientHash(session.clientId, 'pkg');
-            return true;
-        }
-        // 仍 stuck 但改成缺进项裁决 → 去审核队列(补料把销项道打通了,卡点前移到进项)。
-        if (purchaseQueue.length) {
-            window.location.hash = AI.router.buildClientHash(session.clientId, 'review');
-            return true;
-        }
-        // 仍 stuck 且给了具体卡点/缺料原因 → 停下来诚实呈现,别空转。
-        var reasons = [].concat(detail.blocked_reasons || [], detail.needs || []);
-        if (reasons.length) {
+        var queueLen = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []).length;
+        var decision = AI.intakeManifest.routeAfterDecision(detail, queueLen);
+        if (decision.kind === 'continue') return false;
+        if (decision.kind === 'stay') {
+            // 仍 stuck 且给了具体卡点/缺料原因 → 停下来诚实呈现,别空转。
             S.order = detail;
             S.needsSales = (detail.needs || []).indexOf('sales_summary') >= 0;
             S.rerunState = 'idle';
@@ -382,7 +371,9 @@
             render();
             return true;
         }
-        return false;
+        var view = decision.kind === 'review' ? 'review' : decision.kind === 'pkg' ? 'pkg' : 'wo';
+        window.location.hash = AI.router.buildClientHash(session.clientId, view);
+        return true;
     }
 
     // 引导链①(J-B):自动/手动开跑落定后,收料页给「去工单页看进度」的出口——工单页

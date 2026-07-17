@@ -122,14 +122,48 @@
     // 可报(uploadDone 由每批 addMaterials 结算后累加,单批时就是 0→N 一步到位,但那一步
     // 也是真数不是假动画)。分批(BATCH_MAX_BYTES/BATCH_MAX_FILES 触顶才切批)时额外拼
     // 「第几批」,数字+分隔符不夹外语词,不新增 i18n 键(复用既有 intake_uploading/
-    // 错误文案原句,后面加纯数字进度)。
+    // 错误文案原句,后面加纯数字进度)。百分比是当前批的字节级上传进度(XHR
+    // upload.onprogress),纯数字不需要 i18n。
     function batchProgressSuffix(ctx) {
         if (!ctx.uploadTotal) return '';
         var s = ' (' + (ctx.uploadDone || 0) + '/' + ctx.uploadTotal;
         if (ctx.uploadBatchTotal > 1) {
             s += ' · ' + (ctx.uploadBatchIndex || 0) + '/' + ctx.uploadBatchTotal;
         }
+        if (ctx.uploadBytesPct != null) s += ' · ' + ctx.uploadBytesPct + '%';
         return s + ')';
+    }
+
+    // 逐文件回执行:名字 + 状态词。状态颜色类映射 queued→wait / uploading→run /
+    // accepted→ok / rejected+failed→bad(令牌色在 ai-intake.css)。
+    function perFileListHtml(perFile) {
+        if (!perFile || !perFile.length) return '';
+        var stKey = {
+            queued: 'intake_file_queued',
+            uploading: 'intake_file_uploading',
+            accepted: 'intake_file_accepted',
+            rejected: 'intake_file_rejected',
+            failed: 'intake_file_failed',
+        };
+        var stCls = {
+            queued: 'wait',
+            uploading: 'run',
+            accepted: 'ok',
+            rejected: 'bad',
+            failed: 'bad',
+        };
+        var rows = '';
+        for (var i = 0; i < perFile.length; i++) {
+            rows +=
+                '<div class="dz-frow"><span class="dz-fname">' +
+                esc(perFile[i].name) +
+                '</span><span class="dz-fst ' +
+                stCls[perFile[i].status] +
+                '">' +
+                esc(at(stKey[perFile[i].status])) +
+                '</span></div>';
+        }
+        return '<div class="dz-files">' + rows + '</div>';
     }
 
     // 拖拽/点选上传区。四态:idle(空)/ 已选文件 / 上传中 / 刚传完(引导重新跑)。
@@ -147,17 +181,24 @@
                 svg('<path d="M21 12a9 9 0 1 1-6.2-8.5"/>') +
                 '</div><div class="dz-t">' +
                 esc(at('intake_uploading') + batchProgressSuffix(ctx)) +
-                '</div></div>';
+                '</div>' +
+                perFileListHtml(ctx.perFile) +
+                '</div>';
         } else if (n > 0) {
-            var chips = '';
-            for (var i = 0; i < Math.min(n, 60); i++) chips += '<span class="fchip"></span>';
+            var rows = '';
+            for (var i = 0; i < n; i++) {
+                rows +=
+                    '<div class="dz-frow"><span class="dz-fname">' +
+                    esc(ctx.files[i].name) +
+                    '</span></div>';
+            }
             inner =
                 '<div class="dz-filled"><div class="dz-count"><b>' +
                 n +
                 '</b> ' +
                 esc(at('intake_files_ready')) +
-                '</div><div class="file-strip">' +
-                chips +
+                '</div><div class="dz-files">' +
+                rows +
                 '</div><div class="dz-btns">' +
                 '<button class="btn pri" data-action="ik-upload">' +
                 esc(at('intake_start')) +
@@ -175,7 +216,8 @@
                 esc(at('intake_drop_s')) +
                 '</div><button class="btn" data-action="ik-pick">' +
                 esc(at('intake_pick')) +
-                '</button></div>';
+                '</button></div>' +
+                perFileListHtml(ctx.perFile);
         }
         return (
             '<div class="dropzone" id="ikDrop" tabindex="0" role="button" aria-label="' +

@@ -118,6 +118,60 @@
         return !!(state && (state.pendingNames.length || state.failedNames.length));
     }
 
+    // 续跑轮询终态判定(2026-07-17 真跑实测修复:running/collecting 曾被「status !== 'stuck'」
+    // 当成终态直接甩去交付包,而 compute 还没算出数——用户被扔进空 pkg)。返回 kind:
+    // continue=还在跑继续轮询;review=有票等人判(优先于交付包,兑现 intake_lead 的承诺);
+    // pkg=真算出数;stay=停在收料页呈现缺料;wo=终态但无数无票,去工单页看全景。
+    function routeAfterDecision(detail, purchaseQueueLen) {
+        var st = (detail && detail.status) || '';
+        if (st === 'collecting' || st === 'running') return { kind: 'continue' };
+        if (purchaseQueueLen > 0) return { kind: 'review' };
+        if (Object.keys((detail && detail.numbers) || {}).length > 0) return { kind: 'pkg' };
+        var reasons = [].concat(
+            (detail && detail.blocked_reasons) || [],
+            (detail && detail.needs) || []
+        );
+        if (reasons.length) return { kind: 'stay' };
+        return { kind: 'wo' };
+    }
+
+    // 逐文件状态快照(2026-07-17 真跑实测:整批只有总数,单文件是收是拒全程不可见)。
+    // 状态闭集:queued/uploading/accepted/rejected/failed,渲染层按此映射颜色。
+    function initPerFile(files) {
+        return (files || []).map(function (f) {
+            return { name: f.name, status: 'queued' };
+        });
+    }
+
+    function markUploadingPerFile(perFile, batchFiles) {
+        var names = (batchFiles || []).map(function (f) {
+            return f.name;
+        });
+        return (perFile || []).map(function (row) {
+            return names.indexOf(row.name) >= 0 && row.status === 'queued'
+                ? { name: row.name, status: 'uploading' }
+                : row;
+        });
+    }
+
+    function applyOutcomeToPerFile(perFile, evt) {
+        var byName = {};
+        if (evt.type === 'success') {
+            (evt.files || []).forEach(function (f) {
+                byName[f.name] = 'accepted';
+            });
+        } else if (evt.type === 'reject') {
+            byName[evt.name] = 'rejected';
+        } else if (evt.type === 'network_fail') {
+            (evt.files || []).forEach(function (f) {
+                byName[f.name] = 'failed';
+            });
+        }
+        return (perFile || []).map(function (row) {
+            return byName[row.name] ? { name: row.name, status: byName[row.name] } : row;
+        });
+    }
+
     var pure = {
         ALLOWED_EXTS: ALLOWED_EXTS,
         classifyFolderEntry: classifyFolderEntry,
@@ -126,6 +180,10 @@
         serializeQueueState: serializeQueueState,
         parseQueueState: parseQueueState,
         hasResumableQueue: hasResumableQueue,
+        routeAfterDecision: routeAfterDecision,
+        initPerFile: initPerFile,
+        markUploadingPerFile: markUploadingPerFile,
+        applyOutcomeToPerFile: applyOutcomeToPerFile,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -273,6 +331,10 @@
         serializeQueueState: serializeQueueState,
         parseQueueState: parseQueueState,
         hasResumableQueue: hasResumableQueue,
+        routeAfterDecision: routeAfterDecision,
+        initPerFile: initPerFile,
+        markUploadingPerFile: markUploadingPerFile,
+        applyOutcomeToPerFile: applyOutcomeToPerFile,
         manifestHtml: manifestHtml,
         passwordCardHtml: passwordCardHtml,
         resumeBannerHtml: resumeBannerHtml,

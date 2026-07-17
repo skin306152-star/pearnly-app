@@ -252,3 +252,42 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 逐文件回执行(2026-07-17:整批上传单文件状态全程不可见的修复) */
+.dz-files {
+  margin: 10px auto 0;
+  max-width: 420px;
+  max-height: 220px;
+  overflow-y: auto;
+  text-align: left;
+}
+.dz-frow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 2px;
+  font-size: 12.5px;
+}
+.dz-fname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dz-fst {
+  flex: none;
+  font-size: 11.5px;
+}
+.dz-fst.ok {
+  color: var(--good);
+}
+.dz-fst.bad {
+  color: var(--crit);
+}
+.dz-fst.run {
+  color: var(--acc);
+}
+.dz-fst.wait {
+  color: var(--mut);
+}

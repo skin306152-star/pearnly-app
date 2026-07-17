@@ -312,6 +312,61 @@ class AiApiPureTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiApiUploadPureTests(unittest.TestCase):
+    """收料上传薄层(static/ai/ai-api-upload.js,拆自 ai-api.js)的错误构造纯函数守门:
+    非 2xx 响应体 → 与 handleResponse 同构的 code/status/detail(队列层 422 隔离重试
+    依赖 err.detail.code/filename)。XHR 时序(onload/onerror/upload.onprogress)靠
+    浏览器,不在此测。"""
+
+    _MODULE = json.dumps(str(AI_DIR / "ai-api-upload.js"))
+
+    def test_structured_422_detail_matches_handle_response_shape(self):
+        out = _run_node(f"""
+            const u = require({self._MODULE});
+            const body = JSON.stringify({{detail: {{
+                code: 'workorder.intake.pdf_password_required',
+                message: {{en: 'Password required'}},
+                filename: 'bank.pdf',
+            }}}});
+            const e = u.parseUploadError(422, body);
+            process.stdout.write(JSON.stringify([
+                e instanceof Error, e.message, e.code, e.status, e.detail,
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                True,
+                "workorder.intake.pdf_password_required",
+                "workorder.intake.pdf_password_required",
+                422,
+                {
+                    "code": "workorder.intake.pdf_password_required",
+                    "message": {"en": "Password required"},
+                    "filename": "bank.pdf",
+                },
+            ],
+        )
+
+    def test_non_json_body_falls_back_to_generic(self):
+        # nginx 413/502 之类回 HTML 错误页——解析失败兜底 generic,不炸也不漏挂 detail。
+        out = _run_node(f"""
+            const u = require({self._MODULE});
+            const e = u.parseUploadError(502, '<html>bad gateway</html>');
+            process.stdout.write(JSON.stringify([e.code, e.status, e.detail === undefined]));
+            """)
+        self.assertEqual(out, ["generic", 502, True])
+
+    def test_413_json_without_detail_code_uses_generic_path(self):
+        out = _run_node(f"""
+            const u = require({self._MODULE});
+            const e = u.parseUploadError(413, '{{}}');
+            process.stdout.write(JSON.stringify([e.code, e.status, e.detail === undefined]));
+            """)
+        self.assertEqual(out, ["generic", 413, True])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class FieldLabelTests(unittest.TestCase):
     """fieldLabel 是查表 + 回落型格式化函数,随 W2 简化收口从 ai-board.js 搬来同类
     的 statusChip/money 身边——同一份测试跟着函数搬,断言不变。"""
@@ -596,6 +651,107 @@ class AiIntakeManifestPureTests(unittest.TestCase):
             ]));
             """)
         self.assertEqual(out, [False, False, True])
+
+    def test_route_after_decision_covers_all_terminal_kinds(self):
+        # 2026-07-17 真跑实测:running/collecting 曾被「status !== 'stuck'」当终态甩去空
+        # 交付包——continue 必须先于一切;review 优先于 pkg;无数无票无缺料原因才去 wo。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            process.stdout.write(JSON.stringify([
+                r.routeAfterDecision({{status: 'running'}}, 0),
+                r.routeAfterDecision({{status: 'collecting'}}, 0),
+                r.routeAfterDecision({{status: 'review'}}, 2),
+                r.routeAfterDecision({{status: 'review', numbers: {{tax_due: '1'}}}}, 0),
+                r.routeAfterDecision({{status: 'stuck', numbers: {{}}, needs: ['sales_summary']}}, 0),
+                r.routeAfterDecision({{status: 'review'}}, 0),
+                r.routeAfterDecision({{status: 'stuck', blocked_reasons: ['no_tax_id']}}, 0),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"kind": "continue"},
+                {"kind": "continue"},
+                {"kind": "review"},
+                {"kind": "pkg"},
+                {"kind": "stay"},
+                {"kind": "wo"},
+                {"kind": "stay"},
+            ],
+        )
+
+    def test_init_per_file_marks_every_file_queued(self):
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const files = [{{name: 'a.jpg'}}, {{name: 'b.pdf'}}, {{name: 'c.png'}}];
+            process.stdout.write(JSON.stringify(r.initPerFile(files)));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"name": "a.jpg", "status": "queued"},
+                {"name": "b.pdf", "status": "queued"},
+                {"name": "c.png", "status": "queued"},
+            ],
+        )
+
+    def test_mark_uploading_per_file_flips_only_queued_rows_in_batch(self):
+        # 命中批内且仍 queued 的才翻 uploading;前一批已 accepted 的行不动。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const perFile = [
+                {{name: 'a.jpg', status: 'accepted'}},
+                {{name: 'b.pdf', status: 'queued'}},
+                {{name: 'c.png', status: 'queued'}},
+            ];
+            const batch = [{{name: 'a.jpg'}}, {{name: 'b.pdf'}}];
+            process.stdout.write(JSON.stringify(r.markUploadingPerFile(perFile, batch)));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"name": "a.jpg", "status": "accepted"},
+                {"name": "b.pdf", "status": "uploading"},
+                {"name": "c.png", "status": "queued"},
+            ],
+        )
+
+    def test_apply_outcome_per_file_maps_three_event_types(self):
+        # success 翻 accepted;reject 按 name 翻 rejected;network_fail 翻 failed;
+        # 不在名单内的行原样保留。
+        out = _run_node(f"""
+            const r = require({self._MODULE});
+            const perFile = [
+                {{name: 'a.jpg', status: 'uploading'}},
+                {{name: 'b.pdf', status: 'uploading'}},
+                {{name: 'c.png', status: 'queued'}},
+            ];
+            process.stdout.write(JSON.stringify([
+                r.applyOutcomeToPerFile(perFile, {{type: 'success', files: [{{name: 'a.jpg'}}]}}),
+                r.applyOutcomeToPerFile(perFile, {{type: 'reject', name: 'b.pdf'}}),
+                r.applyOutcomeToPerFile(perFile, {{type: 'network_fail', files: [{{name: 'a.jpg'}}, {{name: 'b.pdf'}}]}}),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                [
+                    {"name": "a.jpg", "status": "accepted"},
+                    {"name": "b.pdf", "status": "uploading"},
+                    {"name": "c.png", "status": "queued"},
+                ],
+                [
+                    {"name": "a.jpg", "status": "uploading"},
+                    {"name": "b.pdf", "status": "rejected"},
+                    {"name": "c.png", "status": "queued"},
+                ],
+                [
+                    {"name": "a.jpg", "status": "failed"},
+                    {"name": "b.pdf", "status": "failed"},
+                    {"name": "c.png", "status": "queued"},
+                ],
+            ],
+        )
 
 
 def _intake_at_stub():

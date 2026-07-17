@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from typing import Optional
 
 from core import feature_flags
@@ -19,12 +18,12 @@ from services.workorder import (
     evidence,
     kinds,
     obligation_engine,
+    progress as wo_progress,
     sod,
     store,
     wht_signals,
 )
 from services.workorder.steps import bank_sales_suggest, edc_corroboration, sales_aggregate
-from services.workorder.steps import sort as sort_step
 from services.workspace import tax_profile_store
 
 logger = logging.getLogger(__name__)
@@ -191,8 +190,8 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "intent": wo["intent"],
         "status": wo["status"],
         "current_step": wo["current_step"],
-        "progress": _classify_progress(wo, items, classified),
-        "bank_progress": _bank_progress(wo, items, bank_parsed),
+        "progress": wo_progress.classify_progress(wo, items, classified),
+        "bank_progress": wo_progress.bank_progress(wo, items, bank_parsed),
         "flagged": evidence.flagged_projection(items, events, classified=classified),
         "alerts": evidence.alerts_projection(events) + evidence.amount_read_suggestions(events),
         "needs": needs,
@@ -282,40 +281,6 @@ def financials_projection(cur, *, tenant_id: str, work_order_id: str) -> Optiona
     order_detail()['financials'] 同一份 _financials,不另造第二套判定。"""
     events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     return _financials(events)
-
-
-def _classify_progress(wo: dict, items: list[dict], classified: dict) -> Optional[dict]:
-    """classify 逐件进度(P-4:219 秒别再像死机)。仅当工单正卡在 classify 步时给一份
-    {processed, total};其余步返 None(前端只在 classify 期显进度条)。
-
-    classified 是调用方(order_detail)已回放好的 item_classified 索引,不建新状态表:
-    total = 本单要过 OCR 的图片件数(file_ref 是图片扩展名);processed = 其中已落
-    item_classified 事件的件数(classify 逐件独立事务提交,已处理件即时可见)——processed
-    随 OCR 推进单调递增,跑完 == total。销项直读/银行件不过 OCR,不计入。"""
-    if wo.get("current_step") != "classify":
-        return None
-    image_ids = {
-        it["id"]
-        for it in items
-        if Path(it.get("file_ref") or "").suffix.lower() in sort_step.IMAGE_EXTS
-    }
-    if not image_ids:
-        return None
-    processed = sum(1 for iid in image_ids if iid in classified)
-    return {"step": "classify", "processed": processed, "total": len(image_ids)}
-
-
-def _bank_progress(wo: dict, items: list[dict], bank_parsed: dict) -> Optional[dict]:
-    """reconcile 步银行流水逐件进度(J-B:分批传料期间前端「读对账单 X/N」,同
-    _classify_progress 的现算范式——只在工单正卡在 reconcile 步时给一份 {processed,total},
-    其余步返 None。bank_parsed 是调用方已回放好的 item_bank_parsed 索引,不建新状态表。"""
-    if wo.get("current_step") != "reconcile":
-        return None
-    bank_ids = {it["id"] for it in items if it.get("kind") == kinds.BANK_STATEMENT}
-    if not bank_ids:
-        return None
-    processed = sum(1 for iid in bank_ids if iid in bank_parsed)
-    return {"step": "reconcile", "processed": processed, "total": len(bank_ids)}
 
 
 def _halt_info(events: list[dict], status: str) -> tuple[list, list]:

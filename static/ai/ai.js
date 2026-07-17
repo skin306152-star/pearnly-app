@@ -44,7 +44,7 @@
     var deskGateOpen = null;
 
     // 「待你处理」胶囊共享取数(simplify 收口):此前矩阵/看板各持一份逐字相同的实现,
-    // matrix↔board 纯 UI 切换也各重打一遍 review-queue 刷同一枚基本不变的胶囊。收成
+    // matrix 与 board 纯 UI 切换也各重打一遍 review-queue 刷同一枚基本不变的胶囊。收成
     // 一份 + 15s TTL——胶囊归共享头部(切子视图 DOM 不销毁),短窗内直接用上次的数;
     // 拉不到显 '—' 不臆造。计数口径仍在 AI.board.pendingReviewCount(review+stuck)。
     var pendingStat = { at: 0, value: null };

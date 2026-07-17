@@ -51,7 +51,7 @@ def enrich(
     # running 工单整体跳过(2026-07-17 S3):引擎正在重算这些件,票不给人裁(此刻的裁决
     # 会与重跑互踩),SoD 投影一并不挂——running 卡不渲染任何签批动作,投影无消费方。
     # 这是 feed 自己的语义规则,收在 enrich 内,不让编排层替 feed 削名单。
-    orders = [o for o in orders if o["status"] != engine.STATUS_RUNNING]
+    orders = [o for o in orders if o.get("status") != engine.STATUS_RUNNING]
     if not orders:
         return []
     order_ids = [o["work_order_id"] for o in orders]

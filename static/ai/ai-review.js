@@ -34,7 +34,6 @@
             clientId: clientId,
             queue: [], // 未判票(J-C · 只有这些走单张聚焦流,已判票分流进 decidedEntries)
             decidedEntries: [], // 已判票(mount 时 entry.decision 已有值),折叠分组只读展示
-            totalCount: 0, // 计数器「未判 k / 共 n」的 n = queue.length + decidedEntries.length(mount 时定,不随会话变)
             idx: 0,
             local: {}, // item_id -> {state: 'pending'|'accepted'|'recalc'|'excluded'|'assigned'|'failed', decision}
             poolHandle: AI.reviewPool.create(), // D2-S9 · 推 LINE 待问状态机(ai-review-pool.js)
@@ -97,7 +96,8 @@
             idx: S.idx,
             total: S.queue.length,
             undecidedRemaining: AI.reviewQueue.undecidedCount(S.queue, S.local),
-            totalCount: S.totalCount,
+            // 「共 n」不设独立状态:revisit 只在 queue/decidedEntries 间搬条目,两者之和恒为总数
+            totalCount: S.queue.length + S.decidedEntries.length,
             local: S.local[entry.item_id],
             editing: S.editing,
             editErr: S.editErr,
@@ -658,7 +658,6 @@
                 );
                 S.queue = split.undecided;
                 S.decidedEntries = split.decided;
-                S.totalCount = split.undecided.length + split.decided.length;
                 S.idx = 0;
                 S.mode = 'card';
                 S.alerts = detail.alerts || [];

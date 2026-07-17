@@ -443,7 +443,9 @@ class EditStartValuesTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class ActionOfDecisionTests(unittest.TestCase):
-    def test_maps_known_decisions_and_falls_back_to_assign(self):
+    def test_maps_known_decisions_and_no_fallback_outside_map(self):
+        # 映射外无兜底(简化角):bulkDecisionTemplate 只产 face_value/exclude/recalc,
+        # 未知词显式落空暴露,不静默套 'assign' 错标签。
         out = _run_node(f"""
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             process.stdout.write(JSON.stringify([
@@ -454,7 +456,7 @@ class ActionOfDecisionTests(unittest.TestCase):
                 q.actionOfDecision(null),
             ]));
             """)
-        self.assertEqual(out, ["accept", "exclude", "recalc", "assign", "assign"])
+        self.assertEqual(out, ["accept", "exclude", "recalc", None, None])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

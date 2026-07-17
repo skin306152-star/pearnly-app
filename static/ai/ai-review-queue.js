@@ -173,12 +173,12 @@
     }
 
     // 批量模板的 decision 词 → decide() 用的 ui action 词(ai-review.js::_stateForAction
-    // 复用同一张映射,不为批量另写一套终态标签)。bulkDecisionTemplate 目前只可能产出
-    // face_value/exclude/recalc(verdict.py 的 suggested_decision 策略),留 'assign' 兜底
-    // 以防未来策略扩面到方向裁决。
+    // 复用同一张映射,不为批量另写一套终态标签)。bulkDecisionTemplate 只可能产出
+    // face_value/exclude/recalc(verdict.py 的 suggested_decision 策略),映射外无兜底——
+    // 真出现未知词宁可显式 undefined 暴露,不静默套错标签。
     var _DECISION_TO_ACTION = { face_value: 'accept', exclude: 'exclude', recalc: 'recalc' };
     function actionOfDecision(template) {
-        return (template && _DECISION_TO_ACTION[template.decision]) || 'assign';
+        return template && _DECISION_TO_ACTION[template.decision];
     }
 
     // 改数裁决值 vs OCR 原读数比对(J-C · fieldRows「最新裁决值 + 已人工修正」徽标用):

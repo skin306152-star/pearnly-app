@@ -19,11 +19,11 @@ from decimal import Decimal, InvalidOperation
 from itertools import combinations, product
 from typing import Optional
 
-STANDARD_VAT_RATE = Decimal("0.07")
+from services.workorder.steps.reconcile_gates import STANDARD_VAT_RATE, ZERO
+
 # |净×7%−税| 容差:票面税=round(净×7%, 2),理论残差 ≤0.005;留 0.02 兜双侧二次舍入,与
 # reconcile_gates 的申报口径一致(该值不放宽判定,只作解歧候选的自洽性门槛)。
 RATE_TOL = Decimal("0.02")
-ZERO = Decimal("0")
 
 # 单个数至多纠正的错读位数。真针打错读通常 1 位(IMG_2647 税/含税各 1 位);放到 2 位仍属
 # 「宁缺勿滥」的极小改动量,再多即从纠错滑向猜数,故设硬上限。

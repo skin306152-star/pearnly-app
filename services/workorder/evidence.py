@@ -132,16 +132,19 @@ def alerts_projection(events: list[dict]) -> list[dict]:
     return [a for key, a in suspicions.items() if key not in resolved]
 
 
-def amount_read_suggestions(events: list[dict]) -> list[dict]:
+def amount_read_suggestions(events: list[dict], classified: Optional[dict] = None) -> list[dict]:
     """确定性读数解歧建议投影(J-13 · order_detail.alerts 读侧,与 alerts_projection 同挂 alerts)。
 
     扫进项票 item_classified 的票面三数,对内部不自洽者跑 amount_disambig 求唯一自洽建议,产出
     警示卡数据(前端改数入口预填,消费在 J-C 批)。纯读侧现算、零落库——建议永不进 R1/R2/试算,
-    采纳仍走既有人工改数裁决端点。多解/无解的票不出建议(宁缺勿滥,判定收口在 amount_disambig)。"""
+    采纳仍走既有人工改数裁决端点。多解/无解的票不出建议(宁缺勿滥,判定收口在 amount_disambig)。
+    classified 同 flagged_projection:order_detail 已回放好的索引传进来,别在 5s 轮询热路径上重扫。"""
     from services.workorder.steps import amount_disambig
 
+    if classified is None:
+        classified = replay_items_by_type(events, _EVT_CLASSIFIED)
     out: list[dict] = []
-    for item_id, rec in replay_items_by_type(events, _EVT_CLASSIFIED).items():
+    for item_id, rec in classified.items():
         payload = rec.get("payload") or {}
         if payload.get("kind") != _KIND_PURCHASE:
             continue

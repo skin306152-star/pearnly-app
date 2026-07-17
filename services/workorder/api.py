@@ -181,8 +181,13 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     needs, blocked = _halt_info(events, wo["status"])
     # item_classified 回放同一请求只算一次,喂给 flagged/进度/佐证三个读侧投影(纯参数下沉)。
     classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
-    # item_bank_parsed 回放同上(J-B:reconcile 步银行流水逐件进度,同 classified 的现算范式)。
-    bank_parsed = evidence.replay_items_by_type(events, _EVT_BANK_PARSED)
+    # item_bank_parsed 只有 reconcile 步有消费方(progress.bank_progress 其余步首行返 None),
+    # 其余步跳过回放——order_detail 是 5s 轮询热路径,别每拉一次白扫一遍事件流。
+    bank_parsed = (
+        evidence.replay_items_by_type(events, _EVT_BANK_PARSED)
+        if wo["current_step"] == "reconcile"
+        else {}
+    )
     detail = {
         "id": wo["id"],
         "workspace_client_id": wo["workspace_client_id"],
@@ -193,7 +198,8 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "progress": wo_progress.classify_progress(wo, items, classified),
         "bank_progress": wo_progress.bank_progress(wo, items, bank_parsed),
         "flagged": evidence.flagged_projection(items, events, classified=classified),
-        "alerts": evidence.alerts_projection(events) + evidence.amount_read_suggestions(events),
+        "alerts": evidence.alerts_projection(events)
+        + evidence.amount_read_suggestions(events, classified=classified),
         "needs": needs,
         "blocked_reasons": blocked,
         "numbers": _numbers(events),

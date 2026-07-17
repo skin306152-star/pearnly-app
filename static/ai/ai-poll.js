@@ -1,7 +1,7 @@
 /*
  * Pearnly AI · ai-poll.js · 共享轮询器(J-B)
  *
- * 契约:intake/review 的「重新跑之后盯着」与 board/工单页的「活着就自动刷」四处场景形状不同
+ * 契约:intake/review 的「重新跑之后盯着」与工单页的「活着就自动刷」三处场景形状不同
  * (有无最大次数超时/终态判据不同),共享的是同一套定时器生命周期——收拢这层,不让四个
  * 调用点各写一份 setTimeout 链 + visibilitychange 监听(此前 ai-intake.js/ai-review.js
  * 各自一份 pollAfterRun,逐字节重复,N-6 债)。

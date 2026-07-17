@@ -87,7 +87,10 @@ test.describe('J-B #1 · 收齐才开跑', () => {
                 materialsCalls += 1;
                 return route.fulfill({
                     contentType: 'application/json',
-                    body: JSON.stringify({ registered: [{ item_id: 'a' + materialsCalls }], count: 1 }),
+                    body: JSON.stringify({
+                        registered: [{ item_id: 'a' + materialsCalls }],
+                        count: 1,
+                    }),
                 });
             },
             'POST /api/workorder/orders/wo-1/run': async (route) => {
@@ -185,7 +188,9 @@ test.describe('J-B #3 · 看板状态诚实 + 引导链②③', () => {
                 clients: [{ id: 'c1', name: 'Acme Co' }],
             }),
             'GET /api/workorder/orders': jsonRoute({
-                orders: [{ id: 'wo-1', workspace_client_id: 'c1', period: '2569-05', status: 'stuck' }],
+                orders: [
+                    { id: 'wo-1', workspace_client_id: 'c1', period: '2569-05', status: 'stuck' },
+                ],
             }),
             'GET /api/workorder/orders/wo-1': jsonRoute({
                 id: 'wo-1',
@@ -310,6 +315,9 @@ test.describe('J-B #5 · 手机 390 视口无横向溢出', () => {
         const tabsBox = await page.locator('#clientTabs').boundingBox();
         expect(tabsBox.x).toBeGreaterThanOrEqual(0);
         expect(tabsBox.x + tabsBox.width).toBeLessThanOrEqual(390 + 1);
-        await page.screenshot({ path: path.join(ART, '08-mobile-390-no-overflow.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ART, '08-mobile-390-no-overflow.png'),
+            fullPage: true,
+        });
     });
 });

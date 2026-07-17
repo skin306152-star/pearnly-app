@@ -115,6 +115,46 @@ class ReviewQueueTests(unittest.TestCase):
         self.assertEqual(order["flagged_total"], 2)
         self.assertTrue(all(g["severity"] == "crit" for g in order["flagged_groups"]))
 
+    def test_queue_status_set_covers_review_stuck_running(self):
+        # S3 契约 B(2026-07-17):running 也进队列(处理中可见),不再「消失式处理」。
+        self.assertEqual(
+            review._QUEUE_STATUSES,
+            [engine.STATUS_REVIEW, engine.STATUS_STUCK, engine.STATUS_RUNNING],
+        )
+
+    def test_running_order_projected_but_its_flagged_items_stay_out_of_feed(self):
+        # running 工单出现在 clients/orders 投影(带 current_step/updated_at 供前端灰卡),
+        # 但它的票不交给 review_feed.enrich 现算——引擎在重算,人不该同时裁它的票。
+        rows = [
+            _row(),
+            _row(
+                work_order_id="wo-run",
+                status="running",
+                current_step="compute",
+                flag_reason="amount_math_fail",
+                flagged_count=2,
+            ),
+        ]
+        cur = FakeCur(rows)
+        captured = {}
+
+        def _enrich(cur2, *, tenant_id, orders, actor, sod_enforced, severity=None):
+            captured["order_ids"] = [o["work_order_id"] for o in orders]
+            return []
+
+        with (
+            mock.patch.object(review.line_client_pool_store, "ensure_table"),
+            mock.patch.object(review.review_feed, "enrich", side_effect=_enrich),
+        ):
+            out = review.review_queue(cur, tenant_id="t-1")
+        orders = [o for c in out["clients"] for o in c["orders"]]
+        run = next(o for o in orders if o["work_order_id"] == "wo-run")
+        self.assertEqual(run["status"], "running")
+        self.assertEqual(run["current_step"], "compute")
+        self.assertEqual(run["updated_at"], "2026-06-01T00:00:00+00:00")
+        self.assertEqual(captured["order_ids"], ["wo-1"])
+        self.assertEqual(out["flagged_items"], [])
+
     def test_query_params_wire_filters(self):
         cur = FakeCur([])
         with mock.patch.object(review.line_client_pool_store, "ensure_table"):

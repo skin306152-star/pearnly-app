@@ -169,9 +169,29 @@
         crumb.innerHTML = crumbCur(at(CRUMB_LABEL_KEY[route.name] || 'crumb_dash'));
     }
 
-    // 离开工作台时记滚动位,回来时恢复(Canon §7:视图切换回来滚动位置不丢)。
-    var dashScrollY = 0;
-    var prevRouteName = null;
+    // 契约 C(状态语言 Canon 2026-07-17):离开任何路由都记滚动位,进入时恢复一次(不跟踪
+    // 后续滚动)——泛化此前只有工作台享受的 dashScrollY。键=路由名;客户按期操作页每个
+    // 客户 × 子视图各记各的。
+    var scrollByRoute = {};
+    var prevRoute = null;
+
+    function scrollKeyOf(route) {
+        if (route.name === 'client') return 'client:' + route.clientId + ':' + route.view;
+        return route.name;
+    }
+
+    function restoreScroll(route) {
+        window.scrollTo(0, scrollByRoute[scrollKeyOf(route)] || 0);
+    }
+
+    // pool/client 异步渲染:内容未撑起时 scrollTo 无效(clamp 回 0),双 rAF 等首帧再恢复。
+    function restoreScrollAfterPaint(route) {
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                restoreScroll(route);
+            });
+        });
+    }
 
     function onRoute(api, route) {
         // 闸关(或探针明确回 404)时 #/desk 当未知路由处理——落回工作台,不留一条到
@@ -183,14 +203,12 @@
             window.location.hash = AI.router.buildDashboardHash();
             return;
         }
-        if (prevRouteName === 'dashboard' && route.name !== 'dashboard') {
-            dashScrollY = window.scrollY;
-        }
+        if (prevRoute) scrollByRoute[scrollKeyOf(prevRoute)] = window.scrollY;
         // 离开客户池页收它的一次性 toast(不挂在 v-pool 子树里,同 pkg 证据模态框先例)。
-        if (prevRouteName === 'pool' && route.name !== 'pool' && window.AI.pool) {
+        if (prevRoute && prevRoute.name === 'pool' && route.name !== 'pool' && window.AI.pool) {
             AI.pool.onLeave();
         }
-        prevRouteName = route.name;
+        prevRoute = route;
         setCrumb(route);
         $('v-dashboard').classList.toggle('on', route.name === 'dashboard');
         $('v-client').classList.toggle('on', route.name === 'client');
@@ -216,13 +234,13 @@
         $('navReports').classList.toggle('on', route.name === 'reports');
         $('navSettings').classList.toggle('on', route.name === 'settings');
         if (route.name === 'pool') {
-            window.scrollTo(0, 0);
+            restoreScrollAfterPaint(route);
             AI.pool.mount(api);
             return;
         }
         if (route.name === 'desk') {
             if (deskGateOpen === true) {
-                window.scrollTo(0, 0);
+                restoreScroll(route);
                 AI.desk.mount(api);
             }
             // deskGateOpen === null(探针未落地):不挂载——afterDeskProbe() 落地后
@@ -230,37 +248,37 @@
             return;
         }
         if (route.name === 'vatcheck') {
-            window.scrollTo(0, 0);
+            restoreScroll(route);
             AI.vatcheck.mount(api);
             return;
         }
         if (route.name === 'fileconv') {
-            window.scrollTo(0, 0);
+            restoreScroll(route);
             AI.fileconv.mount(api);
             return;
         }
         if (route.name === 'payroll') {
-            window.scrollTo(0, 0);
+            restoreScroll(route);
             AI.payroll.mount(api);
             return;
         }
         if (route.name === 'clients') {
-            window.scrollTo(0, 0);
+            restoreScroll(route);
             AI.clients.load(api);
             return;
         }
         if (route.name === 'client-archive') {
-            window.scrollTo(0, 0);
+            restoreScroll(route);
             AI.clientArchive.mount(api, route.clientId, route.tab);
             return;
         }
         if (route.name === 'reports') {
-            window.scrollTo(0, 0);
+            restoreScroll(route);
             AI.reports.mount(api);
             return;
         }
         if (route.name === 'settings') {
-            window.scrollTo(0, 0);
+            restoreScroll(route);
             AI.settings.mount(api, {
                 onLogout: function () {
                     localStorage.removeItem('mrpilot_token');
@@ -282,10 +300,10 @@
             $('vtBoard').classList.toggle('on', !isMatrix);
             var loaded = isMatrix ? AI.matrix.load(api) : AI.dashboard.load(api);
             loaded.then(function () {
-                window.scrollTo(0, dashScrollY);
+                restoreScroll(route); // 时机沿用:数据落地内容撑起后恢复
             });
         } else {
-            window.scrollTo(0, 0);
+            restoreScrollAfterPaint(route);
             AI.client.mount(api, route.clientId, route.view, route.period);
         }
     }
@@ -316,7 +334,7 @@
         if (current.name !== 'desk') return;
         if (open) {
             $('v-desk').classList.add('on');
-            window.scrollTo(0, 0);
+            restoreScroll(current); // 与 onRoute 的 desk 分支同口径(契约 C)
             AI.desk.mount(api);
         } else {
             window.location.hash = AI.router.buildDashboardHash();

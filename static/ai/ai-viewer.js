@@ -66,6 +66,31 @@
         if (key != null) loadUrl(key, loader);
     }
 
+    // 取景框适配倍率(S3 §8a):原生分辨率的图缩到正好铺满取景框,小图不放大(≤1)。
+    // 非法尺寸(0/负,图未载或容器未布局)回 1,调用方按"无适配"处理。
+    function computeFitScale(natW, natH, vpW, vpH) {
+        if (!(natW > 0) || !(natH > 0) || !(vpW > 0) || !(vpH > 0)) return 1;
+        return Math.min(vpW / natW, vpH / natH, 1);
+    }
+
+    // 平移量夹取(S3 §8b):保证图至少 40px 留在取景框内;缩放后比框还小的轴直接归 0
+    // (小图不许拖丢)。2026-07-17 Zihao 实锤:全屏里拖出的平移量带回小窗,整张图停在
+    // 框外像"没加载",刷新才回——退出全屏/每次 apply 都过这道夹取。
+    function clampPan(tx, ty, imgW, imgH, scale, vpW, vpH) {
+        var w = imgW * scale;
+        var h = imgH * scale;
+        var maxX = (w + vpW) / 2 - 40;
+        var maxY = (h + vpH) / 2 - 40;
+        return {
+            tx: w < vpW ? 0 : Math.max(-maxX, Math.min(maxX, tx)),
+            ty: h < vpH ? 0 : Math.max(-maxY, Math.min(maxY, ty)),
+        };
+    }
+
+    // 同单跨张保持(S3 §8c):stateKey(调用方给,如工单 id)→ {scaleRel, rot}。
+    // 缩放存相对 fit 的倍率(各张图分辨率不同,绝对 scale 不可比);平移是单张图的事,不存。
+    var viewByKey = new Map();
+
     var I_PLUS =
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>';
     var I_MINUS =
@@ -139,6 +164,7 @@
         if (!vp || !img) return function () {};
 
         var scale = 1;
+        var fit = 1; // 取景框适配倍率(载图后 computeFitScale 算出;显示口径 fit=100%)
         var tx = 0;
         var ty = 0;
         var rot = 0;
@@ -149,7 +175,22 @@
         var clamp = function (v, a, b) {
             return Math.max(a, Math.min(b, v));
         };
+        // 缩放上下界随 fit 走:下界 fit×0.4,上界允许放过原生 100% 一点(§8a)。
+        var clampScale = function (v) {
+            return clamp(v, fit * 0.4, Math.max(fit * 8, 1));
+        };
         var apply = function () {
+            var p = clampPan(
+                tx,
+                ty,
+                img.naturalWidth,
+                img.naturalHeight,
+                scale,
+                vp.clientWidth,
+                vp.clientHeight
+            );
+            tx = p.tx;
+            ty = p.ty;
             img.style.transform =
                 'translate(calc(-50% + ' +
                 tx +
@@ -160,11 +201,33 @@
                 ') rotate(' +
                 rot +
                 'deg)';
-            if (zl) zl.textContent = Math.round(scale * 100) + '%';
+            // 百分比相对 fit:载入即 100% = 正好铺满取景框(不是相对原生像素)。
+            if (zl) zl.textContent = Math.round((scale / fit) * 100) + '%';
+        };
+        // 图层按原生分辨率栅格化(§8a):此前 CSS 把大图先压到布局尺寸再 transform 放大,
+        // 小窗 547% 全是糊的;布局宽=naturalWidth,取景框适配交给 fit 倍率。换图重载重算。
+        img.onload = function () {
+            img.style.width = img.naturalWidth + 'px';
+            img.style.height = 'auto';
+            fit = computeFitScale(
+                img.naturalWidth,
+                img.naturalHeight,
+                vp.clientWidth,
+                vp.clientHeight
+            );
+            scale = fit;
+            tx = 0;
+            ty = 0;
+            var saved = opts.stateKey != null ? viewByKey.get(opts.stateKey) : null;
+            if (saved) {
+                scale = fit * saved.scaleRel; // §8c:同单上一张的缩放感受带过来
+                rot = saved.rot;
+            }
+            apply();
         };
         var onWheel = function (e) {
             e.preventDefault();
-            scale = clamp(scale * (e.deltaY < 0 ? 1.12 : 0.89), 0.4, 6);
+            scale = clampScale(scale * (e.deltaY < 0 ? 1.12 : 0.89));
             apply();
         };
         var onDown = function (e) {
@@ -202,7 +265,7 @@
         var onTMove = function (e) {
             if (e.touches.length === 2) {
                 e.preventDefault();
-                scale = clamp(pinchScale * (dist2(e.touches) / (pinchDist || 1)), 0.4, 6);
+                scale = clampScale(pinchScale * (dist2(e.touches) / (pinchDist || 1)));
                 apply();
             } else if (drag && e.touches.length === 1) {
                 e.preventDefault();
@@ -220,11 +283,11 @@
             if (!b) return;
             e.stopPropagation();
             var z = b.dataset.z;
-            if (z === 'in') scale = clamp(scale * 1.2, 0.4, 6);
-            else if (z === 'out') scale = clamp(scale / 1.2, 0.4, 6);
+            if (z === 'in') scale = clampScale(scale * 1.2);
+            else if (z === 'out') scale = clampScale(scale / 1.2);
             else if (z === 'rot') rot += 90;
             else if (z === 'reset') {
-                scale = 1;
+                scale = fit; // 复位=回取景框适配态(显示 100%),不是原生 1:1
                 tx = 0;
                 ty = 0;
                 rot = 0;
@@ -236,6 +299,11 @@
             }
             apply();
         };
+        // §8b:退出全屏时取景框骤然变小,全屏里拖出的 tx/ty 会把图整张推出框外——
+        // 按小窗尺寸重跑 clampPan(apply 内建)把图拽回可见区。
+        var onFsChange = function () {
+            if (!document.fullscreenElement) apply();
+        };
         vp.addEventListener('wheel', onWheel, { passive: false });
         vp.addEventListener('mousedown', onDown);
         window.addEventListener('mousemove', onMove);
@@ -244,6 +312,7 @@
         vp.addEventListener('touchmove', onTMove, { passive: false });
         vp.addEventListener('touchend', onTEnd);
         vp.addEventListener('click', onTools);
+        document.addEventListener('fullscreenchange', onFsChange);
         img.style.transformOrigin = 'center';
         apply();
         loadInto(vp, img, opts.key, opts.loader, function () {
@@ -252,6 +321,10 @@
 
         return function cleanup() {
             alive = false;
+            if (opts.stateKey != null && fit > 0) {
+                viewByKey.set(opts.stateKey, { scaleRel: scale / fit, rot: rot });
+            }
+            document.removeEventListener('fullscreenchange', onFsChange);
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
@@ -275,6 +348,8 @@
         remountViewer: remountViewer,
         loadUrl: loadUrl,
         preload: preload,
+        computeFitScale: computeFitScale,
+        clampPan: clampPan,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

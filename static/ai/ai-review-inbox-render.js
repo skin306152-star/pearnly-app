@@ -200,13 +200,30 @@
         );
     }
 
+    // S3 契约 B(2026-07-17):running 工单不再从队列消失——卡体只显「AI 在跑」状态行
+    // (胶囊 + 当前步 + 最后活动),签批/冻结/驳回一律不出:引擎正在重算,签了也是签空。
+    function runningBodyHtml(order) {
+        return (
+            '<div class="note">' +
+            AI.format.chipHtml(order.status) +
+            ' · ' +
+            esc(AI.format.stepLabel(order.current_step)) +
+            ' · ' +
+            esc(at('wo_last_active', { t: AI.format.relAgo(order.updated_at, Date.now()) })) +
+            '</div>'
+        );
+    }
+
     function workOrderCardHtml(client, order, ui) {
         ui = ui || {};
+        var running = order.status === 'running';
         var reworkChip = order.is_rework
             ? '<span class="chip w">' + esc(at('riq_rework_badge')) + '</span>'
             : '';
         return (
-            '<div class="panel riq-wo" data-wo="' +
+            '<div class="panel riq-wo' +
+            (running ? ' riq-running' : '') +
+            '" data-wo="' +
             order.work_order_id +
             '">' +
             '<div class="hd"><h3>' +
@@ -224,9 +241,9 @@
             dueLine(order) +
             '</span></h3></div>' +
             '<div class="bd">' +
-            flaggedChipsHtml(order) +
-            woActionsHtml(order, ui) +
-            rejectFormHtml(order, ui) +
+            (running
+                ? runningBodyHtml(order)
+                : flaggedChipsHtml(order) + woActionsHtml(order, ui) + rejectFormHtml(order, ui)) +
             '</div></div>'
         );
     }

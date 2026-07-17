@@ -30,8 +30,10 @@ MAX_BATCH = 200
 # classify 不重开——源料与 OCR 未变,驳回改的是判断不是原件,重跑 OCR 纯烧钱。
 _REOPEN_FROM = "reconcile"
 
-# 待审工单纳入队列的状态:review(跑绿待签)+ stuck(有料过不去待人裁)。取 engine 权威常量。
-_QUEUE_STATUSES = [engine.STATUS_REVIEW, engine.STATUS_STUCK]
+# 待审工单纳入队列的状态:review(跑绿待签)+ stuck(有料过不去待人裁)+ running(引擎在跑)。
+# running 进队列是状态语言 Canon 契约 B(2026-07-17):处理中必须可见,不许「消失式处理」——
+# 此前裁决后工单从队列蒸发,人不知后端死活。取 engine 权威常量。
+_QUEUE_STATUSES = [engine.STATUS_REVIEW, engine.STATUS_STUCK, engine.STATUS_RUNNING]
 
 # 三个原分组子查询(义务/客户池/驳回)改 LEFT JOIN LATERAL:聚合只对队列内工单现算,代价随
 # 队列长度而非全租户历史增长(效率7);rj 走 ix_wo_events_wo (tenant,wo,id) 前缀窄扫。tenant_id
@@ -114,10 +116,13 @@ def review_queue(
         ),
     )
     orders = _group_rows([dict(r) for r in cur.fetchall()], severity)
+    # running 工单的票不进 flagged feed(契约 B 只要求工单卡可见):引擎正在重算这些件,
+    # 人此刻裁它的票会跟重跑互相踩(重跑落新 flagged/改判,此刻的裁决对错未定)。enrich
+    # 的 SoD 投影一并跳过——running 卡不渲染任何签批动作,投影无消费方。
     flagged_items = review_feed.enrich(
         cur,
         tenant_id=tenant_id,
-        orders=orders,
+        orders=[o for o in orders if o["status"] != engine.STATUS_RUNNING],
         actor=actor,
         sod_enforced=sod_enforced,
         severity=severity,

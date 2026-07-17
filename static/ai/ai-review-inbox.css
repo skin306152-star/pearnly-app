@@ -16,6 +16,10 @@
 }
 
 /* ---- 待审工单卡(签批闭环三步按钮化) ---- */
+/* S3 契约 B:running 工单灰卡(AI 在跑 · 不可签批),只降透明度不新造视觉。 */
+.riq-running {
+  opacity: 0.75;
+}
 .riq-wo-flags {
   display: flex;
   flex-wrap: wrap;

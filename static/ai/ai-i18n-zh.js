@@ -189,6 +189,7 @@ window.__AI_I18N_ZH__ = {
     rv_rerun_waiting: '重跑中…',
     rv_still_blocked: '仍有票未裁，回队列继续',
     rv_decision_failed: '第 {n} 张未落库，已还原，请重试',
+    review_saved_toast: '已保存',
     rv_taxid_alert_msg: '票上反复出现 {suspected}，但账套登记为 {registered} — 登记税号疑似录错。',
     rv_taxid_fix_btn: '改成票上税号 · 重锚重跑',
     rv_taxid_fixing: '重锚中…',

@@ -193,6 +193,7 @@ window.__AI_I18N_JA__ = {
     rv_rerun_waiting: '再実行中…',
     rv_still_blocked: 'まだ未判断の項目があります。キューに戻ります',
     rv_decision_failed: '{n}件目の保存に失敗しました。元に戻しました。再試行してください',
+    review_saved_toast: '保存しました',
     rv_taxid_alert_msg:
         '書類には {suspected} が繰り返し出ますが、このアカウントの登録は {registered} です — 登録税番号の入力ミスの可能性があります。',
     rv_taxid_fix_btn: '書類の税番号に修正・再実行',

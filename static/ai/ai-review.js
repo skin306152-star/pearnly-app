@@ -19,6 +19,9 @@
     var S = null;
     var wired = false; // 照 ai-client.js chromeWired 先例:监听器只挂一次,不随每次 mount 重挂。
     var runPoll = null; // 当前重跑轮询的 AI.poll 句柄(mount()/换会话时先停旧的再起新的)
+    // 契约 C(2026-07-17 Canon):orderId → 最后操作的 item_id(裁决/前进时记)。回来重挂载
+    // 若该票仍未判则聚焦它,不再一律打回第一张。
+    var lastItemByOrder = {};
 
     // 本次刚提交的裁决没有服务端 actor 回显(响应体只有 event_id),用当前登录态的展示名
     // 占位(AI.format.actorLabel 回落链:邮箱前缀 → sub 短八位)——不再拼 "user:<uuid>"
@@ -151,10 +154,12 @@
     }
 
     // 换卡先清旧查看器实例(mountKey 固定 'review' · 单张聚焦不会有并存的第二个实例)。
+    // stateKey=工单 id:同单跨张保持缩放/旋转(S3 §8c,状态存取在 AI.viewer)。
     function attachImage(entry) {
         AI.viewer.remountViewer('review', $('rvImgWrap'), {
             key: entry.item_id,
             loader: itemImageLoader(entry.item_id),
+            stateKey: S.orderId,
         });
     }
 
@@ -219,6 +224,7 @@
         var session = S; // 快照当前会话——回调落地时若已切走(S 已指向新会话)一律不认。
         var submittedIdx = S.idx;
         var submittedItemId = entry.item_id;
+        lastItemByOrder[S.orderId] = submittedItemId;
         setLocal(submittedItemId, { state: 'pending' });
         S.editing = false;
         S.editErr = false;
@@ -251,6 +257,10 @@
                             undoExclude(submittedIdx);
                         }
                     );
+                } else {
+                    // 契约 A 动作回执(2026-07-17 Canon):采纳/改数/定向也要一句落库确认,
+                    // 不能只有剔除有回执。
+                    AI.reviewRender.showToast(at('review_saved_toast'), null);
                 }
             })
             .catch(function (err) {
@@ -282,6 +292,7 @@
     function advanceFocus() {
         if (S.idx + 1 < S.queue.length) {
             S.idx += 1;
+            lastItemByOrder[S.orderId] = S.queue[S.idx].item_id;
             renderCurrent();
         } else {
             renderDone();
@@ -659,6 +670,14 @@
                 S.queue = split.undecided;
                 S.decidedEntries = split.decided;
                 S.idx = 0;
+                // 契约 C:回到上次操作那张(仍未判才聚焦,已判/不在则维持第一张未判)。
+                var lastId = lastItemByOrder[order.id];
+                for (var i = 0; lastId && i < S.queue.length; i++) {
+                    if (S.queue[i].item_id === lastId) {
+                        S.idx = i;
+                        break;
+                    }
+                }
                 S.mode = 'card';
                 S.alerts = detail.alerts || [];
                 if (detail.workspace_client_id) S.wsClientId = detail.workspace_client_id;

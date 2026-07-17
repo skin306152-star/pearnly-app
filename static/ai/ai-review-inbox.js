@@ -22,7 +22,10 @@
 
     var S = null;
     var wired = false;
-    var focusedFlag = null; // 键盘流当前聚焦的组(点组头/组内元素时更新,跨渲染保留)。
+    var focusedFlag = null; // 键盘流当前聚焦的组(点组头/组内元素时更新,跨路由保留 · 契约 C)。
+    // 契约 C(状态语言 Canon 2026-07-17):切走再回来,页面还在原地——上次成功拉到的队列
+    // 作 mount 首帧种子(同步渲染,不出骨架屏),真相仍以每次 load() 为准(后台对账刷新)。
+    var lastQueue = null;
 
     function woBody() {
         return $('riqWoBody');
@@ -155,8 +158,20 @@
 
     // ============ 加载(review-queue 一次带回工单卡 + 跨工单 flagged item feed) ============
 
+    // 队列里是否有 running 工单(读模型现在下发 running · S3 §1):在场即引擎在跑,
+    // 载入后就该主动盯进度,不必等一次裁决动作才起轮询。
+    function hasRunning(queue) {
+        var hit = false;
+        ((queue && queue.clients) || []).forEach(function (c) {
+            (c.orders || []).forEach(function (o) {
+                if (o.status === 'running') hit = true;
+            });
+        });
+        return hit;
+    }
+
     function load() {
-        S.loading = true;
+        S.loading = !S.queue; // 已有可看的数据(契约 C 种子/上一轮)时后台对账,不打回骨架屏
         S.error = false;
         renderWo();
         renderFlagged();
@@ -166,9 +181,11 @@
             .then(function (data) {
                 if (S !== session) return;
                 S.queue = data;
+                lastQueue = data;
                 S.loading = false;
                 renderWo();
                 S.flagged.setFeed(data.flagged_items || []); // 后端下发,不再逐单 getOrder(F1)
+                if (hasRunning(data)) startProgressPoll();
             })
             .catch(function () {
                 if (S !== session) return;
@@ -180,8 +197,8 @@
     }
 
     // 裁决落库后引擎自驱重跑(review→running→…→review)是异步的:指数退避有限次轮询
-    // review-queue(F10),复用进度读模型语义(running 工单从队列消失、跑完回 review 才重现),
-    // 每轮刷工单卡 + feed,直到基线内工单都落定或退避次数用尽。替掉此前单发 2.5s 猜时器。
+    // review-queue(F10)。落定判据在 AI.reviewProgress.settled(S3:running 随读模型下发,
+    // 在场即未落定),每轮刷工单卡 + feed,直到落定或 ≈8 分钟封顶(封顶后手动「刷新」钮兜底)。
     function startProgressPoll() {
         S.pollAttempt = 0;
         S.pollBaseline = AI.reviewProgress.baseline(S.queue);
@@ -318,9 +335,16 @@
 
     function mount(api) {
         S = freshState(api);
-        focusedFlag = null;
         wireOnce();
         resolveActorLabel();
+        // 契约 C(2026-07-17 Canon):mount=freshState 全重置是违规先例的修正——lastQueue
+        // 只作首帧种子(同步渲染两分区,不出骨架屏),随后照常 load() 后台对账刷新。
+        if (lastQueue) {
+            S.queue = lastQueue;
+            S.loading = false;
+            renderWo();
+            S.flagged.setFeed(lastQueue.flagged_items || []);
+        }
         load();
         AI.clientPool.mount(api);
     }

@@ -1073,5 +1073,47 @@ class AiGatePureTests(unittest.TestCase):
         )
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiViewerPureTests(unittest.TestCase):
+    """原件查看器纯函数守门(S3 §8):computeFitScale(取景框适配,小图不放大)与
+    clampPan(平移夹取,图至少 40px 留框内;比框小的轴归零)。DOM/transform 侧交真浏览器。"""
+
+    _MODULE = json.dumps(str(AI_DIR / "ai-viewer.js"))
+
+    def test_compute_fit_scale_landscape_portrait_and_small_image(self):
+        out = _run_node(f"""
+            const v = require({self._MODULE});
+            process.stdout.write(JSON.stringify([
+                v.computeFitScale(2000, 1000, 500, 500),
+                v.computeFitScale(1000, 2000, 500, 500),
+                v.computeFitScale(300, 200, 500, 500),
+                v.computeFitScale(0, 0, 500, 500),
+            ]));
+            """)
+        # 横图按宽适配 0.25;竖图按高适配 0.25;小图不放大回 1;0 尺寸保护回 1
+        self.assertEqual(out, [0.25, 0.25, 1, 1])
+
+    def test_clamp_pan_pulls_runaway_offsets_back_and_stays_symmetric(self):
+        out = _run_node(f"""
+            const v = require({self._MODULE});
+            process.stdout.write(JSON.stringify([
+                v.clampPan(10000, 0, 2000, 1000, 1, 500, 400),
+                v.clampPan(-10000, -10000, 2000, 1000, 1, 500, 400),
+            ]));
+            """)
+        # |tx| ≤ (2000+500)/2−40 = 1210;|ty| ≤ (1000+400)/2−40 = 660,正负对称
+        self.assertEqual(
+            out,
+            [{"tx": 1210, "ty": 0}, {"tx": -1210, "ty": -660}],
+        )
+
+    def test_clamp_pan_zeroes_axes_smaller_than_viewport(self):
+        out = _run_node(f"""
+            const v = require({self._MODULE});
+            process.stdout.write(JSON.stringify(v.clampPan(50, -30, 300, 200, 1, 500, 400)));
+            """)
+        self.assertEqual(out, {"tx": 0, "ty": 0})
+
+
 if __name__ == "__main__":
     unittest.main()

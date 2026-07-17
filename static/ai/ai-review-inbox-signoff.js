@@ -13,6 +13,9 @@
 (function () {
     'use strict';
 
+    // running 工单卡(S3 契约 B)不渲染任何动作钮/驳回表单,onWoClick 委托抓不到
+    // data-action,五个动作对 running 单没有可达入口——故此处不设 status 卫哨;若未来
+    // 出现绕过渲染层的入口(键盘直达/程序调用),须先在入口补 running 卫哨再放行。
     function create(api) {
         var ui = {};
 

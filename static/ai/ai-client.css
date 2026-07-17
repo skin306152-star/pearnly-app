@@ -471,6 +471,16 @@
   .rv-grid {
     grid-template-columns: 1fr;
   }
+  /* 手机裁决区吸底(S3 §7):图票对照占满首屏时三键别跟着滚没——照 ai-desk.css
+   * .fd-composer 先例,--paper 垫底防透字。宽屏零改动。 */
+  .rv-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--paper);
+    padding: 10px 0;
+    border-top: 1px solid var(--hair);
+    z-index: 5;
+  }
 }
 
 /* N-5:窄视口(手机 390)5 个 tab 按钮不折行/不缩窄,.ctabs 的 inline-flex 天然内容宽度

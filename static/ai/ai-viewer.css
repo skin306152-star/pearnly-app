@@ -16,12 +16,12 @@
 .pv-viewer.grabbing {
   cursor: grabbing;
 }
+/* 布局宽由 JS 定为原生分辨率(S3 §8a):此前 max-width/max-height:94% 把大图先压到
+ * 布局尺寸再 transform 放大,小窗放到 547% 全是糊的;取景框适配交给 fit 倍率。 */
 .pv-img {
   position: absolute;
   left: 50%;
   top: 50%;
-  max-width: 94%;
-  max-height: 94%;
   transform-origin: center;
   will-change: transform;
   user-select: none;

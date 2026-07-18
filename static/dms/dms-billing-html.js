@@ -269,7 +269,7 @@
             '<div class="dms-bill-topup-done ' +
             (ok ? 'ok' : 'wait') +
             '"><div class="ic">' +
-            (ok ? '✓' : '⏳') +
+            (ok ? '✓' : '…') +
             '</div><div class="msg">' +
             esc(ok ? t('dms-bill-topup-auto-ok') : t('dms-bill-topup-manual')) +
             '</div><button type="button" class="btn" id="dms-bill-topup-again">' +

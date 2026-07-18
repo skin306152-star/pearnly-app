@@ -14,6 +14,8 @@
   --btn-blue: #2f6bff;
   --amber-weak: #fdf3e3;
   --amber-line: #e5b769;
+  --ok: #2aa971;
+  --err: #b3261e;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -28,6 +30,8 @@
     --accent-soft: #232a3f;
     --btn-blue: #5a82ff;
     --amber-weak: #332b1c;
+    --ok: #4ecf95;
+    --err: #ff7a70;
     --amber-line: #7a5f2a;
   }
 }

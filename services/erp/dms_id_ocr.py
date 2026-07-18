@@ -33,11 +33,16 @@ class DmsOcrError(Exception):
 
 
 def resolve_dms_endpoint(user_id: str, endpoint_id: Optional[str]) -> Optional[Dict[str, Any]]:
-    """选 mrerp_dms endpoint。带 id 时校验它确实是 mrerp_dms(绝不用非 DMS 端点);
-    不带时取第一个 enabled 的 mrerp_dms。"""
+    """选 mrerp_dms endpoint。带 id 时校验它确实是 mrerp_dms 且未被停用——停用是老板的
+    收权动作(如波3 停用操作员),会话里残留的 endpoint_id 不得绕过它;不带时取第一个
+    enabled 的 mrerp_dms。"""
     if endpoint_id:
         ep = db.get_erp_endpoint(user_id, endpoint_id)
-        if ep and (ep.get("adapter") or "").strip().lower() == "mrerp_dms":
+        if (
+            ep
+            and (ep.get("adapter") or "").strip().lower() == "mrerp_dms"
+            and ep.get("enabled") is not False
+        ):
             return ep
         return None
     eps = db.list_erp_endpoints(user_id) or []

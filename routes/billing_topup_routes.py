@@ -9,7 +9,7 @@ import logging
 import mimetypes
 import os
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -139,7 +139,11 @@ async def credits_topup_request(req: _TopupRequestBody, request: Request):
 
 @router.post("/api/credits/topup/upload-slip/{request_id}")
 async def credits_topup_upload_slip(
-    request_id: int, request: Request, file: UploadFile = File(...)
+    request_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    payer_name: str = Form(""),
+    note: str = Form(""),
 ):
     user = get_current_user_from_request(request)
     uid = str(user.get("id", ""))
@@ -164,10 +168,18 @@ async def credits_topup_upload_slip(
     slip_filename = f"{request_id}{ext}"
     slip_rel = f"slips/{slip_filename}"
     slip_storage.write_slip(slip_rel, content)
+    # 付款人/备注在第 3 步(上传截图)才收集——建单时落的是空串,此处补写。此前后端
+    # 只收 file,前端(主站与 /dms)发的 payer_name/note 一直被静默丢弃,人工审核对不上人。
+    # isinstance 防御:测试/内部直调不经 DI 时形参是 Form 哨兵对象而非 str。
+    payer_name = (payer_name if isinstance(payer_name, str) else "").strip()[:200]
+    note = (note if isinstance(note, str) else "").strip()[:500]
     with db.get_cursor(commit=True) as cur:
         cur.execute(
-            "UPDATE topup_requests SET slip_path = %s WHERE id = %s",
-            (slip_rel, request_id),
+            "UPDATE topup_requests SET slip_path = %s, "
+            "payer_name = CASE WHEN %s <> '' THEN %s ELSE payer_name END, "
+            "note = CASE WHEN %s <> '' THEN %s ELSE note END "
+            "WHERE id = %s",
+            (slip_rel, payer_name, payer_name, note, note, request_id),
         )
     # ── SlipOK 自动验证 ──────────────────────────────────────────
     slipok = await _verify_slip_with_slipok(slip_rel, expected_amount)

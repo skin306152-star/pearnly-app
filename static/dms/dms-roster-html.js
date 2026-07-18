@@ -11,25 +11,6 @@
             ? root.escapeHtml(s == null ? '' : s)
             : String(s);
     }
-    function fmtDate(v) {
-        if (!v) return '—';
-        var d = new Date(v);
-        if (isNaN(d.getTime())) return String(v);
-        var p = function (x) {
-            return (x < 10 ? '0' : '') + x;
-        };
-        return (
-            d.getFullYear() +
-            '-' +
-            p(d.getMonth() + 1) +
-            '-' +
-            p(d.getDate()) +
-            ' ' +
-            p(d.getHours()) +
-            ':' +
-            p(d.getMinutes())
-        );
-    }
 
     function page(inner) {
         return (
@@ -264,6 +245,5 @@
         listEmpty: listEmpty,
         codeOverlay: codeOverlay,
         pwModal: pwModal,
-        fmtDate: fmtDate,
     };
 })(typeof self !== 'undefined' ? self : this);

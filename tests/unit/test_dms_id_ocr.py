@@ -75,3 +75,17 @@ class TestEditableShape(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestResolveEndpointEnabled(unittest.TestCase):
+    """停用是收权动作:会话残留的显式 endpoint_id 不得绕过 enabled(审查修复回归)。"""
+
+    def test_explicit_id_disabled_endpoint_rejected(self):
+        ep = {"id": "e1", "adapter": "mrerp_dms", "enabled": False}
+        with patch.object(s.db, "get_erp_endpoint", return_value=ep):
+            self.assertIsNone(s.resolve_dms_endpoint("u1", "e1"))
+
+    def test_explicit_id_enabled_endpoint_returned(self):
+        ep = {"id": "e1", "adapter": "mrerp_dms", "enabled": True}
+        with patch.object(s.db, "get_erp_endpoint", return_value=ep):
+            self.assertEqual(s.resolve_dms_endpoint("u1", "e1"), ep)

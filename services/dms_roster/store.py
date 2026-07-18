@@ -39,6 +39,10 @@ def ensure_tables() -> None:
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(_PROFILES)
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS ix_dms_operator_profiles_tenant "
+            "ON dms_operator_profiles (tenant_id)"
+        )
         apply_tenant_rls(cur, TABLE)
 
 

@@ -409,6 +409,8 @@ def list_dms_push_logs_for_tenant(
     """
     if not tenant_id:
         return {"items": [], "total": 0}
+    # WHERE 谓词须与 _classify_push_type 的 id_card 判定同步(SQL 调不了 Python 单源,
+    # 改判定规则时两处一起动)。
     base = """
         FROM erp_push_logs l
         JOIN users u ON u.id = l.user_id AND u.tenant_id = %s
@@ -418,18 +420,22 @@ def list_dms_push_logs_for_tenant(
     """
 
     def _run() -> Dict[str, Any]:
+        # COUNT(*) OVER() 让总数与分页同一次扫描出——四表 JOIN 扫两遍太贵。
         with db.get_cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS n " + base, (str(tenant_id),))
-            total = cur.fetchone()["n"]
             cur.execute(
                 "SELECT l.id, l.invoice_no, l.seller_name, l.status, l.error_msg, "
                 "l.created_at, l.request_body, "
-                "p.display_name AS operator_name, u.role AS operator_role "
+                "p.display_name AS operator_name, u.role AS operator_role, "
+                "COUNT(*) OVER() AS _total "
                 + base
                 + " ORDER BY l.created_at DESC LIMIT %s OFFSET %s",
                 (str(tenant_id), limit, offset),
             )
-            return {"items": [dict(r) for r in cur.fetchall()], "total": total}
+            rows = [dict(r) for r in cur.fetchall()]
+            total = rows[0].pop("_total") if rows else 0
+            for r in rows[1:]:
+                r.pop("_total", None)
+            return {"items": rows, "total": total}
 
     try:
         return _run()

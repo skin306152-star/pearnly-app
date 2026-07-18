@@ -187,12 +187,18 @@ def update_operator(
             cfg["password_enc"] = _encrypt(new_pass)
         from core import db
 
-        db.update_erp_endpoint(str(user_id), str(ep["id"]), config=cfg)
+        # update_erp_endpoint 吞异常返 False——不核对就回 ok 会让老板看到「已换密码」的假成功,
+        # 而操作员仍拿旧密码推单失败(状态诚实)。
+        if not db.update_erp_endpoint(str(user_id), str(ep["id"]), config=cfg):
+            return {"error": "dms_roster.endpoint_update_failed"}
     return {"ok": True}
 
 
 def set_status(owner_user: dict, user_id: str, status: str) -> dict:
-    """停用=endpoint enabled=False + 解绑 LINE(按 user);启用=endpoint enabled=True(LINE 需重新发码绑)。"""
+    """停用=endpoint 禁 + 解绑 LINE + 作废未用绑定码;启用=endpoint 启(LINE 需重新发码绑)。
+
+    收权动作先行且逐步核对返回值:endpoint 禁失败即中止报错(绝不出现「显示已停用、
+    实际还能推单」);档案状态最后写,写失败异常上抛成 5xx(诚实失败,老板重试即可)。"""
     if status not in VALID_STATUS:
         return {"error": "dms_roster.invalid_status"}
     ctx = _require_profile(owner_user, user_id)
@@ -203,22 +209,27 @@ def set_status(owner_user: dict, user_id: str, status: str) -> dict:
     ep = _dms_endpoint(user_id, enabled_only=False)
     from core import db
 
-    if ep:
-        db.update_erp_endpoint(str(user_id), str(ep["id"]), enabled=(status == "active"))
+    if ep and not db.update_erp_endpoint(str(user_id), str(ep["id"]), enabled=(status == "active")):
+        return {"error": "dms_roster.endpoint_update_failed"}
     if status == "inactive":
         from services.line_dms import store as line_dms_store
 
         line_dms_store.unbind_by_user(str(user_id))
+        line_dms_store.void_bind_codes_for_user(str(user_id))
     store.set_profile_status(tenant_id, user_id, status)
     return {"ok": True}
 
 
 def issue_bind_code(owner_user: dict, user_id: str) -> dict:
-    """为某操作员发 LINE 绑定码(复用 line_dms store · 老板逐行发码给该销售)。"""
+    """为某操作员发 LINE 绑定码(复用 line_dms store · 老板逐行发码给该销售)。
+
+    停用的操作员拒发(前端已置灰,这里是 API 层收权闸——停用语义不能被直连 API 绕开)。"""
     ctx = _require_profile(owner_user, user_id)
     if not ctx:
         return {"error": "dms_roster.not_found"}
-    tenant_id, _prof = ctx
+    tenant_id, prof = ctx
+    if (prof.get("status") or "active") != "active":
+        return {"error": "dms_roster.inactive"}
     from services.line_dms import store as line_dms_store
 
     out = line_dms_store.generate_bind_code(tenant_id, user_id)

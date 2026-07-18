@@ -279,6 +279,22 @@ def unbind_by_user(user_id: str) -> bool:
     return bool(_dal("unbind_by_user", False)(_run))
 
 
+def void_bind_codes_for_user(user_id: str) -> bool:
+    """作废该 user 全部未用绑定码(停用操作员时的收权动作:在外流通的码即刻失效)。"""
+    from core import db
+
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE line_dms_binding_codes SET used_at = now() "
+                "WHERE user_id = %s AND used_at IS NULL",
+                (str(user_id),),
+            )
+            return True
+
+    return bool(_dal("void_bind_codes_for_user", False)(_run))
+
+
 def unbind_by_line_user(line_user_id: str) -> bool:
     """LINE 侧解绑(unfollow / 解绑命令)。返回是否真删到一行。"""
     from core import db

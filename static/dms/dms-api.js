@@ -101,9 +101,6 @@
                 if (note) form.append('note', note);
                 return callForm('POST', '/api/credits/topup/upload-slip/' + requestId, form);
             },
-            topupHistory: function () {
-                return call('GET', '/api/credits/topup/history');
-            },
             // 记录明细(扣费/充值):tab=usage|topup · period=all|day|month|year · date=YYYY-MM-DD · 分页。
             records: function (p) {
                 var q =

@@ -185,3 +185,60 @@ class AdminSlipEndpointTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UploadSlipPayerPersistTests(unittest.IsolatedAsyncioTestCase):
+    """审查修复回归:第3步收集的付款人/备注必须落库(此前后端只收 file 静默丢弃)。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._patch = mock.patch.object(slip_storage, "_STORAGE_ROOT", self._tmp.name)
+        self._patch.start()
+        self.addCleanup(self._patch.stop)
+
+    async def test_payer_and_note_persisted_with_slip(self):
+        cur = _FakeCur(fetch={"tenant_id": "t-1", "status": "pending", "amount_thb": 100})
+        upload = mock.Mock()
+        upload.filename = "slip.jpg"
+        upload.read = mock.AsyncMock(return_value=b"jpeg-bytes")
+        req = mock.Mock()
+        req.headers = {}
+
+        with (
+            mock.patch.object(
+                tr, "get_current_user_from_request", return_value={"id": "u1", "tenant_id": "t-1"}
+            ),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(
+                tr, "_verify_slip_with_slipok", new=mock.AsyncMock(return_value={"ok": None})
+            ),
+        ):
+            await tr.credits_topup_upload_slip(
+                7, req, file=upload, payer_name="  สมชาย ", note="โอนจากบัญชีบริษัท"
+            )
+
+        update_sql, params = next((sql, p) for sql, p in cur.executed if "SET slip_path" in sql)
+        self.assertIn("payer_name", update_sql)
+        self.assertIn("สมชาย", params)  # strip 后落库
+        self.assertIn("โอนจากบัญชีบริษัท", params)
+
+    async def test_empty_payer_does_not_overwrite(self):
+        cur = _FakeCur(fetch={"tenant_id": "t-1", "status": "pending", "amount_thb": 100})
+        upload = mock.Mock()
+        upload.filename = "slip.jpg"
+        upload.read = mock.AsyncMock(return_value=b"x")
+        req = mock.Mock()
+        req.headers = {}
+        with (
+            mock.patch.object(
+                tr, "get_current_user_from_request", return_value={"id": "u1", "tenant_id": "t-1"}
+            ),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(
+                tr, "_verify_slip_with_slipok", new=mock.AsyncMock(return_value={"ok": None})
+            ),
+        ):
+            await tr.credits_topup_upload_slip(8, req, file=upload)
+        update_sql, params = next((sql, p) for sql, p in cur.executed if "SET slip_path" in sql)
+        self.assertIn("CASE WHEN", update_sql)  # 空串不覆盖既有值

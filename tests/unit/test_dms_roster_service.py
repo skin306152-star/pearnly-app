@@ -98,12 +98,14 @@ class MutateOperatorTest(unittest.TestCase):
             mock.patch("core.db.list_erp_endpoints", return_value=[ep]),
             mock.patch("core.db.update_erp_endpoint") as up,
             mock.patch("services.line_dms.store.unbind_by_user") as unbind,
+            mock.patch("services.line_dms.store.void_bind_codes_for_user") as void,
             mock.patch.object(service.store, "set_profile_status", return_value=True) as sst,
         ):
             res = service.set_status(OWNER, "op-1", "inactive")
         self.assertTrue(res.get("ok"))
         self.assertIs(up.call_args.kwargs["enabled"], False)
         unbind.assert_called_once_with("op-1")
+        void.assert_called_once_with("op-1")  # 在外流通的未用绑定码随停用即刻失效
         sst.assert_called_once_with("tenant-1", "op-1", "inactive")
 
     def test_activate_enables_endpoint_no_unbind(self):
@@ -183,3 +185,42 @@ class ListOperatorsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StatusHonestyRegressionTest(unittest.TestCase):
+    """审查修复回归:DB 写失败不得吞成假成功;停用语义在 API 层闭环。"""
+
+    _PROF = {"user_id": "op-1", "tenant_id": "tenant-1", "status": "active"}
+    _EP = {"id": "ep-1", "adapter": "mrerp_dms", "enabled": True, "config": {}}
+
+    def test_deactivate_endpoint_toggle_failure_surfaces(self):
+        with (
+            mock.patch.object(service.store, "get_profile", return_value=dict(self._PROF)),
+            mock.patch("core.db.list_erp_endpoints", return_value=[dict(self._EP)]),
+            mock.patch("core.db.update_erp_endpoint", return_value=False),
+            mock.patch("services.line_dms.store.unbind_by_user") as unbind,
+            mock.patch.object(service.store, "set_profile_status") as sst,
+        ):
+            res = service.set_status(OWNER, "op-1", "inactive")
+        self.assertEqual(res.get("error"), "dms_roster.endpoint_update_failed")
+        unbind.assert_not_called()  # 收权没落地就不动后续状态,绝不显示假停用
+        sst.assert_not_called()
+
+    def test_update_creds_write_failure_surfaces(self):
+        with (
+            mock.patch.object(service.store, "get_profile", return_value=dict(self._PROF)),
+            mock.patch("core.db.list_erp_endpoints", return_value=[dict(self._EP)]),
+            mock.patch("core.db.update_erp_endpoint", return_value=False),
+        ):
+            res = service.update_operator(OWNER, "op-1", dms_password="newpw")
+        self.assertEqual(res.get("error"), "dms_roster.endpoint_update_failed")
+
+    def test_issue_bind_code_rejects_inactive_operator(self):
+        prof = dict(self._PROF, status="inactive")
+        with (
+            mock.patch.object(service.store, "get_profile", return_value=prof),
+            mock.patch("services.line_dms.store.generate_bind_code") as gen,
+        ):
+            res = service.issue_bind_code(OWNER, "op-1")
+        self.assertEqual(res.get("error"), "dms_roster.inactive")
+        gen.assert_not_called()

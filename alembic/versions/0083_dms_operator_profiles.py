@@ -32,6 +32,10 @@ def upgrade() -> None:
             created_at timestamptz DEFAULT now()
         )
         """)
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_dms_operator_profiles_tenant "
+        "ON dms_operator_profiles (tenant_id)"
+    )
 
 
 def downgrade() -> None:

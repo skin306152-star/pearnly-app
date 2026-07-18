@@ -31,7 +31,7 @@
     // ── 视图切换 ──
     function mountView(name) {
         currentView = name;
-        ['intake', 'records'].forEach(function (v) {
+        ['intake', 'records', 'billing'].forEach(function (v) {
             var sec = $('dms-view-' + v);
             if (sec) sec.classList.toggle('on', v === name);
         });
@@ -42,6 +42,8 @@
             root.DX.mountIntake();
         } else if (name === 'records') {
             root.DXRECORDS.mount('#dms-view-records');
+        } else if (name === 'billing') {
+            root.DXBILLING.mount('#dms-view-billing');
         }
         window.scrollTo(0, 0);
     }

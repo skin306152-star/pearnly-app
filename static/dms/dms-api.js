@@ -19,6 +19,11 @@
         return h;
     }
 
+    function _reject(r, data) {
+        var detail = data && data.detail;
+        var code = (detail && (detail.code || detail)) || (data && data.code) || 'generic';
+        return Promise.reject({ status: r.status, code: String(code), data: data });
+    }
     function call(method, path, body) {
         var opt = { method: method, headers: authHeaders(!!body) };
         if (body) opt.body = JSON.stringify(body);
@@ -29,13 +34,24 @@
                     return {};
                 })
                 .then(function (data) {
-                    if (r.ok) return data;
-                    var detail = data && data.detail;
-                    var code =
-                        (detail && (detail.code || detail)) || (data && data.code) || 'generic';
-                    return Promise.reject({ status: r.status, code: String(code), data: data });
+                    return r.ok ? data : _reject(r, data);
                 });
         });
+    }
+    // 表单上传(凭证图):不设 Content-Type,交给浏览器带 multipart boundary。
+    function callForm(method, path, form) {
+        return fetch(path, { method: method, headers: authHeaders(false), body: form }).then(
+            function (r) {
+                return r
+                    .json()
+                    .catch(function () {
+                        return {};
+                    })
+                    .then(function (data) {
+                        return r.ok ? data : _reject(r, data);
+                    });
+            }
+        );
     }
 
     function create() {
@@ -61,6 +77,30 @@
             // 推送记录:恒按 mrerp_dms 适配器筛(记录页只呈现身份证 → DMS 的推送)。
             pushLogs: function (limit) {
                 return call('GET', '/api/erp/logs?adapter=mrerp_dms&limit=' + (limit || 50));
+            },
+            // ── 套餐与余额(波1 计费搬家 · 计费端点全用 get_current_user 鉴权,dms token 直调)──
+            getSubscription: function () {
+                return call('GET', '/api/me/subscription');
+            },
+            subscribe: function (planCode) {
+                return call('POST', '/api/subscription/subscribe', { plan_code: planCode });
+            },
+            cancelSubscription: function () {
+                return call('POST', '/api/subscription/cancel');
+            },
+            getCredits: function () {
+                return call('GET', '/api/me/credits');
+            },
+            topupRequest: function (amountThb) {
+                return call('POST', '/api/credits/topup/request', { amount_thb: amountThb });
+            },
+            uploadSlip: function (requestId, file) {
+                var form = new FormData();
+                form.append('file', file, file.name);
+                return callForm('POST', '/api/credits/topup/upload-slip/' + requestId, form);
+            },
+            topupHistory: function () {
+                return call('GET', '/api/credits/topup/history');
             },
         };
     }

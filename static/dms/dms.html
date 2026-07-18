@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pearnly DMS</title>
     <link rel="icon" href="/static/landing/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/dist/dms.css?v=4" />
+    <link rel="stylesheet" href="/static/dist/dms.css?v=5" />
   </head>
   <body>
     <!-- 登录卡 / 邀请制提示门面(dms-gate.js 挂载,与工作台互斥显示) -->
@@ -43,6 +43,12 @@
             data-view="records"
             data-dt="dms-nav-records"
           ></button>
+          <button
+            type="button"
+            class="dms-nav-item"
+            data-view="billing"
+            data-dt="dms-nav-billing"
+          ></button>
         </nav>
 
         <main class="dms-main">
@@ -50,16 +56,17 @@
             <div id="page-dms-intake"></div>
           </section>
           <section class="dms-view" id="dms-view-records"></section>
+          <section class="dms-view" id="dms-view-billing"></section>
         </main>
       </div>
     </div>
 
     <!-- 4 语词典分片(纯数据 · 独立 <script> 先加载)+ 装配层,同 /ai 先例不并入 bundle -->
-    <script src="/static/dms/dms-i18n-zh.js?v=5"></script>
-    <script src="/static/dms/dms-i18n-th.js?v=5"></script>
-    <script src="/static/dms/dms-i18n-en.js?v=5"></script>
-    <script src="/static/dms/dms-i18n-ja.js?v=5"></script>
+    <script src="/static/dms/dms-i18n-zh.js?v=6"></script>
+    <script src="/static/dms/dms-i18n-th.js?v=6"></script>
+    <script src="/static/dms/dms-i18n-en.js?v=6"></script>
+    <script src="/static/dms/dms-i18n-ja.js?v=6"></script>
     <script src="/static/dms/dms-i18n.js?v=2"></script>
-    <script src="/static/dist/dms.js?v=6" defer></script>
+    <script src="/static/dist/dms.js?v=7" defer></script>
   </body>
 </html>

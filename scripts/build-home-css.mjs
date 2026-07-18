@@ -221,7 +221,14 @@ const AI_CSS = [
 
 // Pearnly DMS SPA:壳令牌/原子/门面在前(dms-shell.css 定义 :root 令牌),身份证向导内容区
 // 样式在后(dms-intake.css · .dmsx 按前者令牌解析)。固化 dms.html 引用顺序。
-const DMS_CSS = ['dms/dms-shell.css', 'dms/dms-gate.css', 'dms/dms-intake.css'];
+// dms-billing.css(波1 · 套餐与余额)复用 dms-shell.css 的令牌 + .btn/.dms-state/.dms-badge,
+// 只补计费视图独有的卡片/套餐格/充值区布局,排最后即可,与其余视图互斥显示,层叠零影响。
+const DMS_CSS = [
+    'dms/dms-shell.css',
+    'dms/dms-gate.css',
+    'dms/dms-intake.css',
+    'dms/dms-billing.css',
+];
 
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },

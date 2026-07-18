@@ -267,7 +267,8 @@ const BUNDLES = [
     // 登录门面 → 向导模板(DXHTML,被 core/confirm/controller 引用)→ 取值模型(DXST)→ 上下文
     // ERP 卡(读 DXST)→ 确认页(读 DXST/DXHTML)→ 控制器(读 DXST/DXHTML/DXCONFIRM/DXERP)→
     // 连接向导(读 DXAPI)→ LINE 绑定卡(DL-4b · 读 DXAPI,同 dms-connect 挂载范式,连接卡下方)
-    // → 记录页 → boot(读全部,收尾)。i18n 数据+装配层是独立 <script> 先加载(同 /ai 的
+    // → 套餐与余额(波1 · 模板 dms-billing-html 先于逻辑 dms-billing · 读 DXAPI)→ 记录页 →
+    // boot(读全部,收尾)。i18n 数据+装配层是独立 <script> 先加载(同 /ai 的
     // ai-i18n.js),不并入本 bundle。
     {
         out: 'static/dist/dms.js',
@@ -283,6 +284,8 @@ const BUNDLES = [
             'dms/dms-intake.js',
             'dms/dms-connect.js',
             'dms/dms-line.js',
+            'dms/dms-billing-html.js',
+            'dms/dms-billing.js',
             'dms/dms-records.js',
             'dms/dms-boot.js',
         ],

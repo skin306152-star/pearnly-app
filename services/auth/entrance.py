@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, Set
+from typing import Callable, Optional, Set
+
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +119,39 @@ def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
     if dms_portal_enabled_for(tenant_id, user_id):
         ents.add(DMS)
     return ents
+
+
+def require_entrance_api(
+    user: dict,
+    *,
+    gate_fn: Callable[[Optional[str], Optional[str]], bool],
+    scope_fn: Callable[[Optional[str]], bool],
+    entry: str,
+    not_found_detail: str = "not_found",
+    push_access_fn: Optional[Callable[[dict], None]] = None,
+) -> dict:
+    """无码路由的通用入口守卫(dms_routes 与波3 花名册路由共用 · 下沉自 dms_routes._authorize)。
+
+    这些路由无权限码,API 作用域闸(authz/deps 按码前缀判)管不到,故守卫落本地。语义与
+    原 dms_routes._authorize 逐字节等价:
+      - 超管任意门放行(平台运营);
+      - gate_fn(邀请闸)关 → 404(fail-closed 不泄漏功能存在);
+      - scope_fn(entrance_api_scope)开且 token.entry != 要求的 entry → 403(别的壳会话打不进);
+      - push_access_fn 给出则跑 plan 推送闸。
+    gate_fn/scope_fn/push_access_fn 由调用方按各自模块名传入 —— 保留调用方模块上现有单测的
+    mock.patch 生效(patch 落调用方模块全局,闭包在此按值收到已 patch 的函数)。
+    """
+    if user.get("is_super_admin"):
+        return user
+    tenant_id = str(user["tenant_id"]) if user.get("tenant_id") else None
+    user_id = str(user["id"]) if user.get("id") else None
+    if not gate_fn(tenant_id, user_id):
+        raise HTTPException(404, detail=not_found_detail)
+    if scope_fn(tenant_id) and user.get("entry") != entry:
+        raise HTTPException(403, detail="authz.forbidden")
+    if push_access_fn is not None:
+        push_access_fn(user)
+    return user
 
 
 def login_entrance_allowed(entry: Optional[str], user: dict) -> bool:

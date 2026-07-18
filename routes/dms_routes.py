@@ -28,7 +28,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
 from core.feature_flags import dms_portal_enabled_for, entrance_api_scope_enabled_for
-from services.auth.entrance import DMS
+from services.auth.entrance import DMS, require_entrance_api
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_dms import store as line_dms_store
@@ -41,25 +41,22 @@ router = APIRouter()
 
 
 def _authorize(request: Request) -> Dict[str, Any]:
-    """DMS 入口守卫(四端点统一)· 登录 + dms_portal 邀请闸 + 入口作用域 + plan 推送闸。
+    """DMS 入口守卫(四端点统一)· 薄壳:委托 entrance.require_entrance_api 通用无码守卫。
 
-    这些路由无权限码,入口作用域闸(authz/deps._check)按码前缀判、管不到它们,故守卫放本地:
-      - dms_portal 关 → 404(fail-closed · 不泄漏功能存在,照 workorder M1 闸先例);
-      - entrance_api_scope 开(现恒 True)且 token.entry != dms → 403(语义对齐
-        deps._entrance_scope_deny:main/pos/ai 会话打不进 /api/dms);判定用 entrance.DMS 常量。
-    禁碰 services/erp 服务层:LINE 侧 DMS 推送直调服务层,不能被路由层闸连坐。
+    dms_portal 邀请闸 + 入口作用域(entrance_api_scope)+ plan 推送闸三个消费面按本模块名
+    传入 —— 闸判定逐字节等价原内联实现,且保留 test_dms_entrance_guard 对本模块的 mock.patch
+    生效(patch 落 dms_routes 全局,helper 闭包按值收到已 patch 的函数)。禁碰 services/erp
+    服务层:LINE 侧 DMS 推送直调服务层,不能被路由层闸连坐。
     """
     user = get_current_user_from_request(request)
-    if user.get("is_super_admin"):
-        return user  # 超管任意门放行(平台运营)
-    tenant_id = str(user["tenant_id"]) if user.get("tenant_id") else None
-    user_id = str(user["id"]) if user.get("id") else None
-    if not dms_portal_enabled_for(tenant_id, user_id):
-        raise HTTPException(404, detail="dms.not_found")
-    if entrance_api_scope_enabled_for(tenant_id) and user.get("entry") != DMS:
-        raise HTTPException(403, detail="authz.forbidden")
-    _check_push_access(user)
-    return user
+    return require_entrance_api(
+        user,
+        gate_fn=dms_portal_enabled_for,
+        scope_fn=entrance_api_scope_enabled_for,
+        entry=DMS,
+        not_found_detail="dms.not_found",
+        push_access_fn=_check_push_access,
+    )
 
 
 # 端点解析/字段整形与 LINE 侧共用(services/erp/dms_id_ocr · 2026-07-02 抽出)。
@@ -74,9 +71,15 @@ async def dms_session(request: Request):
     /dms boot 启动时靠它判能否进壳——200=放行进壳,401/403/404 语义由 _authorize
     天然给出(失效/非 dms 入口/闸关)。刻意不做业务副作用:别的路由(尤其 geo)别学
     这里拿业务端点当探针——geo 会解析端点 + 打上游 MR.ERP 全省列表(冷会话触发完整
-    Playwright 登录)只为丢弃结果,且业务 400 会被误当门禁信号。"""
-    _authorize(request)
-    return {"ok": True}
+    Playwright 登录)只为丢弃结果,且业务 400 会被误当门禁信号。
+
+    C5(波3):附 is_owner 供前端藏/显「操作员」花名册 nav。仅当 user 带 role 时附加——真实
+    令牌恒带 role;守卫单测的 mock user 无 role 键,响应保持 {"ok": True} 不破现有断言/消费方。"""
+    user = _authorize(request)
+    resp: Dict[str, Any] = {"ok": True}
+    if "role" in user:
+        resp["is_owner"] = user.get("role") == "owner"
+    return resp
 
 
 # ════════════════════════════════════════════════════════════════════════

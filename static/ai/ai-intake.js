@@ -69,6 +69,7 @@
             passwordCard: null,
             failedBatches: [],
             resumeBanner: null,
+            materialCount: 0,
         };
     }
 
@@ -105,6 +106,7 @@
             passwordCard: S.passwordCard,
             failedBatches: S.failedBatches,
             resumeBanner: S.resumeBanner,
+            materialCount: S.materialCount,
         };
     }
 
@@ -135,6 +137,15 @@
         }
     }
 
+    function renderUploadProgress() {
+        var el = $('ikUploadProgress');
+        if (!el) {
+            render();
+            return;
+        }
+        el.textContent = AI.intakeRender.uploadProgressText(ctx());
+    }
+
     // ============ 拉详情(needs 判缺 sales_summary) ============
 
     function loadDetail() {
@@ -145,6 +156,7 @@
             .then(function (detail) {
                 if (S !== session) return;
                 S.order = detail;
+                S.materialCount = Number(detail.material_count) || 0;
                 S.needsSales = (detail.needs || []).indexOf('sales_summary') >= 0;
                 render();
             })
@@ -519,9 +531,13 @@
             }, render);
         }
         if (!intakeQueue) {
-            intakeQueue = AI.intakeQueue.create(function () {
-                return S;
-            }, render);
+            intakeQueue = AI.intakeQueue.create(
+                function () {
+                    return S;
+                },
+                render,
+                renderUploadProgress
+            );
         }
         // 换单/换客户挂载新会话:旧会话的轮询没有存在意义(isTerminal/onTick 虽已靠 S!==
         // session 卫哨自认失效,但让它继续空转到超时才停也没必要,当场收掉更干净)。

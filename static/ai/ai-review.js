@@ -73,8 +73,10 @@
     // insertAdjacentHTML('afterbegin')——后者多次调用会反序(每次都插到容器最前面)。
     function injectChrome(container) {
         var groups = S.bulkHandle.bulkableGroups(S.queue, S.local);
+        var bulkState = S.bulkHandle.state();
         var html =
-            AI.reviewFoldRender.bulkBannerHtml(groups, S.bulkHandle.state().busyFlag) +
+            AI.reviewFoldRender.bulkBannerHtml(groups, bulkState.busyFlag) +
+            AI.reviewFoldRender.bulkConfirmHtml(bulkState.confirmGroup) +
             AI.reviewRender.taxidAlertHtml(S.alerts, {
                 canManage: S.canManage,
                 busy: S.realignBusy,
@@ -363,8 +365,26 @@
             return g.flagReason === flagReason;
         })[0];
         if (!group) return;
+        S.bulkHandle.requestConfirm(group);
+        renderCurrent();
+    }
+
+    function archiveBulkDecisions() {
+        var split = AI.reviewQueue.splitByDecision(S.queue, S.local);
+        var moved = split.decided.map(function (entry) {
+            var local = S.local[entry.item_id];
+            return Object.assign({}, entry, {
+                decision: (local && local.decision) || entry.decision,
+            });
+        });
+        S.queue = split.undecided;
+        S.decidedEntries = S.decidedEntries.concat(moved);
+        S.idx = Math.min(S.idx, Math.max(0, S.queue.length - 1));
+    }
+
+    function confirmBulk() {
         var session = S; // 快照——网络落地时若已切走(S 已指向新会话)一律不认。
-        S.bulkHandle.confirmAndRun(S.api, S.orderId, group, function (res) {
+        S.bulkHandle.runConfirmed(S.api, S.orderId, function (res) {
             if (S !== session) return;
             if (res) {
                 var template = S.bulkHandle.state().lastTemplate;
@@ -380,10 +400,16 @@
                     });
                 });
                 S.sessionDecided += res.ok_count || 0;
+                archiveBulkDecisions();
             }
-            if (S.mode === 'card') renderCurrent();
+            if (S.mode === 'card' && S.queue.length) renderCurrent();
             else renderDone();
         });
+    }
+
+    function cancelBulk() {
+        S.bulkHandle.cancelConfirm();
+        renderCurrent();
     }
 
     // ============ 导航(↑↓←→,只移焦点不裁决) ============
@@ -559,6 +585,13 @@
         // 不判活会导致切到「工单」等其他 tab 时按 A/E/X 仍偷偷裁决审核队列(契约外行为)。
         var view = $('cv-review');
         if (!view || !view.classList.contains('on')) return;
+        if (S.bulkHandle.state().confirmGroup) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelBulk();
+            }
+            return;
+        }
         if (S.mode !== 'card') return;
         if (S.editing) {
             if (e.key === 'Enter') {
@@ -636,6 +669,8 @@
         else if (action === 'rv-taxid-realign') doRealign();
         else if (action === 'rv-revisit') revisitDecided(el.getAttribute('data-item'));
         else if (action === 'rv-bulk-run') runBulk(el.getAttribute('data-flag'));
+        else if (action === 'rv-bulk-confirm') confirmBulk();
+        else if (action === 'rv-bulk-cancel') cancelBulk();
         else if (action === 'rv-goto-pkg') {
             window.location.hash = AI.router.buildClientHash(S.clientId, 'pkg');
         }

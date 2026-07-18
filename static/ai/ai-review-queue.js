@@ -122,7 +122,7 @@
         return { undecided: undecided, decided: decided };
     }
 
-    // 计数器「未判 k / 共 n」的 k(J-C):localByItem 是当前会话乐观态(item_id -> {decision}),
+    // 三段计数器的待处理数(J-C):localByItem 是当前会话乐观态(item_id -> {decision}),
     // 与 isDecided 同一份判断口径,不重复写一套 truthy 逻辑。
     function undecidedCount(queue, localByItem) {
         localByItem = localByItem || {};

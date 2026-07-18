@@ -304,6 +304,17 @@ test.describe('J-B #4 · 深链账期 → 开单控件默认', () => {
         await expect(page.locator('#ikEmptyPeriodSel')).toHaveValue('2569-05');
         await page.screenshot({ path: path.join(ART, '07-deeplink-period-default.png') });
     });
+
+    test('#/client/x/wo?period=2569-05 → 工单开单也保留深链账期', async ({ page }) => {
+        await mockRoutes(page, {
+            'GET /api/workspace/clients/c1': jsonRoute({ client: { id: 'c1', name: 'Acme Co' } }),
+            'GET /api/workorder/orders': jsonRoute({ orders: [] }),
+        });
+        await page.goto(`${PAGE}#/client/c1/wo?period=2569-05`);
+        await page.waitForSelector('#woEmptyPeriodSel', { timeout: 15000 });
+        await expect(page.locator('#woEmptyPeriodSel')).toHaveValue('2569-05');
+        await page.screenshot({ path: path.join(ART, '07b-wo-deeplink-period-default.png') });
+    });
 });
 
 test.describe('J-B #5 · 手机 390 视口无横向溢出', () => {

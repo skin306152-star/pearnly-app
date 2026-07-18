@@ -227,7 +227,7 @@ Object.assign(window.__AI_I18N_TH__, {
     reports_download_pdf_btn: 'ดาวน์โหลด PDF',
     reports_download_xlsx_btn: 'ดาวน์โหลด Excel',
     reports_downloading: 'กำลังดาวน์โหลด…',
-    wo_open_first_btn: 'เปิดใบงานงวดปัจจุบัน',
+    wo_open_first_btn: 'เปิดใบงานตามงวดที่เลือก',
     wo_open_first_busy: 'กำลังเปิด…',
     settings_lang_title: 'ภาษา',
     settings_lang_zh: '中文',
@@ -315,7 +315,7 @@ Object.assign(window.__AI_I18N_TH__, {
 
     // J-C · ความจำคิวตรวจสอบ(ยังไม่ตัดสินก่อน/พับที่ตัดสินแล้ว)+ ยืนยันเป็นชุด +
     // ค่าเสนอแนะจาก J-A
-    rv_counter: 'ค้าง {k} / รวม {n}',
+    rv_counter: 'รอดำเนินการ {k} · เสร็จแล้ว {d} · รวม {n}',
     rv_manually_corrected: 'แก้ไขโดยเจ้าหน้าที่',
     rv_decided_group_summary: 'ตัดสินแล้ว {n} ใบ（ขยายเพื่อแก้ไข）',
     rv_decided_row: 'ตัดสินโดย {actor} · {result}',
@@ -323,6 +323,8 @@ Object.assign(window.__AI_I18N_TH__, {
     rv_suggest_note: 'AI คำนวณจากสมการหน้าบิล กรุณาตรวจสอบกับภาพต้นฉบับ',
     rv_bulk_confirm_msg:
         'ยืนยันดำเนินการตามคำแนะนำของ AI กับรายการที่คล้ายกันทั้ง {n} รายการหรือไม่? แต่ละรายการจะถูกตัดสินทีละใบและไม่สามารถยกเลิกได้ในคราวเดียว',
+    rv_bulk_confirm_title: 'ดำเนินการเอกสารที่คล้ายกัน',
+    rv_bulk_confirm_btn: 'ยืนยัน {n} รายการ',
 
     // MC1-b2 · เทมเพลตคำอธิบายเกณฑ์ตัดสิน (narrative_key อ้างอิงตรงกับ
     // services/workorder/verdict.py ด้วยมือ · พารามิเตอร์มาจาก _*_params ในไฟล์นั้น)
@@ -451,6 +453,8 @@ Object.assign(window.__AI_I18N_TH__, {
     intake_manifest_zip_n: 'แตกจากซิป {n} ไฟล์',
     intake_resume_body:
         'การอัปโหลดครั้งก่อนถูกขัดจังหวะ — {n} จาก {total} ไฟล์ยังไม่เสร็จ เลือกไฟล์เหล่านั้นใหม่เพื่อทำต่อ',
+    intake_received_count:
+        'ระบบได้รับเอกสารของรอบนี้แล้ว {n} รายการ ข้อมูลจะไม่หายเมื่อออกจากหน้านี้',
     intake_resume_continue: 'อัปโหลดต่อ',
     intake_resume_dismiss: 'ปิด',
     intake_failed_batch_n: '{n} ไฟล์ล้มเหลวจากปัญหาเครือข่าย',

@@ -211,7 +211,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     reports_download_pdf_btn: '下载 PDF',
     reports_download_xlsx_btn: '下载 Excel',
     reports_downloading: '下载中…',
-    wo_open_first_btn: '开当期工单',
+    wo_open_first_btn: '按所选账期开工单',
     wo_open_first_busy: '开单中…',
     settings_lang_title: '语言',
     settings_lang_zh: '中文',
@@ -296,7 +296,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_expl_sales_doc_review: '这看起来是你客户自己开出去的销售票,按 S 确认归销项',
 
     // J-C · 审核队列操作记忆(未判优先/已判折叠)+ 批量确认 + J-A 建议值改数回显
-    rv_counter: '未判 {k} / 共 {n}',
+    rv_counter: '待处理 {k} · 已处理 {d} · 共 {n}',
     rv_manually_corrected: '已人工修正',
     rv_decided_group_summary: '已裁 {n} 张（展开可改判）',
     rv_decided_row: '已由 {actor} 判 · {result}',
@@ -304,6 +304,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     rv_suggest_note: 'AI 按票面等式推算，请核对原图',
     rv_bulk_confirm_msg:
         '确认对这 {n} 张同类票全部按 AI 建议处理？会逐张裁决落库，无法一次性撤销。',
+    rv_bulk_confirm_title: '批量处理同类票据',
+    rv_bulk_confirm_btn: '确认处理 {n} 张',
 
     // MC1-b2 · 判据人话模板(narrative_key 命名空间随 services/workorder/verdict.py
     // 手工对齐,params 见该文件各 _*_params 构造器)
@@ -426,6 +428,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     intake_manifest_rejected_n: '拒收 {n} 件',
     intake_manifest_zip_n: '压缩包解出 {n} 件',
     intake_resume_body: '上次投料中断了——{total} 件里还有 {n} 件没传完,重新选择这些文件继续。',
+    intake_received_count: '本账期后台已收到 {n} 件资料，切换页面不会丢失。',
     intake_resume_continue: '继续上传',
     intake_resume_dismiss: '忽略',
     intake_failed_batch_n: '{n} 件因网络问题未传成功',

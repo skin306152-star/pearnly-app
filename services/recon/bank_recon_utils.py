@@ -128,7 +128,7 @@ _TH_MONTHS = {
 
 # Bank detection keywords
 _BANK_SIGNATURES = {
-    "kbank": ["กสิกรไทย", "kasikorn", "kbank", "k-bank"],
+    "kbank": ["กสิกรไทย", "kasikorn", "kasikornbank", "kbank", "k-bank", "k biz"],
     "bbl": ["กรุงเทพ", "bangkok bank", "bbl"],
     "kkp": ["เกียรตินาคิน", "kiatnakin", "kkp"],
     "ktb": ["กรุงไทย", "krungthai", "ktb"],

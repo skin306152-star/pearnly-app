@@ -138,6 +138,10 @@
         return s + ')';
     }
 
+    function uploadProgressText(ctx) {
+        return at('intake_uploading') + batchProgressSuffix(ctx);
+    }
+
     // 逐文件回执行:名字 + 状态词。状态颜色类映射 queued→wait / uploading→run /
     // accepted→ok / rejected+failed→bad(令牌色在 ai-intake.css)。
     function perFileListHtml(perFile) {
@@ -183,8 +187,8 @@
             inner =
                 '<div class="dz-inner"><div class="dz-ic">' +
                 svg('<path d="M21 12a9 9 0 1 1-6.2-8.5"/>') +
-                '</div><div class="dz-t">' +
-                esc(at('intake_uploading') + batchProgressSuffix(ctx)) +
+                '</div><div class="dz-t" id="ikUploadProgress" aria-live="polite">' +
+                esc(uploadProgressText(ctx)) +
                 '</div>' +
                 perFileListHtml(ctx.perFile) +
                 '</div>';
@@ -418,11 +422,18 @@
             : '';
         var needs = ctx.needsSales ? bankSales + needsCardHtml(ctx) : '';
         var im = root.AI.intakeManifest;
+        var received =
+            ctx.materialCount > 0
+                ? '<div class="intake-received" role="status">' +
+                  esc(at('intake_received_count', { n: ctx.materialCount })) +
+                  '</div>'
+                : '';
         return (
             '<div class="intake-body">' +
             '<p class="intake-lead">' +
             esc(at('intake_lead')) +
             '</p>' +
+            received +
             im.resumeBannerHtml(ctx.resumeBanner) +
             im.passwordCardHtml(ctx.passwordCard) +
             needs +
@@ -447,6 +458,7 @@
         validateFiles: validateFiles,
         splitBatches: splitBatches,
         mergeFiles: mergeFiles,
+        uploadProgressText: uploadProgressText,
         intakeHtml: intakeHtml,
         dropzoneHtml: dropzoneHtml,
         needsCardHtml: needsCardHtml,

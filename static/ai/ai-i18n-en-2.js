@@ -234,7 +234,7 @@ Object.assign(window.__AI_I18N_EN__, {
     reports_download_pdf_btn: 'Download PDF',
     reports_download_xlsx_btn: 'Download Excel',
     reports_downloading: 'Downloading…',
-    wo_open_first_btn: 'Open current-period work order',
+    wo_open_first_btn: 'Open selected-period work order',
     wo_open_first_busy: 'Opening…',
     settings_lang_title: 'Language',
     settings_lang_zh: '中文',
@@ -326,7 +326,7 @@ Object.assign(window.__AI_I18N_EN__, {
 
     // J-C · review queue memory (undecided-first / decided folding) + bulk confirm +
     // J-A suggested value echo
-    rv_counter: '{k} pending / {n} total',
+    rv_counter: '{k} pending · {d} completed · {n} total',
     rv_manually_corrected: 'Manually corrected',
     rv_decided_group_summary: '{n} decided (expand to revise)',
     rv_decided_row: 'Decided by {actor} · {result}',
@@ -335,6 +335,8 @@ Object.assign(window.__AI_I18N_EN__, {
         'AI inferred this from the invoice equation — please verify against the original image.',
     rv_bulk_confirm_msg:
         'Apply the AI-suggested decision to all {n} similar items? Each item is decided individually and this cannot be undone in one step.',
+    rv_bulk_confirm_title: 'Process similar items',
+    rv_bulk_confirm_btn: 'Process {n} items',
 
     // MC1-b2 · verdict narrative templates (narrative_key namespace aligned by hand with
     // services/workorder/verdict.py; params come from that file's _*_params builders)
@@ -468,6 +470,8 @@ Object.assign(window.__AI_I18N_EN__, {
     intake_manifest_zip_n: '{n} extracted from zip',
     intake_resume_body:
         'Your last upload was interrupted — {n} of {total} files did not finish. Reselect them to continue.',
+    intake_received_count:
+        '{n} items have been received for this period. They remain safe when you leave this page.',
     intake_resume_continue: 'Continue upload',
     intake_resume_dismiss: 'Dismiss',
     intake_failed_batch_n: '{n} files failed due to a network issue',

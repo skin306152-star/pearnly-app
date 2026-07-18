@@ -772,6 +772,29 @@ class AutoAdvanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["count"], 1)
         sched.assert_called_once()
 
+    async def test_materials_deferred_batch_does_not_schedule_advance(self):
+        from routes import workorder_routes as wr
+
+        saved_ref = "/m/a.jpg"
+        with (
+            mock.patch.object(wr.storage, "save_material", return_value=saved_ref),
+            mock.patch.object(
+                wr.intake, "register_file", return_value={"id": "it-1", "file_ref": saved_ref}
+            ),
+            mock.patch.object(wr, "_schedule_advance", return_value=True) as sched,
+        ):
+            for p in self._base(wr):
+                self.enterContext(p)
+            out = await wr.add_materials(
+                "wo-1",
+                mock.Mock(),
+                mock.Mock(),
+                files=[_FakeUpload(_valid_jpeg(), filename="a.jpg")],
+                defer_run=True,
+            )
+        self.assertEqual(out["count"], 1)
+        sched.assert_not_called()
+
     async def test_auto_advance_swallows_scheduling_error(self):
         # 自驱是增益:排后台若抛错,已提交的裁决/销项不能被翻成 5xx。
         from routes import workorder_routes as wr

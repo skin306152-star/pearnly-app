@@ -94,9 +94,30 @@
         );
     }
 
+    function bulkConfirmHtml(group) {
+        if (!group) return '';
+        return (
+            '<div class="pkg-mask on enter rv-confirm-mask">' +
+            '<div class="pkg-modal rv-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="rvConfirmTitle">' +
+            '<div class="mh"><div><h3 id="rvConfirmTitle">' +
+            esc(at('rv_bulk_confirm_title')) +
+            '</h3></div><button type="button" class="mclose" data-action="rv-bulk-cancel" aria-label="' +
+            esc(at('intake_form_cancel')) +
+            '">×</button></div><div class="mb"><p>' +
+            esc(at('rv_bulk_confirm_msg', { n: group.entries.length })) +
+            '</p><div class="rv-confirm-actions">' +
+            '<button type="button" class="btn" data-action="rv-bulk-cancel">' +
+            esc(at('intake_form_cancel')) +
+            '</button><button type="button" class="btn pri" data-action="rv-bulk-confirm">' +
+            esc(at('rv_bulk_confirm_btn', { n: group.entries.length })) +
+            '</button></div></div></div></div>'
+        );
+    }
+
     window.AI = window.AI || {};
     window.AI.reviewFoldRender = {
         decidedGroupHtml: decidedGroupHtml,
         bulkBannerHtml: bulkBannerHtml,
+        bulkConfirmHtml: bulkConfirmHtml,
     };
 })();

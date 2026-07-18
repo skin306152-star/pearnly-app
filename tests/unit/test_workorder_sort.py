@@ -216,6 +216,25 @@ class BankContentDetectionTests(unittest.TestCase):
         )
         self.assertEqual(kind, "bank_statement")
 
+    def test_kasikornbank_compound_name_is_bank(self):
+        kind, _ = sort_step.bin_ocr_fields(
+            {"document_type": "other", "seller_name": "KASIKORNBANK", "vat": "0"},
+            own_tax_id=OWN_TAX,
+        )
+        self.assertEqual(kind, "bank_statement")
+
+    def test_kbiz_statement_brand_is_bank(self):
+        kind, _ = sort_step.bin_ocr_fields(
+            {
+                "document_type": "other",
+                "seller_name": "K BIZ",
+                "notes": "Bank statement transaction list",
+                "vat": "0",
+            },
+            own_tax_id=OWN_TAX,
+        )
+        self.assertEqual(kind, "bank_statement")
+
     def test_bank_word_but_has_vat_is_not_bank(self):
         # 真税票里印付款银行(带 VAT 结构)不能被误判成流水页——无 VAT 才认银行。
         kind, _ = sort_step.bin_ocr_fields(
@@ -285,6 +304,14 @@ class StatementRegroupTests(unittest.TestCase):
                     self._stmt_page(notes), own_tax_id=OWN_TAX, stmt_regroup=True
                 )
                 self.assertEqual((kind, reason), ("bank_statement", None))
+
+    def test_english_bank_statement_title_is_regrouped(self):
+        kind, reason = sort_step.bin_ocr_fields(
+            self._stmt_page("Bank statement transaction list"),
+            own_tax_id=OWN_TAX,
+            stmt_regroup=True,
+        )
+        self.assertEqual((kind, reason), ("bank_statement", None))
 
     def test_flag_off_leaves_continuation_pages_as_non_tax(self):
         # 闸关(默认)= 逐字节现状:续页照旧被 payment_evidence 短路踢 non_tax。

@@ -50,6 +50,7 @@ _STMT_TITLE_KEYWORDS = (
     "รายการเดินบัญชี",  # 存折/流水标题(passbook/statement listing)
     "ความเคลื่อนไหวทางบัญชี",  # 账户动态报表(account movement)
     "เคลื่อนไหวบัญชีเงินฝาก",  # 储蓄账户动态(deposit-account movement)
+    "bank statement",
     "statement of account",  # 英文对账单标题(通用,别家行英文页兜底)
 )
 # 标题只落在报表抬头相关字段,不扫全票面(与 _mentions_bank 的宽域故意分开:标题要窄)。

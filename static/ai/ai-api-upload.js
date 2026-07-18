@@ -47,6 +47,7 @@
                 var fd = new FormData();
                 for (var i = 0; i < files.length; i++) fd.append('files', files[i]);
                 if (password) fd.append('password', password);
+                fd.append('defer_run', 'true');
                 return new Promise(function (resolve, reject) {
                     var xhr = new XMLHttpRequest();
                     xhr.open(

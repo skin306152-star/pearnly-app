@@ -273,7 +273,7 @@
     // (ai-intake.js)据此在*这一趟*选中的文件(可能被 splitBatches 切成多批,逐批顺序
     // 落盘)全部落定后才决定要不要自动续跑——不是每批落盘各触发一次,是这一趟收尾才判一次。
 
-    function create(getS, render) {
+    function create(getS, render, renderProgress) {
         function runQueue(files) {
             var session = getS();
             session.uploading = true;
@@ -303,7 +303,7 @@
                     var pct = total > 0 ? Math.floor((loaded / total) * 100) : null;
                     if (pct !== session.uploadBytesPct) {
                         session.uploadBytesPct = pct;
-                        render();
+                        (renderProgress || render)();
                     }
                 },
                 onPasswordNeeded: function (file, detail) {

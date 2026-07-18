@@ -5,14 +5,18 @@
  * flag_reason 分组算出可批量组(复用 AI.reviewVerdict.groupCanBulk/bulkDecisionTemplate,
  * 与收件箱 ai-review-inbox-flagged.js::runGroupBatch 同一份判定单一事实源,不重造),持有
  * busy/错误态,真正落库调用既有 POST .../decisions:batch 端点(AI.api.batchDecisions,与
- * 收件箱同一份,不写第二套)。危险操作确认走原生 window.confirm(四语文案,同
- * ai-profile.js::root_confirm 先例),不建自定义弹窗组件。
+ * 收件箱同一份,不写第二套)。危险操作用站内四语确认框，取消时不发请求。
  */
 (function () {
     'use strict';
 
     function create() {
-        var st = { busyFlag: null, errKey: null, lastTemplate: null };
+        var st = {
+            busyFlag: null,
+            errKey: null,
+            lastTemplate: null,
+            confirmGroup: null,
+        };
 
         // 未判队列按 flag_reason 分组,只留「组内 >1 张且后端给了安全默认动作、置信度均非
         // 低」的组(AI.reviewVerdict.groupCanBulk 单一事实源)。已判票(entry.decision 或
@@ -32,12 +36,22 @@
                 });
         }
 
-        // 一步确认(window.confirm 四语文案)→ 通过才发请求;取消 = 零请求,状态不变。
+        // 站内确认框通过才发请求;取消 = 零请求,状态不变。
         // onSettle 在 busy 置位后立即调一次(渲染 busy 态),网络落地再调一次(渲染终态),
         // 同 ai-review-pool.js::stage 的回调节奏。
-        function confirmAndRun(api, orderId, group, onSettle) {
+        function requestConfirm(group) {
             if (st.busyFlag) return;
-            if (!window.confirm(at('rv_bulk_confirm_msg', { n: group.entries.length }))) return;
+            st.confirmGroup = group;
+        }
+
+        function cancelConfirm() {
+            st.confirmGroup = null;
+        }
+
+        function runConfirmed(api, orderId, onSettle) {
+            if (st.busyFlag) return;
+            var group = st.confirmGroup;
+            if (!group) return;
             var template = AI.reviewVerdict.bulkDecisionTemplate(group.entries[0]);
             if (!template) return;
             var decisions = group.entries.map(function (e) {
@@ -46,6 +60,7 @@
             st.busyFlag = group.flagReason;
             st.errKey = null;
             st.lastTemplate = template;
+            st.confirmGroup = null;
             onSettle(null);
             api.batchDecisions(orderId, decisions)
                 .then(function (res) {
@@ -65,7 +80,9 @@
                 return st;
             },
             bulkableGroups: bulkableGroups,
-            confirmAndRun: confirmAndRun,
+            requestConfirm: requestConfirm,
+            cancelConfirm: cancelConfirm,
+            runConfirmed: runConfirmed,
         };
     }
 

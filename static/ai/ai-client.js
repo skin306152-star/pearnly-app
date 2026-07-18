@@ -103,11 +103,19 @@
     // 复用现成 createOrder(),period 取 AI.board.currentPeriodBE()(同矩阵/看板的
     // "当期"权威口径,不自造第二套)。
     function woEmptyHtml() {
+        var defaultPeriod = S.deepLinkPeriod || AI.board.currentPeriodBE();
+        var optsHtml = AI.state.optionsHtml(AI.board.periodOptions(), defaultPeriod, function (p) {
+            return p;
+        });
         return (
             AI.state.emptyHtml({ title: at('wo_empty_t'), sub: at('wo_empty_s') }) +
-            '<button type="button" class="btn pri" data-action="wo-open-first">' +
+            '<div class="kopen"><select class="period-sel" id="woEmptyPeriodSel" aria-label="' +
+            esc(at('card_period_select_label')) +
+            '">' +
+            optsHtml +
+            '</select><button type="button" class="btn pri" data-action="wo-open-first">' +
             esc(at('wo_open_first_btn')) +
-            '</button>'
+            '</button></div>'
         );
     }
 
@@ -143,8 +151,11 @@
     }
 
     function openFirstOrder() {
-        var btn = $('cv-wo').querySelector('[data-action="wo-open-first"]');
-        createOrderAndReload(AI.board.currentPeriodBE(), btn, at('wo_open_first_btn'), renderWo);
+        var container = $('cv-wo');
+        var sel = container.querySelector('#woEmptyPeriodSel');
+        var period = (sel && sel.value) || AI.board.currentPeriodBE();
+        var btn = container.querySelector('[data-action="wo-open-first"]');
+        createOrderAndReload(period, btn, at('wo_open_first_btn'), renderWo);
     }
 
     // 零工单空态的开单账期选择器(J-8/J-B):默认账期不再恒回当月——深链带了 ?period=

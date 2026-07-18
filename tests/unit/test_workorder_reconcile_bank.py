@@ -187,6 +187,23 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
         out = reconcile.run(_ctx(_store()))
         self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("84.00"))
 
+    def test_bank_parse_runs_before_missing_sales_summary(self):
+        store = _store()
+        store.events = [
+            event
+            for event in store.events
+            if event.get("payload", {}).get("kind") != "sales_summary"
+        ]
+
+        out = reconcile.run(_ctx(store))
+
+        self.assertEqual(out.status, "needs")
+        self.assertEqual(out.missing, ("sales_summary",))
+        parsed = [event for event in store.events if event["event_type"] == "item_bank_parsed"]
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["payload"]["item_id"], "b1")
+        self.assertEqual(len(parsed[0]["payload"]["rows"]), 2)
+
     def test_parser_failure_is_isolated_not_fatal(self):
         def _boom(ctx, item):
             raise RuntimeError("parse blew up")

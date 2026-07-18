@@ -165,6 +165,14 @@ class OrderDetailTests(_ApiTestBase):
         self.assertIn("last_active_at", detail)
         self.assertEqual(detail["last_active_at"], self.store.wo["updated_at"])
 
+    def test_detail_carries_material_count(self):
+        self.store.items = [
+            {"id": "it-1", "kind": "purchase_invoice", "status": "ok"},
+            {"id": "it-2", "kind": "bank_statement", "status": "ok"},
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertEqual(detail["material_count"], 2)
+
     def test_amount_read_suggestion_surfaces_in_alerts(self):
         # J-13:进项票三数内部不自洽(IN26-00575:净+税=含税却 净×7%≠税)→ alerts 挂确定性
         # 读数解歧建议(税/含税各纠 1 位 9↔0),供前端改数入口预填。建议为纯读侧现算,不落库。

@@ -52,6 +52,20 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+.rv-confirm-modal {
+  max-width: min(480px, 100%);
+}
+.rv-confirm-modal .mb {
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.rv-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
 
 /* J-A 建议值三字段改数(净额/VAT/含税同一表单,预填建议值 + 琥珀提示)。 */
 .rv-suggest-note {

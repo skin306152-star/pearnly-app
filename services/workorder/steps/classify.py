@@ -35,7 +35,7 @@ from services.summary_import.parse import parse_table
 from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_reuse
-from services.workorder.steps import ocr_snapshots, purchase_dedup, taxid_alert
+from services.workorder.steps import ocr_snapshots, purchase_dedup, statement_regroup, taxid_alert
 from services.workorder.steps import sort as sort_step
 from services.workspace import client_alias_store
 
@@ -79,6 +79,7 @@ def run(ctx: StepContext) -> StepResult:
         own_name = _resolve_own_name(ctx)
         own_names = None
     stmt_regroup = _stmt_regroup_enabled(ctx)  # SA3R-a 对账单续页回收闸,详见传入的 bin_ocr_fields
+    regroup = statement_regroup.Collector(stmt_regroup)
 
     bins: dict[str, int] = {}
     flagged = 0
@@ -135,6 +136,7 @@ def run(ctx: StepContext) -> StepResult:
             seen=seen_purchase_fp,
             stmt_regroup=stmt_regroup,
         )
+        regroup.add(item, ocr, outcome)
         upd = outcome["update"]
         engine_ver = ocr.get("_ocr_engine") if isinstance(ocr, dict) else None
         # 件 1:每件 OCR 落库时双写 ocr_history(识别台账),失败/无归属只留 NULL,绝不拖垮 classify。
@@ -171,6 +173,7 @@ def run(ctx: StepContext) -> StepResult:
             break
 
     # 撞配额待补 / 成本封顶:整步 stuck 诚实待续(未处理件留 pending,人工 /run 重给预算)。
+    flagged -= regroup.apply(ctx, bins)
     if quota_deferred:
         return StepResult.stuck([f"ocr_quota_deferred:{quota_deferred}"])
     if cost_capped:

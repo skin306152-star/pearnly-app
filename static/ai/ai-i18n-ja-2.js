@@ -232,7 +232,7 @@ Object.assign(window.__AI_I18N_JA__, {
     reports_download_pdf_btn: 'PDF をダウンロード',
     reports_download_xlsx_btn: 'Excel をダウンロード',
     reports_downloading: 'ダウンロード中…',
-    wo_open_first_btn: '当期のワークオーダーを開く',
+    wo_open_first_btn: '選択した期間のワークオーダーを開く',
     wo_open_first_busy: '作成中…',
     settings_lang_title: '言語',
     settings_lang_zh: '中文',
@@ -320,7 +320,7 @@ Object.assign(window.__AI_I18N_JA__, {
 
     // J-C · 審査キューの操作記憶(未処理優先/判定済み折りたたみ)+ 一括確認 +
     // J-A 提案値の反映
-    rv_counter: '未処理 {k} / 全{n}件',
+    rv_counter: '未処理 {k} · 処理済み {d} · 全 {n} 件',
     rv_manually_corrected: '手動修正済み',
     rv_decided_group_summary: '判定済み {n} 件（展開して再判定可）',
     rv_decided_row: '{actor} が判定 · {result}',
@@ -328,6 +328,8 @@ Object.assign(window.__AI_I18N_JA__, {
     rv_suggest_note: 'AIが票面の等式から推算した値です。原本画像で必ず確認してください。',
     rv_bulk_confirm_msg:
         'この同種{n}件にAIの提案どおり一括で処理しますか？1件ずつ確定され、一括での取り消しはできません。',
+    rv_bulk_confirm_title: '類似項目を一括処理',
+    rv_bulk_confirm_btn: '{n} 件を処理',
 
     // MC1-b2 · 判定根拠テンプレート(narrative_key の命名は
     // services/workorder/verdict.py と手動で対応 · パラメータは同ファイルの
@@ -460,6 +462,8 @@ Object.assign(window.__AI_I18N_JA__, {
     intake_manifest_zip_n: 'zip から {n} 件を展開',
     intake_resume_body:
         '前回のアップロードが中断されました——{total} 件中 {n} 件が未完了です。該当ファイルを選び直して続行してください。',
+    intake_received_count:
+        'この期間の資料を {n} 件受信済みです。このページを離れても失われません。',
     intake_resume_continue: 'アップロードを続行',
     intake_resume_dismiss: '閉じる',
     intake_failed_batch_n: 'ネットワークの問題で {n} 件が失敗しました',

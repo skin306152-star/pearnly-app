@@ -8,6 +8,15 @@
   margin-bottom: 16px;
   line-height: 1.7;
 }
+.intake-received {
+  background: var(--sage-soft);
+  border: 1px solid var(--sage-line);
+  border-radius: 10px;
+  color: var(--sage-deep);
+  font-size: 12.5px;
+  margin: -4px 0 16px;
+  padding: 9px 12px;
+}
 .intake-grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;

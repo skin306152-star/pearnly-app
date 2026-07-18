@@ -8,6 +8,7 @@ classify._resolve_own_tax_id),绝不触达生产 OCR 管线或任何 API key—�
 
 import os
 import unittest
+from pathlib import Path
 
 from services.workorder.engine import StepContext
 from services.workorder.steps import classify
@@ -242,6 +243,61 @@ class ClassifyImageTests(unittest.TestCase):
         self.assertEqual(row["status"], "ok")
         self.assertIsNone(row["flag_reason"])
         self.assertEqual(out.payload["flagged"], 0)
+
+    def test_statement_sequence_recovers_ambiguous_continuation_pages(self):
+        items = [_item(str(number), f"/in/IMG_{number}.jpg") for number in range(2484, 2490)]
+        store = FakeItemStore(items)
+        fields = {
+            2484: {
+                "document_type": "other",
+                "seller_name": "KASIKORNBANK",
+                "notes": "Bank statement transaction list",
+            },
+            2485: {
+                "document_type": "other",
+                "seller_name": "KASIKORNBANK",
+                "notes": "Bank statement transaction list",
+            },
+            2486: {
+                "document_type": "payment_evidence",
+                "seller_name": "KASIKORNBANK",
+                "notes": "Transfer record",
+            },
+            2487: {
+                "document_type": "payment_evidence",
+                "seller_name": "K-Contact Center",
+                "notes": "www.kasikornbank.com",
+            },
+            2488: {
+                "document_type": "payment_evidence",
+                "seller_name": "KASIKORNBANK",
+                "notes": "Transfer record",
+            },
+            2489: {
+                "document_type": "other",
+                "seller_name": "KASIKORNBANK",
+                "notes": "Bank statement transaction list",
+            },
+        }
+        classify._ocr_image = lambda path: fields[int(Path(path).stem.split("_")[-1])]
+        classify._stmt_regroup_enabled = lambda ctx: True
+        self.addCleanup(
+            setattr,
+            classify,
+            "_stmt_regroup_enabled",
+            classify._default_stmt_regroup_enabled,
+        )
+
+        out = classify.run(_ctx(store))
+
+        self.assertEqual(out.payload["bins"], {"bank_statement": 6})
+        for item in store.items:
+            self.assertEqual((item["kind"], item["status"]), ("bank_statement", "ok"))
+        regrouped = [e for e in store.events if e["event_type"] == "item_regrouped"]
+        self.assertEqual(
+            {e["payload"]["item_id"] for e in regrouped},
+            {"2486", "2487", "2488"},
+        )
 
     def test_missing_buyer_tax_but_name_matches_own_bins_purchase(self):
         # 买方税号被 OCR 读花/缺失,但买方名称容差匹配本公司名 → 归进项(找回 L2 被踢进 unknown 的真进项票)。

@@ -302,10 +302,15 @@
             esc(at('rv_ai_read')) +
             ' ' +
             statusChip(entry, ctx.local) +
-            // 计数器改「未判 k / 共 n」(J-C):不再是卡在队列里第几张的 idx+1/total——
-            // 已判折叠出主流程后 idx 不再等于"审到第几张",诚实报剩余待办数才有意义。
+            // 三段计数器不再用卡片位置冒充进度；已处理折叠后单独报告待处理/已处理/总数。
             '<span class="note" id="rvCounter" style="margin-left:auto">' +
-            esc(at('rv_counter', { k: ctx.undecidedRemaining, n: ctx.totalCount })) +
+            esc(
+                at('rv_counter', {
+                    k: ctx.undecidedRemaining,
+                    d: ctx.totalCount - ctx.undecidedRemaining,
+                    n: ctx.totalCount,
+                })
+            ) +
             '</span></h3></div>' +
             '<div class="bd">' +
             dirNote +

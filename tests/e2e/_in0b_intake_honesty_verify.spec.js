@@ -63,7 +63,7 @@ test.afterAll(() => {
 // 一份路由 mock)。
 async function bootIntake(
     page,
-    { lang = 'en', materialsHandler, orderNeeds = [], seedQueue } = {}
+    { lang = 'en', materialsHandler, orderNeeds = [], seedQueue, materialCount = 0 } = {}
 ) {
     await page.route('**/api/**', async (route) => {
         const req = route.request();
@@ -86,6 +86,7 @@ async function bootIntake(
                     needs: orderNeeds,
                     numbers: {},
                     flagged: [],
+                    material_count: materialCount,
                 }),
             });
         }
@@ -142,8 +143,10 @@ function passwordRequiredRoute(route) {
 test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
     test('文件夹拖入(≥15 件混合子目录)→ 盘点条计数与实际一致', async ({ page }) => {
         await bootIntake(page, {
-            materialsHandler: (route) =>
-                route.fulfill({
+            materialsHandler: (route, req) => {
+                const body = req.postDataBuffer().toString('utf8');
+                expect(multipartField(body, 'defer_run')).toBe('true');
+                return route.fulfill({
                     contentType: 'application/json',
                     body: JSON.stringify({
                         registered: Array.from({ length: 15 }, (_, i) => ({
@@ -152,7 +155,8 @@ test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
                         })),
                         count: 15,
                     }),
-                }),
+                });
+            },
         });
 
         // 构造:client_may/(5 图) + client_may/sub_a/(5 pdf) + client_may/sub_a/sub_c/(5 png)
@@ -416,6 +420,17 @@ test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
             window.localStorage.getItem('pearnly_ai_intake_queue_wo-1')
         );
         expect(left).toBeNull();
+    });
+
+    test('切页或刷新后仍显示后台已收资料数', async ({ page }) => {
+        await bootIntake(page, { materialCount: 104 });
+        await expect(page.locator('.intake-received')).toContainText('104');
+        await page.reload();
+        await expect(page.locator('.intake-received')).toContainText('104', { timeout: 15000 });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '10b-received-count-after-reload.png'),
+            fullPage: true,
+        });
     });
 
     for (const lang of ['th', 'zh', 'ja']) {

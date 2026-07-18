@@ -333,9 +333,10 @@ async def add_materials(
     background: BackgroundTasks,
     files: list[UploadFile] = File(...),
     password: Optional[str] = Form(None),
+    defer_run: bool = Form(False),
 ):
     """补料:multipart 上传,预处理(zip/HEIC/密码 PDF/损坏)后落盘并登记成 work_order_items
-    (走 intake 幂等指纹)。登记成功后引擎自动续跑(P-7):新料直接进 intake→classify,不必手点 /run。
+    (走 intake 幂等指纹)。默认登记后自动续跑；批量投料可 defer_run，收齐后再显式 /run。
 
     密码 PDF 随传 password 参数即当场解开;不传则 422 pdf_password_required 要密码(密码只用于
     解密,不留存)。整批先读+校验齐全再落盘,任一件不合规=整批拒且盘上零孤儿。"""
@@ -374,7 +375,7 @@ async def add_materials(
             if item.get("file_ref") != str(path):
                 storage.remove_material(path)  # 去重收敛到既有 item → 清刚落盘的重复件
             registered.append({"item_id": item["id"], "file_ref": item["file_ref"]})
-    if registered:
+    if registered and defer_run is not True:
         _auto_advance(background, tenant_id, work_order_id, user)
     return {"registered": registered, "count": len(registered)}
 

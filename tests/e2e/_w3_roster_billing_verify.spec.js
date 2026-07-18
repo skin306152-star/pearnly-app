@@ -4,8 +4,6 @@
 // localStorage → boot 探针 200 → 进壳。覆盖:花名册 4 态(有名单/空/绑定码弹层/非 owner 藏 nav)
 // + 计费(有订阅进度条 / 充值弹窗三步 / 记录明细两 tab)。断言 isVisible + 截图为证。
 // 起法:npx playwright test tests/e2e/_w3_roster_billing_verify.spec.js
-/* global document, window, localStorage */
-
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');

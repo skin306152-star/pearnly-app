@@ -54,7 +54,7 @@ def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> O
     from services.recon import workorder_recon_adapter as adapter
 
     try:
-        rows = _checkpointed_rows(ctx, banks)
+        rows = checkpoint_bank_statements(ctx, banks)
     except BankStatementParseError:
         raise
     try:
@@ -69,6 +69,13 @@ def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> O
         return result.as_gate_payload()
     except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
         return {"error": f"{type(exc).__name__}", "note": "bank_recon_skipped"}
+
+
+def checkpoint_bank_statements(ctx: StepContext, banks: list[dict]) -> Optional[list]:
+    """仅把银行文件逐件解析并落断点，不执行页尾窄读和逐笔对账。"""
+    if not _bank_recon_enabled(ctx):
+        return None
+    return _checkpointed_rows(ctx, banks)
 
 
 def _checkpointed_rows(ctx: StepContext, banks: list[dict]) -> list:

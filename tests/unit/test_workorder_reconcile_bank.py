@@ -195,10 +195,15 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
             if event.get("payload", {}).get("kind") != "sales_summary"
         ]
 
-        out = reconcile.run(_ctx(store))
+        with (
+            mock.patch.object(reconcile_bank, "_stmt_totals_enabled", return_value=True),
+            mock.patch.object(reconcile_bank.stmt_totals, "emit_from_banks") as emit_totals,
+        ):
+            out = reconcile.run(_ctx(store))
 
         self.assertEqual(out.status, "needs")
         self.assertEqual(out.missing, ("sales_summary",))
+        emit_totals.assert_not_called()
         parsed = [event for event in store.events if event["event_type"] == "item_bank_parsed"]
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0]["payload"]["item_id"], "b1")

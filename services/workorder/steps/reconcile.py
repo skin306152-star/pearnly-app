@@ -65,11 +65,23 @@ def run(ctx: StepContext) -> StepResult:
     if r1["unresolved"]:
         return StepResult.stuck(r1["unresolved"])
 
+    banks = [it for it in items if it["kind"] == _BANK]
+    reads = _replay_sales_reads(events) or dict(ctx.data.get("sales_summary_reads") or {})
+    if not reads:
+        if banks:
+            try:
+                reconcile_bank.checkpoint_bank_statements(ctx, banks)
+            except reconcile_bank.BankStatementParseError as exc:
+                return StepResult.stuck([str(exc)])
+        return StepResult.needs(["sales_summary"])
+    r2 = gates.aggregate_sales(reads)
+    if not r2["used"]:
+        return StepResult.needs(["sales_summary"])
+
     # R3 银行材料存在性 + 逐笔真对平(pearnly_ai_bank_recon 闸)。闸关:逐字节维持存在性判定
     # 现状(only present/count/note)。闸开且有 bank_statement 件:把流水与工单事件流的票据
     # 逐笔打分对平,缺票/未达两张清单挂进 gate + 证据链(经 step_done 落库),绝不 stuck、绝不
     # 阻断 package——银行对账是佐证层,税额来自 R1/R2 不来自它。
-    banks = [it for it in items if it["kind"] == _BANK]
     r3 = {"bank_statement_present": bool(banks), "bank_statement_count": len(banks)}
     if not banks:
         r3["note"] = "bank_statement_missing"
@@ -81,14 +93,7 @@ def run(ctx: StepContext) -> StepResult:
         if recon is not None:
             r3["recon"] = recon
 
-    # R2 销项合计。倒推销项依赖上面持久化的 item_bank_parsed,缺料返回不能挡住银行解析。
-    reads = _replay_sales_reads(events) or dict(ctx.data.get("sales_summary_reads") or {})
-    if not reads:
-        return StepResult.needs(["sales_summary"])
-    r2 = gates.aggregate_sales(reads)
-    if not r2["used"]:
-        return StepResult.needs(["sales_summary"])
-
+    # R2 已在 R3 前验证；缺料时只保存银行解析断点，不再执行页尾窄读和逐笔对账。
     # R4 试算平衡(纯函数)。不平时先逐票点名 净+税≠含税 的进项票(票号/原文件名 + 差额),
     # 末尾保留总差额行——停机原因指到具体票,不再只报一个总差让人肉翻照片(J 闸实锤)。
     tb = gates.trial_balance(r1["entries"], r2["sales_amount"], r2["output_vat"])

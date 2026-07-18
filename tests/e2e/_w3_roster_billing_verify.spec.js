@@ -79,8 +79,20 @@ const SUB = {
 };
 const REC_USAGE = {
     rows: [
-        { date: '2026-07-18 09:12', type: 'usage', description: 'บัตร สมชาย', pages: 1, cost_thb: 0 },
-        { date: '2026-07-18 10:30', type: 'usage', description: 'ใบขับขี่', pages: 1, cost_thb: 1.5 },
+        {
+            date: '2026-07-18 09:12',
+            type: 'usage',
+            description: 'บัตร สมชาย',
+            pages: 1,
+            cost_thb: 0,
+        },
+        {
+            date: '2026-07-18 10:30',
+            type: 'usage',
+            description: 'ใบขับขี่',
+            pages: 1,
+            cost_thb: 1.5,
+        },
         { date: '2026-07-01 00:00', type: 'subscription', description: 'Package M', cost_thb: 250 },
     ],
     total: 3,
@@ -89,8 +101,20 @@ const REC_USAGE = {
 };
 const REC_TOPUP = {
     rows: [
-        { id: 11, created_at: '2026-07-15 14:00', amount_thb: 1000, payer_name: 'เจ้าของ', status: 'approved' },
-        { id: 12, created_at: '2026-07-16 09:00', amount_thb: 500, payer_name: '', status: 'pending' },
+        {
+            id: 11,
+            created_at: '2026-07-15 14:00',
+            amount_thb: 1000,
+            payer_name: 'เจ้าของ',
+            status: 'approved',
+        },
+        {
+            id: 12,
+            created_at: '2026-07-16 09:00',
+            amount_thb: 500,
+            payer_name: '',
+            status: 'pending',
+        },
     ],
     total: 2,
     tab: 'topup',
@@ -111,17 +135,25 @@ async function boot(page, { isOwner = true, operators = OPERATORS } = {}) {
     await page.route('**/api/**', (route) => {
         const url = route.request().url();
         const json = (o) =>
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+            route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(o),
+            });
         if (url.includes('/api/dms/session'))
             return json(isOwner ? { ok: true, is_owner: true } : { ok: true, is_owner: false });
         if (url.includes('/bind-code'))
-            return json({ code: '482913', expires_at: new Date(Date.now() + 600000).toISOString() });
+            return json({
+                code: '482913',
+                expires_at: new Date(Date.now() + 600000).toISOString(),
+            });
         if (url.includes('/api/dms/operators')) return json(operators);
         if (url.includes('/api/me/credits')) return json(CREDITS);
         if (url.includes('/api/me/subscription')) return json(SUB);
         if (url.includes('/api/credits/records'))
             return json(url.includes('tab=topup') ? REC_TOPUP : REC_USAGE);
-        if (url.includes('/api/credits/topup/request')) return json({ request_id: 1, status: 'pending' });
+        if (url.includes('/api/credits/topup/request'))
+            return json({ request_id: 1, status: 'pending' });
         if (url.includes('/api/me')) return json({ id: 'owner-1', role: 'owner' });
         return json({ ok: true });
     });
@@ -185,7 +217,10 @@ test('billing · subscription state (progress + current disabled)', async ({ pag
     // 进度条填充宽度 = 140/200 = 70%
     const w = await page.locator('.dms-bill-prog > span').evaluate((el) => el.style.width);
     expect(w).toBe('70%');
-    await page.screenshot({ path: path.join(BILLING_DIR, 'billing-subscription.png'), fullPage: true });
+    await page.screenshot({
+        path: path.join(BILLING_DIR, 'billing-subscription.png'),
+        fullPage: true,
+    });
     expect(errors, errors.join('\n')).toEqual([]);
 });
 

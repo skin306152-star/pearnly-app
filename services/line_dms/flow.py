@@ -25,6 +25,7 @@ from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
 from services.line_dms import (
     _out,
+    approval_flow,
     booking_flow,
     cards,
     draft,
@@ -141,6 +142,10 @@ async def handle_postback(
     # 菜单层(波2):选菜单项 / 建档后继续订车 / 重拍。无 nonce 消费,须在下方写档守卫之前。
     if action in menu_flow.MENU_ACTIONS:
         await menu_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
+        return
+
+    if action in approval_flow.APPROVAL_ACTIONS:  # 波4:nonce/状态守卫都在 approval_flow 内
+        await approval_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
 
     # 逐字段修正(DL-6):开菜单/选字段/取消。nonce 只校验不消费,写档仍由下方 consume_nonce 守卫。
@@ -299,14 +304,19 @@ async def _run_dedup(
         card = cards.new_customer_card(summary, nonce)
     elif scenario == "exact":
         has_admin = draft.has_admin_creds(ep)
+        display = draft.display_diffs(field_diffs, geo)
+        # 波4:花名册 sales→提审卡;admin/无档案→直写(approval 标志守卫提交动作)。
+        args = (tenant, user_id, display, has_admin, nonce)
+        card, approval = await _thr(approval_flow.exact_diff_card, *args)
         payload = {
             **base,
             "scenario": "exact_diff",
             "customer_id": res["match"]["customer_id"],
             "field_diffs": field_diffs,
             "has_admin": has_admin,
+            "approval": approval,
+            "display_diffs": display,
         }
-        card = cards.diff_card(draft.display_diffs(field_diffs, geo), has_admin, nonce)
     else:  # similar
         cands = [
             {

@@ -146,7 +146,12 @@
     function blockedHtml(detail) {
         detail = detail || {};
         var needs = detail.needs || [];
-        var reasons = [].concat(needs, detail.blocked_reasons || []);
+        var reasons = [].concat(
+            needs.map(function (key) {
+                return root.AI.format.fieldLabel(key);
+            }),
+            detail.blocked_reasons || []
+        );
         return (
             '<div class="panel"><div class="bd pkg-blocked">' +
             '<div class="t">' +

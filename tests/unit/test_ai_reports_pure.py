@@ -73,6 +73,32 @@ class DownloadableDeliverablesTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node unavailable")
 class PackageBlockedStateTests(unittest.TestCase):
+    def test_missing_field_uses_localized_label(self):
+        out = _run_node(f"""
+            global.at = (k, v) => v && v.list ? k + ':' + v.list : k;
+            global.AI = {{
+                state: {{esc: String, emptyHtml: () => 'EMPTY'}},
+                format: {{
+                    fieldLabel: key => key === 'sales_summary' ? '销项汇总' : key,
+                }},
+                reviewQueue: {{
+                    splitByDecision: () => ({{undecided: []}}),
+                    filterPurchaseQueue: () => [],
+                }},
+                router: {{buildClientHash: () => '#/intake'}},
+            }};
+            require({json.dumps(str(AI_DIR / "ai-pkg-render.js"))});
+            const html = global.AI.pkgRender.pageHtml({{
+                detail: {{needs: ['sales_summary']}},
+                deliverables: [],
+            }});
+            process.stdout.write(JSON.stringify({{
+                localized: html.includes('销项汇总'),
+                raw: html.includes('sales_summary'),
+            }}));
+            """)
+        self.assertEqual(out, {"localized": True, "raw": False})
+
     def test_empty_deliverables_show_blocker_and_retry(self):
         out = _run_node(f"""
             global.at = (k, v) => v && v.list ? k + ':' + v.list : k;

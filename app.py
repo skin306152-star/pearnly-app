@@ -24,7 +24,9 @@ except ImportError:
     line_client = None  # line_client.py 不在 pearnly 仓库 · 文件需单独部署到服务器
 from routes.report_routes import router as reports_router  # v109.0
 from routes.security_routes import router as security_router  # CSP 违规上报(安全评估 2026-07-07)
-from routes.ocr_recognize_routes import router as ocr_recognize_router  # REFACTOR-WB-app · 2026-06-01
+from routes.ocr_recognize_routes import (
+    router as ocr_recognize_router,
+)  # REFACTOR-WB-app · 2026-06-01
 from services.auth.auth_signup import router as signup_router  # v109.3
 from routes.auth_email_code_routes import (
     router as auth_email_code_router,
@@ -202,7 +204,9 @@ from routes.companion_installer_routes import (  # Express Push · 小助手安�
     router as companion_installer_router,
 )
 from routes.dms_routes import router as dms_router  # MR.ERP DMS · 身份证→订车单
-from routes.dms_roster_routes import router as dms_roster_router  # 波3 · DL-8 操作员花名册(owner-only)
+from routes.dms_roster_routes import (
+    router as dms_roster_router,
+)  # 波3 · DL-8 操作员花名册(owner-only)
 from routes.dms_pick_routes import router as dms_pick_router  # DL-4a · DMS 车辆选择面板
 from routes.line_dms_webhook_routes import router as line_dms_webhook_router  # DMS 独立 OA
 from routes.admin_users_routes import router as admin_users_router  # B1 · 超管 15 路由

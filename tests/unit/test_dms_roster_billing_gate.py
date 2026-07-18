@@ -46,7 +46,12 @@ class OperatorBillingTenantScopedTest(unittest.TestCase):
 
     def test_member_operator_bills_tenant_wallet(self):
         ocr_out = {"needs_review": False, "missing_fields": [], "id_card": {"first_name": "a"}}
-        bill = {"allowed": True, "is_exempt": False, "balance_thb": 99.0, "pages_used_this_month": 1}
+        bill = {
+            "allowed": True,
+            "is_exempt": False,
+            "balance_thb": 99.0,
+            "pages_used_this_month": 1,
+        }
         with (
             mock.patch.object(svc.db, "get_billing_status_combined", return_value=bill) as gate,
             mock.patch.object(svc.db, "charge_ocr_async") as charge,

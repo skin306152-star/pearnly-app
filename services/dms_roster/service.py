@@ -69,7 +69,9 @@ def list_operators(owner_user: dict) -> dict:
                 "username": r.get("username") or "",
                 "line_bound": bool(r.get("bound_at")),
                 "line_display_name": r.get("line_name") or "",
-                "line_bound_at": bound_at.isoformat() if hasattr(bound_at, "isoformat") else bound_at,
+                "line_bound_at": (
+                    bound_at.isoformat() if hasattr(bound_at, "isoformat") else bound_at
+                ),
                 "endpoint_ready": r.get("ep_enabled") is True,
             }
         )

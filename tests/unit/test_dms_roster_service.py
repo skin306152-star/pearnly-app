@@ -91,7 +91,9 @@ class MutateOperatorTest(unittest.TestCase):
         ep = {"id": "ep-1", "adapter": "mrerp_dms", "enabled": True, "config": {}}
         with (
             mock.patch.object(
-                service.store, "get_profile", return_value={"user_id": "op-1", "tenant_id": "tenant-1"}
+                service.store,
+                "get_profile",
+                return_value={"user_id": "op-1", "tenant_id": "tenant-1"},
             ),
             mock.patch("core.db.list_erp_endpoints", return_value=[ep]),
             mock.patch("core.db.update_erp_endpoint") as up,
@@ -108,7 +110,9 @@ class MutateOperatorTest(unittest.TestCase):
         ep = {"id": "ep-1", "adapter": "mrerp_dms", "enabled": False, "config": {}}
         with (
             mock.patch.object(
-                service.store, "get_profile", return_value={"user_id": "op-1", "tenant_id": "tenant-1"}
+                service.store,
+                "get_profile",
+                return_value={"user_id": "op-1", "tenant_id": "tenant-1"},
             ),
             mock.patch("core.db.list_erp_endpoints", return_value=[ep]),
             mock.patch("core.db.update_erp_endpoint") as up,
@@ -124,15 +128,15 @@ class MutateOperatorTest(unittest.TestCase):
         ep = {"id": "ep-1", "adapter": "mrerp_dms", "enabled": True, "config": {"system_url": "u"}}
         with (
             mock.patch.object(
-                service.store, "get_profile", return_value={"user_id": "op-1", "tenant_id": "tenant-1"}
+                service.store,
+                "get_profile",
+                return_value={"user_id": "op-1", "tenant_id": "tenant-1"},
             ),
             mock.patch.object(service.store, "update_profile") as upp,
             mock.patch("core.db.list_erp_endpoints", return_value=[ep]),
             mock.patch("core.db.update_erp_endpoint") as up,
         ):
-            res = service.update_operator(
-                OWNER, "op-1", display_name="New", dms_password="newpw"
-            )
+            res = service.update_operator(OWNER, "op-1", display_name="New", dms_password="newpw")
         self.assertTrue(res.get("ok"))
         upp.assert_called_once()
         cfg = up.call_args.kwargs["config"]

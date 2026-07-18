@@ -1,12 +1,3 @@
-/*
- * Pearnly AI · ai-review-render.js · 人审队列(W3)的 HTML 拼装 + toast
- *
- * 同 ai-kanban-render.js 先例:拼 HTML + 少量样式判断,值得单独断言的逻辑(过滤/分级/
- * payload 构造)已经在 ai-review-queue.js 被单测覆盖,这里不再重复测。唯一带 DOM 的例外
- * 是 showToast/hideToast(挂 document.body 的全局提示,审核队列与收件箱两个编排层共用,
- * 见函数注释)。依赖 window.AI.state/format/reviewQueue/viewer 与全局 at(),故必须排在
- * 它们之后、ai-review.js 之前加载。
- */
 (function () {
     'use strict';
 
@@ -20,9 +11,6 @@
         return v ? esc(v) : '—';
     }
 
-    // 已裁决票的 chip class:accepted/recalc 用 good,excluded 用 faint(灰)——
-    // 同 v4 状态族用法(good=顺畅,warn=处理中,crit=卡点)。pending/failed 走各自的
-    // 硬编码分支(见 statusChip),不经这张表。
     var _CHIP_CLASS = {
         rv_chip_accepted: 'g',
         rv_chip_recalc: 's',
@@ -36,22 +24,16 @@
         return '<span class="chip ' + cls + '">' + esc(label) + '</span>';
     }
 
-    // 该卡当前该显示的 chip:本地乐观态优先于服务端 decision(乐观 UI 立即可见);
-    // 都没有则显 flag_reason 严重度分级(尚未裁决)。
     function statusChip(entry, local) {
         if (local && local.state === 'pending') {
             return chip('w', at('rv_chip_pending'));
         }
         if (local && local.state === 'failed') {
-            // errKey 命中具体错误码就显对应文案,没有就退化通用失败——同 decide().catch
-            // 里给 toast 挑文案的同一份 local.errKey(chip 与 toast 同源,不各拼一套)。
             return chip('b', local.errKey ? at(local.errKey) : at('err_generic'));
         }
         var localKey = local && AI.reviewQueue.decisionChipKey(local.decision);
         var key = localKey || AI.reviewQueue.decisionChipKey(entry.decision);
         if (key) return chip(_CHIP_CLASS[key], at(key));
-        // 严重度读后端 verdict_hint.severity(政策单一事实源在 services/workorder/verdict.py);
-        // 缺 hint(未知原因)诚实回落 crit,与 severity_of 未知→crit 同口径。
         var sev = (entry.verdict_hint && entry.verdict_hint.severity) || 'crit';
         var reasonKey = AI.reviewQueue.flagReasonKey(entry.flag_reason);
         var reasonLabel = reasonKey ? at(reasonKey) : entry.flag_reason || '';
@@ -347,7 +329,6 @@
         );
     }
 
-    // 队列走完(契约 §4)。blockedInfo: {reasons:[], hasQueue, timedOut?} | null;
     // rerunState: 'idle'|'waiting';rerunProgress: {step,processed,total} | null(R2F-R3 #5:
     // 等待态有真进度就报「识别中/读对账单 X/N」,轮询超时诚实说"仍在后台跑"而不是让
     // blockedInfo 空 reasons 的沉默态冒充"卡住需要你判断")。
@@ -355,12 +336,16 @@
         var waitingLabel = rerunProgress
             ? AI.format.progressLabel(rerunProgress)
             : at('rv_rerun_waiting');
-        var btn =
-            rerunState === 'waiting'
-                ? '<button class="btn pri" disabled>' + esc(waitingLabel) + '</button>'
-                : '<button class="btn pri" data-action="rv-rerun">' +
-                  esc(at('rv_rerun')) +
-                  '</button>';
+        var systemBlocked = blockedInfo && blockedInfo.system;
+        var btn = '';
+        if (rerunState === 'waiting') {
+            btn = '<button class="btn pri" disabled>' + esc(waitingLabel) + '</button>';
+        } else if (!blockedInfo || systemBlocked) {
+            btn =
+                '<button class="btn pri" data-action="rv-rerun">' +
+                esc(at(systemBlocked ? 'retry' : 'rv_rerun')) +
+                '</button>';
+        }
         var blocked = '';
         if (blockedInfo && blockedInfo.timedOut) {
             blocked =
@@ -372,8 +357,16 @@
         } else if (blockedInfo) {
             blocked =
                 '<p class="rv-blocked">' +
-                esc(at('rv_still_blocked')) +
-                (blockedInfo.reasons.length ? '：' + esc(blockedInfo.reasons.join('、')) : '') +
+                (systemBlocked
+                    ? esc(
+                          at('system_blocked_detail', {
+                              list: blockedInfo.reasons.join('、'),
+                          })
+                      )
+                    : esc(at('rv_still_blocked')) +
+                      (blockedInfo.reasons.length
+                          ? '：' + esc(blockedInfo.reasons.join('、'))
+                          : '')) +
                 '</p>';
             if (blockedInfo.hasQueue) {
                 blocked +=
@@ -382,12 +375,19 @@
                     '</button>';
             }
         }
+        var chipKey = blockedInfo
+            ? systemBlocked
+                ? 'status_system_failed'
+                : 'status_stuck'
+            : rerunState === 'waiting'
+              ? 'rv_review_complete_running'
+              : 'rv_queue_cleared_t';
         return (
             '<div class="panel"><div class="bd rv-done">' +
-            '<span class="chip g">' +
-            esc(
-                at(rerunState === 'waiting' ? 'rv_review_complete_running' : 'rv_queue_cleared_t')
-            ) +
+            '<span class="chip ' +
+            (blockedInfo ? 'b' : 'g') +
+            '">' +
+            esc(at(chipKey)) +
             '</span>' +
             '<div class="big">' +
             esc(at('rv_queue_cleared_s', { n: n, m: m })) +

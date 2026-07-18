@@ -163,7 +163,11 @@
                 ? '<button type="button" class="btn sm pri" data-action="pkg-go-intake">' +
                   esc(at('pkg_go_intake_btn')) +
                   '</button>'
-                : '') +
+                : reasons.length
+                  ? '<button type="button" class="btn sm pri" data-action="pkg-retry">' +
+                    esc(at('retry')) +
+                    '</button>'
+                  : '') +
             '</div></div>'
         );
     }
@@ -324,6 +328,10 @@
     // ---- 整页(交付物为空 → 复用既有 pkg_empty 四态空态,不重造一份文案) ----
     function pageHtml(ctx) {
         if (!ctx.deliverables || !ctx.deliverables.length) {
+            var detail = ctx.detail || {};
+            if ((detail.needs || []).length || (detail.blocked_reasons || []).length) {
+                return blockedHtml(detail);
+            }
             return (
                 root.AI.state.emptyHtml({ title: at('pkg_empty_t'), sub: at('pkg_empty_s') }) +
                 emptyIntakeLinkHtml(ctx.detail)

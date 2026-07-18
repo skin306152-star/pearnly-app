@@ -137,13 +137,40 @@ class AiFormatTests(unittest.TestCase):
             ],
         )
 
+    def test_status_chip_distinguishes_system_failure_from_pending_review(self):
+        out = _run_node(f"""
+            require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.statusChip('stuck', {{
+                    blocked_reasons: ['IMG_2485.jpg: bank_statement_parse_failed'],
+                    flagged: [{{kind: 'purchase_invoice', decision: {{decision: 'face_value'}}}}],
+                }}),
+                f.statusChip('stuck', {{
+                    blocked_reasons: ['reconcile blocked'],
+                    flagged: [{{kind: 'purchase_invoice'}}],
+                }}),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"cls": "b", "key": "status_system_failed"},
+                {"cls": "b", "key": "status_stuck"},
+            ],
+        )
+
     def test_pending_review_count_matches_pool_scope(self):
-        # S4(2026-07-17):顶部「待你处理」胶囊与 #/pool 同源——review/stuck 计入,
-        # running/collecting/archive 不计;缺形(空/缺 clients/缺 orders)一律 0。
+        # review 与仍有 undecided_count 的 stuck 才计入；系统失败不冒充待审。
         out = _run_node(f"""
             const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
             const queue = {{clients: [
-                {{orders: [{{status: 'review'}}, {{status: 'stuck'}}, {{status: 'running'}}]}},
+                {{orders: [
+                    {{status: 'review'}},
+                    {{status: 'stuck', flagged_groups: [{{count: 4, undecided_count: 0}}]}},
+                    {{status: 'stuck', flagged_groups: [{{count: 2, undecided_count: 1}}]}},
+                    {{status: 'running'}}
+                ]}},
                 {{orders: [{{status: 'collecting'}}, {{status: 'archive'}}]}},
                 {{}},
             ]}};
@@ -520,6 +547,65 @@ class AiClientWoRenderPureTests(unittest.TestCase):
             ]));
             """)
         self.assertEqual(out, [2, 1, 0])
+
+    def test_stuck_bank_page_keeps_progress_and_shows_retry(self):
+        out = _run_node(f"""
+            global.at = (k, v) => v && v.list ? k + ':' + v.list : k;
+            global.AI = {{
+                state: {{esc: String}},
+                format: {{
+                    chipHtml: () => '<span>status_system_failed</span>',
+                    stepLabel: String,
+                    progressLabel: (p) => p.processed + '/' + p.total,
+                    relAgo: () => '',
+                    fieldLabel: String,
+                    money: String,
+                    priorPeriodCheckText: String,
+                }},
+                router: {{buildClientHash: () => '#/review'}},
+            }};
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            require({json.dumps(str(AI_DIR / "ai-client-wo-render.js"))});
+            const html = global.AI.clientWoRender.woSummaryHtml({{
+                status: 'stuck',
+                period: '2569-05',
+                flagged: [{{kind: 'purchase_invoice', decision: {{decision: 'face_value'}}}}],
+                blocked_reasons: ['IMG_2485.jpg: bank_statement_parse_failed'],
+                bank_progress: {{step: 'reconcile', processed: 1, total: 18}},
+            }}, 106);
+            process.stdout.write(JSON.stringify({{
+                progress: html.includes('1/18'),
+                reason: html.includes('IMG_2485.jpg'),
+                retry: html.includes('data-action="wo-retry-stuck"'),
+            }}));
+            """)
+        self.assertEqual(out, {"progress": True, "reason": True, "retry": True})
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiReviewRenderBlockedTests(unittest.TestCase):
+    def test_system_failure_is_not_rendered_as_green_review_complete(self):
+        out = _run_node(f"""
+            global.window = global;
+            global.at = (k, v) => v && v.list ? k + ':' + v.list : k;
+            global.AI = {{
+                state: {{esc: String}},
+                format: {{progressLabel: () => 'progress'}},
+                reviewQueue: {{}},
+            }};
+            require({json.dumps(str(AI_DIR / "ai-review-render.js"))});
+            const html = global.AI.reviewRender.clearedHtml(
+                67, 0, 'idle',
+                {{system: true, hasQueue: false, reasons: ['IMG_2485.jpg']}},
+                null
+            );
+            process.stdout.write(JSON.stringify({{
+                failed: html.includes('status_system_failed'),
+                retry: html.includes('data-action="rv-rerun"'),
+                green: html.includes('chip g'),
+            }}));
+            """)
+        self.assertEqual(out, {"failed": True, "retry": True, "green": False})
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

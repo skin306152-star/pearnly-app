@@ -35,9 +35,14 @@
             root &&
             root.AI &&
             root.AI.reviewQueue &&
-            typeof root.AI.reviewQueue.filterPurchaseQueue === 'function'
+            typeof root.AI.reviewQueue.filterPurchaseQueue === 'function' &&
+            typeof root.AI.reviewQueue.splitByDecision === 'function'
         ) {
-            return root.AI.reviewQueue.filterPurchaseQueue(flagged).length > 0;
+            return (
+                root.AI.reviewQueue.splitByDecision(
+                    root.AI.reviewQueue.filterPurchaseQueue(flagged)
+                ).undecided.length > 0
+            );
         }
         return true;
     }
@@ -95,7 +100,7 @@
 
         var blocked = _arr(detail, 'blocked_reasons');
         if (blocked.length > 0) {
-            return { key: 'card_blocked_n', vars: { n: blocked.length } };
+            return { key: 'card_system_blocked_n', vars: { n: blocked.length } };
         }
 
         var needs = _arr(detail, 'needs');
@@ -124,7 +129,23 @@
         var n = 0;
         ((queue || {}).clients || []).forEach(function (c) {
             (c.orders || []).forEach(function (o) {
-                if (o.status === 'review' || o.status === 'stuck') n += 1;
+                if (o.status === 'review') {
+                    n += 1;
+                    return;
+                }
+                if (o.status !== 'stuck') return;
+                if (!Array.isArray(o.flagged_groups)) {
+                    n += 1;
+                    return;
+                }
+                if (
+                    o.flagged_groups.some(function (g) {
+                        return typeof g.undecided_count === 'number'
+                            ? g.undecided_count > 0
+                            : (g.count || 0) > 0;
+                    })
+                )
+                    n += 1;
             });
         });
         return n;

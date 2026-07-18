@@ -1,14 +1,3 @@
-/*
- * Pearnly AI · ai-review.js · 人审队列(W3 · 产品心脏)编排:键盘流 + 乐观 UI + 续跑轮询
- *
- * 契约:桌面\pearnly ai\施工\W3-交互契约.md。单张聚焦(同 v4 rv1/rv2 切换,不做滚动列表)——
- * A 采纳票面 / E 改票号、日期与金额 / X 剔除,乐观标终态 + 失败回滚(§2);
- * 最后一张落库后自动轮询后台续跑状态，不在前端重估 R1(§4);四态 + 空队列好事态(§6)。
- *
- * 依赖 window.AI.state/format/api/viewer/reviewQueue/reviewRender/poll 与全局 at(),故必须
- * 排在它们之后加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。轮询收编进共享的
- * AI.poll(J-B · N-6 债:此前与 ai-intake.js 各写一份 pollAfterRun,逐字节重复)。
- */
 (function () {
     'use strict';
 
@@ -19,13 +8,8 @@
     var S = null;
     var wired = false; // 照 ai-client.js chromeWired 先例:监听器只挂一次,不随每次 mount 重挂。
     var runPoll = null; // 当前重跑轮询的 AI.poll 句柄(mount()/换会话时先停旧的再起新的)
-    // 契约 C(2026-07-17 Canon):orderId → 最后操作的 item_id(裁决/前进时记)。回来重挂载
-    // 若该票仍未判则聚焦它,不再一律打回第一张。
     var lastItemByOrder = {};
 
-    // 本次刚提交的裁决没有服务端 actor 回显(响应体只有 event_id),用当前登录态的展示名
-    // 占位(AI.format.actorLabel 回落链:邮箱前缀 → sub 短八位)——不再拼 "user:<uuid>"
-    // 糊脸(清单 #2 同源修法,后端落库的 actor 串不变)。
     function currentActorLabel() {
         return AI.format.actorLabel(null, localStorage.getItem('mrpilot_token'));
     }
@@ -128,7 +112,7 @@
     function renderDone() {
         S.mode = 'done';
         var container = body();
-        if (!S.queue.length && !S.decidedEntries.length) {
+        if (!S.queue.length && !S.decidedEntries.length && !S.blockedInfo) {
             container.innerHTML = AI.reviewRender.emptyOkHtml();
             injectChrome(container);
             return;
@@ -544,7 +528,14 @@
             S.decidedEntries = split.decided;
             S.rerunState = 'idle';
             S.autoRunGraceUntil = 0;
-            S.blockedInfo = { reasons: reasons, hasQueue: split.undecided.length > 0 };
+            S.blockedInfo = {
+                reasons: reasons,
+                hasQueue: split.undecided.length > 0,
+                system:
+                    (detail.blocked_reasons || []).length > 0 &&
+                    !(detail.needs || []).length &&
+                    !split.undecided.length,
+            };
             renderDone();
             return true;
         }
@@ -744,6 +735,14 @@
                 S.queue = split.undecided;
                 S.decidedEntries = split.decided;
                 S.idx = 0;
+                var blockers = detail.blocked_reasons || [];
+                if (detail.status === 'stuck' && !S.queue.length && blockers.length) {
+                    S.blockedInfo = {
+                        reasons: blockers,
+                        hasQueue: false,
+                        system: true,
+                    };
+                }
                 // 契约 C:回到上次操作那张(仍未判才聚焦,已判/不在则维持第一张未判)。
                 var lastId = lastItemByOrder[order.id];
                 for (var i = 0; lastId && i < S.queue.length; i++) {

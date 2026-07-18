@@ -1,4 +1,3 @@
-/* Pearnly AI · 中文词典分片(随 ai-i18n.js 一起加载,见该文件顶注;拆分理由同注)。*/
 window.__AI_I18N_ZH__ = {
     brand_word: 'Pearnly',
     brand_ai: 'AI',
@@ -31,7 +30,7 @@ window.__AI_I18N_ZH__ = {
     col_archived: '已归档',
     col_empty: '这一步现在没有客户',
     card_no_order: '还没有工单',
-    card_blocked_n: '{n} 件事要人判',
+    card_system_blocked_n: '系统处理失败 · {n} 个卡点',
     card_needs_list: '缺：{list}',
     card_running_step: '进行中 · {step}',
     card_tax_due: '应缴 {amount}',
@@ -42,6 +41,7 @@ window.__AI_I18N_ZH__ = {
     status_collecting: '等资料',
     status_running: 'AI 在做',
     status_stuck: '等你审',
+    status_system_failed: '处理失败',
     status_review: '待签字',
     status_archive: '已归档',
     status_unknown: '未知状态',
@@ -87,6 +87,7 @@ window.__AI_I18N_ZH__ = {
     wo_needs: '缺料清单',
     wo_classify_progress: '识别中 {done}/{total}',
     wo_bank_progress: '读对账单 {done}/{total}',
+    system_blocked_detail: '后台在这里停住：{list}。已完成的数据已保留，可从断点重试。',
     wo_run_timeout_hint: '仍在后台跑，可以先去做别的，回来刷新看结果',
     wo_refresh_btn: '刷新查看',
     wo_todo_banner: '有 {n} 件事等你，去待我处理 →',
@@ -201,7 +202,6 @@ window.__AI_I18N_ZH__ = {
     err_workorder_decision_invalid: '这个裁决不合法，请重试',
     err_workorder_item_not_found: '这张票不属于本工单',
     err_workorder_item_image_not_found: '原图读不到',
-    // MC1-b2 · 审核收件箱签批闭环(SoD/驳回/冻结错码人话)
     err_workorder_sod_reviewer_is_preparer: '你是本单制单人，复核须换人签（SoD）',
     err_workorder_sod_approver_is_preparer: '你是本单制单人，签批冻结须换人授权（SoD）',
     err_workorder_sod_review_required: '尚无有效复核签批，请先请人复核或声明单人模式',
@@ -229,8 +229,8 @@ window.__AI_I18N_ZH__ = {
     pkg_bank_present: '银行材料已就位 · {n} 份',
     pkg_bank_missing: '缺银行流水',
     pkg_memo_flagged: '{n} 项曾标记复核',
-    pkg_blocked_t: '还没生成申报草稿',
-    pkg_blocked_s: '先清完人审队列 / 补齐缺料,重新跑一遍就会出草稿。',
+    pkg_blocked_t: '暂时无法生成交付包',
+    pkg_blocked_s: '处理下面卡点后继续；已完成的数据已保留。',
     pkg_blocked_reasons: '卡点：{list}',
     pkg_evid_title: '证据链 · {label}',
     pkg_evid_pick_hint: '点一行查看原图',

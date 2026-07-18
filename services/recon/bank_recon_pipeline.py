@@ -124,13 +124,13 @@ def _parse_bank_stmt_via_pipeline(
         balance = _to_float(e.get("balance"))
         if deposit == 0.0 and withdrawal == 0.0:
             continue
-        tx_date = None
-        if e.get("transaction_date"):
+        tx_date = _parse_date(e.get("transaction_date_raw") or "")
+        if tx_date is None and e.get("transaction_date"):
             try:
                 yy, mm, dd = e["transaction_date"].split("-")
                 tx_date = date(int(yy), int(mm), int(dd))
             except (ValueError, AttributeError):
-                tx_date = _parse_date(e.get("transaction_date_raw") or "")
+                tx_date = None
         rows.append(
             StatementRow(
                 date=tx_date,

@@ -1,4 +1,3 @@
-/* Pearnly AI · 日本語辞書シャード(ai-i18n.js と一緒に読み込む。分割理由は同ファイル先頭参照)。*/
 window.__AI_I18N_JA__ = {
     brand_word: 'Pearnly',
     brand_ai: 'AI',
@@ -31,7 +30,7 @@ window.__AI_I18N_JA__ = {
     col_archived: 'アーカイブ済み',
     col_empty: 'この段階の顧客はいません',
     card_no_order: 'ワークオーダーなし',
-    card_blocked_n: '要判断 {n} 件',
+    card_system_blocked_n: 'システム処理失敗 · {n} 件の停止要因',
     card_needs_list: '不足: {list}',
     card_running_step: '処理中 · {step}',
     card_tax_due: '納付額 {amount}',
@@ -42,6 +41,7 @@ window.__AI_I18N_JA__ = {
     status_collecting: '資料待ち',
     status_running: 'AI処理中',
     status_stuck: '要確認',
+    status_system_failed: '処理失敗',
     status_review: '署名待ち',
     status_archive: 'アーカイブ済み',
     status_unknown: '不明な状態',
@@ -87,6 +87,8 @@ window.__AI_I18N_JA__ = {
     wo_needs: '不足資料',
     wo_classify_progress: '認識中 {done}/{total}',
     wo_bank_progress: '通帳を読み取り中 {done}/{total}',
+    system_blocked_detail:
+        'ここで処理が停止しました：{list}。完了済みの処理は保存され、チェックポイントから再試行できます。',
     wo_todo_banner: '{n} 件対応待ちです。やることリストへ →',
     wo_todo_review: '{n} 件があなたの判断待ち——確認へ →',
     wo_last_active: '最終更新 {t}',
@@ -206,7 +208,6 @@ window.__AI_I18N_JA__ = {
     err_workorder_decision_invalid: 'この判断は無効です。再試行してください',
     err_workorder_item_not_found: 'この項目はこのワークオーダーに属していません',
     err_workorder_item_image_not_found: '原本画像を読み込めません',
-    // MC1-b2 · 審査受信箱の署名クローズ(SoD/差し戻し/凍結エラーの人向け文言)
     err_workorder_sod_reviewer_is_preparer:
         'あなたはこの案件の作成者です。レビューは別の人が行ってください(SoD)',
     err_workorder_sod_approver_is_preparer:
@@ -238,8 +239,8 @@ window.__AI_I18N_JA__ = {
     pkg_bank_present: '銀行資料あり · {n} 件',
     pkg_bank_missing: '銀行明細が不足',
     pkg_memo_flagged: '{n} 件が要確認としてフラグ済み',
-    pkg_blocked_t: 'まだ申告草案がありません',
-    pkg_blocked_s: 'レビューキューを片付け / 不足資料を補ってから再実行すると草案が出ます。',
+    pkg_blocked_t: '提出パッケージをまだ生成できません',
+    pkg_blocked_s: '下記の停止要因を解消して続行してください。完了済みの処理は保存されています。',
     pkg_blocked_reasons: '要因：{list}',
     pkg_evid_title: '証跡チェーン · {label}',
     pkg_evid_pick_hint: '行をクリックして原本を表示',
@@ -390,7 +391,6 @@ window.__AI_I18N_JA__ = {
     sp_delete_confirm: 'この仕入先プロファイルを削除しますか？',
     err_sp_tax_id_invalid: '税番号は13桁の数字で入力してください',
     err_sp_axis_required: '現金-掛け、商品-費用のいずれか一つは選択してください',
-    // D2-S8+S9 · LINE 顧客問い合わせプール(会計担当側)
     pool_title: '対応待ち',
     pool_note: '事務所全体の審査受信箱 · 審査待ち案件 / 異常票 / 顧客回答待ち',
     pool_empty_t: '顧客への質問はありません',

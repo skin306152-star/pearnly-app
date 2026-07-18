@@ -1,4 +1,3 @@
-/* Pearnly AI · English dictionary shard (loaded alongside ai-i18n.js, see its header comment). */
 window.__AI_I18N_EN__ = {
     brand_word: 'Pearnly',
     brand_ai: 'AI',
@@ -31,7 +30,7 @@ window.__AI_I18N_EN__ = {
     col_archived: 'Archived',
     col_empty: 'No clients at this stage',
     card_no_order: 'No work order yet',
-    card_blocked_n: '{n} item(s) need your call',
+    card_system_blocked_n: 'System processing failed · {n} blocker(s)',
     card_needs_list: 'Missing: {list}',
     card_running_step: 'In progress · {step}',
     card_tax_due: 'Due {amount}',
@@ -42,6 +41,7 @@ window.__AI_I18N_EN__ = {
     status_collecting: 'Awaiting documents',
     status_running: 'AI working',
     status_stuck: 'Needs review',
+    status_system_failed: 'Processing failed',
     status_review: 'Ready to sign',
     status_archive: 'Archived',
     status_unknown: 'Unknown status',
@@ -87,6 +87,8 @@ window.__AI_I18N_EN__ = {
     wo_needs: 'Missing items',
     wo_classify_progress: 'Recognizing {done}/{total}',
     wo_bank_progress: 'Reading bank statement {done}/{total}',
+    system_blocked_detail:
+        'Processing stopped here: {list}. Completed work is saved; retry resumes from the checkpoint.',
     wo_todo_banner: '{n} thing(s) waiting on you, go to To-do →',
     wo_todo_review: '{n} documents need your call — review →',
     wo_last_active: 'last activity {t}',
@@ -207,7 +209,6 @@ window.__AI_I18N_EN__ = {
     err_workorder_decision_invalid: 'That decision was invalid, please retry',
     err_workorder_item_not_found: 'This item does not belong to this order',
     err_workorder_item_image_not_found: 'Could not load the original image',
-    // MC1-b2 · Review inbox sign-off loop (SoD/reject/freeze error codes, human copy)
     err_workorder_sod_reviewer_is_preparer:
         'You prepared this order — reviewing needs a different signer (SoD)',
     err_workorder_sod_approver_is_preparer:
@@ -238,8 +239,8 @@ window.__AI_I18N_EN__ = {
     pkg_bank_present: 'Bank statements on file · {n}',
     pkg_bank_missing: 'Missing bank statement',
     pkg_memo_flagged: '{n} item(s) were flagged for review',
-    pkg_blocked_t: 'No filing draft yet',
-    pkg_blocked_s: 'Clear the review queue / add missing materials, then re-run to get a draft.',
+    pkg_blocked_t: 'Package not generated yet',
+    pkg_blocked_s: 'Resolve the blocker below and continue. Completed work is saved.',
     pkg_blocked_reasons: 'Blocked on: {list}',
     pkg_evid_title: 'Evidence chain · {label}',
     pkg_evid_pick_hint: 'Click a row to view the original',
@@ -387,7 +388,6 @@ window.__AI_I18N_EN__ = {
     sp_delete_confirm: 'Delete this supplier profile?',
     err_sp_tax_id_invalid: 'Tax ID must be 13 digits',
     err_sp_axis_required: 'Pick at least one of payment or item type',
-    // D2-S8+S9 · LINE client question pool (accountant side)
     pool_title: 'To do',
     pool_note: 'Firm-wide review inbox · pending orders / flagged items / client answers',
     pool_empty_t: 'No client questions pending',

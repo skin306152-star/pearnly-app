@@ -73,8 +73,11 @@ class RouteDirectTests(unittest.TestCase):
         with mock.patch("services.ai_gateway.backends.get_provider", return_value=provider):
             dr._call_model(b"\xff\xd8x", "bank_statement", api_key=None)
         call = provider.calls[0]
-        self.assertIn("Extract EVERY visible transaction row", call["prompt"])
+        self.assertIn("Read EVERY visible transaction row", call["prompt"])
+        self.assertIn("description, max 80 characters", call["prompt"])
+        self.assertIn("two-digit year 26 mean 2026", call["prompt"])
         self.assertNotIn("deposit_ref", call["prompt"])
+        self.assertNotIn('"reference"', call["prompt"])
         self.assertEqual(call["max_tokens"], 16384)
 
     def test_invoice_keeps_standard_output_budget(self):

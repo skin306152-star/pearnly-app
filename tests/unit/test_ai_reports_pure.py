@@ -71,5 +71,37 @@ class DownloadableDeliverablesTests(unittest.TestCase):
         self.assertEqual(out, [])
 
 
+@unittest.skipUnless(shutil.which("node"), "node unavailable")
+class PackageBlockedStateTests(unittest.TestCase):
+    def test_empty_deliverables_show_blocker_and_retry(self):
+        out = _run_node(f"""
+            global.at = (k, v) => v && v.list ? k + ':' + v.list : k;
+            global.AI = {{
+                state: {{esc: String, emptyHtml: () => 'EMPTY'}},
+                format: {{fieldLabel: String}},
+                reviewQueue: {{
+                    splitByDecision: () => ({{undecided: []}}),
+                    filterPurchaseQueue: () => [],
+                }},
+                router: {{buildClientHash: () => '#/intake'}},
+            }};
+            require({json.dumps(str(AI_DIR / "ai-pkg-render.js"))});
+            const html = global.AI.pkgRender.pageHtml({{
+                detail: {{blocked_reasons: ['IMG_2485.jpg: bank_statement_parse_failed']}},
+                deliverables: [],
+            }});
+            process.stdout.write(JSON.stringify({{
+                blocker: html.includes('pkg_blocked_t'),
+                reason: html.includes('IMG_2485.jpg'),
+                retry: html.includes('data-action="pkg-retry"'),
+                empty: html.includes('EMPTY'),
+            }}));
+            """)
+        self.assertEqual(
+            out,
+            {"blocker": True, "reason": True, "retry": True, "empty": False},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

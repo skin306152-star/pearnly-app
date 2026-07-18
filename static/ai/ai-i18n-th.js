@@ -1,4 +1,3 @@
-/* Pearnly AI · 泰语词典分片(随 ai-i18n.js 一起加载,见该文件顶注;拆分理由同注)。*/
 window.__AI_I18N_TH__ = {
     brand_word: 'Pearnly',
     brand_ai: 'AI',
@@ -31,7 +30,7 @@ window.__AI_I18N_TH__ = {
     col_archived: 'จบแล้ว',
     col_empty: 'ยังไม่มีลูกค้าในขั้นนี้',
     card_no_order: 'ยังไม่มีงาน',
-    card_blocked_n: 'มี {n} เรื่องรอคุณตัดสินใจ',
+    card_system_blocked_n: 'ระบบประมวลผลไม่สำเร็จ · ติดขัด {n} จุด',
     card_needs_list: 'ขาด: {list}',
     card_running_step: 'กำลังทำ · {step}',
     card_tax_due: 'ต้องชำระ {amount}',
@@ -42,6 +41,7 @@ window.__AI_I18N_TH__ = {
     status_collecting: 'รอเอกสาร',
     status_running: 'AI กำลังทำ',
     status_stuck: 'รอคุณตรวจ',
+    status_system_failed: 'ประมวลผลไม่สำเร็จ',
     status_review: 'รอเซ็น',
     status_archive: 'จบแล้ว',
     status_unknown: 'ไม่ทราบสถานะ',
@@ -87,6 +87,8 @@ window.__AI_I18N_TH__ = {
     wo_needs: 'รายการที่ขาด',
     wo_classify_progress: 'กำลังอ่าน {done}/{total}',
     wo_bank_progress: 'กำลังอ่านใบแจ้งยอดธนาคาร {done}/{total}',
+    system_blocked_detail:
+        'ระบบหยุดที่นี่: {list} งานที่เสร็จแล้วถูกบันทึกไว้ และลองต่อจากจุดเดิมได้',
     wo_todo_banner: 'มี {n} เรื่องรอคุณ ไปที่ต้องทำ →',
     wo_todo_review: 'มี {n} ใบรอคุณตัดสิน ไปตรวจ →',
     wo_last_active: 'ล่าสุด {t}',
@@ -205,7 +207,6 @@ window.__AI_I18N_TH__ = {
     err_workorder_decision_invalid: 'การตัดสินนี้ไม่ถูกต้อง กรุณาลองใหม่',
     err_workorder_item_not_found: 'รายการนี้ไม่ได้อยู่ในงานนี้',
     err_workorder_item_image_not_found: 'อ่านภาพต้นฉบับไม่ได้',
-    // MC1-b2 · กล่องคิวตรวจสอบ + วงจรลงนาม (ข้อความ SoD/ตีกลับ/ปิดงาน)
     err_workorder_sod_reviewer_is_preparer: 'คุณเป็นผู้จัดทำงานนี้ ต้องให้คนอื่นตรวจทาน (SoD)',
     err_workorder_sod_approver_is_preparer:
         'คุณเป็นผู้จัดทำงานนี้ ต้องให้คนอื่นอนุมัติปิดงาน (SoD)',
@@ -235,8 +236,8 @@ window.__AI_I18N_TH__ = {
     pkg_bank_present: 'มีเอกสารธนาคารแล้ว · {n} รายการ',
     pkg_bank_missing: 'ขาดรายการเดินบัญชีธนาคาร',
     pkg_memo_flagged: 'เคยถูกตั้งค่าสถานะรอทบทวน {n} รายการ',
-    pkg_blocked_t: 'ยังไม่ได้สร้างแบบร่างการยื่นภาษี',
-    pkg_blocked_s: 'ตรวจคิวที่ค้างให้ครบ / เติมเอกสารที่ขาด แล้วรันใหม่จะได้แบบร่าง',
+    pkg_blocked_t: 'ยังสร้างชุดส่งมอบไม่ได้',
+    pkg_blocked_s: 'จัดการจุดที่ติดขัดด้านล่างแล้วทำต่อ งานที่เสร็จแล้วถูกบันทึกไว้',
     pkg_blocked_reasons: 'ติดที่：{list}',
     pkg_evid_title: 'สายหลักฐาน · {label}',
     pkg_evid_pick_hint: 'คลิกแถวเพื่อดูต้นฉบับ',
@@ -381,7 +382,6 @@ window.__AI_I18N_TH__ = {
     sp_delete_confirm: 'ยืนยันลบโปรไฟล์ซัพพลายเออร์นี้?',
     err_sp_tax_id_invalid: 'เลขผู้เสียภาษีต้องมี 13 หลัก',
     err_sp_axis_required: 'เลือกอย่างน้อยหนึ่ง: เงินสด-เชื่อ หรือ สินค้า-ค่าใช้จ่าย',
-    // D2-S8+S9 · กองคำถามค้าง LINE (ฝั่งนักบัญชี)
     pool_title: 'งานที่รอฉัน',
     pool_note: 'กล่องตรวจสอบรวมทั้งสำนักงาน · งานรอตรวจ / รายการผิดปกติ / รอลูกค้าตอบ',
     pool_empty_t: 'ไม่มีบิลที่รอถามลูกค้า',

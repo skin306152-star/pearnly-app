@@ -177,6 +177,25 @@
         createOrderAndReload(period, btn, at('wo_open_first_btn'), renderWo);
     }
 
+    function retryStuckOrder(btn) {
+        var order = currentOrder();
+        if (!order || !btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = at('rv_rerun_waiting');
+        S.api
+            .runOrder(order.id)
+            .then(renderWo)
+            .catch(function (err) {
+                var errKey = AI.api.mapApiErrorKey(err && err.code);
+                if (errKey === 'err_workorder_run_in_progress') {
+                    renderWo();
+                    return;
+                }
+                btn.disabled = false;
+                btn.textContent = at(errKey);
+            });
+    }
+
     // 零工单空态的开单账期选择器(J-8/J-B):默认账期不再恒回当月——深链带了 ?period=
     // (如从看板/客户档案页历史点进来)就该默认那一期,否则用户正在跑的是 2569-05、
     // 控件却默认冒出 2569-07,点错一次就多开一张不该开的工单。default 落最新已知深链
@@ -333,6 +352,8 @@
         };
         $('cv-wo').addEventListener('click', function (e) {
             if (e.target.closest('[data-action="wo-open-first"]')) openFirstOrder();
+            else if (e.target.closest('[data-action="wo-retry-stuck"]'))
+                retryStuckOrder(e.target.closest('[data-action="wo-retry-stuck"]'));
             // 引导链②(J-B):工单页「有 N 件事等你」→ 待我处理聚合队列(D2-S8/MC1-b2,
             // 同看板 col_review「等你审」跳的同一个地方,不另造第二个"审核入口")。
             else if (e.target.closest('[data-action="wo-goto-pool"]')) {

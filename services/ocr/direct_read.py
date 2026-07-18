@@ -55,34 +55,25 @@ _IMAGE_INPUT_NOTE = (
     "and fill the exact same JSON schema. Same rules apply."
 )
 
-_BANK_STATEMENT_IMAGE_PROMPT = """Read this IMAGE page from a Thai bank statement and return one compact JSON object only. Extract EVERY visible transaction row in printed order; never summarize, sample, merge, or omit rows.
+_BANK_STATEMENT_IMAGE_PROMPT = """Read EVERY visible transaction row from this Thai bank-statement IMAGE. Return one compact JSON object only; never summarize, sample, merge, or omit rows.
 
 Schema:
 {
   "document_type": "bank_statement",
   "bank_name": "",
-  "bank_code": "kbank|bbl|scb|ktb|kkp|bay|ttb|",
-  "account_name": "",
-  "account_number": "",
-  "account_last4": "",
-  "period_start": "YYYY-MM-DD or empty",
-  "period_end": "YYYY-MM-DD or empty",
   "opening_balance": "number string or empty",
   "closing_balance": "number string or empty",
   "entries": [{
     "transaction_date": "YYYY-MM-DD or empty",
     "transaction_date_raw": "exact printed date",
-    "description": "printed description",
-    "reference": "reference code or empty",
+    "description": "printed description, max 80 characters",
     "deposit": "number string or empty",
     "withdrawal": "number string or empty",
-    "amount": "deposit if positive otherwise withdrawal",
-    "direction": "deposit|withdrawal|empty",
     "balance": "running balance or empty"
   }]
 }
 
-Amount fields may only come from printed Deposit, Withdrawal, or Balance columns. Never treat reference, account, or description digits as money. Set direction from the populated deposit or withdrawal column. Convert Buddhist years by subtracting 543 and preserve the printed date. Remove commas and currency symbols. Do not output provenance objects or raw row maps. Skip headers, balance-forward rows, and totals as entries."""
+Use one entry per printed row. Put a balance-forward value in opening_balance, not entries, and the final visible running balance in closing_balance. Amounts may only come from printed Deposit, Withdrawal, or Balance columns; never treat reference, account, or description digits as money. Dates ending in two-digit year 26 mean 2026. For four-digit Buddhist years subtract 543. Preserve the exact printed date in transaction_date_raw. Remove commas and currency symbols. Keep each description under 80 characters. Skip headers and totals."""
 
 
 class DirectReadFallback(Exception):

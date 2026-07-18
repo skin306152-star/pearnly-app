@@ -93,8 +93,21 @@
         );
     }
 
+    function systemBlockedHtml(d, guideCount) {
+        var reasons = d.blocked_reasons || [];
+        if (d.status !== 'stuck' || guideCount > 0 || !reasons.length) return '';
+        return (
+            '<div class="wo-guide"><p class="rv-blocked">' +
+            esc(at('system_blocked_detail', { list: reasons.join('、') })) +
+            '</p><button type="button" class="btn sm pri" data-action="wo-retry-stuck">' +
+            esc(at('retry')) +
+            '</button></div>'
+        );
+    }
+
     function woSummaryHtml(d, clientId) {
         var cells = cellsHtml(d);
+        var guideCount = guidanceCount(d, root.AI.reviewQueue);
         var needs = (d.needs || [])
             .map(function (n) {
                 return '<div class="ni">' + esc(n) + '</div>';
@@ -110,7 +123,8 @@
                   '</span>'
                 : '';
         // 进度行同理只对 AI 在跑有意义,人审终态挂「0/10」=没人在读却像卡死(S2 §3-补)。
-        var progress = d.status === 'running' ? d.progress || d.bank_progress : null;
+        var progress =
+            d.status === 'running' || d.status === 'stuck' ? d.progress || d.bank_progress : null;
         // running 期间逐件心跳续约刷 updated_at(=last_active_at),5s 轮询全量重画自然
         // 刷新,不加计时器;后端没给就不拼,不臆造「活着」。
         var lastActive =
@@ -135,7 +149,8 @@
             progressLine +
             (cells ? '<div class="wosum">' + cells + '</div>' : '') +
             (needs ? '<div class="needs-list">' + needs + '</div>' : '') +
-            guidanceHtml(d, clientId, guidanceCount(d, root.AI.reviewQueue)) +
+            guidanceHtml(d, clientId, guideCount) +
+            systemBlockedHtml(d, guideCount) +
             collectingHintHtml(d, clientId) +
             '</div></div>'
         );

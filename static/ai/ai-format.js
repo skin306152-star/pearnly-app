@@ -68,6 +68,21 @@
         if (canBeNeedy && detail && Array.isArray(detail.needs) && detail.needs.length > 0) {
             return { cls: 'w', key: 'chip_needs_materials' };
         }
+        if (
+            status === 'stuck' &&
+            detail &&
+            Array.isArray(detail.blocked_reasons) &&
+            detail.blocked_reasons.length > 0
+        ) {
+            var reviewQueue = root && root.AI && root.AI.reviewQueue;
+            var hasPending =
+                reviewQueue &&
+                typeof reviewQueue.filterPurchaseQueue === 'function' &&
+                typeof reviewQueue.splitByDecision === 'function' &&
+                reviewQueue.splitByDecision(reviewQueue.filterPurchaseQueue(detail.flagged || []))
+                    .undecided.length > 0;
+            if (!hasPending) return { cls: 'b', key: 'status_system_failed' };
+        }
         return STATUS_MAP[status] || { cls: 'n', key: 'status_unknown' };
     }
 

@@ -80,7 +80,11 @@ class MapOrderToColumnTests(unittest.TestCase):
             process.stdout.write(JSON.stringify(
                 b.mapOrderToColumn(
                     {{status: 'stuck'}},
-                    {{needs: [], blocked_reasons: [], flagged: [{{item_id: 'it-1', kind: 'sales_summary'}}]}}
+                    {{needs: [], blocked_reasons: [], flagged: [{{
+                        item_id: 'it-1',
+                        kind: 'purchase_invoice',
+                        decision: {{decision: 'face_value'}}
+                    }}]}}
                 )
             ));
             """)
@@ -134,7 +138,7 @@ class SummarizeCardTests(unittest.TestCase):
                 {{needs: ['bank_statement'], blocked_reasons: ['reconcile.input_vat_mismatch']}}
             )));
             """)
-        self.assertEqual(out, {"key": "card_blocked_n", "vars": {"n": 1}})
+        self.assertEqual(out, {"key": "card_system_blocked_n", "vars": {"n": 1}})
 
     def test_needs_list_joins_real_field_names(self):
         out = _run_node(f"""

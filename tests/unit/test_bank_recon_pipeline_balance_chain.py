@@ -100,6 +100,23 @@ class DirectionFlipAutocorrectTests(unittest.TestCase):
 
 
 class DocLevelFieldsTests(unittest.TestCase):
+    def test_printed_date_wins_over_wrong_model_normalization(self):
+        res = _run(
+            _legacy(
+                [
+                    {
+                        "transaction_date": "2023-05-26",
+                        "transaction_date_raw": "08-05-26 23:04",
+                        "description": "Transfer",
+                        "deposit": "450",
+                        "withdrawal": "",
+                        "balance": "362864.99",
+                    }
+                ]
+            )
+        )
+        self.assertEqual(res["rows"][0].date.isoformat(), "2026-05-08")
+
     def test_opening_closing_passthrough_and_summary_filtered(self):
         res = _run(
             _legacy(

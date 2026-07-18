@@ -186,6 +186,26 @@
         window.location.hash = AI.router.buildClientHash(S.clientId, 'intake');
     }
 
+    function retryBlocked(btn) {
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = at('rv_rerun_waiting');
+        S.api
+            .runOrder(S.orderId)
+            .then(function () {
+                window.location.hash = AI.router.buildClientHash(S.clientId, 'wo');
+            })
+            .catch(function (err) {
+                var errKey = AI.api.mapApiErrorKey(err && err.code);
+                if (errKey === 'err_workorder_run_in_progress') {
+                    window.location.hash = AI.router.buildClientHash(S.clientId, 'wo');
+                    return;
+                }
+                btn.disabled = false;
+                btn.textContent = at(errKey);
+            });
+    }
+
     function download(kind) {
         if (S.downloading) return; // 禁双击重复触发(Canon §7:提交必有 loading 态)
         var session = S;
@@ -300,6 +320,7 @@
         else if (a === 'pkg-calc') toggleCalc();
         else if (a === 'pkg-download') download(el.getAttribute('data-kind'));
         else if (a === 'pkg-go-intake') gotoIntake();
+        else if (a === 'pkg-retry') retryBlocked(el);
         else if (a === 'pkg-sign') signOff();
         else if (a === 'pkg-export') exportEntries();
         else if (a === 'pkg-return') returnOrder();

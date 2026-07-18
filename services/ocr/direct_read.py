@@ -131,9 +131,7 @@ def _call_model(
         sys_prompt = _BANK_STATEMENT_IMAGE_PROMPT
     else:
         base_prompt = (
-            _SYSTEM_PROMPT
-            if document_type in ("auto", "invoice")
-            else _DOC_PROMPTS[document_type]
+            _SYSTEM_PROMPT if document_type in ("auto", "invoice") else _DOC_PROMPTS[document_type]
         )
         sys_prompt = base_prompt + _IMAGE_INPUT_NOTE
     # 与 L2 同口径兜 env:aistudio provider 只认显式 key(vertex 走 SA 忽略此参)

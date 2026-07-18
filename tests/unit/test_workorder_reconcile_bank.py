@@ -311,11 +311,7 @@ class BankParseCostAttributionTests(unittest.TestCase):
             seen["tenant_kwarg"] = tenant_id
             return {
                 "ok": True,
-                "rows": [
-                    StatementRow(
-                        datetime.date(2026, 5, 1), "transfer", 100.0, 0.0, 900.0
-                    )
-                ],
+                "rows": [StatementRow(datetime.date(2026, 5, 1), "transfer", 100.0, 0.0, 900.0)],
             }
 
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
@@ -373,9 +369,7 @@ class BankParseCostAttributionTests(unittest.TestCase):
             "services.recon.bank_recon_v2._parse_bank_statement_impl",
             return_value={"ok": False, "rows": [], "error_code": "ocr_failed"},
         ):
-            with self.assertRaisesRegex(
-                reconcile_bank.BankStatementParseError, "ocr_failed"
-            ):
+            with self.assertRaisesRegex(reconcile_bank.BankStatementParseError, "ocr_failed"):
                 reconcile_bank._default_parse_bank_file(ctx, item)
 
 

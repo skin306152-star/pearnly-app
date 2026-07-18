@@ -45,8 +45,7 @@ def run(ctx: StepContext) -> StepResult:
     )
     items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
 
-    # human_decision 回放一次(带 actor/at 完整 rec):守恒归堆取 payload、备忘留痕取 actor,
-    # ledger 裁决列取 decision——三处共用同一份,不各 replay 一遍。
+    # human_decision 回放一次；守恒、备忘和 ledger 共用，不各 replay 一遍。
     decision_recs = evidence.replay_items_by_type(events, "human_decision")
 
     # 守恒闸(出包前置):每件必须有明确终态。待裁决>0 或 Σ桶≠N → stuck 逐件点名,绝不
@@ -236,6 +235,7 @@ def _write_ledger(
         (it for it in items if it["kind"] == kinds.PURCHASE_INVOICE),
         key=lambda it: it.get("file_ref") or "",
     )
+
     def _row(it: dict) -> str:
         money = (classified.get(it["id"]) or {}).get("payload", {}).get("money") or {}
         decision_payload = (decision_recs.get(it["id"]) or {}).get("payload", {})

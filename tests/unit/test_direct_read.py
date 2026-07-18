@@ -68,6 +68,21 @@ class RouteDirectTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"OCR_IMAGE_DIRECT": ""}):
             self.assertTrue(dr.enabled())  # 默认开
 
+    def test_bank_image_uses_compact_prompt_and_larger_output_budget(self):
+        provider = _FakeProvider(ProviderOutcome(ok=False, error_kind="parse"))
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=provider):
+            dr._call_model(b"\xff\xd8x", "bank_statement", api_key=None)
+        call = provider.calls[0]
+        self.assertIn("Extract EVERY visible transaction row", call["prompt"])
+        self.assertNotIn("deposit_ref", call["prompt"])
+        self.assertEqual(call["max_tokens"], 16384)
+
+    def test_invoice_keeps_standard_output_budget(self):
+        provider = _FakeProvider(ProviderOutcome(ok=False, error_kind="parse"))
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=provider):
+            dr._call_model(b"\xff\xd8x", "invoice", api_key=None)
+        self.assertNotIn("max_tokens", provider.calls[0])
+
 
 class ReadPageTests(unittest.TestCase):
     def test_clean_invoice_yields_confirm_band(self):

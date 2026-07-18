@@ -83,8 +83,26 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
+.rv-suggest-field.wide {
+  grid-column: span 2;
+}
+.rv-edit-note {
+  color: var(--mut);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.rv-edit-original {
+  color: var(--mut);
+  font-size: 10.5px;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
 @media (max-width: 480px) {
   .rv-suggest-fields {
     grid-template-columns: 1fr;
+  }
+  .rv-suggest-field.wide {
+    grid-column: auto;
   }
 }

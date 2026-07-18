@@ -14,6 +14,7 @@ from typing import Optional
 
 from core import feature_flags
 from services.workorder import (
+    corrections,
     decisions,
     evidence,
     kinds,
@@ -360,7 +361,13 @@ def _decision_payload(
             raise WorkOrderApiError("workorder.waive_reason_too_long")
         return {"item_id": item_id, "decision": decision, "reason": reason_s}
     if decision in _DECISIONS:
-        return {"item_id": item_id, "decision": decision, "values": values or {}}
+        normalized = values or {}
+        if decision == decisions.RECALC:
+            try:
+                normalized = corrections.normalize_values(values)
+            except corrections.InvalidCorrection as exc:
+                raise WorkOrderApiError("workorder.decision_invalid") from exc
+        return {"item_id": item_id, "decision": decision, "values": normalized}
     raise WorkOrderApiError("workorder.decision_invalid")
 
 

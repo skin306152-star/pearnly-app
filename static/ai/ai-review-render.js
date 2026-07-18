@@ -84,6 +84,15 @@
         );
     }
 
+    function correctedTextCell(field) {
+        return (
+            txt(field.value) +
+            (field.corrected
+                ? ' <span class="chip w">' + esc(at('rv_manually_corrected')) + '</span>'
+                : '')
+        );
+    }
+
     // 契约 §5:改判过的票再进队列,表格要显 decision.values(裁决数),不是干等一行
     // 「已由谁判」小字却还摆着 AI 原读数误导人。net/vat/grand_total 三字段各自独立比对
     // (J-A 建议值三字段改数态落地后,不再只有 VAT 能被人工改过);face_value/exclude
@@ -96,6 +105,16 @@
             effectiveDecision,
             'grand_total',
             read.total_amount
+        );
+        var invoiceNumber = AI.reviewQueue.decidedValue(
+            effectiveDecision,
+            'invoice_number',
+            read.invoice_number
+        );
+        var invoiceDate = AI.reviewQueue.decidedValue(
+            effectiveDecision,
+            'invoice_date',
+            read.invoice_date
         );
         return (
             '<tr><td class="lb">' +
@@ -121,7 +140,12 @@
             '<tr><td class="lb">' +
             esc(at('rv_field_invno')) +
             '</td><td class="vl">' +
-            txt(read.invoice_number) +
+            correctedTextCell(invoiceNumber) +
+            '</td></tr>' +
+            '<tr><td class="lb">' +
+            esc(at('rv_field_date')) +
+            '</td><td class="vl">' +
+            correctedTextCell(invoiceDate) +
             '</td></tr>'
         );
     }
@@ -248,35 +272,14 @@
         var isDir = AI.reviewQueue.isDirectionTicket(entry);
         var effectiveDecision = (ctx.local && ctx.local.decision) || entry.decision;
         // 方向票不进「改数」态(E),只定向;金额票编辑时隐藏动作行。
-        var dirNote = isDir
-            ? '<div class="rv-dir-note">' + esc(at('rv_dir_prompt')) + '</div>'
-            : '';
+        var narrative = AI.reviewVerdict.narrativeOf(entry.verdict_hint, entry.flag_reason);
+        var dirText = narrative.key
+            ? at(narrative.key, narrative.vars)
+            : narrative.fallbackText || at('rv_dir_prompt');
+        var dirNote = isDir ? '<div class="rv-dir-note">' + esc(dirText) + '</div>' : '';
         var actionsHtml = ctx.editing ? '' : isDir ? directionActions() : amountActions();
-        // J-A 建议值消费(J-C):amount_math_fail 票若投影带解歧建议,改数态升级成三字段
-        // (net/vat/grand_total)预填建议值 + 琥珀标注;无建议票维持现状单字段表单
-        // (ai-review-suggest-render.js 拆出,单文件<500 铁律同 ai-review-pool.js 先例)。
-        var editHtml = ctx.editing
-            ? ctx.editSuggestion
-                ? AI.reviewSuggest.editFormHtml(ctx)
-                : '<div class="rv-edit" id="rvEdit">' +
-                  '<label class="rv-edit-lb" for="rvVatInput">' +
-                  esc(at('rv_field_vat_face')) +
-                  '</label>' +
-                  // editValue 必经 startEdit 赋值(entry.ocr_read.vat 或先前裁决值,至少是
-                  // 空串)才会进这个分支——editing 为 true 时它不会是 null,不用再兜底。
-                  '<input class="rv-vat-input num" id="rvVatInput" inputmode="decimal" value="' +
-                  esc(ctx.editValue) +
-                  '">' +
-                  '<div class="rv-edit-hint">' +
-                  esc(at('rv_edit_hint')) +
-                  '</div>' +
-                  (ctx.editErr
-                      ? '<div class="rv-edit-err" id="rvEditErr">' +
-                        esc(at('rv_edit_vat_required')) +
-                        '</div>'
-                      : '') +
-                  '</div>'
-            : '';
+        // 改数态统一显示票号、日期与三项金额；有确定性建议时额外标注建议来源。
+        var editHtml = ctx.editing ? AI.reviewSuggest.editFormHtml(ctx) : '';
         var poolHtml = ctx.editing ? '' : poolPanelHtml(ctx.pool);
         return (
             '<h2 class="rv-title">' +
@@ -382,7 +385,9 @@
         return (
             '<div class="panel"><div class="bd rv-done">' +
             '<span class="chip g">' +
-            esc(at('rv_queue_cleared_t')) +
+            esc(
+                at(rerunState === 'waiting' ? 'rv_review_complete_running' : 'rv_queue_cleared_t')
+            ) +
             '</span>' +
             '<div class="big">' +
             esc(at('rv_queue_cleared_s', { n: n, m: m })) +

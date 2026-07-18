@@ -276,13 +276,13 @@ class FileNameTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class RecalcFullValuesTests(unittest.TestCase):
-    # J-C · J-A 建议值三字段改数(net/vat/grand_total),vatRaw 省略走 fullValues 路径。
-    def test_full_values_carries_all_three_fields(self):
+    def test_full_values_carries_amounts_and_identifiers(self):
         out = _run_node(f"""
             {_REQUIRE_AI_FORMAT}
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             process.stdout.write(JSON.stringify(q.buildDecisionPayload('it1', 'recalc', null, {{
                 net: '58129.35', vat: '4069.05', grand: '62198.40',
+                invoice_number: ' IN26-00675 ', invoice_date: '2026-04-21',
             }})));
             """)
         self.assertEqual(
@@ -290,7 +290,13 @@ class RecalcFullValuesTests(unittest.TestCase):
             {
                 "item_id": "it1",
                 "decision": "recalc",
-                "values": {"vat": "4069.05", "net": "58129.35", "grand_total": "62198.40"},
+                "values": {
+                    "vat": "4069.05",
+                    "net": "58129.35",
+                    "grand_total": "62198.40",
+                    "invoice_number": "IN26-00675",
+                    "invoice_date": "2026-04-21",
+                },
             },
         )
 
@@ -316,6 +322,16 @@ class RecalcFullValuesTests(unittest.TestCase):
         self.assertEqual(
             out, {"item_id": "it1", "decision": "recalc", "values": {"vat": "4069.05"}}
         )
+
+    def test_invalid_invoice_date_returns_null(self):
+        out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(q.buildDecisionPayload('it1', 'recalc', null, {{
+                net: '100', vat: '7', grand: '107', invoice_date: '21/04/2026',
+            }})));
+            """)
+        self.assertIsNone(out)
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -401,13 +417,29 @@ class SuggestionForItemTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class EditStartValuesTests(unittest.TestCase):
-    def test_no_suggestion_falls_back_to_single_field_state(self):
+    def test_no_suggestion_prefills_all_editable_fields_from_ocr(self):
         out = _run_node(f"""
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
-            const entry = {{item_id: 'it1', ocr_read: {{vat: '100.00'}}}};
+            const entry = {{item_id: 'it1', ocr_read: {{
+                subtotal: '100.00', vat: '7.00', total_amount: '107.00',
+                invoice_number: 'TIV-1', invoice_date: '2026-05-03',
+            }}}};
             process.stdout.write(JSON.stringify(q.editStartValues([], entry, null)));
             """)
-        self.assertEqual(out, {"suggestion": None, "editValue": "100.00", "suggestValues": None})
+        self.assertEqual(
+            out,
+            {
+                "suggestion": None,
+                "editValue": None,
+                "suggestValues": {
+                    "net": "100.00",
+                    "vat": "7.00",
+                    "grand": "107.00",
+                    "invoice_number": "TIV-1",
+                    "invoice_date": "2026-05-03",
+                },
+            },
+        )
 
     def test_suggestion_prefills_three_fields(self):
         out = _run_node(f"""
@@ -422,23 +454,47 @@ class EditStartValuesTests(unittest.TestCase):
             """)
         self.assertEqual(
             out,
-            [True, None, {"net": "58129.35", "vat": "4069.05", "grand": "62198.40"}],
+            [
+                True,
+                None,
+                {
+                    "net": "58129.35",
+                    "vat": "4069.05",
+                    "grand": "62198.40",
+                    "invoice_number": "",
+                    "invoice_date": "",
+                },
+            ],
         )
 
     def test_prior_recalc_values_win_over_suggestion(self):
         # 改判场景:人工已改过的值优先于建议值(不覆盖已裁决的选择)。
         out = _run_node(f"""
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
-            const entry = {{item_id: 'it1', ocr_read: {{vat: '4060.05'}}}};
+            const entry = {{item_id: 'it1', ocr_read: {{
+                vat: '4060.05', invoice_number: 'OCR-OLD', invoice_date: '2026-04-20',
+            }}}};
             const alerts = [{{
                 type: 'amount_read_suggested', item_id: 'it1',
                 suggestion: {{net: '58129.35', vat: '4069.05', grand: '62198.40'}},
             }}];
-            const prior = {{decision: 'recalc', values: {{net: '58200.00', vat: '4074.00', grand_total: '62274.00'}}}};
+            const prior = {{decision: 'recalc', values: {{
+                net: '58200.00', vat: '4074.00', grand_total: '62274.00',
+                invoice_number: 'FIXED-1', invoice_date: '2026-04-21',
+            }}}};
             const v = q.editStartValues(alerts, entry, prior);
             process.stdout.write(JSON.stringify(v.suggestValues));
             """)
-        self.assertEqual(out, {"net": "58200.00", "vat": "4074.00", "grand": "62274.00"})
+        self.assertEqual(
+            out,
+            {
+                "net": "58200.00",
+                "vat": "4074.00",
+                "grand": "62274.00",
+                "invoice_number": "FIXED-1",
+                "invoice_date": "2026-04-21",
+            },
+        )
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

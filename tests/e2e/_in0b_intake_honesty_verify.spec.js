@@ -141,6 +141,45 @@ function passwordRequiredRoute(route) {
 }
 
 test.describe('IN-0b · 收料诚实化(本地 stub 真浏览器)', () => {
+    test('上传中图标持续旋转,鼠标悬停不会闪烁或丢失', async ({ page }) => {
+        let releaseUpload;
+        const uploadGate = new Promise((resolve) => {
+            releaseUpload = resolve;
+        });
+        await bootIntake(page, {
+            materialsHandler: async (route) => {
+                await uploadGate;
+                return route.fulfill({
+                    contentType: 'application/json',
+                    body: JSON.stringify({ registered: [{ item_id: 'spin-1' }], count: 1 }),
+                });
+            },
+        });
+        await page.setInputFiles('#ikFileInput', path.join(FIXTURES, 'normal_receipt.jpg'));
+        await page.click('[data-action="ik-upload"]');
+
+        const icon = page.locator('.dz-ic.uploading svg');
+        await expect(icon).toBeVisible({ timeout: 8000 });
+        await expect(icon).toHaveCSS('animation-name', 'intake-spin');
+        const firstTransform = await icon.evaluate((el) => getComputedStyle(el).transform);
+        await expect
+            .poll(async () => {
+                const current = await icon.evaluate((el) => getComputedStyle(el).transform);
+                return current !== firstTransform;
+            })
+            .toBe(true);
+
+        await page.hover('#ikDrop');
+        await expect(icon).toBeVisible();
+        await expect(page.locator('#ikUploadProgress')).toBeVisible();
+        await page.screenshot({ path: path.join(ARTIFACT_DIR, '00-upload-spinner-hover.png') });
+
+        releaseUpload();
+        await expect(page.locator('.manifest-card .ci-counts')).toContainText('1', {
+            timeout: 8000,
+        });
+    });
+
     test('文件夹拖入(≥15 件混合子目录)→ 盘点条计数与实际一致', async ({ page }) => {
         await bootIntake(page, {
             materialsHandler: (route, req) => {

@@ -60,6 +60,19 @@
   height: 26px;
   stroke: var(--sage-deep);
 }
+.dz-ic.uploading svg {
+  animation: intake-spin var(--dur-spin) linear infinite;
+}
+@keyframes intake-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dz-ic.uploading svg {
+    animation: none;
+  }
+}
 .dz-t {
   font-size: 15px;
   font-weight: 700;

@@ -13,7 +13,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional
 
-from services.workorder import decisions
+from services.workorder import corrections, decisions
 
 TOL = Decimal("0.01")
 ZERO = Decimal("0")
@@ -118,7 +118,8 @@ def resolve_input_vat(
                     f"{_label(it, money)}: flagged({it.get('flag_reason')}) 无人工裁决"
                 )
                 continue
-            _count(it, money, _apply_decision(it, money, dec, unresolved))
+            effective_money = corrections.apply_to_money(money, dec)
+            _count(it, effective_money, _apply_decision(it, money, dec, unresolved))
     for it in ambiguous or []:
         money = classified.get(it["id"]) or {}
         _count(it, money, _apply_direction(it, money, decisions.get(it["id"]), unresolved))

@@ -45,7 +45,14 @@ def _line_subtotals(invoice) -> List[float]:
     return out
 
 
-def line_sum_mismatch(sub, lines: List[float], symmetric: bool = False) -> float | None:
+def line_sum_mismatch(
+    sub,
+    lines: List[float],
+    symmetric: bool = False,
+    *,
+    discount: float | None = None,
+    total: float | None = None,
+) -> float | None:
     """明细行和是否与小计不平,不平则返回行和(供调用方拼消息),平则 None。
 
     单侧(规则 6·默认)只判「行和 > 小计」——行只会漏读不会多出钱,合法漏行
@@ -58,6 +65,15 @@ def line_sum_mismatch(sub, lines: List[float], symmetric: bool = False) -> float
         return None
     line_sum = sum(lines)
     tol = max(_TOL, sub * _RECON_REL)
+    # 折扣票的明细列常印折前含税价，表尾才列折扣、折后未税小计和含税合计。此时
+    # 「明细和 − 折扣 = 含税合计」是合法关系，不能拿折前含税行和直接跟折后未税小计比。
+    # 也兼容明细列印未税价的模板（明细和 − 折扣 = 折后小计）。
+    if discount and discount > 0:
+        after_discount = line_sum - discount
+        if abs(after_discount - sub) <= tol:
+            return None
+        if total is not None and abs(after_discount - total) <= max(tol, total * _RECON_REL):
+            return None
     if line_sum > sub + tol or (symmetric and line_sum < sub - tol):
         return line_sum
     return None
@@ -173,7 +189,7 @@ def _core_reasons(invoice) -> List[str]:
     # 行只会漏读不会多出钱)。抓「重影把 8 糊成 3」这类同一位错同时进小计与总额的自洽性
     # 误读——双读/勾稽全绿,但票面明细行和把真数供出来了。只单向判(行和小于小计=漏行,
     # 合法,不误杀);相对 2% + 绝对 0.5 双容差吸掉四舍五入。
-    line_sum = line_sum_mismatch(sub, lines)
+    line_sum = line_sum_mismatch(sub, lines, discount=discount, total=total)
     if line_sum is not None:
         reasons.append(f"明细行和 {line_sum:.2f} > 小计 {sub} — 结构不可能(疑小计/总额读错一位)")
 

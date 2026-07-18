@@ -73,8 +73,8 @@
 
     // 一次按键 → POST /decisions 的 body(契约 §2)。金额票:A 采纳 / E 改数 / X 剔除;
     // 方向票:P 进项 / S 销项 / X 非税(assign_kind)。recalc 缺合法 VAT 时返回 null——调用方
-    // 不发请求,就地提示「请填有效 VAT」。fullValues(J-C · J-A 建议值三字段改数态)传入才走
-    // net/vat/grand_total 三字段路径,省略走现状单字段路径,不破坏既有调用方/测试。VAT 必填
+    // 不发请求,就地提示格式错误。fullValues 传入时统一提交票号、日期及三项金额；省略时
+    // 保留旧调用方的 VAT-only 兼容路径。VAT 必填
     // (reconcile_gates.py 的权威校验底线);net/grand_total 留空则不带这两个键,后端按票面
     // 等式自行兜底(reconcile_gates.py L64-66:net 缺省从 vat 反推,grand 缺省 = net+vat)。
     function buildDecisionPayload(itemId, action, vatRaw, fullValues) {
@@ -92,6 +92,22 @@
                 if (net) values.net = net;
                 var grand = parseVat(fullValues.grand);
                 if (grand) values.grand_total = grand;
+                if (fullValues.invoice_number != null) {
+                    values.invoice_number = String(fullValues.invoice_number).trim();
+                }
+                if (fullValues.invoice_date != null) {
+                    var invoiceDate = String(fullValues.invoice_date).trim();
+                    if (invoiceDate) {
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) return null;
+                        var parsedDate = new Date(invoiceDate + 'T00:00:00Z');
+                        if (
+                            Number.isNaN(parsedDate.getTime()) ||
+                            parsedDate.toISOString().slice(0, 10) !== invoiceDate
+                        )
+                            return null;
+                    }
+                    values.invoice_date = invoiceDate;
+                }
                 return { item_id: itemId, decision: 'recalc', values: values };
             }
             var vat = parseVat(vatRaw);
@@ -141,10 +157,8 @@
         );
     }
 
-    // 改数(E)态的编辑起始值(J-C):有 J-A 建议(amount_read_suggested)→ 三字段建议表单
-    // 初值(命中的人工改值优先于建议,例如改判场景);无建议 → 现状单字段初值(回落 OCR
-    // 读数)。纯函数,ai-review.js::startEdit 只需把结果塞进 S.editSuggestion/S.editValue/
-    // S.editSuggestValues,不在编排层重复这段判断。
+    // 改数(E)态统一生成五字段初值。金额有确定性建议时优先建议，改判时优先上次人工值；
+    // 票号和日期回落 OCR 原值。纯函数,编排层不重复判断。
     function editStartValues(alerts, entry, priorDecision) {
         var suggestion = suggestionForItem(alerts, entry.item_id);
         var priorVat =
@@ -152,22 +166,27 @@
             priorDecision.decision === 'recalc' &&
             priorDecision.values &&
             priorDecision.values.vat;
-        if (!suggestion) {
-            return {
-                suggestion: null,
-                editValue: priorVat || (entry.ocr_read || {}).vat || '',
-                suggestValues: null,
-            };
-        }
+        var read = entry.ocr_read || {};
         var priorValues =
             (priorDecision && priorDecision.decision === 'recalc' && priorDecision.values) || {};
+        var suggested = suggestion
+            ? suggestion.suggestion
+            : { net: read.subtotal, vat: read.vat, grand: read.total_amount };
         return {
             suggestion: suggestion,
             editValue: null,
             suggestValues: {
-                net: priorValues.net || suggestion.suggestion.net,
-                vat: priorVat || suggestion.suggestion.vat,
-                grand: priorValues.grand_total || suggestion.suggestion.grand,
+                net: priorValues.net || suggested.net || '',
+                vat: priorVat || suggested.vat || '',
+                grand: priorValues.grand_total || suggested.grand || '',
+                invoice_number:
+                    priorValues.invoice_number != null
+                        ? priorValues.invoice_number
+                        : read.invoice_number || '',
+                invoice_date:
+                    priorValues.invoice_date != null
+                        ? priorValues.invoice_date
+                        : read.invoice_date || '',
             },
         };
     }

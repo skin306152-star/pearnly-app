@@ -13,7 +13,7 @@ import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from services.workorder import decisions, evidence, kinds, storage
+from services.workorder import corrections, decisions, evidence, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import conservation, financials_report, pnd_prep, pp30_form
 
@@ -236,14 +236,15 @@ def _write_ledger(
         (it for it in items if it["kind"] == kinds.PURCHASE_INVOICE),
         key=lambda it: it.get("file_ref") or "",
     )
-
     def _row(it: dict) -> str:
         money = (classified.get(it["id"]) or {}).get("payload", {}).get("money") or {}
-        decision = (decision_recs.get(it["id"]) or {}).get("payload", {}).get("decision") or "-"
+        decision_payload = (decision_recs.get(it["id"]) or {}).get("payload", {})
+        effective = corrections.apply_to_money(money, decision_payload)
+        decision = decision_payload.get("decision") or "-"
         return (
-            f"| {Path(it.get('file_ref') or '').name} | {money.get('invoice_number') or '-'} "
-            f"| {money.get('seller_tax') or '-'} | {_dec_str(money.get('subtotal'))} "
-            f"| {_dec_str(money.get('vat'))} | {it['status']} | {decision} |"
+            f"| {Path(it.get('file_ref') or '').name} | {effective.get('invoice_number') or '-'} "
+            f"| {effective.get('seller_tax') or '-'} | {_dec_str(decision_payload.get('values', {}).get('net', effective.get('subtotal')))} "
+            f"| {_dec_str(decision_payload.get('values', {}).get('vat', effective.get('vat')))} | {it['status']} | {decision} |"
         )
 
     header = [

@@ -46,5 +46,29 @@ class LocationForModelTests(unittest.TestCase):
             self.assertEqual(vertex._location_for_model(None), "asia-southeast1")
 
 
+class StructuredVisionConfigTests(unittest.TestCase):
+    def test_gemini_35_uses_minimal_thinking(self):
+        config = vertex._config(
+            0,
+            8192,
+            True,
+            structured_vision_model="gemini-3.5-flash",
+        )
+        self.assertEqual(config.thinking_config.thinking_level.value, "MINIMAL")
+
+    def test_gemini_25_disables_thinking_budget(self):
+        config = vertex._config(
+            0,
+            8192,
+            True,
+            structured_vision_model="gemini-2.5-flash",
+        )
+        self.assertEqual(config.thinking_config.thinking_budget, 0)
+
+    def test_text_json_config_does_not_override_thinking(self):
+        config = vertex._config(0, 8192, True)
+        self.assertIsNone(config.thinking_config)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

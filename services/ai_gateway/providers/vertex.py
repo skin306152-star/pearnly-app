@@ -107,12 +107,18 @@ def _error_kind(exc: Exception) -> str:
     return "provider"
 
 
-def _config(temperature, max_tokens, response_mime):
+def _config(temperature, max_tokens, response_mime, *, structured_vision_model=""):
     from google.genai import types
 
     kw = {"temperature": temperature, "max_output_tokens": max_tokens}
     if response_mime:
         kw["response_mime_type"] = "application/json"
+    if structured_vision_model:
+        if structured_vision_model.lower().startswith("gemini-2.5"):
+            thinking = types.ThinkingConfig(thinking_budget=0)
+        else:
+            thinking = types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)
+        kw["thinking_config"] = thinking
     return types.GenerateContentConfig(**kw)
 
 
@@ -143,6 +149,7 @@ def _gen_json(contents, *, model_name, config, max_retries):
 
     client = _client(_location_for_model(model_name))
     last_raw = ""
+    last_it = last_ot = 0
     for attempt in range(max_retries + 1):
         try:
             resp = client.models.generate_content(
@@ -152,6 +159,7 @@ def _gen_json(contents, *, model_name, config, max_retries):
             return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
         raw = _safe_text(resp)
         it, ot = _usage(resp)
+        last_it, last_ot = it, ot
         if raw:
             last_raw = raw
             try:
@@ -167,7 +175,14 @@ def _gen_json(contents, *, model_name, config, max_retries):
         if attempt < max_retries:
             continue
     # 解析失败带回原文(Agent 可把散文当回复救援)· raw 绝不进日志(_observe 只记 error_kind/token)
-    return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)
+    return ProviderOutcome(
+        ok=False,
+        error_kind="parse",
+        model=model_name,
+        input_tokens=last_it,
+        output_tokens=last_ot,
+        raw=last_raw,
+    )
 
 
 def text_to_json(
@@ -291,7 +306,12 @@ def multimodal_to_json(
     return _gen_json(
         contents,
         model_name=model_name,
-        config=_config(temperature, max_tokens, response_mime),
+        config=_config(
+            temperature,
+            max_tokens,
+            response_mime,
+            structured_vision_model=model_name,
+        ),
         max_retries=max_retries,
     )
 

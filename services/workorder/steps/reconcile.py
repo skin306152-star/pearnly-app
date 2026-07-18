@@ -20,7 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from core import feature_flags
-from services.workorder import decisions, kinds, storage
+from services.workorder import corrections, decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import reconcile_bank
 from services.workorder.steps import reconcile_gates as gates
@@ -74,7 +74,10 @@ def run(ctx: StepContext) -> StepResult:
     if not banks:
         r3["note"] = "bank_statement_missing"
     else:
-        recon = reconcile_bank.run_bank_recon(ctx, banks, events)
+        try:
+            recon = reconcile_bank.run_bank_recon(ctx, banks, events)
+        except reconcile_bank.BankStatementParseError as exc:
+            return StepResult.stuck([str(exc)])
         if recon is not None:
             r3["recon"] = recon
 
@@ -425,7 +428,10 @@ def _default_shadow_push_report(ctx: StepContext) -> tuple:
             dec = decisions_by_item.get(it["id"]) or {}
             if dec.get("decision") in decisions.NON_COUNTING:
                 continue  # 剔除/豁免——未采信,不进期望票号清单
-        inv = str((classified.get(it["id"]) or {}).get("invoice_number") or "").strip()
+        effective = corrections.apply_to_money(
+            classified.get(it["id"]), decisions_by_item.get(it["id"])
+        )
+        inv = str(effective.get("invoice_number") or "").strip()
         if inv and inv not in seen:
             seen.add(inv)
             expected.append(inv)

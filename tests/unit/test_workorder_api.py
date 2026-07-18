@@ -721,6 +721,47 @@ class RecordDecisionTests(_ApiTestBase):
         )
         self.assertEqual(self.store.appended[-1]["step"], "reconcile")
 
+    def test_recalc_accepts_invoice_number_and_date_corrections(self):
+        api.record_decision(
+            None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            item_id="it-1",
+            decision="recalc",
+            values={
+                "vat": "4,069.05",
+                "invoice_number": " IN26-00675 ",
+                "invoice_date": "2026-04-21",
+            },
+            actor="user:9",
+        )
+        self.assertEqual(
+            self.store.appended[-1]["payload"]["values"],
+            {
+                "vat": "4069.05",
+                "invoice_number": "IN26-00675",
+                "invoice_date": "2026-04-21",
+            },
+        )
+
+    def test_recalc_rejects_unknown_or_invalid_fields(self):
+        for values in (
+            {"vat": "35.00", "admin": True},
+            {"vat": "35.00", "invoice_date": "21/04/2026"},
+            {"invoice_number": "INV-1"},
+        ):
+            with self.subTest(values=values):
+                with self.assertRaises(api.WorkOrderApiError):
+                    api.record_decision(
+                        None,
+                        tenant_id="t-1",
+                        work_order_id="wo-1",
+                        item_id="it-1",
+                        decision="recalc",
+                        values=values,
+                        actor="user:9",
+                    )
+
     def test_assign_kind_direction_decision_appends_event(self):
         evt = api.record_decision(
             None,

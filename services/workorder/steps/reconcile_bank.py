@@ -35,6 +35,15 @@ _EVT_BANK_PARSED = "item_bank_parsed"
 _BANK_OCR_TASK = "workorder_bank_parse"
 
 
+class BankStatementParseError(RuntimeError):
+    """银行件未形成可核对流水行。失败件不落检查点，续跑时必须重新解析。"""
+
+    def __init__(self, filename: str, reason: str):
+        self.filename = filename
+        self.reason = reason
+        super().__init__(f"{filename}: bank_statement_parse_failed ({reason})")
+
+
 def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> Optional[dict]:
     """闸开时的 R3 逐笔对平:银行流水行(逐件检查点解析)+ 工单事件流候选票 → 缺票/未达两张
     清单。闸关返 None(调用方据此不挂 recon 键)。对平结果作为纯 dict 随 reconcile 的
@@ -45,6 +54,9 @@ def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> O
 
     try:
         rows = _checkpointed_rows(ctx, banks)
+    except BankStatementParseError:
+        raise
+    try:
         # 自报总数窄读(SA3R-b · 只在 SA-3 建议闸开时补,没人消费就不烧那次读):对账单页 1 表头
         # 印的 N 页/รวมฝาก+รวมถอน 笔数没进存储层,补一次锚页目标读落 bank_statement_totals 事件,
         # coverage_check 据此判缺整页。fail-open 于 stmt_totals 内部,绝不阻断 R3/package。
@@ -73,7 +85,16 @@ def _checkpointed_rows(ctx: StepContext, banks: list[dict]) -> list:
         if iid in parsed:
             rows.extend(parsed[iid])
             continue
-        fresh = _parse_bank_file(ctx, it)
+        try:
+            fresh = _parse_bank_file(ctx, it)
+        except BankStatementParseError:
+            raise
+        except Exception as exc:
+            name = it.get("original_name") or Path(it.get("file_ref") or "").name or iid
+            raise BankStatementParseError(name, type(exc).__name__) from exc
+        if not fresh:
+            name = it.get("original_name") or Path(it.get("file_ref") or "").name or iid
+            raise BankStatementParseError(name, "no_transaction_rows")
         with checkpoint.item_scope(ctx):
             _emit_bank_parsed(ctx, it, fresh)
         rows.extend(fresh)
@@ -166,7 +187,8 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
     """默认单件银行流水解析:读 file_ref 字节 → 生产 bank_recon 解析器 → StatementRow 列表。
 
     单测注入替身(reconcile_bank._parse_bank_file = fake),本函数不在测试里跑 → 不触真解析/
-    付费。无 file_ref / 解析失败 → 空列表(佐证层不因单件坏料中断,该件如实解出零行)。
+    付费。无 file_ref、解析失败或零流水行都抛 BankStatementParseError；调用方停在 reconcile，
+    且不写 item_bank_parsed，修复材料后续跑会重新解析该件。
 
     成本归因:解析深处走统一 OCR 管线,不设归因则落 ai_usage 的 task=ocr.layer2·tenant 空。
     在真正发起解析的本函数体内设归因(contextvars 线程本地——_checkpointed_rows 串行逐件调,
@@ -174,8 +196,9 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
     只改成本记给谁的标签,解析行为/返回数据一字不动。
     """
     file_ref = item.get("file_ref")
+    name = item.get("original_name") or Path(file_ref or "").name or str(item.get("id") or "?")
     if not file_ref:
-        return []
+        raise BankStatementParseError(name, "file_missing")
     from services.recon.bank_recon_v2 import _parse_bank_statement_impl
 
     token = attribution.set_attribution(
@@ -184,7 +207,13 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
     try:
         data = storage.read_bytes(file_ref)  # 落盘密文解回明文再解析(双轨读)
         parsed = _parse_bank_statement_impl(data, Path(file_ref).name, tenant_id=ctx.tenant_id)
-        return list(parsed.get("rows") or []) if parsed.get("ok") else []
+        if not parsed.get("ok"):
+            reason = parsed.get("error_code") or parsed.get("error") or "parser_rejected"
+            raise BankStatementParseError(name, str(reason)[:120])
+        rows = list(parsed.get("rows") or [])
+        if not rows:
+            raise BankStatementParseError(name, "no_transaction_rows")
+        return rows
     finally:
         attribution.reset_attribution(token)
 

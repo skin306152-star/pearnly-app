@@ -161,6 +161,18 @@ class LineSumExceedsSubtotalTests(unittest.TestCase):
         )
         self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
 
+    def test_discounted_vat_inclusive_line_sum_matches_grand_total(self):
+        # SM 真票 IMG_2643:明细列合计 12,810 是折前含税价；减折扣 3,162 后等于
+        # 含税合计 9,648，折后未税小计 9,016.82 + VAT 631.18 也自洽，不应误报。
+        inv = _inv(
+            subtotal="9016.82",
+            vat="631.18",
+            total_amount="9648.00",
+            discount="3162.00",
+            items=self._items("5210.00", "3800.00", "3800.00"),
+        )
+        self.assertEqual(evaluate_sanity(inv), [])
+
     def test_partial_items_not_flagged(self):
         # 只读到部分明细(行和 < 小计)= 合法漏行,不误杀
         inv = _inv(subtotal="1896.68", total_amount="1896.68", items=self._items("396.68"))

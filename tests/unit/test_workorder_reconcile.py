@@ -313,6 +313,18 @@ class R1RecalcBaseConsistencyTests(unittest.TestCase):
         stale = Decimal(self.CLEAN_NET) + Decimal(self.OCR_NET)  # 用旧净的历史错值
         self.assertEqual(self.OFFICIAL_PURCHASE - stale, self.GAP)
 
+    def test_recalc_identifier_correction_becomes_effective_label(self):
+        store = self._store()
+        store.events[-3]["payload"]["money"]["invoice_number"] = "IN26-00575"
+        store.events[-2]["payload"]["values"].update(
+            {"invoice_number": "IN26-00675", "invoice_date": "2026-04-21"}
+        )
+        classified = reconcile._replay_money(store.events)
+        decisions_by_item = reconcile._replay(store.events, "human_decision")
+        result = reconcile.gates.resolve_input_vat(store.items, classified, decisions_by_item)
+        self.assertTrue(any("IN26-00675" in entry["label"] for entry in result["entries"]))
+        self.assertFalse(any("IN26-00575" in entry["label"] for entry in result["entries"]))
+
 
 class R2SalesTests(unittest.TestCase):
     def test_aggregates_sales_and_skips_summary_row(self):

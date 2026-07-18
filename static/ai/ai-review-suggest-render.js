@@ -2,10 +2,8 @@
  * Pearnly AI · ai-review-suggest-render.js · J-A 确定性读数解歧建议(改数三字段预填)HTML
  *
  * amount_math_fail 票若 order_detail.alerts 挂着 amount_read_suggested(J-13 · 后端确定性
- * 纯代码反解出的唯一自洽建议),改数(E)态从单字段(仅 VAT)升级成三字段(净额/VAT/含税),
- * 预填建议值 + 琥珀标注"AI 按票面等式推算,请核对原图"(非静默,人工仍需核对原图再提交,
- * 建议永不自动落库)。无建议票的 E 态维持现状,走 ai-review-render.js 内联的单字段表单,
- * 不进本模块。拆出独立文件同 ai-review-pool.js 先例(单文件<500 铁律)。
+ * 纯代码反解出的唯一自洽建议),改数(E)态预填建议值并用琥珀提示。没有建议时也显示票号、
+ * 日期、净额、VAT、含税合计，让人按原件修正 OCR 原值；建议永不自动落库。
  */
 (function (root) {
     'use strict';
@@ -14,36 +12,69 @@
         return AI.state.esc(s);
     }
 
-    function fieldHtml(id, labelKey, value) {
+    function fieldHtml(id, labelKey, value, original, opts) {
+        opts = opts || {};
         return (
-            '<div class="rv-suggest-field">' +
+            '<div class="rv-suggest-field' +
+            (opts.wide ? ' wide' : '') +
+            '">' +
             '<label class="rv-edit-lb" for="' +
             id +
             '">' +
             esc(at(labelKey)) +
             '</label>' +
-            '<input class="rv-vat-input num" id="' +
+            '<input class="rv-vat-input' +
+            (opts.numeric ? ' num' : '') +
+            '" id="' +
             id +
-            '" inputmode="decimal" value="' +
+            '" type="' +
+            (opts.type || 'text') +
+            '"' +
+            (opts.numeric ? ' inputmode="decimal"' : '') +
+            ' value="' +
             esc(value == null ? '' : value) +
-            '">' +
+            '"><div class="rv-edit-original">' +
+            esc(at('rv_original_value', { value: original || '—' })) +
+            '</div>' +
             '</div>'
         );
     }
 
-    // ctx: {editSuggestValues: {net, vat, grand}, editErr}(ai-review.js::startEdit 赋值,
-    // 三字段均已预填建议值 · 至少是空串,不用再兜底)。
+    // ctx: {editSuggestValues, editErr}(ai-review.js::startEdit 赋值,字段至少是空串)。
     function editFormHtml(ctx) {
         var v = ctx.editSuggestValues || {};
+        var original = (ctx.entry && ctx.entry.ocr_read) || {};
         return (
             '<div class="rv-edit rv-edit-suggest" id="rvEdit">' +
-            '<div class="rv-suggest-note">' +
-            esc(at('rv_suggest_note')) +
+            '<div class="' +
+            (ctx.editSuggestion ? 'rv-suggest-note' : 'rv-edit-note') +
+            '">' +
+            esc(at(ctx.editSuggestion ? 'rv_suggest_note' : 'rv_edit_values_note')) +
             '</div>' +
             '<div class="rv-suggest-fields">' +
-            fieldHtml('rvNetInput', 'rv_field_net', v.net) +
-            fieldHtml('rvVatInput', 'rv_field_vat_face', v.vat) +
-            fieldHtml('rvGrandInput', 'rv_field_total', v.grand) +
+            fieldHtml(
+                'rvInvoiceNoInput',
+                'rv_field_invno',
+                v.invoice_number,
+                original.invoice_number,
+                { wide: true }
+            ) +
+            fieldHtml(
+                'rvInvoiceDateInput',
+                'rv_field_date',
+                v.invoice_date,
+                original.invoice_date,
+                { type: 'date' }
+            ) +
+            fieldHtml('rvNetInput', 'rv_field_net', v.net, original.subtotal, {
+                numeric: true,
+            }) +
+            fieldHtml('rvVatInput', 'rv_field_vat_face', v.vat, original.vat, {
+                numeric: true,
+            }) +
+            fieldHtml('rvGrandInput', 'rv_field_total', v.grand, original.total_amount, {
+                numeric: true,
+            }) +
             '</div>' +
             '<div class="rv-edit-hint">' +
             esc(at('rv_edit_hint')) +

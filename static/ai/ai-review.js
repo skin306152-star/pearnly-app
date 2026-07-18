@@ -2,8 +2,8 @@
  * Pearnly AI · ai-review.js · 人审队列(W3 · 产品心脏)编排:键盘流 + 乐观 UI + 续跑轮询
  *
  * 契约:桌面\pearnly ai\施工\W3-交互契约.md。单张聚焦(同 v4 rv1/rv2 切换,不做滚动列表)——
- * A 采纳票面 / E 改数(仅 VAT)/ X 剔除,乐观标终态 + 失败回滚(§2);裁决完只引导重新跑,
- * 不在前端重估 R1(§4,别重造算钱逻辑);四态 + 空队列好事态(§6)。
+ * A 采纳票面 / E 改票号、日期与金额 / X 剔除,乐观标终态 + 失败回滚(§2);
+ * 最后一张落库后自动轮询后台续跑状态，不在前端重估 R1(§4);四态 + 空队列好事态(§6)。
  *
  * 依赖 window.AI.state/format/api/viewer/reviewQueue/reviewRender/poll 与全局 at(),故必须
  * 排在它们之后加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。轮询收编进共享的
@@ -45,13 +45,14 @@
             editErr: false,
             editValue: null,
             editSuggestion: null, // J-A 建议值消费(J-C):当前编辑票命中的 amount_read_suggested 投影(无则 null)
-            editSuggestValues: null, // 建议三字段编辑值 {net, vat, grand}(仅 editSuggestion 非空时用)
+            editSuggestValues: null, // 五字段编辑值 {invoice_number, invoice_date, net, vat, grand}
             sessionDecided: 0,
             sessionCorrected: 0,
             mode: 'card', // 'card' | 'done'
             rerunState: 'idle',
             blockedInfo: null,
             rerunProgress: null, // classify 步逐件进度快照 {step,processed,total} · R2F-R3 #5
+            autoRunGraceUntil: 0, // 最后一笔裁决响应早于 BackgroundTasks 起跑时,容忍短暂旧 stuck 投影
             // R4 税号错录守护卡:alerts=order_detail.alerts;wsClientId=账套主体 id(改税号目标);
             // canManage=settings.workspace.manage 探针结果(按钮显隐);realignBusy/Err=一键改状态。
             alerts: [],
@@ -127,20 +128,36 @@
     function renderDone() {
         S.mode = 'done';
         var container = body();
-        if (!S.queue.length && !S.sessionDecided && !S.decidedEntries.length) {
+        if (!S.queue.length && !S.decidedEntries.length) {
             container.innerHTML = AI.reviewRender.emptyOkHtml();
             injectChrome(container);
             return;
         }
+        var stats = decisionStats();
         container.innerHTML = AI.reviewRender.clearedHtml(
-            S.sessionDecided,
-            S.sessionCorrected,
+            stats.decided,
+            stats.corrected,
             S.rerunState,
             S.blockedInfo,
             S.rerunProgress
         );
         injectChrome(container);
         injectDecidedGroup(container);
+    }
+
+    function decisionStats() {
+        var seen = {};
+        var stats = { decided: 0, corrected: 0 };
+        S.queue.concat(S.decidedEntries).forEach(function (entry) {
+            if (!entry || seen[entry.item_id]) return;
+            seen[entry.item_id] = true;
+            var local = S.local[entry.item_id];
+            var decision = (local && local.decision) || entry.decision;
+            if (!decision || !decision.decision) return;
+            stats.decided += 1;
+            if (decision.decision === 'recalc') stats.corrected += 1;
+        });
+        return stats;
     }
 
     // ============ 原图(生产同款查看器,AI.viewer 接手拖拽/缩放/旋转/全屏)============
@@ -198,18 +215,16 @@
     function decide(action) {
         var entry = S.queue[S.idx];
         if (!entry) return;
-        // J-A 三字段建议值改数态(J-C):S.editSuggestion 命中时读 rvNetInput/rvGrandInput
-        // 一并提交;否则维持现状单字段(只读 rvVatInput)。
-        var vatRaw =
-            action === 'recalc' && !S.editSuggestion
-                ? $('rvVatInput') && $('rvVatInput').value
-                : null;
+        // 改数态统一提交票号、日期与三项金额；没有确定性建议时也必须让人能修 OCR 原值。
+        var vatRaw = action === 'recalc' ? $('rvVatInput') && $('rvVatInput').value : null;
         var fullValues =
-            action === 'recalc' && S.editSuggestion
+            action === 'recalc' && S.editSuggestValues
                 ? {
                       net: $('rvNetInput') && $('rvNetInput').value,
                       vat: $('rvVatInput') && $('rvVatInput').value,
                       grand: $('rvGrandInput') && $('rvGrandInput').value,
+                      invoice_number: $('rvInvoiceNoInput') && $('rvInvoiceNoInput').value,
+                      invoice_date: $('rvInvoiceDateInput') && $('rvInvoiceDateInput').value,
                   }
                 : null;
         var payload = AI.reviewQueue.buildDecisionPayload(
@@ -226,6 +241,7 @@
         var session = S; // 快照当前会话——回调落地时若已切走(S 已指向新会话)一律不认。
         var submittedIdx = S.idx;
         var submittedItemId = entry.item_id;
+        var finishing = AI.reviewQueue.undecidedCount(S.queue, S.local) === 1;
         lastItemByOrder[S.orderId] = submittedItemId;
         setLocal(submittedItemId, { state: 'pending' });
         S.editing = false;
@@ -235,7 +251,9 @@
         S.editSuggestValues = null;
         S.sessionDecided += 1;
         if (action === 'recalc') S.sessionCorrected += 1;
-        advanceFocus();
+        if (finishing) S.rerunState = 'waiting';
+        if (finishing) renderDone();
+        else advanceFocus();
 
         S.api
             .decide(S.orderId, payload)
@@ -251,7 +269,8 @@
                         at: new Date().toISOString(),
                     },
                 });
-                if (S.mode === 'card') renderCurrent();
+                if (finishing) beginAutoRunPolling(session);
+                else if (S.mode === 'card') renderCurrent();
                 if (action === 'exclude') {
                     AI.reviewRender.showToast(
                         AI.reviewQueue.fileName(entry.file_ref) + ' · ' + at('rv_chip_excluded'),
@@ -274,6 +293,8 @@
                 setLocal(submittedItemId, { state: 'failed', errKey: hit ? errKey : null });
                 S.idx = submittedIdx;
                 S.mode = 'card';
+                S.rerunState = 'idle';
+                S.autoRunGraceUntil = 0;
                 renderCurrent();
                 AI.reviewRender.showToast(
                     hit ? at(errKey) : at('rv_decision_failed', { n: submittedIdx + 1 }),
@@ -320,8 +341,7 @@
         S.editErr = false;
         var entry = S.queue[S.idx];
         var decided = (S.local[entry.item_id] && S.local[entry.item_id].decision) || entry.decision;
-        // J-A 建议值消费(J-C):AI.reviewQueue.editStartValues 决定单字段/三字段两种起始态
-        // (纯函数,判断逻辑不在编排层重复)。
+        // AI.reviewQueue.editStartValues 统一生成票号、日期和三项金额的编辑起始值。
         var vals = AI.reviewQueue.editStartValues(S.alerts, entry, decided);
         S.editSuggestion = vals.suggestion;
         S.editValue = vals.editValue;
@@ -403,7 +423,7 @@
                 archiveBulkDecisions();
             }
             if (S.mode === 'card' && S.queue.length) renderCurrent();
-            else renderDone();
+            else beginAutoRunPolling(session);
         });
     }
 
@@ -429,11 +449,21 @@
 
     // ============ 重新跑 + 轮询(契约 §4) ============
 
+    function beginAutoRunPolling(session) {
+        S.rerunState = 'waiting';
+        S.blockedInfo = null;
+        S.rerunProgress = null;
+        S.autoRunGraceUntil = Date.now() + 5000;
+        renderDone();
+        runPollFor(session);
+    }
+
     function startRerun() {
         var session = S; // 快照——重跑是长链路(网络 + 轮询),切走后续段一律不认。
         S.rerunState = 'waiting';
         S.blockedInfo = null;
         S.rerunProgress = null;
+        S.autoRunGraceUntil = Date.now() + 5000;
         renderDone();
         S.api
             .runOrder(S.orderId)
@@ -453,6 +483,7 @@
                     return;
                 }
                 S.rerunState = 'idle';
+                S.autoRunGraceUntil = 0;
                 S.blockedInfo = { reasons: [at(errKey)], hasQueue: false };
                 renderDone();
             });
@@ -495,17 +526,25 @@
 
     // 一次轮询拿到的 detail → 是否终态(true=停轮询,调用方已在这里做完全部导航/呈现副作用)。
     function routeAfter(detail, session) {
-        var freshQueue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
-        var hasNumbers = Object.keys(detail.numbers || {}).length > 0;
-        if (detail.status !== 'stuck' || !freshQueue.length || hasNumbers) {
+        var status = detail.status || '';
+        if (status === 'collecting' || status === 'running') return false;
+        if (status === 'review' || status === 'archive') {
             window.location.hash = AI.router.buildClientHash(session.clientId, 'pkg');
             return true;
         }
+        if (status !== 'stuck') return false;
+
+        var fresh = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
+        var split = AI.reviewQueue.splitByDecision(fresh);
+        if (!split.undecided.length && Date.now() < S.autoRunGraceUntil) return false;
+
         var reasons = [].concat(detail.blocked_reasons || [], detail.needs || []);
-        if (reasons.length) {
-            S.queue = freshQueue;
+        if (reasons.length || split.undecided.length) {
+            S.queue = split.undecided;
+            S.decidedEntries = split.decided;
             S.rerunState = 'idle';
-            S.blockedInfo = { reasons: reasons, hasQueue: freshQueue.length > 0 };
+            S.autoRunGraceUntil = 0;
+            S.blockedInfo = { reasons: reasons, hasQueue: split.undecided.length > 0 };
             renderDone();
             return true;
         }
@@ -716,7 +755,10 @@
                 S.mode = 'card';
                 S.alerts = detail.alerts || [];
                 if (detail.workspace_client_id) S.wsClientId = detail.workspace_client_id;
+                var polling = detail.status === 'collecting' || detail.status === 'running';
+                if (polling && !S.queue.length) S.rerunState = 'waiting';
                 renderCurrent();
+                if (polling && !S.queue.length) runPollFor(S);
                 // 有守护卡才探 settings.workspace.manage(按钮显隐 · 探到再重渲染,不阻塞首屏)。
                 if (S.alerts.length) probeCanManage(S);
             })

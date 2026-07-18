@@ -55,6 +55,35 @@ _IMAGE_INPUT_NOTE = (
     "and fill the exact same JSON schema. Same rules apply."
 )
 
+_BANK_STATEMENT_IMAGE_PROMPT = """Read this IMAGE page from a Thai bank statement and return one compact JSON object only. Extract EVERY visible transaction row in printed order; never summarize, sample, merge, or omit rows.
+
+Schema:
+{
+  "document_type": "bank_statement",
+  "bank_name": "",
+  "bank_code": "kbank|bbl|scb|ktb|kkp|bay|ttb|",
+  "account_name": "",
+  "account_number": "",
+  "account_last4": "",
+  "period_start": "YYYY-MM-DD or empty",
+  "period_end": "YYYY-MM-DD or empty",
+  "opening_balance": "number string or empty",
+  "closing_balance": "number string or empty",
+  "entries": [{
+    "transaction_date": "YYYY-MM-DD or empty",
+    "transaction_date_raw": "exact printed date",
+    "description": "printed description",
+    "reference": "reference code or empty",
+    "deposit": "number string or empty",
+    "withdrawal": "number string or empty",
+    "amount": "deposit if positive otherwise withdrawal",
+    "direction": "deposit|withdrawal|empty",
+    "balance": "running balance or empty"
+  }]
+}
+
+Amount fields may only come from printed Deposit, Withdrawal, or Balance columns. Never treat reference, account, or description digits as money. Set direction from the populated deposit or withdrawal column. Convert Buddhist years by subtracting 543 and preserve the printed date. Remove commas and currency symbols. Do not output provenance objects or raw row maps. Skip headers, balance-forward rows, and totals as entries."""
+
 
 class DirectReadFallback(Exception):
     """直读不可信/失败 → 调用方整件回落 Vision 路。"""
@@ -98,18 +127,28 @@ def _call_model(
 ):
     from services.ai_gateway import backends
 
-    sys_prompt = (
-        _SYSTEM_PROMPT if document_type in ("auto", "invoice") else _DOC_PROMPTS[document_type]
-    )
+    if document_type == "bank_statement":
+        sys_prompt = _BANK_STATEMENT_IMAGE_PROMPT
+    else:
+        base_prompt = (
+            _SYSTEM_PROMPT
+            if document_type in ("auto", "invoice")
+            else _DOC_PROMPTS[document_type]
+        )
+        sys_prompt = base_prompt + _IMAGE_INPUT_NOTE
     # 与 L2 同口径兜 env:aistudio provider 只认显式 key(vertex 走 SA 忽略此参)
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    request_options = {}
+    if document_type == "bank_statement":
+        request_options["max_tokens"] = 16384
     return backends.get_provider().multimodal_to_json(
-        sys_prompt + _IMAGE_INPUT_NOTE,
+        sys_prompt,
         [(image_bytes, _sniff_mime(image_bytes))],
         tier=tier,
         api_key=key,
         timeout_s=_TIMEOUT_S,
         max_retries=_MAX_RETRIES,
+        **request_options,
     )
 
 

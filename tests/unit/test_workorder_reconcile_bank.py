@@ -204,14 +204,26 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
         self.assertEqual(parsed[0]["payload"]["item_id"], "b1")
         self.assertEqual(len(parsed[0]["payload"]["rows"]), 2)
 
-    def test_parser_failure_is_isolated_not_fatal(self):
+    def test_parser_failure_stops_without_success_checkpoint(self):
         def _boom(ctx, item):
             raise RuntimeError("parse blew up")
 
         reconcile_bank._parse_bank_file = _boom
-        out = reconcile.run(_ctx(_store()))
-        self.assertEqual(out.status, "ok")
-        self.assertEqual(out.payload["gates"]["r3_bank"]["recon"]["note"], "bank_recon_skipped")
+        store = _store()
+        out = reconcile.run(_ctx(store))
+        self.assertEqual(out.status, "stuck")
+        self.assertIn("bank_statement_parse_failed", out.reasons[0])
+        self.assertFalse(any(e["event_type"] == "item_bank_parsed" for e in store.events))
+
+    def test_empty_parser_result_stops_and_remains_retryable(self):
+        reconcile_bank._parse_bank_file = lambda ctx, item: []
+        store = _store()
+
+        out = reconcile.run(_ctx(store))
+
+        self.assertEqual(out.status, "stuck")
+        self.assertIn("no_transaction_rows", out.reasons[0])
+        self.assertFalse(any(e["event_type"] == "item_bank_parsed" for e in store.events))
 
     def test_bank_recon_human_decision_events_are_tax_invisible(self):
         # MC1-b3 验收断言:银行对账 review 人审裁决(human_decision · statement_tx_id 载荷,
@@ -297,7 +309,14 @@ class BankParseCostAttributionTests(unittest.TestCase):
             # 在管线落点被调用的当刻抓归因态(等价 transport._observe 读到的 current())。
             seen["attr"] = attribution.current()
             seen["tenant_kwarg"] = tenant_id
-            return {"ok": True, "rows": []}
+            return {
+                "ok": True,
+                "rows": [
+                    StatementRow(
+                        datetime.date(2026, 5, 1), "transfer", 100.0, 0.0, 900.0
+                    )
+                ],
+            }
 
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
             tf.write(b"\xff\xd8\xff")  # 任意字节,解析被桩替换不真读图
@@ -335,12 +354,29 @@ class BankParseCostAttributionTests(unittest.TestCase):
         # finally 里 reset:异常路径也不把归因泄漏给下一件/下一步。
         self.assertIsNone(attribution.current())
 
-    def test_no_file_ref_sets_no_attribution(self):
-        # 无 file_ref 早返回,不进解析、不设归因(不无谓污染上下文)。
+    def test_no_file_ref_fails_without_setting_attribution(self):
+        # 无 file_ref 直接失败,不进解析、不设归因(不无谓污染上下文)。
         ctx = StepContext(cur=None, tenant_id="t-1", work_order_id="wo-1", store=None, data={})
-        rows = reconcile_bank._default_parse_bank_file(ctx, {"id": "b9", "file_ref": None})
-        self.assertEqual(rows, [])
+        with self.assertRaises(reconcile_bank.BankStatementParseError):
+            reconcile_bank._default_parse_bank_file(ctx, {"id": "b9", "file_ref": None})
         self.assertIsNone(attribution.current())
+
+    def test_parser_rejected_result_is_not_a_success(self):
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
+            tf.write(b"\xff\xd8\xff")
+            path = tf.name
+        self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
+        item = {"id": "b9", "file_ref": path, "original_name": "bank.jpg"}
+        ctx = StepContext(cur=None, tenant_id="t-1", work_order_id="wo-1", store=None, data={})
+
+        with mock.patch(
+            "services.recon.bank_recon_v2._parse_bank_statement_impl",
+            return_value={"ok": False, "rows": [], "error_code": "ocr_failed"},
+        ):
+            with self.assertRaisesRegex(
+                reconcile_bank.BankStatementParseError, "ocr_failed"
+            ):
+                reconcile_bank._default_parse_bank_file(ctx, item)
 
 
 if __name__ == "__main__":

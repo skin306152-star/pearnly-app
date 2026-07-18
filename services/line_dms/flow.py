@@ -23,7 +23,7 @@ from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
-from services.line_dms import _out, booking_flow, cards, draft, edit_flow, store
+from services.line_dms import _out, booking_flow, cards, draft, edit_flow, menu_flow, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
@@ -72,11 +72,19 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
         await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
         return
 
+    # 菜单层(波2):เมนู/问候语弹菜单;menu 态下单字 1/2 = 点对应菜单项(先于手机号判定)。
+    if await menu_flow.handle_text(binding, line_user_id, reply_token, sess, text):
+        return
+
     # 号码透传:ERP 是权威,它吃什么送什么,不在 Pearnly 写死格式(Zihao 拍板)。
     # 含数字即视为号码(纯路由判据,区分号码与闲聊);格式对错由 DMS 保存时裁决。
     if any(ch.isdigit() for ch in text):
         payload = await _merge_session(
-            binding, line_user_id, {"phone": text}, keep=("id_card", "endpoint_id"), sess=sess
+            binding,
+            line_user_id,
+            {"phone": text},
+            keep=("id_card", "endpoint_id", "mode"),
+            sess=sess,
         )
         if payload.get("id_card"):
             _spawn(
@@ -93,7 +101,11 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
             _reply(reply_token, cards.TXT_ASK_CARD)
         return
 
-    _reply(reply_token, _nudge(sess))
+    nudge = _nudge(sess)
+    if nudge is None:  # 无会话 → 菜单卡引路(取代旧 TXT_INTRO 文本)
+        line_client.reply_messages(reply_token, [cards.menu_card()], channel=_CHANNEL)
+    else:
+        _reply(reply_token, nudge)
 
 
 async def handle_postback(
@@ -117,6 +129,11 @@ async def handle_postback(
     sess = await _thr(store.get_session, tenant, line_user_id)
     payload = (sess or {}).get("payload") or {}
 
+    # 菜单层(波2):选菜单项 / 建档后继续订车 / 重拍。无 nonce 消费,须在下方写档守卫之前。
+    if action in menu_flow.MENU_ACTIONS:
+        await menu_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
+        return
+
     # 逐字段修正(DL-6):开菜单/选字段/取消。nonce 只校验不消费,写档仍由下方 consume_nonce 守卫。
     if action in edit_flow.EDIT_ACTIONS:
         await edit_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
@@ -124,13 +141,15 @@ async def handle_postback(
 
     if action == cards.ACT_KEEP:
         _reply(reply_token, cards.TXT_KEEP)
-        d = payload.get("draft") or {}
-        await booking_flow.offer_pick(
+        # 保留旧数据 = 零写入;customer 模式下问是否继续订车,booking/缺省照旧串联。
+        await menu_flow.after_customer_saved(
             binding,
             line_user_id,
             endpoint_id=str(payload.get("endpoint_id") or ""),
             customer_id=str(payload.get("customer_id") or ""),
-            draft=d,
+            draft=payload.get("draft") or {},
+            mode=str(payload.get("mode") or ""),
+            same_data=True,
         )
         return
 
@@ -190,7 +209,7 @@ async def process_image(binding: dict, line_user_id: str, message_id: str) -> No
         binding,
         line_user_id,
         {"id_card": id_card, "endpoint_id": str(ep.get("id") or "")},
-        keep=("phone",),
+        keep=("phone", "mode"),
     )
     if payload.get("phone"):
         await _run_dedup(
@@ -211,6 +230,10 @@ async def _run_dedup(
 ) -> None:
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
+    # 菜单层(波2)的 mode 决定写档后是否自动串联订车;缺省=老直拍行为不变。会话是权威源
+    # (采集路径都先写会话再进这里),避免多签名穿参。
+    _sess = await _thr(store.get_session, tenant, line_user_id)
+    mode = str(((_sess or {}).get("payload") or {}).get("mode") or "")
     if ep is None:
         ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
     if not ep:
@@ -238,12 +261,14 @@ async def _run_dedup(
 
     if scenario == "exact" and not field_diffs:
         _push(line_user_id, cards.TXT_SAME)  # 零写入
-        await booking_flow.offer_pick(
+        await menu_flow.after_customer_saved(
             binding,
             line_user_id,
             endpoint_id=str(ep.get("id") or ""),
             customer_id=str((res.get("match") or {}).get("customer_id") or ""),
             draft=draft_vals,
+            mode=mode,
+            same_data=True,
         )
         return
 
@@ -257,6 +282,7 @@ async def _run_dedup(
         # 逐字段修正(DL-6)按此重跑查重:留原始 id_card/phone 作重放源,改值后回灌此路。
         "id_card": id_card,
         "phone": phone,
+        "mode": mode,  # 写档后分叉(菜单层波2)靠它;编辑重跑经会话回读得以保留。
     }
 
     if scenario == "none":
@@ -386,13 +412,14 @@ async def _execute(
 
     if success:
         _push(line_user_id, cards.receipt_text(result.get("customer_id") or "", name, mode))
-        await booking_flow.offer_pick(
+        await menu_flow.after_customer_saved(
             binding,
             line_user_id,
             endpoint_id=str(payload.get("endpoint_id") or ""),
             customer_id=str(result.get("customer_id") or ""),
             draft=payload.get("draft") or {},
             name=name,
+            mode=str(payload.get("mode") or ""),
         )
     elif result.get("error_code") == "ERR_DMS_ADMIN_AUTH":
         _push(line_user_id, cards.TXT_ADMIN_AUTH_FAIL)  # 不谎称已自动通知
@@ -417,9 +444,9 @@ async def _merge_session(
     return payload
 
 
-def _nudge(sess: Optional[dict]) -> str:
+def _nudge(sess: Optional[dict]) -> Optional[str]:
     if not sess:
-        return cards.TXT_INTRO
+        return None  # 无会话 → 调用方弹 menu_card 引路(取代旧 TXT_INTRO 文本)
     if sess.get("state") == "reviewing":
         return cards.TXT_PICK_ABOVE
     payload = sess.get("payload") or {}

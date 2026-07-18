@@ -562,11 +562,12 @@ class PhonePassthroughTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(merge.call_args.args[2], {"phone": "12345678"})
 
     async def test_non_digit_text_still_nudges(self):
+        # 非问候/非 เมนู 的闲聊(菜单层波2 会把问候语弹菜单,故此处用中性词测缺料提示)。
         binding = {"tenant_id": "t1", "user_id": "u1"}
         sess = {"state": "collecting", "payload": {"id_card": {"people_id": "x"}}}
         with (
             mock.patch.object(flow.store, "get_session", return_value=sess),
             mock.patch.object(flow, "_reply") as rep,
         ):
-            await flow.handle_text(binding, "L1", "rt", "สวัสดี")
+            await flow.handle_text(binding, "L1", "rt", "ราคาเท่าไร")
         rep.assert_called_once_with("rt", cards.TXT_ASK_PHONE)

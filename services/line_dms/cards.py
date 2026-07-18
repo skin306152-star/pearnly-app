@@ -25,10 +25,21 @@ TXT_KEEP = "ใช้ข้อมูลเดิมต่อ"
 TXT_ADMIN_NEEDED = "ต้องตั้งค่าบัญชีแอดมินใน Pearnly ก่อนจึงจะอัปเดตได้"
 TXT_ADMIN_AUTH_FAIL = "อัปเดตไม่สำเร็จ กรุณาแจ้งผู้ดูแลตรวจสอบรหัสแอดมินใน Pearnly"
 TXT_NO_ENDPOINT = "ยังไม่ได้ตั้งค่าการเชื่อมต่อ DMS กรุณาติดต่อผู้ดูแล"
-TXT_NO_CREDIT = "เครดิตไม่พอ กรุณาติดต่อผู้ดูแลเพื่อเติมเครดิต"
+# 402 指路:销售员治不了余额,把动作交给公司管理员并给自助入口,不留死胡同。
+TXT_NO_CREDIT = "เครดิตไม่เพียงพอ กรุณาติดต่อผู้ดูแลระบบของบริษัทเพื่อเติมเงินหรือสมัครแพ็กเกจที่ pearnly.com/dms"
 TXT_SYSTEM_ERROR = "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง"
 TXT_LOOKUP_FAIL = "ตรวจสอบข้อมูลลูกค้าไม่สำเร็จ กรุณาลองใหม่"
 TXT_SAVE_FAIL = "บันทึกไม่สำเร็จ กรุณาลองใหม่"
+
+# 菜单层(波2):เมนู/问候语弹菜单 → 选建档或订车。文案照 ChatGPT mockup。
+TXT_MENU_TITLE = "ยินดีต้อนรับเข้าสู่ระบบ Pearnly DMS"
+TXT_MENU_SUBTITLE = "กรุณาเลือกเมนูด้านล่างเพื่อเริ่มต้นใช้งาน"
+TXT_MENU_SEND_CARD = "กรุณาส่งรูปบัตรประชาชนของลูกค้า"
+# 建档落定后问是否继续订车:真写档(saved)与零写入(same)分开话术,状态诚实。
+TXT_CONTINUE_SAVED = "บันทึกข้อมูลลูกค้าเรียบร้อยแล้ว ต้องการทำใบจองต่อเลยหรือไม่"
+TXT_CONTINUE_SAME = "ข้อมูลตรงกัน ต้องการทำใบจองต่อหรือไม่"
+TXT_CONTINUE_HINT = "พิมพ์ เมนู เพื่อทำรายการอื่น"
+TXT_RETAKE = "กรุณาถ่ายรูปบัตรประชาชนใหม่อีกครั้ง"
 
 BTN_SAVE_NEW = "บันทึกลูกค้าใหม่"
 BTN_RESTART = "เริ่มใหม่"
@@ -37,6 +48,12 @@ BTN_KEEP = "ใช้ข้อมูลเดิม"
 BTN_NEW_CUSTOMER = "ลูกค้าใหม่"
 BTN_EDIT = "แก้ไข"
 BTN_EDIT_CANCEL = "ยกเลิก"
+
+# 菜单层(波2)按钮:数字前缀让「打 1/2」与「点按钮」是同一心智模型。
+BTN_MENU_CUSTOMER = "1️⃣ จัดทำข้อมูลลูกค้า"
+BTN_MENU_BOOKING = "2️⃣ จัดทำใบจอง"
+BTN_CONTINUE_BOOKING = "ทำใบจองต่อ"
+BTN_RETAKE = "📷 ถ่ายบัตรใหม่"
 
 # 逐字段修正(DL-6):可改字段与地道泰文标签(顺序 = quick reply 呈现顺序)。
 # 地理四级 id(จังหวัด/อำเภอ/ตำบล/รหัสไปรษณีย์)不进此表——改地址文本后由既有级联匹配重解。
@@ -69,6 +86,11 @@ ACT_PICK = "pick"
 ACT_EDIT = "edit"
 ACT_EDIT_FIELD = "edit_field"
 ACT_EDIT_CANCEL = "edit_cancel"
+# 菜单层(波2):选菜单项 / 建档后继续订车 / 重拍身份证(重拍带 nonce 只验不消费)。
+ACT_MENU_CUSTOMER = "menu_customer"
+ACT_MENU_BOOKING = "menu_booking"
+ACT_CONTINUE_BOOKING = "continue_booking"
+ACT_RETAKE = "retake"
 # 订车阶段(DL-4a):选车面板落定后的预览确认(booking_flow 侧 dispatch)。
 ACT_CONFIRM_BOOKING = "confirm_booking"
 ACT_CANCEL_BOOKING = "cancel_booking"
@@ -194,6 +216,7 @@ def new_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
     footer = [
         _btn(BTN_SAVE_NEW, _data(ACT_CREATE, nonce=nonce), "primary"),
         _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),
+        _btn(BTN_RETAKE, _data(ACT_RETAKE, nonce=nonce), "secondary"),
         _btn(BTN_RESTART, _data(ACT_RESET), "secondary"),
     ]
     return _bubble("ลูกค้าใหม่ ยืนยันข้อมูลเพื่อบันทึก", rows, footer, "ยืนยันบันทึกลูกค้าใหม่")
@@ -243,6 +266,7 @@ def diff_card(display_diffs: List[Dict[str, str]], has_admin: bool, nonce: str) 
             }
         )
     footer.append(_btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"))
+    footer.append(_btn(BTN_RETAKE, _data(ACT_RETAKE, nonce=nonce), "secondary"))
     footer.append(_btn(BTN_KEEP, _data(ACT_KEEP), "secondary"))
     return _bubble("พบข้อมูลเดิม มีบางส่วนไม่ตรงกัน", rows, footer, "พบข้อมูลลูกค้าที่ต่างกัน")
 
@@ -267,6 +291,61 @@ def receipt_text(customer_id: str, name: str, mode: str) -> str:
     """写档成功回执:客户码 + 姓名 + 做了什么(诚实告知实际动作)。"""
     action = "สร้างลูกค้าใหม่" if mode == "create" else "อัปเดตข้อมูลลูกค้า"
     return f"บันทึกสำเร็จ · {action}\nรหัสลูกค้า: {customer_id or '—'}\nชื่อ: {name or '—'}"
+
+
+# ── 菜单层(波2) ──────────────────────────────────────────────────────────
+def menu_card() -> Dict[str, Any]:
+    """入口菜单:两个无状态 postback(无 nonce)· 点旧卡安全,只重置到对应模式。"""
+    subtitle = {
+        "type": "text",
+        "text": TXT_MENU_SUBTITLE,
+        "size": "sm",
+        "color": "#8a8a8a",
+        "wrap": True,
+    }
+    footer = [
+        _btn(BTN_MENU_CUSTOMER, _data(ACT_MENU_CUSTOMER), "primary"),
+        _btn(BTN_MENU_BOOKING, _data(ACT_MENU_BOOKING), "primary"),
+    ]
+    return _bubble(TXT_MENU_TITLE, [subtitle], footer, TXT_MENU_TITLE)
+
+
+def continue_booking_card(customer_id: str, same_data: bool = False) -> Dict[str, Any]:
+    """建档落定(customer 模式)后问是否继续订车:cid 绑进 postback,继续时校验防串档。"""
+    intro = TXT_CONTINUE_SAME if same_data else TXT_CONTINUE_SAVED
+    return {
+        "type": "flex",
+        "altText": BTN_CONTINUE_BOOKING,
+        "contents": {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {"type": "text", "text": intro, "size": "sm", "wrap": True},
+                    {
+                        "type": "text",
+                        "text": TXT_CONTINUE_HINT,
+                        "size": "xs",
+                        "color": "#8a8a8a",
+                        "wrap": True,
+                    },
+                ],
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    _btn(
+                        BTN_CONTINUE_BOOKING,
+                        _data(ACT_CONTINUE_BOOKING, cid=str(customer_id or "")),
+                        "primary",
+                    )
+                ],
+            },
+        },
+    }
 
 
 # ── 订车阶段(DL-4a) ────────────────────────────────────────────────────

@@ -105,6 +105,7 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reply.call_args.args[1], w._MSG_UNBOUND)
 
     async def test_follow_welcomes_when_gate_open(self):
+        """A6:未绑用户 follow → 绑定码指引 _MSG_WELCOME(守门,行为不变)。"""
         ev = {"type": "follow", "source": {"userId": "L1"}, "replyToken": "rt"}
         with (
             mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
@@ -113,6 +114,22 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
         ):
             await w._handle_dms_event(ev)
         self.assertEqual(reply.call_args.args[1], w._MSG_WELCOME)
+
+    async def test_bound_follow_shows_menu_card(self):
+        """A6:已绑用户 follow → 菜单卡(波2),不再是绑定码指引文本。"""
+        ev = {"type": "follow", "source": {"userId": "L1"}, "replyToken": "rt"}
+        binding = {"tenant_id": "T", "user_id": "u1"}
+        with (
+            mock.patch.object(w.store, "get_binding_by_line_user", return_value=binding),
+            mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.line_client, "reply_text") as reply,
+            mock.patch.object(w.line_client, "reply_messages") as reply_msgs,
+        ):
+            await w._handle_dms_event(ev)
+        reply.assert_not_called()
+        card = reply_msgs.call_args.args[1][0]
+        self.assertEqual(card["type"], "flex")
+        self.assertEqual(card["altText"], w.cards.TXT_MENU_TITLE)
 
     async def test_unfollow_unbinds_silently(self):
         ev = {"type": "unfollow", "source": {"userId": "L1"}}

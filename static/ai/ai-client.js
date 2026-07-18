@@ -58,7 +58,7 @@
         var btn = $('periodValue');
         var menu = $('periodMenu');
         if (!S.orders.length) {
-            btn.textContent = at('period_empty');
+            btn.textContent = S.deepLinkPeriod || AI.board.currentPeriodBE();
             menu.innerHTML = '';
             menu.classList.remove('on');
             return;
@@ -102,20 +102,39 @@
     // 唯一入口,但那要求先回工作台再找到这个客户)——就地给一个"开当期工单"按钮,
     // 复用现成 createOrder(),period 取 AI.board.currentPeriodBE()(同矩阵/看板的
     // "当期"权威口径,不自造第二套)。
-    function woEmptyHtml() {
+    function orderOpenEmptyHtml(title, sub, selectId, action, buttonLabel) {
         var defaultPeriod = S.deepLinkPeriod || AI.board.currentPeriodBE();
         var optsHtml = AI.state.optionsHtml(AI.board.periodOptions(), defaultPeriod, function (p) {
             return p;
         });
         return (
-            AI.state.emptyHtml({ title: at('wo_empty_t'), sub: at('wo_empty_s') }) +
-            '<div class="kopen"><select class="period-sel" id="woEmptyPeriodSel" aria-label="' +
+            '<section class="order-open-empty">' +
+            AI.state.emptyHtml({ title: title, sub: sub }) +
+            '<div class="order-open-form"><label class="order-open-field" for="' +
+            selectId +
+            '"><span>' +
+            esc(at('card_period_select_label')) +
+            '</span><select class="period-sel" id="' +
+            selectId +
+            '" aria-label="' +
             esc(at('card_period_select_label')) +
             '">' +
             optsHtml +
-            '</select><button type="button" class="btn pri" data-action="wo-open-first">' +
-            esc(at('wo_open_first_btn')) +
-            '</button></div>'
+            '</select></label><button type="button" class="btn pri" data-action="' +
+            action +
+            '">' +
+            esc(buttonLabel) +
+            '</button></div></section>'
+        );
+    }
+
+    function woEmptyHtml() {
+        return orderOpenEmptyHtml(
+            at('wo_empty_t'),
+            at('wo_empty_s'),
+            'woEmptyPeriodSel',
+            'wo-open-first',
+            at('wo_open_first_btn')
         );
     }
 
@@ -163,19 +182,12 @@
     // 控件却默认冒出 2569-07,点错一次就多开一张不该开的工单。default 落最新已知深链
     // 期,没有才回落当月(既有行为不变)。
     function intakeEmptyHtml() {
-        var defaultPeriod = S.deepLinkPeriod || AI.board.currentPeriodBE();
-        var optsHtml = AI.state.optionsHtml(AI.board.periodOptions(), defaultPeriod, function (p) {
-            return p;
-        });
-        return (
-            AI.state.emptyHtml({ title: at('intake_empty_t'), sub: at('intake_empty_s') }) +
-            '<div class="kopen"><select class="period-sel" id="ikEmptyPeriodSel" aria-label="' +
-            esc(at('card_period_select_label')) +
-            '">' +
-            optsHtml +
-            '</select><button type="button" class="btn pri" data-action="intake-open-order">' +
-            esc(at('card_open_order')) +
-            '</button></div>'
+        return orderOpenEmptyHtml(
+            at('intake_empty_t'),
+            at('intake_empty_s'),
+            'ikEmptyPeriodSel',
+            'intake-open-order',
+            at('card_open_order')
         );
     }
 

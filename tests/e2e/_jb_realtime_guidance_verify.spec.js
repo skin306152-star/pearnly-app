@@ -302,6 +302,25 @@ test.describe('J-B #4 · 深链账期 → 开单控件默认', () => {
         await page.goto(`${PAGE}#/client/c1/intake?period=2569-05`);
         await page.waitForSelector('#ikEmptyPeriodSel', { timeout: 15000 });
         await expect(page.locator('#ikEmptyPeriodSel')).toHaveValue('2569-05');
+        const openCard = page.locator('#cv-intake .order-open-empty');
+        const openForm = openCard.locator('.order-open-form');
+        await expect(openCard).toBeVisible();
+        await expect(openCard.locator('label[for="ikEmptyPeriodSel"]')).toContainText(
+            'Filing period'
+        );
+        const [cardBox, formBox, selectBox, buttonBox] = await Promise.all([
+            openCard.boundingBox(),
+            openForm.boundingBox(),
+            openForm.locator('#ikEmptyPeriodSel').boundingBox(),
+            openForm.locator('[data-action="intake-open-order"]').boundingBox(),
+        ]);
+        expect(
+            Math.abs(formBox.x + formBox.width / 2 - (cardBox.x + cardBox.width / 2))
+        ).toBeLessThan(2);
+        expect(
+            Math.abs(selectBox.y + selectBox.height - (buttonBox.y + buttonBox.height))
+        ).toBeLessThan(2);
+        await expect(page.locator('#periodValue')).toHaveText('2569-05');
         await page.screenshot({ path: path.join(ART, '07-deeplink-period-default.png') });
     });
 
@@ -314,6 +333,28 @@ test.describe('J-B #4 · 深链账期 → 开单控件默认', () => {
         await page.waitForSelector('#woEmptyPeriodSel', { timeout: 15000 });
         await expect(page.locator('#woEmptyPeriodSel')).toHaveValue('2569-05');
         await page.screenshot({ path: path.join(ART, '07b-wo-deeplink-period-default.png') });
+    });
+});
+
+test.describe('Open-order empty state · mobile layout', () => {
+    test('390px stacks the period field and primary action at full width', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await mockRoutes(page, {
+            'GET /api/workspace/clients/c1': jsonRoute({ client: { id: 'c1', name: 'Acme Co' } }),
+            'GET /api/workorder/orders': jsonRoute({ orders: [] }),
+        });
+        await page.goto(`${PAGE}#/client/c1/intake?period=2569-05`);
+        const openForm = page.locator('#cv-intake .order-open-form');
+        await expect(openForm).toBeVisible({ timeout: 15000 });
+        const [formBox, selectBox, buttonBox] = await Promise.all([
+            openForm.boundingBox(),
+            openForm.locator('#ikEmptyPeriodSel').boundingBox(),
+            openForm.locator('[data-action="intake-open-order"]').boundingBox(),
+        ]);
+        expect(buttonBox.y).toBeGreaterThan(selectBox.y + selectBox.height);
+        expect(Math.abs(selectBox.width - formBox.width)).toBeLessThan(2);
+        expect(Math.abs(buttonBox.width - formBox.width)).toBeLessThan(2);
+        await page.screenshot({ path: path.join(ART, '07c-open-order-mobile.png') });
     });
 });
 

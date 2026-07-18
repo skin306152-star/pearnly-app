@@ -16,6 +16,7 @@ REFACTOR-B1 守门测试 · 静态页面 + 公开 meta 路由从 app.py 抽到 p
 """
 
 import unittest
+from pathlib import Path
 
 from routes.pages_routes import router
 
@@ -100,6 +101,19 @@ class PagesRoutesContractTests(unittest.TestCase):
         dms = "static/dist/dms.html"
         self.assertEqual(asyncio.run(pages_routes.dms_page()).path, dms)
         self.assertEqual(asyncio.run(pages_routes.dms_layout_page("records")).path, dms)
+
+    def test_ai_uses_shared_brand_favicons(self):
+        expected = (
+            "/static/brand/favicon.ico?v=1",
+            "/static/brand/favicon-32.png?v=1",
+            "/static/brand/apple-touch-icon-180.png?v=1",
+        )
+        for path in (Path("static/ai/ai.html"), Path("static/dist/ai.html")):
+            html = path.read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                for asset in expected:
+                    self.assertIn(asset, html)
+                self.assertNotIn("/static/favicon.svg", html)
 
     def test_v1_aliases_delegate_to_base(self):
         """v1_health / v1_contact 委托给本模块 health / contact · 单一来源"""

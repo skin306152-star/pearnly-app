@@ -169,8 +169,9 @@ class MenuTriggerTests(unittest.IsolatedAsyncioTestCase):
                 "T1", "L1", "collecting", {"id_card": dict(_RAW_ID), "phone": _PHONE}
             )
             await flow.handle_text(_BINDING, _LUID, "rt", "สวัสดีครับ")
-            card = env.reply_msgs.call_args.args[1][0]
-            self.assertEqual(card["altText"], cards.TXT_MENU_TITLE)
+            msgs = env.reply_msgs.call_args.args[1]
+            self.assertEqual(msgs[0]["text"], cards.TXT_MENU_GREETING)  # 问候气泡先行
+            self.assertEqual(msgs[1]["altText"], cards.TXT_MENU_TITLE)
             sess = env.session()
             self.assertEqual(sess["state"], "menu")
             self.assertIn("id_card", sess["payload"])

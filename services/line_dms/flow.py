@@ -23,7 +23,16 @@ from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from services.line_binding import line_client
-from services.line_dms import _out, booking_flow, cards, draft, edit_flow, menu_flow, store
+from services.line_dms import (
+    _out,
+    booking_flow,
+    cards,
+    draft,
+    edit_flow,
+    menu_cards,
+    menu_flow,
+    store,
+)
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
@@ -103,7 +112,7 @@ async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: 
 
     nudge = _nudge(sess)
     if nudge is None:  # 无会话 → 菜单卡引路(取代旧 TXT_INTRO 文本)
-        line_client.reply_messages(reply_token, [cards.menu_card()], channel=_CHANNEL)
+        line_client.reply_messages(reply_token, [menu_cards.menu_card()], channel=_CHANNEL)
     else:
         _reply(reply_token, nudge)
 

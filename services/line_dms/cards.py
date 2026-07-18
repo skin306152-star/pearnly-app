@@ -49,9 +49,15 @@ BTN_NEW_CUSTOMER = "ลูกค้าใหม่"
 BTN_EDIT = "แก้ไข"
 BTN_EDIT_CANCEL = "ยกเลิก"
 
-# 菜单层(波2)按钮:数字前缀让「打 1/2」与「点按钮」是同一心智模型。
-BTN_MENU_CUSTOMER = "1️⃣ จัดทำข้อมูลลูกค้า"
-BTN_MENU_BOOKING = "2️⃣ จัดทำใบจอง"
+# 菜单层(波2)文案:行卡布局照泰方认可的 mockup(编号+图标+标题+说明+箭头)。
+TXT_MENU_GREETING = "สวัสดีค่ะ 🙏\n" + TXT_MENU_TITLE + "\n" + TXT_MENU_SUBTITLE
+TXT_MENU_PICK = "กรุณาเลือกเมนูที่ต้องการ"
+TXT_MENU_PICK_SUB = "เลือกรายการเพื่อดำเนินการต่อ"
+TXT_MENU_ITEM1 = "จัดทำข้อมูลลูกค้า"
+TXT_MENU_D1 = "จัดทำข้อมูลลูกค้าใหม่จากบัตรประชาชน หรืออัปเดตข้อมูลลูกค้าเดิม"
+TXT_MENU_ITEM2 = "จัดทำใบจอง"
+TXT_MENU_D2 = "สร้างใบจองรถยนต์ เลือกรุ่น สี และบันทึกการจอง"
+TXT_MENU_HINT = "พิมพ์ เมนู เพื่อเรียกเมนูนี้ได้ตลอดเวลา"
 BTN_CONTINUE_BOOKING = "ทำใบจองต่อ"
 BTN_RETAKE = "📷 ถ่ายบัตรใหม่"
 
@@ -291,61 +297,6 @@ def receipt_text(customer_id: str, name: str, mode: str) -> str:
     """写档成功回执:客户码 + 姓名 + 做了什么(诚实告知实际动作)。"""
     action = "สร้างลูกค้าใหม่" if mode == "create" else "อัปเดตข้อมูลลูกค้า"
     return f"บันทึกสำเร็จ · {action}\nรหัสลูกค้า: {customer_id or '—'}\nชื่อ: {name or '—'}"
-
-
-# ── 菜单层(波2) ──────────────────────────────────────────────────────────
-def menu_card() -> Dict[str, Any]:
-    """入口菜单:两个无状态 postback(无 nonce)· 点旧卡安全,只重置到对应模式。"""
-    subtitle = {
-        "type": "text",
-        "text": TXT_MENU_SUBTITLE,
-        "size": "sm",
-        "color": "#8a8a8a",
-        "wrap": True,
-    }
-    footer = [
-        _btn(BTN_MENU_CUSTOMER, _data(ACT_MENU_CUSTOMER), "primary"),
-        _btn(BTN_MENU_BOOKING, _data(ACT_MENU_BOOKING), "primary"),
-    ]
-    return _bubble(TXT_MENU_TITLE, [subtitle], footer, TXT_MENU_TITLE)
-
-
-def continue_booking_card(customer_id: str, same_data: bool = False) -> Dict[str, Any]:
-    """建档落定(customer 模式)后问是否继续订车:cid 绑进 postback,继续时校验防串档。"""
-    intro = TXT_CONTINUE_SAME if same_data else TXT_CONTINUE_SAVED
-    return {
-        "type": "flex",
-        "altText": BTN_CONTINUE_BOOKING,
-        "contents": {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "sm",
-                "contents": [
-                    {"type": "text", "text": intro, "size": "sm", "wrap": True},
-                    {
-                        "type": "text",
-                        "text": TXT_CONTINUE_HINT,
-                        "size": "xs",
-                        "color": "#8a8a8a",
-                        "wrap": True,
-                    },
-                ],
-            },
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    _btn(
-                        BTN_CONTINUE_BOOKING,
-                        _data(ACT_CONTINUE_BOOKING, cid=str(customer_id or "")),
-                        "primary",
-                    )
-                ],
-            },
-        },
-    }
 
 
 # ── 订车阶段(DL-4a) ────────────────────────────────────────────────────

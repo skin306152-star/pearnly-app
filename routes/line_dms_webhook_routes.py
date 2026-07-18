@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from core.feature_flags import dms_line_enabled_for
 from services.line_binding import line_client, line_webhook_dedup
-from services.line_dms import cards, flow, store
+from services.line_dms import cards, flow, menu_cards, store
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,11 @@ async def _handle_dms_event(ev: dict) -> None:
     if ev_type == "follow":
         # 已绑用户加好友 = 回访,直接给功能菜单(波2);未绑仍给绑定码指引。
         if binding:
-            line_client.reply_messages(reply_token, [cards.menu_card()], channel=_CHANNEL)
+            line_client.reply_messages(
+                reply_token,
+                [{"type": "text", "text": cards.TXT_MENU_GREETING}, menu_cards.menu_card()],
+                channel=_CHANNEL,
+            )
         else:
             _reply(reply_token, _MSG_WELCOME)
         return

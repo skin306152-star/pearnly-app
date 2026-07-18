@@ -127,9 +127,10 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
         ):
             await w._handle_dms_event(ev)
         reply.assert_not_called()
-        card = reply_msgs.call_args.args[1][0]
-        self.assertEqual(card["type"], "flex")
-        self.assertEqual(card["altText"], w.cards.TXT_MENU_TITLE)
+        msgs = reply_msgs.call_args.args[1]
+        self.assertEqual(msgs[0]["text"], w.cards.TXT_MENU_GREETING)  # 问候气泡先行
+        self.assertEqual(msgs[1]["type"], "flex")
+        self.assertEqual(msgs[1]["altText"], w.cards.TXT_MENU_TITLE)
 
     async def test_unfollow_unbinds_silently(self):
         ev = {"type": "unfollow", "source": {"userId": "L1"}}

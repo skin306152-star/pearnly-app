@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.line_binding import line_client
-from services.line_dms import booking_flow, cards, store
+from services.line_dms import booking_flow, cards, menu_cards, store
 from services.line_dms._out import _CHANNEL, _reply, _thr
 
 MENU_ACTIONS = frozenset(
@@ -48,7 +48,11 @@ async def handle_text(
     stripped = text.strip()
     if stripped == _MENU_WORD or stripped.startswith(_GREETING_PREFIX):
         await _enter_menu(binding, line_user_id, sess)
-        line_client.reply_messages(reply_token, [cards.menu_card()], channel=_CHANNEL)
+        # 问候语带欢迎气泡(照 mockup 的进场节奏);เมนู 是回访召唤,只发卡不寒暄。
+        msgs: list = [menu_cards.menu_card()]
+        if stripped != _MENU_WORD:
+            msgs.insert(0, {"type": "text", "text": cards.TXT_MENU_GREETING})
+        line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
         return True
     if (sess or {}).get("state") == "menu" and stripped in _MENU_CHOICES:
         await _choose(binding, line_user_id, reply_token, sess, _MENU_CHOICES[stripped])
@@ -183,5 +187,5 @@ async def after_customer_saved(
     }
     await _thr(store.set_session, tenant, line_user_id, "menu_after_save", payload)
     line_client.push_messages(
-        line_user_id, [cards.continue_booking_card(customer_id, same_data)], channel=_CHANNEL
+        line_user_id, [menu_cards.continue_booking_card(customer_id, same_data)], channel=_CHANNEL
     )

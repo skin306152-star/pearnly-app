@@ -132,10 +132,6 @@
         );
     }
 
-    // 动作按钮定义表:A/E/X(金额票)与 P/S/X(方向票)两组共用同一套拼接逻辑
-    // (actionButton/renderActionButtons/kbdLine),不再各写一份重复 HTML 拼接。命名避开
-    // cardHtml 里已有的局部变量 actionsHtml(动作行拼好的 HTML 字符串),不与之同名撞混。
-    // 收件箱(ai-review-inbox-render.js)经导出面复用同两张表,data-action 前缀参数化。
     var _AMOUNT_ACTION_DEFS = [
         { action: 'rv-accept', key: 'rv_key_accept', kbd: 'A', cls: 'ok' },
         { action: 'rv-edit', key: 'rv_key_edit', kbd: 'E', cls: '' },
@@ -181,12 +177,10 @@
         );
     }
 
-    // 金额票动作行(A 采纳 / E 改数 / X 剔除)。
     function amountActions() {
         return renderActionButtons(_AMOUNT_ACTION_DEFS);
     }
 
-    // 方向票动作行(P 进项 / S 销项 / X 非税)。
     function directionActions() {
         return renderActionButtons(_DIRECTION_ACTION_DEFS);
     }
@@ -247,7 +241,6 @@
         );
     }
 
-    // ctx: {entry, idx, total, local, editing, editErr, editValue, pool}
     function cardHtml(ctx) {
         var entry = ctx.entry;
         var read = entry.ocr_read || {};
@@ -329,18 +322,24 @@
         );
     }
 
-    // rerunState: 'idle'|'waiting';rerunProgress: {step,processed,total} | null(R2F-R3 #5:
-    // 等待态有真进度就报「识别中/读对账单 X/N」,轮询超时诚实说"仍在后台跑"而不是让
-    // blockedInfo 空 reasons 的沉默态冒充"卡住需要你判断")。
     function clearedHtml(n, m, rerunState, blockedInfo, rerunProgress) {
         var waitingLabel = rerunProgress
             ? AI.format.progressLabel(rerunProgress)
             : at('rv_rerun_waiting');
         var systemBlocked = blockedInfo && blockedInfo.system;
+        var materialBlocked = blockedInfo && blockedInfo.needs && blockedInfo.needs.length;
+        var materialList = materialBlocked
+            ? blockedInfo.needs.map(AI.format.fieldLabel).join('、')
+            : '';
         var btn = '';
         if (rerunState === 'waiting') {
             btn = '<button class="btn pri" disabled>' + esc(waitingLabel) + '</button>';
-        } else if (!blockedInfo || systemBlocked) {
+        } else if (materialBlocked) {
+            btn =
+                '<button class="btn pri" data-action="rv-go-intake">' +
+                esc(at('pkg_go_intake_btn')) +
+                '</button>';
+        } else {
             btn =
                 '<button class="btn pri" data-action="rv-rerun">' +
                 esc(at(systemBlocked ? 'retry' : 'rv_rerun')) +
@@ -357,16 +356,18 @@
         } else if (blockedInfo) {
             blocked =
                 '<p class="rv-blocked">' +
-                (systemBlocked
-                    ? esc(
-                          at('system_blocked_detail', {
-                              list: blockedInfo.reasons.join('、'),
-                          })
-                      )
-                    : esc(at('rv_still_blocked')) +
-                      (blockedInfo.reasons.length
-                          ? '：' + esc(blockedInfo.reasons.join('、'))
-                          : '')) +
+                (materialBlocked
+                    ? esc(at('card_needs_list', { list: materialList }))
+                    : systemBlocked
+                      ? esc(
+                            at('system_blocked_detail', {
+                                list: blockedInfo.reasons.join('、'),
+                            })
+                        )
+                      : esc(at('rv_still_blocked')) +
+                        (blockedInfo.reasons.length
+                            ? '：' + esc(blockedInfo.reasons.join('、'))
+                            : '')) +
                 '</p>';
             if (blockedInfo.hasQueue) {
                 blocked +=
@@ -376,16 +377,18 @@
             }
         }
         var chipKey = blockedInfo
-            ? systemBlocked
-                ? 'status_system_failed'
-                : 'status_stuck'
+            ? materialBlocked
+                ? 'chip_needs_materials'
+                : systemBlocked
+                  ? 'status_system_failed'
+                  : 'status_stuck'
             : rerunState === 'waiting'
               ? 'rv_review_complete_running'
               : 'rv_queue_cleared_t';
         return (
             '<div class="panel"><div class="bd rv-done">' +
             '<span class="chip ' +
-            (blockedInfo ? 'b' : 'g') +
+            (materialBlocked ? 'w' : blockedInfo ? 'b' : 'g') +
             '">' +
             esc(at(chipKey)) +
             '</span>' +
@@ -411,9 +414,6 @@
         );
     }
 
-    // ============ toast(挂 document.body,3 秒 undo / 4 秒失败提示) ============
-    // 审核队列(ai-review.js)与收件箱(ai-review-inbox.js)此前各持一份近逐字实现;
-    // 计时器句柄收敛到这里(全局同刻至多一个 #rvToast),编排层只传文案 + 各自的 undo
     // 回调(队列回滚上一张 / 收件箱撤销批量)。
     var UNDO_TOAST_MS = 3000;
     var FAIL_TOAST_MS = 4000;

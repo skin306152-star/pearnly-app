@@ -27,6 +27,7 @@ from services.workorder.steps import checkpoint, stmt_totals
 
 _STEP = "reconcile"
 _EVT_BANK_PARSED = "item_bank_parsed"
+EVT_BANK_PARSE_INVALIDATED = "bank_parse_invalidated"
 
 # R3 银行流水解析走统一 OCR 管线(document_type=bank_statement),管线深处按内部标签
 # (task=ocr.layer2·tenant 空)打点。归因到本 task 让这段成本记到客户账套头上,与主站散单
@@ -78,7 +79,7 @@ def _checkpointed_rows(ctx: StepContext, banks: list[dict]) -> list:
     钱洞同款)。重建保证中断续跑对每件的解析裁决与不中断跑逐字节一致。每件独立事务落
     item_bank_parsed(dedupe_key 锚件,重放不双落)+ 顺带续租(checkpoint.item_scope)。
     """
-    parsed = _replay_parsed_banks(ctx)
+    parsed, generation = _replay_parsed_banks(ctx)
     rows: list = []
     for it in banks:
         iid = it["id"]
@@ -96,31 +97,57 @@ def _checkpointed_rows(ctx: StepContext, banks: list[dict]) -> list:
             name = it.get("original_name") or Path(it.get("file_ref") or "").name or iid
             raise BankStatementParseError(name, "no_transaction_rows")
         with checkpoint.item_scope(ctx):
-            _emit_bank_parsed(ctx, it, fresh)
+            _emit_bank_parsed(ctx, it, fresh, generation)
         rows.extend(fresh)
     return rows
 
 
-def _replay_parsed_banks(ctx: StepContext) -> dict:
+def _replay_parsed_banks(ctx: StepContext) -> tuple[dict, int]:
     """从已提交 item_bank_parsed 事件重建 {item_id: [StatementRow,...]}(首件在先,重放不覆写)。
     解析结果的流水行随事件持久化,续跑从此回放而非重解析——银行件的「断点续跑恢复源」。"""
     events = ctx.store.list_events(
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
     out: dict = {}
-    for e in events:
-        if e.get("event_type") != _EVT_BANK_PARSED:
-            continue
+    for e in active_bank_parse_events(events):
         payload = e.get("payload") or {}
         iid = payload.get("item_id")
         if iid and iid not in out:
             out[iid] = [_deserialize_row(d) for d in (payload.get("rows") or [])]
-    return out
+    return out, bank_parse_generation(events)
 
 
-def _emit_bank_parsed(ctx: StepContext, item: dict, rows: list) -> None:
-    """落一条 item_bank_parsed 检查点事件(dedupe_key 锚 item:并发接管/续跑重放同件只落一条,
-    对平不被重放的流水行撑破)。rows 序列化进 payload,续跑从事件回放不重解析。"""
+def active_bank_generation_events(events: list[dict]) -> list[dict]:
+    """最后一次解析失效标记之后的银行代次事件流。
+
+    检查点是追加证据，解析器修复后不能 DELETE 老结果，也不能继续回放错结果。运维落一条
+    bank_parse_invalidated 即开启新代次：原事件永久留审计链，读侧只消费标记后的解析、
+    大脑建议与行级人裁。没有标记的存量工单保持原行为。
+    """
+    start = 0
+    for index, event in enumerate(events):
+        if event.get("event_type") == EVT_BANK_PARSE_INVALIDATED:
+            start = index + 1
+    return events[start:]
+
+
+def bank_parse_generation(events: list[dict]) -> int:
+    """当前解析代次编号；仅用于检查点幂等键，失效标记每多一条就进入下一代。"""
+    return sum(1 for event in events if event.get("event_type") == EVT_BANK_PARSE_INVALIDATED)
+
+
+def active_bank_parse_events(events: list[dict]) -> list[dict]:
+    """当前银行解析代次内的 item_bank_parsed 事件。"""
+    return [
+        event
+        for event in active_bank_generation_events(events)
+        if event.get("event_type") == _EVT_BANK_PARSED
+    ]
+
+
+def _emit_bank_parsed(ctx: StepContext, item: dict, rows: list, generation: int) -> None:
+    """落一条 item_bank_parsed 检查点事件(dedupe_key 锚代次+item,同代重放只落一条)。
+    rows 序列化进 payload；失效后新代次可重读，正常续跑仍从事件回放。"""
     ctx.store.append_event(
         ctx.cur,
         tenant_id=ctx.tenant_id,
@@ -128,7 +155,7 @@ def _emit_bank_parsed(ctx: StepContext, item: dict, rows: list) -> None:
         step=_STEP,
         event_type=_EVT_BANK_PARSED,
         payload={"item_id": item["id"], "rows": [_serialize_row(r) for r in rows]},
-        dedupe_key=f"bank_parse:{item['id']}",
+        dedupe_key=f"bank_parse:g{generation}:{item['id']}",
     )
 
 

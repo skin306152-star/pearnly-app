@@ -24,7 +24,12 @@ from services.workorder import (
     store,
     wht_signals,
 )
-from services.workorder.steps import bank_sales_suggest, edc_corroboration, sales_aggregate
+from services.workorder.steps import (
+    bank_sales_suggest,
+    edc_corroboration,
+    reconcile_bank,
+    sales_aggregate,
+)
 from services.workspace import tax_profile_store
 
 logger = logging.getLogger(__name__)
@@ -185,7 +190,9 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     # item_bank_parsed 只有 reconcile 步有消费方(progress.bank_progress 其余步首行返 None),
     # 其余步跳过回放——order_detail 是 5s 轮询热路径,别每拉一次白扫一遍事件流。
     bank_parsed = (
-        evidence.replay_items_by_type(events, _EVT_BANK_PARSED)
+        evidence.replay_items_by_type(
+            reconcile_bank.active_bank_parse_events(events), _EVT_BANK_PARSED
+        )
         if wo["current_step"] == "reconcile"
         else {}
     )

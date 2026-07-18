@@ -584,6 +584,48 @@ class AiClientWoRenderPureTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiReviewRenderBlockedTests(unittest.TestCase):
+    def test_missing_material_is_projected_as_a_material_blocker(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(q.blockedInfo({{
+                needs: ['sales_summary'],
+                blocked_reasons: [],
+            }}, false)));
+            """)
+        self.assertEqual(
+            out,
+            {
+                "reasons": ["sales_summary"],
+                "needs": ["sales_summary"],
+                "hasQueue": False,
+                "system": False,
+            },
+        )
+
+    def test_missing_material_routes_back_to_intake(self):
+        out = _run_node(f"""
+            global.window = global;
+            global.at = (k, v) => v && v.list ? k + ':' + v.list : k;
+            global.AI = {{
+                state: {{esc: String}},
+                format: {{progressLabel: () => 'progress', fieldLabel: (key) => key}},
+                reviewQueue: {{}},
+            }};
+            require({json.dumps(str(AI_DIR / "ai-review-render.js"))});
+            const html = global.AI.reviewRender.clearedHtml(
+                67, 0, 'idle',
+                {{needs: ['sales_summary'], reasons: ['sales_summary'], hasQueue: false}},
+                null
+            );
+            process.stdout.write(JSON.stringify({{
+                missing: html.includes('chip_needs_materials'),
+                intake: html.includes('data-action="rv-go-intake"'),
+                rerun: html.includes('data-action="rv-rerun"'),
+                green: html.includes('chip g'),
+            }}));
+            """)
+        self.assertEqual(out, {"missing": True, "intake": True, "rerun": False, "green": False})
+
     def test_system_failure_is_not_rendered_as_green_review_complete(self):
         out = _run_node(f"""
             global.window = global;
@@ -606,6 +648,29 @@ class AiReviewRenderBlockedTests(unittest.TestCase):
             }}));
             """)
         self.assertEqual(out, {"failed": True, "retry": True, "green": False})
+
+    def test_human_queue_blocker_keeps_the_rerun_action(self):
+        out = _run_node(f"""
+            global.window = global;
+            global.at = (k) => k;
+            global.AI = {{
+                state: {{esc: String}},
+                format: {{progressLabel: () => 'progress'}},
+                reviewQueue: {{}},
+            }};
+            require({json.dumps(str(AI_DIR / "ai-review-render.js"))});
+            const html = global.AI.reviewRender.clearedHtml(
+                1, 0, 'idle',
+                {{hasQueue: true, reasons: ['validation_fail']}},
+                null
+            );
+            process.stdout.write(JSON.stringify({{
+                rerun: html.includes('data-action="rv-rerun"'),
+                back: html.includes('data-action="rv-back-to-queue"'),
+                green: html.includes('chip g'),
+            }}));
+            """)
+        self.assertEqual(out, {"rerun": True, "back": True, "green": False})
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

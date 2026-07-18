@@ -339,6 +339,32 @@ class BankProgressTests(_ApiTestBase):
         detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
         self.assertEqual(detail["bank_progress"], {"step": "reconcile", "processed": 1, "total": 3})
 
+    def test_progress_counts_only_current_bank_parse_generation(self):
+        self.store.wo["current_step"] = "reconcile"
+        self.store.items = self._bank_items()
+        self.store.events = [
+            {
+                "id": 1,
+                "step": "reconcile",
+                "event_type": "item_bank_parsed",
+                "payload": {"item_id": "bank-0", "rows": []},
+            },
+            {
+                "id": 2,
+                "step": "reconcile",
+                "event_type": "bank_parse_invalidated",
+                "payload": {"reason": "parser_fix"},
+            },
+            {
+                "id": 3,
+                "step": "reconcile",
+                "event_type": "item_bank_parsed",
+                "payload": {"item_id": "bank-1", "rows": []},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertEqual(detail["bank_progress"], {"step": "reconcile", "processed": 1, "total": 3})
+
     def test_no_bank_progress_outside_reconcile(self):
         self.store.wo["current_step"] = "classify"
         self.store.items = self._bank_items()

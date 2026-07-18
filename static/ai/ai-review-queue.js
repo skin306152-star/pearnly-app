@@ -270,6 +270,19 @@
         };
     }
 
+    function blockedInfo(detail, hasQueue) {
+        detail = detail || {};
+        var needs = Array.isArray(detail.needs) ? detail.needs : [];
+        var reasons = Array.isArray(detail.blocked_reasons) ? detail.blocked_reasons : [];
+        if (!needs.length && !reasons.length && !hasQueue) return null;
+        return {
+            reasons: reasons.concat(needs),
+            needs: needs,
+            hasQueue: !!hasQueue,
+            system: reasons.length > 0 && !needs.length && !hasQueue,
+        };
+    }
+
     var api = {
         PURCHASE_KIND: PURCHASE_KIND,
         isDirectionTicket: isDirectionTicket,
@@ -288,6 +301,7 @@
         editStartValues: editStartValues,
         actionOfDecision: actionOfDecision,
         decidedValue: decidedValue,
+        blockedInfo: blockedInfo,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

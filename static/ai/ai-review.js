@@ -522,20 +522,13 @@
         var split = AI.reviewQueue.splitByDecision(fresh);
         if (!split.undecided.length && Date.now() < S.autoRunGraceUntil) return false;
 
-        var reasons = [].concat(detail.blocked_reasons || [], detail.needs || []);
-        if (reasons.length || split.undecided.length) {
+        var blockedInfo = AI.reviewQueue.blockedInfo(detail, split.undecided.length > 0);
+        if (blockedInfo) {
             S.queue = split.undecided;
             S.decidedEntries = split.decided;
             S.rerunState = 'idle';
             S.autoRunGraceUntil = 0;
-            S.blockedInfo = {
-                reasons: reasons,
-                hasQueue: split.undecided.length > 0,
-                system:
-                    (detail.blocked_reasons || []).length > 0 &&
-                    !(detail.needs || []).length &&
-                    !split.undecided.length,
-            };
+            S.blockedInfo = blockedInfo;
             renderDone();
             return true;
         }
@@ -694,7 +687,9 @@
         else if (action === 'rv-pool-toggle') togglePoolPicker();
         else if (action === 'rv-pool-pick') stageToPool(el.getAttribute('data-qtype'));
         else if (action === 'rv-rerun') startRerun();
-        else if (action === 'rv-back-to-queue') backToQueue();
+        else if (action === 'rv-go-intake') {
+            window.location.hash = AI.router.buildClientHash(S.clientId, 'intake');
+        } else if (action === 'rv-back-to-queue') backToQueue();
         else if (action === 'rv-refresh-status') refreshStatus();
         else if (action === 'rv-taxid-realign') doRealign();
         else if (action === 'rv-revisit') revisitDecided(el.getAttribute('data-item'));
@@ -735,13 +730,8 @@
                 S.queue = split.undecided;
                 S.decidedEntries = split.decided;
                 S.idx = 0;
-                var blockers = detail.blocked_reasons || [];
-                if (detail.status === 'stuck' && !S.queue.length && blockers.length) {
-                    S.blockedInfo = {
-                        reasons: blockers,
-                        hasQueue: false,
-                        system: true,
-                    };
+                if (detail.status === 'stuck' && !S.queue.length) {
+                    S.blockedInfo = AI.reviewQueue.blockedInfo(detail, false);
                 }
                 // 契约 C:回到上次操作那张(仍未判才聚焦,已判/不在则维持第一张未判)。
                 var lastId = lastItemByOrder[order.id];

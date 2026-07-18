@@ -169,6 +169,24 @@ class FingerprintTests(unittest.TestCase):
         events = [_bank_event(rows, item_id="i1", eid=1), _bank_event(rows, item_id="i1", eid=2)]
         self.assertEqual(len(bss.parsed_rows_from_events(events)), 1)
 
+    def test_invalidation_ignores_old_rows_and_old_row_decisions(self):
+        old = [_bank_event([_dep("2023-05-01", 1000.0)], item_id="i1", eid=1)]
+        old_fp = bss.parsed_rows_from_events(old)[0]["fingerprint"]
+        events = old + [
+            _human(old_fp, bss.SALES, eid=2),
+            {
+                "id": 3,
+                "event_type": bss.reconcile_bank.EVT_BANK_PARSE_INVALIDATED,
+                "payload": {"reason": "date_parser_fixed"},
+            },
+            _bank_event([_dep("2026-05-01", 2000.0)], item_id="i1", eid=4),
+        ]
+
+        result = bss.suggest(events)
+
+        self.assertEqual(result["counts"], {"sales": 0, "non_sales": 0, "pending": 1, "total": 1})
+        self.assertEqual(result["rows"][0]["date"], "2026-05-01")
+
 
 class GoldenWorksheetTests(unittest.TestCase):
     """IMG_2481 会计底稿分组金标:四组销售 + 手续费 + 取消,人裁 overlay 模拟会计分组。

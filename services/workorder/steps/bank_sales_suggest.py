@@ -29,7 +29,7 @@ from typing import Optional
 
 from services.sales_agg import vat
 from services.workorder import kinds
-from services.workorder.steps import sales_aggregate, stmt_totals
+from services.workorder.steps import reconcile_bank, sales_aggregate, stmt_totals
 
 _EVT_BANK_PARSED = "item_bank_parsed"
 _EVT_CLASSIFIED = "item_classified"
@@ -117,9 +117,7 @@ def _replay_rows(events: list) -> list[dict]:
     out: list[dict] = []
     seen_items: set = set()
     seq_counter: dict = {}
-    for e in events:
-        if e.get("event_type") != _EVT_BANK_PARSED:
-            continue
+    for e in reconcile_bank.active_bank_parse_events(events):
         payload = e.get("payload") or {}
         item_id = payload.get("item_id")
         if item_id is None or item_id in seen_items:
@@ -265,8 +263,8 @@ def _page_count(events: list) -> int:
     return len(
         {
             (e.get("payload") or {}).get("item_id")
-            for e in events
-            if e.get("event_type") == _EVT_BANK_PARSED and (e.get("payload") or {}).get("item_id")
+            for e in reconcile_bank.active_bank_parse_events(events)
+            if (e.get("payload") or {}).get("item_id")
         }
     )
 
@@ -330,7 +328,7 @@ def brain_overlay(events: list) -> dict:
     """回放大脑建议事件 → {fingerprint: verdict}(只认 valid 的实建议;cannot_judge/invalid 不覆盖,
     留待定)。同行多条后者胜(重跑幂等键锚行指纹,通常只一条)。"""
     out: dict = {}
-    for e in events:
+    for e in reconcile_bank.active_bank_generation_events(events):
         if e.get("event_type") != EVT_SUGGESTED:
             continue
         payload = e.get("payload") or {}
@@ -346,7 +344,7 @@ def human_overlay(events: list) -> dict:
     键的才是银行行级销项裁决,与 item_id 裁决 / statement_tx_id 银行对账裁决天然互斥(按键区分,
     照 evidence.bank_recon_decisions 同款纪律)。非法 verdict 忽略(不落无效态)。"""
     out: dict = {}
-    for e in events:
+    for e in reconcile_bank.active_bank_generation_events(events):
         if e.get("event_type") != EVT_HUMAN_DECISION:
             continue
         payload = e.get("payload") or {}
@@ -442,7 +440,7 @@ def suggested_fingerprints(events: list) -> set:
     也不重复烧钱问同一行,人裁才推进(与 dedupe_key 幂等互为里外双保险)。"""
     return {
         (e.get("payload") or {}).get("fingerprint")
-        for e in events
+        for e in reconcile_bank.active_bank_generation_events(events)
         if e.get("event_type") == EVT_SUGGESTED
     }
 

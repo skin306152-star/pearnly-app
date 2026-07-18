@@ -296,6 +296,26 @@ class BankParseCheckpointTests(unittest.TestCase):
             out2.payload["gates"]["r3_bank"]["recon"], out1.payload["gates"]["r3_bank"]["recon"]
         )
 
+    def test_invalidation_starts_new_generation_and_reparses(self):
+        store = _store()
+        first = reconcile.run(_ctx(store))
+        store.events.append(
+            {
+                "step": "reconcile",
+                "event_type": reconcile_bank.EVT_BANK_PARSE_INVALIDATED,
+                "payload": {"reason": "date_parser_fixed"},
+            }
+        )
+
+        second = reconcile.run(_ctx(store))
+
+        self.assertEqual(self.calls, ["b1", "b1"])
+        self.assertEqual(len(reconcile_bank.active_bank_parse_events(store.events)), 1)
+        self.assertEqual(
+            second.payload["gates"]["r3_bank"]["recon"],
+            first.payload["gates"]["r3_bank"]["recon"],
+        )
+
 
 class BankParseCostAttributionTests(unittest.TestCase):
     """R3 银行流水 OCR 成本归因(L2-ATTR):_default_parse_bank_file 在发起解析前设请求级归因

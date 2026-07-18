@@ -374,6 +374,7 @@ Object.assign(window.__AI_I18N_EN__, {
     // SA-3b (2026-07-14) · bank-statement sales suggestion card (intake tab · missing sales_summary)
     bxs_title: 'Bank statement sales suggestion',
     bxs_state_reliable_chip: 'Usable',
+    bxs_state_pending_chip: '{n} to review',
     bxs_counts_line: '{total} entries · {sales} sales · {pending} pending · {nonsales} non-sales',
     bxs_gross_label: 'Gross total (incl. VAT)',
     bxs_crosscheck_t: 'Cross-check (vs. bank-derived sales)',

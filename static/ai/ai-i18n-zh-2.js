@@ -339,6 +339,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     // SA-3b(2026-07-14)· 银行流水倒推销项建议卡(收料 tab 缺 sales_summary 时)
     bxs_title: '按银行流水倒推销项',
     bxs_state_reliable_chip: '可采信',
+    bxs_state_pending_chip: '待确认 {n} 笔',
     bxs_counts_line: '共 {total} 笔入账 · 销售 {sales} · 待确认 {pending} · 非销售 {nonsales}',
     bxs_gross_label: '含税合计',
     bxs_crosscheck_t: '交叉佐证(与银行倒推销售额比较)',

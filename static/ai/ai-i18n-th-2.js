@@ -360,6 +360,7 @@ Object.assign(window.__AI_I18N_TH__, {
     // SA-3b (2026-07-14) · การ์ดประมาณการยอดขายจากรายการเดินบัญชี (แท็บรับเอกสาร · ขาด sales_summary)
     bxs_title: 'ประมาณการยอดขายจากรายการเดินบัญชี',
     bxs_state_reliable_chip: 'ใช้ได้',
+    bxs_state_pending_chip: 'รอยืนยัน {n} รายการ',
     bxs_counts_line: 'รวม {total} รายการ · ขาย {sales} · รอยืนยัน {pending} · ไม่ใช่ขาย {nonsales}',
     bxs_gross_label: 'ยอดรวมรวมภาษี',
     bxs_crosscheck_t: 'ตรวจไขว้ (เทียบกับยอดขายจากธนาคาร)',

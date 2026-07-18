@@ -86,6 +86,14 @@
         );
     }
 
+    function readinessChip(suggestion) {
+        var pending = Number(suggestion && suggestion.pending_count) || 0;
+        if (canApply(suggestion)) {
+            return { cls: 'g', key: 'bxs_state_reliable_chip', vars: null };
+        }
+        return { cls: 'w', key: 'bxs_state_pending_chip', vars: { n: pending } };
+    }
+
     function groupRows(rows) {
         var out = { sales: [], pending: [], nonSales: [] };
         (rows || []).forEach(function (r) {
@@ -116,6 +124,7 @@
         diffRatio: diffRatio,
         crossCheckRows: crossCheckRows,
         canApply: canApply,
+        readinessChip: readinessChip,
         groupRows: groupRows,
         freshUiState: freshUiState,
     };
@@ -348,6 +357,7 @@
     function reliableCardHtml(suggestion, ui, salesCrb, edcCrb) {
         var grouped = groupRows(suggestion.rows);
         var apply = canApply(suggestion);
+        var chip = readinessChip(suggestion);
         var xrows = crossCheckRows(suggestion, salesCrb, edcCrb);
         var rowFn = function (r) {
             return rowHtml(r, ui);
@@ -355,8 +365,10 @@
         return (
             '<div class="panel bxs-card"><div class="hd"><h3>' +
             esc(at('bxs_title')) +
-            ' <span class="chip g">' +
-            esc(at('bxs_state_reliable_chip')) +
+            ' <span class="chip ' +
+            chip.cls +
+            '">' +
+            esc(at(chip.key, chip.vars)) +
             '</span></h3></div><div class="bd">' +
             '<p class="bxs-sub">' +
             esc(

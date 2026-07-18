@@ -367,6 +367,7 @@ Object.assign(window.__AI_I18N_JA__, {
     // SA-3b(2026-07-14)· 銀行明細からの売上推定カード(収集タブ · sales_summary 不足時)
     bxs_title: '銀行明細からの売上推定',
     bxs_state_reliable_chip: '採用可能',
+    bxs_state_pending_chip: '要確認 {n}件',
     bxs_counts_line: '計 {total} 件 · 売上 {sales} · 未確認 {pending} · 非売上 {nonsales}',
     bxs_gross_label: '税込合計',
     bxs_crosscheck_t: 'クロスチェック(銀行推定売上との比較)',

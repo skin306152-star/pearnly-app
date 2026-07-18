@@ -114,6 +114,33 @@ class CanApplyTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class ReadinessChipTests(unittest.TestCase):
+    def test_pending_rows_are_not_presented_as_usable(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-bank-sales-render.js"))});
+            process.stdout.write(JSON.stringify(b.readinessChip(
+                {{applicable: true, reliable: true, pending_count: 705}}
+            )));
+            """)
+        self.assertEqual(
+            out,
+            {"cls": "w", "key": "bxs_state_pending_chip", "vars": {"n": 705}},
+        )
+
+    def test_zero_pending_rows_are_presented_as_usable(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-bank-sales-render.js"))});
+            process.stdout.write(JSON.stringify(b.readinessChip(
+                {{applicable: true, reliable: true, pending_count: 0}}
+            )));
+            """)
+        self.assertEqual(
+            out,
+            {"cls": "g", "key": "bxs_state_reliable_chip", "vars": None},
+        )
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class GroupRowsTests(unittest.TestCase):
     def test_splits_by_verdict_into_three_buckets(self):
         out = _run_node(f"""

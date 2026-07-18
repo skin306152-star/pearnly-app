@@ -94,13 +94,58 @@
             topupRequest: function (amountThb) {
                 return call('POST', '/api/credits/topup/request', { amount_thb: amountThb });
             },
-            uploadSlip: function (requestId, file) {
+            uploadSlip: function (requestId, file, payerName, note) {
                 var form = new FormData();
                 form.append('file', file, file.name);
+                if (payerName) form.append('payer_name', payerName);
+                if (note) form.append('note', note);
                 return callForm('POST', '/api/credits/topup/upload-slip/' + requestId, form);
             },
             topupHistory: function () {
                 return call('GET', '/api/credits/topup/history');
+            },
+            // 记录明细(扣费/充值):tab=usage|topup · period=all|day|month|year · date=YYYY-MM-DD · 分页。
+            records: function (p) {
+                var q =
+                    'tab=' +
+                    encodeURIComponent(p.tab) +
+                    '&period=' +
+                    encodeURIComponent(p.period || 'all') +
+                    '&limit=' +
+                    (p.limit || 10) +
+                    '&offset=' +
+                    (p.offset || 0);
+                if (p.date) q += '&date=' + encodeURIComponent(p.date);
+                return call('GET', '/api/credits/records?' + q);
+            },
+            // ── 操作员花名册(波3 · DL-8 · owner-only,非 owner 后端 403)──
+            listOperators: function () {
+                return call('GET', '/api/dms/operators');
+            },
+            createOperator: function (payload) {
+                return call('POST', '/api/dms/operators', payload);
+            },
+            updateOperator: function (userId, payload) {
+                return call('PATCH', '/api/dms/operators/' + encodeURIComponent(userId), payload);
+            },
+            setOperatorStatus: function (userId, status) {
+                return call(
+                    'POST',
+                    '/api/dms/operators/' + encodeURIComponent(userId) + '/status',
+                    {
+                        status: status,
+                    }
+                );
+            },
+            operatorBindCode: function (userId) {
+                return call(
+                    'POST',
+                    '/api/dms/operators/' + encodeURIComponent(userId) + '/bind-code'
+                );
+            },
+            // 记录页 owner 视角:全租户 mrerp_dms 推送 + 操作员归属列(C6)。
+            tenantRecords: function (limit) {
+                return call('GET', '/api/dms/records?limit=' + (limit || 100));
             },
         };
     }

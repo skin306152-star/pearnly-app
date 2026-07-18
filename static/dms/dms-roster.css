@@ -1,0 +1,198 @@
+/* Pearnly DMS · 操作员花名册视图(波3 · DL-8)。
+ * 复用 dms-shell.css 令牌 + .btn/.dms-state/.dms-badge + dms-billing.css 的 .dms-bill-card/
+ * .dms-bill-input;只补花名册独有的表单网格 / 操作员表 / 角色徽标 / 弹层这几块。
+ * 与其余视图互斥显示,层叠顺序对彼此零影响。 */
+
+.dms-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 新增操作员表单 */
+.dms-op-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  margin-top: 8px;
+}
+.dms-op-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dms-op-field > span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.dms-op-radios {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dms-op-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink);
+}
+.dms-op-radio input {
+  accent-color: var(--brand);
+}
+.dms-op-form-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+.dms-op-err {
+  margin-top: 10px;
+  color: var(--err);
+  font-size: 13px;
+}
+
+/* 操作员表 */
+.dms-op-table {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+}
+.dms-op-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.4fr 1fr 2.2fr;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.dms-op-row.head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dms-op-row.off {
+  opacity: 0.62;
+}
+.dms-op-c.name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dms-op-c.name b {
+  font-size: 14px;
+  color: var(--ink);
+  word-break: break-word;
+}
+.dms-op-user-mono {
+  font-size: 12px;
+  color: var(--ink2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.dms-op-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.dms-op-badge.sales {
+  background: var(--accent-soft);
+  color: var(--brand);
+}
+.dms-op-badge.admin {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.dms-op-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* 弹层(绑定码大字 / 换密码)· 遮罩 + 卡片,复用 dms-line 大字码样式 */
+.dms-op-modal-host,
+.dms-op-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  background: rgba(0, 0, 0, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dms-op-modal-card {
+  background: var(--card);
+  border-radius: 16px;
+  width: min(420px, 100%);
+  padding: 24px;
+  color: var(--ink);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+.dms-op-modal-h {
+  font-size: 17px;
+  font-weight: 800;
+}
+.dms-op-modal-who {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--ink2);
+}
+.dms-op-modal-card .dms-line-steps {
+  text-align: left;
+}
+.dms-op-modal-card .dms-op-field {
+  margin-top: 14px;
+  text-align: left;
+}
+.dms-op-modal-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* 记录页 owner 视角(C6):在既有 4 列基础上插入「操作员」列(时间/操作员/客户/方式/状态)。 */
+.dms-rec-table.with-op .dms-rec-row {
+  grid-template-columns: 140px 130px 1fr 84px 84px;
+}
+.dms-rec-c.op {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .dms-op-grid {
+    grid-template-columns: 1fr;
+  }
+  .dms-rec-table.with-op .dms-rec-row {
+    grid-template-columns: 100px 1fr 70px;
+  }
+  .dms-rec-table.with-op .dms-rec-c.op,
+  .dms-rec-table.with-op .dms-rec-c.mode {
+    display: none;
+  }
+  .dms-op-row {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 8px;
+  }
+  .dms-op-row.head {
+    display: none;
+  }
+  .dms-op-c.acts {
+    grid-column: 1 / -1;
+  }
+  .dms-op-actions {
+    justify-content: flex-start;
+  }
+}

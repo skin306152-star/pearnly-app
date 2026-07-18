@@ -228,6 +228,10 @@ const DMS_CSS = [
     'dms/dms-gate.css',
     'dms/dms-intake.css',
     'dms/dms-billing.css',
+    // dms-roster.css(波3 · 操作员花名册)复用 dms-shell 令牌 + .btn/.dms-state/.dms-badge +
+    // dms-billing.css 的 .dms-bill-card/.dms-bill-input;只补花名册独有的表单网格/操作员表/角色
+    // 徽标/弹层 + 记录页 owner 视角(C6)的 .with-op 列扩展,排最后即可,与其余视图互斥零影响。
+    'dms/dms-roster.css',
 ];
 
 const BUNDLES = [

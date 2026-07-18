@@ -12,6 +12,7 @@
   --brand-hover: #2456d8;
   --accent-soft: #eaf0ff;
   --btn-blue: #2f6bff;
+  --on-brand: #ffffff;
   --amber-weak: #fdf3e3;
   --amber-line: #e5b769;
   --ok: #2aa971;
@@ -29,6 +30,7 @@
     --brand-hover: #6d92ff;
     --accent-soft: #232a3f;
     --btn-blue: #5a82ff;
+    --on-brand: #ffffff;
     --amber-weak: #332b1c;
     --ok: #4ecf95;
     --err: #ff7a70;

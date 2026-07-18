@@ -1,6 +1,7 @@
 /* Pearnly DMS · 套餐与余额视图 · HTML 模板层(挂 window.DXBILLINGHTML)。
- * 纯字符串构建,不含事件/请求(逻辑在 dms-billing.js · 同 dms-intake-html 分片先例)。
- * 金额一律走 fmtBaht(฿ 千分位);所有文案走 t()(四语)。收款账户为固定值(非 i18n)。 */
+ * 纯字符串构建,不含事件/请求(逻辑在 dms-billing.js / dms-billing-topup.js / dms-billing-records.js)。
+ * 照主站 subscription.ts/billing.ts 语义在 DMS 蓝色令牌系复刻;金额走 fmtBaht(฿ 千分位),文案走 t()。
+ * 收款账户为固定值(非 i18n)。✓ 用内联 SVG(避开 emoji 闸),不用字符。 */
 (function (root) {
     'use strict';
     function t(k, v) {
@@ -11,10 +12,9 @@
             ? root.escapeHtml(s == null ? '' : s)
             : String(s);
     }
-    // ฿ 千分位:整数不带小数,非整数保留 2 位(不引入 float 噪声)。
     function fmtBaht(n) {
         var num = Number(n || 0);
-        var frac = Math.round(num % 1 ? 2 : 0);
+        var frac = num % 1 ? 2 : 0;
         return (
             '฿' +
             num.toLocaleString('en-US', { minimumFractionDigits: frac, maximumFractionDigits: 2 })
@@ -23,6 +23,9 @@
     function fmtInt(n) {
         return Number(n || 0).toLocaleString('en-US');
     }
+    function fmtRate(n) {
+        return '฿' + Number(n || 0).toFixed(2);
+    }
     function fmtDate(v) {
         if (!v) return '—';
         var d = new Date(v);
@@ -30,27 +33,17 @@
         var p = function (x) {
             return (x < 10 ? '0' : '') + x;
         };
-        return (
-            d.getFullYear() +
-            '-' +
-            p(d.getMonth() + 1) +
-            '-' +
-            p(d.getDate()) +
-            ' ' +
-            p(d.getHours()) +
-            ':' +
-            p(d.getMinutes())
-        );
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
 
-    // 固定收款账户(与主站 src/home/billing.ts 一致 · 银行资料非译文,四语共用)。
     var BANK = {
         name: 'ธนาคาร กรุงเทพ',
         branch: 'สาขาโชคชัย 4 ลาดพร้าว',
         acct: '230-0-91368-4',
         holder: 'บจ. มิสเตอร์ อี อาร์ พี',
     };
-    var QUICK_AMOUNTS = [100, 500, 1000, 2000];
+    var CHECK =
+        '<svg class="dms-bill-ck" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>';
 
     function page(inner) {
         return (
@@ -78,7 +71,6 @@
             '</div>'
         );
     }
-    // 员工空态:整视图仅老板可操作(判据由逻辑层给出,无 balance_thb 即员工)。
     function employee() {
         return (
             '<div class="dms-page-head"><h1>' +
@@ -90,7 +82,6 @@
             '</p></div>'
         );
     }
-
     function metric(k, v) {
         return (
             '<div class="dms-bill-metric"><div class="k">' +
@@ -119,15 +110,14 @@
             body += '<div class="dms-bill-exempt">' + esc(t('dms-bill-exempt')) + '</div>';
         }
         body +=
-            '<div class="dms-bill-rule"><div class="rt">' +
-            esc(t('dms-bill-rule-title')) +
-            '</div><div class="rb">' +
-            esc(t('dms-bill-rule-body')) +
-            '</div></div>';
+            '<button type="button" class="btn primary dms-bill-topup-btn" data-bill-topup="1">' +
+            esc(t('dms-bill-topup-open')) +
+            '</button>';
         return '<div class="dms-bill-card">' + body + '</div>';
     }
 
-    function planCard(sub) {
+    // 当前套餐卡:订阅态(进度条 + 取消)/ 已取消(徽标 warn + 说明 · 无取消钮)/ 无订阅(引导看套餐)。
+    function planNowCard(sub) {
         var inner;
         if (!sub) {
             inner =
@@ -135,22 +125,50 @@
                 esc(t('dms-bill-plan-none')) +
                 '</div><div class="none-sub">' +
                 esc(t('dms-bill-plan-none-sub')) +
-                '</div>';
+                '</div><span class="dms-bill-jump" id="dms-bill-jump-plans">' +
+                esc(t('dms-bill-view-plans')) +
+                '</span>';
         } else {
+            var used = sub.pages_used_this_cycle || 0;
+            var quota = sub.quota || 0;
+            var rem = Math.max(0, quota - used);
+            var pct = quota ? Math.min(100, Math.round((used / quota) * 100)) : 0;
+            var cancelled = sub.status === 'cancelled';
             inner =
-                '<span class="pill">' +
+                '<span class="dms-bill-sub-badge ' +
+                (cancelled ? 'warn' : 'ok') +
+                '">' +
+                esc(cancelled ? t('dms-bill-st-cancelled') : t('dms-bill-st-active')) +
+                '</span><div class="dms-bill-sub-name">' +
                 esc(t('dms-bill-plan-name-fmt', { code: sub.plan_code })) +
-                '</span><div class="row">' +
-                metric(
-                    t('dms-bill-plan-remain'),
-                    t('dms-bill-used-fmt', { n: fmtInt(sub.remaining) })
-                ) +
-                metric(t('dms-bill-plan-cycle'), fmtDate(sub.cycle_end)) +
-                '</div>';
-            inner +=
-                sub.auto_renew === false
-                    ? '<div class="cancelled">' + esc(t('dms-bill-plan-cancelled')) + '</div>'
-                    : '';
+                '</div><div class="dms-bill-sub-hint">' +
+                esc(t('dms-bill-plan-over-fmt', { rate: fmtRate(sub.over_rate).slice(1) })) +
+                ' · ' +
+                esc(t('dms-bill-plan-cycle')) +
+                ' ' +
+                esc(fmtDate(sub.cycle_end)) +
+                '</div><div class="dms-bill-prog"><span style="width:' +
+                pct +
+                '%"></span></div><div class="dms-bill-usage-line">' +
+                esc(t('dms-bill-plan-used')) +
+                ' <b>' +
+                esc(fmtInt(used)) +
+                '</b> / ' +
+                esc(fmtInt(quota)) +
+                ' ' +
+                esc(t('dms-bill-used-unit')) +
+                ' · ' +
+                esc(t('dms-bill-remaining')) +
+                ' <b>' +
+                esc(fmtInt(rem)) +
+                '</b></div>' +
+                (cancelled
+                    ? '<div class="dms-bill-sub-note">' +
+                      esc(t('dms-bill-plan-cancelled')) +
+                      '</div>'
+                    : '<button type="button" class="btn dms-bill-cancel-btn" data-bill-cancel="1">' +
+                      esc(t('dms-bill-plan-cancel')) +
+                      '</button>');
         }
         return (
             '<div class="dms-bill-card dms-bill-plan-now"><h2>' +
@@ -164,8 +182,8 @@
     function onePlan(p, currentCode) {
         var isCurrent = currentCode && p.code === currentCode;
         var btn = isCurrent
-            ? '<button type="button" class="btn" data-bill-cancel="1">' +
-              esc(t('dms-bill-plan-cancel')) +
+            ? '<button type="button" class="btn" disabled>' +
+              esc(t('dms-bill-current-badge')) +
               '</button>'
             : '<button type="button" class="btn primary" data-bill-sub="' +
               esc(p.code) +
@@ -175,158 +193,78 @@
         return (
             '<div class="dms-bill-plan' +
             (isCurrent ? ' current' : '') +
-            '">' +
-            (isCurrent ? '<div class="fact">' + esc(t('dms-bill-current-badge')) + '</div>' : '') +
-            '<div class="code">' +
+            '"><div class="dms-bill-plan-top"><div class="dms-bill-plan-letter">' +
             esc(p.code) +
-            '</div><div class="fee">' +
-            esc(t('dms-bill-plan-fee-fmt', { fee: fmtInt(p.fee) })) +
-            '</div><div class="fact">' +
+            '</div><div><div class="dms-bill-plan-name">' +
+            esc(t('dms-bill-plan-name-fmt', { code: p.code })) +
+            '</div><div class="dms-bill-plan-price">' +
+            esc(fmtInt(p.fee)) +
+            ' <span>' +
+            esc(t('dms-bill-per-month')) +
+            '</span></div></div></div><ul class="dms-bill-feats"><li>' +
+            CHECK +
             esc(t('dms-bill-plan-quota-fmt', { n: fmtInt(p.quota) })) +
-            '</div><div class="fact">' +
-            esc(t('dms-bill-plan-over-fmt', { rate: p.over_rate })) +
-            '</div>' +
+            '</li><li>' +
+            CHECK +
+            esc(t('dms-bill-plan-over-fmt', { rate: fmtRate(p.over_rate).slice(1) })) +
+            '</li></ul>' +
             btn +
             '</div>'
         );
     }
     function storeCards(plans, currentCode) {
-        var cards = (plans || []).map(function (p) {
-            return onePlan(p, currentCode);
-        });
+        var cards = (plans || [])
+            .map(function (p) {
+                return onePlan(p, currentCode);
+            })
+            .join('');
         return (
-            '<div class="dms-bill-card"><h2>' +
+            '<div class="dms-bill-card" id="dms-bill-plans-card"><h2>' +
             esc(t('dms-bill-store-title')) +
             '</h2><p class="sub">' +
             esc(t('dms-bill-store-sub')) +
             '</p><div class="dms-bill-plans">' +
-            cards.join('') +
+            cards +
             '</div></div>'
         );
     }
 
-    // 充值卡:head + 可切换的 body(step1 金额 / step2 转账+上传 / done 回执)。
-    function topupCard() {
-        return (
-            '<div class="dms-bill-card"><h2>' +
-            esc(t('dms-bill-topup-title')) +
-            '</h2><p class="sub">' +
-            esc(t('dms-bill-topup-sub')) +
-            '</p><div id="dms-bill-topup-body">' +
-            topupStep1() +
-            '</div></div>'
-        );
-    }
-    function topupStep1() {
-        var quick = QUICK_AMOUNTS.map(function (a) {
+    // 记录明细卡外壳:头(标题 + 导出)+ 双 tab;筛选/列表/分页由 records 控制器填 #dms-bill-rec-body。
+    function recordsCard(activeTab) {
+        function tab(id, key) {
             return (
-                '<button type="button" class="btn dms-bill-qamt" data-bill-qamt="' +
-                a +
+                '<button type="button" class="dms-bill-rec-tab' +
+                (activeTab === id ? ' on' : '') +
+                '" data-bill-rectab="' +
+                id +
                 '">' +
-                esc(fmtBaht(a)) +
+                esc(t(key)) +
                 '</button>'
             );
-        }).join('');
-        return (
-            '<div class="dms-bill-qamts">' +
-            quick +
-            '</div><input type="number" min="10" step="1" class="dms-bill-input" id="dms-bill-amt" placeholder="' +
-            esc(t('dms-bill-topup-amt-ph')) +
-            '"><div class="dms-bill-err" id="dms-bill-amt-err" style="display:none"></div>' +
-            '<div class="dms-bill-upload-row"><button type="button" class="btn primary" id="dms-bill-topup-next">' +
-            esc(t('dms-bill-topup-next')) +
-            '</button></div>'
-        );
-    }
-    function topupStep2(reqId, amount) {
-        return (
-            '<p class="sub">' +
-            esc(t('dms-bill-topup-bank')) +
-            ' · ' +
-            esc(fmtBaht(amount)) +
-            '</p><div class="dms-bill-bank"><div class="bn">' +
-            esc(BANK.name) +
-            '</div><div class="bb">' +
-            esc(BANK.branch) +
-            '</div><div class="ba">' +
-            esc(BANK.acct) +
-            '</div><div class="bh">' +
-            esc(BANK.holder) +
-            '</div></div><div class="dms-bill-reqid">' +
-            esc(t('dms-bill-topup-reqid-fmt', { id: reqId })) +
-            '</div><div class="dms-bill-note">' +
-            esc(t('dms-bill-topup-note')) +
-            '</div><div class="dms-bill-upload-row"><input type="file" id="dms-bill-slip" accept="image/*,.pdf" style="display:none"><button type="button" class="btn primary" id="dms-bill-slip-pick">' +
-            esc(t('dms-bill-topup-pick')) +
-            '</button><span class="dms-bill-note" style="margin:0">' +
-            esc(t('dms-bill-topup-upload-hint')) +
-            '</span></div><div class="dms-bill-err" id="dms-bill-slip-err" style="display:none"></div>'
-        );
-    }
-    function topupDone(autoApproved) {
-        var ok = !!autoApproved;
-        return (
-            '<div class="dms-bill-topup-done ' +
-            (ok ? 'ok' : 'wait') +
-            '"><div class="ic">' +
-            (ok ? '✓' : '…') +
-            '</div><div class="msg">' +
-            esc(ok ? t('dms-bill-topup-auto-ok') : t('dms-bill-topup-manual')) +
-            '</div><button type="button" class="btn" id="dms-bill-topup-again">' +
-            esc(t('dms-bill-topup-again')) +
-            '</button></div>'
-        );
-    }
-
-    function histStatus(s) {
-        if (s === 'approved')
-            return '<span class="dms-badge ok">' + esc(t('dms-bill-hist-approved')) + '</span>';
-        if (s === 'rejected')
-            return '<span class="dms-badge fail">' + esc(t('dms-bill-hist-rejected')) + '</span>';
-        return '<span class="dms-badge pending">' + esc(t('dms-bill-hist-pending')) + '</span>';
-    }
-    function historyCard(items) {
-        var inner;
-        if (!items || !items.length) {
-            inner =
-                '<div class="dms-state empty"><p>' + esc(t('dms-bill-hist-empty')) + '</p></div>';
-        } else {
-            inner = items
-                .slice(0, 20)
-                .map(function (r) {
-                    return (
-                        '<div class="dms-bill-hist-row"><span class="time">' +
-                        esc(fmtDate(r.created_at)) +
-                        '</span><span class="amt">' +
-                        esc(fmtBaht(r.amount_thb)) +
-                        '</span>' +
-                        histStatus(r.status) +
-                        '</div>'
-                    );
-                })
-                .join('');
         }
         return (
-            '<div class="dms-bill-card"><h2>' +
-            esc(t('dms-bill-hist-title')) +
-            '</h2>' +
-            inner +
-            '</div>'
+            '<div class="dms-bill-card"><div class="dms-bill-rec-head"><div class="dms-bill-rec-tabs">' +
+            tab('usage', 'dms-bill-rec-tab-usage') +
+            tab('topup', 'dms-bill-rec-tab-topup') +
+            '</div><button type="button" class="btn" id="dms-bill-rec-export">' +
+            esc(t('dms-bill-rec-export')) +
+            '</button></div><div id="dms-bill-rec-body"></div></div>'
         );
     }
 
     root.DXBILLINGHTML = {
+        BANK: BANK,
+        CHECK: CHECK,
         fmtBaht: fmtBaht,
+        fmtInt: fmtInt,
+        fmtRate: fmtRate,
+        fmtDate: fmtDate,
         page: page,
         state: state,
         employee: employee,
         balanceCard: balanceCard,
-        planCard: planCard,
+        planNowCard: planNowCard,
         storeCards: storeCards,
-        topupCard: topupCard,
-        topupStep1: topupStep1,
-        topupStep2: topupStep2,
-        topupDone: topupDone,
-        historyCard: historyCard,
+        recordsCard: recordsCard,
     };
 })(typeof self !== 'undefined' ? self : this);

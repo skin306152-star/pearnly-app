@@ -10,6 +10,7 @@
     var LANGS = ['zh', 'th', 'en', 'ja'];
     var currentView = 'intake';
     var chromeWired = false;
+    var isOwner = false;
 
     function applyTexts() {
         document.querySelectorAll('[data-dt]').forEach(function (el) {
@@ -30,8 +31,10 @@
 
     // ── 视图切换 ──
     function mountView(name) {
+        // 花名册 owner-only:非 owner 误触(理论上 nav 已藏)回落录入,不空挂。
+        if (name === 'roster' && !isOwner) name = 'intake';
         currentView = name;
-        ['intake', 'records', 'billing'].forEach(function (v) {
+        ['intake', 'records', 'roster', 'billing'].forEach(function (v) {
             var sec = $('dms-view-' + v);
             if (sec) sec.classList.toggle('on', v === name);
         });
@@ -42,10 +45,18 @@
             root.DX.mountIntake();
         } else if (name === 'records') {
             root.DXRECORDS.mount('#dms-view-records');
+        } else if (name === 'roster') {
+            root.DXROSTER.mount('#dms-view-roster');
         } else if (name === 'billing') {
             root.DXBILLING.mount('#dms-view-billing');
         }
         window.scrollTo(0, 0);
+    }
+
+    // 「操作员」花名册 nav 仅 owner 可见(探针 is_owner);员工/非 owner 会话藏之。
+    function applyOwnerNav() {
+        var nav = document.querySelector('.dms-nav-item[data-view="roster"]');
+        if (nav) nav.style.display = isOwner ? '' : 'none';
     }
 
     function wireChrome() {
@@ -95,9 +106,12 @@
         $('gateRoot').classList.add('on');
     }
 
-    function enterApp() {
+    function enterApp(session) {
+        isOwner = !!(session && session.is_owner);
+        root.__dmsIsOwner = isOwner; // 记录页 owner 视角(C6)据此走全租户 + 操作员归属列。
         showShell();
         wireChrome();
+        applyOwnerNav();
         applyTexts();
         highlightLang();
         mountView(currentView);
@@ -143,8 +157,8 @@
         }
         var api = root.DXAPI.create();
         api.probe()
-            .then(function () {
-                enterApp();
+            .then(function (session) {
+                enterApp(session || {});
             })
             .catch(function (err) {
                 if (err && err.status === 401) {

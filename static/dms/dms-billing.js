@@ -1,8 +1,8 @@
-/* Pearnly DMS · 套餐与余额视图 · 逻辑层(挂 window.DXBILLING · 模板在 dms-billing-html.js)。
- * 职责:拉 /api/me/credits + /api/me/subscription + 充值记录 → 四态渲染;订阅/取消/充值三流程接线。
- * 老板/员工判据:credits 响应无 balance_thb 即员工(整视图落「仅限老板」空态)。计费端点全用
- * get_current_user 鉴权,entry=dms token 直调(不走 require_perm)。语言切换由 boot 重挂 mount 重渲。
- * 事件监听在 mount 一次性挂到 host(重渲不掉),避免语言重挂叠加。 */
+/* Pearnly DMS · 套餐与余额视图 · 逻辑层(挂 window.DXBILLING · 模板 dms-billing-html · 充值向导
+ * dms-billing-topup · 记录明细 dms-billing-records)。照主站 subscription.ts/billing.ts 语义复刻。
+ * 职责:拉 /api/me/credits + /api/me/subscription → 顶部双卡 + 套餐三卡 + 记录明细四态渲染;
+ * 订阅(402→自动开充值弹窗)/取消(体系内 danger 确认)/充值(三步弹窗)接线;余额 30s 轮询兜底
+ * (页面可见 + 停在计费视图 + 非豁免才轮,涨额 toast + 刷新)。老板/员工判据:credits 无 balance_thb 即员工。 */
 (function (root) {
     'use strict';
     function H() {
@@ -17,129 +17,71 @@
     function toast(msg, kind) {
         if (typeof root.showToast === 'function') root.showToast(msg, kind);
     }
-    function showErr(el, msg) {
-        if (!el) return;
-        el.textContent = msg;
-        el.style.display = '';
-    }
 
-    var S = { host: null, busy: false, reqId: null, amount: 0, isExempt: false };
+    var S = { host: null, busy: false, isExempt: false, pollTimer: null, lastBal: null };
 
     function load(host) {
         S.host = host;
         S.busy = false;
-        S.reqId = null;
         host.innerHTML = H().state('loading', t('dms-bill-loading'), false);
         api()
             .getCredits()
             .then(function (credits) {
-                // 员工视角:后端只回 my_invoice_count,无 balance_thb → 整视图落老板专属空态。
                 if (credits.balance_thb === undefined) {
+                    stopPoll();
                     host.innerHTML = H().employee();
                     return null;
                 }
-                return Promise.all([api().getSubscription(), api().topupHistory()]).then(
-                    function (res) {
-                        renderOwner(host, credits, res[0] || {}, res[1] || []);
-                    }
-                );
+                return api()
+                    .getSubscription()
+                    .then(function (sub) {
+                        renderOwner(host, credits, sub || {});
+                    });
             })
             .catch(function () {
                 host.innerHTML = H().state('error', t('dms-bill-error'), true);
             });
     }
 
-    function renderOwner(host, credits, sub, history) {
+    function renderOwner(host, credits, sub) {
         var subscription = sub.subscription || null;
         var plans = sub.plans || [];
         var currentCode = subscription ? subscription.plan_code : '';
         S.isExempt = !!(sub.is_billing_exempt || credits.is_billing_exempt);
+        S.lastBal = credits.balance_thb;
         host.innerHTML = H().page(
-            '<div id="dms-bill-balance-wrap">' +
+            '<div class="dms-bill-top">' +
+                H().planNowCard(subscription) +
+                '<div id="dms-bill-balance-wrap">' +
                 H().balanceCard(credits, S.isExempt) +
-                '</div>' +
-                H().planCard(subscription) +
+                '</div></div>' +
                 H().storeCards(plans, currentCode) +
-                H().topupCard() +
-                '<div id="dms-bill-hist-wrap">' +
-                H().historyCard(history) +
-                '</div>'
+                H().recordsCard('usage')
         );
-    }
-
-    // 充值/自动到账后就地刷新余额卡 + 记录卡(不重渲整页,保留充值回执面)。
-    function refreshAfterTopup() {
-        Promise.all([api().getCredits(), api().topupHistory()])
-            .then(function (res) {
-                var bw = S.host.querySelector('#dms-bill-balance-wrap');
-                if (bw && res[0] && res[0].balance_thb !== undefined) {
-                    bw.innerHTML = H().balanceCard(res[0], S.isExempt);
-                }
-                var hw = S.host.querySelector('#dms-bill-hist-wrap');
-                if (hw) hw.innerHTML = H().historyCard(res[1] || []);
-            })
-            .catch(function () {
-                /* 刷新失败不影响已展示的回执面(状态诚实:回执自身仍准确) */
-            });
-    }
-
-    function doTopupRequest() {
-        var host = S.host;
-        var amtEl = host.querySelector('#dms-bill-amt');
-        var errEl = host.querySelector('#dms-bill-amt-err');
-        var amt = Math.floor(Number((amtEl && amtEl.value) || 0));
-        if (!(amt >= 10)) return void showErr(errEl, t('dms-bill-topup-min'));
-        if (S.busy) return;
-        S.busy = true;
-        var btn = host.querySelector('#dms-bill-topup-next');
-        if (btn) btn.disabled = true;
-        api()
-            .topupRequest(amt)
-            .then(function (res) {
-                S.reqId = res.request_id;
-                S.amount = amt;
-                host.querySelector('#dms-bill-topup-body').innerHTML = H().topupStep2(
-                    res.request_id,
-                    amt
-                );
-            })
-            .catch(function () {
-                toast(t('dms-bill-topup-req-fail'), 'error');
-                if (btn) btn.disabled = false;
-            })
-            .then(function () {
-                S.busy = false;
-            });
-    }
-
-    function doUploadSlip(file) {
-        var host = S.host;
-        if (!file || S.busy || !S.reqId) return;
-        S.busy = true;
-        var errEl = host.querySelector('#dms-bill-slip-err');
-        var pick = host.querySelector('#dms-bill-slip-pick');
-        if (pick) {
-            pick.disabled = true;
-            pick.textContent = t('dms-bill-topup-uploading');
+        var recCard = host.querySelector('#dms-bill-rec-body');
+        if (recCard && recCard.closest('.dms-bill-card')) {
+            root.DXBILLRECORDS.mount(recCard.closest('.dms-bill-card'));
         }
+        startPoll();
+    }
+
+    function refreshBalance() {
         api()
-            .uploadSlip(S.reqId, file)
-            .then(function (res) {
-                host.querySelector('#dms-bill-topup-body').innerHTML = H().topupDone(
-                    !!res.auto_approved
-                );
-                refreshAfterTopup();
+            .getCredits()
+            .then(function (c) {
+                if (!c || c.balance_thb === undefined) return;
+                S.lastBal = c.balance_thb;
+                var bw = S.host && S.host.querySelector('#dms-bill-balance-wrap');
+                if (bw) bw.innerHTML = H().balanceCard(c, S.isExempt);
+                if (root.DXBILLRECORDS && root.DXBILLRECORDS.reload) root.DXBILLRECORDS.reload();
             })
             .catch(function () {
-                showErr(errEl, t('dms-bill-topup-fail'));
-                if (pick) {
-                    pick.disabled = false;
-                    pick.textContent = t('dms-bill-topup-pick');
-                }
-            })
-            .then(function () {
-                S.busy = false;
+                /* 刷新失败不影响已展示内容(状态诚实) */
             });
+    }
+
+    function openTopup() {
+        root.DXBILLTOPUP.open({ onClose: refreshBalance });
     }
 
     function doSubscribe(code) {
@@ -156,7 +98,7 @@
             .subscribe(code)
             .then(function () {
                 toast(t('dms-bill-sub-ok'), 'success');
-                load(host); // 全量重渲:反映新套餐 + 扣费后余额
+                load(host);
             })
             .catch(function (err) {
                 S.busy = false;
@@ -166,8 +108,7 @@
                 }
                 if (err && err.status === 402) {
                     toast(t('dms-err-insufficient_balance'), 'error');
-                    var body = host.querySelector('#dms-bill-topup-body');
-                    if (body) body.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    openTopup(); // 402 自动开充值弹窗(照主站 _openTopupModal)
                 } else {
                     toast(t('dms-bill-sub-fail'), 'error');
                 }
@@ -195,21 +136,10 @@
     function onClick(e) {
         var host = S.host;
         if (e.target.closest('#dms-bill-retry')) return void load(host);
-        var q = e.target.closest('[data-bill-qamt]');
-        if (q) {
-            var amtEl = host.querySelector('#dms-bill-amt');
-            if (amtEl) amtEl.value = q.getAttribute('data-bill-qamt');
-            return;
-        }
-        if (e.target.closest('#dms-bill-topup-next')) return void doTopupRequest();
-        if (e.target.closest('#dms-bill-slip-pick')) {
-            var f = host.querySelector('#dms-bill-slip');
-            if (f) f.click();
-            return;
-        }
-        if (e.target.closest('#dms-bill-topup-again')) {
-            S.reqId = null;
-            host.querySelector('#dms-bill-topup-body').innerHTML = H().topupStep1();
+        if (e.target.closest('[data-bill-topup]')) return void openTopup();
+        if (e.target.closest('#dms-bill-jump-plans')) {
+            var card = host.querySelector('#dms-bill-plans-card');
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
         }
         var sb = e.target.closest('[data-bill-sub]');
@@ -217,10 +147,41 @@
         if (e.target.closest('[data-bill-cancel]')) return void doCancel();
     }
 
-    function onChange(e) {
-        if (e.target && e.target.id === 'dms-bill-slip') {
-            doUploadSlip(e.target.files && e.target.files[0]);
+    // ── 余额 30s 轮询(照主站 billing.ts:涨额 toast + 刷新;隐藏/离开计费视图/豁免时跳过)──
+    function stopPoll() {
+        if (S.pollTimer) {
+            clearInterval(S.pollTimer);
+            S.pollTimer = null;
         }
+    }
+    function pollTick() {
+        if (document.hidden || S.isExempt) return;
+        var view = document.getElementById('dms-view-billing');
+        if (!view || !view.classList.contains('on')) return;
+        var tk = '';
+        try {
+            tk = localStorage.getItem('mrpilot_token') || '';
+        } catch (e) {
+            tk = '';
+        }
+        if (!tk) return;
+        api()
+            .getCredits()
+            .then(function (c) {
+                var bal = c && c.balance_thb;
+                if (bal === undefined) return;
+                if (S.lastBal !== null && bal > S.lastBal) {
+                    toast(t('dms-bill-credits-updated'), 'success');
+                    refreshBalance();
+                }
+                S.lastBal = bal;
+            })
+            .catch(function () {});
+    }
+    function startPoll() {
+        stopPoll();
+        if (S.isExempt) return;
+        S.pollTimer = setInterval(pollTick, 30000);
     }
 
     function mount(hostSel) {
@@ -228,7 +189,6 @@
         if (!host) return;
         if (!host._billingWired) {
             host.addEventListener('click', onClick);
-            host.addEventListener('change', onChange);
             host._billingWired = true;
         }
         load(host);

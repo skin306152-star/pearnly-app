@@ -1,4 +1,5 @@
-/* Pearnly DMS · 套餐与余额视图(波1 计费搬家)· 卡片风格沿用壳令牌(--card/--ink/--brand…)。
+/* Pearnly DMS · 套餐与余额视图(波1 计费搬家 · 波3 对齐主站)。
+   照 src/home 的 subscription/billing/billing-records 语义在 DMS 蓝色令牌系里复刻,不引主站 CSS。
    与 dms-shell.css 同一设计语言:蓝主按钮、四态、手机优先。互斥显示,层叠顺序对其余视图零影响。 */
 
 .dms-bill {
@@ -6,6 +7,7 @@
   flex-direction: column;
   gap: 14px;
   max-width: min(900px, 100%);
+  margin: 0 auto;
 }
 .dms-bill-card {
   background: var(--card);
@@ -21,6 +23,18 @@
   font-size: 12px;
   color: var(--ink2);
   margin: 0 0 14px;
+}
+
+/* ── 顶部双卡(当前套餐 | 账户余额)── */
+.dms-bill-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 800px) {
+  .dms-bill-top {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── 余额卡 ── */
@@ -70,19 +84,81 @@
   color: var(--ok);
   font-weight: 700;
 }
+.dms-bill-topup-btn {
+  margin-top: 14px;
+  width: 100%;
+}
 
-/* ── 当前套餐卡 ── */
-.dms-bill-plan-now .pill {
-  display: inline-block;
-  background: var(--accent-soft);
-  color: var(--brand);
+/* ── 当前套餐卡(订阅态 / 已取消 / 无订阅)── */
+.dms-bill-plan-now {
+  position: relative;
+}
+.dms-bill-sub-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
   border-radius: 999px;
   padding: 3px 11px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
+.dms-bill-sub-badge.ok {
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+.dms-bill-sub-badge.warn {
+  background: var(--amber-weak);
+  color: var(--amber-line);
+}
+.dms-bill-sub-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--ink);
+  margin-top: 6px;
+}
+.dms-bill-sub-hint {
+  font-size: 12px;
+  color: var(--ink2);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.dms-bill-prog {
+  height: 8px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 14px 0 8px;
+}
+.dms-bill-prog > span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.dms-bill-usage-line {
+  font-size: 12px;
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+.dms-bill-usage-line b {
+  color: var(--ink);
+  font-weight: 800;
+}
+.dms-bill-sub-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--amber-line);
+  font-weight: 700;
+}
+.dms-bill-cancel-btn {
+  margin-top: 14px;
+  border: 1px solid var(--err);
+  color: var(--err);
+  background: transparent;
+}
 .dms-bill-plan-now .none {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--ink);
 }
@@ -91,17 +167,13 @@
   color: var(--ink2);
   margin-top: 4px;
 }
-.dms-bill-plan-now .row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px;
+.dms-bill-jump {
+  display: inline-block;
   margin-top: 12px;
-}
-.dms-bill-plan-now .cancelled {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--amber-line);
+  font-size: 13px;
   font-weight: 700;
+  color: var(--brand);
+  cursor: pointer;
 }
 
 /* ── 套餐选购三卡 ── */
@@ -116,32 +188,108 @@
   padding: 15px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 .dms-bill-plan.current {
   border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+.dms-bill-plan-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dms-bill-plan-letter {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
   background: var(--accent-soft);
-}
-.dms-bill-plan .code {
-  font-size: 22px;
-  font-weight: 900;
   color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  flex: none;
 }
-.dms-bill-plan .fee {
-  font-size: 15px;
+.dms-bill-plan-name {
+  font-size: 13px;
   font-weight: 800;
   color: var(--ink);
 }
-.dms-bill-plan .fact {
+.dms-bill-plan-price {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--ink);
+}
+.dms-bill-plan-price span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.dms-bill-feats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.dms-bill-feats li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--ink2);
 }
+.dms-bill-ck {
+  width: 14px;
+  height: 14px;
+  color: var(--ok);
+  flex: none;
+}
 .dms-bill-plan .btn {
-  margin-top: 10px;
+  margin-top: auto;
   width: 100%;
 }
 
-/* ── 充值卡 ── */
+/* ── 充值向导(三步弹窗 · 复用 dms-shell .modal 原子)── */
+.dms-bill-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.dms-bill-step-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex: none;
+}
+.dms-bill-step-dot.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--on-brand);
+}
+.dms-bill-step-line {
+  width: 26px;
+  height: 2px;
+  background: var(--line);
+}
+.dms-bill-step {
+  display: none;
+}
+.dms-bill-step.on {
+  display: block;
+}
 .dms-bill-qamts {
   display: flex;
   flex-wrap: wrap;
@@ -151,6 +299,10 @@
 .dms-bill-qamt {
   flex: 1 1 auto;
   min-width: 72px;
+}
+.dms-bill-qamt.on {
+  border-color: var(--brand);
+  color: var(--brand);
 }
 .dms-bill-input {
   width: 100%;
@@ -176,7 +328,7 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 14px;
-  margin: 12px 0;
+  margin: 4px 0 12px;
 }
 .dms-bill-bank .bn {
   font-size: 13px;
@@ -187,78 +339,233 @@
   color: var(--ink2);
   margin-top: 2px;
 }
+.dms-bill-bank .ba-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 2px;
+}
 .dms-bill-bank .ba {
   font-size: 20px;
   font-weight: 900;
   letter-spacing: 1px;
-  margin: 8px 0 2px;
   font-variant-numeric: tabular-nums;
 }
 .dms-bill-bank .bh {
   font-size: 12px;
   color: var(--ink2);
 }
-.dms-bill-reqid {
-  font-size: 12px;
-  color: var(--ink2);
-  margin-top: 8px;
-}
-.dms-bill-note {
-  font-size: 12px;
+.dms-bill-warn {
+  background: var(--amber-weak);
+  border: 1px solid var(--amber-line);
   color: var(--amber-line);
-  margin-top: 8px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.dms-bill-warn b {
+  font-weight: 900;
+}
+.dms-bill-dz {
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  padding: 22px 14px;
+  text-align: center;
+  color: var(--ink2);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.dms-bill-dz.drag-over {
+  border-color: var(--brand);
+  background: var(--accent-soft);
+}
+.dms-bill-dz.has-file {
+  border-color: var(--ok);
+  border-style: solid;
+  color: var(--ok);
   font-weight: 700;
 }
-.dms-bill-upload-row {
+.dms-bill-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.dms-bill-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.dms-bill-modal-foot {
   display: flex;
   gap: 10px;
-  align-items: center;
-  margin-top: 12px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: 14px 18px;
 }
-.dms-bill-topup-done {
+.dms-bill-done {
   text-align: center;
-  padding: 18px 8px;
+  padding: 8px 8px 2px;
 }
-.dms-bill-topup-done .ic {
-  font-size: 30px;
-  line-height: 1;
+.dms-bill-done .ic {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 10px;
 }
-.dms-bill-topup-done .msg {
-  font-size: 14px;
-  font-weight: 800;
-  margin: 10px 0 14px;
-}
-.dms-bill-topup-done.ok .ic {
+.dms-bill-done.ok .ic {
   color: var(--ok);
 }
-.dms-bill-topup-done.wait .ic {
+.dms-bill-done.wait .ic {
   color: var(--brand);
 }
-
-/* ── 充值记录 ── */
-.dms-bill-hist-row {
-  display: grid;
-  grid-template-columns: 1fr 90px 96px;
-  gap: 8px;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 12px;
+.dms-bill-done .msg {
+  font-size: 14px;
+  font-weight: 800;
 }
-.dms-bill-hist-row:last-child {
+
+/* ── 记录明细(扣费 | 充值 双 tab + 筛选 + 分页 + 导出)── */
+.dms-bill-rec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.dms-bill-rec-tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 3px;
+}
+.dms-bill-rec-tab {
+  border: 0;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dms-bill-rec-tab.on {
+  background: var(--card);
+  color: var(--brand);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dms-bill-rec-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.dms-bill-select {
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+  padding: 0 10px;
+}
+.dms-bill-rec-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.dms-bill-rec-row:last-child {
   border-bottom: 0;
 }
-.dms-bill-hist-row .amt {
-  font-weight: 800;
+.dms-bill-rec-l {
+  min-width: 0;
+}
+.dms-bill-rec-title {
+  font-size: 13px;
+  color: var(--ink);
+  word-break: break-word;
+}
+.dms-bill-rec-meta {
+  font-size: 11px;
+  color: var(--ink2);
+  margin-top: 2px;
   font-variant-numeric: tabular-nums;
 }
-.dms-bill-hist-row .time {
+.dms-bill-rec-r {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.dms-bill-rec-badge {
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dms-bill-rec-badge.ok {
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+.dms-bill-rec-badge.bad {
+  background: color-mix(in srgb, var(--err) 15%, transparent);
+  color: var(--err);
+}
+.dms-bill-rec-badge.warn {
+  background: var(--amber-weak);
+  color: var(--amber-line);
+}
+.dms-bill-rec-badge.free,
+.dms-bill-rec-badge.neutral {
+  background: var(--bg);
+  color: var(--ink2);
+}
+.dms-bill-rec-amt {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  min-width: 72px;
+  text-align: right;
+}
+.dms-bill-rec-dl {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dms-bill-rec-dl svg {
+  width: 15px;
+  height: 15px;
+}
+.dms-bill-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: 12px;
   color: var(--ink2);
   font-variant-numeric: tabular-nums;
 }
+.dms-bill-page-btn {
+  min-width: 30px;
+  height: 30px;
+}
+.dms-bill-page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 
-/* ── 手机端 ── */
 @media (max-width: 640px) {
   .dms-bill-plans {
     grid-template-columns: 1fr;

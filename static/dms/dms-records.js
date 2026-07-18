@@ -1,6 +1,7 @@
 /* Pearnly DMS · 推送记录页 · 恒按 adapter=mrerp_dms 筛(身份证 → DMS 客户的推送历史)。
- * 复用主站既有 /api/erp/logs(DXAPI.pushLogs 已固定 adapter 参数)。四态 UI:加载/空/错/列表。
- * 信息密度取简化版:时间 / 客户 / 方式 / 状态(失败附错误信息)。挂 window.DXRECORDS。 */
+ * 员工/普通视角走 /api/erp/logs(user 隔离,DXAPI.pushLogs 已固定 adapter);owner 视角(波3 C6·
+ * __dmsIsOwner)走 /api/dms/records 拉【全租户】推送并加「操作员」归属列(显示名取档案,无档案=
+ * 老板本人)。四态 UI:加载/空/错/列表。信息密度:时间 /(操作员)/ 客户 / 方式 / 状态。挂 window.DXRECORDS。 */
 (function (root) {
     'use strict';
     function t(k) {
@@ -78,7 +79,16 @@
             '</div>'
         );
     }
-    function rowHtml(item) {
+    // 操作员归属(owner 视角):有档案显示名取之;无档案=老板本人发起,显示「老板」。
+    function operatorLabel(item) {
+        if (item.operator_name) return item.operator_name;
+        if (item.operator_role === 'owner') return t('dms-rec-op-owner');
+        return '—';
+    }
+    function opCell(item, owner) {
+        return owner ? '<div class="dms-rec-c op">' + esc(operatorLabel(item)) + '</div>' : '';
+    }
+    function rowHtml(item, owner) {
         var cust =
             esc(item.seller_name || '') +
             (item.invoice_no
@@ -91,7 +101,9 @@
         return (
             '<div class="dms-rec-row"><div class="dms-rec-c time">' +
             esc(fmtTime(item.created_at)) +
-            '</div><div class="dms-rec-c cust">' +
+            '</div>' +
+            opCell(item, owner) +
+            '<div class="dms-rec-c cust">' +
             cust +
             err +
             '</div><div class="dms-rec-c mode">' +
@@ -101,40 +113,57 @@
             '</div></div>'
         );
     }
-    function listHtml(items) {
+    function listHtml(items, owner) {
+        var opHead = owner
+            ? '<div class="dms-rec-c op">' + esc(t('dms-rec-col-operator')) + '</div>'
+            : '';
         var head =
             '<div class="dms-rec-row head"><div class="dms-rec-c time">' +
             esc(t('dms-rec-col-time')) +
-            '</div><div class="dms-rec-c cust">' +
+            '</div>' +
+            opHead +
+            '<div class="dms-rec-c cust">' +
             esc(t('dms-rec-col-customer')) +
             '</div><div class="dms-rec-c mode">' +
             esc(t('dms-rec-col-mode')) +
             '</div><div class="dms-rec-c status">' +
             esc(t('dms-rec-col-status')) +
             '</div></div>';
-        return '<div class="dms-rec-table">' + head + items.map(rowHtml).join('') + '</div>';
+        return (
+            '<div class="dms-rec-table' +
+            (owner ? ' with-op' : '') +
+            '">' +
+            head +
+            items
+                .map(function (it) {
+                    return rowHtml(it, owner);
+                })
+                .join('') +
+            '</div>'
+        );
     }
 
     function load(host) {
+        var owner = !!root.__dmsIsOwner;
         host.innerHTML = shell(stateBox('loading', t('dms-rec-loading'), false));
-        root.DXAPI.create()
-            .pushLogs(100)
-            .then(function (data) {
-                var items = (data && data.items) || [];
-                if (!items.length) {
-                    host.innerHTML = shell(stateBox('empty', t('dms-rec-empty'), false));
-                    return;
-                }
-                host.innerHTML = shell(listHtml(items));
-            })
-            .catch(function () {
-                host.innerHTML = shell(stateBox('error', t('dms-rec-error'), true));
-                var btn = host.querySelector('#dms-rec-retry');
-                if (btn)
-                    btn.addEventListener('click', function () {
-                        load(host);
-                    });
-            });
+        var req = owner
+            ? root.DXAPI.create().tenantRecords(100)
+            : root.DXAPI.create().pushLogs(100);
+        req.then(function (data) {
+            var items = (data && data.items) || [];
+            if (!items.length) {
+                host.innerHTML = shell(stateBox('empty', t('dms-rec-empty'), false));
+                return;
+            }
+            host.innerHTML = shell(listHtml(items, owner));
+        }).catch(function () {
+            host.innerHTML = shell(stateBox('error', t('dms-rec-error'), true));
+            var btn = host.querySelector('#dms-rec-retry');
+            if (btn)
+                btn.addEventListener('click', function () {
+                    load(host);
+                });
+        });
     }
 
     function mount(hostSel) {

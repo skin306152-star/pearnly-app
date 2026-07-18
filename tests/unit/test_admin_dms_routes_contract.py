@@ -292,7 +292,6 @@ class InviteCreateAccountTests(unittest.TestCase):
                 "get_cursor",
                 lambda *a, **k: _cursor_cm(_SeqCursor([[]])),
             ),
-            mock.patch.object(admin_dms_routes.db, "grant_credits"),
             mock.patch.object(
                 admin_dms_routes.platform_settings_store, "add_to_allowlist"
             ) as m_add,
@@ -354,12 +353,12 @@ class InviteCreateAccountTests(unittest.TestCase):
             any("UPDATE users SET email" in (sql or "") for sql, _ in rec.queries),
             "非邮箱用户名不该更新 users.email",
         )
-        # 但初始额度照发(开箱即能识别)。
-        m_grant_credits.assert_called_once()
+        # 波1:新号 0 余额 · 发号不再送额度。
+        m_grant_credits.assert_not_called()
 
-    def test_invite_creates_account_grants_initial_credit(self):
-        """H:新号开箱发初始额度(否则余额 0 被身份证识别余额闸 402 恒拦)。
-        走 canonical 记账口 db.grant_credits · 正额 adjustment(不计 topup 收入 KPI)。"""
+    def test_invite_creates_account_no_initial_credit(self):
+        """波1:发号只开门不送钱 · 新建号余额保持 0(不调 grant_credits)。
+        余额由老板进 /dms 门户「套餐与余额」页自助充值/订阅补齐,发号侧零记账。"""
         with (
             mock.patch.object(admin_dms_routes.db, "find_user_by_username", return_value=None),
             mock.patch.object(
@@ -379,12 +378,7 @@ class InviteCreateAccountTests(unittest.TestCase):
                 "/api/admin/dms/invite", json={"username_or_email": "fresh@example.com"}
             )
         self.assertEqual(r.status_code, 200)
-        m_grant.assert_called_once()
-        kw = m_grant.call_args.kwargs
-        self.assertEqual(kw["tenant_id"], "new-tenant")
-        self.assertEqual(kw["txn_type"], "adjustment")
-        self.assertEqual(kw["amount_thb"], admin_dms_routes._DMS_INITIAL_CREDIT_THB)
-        self.assertGreater(kw["amount_thb"], 0)  # 正额 → 余额闸能过
+        m_grant.assert_not_called()
 
     def test_invite_username_exists_race_returns_409(self):
         with (

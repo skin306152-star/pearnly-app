@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-"""H · DMS 邀请新号初始额度的钱路径契约(不碰真库)。
+"""波1 · DMS 计费搬家后的余额闸钱路径契约(不碰真库)。
 
-两段合起来锁死「新号开箱能识别身份证」:
-  1. grant_credits(canonical 记账口)· 加余额 + 落 credit_transactions 台账行,Decimal 计价,
-     不手写裸 UPDATE 余额(铁律 #26)。
-  2. get_billing_status_combined:发了正额余额 + 无订阅 → allowed=True(即 _billing_gate 放行,
-     不再 402)。invite 新号 → grant_credits 正额 → 本闸开,链路闭合。
+发号侧不再送额度(见 test_admin_dms_routes_contract),新邀请号开箱余额 0 → 身份证识别被
+余额闸 402 恒拦;老板须进 /dms 门户「套餐与余额」页自助充值(topup)或订阅套餐才放行。
+两段锁死这条搬家后的链路:
+  1. grant_credits(canonical 记账口 · 现由 topup / 超管审核走)· 加余额 + 落
+     credit_transactions 台账行,Decimal 计价,不手写裸 UPDATE 余额(铁律 #26)。
+  2. get_billing_status_combined:余额 0 + 无订阅 → allowed=False(insufficient_balance);
+     充值到正额后 → allowed=True。老板自助补齐余额 → 本闸开,链路闭合。
 psycopg2 打桩(charge/account_status 顶/尾 import core.db 会拉起连接池)。
 """
 
@@ -95,8 +97,8 @@ class GrantCreditsHelperTests(unittest.TestCase):
             tenant_id="t-1",
             user_id="u-1",
             amount_thb=Decimal("150"),
-            txn_type="adjustment",
-            description="dms_portal invite 初始额度",
+            txn_type="topup",
+            description="客户充值到账 · #1001",
         )
         kwargs.update(over)
         ret = charge.grant_credits(cur, **kwargs)
@@ -113,10 +115,10 @@ class GrantCreditsHelperTests(unittest.TestCase):
         self.assertEqual(upsert_params, ["t-1", "150", "150"])
         ledger_sql, ledger_params = cur.executed[1]
         self.assertIn("INSERT INTO credit_transactions", ledger_sql)
-        self.assertIn("adjustment", [str(p) for p in ledger_params])
+        self.assertIn("topup", [str(p) for p in ledger_params])
         # balance_after = RETURNING 拿到的加后余额(不是本地算的)。
         self.assertIn("300.00", [str(p) for p in ledger_params])
-        self.assertIn("dms_portal invite 初始额度", [str(p) for p in ledger_params])
+        self.assertIn("客户充值到账 · #1001", [str(p) for p in ledger_params])
 
     def test_returns_decimal_post_balance(self):
         _, ret = self._grant()
@@ -135,7 +137,7 @@ class GrantCreditsHelperTests(unittest.TestCase):
 
 
 class BillingGateOpensAfterGrantTests(unittest.TestCase):
-    """发了正额余额 + 无订阅 → get_billing_status_combined allowed=True(_billing_gate 放行)。"""
+    """新邀请号开箱余额 0 + 无订阅 → 402;老板自助充值到正额后 → allowed=True(闸放行)。"""
 
     def _status(self, balance):
         cur = _RecCursor([{"balance_thb": balance, "pages_used": 0, "sub_pages_used": 0}])
@@ -154,7 +156,7 @@ class BillingGateOpensAfterGrantTests(unittest.TestCase):
         self.assertEqual(st["balance_thb"], 150.0)
 
     def test_zero_balance_blocks(self):
-        # 对照:未发额度(余额 0)· 无订阅 → 拦(这正是本批要修的 402 现象)。
+        # 新邀请号开箱 0 余额 · 无订阅 → 拦(402 · 需老板自助充值/订阅才放行)。
         st = self._status(Decimal("0"))
         self.assertFalse(st["allowed"])
         self.assertEqual(st["error_code"], "insufficient_balance")

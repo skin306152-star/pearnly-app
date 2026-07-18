@@ -50,7 +50,15 @@
 
     function cardHtml(entry, options) {
         var hotClass = entry.column === 'review' ? ' hot' : '';
-        var summaryText = at(entry.summary.key, entry.summary.vars);
+        var summaryVars = entry.summary.vars;
+        if (
+            entry.summary.key === 'card_needs_list' &&
+            entry.detail &&
+            Array.isArray(entry.detail.needs)
+        ) {
+            summaryVars = { list: AI.format.fieldList(entry.detail.needs) };
+        }
+        var summaryText = at(entry.summary.key, summaryVars);
         // 2026-07-17 Zihao 真机实测拍板(推翻 R2F-R3「常显」):本期已有工单的卡不再渲染
         // 账期下拉+开单——活工单卡上挂开单控件像在邀请再开一张,实测点出第二张单的困惑;
         // 补开历史月的入口是客户档案 → 工单历史(既有),不缺路。无本期工单的卡保留控件,

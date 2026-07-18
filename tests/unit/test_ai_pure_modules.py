@@ -472,6 +472,19 @@ class FieldLabelTests(unittest.TestCase):
             """)
         self.assertEqual(out, "sales_amount")
 
+    def test_field_list_localizes_each_item(self):
+        out = _run_node(f"""
+            global.at = (k) => ({{
+                field_sales_summary: '销项汇总',
+                field_bank_statement: '银行流水',
+            }}[k] || k);
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify(
+                f.fieldList(['sales_summary', 'bank_statement'])
+            ));
+            """)
+        self.assertEqual(out, "销项汇总、银行流水")
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class StepLabelTests(unittest.TestCase):

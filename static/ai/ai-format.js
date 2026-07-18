@@ -184,6 +184,10 @@
         return key;
     }
 
+    function fieldList(keys) {
+        return (keys || []).map(fieldLabel).join('、');
+    }
+
     // 引擎步骤 key(services/workorder/engine.py::STEPS)→ 四语人话短标签(S2:工单页
     // 此前裸显 classify/reconcile 英文键)。同 fieldLabel 的「查不到回退原值」范式。
     function stepLabel(stepKey) {
@@ -236,6 +240,7 @@
         actorLabel: actorLabel,
         actorDisplay: actorDisplay,
         fieldLabel: fieldLabel,
+        fieldList: fieldList,
         stepLabel: stepLabel,
         progressLabel: progressLabel,
         relAgo: relAgo,

@@ -13,7 +13,7 @@
 - **通过线**:多入口不串权；审核计数守恒且不返队；银行无需 705 次人工点；无权威销项不出包；最终才用三数比对。
 - **详细交接**:`docs/agent/HANDOFF-2026-07-19-PEARNLY-AI-SM-LIVE-RUN.md`。
 - **收口**:`/simplify` 已审；无未提交 AI 源码，不在收尾时临补高敏 auth/银行路径；共享 DMS/UI 脏树未碰。
-- **仓库**:收尾基线 HEAD/origin `5c81a5e5`；交接文档随本状态卡单独提交，push 后盯 CI。
+- **仓库**:交接提交 `6082217f` 已 push；CI run `29657691641` 全绿（含全量单测/构建/生产 E2E）；本批次未 push=0。
 
 <details><summary>上一状态卡(2026-07-18 · Pearnly AI · SM 5月真人旅程 SA-3 收口)</summary>
 

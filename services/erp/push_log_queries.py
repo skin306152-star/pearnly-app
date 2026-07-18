@@ -396,6 +396,57 @@ def list_push_logs_by_invoice_nos(
         return []
 
 
+def list_dms_push_logs_for_tenant(
+    tenant_id: str, limit: int = 100, offset: int = 0
+) -> Dict[str, Any]:
+    """C6 · owner 视角:全租户 mrerp_dms 身份证订车推送行 + 操作员归属列。
+
+    erp_push_logs 是 user 隔离且 DMS 行不落 tenant_id 列(insert_push_log 不写该列),故按
+    「user_id ∈ 本租户用户」JOIN 收敛,而非 tenant_id 列。owner 连接 + 显式 u.tenant_id 收敛
+    (tenant_id 由已鉴权 owner 令牌给出、不吃客户端参数)—— 不开越权口。操作员归属取档案
+    display_name;无档案(老板本人网页/自己 LINE 发起的行)由前端按 operator_role='owner' 显示
+    「老板」。prod 未跑迁移致档案表缺失时首用自愈重试一次(同 line_dms 范式)。
+    """
+    if not tenant_id:
+        return {"items": [], "total": 0}
+    base = """
+        FROM erp_push_logs l
+        JOIN users u ON u.id = l.user_id AND u.tenant_id = %s
+        LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
+        LEFT JOIN dms_operator_profiles p ON p.user_id = l.user_id
+        WHERE (LOWER(e.adapter) = 'mrerp_dms' OR l.trigger = 'id_card')
+    """
+
+    def _run() -> Dict[str, Any]:
+        with db.get_cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS n " + base, (str(tenant_id),))
+            total = cur.fetchone()["n"]
+            cur.execute(
+                "SELECT l.id, l.invoice_no, l.seller_name, l.status, l.error_msg, "
+                "l.created_at, l.request_body, "
+                "p.display_name AS operator_name, u.role AS operator_role "
+                + base
+                + " ORDER BY l.created_at DESC LIMIT %s OFFSET %s",
+                (str(tenant_id), limit, offset),
+            )
+            return {"items": [dict(r) for r in cur.fetchall()], "total": total}
+
+    try:
+        return _run()
+    except Exception as e:
+        if "dms_operator_profiles" in str(e):
+            try:
+                from services.dms_roster import store as roster_store
+
+                roster_store.ensure_tables()
+                return _run()
+            except Exception as e2:
+                logger.error(f"list_dms_push_logs_for_tenant heal-retry failed: {e2}")
+                return {"items": [], "total": 0}
+        logger.error(f"list_dms_push_logs_for_tenant failed: {e}")
+        return {"items": [], "total": 0}
+
+
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:
     """今日推送统计(总数 · 成功 · 失败)"""
     try:

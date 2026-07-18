@@ -116,6 +116,37 @@ def create_owner_user(
         return {"ok": False, "error": "db_error"}
 
 
+def create_member_user(
+    cur,
+    *,
+    tenant_id: str,
+    username: str,
+    password: str,
+    company_name: Optional[str] = None,
+    invited_by: Optional[str] = None,
+) -> str:
+    """在既有事务游标上建一个 member 用户(role='member' · bcrypt 密码 · is_active)· 返回新 user_id。
+
+    可复用的建员工用户原语(不含 membership/scopes —— 那些由邀请接受流程另按需装配):
+    邀请接受(services/team/invitations.accept)自带 membership + 邮箱去重,走它自己的一体
+    事务;本原语专给「无 membership 的租户内用户」场景(如波3 DMS 操作员——只用 LINE、不进
+    网页门户、不需要权限作用域),避免那类调用点各自手抄 users INSERT。调用方负责事务边界
+    与用户名唯一性(唯一约束撞了在此抛,由调用方回滚兜底)。
+    """
+    pw_hash = _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
+    cur.execute(
+        """
+        INSERT INTO users (
+            username, password_hash, plan, is_active, is_super_admin,
+            tenant_id, role, company_name, invited_by
+        ) VALUES (%s, %s, 'credits', TRUE, FALSE, %s, 'member', %s, %s)
+        RETURNING id
+        """,
+        (username, pw_hash, str(tenant_id), company_name, invited_by),
+    )
+    return str(cur.fetchone()["id"])
+
+
 def preview_owner_cascade(user_id: str) -> Optional[Dict[str, Any]]:
     """v118.16 · 预查删除老板的影响范围 · 给超管一个清单 · 防误删
     返回各表受影响行数 · 让超管在 modal 里看到"删了会失去什么"

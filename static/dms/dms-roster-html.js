@@ -195,6 +195,14 @@
     }
 
     // 绑定码大字弹层(照 dms-line 样式:大字码 + 倒计时);逻辑层填 code/countdown 并驱动过期。
+    // DMS 独立 OA(与 dms-line.js 的 FRIEND_URL 同源);QR 走 api.qrserver.com
+    // (CSP img-src 已放行·主站 LINE 绑定卡同款渠道),扫出来即加好友页。
+    var FRIEND_URL = 'https://line.me/R/ti/p/@264tuqln';
+    var LINE_ID = '@264tuqln';
+    var QR_URL =
+        'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=1&data=' +
+        encodeURIComponent(FRIEND_URL);
+
     function codeOverlay(name) {
         return (
             '<div class="dms-op-modal" role="dialog" aria-modal="true"><div class="dms-op-modal-card">' +
@@ -207,6 +215,18 @@
             '</li><li>' +
             esc(t('dms-op-code-step2')) +
             '</li></ol>' +
+            '<div class="dms-op-qr"><img class="dms-op-qr-img" src="' +
+            QR_URL +
+            '" alt="' +
+            esc(t('dms-line-addfriend')) +
+            '" width="120" height="120" loading="lazy">' +
+            '<div class="dms-op-qr-info"><div class="dms-op-qr-id">LINE ID<br>' +
+            esc(LINE_ID) +
+            '</div><a class="dms-op-qr-link" href="' +
+            FRIEND_URL +
+            '" target="_blank" rel="noopener">' +
+            esc(t('dms-line-addfriend')) +
+            '</a></div></div>' +
             '<div class="dms-line-code" id="dms-op-code-val">······</div>' +
             '<div class="dms-line-countdown" id="dms-op-code-cd"></div>' +
             '<div class="dms-op-modal-actions"><button type="button" class="btn" id="dms-op-code-close">' +

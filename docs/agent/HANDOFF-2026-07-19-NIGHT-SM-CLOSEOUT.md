@@ -44,6 +44,14 @@
 
 ### GC-D(可靠性/旅程·先修·目标=下一单无人在场跑通)
 
+0. **P0-0 守恒闸残留半个裁决死锁**(/simplify 高度角审查揪出·比 P0-1 更深)。44acd479 的
+   「方向槽+金额槽合并回放」只修在 R1(reconcile_decisions.replay),出包守恒闸
+   (`package.py:49` → `conservation.py` `_bucket_of`)、证据索引(`evidence.py:325`)、
+   `excluded_projection`、`freeze.py:89`、`workorder_recon_adapter.py:96` 仍按旧 latest-wins
+   单槽语义消费 human_decision——同一张「先定向、后改数」的票 R1 放行,守恒闸按「无 assign_kind」
+   压回 PENDING(本单是反序所以侥幸通过)。conservation/evidence 里三处「与 reconcile 回放同源/
+   同语义」注释已失真。正解=合并回放下沉为 human_decision 唯一回放入口(evidence 或 decisions 层),
+   全部消费方迁移+各自守门测试;迁移改守恒/证据索引行为,必须白天带完整测试做,禁夜修。
 1. **P0-1 签批死循环**(见 §1)。复核/待签状态判定不许被复核自己触发的重跑刷掉。
 2. 断链页自动升档重读(economy→direct35 阶梯·一次为限·断哪页读哪页)。
 3. `run_pipeline_for_file` task 写死 `invoice`,配置 `overrides_by_task.bank_statement` 管不到工单银行链路(白设)。
@@ -68,7 +76,44 @@
 4. GC-E 另开批次,不与可靠性混。
 5. 验收线不变:**连续 3 个客户-月份、零后台介入、界面走完、差异 ≤0.5% 且可解释 = 能用**。
 
-## 7. 收尾状态
+## 7. /simplify 收口(四路审查·8e519eea)
+
+修 10 项、净减 48 行:emit_stmt_totals 挂事件守门(等销项期间每轮重跑不再重复付费窄读——
+真金洞);segment_chain 常态免全量求和+去 Decimal(str) 空转;date_coverage 单趟;2% 材料性
+红线收单一常量对象 `stmt_totals.MATERIALITY_GAP_MAX`(suggest 别名引用);删单行版 prompt
+死代码/死常量/冗余 kwargs/绕锁回读;测试夹具收 helper+subTest。
+
+**记债不动手(白天做)**:①P0-0(见 §5·守恒闸半死锁·最重);②date_coverage/segment_chain
+三个纯函数寄养在 stmt_totals(被 bank_sales_suggest 500 行顶格挤出来的,该独立成
+stmt_coverage.py 并顺带给 suggest 腾空间);③period_month 手写佛历-543(该走 to_ad_year,
+但其 ≥2400 守卫会改边缘行为,须带测试换);④bank_sales_brain 互斥/进度/熔断是 runner 租约
+与 ocr_quota 退避之外的第三套机制(跨进程不互斥、熔断不分 quota 型错误、run/run_async 双入口
+重复)——GC-D「大脑批量重试收尾」时一并按共享机制重排。
+
+## 8. 预期(下一轮该发生什么·验收对照用)
+
+**同客户 2569-06(下月)重跑预期**:①分类零误判(第 18 页类续页直接进银行集);②银行读取
+若断链,系统自动升档重读断链页(GC-D-2 落地后),不再要运维摇代次;③705 类待定行走
+「AI 预判(后台批量)→分组确认(≤10 次点击)→采纳」全 UI 流,不需要服务端代操;④复核→
+签批冻结一条直路(P0-1 修后);⑤全程零 SSH/零 ops 动作;⑥数字对齐申报 ≤0.5% 且残差可解释。
+以上任何一条破=该项修复没到位,按条目回查。
+
+**换第二个客户预期**:自报合计锚要能命中其银行版式(KBANK 外要扩);业态若非零售,
+规则层「QR/EDC=销售」假设要重审。**"能用"验收线不变:连续 3 个客户-月份、零后台介入、
+界面走完、差异 ≤0.5% 且可解释。**
+
+## 9. 方向队列(Zihao 拍板待立项)
+
+1. **大脑当班(工单管家 Agent)**:把今晚 ops 人肉干的活产品化——卡点唤醒,动作集=升档/换眼
+   重读断链页、看图裁方向票、看图+算术自证补正金额、留言问人;进一步=全程驱动+跑完出结论
+   报告。笼子三条:钱数永由确定性代码算、动作全走事件流留痕(actor=agent)、每单 token 封顶
+   (照 ฿150 先例)。今晚 bd093ba9 的完整事件流=它的第一套毕业考题(同卡点应做出同决策)。
+   排 GC-D 之后立项,7 月 13 日大脑立案五职责是图纸。
+2. **Qwen-VL/Qwen-OCR「第二只眼」评测**:非主力替换——断链页升档重读时的异族眼(现管线
+   全是 Gemini 一家,同族重读重复同样的漏)。材料=IMG_2485 吞行金标+IMG_2484 边界+造错机
+   基线,行级答案已钉。需 DashScope key 或自部署。甩真数,落败不上车(Gemma 先例)。
+
+## 10. 收尾状态
 
 - /simplify 收口审计:今晚四补丁均为小改(合计 +181/−24),两轮棘轮收口已内嵌完成压缩;
   `reconcile_decisions.py` 为拆分新模块(带 6 例单测),无可再安全合并的重复实现。

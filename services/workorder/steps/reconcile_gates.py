@@ -144,10 +144,8 @@ def _apply_direction(
     it: dict, money: dict, dec: Optional[dict], unresolved: list
 ) -> Optional[dict]:
     """方向不明票的人工方向裁决取数。无裁决/未定方向 → 计 unresolved(点名·绝不静默);裁进项
-    → 用其 OCR 钱字段进 R1;裁销项 → 票面不进 R1(销项合计走 R2 的 POS 直读/人工申报);裁非税
-    → 排除;豁免(waive)→ 已处置不计入(放行出包,留痕在备忘)。裁进项但缺金额事件(续跑丢
-    事件)→ 停机不静默少算。方向裁决与金额裁决并存(合并回放的 kind 槽 + recalc/face_value)
-    → 裁进项后按金额裁决取数,票面读错的进项票先定向再改数不再互相顶掉(SM 2569-05 死锁根治)。"""
+    → 用其 OCR 钱字段进 R1(与金额裁决并存时按金额裁决取数——先定向再改数不互顶,死锁根治);
+    裁销项/非税 → 不进 R1;豁免(waive)→ 不计入放行留痕;裁进项缺金额事件 → 停机不静默少算。"""
     if dec and dec.get("decision") == decisions.WAIVE:
         return None
     kind = (dec or {}).get("kind")

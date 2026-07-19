@@ -11,7 +11,7 @@
     var lastItemByOrder = {};
 
     function currentActorLabel() {
-        return AI.format.actorLabel(null, localStorage.getItem('mrpilot_token'));
+        return AI.format.actorLabel(null, AI.token.get());
     }
 
     function freshState(api, order, clientId) {

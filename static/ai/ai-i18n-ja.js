@@ -145,6 +145,11 @@ window.__AI_I18N_JA__ = {
     intake_form_submitting: '送信中…',
     intake_form_cancel: 'キャンセル',
     intake_form_invalid: '有効な売上高と売上税を入力してください(非負の数値)',
+    intake_err_session: 'セッションの有効期限が切れました。もう一度ログインしてください',
+    intake_err_entrance:
+        'このログイン入口では申告できません。Pearnly AI から再ログインしてください',
+    intake_err_forbidden: '申告権限がありません。管理者にお問い合わせください',
+    intake_err_network: 'ネットワークエラーです。もう一度お試しください',
     intake_rerun: '資料補完完了、再実行 →',
     intake_rerun_waiting: 'AIが再処理中…',
     intake_rerun_hint: '資料が揃いました。再実行してAIに計算を続けさせます。',

@@ -72,3 +72,5 @@ CI 绿灯：[source batch · run 29673570515](https://github.com/skin306152-star
 ## 5. 回滚方式
 
 按新到旧依次 revert `1f680ec8`、`bca21044`、`490966ac`，即可撤回测试适配、AI token/错误态前端和后端探针/403 细分；本单没有数据库迁移或 feature flag。
+
+补记（2026-07-19 验收）：已在 `routes/workorder_routes.py` 顶部 docstring 补回四权分立与 `{id}` 路由 404 防枚举安全指针，文件保持 500 行。

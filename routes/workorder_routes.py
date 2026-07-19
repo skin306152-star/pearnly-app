@@ -2,6 +2,8 @@
 """Pearnly AI 工单 HTTP API:开单、推进、补料、复核、冻结与交付。
 全组受 pearnly_ai_m1 闸保护;租户、工单归属和账套作用域均 fail-closed。
 业务编排在 services/workorder/api,后台推进在 services/workorder/runner。
+四权分立细码见 C* 常量 + services/workorder/sod.py。
+每条 {id} 路由校验工单归属+账套作用域，越权 404 防枚举。
 """
 
 from __future__ import annotations
@@ -30,8 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 def _client_name_for_order(cur, *, tenant_id: str, user_id: str, workspace_client_id) -> str:
-    """交付物/报表下载文件名用的客户名。查不到(异常边缘态)诚实回空串,调用方据此
-    退回落盘原名,不拼一个假名字。"""
+    """交付物/报表下载文件名用的客户名。查不到(异常边缘态)诚实回空串,调用方据此退回落盘原名,不拼一个假名字。"""
     try:
         client = db.get_workspace_client(workspace_client_id, user_id, tenant_id=tenant_id)
         return (client or {}).get("name") or ""
@@ -153,8 +154,7 @@ def _raise_from_api_error(e: "api.WorkOrderApiError") -> None:
 def _schedule_advance(
     background: BackgroundTasks, tenant_id: str, work_order_id: str, user: dict
 ) -> bool:
-    """抢 run 租约 + 落 run_requested + 交后台 advance。抢到返 True(已排后台);抢不到
-    (已有 run 在跑)返 False。
+    """抢 run 租约 + 落 run_requested + 交后台 advance。抢到返 True(已排后台);抢不到(已有 run 在跑)返 False。
 
     P-7 引擎自驱:裁决/补料/补销项落库成功后调此,引擎自动续跑,用户不必盯着状态手点 /run。
     实体是 runner.request_run 推进原语(路由/收尸/LINE 回写同一事实源),路由径保留

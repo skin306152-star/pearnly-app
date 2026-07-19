@@ -188,6 +188,14 @@ def recognize_lookup_mrerp_dms(
         from services.erp.mrerp_dms_models import ThaiAddress
 
         look = cl.lookup_customer(people_id)
+        # DMS 搜索偶发空返(2026-07-19 三次实锤:同号建档后数分钟搜不到,隔 1-2s 重试
+        # 即命中)。查重漏检=预览卡误标「新客户」,退避重试两轮把误标压到最低;
+        # 真新客户多付 ~3s,可接受。写路径另有撞码自愈兜底。
+        for _ in range(2):
+            if look["found"] or not (people_id or "").strip():
+                break
+            time.sleep(1.5)
+            look = cl.lookup_customer(people_id)
         form_html = cl._post_text("cus/form.php", {"status": "n"})
         a = ocr_address or {}
         addr = ThaiAddress(

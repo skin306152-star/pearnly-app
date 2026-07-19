@@ -145,7 +145,10 @@ class RecognizeLookupDiffWiringTests(unittest.TestCase):
         from services.erp import erp_dms_intake as intake
         from unittest.mock import patch
 
-        with patch.object(intake, "_build_mrerp_dms_adapter", return_value=(adapter, None)):
+        with (
+            patch.object(intake, "_build_mrerp_dms_adapter", return_value=(adapter, None)),
+            patch.object(intake.time, "sleep"),  # 漏检退避重试不拖慢测试
+        ):
             return intake.recognize_lookup_mrerp_dms(
                 {"id": "e1", "config": {}},
                 people_id="1101700207366",
@@ -179,6 +182,23 @@ class RecognizeLookupDiffWiringTests(unittest.TestCase):
         out = self._run(_FakeAdapter(_LookupFakeTransport(found=False)), "Nobody")
         self.assertNotEqual(out["scenario"], "exact")
         self.assertEqual(out["field_diffs"], [])
+
+    def test_lookup_retry_recovers_flaky_search(self):
+        """搜索首查空返、重试命中 → exact(2026-07-19 三次实锤的漏检退避重试回归)。"""
+        t = _LookupFakeTransport(dms_name="Same Name")
+        orig_post = t.post
+        calls = {"n": 0}
+
+        def flaky_post(url, data=None, files=None, timeout_ms=None):
+            if url.endswith("cus/component/showdata.php"):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    return _Resp("")
+            return orig_post(url, data=data, files=files, timeout_ms=timeout_ms)
+
+        t.post = flaky_post
+        out = self._run(_FakeAdapter(t), "Same Name")
+        self.assertEqual(out["scenario"], "exact")
 
 
 if __name__ == "__main__":

@@ -307,11 +307,15 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.offer.call_args.kwargs["customer_id"], "C99")
             self.assertFalse(env.continue_card_pushed())
 
-    async def test_a4_exact_same_no_mode_offers_pick(self):
-        """A4 守门:exact 零写入 + mode 缺省 → offer_pick(与波1逐字节一致)。"""
+    async def test_a4_exact_same_no_mode_previews_then_keep_offers_pick(self):
+        """A4(2026-07-19 拍板):缺省模式 exact 零差异 → 也先出预览卡;点保持才 offer_pick。"""
         with _Env(lookup=_lookup("exact", customer_id="C7")) as env:
             env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE})
             await flow.process_image(_BINDING, _LUID, "mid1")
+            await env.drain()
+            self.assertFalse(env.offer.called)
+            self.assertEqual(env.session()["state"], "reviewing")
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP))
             await env.drain()
             self.assertTrue(env.offer.called)
             self.assertEqual(env.offer.call_args.kwargs["customer_id"], "C7")

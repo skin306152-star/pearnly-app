@@ -273,19 +273,6 @@ async def _run_dedup(
     draft_vals = draft.build_draft(id_card, geo, res.get("prefixes") or [], phone)
     summary = draft.build_summary(draft_vals, geo)
 
-    if scenario == "exact" and not field_diffs and mode != "customer":
-        _push(line_user_id, cards.TXT_SAME)  # 零写入 · booking/缺省照旧自动串联
-        await menu_flow.after_customer_saved(
-            binding,
-            line_user_id,
-            endpoint_id=str(ep.get("id") or ""),
-            customer_id=str((res.get("match") or {}).get("customer_id") or ""),
-            draft=draft_vals,
-            mode=mode,
-            same_data=True,
-        )
-        return
-
     nonce = secrets.token_hex(8)
     base = {
         "draft": draft_vals,
@@ -305,7 +292,8 @@ async def _run_dedup(
     elif scenario == "exact":
         has_admin = draft.has_admin_creds(ep)
         display = draft.display_diffs(field_diffs, geo)
-        # 审批策略见 approval_flow.APPROVAL_POLICY;无差异(customer 模式)→ 预览卡(保持/修改)。
+        # 审批策略见 approval_flow.APPROVAL_POLICY;无差异 → 同资料预览卡(不分模式,
+        # 2026-07-19 拍板:收到证+电话一律先确认)。按「保持」后 ACT_KEEP 按 mode 分流。
         args = (tenant, user_id, display, has_admin, nonce, summary)
         card, approval = await _thr(approval_flow.exact_diff_card, *args)
         payload = {

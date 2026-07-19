@@ -218,13 +218,16 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kw["addresses"][""]["province_id"], "1")
 
     async def test_c2_exact_no_diff_zero_write(self):
-        """C2:exact 无 diff → 零写入 + session 清 + 提示已存在。"""
+        """C2(2026-07-19 拍板):exact 无 diff → 零写入,一律先出同资料预览卡确认。"""
         with _Env(ocr=_ocr_ok(), lookup=_lookup("exact", customer_id="C7")) as env:
             await self._seed_reviewing(env)
             await env.drain()
             env.push_idcard.assert_not_called()
-            self.assertIsNone(env.session())
-            self.assertEqual(env.push_text.call_args.args[1], cards.TXT_SAME)
+            sess = env.session()
+            self.assertEqual(sess["state"], "reviewing")
+            self.assertEqual(sess["payload"]["customer_id"], "C7")
+            card = env.pushed_card()
+            self.assertEqual(card["altText"], cards.same_customer_card({}, "x")["altText"])
 
     async def test_c3_exact_addr_diff_update_only_changed(self):
         """C3:exact+地址 diff → 卡恰 1 条 diff;确认→overwrite 且 fields 有地址键、无生日。"""

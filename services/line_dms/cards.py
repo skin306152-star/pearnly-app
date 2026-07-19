@@ -266,7 +266,7 @@ def new_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
 
 
 def same_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
-    """场景②已有客户 · 资料一致(customer 模式):预览复述 + [ใช้ข้อมูลเดิม][แก้ไข]。
+    """场景②已有客户 · 资料一致(不分模式):预览复述 + [ใช้ข้อมูลเดิม][แก้ไข]。
     只回一句「ตรงกัน」会把识别/手输出错的销售堵死——预览 + 修正入口必须在。"""
     rows = [
         _kv_row("เลขบัตร", summary.get("people_id", "")),

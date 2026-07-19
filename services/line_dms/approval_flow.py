@@ -79,8 +79,8 @@ def exact_diff_card(
     tenant_id: str, user_id: str, display: list, has_admin: bool, nonce: str, summary: dict = None
 ):
     """flow 的 exact_diff 分支按花名册角色+审批策略解出主按钮:sales 且该类改动要审→提审卡;
-    其余有写权(admin 凭据可用/admin 角色)→直写;都没有→仅设置提示。无差异(customer 模式
-    才走到这)→ 同资料预览卡(保持/修改),OCR 或手输有误时销售有入口改。渲染交给
+    其余有写权(admin 凭据可用/admin 角色)→直写;都没有→仅设置提示。无差异 → 同资料
+    预览卡(保持/修改,不分模式一律先确认),OCR 或手输有误时销售有入口改。渲染交给
     cards(单一 primary 选择)。返回 (card, approval标志)。"""
     if not display:
         return cards.same_customer_card(summary or {}, nonce), False

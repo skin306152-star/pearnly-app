@@ -18,11 +18,12 @@ EXCLUDE = "exclude"  # 剔除,不计入合计
 ASSIGN_KIND = "assign_kind"  # 方向不明票的人工定向裁决(带裁定 kind)
 WAIVE = "waive"  # 显式放行一件无法归位的料(带 reason,备忘留痕)
 
-# assign_kind 的裁定 kind:进项票 / 销项票 / 非税票。
+# assign_kind 的裁定 kind:进项票 / 销项票 / 非税票 / 银行流水。
 PURCHASE_INVOICE = "purchase_invoice"
 SALES_DOC = "sales_doc"
 NON_TAX = "non_tax"
-ASSIGN_KINDS = (PURCHASE_INVOICE, SALES_DOC, NON_TAX)
+BANK_STATEMENT = "bank_statement"
+ASSIGN_KINDS = (PURCHASE_INVOICE, SALES_DOC, NON_TAX, BANK_STATEMENT)
 
 # 「不计入合计」语义集:剔除与豁免都不进 Σ、不进 unresolved(豁免另在备忘留痕)。
 NON_COUNTING = frozenset({EXCLUDE, WAIVE})

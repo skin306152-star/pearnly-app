@@ -73,9 +73,7 @@ class DecisionIn(BaseModel):
     item_id: str = Field(..., description="被裁决的 work_order_item id")
     decision: str = Field(..., description="face_value | recalc | exclude | assign_kind | waive")
     values: Optional[dict] = Field(None, description="recalc 时的人工补正数(如 {vat: '35.00'})")
-    kind: Optional[str] = Field(
-        None, description="assign_kind 方向裁决:purchase_invoice | sales_doc | non_tax"
-    )
+    kind: Optional[str] = Field(None, description="assign_kind kind（含 bank_statement）")
     reason: Optional[str] = Field(
         None, max_length=500, description="waive 豁免理由(必填):谁豁免·为何放行出包"
     )

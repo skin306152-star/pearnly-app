@@ -313,6 +313,35 @@ class StatementRegroupTests(unittest.TestCase):
         )
         self.assertEqual((kind, reason), ("bank_statement", None))
 
+    def test_img_2501_category_and_title_rescue_without_bank_name(self):
+        fields = {
+            "document_type": "payment_evidence",
+            "category": "bank",
+            "notes": "Bank statement/transaction list",
+            "seller_name": "สาขาบิ๊กซี เคหะร่มเกล้า",
+            "vat": "0",
+        }
+        self.assertEqual(
+            sort_step.bin_ocr_fields(fields, own_tax_id=OWN_TAX, stmt_regroup=True),
+            ("bank_statement", None),
+        )
+        self.assertEqual(
+            sort_step.bin_ocr_fields(fields, own_tax_id=OWN_TAX),
+            ("non_tax", "no_tax_elements:payment_evidence"),
+        )
+
+    def test_bank_category_without_statement_title_stays_non_tax(self):
+        fields = {
+            "document_type": "payment_evidence",
+            "category": "bank",
+            "notes": "Transfer completed",
+            "seller_name": "ร้านค้าทั่วไป",
+        }
+        self.assertEqual(
+            sort_step.bin_ocr_fields(fields, own_tax_id=OWN_TAX, stmt_regroup=True),
+            ("non_tax", "no_tax_elements:payment_evidence"),
+        )
+
     def test_flag_off_leaves_continuation_pages_as_non_tax(self):
         # 闸关(默认)= 逐字节现状:续页照旧被 payment_evidence 短路踢 non_tax。
         for name, notes in self._STMT_PAGES.items():

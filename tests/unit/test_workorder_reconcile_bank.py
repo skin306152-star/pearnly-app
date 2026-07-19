@@ -203,11 +203,42 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
 
         self.assertEqual(out.status, "needs")
         self.assertEqual(out.missing, ("sales_summary",))
-        emit_totals.assert_not_called()
+        emit_totals.assert_called_once()
         parsed = [event for event in store.events if event["event_type"] == "item_bank_parsed"]
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0]["payload"]["item_id"], "b1")
         self.assertEqual(len(parsed[0]["payload"]["rows"]), 2)
+
+    def test_full_recon_emits_stmt_totals_once(self):
+        with (
+            mock.patch.object(reconcile_bank, "_stmt_totals_enabled", return_value=True),
+            mock.patch.object(reconcile_bank.stmt_totals, "emit_from_banks") as emit_totals,
+        ):
+            out = reconcile.run(_ctx(_store()))
+        self.assertEqual(out.status, "ok")
+        emit_totals.assert_called_once()
+
+    def test_stmt_totals_gate_off_does_not_emit(self):
+        with (
+            mock.patch.object(reconcile_bank, "_stmt_totals_enabled", return_value=False),
+            mock.patch.object(reconcile_bank.stmt_totals, "emit_from_banks") as emit_totals,
+        ):
+            reconcile.run(_ctx(_store()))
+        emit_totals.assert_not_called()
+
+    def test_assign_kind_bank_statement_overrides_excluded_item(self):
+        store = _store()
+        store.items[-1].update(kind="non_tax", status="excluded")
+        store.events.append(
+            {
+                "event_type": "human_decision",
+                "payload": {"item_id": "b1", "decision": "assign_kind", "kind": "bank_statement"},
+            }
+        )
+        out = reconcile.run(_ctx(store))
+        self.assertEqual(out.payload["gates"]["r3_bank"]["bank_statement_count"], 1)
+        parsed = [event for event in store.events if event["event_type"] == "item_bank_parsed"]
+        self.assertEqual([event["payload"]["item_id"] for event in parsed], ["b1"])
 
     def test_parser_failure_stops_without_success_checkpoint(self):
         def _boom(ctx, item):

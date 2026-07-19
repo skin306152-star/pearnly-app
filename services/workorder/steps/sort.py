@@ -221,10 +221,16 @@ def bin_ocr_fields(
     # 对账单续页救回(SA3R-a · 闸 pearnly_ai_stmt_regroup,由 classify 传入 stmt_regroup)。整月
     # 对账单的续页(满纸转账行、无账号表头)OCR 常把 document_type 判成 payment_evidence,会在
     # 下面的短路支被当「无税务要素」踢掉——尸检实锤金标 KBANK 18 页里 6 页这样丢失。收窄双条件
-    # 救回:命中银行名(_mentions_bank)且命中对账单标题白名单(_is_statement_title)→ bank_statement。
+    # 救回:银行名或 OCR 粗分类明说 bank,且命中对账单标题白名单 → bank_statement。续页页眉
+    # 常只剩分行名,不能要求银行名永远在场。
     # 真付款截图 notes 是动作词不含报表抬头,双条件保它仍归 non_tax(守门测试锁零误吸)。排在
     # payment_evidence 短路之前才拦得住;闸关(默认 stmt_regroup=False)不进此支,逐字节维持现状。
-    if stmt_regroup and not has_vat and _mentions_bank(f) and _is_statement_title(f):
+    if (
+        stmt_regroup
+        and not has_vat
+        and (_mentions_bank(f) or _category_is_bank(f))
+        and _is_statement_title(f)
+    ):
         return (kinds.BANK_STATEMENT, None)
 
     # 支付/订单截图:确定无税务要素,先排除,免得被下面的银行/方向判据接管。
@@ -305,6 +311,11 @@ def _is_statement_title(fields: dict) -> bool:
     document_type/category),不扫全票面——标题判据要窄,配合 _mentions_bank 双锁防误吸真付款截图。"""
     blob = " ".join(str(fields.get(k) or "") for k in _STMT_TITLE_FIELDS).lower()
     return any(kw.lower() in blob for kw in _STMT_TITLE_KEYWORDS)
+
+
+def _category_is_bank(fields: dict) -> bool:
+    """OCR 粗分类明说 bank；单独不作准，必须与对账单标题双锁。"""
+    return str(fields.get("category") or "").strip().lower() == "bank"
 
 
 @dataclass(frozen=True)

@@ -126,7 +126,7 @@ async function bootAnnual(page, { lang = 'zh', summaryBody = SUMMARY_CLEAN } = {
     });
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-pnd1a');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-pnd1a');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

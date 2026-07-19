@@ -55,7 +55,7 @@ async function mockRoutes(page, table, opts = {}) {
     });
     await page.addInitScript(
         ([lang, token]) => {
-            window.localStorage.setItem('mrpilot_token', token || 'tok-r2f-r3');
+            window.localStorage.setItem('mrpilot_token_ai', token || 'tok-r2f-r3');
             window.localStorage.setItem('mrpilot_lang', lang || 'en');
         },
         [opts.lang, opts.token]

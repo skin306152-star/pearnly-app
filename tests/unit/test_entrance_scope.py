@@ -15,6 +15,8 @@ import os
 import unittest
 from unittest import mock
 
+from fastapi import HTTPException
+
 os.environ.setdefault("JWT_SECRET", "test-secret-key-of-sufficient-length")
 
 from services.auth import entrance as entrance_mod  # noqa: E402
@@ -190,6 +192,28 @@ class CheckIntegrationTests(unittest.TestCase):
         ):
             allowed, _ = deps._check(None, _user(entry="pos"), "acct.entry.view")
         self.assertTrue(allowed)
+
+
+class RequirePermDetailTests(unittest.TestCase):
+    def _detail_for(self, reason):
+        request = mock.Mock()
+        user = _user()
+        with (
+            mock.patch("core.auth.get_current_user_from_request", return_value=user),
+            mock.patch.object(deps, "_check", return_value=(False, reason)),
+            mock.patch.object(deps, "_deny_log"),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                deps.require_perm(request, "tax.filing.view")
+        self.assertEqual(ctx.exception.status_code, 403)
+        return ctx.exception.detail
+
+    def test_entrance_scope_has_machine_readable_detail(self):
+        self.assertEqual(self._detail_for("entrance_scope"), "authz.entrance_scope")
+
+    def test_existing_denial_details_stay_stable(self):
+        self.assertEqual(self._detail_for("module_disabled"), "authz.module_disabled")
+        self.assertEqual(self._detail_for("forbidden"), "authz.forbidden")
 
 
 if __name__ == "__main__":

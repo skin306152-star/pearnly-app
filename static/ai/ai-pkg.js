@@ -48,7 +48,7 @@
     // 签批人展示名:同 ai-review.js 先例,用当前登录态展示名(不回读服务端 actor)——
     // 邮箱前缀 → JWT 名 → sub 短八位,绝不拼 "user:<uuid>" 糊脸。
     function currentActorLabel() {
-        return AI.format.actorLabel(null, localStorage.getItem('mrpilot_token'));
+        return AI.format.actorLabel(null, AI.token.get());
     }
 
     function errNotice(err) {

@@ -26,6 +26,7 @@ class RouteContractTests(unittest.TestCase):
     def test_expected_routes_registered(self):
         rs = _route_set(workorder_router)
         expected = {
+            ("GET", "/api/ai/session"),
             ("POST", "/api/workorder/orders"),
             ("GET", "/api/workorder/orders"),
             ("GET", "/api/workorder/orders/{work_order_id}"),
@@ -47,6 +48,7 @@ class RouterMountedTests(unittest.TestCase):
         import app  # noqa: F401
 
         paths = {getattr(r, "path", None) for r in app.app.routes}
+        self.assertIn("/api/ai/session", paths)
         self.assertIn("/api/workorder/orders", paths)
 
 
@@ -64,6 +66,50 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await wr.list_orders(mock.Mock())
         self.assertEqual(ctx.exception.status_code, 404)
+
+
+class AiSessionProbeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_token_returns_401(self):
+        from routes import workorder_routes as wr
+
+        with mock.patch.object(
+            route_helpers,
+            "get_current_user_from_request",
+            side_effect=HTTPException(401, detail="auth.invalid_token"),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.ai_session(mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 401)
+
+    async def test_pos_entry_returns_entrance_scope_403(self):
+        from routes import workorder_routes as wr
+
+        user = {**_USER, "entry": "pos"}
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=user),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(
+                route_helpers,
+                "require_perm",
+                side_effect=HTTPException(403, detail="authz.entrance_scope"),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.ai_session(mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 403)
+        self.assertEqual(ctx.exception.detail, "authz.entrance_scope")
+
+    async def test_ai_entry_returns_ok_without_business_io(self):
+        from routes import workorder_routes as wr
+
+        user = {**_USER, "entry": "ai"}
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=user),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=user) as require,
+        ):
+            self.assertEqual(await wr.ai_session(mock.Mock()), {"ok": True})
+        self.assertEqual(require.call_args.args[1], "tax.filing.view")
 
 
 class CreateOrderTests(unittest.IsolatedAsyncioTestCase):

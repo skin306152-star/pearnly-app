@@ -39,7 +39,7 @@ async function mount(page, table, opts = {}) {
         return route.fulfill({ contentType: 'application/json', body: '{}' });
     });
     await page.addInitScript((lang) => {
-        window.localStorage.setItem('mrpilot_token', 'tok-jc');
+        window.localStorage.setItem('mrpilot_token_ai', 'tok-jc');
         window.localStorage.setItem('mrpilot_lang', lang || 'zh');
     }, opts.lang);
     if (opts.viewport) await page.setViewportSize(opts.viewport);

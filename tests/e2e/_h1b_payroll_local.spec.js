@@ -141,7 +141,7 @@ async function bootPayroll(
     });
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-h1b');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-h1b');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

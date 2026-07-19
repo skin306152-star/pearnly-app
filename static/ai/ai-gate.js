@@ -208,6 +208,7 @@
         opts = opts || {};
         var api = opts.api;
         container.innerHTML = loginHtml();
+        if (opts.initialErrorKey) setMsg(container, t(opts.initialErrorKey), 'error');
         // 切语言 = 整卡重渲染(登录卡尚无跨语言保留输入值的必要,表单本就短)。
         wireLangbar(container, function () {
             mountLogin(container, opts);
@@ -239,11 +240,11 @@
                         setMsg(container, t('err_generic'), 'error');
                         return;
                     }
-                    root.localStorage.setItem('mrpilot_token', data.access_token);
+                    root.AI.token.set(data.access_token);
                     // 入口提示(pre-auth 冷启动/退出用):AI 门。壳权威仍是 token.entry='ai'。
                     try {
                         root.localStorage.setItem('pearnly_entry', 'ai');
-                    } catch (_) {
+                    } catch {
                         /* silent */
                     }
                     if (typeof opts.onSuccess === 'function') opts.onSuccess(data);

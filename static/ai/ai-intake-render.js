@@ -95,6 +95,17 @@
         return merged;
     }
 
+    function resolveIntakeErrKey(err) {
+        if (err && err.status === 401) return 'intake_err_session';
+        if (err && err.status === 403) {
+            return err.code === 'authz.entrance_scope'
+                ? 'intake_err_entrance'
+                : 'intake_err_forbidden';
+        }
+        if (!err || err.status == null) return 'intake_err_network';
+        return 'intake_form_invalid';
+    }
+
     var pure = {
         MAX_BYTES: MAX_BYTES,
         BATCH_MAX_BYTES: BATCH_MAX_BYTES,
@@ -104,6 +115,7 @@
         validateFiles: validateFiles,
         splitBatches: splitBatches,
         mergeFiles: mergeFiles,
+        resolveIntakeErrKey: resolveIntakeErrKey,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -293,7 +305,9 @@
     // 人工填销项表单(缺 sales_summary 时的第二条路)。两个金额 + 凭据备注,Enter 提交 Esc 取消。
     function salesFormHtml(ctx) {
         var errRow = ctx.formErr
-            ? '<div class="intake-err" id="ikFormErr">' + esc(at('intake_form_invalid')) + '</div>'
+            ? '<div class="intake-err" id="ikFormErr">' +
+              esc(at(ctx.formErrKey || 'intake_form_invalid')) +
+              '</div>'
             : '';
         var submitLabel = ctx.submitting ? at('intake_form_submitting') : at('intake_form_submit');
         return (
@@ -324,7 +338,7 @@
             '</div>' +
             '<div class="sf-btns">' +
             '<button type="submit" class="btn pri"' +
-            (ctx.submitting ? ' disabled' : '') +
+            (ctx.submitting || ctx.formLocked ? ' disabled' : '') +
             ' data-action="ik-form-submit">' +
             esc(submitLabel) +
             '</button>' +
@@ -458,6 +472,7 @@
         validateFiles: validateFiles,
         splitBatches: splitBatches,
         mergeFiles: mergeFiles,
+        resolveIntakeErrKey: resolveIntakeErrKey,
         uploadProgressText: uploadProgressText,
         intakeHtml: intakeHtml,
         dropzoneHtml: dropzoneHtml,

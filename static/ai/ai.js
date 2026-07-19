@@ -80,10 +80,9 @@
     }
 
     function renderChrome(api) {
-        var token = localStorage.getItem('mrpilot_token');
+        var token = AI.token.get();
         var name = AI.format.jwtDisplayName(token);
-        // 登录态没有姓名字段(实测 token payload 只有不透明 sub)时,不拿字母/短横线冒充
-        // 姓名展示——整块「谁」区域隐藏比露一个假占位更诚实(状态诚实铁律)。
+        // token 没有可用姓名时隐藏用户块,不拿字母或短横线冒充。
         var who = $('whoWrap');
         if (name) {
             who.style.display = '';
@@ -360,8 +359,7 @@
             restoreScroll(route);
             AI.settings.mount(api, {
                 onLogout: function () {
-                    localStorage.removeItem('mrpilot_token');
-                    boot();
+                    expireSession();
                 },
             });
             return;
@@ -389,8 +387,7 @@
 
     var routerUnsubscribe = null;
 
-    // 门面(登录卡/邀请提示)与工作台二选一显示——切走的一侧真正清空 innerHTML,不是
-    // 叠层藏起来占着 DOM(门面表单元素 id 与工作台无冲突,但没必要留着不用的节点树)。
+    // 门面与工作台二选一显示;切走的一侧清空 DOM,不留隐藏节点树。
     function showShell() {
         $('gateRoot').classList.remove('on');
         $('gateRoot').innerHTML = '';
@@ -402,12 +399,13 @@
         $('gateRoot').classList.add('on');
     }
 
-    // 总台闸探针(GET .../front-desk/status):非阻塞——不拖慢其余视图的首屏(m1 闸探针
-    // 已在 boot() 里挡过一次登录门,这里只决定"总台这一个功能露不露脸")。此前拿 feed 当
-    // 探针,闸关=404 打进 console,每次打开 /ai 一条报错噪音(2026-07-17)——status 不走
-    // 闸 404,闸关也回 200 {enabled:false}。resolve 时若用户仍停在 #/desk(直接深链或探针
-    // 慢于路由触发的时序),补上挂载/跳转——onRoute 里 desk 分支对 deskGateOpen===null
-    // 不作为,交给这里兜底。
+    function expireSession(errorKey) {
+        AI.token.clear();
+        showLogin(errorKey);
+    }
+    AI.expireSession = expireSession;
+
+    // 总台探针不阻塞首屏;结果回来后再决定侧栏显隐,并收口探针前进入的深链。
     function afterDeskProbe(api, open) {
         deskGateOpen = open;
         $('navDesk').style.display = open ? '' : 'none';
@@ -441,10 +439,11 @@
         });
     }
 
-    function showLogin() {
+    function showLogin(initialErrorKey) {
         showGate();
         AI.gate.mountLogin($('gateRoot'), {
             api: AI.api.create(),
+            initialErrorKey: initialErrorKey,
             onSuccess: function () {
                 boot();
             },
@@ -455,43 +454,44 @@
         showGate();
         AI.gate.mountInvited($('gateRoot'), {
             onLogout: function () {
-                localStorage.removeItem('mrpilot_token');
-                boot();
+                expireSession();
             },
         });
     }
 
-    // 工单闸探针非 401(通常是 404 = 闸对该账号关闭)时,借一个非闸接口(/api/me)分辨
-    // "token 本身已失效"与"token 有效但未受邀"——前者清 token 回登录卡,后者才是邀请制
-    // 提示(Zihao Z1-a 拍板的判别口径,不靠猜)。
+    // 门禁非 401 时用 /api/me 分辨失效令牌与有效但未受邀的账号。
     function resolveGateClosed(api) {
         api.getMe()
             .then(function () {
                 showInvited();
             })
             .catch(function () {
-                localStorage.removeItem('mrpilot_token');
-                showLogin();
+                expireSession();
             });
     }
 
     function boot() {
         applyTexts();
-        var token = localStorage.getItem('mrpilot_token');
+        var token = AI.token.get();
         if (!token) {
             showLogin();
             return;
         }
         var api = AI.api.create();
-        // 闸探针:限量拉 1 条即可判定闸开/鉴权是否通过,不预取业务数据(那是路由回调的活)。
-        api.listOrders({ limit: 1 })
+        api.probe()
+            .then(function () {
+                return api.listOrders({ limit: 1 });
+            })
             .then(function () {
                 enterApp(api);
             })
             .catch(function (err) {
                 if (err && err.status === 401) {
-                    localStorage.removeItem('mrpilot_token');
-                    showLogin();
+                    expireSession();
+                    return;
+                }
+                if (!err || err.status == null) {
+                    showLogin('gate_err_network');
                     return;
                 }
                 resolveGateClosed(api);

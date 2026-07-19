@@ -144,7 +144,7 @@ async function bootDesk(
     });
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-fd0d');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-fd0d');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

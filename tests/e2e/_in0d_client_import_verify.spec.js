@@ -143,7 +143,7 @@ async function bootClients(page, { lang = 'zh', parseBody = PREVIEW_OK, parseSta
     });
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-in0d');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-in0d');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

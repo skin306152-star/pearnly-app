@@ -38,7 +38,7 @@
     // /api/me 解析 users.username(与左下角同源 · v5 §五3,一次调用无 N+1),未返回前
     // 走 token 侧回落链(邮箱前缀 → sub 短八位),绝不显示裸 UUID(清单 #2)。
     function currentActorLabel() {
-        return AI.format.actorLabel(null, localStorage.getItem('mrpilot_token'));
+        return AI.format.actorLabel(null, AI.token.get());
     }
 
     function resolveActorLabel() {
@@ -47,7 +47,7 @@
             .getMe()
             .then(function (me) {
                 if (S !== session) return;
-                S.actorLabel = AI.format.actorLabel(me, localStorage.getItem('mrpilot_token'));
+                S.actorLabel = AI.format.actorLabel(me, AI.token.get());
             })
             .catch(function () {
                 // 探针失败保持 token 回落态(短八位),不打扰主流程

@@ -1,12 +1,34 @@
 /*
  * Pearnly AI · ai-api.js · 后端调用薄层(工单制 API + 只读账套主体 API)
  *
- * 鉴权复用既有登录会话(localStorage mrpilot_token,同 console.js/pos.js 先例)——
- * 不新建登录态。闸行为(2026-07-09 拍板):M1 闸关或未登录一律拿到 404/401,
- * 调用方据此整页跳回 /home,不在本页渲染任何业务内容(fail-closed)。
+ * AI 门户使用独立令牌槽,避免同一浏览器的 POS 会话覆盖申报会话。
+ * M1 闸关或未登录一律拿到 404/401,调用方 fail-closed。
  */
 (function (root) {
     'use strict';
+
+    root.AI = root.AI || {};
+    var AI = root.AI;
+    var TOKEN_KEY = 'mrpilot_token_ai';
+    AI.token = {
+        get: function () {
+            try {
+                return root.localStorage.getItem(TOKEN_KEY);
+            } catch {
+                return null;
+            }
+        },
+        set: function (value) {
+            try {
+                root.localStorage.setItem(TOKEN_KEY, value);
+            } catch {}
+        },
+        clear: function () {
+            try {
+                root.localStorage.removeItem(TOKEN_KEY);
+            } catch {}
+        },
+    };
 
     // 错误码 → i18n key 的确定性映射(纯函数,DOM 层用 window.at(mapApiErrorKey(code)) 取文案)。
     function mapApiErrorKey(code) {
@@ -33,7 +55,7 @@
         var getToken =
             opts.getToken ||
             function () {
-                return root.localStorage.getItem('mrpilot_token');
+                return AI.token.get();
             };
 
         // Bearer 头:有 token 才带,没有就是空头(fail-closed 交给后端 401)——
@@ -43,13 +65,8 @@
             return token ? { Authorization: 'Bearer ' + token } : {};
         }
 
-        // 响应外壳统一处理:非 2xx → 抛带 code/status 的 Error(调用方 mapApiErrorKey 取文案),
-        // 2xx → 解出 JSON。JSON/multipart 请求共用同一份,不各拼一套错误契约。detail 多数是
-        // 裸字符串 key,但 payroll output 端点的「无该期数据」、收料预处理(IN-0a)故意回
-        // 结构化 {code,message:{th,en,zh,ja},filename,...}(routes/payroll_routes.py /
-        // services/workorder/intake_prep.py)——两种形态都取得到 code,不新开一条错误处理
-        // 分叉。err.detail 原样透传结构化对象(裸字符串 detail 时为 undefined),供收料
-        // 队列(ai-intake-queue.js)逐件点名 filename + 直出后端四语 message,不再自翻一遍。
+        // 非 2xx 抛带 code/status 的 Error;结构化 detail 原样保留给收料队列展示文件名和
+        // 四语消息。其余调用方统一用 mapApiErrorKey,不各拼一套错误契约。
         function handleResponse(r) {
             return r
                 .json()
@@ -98,11 +115,7 @@
             return parts.length ? '?' + parts.join('&') : '';
         }
 
-        // 附件响应统一收口(xlsx/pdf/图片二进制流不能进 handleResponse,它只认 JSON):
-        // 文件名取 Content-Disposition 的 filename*=UTF-8''(RFC 5987 泰文原名)优先、裸
-        // filename= 兜底、都没有用 fallbackName;失败仍是 JSON 错误壳,借 handleResponse
-        // 抛同构 code/status 错误。_downloadAttachment/downloadDeliverable/
-        // downloadFinancialsReport 与 ai-api-payroll.js 两个下载全走它,不各解一套头。
+        // 附件名优先取 RFC 5987 filename*,再取 filename 或 fallbackName;失败仍走统一错误壳。
         function attachmentResponse(fallbackName) {
             return function (r) {
                 if (!r.ok) return handleResponse(r);
@@ -137,6 +150,9 @@
                     remember: !!remember,
                     entry: 'ai',
                 });
+            },
+            probe: function () {
+                return call('GET', '/api/ai/session');
             },
             // 邀请制门面判别用:token 有效性探针(非闸接口)——工单闸 404 时借它分辨"未登录/
             // token 失效"与"已登录但未受邀"(见 ai.js boot() 的 resolveGateClosed)。

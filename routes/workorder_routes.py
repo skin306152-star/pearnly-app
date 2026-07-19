@@ -1,14 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Pearnly AI · 工单制 HTTP API(M1-B1 · 引擎后端化)。
-
-把 M0 的 CLI 发动机接上真后端:开单 / 列表看板 / 详情 / 触发推进 / 人工裁决 / 补料 / 复核签批 /
-冻结 / 交付包(C3 · 四权分立细码见下方 _C_* 常量 + services/workorder/sod.py)。
-全组挂 feature flag `pearnly_ai_m1`(默认关):闸关时一律 404 —— 对存量 Pearnly 用户,这些
-路由等于不存在(fail-closed)。租户隔离全走 store.py 既有函数(tenant_id 取自登录态),
-每条 {id} 路由都校验工单归属本租户 + 账套作用域(check_workspace_scope,越权 404 防枚举)。
-
-编排细节在 services/workorder/api(无框架内核),后台推进在 services/workorder/runner
-(HTTP 不阻塞:/run 交 BackgroundTasks,引擎每步独立事务提交,续跑安全)。
+"""Pearnly AI 工单 HTTP API:开单、推进、补料、复核、冻结与交付。
+全组受 pearnly_ai_m1 闸保护;租户、工单归属和账套作用域均 fail-closed。
+业务编排在 services/workorder/api,后台推进在 services/workorder/runner。
+四权分立细码见 C* 常量 + services/workorder/sod.py。
+每条 {id} 路由校验工单归属+账套作用域，越权 404 防枚举。
 """
 
 from __future__ import annotations
@@ -37,8 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 def _client_name_for_order(cur, *, tenant_id: str, user_id: str, workspace_client_id) -> str:
-    """交付物/报表下载文件名用的客户名。查不到(异常边缘态)诚实回空串,调用方据此
-    退回落盘原名,不拼一个假名字。"""
+    """交付物/报表下载文件名用的客户名。查不到(异常边缘态)诚实回空串,调用方据此退回落盘原名,不拼一个假名字。"""
     try:
         client = db.get_workspace_client(workspace_client_id, user_id, tenant_id=tenant_id)
         return (client or {}).get("name") or ""
@@ -94,6 +88,13 @@ class ReviewSignoffIn(BaseModel):
 def _authorize(request: Request, perm: str) -> tuple[dict, str]:
     """登录 + M1 闸(关→404 fail-closed)+ 动作细码权限。返回 (user, tenant_id)。"""
     return authorize_pearnly_ai(request, perm, not_found="workorder.not_found")
+
+
+@router.get("/api/ai/session")
+async def ai_session(request: Request):
+    """AI 壳门禁探针:只跑权限守卫,不触发业务读写。"""
+    _authorize(request, _C_VIEW)
+    return {"ok": True}
 
 
 def _assert_owns_workspace(cur, request: Request, user: dict, tenant_id: str, ws_id: int) -> None:
@@ -153,8 +154,7 @@ def _raise_from_api_error(e: "api.WorkOrderApiError") -> None:
 def _schedule_advance(
     background: BackgroundTasks, tenant_id: str, work_order_id: str, user: dict
 ) -> bool:
-    """抢 run 租约 + 落 run_requested + 交后台 advance。抢到返 True(已排后台);抢不到
-    (已有 run 在跑)返 False。
+    """抢 run 租约 + 落 run_requested + 交后台 advance。抢到返 True(已排后台);抢不到(已有 run 在跑)返 False。
 
     P-7 引擎自驱:裁决/补料/补销项落库成功后调此,引擎自动续跑,用户不必盯着状态手点 /run。
     实体是 runner.request_run 推进原语(路由/收尸/LINE 回写同一事实源),路由径保留

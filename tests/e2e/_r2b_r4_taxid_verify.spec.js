@@ -61,7 +61,7 @@ async function mount(page, table, opts = {}) {
         return route.fulfill({ contentType: 'application/json', body: '{}' });
     });
     await page.addInitScript((lang) => {
-        window.localStorage.setItem('mrpilot_token', 'tok-r2b-r4');
+        window.localStorage.setItem('mrpilot_token_ai', 'tok-r2b-r4');
         window.localStorage.setItem('mrpilot_lang', lang || 'zh');
     }, opts.lang);
 }

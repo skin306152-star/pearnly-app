@@ -336,7 +336,15 @@ class CoverageDegradeTests(unittest.TestCase):
         self.assertIsNone(bss.stmt_totals.period_month("May-2569"))
 
     def test_three_missing_tail_days_degrade_and_name_dates(self):
-        events = [_bank_event([_dep("2026-05-01", 100), _dep("2026-05-28", 200)])]
+        days = list(range(1, 18)) + [28]
+        events = [
+            _bank_event(
+                [_dep(f"2026-05-{day:02d}", 100 + row) for row in range(5)],
+                item_id=f"page-{page}",
+                eid=page,
+            )
+            for page, day in enumerate(days, start=1)
+        ]
         result = bss.suggest(events, period="2569-05")
         self.assertFalse(result["reliable"])
         self.assertEqual(result["degrade_reason"], bss.DEGRADE_DATE_GAP)

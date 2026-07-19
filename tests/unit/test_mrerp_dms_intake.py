@@ -187,6 +187,7 @@ class IntakeContractTests(unittest.TestCase):
         }
         cid = self.c.save_customer(fields=fields, mode="create")  # 默认 search_hits=['95']
         self.assertEqual(cid, "95")
+        self.assertTrue(self.c._create_converted)
         self.assertTrue([p for p in self.t.posts if p[0].endswith("cus/edit.php")], "应转 edit.php")
         self.assertFalse([p for p in self.t.posts if p[0].endswith("cus/new.php")], "不应建新")
 
@@ -209,6 +210,7 @@ class IntakeContractTests(unittest.TestCase):
         self.assertEqual(cid, "95")
         self.assertTrue([p for p in t.posts if p[0].endswith("cus/edit.php")], "应转 edit.php 覆盖")
         self.assertTrue(slept.called)  # 复搜带退避,真跑时给搜索端点喘息窗口
+        self.assertTrue(c._create_converted)  # 回执侧据此如实说「อัปเดต」不谎称新建
 
     def test_create_duplicate_code_research_still_missing_raises(self):
         """复搜三次仍空 → 如实抛 ERR_DMS_CUSTOMER_SAVE(不吞错不假成功)。"""

@@ -141,7 +141,7 @@ class _FakeAdapter:
 
 
 class RecognizeLookupDiffWiringTests(unittest.TestCase):
-    def _run(self, adapter, name, phone=""):
+    def _run(self, adapter, name, phone="", fallback=None):
         from services.erp import erp_dms_intake as intake
         from unittest.mock import patch
 
@@ -155,6 +155,7 @@ class RecognizeLookupDiffWiringTests(unittest.TestCase):
                 name=name,
                 ocr_address={},
                 phone=phone,
+                fallback_customer_ids=fallback,
             )
 
     def test_found_customer_reports_name_diff(self):
@@ -182,6 +183,31 @@ class RecognizeLookupDiffWiringTests(unittest.TestCase):
         out = self._run(_FakeAdapter(_LookupFakeTransport(found=False)), "Nobody")
         self.assertNotEqual(out["scenario"], "exact")
         self.assertEqual(out["field_diffs"], [])
+
+    def test_fallback_direct_read_recovers_invisible_customer(self):
+        """搜索连番空返(新客隐身期)→ 台账候选按号直读核对全证号命中 → exact。"""
+        out = self._run(
+            _FakeAdapter(_LookupFakeTransport(dms_name="Same Name", found=False)),
+            "Same Name",
+            fallback=["77"],
+        )
+        self.assertEqual(out["scenario"], "exact")
+        self.assertEqual(out["match"]["customer_id"], "77")
+
+    def test_fallback_candidate_with_other_pid_rejected(self):
+        """台账候选直读后证号对不上 → 不认,仍走新客户(尾4撞号防误合并)。"""
+        t = _LookupFakeTransport(dms_name="X", found=False)
+        orig = t.post
+
+        def post(url, data=None, files=None, timeout_ms=None):
+            r = orig(url, data=data, files=files, timeout_ms=timeout_ms)
+            if url.endswith("cus/form.php"):
+                r = _Resp(r.text.replace("1101700207366", "9909900207366"))
+            return r
+
+        t.post = post
+        out = self._run(_FakeAdapter(t), "X", fallback=["77"])
+        self.assertNotEqual(out["scenario"], "exact")
 
     def test_lookup_retry_recovers_flaky_search(self):
         """搜索首查空返、重试命中 → exact(2026-07-19 三次实锤的漏检退避重试回归)。"""

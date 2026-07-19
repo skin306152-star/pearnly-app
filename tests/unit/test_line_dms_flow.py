@@ -151,6 +151,7 @@ class _Env:
         else:
             p(flow._id_ocr, "recognize_id_card", return_value=(self._ep, self._ocr, 10))
         p(flow._id_ocr, "resolve_dms_endpoint", return_value=self._ep)
+        p(flow._push_logs, "recent_dms_customer_ids_by_tail", return_value=[])
         self.lookup = p(flow._dms_intake, "recognize_lookup_mrerp_dms", return_value=self._lookup)
         self.push_idcard = p(
             flow._dms_intake, "push_idcard_fields_mrerp_dms", return_value=self._push_result
@@ -190,9 +191,13 @@ def _pb_field(action, nonce, field):
 
 
 class FlowTests(unittest.IsolatedAsyncioTestCase):
-    async def _seed_reviewing(self, env):
-        """预置 phone → 送图 → 走完查重,落到 reviewing。返回 session nonce。"""
-        env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE})
+    async def _seed_reviewing(self, env, mode=""):
+        """预置 phone → 送图 → 走完查重,落到 reviewing。返回 session nonce。
+        档案维护语义(diff 卡/更新)只在 mode='customer'(菜单1)存在;缺省=订车工作流。"""
+        payload = {"phone": _PHONE}
+        if mode:
+            payload["mode"] = mode
+        env.store.set_session("T1", "L1", "collecting", payload)
         await flow.process_image(_BINDING, _LUID, "mid1")
         return (env.session() or {}).get("payload", {}).get("nonce")
 
@@ -220,7 +225,7 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_c2_exact_no_diff_zero_write(self):
         """C2(2026-07-19 拍板):exact 无 diff → 零写入,一律先出同资料预览卡确认。"""
         with _Env(ocr=_ocr_ok(), lookup=_lookup("exact", customer_id="C7")) as env:
-            await self._seed_reviewing(env)
+            await self._seed_reviewing(env, mode="customer")
             await env.drain()
             env.push_idcard.assert_not_called()
             sess = env.session()
@@ -229,13 +234,29 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             card = env.pushed_card()
             self.assertEqual(card["altText"], cards.same_customer_card({}, "x")["altText"])
 
+    async def test_c2b_booking_mode_exact_shows_booking_card_even_with_diffs(self):
+        """订车工作流(2026-07-19 泰方拍板):缺省/菜单2 认出已有客户,有差异也不弹更新,
+        出 [ทำใบจองต่อ][แก้ไข] 确认卡;点继续 → offer_pick,零写入。"""
+        diffs = [{"field": "house_no", "old": "88", "new": "99"}]
+        with _Env(
+            ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=True
+        ) as env:
+            await self._seed_reviewing(env)
+            card = env.pushed_card()
+            labels = _all_button_labels(card)
+            self.assertIn(cards.BTN_CONTINUE_BOOKING, labels)
+            self.assertNotIn(cards.BTN_UPDATE, labels)
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP))
+            await env.drain()
+            env.push_idcard.assert_not_called()
+
     async def test_c3_exact_addr_diff_update_only_changed(self):
         """C3:exact+地址 diff → 卡恰 1 条 diff;确认→overwrite 且 fields 有地址键、无生日。"""
         diffs = [{"field": "house_no", "old": "88", "new": "99"}]
         with _Env(
             ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=True
         ) as env:
-            nonce = await self._seed_reviewing(env)
+            nonce = await self._seed_reviewing(env, mode="customer")
             # 卡内容恰 1 条 diff(数颜色为红的差异文本行)
             card = env.pushed_card()
             body = card["contents"]["body"]["contents"]
@@ -322,7 +343,7 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
         with _Env(
             ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=True
         ) as env:
-            nonce = await self._seed_reviewing(env)
+            nonce = await self._seed_reviewing(env, mode="customer")
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_UPDATE, nonce))
             await env.drain()
 
@@ -338,7 +359,7 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
         with _Env(
             ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=False
         ) as env:
-            await self._seed_reviewing(env)
+            await self._seed_reviewing(env, mode="customer")
             card = env.pushed_card()
             labels = _all_button_labels(card)
             self.assertNotIn(cards.BTN_UPDATE, labels)

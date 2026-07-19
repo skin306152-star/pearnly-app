@@ -180,6 +180,7 @@ def recognize_lookup_mrerp_dms(
     name: str = "",
     ocr_address: Dict[str, Any],
     phone: str = "",
+    fallback_customer_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """OCR 后:查 DMS 客户 + 解析 OCR 地址级联 + 选项 + 称谓 + 相似候选。
     scenario:exact(身份证号命中)/ similar(按姓名找到候选)/ none(都没有)。"""
@@ -188,14 +189,23 @@ def recognize_lookup_mrerp_dms(
         from services.erp.mrerp_dms_models import ThaiAddress
 
         look = cl.lookup_customer(people_id)
-        # DMS 搜索偶发空返(2026-07-19 三次实锤:同号建档后数分钟搜不到,隔 1-2s 重试
-        # 即命中)。查重漏检=预览卡误标「新客户」,退避重试两轮把误标压到最低;
-        # 真新客户多付 ~3s,可接受。写路径另有撞码自愈兜底。
+        # DMS 搜索的「新客隐身期」(2026-07-19 四案实锤):新建/刚改的客户在建档会话里
+        # 搜得到,对新会话隐身可达数分钟后又可见 → 秒级重试只救抖动,救不了隐身期。
         for _ in range(2):
             if look["found"] or not (people_id or "").strip():
                 break
             time.sleep(1.5)
             look = cl.lookup_customer(people_id)
+        if not look["found"]:
+            # 台账兜底:本租户最近推过的同尾号客户,按客户号【直读】核对全证号——
+            # 直读不经搜索缓存,权威;命中即视为已有客户,预览卡不再误标「新客户」。
+            pid_digits = "".join(ch for ch in str(people_id) if ch.isdigit())
+            for cid in fallback_customer_ids or []:
+                f = cl.read_customer(str(cid))
+                got = "".join(ch for ch in str(f.get("people_id") or "") if ch.isdigit())
+                if pid_digits and got == pid_digits:
+                    look = {"found": True, "customer_id": str(cid), "fields": f}
+                    break
         form_html = cl._post_text("cus/form.php", {"status": "n"})
         a = ocr_address or {}
         addr = ThaiAddress(
@@ -328,16 +338,18 @@ def push_idcard_fields_mrerp_dms(
         cid = cl.save_customer(
             fields=fields, mode=save_mode, customer_id=customer_id, addresses=addresses
         )
+        # create 被幂等/撞码转成 overwrite 时如实回 update——回执不谎称「新建」。
+        actual = "update" if getattr(cl, "_create_converted", False) else mode
         return {
             "ok": True,
             "success": True,
             "customer_id": cid,
-            "mode": mode,
+            "mode": actual,
             "elapsed_ms": int((time.time() - t0) * 1000),
             "response_body": {
                 "adapter": "mrerp_dms",
                 "customer_id": cid,
-                "mode": mode,
+                "mode": actual,
             },
         }
 

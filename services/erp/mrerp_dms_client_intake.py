@@ -77,12 +77,13 @@ class DMSClientIntakeMixin:
         cid = self.search_customer(people_id) if (people_id or "").strip() else None
         if not cid:
             return {"found": False, "customer_id": None, "fields": {}}
-        page = self._post_text("cus/form.php", {"status": "e", "id": cid})
-        return {
-            "found": True,
-            "customer_id": cid,
-            "fields": self._extract_customer_fields(self._parse_form_defaults(page), page),
-        }
+        return {"found": True, "customer_id": cid, "fields": self.read_customer(cid)}
+
+    def read_customer(self, customer_id: str) -> Dict[str, str]:
+        """按客户号直读全字段。直读不经搜索,不受列表缓存「新客隐身期」影响
+        (2026-07-19 三案实锤:新建客户对新会话隐身数分钟)——台账兜底核对靠它。"""
+        page = self._post_text("cus/form.php", {"status": "e", "id": str(customer_id)})
+        return self._extract_customer_fields(self._parse_form_defaults(page), page)
 
     def search_customers_detailed(self, text: str, limit: int = 10) -> List[Dict[str, str]]:
         """按 码/姓名/证号 搜 DMS 客户,解析多行候选(给相似匹配)。
@@ -172,6 +173,7 @@ class DMSClientIntakeMixin:
         三套地址分别写;不给则用 fields 里的单套地址写满三处(向后兼容)。"""
         if mode not in ("create", "overwrite"):
             raise DMSClientError(f"bad save mode: {mode!r}", "ERR_DMS_CUSTOMER_SAVE")
+        self._create_converted = False  # create 被幂等/撞码转成 overwrite 时置 True(回执诚实)
         with self._writer_session():
             return self._save_customer_locked(
                 fields=fields, mode=mode, customer_id=customer_id, addresses=addresses
@@ -207,6 +209,7 @@ class DMSClientIntakeMixin:
             existing = self.search_customer((fields.get("people_id") or "").strip())
             if existing:
                 mode, customer_id = "overwrite", existing
+                self._create_converted = True
         if mode == "overwrite" and not customer_id:
             raise DMSClientError("overwrite needs customer_id", "ERR_DMS_CUSTOMER_SAVE")
 
@@ -231,6 +234,7 @@ class DMSClientIntakeMixin:
             # 覆盖,不把「已存在」当失败抛给用户;仍搜不到才如实报错。
             existing = self._research_customer((fields.get("people_id") or "").strip())
             if existing:
+                self._create_converted = True
                 return self._save_customer_locked(
                     fields=fields, mode="overwrite", customer_id=existing, addresses=addresses
                 )

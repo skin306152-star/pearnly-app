@@ -129,6 +129,7 @@ class _Env:
         self.insert_log = p(flow.db, "insert_push_log", return_value="LOG1")
         p(flow._id_ocr, "recognize_id_card", return_value=(self._ep, self._ocr, 10))
         p(flow._id_ocr, "resolve_dms_endpoint", return_value=self._ep)
+        p(flow._push_logs, "recent_dms_customer_ids_by_tail", return_value=[])
         self.lookup = p(flow._dms_intake, "recognize_lookup_mrerp_dms", return_value=self._lookup)
         self.push_idcard = p(
             flow._dms_intake, "push_idcard_fields_mrerp_dms", return_value=self._push_result
@@ -176,6 +177,14 @@ class MenuTriggerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sess["state"], "menu")
             self.assertIn("id_card", sess["payload"])
             self.assertEqual(sess["payload"]["phone"], _PHONE)
+
+    async def test_a1_menu_typo_prefix_opens_menu(self):
+        """A1:เมน/เมนB 打错字也弹菜单(2026-07-19 真机实拍),不带问候气泡。"""
+        with _Env() as env:
+            await flow.handle_text(_BINDING, _LUID, "rt", "เมนB")
+            msgs = env.reply_msgs.call_args.args[1]
+            self.assertEqual(len(msgs), 1)
+            self.assertEqual(msgs[0]["altText"], cards.TXT_MENU_TITLE)
 
     async def test_a1_no_session_chatter_shows_menu_card(self):
         """A1:无会话闲聊 → 菜单卡(取代旧 TXT_INTRO 文本)。"""

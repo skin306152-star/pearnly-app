@@ -46,11 +46,13 @@ async def handle_text(
     其余数字文本(如手机号)不被吃成菜单——只认这两个单字符。
     """
     stripped = text.strip()
-    if stripped == _MENU_WORD or stripped.startswith(_GREETING_PREFIX):
+    # เมนู 常见打错(เมน/เมนB,真机 2026-07-19 实拍):短词且以 เมน 起头都当召唤菜单。
+    is_menu_word = stripped == _MENU_WORD or (len(stripped) <= 6 and stripped.startswith("เมน"))
+    if is_menu_word or stripped.startswith(_GREETING_PREFIX):
         await _enter_menu(binding, line_user_id, sess)
         # 问候语带欢迎气泡(照 mockup 的进场节奏);เมนู 是回访召唤,只发卡不寒暄。
         msgs: list = [menu_cards.menu_card()]
-        if stripped != _MENU_WORD:
+        if not is_menu_word:
             msgs.insert(0, {"type": "text", "text": cards.TXT_MENU_GREETING})
         line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
         return True

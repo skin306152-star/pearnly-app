@@ -22,6 +22,7 @@ from urllib.parse import parse_qs
 from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
+from services.erp import push_log_queries as _push_logs
 from services.line_binding import line_client
 from services.line_dms import (
     _out,
@@ -254,6 +255,9 @@ async def _run_dedup(
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
 
+    # 台账候选:DMS 搜索有「新客隐身期」,刚推过的同尾号客户按号直读核对(intake 侧)。
+    tail = str(id_card.get("people_id") or "")[-4:]
+    cands = await _thr(_push_logs.recent_dms_customer_ids_by_tail, tenant, tail)
     res = await _thr(
         _dms_intake.recognize_lookup_mrerp_dms,
         ep,
@@ -261,6 +265,7 @@ async def _run_dedup(
         name=id_card.get("name") or "",
         ocr_address=id_card.get("address") or {},
         phone=phone,
+        fallback_customer_ids=cands,
     )
     if not res.get("ok"):
         fr = res.get("error_friendly") or {}
@@ -289,11 +294,16 @@ async def _run_dedup(
     if scenario == "none":
         payload = {**base, "scenario": "none"}
         card = cards.new_customer_card(summary, nonce)
+    elif scenario == "exact" and mode != "customer":
+        # 订车工作流(泰方拍板:与档案维护是 DMS 两个功能,证件只为认人):认出已有
+        # 客户即确认卡直奔选车,不弹差异不问更新;档案维护走菜单1。
+        payload = {**base, "scenario": "exact_diff", "customer_id": res["match"]["customer_id"]}
+        card = cards.booking_customer_card(summary, nonce)
     elif scenario == "exact":
         has_admin = draft.has_admin_creds(ep)
         display = draft.display_diffs(field_diffs, geo)
-        # 审批策略见 approval_flow.APPROVAL_POLICY;无差异 → 同资料预览卡(不分模式,
-        # 2026-07-19 拍板:收到证+电话一律先确认)。按「保持」后 ACT_KEEP 按 mode 分流。
+        # 审批策略见 approval_flow.APPROVAL_POLICY;无差异 → 同资料预览卡(收到证+电话
+        # 一律先确认)。按「保持/继续」后 ACT_KEEP 按 mode 分流。
         args = (tenant, user_id, display, has_admin, nonce, summary)
         card, approval = await _thr(approval_flow.exact_diff_card, *args)
         payload = {
@@ -418,6 +428,7 @@ async def _execute(
     )
 
     if success:
+        mode = result.get("mode") or mode  # create 被幂等/撞码转更新时回执如实说 อัปเดต
         _push(line_user_id, cards.receipt_text(result.get("customer_id") or "", name, mode))
         await menu_flow.after_customer_saved(
             binding,

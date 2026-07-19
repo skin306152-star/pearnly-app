@@ -49,13 +49,18 @@
   - `tests/e2e/_artifacts/gc0719_bc/03-gc-c-background-progress.png`
   - `tests/e2e/_artifacts/gc0719_bc/04-gc-c-group-confirm.png`
 
+### CI
+
+- 绿链：[CI run 29675558796](https://github.com/skin306152-star/pearnly-app/actions/runs/29675558796)。
+- lint、lint-ui、lint-size、lint-agent、lint-debt、lint-routes、lint-model、全量 unit/coverage/build 与 182 条线上 Playwright smoke 全绿。
+
 ## 3. 验收标准逐条对照
 
 1. **做到**：705 行按 `ceil(705/40)=18` 次模型调用，低于约 20 次；HTTP 只做鉴权、回放待定数和起线程后秒回；进度含 running/total/done/failed_batches/status。
 2. **做到**：每批单独提交 append-only 事件；重启后内存互斥清空，但 `pending_rows` 跳过已有建议且事件 dedupe 锚行指纹，继续补剩余行、不重判已提交批次。
 3. **做到**：待定行最多四组，每组“发起批量动作 + 确认”两击，典型分布最多 8 击；大额逐行可看，小额无 705 个单行按钮路径。
 4. **做到**：普通 `รับโอนเงิน` 明确保持 pending；只有票面明示销售渠道或 EDC 强互证才自动 sales，代码走查与单测双证。
-5. **做到**：本地全量、构建、全部工程闸与真 Chromium 全绿；CI 绿链见提交后的补记。
+5. **做到**：本地全量、构建、全部工程闸、真 Chromium 与分支 CI 全绿，REPORT 附截图及绿链。
 
 ## 4. 待拍板
 

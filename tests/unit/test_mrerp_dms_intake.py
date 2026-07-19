@@ -6,6 +6,7 @@ list_prefixes 的表单字段映射与提交端点(new.php / edit.php)。
 """
 
 import unittest
+from unittest import mock
 
 from services.erp.mrerp_dms_client import DMSClient
 from services.erp.mrerp_dms_client_base import DMSClientError
@@ -90,6 +91,27 @@ class FakeTransport:
     _edit_name = "Old Name"
 
 
+class _DupCodeTransport(FakeTransport):
+    """建档撞唯一键场景:幂等预查与复搜前几次都空返,new.php 恒报 ซ้ำ。
+    research_hit_at=第几次 showdata 搜索起命中(默认第 3 次=复搜第 2 试)。"""
+
+    def __init__(self, research_hit_at: int = 3):
+        super().__init__()
+        self.search_hits = []
+        self._hit_at = research_hit_at
+        self._searches = 0
+
+    def post(self, url, data=None, files=None, timeout_ms=None):
+        if url.endswith("cus/component/showdata.php"):
+            self.posts.append((url, dict(data or {})))
+            self._searches += 1
+            return _Resp('<a data-val="95">row</a>' if self._searches >= self._hit_at else "")
+        if url.endswith("cus/new.php"):
+            self.posts.append((url, dict(data or {})))
+            return _Resp('err::"รหัสลูกค้า" ซ้ำ')
+        return super().post(url, data=data, files=files, timeout_ms=timeout_ms)
+
+
 class IntakeContractTests(unittest.TestCase):
     def setUp(self):
         self.t = FakeTransport()
@@ -167,6 +189,42 @@ class IntakeContractTests(unittest.TestCase):
         self.assertEqual(cid, "95")
         self.assertTrue([p for p in self.t.posts if p[0].endswith("cus/edit.php")], "应转 edit.php")
         self.assertFalse([p for p in self.t.posts if p[0].endswith("cus/new.php")], "不应建新")
+
+    def test_create_duplicate_code_self_heals_to_overwrite(self):
+        """撞「รหัสลูกค้า ซ้ำ」= 搜索漏检但记录其实已在(2026-07-19 演示实锤:建档后
+        3 分钟同号搜不到 → 重复建档被拒)→ 复搜(带重试)命中即转覆盖,不报错给用户。"""
+        t = _DupCodeTransport()
+        t._edit_name = "Heal Person"
+        c = DMSClient(t, "https://x/dms/")
+        fields = {
+            "name": "Heal Person",
+            "people_id": "1234567890123",
+            "province_id": "65",
+            "district_id": "804",
+            "subdistrict_id": "6472",
+            "zipcode_id": "6477",
+        }
+        with mock.patch("services.erp.mrerp_dms_client_intake.time.sleep") as slept:
+            cid = c.save_customer(fields=fields, mode="create")
+        self.assertEqual(cid, "95")
+        self.assertTrue([p for p in t.posts if p[0].endswith("cus/edit.php")], "应转 edit.php 覆盖")
+        self.assertTrue(slept.called)  # 复搜带退避,真跑时给搜索端点喘息窗口
+
+    def test_create_duplicate_code_research_still_missing_raises(self):
+        """复搜三次仍空 → 如实抛 ERR_DMS_CUSTOMER_SAVE(不吞错不假成功)。"""
+        t = _DupCodeTransport(research_hit_at=99)
+        c = DMSClient(t, "https://x/dms/")
+        fields = {
+            "name": "X",
+            "people_id": "1234567890123",
+            "province_id": "65",
+            "district_id": "804",
+            "subdistrict_id": "6472",
+            "zipcode_id": "6477",
+        }
+        with mock.patch("services.erp.mrerp_dms_client_intake.time.sleep"):
+            with self.assertRaises(DMSClientError):
+                c.save_customer(fields=fields, mode="create")
 
     def test_save_fills_empty_prefix_and_zipcode(self):
         """空 selprefix/selzipcodes 触发 DMS 误导性 'already in use' → 提交前兜底补全。"""

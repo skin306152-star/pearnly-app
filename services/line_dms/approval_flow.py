@@ -64,13 +64,24 @@ def _is_active_admin(prof: Optional[dict]) -> bool:
     )
 
 
+# ── 审批策略(2026-07-19 泰方拍板)──────────────────────────────────────────
+# 客户档案改写:销售直写不审——写路径借老板管理员凭据落地(dms_id_ocr._inherit_tenant_defaults)。
+# 信用授权(未来功能)上线时在此登记 True,即接回下方原样保留的提审→选人→批准→执行链。
+APPROVAL_POLICY = {"customer_profile": False, "credit_auth": True}
+
+
+def requires_approval(kind: str) -> bool:
+    """未登记的改动类型按需审批处理(fail-closed:新高危动作忘登记=默认要审)。"""
+    return APPROVAL_POLICY.get(kind, True)
+
+
 def exact_diff_card(tenant_id: str, user_id: str, display: list, has_admin: bool, nonce: str):
-    """flow 的 exact_diff 分支按花名册角色解出主按钮:sales→提审;admin/有 admin 凭据→直写;
-    无档案且没配 admin→仅设置提示。渲染交给 cards.diff_card(单一 primary 选择)。
-    返回 (card, approval标志)。"""
+    """flow 的 exact_diff 分支按花名册角色+审批策略解出主按钮:sales 且该类改动要审→提审卡;
+    其余有写权(admin 凭据可用/admin 角色)→直写;都没有→仅设置提示。渲染交给
+    cards.diff_card(单一 primary 选择)。返回 (card, approval标志)。"""
     prof = roster_store.get_profile(tenant_id, str(user_id))
     role = (prof or {}).get("dms_role") or ""
-    if role == "sales":
+    if role == "sales" and requires_approval("customer_profile"):
         return cards.diff_card(display, nonce, primary="approval"), True
     primary = "update" if (has_admin or role == "admin") else "none"
     return cards.diff_card(display, nonce, primary=primary), False

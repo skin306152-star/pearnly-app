@@ -305,7 +305,7 @@ async def _run_dedup(
     elif scenario == "exact":
         has_admin = draft.has_admin_creds(ep)
         display = draft.display_diffs(field_diffs, geo)
-        # 波4:花名册 sales→提审卡;admin/无档案→直写(approval 标志守卫提交动作)。
+        # 审批策略见 approval_flow.APPROVAL_POLICY:客户档改写销售直写,要审的类型才出提审卡。
         args = (tenant, user_id, display, has_admin, nonce)
         card, approval = await _thr(approval_flow.exact_diff_card, *args)
         payload = {

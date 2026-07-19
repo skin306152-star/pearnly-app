@@ -43,15 +43,71 @@ def resolve_dms_endpoint(user_id: str, endpoint_id: Optional[str]) -> Optional[D
             and (ep.get("adapter") or "").strip().lower() == "mrerp_dms"
             and ep.get("enabled") is not False
         ):
-            return ep
+            return _inherit_tenant_defaults(user_id, ep)
         return None
     eps = db.list_erp_endpoints(user_id) or []
     for ep in eps:
         if (ep.get("adapter") or "").strip().lower() == "mrerp_dms" and ep.get(
             "enabled"
         ) is not False:
-            return ep
+            return _inherit_tenant_defaults(user_id, ep)
     return None
+
+
+def _cfg_has_admin(cfg: Dict[str, Any]) -> bool:
+    return bool(
+        (cfg.get("admin_username_enc") and cfg.get("admin_password_enc"))
+        or (cfg.get("admin_username") and cfg.get("admin_password"))
+    )
+
+
+def _tenant_owner_endpoint_cfg(tenant_id: Any) -> Dict[str, Any]:
+    """member 用户所在租户老板的 mrerp_dms endpoint config(找不到/异常回 {},按未配置处理)。"""
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT id FROM users WHERE tenant_id = %s AND (role = 'owner' OR role IS NULL) "
+                "ORDER BY created_at LIMIT 1",
+                (tenant_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return {}
+        for oep in db.list_erp_endpoints(str(row["id"])) or []:
+            if (oep.get("adapter") or "").strip().lower() == "mrerp_dms":
+                return oep.get("config") or {}
+    except Exception as e:
+        logger.warning(f"[dms] 借老板 endpoint 配置失败(按未配置处理): {e}")
+    return {}
+
+
+def _inherit_tenant_defaults(user_id: str, ep: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """操作员(member)endpoint 缺管理员凭据组/订车默认值时,继承租户老板 endpoint 的。
+
+    销售的 DMS 账号无改档权限是常态(2026-07-19 泰方拍板:销售改档不走审批),客户档
+    写路径靠借老板管理员凭据组落地——密文原样带过去(KMS 同钥),操作员永远接触不到
+    明文;订车默认值(单号前缀)同理跟随老板配置。老板没配 → 原样返回,差异卡如实
+    不出更新按钮。老板自己的 endpoint 在这里恒原样返回。"""
+    cfg = ep.get("config") or {}
+    has_admin = _cfg_has_admin(cfg)
+    if has_admin and cfg.get("booking_defaults"):
+        return ep
+    user = db.find_user_by_id(str(user_id))
+    if not user or (user.get("role") or "owner") == "owner" or not user.get("tenant_id"):
+        return ep
+    owner_cfg = _tenant_owner_endpoint_cfg(user["tenant_id"])
+    if not owner_cfg:
+        return ep
+    merged = dict(cfg)
+    if not has_admin:
+        for key in ("admin_username", "admin_password", "admin_username_enc", "admin_password_enc"):
+            if owner_cfg.get(key):
+                merged[key] = owner_cfg[key]
+    if not merged.get("booking_defaults") and owner_cfg.get("booking_defaults"):
+        merged["booking_defaults"] = owner_cfg["booking_defaults"]
+    out = dict(ep)
+    out["config"] = merged
+    return out
 
 
 def ensure_image_bytes(content: bytes, content_type: str = "") -> bytes:

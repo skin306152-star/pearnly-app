@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import html
 import re
+import time
 from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -224,12 +225,33 @@ class DMSClientIntakeMixin:
         endpoint = "cus/new.php" if mode == "create" else "cus/edit.php"
         resp = self.transport.post(self._url(endpoint), data=data, timeout_ms=60000)
         body = (resp.text or "").strip()
+        if mode == "create" and body.startswith("err::") and "ซ้ำ" in body:
+            # 「ซ้ำ」(重复)= 记录其实已在,只是查重搜索漏检(DMS 搜索偶发空返,
+            # 2026-07-19 实锤:建档后 3 分钟同号搜不到 → 重复建档被拒)。复搜转
+            # 覆盖,不把「已存在」当失败抛给用户;仍搜不到才如实报错。
+            existing = self._research_customer((fields.get("people_id") or "").strip())
+            if existing:
+                return self._save_customer_locked(
+                    fields=fields, mode="overwrite", customer_id=existing, addresses=addresses
+                )
         if resp.status_code != 200 or body.startswith("err::"):
             raise DMSClientError(
                 f"customer {mode} failed: {resp.status_code} {body[:200]!r}",
                 "ERR_DMS_CUSTOMER_SAVE",
             )
         return self._verify_saved(mode, fields, customer_id)
+
+    def _research_customer(self, people_id: str) -> Optional[str]:
+        """撞唯一键后的复搜:搜索端点偶发空返,隔 1.5s 共试 3 次再放弃。"""
+        if not people_id:
+            return None
+        for attempt in range(3):
+            if attempt:
+                time.sleep(1.5)
+            cid = self.search_customer(people_id)
+            if cid:
+                return cid
+        return None
 
     # ── 内部 ────────────────────────────────────────────────────────
     def _extract_customer_fields(self, data: Dict[str, str], form_html: str = "") -> Dict[str, str]:

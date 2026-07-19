@@ -42,13 +42,41 @@ def _btn_actions(card):
 
 
 class ExactDiffCardTests(unittest.TestCase):
-    def test_sales_gets_approval_card(self):
+    def test_sales_direct_update_with_borrowed_admin(self):
+        """2026-07-19 泰方拍板:客户档改写销售不走审批,借到老板 admin 凭据即直写。"""
+        with mock.patch.object(
+            approval_flow.roster_store, "get_profile", return_value={"dms_role": "sales"}
+        ):
+            card, approval = approval_flow.exact_diff_card("T1", "sales-1", [], True, "n1")
+        self.assertFalse(approval)
+        self.assertTrue(any("action=update" in a for a in _btn_actions(card)))
+
+    def test_sales_without_admin_creds_gets_setup_hint(self):
+        """老板没配管理员凭据组=借不到写权 → 诚实不出更新按钮,也不假装能提审。"""
         with mock.patch.object(
             approval_flow.roster_store, "get_profile", return_value={"dms_role": "sales"}
         ):
             card, approval = approval_flow.exact_diff_card("T1", "sales-1", [], False, "n1")
+        self.assertFalse(approval)
+        self.assertFalse(any("action=update" in a for a in _btn_actions(card)))
+        self.assertFalse(any("approval_submit" in a for a in _btn_actions(card)))
+
+    def test_sales_gets_approval_card_when_policy_requires(self):
+        """信用授权接口守门:策略登记要审的改动类型,波4 提审链原样接回。"""
+        with (
+            mock.patch.dict(approval_flow.APPROVAL_POLICY, {"customer_profile": True}),
+            mock.patch.object(
+                approval_flow.roster_store, "get_profile", return_value={"dms_role": "sales"}
+            ),
+        ):
+            card, approval = approval_flow.exact_diff_card("T1", "sales-1", [], False, "n1")
         self.assertTrue(approval)
         self.assertTrue(any("approval_submit" in a for a in _btn_actions(card)))
+
+    def test_unregistered_change_kind_defaults_to_approval(self):
+        self.assertTrue(approval_flow.requires_approval("credit_auth"))
+        self.assertTrue(approval_flow.requires_approval("future_unknown_kind"))
+        self.assertFalse(approval_flow.requires_approval("customer_profile"))
 
     def test_admin_gets_direct_update(self):
         with mock.patch.object(

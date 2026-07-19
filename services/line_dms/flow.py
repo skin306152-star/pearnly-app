@@ -22,7 +22,6 @@ from urllib.parse import parse_qs
 from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
-from services.erp import push_log_queries as _push_logs
 from services.line_binding import line_client
 from services.line_dms import (
     _out,
@@ -257,7 +256,7 @@ async def _run_dedup(
 
     # 台账候选:DMS 搜索有「新客隐身期」,刚推过的同尾号客户按号直读核对(intake 侧)。
     tail = str(id_card.get("people_id") or "")[-4:]
-    cands = await _thr(_push_logs.recent_dms_customer_ids_by_tail, tenant, tail)
+    cands = await _thr(_id_ocr.recent_dms_customer_ids_by_tail, tenant, tail)
     res = await _thr(
         _dms_intake.recognize_lookup_mrerp_dms,
         ep,

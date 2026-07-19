@@ -129,7 +129,7 @@ class _Env:
         self.insert_log = p(flow.db, "insert_push_log", return_value="LOG1")
         p(flow._id_ocr, "recognize_id_card", return_value=(self._ep, self._ocr, 10))
         p(flow._id_ocr, "resolve_dms_endpoint", return_value=self._ep)
-        p(flow._push_logs, "recent_dms_customer_ids_by_tail", return_value=[])
+        p(flow._id_ocr, "recent_dms_customer_ids_by_tail", return_value=[])
         self.lookup = p(flow._dms_intake, "recognize_lookup_mrerp_dms", return_value=self._lookup)
         self.push_idcard = p(
             flow._dms_intake, "push_idcard_fields_mrerp_dms", return_value=self._push_result

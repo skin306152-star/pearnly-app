@@ -453,31 +453,6 @@ def list_dms_push_logs_for_tenant(
         return {"items": [], "total": 0}
 
 
-def recent_dms_customer_ids_by_tail(
-    tenant_id: str, people_id_tail: str, limit: int = 5
-) -> List[str]:
-    """DMS 搜索「新客隐身期」兜底(2026-07-19 实锤:新建客户对新会话隐身数分钟):
-    取本租户最近成功推过的、证号尾4相同的客户号(存 invoice_no 列),调用方逐个
-    直读 DMS 记录核对全证号后才认。只回候选,不下结论;查询失败按无候选处理。"""
-    if not tenant_id or not people_id_tail:
-        return []
-    try:
-        with db.get_cursor() as cur:
-            cur.execute(
-                "SELECT l.invoice_no, MAX(l.created_at) AS ts FROM erp_push_logs l "
-                "JOIN users u ON u.id = l.user_id AND u.tenant_id = %s "
-                "WHERE l.request_body->>'adapter' = 'mrerp_dms' "
-                "AND l.request_body->>'people_id_tail' = %s AND l.status = 'success' "
-                "AND COALESCE(l.invoice_no, '') <> '' "
-                "GROUP BY l.invoice_no ORDER BY ts DESC LIMIT %s",
-                (str(tenant_id), str(people_id_tail), limit),
-            )
-            return [str(r["invoice_no"]) for r in cur.fetchall()]
-    except Exception as e:
-        logger.warning(f"recent_dms_customer_ids_by_tail 兜底候选查询失败(按无候选): {e}")
-        return []
-
-
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:
     """今日推送统计(总数 · 成功 · 失败)"""
     try:

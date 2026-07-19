@@ -151,7 +151,7 @@ class _Env:
         else:
             p(flow._id_ocr, "recognize_id_card", return_value=(self._ep, self._ocr, 10))
         p(flow._id_ocr, "resolve_dms_endpoint", return_value=self._ep)
-        p(flow._push_logs, "recent_dms_customer_ids_by_tail", return_value=[])
+        p(flow._id_ocr, "recent_dms_customer_ids_by_tail", return_value=[])
         self.lookup = p(flow._dms_intake, "recognize_lookup_mrerp_dms", return_value=self._lookup)
         self.push_idcard = p(
             flow._dms_intake, "push_idcard_fields_mrerp_dms", return_value=self._push_result
@@ -367,6 +367,35 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(_card_has_text(card, cards.TXT_ADMIN_NEEDED))
 
     # ── DL-6 逐字段修正 ────────────────────────────────────────────────────
+    async def test_e0_cancel_keeps_card_valid_and_spawns_nothing(self):
+        """菜单阶段取消修改 = 原卡仍有效 + 零后台任务(慢重跑劫持后续流程 · J4 实锤)。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env)
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_EDIT, nonce))
+            spawned_before = len(env.spawned)
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_EDIT_CANCEL, nonce))
+            self.assertEqual(len(env.spawned), spawned_before)  # 不再重跑查重
+            self.assertEqual(env.session()["state"], "reviewing")
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
+            await env.drain()
+            self.assertEqual(env.push_idcard.call_count, 1)  # 原卡同 nonce 仍可确认
+
+    async def test_e0b_editing_text_cancel_restores_reviewing(self):
+        """editing 态文本 ยกเลิก = 原地恢复 reviewing(同 nonce 去 editing_field),不重跑。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env)
+            await flow.handle_postback(
+                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
+            )
+            self.assertEqual(env.session()["state"], "editing")
+            spawned_before = len(env.spawned)
+            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_EDIT_CANCEL)
+            self.assertEqual(len(env.spawned), spawned_before)
+            sess = env.session()
+            self.assertEqual(sess["state"], "reviewing")
+            self.assertNotIn("editing_field", sess["payload"])
+            self.assertEqual(sess["payload"]["nonce"], nonce)
+
     async def test_e1_edit_button_and_menu(self):
         """E1:新建卡有 [แก้ไข];对 nonce → quick reply 字段列表;错 nonce → 过期不进编辑。"""
         with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:

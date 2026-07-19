@@ -78,12 +78,14 @@ async def _pick_field(
 def _cancel(
     binding: dict, line_user_id: str, reply_token: str, sess: Optional[dict], nonce: Optional[str]
 ) -> None:
+    """字段菜单阶段取消:会话仍在 reviewing、nonce 未变,原卡按钮依旧有效——只回话术,
+    零后台任务。此前这里派后台重跑查重(真 DMS 登录 15-25s),慢任务落地时会把旧会话
+    砸回来,劫持用户已开始的下一个流程(2026-07-19 J4 取证实锤)。"""
     payload = (sess or {}).get("payload") or {}
     if not _nonce_ok(sess, nonce) or not payload.get("id_card"):
         _reply(reply_token, cards.TXT_EXPIRED)
         return
     _reply(reply_token, cards.TXT_EDIT_CANCELLED)
-    _rerun(binding, line_user_id, payload)
 
 
 # ── text:editing 态收新值 / 文本取消 ───────────────────────────────────────
@@ -93,8 +95,11 @@ async def handle_text(
     """editing 态的下一条文本 = 新值(或 ยกเลิก 放弃)。flow 已先拦 เริ่มใหม่ 全局重置。"""
     payload = (sess or {}).get("payload") or {}
     if text.strip() == cards.BTN_EDIT_CANCEL:
+        # editing 态取消:原地把会话恢复成 reviewing(去 editing_field·nonce 不变),
+        # 原卡立即重新可用——不重跑查重(同 _cancel:慢任务会劫持后续流程)。
+        restored = {k: v for k, v in payload.items() if k != "editing_field"}
+        await _thr(store.set_session, binding["tenant_id"], line_user_id, "reviewing", restored)
         _reply(reply_token, cards.TXT_EDIT_CANCELLED)
-        _rerun(binding, line_user_id, payload)
         return
 
     field = payload.get("editing_field")

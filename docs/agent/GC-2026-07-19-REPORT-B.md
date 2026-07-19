@@ -5,6 +5,8 @@
 代码提交：`f3dffeeb`、`18c14101`、`b32b58fb`  
 生产状态：未合入 master、未改生产数据、未改任何线上闸值。
 
+验收补记：已恢复建议引擎、分类步与收料编排的关键 why；排除件改判抽至独立 bundle 模块并补纯函数测试，未再以删注释换行数。
+
 ## 1. 改动清单
 
 | 文件 | 改动 |
@@ -31,7 +33,7 @@
 
 ### 全量与定向测试
 
-- 全量：`python -m unittest discover -s tests -q` → `Ran 9690 tests in 86.385s`，`OK (skipped=109)`。
+- 全量：`python -m unittest discover -s tests -q` → `Ran 9691 tests in 96.007s`，`OK (skipped=109)`。
 - Windows 测试进程显式使用 Git Bash、UTF-8，并固定 `RATE_LIMIT_ENABLED=true`，避免 `tests/integration/_helpers.py` 的 `setdefault(false)` 污染后续限流单测；仓库与系统配置均未改。
 - GC-B 三组定向命令分别 61 / 56 / 76 项通过；18 段真实形态加强后 `test_bank_sales_suggest` 27 项通过。
 

@@ -818,6 +818,31 @@ class AiIntakeRenderPureTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiIntakeExcludedPureTests(unittest.TestCase):
+    def test_decision_payload_uses_existing_assign_kind_contract(self):
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-excluded.js"))});
+            process.stdout.write(JSON.stringify([
+                r.decisionPayload('item-2501', 'bank_statement'),
+                r.decisionPayload('', 'bank_statement'),
+                r.decisionPayload('item-2501', ''),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {
+                    "item_id": "item-2501",
+                    "decision": "assign_kind",
+                    "kind": "bank_statement",
+                },
+                None,
+                None,
+            ],
+        )
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiIntakeManifestPureTests(unittest.TestCase):
     """IN-0b 收料诚实化(static/ai/ai-intake-manifest.js)的纯逻辑守门:文件夹拖入递归
     展平(含任意深度子目录 + 不支持件拒收点名)、zip 解出件数估算、队列态序列化/恢复。

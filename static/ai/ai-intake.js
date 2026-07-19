@@ -1,4 +1,8 @@
-/* Pearnly AI · 收料视图编排：上传、补数、排除件改判与自动续跑。 */
+/*
+ * Pearnly AI 收料编排：上传分批源于 G1 真机撞过 prod nginx 50M 单请求挂死。
+ * 人工销项走 /sales-summary 解锁 R2；J-B 只在本轮全部收齐且真有新料时自动续跑一次。
+ * bundle 顺序要求 state/api/router/render/manifest/bank-sales/queue/excluded 均先于本文件。
+ */
 (function () {
     'use strict';
 
@@ -11,6 +15,7 @@
     var fileInput = null; // 持久隐藏文件选择器(单例,不随 render 重建 → File 不丢)
     var bankSales = null; // AI.intakeBankSales 实例,mount() 时装配一次,取当前 S 靠 getS()
     var intakeQueue = null; // AI.intakeQueue 实例(IN-0b 队列/密码/失败批),同上装配一次
+    var excluded = null; // AI.intakeExcluded 实例,独立持有改判 busy/error 态
     var runPoll = null; // 当前重跑轮询的 AI.poll 句柄(mount()/换会话时先停旧的再起新的)
 
     function body() {
@@ -46,49 +51,47 @@
             failedBatches: [],
             resumeBanner: null,
             materialCount: 0,
-            excludedBusy: {},
-            excludedErr: {},
         };
     }
 
     function ctx() {
         // 表单输入值在重渲染间保活:读当前 DOM(用户可能已敲了一半)回填。
-        return {
-            order: S.order,
-            needsSales: S.needsSales,
-            files: S.files,
-            uploading: S.uploading,
-            uploadErrKey: S.uploadErrKey,
-            uploadDone: S.uploadDone,
-            uploadTotal: S.uploadTotal,
-            uploadBatchIndex: S.uploadBatchIndex,
-            uploadBatchTotal: S.uploadBatchTotal,
-            uploadBytesPct: S.uploadBytesPct,
-            perFile: S.perFile,
-            formOpen: S.formOpen,
-            formErr: S.formErr,
-            submitting: S.submitting,
-            dirty: S.dirty,
-            rerunState: S.rerunState,
-            rerunErrKey: S.rerunErrKey,
-            rerunProgress: S.rerunProgress,
-            rerunTimedOut: S.rerunTimedOut,
-            bankSalesSuggestion: S.order && S.order.bank_sales_suggestion,
-            bankSalesUi: S.bankSalesUi,
-            salesCorrob: S.order && S.order.sales_corroboration,
-            edcCorrob: S.order && S.order.edc_corroboration,
-            salesValue: readVal('ikSales'),
-            vatValue: readVal('ikVat'),
-            noteValue: readVal('ikNote'),
-            manifest: S.manifest,
-            passwordCard: S.passwordCard,
-            failedBatches: S.failedBatches,
-            resumeBanner: S.resumeBanner,
-            materialCount: S.materialCount,
-            excluded: (S.order && S.order.excluded) || [],
-            excludedBusy: S.excludedBusy,
-            excludedErr: S.excludedErr,
-        };
+        return Object.assign(
+            {
+                order: S.order,
+                needsSales: S.needsSales,
+                files: S.files,
+                uploading: S.uploading,
+                uploadErrKey: S.uploadErrKey,
+                uploadDone: S.uploadDone,
+                uploadTotal: S.uploadTotal,
+                uploadBatchIndex: S.uploadBatchIndex,
+                uploadBatchTotal: S.uploadBatchTotal,
+                uploadBytesPct: S.uploadBytesPct,
+                perFile: S.perFile,
+                formOpen: S.formOpen,
+                formErr: S.formErr,
+                submitting: S.submitting,
+                dirty: S.dirty,
+                rerunState: S.rerunState,
+                rerunErrKey: S.rerunErrKey,
+                rerunProgress: S.rerunProgress,
+                rerunTimedOut: S.rerunTimedOut,
+                bankSalesSuggestion: S.order && S.order.bank_sales_suggestion,
+                bankSalesUi: S.bankSalesUi,
+                salesCorrob: S.order && S.order.sales_corroboration,
+                edcCorrob: S.order && S.order.edc_corroboration,
+                salesValue: readVal('ikSales'),
+                vatValue: readVal('ikVat'),
+                noteValue: readVal('ikNote'),
+                manifest: S.manifest,
+                passwordCard: S.passwordCard,
+                failedBatches: S.failedBatches,
+                resumeBanner: S.resumeBanner,
+                materialCount: S.materialCount,
+            },
+            excluded.context()
+        );
     }
 
     function readVal(id) {
@@ -385,23 +388,6 @@
         });
     }
 
-    function reassignExcluded(select) {
-        var itemId = select.getAttribute('data-item-id');
-        var kind = select.value;
-        if (!itemId || !kind || S.excludedBusy[itemId]) return;
-        S.excludedBusy[itemId] = true;
-        delete S.excludedErr[itemId];
-        render();
-        S.api
-            .decide(S.orderId, { item_id: itemId, decision: 'assign_kind', kind: kind })
-            .then(loadDetail)
-            .catch(function () {
-                delete S.excludedBusy[itemId];
-                S.excludedErr[itemId] = true;
-                render();
-            });
-    }
-
     // ============ 事件接线(容器委托,只挂一次) ============
 
     function onClick(e) {
@@ -435,11 +421,6 @@
             e.preventDefault();
             submitPassword();
         }
-    }
-
-    function onChange(e) {
-        var select = e.target.closest && e.target.closest('[data-action="ik-excluded-assign"]');
-        if (select) reassignExcluded(select);
     }
 
     // 表单内 Enter 提交 / Esc 取消(Canon §7 键盘可达)。dropzone 聚焦时 Enter/Space 触发选择。
@@ -513,7 +494,9 @@
         var host = body();
         host.addEventListener('click', onClick);
         host.addEventListener('submit', onSubmit);
-        host.addEventListener('change', onChange);
+        host.addEventListener('change', function (event) {
+            excluded.onChange(event);
+        });
         host.addEventListener('dragover', onDragover);
         host.addEventListener('dragleave', onDragleave);
         host.addEventListener('drop', onDrop);
@@ -526,6 +509,13 @@
         // 只在真有残留时挂(hasResumableQueue 过滤掉早已全部完成、只是没被清干净的态)。
         var prior = AI.intakeQueue.loadQueueState(order.id);
         S.resumeBanner = AI.intakeManifest.hasResumableQueue(prior) ? prior : null;
+        excluded = AI.intakeExcluded.create(
+            function () {
+                return S;
+            },
+            render,
+            loadDetail
+        );
         if (!bankSales) {
             bankSales = AI.intakeBankSales.create(function () {
                 return S;

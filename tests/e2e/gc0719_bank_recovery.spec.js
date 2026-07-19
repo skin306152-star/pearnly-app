@@ -78,6 +78,7 @@ async function loadIntake(page) {
     });
     await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-bank-sales-render.js') });
     await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-intake-render.js') });
+    await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-intake-excluded.js') });
     await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-intake.js') });
 }
 

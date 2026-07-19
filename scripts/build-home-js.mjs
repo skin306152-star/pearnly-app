@@ -149,6 +149,8 @@ const BUNDLES = [
             // 先例)依赖 AI.api/AI.intakeRender.splitBatches/AI.intakeManifest(均已在上面),
             // 只需排在 ai-intake.js(mount() 里用 AI.intakeQueue.create())之前。
             'ai/ai-intake-queue.js',
+            // 排除件改判的联网态与 payload 纯函数；ai-intake.js mount 时装配。
+            'ai/ai-intake-excluded.js',
             'ai/ai-intake.js',
             'ai/ai-pkg-render.js',
             'ai/ai-pkg.js',

@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """classify 步：OCR/直读归堆、去重并落可回放证据。
 
-只处理 pending 件；单件失败诚实 flagged，不拖垮整批。生产入口均为可注入绑定。
+诚实三态：OCR 报警即 flagged，绝不静默吞；单件异常只连坐该件；批内仍有 flagged 时步骤
+保持 ok，把裁决留给 reconcile/人审。幂等只处理 pending，已定堆件重跑天然跳过。
+生产入口均为可注入绑定。
 """
 
 from __future__ import annotations

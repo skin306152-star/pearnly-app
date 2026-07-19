@@ -174,11 +174,8 @@ def parse_suggestion(data, allowed_fingerprints) -> dict:
 
 def parse_batch_suggestions(data, allowed_fps) -> list[dict]:
     """批量回复逐元素走单行硬闸；缺行、重复行、题面外行及非法元素均不落事件。
-
-    openai 结构化输出顶层必须是对象不能是数组(真供应商实锤拒过裸数组),题面要求
-    {"suggestions": [...]} 包装;裸数组仍兼容(测试夹具/别家后端)。"""
-    if isinstance(data, dict):
-        data = data.get("suggestions")
+    openai 结构化输出顶层必须是对象(真供应商拒裸数组)→ 认 {"suggestions": [...]},裸数组兼容。"""
+    data = data.get("suggestions") if isinstance(data, dict) else data
     if not isinstance(data, list):
         return []
     allowed = set(allowed_fps)

@@ -185,24 +185,6 @@
                     body
                 );
             },
-            // 银行流水倒推销项(SA-3b · 双闸 pearnly_ai_m1 + pearnly_ai_bank_sales_suggest,
-            // 关一个即 404):run 对未决入账行调大脑分类(幂等,已判行不重调);decide 是行级
-            // 人裁(latest-wins)。建议本体不经这两个端点读,随下一次 getOrder() 的
-            // order_detail.bank_sales_suggestion 读侧回放(同 submitSalesSummary 落库后
-            // 调用方自行 getOrder 刷新的既有口径,不另开读端点)。
-            runBankSales: function (orderId) {
-                return call(
-                    'POST',
-                    '/api/workorder/orders/' + encodeURIComponent(orderId) + '/bank-sales/run'
-                );
-            },
-            decideBankSales: function (orderId, body) {
-                return call(
-                    'POST',
-                    '/api/workorder/orders/' + encodeURIComponent(orderId) + '/bank-sales/decide',
-                    body
-                );
-            },
             // 销项税报告三查(N1-a · routes/vat_report_checks_routes.py):multipart 单文件上传,
             // 同 addMaterials 不能走 call()(要让浏览器带 multipart boundary)。响应即三查结果,
             // 不经 callEnvelope(该端点裸对象出线,无信封)。
@@ -465,6 +447,7 @@
         );
         Object.assign(base, AI.apiClientImport.create(root, authHeaders, handleResponse, call));
         Object.assign(base, AI.apiDesk.create(root, authHeaders, handleResponse, call));
+        Object.assign(base, AI.apiBankSales.create(call));
         Object.assign(base, AI.apiUpload.create(root, authHeaders));
         return Object.assign(
             base,

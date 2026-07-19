@@ -76,6 +76,7 @@ async function loadIntake(page) {
             return text;
         };
     });
+    await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-bank-sales-groups.js') });
     await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-bank-sales-render.js') });
     await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-intake-render.js') });
     await page.addScriptTag({ path: path.join(ROOT, 'static', 'ai', 'ai-intake-excluded.js') });

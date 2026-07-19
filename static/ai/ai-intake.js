@@ -406,11 +406,7 @@
         else if (a === 'ik-resume-pick') resumePick();
         else if (a === 'ik-resume-dismiss') intakeQueue.resumeDismiss();
         else if (a === 'ik-retry-failed') retryFailed();
-        else if (a === 'bxs-fold') bankSales.toggleFold(el.getAttribute('data-kind'));
-        else if (a === 'bxs-decide') {
-            bankSales.decideRow(el.getAttribute('data-fp'), el.getAttribute('data-verdict'));
-        } else if (a === 'bxs-run') bankSales.run();
-        else if (a === 'bxs-apply') bankSales.apply();
+        else if (a.indexOf('bxs-') === 0) bankSales.onAction(a, el);
     }
 
     function onSubmit(e) {

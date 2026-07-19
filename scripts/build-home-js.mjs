@@ -101,6 +101,8 @@ const BUNDLES = [
             // ai-api-upload.js(S1 · 收料上传 XHR 进度薄层,拆自 ai-api.js·单文件<500
             // 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-upload.js',
+            // 银行倒推四端点(run/progress/单行/批量裁决)，拆出避免 ai-api.js 顶格。
+            'ai/ai-api-bank-sales.js',
             'ai/ai-api.js',
             // ai-gate.js(Z1-a 登录卡/邀请制门面)只依赖 AI.state.esc(可选)与全局 at()/
             // atSetLang,排在 ai-state.js/ai-api.js 之后、ai.js(boot 调 AI.gate.mountLogin/
@@ -142,6 +144,7 @@ const BUNDLES = [
             // needsCardHtml() 直接内嵌调用 AI.bankSalesRender.cardHtml(),不另开 mount。
             // ai-intake-bank-sales.js(拆自 ai-intake.js 的网络编排,单文件<500 行铁律)
             // 只需排在 ai-intake.js(mount() 里用 AI.intakeBankSales.create())之前。
+            'ai/ai-bank-sales-groups.js',
             'ai/ai-bank-sales-render.js',
             'ai/ai-intake-bank-sales.js',
             // ai-intake-queue.js(IN-0b · 文件夹递归展开+批级隔离重试+密码串行+队列态

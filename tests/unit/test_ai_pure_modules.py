@@ -1250,6 +1250,7 @@ class AiI18nStructureTests(unittest.TestCase):
             global.window = global;
             global.localStorage = {{ getItem: () => null, setItem: () => {{}} }};
             {shards}
+            require({json.dumps(str(AI_DIR / "ai-i18n-bank-sales.js"))});
             require({json.dumps(str(AI_DIR / "ai-i18n.js"))});
             const d = global.AII18N.dict;
             const keys = Object.fromEntries(

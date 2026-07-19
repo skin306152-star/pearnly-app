@@ -29,7 +29,9 @@ MENU_ACTIONS = frozenset(
     }
 )
 
-_MENU_WORD = "เมนู"
+# mode 语义单一落点:customer=只建档收尾;其余(booking/缺省直拍)串联订车。
+# flow 出卡分流与本文件落档分流都引用它,别再散写裸字符串比较。
+MODE_CUSTOMER = "customer"
 _GREETING_PREFIX = "สวัสดี"
 _MENU_CHOICES = {"1": cards.ACT_MENU_CUSTOMER, "2": cards.ACT_MENU_BOOKING}
 # 弹菜单/切模式时保留的已收料:重复进菜单不丢已拍的卡/已输的号。
@@ -46,8 +48,8 @@ async def handle_text(
     其余数字文本(如手机号)不被吃成菜单——只认这两个单字符。
     """
     stripped = text.strip()
-    # เมนู 常见打错(เมน/เมนB,真机 2026-07-19 实拍):短词且以 เมน 起头都当召唤菜单。
-    is_menu_word = stripped == _MENU_WORD or (len(stripped) <= 6 and stripped.startswith("เมน"))
+    # เมนู 及其常见打错(เมน/เมนB,真机 2026-07-19 实拍):短词且以 เมน 起头都当召唤菜单。
+    is_menu_word = len(stripped) <= 6 and stripped.startswith("เมน")
     if is_menu_word or stripped.startswith(_GREETING_PREFIX):
         await _enter_menu(binding, line_user_id, sess)
         # 问候语带欢迎气泡(照 mockup 的进场节奏);เมนู 是回访召唤,只发卡不寒暄。
@@ -90,7 +92,7 @@ async def _choose(
     binding: dict, line_user_id: str, reply_token: str, sess: Optional[dict], action: str
 ) -> None:
     """选中菜单项:给会话打 mode 回 collecting;齐料直接查重,缺料按缺项提示补料。"""
-    mode = "customer" if action == cards.ACT_MENU_CUSTOMER else "booking"
+    mode = MODE_CUSTOMER if action == cards.ACT_MENU_CUSTOMER else "booking"
     old = (sess or {}).get("payload") or {}
     payload = {k: old.get(k) for k in ("id_card", "phone", "endpoint_id") if old.get(k)}
     payload["mode"] = mode
@@ -167,7 +169,7 @@ async def after_customer_saved(
     菜单1=只建档(泰方拍板 2026-07-19):不再推「ทำใบจองต่อ?」续订卡;其 postback
     处理保留,聊天历史里已发出的旧卡仍能点。same_data=True 表示本次零写入
     (数据已存/选择保留),文案不谎称「已保存」。"""
-    if mode != "customer":
+    if mode != MODE_CUSTOMER:
         await booking_flow.offer_pick(
             binding,
             line_user_id,

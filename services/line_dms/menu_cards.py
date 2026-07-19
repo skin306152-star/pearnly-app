@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DMS LINE 菜单卡(波2):入口菜单 + 建档后的继续订车卡。
+"""DMS LINE 菜单卡(波2):入口菜单行卡。
 
 布局照泰方认可的 ChatGPT mockup:标题区 + 两张整行可点的行卡(编号圆徽+图标+标题
 两行说明+箭头)。从 cards.py 拆出保 500 行硬门;文案/动作名仍以 cards 为单一来源。
@@ -10,13 +10,8 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from services.line_dms.cards import (
-    ACT_CONTINUE_BOOKING,
     ACT_MENU_BOOKING,
     ACT_MENU_CUSTOMER,
-    BTN_CONTINUE_BOOKING,
-    TXT_CONTINUE_HINT,
-    TXT_CONTINUE_SAME,
-    TXT_CONTINUE_SAVED,
     TXT_MENU_D1,
     TXT_MENU_D2,
     TXT_MENU_ITEM1,
@@ -25,7 +20,6 @@ from services.line_dms.cards import (
     TXT_MENU_PICK,
     TXT_MENU_PICK_SUB,
     TXT_MENU_TITLE,
-    _btn,
     _data,
 )
 
@@ -173,41 +167,3 @@ def menu_card() -> Dict[str, Any]:
         ],
     }
     return {"type": "flex", "altText": TXT_MENU_TITLE, "contents": {"type": "bubble", "body": body}}
-
-
-def continue_booking_card(customer_id: str, same_data: bool = False) -> Dict[str, Any]:
-    """建档落定(customer 模式)后问是否继续订车:cid 绑进 postback,继续时校验防串档。"""
-    intro = TXT_CONTINUE_SAME if same_data else TXT_CONTINUE_SAVED
-    return {
-        "type": "flex",
-        "altText": BTN_CONTINUE_BOOKING,
-        "contents": {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "sm",
-                "contents": [
-                    {"type": "text", "text": intro, "size": "sm", "wrap": True},
-                    {
-                        "type": "text",
-                        "text": TXT_CONTINUE_HINT,
-                        "size": "xs",
-                        "color": "#8a8a8a",
-                        "wrap": True,
-                    },
-                ],
-            },
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    _btn(
-                        BTN_CONTINUE_BOOKING,
-                        _data(ACT_CONTINUE_BOOKING, cid=str(customer_id or "")),
-                        "primary",
-                    )
-                ],
-            },
-        },
-    }

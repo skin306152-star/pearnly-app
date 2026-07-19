@@ -22,7 +22,7 @@ import html
 import re
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from services.erp.mrerp_dms_client_base import DMSClientError
 
@@ -166,14 +166,14 @@ class DMSClientIntakeMixin:
         mode: str,
         customer_id: Optional[str] = None,
         addresses: Optional[Dict[str, Dict[str, Any]]] = None,
-    ) -> str:
-        """建(mode='create')或覆盖(mode='overwrite')客户。返回 customer_id。
+    ) -> Tuple[str, bool]:
+        """建(mode='create')或覆盖(mode='overwrite')客户。返回 (customer_id, converted)
+        ——converted=True 表示 create 被幂等/撞码转成了覆盖,回执侧据此如实说「อัปเดต」。
         覆盖:载现表单 → 合并面板字段(非身份证字段原样保留)→ 提交。
         空值一律跳过(不清除 DMS 原值)。addresses 给 {""/_ct/_sd: 地址块} 时
         三套地址分别写;不给则用 fields 里的单套地址写满三处(向后兼容)。"""
         if mode not in ("create", "overwrite"):
             raise DMSClientError(f"bad save mode: {mode!r}", "ERR_DMS_CUSTOMER_SAVE")
-        self._create_converted = False  # create 被幂等/撞码转成 overwrite 时置 True(回执诚实)
         with self._writer_session():
             return self._save_customer_locked(
                 fields=fields, mode=mode, customer_id=customer_id, addresses=addresses
@@ -202,14 +202,14 @@ class DMSClientIntakeMixin:
         mode: str,
         customer_id: Optional[str] = None,
         addresses: Optional[Dict[str, Dict[str, Any]]] = None,
-    ) -> str:
+    ) -> Tuple[str, bool]:
         # 幂等:一个身份证 = DMS 一个客户(编号/身份证号唯一)。create 前先按身份证号查,
         # 已存在则转更新它 —— 修「撞客户编号重复」+ 自愈「建了客户但订车失败」后的重推。
+        converted = False
         if mode == "create":
             existing = self.search_customer((fields.get("people_id") or "").strip())
             if existing:
-                mode, customer_id = "overwrite", existing
-                self._create_converted = True
+                mode, customer_id, converted = "overwrite", existing, True
         if mode == "overwrite" and not customer_id:
             raise DMSClientError("overwrite needs customer_id", "ERR_DMS_CUSTOMER_SAVE")
 
@@ -234,16 +234,16 @@ class DMSClientIntakeMixin:
             # 覆盖,不把「已存在」当失败抛给用户;仍搜不到才如实报错。
             existing = self._research_customer((fields.get("people_id") or "").strip())
             if existing:
-                self._create_converted = True
-                return self._save_customer_locked(
+                cid, _ = self._save_customer_locked(
                     fields=fields, mode="overwrite", customer_id=existing, addresses=addresses
                 )
+                return cid, True
         if resp.status_code != 200 or body.startswith("err::"):
             raise DMSClientError(
                 f"customer {mode} failed: {resp.status_code} {body[:200]!r}",
                 "ERR_DMS_CUSTOMER_SAVE",
             )
-        return self._verify_saved(mode, fields, customer_id)
+        return self._verify_saved(mode, fields, customer_id), converted
 
     def _research_customer(self, people_id: str) -> Optional[str]:
         """撞唯一键后的复搜:搜索端点偶发空返,隔 1.5s 共试 3 次再放弃。"""

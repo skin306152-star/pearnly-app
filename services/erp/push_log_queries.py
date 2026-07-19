@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 def _classify_push_type(row: Dict[str, Any]) -> str:
     """从一行 push log 判 push_type:身份证订车(id_card)还是发票(invoice)。
-    单一判定源 · list/detail/exceptions 三处共用 · 改判定规则只此一处。"""
+    单一判定源 · list/detail/exceptions 三处共用 · 改判定规则只此一处;
+    dms_id_ocr.recent_dms_customer_ids_by_tail 的 SQL 判定也要同步(体积闸挡它搬来同住)。"""
     is_id_card = (row.get("trigger") or "") == "id_card" or (
         row.get("endpoint_adapter") or ""
     ).lower() == "mrerp_dms"

@@ -71,7 +71,7 @@ class AdminCredSetRoutingTests(unittest.TestCase):
         user_t = _TaggedTransport("user")
         c = DMSClient(user_t, "https://x/dms/")
         self.assertIsNone(c._resolve_admin_transport())  # 无 admin 凭据组
-        cid = c.save_customer(fields=_OVERWRITE_FIELDS, mode="overwrite", customer_id="95")
+        cid, _ = c.save_customer(fields=_OVERWRITE_FIELDS, mode="overwrite", customer_id="95")
         self.assertEqual(cid, "95")
         self.assertTrue(user_t.wrote_edit())  # 写落在用户会话(现状路径)
 
@@ -80,7 +80,7 @@ class AdminCredSetRoutingTests(unittest.TestCase):
         user_t = _TaggedTransport("user")
         admin_t = _TaggedTransport("admin")
         c = DMSClient(user_t, "https://x/dms/", admin_transport=admin_t)
-        cid = c.save_customer(fields=_OVERWRITE_FIELDS, mode="overwrite", customer_id="95")
+        cid, _ = c.save_customer(fields=_OVERWRITE_FIELDS, mode="overwrite", customer_id="95")
         self.assertEqual(cid, "95")
         self.assertTrue(admin_t.wrote_edit(), "写请求应落在 admin 会话")
         self.assertEqual(user_t.posts, [], "用户(读)会话不应承担写操作")

@@ -20,6 +20,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from services.erp.dms_customer_diff import diff_customer_fields
+from services.erp.dms_id_validate import normalize_thai_id
 from services.erp.erp_dms_push import (
     _build_mrerp_dms_adapter,
     _dms_friendly,
@@ -189,23 +190,23 @@ def recognize_lookup_mrerp_dms(
         from services.erp.mrerp_dms_models import ThaiAddress
 
         look = cl.lookup_customer(people_id)
-        # DMS 搜索的「新客隐身期」(2026-07-19 四案实锤):新建/刚改的客户在建档会话里
-        # 搜得到,对新会话隐身可达数分钟后又可见 → 秒级重试只救抖动,救不了隐身期。
+        if not look["found"]:
+            # 台账兜底先行:本租户最近推过的同尾号客户,按客户号【直读】核对全证号——
+            # 直读不经搜索缓存,权威零等待;「新客隐身期」(2026-07-19 四案实锤:刚建/
+            # 刚改的客户对新会话隐身数分钟)案例全在台账里,先直读省下退避重试。
+            pid_norm = normalize_thai_id(str(people_id))
+            for cid in fallback_customer_ids or []:
+                f = cl.read_customer(str(cid))
+                if pid_norm and normalize_thai_id(str(f.get("people_id") or "")) == pid_norm:
+                    look = {"found": True, "customer_id": str(cid), "fields": f}
+                    break
+        # 台账也没有才退避重试:只剩「DMS 原生老客户 + 搜索偶发空返」这个窄场景,
+        # 真新客户为它多付 ~3s(误标新客的代价更高,保守保留两试)。
         for _ in range(2):
             if look["found"] or not (people_id or "").strip():
                 break
             time.sleep(1.5)
             look = cl.lookup_customer(people_id)
-        if not look["found"]:
-            # 台账兜底:本租户最近推过的同尾号客户,按客户号【直读】核对全证号——
-            # 直读不经搜索缓存,权威;命中即视为已有客户,预览卡不再误标「新客户」。
-            pid_digits = "".join(ch for ch in str(people_id) if ch.isdigit())
-            for cid in fallback_customer_ids or []:
-                f = cl.read_customer(str(cid))
-                got = "".join(ch for ch in str(f.get("people_id") or "") if ch.isdigit())
-                if pid_digits and got == pid_digits:
-                    look = {"found": True, "customer_id": str(cid), "fields": f}
-                    break
         form_html = cl._post_text("cus/form.php", {"status": "n"})
         a = ocr_address or {}
         addr = ThaiAddress(
@@ -335,11 +336,11 @@ def push_idcard_fields_mrerp_dms(
     save_mode = "create" if mode == "create" else "overwrite"
 
     def _do(cl, adapter):
-        cid = cl.save_customer(
+        cid, converted = cl.save_customer(
             fields=fields, mode=save_mode, customer_id=customer_id, addresses=addresses
         )
         # create 被幂等/撞码转成 overwrite 时如实回 update——回执不谎称「新建」。
-        actual = "update" if getattr(cl, "_create_converted", False) else mode
+        actual = "update" if converted else mode
         return {
             "ok": True,
             "success": True,

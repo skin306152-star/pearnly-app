@@ -293,27 +293,27 @@ async def _run_dedup(
     if scenario == "none":
         payload = {**base, "scenario": "none"}
         card = cards.new_customer_card(summary, nonce)
-    elif scenario == "exact" and mode != "customer":
-        # 订车工作流(泰方拍板:与档案维护是 DMS 两个功能,证件只为认人):认出已有
-        # 客户即确认卡直奔选车,不弹差异不问更新;档案维护走菜单1。
-        payload = {**base, "scenario": "exact_diff", "customer_id": res["match"]["customer_id"]}
-        card = cards.booking_customer_card(summary, nonce)
     elif scenario == "exact":
-        has_admin = draft.has_admin_creds(ep)
-        display = draft.display_diffs(field_diffs, geo)
-        # 审批策略见 approval_flow.APPROVAL_POLICY;无差异 → 同资料预览卡(收到证+电话
-        # 一律先确认)。按「保持/继续」后 ACT_KEEP 按 mode 分流。
-        args = (tenant, user_id, display, has_admin, nonce, summary)
-        card, approval = await _thr(approval_flow.exact_diff_card, *args)
-        payload = {
-            **base,
-            "scenario": "exact_diff",
-            "customer_id": res["match"]["customer_id"],
-            "field_diffs": field_diffs,
-            "has_admin": has_admin,
-            "approval": approval,
-            "display_diffs": display,
-        }
+        payload = {**base, "scenario": "exact_diff", "customer_id": res["match"]["customer_id"]}
+        if mode != menu_flow.MODE_CUSTOMER:
+            # 订车工作流(泰方拍板:与档案维护是 DMS 两个功能,证件只为认人):
+            # 认出即确认卡直奔选车,不弹差异不问更新;档案维护走菜单1。
+            card = cards.booking_customer_card(summary, nonce)
+        elif not field_diffs:
+            # 同资料:预览卡(保持/修改)——收到证+电话一律先确认(泰方拍板)。
+            card = cards.same_customer_card(summary, nonce)
+        else:
+            has_admin = draft.has_admin_creds(ep)
+            display = draft.display_diffs(field_diffs, geo)
+            # 审批策略见 approval_flow.APPROVAL_POLICY;ACT_KEEP 按 mode 分流。
+            args = (tenant, user_id, display, has_admin, nonce, summary)
+            card, approval = await _thr(approval_flow.exact_diff_card, *args)
+            payload.update(
+                field_diffs=field_diffs,
+                has_admin=has_admin,
+                approval=approval,
+                display_diffs=display,
+            )
     else:  # similar
         cands = [
             {

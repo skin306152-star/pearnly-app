@@ -57,7 +57,9 @@ def resolve_dms_endpoint(user_id: str, endpoint_id: Optional[str]) -> Optional[D
 def recent_dms_customer_ids_by_tail(tenant_id: Any, people_id_tail: str, limit: int = 5) -> list:
     """DMS 搜索「新客隐身期」兜底(2026-07-19 实锤:新建客户对新会话隐身数分钟):
     取本租户最近成功推过的、证号尾4相同的客户号(erp_push_logs.invoice_no 列),
-    调用方逐个直读 DMS 记录核对全证号后才认。只回候选,不下结论;查询失败按无候选。"""
+    调用方逐个直读 DMS 记录核对全证号后才认。只回候选,不下结论;查询失败按无候选。
+    「DMS 行」判定与 push_log_queries._classify_push_type 需同步演进(那边改口径这边一起动);
+    7 天窗:隐身期是分钟级,窗口只为让 created_at 索引裁剪扫描量。"""
     if not tenant_id or not people_id_tail:
         return []
     try:
@@ -68,6 +70,7 @@ def recent_dms_customer_ids_by_tail(tenant_id: Any, people_id_tail: str, limit: 
                 "WHERE l.request_body->>'adapter' = 'mrerp_dms' "
                 "AND l.request_body->>'people_id_tail' = %s AND l.status = 'success' "
                 "AND COALESCE(l.invoice_no, '') <> '' "
+                "AND l.created_at > now() - interval '7 days' "
                 "GROUP BY l.invoice_no ORDER BY ts DESC LIMIT %s",
                 (str(tenant_id), str(people_id_tail), limit),
             )
@@ -78,10 +81,12 @@ def recent_dms_customer_ids_by_tail(tenant_id: Any, people_id_tail: str, limit: 
 
 
 def _cfg_has_admin(cfg: Dict[str, Any]) -> bool:
-    return bool(
-        (cfg.get("admin_username_enc") and cfg.get("admin_password_enc"))
-        or (cfg.get("admin_username") and cfg.get("admin_password"))
-    )
+    """与 draft.has_admin_creds 同一判定源(密文误存明文字段的搬移启发式也一致),
+    防「继承层说没配不借、渲染层说配了给按钮」的分叉。"""
+    from services.erp.erp_dms_push import _dms_resolve_admin_creds
+
+    pu, pp, eu, ep_ = _dms_resolve_admin_creds(cfg)
+    return bool((pu and pp) or (eu and ep_))
 
 
 def _tenant_owner_endpoint_cfg(tenant_id: Any) -> Dict[str, Any]:
@@ -97,7 +102,10 @@ def _tenant_owner_endpoint_cfg(tenant_id: Any) -> Dict[str, Any]:
         if not row:
             return {}
         for oep in db.list_erp_endpoints(str(row["id"])) or []:
-            if (oep.get("adapter") or "").strip().lower() == "mrerp_dms":
+            # enabled 过滤与 resolve_dms_endpoint 同口径:停用的老板连接不外借凭据。
+            if (oep.get("adapter") or "").strip().lower() == "mrerp_dms" and oep.get(
+                "enabled"
+            ) is not False:
                 return oep.get("config") or {}
     except Exception as e:
         logger.warning(f"[dms] 借老板 endpoint 配置失败(按未配置处理): {e}")

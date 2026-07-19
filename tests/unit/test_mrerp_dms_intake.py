@@ -149,7 +149,7 @@ class IntakeContractTests(unittest.TestCase):
             "subdistrict_id": "6472",
             "zipcode_id": "6477",
         }
-        cid = self.c.save_customer(fields=fields, mode="create")
+        cid, converted = self.c.save_customer(fields=fields, mode="create")
         self.assertEqual(cid, "95")  # search verify
         save = [p for p in self.t.posts if p[0].endswith("cus/new.php")][0][1]
         self.assertEqual(save["txtcusname"], "New Cust")
@@ -168,7 +168,7 @@ class IntakeContractTests(unittest.TestCase):
             "subdistrict_id": "6472",
             "zipcode_id": "6477",
         }
-        cid = self.c.save_customer(fields=fields, mode="overwrite", customer_id="95")
+        cid, converted = self.c.save_customer(fields=fields, mode="overwrite", customer_id="95")
         self.assertEqual(cid, "95")
         save = [p for p in self.t.posts if p[0].endswith("cus/edit.php")][0][1]
         self.assertEqual(save["stsel"], "e")
@@ -185,9 +185,11 @@ class IntakeContractTests(unittest.TestCase):
             "subdistrict_id": "6472",
             "zipcode_id": "6477",
         }
-        cid = self.c.save_customer(fields=fields, mode="create")  # 默认 search_hits=['95']
+        cid, converted = self.c.save_customer(
+            fields=fields, mode="create"
+        )  # 默认 search_hits=['95']
         self.assertEqual(cid, "95")
-        self.assertTrue(self.c._create_converted)
+        self.assertTrue(converted)
         self.assertTrue([p for p in self.t.posts if p[0].endswith("cus/edit.php")], "应转 edit.php")
         self.assertFalse([p for p in self.t.posts if p[0].endswith("cus/new.php")], "不应建新")
 
@@ -206,11 +208,11 @@ class IntakeContractTests(unittest.TestCase):
             "zipcode_id": "6477",
         }
         with mock.patch("services.erp.mrerp_dms_client_intake.time.sleep") as slept:
-            cid = c.save_customer(fields=fields, mode="create")
+            cid, converted = c.save_customer(fields=fields, mode="create")
         self.assertEqual(cid, "95")
         self.assertTrue([p for p in t.posts if p[0].endswith("cus/edit.php")], "应转 edit.php 覆盖")
         self.assertTrue(slept.called)  # 复搜带退避,真跑时给搜索端点喘息窗口
-        self.assertTrue(c._create_converted)  # 回执侧据此如实说「อัปเดต」不谎称新建
+        self.assertTrue(converted)  # 回执侧据此如实说「อัปเดต」不谎称新建
 
     def test_create_duplicate_code_research_still_missing_raises(self):
         """复搜三次仍空 → 如实抛 ERR_DMS_CUSTOMER_SAVE(不吞错不假成功)。"""

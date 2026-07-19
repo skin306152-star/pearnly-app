@@ -110,7 +110,7 @@ async def handle_text(
 
     id_card = _apply(payload.get("id_card") or {}, field, cleaned)
     phone = cleaned if field == "phone" else (payload.get("phone") or "")
-    _rerun(binding, line_user_id, payload, id_card=id_card, phone=phone)
+    _rerun(binding, line_user_id, payload.get("endpoint_id"), id_card, phone)
 
 
 # ── 逐字段校验 ──────────────────────────────────────────────────────────────
@@ -161,17 +161,8 @@ def _nonce_ok(sess: Optional[dict], nonce: Optional[str]) -> bool:
     )
 
 
-def _rerun(
-    binding: dict,
-    line_user_id: str,
-    payload: dict,
-    *,
-    id_card: Optional[dict] = None,
-    phone: Optional[str] = None,
-) -> None:
-    """整体重跑查重(离主线程后台跑)。改值取覆盖参数,取消取会话原值。"""
+def _rerun(binding: dict, line_user_id: str, endpoint_id, id_card: dict, phone: str) -> None:
+    """改值后整体重跑查重(离主线程后台跑)。"""
     from services.line_dms import flow  # 延迟导入避免 flow ↔ edit_flow 环依赖
 
-    ic = id_card if id_card is not None else (payload.get("id_card") or {})
-    ph = phone if phone is not None else (payload.get("phone") or "")
-    flow._spawn(flow._run_dedup(binding, line_user_id, None, ic, ph, payload.get("endpoint_id")))
+    flow._spawn(flow._run_dedup(binding, line_user_id, None, id_card, phone, endpoint_id))

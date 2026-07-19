@@ -41,6 +41,9 @@ K_TOTAL_PAGES = "total_pages"
 K_DEPOSIT_COUNT = "deposit_count"
 K_WITHDRAWAL_COUNT = "withdrawal_count"
 
+# 跨页交接断链的重要性红线:Σ|断点差额|/捕获入账 ≤ 2% 视为行级噪声(警示不降级)。
+_SEGMENT_GAP_MAX = Decimal("0.02")
+
 # 锚页自报总数正则(KBANK 页 1 表头):รวมฝากเงิน 728 รายการ / รวมถอนเงิน 33 รายการ / 页脚 n/N。
 # 泰文标签直接子串锚,数字带千分位;页脚 X/N 取分母作总页数。别家行英文页兜底 total deposits。
 _DEPOSIT_RE = re.compile(r"(?:รวมฝากเงิน|total\s+deposits?)\D{0,12}?([\d,]+)", re.IGNORECASE)
@@ -221,9 +224,11 @@ def segment_chain(rows: list[dict]) -> Optional[dict]:
         return None
     segments.sort(key=lambda segment: (segment["first_date"], segment["first_balance"]))
     breaks = []
+    gap_total = Decimal("0")
     for previous, current in zip(segments, segments[1:]):
         delta = current["first_balance"] - (previous["last_balance"] + current["first_signed"])
         if abs(delta) > Decimal("1.0"):
+            gap_total += abs(Decimal(str(delta)))
             breaks.append(
                 {
                     "before_date": previous["last_date"],
@@ -231,7 +236,12 @@ def segment_chain(rows: list[dict]) -> Optional[dict]:
                     "delta": format(delta, "f"),
                 }
             )
-    block = {"reliable": not breaks, "breaks": breaks}
+    # 重要性阈值与页内无解释入账同一标准(R1 打回立的 2%):页边界的行级小抖动(SM 实测
+    # 19 页照片单代 ±฿8~2,500)不该二值判死整份建议——≤2% 保留 breaks+message 供人核对,
+    # 只有超过材料性红线才降级。零容忍版在 SM 2569-05 真人重跑被实锤为过拟合。
+    captured = sum((Decimal(str(row["deposit"])) for row in rows), Decimal("0"))
+    material = bool(breaks) and (captured <= 0 or gap_total / captured > _SEGMENT_GAP_MAX)
+    block = {"reliable": not material, "breaks": breaks, "gap_total": format(gap_total, "f")}
     if breaks:
         links = ", ".join(f"{item['before_date']} → {item['after_date']}" for item in breaks)
         block["message"] = {

@@ -393,15 +393,38 @@ class CoverageDegradeTests(unittest.TestCase):
         )
         self.assertTrue(connected["coverage"]["segment_chain"]["reliable"])
 
+        # 材料性断链(差额 100/捕获 765.62 ≈ 13% > 2%)→ 降级
         broken_second = [dict(row) for row in second]
         for row in broken_second:
-            row["balance"] = str(float(row["balance"]) + 10)
+            row["balance"] = str(float(row["balance"]) + 100)
         broken = bss.suggest(
             [_bank_event(first, item_id="a"), _bank_event(broken_second, item_id="b", eid=2)]
         )
         self.assertFalse(broken["reliable"])
         self.assertEqual(broken["degrade_reason"], bss.DEGRADE_CHAIN_BREAK)
         self.assertIn("2026-05-10", broken["message"]["zh"])
+
+    def test_immaterial_boundary_gap_warns_without_degrading(self):
+        # 噪声级断链(差额 10/捕获 765.62 ≈ 1.3% ≤ 2%)→ 保留 breaks+gap_total 供人核对,不降级。
+        # SM 2569-05 真人重跑实锤:19 页照片单代必有 ±฿8~2,500 页边界抖动,零容忍=永远出不了建议。
+        first = [
+            _dep("2026-05-10", 100, balance="327500.00"),
+            _dep("2026-05-10", 100, balance="327600.00"),
+            _dep("2026-05-10", "75.62", balance="327675.62"),
+        ]
+        second = [
+            _dep("2026-05-11", 390, balance="328075.62"),
+            _dep("2026-05-11", 100, balance="328175.62"),
+            _wd("2026-05-11", 50, balance="328125.62"),
+        ]
+        result = bss.suggest(
+            [_bank_event(first, item_id="a"), _bank_event(second, item_id="b", eid=2)]
+        )
+        seg = result["coverage"]["segment_chain"]
+        self.assertTrue(seg["reliable"])
+        self.assertEqual(len(seg["breaks"]), 1)
+        self.assertEqual(seg["gap_total"], "10.00")
+        self.assertNotEqual(result.get("degrade_reason"), bss.DEGRADE_CHAIN_BREAK)
 
 
 class PendingRowsTests(unittest.TestCase):

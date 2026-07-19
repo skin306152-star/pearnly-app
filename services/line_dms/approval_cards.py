@@ -19,6 +19,7 @@ from services.line_dms.cards import (
     _bubble,
     _data,
     _kv_row,
+    diff_rows,
 )
 
 TXT_PICK_APPROVER = "ส่งคำขอให้ใครอนุมัติ"
@@ -83,30 +84,8 @@ def request_card(
         _kv_row("ผู้ขอ", operator_name),
         _kv_row("ลูกค้า", f"{customer_name or '—'} ({customer_id})"),
         {"type": "separator", "margin": "sm"},
+        *diff_rows(display_diffs),
     ]
-    for d in display_diffs:
-        rows.append(
-            {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": d.get("label", ""),
-                        "size": "sm",
-                        "weight": "bold",
-                        "color": "#111111",
-                    },
-                    {
-                        "type": "text",
-                        "text": f"{d.get('old') or '—'}  →  {d.get('new') or '—'}",
-                        "size": "sm",
-                        "color": "#c0392b",
-                        "wrap": True,
-                    },
-                ],
-            }
-        )
     footer = [
         _btn(BTN_APPROVE, _data(ACT_APPROVAL_APPROVE, req=request_id), "primary"),
         _btn(BTN_REJECT, _data(ACT_APPROVAL_REJECT, req=request_id), "secondary"),

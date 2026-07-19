@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Dict, List, Optional
@@ -54,43 +55,48 @@ async def handle_postback(
         )
 
 
+def _is_active_admin(prof: Optional[dict]) -> bool:
+    """「谁算管理员」单一判据(收审批卡与能批准共用,防两处口径漂移)。"""
+    return (
+        bool(prof)
+        and (prof.get("dms_role") or "") == "admin"
+        and (prof.get("status") or "active") == "active"
+    )
+
+
 def exact_diff_card(tenant_id: str, user_id: str, display: list, has_admin: bool, nonce: str):
-    """flow 的 exact_diff 分支按花名册角色出卡:sales→提审卡;admin→直写键(自己的 DMS
-    凭据本就有改权);无档案(老板/存量)→ 旧 has_admin 逻辑。返回 (card, approval标志)。"""
+    """flow 的 exact_diff 分支按花名册角色解出主按钮:sales→提审;admin/有 admin 凭据→直写;
+    无档案且没配 admin→仅设置提示。渲染交给 cards.diff_card(单一 primary 选择)。
+    返回 (card, approval标志)。"""
     prof = roster_store.get_profile(tenant_id, str(user_id))
     role = (prof or {}).get("dms_role") or ""
     if role == "sales":
-        return cards.diff_card(display, has_admin, nonce, approval=True), True
-    return cards.diff_card(display, has_admin or role == "admin", nonce), False
+        return cards.diff_card(display, nonce, primary="approval"), True
+    primary = "update" if (has_admin or role == "admin") else "none"
+    return cards.diff_card(display, nonce, primary=primary), False
 
 
 # ── 审批人名录 ──────────────────────────────────────────────────────────────
 def _bound_approvers(tenant_id: str) -> List[Dict[str, str]]:
-    """本租户可收审批卡的管理员:dms_role='admin' + 启用 + 已绑 LINE。"""
-    out = []
-    for p in roster_store.list_profiles(tenant_id):
-        if (p.get("dms_role") or "") != "admin" or (p.get("status") or "active") != "active":
-            continue
-        b = store.get_binding_by_user(str(p["user_id"]))
-        if not b:
-            continue
-        out.append(
-            {
-                "user_id": str(p["user_id"]),
-                "display_name": p.get("display_name") or "",
-                "line_user_id": b.get("line_user_id") or "",
-            }
-        )
-    return out
+    """本租户可收审批卡的管理员:dms_role='admin' + 启用 + 已绑 LINE。
+
+    line_user_id 直接取自 list_profiles 的 JOIN 列(不再逐人 get_binding_by_user·消 N+1)。"""
+    return [
+        {
+            "user_id": str(p["user_id"]),
+            "display_name": p.get("display_name") or "",
+            "line_user_id": p.get("line_user_id") or "",
+        }
+        for p in roster_store.list_profiles(tenant_id)
+        if _is_active_admin(p) and p.get("line_user_id")
+    ]
 
 
 def _approver_eligible(tenant_id: str, user_id: str) -> bool:
     """能批=admin 档案(启用),或无档案的租户 owner(老板本人绑了 LINE 也能批)。"""
     prof = roster_store.get_profile(tenant_id, user_id)
     if prof:
-        return (prof.get("dms_role") or "") == "admin" and (
-            prof.get("status") or "active"
-        ) == "active"
+        return _is_active_admin(prof)
     user = db.find_user_by_id(str(user_id))
     return bool(user and (user.get("role") or "") == "owner")
 
@@ -128,22 +134,23 @@ async def _submit(binding: dict, line_user_id: str, reply_token: str, pb: dict) 
     )
 
 
-async def _own_pending_request(binding: dict, pb: dict) -> Optional[dict]:
-    """销售侧动作的共同守卫:req 属本租户、发起人是自己、仍 pending(过期惰性落库)。"""
+async def _own_pending_or_reply(binding: dict, reply_token: str, pb: dict) -> Optional[dict]:
+    """销售侧动作(选人/改派)的共同守卫:req 属本租户 + 发起人是自己 + 仍 pending。
+    取不到 → 过期话术;非 pending(已被批/拒/过期)→ 对应状态话术。返回可用 req 或 None。"""
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     req = await _thr(approval_store.get_request, tenant, str(pb.get("req") or ""))
     if not req or str(req.get("operator_user_id")) != str(user_id):
+        _reply(reply_token, cards.TXT_EXPIRED)
+        return None
+    if req.get("status") != "pending":
+        _reply(reply_token, _status_text_for_sales(req))
         return None
     return req
 
 
 async def _target(binding: dict, line_user_id: str, reply_token: str, pb: dict) -> None:
-    req = await _own_pending_request(binding, pb)
+    req = await _own_pending_or_reply(binding, reply_token, pb)
     if not req:
-        _reply(reply_token, cards.TXT_EXPIRED)
-        return
-    if req.get("status") != "pending":
-        _reply(reply_token, _status_text_for_sales(req))
         return
 
     tenant = binding["tenant_id"]
@@ -173,20 +180,21 @@ async def _target(binding: dict, line_user_id: str, reply_token: str, pb: dict) 
         str(req.get("customer_id") or ""),
         _display_diffs(req),
     )
-    for t in targets:
-        line_client.push_messages(t["line_user_id"], [card], channel=_CHANNEL)
+    # 广播并发推(每次 push 是阻塞 HTTP)· 不占事件循环也不让销售的等待卡多等 N 次串行。
+    await asyncio.gather(
+        *(
+            _thr(line_client.push_messages, t["line_user_id"], [card], channel=_CHANNEL)
+            for t in targets
+        )
+    )
     line_client.reply_messages(
         reply_token, [approval_cards.waiting_card(str(req["id"]), label)], channel=_CHANNEL
     )
 
 
 async def _retarget(binding: dict, line_user_id: str, reply_token: str, pb: dict) -> None:
-    req = await _own_pending_request(binding, pb)
+    req = await _own_pending_or_reply(binding, reply_token, pb)
     if not req:
-        _reply(reply_token, cards.TXT_EXPIRED)
-        return
-    if req.get("status") != "pending":
-        _reply(reply_token, _status_text_for_sales(req))
         return
     approvers = await _thr(_bound_approvers, binding["tenant_id"])
     if not approvers:

@@ -189,6 +189,33 @@ def _kv_row(label: str, value: str) -> Dict[str, Any]:
     }
 
 
+def diff_rows(display_diffs: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    """逐条「字段标签(粗) + 旧 → 新(红)」行。diff 卡与审批申请卡共用同一渲染。"""
+    return [
+        {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": d.get("label", ""),
+                    "size": "sm",
+                    "weight": "bold",
+                    "color": "#111111",
+                },
+                {
+                    "type": "text",
+                    "text": f"{d.get('old') or '—'}  →  {d.get('new') or '—'}",
+                    "size": "sm",
+                    "color": "#c0392b",
+                    "wrap": True,
+                },
+            ],
+        }
+        for d in display_diffs
+    ]
+
+
 def _bubble(
     header: str, body_rows: List[Dict[str, Any]], footer_btns: List[Dict[str, Any]], alt: str
 ) -> Dict[str, Any]:
@@ -236,41 +263,20 @@ def new_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
 
 
 def diff_card(
-    display_diffs: List[Dict[str, str]], has_admin: bool, nonce: str, *, approval: bool = False
+    display_diffs: List[Dict[str, str]], nonce: str, *, primary: str = "none"
 ) -> Dict[str, Any]:
     """场景③已有客户 + 有差异:逐条「字段: 旧 → 新」+ 按钮。
 
-    approval(波4·销售)→ [ส่งขออนุมัติ];配了 admin → [อัปเดตข้อมูล];都没有 → 设置提示。
+    主按钮由调用方按角色解出(渲染层不藏优先级):
+      primary='approval'(波4·销售)→ [ส่งขออนุมัติ];'update'(有改写权)→ [อัปเดตข้อมูล];
+      'none'(无改写权且未配 admin)→ 设置提示,不给主按钮。
     """
-    rows: List[Dict[str, Any]] = []
-    for d in display_diffs:
-        rows.append(
-            {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": d.get("label", ""),
-                        "size": "sm",
-                        "weight": "bold",
-                        "color": "#111111",
-                    },
-                    {
-                        "type": "text",
-                        "text": f"{d.get('old') or '—'}  →  {d.get('new') or '—'}",
-                        "size": "sm",
-                        "color": "#c0392b",
-                        "wrap": True,
-                    },
-                ],
-            }
-        )
+    rows: List[Dict[str, Any]] = diff_rows(display_diffs)
     footer: List[Dict[str, Any]] = []
-    if approval:
-        # 波4:销售无改写权 → 主按钮=提交审核(管理员 LINE 批准后以批准人凭据执行)。
+    if primary == "approval":
+        # 销售无改写权 → 提交审核(管理员 LINE 批准后以批准人凭据执行)。
         footer.append(_btn(BTN_SUBMIT_APPROVAL, _data(ACT_SUBMIT_APPROVAL, nonce=nonce), "primary"))
-    elif has_admin:
+    elif primary == "update":
         footer.append(_btn(BTN_UPDATE, _data(ACT_UPDATE, nonce=nonce), "primary"))
     else:
         rows.append({"type": "separator", "margin": "sm"})

@@ -104,6 +104,15 @@ def _dal(label: str, default):
 # ── 绑定码 ────────────────────────────────────────────────────────────────
 
 
+def _void_unused_codes(cur, user_id) -> None:
+    """作废该 user 全部未用绑定码(发新码只留最新 / 停用收权 共用同一句)。"""
+    cur.execute(
+        "UPDATE line_dms_binding_codes SET used_at = now() "
+        "WHERE user_id = %s AND used_at IS NULL",
+        (str(user_id),),
+    )
+
+
 def generate_bind_code(tenant_id, user_id, ttl_minutes: int = DEFAULT_CODE_TTL_MINUTES):
     """为 (tenant, user) 发一个 6 位数字绑定码,作废该 user 旧的未用码(只留最新一个)。
 
@@ -116,11 +125,7 @@ def generate_bind_code(tenant_id, user_id, ttl_minutes: int = DEFAULT_CODE_TTL_M
 
     def _run():
         with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                "UPDATE line_dms_binding_codes SET used_at = now() "
-                "WHERE user_id = %s AND used_at IS NULL",
-                (str(user_id),),
-            )
+            _void_unused_codes(cur, user_id)
             cur.execute(
                 "INSERT INTO line_dms_binding_codes (code, tenant_id, user_id, expires_at) "
                 "VALUES (%s, %s, %s, %s) RETURNING code, expires_at",
@@ -285,11 +290,7 @@ def void_bind_codes_for_user(user_id: str) -> bool:
 
     def _run():
         with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                "UPDATE line_dms_binding_codes SET used_at = now() "
-                "WHERE user_id = %s AND used_at IS NULL",
-                (str(user_id),),
-            )
+            _void_unused_codes(cur, user_id)
             return True
 
     return bool(_dal("void_bind_codes_for_user", False)(_run))

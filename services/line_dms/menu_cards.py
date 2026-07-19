@@ -48,23 +48,29 @@ def _menu_icon_disc(icon: str, soft: str, size: str, img: str) -> Dict[str, Any]
     }
 
 
+# 行卡配色主题(accent 编号/箭头 · soft 图标圆底 · border 卡边):建档蓝 / 订车粉。
+THEME_BLUE = {"accent": "#2f6bff", "soft": "#eaf0ff", "border": "#dfe7ff"}
+THEME_PINK = {"accent": "#f25c6e", "soft": "#fdecef", "border": "#f9d9de"}
+
+
 def _menu_item(
-    num: str, icon: str, accent: str, soft: str, border: str, title: str, desc: str, action: str
+    num: str, icon: str, theme: Dict[str, str], title: str, desc: str, action: str
 ) -> Dict[str, Any]:
     """整行可点的菜单项(postback 无 nonce):编号圆徽 + 图标 + 标题两行说明 + 箭头。"""
+    accent = theme["accent"]
     return {
         "type": "box",
         "layout": "horizontal",
         "spacing": "md",
         "margin": "md",
         "cornerRadius": "14px",
-        "borderColor": border,
+        "borderColor": theme["border"],
         "borderWidth": "1px",
         "paddingAll": "14px",
         "alignItems": "center",
         "action": {"type": "postback", "data": action},
         "contents": [
-            _menu_icon_disc(icon, soft, "46px", "26px"),
+            _menu_icon_disc(icon, theme["soft"], "46px", "26px"),
             {
                 "type": "text",
                 "text": num,
@@ -150,24 +156,10 @@ def menu_card() -> Dict[str, Any]:
             head,
             {"type": "separator", "margin": "lg", "color": "#eeeef4"},
             _menu_item(
-                "1",
-                "menu-1",
-                "#2f6bff",
-                "#eaf0ff",
-                "#dfe7ff",
-                TXT_MENU_ITEM1,
-                TXT_MENU_D1,
-                _data(ACT_MENU_CUSTOMER),
+                "1", "menu-1", THEME_BLUE, TXT_MENU_ITEM1, TXT_MENU_D1, _data(ACT_MENU_CUSTOMER)
             ),
             _menu_item(
-                "2",
-                "menu-2",
-                "#f25c6e",
-                "#fdecef",
-                "#f9d9de",
-                TXT_MENU_ITEM2,
-                TXT_MENU_D2,
-                _data(ACT_MENU_BOOKING),
+                "2", "menu-2", THEME_PINK, TXT_MENU_ITEM2, TXT_MENU_D2, _data(ACT_MENU_BOOKING)
             ),
             {
                 "type": "text",

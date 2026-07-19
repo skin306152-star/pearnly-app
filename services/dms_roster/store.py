@@ -135,7 +135,7 @@ def list_profiles(tenant_id: str) -> List[dict]:
                 """
                 SELECT p.user_id, p.display_name, p.dms_role, p.status, p.created_at,
                        u.username,
-                       b.display_name AS line_name, b.bound_at,
+                       b.display_name AS line_name, b.bound_at, b.line_user_id,
                        e.enabled AS ep_enabled
                 FROM dms_operator_profiles p
                 JOIN users u ON u.id = p.user_id

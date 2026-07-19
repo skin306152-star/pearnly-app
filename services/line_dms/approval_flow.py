@@ -87,9 +87,9 @@ def exact_diff_card(
     prof = roster_store.get_profile(tenant_id, str(user_id))
     role = (prof or {}).get("dms_role") or ""
     if role == "sales" and requires_approval("customer_profile"):
-        return cards.diff_card(display, nonce, primary="approval"), True
+        return cards.diff_card(display, nonce, primary="approval", summary=summary), True
     primary = "update" if (has_admin or role == "admin") else "none"
-    return cards.diff_card(display, nonce, primary=primary), False
+    return cards.diff_card(display, nonce, primary=primary, summary=summary), False
 
 
 # ── 审批人名录 ──────────────────────────────────────────────────────────────

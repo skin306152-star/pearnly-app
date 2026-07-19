@@ -247,51 +247,63 @@ def _bubble(
     }
 
 
-def new_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
-    """场景①新建:五要素复述 + [บันทึกลูกค้าใหม่][เริ่มใหม่]。"""
-    rows = [
-        _kv_row("เลขบัตร", summary.get("people_id", "")),
-        _kv_row("ชื่อ", summary.get("name", "")),
-        _kv_row("วันเกิด", summary.get("birthday_be", "")),
-        _kv_row("ที่อยู่", summary.get("address", "")),
-        _kv_row("เบอร์โทร", summary.get("phone", "")),
+def _summary_rows(summary: Dict[str, str]) -> List[Dict[str, Any]]:
+    """五要素复述行(新客/一致/差异三卡同一预览区 · 2026-07-19 拍板:每张卡先看全信息)。"""
+    s = summary or {}
+    return [
+        _kv_row("เลขบัตร", s.get("people_id", "")),
+        _kv_row("ชื่อ", s.get("name", "")),
+        _kv_row("วันเกิด", s.get("birthday_be", "")),
+        _kv_row("ที่อยู่", s.get("address", "")),
+        _kv_row("เบอร์โทร", s.get("phone", "")),
     ]
+
+
+def new_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
+    """场景①新建:五要素复述 + [บันทึกลูกค้าใหม่][แก้ไข] 两键(拍板瘦身:重拍=直接
+    再发照片,重来=打 เมนู,不占按钮)。"""
     footer = [
         _btn(BTN_SAVE_NEW, _data(ACT_CREATE, nonce=nonce), "primary"),
         _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),
-        _btn(BTN_RETAKE, _data(ACT_RETAKE, nonce=nonce), "secondary"),
-        _btn(BTN_RESTART, _data(ACT_RESET), "secondary"),
     ]
-    return _bubble("ลูกค้าใหม่ ยืนยันข้อมูลเพื่อบันทึก", rows, footer, "ยืนยันบันทึกลูกค้าใหม่")
+    return _bubble(
+        "ลูกค้าใหม่ ยืนยันข้อมูลเพื่อบันทึก",
+        _summary_rows(summary),
+        footer,
+        "ยืนยันบันทึกลูกค้าใหม่",
+    )
 
 
 def same_customer_card(summary: Dict[str, str], nonce: str) -> Dict[str, Any]:
     """场景②已有客户 · 资料一致(不分模式):预览复述 + [ใช้ข้อมูลเดิม][แก้ไข]。
     只回一句「ตรงกัน」会把识别/手输出错的销售堵死——预览 + 修正入口必须在。"""
-    rows = [
-        _kv_row("เลขบัตร", summary.get("people_id", "")),
-        _kv_row("ชื่อ", summary.get("name", "")),
-        _kv_row("วันเกิด", summary.get("birthday_be", "")),
-        _kv_row("ที่อยู่", summary.get("address", "")),
-        _kv_row("เบอร์โทร", summary.get("phone", "")),
-    ]
     footer = [
         _btn(BTN_KEEP, _data(ACT_KEEP), "primary"),
         _btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"),
     ]
-    return _bubble(TXT_SAME, rows, footer, "ข้อมูลลูกค้าตรงกัน")
+    return _bubble(TXT_SAME, _summary_rows(summary), footer, "ข้อมูลลูกค้าตรงกัน")
 
 
 def diff_card(
-    display_diffs: List[Dict[str, str]], nonce: str, *, primary: str = "none"
+    display_diffs: List[Dict[str, str]],
+    nonce: str,
+    *,
+    primary: str = "none",
+    summary: Dict[str, str] = None,
 ) -> Dict[str, Any]:
-    """场景③已有客户 + 有差异:逐条「字段: 旧 → 新」+ 按钮。
+    """场景③已有客户 + 有差异:新资料完整预览 + 逐条「字段: 旧 → 新」同一张卡
+    (2026-07-19 拍板),按钮 [主键][ใช้ข้อมูลเดิม][แก้ไข] 三键。
 
     主按钮由调用方按角色解出(渲染层不藏优先级):
-      primary='approval'(波4·销售)→ [ส่งขออนุมัติ];'update'(有改写权)→ [อัปเดตข้อมูล];
-      'none'(无改写权且未配 admin)→ 设置提示,不给主按钮。
+      primary='approval'(信用授权类·策略要审)→ [ส่งขออนุมัติ];'update'(有改写权)→
+      [อัปเดตข้อมูล];'none'(无改写权且未配 admin)→ 设置提示,不给主按钮。
     """
-    rows: List[Dict[str, Any]] = diff_rows(display_diffs)
+    rows: List[Dict[str, Any]] = []
+    if summary:
+        rows += _summary_rows(summary)
+        rows.append({"type": "separator", "margin": "sm"})
+        rows.append({"type": "text", "text": "ความต่าง", "size": "xs", "color": "#8a8a8a"})
+    rows += diff_rows(display_diffs)
     footer: List[Dict[str, Any]] = []
     if primary == "approval":
         # 销售无改写权 → 提交审核(管理员 LINE 批准后以批准人凭据执行)。
@@ -309,9 +321,8 @@ def diff_card(
                 "wrap": True,
             }
         )
-    footer.append(_btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"))
-    footer.append(_btn(BTN_RETAKE, _data(ACT_RETAKE, nonce=nonce), "secondary"))
     footer.append(_btn(BTN_KEEP, _data(ACT_KEEP), "secondary"))
+    footer.append(_btn(BTN_EDIT, _data(ACT_EDIT, nonce=nonce), "secondary"))
     return _bubble("พบข้อมูลเดิม มีบางส่วนไม่ตรงกัน", rows, footer, "พบข้อมูลลูกค้าที่ต่างกัน")
 
 

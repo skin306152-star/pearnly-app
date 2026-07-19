@@ -48,11 +48,17 @@ R_WITHDRAWAL = "withdrawal"  # 转出(取款)行,不是收入
 R_FEE = "bank_fee"  # 手续费扣账
 R_CANCEL = "cancelled"  # 取消/冲正
 R_MATCHED_SETTLEMENT = "edc_settlement_matched"  # 与 EDC 结算单互证 → 必是销售
+R_SALES_CHANNEL = "sales_channel_explicit"  # 摘要明示销售收款渠道
 R_DEPOSIT_PENDING = "deposit_unclassified"  # 入账但无强信号,待大脑/人裁
 
 # 手续费 / 取消 关键词(泰文 + 英文;真料 KBANK 摘要用泰文,英文兜底)。命中即剔除。
 _FEE_KEYWORDS = ("ค่าธรรมเนียม", "ธรรมเนียม", "fee", "service charge")
 _CANCEL_KEYWORDS = ("ยกเลิก", "คืนเงิน", "ปรับปรุง", "reversal", "cancel", "refund")
+# 泰文原文是银行票面明示“销售收款”，不是从普通个人转入猜销售。
+_SALES_CHANNEL_KEYWORDS = ("รับเงินจากการขายด้วย Thai QR", "K SHOP/MYQR", "EDC")
+_TRANSFER_IN_KEYWORDS = ("รับโอนเงิน", "transfer in")
+_CASH_DEPOSIT_KEYWORDS = ("ฝากเงินสด", "CDM", "cash deposit")
+_GROUP_ORDER = ("qr_edc", "transfer_in", "cash_deposit", "other_in")
 
 _ZERO = Decimal("0")
 
@@ -268,6 +274,18 @@ def _has_keyword(text: str, keywords) -> bool:
     return any(k.lower() in low for k in keywords)
 
 
+def group_key(row: dict) -> str:
+    """按银行摘要归待定组；只认后端给的组键，前端不复制关键词。"""
+    desc = row["description"]
+    if _has_keyword(desc, _SALES_CHANNEL_KEYWORDS):
+        return "qr_edc"
+    if _has_keyword(desc, _TRANSFER_IN_KEYWORDS):
+        return "transfer_in"
+    if _has_keyword(desc, _CASH_DEPOSIT_KEYWORDS):
+        return "cash_deposit"
+    return "other_in"
+
+
 def classify_row(row: dict, strong_sales_keys: set) -> tuple[str, str]:
     """确定性单行分类(漏斗第 1 层,纯函数)。剔除转出/手续费/取消 → 非销售;EDC 互证 → 销售;
     其余入账 → 待定(交大脑/人裁)。strong_sales_keys = {(date, 入账额定点串)}。"""
@@ -281,6 +299,8 @@ def classify_row(row: dict, strong_sales_keys: set) -> tuple[str, str]:
         return NON_SALES, R_FEE
     if _has_keyword(desc, _CANCEL_KEYWORDS):
         return NON_SALES, R_CANCEL
+    if _has_keyword(desc, _SALES_CHANNEL_KEYWORDS):
+        return SALES, R_SALES_CHANNEL
     if (row["date"], deposit) in strong_sales_keys:  # Decimal 键:数值相等(5000.0==5000.00)
         return SALES, R_MATCHED_SETTLEMENT
     return PENDING, R_DEPOSIT_PENDING
@@ -367,6 +387,7 @@ def suggest(events: list, *, period: Optional[str] = None) -> dict:
     human = human_overlay(events)
 
     detail: list[dict] = []
+    groups = {key: {"key": key, "count": 0, "sum": _ZERO} for key in _GROUP_ORDER}
     gross = _ZERO
     counts = {SALES: 0, NON_SALES: 0, PENDING: 0}
     for row in rows:
@@ -376,18 +397,22 @@ def suggest(events: list, *, period: Optional[str] = None) -> dict:
         counts[verdict] += 1
         if verdict == SALES:
             gross += row["deposit"]
-        detail.append(
-            {
-                "fingerprint": fp,
-                "date": row["date"],
-                "deposit": _fmt(row["deposit"]),
-                "withdrawal": _fmt(row["withdrawal"]),
-                "description": row["description"],
-                "verdict": verdict,
-                "reason": reason,
-                "source": source,
-            }
-        )
+        item = {
+            "fingerprint": fp,
+            "date": row["date"],
+            "deposit": _fmt(row["deposit"]),
+            "withdrawal": _fmt(row["withdrawal"]),
+            "description": row["description"],
+            "verdict": verdict,
+            "reason": reason,
+            "source": source,
+        }
+        if verdict == PENDING:
+            key = group_key(row)
+            item["group"] = key
+            groups[key]["count"] += 1
+            groups[key]["sum"] += row["deposit"]
+        detail.append(item)
 
     out = {
         "applicable": True,
@@ -395,6 +420,9 @@ def suggest(events: list, *, period: Optional[str] = None) -> dict:
         "coverage": coverage,
         "counts": {**counts, "total": len(rows)},
         "rows": detail,
+        "pending_groups": [
+            {**group, "sum": _fmt(group["sum"])} for group in groups.values() if group["count"]
+        ],
     }
     if not coverage["reliable"]:
         # 缺整页(自报总数对不上)比页内链断更根因、可行动——优先点名 statement_incomplete,

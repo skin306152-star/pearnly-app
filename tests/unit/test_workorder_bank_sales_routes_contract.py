@@ -13,6 +13,7 @@ import unittest
 from unittest import mock
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from core import route_helpers
 from routes.workorder_bank_sales_routes import router as bank_sales_router
@@ -22,13 +23,20 @@ from tests.unit._route_contract_fakes import route_set as _route_set
 
 _USER = {"id": "u1", "tenant_id": "t-1"}
 _RUN_PATH = "/api/workorder/orders/{work_order_id}/bank-sales/run"
+_PROGRESS_PATH = "/api/workorder/orders/{work_order_id}/bank-sales/progress"
 _DECIDE_PATH = "/api/workorder/orders/{work_order_id}/bank-sales/decide"
+_BATCH_PATH = "/api/workorder/orders/{work_order_id}/bank-sales/decide-batch"
 
 
 class RouteContractTests(unittest.TestCase):
     def test_expected_routes_registered(self):
         rs = _route_set(bank_sales_router)
-        expected = {("POST", _RUN_PATH), ("POST", _DECIDE_PATH)}
+        expected = {
+            ("POST", _RUN_PATH),
+            ("GET", _PROGRESS_PATH),
+            ("POST", _DECIDE_PATH),
+            ("POST", _BATCH_PATH),
+        }
         self.assertTrue(expected.issubset(rs), f"缺路由: {expected - rs}")
 
 
@@ -38,7 +46,9 @@ class RouterMountedTests(unittest.TestCase):
 
         paths = {getattr(r, "path", None) for r in app.app.routes}
         self.assertIn(_RUN_PATH, paths)
+        self.assertIn(_PROGRESS_PATH, paths)
         self.assertIn(_DECIDE_PATH, paths)
+        self.assertIn(_BATCH_PATH, paths)
 
 
 class GateClosedTests(unittest.IsolatedAsyncioTestCase):
@@ -88,6 +98,35 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
                 )
         self.assertEqual(ctx.exception.status_code, 404)
 
+    async def test_sa3a_gate_closed_hides_new_progress_and_batch_routes(self):
+        from routes import workorder_bank_sales_routes as wbs
+
+        calls = (
+            wbs.bank_sales_progress("wo-1", mock.Mock()),
+            wbs.decide_bank_sales_batch(
+                "wo-1",
+                wbs.BankSalesDecideBatchIn(decisions=[{"fingerprint": "a", "verdict": "sales"}]),
+                mock.Mock(),
+            ),
+        )
+        for call in calls:
+            with self.subTest(call=call):
+                with (
+                    mock.patch.object(
+                        route_helpers, "get_current_user_from_request", return_value=_USER
+                    ),
+                    mock.patch.object(
+                        route_helpers, "pearnly_ai_m1_enabled_for", return_value=True
+                    ),
+                    mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+                    mock.patch.object(
+                        wbs, "pearnly_ai_bank_sales_suggest_enabled_for", return_value=False
+                    ),
+                ):
+                    with self.assertRaises(HTTPException) as ctx:
+                        await call
+                self.assertEqual(ctx.exception.status_code, 404)
+
 
 def _open_gate_patches(wbs, wr):
     """双闸开 + 鉴权/归属/事务全假件短路(照 test_workorder_routes_contract 范式)。"""
@@ -112,18 +151,21 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             mock.patch.object(route_helpers, "require_perm", return_value=_USER) as perm,
-            mock.patch.object(wbs.bank_sales_brain, "run", return_value={"enabled": True}),
+            mock.patch.object(wbs.bank_sales_brain, "begin", return_value=True),
+            mock.patch.object(wbs.threading, "Thread") as thread,
+            mock.patch.object(wbs.store, "list_events", return_value=[]),
             mock.patch.object(
                 wbs.bank_sales_review, "record_bank_sales_decision", return_value={"id": 1}
             ),
         ):
+            thread.return_value.start.return_value = None
             for p in _open_gate_patches(wbs, wr):
                 self.enterContext(p)
             await coro
         self.assertTrue(perm.called, "端点未走 require_perm")
         return perm.call_args[0][1]
 
-    async def test_run_and_decide_use_prepare_code(self):
+    async def test_all_bank_sales_routes_use_prepare_code(self):
         from routes import workorder_bank_sales_routes as wbs
 
         cases = (
@@ -133,6 +175,14 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
                 wbs.BankSalesDecideIn(fingerprint="2569-05-01|100|0", verdict="sales"),
                 mock.Mock(),
             ),
+            wbs.bank_sales_progress("wo-1", mock.Mock()),
+            wbs.decide_bank_sales_batch(
+                "wo-1",
+                wbs.BankSalesDecideBatchIn(
+                    decisions=[{"fingerprint": "2569-05-01|100|0", "verdict": "sales"}]
+                ),
+                mock.Mock(),
+            ),
         )
         for coro in cases:
             with self.subTest(coro=coro):
@@ -140,21 +190,59 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
 
 
 class RunEndpointTests(unittest.IsolatedAsyncioTestCase):
-    async def test_gate_open_passes_brain_summary_through(self):
+    async def test_starts_background_and_returns_pending_total(self):
         from routes import workorder_bank_sales_routes as wbs
         from routes import workorder_routes as wr
 
-        summary = {"enabled": True, "asked": 2, "logged": 2, "failed": 0}
         with (
             mock.patch.object(route_helpers, "require_perm", return_value=_USER),
-            mock.patch.object(wbs.bank_sales_brain, "run", return_value=summary) as brain_run,
+            mock.patch.object(wbs.store, "list_events", return_value=[{"id": 1}]),
+            mock.patch.object(wbs.bank_sales_suggest, "pending_rows", return_value=[{}, {}]),
+            mock.patch.object(wbs.bank_sales_brain, "begin", return_value=True),
+            mock.patch.object(wbs.threading, "Thread") as thread,
         ):
             for p in _open_gate_patches(wbs, wr):
                 self.enterContext(p)
             out = await wbs.run_bank_sales("wo-1", mock.Mock())
-        self.assertEqual(out, {"ok": True, **summary})
-        self.assertEqual(brain_run.call_args.kwargs["tenant_id"], "t-1")
-        self.assertEqual(brain_run.call_args.kwargs["work_order_id"], "wo-1")
+        self.assertEqual(out, {"started": True, "total_pending": 2})
+        kwargs = thread.call_args.kwargs
+        self.assertIs(kwargs["target"], wbs.bank_sales_brain.run_async)
+        self.assertTrue(kwargs["daemon"])
+        thread.return_value.start.assert_called_once()
+
+    async def test_running_returns_bare_409_shape(self):
+        from routes import workorder_bank_sales_routes as wbs
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(wbs.store, "list_events", return_value=[]),
+            mock.patch.object(wbs.bank_sales_brain, "begin", return_value=False),
+        ):
+            for p in _open_gate_patches(wbs, wr):
+                self.enterContext(p)
+            out = await wbs.run_bank_sales("wo-1", mock.Mock())
+        self.assertEqual(out.status_code, 409)
+        self.assertEqual(out.body, b'{"running":true}')
+
+
+class ProgressEndpointTests(unittest.IsolatedAsyncioTestCase):
+    async def test_returns_progress_and_current_pending_count(self):
+        from routes import workorder_bank_sales_routes as wbs
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(wbs.store, "list_events", return_value=[{"id": 1}]),
+            mock.patch.object(wbs.bank_sales_suggest, "suggest", return_value={"pending_count": 7}),
+            mock.patch.object(
+                wbs.bank_sales_brain, "progress", return_value={"running": True, "done": 40}
+            ),
+        ):
+            for p in _open_gate_patches(wbs, wr):
+                self.enterContext(p)
+            out = await wbs.bank_sales_progress("wo-1", mock.Mock())
+        self.assertEqual(out, {"running": True, "done": 40, "pending_count": 7})
 
 
 class DecideWildFingerprintTests(unittest.IsolatedAsyncioTestCase):
@@ -177,6 +265,59 @@ class DecideWildFingerprintTests(unittest.IsolatedAsyncioTestCase):
                 )
         self.assertEqual(ctx.exception.status_code, 404)
         self.assertEqual(ctx.exception.detail, "workorder.bank_sales_row_not_found")
+
+
+class DecideBatchTests(unittest.IsolatedAsyncioTestCase):
+    async def test_applies_all_decisions_in_one_request(self):
+        from routes import workorder_bank_sales_routes as wbs
+        from routes import workorder_routes as wr
+
+        req = wbs.BankSalesDecideBatchIn(
+            decisions=[
+                {"fingerprint": "a", "verdict": "sales"},
+                {"fingerprint": "b", "verdict": "non_sales"},
+            ]
+        )
+        with (
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(
+                wbs.bank_sales_review, "record_bank_sales_decision", return_value={"id": 1}
+            ) as record,
+        ):
+            for p in _open_gate_patches(wbs, wr):
+                self.enterContext(p)
+            out = await wbs.decide_bank_sales_batch("wo-1", req, mock.Mock())
+        self.assertEqual(out, {"applied": 2})
+        self.assertEqual(record.call_count, 2)
+
+    async def test_wild_fingerprint_maps_400_with_value(self):
+        from routes import workorder_bank_sales_routes as wbs
+        from routes import workorder_routes as wr
+        from services.workorder import api
+
+        req = wbs.BankSalesDecideBatchIn(decisions=[{"fingerprint": "wild", "verdict": "sales"}])
+        with (
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(
+                wbs.bank_sales_review,
+                "record_bank_sales_decision",
+                side_effect=api.WorkOrderApiError("workorder.bank_sales_row_not_found"),
+            ),
+        ):
+            for p in _open_gate_patches(wbs, wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wbs.decide_bank_sales_batch("wo-1", req, mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(ctx.exception.detail["fingerprint"], "wild")
+
+    def test_rejects_more_than_800_decisions(self):
+        with self.assertRaises(ValidationError):
+            __import__(
+                "routes.workorder_bank_sales_routes", fromlist=["BankSalesDecideBatchIn"]
+            ).BankSalesDecideBatchIn(
+                decisions=[{"fingerprint": str(i), "verdict": "sales"} for i in range(801)]
+            )
 
 
 if __name__ == "__main__":

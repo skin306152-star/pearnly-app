@@ -132,14 +132,17 @@ class RunTests(unittest.TestCase):
 
         def fake_ask(prompt, **kw):
             return _outcome(
-                dict(
-                    answer,
-                    cited_row_fingerprints=(
-                        answer.get("cited_row_fingerprints", [fp])
-                        if answer.get("suggestion") != "cannot_judge"
-                        else []
-                    ),
-                )
+                [
+                    dict(
+                        answer,
+                        row_fingerprint=fp,
+                        cited_row_fingerprints=(
+                            answer.get("cited_row_fingerprints", [fp])
+                            if answer.get("suggestion") != "cannot_judge"
+                            else []
+                        ),
+                    )
+                ]
             )
 
         with (

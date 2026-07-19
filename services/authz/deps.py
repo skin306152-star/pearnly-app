@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """require_perm 统一执行点(docs/permissions/03 · OWASP deny-by-default)。
-
 判定顺序(单点 · 路由不得自己写 if role):
   1. 超管短路放行(平台层)
-  2. POS 双令牌(typ=pos/pos_store)只认收银码集,其余一律 403
-  3. 模块联动:码所属模块在 tenant_modules 关闭 → 403 module_disabled
-  4. 角色码集含码(或 all)→ 过,否则 403 forbidden
-  5. 作用域:带 workspace 维度的路由再调 check_workspace_scope(未分配 → 404 防枚举)
+  2. 入口作用域不匹配 → 403 entrance_scope
+  3. POS 双令牌只认收银码集;模块关闭 → module_disabled;角色缺码 → forbidden
+  4. 带 workspace 维度的路由再调 check_workspace_scope(未分配 → 404 防枚举)
 
 两个入口同逻辑不同错误形态:require_perm 抛 HTTPException(主程序路由),
 require_perm_pos 抛 PosError(POS 信封路由)。授权失败记结构化日志可聚合。
@@ -123,7 +121,7 @@ def _check(request: Request, user: dict, code: str) -> tuple[bool, str]:
 
 
 def require_perm(request: Request, code: str) -> dict:
-    """主程序路由守门:过 → 返 user dict;拒 → 403(authz.forbidden/module_disabled)。"""
+    """主程序路由守门:过则返用户;拒则返回可机读的 authz detail。"""
     from core.auth import get_current_user_from_request
 
     user = get_current_user_from_request(request)
@@ -133,6 +131,8 @@ def require_perm(request: Request, code: str) -> dict:
     _deny_log(user, code, reason, request)
     if reason == "module_disabled":
         raise HTTPException(403, detail="authz.module_disabled")
+    if reason == "entrance_scope":
+        raise HTTPException(403, detail="authz.entrance_scope")
     raise HTTPException(403, detail="authz.forbidden")
 
 

@@ -254,13 +254,13 @@ async def _run_dedup(
         _push(line_user_id, cards.TXT_NO_ENDPOINT)
         return
 
-    full_name = id_card.get("name") or ""
     res = await _thr(
         _dms_intake.recognize_lookup_mrerp_dms,
         ep,
         people_id=id_card.get("people_id", ""),
-        name=full_name,
+        name=id_card.get("name") or "",
         ocr_address=id_card.get("address") or {},
+        phone=phone,
     )
     if not res.get("ok"):
         fr = res.get("error_friendly") or {}
@@ -273,8 +273,8 @@ async def _run_dedup(
     draft_vals = draft.build_draft(id_card, geo, res.get("prefixes") or [], phone)
     summary = draft.build_summary(draft_vals, geo)
 
-    if scenario == "exact" and not field_diffs:
-        _push(line_user_id, cards.TXT_SAME)  # 零写入
+    if scenario == "exact" and not field_diffs and mode != "customer":
+        _push(line_user_id, cards.TXT_SAME)  # 零写入 · booking/缺省照旧自动串联
         await menu_flow.after_customer_saved(
             binding,
             line_user_id,
@@ -305,8 +305,8 @@ async def _run_dedup(
     elif scenario == "exact":
         has_admin = draft.has_admin_creds(ep)
         display = draft.display_diffs(field_diffs, geo)
-        # 审批策略见 approval_flow.APPROVAL_POLICY:客户档改写销售直写,要审的类型才出提审卡。
-        args = (tenant, user_id, display, has_admin, nonce)
+        # 审批策略见 approval_flow.APPROVAL_POLICY;无差异(customer 模式)→ 预览卡(保持/修改)。
+        args = (tenant, user_id, display, has_admin, nonce, summary)
         card, approval = await _thr(approval_flow.exact_diff_card, *args)
         payload = {
             **base,

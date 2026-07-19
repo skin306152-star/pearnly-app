@@ -3,7 +3,7 @@
 
 泰方客户照 ChatGPT mockup 要一层入口:用户不必记「先拍卡」的隐式流程,发问候语即见
 「1 จัดทำข้อมูลลูกค้า / 2 จัดทำใบจอง」两选项。选完落到 collecting,只是给会话打一个 mode:
-  · customer —— 建档为终点,写档后问「要不要顺便订车」而非自动跳订车(客户可能只想建档)。
+  · customer —— 建档为终点,写档后收尾不提订车(泰方拍板:菜单1不弹订车信息)。
   · booking / 缺省 —— 建档后自动串联订车(老用户直接拍卡的行为逐字节不变)。
 mode 存在会话 payload,_run_dedup 读它决定写档后的分叉(见 after_customer_saved)。
 
@@ -18,7 +18,7 @@ from typing import Optional
 
 from services.line_binding import line_client
 from services.line_dms import booking_flow, cards, menu_cards, store
-from services.line_dms._out import _CHANNEL, _reply, _thr
+from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 MENU_ACTIONS = frozenset(
     {
@@ -160,9 +160,11 @@ async def after_customer_saved(
     mode: str = "",
     same_data: bool = False,
 ) -> None:
-    """客户档落定后:booking/缺省 → 照旧 offer_pick;customer → 推 continue 卡等用户决定。
+    """客户档落定后:booking/缺省 → 照旧 offer_pick;customer → 收尾不提订车。
 
-    same_data=True 表示本次零写入(数据已存/选择保留),文案不谎称「已保存」。"""
+    菜单1=只建档(泰方拍板 2026-07-19):不再推「ทำใบจองต่อ?」续订卡;其 postback
+    处理保留,聊天历史里已发出的旧卡仍能点。same_data=True 表示本次零写入
+    (数据已存/选择保留),文案不谎称「已保存」。"""
     if mode != "customer":
         await booking_flow.offer_pick(
             binding,
@@ -174,18 +176,5 @@ async def after_customer_saved(
         )
         return
 
-    tenant = binding["tenant_id"]
-    if not customer_id:  # 无客户号 → 订车无从谈起,收干净(建档非订车必经)
-        await _thr(store.clear_session, tenant, line_user_id)
-        return
-    payload = {
-        "endpoint_id": str(endpoint_id or ""),
-        "customer_id": str(customer_id),
-        "draft": draft or {},
-        "name": name or (draft or {}).get("name", ""),
-        "mode": mode,
-    }
-    await _thr(store.set_session, tenant, line_user_id, "menu_after_save", payload)
-    line_client.push_messages(
-        line_user_id, [menu_cards.continue_booking_card(customer_id, same_data)], channel=_CHANNEL
-    )
+    await _thr(store.clear_session, binding["tenant_id"], line_user_id)
+    _push(line_user_id, cards.TXT_DONE_SAME if same_data else cards.TXT_DONE_SAVED)

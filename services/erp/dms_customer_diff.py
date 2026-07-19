@@ -36,6 +36,14 @@ def _norm(v: Any) -> str:
     return " ".join(s.split())
 
 
+def _norm_phone(v: Any) -> str:
+    """电话按纯数字比:DMS 手工录入常带连字符/空格,「081-234-5678」≠「0812345678」
+    是假差异,会让每次扫卡都弹更新卡。全非数字(如「-」占位)退回普通归一。"""
+    s = _norm(v)
+    digits = "".join(ch for ch in s if ch.isdigit())
+    return digits or s
+
+
 def diff_customer_fields(current: Dict[str, Any], incoming: Dict[str, Any]) -> List[Dict[str, str]]:
     """比对白名单字段,返回变化项 [{'field','old','new'}](归一后对照值)。
 
@@ -45,10 +53,11 @@ def diff_customer_fields(current: Dict[str, Any], incoming: Dict[str, Any]) -> L
     for field in _DIFF_FIELDS:
         if field not in incoming:
             continue
-        new = _norm(incoming.get(field))
+        norm = _norm_phone if field == "phone" else _norm
+        new = norm(incoming.get(field))
         if not new:  # 空值 = 无信息
             continue
-        old = _norm(current.get(field))
+        old = norm(current.get(field))
         if new != old:
             out.append({"field": field, "old": old, "new": new})
     return out

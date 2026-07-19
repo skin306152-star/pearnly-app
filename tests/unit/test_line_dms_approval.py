@@ -41,13 +41,16 @@ def _btn_actions(card):
     return [b["action"]["data"] for b in card["contents"]["footer"]["contents"]]
 
 
+_DISPLAY = [{"label": "ชื่อ", "old": "ก", "new": "ข"}]
+
+
 class ExactDiffCardTests(unittest.TestCase):
     def test_sales_direct_update_with_borrowed_admin(self):
         """2026-07-19 泰方拍板:客户档改写销售不走审批,借到老板 admin 凭据即直写。"""
         with mock.patch.object(
             approval_flow.roster_store, "get_profile", return_value={"dms_role": "sales"}
         ):
-            card, approval = approval_flow.exact_diff_card("T1", "sales-1", [], True, "n1")
+            card, approval = approval_flow.exact_diff_card("T1", "sales-1", _DISPLAY, True, "n1")
         self.assertFalse(approval)
         self.assertTrue(any("action=update" in a for a in _btn_actions(card)))
 
@@ -56,7 +59,7 @@ class ExactDiffCardTests(unittest.TestCase):
         with mock.patch.object(
             approval_flow.roster_store, "get_profile", return_value={"dms_role": "sales"}
         ):
-            card, approval = approval_flow.exact_diff_card("T1", "sales-1", [], False, "n1")
+            card, approval = approval_flow.exact_diff_card("T1", "sales-1", _DISPLAY, False, "n1")
         self.assertFalse(approval)
         self.assertFalse(any("action=update" in a for a in _btn_actions(card)))
         self.assertFalse(any("approval_submit" in a for a in _btn_actions(card)))
@@ -69,7 +72,7 @@ class ExactDiffCardTests(unittest.TestCase):
                 approval_flow.roster_store, "get_profile", return_value={"dms_role": "sales"}
             ),
         ):
-            card, approval = approval_flow.exact_diff_card("T1", "sales-1", [], False, "n1")
+            card, approval = approval_flow.exact_diff_card("T1", "sales-1", _DISPLAY, False, "n1")
         self.assertTrue(approval)
         self.assertTrue(any("approval_submit" in a for a in _btn_actions(card)))
 
@@ -82,15 +85,28 @@ class ExactDiffCardTests(unittest.TestCase):
         with mock.patch.object(
             approval_flow.roster_store, "get_profile", return_value={"dms_role": "admin"}
         ):
-            card, approval = approval_flow.exact_diff_card("T1", "admin-1", [], False, "n1")
+            card, approval = approval_flow.exact_diff_card("T1", "admin-1", _DISPLAY, False, "n1")
         self.assertFalse(approval)
         self.assertTrue(any("action=update" in a for a in _btn_actions(card)))
 
     def test_no_profile_keeps_legacy_has_admin(self):
         with mock.patch.object(approval_flow.roster_store, "get_profile", return_value=None):
-            card, approval = approval_flow.exact_diff_card("T1", "owner-1", [], False, "n1")
+            card, approval = approval_flow.exact_diff_card("T1", "owner-1", _DISPLAY, False, "n1")
         self.assertFalse(approval)
         self.assertFalse(any("action=update" in a for a in _btn_actions(card)))
+
+    def test_no_diffs_returns_same_preview_card(self):
+        """零差异(customer 模式)→ 同资料预览卡:保持(keep)/修改(edit),不查花名册。"""
+        with mock.patch.object(approval_flow.roster_store, "get_profile") as gp:
+            card, approval = approval_flow.exact_diff_card(
+                "T1", "sales-1", [], False, "n1", {"name": "สมชาย"}
+            )
+        gp.assert_not_called()
+        self.assertFalse(approval)
+        acts = _btn_actions(card)
+        self.assertTrue(any("action=keep" in a for a in acts))
+        self.assertTrue(any("action=edit" in a for a in acts))
+        self.assertFalse(any("action=update" in a for a in acts))
 
 
 class SubmitTests(unittest.IsolatedAsyncioTestCase):

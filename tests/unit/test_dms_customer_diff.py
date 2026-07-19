@@ -55,6 +55,18 @@ class DiffPureTests(unittest.TestCase):
         incoming = dict(_CURRENT, people_id="9999999999999")
         self.assertEqual(diff_customer_fields(_CURRENT, incoming), [])
 
+    def test_phone_dash_format_is_not_a_diff(self):
+        """DMS 手工录入常带连字符:「081-111-1111」=「0811111111」,不得弹假差异。"""
+        current = dict(_CURRENT, phone="081-111-1111")
+        incoming = dict(_CURRENT, phone="0811111111")
+        self.assertEqual(diff_customer_fields(current, incoming), [])
+
+    def test_phone_change_yields_diff(self):
+        """手输新号 ≠ DMS 现号 → 必须出 diff(否则更新时被静默丢弃 · 2026-07-19 实锤)。"""
+        incoming = dict(_CURRENT, phone="0868888887")
+        out = diff_customer_fields(_CURRENT, incoming)
+        self.assertEqual(out, [{"field": "phone", "old": "0811111111", "new": "0868888887"}])
+
 
 # ── recognize_lookup 接线:命中已有客户 → field_diffs;未命中 → [] ────────────
 
@@ -129,7 +141,7 @@ class _FakeAdapter:
 
 
 class RecognizeLookupDiffWiringTests(unittest.TestCase):
-    def _run(self, adapter, name):
+    def _run(self, adapter, name, phone=""):
         from services.erp import erp_dms_intake as intake
         from unittest.mock import patch
 
@@ -139,6 +151,7 @@ class RecognizeLookupDiffWiringTests(unittest.TestCase):
                 people_id="1101700207366",
                 name=name,
                 ocr_address={},
+                phone=phone,
             )
 
     def test_found_customer_reports_name_diff(self):
@@ -148,6 +161,19 @@ class RecognizeLookupDiffWiringTests(unittest.TestCase):
         self.assertIn("name", diffs)
         self.assertEqual(diffs["name"]["old"], "Old DMS Name")
         self.assertEqual(diffs["name"]["new"], "New OCR Name")
+
+    def test_operator_phone_joins_diff(self):
+        """手输电话进对比:DMS 现值空 + 手输新号 → phone diff(A2 · 2026-07-19 缺口回归)。"""
+        out = self._run(
+            _FakeAdapter(_LookupFakeTransport(dms_name="Same Name")), "Same Name", "0868888887"
+        )
+        diffs = {d["field"]: d for d in out["field_diffs"]}
+        self.assertIn("phone", diffs)
+        self.assertEqual(diffs["phone"]["new"], "0868888887")
+
+    def test_no_phone_input_produces_no_phone_diff(self):
+        out = self._run(_FakeAdapter(_LookupFakeTransport(dms_name="Same Name")), "Same Name")
+        self.assertNotIn("phone", {d["field"] for d in out["field_diffs"]})
 
     def test_not_found_customer_has_empty_diffs(self):
         out = self._run(_FakeAdapter(_LookupFakeTransport(found=False)), "Nobody")

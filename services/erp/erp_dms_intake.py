@@ -152,11 +152,12 @@ def _score_candidates(
     return out
 
 
-def _incoming_for_diff(name: str, addr, resolved) -> Dict[str, str]:
+def _incoming_for_diff(name: str, addr, resolved, phone: str = "") -> Dict[str, str]:
     """身份证识别侧的「新值」侧,喂 diff_customer_fields。地址取解析后的 master id
-    (与 DMS current_fields 同口径,可比);prefix/birthday/phone 此入口无信息,
-    缺键即不参与 diff。"""
-    return {
+    (与 DMS current_fields 同口径,可比);phone 是操作员手输的(身份证上没有),
+    非空才参与 diff——否则改了电话也测不出差异,更新时被静默丢弃;prefix/birthday
+    此入口无信息,缺键即不参与 diff。"""
+    out = {
         "name": name,
         "house_no": addr.house_no,
         "moo": addr.moo,
@@ -167,10 +168,18 @@ def _incoming_for_diff(name: str, addr, resolved) -> Dict[str, str]:
         "subdistrict_id": resolved.subdistrict_id,
         "zipcode_id": resolved.zipcode_id,
     }
+    if (phone or "").strip():
+        out["phone"] = str(phone).strip()
+    return out
 
 
 def recognize_lookup_mrerp_dms(
-    endpoint: Dict[str, Any], *, people_id: str, name: str = "", ocr_address: Dict[str, Any]
+    endpoint: Dict[str, Any],
+    *,
+    people_id: str,
+    name: str = "",
+    ocr_address: Dict[str, Any],
+    phone: str = "",
 ) -> Dict[str, Any]:
     """OCR 后:查 DMS 客户 + 解析 OCR 地址级联 + 选项 + 称谓 + 相似候选。
     scenario:exact(身份证号命中)/ similar(按姓名找到候选)/ none(都没有)。"""
@@ -219,7 +228,9 @@ def recognize_lookup_mrerp_dms(
         if look["found"]:
             scenario = "exact"
             fields = look["fields"]
-            field_diffs = diff_customer_fields(fields, _incoming_for_diff(name, addr, resolved))
+            field_diffs = diff_customer_fields(
+                fields, _incoming_for_diff(name, addr, resolved, phone)
+            )
             candidates = [
                 {
                     "customer_id": look["customer_id"],

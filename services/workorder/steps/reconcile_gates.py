@@ -133,7 +133,7 @@ def _apply_sales_doc(it: dict, money: dict, dec: Optional[dict]) -> Optional[dic
     """自动判本方销项票的 R1 取数(MC1-c.1)。默认销项:票面不进 R1,无裁决也不 unresolved
     (机器已判销项,佐证聚合另算,绝不阻断出税)。人工 assign_kind 改判进项 → 用其 OCR 钱字段进 R1
     (缺金额事件则跳过,不静默少算也不停整步——佐证票不该拖垮进项主线);改判销项/非税/豁免 → 排除。"""
-    if not dec or dec.get("decision") != decisions.ASSIGN_KIND:
+    if not dec or not dec.get("kind"):
         return None
     if dec.get("kind") == decisions.PURCHASE_INVOICE and money:
         return _effective(money)
@@ -146,19 +146,22 @@ def _apply_direction(
     """方向不明票的人工方向裁决取数。无裁决/未定方向 → 计 unresolved(点名·绝不静默);裁进项
     → 用其 OCR 钱字段进 R1;裁销项 → 票面不进 R1(销项合计走 R2 的 POS 直读/人工申报);裁非税
     → 排除;豁免(waive)→ 已处置不计入(放行出包,留痕在备忘)。裁进项但缺金额事件(续跑丢
-    事件)→ 停机不静默少算。"""
+    事件)→ 停机不静默少算。方向裁决与金额裁决并存(合并回放的 kind 槽 + recalc/face_value)
+    → 裁进项后按金额裁决取数,票面读错的进项票先定向再改数不再互相顶掉(SM 2569-05 死锁根治)。"""
     if dec and dec.get("decision") == decisions.WAIVE:
         return None
-    if not dec or dec.get("decision") != decisions.ASSIGN_KIND:
+    kind = (dec or {}).get("kind")
+    if not kind:
         reason = it.get("flag_reason") or decisions.DIRECTION_AMBIGUOUS
         unresolved.append(f"{_label(it, money)}: 方向不明({reason})未人工裁定")
         return None
-    kind = dec.get("kind")
     if kind == decisions.NON_TAX:
         return None
     if kind == decisions.SALES_DOC:
         return None
     if kind == decisions.PURCHASE_INVOICE:
+        if dec.get("decision") not in (None, decisions.ASSIGN_KIND):
+            return _apply_decision(it, money, dec, unresolved)
         if not money:
             unresolved.append(f"{_label(it, money)}: 方向裁定进项但缺 OCR 金额事件")
             return None

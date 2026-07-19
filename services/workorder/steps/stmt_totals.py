@@ -41,8 +41,9 @@ K_TOTAL_PAGES = "total_pages"
 K_DEPOSIT_COUNT = "deposit_count"
 K_WITHDRAWAL_COUNT = "withdrawal_count"
 
-# 跨页交接断链的重要性红线:Σ|断点差额|/捕获入账 ≤ 2% 视为行级噪声(警示不降级)。
-_SEGMENT_GAP_MAX = Decimal("0.02")
+# 材料性红线单一事实源(R1 打回立的 2%):跨页交接断链与页内无解释入账共用同一常量对象
+# (bank_sales_suggest._INFLOW_GAP_MAX 别名引用此值),两道覆盖闸口径永远同步。
+MATERIALITY_GAP_MAX = Decimal("0.02")
 
 # 锚页自报总数正则(KBANK 页 1 表头):รวมฝากเงิน 728 รายการ / รวมถอนเงิน 33 รายการ / 页脚 n/N。
 # 泰文标签直接子串锚,数字带千分位;页脚 X/N 取分母作总页数。别家行英文页兜底 total deposits。
@@ -168,17 +169,17 @@ def date_coverage(rows: list[dict], period: Optional[str]) -> Optional[dict]:
     year, month = parsed
     start = date(year, month, 1)
     end = date(year, month, monthrange(year, month)[1])
-    days = []
+    first = last = None
     for row in rows:
         try:
             day = date.fromisoformat(row["date"])
         except (TypeError, ValueError):
             continue
         if start <= day <= end:
-            days.append(day)
-    if not days:
+            first = day if first is None or day < first else first
+            last = day if last is None or day > last else last
+    if first is None:
         return None
-    first, last = min(days), max(days)
     head = [start + timedelta(days=i) for i in range((first - start).days)]
     tail = [last + timedelta(days=i) for i in range(1, (end - last).days + 1)]
     missing = [day.isoformat() for day in head + tail]
@@ -201,7 +202,7 @@ def segment_chain(rows: list[dict]) -> Optional[dict]:
     segments = []
     for item_rows in by_item.values():
         balances = [row["balance"] for row in item_rows if row["balance"] is not None]
-        if len(item_rows) < 3 or not balances or all(value == 0 for value in balances):
+        if len(item_rows) < 3 or all(value == 0 for value in balances):
             continue
         first, last = item_rows[0], item_rows[-1]
         if (
@@ -228,7 +229,7 @@ def segment_chain(rows: list[dict]) -> Optional[dict]:
     for previous, current in zip(segments, segments[1:]):
         delta = current["first_balance"] - (previous["last_balance"] + current["first_signed"])
         if abs(delta) > Decimal("1.0"):
-            gap_total += abs(Decimal(str(delta)))
+            gap_total += abs(delta)
             breaks.append(
                 {
                     "before_date": previous["last_date"],
@@ -239,8 +240,11 @@ def segment_chain(rows: list[dict]) -> Optional[dict]:
     # 重要性阈值与页内无解释入账同一标准(R1 打回立的 2%):页边界的行级小抖动(SM 实测
     # 19 页照片单代 ±฿8~2,500)不该二值判死整份建议——≤2% 保留 breaks+message 供人核对,
     # 只有超过材料性红线才降级。零容忍版在 SM 2569-05 真人重跑被实锤为过拟合。
-    captured = sum((Decimal(str(row["deposit"])) for row in rows), Decimal("0"))
-    material = bool(breaks) and (captured <= 0 or gap_total / captured > _SEGMENT_GAP_MAX)
+    # 常态无断链时不算 captured(读侧热路径,760 行求和白扔);rows 由 _dec 统一转过,恒 Decimal。
+    material = False
+    if breaks:
+        captured = sum((row["deposit"] for row in rows), Decimal("0"))
+        material = captured <= 0 or gap_total / captured > MATERIALITY_GAP_MAX
     block = {"reliable": not material, "breaks": breaks, "gap_total": format(gap_total, "f")}
     if breaks:
         links = ", ".join(f"{item['before_date']} → {item['after_date']}" for item in breaks)

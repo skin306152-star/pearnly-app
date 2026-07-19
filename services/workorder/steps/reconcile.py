@@ -27,7 +27,6 @@ from services.workorder.steps import reconcile_decisions
 from services.workorder.steps import reconcile_gates as gates
 
 _EVT_CLASSIFIED = "item_classified"
-_EVT_DECISION = "human_decision"
 _PURCHASE = kinds.PURCHASE_INVOICE
 _SALES = kinds.SALES_SUMMARY
 _BANK = kinds.BANK_STATEMENT
@@ -72,7 +71,7 @@ def run(ctx: StepContext) -> StepResult:
         if banks:
             try:
                 reconcile_bank.checkpoint_bank_statements(ctx, banks)
-                reconcile_bank.emit_stmt_totals(ctx, banks)
+                reconcile_bank.emit_stmt_totals(ctx, banks, events)
             except reconcile_bank.BankStatementParseError as exc:
                 return StepResult.stuck([str(exc)])
         return StepResult.needs(["sales_summary"])

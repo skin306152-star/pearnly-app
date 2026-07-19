@@ -251,46 +251,31 @@ class R1DirectionAmbiguousTests(unittest.TestCase):
     def test_direction_plus_recalc_both_apply_either_order(self):
         # SM 2569-05 死锁根治:同一件先定向再改数(或反序),两裁决必须都生效——
         # 旧单槽 latest-wins 下 recalc 顶掉方向(方向卡)或方向顶掉 recalc(金额卡),永远出不了包。
-        store = FakeStore(
-            [_pi("p1", file="a.jpg"), _ambiguous("d1", file="IMG_2648.jpg")],
-            [
-                _money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"),
-                # 票面读错:净+税≠含税(差 -1000),recalc 人工补正为自洽三数。
-                _ambiguous_money_evt("d1", net="4284.49", vat="369.91", grand="5654.40"),
-                _decision_evt(
-                    "d1",
-                    "recalc",
-                    values={"net": "5284.49", "vat": "369.91", "grand_total": "5654.40"},
-                ),
-                _assign_kind_evt("d1", "purchase_invoice"),
-                _sales_evt(),
-            ],
+        recalc = _decision_evt(
+            "d1", "recalc", values={"net": "5284.49", "vat": "369.91", "grand_total": "5654.40"}
         )
-        out = reconcile.run(_ctx(store))
-        self.assertEqual(out.status, "ok")
-        self.assertEqual(
-            Decimal(out.payload["input_vat_total"]), Decimal("100.00") + Decimal("369.91")
-        )
-
-        store2 = FakeStore(
-            [_pi("p1", file="a.jpg"), _ambiguous("d1", file="IMG_2648.jpg")],
-            [
-                _money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"),
-                _ambiguous_money_evt("d1", net="4284.49", vat="369.91", grand="5654.40"),
-                _assign_kind_evt("d1", "purchase_invoice"),
-                _decision_evt(
-                    "d1",
-                    "recalc",
-                    values={"net": "5284.49", "vat": "369.91", "grand_total": "5654.40"},
-                ),
-                _sales_evt(),
-            ],
-        )
-        out2 = reconcile.run(_ctx(store2))
-        self.assertEqual(out2.status, "ok")
-        self.assertEqual(
-            Decimal(out2.payload["input_vat_total"]), Decimal("100.00") + Decimal("369.91")
-        )
+        assign = _assign_kind_evt("d1", "purchase_invoice")
+        for name, pair in (
+            ("recalc→assign", [recalc, assign]),
+            ("assign→recalc", [assign, recalc]),
+        ):
+            with self.subTest(order=name):
+                store = FakeStore(
+                    [_pi("p1", file="a.jpg"), _ambiguous("d1", file="IMG_2648.jpg")],
+                    [
+                        _money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"),
+                        # 票面读错:净+税≠含税(差 -1000),recalc 人工补正为自洽三数。
+                        _ambiguous_money_evt("d1", net="4284.49", vat="369.91", grand="5654.40"),
+                        *pair,
+                        _sales_evt(),
+                    ],
+                )
+                out = reconcile.run(_ctx(store))
+                self.assertEqual(out.status, "ok")
+                self.assertEqual(
+                    Decimal(out.payload["input_vat_total"]),
+                    Decimal("100.00") + Decimal("369.91"),
+                )
 
     def test_latest_direction_decision_wins(self):
         # 先裁进项(本应计入 3796.80)后改判非税 → latest-wins 排除,不计入。

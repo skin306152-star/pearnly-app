@@ -58,7 +58,7 @@ def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> O
     except BankStatementParseError:
         raise
     try:
-        emit_stmt_totals(ctx, banks)
+        emit_stmt_totals(ctx, banks, events)
         statement_txs = [adapter.tx_from_statement_row(r) for r in rows]
         candidates = adapter.candidates_from_events(events)
         result = adapter.reconcile_workorder(statement_txs, candidates)
@@ -74,9 +74,14 @@ def checkpoint_bank_statements(ctx: StepContext, banks: list[dict]) -> Optional[
     return _checkpointed_rows(ctx, banks)
 
 
-def emit_stmt_totals(ctx: StepContext, banks: list[dict]) -> None:
-    """独立触发自报总数窄读；缺销项的 checkpoint-only 路径也必须执行。"""
-    if banks and _bank_recon_enabled(ctx) and _stmt_totals_enabled(ctx):
+def emit_stmt_totals(ctx: StepContext, banks: list[dict], events: list[dict]) -> None:
+    """独立触发自报总数窄读；缺销项的 checkpoint-only 路径也必须执行。
+
+    事件里已有自报总数即跳过——dedupe_key 只防事件重复落库,防不了重复付费 OCR 读:
+    等销项期间 reconcile 每重跑一轮都会走到这里,无此守门每轮都白读一次锚页。"""
+    if not banks or stmt_totals.totals_from_events(events) is not None:
+        return
+    if _bank_recon_enabled(ctx) and _stmt_totals_enabled(ctx):
         stmt_totals.emit_from_banks(ctx, banks)
 
 

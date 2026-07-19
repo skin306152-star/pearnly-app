@@ -61,26 +61,6 @@ INVALID_CITATION_REQUIRED = "citation_required"
 
 # 判断题 prompt:硬规则写死模板(禁编 / 引用只准题面行指纹 / 无据必 cannot_judge),与
 # parse 的机器校验一一对应(prompt 防君子,parse 防小人)。钱数不问大脑——只问分类。
-_PROMPT_TEMPLATE = """你是泰国代账事务所的月结助手。下面是一条银行账户的入账流水行(deposit)。
-任务:只判断这笔入账是不是「销售收入」。不要算钱,钱数由确定性代码计算。
-
-可选答案(只准从下面选一个,原样输出;列表外一律无效):
-{suggestions}
-
-各答案含义:{meanings}。
-
-硬规则:
-1. 只依据下面这一行的信息判断。摘要看不出是不是销售(如只是"转入/รับโอนเงิน"又无对手方线索)→ 必须选 cannot_judge,严禁编造。
-2. cited_row_fingerprints 只准引用 row_fingerprint 字段给的那一个指纹;选 sales 或 non_sales 必须引用它,选 cannot_judge 给空数组。
-3. reason_zh 用一句中文人话说明理由。
-4. 只输出一个 JSON 对象,不带任何其他文字。
-
-待判行:
-{question}
-
-输出 JSON 形状:
-{{"row_fingerprint": "...", "suggestion": "...", "confidence": 0.0, "reason_zh": "...", "cited_row_fingerprints": []}}"""
-
 _BATCH_PROMPT_TEMPLATE = """你是泰国代账事务所的月结助手。请对下列每一条银行入账行独立判断是否为销售收入，不要算钱。
 
 可选答案:{suggestions}。{meanings}。
@@ -104,14 +84,6 @@ def build_question(row: dict) -> dict:
         "deposit": engine._fmt(row["deposit"]),
         "description": row["description"],
     }
-
-
-def build_prompt(question: dict) -> str:
-    return _PROMPT_TEMPLATE.format(
-        suggestions="\n".join(f"- {s}" for s in SUGGESTIONS),
-        meanings=";".join(_MEANINGS[s] for s in SUGGESTIONS),
-        question=json.dumps(question, ensure_ascii=False, default=str),
-    )
 
 
 def build_batch_question(rows: list[dict]) -> dict:
@@ -311,6 +283,7 @@ def _append_records(cur, tenant_id: str, work_order_id: str, records: list[dict]
 def _run_rows(rows, tenant_id: str, work_order_id: str, write_batch) -> dict:
     limited = rows[: BATCH_SIZE * MAX_BATCHES]
     asked = logged = failed = batches = consecutive_failures = 0
+    final_status = "failed"
     for offset in range(0, len(limited), BATCH_SIZE):
         batch = limited[offset : offset + BATCH_SIZE]
         batches += 1
@@ -320,9 +293,6 @@ def _run_rows(rows, tenant_id: str, work_order_id: str, write_batch) -> dict:
                 build_batch_prompt(build_batch_question(batch)),
                 tenant_id=tenant_id,
                 trace_id=f"bank_sales_brain:batch:{work_order_id}:{batches}",
-                timeout_s=BATCH_TIMEOUT_S,
-                max_tokens=BATCH_MAX_TOKENS,
-                temperature=0.0,
             )
             records = (
                 parse_batch_suggestions(outcome.data, {row["fingerprint"] for row in batch})
@@ -340,21 +310,22 @@ def _run_rows(rows, tenant_id: str, work_order_id: str, write_batch) -> dict:
             )
             _update_progress(work_order_id, failed_batches=failed)
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                _finish(work_order_id, "failed")
+                _finish(work_order_id, final_status)
                 break
             continue
         consecutive_failures = 0
         logged += len(records)
         _update_progress(work_order_id, done=logged, failed_batches=failed)
     else:
-        _finish(work_order_id, "capped" if len(rows) > len(limited) else "completed")
+        final_status = "capped" if len(rows) > len(limited) else "completed"
+        _finish(work_order_id, final_status)
     return {
         "enabled": True,
         "asked": asked,
         "logged": logged,
         "failed": failed,
         "batches": batches,
-        "status": (progress(work_order_id) or {}).get("status"),
+        "status": final_status,
     }
 
 

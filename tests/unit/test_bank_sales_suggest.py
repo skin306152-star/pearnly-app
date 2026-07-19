@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 
@@ -377,29 +378,28 @@ class CoverageDegradeTests(unittest.TestCase):
         self.assertEqual(coverage["statement"]["parsed_pages"], 1)
         self.assertFalse(coverage["statement"]["incomplete"])
 
-    def test_cross_file_balance_handoff_and_break(self):
+    @staticmethod
+    def _handoff_events(balance_shift="0"):
+        """跨页交接两页夹具:第 2 页余额整体平移 shift(Decimal 口径)造断链,0=严丝合缝。"""
+        shift = Decimal(balance_shift)
         first = [
             _dep("2026-05-10", 100, balance="327500.00"),
             _dep("2026-05-10", 100, balance="327600.00"),
             _dep("2026-05-10", "75.62", balance="327675.62"),
         ]
         second = [
-            _dep("2026-05-11", 390, balance="328065.62"),
-            _dep("2026-05-11", 100, balance="328165.62"),
-            _wd("2026-05-11", 50, balance="328115.62"),
+            _dep("2026-05-11", 390, balance=str(Decimal("328065.62") + shift)),
+            _dep("2026-05-11", 100, balance=str(Decimal("328165.62") + shift)),
+            _wd("2026-05-11", 50, balance=str(Decimal("328115.62") + shift)),
         ]
-        connected = bss.suggest(
-            [_bank_event(first, item_id="a"), _bank_event(second, item_id="b", eid=2)]
-        )
+        return [_bank_event(first, item_id="a"), _bank_event(second, item_id="b", eid=2)]
+
+    def test_cross_file_balance_handoff_and_break(self):
+        connected = bss.suggest(self._handoff_events())
         self.assertTrue(connected["coverage"]["segment_chain"]["reliable"])
 
         # 材料性断链(差额 100/捕获 765.62 ≈ 13% > 2%)→ 降级
-        broken_second = [dict(row) for row in second]
-        for row in broken_second:
-            row["balance"] = str(float(row["balance"]) + 100)
-        broken = bss.suggest(
-            [_bank_event(first, item_id="a"), _bank_event(broken_second, item_id="b", eid=2)]
-        )
+        broken = bss.suggest(self._handoff_events(balance_shift="100"))
         self.assertFalse(broken["reliable"])
         self.assertEqual(broken["degrade_reason"], bss.DEGRADE_CHAIN_BREAK)
         self.assertIn("2026-05-10", broken["message"]["zh"])
@@ -407,19 +407,7 @@ class CoverageDegradeTests(unittest.TestCase):
     def test_immaterial_boundary_gap_warns_without_degrading(self):
         # 噪声级断链(差额 10/捕获 765.62 ≈ 1.3% ≤ 2%)→ 保留 breaks+gap_total 供人核对,不降级。
         # SM 2569-05 真人重跑实锤:19 页照片单代必有 ±฿8~2,500 页边界抖动,零容忍=永远出不了建议。
-        first = [
-            _dep("2026-05-10", 100, balance="327500.00"),
-            _dep("2026-05-10", 100, balance="327600.00"),
-            _dep("2026-05-10", "75.62", balance="327675.62"),
-        ]
-        second = [
-            _dep("2026-05-11", 390, balance="328075.62"),
-            _dep("2026-05-11", 100, balance="328175.62"),
-            _wd("2026-05-11", 50, balance="328125.62"),
-        ]
-        result = bss.suggest(
-            [_bank_event(first, item_id="a"), _bank_event(second, item_id="b", eid=2)]
-        )
+        result = bss.suggest(self._handoff_events(balance_shift="10"))
         seg = result["coverage"]["segment_chain"]
         self.assertTrue(seg["reliable"])
         self.assertEqual(len(seg["breaks"]), 1)

@@ -69,7 +69,7 @@ _CHAIN_TOL = sales_aggregate.CONSERV_TOL
 # 无解释入账占比上限:超过即覆盖不可信、建议降级。取 2% 与方案 §三.3 交叉佐证差异黄灯
 # 同一条材料性线——入账缺口把含税合计系统性拉偏超 2%,÷1.07 的建议值就出了会计可接受
 # 误差,不该再以「可用建议」形态出现。金标真形态(64% 捕获)实测 11.6%,远超此线。
-_INFLOW_GAP_MAX = Decimal("0.02")
+_INFLOW_GAP_MAX = stmt_totals.MATERIALITY_GAP_MAX
 DEGRADE_COVERAGE = "coverage_gap"
 # 自报总数缺料降级(SA3R-b):对账单页 1 自报 N 页/笔数,解析到的页/行不足 → 缺整页/缺笔。
 # 比 coverage_gap(页内链断)更根因、更可行动(点名补拍缺页),优先级高于 coverage_gap。

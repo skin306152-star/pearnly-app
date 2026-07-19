@@ -121,7 +121,7 @@ async function boot(page, { lang = 'zh', convertBody = SUMMARY_OCR_OK, delayMs =
     });
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-k1c');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-k1c');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

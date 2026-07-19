@@ -159,6 +159,9 @@ async function wireApi(page, state) {
         const p = url.pathname;
         const method = req.method();
 
+        if (p === '/api/ai/session' && method === 'GET') {
+            return route.fulfill({ json: { ok: true } });
+        }
         if (p === '/api/workorder/orders' && method === 'GET') {
             return route.fulfill({ json: { orders: [], count: 0, limit: 1, offset: 0 } });
         }
@@ -217,7 +220,7 @@ async function wireApi(page, state) {
 async function gotoPool(page, lang) {
     await page.addInitScript(
         ({ token, lang }) => {
-            window.localStorage.setItem('mrpilot_token', token);
+            window.localStorage.setItem('mrpilot_token_ai', token);
             window.localStorage.setItem('mrpilot_lang', lang || 'zh');
         },
         { token: fakeToken(), lang }

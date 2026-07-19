@@ -118,7 +118,7 @@ async function bootWith(page, handlers, hash, lang) {
     await routeApi(page, handlers);
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-debt0714');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-debt0714');
             window.localStorage.setItem('mrpilot_lang', l || 'zh');
         },
         [lang]

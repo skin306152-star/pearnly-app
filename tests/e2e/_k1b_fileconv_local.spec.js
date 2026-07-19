@@ -124,7 +124,7 @@ async function bootFileconv(page, { lang = 'zh', convertBody = SUMMARY_OK, conve
     });
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-k1b');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-k1b');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

@@ -179,7 +179,7 @@ async function boot(page, { lang = 'zh', hash = '#/' } = {}) {
     await page.clock.setFixedTime(new Date(TODAY_FIXED));
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-sa2');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-sa2');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

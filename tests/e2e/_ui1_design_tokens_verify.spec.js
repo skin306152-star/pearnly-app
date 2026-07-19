@@ -117,7 +117,7 @@ async function boot(page, { lang = 'zh', hash = '#/' } = {}) {
     });
     await page.addInitScript(
         ([l]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-ui1');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-ui1');
             window.localStorage.setItem('mrpilot_lang', l);
         },
         [lang]

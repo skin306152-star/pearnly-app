@@ -59,7 +59,7 @@ test.afterAll(() => {
 
 // materialsHandler(route, request) 每个用例注入自己的 addMaterials 剧本(密码/网络失败/
 // 成功次序);缺省即空成功(不测上传结果的用例够用)。seedQueue 供续传横幅用例在导航前
-// 塞一份 localStorage 队列残留(同 mrpilot_token/lang 一起进 addInitScript,不必另开
+// 塞一份 localStorage 队列残留(同 AI token/lang 一起进 addInitScript,不必另开
 // 一份路由 mock)。
 async function bootIntake(
     page,
@@ -107,7 +107,7 @@ async function bootIntake(
     });
     await page.addInitScript(
         ([l, seed]) => {
-            window.localStorage.setItem('mrpilot_token', 'tok-in0b');
+            window.localStorage.setItem('mrpilot_token_ai', 'tok-in0b');
             window.localStorage.setItem('mrpilot_lang', l);
             if (seed) window.localStorage.setItem('pearnly_ai_intake_queue_wo-1', seed);
         },

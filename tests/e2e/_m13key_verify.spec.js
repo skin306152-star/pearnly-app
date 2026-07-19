@@ -136,7 +136,7 @@ async function boot(page, status, lang) {
     await routeApi(page, { initialStatus: status });
     await page.addInitScript(
         ([t, l]) => {
-            window.localStorage.setItem('mrpilot_token', t);
+            window.localStorage.setItem('mrpilot_token_ai', t);
             window.localStorage.setItem('mrpilot_lang', l || 'zh');
         },
         [TOKEN, lang]

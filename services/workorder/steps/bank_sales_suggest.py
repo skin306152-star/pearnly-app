@@ -1,25 +1,10 @@
 # -*- coding: utf-8 -*-
-"""银行流水倒推销项建议引擎(SA-3a · 纯函数 · 建议层 · 闸 pearnly_ai_bank_sales_suggest)。
+"""银行流水倒推销项建议：事件回放、确定性算钱、建议不落库。
 
-P-6 销项断链第三块拼图:SM 这类收款全走银行的客户,会计的真实算法是把当月银行入账里属于
-销售的行加总 ÷1.07 得税前销售额。本模块把「人工心算」变「系统算建议 + 人一键确认」。
-
-三层漏斗(方案 §3.1):
-  1. 确定性规则(本模块):剔除转出/手续费/取消行 → 非销售;与 EDC 结算单(date, gross)互证
-     的入账行 → 必是销售;其余入账行留 待定。
-  2. 大脑(bank_sales_brain):待定行交大脑判「这行是不是销售」,结果落 bank_sales_suggested
-     事件(读侧回放,零重调)。
-  3. 人审:行级人裁落 human_decision(bank_sales_row=行指纹)覆盖前两层,进证据链。
-
-硬闸(方案 §五 · 代码强制):
-  ① 钱数只由确定性代码算:含税合计=SALES 行入账额求和,÷1.07 复用 sales_agg.vat.split_gross
-     (金标口径单一事实源,禁 float 中转,全程 Decimal)。大脑只碰分类,永不碰钱。
-  ② 建议≠落库:本模块零副作用、不写申报数/不写 journal——纯函数(events 进、建议出)。
-  ③ 现金型客户诚实降级:无银行流水行 → not_applicable;流水覆盖显著异常(coverage_check 的
-     余额链证据)→ reliable=False 降级,建议值三键不出,禁「自信地错」(打回 R1 根治)。
-  ④ 行级取舍全部可回放进证据链(税局问「销售额怎么来」逐行可答)。
-
-进料唯一源 = reconcile_bank 落的 item_bank_parsed 事件(不解析原件);读侧纯回放。
+四条硬闸：钱只由确定性代码计算，÷1.07 复用 split_gross 且全程 Decimal；建议层零副作用、
+绝不落申报数；覆盖不可靠必降级，禁止“自信地错”；每一行取舍都可由事件回放。人裁覆盖
+大脑，大脑覆盖规则。打回 R1 的真 12 事件仅捕获 64%，链断 65 处，无解释入账
+77,733.79（约 11.6%），所以覆盖闸不能退成提示。
 """
 
 from __future__ import annotations
@@ -63,11 +48,17 @@ R_WITHDRAWAL = "withdrawal"  # 转出(取款)行,不是收入
 R_FEE = "bank_fee"  # 手续费扣账
 R_CANCEL = "cancelled"  # 取消/冲正
 R_MATCHED_SETTLEMENT = "edc_settlement_matched"  # 与 EDC 结算单互证 → 必是销售
+R_SALES_CHANNEL = "sales_channel_explicit"  # 摘要明示销售收款渠道
 R_DEPOSIT_PENDING = "deposit_unclassified"  # 入账但无强信号,待大脑/人裁
 
 # 手续费 / 取消 关键词(泰文 + 英文;真料 KBANK 摘要用泰文,英文兜底)。命中即剔除。
 _FEE_KEYWORDS = ("ค่าธรรมเนียม", "ธรรมเนียม", "fee", "service charge")
 _CANCEL_KEYWORDS = ("ยกเลิก", "คืนเงิน", "ปรับปรุง", "reversal", "cancel", "refund")
+# 泰文原文是银行票面明示“销售收款”，不是从普通个人转入猜销售。
+_SALES_CHANNEL_KEYWORDS = ("รับเงินจากการขายด้วย Thai QR", "K SHOP/MYQR", "EDC")
+_TRANSFER_IN_KEYWORDS = ("รับโอนเงิน", "transfer in")
+_CASH_DEPOSIT_KEYWORDS = ("ฝากเงินสด", "CDM", "cash deposit")
+_GROUP_ORDER = ("qr_edc", "transfer_in", "cash_deposit", "other_in")
 
 _ZERO = Decimal("0")
 
@@ -83,6 +74,8 @@ DEGRADE_COVERAGE = "coverage_gap"
 # 自报总数缺料降级(SA3R-b):对账单页 1 自报 N 页/笔数,解析到的页/行不足 → 缺整页/缺笔。
 # 比 coverage_gap(页内链断)更根因、更可行动(点名补拍缺页),优先级高于 coverage_gap。
 DEGRADE_INCOMPLETE = "statement_incomplete"
+DEGRADE_DATE_GAP = "statement_date_gap"
+DEGRADE_CHAIN_BREAK = "statement_chain_break"
 
 
 def _dec(value) -> Decimal:
@@ -102,17 +95,10 @@ def _fmt(value: Decimal) -> str:
 
 
 def _replay_rows(events: list) -> list[dict]:
-    """item_bank_parsed 事件 → 归一化流水行(唯一回放口,parsed_rows_from_events/
-    coverage_check 都从这一份派生,不各自重扫一遍 events)。
+    """回放当前代银行行；同件只取首条解析事件，重跑不双计。
 
-    行指纹 = 日期|带符号金额|同键序号(方案:日期+金额+序号)。同 (日期,金额) 多行靠序号消歧,
-    序号按事件追加序 + 行内序确定——重跑/续跑指纹恒定。同 item_id 多事件取首条(与
-    reconcile_bank._replay_parsed_banks「首件在先」一致,续跑重放不双计)。
-
-    余额链恒等式(balance[i] = balance[i-1] + deposit[i] − withdrawal[i])按 item 内行序核对,
-    结果随行内联携带:chain_verified(True=链对上/False=断链/None=首行或缺 balance 验不了)、
-    chain_delta(断链时的带符号差额,verdict 见上)、balance_ok(解析器自带的守恒红旗原样透传)。
-    覆盖判定(coverage_check)由这份携带信息聚合,不再另开一遍循环重算。
+    指纹固定为 日期|带符号金额|同键序号，序号按事件与行原序生成，重跑保持恒定。余额链逐件
+    校验 balance[i] = balance[i-1] + deposit[i] - withdrawal[i]，断点供覆盖闸量化缺口。
     """
     out: list[dict] = []
     seen_items: set = set()
@@ -141,11 +127,13 @@ def _replay_rows(events: list) -> list[dict]:
             prev_balance = balance
             out.append(
                 {
+                    "item_id": item_id,
                     "fingerprint": f"{date}|{signed}|{seq}",
                     "date": date,
                     "deposit": deposit,
                     "withdrawal": withdrawal,
                     "description": str(raw.get("description") or ""),
+                    "balance": balance,
                     "balance_ok": raw.get("balance_ok"),
                     "chain_verified": chain_verified,
                     "chain_delta": chain_delta,
@@ -173,21 +161,13 @@ def parsed_rows_from_events(events: list) -> list[dict]:
 
 
 def _coverage_from_rows(
-    rows: list[dict], *, pages: Optional[int] = None, totals: Optional[dict] = None
+    rows: list[dict],
+    *,
+    pages: Optional[int] = None,
+    totals: Optional[dict] = None,
+    period: Optional[str] = None,
 ) -> dict:
-    """_replay_rows 结果 → 覆盖可信度判定(打回 R1 根治 · 判据=数据内在证据)。
-
-    KBANK 流水行自带余额链(K1a/E1 守恒校验件在库):同一件(页)内相邻两行必满足
-    balance[i] = balance[i-1] + deposit[i] − withdrawal[i]。OCR 漏行时链在漏点断裂,且断点
-    差额精确量化被漏行的净流水——正差=漏掉的净入账(直接把销项建议拉低),负差=漏掉的净
-    转出。金标真形态(12 事件 · 64% 捕获)实测:链断 65 处、无解释入账 77,733.79,占证据
-    入账 11.6%,引擎必须降级不得出建议值(「自信地错」是本产品最不许出的形态)。
-
-    verdict:无解释入账 / (捕获入账 + 无解释入账) > _INFLOW_GAP_MAX → reliable=False。
-    这是下界证据:跨件(页)边界漏行、一断点内入出相抵的漏行探不到——探不到 ≠ 没有,
-    但探到了就必须降级;balance 缺失的行验不了链(verified_pairs 如实报告证据基数),
-    行级 balance_ok=False(解析器自己的守恒红旗)一并计数供读侧呈现。
-    """
+    """聚合页内余额链、页数自报、账期日期与跨文件交接四类确定性证据。"""
     verified = sum(1 for r in rows if r["chain_verified"] is True)
     breaks = sum(1 for r in rows if r["chain_verified"] is False)
     flagged = sum(1 for r in rows if r["balance_ok"] is False)
@@ -221,6 +201,14 @@ def _coverage_from_rows(
     if stmt is not None:
         coverage["statement"] = stmt
         coverage["reliable"] = chain_reliable and not stmt["incomplete"]
+    date_block = stmt_totals.date_coverage(rows, period)
+    if date_block is not None:
+        coverage["date_coverage"] = date_block
+        coverage["reliable"] = coverage["reliable"] and not date_block["incomplete"]
+    segment_chain = stmt_totals.segment_chain(rows)
+    if segment_chain is not None:
+        coverage["segment_chain"] = segment_chain
+        coverage["reliable"] = coverage["reliable"] and segment_chain["reliable"]
     return coverage
 
 
@@ -259,29 +247,43 @@ def _statement_block(
 
 
 def _page_count(events: list) -> int:
-    """本对账单归到的页数 = 不同 item_bank_parsed 件数(一件=一页流水)。"""
+    """解析页数只计至少 5 行的件，排除单行 EDC 片段。"""
     return len(
         {
             (e.get("payload") or {}).get("item_id")
             for e in reconcile_bank.active_bank_parse_events(events)
             if (e.get("payload") or {}).get("item_id")
+            and len((e.get("payload") or {}).get("rows") or []) >= 5
         }
     )
 
 
-def coverage_check(events: list) -> dict:
+def coverage_check(events: list, *, period: Optional[str] = None) -> dict:
     """流水覆盖可信度判定(纯函数)。见 _coverage_from_rows / _statement_block 顶注。无自报总数
     事件时对外形状与行为逐字节维持现状(不挂 statement 块)。"""
     return _coverage_from_rows(
         _replay_rows(events),
         pages=_page_count(events),
         totals=stmt_totals.totals_from_events(events),
+        period=period,
     )
 
 
 def _has_keyword(text: str, keywords) -> bool:
     low = text.lower()
     return any(k.lower() in low for k in keywords)
+
+
+def group_key(row: dict) -> str:
+    """按银行摘要归待定组；只认后端给的组键，前端不复制关键词。"""
+    desc = row["description"]
+    if _has_keyword(desc, _SALES_CHANNEL_KEYWORDS):
+        return "qr_edc"
+    if _has_keyword(desc, _TRANSFER_IN_KEYWORDS):
+        return "transfer_in"
+    if _has_keyword(desc, _CASH_DEPOSIT_KEYWORDS):
+        return "cash_deposit"
+    return "other_in"
 
 
 def classify_row(row: dict, strong_sales_keys: set) -> tuple[str, str]:
@@ -297,6 +299,8 @@ def classify_row(row: dict, strong_sales_keys: set) -> tuple[str, str]:
         return NON_SALES, R_FEE
     if _has_keyword(desc, _CANCEL_KEYWORDS):
         return NON_SALES, R_CANCEL
+    if _has_keyword(desc, _SALES_CHANNEL_KEYWORDS):
+        return SALES, R_SALES_CHANNEL
     if (row["date"], deposit) in strong_sales_keys:  # Decimal 键:数值相等(5000.0==5000.00)
         return SALES, R_MATCHED_SETTLEMENT
     return PENDING, R_DEPOSIT_PENDING
@@ -355,7 +359,7 @@ def human_overlay(events: list) -> dict:
     return out
 
 
-def suggest(events: list) -> dict:
+def suggest(events: list, *, period: Optional[str] = None) -> dict:
     """倒推销项建议(纯函数引擎 + 读侧投影单一实现)。events 进,建议出,零副作用。
 
     三态契约(读侧可机械区分):
@@ -373,13 +377,17 @@ def suggest(events: list) -> dict:
     rows = [_public_row(r) for r in replay]
 
     coverage = _coverage_from_rows(
-        replay, pages=_page_count(events), totals=stmt_totals.totals_from_events(events)
+        replay,
+        pages=_page_count(events),
+        totals=stmt_totals.totals_from_events(events),
+        period=period,
     )
     strong = edc_settlement_keys(events)
     brain = brain_overlay(events)
     human = human_overlay(events)
 
     detail: list[dict] = []
+    groups = {key: {"key": key, "count": 0, "sum": _ZERO} for key in _GROUP_ORDER}
     gross = _ZERO
     counts = {SALES: 0, NON_SALES: 0, PENDING: 0}
     for row in rows:
@@ -389,18 +397,22 @@ def suggest(events: list) -> dict:
         counts[verdict] += 1
         if verdict == SALES:
             gross += row["deposit"]
-        detail.append(
-            {
-                "fingerprint": fp,
-                "date": row["date"],
-                "deposit": _fmt(row["deposit"]),
-                "withdrawal": _fmt(row["withdrawal"]),
-                "description": row["description"],
-                "verdict": verdict,
-                "reason": reason,
-                "source": source,
-            }
-        )
+        item = {
+            "fingerprint": fp,
+            "date": row["date"],
+            "deposit": _fmt(row["deposit"]),
+            "withdrawal": _fmt(row["withdrawal"]),
+            "description": row["description"],
+            "verdict": verdict,
+            "reason": reason,
+            "source": source,
+        }
+        if verdict == PENDING:
+            key = group_key(row)
+            item["group"] = key
+            groups[key]["count"] += 1
+            groups[key]["sum"] += row["deposit"]
+        detail.append(item)
 
     out = {
         "applicable": True,
@@ -408,6 +420,9 @@ def suggest(events: list) -> dict:
         "coverage": coverage,
         "counts": {**counts, "total": len(rows)},
         "rows": detail,
+        "pending_groups": [
+            {**group, "sum": _fmt(group["sum"])} for group in groups.values() if group["count"]
+        ],
     }
     if not coverage["reliable"]:
         # 缺整页(自报总数对不上)比页内链断更根因、可行动——优先点名 statement_incomplete,
@@ -415,7 +430,20 @@ def suggest(events: list) -> dict:
         stmt = coverage.get("statement") or {}
         if stmt.get("incomplete"):
             return dict(out, degrade_reason=DEGRADE_INCOMPLETE, message=stmt.get("message"))
+        date_block = coverage.get("date_coverage") or {}
+        if date_block.get("incomplete"):
+            return dict(out, degrade_reason=DEGRADE_DATE_GAP, message=date_block.get("message"))
+        if Decimal(coverage["inflow_gap_ratio"]) > _INFLOW_GAP_MAX:
+            return dict(out, degrade_reason=DEGRADE_COVERAGE)
+        segment_chain = coverage.get("segment_chain") or {}
+        if not segment_chain.get("reliable", True):
+            return dict(
+                out, degrade_reason=DEGRADE_CHAIN_BREAK, message=segment_chain.get("message")
+            )
         return dict(out, degrade_reason=DEGRADE_COVERAGE)
+    date_block = coverage.get("date_coverage") or {}
+    if date_block.get("message"):
+        out["message"] = date_block["message"]
     sales_amount, output_vat = vat.split_gross(gross)
     return dict(
         out,

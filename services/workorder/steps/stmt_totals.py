@@ -17,7 +17,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
+from calendar import monthrange
+from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
@@ -30,6 +34,7 @@ EVT_STMT_TOTALS = "bank_statement_totals"
 # 窄读成本归因 task(落 ai_usage):锚页自报总数是首次也是唯一一次的目标读,与银行逐行解析
 # (workorder_bank_parse)、进项 OCR(workorder_classify)各自分账。
 _STMT_OCR_TASK = "workorder_stmt_totals"
+_log = logging.getLogger(__name__)
 
 # 自报总数 payload 键(单一事实源,emit / coverage 消费共用,防各打各的字符串)。
 K_TOTAL_PAGES = "total_pages"
@@ -110,7 +115,8 @@ def emit_from_banks(ctx: StepContext, banks: list[dict]) -> Optional[dict]:
             _emit(ctx, totals)
             return totals
         return None
-    except Exception:  # noqa: BLE001 - 安全网单点隔离,绝不阻断出包
+    except Exception as exc:  # noqa: BLE001 - 安全网隔离,但降级必须留声
+        _log.warning("stmt_totals narrow read failed wo=%s: %r", ctx.work_order_id, exc)
         return None
     finally:
         attribution.reset_attribution(token)
@@ -137,6 +143,104 @@ def totals_from_events(events: list) -> Optional[dict]:
         if e.get("event_type") == EVT_STMT_TOTALS:
             out = e.get("payload") or {}
     return out
+
+
+def period_month(period: Optional[str]) -> Optional[tuple[int, int]]:
+    """佛历 YYYY-MM 转公历年月；非法格式不启用日期判据。"""
+    try:
+        year_s, month_s = str(period or "").split("-")
+        if len(year_s) != 4 or len(month_s) != 2:
+            return None
+        parsed = int(year_s) - 543, int(month_s)
+        date(*parsed, 1)
+        return parsed
+    except (TypeError, ValueError):
+        return None
+
+
+def date_coverage(rows: list[dict], period: Optional[str]) -> Optional[dict]:
+    parsed = period_month(period)
+    if parsed is None:
+        return None
+    year, month = parsed
+    start = date(year, month, 1)
+    end = date(year, month, monthrange(year, month)[1])
+    days = []
+    for row in rows:
+        try:
+            day = date.fromisoformat(row["date"])
+        except (TypeError, ValueError):
+            continue
+        if start <= day <= end:
+            days.append(day)
+    if not days:
+        return None
+    first, last = min(days), max(days)
+    head = [start + timedelta(days=i) for i in range((first - start).days)]
+    tail = [last + timedelta(days=i) for i in range(1, (end - last).days + 1)]
+    missing = [day.isoformat() for day in head + tail]
+    block = {"incomplete": len(head) >= 2 or len(tail) >= 2, "missing_dates": missing}
+    if missing:
+        dates = ", ".join(missing)
+        block["message"] = {
+            "th": f"รายการเดินบัญชียังไม่ครอบคลุมวันที่ {dates} กรุณาตรวจสอบหรือส่งหน้าที่ขาด",
+            "en": f"The statement does not cover {dates}. Check or upload the missing pages.",
+            "zh": f"银行流水未覆盖 {dates}，请核对或补齐对应页。",
+            "ja": f"取引明細に {dates} がありません。不足ページを確認・追加してください。",
+        }
+    return block
+
+
+def segment_chain(rows: list[dict]) -> Optional[dict]:
+    by_item: dict[str, list[dict]] = {}
+    for row in rows:
+        by_item.setdefault(row["item_id"], []).append(row)
+    segments = []
+    for item_rows in by_item.values():
+        balances = [row["balance"] for row in item_rows if row["balance"] is not None]
+        if len(item_rows) < 3 or not balances or all(value == 0 for value in balances):
+            continue
+        first, last = item_rows[0], item_rows[-1]
+        if (
+            not first["date"]
+            or not last["date"]
+            or first["balance"] is None
+            or last["balance"] is None
+        ):
+            continue
+        segments.append(
+            {
+                "first_date": first["date"],
+                "last_date": last["date"],
+                "first_balance": first["balance"],
+                "last_balance": last["balance"],
+                "first_signed": first["deposit"] - first["withdrawal"],
+            }
+        )
+    if len(segments) < 2:
+        return None
+    segments.sort(key=lambda segment: (segment["first_date"], segment["first_balance"]))
+    breaks = []
+    for previous, current in zip(segments, segments[1:]):
+        delta = current["first_balance"] - (previous["last_balance"] + current["first_signed"])
+        if abs(delta) > Decimal("1.0"):
+            breaks.append(
+                {
+                    "before_date": previous["last_date"],
+                    "after_date": current["first_date"],
+                    "delta": format(delta, "f"),
+                }
+            )
+    block = {"reliable": not breaks, "breaks": breaks}
+    if breaks:
+        links = ", ".join(f"{item['before_date']} → {item['after_date']}" for item in breaks)
+        block["message"] = {
+            "th": f"ยอดคงเหลือไม่ต่อเนื่องระหว่าง {links} กรุณาตรวจสอบหน้าที่ขาด",
+            "en": f"Statement balances do not connect at {links}. Check the missing pages.",
+            "zh": f"银行流水余额在 {links} 之间断链，请核对缺页。",
+            "ja": f"取引明細の残高が {links} で連続していません。不足ページを確認してください。",
+        }
+    return block
 
 
 def incomplete_message(expected_pages, got_pages: int, missing_rows: Optional[int]) -> dict:

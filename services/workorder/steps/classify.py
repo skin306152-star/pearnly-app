@@ -1,22 +1,9 @@
 # -*- coding: utf-8 -*-
-"""classify 步:进项票过 OCR 归堆去重,销项汇总表直读(任务包 §5 步 3)。
+"""classify 步：OCR/直读归堆、去重并落可回放证据。
 
-纯编排:取 pending 料 → 跨单去重复用(ocr_reuse)/ 调注入的 OCR/直读入口 → 用
-sort.bin_ocr_fields 归堆、purchase_dedup 算票面级指纹查单内重复票 → update_item 落堆/落
-状态 → 末尾 taxid_alert 守护税号错录。真 OCR/直读入口通过模块级函数注入(_ocr_image /
-_read_sales_summary / _resolve_own_tax_id / _find_ocr_by_hashes),默认绑生产实现,单测全部
-patch 掉——本文件测试不碰任何 API key,不触发真实付费调用(硬约束)。
-
-诚实三态:OCR 报警(_needs_review/_validation_warnings)或直读解不出表 → 该件
-flagged + flag_reason,绝不静默吞;单件 OCR 异常只连坐该件(ocr_error),不拖垮
-整步;全部处理完但存在 flagged → 步仍 ok(flagged 是 item 级状态,裁决交
-reconcile/人审,金标 IMG_2647 必须落在这条路径而非被吃掉)。
-
-幂等:只处理 status=pending 的件——已定堆(ok/flagged/excluded)的件不会再出现
-在 pending 列表里,重跑天然跳过,不重复起 OCR。查重指纹只在本次调用内的批次
-互相比对(work_order_items.dedupe_key 是 intake 的 file: 指纹,update_item 未开
-写入口,不动 T1 的 store.py);M0 CLI 一次性喂全部语料、classify 单次跑完整批,
-这个范围不影响金标——若 M1 要支持分批收料再分类,需要 T1 补 dedupe_key 更新口。
+诚实三态：OCR 报警即 flagged，绝不静默吞；单件异常只连坐该件；批内仍有 flagged 时步骤
+保持 ok，把裁决留给 reconcile/人审。幂等只处理 pending，已定堆件重跑天然跳过。
+生产入口均为可注入绑定。
 """
 
 from __future__ import annotations
@@ -161,6 +148,7 @@ def run(ctx: StepContext) -> StepResult:
                 edc=outcome.get("edc"),
                 ocr_engine=engine_ver,
                 reused_from=reused_from,
+                reason=upd.get("flag_reason"),
             )
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
         if outcome["flagged"]:
@@ -193,7 +181,9 @@ def run(ctx: StepContext) -> StepResult:
                     status="flagged",
                     flag_reason=reason,
                 )
-                _emit_classified(ctx, item, kind=kinds.SALES_SUMMARY, status="flagged", money=None)
+                _emit_classified(
+                    ctx, item, kind=kinds.SALES_SUMMARY, status="flagged", money=None, reason=reason
+                )
                 flagged += 1
             else:
                 ctx.store.update_item(
@@ -266,14 +256,19 @@ def _reset_quota_deferred(ctx: StepContext) -> None:
 
 
 def _emit_classified(
-    ctx, item, *, kind, status, money, sales_read=None, edc=None, ocr_engine=None, reused_from=None
+    ctx,
+    item,
+    *,
+    kind,
+    status,
+    money,
+    sales_read=None,
+    edc=None,
+    ocr_engine=None,
+    reused_from=None,
+    reason=None,
 ):
-    """落一条 item_classified 证据事件。payload 带 item_id/kind/status,进项另带票面 money,
-    销项直读另带 sales_read,EDC 结算票另带 edc 快照(SA-2b 聚合回放的唯一持久源),OCR 件
-    另带 ocr_engine(管线版本)——reconcile/冻结据此回放,不依赖同进程 ctx.data(续跑不丢)。
-    reused_from(R2B):本件读数复用自哪条 ocr_history(证据链可溯),新烧件为 None 不挂键。
-
-    dedupe_key 锚到 item:同件重放(并发接管/异常续跑)命中事件唯一约束不重记,守恒不被撑破。"""
+    """落 item_classified 证据；可选读数、引擎、复用来源和分类理由均随事件保存。"""
     payload = {"item_id": item["id"], "kind": kind, "status": status}
     if money:
         payload["money"] = money
@@ -285,6 +280,8 @@ def _emit_classified(
         payload["ocr_engine"] = ocr_engine
     if reused_from:
         payload["ocr_reused_from"] = reused_from
+    if reason:
+        payload["reason"] = reason
     ctx.store.append_event(
         ctx.cur,
         tenant_id=ctx.tenant_id,

@@ -202,6 +202,30 @@ def flagged_projection(
     return out
 
 
+def excluded_projection(items: list[dict], events: Optional[list[dict]] = None) -> list[dict]:
+    """排除件仍可见、可重判；最多投影 200 件，超限在最后一件留截断标。"""
+    decided = replay_items_by_type(events or [], _EVT_DECISION)
+    excluded = [
+        item
+        for item in items
+        if item["status"] == "excluded"
+        and (decided.get(item["id"]) or {}).get("payload", {}).get("decision")
+        != decisions.ASSIGN_KIND
+    ]
+    out = [
+        {
+            "item_id": item["id"],
+            "name": item.get("original_name") or Path(item.get("file_ref") or "").name,
+            "kind": item.get("kind"),
+            "reason": item.get("flag_reason"),
+        }
+        for item in excluded[:200]
+    ]
+    if len(excluded) > 200 and out:
+        out[-1]["truncated"] = True
+    return out
+
+
 def bank_recon_decisions(events: list[dict]) -> dict:
     """银行对账人审裁决回放(MC1-b3 · E2 债 · statement_tx_id → 裁决摘要,latest-wins)。
 

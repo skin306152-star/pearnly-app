@@ -13,6 +13,7 @@ from services.workorder.steps import sort as sort_step
 
 _FILE_NUMBER = re.compile(r"^(.*?)(\d{3,})([^0-9]*)$")
 _MAX_ANCHOR_GAP = 4
+_TRAIL_EXTEND = _MAX_ANCHOR_GAP
 _MIN_ANCHORS = 3
 
 
@@ -73,6 +74,7 @@ class Collector:
 
 
 def _rescued_records(records: list[_Record]) -> list[_Record]:
+    """救回锚区间内续页，并向两端加严扩展，补掉最后一页落在锚范围外的结构性漏洞。"""
     ranges = _statement_ranges(records)
     rescued = []
     for record in records:
@@ -80,11 +82,21 @@ def _rescued_records(records: list[_Record]) -> list[_Record]:
         if not identity or record.kind == kinds.BANK_STATEMENT:
             continue
         group, number = identity
-        if not any(start <= number <= end for start, end in ranges.get(group, ())):
+        if sort_step._has_vat(record.fields):
             continue
-        if sort_step._has_vat(record.fields) or not sort_step._mentions_bank(record.fields):
+        bank_evidence = sort_step._mentions_bank(record.fields) or sort_step._category_is_bank(
+            record.fields
+        )
+        if not bank_evidence:
             continue
-        rescued.append(record)
+        for start, end in ranges.get(group, ()):
+            inside = start <= number <= end
+            extended = (
+                start - _TRAIL_EXTEND <= number < start or end < number <= end + _TRAIL_EXTEND
+            )
+            if inside or (extended and sort_step._is_statement_title(record.fields)):
+                rescued.append(record)
+                break
     return rescued
 
 

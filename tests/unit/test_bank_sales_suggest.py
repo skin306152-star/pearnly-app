@@ -274,10 +274,13 @@ class CoverageDegradeTests(unittest.TestCase):
                 [
                     _dep("2569-05-01", 100.0, balance=1100.0),
                     _dep("2569-05-02", 100.0, balance=1200.0),
+                    _dep("2569-05-03", 100.0, balance=1300.0),
+                    _dep("2569-05-04", 100.0, balance=1400.0),
+                    _dep("2569-05-05", 100.0, balance=1500.0),
                 ],
                 item_id="i1",
             ),
-            _totals_event(pages=1, deposits=2, withdrawals=0),
+            _totals_event(pages=1, deposits=5, withdrawals=0),
         ]
         result = bss.suggest(events)
         self.assertTrue(result["reliable"])
@@ -327,6 +330,78 @@ class CoverageDegradeTests(unittest.TestCase):
         self.assertTrue(result["reliable"])
         self.assertEqual(result["coverage"]["verified_pairs"], 0)
         self.assertEqual(result["coverage"]["chain_breaks"], 0)
+
+    def test_buddhist_period_conversion_and_invalid_period(self):
+        self.assertEqual(bss.stmt_totals.period_month("2569-05"), (2026, 5))
+        self.assertIsNone(bss.stmt_totals.period_month("May-2569"))
+
+    def test_three_missing_tail_days_degrade_and_name_dates(self):
+        days = list(range(1, 18)) + [28]
+        events = [
+            _bank_event(
+                [_dep(f"2026-05-{day:02d}", 100 + row) for row in range(5)],
+                item_id=f"page-{page}",
+                eid=page,
+            )
+            for page, day in enumerate(days, start=1)
+        ]
+        result = bss.suggest(events, period="2569-05")
+        self.assertFalse(result["reliable"])
+        self.assertEqual(result["degrade_reason"], bss.DEGRADE_DATE_GAP)
+        self.assertEqual(
+            result["coverage"]["date_coverage"]["missing_dates"],
+            ["2026-05-29", "2026-05-30", "2026-05-31"],
+        )
+        self.assertIn("2026-05-29", result["message"]["zh"])
+
+    def test_single_missing_day_warns_without_degrading(self):
+        events = [_bank_event([_dep("2026-05-01", 100), _dep("2026-05-30", 200)])]
+        result = bss.suggest(events, period="2569-05")
+        self.assertTrue(result["reliable"])
+        self.assertEqual(result["coverage"]["date_coverage"]["missing_dates"], ["2026-05-31"])
+        self.assertIn("message", result)
+
+    def test_invalid_period_does_not_enable_date_gate(self):
+        events = [_bank_event([_dep("2026-05-01", 100), _dep("2026-05-28", 200)])]
+        result = bss.suggest(events, period="bad")
+        self.assertTrue(result["reliable"])
+        self.assertNotIn("date_coverage", result["coverage"])
+
+    def test_single_row_fragment_is_not_counted_as_statement_page(self):
+        events = [
+            _bank_event([_dep("2026-05-01", i) for i in range(5)], item_id="page"),
+            _bank_event([_dep("2026-05-02", 1)], item_id="IMG_2586", eid=2),
+            _totals_event(pages=1, deposits=None, withdrawals=None),
+        ]
+        coverage = bss.coverage_check(events)
+        self.assertEqual(coverage["statement"]["parsed_pages"], 1)
+        self.assertFalse(coverage["statement"]["incomplete"])
+
+    def test_cross_file_balance_handoff_and_break(self):
+        first = [
+            _dep("2026-05-10", 100, balance="327500.00"),
+            _dep("2026-05-10", 100, balance="327600.00"),
+            _dep("2026-05-10", "75.62", balance="327675.62"),
+        ]
+        second = [
+            _dep("2026-05-11", 390, balance="328065.62"),
+            _dep("2026-05-11", 100, balance="328165.62"),
+            _wd("2026-05-11", 50, balance="328115.62"),
+        ]
+        connected = bss.suggest(
+            [_bank_event(first, item_id="a"), _bank_event(second, item_id="b", eid=2)]
+        )
+        self.assertTrue(connected["coverage"]["segment_chain"]["reliable"])
+
+        broken_second = [dict(row) for row in second]
+        for row in broken_second:
+            row["balance"] = str(float(row["balance"]) + 10)
+        broken = bss.suggest(
+            [_bank_event(first, item_id="a"), _bank_event(broken_second, item_id="b", eid=2)]
+        )
+        self.assertFalse(broken["reliable"])
+        self.assertEqual(broken["degrade_reason"], bss.DEGRADE_CHAIN_BREAK)
+        self.assertIn("2026-05-10", broken["message"]["zh"])
 
 
 class PendingRowsTests(unittest.TestCase):

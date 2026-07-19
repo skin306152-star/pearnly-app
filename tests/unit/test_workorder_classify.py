@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 from services.workorder.engine import StepContext
-from services.workorder.steps import classify
+from services.workorder.steps import classify, statement_regroup
 
 OWN_TAX = "0105567178203"
 OTHER_TAX = "0735527000289"
@@ -172,6 +172,7 @@ class ClassifyImageTests(unittest.TestCase):
         self.assertEqual(store.by_id("i1")["kind"], "non_tax")
         self.assertEqual(store.by_id("i1")["status"], "excluded")
         self.assertEqual(store.by_id("i1")["flag_reason"], "no_tax_elements:payment_evidence")
+        self.assertEqual(store.classified("i1")["reason"], "no_tax_elements:payment_evidence")
         # non_tax 不是「结构上有问题」,不计入 flagged(sort 的既有语义:排除但不留人工)。
         self.assertEqual(out.payload["flagged"], 0)
 
@@ -298,6 +299,35 @@ class ClassifyImageTests(unittest.TestCase):
             {e["payload"]["item_id"] for e in regrouped},
             {"2486", "2487", "2488"},
         )
+
+    def test_statement_sequence_extends_past_last_anchor_only_with_title(self):
+        numbers = [2484, 2488, 2492, 2496, 2500, 2501, 2503]
+        items = [_item(str(number), f"/in/IMG_{number}.jpg") for number in numbers]
+        store = FakeItemStore(items)
+        records = []
+        for item, number in zip(items, numbers):
+            is_anchor = number <= 2500
+            notes = "Bank statement/transaction list" if number != 2503 else "Transfer record"
+            records.append(
+                statement_regroup._Record(
+                    item=item,
+                    fields={"category": "bank", "notes": notes, "vat": "0"},
+                    kind="bank_statement" if is_anchor else "non_tax",
+                    status="ok" if is_anchor else "excluded",
+                )
+            )
+        collector = statement_regroup.Collector(enabled=True)
+        collector.records = records
+        bins = {"bank_statement": 5, "non_tax": 2}
+
+        reduced = collector.apply(_ctx(store), bins)
+
+        self.assertEqual(reduced, 0)
+        self.assertEqual(bins, {"bank_statement": 6, "non_tax": 1})
+        self.assertEqual(store.by_id("2501")["kind"], "bank_statement")
+        self.assertEqual(store.by_id("2503")["kind"], "unknown")
+        regrouped = [e for e in store.events if e["event_type"] == "item_regrouped"]
+        self.assertEqual([e["payload"]["item_id"] for e in regrouped], ["2501"])
 
     def test_missing_buyer_tax_but_name_matches_own_bins_purchase(self):
         # 买方税号被 OCR 读花/缺失,但买方名称容差匹配本公司名 → 归进项(找回 L2 被踢进 unknown 的真进项票)。

@@ -27,6 +27,7 @@
         withdrawal: 'bxs_reason_withdrawal',
         bank_fee: 'bxs_reason_fee',
         cancelled: 'bxs_reason_cancel',
+        sales_channel_explicit: 'bxs_reason_sales_channel',
         edc_settlement_matched: 'bxs_reason_edc',
         deposit_unclassified: 'bxs_reason_pending',
     };
@@ -69,7 +70,8 @@
                 kind: kind,
                 amount: crb.net_total,
                 ratio: ratio,
-                warn: ratio != null && ratio > DIFF_WARN_RATIO,
+                warn: Number(bank) !== 0 && ratio != null && ratio > DIFF_WARN_RATIO,
+                neutral: Number(bank) === 0,
             });
         });
         return out;
@@ -111,6 +113,10 @@
             rowErr: {},
             runBusy: false,
             runErrKey: null,
+            runProgress: null,
+            batchBusy: false,
+            batchErrKey: null,
+            confirmGroup: null,
         };
     }
 
@@ -138,6 +144,11 @@
     }
     function money(v) {
         return v == null || v === '' ? '—' : root.AI.format.money(v);
+    }
+    function localizedMessage(message) {
+        if (!message) return '';
+        var lang = (root.AII18N && root.AII18N.lang) || 'en';
+        return message[lang] || message.en || '';
     }
 
     // 三张流水行清单共用折叠外壳(视觉照抄 ai-recon-render.js 的 .brx-section/.brx-fold,
@@ -256,13 +267,15 @@
             .map(function (r) {
                 var labelKey = r.kind === 'edc' ? 'bxs_crosscheck_edc' : 'bxs_crosscheck_invoice';
                 var pct = root.AI.format.pct(r.ratio);
-                var chip = r.warn
-                    ? '<span class="chip w">' +
-                      esc(at('bxs_crosscheck_diff_warn', { pct: pct })) +
-                      '</span>'
-                    : '<span class="chip s">' +
-                      esc(at('bxs_crosscheck_diff_ok', { pct: pct })) +
-                      '</span>';
+                var chip = r.neutral
+                    ? '<span class="chip n">' + esc(at('bxs_crosscheck_no_bank')) + '</span>'
+                    : r.warn
+                      ? '<span class="chip w">' +
+                        esc(at('bxs_crosscheck_diff_warn', { pct: pct })) +
+                        '</span>'
+                      : '<span class="chip s">' +
+                        esc(at('bxs_crosscheck_diff_ok', { pct: pct })) +
+                        '</span>';
                 return (
                     '<div class="bxs-xc-row"><span class="bxs-xc-lb">' +
                     esc(at(labelKey)) +
@@ -285,11 +298,22 @@
 
     function runRowHtml(ui) {
         var err = ui.runErrKey ? '<div class="bxs-err">' + esc(at(ui.runErrKey)) + '</div>' : '';
+        var progress = ui.runProgress;
+        var label =
+            ui.runBusy && progress
+                ? at('bxs_run_progress', {
+                      done: progress.done || 0,
+                      total: progress.total || 0,
+                      failed: progress.failed_batches || 0,
+                  })
+                : ui.runBusy
+                  ? at('bxs_run_busy')
+                  : at('bxs_run_btn');
         return (
             '<div class="bxs-run"><button type="button" class="btn" data-action="bxs-run"' +
             (ui.runBusy ? ' disabled' : '') +
             '>' +
-            esc(ui.runBusy ? at('bxs_run_busy') : at('bxs_run_btn')) +
+            esc(label) +
             '</button>' +
             err +
             '</div>'
@@ -325,6 +349,28 @@
         );
     }
 
+    function reliableSectionsHtml(suggestion, grouped, ui, rowFn) {
+        return (
+            foldSection(
+                'sales',
+                'bxs_sales_title',
+                grouped.sales.length,
+                ui.open.sales,
+                grouped.sales.map(rowFn).join(''),
+                'bxs_sales_empty'
+            ) +
+            root.AI.bankSalesGroups.sectionHtml(suggestion, ui, rowFn, readonlyRowHtml) +
+            foldSection(
+                'nonSales',
+                'bxs_nonsales_title',
+                grouped.nonSales.length,
+                ui.open.nonSales,
+                grouped.nonSales.map(rowFn).join(''),
+                'bxs_nonsales_empty'
+            )
+        );
+    }
+
     // 覆盖降级卡(reliable=false):黄灯横幅 + coverage 证据 + 逐行明细只读(不给决策按钮——
     // 建议值本体都不出了,行级裁决改不了「宁缺勿错」的降级结论,交互徒增噪声)。折叠仍吃
     // 真实 ui.open(覆盖降级形态常见大批量行,折叠开关必须真管用,不能摆设——真机曾踩过
@@ -332,6 +378,7 @@
     function degradeCardHtml(suggestion, ui) {
         var cov = suggestion.coverage || {};
         var grouped = groupRows(suggestion.rows);
+        var message = localizedMessage(suggestion.message);
         return (
             '<div class="panel bxs-card"><div class="hd"><h3>' +
             esc(at('bxs_title')) +
@@ -340,11 +387,12 @@
             esc(at('bxs_degrade_t')) +
             '</span><span>' +
             esc(
-                at('bxs_degrade_s', {
-                    breaks: cov.chain_breaks,
-                    amount: money(cov.unexplained_inflow),
-                    pct: root.AI.format.pct(cov.inflow_gap_ratio),
-                })
+                message ||
+                    at('bxs_degrade_s', {
+                        breaks: cov.chain_breaks,
+                        amount: money(cov.unexplained_inflow),
+                        pct: root.AI.format.pct(cov.inflow_gap_ratio),
+                    })
             ) +
             '</span></div>' +
             sectionsHtml(grouped, ui, readonlyRowHtml) +
@@ -385,7 +433,7 @@
             summaryLine(at('field_output_vat'), money(suggestion.output_vat)) +
             '</div>' +
             crossCheckHtml(xrows) +
-            sectionsHtml(grouped, ui, rowFn) +
+            reliableSectionsHtml(suggestion, grouped, ui, rowFn) +
             (grouped.pending.length ? runRowHtml(ui) : '') +
             (!apply && grouped.pending.length
                 ? '<p class="bxs-gate-hint">' +
@@ -397,7 +445,8 @@
             '>' +
             esc(at('bxs_apply_btn')) +
             '</button></div>' +
-            '</div></div>'
+            '</div></div>' +
+            root.AI.bankSalesGroups.confirmHtml(ui.confirmGroup)
         );
     }
 

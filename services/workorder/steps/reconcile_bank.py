@@ -58,11 +58,7 @@ def run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> O
     except BankStatementParseError:
         raise
     try:
-        # 自报总数窄读(SA3R-b · 只在 SA-3 建议闸开时补,没人消费就不烧那次读):对账单页 1 表头
-        # 印的 N 页/รวมฝาก+รวมถอน 笔数没进存储层,补一次锚页目标读落 bank_statement_totals 事件,
-        # coverage_check 据此判缺整页。fail-open 于 stmt_totals 内部,绝不阻断 R3/package。
-        if _stmt_totals_enabled(ctx):
-            stmt_totals.emit_from_banks(ctx, banks)
+        emit_stmt_totals(ctx, banks)
         statement_txs = [adapter.tx_from_statement_row(r) for r in rows]
         candidates = adapter.candidates_from_events(events)
         result = adapter.reconcile_workorder(statement_txs, candidates)
@@ -76,6 +72,12 @@ def checkpoint_bank_statements(ctx: StepContext, banks: list[dict]) -> Optional[
     if not _bank_recon_enabled(ctx):
         return None
     return _checkpointed_rows(ctx, banks)
+
+
+def emit_stmt_totals(ctx: StepContext, banks: list[dict]) -> None:
+    """独立触发自报总数窄读；缺销项的 checkpoint-only 路径也必须执行。"""
+    if banks and _bank_recon_enabled(ctx) and _stmt_totals_enabled(ctx):
+        stmt_totals.emit_from_banks(ctx, banks)
 
 
 def _checkpointed_rows(ctx: StepContext, banks: list[dict]) -> list:

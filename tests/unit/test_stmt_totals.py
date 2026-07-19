@@ -104,9 +104,13 @@ class EmitFromBanksTests(unittest.TestCase):
         def boom(ref):
             raise RuntimeError("ocr down")
 
-        with mock.patch.object(stmt_totals, "_narrow_read", boom):
+        with (
+            mock.patch.object(stmt_totals, "_narrow_read", boom),
+            self.assertLogs(stmt_totals.__name__, level="WARNING") as logs,
+        ):
             self.assertIsNone(stmt_totals.emit_from_banks(_Ctx(store), self._banks()))
         self.assertEqual(store.events, [])
+        self.assertIn("wo=wo-1", logs.output[0])
 
     def test_empty_banks_no_read(self):
         store = FakeEventStore()

@@ -1,5 +1,7 @@
-/* Pearnly AI 收料编排:分批上传、人工销项、自动续跑与状态轮询。
- * 银行销项和上传队列分别委托 ai-intake-bank-sales.js / ai-intake-queue.js。
+/*
+ * Pearnly AI 收料编排：上传分批源于 G1 真机撞过 prod nginx 50M 单请求挂死。
+ * 人工销项走 /sales-summary 解锁 R2；J-B 只在本轮全部收齐且真有新料时自动续跑一次。
+ * bundle 顺序要求 state/api/router/render/manifest/bank-sales/queue/excluded 均先于本文件。
  */
 (function () {
     'use strict';
@@ -13,6 +15,7 @@
     var fileInput = null; // 持久隐藏文件选择器(单例,不随 render 重建 → File 不丢)
     var bankSales = null; // AI.intakeBankSales 实例,mount() 时装配一次,取当前 S 靠 getS()
     var intakeQueue = null; // AI.intakeQueue 实例(IN-0b 队列/密码/失败批),同上装配一次
+    var excluded = null; // AI.intakeExcluded 实例,独立持有改判 busy/error 态
     var runPoll = null; // 当前重跑轮询的 AI.poll 句柄(mount()/换会话时先停旧的再起新的)
 
     function body() {
@@ -43,14 +46,8 @@
             rerunErrKey: null,
             rerunProgress: null, // classify 步逐件进度快照 {step,processed,total} · R2F-R3 #5
             rerunTimedOut: false, // 轮询次数用尽仍未收口(仍在后台跑)· R2F-R3 #5
-            // 银行流水倒推销项(SA-3b):折叠/行级裁决/预判 三区确认清单的纯 UI 态,
-            // 建议本体不落在这里——始终读 S.order.bank_sales_suggestion(getOrder 回放)。
             bankSalesUi: AI.bankSalesRender.freshUiState(),
             bankSalesPrefill: null, // 「采用建议值」一次性预填 {sales, vat},render() 消费后清空
-            // IN-0b 收料诚实化四件套的会话态(联网时序在 ai-intake-queue.js,这里只存
-            // 渲染要用的快照):manifest 是本次挂载以来的累计盘点(收进/拒收/zip 解出),
-            // passwordCard 非空即弹供钥卡,failedBatches 是网络级失败待重试的批,
-            // resumeBanner 是 mount() 时读到的上次未完成队列(用户决断前保持只读)。
             manifest: { accepted: 0, rejected: [], zipExpanded: 0 },
             passwordCard: null,
             failedBatches: [],
@@ -61,41 +58,44 @@
 
     function ctx() {
         // 表单输入值在重渲染间保活:读当前 DOM(用户可能已敲了一半)回填。
-        return {
-            order: S.order,
-            needsSales: S.needsSales,
-            files: S.files,
-            uploading: S.uploading,
-            uploadErrKey: S.uploadErrKey,
-            uploadDone: S.uploadDone,
-            uploadTotal: S.uploadTotal,
-            uploadBatchIndex: S.uploadBatchIndex,
-            uploadBatchTotal: S.uploadBatchTotal,
-            uploadBytesPct: S.uploadBytesPct,
-            perFile: S.perFile,
-            formOpen: S.formOpen,
-            formErr: S.formErr,
-            formErrKey: S.formErrKey,
-            formLocked: S.formLocked,
-            submitting: S.submitting,
-            dirty: S.dirty,
-            rerunState: S.rerunState,
-            rerunErrKey: S.rerunErrKey,
-            rerunProgress: S.rerunProgress,
-            rerunTimedOut: S.rerunTimedOut,
-            bankSalesSuggestion: S.order && S.order.bank_sales_suggestion,
-            bankSalesUi: S.bankSalesUi,
-            salesCorrob: S.order && S.order.sales_corroboration,
-            edcCorrob: S.order && S.order.edc_corroboration,
-            salesValue: readVal('ikSales'),
-            vatValue: readVal('ikVat'),
-            noteValue: readVal('ikNote'),
-            manifest: S.manifest,
-            passwordCard: S.passwordCard,
-            failedBatches: S.failedBatches,
-            resumeBanner: S.resumeBanner,
-            materialCount: S.materialCount,
-        };
+        return Object.assign(
+            {
+                order: S.order,
+                needsSales: S.needsSales,
+                files: S.files,
+                uploading: S.uploading,
+                uploadErrKey: S.uploadErrKey,
+                uploadDone: S.uploadDone,
+                uploadTotal: S.uploadTotal,
+                uploadBatchIndex: S.uploadBatchIndex,
+                uploadBatchTotal: S.uploadBatchTotal,
+                uploadBytesPct: S.uploadBytesPct,
+                perFile: S.perFile,
+                formOpen: S.formOpen,
+                formErr: S.formErr,
+                formErrKey: S.formErrKey,
+                formLocked: S.formLocked,
+                submitting: S.submitting,
+                dirty: S.dirty,
+                rerunState: S.rerunState,
+                rerunErrKey: S.rerunErrKey,
+                rerunProgress: S.rerunProgress,
+                rerunTimedOut: S.rerunTimedOut,
+                bankSalesSuggestion: S.order && S.order.bank_sales_suggestion,
+                bankSalesUi: S.bankSalesUi,
+                salesCorrob: S.order && S.order.sales_corroboration,
+                edcCorrob: S.order && S.order.edc_corroboration,
+                salesValue: readVal('ikSales'),
+                vatValue: readVal('ikVat'),
+                noteValue: readVal('ikNote'),
+                manifest: S.manifest,
+                passwordCard: S.passwordCard,
+                failedBatches: S.failedBatches,
+                resumeBanner: S.resumeBanner,
+                materialCount: S.materialCount,
+            },
+            excluded.context()
+        );
     }
 
     function readVal(id) {
@@ -422,11 +422,7 @@
         else if (a === 'ik-resume-pick') resumePick();
         else if (a === 'ik-resume-dismiss') intakeQueue.resumeDismiss();
         else if (a === 'ik-retry-failed') retryFailed();
-        else if (a === 'bxs-fold') bankSales.toggleFold(el.getAttribute('data-kind'));
-        else if (a === 'bxs-decide') {
-            bankSales.decideRow(el.getAttribute('data-fp'), el.getAttribute('data-verdict'));
-        } else if (a === 'bxs-run') bankSales.run();
-        else if (a === 'bxs-apply') bankSales.apply();
+        else if (a.indexOf('bxs-') === 0) bankSales.onAction(a, el);
     }
 
     function onSubmit(e) {
@@ -471,10 +467,7 @@
         if (dz) dz.classList.remove('over');
     }
 
-    // 文件夹拖入(A1):dataTransfer.items 里任一条目是目录(webkitGetAsEntry().isDirectory)
-    // 才走递归展开路——纯文件多选拖拽维持原有 dataTransfer.files 直传路径不变(零回归)。
-    // 展开出的支持文件并入既有 mergeFiles 流;文件夹里的不支持件即时记进盘点条拒收清单
-    // (不静默吞),不等上传发生才知道。
+    // 目录拖入递归展开；不支持件立即进入拒收盘点。
     function onDrop(e) {
         var dz = e.target.closest && e.target.closest('#ikDrop');
         if (!dz) return;
@@ -513,6 +506,9 @@
         var host = body();
         host.addEventListener('click', onClick);
         host.addEventListener('submit', onSubmit);
+        host.addEventListener('change', function (event) {
+            excluded.onChange(event);
+        });
         host.addEventListener('dragover', onDragover);
         host.addEventListener('dragleave', onDragleave);
         host.addEventListener('drop', onDrop);
@@ -525,6 +521,13 @@
         // 只在真有残留时挂(hasResumableQueue 过滤掉早已全部完成、只是没被清干净的态)。
         var prior = AI.intakeQueue.loadQueueState(order.id);
         S.resumeBanner = AI.intakeManifest.hasResumableQueue(prior) ? prior : null;
+        excluded = AI.intakeExcluded.create(
+            function () {
+                return S;
+            },
+            render,
+            loadDetail
+        );
         if (!bankSales) {
             bankSales = AI.intakeBankSales.create(function () {
                 return S;
@@ -539,8 +542,7 @@
                 renderUploadProgress
             );
         }
-        // 换单/换客户挂载新会话:旧会话的轮询没有存在意义(isTerminal/onTick 虽已靠 S!==
-        // session 卫哨自认失效,但让它继续空转到超时才停也没必要,当场收掉更干净)。
+        // 换单或换客户时立即停止旧轮询。
         if (runPoll) {
             runPoll.stop();
             runPoll = null;

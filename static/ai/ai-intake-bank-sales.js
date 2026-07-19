@@ -24,6 +24,8 @@
     }
 
     function create(getS, render) {
+        var pollTimer = null;
+
         function refreshOrder(session) {
             return session.api.getOrder(session.orderId).then(function (detail) {
                 if (getS() !== session) return;
@@ -71,15 +73,102 @@
             render();
             S.api
                 .runBankSales(S.orderId)
+                .then(function (started) {
+                    if (getS() !== session) return;
+                    session.bankSalesUi.runProgress = {
+                        done: 0,
+                        total: started.total_pending || 0,
+                        failed_batches: 0,
+                    };
+                    render();
+                    schedulePoll(session, null, 0);
+                })
+                .catch(function (err) {
+                    if (getS() !== session) return;
+                    if (err && err.status === 409) {
+                        session.bankSalesUi.runErrKey = 'bxs_run_already';
+                        schedulePoll(session, null, 0);
+                        render();
+                        return;
+                    }
+                    session.bankSalesUi.runBusy = false;
+                    session.bankSalesUi.runErrKey = errKey(err);
+                    render();
+                });
+        }
+
+        function schedulePoll(session, lastDone, unchanged) {
+            if (pollTimer) clearTimeout(pollTimer);
+            pollTimer = setTimeout(function () {
+                if (getS() !== session) return;
+                session.api
+                    .bankSalesProgress(session.orderId)
+                    .then(function (status) {
+                        if (getS() !== session) return;
+                        var done = Number(status.done) || 0;
+                        var stable = lastDone != null && done === lastDone ? unchanged + 1 : 0;
+                        session.bankSalesUi.runProgress = status;
+                        render();
+                        if (!status.running || stable >= 2) {
+                            session.bankSalesUi.runBusy = false;
+                            pollTimer = null;
+                            return refreshOrder(session);
+                        }
+                        schedulePoll(session, done, stable);
+                    })
+                    .catch(function (err) {
+                        if (getS() !== session) return;
+                        session.bankSalesUi.runBusy = false;
+                        session.bankSalesUi.runErrKey = errKey(err);
+                        pollTimer = null;
+                        render();
+                    });
+            }, 3000);
+        }
+
+        function requestBatch(groupKey, verdict) {
+            var S = getS();
+            var suggestion = S.order && S.order.bank_sales_suggestion;
+            var groups = AI.bankSalesGroups.pendingGroups(
+                suggestion && suggestion.rows,
+                suggestion && suggestion.pending_groups
+            );
+            var group = groups.find(function (candidate) {
+                return candidate.key === groupKey;
+            });
+            if (!group || ['sales', 'non_sales'].indexOf(verdict) < 0) return;
+            S.bankSalesUi.confirmGroup = Object.assign({ verdict: verdict }, group);
+            render();
+        }
+
+        function cancelBatch() {
+            getS().bankSalesUi.confirmGroup = null;
+            render();
+        }
+
+        function confirmBatch() {
+            var S = getS();
+            var group = S.bankSalesUi.confirmGroup;
+            if (!group || S.bankSalesUi.batchBusy) return;
+            var session = S;
+            var decisions = group.rows.map(function (row) {
+                return { fingerprint: row.fingerprint, verdict: group.verdict };
+            });
+            S.bankSalesUi.confirmGroup = null;
+            S.bankSalesUi.batchBusy = true;
+            S.bankSalesUi.batchErrKey = null;
+            render();
+            S.api
+                .decideBankSalesBatch(S.orderId, decisions)
                 .then(function () {
                     if (getS() !== session) return;
-                    session.bankSalesUi.runBusy = false;
+                    session.bankSalesUi.batchBusy = false;
                     return refreshOrder(session);
                 })
                 .catch(function (err) {
                     if (getS() !== session) return;
-                    session.bankSalesUi.runBusy = false;
-                    session.bankSalesUi.runErrKey = errKey(err);
+                    session.bankSalesUi.batchBusy = false;
+                    session.bankSalesUi.batchErrKey = errKey(err);
                     render();
                 });
         }
@@ -97,7 +186,28 @@
             render();
         }
 
-        return { toggleFold: toggleFold, decideRow: decideRow, run: run, apply: apply };
+        function onAction(action, el) {
+            if (action === 'bxs-fold') toggleFold(el.getAttribute('data-kind'));
+            else if (action === 'bxs-decide') {
+                decideRow(el.getAttribute('data-fp'), el.getAttribute('data-verdict'));
+            } else if (action === 'bxs-run') run();
+            else if (action === 'bxs-batch-request') {
+                requestBatch(el.getAttribute('data-group'), el.getAttribute('data-verdict'));
+            } else if (action === 'bxs-batch-cancel') cancelBatch();
+            else if (action === 'bxs-batch-confirm') confirmBatch();
+            else if (action === 'bxs-apply') apply();
+        }
+
+        return {
+            toggleFold: toggleFold,
+            decideRow: decideRow,
+            run: run,
+            requestBatch: requestBatch,
+            cancelBatch: cancelBatch,
+            confirmBatch: confirmBatch,
+            apply: apply,
+            onAction: onAction,
+        };
     }
 
     window.AI = window.AI || {};

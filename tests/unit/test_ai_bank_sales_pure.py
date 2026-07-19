@@ -80,6 +80,17 @@ class CrossCheckRowsTests(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]["kind"], "edc")
 
+    def test_zero_bank_estimate_uses_neutral_state(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-bank-sales-render.js"))});
+            process.stdout.write(JSON.stringify(b.crossCheckRows(
+                {{applicable: true, reliable: true, sales_amount: '0'}},
+                {{net_total: '100'}}, null
+            )));
+            """)
+        self.assertTrue(out[0]["neutral"])
+        self.assertFalse(out[0]["warn"])
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class CanApplyTests(unittest.TestCase):
@@ -162,6 +173,60 @@ class GroupRowsTests(unittest.TestCase):
             process.stdout.write(JSON.stringify(b.groupRows(null)));
             """)
         self.assertEqual(out, {"sales": [], "pending": [], "nonSales": []})
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class PendingGroupShapeTests(unittest.TestCase):
+    def test_backend_groups_drive_large_and_small_buckets(self):
+        out = _run_node(f"""
+            const g = require({json.dumps(str(AI_DIR / "ai-bank-sales-groups.js"))});
+            process.stdout.write(JSON.stringify(g.pendingGroups([
+                {{fingerprint: 'a', verdict: 'pending', group: 'transfer_in', deposit: '9999.99'}},
+                {{fingerprint: 'b', verdict: 'pending', group: 'transfer_in', deposit: '10000'}},
+                {{fingerprint: 'c', verdict: 'sales', group: 'transfer_in', deposit: '500'}},
+            ], [{{key: 'transfer_in', count: 2, sum: '19999.99'}}])));
+            """)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["count"], 2)
+        self.assertEqual(out[0]["sum"], "19999.99")
+        self.assertEqual([row["fingerprint"] for row in out[0]["large"]], ["b"])
+        self.assertEqual([row["fingerprint"] for row in out[0]["small"]], ["a"])
+
+    def test_unknown_backend_group_falls_back_to_other(self):
+        out = _run_node(f"""
+            const g = require({json.dumps(str(AI_DIR / "ai-bank-sales-groups.js"))});
+            process.stdout.write(JSON.stringify(g.pendingGroups([
+                {{fingerprint: 'x', verdict: 'pending', group: 'unknown', deposit: '1'}}
+            ], [])));
+            """)
+        self.assertEqual(out[0]["key"], "other_in")
+        self.assertEqual(len(out[0]["small"]), 1)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class BankSalesApiTests(unittest.TestCase):
+    def test_four_endpoints_keep_expected_paths_and_bodies(self):
+        out = _run_node(f"""
+            const m = require({json.dumps(str(AI_DIR / "ai-api-bank-sales.js"))});
+            const calls = [];
+            const api = m.create((...args) => {{ calls.push(args); return Promise.resolve({{}}); }});
+            api.runBankSales('wo /1');
+            api.bankSalesProgress('wo /1');
+            api.decideBankSales('wo /1', {{fingerprint: 'a', verdict: 'sales'}});
+            api.decideBankSalesBatch('wo /1', [{{fingerprint: 'b', verdict: 'non_sales'}}]);
+            process.stdout.write(JSON.stringify(calls));
+            """)
+        prefix = "/api/workorder/orders/wo%20%2F1/bank-sales/"
+        self.assertEqual(
+            [call[:2] for call in out],
+            [
+                ["POST", prefix + "run"],
+                ["GET", prefix + "progress"],
+                ["POST", prefix + "decide"],
+                ["POST", prefix + "decide-batch"],
+            ],
+        )
+        self.assertEqual(out[3][2]["decisions"][0]["fingerprint"], "b")
 
 
 if __name__ == "__main__":

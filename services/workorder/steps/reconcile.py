@@ -65,12 +65,13 @@ def run(ctx: StepContext) -> StepResult:
     if r1["unresolved"]:
         return StepResult.stuck(r1["unresolved"])
 
-    banks = [it for it in items if it["kind"] == _BANK]
+    banks = [it for it in items if _kind_with_decisions(it, decisions_by_item) == _BANK]
     reads = _replay_sales_reads(events) or dict(ctx.data.get("sales_summary_reads") or {})
     if not reads:
         if banks:
             try:
                 reconcile_bank.checkpoint_bank_statements(ctx, banks)
+                reconcile_bank.emit_stmt_totals(ctx, banks)
             except reconcile_bank.BankStatementParseError as exc:
                 return StepResult.stuck([str(exc)])
         return StepResult.needs(["sales_summary"])
@@ -162,6 +163,14 @@ def _replay(events: list[dict], event_type: str) -> dict:
         if iid:
             out[iid] = payload
     return out
+
+
+def _kind_with_decisions(item: dict, decisions_by_item: dict) -> str:
+    """最新 assign_kind 人工裁决压过分类 kind，不回写 item 行。"""
+    decision = decisions_by_item.get(item["id"]) or {}
+    if decision.get("decision") == decisions.ASSIGN_KIND and decision.get("kind"):
+        return decision["kind"]
+    return item["kind"]
 
 
 def _replay_money(events: list[dict]) -> dict:

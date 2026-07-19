@@ -210,6 +210,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "progress": wo_progress.classify_progress(wo, items, classified),
         "bank_progress": wo_progress.bank_progress(wo, items, bank_parsed),
         "flagged": evidence.flagged_projection(items, events, classified=classified),
+        "excluded": evidence.excluded_projection(items, events),
         "alerts": evidence.alerts_projection(events)
         + evidence.amount_read_suggestions(events, classified=classified),
         "needs": needs,
@@ -230,7 +231,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     }
     # SA-3a 倒推销项建议:闸关则不挂键(order_detail 逐字节维持现状,现有人工填销项路径不变)。
     if feature_flags.pearnly_ai_bank_sales_suggest_enabled_for(tenant_id):
-        detail["bank_sales_suggestion"] = bank_sales_suggest.suggest(events)
+        detail["bank_sales_suggestion"] = bank_sales_suggest.suggest(events, period=wo["period"])
     return detail
 
 

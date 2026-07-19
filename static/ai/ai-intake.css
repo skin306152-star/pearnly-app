@@ -17,6 +17,56 @@
   margin: -4px 0 16px;
   padding: 9px 12px;
 }
+.intake-excluded {
+  margin-bottom: 16px;
+}
+.intake-excluded > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 13px 16px;
+}
+.intake-excluded-list {
+  border-top: 1px solid var(--hair3);
+  padding: 4px 16px 12px;
+}
+.intake-excluded-row {
+  align-items: center;
+  border-bottom: 1px solid var(--hair3);
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+}
+.intake-excluded-row:last-child {
+  border-bottom: 0;
+}
+.intake-excluded-copy {
+  flex: 1;
+  min-width: 0;
+}
+.intake-excluded-copy b,
+.intake-excluded-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.intake-excluded-copy b {
+  font-size: 12.5px;
+}
+.intake-excluded-copy small {
+  color: var(--mut);
+  font-size: 11.5px;
+}
+.intake-excluded-row select {
+  background: var(--surface);
+  border: 1px solid var(--hair2);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  max-width: 190px;
+  padding: 7px 9px;
+}
 .intake-grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
@@ -272,6 +322,14 @@
 @media (max-width: 960px) {
   .intake-grid {
     grid-template-columns: 1fr;
+  }
+  .intake-excluded-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .intake-excluded-row select {
+    max-width: none;
+    width: 100%;
   }
 }
 

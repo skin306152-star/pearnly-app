@@ -1,30 +1,15 @@
-/*
- * Pearnly AI · ai-intake-render.js · 收料视图(W4 补料流)的纯校验 + HTML 拼装
- *
- * 双导出(同 ai-format.js UMD 先例):浏览器挂 window.AI.intakeRender(HTML 拼装用 at()/
- * AI.state,离不开运行时),node 走 module.exports 只测无 DOM 依赖的纯校验(parseAmount /
- * buildSalesPayload / validateFiles)。真正的上传/表单/续跑编排在 ai-intake.js,那部分靠
- * DOM/fetch 时序,由 W4 E2E 守;这里把「填的数合不合法、文件超没超限」抽成可脱管单测的纯函数。
- */
+/* Pearnly AI · 收料视图的纯校验与 HTML 拼装。 */
 (function (root) {
     'use strict';
 
-    // 单文件字节上限,与后端 workorder_routes 的 _MAX_MATERIAL_BYTES 对齐——前端先挡一道
-    // (省一次注定 413 的往返),后端仍是权威闸(错误码四语呈现同一份文案)。总张数不在这里
-    // 挡:splitBatches 已把任意张数切成 ≤BATCH_MAX_FILES 的安全批,每批都远低于后端单请求
-    // 上限 _MAX_MATERIAL_FILES=50,故前端不再需要一道总数预检门槛。
+    // 与后端 20MB 单文件上限一致；总张数由 splitBatches 切批。
     var MAX_BYTES = 20 * 1024 * 1024;
 
-    // 单次请求分批上限(G1 真机:一次传 25 张 ~55MB 撞 prod nginx client_max_body_size 50M,
-    // 请求挂死无响应)。35MB 留够安全边际(50M 硬顶打对折出头,扛住 multipart 边界开销);
-    // 20 张是既有实测安全值,与字节上限并列独立守——谁先触顶谁切批,两条都守。
+    // 单批 35MB/20 件，给 nginx 50MB 限制留 multipart 余量。
     var BATCH_MAX_BYTES = 35 * 1024 * 1024;
     var BATCH_MAX_FILES = 20;
 
-    // 把已通过 validateFiles 的选中文件切成若干批,顺序上传用(每批一次 multipart 请求)。
-    // 贪心装箱:文件逐个塞进当前批,一旦加进去就超字节上限或张数上限 → 当前批收口开新批。
-    // 单文件不可能超 BATCH_MAX_BYTES(validateFiles 已挡在 MAX_BYTES=20MB < 35MB),但仍按
-    // "当前批非空才检查超限" 兜底,防御性地让任何超大单文件也能独占一批而不是死循环。
+    // 贪心装箱，保留文件选择顺序。
     function splitBatches(files, maxBytes, maxCount) {
         var capBytes = maxBytes || BATCH_MAX_BYTES;
         var capCount = maxCount || BATCH_MAX_FILES;
@@ -117,13 +102,7 @@
         return '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' + inner + '</svg>';
     }
 
-    // 上传中/失败时的真进度后缀(R2F-R3 #4):不论单批多批都拼「已传/共几张」——此前
-    // 单批(BATCH_MAX_FILES=20 以内)不拼数字纯转圈,单批一样有真实的"已传 X / 总 N"
-    // 可报(uploadDone 由每批 addMaterials 结算后累加,单批时就是 0→N 一步到位,但那一步
-    // 也是真数不是假动画)。分批(BATCH_MAX_BYTES/BATCH_MAX_FILES 触顶才切批)时额外拼
-    // 「第几批」,数字+分隔符不夹外语词,不新增 i18n 键(复用既有 intake_uploading/
-    // 错误文案原句,后面加纯数字进度)。百分比是当前批的字节级上传进度(XHR
-    // upload.onprogress),纯数字不需要 i18n。
+    // 上传真进度：累计件数、批次与当前批字节百分比。
     function batchProgressSuffix(ctx) {
         if (!ctx.uploadTotal) return '';
         var s = ' (' + (ctx.uploadDone || 0) + '/' + ctx.uploadTotal;
@@ -359,11 +338,7 @@
         );
     }
 
-    // 补料后「重新跑」面:idle → 按钮;waiting → 禁用转述(有真进度就报「识别中/读对账单
-    // X/N」而不是空转的省略号,R2F-R3 #5)+「去工单页看进度→」引导(J-2/J-14:上传收齐
-    // 自动开跑后不再让用户干瞪眼,给一个"去哪看"的出口);轮询次数用尽 → 诚实说"仍在
-    // 后台跑"+手动刷新钮(不假装失败,也不装作没事发生);错 → 人话 + 重试(409"正在跑"
-    // 也走这条,同时仍在轮询,不是终态)。
+    // 补料后展示真实运行进度；轮询超时只说明仍在后台，不伪装失败。
     function rerunHtml(ctx) {
         if (!ctx.dirty && ctx.rerunState !== 'waiting' && !ctx.rerunTimedOut) return '';
         var inner;
@@ -405,6 +380,59 @@
         );
     }
 
+    function excludedReason(reason) {
+        if (reason === 'no_tax_elements:payment_evidence')
+            return at('intake_excluded_reason_payment');
+        if (String(reason || '').indexOf('duplicate_of:') === 0)
+            return at('intake_excluded_reason_duplicate');
+        return at('intake_excluded_reason_other');
+    }
+
+    function excludedHtml(ctx) {
+        var items = ctx.excluded || [];
+        if (!items.length) return '';
+        var rows = items
+            .map(function (item) {
+                var busy = !!(ctx.excludedBusy && ctx.excludedBusy[item.item_id]);
+                var failed = !!(ctx.excludedErr && ctx.excludedErr[item.item_id]);
+                return (
+                    '<div class="intake-excluded-row"><div class="intake-excluded-copy"><b>' +
+                    esc(item.name || item.item_id) +
+                    '</b><small>' +
+                    esc(excludedReason(item.reason)) +
+                    '</small></div><select data-action="ik-excluded-assign" data-item-id="' +
+                    esc(item.item_id) +
+                    '" aria-label="' +
+                    esc(at('intake_excluded_assign')) +
+                    '"' +
+                    (busy ? ' disabled' : '') +
+                    '><option value="">' +
+                    esc(at('intake_excluded_keep')) +
+                    '</option><option value="bank_statement">' +
+                    esc(at('intake_excluded_bank')) +
+                    '</option><option value="purchase_invoice">' +
+                    esc(at('intake_excluded_purchase')) +
+                    '</option><option value="sales_doc">' +
+                    esc(at('intake_excluded_sales')) +
+                    '</option></select>' +
+                    (failed
+                        ? '<small class="intake-err">' +
+                          esc(at('intake_excluded_failed')) +
+                          '</small>'
+                        : '') +
+                    '</div>'
+                );
+            })
+            .join('');
+        return (
+            '<details class="panel intake-excluded"><summary>' +
+            esc(at('intake_excluded_title', { n: items.length })) +
+            '</summary><div class="intake-excluded-list">' +
+            rows +
+            '</div></details>'
+        );
+    }
+
     // 收料主视图。needsSales 时补料卡置顶;上传区 + 进料口并列;末尾重新跑面。
     // 银行流水倒推卡(SA-3b)排在人工填销项表单之上——cardHtml 闸关/无数据时自己返回空串,
     // needsCardHtml() 的既有人工表单标记不受影响(逐字节不变)。
@@ -437,6 +465,7 @@
             im.resumeBannerHtml(ctx.resumeBanner) +
             im.passwordCardHtml(ctx.passwordCard) +
             needs +
+            excludedHtml(ctx) +
             '<div class="intake-grid">' +
             dropzoneHtml(ctx) +
             channelsHtml() +
@@ -463,5 +492,6 @@
         dropzoneHtml: dropzoneHtml,
         needsCardHtml: needsCardHtml,
         rerunHtml: rerunHtml,
+        excludedHtml: excludedHtml,
     };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

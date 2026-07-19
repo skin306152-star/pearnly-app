@@ -139,6 +139,11 @@
     function money(v) {
         return v == null || v === '' ? '—' : root.AI.format.money(v);
     }
+    function localizedMessage(message) {
+        if (!message) return '';
+        var lang = (root.AII18N && root.AII18N.lang) || 'en';
+        return message[lang] || message.en || '';
+    }
 
     // 三张流水行清单共用折叠外壳(视觉照抄 ai-recon-render.js 的 .brx-section/.brx-fold,
     // 逻辑不跨模块引用——sectionHtml 在那边未导出,各管各的小函数比强行共享更省心)。
@@ -332,6 +337,7 @@
     function degradeCardHtml(suggestion, ui) {
         var cov = suggestion.coverage || {};
         var grouped = groupRows(suggestion.rows);
+        var message = localizedMessage(suggestion.message);
         return (
             '<div class="panel bxs-card"><div class="hd"><h3>' +
             esc(at('bxs_title')) +
@@ -340,11 +346,12 @@
             esc(at('bxs_degrade_t')) +
             '</span><span>' +
             esc(
-                at('bxs_degrade_s', {
-                    breaks: cov.chain_breaks,
-                    amount: money(cov.unexplained_inflow),
-                    pct: root.AI.format.pct(cov.inflow_gap_ratio),
-                })
+                message ||
+                    at('bxs_degrade_s', {
+                        breaks: cov.chain_breaks,
+                        amount: money(cov.unexplained_inflow),
+                        pct: root.AI.format.pct(cov.inflow_gap_ratio),
+                    })
             ) +
             '</span></div>' +
             sectionsHtml(grouped, ui, readonlyRowHtml) +

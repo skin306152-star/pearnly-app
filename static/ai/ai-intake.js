@@ -1,22 +1,4 @@
-/*
- * Pearnly AI · ai-intake.js · 收料视图(W4 补料流)编排:上传 + 人工填销项 + 补料后续跑
- *
- * 契约:M1 §四 W4 行 + §五 状态诚实(客户「⌄」只读、LINE/邮箱收料显示未开通)。上传走
- * add_materials(前端先挡 50 张/20MB,后端 413 权威),按总体积/张数自动分批顺序调用(G1
- * 真机:一次 25 张 ~55MB 撞 prod nginx 50M 单请求挂死,splitBatches 见 ai-intake-render.js),
- * 人工填销项走新 /sales-summary 端点落事件解锁 R2;补料后引导「重新跑」——续跑判活/轮询
- * 范式照抄 ai-review.js(切走后续段不认)。银行流水倒推销项(SA-3b)的折叠/裁决/预判/
- * 采用建议值四个动作的网络编排拆到 ai-intake-bank-sales.js(单文件<500 行铁律),本文件
- * 只在 mount() 时用 bankSales.create(getS, render) 接上,onClick 里转发 data-action。
- *
- * 依赖 window.AI.state/api/router/intakeRender/bankSalesRender/intakeBankSales/poll 与全局
- * at(),排在它们之后、ai-client.js 之前加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。
- *
- * J-B(2026-07-17):补料落盘后不再要求用户手点「重新跑」——这一趟选中的文件(可能被
- * splitBatches 切成多批顺序上传)全部落定、且真有新料落盘才自动续跑一次(收齐才开跑,
- * 不是每批落盘各触发一次);手动「重新跑」按钮仍保留兜底,不锁死。轮询收编进共享的
- * AI.poll(N-6 债:此前与 ai-review.js 各写一份 pollAfterRun,逐字节重复)。
- */
+/* Pearnly AI · 收料视图编排：上传、补数、排除件改判与自动续跑。 */
 (function () {
     'use strict';
 
@@ -57,19 +39,15 @@
             rerunErrKey: null,
             rerunProgress: null, // classify 步逐件进度快照 {step,processed,total} · R2F-R3 #5
             rerunTimedOut: false, // 轮询次数用尽仍未收口(仍在后台跑)· R2F-R3 #5
-            // 银行流水倒推销项(SA-3b):折叠/行级裁决/预判 三区确认清单的纯 UI 态,
-            // 建议本体不落在这里——始终读 S.order.bank_sales_suggestion(getOrder 回放)。
             bankSalesUi: AI.bankSalesRender.freshUiState(),
             bankSalesPrefill: null, // 「采用建议值」一次性预填 {sales, vat},render() 消费后清空
-            // IN-0b 收料诚实化四件套的会话态(联网时序在 ai-intake-queue.js,这里只存
-            // 渲染要用的快照):manifest 是本次挂载以来的累计盘点(收进/拒收/zip 解出),
-            // passwordCard 非空即弹供钥卡,failedBatches 是网络级失败待重试的批,
-            // resumeBanner 是 mount() 时读到的上次未完成队列(用户决断前保持只读)。
             manifest: { accepted: 0, rejected: [], zipExpanded: 0 },
             passwordCard: null,
             failedBatches: [],
             resumeBanner: null,
             materialCount: 0,
+            excludedBusy: {},
+            excludedErr: {},
         };
     }
 
@@ -107,6 +85,9 @@
             failedBatches: S.failedBatches,
             resumeBanner: S.resumeBanner,
             materialCount: S.materialCount,
+            excluded: (S.order && S.order.excluded) || [],
+            excludedBusy: S.excludedBusy,
+            excludedErr: S.excludedErr,
         };
     }
 
@@ -404,6 +385,23 @@
         });
     }
 
+    function reassignExcluded(select) {
+        var itemId = select.getAttribute('data-item-id');
+        var kind = select.value;
+        if (!itemId || !kind || S.excludedBusy[itemId]) return;
+        S.excludedBusy[itemId] = true;
+        delete S.excludedErr[itemId];
+        render();
+        S.api
+            .decide(S.orderId, { item_id: itemId, decision: 'assign_kind', kind: kind })
+            .then(loadDetail)
+            .catch(function () {
+                delete S.excludedBusy[itemId];
+                S.excludedErr[itemId] = true;
+                render();
+            });
+    }
+
     // ============ 事件接线(容器委托,只挂一次) ============
 
     function onClick(e) {
@@ -439,6 +437,11 @@
         }
     }
 
+    function onChange(e) {
+        var select = e.target.closest && e.target.closest('[data-action="ik-excluded-assign"]');
+        if (select) reassignExcluded(select);
+    }
+
     // 表单内 Enter 提交 / Esc 取消(Canon §7 键盘可达)。dropzone 聚焦时 Enter/Space 触发选择。
     function onKeydown(e) {
         var view = body();
@@ -471,10 +474,7 @@
         if (dz) dz.classList.remove('over');
     }
 
-    // 文件夹拖入(A1):dataTransfer.items 里任一条目是目录(webkitGetAsEntry().isDirectory)
-    // 才走递归展开路——纯文件多选拖拽维持原有 dataTransfer.files 直传路径不变(零回归)。
-    // 展开出的支持文件并入既有 mergeFiles 流;文件夹里的不支持件即时记进盘点条拒收清单
-    // (不静默吞),不等上传发生才知道。
+    // 目录拖入递归展开；不支持件立即进入拒收盘点。
     function onDrop(e) {
         var dz = e.target.closest && e.target.closest('#ikDrop');
         if (!dz) return;
@@ -513,6 +513,7 @@
         var host = body();
         host.addEventListener('click', onClick);
         host.addEventListener('submit', onSubmit);
+        host.addEventListener('change', onChange);
         host.addEventListener('dragover', onDragover);
         host.addEventListener('dragleave', onDragleave);
         host.addEventListener('drop', onDrop);
@@ -539,8 +540,7 @@
                 renderUploadProgress
             );
         }
-        // 换单/换客户挂载新会话:旧会话的轮询没有存在意义(isTerminal/onTick 虽已靠 S!==
-        // session 卫哨自认失效,但让它继续空转到超时才停也没必要,当场收掉更干净)。
+        // 换单或换客户时立即停止旧轮询。
         if (runPoll) {
             runPoll.stop();
             runPoll = null;

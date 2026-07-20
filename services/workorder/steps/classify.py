@@ -19,6 +19,7 @@ from core import feature_flags
 from services.ai_gateway import attribution
 from services.ocr import escalation_budget
 from services.ocr.sanity import DISCOUNT_INFERRED_PREFIX
+from services.ocr.totals_rescue import TOTALS_RESCUED_PREFIX
 from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_reuse
@@ -386,6 +387,11 @@ def _gate_reason(fields: dict) -> Optional[str]:
         # 自洽」去核对却发现三个数明明平 —— 标签必须自己站出来,不能借别人的关键词。
         if any(str(w).startswith(DISCOUNT_INFERRED_PREFIX) for w in warnings):
             return "discount_inferred"
+        # 钱数是第二个模型重读出来的:不是「这张票的数对不上」,而是「这批数字换过一双
+        # 眼睛」。前置于 _MATH_HINTS —— 留痕文本里带着 subtotal/vat 的新旧值,撞词表会被
+        # 误标成票面自身勾稽失败。
+        if any(str(w).startswith(TOTALS_RESCUED_PREFIX) for w in warnings):
+            return "totals_rescued"
         text = " ".join(str(w) for w in warnings).lower()
         if any(hint in text for hint in _MATH_HINTS):
             return "amount_math_fail"

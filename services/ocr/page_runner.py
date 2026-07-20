@@ -322,8 +322,14 @@ def _process_one_page(
                 rescued = totals_rescue.rescue_totals(image_bytes, api_key, l3_model)
                 patched = totals_rescue.apply_rescue(l2_invoice, rescued)
                 if patched is not None:
+                    validation_warnings.append(totals_rescue.rescue_note(l2_invoice, patched))
                     invoice = patched
                     layer_chain = [l1_layer_name, "L2", "L3_totals_rescue"]
+                    # 救援成功此前是本函数唯一不设 needs_manual_review 的分支:同一段代码的
+                    # 失败分支(下方 L3_failed/quota/transient)全都留人,唯独「第二个模型
+                    # 把四个金额整体换掉并且算术自洽」被当成不必看。可验收条件只有算术自洽,
+                    # 而第一次读错时它同样成立 —— 换过眼睛的读数必须留痕并留人。
+                    needs_manual_review = True
                 else:
                     layer_chain = [l1_layer_name, "L2", "L3_failed"]
                     needs_manual_review = True

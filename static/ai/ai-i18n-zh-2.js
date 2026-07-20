@@ -296,6 +296,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_expl_ocr_validation_warning: '某个数字可能读错了,对照原图看一眼',
     riq_expl_sales_doc_review: '这看起来是你客户自己开出去的销售票,按 S 确认归销项',
     riq_expl_discount_inferred: '票面对不上,系统按差额补了一行折扣才对上,请看原票真有这行吗',
+    riq_expl_totals_rescued: '第一次读的数不对,换了个模型重读金额,请对着原图核一遍',
 
     // J-C · 审核队列操作记忆(未判优先/已判折叠)+ 批量确认 + J-A 建议值改数回显
     rv_counter: '待处理 {k} · 已处理 {d} · 共 {n}',
@@ -322,6 +323,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
     verdict_ocr_error: 'OCR 识别失败：{error}',
     verdict_duplicate: '与已收票据重复（重复于 {of}）',
+    verdict_totals_rescued:
+        '视觉复读失败后，金额由第二个模型重新读了一次并整体替换，现在是净额 {net}、税额 {vat}、合计 {total}。这次只验过算术能对上——第一次读错时也能对上，请照原图核这三个数',
     verdict_discount_inferred:
         '票面净额、税额、合计原本对不上，系统按差额推断票上印了一行 {discount} 的折扣并补了进去，补完才对上。请核对原票是否真有这行折扣',
     // UI1(2026-07-13)· 客户目录行内分层 + 面包屑修真

@@ -184,6 +184,7 @@ window.__AI_I18N_ZH__ = {
     rv_flag_sales_direction: '疑似本方销项 · 请确认方向',
     rv_flag_sales_doc: '本方销项票 · 请确认(按 S)',
     rv_flag_discount_inferred: '系统补了一行折扣 · 请对照原票',
+    rv_flag_totals_rescued: '金额由第二个模型重读 · 请对照原票',
     rv_key_dir_purchase: '进项',
     rv_key_dir_sales: '销项',
     rv_key_dir_nontax: '非税票',

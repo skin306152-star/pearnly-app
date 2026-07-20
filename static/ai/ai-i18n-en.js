@@ -190,6 +190,7 @@ window.__AI_I18N_EN__ = {
     rv_flag_sales_direction: 'Looks like your own sales doc · confirm direction',
     rv_flag_sales_doc: 'Your own sales invoice · press S to confirm',
     rv_flag_discount_inferred: 'System added a discount line · check the original',
+    rv_flag_totals_rescued: 'Amounts re-read by a second model · check the original',
     rv_key_dir_purchase: 'Purchase',
     rv_key_dir_sales: 'Sale',
     rv_key_dir_nontax: 'Non-tax',

@@ -3,8 +3,13 @@
 
 NBC 折扣票实案:确定性闸报 amount math fail 触发 L3,L3 视觉复读吐不出合法 JSON
 (Layer3FallbackError)—— 修前:原样带着 L2 的错读数字举手(needs_manual_review);
-修后:先试一次 totals_rescue 窄口径重抽,救回来就用对的数字(仍非 auto,confirm
-即可),救不回来才原样举手,数字绝不比修前更差。
+修后:先试一次 totals_rescue 窄口径重抽,救回来就用对的数字,救不回来才原样举手,
+数字绝不比修前更差。
+
+★2026-07-20(A-2)改判「救回来就不用人看」:救援成功曾是本函数唯一不设
+needs_manual_review 的分支,而它的验收条件只有两条算术自洽 —— 第一次读错时同样成立
+(本文件的 _MISREAD 就是 sub+vat=total 自洽却整体错)。「自洽」证明不了「读对」,只
+证明这批数字换过一双眼睛,所以现在留痕(TOTALS_RESCUED_PREFIX,差异原样带上)并留人。
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ from unittest import mock
 
 from services.ocr import page_runner
 from services.ocr.layer3_fallback import Layer3FallbackError
+from services.ocr.totals_rescue import TOTALS_RESCUED_PREFIX
 from services.ocr.schemas import Layer1Result, Layer2PageResult, Page, ThaiInvoice
 
 _PAGE = Page(page_number=1, width=10, height=10, full_text="x", avg_confidence=1.0, blocks=[])
@@ -70,7 +76,14 @@ class TotalsRescueWiringTests(unittest.TestCase):
         self.assertEqual(pr.invoice.vat, "4069.05")
         self.assertEqual(pr.invoice.total_amount, "62198.40")
         self.assertEqual(pr.layer_chain[-1], "L3_totals_rescue")
-        self.assertFalse(pr.needs_manual_review)
+        # A-2(2026-07-20 改判):这里原本断言 needs_manual_review 为 False —— 把「换了双眼睛
+        # 重读、算术能对上」当成了「读对了」。可救援的验收条件只有算术自洽,而第一次读错时
+        # 它同样成立(本夹具的 _MISREAD 就是 sub+vat=total 自洽却整体错)。钱面四数被整体
+        # 替换却无人过目,是本类问题里最靠近钱的一处。
+        self.assertTrue(pr.needs_manual_review)
+        note = [w for w in pr.validation_warnings if w.startswith(TOTALS_RESCUED_PREFIX)]
+        self.assertEqual(len(note), 1, pr.validation_warnings)
+        self.assertIn("53129.00→58129.35", note[0])  # 差异原样进证据链,人才知道该核什么
 
     def test_failed_rescue_still_raises_hand_with_original_numbers(self):
         with (

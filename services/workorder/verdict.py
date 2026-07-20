@@ -45,6 +45,7 @@ _K_VALIDATION = "verdict_ocr_validation"
 _K_OCR_ERROR = "verdict_ocr_error"
 _K_DUPLICATE = "verdict_duplicate"
 _K_DISCOUNT_INFERRED = "verdict_discount_inferred"
+_K_TOTALS_RESCUED = "verdict_totals_rescued"
 
 
 # 泰国标准 VAT 税率。amount_math_fail 的勾稽闸词表(classify._MATH_HINTS)混装了
@@ -103,6 +104,15 @@ def _discount_params(money: dict, _tail: str) -> dict:
     return {"discount": money.get("discount")}
 
 
+def _money_read_params(money: dict, _tail: str) -> dict:
+    """第二次读出来的钱面三数 —— 人要核的就是这三个数,得摆在卡上。"""
+    return {
+        "net": money.get("subtotal"),
+        "vat": money.get("vat"),
+        "total": money.get("total_amount"),
+    }
+
+
 def _error_params(_money: dict, tail: str) -> dict:
     return {"error": tail or None}
 
@@ -144,6 +154,9 @@ _MAP = {
     # 系统按勾稽差额替票面补了一行折扣 → 票面现在自洽,但那份自洽是系统自己造的。
     # crit(直接改了钱面字段)、无安全默认:必须有人对着原图确认真印了这行折扣。
     "discount_inferred": _Policy(_K_DISCOUNT_INFERRED, LOW, _discount_params, SEV_CRIT, None),
+    # 钱数是第二个模型重读出来的(L3 复读失败后的窄口径救援)→ 同样 crit、无安全默认:
+    # 救援的验收条件只有算术自洽,而第一次读错时它也成立,证明不了这次读对了。
+    "totals_rescued": _Policy(_K_TOTALS_RESCUED, LOW, _money_read_params, SEV_CRIT, None),
 }
 
 

@@ -31,6 +31,10 @@ _TIMEOUT_SECONDS = int(os.environ.get("OCR_TOTALS_RESCUE_TIMEOUT_SECONDS", "8"))
 _MAX_OUTPUT_TOKENS = 512
 _FIELDS = ("subtotal", "vat", "discount", "total_amount")
 
+# 救援留痕前缀。消费方(page_runner / workorder.classify)按它识别「这页的钱数是第二次读
+# 出来的」;认前缀不认文案,同 sanity.DISCOUNT_INFERRED_PREFIX 的理由。
+TOTALS_RESCUED_PREFIX = "totals_rescued:"
+
 _SYSTEM_PROMPT = (
     "You are re-reading ONLY the totals/summary block of a Thai tax invoice or "
     "receipt image. A previous extraction of this block failed a consistency "
@@ -94,3 +98,22 @@ def apply_rescue(invoice: ThaiInvoice, rescued: Optional[dict]) -> Optional[Thai
     if vat_ratio_mismatch(sub, vat, discount):
         return None
     return patched
+
+
+def rescue_note(before: ThaiInvoice, after: ThaiInvoice) -> str:
+    """救援改了哪几个钱字段、各从多少改到多少。
+
+    验收救援只看两条算术自洽 —— 而那恰恰是第一次读错时也能满足的条件(NBC 实案
+    sub+vat=total 自洽却整体读错)。所以「自洽」证明不了「读对」,只能证明「这批数字
+    换过一双眼睛」。差异必须原样进证据链,由人对着原图定夺。"""
+    diffs = []
+    for field in _FIELDS:
+        old = str(getattr(before, field, "") or "")
+        new = str(getattr(after, field, "") or "")
+        if old != new:
+            diffs.append(f"{field} {old or '(空)'}→{new or '(空)'}")
+    return (
+        f"{TOTALS_RESCUED_PREFIX} L3 视觉复读失败,金额由第二个模型窄口径重读后整体替换("
+        + " / ".join(diffs)
+        + ")"
+    )

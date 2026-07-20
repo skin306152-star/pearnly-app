@@ -191,5 +191,35 @@ class TotalRowCrossCheckTests(unittest.TestCase):
         self.assertEqual([d["label"] for d in out["total_check_details"]], ["bad"])
 
 
+class VatOverBaseTests(unittest.TestCase):
+    """税额 > 税基 = 认列错位的兜底闸(合计行校验在整体错列时会自洽通过,兜它的盲区)。"""
+
+    HEADERS = ["วันที่", "ยอดขาย", "ภาษีขาย"]
+
+    def test_healthy_read_is_sane(self):
+        out = gates.aggregate_sales({"s": _read(self.HEADERS, [_row(["1", "100.00", "7.00"])])})
+        self.assertTrue(out["sane"])
+        self.assertEqual(gates.total_check_reasons(out), [])
+
+    def test_vat_greater_than_base_flagged_and_named(self):
+        out = gates.aggregate_sales({"s": _read(self.HEADERS, [_row(["1", "7.00", "100.00"])])})
+        self.assertFalse(out["sane"])
+        reasons = gates.total_check_reasons(out)
+        self.assertEqual(len(reasons), 1)
+        self.assertIn("sales_vat_over_base", reasons[0])
+        self.assertIn("100.00", reasons[0])
+
+    def test_equal_amounts_stay_sane(self):
+        """相等不判错:只在严格大于时报,零税率/免税销售只会让比值更低不会更高。"""
+        out = gates.aggregate_sales({"s": _read(self.HEADERS, [_row(["1", "50.00", "50.00"])])})
+        self.assertTrue(out["sane"])
+
+    def test_unused_read_not_named(self):
+        """认不出列(used=False)时不报税基闸——那是缺料不是错列,由 needs 处理。"""
+        out = gates.aggregate_sales({"s": _read(["aaa", "bbb"], [_row(["1", "2"])])})
+        self.assertFalse(out["used"])
+        self.assertEqual(gates.total_check_reasons(out), [])
+
+
 if __name__ == "__main__":
     unittest.main()

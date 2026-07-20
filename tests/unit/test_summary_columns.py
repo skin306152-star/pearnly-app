@@ -86,5 +86,39 @@ class DetectColumnsTests(unittest.TestCase):
         self.assertEqual(cols[columns.SUBTOTAL], 2)
 
 
+# 真件冰厂 7-11 PDF 文字层抽出的表头(声调符号被 pdfplumber 按 x 排序挪到基字符之后)。
+# 这一串是从真 PDF 实抽的原样字节,不是手打的——手打不出这种错位,而它正是漏检的载体。
+ICE_711_PDF_HEADERS = [
+    "วนั ที่",
+    "ยอด",
+    "ราคา",
+    "ยอดเงนิ กอ่ น vat",
+    "ยอดเงนิ vat",
+    "ยอดเงนิ รวม",
+]
+
+
+class ThaiMarkMisplacementTests(unittest.TestCase):
+    """PDF 文字层的泰文声调错位不得动摇认列(真件语料·2026-07-20 端到端实锤)。
+
+    错位表头在子串匹配下 subtotal 落空、税前列被当成 VAT 列,销项税与销售额整体对调,
+    且合计行交叉校验因两边取同一错列而自洽通过——两道闸同时失效,故必须在认列这层挡住。
+    """
+
+    def test_misaligned_pdf_headers_detect_same_as_clean(self):
+        self.assertEqual(
+            columns.detect_columns(ICE_711_PDF_HEADERS),
+            columns.detect_columns(ICE_711_HEADERS),
+        )
+
+    def test_misaligned_pdf_headers_roles_exact(self):
+        cols = columns.detect_columns(ICE_711_PDF_HEADERS)
+        self.assertEqual([cols[r] for r in columns.ROLES], [0, 1, 2, 3, 4, 5])
+
+    def test_skeleton_strips_marks_not_consonants(self):
+        self.assertEqual(columns.skeleton("ยอดเงนิ กอ่ น vat"), columns.skeleton("ยอดเงินก่อน vat"))
+        self.assertNotEqual(columns.skeleton("ยอดเงินก่อน"), columns.skeleton("ยอดเงินรวม"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -306,17 +306,34 @@ def aggregate_sales(reads: dict) -> dict:
         "used": used,
         "total_check": status,
         "total_check_details": details,
+        "sane": _vat_not_over_base(sales_total, vat_total),
     }
 
 
+def _vat_not_over_base(sales: Decimal, vat: Decimal) -> bool:
+    """税额不得大于税基——认列错位的兜底闸(会计常识,零误报)。
+
+    合计行交叉校验有盲区:列认错时逐行和与合计行取的是同一(错)列,两边一起错、自洽通过。
+    冰厂 7-11 PDF 实锤——销项税与销售额整体对调后 total_check 仍报 matched。税额 > 税基
+    在 7% 单一税率下不可能出现(零税率销售只会让比值更低),故拿它当认列错位的独立判据。
+    """
+    return not (vat > sales and sales >= ZERO)
+
+
 def total_check_reasons(r2: dict) -> list[str]:
-    """交叉校验不平 → 停机原因(逐表逐字段点名差额,与 R1/R4 的点名范式同格式)。"""
-    return [
+    """交叉校验不平 / 税额大于税基 → 停机原因(点名格式与 R1/R4 一致)。"""
+    reasons = [
         f"sales_total_mismatch[{d['label']}]: {g['field']} 逐行和={g['rows_sum']} "
         f"表内合计={g['reported']} 差={g['diff']}"
         for d in r2.get("total_check_details") or []
         for g in d["gaps"]
     ]
+    if r2.get("used") and not r2.get("sane", True):
+        reasons.append(
+            f"sales_vat_over_base: 销项税={r2['output_vat']} 大于销售额={r2['sales_amount']}"
+            "(疑似汇总表认列错位,请核对表头与列对应)"
+        )
+    return reasons
 
 
 def trial_balance(purchase_entries: list[dict], sales_amount: Decimal, output_vat: Decimal) -> dict:

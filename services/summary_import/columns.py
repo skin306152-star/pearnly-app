@@ -15,7 +15,15 @@
 
 from __future__ import annotations
 
+import re
 from typing import Dict, List, Optional
+
+# 泰文组合符号(上/下元音与声调,零宽)+ 空白。pdfplumber 从 PDF 文字层抽表头时按 x 坐标
+# 排序,而这些符号零宽、x 定位在下一个字符右侧,于是被排到基字符之后——真件冰厂 7-11 PDF
+# 里「ยอดเงินก่อน vat」抽出来是「ยอดเงนิ กอ่ น vat」,子串匹配全部落空,销项与销售额直接对调。
+# Unicode 归一化(NFC/NFD/NFKC)救不了(实测三种全无效),故匹配前双侧剥符号比骨架:
+# 剥完两者逐字相同,而不同角色的骨架仍互不相同,优先级(长度序)也原样保持。
+_THAI_MARKS = re.compile(r"[ัิ-ฺ็-๎\s]")
 
 DATE = "date"
 QUANTITY = "quantity"
@@ -81,10 +89,18 @@ GUESS: Dict[str, List[str]] = {
 ROLES = (DATE, QUANTITY, UNIT_PRICE, SUBTOTAL, VAT, TOTAL)
 
 
+def skeleton(text: str) -> str:
+    """表头骨架:小写 + 剥泰文组合符号与空白。PDF 文字层的声调错位只动符号不动辅音骨架。"""
+    return _THAI_MARKS.sub("", str(text or "").lower())
+
+
 def _score(header: str, keywords: List[str]) -> int:
-    """表头对某角色的命中分 = 命中的最长关键词长度;没命中为 0。"""
-    low = header.lower()
-    return max((len(kw) for kw in keywords if kw in low), default=0)
+    """表头对某角色的命中分 = 命中的最长关键词骨架长度;没命中为 0。
+
+    分数用骨架长度而非原词长度,两侧同尺度,复合词压过裸词的优先级不受剥符号影响。
+    """
+    low = skeleton(header)
+    return max((len(s) for s in (skeleton(kw) for kw in keywords) if s and s in low), default=0)
 
 
 def detect_columns(headers: List[str]) -> Dict[str, Optional[int]]:

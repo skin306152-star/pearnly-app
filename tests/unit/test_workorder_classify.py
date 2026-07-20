@@ -31,11 +31,25 @@ class FakeItemStore:
     def list_events(self, cur, *, tenant_id, work_order_id):
         return [dict(e) for e in self.events]
 
-    def update_item(self, cur, *, tenant_id, item_id, status=None, kind=None, flag_reason=None):
+    def update_item(
+        self,
+        cur,
+        *,
+        tenant_id,
+        item_id,
+        status=None,
+        kind=None,
+        flag_reason=None,
+        clear_flag_reason=False,
+    ):
+        # 与真 store 同语义:None=省略此字段(此前无条件赋值,把 statement_regroup 漏清
+        # flag_reason 的 bug 遮了整整一批)。清空只认显式 clear_flag_reason。
         it = next(i for i in self.items if i["id"] == item_id)
-        it["status"] = status
-        it["kind"] = kind if kind is not None else it["kind"]
-        it["flag_reason"] = flag_reason
+        for col, val in (("status", status), ("kind", kind), ("flag_reason", flag_reason)):
+            if val is not None:
+                it[col] = val
+        if clear_flag_reason and flag_reason is None:
+            it["flag_reason"] = None
 
     def reset_quota_deferred_items(self, cur, *, tenant_id, work_order_id, flag_reason):
         n = 0
@@ -299,10 +313,19 @@ class ClassifyImageTests(unittest.TestCase):
             {e["payload"]["item_id"] for e in regrouped},
             {"2486", "2487", "2488"},
         )
+        # 改判必须连旧原因一起抹掉:留着 no_tax_elements:* 的件顶着「非税」理由却是 ok 状态,
+        # 冻结 manifest 与备忘都会照抄这条脏值(store.update_item 的 None=省略语义踩过)。
+        for item in store.items:
+            self.assertIsNone(item["flag_reason"])
 
     def test_statement_sequence_extends_past_last_anchor_only_with_title(self):
         numbers = [2484, 2488, 2492, 2496, 2500, 2501, 2503]
         items = [_item(str(number), f"/in/IMG_{number}.jpg") for number in numbers]
+        # 待救回的续页此前已被判 non_tax 并落了原因,救回时这条原因必须一起抹掉——
+        # 初始就是 None 的话断言恒真,抓不到 update_item 的 None=省略语义。
+        for item in items:
+            if int(item["id"]) > 2500:
+                item["flag_reason"] = "no_tax_elements:payment_evidence"
         store = FakeItemStore(items)
         records = []
         for item, number in zip(items, numbers):
@@ -328,6 +351,7 @@ class ClassifyImageTests(unittest.TestCase):
         self.assertEqual(store.by_id("2503")["kind"], "unknown")
         regrouped = [e for e in store.events if e["event_type"] == "item_regrouped"]
         self.assertEqual([e["payload"]["item_id"] for e in regrouped], ["2501"])
+        self.assertIsNone(store.by_id("2501")["flag_reason"])
 
     def test_missing_buyer_tax_but_name_matches_own_bins_purchase(self):
         # 买方税号被 OCR 读花/缺失,但买方名称容差匹配本公司名 → 归进项(找回 L2 被踢进 unknown 的真进项票)。

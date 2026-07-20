@@ -280,3 +280,39 @@ class AppendEventDedupeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UpdateItemFlagReasonTests(unittest.TestCase):
+    """None 是「省略此字段」不是「置空」——两者混淆过一次(statement_regroup 以为传
+    flag_reason=None 就清掉了,脏值留在库里)。这里把语义钉死在 DAL 层。"""
+
+    def test_none_flag_reason_is_omitted_not_cleared(self):
+        cur = FakeCursor()
+        store.update_item(cur, tenant_id="t-1", item_id="i-1", status="ok", flag_reason=None)
+        sql, params = cur.calls[0]
+        self.assertNotIn("flag_reason", sql)
+        self.assertEqual(params, ("ok", "t-1", "i-1"))
+
+    def test_clear_flag_reason_writes_sql_null(self):
+        cur = FakeCursor()
+        store.update_item(cur, tenant_id="t-1", item_id="i-1", status="ok", clear_flag_reason=True)
+        sql, params = cur.calls[0]
+        self.assertIn("flag_reason = NULL", sql)
+        # NULL 直接进 SQL 文本,不占参数位——多塞一个占位符会让参数错位。
+        self.assertEqual(params, ("ok", "t-1", "i-1"))
+
+    def test_explicit_value_wins_over_clear_flag(self):
+        cur = FakeCursor()
+        store.update_item(
+            cur, tenant_id="t-1", item_id="i-1", flag_reason="ocr_error:x", clear_flag_reason=True
+        )
+        sql, params = cur.calls[0]
+        self.assertIn("flag_reason = %s", sql)
+        self.assertNotIn("flag_reason = NULL", sql)
+        self.assertEqual(params, ("ocr_error:x", "t-1", "i-1"))
+
+    def test_clear_flag_alone_still_issues_update(self):
+        cur = FakeCursor()
+        store.update_item(cur, tenant_id="t-1", item_id="i-1", clear_flag_reason=True)
+        self.assertEqual(len(cur.calls), 1)
+        self.assertIn("flag_reason = NULL", cur.calls[0][0])

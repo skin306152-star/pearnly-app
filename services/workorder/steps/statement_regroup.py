@@ -52,7 +52,7 @@ class Collector:
                     item_id=record.item["id"],
                     kind=kinds.BANK_STATEMENT,
                     status="ok",
-                    flag_reason=None,
+                    clear_flag_reason=True,
                 )
                 ctx.store.append_event(
                     ctx.cur,

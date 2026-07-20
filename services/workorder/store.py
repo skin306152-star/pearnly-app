@@ -365,10 +365,12 @@ def update_item(
     kind: Optional[str] = None,
     flag_reason: Optional[str] = None,
     ocr_history_id: Optional[str] = None,
+    clear_flag_reason: bool = False,
 ) -> None:
     """sort/classify 步用:定堆(kind)/判结论(status)/记原因(flag_reason)/回填识别台账
     (ocr_history_id · 件 1)。省略的字段不动——ocr_history_id 缺省 None 即不写,存量 NULL
-    不被清跑覆盖(只向前)。"""
+    不被清跑覆盖(只向前)。抹掉旧 flag_reason 要显式传 clear_flag_reason=True——「None=
+    省略」这条规矩让 flag_reason=None 等于没传(statement_regroup 曾据此漏清,残留脏值)。"""
     set_clause, params = [], []
     for col, val in (
         ("status", status),
@@ -379,6 +381,8 @@ def update_item(
         if val is not None:
             set_clause.append(f"{col} = %s")
             params.append(val)
+    if clear_flag_reason and flag_reason is None:
+        set_clause.append("flag_reason = NULL")
     if not set_clause:
         return
     set_clause.append("updated_at = now()")

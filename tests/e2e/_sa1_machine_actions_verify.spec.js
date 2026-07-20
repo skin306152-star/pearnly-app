@@ -10,7 +10,7 @@
 // 覆盖:① 面板可见且金边竖条生效(getComputedStyle)② 改判行文件名/kind/依据齐全
 //      ③ 银行行改金额与改方向分别计数 ④ 无改动时面板整个不出现(四态诚实)⑤ 四语不裸 key
 // 截图存 tests/e2e/_artifacts/sa1/。
-/* global window */
+/* global window, document */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const localServer = require('./_local_static_server');

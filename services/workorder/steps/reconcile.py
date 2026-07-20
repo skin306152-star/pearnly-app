@@ -23,7 +23,6 @@ from core import feature_flags
 from services.workorder import corrections, decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import reconcile_bank
-from services.workorder.steps import reconcile_decisions
 from services.workorder.steps import reconcile_gates as gates
 
 _EVT_CLASSIFIED = "item_classified"
@@ -44,7 +43,8 @@ def run(ctx: StepContext) -> StepResult:
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
     classified = _replay_money(events)
-    decisions_by_item = reconcile_decisions.replay(events)
+    decision_recs = decisions.replay_records(events)
+    decisions_by_item = {iid: rec["payload"] for iid, rec in decision_recs.items()}
 
     # R1 进项税。除已归堆的进项票外,还收编「方向不明」票:它们钱已 OCR 出来,只是进/销没判准,
     # 必须靠人工 assign_kind 裁决归位(裁进项才入 Σ),无裁决 → 与「flagged 无裁决」同等停机点名。
@@ -65,7 +65,7 @@ def run(ctx: StepContext) -> StepResult:
     if r1["unresolved"]:
         return StepResult.stuck(r1["unresolved"])
 
-    banks = [it for it in items if reconcile_decisions.kind_of(it, decisions_by_item) == _BANK]
+    banks = [it for it in items if decisions.kind_of(it, decision_recs) == _BANK]
     reads = _replay_sales_reads(events) or dict(ctx.data.get("sales_summary_reads") or {})
     if not reads:
         if banks:
@@ -423,7 +423,7 @@ def _default_shadow_push_report(ctx: StepContext) -> tuple:
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
     classified = _replay_money(events)
-    decisions_by_item = reconcile_decisions.replay(events)
+    decisions_by_item = {i: r["payload"] for i, r in decisions.replay_records(events).items()}
 
     expected: list[str] = []
     seen: set[str] = set()

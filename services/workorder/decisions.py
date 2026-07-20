@@ -1,15 +1,23 @@
 # -*- coding: utf-8 -*-
-"""工单裁决通道的唯一词汇表(纯常量叶子模块 · 2026-07-10 simplify 收敛)。
+"""工单裁决词汇表 + 人工裁决合并回放语义(纯叶子模块 · 2026-07-10 simplify 收敛)。
 
 裁决动词 / 方向裁定 kind /「不计入合计」语义集 / 方向不明 flag_reason 前缀——此前散在
 api.py、reconcile_gates.py、conservation.py、evidence.py 里各自重声明,注释都写「与另一处
 同一张表」,但那张表并不存在(改一处极易漏改另一处)。收敛到此成真·单一事实源。
+
+human_decision 的合并回放(replay_records / kind_of)也收在此:方向槽(assign_kind 携带的 kind)
+与金额槽(recalc / face_value / exclude / waive)并存于同一记录,同一件先裁方向再补金额(或反之)
+不再互相顶掉。此前 reconcile / conservation / evidence / freeze / recon 各处各写一份 latest-wins
+单槽回放,recalc-last 丢方向、assign-last 丢改数,酿成「R1 放行、守恒闸压回 PENDING」半死锁——
+回放语义在此与词汇同源,消费方一律取用,不再各判一套。
 
 零依赖:不 import 任何本包模块,避免循环导入。api/reconcile_gates/conservation/... 都从这里
 取词,本模块绝不反向依赖它们。static/ai/ai-review-queue.js 无法 import,前缀数组旁有同步注释。
 """
 
 from __future__ import annotations
+
+EVT_DECISION = "human_decision"
 
 # 裁决动词。金额裁决 face_value/recalc/exclude(W3 的 A/E/X)+ 方向票 assign_kind + 豁免 waive。
 FACE_VALUE = "face_value"  # 采信票面 OCR 读数
@@ -49,3 +57,44 @@ DIRECTION_PREFIXES = (DIRECTION_AMBIGUOUS, SALES_DIRECTION_UNHANDLED)
 # 刻意不进 DIRECTION_PREFIXES:它是「机器已判本方销项」而非「方向不明」,reconcile R1 不把它
 # 当 unresolved 停机(佐证聚合不阻断出税),人工仍可 assign_kind 改判(客户拍错票的兜底)。
 SALES_DOC_REVIEW = "sales_doc_review"
+
+
+def replay_records(events: list[dict]) -> dict:
+    """按 item_id 合并回放 human_decision → {item_id: {"event_id", "payload", "actor", "at"}}。
+
+    payload 为合并槽(方向 kind 与金额 decision/values 并存):assign_kind 只写 kind 槽——此前若整
+    记录是 NON_COUNTING(剔除/豁免)则作废重来(改主意重新定向);其余动词 update 金额槽,kind 槽
+    保留。event_id/actor/at 取该 item 最新一条贡献事件的元数据。wrapper 形状对齐
+    evidence.replay_items_by_type:消费方读 rec["payload"] 即拿合并 payload,读法零改动。
+    """
+    out: dict = {}
+    for e in events:
+        if e.get("event_type") != EVT_DECISION:
+            continue
+        p = e.get("payload") or {}
+        iid = p.get("item_id")
+        if not iid:
+            continue
+        prev = out.get(iid)
+        payload = dict(prev["payload"]) if prev else {}
+        if p.get("decision") == ASSIGN_KIND:
+            if payload.get("decision") in NON_COUNTING:
+                payload = {}  # 豁免/剔除后又改判方向=改主意,旧的不计入裁决作废
+            payload["kind"] = p.get("kind")
+            payload.setdefault("decision", ASSIGN_KIND)
+        else:
+            payload.update({k: v for k, v in p.items() if k != "item_id"})
+        out[iid] = {
+            "event_id": e.get("id"),
+            "payload": payload,
+            "actor": e.get("actor"),
+            "at": e.get("created_at"),
+        }
+    return out
+
+
+def kind_of(item: dict, records: dict) -> str:
+    """人工方向裁决压过分类 kind,不回写 item 行(kind 槽独立于金额裁决)。records 为
+    replay_records 的 wrapper 输出;无裁定方向则回落 item 自身 kind。"""
+    payload = (records.get(item["id"]) or {}).get("payload") or {}
+    return payload.get("kind") or item["kind"]

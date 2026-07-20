@@ -267,11 +267,11 @@
             esc(at('vatcheck_col_buyer')) +
             '</th><th>' +
             esc(at('vatcheck_col_tax_id')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('vatcheck_col_count')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('vatcheck_col_net')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('vatcheck_col_vat')) +
             '</th></tr></thead><tbody>' +
             buyers.map(buyerRowHtml).join('') +

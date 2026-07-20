@@ -123,6 +123,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 钱数列表头随数据右对齐(td.num 靠右而表头默认靠左=「表头与内容对不齐」,GC-E-1) */
+.mx-table thead th.num {
+  text-align: right;
+}
 .mx-table td {
   padding: 9px 10px;
   border-bottom: 1px solid var(--hair);

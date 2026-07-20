@@ -117,7 +117,8 @@
 .sdw-table tbody tr:last-child td {
   border-bottom: none;
 }
-.sdw-table td.num {
+.sdw-table td.num,
+.sdw-table th.num {
   text-align: right;
 }
 

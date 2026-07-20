@@ -150,7 +150,7 @@
             esc(at('shadow_col_dircr')) +
             '</th><th>' +
             esc(at('shadow_col_account')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_amount')) +
             '</th><th>' +
             esc(at('shadow_col_note')) +
@@ -200,11 +200,11 @@
                   esc(at('shadow_col_code')) +
                   '</th><th>' +
                   esc(at('shadow_col_name')) +
-                  '</th><th>' +
+                  '</th><th class="num">' +
                   esc(at('shadow_col_debit')) +
-                  '</th><th>' +
+                  '</th><th class="num">' +
                   esc(at('shadow_col_credit')) +
-                  '</th><th>' +
+                  '</th><th class="num">' +
                   esc(at('shadow_col_balance')) +
                   '</th></tr></thead><tbody>' +
                   accounts.map(accountRowHtml).join('') +
@@ -244,17 +244,17 @@
             '<div class="sdw-scroll"><table class="sdw-table"><thead><tr>' +
             '<th>' +
             esc(at('shadow_col_account')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_shadow_debit')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_shadow_credit')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_gl_debit')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_gl_credit')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_debit_diff')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_credit_diff')) +
             '</th></tr></thead><tbody>' +
             rows.map(glMismatchRowHtml).join('') +
@@ -283,9 +283,9 @@
             '<div class="sdw-scroll"><table class="sdw-table"><thead><tr>' +
             '<th>' +
             esc(at('shadow_col_account')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_shadow_debit')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_shadow_credit')) +
             '</th></tr></thead><tbody>' +
             rows.map(glGapRowHtml).join('') +

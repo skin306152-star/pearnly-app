@@ -123,7 +123,7 @@
             '<div class="mx-scroll"><table class="mx-table"><thead><tr>' +
             '<th>' +
             esc(at('shadow_col_name')) +
-            '</th><th>' +
+            '</th><th class="num">' +
             esc(at('shadow_col_amount')) +
             '</th></tr></thead><tbody>' +
             rows.map(acctRowHtml).join('') +
@@ -219,9 +219,9 @@
                 : '<div class="mx-scroll"><table class="mx-table"><thead><tr>' +
                   '<th>' +
                   esc(at('shadow_col_name')) +
-                  '</th><th>' +
+                  '</th><th class="num">' +
                   esc(at('shadow_col_debit')) +
-                  '</th><th>' +
+                  '</th><th class="num">' +
                   esc(at('shadow_col_credit')) +
                   '</th></tr></thead><tbody>' +
                   rows.map(tbRowHtml).join('') +

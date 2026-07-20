@@ -250,14 +250,12 @@ def read_page(
     invoice = ThaiInvoice(is_not_invoice=True)
     document = None
     warnings: List[str] = []
-    gate_notes: List[str] = []
     if document_type in ("auto", "invoice"):
         try:
             invoice = ThaiInvoice(**outcome.data)
         except ValidationError as e:
             raise DirectReadFallback(f"page {page_number}: invoice schema: {e}") from e
-        gate_notes = _invoice_hard_gates(invoice, page_number)
-        warnings.extend(gate_notes)
+        warnings.extend(_invoice_hard_gates(invoice, page_number))
         warnings.extend(_invoice_soft_flags(invoice))
     else:
         try:
@@ -271,9 +269,10 @@ def read_page(
     force_review = False
 
     # 折扣回填 = 系统替票面补了一行没读到的折扣,补完硬闸(_check_amount_math + sanity)
-    # 自动放行。改写可以自动,消警必须留人 —— 与 Vision 路 page_runner 同一条口径,
-    # 两链不劈叉。降 0.05 置信压不到 needs_review,必须显式 force。
-    if any(str(n).startswith(DISCOUNT_INFERRED_PREFIX) for n in gate_notes):
+    # 自动放行。改写可以自动,消警必须留人 —— 与 Vision 路 page_runner 同口径:留痕落进
+    # warnings,留人从该列表派生(soft_flags/GL 补漏都不带此前缀,扫 warnings 与扫硬闸结果
+    # 等价)。降 0.05 置信压不到 needs_review,必须显式 force。
+    if any(str(w).startswith(DISCOUNT_INFERRED_PREFIX) for w in warnings):
         force_review = True
 
     # 贷记单方向性单据强制人工(两链共判 · sanity.credit_note_review_reason)

@@ -30,7 +30,12 @@ from .layer3_fallback import (
     refine_page as _l3_refine_page,
 )
 from .pattern_memory import InvoicePatternMemory
-from .sanity import credit_note_review_reason, evaluate_sanity, infer_missing_discount
+from .sanity import (
+    DISCOUNT_INFERRED_PREFIX,
+    credit_note_review_reason,
+    evaluate_sanity,
+    infer_missing_discount,
+)
 from .schemas import BusinessDocumentType, Page, PipelinePageResult
 from .triggers import (
     _aggregate_page_confidence,
@@ -192,20 +197,19 @@ def _process_one_page(
     elif document_type in ("auto", "invoice"):
         validation_warnings.extend(validate_invoice(l2_invoice, l1_page))
 
-    def _repair_discount(inv) -> bool:
+    def _repair_discount(inv) -> None:
         """折扣确定性反推(f003 实案):L2 后修平免白跑 L3,L3 换了新 invoice 再兜一次。
 
         回填 = 系统替票面补了一行没读到的折扣,补完 _check_amount_math 自动通过、
         triggers 由响转静(实测回填前 ['amount math fail...'] → 回填后 [])。改写可以
-        自动,消警不行:调用方据返回值强制留人,否则这道闸是被系统自造的自洽消掉的。"""
+        自动,消警不行:留痕落进 validation_warnings,留人由下方硬闸后统一从该列表派生
+        (与 direct_read 同口径),否则这道闸是被系统自造的自洽消掉的。"""
         if document_type in ("auto", "invoice") and not inv.is_not_invoice:
             note = infer_missing_discount(inv)
             if note:
                 validation_warnings.append(note)
-                return True
-        return False
 
-    discount_inferred = _repair_discount(l2_invoice)
+    _repair_discount(l2_invoice)
 
     # --- Trigger evaluation (invoice path only — non-invoice docs use validators) ---
     # triggers gate the slow L3 visual re-read; soft_flags only lower confidence
@@ -418,7 +422,7 @@ def _process_one_page(
 
     # L3/image-first 换了新 invoice 的话,对最终结果再反推一次折扣(视觉复读同样可能漏抓)。
     if invoice is not l2_invoice:
-        discount_inferred = _repair_discount(invoice) or discount_inferred
+        _repair_discount(invoice)
 
     # 合理性硬闸(2026-06-29 · sanity.evaluate_sanity):对【最终】invoice 查结构上不可能的错
     # (负数/卖买税号相同/总额<单行/缺VAT勾稽不平)。命中 → 强制转人工,绝不静默 auto。
@@ -433,9 +437,9 @@ def _process_one_page(
             validation_warnings.append(cn_reason)
             needs_manual_review = True
 
-    # 折扣回填改的是票面钱字段,且改完上面这些闸全部放行。留人放在硬闸之后:
+    # 折扣回填改的是票面钱字段,且改完上面这些闸全部放行。留人放在硬闸之后,从留痕列表派生:
     # 无论 sanity 判没判出别的问题,被系统改写过的票都不许无人确认地过。
-    if discount_inferred:
+    if any(str(w).startswith(DISCOUNT_INFERRED_PREFIX) for w in validation_warnings):
         needs_manual_review = True
 
     # Record final invoice pattern in pattern memory (after possible L3

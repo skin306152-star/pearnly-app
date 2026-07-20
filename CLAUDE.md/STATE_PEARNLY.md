@@ -1,6 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-07-19 · Pearnly AI · SM 2569-05 真人重跑暂停交接)
+## 当前状态卡(2026-07-20 · Pearnly AI · GC-D 全队列收官上线 + /simplify 收口 · 冰厂实测备料中)
+
+- **当前 task**:GC-D(P0-0/P0-1/D2-D6)全部上线 CI 绿、prod 已部署 `cd678e43`;Zihao 在拍冰厂(Sincere Ice·税号 0105546015062)2569-05 原始料,拍完起第二客户实测。
+- **本批上线**(`01ba1c51..cd678e43` 15 commit):①P0-0 裁决合并回放下沉 `decisions.replay_records`,8 消费方归一(交接单只点名 5 处,侦察穷尽出 8)+ `terminal_of` 终态仲裁单源;②P0-1 签批投影 `sod.signoff_projection`(actor/at/stale,复核后重跑=stale 诚实提示一键重签)接进 order_detail+review_feed,前端从投影点亮;③D2 银行断链换眼重读(真相=Vision 行切割吞折行而非 economy 模型;多页 PDF 走 legacy 整份读;修法=断链触发逐页直读、4 路并发、严格变好才采纳、`OCR_BANK_CHAIN_REREAD=0` 急停);④D3 `OcrRequest.policy_task` 落 contracts(策略域与 handler 路由两概念拆开,银行窄读 economy 档生效);⑤D4 缺料键人话化/D5 对账空态文案诚实化;⑥D6 brain quota 退避不计熔断+复用 run_leases 跨进程互斥+失败落事件+recovery tick 自动收尾(封顶 3 次)+partial index。
+- **验证**:全量单测 9558 绿;真浏览器 e2e 32 例四剧本(_jb/_m13key/_mc1b2/_gcd45)+截图;签批投影拿 prod 1537 条真事件回放=stale:true 正中;partial index prod EXPLAIN 双路 Index Only Scan;CI 终 run 29716225954 绿。
+- **生产动作待 Zihao**:工单 bd093ba9 仍 review——UI 现在会亮出他 7/19 的复核记录+「请再次复核」提示,重签「复核通过」→点「签批冻结」即归档(P0-1 修复的终点)。
+- **冰厂实测备料口径(已交待)**:按「申报月的段」拍不按票面日期(4 月票盖 ถือเป็นภาษีซื้อ 5/2569 章的必拍);ภ.พ.30/รายงานภาษีซื้อ-ขาย/付款汇总底稿=答案纸,单独拍进「金标-勿上传」夹(行级对账用);贴页小票整页一拍。6 月料在 3/4 或 4/4 册。
+- **记债**:D2 真多页断链 PDF 真跑未验(冰厂实测/SM 2569-06 自然覆盖,重读不进 ฿150 成本台账);GC-D-7 真人旅程(分组确认→采纳→签批)与实测合并做;run_leases scope 参数化+signoff_projection 挪 evidence(顺手时);GC-E 账簿二期另开批。
+- **仓库**:5 个 wip 分支已合入并删(远端+本地);施工 worktree 已清;共享树 DMS 窗 UI_LINT_REPORT.txt 未碰;未 push=0。
+- **换窗入口**:本卡 + `docs/agent/HANDOFF-2026-07-19-NIGHT-SM-CLOSEOUT.md`(GC-E/方向队列仍有效)+ 记忆 [[gcd-0720-full-queue-shipped]]。
+
+<details><summary>上一状态卡(2026-07-19 · Pearnly AI · SM 2569-05 真人重跑暂停交接)</summary>
+
+## 上一状态卡(2026-07-19 · Pearnly AI · SM 2569-05 真人重跑暂停交接)
 
 - **当前 task**:今天停跑；先修登录隔离与银行销项推断，再清客户 106 / 2569-05 从 A 堆 104 件资料重跑。现在不要继续点“重跑”，也不要人工填金标答案。
 - **生产真值**:工单 `78a34417-ab0b-4c78-b64f-c86c49d9e1ed`=`stuck/reconcile`；18/18 银行件、734 笔、29 非销售、705 待定；人工待判 0；唯一 `needs=["sales_summary"]`；交付包 0；运行锁 0。
@@ -14,6 +27,8 @@
 - **详细交接**:`docs/agent/HANDOFF-2026-07-19-PEARNLY-AI-SM-LIVE-RUN.md`。
 - **收口**:`/simplify` 已审；无未提交 AI 源码，不在收尾时临补高敏 auth/银行路径；共享 DMS/UI 脏树未碰。
 - **仓库**:交接提交 `6082217f` 已 push；CI run `29657691641` 全绿（含全量单测/构建/生产 E2E）；本批次未 push=0。
+
+</details>
 
 <details><summary>上一状态卡(2026-07-18 · Pearnly AI · SM 5月真人旅程 SA-3 收口)</summary>
 

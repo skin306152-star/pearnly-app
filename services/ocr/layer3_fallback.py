@@ -180,6 +180,21 @@ CRITICAL RULES (same as previous extraction; pay attention):
 """
 
 
+# 抗锚定:L3 的定位是"看图复核",但把 Vision 全文 + 上一轮 JSON 一起摆进 prompt 后,
+# 未被 trigger 点名的字段会被整段照抄 —— 2026-07-20 实测,佛历年 2569 被 Vision 读成
+# 2559 时,L3 只修了被点名的金额,日期 0/4 沿用错值;补上本段后同样输入 4/4 读对,
+# 金额不受影响。不点名具体字段,只把"图是唯一真相"从隐含期待写成显式规则。
+_INDEPENDENT_REREAD = (
+    "INDEPENDENT RE-READ (this overrides any habit of copying):\n"
+    "The OCR TEXT and PREVIOUS JSON show what an EARLIER pass produced. They are evidence of\n"
+    "what may be WRONG, never a source of truth. For EVERY field you output, read the characters\n"
+    "off the IMAGE yourself. Where the image and the OCR TEXT disagree, the IMAGE WINS.\n"
+    "Single-stroke digit confusions (5/6, 3/8, 0/9, 1/7) are the most common OCR failure and they\n"
+    "do NOT look wrong in the text — the Buddhist-era year is the highest-risk field: read its four\n"
+    "digits one by one off the image before writing date_raw."
+)
+
+
 def _build_user_prompt(
     layer1_text: str, layer2_invoice: ThaiInvoice, trigger_reasons: List[str]
 ) -> str:
@@ -207,6 +222,7 @@ def _build_user_prompt(
         "=== PREVIOUS JSON ===\n"
         f"{prev_json_str}\n"
         "=== END PREVIOUS JSON ===\n\n"
+        f"{_INDEPENDENT_REREAD}\n\n"
         "Now look at the IMAGE and output the CORRECTED JSON only."
     )
 

@@ -143,31 +143,27 @@ def run_pipeline_for_file(
 ):
     """通用发票管线 facade → controller(始终走 handlers/invoice.py,返回 PipelineResult)。
 
-    task 只定引擎策略档的生效域(overrides_by_task/资费档按此 task 解析),不换 handler:
-    银行窄读传 task="bank_statement" 才能让 prod 的 overrides_by_task.bank_statement 落到位
-    (否则恒按 invoice 档,配置形同虚设),而产物仍是发票管线的 PipelineResult——调用方
-    (stmt_totals 等)据此取 pages。合法值见 contracts.OCR_TASKS。engine_context 可重入:
-    外层按此 task 定档,controller 内层同名进入原样透传,不二次覆写。
+    task 只定引擎策略档的生效域(policy_task,overrides_by_task/资费档按它解析),不换 handler:
+    银行窄读传 task="bank_statement" 让 prod 的 overrides_by_task.bank_statement 落到位(否则恒按
+    invoice 档,配置形同虚设),而产物仍是发票管线的 PipelineResult——调用方(stmt_totals 等)据此
+    取 pages。handler 恒 invoice;task(含非法值)的合法性由 controller 一处校验,调用方零改。
     """
     from services.ocr import controller
-    from services.ocr.contracts import OCR_TASKS, OcrRequest
-    from services.ocr.engine_policy import engine_context
+    from services.ocr.contracts import OcrRequest
 
-    if task not in OCR_TASKS:
-        raise ValueError(f"unknown OCR task: {task!r}")
-    with engine_context(task, plan_code=plan_code, is_exempt=is_exempt):
-        return controller.run(
-            OcrRequest(
-                task="invoice",
-                file_bytes=file_bytes,
-                filename=filename,
-                api_key=api_key,
-                plan_code=plan_code,
-                is_exempt=is_exempt,
-                user_type=user_type,
-                options={"max_pages": max_pages, "document_type": document_type},
-            )
-        ).data
+    return controller.run(
+        OcrRequest(
+            task="invoice",
+            policy_task=task,
+            file_bytes=file_bytes,
+            filename=filename,
+            api_key=api_key,
+            plan_code=plan_code,
+            is_exempt=is_exempt,
+            user_type=user_type,
+            options={"max_pages": max_pages, "document_type": document_type},
+        )
+    ).data
 
 
 def all_pages_not_invoice(pages: list) -> bool:

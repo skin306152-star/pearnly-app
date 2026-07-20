@@ -18,11 +18,17 @@ OCR_TASKS: Tuple[str, ...] = ("invoice", "id_card", "bank_statement", "gl_ledger
 @dataclass(frozen=True)
 class OcrRequest:
     """一次 OCR 任务的全部输入。options 装 task 专属参数
-    (invoice: max_pages · gl_ledger: account_code),不往签名里加一次性字段。"""
+    (invoice: max_pages · gl_ledger: account_code),不往签名里加一次性字段。
+
+    task 与 policy_task 是两个正交概念:task 定 handler 路由(走哪个 handlers/*.py),
+    policy_task 定引擎策略档的生效域(overrides_by_task/资费档按它解析)。银行窄读复用发票
+    handler(task=invoice)却要按银行档解析(policy_task=bank_statement),两者才拆开。
+    policy_task=None → 跟 task(绝大多数入口两者同值,不必显式传)。"""
 
     task: str
     file_bytes: bytes
     filename: str
+    policy_task: Optional[str] = None
     api_key: Optional[str] = None
     tenant_id: Optional[str] = None
     plan_code: Optional[str] = None

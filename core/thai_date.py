@@ -14,6 +14,7 @@ to_char(doc_date,'YYYY-MM') 算,存佛历串会让跨月筛选、排序、账期
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Optional
 
 BUDDHIST_ERA_OFFSET = 543
@@ -33,6 +34,20 @@ def looks_buddhist(year: int) -> bool:
 def to_gregorian_year(year: int) -> int:
     """佛历年 → 公历年;已是公历则原样返回。"""
     return year - BUDDHIST_ERA_OFFSET if looks_buddhist(year) else year
+
+
+def two_digit_year_to_gregorian(yy: int, anchor_year: Optional[int] = None) -> int:
+    """两位年 → 公历年,取离锚点最近的解读。
+
+    泰国票据的两位年有歧义:`69` 可能是公历 2069,也可能是佛历 2569 的缩写(=2026)。
+    实务里近期单据占绝大多数,所以按"离锚点最近"消歧;锚点通常取该单据所属账期,
+    缺省用今年。1957+yy 即 2500+yy-543。
+
+    仓库里此前有四套互斥判据(一律佛历 / yy<70 当公历 / yy>=43 才当佛历 / 取最近),
+    同一个 `69` 能解出 2026 或 2069 —— 后者还能通过 2000..2099 的窗校验落库。
+    """
+    anchor = anchor_year or date.today().year
+    return min((2000 + yy, 1957 + yy), key=lambda y: abs(anchor - y))
 
 
 def buddhist_year_of(value: object) -> Optional[int]:

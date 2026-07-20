@@ -10,6 +10,8 @@ import re
 from datetime import date
 from typing import Optional, Tuple
 
+from core import thai_date
+
 
 def _looks_like_outflow(desc: str) -> bool:
     """从描述判断是否为出账流水"""
@@ -47,11 +49,20 @@ def _parse_amount(s: Optional[str]) -> Optional[float]:
         return None
 
 
+def _reference_year(reference: Optional[str]) -> Optional[int]:
+    """账期串里的公历年(YYYY-MM-DD / YYYY-MM / YYYY 皆可)· 认不出返 None 用今年兜底。"""
+    m = re.match(r"\s*(\d{4})", str(reference or ""))
+    if not m:
+        return None
+    year = int(m.group(1))
+    return thai_date.to_gregorian_year(year)
+
+
 def _normalize_thai_date(s: str, reference: Optional[str] = None) -> Optional[str]:
     """
     DD/MM/YY 或 DD/MM/YYYY → YYYY-MM-DD
     泰国银行对账单年份经常用佛历(+543)· 自动转公历
-    若年份只有 2 位 · 用 reference 年推断
+    两位年按账期(reference)消歧 —— 泰国对账单的 `69` 是佛历 2569(=2026)而非 2069
     """
     if not s:
         return None
@@ -65,11 +76,11 @@ def _normalize_thai_date(s: str, reference: Optional[str] = None) -> Optional[st
         return None
     # 年份归一化
     if yy < 100:
-        # 2 位 · 推测:> 50 归 19xx,其余归 20xx · 泰国一般都是近期
-        yy = 2000 + yy if yy < 70 else 1900 + yy
-    elif yy > 2400:
-        # 佛历 → 公历
-        yy -= 543
+        # 旧判据 `yy<70 → 2000+yy` 把佛历缩写当公历:69 解成 2069,还能过下面的
+        # 2000..2099 窗校验落库。reference(账期)当年就在参数里却从没被用过。
+        yy = thai_date.two_digit_year_to_gregorian(yy, _reference_year(reference))
+    elif thai_date.looks_buddhist(yy):
+        yy = thai_date.to_gregorian_year(yy)
     # 基本验证
     if not (1 <= mm <= 12 and 1 <= dd <= 31 and 2000 <= yy <= 2099):
         return None

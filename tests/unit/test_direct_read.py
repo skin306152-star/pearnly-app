@@ -56,11 +56,22 @@ class RouteDirectTests(unittest.TestCase):
         self.assertTrue(dr.route_direct(1, "bank_statement"))  # 单页拍照对账单=短表
         self.assertTrue(dr.route_direct(1, "vat_report"))
 
-    def test_long_and_multipage_recon_stay_on_vision(self):
-        self.assertFalse(dr.route_direct(4, "invoice"))  # 长文档
-        self.assertFalse(dr.route_direct(2, "bank_statement"))  # 多页对账件门槛更严
+    def test_multi_page_invoice_batch_goes_direct(self):
+        """多票打包(一份 PDF 装 N 张独立发票)按票走直读,不按页数当长表拦。
+
+        2026-07-20 事故:8 张冰厂销项票打成一份 PDF,被纯页数闸判成长表推去 Vision 路,
+        L1 Vision 把佛历 2569 读成 2559(8/8 全错),而 L2 只吃 L1 文本看不到原图,无从纠正。
+        同批图走直读逐页读 8/8 正确。页数不是崩点判据,文档类型才是。
+        """
+        self.assertTrue(dr.route_direct(4, "invoice"))
+        self.assertTrue(dr.route_direct(8, "invoice"))
+        self.assertTrue(dr.route_direct(dr.MAX_DIRECT_PAGES, "auto"))
+
+    def test_table_docs_and_oversized_stay_on_vision(self):
+        self.assertFalse(dr.route_direct(2, "bank_statement"))  # 多页对账件要跨页续表
         self.assertFalse(dr.route_direct(2, "general_ledger"))
         self.assertFalse(dr.route_direct(29, "bank_statement"))  # TTB 真件案例
+        self.assertFalse(dr.route_direct(dr.MAX_DIRECT_PAGES + 1, "invoice"))
 
     def test_kill_switch(self):
         with mock.patch.dict("os.environ", {"OCR_IMAGE_DIRECT": "0"}):
@@ -252,34 +263,82 @@ class PipelineWiringTests(unittest.TestCase):
         rp.assert_not_called()
         self.assertEqual(res.engine, "pipeline_v1")
 
-    def test_long_pdf_stays_on_vision_path(self):
+    @staticmethod
+    def _blank_pdf(n_pages: int) -> bytes:
         import fitz
 
         doc = fitz.open()
-        for _ in range(4):
+        for _ in range(n_pages):
             doc.new_page(width=200, height=200)
-        pdf_bytes = doc.tobytes()
+        out = doc.tobytes()
         doc.close()
-        with mock.patch.object(dr, "read_page") as rp:
-            with mock.patch.object(
-                pipeline, "_process_pages", return_value=[self._fake_page()]
-            ) as pp:
-                res = pipeline.run_on_pdf_bytes(pdf_bytes, enable_text_path=False)
+        return out
+
+    def test_oversized_pdf_stays_on_vision_path(self):
+        pdf_bytes = self._blank_pdf(4)
+        with mock.patch.object(dr, "MAX_DIRECT_PAGES", 3):
+            with mock.patch.object(dr, "read_page") as rp:
+                with mock.patch.object(
+                    pipeline, "_process_pages", return_value=[self._fake_page()]
+                ) as pp:
+                    res = pipeline.run_on_pdf_bytes(pdf_bytes, enable_text_path=False)
         rp.assert_not_called()
         pp.assert_called_once()
         self.assertEqual(res.engine, "pipeline_v1")
 
     def test_short_scan_pdf_goes_direct(self):
-        import fitz
-
-        doc = fitz.open()
-        doc.new_page(width=200, height=200)
-        pdf_bytes = doc.tobytes()
-        doc.close()
         with mock.patch.object(dr, "read_page", return_value=self._fake_page()) as rp:
-            res = pipeline.run_on_pdf_bytes(pdf_bytes, enable_text_path=False)
+            res = pipeline.run_on_pdf_bytes(self._blank_pdf(1), enable_text_path=False)
         rp.assert_called_once()
         self.assertEqual(res.engine, dr.ENGINE_DIRECT)
+
+    def test_multi_page_invoice_pdf_goes_direct(self):
+        """多票打包的 PDF 走直读——2026-07-20 佛历误读事故的回归闸。"""
+        with mock.patch.object(dr, "read_page", return_value=self._fake_page()) as rp:
+            res = pipeline.run_on_pdf_bytes(self._blank_pdf(8), enable_text_path=False)
+        self.assertEqual(rp.call_count, 8)
+        self.assertEqual(res.engine, dr.ENGINE_DIRECT)
+
+
+class RunFileConcurrencyTests(unittest.TestCase):
+    """多页并发调度:页序必须按 page_number 还原,与串行输出逐项一致。
+
+    串行时 8 页实测 82s(每页 8-13s),用户等不起 —— 放宽多页直读必须同时并发,
+    否则把 Vision 路 14s 的体验换成 80s。
+    """
+
+    @staticmethod
+    def _page(n: int) -> PipelinePageResult:
+        return PipelinePageResult(
+            page_number=n, invoice=ThaiInvoice(**_GOOD_INVOICE), layer_chain=["ID"]
+        )
+
+    def _run(self, n_pages: int, workers: int):
+        import time as _t
+
+        def _slow(image_bytes, page_number, document_type, api_key):
+            # 后面的页先返回 → 逼出乱序完成,验证还原靠 page_number 不靠完成顺序
+            _t.sleep(0.02 * (n_pages - page_number))
+            return self._page(page_number)
+
+        with mock.patch.object(dr, "DIRECT_PAGE_WORKERS", workers):
+            with mock.patch.object(dr, "read_page", side_effect=_slow):
+                return dr.run_file([b"img"] * n_pages, document_type="invoice")
+
+    def test_pages_returned_in_page_order_despite_out_of_order_completion(self):
+        res = self._run(6, workers=4)
+        self.assertEqual([p.page_number for p in res.pages], [1, 2, 3, 4, 5, 6])
+        self.assertEqual(res.page_count, 6)
+        self.assertEqual(res.engine, dr.ENGINE_DIRECT)
+
+    def test_concurrent_and_serial_agree(self):
+        concurrent = [p.page_number for p in self._run(5, workers=4).pages]
+        serial = [p.page_number for p in self._run(5, workers=1).pages]
+        self.assertEqual(concurrent, serial)
+
+    def test_single_page_stays_serial(self):
+        res = self._run(1, workers=4)
+        self.assertEqual([p.page_number for p in res.pages], [1])
 
 
 if __name__ == "__main__":

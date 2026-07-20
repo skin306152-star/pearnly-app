@@ -20,9 +20,11 @@ Vision 路(page_runner)整建制保留,承担两件事:
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
 
 from pydantic import ValidationError
@@ -41,10 +43,15 @@ ENGINE_DIRECT = "image_direct"
 # 回落后走的仍是 pipeline_v1,engine 打上标记 → ocr_cost_log 可直接量回落率
 ENGINE_FALLBACK = "pipeline_v1_id_fb"
 
-# 路由阈值:实测 TTB(368/109 行)坐实长表是 B 唯一崩点;对账件哪怕 2 页也可能几十行,
-# 门槛比普通文档更严。阈值保守 + 回落兜底,判错不丢件。
-MAX_DIRECT_PAGES = int(os.environ.get("OCR_IMAGE_DIRECT_MAX_PAGES", "3"))
+# 路由阈值:崩点是【单页行数】不是页数——run_file 逐页独立调用,每页自带 output 预算
+# (实测发票每页 ~900 tok,远低于上限),多装几页不会顶爆。真正吐几百行的是长表,由
+# _TABLE_DOC_TYPES 单独挡。上限只用来兜住"页数离谱到并发也扛不住"的件,回落兜底不丢件。
+MAX_DIRECT_PAGES = int(os.environ.get("OCR_IMAGE_DIRECT_MAX_PAGES", "20"))
 _TABLE_DOC_TYPES = ("bank_statement", "general_ledger")
+
+# 多页并发 · 与 Vision 路 OCR_PDF_PAGE_WORKERS 同口径(各页独立无跨页依赖)。
+# 串行时 8 页要 82s,用户等不起;Vision 路正是靠并发把 8 页压到 14s。
+DIRECT_PAGE_WORKERS = int(os.environ.get("OCR_IMAGE_DIRECT_WORKERS", "4"))
 
 _TIMEOUT_S = 60
 _MAX_RETRIES = 1
@@ -90,12 +97,16 @@ def enabled() -> bool:
 
 
 def route_direct(page_count: int, document_type: BusinessDocumentType) -> bool:
-    """确定性路由:短文档 → 直读;长表/多页对账件 → Vision 路。"""
-    if page_count > MAX_DIRECT_PAGES:
-        return False
-    if document_type in _TABLE_DOC_TYPES and page_count >= 2:
-        return False
-    return True
+    """确定性路由:长表/多页对账件 → Vision 路;其余 → 直读。
+
+    判据是文档类型不是页数:一份 PDF 装 8 张独立发票,页数虽多但每页各自成篇,逐页直读
+    没有跨页依赖;而对账单/总账哪怕 2 页也要跨页续表(余额链、表头),逐页读会切断上下文。
+    早期按纯页数一刀切,把多票打包的进项/销项批误判成长表推去 Vision 路——那条路 L2 只吃
+    L1 文本看不到原图,Vision 读错就无从纠正(2026-07-20 佛历年 2569→2559 事故)。
+    """
+    if document_type in _TABLE_DOC_TYPES:
+        return page_count < 2
+    return page_count <= MAX_DIRECT_PAGES
 
 
 def _sniff_mime(image_bytes: bytes) -> str:
@@ -337,12 +348,32 @@ def run_file(
     document_type: BusinessDocumentType = "auto",
     api_key: Optional[str] = None,
 ) -> PipelineResult:
-    """整件直读(调用方已过 enabled()+route_direct())。任一页不可信 → 整件回落。"""
+    """整件直读(调用方已过 enabled()+route_direct())。任一页不可信 → 整件回落。
+
+    多页并发:各页独立无跨页依赖(与 Vision 路 _process_pages 同理),按页序还原结果。
+    contextvars 每任务一份独立副本 —— few-shot 注入靠请求级 user/tenant 上下文,
+    不复制则多页 PDF 的工作线程读不到(Context 不可并发重入,不能跨 worker 复用)。
+    """
     t0 = time.time()
-    pages = [
-        read_page(ib, page_number=i, document_type=document_type, api_key=api_key)
-        for i, ib in enumerate(page_image_bytes_list, start=1)
-    ]
+
+    def _run_page(index: int, image_bytes: bytes) -> PipelinePageResult:
+        return read_page(
+            image_bytes, page_number=index, document_type=document_type, api_key=api_key
+        )
+
+    n_pages = len(page_image_bytes_list)
+    if n_pages > 1 and DIRECT_PAGE_WORKERS > 1:
+        by_page: dict = {}
+        with ThreadPoolExecutor(max_workers=min(DIRECT_PAGE_WORKERS, n_pages)) as ex:
+            futs = {
+                ex.submit(contextvars.copy_context().run, _run_page, i, ib): i
+                for i, ib in enumerate(page_image_bytes_list, start=1)
+            }
+            for fut in as_completed(futs):
+                by_page[futs[fut]] = fut.result()
+        pages = [by_page[i] for i in range(1, n_pages + 1)]
+    else:
+        pages = [_run_page(i, ib) for i, ib in enumerate(page_image_bytes_list, start=1)]
     return PipelineResult(
         pages=pages,
         page_count=len(pages),

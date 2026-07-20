@@ -18,12 +18,11 @@ from typing import Optional
 from core import feature_flags
 from services.ai_gateway import attribution
 from services.ocr import escalation_budget
-from services.ocr.sanity import DISCOUNT_INFERRED_PREFIX
-from services.ocr.totals_rescue import TOTALS_RESCUED_PREFIX
 from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
-from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_reuse
-from services.workorder.steps import ocr_snapshots, purchase_dedup, statement_regroup, taxid_alert
+from services.workorder.steps import checkpoint, gate_reason, ocr_cost_cap, ocr_ledger, ocr_quota
+from services.workorder.steps import ocr_reuse, ocr_snapshots, purchase_dedup, statement_regroup
+from services.workorder.steps import taxid_alert
 from services.workorder.steps import sort as sort_step
 from services.workorder.steps import summary_read
 from services.workspace import client_alias_store
@@ -33,6 +32,10 @@ _QUOTA_FLAG = "ocr_error:quota"
 
 # 工单 OCR 成本归因 task(落 ai_usage,与主站散单 OCR 台账分得开,见 C-1 §5)。
 _OCR_TASK = "workorder_classify"
+
+# OCR 闸报警 → flag_reason 的政策抽到 gate_reason(每加一类机器改写都要动那张表,与本
+# 文件「取 OCR/归堆/去重」的编排变化理由不同)。
+_gate_reason = gate_reason.of
 
 
 def _ocr_concurrency() -> int:
@@ -45,11 +48,6 @@ def _ocr_concurrency() -> int:
         return max(1, int(os.environ.get("PEARNLY_WORKORDER_OCR_CONCURRENCY", "5")))
     except ValueError:
         return 5
-
-
-# 校验警告文本命中这些关键词才归为「金额算不平」而非泛化的低置信——sanity.py 的
-# 硬闸消息(小计/VAT/行和/折扣勾稽)都落在这个词表里,命中即 amount_math_fail。
-_MATH_HINTS = ("小计", "总额", "行和", "vat", "折", "mismatch", "不平", "误读")
 
 
 def run(ctx: StepContext) -> StepResult:
@@ -376,30 +374,6 @@ def _classify_summary(item: dict) -> tuple:
     if not parsed.get("rows"):
         return None, f"summary_{parsed.get('reason') or 'unparseable'}"
     return parsed, None
-
-
-def _gate_reason(fields: dict) -> Optional[str]:
-    """OCR 确定性闸/勾稽闸报警 → 具体原因,绝不静默放过(金标 IMG_2647 靠这条)。"""
-    warnings = fields.get("_validation_warnings") or []
-    if warnings:
-        # 系统按勾稽差额替票面补了一行没读到的折扣 → 票面现在是自洽的,与「票面自身对不上」
-        # 是两回事。此前靠回填文案里的「折」字撞进 _MATH_HINTS 才被拦下,人看到「数字不
-        # 自洽」去核对却发现三个数明明平 —— 标签必须自己站出来,不能借别人的关键词。
-        if any(str(w).startswith(DISCOUNT_INFERRED_PREFIX) for w in warnings):
-            return "discount_inferred"
-        # 钱数是第二个模型重读出来的:不是「这张票的数对不上」,而是「这批数字换过一双
-        # 眼睛」。前置于 _MATH_HINTS —— 留痕文本里带着 subtotal/vat 的新旧值,撞词表会被
-        # 误标成票面自身勾稽失败。
-        if any(str(w).startswith(TOTALS_RESCUED_PREFIX) for w in warnings):
-            return "totals_rescued"
-        text = " ".join(str(w) for w in warnings).lower()
-        if any(hint in text for hint in _MATH_HINTS):
-            return "amount_math_fail"
-        return "ocr_validation_warning"
-    if fields.get("_needs_review"):
-        band = fields.get("_confidence_band") or "needs_review"
-        return f"ocr_low_confidence:{band}"
-    return None
 
 
 def _resolve_client_field(ctx: StepContext, column: str) -> Optional[str]:

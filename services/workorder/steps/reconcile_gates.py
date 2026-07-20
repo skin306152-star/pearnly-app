@@ -377,33 +377,22 @@ def counted_purchases(items: list[dict], numbers: dict) -> list[dict]:
     进项税(SM 工单实测底稿 9 行 vs 合计 11 张票)。存量工单的 gates 里没有 counted_items,
     回落旧口径 —— 宁可沿用旧行为,不拿空清单把已交付的底稿洗成空白。
     """
-    counted = ((numbers.get("gates") or {}).get("r1_input_vat") or {}).get("counted_items")
-    if not counted:
+    r1 = (numbers.get("gates") or {}).get("r1_input_vat") or {}
+    if "counted_items" not in r1:  # 存量工单没这个键;R1 真计入 0 张票时该出空底稿,不走回落
         return [it for it in items if it["kind"] == kinds.PURCHASE_INVOICE]
-    ids = set(counted)
+    ids = set(r1["counted_items"])
     return [it for it in items if it["id"] in ids]
 
 
 def direction_items(items: list[dict], decision_recs: dict) -> list[dict]:
-    """走方向裁决通道的件(R1 收编口径)。
-
-    判据此前只认 flag_reason 前缀。kind=unknown 但 flag_reason 是别的码(如 ocr_error:*)的件,
-    人裁了 assign_kind 也进不了 R1——同时守恒闸的 _bucket_of 也因同一个前缀判据把它压回
-    PENDING,于是裁多少次都出不了包。人已经裁过方向的一律收编:钱由 _apply_direction 按裁定
-    kind 取,裁销项/非税照旧不进 Σ。
-
-    生产实测(2026-07-20)全部带方向裁决的 unknown 件 flag_reason 都命中前缀,且不存在
-    flag_reason 命中前缀而 kind≠unknown 的件——本次扩展对存量零行为变化。
-    """
+    """R1 该收编哪些方向票。判据在 decisions.is_direction_channel(与守恒归桶同一份)。"""
     return [
         it
         for it in items
         if it["status"] == "flagged"
-        and (
-            str(it.get("flag_reason") or "").startswith(decisions.DIRECTION_PREFIXES)
-            or (
-                it["kind"] == kinds.UNKNOWN
-                and decisions.kind_of(it, decision_recs) != kinds.UNKNOWN
-            )
-        )
+        and decisions.is_direction_channel(it, _ruled_kind(it, decision_recs))
     ]
+
+
+def _ruled_kind(item: dict, decision_recs: dict) -> str | None:
+    return ((decision_recs.get(item["id"]) or {}).get("payload") or {}).get("kind")

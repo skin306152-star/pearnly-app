@@ -12,15 +12,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Optional
 
+from services.workorder import evidence, storage
 from services.workorder.steps import reconcile_bank
 
 EVT_REGROUPED = "item_regrouped"
-
-# 每件银行流水最多列几行样本。760 行的单子全列等于没列,超限留 truncated 标供前端提示。
-_MAX_SAMPLES = 5
 
 
 def projection(events: list[dict], items: list[dict]) -> list[dict]:
@@ -35,29 +32,21 @@ def regroup_actions(events: list[dict], items: list[dict]) -> list[dict]:
     """料件被引擎改判的痕迹(statement_regroup 落的 item_regrouped)。
 
     改判会清空 flag_reason 并把件置 ok,之后它既不在 flagged 也不在 excluded——不投影就等于
-    从所有清单里凭空消失。"""
-    names = {it["id"]: _name_of(it) for it in items}
-    out = []
-    for e in events:
-        if e["event_type"] != EVT_REGROUPED:
-            continue
-        payload = e.get("payload") or {}
-        item_id = payload.get("item_id")
-        if not item_id:
-            continue
-        out.append(
-            {
-                "type": EVT_REGROUPED,
-                "item_id": item_id,
-                "name": names.get(item_id),
-                "from_kind": payload.get("from_kind"),
-                "to_kind": payload.get("to_kind"),
-                "reason": payload.get("reason"),
-                "actor": e.get("actor"),
-                "at": e.get("created_at"),
-            }
-        )
-    return out
+    从所有清单里凭空消失。回放走 evidence.replay_items_by_type 拿 latest-wins,与其余读侧
+    投影同一份语义:同件重复改判只呈现最后一次,不在清单里出两行。"""
+    names = {it["id"]: _display_name(it) for it in items}
+    replayed = evidence.replay_items_by_type(events, EVT_REGROUPED)
+    return [
+        {
+            "type": EVT_REGROUPED,
+            "item_id": item_id,
+            "name": names.get(item_id),
+            "from_kind": rec["payload"].get("from_kind"),
+            "to_kind": rec["payload"].get("to_kind"),
+            "reason": rec["payload"].get("reason"),
+        }
+        for item_id, rec in replayed.items()
+    ]
 
 
 def bank_row_corrections(events: list[dict]) -> list[dict]:
@@ -65,18 +54,22 @@ def bank_row_corrections(events: list[dict]) -> list[dict]:
 
     金额改写同时把 balance_ok 从 False 翻成 True(bank_stmt_balance._REPAIR_RATIO 内即改),
     该行因此退出所有待核对清单;方向改写决定这笔算不算销售收入
-    (bank_sales_suggest.classify_row 按 withdrawal/deposit 判)。两者都影响销项倒推的基数。"""
+    (bank_sales_suggest.classify_row 按 withdrawal/deposit 判)。两者都影响销项倒推的基数。
+
+    同件多条解析事件取首条,与 reconcile_bank._replay_parsed_banks 的「首件在先」一致——
+    呈现的必须是引擎实际采信的那批行,否则数字对不上人看到的流水。"""
     out = []
+    seen: set = set()
     for e in reconcile_bank.active_bank_parse_events(events):
         payload = e.get("payload") or {}
         item_id = payload.get("item_id")
-        rows = payload.get("rows") or []
-        if not item_id:
+        if not item_id or item_id in seen:
             continue
-        corrected = [
-            r for r in rows if r.get("amount_autocorrected") or r.get("direction_autocorrected")
-        ]
-        if not corrected:
+        seen.add(item_id)
+        rows = payload.get("rows") or []
+        amount_rows = sum(1 for r in rows if r.get("amount_autocorrected"))
+        direction_rows = sum(1 for r in rows if r.get("direction_autocorrected"))
+        if not (amount_rows or direction_rows):
             continue
         out.append(
             {
@@ -84,50 +77,22 @@ def bank_row_corrections(events: list[dict]) -> list[dict]:
                 "item_id": item_id,
                 "name": _source_file_of(rows),
                 "row_count": len(rows),
-                "amount_rows": sum(1 for r in corrected if r.get("amount_autocorrected")),
-                "direction_rows": sum(1 for r in corrected if r.get("direction_autocorrected")),
-                "samples": [_sample(r) for r in corrected[:_MAX_SAMPLES]],
-                "truncated": len(corrected) > _MAX_SAMPLES,
+                "amount_rows": amount_rows,
+                "direction_rows": direction_rows,
             }
         )
     return out
 
 
-def memo_lines(actions: list[dict]) -> list[str]:
-    """交付包备忘的「机器自动改动」节。空列表由调用方按既有 _bullets 约定渲染成"无"。"""
-    lines = []
-    for a in actions:
-        if a["type"] == EVT_REGROUPED:
-            lines.append(
-                f"- {a.get('name') or a['item_id']}: {a.get('from_kind')} → {a.get('to_kind')}"
-                f" (依据 {a.get('reason')})"
-            )
-        else:
-            lines.append(
-                f"- {a.get('name') or a['item_id']}: 改金额 {a['amount_rows']} 行 ·"
-                f" 改方向 {a['direction_rows']} 行 (共 {a['row_count']} 行)"
-            )
-    return lines
-
-
-def _sample(row: dict) -> dict:
-    return {
-        "date": row.get("date"),
-        "description": row.get("description"),
-        "withdrawal": row.get("withdrawal"),
-        "deposit": row.get("deposit"),
-        "amount_autocorrected": bool(row.get("amount_autocorrected")),
-        "direction_autocorrected": bool(row.get("direction_autocorrected")),
-    }
+def _display_name(item: dict) -> Optional[str]:
+    """件的展示名:优先 DB 存的原名,否则从落盘 file_ref 剥掉 uuid 前缀(与 freeze 同一口径,
+    别把 `{uuid}__原名` 这种裸落盘名吐给读侧——剥壳责任不该推给每个前端各写一遍正则)。"""
+    return item.get("original_name") or storage.original_name_of(item.get("file_ref"))
 
 
 def _source_file_of(rows: list[dict]) -> Optional[str]:
     for row in rows:
         name = row.get("source_file")
         if name:
-            return Path(name).name
+            return storage.original_name_of(name)
     return None
-
-
-def _name_of(item: dict) -> str:
-    return item.get("original_name") or Path(item.get("file_ref") or "").name

@@ -76,5 +76,5 @@
     }
 
     root.AI = root.AI || {};
-    root.AI.mactRender = { panelHtml: panelHtml, kindLabel: kindLabel };
+    root.AI.mactRender = { panelHtml: panelHtml };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

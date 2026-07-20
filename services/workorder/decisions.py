@@ -134,3 +134,24 @@ def kind_of(item: dict, records: dict) -> str:
     replay_records 的 wrapper 输出;无裁定方向则回落 item 自身 kind。"""
     payload = (records.get(item["id"]) or {}).get("payload") or {}
     return payload.get("kind") or item["kind"]
+
+
+# items.kind 的「未定堆」值。与 kinds.UNKNOWN 同值——本模块守零依赖(见模块头),照 assign_kind
+# 那几个 kind 常量的先例在此复制,不 import kinds。
+_UNKNOWN_KIND = "unknown"
+
+
+def is_direction_channel(item: dict, ruled_kind: str | None) -> bool:
+    """这件走不走方向裁决通道 —— R1 收编(reconcile_gates.direction_items)与守恒归桶
+    (conservation._bucket_of)共用这一份判据。
+
+    两个分支管不相交的两类件:前缀命中 = 机器判了方向不明、人还没裁(必须进通道才会被
+    _apply_direction 点名 unresolved,否则 R1 静默少算);ruled_kind 在场 = 人已裁过,
+    不管机器当初为什么 flag(ocr_error:* 这类也算)。
+
+    此前两处各写一份、靠 docstring 里一句「与对方同口径」维系同步,不同步一次的后果就是
+    「人裁了 → R1 不收编 → 守恒闸压回待裁决 → 裁多少次都出不了包」。判据只留这一处。
+    """
+    if item.get("kind") != _UNKNOWN_KIND:
+        return False
+    return bool(ruled_kind) or str(item.get("flag_reason") or "").startswith(DIRECTION_PREFIXES)

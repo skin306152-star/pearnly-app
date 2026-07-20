@@ -76,15 +76,6 @@ class Conservation:
         return not self.pending and self.total == n
 
 
-def _is_direction(kind: str, flag_reason: str, ruled_kind: str | None = None) -> bool:
-    """走方向通道的件。前缀判据之外还认「人已裁过方向」:kind=unknown 但 flag_reason 是别的码
-    (如 ocr_error:*)的件,裁了 assign_kind 仍不命中前缀 → 落 fail-closed 的 PENDING,而 R1 那边
-    同样因前缀判据不收编它 —— 裁多少次都出不了包。与 reconcile_gates.direction_items 同口径。"""
-    if kind != _KIND_UNKNOWN:
-        return False
-    return bool(ruled_kind) or flag_reason.startswith(decisions.DIRECTION_PREFIXES)
-
-
 def _assigned_bucket(terminal: str, ruled_kind: str | None) -> str:
     """方向已裁定(仲裁给出 kind 槽)时的终态。剔除末态落 EXCLUDED——assign 后又改判 exclude
     的合并件不计入,与 reconcile R1 取数(_apply_direction→_apply_decision 判 NON_COUNTING 返
@@ -107,7 +98,7 @@ def _bucket_of(item: dict, dec: dict | None) -> str:
     kind = item.get("kind")
     flag_reason = str(item.get("flag_reason") or "")
 
-    if _is_direction(kind, flag_reason, ruled_kind):
+    if decisions.is_direction_channel(item, ruled_kind):
         if ruled_kind:  # 有方向 kind 槽即已裁定(assign 单裁 / assign+改数合并件皆认)
             return _assigned_bucket(terminal, ruled_kind)
         return PENDING  # 方向票无方向裁决 → 待裁决(与 R1 unresolved 同口径,含只剔除未定向)

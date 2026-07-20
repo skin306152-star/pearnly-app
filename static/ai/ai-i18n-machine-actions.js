@@ -8,15 +8,9 @@ Object.assign(window.__AI_I18N_ZH__, {
     mact_bank_direction: '改写收/付方向 {n} 行',
     mact_bank_meta: '共 {n} 行',
     mact_bank_why: '金额按前后余额反推改写，方向决定这笔算不算销售收入',
-    mact_more: '另有 {n} 行未列出',
     mact_kind_unknown: '未定类',
-    mact_kind_purchase_invoice: '进项票',
-    mact_kind_sales_summary: '销项汇总表',
     mact_kind_bank_statement: '银行流水',
     mact_kind_non_tax: '非税务单据',
-    mact_kind_duplicate: '重复件',
-    mact_kind_gl_ledger: 'GL 台账',
-    mact_kind_edc_settlement: 'EDC 结算单',
 });
 Object.assign(window.__AI_I18N_TH__, {
     mact_title: 'การแก้ไขอัตโนมัติของระบบ',
@@ -28,15 +22,9 @@ Object.assign(window.__AI_I18N_TH__, {
     mact_bank_meta: 'ทั้งหมด {n} รายการ',
     mact_bank_why:
         'จำนวนเงินถูกคำนวณย้อนจากยอดคงเหลือ ส่วนทิศทางกำหนดว่ารายการนี้นับเป็นรายได้จากการขายหรือไม่',
-    mact_more: 'อีก {n} รายการที่ไม่ได้แสดง',
     mact_kind_unknown: 'ยังไม่จัดประเภท',
-    mact_kind_purchase_invoice: 'ใบกำกับภาษีซื้อ',
-    mact_kind_sales_summary: 'สรุปยอดขาย',
     mact_kind_bank_statement: 'รายการเดินบัญชี',
     mact_kind_non_tax: 'เอกสารที่ไม่ใช่ภาษี',
-    mact_kind_duplicate: 'เอกสารซ้ำ',
-    mact_kind_gl_ledger: 'บัญชีแยกประเภท',
-    mact_kind_edc_settlement: 'ใบสรุปยอด EDC',
 });
 Object.assign(window.__AI_I18N_EN__, {
     mact_title: 'Automatic machine changes',
@@ -48,15 +36,9 @@ Object.assign(window.__AI_I18N_EN__, {
     mact_bank_meta: '{n} row(s) total',
     mact_bank_why:
         'Amounts are back-solved from the running balance; direction decides whether a row counts as sales income',
-    mact_more: '{n} more row(s) not listed',
     mact_kind_unknown: 'Unclassified',
-    mact_kind_purchase_invoice: 'Purchase invoice',
-    mact_kind_sales_summary: 'Sales summary',
     mact_kind_bank_statement: 'Bank statement',
     mact_kind_non_tax: 'Non-tax document',
-    mact_kind_duplicate: 'Duplicate',
-    mact_kind_gl_ledger: 'General ledger',
-    mact_kind_edc_settlement: 'EDC settlement',
 });
 Object.assign(window.__AI_I18N_JA__, {
     mact_title: 'システムによる自動修正',
@@ -67,13 +49,7 @@ Object.assign(window.__AI_I18N_JA__, {
     mact_bank_direction: '入出金の方向を書き換えた行 {n} 件',
     mact_bank_meta: '全 {n} 行',
     mact_bank_why: '金額は残高から逆算して書き換えられ、方向はその行を売上として数えるかを決めます',
-    mact_more: '未表示の行 {n} 件',
     mact_kind_unknown: '未分類',
-    mact_kind_purchase_invoice: '仕入請求書',
-    mact_kind_sales_summary: '売上集計表',
     mact_kind_bank_statement: '銀行明細',
     mact_kind_non_tax: '非課税書類',
-    mact_kind_duplicate: '重複',
-    mact_kind_gl_ledger: '総勘定元帳',
-    mact_kind_edc_settlement: 'EDC 精算書',
 });

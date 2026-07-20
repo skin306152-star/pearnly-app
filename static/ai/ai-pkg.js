@@ -34,13 +34,11 @@
             calcOpen: false,
             downloading: null,
             evid: null, // {numKey, label, entry, selectedItemId} | null
-            // 三键(M1-3KEY)出口态:signed 后本键翻「已标记待签」;exporting/signing/returning
-            // 是各自请求在途的防重入闸;notice = {type:'ok'|'err', text} 出口动作的人话回执/报错。
-            // signed/staleSignoff 拉到详情后由 applySignoffProjection 从 detail.signoff 回读初始化
-            // (P0-1):正常重跑后签批态点亮不再靠易失本地态。
-            signed: false,
-            signedActor: '',
-            staleSignoff: false,
+            // 三键(M1-3KEY)出口态:exporting/signing/returning 是各自请求在途的防重入闸;
+            // notice = {type:'ok'|'err', text} 出口动作的人话回执/报错。签批态渲染期从
+            // detail.signoff 现算(signoffCtx · P0-1 单一事实源),唯一本地态=刚签成功的
+            // 乐观标记(存签批人标签,退回清空),不再存三份可漂移的派生副本。
+            optimisticSigned: '',
             signing: false,
             exporting: false,
             returning: false,
@@ -66,16 +64,31 @@
 
     // ============ 渲染 ============
 
+    // 签批态现算(P0-1 单一事实源):fresh → 已标记待签;stale(复核后引擎重跑过数字)→ 键一
+    // 可点 + 提示重签;乐观标记只在刚签成功后压过投影,下次回读自然接管。
+    function signoffCtx() {
+        if (S.optimisticSigned) {
+            return { signed: true, signedActor: S.optimisticSigned, staleSignoff: false };
+        }
+        var proj = (S.detail || {}).signoff;
+        return {
+            signed: !!(proj && !proj.stale),
+            signedActor: proj && proj.actor ? AI.format.actorDisplay(proj.actor) : '',
+            staleSignoff: !!(proj && proj.stale),
+        };
+    }
+
     function render() {
+        var signoff = signoffCtx();
         body().innerHTML = AI.pkgRender.pageHtml({
             detail: S.detail,
             deliverables: S.deliverables,
             pp30: findDeliverable('pp30_draft'),
             calcOpen: S.calcOpen,
             downloading: S.downloading,
-            signed: S.signed,
-            signedActor: S.signedActor,
-            staleSignoff: S.staleSignoff,
+            signed: signoff.signed,
+            signedActor: signoff.signedActor,
+            staleSignoff: signoff.staleSignoff,
             signing: S.signing,
             exporting: S.exporting,
             returning: S.returning,
@@ -132,16 +145,6 @@
 
     // ============ 拉数据 ============
 
-    // 签批态从后端投影初始化(P0-1):fresh → 已标记待签(键一禁用);stale(复核后引擎重跑过
-    // 数字)→ 键一恢复可点 + 提示重签;无 signoff → 未签。signOff 请求在途时不回读覆盖乐观态。
-    function applySignoffProjection(detail) {
-        if (S.signing) return;
-        var proj = (detail || {}).signoff;
-        S.signed = !!(proj && !proj.stale);
-        S.staleSignoff = !!(proj && proj.stale);
-        S.signedActor = proj && proj.actor ? AI.format.actorDisplay(proj.actor) : '';
-    }
-
     function loadDetail() {
         body().innerHTML = AI.state.loadingHtml();
         var session = S;
@@ -149,7 +152,6 @@
             .then(function (r) {
                 if (S !== session) return; // 已切走
                 S.detail = r[0];
-                applySignoffProjection(r[0]);
                 S.deliverables = r[1].deliverables || [];
                 render();
             })
@@ -248,7 +250,7 @@
     // 键一「确认无误,标记待签」= 既有 POST /review(复核签批,append-only);成功翻「已标记
     // 待签 · 签批人」态。SoD 422 / 冻结 409 走 errNotice 人话直出(与审核收件箱同端点同语义)。
     function signOff() {
-        if (S.signed || S.signing) return;
+        if (signoffCtx().signed || S.signing) return;
         var session = S;
         S.signing = true;
         S.notice = null;
@@ -257,9 +259,7 @@
             .reviewSignoff(S.orderId, '')
             .then(function () {
                 if (S !== session) return;
-                S.signed = true;
-                S.staleSignoff = false; // 重签把 stale 提示收起(乐观态,下次回读投影接管)
-                S.signedActor = currentActorLabel();
+                S.optimisticSigned = currentActorLabel(); // 压过 stale 投影,下次回读接管
             })
             .catch(function (err) {
                 if (S !== session) return;
@@ -312,9 +312,8 @@
             .then(function () {
                 if (S !== session) return;
                 S.returning = false;
-                // 退回使工单重开:此前的「已标记待签」标记随之作废,不留一个矛盾的旧签批态。
-                S.signed = false;
-                S.signedActor = '';
+                // 退回使工单重开:乐观签批标记随之作废(后端投影经 review_rejected 也归 None)。
+                S.optimisticSigned = '';
                 S.notice = { type: 'ok', text: at('pkg_returned_done') };
                 loadDetail();
             })

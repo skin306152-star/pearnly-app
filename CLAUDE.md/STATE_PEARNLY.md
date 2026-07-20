@@ -1,5 +1,20 @@
 # 📊 STATE · Pearnly 项目状态
 
+## 当前状态卡(2026-07-20 深夜续场 · Pearnly AI · ★静默改数 A 类前三条 + S-3 上线)
+
+- **当前 task**:上一场静默改数盘点排的「下一批」头三件全上线 CI 绿(A-1/A-2、A-3、S-3),外加拆分修红 + /simplify 收口,共 6 commit `f393b094..e25f18b2`。**换窗先读 `docs/agent/HANDOFF-2026-07-20-NIGHT2-SILENT-WRITES-A1-A3.md`**(本场逐条带病根/修法/行号/证据)+ `HANDOFF-2026-07-20-NIGHT-SILENT-WRITES.md`(未完成项全清单,权威)。
+- **★本场上线**:**A-1**(`c02e2850`)OCR 按勾稽差额补一行折扣回填、补完闸自动转绿没人举手 → 强制留人留痕 + 专属 `flag_reason=discount_inferred` + 卡上明说「补了 140.00 请核对原票」;**A-2**(`ae44e8ad`)L3 失败后第二个模型重读金额、**救援成功唯独不留人**票不进人审 → 救援成功也留人、新旧值差异进证据链;**A-3**(`bf1b9887`)超 2000 行汇总表静默截断连合计行一起截 → 消费方读 truncated 照 MISMATCH 同级停机点名;**S-3**(`f393b094`)机器改动清单渲染 if/else→查表带 default(第三类动作不再冒充银行行)。
+- **★复现揪出交接页漏的两条**:A-1 工单侧此前靠回填文案「折」字撞词表才拦下(改一字就失守)且标签错标成「票面自身不自洽」(三数其实平);A-2 **救援成功反比救援失败更危险**(失败被拦、成功一路绿灯改了钱)。
+- **★方法**:每条都 ① 先写复现脚本证明结论在今天代码里成立(不照抄文档)② 修完回滚验证(退回即红、揪空守门)③ 涉界面真浏览器截图。证据永久落测试(`test_ocr_discount_inferred_gate`/`test_workorder_totals_rescued_gate`/`test_gate_reason`/`test_workorder_sales_columns` 等),截图 `_artifacts/{a1,a2,a3,sa1}/`。四张已发 Zihao。
+- **拆分修红**:A-1/A-2 撑爆 classify.py 500 行硬闸 → 判据映射抽 `gate_reason.py` 单一事实源、classify 510→484(`cef04180`)。/simplify 应用一条:折扣留人信号两路统一从 warnings 派生、去冗余 bool(`e25f18b2`)。
+- **★下一个种子(pair A-4)**:生产侧「改写→强制留人」仍三处手写 → 深层是把 `REWRITE_PREFIXES` 提成 `ocr`+`gate_reason` 共享注册表、一行派生 needs_review(注册即留人,不会再犯 A-2「唯独忘了设」)。**不在本场做**(OCR 高敏路径要先报方案+真E2E,且 A-4 银行反推翻绿 balance_ok 是同一改写形状、落地本就碰这几个文件,仪式付一次)。A-3 的「降级标记必须有消费方」CI 闸独立成条,别和改写注册表混。
+- **未完成(权威在上一场交接页)**:A-4/A-5/A-6(**A-4 首做**)· B 类 6 / C 类 4 / D 类 11(IN-R 为首,是新建功能先 discovery)· S-1/S-2/S-4。
+- **★删除虚惊**:Zihao 一时冲动要「除三工具外全删源码含对话 Agent」随即撤回 → **一个文件没删,只只读勘察就停**;真要砍得单开一轮理清三工具与月结 Agent 的共用地基(OCR/壳/鉴权/客户档)。
+- **★多窗口血泪**:隔离索引绕法躲 `index.lock` 会**绕过 pre-push 500 行闸**(据此 push 后红过一次)→ 隔离索引提交后 push 前手动跑 check_file_size+check_line_ratchet。stale 索引致 `git status` 显示假象(盘上==HEAD,别惊);收尾时锁仍被别窗持有、查到有 git 进程未强删。
+- **仓库**:master = `e25f18b2` · 未 push=0 · 本场 CI 全绿(classify 红一次自己拆分修绿)。
+
+<details><summary>上一状态卡(2026-07-20 夜 · 静默改数盘点 + SA-1 点灯 + C1 四修)</summary>
+
 ## 当前状态卡(2026-07-20 夜 · Pearnly AI · ★静默改数盘点 + SA-1 点灯 + C1 四修上线)
 
 - **当前 task**:今天 9 个 commit 全上线 CI 绿(`c15e218c..c53dcc9a`)。**换窗先读 `docs/agent/HANDOFF-2026-07-20-NIGHT-SILENT-WRITES.md`**(未完成项逐条带「为什么修/修哪里/怎么复现/建议修法/怎么根治」)+ `HANDOFF-2026-07-20-AGENT-BOUNDARY-AND-FRAMEWORK.md`(边界与框架)。
@@ -13,6 +28,8 @@
 - **管家 Agent 不提前**:这批问题没一条是它能解决的(全在"代码算账"半边),且闸被架空时 Agent 连报警扳机都收不到。先修闸。
 - **★多窗口协作(今天踩 5 次)**:共享 index 卷走对方文件 / `reset --mixed` 改写已提交 hash / 残留锁 / 两处 stale dist / 别窗文件未过 black。**根治=一窗口一 worktree**;立即可用绕法=`GIT_INDEX_FILE=/tmp/x git read-tree HEAD && git add <我的> && git commit`(完全不碰共享 index)。血泪:`git commit -- <paths>` 对 **untracked 新文件不生效**;push 前必须 `npx eslint .` + `format:check` **全仓**(本窗口据此把 CI 弄红过一次)。
 - **仓库**:master = `c53dcc9a`(+别窗 3 个 commit)· 未 push=0 · 四轮 CI 全绿(中间红一次自己修的)。
+
+</details>
 
 <details><summary>上一状态卡(2026-07-20 · GC-D 收官 + GC-E-1 + Agent 边界定案)</summary>
 

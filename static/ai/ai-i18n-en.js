@@ -170,7 +170,7 @@ window.__AI_I18N_EN__ = {
     rv_field_vat_face: 'VAT (face value)',
     rv_field_total: 'Grand total',
     rv_field_invno: 'Invoice no.',
-    rv_field_date: 'Invoice date',
+    rv_field_date: 'Invoice date (A.D.)',
     rv_key_accept: 'Accept face value',
     rv_key_edit: 'Edit',
     rv_key_exclude: 'Exclude',

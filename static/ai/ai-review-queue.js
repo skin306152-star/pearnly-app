@@ -99,6 +99,9 @@
                     var invoiceDate = String(fullValues.invoice_date).trim();
                     if (invoiceDate) {
                         if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) return null;
+                        // 年份 >= 2400 只可能是佛历(2400 BE = 1857 AD)。这里收的是公历,
+                        // 放行会让佛历年落进 DATE 列,推 ERP 时再加 543 直接跑飞。
+                        if (parseInt(invoiceDate.slice(0, 4), 10) >= 2400) return null;
                         var parsedDate = new Date(invoiceDate + 'T00:00:00Z');
                         if (
                             Number.isNaN(parsedDate.getTime()) ||

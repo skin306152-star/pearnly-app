@@ -27,6 +27,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
+from core import thai_date
 from core import workspace_context as wc
 from services.audit import file_access as audit_file_access
 from services.ocr import pdf_storage
@@ -135,12 +136,27 @@ async def ocr_commit(req: OcrCommitRequest, request: Request):
     return {"ok": True, "committed": n}
 
 
+def _find_buddhist_date(pages: Optional[List[dict]]) -> Optional[str]:
+    """任一页的 date 字段填成佛历年 → 返回该串(供闸拦下)。"""
+    for p in pages or []:
+        if not isinstance(p, dict):
+            continue
+        raw = (p.get("fields") or {}).get("date")
+        if thai_date.buddhist_year_of(raw):
+            return str(raw)
+    return None
+
+
 @router.put("/api/history/{record_id}")
 async def history_update(record_id: str, req: HistoryUpdateRequest, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
     if not req.pages:
         raise HTTPException(400, detail="history.empty_pages")
+    # 日期框收公历(库里 DATE 列是公历),但全站默认显示佛历、标签没标纪年 —— 会计按习惯
+    # 填 2569 会静默落库,再推 Express 时 (2569+543)%100 送出 120531。宁可退回让人改。
+    if _find_buddhist_date(req.pages):
+        raise HTTPException(400, detail="history.date_must_be_gregorian")
     ok = update_ocr_history_pages(str(user["id"]), record_id, req.pages, tenant_id=_tid(user))
     if not ok:
         raise HTTPException(404, detail="history.not_found")

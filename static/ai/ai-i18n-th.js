@@ -168,7 +168,7 @@ window.__AI_I18N_TH__ = {
     rv_field_vat_face: 'VAT ตามใบเสร็จ',
     rv_field_total: 'รวมทั้งสิ้น',
     rv_field_invno: 'เลขที่ใบกำกับ',
-    rv_field_date: 'วันที่ในใบกำกับ',
+    rv_field_date: 'วันที่ในใบกำกับ (ค.ศ.)',
     rv_key_accept: 'ยอมรับตามใบเสร็จ',
     rv_key_edit: 'แก้ตัวเลข',
     rv_key_exclude: 'ตัดออก',

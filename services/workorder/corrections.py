@@ -6,6 +6,8 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
+from core import thai_date
+
 AMOUNT_KEYS = ("net", "vat", "grand_total")
 IDENTIFIER_KEYS = ("invoice_number", "invoice_date")
 ALLOWED_KEYS = frozenset((*AMOUNT_KEYS, *IDENTIFIER_KEYS))
@@ -45,6 +47,10 @@ def normalize_values(values: dict | None) -> dict:
                 date.fromisoformat(raw_date)
             except ValueError as exc:
                 raise InvalidCorrection("invoice_date_invalid") from exc
+            # 审核界面默认显示佛历、字段没标纪年,人工补正时按习惯填 พ.ศ. 会通过
+            # fromisoformat(2569-05-31 合法),佛历年就此落库,推 ERP 再加 543 直接跑飞。
+            if thai_date.buddhist_year_of(raw_date):
+                raise InvalidCorrection("invoice_date_must_be_gregorian")
         out["invoice_date"] = raw_date
     return out
 

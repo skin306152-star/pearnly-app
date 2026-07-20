@@ -18,12 +18,12 @@ from typing import Optional
 from core import feature_flags
 from services.ai_gateway import attribution
 from services.ocr import escalation_budget
-from services.summary_import.parse import parse_table
 from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_reuse
 from services.workorder.steps import ocr_snapshots, purchase_dedup, statement_regroup, taxid_alert
 from services.workorder.steps import sort as sort_step
+from services.workorder.steps import summary_read
 from services.workspace import client_alias_store
 
 # quota 待补件的 flag_reason(续跑起手复位这些件回 pending 重试;单一事实源在此)。
@@ -362,13 +362,17 @@ def _classify_from_ocr(
 
 
 def _classify_summary(item: dict) -> tuple:
-    """一份销项汇总表:直读拿 headers/rows,解不出留原因,不硬吃。"""
+    """一份销项汇总表:直读拿 headers/rows,解不出留原因,不硬吃。
+
+    读侧给的 reason(如扫描件 PDF 的 no_text_layer)原样带进 flag_reason,让人看得出是
+    「这份料读不了」而不是笼统的解析失败。
+    """
     try:
         parsed = _read_sales_summary(item["file_ref"])
     except Exception as exc:  # noqa: BLE001
         return None, f"summary_read_error:{type(exc).__name__}"
     if not parsed.get("rows"):
-        return None, "summary_unparseable"
+        return None, f"summary_{parsed.get('reason') or 'unparseable'}"
     return parsed, None
 
 
@@ -470,10 +474,7 @@ def _default_ocr_image(path: str) -> dict:
     return fields
 
 
-def _default_read_sales_summary(path: str) -> dict:
-    """真实现:xlsx 字节交给 summary_import.parse.parse_table 直读(纯函数,零成本)。"""
-    data = storage.read_bytes(path)  # 落盘密文解回明文再解析(双轨读)
-    return parse_table(data, filename=Path(path).name)
+_default_read_sales_summary = summary_read.read
 
 
 def _default_find_ocr_by_hashes(**kwargs) -> dict:

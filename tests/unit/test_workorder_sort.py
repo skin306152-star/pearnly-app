@@ -11,6 +11,7 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from services.workorder.engine import StepContext
 from services.workorder.steps import sort as sort_step
@@ -122,6 +123,66 @@ class SortByFileTests(unittest.TestCase):
         self.assertEqual(store.by_ref("STM KBANK.pdf")["kind"], "bank_statement")
         self.assertEqual(store.by_ref("scan_0001.pdf")["kind"], "unknown")
         self.assertEqual(out.payload["pending_ocr"], 1)
+
+    def test_pdf_sales_summary_by_filename(self):
+        """销售汇总 PDF 归 sales_summary:交 OCR 既烧钱又永远产不出 sales_read。"""
+        store = FakeItemStore(
+            [
+                _item(1, "/in/สรุปยอดขาย 7-11 กรกฎาคม.pdf"),
+                _item(2, "/in/Sales Summary July 2026.pdf"),
+                _item(3, "/in/รายงานการขาย.pdf"),
+            ]
+        )
+        out = sort_step.run(_ctx(store))
+
+        for ref in ("กรกฎาคม.pdf", "July 2026.pdf", "รายงานการขาย.pdf"):
+            self.assertEqual(store.by_ref(ref)["kind"], "sales_summary")
+        self.assertEqual(out.payload["pending_ocr"], 0)
+
+    def test_pdf_invoice_names_never_taken_as_summary(self):
+        """票据名反证:宁可漏归走原 OCR 路,也不把发票误归成汇总表。"""
+        store = FakeItemStore(
+            [
+                _item(1, "/in/ใบกำกับภาษี ยอดขาย 001.pdf"),
+                _item(2, "/in/Tax Invoice sales report 88.pdf"),
+                _item(3, "/in/receipt_0007.pdf"),
+            ]
+        )
+        out = sort_step.run(_ctx(store))
+
+        self.assertEqual({i["kind"] for i in store.items}, {"unknown"})
+        self.assertEqual(out.payload["pending_ocr"], 3)
+
+    def test_gl_and_bank_pdf_judgements_unchanged(self):
+        """GL / 银行判据在汇总表判据之前,优先级不许被抢。"""
+        store = FakeItemStore([_item(1, "/in/GL ยอดขาย.pdf"), _item(2, "/in/KBANK สรุปยอดขาย.pdf")])
+        sort_step.run(_ctx(store))
+
+        self.assertEqual(store.by_ref("GL ยอดขาย.pdf")["kind"], "gl_ledger")
+        self.assertEqual(store.by_ref("KBANK สรุปยอดขาย.pdf")["kind"], "bank_statement")
+
+    def _head_scan(self, pages):
+        with (
+            mock.patch.object(sort_step.storage, "read_bytes", return_value=b"%PDF"),
+            mock.patch.object(sort_step.text_layer, "extract_pages", return_value=pages),
+        ):
+            return sort_step._pdf_head_is_sales_summary("/in/scan_0001.pdf")
+
+    def test_pdf_content_scan_recognizes_report_title(self):
+        """文件名无线索时靠首页文字层报表抬头认;扫描件/票据 → 原 OCR 路。"""
+        self.assertTrue(self._head_scan(["สรุปยอดขาย ประจำเดือน"]))
+        self.assertTrue(self._head_scan(["Monthly Sales Summary"]))
+        self.assertFalse(self._head_scan(["ใบกำกับภาษี สรุปยอดขาย"]))
+        self.assertFalse(self._head_scan(["ยอดขาย 100.00"]))  # 裸词不作数,只认报表抬头
+        self.assertFalse(self._head_scan([""]))
+        self.assertFalse(self._head_scan(None))
+
+    def test_pdf_content_scan_only_reads_first_page(self):
+        """抬头只在首页;第二页出现关键词不作数(也不多花一页解析)。"""
+        self.assertFalse(self._head_scan(["ใบส่งของ", "สรุปยอดขาย"]))
+
+    def test_pdf_content_scan_survives_unreadable_file(self):
+        self.assertFalse(sort_step._pdf_head_is_sales_summary("/nowhere/missing.pdf"))
 
     def test_already_binned_items_untouched(self):
         done = _item(1, "/in/pos.xlsx")

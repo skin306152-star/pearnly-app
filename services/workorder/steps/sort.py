@@ -4,8 +4,9 @@
 零成本信号当场定堆:表格(xlsx/csv)默认销项 POS 汇总,文件名像银行(复用 bank_recon
 的签名表——文件名是人读的高精度信号,正文里满屏对手行名不可靠)或表头像流水
 (ถอน/ฝาก/ยอดคงเหลือ 列)则归银行单;不支持的格式 = 无税务要素,non_tax 排除并留原因。
-图片和无名 PDF 在这一步不动(kind 留 unknown),等 classify 过 OCR 拿到票面字段后调
-bin_ocr_fields 归堆——sort 自己不起 OCR,重活全在 classify。
+PDF 除 GL/银行外再认一类销售汇总表(文件名或首页文字层报表抬头,票据名反证优先)——它交
+OCR 既烧钱又产不出 sales_read。图片和认不出的 PDF 在这一步不动(kind 留 unknown),等
+classify 过 OCR 拿到票面字段后调 bin_ocr_fields 归堆——sort 自己不起 OCR,重活全在 classify。
 
 bin_ocr_fields 是给 classify 用的纯函数:税号锚点判方向,规则与
 services/erp/express_push/direction.py 同口径(自家==买方→进项;脏税号归空绝不误路由),
@@ -20,9 +21,10 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
 
+from services.fileconv import text_layer
 from services.purchase.field_clean import clean_tax_id
 from services.recon.bank_recon_utils import _BANK_SIGNATURES, _bank_from_filename
-from services.workorder import decisions, kinds
+from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 
 # classify 会过 OCR 的图片扩展名(单一事实源:sort 定堆时判「留给 classify」用,api 的
@@ -36,6 +38,40 @@ _BANK_HEADER_KW = ("ถอน", "ฝาก", "ยอดคงเหลือ", "
 # GL 判据先于银行判据——银行科目的 GL(文件名带行名)仍是 GL 佐证件,不是流水。
 _GL_NAME_KW = ("สมุดแยกประเภท", "แยกประเภท")
 _GL_ASCII_RE = re.compile(r"(?<![a-z])gl(?![a-z])")
+
+# 销售汇总表判据(PDF 分流)。PDF 现状是「非 GL 非银行 → 交 classify 过 OCR」,汇总表走这条
+# 既烧 OCR 钱又永远产不出 sales_read(OCR 出的是票面字段,不是表格)——月度销项因此归零。
+# 判据保守:票据名反证优先,宁可漏归(走原 OCR 路)也绝不把发票误归成汇总表。
+_SALES_SUMMARY_NAME_KW = (
+    "สรุปยอดขาย",
+    "รายงานการขาย",
+    "รายงานขาย",
+    "ยอดขาย",
+    "sales summary",
+    "sales report",
+    "daily sales",
+    "销售汇总",
+    "销售报表",
+)
+# 正文判据只认报表抬头这类强标记,不认裸「ยอดขาย」——它也可能是一张发票里的小计行文字。
+_SALES_SUMMARY_TEXT_KW = (
+    "สรุปยอดขาย",
+    "รายงานการขาย",
+    "รายงานขาย",
+    "sales summary",
+    "sales report",
+)
+# 票据名/票面反证词:命中即不认汇总表(单张税票/收据永远不是汇总表)。
+_INVOICE_KW = (
+    "ใบกำกับภาษี",
+    "ใบเสร็จ",
+    "ใบแจ้งหนี้",
+    "ใบส่งของ",
+    "tax invoice",
+    "invoice",
+    "receipt",
+)
+_PDF_TEXT_SCAN_PAGES = 1  # 报表抬头只会在首页;多扫一页只多花时间不多认一张表
 
 # EDC 日终结算票标记(SA-2a):只有商户自己机器的日切汇总打印 SETTLEMENT 独立词——单笔
 # SALE 支付条(BATCH/TRACE/APPR 脚注)和银行 Statement 页都没有,词边界防 Statement 误粘。
@@ -125,6 +161,26 @@ def _is_gl_name(name: str) -> bool:
     return any(kw in name for kw in _GL_NAME_KW) or bool(_GL_ASCII_RE.search(name.lower()))
 
 
+def _is_sales_summary_name(name: str) -> bool:
+    """文件名像销售汇总表。票据名反证优先——「ใบกำกับภาษี ยอดขาย.pdf」是票不是表。"""
+    low = (name or "").lower()
+    if any(kw in low for kw in _INVOICE_KW):
+        return False
+    return any(kw in low for kw in _SALES_SUMMARY_NAME_KW)
+
+
+def _pdf_head_is_sales_summary(file_ref: str) -> bool:
+    """PDF 首页文字层里有报表抬头 → 销售汇总表。扫描件/读不了/依赖缺 → False,走原 OCR 路。"""
+    try:
+        pages = text_layer.extract_pages(storage.read_bytes(file_ref))
+    except Exception:  # noqa: BLE001 · 读盘/解密/解析任一环节炸都只是「认不出」,不该拖垮定堆
+        return False
+    head = " ".join(pages[:_PDF_TEXT_SCAN_PAGES]).lower() if pages else ""
+    if not head.strip() or any(kw in head for kw in _INVOICE_KW):
+        return False
+    return any(kw in head for kw in _SALES_SUMMARY_TEXT_KW)
+
+
 def _bin_by_file(file_ref: str) -> Optional[tuple[str, str, Optional[str]]]:
     """文件名/表头可判的堆 → (kind, status, flag_reason);要过 OCR 才知道的 → None。"""
     path = Path(file_ref or "")
@@ -146,6 +202,8 @@ def _bin_by_file(file_ref: str) -> Optional[tuple[str, str, Optional[str]]]:
             return (kinds.GL_LEDGER, "pending", None)
         if _bank_from_filename(path.name):
             return (kinds.BANK_STATEMENT, "pending", None)
+        if _is_sales_summary_name(path.name) or _pdf_head_is_sales_summary(file_ref):
+            return (kinds.SALES_SUMMARY, "pending", None)
         return None
     return (kinds.NON_TAX, "excluded", f"unsupported_format:{ext or '(none)'}")
 

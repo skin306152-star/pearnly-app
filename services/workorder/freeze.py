@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from core import file_crypto
-from services.workorder import evidence, sod, storage
+from services.workorder import decisions, evidence, sod, storage
 
 # 规则版本:裁决词汇(decisions.py)/守恒·勾稽闸逻辑变更时人工 bump,钉进每份冻结 manifest。
 # 常量落此处而非 decisions.py(那是零依赖词汇叶子,契约零改动)——冻结包是它的唯一消费者。
@@ -31,7 +31,6 @@ MANIFEST_FILENAME = "freeze_manifest.json"
 SCHEMA = "workorder.freeze_manifest/v1"
 
 _EVT_CLASSIFIED = "item_classified"
-_EVT_DECISION = "human_decision"
 
 
 class FreezeError(Exception):
@@ -85,8 +84,9 @@ def _display_name(item: dict) -> Optional[str]:
 
 
 def _replay_decisions(events: list[dict]) -> dict:
-    """裁决/豁免回放(复用 evidence,latest-wins)。每 item → 裁决动作 + 谁 + 何时 + 事件 id。"""
-    replayed = evidence.replay_items_by_type(events, _EVT_DECISION)
+    """裁决/豁免合并回放(decisions.replay_records:方向槽 kind 与金额槽 decision/values 并存)。
+    每 item → 裁决动作 + 裁定方向 + 谁 + 何时 + 事件 id;冻结件同时携带 kind 与 values 不互顶。"""
+    replayed = decisions.replay_records(events)
     out: dict = {}
     for item_id, rec in replayed.items():
         payload = rec["payload"]

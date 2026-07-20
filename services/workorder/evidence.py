@@ -93,9 +93,9 @@ def bank_recon_from_step_done(payload: Optional[dict]) -> Optional[dict]:
 
 
 def replay_items_by_type(events: list[dict], event_type: str) -> dict:
-    """按 item_id 回放某类事件为 {item_id: {"event_id":, "payload":, "actor":, "at":}}
-    (同 item 多条时后者胜,反映最新裁决/识别——与 reconcile.py 回放同一份事件流的语义
-    一致)。actor/at 给「谁在何时判的」读侧(W3 审核队列);老消费者只取 payload 不受影响。"""
+    """按 item_id 回放某类事件为 {item_id: {"event_id":, "payload":, "actor":, "at":}}(同 item 多条
+    后者胜的 latest-wins,反映最新识别)。识别类事件(item_classified 等)用此;human_decision 合并
+    回放走 decisions.replay_records(wrapper 形状对齐此处,不用单槽 latest-wins),actor/at 供读侧。"""
     out: dict = {}
     for e in events:
         if e["event_type"] != event_type:
@@ -176,13 +176,14 @@ def flagged_projection(
     """挂起清单投影(W3 审核队列 + order-detail 一次喂满,零额外往返)。每张 flagged 票带
     OCR 读数、最新裁决、判据人话 + 置信度(verdict_hint · MC1-b1 纯读侧现算,不改引擎不落库)。
 
-    ocr_read = item_classified 的 payload.money(票面钱字段原始串);decision = 该 item 最新一条
-    human_decision(latest-wins,与 reconcile 回放同语义);verdict_hint = verdict.hint(flag_reason,
-    ocr_read)。都可为 None/空 —— 没读出/没判过就诚实给空,不造数据。classified 可由调用方
-    (api.order_detail)传入已回放好的索引,同一请求不重复扫事件流;缺省自算。"""
+    ocr_read = item_classified 的 payload.money(票面钱字段原始串);decision = 该 item 的合并
+    human_decision(decisions.replay_records:方向槽 kind 与金额槽 decision/values 并存);
+    verdict_hint = verdict.hint(flag_reason, ocr_read)。都可为 None/空 —— 没读出/没判过就诚实给空,
+    不造数据。classified 可由调用方(api.order_detail)传入已回放好的索引,同一请求不重复扫事件流;
+    缺省自算。"""
     if classified is None:
         classified = replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions_by_item = replay_items_by_type(events, _EVT_DECISION)
+    decisions_by_item = decisions.replay_records(events)
     out = []
     for it in items:
         if it["status"] != "flagged":
@@ -203,14 +204,14 @@ def flagged_projection(
 
 
 def excluded_projection(items: list[dict], events: Optional[list[dict]] = None) -> list[dict]:
-    """排除件仍可见、可重判；最多投影 200 件，超限在最后一件留截断标。"""
-    decided = replay_items_by_type(events or [], _EVT_DECISION)
+    """排除件仍可见、可重判；最多投影 200 件，超限在最后一件留截断标。裁过方向(合并 payload 有
+    kind 槽)即离开排除堆——无论后续是否又改数,方向一经裁定这件已归位,不再算「被排除」。"""
+    decided = decisions.replay_records(events or [])
     excluded = [
         item
         for item in items
         if item["status"] == "excluded"
-        and (decided.get(item["id"]) or {}).get("payload", {}).get("decision")
-        != decisions.ASSIGN_KIND
+        and not (decided.get(item["id"]) or {}).get("payload", {}).get("kind")
     ]
     out = [
         {
@@ -287,7 +288,7 @@ def build_evidence_index(
     """
     files_by_item = {it["id"]: it.get("file_ref") for it in items}
     classified = replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions_by_item = replay_items_by_type(events, _EVT_DECISION)
+    decisions_by_item = decisions.replay_records(events)
 
     purchase_evidence = _collect_evidence(
         classified,
@@ -350,8 +351,7 @@ def _collect_evidence(
             include_direction_assigned
             and payload.get("kind") in (_KIND_UNKNOWN, decisions.SALES_DOC)
             and dec is not None
-            and dec["payload"].get("decision") == decisions.ASSIGN_KIND
-            and dec["payload"].get("kind") == kind
+            and dec["payload"].get("kind") == kind  # 合并槽有此方向即改判到位(改数不掩盖方向)
         )
         if payload.get("kind") != kind and not direction_assigned:
             continue

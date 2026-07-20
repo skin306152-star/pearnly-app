@@ -97,6 +97,22 @@ class CandidateMappingTests(unittest.TestCase):
         ]
         self.assertEqual(adapter.candidates_from_events(events), [])
 
+    def test_assign_then_recalc_keeps_manual_direction(self):
+        # P0-0:裁方向后又改数(合并回放),category_tag 仍跟人工方向,不被 recalc-last 顶回中性。
+        recalc = {
+            "event_type": "human_decision",
+            "step": "reconcile",
+            "payload": {"item_id": "d1", "decision": "recalc", "values": {"vat": "35.00"}},
+        }
+        for name, decisions in (
+            ("assign→recalc", [_assign("d1", "sales_doc"), recalc]),
+            ("recalc→assign", [recalc, _assign("d1", "sales_doc")]),
+        ):
+            with self.subTest(order=name):
+                events = [_classified("d1", kind="unknown", total="500.00"), *decisions]
+                cands = adapter.candidates_from_events(events)
+                self.assertEqual(cands[0]["category_tag"], "sales")
+
 
 class StatementRowMappingTests(unittest.TestCase):
     def test_withdrawal_row_is_out(self):

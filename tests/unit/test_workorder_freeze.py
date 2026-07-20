@@ -143,6 +143,39 @@ class BuildManifestTests(unittest.TestCase):
         self.assertEqual(m["signatures"]["reviewed_by"], ["user:88"])
         self.assertEqual(m["signatures"]["approved_by"], "user:99")
 
+    def test_merged_decision_records_both_kind_and_values(self):
+        # P0-0:冻结 manifest 的裁决回放走合并语义——方向不明票裁进项后又改数,方向 kind 与
+        # 金额 values 同时钉进不可变 manifest,不因 recalc 是末槽而丢方向。
+        items = [
+            {
+                "id": "d",
+                "kind": "unknown",
+                "status": "flagged",
+                "file_ref": "/o/a.jpg",
+                "original_name": "d.jpg",
+            }
+        ]
+        events = [
+            _classified("d", "unknown"),
+            _decision(5, "d", "assign_kind", kind="purchase_invoice"),
+            _decision(6, "d", "recalc", values={"vat": "35.00"}),
+        ]
+        m = freeze.build_manifest(
+            work_order=_wo(),
+            items=items,
+            events=events,
+            deliverable_version=1,
+            ocr_models=[],
+            approver="user:77",
+            frozen_at="2026-07-11T00:00:00+00:00",
+            sha256_of=_fake_hash,
+        )
+        dec = m["decisions"]["d"]
+        self.assertEqual(dec["kind"], "purchase_invoice")
+        self.assertEqual(dec["values"], {"vat": "35.00"})
+        self.assertEqual(dec["decision"], "recalc")
+        self.assertEqual(dec["event_id"], 6)  # 元数据取最新贡献事件
+
     def test_missing_source_file_fails_closed_and_names_it(self):
         items = [
             {

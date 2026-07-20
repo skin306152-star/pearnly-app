@@ -80,9 +80,21 @@ def _is_direction(kind: str, flag_reason: str) -> bool:
     return kind == _KIND_UNKNOWN and flag_reason.startswith(decisions.DIRECTION_PREFIXES)
 
 
+def _assigned_bucket(dec: dict, decision: str | None) -> str:
+    """方向已裁定(合并 payload 有 kind 槽)时的终态。剔除动作优先落 EXCLUDED——assign 后又改判
+    exclude 的合并件,末态是「不计入」,与 reconcile R1 取数(_apply_direction→_apply_decision 判
+    NON_COUNTING 返 None)口径一致,不把它误计进进项;否则按裁定 kind 归 _ASSIGN_BUCKET。"""
+    if decision == decisions.EXCLUDE:
+        return EXCLUDED
+    return _ASSIGN_BUCKET.get(dec.get("kind"), PENDING)
+
+
 def _bucket_of(item: dict, dec: dict | None) -> str:
-    """单件终态归属。fail-closed:任何未落进明确终态的形态一律归 PENDING(待裁决)。"""
-    decision = (dec or {}).get("decision")
+    """单件终态归属。fail-closed:任何未落进明确终态的形态一律归 PENDING(待裁决)。dec 为
+    decisions.replay_records 的合并 payload——方向 kind 槽与金额 decision 槽并存,归桶按 kind 槽
+    是否已裁定判据,不再要求 decision==ASSIGN_KIND(recalc-last 也认得出方向,半死锁根治)。"""
+    dec = dec or {}
+    decision = dec.get("decision")
     if decision == decisions.WAIVE:  # 豁免是显式人工放行,优先级高于其余判据
         return WAIVED
 
@@ -90,16 +102,16 @@ def _bucket_of(item: dict, dec: dict | None) -> str:
     flag_reason = str(item.get("flag_reason") or "")
 
     if _is_direction(kind, flag_reason):
-        if decision == decisions.ASSIGN_KIND:
-            return _ASSIGN_BUCKET.get((dec or {}).get("kind"), PENDING)
-        return PENDING  # 方向票无 assign_kind 裁决 → 待裁决
+        if dec.get("kind"):  # 有方向 kind 槽即已裁定(assign 单裁 / assign+改数合并件皆认)
+            return _assigned_bucket(dec, decision)
+        return PENDING  # 方向票无方向裁决 → 待裁决
 
     if kind == decisions.SALES_DOC:
         # 自动判本方销项票(MC1-c.1):佐证材料,不进 R1。人工可 assign_kind 改判(拍错票兜底);
         # 改判走 _ASSIGN_BUCKET(进项→计入 / 销项→归销项侧 / 非税→排除)。flagged 且无裁决 →
         # 待人工过目(拍板① 留一次触碰,配 MC1-b 批量确认);status=ok(MC1-c.2 放宽后)免裁归销项侧。
-        if decision == decisions.ASSIGN_KIND:
-            return _ASSIGN_BUCKET.get((dec or {}).get("kind"), PENDING)
+        if dec.get("kind"):
+            return _assigned_bucket(dec, decision)
         if item.get("status") == "ok":
             return SALES_REASSIGNED
         return PENDING
@@ -133,8 +145,9 @@ def _bucket_of(item: dict, dec: dict | None) -> str:
 
 
 def bucket_items(items: list[dict], decisions: dict) -> Conservation:
-    """把每件按终态归堆。decisions = {item_id: 最新 human_decision payload}(latest-wins,
-    与 reconcile 回放同源)。返回完整划分——不变式:Σ桶 == len(items),每件恰一桶。"""
+    """把每件按终态归堆。decisions = {item_id: 合并 human_decision payload}(方向槽与金额槽并存,
+    源自 decisions.replay_records,与 reconcile R1 取数同一份合并回放)。返回完整划分——不变式:
+    Σ桶 == len(items),每件恰一桶。"""
     buckets: dict = {b: [] for b in BUCKET_ORDER}
     for item in items:
         buckets[_bucket_of(item, decisions.get(item["id"]))].append(item)

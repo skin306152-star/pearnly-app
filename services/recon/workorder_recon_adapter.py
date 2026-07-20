@@ -22,13 +22,12 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 from services.recon.bank_recon_scoring import THRESH_AUTO, THRESH_SUGGEST, match_one_tx
+from services.workorder import decisions
 
 _EVT_CLASSIFIED = "item_classified"
-_EVT_DECISION = "human_decision"
 _KIND_PURCHASE = "purchase_invoice"
 _KIND_SALES_DOC = "sales_doc"
 _KIND_NON_TAX = "non_tax"
-_DECISION_ASSIGN = "assign_kind"
 
 # 银行流水方向 → 候选类目倾向。score_direction 只认 category_tag 里的销售/费用词根:
 # 付款(withdrawal/OUT)对应采购/费用票、收款(deposit/IN)对应销售/收入票。
@@ -62,13 +61,13 @@ def _replay_latest(events: list[dict], event_type: str) -> dict[str, dict]:
     return out
 
 
-def _effective_kind(classified: dict, decision: Optional[dict]) -> Optional[str]:
-    """票的有效类别:人工方向裁决(assign_kind)优先于 OCR 归堆的 kind。
-
-    无裁决 → 用 classified kind(方向不明票 kind=unknown,类目留空 → 方向中性打分)。
-    """
-    if decision and decision.get("decision") == _DECISION_ASSIGN and decision.get("kind"):
-        return decision["kind"]
+def _effective_kind(classified: dict, decision_rec: Optional[dict]) -> Optional[str]:
+    """票的有效类别:方向裁决(decisions.replay_records 合并 wrapper 的 kind 槽)优先于 OCR 归堆的
+    kind。kind 槽在场即已裁定方向(assign 单裁 / assign+改数合并件皆认,改数不掩盖方向);无方向
+    裁定 → 用 classified kind(方向不明票 kind=unknown,类目留空 → 方向中性打分)。"""
+    rec_payload = (decision_rec or {}).get("payload") or {}
+    if rec_payload.get("kind"):
+        return rec_payload["kind"]
     return classified.get("kind")
 
 
@@ -93,13 +92,13 @@ def candidates_from_events(events: list[dict]) -> list[dict]:
       有效类别     → category_tag(方向位)
     """
     classified = _replay_latest(events, _EVT_CLASSIFIED)
-    decisions = _replay_latest(events, _EVT_DECISION)
+    decision_recs = decisions.replay_records(events)
     out: list[dict] = []
     for item_id, payload in classified.items():
         money = payload.get("money")
         if not money:
             continue
-        kind = _effective_kind(payload, decisions.get(item_id))
+        kind = _effective_kind(payload, decision_recs.get(item_id))
         if kind == _KIND_NON_TAX:
             continue
         out.append(

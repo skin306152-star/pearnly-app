@@ -130,6 +130,18 @@ def _decision_evt(wid, item_id, decision="accept"):
     }
 
 
+def _assign_kind_evt(wid, item_id, kind):
+    return {
+        "id": 8,
+        "work_order_id": wid,
+        "step": "reconcile",
+        "event_type": "human_decision",
+        "payload": {"item_id": item_id, "decision": "assign_kind", "kind": kind},
+        "actor": "user:rev",
+        "created_at": None,
+    }
+
+
 class BadgeUndecidedTests(unittest.TestCase):
     """清单 #4:裁决不改 item.status,徽章组按最新裁决现算 decided/undecided_count。"""
 
@@ -220,6 +232,28 @@ class BadgeUndecidedTests(unittest.TestCase):
             sod_enforced=False,
         )
         self.assertEqual(len(feed), 1)
+
+    def test_merged_direction_decision_counts_as_decided(self):
+        # P0-0 回归:方向票裁 assign_kind 后又 recalc(合并回放),仍算已裁一件——decided 计数不变。
+        orders = [
+            _order("wo-1", flagged_total=1, flagged_groups=[self._group("direction_ambiguous", 1)])
+        ]
+        events = [
+            _classified_evt("wo-1", "it-1", {}),
+            _assign_kind_evt("wo-1", "it-1", "purchase_invoice"),
+            _decision_evt("wo-1", "it-1", "recalc"),
+        ]
+        items = [_flagged_item("wo-1", "it-1", "direction_ambiguous", kind="unknown")]
+        review_feed.enrich(
+            cur=FakeCur(events, items),
+            tenant_id="t-1",
+            orders=orders,
+            actor=None,
+            sod_enforced=False,
+        )
+        g = orders[0]["flagged_groups"][0]
+        self.assertEqual(g["decided_count"], 1)
+        self.assertEqual(g["undecided_count"], 0)
 
 
 class SodProjectionTests(unittest.TestCase):

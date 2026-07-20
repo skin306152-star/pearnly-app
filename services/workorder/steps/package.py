@@ -45,8 +45,8 @@ def run(ctx: StepContext) -> StepResult:
     )
     items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
 
-    # human_decision 回放一次；守恒、备忘和 ledger 共用，不各 replay 一遍。
-    decision_recs = evidence.replay_items_by_type(events, "human_decision")
+    # human_decision 合并回放一次(方向槽+金额槽并存)；守恒、备忘和 ledger 共用，不各 replay 一遍。
+    decision_recs = decisions.replay_records(events)
 
     # 守恒闸(出包前置):每件必须有明确终态。待裁决>0 或 Σ桶≠N → stuck 逐件点名,绝不
     # 让无裁决/无豁免的件溜进交付包(G1R2 sales_direction_unhandled 黑洞根治的最后一道门)。

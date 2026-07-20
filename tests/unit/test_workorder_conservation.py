@@ -7,7 +7,28 @@ fail-closed 归待裁决;两类方向票无裁决 → 待裁决(G1R2 黑洞);wai
 
 import unittest
 
+from services.workorder import decisions
 from services.workorder.steps import conservation as c
+
+
+def _decision_evt(item_id, decision, **extra):
+    return {
+        "event_type": "human_decision",
+        "payload": {"item_id": item_id, "decision": decision, **extra},
+    }
+
+
+def _assign_evt(item_id, kind):
+    return {
+        "event_type": "human_decision",
+        "payload": {"item_id": item_id, "decision": "assign_kind", "kind": kind},
+    }
+
+
+def _bucket_after_replay(items, events):
+    """事件流 → 合并回放 → 展平成 bucket_items 需的 {item_id: payload}(与 package 编排同路)。"""
+    recs = decisions.replay_records(events)
+    return c.bucket_items(items, {iid: rec["payload"] for iid, rec in recs.items()})
 
 
 def _item(item_id, kind, status="ok", flag_reason=None, file_ref=None):
@@ -176,6 +197,55 @@ class WaivePrecedenceTests(unittest.TestCase):
         self.assertEqual([it["id"] for it in cons.buckets[c.WAIVED]], ["x"])
         self.assertEqual(cons.pending, [])
         self.assertTrue(cons.conserved(1))
+
+
+class MergedDirectionDecisionTests(unittest.TestCase):
+    """P0-0 半死锁根治:方向票裁向后又改数(合并回放)绝不掉回 PENDING——kind 槽在即已裁定。
+    双序都必须归位,不因 recalc 是最后一槽而丢方向(旧单槽 latest-wins 的死锁现场)。"""
+
+    def _direction_item(self):
+        return [_item("d", "unknown", status="flagged", flag_reason="direction_ambiguous")]
+
+    def test_assign_purchase_then_recalc_counts_as_input_either_order(self):
+        recalc = _decision_evt("d", "recalc", values={"vat": "70.00"})
+        assign = _assign_evt("d", "purchase_invoice")
+        for name, events in (
+            ("assign→recalc", [assign, recalc]),
+            ("recalc→assign", [recalc, assign]),
+        ):
+            with self.subTest(order=name):
+                cons = _bucket_after_replay(self._direction_item(), events)
+                self.assertEqual({it["id"] for it in cons.buckets[c.INPUT_COUNTED]}, {"d"})
+                self.assertEqual(cons.pending, [])
+                self.assertTrue(cons.conserved(1))
+
+    def test_assign_sales_then_recalc_goes_to_sales_reassigned(self):
+        events = [
+            _assign_evt("d", "sales_doc"),
+            _decision_evt("d", "recalc", values={"vat": "1.00"}),
+        ]
+        cons = _bucket_after_replay(self._direction_item(), events)
+        self.assertEqual({it["id"] for it in cons.buckets[c.SALES_REASSIGNED]}, {"d"})
+
+    def test_assign_then_waive_goes_to_waived(self):
+        events = [_assign_evt("d", "purchase_invoice"), _decision_evt("d", "waive", reason="lost")]
+        cons = _bucket_after_replay(self._direction_item(), events)
+        self.assertEqual({it["id"] for it in cons.buckets[c.WAIVED]}, {"d"})
+        self.assertEqual(cons.pending, [])
+
+    def test_assign_then_exclude_goes_to_excluded_not_counted(self):
+        # 裁进项后又改判剔除:末态不计入,归 EXCLUDED(与 reconcile R1 不计此票同口径)。
+        events = [_assign_evt("d", "purchase_invoice"), _decision_evt("d", "exclude")]
+        cons = _bucket_after_replay(self._direction_item(), events)
+        self.assertEqual({it["id"] for it in cons.buckets[c.EXCLUDED]}, {"d"})
+        self.assertEqual(cons.buckets[c.INPUT_COUNTED], [])
+
+    def test_recalc_only_without_direction_stays_pending(self):
+        # 无方向 kind 槽(只改数)→ 方向仍未裁定,fail-closed 待裁决(单一裁决行为不变)。
+        cons = _bucket_after_replay(
+            self._direction_item(), [_decision_evt("d", "recalc", values={"vat": "1.00"})]
+        )
+        self.assertEqual([it["id"] for it in cons.pending], ["d"])
 
 
 if __name__ == "__main__":

@@ -639,6 +639,81 @@ class ConservationGateTests(PackageFixture):
         self.assertEqual(len(store.deliverables), 5)
 
 
+class HalfDeadlockMergeTests(PackageFixture):
+    """P0-0 半死锁端到端守门:方向不明票裁 assign_kind 后又 recalc(合并回放)。修前守恒闸单槽
+    latest-wins 见 recalc-last 丢方向 → 判 PENDING → package 卡死(R1 已放行却出不了包);修后
+    合并槽 kind 在即归位,双序都放行出包,证据索引不漏该件。"""
+
+    def _recalc_evt(self, event_id, item_id, values):
+        payload = {"item_id": item_id, "decision": "recalc", "values": values}
+        return {
+            "id": event_id,
+            "step": "reconcile",
+            "event_type": "human_decision",
+            "payload": payload,
+        }
+
+    def _store(self, decision_events):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            _ambiguous_item("d", "/in/deposit_offset.jpg"),
+            _sales_item(),
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={"subtotal": "354923.86", "vat": "25194.28", "total_amount": "380118.14"},
+            ),
+            _classified_evt(
+                2,
+                "d",
+                kind="unknown",
+                status="flagged",
+                money={"subtotal": "4284.49", "vat": "369.91", "total_amount": "5654.40"},
+            ),
+            *decision_events,
+            _classified_evt(6, "s1", kind="sales_summary", sales_read={"headers": [], "rows": []}),
+            _reconcile_done_evt(),
+            _compute_done_evt(),
+        ]
+        return FakeStore(items, events)
+
+    def test_assign_then_recalc_ships_either_order(self):
+        assign = _assign_kind_evt(3, "d", "purchase_invoice")
+        recalc = self._recalc_evt(
+            4, "d", {"net": "5284.49", "vat": "369.91", "grand_total": "5654.40"}
+        )
+        for name, decision_events in (
+            ("assign→recalc", [assign, recalc]),
+            ("recalc→assign", [recalc, assign]),
+        ):
+            with self.subTest(order=name):
+                store = self._store(decision_events)
+                out = package.run(self._ctx(store))
+                self.assertEqual(out.status, "ok")  # 修前此处 stuck(半死锁)
+                self.assertEqual(len(store.deliverables), 5)
+
+    def test_evidence_index_includes_merged_direction_ticket(self):
+        assign = _assign_kind_evt(3, "d", "purchase_invoice")
+        recalc = self._recalc_evt(
+            4, "d", {"net": "5284.49", "vat": "369.91", "grand_total": "5654.40"}
+        )
+        store = self._store([assign, recalc])
+        package.run(self._ctx(store))
+
+        index = json.loads(
+            Path(store.deliverables["evidence_index"]["artifact_path"]).read_text(encoding="utf-8")
+        )
+        input_vat = index["numbers"]["input_vat"]
+        # 合并件(改数不掩盖方向)必现身进项证据:原件路径 + item + 分类/裁决事件 id。
+        self.assertIn("/in/deposit_offset.jpg", input_vat["source_files"])
+        self.assertIn({"item_id": "d", "file_name": "deposit_offset.jpg"}, input_vat["items"])
+        self.assertIn(2, input_vat["event_ids"])  # d 的 item_classified
+        self.assertIn(4, input_vat["event_ids"])  # d 的最新裁决(recalc)事件本身也是证据
+
+
 class WaiveTests(PackageFixture):
     """豁免通道:waive 后守恒放行可出包,但备忘必须留痕(谁豁免·为何·哪张文件)。"""
 

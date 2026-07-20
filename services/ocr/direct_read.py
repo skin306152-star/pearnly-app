@@ -36,6 +36,7 @@ from .layer2_structure import _DOC_PROMPTS, _DOC_SCHEMAS
 from .sanity import credit_note_review_reason, evaluate_sanity, infer_missing_discount
 from .schemas import BusinessDocumentType, PipelinePageResult, PipelineResult, ThaiInvoice
 from .triggers import _bucket_confidence, _check_amount_math
+from .validators import validate_invoice_date
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +266,14 @@ def read_page(
     cn_reason = credit_note_review_reason(invoice)
     if cn_reason:
         warnings.append(cn_reason)
+        force_review = True
+
+    # 日期离谱强制人工:降 0.05 置信压不到 needs_review,而年份读错一位会整张票记错
+    # 会计期与税期(2026-07-20 事故:2016-05-31 落库并推进 Express 的 2559-05 税期)。
+    # 不回落 —— Vision 路读日期更差,回落是净亏,该由人判是补录旧账还是读错年。
+    date_issues = validate_invoice_date(invoice)
+    if date_issues:
+        warnings.extend(date_issues)
         force_review = True
 
     # 双读一致性:过闸的发票再独立读一遍,钱面四件不一致 → 人工(差异原样进警告)。

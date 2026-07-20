@@ -139,5 +139,36 @@ class KindOfTests(unittest.TestCase):
         )
 
 
+class TerminalOfTests(unittest.TestCase):
+    def test_priority_order(self):
+        # 优先序:豁免 > 剔除 > 已定向 > 待裁决;kind 槽原样带出供归桶。
+        self.assertEqual(
+            decisions.terminal_of({"decision": "waive", "kind": "purchase_invoice"}),
+            (decisions.TERMINAL_WAIVED, "purchase_invoice"),
+        )
+        self.assertEqual(
+            decisions.terminal_of({"decision": "exclude", "kind": "purchase_invoice"}),
+            (decisions.TERMINAL_EXCLUDED, "purchase_invoice"),
+        )
+        self.assertEqual(
+            decisions.terminal_of({"decision": "recalc", "kind": "sales_doc"}),
+            (decisions.TERMINAL_ASSIGNED, "sales_doc"),
+        )
+        self.assertEqual(decisions.terminal_of({"decision": "recalc"})[0], "pending")
+        self.assertEqual(decisions.terminal_of(None), (decisions.TERMINAL_PENDING, None))
+
+
+class PayloadViewTests(unittest.TestCase):
+    def test_view_and_replay_payloads_agree(self):
+        events = [
+            _evt("a", "assign_kind", kind="purchase_invoice"),
+            _evt("a", "recalc", values={"vat": "1.00"}),
+        ]
+        records = decisions.replay_records(events)
+        view = decisions.payload_view(records)
+        self.assertEqual(view, decisions.replay_payloads(events))
+        self.assertEqual(view["a"], records["a"]["payload"])
+
+
 if __name__ == "__main__":
     unittest.main()

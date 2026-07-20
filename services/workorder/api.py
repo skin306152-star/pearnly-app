@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 #   face_value=确认票面 OCR 读数 · recalc=人工看原票补正 · exclude=剔除不计入
 _DECISIONS = (decisions.FACE_VALUE, decisions.RECALC, decisions.EXCLUDE)
 _DECISION_STEP = "reconcile"
-_EVT_DECISION = "human_decision"
 _EVT_CLASSIFIED = "item_classified"
 _EVT_BANK_PARSED = "item_bank_parsed"
 _EVT_NEEDS = "step_needs"
@@ -61,7 +60,6 @@ _SALES_KIND = kinds.SALES_SUMMARY
 _MANUAL_SOURCE = "manual"
 _MANUAL_SALES_DEDUPE = "manual:sales_summary"
 _MAX_NOTE_LEN = 500
-_KIND_BANK_STATEMENT = kinds.BANK_STATEMENT
 # reconcile.aggregate_sales 靠表头关键词认「销售额列 / 销项税列」;人工填的两个合计以泰文规范
 # 列名 + 单数据行合成表落库,与真实 POS 汇总表直读产出的 sales_read 形状一致(不另造契约)。
 _SALES_HEADER = "ยอดขาย"
@@ -185,8 +183,9 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     deliverables = store.list_deliverables(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     needs, blocked = _halt_info(events, wo["status"])
-    # item_classified 回放同一请求只算一次,喂给 flagged/进度/佐证三个读侧投影(纯参数下沉)。
+    # item_classified/human_decision 回放同一请求各只算一次,喂给下方各读侧投影(纯参数下沉)。
     classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
+    decided = decisions.replay_records(events)
     # item_bank_parsed 只有 reconcile 步有消费方(progress.bank_progress 其余步首行返 None),
     # 其余步跳过回放——order_detail 是 5s 轮询热路径,别每拉一次白扫一遍事件流。
     bank_parsed = (
@@ -209,8 +208,10 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "material_count": len(items),
         "progress": wo_progress.classify_progress(wo, items, classified),
         "bank_progress": wo_progress.bank_progress(wo, items, bank_parsed),
-        "flagged": evidence.flagged_projection(items, events, classified=classified),
-        "excluded": evidence.excluded_projection(items, events),
+        "flagged": evidence.flagged_projection(
+            items, events, classified=classified, decided=decided
+        ),
+        "excluded": evidence.excluded_projection(items, events, decided=decided),
         "alerts": evidence.alerts_projection(events)
         + evidence.amount_read_suggestions(events, classified=classified),
         "needs": needs,
@@ -254,7 +255,7 @@ def _bank_recon(events: list[dict], items: list[dict]) -> Optional[dict]:
     recon = bank_recon_raw(events)
     if recon is None:
         return None
-    bank_item_ids = [it["id"] for it in items if it.get("kind") == _KIND_BANK_STATEMENT]
+    bank_item_ids = [it["id"] for it in items if it.get("kind") == kinds.BANK_STATEMENT]
     recon = dict(recon, bank_item_ids=bank_item_ids)
     return _overlay_bank_decisions(recon, events)
 
@@ -348,7 +349,7 @@ def record_decision(
         tenant_id=tenant_id,
         work_order_id=work_order_id,
         step=_DECISION_STEP,
-        event_type=_EVT_DECISION,
+        event_type=decisions.EVT_DECISION,
         payload=payload,
         actor=actor,
     )

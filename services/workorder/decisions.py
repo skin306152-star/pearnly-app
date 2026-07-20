@@ -93,6 +93,42 @@ def replay_records(events: list[dict]) -> dict:
     return out
 
 
+def payload_view(records: dict) -> dict:
+    """replay_records 输出 → {item_id: 合并 payload}。守恒桶/闸只吃 payload 不要元数据,此前
+    各调用点各写一遍拆壳推导——收敛到此,管线里只流转一种形状语义。已有 records 的双需调用方
+    (回放一次,元数据/payload 各取所需)用本视图,别再 replay 第二遍。"""
+    return {iid: rec["payload"] for iid, rec in records.items()}
+
+
+def replay_payloads(events: list[dict]) -> dict:
+    """事件流 → payload 视图(只需 payload 的单需调用方一步到位)。"""
+    return payload_view(replay_records(events))
+
+
+# 合并裁决的终态仲裁结果(terminal_of 返回值第一元)。
+TERMINAL_WAIVED = "waived"
+TERMINAL_EXCLUDED = "excluded"
+TERMINAL_ASSIGNED = "assigned"
+TERMINAL_PENDING = "pending"
+
+
+def terminal_of(payload: dict | None) -> tuple[str, str | None]:
+    """合并 payload 的终态仲裁 → (terminal, kind)。优先序单源:豁免 > 剔除 > 已定向 > 待裁决。
+
+    P0-0 把回放归了源,但「kind 槽与 NON_COUNTING 并存时谁说了算」曾散回各消费方自裁且互相
+    矛盾(守恒桶判 EXCLUDED、排除投影却按 kind 在场放行离堆)——终态问题一律问这里。
+    """
+    p = payload or {}
+    decision = p.get("decision")
+    if decision == WAIVE:
+        return TERMINAL_WAIVED, p.get("kind")
+    if decision == EXCLUDE:
+        return TERMINAL_EXCLUDED, p.get("kind")
+    if p.get("kind"):
+        return TERMINAL_ASSIGNED, p.get("kind")
+    return TERMINAL_PENDING, None
+
+
 def kind_of(item: dict, records: dict) -> str:
     """人工方向裁决压过分类 kind,不回写 item 行(kind 槽独立于金额裁决)。records 为
     replay_records 的 wrapper 输出;无裁定方向则回落 item 自身 kind。"""

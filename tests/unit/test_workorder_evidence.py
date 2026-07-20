@@ -52,6 +52,25 @@ class ExcludedProjectionTests(unittest.TestCase):
     def test_bank_statement_is_assignable(self):
         self.assertIn("bank_statement", decisions.ASSIGN_KINDS)
 
+    def test_assign_then_exclude_stays_in_excluded_projection(self):
+        # 终态仲裁归源(terminal_of):assign 后又剔除的合并件末态是「不计入」——仍留堆可重判,
+        # 与守恒桶 EXCLUDED 口径一致(此前按 kind 槽在场放行离堆,与守恒对同一件判反)。
+        items = [{"id": "x1", "status": "excluded", "kind": "non_tax"}]
+        events = [
+            {
+                "id": 1,
+                "event_type": "human_decision",
+                "payload": {"item_id": "x1", "decision": "assign_kind", "kind": "bank_statement"},
+            },
+            {
+                "id": 2,
+                "event_type": "human_decision",
+                "payload": {"item_id": "x1", "decision": "exclude", "values": {}},
+            },
+        ]
+        out = evidence.excluded_projection(items, events)
+        self.assertEqual([r["item_id"] for r in out], ["x1"])
+
     def test_assigned_then_recalc_leaves_excluded_projection_either_order(self):
         # P0-0:裁过方向即离开排除堆,无论后续是否又改数(合并槽 kind 在即已归位)。
         items = [{"id": "x1", "status": "excluded", "kind": "non_tax"}]

@@ -44,7 +44,7 @@ def run(ctx: StepContext) -> StepResult:
     )
     classified = _replay_money(events)
     decision_recs = decisions.replay_records(events)
-    decisions_by_item = {iid: rec["payload"] for iid, rec in decision_recs.items()}
+    decisions_by_item = decisions.payload_view(decision_recs)
 
     # R1 进项税。除已归堆的进项票外,还收编「方向不明」票:它们钱已 OCR 出来,只是进/销没判准,
     # 必须靠人工 assign_kind 裁决归位(裁进项才入 Σ),无裁决 → 与「flagged 无裁决」同等停机点名。
@@ -423,7 +423,7 @@ def _default_shadow_push_report(ctx: StepContext) -> tuple:
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
     classified = _replay_money(events)
-    decisions_by_item = {i: r["payload"] for i, r in decisions.replay_records(events).items()}
+    decisions_by_item = decisions.replay_payloads(events)
 
     expected: list[str] = []
     seen: set[str] = set()

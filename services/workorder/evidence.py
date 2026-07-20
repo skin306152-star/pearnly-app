@@ -37,6 +37,8 @@ _KIND_UNKNOWN = kinds.UNKNOWN
 
 # 应缴税额的证据只挂 compute 自己的 step_done——它是"销项-进项"这一步减法的落库点。
 _NUMBER_STEP = {"tax_due": "compute"}
+# 进证据索引的关键数字键(哪些数字要证据链是本模块的领域知识,调用方传全量 numbers 即可)。
+_INDEX_NUMBER_KEYS = ("tax_due", "sales_amount", "output_vat", "purchase_amount", "input_vat")
 
 # 销项来源标注(状态诚实:人工申报的销项数字不能与 POS 直读的数字混为一谈)。sales_read
 # 有 source 字段(api.record_sales_summary 打的 "manual_entry")才是人工;POS xlsx 直读
@@ -171,7 +173,10 @@ def amount_read_suggestions(events: list[dict], classified: Optional[dict] = Non
 
 
 def flagged_projection(
-    items: list[dict], events: list[dict], classified: Optional[dict] = None
+    items: list[dict],
+    events: list[dict],
+    classified: Optional[dict] = None,
+    decided: Optional[dict] = None,
 ) -> list[dict]:
     """挂起清单投影(W3 审核队列 + order-detail 一次喂满,零额外往返)。每张 flagged 票带
     OCR 读数、最新裁决、判据人话 + 置信度(verdict_hint · MC1-b1 纯读侧现算,不改引擎不落库)。
@@ -179,11 +184,11 @@ def flagged_projection(
     ocr_read = item_classified 的 payload.money(票面钱字段原始串);decision = 该 item 的合并
     human_decision(decisions.replay_records:方向槽 kind 与金额槽 decision/values 并存);
     verdict_hint = verdict.hint(flag_reason, ocr_read)。都可为 None/空 —— 没读出/没判过就诚实给空,
-    不造数据。classified 可由调用方(api.order_detail)传入已回放好的索引,同一请求不重复扫事件流;
-    缺省自算。"""
+    不造数据。classified / decided 可由调用方(api.order_detail)传入已回放好的索引,同一请求
+    (5s 轮询热路径)不重复扫事件流;缺省自算。"""
     if classified is None:
         classified = replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions_by_item = decisions.replay_records(events)
+    decisions_by_item = decisions.replay_records(events) if decided is None else decided
     out = []
     for it in items:
         if it["status"] != "flagged":
@@ -203,15 +208,20 @@ def flagged_projection(
     return out
 
 
-def excluded_projection(items: list[dict], events: Optional[list[dict]] = None) -> list[dict]:
-    """排除件仍可见、可重判；最多投影 200 件，超限在最后一件留截断标。裁过方向(合并 payload 有
-    kind 槽)即离开排除堆——无论后续是否又改数,方向一经裁定这件已归位,不再算「被排除」。"""
-    decided = decisions.replay_records(events or [])
+def excluded_projection(
+    items: list[dict], events: Optional[list[dict]] = None, decided: Optional[dict] = None
+) -> list[dict]:
+    """排除件仍可见、可重判;最多投影 200 件,超限在最后一件留截断标。终态问 decisions.terminal_of
+    单源仲裁:裁定方向即离堆(已归位),但 assign 后又剔除/豁免的末态是「不计入」——仍留堆可重判,
+    与守恒桶 EXCLUDED/WAIVED 口径一致(此前按 kind 槽在场放行,与守恒对同一合并件判反)。"""
+    if decided is None:
+        decided = decisions.replay_records(events or [])
     excluded = [
         item
         for item in items
         if item["status"] == "excluded"
-        and not (decided.get(item["id"]) or {}).get("payload", {}).get("kind")
+        and decisions.terminal_of((decided.get(item["id"]) or {}).get("payload"))[0]
+        != decisions.TERMINAL_ASSIGNED
     ]
     out = [
         {
@@ -274,11 +284,13 @@ def build_evidence_index(
     items: list[dict],
     events: list[dict],
     numbers: dict,
+    classified: Optional[dict] = None,
+    decided: Optional[dict] = None,
 ) -> dict:
     """汇编证据索引:每个关键数字 → 支撑它的事件 id 列表 + 原件路径 + item id。
 
-    numbers 传 package 已解得的 {tax_due, sales_amount, output_vat, purchase_amount,
-    input_vat}(str(Decimal))。进项相关三个数字(input_vat/purchase_amount 共享同一批
+    numbers 传 package 已解得的全量数字 dict(str(Decimal));进索引的键在 _INDEX_NUMBER_KEYS
+    内部筛选,值为 None 的不进。进项相关三个数字(input_vat/purchase_amount 共享同一批
     进项票证据)指向 item_classified(purchase_invoice)+ 对应 human_decision 事件;
     销项两个数字(sales_amount/output_vat)指向 item_classified(sales_summary,status=ok)
     事件,并标注来源(direct_read/manual_entry/mixed,状态诚实不与直读数混淆);tax_due
@@ -286,9 +298,11 @@ def build_evidence_index(
     逐条 {item_id, file_name},拿 item_id 直接打 GET /items/{item_id}/image——file_name
     为 None 即该条无原件(如人工填的销项没有票据文件),前端据此诚实降级不裂图。
     """
+    numbers = {k: numbers[k] for k in _INDEX_NUMBER_KEYS if numbers.get(k) is not None}
     files_by_item = {it["id"]: it.get("file_ref") for it in items}
-    classified = replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions_by_item = decisions.replay_records(events)
+    if classified is None:
+        classified = replay_items_by_type(events, _EVT_CLASSIFIED)
+    decisions_by_item = decisions.replay_records(events) if decided is None else decided
 
     purchase_evidence = _collect_evidence(
         classified,
@@ -386,8 +400,8 @@ def sales_source_info(classified: dict, decisions_by_item: dict) -> dict:
     source == "manual_entry";POS xlsx 直读(classify.py._classify_summary)不写这个字段。
     人工裁决剔除(exclude)的销项件不计入(与 _collect_evidence 的排除口径一致)。
 
-    吃已回放好的 classified/decisions(与 _collect_evidence 一家人)——调用方若手上只有
-    events,用下面的 sales_source_info_from_events 薄包装,不要各自重新 replay 一遍。
+    吃已回放好的 classified/decisions(与 _collect_evidence 一家人)——调用方(package.run /
+    build_evidence_index)把同一请求已回放好的索引下沉进来,不各自重新 replay 一遍。
     """
     sources: set = set()
     notes: list = []
@@ -409,15 +423,6 @@ def sales_source_info(classified: dict, decisions_by_item: dict) -> dict:
     if notes:
         info["note"] = "; ".join(notes)
     return info
-
-
-def sales_source_info_from_events(events: list[dict]) -> dict:
-    """sales_source_info 的薄包装,给拿不到 build_evidence_index 已算好的 classified/
-    decisions 的调用方(package.py:_resolve_numbers,数字落定要早于证据索引汇编)用——
-    每种事件类型只 replay 一次,不比 sales_source_info 本身多扫。"""
-    classified = replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions_by_item = replay_items_by_type(events, _EVT_DECISION)
-    return sales_source_info(classified, decisions_by_item)
 
 
 def _compute_done_event(events: list[dict]) -> Optional[dict]:

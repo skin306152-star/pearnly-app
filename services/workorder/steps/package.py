@@ -45,19 +45,18 @@ def run(ctx: StepContext) -> StepResult:
     )
     items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
 
-    # human_decision 合并回放一次(方向槽+金额槽并存)；守恒、备忘和 ledger 共用，不各 replay 一遍。
+    # human_decision/item_classified 各回放一次;守恒、销项来源、备忘、ledger、证据索引共用。
     decision_recs = decisions.replay_records(events)
+    classified = evidence.replay_items_by_type(events, "item_classified")
 
     # 守恒闸(出包前置):每件必须有明确终态。待裁决>0 或 Σ桶≠N → stuck 逐件点名,绝不
     # 让无裁决/无豁免的件溜进交付包(G1R2 sales_direction_unhandled 黑洞根治的最后一道门)。
-    cons = conservation.bucket_items(
-        items, {iid: rec["payload"] for iid, rec in decision_recs.items()}
-    )
+    cons = conservation.bucket_items(items, decisions.payload_view(decision_recs))
     blocked = conservation.stuck_reasons(cons, len(items))
     if blocked:
         return StepResult.stuck(blocked)
 
-    numbers = _resolve_numbers(ctx, events)
+    numbers = _resolve_numbers(ctx, events, classified, decision_recs)
 
     # ภ.ง.ด.3/53 RD Prep(D1-3):当期有对应 payee 类型 WHT 才出,无则备忘录记一笔——
     # 装配/取数全归 pnd_prep(零重算钱),这里只负责把它并进整批出包。
@@ -65,10 +64,12 @@ def run(ctx: StepContext) -> StepResult:
 
     kinds = {
         _KIND_PP30: _write_pp30(out_dir, numbers),
-        _KIND_LEDGER: _write_ledger(out_dir, items, events, decision_recs, numbers),
+        _KIND_LEDGER: _write_ledger(out_dir, items, classified, decision_recs, numbers),
         _KIND_BANK: _write_bank(out_dir, items, numbers),
         _KIND_MEMO: _write_memo(out_dir, items, cons, decision_recs, numbers, wht_memo_lines),
-        _KIND_EVIDENCE: _write_evidence_index(ctx, out_dir, items, events, numbers),
+        _KIND_EVIDENCE: _write_evidence_index(
+            ctx, out_dir, items, events, numbers, classified, decision_recs
+        ),
         **pnd_kinds,
         **financials_report.build(out_dir, numbers),  # G1a 月度报表:有 r6_financials 才出
     }
@@ -93,7 +94,7 @@ def run(ctx: StepContext) -> StepResult:
     )
 
 
-def _resolve_numbers(ctx: StepContext, events: list[dict]) -> dict:
+def _resolve_numbers(ctx: StepContext, events: list[dict], classified: dict, decided: dict) -> dict:
     """取 compute 落下的六个数字 + reconcile 的 gates(供银行/进销底稿用)。同进程直接读
     ctx.data;续跑场景从事件流回放对应步的 step_done——与 compute.py 同一个范式。"""
     if all(ctx.data.get(k) for k in _COMPUTE_KEYS):
@@ -113,8 +114,8 @@ def _resolve_numbers(ctx: StepContext, events: list[dict]) -> dict:
 
     # 销项来源标注(状态诚实条款):人工申报的销项数字必须与 POS 直读区分,不混同呈现——
     # 永远从事件流回放算(不吃 ctx.data 的同进程捷径),同一份判定给 pp30/ledger 底稿与
-    # evidence_index 共用,不各拼一套。
-    sales_source = evidence.sales_source_info_from_events(events)
+    # evidence_index 共用,不各拼一套。回放索引由 run 下沉,本函数零扫事件流。
+    sales_source = evidence.sales_source_info(classified, decided)
     base["sales_source"] = sales_source.get("source")
     base["sales_source_note"] = sales_source.get("note")
     return base
@@ -227,10 +228,9 @@ def _write_pp30(out_dir: Path, numbers: dict) -> tuple[str, dict]:
 
 
 def _write_ledger(
-    out_dir: Path, items: list[dict], events: list[dict], decision_recs: dict, numbers: dict
+    out_dir: Path, items: list[dict], classified: dict, decision_recs: dict, numbers: dict
 ) -> tuple[str, dict]:
     """进销明细底稿:每张进项票一行[文件名/票号/卖方税号/净额/税额/状态/裁决] + 销项汇总一段。"""
-    classified = evidence.replay_items_by_type(events, "item_classified")
     purchases = sorted(
         (it for it in items if it["kind"] == kinds.PURCHASE_INVOICE),
         key=lambda it: it.get("file_ref") or "",
@@ -480,19 +480,16 @@ def _write_memo(
     return str(path), snapshot
 
 
-def _write_evidence_index(
-    ctx: StepContext, out_dir: Path, items: list[dict], events: list[dict], numbers: dict
-) -> tuple[str, dict]:
+def _write_evidence_index(ctx, out_dir, items, events, numbers, classified, decided):
+    """薄写盘壳(类型同 run 内调用处;classified/decided 是 run 下沉的回放索引)。"""
     index = evidence.build_evidence_index(
         work_order_id=ctx.work_order_id,
         period=numbers.get("period"),
         items=items,
         events=events,
-        numbers={
-            k: numbers[k]
-            for k in ("tax_due", "sales_amount", "output_vat", "purchase_amount", "input_vat")
-            if numbers.get(k) is not None
-        },
+        numbers=numbers,
+        classified=classified,
+        decided=decided,
     )
     path = _write_md(
         out_dir, "evidence_index.json", [json.dumps(index, ensure_ascii=False, indent=2)]

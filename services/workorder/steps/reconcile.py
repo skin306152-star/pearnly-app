@@ -111,7 +111,13 @@ def run(ctx: StepContext) -> StepResult:
 
     purchase_amount = sum((e["net"] for e in r1["entries"]), gates.ZERO)
     result_gates = {
-        "r1_input_vat": {"total": str(r1["total"]), "counted": len(r1["entries"])},
+        "r1_input_vat": {
+            "total": str(r1["total"]),
+            "counted": len(r1["entries"]),
+            # 进销底稿据此逐行列票:件的 kind 不随人工裁决回写(事件流才是事实源),底稿若自己
+            # 按 items.kind 筛,裁进项的方向不明票会漏行,逐行相加就对不上这里的 total。
+            "counted_items": [e["item_id"] for e in r1["entries"]],
+        },
         "r2_sales": {
             "sales_amount": str(r2["sales_amount"]),
             "output_vat": str(r2["output_vat"]),

@@ -16,6 +16,7 @@ from pathlib import Path
 from services.workorder import corrections, decisions, evidence, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import conservation, financials_report, pnd_prep, pp30_form
+from services.workorder.steps import reconcile_gates
 
 _KIND_PP30 = "pp30_draft"
 _KIND_LEDGER = "ledger_workpaper"
@@ -232,8 +233,7 @@ def _write_ledger(
 ) -> tuple[str, dict]:
     """进销明细底稿:每张进项票一行[文件名/票号/卖方税号/净额/税额/状态/裁决] + 销项汇总一段。"""
     purchases = sorted(
-        (it for it in items if it["kind"] == kinds.PURCHASE_INVOICE),
-        key=lambda it: it.get("file_ref") or "",
+        reconcile_gates.counted_purchases(items, numbers), key=lambda it: it.get("file_ref") or ""
     )
 
     def _row(it: dict) -> str:

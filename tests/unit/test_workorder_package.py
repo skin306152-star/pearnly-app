@@ -162,6 +162,16 @@ def _reconcile_done_evt(event_id=20):
     }
 
 
+def _reconcile_done_evt_with_r1(counted_items, event_id=20):
+    """带 R1 闸的 reconcile step_done:counted_items=None 模拟存量工单(该键还不存在)。"""
+    evt = _reconcile_done_evt(event_id)
+    r1 = {"total": "21.00", "counted": len(counted_items or [])}
+    if counted_items is not None:
+        r1["counted_items"] = list(counted_items)
+    evt["payload"]["gates"]["r1_input_vat"] = r1
+    return evt
+
+
 def _compute_done_evt(event_id=21):
     return {
         "id": event_id,
@@ -794,3 +804,74 @@ class VersioningTests(PackageFixture):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LedgerMatchesR1Tests(PackageFixture):
+    """进销底稿逐行 ↔ R1 合计口径必须一致。
+
+    件的 kind 不随人工裁决回写(事件流才是事实源),底稿若自己按 items.kind 筛,被裁成进项的
+    方向不明票 kind 仍是 unknown → 漏行。生产 SM 工单实测:底稿 9 行 vs 合计 11 张票,会计
+    一逐行核对就会认为系统算错。
+    """
+
+    def _store_with_assigned_direction(self, counted_items):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            _ambiguous_item("d", "/in/IMG_2640.jpg"),
+            _sales_item(),
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={"subtotal": "100.00", "vat": "7.00", "total_amount": "107.00"},
+            ),
+            _classified_evt(
+                2,
+                "d",
+                kind="unknown",
+                status="flagged",
+                money={"subtotal": "200.00", "vat": "14.00", "total_amount": "214.00"},
+            ),
+            _assign_kind_evt(3, "d", "purchase_invoice"),
+            _classified_evt(4, "s1", kind="sales_summary", sales_read={"headers": [], "rows": []}),
+            _reconcile_done_evt_with_r1(counted_items),
+            _compute_done_evt(),
+        ]
+        return FakeStore(items, events)
+
+    def _ledger_rows(self, store):
+        md = Path(store.deliverables["ledger_workpaper"]["artifact_path"]).read_text(
+            encoding="utf-8"
+        )
+        return md, [ln for ln in md.splitlines() if ln.startswith("| ") and "---" not in ln]
+
+    def test_direction_assigned_item_appears_in_ledger(self):
+        store = self._store_with_assigned_direction(["u", "d"])
+        # with_ctx_data=False → 走事件流回放取 gates(续跑场景),同进程路径由 ctx.data 覆盖。
+        package.run(self._ctx(store, with_ctx_data=False))
+
+        md, rows = self._ledger_rows(store)
+        self.assertIn("IMG_2640.jpg", md)
+        # 表头 1 行 + 2 张被 R1 计入的票
+        self.assertEqual(len(rows), 3)
+
+    def test_row_count_equals_r1_counted(self):
+        store = self._store_with_assigned_direction(["u", "d"])
+        package.run(self._ctx(store, with_ctx_data=False))
+
+        _, rows = self._ledger_rows(store)
+        snapshot = store.deliverables["ledger_workpaper"]["numbers"]
+        self.assertEqual(len(rows) - 1, snapshot["purchase_item_count"])
+        self.assertEqual(snapshot["purchase_item_count"], 2)
+
+    def test_legacy_order_without_counted_items_falls_back_to_kind(self):
+        # 存量工单的 gates 没有 counted_items:回落旧口径,不拿空清单把已交付底稿洗成空白。
+        store = self._store_with_assigned_direction(None)
+        package.run(self._ctx(store, with_ctx_data=False))
+
+        md, rows = self._ledger_rows(store)
+        self.assertIn("undisputed.jpg", md)
+        self.assertNotIn("IMG_2640.jpg", md)
+        self.assertEqual(len(rows), 2)

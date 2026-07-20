@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from services.summary_import import columns
-from services.workorder import corrections, decisions
+from services.workorder import corrections, decisions, kinds
 
 TOL = Decimal("0.01")
 ZERO = Decimal("0")
@@ -107,6 +107,7 @@ def resolve_input_vat(
         nonlocal total
         total += eff["vat"]
         eff["label"] = _label(it, money)
+        eff["item_id"] = it["id"]  # 底稿按此对齐合计口径,见 counted_purchases
         entries.append(eff)
 
     for it in purchases:
@@ -366,3 +367,18 @@ def trial_balance(purchase_entries: list[dict], sales_amount: Decimal, output_va
         "diff": diff,
         "offenders": offenders,
     }
+
+
+def counted_purchases(items: list[dict], numbers: dict) -> list[dict]:
+    """进销底稿该列哪些件 —— 与 R1 合计同源。
+
+    件的 kind 不随人工裁决回写(human_decision 事件流才是事实源),所以底稿不能自己按
+    items.kind 筛:被裁成进项的方向不明票 kind 仍是 unknown,会漏行,逐行相加对不上申报的
+    进项税(SM 工单实测底稿 9 行 vs 合计 11 张票)。存量工单的 gates 里没有 counted_items,
+    回落旧口径 —— 宁可沿用旧行为,不拿空清单把已交付的底稿洗成空白。
+    """
+    counted = ((numbers.get("gates") or {}).get("r1_input_vat") or {}).get("counted_items")
+    if not counted:
+        return [it for it in items if it["kind"] == kinds.PURCHASE_INVOICE]
+    ids = set(counted)
+    return [it for it in items if it["id"] in ids]

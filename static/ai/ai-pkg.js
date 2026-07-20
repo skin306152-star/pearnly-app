@@ -38,7 +38,7 @@
             // notice = {type:'ok'|'err', text} 出口动作的人话回执/报错。签批态渲染期从
             // detail.signoff 现算(signoffCtx · P0-1 单一事实源),唯一本地态=刚签成功的
             // 乐观标记(存签批人标签,退回清空),不再存三份可漂移的派生副本。
-            optimisticSigned: '',
+            optimisticSigned: null,
             signing: false,
             exporting: false,
             returning: false,
@@ -68,7 +68,12 @@
     // 可点 + 提示重签;乐观标记只在刚签成功后压过投影,下次回读自然接管。
     function signoffCtx() {
         if (S.optimisticSigned) {
-            return { signed: true, signedActor: S.optimisticSigned, staleSignoff: false };
+            // 恒真对象而非裸字符串:stub/匿名会话下 actor 标签可为空串,不能塌成「未签」。
+            return {
+                signed: true,
+                signedActor: S.optimisticSigned.actor || '',
+                staleSignoff: false,
+            };
         }
         var proj = (S.detail || {}).signoff;
         return {
@@ -259,7 +264,7 @@
             .reviewSignoff(S.orderId, '')
             .then(function () {
                 if (S !== session) return;
-                S.optimisticSigned = currentActorLabel(); // 压过 stale 投影,下次回读接管
+                S.optimisticSigned = { actor: currentActorLabel() }; // 压过 stale 投影,下次回读接管
             })
             .catch(function (err) {
                 if (S !== session) return;
@@ -313,7 +318,7 @@
                 if (S !== session) return;
                 S.returning = false;
                 // 退回使工单重开:乐观签批标记随之作废(后端投影经 review_rejected 也归 None)。
-                S.optimisticSigned = '';
+                S.optimisticSigned = null;
                 S.notice = { type: 'ok', text: at('pkg_returned_done') };
                 loadDetail();
             })

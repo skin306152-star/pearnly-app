@@ -158,6 +158,38 @@ class OrderDetailTests(_ApiTestBase):
     def test_unknown_order_returns_none(self):
         self.assertIsNone(api.order_detail(None, tenant_id="t-1", work_order_id="ghost"))
 
+    def test_detail_carries_signoff_projection(self):
+        # P0-1:签批投影随详情下发(单一事实源),前端据此回读点亮而非靠易失本地态。
+        self.store.wo["status"] = "review"
+        self.store.events = [
+            {
+                "step": "review",
+                "event_type": "review_signoff",
+                "actor": "user:rev",
+                "payload": {"note": "核对无误"},
+                "created_at": "2026-06-01T10:00:00+00:00",
+            }
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertEqual(detail["signoff"]["actor"], "user:rev")
+        self.assertEqual(detail["signoff"]["note"], "核对无误")
+        self.assertFalse(detail["signoff"]["stale"])
+
+    def test_detail_signoff_goes_stale_after_rerun(self):
+        # 复核后引擎重跑过(run_finished)→ stale,前端保持复核钮可点提示重签。
+        self.store.wo["status"] = "review"
+        self.store.events = [
+            {"step": "review", "event_type": "review_signoff", "actor": "user:rev", "payload": {}},
+            {"step": "run", "event_type": "run_finished", "actor": "system:runner", "payload": {}},
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertTrue(detail["signoff"]["stale"])
+
+    def test_detail_signoff_none_when_never_signed(self):
+        self.store.events = []
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["signoff"])
+
     def test_detail_carries_last_active_at_from_row_updated_at(self):
         # S2 §4:running 心跳续约每次都刷 updated_at——详情以 last_active_at 出线,
         # 前端工单页据此显示「最后活动 N 分钟前」判 AI 死活。

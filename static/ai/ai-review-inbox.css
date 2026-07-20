@@ -37,6 +37,12 @@
   color: var(--warn);
   margin-top: 8px;
 }
+/* 签批 stale 提示(P0-1):复核后数字重跑过,提示一键重签。 */
+.riq-signoff-stale {
+  font-size: 11.5px;
+  color: var(--warn);
+  margin-top: 8px;
+}
 .riq-receipt {
   margin-top: 10px;
   display: flex;

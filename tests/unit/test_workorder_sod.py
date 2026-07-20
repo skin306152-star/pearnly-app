@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
 
 from services.workorder import sod
 
@@ -153,6 +154,84 @@ class SelfReviewEscapeTests(unittest.TestCase):
         # 闸关本就放行,声明与否不改变(逐字节维持单人流)。
         events = [_decision("user:1"), _self_review("user:1")]
         self.assertIsNone(sod.approver_violation(events, "user:1", enforced=False))
+
+
+def _signoff(actor="user:rev", note="", at="2026-06-01T10:00:00+00:00"):
+    return {
+        "event_type": "review_signoff",
+        "actor": actor,
+        "payload": {"note": note},
+        "created_at": at,
+    }
+
+
+def _rejected():
+    return {"event_type": "review_rejected", "actor": "user:rev", "payload": {"reason": "税额可疑"}}
+
+
+def _run_finished():
+    return {"event_type": "run_finished", "actor": "system:runner", "payload": {"status": "review"}}
+
+
+class SignoffProjectionTests(unittest.TestCase):
+    """P0-1:签批投影四态——无签 None / 签后 fresh / 签后重跑 stale / 签后驳回作废 /
+    重签恢复 fresh。事件按落库序(id 升序)入参,与两读模型取库口径一致。"""
+
+    def test_no_signoff_returns_none(self):
+        self.assertIsNone(sod.signoff_projection([_decision("user:1"), _run_finished()]))
+
+    def test_empty_events_returns_none(self):
+        self.assertIsNone(sod.signoff_projection([]))
+
+    def test_signoff_fresh(self):
+        proj = sod.signoff_projection([_run_finished(), _signoff(note="核对无误")])
+        self.assertEqual(proj["actor"], "user:rev")
+        self.assertEqual(proj["note"], "核对无误")
+        self.assertEqual(proj["at"], "2026-06-01T10:00:00+00:00")
+        self.assertFalse(proj["stale"])
+
+    def test_signoff_then_run_finished_is_stale(self):
+        # 裁决触发的正常重跑:复核后数字重生,需重签。
+        proj = sod.signoff_projection([_signoff(), _run_finished()])
+        self.assertTrue(proj["stale"])
+        self.assertEqual(proj["actor"], "user:rev")
+
+    def test_signoff_then_rejected_returns_none(self):
+        # 驳回打回工单,旧签批作废。
+        self.assertIsNone(sod.signoff_projection([_signoff(), _rejected()]))
+
+    def test_resign_after_stale_restores_fresh(self):
+        proj = sod.signoff_projection([_signoff(), _run_finished(), _signoff(actor="user:rev2")])
+        self.assertEqual(proj["actor"], "user:rev2")
+        self.assertFalse(proj["stale"])
+
+    def test_resign_after_reject_restores_fresh(self):
+        proj = sod.signoff_projection(
+            [_signoff(), _rejected(), _run_finished(), _signoff(actor="user:rev3")]
+        )
+        self.assertEqual(proj["actor"], "user:rev3")
+        self.assertFalse(proj["stale"])
+
+    def test_multiple_run_finished_after_signoff_stays_stale(self):
+        self.assertTrue(
+            sod.signoff_projection([_signoff(), _run_finished(), _run_finished()])["stale"]
+        )
+
+    def test_datetime_created_at_serialized_to_iso(self):
+        evt = _signoff()
+        evt["created_at"] = datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc)
+        self.assertEqual(sod.signoff_projection([evt])["at"], "2026-06-01T10:00:00+00:00")
+
+    def test_missing_note_defaults_empty(self):
+        evt = {
+            "event_type": "review_signoff",
+            "actor": "user:rev",
+            "payload": {},
+            "created_at": None,
+        }
+        proj = sod.signoff_projection([evt])
+        self.assertEqual(proj["note"], "")
+        self.assertIsNone(proj["at"])
 
 
 if __name__ == "__main__":

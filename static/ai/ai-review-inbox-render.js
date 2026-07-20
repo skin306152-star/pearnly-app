@@ -102,6 +102,45 @@
         };
     }
 
+    // 签批渲染判定(纯函数 · P0-1):order.signoff 是后端投影(单一事实源)。
+    //   done   = 已复核 chip(ui.signedNote 乐观刚签,或投影 fresh=!stale)
+    //   hidden = 制单人强制态收起(gate.hideSignoff)
+    //   stale  = 复核后引擎重跑过数字,需重签(投影 stale)
+    //   button = 常态可签
+    // 判定以投影优先(正常重跑后签批态能回读点亮),ui.signedNote 只做点击后的乐观补充。
+    function signoffMode(order, ui, hideSignoff) {
+        ui = ui || {};
+        var proj = order.signoff;
+        if (ui.signedNote || (proj && !proj.stale)) return 'done';
+        if (hideSignoff) return 'hidden';
+        return proj && proj.stale ? 'stale' : 'button';
+    }
+
+    // 签批 chip / 钮 + stale 提示的 HTML 拼装(判定见 signoffMode)。返回 {btn, staleNote}。
+    function signoffCellHtml(order, ui, gate, blocked) {
+        var mode = signoffMode(order, ui, gate.hideSignoff);
+        if (mode === 'done') {
+            var doneText =
+                ui.signedNote ||
+                at('riq_signoff_done', { actor: AI.format.actorDisplay(order.signoff.actor) });
+            return { btn: '<span class="chip g">' + esc(doneText) + '</span>', staleNote: '' };
+        }
+        if (mode === 'hidden') return { btn: '', staleNote: '' };
+        var btn =
+            '<button type="button" class="btn sm pri" data-action="riq-signoff" data-wo="' +
+            order.work_order_id +
+            '"' +
+            (blocked || ui.signoffBusy ? ' disabled' : '') +
+            '>' +
+            esc(ui.signoffBusy ? at('riq_signoff_busy') : at('riq_signoff_btn')) +
+            '</button>';
+        var staleNote =
+            mode === 'stale'
+                ? '<p class="riq-signoff-stale">' + esc(at('riq_signoff_stale')) + '</p>'
+                : '';
+        return { btn: btn, staleNote: staleNote };
+    }
+
     // ui: {signoffBusy, signedNote, archiveBusy, archivedNote, rejectBusy, sodErr,
     //      selfDeclareBusy, selfDeclared, receiptBusy, receiptNote}
     function woActionsHtml(order, ui) {
@@ -109,18 +148,9 @@
         var blocked = order.status !== 'review'; // stuck(还有待裁决)不给签批,避免签个空
         var gate = sodGate(order, ui);
         // 按钮层级(§5 · 2026-07-17):高频动作「复核通过」当主态;「签批冻结」是低频
-        // 收尾动作,降回普通钮——此前主态挂在冻结上,把人往终局动作上引。逻辑零改动。
-        var signoffBtn = ui.signedNote
-            ? '<span class="chip g">' + esc(ui.signedNote) + '</span>'
-            : gate.hideSignoff
-              ? ''
-              : '<button type="button" class="btn sm pri" data-action="riq-signoff" data-wo="' +
-                order.work_order_id +
-                '"' +
-                (blocked || ui.signoffBusy ? ' disabled' : '') +
-                '>' +
-                esc(ui.signoffBusy ? at('riq_signoff_busy') : at('riq_signoff_btn')) +
-                '</button>';
+        // 收尾动作,降回普通钮——此前主态挂在冻结上,把人往终局动作上引。
+        var signoff = signoffCellHtml(order, ui, gate, blocked);
+        var signoffBtn = signoff.btn;
         var archiveBtn = ui.archivedNote
             ? '<span class="chip g">' + esc(ui.archivedNote) + '</span>'
             : !gate.archiveAllowed
@@ -171,6 +201,7 @@
             archiveBtn +
             rejectBtn +
             '</div>' +
+            signoff.staleNote +
             receiptRow +
             sodErr +
             '<div class="riq-sod-strip">' +
@@ -403,6 +434,7 @@
         workOrderCardHtml: workOrderCardHtml,
         groupHtml: groupHtml,
         orderUndecidedTotal: orderUndecidedTotal,
+        signoffMode: signoffMode,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

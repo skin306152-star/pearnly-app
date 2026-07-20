@@ -215,6 +215,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         + evidence.amount_read_suggestions(events, classified=classified),
         "needs": needs,
         "blocked_reasons": blocked,
+        "signoff": sod.signoff_projection(events),  # P0-1 签批态单一事实源(events 已在上)
         "numbers": _numbers(events),
         "bank_recon": _bank_recon(events, items),
         "shadow_draft": shadow_draft(events),

@@ -158,6 +158,9 @@
 .pkg-action-note.err {
   color: var(--danger);
 }
+.pkg-action-note.warn {
+  color: var(--warn);
+}
 
 /* ---- 证据模态框(v4 .mask/.modal/.ev-row 1:1)---- */
 .pkg-mask {

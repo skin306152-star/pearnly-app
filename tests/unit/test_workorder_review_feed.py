@@ -101,6 +101,30 @@ class EnrichFeedTests(unittest.TestCase):
         self.assertEqual(feed, [])
         self.assertEqual(len(cur.executed), 1)  # 无 flagged 工单 → 不发明细查询
 
+    def test_enrich_attaches_signoff_projection(self):
+        # P0-1:队列卡 order['signoff'] 与 api.order_detail 同一份投影,fresh/stale 单一事实源。
+        orders = [_order("wo-1", flagged_total=0)]
+        events = [
+            {
+                "id": 1,
+                "work_order_id": "wo-1",
+                "event_type": "review_signoff",
+                "actor": "user:rev",
+                "payload": {"note": ""},
+                "created_at": None,
+            }
+        ]
+        cur = FakeCur(events, [])
+        review_feed.enrich(cur, tenant_id="t-1", orders=orders, actor=None, sod_enforced=False)
+        self.assertEqual(orders[0]["signoff"]["actor"], "user:rev")
+        self.assertFalse(orders[0]["signoff"]["stale"])
+
+    def test_enrich_signoff_none_when_never_signed(self):
+        orders = [_order("wo-1", flagged_total=0)]
+        cur = FakeCur([], [])
+        review_feed.enrich(cur, tenant_id="t-1", orders=orders, actor=None, sod_enforced=False)
+        self.assertIsNone(orders[0]["signoff"])
+
     def test_severity_filter_keeps_only_matching_items(self):
         orders = [_order("wo-1", flagged_total=2)]
         events = [

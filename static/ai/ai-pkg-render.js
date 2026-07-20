@@ -293,6 +293,12 @@
               esc(ctx.notice.text) +
               '</p>'
             : '';
+        // 复核后数字重新生成(stale · P0-1):键一恢复可点,旁提示需再次复核——避免用户以为
+        // 早先的「已标记待签」仍代表当前数字。已签(乐观/fresh)不显。
+        var staleNote =
+            ctx.staleSignoff && !ctx.signed && reviewable
+                ? '<p class="pkg-action-note warn">' + esc(at('pkg_signoff_stale')) + '</p>'
+                : '';
         return (
             '<div class="panel"><div class="bd pkg-actions">' +
             '<div class="pkg-action-row">' +
@@ -300,6 +306,7 @@
             exportBtn +
             returnBtn +
             '</div>' +
+            staleNote +
             notice +
             '</div></div>'
         );

@@ -61,5 +61,42 @@ class OrderUndecidedTotalTests(unittest.TestCase):
         self.assertEqual(out, 0)
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class SignoffModeTests(unittest.TestCase):
+    """P0-1:签批渲染判定纯函数——投影优先、ui.signedNote 乐观补充、fresh/stale/None 四态。"""
+
+    def _mode(self, order, ui="{}", hide="false"):
+        return _run_node(f"""
+            const r = require({_MOD});
+            process.stdout.write(JSON.stringify(r.signoffMode({order}, {ui}, {hide})));
+            """)
+
+    def test_no_projection_yields_button(self):
+        self.assertEqual(self._mode("{}"), "button")
+
+    def test_fresh_projection_yields_done(self):
+        self.assertEqual(self._mode('{signoff:{actor:"u",stale:false}}'), "done")
+
+    def test_stale_projection_yields_stale(self):
+        self.assertEqual(self._mode('{signoff:{actor:"u",stale:true}}'), "stale")
+
+    def test_optimistic_signed_note_overrides_stale(self):
+        # 刚乐观重签:即便投影仍 stale(回读前),显 done 不再提示重签。
+        self.assertEqual(
+            self._mode('{signoff:{actor:"u",stale:true}}', ui='{signedNote:"已复核 · me"}'),
+            "done",
+        )
+
+    def test_hide_signoff_yields_hidden_when_not_signed(self):
+        # 制单人强制态:无投影且未签 → 收起(gate.hideSignoff)。
+        self.assertEqual(self._mode("{}", hide="true"), "hidden")
+
+    def test_fresh_projection_beats_hide_signoff(self):
+        # 已 fresh 签批仍点亮 chip(收起只作用于「可点的钮」)。
+        self.assertEqual(
+            self._mode('{signoff:{actor:"u",stale:false}}', hide="true"), "done"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

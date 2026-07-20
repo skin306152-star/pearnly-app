@@ -68,6 +68,9 @@ def enrich(
         wid = order["work_order_id"]
         events = events_by_order.get(wid, [])
         order["sod"] = sod_projection(events, actor, sod_enforced)
+        # 签批投影顺路挂(events 已回放好):队列卡据此点亮「已复核」/ 提示 stale 重签,
+        # 与 api.order_detail 同一份 sod.signoff_projection,不另造第二套判定。
+        order["signoff"] = sod.signoff_projection(events)
         if order["flagged_total"] <= 0:
             continue
         projection = evidence.flagged_projection(items_by_order.get(wid, []), events)

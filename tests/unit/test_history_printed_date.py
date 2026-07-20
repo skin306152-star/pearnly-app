@@ -46,7 +46,9 @@ class DeriveFromPrintedTests(unittest.TestCase):
         # 旧记录没有 date_raw:不动 date,但守住"库里不许存佛历年"
         pages = [{"fields": {"date": "2026-05-31"}}]
         self.assertIsNone(_derive_dates_from_printed(pages))
-        self.assertEqual(_derive_dates_from_printed([{"fields": {"date": "2569-05-31"}}]), "2569-05-31")
+        self.assertEqual(
+            _derive_dates_from_printed([{"fields": {"date": "2569-05-31"}}]), "2569-05-31"
+        )
 
     def test_tolerates_malformed_pages(self):
         self.assertIsNone(_derive_dates_from_printed(None))

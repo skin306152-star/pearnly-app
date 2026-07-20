@@ -430,9 +430,9 @@ window.__AI_I18N_EN__ = {
 
     // E2 · Bank reconciliation (work order detail, wo view)
     brx_title: 'Bank reconciliation',
-    brx_disabled_t: 'Bank reconciliation not available',
+    brx_disabled_t: 'Itemized bank reconciliation not generated',
     brx_disabled_s:
-        'No bank statement yet — upload it in Intake; this appears automatically at the reconcile step.',
+        'No itemized reconciliation list for this order yet — sales verification of bank statements happens in Intake; once itemized matching runs, the list appears here automatically.',
     brx_ok_chip: 'Reconciled',
     brx_diff_chip: 'Discrepancy found',
     brx_diff_net: 'Net difference {net}',

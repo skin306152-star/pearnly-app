@@ -416,8 +416,9 @@ window.__AI_I18N_ZH__ = {
 
     // E2 · 银行对账(工单详情 wo 视图)
     brx_title: '银行对账',
-    brx_disabled_t: '银行对账未启用',
-    brx_disabled_s: '还没有银行流水——把对账单传进「收料」,跑到对账步骤这里会自动出现',
+    brx_disabled_t: '逐笔银行对账清单未产出',
+    brx_disabled_s:
+        '本工单尚未产出逐笔对账清单——银行流水的销项核对在「收料」页进行;跑过逐笔对账后,这里会自动出现清单',
     brx_ok_chip: '已核对平',
     brx_diff_chip: '存在差异',
     brx_diff_net: '净差 {net}',

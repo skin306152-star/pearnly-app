@@ -110,7 +110,7 @@
         var guideCount = guidanceCount(d, root.AI.reviewQueue);
         var needs = (d.needs || [])
             .map(function (n) {
-                return '<div class="ni">' + esc(n) + '</div>';
+                return '<div class="ni">' + esc(root.AI.format.fieldLabel(n)) + '</div>';
             })
             .join('');
         // 步骤位只对「AI 在跑」有意义,人审终态甩流程步位=状态打架(2026-07-17 真跑实测)。

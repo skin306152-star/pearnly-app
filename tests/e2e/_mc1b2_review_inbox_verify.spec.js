@@ -139,6 +139,7 @@ function reviewQueueFixture(opts) {
                         flagged_total: 0,
                         top_severity: null,
                         sod: opts.signoffSod,
+                        signoff: opts.signoffProj,
                     },
                 ],
             },
@@ -341,6 +342,60 @@ test.describe('MC1-b2/MC2-A3 · 全所审核收件箱三分区聚合页', () => 
             timeout: 10000,
         });
         await page.screenshot({ path: path.join(ART, '09-archive-done.png'), fullPage: true });
+    });
+
+    test('签批投影 fresh(P0-1):后端 signoff 直接点亮已复核 chip(无需本地点击)', async ({
+        page,
+    }) => {
+        const state = {
+            feed: [],
+            queueFixture: () =>
+                reviewQueueFixture({
+                    bulkFlaggedTotal: 0,
+                    signoffProj: {
+                        actor: 'user:rev',
+                        at: '2026-06-01T10:00:00+00:00',
+                        note: '',
+                        stale: false,
+                    },
+                }),
+        };
+        await wireApi(page, state);
+        await gotoPool(page, 'zh');
+        await page.waitForSelector('.riq-wo[data-wo="wo-signoff"]', { timeout: 10000 });
+        const card = page.locator('.riq-wo[data-wo="wo-signoff"]');
+        // 未点任何按钮,投影 fresh 即点亮「已复核」chip;复核钮转完成态(不再出现)。
+        await expect(card.locator('.riq-wo-steps .chip.g')).toContainText('已复核');
+        await expect(card.locator('[data-action="riq-signoff"]')).toHaveCount(0);
+        await expect(card.locator('.riq-signoff-stale')).toHaveCount(0);
+        await page.screenshot({ path: path.join(ART, '10-signoff-fresh.png'), fullPage: true });
+    });
+
+    test('签批投影 stale(P0-1):复核后重跑过 → 提示重签 + 复核钮保持可点', async ({ page }) => {
+        const state = {
+            feed: [],
+            queueFixture: () =>
+                reviewQueueFixture({
+                    bulkFlaggedTotal: 0,
+                    signoffProj: {
+                        actor: 'user:rev',
+                        at: '2026-06-01T10:00:00+00:00',
+                        note: '',
+                        stale: true,
+                    },
+                }),
+        };
+        await wireApi(page, state);
+        await gotoPool(page, 'zh');
+        await page.waitForSelector('.riq-wo[data-wo="wo-signoff"]', { timeout: 10000 });
+        const card = page.locator('.riq-wo[data-wo="wo-signoff"]');
+        // stale 提示可见(复核后数据重生),且复核钮仍在 + 可点(一键重签)。
+        await expect(card.locator('.riq-signoff-stale')).toBeVisible();
+        const btn = card.locator('[data-action="riq-signoff"]');
+        await expect(btn).toBeVisible();
+        expect(await btn.evaluate((el) => !el.disabled)).toBe(true);
+        await expect(card.locator('.riq-wo-steps .chip.g')).toHaveCount(0); // 尚未有已复核 chip
+        await page.screenshot({ path: path.join(ART, '11-signoff-stale.png'), fullPage: true });
     });
 
     test('③ SoD proactive 显隐:制单人强制态签批/冻结钮按数据收起 → 声明后冻结钮现', async ({

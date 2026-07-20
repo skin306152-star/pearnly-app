@@ -1,5 +1,21 @@
 # 📊 STATE · Pearnly 项目状态
 
+## 当前状态卡(2026-07-20 夜 · Pearnly AI · ★静默改数盘点 + SA-1 点灯 + C1 四修上线)
+
+- **当前 task**:今天 9 个 commit 全上线 CI 绿(`c15e218c..c53dcc9a`)。**换窗先读 `docs/agent/HANDOFF-2026-07-20-NIGHT-SILENT-WRITES.md`**(未完成项逐条带「为什么修/修哪里/怎么复现/建议修法/怎么根治」)+ `HANDOFF-2026-07-20-AGENT-BOUNDARY-AND-FRAMEWORK.md`(边界与框架)。
+- **★真问题是 Zihao 点开证据链翻出来的**:SM 工单 `bd093ba9` 销项 ฿60,073.60 证据链显示 **「无原件(人工申报)」** —— 数字来自银行流水倒推 + **597 行个人转账同一微秒一次性全判销售**(零 non_sales/零 pending),佐证闸自曝 `coverage=12.5% / gap_net=750,764.48 / amber` 只标黄没拦。**这单不该签,缺 POS Z 报表/月度销售汇总**。★机器与人的分工是**互斥不是复核**:LLM 判 sales 的 125 行指纹交集为 0、一条都没人看过。
+- **★系统不知道该来什么,只知道手上有没有**:`needs` 是即时快照(6 个硬编码 if),客户档案零个「本期应到哪些来源」字段;人工填一个数 → 闸绿 → 自动跑到待签 → 正常出包,全程无拦截。
+- **★已上线(9 commit)**:SA-1 机器自动改动进签字页(`2fb5fae0`,引擎改判/银行行改金额改方向此前任何界面都不显示)· 改判清不掉旧 flag_reason(`96f4160e`,真 bug,`update_item` 的 None=省略语义误用,**测试替身语义漂移遮了整批**)· 进销底稿逐行对齐 R1(`b49d9af9`,真 bug,底稿 9 行 vs 合计 11 张票,客户核对必认为算错)· 方向通道判据认「人已裁过」(`d285672f`,理论缺陷生产零命中)· `history_routes` 512→415 拆分(`27b7e6a5`,别窗改动越 500 硬闸)· 重出两处 stale dist(`38ce30cf`,别窗 bump ?v 没 build,不修则改动上线不生效)· /simplify 收口方向判据归一(`9abfe1fc`)。
+- **★三条修复都做过回滚验证**(把修复改回去看测试转不转红)。**其中一条第一次跑仍是绿的** —— 原测试压根没断言过该行为,补预设脏值才真正守住。不做这步,守门是空的。
+- **未完成 · A 类(静默改申报数字)**:①OCR 在票上补一行不存在的折扣、补完勾稽自洽闸就不响(`ocr/sanity.py:213-236`)②L3 失败后第二个模型重读金额,成功就整体顶掉且**唯独不设 needs_manual_review**(`page_runner.py:313-323`)③超 2000 行汇总表静默截断、**连表尾合计行一起截掉**致交叉校验变 absent(`parse.py:20` / 消费缺口 `reconcile_gates:257-310`)④银行金额按余额反推改写**并把 balance_ok 由 False 翻 True**(`bank_stmt_balance.py:163,205-211`)⑤缺值当 0 进合计⑥`_effective` 派生让 R4 恒平。**共同病根=算术自洽就当读对了,而那个自洽是系统自己造的。**
+- **未完成 · 其余**:B 类归类去向 6 条(认不出的表默认归销项汇总/VAT 读花判 non_tax/latin-1 兜底/去重键误判/跨期票无判据)· C 类真 bug 4 条(签核后仍能落裁决/批量建议置信度查表/收件箱批量缺 isDecided 守卫/run_finished 落库失败被吞)· D 类 11 条(**IN-R 为首**)· /simplify 补深 7 条(**S-1 哨兵改造 6 个调用点最便宜时刻** / S-2 钱路径统一走 `kind_of`(销项侧三处仍有病)/ S-3 渲染 default 分支(**不做则第三类动作当天出事**)/ S-4 app.py 注册表数据化)。全部细目见交接页。
+- **★订正一条**:汇总表 ×7% 造税额(`mapping.py:128-135` + `commit.py:33-39` 标 high 绕闸)**只在批量建单线,不进月度工单申报**(工单只 import `columns` 词典)—— 严重性下调,别按"造申报税额"排期。
+- **管家 Agent 不提前**:这批问题没一条是它能解决的(全在"代码算账"半边),且闸被架空时 Agent 连报警扳机都收不到。先修闸。
+- **★多窗口协作(今天踩 5 次)**:共享 index 卷走对方文件 / `reset --mixed` 改写已提交 hash / 残留锁 / 两处 stale dist / 别窗文件未过 black。**根治=一窗口一 worktree**;立即可用绕法=`GIT_INDEX_FILE=/tmp/x git read-tree HEAD && git add <我的> && git commit`(完全不碰共享 index)。血泪:`git commit -- <paths>` 对 **untracked 新文件不生效**;push 前必须 `npx eslint .` + `format:check` **全仓**(本窗口据此把 CI 弄红过一次)。
+- **仓库**:master = `c53dcc9a`(+别窗 3 个 commit)· 未 push=0 · 四轮 CI 全绿(中间红一次自己修的)。
+
+<details><summary>上一状态卡(2026-07-20 · GC-D 收官 + GC-E-1 + Agent 边界定案)</summary>
+
 ## 当前状态卡(2026-07-20 · Pearnly AI · GC-D 收官 + GC-E-1 + ★Agent 边界定案与目标框架 · 冰厂 6 月实测备料中)
 
 - **当前 task**:GC-D 全批 + GC-E-1 + **★销项认列/PDF 切表根治**全部上线 CI 绿、prod 已部署 `8665575a`;下一批建议 **IN-R 预期输入登记表**(冰厂三渠道销项实锤触发)。**换窗先读 `docs/agent/HANDOFF-2026-07-20-AGENT-BOUNDARY-AND-FRAMEWORK.md`**。
@@ -15,6 +31,8 @@
 - **记债**:D2 真多页断链 PDF 真跑未验(冰厂/SM 2569-06 自然覆盖);GC-D-7 真人旅程与实测合并做;run_leases scope 参数化+signoff_projection 挪 evidence;`.mx-table`/`.sdw-table` 两套表格 CSS 并存;纠正记忆须配版本/回滚(ProMem 坑)。**新增两条(各自独立成批)**:①PDF 文字层泰文声调显示错位(只影响看不影响算,认列已免疫;正解=零宽符号按内容流吸附回基字符,作用域限新适配器,别动 `text_layer.py` 契约)②`/ai/#/fileconv` 上方「未做数字校验」与下方守恒校验结果自相矛盾(根因 `convert.py:51` 缺 doc_type 守卫 + 前端 `ai-fileconv-render.js:205` 早返回;`pdf_out.py` 与 `vat_report` 同中招)。另:`pdf_grid` 的 `degraded` 只透出未消费(要不要让降级件强制人工过目=产品判断);L1 在抽测 4 个真 PDF 上命中 2/4,L2 阈值仅合成语料验过。
 - **仓库**:5 个 wip 分支已合入并删(远端+本地);施工 worktree 已清;共享树 DMS 窗 UI_LINT_REPORT.txt 未碰;未 push=0。
 - **换窗入口**:本卡 + **`docs/agent/HANDOFF-2026-07-20-AGENT-BOUNDARY-AND-FRAMEWORK.md`**(本轮唯一入口)+ `HANDOFF-2026-07-19-NIGHT-SM-CLOSEOUT.md`(GC-E 细目仍有效)+ 记忆 [[agent-boundary-read-vs-calc]] [[gcd-0720-full-queue-shipped]]。
+
+</details>
 
 <details><summary>上一状态卡(2026-07-19 · Pearnly AI · SM 2569-05 真人重跑暂停交接)</summary>
 

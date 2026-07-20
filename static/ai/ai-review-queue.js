@@ -48,6 +48,7 @@
         direction_ambiguous: 'rv_flag_direction',
         sales_direction_unhandled: 'rv_flag_sales_direction',
         sales_doc_review: 'rv_flag_sales_doc',
+        discount_inferred: 'rv_flag_discount_inferred',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');

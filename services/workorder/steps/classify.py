@@ -18,6 +18,7 @@ from typing import Optional
 from core import feature_flags
 from services.ai_gateway import attribution
 from services.ocr import escalation_budget
+from services.ocr.sanity import DISCOUNT_INFERRED_PREFIX
 from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import checkpoint, ocr_cost_cap, ocr_ledger, ocr_quota, ocr_reuse
@@ -380,6 +381,11 @@ def _gate_reason(fields: dict) -> Optional[str]:
     """OCR 确定性闸/勾稽闸报警 → 具体原因,绝不静默放过(金标 IMG_2647 靠这条)。"""
     warnings = fields.get("_validation_warnings") or []
     if warnings:
+        # 系统按勾稽差额替票面补了一行没读到的折扣 → 票面现在是自洽的,与「票面自身对不上」
+        # 是两回事。此前靠回填文案里的「折」字撞进 _MATH_HINTS 才被拦下,人看到「数字不
+        # 自洽」去核对却发现三个数明明平 —— 标签必须自己站出来,不能借别人的关键词。
+        if any(str(w).startswith(DISCOUNT_INFERRED_PREFIX) for w in warnings):
+            return "discount_inferred"
         text = " ".join(str(w) for w in warnings).lower()
         if any(hint in text for hint in _MATH_HINTS):
             return "amount_math_fail"

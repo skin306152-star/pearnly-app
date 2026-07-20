@@ -318,6 +318,8 @@ Object.assign(window.__AI_I18N_JA__, {
     riq_expl_ocr_low_confidence: 'AI の読取に自信がありません。確認してください。',
     riq_expl_ocr_validation_warning: '数字を読み違えた可能性があります。原本と照合してください。',
     riq_expl_sales_doc_review: '顧客自身の売上票のようです。S で売上として確定。',
+    riq_expl_discount_inferred:
+        '金額が合わず、システムが差額分の割引行を補って合わせました。原本にその行があるか確認してください。',
 
     // J-C · 審査キューの操作記憶(未処理優先/判定済み折りたたみ)+ 一括確認 +
     // J-A 提案値の反映
@@ -349,6 +351,8 @@ Object.assign(window.__AI_I18N_JA__, {
     verdict_ocr_validation: 'OCR の読取値が検証ルールと食い違い、原本と照合してください',
     verdict_ocr_error: 'OCR 読取に失敗:{error}',
     verdict_duplicate: '既存項目と重複(重複先:{of})',
+    verdict_discount_inferred:
+        '税抜額・税額・合計が合わなかったため、システムが差額から割引 {discount} が印字されていると推定して補いました。原本にこの割引行があるか照合してください',
     // UI1(2026-07-13)· 顧客一覧の階層化 + パンくず修正
     clients_obligations_n: '当期の義務 {n} 件',
     crumb_archive: '顧客ファイル',

@@ -324,6 +324,8 @@ Object.assign(window.__AI_I18N_EN__, {
     riq_expl_ocr_validation_warning: 'A number may be misread — compare with the original image.',
     riq_expl_sales_doc_review:
         "Looks like your client's own sales invoice — press S to confirm as sales.",
+    riq_expl_discount_inferred:
+        'The totals did not add up; the system added a discount line to make them balance — check the original.',
 
     // J-C · review queue memory (undecided-first / decided folding) + bulk confirm +
     // J-A suggested value echo
@@ -356,6 +358,8 @@ Object.assign(window.__AI_I18N_EN__, {
         'OCR reading conflicts with a validation rule — please verify against the original',
     verdict_ocr_error: 'OCR could not read this document: {error}',
     verdict_duplicate: 'Duplicate of an existing item ({of})',
+    verdict_discount_inferred:
+        'Net, VAT and total did not add up. The system inferred a printed discount of {discount} and filled it in, which made them balance. Please verify the original really shows that discount line',
     // UI1 (2026-07-13) · layered client rows + honest breadcrumb
     clients_obligations_n: '{n} obligations this period',
     crumb_archive: 'Client file',

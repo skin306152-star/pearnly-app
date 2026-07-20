@@ -295,6 +295,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_expl_ocr_low_confidence: 'AI 读出来了但把握不大,过目确认一下',
     riq_expl_ocr_validation_warning: '某个数字可能读错了,对照原图看一眼',
     riq_expl_sales_doc_review: '这看起来是你客户自己开出去的销售票,按 S 确认归销项',
+    riq_expl_discount_inferred: '票面对不上,系统按差额补了一行折扣才对上,请看原票真有这行吗',
 
     // J-C · 审核队列操作记忆(未判优先/已判折叠)+ 批量确认 + J-A 建议值改数回显
     rv_counter: '待处理 {k} · 已处理 {d} · 共 {n}',
@@ -321,6 +322,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
     verdict_ocr_error: 'OCR 识别失败：{error}',
     verdict_duplicate: '与已收票据重复（重复于 {of}）',
+    verdict_discount_inferred:
+        '票面净额、税额、合计原本对不上，系统按差额推断票上印了一行 {discount} 的折扣并补了进去，补完才对上。请核对原票是否真有这行折扣',
     // UI1(2026-07-13)· 客户目录行内分层 + 面包屑修真
     clients_obligations_n: '当期义务 {n} 项',
     crumb_archive: '客户档案',

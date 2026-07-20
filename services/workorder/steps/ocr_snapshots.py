@@ -24,6 +24,9 @@ def money_fields(fields: dict) -> dict:
         "subtotal": fields.get("subtotal"),
         "vat": fields.get("vat"),
         "total_amount": fields.get("total_amount"),
+        # 折扣纯佐证:reconcile 只读净/税/含税三项,不参与合计。带上是因为它可能是系统
+        # 回填的(sanity.infer_missing_discount),审核卡要说得出「补了多少钱」。
+        "discount": fields.get("discount"),
         "invoice_number": fields.get("invoice_number"),
         "seller_tax": fields.get("seller_tax"),
         "buyer_tax": fields.get("buyer_tax") or fields.get("buyer_tax_id"),

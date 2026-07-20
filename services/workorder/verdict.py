@@ -44,6 +44,7 @@ _K_LOW_CONF = "verdict_ocr_low_conf"
 _K_VALIDATION = "verdict_ocr_validation"
 _K_OCR_ERROR = "verdict_ocr_error"
 _K_DUPLICATE = "verdict_duplicate"
+_K_DISCOUNT_INFERRED = "verdict_discount_inferred"
 
 
 # 泰国标准 VAT 税率。amount_math_fail 的勾稽闸词表(classify._MATH_HINTS)混装了
@@ -97,6 +98,11 @@ def _band_params(_money: dict, tail: str) -> dict:
     return {"band": tail or None}
 
 
+def _discount_params(money: dict, _tail: str) -> dict:
+    """系统补的那行折扣金额:卡上不说出改了多少钱,「请核对原图」就无从核对起。"""
+    return {"discount": money.get("discount")}
+
+
 def _error_params(_money: dict, tail: str) -> dict:
     return {"error": tail or None}
 
@@ -135,6 +141,9 @@ _MAP = {
     "ocr_error": _Policy(_K_OCR_ERROR, LOW, _error_params, SEV_CRIT, None),
     # 指纹精确命中复件 → high,建议剔除。
     "duplicate_of": _Policy(_K_DUPLICATE, HIGH, _dup_params, SEV_CRIT, _EXCLUDE),
+    # 系统按勾稽差额替票面补了一行折扣 → 票面现在自洽,但那份自洽是系统自己造的。
+    # crit(直接改了钱面字段)、无安全默认:必须有人对着原图确认真印了这行折扣。
+    "discount_inferred": _Policy(_K_DISCOUNT_INFERRED, LOW, _discount_params, SEV_CRIT, None),
 }
 
 

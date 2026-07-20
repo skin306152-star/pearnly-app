@@ -189,6 +189,7 @@ window.__AI_I18N_JA__ = {
     rv_flag_direction: '方向が不明 · 仕入か売上か?',
     rv_flag_sales_direction: '自社の売上書類の可能性 · 方向を確認',
     rv_flag_sales_doc: '自社の売上請求書 · 確認してください（S キー）',
+    rv_flag_discount_inferred: 'システムが割引行を補いました · 原本と照合してください',
     rv_key_dir_purchase: '仕入',
     rv_key_dir_sales: '売上',
     rv_key_dir_nontax: '非課税',

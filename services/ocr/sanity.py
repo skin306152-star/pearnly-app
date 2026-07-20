@@ -28,6 +28,10 @@ from services.ocr.money import (
 )
 from services.ocr.sanity_multi import multi_invoice_reasons
 
+# 折扣回填留痕前缀。消费方(direct_read / workorder.classify)按它识别「系统改写过票面钱
+# 字段」并强制留人;认前缀不认中文文案——按关键词匹配的话,改一个字就静默失守。
+DISCOUNT_INFERRED_PREFIX = "discount_inferred:"
+
 # 钱字段比对容差(泰铢):吸收四舍五入,又抓得住真错。
 _TOL = 0.5
 # 泰国标准 VAT 7%;缺 VAT 时用它反推「总额−小计」是否落在合理区间。
@@ -216,6 +220,10 @@ def infer_missing_discount(invoice) -> str | None:
 
     双重勾稽(差额 + VAT 税基)同时成立才回填,单一差额不动手 —— 那可能是选错列,
     交给规则 4b 转人工。回填成功返回说明文字(进 validation_warnings 留痕),否则 None。
+
+    ⚠️ 回填会改写票面钱字段,且改完 _check_amount_math 与本模块硬闸都自动放行
+    (实测 triggers 由 ['amount math fail...'] 变 [])。消费方必须据 DISCOUNT_INFERRED_PREFIX
+    强制留人:闸的职责是报告差额,不是把票改到闸能过。
     """
     if getattr(invoice, "is_not_invoice", False):
         return None
@@ -233,4 +241,6 @@ def infer_missing_discount(invoice) -> str | None:
     if abs(expected_vat - vat) > max(_TOL, vat * _RECON_REL):
         return None
     invoice.discount = f"{d:.2f}"
-    return f"discount_inferred: 票面折扣 {d:.2f} 未被提取,由勾稽差额+7%税基双重校验反推回填"
+    return (
+        f"{DISCOUNT_INFERRED_PREFIX} 票面折扣 {d:.2f} 未被提取," "由勾稽差额+7%税基双重校验反推回填"
+    )

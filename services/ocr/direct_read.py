@@ -33,7 +33,12 @@ from .cost import _compute_total_cost
 from .gl_balance_chain import repair_gl_document
 from .layer2_prompts import _SYSTEM_PROMPT
 from .layer2_structure import _DOC_PROMPTS, _DOC_SCHEMAS
-from .sanity import credit_note_review_reason, evaluate_sanity, infer_missing_discount
+from .sanity import (
+    DISCOUNT_INFERRED_PREFIX,
+    credit_note_review_reason,
+    evaluate_sanity,
+    infer_missing_discount,
+)
 from .schemas import BusinessDocumentType, PipelinePageResult, PipelineResult, ThaiInvoice
 from .date_sanity import validate_invoice_date
 from .triggers import _bucket_confidence, _check_amount_math
@@ -245,12 +250,14 @@ def read_page(
     invoice = ThaiInvoice(is_not_invoice=True)
     document = None
     warnings: List[str] = []
+    gate_notes: List[str] = []
     if document_type in ("auto", "invoice"):
         try:
             invoice = ThaiInvoice(**outcome.data)
         except ValidationError as e:
             raise DirectReadFallback(f"page {page_number}: invoice schema: {e}") from e
-        warnings.extend(_invoice_hard_gates(invoice, page_number))
+        gate_notes = _invoice_hard_gates(invoice, page_number)
+        warnings.extend(gate_notes)
         warnings.extend(_invoice_soft_flags(invoice))
     else:
         try:
@@ -261,8 +268,15 @@ def read_page(
             # 台账#10 · 与 Vision 路(page_runner)同一套余额链修复,两链不劈叉
             warnings.extend(repair_gl_document(document))
 
-    # 贷记单方向性单据强制人工(两链共判 · sanity.credit_note_review_reason)
     force_review = False
+
+    # 折扣回填 = 系统替票面补了一行没读到的折扣,补完硬闸(_check_amount_math + sanity)
+    # 自动放行。改写可以自动,消警必须留人 —— 与 Vision 路 page_runner 同一条口径,
+    # 两链不劈叉。降 0.05 置信压不到 needs_review,必须显式 force。
+    if any(str(n).startswith(DISCOUNT_INFERRED_PREFIX) for n in gate_notes):
+        force_review = True
+
+    # 贷记单方向性单据强制人工(两链共判 · sanity.credit_note_review_reason)
     cn_reason = credit_note_review_reason(invoice)
     if cn_reason:
         warnings.append(cn_reason)

@@ -17,6 +17,7 @@ function mergeFields(
     const result: {
         invoice_number: unknown;
         date: unknown;
+        date_raw: unknown;
         total_amount: unknown;
         tax_ids: unknown[];
         seller_name: unknown;
@@ -32,6 +33,7 @@ function mergeFields(
     } = {
         invoice_number: null,
         date: null,
+        date_raw: null,
         total_amount: null,
         tax_ids: [],
         seller_name: '',
@@ -53,6 +55,8 @@ function mergeFields(
         // 标量字段:取第一个非空值
         if (!result.invoice_number && f.invoice_number) result.invoice_number = f.invoice_number;
         if (!result.date && f.date) result.date = f.date;
+        // 票面原文:抽屉显示/编辑的就是它,不透传则识别记录路径恒回落公历
+        if (!result.date_raw && f.date_raw) result.date_raw = f.date_raw;
         if (!result.total_amount && f.total_amount) result.total_amount = f.total_amount;
         if (!result.subtotal && f.subtotal) result.subtotal = f.subtotal;
         if (!result.vat && f.vat) result.vat = f.vat;

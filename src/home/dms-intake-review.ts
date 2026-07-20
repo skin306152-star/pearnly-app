@@ -19,7 +19,8 @@ const REV_CORE: Array<[string, string]> = [
     ['seller_name', 'drawer-lbl-name'],
     ['seller_tax', 'drawer-lbl-tax'],
     ['invoice_number', 'drawer-lbl-invoice'],
-    ['date', 'drawer-lbl-date'],
+    // 票面原文(泰国票面印佛历)· 保存走 PUT /api/history 由后端按它反推公历 date
+    ['date_raw', 'drawer-lbl-date'],
     ['subtotal', 'drawer-lbl-subtotal'],
     ['vat', 'drawer-lbl-vat'],
 ];
@@ -135,7 +136,10 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
     const head = headInner ? `<div class="dx-inv-head">${headInner}</div>` : '';
     const cell = ([k, lk]: [string, string]) => {
         const warn = warns.has(k) ? ' warn' : '';
-        const v = String(inv.fields[k] ?? '');
+        // 旧记录/文字层来源没有 date_raw → 回落已归一的 date,不让格子空着
+        const v = String(
+            (k === 'date_raw' ? (inv.fields.date_raw ?? inv.fields.date) : inv.fields[k]) ?? ''
+        );
         return (
             `<div class="dx-rv${warn}"><label>${esc(t(lk))}</label>` +
             `<input class="dx-rv-in" data-iv-field="${fi}:${ii}:${esc(k)}" value="${esc(v)}"></div>`

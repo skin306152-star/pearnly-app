@@ -339,6 +339,15 @@ def _parse_bank_statement_impl(
     _verify_row_balances(rows, opening)
     # v118.35.0.62 · 余额链自动修复『数字读错的金额』· 把可证的 ⚠ 变成自动修正
     _repair_amount_from_balance(rows, opening)
+
+    # GC-D-2 · 整份一眼读会吞多页对账单的折行结算行 → 有余额链断链时逐页换眼(单页直读)重读,
+    # 严格更少断链才采纳(否则原样保留)。escalations 留痕随 item_bank_parsed 事件审计回放。
+    from services.recon import bank_stmt_reread
+
+    rows, escalations = bank_stmt_reread.maybe_reread_chain_breaks(
+        rows, opening, file_bytes=file_bytes, filename=filename, ext=ext, api_key=api_key
+    )
+
     balance_warn_count = sum(1 for r in rows if r.balance_ok is False)
     low_conf_count = sum(1 for r in rows if r.confidence == "low")
     if balance_warn_count or low_conf_count:
@@ -392,7 +401,7 @@ def _parse_bank_statement_impl(
     if not completeness["ok"]:
         logger.info(f"[stmt_parse][{filename}] completeness issues: {completeness['issues']}")
 
-    return {
+    result: Dict[str, Any] = {
         "ok": True,
         "rows": rows,
         "opening": opening,
@@ -404,6 +413,9 @@ def _parse_bank_statement_impl(
         "completeness": completeness,  # v118.35.0.63
         "method_divergence": _arb_divergence,  # 两法分歧原因(空=无)· 与 completeness 分开
     }
+    if escalations:  # GC-D-2 · 无升档时不加字段,老结果形状逐字节不变
+        result["escalations"] = escalations
+    return result
 
 
 def _parse_gl_impl(

@@ -27,6 +27,37 @@ from services.recon.bank_table_io import _is_summary_row
 logger = logging.getLogger(__name__)
 
 
+def statement_rows_from_entries(entries: List[Dict[str, Any]], filename: str) -> List[StatementRow]:
+    """管线银行文档 entries → StatementRow 列表(单一转换事实源:pipeline 适配路与断链换眼
+    重读路共用)。deposit/withdrawal/balance 由校验器保证来自各自列;两侧皆 0 的无动行跳过;
+    日期优先取印刷原文(transaction_date_raw),回退归一化 transaction_date。"""
+    rows: List[StatementRow] = []
+    for e in entries:
+        deposit = _to_float(e.get("deposit"))
+        withdrawal = _to_float(e.get("withdrawal"))
+        balance = _to_float(e.get("balance"))
+        if deposit == 0.0 and withdrawal == 0.0:
+            continue
+        tx_date = _parse_date(e.get("transaction_date_raw") or "")
+        if tx_date is None and e.get("transaction_date"):
+            try:
+                yy, mm, dd = e["transaction_date"].split("-")
+                tx_date = date(int(yy), int(mm), int(dd))
+            except (ValueError, AttributeError):
+                tx_date = None
+        rows.append(
+            StatementRow(
+                date=tx_date,
+                description=e.get("description") or "",
+                withdrawal=withdrawal,
+                deposit=deposit,
+                balance=balance,
+                source_file=filename,
+            )
+        )
+    return rows
+
+
 def _parse_bank_stmt_via_pipeline(
     file_bytes: bytes, filename: str, tenant_id: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -117,30 +148,7 @@ def _parse_bank_stmt_via_pipeline(
             bank_code = code
             break
 
-    rows: List[StatementRow] = []
-    for e in doc.get("entries") or []:
-        deposit = _to_float(e.get("deposit"))
-        withdrawal = _to_float(e.get("withdrawal"))
-        balance = _to_float(e.get("balance"))
-        if deposit == 0.0 and withdrawal == 0.0:
-            continue
-        tx_date = _parse_date(e.get("transaction_date_raw") or "")
-        if tx_date is None and e.get("transaction_date"):
-            try:
-                yy, mm, dd = e["transaction_date"].split("-")
-                tx_date = date(int(yy), int(mm), int(dd))
-            except (ValueError, AttributeError):
-                tx_date = None
-        rows.append(
-            StatementRow(
-                date=tx_date,
-                description=e.get("description") or "",
-                withdrawal=withdrawal,
-                deposit=deposit,
-                balance=balance,
-                source_file=filename,
-            )
-        )
+    rows: List[StatementRow] = statement_rows_from_entries(doc.get("entries") or [], filename)
 
     # 台账#11 · 图片/扫描件路此前拿到行就直接返回,余额链三件套(方向纠正/逐行核对/
     # 金额反推修复)只跑 PDF 与 xlsx 路 → 实弹 5/56 行方向翻转静默放行。与其余两路

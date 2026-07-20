@@ -101,19 +101,29 @@ def _checkpointed_rows(ctx: StepContext, banks: list[dict]) -> list:
             rows.extend(parsed[iid])
             continue
         try:
-            fresh = _parse_bank_file(ctx, it)
+            parsed = _parse_bank_file(ctx, it)
         except BankStatementParseError:
             raise
         except Exception as exc:
             name = it.get("original_name") or Path(it.get("file_ref") or "").name or iid
             raise BankStatementParseError(name, type(exc).__name__) from exc
+        fresh, escalations = _split_parsed(parsed)
         if not fresh:
             name = it.get("original_name") or Path(it.get("file_ref") or "").name or iid
             raise BankStatementParseError(name, "no_transaction_rows")
         with checkpoint.item_scope(ctx):
-            _emit_bank_parsed(ctx, it, fresh, generation)
+            _emit_bank_parsed(ctx, it, fresh, generation, escalations)
         rows.extend(fresh)
     return rows
+
+
+def _split_parsed(parsed) -> tuple[list, list]:
+    """_parse_bank_file 返回值拆成 (rows, escalations)。生产返 (rows, escalations) 二元组;
+    历史/测试替身返裸行列表 → escalations 视为空(向后兼容,注入契约不破)。"""
+    if isinstance(parsed, tuple):
+        fresh_rows, escalations = parsed
+        return list(fresh_rows or []), list(escalations or [])
+    return list(parsed or []), []
 
 
 def _replay_parsed_banks(ctx: StepContext) -> tuple[dict, int]:
@@ -159,16 +169,26 @@ def active_bank_parse_events(events: list[dict]) -> list[dict]:
     ]
 
 
-def _emit_bank_parsed(ctx: StepContext, item: dict, rows: list, generation: int) -> None:
+def _emit_bank_parsed(
+    ctx: StepContext,
+    item: dict,
+    rows: list,
+    generation: int,
+    escalations: Optional[list] = None,
+) -> None:
     """落一条 item_bank_parsed 检查点事件(dedupe_key 锚代次+item,同代重放只落一条)。
-    rows 序列化进 payload；失效后新代次可重读，正常续跑仍从事件回放。"""
+    rows 序列化进 payload；失效后新代次可重读，正常续跑仍从事件回放。escalations 非空才并入
+    (GC-D-2 换眼升档留痕),无升档时 payload 形状逐字节不变。"""
+    payload: dict = {"item_id": item["id"], "rows": [_serialize_row(r) for r in rows]}
+    if escalations:
+        payload["escalations"] = list(escalations)
     ctx.store.append_event(
         ctx.cur,
         tenant_id=ctx.tenant_id,
         work_order_id=ctx.work_order_id,
         step=_STEP,
         event_type=_EVT_BANK_PARSED,
-        payload={"item_id": item["id"], "rows": [_serialize_row(r) for r in rows]},
+        payload=payload,
         dedupe_key=f"bank_parse:g{generation}:{item['id']}",
     )
 
@@ -254,7 +274,8 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
         rows = list(parsed.get("rows") or [])
         if not rows:
             raise BankStatementParseError(name, "no_transaction_rows")
-        return rows
+        # GC-D-2 · 断链换眼重读留痕随行上抛,检查点并进 item_bank_parsed 事件供审计回放。
+        return rows, list(parsed.get("escalations") or [])
     finally:
         attribution.reset_attribution(token)
 

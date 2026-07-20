@@ -78,6 +78,9 @@ def run(ctx: StepContext) -> StepResult:
     r2 = gates.aggregate_sales(reads)
     if not r2["used"]:
         return StepResult.needs(["sales_summary"])
+    # 汇总表自带的合计行与逐行求和打架 = 认列或表本身有问题,两个数只能停机交人工,不许挑一个用。
+    if r2["total_check"] == gates.TOTAL_CHECK_MISMATCH:
+        return StepResult.stuck(gates.total_check_reasons(r2))
 
     # R3 银行材料存在性 + 逐笔真对平(pearnly_ai_bank_recon 闸)。闸关:逐字节维持存在性判定
     # 现状(only present/count/note)。闸开且有 bank_statement 件:把流水与工单事件流的票据
@@ -111,6 +114,7 @@ def run(ctx: StepContext) -> StepResult:
         "r2_sales": {
             "sales_amount": str(r2["sales_amount"]),
             "output_vat": str(r2["output_vat"]),
+            "total_check": r2["total_check"],
         },
         "r3_bank": r3,
         "r4_trial_balance": {

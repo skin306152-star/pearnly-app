@@ -13,6 +13,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional
 
+from services.summary_import import columns
 from services.workorder import corrections, decisions
 
 TOL = Decimal("0.01")
@@ -22,9 +23,13 @@ CENT = Decimal("0.01")
 # 某票税额后,该票的基必须按此率从修正后税额反推,才不破这条恒等式(见 _recalc)。
 STANDARD_VAT_RATE = Decimal("0.07")
 
-# 汇总表列角色识别关键词(泰/英)。先认销项税列再认销售额列,避免销售额误命中税额列。
-_SALES_HINTS = ("ยอดขาย", "มูลค่า", "จำนวนเงิน", "รวมเงิน", "sales", "amount", "ยอด")
-_VAT_HINTS = ("ภาษีขาย", "ภาษีมูลค่า", "vat", "ภาษี", "tax")
+# 表内合计行 ↔ 逐行求和的交叉校验判定。
+TOTAL_CHECK_MATCHED = "matched"
+TOTAL_CHECK_MISMATCH = "mismatch"
+TOTAL_CHECK_ABSENT = "absent"
+
+# 合计行里这些占位符当"没填"看,不当 0——空合计行与真 0 合计不是一回事,前者不该判不平。
+_BLANK_CELLS = ("", "-", "--", "—", "n/a")
 
 
 def to_dec(v: Any) -> Decimal:
@@ -189,50 +194,129 @@ def _apply_decision(it: dict, money: dict, dec: dict, unresolved: list) -> Optio
     return None
 
 
-def _first_match(headers_lower: list[str], hints: tuple, exclude: Optional[int]) -> Optional[int]:
-    for i, h in enumerate(headers_lower):
-        if i == exclude:
-            continue
-        if any(hint in h for hint in hints):
-            return i
-    return None
-
-
-def _detect_cols(headers: list) -> tuple[Optional[int], Optional[int]]:
-    """从表头认「销售额列」「销项税列」下标。先认税列,销售额列再排除税列避免撞列。"""
-    lower = [str(h).strip().lower() for h in headers]
-    vat_idx = _first_match(lower, _VAT_HINTS, exclude=None)
-    sales_idx = _first_match(lower, _SALES_HINTS, exclude=vat_idx)
-    return sales_idx, vat_idx
-
-
 def _cell_num(cells: list, idx: Optional[int]) -> Decimal:
     if idx is None or idx >= len(cells):
         return ZERO
     return to_dec(cells[idx])
 
 
+def _cell_filled(cells: list, idx: Optional[int]) -> bool:
+    """该格填了东西(非空、非占位横杠)。合计行拿它判「这列有没有报数」。"""
+    if idx is None or idx >= len(cells):
+        return False
+    return str(cells[idx]).strip().lower() not in _BLANK_CELLS
+
+
+def _sales_plan(headers: list) -> Optional[tuple[Optional[int], Optional[int], Optional[int]]]:
+    """表头 → 销项取数方案 (税前列, 税额列, 含税合计列);取不出销售额 → None。
+
+    销售额只认税前列;没有税前列但含税合计与税额俱全时按 含税−税额 回推。只有含税合计、
+    没有税额列 → 返回 None(税率无从确证,臆造出来的销项会直接错进 ภ.พ.30),交上层判 needs。
+    """
+    cols = columns.detect_columns(headers)
+    subtotal = cols[columns.SUBTOTAL]
+    vat = cols[columns.VAT]
+    total = cols[columns.TOTAL]
+    if subtotal is not None:
+        return (subtotal, vat, None)
+    if total is not None and vat is not None:
+        return (None, vat, total)
+    return None
+
+
+def _row_money(cells: list, plan: tuple) -> tuple[Decimal, Decimal]:
+    """一行 → (销售额, 销项税)。税前列缺席时销售额 = 含税合计 − 税额。"""
+    subtotal_idx, vat_idx, total_idx = plan
+    vat = _cell_num(cells, vat_idx)
+    if subtotal_idx is not None:
+        return (_cell_num(cells, subtotal_idx), vat)
+    return (_cell_num(cells, total_idx) - vat, vat)
+
+
+def _total_row_check(label: str, rows: list, plan: tuple, sums: tuple) -> Optional[dict]:
+    """逐行求和 ↔ 表内合计行交叉校验 → {label, gaps};无合计行/合计行没报数 → None(不算错)。
+
+    取最后一条 is_summary 行当总计(分页小计在前、总计在后是汇总表通例)。合计行与逐行和
+    差超 TOL → gaps 逐字段带差额,交上层点名停机:两个数打架时绝不悄悄采信其中一个。
+    """
+    summaries = [r for r in rows if r.get("is_summary")]
+    if not summaries:
+        return None
+    cells = summaries[-1].get("cells") or []
+    if not any(_cell_filled(cells, i) for i in plan if i is not None):
+        return None
+    reported = _row_money(cells, plan)
+    gaps = [
+        {"field": field, "rows_sum": rows_sum, "reported": rep, "diff": rows_sum - rep}
+        for field, rows_sum, rep in zip(("sales_amount", "output_vat"), sums, reported)
+        if (rows_sum - rep).copy_abs() > TOL
+    ]
+    return {"label": label, "gaps": gaps}
+
+
 def aggregate_sales(reads: dict) -> dict:
     """R2:POS 直读聚合销售额/销项税。按表头认列,逐行求和,跳过底部合计行(不重复计)。
 
-    返回 {sales_amount, output_vat, used}。used=False 表示所有直读都认不出销售额列(无法产出销项
-    合计),上层据此判 needs——诚实反映缺可用直读源,不硬造数字。
+    列识别走 summary_import.columns(全仓单一事实源):最长命中优先 + 角色独占。销售额取
+    税前列,不取含税合计,也不取数量/单价列——冰厂 7-11 汇总表 `ยอด|ราคา|ยอดเงินก่อน vat|
+    ยอดเงิน vat|ยอดเงินรวม` 在朴素首命中扫描下会把数量当销售额、税前当销项税,还 used=True
+    静默进 ภ.พ.30。
+
+    返回 {sales_amount, output_vat, used, total_check, total_check_details}。
+    used=False = 所有直读都取不出销售额(认不出列,或只有含税合计没有税额),上层据此判 needs,
+    不硬造数字。total_check 是表内合计行与逐行求和的交叉校验(matched/mismatch/absent),
+    mismatch 时 total_check_details 逐表逐字段带差额,由上层停机点名。
     """
     sales_total = ZERO
     vat_total = ZERO
     used = False
-    for parsed in reads.values():
-        s_idx, v_idx = _detect_cols(parsed.get("headers") or [])
-        if s_idx is None:
+    checked = False
+    details: list[dict] = []
+    for label, parsed in reads.items():
+        plan = _sales_plan(parsed.get("headers") or [])
+        if plan is None:
             continue
         used = True
-        for r in parsed.get("rows") or []:
+        rows = parsed.get("rows") or []
+        one_sales = ZERO
+        one_vat = ZERO
+        for r in rows:
             if r.get("is_summary"):
                 continue
-            cells = r.get("cells") or []
-            sales_total += _cell_num(cells, s_idx)
-            vat_total += _cell_num(cells, v_idx)
-    return {"sales_amount": sales_total, "output_vat": vat_total, "used": used}
+            sales, vat = _row_money(r.get("cells") or [], plan)
+            one_sales += sales
+            one_vat += vat
+        sales_total += one_sales
+        vat_total += one_vat
+        check = _total_row_check(str(label), rows, plan, (one_sales, one_vat))
+        if check is None:
+            continue
+        checked = True
+        if check["gaps"]:
+            details.append(check)
+    if details:
+        status = TOTAL_CHECK_MISMATCH
+    elif checked:
+        status = TOTAL_CHECK_MATCHED
+    else:
+        status = TOTAL_CHECK_ABSENT
+    return {
+        "sales_amount": sales_total,
+        "output_vat": vat_total,
+        "used": used,
+        "total_check": status,
+        "total_check_details": details,
+    }
+
+
+def total_check_reasons(r2: dict) -> list[str]:
+    """交叉校验不平 → 停机原因(逐表逐字段点名差额,与 R1/R4 的点名范式同格式)。"""
+    return [
+        f"sales_total_mismatch[{d['label']}]: {g['field']} 逐行和={g['rows_sum']} "
+        f"表内合计={g['reported']} 差={g['diff']}"
+        for d in r2.get("total_check_details") or []
+        for g in d["gaps"]
+    ]
 
 
 def trial_balance(purchase_entries: list[dict], sales_amount: Decimal, output_vat: Decimal) -> dict:

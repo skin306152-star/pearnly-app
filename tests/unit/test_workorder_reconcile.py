@@ -383,6 +383,32 @@ class R2SalesTests(unittest.TestCase):
         self.assertEqual(out.status, "ok")
         self.assertEqual(out.payload["sales_amount_total"], "500.00")
 
+    def test_summary_row_cross_check_recorded_on_gate(self):
+        items = [_pi("p1", file="a.jpg")]
+        events = [_money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"), _sales_evt()]
+        out = reconcile.run(_ctx(FakeStore(items, events)))
+        self.assertEqual(out.payload["gates"]["r2_sales"]["total_check"], "matched")
+
+    def test_summary_row_mismatch_stops_and_names_both_numbers(self):
+        """表内合计行与逐行求和打架 → 停机点名,绝不悄悄采信其中一个数。"""
+        items = [_pi("p1", file="a.jpg")]
+        reads = {
+            "s1": {
+                "headers": ["วันที่", "ยอดขาย", "ภาษีขาย"],
+                "rows": [
+                    {"cells": ["1", "500.00", "35.00"], "is_summary": False},
+                    {"cells": ["รวม", "900.00", "63.00"], "is_summary": True},
+                ],
+            }
+        }
+        events = [_money_evt("p1", net="1428.57", vat="100.00", grand="1528.57")]
+        out = reconcile.run(_ctx(FakeStore(items, events), data={"sales_summary_reads": reads}))
+        self.assertEqual(out.status, "stuck")
+        joined = " ".join(out.reasons)
+        self.assertIn("sales_total_mismatch[s1]", joined)
+        self.assertIn("500.00", joined)
+        self.assertIn("900.00", joined)
+
 
 class R3BankTests(unittest.TestCase):
     def test_bank_missing_notes_but_not_stuck(self):

@@ -67,6 +67,8 @@ const COLS: Array<[string, string]> = [
 ];
 
 // 表头猜列(命中即预选·可改)· 关键词多语言。
+// 单一事实源在后端 services/summary_import/columns.py(工单 R2 销项聚合与本页共用一份词典);
+// 这里是它的镜像,仅为省一次往返做预选。改词典先改后端,再同步这里。
 const GUESS: Record<string, string[]> = {
     date: ['date', 'วันที่', '日期'],
     qty: ['qty', 'quantity', 'จำนวน', 'ยอด', '数量'],

@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from core import feature_flags
@@ -20,6 +19,7 @@ from services.workorder import (
     kinds,
     obligation_engine,
     progress as wo_progress,
+    sales_entry,
     sod,
     store,
     wht_signals,
@@ -54,16 +54,7 @@ _NUMBER_KEYS = (
     "prior_period_check",
 )
 
-# 人工填销项(W4 补料流)常量。落一条与 classify 直读同构的 item_classified(sales_summary)
-# 事件,reconcile 的 _replay_sales_reads/aggregate_sales 原样回放解锁 R2——引擎/steps 不改一行。
-_SALES_KIND = kinds.SALES_SUMMARY
-_MANUAL_SOURCE = "manual"
-_MANUAL_SALES_DEDUPE = "manual:sales_summary"
 _MAX_NOTE_LEN = 500
-# reconcile.aggregate_sales 靠表头关键词认「销售额列 / 销项税列」;人工填的两个合计以泰文规范
-# 列名 + 单数据行合成表落库,与真实 POS 汇总表直读产出的 sales_read 形状一致(不另造契约)。
-_SALES_HEADER = "ยอดขาย"
-_OUTPUT_VAT_HEADER = "ภาษีขาย"
 
 # 复核签批(C3 · 四权分立)。review 态内 append-only 事件,不新增状态位。
 _REVIEW_STEP = "review"
@@ -381,23 +372,6 @@ def _decision_payload(
     raise WorkOrderApiError("workorder.decision_invalid")
 
 
-def _valid_amount(raw) -> str:
-    """销项金额校验:十进制字符串、有限、非负。返回规范化字符串(全程 str/Decimal,禁 float)。
-    去千分位后交 Decimal,解不出/负数/非有限一律拒。"""
-    if raw is None:
-        raise WorkOrderApiError("workorder.sales_summary_invalid")
-    s = str(raw).strip().replace(",", "")
-    if not s:
-        raise WorkOrderApiError("workorder.sales_summary_invalid")
-    try:
-        value = Decimal(s)
-    except InvalidOperation as exc:
-        raise WorkOrderApiError("workorder.sales_summary_invalid") from exc
-    if not value.is_finite() or value < 0:
-        raise WorkOrderApiError("workorder.sales_summary_invalid")
-    return format(value, "f")
-
-
 def record_sales_summary(
     cur,
     *,
@@ -407,47 +381,21 @@ def record_sales_summary(
     output_vat,
     note: Optional[str],
     actor: str,
+    source_label: Optional[str] = None,
 ) -> dict:
-    """人工填销项:销售额/销项税落成与 classify 直读同构的 item_classified(sales_summary,
-    status=ok)事件,sales_read 载荷带单行合成表 —— reconcile 的 R2 回放据此解锁,引擎/steps
-    不动一行。凭据备注随载荷留底(状态诚实:交付包据此标注「来源=人工申报」,不与直读混淆)。
-
-    幂等:同工单只保留一条人工销项件(固定 dedupe_key,重填复用同一 item),重填以最新事件
-    为准——reconcile 回放 latest-wins,旧值自然被覆盖,不会重复计入。"""
-    sales_s = _valid_amount(sales_amount)
-    vat_s = _valid_amount(output_vat)
-    note_s = (note or "").strip()
-    if len(note_s) > _MAX_NOTE_LEN:
-        raise WorkOrderApiError("workorder.sales_summary_note_too_long")
-
-    item = store.add_item(
+    """人工填销项(W4 补料流)。校验/落件/落事件在 sales_entry,这里只注入 store 与错误类型
+    ——测试替换 api.store 后本层随之生效,不必再各自打桩。"""
+    return sales_entry.record(
         cur,
+        store=store,
+        error=WorkOrderApiError,
         tenant_id=tenant_id,
         work_order_id=work_order_id,
-        source=_MANUAL_SOURCE,
-        kind=_SALES_KIND,
-        status="ok",
-        dedupe_key=_MANUAL_SALES_DEDUPE,
-    )
-    sales_read = {
-        "headers": [_SALES_HEADER, _OUTPUT_VAT_HEADER],
-        "rows": [{"cells": [sales_s, vat_s], "is_summary": False}],
-        "source": "manual_entry",
-        "note": note_s,
-    }
-    return store.append_event(
-        cur,
-        tenant_id=tenant_id,
-        work_order_id=work_order_id,
-        step="classify",
-        event_type=_EVT_CLASSIFIED,
-        payload={
-            "item_id": item["id"],
-            "kind": _SALES_KIND,
-            "status": "ok",
-            "sales_read": sales_read,
-        },
+        sales_amount=sales_amount,
+        output_vat=output_vat,
+        note=note,
         actor=actor,
+        source_label=source_label,
     )
 
 

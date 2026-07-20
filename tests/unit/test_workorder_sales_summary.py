@@ -10,7 +10,7 @@ reconcile 的 _replay_sales_reads / aggregate_sales **原样回放解锁 R2**—
 import unittest
 from decimal import Decimal
 
-from services.workorder import api
+from services.workorder import api, evidence
 from services.workorder.engine import StepContext
 from services.workorder.steps import reconcile
 from tests.unit._workorder_fakes import WorkOrderFakeStoreBase
@@ -84,7 +84,7 @@ class ManualSalesUnlocksR2Tests(unittest.TestCase):
         api.store = self.store
         self.addCleanup(setattr, api, "store", self._orig)
 
-    def _record(self, sales, vat, note=""):
+    def _record(self, sales, vat, note="", source_label=None):
         api.record_sales_summary(
             None,
             tenant_id="t-1",
@@ -93,6 +93,7 @@ class ManualSalesUnlocksR2Tests(unittest.TestCase):
             output_vat=vat,
             note=note,
             actor="user:9",
+            source_label=source_label,
         )
 
     def test_missing_sales_summary_blocks_r2(self):
@@ -124,6 +125,91 @@ class ManualSalesUnlocksR2Tests(unittest.TestCase):
         self.assertEqual(out.status, "ok")
         self.assertEqual(Decimal(out.payload["sales_amount_total"]), GOLDEN_SALES_AMOUNT)
         self.assertEqual(Decimal(out.payload["output_vat_total"]), GOLDEN_OUTPUT_VAT)
+
+
+class MultiSourceManualSalesTests(ManualSalesUnlocksR2Tests):
+    """多来源销项:一个月的销项常来自多张表(自开票 / 7-11 / Big C),必须能并存相加。
+
+    继承上面的 setUp/_record(同一份 store 替身与录入口),只加多来源用例——单来源的
+    向后兼容断言仍由父类那几条守住。
+    """
+
+    def test_three_sources_coexist_and_sum(self):
+        _purchase_item(self.store)
+        self._record("100000.00", "7000.00", source_label="ใบกำกับเอง")
+        self._record("200000.00", "14000.00", source_label="7-11")
+        self._record("300000.00", "21000.00", source_label="Big C")
+        out = reconcile.run(_ctx(self.store))
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(Decimal(out.payload["sales_amount_total"]), Decimal("600000.00"))
+        self.assertEqual(Decimal(out.payload["output_vat_total"]), Decimal("42000.00"))
+        self.assertEqual(len([i for i in self.store.items if i["kind"] == "sales_summary"]), 3)
+
+    def test_same_source_refill_overwrites_not_adds(self):
+        _purchase_item(self.store)
+        self._record("100000.00", "7000.00", source_label="7-11")
+        self._record("111111.11", "7777.78", source_label="7-11")
+        self._record("200000.00", "14000.00", source_label="Big C")
+        out = reconcile.run(_ctx(self.store))
+        self.assertEqual(Decimal(out.payload["sales_amount_total"]), Decimal("311111.11"))
+        self.assertEqual(len([i for i in self.store.items if i["kind"] == "sales_summary"]), 2)
+
+    def test_unlabeled_shares_the_legacy_slot(self):
+        """不带来源 = 现状那一条固定槽:重填覆盖,不新开件。"""
+        _purchase_item(self.store)
+        self._record("100000.00", "7000.00")
+        self._record("200000.00", "14000.00")
+        out = reconcile.run(_ctx(self.store))
+        self.assertEqual(Decimal(out.payload["sales_amount_total"]), Decimal("200000.00"))
+        self.assertEqual(len([i for i in self.store.items if i["kind"] == "sales_summary"]), 1)
+
+    def test_blank_label_is_the_legacy_slot(self):
+        """路由默认传空串,必须等价于不带来源(不许开出一条 `manual:sales_summary:` 幽灵槽)。"""
+        _purchase_item(self.store)
+        self._record("100000.00", "7000.00")
+        self._record("200000.00", "14000.00", source_label="   ")
+        self.assertEqual(len([i for i in self.store.items if i["kind"] == "sales_summary"]), 1)
+
+    def test_label_recorded_on_payload_for_audit(self):
+        _purchase_item(self.store)
+        self._record("100000.00", "7000.00", source_label=" 7-11  สาขาบางนา ")
+        read = self.store.events[-1]["payload"]["sales_read"]
+        self.assertEqual(read["source_label"], "7-11 สาขาบางนา")
+        self.assertEqual(read["source"], "manual_entry")
+
+    def test_overlong_label_rejected(self):
+        with self.assertRaises(api.WorkOrderApiError) as cm:
+            self._record("1.00", "0.07", source_label="x" * 61)
+        self.assertEqual(cm.exception.code, "workorder.sales_summary_source_too_long")
+
+
+class SalesSourceInfoTests(unittest.TestCase):
+    """evidence.sales_source_info 的 direct_read / manual_entry / mixed 判定不被多来源打乱。"""
+
+    @staticmethod
+    def _classified(*sources):
+        return {
+            f"i{n}": {
+                "payload": {
+                    "kind": "sales_summary",
+                    "status": "ok",
+                    "sales_read": {"source": src} if src else {},
+                }
+            }
+            for n, src in enumerate(sources)
+        }
+
+    def test_two_manual_sources_still_manual(self):
+        info = evidence.sales_source_info(self._classified("manual_entry", "manual_entry"), {})
+        self.assertEqual(info["source"], "manual_entry")
+
+    def test_manual_plus_direct_read_is_mixed(self):
+        info = evidence.sales_source_info(self._classified("manual_entry", None), {})
+        self.assertEqual(info["source"], "mixed")
+
+    def test_direct_read_only(self):
+        info = evidence.sales_source_info(self._classified(None, None), {})
+        self.assertEqual(info["source"], "direct_read")
 
 
 if __name__ == "__main__":

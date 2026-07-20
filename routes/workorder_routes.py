@@ -14,7 +14,6 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
 
 from core import db
 from core.route_helpers import (
@@ -26,6 +25,12 @@ from services.audit import file_access as audit_file_access
 from services.authz.deps import check_workspace_scope
 from services.workorder import api, archive, engine, intake_prep, runner, storage, store
 from services.workorder.steps import intake
+from routes.workorder_schemas import (
+    DecisionIn,
+    OrderCreate,
+    ReviewSignoffIn,
+    SalesSummaryIn,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -55,32 +60,6 @@ _C_FILE = "tax.filing.file"
 # ——一个月的原料一次给全(L2 真语料 104 张)分三批以内传完,又封住恶意万张打爆内存/磁盘。
 _MAX_MATERIAL_BYTES = 20 * 1024 * 1024
 _MAX_MATERIAL_FILES = 50
-
-
-class OrderCreate(BaseModel):
-    workspace_client_id: int = Field(..., description="账套主体 id")
-    period: str = Field(..., min_length=1, max_length=20, description="申报期,如 2569-05")
-    intent: str = Field("monthly_vat", max_length=40, description="工单意图(默认月度 VAT)")
-
-
-class DecisionIn(BaseModel):
-    item_id: str = Field(..., description="被裁决的 work_order_item id")
-    decision: str = Field(..., description="face_value | recalc | exclude | assign_kind | waive")
-    values: Optional[dict] = Field(None, description="recalc 时的人工补正数(如 {vat: '35.00'})")
-    kind: Optional[str] = Field(None, description="assign_kind kind（含 bank_statement）")
-    reason: Optional[str] = Field(
-        None, max_length=500, description="waive 豁免理由(必填):谁豁免·为何放行出包"
-    )
-
-
-class SalesSummaryIn(BaseModel):
-    sales_amount: str = Field(..., max_length=40, description="销项销售额(十进制字符串)")
-    output_vat: str = Field(..., max_length=40, description="销项税额(十进制字符串)")
-    note: str = Field("", max_length=500, description="凭据备注(人工申报来源)")
-
-
-class ReviewSignoffIn(BaseModel):
-    note: str = Field("", max_length=500, description="复核备注(可选)")
 
 
 def _authorize(request: Request, perm: str) -> tuple[dict, str]:
@@ -316,6 +295,7 @@ async def add_sales_summary(
                 output_vat=req.output_vat,
                 note=req.note,
                 actor=f"user:{user['id']}",
+                source_label=req.source_label,
             )
         except api.WorkOrderApiError as e:
             code = 422 if e.code.startswith("workorder.sales_summary") else 404

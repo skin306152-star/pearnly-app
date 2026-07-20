@@ -1,15 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-07-20 · Pearnly AI · GC-D 全队列收官上线 + /simplify 收口 · 冰厂实测备料中)
+## 当前状态卡(2026-07-20 · Pearnly AI · GC-D 收官 + GC-E-1 + ★Agent 边界定案与目标框架 · 冰厂 6 月实测备料中)
 
-- **当前 task**:GC-D(P0-0/P0-1/D2-D6)全部上线 CI 绿、prod 已部署 `cd678e43`;Zihao 在拍冰厂(Sincere Ice·税号 0105546015062)2569-05 原始料,拍完起第二客户实测。
+- **当前 task**:GC-D 全批 + GC-E-1(报表钱数列表头右对齐·7 表全改)上线 CI 绿、prod 已部署 `e77f6649`;下一批建议 **IN-R 预期输入登记表**(冰厂三渠道销项实锤触发)。**换窗先读 `docs/agent/HANDOFF-2026-07-20-AGENT-BOUNDARY-AND-FRAMEWORK.md`**。
+- **★Agent 边界定案(五路调研+回验·2026-07-20)**:**Agent 认字 / 代码算账 / 会计签规则,三件一件不能互换**。Zihao「代码死规则跟不上噪音」**在读这层对,算与核这层反**——根因是把「表征噪音(无界·该上 LLM)」与「业务规则(有限可配置:6个月抵扣/客户3渠道/发票状态机)」都叫噪音。硬据:LLM 温度0跑1000次出80种结果(batch非不变性→**同输入同输出物理不可能**)/表格查值89%但求和19.6-33%/369字段schema前沿模型0%/agent错法正是税档算错+编数。三可抄:ADK三区宪法(**人审规则不审单据**)、Compiled AI(**编译一次·运行时零调用**·token降57倍)、预期输入登记表+审计学四条完整性闸。厂商数字不可信(Coupa自报99.97% vs 独立Ardent均值25%)。全文见交接 §2,记忆 [[agent-boundary-read-vs-calc]]。
+- **★ERP/账本定位(Zihao 拍板)**:**不做账本,账本始终在 ERP,推送线老站已打通**(MR.ERP adapter + `erp_push_logs` 唯一状态源)。影子底稿=税务佐证 + **推 ERP 载荷**,一行不写 journal_vouchers;**GC-E 目标随之收敛=让影子分录准到能直接推 ERP**,不是做账本。工单→ERP 桥仍是空插座。
+- **月结 Agent 目标框架(9 步·★未建)**:①开单 →②收料+**★完整性登记** →③分拣识别+**★一次编译固化** →④对账裁决(确定性闸+自愈✅+**★主动问人**+**★裁决升格规则**)→⑤算税(**Agent 不出现**)→⑥出包(守恒闸✅+**★完整性闸**)→⑦签批✅ →⑧**★推 ERP** →⑨归档✅。
 - **本批上线**(`01ba1c51..cd678e43` 15 commit):①P0-0 裁决合并回放下沉 `decisions.replay_records`,8 消费方归一(交接单只点名 5 处,侦察穷尽出 8)+ `terminal_of` 终态仲裁单源;②P0-1 签批投影 `sod.signoff_projection`(actor/at/stale,复核后重跑=stale 诚实提示一键重签)接进 order_detail+review_feed,前端从投影点亮;③D2 银行断链换眼重读(真相=Vision 行切割吞折行而非 economy 模型;多页 PDF 走 legacy 整份读;修法=断链触发逐页直读、4 路并发、严格变好才采纳、`OCR_BANK_CHAIN_REREAD=0` 急停);④D3 `OcrRequest.policy_task` 落 contracts(策略域与 handler 路由两概念拆开,银行窄读 economy 档生效);⑤D4 缺料键人话化/D5 对账空态文案诚实化;⑥D6 brain quota 退避不计熔断+复用 run_leases 跨进程互斥+失败落事件+recovery tick 自动收尾(封顶 3 次)+partial index。
 - **验证**:全量单测 9558 绿;真浏览器 e2e 32 例四剧本(_jb/_m13key/_mc1b2/_gcd45)+截图;签批投影拿 prod 1537 条真事件回放=stale:true 正中;partial index prod EXPLAIN 双路 Index Only Scan;CI 终 run 29716225954 绿。
 - **生产动作待 Zihao**:工单 bd093ba9 仍 review——UI 现在会亮出他 7/19 的复核记录+「请再次复核」提示,重签「复核通过」→点「签批冻结」即归档(P0-1 修复的终点)。
-- **冰厂实测备料口径(已交待)**:按「申报月的段」拍不按票面日期(4 月票盖 ถือเป็นภาษีซื้อ 5/2569 章的必拍);ภ.พ.30/รายงานภาษีซื้อ-ขาย/付款汇总底稿=答案纸,单独拍进「金标-勿上传」夹(行级对账用);贴页小票整页一拍。6 月料在 3/4 或 4/4 册。
-- **记债**:D2 真多页断链 PDF 真跑未验(冰厂实测/SM 2569-06 自然覆盖,重读不进 ฿150 成本台账);GC-D-7 真人旅程(分组确认→采纳→签批)与实测合并做;run_leases scope 参数化+signoff_projection 挪 evidence(顺手时);GC-E 账簿二期另开批。
+- **★冰厂 2569-06 实测备料(改跑 6 月·纸少)**:已到手 `C:\Users\skin3\Downloads\` 9 件——自开销项 50 张(Part1/2/3·51页)+其汇总表(285,695/VAT 19,999.30)+**7-11 日销汇总(3,605,337.20/VAT 252,373.60)**+Big C 两店 **42 页扫描件无文本层**+客户送回改的 IV69/06-011+工资凭证 PV690630-001(非税料·可作分拣对抗样本)。**★逐字查实:50 张发票明细里没有 7-11 和 Big C → 三块独立且必须相加,7-11 占九成**(与 SM 单一 POS 结构完全不同,本次实测最值钱考点,也是 IN-R 批触发)。**仍缺**:纸质进项(RR69**06**xx 全拍+早月盖 ถือเป็นภาษีซื้อ **6**/2569 章的也拍)/银行流水/**金标**(6月 ภ.พ.30+进销项报告·Express 直读可兜底)。**待问客户**:7-11 与 Big C 有没有另开发票(防重复计算)、IV69/06-011 改单状态。
+- **下一批建议(交接 §4 排序)**:①**IN-R 预期输入登记表**(客户档案存应到 N 源+每月到齐核对+缺料点名+出包完整性闸)②AG-1 Agent 问人(最大空白)③GC-E 账簿二期(推 ERP 前置质量)④ERP-B 工单→ERP 桥 ⑤AG-2 规则升格 ⑥CP-1 一次编译。
+- **记债**:D2 真多页断链 PDF 真跑未验(冰厂/SM 2569-06 自然覆盖);GC-D-7 真人旅程与实测合并做;run_leases scope 参数化+signoff_projection 挪 evidence;`.mx-table`/`.sdw-table` 两套表格 CSS 并存(合并超范围);纠正记忆须配版本/回滚(ProMem 坑)。
 - **仓库**:5 个 wip 分支已合入并删(远端+本地);施工 worktree 已清;共享树 DMS 窗 UI_LINT_REPORT.txt 未碰;未 push=0。
-- **换窗入口**:本卡 + `docs/agent/HANDOFF-2026-07-19-NIGHT-SM-CLOSEOUT.md`(GC-E/方向队列仍有效)+ 记忆 [[gcd-0720-full-queue-shipped]]。
+- **换窗入口**:本卡 + **`docs/agent/HANDOFF-2026-07-20-AGENT-BOUNDARY-AND-FRAMEWORK.md`**(本轮唯一入口)+ `HANDOFF-2026-07-19-NIGHT-SM-CLOSEOUT.md`(GC-E 细目仍有效)+ 记忆 [[agent-boundary-read-vs-calc]] [[gcd-0720-full-queue-shipped]]。
 
 <details><summary>上一状态卡(2026-07-19 · Pearnly AI · SM 2569-05 真人重跑暂停交接)</summary>
 

@@ -242,13 +242,18 @@ function renderDrawer() {
         if (fieldsLoading) {
             return `<div class="exc-field-row"><label>${escapeHtml(t(labelKey))}</label><span class="val empty">…</span></div>`;
         }
+        // 票面原文缺失(旧记录/文字层来源)→ 回落已归一的公历,不让格子空着
+        const base =
+            key === 'date_raw' && (f.date_raw === undefined || f.date_raw === null)
+                ? f.date
+                : f[key];
         const v = editing
             ? editF[key] !== undefined
                 ? editF[key]
-                : f[key] !== undefined && f[key] !== null
-                  ? f[key]
+                : base !== undefined && base !== null
+                  ? base
                   : ''
-            : f[key];
+            : base;
         const flagged = flagSet.has(key) ? 'flagged' : '';
         if (editing) {
             const inputType = isMoney ? 'number' : 'text';
@@ -274,7 +279,7 @@ function renderDrawer() {
         fieldsHtml = `
             <div class="exc-fields">
                 ${fld('invoice_number', 'exc-fld-invoice-no', false)}
-                ${fld('date', 'exc-fld-date', false)}
+                ${fld('date_raw', 'exc-fld-date', false)}
                 ${fld('seller_name', 'exc-fld-seller', false)}
                 ${fld('seller_tax', 'exc-fld-seller-tax', false)}
                 ${fld('buyer_name', 'exc-fld-buyer', false)}

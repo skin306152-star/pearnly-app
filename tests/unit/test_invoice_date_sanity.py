@@ -14,8 +14,8 @@ from unittest import mock
 
 from services.ai_gateway.tasks import ProviderOutcome
 from services.ocr import direct_read as dr
+from services.ocr.date_sanity import validate_invoice_date
 from services.ocr.schemas import ThaiInvoice
-from services.ocr.validators import validate_invoice_date
 
 _TODAY = date(2026, 7, 20)
 

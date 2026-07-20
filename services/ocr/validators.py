@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, timedelta
 from typing import List, Optional, Set
 
+from .date_sanity import validate_invoice_date
 from .schemas import (
     BankStatementDocument,
     BankStatementEntry,
@@ -428,39 +428,6 @@ def _clear_bank_amount_field(entry: BankStatementEntry, ref_name: str) -> None:
 # ============================================================
 # Invoice validator (lighter — existing trigger logic in pipeline.py covers most)
 # ============================================================
-# 票面日期的合理区间。泰国税法凭证保存期 5 年 —— 比这更旧的进项/销项票不该还在
-# 走识别入库,多半是年份读错一位(2026-07-20:佛历 2569 被读成 2559,归一出 2016,
-# 全链零告警一路推进 Express,连税期都落到 2559-05)。未来票同理不合法。
-_MAX_BACKDATE_YEARS = 5
-_MAX_FUTURE_DAYS = 1
-_ISO_DATE_RE = re.compile(r"^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$")
-
-
-def validate_invoice_date(inv: ThaiInvoice, today: Optional[date] = None) -> List[str]:
-    """票面日期离今天太远 → 标注复核。软闸:回落 Vision 路救不了日期(那条路读
-    日期更差),所以只标注不阻断,由人来判是补录旧账还是读错了年份。
-
-    两条识别链共用(Vision 路经 validate_invoice · 直读经 _invoice_soft_flags),
-    单一实现防手抄漂移。
-    """
-    m = _ISO_DATE_RE.match(str(getattr(inv, "date", "") or ""))
-    if not m:
-        return []  # 缺日期/非 ISO 由别的闸管,这里不重复报
-    try:
-        parsed = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-    except ValueError:
-        return []
-    anchor = today or date.today()
-    if parsed > anchor + timedelta(days=_MAX_FUTURE_DAYS):
-        return [f"invoice date {parsed.isoformat()} is in the future — check the year"]
-    if parsed < anchor - timedelta(days=365 * _MAX_BACKDATE_YEARS):
-        return [
-            f"invoice date {parsed.isoformat()} is over {_MAX_BACKDATE_YEARS} years old "
-            "— check the year (Buddhist-era digit misread reads 10 years early)"
-        ]
-    return []
-
-
 def validate_invoice(inv: ThaiInvoice, page: Page) -> List[str]:
     """Field-source check for invoices: any source_refs present must NOT
     have description as their source_column for amount fields."""

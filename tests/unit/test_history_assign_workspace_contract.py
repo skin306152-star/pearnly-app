@@ -15,7 +15,9 @@ from unittest import mock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import routes.history_routes as hr
+# 端点已拆到 history_assign_routes(2026-07-20),但仍经 include_router 挂在 history
+# router 上——路由树断言走 history_routes.router,打桩走实现所在模块。
+import routes.history_assign_routes as hr
 from routes.history_routes import router
 
 _USER = {"id": "u-1", "tenant_id": "t-1", "is_super_admin": False, "role": "owner"}

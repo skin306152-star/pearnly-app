@@ -77,6 +77,7 @@
   },
   "fileconv_routes": "B",
   "google_oauth_routes": "D",
+  "history_assign_routes": "B",
   "history_routes": "B",
   "import_routes": "B",
   "inventory_report_routes": {

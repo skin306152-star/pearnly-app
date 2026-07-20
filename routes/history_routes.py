@@ -41,7 +41,8 @@ from core.db import (
     update_ocr_history_pages,
 )
 from core.auth import get_current_user_from_request
-from core.route_helpers import _plan_permissions, _tid, content_disposition
+from routes.history_assign_routes import router as _assign_router
+from core.route_helpers import _check_history_access, _tid, content_disposition
 from services.exceptions.exception_checks import _async_run_exception_checks, _parse_money
 from services.ocr_history.posting_manual import (
     _ITEM_TYPE_VALUES,
@@ -53,19 +54,13 @@ from services.ocr_history.posting_manual import (
 logger = logging.getLogger("mr-pilot")
 
 router = APIRouter()
+# 归属类端点(assign_workspace / assign_client)拆到 history_assign_routes,挂同一棵树
+# 让 app.py 零改动;单向依赖(此处 import 它,它不 import 此处)不成环。
+router.include_router(_assign_router)
 
 
 class HistoryUpdateRequest(BaseModel):
     pages: List[Any] = Field(..., description="完整 pages 数组(会计修改后的)")
-
-
-def _check_history_access(user: dict):
-    """v0.8 · 所有 plan 都能看历史,保留天数不同"""
-    plan = (user or {}).get("plan", "free")
-    p = _plan_permissions(plan)
-    if not p.get("can_view_history"):
-        raise HTTPException(403, detail="history.upgrade_required")
-    return int(p.get("history_retention_days", 7))
 
 
 @router.get("/api/history")
@@ -418,95 +413,3 @@ async def v1_history_update(record_id: str, req: HistoryUpdateRequest, request: 
 @router.delete("/api/v1/history/{record_id}")
 async def v1_history_delete(record_id: str, request: Request):
     return await history_delete(record_id, request)
-
-
-class AssignClientRequest(BaseModel):
-    client_id: Optional[int] = None  # None 表示移除归属
-
-
-class AssignWorkspaceRequest(BaseModel):
-    workspace_client_id: int = Field(..., description="目标套账 id(必须指定,不许清空归属)")
-
-
-@router.post("/api/history/{history_id}/assign_workspace")
-async def api_assign_workspace(history_id: str, req: AssignWorkspaceRequest, request: Request):
-    """把识别记录改归属到另一个套账(税号路由再准也有例外:代付/税号印错的票)。
-
-    只许挪到本租户的套账;不提供清空(NULL 会让 Express 方向判定失锚,见 persist 注释)。
-    """
-    user = get_current_user_from_request(request)
-    _check_history_access(user)
-    _tenant = _tid(user)
-    if not _tenant:
-        raise HTTPException(400, detail="workspace.required")
-    from core.workspace_context import assert_workspace_in_tenant
-
-    with db.get_cursor() as cur:
-        assert_workspace_in_tenant(
-            cur, tenant_id=_tenant, workspace_client_id=int(req.workspace_client_id)
-        )
-    ok = db.update_history_workspace_client_id(
-        history_id, int(req.workspace_client_id), str(user["id"]), tenant_id=_tenant
-    )
-    if not ok:
-        raise HTTPException(400, detail="history.assign_workspace_failed")
-    return {"ok": True, "workspace_client_id": int(req.workspace_client_id)}
-
-
-@router.post("/api/history/{history_id}/assign_client")
-async def api_assign_client(history_id: str, req: AssignClientRequest, request: Request):
-    """把发票归属到客户 · client_id=null 表示取消归属"""
-    user = get_current_user_from_request(request)
-    # v118.28.1 · 员工:校验 client_id 在 visible_ids 内 · 否则 403(防员工把发票归到他不能看的客户)
-    if req.client_id is not None:
-        visible = db.get_visible_client_ids_for_user(user)
-        if visible is not None and int(req.client_id) not in set(visible):
-            raise HTTPException(403, detail="client.no_access")
-    ok = db.assign_invoice_to_client(
-        str(user["id"]), history_id, req.client_id, tenant_id=_tid(user)
-    )
-    if not ok:
-        raise HTTPException(400, detail="client.assign_failed")
-
-    # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · 用户手动 assign 时 ·
-    # 把 buyer_name + buyer_tax → client_id 的关系学进 buyer_to_client_memory ·
-    # 下次 OCR 出同 buyer 就 auto-resolve · 不用每次手动选.
-    if req.client_id is not None:
-        try:
-            h = db.get_ocr_history_detail(
-                str(user["id"]),
-                history_id,
-                tenant_id=_tid(user),
-            )
-            if h:
-                _pages = h.get("pages") or []
-                _primary = next(
-                    (
-                        p
-                        for p in _pages
-                        if isinstance(p, dict)
-                        and not p.get("is_duplicate")
-                        and not p.get("is_copy")
-                    ),
-                    _pages[0] if _pages else {},
-                )
-                _f = (_primary or {}).get("fields") or {}
-                _buyer_name = _f.get("buyer_name") or ""
-                _buyer_tax = _f.get("buyer_tax") or ""
-                if _buyer_name:
-                    db.learn_buyer_to_client(
-                        _buyer_name,
-                        _buyer_tax,
-                        int(req.client_id),
-                        str(user["id"]),
-                        tenant_id=_tid(user),
-                    )
-                    logger.info(
-                        "[assign_client] learned buyer→client: %r → %s",
-                        _buyer_name[:40],
-                        req.client_id,
-                    )
-        except Exception as e:
-            logger.warning(f"learn buyer→client failed (history={history_id[:8]}): {e}")
-
-    return {"ok": True}

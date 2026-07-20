@@ -307,3 +307,15 @@ def assert_owns_workspace(
     if not cur.fetchone():
         raise HTTPException(404, detail=not_found)
     check_workspace_scope(request, user, ws_id)
+
+
+def _check_history_access(user: dict) -> int:
+    """历史记录访问闸:所有 plan 都能看,保留天数不同。返回可见天数。
+
+    从 history_routes 上移(history_assign_routes 拆出后两处都要用,留在 routes 层会
+    形成 history_routes ↔ history_assign_routes 循环依赖)。与 _plan_permissions 同族。
+    """
+    p = _plan_permissions((user or {}).get("plan", "free"))
+    if not p.get("can_view_history"):
+        raise HTTPException(403, detail="history.upgrade_required")
+    return int(p.get("history_retention_days", 7))

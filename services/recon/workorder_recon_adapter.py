@@ -48,11 +48,11 @@ def _dec(value: Any) -> Decimal:
         return _ZERO
 
 
-def _replay_latest(events: list[dict], event_type: str) -> dict[str, dict]:
-    """回放某类事件到 {item_id: payload},同 item 多条后者胜(反映最新识别/裁决)。"""
+def _replay_classified(events: list[dict]) -> dict[str, dict]:
+    """回放 item_classified 事件到 {item_id: payload},同 item 多条后者胜(反映最新识别)。"""
     out: dict[str, dict] = {}
     for e in events:
-        if e.get("event_type") != event_type:
+        if e.get("event_type") != _EVT_CLASSIFIED:
             continue
         payload = e.get("payload") or {}
         item_id = payload.get("item_id")
@@ -91,7 +91,7 @@ def candidates_from_events(events: list[dict]) -> list[dict]:
       invoice_number → invoice_no
       有效类别     → category_tag(方向位)
     """
-    classified = _replay_latest(events, _EVT_CLASSIFIED)
+    classified = _replay_classified(events)
     decision_recs = decisions.replay_records(events)
     out: list[dict] = []
     for item_id, payload in classified.items():

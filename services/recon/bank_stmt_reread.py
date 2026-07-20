@@ -10,22 +10,21 @@ EDC/K SHOP ฿28,363 两代同位置被吞),而运维用「单页直读」重读
   ① 断链检测复用 bank_stmt_balance 的现成余额链纯函数(单一事实源),不另写一套算法;
   ② 另一只眼走现成入口 direct_read.read_page,不新造第三条模型调用路径;
   ③ 无断链 → 零渲染零重读零成本;渲染/重读任何异常 → 保原读,不让升档把整件搞挂;
-  ④ 每件最多一轮升档(不递归)。
+  ④ 每件最多一轮升档(不递归);
+  ⑤ 逐页「渲染→读」合成单页任务并发跑(ThreadPoolExecutor):18 页串行 1.5-3 分钟压 reconcile
+     步墙钟 → 并发收窄;渲染在任务内做、读完即释放,峰值内存受在飞页数(≤ max_workers)约束,
+     不再全份 PNG 驻留。
 """
 
 from __future__ import annotations
 
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from services.recon.bank_recon_pipeline import statement_rows_from_entries
 from services.recon.bank_recon_types import StatementRow
-from services.recon.bank_stmt_balance import (
-    _correct_direction_from_balance,
-    _repair_amount_from_balance,
-    _verify_row_balances,
-)
-from services.recon.bank_table_io import _is_summary_row
+from services.recon.bank_stmt_balance import finalize_rows
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +34,8 @@ EYE_DIRECT = "direct"  # 单页直读(direct_read.read_page)
 # 渲染/重读上限:整份有断链才触发(罕见),但页数异常多的巨份跳过防跑飞成本。
 _MAX_REREAD_PAGES = int(os.environ.get("OCR_BANK_REREAD_MAX_PAGES", "50"))
 _RENDER_DPI = int(os.environ.get("OCR_BANK_REREAD_DPI", "200"))
+# 换眼重读的并发度:每页一个「渲染→读」任务,在飞任务数即峰值内存与并发模型调用数的上限。
+_MAX_WORKERS = max(1, int(os.environ.get("OCR_BANK_REREAD_WORKERS", "4")))
 
 
 def enabled() -> bool:
@@ -48,40 +49,17 @@ def enabled() -> bool:
 
 
 def _count_breaks(rows: list[StatementRow]) -> int:
-    """余额链断点数 = 逐行核对(prev+存-取==余额)对不上的动行数。依赖行已过 _verify_row_balances。"""
+    """余额链断点数 = 逐行核对(prev+存-取==余额)对不上的动行数。依赖行已过余额链核对。"""
     return sum(1 for r in rows if r.balance_ok is False)
 
 
-def _finalize(rows: list[StatementRow], opening: float) -> list[StatementRow]:
-    """按主解析器同序把行集过一遍(过滤汇总行 → 方向纠正 → 逐行核对 → 金额反推修复),使重读
-    结果与原读在同一口径下比较断链数。就地复用 bank_stmt_balance 现成纯函数(单一事实源)。"""
-    kept = [r for r in rows if not _is_summary_row(r.description)]
-    _correct_direction_from_balance(kept, opening)
-    _verify_row_balances(kept, opening)
-    _repair_amount_from_balance(kept, opening)
-    return kept
-
-
-def find_break_pages(page_groups: list[list[StatementRow]], opening: float) -> list[int]:
-    """页级断链定位(纯函数)。page_groups = 按页有序的行组;返回含断链或紧邻断点的页号(0-based)。
-
-    跨页交接的断链(前一页末行余额 → 后一页首行对不上)两侧的页都算候选——补拍/重读时相邻
-    两页要一起换眼,单读一页补不回交接缺口。页内断则只标该页。复用 _verify_row_balances 标断点。
-    """
-    flat: list[StatementRow] = []
-    page_of: list[int] = []
-    for page_index, group in enumerate(page_groups):
-        for row in group:
-            flat.append(row)
-            page_of.append(page_index)
-    _verify_row_balances(flat, opening)
-    pages: set[int] = set()
-    for idx, row in enumerate(flat):
-        if row.balance_ok is False:
-            pages.add(page_of[idx])
-            if idx > 0:
-                pages.add(page_of[idx - 1])  # 断点另一侧(可能是上一页)
-    return sorted(pages)
+def _reread_one_page(
+    pdf_bytes: bytes, page_number: int, filename: str, api_key: str | None
+) -> list[StatementRow]:
+    """单页任务:渲染该页 → 换眼直读 → StatementRow。渲染出的 PNG 只在本任务栈内存活,读完即释放
+    (峰值内存受在飞任务数约束)。任一步异常向上抛,由编排层整轮弃保原读。"""
+    image_bytes = _render_page(pdf_bytes, page_number)
+    return _read_page_rows(image_bytes, page_number, filename, api_key)
 
 
 def maybe_reread_chain_breaks(
@@ -101,6 +79,9 @@ def maybe_reread_chain_breaks(
     只覆盖 PDF:xlsx/csv 直读路零成本零模型不入本路;单图直读路本身已是「另一只眼」,不重读。
     整份一眼读丢的是「哪几行」而非「哪一页」(页级来源信息在整份解析里已抹平),故无法把断点定位
     回具体页 → 有断链即逐页整份换眼重读、按文件级断链数仲裁,与运维手动补读同构。
+
+    每页一个「渲染→读」任务经线程池并发跑、按页号顺序收拢保序;任一页(渲染或重读)失败 →
+    取消余下任务、整轮弃保原读(半份重读会丢行,更差)。
     """
     if not enabled() or (ext or "").lower() != "pdf":
         return rows, []
@@ -108,31 +89,33 @@ def maybe_reread_chain_breaks(
     if breaks_before <= 0:
         return rows, []
     try:
-        pages = _render_pages(file_bytes)
-    except Exception as exc:  # noqa: BLE001 - 渲染失败绝不断链整份解析
-        logger.warning("[bank_reread][%s] render failed, keep original: %r", filename, exc)
+        page_count = _pdf_page_count(file_bytes)
+    except Exception as exc:  # noqa: BLE001 - 页数探测失败绝不断链整份解析
+        logger.warning("[bank_reread][%s] page count failed, keep original: %r", filename, exc)
         return rows, []
-    if not pages or len(pages) > _MAX_REREAD_PAGES:
+    if page_count <= 0 or page_count > _MAX_REREAD_PAGES:
         return rows, []
 
     alt_rows: list[StatementRow] = []
-    for page_number, image_bytes in enumerate(pages, start=1):
+    with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, page_count)) as pool:
+        futures = [
+            pool.submit(_reread_one_page, file_bytes, page_number, filename, api_key)
+            for page_number in range(1, page_count + 1)
+        ]
         try:
-            alt_rows.extend(_read_page_rows(image_bytes, page_number, filename, api_key))
-        except Exception as exc:  # noqa: BLE001 - 单页重读崩 → 整轮弃(半份重读会丢行,更差)
-            logger.warning(
-                "[bank_reread][%s] page %d reread failed, keep original: %r",
-                filename,
-                page_number,
-                exc,
-            )
+            for future in futures:  # 按页号顺序收拢,保原始行序
+                alt_rows.extend(future.result())
+        except Exception as exc:  # noqa: BLE001 - 单页渲染/重读崩 → 整轮弃(半份重读会丢行,更差)
+            for pending in futures:
+                pending.cancel()
+            logger.warning("[bank_reread][%s] reread failed, keep original: %r", filename, exc)
             return rows, []
 
-    alt = _finalize(alt_rows, opening)
+    alt = finalize_rows(alt_rows, opening)
     breaks_after = _count_breaks(alt)
     kept = bool(alt) and breaks_after < breaks_before
     escalation = {
-        "pages": list(range(1, len(pages) + 1)),
+        "pages": list(range(1, page_count + 1)),
         "eye_from": EYE_VISION,
         "eye_to": EYE_DIRECT,
         "breaks_before": breaks_before,
@@ -156,21 +139,29 @@ def maybe_reread_chain_breaks(
     return rows, [escalation]
 
 
-def _default_render_pages(pdf_bytes: bytes) -> list[bytes]:
-    """PDF 逐页渲染 PNG(与 pipeline.run_on_pdf_bytes 同渲染器 PyMuPDF/fitz)。
+def _default_pdf_page_count(pdf_bytes: bytes) -> int:
+    """PDF 页数(open 一次读 page_count 即关,不驻留)。整份有断链才调,常态热路径零调用。"""
+    import fitz  # PyMuPDF
 
-    整份一眼读路径(pdfplumber 抽文本 / Gemini 直喂 PDF 字节)本就不产页图,无现成渲染可复用;
-    这里是唯一一次渲染,一页只渲一次。渲染只在整份有断链时发生(罕见),常态热路径零渲染。
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        return doc.page_count
+    finally:
+        doc.close()
+
+
+def _default_render_page(pdf_bytes: bytes, page_number: int) -> bytes:
+    """渲染单页 PNG(1-based · 与 pipeline.run_on_pdf_bytes 同渲染器 PyMuPDF/fitz)。
+
+    每页任务内各自 open(fitz doc 不跨线程共享,逐任务独立 open 才线程安全),渲完即关。
+    整份一眼读路径(pdfplumber 抽文本 / Gemini 直喂 PDF 字节)本就不产页图,无现成渲染可复用。
     """
     import fitz  # PyMuPDF
 
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     try:
         matrix = fitz.Matrix(_RENDER_DPI / 72.0, _RENDER_DPI / 72.0)
-        return [
-            doc.load_page(i).get_pixmap(matrix=matrix, alpha=False).tobytes("png")
-            for i in range(doc.page_count)
-        ]
+        return doc.load_page(page_number - 1).get_pixmap(matrix=matrix, alpha=False).tobytes("png")
     finally:
         doc.close()
 
@@ -189,7 +180,8 @@ def _default_read_page_rows(
     return statement_rows_from_entries(doc.get("entries") or [], filename)
 
 
-# 注入点:模块级绑定,单测用 bank_stmt_reread._render_pages / _read_page_rows = fake 替换,
-# 绝不触真渲染 / 真付费模型调用(照 reconcile_bank / stmt_totals 惯例)。
-_render_pages = _default_render_pages
+# 注入点:模块级绑定,单测用 bank_stmt_reread._pdf_page_count / _render_page / _read_page_rows
+# = fake 替换,绝不触真渲染 / 真付费模型调用(照 reconcile_bank / stmt_totals 惯例)。
+_pdf_page_count = _default_pdf_page_count
+_render_page = _default_render_page
 _read_page_rows = _default_read_page_rows

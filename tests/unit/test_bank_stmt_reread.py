@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""断链页换眼重读(GC-D-2)单测:页级断链定位纯函数 + 换眼重读编排 + escalations 留痕接线。
+"""断链页换眼重读(GC-D-2)单测:并发换眼重读编排 + escalations 留痕接线。
 
-模型/渲染全 mock(注入 bank_stmt_reread._render_pages / _read_page_rows),绝不触真 fitz / 真付费。
+模型/渲染全 mock(注入 bank_stmt_reread._pdf_page_count / _render_page / _read_page_rows),
+绝不触真 fitz / 真付费。
 """
 
 import datetime
@@ -23,46 +24,15 @@ def _row(deposit=0.0, withdrawal=0.0, balance=0.0, desc="tx"):
     return StatementRow(_D, desc, withdrawal, deposit, balance)
 
 
-class FindBreakPagesTests(unittest.TestCase):
-    """页级断链定位:无断链 / 页内断 / 页边界断 / 多处断,各返回正确候选页集(0-based)。"""
-
-    def test_no_break_returns_empty(self):
-        page0 = [_row(deposit=100.0, balance=1100.0), _row(deposit=50.0, balance=1150.0)]
-        self.assertEqual(bank_stmt_reread.find_break_pages([page0], 1000.0), [])
-
-    def test_intra_page_break_marks_only_that_page(self):
-        page0 = [_row(deposit=100.0, balance=1100.0)]
-        page1 = [
-            _row(deposit=100.0, balance=1200.0),  # 1100+100=1200 ✓
-            _row(deposit=50.0, balance=9999.0),  # 1200+50≠9999 ✗ 页内断
-        ]
-        self.assertEqual(bank_stmt_reread.find_break_pages([page0, page1], 1000.0), [1])
-
-    def test_page_boundary_break_marks_both_sides(self):
-        page0 = [_row(deposit=100.0, balance=1100.0)]
-        page1 = [_row(deposit=50.0, balance=2000.0)]  # 1100+50≠2000 ✗ 跨页交接断
-        self.assertEqual(bank_stmt_reread.find_break_pages([page0, page1], 1000.0), [0, 1])
-
-    def test_multiple_intra_page_breaks(self):
-        page0 = [_row(deposit=100.0, balance=1100.0), _row(deposit=100.0, balance=1200.0)]
-        page1 = [
-            _row(deposit=100.0, balance=1300.0),  # 1200+100=1300 ✓ 交接不断
-            _row(deposit=100.0, balance=9999.0),  # ✗ 页内断
-        ]
-        page2 = [
-            _row(deposit=100.0, balance=10099.0),  # 9999+100=10099 ✓ 交接不断
-            _row(deposit=100.0, balance=88888.0),  # ✗ 页内断
-        ]
-        self.assertEqual(bank_stmt_reread.find_break_pages([page0, page1, page2], 1000.0), [1, 2])
-
-
 class MaybeRereadTests(unittest.TestCase):
-    """换眼重读编排:更好→采纳+留痕;更差→保原读;异常→保原读不炸;无断链/非PDF/闸关→零重读。"""
+    """并发换眼重读编排:更好→采纳+留痕;更差→保原读;异常→保原读不炸;无断链/非PDF/闸关→零重读。"""
 
     def setUp(self):
-        self._prev_render = bank_stmt_reread._render_pages
+        self._prev_count = bank_stmt_reread._pdf_page_count
+        self._prev_render = bank_stmt_reread._render_page
         self._prev_read = bank_stmt_reread._read_page_rows
-        self.addCleanup(setattr, bank_stmt_reread, "_render_pages", self._prev_render)
+        self.addCleanup(setattr, bank_stmt_reread, "_pdf_page_count", self._prev_count)
+        self.addCleanup(setattr, bank_stmt_reread, "_render_page", self._prev_render)
         self.addCleanup(setattr, bank_stmt_reread, "_read_page_rows", self._prev_read)
 
     def _original_with_one_break(self):
@@ -70,12 +40,21 @@ class MaybeRereadTests(unittest.TestCase):
         _verify_row_balances(rows, 1000.0)  # 第 2 行 balance_ok=False → breaks_before=1
         return rows
 
-    def _clean_pages(self, _bytes):
-        return [b"pg1", b"pg2"]
+    def _stub_two_pages(self):
+        """两页 PDF · 每页渲染出一枚哨兵 PNG(不触真 fitz)。"""
+        bank_stmt_reread._pdf_page_count = lambda _b: 2
+        bank_stmt_reread._render_page = lambda _b, page_number: b"pg%d" % page_number
+
+    def _forbid_render(self, why):
+        def _boom(*_a, **_k):
+            raise AssertionError(why)
+
+        bank_stmt_reread._pdf_page_count = _boom
+        bank_stmt_reread._render_page = _boom
 
     def test_better_reread_is_adopted_and_recorded(self):
         original = self._original_with_one_break()
-        bank_stmt_reread._render_pages = self._clean_pages
+        self._stub_two_pages()
 
         def _read(_img, page_number, filename, _key):
             if page_number == 1:
@@ -94,11 +73,11 @@ class MaybeRereadTests(unittest.TestCase):
         self.assertEqual(esc[0]["breaks_after"], 0)
         self.assertEqual(esc[0]["eye_from"], "vision")
         self.assertEqual(esc[0]["eye_to"], "direct")
-        self.assertEqual(esc[0]["pages"], [1, 2])
+        self.assertEqual(esc[0]["pages"], [1, 2])  # 并发跑仍按页号保序收拢
 
     def test_worse_reread_keeps_original(self):
         original = self._original_with_one_break()
-        bank_stmt_reread._render_pages = self._clean_pages
+        self._stub_two_pages()
 
         def _read(_img, page_number, filename, _key):
             if page_number == 1:
@@ -116,7 +95,7 @@ class MaybeRereadTests(unittest.TestCase):
 
     def test_page_read_exception_keeps_original_no_crash(self):
         original = self._original_with_one_break()
-        bank_stmt_reread._render_pages = self._clean_pages
+        self._stub_two_pages()
 
         def _boom(_img, page_number, filename, _key):
             if page_number == 2:
@@ -128,15 +107,29 @@ class MaybeRereadTests(unittest.TestCase):
             original, 1000.0, file_bytes=b"%PDF", filename="b.pdf", ext="pdf"
         )
         self.assertIs(rows, original)
-        self.assertEqual(esc, [])  # 重读崩 → 保原读、无留痕
+        self.assertEqual(esc, [])  # 单页重读崩 → 整轮弃、保原读、无留痕
 
-    def test_render_exception_keeps_original(self):
+    def test_page_render_exception_keeps_original(self):
+        original = self._original_with_one_break()
+        bank_stmt_reread._pdf_page_count = lambda _b: 2
+
+        def _render_boom(_b, page_number):
+            raise RuntimeError("render page failed")
+
+        bank_stmt_reread._render_page = _render_boom
+        rows, esc = bank_stmt_reread.maybe_reread_chain_breaks(
+            original, 1000.0, file_bytes=b"%PDF", filename="b.pdf", ext="pdf"
+        )
+        self.assertIs(rows, original)
+        self.assertEqual(esc, [])
+
+    def test_page_count_exception_keeps_original(self):
         original = self._original_with_one_break()
 
-        def _render_boom(_bytes):
+        def _count_boom(_b):
             raise RuntimeError("fitz missing")
 
-        bank_stmt_reread._render_pages = _render_boom
+        bank_stmt_reread._pdf_page_count = _count_boom
         rows, esc = bank_stmt_reread.maybe_reread_chain_breaks(
             original, 1000.0, file_bytes=b"%PDF", filename="b.pdf", ext="pdf"
         )
@@ -146,11 +139,7 @@ class MaybeRereadTests(unittest.TestCase):
     def test_no_break_does_not_render(self):
         clean = [_row(deposit=100.0, balance=1100.0), _row(deposit=50.0, balance=1150.0)]
         _verify_row_balances(clean, 1000.0)  # breaks_before=0
-
-        def _must_not_render(_bytes):
-            raise AssertionError("render must not run when there is no chain break")
-
-        bank_stmt_reread._render_pages = _must_not_render
+        self._forbid_render("render must not run when there is no chain break")
         rows, esc = bank_stmt_reread.maybe_reread_chain_breaks(
             clean, 1000.0, file_bytes=b"%PDF", filename="b.pdf", ext="pdf"
         )
@@ -159,11 +148,7 @@ class MaybeRereadTests(unittest.TestCase):
 
     def test_non_pdf_is_noop(self):
         original = self._original_with_one_break()
-
-        def _must_not_render(_bytes):
-            raise AssertionError("render must not run for non-pdf")
-
-        bank_stmt_reread._render_pages = _must_not_render
+        self._forbid_render("render must not run for non-pdf")
         rows, esc = bank_stmt_reread.maybe_reread_chain_breaks(
             original, 1000.0, file_bytes=b"img", filename="b.jpg", ext="jpg"
         )
@@ -172,11 +157,7 @@ class MaybeRereadTests(unittest.TestCase):
 
     def test_kill_switch_disables_reread(self):
         original = self._original_with_one_break()
-
-        def _must_not_render(_bytes):
-            raise AssertionError("render must not run when kill switch off")
-
-        bank_stmt_reread._render_pages = _must_not_render
+        self._forbid_render("render must not run when kill switch off")
         with mock.patch.dict(os.environ, {"OCR_BANK_CHAIN_REREAD": "0"}):
             rows, esc = bank_stmt_reread.maybe_reread_chain_breaks(
                 original, 1000.0, file_bytes=b"%PDF", filename="b.pdf", ext="pdf"

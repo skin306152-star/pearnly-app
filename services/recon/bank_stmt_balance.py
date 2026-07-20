@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from services.recon.bank_recon_types import StatementRow
 from services.recon.bank_recon_utils import AMOUNT_TOL
+from services.recon.bank_table_io import _is_summary_row
 
 
 def _stmt_bad_ratio(rows: List["StatementRow"], opening: float) -> float:
@@ -208,6 +209,26 @@ def _repair_amount_from_balance(rows: List[StatementRow], opening: float) -> Non
                 r.withdrawal, r.deposit = abs(corrected), 0.0
             r.amount_autocorrected = True
             r.balance_ok = True
+
+
+def finalize_rows(rows: List[StatementRow], opening: float) -> List[StatementRow]:
+    """把解析出的流水行过一遍余额链定案序列,返回可直接比较断链数的行集。三条解析路
+    (PDF 主解析 / 非 PDF 管线适配 / 断链换眼重读)的单一事实源——序列顺序是正确性不变式,
+    不可重排:
+
+      ① 过滤底部汇总/合计行(_is_summary_row)——非交易,进链会污染核对;
+      ② 方向纠正(_correct_direction_from_balance)——必须在核对前,否则借贷读反的行会被误判断链;
+      ③ 逐行核对(_verify_row_balances)——按已摆正的方向标 balance_ok;
+      ④ 金额反推修复(_repair_amount_from_balance)——必须在核对后,依赖它标好的 balance_ok。
+
+    就地改传入行对象,返回过滤后的新列表(长度可能缩短)。opening 由各调用方按自己的
+    口径求出后传入(文档级字段 / 行内 B/F 反推),本函数不再兜底。
+    """
+    kept = [r for r in rows if not _is_summary_row(r.description)]
+    _correct_direction_from_balance(kept, opening)
+    _verify_row_balances(kept, opening)
+    _repair_amount_from_balance(kept, opening)
+    return kept
 
 
 def _audit_completeness(

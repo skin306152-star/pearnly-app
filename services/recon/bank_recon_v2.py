@@ -83,12 +83,13 @@ from services.recon.bank_stmt_gemini import _gemini_parse_statement
 from services.recon.bank_arbitration_guard import divergence_reasons
 
 # STATEMENT BALANCE VERIFY/REPAIR · moved to services/recon/bank_stmt_balance.py
-from services.recon.bank_stmt_balance import (
+from services.recon.bank_stmt_balance import (  # noqa: F401  re-export (bank_v2 tests import balance-chain fns) + facade-internal
     _stmt_bad_ratio,
     _correct_direction_from_balance,
     _verify_row_balances,
     _repair_amount_from_balance,
     _audit_completeness,
+    finalize_rows,
 )
 
 # LEGACY ParsedStatement pipeline · moved to services/recon/bank_stmt_legacy.py
@@ -326,19 +327,9 @@ def _parse_bank_statement_impl(
     for r in rows:
         r.source_file = filename
 
-    # v118.35.0.60 · 跳过底部汇总/合计行(Total/รวมรายการ/合计)· 不是交易 · 防被当交易误标 + 污染余额链
-    #   汇合点统一过滤 · 覆盖 table/text/Gemini 全部解析路径
-    rows = [r for r in rows if not _is_summary_row(r.description)]
-
-    # v118.35.0.50 · 先用余额涨跌纠正 OCR 把借贷方向读反的行(必须在余额验证之前)
-    _correct_direction_from_balance(rows, opening)
-
-    # v118.33.13.0 · row-by-row balance arithmetic verification
-    # For each row: prev_balance + deposit - withdrawal should equal current balance.
-    # If it doesn't, set balance_ok=False so the UI can flag for human review.
-    _verify_row_balances(rows, opening)
-    # v118.35.0.62 · 余额链自动修复『数字读错的金额』· 把可证的 ⚠ 变成自动修正
-    _repair_amount_from_balance(rows, opening)
+    # 汇总行过滤 → 方向纠正 → 逐行核对 → 金额反推修复:余额链定案序列的单一事实源
+    # (bank_stmt_balance.finalize_rows;序列顺序是正确性不变式)。覆盖 table/text/Gemini 全部解析路径。
+    rows = finalize_rows(rows, opening)
 
     # GC-D-2 · 整份一眼读会吞多页对账单的折行结算行 → 有余额链断链时逐页换眼(单页直读)重读,
     # 严格更少断链才采纳(否则原样保留)。escalations 留痕随 item_bank_parsed 事件审计回放。

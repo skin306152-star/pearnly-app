@@ -93,9 +93,7 @@ class SignoffModeTests(unittest.TestCase):
 
     def test_fresh_projection_beats_hide_signoff(self):
         # 已 fresh 签批仍点亮 chip(收起只作用于「可点的钮」)。
-        self.assertEqual(
-            self._mode('{signoff:{actor:"u",stale:false}}', hide="true"), "done"
-        )
+        self.assertEqual(self._mode('{signoff:{actor:"u",stale:false}}', hide="true"), "done")
 
 
 if __name__ == "__main__":

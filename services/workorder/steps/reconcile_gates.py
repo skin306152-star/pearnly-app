@@ -273,6 +273,10 @@ def aggregate_sales(reads: dict) -> dict:
     used = False
     checked = False
     details: list[dict] = []
+    # 解析层超行上限会静默截断(parse._MAX_ROWS / pdf_table),连表尾合计行一起截走 →
+    # total_check 退成 absent(与「本来就没合计行」同表现),逐行和少算截掉的行。降级标记
+    # 必须有消费方,否则这道交叉校验被自己静默关掉(交接 A-3)。
+    truncated = [str(label) for label, parsed in reads.items() if parsed.get("truncated")]
     for label, parsed in reads.items():
         plan = _sales_plan(parsed.get("headers") or [])
         if plan is None:
@@ -307,6 +311,7 @@ def aggregate_sales(reads: dict) -> dict:
         "used": used,
         "total_check": status,
         "total_check_details": details,
+        "truncated": truncated,
         "sane": _vat_not_over_base(sales_total, vat_total),
     }
 
@@ -333,6 +338,11 @@ def total_check_reasons(r2: dict) -> list[str]:
         reasons.append(
             f"sales_vat_over_base: 销项税={r2['output_vat']} 大于销售额={r2['sales_amount']}"
             "(疑似汇总表认列错位,请核对表头与列对应)"
+        )
+    for label in r2.get("truncated") or []:
+        reasons.append(
+            f"sales_rows_truncated[{label}]: 汇总表行数超解析上限被截断,"
+            "少算的行未计入销售额/销项税,且表尾合计行可能一并被截 — 请拆分该表后重传"
         )
     return reasons
 

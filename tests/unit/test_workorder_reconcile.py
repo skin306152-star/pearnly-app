@@ -409,6 +409,22 @@ class R2SalesTests(unittest.TestCase):
         self.assertIn("500.00", joined)
         self.assertIn("900.00", joined)
 
+    def test_truncated_summary_stops_and_names_it(self):
+        """行数超上限被截断 → 停机点名(与合计行打架同级):少算的行不进 R2,合计行常被一并
+        截走让交叉校验退成 absent,不拦就一路绿灯少算销售额/销项税(交接 A-3)。"""
+        items = [_pi("p1", file="a.jpg")]
+        reads = {
+            "big": {
+                "headers": ["วันที่", "ยอดขาย", "ภาษีขาย"],
+                "rows": [{"cells": ["1", "500.00", "35.00"], "is_summary": False}],
+                "truncated": True,
+            }
+        }
+        events = [_money_evt("p1", net="1428.57", vat="100.00", grand="1528.57")]
+        out = reconcile.run(_ctx(FakeStore(items, events), data={"sales_summary_reads": reads}))
+        self.assertEqual(out.status, "stuck")
+        self.assertIn("sales_rows_truncated[big]", " ".join(out.reasons))
+
 
 class R3BankTests(unittest.TestCase):
     def test_bank_missing_notes_but_not_stuck(self):

@@ -75,7 +75,12 @@ def run(ctx: StepContext) -> StepResult:
         return StepResult.needs(["sales_summary"])
     # 汇总表自带的合计行与逐行求和打架 = 认列或表本身有问题,两个数只能停机交人工,不许挑一个用。
     # 税额大于税基同样停机:合计行校验在列整体错位时会自洽通过(两边取同一错列),它兜这个盲区。
-    if r2["total_check"] == gates.TOTAL_CHECK_MISMATCH or not r2.get("sane", True):
+    # 行数超上限被截断也停机:少算的行不进 R2,且合计行常被一并截走让交叉校验退成 absent。
+    if (
+        r2["total_check"] == gates.TOTAL_CHECK_MISMATCH
+        or not r2.get("sane", True)
+        or r2.get("truncated")
+    ):
         return StepResult.stuck(gates.total_check_reasons(r2))
 
     # R3 银行材料存在性 + 逐笔真对平(pearnly_ai_bank_recon 闸)。闸关:逐字节维持存在性判定

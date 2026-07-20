@@ -62,8 +62,8 @@ class RealFixtureTests(unittest.TestCase):
         self.assertEqual(out["sales_amount"], ICE_SUBTOTAL)
 
 
-def _read(headers, rows):
-    return {"headers": headers, "rows": rows}
+def _read(headers, rows, truncated=False):
+    return {"headers": headers, "rows": rows, "truncated": truncated}
 
 
 def _row(cells, summary=False):
@@ -219,6 +219,46 @@ class VatOverBaseTests(unittest.TestCase):
         out = gates.aggregate_sales({"s": _read(["aaa", "bbb"], [_row(["1", "2"])])})
         self.assertFalse(out["used"])
         self.assertEqual(gates.total_check_reasons(out), [])
+
+
+class TruncationTests(unittest.TestCase):
+    """行数超解析上限被截断(parse._MAX_ROWS / pdf_table)= 少算的行不进 R2,且表尾合计行
+    常一并被截 → total_check 退成 absent。降级标记必须有消费方,否则交叉校验被自己静默关掉
+    (交接 A-3:reads 到 truncated=True 直接停机,与 mismatch 同级)。"""
+
+    HEADERS = ["วันที่", "ยอดขาย", "ภาษีขาย"]
+
+    def test_truncated_read_surfaces_the_label(self):
+        out = gates.aggregate_sales(
+            {"big": _read(self.HEADERS, [_row(["1", "100.00", "7.00"])], truncated=True)}
+        )
+        self.assertEqual(out["truncated"], ["big"])
+
+    def test_truncation_produces_a_named_stop_reason(self):
+        out = gates.aggregate_sales(
+            {"big": _read(self.HEADERS, [_row(["1", "100.00", "7.00"])], truncated=True)}
+        )
+        reasons = gates.total_check_reasons(out)
+        self.assertTrue(any("sales_rows_truncated[big]" in r for r in reasons), reasons)
+
+    def test_untruncated_read_has_no_false_positive(self):
+        out = gates.aggregate_sales({"ok": _read(self.HEADERS, [_row(["1", "100.00", "7.00"])])})
+        self.assertEqual(out["truncated"], [])
+        self.assertEqual(gates.total_check_reasons(out), [])
+
+    def test_missing_truncated_key_is_treated_as_not_truncated(self):
+        # 手动录入等旧形状可能没有 truncated 键 —— get() falsy,不许误报成截断。
+        out = gates.aggregate_sales({"m": {"headers": self.HEADERS, "rows": []}})
+        self.assertEqual(out["truncated"], [])
+
+    def test_only_the_truncated_read_is_named(self):
+        out = gates.aggregate_sales(
+            {
+                "ok": _read(self.HEADERS, [_row(["1", "100.00", "7.00"])]),
+                "cut": _read(self.HEADERS, [_row(["1", "100.00", "7.00"])], truncated=True),
+            }
+        )
+        self.assertEqual(out["truncated"], ["cut"])
 
 
 if __name__ == "__main__":

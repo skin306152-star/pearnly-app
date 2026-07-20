@@ -15,8 +15,12 @@ logger = logging.getLogger(__name__)
 MIN_CHARS_PER_PAGE = 40
 
 
-def extract_pages(pdf_bytes: bytes) -> Optional[List[str]]:
-    """逐页抽文字层。解析失败返回 None(交调用方判 no_text_layer)。"""
+def extract_pages(pdf_bytes: bytes, *, layout: bool = False) -> Optional[List[str]]:
+    """逐页抽文字层。解析失败返回 None(交调用方判 no_text_layer)。
+
+    layout=True 保留字符的横向位置(列间空白不被压成单空格),给要按列切表的调用方用
+    (services/summary_import/pdf_table.py)。默认 False = 现状,取数/关键词扫描不受影响。
+    """
     try:
         import pdfplumber
     except ImportError:
@@ -25,7 +29,7 @@ def extract_pages(pdf_bytes: bytes) -> Optional[List[str]]:
 
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            return [(page.extract_text() or "") for page in pdf.pages]
+            return [(page.extract_text(layout=layout) or "") for page in pdf.pages]
     except Exception as e:
         logger.info("PDF 文字层抽取失败 · %s: %s", type(e).__name__, e)
         return None

@@ -9,6 +9,7 @@
 from typing import List, Optional
 
 from services.fileconv import ledger as ledger_mod
+from services.fileconv import pdf_grid
 from services.fileconv import tables as tables_mod
 from services.fileconv import validate as validate_mod
 from services.fileconv.classify import classify
@@ -24,8 +25,12 @@ from services.fileconv.text_layer import extract_pages, has_text_layer
 _LEDGER_TYPES = (GL_LEDGER, BANK_STATEMENT)
 
 
-def convert_pages(pages: List[str], source_name: str) -> ConvertResult:
-    """已抽好文字层的逐页文本 → ConvertResult(核心逻辑,便于单测直喂文本)。"""
+def convert_pages(pages: List[str], source_name: str, grid=None) -> ConvertResult:
+    """已抽好文字层的逐页文本 → ConvertResult(核心逻辑,便于单测直喂文本)。
+
+    grid 是 pdf_grid 切出的规整网格(只有 PDF 入口拿得到)。给了就按真列位建表并按列下标做
+    合计闭合校验;没给退回纯文字行 + 右对齐配对(行为与此前逐字节一致)。
+    """
     full_text = "\n".join(pages)
     doc_type = classify(full_text)
 
@@ -47,7 +52,9 @@ def convert_pages(pages: List[str], source_name: str) -> ConvertResult:
             stats=stats,
         )
 
-    lines = tables_mod.extract_tabular(pages)
+    lines = (
+        tables_mod.from_grid(grid.rows) if grid is not None else tables_mod.extract_tabular(pages)
+    )
     issues = validate_mod.validate_tabular(lines)
     stats = validate_mod.tabular_stats(lines)
     ncols = tables_mod.max_columns(lines)
@@ -69,13 +76,20 @@ def convert_pages(pages: List[str], source_name: str) -> ConvertResult:
 def convert_pdf(
     pdf_bytes: bytes, source_name: str = "", *, tenant_id: Optional[str] = None
 ) -> ConvertResult:
-    """入口:财务 PDF → ConvertResult。带文字层走纯函数路;无文字层(扫描件)转 OCR 桥。"""
+    """入口:财务 PDF → ConvertResult。带文字层走纯函数路;无文字层(扫描件)转 OCR 桥。
+
+    通用表另切一份真列位网格(pdf_grid 三级链)喂给 convert_pages:纯文字行在列间只有单空格
+    的 PDF 上切不开(整行一格),那正是"33 行 × 1 列"与假差额的来源。
+    """
     pages = extract_pages(pdf_bytes)
     if not has_text_layer(pages):
         from services.fileconv import ocr_bridge  # 懒加载:文字层路不牵连 OCR/pydantic 依赖
 
         return ocr_bridge.convert_scanned_pdf(pdf_bytes, source_name, tenant_id=tenant_id)
-    return convert_pages(pages, source_name)
+    layout = extract_pages(pdf_bytes, layout=True)
+    return convert_pages(
+        pages, source_name, grid=pdf_grid.extract_grid(pdf_bytes, pages_text=layout)
+    )
 
 
 def convert_image(

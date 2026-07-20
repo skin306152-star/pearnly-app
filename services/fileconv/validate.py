@@ -85,12 +85,12 @@ def ledger_stats(rows: List[LedgerRow], opening: Dict[str, Decimal]) -> Dict:
 def validate_tabular(lines: List[TabularLine]) -> List[Issue]:
     """明细合计闭合校验。"""
     issues: List[Issue] = []
-    for line_no, col_from_right, expected, actual in reconcile_totals(lines):
+    for line_no, column, expected, actual in reconcile_totals(lines):
         issues.append(
             Issue(
                 kind=ISSUE_FOOTER_TOTAL,
                 line_no=line_no,
-                message=f"合计行右起第 {col_from_right} 金额列:明细之和 ≠ 合计",
+                message=f"合计行{column} 金额列:明细之和 ≠ 合计",
                 expected=f"{expected}",
                 actual=f"{actual}",
             )

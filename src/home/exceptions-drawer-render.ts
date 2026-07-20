@@ -32,6 +32,7 @@ type ExcRow = {
     filename?: string;
     status?: string;
     invoice_date?: string;
+    invoice_date_raw?: string;
     created_at?: string;
     invoice_no?: string;
     severity?: string;
@@ -191,7 +192,10 @@ function renderDrawer() {
     const statusKey = 'exc-status-' + (row.status || 'pending');
     const statusLabel = t(statusKey) || row.status;
     const statusCls = 's-' + (row.status || 'pending');
-    const date = (row.invoice_date || row.created_at || '').slice(0, 10);
+    // 票面原文优先(与列表行、字段区同口径)· 无则回落公历
+    const date = row.invoice_date_raw
+        ? String(row.invoice_date_raw)
+        : (row.invoice_date || row.created_at || '').slice(0, 10);
     document.getElementById('exc-drawer-sub')!.innerHTML = `
         <span>${escapeHtml(seller)}</span>
         ${row.invoice_no ? `<span>· ${escapeHtml(row.invoice_no)}</span>` : ''}

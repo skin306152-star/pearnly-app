@@ -134,7 +134,18 @@ def list_exceptions(
                 SELECT e.id, e.history_id, e.rule_code, e.severity,
                        e.seller_name, e.invoice_no, e.total_amount, e.detail_json,
                        e.status, e.created_at, e.resolved_at,
-                       h.filename, h.invoice_date, h.confidence, h.client_id
+                       h.filename, h.invoice_date, h.confidence, h.client_id,
+                       -- 票面原文(泰国票面印佛历)· 界面显示它,公历列只用于算账期
+                       -- 主页优先(与 _extract_summary_fields 同口径:非副本非重复)· 找不到回落首页
+                       COALESCE(
+                         (SELECT p->'fields'->>'date_raw'
+                            FROM jsonb_array_elements(h.pages) p
+                           WHERE COALESCE((p->>'is_duplicate')::boolean, false) IS FALSE
+                             AND COALESCE((p->>'is_copy')::boolean, false) IS FALSE
+                             AND p->'fields'->>'date_raw' IS NOT NULL
+                           LIMIT 1),
+                         h.pages->0->'fields'->>'date_raw'
+                       ) AS invoice_date_raw
                 FROM exceptions e
                 INNER JOIN ocr_history h ON h.id = e.history_id
                 WHERE {where_sql}
@@ -166,6 +177,7 @@ def list_exceptions(
                         "invoice_date": (
                             r["invoice_date"].isoformat() if r.get("invoice_date") else None
                         ),
+                        "invoice_date_raw": r.get("invoice_date_raw"),
                         "confidence": r.get("confidence"),
                         "client_id": int(r["client_id"]) if r.get("client_id") else None,
                     }

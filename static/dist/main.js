@@ -3756,7 +3756,7 @@ ${p.raw_text||p.text||""}`).join(`
             <div class="exc-why-detail-row"><b>${escapeHtml(t("exc-detail-expected"))}</b><span>${escapeHtml(n)}</span></div>
         `}return e==="confidence_low"?`
             <div class="exc-why-detail-row"><b>${escapeHtml(t("exc-detail-conf-label"))}</b><span class="v-bad">${escapeHtml(a.confidence||"—")}</span></div>
-        `:e==="amount_missing"?`<div class="exc-why-detail-row" style="justify-content:center;color:var(--danger);"><span>${escapeHtml(t("exc-detail-missing"))}</span></div>`:`<div class="exc-why-detail-row"><span style="font-size:11px;">${escapeHtml(JSON.stringify(a))}</span></div>`}function wa(){const e=W.excRow;if(!e)return;const a=e.seller_name&&e.seller_name.trim()?e.seller_name:t("exc-no-seller"),n=e.filename||"—";document.getElementById("exc-drawer-title").textContent=n;const s="exc-status-"+(e.status||"pending"),i=t(s)||e.status,o="s-"+(e.status||"pending"),r=(e.invoice_date||e.created_at||"").slice(0,10);document.getElementById("exc-drawer-sub").innerHTML=`
+        `:e==="amount_missing"?`<div class="exc-why-detail-row" style="justify-content:center;color:var(--danger);"><span>${escapeHtml(t("exc-detail-missing"))}</span></div>`:`<div class="exc-why-detail-row"><span style="font-size:11px;">${escapeHtml(JSON.stringify(a))}</span></div>`}function wa(){const e=W.excRow;if(!e)return;const a=e.seller_name&&e.seller_name.trim()?e.seller_name:t("exc-no-seller"),n=e.filename||"—";document.getElementById("exc-drawer-title").textContent=n;const s="exc-status-"+(e.status||"pending"),i=t(s)||e.status,o="s-"+(e.status||"pending"),r=e.invoice_date_raw?String(e.invoice_date_raw):(e.invoice_date||e.created_at||"").slice(0,10);document.getElementById("exc-drawer-sub").innerHTML=`
         <span>${escapeHtml(a)}</span>
         ${e.invoice_no?`<span>· ${escapeHtml(e.invoice_no)}</span>`:""}
         ${r?`<span>· ${escapeHtml(r)}</span>`:""}
@@ -3889,7 +3889,7 @@ ${p.raw_text||p.text||""}`).join(`
             ${kk()}
             <div class="exc-empty-title">${escapeHtml(t("exc-empty-title"))}</div>
             <div>${escapeHtml(t("exc-empty-desc"))}</div>
-        </div>`,su();return}const n='<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l3 3 5-5"/></svg>',s=(V.currentStatus||"pending")==="pending";a.innerHTML=e.map(i=>{const o=i.severity||"medium",r=Hd(i),c=i.seller_name&&i.seller_name.trim()?i.seller_name:t("exc-no-seller"),l=i.filename||"—",d=$k(i.invoice_date||i.created_at),p=i.status==="pending",u=V.selectedIds.has(i.id),m=s&&p;return`
+        </div>`,su();return}const n='<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l3 3 5-5"/></svg>',s=(V.currentStatus||"pending")==="pending";a.innerHTML=e.map(i=>{const o=i.severity||"medium",r=Hd(i),c=i.seller_name&&i.seller_name.trim()?i.seller_name:t("exc-no-seller"),l=i.filename||"—",d=i.invoice_date_raw?String(i.invoice_date_raw):$k(i.invoice_date||i.created_at),p=i.status==="pending",u=V.selectedIds.has(i.id),m=s&&p;return`
             <div class="exc-row sev-${escapeHtml(o)} ${u?"selected":""}" data-exc-id="${escapeHtml(String(i.id))}">
                 <div class="exc-row-check ${u?"checked":""}" data-check-id="${escapeHtml(String(i.id))}" ${m?"":'style="visibility:hidden;"'}>${n}</div>
                 <div class="exc-row-sev">${wk(o)}</div>

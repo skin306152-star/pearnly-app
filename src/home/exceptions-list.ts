@@ -122,7 +122,10 @@ function renderList(items?: any) {
             const seller =
                 it.seller_name && it.seller_name.trim() ? it.seller_name : t('exc-no-seller');
             const filename = it.filename || '—';
-            const date = _shortDate(it.invoice_date || it.created_at);
+            // 票面原文优先(泰国票面印佛历)· 无则回落公历,再无则用上传时间
+            const date = it.invoice_date_raw
+                ? String(it.invoice_date_raw)
+                : _shortDate(it.invoice_date || it.created_at);
             const isPending = it.status === 'pending';
             const checked = _excState.selectedIds.has(it.id);
             const checkCellVisible = showCheckbox && isPending;

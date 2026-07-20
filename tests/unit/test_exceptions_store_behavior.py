@@ -112,6 +112,38 @@ class InsertExceptionTests(unittest.TestCase):
 
 
 class ListExceptionsTests(unittest.TestCase):
+    def test_list_returns_printed_date_alongside_gregorian(self):
+        """界面显示票面原文(泰国票面印佛历),公历列只用于算账期 —— 两个都要给出去。"""
+        cur = FakeCursor(
+            fetchall=[
+                {
+                    "id": 1,
+                    "history_id": "h1",
+                    "rule_code": "R-DUP-01",
+                    "severity": "high",
+                    "seller_name": "S",
+                    "invoice_no": "RCP69-8028",
+                    "total_amount": None,
+                    "detail_json": {},
+                    "status": "pending",
+                    "created_at": None,
+                    "resolved_at": None,
+                    "filename": "f.jpg",
+                    "invoice_date": None,
+                    "invoice_date_raw": "06/07/69",
+                    "confidence": None,
+                    "client_id": None,
+                }
+            ]
+        )
+        with patch_cursor(cur):
+            items = exc.list_exceptions("u1", tenant_id="t1")
+        self.assertEqual(items[0]["invoice_date_raw"], "06/07/69")
+        self.assertIn("invoice_date_raw", cur.last_sql)
+        # 主页优先(与 _extract_summary_fields 同口径),副本/重复页不参与
+        self.assertIn("is_duplicate", cur.last_sql)
+        self.assertIn("is_copy", cur.last_sql)
+
     def test_tenant_path_filters_by_tenant(self):
         cur = FakeCursor(fetchall=[])
         with patch_cursor(cur):

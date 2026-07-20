@@ -118,6 +118,35 @@ class EmitFromBanksTests(unittest.TestCase):
             self.assertIsNone(stmt_totals.emit_from_banks(_Ctx(store), []))
 
 
+class DefaultNarrowReadTaskTests(unittest.TestCase):
+    """D3:真窄读把 task=bank_statement 透进 run_pipeline_for_file,让引擎档按银行档解析
+    (prod overrides_by_task.bank_statement 才生效);产物仍是发票管线 legacy dict,取 fields。"""
+
+    def test_narrow_read_passes_bank_statement_task(self):
+        captured = {}
+
+        def fake_run(data, name, *, api_key, task, document_type, **kw):
+            captured["task"] = task
+            captured["document_type"] = document_type
+            return object()  # 形状无所谓,legacy_adapter 被 patch 掉
+
+        with (
+            mock.patch.object(stmt_totals.storage, "read_bytes", return_value=b"raw"),
+            mock.patch("services.ocr.entrypoints.run_pipeline_for_file", fake_run),
+            mock.patch(
+                "services.ocr.legacy_adapter.pipeline_result_to_legacy_dict",
+                return_value={"pages": [{"fields": {"s": "รวมฝากเงิน 728 รายการ"}}]},
+            ),
+        ):
+            fields = stmt_totals._default_narrow_read("/x/IMG_2501.jpg")
+        self.assertEqual(captured["task"], "bank_statement")
+        self.assertEqual(captured["document_type"], "bank_statement")
+        self.assertEqual(fields, {"s": "รวมฝากเงิน 728 รายการ"})
+
+    def test_no_file_ref_short_circuits(self):
+        self.assertEqual(stmt_totals._default_narrow_read(""), {})
+
+
 class TotalsFromEventsTests(unittest.TestCase):
     def test_latest_wins(self):
         events = [

@@ -91,8 +91,14 @@ def _default_narrow_read(file_ref: str) -> dict:
     from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
 
     data = storage.read_bytes(file_ref)  # 落盘密文解回明文再喂 OCR(双轨读)
+    # task="bank_statement" 让引擎档按银行窄读的 overrides_by_task 解析(economy),不改 handler:
+    # 产物仍是发票管线 PipelineResult,下面照旧取 pages[0].fields 喂 parse_totals。
     result = run_pipeline_for_file(
-        data, Path(file_ref).name, api_key=None, document_type="bank_statement"
+        data,
+        Path(file_ref).name,
+        api_key=None,
+        task="bank_statement",
+        document_type="bank_statement",
     )
     pages = (pipeline_result_to_legacy_dict(result).get("pages")) or []
     return dict(pages[0].get("fields") or {}) if pages else {}

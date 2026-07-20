@@ -250,3 +250,37 @@ class MergedDirectionDecisionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NonDirectionFlagWithRulingTests(unittest.TestCase):
+    """kind=unknown 但 flag_reason 不是方向码(如 ocr_error:*)的件被人裁过方向。
+
+    此前判据只认 flag_reason 前缀:这类件裁了 assign_kind 仍落 fail-closed 的 PENDING,而 R1
+    那边同样不收编它 —— 裁多少次都出不了包。判据改成「前缀命中 或 人已裁过方向」。
+    """
+
+    def test_ruled_purchase_counts_instead_of_pending(self):
+        items = [_item("x", "unknown", status="flagged", flag_reason="ocr_error:blurred")]
+        cons = _bucket_after_replay(items, [_assign_evt("x", decisions.PURCHASE_INVOICE)])
+        self.assertEqual(cons.buckets[c.INPUT_COUNTED], items)
+        self.assertEqual(cons.pending, [])
+        self.assertTrue(cons.conserved(1))
+
+    def test_ruled_non_tax_is_excluded(self):
+        items = [_item("x", "unknown", status="flagged", flag_reason="ocr_error:blurred")]
+        cons = _bucket_after_replay(items, [_assign_evt("x", decisions.NON_TAX)])
+        self.assertEqual(cons.buckets[c.EXCLUDED], items)
+        self.assertTrue(cons.conserved(1))
+
+    def test_without_ruling_still_pending(self):
+        # 放宽只针对「人已裁过」,无裁决的件必须照旧 fail-closed,否则修死锁变成开后门。
+        items = [_item("x", "unknown", status="flagged", flag_reason="ocr_error:blurred")]
+        cons = _bucket_after_replay(items, [])
+        self.assertEqual(cons.pending, items)
+        self.assertFalse(cons.conserved(1))
+
+    def test_direction_prefix_behaviour_unchanged(self):
+        items = [_item("d", "unknown", status="flagged", flag_reason="direction_ambiguous")]
+        self.assertEqual(_bucket_after_replay(items, []).pending, items)
+        counted = _bucket_after_replay(items, [_assign_evt("d", decisions.PURCHASE_INVOICE)])
+        self.assertEqual(counted.buckets[c.INPUT_COUNTED], items)

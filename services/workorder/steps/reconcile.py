@@ -51,12 +51,7 @@ def run(ctx: StepContext) -> StepResult:
     purchases = [
         it for it in items if it["kind"] == _PURCHASE and it["status"] in ("ok", "flagged")
     ]
-    ambiguous = [
-        it
-        for it in items
-        if it["status"] == "flagged"
-        and str(it.get("flag_reason") or "").startswith(decisions.DIRECTION_PREFIXES)
-    ]
+    ambiguous = gates.direction_items(items, decision_recs)
     # 自动判本方销项票(MC1-c.1):默认销项不进 R1、无裁决不停机,人工改判进项才计入(拍错票兜底)。
     sales_docs = [it for it in items if it["kind"] == decisions.SALES_DOC]
     r1 = gates.resolve_input_vat(

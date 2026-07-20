@@ -15,7 +15,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from services.workorder.engine import StepContext
-from services.workorder.steps import package, pp30_form
+from services.workorder.steps import package, reconcile_gates, pp30_form
 
 GOLDEN_SALES_AMOUNT = "858780.16"
 GOLDEN_OUTPUT_VAT = "60114.61"
@@ -875,3 +875,34 @@ class LedgerMatchesR1Tests(PackageFixture):
         self.assertIn("undisputed.jpg", md)
         self.assertNotIn("IMG_2640.jpg", md)
         self.assertEqual(len(rows), 2)
+
+
+class DirectionItemsTests(unittest.TestCase):
+    """R1 收编口径(reconcile_gates.direction_items)与守恒归桶必须同判据,否则一边算一边压回。"""
+
+    @staticmethod
+    def _recs(item_id=None, kind=None):
+        if not item_id:
+            return {}
+        return {item_id: {"payload": {"decision": "assign_kind", "kind": kind}}}
+
+    def test_ruled_item_with_non_direction_flag_is_collected(self):
+        items = [_ambiguous_item("d", "/in/d.jpg")]
+        items[0]["flag_reason"] = "ocr_error:blurred"
+        got = reconcile_gates.direction_items(items, self._recs("d", "purchase_invoice"))
+        self.assertEqual(got, items)
+
+    def test_unruled_item_with_non_direction_flag_is_not_collected(self):
+        items = [_ambiguous_item("d", "/in/d.jpg")]
+        items[0]["flag_reason"] = "ocr_error:blurred"
+        self.assertEqual(reconcile_gates.direction_items(items, self._recs()), [])
+
+    def test_direction_prefix_collected_without_ruling(self):
+        items = [_ambiguous_item("d", "/in/d.jpg")]
+        self.assertEqual(reconcile_gates.direction_items(items, self._recs()), items)
+
+    def test_ok_status_never_collected(self):
+        items = [_ambiguous_item("d", "/in/d.jpg", status="ok")]
+        self.assertEqual(
+            reconcile_gates.direction_items(items, self._recs("d", "purchase_invoice")), []
+        )

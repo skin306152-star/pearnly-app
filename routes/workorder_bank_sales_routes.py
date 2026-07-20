@@ -61,23 +61,29 @@ def _authorize_bank_sales(request: Request):
 
 @router.post("/api/workorder/orders/{work_order_id}/bank-sales/run")
 async def run_bank_sales(work_order_id: str, request: Request):
-    """占运行位后起守护线程，HTTP 秒回；后台按批短事务落建议事件。"""
+    """占运行位(进程内 + 跨进程租约)后起守护线程，HTTP 秒回；后台按批短事务落建议事件。"""
     tenant_id, _user = _authorize_bank_sales(request)
     with db.get_cursor() as cur:
         _load_mutable_order(cur, request, _user, tenant_id, work_order_id)
         events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
         total = len(bank_sales_suggest.pending_rows(events))
-    if not bank_sales_brain.begin(work_order_id, total):
+    owner = bank_sales_brain.begin_run(tenant_id, work_order_id, total)
+    if owner is None:
         return JSONResponse(status_code=409, content={"running": True})
     try:
         threading.Thread(
             target=bank_sales_brain.run_async,
-            kwargs={"tenant_id": tenant_id, "work_order_id": work_order_id, "claimed": True},
+            kwargs={
+                "tenant_id": tenant_id,
+                "work_order_id": work_order_id,
+                "claimed": True,
+                "lease_owner": owner,
+            },
             daemon=True,
             name=f"bank-sales-{work_order_id[:8]}",
         ).start()
     except Exception:
-        bank_sales_brain.fail_start(work_order_id)
+        bank_sales_brain.fail_start(tenant_id, work_order_id, owner)
         raise
     return {"started": True, "total_pending": total}
 

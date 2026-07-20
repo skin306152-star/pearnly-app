@@ -190,6 +190,12 @@ async def run_recovery_tick():
     except Exception as e:
         logger.warning(f"[workorder_auto_open] tick failed: {e}")
     try:
+        from services.workorder import bank_sales_recovery
+
+        await bank_sales_recovery.run_tick()
+    except Exception as e:
+        logger.warning(f"[bank_sales_recovery] tick failed: {e}")
+    try:
         await run_stage_janitor_tick()
     except Exception as e:
         logger.warning(f"[stage_janitor] tick failed: {e}")

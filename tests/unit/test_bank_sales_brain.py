@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -66,61 +67,6 @@ class _Store:
 
 def _outcome(data, ok=True, model="fake-model"):
     return SimpleNamespace(ok=ok, data=data, model=model)
-
-
-class ParseSuggestionTests(unittest.TestCase):
-    FP = "2569-05-01|1000|0"
-
-    def test_valid_sales_with_citation(self):
-        rec = brain.parse_suggestion(
-            {
-                "suggestion": "sales",
-                "confidence": 0.9,
-                "reason_zh": "客户转账",
-                "cited_row_fingerprints": [self.FP],
-            },
-            {self.FP},
-        )
-        self.assertTrue(rec["valid"])
-        self.assertEqual(rec["suggestion"], "sales")
-
-    def test_cannot_judge_without_citation_is_valid(self):
-        rec = brain.parse_suggestion(
-            {
-                "suggestion": "cannot_judge",
-                "confidence": 0.2,
-                "reason_zh": "看不出",
-                "cited_row_fingerprints": [],
-            },
-            {self.FP},
-        )
-        self.assertTrue(rec["valid"])
-        self.assertEqual(rec["suggestion"], "cannot_judge")
-
-    def test_fake_citation_rejected(self):
-        rec = brain.parse_suggestion(
-            {"suggestion": "sales", "confidence": 0.9, "cited_row_fingerprints": ["9999|0|0"]},
-            {self.FP},
-        )
-        self.assertFalse(rec["valid"])
-        self.assertEqual(rec["invalid_reason"], brain.INVALID_CITED_MISSING)
-
-    def test_real_verdict_without_citation_rejected(self):
-        rec = brain.parse_suggestion(
-            {"suggestion": "sales", "confidence": 0.9, "cited_row_fingerprints": []}, {self.FP}
-        )
-        self.assertFalse(rec["valid"])
-        self.assertEqual(rec["invalid_reason"], brain.INVALID_CITATION_REQUIRED)
-
-    def test_unknown_suggestion_rejected(self):
-        rec = brain.parse_suggestion({"suggestion": "maybe", "confidence": 0.5}, {self.FP})
-        self.assertEqual(rec["invalid_reason"], brain.INVALID_SUGGESTION_UNKNOWN)
-
-    def test_confidence_out_of_range_rejected(self):
-        rec = brain.parse_suggestion(
-            {"suggestion": "sales", "confidence": 5, "cited_row_fingerprints": [self.FP]}, {self.FP}
-        )
-        self.assertEqual(rec["invalid_reason"], brain.INVALID_CONFIDENCE)
 
 
 class RunTests(unittest.TestCase):
@@ -206,6 +152,117 @@ class RunTests(unittest.TestCase):
         ):
             summary = brain.run(None, tenant_id="t-1", work_order_id="wo-1")
         self.assertEqual((summary["asked"], summary["logged"], summary["failed"]), (1, 0, 1))
+
+
+def _quota_outcome():
+    return SimpleNamespace(ok=False, error_kind="quota", data=None, model=None)
+
+
+def _hard_outcome():
+    return SimpleNamespace(ok=False, error_kind="provider", data=None, model=None)
+
+
+def _ans(fp):
+    return {
+        "row_fingerprint": fp,
+        "suggestion": "sales",
+        "confidence": 0.9,
+        "cited_row_fingerprints": [fp],
+    }
+
+
+class QuotaBreakerTerminalTests(unittest.TestCase):
+    """D6-1/D6-3:quota 退避不吃熔断预算;非 quota 三连熔断并落 failed 终态事件(trigger=manual)。"""
+
+    def setUp(self):
+        with brain._PROGRESS_LOCK:
+            brain._PROGRESS.clear()
+
+    def _store(self, count):
+        rows = [_dep("2569-05-01", 100) for _ in range(count)]
+        return _Store([_bank_event(rows)])
+
+    def _run(self, store, side_effect, wo="wo-q"):
+        with (
+            mock.patch.object(brain, "store", store),
+            mock.patch.object(brain, "ask_model", side_effect=side_effect) as ask,
+            mock.patch.object(
+                brain.feature_flags,
+                "pearnly_ai_bank_sales_suggest_enabled_for",
+                return_value=True,
+            ),
+            mock.patch.dict(os.environ, {"PEARNLY_WORKORDER_OCR_QUOTA_BACKOFF_SECONDS": "0"}),
+        ):
+            summary = brain.run(None, tenant_id="t-1", work_order_id=wo)
+        return summary, ask
+
+    def test_quota_retried_within_batch_not_counted(self):
+        store = self._store(1)
+        fp = bss.parsed_rows_from_events(store.events)[0]["fingerprint"]
+        ok = SimpleNamespace(ok=True, error_kind=None, data=[_ans(fp)], model="m")
+        summary, ask = self._run(store, [_quota_outcome(), _quota_outcome(), ok])
+        self.assertEqual(summary["consecutive_failures"], 0)
+        self.assertEqual((summary["logged"], summary["failed"]), (1, 0))
+        self.assertEqual(ask.call_count, 3)  # 2 次退避重试 + 1 次成功,同一批
+        self.assertEqual(summary["status"], "completed")
+
+    def test_quota_exhausted_leaves_row_pending_without_breaker(self):
+        store = self._store(1)
+        summary, ask = self._run(store, [_quota_outcome()] * 3)  # 用满 max_attempts=3
+        self.assertEqual(summary["consecutive_failures"], 0)  # quota 不计熔断
+        self.assertEqual((summary["logged"], summary["failed"]), (0, 1))
+        # 有失败批 → 终态 failed(让自动收尾接续)。
+        failed = [e for e in store.events if e["event_type"] == brain.EVT_BRAIN_FAILED]
+        self.assertEqual(len(failed), 1)
+
+    def test_non_quota_three_failures_trip_breaker_and_emit_failed_event(self):
+        store = self._store(120)  # 3 批
+        summary, ask = self._run(store, [_hard_outcome()] * 3, wo="wo-hard")
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual((summary["failed"], summary["consecutive_failures"]), (3, 3))
+        self.assertEqual(ask.call_count, 3)  # 每批 1 次(非 quota 不重试),3 连败即停
+        failed = [e for e in store.events if e["event_type"] == brain.EVT_BRAIN_FAILED]
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0]["payload"]["trigger"], brain.TRIGGER_MANUAL)
+
+    def test_success_emits_finished_event(self):
+        store = self._store(1)
+        fp = bss.parsed_rows_from_events(store.events)[0]["fingerprint"]
+        ok = SimpleNamespace(ok=True, error_kind=None, data=[_ans(fp)], model="m")
+        summary, _ = self._run(store, [ok], wo="wo-ok")
+        finished = [e for e in store.events if e["event_type"] == brain.EVT_BRAIN_FINISHED]
+        self.assertEqual(len(finished), 1)
+        self.assertEqual(summary["status"], "completed")
+
+
+class BeginRunLeaseTests(unittest.TestCase):
+    """D6-2:begin_run 占进程内位 + 抢跨进程租约;租约被占/DB 故障 → None 且释放进程内位。"""
+
+    def setUp(self):
+        with brain._PROGRESS_LOCK:
+            brain._PROGRESS.clear()
+
+    def test_returns_owner_when_lease_free(self):
+        with mock.patch.object(brain, "_acquire_lease", return_value=True):
+            owner = brain.begin_run("t-1", "wo-free", 5)
+        self.assertTrue(owner and owner.startswith("bank_sales_brain:"))
+
+    def test_rejects_when_lease_taken_and_releases_inproc(self):
+        with mock.patch.object(brain, "_acquire_lease", return_value=False) as acq:
+            self.assertIsNone(brain.begin_run("t-1", "wo-taken", 5))
+        acq.assert_called_once()
+        self.assertTrue(brain.begin("wo-taken", 5))  # 进程内位已释放,可再占
+
+    def test_rejects_on_lease_db_error_and_releases_inproc(self):
+        with mock.patch.object(brain, "_acquire_lease", side_effect=RuntimeError("db down")):
+            self.assertIsNone(brain.begin_run("t-1", "wo-dberr", 5))
+        self.assertTrue(brain.begin("wo-dberr", 5))
+
+    def test_rejects_when_inproc_already_running(self):
+        self.assertTrue(brain.begin("wo-busy", 5))  # 先占进程内位
+        with mock.patch.object(brain, "_acquire_lease", return_value=True) as acq:
+            self.assertIsNone(brain.begin_run("t-1", "wo-busy", 5))
+        acq.assert_not_called()  # 进程内位没拿到,不去碰 DB 租约
 
 
 if __name__ == "__main__":

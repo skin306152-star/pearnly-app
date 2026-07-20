@@ -151,7 +151,7 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             mock.patch.object(route_helpers, "require_perm", return_value=_USER) as perm,
-            mock.patch.object(wbs.bank_sales_brain, "begin", return_value=True),
+            mock.patch.object(wbs.bank_sales_brain, "begin_run", return_value="owner-x"),
             mock.patch.object(wbs.threading, "Thread") as thread,
             mock.patch.object(wbs.store, "list_events", return_value=[]),
             mock.patch.object(
@@ -198,7 +198,7 @@ class RunEndpointTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wbs.store, "list_events", return_value=[{"id": 1}]),
             mock.patch.object(wbs.bank_sales_suggest, "pending_rows", return_value=[{}, {}]),
-            mock.patch.object(wbs.bank_sales_brain, "begin", return_value=True),
+            mock.patch.object(wbs.bank_sales_brain, "begin_run", return_value="owner-x"),
             mock.patch.object(wbs.threading, "Thread") as thread,
         ):
             for p in _open_gate_patches(wbs, wr):
@@ -208,6 +208,8 @@ class RunEndpointTests(unittest.IsolatedAsyncioTestCase):
         kwargs = thread.call_args.kwargs
         self.assertIs(kwargs["target"], wbs.bank_sales_brain.run_async)
         self.assertTrue(kwargs["daemon"])
+        # 路由把 begin_run 抢到的租约 owner 透传给后台,供批间续约/收尾释放。
+        self.assertEqual(kwargs["kwargs"]["lease_owner"], "owner-x")
         thread.return_value.start.assert_called_once()
 
     async def test_running_returns_bare_409_shape(self):
@@ -217,7 +219,7 @@ class RunEndpointTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wbs.store, "list_events", return_value=[]),
-            mock.patch.object(wbs.bank_sales_brain, "begin", return_value=False),
+            mock.patch.object(wbs.bank_sales_brain, "begin_run", return_value=None),
         ):
             for p in _open_gate_patches(wbs, wr):
                 self.enterContext(p)

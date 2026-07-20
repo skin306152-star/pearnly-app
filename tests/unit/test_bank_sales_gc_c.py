@@ -193,7 +193,8 @@ class BatchRunTests(unittest.TestCase):
         ):
             out = brain.run_async(tenant_id="t-1", work_order_id="wo-async")
         self.assertEqual((out["logged"], out["batches"]), (41, 2))
-        self.assertEqual(cursor_modes, [False, True, True])
+        # 读 1(False)+ 每批各自短事务写(True×2)+ 收尾终态事件短事务(True)。
+        self.assertEqual(cursor_modes, [False, True, True, True])
 
 
 if __name__ == "__main__":

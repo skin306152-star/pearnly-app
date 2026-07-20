@@ -147,6 +147,14 @@ RUNTIME_ALTERS = (
     "CREATE INDEX IF NOT EXISTS ix_wo_dead_run_scan "
     "ON work_orders (run_lease_expires_at) "
     "WHERE status = 'running' AND run_lease_expires_at IS NOT NULL",
+    # D6(bank_sales_recovery 收尾扫描):大脑终态事件部分索引——挂在 30s 循环上的
+    # bank_sales_recovery._find_candidates 每 tick 对全租户最大表 work_order_events 做外层
+    # event_type='failed' 谓词 + 子查询 max(finished id),无索引即 seq scan。partial 只覆盖两种
+    # 大脑终态、近零体积;event_type 前导 + (tenant,wo,id) 让外层扫描与子查询 max 都走索引
+    # (与 0085 迁移 dual-run 对齐)。
+    "CREATE INDEX IF NOT EXISTS ix_wo_events_brain_terminal "
+    "ON work_order_events (event_type, tenant_id, work_order_id, id) "
+    "WHERE event_type IN ('bank_sales_brain_failed', 'bank_sales_brain_finished')",
 )
 
 

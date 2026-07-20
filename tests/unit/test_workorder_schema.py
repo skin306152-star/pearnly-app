@@ -172,5 +172,35 @@ class ReaperScanIndexParityTests(unittest.TestCase):
         self.assertIn("DROP INDEX IF EXISTS ix_wo_dead_run_scan", _text(_SCAN_INDEX_MIGRATION))
 
 
+_BRAIN_SCAN_INDEX_MIGRATION = "alembic/versions/0085_bank_sales_recovery_scan_index.py"
+
+# 银行倒推大脑收尾扫描部分索引(D6)DDL 关键片段:ensure(schema.RUNTIME_ALTERS)与 0085
+# 迁移必须同款(dual-run,prod alembic 停 0020 靠 ensure 自愈)。
+_BRAIN_SCAN_INDEX_NEEDLES = (
+    "ix_wo_events_brain_terminal",
+    "ON work_order_events (event_type, tenant_id, work_order_id, id)",
+    "WHERE event_type IN ('bank_sales_brain_failed', 'bank_sales_brain_finished')",
+)
+
+
+class BankSalesRecoveryScanIndexParityTests(unittest.TestCase):
+    def test_ensure_and_migration_carry_same_index_ddl(self):
+        ensure_text = _text(_ENSURE)
+        migration_text = _text(_BRAIN_SCAN_INDEX_MIGRATION)
+        for needle in _BRAIN_SCAN_INDEX_NEEDLES:
+            self.assertIn(needle, ensure_text, f"ensure 缺大脑收尾扫描索引 DDL: {needle}")
+            self.assertIn(needle, migration_text, f"0085 迁移缺大脑收尾扫描索引 DDL: {needle}")
+
+    def test_migration_chains_to_current_head(self):
+        text = _text(_BRAIN_SCAN_INDEX_MIGRATION)
+        self.assertIn('down_revision = "0084_dms_change_requests"', text)
+
+    def test_migration_downgrade_drops_index(self):
+        self.assertIn(
+            "DROP INDEX IF EXISTS ix_wo_events_brain_terminal",
+            _text(_BRAIN_SCAN_INDEX_MIGRATION),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

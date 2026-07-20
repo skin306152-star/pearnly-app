@@ -1,23 +1,34 @@
 # -*- coding: utf-8 -*-
-"""/run 推进租约 + 死亡判据 DAL(C-1 · MC2-0 · MC2-A1)。
+"""工单级独占操作租约 + 死亡判据 DAL(C-1 · MC2-0 · MC2-A1 · D6)。
 
-work_orders 行上的 run_lease_owner / run_lease_expires_at 两列的全部读写出口,从 store.py
-拆出(单文件 <500 铁律)——store 原样 re-export,调用方(runner/reaper/routes)与既有
-测试的 `store.acquire_run_lease` 口径不变,实现单源在此。
+work_orders 行上的 run_lease_owner / run_lease_expires_at 两列是「同一工单同一时刻只允许一个
+长活操作在推进」的跨进程互斥锁,全部读写出口从 store.py 拆出(单文件 <500 铁律)——store 原样
+re-export,调用方(runner/reaper/routes/bank_sales_brain)与既有测试的 `store.acquire_run_lease`
+口径不变,实现单源在此。
 
-租约协议:抢约(acquire)单句条件 UPDATE 原子判「无人持有/自己续租/过期接管」;心跳
-(renew)只续自己 owner;释放(release)只放自己 owner;收尸(list/claim)共用
-_DEAD_RUN_PREDICATE——「活 run 必持未过期租约」不变式的完整表达。
+谁会持约:① /run 引擎推进(runner,owner=进程标识);② bank_sales_brain 大脑批量分类
+(owner 前缀 `bank_sales_brain:`)。D6 起大脑在工单 review/stuck 态也持约(复用 runner 空闲租约免
+费得跨进程互斥),故「持约」不再等价于「status=running」——review 态存在合法的悬空租约。
+
+租约协议:
+  - 抢约(acquire)单句条件 UPDATE 原子判「无人持有 / 自己续租 / 过期接管」;抢不到 = 有人持
+    未过期租约 → 调用方按 409 撞约让位(不裸奔双跑)。
+  - 心跳(renew)只续自己 owner;释放(release)只放自己 owner;owner 已易主则都不动。
+  - 收尸(list/claim)只认 status=running 的死租约(见 _DEAD_RUN_PREDICATE + 调用方注入的
+    status);review/stuck 态的悬空租约不被 reaper 咬,靠 TTL 自然过期让位——大脑批量结束正常
+    release,异常退出则租约过期后下一次抢约即接管。
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-# 死亡判据 =「活 run 必持未过期租约」这条不变式的完整表达(MC2-0 + MC2-A1 F3),两支:
+# 死亡判据 = status=running 的「活 run 却已失去有效租约」这条 reaper 收尸条件(MC2-0 + MC2-A1 F3),
+# 与调用方注入的 status=running 联合成立(见 list_dead_runs / claim_dead_run),两支:
 #   ① 租约已过期 —— 进程被杀(部署 SIGKILL)实锤;
 #   ② 租约 NULL 且 updated_at 老于宽限 —— 翻了 running 却没抢到租约的孤儿(如调度被吞)。
 # MC1-a 进程内崩溃路径自己落 run_failed + 状态离开 running,不落入本判据。
+# review/stuck 态的大脑持约(D6)status 不是 running,天然不被本判据咬 → 只靠 TTL 过期。
 # list 与 claim 必须同一判据:扫描命中而抢占谓词不认,孤儿永远收不走。
 _DEAD_RUN_PREDICATE = (
     "((run_lease_expires_at IS NOT NULL AND run_lease_expires_at < now()) "

@@ -2433,8 +2433,8 @@ This device has been logged out automatically.`,th:`บัญชีของค�
                 ${t("drawer-sec-basic")}
             </div>
             ${ge("invoice_number","drawer-lbl-invoice",r.invoice_number,"input",i)}
-            ${ge("date","drawer-lbl-date",r.date,"input",i)}
-            ${r.date_raw&&r.date_raw!==r.date?`<div class="date-raw-hint" title="${escapeHtml(t("drawer-date-raw-tip"))}">${escapeHtml(t("drawer-date-raw-label"))}: ${escapeHtml(r.date_raw)}</div>`:""}
+            
+            ${ge("date_raw","drawer-lbl-date",r.date_raw||r.date,"input",i)}
             ${ge("subtotal","drawer-lbl-subtotal",r.subtotal,"input",i)}
             ${ge("vat","drawer-lbl-vat",r.vat,"input",i)}
             ${ge("total_amount","drawer-lbl-total",r.total_amount,"input",i)}

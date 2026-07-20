@@ -164,7 +164,7 @@ window.__AI_I18N_ZH__ = {
     rv_field_vat_face: 'VAT 票面',
     rv_field_total: '含税合计',
     rv_field_invno: '票号',
-    rv_field_date: '票据日期(公历)',
+    rv_field_date: '票据日期',
     rv_key_accept: '采纳票面',
     rv_key_edit: '改数',
     rv_key_exclude: '剔除',

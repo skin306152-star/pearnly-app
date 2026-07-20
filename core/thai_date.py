@@ -50,6 +50,39 @@ def two_digit_year_to_gregorian(yy: int, anchor_year: Optional[int] = None) -> i
     return min((2000 + yy, 1957 + yy), key=lambda y: abs(anchor - y))
 
 
+_PRINTED_DATE = re.compile(r"^\s*(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\s*$")
+
+
+def gregorian_from_printed(printed: object, anchor_year: Optional[int] = None) -> Optional[str]:
+    """票面日期原文 → 公历 ISO(YYYY-MM-DD)。认不出返 None。
+
+    人看到和填写的是票面那一串(泰国票面通常 DD/MM/พ.ศ.,如 31/5/2569),库里存的必须是
+    公历 —— 换算只发生在这里,用户不需要知道它存在。年份三种形态都认:4 位佛历减 543、
+    4 位公历原样、2 位按锚点消歧。日在前是泰式排法。
+    """
+    s = str(printed or "").strip()
+    if not s:
+        return None
+    iso = _ISO_DATE.match(s)
+    if iso:
+        year, month, day = int(iso.group(1)), int(iso.group(2)), int(iso.group(3))
+    else:
+        m = _PRINTED_DATE.match(s)
+        if not m:
+            return None
+        day, month, raw_year = int(m.group(1)), int(m.group(2)), m.group(3)
+        year = (
+            two_digit_year_to_gregorian(int(raw_year), anchor_year)
+            if len(raw_year) == 2
+            else int(raw_year)
+        )
+    year = to_gregorian_year(year)
+    try:
+        return date(year, month, day).isoformat()
+    except ValueError:
+        return None
+
+
 def buddhist_year_of(value: object) -> Optional[int]:
     """ISO 日期串(YYYY-MM-DD)的年份若是佛历,返回它;否则 None。
 

@@ -170,7 +170,7 @@ window.__AI_I18N_JA__ = {
     rv_field_vat_face: 'VAT(票面)',
     rv_field_total: '税込合計',
     rv_field_invno: '請求書番号',
-    rv_field_date: '請求書日付(西暦)',
+    rv_field_date: '請求書日付',
     rv_key_accept: '票面どおり採用',
     rv_key_edit: '数値を修正',
     rv_key_exclude: '除外',

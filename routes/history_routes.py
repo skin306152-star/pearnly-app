@@ -131,14 +131,28 @@ async def ocr_commit(req: OcrCommitRequest, request: Request):
     return {"ok": True, "committed": n}
 
 
-def _find_buddhist_date(pages: Optional[List[dict]]) -> Optional[str]:
-    """任一页的 date 字段填成佛历年 → 返回该串(供闸拦下)。"""
+def _derive_dates_from_printed(pages: Optional[List[dict]]) -> Optional[str]:
+    """按票面日期(date_raw)重算库里的公历 date。返回认不出的那串票面值(供闸拦下)。
+
+    会计改的是票面那一串 —— 泰国票面印佛历,人看什么就填什么,换算在这里发生一次,
+    界面上不出现公历。date_raw 为空(旧记录/文字层来源)则沿用既有 date 不动。
+    """
     for p in pages or []:
         if not isinstance(p, dict):
             continue
-        raw = (p.get("fields") or {}).get("date")
-        if thai_date.buddhist_year_of(raw):
-            return str(raw)
+        fields = p.get("fields")
+        if not isinstance(fields, dict):
+            continue
+        printed = fields.get("date_raw")
+        if not str(printed or "").strip():
+            # 无票面原文可依据时,守住底线:date 仍不许是佛历年
+            if thai_date.buddhist_year_of(fields.get("date")):
+                return str(fields.get("date"))
+            continue
+        derived = thai_date.gregorian_from_printed(printed)
+        if not derived:
+            return str(printed)
+        fields["date"] = derived
     return None
 
 
@@ -148,10 +162,9 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
     _check_history_access(user)
     if not req.pages:
         raise HTTPException(400, detail="history.empty_pages")
-    # 日期框收公历(库里 DATE 列是公历),但全站默认显示佛历、标签没标纪年 —— 会计按习惯
-    # 填 2569 会静默落库,再推 Express 时 (2569+543)%100 送出 120531。宁可退回让人改。
-    if _find_buddhist_date(req.pages):
-        raise HTTPException(400, detail="history.date_must_be_gregorian")
+    bad_printed = _derive_dates_from_printed(req.pages)
+    if bad_printed:
+        raise HTTPException(400, detail="history.date_unreadable")
     ok = update_ocr_history_pages(str(user["id"]), record_id, req.pages, tenant_id=_tid(user))
     if not ok:
         raise HTTPException(404, detail="history.not_found")

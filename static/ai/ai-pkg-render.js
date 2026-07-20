@@ -352,7 +352,12 @@
         var pp30Card = ctx.pp30
             ? pp30CardHtml(ctx.pp30.numbers || {}, ctx.calcOpen, (ctx.detail || {}).status)
             : blockedHtml(ctx.detail);
-        return pp30Card + filesListHtml(ctx.deliverables, ctx.downloading) + actionsHtml(ctx);
+        return (
+            pp30Card +
+            root.AI.mactRender.panelHtml(ctx.detail) +
+            filesListHtml(ctx.deliverables, ctx.downloading) +
+            actionsHtml(ctx)
+        );
     }
 
     // ---- 证据模态框(v4 .mask/.modal/.ev-row 1:1;点验回链:数字 → 证据行 → 原图,≤2 击) ----

@@ -17,6 +17,7 @@ from services.workorder import (
     decisions,
     evidence,
     kinds,
+    machine_actions,
     obligation_engine,
     progress as wo_progress,
     sales_entry,
@@ -205,6 +206,9 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "excluded": evidence.excluded_projection(items, events, decided=decided),
         "alerts": evidence.alerts_projection(events)
         + evidence.amount_read_suggestions(events, classified=classified),
+        # 引擎替人改过的归类与钱数。此前只落事件流无消费方,改判件会从 flagged/excluded
+        # 两张清单里同时消失,会计无从知道机器动过手。
+        "machine_actions": machine_actions.projection(events, items),
         "needs": needs,
         "blocked_reasons": blocked,
         "signoff": sod.signoff_projection(events),  # P0-1 签批态单一事实源(events 已在上)

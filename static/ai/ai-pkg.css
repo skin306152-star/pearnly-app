@@ -280,6 +280,33 @@
   padding: 20px;
 }
 
+/* 机器自动改动清单(SA-1):金边竖条区别于普通信息面板——这些是无人确认就落地的改动 */
+.mact .bd {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mact-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-left: 2px solid var(--gold);
+  padding: 4px 0 4px 11px;
+}
+.mact-row b {
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.mact-row span {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.mact-row small {
+  font-size: 10.5px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+
 @media (max-width: 720px) {
   .pkg-modal .mb {
     grid-template-columns: 1fr;

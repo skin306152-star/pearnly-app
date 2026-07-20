@@ -156,6 +156,9 @@ const BUNDLES = [
             'ai/ai-intake-excluded.js',
             'ai/ai-intake.js',
             'ai/ai-pkg-render.js',
+            // ai-mact-render.js(SA-1 · 机器自动改动清单)被 ai-pkg-render.pageHtml 在运行时
+            // 调用,排在其后即可;拆成独立文件是因为 ai-pkg-render.js 已顶到 500 行铁律线。
+            'ai/ai-mact-render.js',
             'ai/ai-pkg.js',
             // ai-recon-render.js(E2 · 银行对账四清单纯逻辑+HTML,依赖 AI.state/format/
             // viewer/router)排在 ai-recon.js(挂载/折叠/原图模态/推 LINE 待问编排)之前,

@@ -11,6 +11,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     mact_kind_unknown: '未定类',
     mact_kind_bank_statement: '银行流水',
     mact_kind_non_tax: '非税务单据',
+    mact_generic: '系统自动改动:{type}(明细展示暂未支持)',
 });
 Object.assign(window.__AI_I18N_TH__, {
     mact_title: 'การแก้ไขอัตโนมัติของระบบ',
@@ -25,6 +26,7 @@ Object.assign(window.__AI_I18N_TH__, {
     mact_kind_unknown: 'ยังไม่จัดประเภท',
     mact_kind_bank_statement: 'รายการเดินบัญชี',
     mact_kind_non_tax: 'เอกสารที่ไม่ใช่ภาษี',
+    mact_generic: 'ระบบแก้ไขอัตโนมัติ: {type} (ยังไม่รองรับการแสดงรายละเอียด)',
 });
 Object.assign(window.__AI_I18N_EN__, {
     mact_title: 'Automatic machine changes',
@@ -39,6 +41,7 @@ Object.assign(window.__AI_I18N_EN__, {
     mact_kind_unknown: 'Unclassified',
     mact_kind_bank_statement: 'Bank statement',
     mact_kind_non_tax: 'Non-tax document',
+    mact_generic: 'Automatic system change: {type} (details not yet displayed here)',
 });
 Object.assign(window.__AI_I18N_JA__, {
     mact_title: 'システムによる自動修正',
@@ -52,4 +55,5 @@ Object.assign(window.__AI_I18N_JA__, {
     mact_kind_unknown: '未分類',
     mact_kind_bank_statement: '銀行明細',
     mact_kind_non_tax: '非課税書類',
+    mact_generic: 'システムによる自動修正:{type}(詳細表示は未対応)',
 });

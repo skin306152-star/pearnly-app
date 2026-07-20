@@ -9,6 +9,7 @@
 //
 // 覆盖:① 面板可见且金边竖条生效(getComputedStyle)② 改判行文件名/kind/依据齐全
 //      ③ 银行行改金额与改方向分别计数 ④ 无改动时面板整个不出现(四态诚实)⑤ 四语不裸 key
+//      ⑥ 表外类型走 default 渲染:露原始 type,不冒充银行行(S-3)
 // 截图存 tests/e2e/_artifacts/sa1/。
 /* global window, document */
 const { test, expect } = require('@playwright/test');
@@ -162,6 +163,23 @@ test.describe('SA-1 · 机器自动改动清单', () => {
         expect(amtOnly).not.toContain('改写收/付方向');
 
         await page.screenshot({ path: path.join(ART, 'zh-three-actions.png'), fullPage: true });
+    });
+
+    test('表外类型走 default:露原始 type · 不冒充银行行', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        const unknown = { type: 'ocr_totals_rescued', item_id: '57016198', name: 'IMG_2647.jpg' };
+        await boot(page, [MACHINE_ACTIONS[0], unknown]);
+        const rows = page.locator('.mact-row');
+        await expect(rows).toHaveCount(2);
+        // 截图在断言前:红跑(旧 bundle)截到 bug 现场,绿跑截到修后形态,同一份证据链。
+        await page.screenshot({ path: path.join(ART, 'zh-unknown-type.png'), fullPage: true });
+        const text = await rows.nth(1).innerText();
+        expect(text).toContain('IMG_2647.jpg');
+        expect(text).toContain('ocr_totals_rescued'); // 原始 type 必须露出,排障要靠它
+        expect(text).not.toContain('mact_'); // 不裸 i18n key
+        expect(text).not.toContain('undefined'); // 旧 else 分支会渲出「共 undefined 行」
+        expect(text).not.toContain('共'); // mact_bank_meta「共 {n} 行」——不冒充银行行
+        expect(text).not.toContain('余额'); // mact_bank_why 银行改写脚注不该出现
     });
 
     test('无改动时面板整个不出现', async ({ page }) => {

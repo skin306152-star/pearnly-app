@@ -24,41 +24,66 @@
         return label === key ? kind : label;
     }
 
-    function rowHtml(a) {
-        var name = esc(root.AI.pkgRender.displayFileName(a.name || a.item_id || ''));
-        if (a.type === 'item_regrouped') {
-            var why =
-                a.reason === 'statement_sequence'
-                    ? '<small>' + esc(at('mact_reason_statement_sequence')) + '</small>'
-                    : '';
-            return (
-                '<div class="mact-row"><b>' +
-                name +
-                '</b><span>' +
-                esc(
-                    at('mact_regroup', {
-                        from: kindLabel(a.from_kind),
-                        to: kindLabel(a.to_kind),
-                    })
-                ) +
-                '</span>' +
-                why +
-                '</div>'
-            );
-        }
+    function displayName(a) {
+        return esc(root.AI.pkgRender.displayFileName(a.name || a.item_id || ''));
+    }
+
+    function regroupRowHtml(a) {
+        var why =
+            a.reason === 'statement_sequence'
+                ? '<small>' + esc(at('mact_reason_statement_sequence')) + '</small>'
+                : '';
+        return (
+            '<div class="mact-row"><b>' +
+            displayName(a) +
+            '</b><span>' +
+            esc(
+                at('mact_regroup', {
+                    from: kindLabel(a.from_kind),
+                    to: kindLabel(a.to_kind),
+                })
+            ) +
+            '</span>' +
+            why +
+            '</div>'
+        );
+    }
+
+    function bankRowHtml(a) {
         var parts = [];
         if (a.amount_rows) parts.push(at('mact_bank_amount', { n: a.amount_rows }));
         if (a.direction_rows) parts.push(at('mact_bank_direction', { n: a.direction_rows }));
         parts.push(at('mact_bank_meta', { n: a.row_count }));
         return (
             '<div class="mact-row"><b>' +
-            name +
+            displayName(a) +
             '</b><span>' +
             esc(parts.join(' · ')) +
             '</span><small>' +
             esc(at('mact_bank_why')) +
             '</small></div>'
         );
+    }
+
+    // 表外的新类型走 default:露出原始 type 让人看见"改过",不冒充银行行。producer 会随
+    // SA-2/SA-3 增多(模型救援、截断标记),后端先行发版时签字页宁可粗陋也不能空白或张冠李戴。
+    var ROW_RENDERERS = {
+        item_regrouped: regroupRowHtml,
+        bank_row_autocorrected: bankRowHtml,
+    };
+
+    function genericRowHtml(a) {
+        return (
+            '<div class="mact-row"><b>' +
+            displayName(a) +
+            '</b><span>' +
+            esc(at('mact_generic', { type: a.type || '?' })) +
+            '</span></div>'
+        );
+    }
+
+    function rowHtml(a) {
+        return (ROW_RENDERERS[a.type] || genericRowHtml)(a);
     }
 
     function panelHtml(detail) {

@@ -71,6 +71,9 @@ function mergeFields(
         if (Array.isArray(f.items) && f.items.length) result.items.push(...f.items);
         if (Array.isArray(f.tax_ids)) result.tax_ids.push(...f.tax_ids);
     }
+    // 票面原文兜公历:抽屉/复核各处直接读 date_raw 即可,不必各写一套回落
+    // (旧记录与文字层来源没有 date_raw)。
+    if (!result.date_raw) result.date_raw = result.date;
     // 兜底:若 seller_tax / buyer_tax 仍空,从 tax_ids 取
     result.tax_ids = [...new Set(result.tax_ids)];
     if (!result.seller_tax && result.tax_ids[0]) result.seller_tax = result.tax_ids[0];

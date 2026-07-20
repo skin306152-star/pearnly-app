@@ -126,7 +126,7 @@ function openDrawer(idx: number) {
             </div>
             ${renderField('invoice_number', 'drawer-lbl-invoice', f.invoice_number, 'input', canEdit)}
             ${/* 显示并编辑票面那一串(泰国票面印佛历)· 公历换算在后端做一次,界面不出现 */ ''}
-            ${renderField('date_raw', 'drawer-lbl-date', f.date_raw || f.date, 'input', canEdit)}
+            ${renderField('date_raw', 'drawer-lbl-date', f.date_raw, 'input', canEdit)}
             ${renderField('subtotal', 'drawer-lbl-subtotal', f.subtotal, 'input', canEdit)}
             ${renderField('vat', 'drawer-lbl-vat', f.vat, 'input', canEdit)}
             ${renderField('total_amount', 'drawer-lbl-total', f.total_amount, 'input', canEdit)}

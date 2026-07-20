@@ -131,28 +131,35 @@ def list_exceptions(
             where_sql = " AND ".join(where)
             cur.execute(
                 f"""
-                SELECT e.id, e.history_id, e.rule_code, e.severity,
-                       e.seller_name, e.invoice_no, e.total_amount, e.detail_json,
-                       e.status, e.created_at, e.resolved_at,
-                       h.filename, h.invoice_date, h.confidence, h.client_id,
-                       -- 票面原文(泰国票面印佛历)· 界面显示它,公历列只用于算账期
-                       -- 主页优先(与 _extract_summary_fields 同口径:非副本非重复)· 找不到回落首页
+                SELECT x.*,
+                       -- 票面原文(泰国票面印佛历)· 界面显示它,公历列只用于算账期;
+                       -- 兜公历保证出接口非空,各渲染点直接读,不必各写一套回落。
+                       -- ⚠️ 本层是过渡:主页判据与 _extract_summary_fields(要求该页至少有
+                       -- invoice_number/total_amount/seller_name 之一)并不完全一致,同一条
+                       -- 记录理论上可能选中不同页。正解是随其余摘要字段一起落
+                       -- ocr_history.invoice_date_raw 列(写入侧单一属主),见交接待办。
                        COALESCE(
                          (SELECT p->'fields'->>'date_raw'
-                            FROM jsonb_array_elements(h.pages) p
-                           WHERE COALESCE((p->>'is_duplicate')::boolean, false) IS FALSE
-                             AND COALESCE((p->>'is_copy')::boolean, false) IS FALSE
-                             AND p->'fields'->>'date_raw' IS NOT NULL
+                            FROM jsonb_array_elements(x.pages) WITH ORDINALITY AS t(p, ord)
+                           WHERE p->'fields'->>'date_raw' IS NOT NULL
+                           ORDER BY ((p->>'is_duplicate')::boolean IS NOT TRUE
+                                 AND (p->>'is_copy')::boolean IS NOT TRUE) DESC, ord
                            LIMIT 1),
-                         h.pages->0->'fields'->>'date_raw'
+                         to_char(x.invoice_date, 'YYYY-MM-DD')
                        ) AS invoice_date_raw
-                FROM exceptions e
-                INNER JOIN ocr_history h ON h.id = e.history_id
-                WHERE {where_sql}
-                ORDER BY
-                  CASE e.severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-                  e.created_at DESC
-                LIMIT %s OFFSET %s
+                FROM (
+                    SELECT e.id, e.history_id, e.rule_code, e.severity,
+                           e.seller_name, e.invoice_no, e.total_amount, e.detail_json,
+                           e.status, e.created_at, e.resolved_at,
+                           h.filename, h.invoice_date, h.confidence, h.client_id, h.pages
+                    FROM exceptions e
+                    INNER JOIN ocr_history h ON h.id = e.history_id
+                    WHERE {where_sql}
+                    ORDER BY
+                      CASE e.severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+                      e.created_at DESC
+                    LIMIT %s OFFSET %s
+                ) x
             """,
                 params + [int(limit), int(offset)],
             )

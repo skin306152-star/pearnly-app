@@ -137,9 +137,8 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
     const cell = ([k, lk]: [string, string]) => {
         const warn = warns.has(k) ? ' warn' : '';
         // 旧记录/文字层来源没有 date_raw → 回落已归一的 date,不让格子空着
-        const v = String(
-            (k === 'date_raw' ? (inv.fields.date_raw ?? inv.fields.date) : inv.fields[k]) ?? ''
-        );
+        const raw = k === 'date_raw' ? (inv.fields.date_raw ?? inv.fields.date) : inv.fields[k];
+        const v = String(raw ?? '');
         return (
             `<div class="dx-rv${warn}"><label>${esc(t(lk))}</label>` +
             `<input class="dx-rv-in" data-iv-field="${fi}:${ii}:${esc(k)}" value="${esc(v)}"></div>`

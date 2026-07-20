@@ -192,10 +192,8 @@ function renderDrawer() {
     const statusKey = 'exc-status-' + (row.status || 'pending');
     const statusLabel = t(statusKey) || row.status;
     const statusCls = 's-' + (row.status || 'pending');
-    // 票面原文优先(与列表行、字段区同口径)· 无则回落公历
-    const date = row.invoice_date_raw
-        ? String(row.invoice_date_raw)
-        : (row.invoice_date || row.created_at || '').slice(0, 10);
+    // 票面原文(后端已兜公历)· 与列表行、字段区同口径
+    const date = String(row.invoice_date_raw || (row.created_at || '').slice(0, 10));
     document.getElementById('exc-drawer-sub')!.innerHTML = `
         <span>${escapeHtml(seller)}</span>
         ${row.invoice_no ? `<span>· ${escapeHtml(row.invoice_no)}</span>` : ''}
@@ -247,17 +245,8 @@ function renderDrawer() {
             return `<div class="exc-field-row"><label>${escapeHtml(t(labelKey))}</label><span class="val empty">…</span></div>`;
         }
         // 票面原文缺失(旧记录/文字层来源)→ 回落已归一的公历,不让格子空着
-        const base =
-            key === 'date_raw' && (f.date_raw === undefined || f.date_raw === null)
-                ? f.date
-                : f[key];
-        const v = editing
-            ? editF[key] !== undefined
-                ? editF[key]
-                : base !== undefined && base !== null
-                  ? base
-                  : ''
-            : base;
+        const base = key === 'date_raw' ? (f.date_raw ?? f.date) : f[key];
+        const v = editing ? (editF[key] ?? base ?? '') : base;
         const flagged = flagSet.has(key) ? 'flagged' : '';
         if (editing) {
             const inputType = isMoney ? 'number' : 'text';

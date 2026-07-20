@@ -387,13 +387,19 @@ def run_file(
     n_pages = len(page_image_bytes_list)
     if n_pages > 1 and DIRECT_PAGE_WORKERS > 1:
         by_page: dict = {}
-        with ThreadPoolExecutor(max_workers=min(DIRECT_PAGE_WORKERS, n_pages)) as ex:
+        # 任一页判回落 = 整件转 Vision 路重跑,余页的结果必然丢弃 —— 立刻取消未启动的任务。
+        # 走 with 的话 shutdown(wait=True) 会把余页跑完才让异常冒出去,页上限 3→20 后
+        # 最坏一件白烧 19 页(开双读则 38 次)模型调用。
+        ex = ThreadPoolExecutor(max_workers=min(DIRECT_PAGE_WORKERS, n_pages))
+        try:
             futs = {
                 ex.submit(contextvars.copy_context().run, _run_page, i, ib): i
                 for i, ib in enumerate(page_image_bytes_list, start=1)
             }
             for fut in as_completed(futs):
                 by_page[futs[fut]] = fut.result()
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
         pages = [by_page[i] for i in range(1, n_pages + 1)]
     else:
         pages = [_run_page(i, ib) for i, ib in enumerate(page_image_bytes_list, start=1)]

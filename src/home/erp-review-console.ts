@@ -79,6 +79,7 @@ export interface ConsoleOptions {
     onPush?: () => void;
     onAcceptAll?: () => void;
     onBack?: () => void; // 有则底栏出返回按钮(步③=返回上传);不传则无(M1 dev 路由)
+    embedded?: boolean; // 嵌进向导步③:砍掉自己的顶部台头+流水线,复用向导步进条(不做两条)
 }
 
 // 线性图标(描边 SVG · 与产品图标语言一致 · 无 emoji)
@@ -168,15 +169,18 @@ export function renderReviewConsole(root: HTMLElement, opts: ConsoleOptions): vo
 
     const needCount = data.rows.filter((r) => r.state === 'confirm' || r.state === 'new').length;
 
+    const embedded = !!opts.embedded;
     root.innerHTML =
-        '<div class="rc-app">' +
-        // 顶部账套条
-        '<div class="rc-top">' +
-        `<div class="rc-title">${esc(L.title)}</div><div class="rc-sp"></div>` +
-        `<div class="rc-acct"><span class="rc-live"></span><b>${esc(L.accountSet)}</b>` +
-        `<span class="rc-muted">· ${esc(L.agentOnline)}</span></div></div>` +
-        // 流水线
-        '<div class="rc-pipe"></div>' +
+        `<div class="rc-app${embedded ? ' embedded' : ''}">` +
+        // 顶部台头 + 流水线:独立台(M1 dev 路由)才显。嵌进向导步③时砍掉——否则步③会出现
+        // 两条 4 段步进条(向导自己的 + 这条),且这条的✓是写死假状态,与 M3 未做的实际对不上。
+        (embedded
+            ? ''
+            : '<div class="rc-top">' +
+              `<div class="rc-title">${esc(L.title)}</div><div class="rc-sp"></div>` +
+              `<div class="rc-acct"><span class="rc-live"></span><b>${esc(L.accountSet)}</b>` +
+              `<span class="rc-muted">· ${esc(L.agentOnline)}</span></div></div>` +
+              '<div class="rc-pipe"></div>') +
         // 复核横幅
         '<div class="rc-banner"></div>' +
         // 筛选
@@ -191,17 +195,18 @@ export function renderReviewConsole(root: HTMLElement, opts: ConsoleOptions): vo
         '<div class="rc-actionbar"></div>' +
         '</div>';
 
-    const pipe = root.querySelector('.rc-pipe') as HTMLElement;
-    pipe.innerHTML = L.stages
-        .map((t, i) => {
-            const cls = i < 2 ? 'done' : i === 2 ? 'active' : '';
-            const mark = i < 2 ? icon('check', 'sm') : String(i + 1);
-            return (
-                `<div class="rc-stage ${cls}"><div class="rc-icn">${mark}</div>` +
-                `<div><div class="rc-st-t">${esc(t)}</div><div class="rc-st-d">${esc(L.stageDetails[i])}</div></div></div>`
-            );
-        })
-        .join('');
+    const pipe = root.querySelector('.rc-pipe') as HTMLElement | null;
+    if (pipe)
+        pipe.innerHTML = L.stages
+            .map((t, i) => {
+                const cls = i < 2 ? 'done' : i === 2 ? 'active' : '';
+                const mark = i < 2 ? icon('check', 'sm') : String(i + 1);
+                return (
+                    `<div class="rc-stage ${cls}"><div class="rc-icn">${mark}</div>` +
+                    `<div><div class="rc-st-t">${esc(t)}</div><div class="rc-st-d">${esc(L.stageDetails[i])}</div></div></div>`
+                );
+            })
+            .join('');
 
     const banner = root.querySelector('.rc-banner') as HTMLElement;
     // 「已完成 N 张」横幅仅在有已就绪项时出现(匹配前 readyCount=0 → 不显示空横幅)。

@@ -141,6 +141,7 @@ export function renderReviewConsoleStep(): void {
     renderReviewConsole(el.querySelector('.dx-rc-console') as HTMLElement, {
         data,
         labels: CONSOLE_LABELS,
+        embedded: true, // 嵌进向导步③:砍自己的流水线,复用向导步进条(不做两条步进条)
         onOpenRow: openRow,
         onAcceptAll: acceptAll,
         onBack: () => showStepInv(1, 'dx-s-upload'), // 返回上传(补回删手风琴丢的那个按钮)

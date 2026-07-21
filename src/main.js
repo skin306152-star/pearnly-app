@@ -45,6 +45,7 @@ import './home/history-drawer.js'; // REFACTOR-C1-home-batch4 · 发票记录页
 import './home/history-workspace.js'; // 归属套账下拉(桥 bindDrawerWorkspace · 抽屉打开时注入 · 手动改归属)
 import './home/history-drawer-tabs.js'; // 销项重做 · 抽屉重排 4-tab+汇总条(history 模式 · 桥 historizeDrawer · openHistoryDrawer 调)
 import './home/dms-intake.js'; // 录入工作台(发票OCR + 汇总表批量建单)· window.loadDmsIntake(invoice/batch 子模块经它 import)
+import './home/erp-review.js'; // ERP 推送复核台 M1 · 隐藏 dev 路由 erp-review(读真 /api/history · console/verify 原型接线)· window.loadErpReview
 import './home/dashboard.js';
 import './home/subscription.js'; // 首页订阅与计费主体(window.loadSubscription · 须在 dashboard.js 后 · billing.js 前)
 import './home/billing-records.js'; // 首页账单记录预览框(window.loadBillingRecords · 扣费/充值/识别 + 导出 · loadSubscription 触发)

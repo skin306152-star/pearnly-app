@@ -69,6 +69,8 @@ const HOME_CSS = [
     'home-54-records.css',
     'home-55-upload-zone.css',
     'home-56-posting-editor.css',
+    'home-57-erp-review.css',
+    'home-58-erp-verify.css',
     'home-59-dx-push-status.css',
 ];
 

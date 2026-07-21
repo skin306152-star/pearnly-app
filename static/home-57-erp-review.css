@@ -1,0 +1,485 @@
+/* ERP 推送复核台 · 批量网格样式(作用域 .rc-*)
+   令牌带回落值,可独立渲染;在 home app 内随主题变量覆盖。图标线性描边。 */
+/* 令牌 = app 全局令牌(home-01-base.css)的别名:无裸 hex,暗色跟随 :root.dark 自动翻,
+   视觉与 /home 紫色系一致。改主题不动这里。 */
+.rc-app {
+    --rc-surface: var(--card);
+    --rc-surface-2: var(--line2);
+    --rc-ink: var(--ink);
+    --rc-muted: var(--ink2);
+    --rc-faint: var(--ink3);
+    --rc-line: var(--line);
+    --rc-line-2: var(--ink-4);
+    --rc-accent: var(--accent);
+    --rc-accent-ink: var(--accent-deep);
+    --rc-accent-wash: var(--accent-weak);
+    --rc-ok: var(--green);
+    --rc-ok-wash: var(--green-weak);
+    --rc-warn: var(--amber);
+    --rc-warn-wash: var(--amber-weak);
+    --rc-stop: var(--red);
+    --rc-sys: var(--accent);
+    --rc-sys-wash: var(--accent-weak);
+    font:
+        14px/1.45 -apple-system,
+        'Segoe UI',
+        'Leelawadee UI',
+        'Noto Sans Thai',
+        sans-serif;
+    color: var(--rc-ink);
+}
+
+.rc-ic {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: none;
+    vertical-align: -3px;
+}
+.rc-ic.sm {
+    width: 13px;
+    height: 13px;
+}
+.rc-sp {
+    flex: 1;
+}
+.rc-muted {
+    color: var(--rc-faint);
+    font-size: 11.5px;
+}
+
+.rc-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+}
+.rc-title {
+    font-size: 15px;
+    font-weight: 650;
+}
+.rc-acct {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--rc-surface);
+    border: 1px solid var(--rc-line);
+    border-radius: 999px;
+    font-size: 12.5px;
+}
+.rc-live {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--rc-ok);
+    box-shadow: 0 0 0 3px var(--rc-ok-wash);
+}
+
+.rc-pipe {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    background: var(--rc-surface);
+    border: 1px solid var(--rc-line);
+    border-radius: 10px;
+    padding: 11px 12px;
+    margin-bottom: 14px;
+}
+.rc-stage {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    position: relative;
+}
+.rc-stage:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    border-top: 1.6px solid var(--rc-line-2);
+    border-right: 1.6px solid var(--rc-line-2);
+    transform: rotate(45deg);
+}
+.rc-icn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1.5px solid var(--rc-line-2);
+    color: var(--rc-faint);
+}
+.rc-stage.done .rc-icn {
+    background: var(--rc-ok-wash);
+    border-color: var(--rc-ok);
+    color: var(--rc-ok);
+}
+.rc-stage.active .rc-icn {
+    background: var(--rc-accent-wash);
+    border-color: var(--rc-accent);
+    color: var(--rc-accent);
+}
+.rc-st-t {
+    font-size: 12px;
+    font-weight: 600;
+}
+.rc-stage.active .rc-st-t {
+    color: var(--rc-accent-ink);
+}
+.rc-st-d {
+    font-size: 10.5px;
+    color: var(--rc-faint);
+    margin-top: 2px;
+    line-height: 1.35;
+}
+
+.rc-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: var(--rc-surface);
+    border: 1px solid var(--rc-line);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+}
+.rc-b-head {
+    font-size: 14px;
+    font-weight: 600;
+}
+.rc-b-sub {
+    font-size: 12px;
+    color: var(--rc-muted);
+    margin-top: 2px;
+}
+
+.rc-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.rc-tab {
+    border: 1px solid var(--rc-line);
+    background: var(--rc-surface);
+    color: var(--rc-muted);
+    border-radius: 999px;
+    padding: 6px 13px;
+    font-size: 12.5px;
+    font-weight: 560;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.rc-tab:hover {
+    border-color: var(--rc-line-2);
+    color: var(--rc-ink);
+}
+.rc-tab.on {
+    background: var(--rc-accent);
+    border-color: var(--rc-accent);
+    color: var(--accent-ink);
+}
+.rc-tab.warn.on {
+    background: var(--rc-warn);
+    border-color: var(--rc-warn);
+}
+.rc-cnt {
+    font-size: 11px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+}
+.rc-tab.on .rc-cnt {
+    background: rgba(255, 255, 255, 0.22);
+}
+.rc-hint {
+    font-size: 11.5px;
+    color: var(--rc-faint);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rc-grid {
+    background: var(--rc-surface);
+    border: 1px solid var(--rc-line);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.rc-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+/* 定宽列:金额/科目/记账去向/状态留足空间;往来方吸收剩余,超长名省略号(title 悬停显示全) */
+.rc-col-dot {
+    width: 22px;
+}
+.rc-col-dir {
+    width: 84px;
+}
+.rc-col-amt {
+    width: 132px;
+}
+.rc-col-acct {
+    width: 196px;
+}
+.rc-col-dest {
+    width: 176px;
+}
+.rc-col-state {
+    width: 122px;
+}
+.rc-table th {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--rc-muted);
+    font-weight: 650;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rc-line);
+    background: var(--rc-surface-2);
+    white-space: nowrap;
+}
+.rc-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--rc-line);
+    font-size: 12.5px;
+    vertical-align: middle;
+}
+.rc-table tr:last-child td {
+    border-bottom: 0;
+}
+/* 金额表头右对齐随数据 · 用 th.rc-tr 提具体度压过通用 .rc-table th{left}(否则表头/数字错开) */
+.rc-table th.rc-tr {
+    text-align: right;
+}
+/* 金额与科目拉开距离:金额额外右内边距把数字推离科目列(表头/数字同步保持右对齐) */
+.rc-table th.rc-tr,
+.rc-table td.rc-amt {
+    padding-right: 28px;
+}
+.rc-row {
+    cursor: pointer;
+}
+.rc-row:hover {
+    background: var(--rc-surface-2);
+}
+.rc-row:focus-visible {
+    outline: 2px solid var(--rc-accent);
+    outline-offset: -2px;
+}
+.rc-row.done {
+    opacity: 0.5;
+}
+.rc-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.rc-dot.ready {
+    background: var(--rc-ok);
+}
+.rc-dot.confirm {
+    background: var(--rc-warn);
+}
+.rc-dot.new {
+    background: var(--rc-sys);
+}
+.rc-dot.unread {
+    background: var(--rc-stop);
+}
+.rc-dir {
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.rc-dir.in {
+    background: var(--rc-accent-wash);
+    color: var(--rc-accent-ink);
+}
+.rc-dir.out {
+    background: var(--line2);
+    color: var(--ink2);
+}
+.rc-party {
+    font-weight: 560;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rc-docno {
+    color: var(--rc-faint);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rc-amt {
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.rc-acctcell {
+    font-size: 11.5px;
+    color: var(--rc-muted);
+}
+.rc-dests {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+.rc-dpill {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.rc-dpill.reuse {
+    background: var(--rc-ok-wash);
+    color: var(--rc-ok);
+}
+.rc-dpill.new {
+    background: var(--rc-sys-wash);
+    color: var(--rc-sys);
+}
+.rc-dpill.exp {
+    background: var(--rc-surface-2);
+    color: var(--rc-muted);
+    border: 1px solid var(--rc-line);
+}
+.rc-need {
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.rc-need.confirm {
+    color: var(--rc-warn);
+}
+.rc-need.new {
+    color: var(--rc-sys);
+}
+.rc-need.unread {
+    color: var(--rc-stop);
+}
+.rc-need.ready {
+    color: var(--rc-ok);
+}
+.rc-collapse {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--rc-surface-2);
+    border-top: 1px dashed var(--rc-line);
+    font-size: 12px;
+    color: var(--rc-muted);
+}
+.rc-collapse b {
+    color: var(--rc-ink);
+}
+
+.rc-btn {
+    border: 1px solid var(--rc-line-2);
+    background: var(--rc-surface);
+    color: var(--rc-ink);
+    border-radius: 9px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    font-weight: 620;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.rc-btn:hover {
+    border-color: var(--rc-accent);
+    color: var(--rc-accent-ink);
+}
+.rc-btn.pri {
+    background: var(--rc-accent);
+    border-color: var(--rc-accent);
+    color: var(--accent-ink);
+}
+.rc-btn.pri:hover {
+    background: var(--rc-accent-ink);
+    color: var(--accent-ink);
+}
+.rc-btn.ok {
+    background: var(--rc-ok);
+    border-color: var(--rc-ok);
+    color: var(--accent-ink);
+}
+
+.rc-actionbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--rc-surface);
+    border: 1px solid var(--rc-line);
+    border-radius: 10px;
+}
+.rc-prog {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.rc-pbar {
+    width: 150px;
+    height: 7px;
+    border-radius: 5px;
+    background: var(--rc-line);
+    overflow: hidden;
+}
+.rc-pbar > i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--rc-ok), var(--rc-accent));
+    border-radius: 5px;
+}
+.rc-remain {
+    font-size: 12px;
+    color: var(--rc-warn);
+    font-weight: 600;
+}
+
+@media (max-width: 860px) {
+    .rc-pipe {
+        grid-template-columns: 1fr 1fr;
+    }
+    .rc-stage:not(:last-child)::after {
+        display: none;
+    }
+    .rc-hidecol {
+        display: none;
+    }
+}

@@ -6,7 +6,8 @@
   ok            全干净 → 一行摘要直接推,不打断
   confirm_profile 画像待确认(unknown/mixed/首次)→ 一次性问这家记账模式,存 config 后不再问
   escalate      永续客户 + 库存路未开 → 商品行不可自动落,留人工(不假装成功)
-  decide_items  有行 fuzzy 或【只存在于库存目录】→ 逐个裁(复用/新建 · 跨类带"挂客户库存"提醒)
+  decide_items  有行 fuzzy 或【只存在于库存目录】→ 捞出例外给人看 · 默认 firm-safe 另建非库存
+                (逐项复用 override 是后续增量,当前仅透明展示不阻断)
 """
 
 from __future__ import annotations

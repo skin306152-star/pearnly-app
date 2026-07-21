@@ -28,6 +28,9 @@ from typing import Any, Dict, Optional
 _PERPETUAL_MIN = 0.60
 _NONE_MAX = 0.15
 
+# 合法 posting_mode 白名单(会计确认的覆盖须属此集,否则视为脏值回落推断,不当 confirmed)。
+_VALID_MODES = frozenset({"non_stock", "direct_account", "stock", "manual_review"})
+
 
 @dataclass
 class PostingProfile:
@@ -65,13 +68,16 @@ def classify_inventory_usage(fingerprint: Optional[Dict[str, Any]]) -> str:
     """记账指纹 → 客观库存用量 none|perpetual|mixed|unknown。指纹缺失=unknown(不猜)。"""
     if not isinstance(fingerprint, dict):
         return "unknown"
-    # 零库存主档 = 铁定不管库存(Saengjit:61 档全服务码 / 0 库存品),直接判 none。
-    try:
-        if int(fingerprint.get("stock_master_count")) == 0:
-            return "none"
-    except (TypeError, ValueError):
-        pass
     r = _moving_ratio(fingerprint)
+    try:
+        masters_zero = int(fingerprint.get("stock_master_count")) == 0
+    except (TypeError, ValueError):
+        masters_zero = False
+    # 零库存主档(Saengjit:全服务码)判 none —— 但仅当也无动库存行时。masters=0 却有动库存行 =
+    # 指纹自相矛盾(可能误报 0),绝不据此静默判 none(会让真永续客户按周期制落 · 违铁律),
+    # 落到比例逻辑:高比例 → perpetual → escalate,中间 → mixed → 交人裁。
+    if masters_zero and (r is None or r <= _NONE_MAX):
+        return "none"
     if r is None:
         return "unknown"
     if r >= _PERPETUAL_MIN:
@@ -124,7 +130,7 @@ def profile_from_config(
     """
     config = config or {}
     override = config.get("posting_profile")
-    if isinstance(override, dict) and override.get("posting_mode"):
+    if isinstance(override, dict) and override.get("posting_mode") in _VALID_MODES:
         mode = str(override.get("posting_mode"))
         # 会计选了库存,但 V2-b 库存路未开 → 还不能执行 → 交人(既不静默降级也不硬发 stock_item
         # 给不会处理的小助手)。库存路落地后 stock_enabled 才为真,这个覆盖才真正生效。

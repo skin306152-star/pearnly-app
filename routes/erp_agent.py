@@ -113,8 +113,8 @@ async def erp_agent_heartbeat(request: Request):
             agent_store.store_mapping(str(ep["id"]), body.get("mapping"))
         # 商品/客户目录 + 记账指纹(小助手读 STMAS/ARMAS/STCRD)→ 存 config,供目录解析器判
         # 复用、供记账画像推库存模式。整体快照替换,老客户端不带 catalog 键则此分支不触发。
-        if body.get("catalog") is not None:
-            cat = body.get("catalog") or {}
+        cat = body.get("catalog")
+        if isinstance(cat, dict):  # 非 dict(脏客户端传字符串/列表)→ 跳过,不让心跳 500
             agent_store.store_reported_catalog(
                 str(ep["id"]),
                 cat.get("products") or [],

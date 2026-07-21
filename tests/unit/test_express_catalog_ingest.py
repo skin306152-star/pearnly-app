@@ -33,6 +33,10 @@ class SanitizeCatalogTests(unittest.TestCase):
         raw = [{"code": f"P{i}"} for i in range(25000)]
         self.assertEqual(len(_sanitize_catalog(raw, _PRODUCT_KEYS)), 20000)
 
+    def test_caps_field_length(self):
+        out = _sanitize_catalog([{"code": "P1", "name": "x" * 500}], _PRODUCT_KEYS)
+        self.assertEqual(len(out[0]["name"]), 200)
+
     def test_non_list_is_empty(self):
         self.assertEqual(_sanitize_catalog("nope", _PRODUCT_KEYS), [])
         self.assertEqual(_sanitize_catalog(None, _PRODUCT_KEYS), [])

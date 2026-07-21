@@ -62,9 +62,31 @@ class TestInventoryClassify(unittest.TestCase):
     def test_mixed_middle(self):
         self.assertEqual(classify_inventory_usage(_REAL["WorldNaturalFood"]), "mixed")
 
-    def test_zero_stock_masters_is_none(self):
-        fp = {"stock_master_count": 0, "stcrd_lines": 100, "stcrd_lines_moving_stock": 50}
+    def test_zero_masters_no_movement_is_none(self):
+        # Saengjit 形:0 库存主档 + 0 动库存行 → none。
+        fp = {"stock_master_count": 0, "stcrd_lines": 100, "stcrd_lines_moving_stock": 0}
         self.assertEqual(classify_inventory_usage(fp), "none")
+
+    def test_zero_masters_but_moving_not_silently_none(self):
+        # ★指纹自相矛盾(masters=0 却有动库存行)→ 绝不静默判 none(会让真永续客户按周期制落)。
+        # 高比例落 perpetual → 上层 escalate 交人,不当 none 自动 non_stock。
+        fp = {"stock_master_count": 0, "stcrd_lines": 100, "stcrd_lines_moving_stock": 80}
+        self.assertEqual(classify_inventory_usage(fp), "perpetual")
+
+    def test_threshold_boundaries(self):
+        # 阈值边界钉死:恰 0.60→perpetual、恰 0.15→none(防随手挪阈值不被测试抓到)。
+        self.assertEqual(
+            classify_inventory_usage(
+                {"stock_master_count": 5, "stcrd_lines": 100, "stcrd_lines_moving_stock": 60}
+            ),
+            "perpetual",
+        )
+        self.assertEqual(
+            classify_inventory_usage(
+                {"stock_master_count": 5, "stcrd_lines": 100, "stcrd_lines_moving_stock": 15}
+            ),
+            "none",
+        )
 
     def test_missing_or_bad_fingerprint_is_unknown(self):
         self.assertEqual(classify_inventory_usage(None), "unknown")
@@ -126,6 +148,16 @@ class TestProfileFromConfig(unittest.TestCase):
         p = profile_from_config(None)
         self.assertEqual(p.posting_mode, "non_stock")
         self.assertTrue(p.needs_confirm)
+
+    def test_bad_override_mode_falls_back_to_inference(self):
+        # override 里非法 posting_mode 视为脏值 → 回落指纹推断,不当 confirmed(防 'banana' 直落)。
+        cfg = {
+            "posting_profile": {"posting_mode": "banana"},
+            "catalog_fingerprint": _REAL["IceFactory"],
+        }
+        p = profile_from_config(cfg)
+        self.assertEqual(p.source, "inferred")
+        self.assertEqual(p.posting_mode, "non_stock")
 
 
 if __name__ == "__main__":

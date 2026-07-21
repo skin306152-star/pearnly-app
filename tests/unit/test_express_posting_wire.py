@@ -46,6 +46,7 @@ def _purchase_history():
             "vat": "26274.30",
             "invoice_number": "RR581231-002",
             "posting_item_type_manual": "goods",
+            "items": [{"name": "เหล็กเส้น", "subtotal": "375347.20"}],
         },
     }
 
@@ -76,6 +77,10 @@ class PurchaseWireTests(unittest.TestCase):
         cfg = {**_PURCHASE_CONFIG, "catalog_fingerprint": _NONE_FP}
         r = build_express_payload(_purchase_history(), config=cfg)
         self.assertTrue(r.ok, r.reason)
+        # 无库存客户 → 明细行落非库存(=今日默认 · 零回归 · 钉死 item_mode 标签)。
+        self.assertTrue(r.payload["items"])
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
 
     def test_no_fingerprint_unchanged_default(self):
         r = build_express_payload(_purchase_history(), config=dict(_PURCHASE_CONFIG))

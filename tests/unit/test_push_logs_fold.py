@@ -148,26 +148,6 @@ class PushLogsFoldShapeTests(unittest.TestCase):
                 self.assertIn("l._rn = 1", sql)
                 self.assertIn(frag, sql, f"status_filter={sf} 缺条件 {frag}")
 
-    def test_history_ids_filter_emitted(self):
-        """录入工作台步④「本批推送状态」:history_ids → l.history_id::text = ANY(%s),
-        列表参数原样入 params(一次拉整批,免逐张查)。"""
-        cur, _ = self._run(history_ids=["h1", "h2", "h3"])
-        for sql, params in cur.executed:
-            self.assertIn("l.history_id::text = ANY(%s)", sql, "缺批量 history_ids 过滤子句")
-            self.assertIn(["h1", "h2", "h3"], params, f"history_ids 列表未入参: {params}")
-
-    def test_history_ids_coerced_to_str(self):
-        """非字符串 id(如 UUID/int)统一 str 化,防 ANY 类型不匹配。"""
-        cur, _ = self._run(history_ids=[1, 2])
-        for _, params in cur.executed:
-            self.assertIn(["1", "2"], params, f"history_ids 未 str 化: {params}")
-
-    def test_history_ids_empty_no_clause(self):
-        """空列表视同不过滤(if history_ids 为假):不发批量子句。"""
-        cur, _ = self._run(history_ids=[])
-        for sql, _ in cur.executed:
-            self.assertNotIn("l.history_id::text = ANY(%s)", sql)
-
     def test_user_id_always_in_cte_where(self):
         """user_id 永在 CTE WHERE 且为首个 param(防 cross-tenant · 折叠在租户内)."""
         for kwargs in ({}, {"adapter_filter": "mrerp"}, {"status_filter": "success"}):

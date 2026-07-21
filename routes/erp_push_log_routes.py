@@ -239,6 +239,7 @@ async def erp_history_push_status(history_id: str, request: Request):
 async def erp_logs(
     request: Request,
     history_id: Optional[str] = None,
+    history_ids: Optional[str] = None,
     endpoint_id: Optional[str] = None,
     status: Optional[str] = None,
     trigger: Optional[str] = None,
@@ -256,9 +257,13 @@ async def erp_logs(
       仍能看到 id_card 行,故不能全局硬剔——只在调用方显式传参时排除。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
+    # 录入工作台步④结果页「本批推送状态」内嵌:history_ids=逗号分隔一次拉整批。
+    # 上限对齐 limit 防超长 URL 撑爆(一批最多 30 张,取 200 冗余)。
+    hids = [h for h in (history_ids or "").split(",") if h.strip()][:200] or None
     return db.list_push_logs(
         user["id"],
         history_id=history_id,
+        history_ids=hids,
         endpoint_id=endpoint_id,
         status_filter=status,
         trigger_filter=trigger,

@@ -9,6 +9,7 @@ import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, Endpoint } from './dms-intake-invoice.js';
 import { pushHistory } from './dms-intake-erp-push.js';
+import { renderBatchPushStatus } from './dms-intake-push-status.js';
 
 // ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
@@ -302,11 +303,18 @@ function renderResult(excelOk: boolean, erpOk: number, erpFail: number) {
         '<div class="dx-success"><div class="dx-suc-ic">✓</div>' +
         `<h3>${esc(t('dxi-res-title'))}</h3><p>${esc(t('dxi-res-sub'))}</p>` +
         `<div class="dx-sgrid">${exLine}${erpLine}</div>` +
+        // 数据互通:推送过就在结果页内嵌本批逐单状态(成功/推送中/重试中/失败+就地重推),
+        // 不必跳独立推送日志页。未推送则容器留空。
+        '<div id="dx-push-status"></div>' +
         '<div class="dx-sact">' +
         `<button class="btn" id="dx-inv-view-rec">${esc(t('dxi-res-view-record'))}</button>` +
         `<button class="btn" id="dx-inv-view-push">${esc(t('dxi-res-view-push'))}</button>` +
         `<button class="btn primary" id="dx-inv-new">${esc(t('dxi-res-new'))}</button></div></div>`;
     showStepInv(4, 'dx-s-success');
+    if (IV.output.erp) {
+        const box = $('dx-push-status');
+        if (box) void renderBatchPushStatus(box, allHistoryIds());
+    }
 }
 function sitem(lk: string, val: string, ok: boolean | null) {
     const cls = ok === null ? '' : ok ? ' ok' : ' fail';

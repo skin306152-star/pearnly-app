@@ -100,6 +100,7 @@ def _derive_v3_meta(body: Any) -> Dict[str, Any]:
 def list_push_logs(
     user_id: str,
     history_id: Optional[str] = None,
+    history_ids: Optional[List[str]] = None,
     endpoint_id: Optional[str] = None,
     status_filter: Optional[str] = None,
     trigger_filter: Optional[str] = None,
@@ -151,6 +152,11 @@ def list_push_logs(
             if history_id:
                 outer.append("l.history_id = %s")
                 params.append(history_id)
+            # 录入工作台步④结果页「本批推送状态」内嵌:一次拉整批(多张 history)的
+            # 推送状态,免逐张查。空列表视同不过滤(与 history_id 单值可叠加,均为 AND)。
+            if history_ids:
+                outer.append("l.history_id::text = ANY(%s)")
+                params.append([str(h) for h in history_ids])
             if endpoint_id:
                 outer.append("l.endpoint_id = %s")
                 params.append(endpoint_id)

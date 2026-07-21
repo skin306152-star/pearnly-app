@@ -1,0 +1,100 @@
+/* 录入工作台 · 步④结果页「本批推送状态」内嵌(作用域 .dxp)· 2026-07-21
+   令牌 = app 全局令牌别名(home-01-base.css):无裸 hex,暗色跟随 :root.dark 自动翻。 */
+.dxp {
+    --dxp-ink: var(--ink);
+    --dxp-muted: var(--ink2);
+    --dxp-line: var(--line);
+    --dxp-ok: var(--green);
+    --dxp-warn: var(--amber);
+    --dxp-stop: var(--red);
+    margin-top: 12px;
+    text-align: left;
+}
+.dxp-h {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--dxp-muted);
+    margin: 0 0 6px 2px;
+}
+.dxp-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--dxp-line);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.dxp-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-top: 1px solid var(--dxp-line);
+}
+.dxp-row:first-child {
+    border-top: 0;
+}
+.dxp-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dxp-muted);
+}
+.dxp-row.ok .dxp-dot {
+    background: var(--dxp-ok);
+}
+.dxp-row.pending .dxp-dot,
+.dxp-row.retrying .dxp-dot {
+    background: var(--dxp-warn);
+}
+.dxp-row.failed .dxp-dot {
+    background: var(--dxp-stop);
+}
+.dxp-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.dxp-doc {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dxp-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.dxp-err {
+    font-size: 11.5px;
+    color: var(--dxp-stop);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.dxp-state {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--dxp-muted);
+}
+.dxp-row.ok .dxp-state {
+    color: var(--dxp-ok);
+}
+.dxp-row.failed .dxp-state {
+    color: var(--dxp-stop);
+}
+.dxp-retry {
+    flex: 0 0 auto;
+    font-size: 12px;
+    padding: 4px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 7px;
+    background: var(--accent-weak);
+    color: var(--accent-deep);
+    cursor: pointer;
+}
+.dxp-retry:hover {
+    background: var(--accent-soft);
+}
+.dxp-retry[disabled] {
+    opacity: 0.55;
+    cursor: default;
+}

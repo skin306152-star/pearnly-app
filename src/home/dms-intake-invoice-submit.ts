@@ -9,6 +9,7 @@ import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, Endpoint } from './dms-intake-invoice.js';
 import { pushHistory } from './dms-intake-erp-push.js';
+import { postingPreviewContainer, refreshPostingPreview } from './dms-intake-posting-preview.js';
 
 // ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
@@ -54,10 +55,19 @@ export function renderSubmit() {
         '</div>' +
         (IV.output.excel ? tplRowHtml() : '') +
         (IV.output.erp ? erpTargetsHtml() : '') +
+        (IV.output.erp && isExpressTarget() ? postingPreviewContainer() : '') +
         '</div>' +
         summaryHtml() +
         submitFootHtml();
     showStepInv(4, 'dx-s-inv-submit');
+    // 推送前预览(记账画像 gate)· 仅 Express 目标 · 异步填充,不阻塞渲染。
+    if (IV.output.erp && isExpressTarget()) {
+        void refreshPostingPreview(allHistoryIds(), IV.target);
+    }
+}
+function isExpressTarget(): boolean {
+    const e = IV.endpoints.find((x) => String(x.id) === IV.target);
+    return (e?.adapter || '').toLowerCase() === 'express';
 }
 function outChoice(key: 'excel' | 'erp', tk: string, dk: string) {
     const on = IV.output[key] ? ' active' : '';

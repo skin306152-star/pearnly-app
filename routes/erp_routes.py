@@ -55,6 +55,7 @@ from routes.erp_push_log_routes import (  # noqa: F401
 )
 from routes.erp_export_routes import router as _export_router  # noqa: F401
 from routes.erp_express_account_routes import router as _express_acct_router  # noqa: F401
+from routes.erp_posting_preview_routes import router as _posting_preview_router  # noqa: F401
 
 router = APIRouter()
 router.include_router(_listing_router)
@@ -62,3 +63,4 @@ router.include_router(_endpoints_router)
 router.include_router(_push_log_router)
 router.include_router(_export_router)
 router.include_router(_express_acct_router)
+router.include_router(_posting_preview_router)

@@ -175,8 +175,8 @@ def build_express_sales_payload(
     # 记账画像:永续客户库存路未开时,销售会结转 COGS/扣库存,绝不静默按周期制落 → 交会计。
     # 指纹未上报→unknown→非库存(=今天默认,行为不变)。
     profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
-    if profile.posting_mode == "manual_review":
-        return fail(f"posting_needs_review:{profile.inventory_usage}")
+    if profile.blocks_auto_posting():
+        return fail(profile.escalate_reason())
 
     # V1 安全明细:OCR 行项目过对账闸(行合计≈税前额才采信)。挂收入科目作直接科目行,
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。

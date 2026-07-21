@@ -171,9 +171,8 @@ def build_express_payload(
     # 非库存(=今天默认,行为不变)。★永续客户库存路未开时,goods 行绝不静默按周期制落
     # (会与其既有永续账双重计成本)→ escalate 交会计;费用票不动库存,不受此闸约束。
     profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
-    if not is_expense and profile.posting_mode == "manual_review":
-        return fail(f"posting_needs_review:{profile.inventory_usage}")
-    item_mode = item_mode_for(profile.posting_mode)
+    if not is_expense and profile.blocks_auto_posting():
+        return fail(profile.escalate_reason())
     vat_capitalized = _s(vat) if is_expense else None
     if is_expense:
         # 费用票口径(拍板 · intake.py「费用类即便读到 vat 也归 0」同口径 / MR.ERP 453 先例):
@@ -214,7 +213,9 @@ def build_express_payload(
     if is_expense:
         detail = _expense_detail(total)
     else:
-        detail = extract_line_items(fields, base, total=total, item_mode=item_mode)
+        detail = extract_line_items(
+            fields, base, total=total, item_mode=item_mode_for(profile.posting_mode)
+        )
 
     # 现购 HP / 赊购 RR:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
     # 票种语义(F3)> 供应商过账档案(F4)> 银行佐证(F6)> config 默认(B2B 缺省 RR)。

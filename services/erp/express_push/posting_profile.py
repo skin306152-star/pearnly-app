@@ -20,7 +20,7 @@ inventory_usage(从指纹推断的客观事实):none | perpetual | mixed | unkno
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, Optional
 
 # 动库存行占比阈值(6 家真账标定:AsiaSports .87 / Moritomo .99 / SKChem .86 = perpetual;
@@ -28,8 +28,11 @@ from typing import Any, Dict, Optional
 _PERPETUAL_MIN = 0.60
 _NONE_MAX = 0.15
 
-# 合法 posting_mode 白名单(会计确认的覆盖须属此集,否则视为脏值回落推断,不当 confirmed)。
-_VALID_MODES = frozenset({"non_stock", "direct_account", "stock", "manual_review"})
+# 合法 posting_mode 白名单(单一事实源 · route 校验 / 画像回落共用,防两处漂移)。
+VALID_MODES = frozenset({"non_stock", "direct_account", "stock", "manual_review"})
+
+# escalate(不可自动落 · 交会计)fail-reason 前缀:mapper/sales_mapper 共用,push_logs/测试认它。
+ESCALATE_REASON_PREFIX = "posting_needs_review"
 
 
 @dataclass
@@ -43,13 +46,15 @@ class PostingProfile:
     reason: str  # 审计留痕:为什么落这个 mode
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "inventory_usage": self.inventory_usage,
-            "posting_mode": self.posting_mode,
-            "needs_confirm": self.needs_confirm,
-            "source": self.source,
-            "reason": self.reason,
-        }
+        return asdict(self)
+
+    def blocks_auto_posting(self) -> bool:
+        """这类行能否自动过账。manual_review = 不可(交会计 · 唯一阻断态 · 单源判据)。"""
+        return self.posting_mode == "manual_review"
+
+    def escalate_reason(self) -> str:
+        """escalate 的 fail-reason(单一格式源,mapper/sales_mapper 共用)。"""
+        return f"{ESCALATE_REASON_PREFIX}:{self.inventory_usage}"
 
 
 def _moving_ratio(fp: Dict[str, Any]) -> Optional[float]:
@@ -130,7 +135,7 @@ def profile_from_config(
     """
     config = config or {}
     override = config.get("posting_profile")
-    if isinstance(override, dict) and override.get("posting_mode") in _VALID_MODES:
+    if isinstance(override, dict) and override.get("posting_mode") in VALID_MODES:
         mode = str(override.get("posting_mode"))
         # 会计选了库存,但 V2-b 库存路未开 → 还不能执行 → 交人(既不静默降级也不硬发 stock_item
         # 给不会处理的小助手)。库存路落地后 stock_enabled 才为真,这个覆盖才真正生效。

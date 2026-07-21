@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from services.erp.express_push.catalog_resolver import resolve_product
+from services.erp.express_push.catalog_resolver import build_name_index, resolve_product_indexed
 from services.erp.express_push.posting_profile import profile_from_config
 
 
@@ -28,6 +28,7 @@ def compute_posting_preview(
     """
     profile = profile_from_config(config, stock_enabled=stock_enabled)
     products = (config or {}).get("reported_products") or []
+    index = build_name_index(products)  # 预建一次骨架索引(H1:精确命中 O(1),不每行重扫)
     # 本客户新建落哪类:stock 模式建库存,其余建非库存(firm-safe 默认)。
     target_kind = "stock" if profile.posting_mode == "stock" else "non_stock"
 
@@ -38,7 +39,7 @@ def compute_posting_preview(
             name = str((it or {}).get("name") or "").strip()
             if not name:
                 continue
-            v = resolve_product(name, products)
+            v = resolve_product_indexed(name, index, products)
             status = v.get("status")
             row: Dict[str, Any] = {"name": name, "status": status}
             if status == "reuse":
@@ -57,7 +58,7 @@ def compute_posting_preview(
             items_out.append(row)
 
     # gate 优先级:escalate(不可自动落)> confirm_profile(画像未定)> decide_items(有例外)> ok。
-    if profile.posting_mode == "manual_review":
+    if profile.blocks_auto_posting():
         gate = "escalate"
     elif profile.needs_confirm:
         gate = "confirm_profile"

@@ -12,9 +12,10 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from services.erp.express_push.catalog_resolver import (  # noqa: E402
+    build_name_index,
     resolve_customer,
-    resolve_line_items,
     resolve_product,
+    resolve_product_indexed,
 )
 
 # 套账既有目录:同一批里既有库存品(kind=stock)也有非库存/服务品(kind=non_stock)。
@@ -73,13 +74,23 @@ class TestResolveCustomer(unittest.TestCase):
         self.assertEqual(v["status"], "reuse")
 
 
-class TestResolveLineItems(unittest.TestCase):
-    def test_batch_aligns_with_items(self):
-        items = [{"name": "น้ำแข็งหลอด"}, {"name": "ของใหม่"}]
-        out = resolve_line_items(items, _CATALOG)
-        self.assertEqual(len(out), 2)
-        self.assertEqual(out[0]["status"], "reuse")
-        self.assertEqual(out[1]["status"], "new")
+class TestIndexedResolve(unittest.TestCase):
+    def test_indexed_exact_hit_o1(self):
+        idx = build_name_index(_CATALOG)
+        v = resolve_product_indexed("น้ำแข็งหลอด", idx, _CATALOG)
+        self.assertEqual(v["status"], "reuse")
+        self.assertEqual(v["code"], "14-01-05")
+        self.assertEqual(v["kind"], "stock")
+
+    def test_indexed_miss_falls_to_fuzzy(self):
+        cat = [{"code": "P1", "name": "ABCDEFGHIJ", "kind": "non_stock"}]
+        idx = build_name_index(cat)
+        v = resolve_product_indexed("ABCDEFGHIX", idx, cat)  # 非精确 → 落 resolve_product 模糊
+        self.assertEqual(v["status"], "confirm")
+
+    def test_indexed_new_when_absent(self):
+        idx = build_name_index(_CATALOG)
+        self.assertEqual(resolve_product_indexed("ของใหม่ไม่มี", idx, _CATALOG)["status"], "new")
 
 
 if __name__ == "__main__":

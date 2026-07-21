@@ -25,6 +25,7 @@ type Preview = {
 
 const CONTAINER_ID = 'dx-posting-preview';
 let _sig = '';
+let _cache: Preview | null = null;
 
 export function postingPreviewContainer(): string {
     return `<div id="${CONTAINER_ID}" class="dx-pp"></div>`;
@@ -38,8 +39,15 @@ export async function refreshPostingPreview(
     const el = document.getElementById(CONTAINER_ID);
     if (!el || !endpointId || !historyIds.length) return;
     const sig = endpointId + '|' + historyIds.join(',');
-    if (sig === _sig && el.innerHTML) return;
+    // 同签名(同批同目标)重渲:从缓存画像数据重画(renderGate 会重挂按钮监听),不重复打后端。
+    // renderSubmit 每次重建空容器 → 旧的 `el.innerHTML` 守卫恒失效,每次勾选/切目标/doFinish 都
+    // 重拉(还与推送并发)。改按数据签名去重根治。
+    if (sig === _sig && _cache) {
+        renderGate(el, _cache, endpointId, historyIds);
+        return;
+    }
     _sig = sig;
+    _cache = null;
     el.innerHTML = `<div class="dx-pp-load">${esc(t('dxpp-loading'))}</div>`;
     try {
         const r = await fetch('/api/erp/posting-preview', {
@@ -47,7 +55,8 @@ export async function refreshPostingPreview(
             headers: authHeaders(true),
             body: JSON.stringify({ history_ids: historyIds, endpoint_id: endpointId }),
         });
-        renderGate(el, (await r.json().catch(() => ({}))) as Preview, endpointId, historyIds);
+        _cache = (await r.json().catch(() => ({}))) as Preview;
+        renderGate(el, _cache, endpointId, historyIds);
     } catch {
         el.innerHTML = '';
     }
@@ -118,5 +127,6 @@ async function saveProfile(
         /* 存失败:重拉预览时会回到 confirm_profile,不静默假装成功 */
     }
     _sig = ''; // 破缓存,拿新画像重渲
+    _cache = null;
     await refreshPostingPreview(historyIds, endpointId);
 }

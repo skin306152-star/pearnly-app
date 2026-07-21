@@ -26,12 +26,11 @@ from services.erp.erp_payload import flatten_history_for_mrerp
 from services.erp.express_push import stock_lane_enabled
 from services.erp.express_push.agent_reporting import _merge_config
 from services.erp.express_push.posting_preview import compute_posting_preview
+from services.erp.express_push.posting_profile import VALID_MODES
 
 logger = logging.getLogger("mr-pilot")
 
 router = APIRouter()
-
-_VALID_POSTING_MODES = {"non_stock", "direct_account", "stock", "manual_review"}
 
 
 def _history_doc(history_id: str, history: Dict[str, Any]) -> Dict[str, Any]:
@@ -88,7 +87,7 @@ async def erp_posting_profile(req: PostingProfileRequest, request: Request):
     user = get_current_user_from_request(request)
     _check_push_access(user)
 
-    if req.posting_mode not in _VALID_POSTING_MODES:
+    if req.posting_mode not in VALID_MODES:
         raise HTTPException(400, detail="erp.invalid_posting_mode")
 
     endpoint = db.get_erp_endpoint(user["id"], req.endpoint_id)

@@ -79,8 +79,27 @@ def resolve_customer(name: str, tax_id: str, customers: List[Dict[str, Any]]) ->
     return _match_by_name(name, customers or [])
 
 
-def resolve_line_items(
-    items: List[Dict[str, Any]], products: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
-    """批量:给每个 OCR 行项目并列解析(顺序对齐 items),供推送前预览 / 载荷回填。"""
-    return [resolve_product(str((it or {}).get("name") or ""), products) for it in (items or [])]
+def build_name_index(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """预建 骨架→主档 精确索引(首现优先)。批量解析用它 O(1) 精确命中,不必每行对全表重算骨架。"""
+    idx: Dict[str, Dict[str, Any]] = {}
+    for it in items or []:
+        sk = skeleton(it.get("name") or "")
+        if sk and sk not in idx:
+            idx[sk] = it
+    return idx
+
+
+def resolve_product_indexed(
+    name: str, index: Dict[str, Dict[str, Any]], products: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """精确命中走预建索引 O(1);未命中才落 resolve_product 的 O(P) 模糊扫(happy path 不跑 difflib)。"""
+    sk = skeleton(name)
+    hit = index.get(sk) if sk else None
+    if hit:
+        return {
+            "status": "reuse",
+            "code": hit.get("code"),
+            "kind": hit.get("kind") or "",
+            "reason": "name_exact",
+        }
+    return resolve_product(name, products)

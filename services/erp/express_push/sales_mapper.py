@@ -35,11 +35,14 @@ from services.erp.express_push.common import (
     extract_line_items,
     fail,
     finalize_payload,
+    item_mode_for,
     payment_verdict_for,
     resolve_account,
     resolve_account_sourced,
     SRC_DEFAULT,
 )
+from services.erp.express_push import stock_lane_enabled
+from services.erp.express_push.posting_profile import profile_from_config
 from services.purchase.field_clean import (
     clean_address,
     clean_invoice_no,
@@ -169,9 +172,17 @@ def build_express_sales_payload(
     if _q(dr) != _q(cr):
         return fail("entry_not_balanced")
 
+    # 记账画像:永续客户库存路未开时,销售会结转 COGS/扣库存,绝不静默按周期制落 → 交会计。
+    # 指纹未上报→unknown→非库存(=今天默认,行为不变)。
+    profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
+    if profile.posting_mode == "manual_review":
+        return fail(f"posting_needs_review:{profile.inventory_usage}")
+
     # V1 安全明细:OCR 行项目过对账闸(行合计≈税前额才采信)。挂收入科目作直接科目行,
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
-    detail = extract_line_items(fields, base, total=total)
+    detail = extract_line_items(
+        fields, base, total=total, item_mode=item_mode_for(profile.posting_mode)
+    )
 
     # 现销 HS / 赊销 IV:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
     # 票种语义(F3)> 银行佐证(F6)> 无信号默认赊销。销项 v1 不接供应商过账档案(档案锚是

@@ -36,6 +36,15 @@ def account_set_allowed(account_set: str, endpoint: Dict[str, Any]) -> bool:
     return bool(configured) and s == configured
 
 
+def stock_lane_enabled(config: Dict[str, Any]) -> bool:
+    """V2-b 库存路(STKTYP=0 主档 + 扣库存 + COGS)是否对本端点开启。
+
+    恒 False:库存路未施工(doc31 §3.6「本期不做,仅留接口位」),故画像判 perpetual 的客户
+    一律走 escalate 交会计,绝不静默按周期制落。V2-b 落地后改成读端点闸,别提前放这个口。
+    """
+    return False
+
+
 def chart_codes(config: Dict[str, Any]) -> Optional[set]:
     """账套上报的可记账科目码集合(写前白名单数据源)。
 

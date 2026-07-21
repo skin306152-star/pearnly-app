@@ -116,6 +116,87 @@ def store_reported_accounts(endpoint_id: str, accounts: Any) -> int:
         return 0
 
 
+# ── 商品/客户目录 + 记账指纹 · 小助手读 STMAS/ARMAS/STCRD 上报 ─────────────────────
+# reported_products/customers 供 catalog_resolver 判「复用现有 vs 新建」;catalog_fingerprint
+# 供 posting_profile 推库存模式。目录可上万条 → 限量;整体快照替换(与账套列表同语义,非累加)。
+_PRODUCT_KEYS = ("code", "name", "kind")  # kind = stock | non_stock(companion 从 STKTYP 派生)
+_CUSTOMER_KEYS = ("code", "name", "tax_id", "kind")
+_FINGERPRINT_INT_KEYS = ("stock_master_count", "stcrd_lines", "stcrd_lines_moving_stock")
+_MAX_CATALOG = 20000
+
+
+def _sanitize_catalog(raw: Any, keys: tuple) -> List[Dict[str, Any]]:
+    """净化上报目录:只留已知键、限长限量;code 或 name 至少一个非空才收。"""
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw[:_MAX_CATALOG]:
+        if not isinstance(item, dict):
+            continue
+        clean: Dict[str, Any] = {}
+        for k in keys:
+            v = item.get(k)
+            if v is not None and str(v).strip() != "":
+                clean[k] = str(v).strip()[:200]
+        if clean.get("code") or clean.get("name"):
+            out.append(clean)
+    return out
+
+
+def _sanitize_fingerprint(raw: Any) -> Dict[str, int]:
+    """净化记账指纹:只留三个计数键、归一非负整数(喂 posting_profile 推库存模式)。"""
+    if not isinstance(raw, dict):
+        return {}
+    fp: Dict[str, int] = {}
+    for k in _FINGERPRINT_INT_KEYS:
+        v = raw.get(k)
+        try:
+            fp[k] = max(0, int(v))
+        except (TypeError, ValueError):
+            continue
+    return fp
+
+
+def store_reported_catalog(
+    endpoint_id: str, products: Any, customers: Any, fingerprint: Any = None
+) -> tuple:
+    """存小助手上报的【商品 + 客户目录 + 记账指纹】→ config(整体快照替换)。
+
+    reported_products/customers 供 catalog_resolver 判复用;catalog_fingerprint 供
+    posting_profile 推库存模式。返回 (商品数, 客户数)。指纹为空则不动既有 catalog_fingerprint。
+    """
+    prods = _sanitize_catalog(products, _PRODUCT_KEYS)
+    custs = _sanitize_catalog(customers, _CUSTOMER_KEYS)
+    fp = _sanitize_fingerprint(fingerprint)
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
+                        'reported_products', %s::jsonb,
+                        'reported_customers', %s::jsonb,
+                        'catalog_seen_at', to_jsonb(NOW()::text))
+                    || CASE WHEN %s::jsonb = '{}'::jsonb THEN '{}'::jsonb
+                            ELSE jsonb_build_object('catalog_fingerprint', %s::jsonb) END
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (
+                    json.dumps(prods, ensure_ascii=False),
+                    json.dumps(custs, ensure_ascii=False),
+                    json.dumps(fp),
+                    json.dumps(fp),
+                    endpoint_id,
+                ),
+            )
+        return (len(prods), len(custs))
+    except Exception as e:
+        logger.error(f"store_reported_catalog failed: {e}")
+        return (0, 0)
+
+
 # 所选账套【整组】· 方法无关(直录/RPA 共用 · 见 11-dispatch 可扩展性契约 §1/§2/§5)。
 # account_set 名(白名单)+ account_dir(DBF 写文件)+ account_company(公司名硬闸)
 # + account_set_row(RPA 登录后公司 grid 行)。客户选一次整组都推出,RPA 来零新增字段。

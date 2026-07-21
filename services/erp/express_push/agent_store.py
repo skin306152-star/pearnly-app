@@ -111,12 +111,14 @@ def authenticate(token: str) -> Optional[Dict[str, Any]]:
 from services.erp.express_push.agent_reporting import (  # noqa: E402,F401
     _sanitize_account_sets,
     _sanitize_accounts,
+    _sanitize_catalog,
     mark_offline,
     selected_account_changed,
     store_account_sets,
     store_mapping,
     store_max_payload_version,
     store_reported_accounts,
+    store_reported_catalog,
     store_selected_account,
     touch_heartbeat,
 )

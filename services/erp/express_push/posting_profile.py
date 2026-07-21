@@ -125,9 +125,14 @@ def profile_from_config(
     config = config or {}
     override = config.get("posting_profile")
     if isinstance(override, dict) and override.get("posting_mode"):
+        mode = str(override.get("posting_mode"))
+        # 会计选了库存,但 V2-b 库存路未开 → 还不能执行 → 交人(既不静默降级也不硬发 stock_item
+        # 给不会处理的小助手)。库存路落地后 stock_enabled 才为真,这个覆盖才真正生效。
+        if mode == "stock" and not stock_enabled:
+            mode = "manual_review"
         return PostingProfile(
             inventory_usage=str(override.get("inventory_usage") or "unknown"),
-            posting_mode=str(override.get("posting_mode")),
+            posting_mode=mode,
             needs_confirm=False,
             source="confirmed",
             reason="accountant-confirmed override",

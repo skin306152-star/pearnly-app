@@ -106,10 +106,16 @@ class TestProfileFromConfig(unittest.TestCase):
             "posting_profile": {"posting_mode": "stock", "inventory_usage": "perpetual"},
             "catalog_fingerprint": _REAL["IceFactory"],
         }
-        p = profile_from_config(cfg)
+        p = profile_from_config(cfg, stock_enabled=True)
         self.assertEqual(p.posting_mode, "stock")
         self.assertEqual(p.source, "confirmed")
         self.assertFalse(p.needs_confirm)
+
+    def test_confirmed_stock_gated_when_lane_off(self):
+        # 会计确认了库存,但库存路(V2-b)没开 → 降 manual_review,绝不硬发 stock_item。
+        cfg = {"posting_profile": {"posting_mode": "stock", "inventory_usage": "perpetual"}}
+        p = profile_from_config(cfg, stock_enabled=False)
+        self.assertEqual(p.posting_mode, "manual_review")
 
     def test_falls_back_to_inference(self):
         p = profile_from_config({"catalog_fingerprint": _REAL["Saengjit"]})

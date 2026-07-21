@@ -4,6 +4,7 @@
 // 抓 getComputedStyle 断言视觉(ok 蓝底 / escalate 琥珀左框 3px / confirm 双按钮 / decide 例外行),
 // 截图落 _artifacts/。全流程数据驱动(真 companion 目录 → preview)属真客户验收门,见交接。
 // ============================================================
+/* global getComputedStyle */ // page.$eval 回调在浏览器上下文跑,getComputedStyle 是浏览器全局
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');

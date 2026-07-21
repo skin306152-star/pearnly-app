@@ -10,14 +10,16 @@ const fs = require('fs');
 
 const CSS = path.resolve(__dirname, '../../static/dist/home.css');
 const GATES = `<div class="dmsx" style="padding:24px;max-width:520px;display:flex;flex-direction:column;gap:16px;background:var(--bg,#f6f5fb)">
-  <div class="dx-pp"><div class="dx-pp-ok">✓ 3 项复用现有 · 2 项新建</div></div>
-  <div class="dx-pp"><div class="dx-pp-warn">⚠ 这家按永续库存记账 · 商品行需人工录入 · 本批留人工</div></div>
+  <div class="dx-pp"><div class="dx-pp-ok">3 项复用现有 · 2 项新建</div></div>
+  <div class="dx-pp"><div class="dx-pp-warn">这家按永续库存记账 · 商品行需人工录入 · 本批留人工</div></div>
   <div class="dx-pp"><div class="dx-pp-confirm"><p>这家客户在 Express 里管库存吗？</p><div class="dx-pp-btns"><button class="btn">不管 · 自动记账</button><button class="btn">管库存 · 逐单人工</button></div></div></div>
   <div class="dx-pp"><div class="dx-pp-decide"><p>以下商品需你确认落点：</p><div class="dx-pp-row"><b>น้ำแข็งหลอด</b><span>已在库存目录 · 默认另建非库存</span></div><div class="dx-pp-note">默认按 firm-safe 另建独立非库存档</div></div></div>
 </div>`;
 
 test('步4 推送前预览四态真浏览器渲染 + 截图为证', async ({ page }) => {
-    await page.setContent(`<!doctype html><html><head><meta charset="utf-8"></head><body>${GATES}</body></html>`);
+    await page.setContent(
+        `<!doctype html><html><head><meta charset="utf-8"></head><body>${GATES}</body></html>`
+    );
     await page.addStyleTag({ path: CSS });
     await page.waitForTimeout(150);
 

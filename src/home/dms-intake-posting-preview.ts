@@ -71,11 +71,11 @@ function renderGate(el: HTMLElement, d: Preview, endpointId: string, historyIds:
     const sm = d.summary || { reuse: 0, new: 0, confirm: 0 };
     if (gate === 'ok') {
         const line = t('dxpp-ok').replace('{r}', String(sm.reuse)).replace('{n}', String(sm.new));
-        el.innerHTML = `<div class="dx-pp-ok">✓ ${esc(line)}</div>`;
+        el.innerHTML = `<div class="dx-pp-ok">${esc(line)}</div>`;
         return;
     }
     if (gate === 'escalate') {
-        el.innerHTML = `<div class="dx-pp-warn">⚠ ${esc(t('dxpp-escalate'))}</div>`;
+        el.innerHTML = `<div class="dx-pp-warn">${esc(t('dxpp-escalate'))}</div>`;
         return;
     }
     if (gate === 'confirm_profile') {

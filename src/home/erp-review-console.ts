@@ -62,6 +62,7 @@ export interface ConsoleLabels {
     push: string;
     progress: string; // 含 {done}{total}
     remain: string; // 含 {n}
+    back?: string; // 有 onBack 时的返回按钮文案(步③=返回上传;M1 dev 路由不传)
 }
 
 export interface ConsoleData {
@@ -77,6 +78,7 @@ export interface ConsoleOptions {
     onOpenRow?: (id: string) => void;
     onPush?: () => void;
     onAcceptAll?: () => void;
+    onBack?: () => void; // 有则底栏出返回按钮(步③=返回上传);不传则无(M1 dev 路由)
 }
 
 // 线性图标(描边 SVG · 与产品图标语言一致 · 无 emoji)
@@ -269,6 +271,9 @@ export function renderReviewConsole(root: HTMLElement, opts: ConsoleOptions): vo
     const actionbar = root.querySelector('.rc-actionbar') as HTMLElement;
     const pct = data.total ? Math.round((data.readyCount / data.total) * 100) : 0;
     actionbar.innerHTML =
+        (opts.onBack
+            ? `<button class="rc-btn" data-act="back">${esc(L.back || '')}</button>`
+            : '') +
         `<div class="rc-prog"><div class="rc-pbar"><i style="width:${pct}%"></i></div>` +
         `<span class="rc-muted">${fill(L.progress, { done: data.readyCount, total: data.total })}</span></div>` +
         `<span class="rc-remain">${fill(L.remain, { n: needCount })}</span><div class="rc-sp"></div>` +
@@ -276,7 +281,8 @@ export function renderReviewConsole(root: HTMLElement, opts: ConsoleOptions): vo
         `<button class="rc-btn pri" data-act="push">${esc(L.push)}</button>`;
     actionbar.addEventListener('click', (e) => {
         const t = e.target as HTMLElement;
-        if (t.closest('[data-act="push"]') && opts.onPush) opts.onPush();
+        if (t.closest('[data-act="back"]') && opts.onBack) opts.onBack();
+        else if (t.closest('[data-act="push"]') && opts.onPush) opts.onPush();
         else if (t.closest('[data-act="review"]') && opts.onOpenRow) {
             const first = filterRows(data.rows, 'need')[0];
             if (first) opts.onOpenRow(first.id);

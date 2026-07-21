@@ -19,7 +19,7 @@ function authHeaders(): Record<string, string> {
 }
 
 // dev labels:数据驱动位({n}{done}{total})交渲染层填;静态位不写死伪造计数(状态诚实)。
-const CONSOLE_LABELS: ConsoleLabels = {
+export const CONSOLE_LABELS: ConsoleLabels = {
     title: 'ERP 推送复核台',
     accountSet: '录入复核台 · 开发预览',
     agentOnline: '读取识别记录',
@@ -53,7 +53,7 @@ const CONSOLE_LABELS: ConsoleLabels = {
     remain: '还剩 {n} 张需确认',
 };
 
-const VERIFY_LABELS: VerifyLabels = {
+export const VERIFY_LABELS: VerifyLabels = {
     dirIn: '进项 · 采购',
     dirOut: '销项 · 销售',
     pos: '{i} / {n}',

@@ -16,9 +16,10 @@ import {
 } from './erp-review-routing';
 
 export interface VerifyField {
-    key: string;
+    key: string; // 显示标签
     value: string;
     flag?: boolean; // 低置信 → 高亮提示对照原图
+    fk?: string; // 写回字段键(改字段回写数据源时用;缺省=key)
 }
 
 export interface VerifyRow {
@@ -62,6 +63,8 @@ export interface VerifyOptions {
     mountImage?: (pane: HTMLElement, row: VerifyRow) => (() => void) | void;
     onConfirm?: (id: string) => void;
     onClose?: () => void;
+    // 改字段实时回写数据源:(当前行 id, 字段键 fk, 新值)。步③(dms-intake)据此写回 IV.results。
+    onFieldEdit?: (rowId: string, key: string, value: string) => void;
 }
 
 export interface VerifyController {
@@ -92,7 +95,7 @@ function fieldHtml(f: VerifyField, L: VerifyLabels): string {
     const numeric = /^[\d.,\-—]+$/.test(f.value) || /VAT|税前|合计|税号/.test(f.key);
     return (
         `<div class="rcv-field${f.flag ? ' flag' : ''}"><label>${esc(f.key)}</label>` +
-        `<input class="rcv-val${numeric ? ' num' : ''}" value="${esc(f.value)}" spellcheck="false" />` +
+        `<input class="rcv-val${numeric ? ' num' : ''}" data-fk="${esc(f.fk || f.key)}" value="${esc(f.value)}" spellcheck="false" />` +
         (f.flag ? `<div class="rcv-hint">${IC_ALERT}${esc(L.flagHint)}</div>` : '') +
         '</div>'
     );
@@ -242,6 +245,13 @@ export function createVerifyOverlay(root: HTMLElement, opts: VerifyOptions): Ver
         else if (a === 'next' || a === 'skip') move(1);
         else if (a === 'confirm') commitRow();
         else if (a === 'close') close();
+    });
+
+    // 改字段实时回写(委托在 fieldsEl · paint 换 innerHTML 不掉监听)。
+    fieldsEl.addEventListener('input', (e) => {
+        const inp = (e.target as HTMLElement).closest('.rcv-val') as HTMLInputElement | null;
+        if (inp && opts.onFieldEdit)
+            opts.onFieldEdit(rows[idx].id, inp.dataset.fk || '', inp.value);
     });
 
     function open(i: number): void {

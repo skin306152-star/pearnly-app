@@ -9,7 +9,7 @@
 import { S, esc, $ } from './dms-intake-core.js';
 import { saveStep } from './step-resume.js';
 import { enterSubmit, renderSubmit, doFinish } from './dms-intake-invoice-submit.js';
-import { renderReview, onReviewClick } from './dms-intake-review.js';
+import { renderReviewConsoleStep } from './dms-intake-review-console.js';
 import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
 import { recognizeOne, ctrls, recState } from './dms-intake-invoice-recognize.js';
 
@@ -97,7 +97,7 @@ export function resetInvoice() {
     IV.view = 'upload';
 }
 export function rerenderInvoice() {
-    if (IV.view === 'review') renderReview();
+    if (IV.view === 'review') renderReviewConsoleStep();
     else if (IV.view === 'submit') renderSubmit();
     else {
         renderInvoiceUpload();
@@ -292,7 +292,7 @@ async function startRecognize() {
     IV.sel = 0;
     IV.openIdx = IV.results.length ? 0 : -1;
     IV.confirmed = new Set<number>();
-    renderReview();
+    renderReviewConsoleStep();
 }
 function stopRecognize() {
     IV.aborted = true;
@@ -343,8 +343,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     }
     if (hit('dx-inv-start')) return (void startRecognize(), true);
     if (hit('dx-inv-stop')) return (stopRecognize(), true);
-    // 复核区就地展开/查看器/确认 → 交给 review 模块(返回 true 即已处理)
-    if (IV.view === 'review' && onReviewClick(tg)) return true;
+    // 步③复核台(console + 遮罩)事件由其各自委托处理,无需在此转发。
     if (hit('dx-inv-rev-back')) {
         renderInvoiceUpload();
         showStepInv(1, 'dx-s-upload');
@@ -366,7 +365,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         return true;
     }
     if (hit('dx-inv-go-int')) return (go('integrations'), true);
-    if (hit('dx-inv-sub-back')) return (renderReview(), true);
+    if (hit('dx-inv-sub-back')) return (renderReviewConsoleStep(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
     if (hit('dx-inv-view-rec')) return (go('history'), true);
     if (hit('dx-inv-view-push')) return (go('integrations'), true);
@@ -387,14 +386,6 @@ export function onInvoiceChange(tg: HTMLElement): boolean {
     }
     if (id === 'dx-inv-tpl') {
         IV.tpl = (tg as HTMLSelectElement).value;
-        return true;
-    }
-    // 复核字段编辑:data-iv-field="fileIdx:invIdx:key"
-    const fk = tg.getAttribute('data-iv-field');
-    if (fk) {
-        const [fi, ii, key] = fk.split(':');
-        const inv = IV.results[+fi]?.invoices[+ii];
-        if (inv) inv.fields[key] = (tg as HTMLInputElement).value;
         return true;
     }
     return false;

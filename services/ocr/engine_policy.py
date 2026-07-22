@@ -36,27 +36,20 @@ _FAILSAFE_MODE = "economy"
 # 保留它有两个实打实的用处:① 运维现场 `OCR_ENGINE_MODE=direct35` 单进程覆写救火
 # (2026-07-19 SM 月结就是这么救的);② 给"该吃 env 默认档"的任务用(见银行,下条)。
 #
-# economy = 省钱档:L2 读取臂 3.1-flash-lite,兜底/L3 升级臂 3.6-flash(勾稽不平/低置信
+# economy = 省钱档:L2 读取臂 3.1-flash-lite,兜底/L3 升级臂 3.5-flash(勾稽不平/低置信
 # 才花大钱救难票)。前身 2.5-flash-lite(97% 总额、฿0.028/张)→ 3.1-flash-lite(~฿0.08/张)。
-# 2.5-flash 三轴全输(22s + 单号乱加前缀),已弃,不入档。3.6/3.1/2.5 同走 Vertex global。
+# 2.5-flash 三轴全输(22s + 单号乱加前缀),已弃,不入档。3.1/2.5 走 Vertex global。
 #
-# ⚠️ 银行对账单别落 economy:2026-07-22 三臂实测(SM 5月 18 张照片、同一条解析路径)
-# 余额链断点 3.5=2 / 3.6=7 / 3.1-flash-lite=40(IMG_2485 单页 26 处)。轻量档读长表会整页读崩,
-# 所以 overrides_by_task.bank_statement 应指 direct35(吃 env 高精默认),不是 economy。
+# ⚠️ 银行对账单别落 economy:2026-07-22 真料实测(SM 5月 18 张照片、同一条解析路径)
+# 余额链断点 3.5=2/2/2 · 3.6=7/6/7 · 3.1-flash-lite=40(IMG_2485 单页 26 处)。轻量档读长表
+# 会整页读崩,所以 overrides_by_task.bank_statement 钉 direct35(吃 env 默认 3.5),不跟全局。
+#
+# 3.6 那天(2026-07-22)全线试过又全线退回:35 张带真值金标各两轮打平、79 张大样本互有胜负,
+# 唯一收益是输出降价约 ฿15/月,却在银行长表上把断点从 2 抬到 7——不值,故留在 3.5。
 MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     "direct35": {},
     "economy": {
         "flash_lite": "gemini-3.1-flash-lite",
-        "fallback": "gemini-3.6-flash",
-        "escalate": "gemini-3.6-flash",
-    },
-    # 长表逐行档:钉 gemini-3.5-flash。2026-07-22 六轮真料实测(SM 5月 18 张对账单照片,
-    # 同一条解析路径,余额链断点):3.5 = 2/2/2,3.6 = 7/6/7,3.1-flash-lite = 40。
-    # 3.5 已在发票路退役(35 张带真值金标两轮打平,让位给 3.6 的输出降价),但读 40+ 行长表
-    # 它稳定更好,故按【用途】而非版本号单开一档给银行——名字不带版本号,换模型只改这行值。
-    "stmt_precision": {
-        "flash": "gemini-3.5-flash",
-        "flash_lite": "gemini-3.5-flash",
         "fallback": "gemini-3.5-flash",
         "escalate": "gemini-3.5-flash",
     },
@@ -82,9 +75,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "exempt": "economy",
     },
     # task → mode 覆写(空 = 跟全局)。task 名与 services/ocr/contracts.OCR_TASKS 一致。
-    # 银行对账单钉 stmt_precision(见 MODE_MODEL_MAPS 的六轮实测):它不跟全局走,
-    # 全局怎么切都不影响银行逐行读取。
-    "overrides_by_task": {"bank_statement": "stmt_precision"},
+    # 银行对账单钉 direct35(直通档=吃 env 默认):不跟全局走,全局切 economy 也不影响
+    # 银行逐行读取(轻量档读长表整页读崩,见 MODE_MODEL_MAPS 上方实测数)。
+    "overrides_by_task": {"bank_statement": "direct35"},
 }
 
 # 当前请求生效的 mode(成本台账/日志读它;不在 engine_context 内 = 空串)

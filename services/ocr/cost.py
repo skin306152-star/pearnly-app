@@ -22,7 +22,7 @@ COST_VISION_PER_PAGE_USD = 0.00150
 # Google 官方单价(USD / 百万 token · 2026-07 价表)。前缀匹配,lite 排在 2.5-flash 前防误吞;
 # 换/加模型先补这行,内部账本才对得上真账单。高精档单价 ≈ 2.5 的 5x/3x——
 # 换模型省不省钱要按这里重算,别拿 token 数当钱数(2026-07-03 血泪)。
-# gemini-3.5-flash 已全线退役(2026-07-22 换 3.6),价表留着只为历史行/旧结果重算对得上账。
+# 3.6 那天试过又退回(见 gemini_models 文件头),两个价都留着:主力是 3.5,历史行照样算得对。
 MODEL_PRICES_PER_M_USD = {
     "gemini-3.6-flash": (1.50, 7.50),
     "gemini-3.5-flash": (1.50, 9.00),
@@ -51,7 +51,7 @@ def price_per_m_usd(model: str) -> Tuple[float, float]:
     for prefix, price in MODEL_PRICES_PER_M_USD.items():
         if name.startswith(prefix):
             return price
-    return MODEL_PRICES_PER_M_USD["gemini-3.6-flash"]
+    return MODEL_PRICES_PER_M_USD["gemini-3.5-flash"]
 
 
 def _compute_total_cost(page_results: List[PipelinePageResult]) -> float:

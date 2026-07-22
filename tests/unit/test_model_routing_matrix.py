@@ -82,12 +82,12 @@ class RoutingMatrixContractTests(unittest.TestCase):
         self.assertEqual(routes["taxops.intent"], rm.EXPECTED_DEFAULT_ROUTES["taxops.intent"])
 
     def test_vertex_location_env_does_not_move_global_only_lanes(self):
-        # VERTEX_LOCATION 只该挪非 global-only 模型。2026-07-22 3.5 退役后生成档全在 global,
-        # 这条 env 的作用面只剩 embedding —— 谁把某档移出 global-only 名单,这里会亮出来。
+        # VERTEX_LOCATION 只该挪非 global-only 模型(3.5/embedding);2.5/3.1 前缀的档不动。
         with scrubbed_env(VERTEX_LOCATION="us-central1"):
             routes = rm.resolve_routes()
         self.assertEqual(routes["agent.brain"].vertex_location, "global")
-        self.assertEqual(routes["ocr.direct35.flash"].vertex_location, "global")
+        self.assertEqual(routes["ocr.economy.flash_lite"].vertex_location, "global")
+        self.assertEqual(routes["ocr.direct35.flash"].vertex_location, "us-central1")
         self.assertEqual(routes["knowledge.embedding"].vertex_location, "us-central1")
 
     def test_vertex_location_25_also_moves_brain_documented_coupling(self):

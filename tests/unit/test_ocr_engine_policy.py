@@ -50,7 +50,7 @@ class ResolveModeTests(unittest.TestCase):
             with mock.patch.object(ep, "load_config", return_value=cfg):
                 with ep.engine_context("invoice") as mode:
                     self.assertEqual(mode, "direct35")
-                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.6-flash")
+                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.5-flash")
 
     def test_auto_resolves_by_plan(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
@@ -74,20 +74,19 @@ class ResolveModeTests(unittest.TestCase):
         self.assertIn("direct35", ep.CONCRETE_MODES)
 
     def test_bank_statement_pinned_off_global_mode(self):
-        # 银行不跟全局:六轮真料实测断点 3.5=2 / 3.6=7 / 3.1-lite=40,长表必须留最稳的那档。
+        # 银行不跟全局:真料实测断点 3.5=2 / 3.6=7 / 3.1-lite=40,长表不许落轻量档。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            for global_mode in ("economy", "direct35", "selfhost"):
+            for global_mode in ("economy", "selfhost"):
                 cfg = {**ep.DEFAULT_CONFIG, "mode": global_mode}
-                self.assertEqual(ep.resolve_mode("bank_statement", config=cfg), "stmt_precision")
+                self.assertEqual(ep.resolve_mode("bank_statement", config=cfg), "direct35")
             self.assertEqual(ep.resolve_mode("invoice", config=cfg), "selfhost")
 
-    def test_stmt_precision_pins_long_table_model(self):
+    def test_bank_reads_with_env_default_not_lite(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             with mock.patch.object(ep, "load_config", return_value=dict(ep.DEFAULT_CONFIG)):
                 with ep.engine_context("bank_statement") as mode:
-                    self.assertEqual(mode, "stmt_precision")
+                    self.assertEqual(mode, "direct35")
                     self.assertEqual(gemini_models.flash_lite(), "gemini-3.5-flash")
-                    self.assertEqual(gemini_models.escalate(), "gemini-3.5-flash")
 
     def test_load_config_failsafe_on_store_error(self):
         with mock.patch(
@@ -106,11 +105,11 @@ class EngineContextTests(unittest.TestCase):
                 with ep.engine_context("invoice") as mode:
                     self.assertEqual(mode, "economy")
                     self.assertEqual(ep.active_mode(), "economy")
-                    # L2 读取臂 = 3.1-lite;兜底/升级臂 = 3.6;flash 档已弃,留 env 默认不覆写
+                    # L2 读取臂 = 3.1-lite;兜底/升级臂 = 3.5;flash 档已弃,留 env 默认不覆写
                     self.assertEqual(gemini_models.flash_lite(), "gemini-3.1-flash-lite")
-                    self.assertEqual(gemini_models.fallback(), "gemini-3.6-flash")
-                    self.assertEqual(gemini_models.escalate(), "gemini-3.6-flash")
-                    self.assertEqual(gemini_models.flash(), "gemini-3.6-flash")
+                    self.assertEqual(gemini_models.fallback(), "gemini-3.5-flash")
+                    self.assertEqual(gemini_models.escalate(), "gemini-3.5-flash")
+                    self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
             self.assertEqual(gemini_models.flash(), before)
             self.assertEqual(ep.active_mode(), "")
 
@@ -134,7 +133,7 @@ class EngineContextTests(unittest.TestCase):
                     # 档钉后端 selfhost(直读/Vision shim 调 get_provider 才吃得到)
                     self.assertEqual(backends.override_backend(), "selfhost")
                     # 不动 Gemini 档位(空覆写)
-                    self.assertEqual(gemini_models.flash(), "gemini-3.6-flash")
+                    self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
             self.assertIsNone(backends.override_backend())
             self.assertEqual(ep.active_mode(), "")
 
@@ -160,7 +159,7 @@ def _page(chain, l2i=0, l2o=0, l3i=0, l3o=0, l2_model="", l3_model=""):
 
 class CostByRecordedModelTests(unittest.TestCase):
     def test_l2_priced_by_recorded_model_not_env(self):
-        # env 默认全 3.6,但页上记录实际用了 2.5-lite → 按 lite 单价计
+        # env 默认全 3.5,但页上记录实际用了 2.5-lite → 按 lite 单价计
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             thb = c._compute_total_cost(
                 [
@@ -198,11 +197,11 @@ class CostByRecordedModelTests(unittest.TestCase):
                         l3i=1_000_000,
                         l3o=1_000_000,
                         l2_model="gemini-2.5-flash-lite",
-                        l3_model="gemini-3.6-flash",
+                        l3_model="gemini-3.5-flash",
                     )
                 ]
             )
-        self.assertAlmostEqual(thb, (1.50 + 7.50) * 35.0, places=4)
+        self.assertAlmostEqual(thb, (1.50 + 9.00) * 35.0, places=4)
 
     def test_selfhost_model_zero_cost(self):
         # 自托管模型无 per-token 云成本 → 记 0(只付电费,不进此观测账本)
@@ -215,10 +214,10 @@ class CostByRecordedModelTests(unittest.TestCase):
         self.assertEqual(thb, 0.0)
 
     def test_missing_recorded_model_falls_back_to_env_tier(self):
-        # 旧结果/直调层函数没记模型 → 按当前档位计(默认 3.6)
+        # 旧结果/直调层函数没记模型 → 按当前档位计(默认 3.5)
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             thb = c._compute_total_cost([_page(["text", "L2"], l2i=1_000_000, l2o=1_000_000)])
-        self.assertAlmostEqual(thb, (1.50 + 7.50) * 35.0, places=4)
+        self.assertAlmostEqual(thb, (1.50 + 9.00) * 35.0, places=4)
 
 
 if __name__ == "__main__":

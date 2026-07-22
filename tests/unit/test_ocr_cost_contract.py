@@ -52,7 +52,7 @@ def _page(chain, l2i=0, l2o=0, l3i=0, l3o=0):
 _LADDER = {
     "OCR_FLASH_MODEL": "gemini-2.5-flash",
     "OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite",
-    "OCR_FALLBACK_MODEL": "gemini-3.6-flash",
+    "OCR_FALLBACK_MODEL": "gemini-3.5-flash",
     "OCR_ESCALATE_MODEL": "",
 }
 
@@ -66,13 +66,13 @@ class CostContractTest(unittest.TestCase):
         self.assertIsNone(getattr(c, "pipeline", None))
 
     def test_price_per_m_usd_by_model(self) -> None:
-        self.assertEqual(c.price_per_m_usd("gemini-3.6-flash"), (1.50, 7.50))
+        self.assertEqual(c.price_per_m_usd("gemini-3.5-flash"), (1.50, 9.00))
         self.assertEqual(c.price_per_m_usd("gemini-2.5-flash"), (0.30, 2.50))
         self.assertEqual(c.price_per_m_usd("gemini-2.5-flash-lite"), (0.10, 0.40))
-        # 已退役的 3.5 留在价表:历史行/旧结果重算仍按它当时的单价
+        # 3.6 试过又退回,价留在表里:历史行/日后重试都算得对
         self.assertEqual(c.price_per_m_usd("gemini-3.5-flash"), (1.50, 9.00))
         # 未知模型按主力高精档计(观测宁高勿低)
-        self.assertEqual(c.price_per_m_usd("mystery-model"), (1.50, 7.50))
+        self.assertEqual(c.price_per_m_usd("mystery-model"), (1.50, 9.00))
 
     def test_compute_prices_l2_by_flashlite_tier(self) -> None:
         # L1+L2 页:1M in + 1M out · lite 档=2.5-flash-lite → (vision 0.0015 + 0.10 + 0.40)*35
@@ -93,15 +93,15 @@ class CostContractTest(unittest.TestCase):
                 [_page(["L1", "L2", "L3"], l2i=0, l2o=0, l3i=1_000_000, l3o=1_000_000)]
             )
         self.assertAlmostEqual(no_l3, 0.00150 * 35.0, places=4)  # 仅 vision
-        # L3 按升级档(3.6-flash)单价计
-        self.assertAlmostEqual(with_l3, (0.00150 + 1.50 + 7.50) * 35.0, places=4)
+        # L3 按升级档(3.5-flash)单价计
+        self.assertAlmostEqual(with_l3, (0.00150 + 1.50 + 9.00) * 35.0, places=4)
 
-    def test_default_env_all_36(self) -> None:
-        # 默认档(全 3.6)下 L2 也按 3.6 单价计——账本跟着档位走
+    def test_default_env_all_35(self) -> None:
+        # 默认档(全 3.5)下 L2 也按 3.5 单价计——账本跟着档位走
         cleared = {k: "" for k in _LADDER}
         with mock.patch.dict("os.environ", cleared):
             cost = c._compute_total_cost([_page(["text", "L2"], l2i=1_000_000, l2o=1_000_000)])
-        self.assertAlmostEqual(cost, (1.50 + 7.50) * 35.0, places=4)
+        self.assertAlmostEqual(cost, (1.50 + 9.00) * 35.0, places=4)
 
     def test_empty_pages_zero(self) -> None:
         self.assertEqual(c._compute_total_cost([]), 0.0)

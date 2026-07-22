@@ -57,11 +57,11 @@ _SELFHOST_UNSET = "(unset)"
 _OCR_TIERS: Tuple[str, ...] = ("flash", "flash_lite", "fallback", "escalate")
 
 # 声明的默认路由(env 全空时的代码事实)。改这里 = 改产品路由意图,要 Zihao 可审的 PR。
-# ★2026-07-22 起全部生成档都在 global:3.6/3.1/2.5 在 Vertex 只发 global 端点(就近区域 404),
-# 只剩 embedding 留 asia-southeast1。区域不再是可选的调优项,是模型发布现实。
+# 区域按模型名前缀定:2.5/3.1(和试过又退回的 3.6)只在 Vertex global 端点发布,
+# 3.5 与 embedding 留就近区域 asia-southeast1。见 vertex._GLOBAL_ONLY_PREFIXES。
 EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "agent.brain": Route("gemini-2.5-flash", "global"),
-    "agent.best": Route("gemini-3.6-flash", "global"),
+    "agent.best": Route("gemini-3.5-flash", "asia-southeast1"),
     # 工单大脑影子(brain_shadow 裁决预判):经 OpenRouter(OPENAI_BASE_URL 覆写),无 Vertex
     # 区域概念。gpt-5.6-luna=2026-07-14 三臂摸底考钉死(方向 96.8%/金额 3⁄4·完胜 nano 33.9%
     # 与 gemini-3.5 61.3%·$1/$6),考卷 tests/e2e/_artifacts/brain_shadow/。
@@ -71,20 +71,15 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     # 与 verdict 各是各的车道——改意图档不连坐裁决档/对话档/OCR,反向亦然(契约测试锁死)。
     "taxops.intent": Route("openai/gpt-5.6-luna", "", "openai"),
     "knowledge.embedding": Route("gemini-embedding-001", "asia-southeast1"),
-    # direct35 = 直通档(空覆写),四档如实等于 env 默认——这也是银行对账单钉的档。
-    "ocr.direct35.flash": Route("gemini-3.6-flash", "global"),
-    "ocr.direct35.flash_lite": Route("gemini-3.6-flash", "global"),
-    "ocr.direct35.fallback": Route("gemini-3.6-flash", "global"),
-    "ocr.direct35.escalate": Route("gemini-3.6-flash", "global"),
-    "ocr.economy.flash": Route("gemini-3.6-flash", "global"),
+    # direct35 = 直通档(空覆写),四档如实等于 env 默认——银行对账单钉的就是它。
+    "ocr.direct35.flash": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.direct35.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.direct35.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.direct35.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.economy.flash": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.economy.flash_lite": Route("gemini-3.1-flash-lite", "global"),
-    "ocr.economy.fallback": Route("gemini-3.6-flash", "global"),
-    "ocr.economy.escalate": Route("gemini-3.6-flash", "global"),
-    # 长表逐行档(银行对账单)· 3.5 不在 global-only 名单里,留就近区域
-    "ocr.stmt_precision.flash": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.stmt_precision.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.stmt_precision.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.stmt_precision.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.economy.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.economy.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
     # 自部署档:后端整体切 selfhost,四档统一映射到同一 VLM(SELFHOST_OCR_MODEL),无 Vertex 区域。
     "ocr.selfhost.flash": Route(_SELFHOST_UNSET, "", "selfhost"),
     "ocr.selfhost.flash_lite": Route(_SELFHOST_UNSET, "", "selfhost"),

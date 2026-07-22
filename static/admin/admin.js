@@ -3042,12 +3042,22 @@
     const _ENG_PLANS = ['none', 'S', 'M', 'L', 'exempt'];
     const _ENG_TASKS = ['invoice', 'id_card', 'bank_statement', 'gl_ledger', 'vat_report'];
 
-    function _engSelect(id, options, withEmpty) {
+    function _engSelect(id, options, withEmpty, current) {
         let html = '<select class="adm-eng-select" id="' + id + '">';
         if (withEmpty)
             html += '<option value="">' + _esc(_t('adm-eng-follow-global')) + '</option>';
-        options.forEach(function (o) {
-            html += '<option value="' + o + '">' + _esc(_t('adm-eng-opt-' + o)) + '</option>';
+        const opts = options.slice();
+        // 防呆:后端存的档位本页不认识(新加的档 / 前端没同步)也必须出现在列表里,
+        // 否则 select 渲染成空白,一按保存就被当"跟全局"静默抹掉——银行钉档真这样丢过。
+        if (current && opts.indexOf(current) === -1) opts.push(current);
+        opts.forEach(function (o) {
+            const label = _t('adm-eng-opt-' + o);
+            html +=
+                '<option value="' +
+                o +
+                '">' +
+                _esc(label === 'adm-eng-opt-' + o ? o : label) +
+                '</option>';
         });
         return html + '</select>';
     }
@@ -3132,8 +3142,10 @@
             : '<div class="cost-section-hint">' + _esc(_t('adm-eng-no-data')) + '</div>';
     }
 
-    function _renderEngineForm(policy) {
-        const mode = policy.mode || 'direct35';
+    function _renderEngineForm(policy, options) {
+        const planModes = (options && options.plan_modes) || ['direct35', 'economy', 'selfhost'];
+        const taskModes = (options && options.modes) || planModes.concat(['auto']);
+        const mode = policy.mode || 'economy';
         document.querySelectorAll('input[name="adm-eng-mode"]').forEach(function (r) {
             r.checked = r.value === mode;
         });
@@ -3147,8 +3159,9 @@
                         '</span>' +
                         _engSelect(
                             'adm-eng-plan-' + p,
-                            ['direct35', 'economy', 'selfhost'],
-                            false
+                            planModes,
+                            false,
+                            (policy.defaults_by_plan || {})[p]
                         ) +
                         '</label>'
                     );
@@ -3156,7 +3169,7 @@
                 .join('');
             _ENG_PLANS.forEach(function (p) {
                 const sel = document.getElementById('adm-eng-plan-' + p);
-                if (sel) sel.value = (policy.defaults_by_plan || {})[p] || 'direct35';
+                if (sel) sel.value = (policy.defaults_by_plan || {})[p] || mode;
             });
         }
         const tasks = document.getElementById('adm-eng-tasks');
@@ -3169,8 +3182,9 @@
                         '</span>' +
                         _engSelect(
                             'adm-eng-task-' + tk,
-                            ['direct35', 'economy', 'selfhost', 'auto'],
-                            true
+                            taskModes,
+                            true,
+                            (policy.overrides_by_task || {})[tk]
                         ) +
                         '</label>'
                     );
@@ -3191,11 +3205,11 @@
             saveBtn.addEventListener('click', async function () {
                 const mode =
                     document.querySelector('input[name="adm-eng-mode"]:checked')?.value ||
-                    'direct35';
+                    'economy';
                 const defaults_by_plan = {};
                 _ENG_PLANS.forEach(function (p) {
                     defaults_by_plan[p] =
-                        document.getElementById('adm-eng-plan-' + p)?.value || 'direct35';
+                        document.getElementById('adm-eng-plan-' + p)?.value || mode;
                 });
                 const overrides_by_task = {};
                 _ENG_TASKS.forEach(function (tk) {
@@ -3223,7 +3237,7 @@
                 _adminFetch('/api/admin/ocr-engine'),
                 _adminFetch('/api/admin/ocr-engine/metrics?days=7'),
             ]);
-            _renderEngineForm(d.policy || {});
+            _renderEngineForm(d.policy || {}, d.options || {});
             const savedEl = document.getElementById('adm-eng-saved');
             if (savedEl)
                 savedEl.textContent = d.updated_at

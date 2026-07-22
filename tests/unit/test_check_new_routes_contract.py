@@ -16,6 +16,7 @@ mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mod)
 scan = mod.scan
 expected_test_names = mod.expected_test_names
+route_modules = mod.route_modules
 
 
 class TestExpectedNames(unittest.TestCase):
@@ -62,6 +63,21 @@ class TestScan(unittest.TestCase):
 
     def test_empty_input_ok(self):
         self.assertEqual(scan([], set()), [])
+
+
+class TestRouteModules(unittest.TestCase):
+    def test_picks_route_modules_only(self):
+        self.assertEqual(
+            route_modules(["routes/billing_routes.py", "services/x.py", ""]),
+            ["routes/billing_routes.py"],
+        )
+
+    def test_contract_test_named_like_route_is_not_a_route(self):
+        # 契约测试自己叫 test_foo_routes.py · 别把它当新路由再要一层测试
+        self.assertEqual(route_modules(["tests/unit/test_erp_posting_preview_routes.py"]), [])
+
+    def test_normalizes_windows_separators(self):
+        self.assertEqual(route_modules(["tests\\unit\\test_a_routes.py"]), [])
 
 
 if __name__ == "__main__":

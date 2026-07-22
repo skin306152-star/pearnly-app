@@ -79,9 +79,20 @@ def _git(args: list) -> str:
     )
 
 
+def route_modules(paths: list[str]) -> list[str]:
+    """diff 里挑出真·路由模块。tests/ 下的 test_xxx_routes.py 是契约测试本身,不是路由,
+    不排除会反过来要求给测试再配 test_test_xxx_routes.py(2026-07-22 真误报过)。"""
+    out = []
+    for p in paths:
+        p = p.strip().replace("\\", "/")
+        if p and _ROUTES_RE.search(p) and not p.startswith("tests/"):
+            out.append(p)
+    return out
+
+
 def _added_routes(base: str, head: str) -> list[str]:
     out = _git(["diff", "--diff-filter=A", "--name-only", f"{base}..{head}"])
-    return [ln.strip() for ln in out.splitlines() if _ROUTES_RE.search(ln.strip())]
+    return route_modules(out.splitlines())
 
 
 def _known_test_basenames() -> set[str]:

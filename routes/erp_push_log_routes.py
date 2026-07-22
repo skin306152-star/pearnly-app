@@ -29,6 +29,9 @@ router = APIRouter()
 class ErpPushRequest(BaseModel):
     history_id: str
     endpoint_id: Optional[str] = Field(None, description="不传则用默认端点")
+    # 本批过账去向(录入向导 step① 每批开关)· 仅 Express 销项消费:'stock'=商品行按真实进销存
+    # 出库(item_mode=stock_sale)· 缺省/'service' → 服务·销售(不动库存 · SAFE 默认 · 行为不变)。
+    posting_kind: Optional[str] = Field(None, description="stock | service · Express 销项库存开关")
 
 
 @router.post("/api/erp/push")
@@ -111,7 +114,9 @@ async def erp_push(req: ErpPushRequest, request: Request):
     # plus uses sync `requests` for webhook adapters) off the event loop.
     import asyncio as _asyncio
 
-    result = await _asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
+    result = await _asyncio.to_thread(
+        _erp.push_to_endpoint, endpoint, history, posting_kind=req.posting_kind
+    )
 
     # 4) 写日志 · P2-D(B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
     final_status = db.classify_push_status(result["success"], result.get("error_msg"))

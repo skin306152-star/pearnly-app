@@ -4,7 +4,9 @@ Pearnly · v0.11 发票智能分组模块
 把一个 PDF 的 N 页拆成 M 张独立发票 · 每张生成一条历史记录
 
 分组规则(优先级从高到低):
-1. 相同 invoice_number 的页 → 合并为一张发票(跨页发票场景)
+1. 按 invoice_number 分界(跨页发票场景):相同号的页合并为一张;无号页默认续接
+   当前发票,但「自带完整钱块(总额+税基/税额)」的无号页判为独立发票——治「另一张
+   打包票的号没读出来就被静默并进上一张」的塌缩漏票(SINCERE 多票 PDF 实案)。
 2. 无 invoice_number 但每页有 total_amount → 每页独立一张
 3. 无 invoice_number 也无 total_amount → 整个 PDF 当 1 张发票(fallback)
 
@@ -181,6 +183,79 @@ def _build_invoice_from_pages(pages_group: List[Dict]) -> Dict[str, Any]:
     return merged_fields
 
 
+def _self_contained_total(fields: Dict[str, Any]):
+    """无发票号的页若自带完整钱块(总额 + 税基或税额)→ 它自成一张发票,不是续页。
+
+    真正的续页至多带一个结尾总额(或只是溢出的明细行),不会自带 subtotal/vat;据此把
+    「另一张打包票的号没读出来」与「同一张票跨页续表」区分开——前者过去被无条件并进第一
+    张(见旧策略1),N 张打包票于是塌成 1 张、被吞票的金额一并蒸发。返回归一化后的总额
+    (供与前一张比对,避免把每页重复打印汇总块的续页误判成独立票);非自足页返回 None。"""
+    if _is_empty(fields.get("total_amount")):
+        return None
+    if _is_empty(fields.get("subtotal")) and _is_empty(fields.get("vat")):
+        return None
+    return normalize_money(fields.get("total_amount"))
+
+
+def _group_by_invoice_boundary(pages: List[Dict]) -> List[Dict[str, Any]]:
+    """按页序切分发票:带号页开一张(同号页再并回,治跨页重复页眉);无号页默认续接当前
+    发票,但「自足且总额与当前不同」的无号页判为独立发票。取代旧「无号页一律并入第一组」。"""
+    groups: List[Dict[str, Any]] = []
+    by_number: Dict[str, Dict[str, Any]] = {}
+    current = None
+    pending: List[Dict] = []  # 首张发票成型前的前导无号非自足页,等它来收
+
+    def _new_group() -> Dict[str, Any]:
+        g = {"source_pages": [], "page_indices": [], "_total": None}
+        groups.append(g)
+        return g
+
+    def _flush_pending(group: Dict[str, Any]) -> None:
+        if pending:
+            group["source_pages"][:0] = pending
+            group["page_indices"].extend(pp["page_index"] for pp in pending)
+            pending.clear()
+
+    for p in pages:
+        f = p.get("fields") or {}
+        inv_no = f.get("invoice_number")
+        if not _is_empty(inv_no):
+            key = str(inv_no).strip()
+            current = by_number.get(key)
+            if current is None:
+                current = _new_group()
+                by_number[key] = current
+                _flush_pending(current)
+        else:
+            sc_total = _self_contained_total(f)
+            cur_total = current["_total"] if current else None
+            if sc_total is not None and (current is None or sc_total != cur_total):
+                current = _new_group()
+                _flush_pending(current)
+            elif current is None:
+                pending.append(p)  # 前导无号非自足页 · 挂起等第一张发票
+                continue
+        current["source_pages"].append(p)
+        current["page_indices"].append(p["page_index"])
+        if current["_total"] is None and not _is_empty(f.get("total_amount")):
+            current["_total"] = normalize_money(f.get("total_amount"))
+
+    if pending:  # 全程无一张成型发票(极少见)→ 兜成一张
+        g = current or _new_group()
+        for pp in pending:
+            g["source_pages"].append(pp)
+            g["page_indices"].append(pp["page_index"])
+
+    return [
+        {
+            "invoice_fields": _build_invoice_from_pages(g["source_pages"]),
+            "source_pages": g["source_pages"],
+            "page_indices": sorted(g["page_indices"]),
+        }
+        for g in groups
+    ]
+
+
 def group_pages_to_invoices(pages: List[Dict]) -> List[Dict[str, Any]]:
     """
     把一个 PDF 的所有页分组成 M 张独立发票
@@ -203,49 +278,21 @@ def group_pages_to_invoices(pages: List[Dict]) -> List[Dict[str, Any]]:
         if "page_index" not in p:
             p["page_index"] = i
 
-    # ------ 策略 1:按 invoice_number 分组 ------
-    groups_by_inv = {}  # invoice_number -> [pages]
+    # ------ 策略 1:按 invoice_number 分界 ------
+    # 门槛:有发票号的页覆盖过半(无号页 ≤ 半数)才按号分界;否则落金额分界(策略2)。
+    # groups_by_inv/pages_without_inv 仅用于门槛判定;分界与无号页归属见
+    # _group_by_invoice_boundary(续页并入当前票,自足的无号页自成一张 · 不再吞进第一组)。
+    groups_by_inv = {}
     pages_without_inv = []
     for p in pages:
         f = p.get("fields") or {}
-        inv_no = f.get("invoice_number")
-        if not _is_empty(inv_no):
-            inv_no_str = str(inv_no).strip()
-            groups_by_inv.setdefault(inv_no_str, []).append(p)
+        if not _is_empty(f.get("invoice_number")):
+            groups_by_inv.setdefault(str(f["invoice_number"]).strip(), []).append(p)
         else:
             pages_without_inv.append(p)
 
-    # 如果有发票号的页覆盖了大部分(>=50% 的总页数)· 按发票号分组
     if groups_by_inv and len(pages_without_inv) <= len(pages) / 2:
-        result = []
-        # 按第一次出现的页顺序排序
-        seen_order = []
-        for p in pages:
-            f = p.get("fields") or {}
-            inv_no = f.get("invoice_number")
-            if not _is_empty(inv_no):
-                inv_no_str = str(inv_no).strip()
-                if inv_no_str not in seen_order:
-                    seen_order.append(inv_no_str)
-
-        for inv_no in seen_order:
-            group_pages = groups_by_inv[inv_no]
-            result.append(
-                {
-                    "invoice_fields": _build_invoice_from_pages(group_pages),
-                    "source_pages": group_pages,
-                    "page_indices": [p["page_index"] for p in group_pages],
-                }
-            )
-
-        # 没有发票号的页:附加到第一组(假设是附加说明/空白页)
-        if pages_without_inv and result:
-            result[0]["source_pages"].extend(pages_without_inv)
-            result[0]["page_indices"].extend([p["page_index"] for p in pages_without_inv])
-            # 重新排序 page_indices
-            result[0]["page_indices"].sort()
-
-        return result
+        return _group_by_invoice_boundary(pages)
 
     # ------ 策略 2:按金额页分界 ------
     # 没有发票号 · 看每页是否有 total_amount

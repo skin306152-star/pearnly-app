@@ -159,7 +159,7 @@ class ScheduleGateTests(unittest.TestCase):
 class RunBranchTests(unittest.TestCase):
     def test_ok_path_logs_match(self):
         s_ret = {"total_amount": "1780", "vat": "116"}
-        with mock.patch.object(sm, "_call_35", return_value=s_ret):
+        with mock.patch.object(sm, "_call_strong", return_value=s_ret):
             with mock.patch("services.ocr.shadow_money_store.insert") as ins:
                 sm._run(
                     b"img",
@@ -175,7 +175,7 @@ class RunBranchTests(unittest.TestCase):
         self.assertTrue(kw["match_all"])
 
     def test_shadow_failure_logs_failed_not_raise(self):
-        with mock.patch.object(sm, "_call_35", side_effect=TimeoutError("boom")):
+        with mock.patch.object(sm, "_call_strong", side_effect=TimeoutError("boom")):
             with mock.patch("services.ocr.shadow_money_store.insert") as ins:
                 sm._run(b"img", "image/jpeg", {"total_amount": "1780"}, "high", "h1", "t1", "u1")
         kw = ins.call_args.kwargs
@@ -183,7 +183,7 @@ class RunBranchTests(unittest.TestCase):
         self.assertIsNone(kw["match_all"])
 
     def test_mismatch_logs_false(self):
-        with mock.patch.object(sm, "_call_35", return_value={"total_amount": "84"}):
+        with mock.patch.object(sm, "_call_strong", return_value={"total_amount": "84"}):
             with mock.patch("services.ocr.shadow_money_store.insert") as ins:
                 sm._run(
                     b"img", "image/jpeg", {"total_amount": "416"}, "needs_review", "h1", "t1", "u1"

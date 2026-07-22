@@ -19,10 +19,12 @@ THB_PER_USD = float(os.environ.get("OCR_PIPELINE_THB_PER_USD", "35"))
 
 COST_VISION_PER_PAGE_USD = 0.00150
 
-# Google 官方单价(USD / 百万 token · 2026-05 价表)。前缀匹配,lite 排在 2.5-flash 前防误吞;
-# 换/加模型先补这行,内部账本才对得上真账单。3.5-flash 单价 ≈ 2.5 的 5x/3.6x——
+# Google 官方单价(USD / 百万 token · 2026-07 价表)。前缀匹配,lite 排在 2.5-flash 前防误吞;
+# 换/加模型先补这行,内部账本才对得上真账单。高精档单价 ≈ 2.5 的 5x/3x——
 # 换模型省不省钱要按这里重算,别拿 token 数当钱数(2026-07-03 血泪)。
+# gemini-3.5-flash 已全线退役(2026-07-22 换 3.6),价表留着只为历史行/旧结果重算对得上账。
 MODEL_PRICES_PER_M_USD = {
+    "gemini-3.6-flash": (1.50, 7.50),
     "gemini-3.5-flash": (1.50, 9.00),
     "gemini-3.1-flash-lite": (0.25, 1.50),
     "gemini-2.5-flash-lite": (0.10, 0.40),
@@ -40,7 +42,7 @@ COST_FLASH_INPUT_PER_M_USD, COST_FLASH_OUTPUT_PER_M_USD = MODEL_PRICES_PER_M_USD
 
 
 def price_per_m_usd(model: str) -> Tuple[float, float]:
-    """模型名 → (输入, 输出) USD/百万token。未知模型按 3.5-flash 计(观测宁高勿低)。
+    """模型名 → (输入, 输出) USD/百万token。未知模型按主力高精档计(观测宁高勿低)。
     自托管模型(== SELFHOST_OCR_MODEL)无 per-token 云成本 → 0,只付电费(不进此账本)。"""
     name = (model or "").strip()
     selfhost = os.environ.get("SELFHOST_OCR_MODEL", "").strip()
@@ -49,7 +51,7 @@ def price_per_m_usd(model: str) -> Tuple[float, float]:
     for prefix, price in MODEL_PRICES_PER_M_USD.items():
         if name.startswith(prefix):
             return price
-    return MODEL_PRICES_PER_M_USD["gemini-3.5-flash"]
+    return MODEL_PRICES_PER_M_USD["gemini-3.6-flash"]
 
 
 def _compute_total_cost(page_results: List[PipelinePageResult]) -> float:

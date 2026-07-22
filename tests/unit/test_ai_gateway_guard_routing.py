@@ -23,7 +23,7 @@ class TierForModelTests(unittest.TestCase):
         ladder = {
             "OCR_FLASH_MODEL": "gemini-2.5-flash",
             "OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite",
-            "OCR_FALLBACK_MODEL": "gemini-3.5-flash",
+            "OCR_FALLBACK_MODEL": "gemini-3.6-flash",
         }
         with mock.patch.dict("os.environ", ladder):
             self.assertEqual(gemini_models.tier_for_model(gemini_models.flash()), "flash")

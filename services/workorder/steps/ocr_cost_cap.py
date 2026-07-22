@@ -33,7 +33,7 @@ def cap_thb() -> float:
 
 
 def fallback_limit() -> int:
-    """一次跑批贵模型回落(升 3.5-flash)次数上限。默认 10。≤0 = 不封顶。
+    """一次跑批贵模型回落(升高精档)次数上限。默认 10。≤0 = 不封顶。
     env PEARNLY_WORKORDER_OCR_FALLBACK_LIMIT 覆写。"""
     try:
         return max(0, int(os.environ.get("PEARNLY_WORKORDER_OCR_FALLBACK_LIMIT", "10")))

@@ -312,7 +312,7 @@ def parse_with_gemini(
             out = _once()
         return out
 
-    # 便宜首读(flash)解析失败/非 JSON → 升级 OCR_FALLBACK_MODEL(=3.5-flash·糊扫描件救场)再读一次。
+    # 便宜首读(flash)解析失败/非 JSON → 升级 OCR_FALLBACK_MODEL(高精档·糊扫描件救场)再读一次。
     out = try_with_fallback(
         _call, primary=flash(), ok=lambda o: bool(o) and o.ok, label="vat_gemini"
     )

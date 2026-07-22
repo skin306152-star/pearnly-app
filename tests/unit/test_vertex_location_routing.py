@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Vertex per-model 区域路由:gemini-2.5-* 与 gemini-3.1-* 只在 global 端点跑得通
-(asia-se1 实测 2.5 返 404、3.1-lite 返空 JSON),必须自动落 global;3.5 与 embedding 留就近区域,
-不被 global-only 档的路由牵连(否则知识库换区/延迟劣化)。"""
+"""Vertex per-model 区域路由:2.5/3.1/3.6 只在 global 端点跑得通(实测 2.5 返 404、
+3.1-lite 返空 JSON、3.6-flash 在 asia-se1 与 us-central1 均 404),必须自动落 global;
+embedding 留就近区域,不被 global-only 档的路由牵连(否则知识库换区/延迟劣化)。"""
 
 from __future__ import annotations
 
@@ -24,16 +24,21 @@ class LocationForModelTests(unittest.TestCase):
             self.assertEqual(vertex._location_for_model("gemini-3.1-flash-lite"), "global")
             self.assertEqual(vertex._location_for_model("gemini-3.1-pro-preview"), "global")
 
-    def test_35_and_embedding_stay_default_region(self):
+    def test_36_models_route_to_global(self):
+        # 2026-07-22 真调坐实:3.6-flash 在 asia-southeast1 / us-central1 均 404,只发 global。
         with mock.patch.dict("os.environ", _CLEAR):
-            self.assertEqual(vertex._location_for_model("gemini-3.5-flash"), "asia-southeast1")
+            self.assertEqual(vertex._location_for_model("gemini-3.6-flash"), "global")
+
+    def test_embedding_stays_default_region(self):
+        with mock.patch.dict("os.environ", _CLEAR):
             self.assertEqual(vertex._location_for_model("gemini-embedding-001"), "asia-southeast1")
 
-    def test_35_follows_vertex_location_env_25_does_not(self):
+    def test_embedding_follows_vertex_location_env_global_only_does_not(self):
         with mock.patch.dict(
             "os.environ", {"VERTEX_LOCATION": "us-central1", "VERTEX_LOCATION_25": ""}
         ):
-            self.assertEqual(vertex._location_for_model("gemini-3.5-flash"), "us-central1")
+            self.assertEqual(vertex._location_for_model("gemini-embedding-001"), "us-central1")
+            self.assertEqual(vertex._location_for_model("gemini-3.6-flash"), "global")
             self.assertEqual(vertex._location_for_model("gemini-2.5-flash-lite"), "global")
 
     def test_25_location_overridable(self):
@@ -47,12 +52,12 @@ class LocationForModelTests(unittest.TestCase):
 
 
 class StructuredVisionConfigTests(unittest.TestCase):
-    def test_gemini_35_uses_minimal_thinking(self):
+    def test_gemini_36_uses_minimal_thinking(self):
         config = vertex._config(
             0,
             8192,
             True,
-            structured_vision_model="gemini-3.5-flash",
+            structured_vision_model="gemini-3.6-flash",
         )
         self.assertEqual(config.thinking_config.thinking_level.value, "MINIMAL")
 

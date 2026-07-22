@@ -24,12 +24,18 @@ def _location() -> str:
     return os.environ.get("VERTEX_LOCATION", "asia-southeast1").strip() or "asia-southeast1"
 
 
+# Vertex 上只在 global 端点发布的模型前缀(就近区域返 404 / 空 JSON,实测逐个坐实:
+# 2.5→404、3.1-lite→空 JSON、3.6-flash→404 @asia-se1 与 us-central1)。
+# 新模型先上 global 是 Google 的常态而非例外——换模型前跑 scripts/probe_vertex_regions.py,
+# 漏登记这里 = 该档全线 404。
+_GLOBAL_ONLY_PREFIXES = ("gemini-2.5", "gemini-3.1", "gemini-3.6")
+
+
 def _location_for_model(model: str) -> str:
-    """按模型选区域:gemini-2.5-* 与 gemini-3.1-* 仅 Vertex global 端点提供(asia-se1 实测,
-    2.5 返 404、3.1-lite 返空 JSON 均跑不通),走 global(真图 OCR 3.5~3.6s / 连打零错);
-    3.5 与 embedding 留就近区域(默认 asia-se1)。VERTEX_LOCATION_25 覆写这批 global-only 档的区域。"""
+    """按模型选区域:global-only 档走 global,其余(embedding 等)留就近区域(默认 asia-se1)。
+    VERTEX_LOCATION_25 覆写这批 global-only 档的区域(名字沿用 2.5 时代,含义=global-only 档)。"""
     m = (model or "").lower()
-    if m.startswith("gemini-2.5") or m.startswith("gemini-3.1"):
+    if m.startswith(_GLOBAL_ONLY_PREFIXES):
         return os.environ.get("VERTEX_LOCATION_25", "global").strip() or "global"
     return _location()
 

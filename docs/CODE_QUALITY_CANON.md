@@ -42,11 +42,12 @@
 - 脚本 `scripts/check_no_hardcoded_model.py`(2026-07-08 建)· 挂 CI `lint-model`(WARN · continue-on-error)。
 - 白名单(模型名合法归属地):`services/ai_gateway/**`、`services/ocr/gemini_models.py`、`cost.py`、`engine_policy.py`、`scripts/agent_brain_ab.py`;测试(`tests/**`)不扫。
 - 业务逻辑(`services`/`routes`/`core`)里出现具体模型名 = 违规。
-- **存量 4 处(待清完切 `--fail` 硬门)**:
+- **存量 2 处(待清完切 `--fail` 硬门)**:
   - `services/importer/ai_mapping.py:25`(`RECON_AI_MAPPING_MODEL` 默认 `gemini-2.5-flash-lite`)
   - `services/knowledge/generation.py:15`(`MODEL = "gemini-2.5-flash"` 参考默认)
-  - `services/ocr/shadow_money.py:146,163`(影子读写死 `gemini-3.5-flash`)
   - 修法:改从 `gemini_models` 取 tier,别写死。**均在 OCR/recon 路径,按"改主路径先报方案"另起,不夹带。**
+  - ✅ 已清:`services/ocr/shadow_money.py`(2026-07-22 · 3.5→3.6 退役时改走 `gemini_models.best()`
+    —— 正是"写死版本号"的代价:换一次模型就得改一次业务码)。
 
 ### 闸-Q5 · 未用 import / 未用变量
 - 工具:`ruff` `F401`/`F841`(多半已在 ruff 配置,确认开 fail)。

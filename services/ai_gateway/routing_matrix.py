@@ -57,11 +57,11 @@ _SELFHOST_UNSET = "(unset)"
 _OCR_TIERS: Tuple[str, ...] = ("flash", "flash_lite", "fallback", "escalate")
 
 # 声明的默认路由(env 全空时的代码事实)。改这里 = 改产品路由意图,要 Zihao 可审的 PR。
-# ★注意 agent.brain 区域=global:不是有意为之,是 vertex 前缀规则(2.5/3.1 → global)
-# 对大脑模型名同样命中的连坐——解耦之前,这行如实记录现状。
+# ★2026-07-22 起全部生成档都在 global:3.6/3.1/2.5 在 Vertex 只发 global 端点(就近区域 404),
+# 只剩 embedding 留 asia-southeast1。区域不再是可选的调优项,是模型发布现实。
 EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "agent.brain": Route("gemini-2.5-flash", "global"),
-    "agent.best": Route("gemini-3.5-flash", "asia-southeast1"),
+    "agent.best": Route("gemini-3.6-flash", "global"),
     # 工单大脑影子(brain_shadow 裁决预判):经 OpenRouter(OPENAI_BASE_URL 覆写),无 Vertex
     # 区域概念。gpt-5.6-luna=2026-07-14 三臂摸底考钉死(方向 96.8%/金额 3⁄4·完胜 nano 33.9%
     # 与 gemini-3.5 61.3%·$1/$6),考卷 tests/e2e/_artifacts/brain_shadow/。
@@ -71,14 +71,14 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     # 与 verdict 各是各的车道——改意图档不连坐裁决档/对话档/OCR,反向亦然(契约测试锁死)。
     "taxops.intent": Route("openai/gpt-5.6-luna", "", "openai"),
     "knowledge.embedding": Route("gemini-embedding-001", "asia-southeast1"),
-    "ocr.direct35.flash": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.direct35.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.direct35.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.direct35.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.economy.flash": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.direct35.flash": Route("gemini-3.6-flash", "global"),
+    "ocr.direct35.flash_lite": Route("gemini-3.6-flash", "global"),
+    "ocr.direct35.fallback": Route("gemini-3.6-flash", "global"),
+    "ocr.direct35.escalate": Route("gemini-3.6-flash", "global"),
+    "ocr.economy.flash": Route("gemini-3.6-flash", "global"),
     "ocr.economy.flash_lite": Route("gemini-3.1-flash-lite", "global"),
-    "ocr.economy.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
-    "ocr.economy.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.economy.fallback": Route("gemini-3.6-flash", "global"),
+    "ocr.economy.escalate": Route("gemini-3.6-flash", "global"),
     # 自部署档:后端整体切 selfhost,四档统一映射到同一 VLM(SELFHOST_OCR_MODEL),无 Vertex 区域。
     "ocr.selfhost.flash": Route(_SELFHOST_UNSET, "", "selfhost"),
     "ocr.selfhost.flash_lite": Route(_SELFHOST_UNSET, "", "selfhost"),

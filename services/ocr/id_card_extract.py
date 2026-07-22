@@ -117,7 +117,7 @@ def _detect_image_mime(b: bytes) -> str:
 
 def _gemini_vision_extract(image_bytes: bytes, api_key: Optional[str]) -> Dict[str, Any]:
     """多模态调用:身份证图 + 专用 prompt → JSON dict。便宜首读(flash_lite)读不出合规
-    13 位身份证号时升级到 OCR_FALLBACK_MODEL(=3.5-flash·糊图/缺一位救场)再读一次。
+    13 位身份证号时升级到 OCR_FALLBACK_MODEL(高精档·糊图/缺一位救场)再读一次。
     经 ai_gateway 网关(随 OCR_LLM_BACKEND 切 vertex/selfhost)。两档都不出号 → 抛
     IdCardExtractError(路由据此回 422 needs_review / 500)。"""
     import os

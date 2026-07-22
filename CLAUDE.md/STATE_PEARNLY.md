@@ -1,6 +1,14 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-07-20 深夜续场 · Pearnly AI · ★静默改数 A 类前三条 + S-3 上线)
+## 当前状态卡(2026-07-22 · OCR 主力 gemini-3.5-flash → 3.6-flash 全线退役换代)
+
+- **换了什么**:代码默认(`gemini_models` 三档 + `engine_policy.economy` 兜底/升级臂 + `agent.best`)、路由总表、价表(3.6 = $1.50/$7.50)、admin 引擎档文案(中/泰)全部 3.5→3.6;`shadow_money` 写死的模型名改走 `gemini_models.best()`(顺手清掉闸-Q4 存量 2/4)。3.5 的价表行保留,只为历史行重算对得上账。
+- **★踩不到就全线 404 的坑**:3.6 在 Vertex **只发 global 端点**(本地 project `pearnly` 与 prod project 双双实测:asia-southeast1 / us-central1 均 404)。`vertex._location_for_model` 的 global-only 前缀表加了 `gemini-3.6`;**现在除 embedding 外全部生成档都在 global**,`VERTEX_LOCATION` 的作用面只剩知识库向量。
+- **真料验收(7 张真票 · 同管线同后端 A/B)**:3.5 = 平均 0.9521 / 钱字段 19-20 / 1 关键漏判(某票 subtotal 读成 1663.55,真值 1780.00);3.6 = 0.9911 / 1.0 / 1.0 三跑,钱字段 20/20 全中、零关键漏判。
+- **成本实测(同 7 票)**:输入 token 一样,**输出 token 反而多 6.3%**(官方"少 17%"是 agentic 榜的口径,不适用于我们这种"图进 JSON 出"的抽取);靠输出单价 $9→$7.5 净省 **6.0%**(฿4.0275→฿3.7874)。按近 30 天生产真实用量推,这条车道月省约 ฿9,**换代的真价值在准度不在钱**。
+- **prod 生效要两步**:`.env` 里 `OCR_FLASH_MODEL/FLASHLITE/FALLBACK/ESCALATE` 四把都硬钉着 3.5,**光合代码 = 假上线**;顺序必须 先部署代码(带 global 区域规则)→ 再改 .env → 重启。回滚 = 四行改回 3.5 + 重启。
+
+## 上一状态卡(2026-07-20 深夜续场 · Pearnly AI · ★静默改数 A 类前三条 + S-3 上线)
 
 - **当前 task**:上一场静默改数盘点排的「下一批」头三件全上线 CI 绿(A-1/A-2、A-3、S-3),外加拆分修红 + /simplify 收口,共 6 commit `f393b094..e25f18b2`。**换窗先读 `docs/agent/HANDOFF-2026-07-20-NIGHT2-SILENT-WRITES-A1-A3.md`**(本场逐条带病根/修法/行号/证据)+ `HANDOFF-2026-07-20-NIGHT-SILENT-WRITES.md`(未完成项全清单,权威)。
 - **★本场上线**:**A-1**(`c02e2850`)OCR 按勾稽差额补一行折扣回填、补完闸自动转绿没人举手 → 强制留人留痕 + 专属 `flag_reason=discount_inferred` + 卡上明说「补了 140.00 请核对原票」;**A-2**(`ae44e8ad`)L3 失败后第二个模型重读金额、**救援成功唯独不留人**票不进人审 → 救援成功也留人、新旧值差异进证据链;**A-3**(`bf1b9887`)超 2000 行汇总表静默截断连合计行一起截 → 消费方读 truncated 照 MISMATCH 同级停机点名;**S-3**(`f393b094`)机器改动清单渲染 if/else→查表带 default(第三类动作不再冒充银行行)。

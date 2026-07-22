@@ -122,7 +122,7 @@ def extract_invoice_fields_batch(
             task="vat.invoice_batch",
         )
 
-    # 便宜首读(flash)失败/没解析出任何发票 → 升级 OCR_FALLBACK_MODEL(=3.5-flash)再读一批。
+    # 便宜首读(flash)失败/没解析出任何发票 → 升级 OCR_FALLBACK_MODEL(高精档)再读一批。
     def _ok(r) -> bool:
         return bool(r) and r.ok and bool((r.data or {}).get("invoices"))
 

@@ -3,10 +3,10 @@
 
 默认关(OCR_IMAGE_FIRST 未开)→ 主路径不变(L2 文字主 + L3 触发兜底)。开关开:
   ① 图直喂 gemini-2.5-flash 为主抽取(Vision L1 文字 + L2 草稿仅作 hint);
-  ② 关键字段缺(发票号/总额)或低置信 → 升 gemini-3.5-flash 重抽(把①结果当 hint)。
+  ② 关键字段缺(发票号/总额)或低置信 → 升 escalate() 高精档重抽(把①结果当 hint)。
 
 依据 docs/smart-intake/05 附A(2026-06-13 prod 4 票 A/B:image-first 抽得≈Paypers,
-3.5-flash 稳抽 tiny 发票号+年份)。**改 OCR 计费主路径**:默认关上线,prod 真 key 跑
+高精档稳抽 tiny 发票号+年份)。**改 OCR 计费主路径**:默认关上线,prod 真 key 跑
 scripts/_ocr_ab_probe.py A/B 确认更准再翻 OCR_IMAGE_FIRST=1(零风险灰度)。
 
 refine / field_conf_fn 由 page_runner 注入(解耦 Gemini 调用 → 可纯单测两条路)。

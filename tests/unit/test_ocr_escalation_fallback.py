@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""三个直调 OCR 入口的「首读不可用 → 升级 OCR_FALLBACK_MODEL(3.5-flash)」单测。
+"""三个直调 OCR 入口的「首读不可用 → 升级 OCR_FALLBACK_MODEL(3.6-flash)」单测。
 
 锁住:便宜首读(flash/flash_lite)结果不可用时,确实再调一次且走 fallback 档(tier="fallback");
 首读即可用时不浪费升级。覆盖入口:身份证、VAT 报表 PDF、VAT 批量发票。
@@ -20,7 +20,7 @@ _MODEL_ENV = ("OCR_FLASH_MODEL", "OCR_FLASHLITE_MODEL", "OCR_FALLBACK_MODEL", "O
 _LADDER = {
     "OCR_FLASH_MODEL": "gemini-2.5-flash",
     "OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite",
-    "OCR_FALLBACK_MODEL": "gemini-3.5-flash",
+    "OCR_FALLBACK_MODEL": "gemini-3.6-flash",
 }
 
 

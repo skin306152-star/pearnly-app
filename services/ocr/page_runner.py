@@ -247,7 +247,7 @@ def _process_one_page(
         needs_manual_review = True
 
     # image-first(OCR_IMAGE_FIRST 灰度 · 默认关):图直喂 2.5-flash 为主 → 低置信/关键
-    # 字段缺升 3.5-flash · 替代触发式 L3(二选一)。默认关 → 走下方原 L3 路径不变。
+    # 字段缺升高精档 · 替代触发式 L3(二选一)。默认关 → 走下方原 L3 路径不变。
     image_first_on = (
         image_first.is_enabled()
         and enable_layer3

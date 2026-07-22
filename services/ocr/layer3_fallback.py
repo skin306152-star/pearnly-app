@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ============================================================
 # Layer3 是 OCR pipeline 的升级兜底档(layer1+2 低置信才到此)· 用更强模型兜底
-# (默认 gemini-3.5-flash)· OCR_FALLBACK_MODEL="" 时退回 OCR_FLASH_MODEL。
+# (默认取 gemini_models.fallback())· OCR_FALLBACK_MODEL="" 时退回 OCR_FLASH_MODEL。
 DEFAULT_MODEL = _ocr_fallback() or _ocr_flash()
 DEFAULT_MAX_RETRIES = 1
 # L3 timeout (P1G-Perf · Zihao 2026-06-18). Prod escalates to gemini-2.5-pro,
@@ -255,7 +255,7 @@ def refine_with_image(
                   "subtotal + vat (8516.13) != total_amount (8000.00)"]
         api_key: API key override; defaults to env GOOGLE_API_KEY then GEMINI_API_KEY
         model_name: Gemini model id; defaults to DEFAULT_MODEL (OCR_FALLBACK_MODEL,
-            i.e. gemini-3.5-flash — layer 3 is the strong-model escalation tier)
+            i.e. gemini_models.fallback() — layer 3 is the strong-model escalation tier)
         max_retries: JSON-parse retries (default 1)
         timeout: per-API-call timeout in seconds (default DEFAULT_TIMEOUT_SECONDS)
 

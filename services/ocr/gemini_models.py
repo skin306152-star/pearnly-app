@@ -4,16 +4,18 @@
 目的:
   1. 一处可配(env)· 各入口不再硬编码模型名 —— grep "gemini-[0-9]" 应只剩本文件。
   2. 糊图/长文档解析失败(返回空、非法 JSON、截断)时,自动升级到更强兜底模型重试一次
-     (默认 gemini-3.5-flash)· 把"换模型救不了的结构问题"和"换模型能救的图质问题"分开处理。
+     (默认 gemini-3.6-flash)· 把"换模型救不了的结构问题"和"换模型能救的图质问题"分开处理。
 
 env 开关(都给了默认值,不配也能跑):
-  OCR_FLASH_MODEL       默认 gemini-3.5-flash  (视觉/解析主力)
-  OCR_FLASHLITE_MODEL   默认 gemini-3.5-flash  (轻量档;economy 档覆写为 3.1-flash-lite,走 Vertex global)
-  OCR_FALLBACK_MODEL    默认 gemini-3.5-flash  (兜底升级;设为空串关闭兜底)
+  OCR_FLASH_MODEL       默认 gemini-3.6-flash  (视觉/解析主力)
+  OCR_FLASHLITE_MODEL   默认 gemini-3.6-flash  (轻量档;economy 档覆写为 3.1-flash-lite,走 Vertex global)
+  OCR_FALLBACK_MODEL    默认 gemini-3.6-flash  (兜底升级;设为空串关闭兜底)
   AGENT_BRAIN_MODEL     默认 gemini-2.5-flash  (对话大脑,与 OCR 档独立)
 
 2026-07-03 Zihao 拍板:OCR 主力升 3.5-flash(57 张真件实测:速度 ~5x、总额 29/29 持平、
 VAT 更全、单号更干净、token 省 ~23%、零回归);大脑不动,单独档钉 2.5(brain())。
+2026-07-22 Zihao 拍板:3.5-flash 全线退役换 3.6-flash(同输入价、输出价 $9→$7.5、官方称
+输出 token 少 17%)。3.6 在 Vertex 只有 global 端点(就近区域 404),区域规则见 vertex provider。
 """
 
 import logging
@@ -51,16 +53,16 @@ def _override_for(tier: str) -> Optional[str]:
 def flash() -> str:
     return (
         _override_for("flash")
-        or os.environ.get("OCR_FLASH_MODEL", "gemini-3.5-flash").strip()
-        or "gemini-3.5-flash"
+        or os.environ.get("OCR_FLASH_MODEL", "gemini-3.6-flash").strip()
+        or "gemini-3.6-flash"
     )
 
 
 def flash_lite() -> str:
     return (
         _override_for("flash_lite")
-        or os.environ.get("OCR_FLASHLITE_MODEL", "gemini-3.5-flash").strip()
-        or "gemini-3.5-flash"
+        or os.environ.get("OCR_FLASHLITE_MODEL", "gemini-3.6-flash").strip()
+        or "gemini-3.6-flash"
     )
 
 
@@ -74,13 +76,13 @@ def fallback() -> str:
     ov = _override_for("fallback")
     if ov:
         return ov
-    return os.environ.get("OCR_FALLBACK_MODEL", "gemini-3.5-flash").strip()
+    return os.environ.get("OCR_FALLBACK_MODEL", "gemini-3.6-flash").strip()
 
 
 def escalate() -> str:
     """image-first 升级臂模型(低置信/关键字段缺时换更强模型重抽)。
 
-    默认 = fallback()(gemini-3.5-flash · 2026-06-13 实测稳抽 tiny 发票号+年份);
+    默认 = fallback()(gemini-3.6-flash);
     OCR_ESCALATE_MODEL 显式覆盖。与 fallback 同源,不另起一套档位。
     """
     return (
@@ -89,7 +91,7 @@ def escalate() -> str:
 
 
 def best() -> str:
-    """最强可用模型(3.5-flash 兜底档;关闭兜底时安全回落 2.5-flash)。
+    """最强可用模型(3.6-flash 兜底档;关闭兜底时安全回落主力档)。
 
     给【低频单次】调用求最准用:大脑意图/分类/银行单解析等(非每页 OCR·不怕慢/贵)。
     """
@@ -102,7 +104,7 @@ def tier_for_model(model_name: str) -> str:
     L2/L3 try_with_fallback) use this to route through the gateway transport,
     which speaks tiers. Unknown names fall back to "flash".
 
-    多档共用同一模型名时(2026-07-03 起默认全 3.5)映到最中性的 "flash"——
+    多档共用同一模型名时(2026-07-22 起默认全 3.6)映到最中性的 "flash"——
     provider 解析回同一模型,行为无差,只影响档位标签。"""
     name = (model_name or "").strip()
     if name == flash():

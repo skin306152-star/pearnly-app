@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""影子双跑:B 档(economy/2.5-lite)发票识别正常出结果后,后台异步再用 3.5 只读钱字段复核,
+"""影子双跑:B 档(economy)发票识别正常出结果后,后台异步再用高精档只读钱字段复核,
 逐字段比对落库(shadow_money_log),量 B 真错率 + 现有置信闸抓取率。一个月后拍板 C 档。
 
 铁律:fire-and-forget —— 超时/报错只落 status=failed,绝不改用户结果、不延迟、不计用户费、
@@ -114,10 +114,10 @@ def _run(content, mime, b_fields, confidence, history_id, tenant_id, user_id) ->
     status = "ok"
     s_fields: dict = {}
     try:
-        s_fields = _call_35(content, mime, tenant_id, user_id, history_id)
+        s_fields = _call_strong(content, mime, tenant_id, user_id, history_id)
     except Exception:
         status = "failed"
-        logger.warning("[shadow_money] 3.5 shadow call failed", exc_info=True)
+        logger.warning("[shadow_money] 高精档影子调用失败", exc_info=True)
 
     if status == "ok":
         values, matches, match_all = _compare(b_fields, s_fields)
@@ -135,15 +135,19 @@ def _run(content, mime, b_fields, confidence, history_id, tenant_id, user_id) ->
     )
 
 
-def _call_35(content, mime, tenant_id, user_id, history_id) -> dict:
-    """强制 3.5(Vertex asia-se1)只读钱字段;成本进 ocr_cost_log(mode=shadow_money_check,不计用户费)。"""
+def _call_strong(content, mime, tenant_id, user_id, history_id) -> dict:
+    """强制走高精档(best())只读钱字段;成本进 ocr_cost_log(mode=shadow_money_check,不计用户费)。
+
+    影子的对照组永远是"当下最强档"而不是某个写死的版本号——换主力模型时这里跟着走,
+    不用改代码(2026-07-22 3.5→3.6 退役即验证了这点)。
+    """
     import time
 
     from core import db
     from services.ai_gateway import costing, transport
     from services.ocr import gemini_models
 
-    tok = gemini_models.set_model_override({"flash": "gemini-3.5-flash"})
+    tok = gemini_models.set_model_override({"flash": gemini_models.best()})
     t0 = time.time()
     try:
         outcome = transport.multimodal_to_json(
@@ -160,7 +164,7 @@ def _call_35(content, mime, tenant_id, user_id, history_id) -> dict:
         gemini_models.reset_model_override(tok)
 
     elapsed = int((time.time() - t0) * 1000)
-    model = getattr(outcome, "model", "") or "gemini-3.5-flash"
+    model = getattr(outcome, "model", "") or gemini_models.best()
     itok = int(getattr(outcome, "input_tokens", 0) or 0)
     otok = int(getattr(outcome, "output_tokens", 0) or 0)
     ok = bool(getattr(outcome, "ok", False))

@@ -147,7 +147,8 @@ def _call_strong(content, mime, tenant_id, user_id, history_id) -> dict:
     from services.ai_gateway import costing, transport
     from services.ocr import gemini_models
 
-    tok = gemini_models.set_model_override({"flash": gemini_models.best()})
+    strong = gemini_models.best()  # 一次解析,下方记账用同一个值(别在 reset 后重取)
+    tok = gemini_models.set_model_override({"flash": strong})
     t0 = time.time()
     try:
         outcome = transport.multimodal_to_json(
@@ -164,7 +165,7 @@ def _call_strong(content, mime, tenant_id, user_id, history_id) -> dict:
         gemini_models.reset_model_override(tok)
 
     elapsed = int((time.time() - t0) * 1000)
-    model = getattr(outcome, "model", "") or gemini_models.best()
+    model = getattr(outcome, "model", "") or strong
     itok = int(getattr(outcome, "input_tokens", 0) or 0)
     otok = int(getattr(outcome, "output_tokens", 0) or 0)
     ok = bool(getattr(outcome, "ok", False))

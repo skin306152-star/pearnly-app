@@ -72,6 +72,7 @@ def _parse_bank_stmt_via_pipeline(
             TABLE_EXTENSIONS,
         )
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+        from services.ocr.engine_policy import engine_context
     except ImportError as e:
         return {
             "ok": False,
@@ -105,8 +106,6 @@ def _parse_bank_stmt_via_pipeline(
     # 只接了 recognize/core 与 controller 两处——银行整份解析从此一直吃 env 默认档,
     # 后台的 overrides_by_task.bank_statement 是白设(GC-D 记债 #3)。这里补上生效域,
     # 那条配置才真管得到银行。engine_context 可重入(已在域内原样透传),不会覆盖外层套餐档。
-    from services.ocr.engine_policy import engine_context
-
     try:
         with engine_context("bank_statement"):
             if ext_dot in IMAGE_EXTENSIONS:
@@ -133,6 +132,7 @@ def _parse_bank_stmt_via_pipeline(
             "error_code": "ocr_failed",
             "error": _short_err(e),
         }
+
     legacy = pipeline_result_to_legacy_dict(pr)
     pages = legacy.get("pages") or []
     if not pages:
@@ -180,7 +180,12 @@ def _parse_gl_via_pipeline(
     file_bytes: bytes, filename: str, account_code: str = ""
 ) -> Dict[str, Any]:
     """Bank-recon-v2 adapter: route GL through services/ocr/pipeline with
-    document_type='general_ledger', then convert to List[GlRow]."""
+    document_type='general_ledger', then convert to List[GlRow].
+
+    记债:本路与银行整份解析同源,同样绕过 engine_context(overrides_by_task.gl_ledger
+    对它无效,一直吃 env 默认档)。银行那条已于 2026-07-22 接上,GL 没接——接上会把 GL
+    从 env 默认换成 economy 的轻量档,而 GL 长表的真料对照一次没做过,不在收尾顺手改。
+    """
     try:
         from services.ocr.pipeline import (
             run_on_image_bytes as _run_image,

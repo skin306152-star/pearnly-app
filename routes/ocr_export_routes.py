@@ -72,6 +72,60 @@ async def get_quota(request: Request):
     )
 
 
+def _enrich_records_by_invoice_no(records: List[Any], user: dict) -> None:
+    """销售明细导出填「新建/复用」动作(向导内路 · 按 merged_fields.invoice_number 回查推送日志)。
+    回查失败/无匹配一律静默降级(模板留 '-'),绝不阻断导出。"""
+    try:
+        from services.erp.export_actions import (
+            apply_erp_actions,
+            erp_actions_by_invoice_nos,
+        )
+
+        user_id = str(user.get("id"))
+        tenant_id = user.get("tenant_id")
+        tenant_id = str(tenant_id) if tenant_id else None
+        nos = []
+        for rec in records or []:
+            mf = rec.get("merged_fields") if isinstance(rec, dict) else None
+            if isinstance(mf, dict):
+                no = str(mf.get("invoice_number") or "").strip()
+                if no:
+                    nos.append(no)
+        if not nos:
+            return
+        actions = erp_actions_by_invoice_nos(user_id, nos, tenant_id)
+        if not actions:
+            return
+        for rec in records or []:
+            mf = rec.get("merged_fields") if isinstance(rec, dict) else None
+            if isinstance(mf, dict):
+                apply_erp_actions(mf, actions.get(str(mf.get("invoice_number") or "").strip()))
+    except Exception as e:
+        logger.warning(f"enrich records by invoice_no failed: {e}")
+
+
+def _enrich_records_by_history_id(
+    records: List[dict], hids: List[str], user_id: str, tenant_id: Optional[str]
+) -> None:
+    """销售明细导出填「新建/复用」动作(单据记录批量路 · 按 history_id 回查)。records 与 hids 同序。
+    回查失败/无匹配一律静默降级,绝不阻断导出。"""
+    try:
+        from services.erp.export_actions import (
+            apply_erp_actions,
+            erp_actions_by_history_ids,
+        )
+
+        actions = erp_actions_by_history_ids(user_id, hids, tenant_id)
+        if not actions:
+            return
+        for rec, hid in zip(records, hids):
+            mf = rec.get("merged_fields") if isinstance(rec, dict) else None
+            if isinstance(mf, dict):
+                apply_erp_actions(mf, actions.get(str(hid)))
+    except Exception as e:
+        logger.warning(f"enrich records by history_id failed: {e}")
+
+
 @router.post("/api/ocr/export")
 async def ocr_export(req: ExportRequest, request: Request):
     user = get_current_user_from_request(request)
@@ -97,6 +151,8 @@ async def ocr_export(req: ExportRequest, request: Request):
                 sales_detail_filename,
             )
 
+            # 按票号回查推送「新建/复用」动作填进 records(向导内导出无 history_id · 走票号匹配)
+            _enrich_records_by_invoice_no(req.records, user)
             xlsx_bytes = build_sales_detail_xlsx(req.records, lang=req.lang)
             filename = sales_detail_filename()
         except Exception as e:
@@ -167,6 +223,7 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
     tenant_id = str(tenant_id) if tenant_id else None
 
     records = []
+    hid_by_record: List[str] = []  # 与 records 同序 · 每条对应的 history_id(回查动作用)
     for hid in req.history_ids:
         try:
             h = db.get_ocr_history_detail(user_id, str(hid), tenant_id)
@@ -189,12 +246,16 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
                     "merged_fields": mf,
                 }
             )
+            hid_by_record.append(str(hid))
         except Exception as e:
             logger.warning(f"export-by-history-ids · history {hid} 拉取失败: {e}")
             continue
 
     if not records:
         raise HTTPException(404, detail="export.no_data")
+
+    # 按 history_id 回查推送「新建/复用」动作填进 records(客户/商品状态列)
+    _enrich_records_by_history_id(records, hid_by_record, user_id, tenant_id)
 
     try:
         from services.excel.excel_template_th import build_sales_detail_xlsx, sales_detail_filename

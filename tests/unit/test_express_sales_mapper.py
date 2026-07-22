@@ -369,9 +369,10 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
         for it in r.payload["items"]:
             self.assertEqual(it["item_mode"], "non_stock_item")
 
-    def test_stock_kind_bypasses_perpetual_escalation(self):
-        # 用户显式选「库存」优先于自动画像:永续客户也直接发 stock_sale(V2-b 真扣库存),不被
-        # 「永续→交会计」挡住(小助手匹配不到真库存品才兜底 escalate)。service 默认仍守旧闸。
+    def test_explicit_kind_bypasses_perpetual_escalation(self):
+        # 用户显式选「库存/服务」优先于自动画像 → 都绕过「永续→交会计」自动 escalate:
+        # 「库存」发 stock_sale(V2-b 真扣库存)·「服务」发 non_stock_item(收入式服务档)。
+        # 只有「没显式选」(缺省/脏值)才对永续账套兜底 escalate。
         cfg = {
             **_CONFIG,
             "catalog_fingerprint": {
@@ -386,12 +387,17 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
         self.assertTrue(r.ok, r.reason)
         for it in r.payload["items"]:
             self.assertEqual(it["item_mode"], "stock_sale")
-        # service(默认)对永续客户仍守旧:交会计,绝不静默按周期制落。
+        # 显式「服务」对永续客户也被尊重:非库存收入式,不再 escalate(用户明确这是服务)。
         r2 = build_express_sales_payload(
             self._history_with_items(), config=cfg, posting_kind="service"
         )
-        self.assertFalse(r2.ok)
-        self.assertTrue(r2.reason.startswith("posting_needs_review"), r2.reason)
+        self.assertTrue(r2.ok, r2.reason)
+        for it in r2.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+        # 缺省(无显式选择)对永续客户仍守安全网:交会计,绝不静默按周期制落。
+        r3 = build_express_sales_payload(self._history_with_items(), config=cfg)
+        self.assertFalse(r3.ok)
+        self.assertTrue(r3.reason.startswith("posting_needs_review"), r3.reason)
 
 
 if __name__ == "__main__":

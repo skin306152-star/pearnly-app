@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.common import (
     ExpressMapResult,
+    ITEM_MODE_NONSTOCK,
     _d,
     _q,
     _s,
@@ -184,17 +185,21 @@ def build_express_sales_payload(
     # 记账画像:永续客户库存路未开时,销售会结转 COGS/扣库存,绝不静默按周期制落 → 交会计。
     # 指纹未上报→unknown→非库存(=今天默认,行为不变)。
     profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
-    # 每批开关优先于自动画像:用户显式选「库存」= 明确要卖真实库存,V2-b 真扣库存正是永续客户
-    # 该走的账,不该被「永续→交会计」的自动 escalate 挡住(否则 V2-b 对目标客户永不触发)。
-    # 放行是安全的:小助手 1.1.39 匹配不到真库存品仍兜底 escalate(ERR_STOCK_NOT_FOUND)。
-    if posting_kind != "stock" and profile.blocks_auto_posting():
+    # 每批开关(库存/服务)= 用户对本批的显式决定 → 一律尊重,绕过「永续→交会计」自动 escalate:
+    # 选「库存」= 明确卖真实库存(V2-b 真扣库存正是永续客户该走的账);选「服务」= 明确是服务/
+    # 非库存(收入式入账,永续账套里的真服务本就不动库存)。自动 escalate 只兜「没显式选」的情形
+    # (系统拿不准,不硬落)。放行库存侧安全:小助手匹配不到真库存品仍兜底 escalate(ERR_STOCK_NOT_FOUND)。
+    if posting_kind not in ("stock", "service") and profile.blocks_auto_posting():
         return fail(profile.escalate_reason())
 
-    # 每批开关优先于画像:用户在 step① 显式选「库存」→ 商品行发 stock_sale(小助手扣真实库存 +
-    # 结转成本)。缺省/'service' → 沿用画像推断的 item_mode(=今天默认,行为不变)。
-    line_item_mode = (
-        ITEM_MODE_STOCK_SALE if posting_kind == "stock" else item_mode_for(profile.posting_mode)
-    )
+    # 每批开关优先于画像:显式「库存」→ stock_sale(小助手扣真实库存 + 结转成本);显式「服务」→
+    # 非库存服务档 + 收入式(不碰库存·不被永续画像推成 stock);缺省 → 沿用画像(=今天默认,行为不变)。
+    if posting_kind == "stock":
+        line_item_mode = ITEM_MODE_STOCK_SALE
+    elif posting_kind == "service":
+        line_item_mode = ITEM_MODE_NONSTOCK
+    else:
+        line_item_mode = item_mode_for(profile.posting_mode)
     # V1 安全明细:OCR 行项目过对账闸(行合计≈税前额才采信)。挂收入科目作直接科目行,
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
     detail = extract_line_items(fields, base, total=total, item_mode=line_item_mode)

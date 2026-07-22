@@ -58,10 +58,16 @@ export function erpTargetCardsHtml(endpoints: ErpEndpoint[], target: string): st
 }
 
 // 单条推送 POST /api/erp/push。已受理=true:ok=true(success/skipped_dup)或 status='pending'(Express 出站拉取异步入队·非失败);failed/manual=false。对齐后端 counts_as_endpoint_success。
-export async function pushHistory(historyId: string, target: string): Promise<boolean> {
+// postingKind:本批过账去向('stock'|'service')· 仅 Express 销项后端消费,'stock'=商品按库存出库。
+export async function pushHistory(
+    historyId: string,
+    target: string,
+    postingKind?: string
+): Promise<boolean> {
     try {
         const body: Record<string, unknown> = { history_id: historyId };
         if (target) body.endpoint_id = target;
+        if (postingKind) body.posting_kind = postingKind;
         const r = await fetch('/api/erp/push', {
             method: 'POST',
             headers: authHeaders(true),

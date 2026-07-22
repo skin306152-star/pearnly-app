@@ -271,7 +271,7 @@ async function doExport(): Promise<boolean> {
     }
 }
 async function pushOne(historyId: string): Promise<boolean> {
-    return pushHistory(historyId, IV.target);
+    return pushHistory(historyId, IV.target, IV.postingKind);
 }
 function downloadBlob(blob: Blob, name: string) {
     const url = URL.createObjectURL(blob);

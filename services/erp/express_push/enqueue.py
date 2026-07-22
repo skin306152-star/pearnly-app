@@ -73,14 +73,16 @@ def enqueue_express(
     history: Dict[str, Any],
     *,
     prefetch: Optional[Dict[str, Any]] = None,
+    posting_kind: Optional[str] = None,
 ) -> Dict[str, Any]:
     """对一条 history 跑前置体检 + 映射 → 返回标准 push 结果(pending / manual / 短路)。
 
     prefetch:批量推送入口(push_dispatch._dispatch_express_batch)算好的批级预取,原样
     透传给 preflight_express;单票路径(手动 /api/erp/push、重试队列)不传 → 内部自查。
+    posting_kind:本批过账去向(手动推送每批开关)· 透传销项 mapper;批量/重试路径不传 → 默认服务。
     """
     t0 = time.time()
-    pf = preflight_express(endpoint, history, prefetch=prefetch)
+    pf = preflight_express(endpoint, history, prefetch=prefetch, posting_kind=posting_kind)
 
     if pf.disabled:
         return _result(

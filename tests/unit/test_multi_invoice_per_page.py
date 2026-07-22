@@ -110,5 +110,71 @@ class MultiInvoicePerPageTests(unittest.TestCase):
         self.assertEqual(_count_invoice_no_candidates("text", ""), 0)
 
 
+def _page(idx, num, total="", sub="", vat="", **extra):
+    """1 页原始 dict(legacy_adapter 落库形态)· 只填 grouper 关心的字段。"""
+    fields = {"invoice_number": num, "total_amount": total, "subtotal": sub, "vat": vat}
+    fields.update(extra)
+    return {"page_index": idx, "page_number": idx, "fields": fields}
+
+
+class PackedMultiInvoiceBoundaryTests(unittest.TestCase):
+    """打包多票 PDF 不再塌成 1 张(grouper 边界分组回归)。
+
+    根因:旧策略1 把所有「没读出发票号」的页无条件并入第一组 → 另一张打包票的号一旦
+    没读到,整张票被静默吞进第一张、金额一并蒸发(N 张 → 1 张)。修复:自带完整钱块
+    (总额+税基/税额)的无号页判为独立发票,续页(仅带结尾总额)仍并入当前票。
+    """
+
+    def test_packed_multi_invoice_missing_number_still_splits(self):
+        # (b) 打包多票:第 2 张的号没读到,但它自带 subtotal/vat/total → 必须仍是 2 张,
+        # 且被吞过的那张金额(4001.80)不能丢。这是「塌成 1 张」的直接回归锚。
+        pages = [
+            _page(1, "IV69100179", total="2889.00", sub="2700.00", vat="189.00", buyer_name="A"),
+            _page(2, None, total="4001.80", sub="3740.00", vat="261.80", buyer_name="B"),
+        ]
+        groups = invoice_grouper.group_pages_to_invoices(pages)
+        self.assertEqual(len(groups), 2)
+        totals = sorted((g["invoice_fields"].get("total_amount") or "") for g in groups)
+        self.assertEqual(totals, ["2889.00", "4001.80"])
+
+    def test_packed_three_invoices_all_numbered_split_to_three(self):
+        # (b) 全部读到号的正常打包三票 → 3 张(happy path 保持)
+        pages = [
+            _page(1, "IV69100179", total="2889.00", sub="2700.00", vat="189.00"),
+            _page(2, "IV69100189", total="4001.80", sub="3740.00", vat="261.80"),
+            _page(3, "IV69/00199", total="706.20", sub="660.00", vat="46.20"),
+        ]
+        groups = invoice_grouper.group_pages_to_invoices(pages)
+        self.assertEqual(len(groups), 3)
+
+    def test_single_invoice_one_page_stays_one(self):
+        # (a) 单票单页 → 1 张
+        groups = invoice_grouper.group_pages_to_invoices(
+            [_page(1, "IV69100179", total="2889.00", sub="2700.00", vat="189.00")]
+        )
+        self.assertEqual(len(groups), 1)
+
+    def test_single_invoice_spanning_two_pages_stays_one(self):
+        # (a) 单票跨两页:结尾总额印在末页(续页只有 total、没有自己的 subtotal/vat)
+        # → 续页并入,仍是 1 张(不能被误拆)。
+        pages = [
+            _page(1, "IV69100179", total="", sub="2700.00", vat="189.00", buyer_name="A"),
+            _page(2, None, total="2889.00"),  # 续页:仅结尾总额
+        ]
+        groups = invoice_grouper.group_pages_to_invoices(pages)
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(sorted(groups[0]["page_indices"]), [1, 2])
+
+    def test_continuation_repeating_summary_block_stays_one(self):
+        # (a) 续页把汇总块(总额+税基+税额)整段重复打印、但没重复号 → 总额与首页相同,
+        # 重复汇总护栏认出这是同一张票,不误拆成 2 张。
+        pages = [
+            _page(1, "IV69100179", total="2889.00", sub="2700.00", vat="189.00"),
+            _page(2, None, total="2889.00", sub="2700.00", vat="189.00"),
+        ]
+        groups = invoice_grouper.group_pages_to_invoices(pages)
+        self.assertEqual(len(groups), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

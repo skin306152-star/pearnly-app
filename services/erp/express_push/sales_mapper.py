@@ -184,7 +184,10 @@ def build_express_sales_payload(
     # 记账画像:永续客户库存路未开时,销售会结转 COGS/扣库存,绝不静默按周期制落 → 交会计。
     # 指纹未上报→unknown→非库存(=今天默认,行为不变)。
     profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
-    if profile.blocks_auto_posting():
+    # 每批开关优先于自动画像:用户显式选「库存」= 明确要卖真实库存,V2-b 真扣库存正是永续客户
+    # 该走的账,不该被「永续→交会计」的自动 escalate 挡住(否则 V2-b 对目标客户永不触发)。
+    # 放行是安全的:小助手 1.1.39 匹配不到真库存品仍兜底 escalate(ERR_STOCK_NOT_FOUND)。
+    if posting_kind != "stock" and profile.blocks_auto_posting():
         return fail(profile.escalate_reason())
 
     # 每批开关优先于画像:用户在 step① 显式选「库存」→ 商品行发 stock_sale(小助手扣真实库存 +

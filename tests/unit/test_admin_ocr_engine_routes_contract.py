@@ -70,7 +70,10 @@ class PolicyRouteTests(unittest.TestCase):
         body = r.json()
         self.assertEqual(body["policy"]["mode"], "economy")  # 现役档(2026-07-22 起)
         self.assertIn("invoice", body["options"]["tasks"])
-        self.assertEqual(body["options"]["plan_modes"], ["direct35", "economy", "selfhost"])
+        self.assertEqual(
+            body["options"]["plan_modes"],
+            ["direct35", "economy", "stmt_precision", "selfhost"],
+        )
 
     def test_selfhost_mode_accepted(self):
         # 自部署档可作全局模式落库(校验走 MODES 派生,后端无需特判)

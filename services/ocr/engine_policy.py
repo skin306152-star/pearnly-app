@@ -50,6 +50,16 @@ MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
         "fallback": "gemini-3.6-flash",
         "escalate": "gemini-3.6-flash",
     },
+    # 长表逐行档:钉 gemini-3.5-flash。2026-07-22 六轮真料实测(SM 5月 18 张对账单照片,
+    # 同一条解析路径,余额链断点):3.5 = 2/2/2,3.6 = 7/6/7,3.1-flash-lite = 40。
+    # 3.5 已在发票路退役(35 张带真值金标两轮打平,让位给 3.6 的输出降价),但读 40+ 行长表
+    # 它稳定更好,故按【用途】而非版本号单开一档给银行——名字不带版本号,换模型只改这行值。
+    "stmt_precision": {
+        "flash": "gemini-3.5-flash",
+        "flash_lite": "gemini-3.5-flash",
+        "fallback": "gemini-3.5-flash",
+        "escalate": "gemini-3.5-flash",
+    },
     # 自部署档:不动 Gemini 档位(空覆写),改把整条 LLM 后端切到 selfhost provider
     # (OpenAI 兼容端点·env SELFHOST_OCR_*)。选中即全管线(直读/Vision 回落)打自托管机。
     "selfhost": {},
@@ -72,10 +82,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "exempt": "economy",
     },
     # task → mode 覆写(空 = 跟全局)。task 名与 services/ocr/contracts.OCR_TASKS 一致。
-    # 银行对账单钉 direct35(=吃 env 高精默认):2026-07-22 三臂实测,同 18 张真照片同一条
-    # 解析路径,余额链断点 3.5=2 / 3.6=7 / 3.1-flash-lite=40。轻量档读长表会整页读崩,
-    # 全局切 economy 时银行必须留在高精档,不跟着走。
-    "overrides_by_task": {"bank_statement": "direct35"},
+    # 银行对账单钉 stmt_precision(见 MODE_MODEL_MAPS 的六轮实测):它不跟全局走,
+    # 全局怎么切都不影响银行逐行读取。
+    "overrides_by_task": {"bank_statement": "stmt_precision"},
 }
 
 # 当前请求生效的 mode(成本台账/日志读它;不在 engine_context 内 = 空串)

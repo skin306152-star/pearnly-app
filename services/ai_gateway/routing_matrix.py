@@ -80,6 +80,11 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "ocr.economy.flash_lite": Route("gemini-3.1-flash-lite", "global"),
     "ocr.economy.fallback": Route("gemini-3.6-flash", "global"),
     "ocr.economy.escalate": Route("gemini-3.6-flash", "global"),
+    # 长表逐行档(银行对账单)· 3.5 不在 global-only 名单里,留就近区域
+    "ocr.stmt_precision.flash": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.stmt_precision.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.stmt_precision.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
+    "ocr.stmt_precision.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
     # 自部署档:后端整体切 selfhost,四档统一映射到同一 VLM(SELFHOST_OCR_MODEL),无 Vertex 区域。
     "ocr.selfhost.flash": Route(_SELFHOST_UNSET, "", "selfhost"),
     "ocr.selfhost.flash_lite": Route(_SELFHOST_UNSET, "", "selfhost"),

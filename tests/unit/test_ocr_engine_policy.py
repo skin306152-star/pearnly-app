@@ -74,11 +74,20 @@ class ResolveModeTests(unittest.TestCase):
         self.assertIn("direct35", ep.CONCRETE_MODES)
 
     def test_bank_statement_pinned_off_global_mode(self):
-        # 全局切 economy 时银行不许跟着走:轻量档读长表整页读崩(2026-07-22 实测断点 40)。
+        # 银行不跟全局:六轮真料实测断点 3.5=2 / 3.6=7 / 3.1-lite=40,长表必须留最稳的那档。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "mode": "economy"}
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
-            self.assertEqual(ep.resolve_mode("bank_statement", config=cfg), "direct35")
+            for global_mode in ("economy", "direct35", "selfhost"):
+                cfg = {**ep.DEFAULT_CONFIG, "mode": global_mode}
+                self.assertEqual(ep.resolve_mode("bank_statement", config=cfg), "stmt_precision")
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "selfhost")
+
+    def test_stmt_precision_pins_long_table_model(self):
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            with mock.patch.object(ep, "load_config", return_value=dict(ep.DEFAULT_CONFIG)):
+                with ep.engine_context("bank_statement") as mode:
+                    self.assertEqual(mode, "stmt_precision")
+                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.5-flash")
+                    self.assertEqual(gemini_models.escalate(), "gemini-3.5-flash")
 
     def test_load_config_failsafe_on_store_error(self):
         with mock.patch(

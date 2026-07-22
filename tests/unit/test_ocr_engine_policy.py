@@ -2,7 +2,7 @@
 """OCR 引擎策略层守门:mode 决策 + 请求级模型覆写 + 成本按实际模型计价。
 
 纯逻辑,platform_settings 全 mock,不连 DB。fail-safe 是钱路要求:
-配置读不到必须回落 direct35(现役稳定档),绝不因配置故障停摆或乱换档。
+配置读不到必须回落当下现役档(2026-07-22 起 economy),绝不因配置故障停摆或乱换档。
 """
 
 from __future__ import annotations
@@ -25,47 +25,67 @@ _ENV_CLEAR = {
 
 
 class ResolveModeTests(unittest.TestCase):
-    def test_default_is_direct35(self):
+    def test_default_is_economy(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            self.assertEqual(ep.resolve_mode("invoice", config=ep.DEFAULT_CONFIG), "direct35")
+            self.assertEqual(ep.resolve_mode("invoice", config=ep.DEFAULT_CONFIG), "economy")
 
     def test_env_beats_config(self):
         with mock.patch.dict("os.environ", {**_ENV_CLEAR, "OCR_ENGINE_MODE": "economy"}):
-            cfg = {**ep.DEFAULT_CONFIG, "mode": "direct35"}
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "selfhost"}
             self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
 
     def test_task_override_beats_global(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             cfg = {
                 **ep.DEFAULT_CONFIG,
-                "mode": "economy",
-                "overrides_by_task": {"id_card": "direct35"},
+                "mode": "selfhost",
+                "overrides_by_task": {"id_card": "economy"},
             }
-            self.assertEqual(ep.resolve_mode("id_card", config=cfg), "direct35")
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
+            self.assertEqual(ep.resolve_mode("id_card", config=cfg), "economy")
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "selfhost")
+
+    def test_direct35_context_leaves_env_alone(self):
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "direct35"}
+            with mock.patch.object(ep, "load_config", return_value=cfg):
+                with ep.engine_context("invoice") as mode:
+                    self.assertEqual(mode, "direct35")
+                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.6-flash")
 
     def test_auto_resolves_by_plan(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             cfg = {
                 **ep.DEFAULT_CONFIG,
                 "mode": "auto",
-                "defaults_by_plan": {"none": "economy", "L": "direct35", "exempt": "direct35"},
+                "defaults_by_plan": {"none": "economy", "L": "selfhost", "exempt": "selfhost"},
             }
             self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
-            self.assertEqual(ep.resolve_mode("invoice", plan_code="L", config=cfg), "direct35")
-            self.assertEqual(ep.resolve_mode("invoice", is_exempt=True, config=cfg), "direct35")
+            self.assertEqual(ep.resolve_mode("invoice", plan_code="L", config=cfg), "selfhost")
+            self.assertEqual(ep.resolve_mode("invoice", is_exempt=True, config=cfg), "selfhost")
 
     def test_invalid_mode_falls_back(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             cfg = {**ep.DEFAULT_CONFIG, "mode": "gpt99"}
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "direct35")
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
+
+    def test_direct35_is_passthrough_not_a_model_tier(self):
+        # A 档的定义是「空覆写 = 跟 env 走」(c32f85f7 建档本意),不是某个模型的高精档。
+        self.assertEqual(ep.MODE_MODEL_MAPS["direct35"], {})
+        self.assertIn("direct35", ep.CONCRETE_MODES)
+
+    def test_bank_statement_pinned_off_global_mode(self):
+        # 全局切 economy 时银行不许跟着走:轻量档读长表整页读崩(2026-07-22 实测断点 40)。
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "economy"}
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
+            self.assertEqual(ep.resolve_mode("bank_statement", config=cfg), "direct35")
 
     def test_load_config_failsafe_on_store_error(self):
         with mock.patch(
             "services.platform_settings.store.get_setting", side_effect=RuntimeError("db down")
         ):
             cfg = ep.load_config()
-        self.assertEqual(cfg["mode"], "direct35")
+        self.assertEqual(cfg["mode"], "economy")
 
 
 class EngineContextTests(unittest.TestCase):
@@ -85,12 +105,12 @@ class EngineContextTests(unittest.TestCase):
             self.assertEqual(gemini_models.flash(), before)
             self.assertEqual(ep.active_mode(), "")
 
-    def test_direct35_leaves_env_defaults(self):
+    def test_default_context_is_economy(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             with mock.patch.object(ep, "load_config", return_value=dict(ep.DEFAULT_CONFIG)):
                 with ep.engine_context("invoice") as mode:
-                    self.assertEqual(mode, "direct35")
-                    self.assertEqual(gemini_models.flash(), "gemini-3.6-flash")
+                    self.assertEqual(mode, "economy")
+                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.1-flash-lite")
 
     def test_selfhost_pins_backend_and_restores(self):
         from services.ai_gateway import backends

@@ -1,6 +1,15 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-07-22 · OCR 主力 gemini-3.5-flash → 3.6-flash 全线退役换代)
+## 当前状态卡(2026-07-22 补 · A 档正名 + 银行接策略层 + 直读进账本 · 先考古后动刀)
+
+- **起因**:换代后真料复测里 A 档(direct35)全面输给 B 档,我一度判它"毫无意义"要解绑成空槽。Zihao 打回:「A 档不是只有一个模型吧,工单那边有些问题只有 A 档救得回,先查清楚历史」。**查完证明我错了两处**,方案推倒重来。
+- **考古结论**:① `direct35` 建档之日(`c32f85f7` 2026-07-04)的定义是「**现役单档 = 空覆写 = 全跟 env 走**」,即**直通档**,从来不是"某个模型的高精度档";后台"最准"是文案自己滑出来的。② 07-19 SM 月结「只有 A 档救得回」属实(economy 两代在 IMG_2485 同位吞 ฿28,363 EDC 行,`OCR_ENGINE_MODE=direct35` 重跑断链 0),**但 07-20 复盘已归因到 Vision 行切割而非模型档**,解法产品化成 D2 `bank_stmt_reread`(断链页自动逐页换眼重读)——当年只有 A 档能做的事,现在 B 档自己会做。
+- **我自己纠正的错结论**:曾据 `row_hash` 差异说"A 档多读回 ฿15,220" —— 伪结论(两档 73 行 hash 全不同,做集合差无意义)。用余额链自洽性重算:那页两档都读崩(B −14,630 / A +14,340)。
+- **★三臂真料基线(SM 5月 18 张照片 · 同一条解析路径 · 余额链断点)**:**3.5=2 / 3.6=7 / 3.1-flash-lite=40**(IMG_2485 单页 26 处)。两个后果:① 银行**绝不能**跟着全局落 economy;② **我今天退役 3.5 让银行逐行变差了(2→7)**,记债,当前靠 D2 换眼重读兜。
+- **本轮落地**:① A 档正名为「直通档」(保留 mode + 切换器,运维 `OCR_ENGINE_MODE=direct35` 现场救火的抓手不动),后台中/泰文案重写、删掉"最准";② fail-safe 与默认配置改 economy——**遵循原设计"回落当下现役档"的意图**,不是新规矩;③ **银行整份解析接进 `engine_context("bank_statement")`**:适配器 2026-05 写成直调 pipeline,策略层 2026-07 才出生从没回头接线,`overrides_by_task.bank_statement` 一直是白设(GC-D 记债 #3),现已生效,并在 `DEFAULT_CONFIG` 把银行钉 direct35;④ **直读改走 transport**:此前裸打 provider 绕过 `_observe`,当下最大的 OCR 路整条不进 `ai_usage`(实锤:32 页银行照片解析完账本零行),一处修全路可观测。
+- **生产动作**:先改配置(`overrides_by_task.bank_statement=direct35`,当时还是惰性的)→ 再推代码,顺序反了银行会掉进 3.1-lite。
+
+## 上一状态卡(2026-07-22 · OCR 主力 gemini-3.5-flash → 3.6-flash 全线退役换代)
 
 - **换了什么**:代码默认(`gemini_models` 三档 + `engine_policy.economy` 兜底/升级臂 + `agent.best`)、路由总表、价表(3.6 = $1.50/$7.50)、admin 引擎档文案(中/泰)全部 3.5→3.6;`shadow_money` 写死的模型名改走 `gemini_models.best()`(顺手清掉闸-Q4 存量 2/4)。3.5 的价表行保留,只为历史行重算对得上账。
 - **★踩不到就全线 404 的坑**:3.6 在 Vertex **只发 global 端点**(本地 project `pearnly` 与 prod project 双双实测:asia-southeast1 / us-central1 均 404)。`vertex._location_for_model` 的 global-only 前缀表加了 `gemini-3.6`;**现在除 embedding 外全部生成档都在 global**,`VERTEX_LOCATION` 的作用面只剩知识库向量。

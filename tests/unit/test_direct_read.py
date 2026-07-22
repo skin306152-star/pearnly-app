@@ -95,7 +95,21 @@ class RouteDirectTests(unittest.TestCase):
         provider = _FakeProvider(ProviderOutcome(ok=False, error_kind="parse"))
         with mock.patch("services.ai_gateway.backends.get_provider", return_value=provider):
             dr._call_model(b"\xff\xd8x", "invoice", api_key=None)
-        self.assertNotIn("max_tokens", provider.calls[0])
+        # 只有 bank_statement 抬到 16384;发票留标准预算(transport 与 provider 默认同为 8192,
+        # 2026-07-22 直读改走 transport 后这个值变成显式传参,断言从"没传"改成"传的是标准值")。
+        self.assertEqual(provider.calls[0]["max_tokens"], 8192)
+
+    def test_direct_read_goes_through_transport_so_it_lands_in_ledger(self):
+        """直读必须经 transport,不许退回裸 provider。
+
+        裸打 provider 会绕过 _observe → 整条直读路(当下最大的 OCR 路,含银行整份解析)
+        不进 ai_usage。2026-07-22 实锤:32 页银行照片解析完账本零行,用了哪个模型查无对证。"""
+        provider = _FakeProvider(ProviderOutcome(ok=False, error_kind="parse"))
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=provider):
+            with mock.patch("services.ai_gateway.transport._observe") as observed:
+                dr._call_model(b"\xff\xd8x", "invoice", api_key=None)
+        observed.assert_called_once()
+        self.assertEqual(observed.call_args[0][0], "ocr.image_direct")
 
 
 class ReadPageTests(unittest.TestCase):

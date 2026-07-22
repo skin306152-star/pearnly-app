@@ -71,6 +71,7 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     # 与 verdict 各是各的车道——改意图档不连坐裁决档/对话档/OCR,反向亦然(契约测试锁死)。
     "taxops.intent": Route("openai/gpt-5.6-luna", "", "openai"),
     "knowledge.embedding": Route("gemini-embedding-001", "asia-southeast1"),
+    # direct35 = 直通档(空覆写),四档如实等于 env 默认——这也是银行对账单钉的档。
     "ocr.direct35.flash": Route("gemini-3.6-flash", "global"),
     "ocr.direct35.flash_lite": Route("gemini-3.6-flash", "global"),
     "ocr.direct35.fallback": Route("gemini-3.6-flash", "global"),

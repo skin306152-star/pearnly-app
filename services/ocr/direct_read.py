@@ -133,7 +133,7 @@ def _call_model(
     api_key: Optional[str],
     tier: str = "flash_lite",
 ):
-    from services.ai_gateway import backends
+    from services.ai_gateway import transport
 
     if document_type == "bank_statement":
         sys_prompt = _BANK_STATEMENT_IMAGE_PROMPT
@@ -147,13 +147,19 @@ def _call_model(
     request_options = {}
     if document_type == "bank_statement":
         request_options["max_tokens"] = 16384
-    return backends.get_provider().multimodal_to_json(
+    # 走 transport 而不是裸 provider:两者后端解析口径相同(get_provider() 与 transport 都吃
+    # override_backend → 全局 env),差别只在 transport 会落 ai_usage 一条。直读是当下最大的
+    # OCR 路,裸打 provider 让它整条不进账本——2026-07-22 实锤:32 页银行照片解析完,
+    # ai_usage 里 workorder_bank_parse 零行,"用了哪个模型"无从查证。task 只是缺省标签,
+    # 上层 attribution 设了就按上层的记(工单银行 → workorder_bank_parse)。
+    return transport.multimodal_to_json(
         sys_prompt,
         [(image_bytes, _sniff_mime(image_bytes))],
         tier=tier,
         api_key=key,
         timeout_s=_TIMEOUT_S,
         max_retries=_MAX_RETRIES,
+        task="ocr.image_direct",
         **request_options,
     )
 

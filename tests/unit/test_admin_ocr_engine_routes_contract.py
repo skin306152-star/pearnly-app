@@ -68,7 +68,7 @@ class PolicyRouteTests(unittest.TestCase):
             r = self.client.get("/api/admin/ocr-engine")
         self.assertEqual(r.status_code, 200)
         body = r.json()
-        self.assertEqual(body["policy"]["mode"], "direct35")
+        self.assertEqual(body["policy"]["mode"], "economy")  # 现役档(2026-07-22 起)
         self.assertIn("invoice", body["options"]["tasks"])
         self.assertEqual(body["options"]["plan_modes"], ["direct35", "economy", "selfhost"])
 

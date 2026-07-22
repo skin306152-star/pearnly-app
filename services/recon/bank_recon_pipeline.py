@@ -101,20 +101,29 @@ def _parse_bank_stmt_via_pipeline(
             f"[stmt_parse][{filename}] xlsx_direct miss({direct.get('error_code')}) · falling back to Gemini"
         )
 
+    # 引擎策略生效域:本适配器 2026-05 写成直调 pipeline,而策略层 2026-07-04 才出生,
+    # 只接了 recognize/core 与 controller 两处——银行整份解析从此一直吃 env 默认档,
+    # 后台的 overrides_by_task.bank_statement 是白设(GC-D 记债 #3)。这里补上生效域,
+    # 那条配置才真管得到银行。engine_context 可重入(已在域内原样透传),不会覆盖外层套餐档。
+    from services.ocr.engine_policy import engine_context
+
     try:
-        if ext_dot in IMAGE_EXTENSIONS:
-            pr = _run_image(file_bytes, document_type="bank_statement")
-        elif ext_dot in TABLE_EXTENSIONS:
-            pr = _run_table(file_bytes, filename=filename or "stmt", document_type="bank_statement")
-        else:
-            return {
-                "ok": False,
-                "rows": [],
-                "row_count": 0,
-                "bank_code": "generic",
-                "error_code": "file_not_supported",
-                "error": f"unsupported format {ext_dot}",
-            }
+        with engine_context("bank_statement"):
+            if ext_dot in IMAGE_EXTENSIONS:
+                pr = _run_image(file_bytes, document_type="bank_statement")
+            elif ext_dot in TABLE_EXTENSIONS:
+                pr = _run_table(
+                    file_bytes, filename=filename or "stmt", document_type="bank_statement"
+                )
+            else:
+                return {
+                    "ok": False,
+                    "rows": [],
+                    "row_count": 0,
+                    "bank_code": "generic",
+                    "error_code": "file_not_supported",
+                    "error": f"unsupported format {ext_dot}",
+                }
     except Exception as e:
         return {
             "ok": False,
@@ -124,7 +133,6 @@ def _parse_bank_stmt_via_pipeline(
             "error_code": "ocr_failed",
             "error": _short_err(e),
         }
-
     legacy = pipeline_result_to_legacy_dict(pr)
     pages = legacy.get("pages") or []
     if not pages:

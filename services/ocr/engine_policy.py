@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-"""OCR 引擎策略层:OCR_MODE(direct35/economy/auto)→ 请求级模型档位覆写。
+"""OCR 引擎策略层:OCR_MODE → 请求级模型档位覆写。
 
-三模式不是三条链路,是一个决策函数:economy = 现存 L1/L2/L3 管线配 2.5 档,
-direct35 = 现役单档(全 3.5),auto = 按任务/租户套餐从配置表选前两者之一。
+模式不是几条链路,是一个决策函数:economy = 现存 L1/L2/L3 管线,L2 读取臂用轻量档、
+难票才升高精档;selfhost = 整条后端切自托管;auto = 按任务/租户套餐选一个具体档。
 决策结果经 gemini_models.set_model_override 下发,管线各层调用时取值,零改动。
 
 配置单一事实源 = platform_settings["ocr_engine_policy"](Earn 超管后台可改,
 30s 进程缓存跟 store 走);env OCR_ENGINE_MODE 是运维快速开关,优先于后台配置。
-fail-safe:配置读不到/值非法 → direct35(当前稳定档),绝不因配置故障停摆 OCR。
+fail-safe = 【当下的现役档】,配置读不到/值非法一律回落它,绝不因配置故障停摆 OCR。
+建档时现役档是 direct35(c32f85f7),2026-07-22 起现役档是 economy——回落跟着现役走,
+这是原设计意图,不是新规矩。
 """
 
 from __future__ import annotations
@@ -24,16 +26,23 @@ from services.ocr import gemini_models
 logger = logging.getLogger(__name__)
 
 SETTING_KEY = "ocr_engine_policy"
-_FAILSAFE_MODE = "direct35"
+_FAILSAFE_MODE = "economy"
 
-# mode → tier 覆写表。direct35 不覆写(吃 env 默认全 3.6);economy 只在 L2 读取臂用
-# 3.1-flash-lite(36 张实测:钱字段 100% 追平 3.5、修对 2.5-lite 抽错那张、3.5s 最快),
-# 兜底/L3 升级臂维持高精档(勾稽不平/低置信才花大钱救难票)。
-# 加新模式只补这里 + cost 价表,CONCRETE_MODES/MODES 由本表派生(admin 路由校验同源)。
-# 前身 2.5-flash-lite(97% 总额、฿0.028/张)已换 3.1-flash-lite(~฿0.08/张,仍是高精档的 1/6);
+# mode → tier 覆写表。加新模式只补这里 + cost 价表,CONCRETE_MODES/MODES 由本表派生。
+#
+# direct35 = 直通档:空覆写 = 不动任何档位、全跟 OCR_*_MODEL env 走。它自建档之日起就是
+# 这个意思("现役单档",c32f85f7),不是"某个模型的高精度档"——后台曾把它写成"最准",
+# 那是文案自己滑过去的,2026-07-22 真料复测已证伪(小票 VAT 漏读、18 张银行照片漏判 4 张)。
+# 保留它有两个实打实的用处:① 运维现场 `OCR_ENGINE_MODE=direct35` 单进程覆写救火
+# (2026-07-19 SM 月结就是这么救的);② 给"该吃 env 默认档"的任务用(见银行,下条)。
+#
+# economy = 省钱档:L2 读取臂 3.1-flash-lite,兜底/L3 升级臂 3.6-flash(勾稽不平/低置信
+# 才花大钱救难票)。前身 2.5-flash-lite(97% 总额、฿0.028/张)→ 3.1-flash-lite(~฿0.08/张)。
 # 2.5-flash 三轴全输(22s + 单号乱加前缀),已弃,不入档。3.6/3.1/2.5 同走 Vertex global。
-# 模式键 direct35 保留旧名:它是 platform_settings/租户配置里的持久值,改名要迁移,
-# 与"高精档换成什么模型"无关(标签在 admin i18n 里跟着模型走)。
+#
+# ⚠️ 银行对账单别落 economy:2026-07-22 三臂实测(SM 5月 18 张照片、同一条解析路径)
+# 余额链断点 3.5=2 / 3.6=7 / 3.1-flash-lite=40(IMG_2485 单页 26 处)。轻量档读长表会整页读崩,
+# 所以 overrides_by_task.bank_statement 应指 direct35(吃 env 高精默认),不是 economy。
 MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     "direct35": {},
     "economy": {
@@ -53,17 +62,20 @@ MODES = (*CONCRETE_MODES, "auto")
 MODE_BACKENDS: Dict[str, str] = {"selfhost": "selfhost"}
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "mode": "direct35",
+    "mode": "economy",
     # auto 模式的套餐默认档:none=无订阅(按量),S/M/L=订阅档,exempt=计费豁免(内部)
     "defaults_by_plan": {
-        "none": "direct35",
-        "S": "direct35",
-        "M": "direct35",
-        "L": "direct35",
-        "exempt": "direct35",
+        "none": "economy",
+        "S": "economy",
+        "M": "economy",
+        "L": "economy",
+        "exempt": "economy",
     },
     # task → mode 覆写(空 = 跟全局)。task 名与 services/ocr/contracts.OCR_TASKS 一致。
-    "overrides_by_task": {},
+    # 银行对账单钉 direct35(=吃 env 高精默认):2026-07-22 三臂实测,同 18 张真照片同一条
+    # 解析路径,余额链断点 3.5=2 / 3.6=7 / 3.1-flash-lite=40。轻量档读长表会整页读崩,
+    # 全局切 economy 时银行必须留在高精档,不跟着走。
+    "overrides_by_task": {"bank_statement": "direct35"},
 }
 
 # 当前请求生效的 mode(成本台账/日志读它;不在 engine_context 内 = 空串)

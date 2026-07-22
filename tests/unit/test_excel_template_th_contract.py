@@ -63,11 +63,20 @@ def _load(records):
 
 
 class HeaderTests(unittest.TestCase):
-    def test_header_row_is_thai_12_cols(self):
+    def test_header_row_is_thai_14_cols(self):
         ws = _load([])
-        headers = [ws.cell(row=1, column=i).value for i in range(1, 13)]
+        headers = [ws.cell(row=1, column=i).value for i in range(1, 15)]
         self.assertEqual(headers, et.HEADERS_TH)
-        self.assertEqual(len(et.HEADERS_TH), 12)
+        self.assertEqual(len(et.HEADERS_TH), 14)
+
+    def test_status_columns_present(self):
+        self.assertEqual(et.HEADERS_TH[12], "สถานะสินค้า")  # 13 商品状态
+        self.assertEqual(et.HEADERS_TH[13], "สถานะลูกค้า")  # 14 客户状态
+
+    def test_header_has_fill_and_sheet_frozen(self):
+        ws = _load([])
+        self.assertEqual(ws.cell(row=1, column=1).fill.fgColor.rgb[-6:], "2C5282")
+        self.assertEqual(ws.freeze_panes, "A2")
 
 
 class FormulaContractTests(unittest.TestCase):
@@ -148,6 +157,102 @@ class EdgeCaseTests(unittest.TestCase):
     def test_customer_fallback_to_customer_name(self):
         ws = _load([{"merged_fields": {"customer_name": "FALLBACK", "items": [{"amount": "1"}]}}])
         self.assertEqual(ws.cell(row=2, column=3).value, "FALLBACK")
+
+
+class NormActionTests(unittest.TestCase):
+    def test_string_aliases(self):
+        self.assertEqual(et._norm_action("new"), et.ACTION_NEW)
+        self.assertEqual(et._norm_action("erp_auto_created"), et.ACTION_NEW)
+        self.assertEqual(et._norm_action("reused"), et.ACTION_REUSED)
+        self.assertEqual(et._norm_action("matched"), et.ACTION_REUSED)
+        self.assertEqual(et._norm_action("cache_hit"), et.ACTION_REUSED)
+
+    def test_bool_is_new_slots_in(self):
+        # ERP 层直接回 is_new 布尔 · 无缝落位
+        self.assertEqual(et._norm_action(True), et.ACTION_NEW)
+        self.assertEqual(et._norm_action(False), et.ACTION_REUSED)
+
+    def test_empty_and_unknown(self):
+        self.assertEqual(et._norm_action(None), et.ACTION_UNKNOWN)
+        self.assertEqual(et._norm_action(""), et.ACTION_UNKNOWN)
+        self.assertEqual(et._norm_action("garbage"), et.ACTION_UNKNOWN)
+
+
+class ErpActionColumnTests(unittest.TestCase):
+    def _rec(self):
+        return [
+            {
+                "merged_fields": {
+                    "invoice_number": "IV/001",
+                    "buyer_name": "ACME",
+                    "customer_erp_action": "new",
+                    "items": [
+                        {
+                            "description": "Coffee",
+                            "qty": "2",
+                            "unit_price": "500",
+                            "erp_action": "new",
+                        },
+                        {
+                            "description": "Tea",
+                            "qty": "1",
+                            "unit_price": "100",
+                            "erp_action": "reused",
+                        },
+                        {"description": "Water", "qty": "3", "unit_price": "10"},  # 无 erp_action
+                    ],
+                }
+            }
+        ]
+
+    def test_product_status_labels(self):
+        ws = _load(self._rec())
+        self.assertEqual(ws.cell(row=2, column=13).value, "ใหม่")  # new
+        self.assertEqual(ws.cell(row=3, column=13).value, "เดิม")  # reused
+        self.assertEqual(ws.cell(row=4, column=13).value, "-")  # 未知 → 占位
+
+    def test_customer_status_repeats_per_row(self):
+        ws = _load(self._rec())
+        # 客户动作单据级 · 每行都标 ใหม่
+        for r in (2, 3, 4):
+            self.assertEqual(ws.cell(row=r, column=14).value, "ใหม่")
+
+    def test_new_gets_green_reused_gets_subtle_unknown_none(self):
+        ws = _load(self._rec())
+        # 商品单元格(col4)按动作填色
+        self.assertEqual(ws.cell(row=2, column=4).fill.fgColor.rgb[-6:], "D6F5DE")  # new 绿
+        self.assertEqual(ws.cell(row=3, column=4).fill.fgColor.rgb[-6:], "EEF2F7")  # reused 淡灰蓝
+        self.assertEqual(ws.cell(row=4, column=4).fill.patternType, None)  # 未知 无填色
+        # 客户单元格(col3)= new → 绿
+        self.assertEqual(ws.cell(row=2, column=3).fill.fgColor.rgb[-6:], "D6F5DE")
+
+    def test_is_new_bool_fallback(self):
+        ws = _load(
+            [
+                {
+                    "merged_fields": {
+                        "invoice_number": "IV/002",
+                        "customer_is_new": False,
+                        "items": [
+                            {"description": "X", "qty": "1", "unit_price": "5", "is_new": True}
+                        ],
+                    }
+                }
+            ]
+        )
+        self.assertEqual(ws.cell(row=2, column=13).value, "ใหม่")  # item is_new=True
+        self.assertEqual(ws.cell(row=2, column=14).value, "เดิม")  # customer is_new=False
+
+
+class MoneyFormatTests(unittest.TestCase):
+    def test_money_cols_right_aligned_thousands(self):
+        ws = _load(
+            [{"merged_fields": {"items": [{"description": "A", "qty": "2", "unit_price": "1500"}]}}]
+        )
+        for col in (6, 7, 8, 9, 10):
+            c = ws.cell(row=2, column=col)
+            self.assertEqual(c.number_format, "#,##0.00")
+            self.assertEqual(c.alignment.horizontal, "right")
 
 
 class FilenameTests(unittest.TestCase):

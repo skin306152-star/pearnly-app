@@ -455,3 +455,19 @@
 .dmsx .dxb-rno{color:var(--dx-muted);min-width:34px}
 .dmsx .dxb-rdet{color:var(--dx-muted);font-variant-numeric:tabular-nums}
 @media(max-width:700px){.dmsx .dxb-stats{grid-template-columns:repeat(2,1fr)}}
+
+/* 步4 推送前预览(记账画像 gate)· 四态:ok/escalate/confirm_profile/decide_items */
+.dmsx .dx-pp{margin-top:11px}
+.dmsx .dx-pp-load{font-size:9px;color:var(--ink2);padding:8px 2px}
+.dmsx .dx-pp-ok{font-size:10px;color:var(--dx-blue);background:var(--dx-blue-soft);border-radius:10px;padding:9px 12px}
+.dmsx .dx-pp-warn{font-size:10px;background:var(--bg);border:1px solid var(--dx-line);border-left:3px solid #f59e0b;border-radius:10px;padding:10px 12px;line-height:1.5}
+.dmsx .dx-pp-confirm{border:1px solid var(--dx-line);border-radius:12px;padding:12px;background:var(--card)}
+.dmsx .dx-pp-confirm p{font-size:10px;margin:0 0 9px}
+.dmsx .dx-pp-btns{display:flex;gap:8px}
+.dmsx .dx-pp-btns .btn{flex:1;font-size:10px}
+.dmsx .dx-pp-decide{border:1px solid var(--dx-line);border-radius:12px;padding:12px;background:var(--card)}
+.dmsx .dx-pp-decide>p{font-size:10px;margin:0 0 8px}
+.dmsx .dx-pp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--dx-line)}
+.dmsx .dx-pp-row b{font-size:10px}
+.dmsx .dx-pp-row span{font-size:9px;color:var(--ink2);white-space:nowrap}
+.dmsx .dx-pp-note{font-size:9px;color:var(--ink2);margin-top:8px;line-height:1.45}

@@ -49,6 +49,7 @@ from services.erp.express_push.common import (
     extract_line_items,
     fail,
     finalize_payload,
+    item_mode_for,
     ITEM_MODE_NONSTOCK,
     ITEMS_OK,
     payment_verdict_for,
@@ -56,6 +57,8 @@ from services.erp.express_push.common import (
     resolve_account_sourced,
     SRC_DEFAULT,
 )
+from services.erp.express_push import stock_lane_enabled
+from services.erp.express_push.posting_profile import profile_from_config
 from services.purchase.field_clean import (
     clean_address,
     clean_invoice_no,
@@ -164,6 +167,12 @@ def build_express_payload(
 
     # 货/费判据(单一事实源 · 与 MR.ERP routing.choose_doc_type 同判据,防两车道判据漂移)。
     is_expense, item_src = item_verdict(fields)
+    # 记账画像:这家客户的商品行该怎么落(非库存/直接科目/库存/交人)。指纹未上报→unknown→
+    # 非库存(=今天默认,行为不变)。★永续客户库存路未开时,goods 行绝不静默按周期制落
+    # (会与其既有永续账双重计成本)→ escalate 交会计;费用票不动库存,不受此闸约束。
+    profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
+    if not is_expense and profile.blocks_auto_posting():
+        return fail(profile.escalate_reason())
     vat_capitalized = _s(vat) if is_expense else None
     if is_expense:
         # 费用票口径(拍板 · intake.py「费用类即便读到 vat 也归 0」同口径 / MR.ERP 453 先例):
@@ -204,7 +213,9 @@ def build_express_payload(
     if is_expense:
         detail = _expense_detail(total)
     else:
-        detail = extract_line_items(fields, base, total=total)
+        detail = extract_line_items(
+            fields, base, total=total, item_mode=item_mode_for(profile.posting_mode)
+        )
 
     # 现购 HP / 赊购 RR:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
     # 票种语义(F3)> 供应商过账档案(F4)> 银行佐证(F6)> config 默认(B2B 缺省 RR)。

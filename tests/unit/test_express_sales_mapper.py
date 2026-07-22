@@ -319,5 +319,72 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertTrue(entry.customer_new)
 
 
+class ExpressSalesStockToggleTests(unittest.TestCase):
+    """本批「库存 vs 销售·服务」开关(录入向导 step① · 仅 Express 销项)· item_mode=stock_sale 接线。"""
+
+    def _history_with_items(self):
+        # 行合计 = 税前 100.00 → items_status=ok(有可落明细行供断言 item_mode)。
+        return _sales_history(
+            fields={
+                "subtotal": "100.00",
+                "vat": "7.00",
+                "items": [{"name": "สินค้า A", "qty": "1", "subtotal": "100.00"}],
+            },
+            total_amount="107.00",
+        )
+
+    def test_stock_kind_sets_stock_sale_on_goods_lines(self):
+        # 用户显式选「库存」→ 每条商品行发 item_mode=stock_sale(小助手据此扣真实库存 + 结转成本)。
+        r = build_express_sales_payload(
+            self._history_with_items(), config=_CONFIG, posting_kind="stock"
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["items_status"], "ok")
+        self.assertTrue(r.payload["items"])
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "stock_sale")
+
+    def test_service_kind_unchanged_non_stock(self):
+        # 显式「销售·服务」→ 沿用画像推断(无指纹=非库存),绝不发 stock_sale(行为不变)。
+        r = build_express_sales_payload(
+            self._history_with_items(), config=_CONFIG, posting_kind="service"
+        )
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_absent_kind_unchanged_non_stock(self):
+        # 缺省(不传 posting_kind · 批量/重试/自动推送路径)= 今日默认,非库存(零回归)。
+        r = build_express_sales_payload(self._history_with_items(), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_unknown_kind_defaults_to_service(self):
+        # 脏输入(未知值)→ 视同服务,绝不误发 stock_sale(安全兜底 · 只有精确 'stock' 才启用库存)。
+        r = build_express_sales_payload(
+            self._history_with_items(), config=_CONFIG, posting_kind="banana"
+        )
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_stock_kind_still_escalates_perpetual_profile(self):
+        # 库存开关不绕过画像 escalation:永续客户 + 库存路未开 → 仍交会计(绝不静默按周期制落)。
+        cfg = {
+            **_CONFIG,
+            "catalog_fingerprint": {
+                "stock_master_count": 672,
+                "stcrd_lines": 9300,
+                "stcrd_lines_moving_stock": 8102,
+            },
+        }
+        r = build_express_sales_payload(
+            self._history_with_items(), config=cfg, posting_kind="stock"
+        )
+        self.assertFalse(r.ok)
+        self.assertTrue(r.reason.startswith("posting_needs_review"), r.reason)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

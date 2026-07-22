@@ -281,9 +281,16 @@ ADAPTER_REGISTRY = {
 ENCRYPTED_CRED_ADAPTERS = {"mrerp", "mrerp_dms"}
 
 
-def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -> Dict[str, Any]:
+def push_to_endpoint(
+    endpoint: Dict[str, Any],
+    history_record: Dict[str, Any],
+    *,
+    posting_kind: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     主入口:把一条 history 推到指定 endpoint。
+
+    posting_kind:本批过账去向(录入向导每批开关)· 仅 Express 销项消费(其它 adapter 忽略)。
 
     返回值统一格式:
     {
@@ -323,7 +330,7 @@ def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -
     if adapter == "express":
         from services.erp.express_push.enqueue import enqueue_express
 
-        return enqueue_express(endpoint, history_record)
+        return enqueue_express(endpoint, history_record, posting_kind=posting_kind)
 
     # A1 (Zihao 2026-05-19 拍板) · MR.ERP early-route.
     #

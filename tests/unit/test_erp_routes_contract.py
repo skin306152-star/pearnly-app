@@ -102,8 +102,13 @@ class ErpRoutesContractTests(unittest.TestCase):
 
     def test_request_model_fields(self):
         """关键 request model 字段契约"""
-        self.assertEqual(set(ErpPushRequest.model_fields.keys()), {"history_id", "endpoint_id"})
+        self.assertEqual(
+            set(ErpPushRequest.model_fields.keys()),
+            {"history_id", "endpoint_id", "posting_kind"},
+        )
         self.assertEqual(ErpPushRequest(history_id="h1").endpoint_id, None)
+        # posting_kind 每批过账开关(Express 库存/服务)· 缺省 None → 后端默认服务·销售(不回归)。
+        self.assertEqual(ErpPushRequest(history_id="h1").posting_kind, None)
         self.assertEqual(set(ErpBatchDeleteRequest.model_fields.keys()), {"log_ids"})
         # ErpEndpointCreate 默认值
         m = ErpEndpointCreate(name="x", adapter="webhook")

@@ -59,6 +59,12 @@ logger = logging.getLogger(__name__)
 CASH_CUSTOMER_NAME = "เงินสด"
 _CASH_BUYER_TOKENS = frozenset({"เงินสด", "ขายสด", "cash"})
 
+# 每批「库存」过账开关(录入向导 step① · 仅 Express 销项)选中时,商品明细行的写入模式。
+# 小助手 1.1.39 起认它:按真实 STKTYP=0 进销存出库 + 移动加权成本结转 COGS;非真库存品它
+# 自退 needs_review。与画像框架的 ITEM_MODE_STOCK(采购侧 · 本期不发)分属两条路 —— 这条是
+# 用户对本批显式指定的销项路,不经指纹推断。缺省仍走销售·服务(item_mode_for · 行为不变)。
+ITEM_MODE_STOCK_SALE = "stock_sale"
+
 
 def _is_cash_buyer(raw: Any) -> bool:
     """买方是否为现金客人(销项专用判定)。"""
@@ -100,11 +106,14 @@ def build_express_sales_payload(
     config: Dict[str, Any],
     mappings: Optional[Dict[str, Any]] = None,
     category: str = "",
+    posting_kind: Optional[str] = None,
 ) -> ExpressMapResult:
     """扁平化 history → Express 销项载荷。判脏/不自洽 → ok=False(留人工)。
 
     config 键:account_set · revenue_acc(兜底收入科目)· vat_output_acc(销项税科目)·
     ar_acc(应收科目)· default_doctype(IV/HS)。
+    posting_kind:本批过账去向(录入向导 step① 的每批开关)。"stock"=商品行按真实进销存出库
+    (item_mode=stock_sale);缺省/'service'/其它 → 沿用画像推断,行为不变(SAFE 默认)。
     """
     mappings = mappings or {}
     fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
@@ -178,11 +187,14 @@ def build_express_sales_payload(
     if profile.blocks_auto_posting():
         return fail(profile.escalate_reason())
 
+    # 每批开关优先于画像:用户在 step① 显式选「库存」→ 商品行发 stock_sale(小助手扣真实库存 +
+    # 结转成本)。缺省/'service' → 沿用画像推断的 item_mode(=今天默认,行为不变)。
+    line_item_mode = (
+        ITEM_MODE_STOCK_SALE if posting_kind == "stock" else item_mode_for(profile.posting_mode)
+    )
     # V1 安全明细:OCR 行项目过对账闸(行合计≈税前额才采信)。挂收入科目作直接科目行,
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
-    detail = extract_line_items(
-        fields, base, total=total, item_mode=item_mode_for(profile.posting_mode)
-    )
+    detail = extract_line_items(fields, base, total=total, item_mode=line_item_mode)
 
     # 现销 HS / 赊销 IV:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
     # 票种语义(F3)> 银行佐证(F6)> 无信号默认赊销。销项 v1 不接供应商过账档案(档案锚是

@@ -308,11 +308,13 @@ def preflight_express(
     history: Dict[str, Any],
     *,
     prefetch: Optional[Dict[str, Any]] = None,
+    posting_kind: Optional[str] = None,
 ) -> Preflight:
     """对一条 history 跑全部前置条件,返回逐项体检结果(纯读 · 不入队不写库)。
 
     prefetch:批量入口(build_batch_prefetch)算好的批级供应商档案/银行索引,原样透传给
     _attach_payment_evidence;None(单票直推/重试路径)→ 该函数内部自查,行为不变。
+    posting_kind:本批过账去向(录入向导每批开关)· 仅销项 mapper 消费(采购不接)· 见 sales_mapper。
     """
     config = (endpoint or {}).get("config") or {}
     pf = Preflight()
@@ -404,7 +406,7 @@ def preflight_express(
 
         if direction == "sales":
             mres = build_express_sales_payload(
-                flat, config=config, mappings=mappings, category=category
+                flat, config=config, mappings=mappings, category=category, posting_kind=posting_kind
             )
         else:
             mres = build_express_payload(flat, config=config, mappings=mappings, category=category)

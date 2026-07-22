@@ -369,8 +369,9 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
         for it in r.payload["items"]:
             self.assertEqual(it["item_mode"], "non_stock_item")
 
-    def test_stock_kind_still_escalates_perpetual_profile(self):
-        # 库存开关不绕过画像 escalation:永续客户 + 库存路未开 → 仍交会计(绝不静默按周期制落)。
+    def test_stock_kind_bypasses_perpetual_escalation(self):
+        # 用户显式选「库存」优先于自动画像:永续客户也直接发 stock_sale(V2-b 真扣库存),不被
+        # 「永续→交会计」挡住(小助手匹配不到真库存品才兜底 escalate)。service 默认仍守旧闸。
         cfg = {
             **_CONFIG,
             "catalog_fingerprint": {
@@ -382,8 +383,15 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
         r = build_express_sales_payload(
             self._history_with_items(), config=cfg, posting_kind="stock"
         )
-        self.assertFalse(r.ok)
-        self.assertTrue(r.reason.startswith("posting_needs_review"), r.reason)
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "stock_sale")
+        # service(默认)对永续客户仍守旧:交会计,绝不静默按周期制落。
+        r2 = build_express_sales_payload(
+            self._history_with_items(), config=cfg, posting_kind="service"
+        )
+        self.assertFalse(r2.ok)
+        self.assertTrue(r2.reason.startswith("posting_needs_review"), r2.reason)
 
 
 if __name__ == "__main__":

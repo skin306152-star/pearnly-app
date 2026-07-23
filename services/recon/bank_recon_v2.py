@@ -341,6 +341,9 @@ def _parse_bank_statement_impl(
 
     balance_warn_count = sum(1 for r in rows if r.balance_ok is False)
     low_conf_count = sum(1 for r in rows if r.confidence == "low")
+    # A-4:金额被余额链反推改写过的行。它们 balance_ok 已翻 True(改完自然自洽),
+    # 因此不进 balance_warn_count —— 但机器改过的钱必须有人看,单独计数供 S8 核对关触发。
+    amount_fixed_count = sum(1 for r in rows if getattr(r, "amount_autocorrected", False))
     if balance_warn_count or low_conf_count:
         logger.info(
             f"[stmt_parse][{filename}] verification: "
@@ -401,6 +404,7 @@ def _parse_bank_statement_impl(
         "row_count": len(rows),
         "balance_warn_count": balance_warn_count,
         "low_conf_count": low_conf_count,
+        "amount_fixed_count": amount_fixed_count,
         "completeness": completeness,  # v118.35.0.63
         "method_divergence": _arb_divergence,  # 两法分歧原因(空=无)· 与 completeness 分开
     }

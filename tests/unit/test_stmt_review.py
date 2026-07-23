@@ -44,6 +44,32 @@ class NeedsReviewTests(unittest.TestCase):
         self.assertFalse(sr.needs_review({"ok": False, "rows": [_row()]}))
         self.assertFalse(sr.needs_review({"ok": True, "rows": [], "low_conf_count": 5}))
 
+    def test_machine_rewritten_amount_triggers(self):
+        """A-4:金额被余额链反推改写过 → 必须弹核对关。
+
+        改写把 balance_ok 翻 True、该行退出 balance_warn 口径,此前整份账单因此判「不用人看」——
+        可这笔数正是销项倒推与逐笔对账的基数。信心高、完整性也过,唯一异常就是机器改过钱。
+        """
+        pr = {
+            "ok": True,
+            "rows": [_row()],
+            "low_conf_count": 0,
+            "amount_fixed_count": 1,
+            "completeness": {"ok": True},
+        }
+        self.assertTrue(sr.needs_review(pr))
+
+    def test_zero_rewrites_stays_frictionless(self):
+        # 没改过就不该多一道关(零摩擦不能被这条新判据破坏)。
+        pr = {
+            "ok": True,
+            "rows": [_row()],
+            "low_conf_count": 0,
+            "amount_fixed_count": 0,
+            "completeness": {"ok": True},
+        }
+        self.assertFalse(sr.needs_review(pr))
+
 
 class SerializeTests(unittest.TestCase):
     def test_rows_to_review_shape_and_idx(self):
@@ -135,6 +161,17 @@ class ReviewPayloadTests(unittest.TestCase):
         self.assertIsNone(
             sr.build_bank_review_payload([self._pdf_res(low=0, comp_ok=True)], ["clean.pdf"])
         )
+
+    def test_rewritten_amount_alone_builds_payload_and_counts(self):
+        """A-4:整份账单信心高、完整性过,唯一异常是机器改过一行金额 → 也要进核对面板。"""
+        res = self._pdf_res(low=0, comp_ok=True)
+        res["amount_fixed_count"] = 1
+        res["rows"][0].amount_autocorrected = True
+        p = sr.build_bank_review_payload([res], ["scan.pdf"])
+        self.assertIsNotNone(p)
+        self.assertEqual(p["amount_fixed_count"], 1)
+        # 改写标记必须逐行透出,面板才指得到是哪一行被改的。
+        self.assertTrue(p["rows"][0]["amount_autocorrected"])
 
     def test_incomplete_pdf_carries_issues(self):
         p = sr.build_bank_review_payload([self._pdf_res(low=0, comp_ok=False)], ["scan.pdf"])

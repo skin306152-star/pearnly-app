@@ -6,7 +6,7 @@ ADR-006 S8 · PDF/扫描件银行账单「逐行核对纠错」基础层。
 本层只负责数据转换 + 判定 + 余额链自检;wire 进 worker/路由/前端是后续切片(S8b/c)。
 
 核心(全部可脱 bank_recon_v2 单测):
-- needs_review(parse_result)        OCR 结果是否该弹核对关(低信心行 或 完整性不过)。
+- needs_review(parse_result)        OCR 结果是否该弹核对关(低信心行 / 机器改过金额的行 / 完整性不过)。
 - statement_rows_to_review(rows)    StatementRow(或任意带同名属性的对象)→ 前端可编辑的 review-row dict。
 - recompute_balance_chain(rows,op)  余额链逐行自检(前端边改边算 / 服务端复核同一套逻辑)。
 - review_rows_to_statement_rows(..) review-row dict → StatementRow(懒 import · 给重对账用)。
@@ -28,14 +28,21 @@ EDITABLE_FIELDS = ("date", "description", "withdrawal", "deposit", "balance")
 def needs_review(parse_result: Dict[str, Any]) -> bool:
     """OCR 结果是否该插核对关(守 ADR-006 铁律:低信心主动喊停 · 不静默出结果)。
 
-    触发 = 有低信心行 OR 完整性校验不过(漏行/期末对不上/印刷笔数不符)。
-    干净 OCR(高信心 + 完整性 ok)→ False → 调用方照旧自动对账(零摩擦)。
+    触发 = 有低信心行 OR 机器改写过金额的行 OR 完整性校验不过(漏行/期末对不上/印刷笔数不符)。
+    干净 OCR(高信心 + 没被改过 + 完整性 ok)→ False → 调用方照旧自动对账(零摩擦)。
+
+    A-4:金额按余额链反推改写的行(_repair_amount_from_balance)此前不触发本关——改写同时把
+    balance_ok 翻 True,该行于是从「需人看」的口径里消失,只剩 Excel 标黄与机器改动清单的
+    计数在「建议复核」。可这笔数正是销项倒推(÷1.07)与逐笔对账的基数,系统改了钱就必须有人
+    确认,不能只是建议。本函数的铁律原话就是「不静默出结果」,改过的钱属于此列。
     """
     if not parse_result or not parse_result.get("ok"):
         return False
     if not parse_result.get("rows"):
         return False
     if int(parse_result.get("low_conf_count") or 0) > 0:
+        return True
+    if int(parse_result.get("amount_fixed_count") or 0) > 0:
         return True
     comp = parse_result.get("completeness") or {}
     if comp and comp.get("ok") is False:
@@ -136,6 +143,7 @@ def build_bank_review_payload(
     all_rows: List[Dict[str, Any]] = []
     issues: List[Dict[str, Any]] = []
     low = 0
+    fixed = 0
     opening: Optional[float] = None
     for res, fn in zip(stmt_results or [], stmt_filenames or []):
         if _ext(fn) not in PDF_IMG_EXTS:
@@ -152,6 +160,7 @@ def build_bank_review_payload(
             r["source_file"] = fn
         all_rows.extend(rv)
         low += int(res.get("low_conf_count") or 0)
+        fixed += int(res.get("amount_fixed_count") or 0)
         comp = res.get("completeness") or {}
         for it in comp.get("issues") or []:
             issues.append({**it, "file": fn})
@@ -164,6 +173,7 @@ def build_bank_review_payload(
         "rows": all_rows,
         "completeness_issues": issues,
         "low_conf_count": low,
+        "amount_fixed_count": fixed,
         "row_count": len(all_rows),
     }
 

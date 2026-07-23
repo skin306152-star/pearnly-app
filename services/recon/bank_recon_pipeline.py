@@ -160,6 +160,8 @@ def _parse_bank_stmt_via_pipeline(
     closing = _to_float(doc.get("closing_balance"))
     rows = finalize_rows(rows, opening)
     balance_warn_count = sum(1 for r in rows if r.balance_ok is False)
+    # A-4:改写过金额的行 balance_ok 已翻 True,不进 warn 口径 —— 单独计数,机器改的钱必须有人看。
+    amount_fixed_count = sum(1 for r in rows if getattr(r, "amount_autocorrected", False))
     if not closing:
         closing = next((r.balance for r in reversed(rows) if r.balance), 0.0)
 
@@ -171,8 +173,11 @@ def _parse_bank_stmt_via_pipeline(
         "closing": closing,
         "bank_code": bank_code,
         "balance_warn_count": balance_warn_count,
+        "amount_fixed_count": amount_fixed_count,
         "parser_version": "bank_recon_v2+pipeline_v1",
-        "needs_review": bool(legacy.get("_needs_review", False) or balance_warn_count),
+        "needs_review": bool(
+            legacy.get("_needs_review", False) or balance_warn_count or amount_fixed_count
+        ),
     }
 
 

@@ -113,8 +113,35 @@ def _checkpointed_rows(ctx: StepContext, banks: list[dict]) -> list:
             raise BankStatementParseError(name, "no_transaction_rows")
         with checkpoint.item_scope(ctx):
             _emit_bank_parsed(ctx, it, fresh, generation, escalations)
+            _flag_if_amounts_rewritten(ctx, it, fresh)
         rows.extend(fresh)
     return rows
+
+
+# A-4:余额链反推改写过金额的行数 → 件上的 flag_reason 尾巴(bank_amount_rewritten:3)。
+BANK_AMOUNT_REWRITTEN = "bank_amount_rewritten"
+
+
+def _flag_if_amounts_rewritten(ctx: StepContext, item: dict, rows: list) -> None:
+    """金额被系统改写过的银行件必须进人审队列(与 discount_inferred / totals_rescued 同族)。
+
+    改写(_repair_amount_from_balance)把 balance_ok 由 False 翻 True,该行于是从所有「需人看」
+    的口径里消失,此前只剩 Excel 标黄与机器改动清单在「建议复核」——没有任何闸要求人去看。
+    可这笔数正是销项倒推(÷1.07)与逐笔对账的基数。件标 flagged 后它进审核队列、并按既有
+    规矩挡住签批冻结,会计裁决过才放行。
+
+    只标不改数:改写本身是对的(前后余额双向佐证),要人确认的是「这个数不是读出来的」。
+    """
+    n = sum(1 for r in rows if getattr(r, "amount_autocorrected", False))
+    if not n or item.get("status") == "flagged":
+        return
+    ctx.store.update_item(
+        ctx.cur,
+        tenant_id=ctx.tenant_id,
+        item_id=item["id"],
+        status="flagged",
+        flag_reason=f"{BANK_AMOUNT_REWRITTEN}:{n}",
+    )
 
 
 def _split_parsed(parsed) -> tuple[list, list]:

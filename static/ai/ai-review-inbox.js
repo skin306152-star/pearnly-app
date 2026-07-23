@@ -243,6 +243,7 @@
         if (action === 'riq-bulk') S.flagged.onBulk(flagReason);
         else if (action === 'riq-exclude-all') S.flagged.onExcludeAll(flagReason);
         else if (action === 'riq-accept') S.flagged.decideItem(itemId, 'accept');
+        else if (action === 'riq-confirm') S.flagged.decideItem(itemId, 'confirm');
         else if (action === 'riq-edit') {
             S.flagged.startEdit(itemId, function () {
                 var input = flaggedBody().querySelector(

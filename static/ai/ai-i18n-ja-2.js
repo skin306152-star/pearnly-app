@@ -353,6 +353,8 @@ Object.assign(window.__AI_I18N_JA__, {
     verdict_ocr_validation: 'OCR の読取値が検証ルールと食い違い、原本と照合してください',
     verdict_ocr_error: 'OCR 読取に失敗:{error}',
     verdict_duplicate: '既存項目と重複(重複先:{of})',
+    verdict_bank_amount_rewritten:
+        'この銀行明細には、金額が読み取りではなく前後の残高からシステムが逆算して補った行が {rows} 件あります。補った後は残高が当然一致しますが、その一致はシステム自身が作ったもので、元の誤読を証明できません。これらの数値は売上の逆算や個別照合の基礎にもなります。明細の原本とご確認ください',
     verdict_totals_rescued:
         '画像による再読取が失敗したため、2つ目のモデルが金額を読み直し、全体を置き換えました(税抜 {net}、税額 {vat}、合計 {total})。検証は計算が合うことのみで、誤読時も同様に合っていました。原本でこの3つの数字をご確認ください',
     verdict_discount_inferred:

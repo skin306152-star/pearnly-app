@@ -29,6 +29,14 @@
         });
     }
 
+    // 佐证件(银行流水/GL/EDC):没有票面钱字段,裁决卡的读值表与「采纳票面/改数/剔除」
+    // 三键对它一律不成立(实测渲染成一列「—」+ 语义不通的动词)。这类件走「确认」单键:
+    // 人看过机器改动即放行(waive · 带 reason 进备忘留痕),不伪造票面语义。
+    var _CORROBORATION_KINDS = { bank_statement: 1, gl_ledger: 1, edc_settlement: 1 };
+    function isCorroborationItem(it) {
+        return !!(it && _CORROBORATION_KINDS[it.kind]);
+    }
+
     // 契约 §1.1:队列 = flagged 里的进项票 + 方向不明票(后者收编进队列由人定向,
     // 不再隐形)。后端已按 created_at 出稳定序,这里只过滤不重排。
     function filterPurchaseQueue(flagged) {
@@ -50,6 +58,7 @@
         sales_doc_review: 'rv_flag_sales_doc',
         discount_inferred: 'rv_flag_discount_inferred',
         totals_rescued: 'rv_flag_totals_rescued',
+        bank_amount_rewritten: 'rv_flag_bank_amount_rewritten',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');
@@ -79,9 +88,13 @@
     // 保留旧调用方的 VAT-only 兼容路径。VAT 必填
     // (reconcile_gates.py 的权威校验底线);net/grand_total 留空则不带这两个键,后端按票面
     // 等式自行兜底(reconcile_gates.py L64-66:net 缺省从 vat 反推,grand 缺省 = net+vat)。
-    function buildDecisionPayload(itemId, action, vatRaw, fullValues) {
+    function buildDecisionPayload(itemId, action, vatRaw, fullValues, waiveReason) {
         if (action === 'accept') return { item_id: itemId, decision: 'face_value' };
         if (action === 'exclude') return { item_id: itemId, decision: 'exclude' };
+        // 佐证件确认:后端 waive 的 reason 必填。文案由调用方(有 i18n 的 UI 层)传进来——
+        // 本模块零 DOM 零 i18n,不在这里取词。谁确认的、什么时候由事件的 actor/created_at 承担。
+        if (action === 'confirm')
+            return { item_id: itemId, decision: 'waive', reason: String(waiveReason || '').trim() };
         if (_ASSIGN_KIND[action]) {
             return { item_id: itemId, decision: 'assign_kind', kind: _ASSIGN_KIND[action] };
         }
@@ -293,6 +306,7 @@
         isDirectionTicket: isDirectionTicket,
         filterPurchaseQueue: filterPurchaseQueue,
         flagReasonKey: flagReasonKey,
+        isCorroborationItem: isCorroborationItem,
         parseVat: parseVat,
         buildDecisionPayload: buildDecisionPayload,
         decisionChipKey: decisionChipKey,

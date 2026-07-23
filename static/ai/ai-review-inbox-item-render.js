@@ -83,6 +83,15 @@
     // 脱离单卡聚焦,改成组内行内按钮(btn sm + data-item)。
     function itemActionsHtml(item, itemUi) {
         itemUi = itemUi || {};
+        // 佐证件(银行流水/GL/EDC):没有票面可采纳、也不该被「剔除」——单键确认即放行。
+        if (AI.reviewQueue.isCorroborationItem(item)) {
+            return (
+                '<div class="riq-item-actions">' +
+                actionRowHtml(AI.reviewRender.CORROBORATION_ACTION_DEFS, item.item_id) +
+                viewImgBtn(item) +
+                '</div>'
+            );
+        }
         var isDir = AI.reviewQueue.isDirectionTicket(item);
         if (isDir) {
             return (
@@ -151,9 +160,13 @@
             esc(item.period) +
             '</span>' +
             '</div>' +
-            '<table class="fldt riq-fldt">' +
-            AI.reviewRender.fieldRows(item.ocr_read, effectiveDecision) +
-            '</table>' +
+            // 佐证件没有票面钱字段:渲染读值表只会得到一列「—」,四态诚实上是「不适用」
+            // 而非「空值」,直接不摆这张表。
+            (AI.reviewQueue.isCorroborationItem(item)
+                ? ''
+                : '<table class="fldt riq-fldt">' +
+                  AI.reviewRender.fieldRows(item.ocr_read, effectiveDecision) +
+                  '</table>') +
             narrativeHtml(item) +
             actionsHtml +
             '</div>'

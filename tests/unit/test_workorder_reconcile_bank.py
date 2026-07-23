@@ -15,6 +15,7 @@ from unittest import mock
 
 from services.ai_gateway import attribution
 from services.recon.bank_recon_types import StatementRow
+from services.workorder import verdict
 from services.workorder.engine import StepContext
 from services.workorder.steps import reconcile, reconcile_bank
 
@@ -29,6 +30,17 @@ class FakeStore:
 
     def list_events(self, cur, *, tenant_id, work_order_id):
         return list(self.events)
+
+    def update_item(self, cur, *, tenant_id, item_id, status=None, flag_reason=None, **kw):
+        """复刻真 DAL 语义:省略的字段不动(None = 本次不改),不是无条件赋值。
+        替身与真 DAL 语义分叉正是 flag_reason 那个 bug 能活下来的原因(S-5)。"""
+        for it in self.items:
+            if it["id"] != item_id:
+                continue
+            if status is not None:
+                it["status"] = status
+            if flag_reason is not None:
+                it["flag_reason"] = flag_reason
 
     def append_event(self, cur, *, tenant_id, work_order_id, step, event_type, payload, **kw):
         # R3 检查点在内存态落 item_bank_parsed(dedupe_key 锚件,重复落只留一条)。
@@ -427,6 +439,55 @@ class BankParseCostAttributionTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(reconcile_bank.BankStatementParseError, "ocr_failed"):
                 reconcile_bank._default_parse_bank_file(ctx, item)
+
+
+class BankAmountRewrittenFlagTests(unittest.TestCase):
+    """A-4 下半:金额被余额链反推改写过的银行件必须进人审队列(与 discount_inferred 同族)。
+
+    修前:改写把 balance_ok 由 False 翻 True,该行退出所有「需人看」的口径,件仍 status=ok
+    → 不进审核队列 → 不挡签批冻结,机器改的钱一路绿灯进销项倒推与逐笔对账的基数。
+    """
+
+    def setUp(self):
+        self._parse = reconcile_bank._parse_bank_file
+        self._enabled = reconcile_bank._bank_recon_enabled
+        reconcile_bank._bank_recon_enabled = lambda ctx: True
+        self.addCleanup(setattr, reconcile_bank, "_parse_bank_file", self._parse)
+        self.addCleanup(setattr, reconcile_bank, "_bank_recon_enabled", self._enabled)
+
+    def _run(self, *autocorrected_flags):
+        d = datetime.date
+        rows = []
+        for i, fixed in enumerate(autocorrected_flags):
+            r = StatementRow(d(2026, 6, 7 + i), f"tx{i}", 100.0, 0.0, 1000.0 - 100.0 * i)
+            r.amount_autocorrected = fixed
+            rows.append(r)
+        reconcile_bank._parse_bank_file = lambda ctx, item: rows
+        store = _store()
+        reconcile_bank.checkpoint_bank_statements(
+            _ctx(store), [it for it in store.items if it["id"] == "b1"]
+        )
+        return next(it for it in store.items if it["id"] == "b1")
+
+    def test_rewritten_rows_flag_the_item_with_row_count(self):
+        item = self._run(False, True, True)
+        self.assertEqual(item["status"], "flagged")
+        self.assertEqual(item["flag_reason"], "bank_amount_rewritten:2")
+
+    def test_untouched_statement_stays_clean(self):
+        # 没改过就不该多一件待裁决(零摩擦不能被这条新判据破坏)。
+        item = self._run(False, False)
+        self.assertEqual(item["status"], "ok")
+        self.assertIsNone(item.get("flag_reason"))
+
+    def test_flag_reason_maps_to_actionable_verdict(self):
+        """队列里必须给人话+行数,且不许给「安全默认」——改过的钱不能一键批量放行。"""
+        h = verdict.hint(flag_reason="bank_amount_rewritten:2")
+        self.assertEqual(h["narrative_key"], "verdict_bank_amount_rewritten")
+        self.assertEqual(h["params"], {"rows": "2"})
+        self.assertEqual(h["severity"], verdict.SEV_CRIT)
+        self.assertIsNone(h["suggested_decision"])
+        self.assertEqual(h["confidence"], verdict.LOW)
 
 
 if __name__ == "__main__":

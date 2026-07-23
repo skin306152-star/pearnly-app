@@ -137,6 +137,10 @@
         { action: 'rv-edit', key: 'rv_key_edit', kbd: 'E', cls: '' },
         { action: 'rv-exclude', key: 'rv_key_exclude', kbd: 'X', cls: 'no' },
     ];
+    // 佐证件(银行流水/GL/EDC)单键:人看过机器改动即放行,不伪造「采纳票面」这种不成立的动词。
+    var _CORROBORATION_ACTION_DEFS = [
+        { action: 'rv-confirm', key: 'rv_key_confirm', kbd: 'A', cls: 'ok' },
+    ];
     // X 语义在方向票模式下是「非税票」而非「剔除」,提示条(dirNote)明示,按钮定义表不重叠含义。
     var _DIRECTION_ACTION_DEFS = [
         { action: 'rv-dir-purchase', key: 'rv_key_dir_purchase', kbd: 'P', cls: 'ok' },
@@ -495,6 +499,7 @@
         fieldRows: fieldRows,
         actionButton: actionButton,
         AMOUNT_ACTION_DEFS: _AMOUNT_ACTION_DEFS,
+        CORROBORATION_ACTION_DEFS: _CORROBORATION_ACTION_DEFS,
         DIRECTION_ACTION_DEFS: _DIRECTION_ACTION_DEFS,
     };
 })();

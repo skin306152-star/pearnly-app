@@ -169,6 +169,8 @@ window.__AI_I18N_TH__ = {
     rv_field_total: 'รวมทั้งสิ้น',
     rv_field_invno: 'เลขที่ใบกำกับ',
     rv_field_date: 'วันที่ในใบกำกับ',
+    rv_key_confirm: 'ยืนยัน',
+    rv_waive_reason_machine_edit: 'ผู้ทำบัญชียืนยันจำนวนเงินที่ระบบคำนวณย้อนจากยอดคงเหลือแล้ว',
     rv_key_accept: 'ยอมรับตามใบเสร็จ',
     rv_key_edit: 'แก้ตัวเลข',
     rv_key_exclude: 'ตัดออก',
@@ -188,6 +190,8 @@ window.__AI_I18N_TH__ = {
     rv_flag_sales_direction: 'คล้ายเอกสารขายของเรา · โปรดยืนยันทิศทาง',
     rv_flag_sales_doc: 'เอกสารขายของเรา · โปรดยืนยัน (กด S)',
     rv_flag_discount_inferred: 'ระบบเติมบรรทัดส่วนลดให้ · โปรดเทียบกับใบจริง',
+    rv_flag_bank_amount_rewritten:
+        'จำนวนเงินถูกคำนวณย้อนจากยอดคงเหลือ · โปรดตรวจกับรายการเดินบัญชี',
     rv_flag_totals_rescued: 'จำนวนเงินอ่านใหม่โดยโมเดลที่สอง · โปรดเทียบกับใบจริง',
     rv_key_dir_purchase: 'ภาษีซื้อ',
     rv_key_dir_sales: 'ภาษีขาย',

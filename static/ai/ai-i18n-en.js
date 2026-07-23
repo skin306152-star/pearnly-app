@@ -171,6 +171,9 @@ window.__AI_I18N_EN__ = {
     rv_field_total: 'Grand total',
     rv_field_invno: 'Invoice no.',
     rv_field_date: 'Invoice date',
+    rv_key_confirm: 'Confirm',
+    rv_waive_reason_machine_edit:
+        'Accountant confirmed the amounts the system back-computed from balances',
     rv_key_accept: 'Accept face value',
     rv_key_edit: 'Edit',
     rv_key_exclude: 'Exclude',
@@ -190,6 +193,8 @@ window.__AI_I18N_EN__ = {
     rv_flag_sales_direction: 'Looks like your own sales doc · confirm direction',
     rv_flag_sales_doc: 'Your own sales invoice · press S to confirm',
     rv_flag_discount_inferred: 'System added a discount line · check the original',
+    rv_flag_bank_amount_rewritten:
+        'Amount back-computed from balances · verify against the statement',
     rv_flag_totals_rescued: 'Amounts re-read by a second model · check the original',
     rv_key_dir_purchase: 'Purchase',
     rv_key_dir_sales: 'Sale',

@@ -173,7 +173,13 @@
         function decideItem(itemId, action, vatRaw) {
             var item = st.itemIndex[itemId];
             if (!item || isArchived(item.work_order_id)) return;
-            var payload = AI.reviewQueue.buildDecisionPayload(itemId, action, vatRaw);
+            var payload = AI.reviewQueue.buildDecisionPayload(
+                itemId,
+                action,
+                vatRaw,
+                null,
+                at('rv_waive_reason_machine_edit')
+            );
             var g = groupUiFor(item.flag_reason);
             var iu = itemUiFor(item.flag_reason, itemId);
             if (!payload) {

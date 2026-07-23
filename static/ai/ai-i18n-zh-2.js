@@ -323,6 +323,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
     verdict_ocr_error: 'OCR 识别失败：{error}',
     verdict_duplicate: '与已收票据重复（重复于 {of}）',
+    verdict_bank_amount_rewritten:
+        '这份银行账单里有 {rows} 行的金额不是读出来的，是系统按前后余额反推填进去的。反推完余额自然对得上，但那份对得上是系统自己造的，证明不了原始读数错在哪。这些数还是销项倒推和逐笔对账的基数，请对着账单确认',
     verdict_totals_rescued:
         '视觉复读失败后，金额由第二个模型重新读了一次并整体替换，现在是净额 {net}、税额 {vat}、合计 {total}。这次只验过算术能对上——第一次读错时也能对上，请照原图核这三个数',
     verdict_discount_inferred:

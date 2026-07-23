@@ -360,6 +360,8 @@ Object.assign(window.__AI_I18N_EN__, {
         'OCR reading conflicts with a validation rule — please verify against the original',
     verdict_ocr_error: 'OCR could not read this document: {error}',
     verdict_duplicate: 'Duplicate of an existing item ({of})',
+    verdict_bank_amount_rewritten:
+        '{rows} row(s) in this bank statement carry amounts that were not read but back-computed by the system from the surrounding balances. Once filled in, the balance chain necessarily reconciles — but that consistency is the system’s own doing and proves nothing about the original misread. These figures also feed the sales back-out and per-transaction reconciliation. Please verify them against the statement',
     verdict_totals_rescued:
         'After the visual re-read failed, a second model re-read the amounts and replaced them wholesale: net {net}, VAT {vat}, total {total}. The only check applied was that they add up — which the misread values also did. Please verify these three against the original',
     verdict_discount_inferred:

@@ -46,6 +46,7 @@ _K_OCR_ERROR = "verdict_ocr_error"
 _K_DUPLICATE = "verdict_duplicate"
 _K_DISCOUNT_INFERRED = "verdict_discount_inferred"
 _K_TOTALS_RESCUED = "verdict_totals_rescued"
+_K_BANK_AMOUNT_REWRITTEN = "verdict_bank_amount_rewritten"
 
 
 # 泰国标准 VAT 税率。amount_math_fail 的勾稽闸词表(classify._MATH_HINTS)混装了
@@ -104,6 +105,12 @@ def _discount_params(money: dict, _tail: str) -> dict:
     return {"discount": money.get("discount")}
 
 
+def _bank_rewrite_params(money: dict, tail: str) -> dict:
+    """被余额链反推改写的行数——会计要知道这份账单里有几行的钱不是读出来的。
+    行数由 flag_reason 尾巴带过来(bank_amount_rewritten:3),件上没有票面 money 可取。"""
+    return {"rows": tail or "?"}
+
+
 def _money_read_params(money: dict, _tail: str) -> dict:
     """第二次读出来的钱面三数 —— 人要核的就是这三个数,得摆在卡上。"""
     return {
@@ -157,6 +164,12 @@ _MAP = {
     # 钱数是第二个模型重读出来的(L3 复读失败后的窄口径救援)→ 同样 crit、无安全默认:
     # 救援的验收条件只有算术自洽,而第一次读错时它也成立,证明不了这次读对了。
     "totals_rescued": _Policy(_K_TOTALS_RESCUED, LOW, _money_read_params, SEV_CRIT, None),
+    # A-4:银行流水行的金额被余额链反推改写(_repair_amount_from_balance)。同族第三条:
+    # 改完余额自然对得上,那份「对得上」是系统自己造的,证明不了原始读数错在哪。这笔数还是
+    # 销项倒推(÷1.07)与逐笔对账的基数 → crit、无安全默认,必须有人对着账单确认。
+    "bank_amount_rewritten": _Policy(
+        _K_BANK_AMOUNT_REWRITTEN, LOW, _bank_rewrite_params, SEV_CRIT, None
+    ),
 }
 
 

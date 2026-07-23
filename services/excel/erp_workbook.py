@@ -73,12 +73,25 @@ def _write_grid(
     return len(rows)
 
 
+def _first(f: Dict[str, Any], *keys: str) -> Optional[float]:
+    """按顺序取第一个能解成数的键。
+
+    OCR 侧(ThaiInvoice)用 subtotal/vat,回导解析侧用 amount_before_vat/vat_amount ——
+    两条来源都要喂进同一张表,只认一套键就会漏一半。
+    """
+    for k in keys:
+        v = _f(f.get(k))
+        if v is not None:
+            return v
+    return None
+
+
 def _purchase_rows(records: List[Dict[str, Any]]) -> List[List[Any]]:
     out: List[List[Any]] = []
     for i, rec in enumerate(records or [], start=1):
         f = (rec or {}).get("merged_fields") or {}
-        base = _f(f.get("amount_before_vat"))
-        vat = _f(f.get("vat_amount"))
+        base = _first(f, "amount_before_vat", "subtotal")
+        vat = _first(f, "vat_amount", "vat")
         total = _f(f.get("total_amount"))
         out.append(
             [
@@ -114,7 +127,7 @@ def _pending_rows(records: List[Dict[str, Any]]) -> List[List[Any]]:
                 _s(f.get("invoice_number")),
                 _s(f.get("seller_name")) or _s(f.get("buyer_name")),
                 _s(f.get("seller_tax")) or _s(f.get("buyer_tax")),
-                _f(f.get("total_amount")),
+                _first(f, "total_amount"),
                 _s(rec.get("reason") or f.get("pending_reason")),
                 *rt.roundtrip_values(
                     push_status=f.get("push_status"),

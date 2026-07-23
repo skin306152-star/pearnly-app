@@ -230,3 +230,79 @@ class ForeignWorkbookTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PurchaseFieldSourceTests(unittest.TestCase):
+    """OCR 侧给的是 subtotal/vat,回导解析侧给的是 amount_before_vat/vat_amount。
+    两条来源都要喂进同一张进项表 —— 只认一套键,真跑时税前和税额两列就是空的(实测踩过)。"""
+
+    def _row(self, **fields):
+        rec = {"merged_fields": {"invoice_number": "P1", "seller_name": "S", **fields}}
+        wb = load_workbook(io.BytesIO(build_review_workbook(purchase=[rec])))
+        ws = wb[rt.SHEET_PURCHASE]
+        h = {ws.cell(row=1, column=c).value: c for c in range(1, ws.max_column + 1)}
+        return lambda name: ws.cell(row=2, column=h[name]).value
+
+    def test_ocr_side_keys(self):
+        g = self._row(subtotal="3200.00", vat="224.00", total_amount="3424.00")
+        self.assertEqual(g(rt.PURCHASE_COL_PRE_VAT), 3200.0)
+        self.assertEqual(g(rt.PURCHASE_COL_VAT), 224.0)
+
+    def test_roundtrip_side_keys(self):
+        g = self._row(amount_before_vat=1000.0, vat_amount=70.0, total_amount=1070.0)
+        self.assertEqual(g(rt.PURCHASE_COL_PRE_VAT), 1000.0)
+        self.assertEqual(g(rt.PURCHASE_COL_VAT), 70.0)
+
+    def test_explicit_key_wins_over_alias(self):
+        g = self._row(amount_before_vat=999.0, subtotal="111.00")
+        self.assertEqual(g(rt.PURCHASE_COL_PRE_VAT), 999.0)
+
+
+class CreatedMastersTests(unittest.TestCase):
+    """汇总表 = 清理清单。只列真正新建的:复用档混进来,会计照单去删就把人家原有的档删了。"""
+
+    def _collect(self, actions, recs):
+        from services.erp.export_actions import collect_created_masters
+
+        return collect_created_masters(recs, actions, list(actions.keys()))
+
+    def test_new_item_and_new_supplier_listed(self):
+        out = self._collect(
+            {
+                "h1": {
+                    "items": [True],
+                    "item_codes": ["PN00048"],
+                    "docnum": "SA1",
+                    "created_party_code": "ท029",
+                    "direction": "sales",
+                }
+            },
+            [{"merged_fields": {"items": [{"description": "NEW OIL"}], "buyer_name": "B"}}],
+        )
+        kinds = {c["kind"]: c for c in out}
+        self.assertEqual(kinds["item"]["code"], "PN00048")
+        self.assertEqual(kinds["item"]["name"], "NEW OIL")
+        self.assertEqual(kinds["customer"]["code"], "ท029")
+
+    def test_reused_masters_never_listed(self):
+        out = self._collect(
+            {"h1": {"items": [False], "item_codes": ["500603"], "created_party_code": ""}},
+            [{"merged_fields": {"items": [{"description": "BRAKE"}]}}],
+        )
+        self.assertEqual(out, [])
+
+    def test_purchase_party_labelled_supplier(self):
+        out = self._collect(
+            {"h1": {"items": [], "created_party_code": "ไ001", "direction": "purchase"}},
+            [{"merged_fields": {"seller_name": "ไทยออยล์"}}],
+        )
+        self.assertEqual(out[0]["kind"], "supplier")
+        self.assertEqual(out[0]["name"], "ไทยออยล์")
+
+    def test_same_code_not_listed_twice(self):
+        acts = {
+            "h1": {"items": [True], "item_codes": ["PN1"], "created_party_code": ""},
+            "h2": {"items": [True], "item_codes": ["PN1"], "created_party_code": ""},
+        }
+        recs = [{"merged_fields": {"items": [{"description": "X"}]}}] * 2
+        self.assertEqual(len(self._collect(acts, recs)), 1)

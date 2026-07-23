@@ -106,15 +106,17 @@ def _enrich_records_by_invoice_no(records: List[Any], user: dict) -> None:
 
 def _enrich_records_by_history_id(
     records: List[dict], hids: List[str], user_id: str, tenant_id: Optional[str]
-) -> str:
+) -> tuple:
     """回填「新建/复用」动作 + 推送状态 + ERP 凭证号(单据记录批量路 · 按 history_id 回查)。
     records 与 hids 同序。回查失败/无匹配一律静默降级,绝不阻断导出。
-    返回这批推的目标 ERP adapter(格式跟着 ERP 走 · 查不到返空串)。"""
-    adapter = ""
+    返回 (adapter, created_masters):adapter 决定出哪套表(格式跟着 ERP 走);
+    created_masters 是本批真正新建的主档清单 —— 删单不会删档,那是清理账。"""
+    adapter, created = "", []
     try:
         from services.erp.export_actions import (
             apply_erp_actions,
             apply_push_state,
+            collect_created_masters,
             erp_actions_by_history_ids,
             push_state_by_history_ids,
         )
@@ -128,12 +130,13 @@ def _enrich_records_by_history_id(
             mf["history_id"] = str(hid)  # 回导键要用它 · 票号会被会计改,不能当键
             apply_erp_actions(mf, actions.get(str(hid)))
             apply_push_state(mf, states.get(str(hid)))
+        created = collect_created_masters(records, actions, hids)
         adapters = {s.get("adapter") for s in states.values() if s.get("adapter")}
         # 同批只应推一个 ERP(端点是单选的)· 真混了就不猜,留空走默认表
         adapter = adapters.pop() if len(adapters) == 1 else ""
     except Exception as e:
         logger.warning(f"enrich records by history_id failed: {e}")
-    return adapter
+    return adapter, created
 
 
 @router.post("/api/ocr/export")
@@ -290,7 +293,9 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
         raise HTTPException(404, detail="export.no_data")
 
     # 回查推送动作/状态/凭证号,并得出这批推的是哪个 ERP
-    adapter = _enrich_records_by_history_id(records, hid_by_record, user_id, tenant_id)
+    adapter, created_masters = _enrich_records_by_history_id(
+        records, hid_by_record, user_id, tenant_id
+    )
 
     try:
         if adapter in _REVIEW_WORKBOOK_ADAPTERS:
@@ -299,7 +304,7 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
             from services.excel.erp_workbook import build_review_workbook, review_workbook_filename
 
             buckets = _split_by_direction(records)
-            xlsx_bytes = build_review_workbook(**buckets)
+            xlsx_bytes = build_review_workbook(**buckets, created_masters=created_masters)
             filename = review_workbook_filename()
         else:
             from services.excel.excel_template_th import (

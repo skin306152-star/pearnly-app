@@ -52,7 +52,56 @@ def _parse_erp_actions(response_body: Any) -> Dict[str, Any]:
         "party_code": str(meta.get("party_code") or "").strip(),
         # 小助手如实回报这张单按哪个方向写进的 ERP —— 分表靠它,不靠再猜一次
         "direction": str(meta.get("doc_type") or "").strip().lower(),
+        # 本次真正新建出来的主档码。在 Express 里删单不会删这些档 —— 不给码就清理不掉
+        "created_masters": [
+            str(c).strip() for c in (meta.get("created_masters") or []) if str(c or "").strip()
+        ],
+        "created_party_code": (
+            str(meta.get("party_code") or "").strip()
+            if meta.get("created_customer") or meta.get("created_supplier")
+            else ""
+        ),
     }
+
+
+def collect_created_masters(
+    records: List[Dict[str, Any]], actions: Dict[str, Dict[str, Any]], hids: List[str]
+) -> List[Dict[str, Any]]:
+    """汇总本批新建的主档 → [{kind, code, name, docnum}]。
+
+    只列【真正新建】的:复用既有档不该出现在清理清单里,否则会计照单去删就把人家
+    原有的档删了。商品行按 created 标记逐行判,客户/供应商按 created_customer/supplier。
+    """
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for rec, hid in zip(records or [], hids or []):
+        act = actions.get(str(hid))
+        if not act:
+            continue
+        mf = rec.get("merged_fields") if isinstance(rec, dict) else None
+        mf = mf if isinstance(mf, dict) else {}
+        docnum = str(act.get("docnum") or "")
+        items = mf.get("items") if isinstance(mf.get("items"), list) else []
+        for i, created in enumerate(act.get("items") or []):
+            code = (
+                (act.get("item_codes") or [""] * (i + 1))[i]
+                if i < len(act.get("item_codes") or [])
+                else ""
+            )
+            if not created or not code or ("item", code) in seen:
+                continue
+            seen.add(("item", code))
+            name = ""
+            if i < len(items) and isinstance(items[i], dict):
+                name = str(items[i].get("description") or items[i].get("name") or "")
+            out.append({"kind": "item", "code": code, "name": name, "docnum": docnum})
+        party = act.get("created_party_code") or ""
+        if party and ("party", party) not in seen:
+            seen.add(("party", party))
+            kind = "supplier" if act.get("direction") == "purchase" else "customer"
+            name = str(mf.get("seller_name") if kind == "supplier" else mf.get("buyer_name") or "")
+            out.append({"kind": kind, "code": party, "name": name, "docnum": docnum})
+    return out
 
 
 def erp_actions_by_history_ids(

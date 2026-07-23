@@ -445,11 +445,13 @@ def _write_memo(
         return _tag(it, f" → {decision or '无裁决'}")
 
     def _waive_row(it: dict) -> str:
+        # 确认机器改动走的也是 waive 通道,但它不是「这件归不了位」——行内自述是哪一种,
+        # 否则交付给客户/查账方的备忘会把一次正常确认写成豁免。
         rec = decision_recs.get(it["id"]) or {}
-        dec = rec.get("payload") or {}
-        actor = rec.get("actor") or "?"
-        reason = dec.get("reason") or "-"
-        return f"- {Path(it.get('file_ref') or '').name}: ยกเว้นโดย (豁免人) {actor} · เหตุผล (理由) {reason}"
+        reason = (rec.get("payload") or {}).get("reason") or "-"
+        done = reason == decisions.WAIVE_REASON_MACHINE_EDIT
+        act = "ยืนยันการแก้ไข (确认机器改动)" if done else f"ยกเว้น (豁免) {reason}"
+        return f"- {Path(it.get('file_ref') or '').name}: {act} · {rec.get('actor') or '?'}"
 
     lines = [
         "# บันทึกเอกสารที่ขาด/ต้องทบทวน (缺料与待复核备忘)",
@@ -464,7 +466,7 @@ def _write_memo(
         *_bullets("รายการที่ไม่ใช่เอกสารภาษี (non_tax 排除清单)", [_tag(it) for it in non_tax]),
         *_bullets("เอกสารซ้ำ (duplicate 排除清单)", [_tag(it) for it in dup_items]),
         *_bullets(
-            "รายการที่ยกเว้นโดยมนุษย์ (人工豁免出包 · 谁豁免·为何·哪张)",
+            "รายการที่มนุษย์ปล่อยผ่าน (人工放行留痕 · 豁免或确认机器改动 · 谁·哪张)",
             [_waive_row(it) for it in waived],
         ),
         *_bullets("หัก ณ ที่จ่าย (WHT · ภ.ง.ด.3/53)", wht_lines),

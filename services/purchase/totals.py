@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import hashlib
-from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any
 
 _CENT = Decimal("0.01")
@@ -164,9 +164,6 @@ def dedupe_key_is_strong(*, doc_no, grand_total) -> bool:
     还会把它归 0,撞车面更宽。这两种情况下指纹只够「像」不够「是」,命中必须交人看:自动
     排除排掉的是真票的抵扣,且不进人审就没有任何人会知道(B-5)。
     """
-    if not str(doc_no or "").strip():
-        return False
-    try:
-        return _q(Decimal(str(grand_total))) > 0
-    except (TypeError, ValueError, ArithmeticError, InvalidOperation):
-        return False
+    # 解析走同文件的 _d/_q —— 指纹本体(dedupe_key)就是用它们造的,另起一套会让「弱指纹」
+    # 与「实际撞车面」在 _d 容错口径变化时悄悄脱钩。
+    return bool(str(doc_no or "").strip()) and _q(_d(grand_total)) > 0

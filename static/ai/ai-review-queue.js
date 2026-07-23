@@ -98,13 +98,15 @@
     // 保留旧调用方的 VAT-only 兼容路径。VAT 必填
     // (reconcile_gates.py 的权威校验底线);net/grand_total 留空则不带这两个键,后端按票面
     // 等式自行兜底(reconcile_gates.py L64-66:net 缺省从 vat 反推,grand 缺省 = net+vat)。
-    function buildDecisionPayload(itemId, action, vatRaw, fullValues, waiveReason) {
+    function buildDecisionPayload(itemId, action, vatRaw, fullValues) {
         if (action === 'accept') return { item_id: itemId, decision: 'face_value' };
         if (action === 'exclude') return { item_id: itemId, decision: 'exclude' };
-        // 佐证件确认:后端 waive 的 reason 必填。文案由调用方(有 i18n 的 UI 层)传进来——
-        // 本模块零 DOM 零 i18n,不在这里取词。谁确认的、什么时候由事件的 actor/created_at 承担。
+        // 佐证件确认:走 waive 通道(显式放行留痕),但 reason 发的是**机器码**不是人话 ——
+        // 后端据它把交付包备忘分段(确认 ≠ 豁免),也让「有多少件是机器改写后被确认的」统计得出来。
+        // 从前端传界面语言的自然语言,会让同一个动作在泰语/中文界面留下两种审计串。
+        // 机器码与后端 decisions.WAIVE_REASON_MACHINE_EDIT 手工对齐(前端 import 不了后端)。
         if (action === 'confirm')
-            return { item_id: itemId, decision: 'waive', reason: String(waiveReason || '').trim() };
+            return { item_id: itemId, decision: 'waive', reason: 'machine_edit_confirmed' };
         if (_ASSIGN_KIND[action]) {
             return { item_id: itemId, decision: 'assign_kind', kind: _ASSIGN_KIND[action] };
         }

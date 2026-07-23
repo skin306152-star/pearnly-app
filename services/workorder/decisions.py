@@ -25,6 +25,11 @@ RECALC = "recalc"  # 人工看原票补正
 EXCLUDE = "exclude"  # 剔除,不计入合计
 ASSIGN_KIND = "assign_kind"  # 方向不明票的人工定向裁决(带裁定 kind)
 WAIVE = "waive"  # 显式放行一件无法归位的料(带 reason,备忘留痕)
+# waive 的 reason 里这个机器码 = 「会计确认了机器对这件做过的改动」,不是「这件归不了位」。
+# 交付包备忘据此分段:混进「人工豁免出包」会把一次正常确认说成豁免,交给查账方就是假话。
+# 机器码由后端认、前端只发码不发人话 —— reason 若是浏览器按界面语言传的自然语言,
+# 同一个动作在泰语/中文界面留下两种字符串,事后统计「有多少件是机器改写后被确认的」做不到。
+WAIVE_REASON_MACHINE_EDIT = "machine_edit_confirmed"
 
 # assign_kind 的裁定 kind:进项票 / 销项票 / 非税票 / 银行流水。
 PURCHASE_INVOICE = "purchase_invoice"

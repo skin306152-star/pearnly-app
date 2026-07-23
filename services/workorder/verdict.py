@@ -110,8 +110,10 @@ def _discount_params(money: dict, _tail: str) -> dict:
 
 def _bank_rewrite_params(money: dict, tail: str) -> dict:
     """被余额链反推改写的行数——会计要知道这份账单里有几行的钱不是读出来的。
-    行数由 flag_reason 尾巴带过来(bank_amount_rewritten:3),件上没有票面 money 可取。"""
-    return {"rows": tail or "?"}
+    行数由 flag_reason 尾巴带过来(bank_amount_rewritten:3),件上没有票面 money 可取。
+    缺尾巴回落 None 而不是 "?":与 _band/_error/_dup_params 同族口径,由前端做诚实降级,
+    别让「有 ? 行的钱不是读出来的」这种字面问号进文案。"""
+    return {"rows": tail or None}
 
 
 def _money_read_params(money: dict, _tail: str) -> dict:

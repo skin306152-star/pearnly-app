@@ -38,17 +38,17 @@ def _months_apart(period: str, doc_date) -> int:
     return (int(period[:4]) - doc_date.year) * 12 + (int(period[5:7]) - doc_date.month)
 
 
-def claim_window_expired(period: str, doc_date) -> bool:
-    """这张进项票对该期已过可抵窗口。period 必须是**公历**「YYYY-MM」。
+def claim_window_expired(period_ad: str, doc_date) -> bool:
+    """这张进项票对该期已过可抵窗口。参数名自述纪年:传公历「YYYY-MM」,不是佛历。
 
     月结工单线(reconcile)与账本线(本文件的有效可抵过滤)共用这一条规则,免得两处各写一份
     「6 个月」——工单线此前根本没有期间判据,超期票照进 ภ.พ.30(B-6)。
-    ⚠️ 工单的 period 是佛历(2569-05),调用方必须先转公历再进来,否则差 543 年恒不过期。
+    工单侧的 period 是佛历(2569-05),转换走 core.thai_date.gregorian_period。
     """
     if not doc_date:
         return False
     try:
-        return _months_apart(period, doc_date) > INPUT_VAT_CLAIM_MONTHS
+        return _months_apart(period_ad, doc_date) > INPUT_VAT_CLAIM_MONTHS
     except (TypeError, ValueError, AttributeError, IndexError):
         return False
 

@@ -2,11 +2,10 @@
 // ============================================================
 // 真渲染代码(static/dist/ai.js/ai.css/ai.html 原样加载)+ 真 DOM,只桩网络层。
 //
-// A-5 是后端闸:reconcile_gates._face_value 判出票面钱字段「印了但读不出」→ 不计入 Σ 并
-// StepResult.stuck 点名。修前 to_dec 把 "7O.00" 归 0,这张票贡献 ฿0 进项税而工单照样 ok
-// 出数——少算且无人知道。本 spec 不引入新 UI,只验这条新停机原因确实摆到了会计眼前,
-// 且把「机器看到的原文」也给了(会计据此判是 OCR 读花还是票本身印成这样)。
-// 截图存 tests/e2e/_artifacts/a5/。
+// B-6 是后端闸:工单线算进项税此前零日期判据,超 6 个月的失效票照进 ภ.พ.30 = 多抵,
+// 被查要补税加罚。修后停机点名,只识别不自动剔除(自动剔除同样是背着人改钱)。
+// 本 spec 不引入新 UI,只验这条新停机原因确实摆到了会计眼前,且票面日期与踩的规则都说清了。
+// 截图存 tests/e2e/_artifacts/b6/。
 /* global window, document */
 const { test, expect } = require('@playwright/test');
 const path = require('path');

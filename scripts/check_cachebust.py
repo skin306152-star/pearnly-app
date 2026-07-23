@@ -52,6 +52,17 @@ CACHE_BUST_PAIRS = (
     CacheBustPair(bundle="static/dist/main.js", html="home.html", ref="dist/main.js"),
     CacheBustPair(bundle="static/dist/ai.js", html="static/ai/ai.html", ref="dist/ai.js"),
     CacheBustPair(bundle="static/dist/ai.css", html="static/ai/ai.html", ref="dist/ai.css"),
+    # i18n 不进 bundle,是带 ?v 直接 serve 的产物 —— 改了词条不 bump 就服旧文案(界面显
+    # raw key),与 b141eb31 同款。八个文件各记各的版本号,漏一个就静默旧文案。
+    *(
+        CacheBustPair(
+            bundle=f"static/ai/ai-i18n-{lang}{suffix}.js",
+            html="static/ai/ai.html",
+            ref=f"ai-i18n-{lang}{suffix}.js",
+        )
+        for lang in ("zh", "th", "en", "ja")
+        for suffix in ("", "-2")
+    ),
 )
 
 

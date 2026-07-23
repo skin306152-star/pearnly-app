@@ -32,6 +32,7 @@ from services.workorder.steps.reconcile_gates import unreadable_money_fields
 # 逐件进度投影也据此认「哪些件要过 OCR」——同一份定义,不各写一套)。
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff", ".bmp"}
 _SHEET_EXTS = {".xlsx", ".xlsm", ".xls", ".csv"}
+_XLSX_EXTS = (".xlsx", ".xlsm")  # 只有这两种扫得了表头;xls/csv 无表头判据,如实走兜底
 # 流水表头列名:命中 ≥2 个不同关键词才算银行(POS 汇总也有「วันที่」,单词不作数)。
 _BANK_HEADER_KW = ("ถอน", "ฝาก", "ยอดคงเหลือ", "withdrawal", "deposit", "balance")
 
@@ -144,30 +145,34 @@ def _scan_xlsx_head(path: Path) -> list[str]:
         return []
 
 
-def _xlsx_header_is_bank(path: Path) -> bool:
-    """扫前 15 行找流水列名(照 vat_file_classifier._excel_quick_meta 的轻量先例)。读不了 → False。"""
+def _head_is_bank(head: list[str]) -> bool:
+    """流水列名(照 vat_file_classifier._excel_quick_meta 的轻量先例):≥2 个不同词才算。"""
     hits = set()
-    for text in _scan_xlsx_head(path):
+    for text in head:
         hits.update(kw for kw in _BANK_HEADER_KW if kw in text)
     return len(hits) >= 2
 
 
-def _xlsx_header_is_gl(path: Path) -> bool:
-    """扫前 15 行找 GL 报表名(สมุดแยกประเภท 标题行)。读不了 → False。"""
-    return any(kw in text for text in _scan_xlsx_head(path) for kw in _GL_NAME_KW)
+def _head_is_gl(head: list[str]) -> bool:
+    return any(kw in text for text in head for kw in _GL_NAME_KW)
 
 
-# 销项汇总表的表头正面判据(与 _GL_NAME_KW / _BANK_HEADER_KW 对称)。此前没有这一条:表格类
-# 文件在 GL、银行都不像时一律兜底归销项汇总(B-1)。兜底本身多半对(会计上传的就是它),但
-# 「猜的」和「认出来的」不该长得一样——一份 GL 或流水的表头没被认出来时走的是同一条兜底路,
-# 它的数字直接进 R2 销售额且不留任何痕迹。词表只收强判据(带「销售」语义的词),不收 amount/
-# 金额这类任何表都有的通用列名,免得把认不出的表也认成销项。
+# 销项汇总表的表头正面判据(B-1)。此前没有这一条:表格类文件在 GL、银行都不像时一律兜底归
+# 销项汇总,于是「猜的」和「认出来的」长得一样——一份表头没被认出来的 GL 或流水走同一条路,
+# 数字直接进 R2 销售额且无痕。只收带「销售」语义的强词,不收 amount/金额这类任何表都有的列名。
 _SALES_HEADER_KW = ("ยอดขาย", "ภาษีขาย", "รายงานการขาย", "sales", "销售", "销项")
 
 
-def _xlsx_header_is_sales(path: Path) -> bool:
-    """扫前 15 行找销售语义的列名/标题。读不了 → False(读不了由 classify 的解析闸点名)。"""
-    return any(kw in text for text in _scan_xlsx_head(path) for kw in _SALES_HEADER_KW)
+def _head_is_sales(head: list[str]) -> bool:
+    """表头有销售语义列名 → 认得出是销项汇总;发票反证优先。
+
+    词表比 _SALES_SUMMARY_TEXT_KW 松是有意的:那条判 PDF **正文**(裸「ยอดขาย」可能是
+    发票小计行),这条判**列名**——汇总表的列头就叫 ยอดขาย/ภาษีขาย,再要求报表抬头会把
+    正常汇总表全判成认不出。
+    """
+    if any(kw in text for text in head for kw in _INVOICE_KW):
+        return False
+    return any(kw in text for text in head for kw in _SALES_HEADER_KW)
 
 
 def _is_gl_name(name: str) -> bool:
@@ -202,22 +207,19 @@ def _bin_by_file(file_ref: str) -> Optional[tuple[str, str, Optional[str]]]:
     if ext in IMAGE_EXTS:
         return None
     if ext in _SHEET_EXTS:
-        if _is_gl_name(path.name):
+        # 表头只扫一次,三家判据共用。read_only 也省不掉解压 + 读共享字符串表,成本随整个
+        # 文件走:5 万行的客户导出单次≈2s,各扫各的就是 6s,而这是收料的同步串行路径。
+        head = _scan_xlsx_head(path) if ext in _XLSX_EXTS else []
+        if _is_gl_name(path.name) or _head_is_gl(head):
             return (kinds.GL_LEDGER, "pending", None)
-        if ext in (".xlsx", ".xlsm") and _xlsx_header_is_gl(path):
-            return (kinds.GL_LEDGER, "pending", None)
-        if _bank_from_filename(path.name):
-            return (kinds.BANK_STATEMENT, "pending", None)
-        if ext in (".xlsx", ".xlsm") and _xlsx_header_is_bank(path):
+        if _bank_from_filename(path.name) or _head_is_bank(head):
             return (kinds.BANK_STATEMENT, "pending", None)
         # B-1:认出来是销项汇总 → 照常归堆。三家都不像 → 这就是一次盲猜,不许无痕:归销项
         # 汇总(下游口径不变)但标 flagged 交人确认一次。xlsx 之外(csv/xls)扫不了表头,只能
         # 维持原兜底 —— 如实记债,不假装也判过。
-        if _is_sales_summary_name(path.name):
+        if _is_sales_summary_name(path.name) or _head_is_sales(head):
             return (kinds.SALES_SUMMARY, "pending", None)
-        if ext in (".xlsx", ".xlsm"):
-            if _xlsx_header_is_sales(path):
-                return (kinds.SALES_SUMMARY, "pending", None)
+        if ext in _XLSX_EXTS:
             return (kinds.SALES_SUMMARY, "flagged", f"table_kind_unclear:{ext.lstrip('.')}")
         return (kinds.SALES_SUMMARY, "pending", None)
     if ext == ".pdf":
@@ -491,10 +493,7 @@ def _has_vat(fields: dict) -> bool:
 
 
 def _vat_unreadable(fields: dict) -> bool:
-    """票面 VAT 印了但读不出 —— 与「这张票本来就没 VAT」不是一回事(B-2)。
-
-    _has_vat 对两者一律返 False,于是读花一个字符(7O.00)的税票会走「无 VAT」的两个静默
-    出口:判成银行流水页,或判成无税务要素的 non_tax 被自动排除(B-3:零人复核的终态)。
-    判据复用 reconcile_gates 那份单一事实源(含 NaN/Infinity 守卫),不另写一套。
-    """
+    """票面 VAT 印了但读不出 ≠ 这张票本来就没 VAT(B-2)。_has_vat 对两者一律返 False,于是
+    读花一个字符(7O.00)的税票会走「无 VAT」的两个静默出口:判成流水页,或判成无税务要素的
+    non_tax 被自动排除。判据复用 reconcile_gates 那份(含 NaN 守卫),不另写一套。"""
     return bool(unreadable_money_fields({"vat": fields.get("vat")}))

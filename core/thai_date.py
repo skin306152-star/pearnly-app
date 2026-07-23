@@ -104,7 +104,11 @@ def gregorian_period(period: object) -> Optional[str]:
     """期间「YYYY-MM」→ 公历「YYYY-MM」;已是公历原样返回(幂等),解不出返 None。
 
     工单的 period 是佛历(2569-05),票面日期落库却是公历 —— 两者直接比会差 543 年,任何
-    「距今几个月」的判据都会恒不触发(B-6 的可抵窗口就踩在这上面)。纪年换算只此一处。
+    「距今几个月」的判据都会恒不触发(B-6 的可抵窗口就踩在这上面)。
+
+    ⚠️ 本函数是新写的期间换算,但仓库里**不止这一处**:obligation_engine._period_to_ad_month_start
+    (自称「唯一权威」)、stmt_totals.period_month(硬编 -543,无 ≥2400 阈值 → 不幂等)、
+    summary_import.dates.to_ad_year 各有一份。新代码一律用本函数,那三处待收编。
     """
     try:
         year_s, month_s = str(period).split("-")

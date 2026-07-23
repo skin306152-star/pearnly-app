@@ -78,9 +78,20 @@ class FingerprintStrengthTests(unittest.TestCase):
                 self.assertFalse(purchase_dedup.fingerprint_is_strong(fields))
 
     def test_two_different_invoices_same_supplier_same_amount_collide(self):
-        """撞车本身是既有事实(指纹算法不变),本条钉死它 —— 所以命中不能自动排除。"""
-        a = {"seller_tax": "0735527000289", "invoice_number": "", "total_amount": "107.00"}
-        b = dict(a)
+        """撞车本身是既有事实(指纹算法不变),本条钉死它 —— 所以命中不能自动排除。
+
+        两张票必须在**指纹外**的字段上真的不同(日期/供应商名),否则拿一份拷贝去比是恒真的,
+        证明不了任何事。
+        """
+        a = {
+            "seller_tax": "0735527000289",
+            "invoice_number": "",
+            "total_amount": "107.00",
+            "invoice_date": "2026-05-03",
+            "vendor": "NBC Trading",
+        }
+        b = {**a, "invoice_date": "2026-05-21", "vendor": "NBC Trading (Rama 9)"}
+        self.assertNotEqual(a, b)  # 确是两张不同的票
         self.assertEqual(
             purchase_dedup.purchase_fingerprint(a), purchase_dedup.purchase_fingerprint(b)
         )

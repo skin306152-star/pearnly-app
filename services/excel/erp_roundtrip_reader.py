@@ -20,11 +20,10 @@ import io
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from services.excel import erp_money as money
 from services.excel import erp_roundtrip as rt
 
 logger = logging.getLogger(__name__)
-
-_VAT_RATE = 0.07
 
 
 class RoundtripParseError(ValueError):
@@ -96,9 +95,10 @@ def _parse_sales_line(ws, row: int, hmap: Dict[str, int]) -> Dict[str, Any]:
     """销项一行 = 一个商品行。金额缺(公式无缓存)时按合同 数量×单价 补。"""
     qty = _num(_cell(ws, row, hmap, rt.SALES_COL_QTY))
     price = _num(_cell(ws, row, hmap, rt.SALES_COL_PRICE))
-    amount = _num(_cell(ws, row, hmap, rt.SALES_COL_AMOUNT))
-    if amount is None and qty is not None and price is not None:
-        amount = round(qty * price, 2)
+    # 会计改成死值就用他的;是公式(无缓存值)就按合同派生 —— 与写侧共用 erp_money
+    amount = money.to_money(_cell(ws, row, hmap, rt.SALES_COL_AMOUNT))
+    if amount is None:
+        amount = money.line_amount(qty, price)
     return {
         "description": _text(_cell(ws, row, hmap, rt.SALES_COL_ITEM)),
         "qty": qty,
@@ -108,12 +108,17 @@ def _parse_sales_line(ws, row: int, hmap: Dict[str, int]) -> Dict[str, Any]:
     }
 
 
-def _sales_doc_totals(items: List[Dict[str, Any]], pre_vat_cells: List[Optional[float]]) -> Tuple:
-    """单据税基/税额/合计。会计把某行税前改成死值 → 用他的;否则按行金额求和再算 7%。"""
+def _sales_doc_totals(items, pre_vat_cells, printed_vat) -> Tuple:
+    """单据税基/税额/合计 —— 全走 erp_money,与写侧同一套舍入,不再各算各的。
+
+    税额优先用票面印的那个(法定数字,要进 ภ.พ.30);只有会计改动使税基真的变了才重算。
+    """
     explicit = [v for v in pre_vat_cells if v is not None]
-    base = round(sum(explicit), 2) if explicit else round(sum(i["amount"] or 0 for i in items), 2)
-    vat = round(base * _VAT_RATE, 2)
-    return base, vat, round(base + vat, 2)
+    return money.doc_totals(
+        [i["amount"] for i in items],
+        explicit_base=money.sum_money(explicit) if explicit else None,
+        printed_vat=printed_vat,
+    )
 
 
 def _read_sales_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
@@ -136,6 +141,7 @@ def _read_sales_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
                 "erp_party_code": _text(_cell(ws, row, hmap, rt.COL_ERP_PARTY)),
                 "items": [],
                 "_pre_vat": [],
+                "_doc_vat": money.to_money(_cell(ws, row, hmap, rt.COL_DOC_VAT)),
                 "_rows": [],
             }
             order.append(gkey)
@@ -147,7 +153,7 @@ def _read_sales_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for gkey in order:
         g = groups.pop(gkey)
-        base, vat, total = _sales_doc_totals(g["items"], g.pop("_pre_vat"))
+        base, vat, total = _sales_doc_totals(g["items"], g.pop("_pre_vat"), g.pop("_doc_vat"))
         rows = g.pop("_rows")
         g.update({"amount_before_vat": base, "vat_amount": vat, "total_amount": total})
         out.append({"fields": g, "source_rows": rows})
@@ -158,11 +164,13 @@ def _read_purchase_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
     """进项表每行一张票(费用票整张进一个科目 · 不拆商品行)。"""
     out: List[Dict[str, Any]] = []
     for row, decoded in _data_rows(ws, hmap):
-        base = _num(_cell(ws, row, hmap, rt.PURCHASE_COL_PRE_VAT))
-        vat = _num(_cell(ws, row, hmap, rt.PURCHASE_COL_VAT))
-        total = _num(_cell(ws, row, hmap, rt.PURCHASE_COL_TOTAL))
-        if total is None and base is not None:
-            total = round(base + (vat if vat is not None else base * _VAT_RATE), 2)
+        base = money.to_money(_cell(ws, row, hmap, rt.PURCHASE_COL_PRE_VAT))
+        printed = money.to_money(_cell(ws, row, hmap, rt.PURCHASE_COL_VAT)) or money.to_money(
+            _cell(ws, row, hmap, rt.COL_DOC_VAT)
+        )
+        base, vat, total = money.doc_totals([], explicit_base=base, printed_vat=printed)
+        if base == 0 and printed is None:  # 整行没有金额 · 不编造 0/0/0
+            base = vat = total = None
         out.append(
             {
                 "fields": {

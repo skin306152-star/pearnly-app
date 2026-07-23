@@ -118,12 +118,12 @@ class CompanionVersionGateTests(unittest.TestCase):
         return None, []
 
     def test_old_companion_warns_loudly(self):
-        doc, out = self._warns("1.1.46")
+        doc, out = self._warns("1.1.47")  # 只装了销项,进项无闸
         self.assertEqual(doc, "D1")  # 仍然带下去 —— 新版小助手连着时闸照样要能用
         self.assertTrue(any("防重单闸可能不生效" in x for x in out))
 
     def test_current_companion_silent(self):
-        body = '{"express_docnum": "D1", "meta": {"companion_version": "1.1.47"}}'
+        body = '{"express_docnum": "D1", "meta": {"companion_version": "1.1.48"}}'
         with _with_row({"response_body": body}):
             with self.assertNoLogs("services.erp.express_push.prior_doc", "WARNING"):
                 self.assertEqual(prior_docnum("h1"), "D1")

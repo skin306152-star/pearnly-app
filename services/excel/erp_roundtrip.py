@@ -37,6 +37,10 @@ DATA_SHEETS: Tuple[str, ...] = (SHEET_SALES, SHEET_PURCHASE, SHEET_PENDING)
 # 更要命的是会计把一张进项票剪到销项表时税号会整个丢掉(真跑实测)。故追加在合同列后。
 COL_PARTY_TAX = "เลขประจำตัวผู้เสียภาษีคู่ค้า"
 
+# 单据税额(票面印的那个)。销项合同 12 列里的 VAT 是【每行】的,多行票逐行相加与
+# 单据税额可能差分币;而票面税额是要进 ภ.พ.30 的法定数字,不能靠我们重算。故原样带走。
+COL_DOC_VAT = "ภาษีมูลค่าเพิ่มรวม"
+
 COL_ERP_DOCNUM = "เลขที่เอกสาร ERP"
 COL_ERP_ITEM = "รหัสสินค้า ERP"
 COL_ERP_PARTY = "รหัสคู่ค้า ERP"
@@ -45,13 +49,14 @@ COL_ROW_KEY = "รหัสอ้างอิงระบบ"
 
 ROUNDTRIP_HEADERS: Tuple[str, ...] = (
     COL_PARTY_TAX,
+    COL_DOC_VAT,
     COL_ERP_DOCNUM,
     COL_ERP_ITEM,
     COL_ERP_PARTY,
     COL_PUSH_STATUS,
     COL_ROW_KEY,
 )
-ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 18, 16, 14, 16, 26)
+ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 16, 18, 16, 14, 16, 26)
 
 # ── 各表的业务列名(写侧和读侧共认这一份 · 读侧按列名取值不按列位,会计插列也不散架)──
 # 销项:前 12 列是 MR.ERP 公式合同,列名见 excel_template_th.HEADERS_TH。
@@ -174,6 +179,7 @@ def is_data_sheet(sheet_name: Any) -> bool:
 def roundtrip_values(
     *,
     party_tax: Any = "",
+    doc_vat: Any = "",
     docnum: Any = "",
     item_code: Any = "",
     party_code: Any = "",
@@ -184,6 +190,7 @@ def roundtrip_values(
     """按 ROUNDTRIP_HEADERS 顺序生成这几格的值(写侧唯一入口·保证顺序不漂)。"""
     return [
         str(party_tax or "").strip(),
+        doc_vat if isinstance(doc_vat, (int, float)) else (str(doc_vat or "").strip() or None),
         str(docnum or "").strip(),
         str(item_code or "").strip(),
         str(party_code or "").strip(),

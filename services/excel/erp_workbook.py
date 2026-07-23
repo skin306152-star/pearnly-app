@@ -107,6 +107,7 @@ def _purchase_rows(records: List[Dict[str, Any]]) -> List[List[Any]]:
                 _s(f.get("category")),
                 *rt.roundtrip_values(
                     party_tax=f.get("seller_tax") or f.get("seller_tax_id"),
+                    doc_vat=vat,
                     docnum=f.get("erp_docnum"),
                     party_code=f.get("erp_party_code"),
                     push_status=f.get("push_status"),

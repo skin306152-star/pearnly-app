@@ -18,10 +18,10 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# 小助手从这个版本起认 prior_docnum(见 companion/dbf_sales.ERR_PRIOR_DOC_EXISTS)。
+# 小助手从这个版本起【销项和进项都】认 prior_docnum(1.1.47 只装了销项)。
 # 比它旧的版本会把这个键当未知字段忽略 —— 闸静默不存在,而云端以为自己受保护了。
 # 小助手是手动发版的,客户机上跑旧版是常态,故这里必须能看出来。
-GUARD_MIN_COMPANION = (1, 1, 47)
+GUARD_MIN_COMPANION = (1, 1, 48)
 
 
 def _version_tuple(raw: Any) -> tuple:

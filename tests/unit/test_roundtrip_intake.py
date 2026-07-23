@@ -76,7 +76,8 @@ class ShortCircuitTests(unittest.TestCase):
         self.assertEqual(inv.items[0].name, "BRAKE (0.5L)")
         # 数字存字符串是 ThaiInvoice 的既有约定 · 且不能带 "3.0" 这种尾巴
         self.assertEqual(inv.items[0].qty, "3")
-        self.assertEqual(inv.items[0].subtotal, "750")
+        # 钱一律两位小数(Decimal 定点)· 数量不是钱,不补小数
+        self.assertEqual(inv.items[0].subtotal, "750.00")
 
     def test_both_directions_come_through(self):
         res = try_parse_roundtrip(
@@ -138,9 +139,9 @@ class AccountantEditThenReimportTests(unittest.TestCase):
         inv = res.pages[0].invoice
         self.assertEqual(inv.invoice_number, "SA1-FIXED")
         self.assertEqual(inv.items[0].qty, "5")
-        self.assertEqual(inv.items[0].subtotal, "1250")
-        self.assertEqual(inv.subtotal, "1250")
-        self.assertEqual(inv.vat, "87.5")
+        self.assertEqual(inv.items[0].subtotal, "1250.00")
+        self.assertEqual(inv.subtotal, "1250.00")
+        self.assertEqual(inv.vat, "87.50")
 
 
 class PendingReasonTests(unittest.TestCase):

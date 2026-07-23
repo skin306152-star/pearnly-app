@@ -46,6 +46,7 @@ _K_OCR_ERROR = "verdict_ocr_error"
 _K_DUPLICATE = "verdict_duplicate"
 _K_DUPLICATE_SUSPECT = "verdict_duplicate_suspect"
 _K_VAT_UNREADABLE = "verdict_vat_unreadable"
+_K_TABLE_KIND_UNCLEAR = "verdict_table_kind_unclear"
 _K_DISCOUNT_INFERRED = "verdict_discount_inferred"
 _K_TOTALS_RESCUED = "verdict_totals_rescued"
 _K_BANK_AMOUNT_REWRITTEN = "verdict_bank_amount_rewritten"
@@ -158,6 +159,9 @@ _MAP = {
     # B-2:票面 VAT 印了但读不出。此前与「本来就没有 VAT」同一信号,件从无税务要素出口被
     # 当 non_tax 自动排除(B-3)。读不出方向也判不了 → 走方向通道交人定向,无安全默认。
     "vat_unreadable": _Policy(_K_VAT_UNREADABLE, LOW, _seller_params, SEV_CRIT, None),
+    # B-1:GL/银行/销项三家表头都不像 → 归销项汇总是一次盲猜。猜错(一份 GL 或流水)它的
+    # 数字会直接进 R2 销售额,故 crit + 无安全默认:确认一次比事后查一个月的销项省事。
+    "table_kind_unclear": _Policy(_K_TABLE_KIND_UNCLEAR, LOW, _empty_params, SEV_CRIT, None),
     "ocr_low_confidence": _Policy(_K_LOW_CONF, LOW, _band_params, SEV_WARN, None),
     "ocr_validation_warning": _Policy(_K_VALIDATION, LOW, _empty_params, SEV_WARN, None),
     "ocr_error": _Policy(_K_OCR_ERROR, LOW, _error_params, SEV_CRIT, None),

@@ -32,7 +32,14 @@
     // 佐证件(银行流水/GL/EDC):没有票面钱字段,裁决卡的读值表与「采纳票面/改数/剔除」
     // 三键对它一律不成立(实测渲染成一列「—」+ 语义不通的动词)。这类件走「确认」单键:
     // 人看过机器改动即放行(waive · 带 reason 进备忘留痕),不伪造票面语义。
-    var _CORROBORATION_KINDS = { bank_statement: 1, gl_ledger: 1, edc_settlement: 1 };
+    // 汇总表/GL/流水/结算票都没有票面钱字段:读值表对它们只会渲染出一列「—」,动作也不该
+    // 是「采纳票面/改数」。归到同一种卡形态,单键确认。
+    var _CORROBORATION_KINDS = {
+        bank_statement: 1,
+        gl_ledger: 1,
+        edc_settlement: 1,
+        sales_summary: 1,
+    };
     function isCorroborationItem(it) {
         return !!(it && _CORROBORATION_KINDS[it.kind]);
     }
@@ -61,6 +68,7 @@
         bank_amount_rewritten: 'rv_flag_bank_amount_rewritten',
         duplicate_suspect: 'rv_flag_duplicate_suspect',
         vat_unreadable: 'rv_flag_vat_unreadable',
+        table_kind_unclear: 'rv_flag_table_kind_unclear',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');

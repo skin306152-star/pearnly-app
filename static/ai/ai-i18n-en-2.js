@@ -359,6 +359,8 @@ Object.assign(window.__AI_I18N_EN__, {
     verdict_ocr_validation:
         'OCR reading conflicts with a validation rule — please verify against the original',
     verdict_ocr_error: 'OCR could not read this document: {error}',
+    verdict_table_kind_unclear:
+        'This table’s header looks like neither a general ledger nor a bank statement, and carries no sales-related column names. The system took it as a sales summary by default — that is a guess, not a determination. If it is actually a ledger or a statement, its figures will be counted as this period’s sales. Please confirm it really is a sales summary; if not, exclude it and re-upload under the correct type.',
     verdict_vat_unreadable:
         'This document shows a VAT amount, but the figure could not be read. Without it the direction cannot be decided, and it must not be treated as「no VAT」— doing so would drop it as a non-tax document and the input VAT with it. Compare against the original and assign a direction (input P / output S / non-tax X); if input, the VAT amount must then be corrected.',
     verdict_duplicate_suspect:

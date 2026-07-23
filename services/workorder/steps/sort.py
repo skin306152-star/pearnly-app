@@ -157,6 +157,19 @@ def _xlsx_header_is_gl(path: Path) -> bool:
     return any(kw in text for text in _scan_xlsx_head(path) for kw in _GL_NAME_KW)
 
 
+# 销项汇总表的表头正面判据(与 _GL_NAME_KW / _BANK_HEADER_KW 对称)。此前没有这一条:表格类
+# 文件在 GL、银行都不像时一律兜底归销项汇总(B-1)。兜底本身多半对(会计上传的就是它),但
+# 「猜的」和「认出来的」不该长得一样——一份 GL 或流水的表头没被认出来时走的是同一条兜底路,
+# 它的数字直接进 R2 销售额且不留任何痕迹。词表只收强判据(带「销售」语义的词),不收 amount/
+# 金额这类任何表都有的通用列名,免得把认不出的表也认成销项。
+_SALES_HEADER_KW = ("ยอดขาย", "ภาษีขาย", "รายงานการขาย", "sales", "销售", "销项")
+
+
+def _xlsx_header_is_sales(path: Path) -> bool:
+    """扫前 15 行找销售语义的列名/标题。读不了 → False(读不了由 classify 的解析闸点名)。"""
+    return any(kw in text for text in _scan_xlsx_head(path) for kw in _SALES_HEADER_KW)
+
+
 def _is_gl_name(name: str) -> bool:
     """文件名像 GL 台账:泰文报表名子串,或 ASCII 'GL' 独立词(大小写不论)。"""
     return any(kw in name for kw in _GL_NAME_KW) or bool(_GL_ASCII_RE.search(name.lower()))
@@ -197,6 +210,15 @@ def _bin_by_file(file_ref: str) -> Optional[tuple[str, str, Optional[str]]]:
             return (kinds.BANK_STATEMENT, "pending", None)
         if ext in (".xlsx", ".xlsm") and _xlsx_header_is_bank(path):
             return (kinds.BANK_STATEMENT, "pending", None)
+        # B-1:认出来是销项汇总 → 照常归堆。三家都不像 → 这就是一次盲猜,不许无痕:归销项
+        # 汇总(下游口径不变)但标 flagged 交人确认一次。xlsx 之外(csv/xls)扫不了表头,只能
+        # 维持原兜底 —— 如实记债,不假装也判过。
+        if _is_sales_summary_name(path.name):
+            return (kinds.SALES_SUMMARY, "pending", None)
+        if ext in (".xlsx", ".xlsm"):
+            if _xlsx_header_is_sales(path):
+                return (kinds.SALES_SUMMARY, "pending", None)
+            return (kinds.SALES_SUMMARY, "flagged", f"table_kind_unclear:{ext.lstrip('.')}")
         return (kinds.SALES_SUMMARY, "pending", None)
     if ext == ".pdf":
         if _is_gl_name(path.name):

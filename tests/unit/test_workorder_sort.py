@@ -116,6 +116,45 @@ class SortByFileTests(unittest.TestCase):
 
         self.assertEqual(store.by_ref("export_may.xlsx")["kind"], "bank_statement")
 
+    def test_unidentifiable_xlsx_is_flagged_not_silently_taken_as_sales(self):
+        """B-1:GL/银行/销项三家表头都不像 → 归销项汇总是盲猜,不许无痕。
+
+        修前一律 (sales_summary, pending, None):一份表头没被认出来的 GL 或流水会走同一条
+        兜底路,它的数字直接进 R2 销售额,且 flag_reason 为空不进任何清单。
+        """
+        with tempfile.TemporaryDirectory() as td:
+            mystery = Path(td) / "export_2569_05.xlsx"
+            _write_xlsx(mystery, ["รหัส", "รายละเอียด", "จำนวน", "หมายเหตุ"])
+            store = FakeItemStore([_item(1, str(mystery))])
+            sort_step.run(_ctx(store))
+
+        row = store.by_ref("export_2569_05.xlsx")
+        self.assertEqual(row["kind"], "sales_summary")  # 下游口径不变
+        self.assertEqual(row["status"], "flagged")  # 但要人确认一次
+        self.assertEqual(row["flag_reason"], "table_kind_unclear:xlsx")
+
+    def test_recognisable_sales_header_stays_frictionless(self):
+        # 有销售语义列名 = 认出来了,不许因为这条新判据给正常汇总表加一次点击。
+        with tempfile.TemporaryDirectory() as td:
+            pos = Path(td) / "export_2569_05.xlsx"
+            _write_xlsx(pos, ["วันที่", "ยอดขาย", "ภาษีขาย"])
+            store = FakeItemStore([_item(1, str(pos))])
+            sort_step.run(_ctx(store))
+
+        row = store.by_ref("export_2569_05.xlsx")
+        self.assertEqual(row["kind"], "sales_summary")
+        self.assertNotEqual(row["status"], "flagged")
+
+    def test_sales_summary_filename_alone_is_enough(self):
+        # 文件名已明说是销售汇总 → 不必再看表头(与 PDF 路同一口径)。
+        with tempfile.TemporaryDirectory() as td:
+            named = Path(td) / "sales summary may.xlsx"
+            _write_xlsx(named, ["a", "b", "c"])
+            store = FakeItemStore([_item(1, str(named))])
+            sort_step.run(_ctx(store))
+
+        self.assertNotEqual(store.by_ref("sales summary may.xlsx")["status"], "flagged")
+
     def test_pdf_bank_by_filename_else_waits_for_ocr(self):
         store = FakeItemStore([_item(1, "/in/STM KBANK.pdf"), _item(2, "/in/scan_0001.pdf")])
         out = sort_step.run(_ctx(store))

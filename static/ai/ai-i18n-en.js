@@ -195,6 +195,7 @@ window.__AI_I18N_EN__ = {
     rv_flag_discount_inferred: 'System added a discount line · check the original',
     rv_flag_bank_amount_rewritten:
         'Amount back-computed from balances · verify against the statement',
+    rv_flag_table_kind_unclear: 'Table type unclear · taken as sales summary · please confirm',
     rv_flag_vat_unreadable: 'VAT figure unreadable · compare original and assign direction',
     rv_flag_duplicate_suspect:
         'Possible duplicate · no invoice number to confirm · compare originals',

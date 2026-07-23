@@ -322,6 +322,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_ocr_low_conf: 'OCR 识别置信度偏低（{band}），建议核对票面',
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
     verdict_ocr_error: 'OCR 识别失败：{error}',
+    verdict_table_kind_unclear:
+        '这份表的表头既不像总账、也不像银行流水、也没有销售相关的列名。系统按默认把它当销项汇总收了 —— 这是一次猜测,不是判断。如果它其实是总账或流水,里面的数字会被当成本期销售额。请确认它确实是销项汇总;不是的话请剔除后按正确类别重传。',
     verdict_vat_unreadable:
         '这张票上印了 VAT,但那个数读不出来。读不出就判不了它是进项还是销项,也不能当「没有 VAT」处理——按没有处理会把它当非税件排掉,进项税就这么没了。请对照原票定方向(进项 P / 销项 S / 非税 X);定成进项后还要把税额补对。',
     verdict_duplicate_suspect:

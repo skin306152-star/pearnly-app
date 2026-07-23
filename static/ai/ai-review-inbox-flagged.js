@@ -98,13 +98,19 @@
         function runGroupBatch(flagReason, template) {
             var group = findGroup(flagReason);
             if (!group || !group.items.length) return;
-            // 冻结单的件不进批量(后端会整单拒,发了也是白撞 409 刷失败计数)
-            var actionable = group.items.filter(function (it) {
-                return !isArchived(it.work_order_id);
-            });
-            if (!actionable.length) return;
             var g = groupUiFor(flagReason);
             if (g.busy) return;
+            // 冻结单的件不进批量(后端会整单拒,发了也是白撞 409 刷失败计数);已裁决的件同样
+            // 不进 —— 会计逐张改过数之后再点组头的「全部按建议处理」,批量会拿组模板把他刚
+            // 改对的值重新覆盖回去(C-3)。判据走 AI.reviewQueue.isDecided 这份单一事实源,
+            // 与 ai-review-bulk.js 同口径,不在这里另写一套 truthy 判断。
+            var actionable = group.items.filter(function (it) {
+                return (
+                    !isArchived(it.work_order_id) &&
+                    !AI.reviewQueue.isDecided(it, g.local[it.item_id])
+                );
+            });
+            if (!actionable.length) return;
             g.busy = true;
             hooks.onChange();
             var grouped = byOrder(actionable);

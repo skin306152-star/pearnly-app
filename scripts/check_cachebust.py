@@ -44,9 +44,14 @@ class CacheBustPair(NamedTuple):
     ref: str  # 源 HTML 中该产物的引用片段(?v= 之前那段)
 
 
-# 监控清单 · 现只锁 main.js↔home.html;新产物带指纹时加一行(pos.js / console.js …)。
+# 监控清单。新产物带指纹时加一行(pos.js / console.js …)。
+# ★ ai.js 是 2026-07-23 补的:此前清单只有 main.js,于是 /ai 连续 5 次改动都改了
+# static/dist/ai.js 而 ai.html 的 ?v 一直停在 79,本闸每次照报 PASS —— 监控清单漏一行,
+# 闸就在它没覆盖的地方安静地绿着。加新的对外产物必须同步加一行。
 CACHE_BUST_PAIRS = (
     CacheBustPair(bundle="static/dist/main.js", html="home.html", ref="dist/main.js"),
+    CacheBustPair(bundle="static/dist/ai.js", html="static/ai/ai.html", ref="dist/ai.js"),
+    CacheBustPair(bundle="static/dist/ai.css", html="static/ai/ai.html", ref="dist/ai.css"),
 )
 
 

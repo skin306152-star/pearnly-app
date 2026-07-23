@@ -75,7 +75,7 @@ python-dotenv==1.2.2
 # 2026-05-24 · 1.20.2(无 py3.12 wheel)每次部署强制源码编译→失败→中断 pip install→
 # 后续包(python-docx 等)装不上。钉到生产实跑且有 py3.12 预编译 wheel 的 1.24.10。
 PyMuPDF==1.24.10
-pypdf==6.13.3  # 6.13.3 修 6 项 CVE(48735/49460/49461/54530/54531+GHSA-jm82·pip-audit 闸)
+pypdf==6.14.0  # 6.14.0 修 CVE-2026-59937/59938;6.13.3 曾修 6 项(48735/49460/49461/54530/54531+GHSA-jm82)·pip-audit 闸
 pdfplumber==0.11.9
 pdfminer.six==20251230
 

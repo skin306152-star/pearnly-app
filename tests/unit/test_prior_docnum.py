@@ -105,5 +105,36 @@ class ReimportKeyTests(unittest.TestCase):
         self.assertEqual(p["prior_docnum"], "D9")
 
 
+class CompanionVersionGateTests(unittest.TestCase):
+    """小助手是手动发版的,客户机跑旧版是常态。旧版会把 prior_docnum 当未知字段忽略 ——
+    闸静默不存在而云端以为受保护,这是「以为有闸其实没有」,比没闸更危险。"""
+
+    def _warns(self, version):
+        body = '{"express_docnum": "D1", "meta": {"companion_version": "%s"}}' % version
+        with _with_row({"response_body": body}):
+            with self.assertLogs("services.erp.express_push.prior_doc", "WARNING") as cm:
+                doc = prior_docnum("h1")
+                return doc, cm.output
+        return None, []
+
+    def test_old_companion_warns_loudly(self):
+        doc, out = self._warns("1.1.46")
+        self.assertEqual(doc, "D1")  # 仍然带下去 —— 新版小助手连着时闸照样要能用
+        self.assertTrue(any("防重单闸可能不生效" in x for x in out))
+
+    def test_current_companion_silent(self):
+        body = '{"express_docnum": "D1", "meta": {"companion_version": "1.1.47"}}'
+        with _with_row({"response_body": body}):
+            with self.assertNoLogs("services.erp.express_push.prior_doc", "WARNING"):
+                self.assertEqual(prior_docnum("h1"), "D1")
+
+    def test_unknown_version_is_not_guessed(self):
+        """版本读不出来时不喊狼来了 —— 误报多了没人看告警。"""
+        body = '{"express_docnum": "D1", "meta": {}}'
+        with _with_row({"response_body": body}):
+            with self.assertNoLogs("services.erp.express_push.prior_doc", "WARNING"):
+                self.assertEqual(prior_docnum("h1"), "D1")
+
+
 if __name__ == "__main__":
     unittest.main()

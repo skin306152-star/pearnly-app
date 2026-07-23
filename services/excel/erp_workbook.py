@@ -28,7 +28,7 @@ except ImportError:
 
 from services.excel import erp_roundtrip as rt
 from services.excel import xlsx_style as sty
-from services.excel.excel_template_th import write_sales_sheet
+from services.excel.excel_template_th import sales_detail_filename, write_sales_sheet
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ def _pending_rows(records: List[Dict[str, Any]]) -> List[List[Any]]:
                 _s(f.get("invoice_number")),
                 _s(f.get("seller_name")) or _s(f.get("buyer_name")),
                 _s(f.get("seller_tax")) or _s(f.get("buyer_tax")),
-                _first(f, "total_amount"),
+                _f(f.get("total_amount")),
                 _s(rec.get("reason") or f.get("pending_reason")),
                 *rt.roundtrip_values(
                     party_tax=f.get("seller_tax") or f.get("buyer_tax"),
@@ -207,6 +207,4 @@ def build_review_workbook(
 
 
 def review_workbook_filename(prefix: str = "Pearnly_ERP_Review") -> str:
-    from datetime import datetime
-
-    return f'{prefix}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    return sales_detail_filename(prefix)

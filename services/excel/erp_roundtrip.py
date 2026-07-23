@@ -63,7 +63,6 @@ SALES_COL_QTY = "จำนวน"
 SALES_COL_PRICE = "ราคาต่อหน่วย"
 SALES_COL_AMOUNT = "จำนวนเงิน"
 SALES_COL_PRE_VAT = "รวมจำนวนเงินก่อนVAT"
-SALES_COL_VAT = "VAT"
 
 # 进项:沿用 ภ.พ.30 进项税明细的法定列(每行一张票 · 不拆商品行 —— 费用票整张进一个科目,
 # 与销项按行动库存的粒度天然不同,不该硬捏成一样)。
@@ -104,8 +103,6 @@ PENDING_WIDTHS: Tuple[int, ...] = (12, 18, 32, 20, 16, 36)
 
 PENDING_COL_DATE = PENDING_HEADERS[0]
 PENDING_COL_INVOICE = PENDING_HEADERS[1]
-PENDING_COL_PARTY = PENDING_HEADERS[2]
-PENDING_COL_TOTAL = PENDING_HEADERS[4]
 
 # ── 推送状态标签(泰文 · 与表格其余部分同语言)────────────────────────────
 _STATUS_LABEL = {

@@ -18,6 +18,18 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+# 小助手从这个版本起认 prior_docnum(见 companion/dbf_sales.ERR_PRIOR_DOC_EXISTS)。
+# 比它旧的版本会把这个键当未知字段忽略 —— 闸静默不存在,而云端以为自己受保护了。
+# 小助手是手动发版的,客户机上跑旧版是常态,故这里必须能看出来。
+GUARD_MIN_COMPANION = (1, 1, 47)
+
+
+def _version_tuple(raw: Any) -> tuple:
+    try:
+        return tuple(int(x) for x in str(raw or "").strip().split("."))
+    except ValueError:
+        return ()
+
 
 def prior_docnum(history_id: Any) -> Optional[str]:
     """该单据上一次成功推送写出的 ERP 凭证号;没有则 None。只读 · 查询失败降级为 None。
@@ -54,7 +66,20 @@ def prior_docnum(history_id: Any) -> Optional[str]:
     body = _coerce_body(dict(row).get("response_body"))
     meta = body.get("meta") if isinstance(body.get("meta"), dict) else {}
     doc = str(body.get("express_docnum") or meta.get("docnum") or "").strip()
-    return doc or None
+    if not doc:
+        return None
+    # 上一版是哪个小助手写的 —— 同一台机器多半还是它。版本不够就明着喊,别让"闸不存在"
+    # 静默发生:旧版忽略 prior_docnum 后照样建单,重复单要到对账时才暴露。
+    ver = _version_tuple(meta.get("companion_version"))
+    if ver and ver < GUARD_MIN_COMPANION:
+        logger.warning(
+            "防重单闸可能不生效:上一版 %s 由小助手 %s 写出,该版本不认 prior_docnum"
+            "(需 >= %s)。重推若未先删旧单会产生重复单。",
+            doc,
+            meta.get("companion_version"),
+            ".".join(str(x) for x in GUARD_MIN_COMPANION),
+        )
+    return doc
 
 
 def attach_prior_docnum(

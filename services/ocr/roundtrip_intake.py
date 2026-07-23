@@ -99,10 +99,9 @@ def try_parse_roundtrip(file_bytes: bytes, filename: str) -> Optional[PipelineRe
 
     pages: List[PipelinePageResult] = []
     for d in parsed["documents"]:
-        fields = dict(d["fields"])
-        # 方向由所在 Sheet 决定(= 会计的分类裁决)· 下游 explicit_direction 认这个键
-        fields["direction"] = d["direction"]
-        pages.append(_page(len(pages) + 1, fields, needs_review=False))
+        # fields.direction 由 reader 按 Sheet 名写好(= 会计的分类裁决)· 下游
+        # explicit_direction 认这个键,这里不重复写一遍
+        pages.append(_page(len(pages) + 1, dict(d["fields"]), needs_review=False))
     for p in parsed["pending"]:
         # 会计没把这张挪进销项/进项表 = 还没裁决方向。带出来但标人工:
         # 不推(推了就是替会计做方向决定),也不静默丢(丢了就是漏票)。

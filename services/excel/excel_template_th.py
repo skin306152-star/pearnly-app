@@ -35,6 +35,7 @@ try:
 except ImportError:
     Workbook = None  # type: ignore
 
+from services.excel import erp_roundtrip as rt
 from services.excel.erp_roundtrip import (
     ROUNDTRIP_HEADERS,
     ROUNDTRIP_WIDTHS,
@@ -46,16 +47,18 @@ from services.excel.erp_roundtrip import (
 logger = logging.getLogger(__name__)
 
 
+# 列名取自 erp_roundtrip —— 读侧按同一批常量取值。两边各写一份泰文串的话,改任一边
+# 读侧都不会报错,只是查不到列、静默降级成空值。
 HEADERS_TH = [
-    "วันที่",  # 1  date
-    "เลขที่",  # 2  invoice_no
-    "รหัสลูกค้า",  # 3  customer
-    "รหัสสินค้า",  # 4  product / description
-    "จำนวน",  # 5  qty (E)
-    "ราคาต่อหน่วย",  # 6  unit_price (F)
-    "จำนวนเงิน",  # 7  amount = E*F
+    rt.SALES_COL_DATE,  # 1  date
+    rt.SALES_COL_INVOICE,  # 2  invoice_no
+    rt.SALES_COL_PARTY,  # 3  customer
+    rt.SALES_COL_ITEM,  # 4  product / description
+    rt.SALES_COL_QTY,  # 5  qty (E)
+    rt.SALES_COL_PRICE,  # 6  unit_price (F)
+    rt.SALES_COL_AMOUNT,  # 7  amount = E*F
     "รวมจำนวนเงิน",  # 8  line total = E*F
-    "รวมจำนวนเงินก่อนVAT",  # 9  pre-VAT = E*F
+    rt.SALES_COL_PRE_VAT,  # 9  pre-VAT = E*F
     "VAT",  # 10 = I*0.07
     "อ้างอิง",  # 11 ref / note(留空)
     "Status",  # 12 会计手填过账状态(留空)

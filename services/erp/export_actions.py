@@ -52,15 +52,8 @@ def _parse_erp_actions(response_body: Any) -> Dict[str, Any]:
         "party_code": str(meta.get("party_code") or "").strip(),
         # 小助手如实回报这张单按哪个方向写进的 ERP —— 分表靠它,不靠再猜一次
         "direction": str(meta.get("doc_type") or "").strip().lower(),
-        # 本次真正新建出来的主档码。在 Express 里删单不会删这些档 —— 不给码就清理不掉
-        "created_masters": [
-            str(c).strip() for c in (meta.get("created_masters") or []) if str(c or "").strip()
-        ],
-        "created_party_code": (
-            str(meta.get("party_code") or "").strip()
-            if meta.get("created_customer") or meta.get("created_supplier")
-            else ""
-        ),
+        # 对手方是不是本次新建的。码是码、新建与否是新建与否,不编码进同一个字符串的空/非空
+        "created_party": bool(meta.get("created_customer") or meta.get("created_supplier")),
     }
 
 
@@ -82,12 +75,9 @@ def collect_created_masters(
         mf = mf if isinstance(mf, dict) else {}
         docnum = str(act.get("docnum") or "")
         items = mf.get("items") if isinstance(mf.get("items"), list) else []
+        codes = act.get("item_codes") or []
         for i, created in enumerate(act.get("items") or []):
-            code = (
-                (act.get("item_codes") or [""] * (i + 1))[i]
-                if i < len(act.get("item_codes") or [])
-                else ""
-            )
+            code = codes[i] if i < len(codes) else ""
             if not created or not code or ("item", code) in seen:
                 continue
             seen.add(("item", code))
@@ -95,11 +85,11 @@ def collect_created_masters(
             if i < len(items) and isinstance(items[i], dict):
                 name = str(items[i].get("description") or items[i].get("name") or "")
             out.append({"kind": "item", "code": code, "name": name, "docnum": docnum})
-        party = act.get("created_party_code") or ""
+        party = act.get("party_code") if act.get("created_party") else ""
         if party and ("party", party) not in seen:
             seen.add(("party", party))
             kind = "supplier" if act.get("direction") == "purchase" else "customer"
-            name = str(mf.get("seller_name") if kind == "supplier" else mf.get("buyer_name") or "")
+            name = str(mf.get("seller_name" if kind == "supplier" else "buyer_name") or "")
             out.append({"kind": kind, "code": party, "name": name, "docnum": docnum})
     return out
 

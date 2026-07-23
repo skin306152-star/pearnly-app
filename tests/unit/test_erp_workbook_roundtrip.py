@@ -273,7 +273,8 @@ class CreatedMastersTests(unittest.TestCase):
                     "items": [True],
                     "item_codes": ["PN00048"],
                     "docnum": "SA1",
-                    "created_party_code": "ท029",
+                    "party_code": "ท029",
+                    "created_party": True,
                     "direction": "sales",
                 }
             },
@@ -286,14 +287,21 @@ class CreatedMastersTests(unittest.TestCase):
 
     def test_reused_masters_never_listed(self):
         out = self._collect(
-            {"h1": {"items": [False], "item_codes": ["500603"], "created_party_code": ""}},
+            {"h1": {"items": [False], "item_codes": ["500603"], "created_party": False}},
             [{"merged_fields": {"items": [{"description": "BRAKE"}]}}],
         )
         self.assertEqual(out, [])
 
     def test_purchase_party_labelled_supplier(self):
         out = self._collect(
-            {"h1": {"items": [], "created_party_code": "ไ001", "direction": "purchase"}},
+            {
+                "h1": {
+                    "items": [],
+                    "party_code": "ไ001",
+                    "created_party": True,
+                    "direction": "purchase",
+                }
+            },
             [{"merged_fields": {"seller_name": "ไทยออยล์"}}],
         )
         self.assertEqual(out[0]["kind"], "supplier")
@@ -301,8 +309,8 @@ class CreatedMastersTests(unittest.TestCase):
 
     def test_same_code_not_listed_twice(self):
         acts = {
-            "h1": {"items": [True], "item_codes": ["PN1"], "created_party_code": ""},
-            "h2": {"items": [True], "item_codes": ["PN1"], "created_party_code": ""},
+            "h1": {"items": [True], "item_codes": ["PN1"], "created_party": False},
+            "h2": {"items": [True], "item_codes": ["PN1"], "created_party": False},
         }
         recs = [{"merged_fields": {"items": [{"description": "X"}]}}] * 2
         self.assertEqual(len(self._collect(acts, recs)), 1)

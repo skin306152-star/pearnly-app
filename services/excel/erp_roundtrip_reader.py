@@ -74,6 +74,24 @@ def _row_is_blank(ws, row: int, hmap: Dict[str, int]) -> bool:
     return not any(_text(_cell(ws, row, hmap, h)) for h in hmap)
 
 
+# 被人编辑过的表 max_row 常被格式撑到上万行,而 openpyxl 读不存在的格会新建 Cell 对象
+# 塞进 _cells。连续这么多空行就当到底了,免得为几千个幽灵行建几万个格。
+_BLANK_STREAK_STOP = 50
+
+
+def _data_rows(ws, hmap: Dict[str, int]):
+    """逐条数据行 -> (行号, 解出的回导键)。空行跳过,连续空行够多就停。"""
+    streak = 0
+    for row in range(2, (ws.max_row or 1) + 1):
+        if _row_is_blank(ws, row, hmap):
+            streak += 1
+            if streak >= _BLANK_STREAK_STOP:
+                return
+            continue
+        streak = 0
+        yield row, rt.decode_row_key(_text(_cell(ws, row, hmap, rt.COL_ROW_KEY)))
+
+
 def _parse_sales_line(ws, row: int, hmap: Dict[str, int]) -> Dict[str, Any]:
     """销项一行 = 一个商品行。金额缺(公式无缓存)时按合同 数量×单价 补。"""
     qty = _num(_cell(ws, row, hmap, rt.SALES_COL_QTY))
@@ -103,11 +121,7 @@ def _read_sales_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
     会计改票号是这个流程的主要目的之一,按票号聚合会把改过号的行拆散。"""
     groups: Dict[str, Dict[str, Any]] = {}
     order: List[str] = []
-    for row in range(2, (ws.max_row or 1) + 1):
-        if _row_is_blank(ws, row, hmap):
-            continue
-        key_raw = _text(_cell(ws, row, hmap, rt.COL_ROW_KEY))
-        decoded = rt.decode_row_key(key_raw)
+    for row, decoded in _data_rows(ws, hmap):
         invoice_no = _text(_cell(ws, row, hmap, rt.SALES_COL_INVOICE))
         # 键 > 票号 > 行号:三级兜底,任何一行都不会被静默并进别人的单据
         gkey = decoded[0] if decoded else (f"inv:{invoice_no}" if invoice_no else f"row:{row}")
@@ -143,10 +157,7 @@ def _read_sales_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
 def _read_purchase_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
     """进项表每行一张票(费用票整张进一个科目 · 不拆商品行)。"""
     out: List[Dict[str, Any]] = []
-    for row in range(2, (ws.max_row or 1) + 1):
-        if _row_is_blank(ws, row, hmap):
-            continue
-        decoded = rt.decode_row_key(_text(_cell(ws, row, hmap, rt.COL_ROW_KEY)))
+    for row, decoded in _data_rows(ws, hmap):
         base = _num(_cell(ws, row, hmap, rt.PURCHASE_COL_PRE_VAT))
         vat = _num(_cell(ws, row, hmap, rt.PURCHASE_COL_VAT))
         total = _num(_cell(ws, row, hmap, rt.PURCHASE_COL_TOTAL))
@@ -180,10 +191,7 @@ def _read_purchase_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
 def _read_pending_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
     """待判表:会计没裁决的票。原样带出来给调用方如实汇报,不推。"""
     out: List[Dict[str, Any]] = []
-    for row in range(2, (ws.max_row or 1) + 1):
-        if _row_is_blank(ws, row, hmap):
-            continue
-        decoded = rt.decode_row_key(_text(_cell(ws, row, hmap, rt.COL_ROW_KEY)))
+    for row, decoded in _data_rows(ws, hmap):
         out.append(
             {
                 "fields": {
@@ -204,14 +212,6 @@ _SHEET_READERS = {
     rt.SHEET_PURCHASE: _read_purchase_sheet,
     rt.SHEET_PENDING: _read_pending_sheet,
 }
-
-
-def looks_like_roundtrip_workbook(file_bytes: bytes) -> bool:
-    """便宜的预判:任一 Sheet 名是我们的数据表且表头带全回导列。用于收料口分流。"""
-    try:
-        return bool(_open_data_sheets(file_bytes))
-    except Exception:  # noqa: BLE001 — 预判失败一律当"不是",回落通用路
-        return False
 
 
 def _open_data_sheets(file_bytes: bytes):

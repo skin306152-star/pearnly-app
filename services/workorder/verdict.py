@@ -44,6 +44,7 @@ _K_LOW_CONF = "verdict_ocr_low_conf"
 _K_VALIDATION = "verdict_ocr_validation"
 _K_OCR_ERROR = "verdict_ocr_error"
 _K_DUPLICATE = "verdict_duplicate"
+_K_DUPLICATE_SUSPECT = "verdict_duplicate_suspect"
 _K_DISCOUNT_INFERRED = "verdict_discount_inferred"
 _K_TOTALS_RESCUED = "verdict_totals_rescued"
 _K_BANK_AMOUNT_REWRITTEN = "verdict_bank_amount_rewritten"
@@ -158,6 +159,9 @@ _MAP = {
     "ocr_error": _Policy(_K_OCR_ERROR, LOW, _error_params, SEV_CRIT, None),
     # 指纹精确命中复件 → high,建议剔除。
     "duplicate_of": _Policy(_K_DUPLICATE, HIGH, _dup_params, SEV_CRIT, _EXCLUDE),
+    # B-5:指纹缺票号(或金额读不出)时只够「像」不够「是」——同供应商两张同额票会撞成
+    # 一枚。LOW + 无安全默认:绝不给批量一键排除,排错了就是把真票的抵扣悄悄扔了。
+    "duplicate_suspect": _Policy(_K_DUPLICATE_SUSPECT, LOW, _dup_params, SEV_CRIT, None),
     # 系统按勾稽差额替票面补了一行折扣 → 票面现在自洽,但那份自洽是系统自己造的。
     # crit(直接改了钱面字段)、无安全默认:必须有人对着原图确认真印了这行折扣。
     "discount_inferred": _Policy(_K_DISCOUNT_INFERRED, LOW, _discount_params, SEV_CRIT, None),

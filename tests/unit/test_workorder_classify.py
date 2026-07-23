@@ -176,6 +176,37 @@ class ClassifyImageTests(unittest.TestCase):
         # 第一张不受影响,仍正常归堆。
         self.assertEqual(store.by_id("i1")["kind"], "purchase_invoice")
 
+    def test_weak_fingerprint_collision_goes_to_review_not_silently_excluded(self):
+        """B-5:票号读不出时「同供应商 + 同金额」不足以证明是同一张,绝不自动排除。
+
+        修前:两张不同的票撞同一枚指纹 → 第二张 status=excluded / flagged=False,
+        进项税被静默扔掉且不进人审队列。现在留在进项堆标 flagged,R1 无裁决即停机点名。
+        """
+        first = _item("i1", "/in/IMG_0001.jpg")
+        second = _item("i2", "/in/IMG_0002.jpg")
+        store = FakeItemStore([first, second])
+        fields_by_path = {
+            # 同一供应商、同一金额、票号都没读出来 —— 但它们是两张不同的票。
+            "/in/IMG_0001.jpg": _purchase_fields(invoice_no="", total="500.00"),
+            "/in/IMG_0002.jpg": _purchase_fields(invoice_no="", total="500.00"),
+        }
+        classify._ocr_image = lambda path: fields_by_path[path]
+
+        out = classify.run(_ctx(store))
+
+        self.assertEqual(out.payload["bins"], {"purchase_invoice": 2})
+        suspect = store.by_id("i2")
+        self.assertEqual(suspect["kind"], "purchase_invoice")  # 没被踢出进项堆
+        self.assertEqual(suspect["status"], "flagged")  # 进人审队列
+        self.assertEqual(suspect["flag_reason"], "duplicate_suspect:IMG_0001.jpg")
+
+    def test_strong_fingerprint_still_auto_excludes(self):
+        # 票号在场 = 身份确凿,自动排除的既有行为不许因 B-5 被放宽。
+        store = FakeItemStore([_item("i1", "/in/a.jpg"), _item("i2", "/in/b.jpg")])
+        classify._ocr_image = lambda path: _purchase_fields(invoice_no="IV777", total="500.00")
+        classify.run(_ctx(store))
+        self.assertEqual(store.by_id("i2")["status"], "excluded")
+
     def test_non_tax_carries_reason_through_bin_ocr_fields(self):
         item = _item("i1", "/in/qr.jpg")
         store = FakeItemStore([item])

@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import hashlib
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from typing import Any
 
 _CENT = Decimal("0.01")
@@ -154,3 +154,19 @@ def dedupe_key(*, supplier_tax, doc_no, grand_total) -> str | None:
     total = format(_q(_d(grand_total)), "f")
     raw = f"{tax}|{no}|{total}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def dedupe_key_is_strong(*, doc_no, grand_total) -> bool:
+    """这枚指纹能不能当「就是同一张票」的证据。
+
+    票号是单据的身份。票号缺失时指纹退化成「税号|空|金额」——同一供应商开两张金额相同的票
+    (月度固定费用、同款商品复购)会撞成同一枚,把两张不同的票判成重复。金额也解不出时 _d
+    还会把它归 0,撞车面更宽。这两种情况下指纹只够「像」不够「是」,命中必须交人看:自动
+    排除排掉的是真票的抵扣,且不进人审就没有任何人会知道(B-5)。
+    """
+    if not str(doc_no or "").strip():
+        return False
+    try:
+        return _q(Decimal(str(grand_total))) > 0
+    except (TypeError, ValueError, ArithmeticError, InvalidOperation):
+        return False

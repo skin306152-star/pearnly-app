@@ -193,6 +193,7 @@ window.__AI_I18N_JA__ = {
     rv_flag_sales_doc: '自社の売上請求書 · 確認してください（S キー）',
     rv_flag_discount_inferred: 'システムが割引行を補いました · 原本と照合してください',
     rv_flag_bank_amount_rewritten: '金額は残高から逆算して補われたもの · 明細と照合してください',
+    rv_flag_duplicate_suspect: '重複の疑い · 伝票番号がなく確定不可 · 原本を照合',
     rv_flag_totals_rescued: '金額は2つ目のモデルで読み直し · 原本と照合してください',
     rv_key_dir_purchase: '仕入',
     rv_key_dir_sales: '売上',

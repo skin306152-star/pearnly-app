@@ -322,6 +322,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_ocr_low_conf: 'OCR 识别置信度偏低（{band}），建议核对票面',
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
     verdict_ocr_error: 'OCR 识别失败：{error}',
+    verdict_duplicate_suspect:
+        '这张票和 {of} 可能是同一张,但它没读出票号——只靠「供应商 + 金额」认不出是不是同一张(同一家开两张金额一样的票很常见)。请对照两张原票:确实重复就剔除,不是同一张就采纳票面',
     verdict_duplicate: '与已收票据重复（重复于 {of}）',
     verdict_bank_amount_rewritten:
         '这份银行账单里有 {rows} 行的金额不是读出来的，是系统按前后余额反推填进去的。反推完余额自然对得上，但那份对得上是系统自己造的，证明不了原始读数错在哪。这些数还是销项倒推和逐笔对账的基数，请对着账单确认',

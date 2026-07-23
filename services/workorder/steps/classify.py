@@ -325,17 +325,21 @@ def _classify_from_ocr(
     if kind == kinds.PURCHASE_INVOICE:
         fp = purchase_dedup.purchase_fingerprint(fields)
         hit = seen.get(fp) if fp else None
-        if hit:
+        if hit and purchase_dedup.fingerprint_is_strong(fields):
             upd = {
                 "status": "excluded",
                 "kind": kinds.DUPLICATE,
                 "flag_reason": f"duplicate_of:{hit}",
             }
             return {"kind": kinds.DUPLICATE, "flagged": False, "update": upd, "money": None}
-        if fp:
+        # 弱指纹(票号读不出/金额读不出)命中:只够「像」不够「是」——同供应商两张同额票会
+        # 撞成一枚。这类件留在进项堆标 flagged 交人裁,绝不自动排除:排掉的是真票的抵扣,
+        # 而且不进人审就没有任何人会知道(B-5)。R1 对无裁决的 flagged 进项票停机点名。
+        dup_suspect = f"duplicate_suspect:{hit}" if hit else None
+        if fp and not hit:
             seen[fp] = Path(item["file_ref"] or "").name
         # 数学勾稽/OCR 置信闸只对进项票生效:进项要用票面钱字段算 VAT,才需盯净+税=总额。
-        reason = _gate_reason(fields) or bin_reason
+        reason = dup_suspect or _gate_reason(fields) or bin_reason
     else:
         # 销项小票/EDC 结算条/银行流水页没有「净+税=总额」结构,不进数学闸——维持各自方向/
         # 类型判据(sales_direction_unhandled / bank_statement / non_tax),不被误挂 amount_math_fail。

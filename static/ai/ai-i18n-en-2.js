@@ -359,6 +359,8 @@ Object.assign(window.__AI_I18N_EN__, {
     verdict_ocr_validation:
         'OCR reading conflicts with a validation rule — please verify against the original',
     verdict_ocr_error: 'OCR could not read this document: {error}',
+    verdict_duplicate_suspect:
+        'This may be the same document as {of}, but its invoice number could not be read — supplier plus amount alone cannot establish identity (one supplier issuing two invoices of equal value is common). Compare both originals: exclude if genuinely duplicated, otherwise accept at face value',
     verdict_duplicate: 'Duplicate of an existing item ({of})',
     verdict_bank_amount_rewritten:
         '{rows} row(s) in this bank statement carry amounts that were not read but back-computed by the system from the surrounding balances. Once filled in, the balance chain necessarily reconciles — but that consistency is the system’s own doing and proves nothing about the original misread. These figures also feed the sales back-out and per-transaction reconciliation. Please verify them against the statement',

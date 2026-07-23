@@ -59,6 +59,7 @@
         discount_inferred: 'rv_flag_discount_inferred',
         totals_rescued: 'rv_flag_totals_rescued',
         bank_amount_rewritten: 'rv_flag_bank_amount_rewritten',
+        duplicate_suspect: 'rv_flag_duplicate_suspect',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');

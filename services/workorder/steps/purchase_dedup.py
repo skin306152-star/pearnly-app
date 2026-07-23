@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from services.purchase.totals import dedupe_key
+from services.purchase.totals import dedupe_key, dedupe_key_is_strong
 from services.workorder import evidence, kinds
 
 # item_classified 是存量事件词(evidence/reconcile/classify 均用),本模块只读回放不新增语义。
@@ -28,6 +28,14 @@ def purchase_fingerprint(fields: dict) -> Optional[str]:
         grand_total=fields.get("total_amount") or fields.get("subtotal"),
     )
     return f"doc:{digest}" if digest else None
+
+
+def fingerprint_is_strong(fields: dict) -> bool:
+    """这枚指纹够不够「就是同一张」的判据(票号在场且金额读得出)。弱指纹命中只能送人审。"""
+    return dedupe_key_is_strong(
+        doc_no=fields.get("invoice_number"),
+        grand_total=fields.get("total_amount") or fields.get("subtotal"),
+    )
 
 
 def replay_seen_fingerprints(ctx) -> dict:

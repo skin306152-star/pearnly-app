@@ -46,3 +46,18 @@ class BuddhistYearOfTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class GregorianPeriodTests(unittest.TestCase):
+    """B-6 前置:工单期间是佛历,票面日期是公历,不换算任何「距今几个月」的判据都恒不触发。"""
+
+    def test_buddhist_period_converts(self):
+        self.assertEqual(thai_date.gregorian_period("2569-05"), "2026-05")
+
+    def test_gregorian_period_is_idempotent(self):
+        self.assertEqual(thai_date.gregorian_period("2026-05"), "2026-05")
+
+    def test_garbage_returns_none_instead_of_guessing(self):
+        for bad in ("", None, "bad", "2569", "2569-13", "2569-00", 2569):
+            with self.subTest(value=bad):
+                self.assertIsNone(thai_date.gregorian_period(bad))

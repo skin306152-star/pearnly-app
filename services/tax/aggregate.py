@@ -38,6 +38,21 @@ def _months_apart(period: str, doc_date) -> int:
     return (int(period[:4]) - doc_date.year) * 12 + (int(period[5:7]) - doc_date.month)
 
 
+def claim_window_expired(period: str, doc_date) -> bool:
+    """这张进项票对该期已过可抵窗口。period 必须是**公历**「YYYY-MM」。
+
+    月结工单线(reconcile)与账本线(本文件的有效可抵过滤)共用这一条规则,免得两处各写一份
+    「6 个月」——工单线此前根本没有期间判据,超期票照进 ภ.พ.30(B-6)。
+    ⚠️ 工单的 period 是佛历(2569-05),调用方必须先转公历再进来,否则差 543 年恒不过期。
+    """
+    if not doc_date:
+        return False
+    try:
+        return _months_apart(period, doc_date) > INPUT_VAT_CLAIM_MONTHS
+    except (TypeError, ValueError, AttributeError, IndexError):
+        return False
+
+
 def classify_payee(tax_id) -> tuple[str, bool]:
     """税号 → (payee_type, missing)。0 开头=法人→PND53,其余=个人→PND3;缺=默认法人+标缺。"""
     t = (tax_id or "").strip()
@@ -88,7 +103,7 @@ def _input_exclusions(cur, *, tenant_id, workspace_client_id, period, account_id
         amount = _dec(r["amount"])
         if r["dr_cr"] == "credit":
             amount = -amount
-        if r["doc_date"] and _months_apart(period, r["doc_date"]) > INPUT_VAT_CLAIM_MONTHS:
+        if claim_window_expired(period, r["doc_date"]):
             expired += amount
         elif not (r["supplier_tax_id"] or "").strip():
             no_taxid += amount

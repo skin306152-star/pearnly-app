@@ -98,3 +98,19 @@ def buddhist_year_of(value: object) -> Optional[int]:
         return None
     year = int(m.group(1))
     return year if looks_buddhist(year) else None
+
+
+def gregorian_period(period: object) -> Optional[str]:
+    """期间「YYYY-MM」→ 公历「YYYY-MM」;已是公历原样返回(幂等),解不出返 None。
+
+    工单的 period 是佛历(2569-05),票面日期落库却是公历 —— 两者直接比会差 543 年,任何
+    「距今几个月」的判据都会恒不触发(B-6 的可抵窗口就踩在这上面)。纪年换算只此一处。
+    """
+    try:
+        year_s, month_s = str(period).split("-")
+        month = int(month_s)
+    except (ValueError, AttributeError, TypeError):
+        return None
+    if not 1 <= month <= 12:
+        return None
+    return f"{to_gregorian_year(int(year_s)):04d}-{month:02d}"

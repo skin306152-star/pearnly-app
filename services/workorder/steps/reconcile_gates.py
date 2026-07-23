@@ -9,11 +9,14 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional
 
+from core import thai_date
 from services.summary_import import columns
+from services.tax import aggregate as tax_aggregate
 from services.workorder import corrections, decisions, kinds
 
 TOL = Decimal("0.01")
@@ -126,12 +129,37 @@ def _face_value(it: dict, money: dict, unresolved: list) -> Optional[dict]:
     return _effective(money)
 
 
+def _expired_note(money: dict, period: Optional[str]) -> Optional[str]:
+    """这张票对本期是否已过泰国 6 个月可抵窗口 → 给人看的一句话;没过/判不了 → None。
+
+    规则单一事实源在 services/tax/aggregate.claim_window_expired(账本线同一条)。工单线
+    此前零日期判据,超期票的税额照进 ภ.พ.30(B-6):这是多抵,被查要补税加罚。
+    这里只识别与点名,绝不自动剔除 —— 自动剔除同样是背着人改钱,方向反了而已。
+    日期读不出来的票不在此拦(那是另一道闸的事),不硬判。
+    """
+    period_ad = thai_date.gregorian_period(period)
+    if not period_ad:
+        return None
+    raw = str(money.get("invoice_date") or "").strip()[:10]
+    try:
+        doc_date = date.fromisoformat(raw)
+    except ValueError:
+        return None
+    if not tax_aggregate.claim_window_expired(period_ad, doc_date):
+        return None
+    return (
+        f"票面日期 {raw} 距本期已超 {tax_aggregate.INPUT_VAT_CLAIM_MONTHS} 个月,"
+        "按泰国规则该期不可抵 —— 请确认剔除,或明示按票面计入"
+    )
+
+
 def resolve_input_vat(
     purchases: list[dict],
     classified: dict,
     decisions: dict,
     ambiguous: list[dict] | None = None,
     sales_docs: list[dict] | None = None,
+    period: Optional[str] = None,
 ) -> dict:
     """R1:进项税 = Σ票面。ok 直接进;flagged 必须有人工裁决,否则计入 unresolved(绝不默认吞)。
     方向不明票(ambiguous)必须有人工 assign_kind 裁决:裁进项才入 Σ,裁销项/非税则排除,无裁决
@@ -163,6 +191,10 @@ def resolve_input_vat(
         if it["status"] == "ok":
             if not money:
                 unresolved.append(f"{_label(it, money)}: 缺 item_classified 金额事件")
+                continue
+            expired = _expired_note(money, period)
+            if expired:
+                unresolved.append(f"{_label(it, money)}: {expired}")
                 continue
             _count(it, money, _face_value(it, money, unresolved))
         else:  # flagged:查人工裁决

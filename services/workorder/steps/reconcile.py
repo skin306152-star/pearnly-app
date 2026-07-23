@@ -54,8 +54,9 @@ def run(ctx: StepContext) -> StepResult:
     ambiguous = gates.direction_items(items, decision_recs)
     # 自动判本方销项票(MC1-c.1):默认销项不进 R1、无裁决不停机,人工改判进项才计入(拍错票兜底)。
     sales_docs = [it for it in items if it["kind"] == decisions.SALES_DOC]
+    # period 传原样(佛历 2569-05);换公历在 gates 内走 thai_date 单一事实源(B-6)。
     r1 = gates.resolve_input_vat(
-        purchases, classified, decisions_by_item, ambiguous=ambiguous, sales_docs=sales_docs
+        purchases, classified, decisions_by_item, ambiguous, sales_docs, _shadow_period(ctx)
     )
     if r1["unresolved"]:
         return StepResult.stuck(r1["unresolved"])

@@ -209,6 +209,60 @@ class R1InputVatTests(unittest.TestCase):
         return FakeStore(items, events)
 
 
+class R1ClaimWindowTests(unittest.TestCase):
+    """B-6:超 6 个月的进项票不再无声计入 ภ.พ.30。
+
+    工单线此前零日期判据(compute 是一次减法),超期票的税额照进申报 = 多抵,被查要补税加罚;
+    账本线早有这条规则却在另一处(services/tax/aggregate),两套口径。修后走同一条规则,并且
+    只点名不自动剔除 —— 自动剔除同样是背着人改钱,只是方向反了。
+    ★ 工单 period 是佛历(2569-05),票面日期落库是公历,不转换判据恒不触发。
+    """
+
+    def _out(self, invoice_date, period="2569-11"):
+        items = [_pi("p1", file="old.jpg")]
+        events = [
+            _money_evt("p1", net="1000.00", vat="70.00", grand="1070.00"),
+            _sales_evt(),
+        ]
+        events[0]["payload"]["money"]["invoice_date"] = invoice_date
+        store = FakeStore(items, events)
+        store.get_work_order = lambda cur, *, tenant_id, work_order_id: {"period": period}
+        # 期间要真读得到才判得了超期:_shadow_period 在 cur 为空时直接返 None,给个非空游标。
+        ctx = StepContext(cur=object(), tenant_id="t-1", work_order_id="wo-1", store=store, data={})
+        return reconcile.run(ctx)
+
+    def test_invoice_beyond_six_months_stucks_and_names_the_ticket(self):
+        # 期间 2569-11 = 公历 2026-11;2026-01 的票已过 6 个月窗口。
+        out = self._out("2026-01-15")
+        self.assertEqual(out.status, "stuck")
+        self.assertTrue(any("old.jpg" in r for r in out.reasons), out.reasons)
+        self.assertTrue(any("2026-01-15" in r for r in out.reasons), out.reasons)
+        self.assertTrue(any("不可抵" in r for r in out.reasons), out.reasons)
+
+    def test_invoice_inside_window_counts_as_before(self):
+        out = self._out("2026-06-15")
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("70.00"))
+
+    def test_buddhist_period_is_converted_not_compared_raw(self):
+        """佛历年直接拿去比会差 543 年 → 判据恒不触发。这条钉死转换真发生了。"""
+        self.assertEqual(self._out("2026-01-15", period="2569-11").status, "stuck")
+        # 同一张票放在 2026-11(万一期间已是公历)也该判超期,转换要幂等。
+        self.assertEqual(self._out("2026-01-15", period="2026-11").status, "stuck")
+
+    def test_unreadable_date_is_not_judged_here(self):
+        # 日期读不出不在本闸拦(那是另一道闸的事),不硬判成超期。
+        out = self._out("")
+        self.assertEqual(out.status, "ok")
+
+    def test_no_period_skips_the_check(self):
+        items = [_pi("p1", file="old.jpg")]
+        events = [_money_evt("p1", net="1000.00", vat="70.00", grand="1070.00"), _sales_evt()]
+        events[0]["payload"]["money"]["invoice_date"] = "2020-01-01"
+        out = reconcile.run(_ctx(FakeStore(items, events)))  # FakeStore 无 get_work_order
+        self.assertEqual(out.status, "ok")
+
+
 class R1UnreadableMoneyTests(unittest.TestCase):
     """A-5 根治:票面钱字段「印了但读不出」绝不当 0 静默进合计,一律停机点名到票到字段。
 

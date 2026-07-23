@@ -43,6 +43,37 @@ def to_dec(v: Any) -> Decimal:
         return ZERO
 
 
+# 进 R1 合计与 R4 试算的三个票面钱字段(值 = 停机原因里给会计看的说法,别甩英文键名)。
+_MONEY_LABELS = {"subtotal": "净额", "vat": "税额", "total_amount": "含税额"}
+_MONEY_FIELDS = tuple(_MONEY_LABELS)
+
+
+def unreadable_money_fields(money: dict) -> list[str]:
+    """票面钱字段里「印了但读不出」的字段名。
+
+    to_dec 对解不出的值归 0 是为了让派生不抛错,但归 0 的值一旦进合计就是静默少算——OCR 把
+    税额读成 "7O.00" 与这张票真的没有税额,在合计里长得一模一样。这里把两者分开:None/空串
+    当「没印」(交给 _effective 派生兜底),其余解不出的一律是「读花了」,由调用方停机点名。
+    语义与 services/sales_agg/model.py 的显式上报同源。
+    """
+    bad = []
+    for field in _MONEY_FIELDS:
+        raw = money.get(field)
+        if raw is None:
+            continue
+        text = str(raw).replace(",", "").strip()
+        if not text:
+            continue
+        try:
+            # NaN/Infinity 是合法的 Decimal 字面量,但它们一旦进合计会把整单污染成 NaN
+            # 且不抛错,比解不出更隐蔽——一并当读花处理。
+            if not Decimal(text).is_finite():
+                bad.append(field)
+        except InvalidOperation:
+            bad.append(field)
+    return bad
+
+
 def _effective(money: dict) -> dict:
     """票面派生分录金额:净额/税额取原值,含税额缺失时用 净+税 兜底(保证借贷自洽)。"""
     net = to_dec(money.get("subtotal"))
@@ -76,6 +107,23 @@ def _label(item: dict, money: dict) -> str:
     name = Path(item.get("file_ref") or "").name or item.get("id") or "?"
     inv = (money or {}).get("invoice_number")
     return f"{name}({inv})" if inv else name
+
+
+def _face_value(it: dict, money: dict, unresolved: list) -> Optional[dict]:
+    """按票面取数的唯一入口。钱字段读花 → 点名不计入,绝不当 0 静默进合计。
+
+    所有「用这张票的票面数」的路径都走这里(自动 ok / flagged 按票面裁决 / 方向裁进项 /
+    销项票改判进项),判据只此一份——判据分散正是 A-2 那类「唯独漏了一处」的病根。
+    """
+    bad = unreadable_money_fields(money)
+    if bad:
+        # 把机器看到的原文一并摆出来:会计据此一眼判得出是 OCR 读花还是票本身印成这样。
+        seen = "、".join(f"{_MONEY_LABELS[f]}「{str(money.get(f)).strip()}」" for f in bad)
+        unresolved.append(
+            f"{_label(it, money)}: 票面{seen}读不出,未计入进项税 — 请核对原票后改数或排除"
+        )
+        return None
+    return _effective(money)
 
 
 def resolve_input_vat(
@@ -116,7 +164,7 @@ def resolve_input_vat(
             if not money:
                 unresolved.append(f"{_label(it, money)}: 缺 item_classified 金额事件")
                 continue
-            _count(it, money, _effective(money))
+            _count(it, money, _face_value(it, money, unresolved))
         else:  # flagged:查人工裁决
             dec = decisions.get(it["id"])
             if not dec:
@@ -131,18 +179,22 @@ def resolve_input_vat(
         _count(it, money, _apply_direction(it, money, decisions.get(it["id"]), unresolved))
     for it in sales_docs or []:
         money = classified.get(it["id"]) or {}
-        _count(it, money, _apply_sales_doc(it, money, decisions.get(it["id"])))
+        _count(it, money, _apply_sales_doc(it, money, decisions.get(it["id"]), unresolved))
     return {"total": total, "unresolved": unresolved, "entries": entries}
 
 
-def _apply_sales_doc(it: dict, money: dict, dec: Optional[dict]) -> Optional[dict]:
+def _apply_sales_doc(
+    it: dict, money: dict, dec: Optional[dict], unresolved: list
+) -> Optional[dict]:
     """自动判本方销项票的 R1 取数(MC1-c.1)。默认销项:票面不进 R1,无裁决也不 unresolved
     (机器已判销项,佐证聚合另算,绝不阻断出税)。人工 assign_kind 改判进项 → 用其 OCR 钱字段进 R1
-    (缺金额事件则跳过,不静默少算也不停整步——佐证票不该拖垮进项主线);改判销项/非税/豁免 → 排除。"""
+    (缺金额事件则跳过,不静默少算也不停整步——佐证票不该拖垮进项主线);改判销项/非税/豁免 → 排除。
+
+    改判进项后它就是进项主线的一员,钱字段读花照样点名;不停机的只是「没人裁决」那一路。"""
     if not dec or not dec.get("kind"):
         return None
     if dec.get("kind") == decisions.PURCHASE_INVOICE and money:
-        return _effective(money)
+        return _face_value(it, money, unresolved)
     return None
 
 
@@ -169,7 +221,7 @@ def _apply_direction(
         if not money:
             unresolved.append(f"{_label(it, money)}: 方向裁定进项但缺 OCR 金额事件")
             return None
-        return _effective(money)
+        return _face_value(it, money, unresolved)
     unresolved.append(f"{_label(it, money)}: 未知方向裁决 kind={kind!r}")
     return None
 
@@ -184,7 +236,7 @@ def _apply_decision(it: dict, money: dict, dec: dict, unresolved: list) -> Optio
         if not money:
             unresolved.append(f"{_label(it, money)}: 按票面裁决但缺金额事件")
             return None
-        return _effective(money)
+        return _face_value(it, money, unresolved)
     if decision == decisions.RECALC:
         values = dec.get("values") or {}
         if not values.get("vat"):

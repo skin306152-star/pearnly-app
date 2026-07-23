@@ -209,6 +209,109 @@ class R1InputVatTests(unittest.TestCase):
         return FakeStore(items, events)
 
 
+class R1UnreadableMoneyTests(unittest.TestCase):
+    """A-5 根治:票面钱字段「印了但读不出」绝不当 0 静默进合计,一律停机点名到票到字段。
+
+    修前:to_dec 把 "7O.00"(字母 O)归 0,这张票贡献 ฿0 进项税、工单照样 ok 出数 —— 进项税
+    少算而没有任何人知道。判据只此一份(_face_value),四条取数路径共用。
+    """
+
+    # 含税额一律不给:让 _effective 派生成 净+税,票面自身恒自洽 → R4 试算闸永远拦不住这张票。
+    # 只有 A-5 这道闸能拦。回滚验证时若含税额写死,红的会是 R4 而不是 A-5,等于测了个寂寞。
+    def _out(self, vat, *, net="1428.57"):
+        items = [_pi("p1", file="clean.jpg"), _pi("p2", file="IMG_2647.jpg")]
+        events = [
+            _money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"),
+            _money_evt("p2", net=net, vat=vat, grand=None, inv="IV002"),
+            _sales_evt(),
+        ]
+        return reconcile.run(_ctx(FakeStore(items, events)))
+
+    def test_readable_twin_proves_the_money_at_stake(self):
+        # 同一张票读对时它贡献 ฿70:这就是修前被静默吞掉的数额。
+        out = self._out("70.00")
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("170.00"))
+
+    def test_ocr_misread_vat_stucks_and_names_ticket_and_field(self):
+        out = self._out("7O.00")
+        self.assertEqual(out.status, "stuck")
+        self.assertTrue(any("IMG_2647" in r for r in out.reasons), out.reasons)
+        self.assertTrue(any("税额" in r and "7O.00" in r for r in out.reasons), out.reasons)
+        self.assertTrue(any("读不出" in r for r in out.reasons), out.reasons)
+        # 停机时绝不能顺手把少算的合计发出去。
+        self.assertIsNone(out.payload.get("input_vat_total"))
+
+    def test_na_and_dash_placeholders_are_misreads_not_zero(self):
+        for placeholder in ("N/A", "-", "—"):
+            with self.subTest(placeholder=placeholder):
+                self.assertEqual(self._out(placeholder).status, "stuck")
+
+    def test_nan_literal_never_poisons_the_total(self):
+        # Decimal("NaN") 是合法字面量,不抛错;修前它一路走到 R4 让整步崩 InvalidOperation。
+        self.assertEqual(self._out("NaN").status, "stuck")
+
+    def test_unreadable_subtotal_also_stucks(self):
+        self.assertEqual(self._out("100.00", net="1,4二8.57").status, "stuck")
+
+    def test_absent_money_field_keeps_current_derive_behaviour(self):
+        # None/空串是「票上没印这个数」,交给 _effective 派生兜底,不算读花 —— 不许因此卡单。
+        for absent in (None, "", "   "):
+            with self.subTest(absent=absent):
+                items = [_pi("p1", file="clean.jpg")]
+                events = [
+                    _money_evt("p1", net="1428.57", vat="100.00", grand=absent),
+                    _sales_evt(),
+                ]
+                out = reconcile.run(_ctx(FakeStore(items, events)))
+                self.assertEqual(out.status, "ok")
+                self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("100.00"))
+
+    def test_face_value_decision_on_misread_ticket_stucks(self):
+        items = [
+            _pi("p1", file="clean.jpg"),
+            _pi("x", status="flagged", flag_reason="amount_math_fail", file="IMG_2647.jpg"),
+        ]
+        events = [
+            _money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"),
+            _money_evt("x", net="58128.57", vat="4O69.00", grand=None, status="flagged"),
+            _decision_evt("x", "face_value"),
+            _sales_evt(),
+        ]
+        out = reconcile.run(_ctx(FakeStore(items, events)))
+        self.assertEqual(out.status, "stuck")
+        self.assertTrue(any("读不出" in r for r in out.reasons), out.reasons)
+
+    def test_direction_assigned_purchase_on_misread_ticket_stucks(self):
+        # 方向不明票必须 kind=unknown 才进方向通道;写成 purchase 会先被「未知裁决」拦下,
+        # 那样测的就不是这道闸了。
+        items = [_pi("p1", file="clean.jpg"), _ambiguous("d", file="DIR.jpg")]
+        events = [
+            _money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"),
+            _ambiguous_money_evt("d", net="1000.00", vat="7O.00", grand=None),
+            {
+                "event_type": "human_decision",
+                "step": "reconcile",
+                "payload": {"item_id": "d", "kind": "purchase_invoice"},
+            },
+            _sales_evt(),
+        ]
+        out = reconcile.run(_ctx(FakeStore(items, events)))
+        self.assertEqual(out.status, "stuck")
+        self.assertTrue(any("DIR.jpg" in r and "读不出" in r for r in out.reasons), out.reasons)
+
+    def test_helper_reports_only_printed_but_unreadable_fields(self):
+        from services.workorder.steps.reconcile_gates import unreadable_money_fields
+
+        self.assertEqual(unreadable_money_fields({"vat": "7O.00"}), ["vat"])
+        self.assertEqual(unreadable_money_fields({"subtotal": None, "vat": ""}), [])
+        self.assertEqual(
+            unreadable_money_fields({"subtotal": "x", "vat": "1", "total_amount": "N/A"}),
+            ["subtotal", "total_amount"],
+        )
+        self.assertEqual(unreadable_money_fields({"vat": "1,234.50"}), [])
+
+
 class R1DirectionAmbiguousTests(unittest.TestCase):
     """G1 黑洞根治:方向不明票(direction_ambiguous)绝不静默,必须走人工方向裁决归位。"""
 

@@ -29,10 +29,6 @@ _PICK_URL = "https://pearnly.com/dms-pick"
 
 BOOKING_ACTIONS = frozenset({cards.ACT_CONFIRM_BOOKING, cards.ACT_CANCEL_BOOKING})
 
-# 待选车会话比面板 token(15 分钟)活得久:会话是重发链接的唯一凭据,它先断,重发入口
-# 就等于不存在,用户只剩重拍身份证一条路(真扣一次 OCR 费)。只加长这一态,不动全局默认。
-_PICK_SESSION_TTL_MINUTES = 120
-
 # 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
 _spawn = _out.make_spawn("line_dms.booking")
 
@@ -78,14 +74,8 @@ async def offer_pick(
         "draft": draft or {},
         "name": name or (draft or {}).get("name", ""),
     }
-    await _thr(
-        store.set_session,
-        tenant,
-        line_user_id,
-        "picking",
-        payload,
-        ttl_minutes=_PICK_SESSION_TTL_MINUTES,
-    )
+    # 会话寿命按态查表(store._STATE_TTL_MINUTES):picking 必须活得比 15 分钟的面板 token 久。
+    await _thr(store.set_session, tenant, line_user_id, "picking", payload)
     url = f"{_PICK_URL}?t={token}"
     line_client.push_messages(line_user_id, [cards.pick_button_message(url)], channel=_CHANNEL)
 

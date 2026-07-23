@@ -19,26 +19,28 @@ from services.line_dms._out import _CHANNEL, _reply, _thr
 
 async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -> None:
     tenant = binding["tenant_id"]
-    sess = await _thr(store.get_session, tenant, line_user_id)
-    cmd = commands.classify(text)
+    cmd = commands.classify(text)  # 纯函数、零 IO:重置路径压根不必读会话
 
     if cmd == commands.CMD_RESET:
         await _thr(store.clear_session, tenant, line_user_id)
         _reply(reply_token, cards.TXT_RESET)
         return
 
+    sess = await _thr(store.get_session, tenant, line_user_id)
+    state = (sess or {}).get("state")
+
     if cmd in (commands.CMD_MENU, commands.CMD_GREETING):
-        if pick_resume.reply_menu_if_pending(reply_token, sess):
+        if pick_resume.reply_if_pending(reply_token, sess, with_menu=True):
             return
-        if (sess or {}).get("state") == "editing":
+        if state == "editing":
             # 编辑被菜单打断:就地结束编辑(半截新值作废、已收料留着),不把 editing 带进菜单。
-            sess = edit_flow.exit_editing(sess)
+            sess = {"payload": edit_flow.exit_editing(sess)}
         await menu_flow.open_menu(
             binding, line_user_id, reply_token, sess, greet=cmd == commands.CMD_GREETING
         )
         return
 
-    if (sess or {}).get("state") == "editing":  # 逐字段修正:下一条文本 = 新值
+    if state == "editing":  # 逐字段修正:下一条文本 = 新值
         await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
         return
 
@@ -55,11 +57,10 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
         await _capture_phone(binding, line_user_id, reply_token, sess, text)
         return
 
-    nudge = _nudge(sess)
-    if nudge is None:  # 无会话 → 菜单卡引路(取代旧 TXT_INTRO 文本)
+    if not sess:  # 无会话 → 菜单卡引路(取代旧 TXT_INTRO 文本)
         line_client.reply_messages(reply_token, [menu_cards.menu_card()], channel=_CHANNEL)
     else:
-        _reply(reply_token, nudge)
+        _reply(reply_token, _nudge(sess))
 
 
 async def _capture_phone(
@@ -82,14 +83,12 @@ async def _capture_phone(
     )
 
 
-def _nudge(sess: Optional[dict]) -> Optional[str]:
-    """按当前收料进度给下一步提示;None = 无会话,调用方弹菜单卡引路。
+def _nudge(sess: dict) -> str:
+    """按当前收料进度给下一步提示(无会话由调用方弹菜单卡引路,不进这里)。
 
     只管「还缺材料」的态:picking/booking_review 已由上面的 pick_resume 分支接管,
     落不到这里——已建档的用户再听见「请发身份证和手机号」就是要人重付一次 OCR。
     """
-    if not sess:
-        return None
     if sess.get("state") == "reviewing":
         return cards.TXT_PICK_ABOVE
     payload = sess.get("payload") or {}

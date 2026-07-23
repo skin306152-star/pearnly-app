@@ -20,7 +20,7 @@
         pick: {},
         prefixUnmappable: false,
         form: {},
-        sameAs: { _ct: true, _sd: true },
+        sameAs: {},
         decision: 'update',
         tab: 'difference',
         busy: false,
@@ -287,8 +287,8 @@
         idKeys.forEach(function (k) {
             putIfSet(fields, k, S.form[k]);
         });
-        fields.people_id = S.form.people_id || S.newVals.people_id || '';
-        fields.name = S.form.name || S.newVals.name || '';
+        putIfSet(fields, 'people_id', S.form.people_id || S.newVals.people_id);
+        putIfSet(fields, 'name', S.form.name || S.newVals.name);
         var block = function (sfx) {
             var o = {};
             ADDR_KEYS.forEach(function (k) {

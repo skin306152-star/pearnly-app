@@ -322,9 +322,41 @@ def _binding_dict(row, line_user_id: str) -> dict:
 # ── 会话态 ────────────────────────────────────────────────────────────────
 
 
-def set_session(tenant_id, line_user_id: str, state: str, payload=None, ttl_minutes: int = 30):
-    """存/覆盖会话态(upsert)。TTL 默认 30 分钟。"""
+DEFAULT_TTL_MINUTES = 30
+# 会话寿命是状态的属性,不是调用点的参数。待选车/待确认订车这两个态里客户档已经落定,
+# 会话是重签选车链接的唯一凭据 —— 它先于 15 分钟的面板 token 断掉,重发入口就等于不存在,
+# 用户只剩重拍身份证一条路(真扣一次 OCR 费)。写在表里,免得哪个写会话的调用点漏传。
+_STATE_TTL_MINUTES = {"picking": 120, "booking_review": 120}
+
+
+def state_ttl_minutes(state: str) -> int:
+    return _STATE_TTL_MINUTES.get(state, DEFAULT_TTL_MINUTES)
+
+
+def verify_nonce(
+    sess: Optional[dict], nonce: Optional[str], expect_state: str = "reviewing"
+) -> bool:
+    """只校验不消费的那半边守卫(consume_nonce 是校验+消费的孪生)。
+
+    读操作(开编辑菜单/重拍/保留旧档)不该吃掉 nonce,但也不能没有守卫——判据只此一份,
+    别再在各 handler 里就地手写状态与 nonce 比较。
+    """
+    payload = (sess or {}).get("payload") or {}
+    return bool(
+        sess and sess.get("state") == expect_state and nonce and payload.get("nonce") == nonce
+    )
+
+
+def set_session(
+    tenant_id, line_user_id: str, state: str, payload=None, ttl_minutes: Optional[int] = None
+):
+    """存/覆盖会话态(upsert)。ttl_minutes 缺省按 state 查表(见 _STATE_TTL_MINUTES)。
+
+    哨兵用 None 不用 0:0 是「立刻过期」这个合法值(测试与强制失效都在用)。
+    """
     from core import db
+
+    ttl = state_ttl_minutes(state) if ttl_minutes is None else int(ttl_minutes)
 
     def _run():
         with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
@@ -340,7 +372,7 @@ def set_session(tenant_id, line_user_id: str, state: str, payload=None, ttl_minu
                     str(line_user_id),
                     state,
                     json.dumps(payload or {}, ensure_ascii=False),
-                    int(ttl_minutes),
+                    ttl,
                 ),
             )
 

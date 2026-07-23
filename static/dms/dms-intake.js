@@ -277,7 +277,6 @@
         S.selectedId = null;
         S.decision = 'update';
         S.tab = 'difference';
-        S.sameAs = { _ct: true, _sd: true };
         renderUpload();
         showStep(1, 'dx-s-upload');
     }

@@ -47,7 +47,7 @@ async def handle_postback(
 
 
 def _open_menu(reply_token: str, sess: Optional[dict], nonce: Optional[str]) -> None:
-    if not _nonce_ok(sess, nonce):
+    if not store.verify_nonce(sess, nonce):
         _reply(reply_token, cards.TXT_EXPIRED)
         return
     line_client.reply_messages(reply_token, [cards.edit_menu_message(nonce)], channel=_CHANNEL)
@@ -61,7 +61,7 @@ async def _pick_field(
     nonce: Optional[str],
     field: Optional[str],
 ) -> None:
-    if not _nonce_ok(sess, nonce) or field not in _EDITABLE_FIELDS:
+    if not store.verify_nonce(sess, nonce) or field not in _EDITABLE_FIELDS:
         _reply(reply_token, cards.TXT_EXPIRED)
         return
     payload = (sess or {}).get("payload") or {}
@@ -82,20 +82,19 @@ def _cancel(
     零后台任务。此前这里派后台重跑查重(真 DMS 登录 15-25s),慢任务落地时会把旧会话
     砸回来,劫持用户已开始的下一个流程(2026-07-19 J4 取证实锤)。"""
     payload = (sess or {}).get("payload") or {}
-    if not _nonce_ok(sess, nonce) or not payload.get("id_card"):
+    if not store.verify_nonce(sess, nonce) or not payload.get("id_card"):
         _reply(reply_token, cards.TXT_EXPIRED)
         return
     _reply(reply_token, cards.TXT_EDIT_CANCELLED)
 
 
 def exit_editing(sess: Optional[dict]) -> Dict[str, Any]:
-    """结束编辑:去掉 editing_field 的会话快照(reviewing 态·nonce 不变,原卡即刻可用)。
+    """结束编辑:返回去掉 editing_field 的 payload(nonce 不变,原卡即刻可用)。
 
     纯函数不落库——调用方按各自去向只写一次会话(取消回 reviewing、菜单词进 menu 态),
     避免同一条消息连写两次。一律不重跑查重:慢任务落地会劫持用户已开始的下一个流程。
     """
-    payload = {k: v for k, v in ((sess or {}).get("payload") or {}).items() if k != "editing_field"}
-    return {"state": "reviewing", "payload": payload}
+    return {k: v for k, v in ((sess or {}).get("payload") or {}).items() if k != "editing_field"}
 
 
 # ── text:editing 态收新值 / 文本取消 ───────────────────────────────────────
@@ -106,9 +105,7 @@ async def handle_text(
     payload = (sess or {}).get("payload") or {}
     if text.strip() == cards.BTN_EDIT_CANCEL:
         restored = exit_editing(sess)
-        await _thr(
-            store.set_session, binding["tenant_id"], line_user_id, "reviewing", restored["payload"]
-        )
+        await _thr(store.set_session, binding["tenant_id"], line_user_id, "reviewing", restored)
         _reply(reply_token, cards.TXT_EDIT_CANCELLED)
         return
 
@@ -161,14 +158,6 @@ def _apply(id_card: Dict[str, Any], field: str, value: str) -> Dict[str, Any]:
     elif field in ("name", "people_id", "birthday_be"):
         ic[field] = value
     return ic
-
-
-def _nonce_ok(sess: Optional[dict], nonce: Optional[str]) -> bool:
-    """会话须在 reviewing 且 nonce 吻合(只校验不消费)。"""
-    payload = (sess or {}).get("payload") or {}
-    return bool(
-        sess and sess.get("state") == "reviewing" and nonce and payload.get("nonce") == nonce
-    )
 
 
 def _rerun(binding: dict, line_user_id: str, endpoint_id, id_card: dict, phone: str) -> None:

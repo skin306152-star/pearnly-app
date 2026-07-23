@@ -133,8 +133,17 @@ class PickingTextGuardTests(unittest.IsolatedAsyncioTestCase):
         with _Env() as env:
             env.seed("picking", {})
             await flow.handle_text(_BINDING, _LUID, "rt", "ราคาเท่าไร")
-            self.assertEqual(env.reply.call_args.args[1], cards.TXT_PICK_LOST)
+            self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
             self.assertEqual(env.session()["state"], "picking")
+
+    async def test_menu_choice_from_picking_says_booking_abandoned(self):
+        """菜单卡的按钮会覆写会话、掐死选车链接 —— 用户可以放弃,但系统必须说一声。"""
+        with _Env() as env:
+            env.seed("picking", {"customer_id": "C99", "endpoint_id": "E1"})
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_MENU_CUSTOMER))
+            said = env.reply.call_args.args[1]
+            self.assertIn(cards.TXT_PICK_ABANDONED, said)
+            self.assertEqual(env.session()["state"], "collecting")
 
     async def test_collecting_state_untouched_by_guard(self):
         """守门:非待选车态照旧走原路(号码仍被当号码收)。"""
@@ -181,18 +190,20 @@ class ReissueTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
 
 
-class PendingCustomerIdTests(unittest.TestCase):
-    def test_only_pick_states_count(self):
+class PendingSessionTests(unittest.TestCase):
+    def test_is_pending_only_pick_states(self):
+        self.assertTrue(pick_resume.is_pending({"state": "picking", "payload": {}}))
+        self.assertTrue(pick_resume.is_pending({"state": "booking_review", "payload": {}}))
+        self.assertFalse(pick_resume.is_pending({"state": "reviewing", "payload": {}}))
+        self.assertFalse(pick_resume.is_pending(None))
+
+    def test_pending_customer_id_is_pure_lookup(self):
+        """状态判定归 is_pending;这里只取值,别再兼任守卫(两处判据就会漂移)。"""
         self.assertEqual(
             pick_resume.pending_customer_id({"state": "picking", "payload": {"customer_id": "C1"}}),
             "C1",
         )
-        self.assertEqual(
-            pick_resume.pending_customer_id(
-                {"state": "reviewing", "payload": {"customer_id": "C1"}}
-            ),
-            "",
-        )
+        self.assertEqual(pick_resume.pending_customer_id({"payload": {}}), "")
         self.assertEqual(pick_resume.pending_customer_id(None), "")
 
 

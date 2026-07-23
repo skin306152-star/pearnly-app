@@ -11,7 +11,6 @@ const localServer = require('./_local_static_server');
 
 const PORT = 8976;
 const BASE = `http://127.0.0.1:${PORT}`;
-const ROOT = path.resolve(__dirname, '..', '..');
 const ART = path.join(__dirname, '_artifacts', 'dms_p1_closure');
 fs.mkdirSync(ART, { recursive: true });
 
@@ -117,7 +116,7 @@ function recognizeBody(scenario) {
 let server;
 const pushed = [];
 test.beforeAll(async () => {
-    server = await localServer.start(PORT, '/static/dms/dms.html');
+    server = await localServer.start(PORT, '/static/dist/dms.html');
 });
 test.afterAll(() => localServer.stop(server));
 

@@ -101,7 +101,7 @@ async def handle_postback(
         return
 
     # 选车链接重发(P1-12):零 OCR、零写档,cid 对齐守卫在 pick_resume 内。
-    if action in pick_resume.REISSUE_ACTIONS:
+    if action == cards.ACT_REISSUE_PICK:
         await pick_resume.handle_postback(binding, line_user_id, reply_token, pb, sess)
         return
 
@@ -117,9 +117,7 @@ async def handle_postback(
     if action == cards.ACT_KEEP:
         # 零写入不等于零后果:它会签发一条新的选车链接。nonce 只校验不消费(照 _retake),
         # 否则翻聊天记录点任意一张旧卡都能白拿链接。
-        keep_nonce = pb.get("nonce")
-        stale = not keep_nonce or payload.get("nonce") != keep_nonce
-        if (sess or {}).get("state") != "reviewing" or stale:
+        if not store.verify_nonce(sess, pb.get("nonce")):
             _reply(reply_token, cards.TXT_EXPIRED)
             return
         _reply(reply_token, cards.TXT_KEEP)

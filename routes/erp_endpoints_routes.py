@@ -161,7 +161,7 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         # DMS 防误推铁律(2026-05-31):mrerp_dms endpoint 的 auto_push 必须 false。
         # 发票自动推送按 db.list_erp_endpoints(auto_push_only=True) 选 endpoint,
         # 若 DMS endpoint auto_push=true 会被卷进发票自动推送 → 把 invoice history
-        # 误推进 DMS(高危数据错投)。身份证自动推送另用 config.id_card_auto_push。
+        # 误推进 DMS(高危数据错投)。身份证没有自动推送这回事——网页与 LINE 两条路都要人确认。
         effective_auto_push = False if req.adapter == "mrerp_dms" else req.auto_push
 
         new_id = db.create_erp_endpoint(

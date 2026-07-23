@@ -21,45 +21,34 @@ from services.line_dms._out import _CHANNEL, _reply
 # 客户档已落定、只差选车/确认订车的两个态。证件与手机号都在手上,不必再向用户要材料。
 PICK_STATES = frozenset({"picking", "booking_review"})
 
-REISSUE_ACTIONS = frozenset({cards.ACT_REISSUE_PICK})
+
+def is_pending(sess: Optional[dict]) -> bool:
+    """会话停在待选车态(客户档已落定,手上可能还有一条有效的选车链接)。"""
+    return bool(sess and sess.get("state") in PICK_STATES)
 
 
 def pending_customer_id(sess: Optional[dict]) -> str:
-    """会话停在待选车态且带客户号 → 客户号;否则空串。"""
-    if not sess or sess.get("state") not in PICK_STATES:
-        return ""
-    return str((sess.get("payload") or {}).get("customer_id") or "")
+    """待选车会话里的客户号(纯取值,状态判定归 is_pending)。"""
+    return str(((sess or {}).get("payload") or {}).get("customer_id") or "")
 
 
-def reply_if_pending(reply_token: str, sess: Optional[dict]) -> bool:
-    """待选车态收到普通文本:出重发卡、一个字节不动会话。返回是否已接管。
+def reply_if_pending(reply_token: str, sess: Optional[dict], *, with_menu: bool = False) -> bool:
+    """待选车态收到文本:出重发卡、一个字节不动会话。返回是否已接管。
 
     不覆写会话是要害:会话态是面板端点的准入条件,冲掉它等于把用户手上那条还没过期的
-    链接一起掐死;客户档丢了才谈得上重来,所以缺客户号时如实说,不再问人要身份证。
+    链接一起掐死。with_menu = 用户打的是 เมนู/问候语 —— 菜单是合法诉求照发,但仍不落
+    menu 态(open_menu 会覆写会话),重发卡挂在菜单卡后面,离输入框最近一指可点。
     """
-    if not sess or sess.get("state") not in PICK_STATES:
+    if not is_pending(sess):
         return False
     cid = pending_customer_id(sess)
+    msgs: List[dict] = [menu_cards.menu_card()] if with_menu else []
     if cid:
-        line_client.reply_messages(reply_token, [cards.pick_resume_card(cid)], channel=_CHANNEL)
-    else:
-        _reply(reply_token, cards.TXT_PICK_LOST)
-    return True
-
-
-def reply_menu_if_pending(reply_token: str, sess: Optional[dict]) -> bool:
-    """待选车态打 เมนู/问候语:菜单卡照发,但不落 menu 态,并附一张重发卡。
-
-    菜单是用户的合法诉求,不该被拦;可 open_menu 会把会话写成 menu,手上那条没过期的
-    链接立刻 401——页面文案又正好叫人「回 LINE 要一条」,照做反而更快掐死自己。
-    """
-    if not sess or sess.get("state") not in PICK_STATES:
-        return False
-    msgs: List[dict] = [menu_cards.menu_card()]
-    cid = pending_customer_id(sess)
-    if cid:  # 重发卡放最后:离输入框最近,一指可点
         msgs.append(cards.pick_resume_card(cid))
-    line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
+    if msgs:
+        line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
+    else:  # 无客户号 = 这条待选车会话已经没救(生产不可达,守着异常态别静默)
+        _reply(reply_token, cards.TXT_EXPIRED)
     return True
 
 
@@ -73,7 +62,7 @@ async def handle_postback(
     """
     payload = (sess or {}).get("payload") or {}
     cid = pb.get("cid") or ""
-    if not cid or cid != pending_customer_id(sess):
+    if not is_pending(sess) or not cid or cid != pending_customer_id(sess):
         _reply(reply_token, cards.TXT_EXPIRED)
         return
     await booking_flow.offer_pick(

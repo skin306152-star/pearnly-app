@@ -20,17 +20,17 @@
         var open = S.openSec[scn.id] !== false;
         // 镜像开着 = 保存时本区被身份证地址整段覆盖。分区默认折叠,所以后果得写在恒可见的
         // 分区副标题上,不能只留一个开关(界面所见 = 实际所写)。
-        var mirrored = !!(scn.addr && scn.sameAs && S.sameAs[scn.addr]);
-        var tools =
-            scn.addr && scn.sameAs
-                ? '<div class="dx-addr-tools"><span>' +
-                  esc(t('dx-same-addr')) +
-                  '</span><div class="dx-switch' +
-                  (S.sameAs[scn.addr] ? ' on' : '') +
-                  '" data-mirror="' +
-                  esc(scn.addr) +
-                  '"></div></div>'
-                : '';
+        var canMirror = !!(scn.addr && scn.sameAs);
+        var mirrored = !!(canMirror && S.sameAs[scn.addr]);
+        var tools = canMirror
+            ? '<div class="dx-addr-tools"><span>' +
+              esc(t('dx-same-addr')) +
+              '</span><div class="dx-switch' +
+              (S.sameAs[scn.addr] ? ' on' : '') +
+              '" data-mirror="' +
+              esc(scn.addr) +
+              '"></div></div>'
+            : '';
         var caret =
             '<div class="dx-fsec-caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>';
         return (

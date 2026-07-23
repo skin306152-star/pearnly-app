@@ -33,9 +33,7 @@ TXT_ID_CHECKSUM = (
 
 def review_text(missing: Iterable[str]) -> str:
     """OCR 打回时对用户说的话:校验位错说号码对不上,其余才是拍不清 + 列缺项。"""
-    keys = list(missing or [])
+    keys = list(missing)
     head = TXT_ID_CHECKSUM if CHECKSUM_KEY in keys else cards.TXT_BLURRY
     labels = [MISSING_LABELS_TH[k] for k in keys if k in MISSING_LABELS_TH]
-    if not labels:
-        return head
-    return head + " (" + ", ".join(labels) + ")"
+    return head + (" (" + ", ".join(labels) + ")" if labels else "")

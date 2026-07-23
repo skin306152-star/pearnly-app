@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.line_binding import line_client
-from services.line_dms import booking_flow, cards, menu_cards, store
+from services.line_dms import booking_flow, cards, menu_cards, pick_resume, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 MENU_ACTIONS = frozenset(
@@ -94,7 +94,12 @@ async def handle_postback(
 async def _choose(
     binding: dict, line_user_id: str, reply_token: str, sess: Optional[dict], action: str
 ) -> None:
-    """选中菜单项:给会话打 mode 回 collecting;齐料直接查重,缺料按缺项提示补料。"""
+    """选中菜单项:给会话打 mode 回 collecting;齐料直接查重,缺料按缺项提示补料。
+
+    从待选车态点进来 = 放弃那张未完成的订车单(会话被覆写,手上那条选车链接随即失效)。
+    这是用户的选择,不拦;但必须说一声——不说就是静默丢单。
+    """
+    abandoned = pick_resume.is_pending(sess)
     mode = MODE_CUSTOMER if action == cards.ACT_MENU_CUSTOMER else "booking"
     old = (sess or {}).get("payload") or {}
     payload = {k: old.get(k) for k in ("id_card", "phone", "endpoint_id") if old.get(k)}
@@ -105,17 +110,19 @@ async def _choose(
     if id_card and phone:
         from services.line_dms import flow  # 延迟导入避免 flow ↔ menu_flow 环依赖
 
+        if abandoned:
+            _reply(reply_token, cards.TXT_PICK_ABANDONED)
         flow._spawn(
             flow._run_dedup(binding, line_user_id, None, id_card, phone, payload.get("endpoint_id"))
         )
         return
     if id_card:
-        _reply(reply_token, cards.TXT_ASK_PHONE)
-        return
-    if phone:
-        _reply(reply_token, cards.TXT_ASK_CARD)
-        return
-    _reply(reply_token, cards.TXT_MENU_SEND_CARD)
+        tail = cards.TXT_ASK_PHONE
+    elif phone:
+        tail = cards.TXT_ASK_CARD
+    else:
+        tail = cards.TXT_MENU_SEND_CARD
+    _reply(reply_token, f"{cards.TXT_PICK_ABANDONED}\n{tail}" if abandoned else tail)
 
 
 async def _continue_booking(
@@ -147,7 +154,7 @@ async def _retake(
     """
     payload = (sess or {}).get("payload") or {}
     nonce = pb.get("nonce")
-    if not (sess and sess.get("state") == "reviewing" and nonce and payload.get("nonce") == nonce):
+    if not store.verify_nonce(sess, nonce):
         _reply(reply_token, cards.TXT_EXPIRED)
         return
     kept = {k: payload.get(k) for k in ("phone", "mode", "endpoint_id") if payload.get(k)}

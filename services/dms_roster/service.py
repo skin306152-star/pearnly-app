@@ -121,7 +121,6 @@ def create_operator(
 
     config = {
         "system_url": tcfg.get("system_url"),
-        "id_card_auto_push": tcfg.get("id_card_auto_push"),
         "username_enc": _encrypt(dms_username),
         "password_enc": _encrypt(dms_password),
     }

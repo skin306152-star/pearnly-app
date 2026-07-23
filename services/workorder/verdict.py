@@ -45,6 +45,7 @@ _K_VALIDATION = "verdict_ocr_validation"
 _K_OCR_ERROR = "verdict_ocr_error"
 _K_DUPLICATE = "verdict_duplicate"
 _K_DUPLICATE_SUSPECT = "verdict_duplicate_suspect"
+_K_VAT_UNREADABLE = "verdict_vat_unreadable"
 _K_DISCOUNT_INFERRED = "verdict_discount_inferred"
 _K_TOTALS_RESCUED = "verdict_totals_rescued"
 _K_BANK_AMOUNT_REWRITTEN = "verdict_bank_amount_rewritten"
@@ -154,6 +155,9 @@ _MAP = {
     "sales_doc_review": _Policy(_K_SALES_DOC, MID, _seller_params, SEV_WARN, _ASSIGN_SALES),
     # 双锚冲突/缺锚判不出 → low、crit(方向漏判会静默漏进项),无安全默认。
     "direction_ambiguous": _Policy(_K_DIRECTION, LOW, _seller_params, SEV_CRIT, None),
+    # B-2:票面 VAT 印了但读不出。此前与「本来就没有 VAT」同一信号,件从无税务要素出口被
+    # 当 non_tax 自动排除(B-3)。读不出方向也判不了 → 走方向通道交人定向,无安全默认。
+    "vat_unreadable": _Policy(_K_VAT_UNREADABLE, LOW, _seller_params, SEV_CRIT, None),
     "ocr_low_confidence": _Policy(_K_LOW_CONF, LOW, _band_params, SEV_WARN, None),
     "ocr_validation_warning": _Policy(_K_VALIDATION, LOW, _empty_params, SEV_WARN, None),
     "ocr_error": _Policy(_K_OCR_ERROR, LOW, _error_params, SEV_CRIT, None),

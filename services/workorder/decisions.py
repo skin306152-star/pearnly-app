@@ -50,7 +50,11 @@ BANK_RECON_REJECT = "bank_recon_reject"
 # 向后兼容保留(reconcile 的 ambiguous 收编口径、conservation 的方向判据仍认它)。
 DIRECTION_AMBIGUOUS = "direction_ambiguous"
 SALES_DIRECTION_UNHANDLED = "sales_direction_unhandled"
-DIRECTION_PREFIXES = (DIRECTION_AMBIGUOUS, SALES_DIRECTION_UNHANDLED)
+# 票面印了 VAT 但读不出(B-2):此前 _has_vat 把「读花」和「本来就没有」都归成 False,件因此
+# 从「无税务要素」出口被当 non_tax 静默排除。读不出方向也就无从判,交人定向 —— 走同一条方向
+# 通道即可,无裁决则 R1 停机点名,裁成进项后票面税额还要再过 A-5 那道读花闸。
+VAT_UNREADABLE = "vat_unreadable"
+DIRECTION_PREFIXES = (DIRECTION_AMBIGUOUS, SALES_DIRECTION_UNHANDLED, VAT_UNREADABLE)
 
 # 自动判定的本方销项票 flag_reason(MC1-c.1):seller==自家税号/名集 → sort 归 SALES_DOC 堆,
 # 默认 flagged 留一次人工过目(拍板① · 配 MC1-b 批量键盘流一键确认),不再判死为 unknown。

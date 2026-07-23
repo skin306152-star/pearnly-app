@@ -223,6 +223,48 @@ class BinOcrFieldsTests(unittest.TestCase):
         self.assertEqual(kind, "non_tax")
         self.assertEqual(reason, "no_tax_elements:receipt")
 
+    def test_unreadable_vat_goes_to_direction_review_not_silently_excluded(self):
+        """B-2/B-3:VAT 印了但读不出 ≠ 没有 VAT。
+
+        修前 _has_vat 对两者一律 False → 两头税号也没读出来时走「无税务要素」出口判 non_tax,
+        classify 再无条件 status=excluded(B-3 的零人复核终态),这张税票的进项税就此消失。
+        现在交人定向:kind=unknown + 方向通道 reason,R1 无裁决即停机点名。
+        """
+        for bad in ("7O.00", "N/A", "-", "NaN"):
+            with self.subTest(vat=bad):
+                kind, reason = sort_step.bin_ocr_fields(
+                    {"document_type": "receipt", "vat": bad, "seller_tax": "", "buyer_tax": ""},
+                    own_tax_id=OWN_TAX,
+                )
+                self.assertEqual(kind, "unknown")
+                self.assertEqual(reason, "vat_unreadable:receipt")
+
+    def test_unreadable_vat_also_beats_the_bank_statement_exit(self):
+        # 另一个静默出口:提到银行 + 无 VAT → 判流水页。读不出时同样不许走。
+        kind, reason = sort_step.bin_ocr_fields(
+            {
+                "document_type": "other",
+                "vat": "7O.00",
+                "seller_tax": "",
+                "buyer_tax": "",
+                "notes": "KASIKORNBANK",
+            },
+            own_tax_id=OWN_TAX,
+        )
+        self.assertEqual(kind, "unknown")
+        self.assertTrue(reason.startswith("vat_unreadable"))
+
+    def test_genuinely_absent_vat_still_takes_the_non_tax_exit(self):
+        # 「本来就没有 VAT」的判定一字不变 —— 不许因为这条新判据把真非税件也拖进人审。
+        for absent in ("0", "", None, "0.00"):
+            with self.subTest(vat=absent):
+                kind, reason = sort_step.bin_ocr_fields(
+                    {"document_type": "receipt", "vat": absent, "seller_tax": "", "buyer_tax": ""},
+                    own_tax_id=OWN_TAX,
+                )
+                self.assertEqual(kind, "non_tax")
+                self.assertEqual(reason, "no_tax_elements:receipt")
+
     def test_own_tax_as_seller_bins_sales_doc_for_review(self):
         # 自家==卖方 → 自动归本方销项堆 sales_doc,flagged 留人工过目(MC1-c.1,替代旧判死 unknown)。
         kind, reason = sort_step.bin_ocr_fields(

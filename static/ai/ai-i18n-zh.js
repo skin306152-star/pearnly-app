@@ -187,6 +187,7 @@ window.__AI_I18N_ZH__ = {
     rv_flag_sales_doc: '本方销项票 · 请确认(按 S)',
     rv_flag_discount_inferred: '系统补了一行折扣 · 请对照原票',
     rv_flag_bank_amount_rewritten: '金额由余额反推填入 · 请对照账单',
+    rv_flag_vat_unreadable: '票面 VAT 读不出 · 请对照原票定方向',
     rv_flag_duplicate_suspect: '疑似重复 · 缺票号认不准 · 请对照原票',
     rv_flag_totals_rescued: '金额由第二个模型重读 · 请对照原票',
     rv_key_dir_purchase: '进项',

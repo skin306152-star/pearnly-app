@@ -322,6 +322,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_ocr_low_conf: 'OCR 识别置信度偏低（{band}），建议核对票面',
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
     verdict_ocr_error: 'OCR 识别失败：{error}',
+    verdict_vat_unreadable:
+        '这张票上印了 VAT,但那个数读不出来。读不出就判不了它是进项还是销项,也不能当「没有 VAT」处理——按没有处理会把它当非税件排掉,进项税就这么没了。请对照原票定方向(进项 P / 销项 S / 非税 X);定成进项后还要把税额补对。',
     verdict_duplicate_suspect:
         '这张票和 {of} 可能是同一张,但它没读出票号——只靠「供应商 + 金额」认不出是不是同一张(同一家开两张金额一样的票很常见)。请对照两张原票:确实重复就剔除,不是同一张就采纳票面',
     verdict_duplicate: '与已收票据重复（重复于 {of}）',

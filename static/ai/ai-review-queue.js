@@ -12,7 +12,7 @@
     // 后端判不出进/销方向的两类票(sort.bin_ocr_fields · kind=unknown):锚点全然不明
     // (direction_ambiguous),或自家==卖方=疑似本方销项票(sales_direction_unhandled)。
     // 随 services/workorder/decisions.py 的 DIRECTION_PREFIXES 同步(前端无法 import,手工对齐)。
-    var DIRECTION_PREFIXES = ['direction_ambiguous', 'sales_direction_unhandled'];
+    var DIRECTION_PREFIXES = ['direction_ambiguous', 'sales_direction_unhandled', 'vat_unreadable'];
 
     // 自动判本方销项票(kind=sales_doc · MC1-c.1):flagged 留人工过目,卡上走同一套 P/S/X
     // 定向键(默认按 S 确认销项;客户拍错票可 P 改进项 / X 非税)。随 decisions.SALES_DOC 同步。
@@ -60,6 +60,7 @@
         totals_rescued: 'rv_flag_totals_rescued',
         bank_amount_rewritten: 'rv_flag_bank_amount_rewritten',
         duplicate_suspect: 'rv_flag_duplicate_suspect',
+        vat_unreadable: 'rv_flag_vat_unreadable',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');

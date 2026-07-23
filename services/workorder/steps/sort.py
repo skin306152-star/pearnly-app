@@ -26,6 +26,7 @@ from services.purchase.field_clean import clean_tax_id
 from services.recon.bank_recon_utils import _BANK_SIGNATURES, _bank_from_filename
 from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
+from services.workorder.steps.reconcile_gates import unreadable_money_fields
 
 # classify 会过 OCR 的图片扩展名(单一事实源:sort 定堆时判「留给 classify」用,api 的
 # 逐件进度投影也据此认「哪些件要过 OCR」——同一份定义,不各写一套)。
@@ -295,6 +296,13 @@ def bin_ocr_fields(
     if dtype in ("payment_evidence", "order_evidence"):
         return (kinds.NON_TAX, f"no_tax_elements:{dtype}")
 
+    # B-2:VAT 印了但读不出 → 下面两个出口都不能走。它们的前提是「这张票没有 VAT」,而这里
+    # 的真相是「有没有 VAT 我没看清」——按无 VAT 处理会把税票判成流水页或无税务要素的
+    # non_tax,后者还会被 classify 直接 excluded(B-3:零人复核的终态,进项税就这么没了)。
+    # 交人定向:无裁决 R1 停机点名,裁成进项后票面税额再过 A-5 那道读花闸。
+    if _vat_unreadable(f):
+        return (kinds.UNKNOWN, f"{decisions.VAT_UNREADABLE}:{dtype}")
+
     # 银行流水页:排在 non_tax 兜底之前——流水页两头税号常缺,否则会被当「无税务要素」排除。
     # 只在无 VAT 税票结构时认,防真税票里印付款银行(带 VAT)被误判成流水。
     if not has_vat and _mentions_bank(f):
@@ -458,3 +466,13 @@ def _has_vat(fields: dict) -> bool:
         return Decimal(str(fields.get("vat") or "0").replace(",", "").strip()) > 0
     except InvalidOperation:
         return False
+
+
+def _vat_unreadable(fields: dict) -> bool:
+    """票面 VAT 印了但读不出 —— 与「这张票本来就没 VAT」不是一回事(B-2)。
+
+    _has_vat 对两者一律返 False,于是读花一个字符(7O.00)的税票会走「无 VAT」的两个静默
+    出口:判成银行流水页,或判成无税务要素的 non_tax 被自动排除(B-3:零人复核的终态)。
+    判据复用 reconcile_gates 那份单一事实源(含 NaN/Infinity 守卫),不另写一套。
+    """
+    return bool(unreadable_money_fields({"vat": fields.get("vat")}))

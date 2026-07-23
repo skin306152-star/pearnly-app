@@ -359,6 +359,8 @@ Object.assign(window.__AI_I18N_EN__, {
     verdict_ocr_validation:
         'OCR reading conflicts with a validation rule — please verify against the original',
     verdict_ocr_error: 'OCR could not read this document: {error}',
+    verdict_vat_unreadable:
+        'This document shows a VAT amount, but the figure could not be read. Without it the direction cannot be decided, and it must not be treated as「no VAT」— doing so would drop it as a non-tax document and the input VAT with it. Compare against the original and assign a direction (input P / output S / non-tax X); if input, the VAT amount must then be corrected.',
     verdict_duplicate_suspect:
         'This may be the same document as {of}, but its invoice number could not be read — supplier plus amount alone cannot establish identity (one supplier issuing two invoices of equal value is common). Compare both originals: exclude if genuinely duplicated, otherwise accept at face value',
     verdict_duplicate: 'Duplicate of an existing item ({of})',

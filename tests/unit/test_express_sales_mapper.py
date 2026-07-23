@@ -319,25 +319,24 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertTrue(entry.customer_new)
 
 
+def _history_with_items():
+    """行合计 = 税前 100.00 → items_status=ok(有可落明细行供断言 item_mode)。"""
+    return _sales_history(
+        fields={
+            "subtotal": "100.00",
+            "vat": "7.00",
+            "items": [{"name": "สินค้า A", "qty": "1", "subtotal": "100.00"}],
+        },
+        total_amount="107.00",
+    )
+
+
 class ExpressSalesStockToggleTests(unittest.TestCase):
     """本批「库存 vs 销售·服务」开关(录入向导 step① · 仅 Express 销项)· item_mode=stock_sale 接线。"""
 
-    def _history_with_items(self):
-        # 行合计 = 税前 100.00 → items_status=ok(有可落明细行供断言 item_mode)。
-        return _sales_history(
-            fields={
-                "subtotal": "100.00",
-                "vat": "7.00",
-                "items": [{"name": "สินค้า A", "qty": "1", "subtotal": "100.00"}],
-            },
-            total_amount="107.00",
-        )
-
     def test_stock_kind_sets_stock_sale_on_goods_lines(self):
         # 用户显式选「库存」→ 每条商品行发 item_mode=stock_sale(小助手据此扣真实库存 + 结转成本)。
-        r = build_express_sales_payload(
-            self._history_with_items(), config=_CONFIG, posting_kind="stock"
-        )
+        r = build_express_sales_payload(_history_with_items(), config=_CONFIG, posting_kind="stock")
         self.assertTrue(r.ok, r.reason)
         self.assertEqual(r.payload["items_status"], "ok")
         self.assertTrue(r.payload["items"])
@@ -347,7 +346,7 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
     def test_service_kind_unchanged_non_stock(self):
         # 显式「销售·服务」→ 沿用画像推断(无指纹=非库存),绝不发 stock_sale(行为不变)。
         r = build_express_sales_payload(
-            self._history_with_items(), config=_CONFIG, posting_kind="service"
+            _history_with_items(), config=_CONFIG, posting_kind="service"
         )
         self.assertTrue(r.ok, r.reason)
         for it in r.payload["items"]:
@@ -355,7 +354,7 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
 
     def test_absent_kind_unchanged_non_stock(self):
         # 缺省(不传 posting_kind · 批量/重试/自动推送路径)= 今日默认,非库存(零回归)。
-        r = build_express_sales_payload(self._history_with_items(), config=_CONFIG)
+        r = build_express_sales_payload(_history_with_items(), config=_CONFIG)
         self.assertTrue(r.ok, r.reason)
         for it in r.payload["items"]:
             self.assertEqual(it["item_mode"], "non_stock_item")
@@ -363,7 +362,7 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
     def test_unknown_kind_defaults_to_service(self):
         # 脏输入(未知值)→ 视同服务,绝不误发 stock_sale(安全兜底 · 只有精确 'stock' 才启用库存)。
         r = build_express_sales_payload(
-            self._history_with_items(), config=_CONFIG, posting_kind="banana"
+            _history_with_items(), config=_CONFIG, posting_kind="banana"
         )
         self.assertTrue(r.ok, r.reason)
         for it in r.payload["items"]:
@@ -381,23 +380,67 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
                 "stcrd_lines_moving_stock": 8102,
             },
         }
-        r = build_express_sales_payload(
-            self._history_with_items(), config=cfg, posting_kind="stock"
-        )
+        r = build_express_sales_payload(_history_with_items(), config=cfg, posting_kind="stock")
         self.assertTrue(r.ok, r.reason)
         for it in r.payload["items"]:
             self.assertEqual(it["item_mode"], "stock_sale")
         # 显式「服务」对永续客户也被尊重:非库存收入式,不再 escalate(用户明确这是服务)。
-        r2 = build_express_sales_payload(
-            self._history_with_items(), config=cfg, posting_kind="service"
-        )
+        r2 = build_express_sales_payload(_history_with_items(), config=cfg, posting_kind="service")
         self.assertTrue(r2.ok, r2.reason)
         for it in r2.payload["items"]:
             self.assertEqual(it["item_mode"], "non_stock_item")
         # 缺省(无显式选择)对永续客户仍守安全网:交会计,绝不静默按周期制落。
-        r3 = build_express_sales_payload(self._history_with_items(), config=cfg)
+        r3 = build_express_sales_payload(_history_with_items(), config=cfg)
         self.assertFalse(r3.ok)
         self.assertTrue(r3.reason.startswith("posting_needs_review"), r3.reason)
+
+
+class ExpressSalesStockMasterPreflightTests(unittest.TestCase):
+    """选「库存」但账套里一件真实库存品都没有 → 当场拦(2026-07-23 真实事故)。
+
+    小助手建库存主档要照抄账套里现有的一条 STKTYP=0 当模板;抄无可抄就 DBF_WRITE_FAILED。
+    心跳的 catalog_fingerprint.stock_master_count 已经把这个事实报上来了,不该让票入队、
+    被领走、烧完 3 次重试才转人工。
+    """
+
+    def _cfg(self, **fingerprint):
+        return {**_CONFIG, "catalog_fingerprint": fingerprint}
+
+    def test_zero_stock_masters_blocks_stock_kind(self):
+        r = build_express_sales_payload(
+            _history_with_items(),
+            config=self._cfg(stock_master_count=0, stcrd_lines=8, stcrd_lines_moving_stock=0),
+            posting_kind="stock",
+        )
+        self.assertFalse(r.ok)
+        self.assertEqual(r.reason, "stock_no_master_in_account_set")
+
+    def test_zero_stock_masters_does_not_block_service_kind(self):
+        # 只拦「库存」· 服务模式本就不碰库存主档,不该被这条闸误伤。
+        r = build_express_sales_payload(
+            _history_with_items(),
+            config=self._cfg(stock_master_count=0, stcrd_lines=8, stcrd_lines_moving_stock=0),
+            posting_kind="service",
+        )
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_unreported_count_passes_through(self):
+        # 老小助手不报这个字段 → None ≠ 0 → 一律放行,绝不因"没上报"误拦既有客户。
+        r = build_express_sales_payload(_history_with_items(), config=_CONFIG, posting_kind="stock")
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "stock_sale")
+
+    def test_dirty_count_value_passes_through(self):
+        # 脏值读不出数 → 当未上报处理(向放行偏),不拿一个读不懂的值去挡钱路。
+        r = build_express_sales_payload(
+            _history_with_items(),
+            config=self._cfg(stock_master_count="ไม่ทราบ"),
+            posting_kind="stock",
+        )
+        self.assertTrue(r.ok, r.reason)
 
 
 if __name__ == "__main__":

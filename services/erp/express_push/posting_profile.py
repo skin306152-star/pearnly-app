@@ -69,15 +69,29 @@ def _moving_ratio(fp: Dict[str, Any]) -> Optional[float]:
     return max(0.0, min(1.0, moving / lines))
 
 
+def account_set_has_no_stock_master(config: Optional[Dict[str, Any]]) -> bool:
+    """心跳明确报了「本账套 STKTYP=0 主档数 = 0」才为 True。
+
+    未上报(老小助手不报此字段)/ 脏值 → False:把"没上报"当"没库存"会把老客户的推送全拦死。
+    小助手建库存主档要照抄账套里现有的一行当模板,零主档必炸 DBF_WRITE_FAILED,故这是
+    「本批能不能走库存」的硬前提(2026-07-23 真料撞出来的)。
+    """
+    return _fingerprint_masters_zero((config or {}).get("catalog_fingerprint"))
+
+
+def _fingerprint_masters_zero(fingerprint: Optional[Dict[str, Any]]) -> bool:
+    try:
+        return int(fingerprint["stock_master_count"]) == 0
+    except (TypeError, KeyError, ValueError):
+        return False
+
+
 def classify_inventory_usage(fingerprint: Optional[Dict[str, Any]]) -> str:
     """记账指纹 → 客观库存用量 none|perpetual|mixed|unknown。指纹缺失=unknown(不猜)。"""
     if not isinstance(fingerprint, dict):
         return "unknown"
     r = _moving_ratio(fingerprint)
-    try:
-        masters_zero = int(fingerprint.get("stock_master_count")) == 0
-    except (TypeError, ValueError):
-        masters_zero = False
+    masters_zero = _fingerprint_masters_zero(fingerprint)
     # 零库存主档(Saengjit:全服务码)判 none —— 但仅当也无动库存行时。masters=0 却有动库存行 =
     # 指纹自相矛盾(可能误报 0),绝不据此静默判 none(会让真永续客户按周期制落 · 违铁律),
     # 落到比例逻辑:高比例 → perpetual → escalate,中间 → mixed → 交人裁。

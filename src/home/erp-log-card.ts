@@ -23,6 +23,8 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     // V2 明细对账(行合计与税前额对不上 / 缺品名金额)→ 退表头并转人工核对。
     items_mismatch: 'erp-reason-items-mismatch',
     items_incomplete: 'erp-reason-items-incomplete',
+    // 本批选了「库存」但账套里一件真实库存品都没有 → 建库存主档没有模板可依,推了必炸。
+    stock_no_master_in_account_set: 'erp-reason-stock-no-master',
     low_confidence: 'erp-reason-low-confidence',
     enqueue_error: 'erp-reason-enqueue-error',
     amounts_not_consistent: 'erp-reason-amounts',

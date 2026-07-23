@@ -44,7 +44,10 @@ from services.erp.express_push.common import (
     SRC_DEFAULT,
 )
 from services.erp.express_push import stock_lane_enabled
-from services.erp.express_push.posting_profile import profile_from_config
+from services.erp.express_push.posting_profile import (
+    account_set_has_no_stock_master,
+    profile_from_config,
+)
 from services.purchase.field_clean import (
     clean_address,
     clean_invoice_no,
@@ -196,6 +199,10 @@ def build_express_sales_payload(
     # 每批开关优先于画像:显式「库存」→ stock_sale(小助手扣真实库存 + 结转成本);显式「服务」→
     # 非库存服务档 + 收入式(不碰库存·不被永续画像推成 stock);缺省 → 沿用画像(=今天默认,行为不变)。
     if posting_kind == "stock":
+        # 心跳已报「这个账套零库存主档」= 推了必炸 —— 与其入队、被领走、烧完 3 次重试再转
+        # 人工,不如当场拦下把缺的东西说清楚。
+        if account_set_has_no_stock_master(config):
+            return fail("stock_no_master_in_account_set")
         line_item_mode = ITEM_MODE_STOCK_SALE
     elif posting_kind == "service":
         line_item_mode = ITEM_MODE_NONSTOCK

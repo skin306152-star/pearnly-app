@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 468 个源文件全扫
+# UI 设计合规扫描报告 · 486 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -86,8 +86,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 201(28 文件)
     96  static\i18n-data.js
-        └ 1401: 'billing-accuracy-good': '✅ 准',
-        └ 1402: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1411: 'billing-accuracy-good': '✅ 准',
+        └ 1412: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -122,9 +122,9 @@
      1  src\home\app-shell-sidebar-html.ts
         └ 345: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
-        └ 92: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+        └ 102: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\erp-log-card.ts
-        └ 82: statusIcon = '⏭';
+        └ 84: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
         └ 280: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts
@@ -262,7 +262,7 @@
      1  src\home\sales-wizard.ts
         └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      1  static\dms\dms-connect.js
-        └ 158: '<div class="dms-wizard" role="dialog" aria-modal="true" style="background:var(--card);bor
+        └ 166: '<div class="dms-wizard" role="dialog" aria-modal="true" style="background:var(--card);bor
      1  static\dms\dms-intake-confirm.js
         └ 298: '<div class="modal dmsx" style="max-width:480px"><div class="modal-head"><b>' +
      1  static\erp-mrerp-connect.js
@@ -384,8 +384,8 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1208: 'time-min-ago-suffix': ' 分钟前',
-        └ 1209: 'time-hour-ago-suffix': ' 小时前',
+        └ 1218: 'time-min-ago-suffix': ' 分钟前',
+        └ 1219: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 476: 'time-hours-ago': '{n} 小时前',
         └ 477: 'time-days-ago': '{n} 天前',

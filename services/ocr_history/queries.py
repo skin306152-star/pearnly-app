@@ -3,7 +3,7 @@
 
 从 services/ocr_history/store.py 按域拆出读取半边(纯搬家 · 0 逻辑改)。
 覆盖:list_ocr_history(分页+多租户+客户过滤)/ get_ocr_history_detail /
-get_history_pdf_info / find_ocr_by_hash / check_duplicate_invoice。
+get_history_pdf_info / check_duplicate_invoice。(哈希缓存两版在 hash_dedup.py)
 游标走 db.get_cursor(...)·跨域调用走 db.*(find_user_by_id)·store.py 文件头 re-export 回
 services.ocr_history.store 命名空间(db.xxx() / store.xxx() 调用点不变)。
 """
@@ -298,72 +298,6 @@ def get_history_pdf_info(
             }
     except Exception as e:
         logger.error(f"get_history_pdf_info 失败 (record_id={record_id}): {e}")
-        return None
-
-
-def find_ocr_by_hash(
-    user_id: str,
-    file_hash: str,
-    max_age_hours: int = 24 * 30,
-    tenant_id: Optional[str] = None,
-    workspace_client_id: Optional[int] = None,
-    strict_workspace: bool = False,
-) -> Optional[dict]:
-    """
-    按文件哈希查最近的识别结果。
-    用于避免重复识别相同文件(省 Gemini 额度)
-
-    v92 · 窗口从 24h 扩到 30 天 · 会计真实场景下月末才会复核上月票 · 24h 太短
-    v92 · 只返回有效结果 · 识别失败(关键字段全空)的记录视为未命中 · 配合第 1 层防御
-    v118.14 · tenant_id 给了 → 同 tenant 内任意成员上传过此文件就能复用结果(省额度)
-    PO-4 · workspace_client_id 给了 → 缓存复用限本套账(+ NULL 未归属行)· 跨套账不串结果
-    """
-    if not file_hash:
-        return None
-    ws_sql, ws_params = _workspace_clause(workspace_client_id)
-    if strict_workspace and workspace_client_id is not None:  # R2B 严格同账套,跨客户绝不串
-        ws_sql, ws_params = " AND workspace_client_id = %s", (int(workspace_client_id),)
-    hours = int(max_age_hours)
-    if tenant_id:
-        scope_sql = "user_id IN (SELECT id FROM users WHERE tenant_id = %s)"
-        scope_params = (tenant_id,)
-    else:
-        scope_sql = "user_id = %s"
-        scope_params = (user_id,)
-    try:
-        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
-            cur.execute(
-                f"""
-                SELECT id, filename, page_count, confidence, elapsed_ms, pages,
-                       archive_name, category_tag, created_at
-                FROM ocr_history
-                WHERE {scope_sql}
-                  AND file_hash = %s
-                  AND created_at >= NOW() - INTERVAL '{hours} hours'
-                  AND pages IS NOT NULL
-                  AND jsonb_array_length(pages) > 0
-                  AND (total_amount IS NOT NULL OR invoice_no IS NOT NULL OR seller_name IS NOT NULL){ws_sql}
-                ORDER BY created_at DESC
-                LIMIT 1
-            """,
-                (*scope_params, file_hash, *ws_params),
-            )
-            r = cur.fetchone()
-            if not r:
-                return None
-            return {
-                "id": str(r["id"]),
-                "filename": r["filename"],
-                "page_count": r["page_count"],
-                "confidence": r["confidence"],
-                "elapsed_ms": r["elapsed_ms"],
-                "pages": r["pages"],
-                "archive_name": r.get("archive_name"),
-                "category_tag": r.get("category_tag"),
-                "created_at": r["created_at"].isoformat(),
-            }
-    except Exception as e:
-        logger.error(f"查缓存失败 (hash={file_hash[:12]}): {e}")
         return None
 
 

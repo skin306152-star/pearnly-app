@@ -13,7 +13,7 @@ from unittest import mock
 from core import db  # noqa: F401
 from services.clients import store as clients_store
 from services.clients import buyer_resolve
-from services.ocr_history import queries, mutations
+from services.ocr_history import hash_dedup, queries, mutations
 
 TENANT = "11111111-1111-1111-1111-111111111111"
 USER = "22222222-2222-2222-2222-222222222222"
@@ -122,7 +122,7 @@ class OcrHistoryContext(unittest.TestCase):
         self._run(queries.get_history_pdf_info, USER, "h1", tenant_id=TENANT, fetchone=None)
 
     def test_find_by_hash(self):
-        self._run(queries.find_ocr_by_hash, USER, "abc", tenant_id=TENANT, fetchone=None)
+        self._run(hash_dedup.find_ocr_by_hash, USER, "abc", tenant_id=TENANT, fetchone=None)
 
     def test_update_pages(self):
         self._run(mutations.update_ocr_history_pages, USER, "h1", [], tenant_id=TENANT)

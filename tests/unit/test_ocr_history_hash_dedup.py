@@ -26,14 +26,17 @@ class _Cur:
     def fetchall(self):
         return self._rows
 
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
 
-def _run(rows, **kwargs):
+
+def _run(rows, fn=hash_dedup.find_ocr_by_hashes, **kwargs):
     cur = _Cur(rows)
     ctx = mock.MagicMock()
     ctx.__enter__.return_value = cur
     ctx.__exit__.return_value = False
     with mock.patch("core.db.get_cursor_rls", return_value=ctx):
-        out = hash_dedup.find_ocr_by_hashes(**kwargs)
+        out = fn(**kwargs)
     return cur, out
 
 
@@ -79,6 +82,23 @@ class FindOcrByHashesTests(unittest.TestCase):
     def test_db_error_degrades_to_empty(self):
         with mock.patch("core.db.get_cursor_rls", side_effect=RuntimeError("db down")):
             self.assertEqual(hash_dedup.find_ocr_by_hashes("u1", ["x"], tenant_id="t1"), {})
+
+
+class StagedExcludedFromCacheTests(unittest.TestCase):
+    """草稿(staged=TRUE)不当哈希缓存源 —— 单查/批量两条路都必须钉住。
+
+    识别记录列表按 staged=FALSE 过滤,草稿在界面上看不见也删不掉;它却能供 30 天哈希缓存,
+    于是用户重传同一文件永远命中一条自己够不着的旧记录(2026-07-23 真实事故:连删日志再
+    重传四次仍全命中)。缓存只认用户看得见、删得掉的记录。
+    """
+
+    def test_batch_query_filters_staged(self):
+        cur, _ = _run([], user_id="u1", file_hashes=["h1"])
+        self.assertIn("staged = FALSE", cur.last_sql)
+
+    def test_single_query_filters_staged(self):
+        cur, _ = _run([], hash_dedup.find_ocr_by_hash, user_id="u1", file_hash="h1")
+        self.assertIn("staged = FALSE", cur.last_sql)
 
 
 if __name__ == "__main__":

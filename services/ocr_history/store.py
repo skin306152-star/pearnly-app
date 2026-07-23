@@ -3,8 +3,8 @@
 
 原 798 行按域拆为:
   - queries.py  · 读取半边:list_ocr_history / get_ocr_history_detail /
-                  get_history_pdf_info / find_ocr_by_hash / check_duplicate_invoice
-  - hash_dedup.py · 文件哈希批量去重查询:find_ocr_by_hashes(R2B 跨单去重)
+                  get_history_pdf_info / check_duplicate_invoice
+  - hash_dedup.py · 文件哈希去重查询:find_ocr_by_hash(单查)/ find_ocr_by_hashes(R2B 批量)
   - mutations.py · 写入半边:_extract_summary_fields / update_ocr_history_pages /
                   delete_ocr_history / delete_ocr_history_with_pdf_paths / insert_ocr_history
 
@@ -16,10 +16,12 @@ from services.ocr_history.queries import (  # noqa: F401
     list_ocr_history,
     get_ocr_history_detail,
     get_history_pdf_info,
-    find_ocr_by_hash,
     check_duplicate_invoice,
 )
-from services.ocr_history.hash_dedup import find_ocr_by_hashes  # noqa: F401
+from services.ocr_history.hash_dedup import (  # noqa: F401
+    find_ocr_by_hash,
+    find_ocr_by_hashes,
+)
 from services.ocr_history.agent_overview import docs_overview  # noqa: F401
 from services.ocr_history.mutations import (  # noqa: F401
     _extract_summary_fields,

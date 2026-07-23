@@ -57,9 +57,19 @@ def prior_docnum(history_id: Any) -> Optional[str]:
     return doc or None
 
 
-def attach_prior_docnum(payload: Dict[str, Any], history: Dict[str, Any]) -> Dict[str, Any]:
-    """原地给载荷补 prior_docnum(有才补)。两个 mapper 共用,逻辑不两处复制。"""
-    doc = prior_docnum((history or {}).get("id"))
+def attach_prior_docnum(
+    payload: Dict[str, Any],
+    history: Dict[str, Any],
+    fields: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """原地给载荷补 prior_docnum(有才补)。两个 mapper 共用,逻辑不两处复制。
+
+    钥匙优先用 fields.history_id ——【这条是闸能不能生效的关键】:会计改完表格回导时,
+    收料口会为上传的工作簿新建一条 history 记录,拿新 id 去查上一版必然查不到,闸就正好
+    在它该生效的场景下哑火。回导解析器从行键里带回的原 history_id 才指向真正的上一版。
+    """
+    key = str((fields or {}).get("history_id") or "").strip() or (history or {}).get("id")
+    doc = prior_docnum(key)
     if doc:
         payload["prior_docnum"] = doc
     return payload

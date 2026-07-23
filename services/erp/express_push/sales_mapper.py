@@ -244,4 +244,4 @@ def build_express_sales_payload(
             "filename": history.get("filename"),
         },
     }
-    return ExpressMapResult(True, finalize_payload(attach_prior_docnum(payload, history)), "ok")
+    return ExpressMapResult(True, finalize_payload(attach_prior_docnum(payload, history, fields)), "ok")

@@ -77,5 +77,33 @@ class AttachTests(unittest.TestCase):
         self.assertNotIn("prior_docnum", attach_prior_docnum({}, None))
 
 
+class ReimportKeyTests(unittest.TestCase):
+    """闸能不能生效的关键:会计改完表格回导时,收料口会为上传的工作簿【新建】一条
+    history 记录。拿新 id 去查上一版必然查不到,闸就正好在它该生效的场景下哑火。
+    回导解析器从行键里带回的原 history_id 才指向真正的上一版。"""
+
+    def test_fields_history_id_wins_over_new_history(self):
+        seen = {}
+
+        def fake_prior(hid):
+            seen["hid"] = hid
+            return "SA1-0723" if hid == "orig-hid" else None
+
+        with mock.patch("services.erp.express_push.prior_doc.prior_docnum", side_effect=fake_prior):
+            p = attach_prior_docnum({}, {"id": "new-upload-hid"}, {"history_id": "orig-hid"})
+        self.assertEqual(seen["hid"], "orig-hid")
+        self.assertEqual(p["prior_docnum"], "SA1-0723")
+
+    def test_falls_back_to_history_when_fields_have_no_key(self):
+        with _with_row({"response_body": '{"express_docnum": "D9"}'}):
+            p = attach_prior_docnum({}, {"id": "h1"}, {})
+        self.assertEqual(p["prior_docnum"], "D9")
+
+    def test_blank_fields_key_does_not_shadow_history(self):
+        with _with_row({"response_body": '{"express_docnum": "D9"}'}):
+            p = attach_prior_docnum({}, {"id": "h1"}, {"history_id": "   "})
+        self.assertEqual(p["prior_docnum"], "D9")
+
+
 if __name__ == "__main__":
     unittest.main()

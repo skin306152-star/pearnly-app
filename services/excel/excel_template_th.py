@@ -4,13 +4,14 @@
 =========================================================
 按泰国本地销售清单习惯生成 · 用户处理完一批发票后导出复盘「都发生了什么」。
 
-表结构(14 列):
+表结构(19 列):
   1-12  会计核算区(与 MR.ERP Korn 反馈的公式合同一致 · 不动列位):
         วันที่ / เลขที่ / รหัสลูกค้า / รหัสสินค้า / จำนวน(E) / ราคาต่อหน่วย(F) /
         จำนวนเงิน(G==E*F) / รวมจำนวนเงิน(H==E*F) / รวมก่อนVAT(I==E*F) /
         VAT(J==I*0.07) / อ้างอิง / Status(留空给会计)
   13    สถานะสินค้า  · 每商品行:ERP 里是新建(ใหม่)还是复用(เดิม)
   14    สถานะลูกค้า  · 每张发票:客户是新建还是复用
+  15-19 回导列(见 erp_roundtrip)· 让「导出→会计改→回导重推」闭得上环
 
 复盘信号靠两处呈现:客户/商品单元格底色(绿=新建·淡灰蓝=复用)+ 末两列显式文本
 (可筛选、黑白打印也读得出)。表头深蓝底白字、冻结首行、金额千分位右对齐。
@@ -34,6 +35,14 @@ try:
 except ImportError:
     Workbook = None  # type: ignore
 
+from services.excel.erp_roundtrip import (
+    ROUNDTRIP_HEADERS,
+    ROUNDTRIP_WIDTHS,
+    SHEET_SALES,
+    encode_row_key,
+    roundtrip_values,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,9 +61,10 @@ HEADERS_TH = [
     "Status",  # 12 会计手填过账状态(留空)
     "สถานะสินค้า",  # 13 商品:ใหม่ / เดิม / -
     "สถานะลูกค้า",  # 14 客户:ใหม่ / เดิม / -
+    *ROUNDTRIP_HEADERS,  # 15-19 回导列
 ]
 
-COLUMN_WIDTHS = [12, 14, 30, 24, 8, 12, 14, 14, 18, 10, 12, 10, 13, 13]
+COLUMN_WIDTHS = [12, 14, 30, 24, 8, 12, 14, 14, 18, 10, 12, 10, 13, 13, *ROUNDTRIP_WIDTHS]
 
 MONEY_COLUMNS = (6, 7, 8, 9, 10)
 QTY_COLUMN = 5
@@ -209,15 +219,12 @@ def _style_data_row(ws, row: int) -> None:
             c.alignment = _LEFT
 
 
-def build_sales_detail_xlsx(records: List[Dict[str, Any]], lang: str = "zh") -> bytes:
-    """返回 .xlsx 二进制。records: list of {filename, engine, merged_fields}。
-    每张发票按 items 拆 N 行 · 共享单据级字段(日期/单号/客户)。"""
-    if Workbook is None:
-        raise RuntimeError("openpyxl not installed")
+def write_sales_sheet(ws, records: List[Dict[str, Any]]) -> int:
+    """把销项记录写进给定工作表,返回写了多少数据行。
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Sheet1"
+    抽出来是为了让它既能单独成表(build_sales_detail_xlsx),也能当复核工作簿里的
+    「ขาย」那一张(erp_workbook)—— 两处必须是同一段代码,格式才不会漂。
+    """
     _write_header(ws)
 
     row = 2
@@ -234,13 +241,19 @@ def build_sales_detail_xlsx(records: List[Dict[str, Any]], lang: str = "zh") -> 
         cust_action = _customer_action(f)
         cust_fill = _fill_for(cust_action)
         total = _to_float(f.get("total_amount"))
+        # 回导用的单据级事实(由 export_actions 从 erp_push_logs 回填 · 缺则留空不假装)
+        erp_docnum = _str(f.get("erp_docnum"))
+        erp_party = _str(f.get("erp_party_code"))
+        push_status = f.get("push_status")
+        push_reason = f.get("push_reason")
+        history_id = _str(f.get("history_id")) or _str(rec.get("history_id"))
 
         items = f.get("items")
         if not isinstance(items, list) or len(items) == 0:
             # 没明细 · 单行兜底(空商品 + 总额)
             items = [{"description": "", "qty": None, "unit_price": None, "amount": total}]
 
-        for it in items:
+        for line_idx, it in enumerate(items):
             if not isinstance(it, dict):
                 it = {}
             qty = _to_float(it.get("qty") or it.get("quantity"))
@@ -282,9 +295,37 @@ def build_sales_detail_xlsx(records: List[Dict[str, Any]], lang: str = "zh") -> 
             _style_data_row(ws, row)
             _write_status_cell(ws, row, PRODUCT_STATUS_COLUMN, item_action)
             _write_status_cell(ws, row, CUSTOMER_STATUS_COLUMN, cust_action)
+
+            # 回导列 · 第 15 列起(合同列位之后追加)
+            rt = roundtrip_values(
+                docnum=erp_docnum,
+                item_code=it.get("erp_item_code"),
+                party_code=erp_party,
+                push_status=push_status,
+                push_reason=push_reason,
+                row_key=encode_row_key(history_id, line_idx),
+            )
+            for off, val in enumerate(rt):
+                ws.cell(row=row, column=CUSTOMER_STATUS_COLUMN + 1 + off, value=val)
             row += 1
 
     ws.freeze_panes = "A2"
+    return row - 2
+
+
+def build_sales_detail_xlsx(records: List[Dict[str, Any]], lang: str = "zh") -> bytes:
+    """返回单表 .xlsx 二进制。records: list of {filename, engine, merged_fields}。
+    每张发票按 items 拆 N 行 · 共享单据级字段(日期/单号/客户)。
+
+    工作表名用 SHEET_SALES —— 表名即方向,单表导出也因此可直接回导重推。
+    """
+    if Workbook is None:
+        raise RuntimeError("openpyxl not installed")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = SHEET_SALES
+    write_sales_sheet(ws, records)
 
     buf = io.BytesIO()
     wb.save(buf)

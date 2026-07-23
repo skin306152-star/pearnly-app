@@ -14,6 +14,7 @@ import unittest
 from openpyxl import load_workbook
 
 from services.excel import excel_template_th as et
+from services.excel.erp_roundtrip import ROUNDTRIP_HEADERS
 
 
 class NormDateTests(unittest.TestCase):
@@ -63,15 +64,41 @@ def _load(records):
 
 
 class HeaderTests(unittest.TestCase):
-    def test_header_row_is_thai_14_cols(self):
+    def test_header_row_matches_declared_headers(self):
         ws = _load([])
-        headers = [ws.cell(row=1, column=i).value for i in range(1, 15)]
+        n = len(et.HEADERS_TH)
+        headers = [ws.cell(row=1, column=i).value for i in range(1, n + 1)]
         self.assertEqual(headers, et.HEADERS_TH)
-        self.assertEqual(len(et.HEADERS_TH), 14)
+
+    def test_accounting_contract_columns_1_to_12_frozen(self):
+        """1-12 列是与 MR.ERP 约定的公式合同 · 列位/列名一格都不许动。
+        后续加列(回导列等)只能追加在其后。"""
+        self.assertEqual(
+            et.HEADERS_TH[:12],
+            [
+                "วันที่",
+                "เลขที่",
+                "รหัสลูกค้า",
+                "รหัสสินค้า",
+                "จำนวน",
+                "ราคาต่อหน่วย",
+                "จำนวนเงิน",
+                "รวมจำนวนเงิน",
+                "รวมจำนวนเงินก่อนVAT",
+                "VAT",
+                "อ้างอิง",
+                "Status",
+            ],
+        )
 
     def test_status_columns_present(self):
         self.assertEqual(et.HEADERS_TH[12], "สถานะสินค้า")  # 13 商品状态
         self.assertEqual(et.HEADERS_TH[13], "สถานะลูกค้า")  # 14 客户状态
+
+    def test_roundtrip_columns_appended_after_contract(self):
+        """回导列必须在合同列之后 · 且顺序由 erp_roundtrip 单点定义(写读共用)。"""
+        self.assertEqual(tuple(et.HEADERS_TH[14:]), ROUNDTRIP_HEADERS)
+        self.assertEqual(len(et.HEADERS_TH), len(et.COLUMN_WIDTHS))
 
     def test_header_has_fill_and_sheet_frozen(self):
         ws = _load([])

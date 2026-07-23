@@ -23,24 +23,33 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_erp_actions(response_body: Any) -> Dict[str, Any]:
-    """从一条成功推送的 response_body 解出新建-复用动作。
+    """从一条成功推送的 response_body 解出「ERP 里到底发生了什么」。
 
-    返回 {"customer": bool|None, "items": [bool|None, ...]}:
-    customer = meta.created_customer(建客户=True · 复用=False · 缺=None);
-    items = line_modes 按 seq 升序的 created(True 新建 / False 复用 / None 直接科目行)。
+    返回:
+      customer   bool|None   meta.created_customer(建客户=True · 复用=False · 缺=None)
+      items      [bool|None] line_modes 按 seq 升序的 created(新建/复用/直接科目行)
+      item_codes [str]       同序的 stkcod —— 会计要清理误建的商品档,得知道码
+      docnum     str         ERP 真实凭证号。票面号超 12 字符时会退回自编号,此时它
+                             ≠ 票面号,不给会计就没法在 ERP 里找到这张单去删
+      party_code str         ERP 客户/供应商码(小助手 party_code · 见 meta 白名单)
     """
     body = _coerce_body(response_body)
     meta = body.get("meta") if isinstance(body.get("meta"), dict) else {}
     customer = meta.get("created_customer")
     items: List[Any] = []
+    item_codes: List[str] = []
     line_modes = body.get("line_modes")
     if isinstance(line_modes, list):
         clean = [m for m in line_modes if isinstance(m, dict)]
         for m in sorted(clean, key=lambda x: int(x.get("seq") or 0)):
             items.append(m.get("created"))
+            item_codes.append(str(m.get("stkcod") or "").strip())
     return {
         "customer": customer if isinstance(customer, bool) else None,
         "items": items,
+        "item_codes": item_codes,
+        "docnum": str(body.get("express_docnum") or meta.get("docnum") or "").strip(),
+        "party_code": str(meta.get("party_code") or "").strip(),
     }
 
 
@@ -129,17 +138,25 @@ def apply_erp_actions(merged_fields: Dict[str, Any], action: Optional[Dict[str, 
 
     customer → customer_erp_action('new'/'reused');items 按顺序对齐 line_modes 的 created →
     items[i].erp_action。行数不齐(OCR 明细数 ≠ 推送行数)时只填对得上的,不瞎补。
+    单据级的 ERP 凭证号/客户码与每行的商品码一并落位,供导出的回导列使用。
     """
     if not action or not isinstance(merged_fields, dict):
         return
     cust = action.get("customer")
     if isinstance(cust, bool):
         merged_fields["customer_erp_action"] = "new" if cust else "reused"
+    for src, dst in (("docnum", "erp_docnum"), ("party_code", "erp_party_code")):
+        v = str(action.get(src) or "").strip()
+        if v:
+            merged_fields[dst] = v
     items = merged_fields.get("items")
     line_created = action.get("items") or []
+    line_codes = action.get("item_codes") or []
     if isinstance(items, list):
         for i, it in enumerate(items):
-            if isinstance(it, dict) and i < len(line_created):
-                c = line_created[i]
-                if isinstance(c, bool):
-                    it["erp_action"] = "new" if c else "reused"
+            if not isinstance(it, dict):
+                continue
+            if i < len(line_created) and isinstance(line_created[i], bool):
+                it["erp_action"] = "new" if line_created[i] else "reused"
+            if i < len(line_codes) and line_codes[i]:
+                it["erp_item_code"] = line_codes[i]

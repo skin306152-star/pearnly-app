@@ -244,6 +244,8 @@ def write_sales_sheet(ws, records: List[Dict[str, Any]]) -> int:
         # 回导用的单据级事实(由 export_actions 从 erp_push_logs 回填 · 缺则留空不假装)
         erp_docnum = _str(f.get("erp_docnum"))
         erp_party = _str(f.get("erp_party_code"))
+        # 对手方税号:销项看买方 · ภ.พ.30 销项附表要它,合同 12 列里没有,故进回导列
+        party_tax = _str(f.get("buyer_tax")) or _str(f.get("buyer_tax_id"))
         push_status = f.get("push_status")
         push_reason = f.get("push_reason")
         history_id = _str(f.get("history_id")) or _str(rec.get("history_id"))
@@ -298,6 +300,7 @@ def write_sales_sheet(ws, records: List[Dict[str, Any]]) -> int:
 
             # 回导列 · 第 15 列起(合同列位之后追加)
             rt = roundtrip_values(
+                party_tax=party_tax,
                 docnum=erp_docnum,
                 item_code=it.get("erp_item_code"),
                 party_code=erp_party,

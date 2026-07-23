@@ -86,25 +86,34 @@ class StatusLabelTests(unittest.TestCase):
 
 
 class RoundtripValuesTests(unittest.TestCase):
-    def test_order_matches_headers(self):
-        vals = rt.roundtrip_values(
+    """按表头映射断言,不写死下标 —— 加列时不该假红,只有真错位才该红。"""
+
+    def _by_header(self, **kw):
+        vals = rt.roundtrip_values(**kw)
+        self.assertEqual(len(vals), len(rt.ROUNDTRIP_HEADERS))
+        return dict(zip(rt.ROUNDTRIP_HEADERS, vals))
+
+    def test_each_fact_lands_under_its_own_header(self):
+        got = self._by_header(
+            party_tax="0105512000101",
             docnum="SA1-0722",
             item_code="500603",
             party_code="ก001",
             push_status="success",
             row_key=rt.encode_row_key("h1", 0),
         )
-        self.assertEqual(len(vals), len(rt.ROUNDTRIP_HEADERS))
-        self.assertEqual(vals[0], "SA1-0722")
-        self.assertEqual(vals[1], "500603")
-        self.assertEqual(vals[2], "ก001")
-        self.assertEqual(vals[3], "สำเร็จ")
-        self.assertEqual(vals[4], "PRN:h1:0")
+        self.assertEqual(got[rt.COL_PARTY_TAX], "0105512000101")
+        self.assertEqual(got[rt.COL_ERP_DOCNUM], "SA1-0722")
+        self.assertEqual(got[rt.COL_ERP_ITEM], "500603")
+        self.assertEqual(got[rt.COL_ERP_PARTY], "ก001")
+        self.assertEqual(got[rt.COL_PUSH_STATUS], "สำเร็จ")
+        self.assertEqual(got[rt.COL_ROW_KEY], "PRN:h1:0")
 
     def test_missing_facts_stay_blank(self):
-        vals = rt.roundtrip_values()
-        self.assertEqual(vals[:3], ["", "", ""])
-        self.assertEqual(vals[3], rt.STATUS_UNKNOWN)
+        got = self._by_header()
+        for h in (rt.COL_PARTY_TAX, rt.COL_ERP_DOCNUM, rt.COL_ERP_ITEM, rt.COL_ERP_PARTY):
+            self.assertEqual(got[h], "", h)
+        self.assertEqual(got[rt.COL_PUSH_STATUS], rt.STATUS_UNKNOWN)
 
 
 if __name__ == "__main__":

@@ -65,6 +65,8 @@ def _to_invoice(fields: Dict[str, Any]) -> ThaiInvoice:
         vat=_s(fields.get("vat_amount")),
         total_amount=_s(fields.get("total_amount")) or None,
         category=_s(fields.get("category")),
+        # 待判原因走 notes —— 只塞进 fields 会被 ThaiInvoice 丢掉,会计界面上就看不见
+        notes=_s(fields.get("pending_reason")),
         items=_line_items(fields.get("items")),
     )
 
@@ -102,8 +104,12 @@ def try_parse_roundtrip(file_bytes: bytes, filename: str) -> Optional[PipelineRe
         fields["direction"] = d["direction"]
         pages.append(_page(len(pages) + 1, fields, needs_review=False))
     for p in parsed["pending"]:
-        # 会计没裁决方向的票:带出来但标人工 —— 不能静默丢掉
-        pages.append(_page(len(pages) + 1, dict(p["fields"]), needs_review=True))
+        # 会计没把这张挪进销项/进项表 = 还没裁决方向。带出来但标人工:
+        # 不推(推了就是替会计做方向决定),也不静默丢(丢了就是漏票)。
+        fields = dict(p["fields"])
+        reason = str(p.get("reason") or "").strip()
+        fields["pending_reason"] = reason or "ยังไม่ได้จำแนกทิศทาง"
+        pages.append(_page(len(pages) + 1, fields, needs_review=True))
 
     if not pages:
         return None  # 空工作簿:当作没识别到,不返回 0 页的假成功

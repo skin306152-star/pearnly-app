@@ -106,6 +106,7 @@ def _purchase_rows(records: List[Dict[str, Any]]) -> List[List[Any]]:
                 total,
                 _s(f.get("category")),
                 *rt.roundtrip_values(
+                    party_tax=f.get("seller_tax") or f.get("seller_tax_id"),
                     docnum=f.get("erp_docnum"),
                     party_code=f.get("erp_party_code"),
                     push_status=f.get("push_status"),
@@ -130,6 +131,7 @@ def _pending_rows(records: List[Dict[str, Any]]) -> List[List[Any]]:
                 _first(f, "total_amount"),
                 _s(rec.get("reason") or f.get("pending_reason")),
                 *rt.roundtrip_values(
+                    party_tax=f.get("seller_tax") or f.get("buyer_tax"),
                     push_status=f.get("push_status"),
                     push_reason=f.get("push_reason"),
                     row_key=rt.encode_row_key(f.get("history_id"), 0),

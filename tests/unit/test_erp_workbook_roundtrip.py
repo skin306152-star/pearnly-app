@@ -306,3 +306,45 @@ class CreatedMastersTests(unittest.TestCase):
         }
         recs = [{"merged_fields": {"items": [{"description": "X"}]}}] * 2
         self.assertEqual(len(self._collect(acts, recs)), 1)
+
+
+class PartyTaxRoundtripTests(unittest.TestCase):
+    """对手方税号:合同 12 列里没有,可 ภ.พ.30 要报,而且会计挪行时它是唯一还带着税号的地方。
+    真跑实测过 —— 把进项票剪到销项表后,供应商税号整个丢了。"""
+
+    def test_sales_buyer_tax_survives_roundtrip(self):
+        rec = _sales_rec(
+            "h1",
+            "S1",
+            "B",
+            [{"description": "X", "qty": 1, "unit_price": 10}],
+            buyer_tax="0105512000101",
+        )
+        out = parse_roundtrip_workbook(build_review_workbook(sales=[rec]))
+        self.assertEqual(out["documents"][0]["fields"]["buyer_tax"], "0105512000101")
+
+    def test_purchase_seller_tax_survives_roundtrip(self):
+        out = parse_roundtrip_workbook(build_review_workbook(purchase=PURCHASE))
+        self.assertEqual(out["documents"][0]["fields"]["seller_tax"], "0105533000202")
+
+    def test_tax_survives_being_moved_between_sheets(self):
+        """会计把进项票剪到销项表 —— 回导列跟着走,税号不该丢。"""
+        raw = build_review_workbook(purchase=PURCHASE)
+        wb = load_workbook(io.BytesIO(raw))
+        src, dst = wb[rt.SHEET_PURCHASE], wb[rt.SHEET_SALES]
+        hs = {src.cell(1, c).value: c for c in range(1, src.max_column + 1)}
+        hd = {dst.cell(1, c).value: c for c in range(1, dst.max_column + 1)}
+        r = dst.max_row + 1
+        dst.cell(r, hd[rt.SALES_COL_INVOICE], src.cell(2, hs[rt.PURCHASE_COL_INVOICE]).value)
+        dst.cell(r, hd[rt.SALES_COL_PARTY], src.cell(2, hs[rt.PURCHASE_COL_PARTY]).value)
+        # 会计整段搬回导列(Excel 里就是选中几格拖过去)
+        for h in rt.ROUNDTRIP_HEADERS:
+            dst.cell(r, hd[h], src.cell(2, hs[h]).value)
+        src.delete_rows(2)
+        buf = io.BytesIO()
+        wb.save(buf)
+
+        out = parse_roundtrip_workbook(buf.getvalue())
+        d = out["documents"][0]
+        self.assertEqual(d["direction"], "sales")
+        self.assertEqual(d["fields"]["buyer_tax"], "0105533000202")

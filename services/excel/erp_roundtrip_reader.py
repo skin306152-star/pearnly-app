@@ -117,6 +117,7 @@ def _read_sales_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
                 "invoice_number": invoice_no,
                 "date": _text(_cell(ws, row, hmap, rt.SALES_COL_DATE)),
                 "buyer_name": _text(_cell(ws, row, hmap, rt.SALES_COL_PARTY)),
+                "buyer_tax": _text(_cell(ws, row, hmap, rt.COL_PARTY_TAX)),
                 "erp_docnum": _text(_cell(ws, row, hmap, rt.COL_ERP_DOCNUM)),
                 "erp_party_code": _text(_cell(ws, row, hmap, rt.COL_ERP_PARTY)),
                 "items": [],
@@ -158,7 +159,10 @@ def _read_purchase_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
                     "invoice_number": _text(_cell(ws, row, hmap, rt.PURCHASE_COL_INVOICE)),
                     "date": _text(_cell(ws, row, hmap, rt.PURCHASE_COL_DATE)),
                     "seller_name": _text(_cell(ws, row, hmap, rt.PURCHASE_COL_PARTY)),
-                    "seller_tax": _text(_cell(ws, row, hmap, rt.PURCHASE_COL_PARTY_TAX)),
+                    "seller_tax": (
+                        _text(_cell(ws, row, hmap, rt.PURCHASE_COL_PARTY_TAX))
+                        or _text(_cell(ws, row, hmap, rt.COL_PARTY_TAX))
+                    ),
                     "category": _text(_cell(ws, row, hmap, rt.PURCHASE_COL_CATEGORY)),
                     "amount_before_vat": base,
                     "vat_amount": vat,

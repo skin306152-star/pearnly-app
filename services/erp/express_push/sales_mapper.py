@@ -23,6 +23,7 @@ import logging
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from services.erp.express_push.prior_doc import attach_prior_docnum
 from services.erp.express_push.common import (
     ExpressMapResult,
     ITEM_MODE_NONSTOCK,
@@ -243,4 +244,4 @@ def build_express_sales_payload(
             "filename": history.get("filename"),
         },
     }
-    return ExpressMapResult(True, finalize_payload(payload), "ok")
+    return ExpressMapResult(True, finalize_payload(attach_prior_docnum(payload, history)), "ok")

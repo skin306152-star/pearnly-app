@@ -166,7 +166,7 @@ def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, An
 def _load_owned_log(cur, endpoint_id: str, log_id: str) -> Optional[Dict[str, Any]]:
     cur.execute(
         """
-        SELECT id, status, attempt, lease_owner, response_body
+        SELECT id, status, attempt, lease_owner, response_body, history_id
         FROM erp_push_logs
         WHERE id = %s AND endpoint_id = %s
         FOR UPDATE
@@ -200,6 +200,30 @@ def _build_response_body(
         m["created_masters"] = [x["stkcod"] for x in line_modes if x.get("stkcod")]
     body_obj["meta"] = m
     return json.dumps(body_obj, ensure_ascii=False)
+
+
+def _mirror_history_status(cur, log: Dict[str, Any], status: str) -> None:
+    """把推送终态同步到 ocr_history.last_push_status。
+
+    ack 原先只改 erp_push_logs,单据记录那边永远停在入队时写的 'pending' —— 实际早就
+    成功了却显示"等待中",用户可能重推造成重复单;导出的状态列也会照抄这个假状态。
+    只镜像终态(success/manual):还要重试的保持 pending 才是诚实的。
+    同事务内更新,状态不会出现"日志成功但记录仍 pending"的中间态。
+    """
+    hid = log.get("history_id")
+    if not hid:
+        return
+    try:
+        cur.execute(
+            """
+            UPDATE ocr_history
+            SET last_push_status = %s, last_pushed_at = NOW()
+            WHERE id = %s
+            """,
+            (status, hid),
+        )
+    except Exception as e:  # noqa: BLE001 — 镜像失败不该回滚推送 ack 本身
+        logger.warning(f"mirror history push status failed (hid={hid}): {e}")
 
 
 def ack(
@@ -258,6 +282,7 @@ def ack(
                     """,
                     (body, log_id),
                 )
+                _mirror_history_status(cur, log, "success")
                 return {"ok": True, "status": "success", "express_docnum": express_docnum}
 
             if eff == C.STAGE_WAITING_LOCK:
@@ -303,6 +328,7 @@ def ack(
                     """,
                     (body, (error or "")[:500] or eff, log_id),
                 )
+                _mirror_history_status(cur, log, "manual")
                 return {"ok": True, "status": "manual", "stage": eff}
 
             # failed / rolled_back:Agent 失败累计(off-by-one 见下),满 _MAX_ATTEMPTS 转 manual。
@@ -327,6 +353,9 @@ def ack(
                 """,
                 (new_status, new_attempt, (error or "")[:500] or "agent_failed", body, log_id),
             )
+            # 还能重试的保持 pending 不镜像 —— 那时它确实还在排队,写"失败"是撒谎
+            if new_status == "manual":
+                _mirror_history_status(cur, log, "manual")
             return {
                 "ok": True,
                 "status": new_status,

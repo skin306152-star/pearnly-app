@@ -143,5 +143,22 @@ class AccountantEditThenReimportTests(unittest.TestCase):
         self.assertEqual(inv.vat, "87.5")
 
 
+class PendingReasonTests(unittest.TestCase):
+    """会计没裁决方向的票:不推(推了就是替他做方向决定)、不丢(丢了就是漏票)、
+    并且要让他看见【为什么】没处理。"""
+
+    def test_reason_surfaces_in_notes(self):
+        res = try_parse_roundtrip(build_review_workbook(pending=PENDING), "review.xlsx")
+        p = res.pages[0]
+        self.assertTrue(p.needs_manual_review)
+        self.assertEqual(p.invoice.notes, "ตรวจไม่พบเลขภาษีของกิจการ")
+
+    def test_missing_reason_still_says_why(self):
+        """原因空着也不能什么都不说 —— 会计得知道它是"还没分类"而不是别的毛病。"""
+        rec = [{"merged_fields": {"history_id": "hx", "invoice_number": "N1"}}]
+        res = try_parse_roundtrip(build_review_workbook(pending=rec), "review.xlsx")
+        self.assertTrue(res.pages[0].invoice.notes)
+
+
 if __name__ == "__main__":
     unittest.main()

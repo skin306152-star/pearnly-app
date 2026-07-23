@@ -37,6 +37,7 @@ import logging
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from services.erp.express_push.prior_doc import attach_prior_docnum
 from services.erp.express_push.common import (
     ExpressMapResult,
     _d,
@@ -267,4 +268,4 @@ def build_express_payload(
     if is_expense:
         # 留痕:这张票原本会读到多少进项税,现改折进成本(VAT capitalized · 排障/对账用)。
         payload["vat_capitalized"] = vat_capitalized
-    return ExpressMapResult(True, finalize_payload(payload), "ok")
+    return ExpressMapResult(True, finalize_payload(attach_prior_docnum(payload, history)), "ok")

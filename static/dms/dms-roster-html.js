@@ -1,6 +1,6 @@
 /* Pearnly DMS · 操作员花名册视图 · HTML 模板层(挂 window.DXROSTERHTML)。
  * 纯字符串构建,不含事件/请求(逻辑在 dms-roster.js · 同 dms-billing-html 分片先例)。
- * 所有文案走 t()(四语);角色徽标销售=ผู้ขาย / 管理员=ผู้อนุมัติ(泰语地道)。 */
+ * 所有文案走 t()(四语);角色徽标销售=ผู้ขาย / 管理员=ผู้ดูแลระบบ。 */
 (function (root) {
     'use strict';
     function t(k, v) {

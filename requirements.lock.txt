@@ -5,32 +5,32 @@
 #    pip-compile --allow-unsafe --newline=LF --no-emit-index-url --no-emit-options --no-emit-trusted-host --output-file=requirements.lock.txt --strip-extras requirements.txt
 #
 
-alembic==1.18.4
+alembic==1.18.5
     # via -r requirements.txt
 annotated-doc==0.0.4
     # via fastapi
 annotated-types==0.7.0
     # via pydantic
-anyio==4.13.0
+anyio==4.14.2
     # via
     #   httpx
     #   openai
     #   starlette
 bcrypt==5.0.0
     # via -r requirements.txt
-certifi==2026.5.20
+certifi==2026.7.22
     # via
     #   httpcore
     #   httpx
     #   requests
-cffi==2.0.0
+cffi==2.1.0
     # via cryptography
-charset-normalizer==3.4.7
+charset-normalizer==3.4.9
     # via
     #   pdfminer-six
     #   reportlab
     #   requests
-click==8.4.1
+click==8.4.2
     # via uvicorn
 colorama==0.4.6
     # via
@@ -48,18 +48,18 @@ et-xmlfile==2.0.0
     # via openpyxl
 exceptiongroup==1.3.1
     # via anyio
-fastapi==0.136.1
+fastapi==0.139.2
     # via -r requirements.txt
 google-ai-generativelanguage==0.6.15
     # via google-generativeai
-google-api-core==2.30.3
+google-api-core==2.33.0
     # via
     #   google-ai-generativelanguage
     #   google-api-python-client
     #   google-generativeai
-google-api-python-client==2.196.0
+google-api-python-client==2.198.0
     # via google-generativeai
-google-auth==2.53.0
+google-auth==2.56.2
     # via
     #   google-ai-generativelanguage
     #   google-api-core
@@ -68,7 +68,7 @@ google-auth==2.53.0
     #   google-generativeai
 google-auth-httplib2==0.4.0
     # via google-api-python-client
-google-genai==2.10.0
+google-genai==2.14.0
     # via -r requirements.txt
 google-generativeai==0.8.6
     # via -r requirements.txt
@@ -76,15 +76,15 @@ googleapis-common-protos==1.75.0
     # via
     #   google-api-core
     #   grpcio-status
-greenlet==3.5.1
+greenlet==3.5.4
     # via
     #   playwright
     #   sqlalchemy
-grpcio==1.80.0
+grpcio==1.83.0
     # via
     #   google-api-core
     #   grpcio-status
-grpcio-status==1.71.2
+grpcio-status==1.83.0
     # via google-api-core
 h11==0.16.0
     # via
@@ -100,12 +100,12 @@ httpx==0.28.1
     # via
     #   -r requirements.txt
     #   openai
-idna==3.16
+idna==3.18
     # via
     #   anyio
     #   httpx
     #   requests
-jiter==0.15.0
+jiter==0.16.0
     # via openai
 lxml==6.1.1
     # via python-docx
@@ -113,7 +113,7 @@ mako==1.3.12
     # via alembic
 markupsafe==3.0.3
     # via mako
-openai==2.32.0
+openai==2.47.0
     # via -r requirements.txt
 openpyxl==3.1.5
     # via -r requirements.txt
@@ -123,7 +123,7 @@ pdfminer-six==20251230
     # via
     #   -r requirements.txt
     #   pdfplumber
-pdfplumber==0.11.9
+pdfplumber==0.11.10
     # via -r requirements.txt
 pillow==12.3.0
     # via
@@ -132,11 +132,11 @@ pillow==12.3.0
     #   pillow-heif
     #   qrcode
     #   reportlab
-pillow-heif==1.4.0
+pillow-heif==1.5.0
     # via -r requirements.txt
-playwright==1.60.0
+playwright==1.61.0
     # via -r requirements.txt
-proto-plus==1.28.0
+proto-plus==1.28.2
     # via
     #   google-ai-generativelanguage
     #   google-api-core
@@ -156,45 +156,45 @@ pyasn1-modules==0.4.2
     # via google-auth
 pycparser==3.0
     # via cffi
-pydantic==2.13.2
+pydantic==2.13.4
     # via
     #   -r requirements.txt
     #   fastapi
     #   google-generativeai
     #   openai
-pydantic-core==2.46.2
+pydantic-core==2.47.0
     # via pydantic
 pyee==13.0.1
     # via playwright
 pyjwt==2.13.0
     # via -r requirements.txt
-pymupdf==1.24.10
+pymupdf==1.28.0
     # via -r requirements.txt
 pymupdfb==1.24.10
     # via pymupdf
 pyparsing==3.3.2
     # via httplib2
-pypdf==6.14.0
+pypdf==6.14.2
     # via -r requirements.txt
-pypdfium2==5.8.0
+pypdfium2==5.12.1
     # via pdfplumber
 python-docx==1.2.0
     # via -r requirements.txt
 python-dotenv==1.2.2
     # via -r requirements.txt
-python-multipart==0.0.31
+python-multipart==0.0.32
     # via -r requirements.txt
 qrcode==8.2
     # via -r requirements.txt
 reportlab==4.5.1
     # via -r requirements.txt
-requests==2.33.1
+requests==2.34.2
     # via
     #   -r requirements.txt
     #   google-api-core
 sniffio==1.3.1
     # via openai
-sqlalchemy==2.0.49
+sqlalchemy==2.0.51
     # via
     #   -r requirements.txt
     #   alembic
@@ -206,11 +206,11 @@ tenacity==9.1.4
     # via google-genai
 tomli==2.4.1
     # via alembic
-tqdm==4.67.3
+tqdm==4.69.0
     # via
     #   google-generativeai
     #   openai
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   alembic
     #   anyio
@@ -238,9 +238,9 @@ uritemplate==4.2.0
     # via google-api-python-client
 urllib3==2.7.0
     # via requests
-uvicorn==0.47.0
+uvicorn==0.51.0
     # via -r requirements.txt
-websockets==16.0
+websockets==16.1.1
     # via google-genai
 xlrd==2.0.2
     # via -r requirements.txt

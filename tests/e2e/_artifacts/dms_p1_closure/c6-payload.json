@@ -1,0 +1,40 @@
+{
+  "fields": {
+    "prefix_id": "17",
+    "name": "สมชาย ใจดี",
+    "people_id": "1101700998118",
+    "tax_id": "1101700998118",
+    "birthday_be": "15/05/2530",
+    "phone": "0811111111"
+  },
+  "addresses": {
+    "": {
+      "house_no": "12/3",
+      "moo": "4",
+      "road": "ถนนบัตร",
+      "province_id": "10",
+      "district_id": "1001",
+      "subdistrict_id": "100101",
+      "zipcode_id": "10200"
+    },
+    "_ct": {
+      "house_no": "99/9",
+      "soi": "ซอยติดต่อ",
+      "road": "ถนนติดต่อ",
+      "province_id": "10",
+      "district_id": "1001",
+      "subdistrict_id": "100101",
+      "zipcode_id": "10200"
+    },
+    "_sd": {
+      "house_no": "55/5",
+      "road": "ถนนส่งเอกสาร",
+      "province_id": "10",
+      "district_id": "1001",
+      "subdistrict_id": "100101",
+      "zipcode_id": "10200"
+    }
+  },
+  "mode": "update",
+  "customer_id": "1234"
+}

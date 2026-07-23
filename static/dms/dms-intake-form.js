@@ -18,6 +18,9 @@
     }
     function sectionHtml(scn) {
         var open = S.openSec[scn.id] !== false;
+        // 镜像开着 = 保存时本区被身份证地址整段覆盖。分区默认折叠,所以后果得写在恒可见的
+        // 分区副标题上,不能只留一个开关(界面所见 = 实际所写)。
+        var mirrored = !!(scn.addr && scn.sameAs && S.sameAs[scn.addr]);
         var tools =
             scn.addr && scn.sameAs
                 ? '<div class="dx-addr-tools"><span>' +
@@ -37,8 +40,10 @@
             esc(scn.id) +
             '"><div class="dx-fsec-h"><div><b>' +
             esc(t(scn.title)) +
-            '</b><div class="sub">' +
-            esc(t(scn.note)) +
+            '</b><div class="sub' +
+            (mirrored ? ' mirror' : '') +
+            '">' +
+            esc(t(mirrored ? 'dx-same-addr-note' : scn.note)) +
             '</div></div><div class="dx-fsec-tools">' +
             tools +
             caret +

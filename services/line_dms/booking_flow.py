@@ -29,6 +29,10 @@ _PICK_URL = "https://pearnly.com/dms-pick"
 
 BOOKING_ACTIONS = frozenset({cards.ACT_CONFIRM_BOOKING, cards.ACT_CANCEL_BOOKING})
 
+# 待选车会话比面板 token(15 分钟)活得久:会话是重发链接的唯一凭据,它先断,重发入口
+# 就等于不存在,用户只剩重拍身份证一条路(真扣一次 OCR 费)。只加长这一态,不动全局默认。
+_PICK_SESSION_TTL_MINUTES = 120
+
 # 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
 _spawn = _out.make_spawn("line_dms.booking")
 
@@ -45,11 +49,13 @@ async def offer_pick(
 ) -> None:
     """客户档落定后:置会话 picking + 推选车入口按钮(URI → 签名面板)。
 
-    缺客户号(异常场景)或签 token 失败 → 不推按钮、清会话回干净态(客户已保存,订车非
-    必经)。会话存 user_id 供面板端点无登录态下解析 DMS 端点。"""
+    缺客户号(异常场景)或签 token 失败 → 清会话回干净态(客户已保存,订车非必经),但
+    必须留一句交代:静默 return 会让人对着空气等一张永不到来的卡。会话存 user_id 供面板
+    端点无登录态下解析 DMS 端点。"""
     tenant = binding["tenant_id"]
     if not customer_id:
         await _thr(store.clear_session, tenant, line_user_id)
+        _push(line_user_id, cards.TXT_PICK_UNAVAILABLE)
         return
     nonce = secrets.token_hex(8)
     try:
@@ -62,6 +68,7 @@ async def offer_pick(
     except Exception:
         logger.warning("[line_dms.booking] sign pick token failed; skip pick", exc_info=True)
         await _thr(store.clear_session, tenant, line_user_id)
+        _push(line_user_id, cards.TXT_PICK_UNAVAILABLE)
         return
     payload = {
         "nonce": nonce,
@@ -71,7 +78,14 @@ async def offer_pick(
         "draft": draft or {},
         "name": name or (draft or {}).get("name", ""),
     }
-    await _thr(store.set_session, tenant, line_user_id, "picking", payload)
+    await _thr(
+        store.set_session,
+        tenant,
+        line_user_id,
+        "picking",
+        payload,
+        ttl_minutes=_PICK_SESSION_TTL_MINUTES,
+    )
     url = f"{_PICK_URL}?t={token}"
     line_client.push_messages(line_user_id, [cards.pick_button_message(url)], channel=_CHANNEL)
 

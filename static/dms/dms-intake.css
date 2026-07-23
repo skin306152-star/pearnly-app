@@ -679,6 +679,11 @@
   color: var(--ink2);
   margin-top: 4px;
 }
+/* 镜像开启态:本区将被身份证地址覆盖 · 提到警示色,折叠时也看得见 */
+.dmsx .dx-fsec-h .sub.mirror {
+  color: var(--dx-amber);
+  font-weight: 600;
+}
 .dmsx .dx-fgrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

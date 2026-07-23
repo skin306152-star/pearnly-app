@@ -32,43 +32,46 @@ MENU_ACTIONS = frozenset(
 # mode 语义单一落点:customer=只建档收尾;其余(booking/缺省直拍)串联订车。
 # flow 出卡分流与本文件落档分流都引用它,别再散写裸字符串比较。
 MODE_CUSTOMER = "customer"
-_GREETING_PREFIX = "สวัสดี"
 _MENU_CHOICES = {"1": cards.ACT_MENU_CUSTOMER, "2": cards.ACT_MENU_BOOKING}
 # 弹菜单/切模式时保留的已收料:重复进菜单不丢已拍的卡/已输的号。
 _KEEP_KEYS = ("id_card", "phone", "endpoint_id", "mode")
 
 
 # ── text:弹菜单 / menu 态下的单字 1|2 ───────────────────────────────────────
-async def handle_text(
-    binding: dict, line_user_id: str, reply_token: str, sess: Optional[dict], text: str
-) -> bool:
-    """处理菜单相关文本,返回是否已接管(未接管则 flow 继续走手机号/nudge)。
+async def open_menu(
+    binding: dict,
+    line_user_id: str,
+    reply_token: str,
+    sess: Optional[dict],
+    *,
+    greet: bool = False,
+) -> None:
+    """置 menu 态(保留已收料含 mode:弹菜单不丢用户已拍/已输的东西)→ 发菜单卡。
 
-    เมนู 或问候语 → 弹菜单(先于手机号判定);menu 态下的 '1'/'2' → 等同点对应菜单项。
-    其余数字文本(如手机号)不被吃成菜单——只认这两个单字符。
+    greet = 问候语进场,照 mockup 先来一句欢迎;เมนู 是回访召唤,只发卡不寒暄。
+    词形判定在 commands.classify,本函数只管落态出卡。
     """
-    stripped = text.strip()
-    # เมนู 及其常见打错(เมน/เมนB,真机 2026-07-19 实拍):短词且以 เมน 起头都当召唤菜单。
-    is_menu_word = len(stripped) <= 6 and stripped.startswith("เมน")
-    if is_menu_word or stripped.startswith(_GREETING_PREFIX):
-        await _enter_menu(binding, line_user_id, sess)
-        # 问候语带欢迎气泡(照 mockup 的进场节奏);เมนู 是回访召唤,只发卡不寒暄。
-        msgs: list = [menu_cards.menu_card()]
-        if not is_menu_word:
-            msgs.insert(0, {"type": "text", "text": cards.TXT_MENU_GREETING})
-        line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
-        return True
-    if (sess or {}).get("state") == "menu" and stripped in _MENU_CHOICES:
-        await _choose(binding, line_user_id, reply_token, sess, _MENU_CHOICES[stripped])
-        return True
-    return False
-
-
-async def _enter_menu(binding: dict, line_user_id: str, sess: Optional[dict]) -> None:
-    """置 menu 态,保留已收料(含 mode):弹菜单不丢用户已拍/已输的东西。"""
     old = (sess or {}).get("payload") or {}
     payload = {k: old.get(k) for k in _KEEP_KEYS if old.get(k)}
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "menu", payload)
+    msgs: list = [menu_cards.menu_card()]
+    if greet:
+        msgs.insert(0, {"type": "text", "text": cards.TXT_MENU_GREETING})
+    line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
+
+
+async def handle_choice(
+    binding: dict, line_user_id: str, reply_token: str, sess: Optional[dict], text: str
+) -> bool:
+    """menu 态下的单字 '1'/'2' = 点对应菜单项,返回是否已接管。
+
+    只认这两个单字符:其余数字文本(如手机号)交回调用方走号码路。
+    """
+    stripped = text.strip()
+    if (sess or {}).get("state") != "menu" or stripped not in _MENU_CHOICES:
+        return False
+    await _choose(binding, line_user_id, reply_token, sess, _MENU_CHOICES[stripped])
+    return True
 
 
 # ── postback:菜单项 / 继续订车 / 重拍 ───────────────────────────────────────

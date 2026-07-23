@@ -153,6 +153,9 @@
             var same = norm(nv) === norm(dv);
             S.pick[c.key] = !existing() ? 'new' : same || !nv ? 'dms' : 'new';
         });
+        // 镜像默认:新建客户三块地址同写(与 LINE 建新客一致,是产品预期);更新既有客户默认关——
+        // 联系/寄送地址常与户籍地址不同,而比对表只列身份证地址块,开着就是静默改写。
+        S.sameAs = { _ct: !existing(), _sd: !existing() };
         var base = existing() ? Object.assign({}, S.dmsVals) : {};
         if (!existing()) Object.assign(base, ocrFormDefaults());
         S.form = base;
@@ -259,6 +262,11 @@
             });
         syncMirror();
     }
+    // 只收有值的键:写库层所见即所存(键在即写、空串=真清空 DMS),补空串会把用户没填的
+    // 字段连同 DMS 原值一起抹掉,与界面「空白值不会清除原资料」的承诺相反。
+    function putIfSet(target, key, v) {
+        if (v != null && String(v) !== '') target[key] = v;
+    }
     function buildPayload() {
         syncFormFromDom();
         var idKeys = [
@@ -277,14 +285,14 @@
         ];
         var fields = {};
         idKeys.forEach(function (k) {
-            if (S.form[k] != null) fields[k] = S.form[k];
+            putIfSet(fields, k, S.form[k]);
         });
         fields.people_id = S.form.people_id || S.newVals.people_id || '';
         fields.name = S.form.name || S.newVals.name || '';
         var block = function (sfx) {
             var o = {};
             ADDR_KEYS.forEach(function (k) {
-                o[k] = S.form[k + sfx] != null ? S.form[k + sfx] : '';
+                putIfSet(o, k, S.form[k + sfx]);
             });
             return o;
         };

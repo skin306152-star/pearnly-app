@@ -170,8 +170,8 @@ class DMSClientIntakeMixin:
         """建(mode='create')或覆盖(mode='overwrite')客户。返回 (customer_id, converted)
         ——converted=True 表示 create 被幂等/撞码转成了覆盖,回执侧据此如实说「อัปเดต」。
         覆盖:载现表单 → 合并面板字段(非身份证字段原样保留)→ 提交。
-        空值一律跳过(不清除 DMS 原值)。addresses 给 {""/_ct/_sd: 地址块} 时
-        三套地址分别写;不给则用 fields 里的单套地址写满三处(向后兼容)。"""
+        字段按「键存在即写」:传了空串=真清空 DMS,没传该键才保留原值。addresses 给
+        {""/_ct/_sd: 地址块} 时三套地址分别写;不给则用 fields 里的单套地址写满三处(向后兼容)。"""
         if mode not in ("create", "overwrite"):
             raise DMSClientError(f"bad save mode: {mode!r}", "ERR_DMS_CUSTOMER_SAVE")
         with self._writer_session():

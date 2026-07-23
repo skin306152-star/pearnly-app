@@ -330,8 +330,8 @@ def push_idcard_fields_mrerp_dms(
 ) -> Dict[str, Any]:
     """面板最终字段 → 建/改客户(只写 DMS 客户库 ลูกค้า,不建订车单)。
     mode:create(新建)/ overwrite(覆盖可映射)/ update(只写差异字段)。
-    update 与 overwrite 在写库层一致(载现表单 + 空值跳过),差异在前端给的字段集;
-    update 只传选了「新值」的字段 → 其余保留 DMS 现值。返回写日志/响应用 dict。"""
+    update 与 overwrite 在写库层一致(载现表单 + 键存在即写),差异在前端给的字段集;
+    update 只传选了「新值」的字段 → 其余保留 DMS 现值(传空串=显式清空)。返回写日志/响应用 dict。"""
     t0 = time.time()
     save_mode = "create" if mode == "create" else "overwrite"
 

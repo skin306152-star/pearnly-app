@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DMS LINE 对话回放(验收证据)</title>
+    <style>
+      :root {
+        --ink: #1b1d21;
+        --ink2: #6b7280;
+        --line-bg: #8ab4d8;
+        --me: #a8e06c;
+        --bot: #ffffff;
+        --ok: #157347;
+        --bad: #b3261e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Noto Sans Thai', 'Segoe UI', system-ui, sans-serif;
+        color: var(--ink);
+        background: #f4f5f7;
+      }
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 20px 16px 48px;
+      }
+      .banner {
+        background: #fff4d6;
+        border: 1px solid #e6c65c;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 18px;
+      }
+      .scene {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 18px;
+      }
+      .scene h2 {
+        font-size: 15px;
+        margin: 0 0 4px;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--ink2);
+        margin: 0 0 12px;
+      }
+      .chat {
+        background: var(--line-bg);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .row {
+        display: flex;
+        margin-bottom: 8px;
+      }
+      .row.me {
+        justify-content: flex-end;
+      }
+      .bubble {
+        max-width: 78%;
+        border-radius: 14px;
+        padding: 8px 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .bubble.me {
+        background: var(--me);
+      }
+      .bubble.bot {
+        background: var(--bot);
+      }
+      .card {
+        min-width: 240px;
+      }
+      .flex-text {
+        margin: 2px 0;
+      }
+      .flex-text.head {
+        font-weight: 700;
+      }
+      .flex-sep {
+        border-top: 1px solid #e5e7eb;
+        margin: 8px 0;
+      }
+      .flex-btn {
+        display: inline-block;
+        border: 1px solid #2563eb;
+        color: #2563eb;
+        border-radius: 8px;
+        padding: 5px 12px;
+        font-size: 13px;
+        margin: 4px 6px 0 0;
+      }
+      .flex-btn.primary {
+        background: #2563eb;
+        color: #fff;
+      }
+      .qr {
+        margin-top: 6px;
+      }
+      .qr span {
+        display: inline-block;
+        border: 1px solid #93a3b8;
+        color: #334155;
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: 12px;
+        margin: 3px 5px 0 0;
+      }
+      .asserts {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0 0;
+        font-size: 13px;
+      }
+      .asserts li {
+        padding: 3px 0;
+      }
+      .asserts .ok b {
+        color: var(--ok);
+      }
+      .asserts .bad b {
+        color: var(--bad);
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      /* 把状态机真跑时捕获的 LINE 消息 payload 渲染成对话视图(验收证据用)。
+         flex 结构任意嵌套,这里只递归提取 text/button/separator/quickReply 四类可视元素 —— 目的是
+         人眼核对"用户到底看到了什么话",不是复刻 LINE 渲染引擎。 */
+      (function () {
+        function esc(s) {
+          return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+          });
+        }
+
+        function walk(node, out) {
+          if (!node || typeof node !== 'object') return;
+          if (Array.isArray(node)) {
+            node.forEach(function (n) {
+              walk(n, out);
+            });
+            return;
+          }
+          if (node.type === 'text' && node.text != null) {
+            out.push(
+              '<div class="flex-text' +
+                (node.weight === 'bold' ? ' head' : '') +
+                '">' +
+                esc(node.text) +
+                '</div>'
+            );
+          } else if (node.type === 'separator') {
+            out.push('<div class="flex-sep"></div>');
+          } else if (node.type === 'button') {
+            var label = (node.action && node.action.label) || '';
+            out.push(
+              '<span class="flex-btn' +
+                (node.style === 'primary' ? ' primary' : '') +
+                '">' +
+                esc(label) +
+                '</span>'
+            );
+          }
+          ['header', 'hero', 'body', 'footer', 'contents'].forEach(function (k) {
+            if (node[k]) walk(node[k], out);
+          });
+        }
+
+        function quickReply(msg) {
+          var items = (msg.quickReply && msg.quickReply.items) || [];
+          if (!items.length) return '';
+          return (
+            '<div class="qr">' +
+            items
+              .map(function (it) {
+                return '<span>' + esc((it.action && it.action.label) || '') + '</span>';
+              })
+              .join('') +
+            '</div>'
+          );
+        }
+
+        function bubble(msg) {
+          if (msg.type === 'text' || msg.text != null) {
+            return esc(msg.text) + quickReply(msg);
+          }
+          var out = [];
+          walk(msg.contents || msg, out);
+          return '<div class="card">' + out.join('') + '</div>' + quickReply(msg);
+        }
+
+        function render() {
+          var data = window.__REPLAY__ || { title: '(no data)', scenes: [] };
+          var h = '<div class="wrap">';
+          h +=
+            '<div class="banner">渲染回放 · <b>非 LINE 真机截图</b>:以下气泡由状态机真跑时捕获的消息 payload 渲染而成,用于人眼核对用户实际看到的话。</div>';
+          h += '<h1>' + esc(data.title || '') + '</h1>';
+          (data.scenes || []).forEach(function (sc) {
+            h += '<section class="scene"><h2>' + esc(sc.name) + '</h2>';
+            if (sc.note) h += '<p class="note">' + esc(sc.note) + '</p>';
+            h += '<div class="chat">';
+            (sc.turns || []).forEach(function (t) {
+              if (t.dir === 'in') {
+                h += '<div class="row me"><div class="bubble me">' + esc(t.text) + '</div></div>';
+              } else {
+                h +=
+                  '<div class="row bot"><div class="bubble bot">' +
+                  bubble(t.msg || t) +
+                  '</div></div>';
+              }
+            });
+            h += '</div>';
+            if (sc.asserts && sc.asserts.length) {
+              h += '<ul class="asserts">';
+              sc.asserts.forEach(function (a) {
+                h +=
+                  '<li class="' +
+                  (a.ok ? 'ok' : 'bad') +
+                  '"><b>' +
+                  (a.ok ? 'PASS' : 'FAIL') +
+                  '</b> ' +
+                  esc(a.text) +
+                  '</li>';
+              });
+              h += '</ul>';
+            }
+            h += '</section>';
+          });
+          h += '</div>';
+          document.body.innerHTML = h;
+        }
+        window.addEventListener('DOMContentLoaded', render);
+      })();
+    </script>
+  </body>
+</html>

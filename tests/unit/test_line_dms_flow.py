@@ -10,7 +10,7 @@ import contextlib
 import unittest
 from unittest import mock
 
-from services.line_dms import cards, flow
+from services.line_dms import cards, flow, ocr_review, text_router
 
 # 网页确认页 fields 键形状(static/dms/dms-intake-core.js)· LINE 侧必须同形。
 SPA_CREATE_FIELD_KEYS = {"prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone"}
@@ -241,12 +241,12 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
         with _Env(
             ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=True
         ) as env:
-            await self._seed_reviewing(env)
+            nonce = await self._seed_reviewing(env)
             card = env.pushed_card()
             labels = _all_button_labels(card)
             self.assertIn(cards.BTN_CONTINUE_BOOKING, labels)
             self.assertNotIn(cards.BTN_UPDATE, labels)
-            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP))
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP, nonce))
             await env.drain()
             env.push_idcard.assert_not_called()
 
@@ -325,7 +325,10 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
 
     async def test_c6_checksum_bounce_no_lookup(self):
-        """C6:people_id_checksum 命中(needs_review)→ 打回重拍,不调 recognize_lookup。"""
+        """C6:people_id_checksum 命中(needs_review)→ 打回,不调 recognize_lookup。
+
+        打回话术必须说「号码校验位不过」,不许沿用泛泛的「拍不清」——归因错会让人反复
+        重拍,每拍一次真扣一次 OCR 费(P1-11)。"""
         ocr = {
             "needs_review": True,
             "missing_fields": ["people_id_checksum"],
@@ -335,7 +338,24 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE})
             await flow.process_image(_BINDING, _LUID, "mid1")
             env.lookup.assert_not_called()
-            self.assertTrue(env.push_text.call_args.args[1].startswith(cards.TXT_BLURRY))
+            said = env.push_text.call_args.args[1]
+            self.assertEqual(said, ocr_review.TXT_ID_CHECKSUM)
+            self.assertNotIn(cards.TXT_BLURRY, said)
+
+    async def test_c6b_unreadable_fields_listed_with_ocr_labels(self):
+        """C6b:缺姓/名 → 拍不清话术后括号真的列出缺项(旧实现拿错词表,括号恒不出现)。"""
+        ocr = {
+            "needs_review": True,
+            "missing_fields": ["first_name", "last_name"],
+            "id_card": dict(_RAW_ID),
+        }
+        with _Env(ocr=ocr, lookup=_lookup("none")) as env:
+            env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE})
+            await flow.process_image(_BINDING, _LUID, "mid1")
+            said = env.push_text.call_args.args[1]
+            self.assertTrue(said.startswith(cards.TXT_BLURRY))
+            self.assertIn(ocr_review.MISSING_LABELS_TH["first_name"], said)
+            self.assertIn(ocr_review.MISSING_LABELS_TH["last_name"], said)
 
     async def test_c8_push_log_trigger_and_field_diffs(self):
         """C8:insert_push_log 被调 · request_body.trigger='line_dms' 且含 field_diffs · push_type='id_card'。"""
@@ -526,15 +546,65 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_RESTART)  # เริ่มใหม่
             self.assertIsNone(env.session())
 
+    async def test_e7_menu_word_during_editing_is_not_eaten_as_new_value(self):
+        """P1-10:编辑姓名时打 เมนู → 弹菜单、结束编辑;不许被当成新姓名写进 id_card。
+
+        产品文案明写「随时可打 เมนู 叫菜单」,旧分发顺序让 editing 态独占文本,菜单词
+        变成新姓名并重跑查重(白烧一次 DMS 登录)。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env)
+            await flow.handle_postback(
+                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
+            )
+            self.assertEqual(env.session()["state"], "editing")
+            lookups = env.lookup.call_count
+
+            await flow.handle_text(_BINDING, _LUID, "rt", "เมนู")
+            await env.drain()
+
+            sess = env.session()
+            self.assertEqual(sess["state"], "menu")
+            self.assertNotIn("editing_field", sess["payload"])
+            self.assertEqual(sess["payload"]["id_card"]["name"], "สมชาย ใจดี")  # 原值没被覆盖
+            self.assertEqual(env.lookup.call_count, lookups)  # 不重跑查重
+            self.assertEqual(env.reply_msgs.call_args.args[1][0]["altText"], cards.TXT_MENU_TITLE)
+
+    async def test_e8_reset_word_during_editing_still_clears(self):
+        """editing 态的 เริ่มใหม่ 仍是全局重置(命令先于状态,顺序调整后不许回退)。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            nonce = await self._seed_reviewing(env)
+            await flow.handle_postback(
+                _BINDING, _LUID, "rt", _pb_field(cards.ACT_EDIT_FIELD, nonce, "name")
+            )
+            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_RESTART)
+            self.assertIsNone(env.session())
+
+    async def test_e9_edit_cancel_word_stays_editing_scoped(self):
+        """ยกเลิก 只在 editing 态生效:非编辑态原样落到闲聊路,不当全局命令。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE})
+            await flow.handle_text(_BINDING, _LUID, "rt", cards.BTN_EDIT_CANCEL)
+            self.assertEqual(env.session()["state"], "collecting")
+            self.assertEqual(env.reply.call_args.args[1], cards.TXT_ASK_CARD)
+
     async def test_keep_no_write_clears_session(self):
         """[ใช้ข้อมูลเดิม] → 不写档 + 清 session + 回 ใช้ข้อมูลเดิมต่อ。"""
         with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
-            await self._seed_reviewing(env)
-            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP))
+            nonce = await self._seed_reviewing(env)
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP, nonce))
             await env.drain()
             env.push_idcard.assert_not_called()
             self.assertIsNone(env.session())
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_KEEP)
+
+    async def test_keep_without_nonce_refused(self):
+        """旧卡后门:ACT_KEEP 无 nonce(或 nonce 不符)→ 过期话术,不白签选车链接。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            await self._seed_reviewing(env)
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP))
+            await env.drain()
+            self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
+            self.assertEqual(env.session()["state"], "reviewing")  # 会话原封不动
 
 
 def _all_button_labels(card):
@@ -608,7 +678,7 @@ class PhonePassthroughTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(flow.store, "get_session", return_value=sess),
             mock.patch.object(flow, "_merge_session", new_callable=mock.AsyncMock) as merge,
             mock.patch.object(flow, "_spawn"),
-            mock.patch.object(flow, "_reply"),
+            mock.patch.object(text_router, "_reply"),
         ):
             merge.return_value = {"id_card": {"people_id": "x"}, "phone": "12345678"}
             await flow.handle_text(binding, "L1", "rt", "12345678")
@@ -620,7 +690,7 @@ class PhonePassthroughTests(unittest.IsolatedAsyncioTestCase):
         sess = {"state": "collecting", "payload": {"id_card": {"people_id": "x"}}}
         with (
             mock.patch.object(flow.store, "get_session", return_value=sess),
-            mock.patch.object(flow, "_reply") as rep,
+            mock.patch.object(text_router, "_reply") as rep,
         ):
             await flow.handle_text(binding, "L1", "rt", "ราคาเท่าไร")
         rep.assert_called_once_with("rt", cards.TXT_ASK_PHONE)

@@ -30,15 +30,15 @@ from services.line_dms import (
     cards,
     draft,
     edit_flow,
-    menu_cards,
     menu_flow,
+    ocr_review,
+    pick_resume,
     store,
+    text_router,
 )
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 logger = logging.getLogger(__name__)
-
-_RESET_WORD = "เริ่มใหม่"
 
 # 建单/新建时写满的地址块键(与网页 dms-intake-core.js 的 ADDR_KEYS 逐键同形)。
 _ADDR_BLOCK_KEYS = (
@@ -70,52 +70,8 @@ def handle_image(binding: dict, line_user_id: str, message_id: str) -> None:
 
 
 async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: str) -> None:
-    """绑定用户发文字:เริ่มใหม่ 重置 / 手机号 / 其余按当前态追料。"""
-    tenant = binding["tenant_id"]
-    if text == _RESET_WORD:  # 全局重置优先于 editing 态
-        await _thr(store.clear_session, tenant, line_user_id)
-        _reply(reply_token, cards.TXT_RESET)
-        return
-
-    sess = await _thr(store.get_session, tenant, line_user_id)
-    if (sess or {}).get("state") == "editing":  # 逐字段修正:下一条文本 = 新值
-        await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
-        return
-
-    # 菜单层(波2):เมนู/问候语弹菜单;menu 态下单字 1/2 = 点对应菜单项(先于手机号判定)。
-    if await menu_flow.handle_text(binding, line_user_id, reply_token, sess, text):
-        return
-
-    # 号码透传:ERP 是权威,它吃什么送什么,不在 Pearnly 写死格式(Zihao 拍板)。
-    # 含数字即视为号码(纯路由判据,区分号码与闲聊);格式对错由 DMS 保存时裁决。
-    if any(ch.isdigit() for ch in text):
-        payload = await _merge_session(
-            binding,
-            line_user_id,
-            {"phone": text},
-            keep=("id_card", "endpoint_id", "mode"),
-            sess=sess,
-        )
-        if payload.get("id_card"):
-            _spawn(
-                _run_dedup(
-                    binding,
-                    line_user_id,
-                    None,
-                    payload["id_card"],
-                    text,
-                    payload.get("endpoint_id"),
-                )
-            )
-        else:
-            _reply(reply_token, cards.TXT_ASK_CARD)
-        return
-
-    nudge = _nudge(sess)
-    if nudge is None:  # 无会话 → 菜单卡引路(取代旧 TXT_INTRO 文本)
-        line_client.reply_messages(reply_token, [menu_cards.menu_card()], channel=_CHANNEL)
-    else:
-        _reply(reply_token, nudge)
+    """绑定用户发文字 → 文本分发(全局命令优先于状态分支,见 text_router)。"""
+    await text_router.route(binding, line_user_id, reply_token, text)
 
 
 async def handle_postback(
@@ -144,6 +100,11 @@ async def handle_postback(
         await menu_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
 
+    # 选车链接重发(P1-12):零 OCR、零写档,cid 对齐守卫在 pick_resume 内。
+    if action in pick_resume.REISSUE_ACTIONS:
+        await pick_resume.handle_postback(binding, line_user_id, reply_token, pb, sess)
+        return
+
     if action in approval_flow.APPROVAL_ACTIONS:  # 波4:nonce/状态守卫都在 approval_flow 内
         await approval_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
@@ -154,6 +115,13 @@ async def handle_postback(
         return
 
     if action == cards.ACT_KEEP:
+        # 零写入不等于零后果:它会签发一条新的选车链接。nonce 只校验不消费(照 _retake),
+        # 否则翻聊天记录点任意一张旧卡都能白拿链接。
+        keep_nonce = pb.get("nonce")
+        stale = not keep_nonce or payload.get("nonce") != keep_nonce
+        if (sess or {}).get("state") != "reviewing" or stale:
+            _reply(reply_token, cards.TXT_EXPIRED)
+            return
         _reply(reply_token, cards.TXT_KEEP)
         # 保留旧数据 = 零写入;customer 模式下问是否继续订车,booking/缺省照旧串联。
         await menu_flow.after_customer_saved(
@@ -214,8 +182,8 @@ async def process_image(binding: dict, line_user_id: str, message_id: str) -> No
         return
 
     if ocr.get("needs_review"):
-        # 读不清 / 校验位对不上 → 打回重拍,列缺失项;不查重(C6)。
-        _push(line_user_id, _blurry_text(ocr.get("missing_fields") or []))
+        # 读不清 / 校验位对不上 → 打回,按真实原因说话(ocr_review);不查重(C6)。
+        _push(line_user_id, ocr_review.review_text(ocr.get("missing_fields") or []))
         return
 
     id_card = _id_ocr.editable_id_card(ocr["id_card"])
@@ -459,26 +427,6 @@ async def _merge_session(
     payload.update(add)
     await _thr(store.set_session, tenant, line_user_id, "collecting", payload)
     return payload
-
-
-def _nudge(sess: Optional[dict]) -> Optional[str]:
-    if not sess:
-        return None  # 无会话 → 调用方弹 menu_card 引路(取代旧 TXT_INTRO 文本)
-    if sess.get("state") == "reviewing":
-        return cards.TXT_PICK_ABOVE
-    payload = sess.get("payload") or {}
-    if payload.get("id_card") and not payload.get("phone"):
-        return cards.TXT_ASK_PHONE
-    if payload.get("phone") and not payload.get("id_card"):
-        return cards.TXT_ASK_CARD
-    return cards.TXT_NEED_BOTH
-
-
-def _blurry_text(missing: List[str]) -> str:
-    labels = [cards.FIELD_LABELS_TH.get(m) for m in missing if cards.FIELD_LABELS_TH.get(m)]
-    if not labels:
-        return cards.TXT_BLURRY
-    return cards.TXT_BLURRY + " (" + ", ".join(labels) + ")"
 
 
 def _ocr_error_text(e: _id_ocr.DmsOcrError) -> str:

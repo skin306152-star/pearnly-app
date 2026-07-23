@@ -46,10 +46,11 @@ _NEW_FORM = """
 """
 
 
-def _edit_form(name="Old Name", tel="0811111111"):
+def _edit_form(name="Old Name", tel="0811111111", house_no=""):
     return (
         _NEW_FORM.replace('name="txtcusname" value=""', f'name="txtcusname" value="{name}"')
         .replace('name="txttel" value=""', f'name="txttel" value="{tel}"')
+        .replace('name="txthousenum" value=""', f'name="txthousenum" value="{house_no}"')
         .replace(
             'name="selzipcodes"><option value="">--</option>',
             'name="selzipcodes"><option value="6477" selected>81120</option>',
@@ -70,7 +71,7 @@ class FakeTransport:
         self.posts.append((url, dict(data or {})))
         if url.endswith("cus/form.php"):
             if (data or {}).get("status") == "e":
-                return _Resp(_edit_form(name=self._edit_name))
+                return _Resp(_edit_form(name=self._edit_name, house_no=self._edit_house_no))
             return _Resp(_NEW_FORM)
         if url.endswith("cus/new.php"):
             self._created = True
@@ -89,6 +90,7 @@ class FakeTransport:
         return _Resp("")
 
     _edit_name = "Old Name"
+    _edit_house_no = ""
 
 
 class _DupCodeTransport(FakeTransport):
@@ -338,6 +340,21 @@ class SaveSemanticTests(unittest.TestCase):
             customer_id="95",
         )
         self.assertEqual(self._posted("cus/edit.php")["txttel"], "0811111111")
+
+    def test_address_present_empty_clears_absent_keeps(self):
+        """地址块同一语义(save_customer docstring 承诺的就是这个,不是「空值一律跳过」)。"""
+        self.t._edit_name = "Addr Cust"
+        self.t._edit_house_no = "9/9"
+        base = {"name": "Addr Cust", "people_id": "1234567890123"}
+        # house_no 显式空串(用户清掉门牌)→ 真清空 DMS
+        self.c.save_customer(
+            fields=base, mode="overwrite", customer_id="95", addresses={"": {"house_no": ""}}
+        )
+        self.assertEqual(self._posted("cus/edit.php")["txthousenum"], "")
+        # 不带 house_no 键(用户没动)→ 保留 DMS 原值
+        self.t.posts.clear()
+        self.c.save_customer(fields=base, mode="overwrite", customer_id="95")
+        self.assertEqual(self._posted("cus/edit.php")["txthousenum"], "9/9")
 
     def test_three_address_blocks_written_separately(self):
         self.t._edit_name = "Addr Cust"

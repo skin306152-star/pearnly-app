@@ -1,11 +1,11 @@
 /* Pearnly DMS · MR.ERP DMS 连接向导 + 设置页连接卡。
  * 移植自主站 src/home/erp-mrerp-dms-connect.ts:DMS 地址写死隐藏(只此一个实例),
  * 向导露 账号/密码/订车单号前缀 + 可选的管理员账密(DL-4b · 只用于客户档改写)。保存
- * adapter=mrerp_dms · config.id_card_auto_push=true · auto_push=false(后端再兜底 false,
- * 防发票自动推送误投)。凭据明文塞 username_enc/password_enc/admin_username_enc/
- * admin_password_enc,路由 kms 加密后落地(前端不加密不留明文;后端已把这两键纳入
- * ENCRYPTED_CRED_ADAPTERS 加密清单,见 routes/erp_endpoints_routes.py)。管理员账密留空
- * 且此前已配过 → 沿用已存密文(PATCH 整体替换 config,空槽会丢旧值,故须显式带回)。
+ * adapter=mrerp_dms · auto_push=false(后端再兜底 false,防发票自动推送误投)。网页这条路
+ * 全程手动:识别 → 查重 → 人工确认 → 推送,没有自动推送开关。凭据明文塞 username_enc/
+ * password_enc/admin_username_enc/admin_password_enc,路由 kms 加密后落地(前端不加密不留
+ * 明文;后端已把这两键纳入 ENCRYPTED_CRED_ADAPTERS 加密清单,见 routes/erp_endpoints_routes.py)。
+ * 管理员账密留空且此前已配过 → 沿用已存密文(PATCH 整体替换 config,空槽会丢旧值,故须显式带回)。
  * 挂 window.DXCONNECT + window._mrerpDmsOpenWizard。 */
 (function (root) {
     'use strict';
@@ -142,6 +142,14 @@
             '</div>'
         );
     }
+    // 订车单号前缀只服务 LINE 渠道建单(网页这条路不建订车单)· 标明作用域,免得看成网页会用。
+    function prefixNoteHtml() {
+        return (
+            '<div style="font-size:11px;color:var(--ink2);margin:-6px 0 14px;line-height:1.5;">' +
+            esc(t('dms-wizard-prefix-note')) +
+            '</div>'
+        );
+    }
     function openWizard() {
         closeWizard();
         var prefix =
@@ -164,6 +172,7 @@
             field('dms-wizard-username', 'dms-w-user', 'text', '', '') +
             field('dms-wizard-password', 'dms-w-pass', 'password', '', '') +
             field('dms-wizard-prefix', 'dms-w-prefix', 'text', prefix, 'PN') +
+            prefixNoteHtml() +
             adminFieldsHtml() +
             '<div id="dms-w-err" style="display:none;color:#b3261e;font-size:13px;margin:4px 0 12px;"></div>' +
             '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;"><button type="button" class="btn" id="dms-w-cancel">' +
@@ -227,7 +236,6 @@
                     system_url: url,
                     username_enc: user,
                     password_enc: pass,
-                    id_card_auto_push: true,
                     booking_defaults: { booking_prefix: prefix.trim() || 'PN' },
                 };
                 applyAdminFields(cfg);

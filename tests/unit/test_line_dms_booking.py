@@ -28,7 +28,11 @@ class FakeStore:
         return self.data.get((str(tenant), str(luid)))
 
     def set_session(self, tenant, luid, state, payload=None, ttl_minutes=30):
-        self.data[(str(tenant), str(luid))] = {"state": state, "payload": payload or {}}
+        self.data[(str(tenant), str(luid))] = {
+            "state": state,
+            "payload": payload or {},
+            "ttl_minutes": ttl_minutes,
+        }
 
     def clear_session(self, tenant, luid):
         self.data.pop((str(tenant), str(luid)), None)
@@ -129,12 +133,16 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             card = env.push_msgs.call_args.args[1][0]
             uri = card["contents"]["footer"]["contents"][0]["action"]["uri"]
             self.assertIn("/dms-pick?t=", uri)
+            # 会话须活过 15 分钟的面板 token:它是重发链接的唯一凭据(P1-12)。
+            self.assertGreater(sess["ttl_minutes"], 15)
 
-    async def test_offer_pick_no_customer_clears(self):
+    async def test_offer_pick_no_customer_clears_and_says_so(self):
+        """缺客户号 → 清会话,但要留一句交代,不静默(状态诚实)。"""
         with _Env() as env:
             await bf.offer_pick(_BINDING, _LUID, endpoint_id="E1", customer_id="", draft={})
             self.assertIsNone(env.session())
             env.push_msgs.assert_not_called()
+            self.assertEqual(env.push_text.call_args.args[1], cards.TXT_PICK_UNAVAILABLE)
 
     async def test_d4_confirm_creates_booking_and_logs(self):
         result = {"ok": True, "booking_id": "BID1", "booking_no": "BK9"}

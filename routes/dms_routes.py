@@ -178,7 +178,7 @@ async def dms_geo(
 @router.post("/api/dms/id-card/push")
 async def dms_id_card_push(request: Request):
     """步2:面板编辑后的字段 → 建/改 DMS 客户(覆盖/新建)→ 写 erp_push_logs。
-    只写客户库(ลูกค้า)· 不建订车单。"""
+    只写客户库(ลูกค้า)· 不建订车单。回执与台账的 mode 以服务层实际结果为准。"""
     user = _authorize(request)
     body = await request.json()
     fields = body.get("fields") or {}
@@ -203,6 +203,7 @@ async def dms_id_card_push(request: Request):
         customer_id=customer_id,
         addresses=addresses,
     )
+    mode = result.get("mode") or mode  # 服务层可能把 create 幂等/撞码转成覆盖 → 回执不谎称新建
     status = "success" if result.get("success") else "failed"
     log_id = await asyncio.to_thread(
         db.insert_push_log,

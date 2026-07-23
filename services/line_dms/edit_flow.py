@@ -88,17 +88,27 @@ def _cancel(
     _reply(reply_token, cards.TXT_EDIT_CANCELLED)
 
 
+def exit_editing(sess: Optional[dict]) -> Dict[str, Any]:
+    """结束编辑:去掉 editing_field 的会话快照(reviewing 态·nonce 不变,原卡即刻可用)。
+
+    纯函数不落库——调用方按各自去向只写一次会话(取消回 reviewing、菜单词进 menu 态),
+    避免同一条消息连写两次。一律不重跑查重:慢任务落地会劫持用户已开始的下一个流程。
+    """
+    payload = {k: v for k, v in ((sess or {}).get("payload") or {}).items() if k != "editing_field"}
+    return {"state": "reviewing", "payload": payload}
+
+
 # ── text:editing 态收新值 / 文本取消 ───────────────────────────────────────
 async def handle_text(
     binding: dict, line_user_id: str, reply_token: str, sess: Optional[dict], text: str
 ) -> None:
-    """editing 态的下一条文本 = 新值(或 ยกเลิก 放弃)。flow 已先拦 เริ่มใหม่ 全局重置。"""
+    """editing 态的下一条文本 = 新值(或 ยกเลิก 放弃)。全局命令已由 text_router 先拦。"""
     payload = (sess or {}).get("payload") or {}
     if text.strip() == cards.BTN_EDIT_CANCEL:
-        # editing 态取消:原地把会话恢复成 reviewing(去 editing_field·nonce 不变),
-        # 原卡立即重新可用——不重跑查重(同 _cancel:慢任务会劫持后续流程)。
-        restored = {k: v for k, v in payload.items() if k != "editing_field"}
-        await _thr(store.set_session, binding["tenant_id"], line_user_id, "reviewing", restored)
+        restored = exit_editing(sess)
+        await _thr(
+            store.set_session, binding["tenant_id"], line_user_id, "reviewing", restored["payload"]
+        )
         _reply(reply_token, cards.TXT_EDIT_CANCELLED)
         return
 

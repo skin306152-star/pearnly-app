@@ -1,7 +1,9 @@
 /* Pearnly DMS · 推送记录页 · 恒按 adapter=mrerp_dms 筛(身份证 → DMS 客户的推送历史)。
  * 员工/普通视角走 /api/erp/logs(user 隔离,DXAPI.pushLogs 已固定 adapter);owner 视角(波3 C6·
  * __dmsIsOwner)走 /api/dms/records 拉【全租户】推送并加「操作员」归属列(显示名取档案,无档案=
- * 老板本人)。四态 UI:加载/空/错/列表。信息密度:时间 /(操作员)/ 客户 / 方式 / 状态。挂 window.DXRECORDS。 */
+ * 老板本人)。四态 UI:加载/空/错/列表。信息密度:时间 /(操作员)/ 客户 / 方式 / 状态。
+ * 同一张表还收 LINE 渠道的订车单行(request_body.mode='booking' · BK 单号占 invoice_no 列)。
+ * 挂 window.DXRECORDS。 */
 (function (root) {
     'use strict';
     function t(k) {
@@ -45,13 +47,12 @@
         if (mode === 'create') return t('dms-rec-mode-create');
         if (mode === 'update') return t('dms-rec-mode-update');
         if (mode === 'overwrite') return t('dms-rec-mode-overwrite');
+        if (mode === 'booking') return t('dms-rec-mode-booking');
         return '—';
     }
     function statusBadge(status) {
         if (status === 'success')
             return '<span class="dms-badge ok">' + esc(t('dms-rec-st-success')) + '</span>';
-        if (status === 'pending')
-            return '<span class="dms-badge pending">' + esc(t('dms-rec-st-pending')) + '</span>';
         return '<span class="dms-badge fail">' + esc(t('dms-rec-st-failed')) + '</span>';
     }
 

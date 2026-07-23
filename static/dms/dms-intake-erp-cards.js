@@ -17,10 +17,6 @@
     function isEnabled(ep) {
         return !!ep && ep.enabled !== false;
     }
-    // DMS 的自动标志在 config.id_card_auto_push(adapter=mrerp_dms 的 auto_push 后端强制 false)。
-    function isAutoPush(ep) {
-        return (ep.config || {}).id_card_auto_push === true;
-    }
     // 已配管理员账密(DL-4b · 只用于客户档改写);值恒为密文,只判是否存在。
     function hasAdmin(ep) {
         return !!(ep.config || {}).admin_username_enc;
@@ -50,12 +46,10 @@
         if (st) {
             if (!ep) st.textContent = T('dx-erp-not-connected');
             else if (!enabled) st.textContent = T('dx-erp-disabled');
+            // 只报连接/停用与管理员凭据:这条路 100% 手动(4 步向导 + 确认弹窗),没有自动推送态。
             else
                 st.textContent =
-                    T('dx-erp-connected') +
-                    ' · ' +
-                    T(isAutoPush(ep) ? 'dx-erp-mode-auto' : 'dx-erp-mode-manual') +
-                    (hasAdmin(ep) ? ' · ' + T('dms-card-admin-badge') : '');
+                    T('dx-erp-connected') + (hasAdmin(ep) ? ' · ' + T('dms-card-admin-badge') : '');
         }
         if (!acts) return;
         if (!ep) {

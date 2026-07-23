@@ -229,7 +229,7 @@ class MenuChoiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a2_non_menu_digit_1_passes_through(self):
         """A2 守门:非 menu 态的「1」不被当菜单项(交回 flow 走号码透传)。"""
-        handled = await menu_flow.handle_text(
+        handled = await menu_flow.handle_choice(
             _BINDING, _LUID, "rt", {"state": "collecting", "payload": {}}, "1"
         )
         self.assertFalse(handled)
@@ -324,7 +324,8 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             await env.drain()
             self.assertFalse(env.offer.called)
             self.assertEqual(env.session()["state"], "reviewing")
-            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP))
+            nonce = env.session()["payload"]["nonce"]
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP, nonce))
             await env.drain()
             self.assertTrue(env.offer.called)
             self.assertEqual(env.offer.call_args.kwargs["customer_id"], "C7")
@@ -350,7 +351,8 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE, "mode": "customer"})
             await flow.process_image(_BINDING, _LUID, "mid1")
             await env.drain()
-            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP))
+            nonce = env.session()["payload"]["nonce"]
+            await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP, nonce))
             await env.drain()
             self.assertIsNone(env.session())
             self.assertFalse(env.offer.called)

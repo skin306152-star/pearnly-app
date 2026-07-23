@@ -360,6 +360,9 @@ ACK_OUTCOMES = (
 _META_STR_KEYS = (
     "companion_version",
     "account_dir",
+    # 小助手实际落盘的绝对路径。只在与 account_dir 不一致时上报 —— 不一致=配置里的路径被系统
+    # 重新解释过(典型:UNC 少写一个反斜杠 → 静默写进本机 C: 影子目录),这条能一眼看穿。
+    "account_dir_resolved",
     "doc_type",
     "docnum",
     "stage",

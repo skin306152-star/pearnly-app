@@ -106,24 +106,34 @@ def _enrich_records_by_invoice_no(records: List[Any], user: dict) -> None:
 
 def _enrich_records_by_history_id(
     records: List[dict], hids: List[str], user_id: str, tenant_id: Optional[str]
-) -> None:
-    """销售明细导出填「新建/复用」动作(单据记录批量路 · 按 history_id 回查)。records 与 hids 同序。
-    回查失败/无匹配一律静默降级,绝不阻断导出。"""
+) -> str:
+    """回填「新建/复用」动作 + 推送状态 + ERP 凭证号(单据记录批量路 · 按 history_id 回查)。
+    records 与 hids 同序。回查失败/无匹配一律静默降级,绝不阻断导出。
+    返回这批推的目标 ERP adapter(格式跟着 ERP 走 · 查不到返空串)。"""
+    adapter = ""
     try:
         from services.erp.export_actions import (
             apply_erp_actions,
+            apply_push_state,
             erp_actions_by_history_ids,
+            push_state_by_history_ids,
         )
 
         actions = erp_actions_by_history_ids(user_id, hids, tenant_id)
-        if not actions:
-            return
+        states = push_state_by_history_ids(user_id, hids, tenant_id)
         for rec, hid in zip(records, hids):
             mf = rec.get("merged_fields") if isinstance(rec, dict) else None
-            if isinstance(mf, dict):
-                apply_erp_actions(mf, actions.get(str(hid)))
+            if not isinstance(mf, dict):
+                continue
+            mf["history_id"] = str(hid)  # 回导键要用它 · 票号会被会计改,不能当键
+            apply_erp_actions(mf, actions.get(str(hid)))
+            apply_push_state(mf, states.get(str(hid)))
+        adapters = {s.get("adapter") for s in states.values() if s.get("adapter")}
+        # 同批只应推一个 ERP(端点是单选的)· 真混了就不猜,留空走默认表
+        adapter = adapters.pop() if len(adapters) == 1 else ""
     except Exception as e:
         logger.warning(f"enrich records by history_id failed: {e}")
+    return adapter
 
 
 @router.post("/api/ocr/export")
@@ -178,6 +188,31 @@ async def ocr_export(req: ExportRequest, request: Request):
 # 让我手上的 excel_template_th 也能从「单据记录批量导出」用 · 真正打通系统
 # 流程:history_ids → db.get_ocr_history_detail → 合并 pages → records → excel_template_th
 # ============================================================
+# 出复核工作簿(销项/进项/待判分表)的 ERP。别的 ERP 列位合同不通用,继续走各自的表。
+_REVIEW_WORKBOOK_ADAPTERS = ("express",)
+
+
+def _split_by_direction(records: List[dict]) -> dict:
+    """按方向把记录分到销项/进项/待判三桶。
+
+    方向判不出的进「待判」而不是硬塞进销项 —— 那种票原先在销项导出里根本不出现,
+    会计压根不知道它们存在,这是漏票不是省事。
+    """
+    sales, purchase, pending = [], [], []
+    for rec in records or []:
+        if not isinstance(rec, dict):
+            continue  # 不是记录就跳过 · 塞进待判会在表里写空行,谎称"有张票没分类"
+        mf = rec.get("merged_fields")
+        d = str((mf or {}).get("direction") or "").strip().lower()
+        if d in ("sales", "income"):
+            sales.append(rec)
+        elif d in ("purchase", "expense"):
+            purchase.append(rec)
+        else:
+            pending.append(rec)
+    return {"sales": sales, "purchase": purchase, "pending": pending}
+
+
 def _merge_pages_to_fields(pages) -> dict:
     """把 history.pages(多页 OCR 结果)合并成一份 merged_fields(后端版 · 跟前端 mergeFields 等价)
     策略:同 key 谁非空用谁 · items 数组直接拼接(同张发票多页明细汇总)
@@ -254,16 +289,28 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
     if not records:
         raise HTTPException(404, detail="export.no_data")
 
-    # 按 history_id 回查推送「新建/复用」动作填进 records(客户/商品状态列)
-    _enrich_records_by_history_id(records, hid_by_record, user_id, tenant_id)
+    # 回查推送动作/状态/凭证号,并得出这批推的是哪个 ERP
+    adapter = _enrich_records_by_history_id(records, hid_by_record, user_id, tenant_id)
 
     try:
-        from services.excel.excel_template_th import build_sales_detail_xlsx, sales_detail_filename
+        if adapter in _REVIEW_WORKBOOK_ADAPTERS:
+            # 复核工作簿:销项/进项/待判分表 —— 一批料可能两种方向混着来,
+            # 而分类正是靠「行在哪张表」表达的(会计挪行即改分类,回导时压过自动判定)。
+            from services.excel.erp_workbook import build_review_workbook, review_workbook_filename
 
-        xlsx_bytes = build_sales_detail_xlsx(records, lang=req.lang)
-        filename = sales_detail_filename()
+            buckets = _split_by_direction(records)
+            xlsx_bytes = build_review_workbook(**buckets)
+            filename = review_workbook_filename()
+        else:
+            from services.excel.excel_template_th import (
+                build_sales_detail_xlsx,
+                sales_detail_filename,
+            )
+
+            xlsx_bytes = build_sales_detail_xlsx(records, lang=req.lang)
+            filename = sales_detail_filename()
     except Exception as e:
-        logger.exception(f"sales_detail_th 生成失败: {e}")
+        logger.exception(f"复核工作簿生成失败(adapter={adapter!r}): {e}")
         raise HTTPException(500, detail="export.build_failed")
 
     return Response(

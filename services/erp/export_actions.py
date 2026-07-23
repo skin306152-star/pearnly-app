@@ -50,6 +50,8 @@ def _parse_erp_actions(response_body: Any) -> Dict[str, Any]:
         "item_codes": item_codes,
         "docnum": str(body.get("express_docnum") or meta.get("docnum") or "").strip(),
         "party_code": str(meta.get("party_code") or "").strip(),
+        # 小助手如实回报这张单按哪个方向写进的 ERP —— 分表靠它,不靠再猜一次
+        "direction": str(meta.get("doc_type") or "").strip().lower(),
     }
 
 
@@ -133,6 +135,65 @@ def erp_actions_by_invoice_nos(
     return out
 
 
+def push_state_by_history_ids(
+    user_id: str, history_ids: List[str], tenant_id: Optional[str] = None
+) -> Dict[str, Dict[str, Any]]:
+    """每单据「最近一次推送」的状态 + 目标 ERP。返回 {history_id: {status, reason, adapter}}。
+
+    与 erp_actions_by_history_ids 的区别:那个只看成功的(为了取新建/复用动作),这个
+    不过滤状态 —— 导出的状态列要如实显示失败/排队/转人工。全成功一个样,会计就可能
+    跑去 ERP 删一张压根没建成的单。
+
+    adapter 决定导出哪套表(格式跟着 ERP 走):不同 ERP 的列位合同不通用。
+    """
+    from core import db
+
+    hids = [str(h) for h in (history_ids or []) if str(h or "").strip()]
+    if not hids:
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    try:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
+            cur.execute(
+                """
+                WITH ranked AS (
+                    SELECT l.history_id, l.status, l.error_msg, e.adapter,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY l.history_id
+                            ORDER BY l.created_at DESC, l.id DESC
+                        ) AS _rn
+                    FROM erp_push_logs l
+                    LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
+                    WHERE l.user_id = %s AND l.history_id = ANY(%s::uuid[])
+                )
+                SELECT history_id, status, error_msg, adapter FROM ranked WHERE _rn = 1
+                """,
+                (user_id, hids),
+            )
+            rows = cur.fetchall() or []
+    except Exception as e:
+        logger.warning(f"push_state_by_history_ids failed: {e}")
+        return {}
+    for r in rows:
+        row = dict(r)
+        out[str(row["history_id"])] = {
+            "status": row.get("status") or "",
+            "reason": row.get("error_msg") or "",
+            "adapter": (row.get("adapter") or "").lower(),
+        }
+    return out
+
+
+def apply_push_state(merged_fields: Dict[str, Any], state: Optional[Dict[str, Any]]) -> None:
+    """推送状态落进 merged_fields。查不到就不填 —— 模板显示 '-',不假装成功。"""
+    if not state or not isinstance(merged_fields, dict):
+        return
+    if state.get("status"):
+        merged_fields["push_status"] = state["status"]
+    if state.get("reason"):
+        merged_fields["push_reason"] = state["reason"]
+
+
 def apply_erp_actions(merged_fields: Dict[str, Any], action: Optional[Dict[str, Any]]) -> None:
     """把回查到的动作填进 merged_fields(原地改)。action 为 None/缺字段 → 不填(模板留 '-')。
 
@@ -145,7 +206,11 @@ def apply_erp_actions(merged_fields: Dict[str, Any], action: Optional[Dict[str, 
     cust = action.get("customer")
     if isinstance(cust, bool):
         merged_fields["customer_erp_action"] = "new" if cust else "reused"
-    for src, dst in (("docnum", "erp_docnum"), ("party_code", "erp_party_code")):
+    for src, dst in (
+        ("docnum", "erp_docnum"),
+        ("party_code", "erp_party_code"),
+        ("direction", "direction"),
+    ):
         v = str(action.get(src) or "").strip()
         if v:
             merged_fields[dst] = v

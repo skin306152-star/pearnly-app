@@ -365,6 +365,8 @@ _META_STR_KEYS = (
     "account_dir_resolved",
     "doc_type",
     "docnum",
+    # ERP 里实际用的客户/供应商码。会计要清理误建的档、或核对配对对不对,都得知道码。
+    "party_code",
     "stage",
     "error_code",
 )

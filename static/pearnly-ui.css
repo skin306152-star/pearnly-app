@@ -24,12 +24,16 @@
   --size-6:1.75rem; --size-7:2rem; --size-8:3rem; --size-9:4rem; --size-10:5rem;
   --size-11:7.5rem; --size-12:10rem; --size-13:15rem; --size-14:20rem; --size-15:30rem;
 
-  /* radius scale (Open Props names — vendored subset) */
-  --radius-1:2px; --radius-2:5px; --radius-3:1rem; --radius-4:2rem;
+  /* radius scale (Open Props names — vendored subset).
+     COHERENCE: --radius-3 retuned 16→12px (large-surface radius: modals/sheets).
+     --radius-1/-2/-4/-5/-6 are NON-CANONICAL — kept for back-compat, no component
+     may consume them; the canonical set is --radius-sm / --radius / --radius-3 / --radius-round. */
+  --radius-1:2px; --radius-2:5px; --radius-3:.75rem; --radius-4:2rem;
   --radius-5:4rem; --radius-6:8rem; --radius-round:1e5px;
 
-  /* font-size scale (Open Props names — vendored subset) */
-  --font-size-0:.75rem; --font-size-1:1rem; --font-size-2:1.1rem; --font-size-3:1.25rem;
+  /* font-size scale (Open Props names — vendored subset). --font-size-2 retuned
+     17.6→18px so the lg control's type lands on a clean step. */
+  --font-size-0:.75rem; --font-size-1:1rem; --font-size-2:1.125rem; --font-size-3:1.25rem;
   --font-size-4:1.5rem; --font-size-5:2rem; --font-size-6:2.5rem; --font-size-7:3rem; --font-size-8:3.5rem;
 
   /* shadow scale (Open Props names — simplified vendored subset, matches home --sh/--sh2 aesthetic) */
@@ -51,7 +55,16 @@
   --good-weak:#E7F6EE; --warn-weak:#FCF3E1; --bad-weak:#FCEDED;
   /* structure tokens carried from home so shared components can lay out */
   --radius:7px; --radius-sm:6px;
-  --shadow-sm:var(--shadow-1); --shadow:var(--shadow-1); --shadow-lg:var(--shadow-4);
+  /* Three-level elevation ramp: sm < (retuned to --shadow-2) < lg — flat by
+     default, shadow only for things that float. */
+  --shadow-sm:var(--shadow-1); --shadow:var(--shadow-2); --shadow-lg:var(--shadow-4);
+  /* Shared control rhythm — buttons AND future inputs read these, so a default
+     button and a default text field land on the same ~37px height (Odoo's
+     $input-btn discipline). lg grows by TYPE not padding → ~44px, not a giant.
+     Bands: sm ~30 / md ~37 / lg ~44px. */
+  --ctrl-pad-y:.5rem;      --ctrl-pad-x:1rem;      --ctrl-font:var(--font-size-1);
+  --ctrl-pad-y-sm:.375rem; --ctrl-pad-x-sm:.75rem; --ctrl-font-sm:.8125rem;
+  --ctrl-pad-y-lg:.625rem; --ctrl-pad-x-lg:1.25rem; --ctrl-font-lg:var(--font-size-2);
   --font-mono:"SF Mono","Monaco",Consolas,"Courier New",monospace;
 }
 
@@ -110,9 +123,9 @@
   --pu-btn-bg-hover: var(--bg);
   --pu-btn-ink-hover: var(--pu-btn-ink);
   --pu-btn-bd-hover: var(--line);
-  --pu-btn-pad-y: var(--size-2);
-  --pu-btn-pad-x: var(--size-3);
-  --pu-btn-font: var(--font-size-1);
+  --pu-btn-pad-y: var(--ctrl-pad-y);
+  --pu-btn-pad-x: var(--ctrl-pad-x);
+  --pu-btn-font: var(--ctrl-font);
 
   display: inline-flex;
   align-items: center;
@@ -215,14 +228,16 @@
 
 /* ── Sizes (md is the default above) ── */
 .pu-btn--sm {
-  --pu-btn-pad-y: var(--size-1);
-  --pu-btn-pad-x: var(--size-2);
-  --pu-btn-font: var(--font-size-0);
+  --pu-btn-pad-y: var(--ctrl-pad-y-sm);
+  --pu-btn-pad-x: var(--ctrl-pad-x-sm);
+  --pu-btn-font: var(--ctrl-font-sm);
 }
+/* lg grows through font-size (+ pad-y +2px only), not padding inflation — keeps
+   the family in a ~30–44px band; lg/md height ratio ≤ 1.25. */
 .pu-btn--lg {
-  --pu-btn-pad-y: var(--size-3);
-  --pu-btn-pad-x: var(--size-5);
-  --pu-btn-font: var(--font-size-2);
+  --pu-btn-pad-y: var(--ctrl-pad-y-lg);
+  --pu-btn-pad-x: var(--ctrl-pad-x-lg);
+  --pu-btn-font: var(--ctrl-font-lg);
 }
 
 /* ── Layout modifier ── */
@@ -269,12 +284,13 @@
 
 /* ── B3.1: .pu-toast — canonical toast / notification ───────────────────────
    Replaces 6+ divergent per-SPA toasts (incl. the DMS `toast()` helper copied
-   across 7 files). Odoo notification decisions ported: a leading accent stripe
-   colored by type + content + optional close + optional autoclose progress bar;
-   the stack container is fixed to a screen corner, safe-area aware. Colors flow
-   from semantic tokens so dark falls out for free. Enter/exit via .is-visible;
-   motion respects prefers-reduced-motion. Define classes only — JS wires show/
-   hide + timers at migration. */
+   across 7 files). Type is conveyed by the ICON color only (success/warn/error/
+   info/neutral) on a plain neutral card — no colored edge stripe. Content +
+   optional close + optional autoclose progress bar; the stack container is fixed
+   to a screen corner, safe-area aware. Colors flow from semantic tokens so dark
+   falls out for free. Enter/exit via .is-visible; motion respects
+   prefers-reduced-motion. Define classes only — JS wires show/hide + timers at
+   migration. */
 
 /* Positioning container: fixed to a corner, stacks toasts, transparent to
    clicks (each toast opts pointer-events back in). */
@@ -307,17 +323,16 @@
 }
 
 .pu-toast {
-  --pu-toast-accent: var(--ink3);   /* neutral default; variants remap this */
+  --pu-toast-accent: var(--ink3);   /* drives icon + progress color; variants remap */
   pointer-events: auto;
   position: relative;
   display: flex;
   align-items: flex-start;
   gap: var(--size-2);
-  padding: var(--size-3) var(--size-3) var(--size-3) var(--size-4);
+  padding: var(--size-3);   /* even on all sides — no stripe to offset for */
   background-color: var(--card);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--pu-toast-accent);   /* Odoo o_notification_bar */
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   font-size: var(--font-size-1);
@@ -394,7 +409,7 @@
   transform-origin: left;
 }
 
-/* Variants only remap the accent var → stripe + icon color track semantics. */
+/* Variants only remap the accent var → icon + progress-bar color track semantics. */
 .pu-toast--success { --pu-toast-accent: var(--good); }
 .pu-toast--warn    { --pu-toast-accent: var(--warn); }
 .pu-toast--error   { --pu-toast-accent: var(--bad); }
@@ -442,7 +457,7 @@
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: var(--radius-3);
-  box-shadow: var(--shadow-6);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;   /* clip corners; the body scrolls itself */
   transform: translateY(8px) scale(.98);
   transition: transform .2s ease;

@@ -31,6 +31,13 @@ SCRIPT_WHITELIST = (
     "cdnjs.cloudflare.com",  # jsPDF
     "cloudflareinsights.com",  # CF beacon(部署注入)
 )
+# 样式表白名单:pearnly-ui.css 是全站共享设计系统层(token + .pu-* 组件),故意不打包 ·
+# StaticFiles 直服 · 必须先于各 SPA bundle 加载才能被其覆盖(见 docs/ui/pearnly-ui-BUILD-SPEC.md),
+# 不属 view-source 退化 → 放行(同 i18n-data.js 故意独立的范式)。
+STYLESHEET_WHITELIST = (
+    "/static/dist/",
+    "/static/pearnly-ui.css",
+)
 SOURCE_HTML = [
     "home.html",
     "login.html",
@@ -49,7 +56,7 @@ def check_source_html(fails):
         html = p.read_text(encoding="utf-8")
         for m in re.finditer(r'<link[^>]*rel=["\']stylesheet["\'][^>]*href=["\']([^"\']+)', html):
             href = m.group(1)
-            if not href.startswith("/static/dist/"):
+            if not any(href.startswith(w) for w in STYLESHEET_WHITELIST):
                 fails.append(
                     f"{rel}: 明文 stylesheet `{href}` — 新 CSS 要加进 "
                     f"scripts/build-home-css.mjs 的清单,别直接 <link>(否则 view-source 退化)"

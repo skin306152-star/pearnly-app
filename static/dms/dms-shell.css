@@ -8,14 +8,12 @@
   --ink2: #6f687d;
   --muted: #6f687d;
   --line: #e7e7f0;
-  --brand: #7c4dff;
-  --brand-hover: #6b3ff2;
-  --accent-soft: #eee5ff;
-  --btn-blue: #7c4dff;
-  --accent: #7c4dff;
-  --accent-deep: #6b3ff2;
-  --accent-weak: #eee5ff;
-  --accent-ink: #fff;
+  /* --accent* come from pearnly-ui.css (loaded first); DMS only maps its legacy
+     names onto the canonical accents so there are zero purple literals in light. */
+  --brand: var(--accent);
+  --brand-hover: var(--accent-deep);
+  --accent-soft: var(--accent-weak);
+  --btn-blue: var(--accent);
   --on-brand: #ffffff;
   --amber-weak: #fdf3e3;
   --amber-line: #e5b769;
@@ -30,14 +28,17 @@
     --ink2: #9a93a6;
     --muted: #9a93a6;
     --line: #2c2f3a;
-    --brand: #a974ff;
-    --brand-hover: #c7a8ff;
-    --accent-soft: #2c2347;
-    --btn-blue: #a974ff;
+    /* Dark uses @media while pearnly-ui's dark is class-toggled (.dark), so DMS
+       can't inherit it — keep the canonical --accent* literals here, but still
+       derive the legacy names from them (one purple literal per token, not three). */
     --accent: #a974ff;
     --accent-deep: #c7a8ff;
     --accent-weak: #2c2347;
     --accent-ink: #1d1438;
+    --brand: var(--accent);
+    --brand-hover: var(--accent-deep);
+    --accent-soft: var(--accent-weak);
+    --btn-blue: var(--accent);
     --on-brand: #ffffff;
     --amber-weak: #332b1c;
     --ok: #4ecf95;

@@ -88,6 +88,36 @@ def dms_push_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
     return None
 
 
+# Express 本地小助手「库存过账」回执码 —— 不带 ERR_ 前缀,作为 error_msg 子串出现
+# (DBF_WRITE_FAILED 账套无库存品主档/泰文写盘崩 · STOCK_ITEM_NOT_FOUND 零负库存)。
+# 未收录时原始码直接裸露给泰国会计看(2026-07-23 真料排障 F1)。
+_EXPRESS_STOCK_FRIENDLY: Dict[str, Dict[str, str]] = {
+    "DBF_WRITE_FAILED": {
+        "zh": "写入 Express 账套失败 · 常见于该账套还没有库存商品主档 · 请先在 Express 建好库存商品,或本批改用「销售·服务」模式推送",
+        "en": "Failed to write into the Express account set — commonly because the set has no stock-item master yet. Please create a stock item in Express first, or push this batch in the “Sales · Service” mode.",
+        "th": "เขียนข้อมูลลงชุดบัญชี Express ไม่สำเร็จ มักเป็นเพราะชุดบัญชียังไม่มีสินค้าคงคลังตั้งต้น กรุณาสร้างสินค้าคงคลังใน Express ก่อน หรือส่งชุดนี้ด้วยโหมด «ขาย•บริการ»",
+        "ja": "Express の帳簿セットへの書き込みに失敗しました。多くは在庫品マスタが未作成のためです。先に Express で在庫品を作成するか、本バッチを「販売・サービス」モードで送信してください。",
+    },
+    "STOCK_ITEM_NOT_FOUND": {
+        "zh": "该商品在 Express 里库存为零或不足 · 请先在 Express 录入进货或期初库存,再推送",
+        "en": "This item has zero or insufficient stock in Express. Please record a purchase or opening balance in Express first, then push again.",
+        "th": "สินค้านี้มีสต๊อกใน Express เป็นศูนย์หรือไม่เพียงพอ กรุณาบันทึกการซื้อหรือยอดยกมาใน Express ก่อน แล้วจึงส่งอีกครั้ง",
+        "ja": "この商品は Express の在庫がゼロまたは不足しています。先に Express で仕入または期首在庫を登録してから再送信してください。",
+    },
+}
+
+
+def express_stock_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
+    """命中 Express 库存过账回执码 → 4 语 dict;否则 None。与 dms_push_friendly 同款:
+    按码长度降序子串匹配,新增码进表即生效。"""
+    if not error_msg:
+        return None
+    for code in sorted(_EXPRESS_STOCK_FRIENDLY, key=len, reverse=True):
+        if code in error_msg:
+            return _EXPRESS_STOCK_FRIENDLY[code]
+    return None
+
+
 def _doc_sanity_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
     """单据防呆码(date_implausible/currency_not_thb 等)四语化 · 复用 routing 唯一目录。
     此前只翻 ERR_*,doc_sanity 码在 LINE 失败消息里裸奔(真机 2026-07-02 截图抓到)。"""
@@ -103,12 +133,13 @@ def _doc_sanity_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
 
 
 def friendly_any(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
-    """发票推送 catalog 优先(friendly_for_ui)→ 单据防呆码 → 身份证订车映射。
+    """发票推送 catalog 优先(friendly_for_ui)→ 单据防呆码 → 身份证订车 → Express 库存码。
     给 push 日志/详情/异常/LINE 失败消息统一用 · 任一命中即不裸露内部码。"""
     return (
         friendly_for_ui(error_msg)
         or _doc_sanity_friendly(error_msg)
         or dms_push_friendly(error_msg)
+        or express_stock_friendly(error_msg)
     )
 
 

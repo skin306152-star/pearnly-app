@@ -95,15 +95,16 @@ def buddhist_display(value: object) -> str:
     泰国人读的是佛历,换算只发生在展示层。给人看日期的地方一律走这里,界面不出现公历年。
     认不出的值(空/None/已是票面串)原样返回;已是佛历年(≥2400)幂等不再加,可安全重复调用。
     """
-    m = _ISO_DATE.match(str(value or ""))
+    s = str(value or "")
+    m = _ISO_DATE.match(s)
     if not m:
-        return str(value or "")
+        return s
     year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
     greg_year = to_gregorian_year(year)  # 已是公历原样;佛历减 543 —— 幂等
     try:
         date(greg_year, month, day)  # 校验真日历日(闰日按公历判)
     except ValueError:
-        return str(value or "")
+        return s
     return f"{day:02d}/{month:02d}/{greg_year + BUDDHIST_ERA_OFFSET:04d}"
 
 

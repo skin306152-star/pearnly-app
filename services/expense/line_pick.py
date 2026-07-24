@@ -230,7 +230,7 @@ def _candidate_text(docs, lang: str) -> str:
     """候选列表文案:抬头 + 逐张「序号. 日期 · 卖家 · ฿额」(格式无关语言·抬头走 i18n)。"""
     lines = [ci.t(ci.PICK_WHICH, lang)]
     for i, d in enumerate(docs, 1):
-        date = _bd(str(d.get("doc_date") or "").strip())
+        date = _bd(d.get("doc_date"))
         vendor = str(d.get("supplier_name") or "").strip()
         head = " · ".join(p for p in (date, vendor) if p)
         amt = ci.money(d.get("grand_total"))

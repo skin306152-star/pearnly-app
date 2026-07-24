@@ -94,7 +94,179 @@
 }
 
 /* ── Layer 5: Component classes — filled per batch. B1 leaves headers only. ── */
-/* B2: .pu-btn (primary/secondary/ghost/danger/sizes) */
+
+/* ── B2: .pu-btn — button system ──────────────────────────────────────────
+   Naming: variant/size are static BEM modifiers (.pu-btn--primary/--sm);
+   runtime, JS-toggled conditions are state classes (.is-loading/.is-disabled).
+   Recolor pattern mirrors Odoo/Bootstrap: variants only re-map local --pu-btn-*
+   vars, the base rule consumes them once — so every variant is a 5-line map and
+   theme flips fall out of the semantic tokens (no per-variant dark rules needed).
+   Odoo decisions ported to our scale: moderate radius (Odoo 4px → our --radius,
+   never pill), semibold CTA weight, ~.15s ease transition, disabled-opacity .5. */
+.pu-btn {
+  --pu-btn-bg: var(--card);
+  --pu-btn-ink: var(--ink);
+  --pu-btn-bd: var(--line);
+  --pu-btn-bg-hover: var(--bg);
+  --pu-btn-ink-hover: var(--pu-btn-ink);
+  --pu-btn-bd-hover: var(--line);
+  --pu-btn-pad-y: var(--size-2);
+  --pu-btn-pad-x: var(--size-3);
+  --pu-btn-font: var(--font-size-1);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-2);
+  padding: var(--pu-btn-pad-y) var(--pu-btn-pad-x);
+  font-family: inherit;
+  font-size: var(--pu-btn-font);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--pu-btn-ink);
+  background-color: var(--pu-btn-bg);
+  border: 1px solid var(--pu-btn-bd);
+  border-radius: var(--radius);
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  white-space: nowrap;
+  appearance: none;
+  transition: color .15s ease, background-color .15s ease,
+    border-color .15s ease, box-shadow .15s ease;
+}
+
+/* Leading/trailing icons: gap handles spacing; keep glyphs on the text metric. */
+.pu-btn > svg,
+.pu-btn > .pu-btn__icon {
+  width: 1.15em;
+  height: 1.15em;
+  flex: 0 0 auto;
+}
+
+/* Interactive states only apply when the button is not off (disabled/loading). */
+.pu-btn:not(:disabled):not(.is-disabled):not(.is-loading):hover {
+  color: var(--pu-btn-ink-hover);
+  background-color: var(--pu-btn-bg-hover);
+  border-color: var(--pu-btn-bd-hover);
+}
+.pu-btn:not(:disabled):not(.is-disabled):not(.is-loading):active {
+  transform: translateY(1px);
+}
+
+/* Keyboard focus ring — a real outline (works everywhere incl. Windows
+   high-contrast, rounds with the button, survives without color-mix) plus a
+   soft accent glow as progressive enhancement. Both token-driven → theme-aware. */
+.pu-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.pu-btn:disabled,
+.pu-btn.is-disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* ── Variants ── */
+.pu-btn--primary {
+  --pu-btn-bg: var(--accent);
+  --pu-btn-ink: var(--accent-ink);
+  --pu-btn-bd: var(--accent);
+  --pu-btn-bg-hover: var(--accent-deep);
+  --pu-btn-ink-hover: var(--accent-ink);
+  --pu-btn-bd-hover: var(--accent-deep);
+}
+.pu-btn--secondary,
+.pu-btn--subtle {
+  --pu-btn-bg: var(--accent-weak);
+  --pu-btn-ink: var(--accent-deep);
+  --pu-btn-bd: var(--accent-weak);
+  --pu-btn-bg-hover: color-mix(in srgb, var(--accent-weak) 78%, var(--accent) 22%);
+  --pu-btn-ink-hover: var(--accent-deep);
+  --pu-btn-bd-hover: color-mix(in srgb, var(--accent-weak) 78%, var(--accent) 22%);
+}
+.pu-btn--outline {
+  --pu-btn-bg: transparent;
+  --pu-btn-ink: var(--accent);
+  --pu-btn-bd: var(--accent);
+  --pu-btn-bg-hover: var(--accent-weak);
+  --pu-btn-ink-hover: var(--accent-deep);
+  --pu-btn-bd-hover: var(--accent);
+}
+.pu-btn--ghost,
+.pu-btn--text {
+  --pu-btn-bg: transparent;
+  --pu-btn-ink: var(--accent-deep);
+  --pu-btn-bd: transparent;
+  --pu-btn-bg-hover: var(--accent-weak);
+  --pu-btn-ink-hover: var(--accent-deep);
+  --pu-btn-bd-hover: transparent;
+}
+.pu-btn--danger {
+  --pu-btn-bg: var(--bad);
+  --pu-btn-ink: var(--accent-ink);
+  --pu-btn-bd: var(--bad);
+  --pu-btn-bg-hover: color-mix(in srgb, var(--bad) 82%, var(--ink) 18%);
+  --pu-btn-ink-hover: var(--accent-ink);
+  --pu-btn-bd-hover: color-mix(in srgb, var(--bad) 82%, var(--ink) 18%);
+}
+
+/* ── Sizes (md is the default above) ── */
+.pu-btn--sm {
+  --pu-btn-pad-y: var(--size-1);
+  --pu-btn-pad-x: var(--size-2);
+  --pu-btn-font: var(--font-size-0);
+}
+.pu-btn--lg {
+  --pu-btn-pad-y: var(--size-3);
+  --pu-btn-pad-x: var(--size-5);
+  --pu-btn-font: var(--font-size-2);
+}
+
+/* ── Layout modifier ── */
+.pu-btn--block {
+  display: flex;
+  width: 100%;
+}
+
+/* ── Loading state — inline spinner via pseudo-element; label hidden but its
+   box preserved so the button keeps its width. Spinner colour tracks the
+   variant ink (independent of the transparent text colour). ── */
+.pu-btn.is-loading {
+  color: transparent;
+  cursor: progress;
+  pointer-events: none;
+  position: relative;
+}
+.pu-btn.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.1em;
+  height: 1.1em;
+  border: 2px solid var(--pu-btn-ink);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: pu-spin .6s linear infinite;
+}
+@keyframes pu-spin {
+  to { transform: rotate(360deg); }
+}
+/* Reduced motion: swap rotation for a non-vestibular opacity pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .pu-btn.is-loading::after {
+    border-top-color: var(--pu-btn-ink);
+    animation: pu-btn-pulse 1s ease-in-out infinite alternate;
+  }
+  @keyframes pu-btn-pulse {
+    from { opacity: .35; }
+    to { opacity: 1; }
+  }
+}
+
 /* B3: .pu-toast .pu-modal .pu-empty .pu-error .pu-skeleton */
 /* B4: .pu-table .pu-pager */
 /* B5: .pu-field .pu-input .pu-select .pu-check */

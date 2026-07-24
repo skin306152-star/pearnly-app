@@ -267,6 +267,385 @@
   }
 }
 
-/* B3: .pu-toast .pu-modal .pu-empty .pu-error .pu-skeleton */
+/* ── B3.1: .pu-toast — canonical toast / notification ───────────────────────
+   Replaces 6+ divergent per-SPA toasts (incl. the DMS `toast()` helper copied
+   across 7 files). Odoo notification decisions ported: a leading accent stripe
+   colored by type + content + optional close + optional autoclose progress bar;
+   the stack container is fixed to a screen corner, safe-area aware. Colors flow
+   from semantic tokens so dark falls out for free. Enter/exit via .is-visible;
+   motion respects prefers-reduced-motion. Define classes only — JS wires show/
+   hide + timers at migration. */
+
+/* Positioning container: fixed to a corner, stacks toasts, transparent to
+   clicks (each toast opts pointer-events back in). */
+.pu-toast-stack {
+  position: fixed;
+  z-index: 1000;
+  top: max(var(--size-4), env(safe-area-inset-top));
+  right: max(var(--size-4), env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
+  width: min(24rem, calc(100vw - var(--size-5)));
+  max-height: 100vh;
+  pointer-events: none;
+}
+.pu-toast-stack--bottom {
+  top: auto;
+  bottom: max(var(--size-4), env(safe-area-inset-bottom));
+  flex-direction: column-reverse;
+}
+.pu-toast-stack--left {
+  right: auto;
+  left: max(var(--size-4), env(safe-area-inset-left));
+}
+.pu-toast-stack--center {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+
+.pu-toast {
+  --pu-toast-accent: var(--ink3);   /* neutral default; variants remap this */
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--size-2);
+  padding: var(--size-3) var(--size-3) var(--size-3) var(--size-4);
+  background-color: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--pu-toast-accent);   /* Odoo o_notification_bar */
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-size-1);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity .22s ease, transform .22s ease;
+}
+.pu-toast.is-visible {
+  opacity: 1;
+  transform: none;
+}
+/* Bottom stacks slide up from below instead of down from above. */
+.pu-toast-stack--bottom .pu-toast { transform: translateY(8px); }
+.pu-toast-stack--bottom .pu-toast.is-visible { transform: none; }
+
+.pu-toast__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25em;
+  height: 1.25em;
+  margin-top: .05em;
+  color: var(--pu-toast-accent);
+}
+.pu-toast__icon > svg { width: 100%; height: 100%; }
+
+.pu-toast__body {
+  flex: 1 1 auto;
+  min-width: 0;   /* let long words wrap rather than overflow the card */
+}
+.pu-toast__title {
+  margin: 0 0 2px;
+  font-weight: 600;
+}
+.pu-toast__msg {
+  margin: 0;
+  color: var(--ink2);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.pu-toast__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  margin: -.15em -.15em 0 var(--size-1);
+  padding: 0;
+  color: var(--ink3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+  transition: color .15s ease, background-color .15s ease;
+}
+.pu-toast__close:hover { color: var(--ink); background-color: var(--line2); }
+.pu-toast__close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Optional autoclose progress bar (Odoo o_notification_progress). */
+.pu-toast__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background-color: var(--pu-toast-accent);
+  opacity: .5;
+  border-radius: 0 0 var(--radius) var(--radius);
+  transform-origin: left;
+}
+
+/* Variants only remap the accent var → stripe + icon color track semantics. */
+.pu-toast--success { --pu-toast-accent: var(--good); }
+.pu-toast--warn    { --pu-toast-accent: var(--warn); }
+.pu-toast--error   { --pu-toast-accent: var(--bad); }
+.pu-toast--info    { --pu-toast-accent: var(--accent); }
+.pu-toast--neutral { --pu-toast-accent: var(--ink3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pu-toast { transition: opacity .22s ease; transform: none; }
+  .pu-toast.is-visible,
+  .pu-toast-stack--bottom .pu-toast,
+  .pu-toast-stack--bottom .pu-toast.is-visible { transform: none; }
+}
+
+/* ── B3.2: .pu-modal — dialog / modal ───────────────────────────────────────
+   Odoo dialog decisions ported: scrim mask + centered card; header/body/footer
+   structure with title ellipsis; body scrolls internally (never the page);
+   elevation via shadow. Sizes --sm/--md/--lg; --danger tints the confirm action.
+   Footer actions reuse .pu-btn. Open via .is-open on the mask. */
+.pu-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--size-4);
+  background-color: color-mix(in srgb, var(--ink) 55%, transparent);   /* scrim */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s ease, visibility .2s ease;
+}
+.pu-modal-mask.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pu-modal {
+  --pu-modal-max: 32rem;   /* md default */
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--pu-modal-max);
+  max-height: min(90vh, 48rem);
+  background-color: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-6);
+  overflow: hidden;   /* clip corners; the body scrolls itself */
+  transform: translateY(8px) scale(.98);
+  transition: transform .2s ease;
+}
+.pu-modal-mask.is-open .pu-modal { transform: none; }
+.pu-modal--sm { --pu-modal-max: 24rem; }
+.pu-modal--md { --pu-modal-max: 32rem; }
+.pu-modal--lg { --pu-modal-max: 48rem; }
+
+.pu-modal-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  padding: var(--size-4);
+  border-bottom: 1px solid var(--line);
+}
+.pu-modal__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--font-size-3);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;   /* Odoo modal-title ellipsis */
+}
+.pu-modal-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+  height: 2em;
+  margin: -.25em -.25em -.25em 0;
+  padding: 0;
+  color: var(--ink3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+  transition: color .15s ease, background-color .15s ease;
+}
+.pu-modal-close:hover { color: var(--ink); background-color: var(--line2); }
+.pu-modal-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.pu-modal-body {
+  flex: 1 1 auto;
+  padding: var(--size-4);
+  overflow: auto;   /* long content scrolls here, never the page */
+  color: var(--ink2);
+  line-height: 1.5;
+}
+
+.pu-modal-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--size-2);
+  padding: var(--size-3) var(--size-4);
+  border-top: 1px solid var(--line);
+}
+
+/* Danger confirm: the primary action adopts destructive coloring, so migrated
+   markup keeps .pu-btn--primary yet reads unmistakably as a destructive confirm. */
+.pu-modal--danger .pu-modal-footer .pu-btn--primary {
+  --pu-btn-bg: var(--bad);
+  --pu-btn-ink: var(--accent-ink);
+  --pu-btn-bd: var(--bad);
+  --pu-btn-bg-hover: color-mix(in srgb, var(--bad) 82%, var(--ink) 18%);
+  --pu-btn-ink-hover: var(--accent-ink);
+  --pu-btn-bd-hover: color-mix(in srgb, var(--bad) 82%, var(--ink) 18%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pu-modal { transition: none; transform: none; }
+  .pu-modal-mask.is-open .pu-modal { transform: none; }
+}
+
+/* ── B3.3: .pu-empty — empty state ──────────────────────────────────────────
+   Calm/muted: icon slot + title + description + optional .pu-btn action. */
+.pu-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-2);
+  padding: var(--size-8) var(--size-4);
+  text-align: center;
+  color: var(--ink2);
+}
+.pu-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-8);
+  height: var(--size-8);
+  margin-bottom: var(--size-1);
+  color: var(--ink3);
+}
+.pu-empty__icon > svg { width: 100%; height: 100%; }
+.pu-empty__title {
+  margin: 0;
+  font-size: var(--font-size-3);
+  font-weight: 600;
+  color: var(--ink);
+}
+.pu-empty__desc {
+  margin: 0;
+  max-width: 34ch;
+  font-size: var(--font-size-1);
+  color: var(--ink3);
+  line-height: 1.5;
+}
+.pu-empty .pu-btn { margin-top: var(--size-3); }
+
+/* ── B3.4: .pu-error — error / retry state ──────────────────────────────────
+   Distinct from empty: icon tinted --bad on a soft --bad-weak disc (present, not
+   alarming-loud), a message, and a retry .pu-btn. */
+.pu-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-2);
+  padding: var(--size-8) var(--size-4);
+  text-align: center;
+  color: var(--ink2);
+}
+.pu-error__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-8);
+  height: var(--size-8);
+  margin-bottom: var(--size-1);
+  color: var(--bad);
+  background-color: var(--bad-weak);
+  border-radius: var(--radius-round);
+}
+.pu-error__icon > svg { width: 55%; height: 55%; }
+.pu-error__title {
+  margin: 0;
+  font-size: var(--font-size-3);
+  font-weight: 600;
+  color: var(--ink);
+}
+.pu-error__msg {
+  margin: 0;
+  max-width: 40ch;
+  font-size: var(--font-size-1);
+  color: var(--ink2);
+  line-height: 1.5;
+}
+.pu-error .pu-btn { margin-top: var(--size-3); }
+
+/* ── B3.5: .pu-skeleton — loading placeholder ───────────────────────────────
+   Shimmer via an animated gradient sweep over --line2/--line. Variants set the
+   shape (line/block/circle); callers may override width/height inline. Reduced
+   motion → a flat static tint, no sweep. */
+.pu-skeleton {
+  display: block;
+  width: 100%;
+  height: 1em;
+  border-radius: var(--radius-sm);
+  background-color: var(--line2);
+  background-image: linear-gradient(90deg,
+    var(--line2) 0%, var(--line) 50%, var(--line2) 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: pu-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes pu-skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+.pu-skeleton--line {
+  height: .8em;
+  border-radius: var(--radius-round);
+}
+.pu-skeleton--line:not(:last-child) { margin-bottom: var(--size-2); }
+.pu-skeleton--text-sm { height: .65em; }
+.pu-skeleton--block {
+  height: var(--size-10);
+  border-radius: var(--radius);
+}
+.pu-skeleton--circle {
+  width: var(--size-8);
+  height: var(--size-8);
+  border-radius: var(--radius-round);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pu-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--line);
+  }
+}
+
 /* B4: .pu-table .pu-pager */
 /* B5: .pu-field .pu-input .pu-select .pu-check */

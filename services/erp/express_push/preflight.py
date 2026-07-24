@@ -419,6 +419,12 @@ def preflight_express(
             )
         payload = mres.payload
         pf.payload = payload
+        # 补期初:会计在「补期初卡」填的期初(name/qty/unit_cost/date)由端点写进 history.merged_fields
+        # (一次性·不落库),mapper 从 flat 构造 payload 时不读 merged_fields,故在此显式透传给小助手 —
+        # 否则期初永远到不了小助手,补期初卡空转。小助手据此先写期初再过账(仅销项·库存卖需要垫库存)。
+        opening = (history.get("merged_fields") or {}).get("opening_stock")
+        if opening:
+            payload["opening_stock"] = opening
         pf.checks.append(Check("mapping", OK))
 
         # 防御性复核白名单(mapper 已带 account_set · 与 Agent lease 同口径)· 命中归 account_set 项。

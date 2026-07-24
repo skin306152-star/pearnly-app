@@ -212,6 +212,24 @@ class DirectionRoutingTests(unittest.TestCase):
         self.assertIn("customer", body)  # 销项产 customer 块
         self.assertNotIn("supplier", body)
 
+    def test_opening_stock_injected_into_payload(self):
+        # 补期初卡重推:history.merged_fields.opening_stock 必须透传进发给小助手的 payload,
+        # 否则期初到不了小助手、补期初卡空转(mapper 从 flat 构造 payload 不读 merged_fields)。
+        h = _sales_history()
+        h["merged_fields"] = {
+            "opening_stock": [{"key": "ข้าวหอม", "qty": 50, "unit_cost": 4.5, "date": "2026-01-01"}]
+        }
+        r = enqueue_express(_sales_endpoint(), h, posting_kind="stock")
+        body = r["request_body"]
+        self.assertEqual(body["direction"], "sales")
+        self.assertIn("opening_stock", body)
+        self.assertEqual(body["opening_stock"][0]["key"], "ข้าวหอม")
+
+    def test_no_opening_stock_key_on_normal_sales(self):
+        # 常规销项(无补期初)→ payload 不带 opening_stock 键。
+        r = enqueue_express(_sales_endpoint(), _sales_history())
+        self.assertNotIn("opening_stock", r["request_body"])
+
     def test_purchase_detected_routes_to_purchase_mapper(self):
         # 自家=买方 → 自动判 purchase → 走 purchase_mapper(产 supplier 块)。
         r = enqueue_express(_endpoint(), _history())

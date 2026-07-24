@@ -20,6 +20,7 @@ from services.erp.push_exception_classify import (  # noqa: F401
     classify_push_exception,
     derive_account_fix,
     derive_bind_fix,
+    derive_stock_fix,
 )
 
 logger = logging.getLogger(__name__)
@@ -268,6 +269,10 @@ def list_push_logs(
                         )
                     elif it["category"] == "direction_unknown":
                         it["bind_fix"] = derive_bind_fix(it.get("error_msg"))
+                    elif it["category"] == "stock_opening_needed":
+                        it["stock_fix"] = derive_stock_fix(
+                            it.get("error_msg"), it.get("request_body")
+                        )
                 # request_body 仅用于派生 direction,用完丢弃,列表 payload 保持轻量。
                 it.pop("request_body", None)
             return {"items": items, "total": total}

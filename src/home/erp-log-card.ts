@@ -5,7 +5,7 @@
 // data-log-* 属性原样保留 → 现有点击委托(详情/重试/勾选/复制单号)不变。
 /* global t, escapeHtml, currentLang */
 
-import { _erpExcAcctPanel, _erpExcBindPanel } from './erp-exc-actions.js';
+import { _erpExcAcctPanel, _erpExcBindPanel, _erpExcStockOpeningPanel } from './erp-exc-actions.js';
 
 // Express 转人工/失败原因码 → 友好文案键(把「EXPRESS_MANUAL: no_revenue_account」这类
 // 看不懂的英文码显成人话)。后端若已带 error_friendly 优先用它;否则这里按码翻译。
@@ -179,17 +179,30 @@ function buildErpLogCard(log: any): string {
     const canMapFix =
         statusClass === 'fail' &&
         (_cat === 'product_mismatch' || _cat === 'customer_mismatch' || _cat === 'no_client');
+    // 缺库存商品 → 会计补期初(数量/单位成本/日期)重推(B1·批次二)。
+    const isStockFix =
+        statusClass === 'fail' &&
+        _cat === 'stock_opening_needed' &&
+        !!(log.stock_fix && (log.stock_fix.items || []).length);
     let repairBtn = '';
     if (isAcctFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-acctfix-open'))}</button>`;
     else if (isBindFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-bind-open'))}</button>`;
+    else if (isStockFix)
+        repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-stockopen-open'))}</button>`;
     else if (canMapFix)
         repairBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(log.id)}">${escapeHtml(_cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer'))}</button>`;
-    const repairPanel = isAcctFix ? _erpExcAcctPanel(log) : isBindFix ? _erpExcBindPanel(log) : '';
+    const repairPanel = isAcctFix
+        ? _erpExcAcctPanel(log)
+        : isBindFix
+          ? _erpExcBindPanel(log)
+          : isStockFix
+            ? _erpExcStockOpeningPanel(log)
+            : '';
 
     const retryBtn =
-        log.status === 'failed' && !isRetrying && !isAcctFix && !isBindFix
+        log.status === 'failed' && !isRetrying && !isAcctFix && !isBindFix && !isStockFix
             ? `<button class="btn btn-sm btn-secondary" data-log-retry="${escapeHtml(log.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`
             : '';
 

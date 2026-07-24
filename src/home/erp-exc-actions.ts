@@ -14,6 +14,8 @@ type RepairItem = {
     endpoint_id?: string;
     account_fix?: { direction?: string; slots?: string[]; bad_code?: string };
     bind_fix?: { can_bind?: boolean };
+    // 缺库存商品 → 会计补期初(数量/单位成本/日期)后重推(B1·批次二)。
+    stock_fix?: { items?: Array<{ name?: string; stkcod?: string }> };
 };
 
 // 待补科目卡:科目槽 → 角色文案键(收入/应收/销项税 + 采购/应付/进项税)。
@@ -202,11 +204,99 @@ async function _erpExcBindSubject(
     _erpExcReload();
 }
 
+// 补期初卡:缺库存的商品逐行 → 会计填 数量/单位成本/日期 → 提交后先写期初再重推。
+// 小助手至今没有客户实际进价,期初成本必须由会计据真实单据填(不静默填 0)。
+function _erpExcStockOpeningPanel(it: RepairItem): string {
+    const items = (it.stock_fix && it.stock_fix.items) || [];
+    if (!items.length) {
+        return `<div class="erp-exc-acctfix" data-acctfix-panel="${escapeHtml(it.id)}" hidden>
+            <div class="erp-exc-acctfix-nochart">${escapeHtml(t('erp-stockopen-noitems'))}</div></div>`;
+    }
+    const rows = items
+        .map(
+            (p) =>
+                `<div class="erp-exc-stockopen-row">` +
+                `<span class="erp-exc-stockopen-name" title="${escapeHtml(p.name || p.stkcod || '')}">${escapeHtml(p.name || p.stkcod || '')}</span>` +
+                `<input type="hidden" data-stockopen-key="${escapeHtml(p.stkcod || p.name || '')}">` +
+                `<label>${escapeHtml(t('erp-stockopen-qty'))}<input type="number" min="0" step="any" data-stockopen-qty></label>` +
+                `<label>${escapeHtml(t('erp-stockopen-cost'))}<input type="number" min="0" step="any" data-stockopen-cost></label>` +
+                `<label>${escapeHtml(t('erp-stockopen-date'))}<input type="date" data-stockopen-date></label>` +
+                `</div>`
+        )
+        .join('');
+    return `<div class="erp-exc-acctfix erp-exc-stockopen" data-acctfix-panel="${escapeHtml(it.id)}" hidden>
+        <div class="erp-exc-stockopen-hint">${escapeHtml(t('erp-stockopen-hint'))}</div>
+        <div class="erp-exc-stockopen-rows">${rows}</div>
+        <div class="erp-exc-acctfix-act">
+            <button class="btn btn-sm btn-primary" type="button" data-stockopen-submit="${escapeHtml(it.id)}">${escapeHtml(t('erp-stockopen-submit'))}</button>
+            <button class="btn btn-sm btn-ghost" type="button" data-acctfix-cancel="${escapeHtml(it.id)}">${escapeHtml(t('erp-acctfix-cancel'))}</button>
+        </div></div>`;
+}
+
+async function _erpExcStockOpening(
+    logId: string,
+    panel: HTMLElement,
+    btn: HTMLButtonElement | null
+) {
+    const items: Array<{ key: string; qty: number; unit_cost: number; date: string }> = [];
+    let bad = false;
+    panel.querySelectorAll('.erp-exc-stockopen-row').forEach((row) => {
+        const key =
+            (row.querySelector('[data-stockopen-key]') as HTMLInputElement | null)?.value.trim() ||
+            '';
+        const qty = parseFloat(
+            (row.querySelector('[data-stockopen-qty]') as HTMLInputElement | null)?.value || ''
+        );
+        const cost = parseFloat(
+            (row.querySelector('[data-stockopen-cost]') as HTMLInputElement | null)?.value || ''
+        );
+        const date =
+            (row.querySelector('[data-stockopen-date]') as HTMLInputElement | null)?.value || '';
+        // 成本可为 0 只在真无成本时(罕见)· 数量必须 >0 · 日期必填(期初日 ≤ 出库日)。
+        if (!(qty > 0) || !(cost >= 0) || Number.isNaN(cost) || !date) {
+            bad = true;
+            return;
+        }
+        items.push({ key, qty, unit_cost: cost, date });
+    });
+    if (bad || !items.length) {
+        showToast(t('erp-stockopen-need-all'), 'error');
+        return;
+    }
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('erp-exc-retrying');
+    }
+    try {
+        const resp = await fetch(
+            '/api/erp/logs/' + encodeURIComponent(logId) + '/express-stock-opening',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: 'Bearer ' + _erpExcTok(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ items }),
+            }
+        );
+        const data = await resp.json().catch(() => ({}));
+        showToast(
+            resp.ok && data.ok ? t('erp-stockopen-ok') : t('erp-stockopen-fail'),
+            resp.ok && data.ok ? 'success' : 'error'
+        );
+    } catch (e) {
+        showToast(t('erp-stockopen-fail'), 'error');
+    }
+    _erpExcReload();
+}
+
 export type { RepairItem };
 export {
     _erpExcAcctPanel,
     _erpExcAccountFix,
     _erpExcBindPanel,
     _erpExcBindSubject,
+    _erpExcStockOpeningPanel,
+    _erpExcStockOpening,
     _erpExcEnsureClients,
 };

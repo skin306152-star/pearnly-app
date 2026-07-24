@@ -25,6 +25,10 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
         return "no_client"
     if "VERIFY_UNAVAILABLE" in msg:
         return "verify_unavailable"
+    # 缺库存商品主档 / 库存零负(小助手推库存模式失败)→ 会计补期初可救。须先于 account_set,
+    # 因 stock_no_master_in_account_set 串里含 "account_set" 会被下面误吞。
+    if "stock_no_master_in_account_set" in msg or "STOCK_ITEM_NOT_FOUND" in msg:
+        return "stock_opening_needed"
     # Express 留人工(EXPRESS_MANUAL:<reason>)· 按可补救路径分桶。
     # 账套配错(小助手连到不可写账套)先于科目判:account_set_not_allowed/no_account_set。
     if "account_set" in msg:
@@ -107,3 +111,34 @@ def derive_bind_fix(error_msg: Optional[str]) -> Optional[Dict[str, Any]]:
     if "direction_unknown" not in msg or "direction_not_enabled" in msg:
         return None
     return {"can_bind": True}
+
+
+def derive_stock_fix(
+    error_msg: Optional[str], request_body: Any = None
+) -> Optional[Dict[str, Any]]:
+    """从「缺库存商品主档 / 库存零负」失败推导补期初卡要给哪些商品补(名字 + 已知商品码)。
+
+    商品取自 request_body.payload.items(推送载荷),名字让会计认出该补哪个商品的期初。
+    取不到明细则返回空 items(前端显示「无可补商品」而非崩)。会计据真实单据填数量/成本/日期。
+    """
+    msg = error_msg or ""
+    if "stock_no_master_in_account_set" not in msg and "STOCK_ITEM_NOT_FOUND" not in msg:
+        return None
+    body = _coerce_body(request_body)
+    payload = (body or {}).get("payload") if isinstance(body, dict) else None
+    src = payload.get("items") if isinstance(payload, dict) else None
+    if not isinstance(src, list):
+        src = (body or {}).get("items") if isinstance(body, dict) else None
+    items = []
+    seen = set()
+    for it in src or []:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("name") or it.get("description") or "").strip()
+        stkcod = str(it.get("stkcod") or it.get("erp_item_code") or "").strip()
+        key = stkcod or name
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        items.append({"name": name, "stkcod": stkcod})
+    return {"items": items}

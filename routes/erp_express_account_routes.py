@@ -36,10 +36,12 @@ _EXPRESS_ACC_SLOTS = {
 }
 
 
-async def _repush_and_finalize(log: dict, push_ep: dict, history: dict):
+async def _repush_and_finalize(log: dict, push_ep: dict, history: dict, *, posting_kind=None):
     """重推一张已留人工的票 → 更新原日志行(不新建)+ 端点统计 + 历史状态 + 清重试。
-    待补科目卡 / 主体绑定卡共用(铁律 #12 单一落库口径)。返回 (final_status, result)。"""
-    result = await asyncio.to_thread(_erp.push_to_endpoint, push_ep, history)
+    待补科目卡 / 主体绑定卡 / 补期初卡共用(铁律 #12 单一落库口径)。返回 (final_status, result)。"""
+    result = await asyncio.to_thread(
+        _erp.push_to_endpoint, push_ep, history, posting_kind=posting_kind
+    )
     final_status = db.classify_push_status(result["success"], result.get("error_msg"))
     db.increment_retry_count(log["id"])
     db.update_log_status_after_retry(
@@ -169,4 +171,70 @@ async def erp_express_bind_subject(
         "status": final_status,
         "error_msg": result.get("error_msg"),
         "bound": True,
+    }
+
+
+def _clean_opening_items(items) -> list:
+    """清洗补期初输入:每行须 key(商品名/码) · 数量>0 · 成本≥0 · 日期(YYYY-MM-DD)。"""
+    out = []
+    for it in items or []:
+        if not isinstance(it, dict):
+            continue
+        key = str(it.get("key") or "").strip()[:60]
+        try:
+            qty = float(it.get("qty"))
+            cost = float(it.get("unit_cost"))
+        except (TypeError, ValueError):
+            continue
+        date = str(it.get("date") or "").strip()[:10]
+        if not key or not (qty > 0) or cost < 0 or not date:
+            continue
+        out.append({"key": key, "qty": qty, "unit_cost": cost, "date": date})
+    return out
+
+
+class ErpExpressStockOpeningRequest(BaseModel):
+    items: list = Field(default_factory=list, description="补期初逐行 [{key,qty,unit_cost,date}]")
+
+
+@router.post("/api/erp/logs/{log_id}/express-stock-opening")
+async def erp_express_stock_opening(
+    log_id: str, req: ErpExpressStockOpeningRequest, request: Request
+):
+    """给缺库存商品补期初(数量/单位成本/日期)→ 期初随载荷重推,小助手据此先写期初再过账。
+
+    成本必须会计据真实单据填(自产/无进价商品给不出成本,不静默填 0)。期初落 Express 的
+    STMAS 开账余额 + GL 借存货,由小助手侧 set_opening_stock 落地。走库存模式重推(posting_kind=stock)。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+
+    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
+    if not log:
+        raise HTTPException(404, detail="erp.log_not_found")
+    if not log.get("history_id") or not log.get("endpoint_id"):
+        raise HTTPException(400, detail="erp.log_missing_refs")
+    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
+    if not endpoint:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    if (endpoint.get("adapter") or "").lower() != "express":
+        raise HTTPException(400, detail="erp.not_express_endpoint")
+    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=_tid(user))
+    if not history:
+        raise HTTPException(404, detail="erp.history_not_found")
+
+    opening = _clean_opening_items(req.items)
+    if not opening:
+        raise HTTPException(400, detail="erp.stock_opening_empty")
+
+    # 期初随本次重推的载荷带给小助手(一次性·不落端点 config)· 库存模式过账。
+    mf = dict(history.get("merged_fields") or {})
+    mf["opening_stock"] = opening
+    history = {**history, "merged_fields": mf}
+
+    final_status, result = await _repush_and_finalize(log, endpoint, history, posting_kind="stock")
+    return {
+        "ok": final_status in ("pending", "success", "skipped_dup"),
+        "status": final_status,
+        "error_msg": result.get("error_msg"),
     }

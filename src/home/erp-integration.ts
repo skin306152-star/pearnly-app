@@ -20,7 +20,12 @@
 
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
 
-import { _erpExcAccountFix, _erpExcBindSubject, _erpExcEnsureClients } from './erp-exc-actions.js';
+import {
+    _erpExcAccountFix,
+    _erpExcBindSubject,
+    _erpExcStockOpening,
+    _erpExcEnsureClients,
+} from './erp-exc-actions.js';
 
 let _logFilter = { key: 'all', val: '' };
 // ERP 系统筛选 = 下拉(adapter)· 独立于 status/trigger chip 组合。
@@ -339,6 +344,16 @@ async function retryPushLog(logId: any) {
             const id = bindSubmit.dataset.bindfixSubmit as string;
             const panel = _panelOf(id);
             if (panel) _erpExcBindSubject(id, panel, bindSubmit as HTMLButtonElement);
+            return;
+        }
+        const stockSubmit = (e.target as HTMLElement).closest(
+            '[data-stockopen-submit]'
+        ) as HTMLElement | null;
+        if (stockSubmit) {
+            e.stopPropagation();
+            const id = stockSubmit.dataset.stockopenSubmit as string;
+            const panel = _panelOf(id);
+            if (panel) _erpExcStockOpening(id, panel, stockSubmit as HTMLButtonElement);
             return;
         }
         const mapFix = (e.target as HTMLElement).closest('[data-erpexc-fix]') as HTMLElement | null;

@@ -63,6 +63,12 @@
   --acc-h: #a95733;
   --acc-soft: #f6e6dd;
   --acc-line: #e6c3ac;
+  /* 结构性并入 pearnly-ui.css:共享组件读 --accent* 令牌,在 AI 里指向自家赤陶橙,
+   * 颜色值不动(共享组件在 /ai 内渲染成暖色而非紫色)。 */
+  --accent: var(--acc);
+  --accent-deep: var(--acc-h);
+  --accent-weak: var(--acc-soft);
+  --accent-ink: #fff;
 
   /* 动效 · 全站只用这四个值 */
   --dur-fast: 120ms;

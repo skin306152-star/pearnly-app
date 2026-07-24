@@ -23,8 +23,10 @@
   --dx-amber-line: #c98a1e;
   --dx-red: #d6586a;
   --dx-red-soft: color-mix(in srgb, #d6586a 14%, var(--card));
-  --dx-blue: #5a78e0;
-  --dx-blue-soft: color-mix(in srgb, #5a78e0 14%, var(--card));
+  /* 无匹配/占位是「空态」而非品牌态:用系统紫调中性 slate(--ink2),不用品牌紫也不留旧蓝。
+   * 名字保留(--dx-blue)避免动全部调用点;仅改值。软底走 color-mix 跟随明暗自适应。 */
+  --dx-blue: var(--ink2);
+  --dx-blue-soft: color-mix(in srgb, var(--ink2) 14%, var(--card));
   --dx-warm: color-mix(in srgb, #c98a1e 8%, var(--card));
   --dx-shadow: 0 12px 32px rgba(44, 31, 88, 0.1);
   color: var(--dx-text);

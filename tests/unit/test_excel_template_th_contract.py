@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 
 from services.excel import excel_template_th as et
 from services.excel.erp_roundtrip import ROUNDTRIP_HEADERS
+from services.excel.erp_roundtrip_reader import parse_roundtrip_workbook
 
 
 class NormDateTests(unittest.TestCase):
@@ -63,6 +64,51 @@ def _load(records):
     return load_workbook(io.BytesIO(raw)).active
 
 
+class NameColumnRoundtripTests(unittest.TestCase):
+    """F3(2026-07-23):3/4 列表头正名为「名」(ชื่อ…)后,客户名/商品名仍如实回导,
+    真 ERP 码从回导列读回 —— 锁死此关系,防日后有人把标签改回「码」(รหัส)而破回导:
+    读侧会把码当客户名/商品名读走,回导即错。"""
+
+    def test_header_labels_are_names_not_codes(self):
+        ws = _load([])
+        self.assertEqual(ws.cell(row=1, column=3).value, "ชื่อลูกค้า")
+        self.assertEqual(ws.cell(row=1, column=4).value, "ชื่อสินค้า")
+
+    def test_names_roundtrip_and_codes_come_from_erp_columns(self):
+        rec = {
+            "filename": "iv.pdf",
+            "engine": "test",
+            "merged_fields": {
+                "invoice_number": "IV69/00888",
+                "date": "2026-03-15",
+                "buyer_name": "บริษัท ลูกค้า ตัวอย่าง จำกัด",
+                "buyer_tax": "0105512345678",
+                "erp_party_code": "C-001",
+                "total_amount": 107.0,
+                "history_id": "h-888",
+                "items": [
+                    {
+                        "description": "น้ำแข็งหลอด",
+                        "qty": 2,
+                        "unit_price": 50,
+                        "amount": 100,
+                        "erp_item_code": "P-042",
+                    }
+                ],
+            },
+        }
+        parsed = parse_roundtrip_workbook(et.build_sales_detail_xlsx([rec]))
+        docs = parsed["documents"]
+        self.assertEqual(len(docs), 1)
+        f = docs[0]["fields"]
+        # 3/4 列(名)如实回导
+        self.assertEqual(f["buyer_name"], "บริษัท ลูกค้า ตัวอย่าง จำกัด")
+        self.assertEqual(f["items"][0]["description"], "น้ำแข็งหลอด")
+        # 真 ERP 码从回导列(COL_ERP_PARTY/COL_ERP_ITEM)回来,不与名混
+        self.assertEqual(f["erp_party_code"], "C-001")
+        self.assertEqual(f["items"][0]["erp_item_code"], "P-042")
+
+
 class HeaderTests(unittest.TestCase):
     def test_header_row_matches_declared_headers(self):
         ws = _load([])
@@ -71,15 +117,16 @@ class HeaderTests(unittest.TestCase):
         self.assertEqual(headers, et.HEADERS_TH)
 
     def test_accounting_contract_columns_1_to_12_frozen(self):
-        """1-12 列是与 MR.ERP 约定的公式合同 · 列位/列名一格都不许动。
+        """1-12 列是与 MR.ERP 约定的公式合同 · 列位/公式一格都不许动。
+        标签如实反映内容:3/4 列装客户名/商品名 → 表头是 ชื่อ… 不是 รหัส…(真码在回导列)。
         后续加列(回导列等)只能追加在其后。"""
         self.assertEqual(
             et.HEADERS_TH[:12],
             [
                 "วันที่",
                 "เลขที่",
-                "รหัสลูกค้า",
-                "รหัสสินค้า",
+                "ชื่อลูกค้า",
+                "ชื่อสินค้า",
                 "จำนวน",
                 "ราคาต่อหน่วย",
                 "จำนวนเงิน",

@@ -59,11 +59,14 @@ ROUNDTRIP_HEADERS: Tuple[str, ...] = (
 ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 16, 18, 16, 14, 16, 26)
 
 # ── 各表的业务列名(写侧和读侧共认这一份 · 读侧按列名取值不按列位,会计插列也不散架)──
-# 销项:前 12 列是 MR.ERP 公式合同,列名见 excel_template_th.HEADERS_TH。
+# 销项:前 12 列是 MR.ERP 公式合同(不动列位/公式),列名见 excel_template_th.HEADERS_TH。
+# ★ 3/4 列装的是客户名/商品名(写侧填 buyer_name/description,读侧原样读回),表头因此
+#   是「ชื่อ…」而非「รหัส…」—— 真 ERP 客户码/商品码在回导列 COL_ERP_PARTY/COL_ERP_ITEM。
+#   曾误标成「รหัส…(码)」却填名,会计看着对不上(2026-07-23 交接 F3)。
 SALES_COL_DATE = "วันที่"
 SALES_COL_INVOICE = "เลขที่"
-SALES_COL_PARTY = "รหัสลูกค้า"
-SALES_COL_ITEM = "รหัสสินค้า"
+SALES_COL_PARTY = "ชื่อลูกค้า"
+SALES_COL_ITEM = "ชื่อสินค้า"
 SALES_COL_QTY = "จำนวน"
 SALES_COL_PRICE = "ราคาต่อหน่วย"
 SALES_COL_AMOUNT = "จำนวนเงิน"

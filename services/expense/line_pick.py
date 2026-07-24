@@ -17,6 +17,7 @@ import re
 from decimal import Decimal
 
 from core import db
+from core.thai_date import buddhist_display as _bd
 from services.expense import conversation, line_classify
 from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
@@ -229,7 +230,7 @@ def _candidate_text(docs, lang: str) -> str:
     """候选列表文案:抬头 + 逐张「序号. 日期 · 卖家 · ฿额」(格式无关语言·抬头走 i18n)。"""
     lines = [ci.t(ci.PICK_WHICH, lang)]
     for i, d in enumerate(docs, 1):
-        date = str(d.get("doc_date") or "").strip()
+        date = _bd(str(d.get("doc_date") or "").strip())
         vendor = str(d.get("supplier_name") or "").strip()
         head = " · ".join(p for p in (date, vendor) if p)
         amt = ci.money(d.get("grand_total"))

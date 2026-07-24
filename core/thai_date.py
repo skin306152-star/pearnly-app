@@ -88,6 +88,25 @@ def gregorian_from_printed(printed: object, anchor_year: Optional[int] = None) -
         return None
 
 
+def buddhist_display(value: object) -> str:
+    """公历日期 → 泰式佛历展示串「DD/MM/พ.ศ.」(如 2026-07-21 → 21/07/2569)。
+
+    gregorian_from_printed 的反向:库里存公历(税期归属靠 to_char(doc_date,'YYYY-MM') 算),
+    泰国人读的是佛历,换算只发生在展示层。给人看日期的地方一律走这里,界面不出现公历年。
+    认不出的值(空/None/已是票面串)原样返回;已是佛历年(≥2400)幂等不再加,可安全重复调用。
+    """
+    m = _ISO_DATE.match(str(value or ""))
+    if not m:
+        return str(value or "")
+    year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    greg_year = to_gregorian_year(year)  # 已是公历原样;佛历减 543 —— 幂等
+    try:
+        date(greg_year, month, day)  # 校验真日历日(闰日按公历判)
+    except ValueError:
+        return str(value or "")
+    return f"{day:02d}/{month:02d}/{greg_year + BUDDHIST_ERA_OFFSET:04d}"
+
+
 def buddhist_year_of(value: object) -> Optional[int]:
     """ISO 日期串(YYYY-MM-DD)的年份若是佛历,返回它;否则 None。
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from core import db
+from core.thai_date import buddhist_display as _bd
 from services.line_binding import line_client, line_reply
 
 logger = logging.getLogger(__name__)
@@ -208,7 +209,7 @@ def reply_detail(reply_token, lang, tid, ws, line_user_id=None, *, quote_token="
     lines = [line_client.t_line(lang, "line_query_detail_intro"), ""]
     for i, r in enumerate(rows, 1):
         tail = f" · {r['vendor']}" if r["vendor"] else ""
-        lines.append(f"{i}. {r['date']} {r['category'] or uncat} ฿{r['amount']}{tail}")
+        lines.append(f"{i}. {_bd(r['date'])} {r['category'] or uncat} ฿{r['amount']}{tail}")
     if line_user_id:
         _remember_detail_order(tid, ws, line_user_id, [r["id"] for r in rows])
     _say("\n".join(lines))

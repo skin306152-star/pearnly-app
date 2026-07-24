@@ -142,6 +142,15 @@ class CardTests(unittest.TestCase):
         self.assertIn("2,722.00 THB", s)
         self.assertIn("请确认后入账", s)
         self.assertIn("待确认", s)
+
+    def test_date_row_shows_buddhist_not_gregorian(self):
+        # 铁律:LINE 卡日期一律佛历票面口径(2026-06-14 → 14/06/2569),界面绝不出现公历年。
+        import json
+
+        for state in ("confirm", "posted"):
+            s = json.dumps(self._card(state), ensure_ascii=False)
+            self.assertIn("14/06/2569", s, state)
+            self.assertNotIn("2026-06-14", s, state)
         self.assertIn("建议分类", s)
         self.assertIn("费用明细", s)
         self.assertNotIn("A" + "I", s)

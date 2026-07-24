@@ -326,9 +326,13 @@ def money(v) -> str:
 
 
 def disp(key: str, value, lang: str) -> str:
-    """字段值 → 展示文本(付款方式码本地化成人话·其余原样·回执/确认用)。"""
+    """字段值 → 展示文本(付款方式码本地化成人话·日期转佛历票面口径·其余原样·回执/确认用)。"""
     if key == "payment_method":
         return pay_label(value, lang)
+    if key in ("doc_date", "date"):
+        from core.thai_date import buddhist_display
+
+        return buddhist_display(value)
     return str(value)
 
 

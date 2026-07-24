@@ -108,7 +108,7 @@ def _summary(changes: dict, lang: str) -> str:
     if "vendor_name" in changes:
         parts.append(f"🏪 {changes['vendor_name']}")
     if "doc_date" in changes:
-        parts.append(f"📅 {changes['doc_date']}")
+        parts.append(f"📅 {ci.disp('doc_date', changes['doc_date'], lang)}")
     if "category" in changes:
         parts.append(f"🏷️ {changes['category']}")
     if "payment_method" in changes:

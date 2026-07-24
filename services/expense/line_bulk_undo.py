@@ -14,6 +14,7 @@ import re
 from decimal import Decimal
 
 from core import db
+from core.thai_date import buddhist_display as _bd
 from services.line_binding import line_card_sections as s
 from services.line_binding import line_postback, line_reply
 
@@ -219,7 +220,7 @@ def _money(x) -> str:
 
 def _doc_line(d) -> str:
     """一笔简列:日期 · 卖家 · ฿金额。"""
-    date = str(d.get("doc_date") or "").strip()
+    date = _bd(str(d.get("doc_date") or "").strip())
     vendor = str(d.get("supplier_name") or "").strip()
     head = " · ".join(p for p in (date, vendor) if p)
     return (

@@ -44,6 +44,33 @@ class BuddhistYearOfTests(unittest.TestCase):
             self.assertIsNone(thai_date.buddhist_year_of(v), v)
 
 
+class BuddhistDisplayTests(unittest.TestCase):
+    """展示层:公历 → 泰式佛历票面串。库里存公历,人看到的只能是佛历(不出现 2026)。"""
+
+    def test_converts_gregorian_iso_to_be_slash(self):
+        self.assertEqual(thai_date.buddhist_display("2026-07-21"), "21/07/2569")
+        self.assertEqual(thai_date.buddhist_display("2026-06-18"), "18/06/2569")
+
+    def test_accepts_date_object(self):
+        from datetime import date
+
+        self.assertEqual(thai_date.buddhist_display(date(2026, 7, 21)), "21/07/2569")
+
+    def test_pads_single_digit_month_day(self):
+        self.assertEqual(thai_date.buddhist_display("2026-7-1"), "01/07/2569")
+
+    def test_idempotent_when_already_buddhist(self):
+        # 已是佛历年不再加 543(防重复调用 3112 那种)。
+        self.assertEqual(thai_date.buddhist_display("2569-07-21"), "21/07/2569")
+
+    def test_passes_through_unparseable(self):
+        # 空/None → "";已是票面串/乱值原样返回(不吞不猜)。
+        self.assertEqual(thai_date.buddhist_display(""), "")
+        self.assertEqual(thai_date.buddhist_display(None), "")
+        self.assertEqual(thai_date.buddhist_display("21/07/69"), "21/07/69")
+        self.assertEqual(thai_date.buddhist_display("2026-02-30"), "2026-02-30")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

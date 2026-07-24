@@ -10,6 +10,7 @@ Flex 原语与分区构建块在 line_card_sections;chrome 文案在 line_card_i
 
 from __future__ import annotations
 
+from core.thai_date import buddhist_display as _bd
 from services.line_binding import line_card_sections as s
 from services.line_binding import line_imagemap
 from services.line_binding.line_card_doctype import doc_type_label
@@ -175,8 +176,9 @@ def _core_section(fields: dict, lang: str, t: dict, low) -> list:
     et = _expense_type_text(fields, t)
     if et:
         rows.append(s.field_row(t["exp_type"], et, t, low=False, strong=False))
-    if str(fields.get("date") or "").strip():
-        rows.append(s.field_row(t["date"], fields.get("date"), t, low=low("date"), strong=False))
+    date_be = _bd(fields.get("date"))  # 日期一律佛历票面口径(库存公历,只在展示层换算)
+    if date_be.strip():
+        rows.append(s.field_row(t["date"], date_be, t, low=low("date"), strong=False))
     if str(fields.get("category") or "").strip():
         rows.append(
             s.field_row(t["category"], fields.get("category"), t, low=low("category"), strong=True)

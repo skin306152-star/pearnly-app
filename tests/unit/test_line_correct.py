@@ -417,10 +417,11 @@ class ApplyOrConfirmTests(unittest.TestCase):
 
     def test_noop_skips_apply(self):
         # 验收 #3:目标值已等于当前值 → 不 void/不重建/不确认,诚实回执。
+        # no-op 判定内部比公历(2026-06-18 == 2026-06-18),但回执按佛历票面口径展示。
         detail = {"doc": {"status": "draft", "doc_date": "2026-06-18"}, "lines": [{}]}
         replies, saved, applied = self._run({"doc_date": "2026-06-18"}, detail)
         self.assertEqual((applied, saved), ([], {}))
-        self.assertIn("2026-06-18", replies[0])  # CHANGED_NOOP
+        self.assertIn("18/06/2569", replies[0])  # CHANGED_NOOP · 佛历票面
 
     def test_amount_multiline_guides_detail(self):
         detail = {"doc": {"status": "draft"}, "lines": [{}, {}]}

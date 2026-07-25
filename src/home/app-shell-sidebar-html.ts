@@ -381,18 +381,56 @@ export const SIDEBAR_HTML = `
         <span class="nav-badge danger" id="nav-exc-badge" style="display:none;">0</span>
     </div>
 
-    </div>
-
-    <!-- 底部 pinned(Claude 式):集成 / 用户卡(点开 = 头像菜单)。
-         「可开启功能」自选业态入口已下架(Zihao 2026-07-11 拍板 · 平台业态套餐不再自选)。 -->
-    <div class="sidebar-bottom">
-        <div class="nav-item" data-route="guide" id="nav-guide">
+    <!-- 使用教程:父栏 → 主题(篇)· 章节在页内选,面包屑回退。子项共用 guide 路由,
+         靠 data-gd-sec 区分是哪一篇(见 guide-page)。 -->
+    <div class="nav-group nav-collapsible" data-collapsible="guide" id="nav-guide">
+        <div class="nav-group-toggle" data-toggle-group="guide">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3.5 4.5A1.5 1.5 0 015 3h4v13H5a1.5 1.5 0 00-1.5 1.5z"/>
                 <path d="M16.5 4.5A1.5 1.5 0 0015 3h-4v13h4a1.5 1.5 0 011.5 1.5z"/>
             </svg>
             <span class="nav-label" data-i18n="nav-guide">使用教程</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
         </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="overview">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M10 6.5v4l2.5 1.5"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-overview">总览</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="setup">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13l-3 3M13 7l3-3"/><path d="M8.5 5.5l-3 3a2.8 2.8 0 000 4l2 2a2.8 2.8 0 004 0l3-3a2.8 2.8 0 000-4l-2-2a2.8 2.8 0 00-4 0z"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-setup">接入</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="daily">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6.5 9.5L10 13l3.5-3.5"/><path d="M4 15v2h12v-2"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-daily">日常推送</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="review">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h9l3 3v9H4z"/><path d="M7 10l2 2 4-4"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-review">核对与回导</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="stuck">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M8 8a2 2 0 113 1.7c-.6.4-1 .8-1 1.6"/><line x1="10" y1="14" x2="10" y2="14.01"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-stuck">推不进去怎么办</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="maintain">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l6 2.5v4.5c0 3.3-2.4 6-6 7-3.6-1-6-3.7-6-7V5.5z"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-maintain">维护与安全</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="concept">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h12M4 10h8M4 15h10"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-concept">概念说明</span>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- 底部 pinned(Claude 式):集成 / 用户卡(点开 = 头像菜单)。
+         「可开启功能」自选业态入口已下架(Zihao 2026-07-11 拍板 · 平台业态套餐不再自选)。 -->
+    <div class="sidebar-bottom">
         <div class="nav-item" data-route="integrations" id="nav-integrations">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M6 14L3 17M14 6l3-3"/>

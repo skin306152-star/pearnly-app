@@ -7,11 +7,7 @@
 // 状态来自 /api/erp/endpoints(data.items) · toggle 走 PATCH {enabled} 并刷新全局端点缓存。
 // ============================================================
 import { esc, authHeaders } from './dms-intake-core.js';
-
-// 小助手 3 分钟内有心跳算在线 —— 与连接向导 erp-express-wizard 同一判据。
-const AGENT_ONLINE_MS = 180000;
-// 小助手上下线只体现在心跳时间戳上,没有推事件;不轮询则冻结在开页那一刻的快照。
-const POLL_MS = 30000;
+import { isAgentOffline, startAgentPolling, stopAgentPolling } from './erp-agent-liveness.js';
 
 interface ErpCardDef {
     key: string;
@@ -62,15 +58,6 @@ function isEnabled(ep: EpRec | null): boolean {
 // 推送方式:发票/汇总表 ERP 看 auto_push。
 function isAutoPush(ep: EpRec): boolean {
     return ep.auto_push === true;
-}
-
-// Express 靠会计电脑上的小助手落库,小助手不在线时票只排队不落地 → 卡片必须照实说。
-// MR.ERP 是云端直连,没有小助手,恒不离线。
-export function isAgentOffline(ep: EpRec): boolean {
-    if (String(ep.adapter || '').toLowerCase() !== 'express') return false;
-    const seen = ep.config?.agent_last_seen_at;
-    const ts = seen ? new Date(String(seen)).getTime() : NaN;
-    return isNaN(ts) || Date.now() - ts >= AGENT_ONLINE_MS;
 }
 
 function cardHtml(def: ErpCardDef): string {
@@ -203,27 +190,13 @@ async function loadStatus(
     });
 }
 
-let pollTimer = 0;
-
-// 壳重渲或切走页面后旧定时器自我了断,避免多份并发打 /api/erp/endpoints。
-function startPolling(zone: HTMLElement, defs: ErpCardDef[]): void {
-    window.clearInterval(pollTimer);
-    pollTimer = window.setInterval(() => {
-        if (!zone.isConnected) {
-            window.clearInterval(pollTimer);
-            return;
-        }
-        if (!document.hidden) void loadStatus(zone, defs, true);
-    }, POLL_MS);
-}
-
 // 渲染当前任务的 ERP 卡到 #dx-erp-cards(dxShell 里的占位)。每次整壳重渲后调。
 export function renderDxErpCards(task: string): void {
     const zone = document.getElementById('dx-erp-cards');
     if (!zone) return;
     const defs = TASK_CARDS[task] || [];
     if (!defs.length) {
-        window.clearInterval(pollTimer);
+        stopAgentPolling();
         zone.innerHTML = '';
         return;
     }
@@ -232,5 +205,5 @@ export function renderDxErpCards(task: string): void {
         `<div class="dx-erp-row">${defs.map(cardHtml).join('')}</div>`;
     bindClicks(zone);
     void loadStatus(zone, defs);
-    startPolling(zone, defs);
+    startAgentPolling(zone, () => void loadStatus(zone, defs, true));
 }

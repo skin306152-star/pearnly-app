@@ -3,7 +3,7 @@
 """
 tests/unit/test_dms_erp_card_offline.py
 
-录入工作台 ERP 卡的小助手在线判定(src/home/dms-intake-erp-cards.ts)真 node 守门。
+小助手活性判定(src/home/erp-agent-liveness.ts)真 node 守门。
 
 Express 靠会计电脑上的小助手写本地 DBF,小助手掉线时票只排队不落地。这张卡此前只看
 endpoint.enabled,小助手关机也照写「已连接 · 自动推送」——会计据此以为票进了 Express。
@@ -21,7 +21,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SRC = PROJECT_ROOT / "src" / "home" / "dms-intake-erp-cards.ts"
+SRC = PROJECT_ROOT / "src" / "home" / "erp-agent-liveness.ts"
 I18N = PROJECT_ROOT / "static" / "i18n-data.js"
 
 DRIVER = r"""
@@ -29,13 +29,9 @@ const esbuild = require('esbuild');
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[1], 'utf8');
 const { code } = esbuild.transformSync(src, { loader: 'ts', format: 'cjs' });
-// 卡片模块只借 core 的 esc/authHeaders,判定本身不碰它们 —— stub 掉即可在裸 node 里跑。
-const shim = (id) =>
-  String(id).includes('dms-intake-core')
-    ? { esc: (s) => String(s == null ? '' : s), authHeaders: () => ({}) }
-    : require(id);
+globalThis.window = { setInterval: () => 0, clearInterval: () => {} };
 const mod = { exports: {} };
-new Function('module', 'exports', 'require', code)(mod, mod.exports, shim);
+new Function('module', 'exports', 'require', code)(mod, mod.exports, require);
 const { isAgentOffline } = mod.exports;
 
 function eq(got, want, msg) {

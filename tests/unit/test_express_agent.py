@@ -463,6 +463,49 @@ class StockMasterFingerprintBumpTests(unittest.TestCase):
                 self.assertIsNone(self._count(lm))
 
 
+class StockAccGroupPayloadShapeTests(unittest.TestCase):
+    """钉住与小助手的字段名接缝。
+
+    2026-07-25 真机哑火:catalog_probe 发 code/desc/inv_acc,服务端只认 acccod/name/stock_acc,
+    净化时整表被丢成空 → 下拉永远没候选,而 seen_at 却写上了,看起来"上报过了"。
+    这里用 catalog_probe 的**真实载荷形状**当输入,任何一边改名都会红。
+    """
+
+    _PROBE_ITEM = {
+        "code": "DM",
+        "desc": "วัตถุดิบ",
+        "inv_acc": "11-04-01-00",
+        "inv_acc_name": "วัตถุดิบคงเหลือ",
+        "cogs_acc": "51-01-00-00",
+        "cogs_acc_name": "ต้นทุนขาย",
+        "used_by": 3,
+        "fit": True,
+    }
+
+    def test_companion_payload_survives_sanitize(self):
+        from services.erp.express_push.agent_reporting import _sanitize_stock_acc_groups
+
+        got = _sanitize_stock_acc_groups([self._PROBE_ITEM])
+        self.assertEqual(len(got), 1, "小助手真实载荷被净化成空 —— 字段名接缝又断了")
+        g = got[0]
+        self.assertEqual(g["acccod"], "DM")
+        self.assertEqual(g["stock_acc"], "11-04-01-00")
+        self.assertEqual(g["stock_acc_name"], "วัตถุดิบคงเหลือ")
+        self.assertEqual(g["cogs_acc_name"], "ต้นทุนขาย")
+        self.assertEqual(g["used_by"], 3)  # 下拉靠它显示「N 个商品在用」
+        self.assertTrue(g["fit"])
+
+    def test_only_fit_ones_are_selectable(self):
+        from services.erp.express_push.agent_reporting import (
+            _sanitize_stock_acc_groups,
+            fit_stock_acc_groups,
+        )
+
+        unfit = {**self._PROBE_ITEM, "code": "ST01", "fit": False}
+        cfg = {"reported_stock_acc_groups": _sanitize_stock_acc_groups([self._PROBE_ITEM, unfit])}
+        self.assertEqual([g["acccod"] for g in fit_stock_acc_groups(cfg)], ["DM"])
+
+
 class HeartbeatStockAccGroupTests(unittest.TestCase):
     """心跳里的存货科目组候选要真落库 —— 两头都做了、中间没人调,是这条链踩过的坑。"""
 

@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 486 个源文件全扫
+# UI 设计合规扫描报告 · 487 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -27,7 +27,7 @@
         └ 282: .rs-tag{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-weak);borde
     10  static\home-10-push-logs.css
         └ 69: .erp-exc-chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
-        └ 300: .erp-exc-cb, .erp-exc-cb-all { accent-color: var(--blue); width: 16px; height: 16px; curso
+        └ 312: .erp-exc-cb, .erp-exc-cb-all { accent-color: var(--blue); width: 16px; height: 16px; curso
      9  static\home-35-bankrecon-v2.css
         └ 22: border-color: var(--accent); background: var(--blue-50);
         └ 29: .brv2-zone-icon-gl { background: var(--blue-100); color: var(--blue-800); }
@@ -124,7 +124,7 @@
      1  src\home\dms-intake-invoice-submit.ts
         └ 102: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\erp-log-card.ts
-        └ 84: statusIcon = '⏭';
+        └ 91: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
         └ 280: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts
@@ -142,7 +142,7 @@
      1  src\home\sales-wizard-io.ts
         └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
      1  static\admin\admin.html
-        └ 883: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+        └ 884: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
      1  static\dms\dms-intake.js
         └ 56: '<div class="dx-file"><div class="dx-file-ic">📄</div><div class="dx-file-c"><b>' +
      1  static\home-09-badges-locks.css
@@ -274,7 +274,7 @@
      1  static\home-08-pagehead-toast.css
         └ 157: max-width: 320px;
      1  static\home-10-push-logs.css
-        └ 578: max-width: 720px;
+        └ 590: max-width: 720px;
      1  static\home-13-upgrade-dup-prefs.css
         └ 67: max-width: 580px;
      1  static\home-14-gemini-admin.css

@@ -121,9 +121,27 @@ def store_reported_accounts(endpoint_id: str, accounts: Any) -> int:
 # (ACCCOD → 存货资产 ACCNUM01 + 销货成本 ACCNUM02)从零建 STKTYP=0。METHOD='A' 只是必要
 # 条件:真账套 70EXP 的 10 个 A 组里有 6 个 ACCNUM01 挂的是费用科目(52/53),拿来建库存品
 # 会把存货记成费用。能不能用由小助手判(fit),云端只存不猜。
-_STOCK_ACC_GROUP_KEYS = ("acccod", "name", "method", "stock_acc", "cogs_acc")
-# 小助手若直接回传 ISACC 原始行,按 DBF 列名归一到上面的键(免两边字段名对不上就整表落空)。
-_ISACC_ALIASES = {"accdes": "name", "accnum01": "stock_acc", "accnum02": "cogs_acc"}
+_STOCK_ACC_GROUP_KEYS = (
+    "acccod",
+    "name",
+    "method",
+    "stock_acc",
+    "stock_acc_name",
+    "cogs_acc",
+    "cogs_acc_name",
+)
+# 上游有两套叫法,都归一到上面这套(键名对不上 → 整表被丢成空 → 下拉永远没候选,
+# 2026-07-25 真机就是这么哑掉的):小助手 catalog_probe 发 code/desc/inv_acc*,
+# 若直接回传 ISACC 原始行则是 DBF 列名。
+_ISACC_ALIASES = {
+    "accdes": "name",
+    "accnum01": "stock_acc",
+    "accnum02": "cogs_acc",
+    "code": "acccod",
+    "desc": "name",
+    "inv_acc": "stock_acc",
+    "inv_acc_name": "stock_acc_name",
+}
 _MAX_STOCK_ACC_GROUPS = 100
 
 
@@ -147,6 +165,10 @@ def _sanitize_stock_acc_groups(raw: Any) -> List[Dict[str, Any]]:
             v = src.get(k)
             if v is not None and str(v).strip() != "":
                 clean[k] = str(v).strip()[:120]
+        try:  # 下拉上显示「N 个商品在用」,帮会计认出哪个才是这家真在用的组
+            clean["used_by"] = max(0, int(src.get("used_by") or 0))
+        except (TypeError, ValueError):
+            clean["used_by"] = 0
         if clean.get("acccod"):
             out.append(clean)
     return out

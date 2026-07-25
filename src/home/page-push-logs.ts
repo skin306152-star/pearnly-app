@@ -40,6 +40,7 @@
                         <button class="chip-filter" data-filter-key="status" data-filter-val="failed">✗ <span data-i18n="erp-logs-filter-fail">失败</span></button>
                         <button class="chip-filter" data-filter-key="trigger" data-filter-val="auto"><span data-i18n="erp-logs-filter-auto">自动</span></button>
                         <button class="chip-filter" data-filter-key="trigger" data-filter-val="manual"><span data-i18n="erp-logs-filter-manual">手动</span></button>
+                        <button class="chip-filter" data-filter-key="status" data-filter-val="uncosted"><span data-i18n="erp-uncosted-tag">未结转成本</span></button>
                         <span class="erp-logs-filter-sep" aria-hidden="true">|</span>
                         <select id="erp-logs-business-select" class="erp-logs-erp-select" aria-label="business">
                             <option value="" data-i18n="erp-logs-biz-all">全部业务</option>

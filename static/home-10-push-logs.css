@@ -160,6 +160,16 @@
 }
 .erp-log-reason b { font-weight: 800; flex: 0 0 auto; }
 .erp-log-reason span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 未结转成本提示条 · 推送成功但账里欠着成本(当期毛利虚高)· 用琥珀不用红:
+   这不是失败,是「成了但有话说」,红色会让会计以为要重推。 */
+.erp-log-note {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 13px; border-top: 1px solid var(--line);
+    background: var(--warn-bg); font-size: 10px; line-height: 1.55; color: var(--amber);
+}
+.erp-log-note b { font-weight: 800; flex: 0 0 auto; }
+.erp-log-note span { min-width: 0; }
+.log-tag.uncosted { background: var(--warn-bg); color: var(--amber); font-weight: 700; }
 .erp-log-meta {
     display: flex; gap: 14px; flex-wrap: wrap;
     padding: 7px 13px; border-top: 1px solid var(--line);

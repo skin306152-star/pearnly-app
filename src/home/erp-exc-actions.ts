@@ -33,6 +33,8 @@ type RepairItem = {
         needs?: string;
         items?: Array<{ name?: string; stkcod?: string }>;
         acc_groups?: AccGroup[];
+        // 小助手上报过候选没有(端点 config 的 stock_acc_groups_seen_at)· 空候选两种成因靠它分。
+        groups_reported?: boolean;
     };
 };
 
@@ -347,7 +349,12 @@ function _erpExcAccGroupPanel(it: RepairItem): string {
         ` data-fix-kind="accgroup" data-accgrp-endpoint="${escapeHtml(it.endpoint_id || '')}" hidden>`;
     const groups = (it.stock_fix && it.stock_fix.acc_groups) || [];
     if (!groups.length) {
-        return `${head}<div class="erp-exc-acctfix-nochart">${escapeHtml(t('erp-accgrp-nogroups'))}</div></div>`;
+        // 空候选两种成因,给同一句话会把人指错方向:小助手根本没上报过(版本旧 / 目录上报
+        // 还没到点,节流 30 分钟)时让会计去 Express 建组,他会白建一个多余的科目组。
+        const emptyKey = it.stock_fix?.groups_reported
+            ? 'erp-accgrp-nogroups'
+            : 'erp-accgrp-unreported';
+        return `${head}<div class="erp-exc-acctfix-nochart">${escapeHtml(t(emptyKey))}</div></div>`;
     }
     const opts = groups
         .map(

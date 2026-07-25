@@ -103,7 +103,12 @@ class StockAccGroupReportTests(unittest.TestCase):
 
     def test_sanitize_keeps_known_keys_and_normalizes_fit(self):
         out = agent_reporting._sanitize_stock_acc_groups([{**_GROUP_FIT, "evil": "drop"}])
-        self.assertEqual(set(out[0]), {"acccod", "name", "method", "stock_acc", "cogs_acc", "fit"})
+        # 下拉要显示「存货科目名 / COGS 科目名 / N 个商品在用」,所以这三个键也得留住;
+        # used_by 恒在(缺省 0),其余按上报有无。
+        self.assertEqual(
+            set(out[0]) - {"stock_acc_name", "cogs_acc_name"},
+            {"acccod", "name", "method", "stock_acc", "cogs_acc", "fit", "used_by"},
+        )
         self.assertIs(out[0]["fit"], True)
         # fit 缺失 = 小助手没说能用 → False,绝不默认可选(选了建不出档就又是死胡同)。
         self.assertIs(
@@ -203,6 +208,16 @@ class StockFixClassifyTests(unittest.TestCase):
         self.assertEqual(fix["needs"], "acc_group")
         self.assertEqual([g["acccod"] for g in fix["acc_groups"]], ["ST01"])
         self.assertEqual(fix["items"], [{"name": "น้ำมันเครื่อง", "stkcod": ""}])
+
+    def test_empty_candidates_distinguish_never_reported(self):
+        # 空候选两种成因不能混:没上报过 → 卡上得说「等小助手报上来」,而不是让会计
+        # 去 Express 白建一个多余的科目组(实测账套里其实有 ST10/ST01)。
+        msg = "EXPRESS_MANUAL:stock_acc_group_required"
+        never = derive_stock_fix(msg, None, acc_groups=[], groups_reported=False)
+        self.assertFalse(never["groups_reported"])
+        reported = derive_stock_fix(msg, None, acc_groups=[], groups_reported=True)
+        self.assertTrue(reported["groups_reported"])
+        self.assertFalse(derive_stock_fix(msg, None)["groups_reported"])
 
     def test_legacy_reasons_still_ask_for_opening(self):
         for msg in ("ERR_STOCK_ITEM_NOT_FOUND", "EXPRESS_MANUAL:stock_no_master_in_account_set"):

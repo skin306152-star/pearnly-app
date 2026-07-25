@@ -125,6 +125,7 @@ def derive_stock_fix(
     error_msg: Optional[str],
     request_body: Any = None,
     acc_groups: Optional[List[Dict[str, Any]]] = None,
+    groups_reported: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """从库存路失败推导补救卡要渲染什么(needs)+ 渲染它要的料。
 
@@ -133,6 +134,10 @@ def derive_stock_fix(
     needs="opening" :旧口径缺主档/库存零负 → 卡渲染补期初三格(数量/成本/日期)。
     两者都带 items(票面商品行,取自 request_body.payload.items),让会计认出这张票涉及哪些
     商品;取不到明细则空列表(前端显示「无可补商品」而非崩)。
+
+    groups_reported = 小助手到底上报过候选没有(端点 config 有 stock_acc_groups_seen_at)。
+    候选为空有两种成因,混成一句会把人指错方向:没上报过是等小助手升级 + 下次目录上报,
+    这时让会计去 Express 建组等于骗他白建一个多余的科目组。
     """
     msg = error_msg or ""
     if not any(k in msg for k in _STOCK_FIX_REASONS):
@@ -156,4 +161,9 @@ def derive_stock_fix(
         items.append({"name": name, "stkcod": stkcod})
     needs = "acc_group" if "stock_acc_group_required" in msg else "opening"
     groups = [g for g in (acc_groups or []) if isinstance(g, dict)]
-    return {"needs": needs, "items": items, "acc_groups": groups}
+    return {
+        "needs": needs,
+        "items": items,
+        "acc_groups": groups,
+        "groups_reported": bool(groups_reported),
+    }

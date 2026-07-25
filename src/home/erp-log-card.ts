@@ -120,6 +120,19 @@ function buildErpLogCard(log: any): string {
               ? `<span class="log-tag retry">${escapeHtml(t('log-tag-retry'))}</span>`
               : `<span class="log-tag manual">${escapeHtml(t('log-tag-manual'))}</span>`;
 
+    // 未结转成本(小助手回执报了 no_cost_basis / new_item_no_cost_basis)· 后端 derive_uncosted 派生。
+    // 推送本身是成功的,但账里欠着成本 —— 不标出来就是一条普通成功记录,会计要到毛利异常才发现。
+    const uncostedN = Number(log.uncosted_lines) || 0;
+    const uncostedTag = uncostedN
+        ? `<span class="log-tag uncosted">${escapeHtml(t('erp-uncosted-tag'))}</span>`
+        : '';
+    const uncostedStrip = uncostedN
+        ? `<div class="erp-log-note"><b>${escapeHtml(t('erp-uncosted-tag'))}</b><span>${escapeHtml(
+              t('erp-uncosted-note', { n: String(uncostedN) }) +
+                  (log.uncosted_created ? ' · ' + t('erp-uncosted-created') : '')
+          )}</span></div>`
+        : '';
+
     const friendlyReason =
         (log.error_friendly && (log.error_friendly[currentLang] || log.error_friendly.en)) || '';
 
@@ -240,7 +253,7 @@ function buildErpLogCard(log: any): string {
                 <span class="erp-log-state ${statusClass}" title="${escapeHtml(statusLabel)}">${statusIcon}</span>
                 <div class="erp-log-titleblock">
                     <b title="${escapeHtml(log.invoice_no || '')}">${escapeHtml(log.invoice_no || '-')}</b>
-                    <div class="erp-log-tags">${typeBadge}${trig}</div>
+                    <div class="erp-log-tags">${typeBadge}${trig}${uncostedTag}</div>
                 </div>
                 <div class="erp-log-party"><label>${escapeHtml(partyLabel)}</label><span>${partyVal}</span></div>
                 <div class="erp-log-party"><label>${escapeHtml(t('erp-log-col-target'))}</label><span>${erpName}</span></div>
@@ -251,6 +264,7 @@ function buildErpLogCard(log: any): string {
                 </div>
             </div>
             ${reasonStrip}
+            ${uncostedStrip}
             <div class="erp-log-meta">
                 <span><b>${escapeHtml(t('erp-log-col-time'))}</b>${escapeHtml(timeStr)}</span>
                 ${docMeta}

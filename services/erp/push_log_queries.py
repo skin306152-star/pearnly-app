@@ -2,17 +2,27 @@
 """ERP 推送日志查询/明细/异常/统计 DAL(REFACTOR-WA-B1 · 2026-05-29 从 erp/push_store 抽出 · 纯搬家 0 逻辑改)
 
 推送日志列表/明细(含 UI 友好化 friendly_for_ui + 外部引用 derive_external_ref · 失败行附
-异常子类 + 自助修复槽)+ 今日统计 + 批量删。组内自洽(只依赖 db + external_ref/business_friendly 叶子)·
+异常子类 + 自助修复槽)+ 今日统计 + 批量删。只依赖 db + 纯函数叶子(external_ref /
+push_log_friendly / push_log_meta / push_exception_classify / agent_reporting.fit_*)·
 push_store 顶部 re-import 当 facade · db.X/store.X/本模块.X 单一对象不变。
 """
 
-import json
 import logging
 import re
 from typing import Optional, Dict, Any, List  # noqa: F401
 
+from services.erp.express_push.agent_reporting import fit_stock_acc_groups
 from services.erp.external_ref import _coerce_body, derive_external_ref  # noqa: F401
 from services.erp.push_log_friendly import dms_push_friendly, friendly_any  # noqa: F401
+
+# response_body → 列表项标量的纯派生 + 未结转成本判据抽到 push_log_meta · 此处 re-import
+# 保 facade(q._derive_v3_meta 调用点与守门测试不变)。
+from services.erp.push_log_meta import (  # noqa: F401
+    NO_COST_REASONS,
+    UNCOSTED_SQL,
+    _derive_push_accounts,
+    _derive_v3_meta,
+)
 
 # 异常分类 + 自助修复派生抽到 push_exception_classify(纯函数)· 此处 re-import 保 facade
 # (store.X is q.X 单一对象 · test_push_log_queries_contract 钉死)。
@@ -51,51 +61,6 @@ def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
     except Exception as e:
         logger.error(f"delete_push_logs failed: {e}")
         return 0
-
-
-def _derive_push_accounts(resp_raw: Any) -> Optional[List[Dict[str, str]]]:
-    """从 response_body 取 Express 队列响应里的分录科目 → [{acc,side,desc}](列表卡科目列用)。
-
-    response_body 可能是 jsonb dict 或 JSON 字符串;无 accounts → None(只在有时带,保列表轻量)。
-    """
-    if not resp_raw:
-        return None
-    try:
-        body = resp_raw if isinstance(resp_raw, dict) else json.loads(resp_raw)
-    except (ValueError, TypeError):
-        return None
-    accs = body.get("accounts") if isinstance(body, dict) else None
-    if not isinstance(accs, list) or not accs:
-        return None
-    out: List[Dict[str, str]] = []
-    for a in accs:
-        if not isinstance(a, dict):
-            continue
-        code = str(a.get("acc") or "").strip()
-        if code:
-            out.append(
-                {"acc": code, "side": str(a.get("side") or ""), "desc": str(a.get("desc") or "")}
-            )
-    return out or None
-
-
-def _derive_v3_meta(body: Any) -> Dict[str, Any]:
-    """从 response_body.meta 派生 V3 细粒度态标量进列表项(轻量·只取前端展示要的几个)。
-
-    push_stage = waiting_lock/rolled_back/needs_review/... (status 列的细化·见 common.STAGE_*);
-    rolled_back = 写了一半已恢复备份;fallback_count = 明细从非库存回落直接科目的行数。
-    """
-    out: Dict[str, Any] = {}
-    meta = body.get("meta") if isinstance(body, dict) else None
-    if isinstance(meta, dict):
-        stage = str(meta.get("stage") or "").strip()
-        if stage:
-            out["push_stage"] = stage
-        if meta.get("rolled_back"):
-            out["rolled_back"] = True
-    if isinstance(body, dict) and body.get("fallback_count"):
-        out["fallback_count"] = body.get("fallback_count")
-    return out
 
 
 def list_push_logs(
@@ -163,6 +128,10 @@ def list_push_logs(
             elif status_filter == "failed":
                 # v118.25.1 · 失败终态:failed + 不在重试队列(已耗尽 / 端点删 / 手动停)
                 outer.append("l.status = 'failed' AND l.next_retry_at IS NULL")
+            elif status_filter == "uncosted":
+                # 未结转成本:显示成功但有行只记收入没结 COGS · 判据与卡上标注同一份名单
+                outer.append(UNCOSTED_SQL)
+                params.append(list(NO_COST_REASONS))
             if trigger_filter in ("manual", "auto"):
                 outer.append("l.trigger = %s")
                 params.append(trigger_filter)
@@ -226,6 +195,8 @@ def list_push_logs(
                        ), '') AS ocr_buyer_name,
                        e.name AS endpoint_name,
                        e.adapter AS endpoint_adapter,
+                       e.config->'reported_stock_acc_groups' AS _acc_groups_raw,
+                       e.config->>'stock_acc_groups_seen_at' AS _acc_groups_seen_at,
                        w.name AS workspace_name
                 FROM ranked l
                 LEFT JOIN ocr_history h ON h.id = l.history_id
@@ -244,6 +215,9 @@ def list_push_logs(
             # 不动状态机 · 不新增状态源 · 仅从已有 response_body+adapter 读出。
             # 派生后丢掉原始 response_body · 列表 payload 保持轻量(详情接口才回完整体)。
             for it in items:
+                # 存货科目组卡要的两样(端点 config)· 逐行 pop:是渲染料,不进列表 payload。
+                grp_raw = it.pop("_acc_groups_raw", None)
+                grp_seen = it.pop("_acc_groups_seen_at", None)
                 # response_body 只解析一次(_coerce_body),派生器都收已解析 dict,避免逐行双重 json.loads。
                 body = _coerce_body(it.pop("response_body", None))
                 ref = derive_external_ref(it.get("endpoint_adapter"), body, it.get("status"))
@@ -271,7 +245,10 @@ def list_push_logs(
                         it["bind_fix"] = derive_bind_fix(it.get("error_msg"))
                     elif it["category"] == "stock_opening_needed":
                         it["stock_fix"] = derive_stock_fix(
-                            it.get("error_msg"), it.get("request_body")
+                            it.get("error_msg"),
+                            it.get("request_body"),
+                            acc_groups=fit_stock_acc_groups({"reported_stock_acc_groups": grp_raw}),
+                            groups_reported=bool(grp_seen),
                         )
                 # request_body 仅用于派生 direction,用完丢弃,列表 payload 保持轻量。
                 it.pop("request_body", None)

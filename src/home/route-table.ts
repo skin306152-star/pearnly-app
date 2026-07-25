@@ -48,6 +48,7 @@ export const VALID_ROUTES = [
     'tax-pp30',
     'tax-pnd',
     'tax-settings',
+    'guide',
 ];
 
 // Phase3 入口守卫(各是各的 · 纯 UX 层)· 壳专属路由集。跨壳深链——pos-entry 手敲会计路由 /
@@ -86,6 +87,7 @@ export const MAIN_ENTRY_ROUTES = new Set<string>([
     'integrations',
     'templates',
     'api-keys',
+    'guide',
 ]);
 
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
@@ -131,4 +133,5 @@ export const ROUTE_LOADERS: Record<string, string> = {
     'tax-pp30': 'loadTaxPp30',
     'tax-pnd': 'loadTaxPnd',
     'tax-settings': 'loadTaxSettings',
+    guide: 'loadGuidePage',
 };

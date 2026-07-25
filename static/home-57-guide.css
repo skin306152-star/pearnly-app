@@ -1,0 +1,54 @@
+/* 使用教程页 · 左目录 + 右正文。颜色一律走全站令牌,不写死值(换肤时零改)。 */
+
+.gd{display:grid;grid-template-columns:264px minmax(0,1fr);gap:24px;align-items:start}
+
+/* ---- 左目录 ---- */
+.gd-toc{position:sticky;top:16px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 14px;max-height:calc(100vh - 96px);overflow:auto}
+.gd-toc-head{font-size:15px;font-weight:700;color:var(--ink)}
+.gd-toc-sub{font-size:11px;color:var(--ink3);margin:4px 0 14px;line-height:1.5}
+.gd-sec{margin-bottom:14px}
+.gd-sec-t{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.02em;margin-bottom:6px}
+.gd-sec-n{margin-left:auto;font-size:10px;font-weight:600;color:var(--ink4);background:var(--line2);border-radius:999px;padding:1px 7px}
+.gd-ch{display:block;width:100%;text-align:left;font-size:13px;line-height:1.45;color:var(--ink2);background:none;border:0;border-radius:8px;padding:7px 9px;cursor:pointer}
+.gd-ch:hover{background:var(--line2);color:var(--ink)}
+.gd-ch.is-on{background:var(--accent-weak);color:var(--accent-deep);font-weight:600}
+.gd-ch.is-todo{color:var(--ink4);cursor:default;font-size:12px;padding-left:9px}
+.gd-ch.is-todo:hover{background:none;color:var(--ink4)}
+
+/* ---- 右正文 ---- */
+.gd-body{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 32px;min-width:0}
+.gd-h1{font-size:22px;font-weight:700;color:var(--ink);margin:0 0 10px;line-height:1.35}
+.gd-intro{font-size:14px;line-height:1.75;color:var(--ink2);margin:0 0 24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+
+.gd-steps{list-style:none;margin:0;padding:0;counter-reset:none}
+.gd-step{display:grid;grid-template-columns:28px minmax(0,1fr);gap:14px;margin-bottom:26px}
+.gd-step-n{width:28px;height:28px;border-radius:50%;background:var(--accent-weak);color:var(--accent-deep);font-size:13px;font-weight:700;display:grid;place-items:center}
+.gd-step-b{min-width:0}
+.gd-step-b>p{margin:3px 0 0;font-size:14px;line-height:1.75;color:var(--ink)}
+
+.gd-fig{margin:12px 0 0}
+.gd-fig img{display:block;max-width:100%;border:1px solid var(--line);border-radius:10px}
+.gd-fig figcaption{font-size:11px;color:var(--ink3);margin-top:7px;line-height:1.5}
+/* 图还没生成时给一条占位,别让读者以为页面坏了。 */
+.gd-fig.is-missing img{display:none}
+.gd-fig.is-missing:before{content:'';display:block;height:96px;border:1px dashed var(--line);border-radius:10px;background:var(--line2)}
+
+.gd-notes{margin-top:28px;display:flex;flex-direction:column;gap:10px}
+.gd-note{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;border-radius:10px;padding:12px 14px;border:1px solid var(--line)}
+.gd-note>p{margin:0;font-size:13px;line-height:1.7;color:var(--ink2)}
+.gd-note-k{font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px;white-space:nowrap}
+.gd-note.is-info{background:var(--line2)}
+.gd-note.is-info .gd-note-k{background:var(--accent-weak);color:var(--accent-deep)}
+.gd-note.is-warn{background:var(--warn-bg);border-color:var(--amber)}
+.gd-note.is-warn .gd-note-k{background:var(--amber);color:var(--card)}
+.gd-note.is-warn>p{color:var(--ink)}
+
+/* ---- 手机/平板:目录收到正文上方,不再吸顶 ---- */
+@media(max-width:980px){
+  .gd{grid-template-columns:minmax(0,1fr);gap:16px}
+  .gd-toc{position:static;max-height:none}
+  .gd-body{padding:20px 18px}
+  .gd-h1{font-size:19px}
+  .gd-step{grid-template-columns:24px minmax(0,1fr);gap:11px;margin-bottom:22px}
+  .gd-step-n{width:24px;height:24px;font-size:12px}
+}

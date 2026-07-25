@@ -41,6 +41,7 @@ export const NAV_NODES: Record<string, string> = {
     company: '.nav-item[data-route="company"]',
     exceptions: '.nav-item[data-route="exceptions"]',
     integrations: '#nav-integrations',
+    guide: '#nav-guide', // 使用教程(Express 推送)· 只对会计版有意义
 };
 
 // 会计版(firm / 未选业态老租户):首页 + Cowork + 采购 + 客户/公司/(知识)/异常 + 销售 + 集成。
@@ -54,6 +55,7 @@ export const FIRM_PRESET: NavPreset = {
         'exceptions',
         'sales',
         'integrations',
+        'guide',
     ],
     home: 'dashboard',
     avatarHide: FIRM_AVATAR_HIDE,

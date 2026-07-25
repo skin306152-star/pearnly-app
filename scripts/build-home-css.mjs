@@ -69,6 +69,7 @@ const HOME_CSS = [
     'home-54-records.css',
     'home-55-upload-zone.css',
     'home-56-posting-editor.css',
+    'home-57-guide.css',
 ];
 
 const ADMIN_CSS = [
@@ -270,9 +271,22 @@ function copyFonts() {
     }
 }
 
+// 使用教程配图(scripts/_guide_shots.cjs 生成)· 同字体的理由:部署只拾 dist,
+// 且 vite emptyOutDir 每次清空,故随打包一并复制回去。
+function copyGuideShots() {
+    const srcDir = path.join(ROOT, 'static/guide/shots');
+    if (!fs.existsSync(srcDir)) return;
+    const outDir = path.join(ROOT, 'static/dist/guide-shots');
+    fs.mkdirSync(outDir, { recursive: true });
+    const files = fs.readdirSync(srcDir).filter((n) => n.endsWith('.png'));
+    for (const f of files) fs.copyFileSync(path.join(srcDir, f), path.join(outDir, f));
+    console.log(`✅ static/dist/guide-shots/ · ${files.length} 张`);
+}
+
 async function main() {
     for (const b of BUNDLES) await buildOne(b.list, b.out);
     copyFonts();
+    copyGuideShots();
 }
 
 main().catch((e) => {

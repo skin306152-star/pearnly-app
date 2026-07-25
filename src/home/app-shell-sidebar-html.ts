@@ -386,6 +386,13 @@ export const SIDEBAR_HTML = `
     <!-- 底部 pinned(Claude 式):集成 / 用户卡(点开 = 头像菜单)。
          「可开启功能」自选业态入口已下架(Zihao 2026-07-11 拍板 · 平台业态套餐不再自选)。 -->
     <div class="sidebar-bottom">
+        <div class="nav-item" data-route="guide" id="nav-guide">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3.5 4.5A1.5 1.5 0 015 3h4v13H5a1.5 1.5 0 00-1.5 1.5z"/>
+                <path d="M16.5 4.5A1.5 1.5 0 0015 3h-4v13h4a1.5 1.5 0 011.5 1.5z"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-guide">使用教程</span>
+        </div>
         <div class="nav-item" data-route="integrations" id="nav-integrations">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M6 14L3 17M14 6l3-3"/>

@@ -1,6 +1,7 @@
 # AGENTS.md · Pearnly 唯一入口(所有 AI 窗口先读这一页)
 
-> **这是唯一的"必读"。** 故意保持一页。完整宪法在 `CLAUDE.md/CLAUDE.md`(铁律细节),业务概念在 `docs/agent/`,但**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工,别一上来啃 7000 行。
+> **这是唯一的"必读"。** 故意保持一页。坑与红线在 `CLAUDE.md/CLAUDE.md`(轻量版约 90 行),干活的具体做法在 `.claude/skills/*`(按需自动装载,别背),业务概念在 `docs/agent/`。**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工。
+> (2026-07-25:CLAUDE.md 由 1470 行瘦身成轻量版 + 8 个 skill,旧全文冻结在 `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md`,逐段对照表见 `docs/context-engineering/2026-07-25-claude-md-simplify.md`。)
 > 最后更新:2026-06-03(✅ **目录重组(铁律#30)+ view-source 成品化(E7)双双收官**。① 重组:122 个 root .py → 顶层 `routes/`+`core/`+复用现有 `services/<域>/`(方案B·非 `app/` 外壳)·app.py 留根·854 处机械改写 verbatim·全量 2176 单测全绿·prod 零 500·见 [[directory-reorg-playbook]]。② E7:所有明文 CSS/JS 打包 minified bundle + HTML 压成一行(home view-source 228行→1行·对标 Claude.ai)·含 BOM 合并坑 + /simplify 收口·见 [[frontend-asset-bundling-playbook]])
 >
 > **🔴 常驻铁律(Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **每次 Zihao 说"收尾"(今天到这/换窗口/下班/总结)→ 主动先跑 `/simplify` 再出收尾报告**。③ **(2026-07-01)任何任务自己做→自己检→自己验证闭环**:凡"视觉/UI 验收"的改动必须真浏览器 E2E + 截图为证(grep 类名/断言 MODAL=true 不算数,见 §3 红线#4);任何 push 后必须自己盯 CI 到绿、红了自己修,不甩给 Zihao/别的窗口。**验证绑批次边界·不攒到最后(2026-07-11·vertical slicing)**:每切完一个可独立验证的批次就地验——命中任一=大批次当场验(高敏路径 登录/OCR/计费/推送/POS 收款/多租户/RLS/迁移 · 用户可见 UI · 新 flag/路由/迁移 · ≥~200 行或一个独立功能单元);小批次(纯格式化/docs/测试-only/无运行时面重构/<~50 行机械改)并到批次末或交付前一起兜。④ **(2026-07-11)动手写码前先做 discovery**:每个功能/派单前先写「场景+对标」——JTBD 真实场景 / RICE·Kano 判实用性(警惕 feature creep)/ 便利性(减摩擦·手机优先·危险操作确认·四态诚实)/ 照抄成熟产品 design pattern(Loyverse·Square…·Jakob's Law),别从代码结构倒推(见 [[design-from-real-scenarios-ref-market-leaders]])。
@@ -46,7 +47,7 @@
    - 成品体积靠 **Vite build + minify**(= 计划 E7),不是手写。**别再问"能不能把 home.js 压到极致"——答案永远是:拆,不压。**
 2. **防屎山靠 CI 机械闸,不靠自律。** check_file_size + check_line_ratchet(行数只降不升)+ CI lint-size。Loop 1 拆完切 fail 模式(铁律 #27)。
 3. **改动三标准**:加新功能=新模块(不进巨石,铁律 #17);改旧功能=先有测试再改;推翻重做=`git rm` 旧的不留 `.deprecated/.legacy` 僵尸(铁律 #7)。
-4. **守门 6 道**(铁律统一 2026-05-29):format:check / 全量 unittest / check_imports / check_i18n / node --check / npm run build(E2E 按需单独跑)。
+4. **机械闸唯一清单 = `docs/GATES.md`**(21 道 · pre-push 本地硬拦 + CI 双层 · 逐道自查命令和豁免法都在那页)。别在别处另记一份计数,会漂。
 5. **commit 署名 = Opus 4.8 (1M context)** · message 含 `· REFACTOR-<task-id>` · 铁律共 **30** 条。
 6. **代码像资深工程师写的,不像 AI 生成的**:源码(新旧都要)**去 AI 味** —— 无过度注释/无 emoji/无防御冗余/无泛化命名(`data`/`temp`)/无调试残留(console.log/print)/DRY/用语言惯用法。拆模块时顺手清,I6 收尾审计。**🛡️ 机械闸(2026-06-01 加·别只靠自觉)**:`scripts/check_ai_smell.py` 已挂 pre-push 第 7 道,改前端 src JS 时机械拦【注释里的 emoji】+【console.log 调试残留】(模板内产品 emoji 放行)。它只查本次改动文件——碰到旧模块带 emoji 会拦,顺手清掉再推。**全套大厂标准(源码→产品→流程→审核→测试→CI/CD→验收→安全→文档)= `docs/ENGINEERING_STANDARD.md`**,那是"拿得上台面"的 Definition of Done。
 
@@ -58,17 +59,15 @@
 4. **改完自跑对应真账号 E2E 验过再 push master**(push=自动部署上线)· 2026-06-12 起所有改动(含登录/注册/OCR/计费/推送)自做自检即 push,不再分高敏、不等谁在场(铁律 #26)。
 5. **schema 改动只走 Alembic + 启动 ensure 双跑**(生产不跑 `alembic upgrade` · 见 §5)。
 
-## 4. 守门 6 道(改完必跑全绿才 commit)
+## 4. 机械闸(改完必跑全绿才 commit)
+
+清单 + 触发条件 + 逐道自查命令 + 豁免语法:**`docs/GATES.md`(21 道)**。一键全套(等价 pre-push,不用真推):
 
 ```bash
-npm run format:check                              # prettier(最易漏)
-python -m unittest discover -s tests/unit         # 全量(不是只跑改的)
-python scripts/check_imports.py --quiet
-python scripts/check_i18n.py --strict
-node --check <改的.js>                            # 改了 JS 才需
-npm run build                                     # 改前端才需(Vite)
-# E2E:npx playwright test —— 按需单独跑,非每 commit 强制
+sh scripts/git-hooks/pre-push     # Git Bash
 ```
+
+新机器/新 worktree 第一次要挂钩子:`git config core.hooksPath scripts/git-hooks`(不挂 = 本地零拦截,只剩 CI 事后红)。
 
 ## 5. 关键基础设施(少踩坑)
 
@@ -119,5 +118,7 @@ npm run build                                     # 改前端才需(Vite)
 | **对话 Agent(当前主线 · M1 WP1~5 已上线)** | `docs/agent/MASTER-PLAN.md`(全景 + 为啥"插座插头" + 里程碑 + 工作包)· `docs/agent/M1-SOCKET-DESIGN.md`(技术总纲)· `docs/agent/CONVERSATION-SPEC.md`(对话文案规范)· `services/agent/README.md`(每文件职责) |
 | **产品北极星 · 模块化平台(防跑偏)** | `docs/PRODUCT_VISION_MODULAR.md`(身份一句话 + 底座/模块/出口三层 + 模块化六原则 + 业态套餐)· 加功能前先对一遍 |
 | 为啥这么决策 | `docs/refactor/adr-*.md`(ADR-001~011) |
-| 铁律全文细节 | `CLAUDE.md/CLAUDE.md`(30 铁律) |
+| 坑 / 业务红线 / 硬线 | `CLAUDE.md/CLAUDE.md`(轻量版 · 约 90 行) |
+| 干活的具体做法 | `.claude/skills/`:`verification` `frontend-change` `erp-integration` `deploy-release` `debug-prod-500` `i18n-4lang` `new-feature-discovery` `wrapup` |
+| 旧 30 铁律全文(已冻结) | `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md` · 对照表 `docs/context-engineering/2026-07-25-claude-md-simplify.md` |
 | 远古历史 | STATE 分割线以下 / `CLAUDE.md/BACKLOG.md` |

@@ -3,18 +3,25 @@
 # 由 .claude/settings.json 的 SessionStart hook 调用;stdout 自动注入每个新窗口上下文。
 # 目的:不靠 agent 自觉去读 —— harness 开窗口第一刻就把"入口 + 真实数字 + 当前 task"塞进上下文。
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
-echo "════════ Pearnly 整顿期 · 进窗口必读(harness 自动注入)════════"
+echo "════════ Pearnly · 进窗口必读(harness 自动注入)════════"
 echo "1. 先读 AGENTS.md(项目根 · 唯一一页入口 · 文档地图 + 今天敲定的认知 + 去AI味)"
+echo "2. 坑与红线看 CLAUDE.md/CLAUDE.md(轻量版 · 约 90 行);干活做法在 .claude/skills/(按需装载,别背)"
 echo ""
 echo "【实时代码规模 · 别信文档手写行数】"
 python scripts/refactor_progress.py 2>/dev/null | sed -n '5,18p' \
   || echo "  (跑 python scripts/refactor_progress.py 看实时数字)"
 echo ""
-echo "【当前状态卡 · STATE 顶部 · 含当前 task】"
-awk '/🎯 状态卡/{f=1} /以下为历史明细/{f=0} f' "CLAUDE.md/STATE_PEARNLY.md" 2>/dev/null \
-  | grep -E '^- ' | sed -n '1,8p' \
-  || echo "  (见 CLAUDE.md/STATE_PEARNLY.md 顶部状态卡)"
+echo "【当前状态卡摘要 · 每条截断 · 要细节自己读 CLAUDE.md/STATE_PEARNLY.md 顶部】"
+# 截断而不是全塞:整卡曾长到几 KB(状态卡该 ≤30 行但会长胖),每个窗口开局白吃三周前的明细。
+PYTHONIOENCODING=utf-8 python -c "
+import io
+t = io.open('CLAUDE.md/STATE_PEARNLY.md', encoding='utf-8').read()
+head = '◉ 状态卡' if '◉ 状态卡' in t else ('\U0001f3af 状态卡' if '\U0001f3af 状态卡' in t else None)
+card = t.split(head)[-1].split('以下为历史明细')[0] if head else ''
+rows = [l for l in card.splitlines() if l.startswith('- ')][:6]
+print('\n'.join('  ' + (l[:160] + ' ...' if len(l) > 160 else l) for l in rows) if rows else '  (见 CLAUDE.md/STATE_PEARNLY.md 顶部状态卡)')
+" 2>/dev/null || echo "  (见 CLAUDE.md/STATE_PEARNLY.md 顶部状态卡)"
 echo ""
-echo "3 窗口 loop 指令: docs/refactor/PARALLEL_LOOP_DISPATCH.md · 大厂标准: docs/ENGINEERING_STANDARD.md"
-echo "整顿封锁期 0 新功能 · 守门 6 道 · 署名 Opus 4.8 · 28 铁律 · push 即上线"
+echo "机械闸清单: docs/GATES.md(pre-push 本地硬拦 + CI)· 大厂标准: docs/ENGINEERING_STANDARD.md"
+echo "push 即上线 · 自做自检即 push · 署名 Opus 5 (1M context) · 数字只信 refactor_progress.py"
 echo "════════════════════════════════════════════════════════════════"

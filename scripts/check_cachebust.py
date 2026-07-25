@@ -83,6 +83,32 @@ _ENTRY_ASSETS = {
         "/static/dms/dms-i18n.js",
         *(f"/static/dms/dms-i18n-{lang}.js" for lang in ("zh", "th", "en", "ja")),
     ),
+    # POS 是在卖钱的产品,它这 5 个带指纹的产物此前一个都没被守(2026-07-25 覆盖率测试照出来)。
+    "static/pos/pos.html": (
+        "/static/dist/pos.js",
+        "/static/dist/pos.css",
+        "/static/pearnly-ui.css",
+        "/static/pos/pos-i18n.js",
+        "/static/pos/cashier.webmanifest",
+    ),
+    "login.html": (
+        "/static/dist/landing.js",
+        "/static/dist/landing.css",
+    ),
+    "static/console/invite.html": (
+        "/static/dist/invite.js",
+        "/static/dist/console.css",
+        "/static/console/console-i18n.js",
+    ),
+    "static/landing/portal.dc.html": (
+        "/static/landing/vendor/three.min.js",
+        "/static/landing/vendor/gsap.min.js",
+        "/static/landing/vendor/ScrollTrigger.min.js",
+        "/static/landing/vendor/support.js",
+        "/static/landing/vendor/fonts.css",
+    ),
+    "static/terms.html": ("/static/legal.css",),
+    "static/privacy.html": ("/static/legal.css",),
     "static/ai/ai.html": (
         "/static/dist/ai.js",
         "/static/dist/ai.css",

@@ -31,28 +31,40 @@ def _version_tuple(raw: Any) -> tuple:
         return ()
 
 
-def prior_docnum(history_id: Any) -> Optional[str]:
+def prior_docnum(history_id: Any, tenant_id: Any = None) -> Optional[str]:
     """该单据上一次成功推送写出的 ERP 凭证号;没有则 None。只读 · 查询失败降级为 None。
 
     降级不阻断推送:防重单是加固,不该因为一次查库抖动就把正常推送卡死。代价是
     那一次可能建出重复单 —— 相比"所有推送都推不出去",这是可接受的取舍。
+
+    **必须带租户作用域**:钥匙可能来自 `fields.history_id`,而 fields 是客户端经
+    `PUT /api/history` 可写的口袋 —— 任一租户能塞一个别家的 history UUID,不限定租户
+    就等于把别家的 ERP 凭证号读进自己的载荷。拿不到 tenant_id 就不查(fail closed):
+    宁可少一道加固,不可跨租户读。
+
+    作用域**落在 ocr_history 上而不是 erp_push_logs 上**:生产实测 `insert_push_log`
+    从来不写 `erp_push_logs.tenant_id`(109 行里只有 9 行有,全靠 user_id),按它过滤等于
+    这道闸恒查不到、静默失效。而要回答的信任问题本来就是「这个 history_id 是不是我的」——
+    `ocr_history.tenant_id` 才是那个事实(945/991),join 上去既安全又不误杀。
     """
     hid = str(history_id or "").strip()
-    if not hid:
+    tid = str(tenant_id or "").strip()
+    if not hid or not tid:
         return None
     try:
         from core import db
 
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tid) as cur:
             cur.execute(
                 """
-                SELECT response_body
-                FROM erp_push_logs
-                WHERE history_id = %s AND status = 'success'
-                ORDER BY created_at DESC, id DESC
+                SELECT l.response_body
+                FROM erp_push_logs l
+                JOIN ocr_history h ON h.id = l.history_id
+                WHERE l.history_id = %s AND h.tenant_id = %s AND l.status = 'success'
+                ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 1
                 """,
-                (hid,),
+                (hid, tid),
             )
             row = cur.fetchone()
     except Exception as e:  # noqa: BLE001
@@ -92,9 +104,12 @@ def attach_prior_docnum(
     钥匙优先用 fields.history_id ——【这条是闸能不能生效的关键】:会计改完表格回导时,
     收料口会为上传的工作簿新建一条 history 记录,拿新 id 去查上一版必然查不到,闸就正好
     在它该生效的场景下哑火。回导解析器从行键里带回的原 history_id 才指向真正的上一版。
+
+    租户来自 history(服务端查出来的记录),不从 fields 取 —— fields 里的东西客户端可写,
+    让它自己指定要查哪个租户等于没有作用域。
     """
     key = str((fields or {}).get("history_id") or "").strip() or (history or {}).get("id")
-    doc = prior_docnum(key)
+    doc = prior_docnum(key, (history or {}).get("tenant_id"))
     if doc:
         payload["prior_docnum"] = doc
     return payload

@@ -79,13 +79,28 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 _UNGUARDED = ("/static/brand/",)
 
 
+def _entry_pages():
+    """仓库里所有会被浏览器直接打开的 HTML —— 从**文件系统**枚举,不从清单反推。
+
+    从清单反推等于用清单守清单:只查得出「已列入口页里漏了某个资源」,查不出「整个入口页
+    漏了」,而后者正是同一失效模式往上一层。实测这么改立刻照出 POS/登录页等 9 个入口全在闸外。
+    """
+    skip = ("static/dist/", ".claude/", "node_modules/", "tests/", "_scratch/", "outputs/")
+    out = []
+    for p in _ROOT.rglob("*.html"):
+        rel = p.relative_to(_ROOT).as_posix()
+        if not any(rel.startswith(s) or f"/{s}" in f"/{rel}" for s in skip):
+            out.append(rel)
+    return sorted(out)
+
+
 class PairCoverageTests(unittest.TestCase):
     def test_every_versioned_asset_in_entry_html_is_guarded(self):
         import re
 
         guarded = {(p.html, p.ref) for p in cachebust.CACHE_BUST_PAIRS}
         missing = []
-        for html in sorted({p.html for p in cachebust.CACHE_BUST_PAIRS}):
+        for html in _entry_pages():
             text = (_ROOT / html).read_text(encoding="utf-8", errors="replace")
             for url in re.findall(r'(?:src|href)="([^"]*\?v=[^"]*)"', text):
                 if any(u in url for u in _UNGUARDED):

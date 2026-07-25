@@ -34,21 +34,21 @@ class _Ctx:
 
 
 def _with_row(row):
-    return mock.patch("core.db.get_cursor", return_value=_Ctx(_Cur(row)))
+    return mock.patch("core.db.get_cursor_rls", return_value=_Ctx(_Cur(row)))
 
 
 class PriorDocnumTests(unittest.TestCase):
     def test_reads_docnum_from_response_body(self):
         with _with_row({"response_body": '{"express_docnum": "SA1-0723", "meta": {}}'}):
-            self.assertEqual(prior_docnum("h1"), "SA1-0723")
+            self.assertEqual(prior_docnum("h1", "t-1"), "SA1-0723")
 
     def test_falls_back_to_meta_docnum(self):
         with _with_row({"response_body": '{"meta": {"docnum": "HP690723-001"}}'}):
-            self.assertEqual(prior_docnum("h1"), "HP690723-001")
+            self.assertEqual(prior_docnum("h1", "t-1"), "HP690723-001")
 
     def test_no_prior_push_returns_none(self):
         with _with_row(None):
-            self.assertIsNone(prior_docnum("h1"))
+            self.assertIsNone(prior_docnum("h1", "t-1"))
 
     def test_blank_history_id_short_circuits(self):
         self.assertIsNone(prior_docnum(""))
@@ -56,20 +56,20 @@ class PriorDocnumTests(unittest.TestCase):
 
     def test_db_failure_degrades_to_none_not_raise(self):
         """防重单是加固 · 查库抖一下不该把正常推送整个卡死。"""
-        with mock.patch("core.db.get_cursor", side_effect=RuntimeError("boom")):
-            self.assertIsNone(prior_docnum("h1"))
+        with mock.patch("core.db.get_cursor_rls", side_effect=RuntimeError("boom")):
+            self.assertIsNone(prior_docnum("h1", "t-1"))
 
 
 class AttachTests(unittest.TestCase):
     def test_key_absent_on_first_push(self):
         """首次推送没有上一版 —— 带个空串会让老版本小助手困惑,干脆不带这个键。"""
         with _with_row(None):
-            p = attach_prior_docnum({"ref_no": "X"}, {"id": "h1"})
+            p = attach_prior_docnum({"ref_no": "X"}, {"id": "h1", "tenant_id": "t-1"})
         self.assertNotIn("prior_docnum", p)
 
     def test_key_present_on_repush(self):
         with _with_row({"response_body": '{"express_docnum": "SA1-0723"}'}):
-            p = attach_prior_docnum({"ref_no": "X"}, {"id": "h1"})
+            p = attach_prior_docnum({"ref_no": "X"}, {"id": "h1", "tenant_id": "t-1"})
         self.assertEqual(p["prior_docnum"], "SA1-0723")
 
     def test_missing_history_is_safe(self):
@@ -85,23 +85,27 @@ class ReimportKeyTests(unittest.TestCase):
     def test_fields_history_id_wins_over_new_history(self):
         seen = {}
 
-        def fake_prior(hid):
-            seen["hid"] = hid
+        def fake_prior(hid, tid=None):
+            seen["hid"], seen["tid"] = hid, tid
             return "SA1-0723" if hid == "orig-hid" else None
 
         with mock.patch("services.erp.express_push.prior_doc.prior_docnum", side_effect=fake_prior):
-            p = attach_prior_docnum({}, {"id": "new-upload-hid"}, {"history_id": "orig-hid"})
+            p = attach_prior_docnum(
+                {}, {"id": "new-upload-hid", "tenant_id": "t-1"}, {"history_id": "orig-hid"}
+            )
         self.assertEqual(seen["hid"], "orig-hid")
+        # 钥匙来自客户端可写的 fields,租户就必须来自服务端查出的记录
+        self.assertEqual(seen["tid"], "t-1")
         self.assertEqual(p["prior_docnum"], "SA1-0723")
 
     def test_falls_back_to_history_when_fields_have_no_key(self):
         with _with_row({"response_body": '{"express_docnum": "D9"}'}):
-            p = attach_prior_docnum({}, {"id": "h1"}, {})
+            p = attach_prior_docnum({}, {"id": "h1", "tenant_id": "t-1"}, {})
         self.assertEqual(p["prior_docnum"], "D9")
 
     def test_blank_fields_key_does_not_shadow_history(self):
         with _with_row({"response_body": '{"express_docnum": "D9"}'}):
-            p = attach_prior_docnum({}, {"id": "h1"}, {"history_id": "   "})
+            p = attach_prior_docnum({}, {"id": "h1", "tenant_id": "t-1"}, {"history_id": "   "})
         self.assertEqual(p["prior_docnum"], "D9")
 
 
@@ -113,7 +117,7 @@ class CompanionVersionGateTests(unittest.TestCase):
         body = '{"express_docnum": "D1", "meta": {"companion_version": "%s"}}' % version
         with _with_row({"response_body": body}):
             with self.assertLogs("services.erp.express_push.prior_doc", "WARNING") as cm:
-                doc = prior_docnum("h1")
+                doc = prior_docnum("h1", "t-1")
                 return doc, cm.output
         return None, []
 
@@ -126,14 +130,14 @@ class CompanionVersionGateTests(unittest.TestCase):
         body = '{"express_docnum": "D1", "meta": {"companion_version": "1.1.48"}}'
         with _with_row({"response_body": body}):
             with self.assertNoLogs("services.erp.express_push.prior_doc", "WARNING"):
-                self.assertEqual(prior_docnum("h1"), "D1")
+                self.assertEqual(prior_docnum("h1", "t-1"), "D1")
 
     def test_unknown_version_is_not_guessed(self):
         """版本读不出来时不喊狼来了 —— 误报多了没人看告警。"""
         body = '{"express_docnum": "D1", "meta": {}}'
         with _with_row({"response_body": body}):
             with self.assertNoLogs("services.erp.express_push.prior_doc", "WARNING"):
-                self.assertEqual(prior_docnum("h1"), "D1")
+                self.assertEqual(prior_docnum("h1", "t-1"), "D1")
 
 
 if __name__ == "__main__":

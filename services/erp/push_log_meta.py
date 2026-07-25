@@ -13,8 +13,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from services.erp.express_push.stock_acc_group import describe_stock_acc_group
-from services.erp.external_ref import _coerce_body
+from services.erp.express_push.stock_acc_group import describe_from_request
 
 # companion stock_sale.NO_COST_REASONS 的镜像:
 #   no_cost_basis          有商品档但零/负库存且无标准成本
@@ -158,9 +157,7 @@ def derive_stock_acc_group(resp_body: Any, req_body: Any, reported: Any) -> Dict
     )
     if not created:
         return {}
-    req = _coerce_body(req_body)
-    payload = req.get("payload") if isinstance(req, dict) else None
-    group = describe_stock_acc_group(reported, (payload or {}).get("stock_acccod"))
+    group = describe_from_request(req_body, reported)
     if not group:
         return {}
     out: Dict[str, Any] = {"stock_created": created, "stock_acccod": group["acccod"]}

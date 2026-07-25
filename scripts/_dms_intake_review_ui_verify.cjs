@@ -387,6 +387,31 @@ function visible(cs) {
     check(follow.pg.startsWith('2/'), `聚焦第 3 张 → 查看器翻到第 2 页(实=${follow.pg})`);
     check(follow.active === '2', `第 3 张被高亮(实=${follow.active})`);
 
+    // 同页第 2 张:第 1、2 张都在第 1 页。此前 onPage 无脑点亮"该页第一张",
+    // 高亮当场被夺回第 1 张 —— 而原来的用例只测了第 3 张(第 2 页)和第 1 张,恰好绕开这格。
+    await page.focus('[data-inv-grp="1"] .dx-rv-in');
+    await page.waitForTimeout(400);
+    const samePage = await page.evaluate(() => ({
+        pg: document.querySelector('.dx-acc-item.open .pv-pgnum')?.textContent || '',
+        active: document.querySelector('[data-inv-grp].active')?.dataset.invGrp ?? '',
+    }));
+    check(samePage.active === '1', `同页第 2 张聚焦后高亮归它(实=${samePage.active})`);
+    check(samePage.pg.startsWith('1/'), `同页切换不翻页(实=${samePage.pg})`);
+
+    // 同页切换不许复位缩放:用户放大到 200% 核对一个数字,点下一个格子就没了 = 白放大
+    await page.click('.dx-acc-item.open .pv-tools button[data-z="in"]');
+    await page.click('.dx-acc-item.open .pv-tools button[data-z="in"]');
+    const zoomBefore = await page.evaluate(
+        () => document.querySelector('.dx-acc-item.open .pv-zoom')?.textContent || ''
+    );
+    await page.focus('[data-inv-grp="0"] .dx-rv-in');
+    await page.waitForTimeout(300);
+    const zoomAfter = await page.evaluate(
+        () => document.querySelector('.dx-acc-item.open .pv-zoom')?.textContent || ''
+    );
+    check(zoomBefore !== '100%', `放大生效(实=${zoomBefore})`);
+    check(zoomAfter === zoomBefore, `同页切换不复位缩放(${zoomBefore} → ${zoomAfter})`);
+
     // 反向:聚焦第 1 张 → 翻回第 1 页
     await page.focus('[data-inv-grp="0"] .dx-rv-in');
     await page.waitForTimeout(400);

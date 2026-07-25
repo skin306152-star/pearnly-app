@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from services.erp.express_push.stock_acc_group import describe_stock_acc_group
+from services.erp.express_push.stock_acc_group import describe_from_request, stock_acc_group_label
 from services.erp.external_ref import _coerce_body
 
 logger = logging.getLogger(__name__)
@@ -30,11 +30,8 @@ def _stock_acc_group_label(request_body: Any, reported: Any) -> str:
     代号,单给码会计认不出来,所以带上科目号和名。非库存路(载荷没这个键)→ 空串,模板留空不假装;
     码在但候选表里查不到(组被删/换了账套)→ 只给码,不编一个科目号出来。
     """
-    req = _coerce_body(request_body)
-    payload = req.get("payload") if isinstance(req, dict) else None
-    g = describe_stock_acc_group(reported, (payload or {}).get("stock_acccod"))
-    # 与推送日志卡同一种拼法(码 · 科目号 · 科目名),会计两边对照时不用换一次脑子
-    return " · ".join(x for x in (g.get(k) for k in ("acccod", "stock_acc", "stock_acc_name")) if x)
+    # 拼法与推送日志卡同源(stock_acc_group_label),会计两边对照时不用换一次脑子
+    return stock_acc_group_label(describe_from_request(request_body, reported))
 
 
 def _parse_erp_actions(

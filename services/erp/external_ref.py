@@ -53,6 +53,18 @@ def _result(
     }
 
 
+def request_payload(request_body: Any) -> Dict[str, Any]:
+    """从 erp_push_logs.request_body 取我们发给小助手的那份载荷。
+
+    落库是 jsonb,取回来可能已是 dict 也可能是串;老记录还有一批把字段摊在顶层、没有
+    payload 这一层。四个派生器都要走这两步,各写一遍就是四份对「载荷长什么样」的假设 ——
+    改了封装形状只会静默降级(卡片空一格、导出少一列),没有一处会报错。
+    """
+    body = _coerce_body(request_body)
+    payload = body.get("payload")
+    return payload if isinstance(payload, dict) else body
+
+
 def _coerce_body(response_body: Any) -> Dict[str, Any]:
     """把 response_body 统一转成 dict。
 

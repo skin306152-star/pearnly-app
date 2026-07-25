@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, NamedTuple, Optional
 
+from services.erp.external_ref import request_payload
+
 # 零库存主档的账套要建第一个库存品时,缺的到底是哪一样 —— 两个码分开,补救卡给的指引才不一样:
 #   missing  一个合格的存货科目组都没有 → 会计得先去 Express 建(组本身不存在,问他选也没得选)
 #   required 合格的有好几个 → 只是没人拍板用哪个 → 弹卡选一次,写进端点 config 后不再问
@@ -61,6 +63,24 @@ def resolve_stock_acc_group(config: Optional[Dict[str, Any]]) -> StockAccGroupCh
     return StockAccGroupChoice(
         "", REASON_ACC_GROUP_REQUIRED if groups else REASON_ACC_GROUP_MISSING, False
     )
+
+
+def describe_from_request(request_body: Any, reported: Any) -> Dict[str, str]:
+    """从推送载荷直接反查这一组的存货科目号/名。推送日志卡与导出复核表共用一个入口。
+
+    载荷键名 `stock_acccod` 只写在这里一处 —— 各写一遍就是各持一份对 mapper 的假设,
+    改了键名两边一起静默降级(卡片少个徽标、导出少一列),没有一处会红。
+    """
+    return describe_stock_acc_group(reported, request_payload(request_body).get("stock_acccod"))
+
+
+def stock_acc_group_label(group: Dict[str, str]) -> str:
+    """「码 · 科目号 · 科目名」—— 会计要拿推送日志卡和导出 Excel 互相对照,
+    分隔符和字段顺序必须同源,不能两边各拼一次。"""
+    return " · ".join(x for x in (group.get(k) for k in _LABEL_PARTS) if x)
+
+
+_LABEL_PARTS = ("acccod", "stock_acc", "stock_acc_name")
 
 
 def describe_stock_acc_group(reported: Any, acccod: str) -> Dict[str, str]:

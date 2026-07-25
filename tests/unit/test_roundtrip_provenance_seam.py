@@ -99,25 +99,54 @@ class RoundtripProvenanceSeam(unittest.TestCase):
         flat = flatten_history_for_mrerp(history)
         self.assertEqual(explicit_direction(flat, history), "sales")
 
-    def test_prior_docnum_gate_keys_off_the_original_record(self):
-        """闸拿哪个 id 去查上一版:必须是行键带回的原 id,不是新建那条。"""
-        merged = _chain(_workbook([_sales_row(ORIG_SALES_HID, "IV69/00474")], []))
-        seen = []
-
-        def _spy(hid):
-            seen.append(hid)
-            return "IV69/00473"
-
+    def _spy_prior_docnum(self, history):
+        """替掉真查库,记下闸拿了哪个 (history_id, tenant_id) 去查。"""
         import services.erp.express_push.prior_doc as pd
 
+        seen = []
         real = pd.prior_docnum
-        pd.prior_docnum = _spy
+        pd.prior_docnum = lambda hid, tid=None: (seen.append((hid, tid)), "IV69/00473")[1]
         try:
-            payload = attach_prior_docnum({}, {"id": "new-record-id"}, merged[0])
+            merged = _chain(_workbook([_sales_row(ORIG_SALES_HID, "IV69/00474")], []))
+            payload = attach_prior_docnum({}, history, merged[0])
         finally:
             pd.prior_docnum = real
-        self.assertEqual(seen, [ORIG_SALES_HID])
+        return seen, payload
+
+    def test_prior_docnum_gate_keys_off_the_original_record(self):
+        """闸拿哪个 id 去查上一版:必须是行键带回的原 id,不是新建那条。"""
+        seen, payload = self._spy_prior_docnum({"id": "new-record-id", "tenant_id": "t-1"})
+        self.assertEqual(seen, [(ORIG_SALES_HID, "t-1")])
         self.assertEqual(payload.get("prior_docnum"), "IV69/00473")
+
+    def test_tenant_scope_comes_from_the_record_not_the_editable_fields(self):
+        """钥匙来自客户端可写的 fields,租户就必须来自服务端查出的记录 ——
+        否则任一租户塞一个别家的 history UUID 就能把别家的 ERP 凭证号读进自己的载荷。"""
+        seen, _ = self._spy_prior_docnum(
+            {"id": "new-record-id", "tenant_id": "t-1", "fields": {"tenant_id": "t-victim"}}
+        )
+        self.assertEqual(seen[0][1], "t-1")
+
+    def test_scope_is_the_history_owner_not_the_log_row(self):
+        """作用域必须落在 ocr_history.tenant_id 上,不能落在 erp_push_logs.tenant_id 上。
+
+        生产实测:insert_push_log 从来不写 erp_push_logs.tenant_id(109 行只有 9 行有,
+        全靠 user_id)。按它过滤 → 这道闸恒查不到 → 静默失效,而桩测试照样绿
+        (2026-07-25 差点这么上线)。真库验证:自己的租户拿到 IV69/00473、别家的拿到 None。
+        """
+        from pathlib import Path
+
+        src = Path("services/erp/express_push/prior_doc.py").read_text(encoding="utf-8")
+        self.assertIn("JOIN ocr_history h ON h.id = l.history_id", src)
+        self.assertIn("h.tenant_id = %s", src)
+        self.assertNotIn("l.tenant_id", src)
+
+    def test_no_tenant_means_no_lookup(self):
+        """拿不到租户就不查(fail closed):宁可少一道加固,不可跨租户读。"""
+        from services.erp.express_push.prior_doc import prior_docnum
+
+        self.assertIsNone(prior_docnum(ORIG_SALES_HID, None))
+        self.assertIsNone(prior_docnum(ORIG_SALES_HID, "  "))
 
     def test_batch_declaration_lands_on_the_same_key(self):
         """向导 step① 选的「本批进项/销项」与回导裁决共用 fields.direction —— 推送侧只认一处。"""

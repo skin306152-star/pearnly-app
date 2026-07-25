@@ -358,7 +358,13 @@ function bindOpenViewer() {
             },
             // 手动翻页 → 点亮该页第一张发票。跟随是双向的,否则翻到第 2 页后左侧
             // 仍高亮着第 1 张,用户不知道自己在核对哪一张。
-            onPage: (p) => markActive(panel, groupOnPage(panel, p)),
+            // 但同一页装着两张票时不能抢:聚焦第 2 张会触发 goToPage(同一页)→ 这里若无脑
+            // 点亮"该页第一张",高亮当场被夺回第 1 张(实测同页多票必现)。
+            onPage: (p) => {
+                const cur = panel.querySelector('[data-inv-grp].active') as HTMLElement | null;
+                if (cur && Number(cur.dataset.invPage || 0) === p) return;
+                markActive(panel, groupOnPage(panel, p));
+            },
         });
     }
     // focusin 而非 click:键盘 Tab 走到下一张的字段时同样该跟随。

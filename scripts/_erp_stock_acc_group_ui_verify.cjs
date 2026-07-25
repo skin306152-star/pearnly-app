@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'tests', 'visual', '_shot');
-const PORT = 8827;
+const PORT = 8832;
 const LANGS = ['th', 'zh', 'en', 'ja'];
 const TYPES = {
     '.js': 'application/javascript',

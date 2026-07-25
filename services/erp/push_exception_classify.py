@@ -11,19 +11,24 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from services.erp.express_push.stock_acc_group import (
+    REASON_ACC_GROUP_MISSING,
+    REASON_ACC_GROUP_REQUIRED,
+)
 from services.erp.external_ref import _coerce_body
 
 # 库存路的自助修失败码。前两个都是「账套零库存主档,建第一个库存品差一个存货科目组」,
 # 差在缺的东西不同:required = 合格的组有好几个,没人拍板选哪个;missing = 一个合格的都没有,
 # 会计得先去 Express 建。后两个是旧口径 —— 2026-07-25 起不再产出,历史日志还在,继续认得出来。
+# 这两个码都要科目组下拉那张卡(而非补期初三格)。从产出方 import,不在这儿手打字面量:
+# 各写一份就是两处对码名的假设,改名时 grep 常量找不全。此前用前缀 "stock_acc_group" 判,
+# 将来出现 stock_acc_group_locked 之类的新码会被静默吞进这个分支。
+_ACC_GROUP_REASONS = (REASON_ACC_GROUP_REQUIRED, REASON_ACC_GROUP_MISSING)
 _STOCK_FIX_REASONS = (
-    "stock_acc_group_required",
-    "stock_acc_group_missing",
+    *_ACC_GROUP_REASONS,
     "stock_no_master_in_account_set",
     "STOCK_ITEM_NOT_FOUND",
 )
-# 这两个码都要科目组下拉那张卡(而非补期初三格)· needs 用前缀判,别再各写一份码清单。
-_ACC_GROUP_PREFIX = "stock_acc_group"
 
 # 小助手防重单闸的码(companion dbf_writer.ERR_PRIOR_DOC_EXISTS)。改了要两边一起改 ——
 # 有 test_prior_docnum 的契约用例钉着。
@@ -189,7 +194,7 @@ def derive_stock_fix(
             continue
         seen.add(key)
         items.append({"name": name, "stkcod": stkcod})
-    needs = "acc_group" if _ACC_GROUP_PREFIX in msg else "opening"
+    needs = "acc_group" if any(r in msg for r in _ACC_GROUP_REASONS) else "opening"
     groups = [g for g in (acc_groups or []) if isinstance(g, dict)]
     return {
         "needs": needs,

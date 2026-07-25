@@ -31,24 +31,12 @@ def _fields(flat: Dict[str, Any]) -> Dict[str, Any]:
     return f if isinstance(f, dict) else {}
 
 
-def explicit_direction(flat: Dict[str, Any], history: Dict[str, Any]) -> Optional[str]:
-    """已带的进项/销项标签(用户确认等)→ 归一 sales/purchase;其它(含银行 deposit/
-    withdrawal)→ None,交给税号判定。
+def normalize(value: Any) -> Optional[str]:
+    """一个方向词 → sales/purchase;认不出 → None(= 当没声明,交税号锚点判)。
 
-    fields.direction 是回导裁决落脚的地方(会计把行挪去哪张 Sheet)。此前只看记录顶层,
-    而 ocr_history 压根没有 direction 列 —— 于是这个函数恒返 None,「挪一行 = 改一次
-    分类」这条回导核心机制从未生效(2026-07-25 真机实锤)。
+    原语。收料口的批级声明和下面的 explicit_direction 都走它,判据只此一份。
     """
-    d = (
-        str(
-            (flat or {}).get("direction")
-            or (history or {}).get("direction")
-            or _fields(flat).get("direction")
-            or ""
-        )
-        .strip()
-        .lower()
-    )
+    d = str(value or "").strip().lower()
     if d in _SALES_TOKENS:
         return "sales"
     if d in _PURCHASE_TOKENS:
@@ -56,13 +44,18 @@ def explicit_direction(flat: Dict[str, Any], history: Dict[str, Any]) -> Optiona
     return None
 
 
-def normalize(value: Any) -> Optional[str]:
-    """归一一个方向声明 → sales/purchase;认不出 → None(= 当没声明,交税号锚点判)。
+def explicit_direction(flat: Dict[str, Any], history: Dict[str, Any]) -> Optional[str]:
+    """已带的进项/销项标签(用户确认等)→ 归一;其它(含银行 deposit/withdrawal)→ None。
 
-    收料口的批级声明用它;判据(哪些词算销项/进项)与 explicit_direction 共用一套,
-    不在两处各写一份 token 表。
+    fields.direction 是回导裁决落脚的地方(会计把行挪去哪张 Sheet)。此前只看记录顶层,
+    而 ocr_history 压根没有 direction 列 —— 于是这个函数恒返 None,「挪一行 = 改一次
+    分类」这条回导核心机制从未生效(2026-07-25 真机实锤)。
     """
-    return explicit_direction({"direction": value}, {})
+    return normalize(
+        (flat or {}).get("direction")
+        or (history or {}).get("direction")
+        or _fields(flat).get("direction")
+    )
 
 
 def apply_batch_direction(fields: Optional[Dict[str, Any]], direction: Optional[str]) -> None:
@@ -71,9 +64,7 @@ def apply_batch_direction(fields: Optional[Dict[str, Any]], direction: Optional[
     已有值不覆盖:回导行的方向是会计**逐行**裁决的(他把行挪去了哪张 Sheet),
     比"整批选一个"更具体 —— 批级声明抹掉它就等于替会计把分类改回去。
     """
-    if fields is None or not direction:
-        return
-    if not fields.get("direction"):
+    if direction and fields is not None and not fields.get("direction"):
         fields["direction"] = direction
 
 

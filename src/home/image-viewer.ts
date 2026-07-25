@@ -99,10 +99,16 @@ export function mountImageViewer(
     const pgEl = root.querySelector('.pv-pgnum');
     let page = 1;
     let total = 1;
+    let started = false;
     const goPage = (p: number) => {
+        // 已经在这一页就什么都不做:调用方按「聚焦哪张发票」翻页,而同一张票有十几个输入框,
+        // Tab 一遍就是十几次同页 goPage。不挡住的话每次都复位缩放(用户放大到 200% 核对一个
+        // 数字,点进格子就没了),留底 PDF 还没生成时更会叠出十几条 404 重试链。
+        if (started && Math.trunc(p) === page) return;
         // total 要到首张图的响应头才知道,首次调用时还是 1 —— 此处不能按它夹,
         // 否则「开面板就跳到第 2 页」会被夹回第 1 页。加载回来后再夹一次。
         page = Math.max(1, Math.trunc(total > 1 ? clamp(p, 1, total) : p));
+        started = true;
         if (pgEl) pgEl.textContent = page + '/' + total; // 立刻更新页码(不等图加载)
         scale = 1; // 翻页即复位变换(每页独立观看)
         tx = 0;

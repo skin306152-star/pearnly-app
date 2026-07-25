@@ -8,7 +8,7 @@
 
 Pearnly = 泰国会计事务所 + SME 老板的 AP 自动化 SaaS。多语言 OCR(泰/中/日)+ 全管道进料(LINE/邮件/文件夹)+ ERP 中立中间件。口号:不让用户换 ERP,让 Pearnly 适配所有 ERP。
 
-FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主站 `/home`、POS `/pos`、超管 `/earn`、AI `/ai`、DMS `/dms`、控制台 `/console`)。**入口 → 可读源文件的映射唯一权威 = `AGENTS.md` §5-bis**(改对外页面前必看:改错位置 = 新域名永远跑老版本)。
+FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主站 `/home`、POS `/pos`、超管 `/earn`、AI `/ai`、DMS `/dms`、控制台 `/console`)。**入口 → 可读源文件的映射唯一权威 = `.claude/skills/frontend-change/entry-map.md`**(改对外页面前必看:改错位置 = 新域名永远跑老版本)。
 
 ## 2. 坑(只写会咬人的;看代码就知道的不写)
 

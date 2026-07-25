@@ -66,6 +66,7 @@ function buildOcrForm(f: IvFile): FormData {
     const wsId = w.getActiveWorkspaceClientId ? w.getActiveWorkspaceClientId() : null;
     if (wsId != null) form.append('workspace_client_id', String(wsId));
     if (IV.postingKind) form.append('posting_kind', IV.postingKind);
+    if (IV.direction) form.append('direction', IV.direction);
     return form;
 }
 // 用户中途停止 → 取消态(两路共用)

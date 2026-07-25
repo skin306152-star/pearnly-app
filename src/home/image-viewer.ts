@@ -61,7 +61,22 @@ export function imageViewerHtml(o: ViewerText = {}): string {
 }
 
 // 挂到一个含 .pv-viewer 的根元素 · 载入 page.png(重试)+ 接拖拽/缩放/旋转/全屏。返回 cleanup。
-export function mountImageViewer(root: HTMLElement, historyId: string | null): () => void {
+// 一份多页 PDF 装多张发票时,调用方要能把查看器翻到「用户正在核对的那一张」所在页,
+// 也要在用户手动翻页时反向知道现在看的是第几页。页码是 mount 的闭包状态,故用回调交出去,
+// 不改 mount 的返回值(三个既有调用方只拿 cleanup)。
+export interface ViewerApi {
+    goToPage(p: number): void;
+}
+export interface ViewerOpts {
+    onReady?: (api: ViewerApi) => void;
+    onPage?: (page: number, total: number) => void;
+}
+
+export function mountImageViewer(
+    root: HTMLElement,
+    historyId: string | null,
+    opts: ViewerOpts = {}
+): () => void {
     const vp = root.querySelector('.pv-viewer') as HTMLElement | null;
     const img = root.querySelector('.pv-img') as HTMLImageElement | null;
     const zl = root.querySelector('.pv-zoom') as HTMLElement | null;
@@ -85,13 +100,16 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
     let page = 1;
     let total = 1;
     const goPage = (p: number) => {
-        page = Math.trunc(clamp(p, 1, total));
+        // total 要到首张图的响应头才知道,首次调用时还是 1 —— 此处不能按它夹,
+        // 否则「开面板就跳到第 2 页」会被夹回第 1 页。加载回来后再夹一次。
+        page = Math.max(1, Math.trunc(total > 1 ? clamp(p, 1, total) : p));
         if (pgEl) pgEl.textContent = page + '/' + total; // 立刻更新页码(不等图加载)
         scale = 1; // 翻页即复位变换(每页独立观看)
         tx = 0;
         ty = 0;
         rot = 0;
         apply();
+        opts.onPage?.(page, total);
         void loadImage(
             vp,
             img,
@@ -101,7 +119,9 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
             (n) => {
                 total = n;
                 vp.classList.toggle('multi', n > 1);
+                if (page > n) page = n;
                 if (pgEl) pgEl.textContent = page + '/' + n;
+                opts.onPage?.(page, n);
             }
         );
     };
@@ -190,6 +210,7 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
     img.style.transformOrigin = 'center';
     apply();
     goPage(1);
+    opts.onReady?.({ goToPage: goPage });
 
     return () => {
         alive = false;

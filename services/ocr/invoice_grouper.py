@@ -39,6 +39,10 @@ _NON_SCALAR_FIELDS = frozenset(
 )
 _SCALAR_FIELDS = tuple(k for k in ThaiInvoice.model_fields if k not in _NON_SCALAR_FIELDS)
 
+# 溯源键不在 ThaiInvoice 里(它们不是票面内容),而合并是按模型字段名重建 dict 的 ——
+# 不显式带过来,会计的分类裁决与防重单钥匙就在这一步静默蒸发(2026-07-25 真机回导实锤)。
+_PROVENANCE_FIELDS = ("direction", "history_id")
+
 
 def _is_empty(v: Any) -> bool:
     if v is None:
@@ -170,6 +174,10 @@ def _build_invoice_from_pages(pages_group: List[Dict]) -> Dict[str, Any]:
         return {}
     # 标量字段一律取第一个非空(跨页发票各字段可能散在不同页)
     merged_fields: Dict[str, Any] = {k: _first_non_empty(pages_group, k) for k in _SCALAR_FIELDS}
+    for k in _PROVENANCE_FIELDS:
+        v = _first_non_empty(pages_group, k)
+        if not _is_empty(v):
+            merged_fields[k] = v
     merged_fields["items"] = _merge_items(pages_group)
     # notes 拼接
     notes = []

@@ -257,11 +257,17 @@
 .dmsx .dx-item-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
 .dmsx .dx-item-tbl th{text-align:left;color:var(--ink2);font-size:9px;font-weight:750;padding:4px 7px}
 .dmsx .dx-item-tbl th.r,.dmsx .dx-item-tbl td.r{text-align:right}
-.dmsx .dx-item-tbl td{background:var(--card);border-top:1px solid var(--dx-line);border-bottom:1px solid var(--dx-line);padding:7px}
-.dmsx .dx-item-tbl td:last-child{text-align:right;font-weight:800}
+.dmsx .dx-item-tbl td{background:var(--card);border-top:1px solid var(--dx-line);border-bottom:1px solid var(--dx-line);padding:4px 7px}
+.dmsx .dx-item-tbl td:last-child{font-weight:800}
+.dmsx .dx-item-in{width:100%;height:26px;border:1px solid transparent;border-radius:7px;background:transparent;color:inherit;font:inherit;font-weight:inherit;padding:0 5px;outline:0;min-width:0}
+.dmsx .dx-item-in:hover{border-color:var(--dx-line-strong)}
+.dmsx .dx-item-in:focus{border-color:var(--btn-blue);background:var(--bg)}
+.dmsx .dx-item-tbl td.r .dx-item-in{text-align:right}
 .dmsx .dx-fields-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;border-top:1px dashed var(--dx-line);padding-top:11px;flex-wrap:wrap}
 .dmsx .dx-fields-foot-a{display:flex;gap:8px}
-.dmsx .dx-imgcard{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden}
+/* 钉住:一份多页 PDF 装多张票时,左边滚到第 3 张,右边原件不能滚出视野 —— 边看边核对
+   的前提是两边同时在场。窄屏(单列)不钉,钉了会挡住正在改的字段。 */
+.dmsx .dx-imgcard{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden;position:sticky;top:14px}
 /* 复用共享查看器 image-viewer.ts(.pv-*)· 在录入工作台里给固定高度、去内层重复边框 */
 .dmsx .dx-imgcard .pv-viewer{height:460px;border:0;border-radius:0}
 /* 上传队列:紧凑可滚动 + × 内联(防几十/上百文件硬堆、按钮被挤到底) */
@@ -276,7 +282,10 @@
 .dmsx .dx-qx:hover{border-color:var(--dx-red);color:var(--dx-red)}
 /* 多发票分组头 + 漏票复核 banner */
 .dmsx .dx-inv-head{font-size:10px;font-weight:800;color:var(--dx-brand);margin:12px 2px 6px;padding-top:9px;border-top:1px dashed var(--dx-line)}
-.dmsx .dx-fields .dx-inv-head:first-of-type{border-top:0;padding-top:0;margin-top:2px}
+.dmsx .dx-fields .dx-inv-grp:first-child .dx-inv-head{border-top:0;padding-top:0;margin-top:2px}
+/* 正在核对的那一张:左侧一道品牌色,一眼看出右边原件对应的是谁 */
+.dmsx .dx-inv-grp{border-left:2px solid transparent;padding-left:7px;margin-left:-9px;border-radius:2px}
+.dmsx .dx-inv-grp.active{border-left-color:var(--dx-brand);background:var(--bg)}
 .dmsx .dx-inv-fmtwarn{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:8px;font-size:9px;font-weight:700;color:#92400e;background:var(--amber-weak);border:1px solid var(--amber-line)}
 .dmsx .dx-recheck-banner{border:1px solid var(--dx-amber-line);background:var(--dx-amber-soft);color:var(--dx-amber);border-radius:11px;padding:10px 12px;font-size:11px;font-weight:700;margin-bottom:11px}
 .dmsx .dx-rv{background:var(--bg);border-radius:10px;padding:9px}
@@ -286,6 +295,7 @@
 .dmsx .dx-rv.warn .dx-rv-in{border-color:var(--dx-amber-line)}
 .dmsx .dx-rv-in:focus{border-color:var(--dx-brand);box-shadow:0 0 0 3px var(--dx-brand-soft)}
 .dmsx .dx-ogrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dmsx .dx-choices{display:grid;gap:8px;margin-top:8px}
 .dmsx .dx-choice{border:1px solid var(--dx-line);border-radius:12px;padding:12px;cursor:pointer;background:var(--card)}
 .dmsx .dx-choice.active{border-color:var(--dx-brand);background:var(--bg)}
 .dmsx .dx-choice b{display:flex;align-items:center;gap:8px;font-size:11px}
@@ -315,6 +325,7 @@
   .dmsx .dx-scan,.dmsx .dx-review-grid{grid-template-columns:1fr 1fr}
   .dmsx .dx-rgrid,.dmsx .dx-rgrid.image-left{grid-template-columns:1fr}
   .dmsx .dx-rgrid.image-left .dx-fields,.dmsx .dx-rgrid.image-left .dx-imgcard{order:0}
+  .dmsx .dx-imgcard{position:static}
   .dmsx .dx-imgcard .pv-viewer{height:380px}
   .dmsx .dx-stepper{grid-template-columns:repeat(2,1fr)}
   .dmsx .dx-step:not(:last-child):after{display:none}

@@ -64,6 +64,9 @@ export const IV = {
     // 初值空 = 没声明,不预选:预选值会被当成「用户对本批的显式决定」落库,进而绕过
     // sales_mapper 的「永续客户 + 库存路未开 → 交会计」escalate,把该交人的票静默按服务记。
     postingKind: '' as '' | 'stock' | 'service',
+    // 本批进项/销项。同样不预选 —— 预选等于替用户声明了方向,而方向判反是把一张进项票
+    // 记成收入(或反之),比没声明严重得多。空 = 交税号锚点自动判(今天的行为)。
+    direction: '' as '' | 'purchase' | 'sales',
     busy: false,
     aborted: false, // 用户点「停止」· worker 据此停拉队列
     view: 'upload' as 'upload' | 'review' | 'submit' | 'success',
@@ -99,6 +102,7 @@ export function resetInvoice() {
     IV.output = { excel: false, erp: false };
     IV.target = '';
     IV.postingKind = '';
+    IV.direction = '';
     IV.busy = false;
     IV.view = 'upload';
 }
@@ -198,13 +202,33 @@ function queueHtml() {
         `<button class="btn primary" id="dx-inv-start"${IV.busy ? ' disabled' : ''}>${esc(t('btn-start'))}</button></div></div>`
     );
 }
+// 侧栏只放「本批要干什么活」的两级声明。原先的「当前流程」「设计原则」两个框已删:
+// 前者是把界面自己在做的事又用文字讲一遍,后者的正文与前者第三条是同一个 i18n key
+// (同一句话在同一屏印两遍)—— 都不承载决策,占的却是决策区的位置。
 function sideHtml() {
-    const tips = [t('dxi-side-flow1'), t('dxi-side-flow2'), t('dxi-side-flow3')];
+    return `<div class="dx-side">${directionHtml()}${postingKindHtml()}</div>`;
+}
+
+// 选项卡片:选中打勾。两个声明同款外观,读法一致。
+function choiceHtml(attr: string, on: boolean, tk: string, dk: string): string {
     return (
-        '<div class="dx-side"><div class="dx-side-box">' +
-        `<b>${esc(t('dx-side-cur'))}</b><ul>${tips.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` +
-        postingKindHtml() +
-        `<div class="dx-side-box"><b>${esc(t('dx-side-rule'))}</b><p>${esc(t('dxi-side-flow3'))}</p></div></div>`
+        `<div class="dx-choice${on ? ' active' : ''}" ${attr}><b>${esc(t(tk))}` +
+        `<span class="dx-choice-chk">✓</span></b><p>${esc(t(dk))}</p></div>`
+    );
+}
+
+// 「本批是进项还是销项」· 用户选了就按他选的做,不再拿税号去猜(税号读错=方向判反)。
+// 不选 = 沿用税号锚点自动判定,行为与今天一致。
+function directionHtml(): string {
+    const opt = (k: 'purchase' | 'sales', tk: string, dk: string) =>
+        choiceHtml(`data-iv-dir="${k}"`, IV.direction === k, tk, dk);
+    return (
+        `<div class="dx-side-box"><b>${esc(t('dxi-dir-h'))}</b>` +
+        `<p>${esc(t('dxi-dir-hint'))}</p>` +
+        '<div class="dx-choices">' +
+        opt('purchase', 'dxi-dir-purchase-t', 'dxi-dir-purchase-d') +
+        opt('sales', 'dxi-dir-sales-t', 'dxi-dir-sales-d') +
+        '</div></div>'
     );
 }
 
@@ -225,17 +249,12 @@ function hasEnabledExpressTarget(): boolean {
 }
 function postingKindHtml(): string {
     if (!hasEnabledExpressTarget()) return ''; // 非 Express 目标:隐藏(MR.ERP 不区分库存/服务)
-    const opt = (k: 'service' | 'stock', tk: string, dk: string) => {
-        const on = IV.postingKind === k ? ' active' : '';
-        return (
-            `<div class="dx-choice${on}" data-iv-posting="${k}"><b>${esc(t(tk))}` +
-            `<span class="dx-choice-chk">✓</span></b><p>${esc(t(dk))}</p></div>`
-        );
-    };
+    const opt = (k: 'service' | 'stock', tk: string, dk: string) =>
+        choiceHtml(`data-iv-posting="${k}"`, IV.postingKind === k, tk, dk);
     return (
         `<div class="dx-side-box"><b>${esc(t('dxi-posting-h'))}</b>` +
         `<p>${esc(t('dxi-posting-hint'))}</p>` +
-        '<div style="display:grid;gap:8px;margin-top:8px">' +
+        '<div class="dx-choices">' +
         opt('service', 'dxi-posting-service-t', 'dxi-posting-service-d') +
         opt('stock', 'dxi-posting-stock-t', 'dxi-posting-stock-d') +
         '</div></div>'
@@ -391,6 +410,14 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         renderInvoiceUpload();
         return true;
     }
+    const dir = tg.closest('[data-iv-dir]') as HTMLElement | null;
+    if (dir) {
+        // 再点一次取消 —— 选错了要能退回「不声明」,否则用户只能刷新页面重来。
+        const v = dir.dataset.ivDir as 'purchase' | 'sales';
+        IV.direction = IV.direction === v ? '' : v;
+        renderInvoiceUpload();
+        return true;
+    }
     // 复核区就地展开/查看器/确认 → 交给 review 模块(返回 true 即已处理)
     if (IV.view === 'review' && onReviewClick(tg)) return true;
     if (hit('dx-inv-rev-back')) {
@@ -443,6 +470,15 @@ export function onInvoiceChange(tg: HTMLElement): boolean {
         const [fi, ii, key] = fk.split(':');
         const inv = IV.results[+fi]?.invoices[+ii];
         if (inv) inv.fields[key] = (tg as HTMLInputElement).value;
+        return true;
+    }
+    // 明细行编辑:data-iv-item="fileIdx:invIdx:itemIdx:key" · 单开一个属性,
+    // 免得给 data-iv-field 的三段式加第四段(key 里带冒号会串位)。
+    const ik = tg.getAttribute('data-iv-item');
+    if (ik) {
+        const [fi, ii, ti, key] = ik.split(':');
+        const items = IV.results[+fi]?.invoices[+ii]?.fields.items as Array<Dict> | undefined;
+        if (Array.isArray(items) && items[+ti]) items[+ti][key] = (tg as HTMLInputElement).value;
         return true;
     }
     return false;

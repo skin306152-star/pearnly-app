@@ -12,6 +12,7 @@ import logging
 from core import db
 from core.db import insert_ocr_history
 from core.route_helpers import _tid
+from services.erp.express_push.direction import apply_batch_direction as _apply_batch_direction
 from services.exceptions.exception_checks import _async_run_exception_checks
 
 logger = logging.getLogger("mr-pilot")
@@ -32,6 +33,7 @@ def persist_invoices(
     _ws_client_id,
     staged=False,
     posting_kind=None,
+    direction=None,
 ):
     # 8. 写入历史记录 · v0.8 改:所有 plan 都写(Free 也能看历史,只是保留 7 天)
     history_id = None
@@ -102,6 +104,9 @@ def persist_invoices(
     for idx, group in enumerate(invoice_groups, start=1):
         g_pages = group["source_pages"]
         g_fields = group["invoice_fields"]
+        # 本批方向声明(向导 step① 选的进项/销项)落在与回导同一个键上,
+        # 推送侧 explicit_direction 一处认。覆盖规则见 apply_batch_direction。
+        _apply_batch_direction(g_fields, direction)
 
         # 给每张发票生成归档名(基于该张的合并字段)
         try:

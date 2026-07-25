@@ -80,6 +80,9 @@ def _page(n: int, fields: Dict[str, Any], needs_review: bool) -> PipelinePageRes
         layer_chain=[ENGINE],
         layer1_avg_confidence=1.0,
         needs_manual_review=needs_review,
+        # 溯源走页级字段,不塞 ThaiInvoice —— 塞进去会被 model_dump 当发票内容
+        declared_direction=_s(fields.get("direction")),
+        source_history_id=_s(fields.get("history_id")),
     )
 
 
@@ -99,8 +102,8 @@ def try_parse_roundtrip(file_bytes: bytes, filename: str) -> Optional[PipelineRe
 
     pages: List[PipelinePageResult] = []
     for d in parsed["documents"]:
-        # fields.direction 由 reader 按 Sheet 名写好(= 会计的分类裁决)· 下游
-        # explicit_direction 认这个键,这里不重复写一遍
+        # fields.direction 由 reader 按 Sheet 名写好 = 会计的分类裁决,_page 把它
+        # 连同原 history_id 抬到页级溯源字段上(链路见 test_roundtrip_provenance_seam)
         pages.append(_page(len(pages) + 1, dict(d["fields"]), needs_review=False))
     for p in parsed["pending"]:
         # 会计没把这张挪进销项/进项表 = 还没裁决方向。带出来但标人工:

@@ -78,6 +78,7 @@ def handle_web_ocr(
     ws_client_id = params.get("workspace_client_id")
     # 闸开之前入队的老 job 的 params 里没有这个键 → None(= 未声明),与同步路不带该字段同义。
     posting_kind = params.get("posting_kind")
+    direction = params.get("direction")
 
     progress_cb({"stage": "running", "filename": filename})
 
@@ -89,6 +90,7 @@ def handle_web_ocr(
             client_id=client_id,
             ws_client_id=ws_client_id,
             posting_kind=posting_kind,
+            direction=direction,
         )
     except HTTPException as he:
         # 校验/非票/余额不足:终态失败,前端按明确原因展示(绝不冒充完成)。

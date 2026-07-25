@@ -144,6 +144,19 @@ class PipelinePageResult(BaseModel):
         description="true when L3 was triggered but failed (and we kept L2 result), "
         "OR (future) when final confidence is too low for auto-acceptance",
     )
+
+    # ── 溯源:不是从票面读出来的,是「这条记录从哪来」──────────────────────────
+    # 挂页级而非 ThaiInvoice:它们不是发票内容,进模型会被当字段参与合并/校验/导出。
+    declared_direction: str = Field(
+        default="",
+        description="人已裁决的进项/销项(回导时 = 行在哪张 Sheet);空 = 没人裁决过,"
+        "下游照常按税号锚点判",
+    )
+    source_history_id: str = Field(
+        default="",
+        description="本条替换的原 ocr_history id(回导行键带回)。防重单闸靠它找上一版 "
+        "ERP 凭证号 —— 收料口会为回导文件新建记录,拿新 id 查必然查不到",
+    )
     confidence_band: Literal["auto", "yellow_confirm", "needs_review"] = Field(
         default="auto",
         description="confidence routing bucket: "

@@ -104,6 +104,13 @@ def _page_to_legacy(
         "_final_confidence": float(p.final_confidence),
         "_validation_warnings": list(p.validation_warnings),
     }
+    # 溯源随 fields 走(回导专有)· 不加 _ 前缀:HTTP 出口净化会剥 _ 键,而前端复核屏
+    # 要按方向决定「名称/税号」取买方还是卖方。普通扫描件两者皆空 → 不写这两个键,
+    # 免得凭空多出一个 direction 去压过税号锚点判定。
+    if p.declared_direction:
+        out["fields"]["direction"] = p.declared_direction
+    if p.source_history_id:
+        out["fields"]["history_id"] = p.source_history_id
     # When a non-invoice document is present (GL / Bank / VAT / Table), expose
     # its normalized JSON so bank reconciliation can consume it directly.
     if p.document is not None:

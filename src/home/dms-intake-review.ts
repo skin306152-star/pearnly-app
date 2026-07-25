@@ -13,26 +13,39 @@ import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, ext, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, IvInvoice, IvResult } from './dms-intake-invoice.js';
 import { imageViewerHtml, mountImageViewer } from './image-viewer.js';
+import type { ViewerApi } from './image-viewer.js';
 
 // 复核预览字段(复用 OCR 抽屉字段标签键)
-const REV_CORE: Array<[string, string]> = [
-    ['seller_name', 'drawer-lbl-name'],
-    ['seller_tax', 'drawer-lbl-tax'],
+const REV_REST: Array<[string, string]> = [
     ['invoice_number', 'drawer-lbl-invoice'],
     // 票面原文(泰国票面印佛历)· 保存走 PUT /api/history 由后端按它反推公历 date
     ['date_raw', 'drawer-lbl-date'],
     ['subtotal', 'drawer-lbl-subtotal'],
     ['vat', 'drawer-lbl-vat'],
 ];
-const REV_MORE: Array<[string, string]> = [
-    ['total_amount', 'drawer-lbl-total'],
-    ['buyer_name', 'drawer-lbl-name'],
-    ['wht_amount', 'drawer-lbl-wht-amount'],
-];
+
+// 对手方在哪一侧看方向:销项是买方,进项是卖方。此前写死 seller_*,销项票(回导来的、
+// 或税号判成 sales 的)于是"名称/税号空 + 需确认",看着像识别失败,其实数据在 buyer_*。
+function partyKeys(f: Dict): { name: string; tax: string; other: string } {
+    return String(f.direction || '') === 'sales'
+        ? { name: 'buyer_name', tax: 'buyer_tax', other: 'seller_name' }
+        : { name: 'seller_name', tax: 'seller_tax', other: 'buyer_name' };
+}
+function revCore(f: Dict): Array<[string, string]> {
+    const p = partyKeys(f);
+    return [[p.name, 'drawer-lbl-name'], [p.tax, 'drawer-lbl-tax'], ...REV_REST];
+}
+function revMore(f: Dict): Array<[string, string]> {
+    return [
+        ['total_amount', 'drawer-lbl-total'],
+        [partyKeys(f).other, 'drawer-lbl-name'],
+        ['wht_amount', 'drawer-lbl-wht-amount'],
+    ];
+}
 
 function warnFields(f: Dict): Set<string> {
     const s = new Set<string>();
-    ['invoice_number', 'seller_tax', 'total_amount'].forEach((k) => {
+    ['invoice_number', partyKeys(f).tax, 'total_amount'].forEach((k) => {
         if (!String(f[k] || '').trim()) s.add(k);
     });
     return s;
@@ -48,6 +61,7 @@ function passable(r: IvResult): boolean {
 // 原图查看器复用识别记录/异常同款共享件(image-viewer.ts · 按物理页翻 + 缩放/旋转/全屏)·
 // 同一刻只一个面板挂载,重渲先清旧实例。
 let viewerCleanup: (() => void) | null = null;
+let viewerApi: ViewerApi | null = null;
 
 export function renderReview() {
     IV.view = 'review';
@@ -109,12 +123,15 @@ function accItemHtml(r: IvResult, i: number): string {
 function accPanelHtml(r: IvResult, i: number): string {
     const groups = r.invoices.map((inv, ii) => invoiceGroupHtml(i, ii, inv)).join('');
     const gridCls = IV.imgSide === 'left' ? ' image-left' : '';
+    // 走库存路时明细不是附加信息:它就是要进 ERP 建主档、动库存的主数据,默认摊开。
+    // 只在这一种情形展开,不改全局默认(其它票型明细仍属参考,折叠更清爽)。
+    const extra = IV.postingKind === 'stock' ? ' extra-on' : '';
     return (
-        '<div class="dx-acc-panel"><div class="dx-acc-top"><div>' +
+        `<div class="dx-acc-panel${extra}"><div class="dx-acc-top"><div>` +
         `<b>${esc(r.filename)} · ${esc(t('dxi-rev-h'))}</b>` +
         `<span class="dx-acc-tip">${esc(t('dxi-rev-panel-tip'))}</span></div>` +
         '<div class="dx-acc-top-a">' +
-        `<button class="dx-toggle dx-extra-toggle">${esc(t('dxi-rev-toggle-all'))}</button>` +
+        `<button class="dx-toggle dx-extra-toggle">${esc(t(extra ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all'))}</button>` +
         `<button class="dx-toggle dx-collapse-one">${esc(t('dxi-rev-collapse'))}</button></div></div>` +
         `<div class="dx-rgrid${gridCls}"><div class="dx-fields">${groups}${fieldsFootHtml()}</div>` +
         imageCardHtml(r) +
@@ -144,31 +161,54 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
             `<input class="dx-rv-in" data-iv-field="${fi}:${ii}:${esc(k)}" value="${esc(v)}"></div>`
         );
     };
-    const core = REV_CORE.map(cell).join('');
-    const more = REV_MORE.map(cell).join('');
+    const core = revCore(inv.fields).map(cell).join('');
+    const more = revMore(inv.fields).map(cell).join('');
+    // 包一层:右侧查看器要靠它知道"用户正在核对第几张",才能翻到那张票所在的物理页。
+    // 分组号同时给反向高亮用(手动翻页 → 点亮该页第一张)。
     return (
+        `<div class="dx-inv-grp" data-inv-grp="${ii}" data-inv-page="${invPage(inv)}">` +
         head +
         `<div class="dx-review-grid">${core}</div>` +
-        `<div class="dx-extra"><div class="dx-review-grid">${more}</div>${itemsTableHtml(inv)}</div>`
+        '<div class="dx-extra"><div class="dx-review-grid">' +
+        `${more}</div>${itemsTableHtml(fi, ii, inv)}</div></div>`
     );
 }
 
-function itemsTableHtml(inv: IvInvoice): string {
+// 该张发票在原 PDF 的物理页。后端 invoice_grouper 一直算着 page_indices 并透到前端,
+// 但从来没人读 —— 查看器因此固定停在第一页,三张票共用一个画面(2026-07-25 用户实测)。
+function invPage(inv: IvInvoice): number {
+    return inv.pageIndices?.length ? inv.pageIndices[0] : inv.idx;
+}
+
+// 明细四列各归各位:此前「金额」列取的是 price(单价),16×55=880 的票在那列显示 55,
+// 会计对不上票面只会以为我们读错了。走库存路时这几格还是建 STMAS 主档的依据,故可编辑 ——
+// 名字读歪一个字就是一个永久垃圾档(Express 删单不删档)。
+const ITEM_COLS: Array<[string, string]> = [
+    ['name', 'dxi-rev-item-name'],
+    ['qty', 'dxi-rev-item-qty'],
+    ['price', 'dxi-rev-item-price'],
+    ['subtotal', 'dxi-rev-item-amt'],
+];
+
+function itemsTableHtml(fi: number, ii: number, inv: IvInvoice): string {
     const items = (inv.fields.items as Array<Dict>) || [];
     if (!Array.isArray(items) || !items.length) return '';
     const rows = items
-        .map((it) => {
-            const name = String(it.name ?? '');
-            const qty = String(it.qty ?? '');
-            const amt = String(it.price ?? it.subtotal ?? it.amount ?? '');
-            return `<tr><td>${esc(name)}</td><td>${esc(qty)}</td><td>${esc(amt)}</td></tr>`;
+        .map((it, ti) => {
+            const tds = ITEM_COLS.map(([k], ci) => {
+                const v = String(it[k] ?? (k === 'subtotal' ? (it.amount ?? '') : ''));
+                return (
+                    `<td${ci ? ' class="r"' : ''}><input class="dx-item-in"` +
+                    ` data-iv-item="${fi}:${ii}:${ti}:${k}" value="${esc(v)}"></td>`
+                );
+            }).join('');
+            return `<tr>${tds}</tr>`;
         })
         .join('');
-    return (
-        '<table class="dx-item-tbl"><thead><tr>' +
-        `<th>${esc(t('dxi-rev-item-name'))}</th><th>${esc(t('dxi-rev-item-qty'))}</th>` +
-        `<th class="r">${esc(t('dxi-rev-item-amt'))}</th></tr></thead><tbody>${rows}</tbody></table>`
-    );
+    const ths = ITEM_COLS.map(
+        ([, lk], ci) => `<th${ci ? ' class="r"' : ''}>${esc(t(lk))}</th>`
+    ).join('');
+    return `<table class="dx-item-tbl"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function fieldsFootHtml(): string {
@@ -305,12 +345,42 @@ function bindOpenViewer() {
         viewerCleanup();
         viewerCleanup = null;
     }
+    viewerApi = null;
     if (IV.openIdx < 0) return;
     const panel = openPanel();
     const r = IV.results[IV.openIdx];
     if (!panel || !r) return;
     const pane = panel.querySelector('.dx-imgcard') as HTMLElement | null;
     if (pane?.querySelector('.pv-viewer')) {
-        viewerCleanup = mountImageViewer(pane, r.history_ids[0] || null);
+        viewerCleanup = mountImageViewer(pane, r.history_ids[0] || null, {
+            onReady: (api) => {
+                viewerApi = api;
+            },
+            // 手动翻页 → 点亮该页第一张发票。跟随是双向的,否则翻到第 2 页后左侧
+            // 仍高亮着第 1 张,用户不知道自己在核对哪一张。
+            onPage: (p) => markActive(panel, groupOnPage(panel, p)),
+        });
     }
+    // focusin 而非 click:键盘 Tab 走到下一张的字段时同样该跟随。
+    panel.addEventListener('focusin', onFieldFocus);
+}
+
+function onFieldFocus(e: Event) {
+    const grp = (e.target as HTMLElement)?.closest?.('[data-inv-grp]') as HTMLElement | null;
+    const panel = openPanel();
+    if (!grp || !panel) return;
+    markActive(panel, grp);
+    const p = Number(grp.dataset.invPage || 0);
+    if (p > 0) viewerApi?.goToPage(p);
+}
+
+function groupOnPage(panel: HTMLElement, page: number): HTMLElement | null {
+    const all = Array.from(panel.querySelectorAll('[data-inv-grp]')) as HTMLElement[];
+    return all.find((g) => Number(g.dataset.invPage || 0) === page) || null;
+}
+
+function markActive(panel: HTMLElement, grp: HTMLElement | null): void {
+    panel
+        .querySelectorAll('[data-inv-grp]')
+        .forEach((g) => g.classList.toggle('active', g === grp));
 }

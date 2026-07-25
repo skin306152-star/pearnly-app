@@ -32,6 +32,8 @@ async def ocr_recognize(
     # 录入向导「本批过账去向」声明(service / stock)· 跟着票走(写进 history),
     # 让自动推/重试/邮件/LINE 四条腿读同一份声明。不带 = 未声明 → 回落账套默认。
     posting_kind: Optional[str] = Form(None),
+    # 同款:「本批是进项还是销项」· 用户选了就按他选的做,不再靠税号猜。
+    direction: Optional[str] = Form(None),
 ):
     user = get_current_user_from_request(request)
 
@@ -50,6 +52,7 @@ async def ocr_recognize(
         ws_client_id=_ws_client_id,
         staged=True,
         posting_kind=posting_kind,
+        direction=direction,
     )
 
     # PDF 留底后台化:响应返回后才生成 searchable PDF + 回填 pdf_storage_path(前端 has_pdf 届时显示)。

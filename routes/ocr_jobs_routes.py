@@ -37,6 +37,7 @@ async def ocr_submit(
     # 与同步路 /api/ocr/recognize 同款:录入向导「本批过账去向」声明随票走。
     # 不接住这个字段,闸 OCR_ASYNC_WEB 一开声明就静默丢失(前端两路共用同一份表单拼装)。
     posting_kind: Optional[str] = Form(None),
+    direction: Optional[str] = Form(None),
 ):
     """异步上传:暂存文件 + 入队 + 秒回 job_id。前端随后轮询 /api/ocr/jobs/{id}。"""
     user = get_current_user_from_request(request)
@@ -68,6 +69,7 @@ async def ocr_submit(
         "client_id": client_id,
         "workspace_client_id": ws_client_id,
         "posting_kind": posting_kind,
+        "direction": direction,
     }
     rid = store.enqueue(
         user_id=str(user["id"]),

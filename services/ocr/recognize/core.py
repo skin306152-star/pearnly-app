@@ -31,6 +31,7 @@ from services.ocr.recognize.persist import persist_invoices
 from services.ocr.recognize.autopush import dispatch_auto_push
 from services.ocr.recognize.sanitize import strip_internal_fields
 from services.erp.express_push.posting_kind import normalize as _normalize_posting_kind
+from services.erp.express_push.direction import normalize as _normalize_direction
 from services.ocr.invoice_no import format_warnings_for_groups
 
 logger = logging.getLogger("mr-pilot")
@@ -86,6 +87,7 @@ def run_recognition_core(
     ws_client_id: Optional[int] = None,
     staged: bool = False,
     posting_kind: Optional[str] = None,
+    direction: Optional[str] = None,
 ) -> Dict[str, Any]:
     """识别核心 · 同步(pipeline/persist/push 全同步)· 调用方负责读 content + 留底调度。
 
@@ -94,11 +96,17 @@ def run_recognition_core(
 
     posting_kind:本批过账去向声明 · 在此归一后落进 history 跟着票走(语义见
     express_push.posting_kind)· 无向导会话的入口不传 → NULL。
+
+    direction:本批进项/销项声明 · 归一后落进 fields.direction,与回导逐行裁决同一个键,
+    推送侧 express_push.direction.explicit_direction 一处认。认不出 → 当没声明,交税号锚点判。
     """
     declared_kind, posting_kind = posting_kind, _normalize_posting_kind(posting_kind)
     if declared_kind and posting_kind is None:
         # 丢掉一次声明是静默改数的入口 · 留痕(旧客户端拼错 / 构造请求都从这条看得出来)。
         logger.warning("[posting-kind] 认不出的过账去向声明 %r · 按未声明处理", declared_kind)
+    declared_dir, direction = direction, _normalize_direction(direction)
+    if declared_dir and direction is None:
+        logger.warning("[direction] 认不出的方向声明 %r · 按未声明处理", declared_dir)
     plan = user.get("plan", "free")
 
     # PO-4 · 缺套账时回落本租户默认套账(上传记录绝不漏归属写 NULL)。
@@ -355,6 +363,7 @@ def run_recognition_core(
         _ws_client_id=ws_client_id,
         staged=staged,
         posting_kind=posting_kind,
+        direction=direction,
     )
     invoice_groups = _persist["invoice_groups"]
     invoice_count = _persist["invoice_count"]

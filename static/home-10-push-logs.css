@@ -116,7 +116,8 @@
     border: 1px solid var(--line);
     border-radius: 13px;
     background: var(--card);
-    overflow: hidden;
+    /* 不裁:徽章的悬停解释要能探出卡外(overflow:hidden 会把它切掉,今天在 sticky 上已栽过
+       同款)。原本 hidden 只为裁末行底色的方角 —— 改成给末行自己加圆角,代价更小。 */
     cursor: pointer;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -160,26 +161,36 @@
 }
 .erp-log-reason b { font-weight: 800; flex: 0 0 auto; }
 .erp-log-reason span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 未结转成本提示条 · 推送成功但账里欠着成本(当期毛利虚高)· 用琥珀不用红:
-   这不是失败,是「成了但有话说」,红色会让会计以为要重推。 */
-.erp-log-note {
-    display: flex; align-items: flex-start; gap: 8px;
-    padding: 8px 13px; border-top: 1px solid var(--line);
-    background: var(--warn-bg); font-size: 10px; line-height: 1.55; color: var(--amber);
-}
-.erp-log-note b { font-weight: 800; flex: 0 0 auto; }
-.erp-log-note span { min-width: 0; }
 /* 琥珀 = 推送成功但账里有一处要会计回头核:未结转成本 / 单位是系统按账套常用值填的。 */
 .log-tag.uncosted,
 .log-tag.unit-guessed { background: var(--warn-bg); color: var(--amber); font-weight: 700; }
 /* 新建库存品 + 用的存货科目组 · 用绿不用琥珀:这不是「有话说」而是「系统替你建了档,来核一眼」,
    与导出表里新建主档的绿底同一套语义(琥珀留给未结转成本,两条同时出现时也分得开)。 */
-.erp-log-note.stock-new { background: var(--success-bg); color: var(--green); }
 .log-tag.stock-new { background: var(--success-bg); color: var(--green); font-weight: 700; }
+
+/* 徽章悬停出解释 · 取代此前每条标记各占一条整宽横幅的做法(一屏 8 张票就把同一段话印 8 遍)。
+   用真元素不用 ::after:伪元素量不到尺寸,「换行了没」就无从断言(本次改动的要点就是换行)。 */
+/* position 无条件给,不靠 :has() —— 万一 :has() 不生效,提示会拿更远的祖先当定位基准跑飞。 */
+.log-tag { position: relative; }
+.log-tag:has(> .log-tip) { cursor: help; outline: none; }
+.log-tip {
+    position: absolute; top: calc(100% + 7px); left: 0; z-index: 40;
+    display: block; width: 320px;
+    white-space: normal; text-align: start; word-break: break-word;
+    padding: 9px 11px; border-radius: 9px;
+    background: var(--ink); color: var(--card);
+    font-size: 10px; font-weight: 500; line-height: 1.7;
+    box-shadow: var(--shadow-lg);
+    opacity: 0; visibility: hidden; transition: opacity 0.12s ease;
+    pointer-events: none;
+}
+.log-tag:hover > .log-tip,
+.log-tag:focus-visible > .log-tip { opacity: 1; visibility: visible; }
 .erp-log-meta {
     display: flex; gap: 14px; flex-wrap: wrap;
     padding: 7px 13px; border-top: 1px solid var(--line);
     background: var(--bg); font-size: 9px; color: var(--ink-3);
+    border-radius: 0 0 12px 12px; /* 卡片不再裁,末行自己收圆角(比外圈 13 少 1,压住描边) */
 }
 .erp-log-meta b { color: var(--ink-2); margin-right: 4px; font-weight: 700; }
 .erp-log-meta .log-doc-copy { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }

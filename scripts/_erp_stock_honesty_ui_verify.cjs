@@ -197,6 +197,9 @@ function visible(cs) {
             const btn = await page.$(`[data-erpexc-acctfix="${id}"]`);
             if (btn) await btn.click();
         }
+        // 真悬停到「未结转成本」徽章上 —— 解释现在挂在它的提示里,不悬停就该是隐藏的。
+        await page.hover('.erp-log-card[data-log-detail="log-uncosted"] .log-tag.uncosted');
+        await page.waitForTimeout(200);
         const probe = await page.evaluate(() => {
             const cs = (el) => {
                 if (!el) return null;
@@ -206,7 +209,15 @@ function visible(cs) {
                     visibility: s.visibility,
                     opacity: s.opacity,
                     h: el.getBoundingClientRect().height,
-                    text: (el.textContent || '').trim(),
+                    w: el.getBoundingClientRect().width,
+                    // 徽章里嵌了提示元素 —— 优先取它自己的文本节点,否则标签名会拖着整段解释;
+                    // 标签藏在子元素里的(筛选 chip)自身没有文本节点,退回整体 textContent。
+                    text:
+                        Array.from(el.childNodes)
+                            .filter((n) => n.nodeType === 3)
+                            .map((n) => n.nodeValue)
+                            .join('')
+                            .trim() || (el.textContent || '').trim(),
                 };
             };
             const card = (id) => document.querySelector(`.erp-log-card[data-log-detail="${id}"]`);
@@ -218,9 +229,12 @@ function visible(cs) {
             }
             for (const id of ['log-clean', 'log-uncosted']) {
                 const c = card(id);
-                out[id + ':tag'] = cs(c && c.querySelector('.log-tag.uncosted'));
-                out[id + ':note'] = cs(c && c.querySelector('.erp-log-note'));
+                const tag = c && c.querySelector('.log-tag.uncosted');
+                out[id + ':tag'] = cs(tag);
+                // 解释改挂徽章的悬停提示:伪元素没有 rect,故读它的计算样式 + data-tip 原文。
+                out[id + ':note'] = tag ? cs(tag.querySelector('.log-tip')) : null;
             }
+            out['strip-count'] = document.querySelectorAll('.erp-log-note').length;
             out['chip'] = cs(
                 document.querySelector('#erp-logs-filters [data-filter-val="uncosted"]')
             );
@@ -240,9 +254,7 @@ function visible(cs) {
     const filtered = await page.evaluate(() =>
         Array.from(document.querySelectorAll('#erp-logs-list .erp-log-card')).map((c) => ({
             id: c.getAttribute('data-log-detail'),
-            noteH: c.querySelector('.erp-log-note')
-                ? c.querySelector('.erp-log-note').getBoundingClientRect().height
-                : 0,
+            tipped: !!c.querySelector('.log-tag.uncosted .log-tip'),
         }))
     );
     await page.screenshot({ path: path.join(OUT, 'erp-stock-honesty-filter.png') });
@@ -288,10 +300,27 @@ function visible(cs) {
             visible(tag) && tag.text === tr(lang, 'erp-uncosted-tag'),
             `visible=${visible(tag)} "${tag ? tag.text : ''}"`
         );
+        // 解释挂在徽章的悬停提示里(此前是每张卡下方一条整宽横幅,一屏 8 张就把同一段话印 8 遍)。
         check(
-            `${lang}/uncosted-note`,
-            visible(note) && note.text.includes(wantNote),
-            `visible=${visible(note)} "${(note && note.text ? note.text : '').slice(0, 60)}…"`
+            `${lang}/uncosted-tip-text`,
+            !!note && note.text.includes(wantNote),
+            `"${(note && note.text ? note.text : '').slice(0, 50)}…"`
+        );
+        check(
+            `${lang}/uncosted-tip-shown-on-hover`,
+            visible(note),
+            `visibility=${note && note.visibility} opacity=${note && note.opacity} h=${note && note.h}`
+        );
+        // 换行,不是拖成一长条 —— 这是这次改动被点名要的
+        check(
+            `${lang}/uncosted-tip-wraps`,
+            !!note && note.h > 26 && note.w <= 344,
+            `真实高度=${note && Math.round(note.h)}px(一行约 17)· 宽=${note && Math.round(note.w)}`
+        );
+        check(
+            `${lang}/no-fullwidth-strip`,
+            !probe['strip-count'],
+            `整宽提示条已删除(实剩 ${probe['strip-count']} 条)`
         );
         check(
             `${lang}/clean-not-marked`,
@@ -311,7 +340,7 @@ function visible(cs) {
     );
     check(
         'filter/only-uncosted-rows',
-        filtered.length === 1 && filtered[0].id === 'log-uncosted' && filtered[0].noteH > 0,
+        filtered.length === 1 && filtered[0].id === 'log-uncosted' && filtered[0].tipped,
         JSON.stringify(filtered)
     );
 

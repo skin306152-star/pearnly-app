@@ -188,6 +188,8 @@ function visible(cs) {
         await page.evaluate((l) => window.applyLang(l), lang);
         await page.click('.nav-item[data-route="push-logs"]');
         await page.waitForSelector('#erp-logs-list .erp-log-card', { timeout: 8000 });
+        await page.hover('.erp-log-card[data-log-detail="log-unit-guessed"] .log-tag.unit-guessed');
+        await page.waitForTimeout(200);
         const probe = await page.evaluate(() => {
             const cs = (el) => {
                 if (!el) return null;
@@ -199,17 +201,26 @@ function visible(cs) {
                     color: s.color,
                     bg: s.backgroundColor,
                     h: el.getBoundingClientRect().height,
-                    text: (el.textContent || '').trim(),
+                    w: el.getBoundingClientRect().width,
+                    // 徽章里嵌了提示元素 —— 优先取它自己的文本节点,否则标签名会拖着整段解释;
+                    // 标签藏在子元素里的(筛选 chip)自身没有文本节点,退回整体 textContent。
+                    text:
+                        Array.from(el.childNodes)
+                            .filter((n) => n.nodeType === 3)
+                            .map((n) => n.nodeValue)
+                            .join('')
+                            .trim() || (el.textContent || '').trim(),
                 };
             };
             const card = (id) => document.querySelector(`.erp-log-card[data-log-detail="${id}"]`);
             const out = {};
             for (const id of ['log-unit-guessed', 'log-unit-clean']) {
                 const c = card(id);
-                out[id + ':tag'] = cs(c && c.querySelector('.log-tag.unit-guessed'));
-                const notes = c ? Array.from(c.querySelectorAll('.erp-log-note')) : [];
-                out[id + ':note'] = cs(notes[0]);
-                out[id + ':noteCount'] = notes.length;
+                const tag = c && c.querySelector('.log-tag.unit-guessed');
+                out[id + ':tag'] = cs(tag);
+                // 解释改挂徽章的悬停提示(此前是卡下一条整宽横幅)· 伪元素没有 rect,读计算样式。
+                out[id + ':note'] = tag ? cs(tag.querySelector('.log-tip')) : null;
+                out[id + ':noteCount'] = c ? c.querySelectorAll('.erp-log-note').length : 0;
             }
             const amber = cs(document.querySelector('.log-tag.uncosted, .log-tag.unit-guessed'));
             out.amberRef = amber;
@@ -241,12 +252,12 @@ function visible(cs) {
             `visible=${visible(tag)} "${tag ? tag.text : ''}"`
         );
         check(
-            `${lang}/note-exact`,
-            visible(note) && note.text.includes(wantNote),
-            `visible=${visible(note)} "${(note && note.text ? note.text : '').slice(0, 70)}…"`
+            `${lang}/tip-exact`,
+            visible(note) && note.text.includes(wantNote) && note.h > 26 && note.w <= 344,
+            `可见=${visible(note)} 真实高=${note && Math.round(note.h)}px(一行约 17 · >26 即已换行) "${(note && note.text ? note.text : '').slice(0, 44)}…"`
         );
         check(
-            `${lang}/note-names-the-unit`,
+            `${lang}/tip-names-the-unit`,
             !!note && derived.unit_guessed_codes.every((c) => note.text.includes(c)),
             `codes=${derived.unit_guessed_codes.join(',')}`
         );

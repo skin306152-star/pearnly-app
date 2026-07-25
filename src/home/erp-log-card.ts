@@ -131,17 +131,28 @@ function buildErpLogCard(log: any): string {
               ? `<span class="log-tag retry">${escapeHtml(t('log-tag-retry'))}</span>`
               : `<span class="log-tag manual">${escapeHtml(t('log-tag-manual'))}</span>`;
 
+    // 「系统替你做了主」类标记:徽章常驻,长解释挂在徽章的悬停提示里。
+    //
+    // 此前每条标记在卡片下方各占一条整宽横幅。真机一屏 8 张票,8 张全带「未结转成本」——
+    // 同一段会计解释印 8 遍,提示就成了背景噪音,还把绿勾「成功」在视觉上否定掉。
+    // 而这不是偶然:真账套 162 个库存品只有 2 个有标准成本,未结转成本在这个客户身上几乎每单必有。
+    // 例外的展示方式承载不了常态 —— 故降到「扫一眼看得见、要细节才展开」。
+    // 提示用真元素不用 ::after —— 伪元素在 CSSOM 里量不到尺寸,量不到就验不了「真的换行了没」,
+    // 而这条正是本次改动的要点。真元素还能自然换行、能拿 rect 断言。
+    const tipTag = (cls: string, label: string, tip: string) =>
+        `<span class="log-tag ${cls}" tabindex="0">${escapeHtml(label)}` +
+        `<span class="log-tip" role="tooltip">${escapeHtml(tip)}</span></span>`;
+
     // 未结转成本(小助手回执报了 no_cost_basis / new_item_no_cost_basis)· 后端 derive_uncosted 派生。
     // 推送本身是成功的,但账里欠着成本 —— 不标出来就是一条普通成功记录,会计要到毛利异常才发现。
     const uncostedN = Number(log.uncosted_lines) || 0;
     const uncostedTag = uncostedN
-        ? `<span class="log-tag uncosted">${escapeHtml(t('erp-uncosted-tag'))}</span>`
-        : '';
-    const uncostedStrip = uncostedN
-        ? `<div class="erp-log-note"><b>${escapeHtml(t('erp-uncosted-tag'))}</b><span>${escapeHtml(
+        ? tipTag(
+              'uncosted',
+              t('erp-uncosted-tag'),
               t('erp-uncosted-note', { n: String(uncostedN) }) +
                   (log.uncosted_created ? ' · ' + t('erp-uncosted-created') : '')
-          )}</span></div>`
+          )
         : '';
 
     // 单位是猜的(小助手建库存主档时票面没给单位,按本账套最常用的单位填的)· 后端 derive_guessed_unit
@@ -152,12 +163,11 @@ function buildErpLogCard(log: any): string {
         .filter(Boolean)
         .join(' · ');
     const unitTag = unitGuessedN
-        ? `<span class="log-tag unit-guessed">${escapeHtml(t('erp-unit-guessed-tag'))}</span>`
-        : '';
-    const unitStrip = unitGuessedN
-        ? `<div class="erp-log-note"><b>${escapeHtml(t('erp-unit-guessed-tag'))}</b><span>${escapeHtml(
+        ? tipTag(
+              'unit-guessed',
+              t('erp-unit-guessed-tag'),
               t('erp-unit-guessed-note', { n: String(unitGuessedN), u: unitCodes })
-          )}</span></div>`
+          )
         : '';
 
     // 本次在账套里新建了库存品 · 后端 derive_stock_acc_group 派生(回执 created + 载荷 stock_acccod)。
@@ -171,12 +181,11 @@ function buildErpLogCard(log: any): string {
               .join(' · ')
         : '';
     const stockTag = stockGroup
-        ? `<span class="log-tag stock-new">${escapeHtml(t('erp-stock-new-tag'))}</span>`
-        : '';
-    const stockStrip = stockGroup
-        ? `<div class="erp-log-note stock-new"><b>${escapeHtml(t('erp-stock-new-tag'))}</b><span>${escapeHtml(
+        ? tipTag(
+              'stock-new',
+              t('erp-stock-new-tag'),
               t('erp-stock-new-note', { n: String(stockCreatedN), g: stockGroup })
-          )}</span></div>`
+          )
         : '';
 
     const friendlyReason =
@@ -311,9 +320,6 @@ function buildErpLogCard(log: any): string {
                 </div>
             </div>
             ${reasonStrip}
-            ${uncostedStrip}
-            ${unitStrip}
-            ${stockStrip}
             <div class="erp-log-meta">
                 <span><b>${escapeHtml(t('erp-log-col-time'))}</b>${escapeHtml(timeStr)}</span>
                 ${docMeta}

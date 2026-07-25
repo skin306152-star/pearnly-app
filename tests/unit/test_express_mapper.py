@@ -356,5 +356,78 @@ class ExpressExpenseLaneTests(unittest.TestCase):
         self.assertNotIn("vat_capitalized", p)
 
 
+_PERPETUAL_FP = {"stock_master_count": 672, "stcrd_lines": 9300, "stcrd_lines_moving_stock": 8102}
+
+
+def _history_with_items(**over):
+    """带一行可信明细的采购票(行合计==税前额 → 过对账闸,item_mode 才有得看)。"""
+    fields = {"items": [{"name": "เหล็กเส้น", "qty": "10", "subtotal": "375347.20"}]}
+    fields.update(over.pop("fields", {}))
+    return _ptt_history(fields=fields, **over)
+
+
+class ExpressPurchaseStockToggleTests(unittest.TestCase):
+    """本批「库存 vs 服务」开关(录入向导 step①)在进项侧的接线 · item_mode=stock_item。"""
+
+    def test_stock_kind_sets_stock_item_on_goods_lines(self):
+        # 显式「库存」→ 每条商品行发 stock_item:小助手据此建/复用 STKTYP=0 并真入库(移动均价)。
+        r = build_express_payload(_history_with_items(), config=_CONFIG, posting_kind="stock")
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["items_status"], "ok")
+        self.assertTrue(r.payload["items"])
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "stock_item")
+
+    def test_service_kind_stays_non_stock(self):
+        r = build_express_payload(_history_with_items(), config=_CONFIG, posting_kind="service")
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_absent_kind_unchanged_non_stock(self):
+        # 缺省(批量/重试/邮件收料等无向导会话的路径)= 今日默认,零回归。
+        r = build_express_payload(_history_with_items(), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_unknown_kind_never_becomes_stock(self):
+        # 脏值(旧客户端/手改库)绝不静默当库存:错记会真建库存品并进货值,不可逆。
+        r = build_express_payload(_history_with_items(), config=_CONFIG, posting_kind="banana")
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_expense_lane_ignores_stock_kind(self):
+        # 费用票即便本批选了「库存」也不进库存:VAT 已计入成本,入库会把不可抵进项税混进货值。
+        h = _history_with_items(
+            fields={
+                "posting_item_type_manual": "expense",
+                "document_type": "receipt",
+                "buyer_tax": "",
+            }
+        )
+        r = build_express_payload(h, config=_CONFIG, posting_kind="stock")
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doc_lane"], "expense")
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+
+    def test_explicit_kind_bypasses_perpetual_escalation(self):
+        # 永续客户(指纹)+ 库存路未开:显式声明 = 用户对本批的决定 → 放行;没声明仍交会计。
+        cfg = {**_CONFIG, "catalog_fingerprint": _PERPETUAL_FP}
+        r = build_express_payload(_history_with_items(), config=cfg, posting_kind="stock")
+        self.assertTrue(r.ok, r.reason)
+        for it in r.payload["items"]:
+            self.assertEqual(it["item_mode"], "stock_item")
+        r2 = build_express_payload(_history_with_items(), config=cfg, posting_kind="service")
+        self.assertTrue(r2.ok, r2.reason)
+        for it in r2.payload["items"]:
+            self.assertEqual(it["item_mode"], "non_stock_item")
+        r3 = build_express_payload(_history_with_items(), config=cfg)
+        self.assertFalse(r3.ok)
+        self.assertTrue(r3.reason.startswith("posting_needs_review"), r3.reason)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

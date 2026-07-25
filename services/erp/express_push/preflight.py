@@ -314,7 +314,8 @@ def preflight_express(
 
     prefetch:批量入口(build_batch_prefetch)算好的批级供应商档案/银行索引,原样透传给
     _attach_payment_evidence;None(单票直推/重试路径)→ 该函数内部自查,行为不变。
-    posting_kind:本批过账去向(录入向导每批开关)· 仅销项 mapper 消费(采购不接)· 见 sales_mapper。
+    posting_kind:本批过账去向(录入向导每批开关)· 销项/进项两个 mapper 都消费:销项据此扣
+    库存结转 COGS,进项据此建库存品真入库(合起来才是一条闭环)· 解析口径见 posting_kind 模块。
     """
     config = (endpoint or {}).get("config") or {}
     pf = Preflight()
@@ -409,14 +410,15 @@ def preflight_express(
                 flat, config=config, mappings=mappings, category=category, posting_kind=posting_kind
             )
         else:
-            mres = build_express_payload(flat, config=config, mappings=mappings, category=category)
-        if not mres.ok:
-            return _block(
-                pf,
-                "mapping",
-                reason=mres.reason,
-                request_body={"adapter": "express", "manual_reason": mres.reason},
+            mres = build_express_payload(
+                flat, config=config, mappings=mappings, category=category, posting_kind=posting_kind
             )
+        if not mres.ok:
+            body = {"adapter": "express", "manual_reason": mres.reason}
+            if mres.items:
+                # 库存类失败要靠它渲染补救卡(derive_stock_fix 读 request_body.items)。
+                body["items"] = mres.items
+            return _block(pf, "mapping", reason=mres.reason, request_body=body)
         payload = mres.payload
         pf.payload = payload
         # 补期初:会计在「补期初卡」填的期初(name/qty/unit_cost/date)由端点写进 history.merged_fields

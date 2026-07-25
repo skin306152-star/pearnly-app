@@ -396,11 +396,11 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
 
 
 class ExpressSalesStockMasterPreflightTests(unittest.TestCase):
-    """选「库存」但账套里一件真实库存品都没有 → 当场拦(2026-07-23 真实事故)。
+    """选「库存」+ 账套零库存主档 + 端点没选存货科目组 → 当场拦(2026-07-23 真实事故)。
 
-    小助手建库存主档要照抄账套里现有的一条 STKTYP=0 当模板;抄无可抄就 DBF_WRITE_FAILED。
-    心跳的 catalog_fingerprint.stock_master_count 已经把这个事实报上来了,不该让票入队、
-    被领走、烧完 3 次重试才转人工。
+    小助手要么照抄账套里现有的 STKTYP=0 当模板,要么靠 ISACC 存货科目组从零建;两样都没有
+    就 DBF_WRITE_FAILED。心跳的 catalog_fingerprint.stock_master_count 已经把主档为零这个
+    事实报上来了,不该让票入队、被领走、烧完 3 次重试才转人工。
     """
 
     def _cfg(self, **fingerprint):
@@ -413,7 +413,11 @@ class ExpressSalesStockMasterPreflightTests(unittest.TestCase):
             posting_kind="stock",
         )
         self.assertFalse(r.ok)
-        self.assertEqual(r.reason, "stock_no_master_in_account_set")
+        self.assertEqual(r.reason, "stock_acc_group_required")
+        # 闸在载荷构造之前退出 —— 不把票面商品带出来的话,推送日志里只剩一个 reason,
+        # 补救卡(derive_stock_fix)拿到空列表,会计看到的就只有一句话没有可填的行。
+        self.assertTrue(r.items, "库存闸失败必须带出票面商品行,否则补救卡渲染不出来")
+        self.assertTrue(all(i.get("name") for i in r.items))
 
     def test_zero_stock_masters_does_not_block_service_kind(self):
         # 只拦「库存」· 服务模式本就不碰库存主档,不该被这条闸误伤。

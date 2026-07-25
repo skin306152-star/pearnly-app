@@ -130,6 +130,9 @@ async def erp_agent_heartbeat(request: Request):
         # 的版本闸(老客户端跟不上新契约字段就拦推送,而不是塞一份它解析不了的载荷)。
         if body.get("max_payload_version") is not None:
             agent_store.store_max_payload_version(str(ep["id"]), body.get("max_payload_version"))
+        # 小助手版本落端点:发版后「在用的真更新了没」得能查,不能只靠上机器看托盘。
+        if cfg.get("companion_version") != body.get("companion_version"):
+            agent_store.store_companion_version(str(ep["id"]), body.get("companion_version"))
     return {
         "ok": True,
         "endpoint_id": str(ep["id"]),

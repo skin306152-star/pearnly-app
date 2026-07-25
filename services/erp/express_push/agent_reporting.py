@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,81 @@ def store_reported_accounts(endpoint_id: str, accounts: Any) -> int:
     except Exception as e:
         logger.error(f"store_reported_accounts failed: {e}")
         return 0
+
+
+# ── 存货科目组候选 · 小助手读 ISACC.DBF(METHOD='A')上报 ──────────────────────────
+# 账套里一件库存品都没有时,小助手没有可克隆的 STMAS 模板行,只能靠一个 ISACC 科目组
+# (ACCCOD → 存货资产 ACCNUM01 + 销货成本 ACCNUM02)从零建 STKTYP=0。METHOD='A' 只是必要
+# 条件:真账套 70EXP 的 10 个 A 组里有 6 个 ACCNUM01 挂的是费用科目(52/53),拿来建库存品
+# 会把存货记成费用。能不能用由小助手判(fit),云端只存不猜。
+_STOCK_ACC_GROUP_KEYS = ("acccod", "name", "method", "stock_acc", "cogs_acc")
+# 小助手若直接回传 ISACC 原始行,按 DBF 列名归一到上面的键(免两边字段名对不上就整表落空)。
+_ISACC_ALIASES = {"accdes": "name", "accnum01": "stock_acc", "accnum02": "cogs_acc"}
+_MAX_STOCK_ACC_GROUPS = 100
+
+
+def _sanitize_stock_acc_groups(raw: Any) -> List[Dict[str, Any]]:
+    """净化上报的存货科目组候选:只留已知键、限长限量,fit 归一布尔。
+
+    acccod 必填 —— 它是「选哪个组」的唯一锚,没有它这条候选选不了也存不住。
+    """
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw[:_MAX_STOCK_ACC_GROUPS]:
+        if not isinstance(item, dict):
+            continue
+        src = {str(k).strip().lower(): v for k, v in item.items()}
+        for alias, key in _ISACC_ALIASES.items():
+            if alias in src and key not in src:
+                src[key] = src[alias]
+        clean: Dict[str, Any] = {"fit": bool(src.get("fit"))}
+        for k in _STOCK_ACC_GROUP_KEYS:
+            v = src.get(k)
+            if v is not None and str(v).strip() != "":
+                clean[k] = str(v).strip()[:120]
+        if clean.get("acccod"):
+            out.append(clean)
+    return out
+
+
+def store_reported_stock_acc_groups(endpoint_id: str, candidates: Any) -> int:
+    """存小助手上报的【存货科目组候选】→ config.reported_stock_acc_groups(整体快照替换)。
+
+    净化后替换 + 记 stock_acc_groups_seen_at;返回存入条数。镜像 store_reported_accounts。
+    端点 PATCH 据此校验「选的是不是真候选」,推送异常卡据此渲染科目组下拉。
+    """
+    groups = _sanitize_stock_acc_groups(candidates)
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
+                        'reported_stock_acc_groups', %s::jsonb,
+                        'stock_acc_groups_seen_at', to_jsonb(NOW()::text))
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (json.dumps(groups, ensure_ascii=False), endpoint_id),
+            )
+        return len(groups)
+    except Exception as e:
+        logger.error(f"store_reported_stock_acc_groups failed: {e}")
+        return 0
+
+
+def fit_stock_acc_groups(config: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """本端点可选的存货科目组(小助手判 fit=True 的候选)· 纯函数 · 不查库。
+
+    单一名单源:端点 PATCH 用它校验选择、异常卡用它渲染下拉 —— 两处认同一份名单,不会出现
+    「卡里选得到、存的时候 400」。
+    """
+    raw = (config or {}).get("reported_stock_acc_groups")
+    if not isinstance(raw, list):
+        return []
+    return [g for g in raw if isinstance(g, dict) and g.get("fit") and g.get("acccod")]
 
 
 # ── 商品/客户目录 + 记账指纹 · 小助手读 STMAS/ARMAS/STCRD 上报 ─────────────────────
@@ -297,6 +372,55 @@ def store_max_payload_version(endpoint_id: str, value: Any) -> bool:
     if n < 1:
         return False
     return _merge_config(endpoint_id, {"max_payload_version": n})
+
+
+def bump_stock_master_count(endpoint_id: str, created: int) -> bool:
+    """推送真建出了 N 个库存主档 → 就地把指纹里的库存品数加上去。
+
+    指纹由小助手心跳上报,但目录扫描节流到 30 分钟一次。采购刚把第一个库存品建出来、
+    会计立刻重推销售票时,零主档闸读的还是旧指纹 → 又拦一次,人看到的是「补完了还是不让推」。
+    ack 这里已经确知建了几个,当场加上,别让人等下一次目录上报。
+    """
+    if not created or created < 1:
+        return False
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = jsonb_set(
+                        COALESCE(config, '{}'::jsonb),
+                        '{catalog_fingerprint,stock_master_count}',
+                        to_jsonb(
+                            COALESCE(
+                                (config #>> '{catalog_fingerprint,stock_master_count}')::int, 0
+                            ) + %s
+                        ),
+                        true
+                    )
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (int(created), endpoint_id),
+            )
+        return True
+    except Exception as e:
+        logger.error(f"bump_stock_master_count failed: {e}")
+        return False
+
+
+def store_companion_version(endpoint_id: str, value: Any) -> bool:
+    """存小助手心跳上报的自身版本号 → config.companion_version。
+
+    小助手一直在心跳里发它,但此前只落进单次推送回执的 meta —— 于是「发版后在用的小助手
+    有没有真更新到新版」在系统侧查不到,只能上机器看托盘。发版铁律的第三步因此每次都靠人肉。
+    存进端点后 SELECT 一下就能答。形如 "1.1.51";脏值/超长不写,视同未上报。
+    """
+    v = str(value or "").strip()
+    if not v or len(v) > 20:
+        return False
+    return _merge_config(endpoint_id, {"companion_version": v})
 
 
 def mark_offline(endpoint_id: str) -> None:

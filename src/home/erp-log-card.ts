@@ -5,7 +5,12 @@
 // data-log-* 属性原样保留 → 现有点击委托(详情/重试/勾选/复制单号)不变。
 /* global t, escapeHtml, currentLang */
 
-import { _erpExcAcctPanel, _erpExcBindPanel, _erpExcStockOpeningPanel } from './erp-exc-actions.js';
+import {
+    _erpExcAcctPanel,
+    _erpExcAccGroupPanel,
+    _erpExcBindPanel,
+    _erpExcStockOpeningPanel,
+} from './erp-exc-actions.js';
 
 // Express 转人工/失败原因码 → 友好文案键(把「EXPRESS_MANUAL: no_revenue_account」这类
 // 看不懂的英文码显成人话)。后端若已带 error_friendly 优先用它;否则这里按码翻译。
@@ -179,11 +184,18 @@ function buildErpLogCard(log: any): string {
     const canMapFix =
         statusClass === 'fail' &&
         (_cat === 'product_mismatch' || _cat === 'customer_mismatch' || _cat === 'no_client');
-    // 缺库存商品 → 会计补期初(数量/单位成本/日期)重推(B1·批次二)。
+    // 库存路推不动的两支同归 category=stock_opening_needed,靠 stock_fix.needs 分卡:
+    //   'acc_group' → 账套零库存主档且没选存货科目组,选一次就能建主档(候选可能为空,那时
+    //                 面板显「先去 Express 建一个」,比不给入口诚实);
+    //   缺省/其他   → 缺主档或零负库存,会计按真实单据补期初(B1·批次二 · 老日志无 needs)。
+    const _sf = log.stock_fix || {};
+    const isAccGrpFix =
+        statusClass === 'fail' && _cat === 'stock_opening_needed' && _sf.needs === 'acc_group';
     const isStockFix =
         statusClass === 'fail' &&
         _cat === 'stock_opening_needed' &&
-        !!(log.stock_fix && (log.stock_fix.items || []).length);
+        !isAccGrpFix &&
+        !!(_sf.items || []).length;
     let repairBtn = '';
     if (isAcctFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-acctfix-open'))}</button>`;
@@ -191,6 +203,8 @@ function buildErpLogCard(log: any): string {
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-bind-open'))}</button>`;
     else if (isStockFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-stockopen-open'))}</button>`;
+    else if (isAccGrpFix)
+        repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-accgrp-open'))}</button>`;
     else if (canMapFix)
         repairBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(log.id)}">${escapeHtml(_cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer'))}</button>`;
     const repairPanel = isAcctFix
@@ -199,8 +213,11 @@ function buildErpLogCard(log: any): string {
           ? _erpExcBindPanel(log)
           : isStockFix
             ? _erpExcStockOpeningPanel(log)
-            : '';
+            : isAccGrpFix
+              ? _erpExcAccGroupPanel(log)
+              : '';
 
+    // 存货科目组卡不进这个排除表:选组只写端点配置、不重推,重试按钮得留着让会计选完自己点。
     const retryBtn =
         log.status === 'failed' && !isRetrying && !isAcctFix && !isBindFix && !isStockFix
             ? `<button class="btn btn-sm btn-secondary" data-log-retry="${escapeHtml(log.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`

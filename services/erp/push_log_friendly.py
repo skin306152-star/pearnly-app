@@ -89,20 +89,27 @@ def dms_push_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
 
 
 # Express 本地小助手「库存过账」回执码 —— 不带 ERR_ 前缀,作为 error_msg 子串出现
-# (DBF_WRITE_FAILED 账套无库存品主档/泰文写盘崩 · STOCK_ITEM_NOT_FOUND 零负库存)。
-# 未收录时原始码直接裸露给泰国会计看(2026-07-23 真料排障 F1)。
+# (DBF_WRITE_FAILED 账套无库存品主档/泰文写盘崩 · STOCK_ITEM_NOT_FOUND 无档案或零负库存 ·
+# STOCK_IN_FAILED 采购入库整条路的失败)。未收录时原始码直接裸露给泰国会计看(2026-07-23 真料排障 F1)。
 _EXPRESS_STOCK_FRIENDLY: Dict[str, Dict[str, str]] = {
     "DBF_WRITE_FAILED": {
-        "zh": "写入 Express 账套失败 · 常见于该账套还没有库存商品主档 · 请先在 Express 建好库存商品,或本批改用「销售·服务」模式推送",
-        "en": "Failed to write into the Express account set — commonly because the set has no stock-item master yet. Please create a stock item in Express first, or push this batch in the “Sales · Service” mode.",
-        "th": "เขียนข้อมูลลงชุดบัญชี Express ไม่สำเร็จ มักเป็นเพราะชุดบัญชียังไม่มีสินค้าคงคลังตั้งต้น กรุณาสร้างสินค้าคงคลังใน Express ก่อน หรือส่งชุดนี้ด้วยโหมด «ขาย•บริการ»",
-        "ja": "Express の帳簿セットへの書き込みに失敗しました。多くは在庫品マスタが未作成のためです。先に Express で在庫品を作成するか、本バッチを「販売・サービス」モードで送信してください。",
+        "zh": "写入 Express 账套失败 · 常见于该账套还没有库存商品主档 · 请先在 Express 建好库存商品,或本批改用「服务·非库存」模式推送",
+        "en": "Failed to write into the Express account set — commonly because the set has no stock-item master yet. Please create a stock item in Express first, or push this batch in the “Service · Non-stock” mode.",
+        "th": "เขียนข้อมูลลงชุดบัญชี Express ไม่สำเร็จ มักเป็นเพราะชุดบัญชียังไม่มีสินค้าคงคลังตั้งต้น กรุณาสร้างสินค้าคงคลังใน Express ก่อน หรือส่งชุดนี้ด้วยโหมด «บริการ · ไม่ใช่สินค้าคงคลัง»",
+        "ja": "Express の帳簿セットへの書き込みに失敗しました。多くは在庫品マスタが未作成のためです。先に Express で在庫品を作成するか、本バッチを「サービス・非在庫」モードで送信してください。",
+    },
+    # 采购入库路的失败全归这一码(混行/超购货额/缺科目/数量非法)· 会计分不清是哪支,故按最常撞上的顺序给动作。
+    "STOCK_IN_FAILED": {
+        "zh": "这张进货票没能入库 · 请依次检查:票里库存品和非库存品是否混在一起(混了就拆成两张分别推)· 明细行的数量/金额是否与票面一致 · 账套是否已配存货和销售成本科目",
+        "en": "This purchase invoice could not be booked into stock. Check in order: stock and non-stock lines mixed on one invoice (split them and push separately), line quantities/amounts not matching the invoice, and whether the account set has inventory and COGS accounts configured.",
+        "th": "ใบซื้อนี้ลงสต๊อกไม่สำเร็จ กรุณาตรวจตามลำดับ: มีสินค้าคงคลังปนกับสินค้าที่ไม่ใช่คงคลังในใบเดียวกันหรือไม่ (ถ้าปนให้แยกเป็นสองใบแล้วส่งแยกกัน) · จำนวนและมูลค่าในรายการตรงกับหน้าใบหรือไม่ · ชุดบัญชีตั้งบัญชีสินค้าคงเหลือและต้นทุนขายแล้วหรือยัง",
+        "ja": "この仕入請求書は在庫計上できませんでした。順に確認してください:1 枚に在庫品と非在庫品が混在していないか(混在なら 2 枚に分けて送信)· 明細の数量/金額が請求書と一致しているか · 会計セットに棚卸資産と売上原価の勘定が設定されているか。",
     },
     "STOCK_ITEM_NOT_FOUND": {
-        "zh": "该商品在 Express 里库存为零或不足 · 请先在 Express 录入进货或期初库存,再推送",
-        "en": "This item has zero or insufficient stock in Express. Please record a purchase or opening balance in Express first, then push again.",
-        "th": "สินค้านี้มีสต๊อกใน Express เป็นศูนย์หรือไม่เพียงพอ กรุณาบันทึกการซื้อหรือยอดยกมาใน Express ก่อน แล้วจึงส่งอีกครั้ง",
-        "ja": "この商品は Express の在庫がゼロまたは不足しています。先に Express で仕入または期首在庫を登録してから再送信してください。",
+        "zh": "这件商品在 Express 里还没有库存档案,或库存为零/不足 · 请先把它的进货票用「库存」模式推一次(或补录期初库存),再推这张销售票",
+        "en": "This item has no stock record in Express yet, or its stock is zero/insufficient. Push its purchase invoice in Inventory mode first (or fill in the opening balance), then push this sales invoice again.",
+        "th": "สินค้านี้ยังไม่มีทะเบียนสต๊อกใน Express หรือสต๊อกเป็นศูนย์/ไม่เพียงพอ กรุณาส่งใบซื้อของสินค้านี้ด้วยโหมดสินค้า (คงคลัง) ก่อน หรือกรอกยอดยกมา แล้วจึงส่งใบขายนี้อีกครั้ง",
+        "ja": "この商品は Express に在庫マスタが未登録、または在庫がゼロ/不足です。先にこの商品の仕入請求書を在庫モードで送信するか期首在庫を登録してから、この売上請求書を再送信してください。",
     },
 }
 

@@ -41,6 +41,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("PATCH", "/api/erp/endpoints/{endpoint_id}/seed"),
             ("PATCH", "/api/erp/endpoints/{endpoint_id}/express-accounts"),
             ("PATCH", "/api/erp/endpoints/{endpoint_id}/express-autonomy"),
+            ("PATCH", "/api/erp/endpoints/{endpoint_id}/express-stock-acc-group"),
             ("POST", "/api/erp/test-connection"),
             ("POST", "/api/erp/endpoints/{endpoint_id}/test-connection"),
             ("GET", "/api/erp/endpoints/{endpoint_id}/customers"),
@@ -63,7 +64,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/posting-profile"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 27)
+        self.assertEqual(len(router.routes), 28)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""

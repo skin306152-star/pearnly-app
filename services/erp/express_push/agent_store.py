@@ -116,6 +116,8 @@ from services.erp.express_push.agent_reporting import (  # noqa: E402,F401
     selected_account_changed,
     store_account_sets,
     store_mapping,
+    bump_stock_master_count,
+    store_companion_version,
     store_max_payload_version,
     store_reported_accounts,
     store_reported_catalog,
@@ -202,6 +204,21 @@ def _build_response_body(
     return json.dumps(body_obj, ensure_ascii=False)
 
 
+def _bump_created_stock_masters(
+    endpoint_id: str, line_modes: Optional[List[Dict[str, Any]]]
+) -> None:
+    """本次推送真建出的库存主档数 → 就地加进指纹(见 bump_stock_master_count 的 why)。"""
+    from services.erp.express_push import common as C
+
+    n = sum(
+        1
+        for m in (line_modes or [])
+        if isinstance(m, dict) and m.get("mode") == C.ITEM_MODE_STOCK and m.get("created")
+    )
+    if n:
+        bump_stock_master_count(endpoint_id, n)
+
+
 def _mirror_history_status(cur, log: Dict[str, Any], status: str) -> None:
     """把推送终态同步到 ocr_history.last_push_status。
 
@@ -283,6 +300,7 @@ def ack(
                     (body, log_id),
                 )
                 _mirror_history_status(cur, log, "success")
+                _bump_created_stock_masters(endpoint_id, line_modes)
                 return {"ok": True, "status": "success", "express_docnum": express_docnum}
 
             if eff == C.STAGE_WAITING_LOCK:

@@ -33,6 +33,7 @@ ENDPOINT_PATHS = {
     ("PATCH", "/api/erp/endpoints/{endpoint_id}/seed"),
     ("PATCH", "/api/erp/endpoints/{endpoint_id}/express-accounts"),
     ("PATCH", "/api/erp/endpoints/{endpoint_id}/express-autonomy"),
+    ("PATCH", "/api/erp/endpoints/{endpoint_id}/express-stock-acc-group"),
 }
 PUSH_PATHS = {
     ("POST", "/api/erp/push"),

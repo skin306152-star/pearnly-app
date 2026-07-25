@@ -9,9 +9,17 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from services.erp.external_ref import _coerce_body
+
+# 库存路的自助修失败码。stock_acc_group_required = 账套零库存主档且端点没选存货科目组
+# (选一次即通);另两个是旧口径 —— 2026-07-25 起不再产出,历史日志还在,继续认得出来。
+_STOCK_FIX_REASONS = (
+    "stock_acc_group_required",
+    "stock_no_master_in_account_set",
+    "STOCK_ITEM_NOT_FOUND",
+)
 
 
 def classify_push_exception(error_msg: Optional[str]) -> str:
@@ -25,9 +33,9 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
         return "no_client"
     if "VERIFY_UNAVAILABLE" in msg:
         return "verify_unavailable"
-    # 缺库存商品主档 / 库存零负(小助手推库存模式失败)→ 会计补期初可救。须先于 account_set,
-    # 因 stock_no_master_in_account_set 串里含 "account_set" 会被下面误吞。
-    if "stock_no_master_in_account_set" in msg or "STOCK_ITEM_NOT_FOUND" in msg:
+    # 库存路推不动(缺存货科目组 / 缺主档 / 库存零负)→ 会计自助可救(选科目组或补期初)。
+    # 须先于 account_set,因 stock_no_master_in_account_set 串里含 "account_set" 会被下面误吞。
+    if any(k in msg for k in _STOCK_FIX_REASONS):
         return "stock_opening_needed"
     # Express 留人工(EXPRESS_MANUAL:<reason>)· 按可补救路径分桶。
     # 账套配错(小助手连到不可写账套)先于科目判:account_set_not_allowed/no_account_set。
@@ -114,15 +122,20 @@ def derive_bind_fix(error_msg: Optional[str]) -> Optional[Dict[str, Any]]:
 
 
 def derive_stock_fix(
-    error_msg: Optional[str], request_body: Any = None
+    error_msg: Optional[str],
+    request_body: Any = None,
+    acc_groups: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
-    """从「缺库存商品主档 / 库存零负」失败推导补期初卡要给哪些商品补(名字 + 已知商品码)。
+    """从库存路失败推导补救卡要渲染什么(needs)+ 渲染它要的料。
 
-    商品取自 request_body.payload.items(推送载荷),名字让会计认出该补哪个商品的期初。
-    取不到明细则返回空 items(前端显示「无可补商品」而非崩)。会计据真实单据填数量/成本/日期。
+    needs="acc_group":账套零库存主档且端点没选存货科目组 → 卡渲染科目组下拉,选完小助手就能
+    从零建 STKTYP=0。候选(fit 过的)由调用方从端点 config 取来传进,本分类器是纯函数不查库。
+    needs="opening" :旧口径缺主档/库存零负 → 卡渲染补期初三格(数量/成本/日期)。
+    两者都带 items(票面商品行,取自 request_body.payload.items),让会计认出这张票涉及哪些
+    商品;取不到明细则空列表(前端显示「无可补商品」而非崩)。
     """
     msg = error_msg or ""
-    if "stock_no_master_in_account_set" not in msg and "STOCK_ITEM_NOT_FOUND" not in msg:
+    if not any(k in msg for k in _STOCK_FIX_REASONS):
         return None
     body = _coerce_body(request_body)
     payload = (body or {}).get("payload") if isinstance(body, dict) else None
@@ -141,4 +154,6 @@ def derive_stock_fix(
             continue
         seen.add(key)
         items.append({"name": name, "stkcod": stkcod})
-    return {"items": items}
+    needs = "acc_group" if "stock_acc_group_required" in msg else "opening"
+    groups = [g for g in (acc_groups or []) if isinstance(g, dict)]
+    return {"needs": needs, "items": items, "acc_groups": groups}

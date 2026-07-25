@@ -290,7 +290,7 @@ def push_to_endpoint(
     """
     主入口:把一条 history 推到指定 endpoint。
 
-    posting_kind:本批过账去向(录入向导每批开关)· 仅 Express 销项消费(其它 adapter 忽略)。
+    posting_kind:本批过账去向(录入向导每批开关)· 仅 Express 消费,销项进项都认(其它 adapter 忽略)。
 
     返回值统一格式:
     {

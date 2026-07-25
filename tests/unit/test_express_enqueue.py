@@ -237,6 +237,17 @@ class DirectionRoutingTests(unittest.TestCase):
         self.assertEqual(r["request_body"]["direction"], "purchase")
         self.assertIn("supplier", r["request_body"])
 
+    def test_posting_kind_reaches_purchase_mapper(self):
+        # 本批「库存」声明要一路穿到进项 mapper(preflight 此前只喂销项)——断在这里的话
+        # 采购票照旧建非库存主档,库存闭环只剩销售半条,下一单必卡 STOCK_ITEM_NOT_FOUND。
+        h = _history(items=[{"name": "เหล็กเส้น", "qty": "10", "subtotal": "375347.20"}])
+        r = enqueue_express(_endpoint(), h, posting_kind="stock")
+        body = r["request_body"]
+        self.assertEqual(body["direction"], "purchase")
+        self.assertTrue(body["items"])
+        for it in body["items"]:
+            self.assertEqual(it["item_mode"], "stock_item")
+
     def test_ambiguous_direction_to_manual(self):
         # 自家税号与票面 seller/buyer 都对不上 → ambiguous → EXPRESS_MANUAL: direction_unknown。
         h = _history(seller_tax=VENDOR_TAX, buyer_tax=CUSTOMER_TAX)

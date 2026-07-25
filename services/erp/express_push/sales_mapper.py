@@ -15,6 +15,7 @@
   vat_rate       7.00 | 0.00
   base_amount / vat_amount / total_amount
   lines          [{acc,side(D/C),amount,desc}] · 借应收 = 贷收入 + 贷销项税 · 借贷必平
+  stock_acccod   存货科目组(ISACC ACCCOD)· 仅库存路且端点配了才带 · 小助手建新库存主档用
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ from services.erp.express_push.common import (
     fail,
     finalize_payload,
     item_mode_for,
+    line_item_names,
     payment_verdict_for,
     resolve_account,
     resolve_account_sourced,
@@ -201,13 +203,16 @@ def build_express_sales_payload(
     if posting_kind not in VALID_POSTING_KINDS and profile.blocks_auto_posting():
         return fail(profile.escalate_reason())
 
+    stock_acccod = str(config.get("stock_acccod") or "").strip()
     # 每批开关优先于画像:显式「库存」→ stock_sale(小助手扣真实库存 + 结转成本);显式「服务」→
     # 非库存服务档 + 收入式(不碰库存·不被永续画像推成 stock);缺省 → 沿用画像(=今天默认,行为不变)。
     if posting_kind == POSTING_KIND_STOCK:
-        # 心跳已报「这个账套零库存主档」= 推了必炸 —— 与其入队、被领走、烧完 3 次重试再转
-        # 人工,不如当场拦下把缺的东西说清楚。
-        if account_set_has_no_stock_master(config):
-            return fail("stock_no_master_in_account_set")
+        # 零库存主档 = 小助手没有可克隆的 STMAS 模板行,只能靠 ISACC 存货科目组从零建档。
+        # 拦的是「端点缺这一项配置」,不是「账里缺这个品」:品不在账里/库存为零负都照落
+        # (建档 + 卖成负,没成本基础就不结转 COGS)—— 选了库存就一定能落,不留死胡同。
+        if account_set_has_no_stock_master(config) and not stock_acccod:
+            # 带上票面商品行:闸在载荷构造之前退出,不带出来卡就没东西可列(只剩一句话)。
+            return fail("stock_acc_group_required", line_item_names(fields))
         line_item_mode = ITEM_MODE_STOCK_SALE
     elif posting_kind == POSTING_KIND_SERVICE:
         line_item_mode = ITEM_MODE_NONSTOCK
@@ -256,6 +261,10 @@ def build_express_sales_payload(
             "filename": history.get("filename"),
         },
     }
+    if line_item_mode == ITEM_MODE_STOCK_SALE and stock_acccod:
+        # 小助手建新库存主档时拿它填 STMAS.ACCCOD(→ISACC→存货资产 + 销货成本)。
+        # 账里已有该品就用不上;没配就不发,别给老小助手塞没约定的空键。
+        payload["stock_acccod"] = stock_acccod
     return ExpressMapResult(
         True, finalize_payload(attach_prior_docnum(payload, history, fields)), "ok"
     )

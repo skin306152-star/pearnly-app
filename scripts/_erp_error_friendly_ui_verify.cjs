@@ -1,6 +1,6 @@
 // 真浏览器验收 · F1 错误码四语友好文案(推送日志页真实点击流)。
-// 走真实导航:/home → 点左栏「推送日志」nav-item(禁 routeTo 捷径)→ 桩两条失败日志
-// (DBF_WRITE_FAILED / STOCK_ITEM_NOT_FOUND · error_friendly 用后端 friendly_any 真实输出)→
+// 走真实导航:/home → 点左栏「推送日志」nav-item(禁 routeTo 捷径)→ 桩三条失败日志
+// (DBF_WRITE_FAILED / STOCK_IN_FAILED / STOCK_ITEM_NOT_FOUND · error_friendly 用后端 friendly_any 真实输出)→
 // 抓 getComputedStyle 断言失败摘要条可见、显泰文友好文案、不含裸原始码。四语截图。
 // 模型抄 scripts/_stock_guard_ui_verify.cjs。产物:tests/visual/_shot/erp-errfriendly-*.png。
 const http = require('http');
@@ -42,21 +42,32 @@ function serve() {
 
 // error_friendly = 后端 friendly_any(...) 真实输出(逐字·非手打)。
 const DBF_FRIENDLY = {
-    zh: '写入 Express 账套失败 · 常见于该账套还没有库存商品主档 · 请先在 Express 建好库存商品,或本批改用「销售·服务」模式推送',
-    en: 'Failed to write into the Express account set — commonly because the set has no stock-item master yet. Please create a stock item in Express first, or push this batch in the “Sales · Service” mode.',
-    th: 'เขียนข้อมูลลงชุดบัญชี Express ไม่สำเร็จ มักเป็นเพราะชุดบัญชียังไม่มีสินค้าคงคลังตั้งต้น กรุณาสร้างสินค้าคงคลังใน Express ก่อน หรือส่งชุดนี้ด้วยโหมด «ขาย•บริการ»',
-    ja: 'Express の帳簿セットへの書き込みに失敗しました。多くは在庫品マスタが未作成のためです。先に Express で在庫品を作成するか、本バッチを「販売・サービス」モードで送信してください。',
+    zh: '写入 Express 账套失败 · 常见于该账套还没有库存商品主档 · 请先在 Express 建好库存商品,或本批改用「服务·非库存」模式推送',
+    en: 'Failed to write into the Express account set — commonly because the set has no stock-item master yet. Please create a stock item in Express first, or push this batch in the “Service · Non-stock” mode.',
+    th: 'เขียนข้อมูลลงชุดบัญชี Express ไม่สำเร็จ มักเป็นเพราะชุดบัญชียังไม่มีสินค้าคงคลังตั้งต้น กรุณาสร้างสินค้าคงคลังใน Express ก่อน หรือส่งชุดนี้ด้วยโหมด «บริการ · ไม่ใช่สินค้าคงคลัง»',
+    ja: 'Express の帳簿セットへの書き込みに失敗しました。多くは在庫品マスタが未作成のためです。先に Express で在庫品を作成するか、本バッチを「サービス・非在庫」モードで送信してください。',
+};
+const STOCKIN_FRIENDLY = {
+    zh: '这张进货票没能入库 · 请依次检查:票里库存品和非库存品是否混在一起(混了就拆成两张分别推)· 明细行的数量/金额是否与票面一致 · 账套是否已配存货和销售成本科目',
+    en: 'This purchase invoice could not be booked into stock. Check in order: stock and non-stock lines mixed on one invoice (split them and push separately), line quantities/amounts not matching the invoice, and whether the account set has inventory and COGS accounts configured.',
+    th: 'ใบซื้อนี้ลงสต๊อกไม่สำเร็จ กรุณาตรวจตามลำดับ: มีสินค้าคงคลังปนกับสินค้าที่ไม่ใช่คงคลังในใบเดียวกันหรือไม่ (ถ้าปนให้แยกเป็นสองใบแล้วส่งแยกกัน) · จำนวนและมูลค่าในรายการตรงกับหน้าใบหรือไม่ · ชุดบัญชีตั้งบัญชีสินค้าคงเหลือและต้นทุนขายแล้วหรือยัง',
+    ja: 'この仕入請求書は在庫計上できませんでした。順に確認してください:1 枚に在庫品と非在庫品が混在していないか(混在なら 2 枚に分けて送信)· 明細の数量/金額が請求書と一致しているか · 会計セットに棚卸資産と売上原価の勘定が設定されているか。',
 };
 const STOCK_FRIENDLY = {
-    zh: '该商品在 Express 里库存为零或不足 · 请先在 Express 录入进货或期初库存,再推送',
-    en: 'This item has zero or insufficient stock in Express. Please record a purchase or opening balance in Express first, then push again.',
-    th: 'สินค้านี้มีสต๊อกใน Express เป็นศูนย์หรือไม่เพียงพอ กรุณาบันทึกการซื้อหรือยอดยกมาใน Express ก่อน แล้วจึงส่งอีกครั้ง',
-    ja: 'この商品は Express の在庫がゼロまたは不足しています。先に Express で仕入または期首在庫を登録してから再送信してください。',
+    zh: '这件商品在 Express 里还没有库存档案,或库存为零/不足 · 请先把它的进货票用「库存」模式推一次(或补录期初库存),再推这张销售票',
+    en: 'This item has no stock record in Express yet, or its stock is zero/insufficient. Push its purchase invoice in Inventory mode first (or fill in the opening balance), then push this sales invoice again.',
+    th: 'สินค้านี้ยังไม่มีทะเบียนสต๊อกใน Express หรือสต๊อกเป็นศูนย์/ไม่เพียงพอ กรุณาส่งใบซื้อของสินค้านี้ด้วยโหมดสินค้า (คงคลัง) ก่อน หรือกรอกยอดยกมา แล้วจึงส่งใบขายนี้อีกครั้ง',
+    ja: 'この商品は Express に在庫マスタが未登録、または在庫がゼロ/不足です。先にこの商品の仕入請求書を在庫モードで送信するか期首在庫を登録してから、この売上請求書を再送信してください。',
 };
-const RAW = { dbf: 'DBF_WRITE_FAILED', stock: 'STOCK_ITEM_NOT_FOUND' };
+// 卡片 id → {期望文案, 不得裸露的原始码}
+const EXPECT = {
+    'log-dbf': { friendly: DBF_FRIENDLY, raw: 'DBF_WRITE_FAILED' },
+    'log-stockin': { friendly: STOCKIN_FRIENDLY, raw: 'STOCK_IN_FAILED' },
+    'log-stock': { friendly: STOCK_FRIENDLY, raw: 'STOCK_ITEM_NOT_FOUND' },
+};
 
 const LOGS = {
-    total: 2,
+    total: 3,
     items: [
         {
             id: 'log-dbf',
@@ -69,6 +80,21 @@ const LOGS = {
             created_at: new Date().toISOString(),
             error_msg: 'DBF_WRITE_FAILED 账套无真库存品模板(STKTYP=0)',
             error_friendly: DBF_FRIENDLY,
+            http_status: 200,
+            retry_count: 3,
+            max_retries: 3,
+        },
+        {
+            id: 'log-stockin',
+            status: 'failed',
+            trigger: 'manual',
+            push_type: 'invoice',
+            invoice_no: 'PU69/00120',
+            endpoint_name: 'Express',
+            ocr_buyer_name: 'บจก. ตัวอย่าง',
+            created_at: new Date().toISOString(),
+            error_msg: 'STOCK_IN_FAILED 采购入库失败',
+            error_friendly: STOCKIN_FRIENDLY,
             http_status: 200,
             retry_count: 3,
             max_retries: 3,
@@ -138,7 +164,8 @@ const EPS = {
         const g = document.getElementById('workspace-gate-root');
         if (g) g.remove();
         const st = document.createElement('style');
-        st.textContent = '#ws-modal{display:none!important;}#workspace-gate-root{display:none!important;}';
+        st.textContent =
+            '#ws-modal{display:none!important;}#workspace-gate-root{display:none!important;}';
         document.head.appendChild(st);
     });
 
@@ -158,21 +185,19 @@ const EPS = {
         });
         const probe = await page.evaluate(() => {
             const out = [];
-            document
-                .querySelectorAll('#erp-logs-list .erp-log-card.fail')
-                .forEach((card) => {
-                    const strip = card.querySelector('.erp-log-reason');
-                    const span = strip && strip.querySelector('span');
-                    const cs = strip ? getComputedStyle(strip) : null;
-                    out.push({
-                        id: card.getAttribute('data-log-detail'),
-                        text: span ? span.textContent : null,
-                        display: cs ? cs.display : null,
-                        visibility: cs ? cs.visibility : null,
-                        opacity: cs ? cs.opacity : null,
-                        h: strip ? strip.getBoundingClientRect().height : 0,
-                    });
+            document.querySelectorAll('#erp-logs-list .erp-log-card.fail').forEach((card) => {
+                const strip = card.querySelector('.erp-log-reason');
+                const span = strip && strip.querySelector('span');
+                const cs = strip ? getComputedStyle(strip) : null;
+                out.push({
+                    id: card.getAttribute('data-log-detail'),
+                    text: span ? span.textContent : null,
+                    display: cs ? cs.display : null,
+                    visibility: cs ? cs.visibility : null,
+                    opacity: cs ? cs.opacity : null,
+                    h: strip ? strip.getBoundingClientRect().height : 0,
                 });
+            });
             return out;
         });
         await page.screenshot({ path: path.join(OUT, `erp-errfriendly-${lang}.png`) });
@@ -185,17 +210,19 @@ const EPS = {
     srv.close();
 
     let fail = 0;
+    let total = 0;
     for (const r of results) {
         for (const c of r.probe) {
+            total++;
             const visible =
                 c.display !== 'none' &&
                 c.visibility !== 'hidden' &&
                 parseFloat(c.opacity) > 0 &&
                 c.h > 0;
-            const friendly = c.id === 'log-dbf' ? DBF_FRIENDLY[r.lang] : STOCK_FRIENDLY[r.lang];
-            const rawCode = c.id === 'log-dbf' ? RAW.dbf : RAW.stock;
-            const showsFriendly = !!(c.text && c.text.includes(friendly));
-            const leaksRaw = !!(c.text && c.text.includes(rawCode));
+            const exp = EXPECT[c.id] || {};
+            const friendly = (exp.friendly || {})[r.lang];
+            const showsFriendly = !!(friendly && c.text && c.text.includes(friendly));
+            const leaksRaw = !!(exp.raw && c.text && c.text.includes(exp.raw));
             const ok = visible && showsFriendly && !leaksRaw;
             if (!ok) fail++;
             console.log(
@@ -204,7 +231,7 @@ const EPS = {
             );
         }
     }
-    console.log(fail === 0 ? '\n✅ ALL PASS (8/8)' : `\n🔴 ${fail} FAIL`);
+    console.log(fail === 0 ? `\n✅ ALL PASS (${total}/${total})` : `\n🔴 ${fail} FAIL`);
     process.exit(fail === 0 ? 0 : 1);
 })().catch((e) => {
     console.error(e);

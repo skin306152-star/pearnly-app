@@ -1,12 +1,24 @@
 // ============================================================
-// ERP 推送失败卡 · 自助修复动作(待补科目 / 绑主体)
+// ERP 推送失败卡 · 自助修复动作(待补科目 / 绑主体 / 补期初 / 选存货科目组)
 //
 // 「推送异常」tab 并入「推送日志」后(2026-06-26)· 这些修复入口挂在推送日志的失败卡上。
-// 卡内下拉面板(科目槽 / 账套主体)+ 提交(补科目重推 / 绑主体重推)· 成功后重拉推送日志
-// (单一状态源 · 铁律 #12 · 修好的行自动翻态/消失,不维护乐观态)。面板 HTML 由 erp-log-card
-// 注入失败卡,事件在 erp-integration 的列表委托里绑定(调本模块函数)。
+// 卡内下拉/表单面板 + 提交(补科目重推 / 绑主体重推 / 写期初重推 / 存货科目组存端点)·
+// 提交后重拉推送日志(单一状态源 · 铁律 #12 · 修好的行自动翻态/消失,不维护乐观态)。
+// 面板 HTML 由 erp-log-card 注入失败卡,事件在 erp-integration 的列表委托里绑定(调本模块函数)。
 // ============================================================
 /* global t, escapeHtml, showToast */
+
+// 存货科目组候选(小助手读 ISACC.DBF 上报 · 字段名跟 agent_reporting 的白名单一致)。
+// 科目名和用量是可选增强:小助手报了就显,没报就只显科目号 —— 缺的不编。
+type AccGroup = {
+    acccod: string;
+    name?: string;
+    stock_acc?: string;
+    stock_acc_name?: string;
+    cogs_acc?: string;
+    cogs_acc_name?: string;
+    used_by?: number;
+};
 
 // 失败卡修复面板要用到的最小字段(由 list_push_logs 在失败行附带)。
 type RepairItem = {
@@ -14,8 +26,14 @@ type RepairItem = {
     endpoint_id?: string;
     account_fix?: { direction?: string; slots?: string[]; bad_code?: string };
     bind_fix?: { can_bind?: boolean };
-    // 缺库存商品 → 会计补期初(数量/单位成本/日期)后重推(B1·批次二)。
-    stock_fix?: { items?: Array<{ name?: string; stkcod?: string }> };
+    // 库存路推不动的两支(后端同归 category=stock_opening_needed · 靠 needs 分):
+    //   needs='acc_group' → 账套零库存主档且没选存货科目组,选一次就能从零建主档;
+    //   缺省/'opening'    → 缺主档或零负库存,会计补期初(数量/单位成本/日期)。
+    stock_fix?: {
+        needs?: string;
+        items?: Array<{ name?: string; stkcod?: string }>;
+        acc_groups?: AccGroup[];
+    };
 };
 
 // 待补科目卡:科目槽 → 角色文案键(收入/应收/销项税 + 采购/应付/进项税)。
@@ -84,7 +102,18 @@ function _erpExcAcctPanel(it: RepairItem): string {
         </div></div>`;
 }
 
+// 失败卡「提交」的唯一入口:委托层只认 data-acctfix-submit(见 erp-integration 的列表委托),
+// 走哪条修复路由由面板自报的 data-fix-kind 决定 —— 新增修复卡在这里加分支,不动委托层。
 async function _erpExcAccountFix(logId: string, panel: HTMLElement, btn: HTMLButtonElement | null) {
+    if (panel.dataset.fixKind === 'accgroup') return _erpExcAccGroupFix(panel, btn);
+    return _erpExcAccountSlotsFix(logId, panel, btn);
+}
+
+async function _erpExcAccountSlotsFix(
+    logId: string,
+    panel: HTMLElement,
+    btn: HTMLButtonElement | null
+) {
     const accounts: Record<string, string> = {};
     panel.querySelectorAll('select[data-acctfix-slot]').forEach((sel) => {
         const slot = (sel as HTMLElement).dataset.acctfixSlot as string;
@@ -290,10 +319,98 @@ async function _erpExcStockOpening(
     _erpExcReload();
 }
 
+// 下拉选项只能放纯文本 → 把会计判断要用的都拼成一行:
+// 组码(·组名) · 存货科目号(+名) · 销货成本科目号(+名) · 已有几个商品在用。
+// 每段都以小助手真报上来为准,缺哪段就不显哪段 —— 宁可信息少,不拿占位符冒充数据。
+// 用量是选错的最好防线(主力存货组商品最多);ISACC 的 ACCDES 常等于 ACCCOD,重了不显两遍。
+function _erpExcAccGroupLabel(g: AccGroup): string {
+    const acc = (key: string, num?: string, name?: string) =>
+        num ? t(key) + ' ' + num + (name ? ' ' + name : '') : '';
+    return [
+        g.acccod,
+        g.name && g.name !== g.acccod ? g.name : '',
+        acc('erp-accgrp-inv', g.stock_acc, g.stock_acc_name),
+        acc('erp-accgrp-cogs', g.cogs_acc, g.cogs_acc_name),
+        typeof g.used_by === 'number' ? t('erp-accgrp-used-by', { n: String(g.used_by) }) : '',
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+// 存货科目组卡:账套一件库存品都没有、小助手没有可克隆的主档模板 → 会计选一个 ISACC 组
+// (存货资产 + 销货成本),小助手据此从零建 STKTYP=0。Zihao 拍板做进失败卡,不做进设置页。
+// 候选名单只认端点上 fit 过的那份(后端 fit_stock_acc_groups 同一份),前端不再自筛,
+// 免得出现「卡里选得到、存的时候 400」。存回后不自动重推 —— 卡上保留重试按钮由会计自己点。
+function _erpExcAccGroupPanel(it: RepairItem): string {
+    const head =
+        `<div class="erp-exc-acctfix erp-exc-accgrp" data-acctfix-panel="${escapeHtml(it.id)}"` +
+        ` data-fix-kind="accgroup" data-accgrp-endpoint="${escapeHtml(it.endpoint_id || '')}" hidden>`;
+    const groups = (it.stock_fix && it.stock_fix.acc_groups) || [];
+    if (!groups.length) {
+        return `${head}<div class="erp-exc-acctfix-nochart">${escapeHtml(t('erp-accgrp-nogroups'))}</div></div>`;
+    }
+    const opts = groups
+        .map(
+            (g) =>
+                `<option value="${escapeHtml(g.acccod)}">${escapeHtml(_erpExcAccGroupLabel(g))}</option>`
+        )
+        .join('');
+    return `${head}
+        <div class="erp-exc-acctfix-nochart erp-exc-accgrp-hint">${escapeHtml(t('erp-accgrp-hint'))}</div>
+        <div class="erp-exc-acctfix-slots"><label class="erp-exc-acctfix-slot"><span>${escapeHtml(t('erp-accgrp-label'))}</span>
+        <select data-accgrp-select><option value="">${escapeHtml(t('erp-accgrp-pick'))}</option>${opts}</select></label></div>
+        <div class="erp-exc-acctfix-nochart erp-exc-accgrp-warn">${escapeHtml(t('erp-accgrp-scope-warn'))}</div>
+        <div class="erp-exc-acctfix-act">
+            <button class="btn btn-sm btn-primary" type="button" data-acctfix-submit="${escapeHtml(it.id)}">${escapeHtml(t('erp-accgrp-submit'))}</button>
+            <button class="btn btn-sm btn-ghost" type="button" data-acctfix-cancel="${escapeHtml(it.id)}">${escapeHtml(t('erp-acctfix-cancel'))}</button>
+        </div></div>`;
+}
+
+// 存回端点(整个账套一处设置)· 不带 log id:改的是端点配置,不是这一条日志。
+async function _erpExcAccGroupFix(panel: HTMLElement, btn: HTMLButtonElement | null) {
+    const sel = panel.querySelector('[data-accgrp-select]') as HTMLSelectElement | null;
+    const code = (sel ? sel.value : '').trim();
+    const endpointId = panel.dataset.accgrpEndpoint || '';
+    if (!code) {
+        showToast(t('erp-accgrp-need-pick'), 'error');
+        return;
+    }
+    if (!endpointId) {
+        showToast(t('erp-accgrp-fail'), 'error');
+        return;
+    }
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('msg-saving');
+    }
+    try {
+        const resp = await fetch(
+            '/api/erp/endpoints/' + encodeURIComponent(endpointId) + '/express-stock-acc-group',
+            {
+                method: 'PATCH',
+                headers: {
+                    Authorization: 'Bearer ' + _erpExcTok(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ stock_acccod: code }),
+            }
+        );
+        const data = await resp.json().catch(() => ({}));
+        showToast(
+            resp.ok && data.ok ? t('erp-accgrp-ok') : t('erp-accgrp-fail'),
+            resp.ok && data.ok ? 'success' : 'error'
+        );
+    } catch (e) {
+        showToast(t('erp-accgrp-fail'), 'error');
+    }
+    _erpExcReload();
+}
+
 export type { RepairItem };
 export {
     _erpExcAcctPanel,
     _erpExcAccountFix,
+    _erpExcAccGroupPanel,
     _erpExcBindPanel,
     _erpExcBindSubject,
     _erpExcStockOpeningPanel,

@@ -413,6 +413,56 @@ class MaxPayloadVersionTests(unittest.TestCase):
         self.assertEqual(cur.executed, [])
 
 
+class CompanionVersionTests(unittest.TestCase):
+    """小助手版本落端点 —— 发版铁律第三步「在用的真更新了没」靠它才查得到,别删。"""
+
+    def test_writes_config(self):
+        cur = FakeCursor()
+        with _patch_cursor(cur):
+            ok = agent_store.store_companion_version("ep-1", "1.1.51")
+        self.assertTrue(ok)
+        sql, params = cur.executed[0]
+        self.assertIn("adapter = 'express'", sql)
+        self.assertIn('"companion_version": "1.1.51"', params[0])
+
+    def test_rejects_empty_and_overlong(self):
+        for bad in ("", "   ", None, "x" * 21):
+            cur = FakeCursor()
+            with self.subTest(bad=bad), _patch_cursor(cur):
+                self.assertFalse(agent_store.store_companion_version("ep-1", bad))
+                self.assertEqual(cur.executed, [])
+
+
+class StockMasterFingerprintBumpTests(unittest.TestCase):
+    """建出库存主档后就地加指纹 —— 否则零主档闸拿 30 分钟前的旧指纹再拦一次重推。"""
+
+    def _count(self, line_modes):
+        seen = {}
+        with mock.patch.object(
+            agent_store, "bump_stock_master_count", lambda ep, n: seen.setdefault("n", n)
+        ):
+            agent_store._bump_created_stock_masters("ep-1", line_modes)
+        return seen.get("n")
+
+    def test_counts_only_newly_created_stock_masters(self):
+        self.assertEqual(
+            self._count(
+                [
+                    {"mode": "stock_item", "created": True},
+                    {"mode": "stock_item", "created": False},  # 复用既有档,不算新建
+                    {"mode": "non_stock_item", "created": True},  # 服务档不进库存指纹
+                    {"mode": "stock_item", "created": True},
+                ]
+            ),
+            2,
+        )
+
+    def test_no_creation_does_not_touch_fingerprint(self):
+        for lm in ([], None, [{"mode": "stock_item", "created": False}]):
+            with self.subTest(lm=lm):
+                self.assertIsNone(self._count(lm))
+
+
 class HeartbeatReceiveTests(unittest.TestCase):
     def test_heartbeat_stores_accounts_chart(self):
         import asyncio

@@ -38,6 +38,11 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.prior_doc import attach_prior_docnum
+from services.erp.express_push.posting_kind import (
+    POSTING_KIND_SERVICE,
+    POSTING_KIND_STOCK,
+    VALID_POSTING_KINDS,
+)
 from services.erp.express_push.common import (
     ExpressMapResult,
     _d,
@@ -52,6 +57,7 @@ from services.erp.express_push.common import (
     finalize_payload,
     item_mode_for,
     ITEM_MODE_NONSTOCK,
+    ITEM_MODE_STOCK,
     ITEMS_OK,
     payment_verdict_for,
     resolve_account,
@@ -59,7 +65,7 @@ from services.erp.express_push.common import (
     SRC_DEFAULT,
 )
 from services.erp.express_push import stock_lane_enabled
-from services.erp.express_push.posting_profile import profile_from_config
+from services.erp.express_push.posting_profile import PostingProfile, profile_from_config
 from services.purchase.field_clean import (
     clean_address,
     clean_invoice_no,
@@ -94,6 +100,20 @@ def _expense_detail(total: Decimal) -> Dict[str, Any]:
         "item_mode": ITEM_MODE_NONSTOCK,
     }
     return {"items": [line], "status": ITEMS_OK, "line_sum": _s(total)}
+
+
+def _goods_item_mode(posting_kind: Optional[str], profile: PostingProfile) -> str:
+    """货票明细行的写入模式。本批显式声明优先,未声明 → 画像推断(=今日默认,行为不变)。
+
+    声明「库存」发 ITEM_MODE_STOCK:小助手据此建/复用 STKTYP=0 库存品并真入库(移动均价),
+    与销项 stock_sale 扣库存结转 COGS 合成闭环。销项那道「账套零库存主档就拦下」的闸不照搬到
+    采购 —— 采购正是把第一个库存品建出来的那一步,零主档是新客户的正常起点,拦了就永远起不来。
+    """
+    if posting_kind == POSTING_KIND_STOCK:
+        return ITEM_MODE_STOCK
+    if posting_kind == POSTING_KIND_SERVICE:
+        return ITEM_MODE_NONSTOCK
+    return item_mode_for(profile.posting_mode)
 
 
 def _resolve_supplier(
@@ -131,12 +151,16 @@ def build_express_payload(
     config: Dict[str, Any],
     mappings: Optional[Dict[str, Any]] = None,
     category: str = "",
+    posting_kind: Optional[str] = None,
 ) -> ExpressMapResult:
     """扁平化 history → Express 采购载荷。判脏/不自洽 → ok=False(留人工)。
 
     config 键:account_set(目标账套)· fallback_acc(兜底采购科目)·
     vat_input_acc(进项税科目)· ap_acc(应付科目)· default_doctype(RR/HP)。
     mappings:get_mrerp_mappings_bundle(tenant_id)(accounts/clients)。
+    posting_kind:本批过账去向(录入向导 step① 的每批开关)。"stock"=货票明细按真实进货入库
+    (item_mode=stock_item);"service"/缺省/其它 → 非库存路径,行为不变(SAFE 默认)。
+    费用票不受此开关影响(进项税不可抵、VAT 计入成本,那条车道与库存无关)。
     """
     mappings = mappings or {}
     fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
@@ -172,7 +196,10 @@ def build_express_payload(
     # 非库存(=今天默认,行为不变)。★永续客户库存路未开时,goods 行绝不静默按周期制落
     # (会与其既有永续账双重计成本)→ escalate 交会计;费用票不动库存,不受此闸约束。
     profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
-    if not is_expense and profile.blocks_auto_posting():
+    # 本批显式声明优先于画像:声明「库存」→ 真入库(永续客户本该走的路),声明「服务」→ 不碰
+    # 库存。自动 escalate 只兜「没人声明」的票 —— 系统拿不准就不硬落(镜像 sales_mapper 口径)。
+    declared = posting_kind in VALID_POSTING_KINDS
+    if not is_expense and not declared and profile.blocks_auto_posting():
         return fail(profile.escalate_reason())
     vat_capitalized = _s(vat) if is_expense else None
     if is_expense:
@@ -209,13 +236,14 @@ def build_express_payload(
     if _q(dr) != _q(cr):
         return fail("entry_not_balanced")
 
-    # V1 安全明细(镜像销项):OCR 行过对账闸,挂采购科目作直接科目行,不碰库存/成本。
-    # 费用车道另走单行收尾(_expense_detail·见函数注释,base 已改含税全额喂闸会误判)。
+    # 明细行:OCR 行过对账闸(行合计≈税前额才采信),写入模式见 _goods_item_mode。
+    # 费用车道另走单行收尾(_expense_detail·见函数注释,base 已改含税全额喂闸会误判),
+    # 且恒非库存 —— 费用票的 VAT 已计入成本,进库存会把不可抵进项税混进货值。
     if is_expense:
         detail = _expense_detail(total)
     else:
         detail = extract_line_items(
-            fields, base, total=total, item_mode=item_mode_for(profile.posting_mode)
+            fields, base, total=total, item_mode=_goods_item_mode(posting_kind, profile)
         )
 
     # 现购 HP / 赊购 RR:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
@@ -229,12 +257,14 @@ def build_express_payload(
     doctype = "HP" if paid else "RR"
     doc_lane = "expense" if is_expense else "goods"
     logger.info(
-        "[express-purchase] ref_no=%s doctype=%s payment_src=%s doc_lane=%s item_src=%s",
+        "[express-purchase] ref_no=%s doctype=%s payment_src=%s doc_lane=%s item_src=%s "
+        "posting_kind=%s",
         ref_no,
         doctype,
         verdict_src or "config_default",
         doc_lane,
         item_src,
+        posting_kind or "none",  # 走没走真入库:出账不对时先看这行(none=没人声明)
     )
 
     payload = {
@@ -268,6 +298,10 @@ def build_express_payload(
     if is_expense:
         # 留痕:这张票原本会读到多少进项税,现改折进成本(VAT capitalized · 排障/对账用)。
         payload["vat_capitalized"] = vat_capitalized
+    stock_acccod = str(config.get("stock_acccod") or "").strip()
+    if _goods_item_mode(posting_kind, profile) == ITEM_MODE_STOCK and stock_acccod:
+        # 与销项同键同义:账套一件库存品都没有时,小助手靠它建 STKTYP=0(见 sales_mapper 同处)。
+        payload["stock_acccod"] = stock_acccod
     return ExpressMapResult(
         True, finalize_payload(attach_prior_docnum(payload, history, fields)), "ok"
     )

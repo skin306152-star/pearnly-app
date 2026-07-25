@@ -18,6 +18,7 @@ from services.erp import erp_push as _erp
 from core.auth import get_current_user_from_request
 from core.route_helpers import _plan_permissions, _record_500
 from routes.erp_routes_access import _check_push_access
+from services.erp.express_push.agent_reporting import fit_stock_acc_groups
 
 logger = logging.getLogger("mr-pilot")
 
@@ -428,3 +429,36 @@ async def erp_endpoints_express_autonomy(endpoint_id: str, req: ExpressAutonomy,
     if not ok:
         raise HTTPException(404, detail="erp.endpoint_not_found")
     return {"ok": True, "autonomy": level}
+
+
+class ExpressStockAccGroup(BaseModel):
+    stock_acccod: str
+
+
+@router.patch("/api/erp/endpoints/{endpoint_id}/express-stock-acc-group")
+async def erp_endpoints_express_stock_acc_group(
+    endpoint_id: str, req: ExpressStockAccGroup, request: Request
+):
+    """Express「存货科目组」(ISACC ACCCOD)· 服务端只合并 config.stock_acccod。
+
+    账套里一件库存品都没有时,小助手没有可克隆的主档模板,只能靠这个科目组从零建 STKTYP=0
+    (ACCCOD → 存货资产 + 销货成本)。选定后销项库存路不再因「零主档」被拦。
+    只收小助手上报过且它判 fit 的候选:哪个组能当存货用得看真账套(真账里 METHOD='A' 的组
+    过半把 ACCNUM01 挂在费用科目上),云端不猜。同 /seed 套路读 DB 原始 config 只覆盖这一键。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    if (ep.get("adapter") or "").lower() != "express":
+        raise HTTPException(400, detail="erp.not_express_endpoint")
+    cfg = dict(ep.get("config") or {})
+    code = str(req.stock_acccod or "").strip()
+    if code not in {str(g.get("acccod")) for g in fit_stock_acc_groups(cfg)}:
+        raise HTTPException(400, detail="erp.bad_stock_acc_group")
+    cfg["stock_acccod"] = code
+    ok = db.update_erp_endpoint(user["id"], endpoint_id, config=cfg)
+    if not ok:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    return {"ok": True, "stock_acccod": code}

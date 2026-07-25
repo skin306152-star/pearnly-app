@@ -54,6 +54,9 @@ class ExpressMapResult:
     ok: bool
     payload: Optional[Dict[str, Any]]
     reason: str
+    # 失败时票上的商品行(name/stkcod)。库存类失败要靠它渲染「补期初 / 选存货科目组」卡:
+    # 闸在载荷构造之前就退出,不带出来的话日志里只剩一个 reason,卡拿到空列表退化成一句话。
+    items: Optional[List[Dict[str, Any]]] = None
 
 
 def _d(v: Any) -> Optional[Decimal]:
@@ -74,8 +77,26 @@ def _s(v: Decimal) -> str:
     return format(_q(v), "f")
 
 
-def fail(reason: str) -> ExpressMapResult:
-    return ExpressMapResult(False, None, reason)
+def fail(reason: str, items: Optional[List[Dict[str, Any]]] = None) -> ExpressMapResult:
+    return ExpressMapResult(False, None, reason, items)
+
+
+def line_item_names(fields: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """票面商品行的名字(去重保序)· 给库存类失败卡当「这张票涉及哪些商品」用。
+
+    直接取 OCR 行,不过对账闸 —— 卡只是让会计认出该补哪个商品,不参与记账金额。
+    """
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for it in fields.get("items") or []:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("name") or it.get("description") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append({"name": name})
+    return out
 
 
 def detect_prename(name: str) -> str:

@@ -29,9 +29,9 @@ router = APIRouter()
 class ErpPushRequest(BaseModel):
     history_id: str
     endpoint_id: Optional[str] = Field(None, description="不传则用默认端点")
-    # 本批过账去向(录入向导 step① 每批开关)· 仅 Express 销项消费:'stock'=商品行按真实进销存
-    # 出库(item_mode=stock_sale)· 缺省/'service' → 服务·销售(不动库存 · SAFE 默认 · 行为不变)。
-    posting_kind: Optional[str] = Field(None, description="stock | service · Express 销项库存开关")
+    # 本批过账去向(录入向导 step① 每批开关)· 仅 Express 消费:'stock'=商品行走真实进销存
+    # (销项 stock_sale 出库结转成本 / 进项 stock_item 建库存品入库)· 缺省/'service' → 非库存(SAFE 默认)。
+    posting_kind: Optional[str] = Field(None, description="stock | service · Express 库存过账开关")
 
 
 @router.post("/api/erp/push")

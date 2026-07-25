@@ -276,6 +276,8 @@
     border-top: 1px dashed var(--line);
     display: flex; flex-direction: column; gap: 10px; cursor: default;
 }
+/* display:flex 压过 [hidden] 的默认 display:none → 该收起的面板照样展开(补期初/科目组两张卡同病) */
+.erp-exc-acctfix[hidden] { display: none; }
 .erp-exc-acctfix-slots { display: flex; flex-wrap: wrap; gap: 12px; }
 .erp-exc-acctfix-slot {
     display: flex; flex-direction: column; gap: 4px;

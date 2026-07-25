@@ -19,6 +19,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.common import ITEMS_INCOMPLETE, ITEMS_MISMATCH
+from services.erp.express_push.posting_kind import resolve_posting_kind
 from services.erp.express_push.preflight import preflight_express
 
 # error_msg 哨兵 · 让现有 classify_push_status 把这一行落成 pending / manual(单一状态源 · 铁律 #12)。
@@ -79,9 +80,11 @@ def enqueue_express(
 
     prefetch:批量推送入口(push_dispatch._dispatch_express_batch)算好的批级预取,原样
     透传给 preflight_express;单票路径(手动 /api/erp/push、重试队列)不传 → 内部自查。
-    posting_kind:本批过账去向(手动推送每批开关)· 透传销项 mapper;批量/重试路径不传 → 默认服务。
+    posting_kind:调用方显式指定的过账去向;不传则读票上的声明(见 posting_kind 模块)。
+    解析必须留在本函数:push_dispatch 的批量分拣绕过 push_to_endpoint 直调这里。
     """
     t0 = time.time()
+    posting_kind = resolve_posting_kind(posting_kind, history)
     pf = preflight_express(endpoint, history, prefetch=prefetch, posting_kind=posting_kind)
 
     if pf.disabled:

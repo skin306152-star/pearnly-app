@@ -31,6 +31,7 @@ def persist_invoices(
     client_id,
     _ws_client_id,
     staged=False,
+    posting_kind=None,
 ):
     # 8. 写入历史记录 · v0.8 改:所有 plan 都写(Free 也能看历史,只是保留 7 天)
     history_id = None
@@ -250,6 +251,8 @@ def persist_invoices(
             # 反馈闭环 ② · ai_raw 留底由 insert_ocr_history 缺省取 pages 自动写(全入口普适)
             # 草稿态:仅网页交互式上传传 True(第4步完成才落识别记录);后台/文件夹入口 False。
             staged=staged,
+            # 同一 PDF 拆出的多张票共用同一声明(整批一个开关)· 已在 core 归一。
+            posting_kind=posting_kind,
         )
         if hid:
             history_ids.append(hid)

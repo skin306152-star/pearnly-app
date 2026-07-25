@@ -29,6 +29,9 @@ async def ocr_recognize(
     client_id: Optional[str] = Form(None),  # v27.8.1.13a · 右上角客户切换器选中时自动归属
     # B1 相 1 · workspace 账套归属 · 可选 · Form 或 header X-Workspace-Client-Id · 带不上 NULL。
     workspace_client_id: Optional[str] = Form(None),
+    # 录入向导「本批过账去向」声明(service / stock)· 跟着票走(写进 history),
+    # 让自动推/重试/邮件/LINE 四条腿读同一份声明。不带 = 未声明 → 回落账套默认。
+    posting_kind: Optional[str] = Form(None),
 ):
     user = get_current_user_from_request(request)
 
@@ -40,7 +43,13 @@ async def ocr_recognize(
     # staged=True:网页交互式录入 → 识别先以草稿落库(不进识别记录),待录入第4步
     # 完成/导出/推送调 /api/ocr/commit 才翻正式。后台 worker / 文件夹自动入口不走本路由(即时可见)。
     outcome = run_recognition_core(
-        user, content, file, client_id=client_id, ws_client_id=_ws_client_id, staged=True
+        user,
+        content,
+        file,
+        client_id=client_id,
+        ws_client_id=_ws_client_id,
+        staged=True,
+        posting_kind=posting_kind,
     )
 
     # PDF 留底后台化:响应返回后才生成 searchable PDF + 回填 pdf_storage_path(前端 has_pdf 届时显示)。

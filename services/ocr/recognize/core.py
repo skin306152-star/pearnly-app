@@ -30,6 +30,7 @@ from services.ocr.recognize.cache import serve_cache_hit
 from services.ocr.recognize.persist import persist_invoices
 from services.ocr.recognize.autopush import dispatch_auto_push
 from services.ocr.recognize.sanitize import strip_internal_fields
+from services.erp.express_push.posting_kind import normalize as _normalize_posting_kind
 from services.ocr.invoice_no import format_warnings_for_groups
 
 logger = logging.getLogger("mr-pilot")
@@ -84,12 +85,20 @@ def run_recognition_core(
     client_id: Optional[str] = None,
     ws_client_id: Optional[int] = None,
     staged: bool = False,
+    posting_kind: Optional[str] = None,
 ) -> Dict[str, Any]:
     """识别核心 · 同步(pipeline/persist/push 全同步)· 调用方负责读 content + 留底调度。
 
     staged=True(仅网页交互式上传):识别记录先以草稿落库,不进识别记录列表,
     待第4步完成/导出/推送调 /api/ocr/commit 才翻正式。后台/文件夹自动入口不传(即时可见)。
+
+    posting_kind:本批过账去向声明 · 在此归一后落进 history 跟着票走(语义见
+    express_push.posting_kind)· 无向导会话的入口不传 → NULL。
     """
+    declared_kind, posting_kind = posting_kind, _normalize_posting_kind(posting_kind)
+    if declared_kind and posting_kind is None:
+        # 丢掉一次声明是静默改数的入口 · 留痕(旧客户端拼错 / 构造请求都从这条看得出来)。
+        logger.warning("[posting-kind] 认不出的过账去向声明 %r · 按未声明处理", declared_kind)
     plan = user.get("plan", "free")
 
     # PO-4 · 缺套账时回落本租户默认套账(上传记录绝不漏归属写 NULL)。
@@ -345,6 +354,7 @@ def run_recognition_core(
         client_id=client_id,
         _ws_client_id=ws_client_id,
         staged=staged,
+        posting_kind=posting_kind,
     )
     invoice_groups = _persist["invoice_groups"]
     invoice_count = _persist["invoice_count"]

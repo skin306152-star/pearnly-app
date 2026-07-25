@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_clients_table():
-    """启动时建客户表 · 加 client_id 列到 ocr_history · 幂等"""
+    """启动时建客户表 · ocr_history 补列的归口(client_id/ai_raw/官方名/staged/posting_kind)· 幂等"""
     try:
         with db.get_cursor(commit=True) as cur:
             # 1. 客户表
@@ -65,13 +65,14 @@ def ensure_clients_table():
                 -- 草稿态:网页录入识别后先 staged=TRUE(不进识别记录列表)·第4步完成/导出/推送才翻 FALSE 落库。
                 -- 默认 FALSE → 存量记录 + LINE 等其它入口照旧即时可见(只有网页录入流会置 TRUE)。
                 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS staged BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS posting_kind TEXT;  -- 见 express_push/posting_kind
             """)
             # B8 RLS wave3:两表都含 tenant_id + user_id → tenant_or_user 隔离。
             # force=False(owner 仍绕过→外围未迁的裸 get_cursor 不破);业务连接 SET ROLE 后强制。
             from core.rls import apply_tenant_or_user_rls
 
             apply_tenant_or_user_rls(cur, "clients", "ocr_history")
-            logger.info("✅ clients 表 + ocr_history.client_id + RLS policy 已就绪")
+            logger.info("✅ clients 表 + ocr_history 补列 + RLS policy 已就绪")
     except Exception as e:
         logger.error(f"ensure_clients_table failed: {e}")
 

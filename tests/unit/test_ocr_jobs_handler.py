@@ -22,6 +22,7 @@ def _params(**kw):
         "filename": "inv.pdf",
         "client_id": None,
         "workspace_client_id": None,
+        "posting_kind": None,
     }
     base.update(kw)
     return base
@@ -85,6 +86,19 @@ class HandleWebOcrTests(unittest.TestCase):
         ):
             out = h.handle_web_ocr(_params(), [], lambda p: None)
         self.assertEqual(out, ("__failed__", {"error_code": "insufficient_balance"}))
+
+    def test_posting_kind_forwarded_to_core(self):
+        # 提交时带的「本批过账去向」声明必须原样喂给 core,与同步路 /api/ocr/recognize 对齐;
+        # 闸开之前入队的老 job 载荷里没这个键 → 喂 None,不能 KeyError。
+        legacy = _params()
+        legacy.pop("posting_kind")
+        with self._patch_core(
+            return_value={"response": {}, "raw_pages": [], "history_ids": []}
+        ) as core:
+            h.handle_web_ocr(_params(posting_kind="stock"), [], lambda p: None)
+            h.handle_web_ocr(legacy, [], lambda p: None)
+        kinds = [c.kwargs.get("posting_kind") for c in core.call_args_list]
+        self.assertEqual(kinds, ["stock", None])
 
     def test_progress_emitted_before_core(self):
         seen = []

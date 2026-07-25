@@ -60,8 +60,10 @@ export const IV = {
     tpl: 'input_vat',
     endpoints: [] as Endpoint[],
     target: '' as string,
-    // 本批过账去向(录入向导 step① 每批开关 · 仅 Express 有此拆分)· 默认服务·销售 = SAFE 现状。
-    postingKind: 'service' as 'stock' | 'service',
+    // 本批过账去向(录入向导 step① 每批开关 · 仅 Express 有此拆分)。
+    // 初值空 = 没声明,不预选:预选值会被当成「用户对本批的显式决定」落库,进而绕过
+    // sales_mapper 的「永续客户 + 库存路未开 → 交会计」escalate,把该交人的票静默按服务记。
+    postingKind: '' as '' | 'stock' | 'service',
     busy: false,
     aborted: false, // 用户点「停止」· worker 据此停拉队列
     view: 'upload' as 'upload' | 'review' | 'submit' | 'success',
@@ -96,7 +98,7 @@ export function resetInvoice() {
     IV.confirmed = new Set<number>();
     IV.output = { excel: false, erp: false };
     IV.target = '';
-    IV.postingKind = 'service';
+    IV.postingKind = '';
     IV.busy = false;
     IV.view = 'upload';
 }

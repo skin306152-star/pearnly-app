@@ -24,6 +24,11 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.prior_doc import attach_prior_docnum
+from services.erp.express_push.posting_kind import (
+    POSTING_KIND_SERVICE,
+    POSTING_KIND_STOCK,
+    VALID_POSTING_KINDS,
+)
 from services.erp.express_push.common import (
     ExpressMapResult,
     ITEM_MODE_NONSTOCK,
@@ -193,18 +198,18 @@ def build_express_sales_payload(
     # 选「库存」= 明确卖真实库存(V2-b 真扣库存正是永续客户该走的账);选「服务」= 明确是服务/
     # 非库存(收入式入账,永续账套里的真服务本就不动库存)。自动 escalate 只兜「没显式选」的情形
     # (系统拿不准,不硬落)。放行库存侧安全:小助手匹配不到真库存品仍兜底 escalate(ERR_STOCK_NOT_FOUND)。
-    if posting_kind not in ("stock", "service") and profile.blocks_auto_posting():
+    if posting_kind not in VALID_POSTING_KINDS and profile.blocks_auto_posting():
         return fail(profile.escalate_reason())
 
     # 每批开关优先于画像:显式「库存」→ stock_sale(小助手扣真实库存 + 结转成本);显式「服务」→
     # 非库存服务档 + 收入式(不碰库存·不被永续画像推成 stock);缺省 → 沿用画像(=今天默认,行为不变)。
-    if posting_kind == "stock":
+    if posting_kind == POSTING_KIND_STOCK:
         # 心跳已报「这个账套零库存主档」= 推了必炸 —— 与其入队、被领走、烧完 3 次重试再转
         # 人工,不如当场拦下把缺的东西说清楚。
         if account_set_has_no_stock_master(config):
             return fail("stock_no_master_in_account_set")
         line_item_mode = ITEM_MODE_STOCK_SALE
-    elif posting_kind == "service":
+    elif posting_kind == POSTING_KIND_SERVICE:
         line_item_mode = ITEM_MODE_NONSTOCK
     else:
         line_item_mode = item_mode_for(profile.posting_mode)

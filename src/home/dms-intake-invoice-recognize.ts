@@ -56,13 +56,16 @@ function ingestOcrSuccess(f: IvFile, d: Dict) {
         }
     }
 }
-// 上传表单(文件 + 当前 client_id 归属 + 当前套账)· 同步/异步两路共用
+// 上传表单(文件 + 当前 client_id 归属 + 当前套账 + 本批过账去向)· 同步/异步两路共用
+// posting_kind 必须在识别请求就带上:开了自动推的客户在识别完成时就已推出,走不到第4步的推送传参。
+// 用户没选就不带 —— 未声明与「选了服务」是两回事,见 express_push/posting_kind.py。
 function buildOcrForm(f: IvFile): FormData {
     const form = new FormData();
     form.append('file', f.file, f.name);
     if (recState.cidCache != null) form.append('client_id', String(recState.cidCache));
     const wsId = w.getActiveWorkspaceClientId ? w.getActiveWorkspaceClientId() : null;
     if (wsId != null) form.append('workspace_client_id', String(wsId));
+    if (IV.postingKind) form.append('posting_kind', IV.postingKind);
     return form;
 }
 // 用户中途停止 → 取消态(两路共用)

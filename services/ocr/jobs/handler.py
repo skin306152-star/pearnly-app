@@ -76,12 +76,19 @@ def handle_web_ocr(
     client_id = params.get("client_id")
     # submit 已归一为 int|None 存入 params(JSONB 保型)→ 此处直取,无需复解析。
     ws_client_id = params.get("workspace_client_id")
+    # 闸开之前入队的老 job 的 params 里没有这个键 → None(= 未声明),与同步路不带该字段同义。
+    posting_kind = params.get("posting_kind")
 
     progress_cb({"stage": "running", "filename": filename})
 
     try:
         outcome = run_recognition_core(
-            user, content, file, client_id=client_id, ws_client_id=ws_client_id
+            user,
+            content,
+            file,
+            client_id=client_id,
+            ws_client_id=ws_client_id,
+            posting_kind=posting_kind,
         )
     except HTTPException as he:
         # 校验/非票/余额不足:终态失败,前端按明确原因展示(绝不冒充完成)。

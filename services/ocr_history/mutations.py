@@ -351,6 +351,8 @@ def insert_ocr_history(
     # 草稿态:网页录入识别后置 TRUE(不进识别记录列表)· 第4步完成/导出/推送才翻 FALSE。
     # 默认 FALSE → 存量 + LINE 等其它入口照旧即时可见(只有网页录入流会显式传 TRUE)。
     staged: bool = False,
+    # 本批过账去向声明 · 调用方负责归一(语义见 express_push.posting_kind)· 未声明 NULL。
+    posting_kind: Optional[str] = None,
 ) -> Optional[str]:
     """写入一条历史记录,返回新记录的 id(失败返回 None,不影响主流程)"""
     summary = _extract_summary_fields(pages)
@@ -418,7 +420,7 @@ def insert_ocr_history(
                     source_pdf_id, source_page_indices, source_index, source_total,
                     source, source_ref,
                     pdf_storage_path, pdf_size_bytes,
-                    client_id, workspace_client_id, ai_raw, staged
+                    client_id, workspace_client_id, ai_raw, staged, posting_kind
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s,
                     %s::jsonb, %s, %s,
@@ -427,7 +429,7 @@ def insert_ocr_history(
                     %s, %s::jsonb, %s, %s,
                     %s, %s,
                     %s, %s,
-                    %s, %s, %s::jsonb, %s
+                    %s, %s, %s::jsonb, %s, %s
                 )
                 RETURNING id
             """,
@@ -460,6 +462,7 @@ def insert_ocr_history(
                     safe_workspace_client_id,
                     _json.dumps(ai_raw if ai_raw is not None else pages, ensure_ascii=False),
                     bool(staged),
+                    posting_kind,
                 ),
             )
             row = cur.fetchone()

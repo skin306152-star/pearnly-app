@@ -213,7 +213,7 @@ def get_ocr_history_detail(
                        archive_name, category_tag,
                        fields_edited_at, edit_count, created_at, updated_at,
                        client_id, workspace_client_id,
-                       seller_name_official, seller_name_verified
+                       seller_name_official, seller_name_verified, posting_kind
                 FROM ocr_history
                 WHERE id = %s AND {owner_sql}{ws_sql}
                 LIMIT 1
@@ -249,6 +249,8 @@ def get_ocr_history_detail(
                 # ③ 官方名核验 · 税局 RD 官方抬头 + 已核验标(并存·前端可展示·记账/推送优先用)
                 "seller_name_official": r.get("seller_name_official"),
                 "seller_name_verified": bool(r.get("seller_name_verified")),
+                # 上传时声明的过账去向 · 推送四条腿共用(express_push.posting_kind 解析)
+                "posting_kind": r.get("posting_kind"),
             }
     except Exception as e:
         logger.error(f"查询历史详情失败 (id={record_id}): {e}")

@@ -320,6 +320,14 @@ jobs:
       - name: i18n completeness check (home.js · zh/en/th/ja)
         run: python scripts/check_i18n.py --strict --quiet
 
+      # 第 8 道闸(docs/permissions/05)· 2026-07-25 起进 CI:此前它只挂 pre-push,而
+      # core.hooksPath 从没指过 scripts/git-hooks → 这道闸两边都没跑过,谁漏个门都没人拦。
+      # 每条路由必须有可见守门,或登记进 PUBLIC_ROUTES / DELEGATED_ROUTES / SEALED_ROUTES。
+      - name: 路由权限覆盖闸 · 每条路由必有守门或显式登记(FAIL mode)
+        run: python scripts/check_authz_coverage.py --quiet
+        env:
+          PYTHONIOENCODING: utf-8
+
       # Node deps must be installed BEFORE unit tests: the *_frontend node
       # gates (format-date / ui-templates / with-loading) require esbuild to
       # compile the src/home TS, else they fail with "Cannot find module

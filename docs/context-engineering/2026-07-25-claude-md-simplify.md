@@ -78,12 +78,21 @@
 
 ## 七、遗留 / 待拍板
 
+### ✅ 已清(2026-07-25 当天做完)
+
+| 项 | 结论 | 落地 |
+|---|---|---|
+| authz 闸自己不准 | **85 条报红,逐条读源码后零真缺口**:68 条有门(闸认不出)· 14 条真公开面 · 3 条已封死端点(handler 无条件 403) | 闸改成**顺着调用往里看两层**(不再靠往名单堆函数名):`_gate_of()` 递归同文件 helper,认出 `authorize_pearnly_ai` / `_authorize` / `_authorize_bank_sales` / `_load_year_or_404` / POS 写事务信封 `pos_write`·`pos_api.subject`·`execute_gated_write` / `_require_owner`。改后 `authz coverage OK · 626 routes`,public 仍 75 条(没因为看深了把该报的吞掉) |
+| 公开面/封死端点没登记 | 页面壳 `/ai` `/cashier` `/dms` `/earn` `/dms-pick` `cashier-sw.js` · `/api/csp-report`(只记日志返 204)· `/api/line/dms/webhook`(验签即凭证)· dms_pick 三端点(一次性 token+nonce 即凭证) | 全部进 `PUBLIC_ROUTES` 带"为何公开"注释;3 条封死端点进新的 `SEALED_ROUTES`(判据:handler 第一行就 raise 403,没有分支能碰数据,解封必须同时加真门) |
+| 闸没在跑 | 它此前只挂 pre-push,而 `core.hooksPath` 从没指过 `scripts/git-hooks` → **两边都没跑过** | 加进 CI 主 job(`路由权限覆盖闸 · FAIL mode`,continue-on-error=False),以后漏门 CI 直接红 |
+| 闸脚本 Windows 假红 | 中文输出撞 cp874 → `UnicodeEncodeError` → exit 1(检查其实通过)。复现:`check_ai_smell.py AGENTS.md` → exit 1;加 `PYTHONIOENCODING=utf-8` → exit 0 | `scripts/git-hooks/pre-push` 入口 `export PYTHONIOENCODING=utf-8`,一行治全套。已验:hook 环境下同命令 exit=0 |
+| 闸会不会变橡皮章 | 递归查门有"看到天亮就都算有门"的风险 | 新增 `tests/unit/test_authz_gate_detection.py` 5 例锁住:直接门 / 一跳 / 两跳都认得出,**真没门的照样报**,超过两跳不认。写测试时抓到自己一个 bug(`def foo(` 的函数名被当成调用,白吃一层),已修 |
+
+### 仍待办
+
 | 项 | 现状 | 要做什么 |
 |---|---|---|
-| authz 闸自己不准(49/85 误报) | `GATE_PATTERNS` 的 `helper_gated` 只认 `_auth(`,认不出 `_authorize(` → 8 个文件 49 条有门的路由被判 public | 给 `scripts/authz_route_inventory.py` 补认 `_authorize` / `_load_order` / `_assert_owns_workspace`。**只改闸,不改运行时**,零风险 |
-| 12 条公开面没登记 | SPA 外壳 `/ai` `/cashier` `/dms` `/earn` `/dms-pick` · `cashier-sw.js` · `/api/csp-report` · `/api/line/dms/webhook` | 进 `PUBLIC_ROUTES` 并写"为何公开"注释。**只改闸清单,不改运行时** |
-| 约 24 条待人工逐条看 | payroll 5 · pos_shift 3 · pos_sales 退款/作废 2 · pos_modules 3 · dms_roster 6 · dms_pick 3 · fileconv 1 · front_desk status 1 · tax_profile matrix 1 | 一条条读 handler + 它调的 service,判"门在别处 / 真缺门"。真缺门的补 `require_perm` 属安全敏感改动 → 独立批次 + 真账号验。三条清完才谈挂 `core.hooksPath` + 进 CI |
-| 闸脚本在 Windows 上会**假红** | 中文输出撞 cp874 → `UnicodeEncodeError` → 退出码 1。已复现:`python scripts/check_ai_smell.py AGENTS.md` 检查其实通过,但打印"[OK] 去 AI 味检查通过"时崩掉 → `exit=1`;同一条命令加 `PYTHONIOENCODING=utf-8` → `exit=0`。`check_authz_coverage.py` 同病(失败清单看不见) | 钩子入口加一行 `export PYTHONIOENCODING=utf-8`(治所有脚本),或逐脚本设 stdout 编码。**不修这条,本地钩子挂上也会随机假红拦 push** |
+| 本地 pre-push 钩子仍是关的 | 挡路的两笔债已清(闸准了、假红治了),但挂上意味着**每次 push 本地先跑全套约 8 分钟**,且这棵树三个窗口共用 | 属工作流取舍,不单方面替别的窗口决定。想挂:`git config core.hooksPath scripts/git-hooks`(逐机器/逐 worktree 各设一次);不挂也有 CI 兜 |
 | STATE 状态卡超长 | 规矩写 ≤30 行,实际 469 行 / 150KB;banner 现已截断注入,但卡本身仍胖 | 由当前主线窗口重写状态卡(别窗口不代写) |
 | `MEMORY.md` 索引 28.3 KB | 374 条记忆的索引每会话全量加载(约 14k token) | 另议:是否按领域分片 / 只保留高频条目 |
 

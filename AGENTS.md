@@ -67,7 +67,9 @@
 sh scripts/git-hooks/pre-push     # Git Bash
 ```
 
-⚠️ **本地钩子当前是关的**(`core.hooksPath` 指 `.git/hooks`,没有 pre-push)→ 现在只剩 CI 事后红,push 前请手跑上面那条。**别急着挂**:2026-07-25 试挂过,第一跑就被 `check_authz_coverage` 报红 85 条;当场逐条只读体检 = **49 条是闸自己误报**(handler 有 `_authorize()` 门,闸的正则只认 `_auth(` 认不出)· 12 条是没登记的公开面(SPA 外壳/webhook/CSP 上报)· 约 24 条待人工逐条看(payroll/pos_shift/pos_sales/pos_modules/dms_roster/dms_pick/fileconv 等)。**这道闸也不在 CI。** 三件清完再挂,详见 `docs/context-engineering/2026-07-25-claude-md-simplify.md` 文末遗留表。
+**本地钩子当前是关的**(`core.hooksPath` 指 `.git/hooks`)→ 只剩 CI 兜,push 前请手跑上面那条。想挂:`git config core.hooksPath scripts/git-hooks`(逐机器/逐 worktree 各设一次)· 代价 = 每次 push 本地先跑全套约 8 分钟,共用工作树的窗口自己权衡。
+
+> 2026-07-25 修过这道的两笔债:① authz 覆盖闸此前只挂 pre-push 而钩子从没挂上 = **两边都没跑过** → 已加进 CI 主 job(FAIL mode);报红 85 条逐条读源码后**零真缺口**(68 条有门闸认不出 · 14 条真公开面 · 3 条封死端点),闸改成顺着调用看两层 + `tests/unit/test_authz_gate_detection.py` 锁住"真没门的照样报"。② 闸脚本中文输出撞 Windows cp874 会假红(exit 1)→ 钩子入口已 `export PYTHONIOENCODING=utf-8`;**手跑单个脚本时自己带上这个变量**。详见 `docs/context-engineering/2026-07-25-claude-md-simplify.md`。
 
 ## 5. 关键基础设施(少踩坑)
 

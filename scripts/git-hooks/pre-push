@@ -27,6 +27,10 @@
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT" || exit 1
 
+# Windows 默认控制台是 cp874(泰语页):闸脚本打印中文会 UnicodeEncodeError → 退出码 1 →
+# 明明通过的闸报假红,失败清单也印不出来(2026-07-25 复现:check_ai_smell 通过却 exit 1)。
+export PYTHONIOENCODING=utf-8
+
 echo "──────────────────────────────────────────────────────────"
 echo "🔒 pre-push 机械闸 · 推送前本地守门(防坏码上线)"
 echo "──────────────────────────────────────────────────────────"

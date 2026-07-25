@@ -32,6 +32,16 @@ PUBLIC_ROUTES = {
     ("GET", "/pos-sw.js"),  # PWA Service Worker 脚本(公开静态 · 前端鉴权同 /pos)
     ("GET", "/console"),
     ("GET", "/console/{rest:path}"),
+    # 同上:各入口 SPA 壳(只 FileResponse 打包好的 html,零业务数据)· 鉴权在各自 boot.js + 后端 API
+    ("GET", "/ai"),
+    ("GET", "/ai/{rest:path}"),
+    ("GET", "/cashier"),
+    ("GET", "/cashier/{rest:path}"),
+    ("GET", "/dms"),
+    ("GET", "/dms/{rest:path}"),
+    ("GET", "/earn"),
+    ("GET", "/dms-pick"),  # 选车面板壳 · 页内 JS 携 ?t= 调 API,token/nonce 在 API 侧 enforce
+    ("GET", "/cashier-sw.js"),  # PWA Service Worker 脚本(公开静态 · 同 /pos-sw.js)
     ("GET", "/invite/{token}"),
     ("GET", "/reset"),
     ("GET", "/terms"),
@@ -58,8 +68,11 @@ PUBLIC_ROUTES = {
     # OAuth 回调(state 即凭证)
     ("GET", "/api/erp/xero/auth/callback"),
     ("GET", "/api/integrations/google/callback"),  # Google 外流授权回调 · state CSRF 即凭证
+    # 浏览器自动上报(无会话 · 只记一条截断日志后返 204 · body 有上限 · 不读写业务数据)
+    ("POST", "/api/csp-report"),
     # webhook(签名校验在实现内:LINE signature / GitHub secret)
     ("POST", "/api/line/webhook"),
+    ("POST", "/api/line/dms/webhook"),  # DMS channel · line_client.verify_signature 验签即凭证
     ("POST", "/api/line/liff/auth"),  # LIFF id_token 即凭证(LINE verify 验签)
     ("GET", "/api/line/liff/config"),  # 仅返回公开 LIFF ID(非密)· 前端 liff.init 用
     ("GET", "/liff/purchase/{doc_id}"),  # LIFF 页入口·跳 /home 复核屏(前端 LIFF 鉴权)
@@ -80,6 +93,12 @@ PUBLIC_ROUTES = {
     ("GET", "/api/sales/documents/shared/{token}/pdf"),
     # 本月凭证打包下载(C-1)· token=时效签名(tenant+ws+period+落盘 rel+exp)即凭证 · verify_token 验签
     ("GET", "/api/purchase/proof-pdf/{token}"),
+    # DMS 选车面板三端点(DL-4a)· 无登录会话:LINE 侧签发的一次性 token 即凭证 —— 每个先过
+    # _verify(scope='dms_pick' + 未过期 → dms_line 闸 → 会话 picking 态 + nonce 吻合),
+    # 提交后换 nonce 使旧 token 失效;坏/过期 token 401,闸关 404(不泄漏功能存在)
+    ("GET", "/api/dms/pick/data"),
+    ("GET", "/api/dms/pick/paints"),
+    ("POST", "/api/dms/pick/submit"),
     # 泰语图卡出图 · LINE imagemap/图片按 baseUrl/{size} 取图 · ver 破缓存 · 仅固定卡(白名单)· 非敏感
     ("GET", "/api/line/card/{ver}/{card}/{size}"),
     # Express 本地 Agent 出站拉取 · Bearer agent token 即凭证(_auth_agent 验 sha256 · 只取本连接队列)·
@@ -87,6 +106,15 @@ PUBLIC_ROUTES = {
     ("POST", "/api/erp/agent/heartbeat"),
     ("POST", "/api/erp/agent/lease"),
     ("POST", "/api/erp/agent/ack"),
+}
+
+# 已封死:handler 无条件 raise 403,不读写任何数据,也不需要鉴权(留路由壳只为不动 app 注册)。
+# 自助模块管理与「入口定功能」冲突后封死(routes/pos_modules_routes.py 顶注 · 零前端消费者)。
+# 判据:handler 第一行就 raise,没有任何分支能碰到数据 —— 解封时必须同时加真门。
+SEALED_ROUTES = {
+    ("GET", "/api/pos/admin/modules"),
+    ("PUT", "/api/pos/admin/modules"),
+    ("GET", "/api/pos/admin/business-presets"),
 }
 
 # 别名/委托:endpoint 把请求原样转发给已守门的实现(委托点注明)。
@@ -119,7 +147,7 @@ def main() -> int:
             continue
         for method in r["methods"].split("/"):
             key = (method, r["path"])
-            if key not in PUBLIC_ROUTES and key not in DELEGATED_ROUTES:
+            if key not in PUBLIC_ROUTES | DELEGATED_ROUTES | SEALED_ROUTES:
                 missing.append(r)
                 break
     if missing:

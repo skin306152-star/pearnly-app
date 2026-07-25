@@ -59,6 +59,7 @@ def _write_grid(
 ) -> int:
     """通用网格写入。money_cols 是 1-based 列号。"""
     sty.write_header_row(ws, headers, widths)
+    rt.hide_machine_columns(ws, headers)
     money = set(money_cols)
     for r_off, values in enumerate(rows):
         row = 2 + r_off

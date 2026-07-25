@@ -200,6 +200,7 @@ def _write_header(ws) -> None:
         c.border = _BORDER
         ws.column_dimensions[get_column_letter(i)].width = COLUMN_WIDTHS[i - 1]
     ws.row_dimensions[1].height = 30
+    rt.hide_machine_columns(ws, HEADERS_TH)
 
 
 def _write_status_cell(ws, row: int, column: int, action: str) -> None:

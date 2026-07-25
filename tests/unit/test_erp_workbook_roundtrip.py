@@ -85,6 +85,29 @@ class SheetLayoutTests(unittest.TestCase):
             [rt.SHEET_SALES, rt.SHEET_PURCHASE, rt.SHEET_PENDING, rt.SHEET_SUMMARY],
         )
 
+    def test_row_key_column_is_hidden_but_still_parses(self):
+        """回导键是机器读的(PRN:<uuid>:<行序>),对会计零信息量却占一整列还把行撑高。
+
+        藏起来同时降低被误删的风险 —— 它一没,防重单闸和「改了票号还认得出是同一条」全断。
+        但只能藏不能删:读侧按列名取值,列在不在视野里与解析无关,这里两件一起钉。
+        """
+        from openpyxl.utils import get_column_letter
+
+        raw = build_review_workbook(sales=SALES, purchase=PURCHASE, pending=PENDING)
+        wb = load_workbook(io.BytesIO(raw))
+        for name in (rt.SHEET_SALES, rt.SHEET_PURCHASE, rt.SHEET_PENDING):
+            ws = wb[name]
+            col = next(
+                i for i in range(1, ws.max_column + 1) if ws.cell(1, i).value == rt.COL_ROW_KEY
+            )
+            letter = get_column_letter(col)
+            self.assertTrue(ws.column_dimensions[letter].hidden, f"{name} 的回导键列 {letter} 没藏")
+        out = parse_roundtrip_workbook(raw)
+        self.assertTrue(out["documents"], "藏了列之后反而解析不出来了")
+        self.assertEqual(
+            out["documents"][0]["fields"]["history_id"], SALES[0]["merged_fields"]["history_id"]
+        )
+
     def test_summary_sheet_is_not_parsed_back(self):
         """汇总是给人看的清理清单 · 绝不能被当数据回导重推。"""
         out = parse_roundtrip_workbook(

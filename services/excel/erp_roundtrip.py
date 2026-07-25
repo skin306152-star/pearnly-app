@@ -58,6 +58,22 @@ ROUNDTRIP_HEADERS: Tuple[str, ...] = (
 )
 ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 16, 18, 16, 14, 16, 26)
 
+
+def hide_machine_columns(ws, headers: Sequence[str]) -> None:
+    """把只有机器读的列藏起来(数据仍在,回导照样解析)。
+
+    回导键长这样:PRN:27d3dd57-261c-419a-8338-826af71e11d1:0 —— 对会计零信息量,
+    却占一整列、自动换行还把每一行撑高两倍。藏起来同时少一份被误删的风险:
+    会计看不见就不会顺手清空它,而它一没,防重单闸和「改了票号还认得出是同一条」就都断了。
+    只藏不删:回导按列名取值,列在不在视野里与解析无关。
+    """
+    from openpyxl.utils import get_column_letter
+
+    for i, h in enumerate(headers, start=1):
+        if h == COL_ROW_KEY:
+            ws.column_dimensions[get_column_letter(i)].hidden = True
+
+
 # ── 各表的业务列名(写侧和读侧共认这一份 · 读侧按列名取值不按列位,会计插列也不散架)──
 # 销项:前 12 列是 MR.ERP 公式合同(不动列位/公式),列名见 excel_template_th.HEADERS_TH。
 # ★ 3/4 列装的是客户名/商品名(写侧填 buyer_name/description,读侧原样读回),表头因此

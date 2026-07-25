@@ -463,6 +463,43 @@ class StockMasterFingerprintBumpTests(unittest.TestCase):
                 self.assertIsNone(self._count(lm))
 
 
+class HeartbeatStockAccGroupTests(unittest.TestCase):
+    """心跳里的存货科目组候选要真落库 —— 两头都做了、中间没人调,是这条链踩过的坑。"""
+
+    def _run(self, catalog):
+        import asyncio
+
+        from routes import erp_agent
+
+        class _Req:
+            headers = {"authorization": "Bearer exp_ep-1_x"}
+
+            async def json(self):
+                return {"catalog": catalog, "method": "dbf"}
+
+        ep = {"id": "ep-1", "enabled": True, "config": {}}
+        with (
+            mock.patch.object(erp_agent, "express_push_enabled", return_value=True),
+            mock.patch.object(erp_agent.agent_store, "authenticate", return_value=ep),
+            mock.patch.object(erp_agent.agent_store, "touch_heartbeat"),
+            mock.patch.object(erp_agent.agent_store, "store_account_sets", return_value=0),
+            mock.patch.object(erp_agent.agent_store, "store_reported_catalog", return_value=(0, 0)),
+            mock.patch.object(
+                erp_agent.agent_store, "store_reported_stock_acc_groups", return_value=1
+            ) as store_groups,
+        ):
+            asyncio.run(erp_agent.erp_agent_heartbeat(_Req()))
+        return store_groups
+
+    def test_candidates_are_stored(self):
+        groups = [{"acccod": "ST10", "fit": True}]
+        self.assertEqual(self._run({"isacc_candidates": groups}).call_args.args[1], groups)
+
+    def test_old_client_without_the_key_does_not_wipe_stored(self):
+        # store 侧是整体快照替换:老客户端不带这个键时若照调,会把已选好的候选擦成空。
+        self._run({"products": [], "customers": []}).assert_not_called()
+
+
 class HeartbeatReceiveTests(unittest.TestCase):
     def test_heartbeat_stores_accounts_chart(self):
         import asyncio

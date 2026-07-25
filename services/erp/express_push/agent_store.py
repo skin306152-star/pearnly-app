@@ -121,6 +121,7 @@ from services.erp.express_push.agent_reporting import (  # noqa: E402,F401
     store_max_payload_version,
     store_reported_accounts,
     store_reported_catalog,
+    store_reported_stock_acc_groups,
     store_selected_account,
     touch_heartbeat,
 )

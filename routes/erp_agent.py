@@ -121,6 +121,12 @@ async def erp_agent_heartbeat(request: Request):
                 cat.get("customers") or [],
                 cat.get("fingerprint"),
             )
+            # 存货科目组候选 → 供「零库存账套建第一个库存品」的下拉。搭同一班目录上报。
+            # 带了才写:store 侧是整体快照替换,老客户端不带这个键时若照调会把已存候选擦成空。
+            if cat.get("isacc_candidates") is not None:
+                agent_store.store_reported_stock_acc_groups(
+                    str(ep["id"]), cat.get("isacc_candidates")
+                )
         # 小助手上报客户【所选账套整组】→ 存 config(方法无关·直录/RPA 共用·见可扩展性契约)。
         # 仅在与已存不同时写,省稳态每拍无谓写库。
         selected = str(body.get("account_set") or "").strip() or None

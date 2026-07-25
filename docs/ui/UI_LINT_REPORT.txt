@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 491 个源文件全扫
+# UI 设计合规扫描报告 · 492 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -124,9 +124,9 @@
      1  src\home\dms-intake-invoice-submit.ts
         └ 102: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\erp-log-card.ts
-        └ 102: statusIcon = '⏭';
+        └ 101: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
-        └ 280: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
+        └ 285: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts
         └ 342: // v102 · 点统一「需复核」⚠ 直接打开抽屉(原 fill-amount 改名为 review)
      1  src\home\line-panel.ts
@@ -152,7 +152,7 @@
      1  static\home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 120(62 文件)
+## 小固定max-width(查是否@media) — 命中 153(83 文件)
      8  src\home\sales-detail.ts
         └ 115: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 160: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -165,6 +165,9 @@
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
+     4  static\ai\ai-intake.css
+        └ 7: max-width: min(560px, 100%);
+        └ 136: max-width: min(360px, 100%);
      4  static\home-37-html-inline.css
         └ 660: max-width: 420px;
         └ 1201: max-width: 420px;
@@ -183,6 +186,9 @@
      3  static\admin\admin.css
         └ 610: max-width: 260px;
         └ 769: max-width: 200px;
+     3  static\ai\ai-review-jc.css
+        └ 12: max-width: min(560px, 100%);
+        └ 49: max-width: min(560px, 100%);
      3  static\home-16-cost-clients.css
         └ 340: max-width: 520px;
         └ 544: .modal.modal-lg { max-width: 640px; width: 92vw; }
@@ -207,12 +213,33 @@
      2  src\home\confirm-modals-html.ts
         └ 13: <div class="modal" style="max-width:420px;">
         └ 30: <div class="modal" style="max-width:420px;">
+     2  src\home\onboarding-flow-html.ts
+        └ 37: .onb-pane{width:100%;max-width:min(600px,100%);}
+        └ 39: .onb-steps{display:flex;align-items:center;margin:6px auto 30px;max-width:min(440px,100%);
      2  src\home\sales-products.ts
         └ 130: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
         └ 242: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      2  src\home\sales-wizard-steps.ts
         └ 239: <div class="sw-row" style="max-width:580px">
         └ 242: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
+     2  static\ai\ai-client-empty.css
+        └ 2: width: min(560px, 100%);
+        └ 16: width: min(360px, 100%);
+     2  static\ai\ai-client.css
+        └ 429: max-width: min(420px, 100%);
+        └ 435: max-width: min(560px, 100%);
+     2  static\ai\ai-desk.css
+        └ 27: max-width: min(720px, 100%);
+        └ 205: max-width: min(720px, 100%);
+     2  static\console\console.css
+        └ 508: width: min(560px, 100%);
+        └ 970: width: min(420px, 100%);
+     2  static\dms\dms-intake.css
+        └ 995: max-width: min(720px, 100%);
+        └ 1514: max-width: min(400px, 100%);
+     2  static\dms\pick.html
+        └ 62: max-width: min(460px, 100%);
+        └ 240: max-width: min(320px, 100%);
      2  static\home-01-base.css
         └ 387: max-width: 240px;
         └ 393: .brand-workspace { font-size: 14px; max-width: 140px; }
@@ -239,6 +266,10 @@
         └ 134: '.rmap-tbl th,.rmap-tbl td{border:1px solid #e8e8e3;padding:5px 8px;text-align:left;white-
      1  src\home\bank-client-picker-html.ts
         └ 12: <div class="modal" style="max-width: 420px;">
+     1  src\home\client-assign.ts
+        └ 25: .casg{background:var(--card);border-radius:16px;width:100%;max-width:min(440px,100%);box-s
+     1  src\home\company-profile.ts
+        └ 17: .cprof{color:var(--ink);font-size:13.5px;max-width:min(760px,100%);}
      1  src\home\core.ts
         └ 185: '<div style="background:var(--card);border-radius:14px;padding:32px 24px 24px;max-width:36
      1  src\home\knowledge-fab.ts
@@ -261,10 +292,30 @@
         └ 222: `<div class="rs-pop" style="max-width:460px;">` +
      1  src\home\sales-wizard.ts
         └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+     1  src\home\workspace-gate-html.ts
+        └ 106: .wsg-empty-d{color:var(--ink2);font-size:13px;line-height:1.7;max-width:min(380px,100%);ma
+     1  static\ai\ai-pkg.css
+        └ 203: max-width: min(760px, 100%);
+     1  static\ai\ai-profile.css
+        └ 10: max-width: min(560px, 100%);
+     1  static\ai\ai-recon.css
+        └ 103: max-width: min(560px, 100%);
+     1  static\ai\ai-shell.css
+        └ 446: max-width: min(380px, 100%);
+     1  static\dms\dms-billing.css
+        └ 9: max-width: min(900px, 100%);
      1  static\dms\dms-connect.js
         └ 166: '<div class="dms-wizard" role="dialog" aria-modal="true" style="background:var(--card);bor
      1  static\dms\dms-intake-confirm.js
         └ 298: '<div class="modal dmsx" style="max-width:480px"><div class="modal-head"><b>' +
+     1  static\dms\dms-roster.css
+        └ 136: width: min(420px, 100%);
+     1  static\dms\dms-shell.css
+        └ 126: max-width: min(480px, 100%);
+     1  static\dms\dms-util.js
+        └ 59: 'border-radius:14px;width:min(400px,100%);padding:22px 24px;color:var(--ink);' +
+     1  static\erp-mrerp-connect.css
+        └ 176: width: min(820px, 100%);
      1  static\erp-mrerp-connect.js
         └ 895: '<div class="mrerp-wizard" style="max-width:520px">' +
      1  static\home-06-responsive-rd.css

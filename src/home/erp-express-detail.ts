@@ -72,7 +72,8 @@
             '</strong></div>'
         );
     }
-    function _tl(cls: string, dot: string, title: string, sub: string): string {
+    // extra 是已转义好的 HTML(体检卡住那一行的教程深链),其余文本一律走 _esc。
+    function _tl(cls: string, dot: string, title: string, sub: string, extra?: string): string {
         return (
             '<div class="erp-tl-row ' +
             cls +
@@ -82,7 +83,9 @@
             _esc(title) +
             '</b><span>' +
             _esc(sub) +
-            '</span></div></div>'
+            '</span>' +
+            (extra || '') +
+            '</div></div>'
         );
     }
 
@@ -215,7 +218,10 @@
             var cls = ok ? 'ok' : bad ? 'fail' : 'mid';
             var dot = ok ? '✓' : bad ? '✗' : '◦';
             var why = bad ? _preflightWhy(c.reason || '') : '';
-            rows += _tl(cls, dot, _t('erp-preflight-key-' + c.key), why);
+            // 体检卡在哪一步,教程就从哪一步接上(该码没写章节时 whyLink 返空,行照常渲染)。
+            var gl = (window as any).guideWhyLink;
+            var whyLink = bad && typeof gl === 'function' ? gl(c.reason || '') : '';
+            rows += _tl(cls, dot, _t('erp-preflight-key-' + c.key), why, whyLink);
         }
         return _sec(
             _t('erp-preflight-title'),

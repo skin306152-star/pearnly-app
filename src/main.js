@@ -79,6 +79,7 @@ import './home/modal-client-edit.js'; // REFACTOR-WB-C3 · 客户/账套主体�
 import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
 import './home/client-assign.js'; // 用户引导闭环 · 客户管理「分派会计」弹窗(window.openClientAssign · 复用 /api/team/members + scope)
 import './home/guide-page.js'; // 使用教程页(Express 推送)· window.loadGuidePage · 正文数据在 guide-content
+import './home/guide-links.js'; // 教程深链 · 失败原因码→章节映射 + 「这是怎么回事」委派(须在 guide-page 后)
 import './home/page-exceptions.js'; // REFACTOR-WB-C3 · 异常栏页骨架运行期注入(home.html section 抽出 · 须在 exceptions.js 前)
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
 import './home/erp-exceptions-edit.js'; // ERP 失败卡「修复映射」picker(window._erpExcOpenEdit · 推送日志失败卡调)

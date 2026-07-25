@@ -1,8 +1,5 @@
 /* 使用教程页 · 面包屑 + 单栏正文(目录在侧栏)。颜色一律走全站令牌,不写死值。 */
 
-/* 正文行宽上限:长行难读。用 min() 而非 max-width —— 后者被 UI lint 当固定宽度拦。 */
-.gd{width:min(100%,920px)}
-
 /* ---- 面包屑 ---- */
 .gd-crumb{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:14px;font-size:12px}
 .gd-crumb-b{font-size:12px;color:var(--ink3);background:none;border:0;padding:2px 0;cursor:pointer}
@@ -11,7 +8,10 @@
 .gd-crumb-cur{color:var(--ink2);font-weight:600}
 
 /* ---- 正文容器 ---- */
+/* 容器铺满到边(设计系统「铺满不聚拢」),限的是段落测量宽而非版面宽:14px 正文在宽屏
+   内容区能拉到 ~140 字符/行,约为可读上限的两倍。卡片/栅格/配图照旧顶到容器边。 */
 .gd-body{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 32px;min-width:0}
+.gd-intro,.gd-step-b>p,.gd-note>p{max-inline-size:78ch}
 .gd-h1{font-size:22px;font-weight:700;color:var(--ink);margin:0 0 10px;line-height:1.35}
 .gd-intro{font-size:14px;line-height:1.75;color:var(--ink2);margin:0 0 24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
 
@@ -67,3 +67,17 @@
   .gd-step{grid-template-columns:24px minmax(0,1fr);gap:11px;margin-bottom:22px}
   .gd-step-n{width:24px;height:24px;font-size:12px}
 }
+
+/* ---- 教程深链「这是怎么回事」---- */
+/* 埋在推送失败卡的原因条 / 详情抽屉的失败框 / Express 体检卡住那一行。
+   字号与颜色一律继承所在容器(失败条是红底红字,抽屉是灰底),只加下划线和箭头 ——
+   这是一条顺手的出口,不是要跟旁边的修复按钮抢注意力。 */
+.gd-why{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;
+  font:inherit;color:inherit;background:none;border:0;padding:0;
+  cursor:pointer;text-decoration:underline;text-underline-offset:2px;opacity:.85
+}
+.gd-why:hover,.gd-why:focus-visible{opacity:1}
+.gd-why-ar{font-size:1.1em;line-height:1}
+/* 抽屉失败框里独占一行(那里是竖排块,不是横排条)。 */
+.erp-receipt-fail-box .gd-why{margin-top:8px}

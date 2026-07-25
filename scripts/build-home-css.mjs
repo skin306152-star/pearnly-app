@@ -273,20 +273,50 @@ function copyFonts() {
 
 // 使用教程配图(scripts/_guide_shots.cjs 生成)· 同字体的理由:部署只拾 dist,
 // 且 vite emptyOutDir 每次清空,故随打包一并复制回去。
-function copyGuideShots() {
-    const srcDir = path.join(ROOT, 'static/guide/shots');
-    if (!fs.existsSync(srcDir)) return;
-    const outDir = path.join(ROOT, 'static/dist/guide-shots');
-    fs.mkdirSync(outDir, { recursive: true });
-    const files = fs.readdirSync(srcDir).filter((n) => n.endsWith('.png'));
-    for (const f of files) fs.copyFileSync(path.join(srcDir, f), path.join(outDir, f));
-    console.log(`✅ static/dist/guide-shots/ · ${files.length} 张`);
+function copyGuideAssets() {
+    for (const [from, to, ext, label] of [
+        ['static/guide/shots', 'static/dist/guide-shots', '.png', '张配图'],
+        ['static/guide/content', 'static/dist/guide-content', '.json', '篇正文'],
+    ]) {
+        const srcDir = path.join(ROOT, from);
+        if (!fs.existsSync(srcDir)) continue;
+        const outDir = path.join(ROOT, to);
+        fs.mkdirSync(outDir, { recursive: true });
+        const files = fs.readdirSync(srcDir).filter((n) => n.endsWith(ext));
+        for (const f of files) fs.copyFileSync(path.join(srcDir, f), path.join(outDir, f));
+        console.log(`✅ ${to}/ · ${files.length} ${label}`);
+    }
+    stampGuideChapterCounts();
+}
+
+// 手册首页七张卡要显示各篇已完工章数。章数在构建期就是已知的,运行期去数 = 为七个数字
+// 拉下全书正文(850 KB),把「按篇懒加载」当场作废。故这里数好写进 dist 的 index.json,
+// 首页只需那 1 KB 目录。源 index.json 不写这个字段 —— 手写必然与正文漂开。
+function stampGuideChapterCounts() {
+    const srcDir = path.join(ROOT, 'static/guide/content');
+    const idxPath = path.join(srcDir, 'index.json');
+    if (!fs.existsSync(idxPath)) return;
+    const index = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
+    for (const sec of index.sections || []) {
+        const file = path.join(srcDir, `${sec.id}.json`);
+        // 篇还没开工 = 文件不存在 = 0 章(页面据此显示「编写中」)。
+        sec.done = fs.existsSync(file)
+            ? (JSON.parse(fs.readFileSync(file, 'utf8')).chapters || []).length
+            : 0;
+    }
+    fs.writeFileSync(
+        path.join(ROOT, 'static/dist/guide-content/index.json'),
+        JSON.stringify(index)
+    );
+    console.log(
+        `✅ guide-content/index.json · 章数 ${index.sections.map((s) => s.done).join('/')}`
+    );
 }
 
 async function main() {
     for (const b of BUNDLES) await buildOne(b.list, b.out);
     copyFonts();
-    copyGuideShots();
+    copyGuideAssets();
 }
 
 main().catch((e) => {

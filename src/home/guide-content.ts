@@ -1,8 +1,9 @@
 // ============================================================
-// 使用教程 · 内容数据(Express 推送)
-// 章节清单由代码穷举 + 三路批判审计得出(docs/integrations/express-push/),不是凭印象写的。
-// 文案定调:正式书面语,不用口语;步骤到「点哪个按钮、看到什么算成功」的粒度。
-// 图一律由 scripts/_guide_shots.cjs 按 shot 字段批量生成,界面改了重跑即换新,不手截。
+// 使用教程 · 内容加载(Express 推送手册)
+// 正文不进 JS bundle:124 章中泰双语几百 KB,塞进 main.js 会拖慢所有页面的首屏,
+// 而教程是低频入口。改成按篇 JSON 懒加载,随 dist 一起部署(新增 static 根文件
+// 不会被 webhook 拾取,dist 子目录实测可靠)。
+// 指纹沿用页面上 main.js 的 ?v —— 每次发版自动破缓存,不用另记一套版本号。
 // ============================================================
 
 export type Lang = 'zh' | 'th';
@@ -14,7 +15,7 @@ export interface Bilingual {
 
 export interface GuideStep {
     text: Bilingual;
-    // 配图文件名(不含扩展名)· 对应 static/guide/shots/<shot>.png
+    // 配图基名 · 实际取 /static/dist/guide-shots/<shot>.<lang>.png
     shot?: string;
     caption?: Bilingual;
 }
@@ -32,166 +33,113 @@ export interface GuideChapter {
     notes: GuideNote[];
 }
 
-export interface GuideSection {
+export interface SectionMeta {
     id: string;
     title: Bilingual;
-    // 本篇最终章数(清单已定稿)· 未开工的章在目录里占位,让读者看得到全貌。
+    // 清单定稿的章数 · 与已完工章数一起显示,读者看得到这篇还剩多少
     planned: number;
-    chapters: GuideChapter[];
+    // 已完工章数 · 由构建期数各篇 chapters 写进 dist 的 index.json(源 index.json 不写:
+    // 手写必然漂)。首页七张卡只要这七个数字,不该为此把全书正文拉下来。
+    done: number;
 }
 
-const CH_UPLOAD_BATCH: GuideChapter = {
-    id: 'push-upload-batch',
-    title: { zh: '上传本批票据', th: 'อัปโหลดเอกสารชุดนี้' },
-    intro: {
-        zh: '收到客户送来的一批票据(手机照片、PDF 扫描件或 Excel 表格)后,在本页一次性上传并开始识别。',
-        th: 'เมื่อได้รับเอกสารจากลูกค้าเป็นชุด (ภาพถ่าย ไฟล์ PDF หรือไฟล์ Excel) ให้อัปโหลดทั้งหมดในครั้งเดียวจากหน้านี้ แล้วเริ่มอ่านค่าเอกสาร',
-    },
-    steps: [
-        {
-            text: {
-                zh: '在左侧导航中展开 Pearnly Cowork,点击「录入工作台」。',
-                th: 'ในเมนูด้านซ้าย เปิดกลุ่ม Pearnly Cowork แล้วคลิก「บันทึกเอกสาร」',
-            },
-            shot: 'upload-01-nav',
-            caption: {
-                zh: '左侧导航 · Pearnly Cowork 展开后的四个入口',
-                th: 'เมนูด้านซ้าย · สี่เมนูย่อยใต้ Pearnly Cowork',
-            },
-        },
-        {
-            text: {
-                zh: '在「选择录入任务」区域,确认已选中「发票 / 收据录入」。该卡片右侧显示勾选标记即为选中。',
-                th: 'ในส่วน「เลือกงานบันทึกข้อมูล」ตรวจสอบว่าเลือก「บันทึกใบกำกับ / ใบเสร็จ」แล้ว การ์ดที่เลือกจะมีเครื่องหมายถูกอยู่ทางขวา',
-            },
-            shot: 'upload-02-task',
-            caption: {
-                zh: '两张任务卡片,左侧为当前选中项',
-                th: 'การ์ดงานสองใบ ใบซ้ายคือรายการที่เลือกอยู่',
-            },
-        },
-        {
-            text: {
-                zh: '将文件拖入上传区,或点击「选择文件」。支持 PDF、图片、Excel、CSV 与 Word,可一次选择多个文件。在手机或平板上,另可使用「拍照」与「从相册」两个按钮。',
-                th: 'ลากไฟล์มาวางในพื้นที่อัปโหลด หรือคลิก「เลือกไฟล์」รองรับ PDF รูปภาพ Excel CSV และ Word เลือกได้หลายไฟล์พร้อมกัน หากใช้งานบนมือถือหรือแท็บเล็ต จะมีปุ่ม「ถ่ายภาพ」และ「เลือกจากอัลบั้ม」เพิ่มมาให้',
-            },
-            shot: 'upload-03-dropzone',
-            caption: {
-                zh: '上传区空态 · 单个文件与单批数量上限标注在右上角',
-                th: 'พื้นที่อัปโหลดขณะยังไม่มีไฟล์ · ขนาดต่อไฟล์และจำนวนสูงสุดต่อชุดแสดงที่มุมขวาบน',
-            },
-        },
-        {
-            text: {
-                zh: '核对文件队列。每一行显示文件名、大小与当前状态;文件名与大小完全相同的重复文件会被自动去除。',
-                th: 'ตรวจสอบรายการไฟล์ แต่ละแถวแสดงชื่อไฟล์ ขนาด และสถานะปัจจุบัน ไฟล์ที่ชื่อและขนาดซ้ำกันทั้งหมดจะถูกตัดออกโดยอัตโนมัติ',
-            },
-            shot: 'upload-04-queue',
-            caption: {
-                zh: '文件队列 · 同屏展示已上传、处理中、失败三种状态',
-                th: 'รายการไฟล์ · แสดงสถานะอัปโหลดแล้ว กำลังประมวลผล และล้มเหลว ในหน้าจอเดียว',
-            },
-        },
-        {
-            text: {
-                zh: '如有文件行显示失败,点击该行的重试图标重新上传;不需要的文件点击删除图标移除。',
-                th: 'หากมีแถวที่ล้มเหลว ให้คลิกไอคอนลองใหม่ที่แถวนั้นเพื่ออัปโหลดซ้ำ ส่วนไฟล์ที่ไม่ต้องการ ให้คลิกไอคอนลบเพื่อนำออก',
-            },
-        },
-        {
-            text: {
-                zh: '确认文件数量与大小未超出页面标注的上限,点击「开始」。',
-                th: 'ตรวจสอบว่าจำนวนและขนาดไฟล์ไม่เกินที่ระบุไว้ในหน้าจอ แล้วคลิก「เริ่ม」',
-            },
-            shot: 'upload-05-start',
-            caption: {
-                zh: '底部操作条 · 左侧为文件计数,右侧为「开始」按钮',
-                th: 'แถบด้านล่าง · ซ้ายคือจำนวนไฟล์ ขวาคือปุ่ม「เริ่ม」',
-            },
-        },
-    ],
-    notes: [
-        {
-            kind: 'warn',
-            text: {
-                zh: '识别按张计费。余额不足时,该文件行会转为红色,显示「余额不足」、当前余额与「点击充值」。这并非文件损坏,无需重新拍摄或转换格式;完成充值后点击该行的重试图标即可继续。',
-                th: 'การอ่านค่าเอกสารคิดค่าบริการเป็นรายใบ หากยอดคงเหลือไม่พอ แถวนั้นจะเปลี่ยนเป็นสีแดง พร้อมข้อความ「ยอดคงเหลือไม่พอ」ยอดคงเหลือปัจจุบัน และ「คลิกเพื่อเติมเงิน」กรณีนี้ไม่ใช่ไฟล์เสีย ไม่ต้องถ่ายใหม่หรือแปลงไฟล์ เมื่อเติมเงินแล้วให้คลิกไอคอนลองใหม่ที่แถวนั้นเพื่อทำต่อ',
-            },
-        },
-        {
-            kind: 'info',
-            text: {
-                zh: '图片会先经过清晰度检查再转为 PDF。若系统提示图片偏暗或清晰度不足,建议重新拍摄原件——后续因日期或税号读错而返工,代价更高。',
-                th: 'ระบบจะตรวจความคมชัดของรูปก่อนแปลงเป็น PDF หากมีข้อความแจ้งว่ารูปมืดหรือไม่ชัดพอ แนะนำให้ถ่ายเอกสารต้นฉบับใหม่ เพราะหากอ่านวันที่หรือเลขประจำตัวผู้เสียภาษีผิด จะต้องแก้ย้อนหลังซึ่งเสียเวลากว่ามาก',
-            },
-        },
-        {
-            kind: 'info',
-            text: {
-                zh: '一个文件中包含多张票据属于常见情况,系统会自动按张拆分,核对屏会以「发票 2/3」的形式标注。',
-                th: 'ไฟล์เดียวที่มีเอกสารหลายใบเป็นเรื่องปกติ ระบบจะแยกให้เองเป็นรายใบ และหน้าตรวจทานจะกำกับไว้ในรูปแบบ「ใบกำกับ 2/3」',
-            },
-        },
-    ],
-};
+export interface BookIndex {
+    book: Bilingual;
+    sections: SectionMeta[];
+}
 
-// 篇顺序 = 会计的真实使用顺序。planned 是清单定稿的章数,chapters 是已完工的。
-export const GUIDE_SECTIONS: GuideSection[] = [
-    {
-        id: 'overview',
-        title: { zh: '总览', th: 'ภาพรวม' },
-        planned: 11,
-        chapters: [],
-    },
-    {
-        id: 'setup',
-        title: { zh: '接入', th: 'การเชื่อมต่อ' },
-        planned: 12,
-        chapters: [],
-    },
-    {
-        id: 'daily',
-        title: { zh: '日常推送', th: 'งานประจำวัน' },
-        planned: 27,
-        chapters: [CH_UPLOAD_BATCH],
-    },
-    {
-        id: 'review',
-        title: { zh: '核对与回导', th: 'ตรวจทานและนำกลับเข้าระบบ' },
-        planned: 9,
-        chapters: [],
-    },
-    {
-        id: 'stuck',
-        title: { zh: '推不进去怎么办', th: 'เมื่อส่งเข้า Express ไม่สำเร็จ' },
-        planned: 40,
-        chapters: [],
-    },
-    {
-        id: 'maintain',
-        title: { zh: '维护与安全', th: 'การดูแลและความปลอดภัย' },
-        planned: 8,
-        chapters: [],
-    },
-    {
-        id: 'concept',
-        title: { zh: '概念说明', th: 'อธิบายศัพท์และหลักการ' },
-        planned: 16,
-        chapters: [],
-    },
-];
+const BASE = '/static/dist/guide-content/';
 
-export function findChapter(id: string): GuideChapter | null {
-    for (const s of GUIDE_SECTIONS) {
-        const hit = s.chapters.find((c) => c.id === id);
+// 教程页与深链映射两边都要转义/取词条,提到这里共用(此前各写一份逐字相同的实现)。
+export function esc(s: string): string {
+    return s.replace(
+        /[&<>"']/g,
+        (c) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string
+    );
+}
+
+export function T(key: string): string {
+    const fn = (window as unknown as { t?: (k: string) => string }).t;
+    const v = typeof fn === 'function' ? fn(key) : '';
+    return v || key;
+}
+
+function fingerprint(): string {
+    const el = document.querySelector<HTMLScriptElement>('script[src*="/dist/main.js"]');
+    const m = el && el.src.match(/[?&]v=([^&]+)/);
+    return m ? m[1] : '';
+}
+
+const url = (name: string): string => `${BASE}${name}.json?v=${fingerprint()}`;
+
+let index: BookIndex | null = null;
+let indexPending: Promise<BookIndex | null> | null = null;
+const sections = new Map<string, GuideChapter[]>();
+
+async function fetchIndex(): Promise<BookIndex | null> {
+    try {
+        const r = await fetch(url('index'));
+        if (r.ok) index = (await r.json()) as BookIndex;
+    } catch {
+        /* 目录取不到就当没有:页面回落到手册名占位,不弹错 */
+    }
+    indexPending = null;
+    return index;
+}
+
+// 进教程页时侧栏点击与路由派发会各叫一次(手机端还多一次)—— 缓存要连在途请求一起认,
+// 只认结果的话同一份目录会被并发拉好几遍。
+export function loadIndex(): Promise<BookIndex | null> {
+    if (index) return Promise.resolve(index);
+    if (!indexPending) indexPending = fetchIndex();
+    return indexPending;
+}
+
+// 已完工章节:某篇还没开工时文件不存在,404 按空篇处理,不当故障。
+export async function loadSection(id: string): Promise<GuideChapter[]> {
+    const hit = sections.get(id);
+    if (hit) return hit;
+    let list: GuideChapter[] = [];
+    try {
+        const r = await fetch(url(id));
+        if (r.ok) {
+            const data = (await r.json()) as { chapters?: GuideChapter[] };
+            if (Array.isArray(data.chapters)) list = data.chapters;
+        }
+    } catch {
+        /* 网络失败按空篇渲染,页面给的是「编写中」而不是错误弹窗 */
+    }
+    sections.set(id, list);
+    return list;
+}
+
+export function loadedIndex(): BookIndex | null {
+    return index;
+}
+
+export function loadedSection(id: string): GuideChapter[] | undefined {
+    return sections.get(id);
+}
+
+export function findLoadedChapter(id: string): GuideChapter | null {
+    for (const list of sections.values()) {
+        const hit = list.find((c) => c.id === id);
         if (hit) return hit;
     }
     return null;
 }
 
-export function firstChapterId(): string {
-    for (const s of GUIDE_SECTIONS) {
-        if (s.chapters.length) return s.chapters[0].id;
+// 深链要能直达任意章,而章属于哪一篇只有 index 知道 → 顺序探测已开工的篇。
+export async function findChapterAcrossBook(
+    id: string
+): Promise<{ sectionId: string; chapter: GuideChapter } | null> {
+    const idx = await loadIndex();
+    if (!idx) return null;
+    for (const s of idx.sections) {
+        const list = await loadSection(s.id);
+        const hit = list.find((c) => c.id === id);
+        if (hit) return { sectionId: s.id, chapter: hit };
     }
-    return '';
+    return null;
 }

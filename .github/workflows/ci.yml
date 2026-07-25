@@ -7,6 +7,7 @@ name: CI
 #   lint-ui     : UI 一致性棘轮(REFACTOR-WC 审计#2)· 违规不许反弹超基线 · FAIL 模式(2026-06-05 拍板切硬门 · 存量 B 类视觉清理仍 Zihao-gated)
 #   lint-debt   : 新债 diff 闸(REFACTOR-WC 审计#3)· 禁新增 ensure_*/巨石路由(铁律 #5/#17)· FAIL 模式
 #   lint-routes : 新路由契约软闸(REFACTOR-WC 审计#4)· 新 *_routes.py 必带契约测试 · WARNING 模式(continue-on-error · 唯一仍软的闸)
+#   lint-guide  : 使用教程内容闸 · 配图两套齐 / 中泰双语齐 / 一章一屏 · FAIL 模式
 #   test        : 5 关 = import 静态检查 / home.js i18n 4 语完整 / unit+coverage(--fail-under=40)
 #                 / Vite build 跑通 / Playwright E2E smoke(pearnly.com 公开页 · 4 语切换 · 0 console error)
 # 不依赖生产 secret · 不调后端业务(integ contract tests 全部 stub · e2e 只 GET 公开页)
@@ -133,6 +134,33 @@ jobs:
           else
             python scripts/check_cachebust.py
           fi
+
+  # 使用教程内容闸(2026-07-26 从 lint-size 里挪出来独立成 job)
+  #   教程正文是纯数据,没有编译期检查:漏一段泰文、少一张泰文图、一章写到三屏,页面照样
+  #   渲染,只有泰籍会计打开时才发现看的是中文、图是空的。
+  #   独立成 job 的理由:查的是【内容完整性】,与 lint-size 的【防大文件/blob/缓存破】不是
+  #   一个轴 —— 挂在那里会让教程笔误在 PR 检查列表里显示成 "anti-bigfile" 失败,误导定位。
+  #   闸本身的覆盖率测试在 tests/unit/test_guide_gate.py(坏数据反证「闸真的在看」)。
+  lint-guide:
+    name: lint-guide (教程内容完整性 · 配图/双语/一屏 · FAIL mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 零依赖(只用标准库)· 任何环境跑得动
+
+      - name: 使用教程内容闸 · 配图两套齐 / 中泰双语齐 / 一章一屏
+        run: python scripts/check_guide.py
+        env:
+          PYTHONIOENCODING: utf-8
 
   # REFACTOR-WC · UI 一致性闸(审计发现 #2:check_ui_consistency 没接 CI · 1787 违规无人棘轮)
   #   棘轮:违规总数 > BASELINE_TOTAL(脚本内)→ 非零退出。

@@ -3,24 +3,26 @@
 // 侧栏只到手册这一层(父栏「使用教程」→ 子栏「Express 推送手册」)—— 使用教程以后还要
 // 挂别的手册,手册内部的篇章不占侧栏。进手册先看七篇总览(无面包屑),点进某一篇才起面包屑。
 // 正文只做中泰(会计与老板的实际语言),英/日回落中文;配图同样分中泰两套 ——
-// 中文正文配泰文界面图读者对不上号。图走 /static/dist/guide-shots/,随 dist 部署
-// (新增 static 根文件不会被 webhook 拾取,见 reset.html 那次 404)。
+// 中文正文配泰文界面图读者对不上号。
 // ============================================================
-import { GUIDE_SECTIONS, findChapter } from './guide-content.js';
-import type { Bilingual, GuideChapter, GuideSection, Lang } from './guide-content.js';
+import {
+    esc,
+    T,
+    loadIndex,
+    loadSection,
+    loadedIndex,
+    loadedSection,
+    findLoadedChapter,
+    findChapterAcrossBook,
+} from './guide-content.js';
+import type { Bilingual, GuideChapter, Lang, SectionMeta } from './guide-content.js';
 
 const SHOT_BASE = '/static/dist/guide-shots/';
 
 interface WinBridge {
     _currentLang?: string;
     subscribeI18n?: (key: string, fn: () => void) => void;
-    t?: (k: string) => string;
     routeTo?: (r: string) => void;
-}
-
-function T(k: string): string {
-    const w = window as unknown as WinBridge;
-    return typeof w.t === 'function' ? w.t(k) : k;
 }
 
 function lang(): Lang {
@@ -30,38 +32,42 @@ function lang(): Lang {
 
 const say = (b: Bilingual): string => b[lang()];
 
-function esc(s: string): string {
-    return s.replace(
-        /[&<>"']/g,
-        (c) =>
-            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string
-    );
-}
-
 let secId = '';
 let chId = '';
 
-const findSection = (id: string): GuideSection | undefined =>
-    GUIDE_SECTIONS.find((s) => s.id === id);
+const meta = (id: string): SectionMeta | undefined =>
+    loadedIndex()?.sections.find((s) => s.id === id);
+
+const bookTitle = (): string => {
+    const idx = loadedIndex();
+    return idx ? say(idx.book) : T('gd-book-express');
+};
+
+// 三层页面同一套页头(标题 + 副行);副行省略时只出标题。
+function pageHead(title: string, sub?: string): string {
+    return (
+        `<h1 class="gd-h1">${esc(title)}</h1>` +
+        (sub === undefined ? '' : `<p class="gd-intro">${esc(sub)}</p>`)
+    );
+}
 
 // 七篇总览页不起面包屑(它就是手册首页);进了某一篇才需要回退路径。
 function crumbHtml(): string {
     if (!secId) return '';
     const parts = [
-        `<button type="button" class="gd-crumb-b" data-gd-root>${esc(T('gd-book-express'))}</button>`,
+        `<button type="button" class="gd-crumb-b" data-gd-root>${esc(bookTitle())}</button>`,
     ];
-    const sec = findSection(secId);
-    if (sec) {
-        const last = !chId;
+    const s = meta(secId);
+    if (s) {
         parts.push('<span class="gd-crumb-sep">/</span>');
         parts.push(
-            last
-                ? `<span class="gd-crumb-cur">${esc(say(sec.title))}</span>`
-                : `<button type="button" class="gd-crumb-b" data-gd-sec-up="${esc(sec.id)}">${esc(say(sec.title))}</button>`
+            chId
+                ? `<button type="button" class="gd-crumb-b" data-gd-sec-up="${esc(s.id)}">${esc(say(s.title))}</button>`
+                : `<span class="gd-crumb-cur">${esc(say(s.title))}</span>`
         );
     }
     if (chId) {
-        const c = findChapter(chId);
+        const c = findLoadedChapter(chId);
         if (c) {
             parts.push('<span class="gd-crumb-sep">/</span>');
             parts.push(`<span class="gd-crumb-cur">${esc(say(c.title))}</span>`);
@@ -70,43 +76,40 @@ function crumbHtml(): string {
     return `<nav class="gd-crumb">${parts.join('')}</nav>`;
 }
 
-// 篇总览:没选主题时的落地页,也是面包屑第一级点回来的地方。
 function rootHtml(): string {
-    const cards = GUIDE_SECTIONS.map((s) => {
-        const done = s.chapters.length;
-        const meta = done
-            ? `${done} / ${s.planned}`
-            : `<span class="gd-todo">${esc(T('gd-soon'))}</span>`;
-        return (
-            `<button type="button" class="gd-card${done ? '' : ' is-todo'}" data-gd-sec="${esc(s.id)}">` +
-            `<b>${esc(say(s.title))}</b><span class="gd-card-n">${meta}</span></button>`
-        );
-    }).join('');
-    return (
-        `<h1 class="gd-h1">${esc(T('gd-book-express'))}</h1>` +
-        `<p class="gd-intro">${esc(T('gd-sub'))}</p>` +
-        `<div class="gd-grid">${cards}</div>`
-    );
+    const idx = loadedIndex();
+    if (!idx) return pageHead(T('gd-book-express'));
+    const cards = idx.sections
+        .map((s) => {
+            const label = s.done
+                ? `${s.done} / ${s.planned}`
+                : `<span class="gd-todo">${esc(T('gd-soon'))}</span>`;
+            return (
+                `<button type="button" class="gd-card${s.done ? '' : ' is-todo'}" data-gd-sec="${esc(s.id)}">` +
+                `<b>${esc(say(s.title))}</b><span class="gd-card-n">${label}</span></button>`
+            );
+        })
+        .join('');
+    return pageHead(say(idx.book), T('gd-sub')) + `<div class="gd-grid">${cards}</div>`;
 }
 
-// 主题下的章节列表。未开工的章按定稿章数占位,读者知道这篇还有多少。
-function sectionHtml(s: GuideSection): string {
-    const items = s.chapters
+function sectionHtml(s: SectionMeta): string {
+    const list = loadedSection(s.id) || [];
+    const items = list
         .map(
             (c) =>
                 `<button type="button" class="gd-item" data-gd-ch="${esc(c.id)}">` +
                 `<b>${esc(say(c.title))}</b><span>${esc(say(c.intro))}</span></button>`
         )
         .join('');
-    const restCount = s.planned - s.chapters.length;
-    const rest =
-        restCount > 0
-            ? `<div class="gd-item is-todo"><b>${esc(T('gd-soon'))}</b><span>${restCount}</span></div>`
+    const rest = s.planned - list.length;
+    const todo =
+        rest > 0
+            ? `<div class="gd-item is-todo"><b>${esc(T('gd-soon'))}</b><span>${rest}</span></div>`
             : '';
     return (
-        `<h1 class="gd-h1">${esc(say(s.title))}</h1>` +
-        `<p class="gd-intro">${s.chapters.length} / ${s.planned}</p>` +
-        `<div class="gd-list">${items}${rest}</div>`
+        pageHead(say(s.title), `${list.length} / ${s.planned}`) +
+        `<div class="gd-list">${items}${todo}</div>`
     );
 }
 
@@ -130,7 +133,7 @@ function chapterHtml(c: GuideChapter): string {
                 `</div></li>`
         )
         .join('');
-    const notes = c.notes
+    const notes = (c.notes || [])
         .map(
             (n) =>
                 `<div class="gd-note is-${n.kind}">` +
@@ -139,8 +142,7 @@ function chapterHtml(c: GuideChapter): string {
         )
         .join('');
     return (
-        `<h1 class="gd-h1">${esc(say(c.title))}</h1>` +
-        `<p class="gd-intro">${esc(say(c.intro))}</p>` +
+        pageHead(say(c.title), say(c.intro)) +
         `<ol class="gd-steps">${steps}</ol>` +
         (notes ? `<div class="gd-notes">${notes}</div>` : '')
     );
@@ -165,22 +167,29 @@ function guardImages(root: HTMLElement): void {
 function render(): void {
     const page = document.getElementById('page-guide');
     if (!page) return;
-    const sec = secId ? findSection(secId) : undefined;
-    const c = chId ? findChapter(chId) : null;
+    const s = secId ? meta(secId) : undefined;
+    const c = chId ? findLoadedChapter(chId) : null;
     let body: string;
     if (c) body = chapterHtml(c);
-    else if (sec) body = sectionHtml(sec);
+    else if (s) body = sectionHtml(s);
     else body = rootHtml();
     page.innerHTML = `<div class="gd">${crumbHtml()}<article class="gd-body">${body}</article></div>`;
     guardImages(page);
     page.scrollTop = 0;
 }
 
-function goSection(id: string): void {
+// 进教程页的共同前置:绑一次委派 + 拿目录(1 KB)。首页七张卡的章数就在目录里,
+// 正文按篇懒加载 —— 点进哪篇才拉哪篇。
+async function enterBook(): Promise<void> {
+    bindPage();
+    await loadIndex();
+}
+
+async function goSection(id: string): Promise<void> {
     secId = id;
+    const list = await loadSection(id);
     // 该篇只有一章时直接进正文,省掉一次点击。
-    const s = findSection(id);
-    chId = s && s.chapters.length === 1 ? s.chapters[0].id : '';
+    chId = list.length === 1 ? list[0].id : '';
     render();
 }
 
@@ -196,15 +205,14 @@ function bindPage(): void {
             render();
             return;
         }
-        const up = t.closest<HTMLElement>('[data-gd-sec-up]');
-        if (up) {
+        if (t.closest('[data-gd-sec-up]')) {
             chId = '';
             render();
             return;
         }
         const card = t.closest<HTMLElement>('[data-gd-sec]');
         if (card && !card.classList.contains('is-todo')) {
-            goSection(card.dataset.gdSec || '');
+            void goSection(card.dataset.gdSec || '');
             return;
         }
         const ch = t.closest<HTMLElement>('[data-gd-ch]');
@@ -215,7 +223,7 @@ function bindPage(): void {
     });
 }
 
-// 侧栏点「Express 推送手册」→ 回到该手册首页(七篇总览),不停在上次看的那一章。
+// 侧栏点「Express 推送手册」→ 回该手册首页,不停在上次看的那一章。
 document.addEventListener('click', (e) => {
     const item = (e.target as HTMLElement).closest<HTMLElement>('.nav-sub-item[data-gd-book]');
     if (!item) return;
@@ -223,31 +231,42 @@ document.addEventListener('click', (e) => {
     chId = '';
     const w = window as unknown as WinBridge;
     if (typeof w.routeTo === 'function') w.routeTo('guide');
-    bindPage();
-    render();
+    void loadGuidePage();
 });
 
 // 全站切语言即重渲(整页文本都来自数据,不走 [data-i18n] 那套)。
-const w = window as unknown as WinBridge;
-if (typeof w.subscribeI18n === 'function') {
-    w.subscribeI18n('guide-page', () => {
+const bridge = window as unknown as WinBridge;
+if (typeof bridge.subscribeI18n === 'function') {
+    bridge.subscribeI18n('guide-page', () => {
         if (document.getElementById('page-guide')?.classList.contains('active')) render();
     });
 }
 
-// 报错卡等处深链某一章:window.openGuide('push-upload-batch')。
-(window as unknown as Record<string, unknown>).openGuide = function openGuide(id: string): void {
-    const sec = GUIDE_SECTIONS.find((s) => s.chapters.some((c) => c.id === id));
-    if (!sec) return;
-    secId = sec.id;
-    chId = id;
-    const bridge = window as unknown as WinBridge;
-    if (typeof bridge.routeTo === 'function') bridge.routeTo('guide');
-    bindPage();
+async function loadGuidePage(): Promise<void> {
+    await enterBook();
     render();
-};
+}
 
-(window as unknown as Record<string, unknown>).loadGuidePage = function loadGuidePage(): void {
-    bindPage();
+// hint = 调用方已知的所属篇(失败码映射表里写着)→ 只拉那一篇;篇里没有再全书兜底。
+async function sectionOf(id: string, hint?: string): Promise<string | null> {
+    if (hint && (await loadSection(hint)).some((c) => c.id === id)) return hint;
+    const hit = await findChapterAcrossBook(id);
+    return hit ? hit.sectionId : null;
+}
+
+// 报错卡等处深链某一章:window.openGuide('push-upload-batch', 'daily')。
+async function openGuide(id: string, sec?: string): Promise<void> {
+    const w = window as unknown as WinBridge;
+    if (typeof w.routeTo === 'function') w.routeTo('guide');
+    await enterBook();
+    // 深链的章可能还没写(失败卡上的入口先接线、内容后补)。找不到就回手册首页 ——
+    // 不清位置的话会停在上次看的那一章,读者以为点错了。
+    const found = await sectionOf(id, sec);
+    secId = found || '';
+    chId = found ? id : '';
     render();
-};
+}
+
+const api = window as unknown as Record<string, unknown>;
+api.loadGuidePage = loadGuidePage;
+api.openGuide = openGuide;

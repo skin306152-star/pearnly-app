@@ -2,80 +2,16 @@
 // 图用 naturalWidth 判,不看 src 是否写对 —— 路径写对但 404 的坑就是这么漏过去的。
 // 跑法: node scripts/_guide_page_verify.cjs → tests/visual/_shot/guide-*.png
 /* eslint-disable no-undef */
-const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
+const { serveStatic, chk, summary, crumbs, bootHome } = require('./_verify_shared.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'tests', 'visual', '_shot');
 const PORT = 8799;
-const TYPES = {
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.html': 'text/html',
-    '.map': 'application/json',
-    '.png': 'image/png',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',
-    '.woff2': 'font/woff2',
-};
 
-function serve() {
-    const srv = http.createServer((req, res) => {
-        let p = decodeURIComponent(req.url.split('?')[0]);
-        if (p === '/home') p = '/home.html';
-        const file = path.join(ROOT, p);
-        if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-            res.writeHead(404);
-            return res.end('nf');
-        }
-        res.writeHead(200, {
-            'content-type': TYPES[path.extname(file)] || 'text/plain',
-            'cache-control': 'no-store',
-        });
-        fs.createReadStream(file).pipe(res);
-    });
-    return new Promise((r) => srv.listen(PORT, () => r(srv)));
-}
-
-let pass = 0;
-let fail = 0;
-function chk(name, ok) {
-    ok ? pass++ : fail++;
-    console.log((ok ? 'PASS' : 'FAIL').padEnd(5), name);
-    return ok;
-}
-
-async function boot(ctx, lang, viewport) {
-    const page = await ctx.newPage();
-    await page.setViewportSize(viewport);
-    await page.addInitScript((lg) => {
-        localStorage.setItem('mrpilot_token', 'tok');
-        localStorage.setItem('mrpilot_lang', lg);
-    }, lang);
-    await page.route('**/api/**', (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ ok: true, items: [] }),
-        })
-    );
-    const errs = [];
-    page.on('pageerror', (e) => errs.push(String(e)));
-    await page.goto('http://localhost:' + PORT + '/home', { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => typeof window.routeTo === 'function');
-    await page.evaluate(() => {
-        window.isOwner = () => true;
-        document.body.classList.remove('workspace-gate-preboot');
-        document.getElementById('workspace-gate-root')?.remove();
-        const st = document.createElement('style');
-        st.textContent =
-            '#ws-modal{display:none!important}#workspace-gate-root{display:none!important}';
-        document.head.appendChild(st);
-    });
-    return { page, errs };
-}
+const boot = (ctx, lang, viewport) => bootHome(ctx, { port: PORT, lang, viewport });
 
 const visible = (page, sel) =>
     page.evaluate((s) => {
@@ -89,16 +25,9 @@ const visible = (page, sel) =>
         return true;
     }, sel);
 
-const crumb = (page) =>
-    page.evaluate(() =>
-        [...document.querySelectorAll('.gd-crumb-b, .gd-crumb-cur')].map((e) =>
-            e.textContent.trim()
-        )
-    );
-
 async function run() {
     fs.mkdirSync(OUT, { recursive: true });
-    const srv = await serve();
+    const srv = await serveStatic(PORT);
     const browser = await chromium.launch();
     const ctx = await browser.newContext({ deviceScaleFactor: 2 });
 
@@ -139,10 +68,12 @@ async function run() {
     chk('手册首页不起面包屑', (await page.locator('.gd-crumb').count()) === 0);
     await page.screenshot({ path: path.join(OUT, 'guide-root.png') });
 
-    // 点某一篇 → 只有一章,直达正文,此时才起面包屑
+    // 点某一篇 → 章节列表;点其中一章才进正文,此时才起面包屑
     await page.click('.gd-card[data-gd-sec="daily"]');
+    await page.waitForSelector('#page-guide .gd-list', { timeout: 8000 });
+    await page.click('.gd-item[data-gd-ch="push-upload-batch"]');
     await page.waitForSelector('#page-guide .gd-steps', { timeout: 8000 });
-    let c = await crumb(page);
+    let c = await crumbs(page);
     console.log('  面包屑:', c.join(' / '));
     chk('面包屑三级(手册 / 篇 / 章节)', c.length === 3);
     chk('面包屑首级是手册名', /Express/.test(c[0] || ''));
@@ -173,10 +104,12 @@ async function run() {
     // 面包屑回退:中级 → 该篇章节列表
     await page.click('[data-gd-sec-up]');
     await page.waitForSelector('.gd-list', { timeout: 5000 });
-    c = await crumb(page);
+    c = await crumbs(page);
     chk('回退后面包屑两级', c.length === 2);
-    chk('章节列表有已完工那一章', (await page.locator('.gd-item[data-gd-ch]').count()) === 1);
-    chk('列表给出未完工占位', (await page.locator('.gd-item.is-todo').count()) === 1);
+    const items = await page.locator('.gd-item[data-gd-ch]').count();
+    chk(`章节列表列出该篇全部章(实得 ${items})`, items === 27);
+    // 全篇写完时不该再出「编写中」占位(planned - 实际 = 0)。
+    chk('已写完的篇不留占位', (await page.locator('.gd-item.is-todo').count()) === 0);
     await page.screenshot({ path: path.join(OUT, 'guide-section-list.png') });
 
     // 面包屑回退:首级 → 七篇总览(回到首页面包屑消失)
@@ -186,6 +119,8 @@ async function run() {
 
     // 切中文:正文与配图同步换
     await page.click('.gd-card[data-gd-sec="daily"]');
+    await page.waitForSelector('.gd-list', { timeout: 5000 });
+    await page.click('.gd-item[data-gd-ch="push-upload-batch"]');
     await page.waitForSelector('.gd-steps', { timeout: 5000 });
     await page.evaluate(() => window.applyLang && window.applyLang('zh'));
     await page.waitForTimeout(800);
@@ -206,7 +141,7 @@ async function run() {
     await page.waitForTimeout(300);
     await page.evaluate(() => window.openGuide('push-upload-batch'));
     await page.waitForSelector('.gd-steps', { timeout: 5000 });
-    chk('openGuide 深链直达该章', (await crumb(page)).length === 3);
+    chk('openGuide 深链直达该章', (await crumbs(page)).length === 3);
 
     chk('无页面 JS 错误', errs.length === 0);
     if (errs.length) console.log('  pageerror:', errs.slice(0, 3));
@@ -243,8 +178,7 @@ async function run() {
 
     await browser.close();
     srv.close();
-    console.log(`\n${pass} passed, ${fail} failed`);
-    process.exit(fail ? 1 : 0);
+    process.exit(summary());
 }
 
 run().catch((e) => {

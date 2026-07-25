@@ -38,11 +38,17 @@ const CHECKS = [
         re: /--(blue|rep-blue|c-blue|invp|pur-blue|brand-blue)\b/gi,
     },
     { key: 'emoji当图标(应换Lucide)', re: /\p{Extended_Pictographic}/gu, skipToken: false },
-    // 只抓"固定 max-width"(非响应式):@media 查询里的 max-width 是正确的响应式断点,
+    // 只抓"固定宽度上限"(非响应式):@media 查询里的 max-width 是正确的响应式断点,
     // 类名"查是否@media"本就承诺只看 @media 之外的固定宽度 → skipLineRe 跳过 @media 行。
+    // DESIGN_SYSTEM.md §布局栅格「铺满不聚拢」:内容区 width:100%/max-width:none,写死
+    // 的 760/920 这类小宽度会在宽屏留大片空白 = bug。
+    // 三种写法同一件事,必须一起认 —— 只认 `max-width:NNNpx` 的话,作者把它改写成
+    // `width:min(100%,920px)` 或 `max-width:min(920px,100%)` 就绕过去了(层叠结果逐像素
+    // 相同),闸变成"考验作者会不会换写法"。第二个参数是 100% 才等价;`min(480px,94vw)`
+    // 这类视口相对写法是真响应式,语义不同,不在此列。
     {
         key: '小固定max-width(查是否@media)',
-        re: /max-width:\s*([1-9]\d{2})px/gi,
+        re: /max-width:\s*[1-9]\d{2}px|(?<![-\w])(?:max-)?width:\s*min\(\s*(?:100%\s*,\s*[1-9]\d{2}px|[1-9]\d{2}px\s*,\s*100%)\s*\)/gi,
         skipLineRe: /@media/i,
     },
     // `.drawer\b` 会误匹配 `.drawer-decision-zone` 等子元素选择器(已存在抽屉的内部结构,
@@ -151,8 +157,20 @@ const totals = {};
 for (const c of CHECKS) totals[c.key] = results[c.key].reduce((s, r) => s + r.count, 0);
 totals['裸hex'] = hexTotal;
 
+// baseline 里下划线开头的键是人写的说明(某类存量债为什么是这个数、欠着的多少处),
+// 收紧基线时原样带走 —— 否则跑一次 --update-baseline 就把这段来龙去脉抹掉了。
+// 闸只比对 totals 里的键,说明键不参与判定。
+function carryNotes() {
+    try {
+        const prev = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
+        return Object.fromEntries(Object.entries(prev).filter(([k]) => k.startsWith('_')));
+    } catch {
+        return {};
+    }
+}
+
 if (MODE_UPDATE) {
-    fs.writeFileSync(BASELINE_FILE, JSON.stringify(totals, null, 2) + '\n');
+    fs.writeFileSync(BASELINE_FILE, JSON.stringify({ ...carryNotes(), ...totals }, null, 2) + '\n');
     console.log(`baseline 已写入 ${BASELINE_FILE}`);
 } else if (MODE_GATE) {
     let base;

@@ -228,10 +228,15 @@ async function showLogDetail(logId: any) {
                 : isMappingErr
                   ? t('erp-detail-advice-mapping')
                   : t('erp-detail-advice-generic');
+            // 原因写完给一条出口:该原因码有教程章节才出现,没有就只剩原因(不给死链)。
+            const gl = (window as unknown as { guideWhyLink?: (r: unknown) => string })
+                .guideWhyLink;
+            const whyLink = typeof gl === 'function' ? gl(log.error_msg || '') : '';
             failBlockHtml = `
                 <div class="erp-receipt-fail-box">
                     ${errCode ? `<div class="erp-receipt-errcode">${escapeHtml(errCode)}</div>` : ''}
                     <div class="erp-receipt-friendly">${escapeHtml(friendly)}</div>
+                    ${whyLink}
                 </div>`;
         }
 

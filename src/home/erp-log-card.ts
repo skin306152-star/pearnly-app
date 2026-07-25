@@ -11,6 +11,7 @@ import {
     _erpExcBindPanel,
     _erpExcStockOpeningPanel,
 } from './erp-exc-actions.js';
+import { extractReasonCode, guideWhyLink } from './guide-links.js';
 
 // Express 转人工/失败原因码 → 友好文案键(把「EXPRESS_MANUAL: no_revenue_account」这类
 // 看不懂的英文码显成人话)。后端若已带 error_friendly 优先用它;否则这里按码翻译。
@@ -64,16 +65,14 @@ const _AGENT_REASON_I18N: Record<string, string> = {
 
 function _expressFriendlyReason(raw: string, log?: any): string {
     // raw 形如 "EXPRESS_MANUAL: no_revenue_account" 或 "account_set_not_allowed:DATAT"
-    const stripped = (raw || '').replace(/^EXPRESS_MANUAL:?\s*/i, '').trim();
-    const agent = stripped.match(/^\[([A-Z0-9_]+)\]/);
-    if (agent && _AGENT_REASON_I18N[agent[1]]) {
-        const text = t(_AGENT_REASON_I18N[agent[1]]);
+    const code = extractReasonCode(raw);
+    if (_AGENT_REASON_I18N[code]) {
+        const text = t(_AGENT_REASON_I18N[code]);
         // 单据号从后端派生的结构化字段取(载荷里的 prior_docnum),不从错误串抠。
         // 只说"有旧单挡着"而不说是哪一号,会计没法动手。
         const doc = (log && log.prior_doc_fix && log.prior_doc_fix.docnum) || '';
         return text.replace('{doc}', doc);
     }
-    const code = stripped.split(':')[0].trim();
     const key = _EXPRESS_REASON_I18N[code];
     return key ? t(key) : '';
 }
@@ -297,9 +296,12 @@ function buildErpLogCard(log: any): string {
     const rawReason = (log.error_msg || '').replace(/^ERR_[A-Z0-9_]+:?\s*/, '').trim();
     const reasonText =
         friendlyReason || _expressFriendlyReason(log.error_msg || '', log) || rawReason;
+    // 摘要读完接着就是「那我该怎么办」——原因码有对应章节时就地给一条深链,没有则不出现,
+    // 免得点开一篇跟这张票无关的文章。
+    const whyLink = statusClass === 'fail' ? guideWhyLink(log.error_msg || '') : '';
     const reasonStrip =
         statusClass === 'fail' && reasonText
-            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(reasonText)}</span></div>`
+            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(reasonText)}</span>${whyLink}</div>`
             : '';
 
     return `

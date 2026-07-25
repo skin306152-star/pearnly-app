@@ -107,10 +107,10 @@ async function run() {
     // 入口必须「点得到」,不是「DOM 里有」:会计版白名单漏加就会被 display:none。
     chk('侧栏「使用教程」父栏可见', await visible(page, '[data-collapsible="guide"]'));
 
-    // 默认展开:不点也看得见 7 个主题 —— 收起的话新会计根本不知道教程里有东西。
+    // 侧栏只到手册这一层:使用教程以后还要挂别的手册,篇章不占侧栏。
     const subs = await page.locator('[data-collapsible="guide"] .nav-sub-item').count();
-    chk(`默认展开并列出 7 个主题(实得 ${subs})`, subs === 7);
-    chk('主题子栏可见', await visible(page, '[data-gd-sec="daily"]'));
+    chk(`子栏只有手册这一层(实得 ${subs})`, subs === 1);
+    chk('「Express 推送手册」子栏可见', await visible(page, '[data-gd-book="express"]'));
     chk(
         '默认未折叠',
         !(await page.evaluate(() =>
@@ -130,21 +130,23 @@ async function run() {
     );
     await page.click('[data-toggle-group="guide"]');
     await page.waitForTimeout(400);
-    chk('再点可展开', await visible(page, '[data-gd-sec="daily"]'));
+    chk('再点可展开', await visible(page, '[data-gd-book="express"]'));
 
-    // 点主题 → 该篇只有一章,直达正文
-    await page.click('[data-gd-sec="daily"]');
+    // 点手册 → 先看七篇总览,此时不该有面包屑
+    await page.click('[data-gd-book="express"]');
+    await page.waitForSelector('#page-guide .gd-grid', { timeout: 8000 });
+    chk('手册首页列出 7 篇卡片', (await page.locator('.gd-card').count()) === 7);
+    chk('手册首页不起面包屑', (await page.locator('.gd-crumb').count()) === 0);
+    await page.screenshot({ path: path.join(OUT, 'guide-root.png') });
+
+    // 点某一篇 → 只有一章,直达正文,此时才起面包屑
+    await page.click('.gd-card[data-gd-sec="daily"]');
     await page.waitForSelector('#page-guide .gd-steps', { timeout: 8000 });
     let c = await crumb(page);
     console.log('  面包屑:', c.join(' / '));
-    chk('面包屑三级(教程 / 主题 / 章节)', c.length === 3);
+    chk('面包屑三级(手册 / 篇 / 章节)', c.length === 3);
+    chk('面包屑首级是手册名', /Express/.test(c[0] || ''));
     chk('末级是当前章节', /อัปโหลด/.test(c[2] || ''));
-    chk(
-        '侧栏该主题高亮',
-        await page.evaluate(() =>
-            document.querySelector('[data-gd-sec="daily"]')?.classList.contains('active')
-        )
-    );
 
     const steps = await page.locator('.gd-step').count();
     chk(`步骤全渲染(实得 ${steps} 步)`, steps === 6);
@@ -177,15 +179,13 @@ async function run() {
     chk('列表给出未完工占位', (await page.locator('.gd-item.is-todo').count()) === 1);
     await page.screenshot({ path: path.join(OUT, 'guide-section-list.png') });
 
-    // 面包屑回退:首级 → 七篇总览
+    // 面包屑回退:首级 → 七篇总览(回到首页面包屑消失)
     await page.click('[data-gd-root]');
     await page.waitForSelector('.gd-grid', { timeout: 5000 });
-    chk('首级列出 7 篇卡片', (await page.locator('.gd-card').count()) === 7);
-    chk('回到首级后面包屑只剩一级', (await crumb(page)).length === 1);
-    await page.screenshot({ path: path.join(OUT, 'guide-root.png') });
+    chk('回首页后面包屑消失', (await page.locator('.gd-crumb').count()) === 0);
 
     // 切中文:正文与配图同步换
-    await page.click('[data-gd-sec="daily"]');
+    await page.click('.gd-card[data-gd-sec="daily"]');
     await page.waitForSelector('.gd-steps', { timeout: 5000 });
     await page.evaluate(() => window.applyLang && window.applyLang('zh'));
     await page.waitForTimeout(800);
@@ -211,6 +211,25 @@ async function run() {
     chk('无页面 JS 错误', errs.length === 0);
     if (errs.length) console.log('  pageerror:', errs.slice(0, 3));
     await page.close();
+
+    // 集成已并入主数据折叠组,底部不再单列
+    const { page: m0 } = await boot(ctx, 'th', { width: 1440, height: 980 });
+    chk(
+        '集成在主数据组内',
+        await m0.evaluate(
+            () => !!document.querySelector('[data-collapsible="master"] #nav-integrations')
+        )
+    );
+    chk(
+        '主数据可折叠',
+        await m0.evaluate(() => !!document.querySelector('[data-toggle-group="master"]'))
+    );
+    chk(
+        '侧栏底部不再单列集成',
+        await m0.evaluate(() => !document.querySelector('.sidebar-bottom #nav-integrations'))
+    );
+    await m0.screenshot({ path: path.join(OUT, 'guide-nav-master.png') });
+    await m0.close();
 
     // 手机端
     const { page: m } = await boot(ctx, 'th', { width: 390, height: 844 });

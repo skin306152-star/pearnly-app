@@ -1,7 +1,7 @@
 // ============================================================
-// 使用教程页(#page-guide)· 三层:篇 → 主题下的章节 → 章节正文,靠面包屑回退。
-// 目录不占正文旁边一栏:导航在侧栏(父栏「使用教程」→ 子栏主题),页内只留面包屑。
-// 侧栏 7 个子项共用 guide 路由,靠 data-gd-sec 区分是哪一篇。
+// 使用教程页(#page-guide)· 手册 → 篇 → 章节正文。
+// 侧栏只到手册这一层(父栏「使用教程」→ 子栏「Express 推送手册」)—— 使用教程以后还要
+// 挂别的手册,手册内部的篇章不占侧栏。进手册先看七篇总览(无面包屑),点进某一篇才起面包屑。
 // 正文只做中泰(会计与老板的实际语言),英/日回落中文;配图同样分中泰两套 ——
 // 中文正文配泰文界面图读者对不上号。图走 /static/dist/guide-shots/,随 dist 部署
 // (新增 static 根文件不会被 webhook 拾取,见 reset.html 那次 404)。
@@ -44,11 +44,13 @@ let chId = '';
 const findSection = (id: string): GuideSection | undefined =>
     GUIDE_SECTIONS.find((s) => s.id === id);
 
+// 七篇总览页不起面包屑(它就是手册首页);进了某一篇才需要回退路径。
 function crumbHtml(): string {
+    if (!secId) return '';
     const parts = [
-        `<button type="button" class="gd-crumb-b" data-gd-root>${esc(T('gd-title'))}</button>`,
+        `<button type="button" class="gd-crumb-b" data-gd-root>${esc(T('gd-book-express'))}</button>`,
     ];
-    const sec = secId ? findSection(secId) : undefined;
+    const sec = findSection(secId);
     if (sec) {
         const last = !chId;
         parts.push('<span class="gd-crumb-sep">/</span>');
@@ -81,7 +83,7 @@ function rootHtml(): string {
         );
     }).join('');
     return (
-        `<h1 class="gd-h1">${esc(T('gd-title'))}</h1>` +
+        `<h1 class="gd-h1">${esc(T('gd-book-express'))}</h1>` +
         `<p class="gd-intro">${esc(T('gd-sub'))}</p>` +
         `<div class="gd-grid">${cards}</div>`
     );
@@ -160,14 +162,6 @@ function guardImages(root: HTMLElement): void {
     });
 }
 
-// 侧栏子项高亮跟着当前主题走(共用 guide 路由,通用高亮逻辑认不出是哪一篇)。
-function syncNav(): void {
-    document.querySelectorAll<HTMLElement>('[data-gd-sec]').forEach((el) => {
-        if (el.classList.contains('nav-sub-item'))
-            el.classList.toggle('active', el.dataset.gdSec === secId);
-    });
-}
-
 function render(): void {
     const page = document.getElementById('page-guide');
     if (!page) return;
@@ -179,7 +173,6 @@ function render(): void {
     else body = rootHtml();
     page.innerHTML = `<div class="gd">${crumbHtml()}<article class="gd-body">${body}</article></div>`;
     guardImages(page);
-    syncNav();
     page.scrollTop = 0;
 }
 
@@ -222,13 +215,16 @@ function bindPage(): void {
     });
 }
 
-// 侧栏子项:通用导航只认 data-route,认不出点的是哪一篇 —— 这里补上。
+// 侧栏点「Express 推送手册」→ 回到该手册首页(七篇总览),不停在上次看的那一章。
 document.addEventListener('click', (e) => {
-    const item = (e.target as HTMLElement).closest<HTMLElement>('.nav-sub-item[data-gd-sec]');
+    const item = (e.target as HTMLElement).closest<HTMLElement>('.nav-sub-item[data-gd-book]');
     if (!item) return;
+    secId = '';
+    chId = '';
     const w = window as unknown as WinBridge;
-    goSection(item.dataset.gdSec || '');
     if (typeof w.routeTo === 'function') w.routeTo('guide');
+    bindPage();
+    render();
 });
 
 // 全站切语言即重渲(整页文本都来自数据,不走 [data-i18n] 那套)。

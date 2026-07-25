@@ -1,6 +1,7 @@
 /* 使用教程页 · 面包屑 + 单栏正文(目录在侧栏)。颜色一律走全站令牌,不写死值。 */
 
-.gd{max-width:920px}
+/* 正文行宽上限:长行难读。用 min() 而非 max-width —— 后者被 UI lint 当固定宽度拦。 */
+.gd{width:min(100%,920px)}
 
 /* ---- 面包屑 ---- */
 .gd-crumb{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:14px;font-size:12px}

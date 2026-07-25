@@ -345,16 +345,26 @@ export const SIDEBAR_HTML = `
     <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
     <div class="nav-divider"></div>
 
-    <!-- 主数据 · 商品/客户共享(以后 POS/库存复用同一份商品库)-->
-    <div class="nav-section-label" data-i18n="nav-group-master">主数据</div>
+    <!-- 主数据 · 商品/客户共享(以后 POS/库存复用同一份商品库)· 集成并入本组(Zihao 2026-07-25:
+         它是配置类而非日常操作,与客户/公司资料同属主数据) -->
+    <div class="nav-group nav-collapsible" data-collapsible="master">
+        <div class="nav-group-toggle" data-toggle-group="master">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="10" cy="5" rx="6.5" ry="2.5"/><path d="M3.5 5v10c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5V5"/><path d="M3.5 10c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-master">主数据</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
 
     <!-- 商品管理已升级为顶级「商品」组(商品数据 + 费用数据 · 见上方 data-collapsible=products)· 此处不再散落 -->
-    <!-- 客户 / 异常栏 / 自动化 独立项(自动化 Phase 7 才合并进集成页) -->
-    <div class="nav-item" data-route="clients"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17v-1.5a3 3 0 00-3-3H5a3 3 0 00-3 3V17"/><circle cx="8" cy="6.5" r="3"/><path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/><path d="M13 3.6a3 3 0 010 5.8"/></svg><span class="nav-label" data-i18n="nav-clients">客户管理</span></div>
+    <div class="nav-item nav-sub-item" data-route="clients"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17v-1.5a3 3 0 00-3-3H5a3 3 0 00-3 3V17"/><circle cx="8" cy="6.5" r="3"/><path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/><path d="M13 3.6a3 3 0 010 5.8"/></svg><span class="nav-label" data-i18n="nav-clients">客户管理</span></div>
     <!-- 公司资料 · 当前账套主体开票/申报信息(行内编辑 · company-profile.ts) -->
-    <div class="nav-item" data-route="company"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M8 17.5v-3h4v3M7 6h.01M13 6h.01M7 9h.01M13 9h.01M7 12h.01M13 12h.01"/></svg><span class="nav-label" data-i18n="nav-company">公司资料</span></div>
+    <div class="nav-item nav-sub-item" data-route="company"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M8 17.5v-3h4v3M7 6h.01M13 6h.01M7 9h.01M13 9h.01M7 12h.01M13 12h.01"/></svg><span class="nav-label" data-i18n="nav-company">公司资料</span></div>
     <!-- POS · Google Sheet 留档(从收银组搬入主数据 · pos&&owner 门控 · module-nav applyPosRoles) -->
-    <div class="nav-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" style="display:none;">
+    <div class="nav-item nav-sub-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" style="display:none;">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="3" width="16" height="14" rx="1.5"/><line x1="2" y1="7" x2="18" y2="7"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/>
         </svg>
@@ -362,7 +372,7 @@ export const SIDEBAR_HTML = `
     </div>
 
     <!-- KNOWLEDGE · 客户知识中心入口(放「客户管理」下方)· 探针门控(知识库 flag 开才显示 · knowledge-center.ts) -->
-    <div class="nav-item" data-route="knowledge" id="nav-knowledge" style="display:none;">
+    <div class="nav-item nav-sub-item" data-route="knowledge" id="nav-knowledge" style="display:none;">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="10" cy="10" r="7.5"/>
             <path d="M7.8 7.6a2.2 2.2 0 114.4 0c0 1.3-2.2 1.7-2.2 3"/>
@@ -371,7 +381,7 @@ export const SIDEBAR_HTML = `
         <span class="nav-label" data-i18n="nav-knowledge">客户知识</span>
     </div>
 
-    <div class="nav-item" data-route="exceptions">
+    <div class="nav-item nav-sub-item" data-route="exceptions">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9.1 3.4L2.3 15a1.5 1.5 0 001.3 2.3h12.8A1.5 1.5 0 0017.7 15L10.9 3.4a1.5 1.5 0 00-1.8 0z"/>
             <line x1="10" y1="8" x2="10" y2="12"/>
@@ -379,6 +389,16 @@ export const SIDEBAR_HTML = `
         </svg>
         <span class="nav-label" data-i18n="nav-exceptions">异常栏</span>
         <span class="nav-badge danger" id="nav-exc-badge" style="display:none;">0</span>
+    </div>
+
+    <div class="nav-item nav-sub-item" data-route="integrations" id="nav-integrations">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 14L3 17M14 6l3-3"/>
+            <path d="M8 4L4 8a2.83 2.83 0 000 4l4 4a2.83 2.83 0 004 0l4-4a2.83 2.83 0 000-4l-4-4a2.83 2.83 0 00-4 0z"/>
+        </svg>
+        <span class="nav-label" data-i18n="nav-integrations">集成</span>
+    </div>
+        </div>
     </div>
 
     <!-- 使用教程:父栏 → 主题(篇)· 章节在页内选,面包屑回退。子项共用 guide 路由,
@@ -395,33 +415,9 @@ export const SIDEBAR_HTML = `
             </svg>
         </div>
         <div class="nav-sub">
-            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="overview">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M10 6.5v4l2.5 1.5"/></svg>
-                <span class="nav-label" data-i18n="nav-guide-overview">总览</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="setup">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13l-3 3M13 7l3-3"/><path d="M8.5 5.5l-3 3a2.8 2.8 0 000 4l2 2a2.8 2.8 0 004 0l3-3a2.8 2.8 0 000-4l-2-2a2.8 2.8 0 00-4 0z"/></svg>
-                <span class="nav-label" data-i18n="nav-guide-setup">接入</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="daily">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6.5 9.5L10 13l3.5-3.5"/><path d="M4 15v2h12v-2"/></svg>
-                <span class="nav-label" data-i18n="nav-guide-daily">日常推送</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="review">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h9l3 3v9H4z"/><path d="M7 10l2 2 4-4"/></svg>
-                <span class="nav-label" data-i18n="nav-guide-review">核对与回导</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="stuck">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M8 8a2 2 0 113 1.7c-.6.4-1 .8-1 1.6"/><line x1="10" y1="14" x2="10" y2="14.01"/></svg>
-                <span class="nav-label" data-i18n="nav-guide-stuck">推不进去怎么办</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="maintain">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l6 2.5v4.5c0 3.3-2.4 6-6 7-3.6-1-6-3.7-6-7V5.5z"/></svg>
-                <span class="nav-label" data-i18n="nav-guide-maintain">维护与安全</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="guide" data-gd-sec="concept">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h12M4 10h8M4 15h10"/></svg>
-                <span class="nav-label" data-i18n="nav-guide-concept">概念说明</span>
+            <div class="nav-item nav-sub-item" data-route="guide" data-gd-book="express">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 9h14M8 16v2m4-2v2"/></svg>
+                <span class="nav-label" data-i18n="nav-guide-express">Express 推送手册</span>
             </div>
         </div>
     </div>
@@ -431,13 +427,6 @@ export const SIDEBAR_HTML = `
     <!-- 底部 pinned(Claude 式):集成 / 用户卡(点开 = 头像菜单)。
          「可开启功能」自选业态入口已下架(Zihao 2026-07-11 拍板 · 平台业态套餐不再自选)。 -->
     <div class="sidebar-bottom">
-        <div class="nav-item" data-route="integrations" id="nav-integrations">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 14L3 17M14 6l3-3"/>
-                <path d="M8 4L4 8a2.83 2.83 0 000 4l4 4a2.83 2.83 0 004 0l4-4a2.83 2.83 0 000-4l-4-4a2.83 2.83 0 00-4 0z"/>
-            </svg>
-            <span class="nav-label" data-i18n="nav-integrations">集成</span>
-        </div>
         <button type="button" class="sb-user" id="sb-user" title="">
             <span class="avatar sb-user-ava" id="sb-user-ava" aria-hidden="true">·</span>
             <span class="sb-user-tx">

@@ -264,7 +264,9 @@ class GuideGateTests(unittest.TestCase):
         # 2026-07-25 的真事:整表 35 条写的是占位 id,正文里全是另一套前缀,一条都没命中,
         # 而页面只是安静地退回手册首页。闸必须逐条报,别只报第一条。
         self._shot("upload-01-nav")
-        self.link_map = {c: f"stuck-{c}" for c in ("no_ar_account", "credit_note", "low_confidence")}
+        self.link_map = {
+            c: f"stuck-{c}" for c in ("no_ar_account", "credit_note", "low_confidence")
+        }
         fails = [f for f in self._run() if f.startswith("[深链]")]
         self.assertEqual(len(fails), 3, fails)
 

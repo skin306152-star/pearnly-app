@@ -412,6 +412,8 @@
 .dmsx .dx-erp-card{cursor:default}
 .dmsx .dx-erp-card.is-disabled{opacity:.72}
 .dmsx .dx-erp-card.is-disabled .dx-erp-status{color:var(--ink2)}
+/* 已连接但小助手掉线:双类提具体度压过上面 is-connected 的绿,不靠书写顺序。 */
+.dmsx .dx-erp-card.is-connected.is-offline .dx-erp-status{color:var(--dx-amber)}
 .dmsx .dx-erp-acts{display:flex;gap:8px;align-items:center}
 .dmsx .dx-erp-cta{cursor:pointer}
 .dmsx .dx-erp-toggle{font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap;padding:7px 12px;border:1px solid var(--dx-line);border-radius:10px;background:var(--card);cursor:pointer}

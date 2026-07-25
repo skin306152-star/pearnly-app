@@ -8,6 +8,11 @@
 // ============================================================
 import { esc, authHeaders } from './dms-intake-core.js';
 
+// 小助手 3 分钟内有心跳算在线 —— 与连接向导 erp-express-wizard 同一判据。
+const AGENT_ONLINE_MS = 180000;
+// 小助手上下线只体现在心跳时间戳上,没有推事件;不轮询则冻结在开页那一刻的快照。
+const POLL_MS = 30000;
+
 interface ErpCardDef {
     key: string;
     name: string;
@@ -59,6 +64,15 @@ function isAutoPush(ep: EpRec): boolean {
     return ep.auto_push === true;
 }
 
+// Express 靠会计电脑上的小助手落库,小助手不在线时票只排队不落地 → 卡片必须照实说。
+// MR.ERP 是云端直连,没有小助手,恒不离线。
+export function isAgentOffline(ep: EpRec): boolean {
+    if (String(ep.adapter || '').toLowerCase() !== 'express') return false;
+    const seen = ep.config?.agent_last_seen_at;
+    const ts = seen ? new Date(String(seen)).getTime() : NaN;
+    return isNaN(ts) || Date.now() - ts >= AGENT_ONLINE_MS;
+}
+
 function cardHtml(def: ErpCardDef): string {
     // 骨架:图标 + 名称 + 状态占位 + 动作区(状态拉回后由 fillCard 填按钮)。
     return (
@@ -79,13 +93,16 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
     const st = card.querySelector<HTMLElement>('[data-erp-status]');
     const acts = card.querySelector<HTMLElement>('[data-erp-acts]');
     const enabled = isEnabled(ep);
+    const offline = !!ep && enabled && isAgentOffline(ep);
     card.classList.toggle('is-connected', !!ep && enabled);
     card.classList.toggle('is-disabled', !!ep && !enabled);
+    card.classList.toggle('is-offline', offline);
 
     if (st) {
-        // 已连接时接上推送方式(自动/手动)· 停用/未连接不显示(此时方式无意义)。
+        // 已连接时接上推送方式(自动/手动)· 停用/未连接/离线不显示(此时方式无意义)。
         if (!ep) st.textContent = T('dx-erp-not-connected');
         else if (!enabled) st.textContent = T('dx-erp-disabled');
+        else if (offline) st.textContent = T('dx-erp-offline');
         else
             st.textContent =
                 T('dx-erp-connected') +
@@ -156,8 +173,14 @@ function bindClicks(zone: HTMLElement): void {
     });
 }
 
-async function loadStatus(zone: HTMLElement, defs: ErpCardDef[]): Promise<void> {
-    let items: EpRec[] = [];
+// keepOnError:轮询拉不到时保持上一次渲染 —— 否则网络抖一下卡片就闪「未连接」。
+// 首次渲染仍按未连接落地,不把「没拉到」装成「检查连接中」永远转下去。
+async function loadStatus(
+    zone: HTMLElement,
+    defs: ErpCardDef[],
+    keepOnError = false
+): Promise<void> {
+    let items: EpRec[] | null = null;
     try {
         const r = await fetch('/api/erp/endpoints', { headers: authHeaders() });
         if (r.ok) {
@@ -165,14 +188,33 @@ async function loadStatus(zone: HTMLElement, defs: ErpCardDef[]): Promise<void> 
             if (Array.isArray(data.items)) items = data.items;
         }
     } catch {
-        /* 离线/无端点 → 全部按未连接渲染 */
+        /* 网络抖动 → 下面按 keepOnError 决定保持还是落未连接 */
     }
+    if (!items) {
+        if (keepOnError) return;
+        items = [];
+    }
+    const list = items;
     defs.forEach((def) => {
         const card = zone.querySelector<HTMLElement>(`[data-erp="${def.adapter}"]`);
         if (!card) return;
-        const ep = items.find((e) => String(e.adapter || '').toLowerCase() === def.adapter) || null;
+        const ep = list.find((e) => String(e.adapter || '').toLowerCase() === def.adapter) || null;
         fillCard(card, ep);
     });
+}
+
+let pollTimer = 0;
+
+// 壳重渲或切走页面后旧定时器自我了断,避免多份并发打 /api/erp/endpoints。
+function startPolling(zone: HTMLElement, defs: ErpCardDef[]): void {
+    window.clearInterval(pollTimer);
+    pollTimer = window.setInterval(() => {
+        if (!zone.isConnected) {
+            window.clearInterval(pollTimer);
+            return;
+        }
+        if (!document.hidden) void loadStatus(zone, defs, true);
+    }, POLL_MS);
 }
 
 // 渲染当前任务的 ERP 卡到 #dx-erp-cards(dxShell 里的占位)。每次整壳重渲后调。
@@ -181,6 +223,7 @@ export function renderDxErpCards(task: string): void {
     if (!zone) return;
     const defs = TASK_CARDS[task] || [];
     if (!defs.length) {
+        window.clearInterval(pollTimer);
         zone.innerHTML = '';
         return;
     }
@@ -189,4 +232,5 @@ export function renderDxErpCards(task: string): void {
         `<div class="dx-erp-row">${defs.map(cardHtml).join('')}</div>`;
     bindClicks(zone);
     void loadStatus(zone, defs);
+    startPolling(zone, defs);
 }

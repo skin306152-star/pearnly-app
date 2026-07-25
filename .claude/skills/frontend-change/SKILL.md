@@ -22,7 +22,7 @@ description: 动前端必读 —— src/** 或 static/** 或任何用户可见 U
 
 ## 2. 编码 / 换行禁忌
 
-`home.html` · `login.html` · `home.js` · `static/i18n-data.js` · `static/home-*.css` · `static/pos/*.css` 是 CRLF 且在 `.prettierignore` 里:
+`home.html` · `login.html` · `static/i18n-data.js` · `static/home-*.css` · `static/pos/*.css` 是 CRLF 且在 `.prettierignore` 里:
 
 - 禁 `sed`、禁 `prettier --write`、禁 python/node 用 latin1 追加(会毁 UTF-8 中泰文)
 - 禁 PowerShell `Get-Content -Raw`(无编码参数会读坏中泰文)→ 用 Edit 工具

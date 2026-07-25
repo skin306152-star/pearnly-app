@@ -20,10 +20,12 @@ description: 改完代码怎么算"验过了" —— 批次边界(什么必须�
 
 ## 2. 机械闸:开工先拿基线,收尾跑全套
 
-- 全套(等价 pre-push,不用真推):Git Bash 跑 `sh scripts/git-hooks/pre-push`
+- 全套(等价 pre-push,不用真推):Git Bash 跑 `PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`
 - 逐道命令 + 触发条件 + 豁免法:`docs/GATES.md`
 - 开工第 0 步先跑一遍,才知道哪些红是别窗口/存量的,不然会替别人的债背锅
 - **闸别接管道**:`cmd | tee` / `| grep` 会吞掉退出码,判绿只认脚本自己的退出码
+- **Windows 上必须带 `PYTHONIOENCODING=utf-8`**:闸脚本打印中文撞 cp874 会 `UnicodeEncodeError` 退 1 —— 检查其实通过了也报红,而且失败清单印不出来(已复现于 `check_ai_smell` / `check_authz_coverage`)
+- 本地钩子当前没挂(原因见 `docs/context-engineering/2026-07-25-claude-md-simplify.md` 遗留表),所以**手跑不是可选项**
 
 ## 3. UI / 视觉验收:真浏览器,截图为证
 

@@ -56,7 +56,9 @@ FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主�
 | 动手写码之前 | `new-feature-discovery` |
 | Zihao 说"收尾 / 换窗口 / 今天到这" | `wrapup` |
 
-机械闸清单 + 逐道自查命令 + 豁免语法:`docs/GATES.md`(pre-push 本地硬拦 + CI 双层)。棘轮豁免写在 commit message:`RATCHET-EXEMPT: <file> +<N> · <理由>`;新增 `ensure_*` 写 `NEW-DEBT-EXEMPT: <理由>`。
+机械闸清单 + 逐道自查命令 + 豁免语法:`docs/GATES.md`。棘轮豁免写在 commit message:`RATCHET-EXEMPT: <file> +<N> · <理由>`;新增 `ensure_*` 写 `NEW-DEBT-EXEMPT: <理由>`。
+
+⚠️ **本地 pre-push 钩子目前是关的**(`core.hooksPath` 没指向 `scripts/git-hooks`)→ 真正拦你的只有 CI 事后红,所以 push 前自己手跑:`PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`(不设编码变量会假红)。为什么还没挂上、要清什么债才能挂:`docs/context-engineering/2026-07-25-claude-md-simplify.md` 文末遗留表。
 
 ## 5. 文档地图(用 `@` 引用,别通读)
 

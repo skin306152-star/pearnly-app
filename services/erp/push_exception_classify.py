@@ -25,6 +25,10 @@ _STOCK_FIX_REASONS = (
 # 这两个码都要科目组下拉那张卡(而非补期初三格)· needs 用前缀判,别再各写一份码清单。
 _ACC_GROUP_PREFIX = "stock_acc_group"
 
+# 小助手防重单闸的码(companion dbf_writer.ERR_PRIOR_DOC_EXISTS)。改了要两边一起改 ——
+# 有 test_prior_docnum 的契约用例钉着。
+PRIOR_DOC_CODE = "PRIOR_DOC_STILL_IN_ERP"
+
 
 def classify_push_exception(error_msg: Optional[str]) -> str:
     """把 ERP 推送失败错误码归到异常子类(前端 chip 用 · 通用 · 不写死 MR.ERP)。"""
@@ -37,6 +41,10 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
         return "no_client"
     if "VERIFY_UNAVAILABLE" in msg:
         return "verify_unavailable"
+    # 防重单闸拦下:上一版单据还躺在 Express 里。会计得先去删那张,不删就重推必出重复单。
+    # 须先于下面的通用分支 —— 这条有专属指引(要说清删哪一号),掉进 other 就只剩一句裸码。
+    if PRIOR_DOC_CODE in msg:
+        return "prior_doc_exists"
     # 库存路推不动(缺存货科目组 / 缺主档 / 库存零负)→ 会计自助可救(选科目组或补期初)。
     # 须先于 account_set,因 stock_no_master_in_account_set 串里含 "account_set" 会被下面误吞。
     if any(k in msg for k in _STOCK_FIX_REASONS):
@@ -110,6 +118,22 @@ def derive_account_fix(
             slots = _SALES_SLOTS + _PURCHASE_SLOTS
         return {"direction": direction, "slots": slots, "bad_code": bad}
     return None
+
+
+def derive_prior_doc_fix(
+    error_msg: Optional[str], request_body: Any = None
+) -> Optional[Dict[str, Any]]:
+    """防重单闸拦下时,告诉会计**要去 Express 删哪一号**。
+
+    单据号取自载荷的 prior_docnum(我们自己发下去的、权威),不从错误串里正则抠 ——
+    小助手那句提示是写死中文,泰国会计看不懂,也不该成为云端的数据来源。
+    """
+    if PRIOR_DOC_CODE not in (error_msg or ""):
+        return None
+    body = _coerce_body(request_body)
+    payload = (body or {}).get("payload") if isinstance(body, dict) else None
+    src = payload if isinstance(payload, dict) else (body if isinstance(body, dict) else {})
+    return {"docnum": str((src or {}).get("prior_docnum") or "").strip()}
 
 
 def derive_bind_fix(error_msg: Optional[str]) -> Optional[Dict[str, Any]]:

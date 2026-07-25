@@ -31,6 +31,7 @@ from services.erp.push_exception_classify import (  # noqa: F401
     classify_push_exception,
     derive_account_fix,
     derive_bind_fix,
+    derive_prior_doc_fix,
     derive_stock_fix,
 )
 
@@ -246,6 +247,10 @@ def list_push_logs(
                         )
                     elif it["category"] == "direction_unknown":
                         it["bind_fix"] = derive_bind_fix(it.get("error_msg"))
+                    elif it["category"] == "prior_doc_exists":
+                        it["prior_doc_fix"] = derive_prior_doc_fix(
+                            it.get("error_msg"), it.get("request_body")
+                        )
                     elif it["category"] == "stock_opening_needed":
                         it["stock_fix"] = derive_stock_fix(
                             it.get("error_msg"),

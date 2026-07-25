@@ -124,7 +124,7 @@
      1  src\home\dms-intake-invoice-submit.ts
         └ 102: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\erp-log-card.ts
-        └ 93: statusIcon = '⏭';
+        └ 102: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
         └ 280: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts

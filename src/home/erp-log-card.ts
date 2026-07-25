@@ -57,13 +57,22 @@ const _AGENT_REASON_I18N: Record<string, string> = {
     CUSTOMER_DUP_SUSPECTED: 'erp-reason-customer-dup',
     CDX_REINDEX_FAILED: 'erp-reason-cdx-failed',
     ACCOUNT_BUSY_LOCKED: 'erp-reason-account-busy',
+    // 防重单闸:改了票号回导重推,而上一版单据还在 Express 里。此前没接进来 → 前端翻译返空
+    // → 原样显示小助手那句写死中文 + 方括号里的英文码,泰国会计看不懂也不知道要删哪张。
+    PRIOR_DOC_STILL_IN_ERP: 'erp-reason-prior-doc',
 };
 
-function _expressFriendlyReason(raw: string): string {
+function _expressFriendlyReason(raw: string, log?: any): string {
     // raw 形如 "EXPRESS_MANUAL: no_revenue_account" 或 "account_set_not_allowed:DATAT"
     const stripped = (raw || '').replace(/^EXPRESS_MANUAL:?\s*/i, '').trim();
     const agent = stripped.match(/^\[([A-Z0-9_]+)\]/);
-    if (agent && _AGENT_REASON_I18N[agent[1]]) return t(_AGENT_REASON_I18N[agent[1]]);
+    if (agent && _AGENT_REASON_I18N[agent[1]]) {
+        const text = t(_AGENT_REASON_I18N[agent[1]]);
+        // 单据号从后端派生的结构化字段取(载荷里的 prior_docnum),不从错误串抠。
+        // 只说"有旧单挡着"而不说是哪一号,会计没法动手。
+        const doc = (log && log.prior_doc_fix && log.prior_doc_fix.docnum) || '';
+        return text.replace('{doc}', doc);
+    }
     const code = stripped.split(':')[0].trim();
     const key = _EXPRESS_REASON_I18N[code];
     return key ? t(key) : '';
@@ -277,7 +286,8 @@ function buildErpLogCard(log: any): string {
 
     // 失败摘要:优先友好原因(catalog)· 回落到去掉 ERR_ 码的原始 error_msg(失败卡始终有摘要)
     const rawReason = (log.error_msg || '').replace(/^ERR_[A-Z0-9_]+:?\s*/, '').trim();
-    const reasonText = friendlyReason || _expressFriendlyReason(log.error_msg || '') || rawReason;
+    const reasonText =
+        friendlyReason || _expressFriendlyReason(log.error_msg || '', log) || rawReason;
     const reasonStrip =
         statusClass === 'fail' && reasonText
             ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(reasonText)}</span></div>`

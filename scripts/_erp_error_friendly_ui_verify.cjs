@@ -59,11 +59,19 @@ const STOCK_FRIENDLY = {
     th: 'สินค้านี้ยังไม่มีทะเบียนสต๊อกใน Express หรือสต๊อกเป็นศูนย์/ไม่เพียงพอ กรุณาส่งใบซื้อของสินค้านี้ด้วยโหมดสินค้า (คงคลัง) ก่อน หรือกรอกยอดยกมา แล้วจึงส่งใบขายนี้อีกครั้ง',
     ja: 'この商品は Express に在庫マスタが未登録、または在庫がゼロ/不足です。先にこの商品の仕入請求書を在庫モードで送信するか期首在庫を登録してから、この売上請求書を再送信してください。',
 };
+const ACCGRP_FRAGMENTS = {
+    zh: '选存货科目组',
+    en: 'inventory account group',
+    th: 'เลือกกลุ่มบัญชีสินค้า',
+    ja: '在庫勘定グループを選択',
+};
 // 卡片 id → {期望文案, 不得裸露的原始码}
 const EXPECT = {
     'log-dbf': { friendly: DBF_FRIENDLY, raw: 'DBF_WRITE_FAILED' },
     'log-stockin': { friendly: STOCKIN_FRIENDLY, raw: 'STOCK_IN_FAILED' },
     'log-stock': { friendly: STOCK_FRIENDLY, raw: 'STOCK_ITEM_NOT_FOUND' },
+    // 只钉各语种的判别片段(全文单一源在 static/i18n-data.js,别在这儿抄第二份)。
+    'log-accgrp': { friendly: ACCGRP_FRAGMENTS, raw: 'stock_acc_group_required' },
 };
 
 const LOGS = {
@@ -112,6 +120,22 @@ const LOGS = {
             error_friendly: STOCK_FRIENDLY,
             http_status: 200,
             retry_count: 3,
+            max_retries: 3,
+        },
+        {
+            id: 'log-accgrp',
+            status: 'failed',
+            trigger: 'manual',
+            push_type: 'invoice',
+            invoice_no: 'IV69/00473',
+            endpoint_name: 'Express',
+            ocr_buyer_name: 'บจก. ตัวอย่าง',
+            created_at: new Date().toISOString(),
+            // preflight 的 EXPRESS_MANUAL 原因码:后端不产 error_friendly,靠前端码→i18n 映射。
+            // 生产日志 47a281c8 就是漏了映射,裸码直接怼到会计脸上。
+            error_msg: 'EXPRESS_MANUAL: stock_acc_group_required',
+            http_status: 0,
+            retry_count: 0,
             max_retries: 3,
         },
     ],

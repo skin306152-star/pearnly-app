@@ -30,6 +30,8 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     items_incomplete: 'erp-reason-items-incomplete',
     // 本批选了「库存」但账套里一件真实库存品都没有 → 建库存主档没有模板可依,推了必炸。
     stock_no_master_in_account_set: 'erp-reason-stock-no-master',
+    // 新规则下产出的是这条(零主档 + 没配科目组);旧码只为认存量日志保留。
+    stock_acc_group_required: 'erp-reason-stock-acc-group',
     low_confidence: 'erp-reason-low-confidence',
     enqueue_error: 'erp-reason-enqueue-error',
     amounts_not_consistent: 'erp-reason-amounts',

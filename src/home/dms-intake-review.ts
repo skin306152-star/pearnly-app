@@ -123,15 +123,12 @@ function accItemHtml(r: IvResult, i: number): string {
 function accPanelHtml(r: IvResult, i: number): string {
     const groups = r.invoices.map((inv, ii) => invoiceGroupHtml(i, ii, inv)).join('');
     const gridCls = IV.imgSide === 'left' ? ' image-left' : '';
-    // 走库存路时明细不是附加信息:它就是要进 ERP 建主档、动库存的主数据,默认摊开。
-    // 只在这一种情形展开,不改全局默认(其它票型明细仍属参考,折叠更清爽)。
-    const extra = IV.postingKind === 'stock' ? ' extra-on' : '';
     return (
-        `<div class="dx-acc-panel${extra}"><div class="dx-acc-top"><div>` +
+        '<div class="dx-acc-panel"><div class="dx-acc-top"><div>' +
         `<b>${esc(r.filename)} · ${esc(t('dxi-rev-h'))}</b>` +
         `<span class="dx-acc-tip">${esc(t('dxi-rev-panel-tip'))}</span></div>` +
         '<div class="dx-acc-top-a">' +
-        `<button class="dx-toggle dx-extra-toggle">${esc(t(extra ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all'))}</button>` +
+        `<button class="dx-toggle dx-extra-toggle">${esc(t('dxi-rev-toggle-all'))}</button>` +
         `<button class="dx-toggle dx-collapse-one">${esc(t('dxi-rev-collapse'))}</button></div></div>` +
         `<div class="dx-rgrid${gridCls}"><div class="dx-fields">${groups}${fieldsFootHtml()}</div>` +
         imageCardHtml(r) +
@@ -165,12 +162,15 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
     const more = revMore(inv.fields).map(cell).join('');
     // 包一层:右侧查看器要靠它知道"用户正在核对第几张",才能翻到那张票所在的物理页。
     // 分组号同时给反向高亮用(手动翻页 → 点亮该页第一张)。
+    //
+    // 明细表不放进 .dx-extra:它是核对时最常看的东西(数量单价对不对、商品名会不会建错档),
+    // 藏在「展开全部字段」后面等于没有。折叠区只留补充字段(总额/对手方/预扣税)。
     return (
         `<div class="dx-inv-grp" data-inv-grp="${ii}" data-inv-page="${invPage(inv)}">` +
         head +
         `<div class="dx-review-grid">${core}</div>` +
-        '<div class="dx-extra"><div class="dx-review-grid">' +
-        `${more}</div>${itemsTableHtml(fi, ii, inv)}</div></div>`
+        itemsTableHtml(fi, ii, inv) +
+        `<div class="dx-extra"><div class="dx-review-grid">${more}</div></div></div>`
     );
 }
 

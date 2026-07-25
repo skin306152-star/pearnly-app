@@ -259,12 +259,22 @@ function visible(cs) {
             const td = Array.from(g0.querySelectorAll('.dx-item-tbl tbody tr td input')).map(
                 (x) => x.value
             );
+            const w = (sel) => {
+                const el = panel.querySelector(sel);
+                return el ? Math.round(el.getBoundingClientRect().width) : 0;
+            };
             return {
                 labels,
                 th,
                 td,
+                itemTbl: cs(g0.querySelector('.dx-item-tbl')),
                 extra: cs(g0.querySelector('.dx-extra')),
                 imgcard: cs(panel.querySelector('.dx-imgcard')),
+                viewerW: w('.dx-imgcard'),
+                fieldsW: w('.dx-fields'),
+                viewerH: Math.round(
+                    panel.querySelector('.pv-viewer')?.getBoundingClientRect().height || 0
+                ),
                 warnPill: cs(
                     document.querySelector('.dmsx .dx-acc-item.open .dx-acc-row .dx-pill.warn')
                 ),
@@ -306,7 +316,20 @@ function visible(cs) {
         );
 
         // ⑤⑥ 库存路默认摊开 + 查看器钉住
-        check(visible(probe.extra), `[${lang}] 走库存路时明细默认可见`);
+        // ⑤ 明细表**不折叠**:核对时最常看的东西,藏在「展开全部字段」后面等于没有。
+        //    补充字段(总额/对手方/预扣税)仍折叠 —— 两者必须一个开一个关,不是全开。
+        check(visible(probe.itemTbl), `[${lang}] 商品明细默认可见(不再需要点展开)`);
+        check(!visible(probe.extra), `[${lang}] 补充字段区仍折叠(只有明细被提出来)`);
+
+        // ⑥ 版面:原件要看得清 —— 查看器必须比字段栏宽,且高度吃到视口而不是固定 460
+        check(
+            probe.viewerW > probe.fieldsW,
+            `[${lang}] 查看器比字段栏宽(实 ${probe.viewerW} vs ${probe.fieldsW})`
+        );
+        check(
+            probe.viewerH > 700,
+            `[${lang}] 查看器高度吃满视口(实=${probe.viewerH} · 修前固定 460)`
+        );
         check(probe.nGrp === 3, `[${lang}] 三张发票各成一组(实=${probe.nGrp})`);
     }
 

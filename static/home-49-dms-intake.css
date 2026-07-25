@@ -227,6 +227,8 @@
 .dmsx .dx-up-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px}
 .dmsx .dx-toggle{border:0;background:transparent;color:var(--dx-brand);font-size:11px;font-weight:800;cursor:pointer}
 .dmsx .dx-review-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+/* 核对屏左栏变窄了(宽度让给原件),三列会把泰文公司名挤成两行 → 收成两列 */
+.dmsx .dx-fields .dx-review-grid{grid-template-columns:1fr 1fr}
 /* 复核 · 就地手风琴 + 原图查看器 */
 .dmsx .dx-rv-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:11px}
 .dmsx .dx-rv-bar-t b{font-size:12px}
@@ -251,7 +253,9 @@
 .dmsx .dx-acc-top b{font-size:12px}
 .dmsx .dx-acc-tip{display:block;font-size:10px;color:var(--ink2);margin-top:3px}
 .dmsx .dx-acc-top-a{display:flex;gap:10px;flex-wrap:wrap}
-.dmsx .dx-rgrid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:13px;align-items:start}
+/* 核对屏的空间分配:原件要看清,字段只是几个短输入框 —— 把主要宽度给查看器。
+   此前 1.25:1 是字段占大头,原件挤成邮票,会计得靠放大镜逐格对。 */
+.dmsx .dx-rgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:13px;align-items:start}
 .dmsx .dx-rgrid.image-left .dx-fields{order:2}
 .dmsx .dx-rgrid.image-left .dx-imgcard{order:1}
 .dmsx .dx-fields{min-width:0}
@@ -271,8 +275,10 @@
 /* 钉住:一份多页 PDF 装多张票时,左边滚到第 3 张,右边原件不能滚出视野 —— 边看边核对
    的前提是两边同时在场。窄屏(单列)不钉,钉了会挡住正在改的字段。 */
 .dmsx .dx-imgcard{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden;position:sticky;top:14px}
-/* 复用共享查看器 image-viewer.ts(.pv-*)· 在录入工作台里给固定高度、去内层重复边框 */
-.dmsx .dx-imgcard .pv-viewer{height:460px;border:0;border-radius:0}
+/* 复用共享查看器 image-viewer.ts(.pv-*)· 去内层重复边框。
+   高度吃满视口(减去 sticky 偏移与呼吸位):钉住之后固定 460px 是浪费 —— 泰国票面是竖版
+   A5/A4,矮了就只能缩到看不清字。上限防超大屏上拉成一条。 */
+.dmsx .dx-imgcard .pv-viewer{height:min(calc(100vh - 40px),1000px);min-height:460px;border:0;border-radius:0}
 /* 上传队列:紧凑可滚动 + × 内联(防几十/上百文件硬堆、按钮被挤到底) */
 .dmsx .dx-two{align-items:start}
 .dmsx .dx-qlist{display:grid;gap:7px;max-height:340px;overflow:auto;padding-right:2px;margin-top:4px}

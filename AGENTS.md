@@ -67,7 +67,7 @@
 sh scripts/git-hooks/pre-push     # Git Bash
 ```
 
-新机器/新 worktree 第一次要挂钩子:`git config core.hooksPath scripts/git-hooks`(不挂 = 本地零拦截,只剩 CI 事后红)。
+⚠️ **本地钩子当前是关的**(`core.hooksPath` 指 `.git/hooks`,没有 pre-push)→ 现在只剩 CI 事后红,push 前请手跑上面那条。**别急着挂**:2026-07-25 试挂过,第一跑就被 `check_authz_coverage` 拦住 —— `routes/workorder_*.py` 有 24+ 路由无可见守门且不在 `PUBLIC_ROUTES`(存量债,且这道闸不在 CI),清完那笔债再挂,详见 `docs/context-engineering/2026-07-25-claude-md-simplify.md` 文末遗留表。
 
 ## 5. 关键基础设施(少踩坑)
 

@@ -186,7 +186,9 @@ function visible(cs) {
     check(rail.nPost === 2, `服务/库存两个选项在位(实=${rail.nPost})`);
     for (const lang of LANGS) {
         check(
-            rail.heads.every((h) => h !== tr(lang, 'dx-side-cur') && h !== tr(lang, 'dx-side-rule')),
+            rail.heads.every(
+                (h) => h !== tr(lang, 'dx-side-cur') && h !== tr(lang, 'dx-side-rule')
+            ),
             `[${lang}] 「当前流程」「设计原则」已不在侧栏`
         );
     }
@@ -305,9 +307,47 @@ function visible(cs) {
 
         // ⑤⑥ 库存路默认摊开 + 查看器钉住
         check(visible(probe.extra), `[${lang}] 走库存路时明细默认可见`);
-        check(probe.imgcard?.position === 'sticky', `[${lang}] 查看器 sticky(实=${probe.imgcard?.position})`);
         check(probe.nGrp === 3, `[${lang}] 三张发票各成一组(实=${probe.nGrp})`);
     }
+
+    // ⑤ 钉住:必须验**行为**。只断言 position==='sticky' 是假绿 —— 属性会生效,
+    // 而祖先链上任何 overflow:hidden 都会把它变成那个盒子的滚动容器,页面滚动时照样滚走
+    // (2026-07-25 用户真机戳破:.dx-card + .dx-acc-item 两处 hidden)。
+    const stickyChain = await page.evaluate(() => {
+        const card = document.querySelector('.dmsx .dx-acc-item.open .dx-imgcard');
+        const bad = [];
+        for (let e = card.parentElement; e && e !== document.documentElement; e = e.parentElement) {
+            const s = getComputedStyle(e);
+            if (/(hidden|auto|scroll)/.test(s.overflow + s.overflowY))
+                bad.push(String(e.className).slice(0, 40));
+        }
+        return { pos: getComputedStyle(card).position, bad };
+    });
+    check(stickyChain.pos === 'sticky', `查看器 position:sticky(实=${stickyChain.pos})`);
+    check(
+        stickyChain.bad.length === 0,
+        `祖先链上没有会掐死 sticky 的 overflow(实=${JSON.stringify(stickyChain.bad)})`
+    );
+    const STICK_TOP = 14; // 与 CSS 的 .dx-imgcard{top:14px} 对齐
+    const stick = await page.evaluate(async () => {
+        const el = () => document.querySelector('.dmsx .dx-acc-item.open .dx-imgcard');
+        const sc = document.scrollingElement || document.documentElement;
+        const before = el().getBoundingClientRect().top;
+        const from = sc.scrollTop;
+        sc.scrollTop = from + 600;
+        await new Promise((r) => setTimeout(r, 250));
+        const moved = sc.scrollTop - from;
+        const after = el().getBoundingClientRect().top;
+        sc.scrollTop = from;
+        return { before, after, moved };
+    });
+    // 前置条件:页面真的滚够了,否则这条断言什么都没测
+    check(stick.moved >= 500, `页面真滚了 ${stick.moved}px(够验钉住)`);
+    const wouldBe = stick.before - stick.moved; // 不钉住的话会掉到这里
+    check(
+        Math.abs(stick.after - STICK_TOP) <= 6,
+        `滚动后钉在 top≈${STICK_TOP}(实=${Math.round(stick.after)} · 不钉住的话应是 ${Math.round(wouldBe)})`
+    );
 
     // ⑥ 跟随:聚焦第 3 张的字段 → 查看器翻到第 2 页 + 该组高亮
     await page.evaluate((l) => window.applyLang(l), 'th');

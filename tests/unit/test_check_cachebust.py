@@ -71,5 +71,33 @@ class FindViolationsTests(unittest.TestCase):
         self.assertEqual(len(fails), 1)
 
 
+# 这个闸真正的失效方式不是判定写错,是**清单漏一行** —— 漏掉的那个产物永远报 PASS。
+# 已经犯两次(2026-07-23 ai.js 停在 ?v=79 五次改动没人知道;2026-07-25 home.css 同款)。
+# 故守覆盖率:入口 HTML 里每一个指向仓库内真实文件的 ?v= 引用,都必须在清单里有一行。
+_ROOT = Path(__file__).resolve().parent.parent.parent
+# 明确不守的:图标类资源改了不 bump 顶多显示旧图标,不影响功能与文案。
+_UNGUARDED = ("/static/brand/",)
+
+
+class PairCoverageTests(unittest.TestCase):
+    def test_every_versioned_asset_in_entry_html_is_guarded(self):
+        import re
+
+        guarded = {(p.html, p.ref) for p in cachebust.CACHE_BUST_PAIRS}
+        missing = []
+        for html in sorted({p.html for p in cachebust.CACHE_BUST_PAIRS}):
+            text = (_ROOT / html).read_text(encoding="utf-8", errors="replace")
+            for url in re.findall(r'(?:src|href)="([^"]*\?v=[^"]*)"', text):
+                if any(u in url for u in _UNGUARDED):
+                    continue
+                path = url.split("?")[0].lstrip("/")
+                if not (_ROOT / path).is_file():
+                    continue  # 引的不是仓库内文件(CDN 等)→ 与本闸无关
+                ref = url.split("?")[0]
+                if not any(h == html and ref.endswith(r) for h, r in guarded):
+                    missing.append(f"{html} 引了 {ref}?v= 但 CACHE_BUST_PAIRS 里没有对应行")
+        self.assertEqual(missing, [], "\n".join(missing))
+
+
 if __name__ == "__main__":
     unittest.main()

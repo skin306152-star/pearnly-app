@@ -18,7 +18,10 @@
 .dmsx .dx-wrap{max-width:none;margin:0;padding:4px 0 96px}
 
 /* 卡片 / 任务选择 */
-.dmsx .dx-card{background:var(--card);border:1px solid var(--dx-line);border-radius:16px;overflow:hidden;box-shadow:var(--dx-shadow)}
+/* clip 而非 hidden:两者都裁圆角,但 hidden 会把这个盒子变成滚动容器,里面的
+   position:sticky 就只相对它生效 —— 而它自己不滚,于是 sticky 形同虚设。
+   查看器要跟着页面滚动钉住,这条链上就不能有 hidden(实测 .dx-card + .dx-acc-item 两处)。*/
+.dmsx .dx-card{background:var(--card);border:1px solid var(--dx-line);border-radius:16px;overflow:clip;box-shadow:var(--dx-shadow)}
 .dmsx .dx-task{padding:16px 16px 12px;margin-bottom:16px}
 .dmsx .dx-task-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .dmsx .dx-task-h b{font-size:13px}
@@ -234,7 +237,7 @@
 .dmsx .dx-imgside-btn{border:0;background:transparent;color:var(--ink2);font-size:10px;font-weight:800;padding:4px 11px;border-radius:999px;cursor:pointer}
 .dmsx .dx-imgside-btn.active{background:var(--dx-brand);color:#fff}
 .dmsx .dx-acc{display:grid;gap:8px}
-.dmsx .dx-acc-item{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden}
+.dmsx .dx-acc-item{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:clip}
 .dmsx .dx-acc-item.open{border-color:var(--dx-brand);box-shadow:var(--dx-shadow)}
 .dmsx .dx-acc-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 12px;cursor:pointer}
 .dmsx .dx-acc-btn{border:1px solid var(--dx-line);background:var(--card);color:var(--dx-brand);font-size:11px;font-weight:800;border-radius:9px;padding:6px 11px;cursor:pointer;white-space:nowrap}

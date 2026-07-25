@@ -296,7 +296,7 @@
      1  static\home-39-sales.css
         └ 101: max-width: 300px;
      1  static\home-49-dms-intake.css
-        └ 203: .dmsx .dx-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:left;m
+        └ 206: .dmsx .dx-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:left;m
      1  static\home-54-records.css
         └ 295: max-width: 380px;
      1  static\landing\landing-static-bg.css

@@ -67,7 +67,11 @@
 
 ## 六、顺手修的三个真缺陷
 
-1. **本地 pre-push 闸从未生效,而且暂时还挂不上**:`git config core.hooksPath` 一直指着 `.git/hooks`(里面只有 `.sample`),真钩子 `scripts/git-hooks/pre-push` 从未被挂 —— GATES.md 与旧铁律 #26 写的"pre-push 本地硬拦"在这台机器上一次都没发生过。本次试挂后第一次真跑就被 `check_authz_coverage` 拦下,报 `routes/workorder_*.py` 有 24+ 个路由既没有可见守门、也不在 `PUBLIC_ROUTES` 白名单;这些文件不在任何窗口的 WIP 里,是 master 上的存量。**该闸不在 CI**(`.github/workflows/*.yml` 里 grep 不到 `check_authz_coverage`),所以这笔债两边都没人看见,master CI 一直绿。→ 已把 `core.hooksPath` 退回原状(不退的话所有窗口一 push 就撞这堵墙),清债 + 挂闸列为待拍板项(见文末)。
+1. **本地 pre-push 闸从未生效,而且暂时还挂不上**:`git config core.hooksPath` 一直指着 `.git/hooks`(里面只有 `.sample`),真钩子 `scripts/git-hooks/pre-push` 从未被挂 —— GATES.md 与旧铁律 #26 写的"pre-push 本地硬拦"在这台机器上一次都没发生过。本次试挂后第一次真跑就被 `check_authz_coverage` 拦下。**该闸不在 CI**(`.github/workflows/*.yml` 里 grep 不到 `check_authz_coverage`),所以两边都没人看见,master CI 一直绿。→ 已把 `core.hooksPath` 退回原状(不退的话所有窗口一 push 就撞这堵墙)。
+
+   **闸报红 85 条,逐条只读体检后的真实分布(2026-07-25 当场做的,别再引用"24 条无守门"那句错话)**:
+   - **49 条是误报**:handler 第一行就调 `_authorize(request, 权限码)`(登录 + M1 闸 fail-closed + 动作细码)再加 `_load_order` / `_assert_owns_workspace` 验账套归属,门是齐的。闸的 `GATE_PATTERNS` 里 `helper_gated` 写的是 `_auth\s*\(`,匹配不到 `_authorize(` → 全判 public。涉及 `workorder_routes`(13)`dms_routes`(8)`tax_profile_routes`(6)`workorder_review_routes`(6)`client_pool_routes`(4)`front_desk_routes`(4)`workorder_financials_routes`(4)`workorder_bank_sales_routes`(4)。**修法是给闸补认 `_authorize`,不是给路由加锁。**
+   - **36 条粗筛没看到门**,其中约 12 条一眼属于本该公开的面(SPA 外壳 `/ai` `/cashier` `/dms` `/earn` `/dms-pick`、`cashier-sw.js`、`/api/csp-report`、`/api/line/dms/webhook` 验签在实现内)→ 该登记 `PUBLIC_ROUTES`。**剩约 24 条要人工逐条打开看**:payroll 5 · pos_shift 3 · pos_sales(退款/作废)2 · pos_modules 3 · dms_roster 6 · dms_pick 3 · fileconv 1 · front_desk status 1 · tax_profile matrix 1 —— 这些可能门在 service 层或用了别的 helper 名,**没逐条看过之前不许说"有洞"**。
    附带缺陷:`scripts/check_authz_coverage.py` 在 Windows 默认控制台(cp874)打印失败清单时会 `UnicodeEncodeError` 崩掉 —— 不加 `PYTHONIOENCODING=utf-8` 根本看不到是哪些路由红,只看到一句"守门红"。
 2. `docs/GATES.md` 标题写"13 道闸",表里实际 21 道 → 已改。
 3. `scripts/session_banner.sh` 每个新窗口注入的尾行仍是"整顿封锁期 0 新功能 · 守门 6 道 · 署名 Opus 4.8 · 28 铁律" → 已改成当前事实。
@@ -76,7 +80,9 @@
 
 | 项 | 现状 | 要做什么 |
 |---|---|---|
-| authz 覆盖债 | `routes/workorder_*.py` 24+ 路由无可见守门且不在 `PUBLIC_ROUTES`;闸既不在 CI 也没在本地跑过 | 逐路由判定"该 require_perm 哪个码 / 还是确属公开",清完再把 `core.hooksPath` 挂上 + 把这道闸加进 CI。属安全敏感改动,需独立批次 + 真账号验证 |
+| authz 闸自己不准(49/85 误报) | `GATE_PATTERNS` 的 `helper_gated` 只认 `_auth(`,认不出 `_authorize(` → 8 个文件 49 条有门的路由被判 public | 给 `scripts/authz_route_inventory.py` 补认 `_authorize` / `_load_order` / `_assert_owns_workspace`。**只改闸,不改运行时**,零风险 |
+| 12 条公开面没登记 | SPA 外壳 `/ai` `/cashier` `/dms` `/earn` `/dms-pick` · `cashier-sw.js` · `/api/csp-report` · `/api/line/dms/webhook` | 进 `PUBLIC_ROUTES` 并写"为何公开"注释。**只改闸清单,不改运行时** |
+| 约 24 条待人工逐条看 | payroll 5 · pos_shift 3 · pos_sales 退款/作废 2 · pos_modules 3 · dms_roster 6 · dms_pick 3 · fileconv 1 · front_desk status 1 · tax_profile matrix 1 | 一条条读 handler + 它调的 service,判"门在别处 / 真缺门"。真缺门的补 `require_perm` 属安全敏感改动 → 独立批次 + 真账号验。三条清完才谈挂 `core.hooksPath` + 进 CI |
 | 闸脚本在 Windows 上会**假红** | 中文输出撞 cp874 → `UnicodeEncodeError` → 退出码 1。已复现:`python scripts/check_ai_smell.py AGENTS.md` 检查其实通过,但打印"[OK] 去 AI 味检查通过"时崩掉 → `exit=1`;同一条命令加 `PYTHONIOENCODING=utf-8` → `exit=0`。`check_authz_coverage.py` 同病(失败清单看不见) | 钩子入口加一行 `export PYTHONIOENCODING=utf-8`(治所有脚本),或逐脚本设 stdout 编码。**不修这条,本地钩子挂上也会随机假红拦 push** |
 | STATE 状态卡超长 | 规矩写 ≤30 行,实际 469 行 / 150KB;banner 现已截断注入,但卡本身仍胖 | 由当前主线窗口重写状态卡(别窗口不代写) |
 | `MEMORY.md` 索引 28.3 KB | 374 条记忆的索引每会话全量加载(约 14k token) | 另议:是否按领域分片 / 只保留高频条目 |

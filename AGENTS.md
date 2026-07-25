@@ -67,7 +67,7 @@
 sh scripts/git-hooks/pre-push     # Git Bash
 ```
 
-⚠️ **本地钩子当前是关的**(`core.hooksPath` 指 `.git/hooks`,没有 pre-push)→ 现在只剩 CI 事后红,push 前请手跑上面那条。**别急着挂**:2026-07-25 试挂过,第一跑就被 `check_authz_coverage` 拦住 —— `routes/workorder_*.py` 有 24+ 路由无可见守门且不在 `PUBLIC_ROUTES`(存量债,且这道闸不在 CI),清完那笔债再挂,详见 `docs/context-engineering/2026-07-25-claude-md-simplify.md` 文末遗留表。
+⚠️ **本地钩子当前是关的**(`core.hooksPath` 指 `.git/hooks`,没有 pre-push)→ 现在只剩 CI 事后红,push 前请手跑上面那条。**别急着挂**:2026-07-25 试挂过,第一跑就被 `check_authz_coverage` 报红 85 条;当场逐条只读体检 = **49 条是闸自己误报**(handler 有 `_authorize()` 门,闸的正则只认 `_auth(` 认不出)· 12 条是没登记的公开面(SPA 外壳/webhook/CSP 上报)· 约 24 条待人工逐条看(payroll/pos_shift/pos_sales/pos_modules/dms_roster/dms_pick/fileconv 等)。**这道闸也不在 CI。** 三件清完再挂,详见 `docs/context-engineering/2026-07-25-claude-md-simplify.md` 文末遗留表。
 
 ## 5. 关键基础设施(少踩坑)
 

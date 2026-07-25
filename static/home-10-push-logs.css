@@ -169,7 +169,13 @@
 }
 .erp-log-note b { font-weight: 800; flex: 0 0 auto; }
 .erp-log-note span { min-width: 0; }
-.log-tag.uncosted { background: var(--warn-bg); color: var(--amber); font-weight: 700; }
+/* 琥珀 = 推送成功但账里有一处要会计回头核:未结转成本 / 单位是系统按账套常用值填的。 */
+.log-tag.uncosted,
+.log-tag.unit-guessed { background: var(--warn-bg); color: var(--amber); font-weight: 700; }
+/* 新建库存品 + 用的存货科目组 · 用绿不用琥珀:这不是「有话说」而是「系统替你建了档,来核一眼」,
+   与导出表里新建主档的绿底同一套语义(琥珀留给未结转成本,两条同时出现时也分得开)。 */
+.erp-log-note.stock-new { background: var(--success-bg); color: var(--green); }
+.log-tag.stock-new { background: var(--success-bg); color: var(--green); font-weight: 700; }
 .erp-log-meta {
     display: flex; gap: 14px; flex-wrap: wrap;
     padding: 7px 13px; border-top: 1px solid var(--line);

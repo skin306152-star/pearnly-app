@@ -413,7 +413,8 @@ class ExpressSalesStockMasterPreflightTests(unittest.TestCase):
             posting_kind="stock",
         )
         self.assertFalse(r.ok)
-        self.assertEqual(r.reason, "stock_acc_group_required")
+        # 这份 config 没有任何上报候选 → 缺的是科目组本身(missing),不是「有几个没人选」。
+        self.assertEqual(r.reason, "stock_acc_group_missing")
         # 闸在载荷构造之前退出 —— 不把票面商品带出来的话,推送日志里只剩一个 reason,
         # 补救卡(derive_stock_fix)拿到空列表,会计看到的就只有一句话没有可填的行。
         self.assertTrue(r.items, "库存闸失败必须带出票面商品行,否则补救卡渲染不出来")

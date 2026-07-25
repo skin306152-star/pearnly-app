@@ -6,8 +6,9 @@
 建 STKTYP=0。故这里钉死四段:
 1. 候选净化 + 落库(脏值不进 config,acccod 是选择的锚必填);
 2. 端点 PATCH 只收「上报过 + fit=True」的候选,别的一律 400(云端不猜哪个组能当存货);
-3. 销项 mapper:配了就放行且载荷带 stock_acccod,没配 + 零主档才拦,reason 换成新码;
-4. 异常分类器认新码,并告诉卡渲染「科目组下拉」而不是「补期初三格」。
+3. 三档解析(2026-07-25):配了用配的;没配时唯一候选自动用、零候选报 missing、多候选报
+   required —— 销项/采购两个 mapper 同一口径,零主档账套的第一个库存品才不会次次弹卡;
+4. 异常分类器认两个新码,并告诉卡渲染「科目组下拉」而不是「补期初三格」。
 """
 
 from __future__ import annotations
@@ -24,7 +25,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from services.erp.express_push import agent_reporting  # noqa: E402
+from services.erp.express_push.mapper import build_express_payload  # noqa: E402
 from services.erp.express_push.sales_mapper import build_express_sales_payload  # noqa: E402
+from services.erp.express_push.stock_acc_group import resolve_stock_acc_group  # noqa: E402
 from services.erp.push_exception_classify import (  # noqa: E402
     classify_push_exception,
     derive_stock_fix,
@@ -48,11 +51,26 @@ _GROUP_UNFIT = {
     "fit": False,
 }
 
+# 第二个合格候选:两个都能当存货时系统不许替客户拍板(选错要去 Express 逐个商品改档)。
+_GROUP_FIT_2 = {
+    "acccod": "DM",
+    "name": "วัตถุดิบ",
+    "method": "A",
+    "stock_acc": "11-04-01-00",
+    "stock_acc_name": "วัตถุดิบคงเหลือ",
+    "cogs_acc": "51-01-00-00",
+    "fit": True,
+}
+
+# 销项 + 采购两个方向的科目一起给:同一份 config 喂两个 mapper,才验得出「两边口径一致」。
 _CONFIG = {
     "account_set": "DATAT",
     "revenue_acc": "41-01-00-00",
     "vat_output_acc": "11-05-04-02",
     "ar_acc": "11-02-01-00",
+    "fallback_acc": "51-03-00-00",
+    "vat_input_acc": "11-05-04-01",
+    "ap_acc": "21-02-01-00",
 }
 
 
@@ -75,10 +93,31 @@ def _history():
     }
 
 
-def _cfg(*, masters=0, acccod=None):
+def _purchase_history():
+    """一张完整税票的采购票(posting_item_type_manual 钉货道,不让货/费判据随样例漂)。"""
+    return {
+        "id": "hist-stock-buy",
+        "invoice_date": "2026-01-15",
+        "invoice_no": "PO-7001",
+        "total_amount": "1070.00",
+        "fields": {
+            "seller_name": "บริษัท ซัพพลาย จำกัด",
+            "seller_tax": "0107561000013",
+            "subtotal": "1000.00",
+            "vat": "70.00",
+            "invoice_number": "PO-7001",
+            "posting_item_type_manual": "goods",
+            "items": [{"name": "ผงชูรส", "qty": "100", "price": "10.00", "subtotal": "1000.00"}],
+        },
+    }
+
+
+def _cfg(*, masters=0, acccod=None, groups=()):
     cfg = {**_CONFIG, "catalog_fingerprint": {"stock_master_count": masters}}
     if acccod:
         cfg["stock_acccod"] = acccod
+    if groups:
+        cfg["reported_stock_acc_groups"] = list(groups)
     return cfg
 
 
@@ -162,11 +201,40 @@ class SalesStockAccGroupPayloadTests(unittest.TestCase):
         for it in r.payload["items"]:
             self.assertEqual(it["item_mode"], "stock_sale")
 
-    def test_missing_group_with_zero_master_fails_with_new_reason(self):
+    def test_zero_candidates_reports_missing(self):
         r = build_express_sales_payload(_history(), config=_cfg(masters=0), posting_kind="stock")
         self.assertFalse(r.ok)
-        self.assertEqual(r.reason, "stock_acc_group_required")
+        self.assertEqual(r.reason, "stock_acc_group_missing")
         self.assertEqual([i["name"] for i in r.items], ["น้ำมันเครื่อง"])
+
+    def test_single_candidate_is_auto_used(self):
+        # 只有一个合格组 = 没得选,问了也是白问 —— 不拦、不弹卡,载荷直接带上它。
+        r = build_express_sales_payload(
+            _history(),
+            config=_cfg(masters=0, groups=[_GROUP_FIT, _GROUP_UNFIT]),
+            posting_kind="stock",
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["stock_acccod"], "ST01")
+
+    def test_two_candidates_still_ask(self):
+        r = build_express_sales_payload(
+            _history(),
+            config=_cfg(masters=0, groups=[_GROUP_FIT, _GROUP_FIT_2]),
+            posting_kind="stock",
+        )
+        self.assertFalse(r.ok)
+        self.assertEqual(r.reason, "stock_acc_group_required")
+
+    def test_configured_group_wins_over_candidates(self):
+        # 会计拍过板的选择不因心跳刷新翻案:候选有两个也不再问,配的那个直接用。
+        r = build_express_sales_payload(
+            _history(),
+            config=_cfg(masters=0, acccod="DM", groups=[_GROUP_FIT, _GROUP_FIT_2]),
+            posting_kind="stock",
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["stock_acccod"], "DM")
 
     def test_existing_masters_carry_group_when_configured(self):
         # 账里已有库存品(不必从零建)也照发码:小助手遇到票上的新品仍要建档。
@@ -190,14 +258,95 @@ class SalesStockAccGroupPayloadTests(unittest.TestCase):
         self.assertNotIn("stock_acccod", r.payload)
 
 
+class ResolveStockAccGroupTests(unittest.TestCase):
+    """三档解析本身(纯函数)· 两个 mapper 共用它,判据只此一处。"""
+
+    def test_configured_beats_candidate_count(self):
+        c = resolve_stock_acc_group(_cfg(acccod="ST01", groups=[_GROUP_FIT, _GROUP_FIT_2]))
+        self.assertEqual((c.acccod, c.fail_reason, c.auto), ("ST01", "", False))
+
+    def test_single_fit_auto(self):
+        c = resolve_stock_acc_group(_cfg(groups=[_GROUP_FIT, _GROUP_UNFIT]))
+        self.assertEqual((c.acccod, c.fail_reason, c.auto), ("ST01", "", True))
+
+    def test_none_fit_is_missing(self):
+        # 只有 fit=False 的组 ≠ 有得选:候选表非空但一个都不能当存货,缺的仍是科目本身。
+        for cfg in (_cfg(), _cfg(groups=[_GROUP_UNFIT]), None):
+            c = resolve_stock_acc_group(cfg)
+            self.assertEqual((c.acccod, c.fail_reason), ("", "stock_acc_group_missing"))
+
+    def test_multiple_fit_requires_pick(self):
+        c = resolve_stock_acc_group(_cfg(groups=[_GROUP_FIT, _GROUP_FIT_2]))
+        self.assertEqual((c.acccod, c.fail_reason, c.auto), ("", "stock_acc_group_required", False))
+
+    def test_does_not_pick_by_usage_mode(self):
+        # 真账套 69SINCER:用得最多的 ST01 挂的是办公设备(固定资产),真在用的是 DM。
+        # 众数会选错,所以 used_by 再高也不构成「自动选它」的理由。
+        used_most = {**_GROUP_FIT, "used_by": 19}
+        c = resolve_stock_acc_group(_cfg(groups=[used_most, {**_GROUP_FIT_2, "used_by": 17}]))
+        self.assertEqual(c.fail_reason, "stock_acc_group_required")
+
+
+class PurchaseStockAccGroupTests(unittest.TestCase):
+    """采购与销项同一口径:采购建的正是第一个库存品,同样要一个存货科目组才建得出来。"""
+
+    def test_single_candidate_auto_used(self):
+        r = build_express_payload(
+            _purchase_history(),
+            config=_cfg(masters=0, groups=[_GROUP_FIT, _GROUP_UNFIT]),
+            posting_kind="stock",
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["stock_acccod"], "ST01")
+
+    def test_zero_candidates_reports_missing(self):
+        r = build_express_payload(_purchase_history(), config=_cfg(masters=0), posting_kind="stock")
+        self.assertFalse(r.ok)
+        self.assertEqual(r.reason, "stock_acc_group_missing")
+        self.assertEqual([i["name"] for i in r.items], ["ผงชูรส"])
+
+    def test_two_candidates_still_ask(self):
+        r = build_express_payload(
+            _purchase_history(),
+            config=_cfg(masters=0, groups=[_GROUP_FIT, _GROUP_FIT_2]),
+            posting_kind="stock",
+        )
+        self.assertFalse(r.ok)
+        self.assertEqual(r.reason, "stock_acc_group_required")
+
+    def test_existing_masters_are_not_gated(self):
+        # 账里已有库存品 → 小助手照抄现有 STMAS 当模板,不需要科目组,别拿这条闸拦住老客户。
+        r = build_express_payload(
+            _purchase_history(), config=_cfg(masters=42), posting_kind="stock"
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertNotIn("stock_acccod", r.payload)
+
+    def test_service_kind_not_gated(self):
+        r = build_express_payload(
+            _purchase_history(), config=_cfg(masters=0), posting_kind="service"
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertNotIn("stock_acccod", r.payload)
+
+
 class StockFixClassifyTests(unittest.TestCase):
     """异常卡:新码 → 科目组下拉;旧码(历史日志)→ 补期初三格。"""
 
     def test_new_reason_classified_as_stock(self):
-        self.assertEqual(
-            classify_push_exception("EXPRESS_MANUAL:stock_acc_group_required"),
-            "stock_opening_needed",
+        for code in ("stock_acc_group_required", "stock_acc_group_missing"):
+            self.assertEqual(
+                classify_push_exception(f"EXPRESS_MANUAL:{code}"), "stock_opening_needed", code
+            )
+
+    def test_missing_reason_also_asks_for_acc_group(self):
+        # missing 与 required 同族:都渲染科目组卡。候选为空时卡自己退化成一句指引
+        # (groups_reported 分「等小助手报」还是「去 Express 建」),不是「补期初三格」。
+        fix = derive_stock_fix(
+            "EXPRESS_MANUAL:stock_acc_group_missing", None, acc_groups=[], groups_reported=True
         )
+        self.assertEqual(fix["needs"], "acc_group")
+        self.assertEqual(fix["acc_groups"], [])
 
     def test_new_reason_asks_for_acc_group(self):
         fix = derive_stock_fix(

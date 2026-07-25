@@ -142,8 +142,10 @@ def _pending_rows(records: List[Dict[str, Any]]) -> List[List[Any]]:
     return out
 
 
-_SUMMARY_HEADERS = ("ประเภท", "รหัส", "ชื่อ", "เอกสารที่สร้าง")
-_SUMMARY_WIDTHS = (16, 18, 40, 20)
+# 末列 = 新建库存品挂的存货科目组。这张表就是「本批系统建了哪些档」的清理/核对清单,商品档
+# 记进哪个存货科目跟码和名一样要摆出来 —— 账套只有一个合格科目组时那是系统替会计定的。
+_SUMMARY_HEADERS = ("ประเภท", "รหัส", "ชื่อ", "เอกสารที่สร้าง", "กลุ่มบัญชีสินค้าคงคลัง")
+_SUMMARY_WIDTHS = (16, 18, 40, 20, 34)
 _KIND_LABEL = {"item": "สินค้า/บริการ", "customer": "ลูกค้า", "supplier": "ผู้ขาย"}
 
 
@@ -154,6 +156,7 @@ def _summary_rows(created: List[Dict[str, Any]]) -> List[List[Any]]:
             _s(c.get("code")),
             _s(c.get("name")),
             _s(c.get("docnum")),
+            _s(c.get("acc_group")),
         ]
         for c in (created or [])
     ]

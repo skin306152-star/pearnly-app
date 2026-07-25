@@ -13,13 +13,17 @@ from typing import Any, Dict, List, Optional
 
 from services.erp.external_ref import _coerce_body
 
-# 库存路的自助修失败码。stock_acc_group_required = 账套零库存主档且端点没选存货科目组
-# (选一次即通);另两个是旧口径 —— 2026-07-25 起不再产出,历史日志还在,继续认得出来。
+# 库存路的自助修失败码。前两个都是「账套零库存主档,建第一个库存品差一个存货科目组」,
+# 差在缺的东西不同:required = 合格的组有好几个,没人拍板选哪个;missing = 一个合格的都没有,
+# 会计得先去 Express 建。后两个是旧口径 —— 2026-07-25 起不再产出,历史日志还在,继续认得出来。
 _STOCK_FIX_REASONS = (
     "stock_acc_group_required",
+    "stock_acc_group_missing",
     "stock_no_master_in_account_set",
     "STOCK_ITEM_NOT_FOUND",
 )
+# 这两个码都要科目组下拉那张卡(而非补期初三格)· needs 用前缀判,别再各写一份码清单。
+_ACC_GROUP_PREFIX = "stock_acc_group"
 
 
 def classify_push_exception(error_msg: Optional[str]) -> str:
@@ -129,8 +133,10 @@ def derive_stock_fix(
 ) -> Optional[Dict[str, Any]]:
     """从库存路失败推导补救卡要渲染什么(needs)+ 渲染它要的料。
 
-    needs="acc_group":账套零库存主档且端点没选存货科目组 → 卡渲染科目组下拉,选完小助手就能
+    needs="acc_group":账套零库存主档且科目组定不下来 → 卡渲染科目组下拉,选完小助手就能
     从零建 STKTYP=0。候选(fit 过的)由调用方从端点 config 取来传进,本分类器是纯函数不查库。
+    候选空(stock_acc_group_missing)时下拉退化成一句指引,靠 groups_reported 分「等小助手报」
+    还是「去 Express 建」—— 同一张卡两种空态,不另开一条渲染路径。
     needs="opening" :旧口径缺主档/库存零负 → 卡渲染补期初三格(数量/成本/日期)。
     两者都带 items(票面商品行,取自 request_body.payload.items),让会计认出这张票涉及哪些
     商品;取不到明细则空列表(前端显示「无可补商品」而非崩)。
@@ -159,7 +165,7 @@ def derive_stock_fix(
             continue
         seen.add(key)
         items.append({"name": name, "stkcod": stkcod})
-    needs = "acc_group" if "stock_acc_group_required" in msg else "opening"
+    needs = "acc_group" if _ACC_GROUP_PREFIX in msg else "opening"
     groups = [g for g in (acc_groups or []) if isinstance(g, dict)]
     return {
         "needs": needs,

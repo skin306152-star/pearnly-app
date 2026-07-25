@@ -165,3 +165,4 @@ scripts/_scratch/
 static/dist/*.map
 *.js.map
 *.css.map
+static/_posnext/

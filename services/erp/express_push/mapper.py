@@ -24,6 +24,8 @@ purchase_docs):顶层 history 字段 + `fields`(主页 OCR 字段)。判脏/数�
   total_amount   含税合计 = base + vat
   lines          复式分录 [{acc,side(D/C),amount,desc}] · 借贷必平
   doc_lane       "goods"(完整税票·可抵进项)| "expense"(费用票·进项税不可抵扣)
+  stock_acccod   存货科目组(ISACC ACCCOD)· 仅库存路才带 · 小助手建新库存主档用。端点配过
+                 用配的;没配且账套零库存主档时按合格候选数解析(见 stock_acc_group)
 
 货/费分档(拍板口径):费用票(无完整税票/judge_direction=expense)进项税不可抵扣、VAT 计入
 成本——doc_lane=expense 时 base_amount 改含税全额、vat_amount 清零、不产生进项税行,借方
@@ -59,13 +61,19 @@ from services.erp.express_push.common import (
     ITEM_MODE_NONSTOCK,
     ITEM_MODE_STOCK,
     ITEMS_OK,
+    line_item_names,
     payment_verdict_for,
     resolve_account,
     resolve_account_sourced,
     SRC_DEFAULT,
 )
 from services.erp.express_push import stock_lane_enabled
-from services.erp.express_push.posting_profile import PostingProfile, profile_from_config
+from services.erp.express_push.posting_profile import (
+    PostingProfile,
+    account_set_has_no_stock_master,
+    profile_from_config,
+)
+from services.erp.express_push.stock_acc_group import resolve_stock_acc_group
 from services.purchase.field_clean import (
     clean_address,
     clean_invoice_no,
@@ -106,8 +114,7 @@ def _goods_item_mode(posting_kind: Optional[str], profile: PostingProfile) -> st
     """货票明细行的写入模式。本批显式声明优先,未声明 → 画像推断(=今日默认,行为不变)。
 
     声明「库存」发 ITEM_MODE_STOCK:小助手据此建/复用 STKTYP=0 库存品并真入库(移动均价),
-    与销项 stock_sale 扣库存结转 COGS 合成闭环。销项那道「账套零库存主档就拦下」的闸不照搬到
-    采购 —— 采购正是把第一个库存品建出来的那一步,零主档是新客户的正常起点,拦了就永远起不来。
+    与销项 stock_sale 扣库存结转 COGS 合成闭环。
     """
     if posting_kind == POSTING_KIND_STOCK:
         return ITEM_MODE_STOCK
@@ -201,6 +208,21 @@ def build_express_payload(
     declared = posting_kind in VALID_POSTING_KINDS
     if not is_expense and not declared and profile.blocks_auto_posting():
         return fail(profile.escalate_reason())
+
+    item_mode = _goods_item_mode(posting_kind, profile)
+    stock_acccod = str(config.get("stock_acccod") or "").strip()
+    acc_group_auto = False
+    # 采购建第一个库存品同样要一个存货科目组:零主档账套里小助手没有可克隆的 STMAS 模板行,
+    # 只能靠 ISACC 从零建 STKTYP=0。此前这道闸只装在销项、采购一律放行,可放行的票到了小助手
+    # 那儿照样建不出档 —— 只是把失败推迟到会计看不懂的地方。改成与销项同一个解析器后,合格组
+    # 唯一的账套自动通过(零打扰),真拦下的只剩「Express 里压根没有存货科目组」,那必须人去建。
+    if not is_expense and item_mode == ITEM_MODE_STOCK and account_set_has_no_stock_master(config):
+        choice = resolve_stock_acc_group(config)
+        if choice.fail_reason:
+            # 带上票面商品行:闸在载荷构造之前退出,不带出来补救卡就只剩一句话没有可填的行。
+            return fail(choice.fail_reason, line_item_names(fields))
+        stock_acccod, acc_group_auto = choice.acccod, choice.auto
+
     vat_capitalized = _s(vat) if is_expense else None
     if is_expense:
         # 费用票口径(拍板 · intake.py「费用类即便读到 vat 也归 0」同口径 / MR.ERP 453 先例):
@@ -242,9 +264,7 @@ def build_express_payload(
     if is_expense:
         detail = _expense_detail(total)
     else:
-        detail = extract_line_items(
-            fields, base, total=total, item_mode=_goods_item_mode(posting_kind, profile)
-        )
+        detail = extract_line_items(fields, base, total=total, item_mode=item_mode)
 
     # 现购 HP / 赊购 RR:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
     # 票种语义(F3)> 供应商过账档案(F4)> 银行佐证(F6)> config 默认(B2B 缺省 RR)。
@@ -258,13 +278,15 @@ def build_express_payload(
     doc_lane = "expense" if is_expense else "goods"
     logger.info(
         "[express-purchase] ref_no=%s doctype=%s payment_src=%s doc_lane=%s item_src=%s "
-        "posting_kind=%s",
+        "posting_kind=%s stock_acccod=%s/%s",
         ref_no,
         doctype,
         verdict_src or "config_default",
         doc_lane,
         item_src,
         posting_kind or "none",  # 走没走真入库:出账不对时先看这行(none=没人声明)
+        stock_acccod or "-",
+        "auto" if acc_group_auto else "config",  # auto=账套只有一个合格组,系统替客户定的
     )
 
     payload = {
@@ -298,8 +320,7 @@ def build_express_payload(
     if is_expense:
         # 留痕:这张票原本会读到多少进项税,现改折进成本(VAT capitalized · 排障/对账用)。
         payload["vat_capitalized"] = vat_capitalized
-    stock_acccod = str(config.get("stock_acccod") or "").strip()
-    if _goods_item_mode(posting_kind, profile) == ITEM_MODE_STOCK and stock_acccod:
+    if item_mode == ITEM_MODE_STOCK and stock_acccod:
         # 与销项同键同义:账套一件库存品都没有时,小助手靠它建 STKTYP=0(见 sales_mapper 同处)。
         payload["stock_acccod"] = stock_acccod
     return ExpressMapResult(

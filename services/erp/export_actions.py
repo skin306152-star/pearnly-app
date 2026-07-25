@@ -17,12 +17,29 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from services.erp.express_push.stock_acc_group import describe_stock_acc_group
 from services.erp.external_ref import _coerce_body
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_erp_actions(response_body: Any) -> Dict[str, Any]:
+def _stock_acc_group_label(request_body: Any, reported: Any) -> str:
+    """本次建库存品挂的存货科目组 → 「DM · 11-04-01-00 · วัตถุดิบคงเหลือ」。
+
+    合格候选唯一时这个组是系统替会计定的,导出表上得看得见记进了哪个存货科目;组码是账套内部
+    代号,单给码会计认不出来,所以带上科目号和名。非库存路(载荷没这个键)→ 空串,模板留空不假装;
+    码在但候选表里查不到(组被删/换了账套)→ 只给码,不编一个科目号出来。
+    """
+    req = _coerce_body(request_body)
+    payload = req.get("payload") if isinstance(req, dict) else None
+    g = describe_stock_acc_group(reported, (payload or {}).get("stock_acccod"))
+    # 与推送日志卡同一种拼法(码 · 科目号 · 科目名),会计两边对照时不用换一次脑子
+    return " · ".join(x for x in (g.get(k) for k in ("acccod", "stock_acc", "stock_acc_name")) if x)
+
+
+def _parse_erp_actions(
+    response_body: Any, request_body: Any = None, reported_groups: Any = None
+) -> Dict[str, Any]:
     """从一条成功推送的 response_body 解出「ERP 里到底发生了什么」。
 
     返回:
@@ -32,6 +49,7 @@ def _parse_erp_actions(response_body: Any) -> Dict[str, Any]:
       docnum     str         ERP 真实凭证号。票面号超 12 字符时会退回自编号,此时它
                              ≠ 票面号,不给会计就没法在 ERP 里找到这张单去删
       party_code str         ERP 客户/供应商码(小助手 party_code · 见 meta 白名单)
+      stock_acc_group str    新建库存品挂的存货科目组(码 + 存货科目号/名 · 见上)
     """
     body = _coerce_body(response_body)
     meta = body.get("meta") if isinstance(body.get("meta"), dict) else {}
@@ -54,16 +72,18 @@ def _parse_erp_actions(response_body: Any) -> Dict[str, Any]:
         "direction": str(meta.get("doc_type") or "").strip().lower(),
         # 对手方是不是本次新建的。码是码、新建与否是新建与否,不编码进同一个字符串的空/非空
         "created_party": bool(meta.get("created_customer") or meta.get("created_supplier")),
+        "stock_acc_group": _stock_acc_group_label(request_body, reported_groups),
     }
 
 
 def collect_created_masters(
     records: List[Dict[str, Any]], actions: Dict[str, Dict[str, Any]], hids: List[str]
 ) -> List[Dict[str, Any]]:
-    """汇总本批新建的主档 → [{kind, code, name, docnum}]。
+    """汇总本批新建的主档 → [{kind, code, name, docnum, acc_group}]。
 
     只列【真正新建】的:复用既有档不该出现在清理清单里,否则会计照单去删就把人家
     原有的档删了。商品行按 created 标记逐行判,客户/供应商按 created_customer/supplier。
+    商品行带上存货科目组:这批档是系统建的,记进哪个存货科目要跟码/名一起摆给会计核。
     """
     out: List[Dict[str, Any]] = []
     seen = set()
@@ -84,7 +104,15 @@ def collect_created_masters(
             name = ""
             if i < len(items) and isinstance(items[i], dict):
                 name = str(items[i].get("description") or items[i].get("name") or "")
-            out.append({"kind": "item", "code": code, "name": name, "docnum": docnum})
+            out.append(
+                {
+                    "kind": "item",
+                    "code": code,
+                    "name": name,
+                    "docnum": docnum,
+                    "acc_group": str(act.get("stock_acc_group") or ""),
+                }
+            )
         party = act.get("party_code") if act.get("created_party") else ""
         if party and ("party", party) not in seen:
             seen.add(("party", party))
@@ -112,17 +140,20 @@ def erp_actions_by_history_ids(
             cur.execute(
                 """
                 WITH ranked AS (
-                    SELECT l.history_id, l.response_body,
+                    SELECT l.history_id, l.response_body, l.request_body,
+                        e.config->'reported_stock_acc_groups' AS acc_groups,
                         ROW_NUMBER() OVER (
                             PARTITION BY l.history_id
                             ORDER BY l.created_at DESC, l.id DESC
                         ) AS _rn
                     FROM erp_push_logs l
+                    LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
                     WHERE l.user_id = %s
                       AND l.history_id = ANY(%s::uuid[])
                       AND l.status = 'success'
                 )
-                SELECT history_id, response_body FROM ranked WHERE _rn = 1
+                SELECT history_id, response_body, request_body, acc_groups
+                FROM ranked WHERE _rn = 1
                 """,
                 (user_id, hids),
             )
@@ -132,7 +163,9 @@ def erp_actions_by_history_ids(
         return {}
     for r in rows:
         row = dict(r)
-        out[str(row["history_id"])] = _parse_erp_actions(row.get("response_body"))
+        out[str(row["history_id"])] = _parse_erp_actions(
+            row.get("response_body"), row.get("request_body"), row.get("acc_groups")
+        )
     return out
 
 
@@ -153,8 +186,10 @@ def erp_actions_by_invoice_nos(
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 """
-                SELECT DISTINCT ON (l.invoice_no) l.invoice_no, l.response_body
+                SELECT DISTINCT ON (l.invoice_no) l.invoice_no, l.response_body, l.request_body,
+                       e.config->'reported_stock_acc_groups' AS acc_groups
                 FROM erp_push_logs l
+                LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
                 WHERE l.user_id = %s
                   AND l.invoice_no = ANY(%s::text[])
                   AND l.status = 'success'
@@ -170,7 +205,9 @@ def erp_actions_by_invoice_nos(
         row = dict(r)
         key = str(row["invoice_no"] or "").strip()
         if key:
-            out[key] = _parse_erp_actions(row.get("response_body"))
+            out[key] = _parse_erp_actions(
+                row.get("response_body"), row.get("request_body"), row.get("acc_groups")
+            )
     return out
 
 
@@ -249,6 +286,8 @@ def apply_erp_actions(merged_fields: Dict[str, Any], action: Optional[Dict[str, 
         ("docnum", "erp_docnum"),
         ("party_code", "erp_party_code"),
         ("direction", "direction"),
+        # 新建库存品挂进的存货科目组 —— 模板只在「本行商品是新建」那格填,复用档不填
+        ("stock_acc_group", "stock_acc_group"),
     ):
         v = str(action.get(src) or "").strip()
         if v:

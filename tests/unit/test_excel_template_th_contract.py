@@ -144,8 +144,14 @@ class HeaderTests(unittest.TestCase):
 
     def test_roundtrip_columns_appended_after_contract(self):
         """回导列必须在合同列之后 · 且顺序由 erp_roundtrip 单点定义(写读共用)。"""
-        self.assertEqual(tuple(et.HEADERS_TH[14:]), ROUNDTRIP_HEADERS)
+        n = len(ROUNDTRIP_HEADERS)
+        self.assertEqual(tuple(et.HEADERS_TH[14 : 14 + n]), ROUNDTRIP_HEADERS)
         self.assertEqual(len(et.HEADERS_TH), len(et.COLUMN_WIDTHS))
+
+    def test_stock_acc_group_column_is_last(self):
+        """存货科目组列追加在回导列之后 —— 挤在中间会顶掉回导列位。"""
+        self.assertEqual(et.HEADERS_TH[-1], et.COL_STOCK_ACC_GROUP)
+        self.assertEqual(et.STOCK_GROUP_COLUMN, len(et.HEADERS_TH))
 
     def test_header_has_fill_and_sheet_frozen(self):
         ws = _load([])
@@ -299,6 +305,17 @@ class ErpActionColumnTests(unittest.TestCase):
         self.assertEqual(ws.cell(row=4, column=4).fill.patternType, None)  # 未知 无填色
         # 客户单元格(col3)= new → 绿
         self.assertEqual(ws.cell(row=2, column=3).fill.fgColor.rgb[-6:], "D6F5DE")
+
+    def test_stock_acc_group_only_on_newly_created_items(self):
+        # 复用既有档记进哪个科目是客户原本定好的,不是这次的动作 —— 填上去会让会计以为每行都要核。
+        recs = self._rec()
+        recs[0]["merged_fields"]["stock_acc_group"] = "DM · 11-04-01-00 · วัตถุดิบคงเหลือ"
+        ws = _load(recs)
+        col = et.STOCK_GROUP_COLUMN
+        self.assertEqual(ws.cell(row=2, column=col).value, "DM · 11-04-01-00 · วัตถุดิบคงเหลือ")
+        self.assertEqual(ws.cell(row=2, column=col).fill.fgColor.rgb[-6:], "D6F5DE")
+        self.assertIsNone(ws.cell(row=3, column=col).value)  # reused
+        self.assertIsNone(ws.cell(row=4, column=col).value)  # 未知
 
     def test_is_new_bool_fallback(self):
         ws = _load(

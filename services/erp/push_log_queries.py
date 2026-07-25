@@ -22,6 +22,7 @@ from services.erp.push_log_meta import (  # noqa: F401
     UNCOSTED_SQL,
     _derive_push_accounts,
     _derive_v3_meta,
+    derive_stock_acc_group,
 )
 
 # 异常分类 + 自助修复派生抽到 push_exception_classify(纯函数)· 此处 re-import 保 facade
@@ -225,6 +226,8 @@ def list_push_logs(
                 # Express 队列响应带的分录科目(at-a-glance·列表科目列)· 无则不带,保持轻量。
                 it["push_accounts"] = _derive_push_accounts(body)
                 it.update(_derive_v3_meta(body))  # V3 细粒度态(push_stage/rolled_back/fallback)
+                # 本次新建的库存品挂了哪个存货科目组:合格组唯一时是系统替会计定的,得标出来。
+                it.update(derive_stock_acc_group(body, it.get("request_body"), grp_raw))
                 # DMS 推送可视化闭环(Zihao 2026-06-01)· 身份证→订车单 ≠ 发票推送:
                 # 标 push_type 让前端按 DMS 字段(订车单号/客户/身份证)渲染该行,
                 # 不再用发票字段框;并附 4 语友好错误(身份证订车码 friendly_for_ui 不覆盖)。

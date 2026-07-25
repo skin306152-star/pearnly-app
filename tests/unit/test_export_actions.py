@@ -7,7 +7,15 @@ DAL(erp_actions_by_*)是薄 SQL,由 E2E 覆盖;此处钉死解析与应用不出
 import json
 import unittest
 
-from services.erp.export_actions import _parse_erp_actions, apply_erp_actions
+from services.erp.export_actions import (
+    _parse_erp_actions,
+    apply_erp_actions,
+    collect_created_masters,
+)
+
+_REPORTED = [
+    {"acccod": "DM", "stock_acc": "11-04-01-00", "stock_acc_name": "วัตถุดิบคงเหลือ", "fit": True}
+]
 
 
 class ParseErpActions(unittest.TestCase):
@@ -46,6 +54,34 @@ class ParseErpActions(unittest.TestCase):
     def test_created_customer_non_bool_becomes_none(self):
         got = _parse_erp_actions({"meta": {"created_customer": "yes"}})
         self.assertIsNone(got["customer"])
+
+    def test_stock_acc_group_label_from_payload_and_candidates(self):
+        # 载荷里只有码,会计认不出记进哪个存货科目 —— 导出表上要码 + 科目号 + 科目名。
+        got = _parse_erp_actions({"ok": True}, {"payload": {"stock_acccod": "DM"}}, _REPORTED)
+        self.assertEqual(got["stock_acc_group"], "DM · 11-04-01-00 · วัตถุดิบคงเหลือ")
+
+    def test_stock_acc_group_empty_when_not_stock_lane(self):
+        self.assertEqual(_parse_erp_actions({"ok": True})["stock_acc_group"], "")
+        self.assertEqual(
+            _parse_erp_actions({"ok": True}, {"payload": {}}, _REPORTED)["stock_acc_group"], ""
+        )
+
+
+class CollectCreatedMasters(unittest.TestCase):
+    def test_new_item_row_carries_acc_group(self):
+        # 这张汇总表就是「本批系统建了哪些档」的核对清单,商品行记进哪个存货科目要摆出来。
+        recs = [{"merged_fields": {"items": [{"description": "ผงชูรส"}]}}]
+        actions = {
+            "h1": {
+                "items": [True],
+                "item_codes": ["P001"],
+                "docnum": "RR6900001",
+                "stock_acc_group": "DM · 11-04-01-00 · วัตถุดิบคงเหลือ",
+            }
+        }
+        out = collect_created_masters(recs, actions, ["h1"])
+        self.assertEqual(out[0]["kind"], "item")
+        self.assertEqual(out[0]["acc_group"], "DM · 11-04-01-00 · วัตถุดิบคงเหลือ")
 
 
 class ApplyErpActions(unittest.TestCase):

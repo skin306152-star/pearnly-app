@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+
+# 存货科目组的判据(筛候选 / 选哪个)已拆去 stock_acc_group —— 本模块只管上报数据的存取。
+# 此处 re-import 当 facade:agent_reporting.fit_stock_acc_groups 的既有调用点不用跟着改。
+from services.erp.express_push.stock_acc_group import fit_stock_acc_groups  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -199,18 +203,6 @@ def store_reported_stock_acc_groups(endpoint_id: str, candidates: Any) -> int:
     except Exception as e:
         logger.error(f"store_reported_stock_acc_groups failed: {e}")
         return 0
-
-
-def fit_stock_acc_groups(config: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """本端点可选的存货科目组(小助手判 fit=True 的候选)· 纯函数 · 不查库。
-
-    单一名单源:端点 PATCH 用它校验选择、异常卡用它渲染下拉 —— 两处认同一份名单,不会出现
-    「卡里选得到、存的时候 400」。
-    """
-    raw = (config or {}).get("reported_stock_acc_groups")
-    if not isinstance(raw, list):
-        return []
-    return [g for g in raw if isinstance(g, dict) and g.get("fit") and g.get("acccod")]
 
 
 # ── 商品/客户目录 + 记账指纹 · 小助手读 STMAS/ARMAS/STCRD 上报 ─────────────────────

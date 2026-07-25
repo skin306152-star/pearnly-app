@@ -4,14 +4,15 @@
 =========================================================
 按泰国本地销售清单习惯生成 · 用户处理完一批发票后导出复盘「都发生了什么」。
 
-表结构(19 列):
+表结构(22 列):
   1-12  会计核算区(与 MR.ERP Korn 反馈的公式合同一致 · 不动列位/公式):
         วันที่ / เลขที่ / ชื่อลูกค้า / ชื่อสินค้า / จำนวน(E) / ราคาต่อหน่วย(F) /
         จำนวนเงิน(G==E*F) / รวมจำนวนเงิน(H==E*F) / รวมก่อนVAT(I==E*F) /
         VAT(J==I*0.07) / อ้างอิง / Status(留空给会计)
   13    สถานะสินค้า  · 每商品行:ERP 里是新建(ใหม่)还是复用(เดิม)
   14    สถานะลูกค้า  · 每张发票:客户是新建还是复用
-  15-19 回导列(见 erp_roundtrip)· 让「导出→会计改→回导重推」闭得上环
+  15-21 回导列(见 erp_roundtrip)· 让「导出→会计改→回导重推」闭得上环
+  22    กลุ่มบัญชีสินค้าคงคลัง · 新建库存品挂的存货科目组(仅新建行填)
 
 复盘信号靠两处呈现:客户/商品单元格底色(绿=新建·淡灰蓝=复用)+ 末两列显式文本
 (可筛选、黑白打印也读得出)。表头深蓝底白字、冻结首行、金额千分位右对齐。
@@ -47,6 +48,11 @@ from services.excel.erp_roundtrip import (
 logger = logging.getLogger(__name__)
 
 
+# 新建库存品挂进的存货科目组。追加在回导列【之后】:回导读侧按列名取值,末尾加列不动它的列位;
+# 前 12 列的公式合同更不能碰。只在「本行商品是本次新建」的行填 —— 账套只有一个合格科目组时这
+# 是系统替会计定的,会计拿导出表逐行核对时得看得见记进了哪个存货科目。
+COL_STOCK_ACC_GROUP = "กลุ่มบัญชีสินค้าคงคลัง"
+
 # 列名取自 erp_roundtrip —— 读侧按同一批常量取值。两边各写一份泰文串的话,改任一边
 # 读侧都不会报错,只是查不到列、静默降级成空值。
 HEADERS_TH = [
@@ -64,15 +70,17 @@ HEADERS_TH = [
     "Status",  # 12 会计手填过账状态(留空)
     "สถานะสินค้า",  # 13 商品:ใหม่ / เดิม / -
     "สถานะลูกค้า",  # 14 客户:ใหม่ / เดิม / -
-    *ROUNDTRIP_HEADERS,  # 15-19 回导列
+    *ROUNDTRIP_HEADERS,  # 15-21 回导列
+    COL_STOCK_ACC_GROUP,  # 22 存货科目组(仅新建库存品的行)
 ]
 
-COLUMN_WIDTHS = [12, 14, 30, 24, 8, 12, 14, 14, 18, 10, 12, 10, 13, 13, *ROUNDTRIP_WIDTHS]
+COLUMN_WIDTHS = [12, 14, 30, 24, 8, 12, 14, 14, 18, 10, 12, 10, 13, 13, *ROUNDTRIP_WIDTHS, 34]
 
 MONEY_COLUMNS = (6, 7, 8, 9, 10)
 QTY_COLUMN = 5
 PRODUCT_STATUS_COLUMN = 13
 CUSTOMER_STATUS_COLUMN = 14
+STOCK_GROUP_COLUMN = len(HEADERS_TH)
 
 _MONEY_FMT = "#,##0.00"
 _QTY_FMT = "#,##0.###"
@@ -254,6 +262,7 @@ def write_sales_sheet(ws, records: List[Dict[str, Any]]) -> int:
         doc_vat = _to_float(f.get("vat_amount")) or _to_float(f.get("vat"))
         push_status = f.get("push_status")
         push_reason = f.get("push_reason")
+        stock_group = _str(f.get("stock_acc_group"))
         history_id = _str(f.get("history_id")) or _str(rec.get("history_id"))
 
         items = f.get("items")
@@ -317,6 +326,11 @@ def write_sales_sheet(ws, records: List[Dict[str, Any]]) -> int:
             )
             for off, val in enumerate(rt):
                 ws.cell(row=row, column=CUSTOMER_STATUS_COLUMN + 1 + off, value=val)
+            # 只有本次新建的商品才填科目组:复用既有档记进哪个科目是客户原本就定好的,不是这次
+            # 的动作,填上去会让会计以为每一行都要去核。同一格用新建绿,与商品名那格看齐。
+            if item_action == ACTION_NEW and stock_group:
+                grp_cell = ws.cell(row=row, column=STOCK_GROUP_COLUMN, value=stock_group)
+                grp_cell.fill = _FILL_NEW
             row += 1
 
     ws.freeze_panes = "A2"

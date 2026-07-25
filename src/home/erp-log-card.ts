@@ -30,8 +30,10 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     items_incomplete: 'erp-reason-items-incomplete',
     // 本批选了「库存」但账套里一件真实库存品都没有 → 建库存主档没有模板可依,推了必炸。
     stock_no_master_in_account_set: 'erp-reason-stock-no-master',
-    // 新规则下产出的是这条(零主档 + 没配科目组);旧码只为认存量日志保留。
+    // 零主档账套建第一个库存品差存货科目组:required=合格的有好几个,没人选;missing=一个
+    // 合格的都没有(或小助手还没报上来)。指引不同故分两句,别合成一条。
     stock_acc_group_required: 'erp-reason-stock-acc-group',
+    stock_acc_group_missing: 'erp-reason-stock-acc-group-missing',
     low_confidence: 'erp-reason-low-confidence',
     enqueue_error: 'erp-reason-enqueue-error',
     amounts_not_consistent: 'erp-reason-amounts',
@@ -130,6 +132,41 @@ function buildErpLogCard(log: any): string {
         ? `<div class="erp-log-note"><b>${escapeHtml(t('erp-uncosted-tag'))}</b><span>${escapeHtml(
               t('erp-uncosted-note', { n: String(uncostedN) }) +
                   (log.uncosted_created ? ' · ' + t('erp-uncosted-created') : '')
+          )}</span></div>`
+        : '';
+
+    // 单位是猜的(小助手建库存主档时票面没给单位,按本账套最常用的单位填的)· 后端 derive_guessed_unit
+    // 派生。同「未结转成本」一样用琥珀:推送是成功的,但账里有一处是系统替会计做的主,得看得见。
+    const unitGuessedN = Number(log.unit_guessed_lines) || 0;
+    const unitCodes = (Array.isArray(log.unit_guessed_codes) ? log.unit_guessed_codes : [])
+        .map((s: unknown) => String(s ?? '').trim())
+        .filter(Boolean)
+        .join(' · ');
+    const unitTag = unitGuessedN
+        ? `<span class="log-tag unit-guessed">${escapeHtml(t('erp-unit-guessed-tag'))}</span>`
+        : '';
+    const unitStrip = unitGuessedN
+        ? `<div class="erp-log-note"><b>${escapeHtml(t('erp-unit-guessed-tag'))}</b><span>${escapeHtml(
+              t('erp-unit-guessed-note', { n: String(unitGuessedN), u: unitCodes })
+          )}</span></div>`
+        : '';
+
+    // 本次在账套里新建了库存品 · 后端 derive_stock_acc_group 派生(回执 created + 载荷 stock_acccod)。
+    // 账套只有一个合格存货科目组时那个组是系统替会计定的 —— 替人做主就得让他在日志上看见挂进了
+    // 哪个存货科目,否则账里凭空多一件商品要等对科目余额才发现。
+    const stockCreatedN = Number(log.stock_created) || 0;
+    const stockGroup = stockCreatedN
+        ? [log.stock_acccod, log.stock_acc, log.stock_acc_name]
+              .map((s: unknown) => String(s ?? '').trim())
+              .filter(Boolean)
+              .join(' · ')
+        : '';
+    const stockTag = stockGroup
+        ? `<span class="log-tag stock-new">${escapeHtml(t('erp-stock-new-tag'))}</span>`
+        : '';
+    const stockStrip = stockGroup
+        ? `<div class="erp-log-note stock-new"><b>${escapeHtml(t('erp-stock-new-tag'))}</b><span>${escapeHtml(
+              t('erp-stock-new-note', { n: String(stockCreatedN), g: stockGroup })
           )}</span></div>`
         : '';
 
@@ -253,7 +290,7 @@ function buildErpLogCard(log: any): string {
                 <span class="erp-log-state ${statusClass}" title="${escapeHtml(statusLabel)}">${statusIcon}</span>
                 <div class="erp-log-titleblock">
                     <b title="${escapeHtml(log.invoice_no || '')}">${escapeHtml(log.invoice_no || '-')}</b>
-                    <div class="erp-log-tags">${typeBadge}${trig}${uncostedTag}</div>
+                    <div class="erp-log-tags">${typeBadge}${trig}${uncostedTag}${unitTag}${stockTag}</div>
                 </div>
                 <div class="erp-log-party"><label>${escapeHtml(partyLabel)}</label><span>${partyVal}</span></div>
                 <div class="erp-log-party"><label>${escapeHtml(t('erp-log-col-target'))}</label><span>${erpName}</span></div>
@@ -265,6 +302,8 @@ function buildErpLogCard(log: any): string {
             </div>
             ${reasonStrip}
             ${uncostedStrip}
+            ${unitStrip}
+            ${stockStrip}
             <div class="erp-log-meta">
                 <span><b>${escapeHtml(t('erp-log-col-time'))}</b>${escapeHtml(timeStr)}</span>
                 ${docMeta}

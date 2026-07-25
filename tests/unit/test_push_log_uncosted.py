@@ -67,6 +67,50 @@ class DeriveUncostedTests(unittest.TestCase):
         self.assertEqual(out["uncosted_lines"], 1)
 
 
+_REPORTED = [
+    {"acccod": "DM", "stock_acc": "11-04-01-00", "stock_acc_name": "วัตถุดิบคงเหลือ", "fit": True},
+    {"acccod": "ST01", "stock_acc": "14-01-03-00", "fit": False},
+]
+
+
+class DeriveStockAccGroupTests(unittest.TestCase):
+    """新建库存品挂了哪个存货科目组 —— 合格组唯一时是系统替会计定的,必须标出来。"""
+
+    def _req(self, acccod="DM"):
+        return {"payload": {"stock_acccod": acccod}} if acccod else {"payload": {}}
+
+    def test_created_lines_carry_group_detail(self):
+        out = meta.derive_stock_acc_group(_body("ok", created=True), self._req(), _REPORTED)
+        self.assertEqual(out["stock_created"], 1)
+        self.assertEqual(out["stock_acccod"], "DM")
+        self.assertEqual(out["stock_acc"], "11-04-01-00")
+        self.assertEqual(out["stock_acc_name"], "วัตถุดิบคงเหลือ")
+
+    def test_accepts_json_string_request_body(self):
+        # request_body 在库里是 text/jsonb 两副面孔,列表查询两种都会拿到。
+        out = meta.derive_stock_acc_group(
+            _body("ok", created=True), '{"payload": {"stock_acccod": "DM"}}', _REPORTED
+        )
+        self.assertEqual(out["stock_acccod"], "DM")
+
+    def test_unknown_code_still_shown_without_invented_account(self):
+        # 候选表里查不到这个码(组被删/换账套)→ 只报码,绝不编一个科目号出来。
+        out = meta.derive_stock_acc_group(_body("ok", created=True), self._req("ZZ9"), _REPORTED)
+        self.assertEqual(out, {"stock_created": 1, "stock_acccod": "ZZ9"})
+
+    def test_direct_fallback_lines_are_not_counted(self):
+        # 回落成直接科目行的那条也带 created,但建的是科目行不是库存品,数进来就报多。
+        body = {"line_modes": [{"seq": 1, "mode": "direct_account", "created": True}]}
+        self.assertEqual(meta.derive_stock_acc_group(body, self._req(), _REPORTED), {})
+
+    def test_silent_when_nothing_created_or_no_group(self):
+        self.assertEqual(meta.derive_stock_acc_group(_body("ok"), self._req(), _REPORTED), {})
+        self.assertEqual(
+            meta.derive_stock_acc_group(_body("ok", created=True), self._req(""), _REPORTED), {}
+        )
+        self.assertEqual(meta.derive_stock_acc_group(None, None, None), {})
+
+
 class UncostedPredicateTests(unittest.TestCase):
     def test_reasons_are_not_inlined_into_sql(self):
         for reason in meta.NO_COST_REASONS:

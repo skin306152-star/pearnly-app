@@ -8,7 +8,7 @@
  *   #/clients                 客户目录(全租户客户表 · 侧栏「客户」)
  *   #/clients/<id>/<tab>      单客户档案页,tab ∈ profile|supplier|history
  *   #/reports                 跨客户报表中心(侧栏「报表」)
- *   #/settings                设置(语言 + 账号 + 退出 · 侧栏「设置」)
+ *   (设置无路由:语言/账号/退出改由左下角用户块弹浮层,见 ai-settings.js)
  *
  * 矩阵/看板共用 route.name='dashboard'(同一个「工作台」页面壳,toolrow/统计卡不
  * 重复挂载),靠 route.sub 区分渲染哪块 body——不新起一个顶层路由名,ai.js 的
@@ -71,8 +71,6 @@
         if (h === '/clients') return { name: 'clients' };
         // 报表中心(EN-clients · 侧栏「报表」转正):选客户+期间查报表包,独立顶层路由。
         if (h === '/reports') return { name: 'reports' };
-        // 设置(EN-clients · 侧栏「设置」转正):语言/账号/退出,独立顶层路由。
-        if (h === '/settings') return { name: 'settings' };
         // 单客户档案页必须排在 /client/... 的正则前面判断——两者前缀不重叠
         // (client vs clients),顺序对彼此零影响,紧邻只是同属客户域的语义分组。
         var mArchive = /^\/clients\/([^/]+)\/?([^/]*)$/.exec(h);
@@ -151,10 +149,6 @@
         return '#/reports';
     }
 
-    function buildSettingsHash() {
-        return '#/settings';
-    }
-
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
     function subscribe(onChange) {
         function fire() {
@@ -185,7 +179,6 @@
         buildClientsHash: buildClientsHash,
         buildClientArchiveHash: buildClientArchiveHash,
         buildReportsHash: buildReportsHash,
-        buildSettingsHash: buildSettingsHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

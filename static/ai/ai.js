@@ -104,6 +104,12 @@
             .catch(function () {
                 // 探针失败保持 token 回落态(名字有就显示,没有就藏)。
             });
+        // 用户块浮层(原「设置」页):每次都调,api 换新要跟着换;监听在模块内只挂一次。
+        AI.settings.mountUserMenu(api, {
+            onLogout: function () {
+                expireSession();
+            },
+        });
         if (chromeWired) return;
         chromeWired = true;
         $('navClients').addEventListener('click', function () {
@@ -111,9 +117,6 @@
         });
         $('navReports').addEventListener('click', function () {
             window.location.hash = AI.router.buildReportsHash();
-        });
-        $('navSettings').addEventListener('click', function () {
-            window.location.hash = AI.router.buildSettingsHash();
         });
         $('brandHome').addEventListener('click', function () {
             window.location.hash = AI.router.buildDashboardHash();
@@ -171,7 +174,6 @@
         payroll: 'nav_payroll',
         clients: 'nav_clients',
         reports: 'nav_reports',
-        settings: 'nav_settings',
     };
 
     function wireBack(el, hash) {
@@ -298,7 +300,6 @@
         $('v-clients').classList.toggle('on', route.name === 'clients');
         $('v-client-archive').classList.toggle('on', route.name === 'client-archive');
         $('v-reports').classList.toggle('on', route.name === 'reports');
-        $('v-settings').classList.toggle('on', route.name === 'settings');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
         $('navTodo').classList.toggle('on', route.name === 'pool');
         $('navDesk').classList.toggle('on', route.name === 'desk');
@@ -310,7 +311,6 @@
             route.name === 'clients' || route.name === 'client-archive'
         );
         $('navReports').classList.toggle('on', route.name === 'reports');
-        $('navSettings').classList.toggle('on', route.name === 'settings');
         if (route.name === 'pool') {
             restoreScrollAfterPaint(route);
             AI.pool.mount(api);
@@ -353,15 +353,6 @@
         if (route.name === 'reports') {
             restoreScroll(route);
             AI.reports.mount(api);
-            return;
-        }
-        if (route.name === 'settings') {
-            restoreScroll(route);
-            AI.settings.mount(api, {
-                onLogout: function () {
-                    expireSession();
-                },
-            });
             return;
         }
         if (route.name === 'dashboard') {

@@ -220,7 +220,6 @@ test.describe('UI1 · 设计令牌 + 四处做工修复(本地 stub 真浏览器
             ['#/pool', '待我处理'],
             ['#/clients', '客户'],
             ['#/reports', '报表'],
-            ['#/settings', '设置'],
         ]) {
             await page.evaluate((h) => {
                 window.location.hash = h;

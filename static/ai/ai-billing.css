@@ -1,0 +1,234 @@
+/* Pearnly AI · ai-billing.css · 设置页计费区 + 三步充值弹窗(B5 老站对齐 #16)
+ *
+ * 复用面:面板/按钮走 ai-shell.css(.panel/.btn),三格指标走 ai-client.css(.wosum/.cell),
+ * 弹窗外壳走 ai-pkg.css(.pkg-mask/.pkg-modal),状态徽章走 ai-states.css(.st-badge)。
+ * 本文件只补计费独有的布局(余额大数/记录行/步骤条/银行卡/凭证拖拽区),颜色全走令牌。 */
+
+.bill-balance-v {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.bill-exempt {
+  margin-top: 12px;
+}
+.bill-actions {
+  margin-top: 14px;
+}
+.bill-emp-hint {
+  font-size: 12.5px;
+  color: var(--mut);
+}
+.bill-emp-count {
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* 记录行:日期 · 金额 · 状态徽章;驳回原因整行换行铺底 */
+.bill-hrow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--hair3);
+  font-size: 12.5px;
+}
+.bill-hrow:last-child {
+  border-bottom: none;
+}
+.bill-hrow .d {
+  color: var(--mut);
+}
+.bill-hrow .amt {
+  font-weight: 700;
+}
+.bill-hnote {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+  color: var(--mut);
+}
+
+/* 三步弹窗:步骤条(弹窗窄版:三步表单不需要 .pkg-modal 的 760px 全宽) */
+.bill-modal {
+  max-width: min(480px, 94vw);
+}
+.bill-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.bill-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--mut);
+  white-space: nowrap;
+}
+.bill-step.on {
+  color: var(--ink);
+  font-weight: 600;
+}
+.bill-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--surface2);
+  border: 1px solid var(--hair2);
+  color: var(--mut);
+}
+.bill-step.on .bill-dot {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--accent-ink);
+}
+.bill-line {
+  flex: 1;
+  height: 1px;
+  background: var(--hair2);
+}
+
+/* 金额步 */
+.bill-lb {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+  margin: 12px 0 6px;
+}
+.bill-qamts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.bill-qamt.on {
+  border-color: var(--acc);
+  background: var(--acc-soft);
+  color: var(--acc);
+}
+.bill-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--hair2);
+  border-radius: 9px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.bill-err {
+  min-height: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--crit);
+}
+
+/* 转账步:银行卡 + 恰好金额警示 */
+.bill-bank {
+  border: 1px solid var(--hair2);
+  border-radius: 11px;
+  padding: 14px 16px;
+  background: var(--surface2);
+  font-size: 12.5px;
+}
+.bill-bank .bn {
+  font-weight: 700;
+}
+.bill-bank .bb,
+.bill-bank .bh {
+  color: var(--mut);
+}
+.bill-bank .ba-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+.bill-bank .ba {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.bill-warn {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--warn-line);
+  border-radius: 9px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12.5px;
+}
+
+/* 凭证步:拖拽区(触控目标 ≥44px:padding 撑起) */
+.bill-dz {
+  border: 1.5px dashed var(--hair2);
+  border-radius: 11px;
+  padding: 26px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--mut);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.bill-dz:hover,
+.bill-dz.drag-over {
+  border-color: var(--acc);
+  color: var(--ink2);
+}
+.bill-dz.has-file {
+  border-style: solid;
+  border-color: var(--good-line);
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.bill-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* 收尾态:绿勾=已入账 / 黄钟=待人工审核 */
+.bill-done {
+  text-align: center;
+  padding: 26px 10px;
+}
+.bill-done .ic svg {
+  width: 44px;
+  height: 44px;
+}
+.bill-done.ok .ic {
+  color: var(--good);
+}
+.bill-done.wait .ic {
+  color: var(--warn);
+}
+.bill-done .msg {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 800px) {
+  .bill-steps {
+    gap: 6px;
+  }
+  .bill-qamts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .bill-hrow {
+    grid-template-columns: auto 1fr auto;
+  }
+}

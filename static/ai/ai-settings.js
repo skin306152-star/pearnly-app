@@ -5,7 +5,9 @@
  * 同 console.js 的 langSeg 先例,视觉复用 .view-toggle/.vt-btn 而非重画一套分段控件)
  * + 当前账号信息(GET /api/me 已有的 email/tenant_name,零新增后端)+ 退出登录
  * (复用 AI.api.logout() + 清 token,回调交给 ai.js,同 AI.gate.mountInvited 的
- * onLogout 先例)。单文件小、编排与拼装未拆(参照 ai-financials.js 同等体量的先例,
+ * onLogout 先例)。B5 #16 起追加计费区(OCR 余额/三步充值/充值记录),整块下沉
+ * AI.billing(ai-billing.js),本页只留一个挂载点。单文件小、编排与拼装未拆
+ * (参照 ai-financials.js 同等体量的先例,
  * 未设独立 node 纯函数测试文件——本页无值得单测的业务逻辑,E2E 覆盖交互)。
  *
  * 语言切换后整页 reload(不做局部重渲染):侧栏/多层嵌套视图的文案分散在十余个模块,
@@ -74,9 +76,12 @@
             accountRowHtml('settings_account_email', me && me.email) +
             accountRowHtml('settings_account_tenant', me && me.tenant_name) +
             '</div></div></div>' +
+            '<div id="stBillingWrap"></div>' +
             '<button type="button" class="btn" data-action="settings-logout">' +
             esc(at('settings_logout_btn')) +
             '</button>';
+        // 计费区(B5 #16):余额/充值/记录自带四态与轮询,数据编排全在 AI.billing。
+        AI.billing.mount(S.api, $('stBillingWrap'));
     }
 
     function loadMe() {

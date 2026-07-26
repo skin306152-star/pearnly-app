@@ -229,6 +229,10 @@ const AI_CSS = [
     // 这些布局,状态的脸全取自 ai-states.css 的 .st-* 组件,故必须排在其后;与其余视图
     // 互斥显示(命令条挂在工作台,类名 stw-* 全新不覆盖任何存量),层叠零影响。
     'ai/ai-steward.css',
+    // ai-billing.css(B5 #16 · 设置页计费区+三步充值弹窗)复用 .panel/.btn/.wosum/
+    // .pkg-mask/.st-badge,只补 bill-* 独有布局;徽章脸取自 ai-states.css 故排其后,
+    // 类名全新不覆盖任何存量,排最后即可。
+    'ai/ai-billing.css',
 ];
 
 // Pearnly DMS SPA:壳令牌/原子/门面在前(dms-shell.css 定义 :root 令牌),身份证向导内容区

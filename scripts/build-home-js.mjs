@@ -98,6 +98,9 @@ const BUNDLES = [
             // ai-api-steward.js(B2-M1 · 智能管家五端点:探针/建会话/读会话/发消息/读任务,
             // 拆自 ai-api.js·单文件<500 铁律)同 ai-api-desk.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-steward.js',
+            // ai-api-billing.js(B5 #16 · OCR 余额/充值四端点,复用 /home 生产端点零新增
+            // 钱逻辑)同 ai-api-steward.js 先例,只需排在 ai-api.js 之前。
+            'ai/ai-api-billing.js',
             // ai-api-review.js(MC1-b2 · 审核收件箱 + 签批闭环七端点,拆自 ai-api.js·单文件
             // <500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-review.js',
@@ -273,6 +276,12 @@ const BUNDLES = [
             'ai/ai-client-archive.js',
             'ai/ai-reports-render.js',
             'ai/ai-reports.js',
+            // 设置页计费区(B5 #16 · OCR 余额/三步充值/充值记录):ai-billing-render.js
+            // (纯函数+HTML,依赖 AI.state/format)排在 ai-billing.js(数据/弹窗编排)之前,
+            // 两者都在 ai-settings.js(render() 里调 AI.billing.mount)之前——同
+            // ai-reports-render/ai-reports 先例。
+            'ai/ai-billing-render.js',
+            'ai/ai-billing.js',
             'ai/ai-settings.js',
             // ai-states-render.js(B1 · 状态词典 #/states 纯函数+样例页拼装,依赖全局
             // at())排在 ai-states.js(挂载/演示计时器编排)之前,两者都在 ai.js(onRoute

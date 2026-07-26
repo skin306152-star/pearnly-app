@@ -464,6 +464,7 @@
         Object.assign(base, AI.apiClientImport.create(root, authHeaders, handleResponse, call));
         Object.assign(base, AI.apiDesk.create(root, authHeaders, handleResponse, call));
         Object.assign(base, AI.apiSteward.create(call));
+        Object.assign(base, AI.apiBilling.create(root, authHeaders, handleResponse, call));
         Object.assign(base, AI.apiBankSales.create(call));
         Object.assign(base, AI.apiUpload.create(root, authHeaders));
         return Object.assign(

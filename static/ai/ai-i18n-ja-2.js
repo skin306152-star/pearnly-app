@@ -451,6 +451,11 @@ Object.assign(window.__AI_I18N_JA__, {
     purge_not_clean: '消去しきれていません · データが残っています',
     purge_done_stat: '{rows} 行、{files} 件のファイルを削除しました。',
     purge_leftover: '次のテーブルを消去できませんでした。お問い合わせください：{tables}',
+    purge_period_label: '会計期間',
+    purge_period_all: '全期間（事業体まるごと消去）',
+    purge_period_opt: '{p}（作業指示 {n} 件）',
+    purge_warn_body_period:
+        'この期間のみ消去します：当期の作業指示と、その配下の証憑・審査・成果物・仕訳・申告記録・アップロード済みの画像とファイル。マスタ（顧客情報・商品・勘定科目・仕入先）と他の期間には影響しません。',
     purge_finish: '完了',
     client_import_title: '顧客名簿の一括インポート',
     client_import_hint:

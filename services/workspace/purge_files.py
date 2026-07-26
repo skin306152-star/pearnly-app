@@ -33,8 +33,13 @@ def _rows(cur, sql: str, params) -> List[Dict[str, Any]]:
     return [dict(r) for r in cur.fetchall()]
 
 
-def collect(cur, *, tenant_id: str, ws_id: int) -> Dict[str, List[str]]:
+def collect(
+    cur, *, tenant_id: str, ws_id: int, scope: Dict[str, List[str]] | None = None
+) -> Dict[str, List[str]]:
     """删表【之前】把该账套名下的盘上文件位置抠出来。
+
+    scope 给值 = 只清这一期(purge.period_scope 的产物:该期工单 id 与挂上去的票据 id),
+    别期的文件一个不碰。scope=None = 整个账套。
 
     返回 {"files": [绝对路径], "dirs": [绝对目录]}。取不到的类别静默跳过 —— 这些表
     未必在每套部署里都存在,少一类不该让整个清除失败。
@@ -45,57 +50,77 @@ def collect(cur, *, tenant_id: str, ws_id: int) -> Dict[str, List[str]]:
     # ① OCR 原件转出的 PDF:pdf_storage_path 相对 PDF_STORAGE_DIR(storage_path 生产恒 NULL,
     #    上一版只认它 → 一个都没收到)。
     try:
-        for r in _rows(
-            cur,
-            "SELECT pdf_storage_path AS p FROM ocr_history "
-            "WHERE workspace_client_id = %s AND pdf_storage_path IS NOT NULL "
-            "AND pdf_storage_path <> ''",
-            (ws_id,),
-        ):
+        if scope is None:
+            rows = _rows(
+                cur,
+                "SELECT pdf_storage_path AS p FROM ocr_history "
+                "WHERE workspace_client_id = %s AND pdf_storage_path IS NOT NULL "
+                "AND pdf_storage_path <> ''",
+                (ws_id,),
+            )
+        elif scope.get("ocr_history_ids"):
+            rows = _rows(
+                cur,
+                "SELECT pdf_storage_path AS p FROM ocr_history "
+                "WHERE id::text = ANY(%s) AND pdf_storage_path IS NOT NULL "
+                "AND pdf_storage_path <> ''",
+                (scope["ocr_history_ids"],),
+            )
+        else:
+            rows = []
+        for r in rows:
             files.append(str(Path(_PDF_BASE) / str(r["p"])))
     except Exception:  # noqa: BLE001
         logger.warning("[purge-files] ocr_history 收集失败", exc_info=True)
 
-    # ② 知识库文档:相对 PDF_STORAGE_DIR/knowledge(见 services/knowledge/host_provider)
-    try:
-        for r in _rows(
-            cur,
-            "SELECT storage_path AS p FROM knowledge_documents "
-            "WHERE workspace_client_id = %s AND storage_path IS NOT NULL AND storage_path <> ''",
-            (ws_id,),
-        ):
-            files.append(str(Path(_PDF_BASE) / "knowledge" / str(r["p"])))
-    except Exception:  # noqa: BLE001
-        logger.warning("[purge-files] knowledge_documents 收集失败", exc_info=True)
+    # ② 知识库文档 / ④ 采购附件:都不带账期,只在整套账清除时收 —— 按期清不该动它们。
+    if scope is None:
+        # 知识库:相对 PDF_STORAGE_DIR/knowledge(见 services/knowledge/host_provider)
+        try:
+            for r in _rows(
+                cur,
+                "SELECT storage_path AS p FROM knowledge_documents WHERE workspace_client_id = %s "
+                "AND storage_path IS NOT NULL AND storage_path <> ''",
+                (ws_id,),
+            ):
+                files.append(str(Path(_PDF_BASE) / "knowledge" / str(r["p"])))
+        except Exception:  # noqa: BLE001
+            logger.warning("[purge-files] knowledge_documents 收集失败", exc_info=True)
+        # 采购附件:generated=TRUE 是虚 URL(没有实体文件),不收。
+        try:
+            for r in _rows(
+                cur,
+                "SELECT url FROM purchase_attachments WHERE generated IS NOT TRUE "
+                "AND purchase_doc_id IN "
+                "(SELECT id FROM purchase_docs WHERE workspace_client_id = %s)",
+                (ws_id,),
+            ):
+                name = Path(str(r["url"])).name
+                if name:
+                    files.append(str(Path(_IMAGE_BASE) / str(tenant_id) / name))
+        except Exception:  # noqa: BLE001
+            logger.warning("[purge-files] purchase_attachments 收集失败", exc_info=True)
 
     # ③ 工单目录(用户上传的原件与交付物都在这儿 · 线上最大的一块):
     #    workorders/<租户8位>/<工单id>/{materials,deliverables}
     try:
         from services.workorder import storage as wo_storage
 
-        for r in _rows(
-            cur,
-            "SELECT id::text AS id FROM work_orders WHERE workspace_client_id = %s",
-            (ws_id,),
-        ):
-            dirs.append(str(wo_storage.order_dir(tenant_id, r["id"])))
+        if scope is None:
+            ids = [
+                r["id"]
+                for r in _rows(
+                    cur,
+                    "SELECT id::text AS id FROM work_orders WHERE workspace_client_id = %s",
+                    (ws_id,),
+                )
+            ]
+        else:
+            ids = list(scope.get("work_order_ids") or [])
+        for wid in ids:
+            dirs.append(str(wo_storage.order_dir(tenant_id, wid)))
     except Exception:  # noqa: BLE001
         logger.warning("[purge-files] work_orders 目录收集失败", exc_info=True)
-
-    # ④ 采购附件:generated=TRUE 是虚 URL(没有实体文件),不收。
-    try:
-        for r in _rows(
-            cur,
-            "SELECT url FROM purchase_attachments WHERE generated IS NOT TRUE "
-            "AND purchase_doc_id IN "
-            "(SELECT id FROM purchase_docs WHERE workspace_client_id = %s)",
-            (ws_id,),
-        ):
-            name = Path(str(r["url"])).name
-            if name:
-                files.append(str(Path(_IMAGE_BASE) / str(tenant_id) / name))
-    except Exception:  # noqa: BLE001
-        logger.warning("[purge-files] purchase_attachments 收集失败", exc_info=True)
 
     return {"files": files, "dirs": dirs}
 

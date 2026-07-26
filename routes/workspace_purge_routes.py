@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Iterator
+from typing import Iterator, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from core import db
@@ -38,15 +38,18 @@ def _assert_owns(cur, ws_id: int, tenant_id: str) -> str:
     return str(row["name"])
 
 
-def _stream(tenant_id: str, ws_id: int, user_id: str) -> Iterator[bytes]:
+def _stream(tenant_id: str, ws_id: int, period: Optional[str]) -> Iterator[bytes]:
     targets: dict = {}
     leftover: list[str] = []
     leftover_detail: list = []
     deleted_total = 0
     with db.get_cursor_rls(tenant_id=tenant_id, workspace_client_id=ws_id, commit=True) as cur:
         _assert_owns(cur, ws_id, tenant_id)
-        targets = files_svc.collect(cur, tenant_id=tenant_id, ws_id=ws_id)
-        for evt in purge_svc.purge(cur, tenant_id=tenant_id, ws_id=ws_id):
+        # 文件位置必须在删表之前收 —— 按期清时更是:票据与账期的联系只存在于 work_order_items,
+        # 子行一删就再也认不出哪些文件属于这一期。
+        scope = purge_svc.period_scope(cur, ws_id, period) if period else None
+        targets = files_svc.collect(cur, tenant_id=tenant_id, ws_id=ws_id, scope=scope)
+        for evt in purge_svc.purge(cur, tenant_id=tenant_id, ws_id=ws_id, period=period):
             if evt.get("step") == "finished":
                 leftover = list(evt.get("leftover") or [])
                 leftover_detail = list(evt.get("leftover_detail") or [])
@@ -78,11 +81,29 @@ def _stream(tenant_id: str, ws_id: int, user_id: str) -> Iterator[bytes]:
     ).encode()
 
 
-@router.post("/api/workspace/clients/{workspace_client_id}/purge")
-async def purge_workspace_client_data(workspace_client_id: int, request: Request):
-    """清空该账套主体名下全部业务数据(主体行只留名称与税号)。仅老板/超管。
+@router.get("/api/workspace/clients/{workspace_client_id}/purge-periods")
+async def list_purge_periods(workspace_client_id: int, request: Request):
+    """该账套下真有数据的账期(供清除弹窗的账期下拉)。只列真有的,不摆空选项。"""
+    user = require_perm(request, "settings.workspace.manage")
+    tenant_id = _tid(user)
+    if not tenant_id:
+        raise HTTPException(403, detail="authz.forbidden")
+    with db.get_cursor_rls(tenant_id=tenant_id, workspace_client_id=workspace_client_id) as cur:
+        _assert_owns(cur, workspace_client_id, tenant_id)
+        return {"periods": purge_svc.periods_with_data(cur, workspace_client_id)}
 
-    不可撤销。越权或不存在一律 404(不泄漏存在性,同本域既有端点口径)。
+
+@router.post("/api/workspace/clients/{workspace_client_id}/purge")
+async def purge_workspace_client_data(
+    workspace_client_id: int,
+    request: Request,
+    period: Optional[str] = Query(None, description="留空=整个账套;给值=只清这一期"),
+):
+    """清空账套数据。仅老板/超管。不可撤销。
+
+    留空 period = 整个账套(主体行只留名称与税号)。
+    给了 period = 只清这一期:该期工单及其名下一切 + 挂上去的票据 + 带期表按期过滤;
+    主数据与别的账期不动。越权或不存在一律 404(不泄漏存在性,同本域既有端点口径)。
     """
     user = require_perm(request, "settings.workspace.manage")
     tenant_id = _tid(user)
@@ -98,10 +119,10 @@ async def purge_workspace_client_data(workspace_client_id: int, request: Request
         target_type="workspace_client",
         target_id=str(workspace_client_id),
         target_name=name,
-        details={"irreversible": True},
+        details={"irreversible": True, "period": period or "ALL"},
     )
     return StreamingResponse(
-        _stream(tenant_id, workspace_client_id, str(user["id"])),
+        _stream(tenant_id, workspace_client_id, period),
         media_type="application/x-ndjson",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )

@@ -73,6 +73,12 @@ async function boot(page, lang = 'zh') {
         if (p.endsWith('/purge')) {
             return r.fulfill({ status: 200, contentType: 'application/x-ndjson', body: NDJSON });
         }
+        if (p.endsWith('/purge-periods')) {
+            return r.fulfill({
+                contentType: 'application/json',
+                body: '{"periods":[{"period":"2569-05","orders":2},{"period":"2569-04","orders":1}]}',
+            });
+        }
         if (p === '/api/tax-profile/matrix') {
             matrixCalls += 1;
             return r.fulfill({ contentType: 'application/json', body: JSON.stringify(MATRIX) });
@@ -181,6 +187,59 @@ test.describe('按账套清空数据(本地 stub · 真构建产物)', () => {
         await expect(page.locator('.pg-leftover')).toContainText('work_order_items');
         await expect(page.locator('.pg-leftover'), '要说清还剩几行').toContainText('105');
         await page.screenshot({ path: path.join(ARTIFACT_DIR, '06-leftover-failed.png') });
+    });
+
+    test('账期下拉只列真有数据的期,选了期请求必须带 period', async ({ page }) => {
+        await boot(page);
+        let purgeUrl = '';
+        await page.route('**/purge?**', (r) => {
+            purgeUrl = r.request().url();
+            return r.fulfill({
+                status: 200,
+                contentType: 'application/x-ndjson',
+                body:
+                    '{"step":"table","label":"work_orders","deleted":2,"done":1,"total":2,"ok":true}\n' +
+                    '{"step":"finished","deleted_total":2,"files_removed":3,"leftover":[],' +
+                    '"leftover_detail":[],"period":"2569-05","ok":true}\n',
+            });
+        });
+
+        await page.locator('#clientsPurgeBtn').click();
+        await page.locator('.pg-opt input[value="1"]').check();
+        await page.locator('[data-action="pg-next"]').click();
+
+        // 默认「全部账期」+ 两个真账期,不摆空选项
+        const sel = page.locator('#pgPeriod');
+        await expect(sel).toBeVisible({ timeout: 10000 });
+        await expect(sel.locator('option')).toHaveCount(3);
+        await expect(sel).toHaveValue('');
+
+        // 选了期,警告文案要换成「只清这一期」的说法
+        await sel.selectOption('2569-05');
+        await expect(page.locator('.pg-note')).toContainText('只清这一个账期');
+        await page.screenshot({ path: path.join(ARTIFACT_DIR, '07-period.png') });
+
+        await page.locator('[data-action="pg-run"]').click();
+        await expect(page.locator('.pg-done')).toBeVisible({ timeout: 15000 });
+        expect(purgeUrl, '选了账期就必须把 period 带上,否则会清掉整个套账').toContain(
+            'period=2569-05'
+        );
+    });
+
+    test('不选账期 = 全部账期,请求不带 period', async ({ page }) => {
+        await boot(page);
+        let purgeUrl = '';
+        await page.route('**/*/purge**', (r) => {
+            purgeUrl = r.request().url();
+            return r.fulfill({ status: 200, contentType: 'application/x-ndjson', body: NDJSON });
+        });
+        await page.locator('#clientsPurgeBtn').click();
+        await page.locator('.pg-opt input[value="1"]').check();
+        await page.locator('[data-action="pg-next"]').click();
+        await expect(page.locator('#pgPeriod')).toBeVisible({ timeout: 10000 });
+        await page.locator('[data-action="pg-run"]').click();
+        await expect(page.locator('.pg-done')).toBeVisible({ timeout: 15000 });
+        expect(purgeUrl).not.toContain('period=');
     });
 
     for (const lang of ['th', 'en', 'ja']) {

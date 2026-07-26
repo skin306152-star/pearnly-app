@@ -457,6 +457,11 @@ Object.assign(window.__AI_I18N_EN__, {
     purge_not_clean: 'Not fully cleared — data remains',
     purge_done_stat: 'Deleted {rows} rows and {files} files.',
     purge_leftover: 'These tables could not be cleared, please contact us: {tables}',
+    purge_period_label: 'Period',
+    purge_period_all: 'All periods (wipe the whole entity)',
+    purge_period_opt: '{p} ({n} work orders)',
+    purge_warn_body_period:
+        'Only this period is cleared: its work orders and everything under them — documents, review, deliverables, ledger entries, tax filings, uploaded images and files. Master data (client profile, products, chart of accounts, suppliers) and other periods are untouched.',
     purge_finish: 'Done',
     client_import_title: 'Bulk import client list',
     client_import_hint:

@@ -419,6 +419,11 @@ Object.assign(window.__AI_I18N_ZH__, {
     purge_not_clean: '未清干净 · 还有数据残留',
     purge_done_stat: '共删除 {rows} 行数据、{files} 个文件。',
     purge_leftover: '以下表未能清空，请联系我们：{tables}',
+    purge_period_label: '账期',
+    purge_period_all: '全部账期（整个套账清空）',
+    purge_period_opt: '{p}（{n} 张工单）',
+    purge_warn_body_period:
+        '只清这一个账期：该期工单及其名下的资料、审核、交付包、凭证、申报记录、上传的图片与文档，全部删除。客户档案、商品、科目表、供应商等主数据不动，其它账期不动。',
     purge_finish: '完成',
     client_import_title: '批量导入客户名录',
     client_import_hint: '上传 Excel/CSV,自动识别表头,逐行预览后再确认建档',

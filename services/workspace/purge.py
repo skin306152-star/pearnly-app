@@ -76,6 +76,30 @@ def child_edges(cur) -> List[Dict[str, str]]:
     return [dict(r) for r in cur.fetchall()]
 
 
+def _period_tables(cur, tables: List[str]) -> List[str]:
+    """账套级表里带 period 列的那几张(生产上 73 张里只有 9 张)。"""
+    cur.execute(
+        "SELECT c.relname AS t FROM pg_attribute a "
+        "JOIN pg_class c ON c.oid = a.attrelid "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relkind = 'r' AND a.attname = 'period' "
+        "AND a.attnum > 0 AND NOT a.attisdropped"
+    )
+    have = {r["t"] for r in cur.fetchall()}
+    return [t for t in tables if t in have]
+
+
+def periods_with_data(cur, ws_id: int) -> List[Dict[str, Any]]:
+    """该账套下真有数据的账期 + 每期的工单数。只列真有的 —— 下拉里摆一堆空账期是假选项。"""
+    cur.execute(
+        "SELECT period, count(*) AS orders FROM work_orders "
+        "WHERE workspace_client_id = %s AND period IS NOT NULL AND period <> '' "
+        "GROUP BY period ORDER BY period DESC",
+        (ws_id,),
+    )
+    return [{"period": r["period"], "orders": int(r["orders"] or 0)} for r in cur.fetchall()]
+
+
 def verify_empty(cur, ws_id: int) -> List[Dict[str, Any]]:
     """删完真回数:哪张表还剩行就报哪张。
 
@@ -170,11 +194,137 @@ def _reset_subject_row(cur, ws_id: int, tenant_id: Optional[str]) -> None:
     )
 
 
-def purge(cur, *, tenant_id: Optional[str], ws_id: int) -> Iterator[Dict[str, Any]]:
+def period_scope(cur, ws_id: int, period: str) -> Dict[str, List[str]]:
+    """该账期的工单 id、以及挂在这些工单上的票据 id。
+
+    必须在删任何行【之前】取:票据与账期的唯一联系是 work_order_items.ocr_history_id,
+    子行一删这层关系就没了,票据再也认不出属于哪个账期。
+    """
+    cur.execute(
+        "SELECT id::text AS id FROM work_orders WHERE workspace_client_id = %s AND period = %s",
+        (ws_id, period),
+    )
+    wo_ids = [r["id"] for r in cur.fetchall()]
+    hist_ids: List[str] = []
+    if wo_ids:
+        cur.execute(
+            "SELECT DISTINCT ocr_history_id::text AS id FROM work_order_items "
+            "WHERE work_order_id = ANY(%s::uuid[]) AND ocr_history_id IS NOT NULL",
+            (wo_ids,),
+        )
+        hist_ids = [r["id"] for r in cur.fetchall()]
+    return {"work_order_ids": wo_ids, "ocr_history_ids": hist_ids}
+
+
+def _period_pending(cur, ws_id: int, period: str, scope: Dict[str, List[str]]) -> List[Tuple]:
+    """按账期清的工作清单。只碰这一期的东西:该期工单及其名下一切 + 挂上去的票据 +
+    带 period 列的那几张表按期过滤。主数据(商品/科目表/供应商/客户档案)与别的账期不动。"""
+    wo_ids = scope["work_order_ids"]
+    hist_ids = scope["ocr_history_ids"]
+    items: List[Tuple] = []
+
+    if wo_ids:
+        for edge in child_edges(cur):
+            if edge["parent"] != "work_orders":
+                continue
+            items.append(
+                (
+                    "child",
+                    edge["child"],
+                    lambda e=edge: _delete_by_ids(cur, e["child"], e["child_col"], wo_ids),
+                )
+            )
+        items.append(
+            ("table", "work_orders", lambda: _delete_by_ids(cur, "work_orders", "id", wo_ids))
+        )
+    if hist_ids:
+        for edge in child_edges(cur):
+            if edge["parent"] != "ocr_history":
+                continue
+            items.append(
+                (
+                    "child",
+                    edge["child"],
+                    lambda e=edge: _delete_by_ids(cur, e["child"], e["child_col"], hist_ids),
+                )
+            )
+        items.append(
+            ("table", "ocr_history", lambda: _delete_by_ids(cur, "ocr_history", "id", hist_ids))
+        )
+    for table in _period_tables(cur, scope_tables(cur)):
+        if table == "work_orders":
+            continue
+        items.append(
+            ("table", table, lambda t=table: _delete_by_period(cur, t, ws_id, period)),
+        )
+    return items
+
+
+def _delete_by_ids(cur, table: str, column: str, ids: List[str]) -> int:
+    if not ids:
+        return 0
+    cur.execute(
+        f"DELETE FROM {table} WHERE {column}::text = ANY(%s)",  # noqa: S608 — 标识符来自 pg_catalog
+        (ids,),
+    )
+    return cur.rowcount or 0
+
+
+def _delete_by_period(cur, table: str, ws_id: int, period: str) -> int:
+    cur.execute(
+        f"DELETE FROM {table} WHERE workspace_client_id = %s AND period = %s",  # noqa: S608
+        (ws_id, period),
+    )
+    return cur.rowcount or 0
+
+
+def verify_period_empty(cur, ws_id: int, period: str, scope: Dict[str, List[str]]) -> List[Dict]:
+    """按账期清完的真回数:该期工单还剩几张、挂上去的票据还剩几条、带期表还剩几行。"""
+    left: List[Dict[str, Any]] = []
+    cur.execute(
+        "SELECT count(*) AS n FROM work_orders WHERE workspace_client_id = %s AND period = %s",
+        (ws_id, period),
+    )
+    n = int((cur.fetchone() or {}).get("n") or 0)
+    if n:
+        left.append({"table": "work_orders", "rows": n})
+    if scope["ocr_history_ids"]:
+        cur.execute(
+            "SELECT count(*) AS n FROM ocr_history WHERE id::text = ANY(%s)",
+            (scope["ocr_history_ids"],),
+        )
+        n = int((cur.fetchone() or {}).get("n") or 0)
+        if n:
+            left.append({"table": "ocr_history", "rows": n})
+    for table in _period_tables(cur, scope_tables(cur)):
+        if table == "work_orders":
+            continue
+        cur.execute(
+            f"SELECT count(*) AS n FROM {table} "  # noqa: S608
+            "WHERE workspace_client_id = %s AND period = %s",
+            (ws_id, period),
+        )
+        n = int((cur.fetchone() or {}).get("n") or 0)
+        if n:
+            left.append({"table": table, "rows": n})
+    return left
+
+
+def purge(
+    cur, *, tenant_id: Optional[str], ws_id: int, period: Optional[str] = None
+) -> Iterator[Dict[str, Any]]:
     """逐表清空并把进度吐出来。调用方负责事务提交/回滚与文件清理。
 
-    产出:{"step","label","deleted","done","total"};收尾一条 {"done": total, "leftover": [...]}。
+    period=None → 整个账套清空(主体行只留名称与税号)。
+    period 给值 → 只清这一期:该期工单及其名下一切 + 挂上去的票据 + 带期表按期过滤;
+    主体行与主数据不动 —— 换一期还要接着用。
+
+    产出:{"step","label","deleted","done","total"};收尾一条 {"leftover","leftover_detail"}。
     """
+    if period:
+        yield from _purge_period(cur, ws_id=ws_id, period=period)
+        return
+
     edges = child_edges(cur)
     tables = scope_tables(cur)
     total = len(edges) + len(tables) + 1  # +1 = 主体行重置
@@ -235,6 +385,48 @@ def purge(cur, *, tenant_id: Optional[str], ws_id: int) -> Iterator[Dict[str, An
         "deleted_total": deleted_total,
         "done": done,
         "total": total,
+        "leftover": [x["table"] for x in left],
+        "leftover_detail": left,
+    }
+
+
+def _purge_period(cur, *, ws_id: int, period: str) -> Iterator[Dict[str, Any]]:
+    scope = period_scope(cur, ws_id, period)
+    pending = _period_pending(cur, ws_id, period, scope)
+    total = max(len(pending), 1)
+    done = 0
+    deleted_total = 0
+
+    while pending:
+        stuck: List[Tuple] = []
+        progressed = False
+        for kind, label, run in pending:
+            ok, n = _try_delete(cur, label, run)
+            if not ok:
+                stuck.append((kind, label, run))
+                continue
+            progressed = True
+            done += 1
+            deleted_total += n
+            yield {
+                "step": kind,
+                "label": label,
+                "deleted": n,
+                "done": done,
+                "total": total,
+                "ok": True,
+            }
+        if not progressed:
+            break
+        pending = stuck
+
+    left = verify_period_empty(cur, ws_id, period, scope)
+    yield {
+        "step": "finished",
+        "deleted_total": deleted_total,
+        "done": done,
+        "total": total,
+        "period": period,
         "leftover": [x["table"] for x in left],
         "leftover_detail": left,
     }

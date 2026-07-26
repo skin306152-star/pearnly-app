@@ -56,6 +56,38 @@
         );
     }
 
+    // 账期只列真有数据的(GET purge-periods)。产品本来就按套账×账期工作,
+    // 但 73 张表里只有 9 张带账期 —— 按期清只动这一期的工单及其名下一切,主数据不碰,
+    // 文案必须说清楚,不然用户以为「按期清」也会带走商品/科目表。
+    function periodHtml() {
+        var opts =
+            '<option value="">' +
+            esc(at('purge_period_all')) +
+            '</option>' +
+            (S.periods || [])
+                .map(function (p) {
+                    return (
+                        '<option value="' +
+                        esc(p.period) +
+                        '"' +
+                        (S.period === p.period ? ' selected' : '') +
+                        '>' +
+                        esc(
+                            at('purge_period_opt').replace('{p}', p.period).replace('{n}', p.orders)
+                        ) +
+                        '</option>'
+                    );
+                })
+                .join('');
+        return (
+            '<div class="pg-field"><label for="pgPeriod">' +
+            esc(at('purge_period_label')) +
+            '</label><select id="pgPeriod" class="pg-select">' +
+            opts +
+            '</select></div>'
+        );
+    }
+
     function confirmHtml() {
         var c = S.picked || {};
         return (
@@ -67,8 +99,9 @@
             '</b><small>' +
             esc(c.tax_id || at('purge_no_tax')) +
             '</small></div>' +
+            periodHtml() +
             '<p class="pg-note">' +
-            esc(at('purge_warn_body')) +
+            esc(S.period ? at('purge_warn_body_period') : at('purge_warn_body')) +
             '</p>' +
             '<div class="pkg-actions"><button type="button" class="btn" data-action="pg-back">' +
             esc(at('purge_back')) +
@@ -202,15 +235,42 @@
         return rest;
     }
 
+    // 账期拉不到不阻断:下拉只剩「全部账期」,清整套账仍然可用(不拿假选项冒充)。
+    function loadPeriods() {
+        var token = AI.token.get();
+        var id = S.picked.id;
+        window
+            .fetch('/api/workspace/clients/' + encodeURIComponent(id) + '/purge-periods', {
+                headers: token ? { Authorization: 'Bearer ' + token } : {},
+            })
+            .then(function (r) {
+                return r.ok ? r.json() : { periods: [] };
+            })
+            .then(function (j) {
+                if (!S || !S.picked || String(S.picked.id) !== String(id)) return;
+                S.periods = j.periods || [];
+                if (S.step === 'confirm') render();
+            })
+            .catch(function () {
+                /* 网络失败就只留「全部账期」 */
+            });
+    }
+
     function run() {
         S.step = 'running';
         render();
         var token = AI.token.get();
         window
-            .fetch('/api/workspace/clients/' + encodeURIComponent(S.picked.id) + '/purge', {
-                method: 'POST',
-                headers: token ? { Authorization: 'Bearer ' + token } : {},
-            })
+            .fetch(
+                '/api/workspace/clients/' +
+                    encodeURIComponent(S.picked.id) +
+                    '/purge' +
+                    (S.period ? '?period=' + encodeURIComponent(S.period) : ''),
+                {
+                    method: 'POST',
+                    headers: token ? { Authorization: 'Bearer ' + token } : {},
+                }
+            )
             .then(function (r) {
                 if (!r.ok || !r.body) throw new Error('purge_failed');
                 var reader = r.body.getReader();
@@ -238,6 +298,13 @@
             });
     }
 
+    function onChange(e) {
+        if (e.target && e.target.id === 'pgPeriod') {
+            S.period = e.target.value;
+            render();
+        }
+    }
+
     function onClick(e) {
         var radio = e.target.closest('input[name="pg-ws"]');
         if (radio) {
@@ -254,7 +321,9 @@
         if (name === 'pg-close') return close();
         if (name === 'pg-next' && S.picked) {
             S.step = 'confirm';
-            return render();
+            S.period = '';
+            render();
+            return loadPeriods();
         }
         if (name === 'pg-back') {
             S.step = 'pick';
@@ -267,12 +336,21 @@
     // clients:[{id,name,tax_id}] · onDone:清完回调(客户页重拉列表)
     function open(clients, onDone) {
         close();
-        S = { clients: clients || [], picked: null, step: 'pick', result: null, onDone: onDone };
+        S = {
+            clients: clients || [],
+            picked: null,
+            periods: [],
+            period: '',
+            step: 'pick',
+            result: null,
+            onDone: onDone,
+        };
         var host = document.createElement('div');
         host.innerHTML = modalHtml();
         var el = host.firstChild;
         document.body.appendChild(el);
         el.addEventListener('click', onClick);
+        el.addEventListener('change', onChange);
     }
 
     window.AI = window.AI || {};

@@ -10,7 +10,7 @@ copy.artifacts / copy.artifact_links,不直接 import 本模块。
 
 from __future__ import annotations
 
-from services.steward import registry
+from services.steward import copy_close, registry
 
 DEFAULT_LANG = "zh"
 
@@ -22,6 +22,11 @@ _ARTIFACT_LABEL = {
     "push_rows": {"zh": "推送记录", "th": "รายการที่ส่ง"},
     "history_rows": {"zh": "识别记录", "th": "เอกสารที่สแกน"},
     "clients": {"zh": "客户", "th": "ลูกค้า"},
+    "due_rows": {"zh": "还没交完的", "th": "ที่ยังไม่ได้ยื่น"},
+    "queue_rows": {"zh": "等人审的工单", "th": "งานที่รอตรวจ"},
+    "missing_invoice": {"zh": "缺票的流水", "th": "รายการเดินบัญชีที่ขาดใบกำกับ"},
+    "push_attempts": {"zh": "这张票的推送尝试", "th": "ประวัติการส่งใบนี้"},
+    "board_link": {"zh": "打开看板 · 等你审", "th": "เปิดบอร์ด · รอคุณตรวจ"},
 }
 
 _COLUMN_LABEL = {
@@ -39,6 +44,15 @@ _COLUMN_LABEL = {
     "seller_name": {"zh": "卖方", "th": "ผู้ขาย"},
     "invoice_date": {"zh": "票面日期", "th": "วันที่ในเอกสาร"},
     "tax_id": {"zh": "税号", "th": "เลขผู้เสียภาษี"},
+    "period": {"zh": "账期", "th": "งวด"},
+    "due": {"zh": "截止日", "th": "วันครบกำหนด"},
+    "days_left": {"zh": "还剩", "th": "เหลือ"},
+    "flagged": {"zh": "待判件", "th": "รายการที่ต้องตัดสิน"},
+    "severity": {"zh": "严重度", "th": "ระดับ"},
+    "tx_date": {"zh": "日期", "th": "วันที่"},
+    "amount": {"zh": "金额", "th": "จำนวนเงิน"},
+    "description": {"zh": "摘要", "th": "รายละเอียด"},
+    "category": {"zh": "失败类型", "th": "ประเภทข้อผิดพลาด"},
 }
 
 
@@ -78,7 +92,56 @@ def build(tool: str, data: dict, lang: str) -> list[dict]:
     if tool == registry.CLIENT_LOOKUP:
         rows = data.get("clients") or []
         return [_table("clients", rows, ("name", "tax_id"), lang)] if rows else []
+    if tool == registry.DUE_SOON:
+        rows = [_due_row(r, lang) for r in (data.get("rows") or [])]
+        cols = ("client_name", "obligation_code", "due", "days_left", "badge")
+        out = [_link("matrix_link", "/ai#/", lang)]
+        return out + ([_table("due_rows", rows, cols, lang)] if rows else [])
+    if tool == registry.REVIEW_QUEUE:
+        rows = [_queue_row(r, lang) for r in (data.get("rows") or [])]
+        cols = ("client_name", "period", "status", "flagged", "severity", "due")
+        # 待审队列在 SPA 里的落点是看板(#/board 消费 /api/workorder/review-queue),
+        # 不是另起一个 #/review —— 那个路由不存在,摆出来就是点开 404 的按钮。
+        out = [_link("board_link", "/ai#/board", lang)]
+        return out + ([_table("queue_rows", rows, cols, lang)] if rows else [])
+    if tool == registry.TAX_NUMBERS:
+        return _client_link(data, lang)
+    if tool == registry.BANK_RECON_STATUS:
+        rows = data.get("rows") or []
+        cols = ("tx_date", "amount", "description")
+        return _client_link(data, lang) + (
+            [_table("missing_invoice", rows, cols, lang)] if rows else []
+        )
+    if tool == registry.INVOICE_DETAIL:
+        rows = data.get("push_rows") or []
+        cols = ("created_at", "status", "error_code", "category")
+        return [_table("push_attempts", rows, cols, lang)] if rows else []
     return []
+
+
+def _due_row(row: dict, lang: str) -> dict:
+    """倒计时与徽章在这里就翻成人话:表格里印 -3 / missing_materials 等于让人自己解码。"""
+    return {
+        **row,
+        "days_left": copy_close.days_left(row.get("days_left"), lang),
+        "badge": copy_close.badge(row.get("badge"), lang),
+    }
+
+
+def _queue_row(row: dict, lang: str) -> dict:
+    return {
+        **row,
+        "status": copy_close.order_status(row.get("status"), lang),
+        "severity": copy_close.severity(row.get("severity"), lang),
+    }
+
+
+def _client_link(data: dict, lang: str) -> list[dict]:
+    """按客户查的工具共用的落点:这家这期的工单页(没定位到客户就不摆按钮)。"""
+    if not data.get("client_id"):
+        return []
+    href = f"/ai#/client/{data['client_id']}/wo?period={data.get('period', '')}"
+    return [_link("client_link", href, lang)]
 
 
 def links(artifacts: list) -> list[dict]:

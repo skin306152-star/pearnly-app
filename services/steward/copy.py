@@ -9,29 +9,21 @@ reply_guard 出口护栏)。
 只写 zh + th:与前端 static/ai/ai-i18n-steward.js 同一决定(管家是事务所内部工作台入口,
 照 adm-* 超管键先例先做两语,en/ja 回落 zh),对外开放再补两语——两侧同进同退,不各走各的。
 
-体积闸(<500 行)下的两块分居:产物层在 copy_artifacts,写工具 erp_push 的文案在
-copy_erp_push。语义边界不变 —— 调用方一律只 import copy,本模块按工具/错误码委派过去。
+体积闸(<500 行)下的三块分居:产物层在 copy_artifacts,月结产线四问 + 单票体检的文案在
+copy_close,写工具 erp_push 的文案在 copy_erp_push。语义边界不变 —— 调用方一律只 import
+copy,本模块按工具/错误码委派过去。
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from services.steward import copy_artifacts, copy_erp_push, registry, store
+from services.steward import copy_artifacts, copy_close, copy_erp_push, registry, store
 
 DEFAULT_LANG = "zh"
 _LANGS = ("zh", "th")
 
 _THAI_RANGE = ("฀", "๿")
-
-# 工单五态(services/workorder/engine.STATUS_*)的人话。机器词只在这里翻一次。
-_ORDER_STATUS = {
-    "collecting": {"zh": "收料中", "th": "กำลังรับเอกสาร"},
-    "running": {"zh": "执行中", "th": "กำลังประมวลผล"},
-    "stuck": {"zh": "卡住等人", "th": "ติดขัดรอคน"},
-    "review": {"zh": "待审", "th": "รอตรวจ"},
-    "archive": {"zh": "已冻结", "th": "ปิดงวดแล้ว"},
-}
 
 # 状态语义组(engine.STATUS_GROUPS 的组名)的人话。工单清单的答复要自证口径:
 # 「2569-07:0 张工单」看不出筛没筛,与同屏矩阵的「待审 2」对不上时无从判断谁错。
@@ -50,6 +42,7 @@ _TOOL_TITLE = {
     registry.HISTORY_QUERY: {"zh": "找识别记录", "th": "ค้นเอกสารที่สแกน"},
     registry.CLIENT_LOOKUP: {"zh": "查客户名录", "th": "ค้นรายชื่อลูกค้า"},
     registry.ERP_PUSH: {"zh": "推票进 Express", "th": "ส่งใบเข้า Express"},
+    **copy_close.TITLES,
 }
 
 _STEP_UNDERSTAND = {"zh": "听懂你要什么", "th": "ทำความเข้าใจคำสั่ง"}
@@ -129,12 +122,14 @@ _FAIL_REASON = {
 
 _OUT_OF_SCOPE = {
     "zh": (
-        "这个我还做不了。我能查:本期矩阵、某家客户进度、工单清单、推送成败、识别记录、客户名录;"
+        "这个我还做不了。我能查:本期矩阵、到期义务、待审队列、某家客户进度、工单清单、应交税额、"
+        "银行对账、推送成败、识别记录与单票详情、客户名录;"
         "能改的只有一件 —— 把一张已识别的票推进 Express(要你先批准)。"
     ),
     "th": (
-        "เรื่องนี้ยังทำให้ไม่ได้ค่ะ ที่ค้นได้: ภาพรวมงวด · ความคืบหน้าลูกค้า · "
-        "รายการงาน · ผลส่งเข้า ERP · เอกสารที่สแกน · รายชื่อลูกค้า; "
+        "เรื่องนี้ยังทำให้ไม่ได้ค่ะ ที่ค้นได้: ภาพรวมงวด · รายการใกล้ครบกำหนด · คิวรอตรวจ · "
+        "ความคืบหน้าลูกค้า · รายการงาน · ยอดภาษีที่ต้องชำระ · ผลกระทบยอดธนาคาร · "
+        "ผลส่งเข้า ERP · เอกสารที่สแกนและรายละเอียดใบเดี่ยว · รายชื่อลูกค้า; "
         "ที่แก้ข้อมูลได้มีอย่างเดียว — ส่งใบที่สแกนแล้วเข้า Express (ต้องให้คุณอนุมัติก่อน)"
     ),
 }
@@ -303,6 +298,9 @@ def error(code: str, data: Optional[dict], lang: str) -> str:
 
 def reply(tool: str, data: dict, lang: str) -> str:
     """工具结果 → 一句人话。数字全部取自 data,模板不做任何计算。"""
+    renderer = copy_close.REPLIES.get(tool)
+    if renderer:
+        return renderer(data, lang)
     if tool == registry.ERP_PUSH:
         return copy_erp_push.reply(data, lang)
     if tool == registry.CLIENT_STATUS:
@@ -374,9 +372,8 @@ def status_filter(group: Optional[str], lang: str) -> str:
 
 
 def order_status(status: Optional[str], lang: str) -> str:
-    """工单机器态 → 人话。不认识的未来态原样吐机器词(诚实,不冒充已知态)。"""
-    table = _ORDER_STATUS.get(status or "")
-    return _t(table, lang) if table else (status or "")
+    """工单机器态 → 人话(词表在 copy_close,产物层与答复层共用一份)。"""
+    return copy_close.order_status(status, lang)
 
 
 def _breakdown(counts: dict, lang: str) -> str:

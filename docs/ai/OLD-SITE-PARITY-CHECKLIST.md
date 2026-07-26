@@ -16,12 +16,14 @@
 4. **界面** — 仅必要时保留专用界面(如大批量逐票复核的队列页),**且只用 /ai 现有页面,不新增**。
 
 「落点」= /ai 已有位置,或排期批次:**B2 管家M1 / B3 授权与主动汇报 / 桥P0只读 / 桥P2写路 / 待排**。
-「验收态」当前全部为 **未验**(/ai 侧有对应物但未真机验收)或 **老站在用**(/ai 侧尚无对应物)。
+「验收态」三档口径见 §1 表头下一行说明。
 
 服务层(`services/`)是入口无关的:方向判定 / 过账去向 / 防重单 / 现赊漏斗等全在后端,
 桥P2 接通写路后 /ai **免费继承**,不存在"逻辑搬家"。
 
 ## 1. 主清单
+
+「验收态」口径:**老站在用** = /ai 侧尚无对应物;**未验** = /ai 已有对应物但未真机验收;**—** = 已判定无需对齐 / 不入退役闸。
 
 | # | 能力(老站入口) | 老站现状(关键文件) | 吸收方式 | 落点 | 验收态 |
 |---|---|---|---|---|---|
@@ -38,7 +40,7 @@
 | 11 | 公司资料(#/company) | 账套主体开票/申报信息行内编辑;`src/home/company-profile.ts` | 配置 | 部分已有:税务画像/义务清单(`static/ai/ai-profile.js`);开票资料字段覆盖度 **待核** | 未验 |
 | 12 | 异常栏(#/exceptions) | **2026-07-26 已下线**(`route-table.ts` 注释:路由摘除、侧栏恒隐、后端开关关) | — | 无需对齐;其职能由 /ai 异常票据裁决队列吸收(`ai-review-inbox-flagged.js`) | — |
 | 13 | 报表导出 | 报表模板/统一导出弹窗(`src/home/report-templates.ts`);出账本/报税包(#/acct-books,`acct-books.ts`,做账模块门控) | 自动+界面 | 已有近亲:报表包 + BS/PL/TB 三件套 + #/reports(`static/ai/ai-pkg.js`、`ai-financials-render.js`、`ai-reports.js`);逐项覆盖度 **待核** | 未验 |
-| 14 | 集成页(#/integrations、#/cloud、#/api-keys) | 小助手下载/连接向导/ERP 日志区(`src/home/page-integrations.ts`);云盘为占位页(`page-placeholders.ts`);API keys 独立路由 | 配置+界面 | 待排。小助手分发/配对是 Express 桥的硬依赖,**桥P0只读**需要它在线,此页老站退役前必须有去处 | 老站在用 |
+| 14 | 集成页(#/integrations、#/cloud、#/api-keys) | 小助手下载/配对向导 + ERP 日志区(`src/home/page-integrations.ts`);#/cloud、#/api-keys 是 coming-soon 占位(`src/home/page-placeholders.ts`) | — | **无需对齐**。① 小助手下载/配对 → **随老站一同退役**:新桥是装在 Express 数据所在文件服务器(192.168.0.212)的独立程序,自己直读 DBF,端点身份 / 密钥 / 发布通道全独立,不需要小助手在线也不经过它(桥P0只读已完工:`pearnly-companion` 仓 `bridge/`,commit a558f45,7 个真账套只读冒烟通过);老站退役=小助手退役,分发/配对页随之作废。② 云盘 → 占位页,无需对齐。③ API keys → 同为占位页,**今天无消费方**(`route-table.ts` 的 `ROUTE_LOADERS` 无 `api-keys` 项、`static/dist/home.html` 无 `data-route="api-keys"` 侧栏入口、后端 0 个 API key 端点),无需对齐 | — |
 | 15 | 使用教程(#/guide) | Express 推送手册,中泰双语,按篇 JSON 懒加载;`src/home/guide-page.ts`、`guide-content.ts` | 对话(管家就地答)+界面 | 待排(管家问答可吸收大部分「怎么做」类查询) | 老站在用 |
 | 16 | OCR 余额 / 充值 | 充值弹窗三步流 + 余额实时轮询;`src/home/billing.ts`、`billing-records.ts` | 界面 | 待排(计费钱路径,或保留全局入口不随壳走 · **待核**) | 老站在用 |
 | 17 | 汇总表 → 批量建单(#/dms-intake 第三卡) | 两种录入模式之二(逐张识别 vs 汇总表批量),见 §3;`src/home/dms-intake-batch*.ts`、`services/summary_import/` | 自动+对话 | **桥P2写路**(建单+推全链);近亲已有:银行倒推日销(`static/ai/ai-intake-bank-sales.js`) | 老站在用 |
@@ -94,7 +96,7 @@
 | 首页仪表盘(#/dashboard) | 余额/统计卡;`src/home/dashboard.ts` | 已有:/ai 工作台矩阵默认首页(`static/ai/ai-matrix.js`) | 未验 |
 | 设置页(#/settings) | 语言/账号;`src/home/page-settings.ts` | 已有:#/settings(`static/ai/ai-settings.js`) | 未验 |
 | 客户知识(#/knowledge,flag 门控) | 知识中心问答;`src/home/knowledge-ask.ts` | 对话(管家天然吸收);**B2 管家M1 · 待核** | 老站在用 |
-| 做账模块群(#/vouchers、#/acct-*、#/tax-*,opt-in 默认关) | 自动凭证/逐笔审/科目表/银行对账/出账本/报税中心;`route-table.ts` MAIN_ENTRY_ROUTES | /ai 已有近亲:影子底稿(`ai-shadow.js`)+ 财务三件套(`ai-financials-render.js`);**是否在接管范围 → 待老板拍板(待核)** | 老站在用 |
+| 做账模块群(#/vouchers、#/acct-*、#/tax-*) | 自动凭证/逐笔审/科目表/银行对账/出账本/报税中心;`route-table.ts` MAIN_ENTRY_ROUTES。门控 = `accounting` 模块:`services/modules/store.py` 的 `DEFAULT_ENABLED` 里默认 `False`(opt-in),后端 `routes/accounting_common.py::gate` 未开即 403,侧栏 `data-module="accounting"` 由 `/api/me/modules` 显隐(`src/home/module-nav.ts`) | **不入退役闸**:默认关闭,且**无外部租户在用**——2026-07-26 生产只读核(`_gemini_key.local/dbq.py`):40 个租户里 17 个开着 `accounting`,但全是内部号(老板本人 skin306152 / 18685123459、mrerp、PEARNLY、E2E Test Co 1–3、parked 测试号);`journal_vouchers` 219 张同样只出自这 8 个内部号,近 14 天 33 张里 22 张来自老板 dev 账号,`acct_bank_accounts` / `acct_bank_lines` 0 行。事务所实际走 Express 记账;/ai 侧影子底稿(`ai-shadow.js`)+ 财务三件套(`ai-financials-render.js`)已覆盖同类需求。**若将来有外部租户启用,需重新入表** | — |
 | 报表模板(#/templates) | 统一导出弹窗;`src/home/report-templates.ts`(ROUTE_LOADERS 无独立 loader,**待核**) | 界面;**待排** | 老站在用 |
 
 ## 5. 明确排除(不入退役闸)

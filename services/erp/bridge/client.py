@@ -28,6 +28,7 @@ from services.erp.bridge import (
 )
 from services.erp.bridge import store, write_gate
 from services.erp.express_push.common import PAYLOAD_VERSION
+from services.erp.express_push.doctypes import WRITE_SPECS
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,9 @@ POLL_INTERVAL = 0.25
 
 # direction → 合法 doctype(契约=express_push mapper/sales_mapper 模块头,逐字):
 # 采购 RR(赊购)/HP(现购);销售 IV(赊销)/HS(现销)。
+# 会计手录的四类单据(收款 RE / 付款 PS / 手工凭证 GL / 库存调整 OU)不进这张表:
+# 它们的形状各不相同(只有手工凭证有 lines),逐类校验在 express_push.doctypes 的
+# check_payload 里,这里按 direction 分派。两条路的 direction 不重叠。
 _WRITE_DOCTYPES = {"purchase": ("RR", "HP"), "sales": ("IV", "HS")}
 
 OPS = ("books", "tables", "rows")
@@ -162,8 +166,9 @@ def _await_job(tenant_id: str, job_id: str, timeout: float) -> Dict[str, Any]:
 def build_write_payload(payload: Any, book_id: Optional[str]) -> Dict[str, Any]:
     """写载荷轻校验:形状不对当场拒;深校验(科目存在/幂等/主档)在桥端。
 
-    契约与 express_push mapper 产物一字不差 —— 云端只把"根本不是一张单"的挡下:
-    版本、方向/票种、账套一致、借贷平衡、金额可解析。
+    契约与 express_push mapper / doctypes 产物一字不差 —— 云端只把"根本不是一张单"的
+    挡下:版本、方向/票种、账套一致、逐类恒等式(借贷平、金额可解析、日期合法)。
+    未知 direction 一律拒(桥端"收到什么就照做"的口不能开)。
     """
     if not isinstance(payload, dict):
         raise BridgeRejected("写载荷须为对象", "bridge.bad_payload")
@@ -173,7 +178,8 @@ def build_write_payload(payload: Any, book_id: Optional[str]) -> Dict[str, Any]:
             "bridge.bad_payload",
         )
     direction = payload.get("direction")
-    doctypes = _WRITE_DOCTYPES.get(direction)
+    spec = WRITE_SPECS.get(direction)
+    doctypes = (spec.doctype,) if spec else _WRITE_DOCTYPES.get(direction)
     if not doctypes:
         raise BridgeRejected(f"direction 非法: {direction!r}", "bridge.bad_payload")
     if payload.get("doctype") not in doctypes:
@@ -189,6 +195,13 @@ def build_write_payload(payload: Any, book_id: Optional[str]) -> Dict[str, Any]:
             f"account_set 与 book_id 不一致: {account_set!r} != {book_id!r}",
             "bridge.bad_payload",
         )
+    if spec:
+        # 四类手录单据里只有手工凭证带 lines(其余三类的科目要到目标账套查主档才解得出),
+        # 各自的恒等式在 doctypes 各模块里,别在这儿铺第二份。
+        err = spec.check(payload)
+        if err:
+            raise BridgeRejected(err, "bridge.bad_payload")
+        return payload
     _assert_lines_balanced(payload.get("lines"))
     return payload
 

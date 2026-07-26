@@ -86,18 +86,34 @@ async function run() {
     chk('页内不再有常驻目录栏', (await page.locator('.gd-toc').count()) === 0);
 
     await page.waitForTimeout(1200);
+    // 指纹与文件名分开看:文件名决定配的是哪套语言的界面图,?v 决定重拍后浏览器/CDN 认不认新图。
     const imgs = await page.evaluate(() =>
-        [...document.querySelectorAll('.gd-fig img')].map((i) => ({
-            src: i.getAttribute('src'),
-            w: i.naturalWidth,
-        }))
+        [...document.querySelectorAll('.gd-fig img')].map((i) => {
+            const u = new URL(i.getAttribute('src'), location.href);
+            return { file: u.pathname, v: u.searchParams.get('v'), w: i.naturalWidth };
+        })
     );
-    console.log('  配图:', imgs.map((i) => `${i.src.split('/').pop()}=${i.w}px`).join(' '));
+    console.log('  配图:', imgs.map((i) => `${i.file.split('/').pop()}=${i.w}px`).join(' '));
     chk(`配图 5 张(实得 ${imgs.length})`, imgs.length === 5);
     chk('每张都真的加载出来(naturalWidth>0)', imgs.length > 0 && imgs.every((i) => i.w > 0));
     chk(
         '泰文正文配的是泰文界面图',
-        imgs.every((i) => i.src.endsWith('.th.png'))
+        imgs.every((i) => i.file.endsWith('.th.png'))
+    );
+
+    // 图名固定(daily-02-review.zh.png),界面改了重拍必然同名 —— URL 上没指纹的话浏览器和 CDN
+    // 一直发旧图,"重拍即换新"这条承诺在缓存层就断了。指纹必须就是页面上 main.js 的那个:
+    // 另造一套版本号迟早漂成只 bump 一边。这条防的是以后有人改渲染时又把指纹丢了。
+    const pageV = await page.evaluate(() => {
+        const el = document.querySelector('script[src*="/dist/main.js"]');
+        const m = el && el.src.match(/[?&]v=([^&]+)/);
+        return m ? m[1] : '';
+    });
+    console.log('  页面指纹:', pageV || '(缺)');
+    chk('页面 main.js 带指纹', !!pageV);
+    chk(
+        `每张配图都带 ?v=${pageV}(与正文 JSON 同一指纹)`,
+        imgs.length > 0 && !!pageV && imgs.every((i) => i.v === pageV)
     );
     await page.screenshot({ path: path.join(OUT, 'guide-th-desktop.png'), fullPage: true });
 
@@ -127,12 +143,28 @@ async function run() {
     const h1zh = (await page.locator('.gd-h1').innerText()).trim();
     console.log('  中文标题:', h1zh);
     chk('切中文后正文变中文', h1zh === '上传本批票据');
+    await page
+        .waitForFunction(
+            () =>
+                [...document.querySelectorAll('.gd-fig img')].every((i) => i.complete) &&
+                document.querySelectorAll('.gd-fig img').length === 5,
+            { timeout: 8000 }
+        )
+        .catch(() => {});
     const zhImgs = await page.evaluate(() =>
-        [...document.querySelectorAll('.gd-fig img')].map((i) => i.getAttribute('src'))
+        [...document.querySelectorAll('.gd-fig img')].map((i) => {
+            const u = new URL(i.getAttribute('src'), location.href);
+            return { file: u.pathname, v: u.searchParams.get('v'), w: i.naturalWidth };
+        })
     );
     chk(
         '配图同步换成中文界面图',
-        zhImgs.length === 5 && zhImgs.every((s) => s.endsWith('.zh.png'))
+        zhImgs.length === 5 && zhImgs.every((i) => i.file.endsWith('.zh.png'))
+    );
+    // 带上 ?v 后路径写错就是 404,只看 URL 变了不算数 —— 仍要真的解码出像素。
+    chk(
+        '中文配图带同一指纹且真的加载出来',
+        zhImgs.every((i) => i.v === pageV && i.w > 0)
     );
     await page.screenshot({ path: path.join(OUT, 'guide-zh-desktop.png'), fullPage: true });
 

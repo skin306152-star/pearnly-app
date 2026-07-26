@@ -4,7 +4,12 @@
 锁纯判定函数 find_violations / extract_vparam:产物变则源 HTML 指纹必 bump,否则违规。
 不碰 git(main() 的 git 接线由 CI 真跑覆盖),只验判定逻辑本身。"""
 
+import contextlib
 import importlib.util
+import io
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -71,6 +76,97 @@ class FindViolationsTests(unittest.TestCase):
         self.assertEqual(len(fails), 1)
 
 
+GUIDE_JSON = "static/dist/guide-content/setup.json"
+GUIDE_SHOT = "static/dist/guide-shots/setup-01-login.zh.png"
+
+
+class GuideAssetDirTests(unittest.TestCase):
+    """教程资源:改 JSON 却要 bump main.js 的 ?v —— 它俩共用一个指纹,不是笔误。
+
+    2026-07-26 事故:JSON 改了、dist 提了、CI 全绿、文件也部署了,会计打开还是旧内容,
+    因为 URL 上的 ?v 没变、CDN 按 URL 缓存。以下四条钉住这层间接关系,防止有人"顺手简化"
+    成「改哪个产物查哪个 ?v」而把整条规则悄悄改没。
+    """
+
+    def test_guide_json_changed_without_bump_fails(self):
+        fails = cachebust.find_violations(
+            changed={GUIDE_JSON},
+            base_html={HTML: _html("12017001")},
+            head_html={HTML: _html("12017001")},
+        )
+        self.assertEqual(len(fails), 1)
+        self.assertIn("guide-content", fails[0])
+        self.assertIn("12017001", fails[0])
+
+    def test_guide_json_changed_with_bump_passes(self):
+        fails = cachebust.find_violations(
+            changed={GUIDE_JSON, HTML},
+            base_html={HTML: _html("12017001")},
+            head_html={HTML: _html("12022201")},
+        )
+        self.assertEqual(fails, [])
+
+    def test_guide_shot_changed_without_bump_fails(self):
+        fails = cachebust.find_violations(
+            changed={GUIDE_SHOT},
+            base_html={HTML: _html("1")},
+            head_html={HTML: _html("1")},
+        )
+        self.assertEqual(len(fails), 1)
+        self.assertIn("guide-shots", fails[0])
+
+    def test_guide_source_outside_dist_not_guarded(self):
+        # 源目录 static/guide/content/ 不对外 serve(dist 才是),改它不该逼人 bump。
+        fails = cachebust.find_violations(
+            changed={"static/guide/content/setup.json"},
+            base_html={HTML: _html("1")},
+            head_html={HTML: _html("1")},
+        )
+        self.assertEqual(fails, [])
+
+
+class GitPlumbingTests(unittest.TestCase):
+    """在真临时 git 仓库上跑 main() —— 判定函数对不代表 git 接线也对。
+
+    单测桩喂的是现成的 changed 集合;真实失效可能发生在「diff 根本没把这些路径喂进来」。
+    这条造真 commit 走真 git diff,是对「闸报绿≠闸看过」的直接反证。
+    """
+
+    def _repo(self, tmp: Path, guide_text: str, vparam: str, stage: str) -> None:
+        (tmp / "static/dist/guide-content").mkdir(parents=True, exist_ok=True)
+        (tmp / GUIDE_JSON).write_text(guide_text, encoding="utf-8")
+        (tmp / HTML).write_text(_html(vparam), encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=tmp, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", stage], cwd=tmp, check=True, capture_output=True)
+
+    def _run(self, guide_text: str, vparam: str) -> tuple[int, str]:
+        """返回 (退出码, 闸的输出) · 输出捕走,免得反证用例的红字混进测试日志被当成真失败。"""
+        buf = io.StringIO()
+        with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(buf):
+            tmp = Path(d)
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True, capture_output=True)
+            for k, v in (("user.email", "t@t"), ("user.name", "t")):
+                subprocess.run(["git", "config", k, v], cwd=tmp, check=True, capture_output=True)
+            self._repo(tmp, '{"chapters": []}', "12017001", "base")
+            self._repo(tmp, guide_text, vparam, "head")
+            original, cachebust.PROJECT_ROOT = cachebust.PROJECT_ROOT, tmp
+            argv, sys.argv = sys.argv, ["check_cachebust.py", "--quiet"]
+            try:
+                return cachebust.main(), buf.getvalue()
+            finally:
+                cachebust.PROJECT_ROOT, sys.argv = original, argv
+
+    def test_real_commit_changing_guide_json_without_bump_exits_1(self):
+        code, out = self._run('{"chapters": [1]}', "12017001")
+        self.assertEqual(code, 1)
+        self.assertIn("guide-content", out)
+
+    def test_real_commit_changing_guide_json_with_bump_exits_0(self):
+        code, out = self._run('{"chapters": [1]}', "12022201")
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+
 # 这个闸真正的失效方式不是判定写错,是**清单漏一行** —— 漏掉的那个产物永远报 PASS。
 # 已经犯两次(2026-07-23 ai.js 停在 ?v=79 五次改动没人知道;2026-07-25 home.css 同款)。
 # 故守覆盖率:入口 HTML 里每一个指向仓库内真实文件的 ?v= 引用,都必须在清单里有一行。
@@ -92,6 +188,27 @@ def _entry_pages():
         if not any(rel.startswith(s) or f"/{s}" in f"/{rel}" for s in skip):
             out.append(rel)
     return sorted(out)
+
+
+# dist 下的**目录**产物同理要守覆盖率:新加一个子目录、忘了进 CACHE_BUST_DIRS,它就永远绿。
+# 豁免要写理由,不许空着 —— 无 ?v 的资源 bump 也救不了它,收进闸只会给假安全感。
+_DIR_EXEMPT = {
+    "static/dist/fonts/": "woff2 从 CSS 里裸 URL 引用(ai-theme.css @font-face),没有 ?v 可 bump;"
+    "字体文件几乎不改,真要换建议换文件名",
+}
+
+
+class DirCoverageTests(unittest.TestCase):
+    def test_every_dist_subdir_is_guarded_or_exempt(self):
+        guarded = {d.prefix for d in cachebust.CACHE_BUST_DIRS}
+        missing = [
+            rel
+            for p in sorted((_ROOT / "static/dist").iterdir())
+            if p.is_dir()
+            for rel in [f"{p.relative_to(_ROOT).as_posix()}/"]
+            if rel not in guarded and rel not in _DIR_EXEMPT
+        ]
+        self.assertEqual(missing, [], f"dist 新子目录未进 CACHE_BUST_DIRS 也未豁免:{missing}")
 
 
 class PairCoverageTests(unittest.TestCase):

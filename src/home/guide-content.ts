@@ -3,8 +3,9 @@
 // 正文不进 JS bundle:124 章中泰双语几百 KB,塞进 main.js 会拖慢所有页面的首屏,
 // 而教程是低频入口。改成按篇 JSON 懒加载,随 dist 一起部署(新增 static 根文件
 // 不会被 webhook 拾取,dist 子目录实测可靠)。
-// 指纹沿用页面上 main.js 的 ?v —— 每次发版自动破缓存,不用另记一套版本号。
+// 指纹沿用页面上 main.js 的 ?v —— 每次发版自动破缓存,不用另记一套版本号(见 asset-fingerprint)。
 // ============================================================
+import { withFingerprint } from './asset-fingerprint.js';
 
 export type Lang = 'zh' | 'th';
 
@@ -65,13 +66,7 @@ export function T(key: string): string {
     return v || key;
 }
 
-function fingerprint(): string {
-    const el = document.querySelector<HTMLScriptElement>('script[src*="/dist/main.js"]');
-    const m = el && el.src.match(/[?&]v=([^&]+)/);
-    return m ? m[1] : '';
-}
-
-const url = (name: string): string => `${BASE}${name}.json?v=${fingerprint()}`;
+const url = (name: string): string => withFingerprint(`${BASE}${name}.json`);
 
 let index: BookIndex | null = null;
 let indexPending: Promise<BookIndex | null> | null = null;

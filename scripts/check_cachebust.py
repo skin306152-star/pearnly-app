@@ -8,9 +8,12 @@
 本闸:一个 commit range 内,若打包产物变了,引用它的源 HTML 的 `?v=` 指纹必须也变,否则
 非零退出并打人话——把"忘了 bump ?v"从人肉自觉变成 CI 红线。
 
-监控对为脚本内常量 CACHE_BUST_PAIRS,覆盖主站 / 超管 / 门户 / DMS / AI 五个入口。
+两张监控清单:
+  CACHE_BUST_PAIRS —— HTML 里写死引用的产物,产物变则查它自己的 ?v(覆盖主站 / 超管 /
+                      门户 / DMS / AI 五个入口);
+  CACHE_BUST_DIRS  —— 运行时 fetch、URL 由 JS 现拼的目录产物,指纹是借别人的(见该常量注释)。
 **新增任何带 ?v= 的对外产物必须同步加一行** —— 漏一行,闸就在它没覆盖的地方安静地绿着
-(已犯两次:2026-07-23 ai.js、2026-07-25 home.css)。
+(已犯三次:2026-07-23 ai.js、2026-07-25 home.css、2026-07-26 教程 JSON)。
 
 用法:
   python scripts/check_cachebust.py                                   # 默认 HEAD~1..HEAD
@@ -43,6 +46,15 @@ class CacheBustPair(NamedTuple):
     bundle: str  # 产物路径(git 路径 · 正斜杠)
     html: str  # 源 HTML 路径
     ref: str  # 源 HTML 中该产物的引用片段(?v= 之前那段)
+
+
+class CacheBustDir(NamedTuple):
+    """一组「目录产物 ↔ 它借用的那个 ?v」—— 与 CacheBustPair 的映射方向不同,见下方注释。"""
+
+    prefix: str  # 目录前缀(git 路径 · 正斜杠 · 结尾带 /)
+    html: str  # 借指纹的源 HTML
+    ref: str  # 借的是这个产物的 ?v=(注意:不是本目录自己的)
+    why: str  # 这层间接关系的人话解释 · 直接印进违规信息,免得下一个人以为闸写错了
 
 
 # 监控清单:按入口页列出它引用的、带 ?v= 的仓库内产物(URL 原样,派生 bundle 路径)。
@@ -131,6 +143,38 @@ CACHE_BUST_PAIRS = tuple(
 )
 
 
+# 目录清单:**产物和它的 ?v 不是同一个文件**,与上面的 pairs 恰好差一层间接。
+#
+#   pairs :产物 A 变 → 查 HTML 里 A 自己的 `A?v=`(HTML 里写死的引用,一一对应);
+#   dirs  :目录里任何文件变 → 查 HTML 里 **另一个产物** 的 `?v=`。
+#
+# 为什么会有这种借用:这些资源不在 HTML 里,是运行时 fetch / 现拼 URL 的,指纹从页面上 main.js
+# 的 ?v 里抠(src/home/asset-fingerprint.ts 的 withFingerprint())。所以「改教程 JSON 要去
+# bump main.js 的 ?v」不是笔误——它俩共用一个指纹,main.js 的 ?v 就是整个前端发版号。
+#
+# 2026-07-26 事故固化:改了教程正文、dist 提了、CI 全绿、文件也部署上去了,会计打开还是旧的。
+# 因为只动 JSON 没动 main.js,?v 没变,CDN 按 URL 缓存一直发旧的
+# (curl `setup.json?v=12017001` 出旧内容,换 `?nocache=随机` 出新内容 —— 文件新,URL 旧)。
+CACHE_BUST_DIRS = (
+    CacheBustDir(
+        prefix="static/dist/guide-content/",
+        html="home.html",
+        ref="/static/dist/main.js",
+        why="教程正文是运行时 fetch 的 JSON,URL 上的 ?v 抠自页面里 main.js 的 ?v"
+        "(src/home/asset-fingerprint.ts · withFingerprint())",
+    ),
+    CacheBustDir(
+        prefix="static/dist/guide-shots/",
+        html="home.html",
+        ref="/static/dist/main.js",
+        # 2026-07-26 起配图 <img src> 也带同一指纹(guide-page.ts figureHtml → withFingerprint),
+        # 所以这条不再是「提醒一下」而是真的破得掉缓存:图名固定,界面改了重拍必然同名,
+        # 不 bump 就永远发旧图。E2E 闸 scripts/_guide_page_verify.cjs 逐张核 ?v 等于页面指纹。
+        why="教程配图 URL 的 ?v 与正文共用页面里 main.js 的那个指纹(重拍同名图靠它换新)",
+    ),
+)
+
+
 def extract_vparam(html_text: str, ref: str) -> Optional[str]:
     """从 HTML 抓 `<ref>?v=<指纹>` 的指纹值;找不到返 None。"""
     m = re.search(re.escape(ref) + r"\?v=([\w.-]+)", html_text or "")
@@ -142,10 +186,11 @@ def find_violations(
     base_html: dict[str, str],
     head_html: dict[str, str],
     pairs=CACHE_BUST_PAIRS,
+    dirs=CACHE_BUST_DIRS,
 ) -> list[str]:
     """产物变了但源 HTML 指纹没变 = 违规。返回人话违规说明列表(空 = 通过)。
 
-    changed:本次 range 改动的 git 路径集合。
+    changed:本次 range 改动的 git 路径集合(git diff --name-only,含新增与删除)。
     base_html / head_html:{html 路径: 文本},分别取自 range 两端(缺省视作空串)。
     """
     fails: list[str] = []
@@ -159,6 +204,20 @@ def find_violations(
                 f"{pair.bundle} 变了,但 {pair.html} 里 `{pair.ref}?v=` 没 bump"
                 f"(仍是 {old})——CDN immutable 缓存会让 prod 吃旧 bundle。"
                 f"改 {pair.html} 的 ?v= 值(任意新指纹)后重新提交。"
+            )
+    for rule in dirs:
+        hits = sorted(p for p in changed if p.startswith(rule.prefix))
+        if not hits:
+            continue
+        old = extract_vparam(base_html.get(rule.html, ""), rule.ref)
+        new = extract_vparam(head_html.get(rule.html, ""), rule.ref)
+        if old == new:
+            sample = "、".join(hits[:3]) + ("…" if len(hits) > 3 else "")
+            fails.append(
+                f"{rule.prefix} 下有 {len(hits)} 个文件增删改({sample}),但 {rule.html} 里"
+                f" `{rule.ref}?v=` 没 bump(仍是 {old})——{rule.why};"
+                f"?v 不变 = URL 不变 = CDN 一直发旧的,文件是新的也没人看得到。"
+                f"改 {rule.html} 的 ?v= 值(任意新指纹)后重新提交。"
             )
     return fails
 
@@ -218,7 +277,7 @@ def main() -> int:
         print(f"⚠️  git diff 失败 · 跳过:{e}")
         return 0
 
-    htmls = {p.html for p in CACHE_BUST_PAIRS}
+    htmls = {p.html for p in CACHE_BUST_PAIRS} | {d.html for d in CACHE_BUST_DIRS}
     base_html = {h: _show(args.base, h) for h in htmls}
     head_html = {h: _show(args.head, h) for h in htmls}
 

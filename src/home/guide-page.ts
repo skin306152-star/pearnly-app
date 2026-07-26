@@ -16,6 +16,7 @@ import {
     findChapterAcrossBook,
 } from './guide-content.js';
 import type { Bilingual, GuideChapter, Lang, SectionMeta } from './guide-content.js';
+import { withFingerprint } from './asset-fingerprint.js';
 
 const SHOT_BASE = '/static/dist/guide-shots/';
 
@@ -113,11 +114,15 @@ function sectionHtml(s: SectionMeta): string {
     );
 }
 
+// 图名固定(daily-02-review.zh.png),界面改了重拍必然同名 —— URL 上不带指纹的话浏览器与
+// CDN 会一直发旧图,而「图跟着界面走、不会变成旧图误导会计」正是这套教程存在的理由。
+// 指纹与正文 JSON 同一个(asset-fingerprint),不另造版本号。
 function figureHtml(shot: string, caption?: Bilingual): string {
     const cap = caption ? `<figcaption>${esc(say(caption))}</figcaption>` : '';
+    const src = withFingerprint(`${SHOT_BASE}${esc(shot)}.${lang()}.png`);
     return (
         `<figure class="gd-fig" data-gd-fig>` +
-        `<img alt="" loading="lazy" src="${SHOT_BASE}${esc(shot)}.${lang()}.png">` +
+        `<img alt="" loading="lazy" src="${src}">` +
         cap +
         `</figure>`
     );

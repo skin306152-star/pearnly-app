@@ -1,6 +1,36 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-07-26 · 产品内「使用教程」上线 · Express 推送手册 125 章)
+## 当前状态卡(2026-07-26 晚 · 异常栏下线 + 三处指错路的入口/文案改对)
+
+- **主站 `df0f5e79`** · 五笔全绿上线:`b23aef4a` 异常栏下线 → `e4bc0e13` 推送日志入口+原因
+  人话 → `cbf69012` 两处死路改道 → `d3cae55b` 删死文案 → `df0f5e79` 高亮收口。
+- **异常栏全链下线**(Zihao:用下来毫无用处)。三层断电、不删码,复活清单写在
+  `src/home/route-table.ts` 的下线注释里:① 侧栏项恒隐 + 摘出 nav-presets 的 NAV_NODES
+  (留着会被 `applyNavPreset` 的 `show(el,true)` 重新打开)② 路由表三处摘除,深链回落
+  录入工作台 ③ 后端 `EXCEPTIONS_ENGINE` 默认关,五个调用点早退——不写 exceptions 表、
+  **不再推 LINE 高危提醒**。命令面板项 / 推送日志详情的死跳转 / 每 60 秒红点轮询一并停。
+- **三处指错路的入口**:第 4 步「查看推送日志」还跳集成页(推送日志早已独立成页)、
+  空态「去集成中心配置」跳到一个没有任何 ERP 卡的页、详情底部「查看原始单据」同样跳集成页
+  → 分别改为 `push-logs` 路由 / 滚到本页 `#dx-erp-cards` 并高亮 / 回该票识别记录抽屉。
+- **`EXPRESS_MANUAL: posting_needs_review:*` 出四语人话**,按后缀(perpetual/mixed)分句,
+  列表卡与详情抽屉共用同一份表(后端 `error_friendly` 只覆盖 `ERR_*`,不接就两处两个说法)。
+- **★ 死胡同待办(Zihao 2026-07-26 拍板「先不做」)**:票一旦以「未指定过账去向」识别并
+  escalate,产品内**没有补选的地方**——`retryPushLog` 不带 `posting_kind`、识别记录页无
+  推送入口,只能回录入工作台重新上传识别(重扣 OCR 费)。要做就在失败卡加「选库存/选服务
+  → 重推」,后端 `/api/erp/logs/{id}/retry` 已能收该参数,只差前端传。
+- **★ 血泪 · 「过账去向」在上传页第 1 步,不是第 4 步**。我按「有 `postingKindHtml()` +
+  文案叫『本批』」想当然写进四语文案,被 Zihao 当场问住;追 `sideHtml()` 调用点才发现它只
+  被 `renderInvoiceUpload()` 调,且 `posting_kind` 在识别请求就要带上。**指路类文案必须追到
+  渲染它的那个 render 函数,别从命名推位置。**
+- **★ 修了 bug 必须回头改手册**:教程把这些坑当「已知现象」写成了绕行指南(「请勿点击该
+  按钮」「不会回到这张票据」「这是已知问题」),不改就反过来教错。本批改写/删除 daily
+  与 overview 共 9 处 + stuck 篇整章 2 配图,`planned` 也要跟着减(漏减就一直显示 41/42)。
+- **假 M 别慌**:`npm run build` 重写全部 dist 会让 `git status` 报几十个 `M`,`git diff`
+  刷新 index 后自动消失(内容一致)。共享工作树下别看见 M 就 `git add`。
+- 防回潮钉两份:`tests/unit/test_exceptions_entry_retired.py`(14 条,注入三处回潮反证过)、
+  `tests/unit/test_push_log_entry_and_reason.py`(12 条)。
+
+## 状态卡(2026-07-26 · 产品内「使用教程」上线 · Express 推送手册 125 章)
 
 - **主站 `621639e2`**(前一笔 `890b1a14` 被并发 push 取消 = 非失败,它是 621639e2 祖先)。
 - **交接全文:`docs/guide/2026-07-26-使用教程上线交接.md`** —— 接手先读它。

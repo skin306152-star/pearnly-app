@@ -517,36 +517,34 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
     async def test_badge_mapping_covers_all_engine_states(self):
         """状态词汇全部取自 engine.STATUS_*(单一事实源)——C4-R1 教训:首版测试手打
         "archived"/"signed" 臆造词与实现自证自洽,真冻结单(status=archive)错标未评估。"""
-        from routes import tax_profile_routes as tr
-        from services.workorder import engine
+        from services.workorder import engine, matrix
         from services.workorder.obligation_engine import STATUS_NIL
 
-        self.assertEqual(tr._matrix_badge(None, None), "not_evaluated")
-        self.assertEqual(tr._matrix_badge(STATUS_NIL, engine.STATUS_ARCHIVE), "no_need")
-        self.assertEqual(tr._matrix_badge("due", None), "pending_order")
-        self.assertEqual(tr._matrix_badge("due", engine.STATUS_COLLECTING), "missing_materials")
-        self.assertEqual(tr._matrix_badge("due", engine.STATUS_RUNNING), "in_progress")
-        self.assertEqual(tr._matrix_badge("due", engine.STATUS_STUCK), "pending_review")
-        self.assertEqual(tr._matrix_badge("tentative", engine.STATUS_REVIEW), "pending_review")
-        self.assertEqual(tr._matrix_badge("due", engine.STATUS_ARCHIVE), "frozen")
-        self.assertEqual(tr._matrix_badge("due", "some_future_status"), "not_evaluated")
+        self.assertEqual(matrix.badge(None, None), "not_evaluated")
+        self.assertEqual(matrix.badge(STATUS_NIL, engine.STATUS_ARCHIVE), "no_need")
+        self.assertEqual(matrix.badge("due", None), "pending_order")
+        self.assertEqual(matrix.badge("due", engine.STATUS_COLLECTING), "missing_materials")
+        self.assertEqual(matrix.badge("due", engine.STATUS_RUNNING), "in_progress")
+        self.assertEqual(matrix.badge("due", engine.STATUS_STUCK), "pending_review")
+        self.assertEqual(matrix.badge("tentative", engine.STATUS_REVIEW), "pending_review")
+        self.assertEqual(matrix.badge("due", engine.STATUS_ARCHIVE), "frozen")
+        self.assertEqual(matrix.badge("due", "some_future_status"), "not_evaluated")
 
     async def test_badge_vocabulary_drift_guard(self):
         """引擎词汇全集逐一喂给徽章映射,任何一个落 fallthrough(未评估)即红——
         引擎未来新增/改名 status 时本测试先失败,矩阵必须同步认识新词才能过。"""
-        from routes import tax_profile_routes as tr
-        from services.workorder import engine
+        from services.workorder import engine, matrix
         from services.workorder.archive import _STATUS_ARCHIVE
 
         for status in engine.ALL_STATUSES:
-            badge = tr._matrix_badge("due", status)
+            got = matrix.badge("due", status)
             self.assertNotEqual(
-                badge,
+                got,
                 "not_evaluated",
                 f"引擎状态 {status!r} 未被矩阵徽章映射认识(词汇漂移)",
             )
         # 冻结徽章必须由归档模块真正写库的终态触发(主窗复验点:真冻结单 453b5a8c)。
-        self.assertEqual(tr._matrix_badge("due", _STATUS_ARCHIVE), "frozen")
+        self.assertEqual(matrix.badge("due", _STATUS_ARCHIVE), "frozen")
 
     async def test_client_without_any_obligation_row_still_listed(self):
         """无物化记录的客户仍出现在矩阵里(LEFT JOIN 空行不吞客户),且不产生虚假列。"""
@@ -671,11 +669,11 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
     def test_profile_completeness_counts_answered_unknown_defaultable_fields(self):
         """纯函数:6 个默认 unknown 的画像字段答了几个,0..1(EN-clients 客户目录 · 矩阵行
         画像列带 p_ 前缀走 prefix 参数;GET tax-profile 的 profile dict 不带前缀)。"""
-        from routes import tax_profile_routes as tr
+        from services.workorder import matrix
 
-        self.assertEqual(tr._profile_completeness({}), 0.0)
+        self.assertEqual(matrix.profile_completeness({}), 0.0)
         self.assertEqual(
-            tr._profile_completeness(
+            matrix.profile_completeness(
                 {
                     "p_has_employees": "yes",
                     "p_pays_individuals": "no",
@@ -689,7 +687,7 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
             0.33,
         )
         self.assertEqual(
-            tr._profile_completeness(
+            matrix.profile_completeness(
                 {
                     "has_employees": "yes",
                     "pays_individuals": "no",

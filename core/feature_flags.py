@@ -161,6 +161,11 @@ ENTRANCE_API_SCOPE_KEY = "entrance_api_scope"
 # 双闸:pearnly_ai_m1 在场才有效(组合闸,同 pearnly_ai_line_intake 先例)。按 tenant 判定;
 # 消费在 routes/front_desk_routes.py。默认关,测稳后 rollout=all。
 PEARNLY_AI_FRONT_DESK_KEY = "pearnly_ai_front_desk"
+# 智能管家闸(B2-M1 · /ai 顶部对话入口):默认关 fail-closed。关 = /api/ai/steward/* 五端点
+# 一律 404(status 探针除外,它回 {enabled:false} 供前端三态挂载)、管家页不渲染;开 = 用户
+# 一句话派工具查数(M1 全只读:查询/汇总/深链,写与授权卡归 B3)。双闸:pearnly_ai_m1 在场
+# 才有效(组合闸,同 pearnly_ai_front_desk 先例)。按 tenant 判定;消费在 routes/steward_routes.py。
+PEARNLY_AI_STEWARD_KEY = "pearnly_ai_steward"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -373,6 +378,17 @@ def pearnly_ai_front_desk_enabled_for(tenant_id: Optional[str]) -> bool:
     if not pearnly_ai_m1_enabled_for(tenant_id, None):
         return False
     return _enabled(PEARNLY_AI_FRONT_DESK_KEY, tenant_id, "pearnly_ai_front_desk_enabled_for")
+
+
+def pearnly_ai_steward_enabled_for(tenant_id: Optional[str]) -> bool:
+    """智能管家闸(B2-M1)。关 = 管家五端点 404(status 探针照回 {enabled:false}),/ai 现状不变。
+
+    双闸:pearnly_ai_m1 在场才有效(组合闸,同 pearnly_ai_front_desk);任一关或异常均
+    fail-closed。按 tenant 判定(单所整体开/关);超管在平台后台把 tenant_id 加进 allowlist 即灰度。
+    """
+    if not pearnly_ai_m1_enabled_for(tenant_id, None):
+        return False
+    return _enabled(PEARNLY_AI_STEWARD_KEY, tenant_id, "pearnly_ai_steward_enabled_for")
 
 
 def pearnly_ai_bank_recon_enabled_for(tenant_id: Optional[str]) -> bool:

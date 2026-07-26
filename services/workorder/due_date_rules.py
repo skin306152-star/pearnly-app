@@ -112,3 +112,8 @@ def defer_due_date(due: date) -> date:
 def defer_optional(due: Optional[date]) -> Optional[date]:
     """None 直通版(供读侧序列化 due_paper/due_efiling 可能为空的场景直接调用)。"""
     return defer_due_date(due) if due is not None else None
+
+
+def iso_or_none(value) -> Optional[str]:
+    """date/datetime → ISO 字符串,None 直通。截止日读侧(义务清单/矩阵)共用一份序列化。"""
+    return value.isoformat() if value is not None else None

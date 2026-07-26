@@ -174,6 +174,7 @@ from routes.workorder_financials_routes import (
 from routes.workorder_review_routes import router as workorder_review_router  # MC1-b1
 from routes.workorder_bank_sales_routes import router as workorder_bank_sales_router  # SA-3a
 from routes.front_desk_routes import router as front_desk_router  # FD-0a · 目标驱动前门
+from routes.steward_routes import router as steward_router  # B2-M1 · 智能管家(只读)
 from routes.tax_profile_routes import (
     router as tax_profile_router,
 )  # B2-e · 税务画像/别名/义务清单 API(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-10
@@ -361,6 +362,7 @@ app.include_router(workorder_financials_router)  # N1 · 月度报表 PDF/Excel 
 app.include_router(workorder_review_router)  # MC1-b1 · 审核队列与签批闭环 · 2026-07-13
 app.include_router(workorder_bank_sales_router)  # SA-3a · 银行流水倒推销项建议 · 2026-07-14
 app.include_router(front_desk_router)  # FD-0a · 目标驱动前门(m1+front_desk 双闸) · 2026-07-16
+app.include_router(steward_router)  # B2-M1 · 智能管家(m1+steward 双闸 · 全只读) · 2026-07-26
 app.include_router(tax_profile_router)  # B2-e · 税务画像/别名/义务清单(m1 闸) · 2026-07-10
 app.include_router(
     client_pool_router
@@ -476,10 +478,8 @@ async def _capture_unhandled_500(request: Request, exc: Exception):
 register_pos_error_handler(app)
 
 
-# ============================================================
 # v118.27.5.4 · 前端版本号自动读取(给 /api/version 用 · 检测新版弹横幅)
 # 启动时解析 home.html 里的 ?v= 数字 · 部署后立刻反映
-# ============================================================
 
 
 PEARNLY_FRONTEND_VERSION = read_frontend_version()

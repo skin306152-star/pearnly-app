@@ -44,7 +44,11 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from services.summary_import.dates import to_ad_year
-from services.workorder.due_date_rules import defer_due_date, defer_optional  # noqa: F401
+from services.workorder.due_date_rules import (  # noqa: F401
+    defer_due_date,
+    defer_optional,
+    iso_or_none,
+)
 from services.workspace import tax_profile_store
 
 logger = logging.getLogger(__name__)
@@ -108,6 +112,23 @@ def current_be_period() -> str:
     GET 缺省 period)用同一权威,不许各自另算。"""
     today = datetime.now(timezone.utc).date()
     return f"{today.year + _BE_YEAR_OFFSET:04d}-{today.month:02d}"
+
+
+def be_period_from_ce(ce_month: Optional[str]) -> Optional[str]:
+    """公历「YYYY-MM」→ 佛历期「YYYY-MM」。解析不出返回 None(诚实认不识,绝不猜一个期)。
+
+    大脑给的期间线索经 front_desk.interpret.parse_period_hint 归成公历,工单全链走佛历;
+    换算收口在本模块(period↔公历互译的唯一权威),调用方不许各自 +543。
+    """
+    try:
+        year_s, month_s = str(ce_month or "").split("-")
+        month = int(month_s)
+        year = int(year_s)
+    except ValueError:
+        return None
+    if not 1 <= month <= 12:
+        return None
+    return f"{year + _BE_YEAR_OFFSET:04d}-{month:02d}"
 
 
 def _period_to_ad_month_start(period: str) -> date:

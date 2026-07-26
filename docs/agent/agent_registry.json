@@ -72,6 +72,7 @@
   "erp_posting_preview_routes": "B",
   "exceptions_routes": "B",
   "front_desk_routes": "C",
+  "steward_routes": "C",
   "export_routes": {
     "bucket": "A",
     "agent": "exempt:file-export",

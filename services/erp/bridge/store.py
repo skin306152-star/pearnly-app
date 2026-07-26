@@ -20,13 +20,13 @@ import re
 import secrets
 from typing import Any, Dict, Iterable, List, Optional
 
-from services.erp.bridge import BridgeRejected
+from services.erp.bridge import BridgeRejected, write_gate
 from services.erp.bridge.schema import BRIDGES, JOBS, heal
 
 logger = logging.getLogger(__name__)
 
 TOKEN_PREFIX = "brg_"
-# 任务租约:桥领走 60s 内没 ack 就退回队列(桥崩溃不卡死队列)。
+# 任务租约:桥领走 60s 内没 ack 就退回队列(桥崩溃不卡死队列)。写活的放宽版在 write_gate。
 LEASE_SECONDS = 60
 # 在线判据:心跳 60s 一拍,连丢 3 拍才算掉线 —— 写桥唯一闸据此决定要不要让位。
 ONLINE_WINDOW_SECONDS = 180
@@ -232,9 +232,10 @@ def register_hello(
 def enqueue_job(
     bridge: Dict[str, Any], kind: str, payload: Dict[str, Any], book_id: Optional[str] = None
 ) -> str:
-    """入队一条问答 · book_id 必须在桥上报的清单内(assert_book_allowed 拒非法)。"""
+    """入队一条任务 · kind 过白名单+写角色闸(write_gate),book_id 必须在桥上报清单内。"""
     from core import db
 
+    write_gate.assert_enqueue_allowed(bridge, kind)
     assert_book_allowed(bridge, book_id)
     tenant_id = str(bridge["tenant_id"])
 
@@ -247,7 +248,7 @@ def enqueue_job(
                     tenant_id,
                     str(bridge["id"]),
                     (str(book_id) if book_id else None),
-                    str(kind)[:32],
+                    kind,
                     json.dumps(payload or {}, ensure_ascii=False),
                 ),
             )
@@ -257,16 +258,18 @@ def enqueue_job(
 
 
 def lease_jobs(bridge: Dict[str, Any], max_n: int = 1) -> List[Dict[str, Any]]:
-    """领任务(置 60s 租约)· 只领本桥的、且 book_id 仍在本桥上报清单内的。
+    """领任务(置租约:query 60s / write 300s)· 只领本桥的、book_id 仍在其上报清单内的。
 
     同一事务里先做两件自愈:租约过期的退回队列(桥崩溃过),超龄的落 expired
-    (门面早不等了)。派活用 SKIP LOCKED,多进程同时 lease 不会重复派同一条。
+    (门面早不等了;写活超龄放宽到 600s,见 write_gate)。派活用 SKIP LOCKED,
+    多进程同时 lease 不会重复派同一条;可领 kind 按生效角色现算(降级兜底)。
     """
     from core import db
 
     tenant_id = str(bridge["tenant_id"])
     bid = str(bridge["id"])
     allowed = sorted(book_ids(bridge.get("books")))
+    kinds = write_gate.leasable_kinds(bridge)
     n = max(1, min(int(max_n or 1), 10))
 
     def _run():
@@ -278,9 +281,9 @@ def lease_jobs(bridge: Dict[str, Any], max_n: int = 1) -> List[Dict[str, Any]]:
             )
             cur.execute(
                 f"UPDATE {JOBS} SET status = 'expired', finished_at = now() "
-                "WHERE bridge_id = %s AND status = 'queued' "
-                "AND created_at < now() - make_interval(secs => %s)",
-                (bid, JOB_TTL_SECONDS),
+                "WHERE bridge_id = %s AND status = 'queued' AND created_at < now() "
+                "- make_interval(secs => CASE WHEN kind = 'write' THEN %s ELSE %s END)",
+                (bid, write_gate.WRITE_JOB_TTL_SECONDS, JOB_TTL_SECONDS),
             )
             cur.execute(
                 f"""
@@ -288,18 +291,20 @@ def lease_jobs(bridge: Dict[str, Any], max_n: int = 1) -> List[Dict[str, Any]]:
                     SELECT id FROM {JOBS}
                     WHERE bridge_id = %s AND status = 'queued'
                       AND (book_id IS NULL OR book_id = ANY(%s::text[]))
+                      AND kind = ANY(%s::text[])
                     ORDER BY created_at
                     LIMIT %s
                     FOR UPDATE SKIP LOCKED
                 )
                 UPDATE {JOBS} j
                 SET status = 'leased', lease_owner = %s,
-                    lease_expires_at = now() + make_interval(secs => %s)
+                    lease_expires_at = now() + make_interval(
+                        secs => CASE WHEN j.kind = 'write' THEN %s ELSE %s END)
                 FROM due
                 WHERE j.id = due.id
                 RETURNING j.id, j.kind, j.book_id, j.payload
                 """,
-                (bid, allowed, n, bid, LEASE_SECONDS),
+                (bid, allowed, kinds, n, bid, write_gate.WRITE_LEASE_SECONDS, LEASE_SECONDS),
             )
             return [dict(r) for r in (cur.fetchall() or [])]
 

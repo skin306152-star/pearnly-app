@@ -5,6 +5,9 @@ query() 把一次"问内网"包成同步调用 —— 入队 → 轮询 → 拿�
 调用方看到的就是一个会阻塞几百毫秒的普通函数;async 路由里请 await asyncio.to_thread
 包一层(psycopg2 是同步的,直接调会卡住事件循环)。
 
+写路走 submit_write()(投单即返 job_id)+ write_status()(查进度)—— 写活在桥端是
+分钟级,同步等不现实;阻塞版 write() 只给测试脚本用。
+
 参数白名单在这里执行:云端下发给内网的 payload 只允许协议内字段,形状不对当场拒,
 不给桥"收到什么就照做"的机会(桥侧还会再校一次表名形状 + 目录白名单)。
 """
@@ -14,6 +17,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
 from services.erp.bridge import (
@@ -22,14 +26,22 @@ from services.erp.bridge import (
     BridgeTimeout,
     BridgeUnavailable,
 )
-from services.erp.bridge import store
+from services.erp.bridge import store, write_gate
+from services.erp.express_push.common import PAYLOAD_VERSION
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 20.0
+# 写活阻塞等待默认:对齐 write_gate.WRITE_LEASE_SECONDS —— 桥端备份+写+CDX 重建跨
+# SMB 是分钟级,20s 的查询默认根本等不完一次写。
+WRITE_TIMEOUT = 300.0
 # 轮询间隔:桥答一次通常在百毫秒级,250ms 让 p50 只多等半拍,一次 20s 等待也才 80 次
 # 主键查询 —— 比给 bridge_jobs 加 LISTEN/NOTIFY 那套的复杂度划算得多。
 POLL_INTERVAL = 0.25
+
+# direction → 合法 doctype(契约=express_push mapper/sales_mapper 模块头,逐字):
+# 采购 RR(赊购)/HP(现购);销售 IV(赊销)/HS(现销)。
+_WRITE_DOCTYPES = {"purchase": ("RR", "HP"), "sales": ("IV", "HS")}
 
 OPS = ("books", "tables", "rows")
 _OP_PARAMS = {
@@ -142,6 +154,89 @@ def _await_job(tenant_id: str, job_id: str, timeout: float) -> Dict[str, Any]:
             store.expire_job(tenant_id, job_id)
             raise BridgeTimeout(f"等桥回结果超时({timeout:g}s): {job_id}")
         time.sleep(POLL_INTERVAL)
+
+
+def build_write_payload(payload: Any, book_id: Optional[str]) -> Dict[str, Any]:
+    """写载荷轻校验:形状不对当场拒;深校验(科目存在/幂等/主档)在桥端。
+
+    契约与 express_push mapper 产物一字不差 —— 云端只把"根本不是一张单"的挡下:
+    版本、方向/票种、账套一致、借贷平衡、金额可解析。
+    """
+    if not isinstance(payload, dict):
+        raise BridgeRejected("写载荷须为对象", "bridge.bad_payload")
+    if payload.get("payload_version") != PAYLOAD_VERSION:
+        raise BridgeRejected(
+            f"payload_version 不符(须为 {PAYLOAD_VERSION}): {payload.get('payload_version')!r}",
+            "bridge.bad_payload",
+        )
+    direction = payload.get("direction")
+    doctypes = _WRITE_DOCTYPES.get(direction)
+    if not doctypes:
+        raise BridgeRejected(f"direction 非法: {direction!r}", "bridge.bad_payload")
+    if payload.get("doctype") not in doctypes:
+        raise BridgeRejected(
+            f"doctype 与 direction={direction} 不匹配: {payload.get('doctype')!r}",
+            "bridge.bad_payload",
+        )
+    account_set = str(payload.get("account_set") or "").strip()
+    if not account_set:
+        raise BridgeRejected("account_set 必填", "bridge.bad_payload")
+    if book_id is None or account_set != str(book_id):
+        raise BridgeRejected(
+            f"account_set 与 book_id 不一致: {account_set!r} != {book_id!r}",
+            "bridge.bad_payload",
+        )
+    _assert_lines_balanced(payload.get("lines"))
+    return payload
+
+
+def _assert_lines_balanced(lines: Any) -> None:
+    """复式分录形状:每行 {acc,side,amount} · 金额可解析成 Decimal · 借贷两侧和相等。"""
+    if not isinstance(lines, list) or not lines:
+        raise BridgeRejected("lines 须为非空数组", "bridge.bad_payload")
+    sums = {"D": Decimal("0"), "C": Decimal("0")}
+    for i, line in enumerate(lines):
+        if not isinstance(line, dict) or not str(line.get("acc") or "").strip():
+            raise BridgeRejected(f"lines[{i}] 缺科目 acc", "bridge.bad_payload")
+        side = line.get("side")
+        if side not in sums:
+            raise BridgeRejected(f"lines[{i}].side 须为 D/C: {side!r}", "bridge.bad_payload")
+        try:
+            sums[side] += Decimal(str(line.get("amount")))
+        except InvalidOperation:
+            raise BridgeRejected(
+                f"lines[{i}].amount 解析不了: {line.get('amount')!r}", "bridge.bad_payload"
+            ) from None
+    if sums["D"] != sums["C"]:
+        raise BridgeRejected(f"借贷不平: D={sums['D']} C={sums['C']}", "bridge.bad_payload")
+
+
+def submit_write(tenant_id: str, book_id: str, payload: Dict[str, Any]) -> str:
+    """投写活 · 返 job_id 不阻塞。写角色闸在 enqueue(write_gate),这里挑桥+校形状。"""
+    body = build_write_payload(payload, book_id)
+    bridge = write_gate.pick_write_bridge(tenant_id, book_id)
+    return store.enqueue_job(bridge, "write", body, book_id=book_id)
+
+
+def write_status(tenant_id: str, job_id: str) -> Optional[Dict[str, Any]]:
+    """写活进度:{job_id,status,result,error};查无此单(或非本租户)返 None。"""
+    job = store.get_job(tenant_id, job_id)
+    if not job:
+        return None
+    return {
+        "job_id": str(job["id"]),
+        "status": job.get("status"),
+        "result": job.get("result"),
+        "error": job.get("error"),
+    }
+
+
+def write(
+    tenant_id: str, book_id: str, payload: Dict[str, Any], *, timeout: float = WRITE_TIMEOUT
+) -> Dict[str, Any]:
+    """阻塞便捷封装(测试脚本用)· 等到终态,超时把任务落 expired 并抛 BridgeTimeout。"""
+    job_id = submit_write(tenant_id, book_id, payload)
+    return _await_job(str(tenant_id), job_id, timeout)
 
 
 def list_books(tenant_id: str) -> List[Dict[str, Any]]:

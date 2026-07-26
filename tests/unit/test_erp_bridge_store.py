@@ -264,8 +264,8 @@ class LeaseTests(unittest.TestCase):
         sql, params = next((s, p) for s, p in cur.executed if "WITH due AS" in s)
         self.assertIn("bridge_id = %s", sql)
         self.assertEqual(params[0], BRIDGE_A)
-        self.assertEqual(params[3], BRIDGE_A)  # lease_owner = 本桥
-        self.assertEqual(params[4], store.LEASE_SECONDS)
+        self.assertEqual(params[4], BRIDGE_A)  # lease_owner = 本桥
+        self.assertEqual(params[6], store.LEASE_SECONDS)  # 写活的 300s 见 test_erp_bridge_write
 
     def test_lease_only_offers_books_the_bridge_reported(self):
         _, cur = self._lease([])

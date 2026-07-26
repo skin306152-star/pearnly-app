@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import registry
+from services.steward import authz, registry
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -338,12 +338,19 @@ _HANDLERS = {
 }
 
 
-def run(name: str, ctx: ToolContext, args: dict) -> ToolResult:
-    """按名执行。注册表外的名字 / 注册表与执行器不同步 → 拒绝,绝不放行未知能力。"""
+def run(name: str, ctx: ToolContext, args: dict, grant=None) -> ToolResult:
+    """按名执行。注册表外的名字 / 注册表与执行器不同步 → 拒绝,绝不放行未知能力。
+
+    写/危险工具在这里物理设闸(B3):没有已批准、且盖着当前参数指纹的批文(grant =
+    任务 payload.authorization)一律拒 —— 授权不是前端不显示按钮,是执行层进不去。
+    """
     spec = registry.get(name)
     handler = _HANDLERS.get(name) if spec else None
     if handler is None:
         return ToolResult(ok=False, error_code=ERR_UNKNOWN_TOOL, data={"tool": name})
+    denial = authz.execution_error(spec, grant, tool=name, args=args or {})
+    if denial:
+        return ToolResult(ok=False, error_code=denial, data={"tool": name})
     try:
         return handler(ctx, args or {})
     except Exception:  # noqa: BLE001 — 工具炸了是"这条查不出来",不是整个对话崩

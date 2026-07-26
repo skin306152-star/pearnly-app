@@ -1,20 +1,23 @@
 # -*- coding: utf-8 -*-
 """智能管家 HTTP API:会话 + 消息 + 任务(B3 起消息异步:入队秒回,执行在 worker)。
 
-六端点(前端契约,static/ai/ai-api-steward.js 逐条对齐):
+八端点(前端契约,static/ai/ai-api-steward.js 逐条对齐):
   GET  /api/ai/steward/status                  闸态探针(闸关也回 200 {enabled:false})
   POST /api/ai/steward/sessions                建会话
   GET  /api/ai/steward/sessions/{sid}          重建消息流 + 当前任务 id
   POST /api/ai/steward/sessions/{sid}/messages 说一句话 → 立即应承(+ 入队的任务 id)
   GET  /api/ai/steward/tasks/{tid}             左窗任务数据(轮询;失联任务就地收口)
   POST /api/ai/steward/tasks/{tid}/cancel      取消还在跑的任务(幂等)
+  POST /api/ai/steward/authorizations/approve  批准写授权卡(token 走 body 不进 URL/访问日志)
+  POST /api/ai/steward/authorizations/reject   拒绝写授权卡(任务收 cancelled·一步没执行)
 
 除 status 外全组挂 `pearnly_ai_steward`(tenant 级默认关 · fail-closed · 叠加 pearnly_ai_m1):
 闸关一律 404 —— 对存量用户等于不存在。status 走 m1 鉴权但把 steward 闸态当数据返回,免得
 闸关用户每开一次 /ai 就吃一条 404(照 front_desk /status 先例)。
 
-权限统一用 tax.filing.view:管家 M1 只读,它能看到的每一样(矩阵/工单/推送/识别记录)都是
-「看申报工作」这一层的东西,不另立细码;写能力(B3 写工具)届时再叠自己的动作权限。
+权限:读端点统一 tax.filing.view(管家能看到的每一样都是「看申报工作」这一层的东西);
+批准写授权卡要 tax.filing.approve(签批级动作,复用 C3 四权分立的现成码不另立),拒绝仍是
+view —— 喊停永远是安全侧,谁看得见谁就能拦。权限判在 token 消费之前:无权点批准不烧卡。
 
 编排薄:本层只做鉴权 + 作用域 + 取值,一句话怎么变成任务在 services/steward。
 """
@@ -29,13 +32,14 @@ from pydantic import BaseModel, Field
 from core import db, feature_flags
 from core.route_helpers import authorize_pearnly_ai
 from services.authz.deps import get_authz
-from services.steward import copy as steward_copy, orchestrator, store, worker
+from services.steward import authz, copy as steward_copy, orchestrator, store, worker
 from services.steward.registry import ToolContext
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _C_VIEW = "tax.filing.view"
+_C_APPROVE = "tax.filing.approve"
 _NOT_FOUND = "steward.not_found"
 _MAX_TEXT = 2000
 
@@ -45,9 +49,13 @@ class MessageIn(BaseModel):
     lang: str = Field("", max_length=8, description="回复语言(zh/th);不给则按这句话自判")
 
 
-def _authorize(request: Request) -> tuple[dict, str]:
-    """登录 + 双闸(pearnly_ai_m1 叠加 pearnly_ai_steward · 关→404 fail-closed)+ 读权限。"""
-    user, tenant_id = authorize_pearnly_ai(request, _C_VIEW, not_found=_NOT_FOUND)
+class AuthzDecisionIn(BaseModel):
+    token: str = Field(..., min_length=8, max_length=64, description="授权卡一次性令牌")
+
+
+def _authorize(request: Request, perm: str = _C_VIEW) -> tuple[dict, str]:
+    """登录 + 双闸(pearnly_ai_m1 叠加 pearnly_ai_steward · 关→404 fail-closed)+ 动作权限。"""
+    user, tenant_id = authorize_pearnly_ai(request, perm, not_found=_NOT_FOUND)
     if not feature_flags.pearnly_ai_steward_enabled_for(tenant_id):
         raise HTTPException(404, detail=_NOT_FOUND)
     return user, tenant_id
@@ -158,3 +166,30 @@ async def cancel_task(task_id: str, request: Request):
             )
             task = cancelled or store.get_task(cur, tenant_id=tenant_id, task_id=task_id)
     return store.public_task(task)
+
+
+@router.post("/api/ai/steward/authorizations/approve")
+async def approve_authorization(req: AuthzDecisionIn, request: Request):
+    """批准写授权卡:token 原子消费(单次单用)→ 参数指纹比对 → 任务复跑。
+    权限(tax.filing.approve)判在消费之前 —— 无权点批准不烧卡,拿到权限后同一张卡仍可批。"""
+    user, tenant_id = _authorize(request, perm=_C_APPROVE)
+    return _decide_authorization(user, tenant_id, req.token, approve=True)
+
+
+@router.post("/api/ai/steward/authorizations/reject")
+async def reject_authorization(req: AuthzDecisionIn, request: Request):
+    """拒绝写授权卡:任务收 cancelled,一步没执行。喊停是安全侧,view 权限即可。"""
+    user, tenant_id = _authorize(request)
+    return _decide_authorization(user, tenant_id, req.token, approve=False)
+
+
+def _decide_authorization(user: dict, tenant_id: str, token: str, *, approve: bool) -> dict:
+    store.ensure_once()
+    with db.get_cursor(commit=True) as cur:
+        out = authz.decide(cur, tenant_id=tenant_id, token=token, actor=user, approve=approve)
+    if not out["ok"]:
+        raise HTTPException(out["http"], detail=out["code"])
+    return {
+        "task_id": out["task_id"],
+        "authorization": authz.public_authorization_card(out["authorization"]),
+    }

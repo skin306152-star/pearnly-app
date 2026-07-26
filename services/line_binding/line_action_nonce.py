@@ -51,22 +51,28 @@ def mint(
     action_ref,
     user_id="",
     ttl_hours=DEFAULT_TTL_HOURS,
+    ttl_minutes=None,
 ) -> str:
-    """发卡时建一次性 token,返回 urlsafe 串。无 ref → 空串(卡走无 token 链路,不强发)。"""
+    """发卡时建一次性 token,返回 urlsafe 串。无 ref → 空串(卡走无 token 链路,不强发)。
+
+    ttl_minutes 给分钟级时效场景(管家写授权卡 5 分钟口径,make_interval 的 hours 参数是
+    整数表达不了),给了它就覆盖 ttl_hours;单位名来自闭集,不进 SQL 拼接面。
+    """
     if not action_ref:
         return ""
+    unit, ttl = ("mins", ttl_minutes) if ttl_minutes is not None else ("hours", ttl_hours)
     token = secrets.token_urlsafe(18)
     cur.execute(
         "INSERT INTO line_action_nonces "
         "(token, tenant_id, workspace_client_id, user_id, action_ref, expires_at) "
-        "VALUES (%s, %s, %s, %s, %s, now() + make_interval(hours => %s))",
+        f"VALUES (%s, %s, %s, %s, %s, now() + make_interval({unit} => %s))",
         (
             token,
             tenant_id,
             workspace_client_id,
             str(user_id or ""),
             str(action_ref),
-            int(ttl_hours),
+            int(ttl),
         ),
     )
     return token

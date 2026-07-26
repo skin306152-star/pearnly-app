@@ -24,7 +24,7 @@ import logging
 from typing import Optional
 
 from services.agent.contracts import AgentAction, AgentContext
-from services.steward import copy, planner, registry, store
+from services.steward import budget, copy, planner, registry, store
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,20 @@ def handle_message(ctx: ToolContext, *, session_id: str, text: str) -> dict:
             for m in store.list_messages(cur, tenant_id=ctx.tenant_id, session_id=session_id)
         ][-_HISTORY_TURNS:]
 
-    outcome = _turn(ctx, text=text, history=history, session_id=session_id)
+    # 成本硬封顶(B3):模型调用前占坑、回来结算 —— 超限的轮次一次模型都不调,人话拒。
+    gate = budget.reserve(tenant_id=ctx.tenant_id, session_id=session_id)
+    if gate["allowed"]:
+        outcome = None
+        try:
+            outcome = _turn(ctx, text=text, history=history, session_id=session_id)
+        finally:
+            budget.settle(
+                tenant_id=ctx.tenant_id,
+                entry_id=gate.get("entry_id"),
+                cost_thb=(outcome or {}).get("cost_thb"),
+            )
+    else:
+        outcome = _budget_blocked(gate, lang=copy.pick_lang(text, ctx.lang))
     with db.get_cursor(commit=True) as cur:
         steward_msg = store.add_message(
             cur,
@@ -80,13 +93,35 @@ def handle_message(ctx: ToolContext, *, session_id: str, text: str) -> dict:
     if outcome.get("task_id"):
         out["task_id"] = outcome["task_id"]
         out["task_status"] = outcome["task_status"]
+    if outcome.get("budget"):
+        out["budget"] = outcome["budget"]
+    return out
+
+
+def _budget_blocked(gate: dict, *, lang: str) -> dict:
+    """超限轮次:不调模型不派活,人话说明卡在哪条线 + 机器可读的 budget 块(前端契约)。"""
+    code = gate["code"]
+    out = _talk_only(
+        copy.fail_reason(code, lang, cap=gate["cap_thb"]),
+        [{"tool": None, "ok": False, "error": code}],
+    )
+    out["budget"] = {"code": code, "cap_thb": gate["cap_thb"], "spent_thb": gate["spent_thb"]}
     return out
 
 
 def _turn(ctx: ToolContext, *, text: str, history: list, session_id: str) -> dict:
-    """挑工具 → 接地 → 执行。不碰会话表,便于单测(DB 只在 handle_message 那两段)。"""
+    """挑工具 → 接地 → 执行。不碰会话表,便于单测(DB 只在 handle_message 那两段)。
+    cost_thb 是本轮模型真实花费,随结果出去给 handle_message 结算预算占坑。"""
     lang = copy.pick_lang(text, ctx.lang)
     plan = planner.plan(text, tenant_id=ctx.tenant_id, trace_id=session_id, history=history)
+    out = _turn_outcome(ctx, plan, lang=lang, text=text, history=history, session_id=session_id)
+    out["cost_thb"] = plan.get("cost_thb")
+    return out
+
+
+def _turn_outcome(
+    ctx: ToolContext, plan: dict, *, lang: str, text: str, history: list, session_id: str
+) -> dict:
     if plan["degraded"]:
         return _talk_only(
             copy.degraded(lang), [{"tool": None, "ok": False, "error": plan["reason"]}]

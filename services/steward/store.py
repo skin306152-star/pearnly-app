@@ -36,6 +36,13 @@ TASK_CANCELLED = "cancelled"
 # worker 结果或重复取消都写不动(取消与执行赛跑时,先落者赢)。
 _FINISHABLE = (TASK_RUNNING, TASK_WAITING_USER)
 
+# 授权卡态(payload.authorization.status)。状态机在 authz.py,常量放这层是 import 方向
+# 决定的:authz 依赖 copy 依赖本模块,反向 import 成环。
+AUTH_PENDING = "pending"
+AUTH_APPROVED = "approved"
+AUTH_REJECTED = "rejected"
+AUTH_EXPIRED = "expired"
+
 # 步骤态(同上,stw_step_*)。waiting_auth 留给 B3 的授权卡,M1 只读不会产出。
 STEP_DONE = "done"
 STEP_RUNNING = "running"
@@ -467,4 +474,9 @@ def public_task(row: dict) -> dict[str, Any]:
     if row.get("error_code"):
         out["error_code"] = row["error_code"]
         out["error_reason"] = row.get("error_message") or ""
+    # 懒 import:authz 模块级依赖本模块,卡片投影只能函数级反向取(不然成环)。
+    from services.steward.authz import public_authorization_card
+
+    if card := public_authorization_card((row.get("payload") or {}).get("authorization")):
+        out["authorization"] = card
     return out

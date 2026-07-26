@@ -20,6 +20,13 @@ from typing import Any, Optional
 
 from services.agent.contracts import SlotSpec
 
+# 风险等级(B3 授权闸的判据面):read 直接执行;write 落数据、danger 落数据且难撤销
+# (推 ERP/删单据)。非 read 一律要求人批的授权令牌 —— 执行层物理拒,不是前端不显示。
+RISK_READ = "read"
+RISK_WRITE = "write"
+RISK_DANGER = "danger"
+RISK_LEVELS = (RISK_READ, RISK_WRITE, RISK_DANGER)
+
 # 工具名(单一事实源:planner/tools/copy 一律 import 这些常量,不各打字符串)。
 MATRIX_OVERVIEW = "matrix_overview"
 CLIENT_STATUS = "client_status"
@@ -31,13 +38,27 @@ CLIENT_LOOKUP = "client_lookup"
 
 @dataclass(frozen=True)
 class StewardTool:
-    """一个管家能调的能力。readonly 是 M1 的硬约束面:注册表里出现 False 即违约(测试守门)。"""
+    """一个管家能调的能力。风险等级是授权闸的唯一判据:readonly 从 risk 推导而非独立字段
+    ——两个字段会漂(readonly=True 而 risk=write 的工具就是后门),单一事实源杜绝。"""
 
     name: str
     desc: str  # 中文:这个工具干嘛(进提示词,大脑据此挑)
     slots: tuple[SlotSpec, ...]
     handler: str  # services/steward/tools.py 里的函数名
-    readonly: bool = True
+    risk: str = RISK_READ
+
+    def __post_init__(self) -> None:
+        if self.risk not in RISK_LEVELS:
+            raise ValueError(f"steward tool {self.name}: unknown risk {self.risk!r}")
+
+    @property
+    def readonly(self) -> bool:
+        return self.risk == RISK_READ
+
+
+def requires_authorization(tool: StewardTool) -> bool:
+    """写/危险工具必须持人批的授权令牌才准执行(闸在 tools.run,物理拒)。"""
+    return tool.risk != RISK_READ
 
 
 def _period_slot() -> SlotSpec:

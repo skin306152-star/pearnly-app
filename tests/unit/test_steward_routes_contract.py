@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """管家路由契约 + fail-closed 守门(routes/steward_routes.py · B3 异步)。
 
-锁:①六端点按 path+method 注册且挂进 app(前端 static/ai/ai-api-steward.js 逐条对齐);
+锁:①八端点按 path+method 注册且挂进 app(前端 static/ai/ai-api-steward.js 逐条对齐);
 ②闸关(pearnly_ai_steward 或 m1 任一关)时五个业务端点一律 404、status 仍回 200
 {enabled:false}(探针不制造 console 噪音);③别人的会话 404(会话是私人工作记录)。
 """
@@ -24,6 +24,8 @@ _EXPECTED = {
     ("POST", "/api/ai/steward/sessions/{session_id}/messages"),
     ("GET", "/api/ai/steward/tasks/{task_id}"),
     ("POST", "/api/ai/steward/tasks/{task_id}/cancel"),
+    ("POST", "/api/ai/steward/authorizations/approve"),
+    ("POST", "/api/ai/steward/authorizations/reject"),
 }
 
 
@@ -64,6 +66,9 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
             await self._assert_404(
                 sr.post_message("s-1", sr.MessageIn(text="本期谁缺料"), mock.Mock())
             )
+            decision = sr.AuthzDecisionIn(token="tok-12345678")
+            await self._assert_404(sr.approve_authorization(decision, mock.Mock()))
+            await self._assert_404(sr.reject_authorization(decision, mock.Mock()))
 
     async def test_status_probe_reports_false_instead_of_404(self):
         p1, p2 = self._patches()

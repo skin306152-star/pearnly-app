@@ -98,6 +98,18 @@ _FAIL_REASON = {
         "zh": "派活时的账号或权限已变更,这条没法继续跑。重新说一次即可。",
         "th": "บัญชีหรือสิทธิ์ที่ใช้สั่งงานเปลี่ยนไปแล้ว งานนี้ทำต่อไม่ได้ สั่งใหม่อีกครั้งนะคะ",
     },
+    "steward.authz_rejected": {
+        "zh": "这个操作被拒绝了,一步都没有执行。要做的话重新说一次、批准后才会动手。",
+        "th": "คำขอนี้ถูกปฏิเสธ ยังไม่ได้ทำอะไรเลยค่ะ ถ้าต้องการทำจริง สั่งใหม่แล้วกดอนุมัติก่อนนะคะ",
+    },
+    "steward.budget_task_exceeded": {
+        "zh": "这条任务的 AI 花费到上限了(฿{cap}),先停在这里。改小范围再试,或让管理员调高上限。",
+        "th": "งานนี้ใช้ค่า AI ถึงเพดานแล้ว (฿{cap}) ขอหยุดก่อนค่ะ ลองสั่งให้แคบลง หรือให้ผู้ดูแลปรับเพดาน",
+    },
+    "steward.budget_session_exceeded": {
+        "zh": "这个会话的 AI 花费到上限了(฿{cap}),先停在这里。开个新会话继续,或让管理员调高上限。",
+        "th": "แชตนี้ใช้ค่า AI ถึงเพดานแล้ว (฿{cap}) ขอหยุดก่อนค่ะ เปิดแชตใหม่เพื่อทำต่อ หรือให้ผู้ดูแลปรับเพดาน",
+    },
 }
 
 _OUT_OF_SCOPE = {
@@ -241,13 +253,19 @@ def task_ack(title: str, lang: str) -> str:
     return _t(_TASK_ACK, lang).format(title=title)
 
 
-def fail_reason(code: str, lang: str, *, seconds: Optional[int] = None) -> str:
-    """任务级失败原因(超时/失联/取消)。没配文案的码走兜底句,原样带码 —— 诚实。"""
+def fail_reason(
+    code: str, lang: str, *, seconds: Optional[int] = None, cap: Optional[str] = None
+) -> str:
+    """任务级失败原因(超时/失联/取消/拒批/超预算)。没配文案的码走兜底句,原样带码 —— 诚实。"""
     table = _FAIL_REASON.get(code)
     if not table:
         return _t(_ERROR_FALLBACK, lang).format(code=code)
     text = _t(table, lang)
-    return text.format(seconds=seconds) if "{seconds}" in text else text
+    if "{seconds}" in text:
+        return text.format(seconds=seconds)
+    if "{cap}" in text:
+        return text.format(cap=cap)
+    return text
 
 
 def error(code: str, data: Optional[dict], lang: str) -> str:

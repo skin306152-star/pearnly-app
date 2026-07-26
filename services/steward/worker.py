@@ -105,8 +105,12 @@ async def _execute(row: dict) -> None:
         return
     await asyncio.to_thread(_mark_tool_running, row, tool, lang)
     try:
+        # 批文(payload.authorization)随任务走:写工具的授权闸在 tools.run 里逐次校验,
+        # worker 只负责递到位 —— 没批文/批文对不上参数,执行层自己会拒。
         result = await asyncio.wait_for(
-            asyncio.to_thread(tools.run, tool, ctx, payload.get("args") or {}),
+            asyncio.to_thread(
+                tools.run, tool, ctx, payload.get("args") or {}, payload.get("authorization")
+            ),
             timeout=timeout_s,
         )
     except asyncio.TimeoutError:

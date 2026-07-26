@@ -138,13 +138,14 @@ def _default_ask(prompt: str, *, tenant_id=None, trace_id=None):
 ask_model = _default_ask  # 注入点:测试直接 patch,零真调用
 
 
-def _degraded(reason: str) -> dict:
+def _degraded(reason: str, cost_thb: float = 0.0) -> dict:
     return {
         "degraded": True,
         "reason": reason,
         "tool": registry.OUT_OF_SCOPE,
         "args": {},
         "message": "",
+        "cost_thb": cost_thb,
     }
 
 
@@ -162,14 +163,17 @@ def plan(
     token = set_attribution(TASK, tenant_id=tenant_id, trace_id=trace_id)
     try:
         outcome = ask_model(prompt, tenant_id=tenant_id, trace_id=trace_id)
+        # 成本随计划出去(orchestrator 拿它结算预算占坑):降级的调用也可能已计费,如实带。
+        cost = float(getattr(outcome, "cost_thb", 0.0) or 0.0)
         if not outcome.ok:
             return _degraded(
-                DEGRADED_TIMEOUT if outcome.error_kind == "timeout" else DEGRADED_BRAIN_ERROR
+                DEGRADED_TIMEOUT if outcome.error_kind == "timeout" else DEGRADED_BRAIN_ERROR,
+                cost_thb=cost,
             )
         parsed = parse_plan(outcome.data)
         if parsed.pop("bad_shape"):
-            return _degraded(DEGRADED_BAD_OUTPUT)
-        return {"degraded": False, "reason": None, **parsed}
+            return _degraded(DEGRADED_BAD_OUTPUT, cost_thb=cost)
+        return {"degraded": False, "reason": None, "cost_thb": cost, **parsed}
     except Exception:  # noqa: BLE001 — 大脑层任何炸法都不许波及对话/别的入口
         logger.warning("[steward.planner] brain call failed; degrading", exc_info=True)
         return _degraded(DEGRADED_BRAIN_ERROR)

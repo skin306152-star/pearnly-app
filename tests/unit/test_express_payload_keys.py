@@ -40,9 +40,7 @@ _SALES_CONFIG = {
     "stock_acccod": "12-01-01",
 }
 
-_ITEMS = [
-    {"name": "ผงชูรส", "qty": "100", "unit": "ถัง", "price": "10.00", "subtotal": "1000.00"}
-]
+_ITEMS = [{"name": "ผงชูรส", "qty": "100", "unit": "ถัง", "price": "10.00", "subtotal": "1000.00"}]
 
 
 def _purchase_history(manual="goods"):
@@ -111,9 +109,7 @@ class WritePayloadKeysContractTests(unittest.TestCase):
         self._assert_within_contract(keys)
 
     def test_purchase_expense_lane_keys_within_contract(self):
-        with mock.patch(
-            "services.erp.express_push.prior_doc.prior_docnum", return_value=None
-        ):
+        with mock.patch("services.erp.express_push.prior_doc.prior_docnum", return_value=None):
             keys = _keys(
                 build_express_payload(_purchase_history(manual="expense"), config=_PURCHASE_CONFIG)
             )

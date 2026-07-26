@@ -55,7 +55,13 @@ class TaskRenderPureTests(unittest.TestCase):
         )
         self.assertEqual(
             out["tasks"],
-            [["running", "run"], ["done", "ok"], ["failed", "err"], ["waiting_user", "wait"]],
+            [
+                ["running", "run"],
+                ["done", "ok"],
+                ["failed", "err"],
+                ["waiting_user", "wait"],
+                ["cancelled", "off"],
+            ],
         )
         # 契约外的值不冒充任何具体状态。
         self.assertEqual(out["unknownStep"], "empty")
@@ -79,17 +85,18 @@ class TaskRenderPureTests(unittest.TestCase):
             ],
         )
 
-    def test_only_done_failed_waiting_user_stop_polling(self):
+    def test_only_terminal_and_waiting_user_stop_polling(self):
         out = _run_node(f"""
             const r = require({_RENDER});
             process.stdout.write(JSON.stringify([
                 r.isTerminalStatus('done'), r.isTerminalStatus('failed'),
-                r.isTerminalStatus('waiting_user'), r.isTerminalStatus('running'),
+                r.isTerminalStatus('waiting_user'), r.isTerminalStatus('cancelled'),
+                r.isTerminalStatus('running'),
                 r.isTerminalStatus(undefined), r.isTerminalStatus('bogus'),
             ]));
             """)
         # 未知值当"还在跑"继续轮询——停轮询会让真在跑的任务永远停在半路。
-        self.assertEqual(out, [True, True, True, False, False, False])
+        self.assertEqual(out, [True, True, True, True, False, False, False])
 
     def test_deeplink_whitelist_drops_dangerous_and_offsite_hrefs(self):
         out = _run_node(f"""
@@ -257,6 +264,8 @@ class StewardI18nShardTests(unittest.TestCase):
         sources = (
             "ai-steward-render.js",
             "ai-steward-chat-render.js",
+            "ai-steward-authz-render.js",
+            "ai-steward-actions.js",
             "ai-steward.js",
             "ai-steward-bar.js",
             "ai.html",
@@ -266,13 +275,19 @@ class StewardI18nShardTests(unittest.TestCase):
             text = (AI_DIR / name).read_text(encoding="utf-8")
             # 尾下划线的是动态拼 key 的前缀字面量('stw_step_' + state),不是完整 key。
             referenced |= {k for k in re.findall(r"\bstw_[a-z0-9_]+", text) if not k.endswith("_")}
-        # 动态拼 key 的两处(stw_step_ + 步骤态 / stw_status_ + 任务态)静态正则抓不全,补闭集。
+        # 动态拼 key 的三处(stw_step_ + 步骤态 / stw_status_ + 任务态 / stw_authz_ + 卡态)
+        # 静态正则抓不全,补闭集。
         referenced |= {
             f"stw_step_{s}"
             for s in ("done", "running", "queued", "waiting_auth", "failed", "unknown")
         }
         referenced |= {
-            f"stw_status_{s}" for s in ("running", "done", "failed", "waiting_user", "unknown")
+            f"stw_status_{s}"
+            for s in ("running", "done", "failed", "waiting_user", "cancelled", "unknown")
+        }
+        referenced |= {
+            f"stw_authz_{s}"
+            for s in ("pending", "approved", "rejected", "expired", "unknown")
         }
         missing = sorted(referenced - zh)
         self.assertEqual(missing, [], f"引用了词典里不存在的 key: {missing}")

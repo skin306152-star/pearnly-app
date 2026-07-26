@@ -5,7 +5,9 @@
  *   { task_id, title, status, started_at, agent_count,
  *     steps: [{ id, label, state, detail, links: [{label, href}] }],
  *     artifacts: [{ kind, label, href?,
- *                   columns?: [{key, label}], rows?: [{<key>: 值}] }] }
+ *                   columns?: [{key, label}], rows?: [{<key>: 值}] }],
+ *     error_code?, error_reason?(没跑成时的机器码 + 人话),
+ *     authorization?(写授权卡 · 拼装在 ai-steward-authz-render.js) }
  *
  * 状态一律从 B1 状态词典取脸(docs/design-system/STATE-LANGUAGE.md · ai-states.css),
  * 本文件只做「业务码 → 色族」的查表(同 ai-matrix-render.js 的 BADGE_CHIP 先例),
@@ -21,10 +23,10 @@
     // 契约闭集。后端给了集合外的值 = 契约漂了,统一落 'empty' 族显示「状态未知」,
     // 绝不猜成某个具体状态(状态诚实:宁可承认不知道,也不点一盏假绿灯)。
     var STEP_STATES = ['done', 'running', 'queued', 'waiting_auth', 'failed'];
-    var TASK_STATUSES = ['running', 'done', 'failed', 'waiting_user'];
+    var TASK_STATUSES = ['running', 'done', 'failed', 'waiting_user', 'cancelled'];
 
     // 契约 §左窗:done→成功绿 / running→执行蓝(带脉冲)/ queued→中性灰 /
-    // waiting_auth→警告橙 / failed→错误红。
+    // waiting_auth→警告橙 / failed→错误红;任务 cancelled→禁用灰(人主动停的,不是错)。
     var STEP_FAMILY = {
         done: 'ok',
         running: 'run',
@@ -37,6 +39,7 @@
         done: 'ok',
         failed: 'err',
         waiting_user: 'wait',
+        cancelled: 'off',
     };
 
     function stepFamily(state) {
@@ -55,10 +58,15 @@
         return TASK_STATUSES.indexOf(status) >= 0 ? 'stw_status_' + status : 'stw_status_unknown';
     }
 
-    // 轮询收口判据:三个终态之外(含契约外的未知值)都当"还在跑"继续轮询——
-    // 未知值停轮询会让真在跑的任务永远停在半路,宁可多拉几次。
+    // 轮询收口判据:终态与 waiting_user(等人批卡,批完由决断响应重启轮询)都停;
+    // 契约外的未知值当"还在跑"继续轮询 —— 停了会让真在跑的任务永远停在半路。
     function isTerminalStatus(status) {
-        return status === 'done' || status === 'failed' || status === 'waiting_user';
+        return (
+            status === 'done' ||
+            status === 'failed' ||
+            status === 'waiting_user' ||
+            status === 'cancelled'
+        );
     }
 
     // 深链白名单:只放 SPA 内 hash 深链与同源绝对路径(附件下载)。javascript:/data:/
@@ -224,7 +232,34 @@
         return '<div class="stw-meta">' + esc(parts.join(' · ')) + '</div>';
     }
 
-    // 任务面板。stalledNote 由挂载层在轮询自行收口(超时)后传入 —— 面板不猜"还在不在跑"。
+    // 没跑成的任务把原因摆在脸上(error_reason 是后端按任务语言写好的人话,error_code
+    // 小字随行给排障用)。cancelled 是人主动停的,用中性灰,不套错误红。
+    function reasonHtml(task) {
+        if (!task.error_reason && !task.error_code) return '';
+        return (
+            '<div class="stw-reason' +
+            (task.status === 'cancelled' ? ' off' : '') +
+            '">' +
+            esc(task.error_reason || '') +
+            (task.error_code ? '<code>' + esc(task.error_code) + '</code>' : '') +
+            '</div>'
+        );
+    }
+
+    // 执行中给「取消」出口(取消是幂等端点,连点不炸);终态不摆一个点了没意义的按钮。
+    function cancelHtml(task, busy) {
+        if (task.status !== 'running') return '';
+        return (
+            '<div class="stw-cancel-row"><button type="button" class="btn sm" ' +
+            'data-action="stw-cancel"' +
+            (busy ? ' disabled' : '') +
+            '>' +
+            esc(at('stw_cancel_task')) +
+            '</button></div>'
+        );
+    }
+
+    // 任务面板。stalled/授权卡的 busy 与错误由挂载层传入 —— 面板不猜"还在不在跑"。
     function panelHtml(task, opts) {
         opts = opts || {};
         var counts = stepCounts(task.steps);
@@ -237,6 +272,12 @@
               '<button type="button" class="btn sm" data-action="stw-poll-again">' +
               esc(at('stw_poll_refresh')) +
               '</button></div>'
+            : '';
+        var authz = task.authorization
+            ? AI.stewardAuthzRender.cardHtml(task.authorization, { busy: opts.authzBusy })
+            : '';
+        var actionErr = opts.actionErr
+            ? '<div class="stw-err">' + esc(opts.actionErr) + '</div>'
             : '';
         return (
             '<div class="panel stw-task"><div class="hd"><h3>' +
@@ -251,8 +292,12 @@
             AI.statesRender.countHtml(counts.done, counts.total, at('stw_steps_hd')) +
             '</div>' +
             stalled +
+            reasonHtml(task) +
+            actionErr +
+            authz +
             (steps ? '<ul class="stw-steps">' + steps + '</ul>' : '') +
             (arts ? '<div class="stw-arts-hd">' + esc(at('stw_arts_hd')) + '</div>' + arts : '') +
+            cancelHtml(task, opts.cancelBusy) +
             '</div></div>'
         );
     }

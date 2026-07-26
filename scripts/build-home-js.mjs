@@ -297,6 +297,12 @@ const BUNDLES = [
             // AI.steward.onRoute + enterApp 调 probe)之前。
             'ai/ai-steward-render.js',
             'ai/ai-steward-chat-render.js',
+            // B3 追加两件:ai-steward-authz-render.js(写授权卡/预算块拼装,steward-render
+            // 与 chat-render 只在调用期引用它,排在 ai-steward.js 之前即可);
+            // ai-steward-actions.js(决断/取消/倒计时动作层)被 ai-steward.js 在【加载期】
+            // create(),必须排在它之前。
+            'ai/ai-steward-authz-render.js',
+            'ai/ai-steward-actions.js',
             'ai/ai-steward.js',
             'ai/ai-steward-bar.js',
             'ai/ai.js',

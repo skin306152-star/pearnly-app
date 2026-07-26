@@ -129,6 +129,9 @@
 
     function msgHtml(msg) {
         var cls = roleClass(msg.role);
+        // 超限轮的回复气泡下面挂预算块(已用/上限 + 会话级的「开新会话」出口):
+        // reply 人话说为什么停,这块给数字和下一步 —— 两者都来自后端,本层不算钱。
+        var budget = msg.budget ? AI.stewardAuthzRender.budgetHtml(msg.budget) : '';
         return (
             '<div class="stw-msg ' +
             cls +
@@ -137,7 +140,9 @@
             '</div><div class="stw-bubble">' +
             esc(msg.text || '') +
             msgFootHtml(msg) +
-            '</div></div>'
+            '</div>' +
+            budget +
+            '</div>'
         );
     }
 
@@ -175,8 +180,8 @@
             (busy ? ' disabled' : '') +
             '>' +
             esc(at('stw_send')) +
-            '</button></div><div class="stw-readonly">' +
-            esc(at('stw_readonly')) +
+            '</button></div><div class="stw-composer-note">' +
+            esc(at('stw_composer_note')) +
             '</div></div>'
         );
     }

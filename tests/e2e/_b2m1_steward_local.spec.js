@@ -97,6 +97,50 @@ function taskPayload(status) {
 
 const REPLY = '这一期有 2 家还缺料,清单贴在左边。';
 
+// 授权卡桩:形状逐键抄 services/steward/authz.py 的 _CARD_PUBLIC_KEYS(冻结契约),
+// 不多不少 —— args_fp 等内部字段后端永不外泄,桩里也不许有。
+function authzCard(status) {
+    const pending = status === 'pending';
+    return {
+        token: 'tok-e2e-authz-0001',
+        tool: 'erp_push_sales_summary',
+        title: '把 SM 2569-06 的销项汇总推送进 Express(影响 3 条,可在 Express 撤销)',
+        risk: 'write',
+        args: { client: 'SM', period: '2569-06', rows: '3' },
+        status,
+        requested_at: new Date(Date.now() - 5000).toISOString(),
+        expires_at: new Date(Date.now() + 295000).toISOString(),
+        decided_by: pending ? null : 'u1',
+        decided_at: pending ? null : new Date().toISOString(),
+    };
+}
+
+// 等批文的任务:status=waiting_user + 工具步 waiting_auth + 顶层 authorization(冻结契约)。
+function waitingAuthzPayload() {
+    const t = taskPayload('running');
+    t.status = 'waiting_user';
+    t.steps = [
+        { id: 's1', label: '解析期间', state: 'done', detail: '2569-06', links: [] },
+        { id: 's2', label: '推送销项汇总', state: 'waiting_auth', detail: '等你批准' },
+    ];
+    t.authorization = authzCard('pending');
+    return t;
+}
+
+// 人拒/人取消后的终态:error_code + error_reason(人话)照 store.public_task 的输出形状。
+function cancelledPayload(code, reason, authStatus) {
+    const t = taskPayload('running');
+    t.status = 'cancelled';
+    t.steps = [
+        { id: 's1', label: '解析期间', state: 'done', detail: '2569-06', links: [] },
+        { id: 's2', label: '推送销项汇总', state: 'failed', detail: reason },
+    ];
+    t.error_code = code;
+    t.error_reason = reason;
+    if (authStatus) t.authorization = authzCard(authStatus);
+    return t;
+}
+
 function json(route, payload) {
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(payload) });
 }
@@ -106,6 +150,9 @@ async function boot(page, opts) {
     const gate = opts.stewardEnabled !== false;
     const taskStates = opts.taskStates || ['running'];
     let taskCall = 0;
+    // 记下打到管家端点的每个 POST(路径 + body),断言「点了按钮真发了什么」用。
+    const posts = [];
+    let sessionPosts = 0;
 
     await page.route('**/api/me**', (r) =>
         r.fulfill({ contentType: 'application/json', body: '{"username":"skin"}' })
@@ -117,7 +164,23 @@ async function boot(page, opts) {
     // .../sessions/s1/messages 一并吃掉),分派表一眼看得出哪条 URL 回什么。
     await page.route('**/api/ai/steward/**', (r) => {
         const p = new URL(r.request().url()).pathname;
+        if (r.request().method() === 'POST') {
+            posts.push({ path: p, body: r.request().postDataJSON() });
+        }
         if (p.endsWith('/steward/status')) return json(r, { enabled: gate });
+        // B3 决断二端点:成功响应 {task_id, authorization}(状态已翻)——冻结契约。
+        if (p.endsWith('/authorizations/approve')) {
+            return json(r, { task_id: 't1', authorization: authzCard('approved') });
+        }
+        if (p.endsWith('/authorizations/reject')) {
+            return json(r, { task_id: 't1', authorization: authzCard('rejected') });
+        }
+        if (p.endsWith('/cancel')) {
+            return json(
+                r,
+                cancelledPayload('steward.cancelled', '你取消了这条任务,后面的步骤没有跑。')
+            );
+        }
         if (p.endsWith('/messages')) {
             if (opts.sendFails) {
                 return r.fulfill({
@@ -126,9 +189,28 @@ async function boot(page, opts) {
                     body: '{"detail":{"code":"generic"}}',
                 });
             }
+            // 超限轮(冻结契约):reply 即人话,budget 三键,无 task_id(不建任务)。
+            if (opts.budget) {
+                return json(r, {
+                    message_id: 'm1',
+                    user_message_id: 'um1',
+                    reply: '这个会话的 AI 花费到上限了(฿5.00),先停在这里。开个新会话继续,或让管理员调高上限。',
+                    budget: {
+                        code: 'steward.budget_session_exceeded',
+                        cap_thb: '5.00',
+                        spent_thb: '5.02',
+                    },
+                });
+            }
             return json(r, { message_id: 'm1', reply: REPLY, task_id: 't1' });
         }
         if (p.indexOf('/steward/tasks/') >= 0) {
+            // taskSeq 优先(整份载荷桩,授权卡/终态流转用);否则按状态名走老路。
+            if (opts.taskSeq) {
+                const payload = opts.taskSeq[Math.min(taskCall, opts.taskSeq.length - 1)];
+                taskCall += 1;
+                return json(r, payload);
+            }
             const state = taskStates[Math.min(taskCall, taskStates.length - 1)];
             taskCall += 1;
             return json(r, taskPayload(state));
@@ -144,7 +226,8 @@ async function boot(page, opts) {
                 current_task_id: 't1',
             });
         }
-        return json(r, { session_id: 's1' });
+        if (p.endsWith('/steward/sessions')) sessionPosts += 1;
+        return json(r, { session_id: 's' + sessionPosts });
     });
     await page.route('**/api/**', (r) => {
         const url = r.request().url();
@@ -157,6 +240,7 @@ async function boot(page, opts) {
         window.localStorage.setItem('mrpilot_lang', 'zh');
     });
     await page.goto(`${BASE}/static/dist/ai.html${opts.hash || ''}`);
+    return { posts };
 }
 
 async function bg(page, selector) {
@@ -330,5 +414,143 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
             path: path.join(ARTIFACT_DIR, '06-send-failed-honest.png'),
             fullPage: true,
         });
+    });
+});
+
+// B3:写授权卡 / 取消 / 成本封顶 / 文案纠偏。桩形状逐键对齐冻结契约
+// (routes/steward_routes.py 顶注 + authz.public_authorization_card + orchestrator budget)。
+test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', () => {
+    async function openWithTask(page, opts) {
+        const h = await boot(page, opts);
+        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
+        await page.locator('#stwBar .stw-chip').first().click();
+        await page.waitForSelector('#v-steward.on', { state: 'visible', timeout: 15000 });
+        return h;
+    }
+
+    test('待批卡:说清做什么 · 批/拒两动作 · 倒计时活的 · 文案不再自称只读', async ({ page }) => {
+        await openWithTask(page, { taskSeq: [waitingAuthzPayload()] });
+        await page.waitForSelector('.stw-authz', { state: 'visible', timeout: 15000 });
+
+        // 卡自述:标题(要对哪个账套做什么/影响几条/可不可撤销)+ 待批徽章 + 风险徽章。
+        await expect(page.locator('.stw-authz-title')).toContainText('SM 2569-06');
+        await expect(page.locator('.stw-authz-title')).toContainText('可在 Express 撤销');
+        await expect(page.locator('.stw-authz .st-badge').first()).toHaveClass(/st-warn/);
+        // 参数逐行摆给人复核(3 个槽 = 3 行)。
+        await expect(page.locator('.stw-authz-args dt')).toHaveCount(3);
+        await expect(page.locator('[data-action="stw-authz-approve"]')).toBeVisible();
+        await expect(page.locator('[data-action="stw-authz-reject"]')).toBeVisible();
+        // 倒计时真在走:两次采样文字不同(纯静态字符串 = 死表)。
+        const cd1 = await page.locator('#stwAuthzCd').innerText();
+        await page.waitForTimeout(2200);
+        const cd2 = await page.locator('#stwAuthzCd').innerText();
+        expect(cd1).toMatch(/\d+:\d\d/);
+        expect(cd2).not.toBe(cd1);
+        // 工具步是 waiting_auth 橙(B1 既有色族,契约点名)。
+        await expect(page.locator('.stw-step:nth-child(2) .st-badge')).toHaveClass(/st-warn/);
+        // 文案纠偏:授权能力上线后页面任何地方不许再自称「只读」。
+        const noteTexts = await page.evaluate(() => [
+            document.querySelector('#v-steward .board-head .note').textContent,
+            document.querySelector('.stw-composer-note').textContent,
+        ]);
+        for (const t of noteTexts) {
+            expect(t).not.toContain('只读');
+            expect(t).toContain('批准');
+        }
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '07-authz-pending-card.png'),
+            fullPage: true,
+        });
+    });
+
+    test('批准:POST approve 带 token · 任务复跑回 running', async ({ page }) => {
+        const h = await openWithTask(page, {
+            taskSeq: [waitingAuthzPayload(), taskPayload('running')],
+        });
+        await page.waitForSelector('[data-action="stw-authz-approve"]', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        await page.locator('[data-action="stw-authz-approve"]').click();
+        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-run/, {
+            timeout: 15000,
+        });
+        const approvePost = h.posts.find((x) => x.path.endsWith('/authorizations/approve'));
+        expect(approvePost.body).toEqual({ token: 'tok-e2e-authz-0001' });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '08-authz-approved-resumed.png'),
+            fullPage: true,
+        });
+    });
+
+    test('拒绝:任务收 cancelled · 灰徽章 + 人话原因 + 已拒卡盖章', async ({ page }) => {
+        const h = await openWithTask(page, {
+            taskSeq: [
+                waitingAuthzPayload(),
+                cancelledPayload(
+                    'steward.authz_rejected',
+                    '这个操作被拒绝了,一步都没有执行。要做的话重新说一次、批准后才会动手。',
+                    'rejected'
+                ),
+            ],
+        });
+        await page.waitForSelector('[data-action="stw-authz-reject"]', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        await page.locator('[data-action="stw-authz-reject"]').click();
+        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-off/, {
+            timeout: 15000,
+        });
+        // 原因面:人话 + 机器码,cancelled 用中性灰(人停的不是错误红)。
+        await expect(page.locator('.stw-reason')).toContainText('一步都没有执行');
+        await expect(page.locator('.stw-reason code')).toContainText('steward.authz_rejected');
+        await expect(page.locator('.stw-reason')).toHaveClass(/off/);
+        // 卡已盖「已拒绝」章,批/拒按钮消失(不摆点了才知道死了的按钮)。
+        expect(await page.locator('[data-action="stw-authz-approve"]').count()).toBe(0);
+        expect(h.posts.some((x) => x.path.endsWith('/authorizations/reject'))).toBe(true);
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '09-authz-rejected-cancelled.png'),
+            fullPage: true,
+        });
+    });
+
+    test('执行中可取消:点取消 → POST cancel → 终态灰 + 原因 + 按钮收走', async ({ page }) => {
+        const h = await openWithTask(page, { taskStates: ['running'] });
+        await page.waitForSelector('[data-action="stw-cancel"]', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        await page.locator('[data-action="stw-cancel"]').click();
+        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-off/, {
+            timeout: 15000,
+        });
+        await expect(page.locator('.stw-reason')).toContainText('你取消了这条任务');
+        expect(await page.locator('[data-action="stw-cancel"]').count()).toBe(0);
+        expect(h.posts.some((x) => x.path.endsWith('/cancel'))).toBe(true);
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '10-cancel-running-task.png'),
+            fullPage: true,
+        });
+    });
+
+    test('会话超限:人话 + 已用/上限数字 + 「开新会话」真开新会话', async ({ page }) => {
+        const h = await openWithTask(page, { budget: true });
+        await page.waitForSelector('.stw-budget', { state: 'visible', timeout: 15000 });
+        // reply 人话在气泡里,数字块给已用/上限(decimal 字符串原样印,不重算)。
+        await expect(page.locator('.stw-msg.agent .stw-bubble')).toContainText('฿5.00');
+        await expect(page.locator('.stw-budget')).toContainText('5.02');
+        await expect(page.locator('.stw-budget')).toContainText('5.00');
+        // 超限轮不建任务:左窗诚实空态,不摆假执行中。
+        await expect(page.locator('#stwLeft [data-state="empty"]')).toBeVisible();
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '11-budget-session-exceeded.png'),
+            fullPage: true,
+        });
+        await page.locator('[data-action="stw-new-session"]').click();
+        // 出口是真的:第二次 POST /sessions 打出去,对话面回到空态指路。
+        await expect(page.locator('.stw-feed-empty')).toBeVisible({ timeout: 10000 });
+        const sessionPosts = h.posts.filter((x) => x.path.endsWith('/steward/sessions'));
+        expect(sessionPosts.length).toBe(2);
     });
 });

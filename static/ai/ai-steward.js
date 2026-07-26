@@ -48,6 +48,10 @@
             taskErr: false,
             stalled: false,
             poller: null,
+            authzBusy: false,
+            cancelBusy: false,
+            actionErr: null,
+            cdTimer: null,
         };
     }
 
@@ -85,8 +89,14 @@
                 sub: at('stw_no_task_s'),
             });
         } else {
-            el.innerHTML = AI.stewardRender.panelHtml(S.task, { stalled: S.stalled });
+            el.innerHTML = AI.stewardRender.panelHtml(S.task, {
+                stalled: S.stalled,
+                authzBusy: S.authzBusy,
+                cancelBusy: S.cancelBusy,
+                actionErr: S.actionErr,
+            });
         }
+        actions.syncCountdown();
     }
 
     function renderRight(opts) {
@@ -186,11 +196,13 @@
                 msg.id = resp && resp.message_id;
                 S.busy = false;
                 // 计划必须落库成任务行:后端给了 task_id 才有左窗,前端不替它编一份计划。
+                // budget 只在超限轮出现(那一轮无任务),挂在回复气泡下给数字与出口。
                 if (resp && (resp.reply || resp.task_id)) {
                     S.messages.push({
                         role: 'steward',
                         text: resp.reply || '',
                         task_id: resp.task_id || null,
+                        budget: resp.budget || null,
                     });
                 }
                 renderRight({ focus: true });
@@ -270,6 +282,7 @@
         S.taskLoading = true;
         S.taskErr = false;
         S.stalled = false;
+        S.actionErr = null;
         renderLeft();
         var session = S;
         S.api
@@ -289,6 +302,39 @@
             });
     }
 
+    // ---------- 授权卡 / 取消(实现在 ai-steward-actions.js,钩子注入·状态仍在 S) ----------
+
+    var actions = AI.stewardActions.create({
+        state: function () {
+            return S;
+        },
+        getEl: $,
+        renderLeft: function () {
+            renderLeft();
+        },
+        loadTask: function (id) {
+            loadTask(id);
+        },
+        startPoll: function (id) {
+            startPoll(id);
+        },
+        stopPoll: stopPoll,
+        isTerminal: function (status) {
+            return AI.stewardRender.isTerminalStatus(status);
+        },
+    });
+
+    // 会话级封顶后的出路:开新会话从零起算(旧消息流留在服务端旧会话里,不迁移)。
+    function newSession() {
+        stopPoll();
+        actions.stopCountdown();
+        S = freshState(S.api);
+        renderShell();
+        renderLeft();
+        renderRight();
+        ensureSession();
+    }
+
     // ---------- 交互 ----------
 
     function onClick(e) {
@@ -300,6 +346,10 @@
         else if (a === 'stw-resend') resend(el.getAttribute('data-mid'));
         else if (a === 'stw-open-task') loadTask(el.getAttribute('data-tid'));
         else if (a === 'stw-poll-again' && S.taskId) loadTask(S.taskId);
+        else if (a === 'stw-cancel') actions.cancel();
+        else if (a === 'stw-authz-approve') actions.decide(true, el.getAttribute('data-token'));
+        else if (a === 'stw-authz-reject') actions.decide(false, el.getAttribute('data-token'));
+        else if (a === 'stw-new-session') newSession();
         // 四态壳的重试按钮左右两窗同名,按落点分派(左=重拉任务,右=重建会话)。
         else if (a === 'retry' && el.closest('.stw-left') && S.taskId) loadTask(S.taskId);
         else if (a === 'retry' && el.closest('.stw-right')) ensureSession();
@@ -388,6 +438,7 @@
         $('v-steward').classList.toggle('on', mine && gateOpen === true);
         if (!mine) {
             stopPoll();
+            actions.stopCountdown();
             return false;
         }
         if (gateOpen === false) {

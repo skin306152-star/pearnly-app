@@ -276,10 +276,118 @@
   padding: 7px 11px;
   margin-bottom: 8px;
 }
-.stw-readonly {
+.stw-composer-note {
   font-size: 11.5px;
   color: var(--mut);
   margin-top: 7px;
+}
+
+/* ---------- 没跑成的原因(failed=错误红 / cancelled=中性灰,人停的不是错) ---------- */
+.stw-reason {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--crit);
+  background: var(--crit-soft);
+  border: 1px solid var(--crit-line);
+  border-radius: 10px;
+  padding: 8px 11px;
+  margin-bottom: 12px;
+}
+.stw-reason.off {
+  color: var(--mut);
+  background: var(--surface2);
+  border-color: var(--hair);
+}
+.stw-reason code {
+  display: block;
+  font-size: 10.5px;
+  color: var(--faint);
+  margin-top: 3px;
+}
+
+/* ---------- 写操作授权卡(状态徽章/按钮取 B1 与 .btn,这里只管卡怎么摆) ---------- */
+.stw-authz {
+  border: 1px solid var(--alert-line);
+  border-radius: 12px;
+  background: var(--alert-soft);
+  padding: 11px 13px;
+  margin-bottom: 12px;
+}
+.stw-authz-hd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.stw-authz-t {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--alert);
+}
+.stw-authz-title {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink);
+  margin-top: 7px;
+}
+.stw-authz-args-hd {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+  margin-top: 9px;
+}
+.stw-authz-args {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 12px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.stw-authz-args dt {
+  color: var(--mut);
+}
+.stw-authz-args dd {
+  color: var(--ink);
+  word-break: break-word;
+}
+.stw-authz-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 11px;
+}
+.stw-authz-cd {
+  font-size: 12px;
+  color: var(--alert);
+  font-variant-numeric: tabular-nums;
+}
+.stw-authz-hint {
+  font-size: 12px;
+  color: var(--mut);
+  margin-top: 9px;
+}
+
+/* ---------- 成本封顶(回复气泡下的数字块) ---------- */
+.stw-budget {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  font-size: 12px;
+  color: var(--alert);
+  background: var(--alert-soft);
+  border: 1px solid var(--alert-line);
+  border-radius: 10px;
+  padding: 7px 11px;
+  margin-top: 7px;
+}
+
+/* ---------- 任务取消入口(只在执行中出现) ---------- */
+.stw-cancel-row {
+  margin-top: 12px;
 }
 
 /* ---------- 移动端(390px 基准):单栏,执行状态卡内嵌在对话流上方 ---------- */
@@ -293,5 +401,13 @@
   }
   .stw-msg {
     max-width: 100%;
+  }
+  /* 批准/拒绝是高敏动作:手机上撑满一行、触控目标 ≥44px,倒计时另起一行看得清。 */
+  .stw-authz-actions .btn {
+    flex: 1 1 40%;
+    min-height: 44px;
+  }
+  .stw-authz-cd {
+    flex-basis: 100%;
   }
 }

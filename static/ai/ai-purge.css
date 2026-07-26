@@ -1,8 +1,10 @@
 /* Pearnly AI · 按账套清空数据弹窗 —— 外壳复用 .pkg-mask/.pkg-modal(ai-pkg.css),
    这里只补选择列表、警告块、进度条三样本弹窗独有的东西。 */
 
+/* 窄弹窗:桌面封顶 480,窄屏按视口收(94vw 留出两侧边距)。用 vw 不用 100% ——
+   后者贴死屏幕边,且属写死宽度(见 scripts/ui_design_lint.mjs 该条注释)。 */
 .pg-modal {
-  max-width: min(480px, 100%);
+  max-width: min(480px, 94vw);
 }
 
 /* ── 选账套 ── */

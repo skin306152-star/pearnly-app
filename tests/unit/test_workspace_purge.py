@@ -46,14 +46,18 @@ class _FakeCursor:
         if "PG_CONSTRAINT" in s:
             self._rows = [dict(e) for e in EDGES]
             return
-        if "PG_ATTRIBUTE" in s and "WORKSPACE_CLIENT_ID" in s:
-            self._rows = [{"table_name": t} for t in SCOPE]
+        # 表结构发现现在一条 SQL 带列名参数:靠参数分派,别靠 SQL 里的字面量
+        if "AS TABLE_NAME" in s and "PG_ATTRIBUTE" in s:
+            col = (params or ("",))[0]
+            if col == "workspace_client_id":
+                self._rows = [{"table_name": x} for x in SCOPE]
+            elif col == "tenant_id":
+                self._rows = [{"table_name": x} for x in SCOPE]  # 都带 tenant_id
+            else:
+                self._rows = []
             return
-        if "PG_ATTRIBUTE" in s and "TENANT_ID" in s:
-            self._rows = [{"?column?": 1}]
-            return
-        if s.startswith("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS"):
-            self._rows = [{"column_name": c} for c in ("address", "phone", "name", "tax_id")]
+        if "WORKSPACE_CLIENTS" in s and "PG_ATTRIBUTE" in s:
+            self._rows = [{"c": c} for c in ("address", "phone", "name", "tax_id")]
             return
         if s.startswith("SELECT COUNT(*)"):
             table = sql.split("FROM", 1)[1].split()[0]

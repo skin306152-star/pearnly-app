@@ -72,9 +72,7 @@
                         '"' +
                         (S.period === p.period ? ' selected' : '') +
                         '>' +
-                        esc(
-                            at('purge_period_opt').replace('{p}', p.period).replace('{n}', p.orders)
-                        ) +
+                        esc(at('purge_period_opt', { p: p.period, n: p.orders })) +
                         '</option>'
                     );
                 })
@@ -125,14 +123,12 @@
     function doneHtml() {
         var r = S.result || {};
         var left = r.leftover_detail || [];
-        var failed = (r.leftover || []).length > 0;
-        var what = left.length
-            ? left
-                  .map(function (x) {
-                      return x.table + '(' + x.rows + ')';
-                  })
-                  .join(', ')
-            : (r.leftover || []).join(', ');
+        var failed = r.ok === false;
+        var what = left
+            .map(function (x) {
+                return x.table + '(' + x.rows + ')';
+            })
+            .join(', ');
         return (
             '<div class="' +
             (failed ? 'pg-failed' : 'pg-done') +
@@ -141,14 +137,15 @@
             '</div>' +
             '<div class="pg-status">' +
             esc(
-                at('purge_done_stat')
-                    .replace('{rows}', String(r.deleted_total || 0))
-                    .replace('{files}', String(r.files_removed || 0))
+                at('purge_done_stat', {
+                    rows: r.deleted_total || 0,
+                    files: r.files_removed || 0,
+                })
             ) +
             '</div>' +
             (failed
                 ? '<p class="pg-note pg-leftover">' +
-                  esc(at('purge_leftover').replace('{tables}', what)) +
+                  esc(at('purge_leftover', { tables: what })) +
                   '</p>'
                 : '') +
             '<div class="pkg-actions"><button type="button" class="btn pri" data-action="pg-finish">' +
@@ -196,10 +193,11 @@
             fill.style.width = Math.round((evt.done / evt.total) * 100) + '%';
         }
         if (status && evt.label) {
-            status.textContent = at('purge_progress')
-                .replace('{done}', String(evt.done))
-                .replace('{total}', String(evt.total))
-                .replace('{table}', evt.label);
+            status.textContent = at('purge_progress', {
+                done: evt.done,
+                total: evt.total,
+                table: evt.label,
+            });
         }
     }
 
@@ -298,10 +296,14 @@
             });
     }
 
+    // 只换那一行提示语。整屏重渲会把用户正在用的 <select> 连同 option 一起销毁重建,
+    // 焦点和展开态全丢 —— 而这屏里依赖 S.period 的只有这句文案。
     function onChange(e) {
-        if (e.target && e.target.id === 'pgPeriod') {
-            S.period = e.target.value;
-            render();
+        if (!e.target || e.target.id !== 'pgPeriod') return;
+        S.period = e.target.value;
+        var note = mask() && mask().querySelector('.pg-note');
+        if (note) {
+            note.textContent = at(S.period ? 'purge_warn_body_period' : 'purge_warn_body');
         }
     }
 

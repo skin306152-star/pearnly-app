@@ -18,7 +18,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 _PDF_BASE = os.environ.get("PDF_STORAGE_DIR", "/opt/mrpilot/storage/pdfs")
 _WORKORDER_BASE = os.environ.get("WORKORDER_STORAGE_DIR", "/opt/mrpilot/storage/workorders")
 _IMAGE_BASE = os.environ.get("IMAGE_STORAGE_DIR", "/opt/mrpilot/storage/images")
+# VAT 对账上传的 Excel 落在 uploads 下(不在 storage 里),见 routes/vat_excel_routes.EXCEL_STORE_DIR
+_VAT_EXCEL_BASE = "/opt/mrpilot/uploads/vat_recon"
 
 
 def _rows(cur, sql: str, params) -> List[Dict[str, Any]]:
@@ -86,6 +88,17 @@ def collect(
                 files.append(str(Path(_PDF_BASE) / "knowledge" / str(r["p"])))
         except Exception:  # noqa: BLE001
             logger.warning("[purge-files] knowledge_documents 收集失败", exc_info=True)
+        # VAT 对账上传的 Excel:excel_path 是绝对路径。
+        try:
+            for r in _rows(
+                cur,
+                "SELECT excel_path AS p FROM vat_recon_tasks WHERE workspace_client_id = %s "
+                "AND excel_path IS NOT NULL AND excel_path <> ''",
+                (ws_id,),
+            ):
+                files.append(str(r["p"]))
+        except Exception:  # noqa: BLE001
+            logger.warning("[purge-files] vat_recon_tasks 收集失败", exc_info=True)
         # 采购附件:generated=TRUE 是虚 URL(没有实体文件),不收。
         try:
             for r in _rows(
@@ -126,18 +139,25 @@ def collect(
 
 
 # 允许动的根:库里存的字符串不当可信输入,越出这几个根一律不碰。
-_ALLOWED_ROOTS = (_PDF_BASE, _WORKORDER_BASE, _IMAGE_BASE)
+# 模块加载时解析一次 —— 原来每判一个路径就把三个根重解析一遍(N 个文件 = 3N 次 syscall)。
+_ALLOWED_ROOTS = (_PDF_BASE, _WORKORDER_BASE, _IMAGE_BASE, _VAT_EXCEL_BASE)
+
+
+def _resolved_roots() -> Tuple[Path, ...]:
+    out = []
+    for root in _ALLOWED_ROOTS:
+        try:
+            out.append(Path(root).resolve())
+        except OSError:
+            continue
+    return tuple(out)
+
+
+_ROOTS = _resolved_roots()
 
 
 def _inside_allowed_root(p: Path) -> bool:
-    for root in _ALLOWED_ROOTS:
-        try:
-            r = Path(root).resolve()
-        except OSError:
-            continue
-        if p == r or r in p.parents:
-            return True
-    return False
+    return any(p == r or r in p.parents for r in _ROOTS)
 
 
 def purge(targets: Dict[str, List[str]]) -> int:
@@ -164,7 +184,10 @@ def purge(targets: Dict[str, List[str]]) -> int:
                 logger.warning(f"[purge-files] 目录越界,跳过: {raw}")
                 continue
             if d.is_dir():
-                removed += sum(1 for _ in d.rglob("*") if _.is_file())
+                # 一次 os.walk 边数边删:原来 rglob 数一遍(每项一次 stat)再 rmtree 走一遍,
+                # 同一棵树遍历两次;线上工单目录曾有 1.4G,不值当。
+                for root, _dirs, names in os.walk(d, topdown=False):
+                    removed += len(names)
                 shutil.rmtree(d)
         except Exception:  # noqa: BLE001
             logger.warning(f"[purge-files] 删目录失败: {raw}", exc_info=True)

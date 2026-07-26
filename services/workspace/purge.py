@@ -31,21 +31,27 @@ _KEEP_COLUMNS = frozenset({"id", "tenant_id", "user_id", "name", "tax_id"})
 # pearnly_app 上,这几个视图返回 0 行 → 子表清单为空 → 一张子表没删 → 父表 work_orders
 # 被 RESTRICT 外键挡住 → 报「清除完毕」但工单/审核/交付包/报表原样还在。
 # 本地验收连的是属主账号,视图正常,所以没照出来。pg_catalog 不挑权限,两边一致。
-_SCOPE_TABLES_SQL = """
+_TABLES_WITH_COLUMN_SQL = """
     SELECT c.relname AS table_name
     FROM pg_attribute a
     JOIN pg_class c ON c.oid = a.attrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relkind = 'r'
-      AND a.attname = 'workspace_client_id' AND a.attnum > 0 AND NOT a.attisdropped
+      AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped
     ORDER BY c.relname
 """
+_SCOPE_TABLES_SQL = _TABLES_WITH_COLUMN_SQL.replace("%s", "'workspace_client_id'")
+
+
+def tables_with_column(cur, column: str) -> List[str]:
+    """public 下带某列的表。一条查回来 —— 逐表问「有没有这列」是 73 次往返换一张表。"""
+    cur.execute(_TABLES_WITH_COLUMN_SQL, (column,))
+    return [r["table_name"] for r in cur.fetchall()]
 
 
 def scope_tables(cur) -> List[str]:
     """所有带 workspace_client_id 的表(= 直接归属某个账套的数据)。"""
-    cur.execute(_SCOPE_TABLES_SQL)
-    return [r["table_name"] for r in cur.fetchall()]
+    return tables_with_column(cur, "workspace_client_id")
 
 
 def child_edges(cur) -> List[Dict[str, str]]:
@@ -76,17 +82,20 @@ def child_edges(cur) -> List[Dict[str, str]]:
     return [dict(r) for r in cur.fetchall()]
 
 
+# ⚠️ 按期清能碰哪些表,只能白名单,不能按「有没有 period 列」嗅 —— 列名一样不代表
+# 说的是同一件事。生产实测:work_orders/client_period_obligations 是佛历(2569-07),
+# journal_vouchers/tax_filings 是公历(2026-07),document_number_sequences 是公历年月桶
+# 且它是发票号计数器(删了号会跳,泰国税票号不许跳,见 alembic 0006_sales_core)。
+# 拿佛历期去删公历表 = 删 0 行还报成功,正是本模块要根治的静默漏删;拿它去删计数器
+# 则是踩法律红线。宁可少删并如实说明,不可乱删。
+# 新增带 period 的表要进来,先确认它的 period 与 work_orders 同一套词汇。
+_PERIOD_TABLES_BE = ("work_orders", "client_period_obligations", "client_payroll_rows")
+
+
 def _period_tables(cur, tables: List[str]) -> List[str]:
-    """账套级表里带 period 列的那几张(生产上 73 张里只有 9 张)。"""
-    cur.execute(
-        "SELECT c.relname AS t FROM pg_attribute a "
-        "JOIN pg_class c ON c.oid = a.attrelid "
-        "JOIN pg_namespace n ON n.oid = c.relnamespace "
-        "WHERE n.nspname = 'public' AND c.relkind = 'r' AND a.attname = 'period' "
-        "AND a.attnum > 0 AND NOT a.attisdropped"
-    )
-    have = {r["t"] for r in cur.fetchall()}
-    return [t for t in tables if t in have]
+    """按期清覆盖的表:与 work_orders 同一套佛历账期词汇的那几张(白名单,见上注)。"""
+    have = set(tables_with_column(cur, "period")) & set(tables)
+    return [t for t in _PERIOD_TABLES_BE if t in have]
 
 
 def periods_with_data(cur, ws_id: int) -> List[Dict[str, Any]]:
@@ -127,18 +136,6 @@ def verify_empty(cur, ws_id: int) -> List[Dict[str, Any]]:
     return left
 
 
-def _has_tenant_column(cur, table: str) -> bool:
-    cur.execute(
-        "SELECT 1 FROM pg_attribute a "
-        "JOIN pg_class c ON c.oid = a.attrelid "
-        "JOIN pg_namespace n ON n.oid = c.relnamespace "
-        "WHERE n.nspname = 'public' AND c.relname = %s "
-        "AND a.attname = 'tenant_id' AND a.attnum > 0 AND NOT a.attisdropped",
-        (table,),
-    )
-    return cur.fetchone() is not None
-
-
 def _delete_child(cur, edge: Dict[str, str], ws_id: int) -> int:
     cur.execute(
         f"DELETE FROM {edge['child']} WHERE {edge['child_col']} IN "  # noqa: S608 — 标识符来自 information_schema
@@ -149,16 +146,10 @@ def _delete_child(cur, edge: Dict[str, str], ws_id: int) -> int:
 
 
 def _delete_scope(cur, table: str, ws_id: int, tenant_id: Optional[str], scoped: bool) -> int:
-    if scoped:
-        cur.execute(
-            f"DELETE FROM {table} WHERE workspace_client_id = %s AND tenant_id = %s",  # noqa: S608
-            (ws_id, tenant_id),
-        )
-    else:
-        cur.execute(
-            f"DELETE FROM {table} WHERE workspace_client_id = %s",  # noqa: S608
-            (ws_id,),
-        )
+    """应用层 WHERE 是主隔离;表上有 tenant_id 就再叠一层(RLS 是第二道)。"""
+    where = "workspace_client_id = %s" + (" AND tenant_id = %s" if scoped else "")
+    params = (ws_id, tenant_id) if scoped else (ws_id,)
+    cur.execute(f"DELETE FROM {table} WHERE {where}", params)  # noqa: S608 — 标识符来自 pg_catalog
     return cur.rowcount or 0
 
 
@@ -178,12 +169,16 @@ def _try_delete(cur, key: str, run) -> Tuple[bool, int]:
 
 def _reset_subject_row(cur, ws_id: int, tenant_id: Optional[str]) -> None:
     """主体行只留名称与税号,其余可空业务列清掉(结构列与 NOT NULL 列不动)。"""
+    # 同顶注:走 pg_catalog 不走 information_schema —— 后者按权限过滤,最小权限角色下
+    # 可能返回空,那样这行就「清了个寂寞」还一声不吭。
     cur.execute(
-        "SELECT column_name FROM information_schema.columns "
-        "WHERE table_schema = 'public' AND table_name = 'workspace_clients' "
-        "AND is_nullable = 'YES'"
+        "SELECT a.attname AS c FROM pg_attribute a "
+        "JOIN pg_class t ON t.oid = a.attrelid "
+        "JOIN pg_namespace n ON n.oid = t.relnamespace "
+        "WHERE n.nspname = 'public' AND t.relname = 'workspace_clients' "
+        "AND a.attnum > 0 AND NOT a.attisdropped AND NOT a.attnotnull"
     )
-    cols = [r["column_name"] for r in cur.fetchall() if r["column_name"] not in _KEEP_COLUMNS]
+    cols = [r["c"] for r in cur.fetchall() if r["c"] not in _KEEP_COLUMNS]
     if not cols:
         return
     sets = ", ".join(f"{c} = NULL" for c in cols)
@@ -231,11 +226,15 @@ def _period_pending(cur, ws_id: int, period: str, scope: Dict[str, List[str]]) -
                 (
                     "child",
                     edge["child"],
-                    lambda e=edge: _delete_by_ids(cur, e["child"], e["child_col"], wo_ids),
+                    lambda e=edge: _delete_by_ids(cur, e["child"], e["child_col"], wo_ids, ws_id),
                 )
             )
         items.append(
-            ("table", "work_orders", lambda: _delete_by_ids(cur, "work_orders", "id", wo_ids))
+            (
+                "table",
+                "work_orders",
+                lambda: _delete_by_ids(cur, "work_orders", "id", wo_ids, ws_id),
+            )
         )
     if hist_ids:
         for edge in child_edges(cur):
@@ -245,11 +244,15 @@ def _period_pending(cur, ws_id: int, period: str, scope: Dict[str, List[str]]) -
                 (
                     "child",
                     edge["child"],
-                    lambda e=edge: _delete_by_ids(cur, e["child"], e["child_col"], hist_ids),
+                    lambda e=edge: _delete_by_ids(cur, e["child"], e["child_col"], hist_ids, ws_id),
                 )
             )
         items.append(
-            ("table", "ocr_history", lambda: _delete_by_ids(cur, "ocr_history", "id", hist_ids))
+            (
+                "table",
+                "ocr_history",
+                lambda: _delete_by_ids(cur, "ocr_history", "id", hist_ids, ws_id),
+            )
         )
     for table in _period_tables(cur, scope_tables(cur)):
         if table == "work_orders":
@@ -260,13 +263,25 @@ def _period_pending(cur, ws_id: int, period: str, scope: Dict[str, List[str]]) -
     return items
 
 
-def _delete_by_ids(cur, table: str, column: str, ids: List[str]) -> int:
+def _delete_by_ids(cur, table: str, column: str, ids: List[str], ws_id: Optional[int]) -> int:
+    """按 id 列表删。表上有 workspace_client_id 就再叠一层 —— 模块的硬规矩是每条 DELETE
+    都带账套隔离,不能因为「id 是从受限查询里来的」就省掉(调用序不是隔离)。"""
     if not ids:
         return 0
-    cur.execute(
-        f"DELETE FROM {table} WHERE {column}::text = ANY(%s)",  # noqa: S608 — 标识符来自 pg_catalog
-        (ids,),
-    )
+    where = f"{column} = ANY(%s::uuid[])"
+    params: tuple = (ids,)
+    if ws_id is not None and column != "workspace_client_id":
+        cur.execute(
+            "SELECT 1 FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' "
+            "AND c.relname = %s AND a.attname = 'workspace_client_id' "
+            "AND a.attnum > 0 AND NOT a.attisdropped",
+            (table,),
+        )
+        if cur.fetchone():
+            where += " AND workspace_client_id = %s"
+            params = (ids, ws_id)
+    cur.execute(f"DELETE FROM {table} WHERE {where}", params)  # noqa: S608 — 标识符来自 pg_catalog
     return cur.rowcount or 0
 
 
@@ -290,7 +305,7 @@ def verify_period_empty(cur, ws_id: int, period: str, scope: Dict[str, List[str]
         left.append({"table": "work_orders", "rows": n})
     if scope["ocr_history_ids"]:
         cur.execute(
-            "SELECT count(*) AS n FROM ocr_history WHERE id::text = ANY(%s)",
+            "SELECT count(*) AS n FROM ocr_history WHERE id = ANY(%s::uuid[])",
             (scope["ocr_history_ids"],),
         )
         n = int((cur.fetchone() or {}).get("n") or 0)
@@ -307,6 +322,22 @@ def verify_period_empty(cur, ws_id: int, period: str, scope: Dict[str, List[str]
         n = int((cur.fetchone() or {}).get("n") or 0)
         if n:
             left.append({"table": table, "rows": n})
+    # 子表也要回数:整套账清那条已经逐张子表数了,按期这条原先一张不数 —— 而"子表全没删"
+    # 正是本模块要根治的事故形状,在按期路径上不能是结构性看不见的。
+    for edge in child_edges(cur):
+        if edge["parent"] not in ("work_orders", "ocr_history"):
+            continue
+        ids = scope["work_order_ids" if edge["parent"] == "work_orders" else "ocr_history_ids"]
+        if not ids:
+            continue
+        cur.execute(
+            f"SELECT count(*) AS n FROM {edge['child']} "  # noqa: S608
+            f"WHERE {edge['child_col']} = ANY(%s::uuid[])",
+            (ids,),
+        )
+        n = int((cur.fetchone() or {}).get("n") or 0)
+        if n:
+            left.append({"table": edge["child"], "rows": n})
     return left
 
 
@@ -333,7 +364,7 @@ def purge(
 
     # 子表与账套级表进同一个重试轮:子表原本只跑一轮,顺序不对或一次失败就永久漏掉
     # (2026-07-26 线上正是子表全漏)。子表排前面 —— RESTRICT 外键要求先清子再清父。
-    scoped = {t: _has_tenant_column(cur, t) for t in tables}
+    scoped = set(tables_with_column(cur, "tenant_id"))
     pending: List[Tuple[str, str, Any]] = [("child", e["child"], e) for e in edges] + [
         ("table", t, t) for t in tables
     ]
@@ -348,7 +379,7 @@ def purge(
                 ok, n = _try_delete(
                     cur,
                     label,
-                    lambda t=target: _delete_scope(cur, t, ws_id, tenant_id, scoped[t]),
+                    lambda t=target: _delete_scope(cur, t, ws_id, tenant_id, t in scoped),
                 )
             if not ok:
                 stuck.append((kind, label, target))

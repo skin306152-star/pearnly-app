@@ -12,7 +12,7 @@
     {
       "id": "stuck",
       "title": { "zh": "推不进去怎么办", "th": "เมื่อส่งเข้า Express ไม่สำเร็จ" },
-      "planned": 42
+      "planned": 41
     },
     {
       "id": "maintain",

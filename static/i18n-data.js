@@ -2547,6 +2547,11 @@ window.I18N = {
         'erp-reason-customer-dup': '疑似与已有客户重复 · 已暂停建档,请人工确认是新建还是选用已有客户',
         'erp-reason-direction-not-enabled': '本连接未开启这个方向(进项/销项)的推送',
         'erp-reason-low-confidence': '识别置信度低 · 待人工核对',
+        'erp-reason-posting-review': '这批票没指定「过账去向」· 在录入工作台上传页右侧「过账去向 · 本批」选「库存」或「服务·非库存」后重新识别推送',
+        'erp-reason-posting-review-perpetual':
+            '这批票没指定「过账去向」,而这个账套在用真实进销存 · 按非库存落会与既有存货账重复计成本,系统不替你决定 · 请在录入工作台上传页右侧「过账去向 · 本批」选好再推',
+        'erp-reason-posting-review-mixed':
+            '这批票没指定「过账去向」,而这个账套库存与非库存两种都在用 · 系统定不了这批该走哪种 · 请在录入工作台上传页右侧「过账去向 · 本批」选好再推',
         'erp-reason-enqueue-error': '入队时出错 · 请稍后重试',
         'erp-reason-currency': '外币票(非泰铢)· 不能当泰铢入账,需人工核对币种与折算',
         'erp-reason-same-tax': '买卖方税号相同 · 票面异常(自己卖给自己),需人工复核',
@@ -2761,7 +2766,7 @@ window.I18N = {
         'dxi-target-staged-only': '仅入库',
         'dxi-target-export-push': '导出 + 推送',
         'dxi-submit-finish-only': '完成',
-        'dxi-submit-hint': '执行后可在「识别记录」与「集成 → 推送日志」中查看结果',
+        'dxi-submit-hint': '执行后可在左侧「识别记录」与「推送日志」中查看结果',
         'dxi-submit-back': '返回检查',
         'dxi-submit-go': '执行导出 / 推送',
         'dxi-need-output': '请至少选择一种输出方式',
@@ -7627,6 +7632,12 @@ window.I18N = {
         'erp-reason-customer-dup': 'Possible duplicate of an existing customer - paused; confirm whether to create a new one or use the existing',
         'erp-reason-direction-not-enabled': 'This connection does not handle this direction (purchase/sales)',
         'erp-reason-low-confidence': 'Low recognition confidence · pending manual review',
+        'erp-reason-posting-review':
+            'No posting target was set for this batch · set "Posting target · this batch" on the right of the upload page, then scan and push again',
+        'erp-reason-posting-review-perpetual':
+            'No posting target was set for this batch, and this account set runs real inventory · booking it as non-stock would double-count cost against the existing stock ledger, so the system did not decide for you · set "Posting target · this batch" on the upload page before pushing',
+        'erp-reason-posting-review-mixed':
+            'No posting target was set for this batch, and this account set uses both stock and non-stock treatment · the system cannot tell which one applies · set "Posting target · this batch" on the upload page before pushing',
         'erp-reason-enqueue-error': 'Error while queuing · please retry shortly',
         'erp-reason-currency': 'Foreign-currency invoice (not THB) — must not post as baht; review currency manually',
         'erp-reason-same-tax': 'Seller and buyer share the same tax ID — abnormal document; review manually',
@@ -7841,7 +7852,7 @@ window.I18N = {
         'dxi-target-staged-only': 'Records only',
         'dxi-target-export-push': 'Export + Push',
         'dxi-submit-finish-only': 'Done',
-        'dxi-submit-hint': 'Afterwards you can check results in Records and Integrations → push log',
+        'dxi-submit-hint': 'Afterwards you can check results in Scan Records and Push Logs on the left',
         'dxi-submit-back': 'Back to review',
         'dxi-submit-go': 'Run export / push',
         'dxi-need-output': 'Choose at least one output',
@@ -12692,6 +12703,12 @@ window.I18N = {
         'erp-reason-customer-dup': 'อาจซ้ำกับลูกค้าที่มีอยู่ · หยุดสร้างไว้ก่อน กรุณายืนยันว่าจะสร้างใหม่หรือใช้รายเดิม',
         'erp-reason-direction-not-enabled': 'การเชื่อมต่อนี้ไม่รองรับทิศทางนี้ (ซื้อ/ขาย)',
         'erp-reason-low-confidence': 'ความมั่นใจในการอ่านต่ำ · รอตรวจสอบโดยเจ้าหน้าที่',
+        'erp-reason-posting-review':
+            'ชุดนี้ยังไม่ได้ระบุ「การลงบัญชี · ชุดนี้」· กรุณาเลือก สินค้า (คงคลัง) หรือ บริการ · ไม่ใช่สินค้าคงคลัง ที่แถบด้านขวาของหน้าอัปโหลด แล้วอ่านและส่งใหม่',
+        'erp-reason-posting-review-perpetual':
+            'ชุดนี้ยังไม่ได้ระบุ「การลงบัญชี · ชุดนี้」 และชุดบัญชีนี้ใช้ระบบสินค้าคงคลังจริง · หากลงแบบไม่ใช่สินค้าคงคลังจะคิดต้นทุนซ้ำกับบัญชีสินค้าเดิม ระบบจึงไม่ตัดสินแทน · กรุณาระบุที่แถบด้านขวาของหน้าอัปโหลดก่อนส่ง',
+        'erp-reason-posting-review-mixed':
+            'ชุดนี้ยังไม่ได้ระบุ「การลงบัญชี · ชุดนี้」 และชุดบัญชีนี้ใช้ทั้งแบบสินค้าคงคลังและไม่ใช่สินค้าคงคลัง · ระบบจึงตัดสินแทนไม่ได้ · กรุณาระบุที่แถบด้านขวาของหน้าอัปโหลดก่อนส่ง',
         'erp-reason-enqueue-error': 'เกิดข้อผิดพลาดขณะเข้าคิว · โปรดลองใหม่ภายหลัง',
         'erp-reason-currency': 'ใบกำกับสกุลเงินต่างประเทศ (ไม่ใช่บาท) · ห้ามลงเป็นบาท ต้องตรวจสกุลเงินเอง',
         'erp-reason-same-tax': 'เลขผู้เสียภาษีผู้ขายกับผู้ซื้อเป็นเลขเดียวกัน · เอกสารผิดปกติ ต้องตรวจสอบเอง',
@@ -12906,7 +12923,7 @@ window.I18N = {
         'dxi-target-staged-only': 'บันทึกเท่านั้น',
         'dxi-target-export-push': 'ส่งออก + ส่ง',
         'dxi-submit-finish-only': 'เสร็จสิ้น',
-        'dxi-submit-hint': 'หลังทำเสร็จดูผลได้ที่บันทึก และศูนย์เชื่อมต่อ → บันทึกการส่ง',
+        'dxi-submit-hint': 'หลังทำเสร็จดูผลได้ที่ บันทึกการสแกน และ บันทึกการส่ง ในเมนูด้านซ้าย',
         'dxi-submit-back': 'กลับไปตรวจ',
         'dxi-submit-go': 'ดำเนินการส่งออก / ส่ง',
         'dxi-need-output': 'เลือกวิธีส่งออกอย่างน้อยหนึ่งอย่าง',
@@ -17749,6 +17766,12 @@ window.I18N = {
         'erp-reason-customer-dup': '既存の得意先と重複の可能性 · 作成を一時停止しました。新規作成か既存利用かご確認ください',
         'erp-reason-direction-not-enabled': 'この連携はこの方向(仕入/売上)を扱いません',
         'erp-reason-low-confidence': '認識の信頼度が低めです · 手動確認待ち',
+        'erp-reason-posting-review':
+            'このバッチは「計上先 · このバッチ」が未指定です · アップロード画面右側で在庫またはサービス・非在庫を選び、読み取りから送信し直してください',
+        'erp-reason-posting-review-perpetual':
+            'このバッチは「計上先 · このバッチ」が未指定で、この会計セットは実在庫を運用しています · 非在庫として記帳すると既存の在庫元帳と原価が二重計上されるため、システムは判断を保留しました · アップロード画面右側で指定してから送信してください',
+        'erp-reason-posting-review-mixed':
+            'このバッチは「計上先 · このバッチ」が未指定で、この会計セットは在庫と非在庫の両方を使っているため判断できません · アップロード画面右側で指定してから送信してください',
         'erp-reason-enqueue-error': 'キュー登録時にエラー · しばらくして再試行してください',
         'erp-reason-currency': '外貨建て請求書(タイバーツ以外)· バーツとして計上不可、通貨を手動で確認',
         'erp-reason-same-tax': '売り手と買い手の納税者番号が同一 · 伝票異常のため手動確認',
@@ -17963,7 +17986,7 @@ window.I18N = {
         'dxi-target-staged-only': '記録のみ',
         'dxi-target-export-push': 'エクスポート + 送信',
         'dxi-submit-finish-only': '完了',
-        'dxi-submit-hint': '実行後は記録と連携センター → 送信ログで結果を確認できます',
+        'dxi-submit-hint': '実行後は左メニューの読取記録と送信ログで結果を確認できます',
         'dxi-submit-back': '確認に戻る',
         'dxi-submit-go': '出力 / 送信を実行',
         'dxi-need-output': '出力方法を1つ以上選択してください',

@@ -15,6 +15,7 @@ CI 无凭据时那条会跳过,故这里用源码级断言兜底。
 
 from __future__ import annotations
 
+import json
 import os
 import unittest
 from pathlib import Path
@@ -125,6 +126,14 @@ class GuideChapterRemovedTests(unittest.TestCase):
             shot = PROJECT_ROOT / f"static/guide/shots/stuck-03-exceptions.{lang}.png"
             self.assertFalse(shot.exists(), f"{shot.name} 又回来了")
         self.assertFalse("stuck-03-exceptions" in _read("scripts/_guide_shots_list.cjs"))
+
+    def test_planned_count_followed_the_deletion(self):
+        """删章要同步 index.json 的 planned:手册首页显示 done/planned,还会按差值渲染
+        一条「即将推出」占位 —— 少减一下,这篇就永远像缺一章没写完。"""
+        index = json.loads(_read("static/guide/content/index.json"))
+        stuck_planned = next(s for s in index["sections"] if s["id"] == "stuck")["planned"]
+        actual = len(json.loads(_read("static/guide/content/stuck.json"))["chapters"])
+        self.assertEqual(stuck_planned, actual, "stuck 篇 planned 与实际章数对不上")
 
 
 if __name__ == "__main__":

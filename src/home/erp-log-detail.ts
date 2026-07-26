@@ -215,8 +215,18 @@ async function showLogDetail(logId: any) {
             const _efLang =
                 (typeof currentLang === 'string' && currentLang) || window._currentLang || 'th';
             const _ef = log.error_friendly && log.error_friendly[_efLang];
+            // 后端 catalog 只覆盖 ERR_* 码;Express 转人工码(EXPRESS_MANUAL:*)的人话在
+            // erp-log-card 那份表里,不接就跟列表卡不一致——详情反而裸露原始码。
+            const _xr = (
+                window as unknown as {
+                    _expressFriendlyReason?: (raw: string, log?: unknown) => string;
+                }
+            )._expressFriendlyReason;
+            const _express = typeof _xr === 'function' ? _xr(log.error_msg || '', log) : '';
             const friendly =
-                _ef || (log.error_msg ? humanizeError(log.error_msg) : t('erp-receipt-no-error'));
+                _ef ||
+                _express ||
+                (log.error_msg ? humanizeError(log.error_msg) : t('erp-receipt-no-error'));
             const isMappingErr =
                 /ERR_NO_CUSTOMER_MAPPING|ERR_NO_CLIENT|ERR_NO_SEED_CUSTOMER|ERR_NO_SEED_PRODUCT|ERR_PRODUCT_NAME_MISMATCH|ERR_CUSTOMER_NAME_MISMATCH/.test(
                     log.error_msg || ''

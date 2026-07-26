@@ -63,9 +63,20 @@ const _AGENT_REASON_I18N: Record<string, string> = {
     PRIOR_DOC_STILL_IN_ERP: 'erp-reason-prior-doc',
 };
 
+// 过账去向留人工(raw 形如 "EXPRESS_MANUAL: posting_needs_review:perpetual")· 冒号后是这家
+// 账套的客观库存用法,它决定该跟会计说哪一句,所以按后缀分文案,取不到后缀回落通用句。
+const _POSTING_REVIEW_I18N: Record<string, string> = {
+    perpetual: 'erp-reason-posting-review-perpetual',
+    mixed: 'erp-reason-posting-review-mixed',
+};
+
 function _expressFriendlyReason(raw: string, log?: any): string {
     // raw 形如 "EXPRESS_MANUAL: no_revenue_account" 或 "account_set_not_allowed:DATAT"
     const code = extractReasonCode(raw);
+    if (code === 'posting_needs_review') {
+        const usage = raw.split(':').pop()!.trim();
+        return t(_POSTING_REVIEW_I18N[usage] || 'erp-reason-posting-review');
+    }
     if (_AGENT_REASON_I18N[code]) {
         const text = t(_AGENT_REASON_I18N[code]);
         // 单据号从后端派生的结构化字段取(载荷里的 prior_docnum),不从错误串抠。

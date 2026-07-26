@@ -444,7 +444,9 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     if (hit('dx-inv-sub-back')) return (renderReview(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
     if (hit('dx-inv-view-rec')) return (go('history'), true);
-    if (hit('dx-inv-view-push')) return (go('integrations'), true);
+    // 推送日志早已从集成页拆成独立页(nav「Pearnly Cowork → 推送日志」),这里一直还在
+    // 往集成页跳 —— 点了看不到日志。
+    if (hit('dx-inv-view-push')) return (go('push-logs'), true);
     if (hit('dx-inv-new')) {
         resetInvoice();
         renderInvoiceUpload();

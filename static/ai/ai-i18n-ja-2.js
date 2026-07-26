@@ -218,8 +218,6 @@ Object.assign(window.__AI_I18N_JA__, {
     err_workspace_thai_name_required:
         'タイ語の登録名を入力してください(税番号の読み取りミス時の代替として使用します)',
     err_workspace_tax_id_duplicate: 'この税番号は同じテナント内の別の顧客で既に使用されています',
-    err_pos_workspace_single_store:
-        'このアカウントは1店舗に限定されています。追加は管理者にお問い合わせください',
     client_view_archive_btn: '顧客プロフィールを見る',
     ca_open_order_btn: '当期のワークオーダーを開く',
     ca_profile_cta_chip: '未着手',

@@ -220,8 +220,6 @@ Object.assign(window.__AI_I18N_EN__, {
         'Please enter the Thai registered name (used as a fallback when the tax ID is misread)',
     err_workspace_tax_id_duplicate:
         'This tax ID is already used by another client in this workspace',
-    err_pos_workspace_single_store:
-        'This account is limited to one store — contact your administrator to add more',
     client_view_archive_btn: 'View client profile',
     ca_open_order_btn: 'Open current work order',
     ca_profile_cta_chip: 'Not started',

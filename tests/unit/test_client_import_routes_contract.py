@@ -73,15 +73,17 @@ class SharedValidationPathTests(unittest.TestCase):
         self.assertEqual(out["status"], "error")
         self.assertEqual(out["reason"], "workspace.thai_name_required")
 
-    def test_pos_single_store_gate_maps_to_error(self):
+    def test_dict_detail_without_code_falls_back_to_generic_reason(self):
+        """detail 是 dict 但没带 code(上游契约漂移)→ 必须落 err_generic,不能把 None
+        当 reason 漏给前端:前端按 reason 映射四语,None 会退化成空文案。"""
         row = r.ClientImportRow(row_index=4, name="ACME Co Ltd")
         with mock.patch(
             "routes.client_import_routes._create_validated_client",
-            side_effect=HTTPException(403, detail="pos.workspace_single_store"),
+            side_effect=HTTPException(422, detail={"message": {"zh": "说不清的失败"}}),
         ):
             out = r._judge_row(row, {"id": "u1"}, "tenant-1", dry_run=False)
         self.assertEqual(out["status"], "error")
-        self.assertEqual(out["reason"], "pos.workspace_single_store")
+        self.assertEqual(out["reason"], "client_import.err_generic")
 
     def test_missing_name_short_circuits_before_shared_creator(self):
         # 结构性错误(缺 name)在本模块自己拦,压根不该打共享校验体一次往返。

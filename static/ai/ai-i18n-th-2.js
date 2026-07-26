@@ -214,7 +214,6 @@ Object.assign(window.__AI_I18N_TH__, {
     err_workspace_thai_name_required:
         'กรุณากรอกชื่อจดทะเบียนภาษาไทย (ใช้เป็นตัวสำรองเมื่ออ่านเลขผู้เสียภาษีผิด)',
     err_workspace_tax_id_duplicate: 'เลขผู้เสียภาษีนี้ถูกใช้กับลูกค้ารายอื่นในบัญชีนี้แล้ว',
-    err_pos_workspace_single_store: 'บัญชีนี้จำกัดไว้ที่ 1 ร้านค้า ติดต่อผู้ดูแลระบบเพื่อเพิ่ม',
     client_view_archive_btn: 'ดูโปรไฟล์ลูกค้า',
     ca_open_order_btn: 'เปิดใบงานงวดปัจจุบัน',
     ca_profile_cta_chip: 'ยังไม่เริ่ม',

@@ -3,7 +3,7 @@
 
 命门:commit 逐行走与单个建档(POST /api/workspace/clients)**同一段**校验/创建代码
 ——调用 routes.workspace_routes._create_validated_client(dry_run=...),不重造第二套
-校验实现,M1 泰文名闸 / 税号查重 / pos_only 一号一店闸对导入行同样逐行如实生效。
+校验实现,M1 泰文名闸 / 税号查重对导入行同样逐行如实生效。
 
 解析 + 表头猜测在 services/workspace/client_import.py(纯函数,零 DB 依赖);本文件
 只管上传 → 薄层编排(结构校验 → 共享校验体)→ 落库。上传内容全程内存,不落盘。
@@ -45,7 +45,7 @@ def _judge_row(
     """单行判定:结构校验 → 共享校验体(dry_run 时只判不写)。
 
     三态:valid(预览将建)/created(已建)、skip(税号已存在)、error(缺 name/税号格式错/
-    泰文名闸不过/pos_only 一号一店闸/其它)——逐行给 reason(前端映射四语文案)。结果
+    泰文名闸不过/其它)——逐行给 reason(前端映射四语文案)。结果
     始终回显 name/tax_id(前端预览表要展示这两列,报错行也要能看出是哪一行)。
     """
     name = (row.name or "").strip()

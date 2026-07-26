@@ -199,7 +199,6 @@ Object.assign(window.__AI_I18N_ZH__, {
     clients_new_tax_use_result_btn: '使用该名称',
     err_workspace_thai_name_required: '请填写泰文注册名（税号读错时用它兜底认账套）',
     err_workspace_tax_id_duplicate: '该税号已被本租户其它客户使用',
-    err_pos_workspace_single_store: '该账号限一店，增开需联系管理员',
     client_view_archive_btn: '查看客户档案',
     ca_open_order_btn: '打开当期工单',
     ca_profile_cta_chip: '未开始',

@@ -26,7 +26,6 @@ from core.auth import get_current_user_from_request
 from core.feature_flags import pearnly_ai_m1_enabled_for
 from core.route_helpers import _tid, _log_op
 from services.authz.deps import actor_has_perm, get_authz, require_perm
-from services.modules.store import get_business_type
 from services.workspace import thai_name_gate
 
 router = APIRouter()
@@ -153,29 +152,6 @@ async def workspace_tax_lookup(tax_id: str, request: Request, branch: int = 0):
     return {"ok": True, "data": data, "cached": bool(result.get("cached"))}
 
 
-def _pos_single_store_blocked(tenant_id: Optional[str]) -> bool:
-    """pos_only 且该租户已有 ≥1 个套账 → True(阻止再建)。
-
-    非 pos_only(含 firm)恒 False——判据显式限定 business_type == "pos_only",
-    firm/未选业态/其它租户零影响。无 tenant_id(未建档主体)也恒 False,不碰 DB。
-
-    ⚠️ 与 services/pos/entitlements.py 的 pos_entitlements.store_limit 是两套独立机制,
-    这里硬编码 >=1,不读 store_limit——Zihao 拍板「一号一店」是固定业务规则(2026-07-12),
-    不是「额度内可多店」的软上限。若未来 grant API 开放 store_limit>1(目前无入口暴露),
-    此闸仍会卡死第 2 家,须显式改这里,不会自动跟着额度联动。
-    """
-    if not tenant_id:
-        return False
-    with db.get_cursor_rls(tenant_id=tenant_id) as cur:
-        if get_business_type(cur, tenant_id=tenant_id) != "pos_only":
-            return False
-        cur.execute(
-            "SELECT count(*) AS n FROM workspace_clients WHERE tenant_id = %s",
-            (tenant_id,),
-        )
-        return int((cur.fetchone() or {}).get("n") or 0) >= 1
-
-
 def _create_validated_client(
     req: WorkspaceClientCreate, user: dict, tenant_id: Optional[str], *, dry_run: bool = False
 ) -> Optional[int]:
@@ -186,11 +162,10 @@ def _create_validated_client(
     dry_run=True 只跑校验、不落库(导入「预览」复用同一判定口径,零副作用)——
     校验全过时返回 None(无 id 可给,调用方按"未抛异常"判 valid)。
     """
-    # POS 一号一店(Zihao 2026-07-12 拍板):pos_only 已有套账 → 禁止再建(照本文件既有
-    # 错误抛法 · HTTPException+detail code · 与下方 tax_id_duplicate 同款,前端 apiClient
-    # 读 err.detail 映射四语,不用 PosError 信封)。
-    if _pos_single_store_blocked(tenant_id):
-        raise HTTPException(403, detail="pos.workspace_single_store")
+    # 「一号一店」于 2026-07-26 撤销(Zihao 拍板 · 原规则立于 2026-07-12):账套主体数量
+    # 不再设任何上限,POS / AI 两侧一视同仁。POS 真正的付费额度闸在
+    # services/pos/entitlements.check_limit(门店取码路 · routes/pos_auth_routes),
+    # 与建账套主体是两回事,不受本次撤销影响。
     # M1-B2:泰文注册名必填(闸关 = 现状不变)——税号被 OCR 读花时,这是分拣方向
     # 判定唯一的名称锚兜底(见 L2-验收.md 真语料坐实)。
     if pearnly_ai_m1_enabled_for(

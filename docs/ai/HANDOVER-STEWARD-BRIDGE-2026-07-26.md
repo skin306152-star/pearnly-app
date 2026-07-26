@@ -16,7 +16,22 @@
 | B2 后端 | `services/steward/*` 六只读工具 + `routes/steward_routes.py` + 迁移 `0088` | `de908290` `a66afa9d` | 84 测绿 |
 | B2 前端 | `static/ai/ai-steward*.js/css` 命令条 + `#/steward` 双栏 | `3eaca780` | 见下,**需返工** |
 
-## 二、B2 验收揪出的三缺陷(返工队在修,被打断则重派)
+### 追加(22:5x 全部交付完成,两仓工作树干净)
+
+| 批次 | 内容 | commit |
+|---|---|---|
+| 逆向文档 | `docs/integrations/express-push/40~44` 四类单据只读逆向(收款 1077 单 / 付款 2761 单 / 手工凭证 3284 张 / 库存调整 193 张 OU+ZZ) | `5c460751` |
+| B2 返工 | 三缺陷全修 + 复验 PASS(表格反证过 · 8 个 chip 中泰全出结果 · 待审数与矩阵逐数对上);**`app.py` 499→150 行**,路由清单搬 `routes/registry.py`,639 条逐条全等 | `7fc26523` |
+| 桥兼容性 | 单 exe 绿色包 11.6MB + 首次配置向导 + 自动找账套(真机扫出 18 个数据根)+ 开机自启/计划任务;123 测绿 | companion `82a7a4f` |
+| 桥 BOM 修 | 手填 config.json 带 BOM 起不来 → 改收 utf-8-sig(+反证测试),124 测绿 | companion `50fb300` |
+
+**⚠️ 两条待办(下窗口接手先看)**
+
+1. **网络共享 22:35 起掉线且至今未恢复**:`\\192.168.0.212\pas212` 与 `\\Accserver\d$` 全部 Test-Path False。桥 P2 需要 TEST 靶场,开工前先确认共享恢复(可能是服务器关机/网络切换)。
+2. **桥兼容性验收有一条未验**:「7 套账 552 客户」因共享掉线没验成,验收代理改用本机 `D:\pearnly-erp-lab` 真账套完成(542 客户/1742 单,泰文正常)。共享恢复后补验一次。
+3. 桥 exe 当前是 3.11 构建 = **Win10+**;要覆盖 Win7 需在装 32 位 Python 3.8 的机器上跑 `build_bridge.ps1 -RequireLegacyWindows`,依赖侧已独立核实通过,PyInstaller 侧官方只承诺 Win8+,未实测。
+
+## 二、B2 验收揪出的三缺陷(已全部修复 · `7fc26523` · 复验 PASS)
 
 1. **P0 产物表格全废**:后端发 `columns:[{key,label}]`+dict 行,前端 `ai-steward-render.js:168-193` 按旧形状渲染 → 页面全是 `[object Object]`。**假绿根源**:前端 E2E 桩 `_b2m1_steward_local.spec.js:76-81` 用了产品里不存在的旧形状自证。
 2. **P1 期间词**:`services/front_desk/interpret.py:123-130` 的 `_THIS_MONTH_WORDS` 不认「本期/本月/当期/งวดนี้」→ 产品自带 4 个 chips 有 2 个停在追问。

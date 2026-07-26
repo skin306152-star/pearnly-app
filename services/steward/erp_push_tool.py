@@ -23,21 +23,19 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
-
-from fastapi import HTTPException
+from decimal import Decimal
+from typing import Optional
 
 from services.agent.contracts import ToolResult
 from services.erp.bridge import BridgeError, BridgeUnavailable
+from services.steward import tool_scope
 from services.steward.registry import ToolContext
+from services.steward.tool_scope import ERR_INVOICE_AMBIGUOUS, ERR_INVOICE_NOT_FOUND  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 ERR_ENDPOINT_MISSING = "steward.erp_endpoint_missing"
 ERR_ACCOUNT_SET_MISMATCH = "steward.account_set_mismatch"
-ERR_INVOICE_NOT_FOUND = "steward.invoice_not_found"
-ERR_INVOICE_AMBIGUOUS = "steward.invoice_ambiguous"
 ERR_INVOICE_CHANGED = "steward.invoice_changed"
 ERR_PUSH_BLOCKED = "steward.erp_push_blocked"
 ERR_BRIDGE_OFFLINE = "steward.bridge_offline"
@@ -53,8 +51,6 @@ SNAPSHOT_KEYS = ("invoice_no", "seller_name", "total_amount")
 # 授权卡上的参数行顺序(前端按键序摆行)。
 ARG_KEYS = ("account_set", "direction", "invoice_no", "seller_name", "total_amount", "history_id")
 
-_CANDIDATE_LIMIT = 5
-_SEARCH_LIMIT = 20
 # 轮询:桥端一次写活是分钟级(备份→写 DBF→重建 CDX),2 秒一拍够密。deadline 留在任务
 # 超时(registry.ERP_PUSH_TIMEOUT_S)之内,好让「还在写」由本函数如实报出来并带上 job_id
 # ——被 worker 的 wait_for 硬砍掉的话,job_id 就丢了,会计没有东西可以对账。
@@ -80,12 +76,7 @@ def _fail(code: str, **data) -> PrepareResult:
     return PrepareResult(error=ToolResult(ok=False, error_code=code, data=data))
 
 
-def _money(value: Any) -> str:
-    """金额一律 decimal 两位字符串(钱不过 float:卡上印的、比对的、审计的必须同一个值)。"""
-    try:
-        return str(Decimal(str(value if value is not None else "0")).quantize(Decimal("0.01")))
-    except (InvalidOperation, ValueError):
-        return "0.00"
+_money = tool_scope.money  # 钱不过 float:卡上印的、比对的、审计的必须同一个值
 
 
 def express_endpoint(user_id: str) -> Optional[dict]:
@@ -96,33 +87,6 @@ def express_endpoint(user_id: str) -> Optional[dict]:
         if (endpoint.get("adapter") or "").lower() == "express" and endpoint.get("enabled", True):
             return endpoint
     return None
-
-
-def _search_invoices(ctx: ToolContext, keyword: str) -> list[dict]:
-    """按关键词找票(与 history_query 同一个 DAL、同一套保留期与可见性口径)。"""
-    from core import db
-    from core.route_helpers import _check_history_access
-    from services.ocr_history import queries as history_queries
-
-    retention = _check_history_access(ctx.user)  # 套餐门:看不了识别记录的人也推不了票
-    res = history_queries.list_ocr_history(
-        user_id=ctx.user_id,
-        retention_days=retention,
-        keyword=keyword,
-        limit=_SEARCH_LIMIT,
-        tenant_id=ctx.tenant_id,
-        restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
-    )
-    return list(res.get("items") or [])
-
-
-def _candidate(row: dict) -> dict:
-    return {
-        "history_id": str(row.get("id") or ""),
-        "invoice_no": row.get("invoice_no") or "",
-        "seller_name": row.get("seller_name") or "",
-        "invoice_date": row.get("invoice_date") or "",
-    }
 
 
 def prepare(ctx: ToolContext, args: dict) -> PrepareResult:
@@ -141,27 +105,9 @@ def prepare(ctx: ToolContext, args: dict) -> PrepareResult:
         # 会计说 A、连接配的是 B:账套写错是账务事故,宁可停下问,绝不"就近"推进 B。
         return _fail(ERR_ACCOUNT_SET_MISMATCH, asked=asked, account_set=account_set)
 
-    keyword = str(args.get("keyword") or "").strip()
-    if not keyword:
-        # 空关键词会捞回"最近 20 张"——绝不在这条路上默认"就推最近那张"。
-        return _fail(ERR_INVOICE_NOT_FOUND, keyword="")
-    try:
-        hits = _search_invoices(ctx, keyword)
-    except HTTPException:
-        from services.steward.tools import ERR_HISTORY_FORBIDDEN
-
-        return _fail(ERR_HISTORY_FORBIDDEN)
-    if not hits:
-        return _fail(ERR_INVOICE_NOT_FOUND, keyword=keyword)
-    if len(hits) > 1:
-        return _fail(
-            ERR_INVOICE_AMBIGUOUS,
-            keyword=keyword,
-            candidates=[_candidate(h) for h in hits[:_CANDIDATE_LIMIT]],
-            total=len(hits),
-        )
-
-    row = hits[0]
+    row, err = tool_scope.resolve_invoice(ctx, args.get("keyword"))
+    if err:
+        return PrepareResult(error=err)
     resolved = {
         "history_id": str(row.get("id") or ""),
         "account_set": account_set,

@@ -1,0 +1,163 @@
+# -*- coding: utf-8 -*-
+"""管家工具的共用接地件:账套作用域、客户名 → 真实名录、期间缺省、金额规范化。
+
+从 tools.py 抽出来是为了让新工具模块(tools_close / tools_invoice)与原六只读共用同一份
+判据而不互相 import —— 三个模块都 import 本模块,tools.py 再把执行器汇总成闭集,没有环。
+
+四条口径收在这里,别处不许另起一份:
+  ① 作用域:allowed_client_ids=None 表示不限(老板/超管),给了集合就只看分到的账套,
+     与 /api/tax-profile/matrix 的收窄口径同源;
+  ② 客户名:必须在真实名录里命中唯一一家才作数 —— 查无/多义都退回可追问的错误,
+     挂错账套是红线;
+  ③ 票:关键词必须命中唯一一张识别记录才作数。查票的 invoice_detail 与推票的 erp_push
+     共用同一段定位 —— 同一句话在"先查清楚"和"那就推吧"两步里给出不同的候选集,会计就
+     无从下手;
+  ④ 钱:一律 decimal 两位字符串,不过 float(卡上印的、比对的、答复里说的是同一个值)。
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal, InvalidOperation
+from typing import Any, Optional
+
+from fastapi import HTTPException
+
+from services.agent.contracts import ToolResult
+from services.steward.registry import ToolContext
+
+LIST_LIMIT = 20  # 对话里回的清单只给前几条,详情去深链看
+
+INVOICE_SEARCH_LIMIT = 20
+INVOICE_CANDIDATE_LIMIT = 5
+
+ERR_CLIENT_NOT_FOUND = "steward.client_not_found"
+ERR_CLIENT_AMBIGUOUS = "steward.client_ambiguous"
+ERR_HISTORY_FORBIDDEN = "steward.history_forbidden"
+ERR_INVOICE_NOT_FOUND = "steward.invoice_not_found"
+ERR_INVOICE_AMBIGUOUS = "steward.invoice_ambiguous"
+
+
+def cursor():
+    from core import db
+
+    return db.get_cursor()
+
+
+def scope_ids(ctx: ToolContext) -> Optional[list]:
+    """账套作用域 → list(供 DAL 的 restrict_ids)· None = 不限(老板/超管)。"""
+    return None if ctx.allowed_client_ids is None else [int(i) for i in ctx.allowed_client_ids]
+
+
+def in_scope(ctx: ToolContext, client_id) -> bool:
+    return ctx.allowed_client_ids is None or int(client_id) in ctx.allowed_client_ids
+
+
+def clients(ctx: ToolContext) -> list[dict]:
+    """本租户账套主体名录(一次查询,给名字解析/列表补名共用,防 N+1)。"""
+    from services.workspace import store as ws_store
+
+    rows = ws_store.list_workspace_clients(ctx.user_id, ctx.tenant_id, restrict_ids=scope_ids(ctx))
+    return [
+        {"id": int(r["id"]), "name": r.get("name") or "", "tax_id": r.get("tax_id")} for r in rows
+    ]
+
+
+def match_clients(rows: list[dict], keyword: str) -> list[dict]:
+    """名字/税号模糊命中(精确同名优先)。纯函数,便于单测。"""
+    kw = (keyword or "").strip().lower()
+    if not kw:
+        return []
+    exact = [c for c in rows if c["name"].lower() == kw]
+    if exact:
+        return exact
+    return [
+        c for c in rows if kw in c["name"].lower() or (c.get("tax_id") and kw in str(c["tax_id"]))
+    ]
+
+
+def resolve_client(ctx: ToolContext, keyword: str) -> tuple[Optional[dict], Optional[ToolResult]]:
+    """客户名 → 真实名录里的一家。查无/多义都不猜,退回可追问的错误(挂错账套是红线)。"""
+    hits = match_clients(clients(ctx), keyword)
+    if not hits:
+        return None, ToolResult(
+            ok=False, error_code=ERR_CLIENT_NOT_FOUND, data={"keyword": keyword, "candidates": []}
+        )
+    if len(hits) > 1:
+        return None, ToolResult(
+            ok=False,
+            error_code=ERR_CLIENT_AMBIGUOUS,
+            data={"keyword": keyword, "candidates": hits[:LIST_LIMIT]},
+        )
+    return hits[0], None
+
+
+def search_invoices(ctx: ToolContext, keyword: str) -> list[dict]:
+    """按关键词找票(与 history_query 同一个 DAL、同一套保留期与可见性口径)。
+
+    套餐门在这里就把人挡住(HTTPException 上抛给调用方翻错误码):看不了识别记录的人,
+    既不该查到票的详情,也不该推得动票。
+    """
+    from core import db
+    from core.route_helpers import _check_history_access
+    from services.ocr_history import queries as history_queries
+
+    res = history_queries.list_ocr_history(
+        user_id=ctx.user_id,
+        retention_days=_check_history_access(ctx.user),
+        keyword=keyword,
+        limit=INVOICE_SEARCH_LIMIT,
+        tenant_id=ctx.tenant_id,
+        restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
+    )
+    return list(res.get("items") or [])
+
+
+def invoice_candidate(row: dict) -> dict:
+    """多义时给人挑的一行(单号 + 卖方 + 票面日期,足够认出是哪张)。"""
+    return {
+        "history_id": str(row.get("id") or ""),
+        "invoice_no": row.get("invoice_no") or "",
+        "seller_name": row.get("seller_name") or "",
+        "invoice_date": row.get("invoice_date") or "",
+    }
+
+
+def resolve_invoice(ctx: ToolContext, keyword: str) -> tuple[Optional[dict], Optional[ToolResult]]:
+    """关键词 → 识别记录里唯一一张票。空关键词也算查无:空串会捞回"最近 20 张",
+    在这条路上绝不默认"就是最近那张"。"""
+    keyword = (keyword or "").strip()
+    if not keyword:
+        return None, ToolResult(ok=False, error_code=ERR_INVOICE_NOT_FOUND, data={"keyword": ""})
+    try:
+        hits = search_invoices(ctx, keyword)
+    except HTTPException:
+        return None, ToolResult(ok=False, error_code=ERR_HISTORY_FORBIDDEN)
+    if not hits:
+        return None, ToolResult(
+            ok=False, error_code=ERR_INVOICE_NOT_FOUND, data={"keyword": keyword}
+        )
+    if len(hits) > 1:
+        return None, ToolResult(
+            ok=False,
+            error_code=ERR_INVOICE_AMBIGUOUS,
+            data={
+                "keyword": keyword,
+                "total": len(hits),
+                "candidates": [invoice_candidate(h) for h in hits[:INVOICE_CANDIDATE_LIMIT]],
+            },
+        )
+    return hits[0], None
+
+
+def period_or_current(period: Optional[str]) -> str:
+    from services.workorder import obligation_engine
+
+    return period or obligation_engine.current_be_period()
+
+
+def money(value: Any) -> str:
+    """金额 → decimal 两位字符串。读不出来给 "0.00" 而不是抛,答复层永远拿得到可印的值。"""
+    try:
+        return str(Decimal(str(value if value is not None else "0")).quantize(Decimal("0.01")))
+    except (InvalidOperation, ValueError):
+        return "0.00"

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""管家工具执行层 —— 六个只读工具薄封装既有服务层(零新 SQL、零直接写库)+ 一个写工具。
+"""管家工具执行层 —— 闭集汇总 + 原六只读工具薄封装既有服务层(零新 SQL、零直接写库)。
 
 留痕复用是硬约束:对话里查到的东西必须与用户手点看到的同源,所以每个工具都只是「调既有
 服务层函数 + 把结果整理成一份小结构」。哪个工具包了谁:
@@ -10,8 +10,9 @@
   history_query    services.ocr_history.queries.list_ocr_history    (= /api/history)
   client_lookup    services.workspace.store.list_workspace_clients  (= /api/workspace/clients)
 
-唯一的写工具 erp_push(经桥真写 Express)住 erp_push_tool.py:它有请求侧接地 + 执行侧投单
-两段,塞进本文件会破体积闸,也会让"只读工具一律薄封装"这条读起来不再成立。
+体积闸(<500 行)下的分居 —— 语义边界不变,闭集与执行入口(prepare/run)一律留在本模块:
+  erp_push_tool   唯一的写工具(请求侧接地 + 执行侧经桥投单两段)
+  tool_scope      各工具共用的作用域 / 客户名接地 / 票据定位 / 期间缺省 / 金额规范化
 
 工具只出数据,不出文案 —— 人话在 copy.py 按数据渲染(模型不参与任何数字)。
 失败一律返回 ToolResult(ok=False, error_code=...),绝不抛给对话层(四态诚实:说不出来就
@@ -26,83 +27,23 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import authz, erp_push_tool, registry
+from services.steward import authz, erp_push_tool, registry, tool_scope
 from services.steward.registry import ToolContext
+from services.steward.tool_scope import (  # 入口仍在 tools:调用方按 tools.ERR_* 认错误码
+    ERR_CLIENT_AMBIGUOUS,  # noqa: F401
+    ERR_CLIENT_NOT_FOUND,  # noqa: F401
+    ERR_HISTORY_FORBIDDEN,
+)
 
 logger = logging.getLogger(__name__)
 
-_LIST_LIMIT = 20  # 对话里回的清单只给前几条,详情去深链看
+_LIST_LIMIT = tool_scope.LIST_LIMIT
 _PUSH_SCAN_LIMIT = 100  # 推送日志按时间倒序扫这么多条再按天数过滤(超出如实标 truncated)
 _DEFAULT_PUSH_DAYS = 7
 _MAX_PUSH_DAYS = 90
 
-ERR_CLIENT_NOT_FOUND = "steward.client_not_found"
-ERR_CLIENT_AMBIGUOUS = "steward.client_ambiguous"
-ERR_HISTORY_FORBIDDEN = "steward.history_forbidden"
 ERR_TOOL_FAILED = "steward.tool_failed"
 ERR_UNKNOWN_TOOL = "steward.unknown_tool"
-
-
-def _cursor():
-    from core import db
-
-    return db.get_cursor()
-
-
-def _scope_ids(ctx: ToolContext) -> Optional[list]:
-    """账套作用域 → list(供 DAL 的 restrict_ids)· None = 不限(老板/超管)。"""
-    return None if ctx.allowed_client_ids is None else [int(i) for i in ctx.allowed_client_ids]
-
-
-def _in_scope(ctx: ToolContext, client_id) -> bool:
-    return ctx.allowed_client_ids is None or int(client_id) in ctx.allowed_client_ids
-
-
-def _clients(ctx: ToolContext) -> list[dict]:
-    """本租户账套主体名录(一次查询,给名字解析/列表补名共用,防 N+1)。"""
-    from services.workspace import store as ws_store
-
-    rows = ws_store.list_workspace_clients(ctx.user_id, ctx.tenant_id, restrict_ids=_scope_ids(ctx))
-    return [
-        {"id": int(r["id"]), "name": r.get("name") or "", "tax_id": r.get("tax_id")} for r in rows
-    ]
-
-
-def _match_clients(clients: list[dict], keyword: str) -> list[dict]:
-    """名字/税号模糊命中(精确同名优先)。纯函数,便于单测。"""
-    kw = (keyword or "").strip().lower()
-    if not kw:
-        return []
-    exact = [c for c in clients if c["name"].lower() == kw]
-    if exact:
-        return exact
-    return [
-        c
-        for c in clients
-        if kw in c["name"].lower() or (c.get("tax_id") and kw in str(c["tax_id"]))
-    ]
-
-
-def _resolve_client(ctx: ToolContext, keyword: str) -> tuple[Optional[dict], Optional[ToolResult]]:
-    """客户名 → 真实名录里的一家。查无/多义都不猜,退回可追问的错误(挂错账套是红线)。"""
-    hits = _match_clients(_clients(ctx), keyword)
-    if not hits:
-        return None, ToolResult(
-            ok=False, error_code=ERR_CLIENT_NOT_FOUND, data={"keyword": keyword, "candidates": []}
-        )
-    if len(hits) > 1:
-        return None, ToolResult(
-            ok=False,
-            error_code=ERR_CLIENT_AMBIGUOUS,
-            data={"keyword": keyword, "candidates": hits[:_LIST_LIMIT]},
-        )
-    return hits[0], None
-
-
-def _period_or_current(period: Optional[str]) -> str:
-    from services.workorder import obligation_engine
-
-    return period or obligation_engine.current_be_period()
 
 
 # ── 工具实现 ────────────────────────────────────────────────
@@ -112,10 +53,10 @@ def matrix_overview(ctx: ToolContext, args: dict) -> ToolResult:
     """某期事务所矩阵总览(缺料/待审/进行中/未开单各多少家)。"""
     from services.workorder import matrix
 
-    period = _period_or_current(args.get("period"))
-    with _cursor() as cur:
+    period = tool_scope.period_or_current(args.get("period"))
+    with tool_scope.cursor() as cur:
         rows = matrix.fetch_rows(cur, tenant_id=ctx.tenant_id, period=period)
-    rows = [r for r in rows if _in_scope(ctx, r["client_id"])]
+    rows = [r for r in rows if tool_scope.in_scope(ctx, r["client_id"])]
     view = matrix.build(rows, period=period)
     badges = Counter(c["badge"] for c in view["cells"])
     attention = [
@@ -157,11 +98,11 @@ def client_status(ctx: ToolContext, args: dict) -> ToolResult:
     """某客户某期进度:工单状态 + 当前步骤 + 还缺什么(全部来自工单详情投影)。"""
     from services.workorder import api as wo_api
 
-    client, err = _resolve_client(ctx, args.get("client_name") or "")
+    client, err = tool_scope.resolve_client(ctx, args.get("client_name") or "")
     if err:
         return err
-    period = _period_or_current(args.get("period"))
-    with _cursor() as cur:
+    period = tool_scope.period_or_current(args.get("period"))
+    with tool_scope.cursor() as cur:
         listing = wo_api.list_orders(
             cur,
             tenant_id=ctx.tenant_id,
@@ -205,8 +146,8 @@ def workorder_list(ctx: ToolContext, args: dict) -> ToolResult:
     from services.workorder import api as wo_api, engine
 
     status_filter, statuses = engine.resolve_status_filter(args.get("status"))
-    period = _period_or_current(args.get("period"))
-    with _cursor() as cur:
+    period = tool_scope.period_or_current(args.get("period"))
+    with tool_scope.cursor() as cur:
         listing = wo_api.list_orders(
             cur,
             tenant_id=ctx.tenant_id,
@@ -214,8 +155,8 @@ def workorder_list(ctx: ToolContext, args: dict) -> ToolResult:
             statuses=statuses or None,
             limit=_LIST_LIMIT,
         )
-    names = {c["id"]: c["name"] for c in _clients(ctx)}
-    orders = [o for o in listing["orders"] if _in_scope(ctx, o["workspace_client_id"])]
+    names = {c["id"]: c["name"] for c in tool_scope.clients(ctx)}
+    orders = [o for o in listing["orders"] if tool_scope.in_scope(ctx, o["workspace_client_id"])]
     return ToolResult(
         ok=True,
         data={
@@ -322,7 +263,7 @@ def history_query(ctx: ToolContext, args: dict) -> ToolResult:
 def client_lookup(ctx: ToolContext, args: dict) -> ToolResult:
     """客户名/税号模糊查(参数接地用:先对上名录里真有的那家,再谈别的)。"""
     keyword = args.get("keyword") or ""
-    hits = _match_clients(_clients(ctx), keyword)
+    hits = tool_scope.match_clients(tool_scope.clients(ctx), keyword)
     return ToolResult(
         ok=True,
         data={"keyword": keyword, "total": len(hits), "clients": hits[:_LIST_LIMIT]},

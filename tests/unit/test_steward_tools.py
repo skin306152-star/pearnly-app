@@ -17,7 +17,7 @@ from core import (
 )  # noqa: F401 —— 先落 core.db,再 import 下面的 DAL(否则撞 dal_reexports 的循环导入)
 from services.erp import push_log_queries
 from services.ocr_history import queries as history_queries
-from services.steward import registry, tools
+from services.steward import registry, tool_scope, tools
 from services.steward.registry import ToolContext
 from services.workorder import api as wo_api, matrix, obligation_engine
 from services.workspace import store as ws_store
@@ -59,14 +59,14 @@ class MatchClientsTests(unittest.TestCase):
             {"id": 1, "name": "Sister", "tax_id": None},
             {"id": 2, "name": "Sister Makeup", "tax_id": None},
         ]
-        self.assertEqual([c["id"] for c in tools._match_clients(rows, "sister")], [1])
+        self.assertEqual([c["id"] for c in tool_scope.match_clients(rows, "sister")], [1])
 
     def test_substring_and_tax_id(self):
-        self.assertEqual([c["id"] for c in tools._match_clients(_CLIENTS, "makeup")], [1])
-        self.assertEqual([c["id"] for c in tools._match_clients(_CLIENTS, "9999")], [2])
+        self.assertEqual([c["id"] for c in tool_scope.match_clients(_CLIENTS, "makeup")], [1])
+        self.assertEqual([c["id"] for c in tool_scope.match_clients(_CLIENTS, "9999")], [2])
 
     def test_empty_keyword_matches_nothing(self):
-        self.assertEqual(tools._match_clients(_CLIENTS, "  "), [])
+        self.assertEqual(tool_scope.match_clients(_CLIENTS, "  "), [])
 
 
 class MatrixOverviewTests(unittest.TestCase):
@@ -133,7 +133,7 @@ class ClientStatusTests(unittest.TestCase):
         }
         with (
             _no_db(),
-            mock.patch.object(tools, "_clients", return_value=_CLIENTS),
+            mock.patch.object(tool_scope, "clients", return_value=_CLIENTS),
             mock.patch.object(
                 wo_api, "list_orders", return_value={"orders": [{"id": "w1"}], "count": 1}
             ) as lst,
@@ -148,7 +148,7 @@ class ClientStatusTests(unittest.TestCase):
         self.assertEqual(len(res.data["needs"]), 1)
 
     def test_unknown_client_refuses_instead_of_guessing(self):
-        with _no_db(), mock.patch.object(tools, "_clients", return_value=_CLIENTS):
+        with _no_db(), mock.patch.object(tool_scope, "clients", return_value=_CLIENTS):
             res = tools.client_status(_ctx(), {"client_name": "nobody"})
         self.assertFalse(res.ok)
         self.assertEqual(res.error_code, tools.ERR_CLIENT_NOT_FOUND)
@@ -158,7 +158,7 @@ class ClientStatusTests(unittest.TestCase):
             {"id": 1, "name": "Siam A", "tax_id": None},
             {"id": 2, "name": "Siam B", "tax_id": None},
         ]
-        with _no_db(), mock.patch.object(tools, "_clients", return_value=rows):
+        with _no_db(), mock.patch.object(tool_scope, "clients", return_value=rows):
             res = tools.client_status(_ctx(), {"client_name": "siam"})
         self.assertEqual(res.error_code, tools.ERR_CLIENT_AMBIGUOUS)
         self.assertEqual(len(res.data["candidates"]), 2)
@@ -166,7 +166,7 @@ class ClientStatusTests(unittest.TestCase):
     def test_no_order_is_reported_honestly(self):
         with (
             _no_db(),
-            mock.patch.object(tools, "_clients", return_value=_CLIENTS),
+            mock.patch.object(tool_scope, "clients", return_value=_CLIENTS),
             mock.patch(
                 "services.workorder.api.list_orders", return_value={"orders": [], "count": 0}
             ),
@@ -184,7 +184,7 @@ class WorkorderListTests(unittest.TestCase):
     def _run(self, args):
         with (
             _no_db(),
-            mock.patch.object(tools, "_clients", return_value=_CLIENTS),
+            mock.patch.object(tool_scope, "clients", return_value=_CLIENTS),
             mock.patch.object(
                 wo_api, "list_orders", return_value={"orders": self._ORDERS, "count": 1}
             ) as lst,

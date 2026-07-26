@@ -303,31 +303,28 @@ class AiRouterTests(unittest.TestCase):
             ["#/client/7/pkg", {"name": "client", "clientId": "7", "view": "pkg", "period": None}],
         )
 
-    def test_clients_and_reports_are_independent_top_level_routes(self):
-        """EN-clients:导航禁用占位收口——两个侧栏入口各自独立顶层路由。"""
+    def test_clients_reports_settings_are_independent_top_level_routes(self):
+        """EN-clients:导航禁用占位收口——三个侧栏入口各自独立顶层路由。"""
         out = _run_node(f"""
             const r = require({json.dumps(str(AI_DIR / "ai-router.js"))});
             process.stdout.write(JSON.stringify([
                 r.parseHash('#/clients'),
                 r.parseHash('#/reports'),
-                r.buildClientsHash(), r.buildReportsHash(),
+                r.parseHash('#/settings'),
+                r.buildClientsHash(), r.buildReportsHash(), r.buildSettingsHash(),
             ]));
             """)
         self.assertEqual(
             out,
-            [{"name": "clients"}, {"name": "reports"}, "#/clients", "#/reports"],
+            [
+                {"name": "clients"},
+                {"name": "reports"},
+                {"name": "settings"},
+                "#/clients",
+                "#/reports",
+                "#/settings",
+            ],
         )
-
-    def test_settings_route_retired_and_falls_back_to_dashboard(self):
-        """设置改为左下角用户块浮层(2026-07-26),不再是路由。旧书签落工作台,不白屏。"""
-        out = _run_node(f"""
-            const r = require({json.dumps(str(AI_DIR / "ai-router.js"))});
-            process.stdout.write(JSON.stringify([
-                r.parseHash('#/settings'),
-                typeof r.buildSettingsHash,
-            ]));
-            """)
-        self.assertEqual(out, [{"name": "dashboard", "sub": "matrix"}, "undefined"])
 
     def test_client_archive_hash_parses_tab_and_defaults_unknown_to_profile(self):
         # "clients" vs "client" 前缀不重叠——单客户档案页与按期操作页互不误判。

@@ -107,13 +107,9 @@
   color: var(--nav-on-n);
 }
 /* 左下角=登录用户块(v5 §五3):首字母方块头像 + 用户名,禁死品牌名占位。
-   点它弹设置浮层(语言/账号/退出),故是 button 不是 div——键盘可达、读屏报得出来。
-   .footwrap 只提供定位上下文,浮层绝对定位在按钮正上方。 */
-.side .footwrap {
-  margin-top: auto;
-  position: relative;
-}
+   2026-07-26 起它也是设置页入口(侧栏那条已撤),故是 button 不是 div——键盘可达。 */
 .side .foot {
+  margin-top: auto;
   width: 100%;
   padding: 16px 20px;
   border: 0;
@@ -127,18 +123,10 @@
   gap: 11px;
 }
 .side .foot:hover {
-  background: var(--neutral-soft);
+  background: var(--nav-hover);
 }
-.side .foot .uchev {
-  width: 16px;
-  height: 16px;
-  margin-left: auto;
-  flex-shrink: 0;
-  stroke: var(--mut);
-  transition: transform var(--dur-fast) var(--ease);
-}
-.side .foot[aria-expanded='true'] .uchev {
-  transform: rotate(180deg);
+.side .foot.on {
+  background: var(--nav-hover);
 }
 .side .foot .uav {
   width: 30px;
@@ -165,63 +153,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* 用户浮层(原「设置」页整页搬进来):贴着用户块往上弹,内容由 ai-settings.js 渲染。
- * 不做遮罩——它是导航级次要面板,不是需要打断的模态框(模态框范式见 ai-pkg.css)。 */
-.side .upop {
-  position: absolute;
-  left: 12px;
-  /* 侧栏只有 224px(折叠态 64px),贴边排不下 4 个语言按钮——固定宽度让它向右压住正文。 */
-  width: min(300px, calc(100vw - 24px));
-  bottom: calc(100% + 8px);
-  z-index: 60;
-  background: var(--surface);
-  border: 1px solid var(--hair);
-  border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(51, 47, 39, 0.16);
-  padding: 14px;
-  max-height: min(70vh, 560px);
-  overflow-y: auto;
-  animation: ai-upop-in var(--dur-fast) var(--ease);
-}
-.side .upop[hidden] {
-  display: none;
-}
-/* 浮层里的排版收紧:panel/view-toggle 原本是给整页宽度画的,原样塞进 300px 会把
-   「日本語」挤成竖排三行、整层高到 600px。只在浮层作用域内改,不动它们在正文页的样子。 */
-.side .upop .panel {
-  box-shadow: none;
-  margin-bottom: 10px;
-}
-.side .upop .panel .hd {
-  padding: 11px 13px 0;
-}
-.side .upop .panel .bd {
-  padding: 9px 13px 13px;
-}
-.side .upop #stLangSeg {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 100%;
-  margin-bottom: 0;
-}
-.side .upop #stLangSeg .vt-btn {
-  padding: 8px 6px;
-  white-space: nowrap;
-}
-.side .upop .wosum {
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-.side .upop .btn {
-  width: 100%;
-}
-@keyframes ai-upop-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
 }
 
 .main {
@@ -560,14 +491,8 @@
   .brand .word,
   .snav .lbl,
   .snav a .n,
-  .side .foot small,
-  .side .foot .uchev {
+  .side .foot small {
     display: none;
-  }
-  /* 折叠成图标栏后用户块只剩头像,居中摆,别让 padding 把它挤出 64px。 */
-  .side .foot {
-    justify-content: center;
-    padding: 16px 0;
   }
   /* 触屏没有 hover,title 兜底白给(2026-07-17 复测)——图标下压一行小字标签,
    * 超长省略;64px 栏宽刚好放下最长的「销项税报告三查」前几字。 */

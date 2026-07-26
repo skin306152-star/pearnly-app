@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/ai.css?v=52" />
+    <link rel="stylesheet" href="/static/dist/ai.css?v=53" />
   </head>
   <body>
     <div id="gateRoot" class="gate-root"></div>
@@ -84,25 +84,10 @@
             <span data-at="nav_reports"></span>
           </a>
         </nav>
-        <div class="footwrap">
-          <div class="upop" id="userPop" hidden>
-            <div id="stBody"></div>
-          </div>
-          <button
-            type="button"
-            class="foot"
-            id="footUser"
-            style="display: none"
-            aria-haspopup="true"
-            aria-expanded="false"
-          >
-            <div class="uav" id="footAv"></div>
-            <small><b id="footName"></b></small>
-            <svg class="uchev" viewBox="0 0 24 24" fill="none" stroke-width="2">
-              <path d="M6 15l6-6 6 6" />
-            </svg>
-          </button>
-        </div>
+        <button type="button" class="foot" id="footUser" style="display: none">
+          <div class="uav" id="footAv"></div>
+          <small><b id="footName"></b></small>
+        </button>
       </aside>
 
       <div class="main">
@@ -329,6 +314,13 @@
             <div id="rptPicker"></div>
             <div id="rptBody"></div>
           </section>
+
+          <section class="view" id="v-settings">
+            <div class="board-head">
+              <h2 data-at="nav_settings"></h2>
+            </div>
+            <div id="stBody"></div>
+          </section>
         </div>
       </div>
     </div>
@@ -344,6 +336,6 @@
     <script src="/static/ai/ai-i18n-bank-sales.js?v=1"></script>
     <script src="/static/ai/ai-i18n-machine-actions.js?v=3"></script>
     <script src="/static/ai/ai-i18n.js?v=10"></script>
-    <script src="/static/dist/ai.js?v=82" defer></script>
+    <script src="/static/dist/ai.js?v=83" defer></script>
   </body>
 </html>

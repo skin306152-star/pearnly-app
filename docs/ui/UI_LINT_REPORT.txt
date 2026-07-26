@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 493 个源文件全扫
+# UI 设计合规扫描报告 · 495 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -86,8 +86,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 201(28 文件)
     96  static\i18n-data.js
-        └ 1411: 'billing-accuracy-good': '✅ 准',
-        └ 1412: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1410: 'billing-accuracy-good': '✅ 准',
+        └ 1411: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -126,7 +126,7 @@
      1  src\home\erp-log-card.ts
         └ 112: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
-        └ 293: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
+        └ 299: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts
         └ 342: // v102 · 点统一「需复核」⚠ 直接打开抽屉(原 fill-amount 改名为 review)
      1  src\home\line-panel.ts
@@ -301,7 +301,7 @@
      1  static\ai\ai-recon.css
         └ 103: max-width: min(560px, 100%);
      1  static\ai\ai-shell.css
-        └ 446: max-width: min(380px, 100%);
+        └ 459: max-width: min(380px, 100%);
      1  static\dms\dms-billing.css
         └ 9: max-width: min(900px, 100%);
      1  static\dms\dms-connect.js
@@ -435,8 +435,8 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1218: 'time-min-ago-suffix': ' 分钟前',
-        └ 1219: 'time-hour-ago-suffix': ' 小时前',
+        └ 1217: 'time-min-ago-suffix': ' 分钟前',
+        └ 1218: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 476: 'time-hours-ago': '{n} 小时前',
         └ 477: 'time-days-ago': '{n} 天前',

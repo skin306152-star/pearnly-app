@@ -192,19 +192,24 @@ async function loadStatus(
 
 // 「还没有可用的 ERP 端点」空态的去处:ERP 连接卡就在本页最下方,集成页早已没有任何
 // ERP 卡片(只剩 LINE Bot / Gmail / 文件夹监听 / 通知提醒)—— 往那跳等于把人送进死路。
-// 滚过去还要点一下,否则用户到了底部也不知道该看哪张卡。
+// 滚过去还要点一下,否则用户到了底部也不知道该看哪张卡。高亮沿用采购导出页
+// jumpToConnect 那套(accent 描边 + 弱色光环 · 1600ms),别各页各写一种闪法。
+const FOCUS_STYLE_ID = 'dx-erp-focus-style';
+
 export function focusDxErpCards(): void {
     const zone = document.getElementById('dx-erp-cards');
     if (!zone) return;
+    if (!document.getElementById(FOCUS_STYLE_ID)) {
+        const st = document.createElement('style');
+        st.id = FOCUS_STYLE_ID;
+        st.textContent =
+            '.dx-erp-cards-zone.hl{border-radius:12px;outline:2px solid var(--accent);' +
+            'outline-offset:4px;box-shadow:0 0 0 3px var(--accent-weak);}';
+        document.head.appendChild(st);
+    }
     zone.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    zone.style.outline = '2px solid var(--accent)';
-    zone.style.outlineOffset = '6px';
-    zone.style.borderRadius = '12px';
-    setTimeout(() => {
-        zone.style.outline = '';
-        zone.style.outlineOffset = '';
-        zone.style.borderRadius = '';
-    }, 1800);
+    zone.classList.add('hl');
+    setTimeout(() => zone.classList.remove('hl'), 1600);
 }
 
 // 渲染当前任务的 ERP 卡到 #dx-erp-cards(dxShell 里的占位)。每次整壳重渲后调。

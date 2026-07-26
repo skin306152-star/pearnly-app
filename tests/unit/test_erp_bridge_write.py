@@ -256,7 +256,9 @@ class WriteFacadeTests(unittest.TestCase):
             out = client.write(TENANT, "DATAT", write_payload())
         self.assertEqual(out["docnum"], "RR2601001")
 
-    def test_blocking_write_timeout_expires_the_job(self):
+    def test_blocking_write_timeout_asks_store_to_expire(self):
+        # 超时只把「还没被领走」的活交给 store.expire_job 收尾;在途写活由 store 侧
+        # 跳过(见 test_erp_bridge_store 的 expire 语义测试),这里钉门面行为不变。
         with (
             mock.patch.object(write_gate, "pick_write_bridge", return_value=self._write_bridge()),
             mock.patch.object(store, "enqueue_job", return_value=JOB_ID),
@@ -268,8 +270,11 @@ class WriteFacadeTests(unittest.TestCase):
                 client.write(TENANT, "DATAT", write_payload(), timeout=0.05)
         expired.assert_called_once_with(TENANT, JOB_ID)
 
-    def test_write_timeout_default_matches_write_lease(self):
-        self.assertEqual(client.WRITE_TIMEOUT, 300.0)
+    def test_write_timeout_default_covers_the_full_in_flight_window(self):
+        # 旧默认 == 写租约(300s)= 慢写必超时:超时曾连带把在途写活 expire,酿成
+        # 「账套里已有单、云端记失败」。默认必须罩住「排队上限 + 一整个写租约」。
+        floor = write_gate.WRITE_JOB_TTL_SECONDS + write_gate.WRITE_LEASE_SECONDS
+        self.assertGreaterEqual(client.WRITE_TIMEOUT, floor)
         self.assertEqual(client.DEFAULT_TIMEOUT, 20.0)  # 查询默认不动
 
 

@@ -32,9 +32,10 @@ from services.erp.express_push.common import PAYLOAD_VERSION
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 20.0
-# 写活阻塞等待默认:对齐 write_gate.WRITE_LEASE_SECONDS —— 桥端备份+写+CDX 重建跨
-# SMB 是分钟级,20s 的查询默认根本等不完一次写。
-WRITE_TIMEOUT = 300.0
+# 写活阻塞等待默认 = 排队上限 + 一整个写租约 + 余量:桥端备份+写+CDX 重建跨 SMB 是
+# 分钟级,等待窗小于「排队 + 租约」就会在桥还在正常干活时放弃。放弃虽已无害
+# (超时只 expire 还没被领走的活,见 store.expire_job),默认值仍须罩住整个合法在途窗。
+WRITE_TIMEOUT = float(write_gate.WRITE_JOB_TTL_SECONDS + write_gate.WRITE_LEASE_SECONDS + 30)
 # 轮询间隔:桥答一次通常在百毫秒级,250ms 让 p50 只多等半拍,一次 20s 等待也才 80 次
 # 主键查询 —— 比给 bridge_jobs 加 LISTEN/NOTIFY 那套的复杂度划算得多。
 POLL_INTERVAL = 0.25
@@ -139,6 +140,8 @@ def query(
 
 
 def _await_job(tenant_id: str, job_id: str, timeout: float) -> Dict[str, Any]:
+    # 超时的 expire 只对「还没被领走的活 + 在途查询」生效:在途写活桥可能正写着账套,
+    # store.expire_job 会跳过它,结果稍后仍由桥 ack 落库(拿 write_status 对账)。
     deadline = time.monotonic() + max(0.5, float(timeout))
     while True:
         job = store.get_job(tenant_id, job_id) or {}
@@ -234,7 +237,12 @@ def write_status(tenant_id: str, job_id: str) -> Optional[Dict[str, Any]]:
 def write(
     tenant_id: str, book_id: str, payload: Dict[str, Any], *, timeout: float = WRITE_TIMEOUT
 ) -> Dict[str, Any]:
-    """阻塞便捷封装(测试脚本用)· 等到终态,超时把任务落 expired 并抛 BridgeTimeout。"""
+    """阻塞便捷封装(测试脚本用)· 等到终态,超时抛 BridgeTimeout。
+
+    超时 ≠ 没写进去:任务已被桥领走时不落 expired(桥可能正写账套,写完照常 ack 落
+    done/failed);只有还没被领走的活会落 expired。拿到 BridgeTimeout 后用
+    write_status 对账,别直接当失败重录。
+    """
     job_id = submit_write(tenant_id, book_id, payload)
     return _await_job(str(tenant_id), job_id, timeout)
 

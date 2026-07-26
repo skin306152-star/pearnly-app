@@ -360,14 +360,24 @@ def finish_job(
             if cur.rowcount == 1:
                 return {"ok": True, "status": status, "truncated": truncated}
             cur.execute(
-                f"SELECT status FROM {JOBS} WHERE id = %s AND bridge_id = %s",
+                f"SELECT status, kind FROM {JOBS} WHERE id = %s AND bridge_id = %s",
                 (str(job_id), bid),
             )
             row = cur.fetchone()
             if not row:
                 return {"ok": False, "reason": "job_not_found"}
-            # 门面等超时后已把它落 expired,桥这才回来 —— 收下不报错,但如实标 stale。
-            return {"ok": True, "status": str(row["status"]), "stale": True}
+            # 任务已 expired(租约被回收后超龄扫尾),桥这才回来 —— 收下不报错,如实标 stale。
+            # 写活的迟到结果必须落库:单据可能已真实进了账套,丢掉 ack 就丢了 docnum,
+            # 改票号重推的 prior_docnum 防重链会断在这单;状态保持 expired 如实记「没人等到」。
+            out = {"ok": True, "status": str(row["status"]), "stale": True}
+            if str(row.get("kind") or "") == write_gate.KIND_WRITE and out["status"] == "expired":
+                cur.execute(
+                    f"UPDATE {JOBS} SET result = %s, error = %s, finished_at = now() "
+                    "WHERE id = %s AND bridge_id = %s AND status = 'expired'",
+                    (result_json, error_json, str(job_id), bid),
+                )
+                out["result_saved"] = cur.rowcount == 1
+            return out
 
     return heal(_run)
 
@@ -400,7 +410,13 @@ def get_job(tenant_id: str, job_id: str) -> Optional[Dict[str, Any]]:
 
 
 def expire_job(tenant_id: str, job_id: str) -> bool:
-    """门面等不到了 → 把还没终态的任务落 expired(结果回来也没人要,别让桥白跑)。"""
+    """门面等不到了 → 把还没终态的任务落 expired(结果回来也没人要,别让桥白跑)。
+
+    已被领走(leased)的写活不动:桥此刻多半正在备份+写盘+重建索引,落 expired 会造出
+    「账套里已有单、云端却记失败」,docnum 随桥的 ack 一起被丢。让它留在 leased,
+    桥写完照常 ack 落 done/failed;等待方超时只代表「不再等」,不代表写没发生。
+    彻底失联的写活由 lease_jobs 的回收+超龄扫尾兜底(queued 后按 WRITE_JOB_TTL 落 expired)。
+    """
     from core import db
 
     if not _UUID_RE.match(str(job_id or "")):
@@ -410,7 +426,8 @@ def expire_job(tenant_id: str, job_id: str) -> bool:
         with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
             cur.execute(
                 f"UPDATE {JOBS} SET status = 'expired', finished_at = now() "
-                "WHERE id = %s AND tenant_id = %s AND status IN ('queued', 'leased')",
+                "WHERE id = %s AND tenant_id = %s "
+                "AND (status = 'queued' OR (status = 'leased' AND kind <> 'write'))",
                 (str(job_id), str(tenant_id)),
             )
             return cur.rowcount == 1

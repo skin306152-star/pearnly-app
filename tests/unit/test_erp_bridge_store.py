@@ -299,14 +299,49 @@ class AckTests(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertEqual(res["reason"], "job_not_found")
 
-    def test_late_ack_on_expired_job_is_honest(self):
-        cur = FakeCursor(script=[("SELECT status FROM bridge_jobs", [{"status": "expired"}])])
-        cur._default_rowcount = 0
+    def test_late_ack_on_expired_query_is_honest_and_drops_result(self):
+        cur = FakeCursor(
+            script=[
+                ("SET status = %s", 0),
+                ("SELECT status, kind", [{"status": "expired", "kind": "query"}]),
+            ]
+        )
         with patch_db(cur):
             res = store.finish_job(bridge_row(), JOB_ID, True, {})
-        self.assertTrue(res["ok"])
-        self.assertTrue(res["stale"])
-        self.assertEqual(res["status"], "expired")
+        self.assertEqual(res, {"ok": True, "status": "expired", "stale": True})
+        self.assertNotIn("SET result = %s", cur.all_sql())
+
+    def test_late_ack_on_expired_write_still_lands_the_result(self):
+        # 租约被回收→超龄落 expired 后桥才写完:单据已真实进账套,docnum 不落库
+        # 的话防重链(prior_docnum)就断在这单,会计还会照「失败」手工补录成双份。
+        cur = FakeCursor(
+            script=[
+                ("SET status = %s", 0),
+                ("SELECT status, kind", [{"status": "expired", "kind": "write"}]),
+                ("SET result = %s", 1),
+            ]
+        )
+        with patch_db(cur):
+            res = store.finish_job(bridge_row(), JOB_ID, True, {"docnum": "RR2601001"})
+        self.assertEqual(
+            res, {"ok": True, "status": "expired", "stale": True, "result_saved": True}
+        )
+        sql, params = next((s, p) for s, p in cur.executed if "SET result = %s" in s)
+        self.assertIn("status = 'expired'", sql)  # 只补 expired 行 · 不碰其它状态
+        self.assertIn('"docnum"', params[0])
+
+    def test_late_ack_on_reclaimed_queued_write_defers_to_the_redo(self):
+        # 回收到 queued 的写活会被重新派发,桥端幂等墙会回同一个 docnum —— 这里不落库。
+        cur = FakeCursor(
+            script=[
+                ("SET status = %s", 0),
+                ("SELECT status, kind", [{"status": "queued", "kind": "write"}]),
+            ]
+        )
+        with patch_db(cur):
+            res = store.finish_job(bridge_row(), JOB_ID, True, {"docnum": "RR2601001"})
+        self.assertEqual(res, {"ok": True, "status": "queued", "stale": True})
+        self.assertNotIn("SET result = %s", cur.all_sql())
 
     def test_ack_failure_records_error_code(self):
         cur = FakeCursor(rowcount=1)
@@ -416,11 +451,15 @@ class FacadeTests(unittest.TestCase):
                 client.query(TENANT, "DATAT", "tables", timeout=0.05)
         expired.assert_called_once_with(TENANT, JOB_ID)
 
-    def test_expire_job_only_touches_unfinished(self):
+    def test_expire_job_spares_in_flight_writes(self):
+        # 排队中的活(不分 kind)和在途查询可以 expire;在途写活不行 —— 桥可能正写账套,
+        # expire 会把随后 ack 回来的 docnum 丢掉,云端记失败、账套里却真有单。
         cur = FakeCursor(rowcount=1)
         with patch_db(cur):
             self.assertTrue(store.expire_job(TENANT, JOB_ID))
-        self.assertIn("status IN ('queued', 'leased')", cur.executed[0][0])
+        sql = cur.executed[0][0]
+        self.assertIn("status = 'queued' OR (status = 'leased' AND kind <> 'write')", sql)
+        self.assertNotIn("status IN ('queued', 'leased')", sql)
 
     def test_list_books_dedupes_and_skips_offline(self):
         bridges = [

@@ -17,8 +17,11 @@ JOB_KINDS = ("query", "write")
 KIND_WRITE = "write"
 
 # 写活租约/超龄:跨 SMB 的备份+写+CDX 重建是分钟级(查询 60/120 秒不动)。
-# 租约 300s = 桥崩溃后写活最多压 5 分钟才退回队列;超龄 600s = 排队半天没桥接,
+# 租约 300s = 桥崩溃后写活最多压 5 分钟才退回队列;超龄 600s = 排队半天没桥领,
 # 结果没人等了,诚实落 expired 而不是突然写进账套吓会计一跳。
+# ⚠️ expired 只对「从没被领走」的写活保证没写进账套:被领走后租约被回收再超龄落
+# expired 的单,桥仍可能写完迟到 ack —— 结果照落库(store.finish_job),对账认
+# result 里的 docnum,别把 expired 一律当「没推进去」展示给会计。
 WRITE_LEASE_SECONDS = 300
 WRITE_JOB_TTL_SECONDS = 600
 

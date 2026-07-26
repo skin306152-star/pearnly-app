@@ -106,6 +106,12 @@ PUBLIC_ROUTES = {
     ("POST", "/api/erp/agent/heartbeat"),
     ("POST", "/api/erp/agent/lease"),
     ("POST", "/api/erp/agent/ack"),
+    # ERP 桥出站三端点 · Bearer brg_ 密钥即凭证(_auth_bridge 比对 sha256 · 只领本桥的 job)·
+    # 桥在客户内网无网页会话;book_id 另受"必须在本桥 hello 上报清单内"约束;
+    # 急停 ERP_BRIDGE_ENABLED=0 → 全部 404。管理端 /api/erp/bridges 两条走 require_perm。
+    ("POST", "/api/erp/bridge/hello"),
+    ("POST", "/api/erp/bridge/lease"),
+    ("POST", "/api/erp/bridge/ack"),
 }
 
 # 已封死:handler 无条件 raise 403,不读写任何数据,也不需要鉴权(留路由壳只为不动 app 注册)。

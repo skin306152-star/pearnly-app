@@ -195,9 +195,8 @@ from routes.line_binding_routes import (
 from routes.erp_routes import (  # REFACTOR-B1 · ERP 推送 15 路由 · 2026-05-25
     router as erp_router,
 )
-from routes.erp_agent import (  # Express Push · 本地 Agent 出站拉取 + token 4 路由
-    router as erp_agent_router,
-)
+from routes.erp_agent import router as erp_agent_router  # Express Push · 本地 Agent 出站 4 路由
+from routes.erp_bridge_routes import router as erp_bridge_router  # ERP 桥 · 内网出站 5 路由
 from routes.companion_installer_routes import (  # Express Push · 小助手安装包下载
     router as companion_installer_router,
 )
@@ -373,6 +372,7 @@ app.include_router(me_router)  # REFACTOR-B1 · /api/me 家族 3 路由(me/v1/me
 app.include_router(line_binding_router)  # REFACTOR-B1 · LINE 绑定 + 偏好语言 4 路由(2026-05-25)
 app.include_router(erp_router)  # REFACTOR-B1 · ERP 推送 15 路由(2026-05-25)
 app.include_router(erp_agent_router)  # Express Push · 本地 Agent 出站拉取 + token 4 路由
+app.include_router(erp_bridge_router)  # ERP 桥 · 内网出站 3 路由 + 管理端 2 路由(2026-07-26)
 app.include_router(companion_installer_router)  # Express Push · 小助手安装包下载
 app.include_router(dms_router)  # MR.ERP DMS · 身份证→订车单 1 路由(2026-05-31)
 app.include_router(dms_roster_router)  # 波3 · DL-8 操作员花名册 6 路由(owner-only)

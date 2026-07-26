@@ -202,6 +202,80 @@ class GuideGateTests(unittest.TestCase):
         fails = [f for f in self._run() if f.startswith("[一屏]")]
         self.assertTrue(any("步 >" in f for f in fails), fails)
 
+    # -- 闸⑤ 内部话 ----------------------------------------------------------
+
+    def _insider(self):
+        return [f for f in self._run() if f.startswith("[内部话]")]
+
+    def test_self_reference_talk_fails(self):
+        # 2026-07-25 真机验收的原句:读者没见过旧文档,这句话让他去核对不存在的东西。
+        self._shot("upload-01-nav")
+        self._chapter()["intro"]["zh"] = "旧文档中「每天必须执行 PACK」的说法已不存在。"
+        fails = self._insider()
+        self.assertEqual(len(fails), 1, fails)
+        self.assertIn("旧文档", fails[0])
+        self.assertIn("文档自指", fails[0])
+        self.assertIn("push-upload-batch", fails[0])
+
+    def test_speech_directive_talk_fails(self):
+        # 教程是操作手册不是话术稿 —— 一句里两个词就报两条,别只报第一个。
+        self._shot("upload-01-nav")
+        self._chapter()["steps"][1]["text"]["zh"] = "继续这样说明会引起客户追问。"
+        fails = self._insider()
+        self.assertEqual(len(fails), 2, fails)
+        self.assertTrue(all("第2步.text" in f and "指挥对外言行" in f for f in fails), fails)
+        self.assertTrue(any("会引起客户追问" in f for f in fails), fails)
+        self.assertTrue(any("继续这样说明" in f for f in fails), fails)
+
+    def test_code_jargon_fails(self):
+        self._shot("upload-01-nav")
+        self._chapter()["notes"][0]["text"]["zh"] = "这一步会重建 manifest。"
+        fails = self._insider()
+        self.assertEqual(len(fails), 1, fails)
+        self.assertIn("manifest", fails[0])
+        self.assertIn("代码内部词", fails[0])
+        self.assertIn("提示1.text", fails[0])
+
+    def test_code_jargon_in_thai_side_fails(self):
+        # 组三跨语种都查:泰文侧甩个 adapter,泰籍会计一样看不懂。
+        self._shot("upload-01-nav")
+        self._chapter()["steps"][0]["text"]["th"] = "ระบบจะเรียก adapter ตัวใหม่"
+        fails = self._insider()
+        self.assertEqual(len(fails), 1, fails)
+        self.assertIn("(th)", fails[0])
+        self.assertIn("adapter", fails[0])
+
+    def test_thai_self_reference_is_a_known_gap(self):
+        # 组一/组二只查中文侧:泰文没有「旧文档」这种定型说法,硬列词表要么漏要么误伤。
+        # 钉住这个缺口 —— 哪天补上了泰文词表,这条会红,提醒改测试而不是悄悄漂移。
+        self._shot("upload-01-nav")
+        self._chapter()["intro"]["th"] = "ตามเอกสารเก่า ต้องกด PACK ทุกวัน"
+        self.assertEqual(self._insider(), [])
+
+    def test_batch_word_is_not_insider_talk(self):
+        # 防误伤:「进项 / 销项 · 本批」是界面上真有的字样,收进禁词表会误判 31 处正文。
+        self._shot("upload-01-nav")
+        self._chapter()["intro"][
+            "zh"
+        ] = "上传前在侧栏勾选「进项 / 销项 · 本批」与「过账去向 · 本批」。"
+        self._chapter()["notes"][0]["text"]["zh"] = "本批票据的字段在核对屏左侧。"
+        self.assertEqual(self._run(), [])
+
+    def test_onscreen_key_literal_is_not_insider_talk(self):
+        # 防误伤:界面原样印着这串英文键名,教程必须教会计认它。整词匹配放行键名里的
+        # preflight / payload,只逮裸着写的那种。
+        self._shot("upload-01-nav")
+        self._chapter()["steps"][1]["text"][
+            "zh"
+        ] = "界面会印出英文键名 erp-preflight-key-payload_version,按上下两行判断即可。"
+        self.assertEqual(self._run(), [])
+
+    def test_bare_jargon_still_fails_next_to_key_literal(self):
+        # 上一条放行的是键名,不是这个词本身 —— 裸着写照样红,否则整词规则等于放弃组三。
+        self._shot("upload-01-nav")
+        self._chapter()["steps"][1]["text"]["zh"] = "payload 的格式由云端决定。"
+        self.assertTrue(any("payload" in f for f in self._insider()), self._insider())
+
     # -- 清单:planned 倒挂 / id 重复 ----------------------------------------
 
     def test_chapters_exceeding_planned_fails(self):

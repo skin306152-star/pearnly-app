@@ -13,6 +13,7 @@
   闸④ 深链不落空:guide-links.ts 的 REASON_CHAPTER 里每个 (篇, 章) 都得真有这一章。
        失败卡上的「这是怎么回事」查不到章就退回手册首页,不白屏也不报错 —— 35 条映射
        曾整表指向占位 id,无一命中,深链等于没做而页面看着一切正常。
+  闸⑤ 不说内部话:正文里不许出现「对内不对外」的句子(见下方禁词表)。
 
 另两项清单校验:index.json 的 planned 不得小于该篇实际章数(防出现 5/3 这种倒挂进度),
 章 id 全局唯一(深链 findChapterAcrossBook 按 id 找章,重了会命中错的那章)。
@@ -48,6 +49,90 @@ _LINK_TABLE = re.compile(r"inSection\(\s*'([A-Za-z0-9_-]+)'\s*,\s*\{(.*?)^\}\)",
 _LINK_ENTRY = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*'([^']+)'", re.M)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 闸⑤ 内部话禁词表 —— 要加词的人先读这段
+#
+# 读者是泰国会计,手上只有这本教程和屏幕。正文一旦出现「对内不对外」的话,他既无从
+# 对照也无从执行,只会以为自己漏看了什么:
+#   · 指向他从没见过的旧文档(「旧文档中…的说法已不存在」)
+#   · 指挥他怎么对客户说话(「继续这样说明会引起客户追问」)
+#   · 直接甩代码内部词(payload / adapter)
+# 2026-07-25 真机验收在正文里逮到前两类:派单时给写手的约束被当正文抄了进去。125 章
+# 靠人读抓不住,只能做成闸。
+#
+# 加词前先在真正文上跑一遍(python scripts/check_guide.py):宁可少收也别误伤 —— 一条
+# 假红会让整道闸失去信息量,下一个人就开始习惯性忽略它。
+#
+# 故意不收的词(别再往回加):
+#   「本批」  界面上真有「进项 / 销项 · 本批」「过账去向 · 本批」,收了直接误伤 31 处。
+#   「闸」「字段」  教程里是正当说法(核对屏左侧就叫字段)。
+#   「已作废」  会计正当用法 —— stuck 篇「里面全是作废档」说的是 Express 里的作废档案。
+#              两处文档自指另带「旧文档」「旧版说明」,不靠它也抓得到。
+#   「上游」  「上游供应商」是会计正当说法,收了会误伤采购票章节。
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 组一 · 文档自指:读者没见过旧文档,拿它当参照物等于让他去核对一个不存在的东西。
+BANNED_SELF_REFERENCE = (
+    "旧文档",
+    "旧版本的说法",
+    "旧版说明",
+    "旧说明",
+    "清单定稿",
+    "派单",
+    "子代理",
+    "据勘察",
+    "本轮",
+)
+
+# 组二 · 指挥对外言行:教程是操作手册,不是话术稿。谁该跟客户怎么说,不进正文。
+BANNED_SPEECH_DIRECTIVE = (
+    "不要承诺",
+    "不能承诺",
+    "会引起客户追问",
+    "继续这样说明",
+)
+
+# 组三 · 代码内部词:会计不读代码,这些词对他等于乱码。中泰两侧都查(拉丁词跨语种同样刺眼)。
+BANNED_CODE_JARGON = (
+    "preflight",
+    "payload",
+    "adapter",
+    "i18n",
+    "manifest",
+    "棘轮",
+)
+
+# 泰文侧只查组三。组一/组二是中文定型短语,泰文没有对应的固定说法(「旧文档」可以译成
+# เอกสารเก่า / คู่มือฉบับก่อน / ฉบับเดิม…),硬列词表要么漏收要么误伤。已知缺口,现实兜法:
+# 泰文那句是同一段的译文,中文侧先报红,改的时候两边一起改。
+INSIDER_GROUPS = (
+    ("文档自指", ("zh",), BANNED_SELF_REFERENCE),
+    ("指挥对外言行", ("zh",), BANNED_SPEECH_DIRECTIVE),
+    ("代码内部词", LANGS, BANNED_CODE_JARGON),
+)
+
+_LATIN_TERM = re.compile(r"^[a-z0-9]+$")
+
+
+def _term_pattern(term):
+    """拉丁词按整词匹配,中文词按子串匹配。
+
+    界面上原样印着 erp-preflight-key-payload_version 这类英文键名,教程必须教会计认它 ——
+    整词匹配让裸着写的「payload 格式」报红,而键名里的 payload_version 放行。中文没有词
+    边界,只能子串匹配。
+    """
+    if _LATIN_TERM.match(term):
+        return re.compile(rf"(?<![A-Za-z0-9_-]){re.escape(term)}(?![A-Za-z0-9_-])", re.I)
+    return re.compile(re.escape(term))
+
+
+_INSIDER_RULES = tuple(
+    (label, langs, term, _term_pattern(term))
+    for label, langs, terms in INSIDER_GROUPS
+    for term in terms
+)
+
+
 def _zh_len(text):
     """中文字数 = 去掉空白后的字符数(中文无词间空格,字符数即字数)。"""
     return len(_WS.sub("", text or ""))
@@ -72,6 +157,22 @@ def _check_bilingual(value, where, fails):
             fails.append(f"[双语] {where}: {lg} 为空 — 补上翻译")
 
 
+def _check_insider_talk(value, where, fails):
+    """闸⑤:正文字段里不许出现对内不对外的话。形状问题交给双语闸报,这里只管词。"""
+    if not isinstance(value, dict):
+        return
+    for label, langs, term, pattern in _INSIDER_RULES:
+        for lg in langs:
+            if pattern.search(str(value.get(lg) or "")):
+                fails.append(f"[内部话] {where}({lg}): {label}「{term}」 — 读者是会计,无从对照")
+
+
+def _check_text(value, where, fails):
+    """读者能看见的文案:中泰齐全,且不含内部话。"""
+    _check_bilingual(value, where, fails)
+    _check_insider_talk(value, where, fails)
+
+
 def _check_shot(shot, where, shots_dir, fails):
     for lg in LANGS:
         if not (shots_dir / f"{shot}.{lg}.png").exists():
@@ -90,13 +191,13 @@ def _check_steps(steps, where, shots_dir, fails):
         if not isinstance(step, dict):
             fails.append(f"[双语] {at}: 不是对象")
             continue
-        _check_bilingual(step.get("text"), f"{at}.text", fails)
+        _check_text(step.get("text"), f"{at}.text", fails)
         zh_chars += _zh_of(step.get("text"))
         if step.get("shot"):
             _check_shot(step["shot"], at, shots_dir, fails)
         # 图注可省;写了就得中泰都写(只写一半 = 另一语种读者看不懂这张图指的是哪块界面)。
         if step.get("caption") is not None:
-            _check_bilingual(step.get("caption"), f"{at}.caption", fails)
+            _check_text(step.get("caption"), f"{at}.caption", fails)
     return zh_chars
 
 
@@ -107,7 +208,7 @@ def _check_notes(notes, where, fails):
         if not isinstance(note, dict):
             fails.append(f"[双语] {at}: 不是对象")
             continue
-        _check_bilingual(note.get("text"), f"{at}.text", fails)
+        _check_text(note.get("text"), f"{at}.text", fails)
         zh_chars += _zh_of(note.get("text"))
     return zh_chars
 
@@ -122,8 +223,8 @@ def _check_chapter(chapter, sec_id, pos, shots_dir, fails):
     if not ch_id:
         fails.append(f"[清单] {where}: 缺 id — 深链靠 id 定位")
 
-    _check_bilingual(chapter.get("title"), f"{where}.title", fails)
-    _check_bilingual(chapter.get("intro"), f"{where}.intro", fails)
+    _check_text(chapter.get("title"), f"{where}.title", fails)
+    _check_text(chapter.get("intro"), f"{where}.intro", fails)
 
     zh_chars = _zh_of(chapter.get("intro"))
 
@@ -218,7 +319,7 @@ def collect_failures(content_dir=CONTENT_DIR, shots_dir=SHOTS_DIR, links_path=LI
     if not isinstance(index, dict):
         return fails
 
-    _check_bilingual(index.get("book"), "index.json book", fails)
+    _check_text(index.get("book"), "index.json book", fails)
     sections = index.get("sections")
     if not isinstance(sections, list):
         fails.append("[清单] index.json: sections 缺失或不是数组")
@@ -231,7 +332,7 @@ def collect_failures(content_dir=CONTENT_DIR, shots_dir=SHOTS_DIR, links_path=LI
             fails.append(f"[清单] index.json 第 {pos} 篇: 缺 id")
             continue
         listed.add(sec["id"])
-        _check_bilingual(sec.get("title"), f"index.json {sec['id']}.title", fails)
+        _check_text(sec.get("title"), f"index.json {sec['id']}.title", fails)
         _check_section_file(sec, content_dir, shots_dir, seen_ids, fails)
 
     # 篇文件没登记进 index = 侧栏进不去,写了也没人看得到。
@@ -247,7 +348,7 @@ def collect_failures(content_dir=CONTENT_DIR, shots_dir=SHOTS_DIR, links_path=LI
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="使用教程内容闸(配图/双语/一屏/深链)")
+    ap = argparse.ArgumentParser(description="使用教程内容闸(配图/双语/一屏/深链/内部话)")
     ap.add_argument("--content", default=str(CONTENT_DIR), help="教程 JSON 目录")
     ap.add_argument("--shots", default=str(SHOTS_DIR), help="配图目录")
     ap.add_argument("--links", default=str(LINKS_TS), help="深链映射表(guide-links.ts)")
@@ -256,14 +357,16 @@ def main(argv=None):
     fails = collect_failures(Path(args.content), Path(args.shots), Path(args.links))
 
     print("=" * 70)
-    print("使用教程内容闸(配图存在 / 双语齐全 / 一章一屏 / 深链落到真章)")
+    print("使用教程内容闸(配图存在 / 双语齐全 / 一章一屏 / 深链落到真章 / 不说内部话)")
     print("=" * 70)
     if fails:
         for f in fails:
             print(f"  [X] {f}")
         print(f"\n结果: FAIL - {len(fails)} 处违规")
         return 1
-    print("结果: PASS - 配图两套齐 / 中泰双语齐 / 每章都在一屏内 / 深链条条落到真章")
+    print(
+        "结果: PASS - 配图两套齐 / 中泰双语齐 / 每章都在一屏内 / 深链条条落到真章 / 正文没有内部话"
+    )
     return 0
 
 

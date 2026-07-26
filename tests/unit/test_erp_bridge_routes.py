@@ -253,13 +253,52 @@ class RegistrationTests(unittest.TestCase):
             self.assertIn(("POST", f"/api/erp/bridge/{path}"), PUBLIC_ROUTES)
 
     def test_router_is_mounted_on_the_app(self):
-        import os
+        self.assertIn("/api/erp/bridge/lease", {r.path for r in _app().routes})
 
-        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
-        os.environ.setdefault("JWT_SECRET", "bridge-dummy-secret-16chars")
-        from app import app
 
-        self.assertIn("/api/erp/bridge/lease", {r.path for r in app.routes})
+def _app():
+    import os
+
+    os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+    os.environ.setdefault("JWT_SECRET", "bridge-dummy-secret-16chars")
+    from app import app
+
+    return app
+
+
+class AsgiSmokeTests(unittest.TestCase):
+    """走真 ASGI 栈过一遍 —— 直调 handler 跑绿不等于路由真接上(模型/依赖/注册任一断都在这红)。"""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+
+        cls.client = TestClient(_app())
+
+    def test_every_bridge_endpoint_rejects_anonymous(self):
+        for method, path, body in (
+            ("post", "/api/erp/bridge/hello", {}),
+            ("post", "/api/erp/bridge/lease", {"max": 1}),
+            ("post", "/api/erp/bridge/ack", {"job_id": JOB_ID}),
+            ("post", "/api/erp/bridges", {"name": "nas"}),
+            ("get", "/api/erp/bridges", None),
+        ):
+            with self.subTest(path=path, method=method):
+                call = getattr(self.client, method)
+                res = call(path, json=body) if body is not None else call(path)
+                self.assertEqual(res.status_code, 401)
+
+    def test_garbage_secret_never_reaches_the_database(self):
+        # bridge_id 段先过 uuid 形状闸:脏 token 连一次查库都不该触发(也不给注入面)。
+        res = self.client.post(
+            "/api/erp/bridge/hello", json={}, headers={"Authorization": "Bearer brg_x'--_y"}
+        )
+        self.assertEqual(res.status_code, 401)
+
+    def test_kill_switch_returns_404_through_the_stack(self):
+        with mock.patch.dict("os.environ", {"ERP_BRIDGE_ENABLED": "0"}):
+            res = self.client.post("/api/erp/bridge/hello", json={})
+        self.assertEqual(res.status_code, 404)
 
 
 if __name__ == "__main__":

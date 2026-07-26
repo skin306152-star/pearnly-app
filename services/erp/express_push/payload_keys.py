@@ -49,3 +49,92 @@ WRITE_PAYLOAD_KEYS = frozenset(
         "opening_stock",
     }
 )
+
+# 会计手录四类单据(P2-B)· 逐 direction 冻结键集。与上面 v1 的两条老路分开列,不合并:
+# 老路的键集是老小助手在生产消费的东西,往里塞新键会让"这个键该不该出现在采购载荷里"
+# 无从判断;桥端白名单同样按 direction 分表,两边逐集对镜才有意义。
+DOCTYPE_PAYLOAD_KEYS = {
+    "ar_receipt": frozenset(
+        {
+            "payload_version",
+            "direction",
+            "doctype",
+            "account_set",
+            "docdate_be",
+            "customer",
+            "net_amount",
+            "wht_amount",
+            "cash_amount",
+            "cheque_amount",
+            "advance_amount",
+            "shortfall_amount",
+            "allocations",
+            "channels",
+            "advance",
+            "allow_unallocated",
+            "userid",
+            "depcod",
+            "prior_docnum",
+            "source",
+        }
+    ),
+    "ap_payment": frozenset(
+        {
+            "payload_version",
+            "direction",
+            "doctype",
+            "account_set",
+            "docdate_be",
+            "supplier",
+            "net_amount",
+            "wht_amount",
+            "cash_amount",
+            "cheque_amount",
+            "settlements",
+            "channels",
+            "withholding",
+            "userid",
+            "depcod",
+            "prior_docnum",
+            "source",
+        }
+    ),
+    "gl_journal": frozenset(
+        {
+            "payload_version",
+            "direction",
+            "doctype",
+            "account_set",
+            "docdate_be",
+            "journal_code",
+            "voucher_no",
+            "description",
+            "total_amount",
+            "lines",
+            "vat",
+            "userid",
+            "source",
+        }
+    ),
+    "stock_adjust": frozenset(
+        {
+            "payload_version",
+            "direction",
+            "doctype",
+            "subtype",
+            "posopr",
+            "account_set",
+            "docdate_be",
+            "isrun_prefix",
+            "loccod",
+            "remark",
+            "offset_account",
+            "net_amount",
+            "items",
+            "userid",
+            "depcod",
+            "prior_docnum",
+            "source",
+        }
+    ),
+}

@@ -1,0 +1,127 @@
+/* Pearnly AI · 按账套清空数据弹窗 —— 外壳复用 .pkg-mask/.pkg-modal(ai-pkg.css),
+   这里只补选择列表、警告块、进度条三样本弹窗独有的东西。 */
+
+.pg-modal {
+  max-width: min(480px, 100%);
+}
+
+/* ── 选账套 ── */
+.pg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.pg-opt {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.pg-opt:hover {
+  border-color: var(--mut);
+}
+.pg-opt span {
+  min-width: 0;
+}
+.pg-opt b {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pg-opt small {
+  color: var(--mut);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.pg-empty {
+  color: var(--mut);
+  font-size: 12.5px;
+  padding: 18px 0;
+  text-align: center;
+}
+
+/* ── 确认 ── */
+.pg-warn {
+  background: var(--crit-soft);
+  border: 1px solid var(--crit-line);
+  color: var(--crit);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.pg-target {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+.pg-target b {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.pg-target small {
+  color: var(--mut);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.pg-note {
+  margin-top: 11px;
+  color: var(--ink2);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.pg-leftover {
+  color: var(--warn);
+}
+/* 不可撤销的动作用危险色实底,不跟主 CTA 的赤陶橙混用 —— 手滑成本不一样。 */
+.pg-danger {
+  background: var(--crit);
+  border-color: var(--crit);
+  color: #fff;
+}
+.pg-danger:hover {
+  background: var(--crit);
+  border-color: var(--crit);
+  filter: brightness(1.06);
+}
+
+/* ── 进度 ── */
+.pg-bar {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--neutral-soft);
+  overflow: hidden;
+}
+.pg-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 99px;
+  background: var(--sage);
+  transition: width var(--dur-fast) var(--ease);
+}
+.pg-status {
+  margin-top: 11px;
+  color: var(--ink2);
+  font-size: 12.5px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+.pg-done {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--good);
+}

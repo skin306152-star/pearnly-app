@@ -431,6 +431,27 @@ Object.assign(window.__AI_I18N_JA__, {
     err_workorder_run_in_progress: 'ワークオーダーの実行中です。しばらくして再試行してください',
     // IN-0d · 顧客名簿の一括インポート
     client_import_open_btn: '名簿をインポート',
+    purge_open_btn: 'データ消去',
+    purge_title: '事業体データの消去',
+    purge_hint:
+        '事業体を 1 つ選び、その配下のデータをすべて消去します。名称と納税者番号のみ残ります。',
+    purge_no_client: '事業体がまだありません',
+    purge_no_tax: '納税者番号なし',
+    purge_cancel: 'キャンセル',
+    purge_next: '次へ',
+    purge_back: '戻る',
+    purge_warn_title: 'この操作は取り消せません。消去後の復元はできません。',
+    purge_warn_body:
+        'この事業体配下のすべてを消去します：証憑と読取履歴、作業指示、請求書と仕入、在庫とPOS、仕訳、申告記録、ナレッジ、消込、アップロード済みの画像とファイル。残るのは事業体名と納税者番号のみです。他の事業体には影響しません。',
+    purge_confirm: '消去する',
+    purge_running: '消去中…',
+    purge_progress: '消去中 {done}/{total} · {table}',
+    purge_failed: '消去に失敗しました。再試行してください。',
+    purge_done: '消去完了',
+    purge_done_partial: '消去完了（残留あり）',
+    purge_done_stat: '{rows} 行、{files} 件のファイルを削除しました。',
+    purge_leftover: '次のテーブルを消去できませんでした。お問い合わせください：{tables}',
+    purge_finish: '完了',
     client_import_title: '顧客名簿の一括インポート',
     client_import_hint:
         'Excel/CSV をアップロード。ヘッダーを自動認識し、行ごとに確認してから登録します',

@@ -60,10 +60,23 @@
         });
     }
 
+    // 清完数据重拉矩阵:主体还在(名称/税号留着),但完整度/义务格子全归零,
+    // 列表必须跟着变——否则用户看到的还是清除前的旧数,以为没生效。
+    function wirePurgeButton() {
+        var btn = $('clientsPurgeBtn');
+        if (!btn || btn.dataset.wired) return;
+        btn.dataset.wired = '1';
+        btn.style.display = '';
+        btn.onclick = function () {
+            AI.purge.open((S.matrix && S.matrix.clients) || [], onClientsImported);
+        };
+    }
+
     function load(api) {
         S.api = api;
         AI.clientNew.wireButton(api, onClientCreated);
         AI.clientImport.wireButton(api, onClientsImported);
+        wirePurgeButton();
         if (!body().querySelector('.cl-list')) body().innerHTML = AI.state.loadingHtml();
         return api
             .getTaxProfileMatrix()

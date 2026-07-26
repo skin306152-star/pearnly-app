@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/ai.css?v=53" />
+    <link rel="stylesheet" href="/static/dist/ai.css?v=54" />
   </head>
   <body>
     <div id="gateRoot" class="gate-root"></div>
@@ -272,11 +272,19 @@
             <div class="board-head">
               <h2 data-at="nav_clients"></h2>
               <span class="note" data-at="clients_col_obligations"></span>
+              <!-- 破坏性动作摆在最左、离主 CTA「新建客户」最远,减少手滑 -->
+              <button
+                type="button"
+                id="clientsPurgeBtn"
+                class="btn"
+                style="display: none; margin-left: auto"
+                data-at="purge_open_btn"
+              ></button>
               <button
                 type="button"
                 id="clientsImportBtn"
                 class="btn"
-                style="display: none; margin-left: auto"
+                style="display: none"
                 data-at="client_import_open_btn"
               ></button>
               <button
@@ -326,16 +334,16 @@
     </div>
 
     <script src="/static/ai/ai-i18n-zh.js?v=42"></script>
-    <script src="/static/ai/ai-i18n-zh-2.js?v=36"></script>
+    <script src="/static/ai/ai-i18n-zh-2.js?v=37"></script>
     <script src="/static/ai/ai-i18n-th.js?v=42"></script>
-    <script src="/static/ai/ai-i18n-th-2.js?v=36"></script>
+    <script src="/static/ai/ai-i18n-th-2.js?v=37"></script>
     <script src="/static/ai/ai-i18n-en.js?v=43"></script>
-    <script src="/static/ai/ai-i18n-en-2.js?v=36"></script>
+    <script src="/static/ai/ai-i18n-en-2.js?v=37"></script>
     <script src="/static/ai/ai-i18n-ja.js?v=42"></script>
-    <script src="/static/ai/ai-i18n-ja-2.js?v=36"></script>
+    <script src="/static/ai/ai-i18n-ja-2.js?v=37"></script>
     <script src="/static/ai/ai-i18n-bank-sales.js?v=1"></script>
     <script src="/static/ai/ai-i18n-machine-actions.js?v=3"></script>
     <script src="/static/ai/ai-i18n.js?v=10"></script>
-    <script src="/static/dist/ai.js?v=83" defer></script>
+    <script src="/static/dist/ai.js?v=84" defer></script>
   </body>
 </html>

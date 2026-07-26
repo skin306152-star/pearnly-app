@@ -305,3 +305,10 @@ async def archive_workspace_client_route(workspace_client_id: int, request: Requ
     if not ok:
         raise HTTPException(404, detail="workspace.not_found")
     return {"ok": True}
+
+
+# 清空数据(破坏性 · NDJSON 流式进度)拆在独立模块,挂在本域路由下 —— app.py 已顶到
+# 500 行硬线,不再往那儿加注册行。
+from routes.workspace_purge_routes import router as _purge_router  # noqa: E402
+
+router.include_router(_purge_router)

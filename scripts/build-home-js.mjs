@@ -262,6 +262,9 @@ const BUNDLES = [
             // AI.clientImport.wireButton)之前——同 ai-client-new.js 先例。
             'ai/ai-client-import-render.js',
             'ai/ai-client-import.js',
+            // ai-purge.js(按账套清空数据模态,依赖 AI.state/token 与全局 at())同
+            // ai-client-new.js 先例:只需排在 ai-clients.js(load() 里调 AI.purge.open)之前。
+            'ai/ai-purge.js',
             'ai/ai-clients.js',
             'ai/ai-client-archive-render.js',
             'ai/ai-client-archive.js',

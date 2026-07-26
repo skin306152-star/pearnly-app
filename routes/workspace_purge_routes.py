@@ -21,6 +21,7 @@ from core import db
 from core.route_helpers import _tid, _log_op
 from services.authz.deps import require_perm
 from services.workspace import purge as purge_svc
+from services.workspace import purge_files as files_svc
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -38,13 +39,13 @@ def _assert_owns(cur, ws_id: int, tenant_id: str) -> str:
 
 
 def _stream(tenant_id: str, ws_id: int, user_id: str) -> Iterator[bytes]:
-    paths: list[str] = []
+    targets: dict = {}
     leftover: list[str] = []
     leftover_detail: list = []
     deleted_total = 0
     with db.get_cursor_rls(tenant_id=tenant_id, workspace_client_id=ws_id, commit=True) as cur:
         _assert_owns(cur, ws_id, tenant_id)
-        paths = purge_svc.collect_file_paths(cur, ws_id)
+        targets = files_svc.collect(cur, tenant_id=tenant_id, ws_id=ws_id)
         for evt in purge_svc.purge(cur, tenant_id=tenant_id, ws_id=ws_id):
             if evt.get("step") == "finished":
                 leftover = list(evt.get("leftover") or [])
@@ -53,7 +54,7 @@ def _stream(tenant_id: str, ws_id: int, user_id: str) -> Iterator[bytes]:
                 continue
             yield (json.dumps(evt, ensure_ascii=False) + "\n").encode()
     # 事务已提交,再动盘上文件
-    files_removed = purge_svc.purge_files(paths)
+    files_removed = files_svc.purge(targets)
     # 有残留 = 这次清除【没成功】,按 error 记 —— 上一版记 info,线上漏删 1648 行子数据
     # 时日志里毫无异样,是用户点开界面才发现的。
     msg = (

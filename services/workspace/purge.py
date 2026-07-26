@@ -16,27 +16,13 @@ WHERE 是主隔离,RLS 是第二道(core/rls.py)。
 from __future__ import annotations
 
 import logging
-import os
-from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-_STORAGE_ROOT = os.environ.get("PEARNLY_STORAGE_ROOT", "/opt/mrpilot/storage")
-
 # 主体行上要留下的列:Zihao 拍板「除了套账名称和税号,其它全部清空」。
 # 结构性列(id/tenant_id/user_id/时间戳)与 NOT NULL 列不动,否则行本身就废了。
 _KEEP_COLUMNS = frozenset({"id", "tenant_id", "user_id", "name", "tax_id"})
-
-# 存本地磁盘路径的列(删行前先把路径抠出来,删完再清文件 —— 同
-# services/purchase/attachment_files.py 的 collect→delete→purge 三段式)。
-# 只列真正指向本机文件的;外部链接(drive_url/receipt_url)不在此列,删不着也不该删。
-_FILE_COLUMNS: Tuple[Tuple[str, str], ...] = (
-    ("ocr_history", "storage_path"),
-    ("ocr_history", "pdf_storage_path"),
-    ("knowledge_documents", "storage_path"),
-    ("vat_recon_tasks", "excel_path"),
-)
 
 
 # ⚠️ 表结构一律从 pg_catalog 读,不碰 information_schema。
@@ -127,44 +113,6 @@ def _has_tenant_column(cur, table: str) -> bool:
         (table,),
     )
     return cur.fetchone() is not None
-
-
-def collect_file_paths(cur, ws_id: int) -> List[str]:
-    """删行【之前】把本地文件路径抠出来 —— 行没了就再也定位不到这些文件。"""
-    paths: List[str] = []
-    tables = set(scope_tables(cur))
-    for table, column in _FILE_COLUMNS:
-        if table not in tables:
-            continue
-        cur.execute(
-            f"SELECT {column} AS p FROM {table} "  # noqa: S608 — 表名/列名来自本模块常量,非外部输入
-            f"WHERE workspace_client_id = %s AND {column} IS NOT NULL AND {column} <> ''",
-            (ws_id,),
-        )
-        paths.extend(str(r["p"]) for r in cur.fetchall())
-    return paths
-
-
-def purge_files(paths: List[str]) -> int:
-    """事务提交后 best-effort 删盘上文件,返回真删掉的个数。
-
-    失败只记日志不抛:行已经删了,留个孤儿文件不影响正确性,把整个清除报成失败反而更糟。
-    只动 storage 根目录之下的路径 —— 库里存的字符串不该当可信输入,越界的一律跳过。
-    """
-    root = Path(_STORAGE_ROOT).resolve()
-    removed = 0
-    for raw in paths:
-        try:
-            p = (root / raw).resolve() if not os.path.isabs(raw) else Path(raw).resolve()
-            if root not in p.parents:
-                logger.warning(f"[purge] 路径越界,跳过: {raw}")
-                continue
-            if p.is_file():
-                p.unlink()
-                removed += 1
-        except Exception:  # noqa: BLE001
-            logger.warning(f"[purge] 删文件失败: {raw}", exc_info=True)
-    return removed
 
 
 def _delete_child(cur, edge: Dict[str, str], ws_id: int) -> int:

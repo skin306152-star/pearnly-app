@@ -13,6 +13,7 @@ import unittest
 from pathlib import Path
 
 from services.workspace import purge as P
+from services.workspace import purge_files as PF
 
 SCOPE = ["ocr_history", "products", "work_orders"]
 EDGES = [
@@ -176,10 +177,20 @@ class SchemaDiscoveryPrivilegeTests(unittest.TestCase):
 
 
 class PurgeFilePathGuardTests(unittest.TestCase):
-    def test_paths_outside_storage_root_are_skipped(self):
-        # 库里的字符串不是可信输入:越界路径必须跳过,不能顺着删到 storage 之外。
-        removed = P.purge_files(["../../etc/passwd", "/etc/shadow"])
+    def test_paths_outside_allowed_roots_are_skipped(self):
+        # 库里的字符串不是可信输入:越界路径必须跳过,不能顺着删到允许的存储根之外。
+        removed = PF.purge({"files": ["/etc/shadow", "../../etc/passwd"], "dirs": ["/etc"]})
         self.assertEqual(removed, 0)
+
+    def test_collect_uses_the_columns_that_actually_hold_paths(self):
+        """根因钉:上一版只认 ocr_history.storage_path —— 生产上这列恒 NULL,真正存路径的是
+        pdf_storage_path;而且它相对的是 PDF_STORAGE_DIR 不是 storage 根。两处都错 →
+        每次 files=0,用户上传的图一张没删过(单 workorders 目录线上就 1.4G)。"""
+        src = (Path(PF.__file__)).read_text(encoding="utf-8")
+        self.assertIn("pdf_storage_path", src)
+        self.assertIn("PDF_STORAGE_DIR", src)
+        self.assertIn("WORKORDER_STORAGE_DIR", src, "用户上传的原件在工单目录下,必须一并删")
+        self.assertNotIn("PEARNLY_STORAGE_ROOT", src, "别再拿 storage 根去拼相对路径")
 
 
 if __name__ == "__main__":

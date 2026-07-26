@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/ai.css?v=58" />
+    <link rel="stylesheet" href="/static/dist/ai.css?v=59" />
   </head>
   <body>
     <div id="gateRoot" class="gate-root"></div>
@@ -329,6 +329,15 @@
             </div>
             <div id="stBody"></div>
           </section>
+
+          <!-- 状态词典(B1 · #/states 直达,不进侧栏):15 类状态语言的活样例。 -->
+          <section class="view" id="v-states">
+            <div class="board-head">
+              <h2 data-at="sts_title"></h2>
+              <span class="note" data-at="sts_note"></span>
+            </div>
+            <div id="stsBody"></div>
+          </section>
         </div>
       </div>
     </div>
@@ -343,7 +352,8 @@
     <script src="/static/ai/ai-i18n-ja-2.js?v=39"></script>
     <script src="/static/ai/ai-i18n-bank-sales.js?v=1"></script>
     <script src="/static/ai/ai-i18n-machine-actions.js?v=3"></script>
+    <script src="/static/ai/ai-i18n-states.js?v=1"></script>
     <script src="/static/ai/ai-i18n.js?v=10"></script>
-    <script src="/static/dist/ai.js?v=87" defer></script>
+    <script src="/static/dist/ai.js?v=88" defer></script>
   </body>
 </html>

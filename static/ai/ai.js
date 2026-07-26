@@ -174,6 +174,7 @@
         clients: 'nav_clients',
         reports: 'nav_reports',
         settings: 'nav_settings',
+        states: 'sts_title',
     };
 
     function wireBack(el, hash) {
@@ -301,6 +302,7 @@
         $('v-client-archive').classList.toggle('on', route.name === 'client-archive');
         $('v-reports').classList.toggle('on', route.name === 'reports');
         $('v-settings').classList.toggle('on', route.name === 'settings');
+        $('v-states').classList.toggle('on', route.name === 'states');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
         $('navTodo').classList.toggle('on', route.name === 'pool');
         $('navDesk').classList.toggle('on', route.name === 'desk');
@@ -355,6 +357,12 @@
         if (route.name === 'reports') {
             restoreScroll(route);
             AI.reports.mount(api);
+            return;
+        }
+        // 状态词典(B1):纯展示页,不吃 api——所有内容由 ai-states-render.js 本地拼装。
+        if (route.name === 'states') {
+            restoreScroll(route);
+            AI.states.mount();
             return;
         }
         if (route.name === 'settings') {

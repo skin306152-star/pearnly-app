@@ -85,6 +85,19 @@
   --dur-skel: 1400ms;
   --dur-spin: 800ms;
 
+  /* B1 状态语言(2026-07-26 拍板)· 现有色板缺的三个状态色相:执行=蓝 / AI=紫 /
+     警告=橙(错误沿用 --crit 红系)。饱和度压到与 good/warn/crit 同档,米色底上
+     一个柔和度;hex 只许出现在本文件,语义层(ai-states.css 的 --st-*)只 var() 引用。 */
+  --exec: #4f6b84;
+  --exec-soft: #e3eaef;
+  --exec-line: #c9d6df;
+  --brain: #7d6493;
+  --brain-soft: #ebe5f0;
+  --brain-line: #d6cade;
+  --alert: #b06529;
+  --alert-soft: #f6e8d8;
+  --alert-line: #e9cfad;
+
   /* v4 组件层直接写死、未提到 :root 的固定色(值逐字节抄 v4,只是在本仓库补成令牌 ——
      * lint-ui 禁裸 hex,v4 原型文件本身不受这条约束)。 */
   --nav-hover: #f0ece0;

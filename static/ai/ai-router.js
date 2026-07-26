@@ -73,6 +73,10 @@
         if (h === '/reports') return { name: 'reports' };
         // 设置(EN-clients · 侧栏「设置」转正):语言/账号/退出,独立顶层路由。
         if (h === '/settings') return { name: 'settings' };
+        // 状态词典(B1 · 状态语言底座):15 类状态的活样例页,规范配套
+        // docs/design-system/STATE-LANGUAGE.md。故意不进侧栏——是给装配新页面的人查的
+        // 词典,不是日常业务入口,URL 直达即可。
+        if (h === '/states') return { name: 'states' };
         // 单客户档案页必须排在 /client/... 的正则前面判断——两者前缀不重叠
         // (client vs clients),顺序对彼此零影响,紧邻只是同属客户域的语义分组。
         var mArchive = /^\/clients\/([^/]+)\/?([^/]*)$/.exec(h);
@@ -155,6 +159,10 @@
         return '#/settings';
     }
 
+    function buildStatesHash() {
+        return '#/states';
+    }
+
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
     function subscribe(onChange) {
         function fire() {
@@ -186,6 +194,7 @@
         buildClientArchiveHash: buildClientArchiveHash,
         buildReportsHash: buildReportsHash,
         buildSettingsHash: buildSettingsHash,
+        buildStatesHash: buildStatesHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

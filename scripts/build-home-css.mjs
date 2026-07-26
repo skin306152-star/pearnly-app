@@ -221,6 +221,10 @@ const AI_CSS = [
     // (上下文条/消息卡/输入条 sticky)这块总台独有的 .fd-* 结构,排最后即可,与其余
     // 视图互斥显示,层叠顺序对彼此零影响。
     'ai/ai-desk.css',
+    // ai-states.css(B1 · 状态语言底座):--st-* 语义令牌 + 状态组件词典(徽章/进度/
+    // 动画/按钮七态/可解释卡)+ #/states 样例页布局。令牌值全引 ai-theme.css(排首位
+    // 已定),组件类名(st-*/sts-*)全新不覆盖任何存量,排最后即可。
+    'ai/ai-states.css',
 ];
 
 // Pearnly DMS SPA:壳令牌/原子/门面在前(dms-shell.css 定义 :root 令牌),身份证向导内容区

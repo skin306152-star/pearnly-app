@@ -271,6 +271,11 @@ const BUNDLES = [
             'ai/ai-reports-render.js',
             'ai/ai-reports.js',
             'ai/ai-settings.js',
+            // ai-states-render.js(B1 · 状态词典 #/states 纯函数+样例页拼装,依赖全局
+            // at())排在 ai-states.js(挂载/演示计时器编排)之前,两者都在 ai.js(onRoute
+            // 用 AI.states.mount)之前——同 ai-vatcheck/ai-fileconv 先例(顶层独立视图)。
+            'ai/ai-states-render.js',
+            'ai/ai-states.js',
             'ai/ai.js',
         ],
     },

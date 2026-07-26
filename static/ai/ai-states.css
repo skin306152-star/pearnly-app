@@ -1,0 +1,476 @@
+/* Pearnly AI · ai-states.css · 状态语言底座(B1 · 2026-07-26 Zihao 拍板 15 类)
+ *
+ * 全站状态的唯一视觉词典:今后任何页面(含智能管家)表达「状态」一律从这里取组件,
+ * 不许自造配色/动画——不然 15 类状态在不同页面长出 15 副面孔(全站 UI 碎片化审计的
+ * 教训:按钮 159 变体就是这么长出来的)。规范正文 docs/design-system/STATE-LANGUAGE.md,
+ * 活样例 #/states(ai-states-render.js)。
+ *
+ * 分层:① --st-* 语义令牌(八大色系 × bg/fg/line,值全部引 ai-theme.css,本文件零 hex)
+ *       ② .st-<族> 色族修饰类(把三值装进 --st-bg/fg/line,徽章/进度/动画组件通用)
+ *       ③ 组件(.st-badge / 进度五件 / 动画五件 / .st-btn 七态 / .st-explain)
+ *       ④ #/states 样例页私有布局(.sts-*,别的页面不该用)
+ * 动画时长全走 ai-theme.css 的 --dur-* 令牌;prefers-reduced-motion 由 ai-theme.css
+ * 的全局降级规则统一关停(本文件不重复写,骨架/三点在静止态仍可辨认)。
+ */
+
+/* ---------- ① 语义令牌:八大色系 ---------- */
+:root {
+  --st-ok-bg: var(--good-soft);
+  --st-ok-fg: var(--good);
+  --st-ok-line: var(--good-line);
+  --st-wait-bg: var(--warn-soft);
+  --st-wait-fg: var(--warn);
+  --st-wait-line: var(--warn-line);
+  --st-run-bg: var(--exec-soft);
+  --st-run-fg: var(--exec);
+  --st-run-line: var(--exec-line);
+  --st-ai-bg: var(--brain-soft);
+  --st-ai-fg: var(--brain);
+  --st-ai-line: var(--brain-line);
+  --st-warn-bg: var(--alert-soft);
+  --st-warn-fg: var(--alert);
+  --st-warn-line: var(--alert-line);
+  --st-err-bg: var(--crit-soft);
+  --st-err-fg: var(--crit);
+  --st-err-line: var(--crit-line);
+  --st-off-bg: var(--neutral-soft);
+  --st-off-fg: var(--mut);
+  --st-off-line: var(--hair2);
+  --st-empty-bg: var(--surface);
+  --st-empty-fg: var(--faint);
+  --st-empty-line: var(--hair);
+}
+
+/* ---------- ② 色族修饰类(徽章/进度/动画通吃,一个类切换整族) ---------- */
+.st-ok {
+  --st-bg: var(--st-ok-bg);
+  --st-fg: var(--st-ok-fg);
+  --st-line: var(--st-ok-line);
+}
+.st-wait {
+  --st-bg: var(--st-wait-bg);
+  --st-fg: var(--st-wait-fg);
+  --st-line: var(--st-wait-line);
+}
+.st-run {
+  --st-bg: var(--st-run-bg);
+  --st-fg: var(--st-run-fg);
+  --st-line: var(--st-run-line);
+}
+.st-ai {
+  --st-bg: var(--st-ai-bg);
+  --st-fg: var(--st-ai-fg);
+  --st-line: var(--st-ai-line);
+}
+.st-warn {
+  --st-bg: var(--st-warn-bg);
+  --st-fg: var(--st-warn-fg);
+  --st-line: var(--st-warn-line);
+}
+.st-err {
+  --st-bg: var(--st-err-bg);
+  --st-fg: var(--st-err-fg);
+  --st-line: var(--st-err-line);
+}
+.st-off {
+  --st-bg: var(--st-off-bg);
+  --st-fg: var(--st-off-fg);
+  --st-line: var(--st-off-line);
+}
+.st-empty {
+  --st-bg: var(--st-empty-bg);
+  --st-fg: var(--st-empty-fg);
+  --st-line: var(--st-empty-line);
+}
+
+/* ---------- ③-1 徽章(胶囊形,几何与 ai-shell.css 的 .chip 同款) ---------- */
+.st-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2.5px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+  background: var(--st-bg, var(--st-empty-bg));
+  color: var(--st-fg, var(--st-empty-fg));
+  border: 1px solid var(--st-line, var(--st-empty-line));
+}
+
+/* ---------- ③-2 进度六件:条 / 环 / 步骤 / 计数 / 排队 / 预计剩余 ---------- */
+.st-bar {
+  display: inline-block;
+  width: 160px;
+  max-width: 100%;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--surface2);
+  border: 1px solid var(--hair);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.st-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  width: calc(var(--p, 0) * 1%);
+  background: var(--st-fg, var(--exec));
+  transition: width var(--dur-slow) var(--ease);
+}
+.st-ring {
+  --p: 0;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: conic-gradient(var(--st-fg, var(--exec)) calc(var(--p) * 1%), var(--surface2) 0);
+  vertical-align: middle;
+}
+.st-ring::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.st-ring > b {
+  position: relative;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink2);
+}
+.st-steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 160px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.st-steps > i {
+  flex: 1;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface2);
+  border: 1px solid var(--hair);
+}
+.st-steps > i.on {
+  background: var(--st-fg, var(--exec));
+  border-color: transparent;
+}
+.st-count {
+  font-size: 12px;
+  color: var(--mut);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.st-count > b {
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.st-queue {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.st-queue > b {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  background: var(--st-bg, var(--st-wait-bg));
+  color: var(--st-fg, var(--st-wait-fg));
+  border: 1px solid var(--st-line, var(--st-wait-line));
+}
+.st-eta {
+  font-size: 12px;
+  color: var(--mut);
+  white-space: nowrap;
+}
+.st-eta > b {
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- ③-3 动画五件:骨架 / 流光 / 呼吸 / 三点 / 徽章跳动 ---------- */
+/* 骨架屏:配方同 ai-shell.css 的 .skel(词典名收口;存量 .skel 不动,新页面用这个名)。 */
+.st-skeleton {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--hair) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: st-skel var(--dur-skel) ease infinite;
+  border-radius: 8px;
+}
+@keyframes st-skel {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+/* 流光:盖在任意元素上扫一道高光(OCR 识别中的文件卡等)。宿主需非 static 定位。 */
+.st-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.st-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: st-shimmer var(--dur-skel) ease infinite;
+  pointer-events: none;
+}
+@keyframes st-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+/* 呼吸:AI 思考中这类「活着但没有可数进度」的状态;幅度克制,不抢注意力。 */
+.st-pulse {
+  animation: st-pulse var(--dur-skel) var(--ease) infinite;
+}
+@keyframes st-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+/* 三点加载:调用工具/生成回答这类短等待;色随色族修饰类走。 */
+.st-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+.st-dots > i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--st-fg, var(--mut));
+  animation: st-dot var(--dur-skel) ease-in-out infinite;
+}
+.st-dots > i:nth-child(2) {
+  animation-delay: calc(var(--dur-skel) / -3 * 2);
+}
+.st-dots > i:nth-child(3) {
+  animation-delay: calc(var(--dur-skel) / -3);
+}
+@keyframes st-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* 徽章跳动:新通知到达时跳三下就停(无限跳会变成噪音)。 */
+.st-badge-bounce {
+  animation: st-bounce var(--dur-spin) var(--ease) 3;
+}
+@keyframes st-bounce {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(-1px);
+  }
+}
+
+/* ---------- ③-4 按钮七态(default / hover / active / disabled / loading / success / error)
+ * 几何与 ai-shell.css 的 .btn 同款;.is-hover/.is-active 是样例页静态展示伪类用的
+ * 镜像类,真实页面靠 :hover/:active 即可。loading 由 JS 加 .is-loading + 内嵌 .st-dots。 */
+.st-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 9px;
+  padding: 8px 16px;
+  border: 1px solid var(--hair2);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.st-btn:hover:not([disabled]),
+.st-btn.is-hover {
+  border-color: var(--mut);
+  box-shadow: var(--sh-card);
+}
+.st-btn:active:not([disabled]),
+.st-btn.is-active {
+  transform: scale(0.98);
+}
+.st-btn[disabled] {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.st-btn.is-loading {
+  pointer-events: none;
+  color: var(--mut);
+}
+.st-btn.is-success {
+  background: var(--st-ok-bg);
+  color: var(--st-ok-fg);
+  border-color: var(--st-ok-line);
+}
+.st-btn.is-error {
+  background: var(--st-err-bg);
+  color: var(--st-err-fg);
+  border-color: var(--st-err-line);
+}
+
+/* ---------- ③-5 AI 可解释卡:结论 + 可展开「依据」清单 ---------- */
+.st-explain {
+  border: 1px solid var(--st-ai-line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px 14px;
+  max-width: min(480px, 94vw);
+}
+.st-explain .st-explain-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.st-explain .st-explain-verdict {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.st-explain .st-explain-toggle {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--st-ai-fg);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.st-explain .st-explain-bd {
+  display: none;
+  margin-top: 9px;
+  border-top: 1px dashed var(--hair2);
+  padding-top: 9px;
+}
+.st-explain.on .st-explain-bd {
+  display: block;
+}
+.st-explain .st-explain-src {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink2);
+  padding: 3px 0;
+}
+.st-explain .st-explain-src small {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--st-ai-fg);
+}
+
+/* ---------- ④ #/states 样例页私有布局(词典页专用,业务页面别引) ---------- */
+.sts-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  align-items: flex-end;
+}
+.sts-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 96px;
+}
+.sts-item > small {
+  font-size: 10.5px;
+  color: var(--faint);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.sts-flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sts-flow .sts-arrow {
+  color: var(--faint);
+  font-size: 11px;
+}
+.sts-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+.sts-swatch {
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--st-bg);
+  border: 1px solid var(--st-line);
+}
+.sts-swatch b {
+  display: block;
+  font-size: 12px;
+  color: var(--st-fg);
+}
+.sts-swatch code {
+  display: block;
+  font-size: 10.5px;
+  color: var(--st-fg);
+  opacity: 0.8;
+  word-break: break-all;
+}
+.sts-demo-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--hair);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--ink2);
+  background: var(--surface2);
+}
+.sts-skel-demo {
+  width: 200px;
+  max-width: 100%;
+  height: 40px;
+}

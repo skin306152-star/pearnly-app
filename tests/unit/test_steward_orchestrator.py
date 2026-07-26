@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""管家单轮编排(services/steward/orchestrator.py · B2-M1)。
+"""管家单轮编排(services/steward/orchestrator.py · B3 异步)。
 
 锁四件事:①参数接地拒编造值(模型给的客户名不在用户原话里 → 追问,工具一步不跑);
-②期间线索解不出就追问,绝不拿猜的账期去查;③挑中工具的每一轮都真落任务行(先 running
-再终态),不许"回复里说查了、库里查无此任务";④大脑降级/超范围不造假任务。
+②期间线索解不出就追问,绝不拿猜的账期去查;③挑中工具的每一轮都真落任务行(入队
+running + payload 带全执行上下文,请求内不跑工具 —— 执行归 worker,见
+test_steward_async);④大脑降级/超范围不造假任务。
 零真 DB:core.db.get_cursor 与 store 写函数是注入点。
 """
 
@@ -13,8 +14,7 @@ import unittest
 from datetime import date
 from unittest import mock
 
-from services.agent.contracts import ToolResult
-from services.steward import orchestrator, registry
+from services.steward import orchestrator, registry, tools
 from services.steward.registry import ToolContext
 
 _TODAY = date(2026, 7, 26)  # 佛历 2569-07
@@ -39,11 +39,11 @@ class _CurCM:
 
 
 class _TurnHarness:
-    """一轮的注入面:planner.plan 结果 + tools.run 结果,任务写库记在 tasks 列表里。"""
+    """一轮的注入面:planner.plan 结果注入,任务写库记在 tasks 列表里。
+    tools.run 也挂了记录桩:B3 起请求内一步工具都不许跑,tool_calls 必须恒空。"""
 
-    def __init__(self, plan, tool_result=None):
+    def __init__(self, plan):
         self.plan = plan
-        self.tool_result = tool_result
         self.tasks = []
         self.tool_calls = []
 
@@ -53,12 +53,12 @@ class _TurnHarness:
 
     def _run(self, name, ctx, args):
         self.tool_calls.append((name, args))
-        return self.tool_result
+        raise AssertionError("tools.run must not be called inside the request")
 
     def turn(self, text, history=None):
         with (
             mock.patch.object(orchestrator.planner, "plan", return_value=self.plan),
-            mock.patch.object(orchestrator.tools, "run", self._run),
+            mock.patch.object(tools, "run", self._run),
             mock.patch.object(orchestrator.store, "create_task", self._create_task),
             mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
         ):
@@ -85,25 +85,19 @@ class GroundingTests(unittest.TestCase):
         self.assertEqual(out["task_status"], "waiting_user")
         self.assertEqual(h.tasks[0]["status"], "waiting_user")
 
-    def test_grounded_client_name_reaches_tool(self):
-        h = _TurnHarness(
-            _plan(registry.CLIENT_STATUS, {"client_name": "Sister"}),
-            ToolResult(
-                ok=True, data={"client_name": "Sister", "period": "2569-06", "has_order": False}
-            ),
-        )
+    def test_grounded_client_name_reaches_task_payload(self):
+        h = _TurnHarness(_plan(registry.CLIENT_STATUS, {"client_name": "Sister"}))
         out = h.turn("Sister 上个月怎么样")
-        self.assertEqual(h.tool_calls[0][0], registry.CLIENT_STATUS)
-        self.assertEqual(h.tool_calls[0][1]["client_name"], "Sister")
-        self.assertEqual(out["task_status"], "done")
+        self.assertEqual(h.tool_calls, [])
+        payload = h.tasks[0]["payload"]
+        self.assertEqual(payload["tool"], registry.CLIENT_STATUS)
+        self.assertEqual(payload["args"]["client_name"], "Sister")
+        self.assertEqual(out["task_status"], "running")
 
     def test_period_hint_normalised_to_buddhist_period(self):
-        h = _TurnHarness(
-            _plan(registry.MATRIX_OVERVIEW, {"period": "上个月"}),
-            ToolResult(ok=True, data={"period": "2569-06", "client_count": 0, "badges": {}}),
-        )
+        h = _TurnHarness(_plan(registry.MATRIX_OVERVIEW, {"period": "上个月"}))
         h.turn("上个月谁缺料")
-        self.assertEqual(h.tool_calls[0][1]["period"], "2569-06")
+        self.assertEqual(h.tasks[0]["payload"]["args"]["period"], "2569-06")
 
     def test_unparsable_period_asks_back_instead_of_guessing(self):
         h = _TurnHarness(_plan(registry.MATRIX_OVERVIEW, {"period": "下辈子"}))
@@ -120,46 +114,38 @@ class GroundingTests(unittest.TestCase):
 
 
 class TaskPersistenceTests(unittest.TestCase):
-    def test_task_written_running_first_then_finished(self):
-        """先落 running(左窗立刻有得看/进程死也不骗人),终态随真实结果回填。"""
-        h = _TurnHarness(
-            _plan(registry.MATRIX_OVERVIEW, {}),
-            ToolResult(
-                ok=True,
-                data={
-                    "period": "2569-07",
-                    "client_count": 3,
-                    "missing_order": 1,
-                    "badges": {"missing_materials": 2, "pending_review": 1, "in_progress": 0},
-                    "attention": [],
-                },
-            ),
-        )
+    def test_tool_turn_enqueues_running_task_and_acks(self):
+        """挑中工具即入队:任务行 running + 步骤全排队 + payload 带全执行上下文,
+        请求内一步工具不跑(执行/收尾归 worker),回复是应承话不是冒领的结果。"""
+        h = _TurnHarness(_plan(registry.MATRIX_OVERVIEW, {}))
         out = h.turn("本期谁缺料")
+        self.assertEqual(h.tool_calls, [])
         self.assertEqual(h.tasks[0]["status"], "running")
-        self.assertEqual([s["state"] for s in h.tasks[0]["steps"]], ["done", "running", "queued"])
-        self.assertEqual(out["task_status"], "done")
-        self.assertEqual([s["state"] for s in out["steps"]], ["done", "done", "done"])
-        self.assertIn("3", out["reply"])
-        self.assertTrue(any(a["kind"] == "deeplink" for a in out["artifacts"]))
-
-    def test_tool_failure_marks_task_failed_and_explains(self):
-        h = _TurnHarness(
-            _plan(registry.CLIENT_STATUS, {"client_name": "Sister"}),
-            ToolResult(
-                ok=False,
-                error_code="steward.client_not_found",
-                data={"keyword": "Sister", "candidates": []},
-            ),
-        )
-        out = h.turn("Sister 怎么样")
-        self.assertEqual(out["task_status"], "failed")
-        self.assertEqual(out["steps"][1]["state"], "failed")
-        self.assertIn("Sister", out["reply"])
+        self.assertEqual([s["state"] for s in h.tasks[0]["steps"]], ["done", "queued", "queued"])
+        payload = h.tasks[0]["payload"]
+        self.assertEqual(payload["tool"], registry.MATRIX_OVERVIEW)
+        self.assertEqual(payload["user_id"], "u1")
+        self.assertIsNone(payload["allowed_client_ids"])
+        self.assertTrue(out["deferred"])
+        self.assertEqual(out["task_status"], "running")
+        self.assertEqual(out["artifacts"], [])
+        self.assertIn("查本期矩阵", out["reply"])
         self.assertEqual(
-            out["tool_trace"],
-            [{"tool": registry.CLIENT_STATUS, "ok": False, "error": "steward.client_not_found"}],
+            out["tool_trace"], [{"tool": registry.MATRIX_OVERVIEW, "ok": None, "error": None}]
         )
+
+    def test_scope_snapshot_travels_with_the_task(self):
+        """被分派成员的账套作用域随任务定格 —— worker 没有请求可算,绝不放宽成看全租户。"""
+        h = _TurnHarness(_plan(registry.MATRIX_OVERVIEW, {}))
+        ctx = _ctx()
+        ctx.allowed_client_ids = frozenset({7, 3})
+        with (
+            mock.patch.object(orchestrator.planner, "plan", return_value=h.plan),
+            mock.patch.object(orchestrator.store, "create_task", h._create_task),
+            mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
+        ):
+            orchestrator._turn(ctx, text="本期谁缺料", history=[], session_id="s-1")
+        self.assertEqual(h.tasks[0]["payload"]["allowed_client_ids"], [3, 7])
 
     def test_degraded_turn_creates_no_task(self):
         h = _TurnHarness(_plan(registry.OUT_OF_SCOPE, degraded=True, reason="brain_timeout"))

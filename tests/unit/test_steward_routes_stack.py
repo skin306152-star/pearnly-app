@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""管家五端点走真 ASGI 栈(routes/steward_routes.py · B2-M1)。
+"""管家六端点走真 ASGI 栈(routes/steward_routes.py · B3 异步)。
 
 直调 handler 跑绿不等于路由真接上 —— 模型/依赖/注册任一断都只在这层看得出来
 (照 test_erp_bridge_routes.AsgiSmokeTests 先例)。锁:①匿名一律不给 200;②消息体
@@ -17,6 +17,7 @@ _ENDPOINTS = (
     ("get", "/api/ai/steward/sessions/s-1", None),
     ("post", "/api/ai/steward/sessions/s-1/messages", {"text": "本期谁缺料"}),
     ("get", "/api/ai/steward/tasks/t-1", None),
+    ("post", "/api/ai/steward/tasks/t-1/cancel", {}),
 )
 
 

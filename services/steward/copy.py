@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from services.steward import registry
+from services.steward import registry, store
 
 DEFAULT_LANG = "zh"
 _LANGS = ("zh", "th")
@@ -63,6 +63,40 @@ _ASK = {
     "period": {
         "zh": "哪一期?说「上个月」或「2569-06」这样的都行。",
         "th": "งวดไหนคะ พิมพ์ว่า「เดือนที่แล้ว」หรือ「2569-06」ก็ได้",
+    },
+}
+
+_TASK_ACK = {
+    "zh": "收到,「{title}」开跑了。左边看得到进度,跑完我会在这里回你。",
+    "th": "รับทราบค่ะ กำลังทำ「{title}」ให้อยู่ ดูความคืบหน้าได้ทางซ้าย เสร็จแล้วจะตอบในแชทนี้ค่ะ",
+}
+
+# 任务级失败原因(error_code → 人话)。与工具级 _ERROR 分开:这里是"任务没跑成"
+# (超时/失联/取消),那边是"工具跑了但查不出"(查无客户/多义)。
+_FAIL_REASON = {
+    "steward.timeout": {
+        "zh": "跑了超过 {seconds} 秒还没有结果,先停了。稍后再说一次让我重跑。",
+        "th": "ทำงานเกิน {seconds} วินาทีแล้วยังไม่เสร็จ ระบบหยุดให้ก่อน ลองสั่งใหม่อีกครั้งนะคะ",
+    },
+    "steward.worker_lost": {
+        "zh": "执行中断(服务重启或异常),这条没跑完。再说一次让我重跑。",
+        "th": "งานถูกขัดจังหวะ (ระบบรีสตาร์ต) ยังทำไม่เสร็จ ลองสั่งใหม่อีกครั้งนะคะ",
+    },
+    "steward.queue_stalled": {
+        "zh": "排了很久也没开始跑(后台执行不在线),先标记失败。再说一次让我重跑。",
+        "th": "รอคิวนานแต่ยังไม่ได้เริ่มทำ (ระบบประมวลผลไม่ออนไลน์) ขอบันทึกว่าล้มเหลวก่อน ลองสั่งใหม่นะคะ",
+    },
+    "steward.cancelled": {
+        "zh": "你取消了这条任务,后面的步骤没有跑。",
+        "th": "คุณยกเลิกงานนี้แล้ว ขั้นตอนที่เหลือไม่ได้ทำต่อค่ะ",
+    },
+    "steward.task_crashed": {
+        "zh": "执行时出了意外错误,这条没跑完。再说一次让我重跑。",
+        "th": "เกิดข้อผิดพลาดระหว่างทำงาน ยังทำไม่เสร็จ ลองสั่งใหม่อีกครั้งนะคะ",
+    },
+    "steward.context_lost": {
+        "zh": "派活时的账号或权限已变更,这条没法继续跑。重新说一次即可。",
+        "th": "บัญชีหรือสิทธิ์ที่ใช้สั่งงานเปลี่ยนไปแล้ว งานนี้ทำต่อไม่ได้ สั่งใหม่อีกครั้งนะคะ",
     },
 }
 
@@ -202,6 +236,20 @@ def degraded(lang: str) -> str:
     return _t(_DEGRADED, lang)
 
 
+def task_ack(title: str, lang: str) -> str:
+    """入队即回的应承话:告诉会计活真派出去了、去哪看进度、结果会回到对话里。"""
+    return _t(_TASK_ACK, lang).format(title=title)
+
+
+def fail_reason(code: str, lang: str, *, seconds: Optional[int] = None) -> str:
+    """任务级失败原因(超时/失联/取消)。没配文案的码走兜底句,原样带码 —— 诚实。"""
+    table = _FAIL_REASON.get(code)
+    if not table:
+        return _t(_ERROR_FALLBACK, lang).format(code=code)
+    text = _t(table, lang)
+    return text.format(seconds=seconds) if "{seconds}" in text else text
+
+
 def error(code: str, data: Optional[dict], lang: str) -> str:
     data = data or {}
     table = _ERROR.get(code)
@@ -330,6 +378,56 @@ def artifacts(tool: str, data: dict, lang: str) -> list[dict]:
         rows = data.get("clients") or []
         return [_table("clients", rows, ("name", "tax_id"), lang)] if rows else []
     return []
+
+
+def build_steps(
+    tool: str,
+    lang: str,
+    *,
+    tool_state: str,
+    detail: str = "",
+    links: Optional[list] = None,
+    summarize: Optional[str] = None,
+) -> list[dict]:
+    """三步流水:听懂 → 跑工具 → 整理答复。state 值与前端 B1 状态语言一一对应。
+    请求侧(入队/追问)与 worker 侧(执行/收尾)共用同一个装配,两边不各写各的。
+
+    summarize 缺省跟随工具步:工具还在跑 → 排队;跑完(成功或失败)→ 已完成,因为失败
+    也是要组织成一句人话说出去的,那一步真做了。入队时两步都还没跑,显式传 queued。
+    """
+    return [
+        {
+            "id": "understand",
+            "label": step_understand(lang),
+            "state": store.STEP_DONE,
+            "detail": tool_title(tool, lang),
+            "links": [],
+        },
+        {
+            "id": tool,
+            "label": tool_title(tool, lang),
+            "state": tool_state,
+            "detail": detail,
+            "links": links or [],
+        },
+        {
+            "id": "summarize",
+            "label": step_summarize(lang),
+            "state": summarize
+            or (store.STEP_QUEUED if tool_state == store.STEP_RUNNING else store.STEP_DONE),
+            "detail": "",
+            "links": [],
+        },
+    ]
+
+
+def artifact_links(artifacts: list) -> list[dict]:
+    """产物里的深链投到步骤行上(左窗步骤直接可点,不用翻产物区)。"""
+    return [
+        {"label": a["label"], "href": a["href"]}
+        for a in artifacts
+        if a.get("kind") == "deeplink" and a.get("href")
+    ]
 
 
 def _link(label_key: str, href: str, lang: str) -> dict:

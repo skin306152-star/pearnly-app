@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
-"""智能管家(B2-M1)HTTP API:会话 + 消息 + 任务(全只读工具)。
+"""智能管家 HTTP API:会话 + 消息 + 任务(B3 起消息异步:入队秒回,执行在 worker)。
 
-五端点(与 static/ai/ai-api-steward.js 的契约逐条对齐):
+六端点(前端契约,static/ai/ai-api-steward.js 逐条对齐):
   GET  /api/ai/steward/status                  闸态探针(闸关也回 200 {enabled:false})
   POST /api/ai/steward/sessions                建会话
   GET  /api/ai/steward/sessions/{sid}          重建消息流 + 当前任务 id
-  POST /api/ai/steward/sessions/{sid}/messages 说一句话 → 同步答复(+ 触发的任务 id)
-  GET  /api/ai/steward/tasks/{tid}             左窗任务数据
+  POST /api/ai/steward/sessions/{sid}/messages 说一句话 → 立即应承(+ 入队的任务 id)
+  GET  /api/ai/steward/tasks/{tid}             左窗任务数据(轮询;失联任务就地收口)
+  POST /api/ai/steward/tasks/{tid}/cancel      取消还在跑的任务(幂等)
 
 除 status 外全组挂 `pearnly_ai_steward`(tenant 级默认关 · fail-closed · 叠加 pearnly_ai_m1):
 闸关一律 404 —— 对存量用户等于不存在。status 走 m1 鉴权但把 steward 闸态当数据返回,免得
 闸关用户每开一次 /ai 就吃一条 404(照 front_desk /status 先例)。
 
 权限统一用 tax.filing.view:管家 M1 只读,它能看到的每一样(矩阵/工单/推送/识别记录)都是
-「看申报工作」这一层的东西,不另立细码;写能力(B3)届时再叠自己的动作权限。
+「看申报工作」这一层的东西,不另立细码;写能力(B3 写工具)届时再叠自己的动作权限。
 
-编排薄:本层只做鉴权 + 作用域 + 取值,一句话怎么变成工具调用在 services/steward。
+编排薄:本层只做鉴权 + 作用域 + 取值,一句话怎么变成任务在 services/steward。
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from pydantic import BaseModel, Field
 from core import db, feature_flags
 from core.route_helpers import authorize_pearnly_ai
 from services.authz.deps import get_authz
-from services.steward import orchestrator, store
+from services.steward import copy as steward_copy, orchestrator, store, worker
 from services.steward.registry import ToolContext
 
 router = APIRouter()
@@ -111,7 +112,8 @@ async def get_session(session_id: str, request: Request):
 
 @router.post("/api/ai/steward/sessions/{session_id}/messages")
 async def post_message(session_id: str, req: MessageIn, request: Request):
-    """说一句话 → 同步返回管家答复;这句话若派了活,一并给 task_id 供前端轮询左窗。"""
+    """说一句话 → 立即返回应承;派了活就给 task_id + task_status,前端轮询左窗看真进度。
+    工具执行在后台 worker(接分钟级长活的前提),追问/降级/超范围仍当场回。"""
     user, tenant_id = _authorize(request)
     store.ensure_once()
     with db.get_cursor() as cur:
@@ -123,11 +125,36 @@ async def post_message(session_id: str, req: MessageIn, request: Request):
 
 @router.get("/api/ai/steward/tasks/{task_id}")
 async def get_task(task_id: str, request: Request):
-    """左窗任务数据(前端直接喂 B1 状态组件)。"""
+    """左窗任务数据(前端直接喂 B1 状态组件)。查询前先把失联任务就地收口 ——
+    worker 死了/急停了,轮询的人也要在超时限后看到诚实的 failed,不是永远转圈。"""
     _user, tenant_id = _authorize(request)
     store.ensure_once()
-    with db.get_cursor() as cur:
+    with db.get_cursor(commit=True) as cur:
+        worker.heal_stale(cur, tenant_id=tenant_id, task_id=task_id)
         task = store.get_task(cur, tenant_id=tenant_id, task_id=task_id)
     if not task:
         raise HTTPException(404, detail=_NOT_FOUND)
+    return store.public_task(task)
+
+
+@router.post("/api/ai/steward/tasks/{task_id}/cancel")
+async def cancel_task(task_id: str, request: Request):
+    """取消任务。只有还在跑的能取消;已收尾的原样返回(幂等,连点两下不报错)。
+    与 worker 收尾赛跑时先落者赢:取消落定后,晚到的执行结果被 finish 守卫拒收。"""
+    _user, tenant_id = _authorize(request)
+    store.ensure_once()
+    with db.get_cursor(commit=True) as cur:
+        task = store.get_task(cur, tenant_id=tenant_id, task_id=task_id)
+        if not task:
+            raise HTTPException(404, detail=_NOT_FOUND)
+        if task["status"] == store.TASK_RUNNING:
+            lang = (task.get("payload") or {}).get("lang") or steward_copy.DEFAULT_LANG
+            reason = steward_copy.fail_reason(worker.ERR_CANCELLED, lang)
+            cancelled = store.cancel_task(
+                cur,
+                tenant_id=tenant_id,
+                task_id=task_id,
+                steps=store.fail_steps(task.get("steps") or [], reason),
+            )
+            task = cancelled or store.get_task(cur, tenant_id=tenant_id, task_id=task_id)
     return store.public_task(task)

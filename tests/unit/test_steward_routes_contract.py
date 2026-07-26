@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""管家路由契约 + fail-closed 守门(routes/steward_routes.py · B2-M1)。
+"""管家路由契约 + fail-closed 守门(routes/steward_routes.py · B3 异步)。
 
-锁:①五端点按 path+method 注册且挂进 app(前端 static/ai/ai-api-steward.js 逐条对齐);
-②闸关(pearnly_ai_steward 或 m1 任一关)时四个业务端点一律 404、status 仍回 200
+锁:①六端点按 path+method 注册且挂进 app(前端 static/ai/ai-api-steward.js 逐条对齐);
+②闸关(pearnly_ai_steward 或 m1 任一关)时五个业务端点一律 404、status 仍回 200
 {enabled:false}(探针不制造 console 噪音);③别人的会话 404(会话是私人工作记录)。
 """
 
@@ -23,6 +23,7 @@ _EXPECTED = {
     ("GET", "/api/ai/steward/sessions/{session_id}"),
     ("POST", "/api/ai/steward/sessions/{session_id}/messages"),
     ("GET", "/api/ai/steward/tasks/{task_id}"),
+    ("POST", "/api/ai/steward/tasks/{task_id}/cancel"),
 }
 
 
@@ -59,6 +60,7 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
             await self._assert_404(sr.create_session(mock.Mock()))
             await self._assert_404(sr.get_session("s-1", mock.Mock()))
             await self._assert_404(sr.get_task("t-9", mock.Mock()))
+            await self._assert_404(sr.cancel_task("t-9", mock.Mock()))
             await self._assert_404(
                 sr.post_message("s-1", sr.MessageIn(text="本期谁缺料"), mock.Mock())
             )

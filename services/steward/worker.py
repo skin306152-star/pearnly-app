@@ -50,7 +50,7 @@ def heal_stale(cur, *, tenant_id: Optional[str] = None, task_id: Optional[str] =
     rows = store.list_stale_tasks(cur, tenant_id=tenant_id, task_id=task_id, grace_s=STALE_GRACE_S)
     for row in rows:
         code = ERR_WORKER_LOST if row.get("worker_id") else ERR_QUEUE_STALLED
-        reason = copy.fail_reason(code, _lang_of(row))
+        reason = copy.fail_reason(code, _lang_of(row), tool=_tool_of(row))
         store.finish_task(
             cur,
             tenant_id=str(row["tenant_id"]),
@@ -66,6 +66,10 @@ def heal_stale(cur, *, tenant_id: Optional[str] = None, task_id: Optional[str] =
 
 def _lang_of(row: dict) -> str:
     return (row.get("payload") or {}).get("lang") or copy.DEFAULT_LANG
+
+
+def _tool_of(row: dict) -> str:
+    return str((row.get("payload") or {}).get("tool") or "")
 
 
 def _build_context(payload: dict, tenant_id: str) -> Optional[ToolContext]:
@@ -115,7 +119,8 @@ async def _execute(row: dict) -> None:
         )
     except asyncio.TimeoutError:
         logger.warning("[steward-worker] task %s timeout after %.0fs", task_id, timeout_s)
-        reason = copy.fail_reason(ERR_TIMEOUT, lang, seconds=max(1, round(timeout_s)))
+        # tool 随原因走:写工具超时不许说"再说一次让我重跑"(桥可能已经落账 → 双写)。
+        reason = copy.fail_reason(ERR_TIMEOUT, lang, seconds=max(1, round(timeout_s)), tool=tool)
         await asyncio.to_thread(_finalize_failure, row, ERR_TIMEOUT, reason)
         return
     except Exception:

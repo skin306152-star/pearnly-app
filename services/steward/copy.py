@@ -8,13 +8,16 @@ reply_guard 出口护栏)。
 
 只写 zh + th:与前端 static/ai/ai-i18n-steward.js 同一决定(管家是事务所内部工作台入口,
 照 adm-* 超管键先例先做两语,en/ja 回落 zh),对外开放再补两语——两侧同进同退,不各走各的。
+
+体积闸(<500 行)下的两块分居:产物层在 copy_artifacts,写工具 erp_push 的文案在
+copy_erp_push。语义边界不变 —— 调用方一律只 import copy,本模块按工具/错误码委派过去。
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from services.steward import registry, store
+from services.steward import copy_artifacts, copy_erp_push, registry, store
 
 DEFAULT_LANG = "zh"
 _LANGS = ("zh", "th")
@@ -46,6 +49,7 @@ _TOOL_TITLE = {
     registry.PUSH_LOG_QUERY: {"zh": "查推送成败", "th": "ดูผลส่งเข้า ERP"},
     registry.HISTORY_QUERY: {"zh": "找识别记录", "th": "ค้นเอกสารที่สแกน"},
     registry.CLIENT_LOOKUP: {"zh": "查客户名录", "th": "ค้นรายชื่อลูกค้า"},
+    registry.ERP_PUSH: {"zh": "推票进 Express", "th": "ส่งใบเข้า Express"},
 }
 
 _STEP_UNDERSTAND = {"zh": "听懂你要什么", "th": "ทำความเข้าใจคำสั่ง"}
@@ -124,10 +128,14 @@ _FAIL_REASON = {
 }
 
 _OUT_OF_SCOPE = {
-    "zh": "这个我还做不了。这一版我只能查:本期矩阵、某家客户进度、工单清单、推送成败、识别记录、客户名录。",
+    "zh": (
+        "这个我还做不了。我能查:本期矩阵、某家客户进度、工单清单、推送成败、识别记录、客户名录;"
+        "能改的只有一件 —— 把一张已识别的票推进 Express(要你先批准)。"
+    ),
     "th": (
-        "เรื่องนี้ยังทำให้ไม่ได้ค่ะ รุ่นนี้ค้นได้แค่: ภาพรวมงวด · ความคืบหน้าลูกค้า · "
-        "รายการงาน · ผลส่งเข้า ERP · เอกสารที่สแกน · รายชื่อลูกค้า"
+        "เรื่องนี้ยังทำให้ไม่ได้ค่ะ ที่ค้นได้: ภาพรวมงวด · ความคืบหน้าลูกค้า · "
+        "รายการงาน · ผลส่งเข้า ERP · เอกสารที่สแกน · รายชื่อลูกค้า; "
+        "ที่แก้ข้อมูลได้มีอย่างเดียว — ส่งใบที่สแกนแล้วเข้า Express (ต้องให้คุณอนุมัติก่อน)"
     ),
 }
 _DEGRADED = {
@@ -189,33 +197,6 @@ _NEEDS_SOME = {"zh": "还缺 {n} 项", "th": "ยังขาด {n} ราย�
 _TRUNCATED = {"zh": "(条数多,只统计了最近一批)", "th": "(รายการเยอะ นับเฉพาะชุดล่าสุด)"}
 _SHOWN = {"zh": ",列出前 {n} 条", "th": " แสดง {n} รายการแรก"}
 
-_ARTIFACT_LABEL = {
-    "matrix_link": {"zh": "打开本期矩阵", "th": "เปิดตารางงวดนี้"},
-    "client_link": {"zh": "打开这家的工单", "th": "เปิดงานของลูกค้ารายนี้"},
-    "attention": {"zh": "要盯的格子", "th": "ช่องที่ต้องตาม"},
-    "orders": {"zh": "工单", "th": "รายการงาน"},
-    "push_rows": {"zh": "推送记录", "th": "รายการที่ส่ง"},
-    "history_rows": {"zh": "识别记录", "th": "เอกสารที่สแกน"},
-    "clients": {"zh": "客户", "th": "ลูกค้า"},
-}
-
-_COLUMN_LABEL = {
-    "name": {"zh": "客户", "th": "ลูกค้า"},
-    "client_name": {"zh": "客户", "th": "ลูกค้า"},
-    "obligation_code": {"zh": "义务", "th": "ภาระ"},
-    "badge": {"zh": "状态", "th": "สถานะ"},
-    "status": {"zh": "状态", "th": "สถานะ"},
-    "current_step": {"zh": "当前步骤", "th": "ขั้นตอน"},
-    "invoice_no": {"zh": "单号", "th": "เลขที่"},
-    "subject": {"zh": "对象", "th": "เกี่ยวกับ"},
-    "error_code": {"zh": "错误码", "th": "รหัสข้อผิดพลาด"},
-    "created_at": {"zh": "时间", "th": "เวลา"},
-    "filename": {"zh": "文件", "th": "ไฟล์"},
-    "seller_name": {"zh": "卖方", "th": "ผู้ขาย"},
-    "invoice_date": {"zh": "票面日期", "th": "วันที่ในเอกสาร"},
-    "tax_id": {"zh": "税号", "th": "เลขผู้เสียภาษี"},
-}
-
 
 def pick_lang(text: str, hint: Optional[str] = None) -> str:
     """回复语言:前端给了 hint 就听它;没给就看这句话里有没有泰文字符(默认 zh)。
@@ -274,11 +255,29 @@ def authz_wait(lang: str) -> str:
     return _t(_AUTHZ_WAIT, lang)
 
 
+def authz_title(tool: str, facts: dict, lang: str) -> str:
+    """授权卡标题。写工具按接地事实现渲染(对哪个账套做什么、影响几条),其余回落工具名。"""
+    if tool == registry.ERP_PUSH:
+        return copy_erp_push.card_title(facts or {}, lang)
+    return tool_title(tool, lang)
+
+
 def fail_reason(
-    code: str, lang: str, *, seconds: Optional[int] = None, cap: Optional[str] = None
+    code: str,
+    lang: str,
+    *,
+    seconds: Optional[int] = None,
+    cap: Optional[str] = None,
+    tool: str = "",
 ) -> str:
-    """任务级失败原因(超时/失联/取消/拒批/超预算)。没配文案的码走兜底句,原样带码 —— 诚实。"""
-    table = _FAIL_REASON.get(code)
+    """任务级失败原因(超时/失联/取消/拒批/超预算)。没配文案的码走兜底句,原样带码 —— 诚实。
+
+    tool 给了写工具时优先取写工具版:同一个「超时」,只读工具可以说"再说一次让我重跑",
+    写工具说这句就是在教人双写(桥可能已经落账),必须改口成"别重推、先去查"。
+    """
+    spec = registry.get(tool) if tool else None
+    table = copy_erp_push.FAIL_REASON.get(code) if spec and not spec.readonly else None
+    table = table or _FAIL_REASON.get(code)
     if not table:
         return _t(_ERROR_FALLBACK, lang).format(code=code)
     text = _t(table, lang)
@@ -291,6 +290,8 @@ def fail_reason(
 
 def error(code: str, data: Optional[dict], lang: str) -> str:
     data = data or {}
+    if code in copy_erp_push.ERRORS:
+        return copy_erp_push.error(code, data, lang)
     table = _ERROR.get(code)
     if not table:
         return _t(_ERROR_FALLBACK, lang).format(code=code)
@@ -302,6 +303,8 @@ def error(code: str, data: Optional[dict], lang: str) -> str:
 
 def reply(tool: str, data: dict, lang: str) -> str:
     """工具结果 → 一句人话。数字全部取自 data,模板不做任何计算。"""
+    if tool == registry.ERP_PUSH:
+        return copy_erp_push.reply(data, lang)
     if tool == registry.CLIENT_STATUS:
         return _client_status_reply(data, lang)
     if tool == registry.MATRIX_OVERVIEW:
@@ -382,41 +385,8 @@ def _breakdown(counts: dict, lang: str) -> str:
 
 
 def artifacts(tool: str, data: dict, lang: str) -> list[dict]:
-    """左窗产物:表格 + 已验证过的 /ai 深链(#/ 与 #/client/<id>/wo?period= 见 ai-router.js)。
-
-    只给真实存在的路由,查不到落点的(推送日志/识别记录在主站不在 /ai)就只给表格不编深链。
-    """
-    if tool == registry.MATRIX_OVERVIEW:
-        out = [_link("matrix_link", "/ai#/", lang)]
-        if data.get("attention"):
-            out.append(
-                _table("attention", data["attention"], ("name", "obligation_code", "badge"), lang)
-            )
-        return out
-    if tool == registry.CLIENT_STATUS:
-        if not data.get("client_id"):
-            return []
-        href = f"/ai#/client/{data['client_id']}/wo?period={data.get('period', '')}"
-        return [_link("client_link", href, lang)]
-    if tool == registry.WORKORDER_LIST:
-        rows = data.get("orders") or []
-        return (
-            [_table("orders", rows, ("client_name", "status", "current_step"), lang)]
-            if rows
-            else []
-        )
-    if tool == registry.PUSH_LOG_QUERY:
-        rows = data.get("rows") or []
-        cols = ("created_at", "subject", "invoice_no", "status", "error_code")
-        return [_table("push_rows", rows, cols, lang)] if rows else []
-    if tool == registry.HISTORY_QUERY:
-        rows = data.get("rows") or []
-        cols = ("invoice_no", "seller_name", "invoice_date", "status")
-        return [_table("history_rows", rows, cols, lang)] if rows else []
-    if tool == registry.CLIENT_LOOKUP:
-        rows = data.get("clients") or []
-        return [_table("clients", rows, ("name", "tax_id"), lang)] if rows else []
-    return []
+    """左窗产物(表格 + /ai 深链)· 实现在 copy_artifacts,入口留在 copy 不变。"""
+    return copy_artifacts.build(tool, data, lang)
 
 
 def build_steps(
@@ -462,21 +432,4 @@ def build_steps(
 
 def artifact_links(artifacts: list) -> list[dict]:
     """产物里的深链投到步骤行上(左窗步骤直接可点,不用翻产物区)。"""
-    return [
-        {"label": a["label"], "href": a["href"]}
-        for a in artifacts
-        if a.get("kind") == "deeplink" and a.get("href")
-    ]
-
-
-def _link(label_key: str, href: str, lang: str) -> dict:
-    return {"kind": "deeplink", "label": _t(_ARTIFACT_LABEL[label_key], lang), "href": href}
-
-
-def _table(label_key: str, rows: list, columns: tuple, lang: str) -> dict:
-    return {
-        "kind": "table",
-        "label": _t(_ARTIFACT_LABEL[label_key], lang),
-        "columns": [{"key": k, "label": _t(_COLUMN_LABEL.get(k, {}), lang) or k} for k in columns],
-        "rows": [{k: r.get(k) for k in columns} for r in rows],
-    }
+    return copy_artifacts.links(artifacts)

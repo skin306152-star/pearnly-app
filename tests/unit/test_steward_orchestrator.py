@@ -164,7 +164,9 @@ class TaskPersistenceTests(unittest.TestCase):
     def test_out_of_scope_without_message_falls_back_to_capability_list(self):
         h = _TurnHarness(_plan(registry.OUT_OF_SCOPE))
         out = h.turn("今天天气怎么样")
-        self.assertIn("只能查", out["reply"])
+        self.assertIn("我能查", out["reply"])
+        # 能力清单必须与注册表实情一致:写工具挂上了就得说出来,不然产品在撒谎。
+        self.assertIn("Express", out["reply"])
 
 
 class WriteToolEnqueueTests(unittest.TestCase):

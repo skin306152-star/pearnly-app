@@ -34,6 +34,11 @@ WORKORDER_LIST = "workorder_list"
 PUSH_LOG_QUERY = "push_log_query"
 HISTORY_QUERY = "history_query"
 CLIENT_LOOKUP = "client_lookup"
+ERP_PUSH = "erp_push"
+
+# 经桥写 Express 是分钟级(桥端备份账套 → 写 DBF → 重建 CDX,全程跨 SMB),按只读工具的
+# 5 分钟任务超时会在桥还在正常干活时把任务砍成 failed。定格进任务行,见 store.create_task。
+ERP_PUSH_TIMEOUT_S = 900
 
 
 @dataclass(frozen=True)
@@ -46,6 +51,7 @@ class StewardTool:
     slots: tuple[SlotSpec, ...]
     handler: str  # services/steward/tools.py 里的函数名
     risk: str = RISK_READ
+    timeout_s: Optional[int] = None  # 本工具的任务超时(缺省走 store.default_timeout_s)
 
     def __post_init__(self) -> None:
         if self.risk not in RISK_LEVELS:
@@ -173,6 +179,39 @@ TOOLS: tuple[StewardTool, ...] = (
         ),
         handler="client_lookup",
     ),
+    StewardTool(
+        name=ERP_PUSH,
+        desc=(
+            "把一张已识别的票推进 Express 账套(会真写客户的账 · 必须人批准后才执行)· "
+            "会计明确说要推/过账/记进 Express 时才用"
+        ),
+        slots=(
+            SlotSpec(
+                "keyword",
+                required=True,
+                source="user_text",
+                desc_th="ระบุใบที่จะส่ง เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="要推的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
+            ),
+            SlotSpec(
+                "account_set",
+                required=False,
+                source="user_text",
+                desc_th="ชุดบัญชีปลายทางถ้าผู้ใช้ระบุ (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="目标账套代码(用户说了才填·没说给 null,系统用连接里配的那个)",
+            ),
+            SlotSpec(
+                "direction",
+                required=False,
+                source="model_freeform",
+                desc_th="ทิศทาง: purchase(ซื้อ) / sales(ขาย)",
+                desc_zh="方向(purchase 进项 / sales 销项)· 用户没说给 null,系统按税号自己判",
+            ),
+        ),
+        handler="erp_push",
+        risk=RISK_WRITE,
+        timeout_s=ERP_PUSH_TIMEOUT_S,
+    ),
 )
 
 TOOLS_BY_NAME: dict[str, StewardTool] = {t.name: t for t in TOOLS}
@@ -208,11 +247,16 @@ def is_known(name: Optional[str]) -> bool:
 
 
 def catalog() -> str:
-    """提示词里的工具表(从注册表现生成:加工具即改本表,提示词自动跟着变)。"""
+    """提示词里的工具表(从注册表现生成:加工具即改本表,提示词自动跟着变)。
+
+    写/危险工具在表里带标记:大脑必须看得见「这个会真改客户的账」,才可能只在会计明说时挑它
+    —— 提示词里手写一份工具清单迟早与注册表漂,标记也一并从 risk 现算。
+    """
     lines = []
     for t in TOOLS:
         slot_names = ", ".join(s.name for s in t.slots) or "无"
-        lines.append(f"  - {t.name}: {t.desc}(参数: {slot_names})")
+        mark = "" if t.readonly else "【会改数据·须人批准】"
+        lines.append(f"  - {t.name}: {mark}{t.desc}(参数: {slot_names})")
     return "\n".join(lines)
 
 

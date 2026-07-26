@@ -96,11 +96,14 @@ def open_request(
     args: dict,
     requested_by: str,
     workspace_client_id: int = 0,
+    title: str = "",
     lang: str = copy.DEFAULT_LANG,
 ) -> Optional[dict]:
     """铸一张授权卡:一次性 token 入库 + 卡落任务 payload + 任务停 waiting_user。
     【不执行任何工具】。只读工具走不到这里(调用方契约错误,早炸)。
-    workspace_client_id 是 nonce 表的必填目标位:写活有目标账套就传,框架级场景传 0 占位。"""
+    workspace_client_id 是 nonce 表的必填目标位:写活有目标账套就传,框架级场景传 0 占位。
+    title 是卡上那句人话(「对哪个账套做什么、影响几条」· 调用方按接地事实渲染);
+    不传回落工具名 —— 卡上宁可笼统,也不摆一句与实际参数不符的漂亮话。"""
     spec = registry.get(tool)
     if spec is None or not registry.requires_authorization(spec):
         raise ValueError(f"steward authz: {tool!r} does not require authorization")
@@ -122,7 +125,7 @@ def open_request(
     auth = {
         "token": token,
         "tool": tool,
-        "title": copy.tool_title(tool, lang),
+        "title": title or copy.tool_title(tool, lang),
         "risk": spec.risk,
         "args": args or {},
         "args_fp": fp,

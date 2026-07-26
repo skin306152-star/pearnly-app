@@ -1,0 +1,358 @@
+# -*- coding: utf-8 -*-
+"""管家第一个写工具 erp_push:把一张已识别的票经桥真写进 Express(B4)。
+
+两段式,与授权闸的「批的就是执行的」对齐:
+  ① prepare(请求侧 · 铸卡前):把用户嘴里的「那张 7-11 的票」落成一条真实 history —— 命中
+     0 条/多条都不猜,退回可追问的错误;顺带把目标账套(端点配置)与票面快照(票号/卖方/
+     含税额)钉进参数。授权卡因此能说清「对哪个账套做什么、影响几条」,而不是摆一串 uuid。
+  ② erp_push(执行侧 · worker 持批文调):重新读票 → 与快照比对(铸卡后被改过就不写)→
+     preflight_express 组装 express payload v1(复用既有 mapper,不自己拼)→ 经桥门面
+     submit_write 投单 → 轮询 write_status 到终态。
+
+不复用 enqueue_express 的原因:那条路是「写进 erp_push_logs 等小助手来领」(pending),
+本工具走的是 P2-A 的桥直写(submit_write),两者只共用 preflight 这一段体检 + 载荷装配。
+推送日志照旧落一行(erp_push_logs 是推送状态唯一事实源),否则管家推完自己的
+push_log_query 会答「近 7 天 0 条」。
+
+超时不等于没写进去(见 bridge/client.write 顶注):桥领走后的写活迟到 ack 照样落库,
+所以等不到终态时报 pending 并把 job_id 交出去对账,文案明确「别重推」——重推 = 双写。
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
+from typing import Any, Optional
+
+from fastapi import HTTPException
+
+from services.agent.contracts import ToolResult
+from services.erp.bridge import BridgeError, BridgeUnavailable
+from services.steward.registry import ToolContext
+
+logger = logging.getLogger(__name__)
+
+ERR_ENDPOINT_MISSING = "steward.erp_endpoint_missing"
+ERR_ACCOUNT_SET_MISMATCH = "steward.account_set_mismatch"
+ERR_INVOICE_NOT_FOUND = "steward.invoice_not_found"
+ERR_INVOICE_AMBIGUOUS = "steward.invoice_ambiguous"
+ERR_INVOICE_CHANGED = "steward.invoice_changed"
+ERR_PUSH_BLOCKED = "steward.erp_push_blocked"
+ERR_BRIDGE_OFFLINE = "steward.bridge_offline"
+ERR_PUSH_REJECTED = "steward.erp_push_rejected"
+ERR_PUSH_FAILED = "steward.erp_push_failed"
+ERR_PUSH_EXPIRED = "steward.erp_push_expired"
+ERR_PUSH_PENDING = "steward.erp_push_pending"
+
+AUDIT_SUBMITTED = "steward.erp_push_submitted"
+
+# 快照字段:铸卡时定格、执行前重比。票面变了(会计改了金额/票号)旧批文就不作数。
+SNAPSHOT_KEYS = ("invoice_no", "seller_name", "total_amount")
+# 授权卡上的参数行顺序(前端按键序摆行)。
+ARG_KEYS = ("account_set", "direction", "invoice_no", "seller_name", "total_amount", "history_id")
+
+_CANDIDATE_LIMIT = 5
+_SEARCH_LIMIT = 20
+# 轮询:桥端一次写活是分钟级(备份→写 DBF→重建 CDX),2 秒一拍够密。deadline 留在任务
+# 超时(registry.ERP_PUSH_TIMEOUT_S)之内,好让「还在写」由本函数如实报出来并带上 job_id
+# ——被 worker 的 wait_for 硬砍掉的话,job_id 就丢了,会计没有东西可以对账。
+_POLL_INTERVAL_S = 2.0
+_POLL_DEADLINE_S = 840.0
+
+
+@dataclass
+class PrepareResult:
+    """铸卡前的接地结果:成功给可执行参数 + 卡面事实;失败给可追问的 ToolResult。"""
+
+    args: dict = field(default_factory=dict)
+    facts: dict = field(default_factory=dict)
+    workspace_client_id: int = 0  # 目标账套主体(nonce 表的目标位 · 令牌因此绑死这个账套)
+    error: Optional[ToolResult] = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
+
+
+def _fail(code: str, **data) -> PrepareResult:
+    return PrepareResult(error=ToolResult(ok=False, error_code=code, data=data))
+
+
+def _money(value: Any) -> str:
+    """金额一律 decimal 两位字符串(钱不过 float:卡上印的、比对的、审计的必须同一个值)。"""
+    try:
+        return str(Decimal(str(value if value is not None else "0")).quantize(Decimal("0.01")))
+    except (InvalidOperation, ValueError):
+        return "0.00"
+
+
+def express_endpoint(user_id: str) -> Optional[dict]:
+    """本用户的 Express 连接(单例 · push_store 建连接时就保 express 唯一)。"""
+    from core import db
+
+    for endpoint in db.list_erp_endpoints(user_id):
+        if (endpoint.get("adapter") or "").lower() == "express" and endpoint.get("enabled", True):
+            return endpoint
+    return None
+
+
+def _search_invoices(ctx: ToolContext, keyword: str) -> list[dict]:
+    """按关键词找票(与 history_query 同一个 DAL、同一套保留期与可见性口径)。"""
+    from core import db
+    from core.route_helpers import _check_history_access
+    from services.ocr_history import queries as history_queries
+
+    retention = _check_history_access(ctx.user)  # 套餐门:看不了识别记录的人也推不了票
+    res = history_queries.list_ocr_history(
+        user_id=ctx.user_id,
+        retention_days=retention,
+        keyword=keyword,
+        limit=_SEARCH_LIMIT,
+        tenant_id=ctx.tenant_id,
+        restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
+    )
+    return list(res.get("items") or [])
+
+
+def _candidate(row: dict) -> dict:
+    return {
+        "history_id": str(row.get("id") or ""),
+        "invoice_no": row.get("invoice_no") or "",
+        "seller_name": row.get("seller_name") or "",
+        "invoice_date": row.get("invoice_date") or "",
+    }
+
+
+def prepare(ctx: ToolContext, args: dict) -> PrepareResult:
+    """用户级参数 → 可执行参数 + 卡面事实。任何一步接不了地都不铸卡(绝不批一张空头卡)。"""
+    from services.erp.express_push.direction import normalize as normalize_direction
+
+    endpoint = express_endpoint(ctx.user_id)
+    if not endpoint:
+        return _fail(ERR_ENDPOINT_MISSING)
+    account_set = str((endpoint.get("config") or {}).get("account_set") or "").strip()
+    if not account_set:
+        return _fail(ERR_ENDPOINT_MISSING)
+
+    asked = str(args.get("account_set") or "").strip()
+    if asked and asked.upper() != account_set.upper():
+        # 会计说 A、连接配的是 B:账套写错是账务事故,宁可停下问,绝不"就近"推进 B。
+        return _fail(ERR_ACCOUNT_SET_MISMATCH, asked=asked, account_set=account_set)
+
+    keyword = str(args.get("keyword") or "").strip()
+    if not keyword:
+        # 空关键词会捞回"最近 20 张"——绝不在这条路上默认"就推最近那张"。
+        return _fail(ERR_INVOICE_NOT_FOUND, keyword="")
+    try:
+        hits = _search_invoices(ctx, keyword)
+    except HTTPException:
+        from services.steward.tools import ERR_HISTORY_FORBIDDEN
+
+        return _fail(ERR_HISTORY_FORBIDDEN)
+    if not hits:
+        return _fail(ERR_INVOICE_NOT_FOUND, keyword=keyword)
+    if len(hits) > 1:
+        return _fail(
+            ERR_INVOICE_AMBIGUOUS,
+            keyword=keyword,
+            candidates=[_candidate(h) for h in hits[:_CANDIDATE_LIMIT]],
+            total=len(hits),
+        )
+
+    row = hits[0]
+    resolved = {
+        "history_id": str(row.get("id") or ""),
+        "account_set": account_set,
+        "direction": normalize_direction(args.get("direction")) or "",
+        "invoice_no": str(row.get("invoice_no") or ""),
+        "seller_name": str(row.get("seller_name") or ""),
+        "total_amount": _money(row.get("total_amount")),
+    }
+    return PrepareResult(
+        args={k: resolved[k] for k in ARG_KEYS},
+        facts={**resolved, "doc_count": 1},
+        workspace_client_id=int(row.get("workspace_client_id") or 0),
+    )
+
+
+def _load_history(ctx: ToolContext, history_id: str) -> Optional[dict]:
+    from core import db
+
+    return db.get_ocr_history_detail(ctx.user_id, history_id, tenant_id=ctx.tenant_id)
+
+
+def _snapshot_drift(history: dict, args: dict) -> Optional[str]:
+    """票面与批文快照的差异键(None = 一致)。会计在等批准的空档改了票,这张批文就作废。"""
+    current = {
+        "invoice_no": str(history.get("invoice_no") or ""),
+        "seller_name": str(history.get("seller_name") or ""),
+        "total_amount": _money(history.get("total_amount")),
+    }
+    for key in SNAPSHOT_KEYS:
+        if current[key] != str(args.get(key) or ""):
+            return key
+    return None
+
+
+def _build_payload(endpoint: dict, history: dict, direction: str) -> tuple[Optional[dict], str]:
+    """走 preflight 的全套体检 + mapper 装配,返回 (express payload v1, 拦截原因)。"""
+    from services.erp.express_push.preflight import preflight_express
+
+    if direction:
+        # 显式方向优先于税号锚点(direction.explicit_direction 读 history.direction)。
+        history = {**history, "direction": direction}
+    pf = preflight_express(endpoint, history)
+    if pf.disabled:
+        return None, "express_disabled"
+    if pf.blocked:
+        return None, pf.reason or "blocked"
+    return pf.payload, ""
+
+
+def _await_write(tenant_id: str, job_id: str) -> dict:
+    """轮询桥的写活到终态。返回 {status, result, error};等不到终态 → status='pending'。"""
+    from services.erp.bridge import client as bridge_client
+
+    deadline = time.monotonic() + _POLL_DEADLINE_S
+    while True:
+        job = bridge_client.write_status(tenant_id, job_id) or {}
+        status = str(job.get("status") or "")
+        if status in ("done", "failed", "expired"):
+            return {"status": status, "result": job.get("result") or {}, "error": job.get("error")}
+        if time.monotonic() >= deadline:
+            return {"status": "pending", "result": {}, "error": None}
+        time.sleep(_POLL_INTERVAL_S)
+
+
+def erp_push(ctx: ToolContext, args: dict) -> ToolResult:
+    """把一张已识别的票经桥真写进 Express。只在持批文时进得来(闸在 tools.run)。"""
+    endpoint = express_endpoint(ctx.user_id)
+    if not endpoint:
+        return ToolResult(ok=False, error_code=ERR_ENDPOINT_MISSING)
+    account_set = str(args.get("account_set") or "").strip()
+    configured = str((endpoint.get("config") or {}).get("account_set") or "").strip()
+    if not account_set or account_set != configured:
+        # 铸卡后连接被改成别的账套 → 批的那个账套已不是现在会写进去的那个,停手。
+        return ToolResult(
+            ok=False,
+            error_code=ERR_ACCOUNT_SET_MISMATCH,
+            data={"asked": account_set, "account_set": configured},
+        )
+
+    history = _load_history(ctx, str(args.get("history_id") or ""))
+    if not history:
+        return ToolResult(ok=False, error_code=ERR_INVOICE_NOT_FOUND, data={"keyword": ""})
+    wcid = history.get("workspace_client_id")
+    if wcid and ctx.allowed_client_ids is not None and int(wcid) not in ctx.allowed_client_ids:
+        return ToolResult(ok=False, error_code=ERR_INVOICE_NOT_FOUND, data={"keyword": ""})
+    drift = _snapshot_drift(history, args)
+    if drift:
+        return ToolResult(ok=False, error_code=ERR_INVOICE_CHANGED, data={"field": drift})
+
+    payload, blocked = _build_payload(endpoint, history, str(args.get("direction") or ""))
+    if not payload:
+        return ToolResult(ok=False, error_code=ERR_PUSH_BLOCKED, data={"reason": blocked})
+
+    return _submit(ctx, endpoint, history, payload, account_set)
+
+
+def _submit(
+    ctx: ToolContext, endpoint: dict, history: dict, payload: dict, account_set: str
+) -> ToolResult:
+    """投单 + 等终态 + 落推送日志/审计。桥层异常一律翻成人话错误码,不上抛。"""
+    from services.erp.bridge import client as bridge_client
+
+    try:
+        job_id = bridge_client.submit_write(ctx.tenant_id, account_set, payload)
+    except BridgeUnavailable:
+        logger.warning("[steward.erp_push] no write bridge for %s", account_set)
+        return ToolResult(
+            ok=False, error_code=ERR_BRIDGE_OFFLINE, data={"account_set": account_set}
+        )
+    except BridgeError as e:
+        # 形状被拒(BridgeRejected)与其它桥层异常同归一路:都是"没写进去",指路文案一致。
+        return ToolResult(ok=False, error_code=ERR_PUSH_REJECTED, data={"reason": str(e)})
+
+    _audit(ctx, history, payload, job_id)
+    outcome = _await_write(ctx.tenant_id, job_id)
+    data = {
+        "job_id": job_id,
+        "account_set": account_set,
+        "doctype": payload.get("doctype"),
+        "direction": payload.get("direction"),
+        "ref_no": payload.get("ref_no"),
+        "total_amount": payload.get("total_amount"),
+        "docnum": (outcome["result"] or {}).get("docnum") or "",
+    }
+    status = outcome["status"]
+    if status == "done":
+        _log_push(ctx, endpoint, history, payload, "success", data)
+        return ToolResult(ok=True, data=data)
+    if status == "pending":
+        # 桥还在写:不是失败也不是成功,如实报"在途"并交出 job_id(重推 = 双写)。
+        _log_push(ctx, endpoint, history, payload, "pending", data)
+        return ToolResult(ok=False, error_code=ERR_PUSH_PENDING, data=data)
+    err = outcome["error"] or {}
+    data["reason"] = str(err.get("message") or err.get("code") or "")
+    code = ERR_PUSH_EXPIRED if status == "expired" else ERR_PUSH_FAILED
+    _log_push(ctx, endpoint, history, payload, "failed", data)
+    return ToolResult(ok=False, error_code=code, data=data)
+
+
+def _log_push(
+    ctx: ToolContext, endpoint: dict, history: dict, payload: dict, status: str, data: dict
+) -> None:
+    """落 erp_push_logs 一行(推送状态唯一事实源;不落的话管家自己的推送查询看不见这次)。
+
+    不设 next_retry_at:重试队列是给旧 pending 路径用的,桥直写的单绝不由后台自动重推。
+    审计/日志写挂不回滚已经发生的写 —— 桥那边可能已经落账,吞掉状态才是真事故。
+    """
+    from core import db
+
+    try:
+        db.insert_push_log(
+            user_id=ctx.user_id,
+            endpoint_id=str(endpoint.get("id") or ""),
+            history_id=str(history.get("id") or ""),
+            invoice_no=payload.get("ref_no"),
+            seller_name=str(history.get("seller_name") or ""),
+            total_amount=Decimal(_money(payload.get("total_amount"))),
+            status=status,
+            http_status=202,
+            request_body=payload,
+            response_body=None,
+            error_msg=data.get("reason") or None,
+            attempt=1,
+            elapsed_ms=0,
+            trigger="steward",
+        )
+    except Exception:  # noqa: BLE001 — 日志写失败不改变桥那边的既成事实
+        logger.warning("[steward.erp_push] push log write failed job=%s", data.get("job_id"))
+
+
+def _audit(ctx: ToolContext, history: dict, payload: dict, job_id: str) -> None:
+    """写操作留痕:谁把哪张票投进了哪个账套(投单即记,不等结果 —— 结果可能永远等不到)。"""
+    try:
+        from services.audit import store as audit_store
+
+        audit_store.insert_operation_log(
+            tenant_id=ctx.tenant_id,
+            actor_user_id=ctx.user_id,
+            actor_username=ctx.user.get("username"),
+            actor_is_super=bool(ctx.user.get("is_super_admin")),
+            action=AUDIT_SUBMITTED,
+            target_type="ocr_history",
+            target_id=str(history.get("id") or ""),
+            target_name=payload.get("ref_no"),
+            details={
+                "job_id": job_id,
+                "account_set": payload.get("account_set"),
+                "direction": payload.get("direction"),
+                "doctype": payload.get("doctype"),
+                "total_amount": payload.get("total_amount"),
+            },
+        )
+    except Exception:  # noqa: BLE001 — 审计挂不阻断已投出去的写活
+        logger.warning("[steward.erp_push] audit write failed job=%s", job_id, exc_info=True)

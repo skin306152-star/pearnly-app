@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""管家六个只读工具 —— 一律薄封装既有服务层,零新 SQL、零直接写库。
+"""管家工具执行层 —— 六个只读工具薄封装既有服务层(零新 SQL、零直接写库)+ 一个写工具。
 
 留痕复用是硬约束:对话里查到的东西必须与用户手点看到的同源,所以每个工具都只是「调既有
 服务层函数 + 把结果整理成一份小结构」。哪个工具包了谁:
@@ -9,6 +9,9 @@
   push_log_query   services.erp.push_log_queries.list_push_logs     (= /api/erp/push-logs)
   history_query    services.ocr_history.queries.list_ocr_history    (= /api/history)
   client_lookup    services.workspace.store.list_workspace_clients  (= /api/workspace/clients)
+
+唯一的写工具 erp_push(经桥真写 Express)住 erp_push_tool.py:它有请求侧接地 + 执行侧投单
+两段,塞进本文件会破体积闸,也会让"只读工具一律薄封装"这条读起来不再成立。
 
 工具只出数据,不出文案 —— 人话在 copy.py 按数据渲染(模型不参与任何数字)。
 失败一律返回 ToolResult(ok=False, error_code=...),绝不抛给对话层(四态诚实:说不出来就
@@ -23,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import authz, registry
+from services.steward import authz, erp_push_tool, registry
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -335,7 +338,32 @@ _HANDLERS = {
     registry.PUSH_LOG_QUERY: push_log_query,
     registry.HISTORY_QUERY: history_query,
     registry.CLIENT_LOOKUP: client_lookup,
+    registry.ERP_PUSH: erp_push_tool.erp_push,
 }
+
+# 铸卡前的接地器(只写工具有):把用户嘴里的目标落成执行级参数 + 卡面事实。见 prepare()。
+_PREPARERS = {
+    registry.ERP_PUSH: erp_push_tool.prepare,
+}
+
+
+def prepare(name: str, ctx: ToolContext, args: dict) -> erp_push_tool.PrepareResult:
+    """写工具铸卡前的接地(orchestrator 调 · 请求侧)。
+
+    为什么必须在铸卡【前】跑:授权卡要说清「对哪个账套做什么、影响几条」,而这些事实要先把
+    「那张 7-11 的票」落成一条真实记录才知道;顺带把落定的参数写死进指纹 —— 卡上批的与
+    执行时跑的因此逐字节相同。没接地器的工具原样透传(只读路径行为不变)。
+    """
+    preparer = _PREPARERS.get(name)
+    if preparer is None:
+        return erp_push_tool.PrepareResult(args=dict(args or {}))
+    try:
+        return preparer(ctx, dict(args or {}))
+    except Exception:  # noqa: BLE001 — 接地炸了是"这活派不出去",不是把异常抛进对话层
+        logger.warning("[steward] prepare %s failed", name, exc_info=True)
+        return erp_push_tool.PrepareResult(
+            error=ToolResult(ok=False, error_code=ERR_TOOL_FAILED, data={"tool": name})
+        )
 
 
 def run(name: str, ctx: ToolContext, args: dict, grant=None) -> ToolResult:

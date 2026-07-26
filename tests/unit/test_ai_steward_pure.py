@@ -286,8 +286,7 @@ class StewardI18nShardTests(unittest.TestCase):
             for s in ("running", "done", "failed", "waiting_user", "cancelled", "unknown")
         }
         referenced |= {
-            f"stw_authz_{s}"
-            for s in ("pending", "approved", "rejected", "expired", "unknown")
+            f"stw_authz_{s}" for s in ("pending", "approved", "rejected", "expired", "unknown")
         }
         missing = sorted(referenced - zh)
         self.assertEqual(missing, [], f"引用了词典里不存在的 key: {missing}")

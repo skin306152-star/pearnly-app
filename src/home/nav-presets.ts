@@ -39,12 +39,13 @@ export const NAV_NODES: Record<string, string> = {
     perm: '#nav-group-perm', // 权限管理系统(收银员/切收银台/操作记录)
     clients: '.nav-item[data-route="clients"]',
     company: '.nav-item[data-route="company"]',
-    exceptions: '.nav-item[data-route="exceptions"]',
+    // exceptions 不在此:2026-07-26 下线,由 app-shell-sidebar-html 内联 display:none 恒隐
+    // (留在这里会被 applyNavPreset 的 show(el,true) 打开)。
     integrations: '#nav-integrations',
     guide: '[data-collapsible="guide"]', // 使用教程(父栏 → 主题)· 只对会计版有意义
 };
 
-// 会计版(firm / 未选业态老租户):首页 + Cowork + 采购 + 客户/公司/(知识)/异常 + 销售 + 集成。
+// 会计版(firm / 未选业态老租户):首页 + Cowork + 采购 + 客户/公司/(知识) + 销售 + 集成。
 export const FIRM_PRESET: NavPreset = {
     show: [
         'dashboard',
@@ -52,7 +53,6 @@ export const FIRM_PRESET: NavPreset = {
         'purchases',
         'clients',
         'company',
-        'exceptions',
         'sales',
         'integrations',
         'guide',

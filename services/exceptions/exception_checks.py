@@ -15,6 +15,7 @@ LINE 智能提醒。
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from core import db
@@ -28,6 +29,15 @@ logger = logging.getLogger("mr-pilot")
 
 # OCR 置信度非 high 的复核信号。它不是发票对错的规则,故不进引擎,留在本 hook 内常跑。
 EXC_RULE_CONFIDENCE_LOW = "confidence_low"
+
+
+# 异常栏 2026-07-26 下线(Zihao 拍板:用下来毫无用处)。引擎默认不跑 —— 五个调用点
+# (OCR persist / cache / LINE 两条 fastpath / history PUT 重跑)一律早退:不写 exceptions
+# 表、不推 LINE 高危提醒。页面代码 / API / 历史数据全留着,复活置 EXCEPTIONS_ENGINE=1,
+# 前端入口另按 src/home/route-table.ts 的下线注释放回。
+def _engine_enabled() -> bool:
+    """每次调用读一次 env:线上改环境变量重启即生效,测试也能就地 patch。"""
+    return os.getenv("EXCEPTIONS_ENGINE", "0") == "1"
 
 
 def _parse_money(raw) -> Optional[float]:
@@ -55,6 +65,8 @@ async def _async_run_exception_checks(
     fields: Optional[Dict[str, Any]] = None,
 ):
     """OCR 完成后异步跑规则 · 任何失败都吞掉 · 绝不影响主流程"""
+    if not _engine_enabled():
+        return
     try:
         fields = fields or {}
         logger.debug(

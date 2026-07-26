@@ -60,16 +60,11 @@ function _erpExcChart(endpointId?: string): Array<{ code: string; name?: string 
     return Array.isArray(ra) ? ra : [];
 }
 
-// 修复成功后重拉推送日志 + 刷新侧栏异常红点(OCR 异常徽标 · 无害共用)。
+// 修复成功后重拉推送日志(原先顺带刷侧栏异常红点 · 异常栏 2026-07-26 下线后已无处可刷)。
 function _erpExcReload() {
     if (typeof window.loadErpLogs === 'function') {
         try {
             window.loadErpLogs();
-        } catch (_) {}
-    }
-    if (typeof window.refreshExcBadge === 'function') {
-        try {
-            window.refreshExcBadge();
         } catch (_) {}
     }
 }

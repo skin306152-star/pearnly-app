@@ -6,6 +6,9 @@ source now (no flag, no legacy path), so the invariants are: engine findings
 land in the existing exception store, confidence_low still fires alongside them,
 and a high-severity finding still triggers the exception_high LINE reminder. No
 database, no network.
+
+The engine ships switched off (exception review was retired 2026-07-26), so the
+behavioural cases force it on and one case pins the shipped-off state as inert.
 """
 
 import asyncio
@@ -31,10 +34,11 @@ class _Recorder:
         return [row["rule_code"] for row in self.inserted]
 
 
-def _run_hook(*, confidence, fields, total_amount, duplicate=None):
+def _run_hook(*, confidence, fields, total_amount, duplicate=None, engine_on=True):
     rec = _Recorder()
     notify_high = AsyncMock()
     with (
+        patch.object(ec, "_engine_enabled", lambda: engine_on),
         patch.object(ec.db, "insert_exception", rec.insert_exception),
         patch.object(ec.db, "is_exception_whitelisted", lambda *a, **k: False),
         patch.object(ec, "_notify_exception_high", notify_high),
@@ -82,6 +86,27 @@ def test_high_finding_triggers_line_reminder():
     )
     fired = [call.kwargs.get("rule_code") for call in notify_high.call_args_list]
     assert "R-VAT-02" in fired
+
+
+def test_engine_off_is_inert():
+    """异常栏 2026-07-26 下线态(EXCEPTIONS_ENGINE 未开):整条钩子早退 ——
+    连 confidence_low 都不写,更不推 LINE。这是当前线上默认。"""
+    rec, notify_high = _run_hook(
+        confidence="low",
+        fields={"seller_tax": _VALID_SELLER, "subtotal": "1000", "vat": "70"},
+        total_amount=2000.0,
+        engine_on=False,
+    )
+    assert rec.inserted == []
+    assert notify_high.call_args_list == []
+
+
+def test_engine_enabled_reads_env():
+    """开关真值来自 env,不是模块加载期定死:改环境变量重启即生效。"""
+    with patch.dict("os.environ", {"EXCEPTIONS_ENGINE": "1"}):
+        assert ec._engine_enabled() is True
+    with patch.dict("os.environ", {"EXCEPTIONS_ENGINE": "0"}):
+        assert ec._engine_enabled() is False
 
 
 def test_clean_invoice_writes_nothing():

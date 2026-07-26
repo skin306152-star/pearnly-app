@@ -72,9 +72,7 @@ async function showLogDetail(logId: any) {
                 return;
             }
             if (act === 'retry') window.retryPushLog!(actEl.dataset.logId);
-            else if (act === 'exceptions') {
-                if (typeof routeTo === 'function') routeTo('exceptions');
-            } else if (act === 'mappings' || act === 'source') {
+            else if (act === 'mappings' || act === 'source') {
                 if (typeof routeTo === 'function') routeTo('integrations');
             }
             closeAll();

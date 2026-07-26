@@ -126,7 +126,7 @@
      1  src\home\erp-log-card.ts
         └ 101: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
-        └ 285: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
+        └ 283: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts
         └ 342: // v102 · 点统一「需复核」⚠ 直接打开抽屉(原 fill-amount 改名为 review)
      1  src\home\line-panel.ts

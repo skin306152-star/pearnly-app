@@ -139,11 +139,6 @@ const SHOTS = [
         sel: '#erp-logs-filters',
         prep: (page) => goRoute(page, 'push-logs', '#erp-logs-list .erp-log-card'),
     },
-    {
-        id: 'stuck-03-exceptions',
-        sel: '#page-exceptions',
-        prep: (page) => goRoute(page, 'exceptions', '#exc-list .exc-row'),
-    },
 
     // ── 总览篇 · 登录页(landing.js 独立渲染)──────────────────────
     { id: 'overview-01-login', scene: 'login', sel: '.auth-shell' },

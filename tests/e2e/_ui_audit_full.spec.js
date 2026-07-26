@@ -36,7 +36,6 @@ const ROUTES = [
     'pos-tables',
     'pos-payment',
     'knowledge',
-    'exceptions',
     'integrations',
 ];
 
@@ -146,7 +145,6 @@ test('full surface audit', async ({ page }) => {
         ['purchase', 'L1-进项单据详情', '#pur-body .row[data-id]'],
         ['sales-invoices', 'L1-销项单据详情', '#page-sales-invoices table.sx-tbl tr.click'],
         ['clients', 'L1-客户抽屉', '#buyer-tbody .cust-row[data-cid] .cust-cell-name'],
-        ['exceptions', 'L1-异常抽屉', '.exc-row[data-exc-id] .exc-row-main, .exc-row[data-exc-id]'],
     ];
     for (const [route, name, sel] of rowOpens) {
         try {

@@ -85,13 +85,13 @@ test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
             'purchases',
             'clients',
             'company',
-            'exceptions',
             'sales',
             'integrations',
         ]) {
             await expect(page.locator(SIDEBAR[key]), `${key} 应可见`).toBeVisible();
         }
-        for (const key of ['products', 'accounting', 'cashier', 'perm', 'enroll']) {
+        // exceptions:2026-07-26 下线,会计版也不再露出(下线反证 · 见 05-exceptions.spec.js)
+        for (const key of ['products', 'accounting', 'cashier', 'perm', 'enroll', 'exceptions']) {
             await expect(page.locator(SIDEBAR[key]), `${key} 应隐藏`).toBeHidden();
         }
 

@@ -122,9 +122,8 @@ window.addEventListener('online', () => {
     }
 });
 
-// 启动后立即拉一次徽章数 · 每 60 秒刷一次
-setTimeout(refreshExcBadge, 1500);
-setInterval(refreshExcBadge, 60000);
+// 徽章轮询(原:启动 1.5s 拉一次 + 每 60s 刷)已随异常栏 2026-07-26 下线一并停掉——
+// 入口恒隐,再轮询只是每分钟白打一次 /api/exceptions/stats。复活见 route-table.ts 下线注释。
 
 window.loadLearnedRules = loadLearnedRules;
 

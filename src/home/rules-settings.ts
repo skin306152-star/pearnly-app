@@ -1,7 +1,7 @@
 // ============================================================
 // 客户风险规矩设置 · 逻辑(KNOWLEDGE feature · flag-gated)
 //
-// window.openRulesSettings() 由异常页「规矩设置」按钮调用 · 首开懒建 DOM(注入
+// window.openRulesSettings() 由客户知识页「规则」tab 的「管理客户规矩」按钮调用 · 首开懒建 DOM(注入
 // 一次样式 + 两层弹窗 · 不改 home.html)· 读 /api/knowledge/rules 渲染四组规矩,
 // 增删改经同一 REST。静态数据/样式/线性图标见 rules-settings-data.ts(分文件守 <500)。
 // 全所一套:workspace_client_id 不传(默认 firm-wide)。
@@ -449,45 +449,11 @@ window.openRulesSettings = function openRulesSettings(): void {
     rsLoad();
 };
 
-// ---- 入口按钮:仅当知识库后端可用(flag 开)才注入到异常页,避免给关闭态用户一个点了报错的按钮 ----
-function rsInjectButton(): void {
-    const actions = document.querySelector('#page-exceptions .page-head-actions');
-    if (!actions || document.getElementById('exc-rules-btn')) return;
-    const btn = document.createElement('button');
-    btn.id = 'exc-rules-btn';
-    btn.type = 'button';
-    btn.className = 'btn btn-ghost';
-    btn.innerHTML = rsSvg('settings', 16) + `<span class="rs-btn-label">${rsL().btn}</span>`;
-    btn.addEventListener('click', () => window.openRulesSettings && window.openRulesSettings());
-    actions.insertBefore(btn, actions.firstChild);
-}
-
-let rsProbed = false;
-async function rsEnsureButton(): Promise<void> {
-    if (rsProbed) return;
-    rsProbed = true;
-    try {
-        const resp = await rsApi('GET', '');
-        if (resp.ok) rsInjectButton();
-    } catch (_e) {
-        /* knowledge feature off · 不注入按钮 */
-    }
-}
-
-// 异常页打开时探一次(只有访问异常页的用户付出一次探针 · 关闭态零按钮)
-const rsOrigLoadExc = window.loadExceptionsPage;
-window.loadExceptionsPage = function rsWrappedLoadExc(): void {
-    rsEnsureButton();
-    if (rsOrigLoadExc) rsOrigLoadExc();
-};
-
-// 切语言:刷新按钮文案 + 重渲打开中的弹窗
+// 切语言:重渲打开中的弹窗(入口按钮在客户知识页 · 文案走 data-i18n 由通用扫描补译)
 if (!Array.isArray(window.__i18nSubs)) window.__i18nSubs = [];
 window.__i18nSubs.push({
     name: 'rules-settings',
     fn: () => {
-        const lbl = document.querySelector('#exc-rules-btn .rs-btn-label');
-        if (lbl) lbl.textContent = rsL().btn;
         if (document.getElementById('rules-settings-modal')?.classList.contains('rs-open'))
             rsRender();
     },

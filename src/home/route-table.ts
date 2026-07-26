@@ -2,6 +2,11 @@
 // 加新页只改这里,core-boot 的 routeTo/reloadCurrentRoute 数据驱动不再长。
 
 // v118.32.5.5.37 NAV-IA Phase 5: automation 页面无侧边栏入口且不可路由 · 银行上传改为对账中心原地上传
+//
+// 异常栏(exceptions)2026-07-26 下线:不在 VALID_ROUTES = 深链 #/exceptions 回落 dms-intake。
+// 页面代码 / API / 数据都留着;要复活就把 'exceptions' 加回本表三处(VALID_ROUTES /
+// MAIN_ENTRY_ROUTES / ROUTE_LOADERS)、摘掉侧栏项的内联 display:none、把 exceptions 加回
+// nav-presets 的 NAV_NODES + FIRM_PRESET,并把后端 EXCEPTIONS_ENGINE 开关打开。
 export const VALID_ROUTES = [
     'dms-intake',
     'dashboard',
@@ -11,7 +16,6 @@ export const VALID_ROUTES = [
     'templates',
     'api-keys',
     'settings',
-    'exceptions',
     'clients',
     'company',
     'vouchers',
@@ -83,7 +87,6 @@ export const MAIN_ENTRY_ROUTES = new Set<string>([
     'history',
     'push-logs',
     'reconcile',
-    'exceptions',
     'integrations',
     'templates',
     'api-keys',
@@ -119,7 +122,6 @@ export const ROUTE_LOADERS: Record<string, string> = {
     'purchase-detail': 'loadPurchaseDetail',
     'purchase-export': 'loadPurchaseExport',
     'purchase-capture': 'loadPurchaseCapture',
-    exceptions: 'loadExceptionsPage',
     reconcile: 'loadReconcilePage',
     dashboard: 'loadDashboard',
     vouchers: 'loadAcctList',

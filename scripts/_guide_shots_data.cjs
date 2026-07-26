@@ -213,66 +213,6 @@ const ERP_LOGS = {
 
 const ERP_TODAY = { total: 4, success: 2, failed: 1, auto_cnt: 3 };
 
-const EXC_STATS = {
-    pending: 3,
-    high_severity: 1,
-    resolved: 12,
-    ignored: 2,
-    learned_rules: 4,
-    by_rule: { 'R-VAT-01': 1, 'R-TAXID-01': 1, 'R-DUP-01': 1 },
-};
-
-function excRow(id, rule, sev, seller, file, no, date, total) {
-    return {
-        id,
-        rule_code: rule,
-        severity: sev,
-        status: 'pending',
-        seller_name: seller,
-        filename: file,
-        invoice_no: no,
-        invoice_date_raw: date,
-        total_amount: total,
-        created_at: '2026-07-20T10:24:00',
-    };
-}
-
-const EXC_LIST = {
-    items: [
-        excRow(
-            1,
-            'R-VAT-01',
-            'high',
-            SELLER,
-            'INV-2569-07-11.pdf',
-            'INV-2569/0011',
-            '20/07/2569',
-            32100
-        ),
-        excRow(
-            2,
-            'R-TAXID-01',
-            'medium',
-            BUYER_B,
-            'INV-2569-07-12.pdf',
-            'INV-2569/0012',
-            '19/07/2569',
-            10700
-        ),
-        excRow(
-            3,
-            'R-DUP-01',
-            'medium',
-            BUYER_C,
-            'RECEIPT-2569-07-13.jpg',
-            'INV-2569/0013',
-            '18/07/2569',
-            5350
-        ),
-    ],
-    total: 3,
-};
-
 // 服务端 list_templates 的镜像(erp 模板前端自己会滤掉 · sales_detail_th 前端自己会加)。
 const TPL_TEXT = {
     input_vat: {
@@ -391,8 +331,6 @@ function apiBody(url, lang) {
     if (p.endsWith('/api/erp/stats/today')) return ERP_TODAY;
     if (p.endsWith('/api/erp/logs')) return ERP_LOGS;
     if (p.endsWith('/api/reports/templates')) return templates(lang);
-    if (p.endsWith('/api/exceptions/stats')) return EXC_STATS;
-    if (p.endsWith('/api/exceptions/list')) return EXC_LIST;
     if (/\/api\/history\/[^/]+$/.test(p)) return HISTORY_DETAIL;
     if (p.endsWith('/api/history')) return HISTORY;
     return null;

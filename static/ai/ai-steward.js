@@ -361,14 +361,21 @@
         mount(api);
     }
 
-    // 探针不阻塞首屏;失败也 fail-closed(闸关待遇),不给一个点了 404 的入口。
+    // 探针不阻塞首屏;失败 fail-closed(闸关待遇),不给一个点了 404 的入口。
+    // 401 例外:会话过期/被踢下线不是"这个功能没开",静默隐藏会让人以为管家被下架了。
+    // 走整站唯一的过期出口(ai.js 的 expireSession → 登录卡 + 过期提示),不另造一套;
+    // 文案沿用 intake_err_session(整站同一句「会话已失效,请重新登录」·四语齐全)。
     function probe(api) {
         gateOpen = null;
         api.getStewardStatus()
             .then(function (resp) {
                 applyGate(api, resp && resp.enabled === true);
             })
-            .catch(function () {
+            .catch(function (err) {
+                if (err && err.status === 401) {
+                    AI.expireSession('intake_err_session');
+                    return;
+                }
                 applyGate(api, false);
             });
     }

@@ -225,5 +225,33 @@ class ReopenTests(unittest.TestCase):
         self.assertEqual(len(store.events), n)
 
 
+class StatusGroupTests(unittest.TestCase):
+    """状态语义组是矩阵徽章与管家筛选共用的唯一口径(两处曾各写一份,同屏数字打架)。"""
+
+    def test_every_status_belongs_to_exactly_one_group(self):
+        seen = [s for _g, members in engine.STATUS_GROUPS for s in members]
+        self.assertEqual(sorted(seen), sorted(engine.ALL_STATUSES))
+        self.assertEqual(len(seen), len(set(seen)))
+
+    def test_stuck_and_review_share_the_pending_review_group(self):
+        self.assertEqual(engine.group_of(engine.STATUS_STUCK), "pending_review")
+        self.assertEqual(engine.group_of(engine.STATUS_REVIEW), "pending_review")
+
+    def test_unknown_future_status_has_no_group(self):
+        self.assertIsNone(engine.group_of("some_future_status"))
+        self.assertIsNone(engine.group_of(None))
+
+    def test_resolve_accepts_group_name_and_raw_status_alike(self):
+        by_group = engine.resolve_status_filter("pending_review")
+        by_status = engine.resolve_status_filter(engine.STATUS_REVIEW)
+        self.assertEqual(by_group, by_status)
+        self.assertEqual(by_group[0], "pending_review")
+        self.assertEqual(sorted(by_group[1]), ["review", "stuck"])
+
+    def test_resolve_unknown_word_means_no_filter(self):
+        for word in ("almost_done", "", None):
+            self.assertEqual(engine.resolve_status_filter(word), (None, ()))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,7 +21,7 @@ jsonb 载荷一律 json.dumps 走参数化,不拼字符串。
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 # run 租约 + 死亡判据 DAL 拆在 run_leases.py(单文件 <500 铁律),re-export 保持调用方
 # (runner/reaper/routes/测试)的 store.* 口径不变,实现单源在彼。
@@ -97,36 +97,40 @@ _WO_COLUMNS = (
 )
 
 
+# 列表与计数共用这份谓词/参数:total 与页内行同口径靠共用,不靠两处对照抄;值全参数化不拼结构。
+_WO_FILTER_SQL = (
+    "WHERE tenant_id = %s "
+    "AND (%s::bigint IS NULL OR workspace_client_id = %s::bigint) "
+    "AND (%s::text IS NULL OR period = %s::text) "
+    "AND (%s::text[] IS NULL OR status = ANY(%s::text[])) "
+)
+
+
+def _wo_filter_params(tenant_id, workspace_client_id, period, statuses) -> tuple:
+    """_WO_FILTER_SQL 的七个占位符实参。statuses 空/None 一律当不筛,不静默返回 0 行。"""
+    arr = list(statuses) if statuses else None
+    return (tenant_id, workspace_client_id, workspace_client_id, period, period, arr, arr)
+
+
 def list_work_orders(
     cur,
     *,
     tenant_id: str,
     workspace_client_id: Optional[int] = None,
     period: Optional[str] = None,
-    status: Optional[str] = None,
+    statuses: Optional[Sequence[str]] = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
-    """列该租户工单,可按账套/账期/状态筛,倒序分页。可选筛选走 `%s IS NULL OR col = %s`
-    的静态谓词(不动态拼 SQL 结构,值全参数化)——看板/列表读侧用。"""
+    """列该租户工单,可按账套/账期/状态筛,倒序分页(看板/列表读侧用)。
+
+    statuses 收一组而非一个:调用方按 engine.resolve_status_filter 展开的语义组来筛
+    (「待审」= stuck + review),否则 COUNT 与矩阵徽章数不上。"""
     cur.execute(
         f"SELECT {_WO_COLUMNS} FROM work_orders "
-        "WHERE tenant_id = %s "
-        "AND (%s::bigint IS NULL OR workspace_client_id = %s::bigint) "
-        "AND (%s::text IS NULL OR period = %s::text) "
-        "AND (%s::text IS NULL OR status = %s::text) "
-        "ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s",
-        (
-            tenant_id,
-            workspace_client_id,
-            workspace_client_id,
-            period,
-            period,
-            status,
-            status,
-            limit,
-            offset,
-        ),
+        + _WO_FILTER_SQL
+        + "ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s",
+        _wo_filter_params(tenant_id, workspace_client_id, period, statuses) + (limit, offset),
     )
     return [dict(r) for r in cur.fetchall()]
 
@@ -137,16 +141,12 @@ def count_work_orders(
     tenant_id: str,
     workspace_client_id: Optional[int] = None,
     period: Optional[str] = None,
-    status: Optional[str] = None,
+    statuses: Optional[Sequence[str]] = None,
 ) -> int:
-    """列表总数(分页 total)。同 list_work_orders 的筛选谓词。"""
+    """列表总数(分页 total)。谓词与参数都与 list_work_orders 同源。"""
     cur.execute(
-        "SELECT count(*) AS n FROM work_orders "
-        "WHERE tenant_id = %s "
-        "AND (%s::bigint IS NULL OR workspace_client_id = %s::bigint) "
-        "AND (%s::text IS NULL OR period = %s::text) "
-        "AND (%s::text IS NULL OR status = %s::text)",
-        (tenant_id, workspace_client_id, workspace_client_id, period, period, status, status),
+        "SELECT count(*) AS n FROM work_orders " + _WO_FILTER_SQL,
+        _wo_filter_params(tenant_id, workspace_client_id, period, statuses),
     )
     return int(cur.fetchone()["n"])
 

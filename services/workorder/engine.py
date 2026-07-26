@@ -50,6 +50,33 @@ STATUS_REVIEW = TERMINAL_STATUS
 STATUS_ARCHIVE = "archive"
 ALL_STATUSES = (STATUS_COLLECTING, STATUS_RUNNING, STATUS_STUCK, STATUS_REVIEW, STATUS_ARCHIVE)
 
+# 状态语义组:一组引擎态在使用者眼里是同一件事。组名即矩阵徽章名(matrix.badge 直接取用)。
+# stuck 与 review 合成「待审」是矩阵早就定下的口径(两态对看矩阵的人都是"要人看"),
+# 但管家的工单筛选曾另写一份 status == 'review' 精确匹配,于是同一屏出现矩阵「待审 2」
+# 而管家答「0 张工单」。口径写在这里一份,矩阵与管家都从这里取,改口径只改这里。
+STATUS_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("missing_materials", (STATUS_COLLECTING,)),
+    ("in_progress", (STATUS_RUNNING,)),
+    ("pending_review", (STATUS_STUCK, STATUS_REVIEW)),
+    ("frozen", (STATUS_ARCHIVE,)),
+)
+_STATUSES_BY_GROUP = dict(STATUS_GROUPS)
+_GROUP_BY_STATUS = {s: name for name, members in STATUS_GROUPS for s in members}
+
+
+def group_of(status: Optional[str]) -> Optional[str]:
+    """引擎态 → 语义组名。未知未来态返回 None(诚实降级,不冒充某个已知组)。"""
+    return _GROUP_BY_STATUS.get(status or "")
+
+
+def resolve_status_filter(word: Optional[str]) -> tuple[Optional[str], tuple[str, ...]]:
+    """筛选词 → (语义组名, 要查的引擎态)。组名与单个引擎态都认,认不出返回 (None, ())
+    = 当没筛。问 review 得 stuck+review:筛出来的必须与矩阵徽章数得起来。"""
+    key = word or ""
+    group = key if key in _STATUSES_BY_GROUP else group_of(key)
+    return (group, _STATUSES_BY_GROUP[group]) if group else (None, ())
+
+
 STEP_OK = "ok"
 STEP_STUCK = "stuck"
 STEP_NEEDS = "needs"

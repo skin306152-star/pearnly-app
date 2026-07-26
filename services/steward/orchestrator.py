@@ -11,6 +11,11 @@ running 落库、再跑工具、跑完改终态 —— 左窗看到的每一步�
 参数接地全程复用 services/agent/slots.py(source=user_text 的值必须出现在用户原话/近几轮里,
 编造的进 rejected 绝不流到执行);期间线索复用 front_desk.interpret.parse_period_hint 解析,
 再经 obligation_engine.be_period_from_ce 折成佛历账期 —— 解不出就追问,绝不猜一个期。
+
+同步执行是 M1 的取舍(不是没写完):POST /messages 把工具跑完才返回,所以左窗的 running 态在
+真实链路里一闪即过——M1 六个工具都是一次只读查询、秒级返回,为它们上异步队列只是给自己加一层
+可能丢任务的中间态。等 B3 有了真跑批(整期重算/批量推送这类分钟级长任务),再把执行搬去后台、
+让左窗的 running 有真事可表达。
 """
 
 from __future__ import annotations

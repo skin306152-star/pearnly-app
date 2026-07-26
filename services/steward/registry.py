@@ -83,15 +83,21 @@ TOOLS: tuple[StewardTool, ...] = (
     ),
     StewardTool(
         name=WORKORDER_LIST,
-        desc="列工单:某一期、或某个状态(收料中/执行中/卡住/待审/已冻结)的工单有哪些",
+        desc="列工单:某一期的工单有哪些,可按口径筛(缺料/进行中/待审/已冻结)",
         slots=(
             _period_slot(),
+            # 口径词而非引擎态:用户说的「还没审完」在矩阵里是 stuck+review 两态合成的
+            # 「待审」。让大脑挑口径词、由 engine.resolve_status_filter 展开成引擎态,
+            # 答复才与同屏矩阵数得起来(引擎态原词执行器也认,归到所属口径)。
             SlotSpec(
                 "status",
                 required=False,
                 source="model_freeform",
-                desc_th="สถานะงาน: collecting/running/stuck/review/archive",
-                desc_zh="工单状态枚举(collecting/running/stuck/review/archive)· 执行器再验",
+                desc_th="ขอบเขต: missing_materials/in_progress/pending_review/frozen",
+                desc_zh=(
+                    "筛选口径(missing_materials 缺料 / in_progress 进行中 / "
+                    "pending_review 待审 / frozen 已冻结)· 执行器再验"
+                ),
             ),
         ),
         handler="workorder_list",

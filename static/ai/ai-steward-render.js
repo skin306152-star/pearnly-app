@@ -4,7 +4,8 @@
  * 吃 GET /api/ai/steward/tasks/{tid} 的载荷:
  *   { task_id, title, status, started_at, agent_count,
  *     steps: [{ id, label, state, detail, links: [{label, href}] }],
- *     artifacts: [{ kind, label, href?, rows?, columns? }] }
+ *     artifacts: [{ kind, label, href?,
+ *                   columns?: [{key, label}], rows?: [{<key>: 值}] }] }
  *
  * 状态一律从 B1 状态词典取脸(docs/design-system/STATE-LANGUAGE.md · ai-states.css),
  * 本文件只做「业务码 → 色族」的查表(同 ai-matrix-render.js 的 BADGE_CHIP 先例),
@@ -165,26 +166,31 @@
         );
     }
 
+    // 表格产物形状由后端定契约(services/steward/copy.py _table):
+    //   columns = [{key, label}] · rows = [{<key>: 值}]
+    // 取值一律按 columns 的 key 走,列顺序即表头顺序;缺 key 给空格子,不印 undefined。
+    // (首版按「columns 是字符串数组 + 行是数组」渲染,dict 行整个进一个 td 印成
+    //  [object Object] —— 五个工具的表格全废;E2E 的桩当时抄了那套不存在的形状,自证自洽。)
     function tableHtml(art) {
         var rows = art.rows || [];
-        if (!rows.length) return '';
-        var head = (art.columns || []).length
-            ? '<thead><tr>' +
-              art.columns
-                  .map(function (c) {
-                      return '<th>' + esc(c) + '</th>';
-                  })
-                  .join('') +
-              '</tr></thead>'
-            : '';
+        var cols = art.columns || [];
+        if (!rows.length || !cols.length) return '';
+        var head =
+            '<thead><tr>' +
+            cols
+                .map(function (c) {
+                    return '<th>' + esc((c && (c.label || c.key)) || '') + '</th>';
+                })
+                .join('') +
+            '</tr></thead>';
         var body = rows
             .map(function (r) {
-                var cells = Array.isArray(r) ? r : [r];
                 return (
                     '<tr>' +
-                    cells
+                    cols
                         .map(function (c) {
-                            return '<td>' + esc(c) + '</td>';
+                            var v = r && c ? r[c.key] : null;
+                            return '<td>' + esc(v == null ? '' : v) + '</td>';
                         })
                         .join('') +
                     '</tr>'

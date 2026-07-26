@@ -30,6 +30,15 @@ _ORDER_STATUS = {
     "archive": {"zh": "已冻结", "th": "ปิดงวดแล้ว"},
 }
 
+# 状态语义组(engine.STATUS_GROUPS 的组名)的人话。工单清单的答复要自证口径:
+# 「2569-07:0 张工单」看不出筛没筛,与同屏矩阵的「待审 2」对不上时无从判断谁错。
+_STATUS_GROUP = {
+    "missing_materials": {"zh": "缺料", "th": "เอกสารไม่ครบ"},
+    "in_progress": {"zh": "进行中", "th": "กำลังทำ"},
+    "pending_review": {"zh": "待审", "th": "รอตรวจ"},
+    "frozen": {"zh": "已冻结", "th": "ปิดงวดแล้ว"},
+}
+
 _TOOL_TITLE = {
     registry.MATRIX_OVERVIEW: {"zh": "查本期矩阵", "th": "ดูภาพรวมงวด"},
     registry.CLIENT_STATUS: {"zh": "查客户进度", "th": "ดูความคืบหน้าลูกค้า"},
@@ -93,8 +102,8 @@ _REPLY = {
         "th": "งวด {period}: ลูกค้า {client_count} ราย · เอกสารไม่ครบ {missing_materials} · รอตรวจ {pending_review} · กำลังทำ {in_progress} · ยังไม่เปิดงาน {missing_order}",
     },
     registry.WORKORDER_LIST: {
-        "zh": "{period}:{total} 张工单{breakdown}。",
-        "th": "งวด {period}: {total} งาน{breakdown}",
+        "zh": "{period}{status_filter}:{total} 张工单{breakdown}。",
+        "th": "งวด {period}{status_filter}: {total} งาน{breakdown}",
     },
     registry.PUSH_LOG_QUERY: {
         "zh": "近 {days} 天 {total} 条推送:成功 {success} · 失败 {failed}。{note}",
@@ -221,6 +230,7 @@ def reply(tool: str, data: dict, lang: str) -> str:
     if tool == registry.WORKORDER_LIST:
         return _t(_REPLY[tool], lang).format(
             period=data.get("period", ""),
+            status_filter=status_filter(data.get("status_filter"), lang),
             total=data.get("total", 0),
             breakdown=_breakdown(data.get("counts") or {}, lang),
         )
@@ -263,6 +273,14 @@ def _client_status_reply(data: dict, lang: str) -> str:
         material_count=data.get("material_count", 0),
         needs=needs_txt,
     )
+
+
+def status_filter(group: Optional[str], lang: str) -> str:
+    """筛选口径 → 答复里的「 · 待审」片段。没筛返回空串,不认识的组名原样吐(诚实)。"""
+    if not group:
+        return ""
+    table = _STATUS_GROUP.get(group)
+    return " · " + (_t(table, lang) if table else group)
 
 
 def order_status(status: Optional[str], lang: str) -> str:

@@ -189,7 +189,10 @@ async def list_orders(
     limit: int = 50,
     offset: int = 0,
 ):
-    """工单列表(按账套/账期/状态筛,倒序分页)。"""
+    """工单列表(按账套/账期/状态筛,倒序分页)。
+
+    status 保持逐字精确匹配(不展开成 engine 的语义组):这条 HTTP 契约的消费方按引擎态
+    取数,而语义组是给人看的口径(管家/矩阵用)。两种需求各自诚实,不共用一个参数含混。"""
     _user, tenant_id = _authorize(request, _C_VIEW)
     limit = max(1, min(int(limit), 200))
     offset = max(0, int(offset))
@@ -199,7 +202,7 @@ async def list_orders(
             tenant_id=tenant_id,
             workspace_client_id=client_id,
             period=period,
-            status=status,
+            statuses=[status] if status else None,
             limit=limit,
             offset=offset,
         )

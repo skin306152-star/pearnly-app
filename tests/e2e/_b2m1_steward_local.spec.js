@@ -74,13 +74,21 @@ function taskPayload(status) {
                 label: '去 SM 的工单页',
                 href: '#/client/c-sm/wo?period=2569-06',
             },
+            // 形状必须与后端真实产出逐字段一致(services/steward/copy.py _table:
+            // columns=[{key,label}] + dict 行)。首版桩抄的是产品里不存在的旧形状
+            // (字符串列 + 数组行),于是表格全渲染成 [object Object] 却全绿——
+            // 桩的形状不是随便编的,它就是被验的契约本身。
             {
                 kind: 'table',
-                label: '缺料清单',
-                columns: ['客户', '缺什么'],
+                label: '要盯的格子',
+                columns: [
+                    { key: 'name', label: '客户' },
+                    { key: 'obligation_code', label: '义务' },
+                    { key: 'badge', label: '状态' },
+                ],
                 rows: [
-                    ['SM', '银行流水'],
-                    ['MR.ERP', '销项汇总'],
+                    { name: 'SM', obligation_code: 'PP30', badge: 'missing_materials' },
+                    { name: 'MR.ERP', obligation_code: 'PND3', badge: null },
                 ],
             },
         ],
@@ -212,6 +220,21 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
             '#/client/c-sm/wo?period=2569-06'
         );
         await expect(page.locator('#stwLeft .stw-table tbody tr')).toHaveCount(2);
+
+        // 表头按 label 显示、单元格按 column.key 从 dict 行取值,缺值给空格子。
+        await expect(page.locator('#stwLeft .stw-table thead th')).toHaveText([
+            '客户',
+            '义务',
+            '状态',
+        ]);
+        await expect(page.locator('#stwLeft .stw-table tbody tr').first().locator('td')).toHaveText(
+            ['SM', 'PP30', 'missing_materials']
+        );
+        // 反证闸:任何一格印出 [object Object] = 契约又漂了(这次就是这么漏过去的)。
+        const cellTexts = await page.locator('#stwLeft .stw-table td').allInnerTexts();
+        expect(cellTexts.length).toBe(6);
+        expect(cellTexts.join('|')).not.toContain('[object Object]');
+        expect(cellTexts.join('|')).not.toContain('undefined');
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '02-steward-two-pane.png'),
             fullPage: true,

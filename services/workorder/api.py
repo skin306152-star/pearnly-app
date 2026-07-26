@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Optional, Sequence
 
 from core import feature_flags
 from services.workorder import (
@@ -142,16 +142,17 @@ def list_orders(
     tenant_id: str,
     workspace_client_id: Optional[int] = None,
     period: Optional[str] = None,
-    status: Optional[str] = None,
+    statuses: Optional[Sequence[str]] = None,
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
+    """工单列表 + 总数。statuses 收一组状态(语义组见 engine.resolve_status_filter)。"""
     orders = store.list_work_orders(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         period=period,
-        status=status,
+        statuses=statuses,
         limit=limit,
         offset=offset,
     )
@@ -160,7 +161,7 @@ def list_orders(
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         period=period,
-        status=status,
+        statuses=statuses,
     )
     return {"orders": orders, "count": total, "limit": limit, "offset": offset}
 

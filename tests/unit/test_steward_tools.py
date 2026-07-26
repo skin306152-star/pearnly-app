@@ -177,21 +177,37 @@ class ClientStatusTests(unittest.TestCase):
 
 
 class WorkorderListTests(unittest.TestCase):
-    def test_wraps_list_orders_and_drops_bogus_status(self):
-        orders = [
-            {"id": "w1", "workspace_client_id": 1, "status": "running", "current_step": "classify"}
-        ]
+    _ORDERS = [
+        {"id": "w1", "workspace_client_id": 1, "status": "running", "current_step": "classify"}
+    ]
+
+    def _run(self, args):
         with (
             _no_db(),
             mock.patch.object(tools, "_clients", return_value=_CLIENTS),
             mock.patch.object(
-                wo_api, "list_orders", return_value={"orders": orders, "count": 1}
+                wo_api, "list_orders", return_value={"orders": self._ORDERS, "count": 1}
             ) as lst,
         ):
-            res = tools.workorder_list(_ctx(), {"status": "almost_done", "period": "2569-06"})
-        self.assertIsNone(lst.call_args.kwargs["status"])  # 枚举外不拿去查库
+            return tools.workorder_list(_ctx(), args), lst
+
+    def test_wraps_list_orders_and_drops_bogus_status(self):
+        res, lst = self._run({"status": "almost_done", "period": "2569-06"})
+        self.assertIsNone(lst.call_args.kwargs["statuses"])  # 枚举外不拿去查库
+        self.assertIsNone(res.data["status_filter"])
         self.assertEqual(res.data["counts"], {"running": 1})
         self.assertEqual(res.data["orders"][0]["client_name"], "Sister Makeup")
+
+    def test_pending_review_matches_matrix_badge_scope(self):
+        """「还没审完」= 矩阵的「待审」= stuck + review。少查一态就会与同屏矩阵打架。"""
+        res, lst = self._run({"status": "pending_review", "period": "2569-07"})
+        self.assertEqual(sorted(lst.call_args.kwargs["statuses"]), ["review", "stuck"])
+        self.assertEqual(res.data["status_filter"], "pending_review")
+
+    def test_raw_engine_status_is_widened_to_its_group(self):
+        """大脑照旧吐 'review' 也不再漏掉 stuck —— 口径只有一份,入口用哪个词都归它。"""
+        _res, lst = self._run({"status": "review"})
+        self.assertEqual(sorted(lst.call_args.kwargs["statuses"]), ["review", "stuck"])
 
 
 class PushLogQueryTests(unittest.TestCase):

@@ -14,25 +14,18 @@ from __future__ import annotations
 
 from typing import Optional
 
-from services.workorder import obligation_engine
-from services.workorder.engine import (
-    STATUS_ARCHIVE,
-    STATUS_COLLECTING,
-    STATUS_REVIEW,
-    STATUS_RUNNING,
-    STATUS_STUCK,
-)
+from services.workorder import engine, obligation_engine
 
 # 矩阵格子徽章(C4 · UI-Canon-v4 §1 四色族:good=顺畅/完结,warn=缺料/催,
-# crit=等人判/卡点,sage=AI 在做)。stuck 与 review 两个引擎态合并成同一个「待审」
-# 徽章——矩阵一次 JOIN 喂全租户全客户,不能像工单详情那样逐单读 events 分辨 stuck
-# 是缺料还是等人判(那是 N+1),两态对矩阵使用者都是"要人看"这一层意思,故不细分。
+# crit=等人判/卡点,sage=AI 在做)。由工单态推出的四个徽章名与 engine.STATUS_GROUPS 的
+# 组名同名同义(stuck+review 合成「待审」等口径写在那里一份,管家筛工单共用)——
+# 常量留在此处是给消费方一个稳定的徽章词汇入口,值一律从组表来,不另写一套判据。
 BADGE_NO_NEED = "no_need"
 BADGE_PENDING_ORDER = "pending_order"
-BADGE_MISSING_MATERIALS = "missing_materials"
-BADGE_IN_PROGRESS = "in_progress"
-BADGE_PENDING_REVIEW = "pending_review"
-BADGE_FROZEN = "frozen"
+BADGE_MISSING_MATERIALS = engine.group_of(engine.STATUS_COLLECTING)
+BADGE_IN_PROGRESS = engine.group_of(engine.STATUS_RUNNING)
+BADGE_PENDING_REVIEW = engine.group_of(engine.STATUS_REVIEW)
+BADGE_FROZEN = engine.group_of(engine.STATUS_ARCHIVE)
 BADGE_NOT_EVALUATED = "not_evaluated"
 
 # 客户目录(EN-clients · 2026-07-13)「画像完整度」= 这 6 个默认落 unknown 的画像字段
@@ -85,9 +78,9 @@ def profile_completeness(row: dict, prefix: str = "") -> float:
 def badge(obligation_status: Optional[str], order_status: Optional[str]) -> str:
     """(obligation_status, order_status) → 矩阵格子徽章(纯函数,零 I/O,见常量顶注)。
 
-    order_status 词汇一律 import engine.STATUS_*(单一事实源,C4-R1:首版手打
-    "archived"/"signed" 两个臆造词,真冻结单 status=archive 落 fallthrough 错标
-    「未评估」——测试也用同一套错词自证自洽,教训=状态字符串必须来自权威常量)。
+    工单态一律经 engine.group_of 归组(单一事实源,C4-R1:首版手打 "archived"/"signed"
+    两个臆造词,真冻结单 status=archive 落 fallthrough 错标「未评估」——测试也用同一套
+    错词自证自洽,教训=状态字符串必须来自权威常量)。
     """
     if obligation_status is None:
         return BADGE_NOT_EVALUATED  # 该期从未物化过义务(未存过画像/未开过单)
@@ -95,15 +88,7 @@ def badge(obligation_status: Optional[str], order_status: Optional[str]) -> str:
         return BADGE_NO_NEED
     if order_status is None:
         return BADGE_PENDING_ORDER
-    if order_status == STATUS_COLLECTING:
-        return BADGE_MISSING_MATERIALS
-    if order_status == STATUS_RUNNING:
-        return BADGE_IN_PROGRESS
-    if order_status in (STATUS_STUCK, STATUS_REVIEW):
-        return BADGE_PENDING_REVIEW
-    if order_status == STATUS_ARCHIVE:
-        return BADGE_FROZEN
-    return BADGE_NOT_EVALUATED  # 未知未来态:诚实降级,不冒充已知徽章
+    return engine.group_of(order_status) or BADGE_NOT_EVALUATED  # 未知未来态:诚实降级
 
 
 def fetch_rows(cur, *, tenant_id: str, period: str) -> list[dict]:

@@ -194,16 +194,22 @@ def client_status(ctx: ToolContext, args: dict) -> ToolResult:
 
 
 def workorder_list(ctx: ToolContext, args: dict) -> ToolResult:
-    """列工单(按期/按状态)。客户名从名录一次补齐,不逐单查(防 N+1)。"""
+    """列工单(按期/按口径)。客户名从名录一次补齐,不逐单查(防 N+1)。
+
+    筛选走 engine.resolve_status_filter 的语义组:问「还没审完」得 stuck+review 两态,
+    与矩阵徽章同一口径 —— 否则同屏出现矩阵「待审 2」而这里答「0 张工单」。
+    认不出的词一律当没筛(不拿编造的状态去查库)。"""
     from services.workorder import api as wo_api, engine
 
-    status = args.get("status")
-    if status not in engine.ALL_STATUSES:
-        status = None  # 枚举外一律当没筛(不拿编造的状态去查库)
+    status_filter, statuses = engine.resolve_status_filter(args.get("status"))
     period = _period_or_current(args.get("period"))
     with _cursor() as cur:
         listing = wo_api.list_orders(
-            cur, tenant_id=ctx.tenant_id, period=period, status=status, limit=_LIST_LIMIT
+            cur,
+            tenant_id=ctx.tenant_id,
+            period=period,
+            statuses=statuses or None,
+            limit=_LIST_LIMIT,
         )
     names = {c["id"]: c["name"] for c in _clients(ctx)}
     orders = [o for o in listing["orders"] if _in_scope(ctx, o["workspace_client_id"])]
@@ -211,7 +217,7 @@ def workorder_list(ctx: ToolContext, args: dict) -> ToolResult:
         ok=True,
         data={
             "period": period,
-            "status_filter": status,
+            "status_filter": status_filter,
             "total": listing["count"],
             "counts": dict(Counter(o["status"] for o in orders)),
             "orders": [

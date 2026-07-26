@@ -60,14 +60,14 @@ class _FakeStore(WorkOrderFakeStoreBase):
         tenant_id,
         workspace_client_id=None,
         period=None,
-        status=None,
+        statuses=None,
         limit=50,
         offset=0,
     ):
         return [dict(self.wo)]
 
     def count_work_orders(
-        self, cur, *, tenant_id, workspace_client_id=None, period=None, status=None
+        self, cur, *, tenant_id, workspace_client_id=None, period=None, statuses=None
     ):
         return 1
 

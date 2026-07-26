@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 
 from services.steward import copy, registry, store
+from services.workorder import engine
 
 _ROOT = Path(__file__).resolve().parents[2]
 _I18N = _ROOT / "static" / "ai" / "ai-i18n-steward.js"
@@ -40,6 +41,28 @@ class NumbersComeFromToolsTests(unittest.TestCase):
         """空数据不许被润色成"一切正常"——四态诚实,0 就是 0。"""
         line = copy.reply(registry.MATRIX_OVERVIEW, {"period": "2569-06"}, "zh")
         self.assertIn("0", line)
+
+    def test_workorder_reply_states_the_filter_it_used(self):
+        """答复要自证口径:只说「0 张工单」时,同屏矩阵写「待审 2」就无从判断谁错。"""
+        data = {"period": "2569-07", "status_filter": "pending_review", "total": 2, "counts": {}}
+        line = copy.reply(registry.WORKORDER_LIST, data, "zh")
+        self.assertIn("2569-07", line)
+        self.assertIn("待审", line)
+        self.assertIn("2", line)
+        self.assertIn("รอตรวจ", copy.reply(registry.WORKORDER_LIST, data, "th"))
+
+    def test_workorder_reply_without_filter_says_nothing_extra(self):
+        data = {"period": "2569-07", "status_filter": None, "total": 5, "counts": {}}
+        self.assertEqual(copy.reply(registry.WORKORDER_LIST, data, "zh"), "2569-07:5 张工单。")
+
+    def test_unknown_filter_group_is_not_dressed_up(self):
+        self.assertEqual(copy.status_filter("some_future_group", "zh"), " · some_future_group")
+
+    def test_every_status_group_has_copy_in_both_languages(self):
+        """反证:engine 加一个语义组而这里忘了配人话,答复会把机器词吐给会计。"""
+        for group, _statuses in engine.STATUS_GROUPS:
+            for lang in ("zh", "th"):
+                self.assertNotIn(group, copy.status_filter(group, lang), f"{group}/{lang}")
 
     def test_client_status_reply_uses_returned_status_and_counts(self):
         data = {

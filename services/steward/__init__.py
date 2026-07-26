@@ -8,4 +8,8 @@
   orchestrator.py 单轮编排:计划 → 参数接地 → 执行 → 任务落库 → 答复
   copy.py         答复/步骤的 zh+th 文案(数字全部来自工具返回,模板不做任何计算)
   store.py        会话/消息/任务三表 DAL(RLS 按 tenant)
+
+闸(pearnly_ai_steward · tenant 级 · 默认关)读的是 platform_settings,那层有 30s 进程内
+TTL 缓存(services/platform_settings/store._CACHE_TTL_S):超管在后台开闸后,每个 web 进程
+最迟 30s 才看得到,多 worker 各自到点收敛。验收时刷新页面没出管家先等半分钟再报障。
 """

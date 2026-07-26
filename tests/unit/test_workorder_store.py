@@ -78,6 +78,31 @@ class WorkOrderReadWriteTests(unittest.TestCase):
         self.assertEqual(params, ("running", "classify", "t-1", "wo-1"))
 
 
+class ListWorkOrdersFilterTests(unittest.TestCase):
+    """状态筛选收一组(语义组「待审」= stuck + review),列表与 COUNT 必须同一份谓词。"""
+
+    def test_status_predicate_is_a_parameterized_array_membership(self):
+        cur = FakeCursor(fetchall_queue=[[]])
+        store.list_work_orders(cur, tenant_id="t-1", statuses=["stuck", "review"])
+        sql, params = cur.calls[0]
+        self.assertIn("status = ANY(%s::text[])", sql)
+        self.assertEqual(params[5], ["stuck", "review"])
+        self.assertEqual(params[6], ["stuck", "review"])
+
+    def test_count_uses_the_same_predicate(self):
+        cur = FakeCursor([{"n": 2}])
+        self.assertEqual(store.count_work_orders(cur, tenant_id="t-1", statuses=["stuck"]), 2)
+        sql, params = cur.calls[0]
+        self.assertIn("status = ANY(%s::text[])", sql)
+        self.assertEqual(params[-1], ["stuck"])
+
+    def test_none_and_empty_both_mean_no_filter(self):
+        for arg in (None, [], ()):
+            cur = FakeCursor(fetchall_queue=[[]])
+            store.list_work_orders(cur, tenant_id="t-1", statuses=arg)
+            self.assertIsNone(cur.calls[0][1][5], arg)  # NULL::text[] → 谓词恒真,不是 0 行
+
+
 class EventsAppendOnlyTests(unittest.TestCase):
     def test_append_event_serializes_payload_as_json_param(self):
         cur = FakeCursor([{"id": 1, "event_type": "step_started"}])

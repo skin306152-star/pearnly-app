@@ -24,6 +24,7 @@ def _iter_execute_calls():
     for d in _DIRS:
         for f in sorted(pathlib.Path(d).glob("*.py")):
             tree = ast.parse(f.read_text(encoding="utf-8"))
+            consts = _module_str_consts(tree)
             for node in ast.walk(tree):
                 if (
                     isinstance(node, ast.Call)
@@ -31,15 +32,37 @@ def _iter_execute_calls():
                     and node.func.attr in ("execute", "executemany")
                     and node.args
                 ):
-                    yield f.name, node.lineno, node.args[0]
+                    yield f.name, node.lineno, node.args[0], consts
 
 
-def _sql_and_interps(arg):
+def _module_str_consts(tree) -> dict:
+    """模块级 `NAME = "..."` 字符串常量表。
+
+    SQL 片段抽成常量给多个函数复用是好事(列表与 COUNT 必须同一份 WHERE),但常量一抽,
+    只看字面量的本闸就再也看不见里面的 tenant_id —— 会把合规的语句报成违规,也会把真漏
+    tenant_id 的语句藏进常量里溜过去。所以这里把常量文本还原回调用点。"""
+    out = {}
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            text, _ = _sql_and_interps(node.value)
+            if text:
+                out[node.targets[0].id] = text
+    return out
+
+
+def _sql_and_interps(arg, consts=None):
+    consts = consts or {}
     text, interps = [], []
 
     def walk(n):
         if isinstance(n, ast.Constant) and isinstance(n.value, str):
             text.append(n.value)
+        elif isinstance(n, ast.Name) and n.id in consts:
+            text.append(consts[n.id])
         elif isinstance(n, ast.JoinedStr):
             for v in n.values:
                 if isinstance(v, ast.Constant) and isinstance(v.value, str):
@@ -72,18 +95,30 @@ def _name_of(expr):
 class WorkOrderSqlIsolationTests(unittest.TestCase):
     def test_every_dml_carries_tenant_id(self):
         missing = []
-        for fname, lineno, arg in _iter_execute_calls():
-            sql, _ = _sql_and_interps(arg)
+        for fname, lineno, arg, consts in _iter_execute_calls():
+            sql, _ = _sql_and_interps(arg, consts)
             if not _DML.search(sql) or _DDL.search(sql):
                 continue
             if "tenant_id" not in sql.lower():
                 missing.append(f"{fname}:{lineno} → {sql.strip()[:90]}")
         self.assertEqual(missing, [], "DML 缺 tenant_id:\n" + "\n".join(missing))
 
+    def test_sql_constants_are_inlined_at_the_call_site(self):
+        """反证:常量里的 WHERE 必须真被还原,否则上面那条闸是睁眼瞎(拆常量即失明)。"""
+        seen = [
+            _sql_and_interps(arg, consts)[0]
+            for fname, _lineno, arg, consts in _iter_execute_calls()
+            if fname == "store.py"
+        ]
+        wo_selects = [s for s in seen if "FROM work_orders" in s]
+        self.assertTrue(wo_selects)
+        for sql in wo_selects:
+            self.assertIn("tenant_id = %s", sql)
+
     def test_sql_interpolations_are_column_constants_only(self):
         bad = []
-        for fname, lineno, arg in _iter_execute_calls():
-            sql, interps = _sql_and_interps(arg)
+        for fname, lineno, arg, consts in _iter_execute_calls():
+            sql, interps = _sql_and_interps(arg, consts)
             if not _DML.search(sql):
                 continue
             for name in interps:
@@ -93,10 +128,10 @@ class WorkOrderSqlIsolationTests(unittest.TestCase):
 
     def test_work_order_events_never_updated_or_deleted(self):
         bad = []
-        for fname, lineno, arg in _iter_execute_calls():
+        for fname, lineno, arg, consts in _iter_execute_calls():
             if fname != "store.py":
                 continue
-            sql, _ = _sql_and_interps(arg)
+            sql, _ = _sql_and_interps(arg, consts)
             upper = sql.upper()
             if "WORK_ORDER_EVENTS" not in upper:
                 continue

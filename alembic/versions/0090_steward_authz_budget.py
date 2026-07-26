@@ -37,6 +37,10 @@ def upgrade() -> None:
         "CREATE INDEX IF NOT EXISTS ix_steward_cost_entries_session "
         "ON steward_cost_entries (tenant_id, session_id)"
     )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_steward_cost_entries_tenant_day "
+        "ON steward_cost_entries (tenant_id, created_at)"
+    )
 
 
 def downgrade() -> None:

@@ -6,7 +6,8 @@
  *     { token, tool, title, risk: write|danger, args, status: pending|approved|rejected|
  *       expired, requested_at, expires_at, decided_by, decided_at }
  *   成本封顶 messages 响应可选键 budget:
- *     { code: steward.budget_session_exceeded|steward.budget_task_exceeded,
+ *     { code: steward.budget_session_exceeded|steward.budget_task_exceeded|
+ *       steward.budget_tenant_exceeded,
  *       cap_thb, spent_thb }(两位小数字符串,decimal 序列化,前端原样展示不做算术)
  *
  * pending 但已过 expires_at 的卡服务端读侧已折成 expired,本层不自己比时间判状态;
@@ -37,6 +38,7 @@
 
     var BUDGET_SESSION = 'steward.budget_session_exceeded';
     var BUDGET_TASK = 'steward.budget_task_exceeded';
+    var BUDGET_TENANT = 'steward.budget_tenant_exceeded';
 
     function authzFamily(status) {
         return AUTHZ_FAMILY[status] || 'empty';
@@ -81,14 +83,14 @@
         return DECIDE_ERR_KEYS[code] || 'err_generic';
     }
 
-    // 会话级超限才给「开新会话继续」的出口(封顶按会话计,新会话即重新起算);
-    // 任务级超限的出路在 reply 人话里(改小范围再试),没有一键动作。
+    // 会话级超限才给「开新会话继续」的出口(该级按会话计,新会话即重新起算);
+    // 任务级出路在 reply 人话里(改小范围再试),租户日额级开新会话也没用 —— 都不给按钮。
     function isSessionBudget(code) {
         return code === BUDGET_SESSION;
     }
 
     function isBudgetCode(code) {
-        return code === BUDGET_SESSION || code === BUDGET_TASK;
+        return code === BUDGET_SESSION || code === BUDGET_TASK || code === BUDGET_TENANT;
     }
 
     var pure = {

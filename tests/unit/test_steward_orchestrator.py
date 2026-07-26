@@ -167,5 +167,48 @@ class TaskPersistenceTests(unittest.TestCase):
         self.assertIn("只能查", out["reply"])
 
 
+class WriteToolEnqueueTests(unittest.TestCase):
+    """写工具入队走 confirm-first(审查缺陷:闸有了、铸卡方缺位):_enqueue 必须在同一
+    事务里铸授权卡,应承说「先批后动」不说「开跑了」,步骤停 waiting_auth。"""
+
+    _TOOL = "erp_push_draft"
+
+    def setUp(self):
+        from services.steward.registry import StewardTool
+
+        spec = StewardTool(
+            name=self._TOOL, desc="d", slots=(), handler=self._TOOL, risk=registry.RISK_WRITE
+        )
+        registry.TOOLS_BY_NAME[self._TOOL] = spec
+        self.addCleanup(registry.TOOLS_BY_NAME.pop, self._TOOL, None)
+
+    def test_write_tool_mints_a_card_and_parks_instead_of_running(self):
+        from services.steward import authz, store
+
+        h = _TurnHarness(_plan(self._TOOL, {}))
+        opened = mock.Mock(return_value={"token": "tok"})
+        with mock.patch.object(authz, "open_request", opened):
+            out = h.turn("把这张草稿推进 ERP")
+        self.assertEqual(h.tool_calls, [])
+        kwargs = opened.call_args.kwargs
+        self.assertEqual(kwargs["tool"], self._TOOL)
+        self.assertEqual(kwargs["task_id"], "task-1")
+        self.assertEqual(kwargs["requested_by"], "u1")
+        self.assertEqual(out["task_status"], store.TASK_WAITING_USER)
+        self.assertIn(store.STEP_WAITING_AUTH, [s["state"] for s in out["steps"]])
+        self.assertIn("授权卡", out["reply"])
+        self.assertNotIn("开跑", out["reply"])
+
+    def test_readonly_tool_still_enqueues_running_without_a_card(self):
+        from services.steward import authz, store
+
+        h = _TurnHarness(_plan(registry.MATRIX_OVERVIEW, {}))
+        opened = mock.Mock()
+        with mock.patch.object(authz, "open_request", opened):
+            out = h.turn("本期谁缺料")
+        opened.assert_not_called()
+        self.assertEqual(out["task_status"], store.TASK_RUNNING)
+
+
 if __name__ == "__main__":
     unittest.main()

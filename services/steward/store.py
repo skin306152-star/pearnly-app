@@ -43,7 +43,8 @@ AUTH_APPROVED = "approved"
 AUTH_REJECTED = "rejected"
 AUTH_EXPIRED = "expired"
 
-# 步骤态(同上,stw_step_*)。waiting_auth 留给 B3 的授权卡,M1 只读不会产出。
+# 步骤态(同上,stw_step_*)。waiting_auth = 写工具停在授权卡上等人批
+# (orchestrator._enqueue 铸卡时落,当前注册表全只读、第一个写工具挂上即出现)。
 STEP_DONE = "done"
 STEP_RUNNING = "running"
 STEP_QUEUED = "queued"

@@ -129,17 +129,20 @@ class AuthzCardPureTests(unittest.TestCase):
         )
 
     def test_budget_codes_closed_set_and_session_only_gets_exit(self):
+        # 租户日额级也进数字块闭集,但「开新会话」出口只属于会话级 —— 新会话绕不过日额顶。
         out = _run_node(f"""
             const a = require({_AUTHZ});
             process.stdout.write(JSON.stringify([
                 a.isBudgetCode('steward.budget_session_exceeded'),
                 a.isBudgetCode('steward.budget_task_exceeded'),
+                a.isBudgetCode('steward.budget_tenant_exceeded'),
                 a.isBudgetCode('steward.timeout'), a.isBudgetCode(undefined),
                 a.isSessionBudget('steward.budget_session_exceeded'),
                 a.isSessionBudget('steward.budget_task_exceeded'),
+                a.isSessionBudget('steward.budget_tenant_exceeded'),
             ]));
             """)
-        self.assertEqual(out, [True, True, False, False, True, False])
+        self.assertEqual(out, [True, True, True, False, False, True, False, False])
 
 
 if __name__ == "__main__":

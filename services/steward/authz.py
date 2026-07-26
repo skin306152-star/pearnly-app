@@ -143,7 +143,10 @@ def decide(cur, *, tenant_id: str, token: str, actor: dict, approve: bool) -> di
     """
     from services.line_binding import line_action_nonce as nonce
 
-    res = nonce.consume(cur, tenant_id=tenant_id, token=token)
+    # ref_kind 过滤进消费的 WHERE:nonce 表与 LINE 数据卡(确认入账/撤销/丢弃 · 涉钱)共用,
+    # 不过滤的话,这里会把同租户 LINE 卡的一次性凭证隔空烧掉(consume 先落 consumed_at,
+    # 之后才验 kind 就晚了)。别家 kind 一律 missing:不消费,也不泄漏存在性。
+    res = nonce.consume(cur, tenant_id=tenant_id, token=token, ref_kind=REF_KIND)
     if res["status"] == "expired":
         return _err(409, ERR_AUTHZ_EXPIRED)
     if res["status"] == "used":

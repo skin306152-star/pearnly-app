@@ -78,23 +78,30 @@ def mint(
     return token
 
 
-def consume(cur, *, tenant_id, token) -> dict:
+def consume(cur, *, tenant_id, token, ref_kind=None) -> dict:
     """原子消费一次性 token。
 
     返回 {status, action_ref, workspace_client_id, user_id}:
       ok       首次有效消费 → 携目标记录(用它,不信客户端 doc_id)
       expired  过了 TTL
       used     已消费过(重放/双击)→ 仍携目标记录,供按真实状态重发当前卡(P1G 验收 2)
-      missing  无此 token(伪造/旧卡无 token)
+      missing  无此 token(伪造/旧卡无 token/类别不符)
     并发双击靠 `UPDATE ... WHERE consumed_at IS NULL` 行锁串行化,只一次命中 RETURNING。
+
+    ref_kind:收窄可消费的令牌类别(action_ref 的 `{"kind": ...}` 前缀)。这张表由
+    LINE 数据卡与管家授权卡共用,不带类别过滤的消费会把别的子系统的一次性凭证隔空烧掉;
+    类别不符一律按 missing —— 不消费,也不泄漏别家 token 的存在性。值来自调用方常量闭集,
+    不进 SQL 拼接面。
     """
     if not token:
         return {"status": "missing"}
+    kind_sql = " AND action_ref LIKE %s" if ref_kind else ""
+    kind_params = (f'{{"kind": "{ref_kind}"%',) if ref_kind else ()
     cur.execute(
         "UPDATE line_action_nonces SET consumed_at = now() "
         "WHERE token = %s AND tenant_id = %s AND consumed_at IS NULL AND expires_at > now() "
-        "RETURNING action_ref, workspace_client_id, user_id",
-        (token, tenant_id),
+        f"{kind_sql} RETURNING action_ref, workspace_client_id, user_id",
+        (token, tenant_id) + kind_params,
     )
     row = cur.fetchone()
     if row:
@@ -107,8 +114,8 @@ def consume(cur, *, tenant_id, token) -> dict:
     cur.execute(
         "SELECT consumed_at, action_ref, workspace_client_id, "
         "(expires_at <= now()) AS expired FROM line_action_nonces "
-        "WHERE token = %s AND tenant_id = %s",
-        (token, tenant_id),
+        f"WHERE token = %s AND tenant_id = %s{kind_sql}",
+        (token, tenant_id) + kind_params,
     )
     info = cur.fetchone()
     if info is None:

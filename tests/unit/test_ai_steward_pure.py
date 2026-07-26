@@ -301,3 +301,30 @@ class StewardI18nShardTests(unittest.TestCase):
         for k in quick:
             self.assertIn(k, keys["zh"])
             self.assertIn(k, keys["th"])
+
+
+class CopyMatchesCapabilityTests(unittest.TestCase):
+    """页面自述必须与注册表真实能力一致(状态诚实):B3 曾把文案提前改成「要改数的会先出
+    授权卡」,而闭集里一个写工具都没有 —— 用户照文案提改数请求只会吃 out_of_scope。
+    此闸双向:全只读 ⇒ 不许承诺授权卡;第一个写工具挂上 ⇒ 不许再自称只读(逼文案随能力换)。"""
+
+    def _notes(self):
+        text = (AI_DIR / "ai-i18n-steward.js").read_text(encoding="utf-8")
+        out = {}
+        for key in ("stw_note", "stw_composer_note"):
+            values = re.findall(rf"{key}: '([^']*)'", text)
+            self.assertEqual(len(values), 2, f"{key} 应 zh/th 各一条")
+            out[key] = values
+        return out
+
+    def test_notes_promise_exactly_what_the_registry_can_do(self):
+        from services.steward import registry
+
+        has_write = any(not t.readonly for t in registry.TOOLS_BY_NAME.values())
+        for key, (zh, th) in self._notes().items():
+            if has_write:
+                self.assertNotIn("只查不改数", zh, f"{key}: 有写工具了还自称只读")
+                self.assertNotIn("อ่านอย่างเดียว", th, f"{key}: 有写工具了还自称只读(th)")
+            else:
+                self.assertNotIn("授权卡", zh, f"{key}: 没有写工具却承诺授权卡")
+                self.assertNotIn("การ์ดขออนุมัติ", th, f"{key}: 没有写工具却承诺授权卡(th)")

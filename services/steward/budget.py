@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
-"""管家模型调用成本硬封顶(B3)—— 单任务与单会话两级上限,超限即停。
+"""管家模型调用成本硬封顶(B3)—— 单任务/单会话/租户日额三级上限,超限即停。
 
 钱的口径与全站一致:THB · Decimal(services/billing/charge.py 同款 _Dec 纪律),成本数字
 本身仍由 ai_gateway.costing 按实际模型单价算(网关照旧落 ai_usage 台账,这里不重复记账,
 只做封顶判据的台账 steward_cost_entries —— ai_usage 的写入是 fire-and-forget 允许丢行,
 拿它当封顶判据会漏计)。
 
-并发正确性(两个任务各自没超但合计超也要拦)靠"预留-结算"两段式:
-  reserve  锁本会话行(steward_sessions FOR UPDATE 串行化同会话的并发预留)→ 汇总已花
-           (含别人在飞未结算的预留)→ 超限拒;没超先按预留额记一行占坑;
+三级判据:任务 ฿1 / 会话 ฿5 / 租户 24 小时 ฿50(各自 env 可配,≤0 关闭该级)。
+租户级是失控用户的顶:前两级都以 session_id 为界,「烧满就开新会话」能无限重置,
+建会话又无频控 —— 没有跨会话的总量顶,封顶只挡得住失控循环、挡不住失控用户。
+按滚动 24 小时计(不按日历日),没有午夜清零可蹲。
+
+并发正确性(两路各自没超但合计超也要拦)靠"预留-结算"两段式:
+  reserve  取租户级事务咨询锁(pg_advisory_xact_lock 串行化同租户的并发预留 ——
+           会话级顶收窄自然被盖住)→ 汇总已花(含别人在飞未结算的预留)→ 超限拒;
+           没超先按预留额记一行占坑;
   settle   调用回来后把占坑行改成真实成本。
 在飞预留计入合计,并发窗口内第二路看得见第一路 —— check-then-spend 的赛道被锁+占坑封死。
 进程死在 reserve 与 settle 之间 → 占坑额永久计入(偏保守:宁可少烧,封顶不放水)。
@@ -28,10 +34,13 @@ logger = logging.getLogger(__name__)
 
 ERR_TASK = "steward.budget_task_exceeded"
 ERR_SESSION = "steward.budget_session_exceeded"
+ERR_TENANT = "steward.budget_tenant_exceeded"
 
-# 默认上限(THB)。planner 单次调用 <฿0.1,任务 ฿1/会话 ฿5 够正常用、烧不穿。
+# 默认上限(THB)。planner 单次调用 <฿0.1,任务 ฿1/会话 ฿5 够正常用、烧不穿;
+# 租户 24h ฿50 = 十个会话的量,事务所全员正常用碰不到,失控用户碰得到。
 _DEFAULT_TASK_CAP = "1"
 _DEFAULT_SESSION_CAP = "5"
+_DEFAULT_TENANT_DAILY_CAP = "50"
 # 单次调用的预留额:占坑用,结算时改成真实成本。必须小于两级上限,否则一次都批不出去。
 _DEFAULT_CALL_RESERVE = "0.1"
 
@@ -47,9 +56,12 @@ CREATE TABLE IF NOT EXISTS steward_cost_entries (
 )
 """
 
-_INDEX = (
+_INDEXES = (
     "CREATE INDEX IF NOT EXISTS ix_steward_cost_entries_session "
-    "ON steward_cost_entries (tenant_id, session_id)"
+    "ON steward_cost_entries (tenant_id, session_id)",
+    # 租户日额判据按 (tenant, created_at) 扫最近 24h,不能蹭 session 索引。
+    "CREATE INDEX IF NOT EXISTS ix_steward_cost_entries_tenant_day "
+    "ON steward_cost_entries (tenant_id, created_at)",
 )
 
 _ensured = False
@@ -62,7 +74,8 @@ def ensure_tables() -> None:
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(_TABLE)
-        cur.execute(_INDEX)
+        for idx in _INDEXES:
+            cur.execute(idx)
         apply_tenant_rls(cur, "steward_cost_entries")
 
 
@@ -94,6 +107,13 @@ def session_cap_thb() -> Optional[Decimal]:
     return cap if cap > 0 else None
 
 
+def tenant_daily_cap_thb() -> Optional[Decimal]:
+    """租户滚动 24h 上限(env STEWARD_TENANT_DAILY_CAP_THB)。≤0 = 该级封顶关闭。
+    这是「开新会话重置」绕不过去的那一级 —— 台账按 tenant_id 汇总,不看会话。"""
+    cap = _env_decimal("STEWARD_TENANT_DAILY_CAP_THB", _DEFAULT_TENANT_DAILY_CAP)
+    return cap if cap > 0 else None
+
+
 def call_reserve_thb() -> Decimal:
     """单次调用预留额(env STEWARD_CALL_COST_RESERVE_THB)。负数归零(零预留只削弱并发
     封口、不放开封顶 —— 已花超限照拦)。"""
@@ -107,13 +127,17 @@ def decide(
     estimate: Decimal,
     session_cap: Optional[Decimal],
     task_cap: Optional[Decimal],
+    tenant_spent: Decimal = Decimal("0"),
+    tenant_cap: Optional[Decimal] = None,
 ) -> Optional[str]:
     """封顶判据(纯函数)。含预留额判:已花 + 这次的预留会破线就不放行,上限绝不被越过。
-    任务级先判(口径更窄,报因更准);None = 放行。"""
+    窄口径先判(任务 → 会话 → 租户,报因更准);None = 放行。"""
     if task_cap is not None and task_spent + estimate > task_cap:
         return ERR_TASK
     if session_cap is not None and session_spent + estimate > session_cap:
         return ERR_SESSION
+    if tenant_cap is not None and tenant_spent + estimate > tenant_cap:
+        return ERR_TENANT
     return None
 
 
@@ -123,16 +147,19 @@ def reserve(*, tenant_id: str, session_id: str, task_id: Optional[str] = None) -
     """
     estimate = call_reserve_thb()
     session_cap, task_cap = session_cap_thb(), task_cap_thb()
-    if session_cap is None and task_cap is None:
+    tenant_cap = tenant_daily_cap_thb()
+    if session_cap is None and task_cap is None and tenant_cap is None:
         return {"allowed": True, "entry_id": None}
     try:
         from core import db
 
         ensure_once()
         with db.get_cursor(commit=True) as cur:
+            # 租户级事务咨询锁:租户日额跨会话汇总,会话行锁串行化不了两个会话的并发预留。
+            # 同租户的 reserve 全串行(占坑事务毫秒级,锁随提交自动释放)。
             cur.execute(
-                "SELECT id FROM steward_sessions WHERE tenant_id = %s AND id = %s FOR UPDATE",
-                (tenant_id, session_id),
+                "SELECT pg_advisory_xact_lock(hashtextextended('steward_budget:' || %s, 0))",
+                (str(tenant_id),),
             )
             cur.fetchone()
             cur.execute(
@@ -144,16 +171,21 @@ def reserve(*, tenant_id: str, session_id: str, task_id: Optional[str] = None) -
             row = cur.fetchone() or {}
             session_spent = Decimal(str(row.get("session_spent") or 0))
             task_spent = Decimal(str(row.get("task_spent") or 0))
+            tenant_spent = Decimal("0")
+            if tenant_cap is not None:
+                tenant_spent = _tenant_spent_24h(cur, tenant_id)
             code = decide(
                 session_spent=session_spent,
                 task_spent=task_spent,
                 estimate=estimate,
                 session_cap=session_cap,
                 task_cap=task_cap,
+                tenant_spent=tenant_spent,
+                tenant_cap=tenant_cap,
             )
             if code:
-                cap = task_cap if code == ERR_TASK else session_cap
-                spent = task_spent if code == ERR_TASK else session_spent
+                cap = {ERR_TASK: task_cap, ERR_SESSION: session_cap}.get(code, tenant_cap)
+                spent = {ERR_TASK: task_spent, ERR_SESSION: session_spent}.get(code, tenant_spent)
                 return {
                     "allowed": False,
                     "code": code,
@@ -169,6 +201,17 @@ def reserve(*, tenant_id: str, session_id: str, task_id: Optional[str] = None) -
     except Exception:  # noqa: BLE001 — 封顶基础设施故障不停全功能(fail-open · 顶注取舍)
         logger.warning("[steward.budget] reserve failed; allowing call", exc_info=True)
         return {"allowed": True, "entry_id": None}
+
+
+def _tenant_spent_24h(cur, tenant_id: str) -> Decimal:
+    """租户滚动 24h 已花(含在飞预留)。滚动窗而非日历日:没有午夜清零可蹲。"""
+    cur.execute(
+        "SELECT COALESCE(SUM(cost_thb), 0) AS tenant_spent FROM steward_cost_entries "
+        "WHERE tenant_id = %s AND created_at > now() - interval '24 hours'",
+        (tenant_id,),
+    )
+    row = cur.fetchone() or {}
+    return Decimal(str(row.get("tenant_spent") or 0))
 
 
 def settle(*, tenant_id: str, entry_id: Optional[str], cost_thb=None) -> None:

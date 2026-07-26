@@ -428,7 +428,7 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         return h;
     }
 
-    test('待批卡:说清做什么 · 批/拒两动作 · 倒计时活的 · 文案不再自称只读', async ({ page }) => {
+    test('待批卡:说清做什么 · 批/拒两动作 · 倒计时活的 · 文案不承诺没有的能力', async ({ page }) => {
         await openWithTask(page, { taskSeq: [waitingAuthzPayload()] });
         await page.waitForSelector('.stw-authz', { state: 'visible', timeout: 15000 });
 
@@ -448,15 +448,17 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         expect(cd2).not.toBe(cd1);
         // 工具步是 waiting_auth 橙(B1 既有色族,契约点名)。
         await expect(page.locator('.stw-step:nth-child(2) .st-badge')).toHaveClass(/st-warn/);
-        // 文案纠偏:授权能力上线后页面任何地方不许再自称「只读」。
+        // 文案与能力一致(双向闸在 tests/unit/test_ai_steward_pure.py):注册表还全只读,
+        // 页面自述保持「只查不改数」、不承诺授权卡 —— 授权卡措辞随第一个写工具一起换。
         const noteTexts = await page.evaluate(() => [
             document.querySelector('#v-steward .board-head .note').textContent,
             document.querySelector('.stw-composer-note').textContent,
         ]);
         for (const t of noteTexts) {
-            expect(t).not.toContain('只读');
-            expect(t).toContain('批准');
+            expect(t).not.toContain('授权卡');
         }
+        expect(noteTexts[0]).toContain('只查不改数');
+        expect(noteTexts[1]).toContain('只查不改数');
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '07-authz-pending-card.png'),
             fullPage: true,

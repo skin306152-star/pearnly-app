@@ -26,9 +26,16 @@ class FakeNonceCursor:
             }
             self._ret = None
         elif "UPDATE line_action_nonces SET consumed_at" in sql:
-            token, tid = params
+            token, tid = params[0], params[1]
             r = self.rows.get(token)
-            if r and r["tenant_id"] == str(tid) and not r["consumed"] and not r["expired"]:
+            hit = (
+                r
+                and r["tenant_id"] == str(tid)
+                and not r["consumed"]
+                and not r["expired"]
+                and self._kind_ok(sql, params, r)
+            )
+            if hit:
                 r["consumed"] = True
                 self._ret = {
                     "action_ref": r["action_ref"],
@@ -38,7 +45,7 @@ class FakeNonceCursor:
             else:
                 self._ret = None
         elif "SELECT consumed_at" in sql:
-            token, tid = params
+            token, tid = params[0], params[1]
             r = self.rows.get(token)
             self._ret = (
                 {
@@ -47,9 +54,16 @@ class FakeNonceCursor:
                     "workspace_client_id": r["workspace_client_id"],
                     "expired": r["expired"],
                 }
-                if r and r["tenant_id"] == str(tid)
+                if r and r["tenant_id"] == str(tid) and self._kind_ok(sql, params, r)
                 else None
             )
+
+    @staticmethod
+    def _kind_ok(sql, params, row):
+        """`action_ref LIKE %s` 的前缀语义(pattern 尾是 %)。"""
+        if "action_ref LIKE %s" not in sql:
+            return True
+        return row["action_ref"].startswith(params[2].rstrip("%"))
 
     def fetchone(self):
         return self._ret
@@ -107,6 +121,24 @@ class ConsumeTests(unittest.TestCase):
         cur = FakeNonceCursor()
         tok = self._mint(cur)
         self.assertEqual(nonce.consume(cur, tenant_id="other", token=tok)["status"], "missing")
+
+    def test_ref_kind_filter_refuses_foreign_kind_without_burning(self):
+        """表由 LINE 卡与管家授权卡共用:带 ref_kind 的消费对别家类别按 missing,
+        且绝不落 consumed —— 一次性凭证不被别的子系统隔空烧掉。"""
+        cur = FakeNonceCursor()
+        tok = nonce.mint(
+            cur,
+            tenant_id="t",
+            workspace_client_id=7,
+            action_ref='{"kind": "agent_push", "doc_id": "d1"}',
+            user_id="u",
+        )
+        res = nonce.consume(cur, tenant_id="t", token=tok, ref_kind="steward_write")
+        self.assertEqual(res["status"], "missing")
+        self.assertFalse(cur.rows[tok]["consumed"])
+        # 类别对上照常单次单用。
+        ok = nonce.consume(cur, tenant_id="t", token=tok, ref_kind="agent_push")
+        self.assertEqual(ok["status"], "ok")
 
 
 if __name__ == "__main__":

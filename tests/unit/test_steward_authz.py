@@ -31,11 +31,12 @@ _ARGS = {"invoice_no": "INV-9", "amount": "107.00"}
 
 
 class _World:
-    """内存版 nonce 表 + 单条任务行(FakeCur 按真 SQL 的分支语义读写它)。"""
+    """内存版 nonce 表 + 单条任务行 + 消息流水(FakeCur 按真 SQL 的分支语义读写它)。"""
 
     def __init__(self, task=None):
         self.nonces = {}
         self.task = task
+        self.messages = []
 
 
 def _task_row(**over):
@@ -80,21 +81,28 @@ class FakeCur:
             }
             self._ret = None
         elif "UPDATE line_action_nonces SET consumed_at" in sql:
-            token, tid = params
+            token, tid = params[0], params[1]
             r = w.nonces.get(token)
-            if r and r["tenant_id"] == str(tid) and not r["consumed"] and not r["expired"]:
+            hit = (
+                r
+                and r["tenant_id"] == str(tid)
+                and not r["consumed"]
+                and not r["expired"]
+                and self._kind_ok(sql, params, r)
+            )
+            if hit:
                 r["consumed"] = True
                 self._ret = {"action_ref": r["action_ref"], "workspace_client_id": 0,
                              "user_id": r["user_id"]}  # fmt: skip
             else:
                 self._ret = None
         elif "SELECT consumed_at" in sql:
-            token, tid = params
+            token, tid = params[0], params[1]
             r = w.nonces.get(token)
             self._ret = (
                 {"consumed_at": 1 if r["consumed"] else None, "action_ref": r["action_ref"],
                  "workspace_client_id": 0, "expired": r["expired"]}  # fmt: skip
-                if r and r["tenant_id"] == str(tid)
+                if r and r["tenant_id"] == str(tid) and self._kind_ok(sql, params, r)
                 else None
             )
         elif "jsonb_set" in sql:
@@ -106,8 +114,35 @@ class FakeCur:
             t = w.task
             hit = t and str(t["tenant_id"]) == str(tid) and str(t["id"]) == str(task_id)
             self._ret = dict(t) if hit else None
+        elif "SET steps = %s::jsonb" in sql:
+            self._update_steps(params)
+        elif "INSERT INTO steward_messages" in sql:
+            tid, sid, role, text, trace, task_id = params
+            w.messages.append({"role": role, "text": text, "task_id": task_id})
+            self._ret = {"id": f"m{len(w.messages)}", "tenant_id": tid, "session_id": sid,
+                         "role": role, "text": text, "tool_trace": json.loads(trace),
+                         "task_id": task_id, "created_at": None}  # fmt: skip
+        elif "UPDATE steward_sessions SET last_active_at" in sql:
+            self._ret = None
         else:
             raise AssertionError(f"unexpected sql: {sql[:80]}")
+
+    @staticmethod
+    def _kind_ok(sql, params, nonce_row):
+        """按真 SQL 的 `action_ref LIKE %s` 语义过滤类别(pattern 尾是 %)。"""
+        if "action_ref LIKE %s" not in sql:
+            return True
+        return nonce_row["action_ref"].startswith(params[2].rstrip("%"))
+
+    def _update_steps(self, params):
+        steps, tid, task_id, status = params
+        t = self.world.task
+        match = t and str(t["tenant_id"]) == str(tid) and str(t["id"]) == str(task_id)
+        if match and t["status"] == status:
+            t["steps"] = json.loads(steps)
+            self.rowcount = 1
+        else:
+            self.rowcount = 0
 
     def _jsonb_update(self, sql, params):
         w = self.world
@@ -305,6 +340,20 @@ class TokenLifecycleTests(_WriteToolMixin):
         self.assertEqual(out, {"ok": False, "http": 404, "code": authz.ERR_NOT_FOUND})
         self.assertEqual(self.world.task["status"], store.TASK_WAITING_USER)  # 任务纹丝不动
 
+    def test_foreign_kind_token_is_not_burned(self):
+        """nonce 表与 LINE 数据卡共用:同租户 LINE 卡的 token 打进管家决断端点,必须
+        按不存在拒 —— 且【不消费】。此前 decide 先 consume 后验 kind,一次 404 就把
+        LINE 侧的涉钱确认令牌隔空烧成 used。"""
+        line_ref = json.dumps({"kind": "agent_push", "doc_id": "d-9"})
+        self.world.nonces["line-tok"] = {"tenant_id": "t-1", "user_id": "u1",
+                                         "action_ref": line_ref, "consumed": False,
+                                         "expired": False}  # fmt: skip
+        out = authz.decide(
+            self.cur, tenant_id="t-1", token="line-tok", actor={"id": "boss"}, approve=False
+        )
+        self.assertEqual(out, {"ok": False, "http": 404, "code": authz.ERR_NOT_FOUND})
+        self.assertFalse(self.world.nonces["line-tok"]["consumed"])  # 一次性凭证还活着
+
     def test_changed_args_invalidate_the_old_token(self):
         """铸卡后参数被改 → 指纹对不上,决断拒 + 卡就地标失效(不留活按钮)。"""
         auth = self._open()
@@ -383,22 +432,27 @@ class MintMinutesTests(unittest.TestCase):
 
 
 class _LedgerCur:
-    """成本台账假游标:锁行 / 汇总(含未结算预留)/ 占坑 / 结算,四条 SQL 各一分支。"""
+    """成本台账假游标:租户咨询锁 / 会话汇总 / 租户 24h 汇总 / 占坑 / 结算,各一分支。
+    假台账的每一行都视为 24h 内(reserve 只插当下,滚动窗语义由真 SQL 承担)。"""
 
     def __init__(self, entries):
         self.entries = entries
         self._ret = None
 
     def execute(self, sql, params=()):
-        if "FOR UPDATE" in sql:
-            self._ret = {"id": params[1]}
-        elif "SUM(cost_thb)" in sql:
+        if "pg_advisory_xact_lock" in sql:
+            self._ret = None
+        elif "FILTER (WHERE task_id" in sql:
             task_id, tid, sid = params
             rows = [e for e in self.entries if e["tenant_id"] == tid and e["session_id"] == sid]
             self._ret = {
                 "session_spent": sum(e["cost_thb"] for e in rows),
                 "task_spent": sum(e["cost_thb"] for e in rows if e["task_id"] == task_id),
             }
+        elif "interval '24 hours'" in sql:
+            (tid,) = params
+            rows = [e for e in self.entries if e["tenant_id"] == tid]
+            self._ret = {"tenant_spent": sum(e["cost_thb"] for e in rows)}
         elif "INSERT INTO steward_cost_entries" in sql:
             tid, sid, task_id, cost = params
             entry = {"id": f"e{len(self.entries) + 1}", "tenant_id": tid, "session_id": sid,
@@ -494,10 +548,40 @@ class BudgetTests(unittest.TestCase):
             out = budget.reserve(tenant_id="t-1", session_id="s-1")
         self.assertEqual(out, {"allowed": True, "entry_id": None})
 
+    def test_new_session_does_not_reset_the_tenant_daily_cap(self):
+        """「烧满就开新会话」的绕行必须被租户级顶住:会话级重新起算,租户 24h 合计不清零。"""
+        self._env(
+            STEWARD_TASK_COST_CAP_THB="0",
+            STEWARD_SESSION_COST_CAP_THB="5",
+            STEWARD_TENANT_DAILY_CAP_THB="0.15",
+            STEWARD_CALL_COST_RESERVE_THB="0.1",
+        )
+        first = budget.reserve(tenant_id="t-1", session_id="s-1")
+        fresh_session = budget.reserve(tenant_id="t-1", session_id="s-2")
+        self.assertTrue(first["allowed"])
+        self.assertEqual(fresh_session["allowed"], False)
+        self.assertEqual(fresh_session["code"], budget.ERR_TENANT)
+        self.assertEqual(fresh_session["cap_thb"], "0.15")
+        self.assertEqual(fresh_session["spent_thb"], "0.10")
+
+    def test_other_tenants_do_not_share_the_daily_cap(self):
+        self._env(
+            STEWARD_TENANT_DAILY_CAP_THB="0.15",
+            STEWARD_CALL_COST_RESERVE_THB="0.1",
+        )
+        budget.reserve(tenant_id="t-1", session_id="s-1")
+        other = budget.reserve(tenant_id="t-2", session_id="s-9")
+        self.assertTrue(other["allowed"])
+
     def test_caps_are_decimal_and_disabled_by_nonpositive(self):
-        self._env(STEWARD_TASK_COST_CAP_THB="0", STEWARD_SESSION_COST_CAP_THB="2.5")
+        self._env(
+            STEWARD_TASK_COST_CAP_THB="0",
+            STEWARD_SESSION_COST_CAP_THB="2.5",
+            STEWARD_TENANT_DAILY_CAP_THB="-1",
+        )
         self.assertIsNone(budget.task_cap_thb())
         self.assertEqual(budget.session_cap_thb(), Decimal("2.5"))
+        self.assertIsNone(budget.tenant_daily_cap_thb())
 
     def test_decide_prefers_the_narrower_task_cap(self):
         code = budget.decide(
@@ -506,8 +590,22 @@ class BudgetTests(unittest.TestCase):
             estimate=Decimal("0.1"),
             session_cap=Decimal("5"),
             task_cap=Decimal("1"),
+            tenant_spent=Decimal("99"),
+            tenant_cap=Decimal("50"),
         )
         self.assertEqual(code, budget.ERR_TASK)
+
+    def test_decide_reports_tenant_cap_when_only_it_breaks(self):
+        code = budget.decide(
+            session_spent=Decimal("1"),
+            task_spent=Decimal("0.1"),
+            estimate=Decimal("0.1"),
+            session_cap=Decimal("5"),
+            task_cap=Decimal("1"),
+            tenant_spent=Decimal("50"),
+            tenant_cap=Decimal("50"),
+        )
+        self.assertEqual(code, budget.ERR_TENANT)
 
 
 class OrchestratorBudgetTests(unittest.TestCase):
@@ -583,6 +681,80 @@ class WorkerGrantTests(unittest.IsolatedAsyncioTestCase):
         ):
             await worker._execute(row)
         self.assertEqual(run.call_args.args[3], grant)
+
+
+class ConfirmFirstChainTests(_WriteToolMixin, unittest.IsolatedAsyncioTestCase):
+    """铸卡→批准→复跑全链(审查缺陷:授权卡只有闸、没有铸卡方)。orchestrator._enqueue /
+    authz / worker / tools 全走真码,DB 是按真 SQL 分支语义仿真的 FakeCur(CI 无 Postgres,
+    路由层的真 ASGI 面在 test_steward_routes_stack)。"""
+
+    def setUp(self):
+        super().setUp()
+        self.world = _World(None)
+        self.cur = FakeCur(self.world)
+        mock.patch("services.audit.store.insert_operation_log").start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _create_task(self, _cur, **kw):
+        self.world.task = _task_row(
+            status=kw["status"], steps=kw["steps"], payload=kw["payload"], title=kw["title"]
+        )
+        return self.world.task
+
+    def _enqueue(self):
+        ctx = ToolContext(user={"id": "u1", "tenant_id": "t-1"}, tenant_id="t-1", user_id="u1")
+        with (
+            mock.patch.object(store, "create_task", self._create_task),
+            mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM(self.cur)),
+        ):
+            return orchestrator._enqueue(ctx, _WRITE_TOOL, dict(_ARGS), "zh", session_id="s-1")
+
+    async def test_mint_approve_rerun_executes_the_tool_once(self):
+        out = self._enqueue()
+        # ① 铸卡停靠:waiting_user + pending 卡外发 + waiting_auth 步;应承不冒领「开跑了」。
+        self.assertEqual(out["task_status"], store.TASK_WAITING_USER)
+        self.assertEqual(self.world.task["status"], store.TASK_WAITING_USER)
+        card = store.public_task(self.world.task)["authorization"]
+        self.assertEqual(card["status"], store.AUTH_PENDING)
+        self.assertNotIn("args_fp", card)
+        self.assertIn(store.STEP_WAITING_AUTH, [s["state"] for s in out["steps"]])
+        self.assertIn("授权卡", out["reply"])
+        self.assertNotIn("开跑", out["reply"])
+        self.assertEqual(self.handler_calls, [])  # 批准前一步不跑
+
+        # ② 批准:token 消费,任务复跑 running,批文随 payload。
+        token = self.world.task["payload"]["authorization"]["token"]
+        decided = authz.decide(
+            self.cur, tenant_id="t-1", token=token, actor={"id": "boss"}, approve=True
+        )
+        self.assertTrue(decided["ok"])
+        self.assertEqual(self.world.task["status"], store.TASK_RUNNING)
+
+        # ③ worker 持批文执行:真 tools.run 进 handler,任务 done + 主动汇报消息落库。
+        ctx = ToolContext(user={"id": "u1"}, tenant_id="t-1", user_id="u1")
+        with (
+            mock.patch.object(worker, "_build_context", lambda *a: ctx),
+            mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM(self.cur)),
+        ):
+            await worker._execute(dict(self.world.task))
+        self.assertEqual(self.handler_calls, [dict(_ARGS)])
+        self.assertEqual(self.world.task["status"], store.TASK_DONE)
+        self.assertEqual(len(self.world.messages), 1)
+
+    async def test_unapproved_write_task_fails_closed_at_execution(self):
+        """停靠万一失守、pending 任务被当 running 认领(理论不可达)→ 执行闸物理拒,
+        任务失败向安全侧,handler 一步不进。"""
+        self._enqueue()
+        self.world.task["status"] = store.TASK_RUNNING
+        ctx = ToolContext(user={"id": "u1"}, tenant_id="t-1", user_id="u1")
+        with (
+            mock.patch.object(worker, "_build_context", lambda *a: ctx),
+            mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM(self.cur)),
+        ):
+            await worker._execute(dict(self.world.task))
+        self.assertEqual(self.handler_calls, [])
+        self.assertEqual(self.world.task["status"], store.TASK_FAILED)
+        self.assertEqual(self.world.task["error_code"], authz.ERR_AUTHZ_REQUIRED)
 
 
 class RoutePermissionTests(unittest.IsolatedAsyncioTestCase):

@@ -4,7 +4,8 @@ REFACTOR-WA-B1 守门测试 · services/startup.py
 (2026-05-29 从 app.py lifespan(~446 行)抽出启动/关闭序列 · 纯搬家 0 逻辑改)
 
 锁定:
-  1. 导出 run_startup / run_shutdown(均 coroutine)+ _GIT_DEPLOY_SH 常量。
+  1. 导出 run_startup / run_shutdown(均 coroutine)+ GIT_DEPLOY_SH 转发引用
+     (正本 2026-07-26 起在 services/deploy_script.py,startup 只转发)。
   2. run_shutdown({}) / run_shutdown(None) 安全可调不 raise(无 task 时收尾不炸)。
   3. app.lifespan 仍是 @asynccontextmanager(FastAPI 要)· app 不再自带 startup 明细。
   4. startup 复用单一来源(playwright_bootstrap / background_loops / users.columns)·
@@ -24,9 +25,9 @@ class StartupContractTests(unittest.TestCase):
         self.assertTrue(inspect.iscoroutinefunction(startup.run_shutdown))
 
     def test_git_deploy_sh_constant_present(self):
-        self.assertIsInstance(startup._GIT_DEPLOY_SH, str)
-        self.assertIn("git-deploy.sh", startup._GIT_DEPLOY_SH)
-        self.assertIn("systemctl restart mrpilot", startup._GIT_DEPLOY_SH)
+        self.assertIsInstance(startup.GIT_DEPLOY_SH, str)
+        self.assertIn("git-deploy.sh", startup.GIT_DEPLOY_SH)
+        self.assertIn("systemctl restart mrpilot", startup.GIT_DEPLOY_SH)
 
     def test_run_shutdown_safe_with_no_tasks(self):
         # 无 task(email_task/erp_retry_task 都 None)· 收尾不应 raise

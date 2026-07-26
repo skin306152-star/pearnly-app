@@ -173,7 +173,10 @@ def _to_be_period(hint: str, ctx: ToolContext) -> Optional[str]:
 
 
 def _enqueue(ctx: ToolContext, tool: str, args: dict, lang: str, *, session_id: str) -> dict:
-    """接地过的活入队(status=running,worker_id 空 = 待认领),立即应承。
+    """接地过的活入队,立即应承。只读工具 status=running(worker_id 空 = 待认领);
+    写/危险工具走 confirm-first:同一事务里入队后立刻铸授权卡(authz.open_request),
+    任务停 waiting_user 等人批 —— 提交时已是停靠态,worker 从头到尾看不见一个没批文的
+    running 写任务。铸卡万一没落地(理论不可达),tools.run 的执行闸仍会物理拒。
 
     payload 定格执行身份:user_id 供 worker 现查最新用户(权限变更即时生效),
     allowed_client_ids 是本轮请求算好的账套作用域快照 —— worker 没有请求可算,
@@ -181,9 +184,23 @@ def _enqueue(ctx: ToolContext, tool: str, args: dict, lang: str, *, session_id: 
     trace 随 worker 的收尾消息落库,这条应承消息不冒领。
     """
     from core import db
+    from services.steward import authz
 
+    spec = registry.get(tool)
+    needs_auth = spec is not None and registry.requires_authorization(spec)
     title = copy.tool_title(tool, lang)
-    steps = copy.build_steps(tool, lang, tool_state=store.STEP_QUEUED, summarize=store.STEP_QUEUED)
+    if needs_auth:
+        steps = copy.build_steps(
+            tool,
+            lang,
+            tool_state=store.STEP_WAITING_AUTH,
+            summarize=store.STEP_QUEUED,
+            detail=copy.authz_wait(lang),
+        )
+    else:
+        steps = copy.build_steps(
+            tool, lang, tool_state=store.STEP_QUEUED, summarize=store.STEP_QUEUED
+        )
     payload = {
         "tool": tool,
         "args": args,
@@ -205,10 +222,24 @@ def _enqueue(ctx: ToolContext, tool: str, args: dict, lang: str, *, session_id: 
             steps=steps,
             payload=payload,
         )
+        if needs_auth:
+            authz.open_request(
+                cur,
+                tenant_id=ctx.tenant_id,
+                task_id=str(task["id"]),
+                tool=tool,
+                args=args,
+                requested_by=ctx.user_id,
+                lang=lang,
+            )
+    if needs_auth:
+        reply, task_status = copy.authz_ack(title, lang), store.TASK_WAITING_USER
+    else:
+        reply, task_status = copy.task_ack(title, lang), store.TASK_RUNNING
     return {
-        "reply": copy.task_ack(title, lang),
+        "reply": reply,
         "task_id": str(task["id"]),
-        "task_status": store.TASK_RUNNING,
+        "task_status": task_status,
         "steps": steps,
         "artifacts": [],
         "tool_trace": [{"tool": tool, "ok": None, "error": None}],

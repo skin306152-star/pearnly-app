@@ -290,6 +290,29 @@ class StockAdjustPayloadTests(unittest.TestCase):
         self.assertEqual(p["net_amount"], "500.00")
         self.assertEqual(p["items"][0]["amount"], "500.00")
 
+    def test_quantity_keeps_four_decimals(self):
+        # 库存余额靠 XTRNQTY = TRNQTY × TFACTOR 移动(都是 B(8,4)):数量跟着钱走两位,
+        # 0.0625 公斤会变成 0.06,余额再也对不回去。
+        line = stock_req()["lines"][0]
+        p = _ok(
+            build_stock_adjust_payload(
+                stock_req(
+                    lines=[{**line, "qty": "0.0625", "unit_price": "16", "tfactor": "1.408"}]
+                ),
+                config=_CONFIG,
+            )
+        )
+        item = p["items"][0]
+        self.assertEqual((item["qty"], item["tfactor"]), ("0.0625", "1.4080"))
+        self.assertEqual(item["amount"], "1.00")
+        # 四位以下的数量落位后就是 0 —— 当场退回,不推一张数量为零的调整单。
+        self.assertEqual(
+            build_stock_adjust_payload(
+                stock_req(lines=[{**line, "qty": "0.00004"}]), config=_CONFIG
+            ).reason,
+            "bad_item_qty",
+        )
+
     def test_rejects(self):
         line = stock_req()["lines"][0]
         cases = (

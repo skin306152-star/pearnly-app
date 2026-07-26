@@ -10,12 +10,13 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.common import _d, _q, _s, be_dates, thai_dbf_safe
 
 ZERO = Decimal("0")
+_QTY_STEP = Decimal("0.0001")  # STCRD.TRNQTY / TFACTOR 是 B(8,4)
 
 # 分录方向,与老链路 lines[].side 同字面(桥端 TRNTYP:D→'0' 借 / C→'1' 贷)。
 SIDE_DEBIT = "D"
@@ -30,6 +31,20 @@ def money(value: Any) -> Optional[Decimal]:
 def money_str(value: Decimal) -> str:
     """Decimal → 定点两位字符串(载荷里的钱一律字符串化)。"""
     return _s(value)
+
+
+def quantize_qty(value: Decimal) -> Decimal:
+    """数量/换算系数按四位小数落位。
+
+    数量不能跟着钱走分位:按两位落位,0.0625 公斤会变成 0.06、TFACTOR 1.408 会变成
+    1.41,库存余额靠 XTRNQTY = TRNQTY × TFACTOR 移动,两处各歪一点就再也对不回去。
+    """
+    return value.quantize(_QTY_STEP, rounding=ROUND_HALF_EVEN)
+
+
+def qty_str(value: Decimal) -> str:
+    """Decimal → 定点四位字符串(载荷里的数量一律字符串化)。"""
+    return format(quantize_qty(value), "f")
 
 
 def same(left: Decimal, right: Decimal) -> bool:

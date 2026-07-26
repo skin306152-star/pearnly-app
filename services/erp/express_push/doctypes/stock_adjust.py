@@ -29,6 +29,7 @@ OU/ZZ 单逐条复核)。桥端照本模块的 docstring 消费。
                  两处都空 → 桥端拒写不猜(ACCNUMCR 对 POSOPR='6' 恒留空)
   net_amount     Σ items.amount · |NET|>0.005 且账套永续时桥端才建 GLJNL/GLJNLIT(恒 2 行)
   items[]        [{stock_code, qty, unit, tfactor, unit_price, amount, source_lot}]
+                 qty/tfactor/unit_price 字符串保四位小数(B(8,4)),amount 保两位(钱)。
                  qty 恒正(录入单位);桥端落 TRNQTY=qty、XTRNQTY=qty×TFACTOR ——
                  **库存余额靠 XTRNQTY 移动**,TFACTOR 实测到 12/50/100,按 TRNQTY 加减差几十倍
                  source_lot → MLOTNUM · 可空则桥端按账套 COSMTD 选批;选不出 escalate。
@@ -137,12 +138,15 @@ def _normalize_items(rows: List[Dict[str, Any]]) -> tuple:
         code = str(row.get("stock_code") or "").strip()
         if not code or base.width_error("stock_code", code, _MAX_STOCK_CODE):
             return [], "bad_stock_code"
+        # 先落位再判正负:四位以下的数量(0.00004)落位后就是 0,当场退回而不是推一张
+        # 数量为零的调整单进去。出库类 POSOPR(4/6/7/9)一律存正数,只有 '8' 存负数 ——
+        # 给内部领用写负数,Express 会把它当"负出库=入库"办(P1-2)。
         qty = base.money(row.get("qty"))
+        qty = base.quantize_qty(qty) if qty is not None else None
         if qty is None or qty <= base.ZERO:
-            # 出库类 POSOPR(4/6/7/9)一律存正数,只有 '8' 数量调整存负数。给内部领用写
-            # 负数,Express 会把它当"负出库=入库"办(P1-2)。
             return [], "bad_item_qty"
         price = base.money(row.get("unit_price"))
+        price = base.quantize_qty(price) if price is not None else None
         if price is None or price <= base.ZERO:
             # 单价 0 = 成本没解出来。推一张金额 0 的报损单等于费用少记,退回让会计填。
             return [], "bad_item_unit_price"
@@ -151,16 +155,17 @@ def _normalize_items(rows: List[Dict[str, Any]]) -> tuple:
             return [], "bad_source_lot"
         item = {
             "stock_code": code,
-            "qty": base.money_str(qty),
+            "qty": base.qty_str(qty),
             "unit": str(row.get("unit") or "").strip()[:_MAX_UNIT],
-            "unit_price": base.money_str(price),
+            "unit_price": base.qty_str(price),
             "amount": base.money_str(qty * price),
         }
         factor = base.money(row.get("tfactor"))
         if factor is not None:
+            factor = base.quantize_qty(factor)
             if factor <= base.ZERO:
                 return [], "bad_item_tfactor"
-            item["tfactor"] = base.money_str(factor)
+            item["tfactor"] = base.qty_str(factor)
         if lot:
             item["source_lot"] = lot
         out.append(item)

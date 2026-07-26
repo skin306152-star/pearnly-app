@@ -105,6 +105,18 @@ class DeadEndJumpsToIntegrationsTests(unittest.TestCase):
         self.assertFalse("在集成中心连接并启用" in text)
         self.assertFalse("去集成中心配置" in text)
 
+    def test_orphan_google_note_stays_deleted(self):
+        """Google 授权卡早已从集成页搬到采购导出页,就地 OAuth,不跳任何地方。这条
+        「会带你去集成中心授权」的旧文案全仓 0 引用(死文案),留着只会被人捡起来当真。"""
+        self.assertFalse(
+            "pur-export-note-disconnected" in _read("static/i18n-data.js"),
+            "孤儿键 pur-export-note-disconnected 又回来了",
+        )
+        self.assertTrue(
+            "int-google-connect" in _read("src/home/purchase-export-google.ts"),
+            "采购导出页的就地「连接 Google」按钮没了",
+        )
+
 
 class GuideMatchesShippedBehaviourTests(unittest.TestCase):
     """手册不能再教「按钮会跳错、请走侧栏绕行」——那是修好之前的事。"""

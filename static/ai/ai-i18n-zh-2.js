@@ -416,7 +416,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     purge_progress: '正在清除 {done}/{total} · {table}',
     purge_failed: '清除失败，请重试。',
     purge_done: '清除完毕',
-    purge_done_partial: '清除完毕（有残留）',
+    purge_not_clean: '未清干净 · 还有数据残留',
     purge_done_stat: '共删除 {rows} 行数据、{files} 个文件。',
     purge_leftover: '以下表未能清空，请联系我们：{tables}',
     purge_finish: '完成',

@@ -454,7 +454,7 @@ Object.assign(window.__AI_I18N_EN__, {
     purge_progress: 'Clearing {done}/{total} · {table}',
     purge_failed: 'Clearing failed. Please try again.',
     purge_done: 'Cleared',
-    purge_done_partial: 'Cleared (with leftovers)',
+    purge_not_clean: 'Not fully cleared — data remains',
     purge_done_stat: 'Deleted {rows} rows and {files} files.',
     purge_leftover: 'These tables could not be cleared, please contact us: {tables}',
     purge_finish: 'Done',

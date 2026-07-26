@@ -40,6 +40,7 @@ def _assert_owns(cur, ws_id: int, tenant_id: str) -> str:
 def _stream(tenant_id: str, ws_id: int, user_id: str) -> Iterator[bytes]:
     paths: list[str] = []
     leftover: list[str] = []
+    leftover_detail: list = []
     deleted_total = 0
     with db.get_cursor_rls(tenant_id=tenant_id, workspace_client_id=ws_id, commit=True) as cur:
         _assert_owns(cur, ws_id, tenant_id)
@@ -47,15 +48,19 @@ def _stream(tenant_id: str, ws_id: int, user_id: str) -> Iterator[bytes]:
         for evt in purge_svc.purge(cur, tenant_id=tenant_id, ws_id=ws_id):
             if evt.get("step") == "finished":
                 leftover = list(evt.get("leftover") or [])
+                leftover_detail = list(evt.get("leftover_detail") or [])
                 deleted_total = int(evt.get("deleted_total") or 0)
                 continue
             yield (json.dumps(evt, ensure_ascii=False) + "\n").encode()
     # 事务已提交,再动盘上文件
     files_removed = purge_svc.purge_files(paths)
-    logger.info(
+    # 有残留 = 这次清除【没成功】,按 error 记 —— 上一版记 info,线上漏删 1648 行子数据
+    # 时日志里毫无异样,是用户点开界面才发现的。
+    msg = (
         f"[purge] ws={ws_id} tenant={tenant_id} rows={deleted_total} "
-        f"files={files_removed} leftover={leftover}"
+        f"files={files_removed} leftover={leftover_detail}"
     )
+    logger.error(msg) if leftover else logger.info(msg)
     yield (
         json.dumps(
             {
@@ -63,6 +68,7 @@ def _stream(tenant_id: str, ws_id: int, user_id: str) -> Iterator[bytes]:
                 "deleted_total": deleted_total,
                 "files_removed": files_removed,
                 "leftover": leftover,
+                "leftover_detail": leftover_detail,
                 "ok": not leftover,
             },
             ensure_ascii=False,

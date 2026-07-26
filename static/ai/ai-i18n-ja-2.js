@@ -448,7 +448,7 @@ Object.assign(window.__AI_I18N_JA__, {
     purge_progress: '消去中 {done}/{total} · {table}',
     purge_failed: '消去に失敗しました。再試行してください。',
     purge_done: '消去完了',
-    purge_done_partial: '消去完了（残留あり）',
+    purge_not_clean: '消去しきれていません · データが残っています',
     purge_done_stat: '{rows} 行、{files} 件のファイルを削除しました。',
     purge_leftover: '次のテーブルを消去できませんでした。お問い合わせください：{tables}',
     purge_finish: '完了',

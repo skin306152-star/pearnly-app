@@ -442,7 +442,7 @@ Object.assign(window.__AI_I18N_TH__, {
     purge_progress: 'กำลังล้าง {done}/{total} · {table}',
     purge_failed: 'ล้างข้อมูลไม่สำเร็จ กรุณาลองใหม่',
     purge_done: 'ล้างข้อมูลเสร็จแล้ว',
-    purge_done_partial: 'ล้างข้อมูลเสร็จแล้ว (มีตกค้าง)',
+    purge_not_clean: 'ล้างไม่หมด · ยังมีข้อมูลตกค้าง',
     purge_done_stat: 'ลบข้อมูล {rows} แถว และไฟล์ {files} รายการ',
     purge_leftover: 'ตารางต่อไปนี้ล้างไม่สำเร็จ โปรดติดต่อเรา: {tables}',
     purge_finish: 'เสร็จสิ้น',

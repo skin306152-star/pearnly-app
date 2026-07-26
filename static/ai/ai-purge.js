@@ -87,12 +87,24 @@
         );
     }
 
+    // 有残留 = 没清干净 = 失败,红着报并列出还剩什么。上一版把它写成「清除完毕(有残留)」
+    // 配一行小字,用户读到的是"完成了",跟数据还在的事实对不上。
     function doneHtml() {
         var r = S.result || {};
-        var leftover = (r.leftover || []).length;
+        var left = r.leftover_detail || [];
+        var failed = (r.leftover || []).length > 0;
+        var what = left.length
+            ? left
+                  .map(function (x) {
+                      return x.table + '(' + x.rows + ')';
+                  })
+                  .join(', ')
+            : (r.leftover || []).join(', ');
         return (
-            '<div class="pg-done">' +
-            esc(leftover ? at('purge_done_partial') : at('purge_done')) +
+            '<div class="' +
+            (failed ? 'pg-failed' : 'pg-done') +
+            '">' +
+            esc(failed ? at('purge_not_clean') : at('purge_done')) +
             '</div>' +
             '<div class="pg-status">' +
             esc(
@@ -101,9 +113,9 @@
                     .replace('{files}', String(r.files_removed || 0))
             ) +
             '</div>' +
-            (leftover
+            (failed
                 ? '<p class="pg-note pg-leftover">' +
-                  esc(at('purge_leftover').replace('{tables}', (r.leftover || []).join(', '))) +
+                  esc(at('purge_leftover').replace('{tables}', what)) +
                   '</p>'
                 : '') +
             '<div class="pkg-actions"><button type="button" class="btn pri" data-action="pg-finish">' +

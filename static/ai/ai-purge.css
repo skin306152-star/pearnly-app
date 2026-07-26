@@ -139,3 +139,9 @@
   font-weight: 700;
   color: var(--good);
 }
+/* 没清干净 = 失败,红着报。不给「完成了但有残留」这种读起来像成功的中间态。 */
+.pg-failed {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--crit);
+}

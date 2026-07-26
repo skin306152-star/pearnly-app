@@ -154,16 +154,19 @@ test.describe('按账套清空数据(本地 stub · 真构建产物)', () => {
         await expect(page.locator('#purgeMask')).toHaveCount(0);
     });
 
-    test('残留表要如实报出来,不许报"清空成功"', async ({ page }) => {
+    // 2026-07-26 线上事故的形状:每条 DELETE 都「成功」,却漏删 1648 行子数据,界面报
+    // 「清除完毕」。现在结论以删完真回数为准,有残留一律按失败红着报并列出剩几行。
+    test('有残留必须报失败(不是"清除完毕"),并列出剩几行', async ({ page }) => {
         await boot(page);
         await page.route('**/api/workspace/clients/*/purge', (r) =>
             r.fulfill({
                 status: 200,
                 contentType: 'application/x-ndjson',
                 body:
-                    '{"step":"table","label":"products","deleted":0,"done":1,"total":2,"ok":true}\n' +
+                    '{"step":"child","label":"work_order_items","deleted":0,"done":1,"total":2,"ok":true}\n' +
                     '{"step":"finished","deleted_total":0,"files_removed":0,' +
-                    '"leftover":["products"],"ok":false}\n',
+                    '"leftover":["work_order_items"],' +
+                    '"leftover_detail":[{"table":"work_order_items","rows":105}],"ok":false}\n',
             })
         );
         await page.locator('#clientsPurgeBtn').click();
@@ -171,8 +174,13 @@ test.describe('按账套清空数据(本地 stub · 真构建产物)', () => {
         await page.locator('[data-action="pg-next"]').click();
         await page.locator('[data-action="pg-run"]').click();
 
-        await expect(page.locator('.pg-leftover')).toBeVisible({ timeout: 15000 });
-        await expect(page.locator('.pg-leftover')).toContainText('products');
+        await expect(page.locator('.pg-failed')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('.pg-done')).toHaveCount(0, {
+            timeout: 5000,
+        });
+        await expect(page.locator('.pg-leftover')).toContainText('work_order_items');
+        await expect(page.locator('.pg-leftover'), '要说清还剩几行').toContainText('105');
+        await page.screenshot({ path: path.join(ARTIFACT_DIR, '06-leftover-failed.png') });
     });
 
     for (const lang of ['th', 'en', 'ja']) {

@@ -39,13 +39,26 @@ _FILE_COLUMNS: Tuple[Tuple[str, str], ...] = (
 )
 
 
+# ⚠️ 表结构一律从 pg_catalog 读,不碰 information_schema。
+# 2026-07-26 线上事故:information_schema 的约束视图(constraint_column_usage /
+# key_column_usage)【按权限过滤】—— 只对表属主可见。生产业务连接跑在最小权限角色
+# pearnly_app 上,这几个视图返回 0 行 → 子表清单为空 → 一张子表没删 → 父表 work_orders
+# 被 RESTRICT 外键挡住 → 报「清除完毕」但工单/审核/交付包/报表原样还在。
+# 本地验收连的是属主账号,视图正常,所以没照出来。pg_catalog 不挑权限,两边一致。
+_SCOPE_TABLES_SQL = """
+    SELECT c.relname AS table_name
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+      AND a.attname = 'workspace_client_id' AND a.attnum > 0 AND NOT a.attisdropped
+    ORDER BY c.relname
+"""
+
+
 def scope_tables(cur) -> List[str]:
     """所有带 workspace_client_id 的表(= 直接归属某个账套的数据)。"""
-    cur.execute(
-        "SELECT table_name FROM information_schema.columns "
-        "WHERE table_schema = 'public' AND column_name = 'workspace_client_id' "
-        "ORDER BY table_name"
-    )
+    cur.execute(_SCOPE_TABLES_SQL)
     return [r["table_name"] for r in cur.fetchall()]
 
 
@@ -55,30 +68,62 @@ def child_edges(cur) -> List[Dict[str, str]]:
     这些表按父表 id 反查删除。CASCADE 的父表删了会自动带走,但 RESTRICT 的会把父表
     的删除整个挡下来(work_order_items / pos_sale_lines 等),所以一律先删子表。
     """
-    cur.execute("""
-        WITH ws AS (
-            SELECT table_name FROM information_schema.columns
-            WHERE table_schema = 'public' AND column_name = 'workspace_client_id'
-        )
-        SELECT DISTINCT tc.table_name AS child, kcu.column_name AS child_col,
-               ccu.table_name AS parent, ccu.column_name AS parent_col
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kcu
-             ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
-        JOIN information_schema.constraint_column_usage ccu
-             ON ccu.constraint_name = tc.constraint_name
-        WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
-          AND ccu.table_name IN (SELECT table_name FROM ws)
-          AND tc.table_name NOT IN (SELECT table_name FROM ws)
+    cur.execute(f"""
+        WITH ws AS ({_SCOPE_TABLES_SQL})
+        SELECT DISTINCT
+               ch.relname AS child,
+               ca.attname AS child_col,
+               pa.relname AS parent,
+               fa.attname AS parent_col
+        FROM pg_constraint c
+        JOIN pg_class ch ON ch.oid = c.conrelid
+        JOIN pg_class pa ON pa.oid = c.confrelid
+        JOIN pg_namespace n ON n.oid = ch.relnamespace
+        JOIN pg_attribute ca ON ca.attrelid = c.conrelid AND ca.attnum = c.conkey[1]
+        JOIN pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = c.confkey[1]
+        WHERE c.contype = 'f' AND n.nspname = 'public'
+          AND array_length(c.conkey, 1) = 1
+          AND pa.relname IN (SELECT table_name FROM ws)
+          AND ch.relname NOT IN (SELECT table_name FROM ws)
         ORDER BY child, child_col
         """)
     return [dict(r) for r in cur.fetchall()]
 
 
+def verify_empty(cur, ws_id: int) -> List[Dict[str, Any]]:
+    """删完真回数:哪张表还剩行就报哪张。
+
+    「删了 0 行」和「这张表本来就没数据」在 DELETE 的 rowcount 上长得一模一样 ——
+    上一版正是靠 rowcount 报成功,结果一张子表都没删掉还说清完了。这里不看过程看结果。
+    """
+    left: List[Dict[str, Any]] = []
+    for table in scope_tables(cur):
+        cur.execute(
+            f"SELECT count(*) AS n FROM {table} WHERE workspace_client_id = %s",  # noqa: S608
+            (ws_id,),
+        )
+        n = int((cur.fetchone() or {}).get("n") or 0)
+        if n:
+            left.append({"table": table, "rows": n})
+    for edge in child_edges(cur):
+        cur.execute(
+            f"SELECT count(*) AS n FROM {edge['child']} WHERE {edge['child_col']} IN "  # noqa: S608
+            f"(SELECT {edge['parent_col']} FROM {edge['parent']} WHERE workspace_client_id = %s)",
+            (ws_id,),
+        )
+        n = int((cur.fetchone() or {}).get("n") or 0)
+        if n:
+            left.append({"table": edge["child"], "rows": n})
+    return left
+
+
 def _has_tenant_column(cur, table: str) -> bool:
     cur.execute(
-        "SELECT 1 FROM information_schema.columns "
-        "WHERE table_schema = 'public' AND table_name = %s AND column_name = 'tenant_id'",
+        "SELECT 1 FROM pg_attribute a "
+        "JOIN pg_class c ON c.oid = a.attrelid "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relname = %s "
+        "AND a.attname = 'tenant_id' AND a.attnum > 0 AND NOT a.attisdropped",
         (table,),
     )
     return cur.fetchone() is not None
@@ -188,37 +233,34 @@ def purge(cur, *, tenant_id: Optional[str], ws_id: int) -> Iterator[Dict[str, An
     done = 0
     deleted_total = 0
 
-    for edge in edges:
-        ok, n = _try_delete(cur, edge["child"], lambda e=edge: _delete_child(cur, e, ws_id))
-        done += 1
-        deleted_total += n
-        yield {
-            "step": "child",
-            "label": edge["child"],
-            "deleted": n,
-            "done": done,
-            "total": total,
-            "ok": ok,
-        }
+    # 子表与账套级表进同一个重试轮:子表原本只跑一轮,顺序不对或一次失败就永久漏掉
+    # (2026-07-26 线上正是子表全漏)。子表排前面 —— RESTRICT 外键要求先清子再清父。
+    scoped = {t: _has_tenant_column(cur, t) for t in tables}
+    pending: List[Tuple[str, str, Any]] = [("child", e["child"], e) for e in edges] + [
+        ("table", t, t) for t in tables
+    ]
 
-    pending = list(tables)
-    scoped = {t: _has_tenant_column(cur, t) for t in pending}
     while pending:
-        stuck: List[str] = []
+        stuck: List[Tuple[str, str, Any]] = []
         progressed = False
-        for table in pending:
-            ok, n = _try_delete(
-                cur, table, lambda t=table: _delete_scope(cur, t, ws_id, tenant_id, scoped[t])
-            )
+        for kind, label, target in pending:
+            if kind == "child":
+                ok, n = _try_delete(cur, label, lambda e=target: _delete_child(cur, e, ws_id))
+            else:
+                ok, n = _try_delete(
+                    cur,
+                    label,
+                    lambda t=target: _delete_scope(cur, t, ws_id, tenant_id, scoped[t]),
+                )
             if not ok:
-                stuck.append(table)
+                stuck.append((kind, label, target))
                 continue
             progressed = True
             done += 1
             deleted_total += n
             yield {
-                "step": "table",
-                "label": table,
+                "step": kind,
+                "label": label,
                 "deleted": n,
                 "done": done,
                 "total": total,
@@ -238,10 +280,13 @@ def purge(cur, *, tenant_id: Optional[str], ws_id: int) -> Iterator[Dict[str, An
         "total": total,
         "ok": True,
     }
+    # 结论以真回数为准,不以 DELETE 的 rowcount 为准。
+    left = verify_empty(cur, ws_id)
     yield {
         "step": "finished",
         "deleted_total": deleted_total,
         "done": done,
         "total": total,
-        "leftover": pending,
+        "leftover": [x["table"] for x in left],
+        "leftover_detail": left,
     }

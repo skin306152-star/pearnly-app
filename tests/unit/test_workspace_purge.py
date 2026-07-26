@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from services.workspace import purge as P
 
@@ -27,11 +28,13 @@ EDGES = [
 class _FakeCursor:
     """记录每条 execute;按需让指定表的 DELETE 抛一次外键错(模拟顺序问题)。"""
 
-    def __init__(self, fail_once_on=None):
+    def __init__(self, fail_once_on=None, leftover_rows=None):
         self.executed: list = []
         self.rowcount = 0
         self._fail_once = set(fail_once_on or [])
         self._rows = []
+        # 删完回数时每张表还剩多少行(默认全 0 = 真清干净)
+        self.leftover_rows = dict(leftover_rows or {})
 
     def execute(self, sql, params=None):
         self.executed.append((" ".join(sql.split()), params))
@@ -39,17 +42,21 @@ class _FakeCursor:
         if s.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
             self.rowcount = 0
             return
-        if s.startswith("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.COLUMNS") and "'PUBLIC'" in s:
+        if "PG_CONSTRAINT" in s:
+            self._rows = [dict(e) for e in EDGES]
+            return
+        if "PG_ATTRIBUTE" in s and "WORKSPACE_CLIENT_ID" in s:
             self._rows = [{"table_name": t} for t in SCOPE]
             return
-        if "CONSTRAINT_TYPE = 'FOREIGN KEY'" in sql.upper():
-            self._rows = [dict(e) for e in EDGES]
+        if "PG_ATTRIBUTE" in s and "TENANT_ID" in s:
+            self._rows = [{"?column?": 1}]
             return
         if s.startswith("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS"):
             self._rows = [{"column_name": c} for c in ("address", "phone", "name", "tax_id")]
             return
-        if s.startswith("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS"):
-            self._rows = [{"?column?": 1}]
+        if s.startswith("SELECT COUNT(*)"):
+            table = sql.split("FROM", 1)[1].split()[0]
+            self._rows = [{"n": self.leftover_rows.get(table, 0)}]
             return
         if s.startswith("DELETE"):
             table = sql.split("FROM", 1)[1].split()[0]
@@ -112,22 +119,24 @@ class PurgeOrderTests(unittest.TestCase):
 
 
 class PurgeHonestyTests(unittest.TestCase):
-    def test_permanently_stuck_table_is_reported_not_hidden(self):
-        cur = _FakeCursor()
-        cur._fail_once = set()
+    def test_leftover_comes_from_real_recount_not_rowcount(self):
+        """结论必须靠删完真回数。
 
-        original = cur.execute
-
-        def always_fail(sql, params=None):
-            if sql.strip().upper().startswith("DELETE") and "products" in sql:
-                cur.executed.append((" ".join(sql.split()), params))
-                raise RuntimeError("fk violation forever")
-            return original(sql, params)
-
-        cur.execute = always_fail
+        2026-07-26 线上事故的形状:子表一张没删,但每条 DELETE 都「成功」(rowcount=0),
+        按 rowcount 判就是「全清干净」。这里让所有 DELETE 都报成功、回数却仍有 105 行,
+        结论必须是残留。
+        """
+        cur = _FakeCursor(leftover_rows={"work_order_items": 105})
         finished = list(P.purge(cur, tenant_id="t-1", ws_id=42))[-1]
         self.assertEqual(finished["step"], "finished")
-        self.assertIn("products", finished["leftover"], "删不掉的表必须报出来,不许假装清空了")
+        self.assertIn("work_order_items", finished["leftover"], "回数还有行就必须报残留")
+        self.assertEqual(finished["leftover_detail"], [{"table": "work_order_items", "rows": 105}])
+
+    def test_clean_purge_reports_no_leftover(self):
+        cur = _FakeCursor()
+        finished = list(P.purge(cur, tenant_id="t-1", ws_id=42))[-1]
+        self.assertEqual(finished["leftover"], [])
+        self.assertEqual(finished["leftover_detail"], [])
 
     def test_subject_row_keeps_name_and_tax_id(self):
         cur = _FakeCursor()
@@ -139,6 +148,31 @@ class PurgeHonestyTests(unittest.TestCase):
         self.assertIn("phone = NULL", sql)
         self.assertNotIn("name = NULL", sql, "套账名称必须留下")
         self.assertNotIn("tax_id = NULL", sql, "税号必须留下")
+
+
+class SchemaDiscoveryPrivilegeTests(unittest.TestCase):
+    """根因钉(2026-07-26 线上事故)。
+
+    information_schema 的约束视图【按权限过滤】——只对表属主可见。生产业务连接跑在
+    最小权限角色 pearnly_app 上,constraint_column_usage / key_column_usage 一律返回 0 行,
+    于是子表清单为空、一张子表没删、父表被 RESTRICT 挡住,却报「清除完毕」。
+    本地验收连的是属主账号,视图正常,所以本地怎么跑都是绿的。
+    表结构一律走 pg_catalog(不挑权限),这条钉住它别被改回去。
+    """
+
+    def test_discovery_never_uses_privilege_filtered_views(self):
+        src = (Path(P.__file__)).read_text(encoding="utf-8")
+        for view in (
+            "information_schema.constraint_column_usage",
+            "information_schema.key_column_usage",
+            "information_schema.table_constraints",
+        ):
+            self.assertNotIn(view, src, f"{view} 按权限过滤,最小权限角色下返回空 → 静默漏删")
+
+    def test_discovery_reads_pg_catalog(self):
+        src = (Path(P.__file__)).read_text(encoding="utf-8")
+        self.assertIn("pg_constraint", src)
+        self.assertIn("pg_attribute", src)
 
 
 class PurgeFilePathGuardTests(unittest.TestCase):

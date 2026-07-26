@@ -34,6 +34,11 @@ WORKORDER_LIST = "workorder_list"
 PUSH_LOG_QUERY = "push_log_query"
 HISTORY_QUERY = "history_query"
 CLIENT_LOOKUP = "client_lookup"
+DUE_SOON = "due_soon"
+REVIEW_QUEUE = "review_queue"
+TAX_NUMBERS = "tax_numbers"
+BANK_RECON_STATUS = "bank_recon_status"
+INVOICE_DETAIL = "invoice_detail"
 ERP_PUSH = "erp_push"
 
 # 经桥写 Express 是分钟级(桥端备份账套 → 写 DBF → 重建 CDX,全程跨 SMB),按只读工具的
@@ -81,6 +86,11 @@ def _period_slot() -> SlotSpec:
         desc_th="ช่วงเวลาที่ผู้ใช้พูดถึง เช่น มิ.ย.69 / เดือนที่แล้ว / 2026-06",
         desc_zh="期间线索原文(如「上个月」「6月」「2569-06」)· 没提到给 null",
     )
+
+
+def _keyword_slot(desc_th: str, desc_zh: str) -> SlotSpec:
+    """票据关键词槽。source=user_text 同客户名槽:模型编一个单号会把人指到另一张票上。"""
+    return SlotSpec("keyword", required=True, source="user_text", desc_th=desc_th, desc_zh=desc_zh)
 
 
 def _client_name_slot(required: bool) -> SlotSpec:
@@ -155,15 +165,57 @@ TOOLS: tuple[StewardTool, ...] = (
         name=HISTORY_QUERY,
         desc="在识别记录里找某张票(按店名/单号/文件名关键词)",
         slots=(
-            SlotSpec(
-                "keyword",
-                required=True,
-                source="user_text",
-                desc_th="คำค้น เช่น ชื่อร้านหรือเลขใบเสร็จ (คัดจากข้อความผู้ใช้เท่านั้น)",
-                desc_zh="关键词(店名/单号/文件名·必须出自用户原话)",
+            _keyword_slot(
+                "คำค้น เช่น ชื่อร้านหรือเลขใบเสร็จ (คัดจากข้อความผู้ใช้เท่านั้น)",
+                "关键词(店名/单号/文件名·必须出自用户原话)",
             ),
         ),
         handler="history_query",
+    ),
+    StewardTool(
+        name=DUE_SOON,
+        desc="查某一期还没交完的申报义务和截止日:哪几家、什么表、还剩几天、有没有逾期",
+        slots=(_period_slot(),),
+        handler="due_soon",
+    ),
+    StewardTool(
+        name=REVIEW_QUEUE,
+        desc="查等人审的工单队列:有什么等我审、哪些卡住待判、可按客户或严重度筛",
+        slots=(
+            _period_slot(),
+            _client_name_slot(required=False),
+            SlotSpec(
+                "severity",
+                required=False,
+                source="model_freeform",
+                desc_th="ระดับความรุนแรง: crit(ร้ายแรง) / warn(เตือน)",
+                desc_zh="严重度(crit 严重 / warn 提醒)· 只问严重的才给 crit,否则 null",
+            ),
+        ),
+        handler="review_queue",
+    ),
+    StewardTool(
+        name=TAX_NUMBERS,
+        desc="查某家某期算出来的税额:销项/进项/销项税/进项税/应交多少",
+        slots=(_client_name_slot(required=True), _period_slot()),
+        handler="tax_numbers",
+    ),
+    StewardTool(
+        name=BANK_RECON_STATUS,
+        desc="查某家某期的银行对账进度:对上几笔、缺票几笔、有票无流水几笔、差多少钱",
+        slots=(_client_name_slot(required=True), _period_slot()),
+        handler="bank_recon_status",
+    ),
+    StewardTool(
+        name=INVOICE_DETAIL,
+        desc="查某一张票的详情:识别成什么、过账去向、推进 ERP 了没、失败原因是什么",
+        slots=(
+            _keyword_slot(
+                "ระบุใบที่จะดู เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
+                "要看的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
+            ),
+        ),
+        handler="invoice_detail",
     ),
     StewardTool(
         name=CLIENT_LOOKUP,
@@ -186,12 +238,9 @@ TOOLS: tuple[StewardTool, ...] = (
             "会计明确说要推/过账/记进 Express 时才用"
         ),
         slots=(
-            SlotSpec(
-                "keyword",
-                required=True,
-                source="user_text",
-                desc_th="ระบุใบที่จะส่ง เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
-                desc_zh="要推的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
+            _keyword_slot(
+                "ระบุใบที่จะส่ง เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
+                "要推的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
             ),
             SlotSpec(
                 "account_set",

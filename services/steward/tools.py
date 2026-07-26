@@ -11,6 +11,8 @@
   client_lookup    services.workspace.store.list_workspace_clients  (= /api/workspace/clients)
 
 体积闸(<500 行)下的分居 —— 语义边界不变,闭集与执行入口(prepare/run)一律留在本模块:
+  tools_close     月结产线四问(到期义务 / 待审队列 / 应交税额 / 银行对账)
+  tools_invoice   单票体检(识别结果 + 推送成败 + 为什么推不进去)
   erp_push_tool   唯一的写工具(请求侧接地 + 执行侧经桥投单两段)
   tool_scope      各工具共用的作用域 / 客户名接地 / 票据定位 / 期间缺省 / 金额规范化
 
@@ -27,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import authz, erp_push_tool, registry, tool_scope
+from services.steward import authz, erp_push_tool, registry, tool_scope, tools_close, tools_invoice
 from services.steward.registry import ToolContext
 from services.steward.tool_scope import (  # 入口仍在 tools:调用方按 tools.ERR_* 认错误码
     ERR_CLIENT_AMBIGUOUS,  # noqa: F401
@@ -279,6 +281,11 @@ _HANDLERS = {
     registry.PUSH_LOG_QUERY: push_log_query,
     registry.HISTORY_QUERY: history_query,
     registry.CLIENT_LOOKUP: client_lookup,
+    registry.DUE_SOON: tools_close.due_soon,
+    registry.REVIEW_QUEUE: tools_close.review_queue,
+    registry.TAX_NUMBERS: tools_close.tax_numbers,
+    registry.BANK_RECON_STATUS: tools_close.bank_recon_status,
+    registry.INVOICE_DETAIL: tools_invoice.invoice_detail,
     registry.ERP_PUSH: erp_push_tool.erp_push,
 }
 

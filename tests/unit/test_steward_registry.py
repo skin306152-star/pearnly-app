@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""管家工具注册表闭集(services/steward/registry.py + tools.py · B2-M1 + B4 首个写工具)。
+"""管家工具注册表闭集(services/steward/registry.py + tools.py · B2-M1 + B4 写工具与工具扩容)。
 
 锁:①注册表与执行器一一对应(不同步 = 大脑挑得到却调不了 / 或有后门能力没进闭集);
 ②写工具是点名白名单且个个要授权(冒出没点名的写工具即红);③表外名字物理调不到;④提示词工具表从注册表现生成
@@ -40,8 +40,8 @@ class ClosedSetTests(unittest.TestCase):
             if not tool.readonly:
                 self.assertTrue((tool.timeout_s or 0) >= 600, tool.name)
 
-    def test_seven_tools_registered(self):
-        self.assertEqual(len(registry.TOOLS), 7)
+    def test_twelve_tools_registered(self):
+        self.assertEqual(len(registry.TOOLS), 12)
         self.assertEqual(len(registry.ALL_NAMES), len(set(registry.ALL_NAMES)))
 
     def test_unknown_names_rejected(self):

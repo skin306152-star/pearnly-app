@@ -13,6 +13,7 @@ import { renderReview, onReviewClick } from './dms-intake-review.js';
 import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
 import { recognizeOne, ctrls, recState } from './dms-intake-invoice-recognize.js';
 import { fetchErpEndpoints } from './dms-intake-erp-push.js';
+import { focusDxErpCards } from './dms-intake-erp-cards.js';
 
 export type Dict = Record<string, unknown>;
 export interface IvFile {
@@ -440,7 +441,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         renderSubmit();
         return true;
     }
-    if (hit('dx-inv-go-int')) return (go('integrations'), true);
+    if (hit('dx-inv-go-int')) return (focusDxErpCards(), true);
     if (hit('dx-inv-sub-back')) return (renderReview(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
     if (hit('dx-inv-view-rec')) return (go('history'), true);

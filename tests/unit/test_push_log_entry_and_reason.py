@@ -73,6 +73,39 @@ class PostingReviewReasonTests(unittest.TestCase):
             self.assertEqual(text.count(needle), 4, f"i18n 键 {key} 不是 4 语齐")
 
 
+class DeadEndJumpsToIntegrationsTests(unittest.TestCase):
+    """集成页现在只剩 LINE Bot / Gmail / 文件夹监听 / 通知提醒四张卡,任何「去那儿办 ERP
+    的事」的跳转都是死路(Zihao 2026-07-26 让一并做对)。"""
+
+    def test_integrations_page_really_has_no_erp_card(self):
+        # 下面两条修复的前提。哪天 ERP 卡搬回集成页,这条会先红,提醒重新评估。
+        page = _read("src/home/page-integrations.ts")
+        self.assertFalse("int-name-erp" in page)
+        self.assertFalse('data-int-card="erp"' in page)
+
+    def test_empty_state_button_scrolls_to_the_cards_on_this_page(self):
+        # ERP 连接卡就在录入工作台最下方(#dx-erp-cards),不必跳走。
+        self.assertTrue("focusDxErpCards" in _read("src/home/dms-intake-erp-cards.ts"))
+        for mod in ("dms-intake-invoice.ts", "dms-intake-batch-submit.ts"):
+            text = _read(f"src/home/{mod}")
+            self.assertTrue("focusDxErpCards" in text, f"{mod} 没接上就地滚动")
+            self.assertFalse("'integrations'" in text, f"{mod} 又往集成页跳了")
+
+    def test_view_source_returns_to_the_document(self):
+        text = _read("src/home/erp-log-detail.ts")
+        self.assertTrue("openHistoryDrawer" in text, "「查看原始单据」没回识别记录")
+        self.assertTrue('data-history-id="' in text, "按钮没带 history_id,回不去具体那张票")
+        # mappings 分支本就无按钮触发(死码),连同 source 一起清掉。
+        self.assertFalse("act === 'mappings'" in text)
+
+    def test_no_text_still_sends_users_to_the_integration_center(self):
+        text = _read("static/i18n-data.js")
+        for key in ("dxi-erp-empty-btn", "dxi-erp-empty-d", "dxi-need-erp"):
+            self.assertEqual(text.count("'" + key + "':"), 4, f"{key} 不是 4 语齐")
+        self.assertFalse("在集成中心连接并启用" in text)
+        self.assertFalse("去集成中心配置" in text)
+
+
 class GuideMatchesShippedBehaviourTests(unittest.TestCase):
     """手册不能再教「按钮会跳错、请走侧栏绕行」——那是修好之前的事。"""
 
@@ -82,6 +115,9 @@ class GuideMatchesShippedBehaviourTests(unittest.TestCase):
         self.assertFalse("并非推送日志页" in daily, "手册还在说「查看推送日志」跳集成页")
         self.assertFalse("给出的路径与实际位置不符" in daily, "手册还在说底部提示路径不符")
         self.assertFalse("有两个按钮会跳转到其他页面" in overview, "手册还在说两个按钮都跳集成页")
+        self.assertFalse("请勿点击该按钮" in daily, "手册还在叫用户别点「去连接 ERP」")
+        self.assertFalse("不会回到这张票据" in daily, "手册还在说「查看原始单据」回不去")
+        self.assertFalse("这个名字最像是能跳回那张票" in overview, "手册还留着那条已修的已知问题")
 
 
 if __name__ == "__main__":

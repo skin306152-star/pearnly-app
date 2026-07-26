@@ -12,6 +12,7 @@ import {
     pushHistory,
     type ErpEndpoint,
 } from './dms-intake-erp-push.js';
+import { focusDxErpCards } from './dms-intake-erp-cards.js';
 
 function t(k: string): string {
     const w = window as unknown as { t?: (k: string) => string };
@@ -196,7 +197,7 @@ export function onBatchSubmitClick(tg: HTMLElement): boolean {
         return true;
     }
     if (tg.closest('#dxb-go-int')) {
-        goRoute('integrations');
+        focusDxErpCards();
         return true;
     }
     if (tg.closest('#dxb-view-list')) {

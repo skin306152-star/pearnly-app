@@ -8,7 +8,7 @@
 // P3c (2026-07-10) · adapter=='mrerp' 分支挂 posting-editor.ts 的共用改判入口(现/赊 +
 // 货/费两轴人工裁决),补上 MR.ERP 此前完全没有的改判能力,与 Express 卡走同一控件。
 // ============================================================
-/* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
+/* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal, openHistoryDrawer */
 
 // 临时任务 (Zihao 2026-05-26) · 复制 ERP 单号(列表 / 凭证弹窗共用)·
 // 带 clipboard API 失败时的 textarea+execCommand 降级(http 环境 / 权限禁用)。
@@ -72,8 +72,14 @@ async function showLogDetail(logId: any) {
                 return;
             }
             if (act === 'retry') window.retryPushLog!(actEl.dataset.logId);
-            else if (act === 'mappings' || act === 'source') {
-                if (typeof routeTo === 'function') routeTo('integrations');
+            else if (act === 'source') {
+                // 「查看原始单据」= 回这张票的识别记录抽屉。原先跳集成页 —— 那页跟这张票
+                // 毫无关系(现在连 ERP 卡都没有),点了等于把人从排查现场支走。
+                const hid = actEl.dataset.historyId || '';
+                if (hid) {
+                    if (typeof routeTo === 'function') routeTo('history');
+                    if (typeof openHistoryDrawer === 'function') void openHistoryDrawer(hid);
+                }
             }
             closeAll();
             return;
@@ -311,7 +317,7 @@ async function showLogDetail(logId: any) {
 
         const foot = `<div class="erp-detail-foot">
             ${!isOk && log.error_msg ? `<button class="btn btn-ghost" type="button" data-receipt-action="copy-err" data-err-text="${escapeHtml((log.error_msg || '').slice(0, 500))}">${escapeHtml(t('erp-detail-copy-err'))}</button>` : ''}
-            <button class="btn btn-ghost" type="button" data-receipt-action="source">${escapeHtml(t('erp-detail-open-source'))}</button>
+            ${log.history_id ? `<button class="btn btn-ghost" type="button" data-receipt-action="source" data-history-id="${escapeHtml(log.history_id)}">${escapeHtml(t('erp-detail-open-source'))}</button>` : ''}
             ${log.history_id && log.endpoint_id ? `<button class="btn btn-primary" type="button" data-receipt-action="retry" data-log-id="${escapeHtml(log.id)}">${escapeHtml(t('erp-receipt-act-retry'))}</button>` : ''}
         </div>`;
 

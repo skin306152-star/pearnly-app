@@ -225,6 +225,10 @@ const AI_CSS = [
     // 动画/按钮七态/可解释卡)+ #/states 样例页布局。令牌值全引 ai-theme.css(排首位
     // 已定),组件类名(st-*/sts-*)全新不覆盖任何存量,排最后即可。
     'ai/ai-states.css',
+    // ai-steward.css(B2-M1 · 智能管家命令条 + #/steward 双栏页)只补两栏栅格/气泡/命令条
+    // 这些布局,状态的脸全取自 ai-states.css 的 .st-* 组件,故必须排在其后;与其余视图
+    // 互斥显示(命令条挂在工作台,类名 stw-* 全新不覆盖任何存量),层叠零影响。
+    'ai/ai-steward.css',
 ];
 
 // Pearnly DMS SPA:壳令牌/原子/门面在前(dms-shell.css 定义 :root 令牌),身份证向导内容区

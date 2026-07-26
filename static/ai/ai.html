@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/ai.css?v=59" />
+    <link rel="stylesheet" href="/static/dist/ai.css?v=60" />
   </head>
   <body>
     <div id="gateRoot" class="gate-root"></div>
@@ -20,6 +20,15 @@
         </a>
         <nav class="snav">
           <div class="lbl" data-at="nav_group_work"></div>
+          <!-- B2-M1 智能管家:闸(pearnly_ai_steward)默认关,style="display:none" 是
+               闸关时的默认态(同 navDesk 先例);ai-steward.js 的闸探针成功才摘掉。 -->
+          <a id="navSteward" style="display: none">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M12 3a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4z" />
+              <path d="M5 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1" />
+            </svg>
+            <span data-at="nav_steward"></span>
+          </a>
           <!-- FD-0d 总台:闸(pearnly_ai_front_desk)默认关,style="display:none" 是
                闸关时的默认态(与今天的 /ai 逐字节一致);ai.js 的闸探针成功才摘掉。 -->
           <a id="navDesk" style="display: none">
@@ -131,6 +140,10 @@
                 <input id="searchInput" data-at-ph="search_ph" />
               </div>
             </div>
+
+            <!-- B2-M1 智能管家命令条(收起态 · 矩阵上方常驻)。闸关时整条不渲染:
+                 默认 display:none 且内容为空,由 ai-steward-bar.js 在闸开后填充。 -->
+            <div class="stw-bar" id="stwBar" style="display: none"></div>
 
             <div class="view-toggle" id="viewToggle">
               <button type="button" class="vt-btn" id="vtMatrix" data-sub="matrix">
@@ -244,6 +257,15 @@
             <div id="fdBody"></div>
           </section>
 
+          <!-- 智能管家(B2-M1 · #/steward)双栏页:左=执行状态窗,右=对话流。 -->
+          <section class="view" id="v-steward">
+            <div class="board-head">
+              <h2 data-at="stw_title"></h2>
+              <span class="note" data-at="stw_note"></span>
+            </div>
+            <div id="stwBody"></div>
+          </section>
+
           <section class="view" id="v-vatcheck">
             <div class="board-head">
               <h2 data-at="vatcheck_title"></h2>
@@ -353,7 +375,8 @@
     <script src="/static/ai/ai-i18n-bank-sales.js?v=1"></script>
     <script src="/static/ai/ai-i18n-machine-actions.js?v=3"></script>
     <script src="/static/ai/ai-i18n-states.js?v=1"></script>
+    <script src="/static/ai/ai-i18n-steward.js?v=1"></script>
     <script src="/static/ai/ai-i18n.js?v=10"></script>
-    <script src="/static/dist/ai.js?v=89" defer></script>
+    <script src="/static/dist/ai.js?v=90" defer></script>
   </body>
 </html>

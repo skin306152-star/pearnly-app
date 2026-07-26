@@ -58,6 +58,10 @@
         // (pearnly_ai_front_desk)关时 ai.js 的 onRoute 把这个路由名当未知路由处理
         // (落回工作台),路由解析本身不读闸——纯函数不碰运行时状态。
         if (h === '/desk') return { name: 'desk' };
+        // 智能管家(B2-M1 · 对话式只读工作台):顶层独立路由,不带会话 id——会话是页内
+        // 状态,不进 URL(双标签隔离铁律:路由只读 URL,不做跨标签共享态)。闸
+        // (pearnly_ai_steward)关时由 AI.steward.onRoute 落回工作台,路由解析本身不读闸。
+        if (h === '/steward') return { name: 'steward' };
         // 「销项税报告三查」(N1 · 顶层独立工具):上传一份报告文件即可查,不依赖任何
         // 客户/工单上下文,同 /pool 一样是独立顶层路由。
         if (h === '/vatcheck') return { name: 'vatcheck' };
@@ -130,6 +134,10 @@
         return '#/desk';
     }
 
+    function buildStewardHash() {
+        return '#/steward';
+    }
+
     function buildVatcheckHash() {
         return '#/vatcheck';
     }
@@ -187,6 +195,7 @@
         buildBoardHash: buildBoardHash,
         buildPoolHash: buildPoolHash,
         buildDeskHash: buildDeskHash,
+        buildStewardHash: buildStewardHash,
         buildVatcheckHash: buildVatcheckHash,
         buildFileconvHash: buildFileconvHash,
         buildPayrollHash: buildPayrollHash,

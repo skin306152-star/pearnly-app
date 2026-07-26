@@ -95,6 +95,9 @@ const BUNDLES = [
             // ai-api-desk.js(FD-0d · 前门四端点:建草稿/解析/确认/消息流,拆自 ai-api.js·
             // 单文件<500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-desk.js',
+            // ai-api-steward.js(B2-M1 · 智能管家五端点:探针/建会话/读会话/发消息/读任务,
+            // 拆自 ai-api.js·单文件<500 铁律)同 ai-api-desk.js 先例,只需排在 ai-api.js 之前。
+            'ai/ai-api-steward.js',
             // ai-api-review.js(MC1-b2 · 审核收件箱 + 签批闭环七端点,拆自 ai-api.js·单文件
             // <500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
             'ai/ai-api-review.js',
@@ -276,6 +279,17 @@ const BUNDLES = [
             // 用 AI.states.mount)之前——同 ai-vatcheck/ai-fileconv 先例(顶层独立视图)。
             'ai/ai-states-render.js',
             'ai/ai-states.js',
+            // 智能管家(B2-M1 · #/steward + 工作台命令条)四文件。两个 render(左窗任务 /
+            // 右窗对话+命令条)都依赖 AI.state 与 AI.statesRender(B1 状态词典组件),故
+            // 必须排在 ai-states-render.js 之后;ai-steward.js(编排:会话/送出/轮询/闸)
+            // 用两个 render + AI.poll + AI.router,排它们之后;ai-steward-bar.js(命令条挂载)
+            // 在 applyGate 时才引用 AI.steward.openWith(不是加载期),但 ai-steward.js 的
+            // applyGate 会调 AI.stewardBar.applyGate,故排在其后、ai.js(onRoute 调
+            // AI.steward.onRoute + enterApp 调 probe)之前。
+            'ai/ai-steward-render.js',
+            'ai/ai-steward-chat-render.js',
+            'ai/ai-steward.js',
+            'ai/ai-steward-bar.js',
             'ai/ai.js',
         ],
     },

@@ -1,0 +1,297 @@
+/* Pearnly AI · ai-steward.css · 智能管家(B2-M1)命令条 + #/steward 双栏页布局。
+ *
+ * 状态的「脸」全部来自 B1 状态词典(ai-states.css 的 .st-badge/.st-dots/.st-steps/
+ * .st-count/.st-pulse),本文件一条状态样式都不写 —— 只管两栏怎么排、气泡怎么摆。
+ * 徽章/按钮/面板复用 ai-shell.css 的 .panel/.btn/.chip 原子,颜色一律 var() 令牌
+ * (ai-theme.css),零裸 hex。
+ */
+
+/* ---------- 工作台顶部命令条(收起态) ---------- */
+.stw-bar {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: var(--sh-card);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.stw-bar-row {
+  display: flex;
+  gap: 8px;
+}
+.stw-bar-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-family: inherit;
+  padding: 9px 13px;
+  border: 1px solid var(--hair2);
+  border-radius: 11px;
+  background: var(--surface2);
+  color: var(--ink);
+}
+.stw-bar-input::placeholder {
+  color: var(--faint);
+}
+.stw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+.stw-chip {
+  cursor: pointer;
+  border-color: var(--hair2);
+  background: var(--surface2);
+  color: var(--ink2);
+}
+.stw-chip:hover {
+  border-color: var(--sage);
+  background: var(--sage-soft);
+  color: var(--sage-deep);
+}
+
+/* ---------- #/steward 双栏(左=执行状态,右=对话) ---------- */
+.stw-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 18px;
+  align-items: start;
+}
+.stw-col {
+  min-width: 0;
+}
+.stw-col-hd {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mut);
+  margin-bottom: 9px;
+}
+
+/* ---------- 左窗:任务面板 ---------- */
+.stw-meta {
+  font-size: 12px;
+  color: var(--mut);
+  margin-bottom: 10px;
+}
+.stw-prog {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.stw-stalled {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--alert);
+  background: var(--alert-soft);
+  border: 1px solid var(--alert-line);
+  border-radius: 10px;
+  padding: 8px 11px;
+  margin-bottom: 12px;
+}
+.stw-steps {
+  list-style: none;
+}
+.stw-step {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px dashed var(--hair);
+}
+.stw-step-badge {
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.stw-step-main {
+  min-width: 0;
+  flex: 1;
+}
+.stw-step-t {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.stw-step-d {
+  font-size: 12px;
+  color: var(--mut);
+  margin-top: 2px;
+}
+.stw-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 5px;
+}
+.stw-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--acc);
+  text-decoration: none;
+}
+.stw-link:hover {
+  color: var(--acc-h);
+  text-decoration: underline;
+}
+.stw-arts-hd {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mut);
+  margin: 14px 0 8px;
+}
+.stw-art {
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-bottom: 8px;
+  background: var(--surface2);
+}
+.stw-art-t {
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+/* 宽表格只在自己的容器里横滑,页面本体永不出现横向滚动条。 */
+.stw-scroll {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+.stw-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.stw-table th,
+.stw-table td {
+  text-align: left;
+  padding: 5px 9px;
+  border-bottom: 1px solid var(--hair);
+  white-space: nowrap;
+}
+.stw-table th {
+  color: var(--mut);
+  font-weight: 600;
+}
+
+/* ---------- 右窗:对话流 ---------- */
+.stw-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 12px;
+}
+.stw-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(560px, 92%);
+}
+.stw-msg.me {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.stw-who {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+.stw-bubble {
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--hair);
+  background: var(--surface);
+  color: var(--ink);
+}
+.stw-msg.me .stw-bubble {
+  background: var(--sage-soft);
+  border-color: var(--sage-line);
+}
+.stw-msg-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  font-size: 11.5px;
+  color: var(--mut);
+}
+.stw-linkbtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--acc);
+  cursor: pointer;
+}
+.stw-linkbtn:hover {
+  color: var(--acc-h);
+  text-decoration: underline;
+}
+.stw-feed-empty {
+  border: 1px dashed var(--hair2);
+  border-radius: 12px;
+  padding: 20px 18px;
+  margin-bottom: 12px;
+  background: var(--surface);
+}
+.stw-feed-empty-t {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.stw-feed-empty-s {
+  font-size: 12px;
+  color: var(--mut);
+  margin-top: 4px;
+}
+.stw-composer {
+  position: sticky;
+  bottom: 0;
+  background: var(--paper);
+  padding-top: 10px;
+}
+.stw-err {
+  font-size: 12px;
+  color: var(--crit);
+  background: var(--crit-soft);
+  border: 1px solid var(--crit-line);
+  border-radius: 9px;
+  padding: 7px 11px;
+  margin-bottom: 8px;
+}
+.stw-readonly {
+  font-size: 11.5px;
+  color: var(--mut);
+  margin-top: 7px;
+}
+
+/* ---------- 移动端(390px 基准):单栏,执行状态卡内嵌在对话流上方 ---------- */
+@media (max-width: 900px) {
+  .stw-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .stw-feed {
+    max-height: none;
+  }
+  .stw-msg {
+    max-width: 100%;
+  }
+}

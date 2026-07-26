@@ -168,6 +168,7 @@
         dashboard: 'crumb_dash',
         pool: 'nav_todo',
         desk: 'nav_desk',
+        steward: 'nav_steward',
         vatcheck: 'nav_vatcheck',
         fileconv: 'nav_fileconv',
         payroll: 'nav_payroll',
@@ -315,6 +316,10 @@
         );
         $('navReports').classList.toggle('on', route.name === 'reports');
         $('footUser').classList.toggle('on', route.name === 'settings');
+        // 智能管家(B2-M1):闸三态 + 视图显隐 + 挂载 + 闸关回落全在 AI.steward 内收口
+        // (本文件已顶到 500 行预算线,不再抄一份 desk 那套探针分支)。每条路由都要调
+        // ——离开管家页由它负责关视图并停轮询;返回 true = 这条路由归它管,本函数收工。
+        if (AI.steward.onRoute(api, route)) return;
         if (route.name === 'pool') {
             restoreScrollAfterPaint(route);
             AI.pool.mount(api);
@@ -441,6 +446,7 @@
             .catch(function () {
                 afterDeskProbe(api, false); // 探针失败仍 fail-closed
             });
+        AI.steward.probe(api); // 管家闸探针(自带 fail-closed 与深链收口,见该文件)
         // 二次进入(门面登出/登录闭环)可能已订阅过一次——先退订再订阅,防止 hashchange
         // 监听器逐轮叠加(每次都多触发一遍 onRoute,状态越切越花)。
         if (routerUnsubscribe) routerUnsubscribe();

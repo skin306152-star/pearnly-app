@@ -129,6 +129,7 @@ _ENTRY_ASSETS = {
         "/static/ai/ai-i18n-bank-sales.js",
         "/static/ai/ai-i18n-machine-actions.js",
         "/static/ai/ai-i18n-states.js",
+        "/static/ai/ai-i18n-steward.js",
         *(
             f"/static/ai/ai-i18n-{lang}{suffix}.js"
             for lang in ("zh", "th", "en", "ja")

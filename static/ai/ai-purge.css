@@ -1,6 +1,18 @@
 /* Pearnly AI · 按账套清空数据弹窗 —— 外壳复用 .pkg-mask/.pkg-modal(ai-pkg.css),
    这里只补选择列表、警告块、进度条三样本弹窗独有的东西。 */
 
+/* 客户页头部原本两个按钮,加「清除数据」变三个 —— 窄屏一行排不下会横向溢出
+   (E2E 的 390px 无溢出断言逐个照出来了)。窄屏让按钮组整体换到第二行:
+   标题与按钮各自仍不折词,只是分两行摆,与 .board-head 既有"不许折行"的意图不冲突。 */
+@media (max-width: 960px) {
+  #v-clients .board-head {
+    flex-wrap: wrap;
+  }
+  #v-clients .board-head #clientsPurgeBtn {
+    margin-left: 0;
+  }
+}
+
 /* 窄弹窗:桌面封顶 480,窄屏按视口收(94vw 留出两侧边距)。用 vw 不用 100% ——
    后者贴死屏幕边,且属写死宽度(见 scripts/ui_design_lint.mjs 该条注释)。 */
 .pg-modal {

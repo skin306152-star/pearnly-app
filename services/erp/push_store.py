@@ -319,26 +319,19 @@ def has_recent_successful_push(
     invoice_no: Optional[str] = None,
     seller_name: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
-    """批 2 改动 2 (Zihao 2026-05-19 拍板 · v118.34.34) · 推送去重 check.
-    返回最近一次 success log (含 mrerp_bill_no 等)· 没有返 None.
+    """推送去重 L0(Zihao 2026-05-19 拍板)· 返回最近一次 success log,没有返 None。
 
-    ⚠️ 名字里的 `recent` 是**假的**:SQL 里没有任何时间窗,实际语义是 "ever" —— 这条
-    history × endpoint 只要成功过一次(哪怕去年),就恒命中。改成有时间窗会打开重复过账的
-    口子,所以留的是语义、不是名字;读代码时按 "ever" 理解。
-
-    ⚠️ 作用域是 **user_id 不是 tenant_id**。它是 L0(推送日志层去重),而 L1(载荷层
-    prior_docnum,见 services/erp/express_push/prior_doc.py)按 tenant_id 作用域。同租户
-    换一个会计重推时 L0 判不出、要靠 L1 接住 —— **别以为 L0 已经兜死了**。两层同一件事用
-    两把尺子是有意的(L0 防的是同一个人重复点,L1 防的是账套里已经有那张单),但谁也别
-    单独依赖。语义由 tests/unit/test_push_dedup_contract.py 钉住。
+    ⚠️ 名字里的 `recent` 是**假的**:SQL 里没有任何时间窗,实际语义是 "ever" —— 成功过
+    一次(哪怕去年)就恒命中。加时间窗 = 打开重复过账的口子,所以留语义不留名字。
+    ⚠️ 作用域是 **user_id 不是 tenant_id**。L1(载荷层 prior_docnum,见 express_push/
+    prior_doc.py)才按 tenant_id 走:同租户换个会计重推时 L0 判不出、靠 L1 接 —— 两层
+    同一件事用两把尺子,**谁都别单独依赖**。两条语义由 test_push_dedup_contract.py 钉住。
 
     ① 同 history × endpoint 已 success 过 → 命中(原逻辑)。
     ② 跨记录:同一张票**重新上传**=新 history_id,原①判不出 → 按自然键
        (票号 + 卖方名)× endpoint 再判一次,防同票 auto 双推双记账(对抗票 16)。
        仅在 invoice_no 提供时启用(auto-push 传入);manual/旧 3 参调用行为不变。
        要求票号**与**卖方名都相等才算撞(err 向"放行"·不误挡不同卖方复用同号/OCR 变体)。
-
-    严格 user_id scope · 防跨账号 false positive.
     """
     if not endpoint_id:
         return None

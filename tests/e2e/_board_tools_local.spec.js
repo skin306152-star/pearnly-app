@@ -136,8 +136,15 @@ test.describe('缺哪张单看得见', () => {
         await expect(strip).toBeVisible();
         const text = await strip.locator('.kmiss-t').innerText();
         expect(text).toContain(PERIOD);
-        expect(text).toContain('增值税');
-        expect(text).toContain('预扣税');
+        // 缺单条列的是官方表号短码(PP30 / PND1),不是后端 display_names 的全名 —— 全名两项
+        // 塞进卡里会被 line-clamp 裁掉半句。短码从页面真词典取(obl_short_*,与矩阵列头同源),
+        // 不在 spec 里手抄一份,免得表号口径再动时两边漂。
+        const [pp30, pnd1] = await page.evaluate(() => [
+            window.at('obl_short_pp30'),
+            window.at('obl_short_pnd1'),
+        ]);
+        expect(text).toContain(pp30);
+        expect(text).toContain(pnd1);
         // 干话不再出现,i18n key 也不许露脸
         await expect(card(page, 1)).not.toContainText('还没有工单');
         expect(text).not.toContain('kb_missing');

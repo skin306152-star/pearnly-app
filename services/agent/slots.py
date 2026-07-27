@@ -10,12 +10,19 @@
 
 from __future__ import annotations
 
+import re
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from services.agent import manifest
 from services.agent.contracts import AgentAction, AgentContext, SlotCheck, SlotSpec
 
 _MAX_FREEFORM = 100
+
+# 数字接地的取词与清洗:千分位逗号、货币符、百分号是排版不是数值,两侧都先剥掉再按值比。
+# token 里不含空白 —— "1 ใบ 200 บาท" 合成 1200 会把两个数字粘成一个不存在的金额。
+_NUM_TOKEN = re.compile(r"\d[\d,]*(?:\.\d+)?")
+_NUM_NOISE = str.maketrans("", "", ", ฿%")
 
 
 def _texts(user_text: str, history: Optional[list]) -> str:
@@ -25,9 +32,45 @@ def _texts(user_text: str, history: Optional[list]) -> str:
     return "\n".join(parts).lower()
 
 
+def _as_number(text: str) -> Optional[Decimal]:
+    """"10,700" / "฿10700" / "3%" → Decimal;不是纯数字一律 None(走原字面接地)。"""
+    cleaned = (text or "").translate(_NUM_NOISE)
+    if not cleaned:
+        return None
+    try:
+        value = Decimal(cleaned)
+    except (InvalidOperation, ValueError):
+        return None
+    return value if value.is_finite() else None
+
+
+def _numbers_in(blob: str) -> set:
+    """用户原话里真出现过的数值集合(数值相等的 Decimal 哈希相同,可直接查集合)。"""
+    out = set()
+    for token in _NUM_TOKEN.findall(blob):
+        value = _as_number(token)
+        if value is not None:
+            out.add(value)
+    return out
+
+
 def _appears_in_text(value: str, blob: str) -> bool:
+    """字面接地;字面对不上且值是纯数字时,再按【数值】接地一次。
+
+    金额天生带排版:会计打「10,700 含税的」,模型交回 10700,逐字比会把真数判成编造,
+    追问一轮等于逼人重打一遍。数值面只认用户原话里真出现过的那些数(集合取自 blob),
+    编造的数照样进不来。
+
+    只加不减:字面能接地的一律照旧放行 —— 这道闸是 LINE Agent 与管家共用的安全核心,
+    收紧字面判据会连带改掉别处的单号/税号接地口径,不在本次改动的射程里。
+    """
     v = (value or "").strip().lower()
-    return bool(v) and v in blob
+    if not v:
+        return False
+    if v in blob:
+        return True
+    number = _as_number(v)
+    return number is not None and number in _numbers_in(blob)
 
 
 def _ground(

@@ -13,22 +13,22 @@ OU/ZZ 单逐条复核)。桥端照本模块的 docstring 消费。
 的 TRNVAL **存正数**,193/193 张真单是 `Dr 对方科目(费用) / Cr 存货科目`。按"NET>0 → 借存货"
 写会 100% 写反成凭空造存货。所以载荷里的 qty/amount 一律为正,方向由 posopr 表达。
 
-载荷契约:
-  direction      "stock_adjust"
+载荷契约(**键名以桥端 `writepath/doc_stock_adjust.py` 实际读取的为准**,机械对镜见
+services/erp/express_push/bridge_contract.py):
+  direction      "stock_adjust"(云端桥门面按它分派)
+  doc_type       "stock_adjust"(桥端 write_jobs 的路由键 · 显式给,不靠 direction 兜底)
   doctype        "OU"(ISRUN DOCTYP='OU' 族 · 具体单别看 isrun_prefix)
   subtype        "internal_issue"(v1 唯一受理的子类 · JU/TK 数量调整 8、CA 成本调整 5、
                  RL 调拨 4 一律 escalate:生产账套零样本,无从对标)
-  posopr         "6" 常量 · 桥端写 STTRN.POSOPR 与每行 STCRD.POSOPR
   account_set    账套名
-  docdate_be     佛历 YYMMDD 调整日(→ STTRN.DOCDAT,行同值)
+  doc_date       公历 ISO 调整日(→ STTRN.DOCDAT,行同值)
   isrun_prefix   该账套 ISRUN DOCTYP='OU' 下的某个 PREFIX(ZZ 报损 / XS / PM …)。各账套自建,
                  69SINCER 有 22 个、69ASIAMI 26 个,**不能硬编码**;桥端再校一次存在性
   loccod         仓库码 C(4) · 可空(桥端回落 ISINFO.MAINLOC,全库实测均 '01')
   remark         → STTRN.REMARK C(50),同时进 STCRD.STKDES(调整单的 STKDES 是摘要不是品名)
   offset_account 对方科目(→ STTRN.ACCNUMDR,借方)· 可空则桥端取 ISRUN[前缀].ACCNUM01;
                  两处都空 → 桥端拒写不猜(ACCNUMCR 对 POSOPR='6' 恒留空)
-  net_amount     Σ items.amount · |NET|>0.005 且账套永续时桥端才建 GLJNL/GLJNLIT(恒 2 行)
-  items[]        [{stock_code, qty, unit, tfactor, unit_price, amount, source_lot}]
+  lines[]        [{stock_code, qty, unit, tfactor, unit_price, amount, source_lot}]
                  qty/tfactor/unit_price 字符串保四位小数(B(8,4)),amount 保两位(钱)。
                  qty 恒正(录入单位);桥端落 TRNQTY=qty、XTRNQTY=qty×TFACTOR ——
                  **库存余额靠 XTRNQTY 移动**,TFACTOR 实测到 12/50/100,按 TRNQTY 加减差几十倍
@@ -40,6 +40,11 @@ OU/ZZ 单逐条复核)。桥端照本模块的 docstring 消费。
 
 单价必填(契约里 STMAS 均价兜底口径不在 v1):报损/领用金额直接进费用科目,会计在录入台
 点"推送"前必须看得见金额;"推完才知道多少钱"对这类单不可接受。
+
+POSOPR/NET 不下发:POSOPR 由 subtype 定死(桥端对 internal_issue 恒写 '6'),NET 由桥端
+按每行 XTRNQTY × 单位成本自己算(|NET|>0.005 且账套永续时才建 GLJNL/GLJNLIT 恒 2 行)。
+两个都是桥端说了算的值,云端跟着发一份只会在两边算法出现分歧时把错数写进 STTRN.TRNVAL,
+而且它俩本就不在桥端载荷白名单里 —— 发了整单当场 bad_payload。
 """
 
 from __future__ import annotations
@@ -53,7 +58,6 @@ DIRECTION = "stock_adjust"
 DOCTYPE = "OU"
 
 SUBTYPE_INTERNAL_ISSUE = "internal_issue"
-POSOPR_INTERNAL_ISSUE = "6"
 # 留字段不留实现:载荷带这几个子类一律 escalate(生产 2569 三套 0 张样本,无从对标)。
 _UNSUPPORTED_SUBTYPES = ("quantity", "cost", "relocate")
 
@@ -80,8 +84,8 @@ def build_stock_adjust_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -
     if subtype != SUBTYPE_INTERNAL_ISSUE:
         return fail("bad_stock_adjust_subtype")
 
-    docdate_be = base.be_docdate(req.get("doc_date"))
-    if not docdate_be:
+    doc_date = base.iso_docdate(req.get("doc_date"))
+    if not doc_date:
         return fail("bad_or_missing_date")
 
     prefix = str(req.get("isrun_prefix") or "").strip().upper()
@@ -100,23 +104,22 @@ def build_stock_adjust_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -
         # STKDES 也抄它:摘要空 = 会计几个月后看报表认不出这批货去哪了。
         return fail("no_remark")
 
-    norm_items, bad = _normalize_items(base.clean_rows(req.get("lines") or req.get("items")))
+    norm_lines, bad = _normalize_lines(base.clean_rows(req.get("lines") or req.get("items")))
     if bad:
         return fail(bad)
 
     payload: Dict[str, Any] = {
         "direction": DIRECTION,
+        "doc_type": DIRECTION,
         "doctype": DOCTYPE,
         "subtype": SUBTYPE_INTERNAL_ISSUE,
-        "posopr": POSOPR_INTERNAL_ISSUE,
         "account_set": account_set,
-        "docdate_be": docdate_be,
+        "doc_date": doc_date,
         "isrun_prefix": prefix,
         "loccod": loccod,
         "remark": remark,
         "offset_account": offset_account,
-        "net_amount": base.money_str(base.sum_rows(norm_items)),
-        "items": norm_items,
+        "lines": norm_lines,
         "userid": base.cp874_trim(req.get("userid"), _MAX_USERID),
         "depcod": str(req.get("depcod") or "").strip(),
         "source": {"ref": str(req.get("ref") or ""), "note": str(req.get("note") or "")},
@@ -130,7 +133,7 @@ def build_stock_adjust_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -
     return ExpressMapResult(True, finalize_payload(payload), "ok")
 
 
-def _normalize_items(rows: List[Dict[str, Any]]) -> tuple:
+def _normalize_lines(rows: List[Dict[str, Any]]) -> tuple:
     if not rows:
         return [], "no_items"
     out: List[Dict[str, str]] = []
@@ -153,7 +156,7 @@ def _normalize_items(rows: List[Dict[str, Any]]) -> tuple:
         lot = str(row.get("source_lot") or "").strip()
         if lot and base.width_error("source_lot", lot, _MAX_LOT):
             return [], "bad_source_lot"
-        item = {
+        line = {
             "stock_code": code,
             "qty": base.qty_str(qty),
             "unit": str(row.get("unit") or "").strip()[:_MAX_UNIT],
@@ -165,62 +168,53 @@ def _normalize_items(rows: List[Dict[str, Any]]) -> tuple:
             factor = base.quantize_qty(factor)
             if factor <= base.ZERO:
                 return [], "bad_item_tfactor"
-            item["tfactor"] = base.qty_str(factor)
+            line["tfactor"] = base.qty_str(factor)
         if lot:
-            item["source_lot"] = lot
-        out.append(item)
+            line["source_lot"] = lot
+        out.append(line)
     return out, ""
 
 
 _REQUIRED = (
     "account_set",
-    "docdate_be",
+    "doc_date",
     "isrun_prefix",
     "remark",
-    "net_amount",
-    "items",
-    "posopr",
+    "lines",
     "subtype",
 )
 
 
 def check_payload(payload: Dict[str, Any]) -> Optional[str]:
     """写路总闸(桥门面 build_write_payload 调用)· 返回错误文案或 None。"""
-    err = base.required_error(payload, _REQUIRED) or base.money_fields_error(
-        payload, ("net_amount",)
-    )
+    err = base.required_error(payload, _REQUIRED)
     if err:
         return err
-    err = base.docdate_error(payload)
+    err = base.docdate_error(payload, "doc_date")
     if err:
         return err
     if payload.get("subtype") != SUBTYPE_INTERNAL_ISSUE:
+        # subtype 就是方向:桥端只对 internal_issue 写 POSOPR='6'(出库),别的子类它转人工。
+        # 被改成别的值 = 分录方向整个翻面,必须当场拒(45 号契约 X1)。
         return f"subtype v1 只受理 {SUBTYPE_INTERNAL_ISSUE}: {payload.get('subtype')!r}"
-    if payload.get("posopr") != POSOPR_INTERNAL_ISSUE:
-        # 方向由 POSOPR 表达(X1)。它被改成别的值 = 分录方向整个翻面,必须当场拒。
-        return f"posopr v1 恒为 '{POSOPR_INTERNAL_ISSUE}': {payload.get('posopr')!r}"
     err = base.width_error("isrun_prefix", payload.get("isrun_prefix"), _MAX_PREFIX)
     if err:
         return err
 
-    items = payload.get("items")
-    err = base.rows_error(items, "items")
+    lines = payload.get("lines")
+    err = base.rows_error(lines, "lines")
     if err:
         return err
-    total = base.ZERO
-    for i, row in enumerate(items):
+    for i, row in enumerate(lines):
         if not str(row.get("stock_code") or "").strip():
-            return f"items[{i}] 缺 stock_code"
+            return f"lines[{i}] 缺 stock_code"
         qty = base.money(row.get("qty"))
         price = base.money(row.get("unit_price"))
         amount = base.money(row.get("amount"))
         if qty is None or qty <= base.ZERO:
-            return f"items[{i}].qty 须为正数: {row.get('qty')!r}"
+            return f"lines[{i}].qty 须为正数: {row.get('qty')!r}"
         if price is None or price <= base.ZERO:
-            return f"items[{i}].unit_price 须为正数: {row.get('unit_price')!r}"
+            return f"lines[{i}].unit_price 须为正数: {row.get('unit_price')!r}"
         if not base.same(amount, qty * price):
-            return f"items[{i}].amount({amount}) != qty×unit_price({qty} × {price})"
-        total += amount
-    if not base.same(base.money(payload["net_amount"]), total):
-        return f"net_amount({payload['net_amount']}) != Σ行金额({total})"
+            return f"lines[{i}].amount({amount}) != qty×unit_price({qty} × {price})"
     return None

@@ -52,21 +52,23 @@ WRITE_PAYLOAD_KEYS = frozenset(
 
 # 会计手录四类单据(P2-B)· 逐 direction 冻结键集。与上面 v1 的两条老路分开列,不合并:
 # 老路的键集是老小助手在生产消费的东西,往里塞新键会让"这个键该不该出现在采购载荷里"
-# 无从判断;桥端白名单同样按 direction 分表,两边逐集对镜才有意义。
+# 无从判断。
+#
+# ⚠️ 这张表只管"云端自己产什么",判不了对错 —— 判对错的是 bridge_contract.py 里桥端
+# 消费契约的镜像(BRIDGE_ACCEPTED_KEYS / BRIDGE_REQUIRED_KEYS)。两张表都要过,缺一个
+# 就回到 P2-B 那种"自己验自己全绿、真实下行路径一类都走不通"的假绿。
 DOCTYPE_PAYLOAD_KEYS = {
     "ar_receipt": frozenset(
         {
             "payload_version",
             "direction",
+            "doc_type",
             "doctype",
             "account_set",
-            "docdate_be",
-            "customer",
-            "net_amount",
+            "receipt_date",
+            "customer_code",
             "wht_amount",
-            "cash_amount",
-            "cheque_amount",
-            "advance_amount",
+            "wht_isrun_zr_prefix",
             "shortfall_amount",
             "allocations",
             "channels",
@@ -82,14 +84,13 @@ DOCTYPE_PAYLOAD_KEYS = {
         {
             "payload_version",
             "direction",
+            "doc_type",
             "doctype",
             "account_set",
-            "docdate_be",
-            "supplier",
-            "net_amount",
+            "payment_date",
+            "supplier_code",
+            "payee_code",
             "wht_amount",
-            "cash_amount",
-            "cheque_amount",
             "settlements",
             "channels",
             "withholding",
@@ -103,9 +104,10 @@ DOCTYPE_PAYLOAD_KEYS = {
         {
             "payload_version",
             "direction",
+            "doc_type",
             "doctype",
             "account_set",
-            "docdate_be",
+            "voucher_date",
             "journal_code",
             "voucher_no",
             "description",
@@ -120,17 +122,16 @@ DOCTYPE_PAYLOAD_KEYS = {
         {
             "payload_version",
             "direction",
+            "doc_type",
             "doctype",
             "subtype",
-            "posopr",
             "account_set",
-            "docdate_be",
+            "doc_date",
             "isrun_prefix",
             "loccod",
             "remark",
             "offset_account",
-            "net_amount",
-            "items",
+            "lines",
             "userid",
             "depcod",
             "prior_docnum",

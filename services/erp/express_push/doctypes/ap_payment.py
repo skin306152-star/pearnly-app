@@ -14,26 +14,31 @@ istab55.SHORTNAM → ISINFO.ACCNUM09 → ISRUN(ZP,'TS'/'TA') 四级取值链。�
         Σ channels.amount + wht_amount == net_amount
     W1  wht.tax_amount == round(base_amount × tax_rate / 100, 2)
 
-载荷契约:
-  direction        "ap_payment"
+载荷契约(**键名以桥端 `writepath/doc_payment.py` 实际读取的为准**,机械对镜见
+services/erp/express_push/bridge_contract.py):
+  direction        "ap_payment"(云端桥门面按它分派)
+  doc_type         "ap_payment"(桥端 write_jobs 的路由键 · 显式给,不靠 direction 兜底)
   doctype          "PS"(ISRUN DOCTYP='PS' · 判别键是 APTRN.RECTYP='9' 不是号前缀)
   account_set      账套名(桥端三重一致性闸沿用现役)
-  docdate_be       佛历 YYMMDD 付款日(桥端反推公历写 DOCDAT/DUEDAT)
-  supplier         {code, payee_code} · code 必须已存在于 APMAS;payee_code→BILLBE(实际
-                   收款/开预扣凭证对象,默认空)
-  net_amount       NETAMT = RCVAMT = PAYAMT = 本次结清净额
+  payment_date     公历 ISO 付款日(桥端写 DOCDAT/DUEDAT)
+  supplier_code    必须已存在于 APMAS,本单不建档
+  payee_code       → BILLBE(实际收款/开预扣凭证对象,默认空)
   wht_amount       TAX(本次预扣合计,默认 0;非 0 时 withholding 必填)
-  cash_amount      → CSHPAY(kind='cash' 的渠道合计)
-  cheque_amount    → CHQPAY(其余 kind 的渠道合计;INTPAY 口径未证实 · v1 恒 0 不下发)
   settlements[]    → APRCPIT · {doc_no, rectyp('3'), amount, vat_amount}
-  channels[]       → APRCPCQ(+ BKTRN)· {prefix(ISRUN ZP), kind, amount, is_cheque,
-                   bank_account(BKMAS.BNKACC · is_cheque 时必填)}
+  channels[]       → APRCPCQ(+ BKTRN)· {isrun_zp_prefix, kind, amount, is_cheque,
+                   bank_account(BKMAS.BNKACC 银行档编码 C(2) · is_cheque 时必填)}
                    amount 正 = 付出去(贷该科目),负 = 手续费/汇兑损(借该科目)
   withholding      {tax_type('S03' 个人 ภ.ง.ด.3 / 'S53' 法人 ภ.ง.ด.53), tax_rate,
                    base_amount, tax_amount, tax_desc, tax_cond} · 必须显式给,代码不推导
   userid / depcod  USERID · DEPCOD
   prior_docnum     重推防重单(沿用现役闸)
   source           留痕 {ref, note}
+
+NETAMT/CSHPAY/CHQPAY 不下发:桥端 NETAMT 取 Σ settlements、收付分桶按 channels[].is_cheque,
+自己算得出。云端多发一份派生值,轻则与明细打架、重则被桥端载荷白名单当契约外字段整单拒。
+
+⚠️ 分桶口径两边不同:云端曾按 kind=='cash' 分,桥端按 is_cheque 分(转账进 CSHPAY)。
+下发派生桶就是把这条分歧变成写进 APTRN 的错数;不下发,分歧就不存在。
 
 v1 范围收窄(载荷里出现即 escalate,不写):退货冲抵 rectyp 4/5、预付冲抵 rectyp 0、
 付款时认列进项税 input_vat_on_payment、负 NETAMT(汇兑损益)、多张支票。它们合计只占
@@ -69,7 +74,10 @@ _WHT_TOL = Decimal("0.01")
 _MAX_SUPPLIER = 10  # APMAS.SUPCOD C(10) · BILLBE C(10)
 _MAX_DOCNUM = 12  # APTRN.DOCNUM C(12)
 _MAX_PREFIX = 2  # ISRUN.PREFIX C(2)
-_MAX_BANK = 15  # BKMAS.BNKACC
+# BKMAS/BKTRN.BNKACC 是账套内的**银行档编码** C(2)(镜像 17 个账套 17/17),不是银行
+# 账号。这里曾按 15 放行,于是一张写着真实账号的支票单会一路过完云端所有闸,在桥端
+# check_widths 撞 FIELD_TOO_LONG —— 而 BKTRN 是最后一张写的表,再往下就是半写回滚。
+_MAX_BANK = 2
 _MAX_USERID = 8
 _MAX_TAX_DESC = 25  # ISTAX.TAXDES C(25)
 
@@ -86,8 +94,8 @@ def build_payment_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -> Exp
     if req.get("advance"):
         return fail("advance_settlement_unsupported")
 
-    docdate_be = base.be_docdate(req.get("payment_date"))
-    if not docdate_be:
+    payment_date = base.iso_docdate(req.get("payment_date"))
+    if not payment_date:
         return fail("bad_or_missing_date")
 
     supplier_code = str(req.get("supplier_code") or "").strip()
@@ -122,22 +130,18 @@ def build_payment_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -> Exp
         # 正是 v1 escalate 的那几类。
         return fail("no_channels")
 
-    cash = _bucket(norm_channels, cash=True)
-    cheque = _bucket(norm_channels, cash=False)
-    net = base.sum_rows(norm_settlements)
-    if net <= base.ZERO:
+    if base.sum_rows(norm_settlements) <= base.ZERO:
         return fail("net_amount_not_positive")
 
     payload: Dict[str, Any] = {
         "direction": DIRECTION,
+        "doc_type": DIRECTION,
         "doctype": DOCTYPE,
         "account_set": account_set,
-        "docdate_be": docdate_be,
-        "supplier": {"code": supplier_code, "payee_code": payee_code},
-        "net_amount": base.money_str(net),
+        "payment_date": payment_date,
+        "supplier_code": supplier_code,
+        "payee_code": payee_code,
         "wht_amount": base.money_str(wht),
-        "cash_amount": base.money_str(cash),
-        "cheque_amount": base.money_str(cheque),
         "settlements": norm_settlements,
         "channels": norm_channels,
         "userid": base.cp874_trim(req.get("userid"), _MAX_USERID),
@@ -187,7 +191,7 @@ def _normalize_channels(rows: List[Dict[str, Any]]) -> tuple:
     out: List[Dict[str, Any]] = []
     for row in rows:
         prefix = str(row.get("isrun_zp_prefix") or row.get("prefix") or "").strip().upper()
-        if not prefix or base.width_error("prefix", prefix, _MAX_PREFIX):
+        if not prefix or base.width_error("isrun_zp_prefix", prefix, _MAX_PREFIX):
             return [], "bad_channel_prefix"
         kind = str(row.get("kind") or "").strip().lower()
         if kind not in CHANNEL_KINDS:
@@ -201,7 +205,7 @@ def _normalize_channels(rows: List[Dict[str, Any]]) -> tuple:
             return [], "bad_bank_account"
         out.append(
             {
-                "prefix": prefix,
+                "isrun_zp_prefix": prefix,
                 "kind": kind,
                 "amount": base.money_str(amount),
                 "is_cheque": is_cheque,
@@ -240,21 +244,14 @@ def _normalize_withholding(raw: Any) -> tuple:
     }, ""
 
 
-def _bucket(channels: List[Dict[str, Any]], *, cash: bool) -> Decimal:
-    return base.sum_rows([c for c in channels if (c["kind"] == KIND_CASH) == cash])
-
-
 _REQUIRED = (
     "account_set",
-    "docdate_be",
-    "supplier",
-    "net_amount",
+    "payment_date",
+    "supplier_code",
     "wht_amount",
-    "cash_amount",
-    "cheque_amount",
     "settlements",
 )
-_MONEY_FIELDS = ("net_amount", "wht_amount", "cash_amount", "cheque_amount")
+_MONEY_FIELDS = ("wht_amount",)
 
 
 def check_payload(payload: Dict[str, Any]) -> Optional[str]:
@@ -265,15 +262,13 @@ def check_payload(payload: Dict[str, Any]) -> Optional[str]:
     err = base.required_error(payload, _REQUIRED) or base.money_fields_error(payload, _MONEY_FIELDS)
     if err:
         return err
-    err = base.docdate_error(payload)
+    err = base.docdate_error(payload, "payment_date")
     if err:
         return err
-    code = str((payload.get("supplier") or {}).get("code") or "").strip()
-    if not code:
-        return "supplier.code 必填(付款单不建供应商档)"
-    err = base.width_error("supplier.code", code, _MAX_SUPPLIER)
-    if err:
-        return err
+    for label in ("supplier_code", "payee_code"):
+        err = base.width_error(label, payload.get(label), _MAX_SUPPLIER)
+        if err:
+            return err
 
     settlements = payload.get("settlements")
     err = base.rows_error(settlements, "settlements")
@@ -282,22 +277,25 @@ def check_payload(payload: Dict[str, Any]) -> Optional[str]:
     for i, row in enumerate(settlements):
         if str(row.get("rectyp") or "") != RECTYP_CREDIT_PURCHASE:
             return f"settlements[{i}].rectyp v1 只受理赊购票 '3': {row.get('rectyp')!r}"
-    err = base.rows_error(payload.get("channels"), "channels", min_rows=0, positive=False)
+    channels = payload.get("channels") or []
+    err = base.rows_error(channels, "channels", min_rows=0, positive=False)
     if err:
         return err
+    for i, row in enumerate(channels):
+        if not str(row.get("isrun_zp_prefix") or "").strip():
+            return f"channels[{i}] 缺 isrun_zp_prefix(收付腿科目的唯一来源)"
+        if row.get("is_cheque") and not str(row.get("bank_account") or "").strip():
+            return f"channels[{i}] 支票行须给 bank_account"
+        err = base.width_error(f"channels[{i}].bank_account", row.get("bank_account"), _MAX_BANK)
+        if err:
+            return err
 
-    net = base.money(payload["net_amount"])
-    cash = base.money(payload["cash_amount"])
-    cheque = base.money(payload["cheque_amount"])
+    net = base.sum_rows(settlements)
     wht = base.money(payload["wht_amount"])
     if net <= base.ZERO:
-        return f"net_amount 须为正数: {payload['net_amount']!r}"
-    if not base.same(net, base.sum_rows(settlements)):
-        return f"A1 不闭合: NETAMT({net}) != Σ结清额({base.sum_rows(settlements)})"
-    if not base.same(cash + cheque, base.sum_rows(payload.get("channels") or [])):
-        return "渠道分桶与 channels 合计对不上"
-    if not base.same(cash + cheque, net - wht):
-        return f"A3 不闭合: CSHPAY+CHQPAY({cash + cheque}) != NETAMT−TAX({net - wht})"
+        return f"NETAMT(Σ结清额)须为正数: {net}"
+    if not base.same(base.sum_rows(channels) + wht, net):
+        return f"A3 不闭合: Σ渠道额+TAX({base.sum_rows(channels) + wht}) != NETAMT({net})"
     return _check_withholding(payload.get("withholding"), wht)
 
 

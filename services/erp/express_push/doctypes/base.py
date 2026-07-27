@@ -13,7 +13,7 @@ from __future__ import annotations
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any, Dict, List, Optional
 
-from services.erp.express_push.common import _d, _q, _s, be_dates, thai_dbf_safe
+from services.erp.express_push.common import _d, _q, _s, parse_invoice_date, thai_dbf_safe
 
 ZERO = Decimal("0")
 _QTY_STEP = Decimal("0.0001")  # STCRD.TRNQTY / TFACTOR 是 B(8,4)
@@ -21,6 +21,9 @@ _QTY_STEP = Decimal("0.0001")  # STCRD.TRNQTY / TFACTOR 是 B(8,4)
 # 分录方向,与老链路 lines[].side 同字面(桥端 TRNTYP:D→'0' 借 / C→'1' 贷)。
 SIDE_DEBIT = "D"
 SIDE_CREDIT = "C"
+# 分录行的科目列名。桥端 doc_journal 读 `account`,老链路读 `acc` —— 常量化是为了让
+# 「改名」这件事只发生在一处,而不是散在校验与组装两侧各写一个字面量。
+ACCOUNT_KEY = "account"
 
 
 def money(value: Any) -> Optional[Decimal]:
@@ -89,32 +92,32 @@ def width_error(label: str, text: Any, limit: int) -> Optional[str]:
     return None
 
 
-def be_docdate(raw: Any) -> Optional[str]:
-    """公历 ISO / DD-MM-YYYY → 佛历 YYMMDD(与老链路 docdate_be 同一口径)。"""
-    dates = be_dates(raw)
-    return dates[0] if dates else None
+def iso_docdate(raw: Any) -> Optional[str]:
+    """公历 ISO / DD-MM-YYYY → 公历 ISO YYYY-MM-DD。解析不出 → None。
 
-
-def be_period(raw: Any) -> Optional[str]:
-    """公历日期 → 佛历税期 YYMM01(申报所属月 1 号)。"""
-    dates = be_dates(raw)
-    return dates[1] if dates else None
+    四类手录单据的日期走公历 ISO,不走老链路的佛历 `docdate_be`:桥端
+    `writepath/doc_payload.iso_date` 只认 `date.fromisoformat`,佛历串在那边一律
+    INVALID_DOC_DATE。佛历只出现在桥端自己拼的单号里。
+    """
+    d = parse_invoice_date(raw)
+    return d.isoformat() if d else None
 
 
 def lines_error(lines: Any, *, min_lines: int = 1, positive: bool = False) -> Optional[str]:
     """复式分录形状 + 借贷平衡。返回错误文案或 None。
 
-    老链路(bridge.client)与手工凭证共用这一份:借贷平是写路唯一的「不是一张单就别
-    下发」硬闸,两处各写一份必然漂。positive=True 时另钉 AMOUNT>0(GLJNLIT.AMOUNT 恒
-    为正,方向只由 TRNTYP 表达 —— 负数进去 Express 会当反方向记)。
+    科目列名是 `account`(桥端 `writepath/doc_journal` 逐行读它;老链路那套走
+    `bridge.client._assert_lines_balanced` 的 `acc`,两条路不共用这一份)。
+    positive=True 时另钉 AMOUNT>0(GLJNLIT.AMOUNT 恒为正,方向只由 TRNTYP 表达 ——
+    负数进去 Express 会当反方向记)。
     """
     floor = max(1, min_lines)
     if not isinstance(lines, list) or len(lines) < floor:
         return f"lines 须为至少 {floor} 行的数组"
     sums = {SIDE_DEBIT: ZERO, SIDE_CREDIT: ZERO}
     for i, line in enumerate(lines):
-        if not isinstance(line, dict) or not str(line.get("acc") or "").strip():
-            return f"lines[{i}] 缺科目 acc"
+        if not isinstance(line, dict) or not str(line.get(ACCOUNT_KEY) or "").strip():
+            return f"lines[{i}] 缺科目 {ACCOUNT_KEY}"
         side = line.get("side")
         if side not in sums:
             return f"lines[{i}].side 须为 D/C: {side!r}"
@@ -179,18 +182,16 @@ def money_fields_error(payload: Dict[str, Any], keys: tuple) -> Optional[str]:
     return None
 
 
-def docdate_error(payload: Dict[str, Any]) -> Optional[str]:
-    """佛历单据日形状闸(YYMMDD 六位数字 + 月日在范围内)。
+def docdate_error(payload: Dict[str, Any], key: str) -> Optional[str]:
+    """单据日形状闸:必须是桥端 `date.fromisoformat` 认的公历 YYYY-MM-DD。
 
-    桥端拿它反推公历写 DOCDAT,形状错了会写出一个「合法但不是那天」的日期 —— 落进
-    已申报月就是污染 ภ.พ.30,比直接报错难查得多。
+    形状错了桥端当场 INVALID_DOC_DATE;更坏的是形状"看着对"但不是那天(佛历 690115 被
+    当公历读),落进已申报月就是污染 ภ.พ.30,比直接报错难查得多。所以严格钉 10 位 ISO
+    而不是"能解析出来就行"。
     """
-    raw = str(payload.get("docdate_be") or "")
-    if len(raw) != 6 or not raw.isdigit():
-        return f"docdate_be 须为佛历 YYMMDD: {payload.get('docdate_be')!r}"
-    month, day = int(raw[2:4]), int(raw[4:6])
-    if not (1 <= month <= 12 and 1 <= day <= 31):
-        return f"docdate_be 月日非法: {raw}"
+    raw = str(payload.get(key) or "")
+    if len(raw) != 10 or iso_docdate(raw) != raw:
+        return f"{key} 须为公历 ISO YYYY-MM-DD: {payload.get(key)!r}"
     return None
 
 

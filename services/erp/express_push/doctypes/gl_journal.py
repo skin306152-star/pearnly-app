@@ -11,11 +11,13 @@
 它也是唯一「只写 2 张表」的单据(GLJNL + GLJNLIT [+ ISVAT]),APTRN/ARTRN/APBAL/ARBAL/
 STTRN/ISRUN 一张不碰 —— 这正是桥端最强的反向闸。
 
-载荷契约:
-  direction      "gl_journal"
+载荷契约(**键名以桥端 `writepath/doc_journal.py` 实际读取的为准**,机械对镜见
+services/erp/express_push/bridge_contract.py):
+  direction      "gl_journal"(云端桥门面按它分派)
+  doc_type       "gl_journal"(桥端 write_jobs 的路由键 · 显式给,不靠 direction 兜底)
   doctype        "GL"(= GLJNL.SRCJNL 常量标记 · 手工凭证唯一判别式,推单据时该列必须留空)
   account_set    账套名
-  docdate_be     佛历 YYMMDD 凭证日(→ GLJNL.VOUDAT,且逐行 GLJNLIT.VOUDAT 同值)
+  voucher_date   公历 ISO 凭证日(→ GLJNL.VOUDAT,且逐行 GLJNLIT.VOUDAT 同值)
   journal_code   选哪本账 = ISRUN[DOCTYP='GL'].**DOCCOD**('00' 一般/'01' 付款/'02' 收款/
                  '03' 销售/'04' 采购/'05'+ 各账套自建)。⚠️ 读 DOCCOD 不读 JNLTYP —— GL 行的
                  JNLTYP 列是空的(45 号契约 X7)。必须是目标账套 ISRUN 里真实存在的值,桥端再校一次
@@ -24,11 +26,17 @@ STTRN/ISRUN 一张不碰 —— 这正是桥端最强的反向闸。
                  (软删行的号仍算"用过",但拿它判"已存在"会误拒 —— 6902ASC 有 3753 个复用号)
   description    → GLJNL.DESCRP · C(50) 按 cp874 字节截断(泰文词间空格建议 NBSP 0xA0)
   total_amount   Σ 借方(= Σ 贷方)· 给复核台/推送日志显示金额用,桥端不据此落库
-  lines[]        [{acc, side(D/C), amount, desc, depcod, jobcod, phase, coscod}] · ≥2 行 ·
+  lines[]        [{account, side(D/C), amount, depcod, jobcod}] · ≥2 行 ·
                  amount 恒正(方向只由 side→TRNTYP 表达,负数进 Express 会被当反方向记)
-  vat            可选(带税凭证 · 6902ASC 16.6% 才写):{vat_rec('P'|'S'), vat_period_be,
-                 ref_no, base_amount, vat_amount, tax_id, prename, depcod}。ISVAT 的
-                 VATTYP/RECTYP/LATE/SELF_ADDED 一律留空 —— 那正是它与单据产生的 VAT 行的区分点
+  vat            可选(带税凭证 · 6902ASC 16.6% 才写):{vat_rec('P'|'S'), vat_period(公历
+                 ISO · 桥端取它的年月落 ISVAT.VATPRD 月首), ref_no, base_amount, vat_amount,
+                 tax_id, prename, depcod}。ISVAT 的 VATTYP/RECTYP/LATE/SELF_ADDED 一律留空
+                 —— 那正是它与单据产生的 VAT 行的区分点
+
+**行级只发桥端真的会落盘的那几列**:GLJNLIT.DESCRP 由桥端统一抄单头摘要(doc_common
+`write_journal` 逐腿写 `descrp[:50]`),行级 phase/coscod 桥端的 `Leg` 里根本没有位置。
+发了不报错,是会计在录入台逐行敲的摘要与维度**静默蒸发** —— 比报错难查,所以不发。
+真要做行级摘要,得先在桥端 `Leg` 上开列并发桥新版,不是云端多塞一个键。
   userid         → GLJNL.CREBY/USERID · C(8)
   source         留痕 {ref, note}
 
@@ -59,8 +67,10 @@ _MAX_ACCNUM = 15  # GLJNLIT.ACCNUM C(15)
 _MAX_USERID = 8
 _MAX_REFNUM = 15  # ISVAT.REFNUM
 
-# GLJNLIT 的可选维度列(手工凭证 16975/16981 全空 —— 给上就带,不给不发空键)。
-_LINE_DIMS = (("depcod", 4), ("jobcod", 6), ("phase", 4), ("coscod", 4))
+# 桥端 `doc_common.Leg` 认得的行级维度(手工凭证 16975/16981 全空 —— 给上就带,
+# 不给不发空键)。桥端拿 (account, depcod, jobcod) 撞 GLBAL 主键集做 A14,少发一个
+# 就成了"验一把钥匙、开另一把锁"。
+_LINE_DIMS = (("depcod", 4), ("jobcod", 6))
 
 
 def build_journal_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -> ExpressMapResult:
@@ -70,8 +80,8 @@ def build_journal_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -> Exp
         return fail("no_account_set")
     req = req or {}
 
-    docdate_be = base.be_docdate(req.get("voucher_date"))
-    if not docdate_be:
+    voucher_date = base.iso_docdate(req.get("voucher_date"))
+    if not voucher_date:
         return fail("bad_or_missing_date")
 
     journal_code = str(req.get("journal_code") or "").strip().upper()
@@ -89,7 +99,7 @@ def build_journal_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -> Exp
         # 真数据 3284/3284 头行 DESCRP 非空:凭证摘要是会计事后唯一能认出这张单的线索。
         return fail("no_description")
 
-    norm_lines, bad = _normalize_lines(base.clean_rows(req.get("lines")), description)
+    norm_lines, bad = _normalize_lines(base.clean_rows(req.get("lines")))
     if bad:
         return fail(bad)
 
@@ -99,9 +109,10 @@ def build_journal_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -> Exp
 
     payload: Dict[str, Any] = {
         "direction": DIRECTION,
+        "doc_type": DIRECTION,
         "doctype": DOCTYPE,
         "account_set": account_set,
-        "docdate_be": docdate_be,
+        "voucher_date": voucher_date,
         "journal_code": journal_code,
         "description": description,
         "total_amount": base.money_str(_debit_total(norm_lines)),
@@ -119,21 +130,19 @@ def build_journal_payload(req: Dict[str, Any], *, config: Dict[str, Any]) -> Exp
     return ExpressMapResult(True, finalize_payload(payload), "ok")
 
 
-def _normalize_lines(rows: List[Dict[str, Any]], default_desc: str) -> tuple:
+def _normalize_lines(rows: List[Dict[str, Any]]) -> tuple:
     err = base.lines_error(rows, min_lines=_MIN_LINES, positive=True)
     if err:
         return [], "bad_journal_lines"
     out: List[Dict[str, str]] = []
     for row in rows:
-        acc = str(row.get("acc") or "").strip()
-        if base.width_error("acc", acc, _MAX_ACCNUM):
+        account = str(row.get(base.ACCOUNT_KEY) or "").strip()
+        if base.width_error(base.ACCOUNT_KEY, account, _MAX_ACCNUM):
             return [], "account_code_too_long"
         line: Dict[str, str] = {
-            "acc": acc,
+            base.ACCOUNT_KEY: account,
             "side": row.get("side"),
             "amount": base.money_str(base.money(row.get("amount"))),
-            # 真数据里行摘要从不为空,默认抄头(Express 手录也是这个行为)。
-            "desc": base.cp874_trim(row.get("desc") or default_desc, _MAX_DESCRP),
         }
         for key, width in _LINE_DIMS:
             value = str(row.get(key) or "").strip()
@@ -153,8 +162,11 @@ def _normalize_vat(raw: Any) -> tuple:
     vat_rec = str(raw.get("vat_rec") or "").strip().upper()
     if vat_rec not in VAT_RECS:
         return None, "bad_vat_rec"
-    vat_period_be = base.be_period(raw.get("vat_period") or raw.get("vat_date"))
-    if not vat_period_be:
+    # 税期发公历 ISO,不发佛历 YYMM01:桥端 `_write_isvat` 拿 `iso_date(vat.vat_period)`
+    # 取年月落 VATPRD 月首,佛历串在那儿解不出 → 静默回落成凭证日期,一张补记进上月的
+    # 带税凭证会被算进本月税表,而两边都不报错。
+    vat_period = base.iso_docdate(raw.get("vat_period") or raw.get("vat_date"))
+    if not vat_period:
         return None, "bad_vat_period"
     taxable = base.money(raw.get("base_amount"))
     amount = base.money(raw.get("vat_amount"))
@@ -162,7 +174,7 @@ def _normalize_vat(raw: Any) -> tuple:
         return None, "bad_vat_amount"
     return {
         "vat_rec": vat_rec,
-        "vat_period_be": vat_period_be,
+        "vat_period": vat_period,
         "ref_no": base.cp874_trim(raw.get("ref_no"), _MAX_REFNUM),
         "base_amount": base.money_str(taxable),
         "vat_amount": base.money_str(amount),
@@ -176,7 +188,7 @@ def _debit_total(lines: List[Dict[str, str]]) -> Decimal:
     return base.sum_rows([ln for ln in lines if ln.get("side") == base.SIDE_DEBIT])
 
 
-_REQUIRED = ("account_set", "docdate_be", "journal_code", "description", "total_amount", "lines")
+_REQUIRED = ("account_set", "voucher_date", "journal_code", "description", "total_amount", "lines")
 
 
 def check_payload(payload: Dict[str, Any]) -> Optional[str]:
@@ -186,7 +198,7 @@ def check_payload(payload: Dict[str, Any]) -> Optional[str]:
     )
     if err:
         return err
-    err = base.docdate_error(payload)
+    err = base.docdate_error(payload, "voucher_date")
     if err:
         return err
     code = str(payload.get("journal_code") or "")
@@ -214,9 +226,9 @@ def _check_vat(raw: Any) -> Optional[str]:
         return "vat 须为对象"
     if str(raw.get("vat_rec") or "") not in VAT_RECS:
         return f"vat.vat_rec 须为 {VAT_RECS}: {raw.get('vat_rec')!r}"
-    period = str(raw.get("vat_period_be") or "")
-    if len(period) != 6 or not period.isdigit():
-        return f"vat.vat_period_be 须为佛历 YYMM01: {period!r}"
+    err = base.docdate_error(raw, "vat_period")
+    if err:
+        return err
     if base.money(raw.get("base_amount")) is None or base.money(raw.get("vat_amount")) is None:
         return "vat 金额解析不了"
     return None

@@ -4,6 +4,7 @@
 import unittest
 from decimal import Decimal
 
+from services.sales_agg import vat
 from services.sales_agg.vat import split_gross, split_report
 
 
@@ -51,6 +52,29 @@ class TestSplitReport(unittest.TestCase):
         for key, value in rep.items():
             self.assertIsInstance(value, Decimal, key)
             self.assertNotIsInstance(value, float, key)
+
+
+class TestSingleRateSource(unittest.TestCase):
+    """7/107 只有这一份。三个消费者把它拼进三种介质,各写一份就会出现「底稿算的和申报表
+    算的不一样」—— 而那种差异只在月末对不平时才暴露,查起来最贵。"""
+
+    def test_the_rate_itself(self):
+        self.assertEqual((vat.VAT_PART, vat.GROSS_PART), (7, 107))
+
+    def test_decimal_split_derives_from_it(self):
+        self.assertEqual(vat._VAT_PART, Decimal(vat.VAT_PART))
+        self.assertEqual(vat._GROSS_PART, Decimal(vat.GROSS_PART))
+
+    def test_excel_formula_and_purchase_reverse_derive_from_it(self):
+        from services.ledger import xlsx_common
+        from services.purchase import totals
+
+        self.assertEqual(xlsx_common.VAT_NUMERATOR, vat.VAT_PART)
+        self.assertEqual(xlsx_common.VAT_DENOMINATOR, vat.GROSS_PART)
+        self.assertEqual(totals._VAT_INCL_NUM, Decimal(vat.VAT_PART))
+        self.assertEqual(totals._VAT_INCL_DEN, Decimal(vat.GROSS_PART))
+        # 反证:公式串里真的用了这个比,不是巧合地各自写了同一个数字。
+        self.assertIn(f"*{vat.VAT_PART}/{vat.GROSS_PART},2)", xlsx_common.vat_included("B5"))
 
 
 if __name__ == "__main__":

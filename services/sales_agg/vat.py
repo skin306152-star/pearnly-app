@@ -18,8 +18,14 @@ from typing import Iterable
 
 CENT = Decimal("0.01")
 ZERO = Decimal("0")
-_VAT_PART = Decimal(7)
-_GROSS_PART = Decimal(107)
+
+# 泰国 VAT 7% 的含税拆分比,全站单一事实源。整数而非 Decimal:除 Decimal 算账外还有两个
+# 消费者要把它拼进别的介质 —— ledger 拼进 Excel 公式串,purchase 拼进反推式。税率真要动
+# (泰国 7% 是长期减免税率,法定 10%),只该改这两行。
+VAT_PART = 7
+GROSS_PART = 107
+_VAT_PART = Decimal(VAT_PART)
+_GROSS_PART = Decimal(GROSS_PART)
 
 
 def split_gross(gross: Decimal) -> tuple[Decimal, Decimal]:

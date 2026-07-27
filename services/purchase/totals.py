@@ -15,6 +15,8 @@ import hashlib
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any
 
+from services.sales_agg import vat
+
 _CENT = Decimal("0.01")
 _HUNDRED = Decimal("100")
 
@@ -127,8 +129,9 @@ def override_totals(lines, *, doc_discount=0, rounding=0, override) -> tuple[dic
     return out, True
 
 
-_VAT_INCL_NUM = Decimal("7")
-_VAT_INCL_DEN = Decimal("107")
+# 税率取 sales_agg.vat 的单一事实源(不再各写一份 7/107)。
+_VAT_INCL_NUM = Decimal(vat.VAT_PART)
+_VAT_INCL_DEN = Decimal(vat.GROSS_PART)
 _VAT_FACE_TOL = Decimal("1.5")
 
 

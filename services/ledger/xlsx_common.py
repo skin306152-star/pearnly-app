@@ -16,9 +16,12 @@ from typing import Any, Optional, Sequence
 from openpyxl.utils import get_column_letter
 
 from services.excel import xlsx_style as sty
+from services.sales_agg import vat
 
-VAT_NUMERATOR = 7
-VAT_DENOMINATOR = 107
+# 税率不在这里定,从 sales_agg.vat 取 —— 拆税的 Decimal 口径与本模块生成的 Excel 公式
+# 必须是同一个比,各写一份迟早出现「底稿算的和申报表算的不一样」。
+VAT_NUMERATOR = vat.VAT_PART
+VAT_DENOMINATOR = vat.GROSS_PART
 
 TITLE_ROW = 1
 BANNER_ROW = 2

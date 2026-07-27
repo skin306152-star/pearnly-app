@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from decimal import Decimal
@@ -299,9 +300,17 @@ class ExpressSalesMapperTests(unittest.TestCase):
 
     def test_contract_alignment_with_companion_sales_adapter(self):
         """本 mapper 产物直接喂 companion sales_adapter:字段名/类型/doctype 一字不差能过。"""
-        companion_src = Path("D:/pearnly-companion/src")
+        # 路径写死会让这道跨仓闸在仓库搬家后静默 skip(2026-07-27 实测已死一段时间):
+        # 与 test_express_bridge_contract 同口径,环境变量优先、缺省取兄弟目录。
+        companion_src = (
+            Path(
+                os.environ.get("PEARNLY_COMPANION_DIR")
+                or Path(__file__).resolve().parents[2] / "pearnly-companion"
+            )
+            / "src"
+        )
         if not (companion_src / "companion" / "sales_adapter.py").exists():
-            self.skipTest("companion repo not present")
+            self.skipTest(f"companion repo not present at {companion_src}")
         if str(companion_src) not in sys.path:
             sys.path.insert(0, str(companion_src))
         from companion.sales_adapter import build_sales_entry, validate_sales_payload

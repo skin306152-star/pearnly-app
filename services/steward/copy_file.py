@@ -14,8 +14,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from services.steward import attach_kinds as ak, registry, store
-
-DEFAULT_LANG = "zh"
+from services.steward.copy_lang import t as _t
 
 TITLES = {
     registry.FILE_CONVERT: {"zh": "转成 Excel", "th": "แปลงเป็น Excel"},
@@ -114,10 +113,6 @@ ERRORS = {
         "กด「อ่านด้วย OCR」หรือแปลงเป็น Excel แล้วส่งใหม่",
     },
 }
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def kind_label(kind: str, lang: str) -> str:

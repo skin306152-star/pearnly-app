@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-DEFAULT_LANG = "zh"
+from services.steward.copy_lang import t as _t
 
 # ฿ 的墨迹比字宽宽半像素,紧跟数字会糊成一团(粗体大字最明显)。垫一个窄空格分开。
 BAHT = "฿\u2009"  # ฿ + 窄空格 U+2009
@@ -144,10 +144,6 @@ ERRORS = {
         "th": "Express ยังเขียนใบนี้อยู่ (เลขงาน {job_id}) รอผลไม่ทันจึงตอบก่อน อย่าส่งซ้ำ — อีกสักครู่ดูสถานะสุดท้ายที่「บันทึกการส่ง」",
     },
 }
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def direction_label(direction: Optional[str], lang: str) -> str:

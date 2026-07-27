@@ -11,8 +11,7 @@
 from __future__ import annotations
 
 from services.steward import registry, tools_calc
-
-DEFAULT_LANG = "zh"
+from services.steward.copy_lang import t as _t
 
 TITLES = {registry.VAT_CALC: {"zh": "算 VAT", "th": "คำนวณ VAT"}}
 
@@ -56,10 +55,6 @@ ERRORS = {
         "th": 'อัตราหัก ณ ที่จ่าย "{raw}" อ่านไม่ออก กรอกเป็นตัวเลข เช่น 3%',
     },
 }
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def vat_calc(data: dict, lang: str) -> str:

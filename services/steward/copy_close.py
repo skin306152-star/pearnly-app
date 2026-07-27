@@ -16,8 +16,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.steward import registry
-
-DEFAULT_LANG = "zh"
+from services.steward.copy_lang import t as _t
 
 # 工单五态(services.workorder.engine.STATUS_*)的人话。答复层与产物层都要翻它,词表住在
 # 叶子模块,两边各自 import —— 放在 facade(copy)里会让产物层为了一个词反向依赖入口。
@@ -143,10 +142,6 @@ TITLES = {
     registry.BANK_RECON_STATUS: {"zh": "查银行对账", "th": "ดูผลกระทบยอดธนาคาร"},
     registry.INVOICE_DETAIL: {"zh": "查单票详情", "th": "ดูรายละเอียดใบนี้"},
 }
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def order_status(status: Optional[str], lang: str) -> str:

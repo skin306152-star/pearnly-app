@@ -15,8 +15,7 @@ from __future__ import annotations
 
 from services.steward import registry, tools_period
 from services.workorder import push_coverage
-
-DEFAULT_LANG = "zh"
+from services.steward.copy_lang import t as _t
 
 # 税额表里一行的三态。
 _TAX_STATE = {
@@ -90,10 +89,6 @@ TITLES = {
     registry.TAX_MATRIX: {"zh": "列全所税额表", "th": "ทำตารางภาษีทุกราย"},
     registry.PERIOD_INVOICES: {"zh": "列这期的票", "th": "รายการใบกำกับในงวด"},
 }
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def tax_state(code: str, lang: str) -> str:

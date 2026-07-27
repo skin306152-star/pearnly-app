@@ -12,7 +12,7 @@ reply_guard 出口护栏)。
 体积闸(<500 行)下的分居:产物层在 copy_artifacts,月结产线四问 + 单票体检的文案在
 copy_close,现场算账的文案在 copy_calc,开工简报 / 签批闸 / 交付物清单的文案在 copy_brief,
 本期盘点两问的文案在 copy_period,写工具 erp_push 的文案在 copy_erp_push。语义边界不变 —— 调用方一律只 import copy,本模块
-按工具/错误码委派过去。
+按工具/错误码委派过去。语言机制(支持语种 / 回落 / 取词)在 copy_lang,九个模块共用一份。
 """
 
 from __future__ import annotations
@@ -30,9 +30,7 @@ from services.steward import (
     registry,
     store,
 )
-
-DEFAULT_LANG = "zh"
-_LANGS = ("zh", "th")
+from services.steward.copy_lang import DEFAULT_LANG, LANGS, t as _t
 
 _THAI_RANGE = ("฀", "๿")
 
@@ -238,16 +236,12 @@ def pick_lang(text: str, hint: Optional[str] = None) -> str:
     前端目前只发 {text}(见 static/ai/ai-api-steward.js),所以必须能自己判——判据是文字
     本身,不是浏览器语言(会计在中文界面里用泰文打字是常态)。
     """
-    if hint in _LANGS:
+    if hint in LANGS:
         return hint
     for ch in text or "":
         if _THAI_RANGE[0] <= ch <= _THAI_RANGE[1]:
             return "th"
     return DEFAULT_LANG
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def tool_title(tool: str, lang: str) -> str:

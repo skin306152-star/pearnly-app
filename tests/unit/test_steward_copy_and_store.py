@@ -13,7 +13,20 @@ import re
 import unittest
 from pathlib import Path
 
-from services.steward import copy, registry, store
+from services.steward import (
+    copy,
+    copy_artifacts,
+    copy_brief,
+    copy_calc,
+    copy_close,
+    copy_erp_push,
+    copy_file,
+    copy_lang,
+    copy_loop,
+    copy_period,
+    registry,
+    store,
+)
 from services.workorder import engine
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -107,6 +120,31 @@ class LanguageTests(unittest.TestCase):
     def test_explicit_hint_wins(self):
         self.assertEqual(copy.pick_lang("本期谁缺料", "th"), "th")
         self.assertEqual(copy.pick_lang("x", "fr"), "zh")  # 白名单外回落
+
+    def test_missing_thai_falls_back_to_default_not_to_the_key(self):
+        """回落只往 DEFAULT_LANG 走,取不到就给空串。
+
+        九个 copy_* 模块共用 copy_lang.t —— 这条锁的是「泰文没写全时会计看到的是中文,
+        不是一串 stw_xxx」。任何一处改回落口径,这里先红。
+        """
+        self.assertEqual(copy_lang.t({"zh": "缺料"}, "th"), "缺料")
+        self.assertEqual(copy_lang.t({}, "th"), "")
+
+    def test_every_copy_module_shares_one_language_base(self):
+        """反证:这条闸报绿得是因为真收成了一份,而不是各模块又各写了一个同名函数。"""
+        mods = (
+            copy,
+            copy_artifacts,
+            copy_brief,
+            copy_calc,
+            copy_close,
+            copy_erp_push,
+            copy_file,
+            copy_loop,
+            copy_period,
+        )
+        for mod in mods:
+            self.assertIs(mod._t, copy_lang.t, mod.__name__)
 
 
 class ErrorCopyTests(unittest.TestCase):

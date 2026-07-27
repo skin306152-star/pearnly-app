@@ -16,6 +16,7 @@ import json
 from typing import Optional
 
 from services.steward import copy, store
+from services.steward.copy_lang import t as _t
 
 # 单条观测进提示词的上限(字符)。见设计报告 §5 的成本表:6 步不截断 ฿2.13 → 截断后 ฿1.29。
 OBS_MAX_CHARS = 1200
@@ -42,10 +43,6 @@ _NO_RESULT = {
 }
 _TRIED_NONE = {"zh": "几步查询", "th": "หลายขั้นตอน"}
 _RESUMED = {"zh": "继续执行。", "th": "ทำต่อ"}
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(copy.DEFAULT_LANG) or ""
 
 
 def step_ask(lang: str) -> str:

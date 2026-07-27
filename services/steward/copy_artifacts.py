@@ -11,8 +11,7 @@ copy.artifacts / copy.artifact_links,不直接 import 本模块。
 from __future__ import annotations
 
 from services.steward import copy_brief, copy_calc, copy_close, copy_file, copy_period, registry
-
-DEFAULT_LANG = "zh"
+from services.steward.copy_lang import t as _t
 
 _ARTIFACT_LABEL = {
     "matrix_link": {"zh": "打开本期矩阵", "th": "เปิดตารางงวดนี้"},
@@ -76,10 +75,6 @@ _COLUMN_LABEL = {
     "deliverable": {"zh": "报表", "th": "รายงาน"},
     "file": {"zh": "文件", "th": "ไฟล์"},
 }
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def build(tool: str, data: dict, lang: str) -> list[dict]:

@@ -14,8 +14,7 @@ copy.py 仍是唯一入口,tool_title / reply / artifacts 按工具委派到这�
 from __future__ import annotations
 
 from services.steward import copy_close, registry, tools_brief, tools_signoff
-
-DEFAULT_LANG = "zh"
+from services.steward.copy_lang import t as _t
 
 # 待办类型(tools_brief.KIND_*)的人话。
 _KIND = {
@@ -163,10 +162,6 @@ TITLES = {
     registry.CLOSE_READINESS: {"zh": "查能不能签批", "th": "ตรวจว่าอนุมัติได้หรือยัง"},
     registry.DELIVERABLES_LIST: {"zh": "查交付物", "th": "ดูชุดส่งมอบ"},
 }
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang) or table.get(DEFAULT_LANG) or ""
 
 
 def kind(code: str, lang: str) -> str:

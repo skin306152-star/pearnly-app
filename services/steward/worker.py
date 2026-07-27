@@ -22,7 +22,7 @@ import time
 from typing import Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import copy, store, tools
+from services.steward import copy, loop_run, loop_state, store, tools
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -113,8 +113,17 @@ async def _execute(row: dict) -> None:
             _finalize_failure, row, ERR_CONTEXT_LOST, copy.fail_reason(ERR_CONTEXT_LOST, lang)
         )
         return
-    await asyncio.to_thread(_mark_tool_running, row, tool, lang)
+    if not loop_state.is_loop_task(payload):
+        await asyncio.to_thread(_mark_tool_running, row, tool, lang)
     try:
+        if loop_state.is_loop_task(payload):
+            # 大脑循环任务:整圈(模型 ↔ 工具)在这里跑,收尾由循环自己按真实结果调 _finalize。
+            # 不先标 _mark_tool_running —— 那是单工具的三步模板,会把循环的 append-only
+            # 步骤账本整份冲掉(左窗当场丢掉它已经跑过的那几步)。
+            await asyncio.wait_for(
+                asyncio.to_thread(loop_run.run, row, ctx, _finalize), timeout=timeout_s
+            )
+            return
         # 批文(payload.authorization)随任务走:写工具的授权闸在 tools.run 里逐次校验,
         # worker 只负责递到位 —— 没批文/批文对不上参数,执行层自己会拒。
         result = await asyncio.wait_for(
@@ -182,15 +191,23 @@ def _finalize_result(row: dict, tool: str, lang: str, result: ToolResult) -> Non
 
 
 def _finalize_failure(row: dict, code: str, reason: str) -> None:
-    """任务级失败(超时/身份失效/意外崩):错误码 + 人话原因,步骤如实标失败。"""
+    """任务级失败(超时/身份失效/意外崩):错误码 + 人话原因,步骤如实标失败。
+
+    循环任务在自己的步骤账本上标失败(store.fail_steps 保留已 done 的行)—— 拿三步模板
+    重建等于把「它已经跑到第几步」抹掉,失败消息就只剩笼统一句,说不出停在哪一步。"""
     payload = row.get("payload") or {}
     tool = str(payload.get("tool") or "")
     lang = _lang_of(row)
+    steps = (
+        store.fail_steps(row.get("steps") or [], reason)
+        if loop_state.is_loop_task(payload)
+        else copy.build_steps(tool, lang, tool_state=store.STEP_FAILED, detail=reason)
+    )
     _finalize(
         row,
         status=store.TASK_FAILED,
         reply=reason,
-        steps=copy.build_steps(tool, lang, tool_state=store.STEP_FAILED, detail=reason),
+        steps=steps,
         artifacts=[],
         trace=[{"tool": tool, "ok": False, "error": code}],
         error_code=code,

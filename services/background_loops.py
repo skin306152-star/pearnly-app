@@ -199,6 +199,10 @@ async def run_recovery_tick():
         await run_stage_janitor_tick()
     except Exception as e:
         logger.warning(f"[stage_janitor] tick failed: {e}")
+    try:
+        await run_steward_attachment_tick()
+    except Exception as e:
+        logger.warning(f"[steward_attachments] tick failed: {e}")
     from services.workorder import reaper
 
     # run_tick 自吞异常(挂点安全在 reaper 内部保证),与 erp_retry_loop 开场的调用点一致裸调。
@@ -217,6 +221,18 @@ async def run_line_ocr_job_tick():
     from services.ocr import line_ocr_jobs
 
     await line_ocr_jobs.process_due(limit=3)
+
+
+async def run_steward_attachment_tick():
+    """管家会话附件到期清理(搭 recovery tick 便车,同 stage_janitor 先例)。
+
+    对话里扔的文件是临时件不是业务档案,靠 TTL 收 —— 它不挂 workspace_client_id,
+    「按账套清空」那条路(services/workspace/purge_files)天然收不到它。"""
+    import asyncio as _asyncio
+
+    from services.steward import attachments
+
+    await _asyncio.to_thread(attachments.sweep_expired)
 
 
 async def run_stage_janitor_tick():

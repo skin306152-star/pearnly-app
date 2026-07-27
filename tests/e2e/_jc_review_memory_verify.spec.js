@@ -7,6 +7,9 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const localServer = require('./_local_static_server');
+// 货币前缀借真源:฿ 与数字之间垫不垫窄空格由 ai-format.js 单点声明(排版口径),
+// 本例要验的是「未改票原样显示 OCR 值」那个数,不是前缀长什么样。
+const { BAHT } = require('../../static/ai/ai-format.js');
 
 const PORT = 8996;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -539,7 +542,7 @@ test('收件箱:改数裁决票显最新值+已人工修正徽标,未改票显 O
     // 未改票(plain):OCR 值原样显示,不带「已人工修正」。
     const plainCard = page.locator('.riq-item[data-item="plain1"]');
     await expect(plainCard).toBeVisible();
-    await expect(plainCard).toContainText('฿4,060.05');
+    await expect(plainCard).toContainText(`${BAHT}4,060.05`);
     await expect(plainCard).not.toContainText('已人工修正');
 
     // 改数票(corrected)折叠进已判分组,默认收起。
@@ -554,7 +557,7 @@ test('收件箱:改数裁决票显最新值+已人工修正徽标,未改票显 O
     // 展开后:显最新裁决值(4069.05)+「已人工修正」徽标,不是旧 OCR 值(4060.05)。
     await group.locator('summary').click();
     await expect(correctedCard).toBeVisible();
-    await expect(correctedCard).toContainText('฿4,069.05');
+    await expect(correctedCard).toContainText(`${BAHT}4,069.05`);
     await expect(correctedCard).toContainText('已人工修正');
 
     await page.screenshot({ path: path.join(ART, '09-inbox-corrected-value.png'), fullPage: true });

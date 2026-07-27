@@ -18,6 +18,13 @@ const path = require('path');
 const http = require('http');
 
 const ROOT = path.resolve(__dirname, '..', '..');
+
+// 货币前缀从真源借,不在断言里写死:฿ 与数字之间垫不垫窄空格是全站排版口径,由
+// ai-format.js 单点声明(tests/unit/test_ai_money_single_exit.py 守着「别处不许自己拼」)。
+// 排版口径动一次就让六条 E2E 集体变红,是断言抄了不归它管的东西。这里只管数字对不对 ——
+// 小数位/千分位/负号仍写死,那才是本例要验的。
+const { BAHT } = require(path.join(ROOT, 'static', 'ai', 'ai-format.js'));
+
 const PORT = 8994;
 const BASE = `http://127.0.0.1:${PORT}`;
 const ARTIFACT_DIR = path.join(__dirname, '_artifacts', 'b5_billing');
@@ -141,7 +148,7 @@ test.describe('/ai 设置页计费区(本地 stub · 真构建产物)', () => {
     test('老板视角:余额三格 + 充值按钮 + 记录空态指路', async ({ page }) => {
         await boot(page);
         const wrap = page.locator('#stBillingWrap');
-        await expect(wrap.locator('.bill-balance-v')).toHaveText('฿1,234.50');
+        await expect(wrap.locator('.bill-balance-v')).toHaveText(`${BAHT}1,234.50`);
         await expect(wrap.locator('.wosum .cell')).toHaveCount(3);
         await expect(wrap.locator('[data-action="bill-topup"]')).toBeVisible();
         // 空态不是干巴巴"暂无数据",要指路去点充值
@@ -168,7 +175,7 @@ test.describe('/ai 设置页计费区(本地 stub · 真构建产物)', () => {
 
         // 步2:银行卡 + 恰好金额警示 + 复制账号
         await expect(modal.locator('.bill-bank .ba')).toHaveText('230-0-91368-4');
-        await expect(modal.locator('.bill-warn')).toContainText('฿500.00');
+        await expect(modal.locator('.bill-warn')).toContainText(`${BAHT}500.00`);
         await modal.locator('[data-action="bill-copy"]').click();
         await expect(modal.locator('[data-action="bill-copy"]')).toContainText('已复制');
         await page.screenshot({ path: path.join(ARTIFACT_DIR, '03-step2-bank.png') });
@@ -199,7 +206,7 @@ test.describe('/ai 设置页计费区(本地 stub · 真构建产物)', () => {
         await modal.locator('[data-action="bill-back"]').click();
         await expect(page.locator('#billTopupMask')).toHaveCount(0);
         const row = page.locator('#stBillingWrap .bill-hrow').first();
-        await expect(row).toContainText('฿500.00');
+        await expect(row).toContainText(`${BAHT}500.00`);
         await expect(row.locator('.st-badge')).toHaveText('待审核');
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '06-history-pending.png'),
@@ -213,7 +220,7 @@ test.describe('/ai 设置页计费区(本地 stub · 真构建产物)', () => {
         const modal = page.locator('#billTopupMask');
         await modal.locator('#billAmt').fill('5');
         await modal.locator('[data-action="bill-next"]').click();
-        await expect(modal.locator('#billErr')).toContainText('฿10');
+        await expect(modal.locator('#billErr')).toContainText(`${BAHT}10`);
         expect(state.topupRequests).toHaveLength(0);
     });
 
@@ -224,7 +231,7 @@ test.describe('/ai 设置页计费区(本地 stub · 真构建产物)', () => {
         await page.screenshot({ path: path.join(ARTIFACT_DIR, '07-error-state.png') });
         state.credits = OWNER_CREDITS; // 后端恢复 → 点重试要能起死回生
         await wrap.locator('[data-action="retry"]').click();
-        await expect(wrap.locator('.bill-balance-v')).toHaveText('฿1,234.50');
+        await expect(wrap.locator('.bill-balance-v')).toHaveText(`${BAHT}1,234.50`);
     });
 
     test('员工视角:不露钱、不给充值按钮、不拉记录', async ({ page }) => {

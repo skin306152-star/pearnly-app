@@ -15,6 +15,10 @@ const path = require('path');
 const http = require('http');
 
 const ROOT = path.resolve(__dirname, '..', '..');
+// 货币前缀借真源:฿ 与数字之间垫不垫窄空格由 ai-format.js 单点声明(排版口径),
+// 本例要验的是守恒后的期末余额那个数,不是前缀长什么样。
+const { BAHT } = require(path.join(ROOT, 'static', 'ai', 'ai-format.js'));
+
 const PORT = 8982;
 const BASE = `http://127.0.0.1:${PORT}`;
 const ARTIFACT_DIR = path.join(__dirname, '_artifacts', 'k1c');
@@ -163,8 +167,8 @@ test.describe('K1c · 图片→Excel OCR 增量(本地 stub 真浏览器)', () =
             fullPage: true,
         });
         await expect(page.locator('.fc-banner.g')).toBeVisible({ timeout: 5000 });
-        // AI.format.money 负数形态 = -฿41,356.00
-        await expect(page.locator('.fc-stats')).toContainText('฿41,356.00');
+        // AI.format.money 负数形态 = 负号 + 前缀 + 数(负号在 ฿ 前)
+        await expect(page.locator('.fc-stats')).toContainText(`-${BAHT}41,356.00`);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '02-ocr-conserved.png'),
             fullPage: true,

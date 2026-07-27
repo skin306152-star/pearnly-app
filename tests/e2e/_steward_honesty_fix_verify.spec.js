@@ -22,6 +22,18 @@ const PASS = 'StwVerify#2026';
 const ART = path.join(__dirname, '_artifacts', 'steward_honesty_fix');
 const DESKTOP = { width: 1280, height: 900 };
 
+// 本机真栈专用,两重原因:登录号 stw_e2e 只存在于本地 docker 库(CI 打 pearnly.com 必红在
+// 401);且本例要的「compute 跑完、package 卡住」是手工种进库的,不种就红在数据上。
+// 跑前种:
+//   docker exec -i pearnly-db psql -U pearnly -d pearnly -c "set app.bypass_rls='on';
+//     INSERT INTO work_order_events(work_order_id, kind, step, actor)
+//     VALUES('6fd05bba-...', 'step_done', 'compute', 'e2e:steward-fix-verify');"
+// 跑后清:
+//   docker exec -i pearnly-db psql -U pearnly -d pearnly -c "set app.bypass_rls='on';
+//     DELETE FROM work_order_events WHERE actor='e2e:steward-fix-verify';"
+// 本机跑法:PEARNLY_E2E_LOCAL=1 PEARNLY_E2E_BASE_URL=http://127.0.0.1:7861 npx playwright test tests/e2e/_steward_honesty_fix_verify.spec.js
+test.skip(process.env.PEARNLY_E2E_LOCAL !== '1', '需本机真栈(PEARNLY_E2E_LOCAL=1)');
+
 fs.mkdirSync(ART, { recursive: true });
 let TOKEN = '';
 

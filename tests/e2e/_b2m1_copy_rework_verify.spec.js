@@ -17,6 +17,12 @@ const BASE = process.env.PEARNLY_E2E_BASE_URL || 'http://127.0.0.1:7860';
 const USER = 'stw_e2e';
 const PASS = 'StwVerify#2026';
 const ART = path.join(__dirname, '_artifacts', 'steward_copy_rework');
+
+// 本机真栈专用:登录号 stw_e2e 只存在于本地 docker 库,CI 打 pearnly.com 那边不认这个号。
+// 放在读 fixture 之前,让「为什么不在 CI 跑」是打开文件第一眼就看见的事。
+// 本机跑法:PEARNLY_E2E_LOCAL=1 PEARNLY_E2E_BASE_URL=http://127.0.0.1:7860 npx playwright test tests/e2e/_b2m1_copy_rework_verify.spec.js
+test.skip(process.env.PEARNLY_E2E_LOCAL !== '1', '需本机真栈(PEARNLY_E2E_LOCAL=1)');
+
 const FIX = JSON.parse(
     fs.readFileSync(path.join(__dirname, '_fixtures_steward_copy.json'), 'utf8')
 );

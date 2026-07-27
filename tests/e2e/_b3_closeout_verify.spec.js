@@ -15,8 +15,17 @@ const fs = require('fs');
 const BASE = process.env.PEARNLY_E2E_BASE_URL || 'http://127.0.0.1:7860';
 const USER = 'stw_e2e';
 const PASS = 'StwVerify#2026';
+// 货币前缀借真源:฿ 与数字之间垫不垫窄空格由 ai-format.js 单点声明(排版口径),
+// 断言只管数字对不对。
+const { BAHT } = require('../../static/ai/ai-format.js');
+
 const ART = path.join(__dirname, '_artifacts', 'b3_closeout');
 const EVID = path.join(ART, 'evidence.json');
+
+// 本机真栈专用:登录/会话/消息/任务/工人/大脑全走真后端,登录号 stw_e2e 只存在于本地
+// docker 库 —— CI 打 pearnly.com 那边不认这个号,beforeAll 必红在 401。
+// 本机跑法:PEARNLY_E2E_LOCAL=1 PEARNLY_E2E_BASE_URL=http://127.0.0.1:7860 npx playwright test tests/e2e/_b3_closeout_verify.spec.js
+test.skip(process.env.PEARNLY_E2E_LOCAL !== '1', '需本机真栈(PEARNLY_E2E_LOCAL=1)');
 
 fs.mkdirSync(ART, { recursive: true });
 let evidence = {};
@@ -551,7 +560,7 @@ test.describe.serial('B3 收官视觉验收', () => {
         await typeAndSend(page, '本期谁缺料');
         await page.waitForSelector('.stw-budget', { state: 'visible', timeout: 30000 });
         const budgetText = (await page.locator('.stw-budget').innerText()).trim();
-        expect(budgetText).toContain('已用 ฿5.02 / 上限 ฿5.00');
+        expect(budgetText).toContain(`已用 ${BAHT}5.02 / 上限 ${BAHT}5.00`);
         await expect(page.locator('[data-action="stw-new-session"]')).toContainText(
             '开个新会话继续'
         );

@@ -23,6 +23,11 @@ const PASS = 'StwVerify#2026';
 const ART = path.join(__dirname, '_artifacts', 'ai_gaps');
 const EVID = path.join(ART, 'evidence.json');
 
+// 本机真栈专用:登录号 stw_e2e 只存在于本地 docker 库,CI 打的是 pearnly.com —— 那边不认
+// 这个号,beforeAll 必红在 401(且五个同类脚本连打会把生产登录口的限流打到 429)。
+// 本机跑法:PEARNLY_E2E_LOCAL=1 PEARNLY_E2E_BASE_URL=http://127.0.0.1:7860 npx playwright test tests/e2e/_ai_gaps_verify.spec.js
+test.skip(process.env.PEARNLY_E2E_LOCAL !== '1', '需本机真栈(PEARNLY_E2E_LOCAL=1)');
+
 // 真库里的客户(beforeAll 按真接口挑,不写死 id):零工单的那个走空态/开单失败,
 // 有工单的那个走收料上传失败。
 let CLIENT_NO_ORDER = null;

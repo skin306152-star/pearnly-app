@@ -20,11 +20,21 @@ const fs = require('fs');
 const BASE = process.env.PEARNLY_E2E_BASE_URL || 'http://127.0.0.1:7860';
 const USER = 'stw_e2e';
 const PASS = 'StwVerify#2026';
+// 货币前缀借真源:฿ 与数字之间垫不垫窄空格由 ai-format.js 单点声明(排版口径),
+// 断言只管数字对不对。
+const { BAHT } = require('../../static/ai/ai-format.js');
+
 const TENANT = 'b2000000-0000-4000-8000-000000000001';
 const CLIENT_ID = 84;
 const ART = path.join(__dirname, '_artifacts', 'ai_blocked_reasons');
 const EVID = path.join(ART, 'evidence.json');
 const TOPUP = 'a[href="#/settings?focus=billing"]';
+
+// 本机真栈专用:登录号 stw_e2e 只存在于本地 docker 库(CI 打 pearnly.com 那边不认这个号,
+// 必红在 401),且停机 fixture 是 docker exec pearnly-db psql 直接种的 —— CI runner 上
+// 没有也不会有这个容器。写死的 TENANT/CLIENT_ID 同样只在本地库里成立。
+// 本机跑法:PEARNLY_E2E_LOCAL=1 PEARNLY_E2E_BASE_URL=http://127.0.0.1:7860 npx playwright test tests/e2e/_ai_blocked_reasons_verify.spec.js
+test.skip(process.env.PEARNLY_E2E_LOCAL !== '1', '需本机真栈(PEARNLY_E2E_LOCAL=1)');
 
 const DESKTOP = { width: 1280, height: 900 };
 const MOBILE = { width: 390, height: 844 };
@@ -191,7 +201,7 @@ test.describe.serial('工单卡:卡点说人话 + 余额不足给出路', () => 
             // ④ 三问答完:跑了几件(共几件)· 差多少 · 回来点哪个按钮
             expect(view.blocked).toContain('8');
             expect(view.blocked).toContain('12');
-            expect(view.blocked).toContain('฿6.00');
+            expect(view.blocked).toContain(`${BAHT}6.00`);
             expect(view.blocked).toContain(cfg.how);
             expect(view.blocked).not.toContain('{'); // 占位符没漏上屏
             expect(view.progressLine).toBeNull(); // 停住了就别再说「识别中」

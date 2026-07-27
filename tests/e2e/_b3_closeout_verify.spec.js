@@ -172,10 +172,7 @@ test.describe.serial('B3 收官视觉验收', () => {
         await page.setViewportSize({ width: 1280, height: 900 });
         const taskPolls = [];
         page.on('response', async (res) => {
-            if (
-                res.url().indexOf('/api/ai/steward/tasks/') < 0 ||
-                res.request().method() !== 'GET'
-            )
+            if (res.url().indexOf('/api/ai/steward/tasks/') < 0 || res.request().method() !== 'GET')
                 return;
             try {
                 const b = await res.json();
@@ -193,7 +190,9 @@ test.describe.serial('B3 收官视觉验收', () => {
         // ⑧ 文案与能力一致:注册表零写工具期间自述「只查不改数」,不承诺授权卡
         //(双向闸 tests/unit/test_ai_steward_pure.py:第一个写工具挂上时逼文案一起换)
         await page.waitForSelector('#stwInput', { state: 'visible', timeout: 30000 });
-        const note = (await page.locator('#v-steward .note[data-at="stw_note"]').innerText()).trim();
+        const note = (
+            await page.locator('#v-steward .note[data-at="stw_note"]').innerText()
+        ).trim();
         const composerNote = (await page.locator('.stw-composer-note').innerText()).trim();
         const bodyText = await page.evaluate(() => document.body.innerText);
         expect(note).toContain('只查不改数');
@@ -206,12 +205,18 @@ test.describe.serial('B3 收官视觉验收', () => {
             timeout: 30000,
         });
         await expect(page.locator('.stw-feed-empty .stw-chip')).toHaveCount(4);
-        await page.screenshot({ path: path.join(ART, '01-empty-4state-zh-desktop.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ART, '01-empty-4state-zh-desktop.png'),
+            fullPage: true,
+        });
 
         // 真键盘输入(不 fill)→ 真大脑 → 真任务
         await typeAndSend(page, '本期谁缺料');
         await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 120000 });
-        await page.screenshot({ path: path.join(ART, '02-running-zh-desktop.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ART, '02-running-zh-desktop.png'),
+            fullPage: true,
+        });
 
         // running → done(轮询真推进,以 DOM 徽章文字为准)
         await page.waitForFunction(
@@ -229,10 +234,11 @@ test.describe.serial('B3 收官视觉验收', () => {
             null,
             { timeout: 60000 }
         );
-        const agentMsgs = await page
-            .locator('.stw-msg.agent .stw-bubble')
-            .allInnerTexts();
-        await page.screenshot({ path: path.join(ART, '03-done-report-zh-desktop.png'), fullPage: true });
+        const agentMsgs = await page.locator('.stw-msg.agent .stw-bubble').allInnerTexts();
+        await page.screenshot({
+            path: path.join(ART, '03-done-report-zh-desktop.png'),
+            fullPage: true,
+        });
 
         const leftText = await page.locator('#stwLeft').innerText();
         expect(leftText).not.toContain('[object Object]');
@@ -291,10 +297,16 @@ test.describe.serial('B3 收官视觉验收', () => {
                 return r.fulfill({
                     status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify(taskBody('zh', 'waiting_user', { authorization: authzCard('zh') })),
+                    body: JSON.stringify(
+                        taskBody('zh', 'waiting_user', { authorization: authzCard('zh') })
+                    ),
                 });
             }
-            return r.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"boom"}' });
+            return r.fulfill({
+                status: 500,
+                contentType: 'application/json',
+                body: '{"detail":"boom"}',
+            });
         });
         await page.route('**/api/ai/steward/sessions/*/messages', (r) => {
             if (r.request().method() !== 'POST') return r.fallback();
@@ -343,7 +355,9 @@ test.describe.serial('B3 收官视觉验收', () => {
     test('T3 · zh 桌面 · 授权卡 pending → 409 used 人话 → 拒绝 → cancelled', async ({ page }) => {
         test.setTimeout(180000);
         await page.setViewportSize({ width: 1280, height: 900 });
-        const mode = { fn: () => taskBody('zh', 'waiting_user', { authorization: authzCard('zh') }) };
+        const mode = {
+            fn: () => taskBody('zh', 'waiting_user', { authorization: authzCard('zh') }),
+        };
         await injectAuthzRoutes(page, 'zh', mode);
 
         let decideMode = 'used-409';
@@ -448,7 +462,9 @@ test.describe.serial('B3 收官视觉验收', () => {
     test('T4 · zh 桌面 · 授权卡批准 → running 恢复', async ({ page }) => {
         test.setTimeout(120000);
         await page.setViewportSize({ width: 1280, height: 900 });
-        const mode = { fn: () => taskBody('zh', 'waiting_user', { authorization: authzCard('zh') }) };
+        const mode = {
+            fn: () => taskBody('zh', 'waiting_user', { authorization: authzCard('zh') }),
+        };
         await injectAuthzRoutes(page, 'zh', mode);
         await page.route('**/api/ai/steward/authorizations/approve', (r) =>
             r.fulfill({
@@ -562,11 +578,15 @@ test.describe.serial('B3 收官视觉验收', () => {
     test('T6 · th 桌面 · 泰语授权卡 + 文案诚实', async ({ page }) => {
         test.setTimeout(120000);
         await page.setViewportSize({ width: 1280, height: 900 });
-        const mode = { fn: () => taskBody('th', 'waiting_user', { authorization: authzCard('th') }) };
+        const mode = {
+            fn: () => taskBody('th', 'waiting_user', { authorization: authzCard('th') }),
+        };
         await injectAuthzRoutes(page, 'th', mode);
         const { errs } = await open(page, { lang: 'th' });
         await page.waitForSelector('#stwInput', { state: 'visible', timeout: 30000 });
-        const note = (await page.locator('#v-steward .note[data-at="stw_note"]').innerText()).trim();
+        const note = (
+            await page.locator('#v-steward .note[data-at="stw_note"]').innerText()
+        ).trim();
         expect(note).toContain('อ่านอย่างเดียว ไม่แก้ตัวเลข');
         expect(note).not.toContain('การ์ดขออนุมัติ');
         await typeAndSend(page, 'แก้ยอดภาษีขายของ SM งวด มิ.ย. เป็น 12500');
@@ -645,14 +665,19 @@ test.describe.serial('B3 收官视觉验收', () => {
         });
         expect(geo.overflow).toBeLessThanOrEqual(0);
         expect(geo.sameColumn).toBe(true);
-        await page.screenshot({ path: path.join(ART, '16-mobile-task-zh-390.png'), fullPage: true });
+        await page.screenshot({
+            path: path.join(ART, '16-mobile-task-zh-390.png'),
+            fullPage: true,
+        });
         record('t8_real', { geo, consoleErrors: errs });
     });
 
     test('T9 · zh 移动 390×844 · 授权卡布局(按钮真在视口内可点)', async ({ page }) => {
         test.setTimeout(120000);
         await page.setViewportSize({ width: 390, height: 844 });
-        const mode = { fn: () => taskBody('zh', 'waiting_user', { authorization: authzCard('zh') }) };
+        const mode = {
+            fn: () => taskBody('zh', 'waiting_user', { authorization: authzCard('zh') }),
+        };
         await injectAuthzRoutes(page, 'zh', mode);
         const { errs } = await open(page, { lang: 'zh' });
         await typeAndSend(page, '把 SM 六月销项税改成 12500 重新过账');

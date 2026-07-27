@@ -12,7 +12,7 @@
 // 抄错一处就会像 B2-M1 那次一样「桩和前端自洽、产品里全废」。
 //
 // 起法:npx playwright test tests/e2e/_f1_steward_attach_local.spec.js
-/* global window, document, DataTransfer, File, getComputedStyle */
+/* global window, document, DataTransfer, DragEvent, ClipboardEvent, getComputedStyle */
 
 const { test, expect } = require('@playwright/test');
 const { spawn } = require('child_process');

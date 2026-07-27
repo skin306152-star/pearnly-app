@@ -38,6 +38,10 @@ _BRIDGE_V1_KEYS = frozenset(
         "docdate_be",
         "vat_period_be",
         "ref_no",
+        # 「知道了,还是推」· 会计确认后放行落第二张(桥端 writepath/duplicate_gate)。
+        # 云端目前不发这个键 —— 镜像照抄是为了让「桥收什么」这份表保持完整,
+        # 少一个键会让下次对镜比出假差异,而不是挡住什么。
+        "duplicate_confirmed",
         "supplier",
         "customer",
         "vat_rate",

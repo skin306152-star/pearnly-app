@@ -71,6 +71,7 @@ class TestSingleRateSource(unittest.TestCase):
 
         self.assertEqual(xlsx_common.VAT_NUMERATOR, vat.VAT_PART)
         self.assertEqual(xlsx_common.VAT_DENOMINATOR, vat.GROSS_PART)
+        self.assertEqual((totals.VAT_PART, totals.GROSS_PART), (vat.VAT_PART, vat.GROSS_PART))
         self.assertEqual(totals._VAT_INCL_NUM, Decimal(vat.VAT_PART))
         self.assertEqual(totals._VAT_INCL_DEN, Decimal(vat.GROSS_PART))
         # 反证:公式串里真的用了这个比,不是巧合地各自写了同一个数字。

@@ -102,14 +102,21 @@
         );
     }
 
+    // 列级空态常驻在 DOM 里(有卡时 display:none),由 ai-dashboard.js::updateColumnStates
+    // 按可见卡数开关并改词——此前只在初次分组为空时才拼这一句,筛完剩 0 张的列就只剩
+    // 「等资料 0」四个字的空灰盒,同屏两种空列长得不一样,像坏了(2026-07-27 实测)。
     function columnHtml(col, items, options) {
-        var body = items.length
-            ? items
-                  .map(function (entry) {
-                      return cardHtml(entry, options);
-                  })
-                  .join('')
-            : '<div class="kempty">' + esc(at('col_empty')) + '</div>';
+        var body =
+            items
+                .map(function (entry) {
+                    return cardHtml(entry, options);
+                })
+                .join('') +
+            '<div class="kempty" data-role="col-empty"' +
+            (items.length ? ' style="display:none"' : '') +
+            '>' +
+            esc(at('col_empty')) +
+            '</div>';
         return (
             '<div class="kcol"><h4><span class="dot ' +
             col.dot +

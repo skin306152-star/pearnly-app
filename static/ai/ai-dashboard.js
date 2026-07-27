@@ -24,6 +24,10 @@
         matrix: null, // 最近一次成功拉到的矩阵响应(筛选判据/缺单义务名/批量开单账期的来源)
         filters: [], // 激活的筛选:missing/review/risk 的子集
         filtersWired: false,
+        // 客户 id → 这张卡脸上那个状态胶囊的词条 key(与 ai-kanban-render.js 渲染出来的
+        // 是同一个 AI.format.statusChip 结果)。状态类筛选拿它当准,不拿粗粒度徽章当准
+        // ——点「待审」必须只留下写着「待审」的卡,见 AI.boardTools.matchesFilters。
+        cardStateByClient: {},
     };
 
     function latestOrderByClient(orders) {
@@ -86,10 +90,16 @@
         });
         var lang = (window.AII18N && window.AII18N.lang) || 'zh';
         var missing = AI.boardTools.missingByClient(S.matrix, lang);
+        S.cardStateByClient = {};
         clients.forEach(function (c) {
             var order = latest[c.id] || null;
             var detail = order ? detailsByOrderId[order.id] : null;
             var mapped = AI.board.mapOrderToColumn(order, detail);
+            // 没有工单的卡上没有状态胶囊(渲染层不给),不登记 → 筛选退回按矩阵格子判,
+            // 免得"还没开单"的卡被「缺料」chip 一并捞进来。
+            if (order) {
+                S.cardStateByClient[String(c.id)] = AI.format.statusChip(order.status, detail).key;
+            }
             var entry = {
                 client: c,
                 order: order,
@@ -150,12 +160,26 @@
         input.oninput = applyFiltersAndSearch;
     }
 
-    // 三个筛选 chip(缺料/待审/风险)—— 判据吃矩阵格子徽章,见 ai-board-tools-render.js。
+    // chip 三处状态归零(数据态 + .on 高亮 + aria-pressed)。收起工具条与「清除筛选」
+    // 共用这一份:只清数据态、留着亮起来的 chip,就是状态撒谎——而且后果不对称,用户
+    // 看见亮着的 chip 会去点它想关掉,indexOf 是 -1 反而把筛选打开,卡片当场少一半。
+    function resetChips() {
+        S.filters = [];
+        $('boardTools')
+            .querySelectorAll('.kb-chip')
+            .forEach(function (btn) {
+                btn.classList.remove('on');
+                btn.setAttribute('aria-pressed', 'false');
+            });
+    }
+
+    // 三个筛选 chip(缺料/待审/风险)—— 判据在 ai-board-tools-render.js,状态类筛选按
+    // 卡片脸上写的那个词判(S.cardStateByClient),不按粗粒度徽章判。
     // 拿不到矩阵响应时整条工具条收起:给个点不动的筛选比没有筛选更糟。
     function wireFilters() {
         var tools = $('boardTools');
         tools.style.display = S.matrix ? '' : 'none';
-        if (!S.matrix) S.filters = [];
+        if (!S.matrix) resetChips();
         if (S.filtersWired) return;
         S.filtersWired = true;
         tools.querySelectorAll('.kb-chip').forEach(function (btn) {
@@ -183,15 +207,23 @@
             var id = el.getAttribute('data-client-id');
             var show =
                 (!q || name.indexOf(q) >= 0) &&
-                AI.boardTools.matchesFilters(cells[id] || [], S.filters, today);
+                AI.boardTools.matchesFilters(
+                    cells[id] || [],
+                    S.filters,
+                    today,
+                    S.cardStateByClient[id]
+                );
             el.style.display = show ? '' : 'none';
             if (show) visible += 1;
         });
-        updateColumnCounts();
+        updateColumnStates(!!q || S.filters.length > 0);
         renderNoResults(visible);
     }
 
-    function updateColumnCounts() {
+    // 列头计数 + 列级空态一起改。空态必须跟着筛选走:天生为空的列写「这一步现在没有
+    // 客户」,被筛空的列若不补一句,同屏就是"一半列有说明一半列只剩个数字"的坏相
+    // (2026-07-17 空态规范:空了要说一句话,而且要说对是哪种空)。
+    function updateColumnStates(filtering) {
         document.querySelectorAll('#dashBody .kcol').forEach(function (col) {
             var n = 0;
             col.querySelectorAll('.kcard').forEach(function (card) {
@@ -199,6 +231,10 @@
             });
             var badge = col.querySelector('h4 [data-role="col-count"]');
             if (badge) badge.textContent = String(n);
+            var empty = col.querySelector('[data-role="col-empty"]');
+            if (!empty) return;
+            empty.style.display = n ? 'none' : '';
+            if (!n) empty.textContent = at(filtering ? 'kb_col_empty_filtered' : 'col_empty');
         });
     }
 
@@ -225,13 +261,7 @@
     }
 
     function clearAllFilters() {
-        S.filters = [];
-        $('boardTools')
-            .querySelectorAll('.kb-chip')
-            .forEach(function (btn) {
-                btn.classList.remove('on');
-                btn.setAttribute('aria-pressed', 'false');
-            });
+        resetChips();
         $('searchInput').value = '';
         applyFiltersAndSearch();
     }

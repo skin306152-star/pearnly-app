@@ -131,6 +131,7 @@ def build(rows: list[dict], *, period: str) -> dict:
 
     out_clients = []
     for cid, c in clients.items():
+        # 只答「本期没有工单」不答「该有单」(全 no_need 的也 True)· 催不催单见前端 hasDuty。
         c["missing_order"] = not client_has_order.get(cid, False)
         out_clients.append(c)
     out_clients.sort(key=lambda c: c["name"])
@@ -153,9 +154,8 @@ def _cell(r: dict, client_id: int, code: str) -> dict:
         "work_order_id": str(r["work_order_id"]) if r["work_order_id"] else None,
         "due_paper": iso(r["due_paper"]),
         "due_efiling": iso(r["due_efiling"]),
-        # 顺延(G3 · MC2-B 件2):原始日照旧透传,顺延日现算另加字段——矩阵前端的
-        # 逾期判据(static/ai/ai-matrix-render.js isOverdue)目前仍读 due_efiling
-        # 原始日,尚未切到 due_efiling_deferred(前端改动归后续 A3,本批只接线后端)。
+        # 顺延(G3 · MC2-B 件2):原始日透传,顺延日现算另加。逾期锚点日以 due_efiling_deferred
+        # 为权威(前端 isOverdue 指回此处;管家 tools_close.py 仍锚纸质日晚 8 天,未收口)。
         "due_paper_deferred": iso(obligation_engine.defer_optional(r["due_paper"])),
         "due_efiling_deferred": iso(obligation_engine.defer_optional(r["due_efiling"])),
         "badge": badge(r["obligation_status"], r["order_status"]),

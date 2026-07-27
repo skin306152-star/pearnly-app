@@ -27,10 +27,20 @@ from tests.unit._node_harness import AI_DIR, _run_node
 
 TOOLS = str(AI_DIR / "ai-board-tools-render.js")
 STATE = str(AI_DIR / "ai-state.js")
+FORMAT = str(AI_DIR / "ai-format.js")
 
 PRELUDE = f"""
     require({json.dumps(STATE)});
     const b = require({json.dumps(TOOLS)});
+    """
+
+# 词典存在时的 at()(浏览器路):短码键命中即返回短码,其余键原样回声,让"取的是短码
+# 还是全名"在 node 里可断言。
+AT_STUB = """
+    global.at = (k) => ({
+        obl_short_pnd1: 'PND1',
+        obl_short_pp30: 'PP30',
+    })[k] || k;
     """
 
 # 一份贴着后端 /api/tax-profile/matrix 出参形状的矩阵响应(services/workorder/matrix.py::build)。
@@ -50,6 +60,7 @@ MATRIX = {
             "client_id": 1,
             "obligation_code": "pp30",
             "badge": "pending_order",
+            "order_status": None,
             "due_efiling": "2569-08-23",
             "due_efiling_deferred": "2569-08-25",
         },
@@ -57,6 +68,7 @@ MATRIX = {
             "client_id": 1,
             "obligation_code": "pnd1",
             "badge": "pending_order",
+            "order_status": None,
             "due_efiling": "2569-08-07",
             "due_efiling_deferred": "2569-08-07",
         },
@@ -64,6 +76,7 @@ MATRIX = {
             "client_id": 2,
             "obligation_code": "pp30",
             "badge": "pending_review",
+            "order_status": "review",
             "due_efiling": "2569-08-23",
             "due_efiling_deferred": "2569-08-25",
         },
@@ -115,11 +128,12 @@ class OverdueTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class MatchesFiltersTests(unittest.TestCase):
-    def _match(self, cells, filters, today="2569-08-01"):
+    def _match(self, cells, filters, today="2569-08-01", card_state=None):
         return _run_node(f"""
             {PRELUDE}
             process.stdout.write(JSON.stringify(
-                b.matchesFilters({json.dumps(cells)}, {json.dumps(filters)}, {json.dumps(today)})
+                b.matchesFilters({json.dumps(cells)}, {json.dumps(filters)}, {json.dumps(today)},
+                                 {json.dumps(card_state)})
             ));
             """)
 
@@ -150,6 +164,72 @@ class MatchesFiltersTests(unittest.TestCase):
         # 本期一格义务都没物化的客户,在任何筛选下都不该冒充命中
         self.assertFalse(self._match([], ["missing"]))
 
+    def test_card_state_beats_the_coarse_badge(self):
+        # 后端把 stuck 折进 pending_review(粗粒度组名),但看板卡按 detail.needs 在脸上
+        # 写着「缺料」——点「待审」筛出一张写「缺料」的卡就是点击语义反转。看板知道卡面
+        # 写的是哪个词,状态类筛选一律以它为准。
+        stuck = [{"badge": "pending_review", "order_status": "stuck"}]
+        self.assertFalse(self._match(stuck, ["review"], card_state="chip_needs_materials"))
+        self.assertTrue(self._match(stuck, ["missing"], card_state="chip_needs_materials"))
+        self.assertTrue(self._match(stuck, ["review"], card_state="status_stuck"))
+        self.assertFalse(self._match(stuck, ["missing"], card_state="status_stuck"))
+
+    def test_card_state_covers_the_whole_five_status_vocabulary(self):
+        cells = [{"badge": "pending_review"}]
+        hits = {
+            "status_collecting": "missing",  # 等资料
+            "chip_needs_materials": "missing",  # 缺料
+            "status_stuck": "review",  # 等你审
+            "status_review": "review",  # 待签字
+        }
+        for state, chip in hits.items():
+            other = "review" if chip == "missing" else "missing"
+            self.assertTrue(self._match(cells, [chip], card_state=state), state)
+            self.assertFalse(self._match(cells, [other], card_state=state), state)
+        # AI 在做 / 已归档 / 处理失败 都不是"缺料"也不是"待审",两个 chip 都不认
+        for state in ("status_running", "status_archive", "status_system_failed"):
+            self.assertFalse(self._match(cells, ["missing", "review"], card_state=state), state)
+
+    def test_card_state_does_not_touch_the_risk_filter(self):
+        # 风险问的是"这家有没有过期的义务格",跟卡面写的是哪个状态词无关
+        cells = [{"badge": "missing_materials", "due_efiling_deferred": "2569-07-25"}]
+        self.assertTrue(self._match(cells, ["risk"], card_state="status_review"))
+
+    def test_every_state_the_card_can_really_show_is_classified(self):
+        """卡面状态词不是这份测试编的:直接跑 ai-format.js::statusChip 取真产物的词条 key,
+        再问筛选认不认。凭空写一串 key 来验自己,验的是想象中的产品(见 memory
+        verify-target-must-be-real-content)。"""
+        cases = [
+            ("collecting", None, "missing"),
+            ("collecting", {"needs": ["intake_files"]}, "missing"),
+            ("running", None, None),
+            ("stuck", None, "review"),
+            ("stuck", {"needs": ["sales_summary"]}, "missing"),
+            ("stuck", {"blocked_reasons": ["unbalanced"], "flagged": []}, None),
+            ("review", None, "review"),
+            ("archive", None, None),
+        ]
+        out = _run_node(f"""
+            {PRELUDE}
+            const f = require({json.dumps(FORMAT)});
+            const cases = {json.dumps([[s, d] for s, d, _ in cases])};
+            process.stdout.write(JSON.stringify(cases.map(([s, d]) => {{
+                const key = f.statusChip(s, d).key;
+                return [key, b.matchesFilters([], ['missing'], '2569-08-01', key),
+                             b.matchesFilters([], ['review'], '2569-08-01', key)];
+            }})));
+            """)
+        for (status, _detail, expected), (key, missing, review) in zip(cases, out):
+            self.assertNotEqual(key, "status_unknown", status)
+            self.assertEqual(missing, expected == "missing", f"{status} → {key} · 缺料")
+            self.assertEqual(review, expected == "review", f"{status} → {key} · 待审")
+
+    def test_matrix_side_keeps_reading_the_backend_badge(self):
+        # 矩阵没有逐单 detail,格子脸上写的就是徽章词 —— 不传 cardState 时判据回到徽章
+        stuck = [{"badge": "pending_review", "order_status": "stuck"}]
+        self.assertFalse(self._match(stuck, ["missing"]))
+        self.assertTrue(self._match(stuck, ["review"]))
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class MissingByClientTests(unittest.TestCase):
@@ -170,6 +250,57 @@ class MissingByClientTests(unittest.TestCase):
 
     def test_names_follow_current_language(self):
         self.assertEqual(self._missing("th")["1"]["names"], ["ภ.ง.ด.1", "ภ.พ.30"])
+
+    def test_prefers_the_official_short_code_over_the_full_display_name(self):
+        # 后端 display_names 给的是「工资薪金预扣税申报(PND1)」这种全名,两个名字塞不进
+        # 164px 宽的卡(桌面 1280 实测被 line-clamp 裁掉第二项)。缺单条与矩阵列头同源
+        # 取 obl_short_*,词典没这码才回落全名。
+        out = _run_node(f"""
+            {AT_STUB}
+            {PRELUDE}
+            process.stdout.write(JSON.stringify(
+                b.missingByClient({json.dumps(MATRIX)}, 'zh')
+            ));
+            """)
+        self.assertEqual(out["1"]["names"], ["PND1", "PP30"])
+
+    def test_short_code_missing_from_the_dictionary_falls_back_to_the_full_name(self):
+        matrix = {
+            "period": "2569-07",
+            "clients": [{"id": 4, "name": "E", "missing_order": True}],
+            "obligation_labels": {"sso": {"zh": "社保申报(SSO 1-10)"}},
+            "cells": [{"client_id": 4, "obligation_code": "sso", "badge": "pending_order"}],
+        }
+        out = _run_node(f"""
+            {AT_STUB}
+            {PRELUDE}
+            process.stdout.write(JSON.stringify(b.missingByClient({json.dumps(matrix)}, 'zh')));
+            """)
+        self.assertEqual(out["4"]["names"], ["社保申报(SSO 1-10)"])
+
+    def test_clients_with_nothing_to_file_this_period_are_not_missing_anything(self):
+        # 本期义务全是「无需申报/已冻结」的客户:后端 missing_order 只答"本期没有工单",
+        # 答不了"本期该有单"。不排掉的话卡上会冒出黄底告警条 + 勾选框,一勾就给一个本期
+        # 无义务的客户真开出一张单。
+        matrix = {
+            "period": "2569-07",
+            "clients": [
+                {"id": 5, "name": "F", "missing_order": True},
+                {"id": 6, "name": "G", "missing_order": True},
+            ],
+            "cells": [
+                {"client_id": 5, "obligation_code": "pp30", "badge": "no_need"},
+                {"client_id": 5, "obligation_code": "pnd1", "badge": "frozen"},
+                {"client_id": 6, "obligation_code": "pp30", "badge": "no_need"},
+                {"client_id": 6, "obligation_code": "pnd1", "badge": "pending_order"},
+            ],
+        }
+        out = _run_node(f"""
+            {PRELUDE}
+            process.stdout.write(JSON.stringify(b.missingByClient({json.dumps(matrix)}, 'zh')));
+            """)
+        self.assertEqual(sorted(out.keys()), ["6"])  # 5 本期真不用交,不该被催开单
+        self.assertEqual(out["6"]["names"], ["pnd1"])
 
     def test_unknown_obligation_code_degrades_to_the_code(self):
         matrix = {

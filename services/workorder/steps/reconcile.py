@@ -20,7 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from core import feature_flags
-from services.workorder import corrections, decisions, kinds, storage
+from services.workorder import decisions, kinds, push_coverage, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import reconcile_bank
 from services.workorder.steps import reconcile_gates as gates
@@ -42,7 +42,7 @@ def run(ctx: StepContext) -> StepResult:
     events = ctx.store.list_events(
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
-    classified = _replay_money(events)
+    classified = push_coverage.replay_money(events)
     decision_recs = decisions.replay_records(events)
     decisions_by_item = decisions.payload_view(decision_recs)
 
@@ -174,16 +174,6 @@ def _replay(events: list[dict], event_type: str) -> dict:
         iid = payload.get("item_id")
         if iid:
             out[iid] = payload
-    return out
-
-
-def _replay_money(events: list[dict]) -> dict:
-    """票面钱字段:任何带 money 载荷的 item_classified 事件(进项票 + 方向不明票——后者
-    钱已读出,待人工定向后按裁定 kind 决定是否进 R1)。按 item_id 回放,latest-wins。"""
-    out: dict = {}
-    for p in _replay(events, _EVT_CLASSIFIED).values():
-        if p.get("money"):
-            out[p["item_id"]] = p["money"]
     return out
 
 
@@ -394,9 +384,6 @@ def _default_shadow_account_bridge(ctx: StepContext) -> dict:
     )
 
 
-_PUSH_TERMINAL_SUCCESS = ("success", "skipped_dup")
-
-
 def _aggregate_matched_by(rows: list[dict]) -> str:
     """一批推送回执行的整体匹配口径(MC2-C):全部行都按本工单 work_order_id 精确命中才
     标 "work_order_id";只要有一行落回租户+票号的旧口径,如实标 "invoice_no"——弱链接
@@ -409,11 +396,8 @@ def _aggregate_matched_by(rows: list[dict]) -> str:
 def _default_shadow_push_report(ctx: StepContext) -> tuple:
     """F2-辅 推送回执源(T4c · 纯读侧接入 · 零碰推送主路径)。
 
-    expected:本工单已裁进项票号——kind=purchase_invoice 且 status=ok(已计入 R1 合计),
-    或 status=flagged 且裁决非 exclude/waive(同样已计入 R1 合计,与 reconcile_gates.
-    resolve_input_vat 同一份"采信"口径),从事件流回放 item_classified.money.invoice_number,
-    空号丢弃、票号去重保序。方向不明票(assign_kind 裁进项)不在此列——本函数只认 sort/
-    classify 阶段已直接定堆 purchase_invoice 的件,范围小于 R1 entries(有意收窄,不外推)。
+    expected:本工单已采信的进项票号,口径与取数都在 push_coverage.expected_invoice_nos
+    (管家「这期还有几张没推进 Express」问的是同一个集合,两处各算一份必漂)。
 
     report:按 tenant_id(+ work_order_id 精确优先)查 erp_push_logs(services.erp.
     push_log_queries,SQL 参数化 + tenant_id 显式过滤做租户隔离),状态词映射到 ImportReport
@@ -434,25 +418,7 @@ def _default_shadow_push_report(ctx: StepContext) -> tuple:
     events = ctx.store.list_events(
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
-    classified = _replay_money(events)
-    decisions_by_item = decisions.replay_payloads(events)
-
-    expected: list[str] = []
-    seen: set[str] = set()
-    for it in items:
-        if it["kind"] != _PURCHASE or it["status"] not in ("ok", "flagged"):
-            continue
-        if it["status"] == "flagged":
-            dec = decisions_by_item.get(it["id"]) or {}
-            if dec.get("decision") in decisions.NON_COUNTING:
-                continue  # 剔除/豁免——未采信,不进期望票号清单
-        effective = corrections.apply_to_money(
-            classified.get(it["id"]), decisions_by_item.get(it["id"])
-        )
-        inv = str(effective.get("invoice_number") or "").strip()
-        if inv and inv not in seen:
-            seen.add(inv)
-            expected.append(inv)
+    expected = push_coverage.expected_invoice_nos(items, events)
     if not expected:
         return [], None, 0, None
 
@@ -470,20 +436,21 @@ def _build_import_report(rows: list[dict]):
     """erp_push_logs 状态词 → ImportReport 鸭子契约(T4c 状态词映射 · 复用 mrerp_report_parser
     的 dataclass,不新造平行类)。
 
-    success / skipped_dup → success 侧(skipped_dup=判重跳过,语义是"之前已成功推过",归成功
-    不归失败)。failed → failed 侧,reasons 取 error_msg(缺失兜底 "failed",不留空列表假装
-    无原因)。pending / retrying / manual 是未终态——两侧都不进:如实反映"仍在途",让上层
-    reconcile_push 把它落进 missing 桶,好过冒充任一终态。
+    状态词 → 四态的判据在 push_coverage.push_state(管家答"这张推进去了没"用同一份)。
+    pushed → success 侧(含 skipped_dup:判重跳过语义是"之前已成功推过")。failed → failed 侧,
+    reasons 取 error_msg(缺失兜底 "failed",不留空列表假装无原因)。in_flight(pending /
+    retrying / manual)两侧都不进:如实反映"仍在途",让上层 reconcile_push 把它落进 missing
+    桶,好过冒充任一终态。
     """
     from services.erp.mrerp_report_parser import ImportReport, ImportReportRow
 
     report = ImportReport()
     for row in rows:
-        status = row.get("status")
+        state = push_coverage.push_state(row)
         inv = row.get("invoice_no")
-        if status in _PUSH_TERMINAL_SUCCESS:
+        if state == push_coverage.STATE_PUSHED:
             report.success.append(inv)
-        elif status == "failed":
+        elif state == push_coverage.STATE_FAILED:
             report.failed.append(
                 ImportReportRow(invoice_no=inv, reasons=[row.get("error_msg") or "failed"])
             )

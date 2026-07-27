@@ -97,6 +97,27 @@ def fetch_rows(cur, *, tenant_id: str, period: str) -> list[dict]:
     return [dict(r) for r in cur.fetchall()]
 
 
+def fetch_deliverable_numbers(
+    cur, *, tenant_id: str, work_order_ids: list, kind: str
+) -> dict[str, dict]:
+    """整批工单某类交付物最新版本的 numbers → {work_order_id: numbers}。
+
+    住在矩阵模块而不是 store:它和 fetch_rows 是同一件事的两半——一次喂全矩阵的原料。
+    逐单调 store.list_deliverables 就是 30 家 30 次往返(管家的全所税额表会直接拖到超时)。
+    版本口径与单单版同源:DISTINCT ON 取每单最大版本。
+    """
+    if not work_order_ids:
+        return {}
+    cur.execute(
+        "SELECT DISTINCT ON (work_order_id) work_order_id, numbers "
+        "FROM work_order_deliverables "
+        "WHERE tenant_id = %s AND kind = %s AND work_order_id = ANY(%s::uuid[]) "
+        "ORDER BY work_order_id, version DESC",
+        (tenant_id, kind, [str(i) for i in work_order_ids]),
+    )
+    return {str(r["work_order_id"]): (r["numbers"] or {}) for r in cur.fetchall()}
+
+
 def build(rows: list[dict], *, period: str) -> dict:
     """原料行 → 矩阵视图 {period, clients, obligation_codes, obligation_labels, cells}。
 

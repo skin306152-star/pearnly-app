@@ -10,6 +10,7 @@ R4 试算平/不平;幂等重跑。
 import unittest
 from decimal import Decimal
 
+from services.workorder import push_coverage
 from services.workorder.engine import StepContext
 from services.workorder.steps import reconcile
 
@@ -505,7 +506,7 @@ class R1RecalcBaseConsistencyTests(unittest.TestCase):
         store.events[-2]["payload"]["values"].update(
             {"invoice_number": "IN26-00675", "invoice_date": "2026-04-21"}
         )
-        classified = reconcile._replay_money(store.events)
+        classified = push_coverage.replay_money(store.events)
         decisions_by_item = reconcile._replay(store.events, "human_decision")
         result = reconcile.gates.resolve_input_vat(store.items, classified, decisions_by_item)
         self.assertTrue(any("IN26-00675" in entry["label"] for entry in result["entries"]))

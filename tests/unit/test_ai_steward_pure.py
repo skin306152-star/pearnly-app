@@ -27,6 +27,7 @@ from tests.unit._node_harness import AI_DIR, _run_node
 _RENDER = json.dumps(str(AI_DIR / "ai-steward-render.js"))
 _CHAT = json.dumps(str(AI_DIR / "ai-steward-chat-render.js"))
 _ROUTER = json.dumps(str(AI_DIR / "ai-router.js"))
+_ATTACH_RENDER = json.dumps(str(AI_DIR / "ai-steward-attach-render.js"))
 _I18N = json.dumps(str(AI_DIR / "ai-i18n-steward.js"))
 
 
@@ -266,6 +267,8 @@ class StewardI18nShardTests(unittest.TestCase):
             "ai-steward-chat-render.js",
             "ai-steward-authz-render.js",
             "ai-steward-actions.js",
+            "ai-steward-attach-render.js",
+            "ai-steward-attach.js",
             "ai-steward.js",
             "ai-steward-bar.js",
             "ai.html",
@@ -288,6 +291,17 @@ class StewardI18nShardTests(unittest.TestCase):
         referenced |= {
             f"stw_authz_{s}" for s in ("pending", "approved", "rejected", "expired", "unknown")
         }
+        # 万能口两处动态拼 key(料的闭集 kindKey / 选文件当下的拒收码 limitErrKey):
+        # 【跑真函数取 key】,不手抄一份后缀清单 —— 首版就是手抄的,limitErrKey 实际吐的是
+        # stw_att_err_attachment_too_large,清单里写的是 stw_att_err_too_large,闸全绿而
+        # 产品里每条被拒的料都印一串原始 key。被验的标识符必须来自真实产物。
+        referenced |= set(
+            _run_node(f"""
+            const a = require({_ATTACH_RENDER});
+            process.stdout.write(JSON.stringify(
+                a.KINDS.map(a.kindKey).concat(a.REJECT_CODES.map(a.limitErrKey))));
+            """)
+        )
         missing = sorted(referenced - zh)
         self.assertEqual(missing, [], f"引用了词典里不存在的 key: {missing}")
 

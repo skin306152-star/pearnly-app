@@ -215,14 +215,29 @@
         );
     }
 
-    function artifactHtml(art) {
+    // 产物三种 kind:deeplink(一条链接)/ table(已渲好的人话与数字)/ actions(闭集按钮)。
+    // 原件与转出物的下载链要带 Bearer 头,<a href> 发不了自定义头 —— 命中下载前缀的换成
+    // 走 fetch 的按钮,不摆一个点了 401 的假出口。
+    function artifactHtml(art, opts) {
         if (!art) return '';
-        var href = safeHref(art.href);
         var label = esc(art.label || '');
-        var title = href
-            ? '<a class="stw-link" href="' + esc(href) + '">' + label + '</a>'
-            : '<span class="stw-art-t">' + label + '</span>';
-        var body = art.kind === 'table' ? tableHtml(art) : '';
+        var aid = AI.stewardAttachRender.downloadIdOf(art.href);
+        var href = aid ? null : safeHref(art.href);
+        var title = aid
+            ? '<button type="button" class="stw-linkbtn" data-action="stw-att-dl" data-aid="' +
+              esc(aid) +
+              '">' +
+              label +
+              '</button>'
+            : href
+              ? '<a class="stw-link" href="' + esc(href) + '">' + label + '</a>'
+              : '<span class="stw-art-t">' + label + '</span>';
+        var body =
+            art.kind === 'table'
+                ? tableHtml(art)
+                : art.kind === 'actions'
+                  ? AI.stewardAttachRender.actionsHtml(art, opts)
+                  : '';
         return '<div class="stw-art">' + title + body + '</div>';
     }
 
@@ -267,7 +282,14 @@
         var counts = stepCounts(task.steps);
         var fam = taskFamily(task.status);
         var steps = (task.steps || []).map(stepHtml).join('');
-        var arts = (task.artifacts || []).map(artifactHtml).join('');
+        // 卡还活着才让按钮可点(waiting_user + actions 块);终态后置灰 —— 后端那一轮不认,
+        // 点下去只会拿到一个错。busy 是本地送出在途,连点会开出两个任务。
+        var dead = { dead: task.status !== 'waiting_user' || !!opts.busy };
+        var arts = (task.artifacts || [])
+            .map(function (a) {
+                return artifactHtml(a, dead);
+            })
+            .join('');
         var stalled = opts.stalled
             ? '<div class="stw-stalled">' +
               esc(at('stw_poll_stopped')) +

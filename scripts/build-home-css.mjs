@@ -229,6 +229,9 @@ const AI_CSS = [
     // 这些布局,状态的脸全取自 ai-states.css 的 .st-* 组件,故必须排在其后;与其余视图
     // 互斥显示(命令条挂在工作台,类名 stw-* 全新不覆盖任何存量),层叠零影响。
     'ai/ai-steward.css',
+    // ai-steward-attach.css(F1 · 万能口附件口:落区/附件盘四态/原件行/动作按钮)与
+    // ai-steward.css 分家只因行数,依赖面相同(.st-bar 取自 ai-states.css),紧随其后。
+    'ai/ai-steward-attach.css',
     // ai-billing.css(B5 #16 · 设置页计费区+三步充值弹窗)复用 .panel/.btn/.wosum/
     // .pkg-mask/.st-badge,只补 bill-* 独有布局;徽章脸取自 ai-states.css 故排其后,
     // 类名全新不覆盖任何存量,排最后即可。

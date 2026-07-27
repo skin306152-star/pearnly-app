@@ -91,6 +91,18 @@
         );
     }
 
+    // 双栏骨架(左=执行状态,右=对话)。挂载层只管往两个坑里填,不在编排文件里拼 HTML。
+    function shellHtml() {
+        return (
+            '<div class="stw-grid"><section class="stw-col stw-left"><h3 class="stw-col-hd">' +
+            esc(at('stw_pane_task')) +
+            '</h3><div id="stwLeft"></div></section><section class="stw-col stw-right">' +
+            '<h3 class="stw-col-hd">' +
+            esc(at('stw_pane_chat')) +
+            '</h3><div id="stwRight"></div></section></div>'
+        );
+    }
+
     function msgFootHtml(msg) {
         var state = sendState(msg.state);
         if (state === 'sending') {
@@ -132,56 +144,79 @@
         // 超限轮的回复气泡下面挂预算块(已用/上限 + 会话级的「开新会话」出口):
         // reply 人话说为什么停,这块给数字和下一步 —— 两者都来自后端,本层不算钱。
         var budget = msg.budget ? AI.stewardAuthzRender.budgetHtml(msg.budget) : '';
+        // 这一轮带的原件永久留在气泡下面(会话重建时后端把 attachments 一并回来)。
+        // 纯文件手势下 text 是空串,气泡本体不渲染 —— 否则是一个空框吊着几个文件。
+        var files = AI.stewardAttachRender.bubbleFilesHtml(msg.attachments);
+        var foot = msgFootHtml(msg);
+        var bubble =
+            msg.text || !files
+                ? '<div class="stw-bubble">' + esc(msg.text || '') + foot + '</div>'
+                : foot;
         return (
             '<div class="stw-msg ' +
             cls +
             '"><div class="stw-who">' +
             esc(at(msg.role === 'user' ? 'stw_you' : 'stw_agent')) +
-            '</div><div class="stw-bubble">' +
-            esc(msg.text || '') +
-            msgFootHtml(msg) +
             '</div>' +
+            files +
+            bubble +
             budget +
             '</div>'
         );
     }
 
     // 空态指路:不摆空白,直接把四条能问的话摆出来(四态诚实 · 空态必须指路)。
-    function emptyFeedHtml() {
+    // 有附件口时补一句「料也可以直接拖进来」—— 会计不会去猜一个没写出来的手势。
+    function emptyFeedHtml(attach) {
+        var files =
+            attach && attach.limits
+                ? '<div class="stw-feed-empty-s">' + esc(at('stw_feed_empty_files')) + '</div>'
+                : '';
         return (
             '<div class="stw-feed-empty"><div class="stw-feed-empty-t">' +
             esc(at('stw_feed_empty_t')) +
             '</div><div class="stw-feed-empty-s">' +
             esc(at('stw_feed_empty_s')) +
             '</div>' +
+            files +
             chipsHtml() +
             '</div>'
         );
     }
 
-    function feedHtml(messages) {
+    function feedHtml(messages, attach) {
         var list = messages || [];
-        if (!list.length) return emptyFeedHtml();
+        if (!list.length) return emptyFeedHtml(attach);
         return '<div class="stw-feed">' + list.map(msgHtml).join('') + '</div>';
     }
 
+    // ctx.attach 是附件盘视图(AI.stewardAttach.view());没有附件口时它是 null,
+    // composer 退回纯文字形态 —— 不摆一个点了必失败的回形针。
     function composerHtml(ctx) {
-        var busy = !!(ctx && ctx.busy);
-        var err = ctx && ctx.errText ? '<div class="stw-err">' + esc(ctx.errText) + '</div>' : '';
+        ctx = ctx || {};
+        var busy = !!ctx.busy;
+        var attach = ctx.attach || {};
+        var AR = AI.stewardAttachRender;
+        // 还在传就不许送:排队送等于把「立即应承」改成等 30 秒(契约不能这么改)。
+        var blocked = busy || AR.hasUploading(attach.chips);
+        var err = ctx.errText ? '<div class="stw-err">' + esc(ctx.errText) + '</div>' : '';
+        var note = attach.limits ? 'stw_composer_note_files' : 'stw_composer_note';
         return (
             '<div class="stw-composer">' +
             err +
-            '<div class="stw-bar-row"><input id="stwInput" class="stw-bar-input" type="text" ' +
-            'placeholder="' +
-            esc(at('stw_input_ph')) +
+            AR.trayHtml(attach) +
+            '<div class="stw-bar-row">' +
+            AR.pickerHtml(attach) +
+            '<input id="stwInput" class="stw-bar-input" type="text" placeholder="' +
+            esc(at(attach.limits ? 'stw_input_ph_files' : 'stw_input_ph')) +
             '"' +
             (busy ? ' disabled' : '') +
             ' /><button type="button" class="btn pri sm" data-action="stw-send"' +
-            (busy ? ' disabled' : '') +
+            (blocked ? ' disabled' : '') +
             '>' +
             esc(at('stw_send')) +
             '</button></div><div class="stw-composer-note">' +
-            esc(at('stw_composer_note')) +
+            esc(at(note)) +
             '</div></div>'
         );
     }
@@ -190,6 +225,7 @@
     root.AI.stewardChatRender = Object.assign(
         {
             barHtml: barHtml,
+            shellHtml: shellHtml,
             chipsHtml: chipsHtml,
             feedHtml: feedHtml,
             composerHtml: composerHtml,

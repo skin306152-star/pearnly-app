@@ -310,6 +310,7 @@ const BUNDLES = [
             // 在 applyGate 时才引用 AI.steward.openWith(不是加载期),但 ai-steward.js 的
             // applyGate 会调 AI.stewardBar.applyGate,故排在其后、ai.js(onRoute 调
             // AI.steward.onRoute + enterApp 调 probe)之前。
+            'ai/ai-steward-attach-render.js',
             'ai/ai-steward-render.js',
             'ai/ai-steward-chat-render.js',
             // B3 追加两件:ai-steward-authz-render.js(写授权卡/预算块拼装,steward-render
@@ -318,6 +319,12 @@ const BUNDLES = [
             // create(),必须排在它之前。
             'ai/ai-steward-authz-render.js',
             'ai/ai-steward-actions.js',
+            // F1 万能口两件:ai-steward-attach-render.js(附件盘/原件行/落区/动作按钮拼装,
+            // 被 steward-render 与 chat-render 在调用期引用)必须排在两个 render 之前 ——
+            // freshState() 在【加载期之后的挂载期】就调它的 normalizeLimits;
+            // ai-steward-attach.js(选/拖/粘 → 传 → 送出的动作层)被 ai-steward.js 在
+            // 【加载期】create(),必须排在它之前。
+            'ai/ai-steward-attach.js',
             'ai/ai-steward.js',
             'ai/ai-steward-bar.js',
             'ai/ai.js',

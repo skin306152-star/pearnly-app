@@ -106,7 +106,8 @@ window.__AI_I18N_JA__ = {
     intake_empty_s: '作成後に資料の投入・売上補完・照合ができます。',
     intake_lead: 'この顧客の1か月分の資料をアップロード。処理が終わると「要確認」へ移動します。',
     intake_drop_t: 'ファイルをドラッグ、またはクリックで選択',
-    intake_drop_s: '仕入請求書 · 売上POS集計 · 銀行明細をまとめてアップロードできます。JPG / PDF / Excel 対応。',
+    intake_drop_s:
+        '仕入請求書 · 売上POS集計 · 銀行明細をまとめてアップロードできます。JPG / PDF / Excel 対応。',
     intake_pick: 'ファイルを選択',
     intake_files_ready: '件が準備完了',
     intake_file_queued: '待機中',

@@ -52,8 +52,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     stw_session_err_s: '服务无响应或权限不足,点重试',
     stw_cancel_task: '取消任务',
     stw_cancel_failed: '取消没成功,网络或服务出错,再点一次',
-    stw_cancel_locked:
-        '已送进 Express,取消不了。去「推送日志」看这张票的最终状态,不要重推。',
+    stw_cancel_locked: '已送进 Express,取消不了。去「推送日志」看这张票的最终状态,不要重推。',
     stw_authz_hd: '写操作授权',
     stw_authz_pending: '待批准',
     stw_authz_approved: '已批准',
@@ -203,7 +202,8 @@ Object.assign(window.__AI_I18N_TH__, {
     stw_act_model: 'ใช้เครดิต OCR หนึ่งครั้ง',
     stw_att_err_too_large: 'ไฟล์เดียวต้องไม่เกิน {max} ไฟล์นี้ {size}',
     stw_att_err_batch_too_large: 'ชุดนี้รวมกันเกิน {max} ส่งชุดนี้ก่อนแล้วค่อยอัปโหลดชุดถัดไป',
-    stw_att_err_too_many: 'หนึ่งข้อความแนบได้ไม่เกิน {max} ไฟล์ ส่งชุดนี้ก่อนแล้วค่อยอัปโหลดชุดถัดไป',
+    stw_att_err_too_many:
+        'หนึ่งข้อความแนบได้ไม่เกิน {max} ไฟล์ ส่งชุดนี้ก่อนแล้วค่อยอัปโหลดชุดถัดไป',
     stw_att_err_bad_ext: 'ส่ง {ext} ไม่ได้ · ที่ส่งได้: {accept}',
     stw_att_err_empty: 'ไฟล์นี้ว่างเปล่า (0 ไบต์) ส่งออกใหม่แล้วอัปโหลดอีกครั้ง',
     stw_att_err_closed: 'ที่นี่ยังแนบไฟล์ไม่ได้ ให้อัปโหลดที่หน้า「รับเอกสาร」',

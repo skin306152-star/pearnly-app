@@ -242,6 +242,38 @@ def list_for_message(cur, *, tenant_id: str, session_id: str) -> list[dict]:
     return [dict(r) for r in cur.fetchall()]
 
 
+def group_by_message(rows: list[dict]) -> dict[str, list[dict]]:
+    """按消息分组的附件视图(会话重建用:用户气泡下那行附件是永久留痕)。"""
+    out: dict[str, list[dict]] = {}
+    for row in rows:
+        out.setdefault(str(row["message_id"]), []).append(public_attachment(row))
+    return out
+
+
+def files_of(grouped: dict, message_id) -> dict[str, Any]:
+    """有附件才带这个键 —— 每条消息都挂一个空数组,前端就要多判一次「有没有」。"""
+    found = grouped.get(str(message_id))
+    return {"attachments": found} if found else {}
+
+
+def download_payload(tenant_id: str, row: dict) -> Optional[tuple[bytes, str, str]]:
+    """下载一件原件 → (明文字节, media_type, 展示名);路径越界/文件没了返 None。
+
+    落盘密文必须经 read_content 解回明文再出流 —— FastAPI 的 FileResponse 会把密文原样吐给
+    浏览器(同 workorder.get_item_image 换 Response 的理由)。"""
+    path = resolve_within_session(
+        tenant_id, str(row.get("session_id") or ""), row.get("file_ref") or ""
+    )
+    if not path:
+        return None
+    name = row.get("original_name") or original_name_of(row.get("file_ref")) or path.name
+    mime = row.get("mime") or guess_mime(name)
+    try:
+        return read_content(str(path)), mime, name
+    except OSError:
+        return None
+
+
 def public_attachment(row: dict) -> dict[str, Any]:
     """附件 → 前端视图。file_ref(盘上真实路径)绝不外泄;认不出就如实写 unknown,
     不回落成「其他」这种假装认过的词。"""

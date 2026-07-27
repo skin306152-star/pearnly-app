@@ -27,7 +27,6 @@ view —— 喊停永远是安全侧,谁看得见谁就能拦。权限判在 tok
 from __future__ import annotations
 
 import logging
-import mimetypes
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
@@ -148,23 +147,17 @@ async def get_session(session_id: str, request: Request):
         messages = store.list_messages(cur, tenant_id=tenant_id, session_id=session_id)
         current = store.latest_task_id(cur, tenant_id=tenant_id, session_id=session_id)
         files = attachments.list_for_message(cur, tenant_id=tenant_id, session_id=session_id)
-    by_message: dict[str, list] = {}
-    for row in files:
-        by_message.setdefault(str(row["message_id"]), []).append(attachments.public_attachment(row))
+    by_message = attachments.group_by_message(files)
     out = {
         "session_id": session_id,
         "messages": [
-            {**store.public_message(m), **_message_files(by_message, m)} for m in messages
+            {**store.public_message(m), **attachments.files_of(by_message, m["id"])}
+            for m in messages
         ],
     }
     if current:
         out["current_task_id"] = current
     return out
-
-
-def _message_files(by_message: dict, message: dict) -> dict:
-    found = by_message.get(str(message["id"]))
-    return {"attachments": found} if found else {}
 
 
 @router.post("/api/ai/steward/sessions/{session_id}/attachments")
@@ -239,14 +232,10 @@ async def download_attachment(attachment_id: str, request: Request):
         row = attachments.get_owned(
             cur, tenant_id=tenant_id, attachment_id=attachment_id, user_id=str(user["id"])
         )
-    if not row:
+    payload = attachments.download_payload(tenant_id, row) if row else None
+    if not payload:
         raise HTTPException(404, detail=_NOT_FOUND)
-    path = attachments.resolve_within_session(
-        tenant_id, str(row["session_id"]), row.get("file_ref") or ""
-    )
-    if not path:
-        raise HTTPException(404, detail=_NOT_FOUND)
-    name = row.get("original_name") or path.name
+    content, media_type, name = payload
     audit_file_access.log_user_file_access(
         request,
         user,
@@ -255,11 +244,10 @@ async def download_attachment(attachment_id: str, request: Request):
         target_id=attachment_id,
         details={"kind": "steward_attachment", "session_id": str(row["session_id"])},
     )
-    # 落盘密文经 read_content 解回明文再出流(FileResponse 会直吐密文,故换 Response)。
     return Response(
-        content=attachments.read_content(str(path)),
-        media_type=row.get("mime") or mimetypes.guess_type(name)[0] or "application/octet-stream",
-        headers={"Content-Disposition": content_disposition(name, path.name)},
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": content_disposition(name, "attachment")},
     )
 
 

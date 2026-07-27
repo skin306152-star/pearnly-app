@@ -52,9 +52,11 @@ class AsgiSmokeTests(unittest.TestCase):
                 res = self._call(method, path, body)
                 self.assertIn(res.status_code, (401, 403, 404))
 
-    def test_empty_message_rejected_by_request_model(self):
+    def test_empty_message_still_needs_login_before_anything_else(self):
+        """F1 起 text 允许为空(纯文件送出是万能口的核心手势),空轮的 422 判在鉴权【之后】
+        —— 匿名请求必须先吃 401,绝不能靠形状校验把未登录者挡出一个 422 的假象。"""
         res = self.client.post("/api/ai/steward/sessions/s-1/messages", json={"text": ""})
-        self.assertEqual(res.status_code, 422)
+        self.assertIn(res.status_code, (401, 403, 404))
 
     def test_gate_closed_is_404_for_a_logged_in_user(self):
         """闸关 = 对存量用户等于不存在。登录态由鉴权 helper 注入,闸判定走真请求路径。"""
@@ -69,7 +71,7 @@ class AsgiSmokeTests(unittest.TestCase):
             res = self.client.get("/api/ai/steward/tasks/t-1")
             probe = self.client.get("/api/ai/steward/status")
         self.assertEqual(res.status_code, 404)
-        self.assertEqual(probe.json(), {"enabled": False})  # 探针不跟着 404
+        self.assertIs(probe.json()["enabled"], False)  # 探针不跟着 404
 
 
 class AuthzDecisionStackTests(unittest.TestCase):

@@ -20,15 +20,12 @@ from services.ai_gateway import attribution
 from services.ocr import escalation_budget
 from services.workorder import decisions, kinds, storage
 from services.workorder.engine import StepContext, StepResult
-from services.workorder.steps import checkpoint, gate_reason, ocr_cost_cap, ocr_ledger, ocr_quota
-from services.workorder.steps import ocr_reuse, ocr_snapshots, purchase_dedup, statement_regroup
-from services.workorder.steps import taxid_alert
+from services.workorder.steps import checkpoint, gate_reason, ocr_balance, ocr_cost_cap
+from services.workorder.steps import ocr_ledger, ocr_quota, ocr_reuse, ocr_snapshots
+from services.workorder.steps import purchase_dedup, statement_regroup, taxid_alert
 from services.workorder.steps import sort as sort_step
 from services.workorder.steps import summary_read
 from services.workspace import client_alias_store
-
-# quota 待补件的 flag_reason(续跑起手复位这些件回 pending 重试;单一事实源在此)。
-_QUOTA_FLAG = "ocr_error:quota"
 
 # 工单 OCR 成本归因 task(落 ai_usage,与主站散单 OCR 台账分得开,见 C-1 §5)。
 _OCR_TASK = "workorder_classify"
@@ -52,7 +49,7 @@ def _ocr_concurrency() -> int:
 
 def run(ctx: StepContext) -> StepResult:
     """给 pending 的图片/PDF 过 OCR 归堆去重,给 pending 的销项 xlsx 直读。"""
-    _reset_quota_deferred(ctx)  # R1:先于取 pending,把上次 quota 待补件复位回 pending 一起重烧
+    ocr_quota.reset_deferred(ctx)  # R1:先于取 pending,把上次 quota 待补件复位一起重烧
     pending = ctx.store.list_items(
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id, status="pending"
     )
@@ -93,8 +90,14 @@ def run(ctx: StepContext) -> StepResult:
     governor = ocr_quota.QuotaGovernor() if images else None
     budget = escalation_budget.new_budget(ocr_cost_cap.fallback_limit()) if images else None
     cost_cap = ocr_cost_cap.from_ctx(ctx, [it["id"] for it in images])
+    # 用户钱包闸(与上面的内部成本封顶是两笔钱、两个原因码,见 ocr_balance):余额不够开跑前就停,
+    # 全复用批零成本不建账不受挡(老站「指纹缓存先于余额闸」同款)。
+    wallet = ocr_balance.from_ctx(ctx, history_owner, images, reused)
+    if wallet is not None and wallet.exhausted():
+        return StepResult.stuck([ocr_balance.STUCK_REASON])
     quota_deferred = 0
     cost_capped = False
+    out_of_credit = False
     # 复用件直接给缓存 fields(reused_from=源 history_id),其余走并发 OCR;原序消费保查重确定性。
     ocr_stream = ocr_reuse.stream(
         images,
@@ -110,7 +113,7 @@ def run(ctx: StepContext) -> StepResult:
                     tenant_id=ctx.tenant_id,
                     item_id=item["id"],
                     status="flagged",
-                    flag_reason=_QUOTA_FLAG,
+                    flag_reason=ocr_quota.DEFERRED_FLAG,
                 )
             quota_deferred += 1
             continue
@@ -153,6 +156,10 @@ def run(ctx: StepContext) -> StepResult:
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
         if outcome["flagged"]:
             flagged += 1
+        # 逐件结账:复用件/失败件不扣(幂等锚见 ocr_balance);扣到余额见底即停,未处理件留 pending。
+        if wallet is not None and wallet.settle(item, ocr, reused_from, history_id):
+            out_of_credit = True
+            break
         # 达成本封顶即停止投料:未处理件留 pending,生成器收尾取消在队未起的 OCR(白烧至多一窗)。
         # 复用件零成本不触发封顶回查;exceeded 内部走独立短事务读台账,读完即释放锁(绝不在步事务
         # 里攥 ai_usage 锁,见 ocr_cost_cap 死锁根因)。
@@ -160,12 +167,15 @@ def run(ctx: StepContext) -> StepResult:
             cost_capped = True
             break
 
-    # 撞配额待补 / 成本封顶:整步 stuck 诚实待续(未处理件留 pending,人工 /run 重给预算)。
+    # 撞配额待补 / 成本封顶 / 用户余额见底:整步 stuck 诚实待续(未处理件留 pending,已处理件
+    # 已落库保留;前两者人工 /run 重给预算,后者充值后点继续,三个原因码各说各的事)。
     flagged -= regroup.apply(ctx, bins)
     if quota_deferred:
         return StepResult.stuck([f"ocr_quota_deferred:{quota_deferred}"])
     if cost_capped:
         return StepResult.stuck(["ocr_cost_cap_exceeded"])
+    if out_of_credit:
+        return StepResult.stuck([ocr_balance.STUCK_REASON])
 
     reads: dict[str, dict] = dict(ctx.data.get("sales_summary_reads") or {})
     for item in pending:
@@ -241,18 +251,6 @@ def _ocr_in_order(images: list[dict], tenant_id: str, *, governor=None, budget=N
             yield item, fut.result()
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
-
-
-def _reset_quota_deferred(ctx: StepContext) -> None:
-    """续跑起手把上次 quota 待补件(flagged, ocr_error:quota)复位回 pending 供重烧(它们当时未落
-    终局证据事件,dedupe_key 不会锁死错值,重烧与不中断跑等价)。走独立提交事务(有 factory 时)
-    释放行锁,免与后续 item_scope 逐件子事务互等自死锁。"""
-    kw = dict(tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id, flag_reason=_QUOTA_FLAG)
-    if ctx.cursor_factory is None:
-        ctx.store.reset_quota_deferred_items(ctx.cur, **kw)
-    else:
-        with ctx.cursor_factory() as cur:
-            ctx.store.reset_quota_deferred_items(cur, **kw)
 
 
 def _emit_classified(

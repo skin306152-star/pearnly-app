@@ -219,8 +219,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "bank_recon": _bank_recon(events, items),
         "shadow_draft": shadow,
         "financials": financials,
-        # 两区没产出时前端要说的话不一样:off=「还没跑到,不用管」,degraded=「跑挂了,
-        # 不会自己好」。判据由后端直报,不让前端从 status 反推(降级根本不打 stuck)。
+        # 没产出时前端要说的话按三态分(见 _gate_view),不让它从 status 反推:降级不打 stuck。
         "shadow_draft_state": shadow_state,
         "financials_state": financials_state,
         "sales_corroboration": sales_aggregate.corroboration_for_detail(
@@ -277,41 +276,31 @@ def _overlay_bank_decisions(recon: dict, events: list[dict]) -> dict:
     return dict(recon, review=review)
 
 
-GATE_OFF = "off"  # gates 里根本没这个键:闸关,或还没跑到 reconcile
-GATE_DEGRADED = "degraded"  # 跑过了但引擎异常,只留下 {error, note} 残影
-GATE_OK = "ok"
-
-# 佐证 gate 的深取坐标(gate 键, 判「真有产出」的必备键)——多个读侧共用,别各写一份。
+# 佐证 gate 三态 + 深取坐标(gate 键, 判「真有产出」的必备键)· 多个读侧共用不各写一份。
+GATE_OFF, GATE_DEGRADED, GATE_OK = "off", "degraded", "ok"
 _R5_SHADOW_GATE = ("r5_shadow", "trial_balance")
 _R6_FINANCIALS_GATE = ("r6_financials", "balance_sheet")
 
 
 def _gate_view(events: list[dict], gate: tuple[str, str]) -> tuple[Optional[dict], str]:
-    """从 reconcile 步 step_done 深取某佐证 gate:(只读投影, 三态)。
-
-    投影缺内容一律 None,不拼假数据充数;但「为什么没有」必须分得开——降级残影
-    (_run_shadow_draft 捕获异常后返 {error, note},注释明写「绝不 stuck、绝不阻断 package」)
-    不会把工单打成 stuck,工单照样走到 review。读侧若只给一个 None,前端只能从 status 反推,
-    于是跑完即降级的单会永远显示「不用管它,会自动生成」——它不会再自己好了。"""
-    gate_key, required_key = gate
+    """深取 reconcile 步 step_done 的某佐证 gate:(只读投影, 三态)。缺内容一律 None 不拼假数据,
+    但「为什么没有」必须分得开:off=闸关/还没跑到;degraded=跑过了但引擎异常只剩 {error,note}
+    残影(_run_shadow_draft 明写「绝不 stuck」,工单照样走到 review)。只给一个 None 的话前端
+    从 status 反推不出来,跑完即降级的单会永远显示「不用管它,会自动生成」——它不会再自己好。"""
     payload = evidence.replay_step_done(events, _DECISION_STEP)
-    raw = (payload.get("gates") or {}).get(gate_key) if payload else None
+    raw = (payload.get("gates") or {}).get(gate[0]) if payload else None
     if not isinstance(raw, dict):
         return None, GATE_OFF
-    if required_key not in raw:
-        return None, GATE_DEGRADED
-    return raw, GATE_OK
+    return (raw, GATE_OK) if gate[1] in raw else (None, GATE_DEGRADED)
 
 
 def shadow_draft(events: list[dict]) -> Optional[dict]:
-    """R5 影子底稿三件套只读投影(F3 影子底稿视图读侧 + M1-3KEY 键二分录导出)。深取
-    gates.r5_shadow;降级残影缺 trial_balance → None(_run_shadow_draft 的 skipped 残影不充数)。"""
+    """R5 影子底稿只读投影(F3 视图 + M1-3KEY 二分录导出)。降级残影不充数,见 _gate_view。"""
     return _gate_view(events, _R5_SHADOW_GATE)[0]
 
 
 def _financials(events: list[dict]) -> Optional[dict]:
-    """R6 月度报表三件套只读投影(G1b 报表包视图读侧)。深取 gates.r6_financials;闸关/影子跳过/
-    降级残影缺 balance_sheet → None(_run_shadow_financials 的 skipped 残影不充数)。"""
+    """R6 月度报表只读投影(G1b 报表包视图读侧)。降级残影不充数,见 _gate_view。"""
     return _gate_view(events, _R6_FINANCIALS_GATE)[0]
 
 

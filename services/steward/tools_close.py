@@ -12,7 +12,7 @@
 数字一律取自既有投影,本模块不算账也不重排口径 —— 对话里说的数与人手点开工单看到的必须
 逐位相同。钱走 tool_scope.money(decimal 两位字符串,不过 float)。
 
-作用域与客户名接地共用 tool_scope:allowed_client_ids 是请求侧算好的账套快照,被分派成员
+作用域、客户名接地、工单详情取法(client_order)共用 tool_scope:allowed_client_ids 是请求侧算好的账套快照,被分派成员
 在对话里也只看得见分到的账套(worker 没有请求可算,绝不在这里放宽)。
 """
 
@@ -31,9 +31,9 @@ DUE_SOON_DAYS = 7
 
 _SEVERITIES = ("crit", "warn")
 
-# order_detail['numbers'] 里的钱字段(compute 步落的 R1/R2 认列结果)。period 也在同一个
-# 投影里但不是钱,单独取,不进金额规范化。
-_MONEY_KEYS = ("sales_amount", "output_vat", "purchase_amount", "input_vat", "tax_due")
+# order_detail['numbers'] 里的钱字段(compute 步落的 R1/R2 认列结果)。全所税额表答的是同一批
+# 数字,字段集因此住在 tool_scope 一份。period 也在同一个投影里但不是钱,单独取。
+_MONEY_KEYS = tool_scope.TAX_MONEY_KEYS
 
 _RECON_LISTS = ("auto_matched", "review", "missing_invoice", "unmatched_invoice")
 
@@ -162,41 +162,13 @@ def review_queue(ctx: ToolContext, args: dict) -> ToolResult:
     )
 
 
-def _client_order(ctx: ToolContext, args: dict) -> tuple[dict, str, Optional[dict], ToolResult]:
-    """客户名 + 期 → (客户, 期, 工单详情 或 None, 错误)。两个工单口径的工具共用这一段。
-
-    没开工单不是错误 —— 是「这期还没开工」这个诚实答案,detail=None 交给各自的 data 表述。
-    """
-    from services.workorder import api as wo_api
-
-    client, err = tool_scope.resolve_client(ctx, args.get("client_name") or "")
-    if err:
-        return {}, "", None, err
-    period = tool_scope.period_or_current(args.get("period"))
-    with tool_scope.cursor() as cur:
-        listing = wo_api.list_orders(
-            cur,
-            tenant_id=ctx.tenant_id,
-            workspace_client_id=client["id"],
-            period=period,
-            limit=1,
-        )
-        orders = listing["orders"]
-        detail = (
-            wo_api.order_detail(cur, tenant_id=ctx.tenant_id, work_order_id=str(orders[0]["id"]))
-            if orders
-            else None
-        )
-    return client, period, detail, None
-
-
 def tax_numbers(ctx: ToolContext, args: dict) -> ToolResult:
     """某家某期的销项/进项/应交税额(order_detail['numbers'] = compute 步认列结果)。
 
     引擎还没跑到 compute 就没有 numbers —— 此时诚实报 has_numbers=False,绝不用 0 充数:
     「应交 0 บาท」和「还没算出来」在会计眼里是两件完全不同的事。
     """
-    client, period, detail, err = _client_order(ctx, args)
+    client, period, detail, err = tool_scope.client_order(ctx, args)
     if err:
         return err
     numbers = (detail or {}).get("numbers") or {}
@@ -222,7 +194,7 @@ def bank_recon_status(ctx: ToolContext, args: dict) -> ToolResult:
     金额合计与净差。闸关、没收到银行流水、还没跑到 reconcile 一律 has_recon=False —— 投影
     本身在这些情形给 None,这里照实转述,不拼一份"全 0 已对平"的假象。
     """
-    client, period, detail, err = _client_order(ctx, args)
+    client, period, detail, err = tool_scope.client_order(ctx, args)
     if err:
         return err
     recon = (detail or {}).get("bank_recon") or None
@@ -236,7 +208,7 @@ def bank_recon_status(ctx: ToolContext, args: dict) -> ToolResult:
     }
     if recon:
         diff = recon.get("diff") or {}
-        data.update({k: _recon_count(recon, k) for k in _RECON_LISTS})
+        data.update({k: tool_scope.recon_count(recon, k) for k in _RECON_LISTS})
         data.update(
             {
                 "missing_invoice_total": tool_scope.money(diff.get("missing_invoice_total")),
@@ -255,11 +227,3 @@ def bank_recon_status(ctx: ToolContext, args: dict) -> ToolResult:
             }
         )
     return ToolResult(ok=True, data=data)
-
-
-def _recon_count(recon: dict, key: str) -> int:
-    """清单条数:优先落库时算好的 *_count,没有就数清单本身(两种形态的 gate 载荷都认)。"""
-    counted = recon.get(f"{key}_count")
-    if isinstance(counted, int):
-        return counted
-    return len(recon.get(key) or [])

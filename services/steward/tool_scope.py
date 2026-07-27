@@ -13,11 +13,14 @@
      共用同一段定位 —— 同一句话在"先查清楚"和"那就推吧"两步里给出不同的候选集,会计就
      无从下手;
   ④ 钱:一律 decimal 两位字符串,不过 float(卡上印的、比对的、答复里说的是同一个值)。
+
+工单详情的取法(client_order)也收在这里:税额 / 银行对账 / 签批闸三个工具都是「客户名 + 期
+→ 那张工单的投影」,取法漂了会让同一家同一期在三句答复里对不上。
 """
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Context, Decimal, InvalidOperation, localcontext
 from typing import Any, Optional
 
 from fastapi import HTTPException
@@ -35,6 +38,14 @@ ERR_CLIENT_AMBIGUOUS = "steward.client_ambiguous"
 ERR_HISTORY_FORBIDDEN = "steward.history_forbidden"
 ERR_INVOICE_NOT_FOUND = "steward.invoice_not_found"
 ERR_INVOICE_AMBIGUOUS = "steward.invoice_ambiguous"
+
+# 量化金额用的独立上下文(见 money 的注释:默认 28 位精度撑不住全所合计)。舍入沿用默认的
+# ROUND_HALF_EVEN —— 只放宽位数,不顺手改既有工具算出来的分位。
+_MONEY_CONTEXT = Context(prec=38)
+
+# 税额表的五个钱字段(compute 步认列结果的键)。tax_numbers 逐家答、tax_matrix 整表答,
+# 字段集必须是同一份 —— 两处各写一遍就会出现"表里有的数,单查却没有"。
+TAX_MONEY_KEYS = ("sales_amount", "output_vat", "purchase_amount", "input_vat", "tax_due")
 
 
 def cursor():
@@ -155,9 +166,68 @@ def period_or_current(period: Optional[str]) -> str:
     return period or obligation_engine.current_be_period()
 
 
-def money(value: Any) -> str:
-    """金额 → decimal 两位字符串。读不出来给 "0.00" 而不是抛,答复层永远拿得到可印的值。"""
+def client_order(
+    ctx: ToolContext, args: dict
+) -> tuple[dict, str, Optional[dict], Optional[ToolResult]]:
+    """客户名 + 期 → (客户, 期, 工单详情 或 None, 错误)。按工单口径读的工具共用这一段。
+
+    没开工单不是错误 —— 是「这期还没开工」这个诚实答案,detail=None 交给各自的 data 表述。
+    """
+    from services.workorder import api as wo_api
+
+    client, err = resolve_client(ctx, args.get("client_name") or "")
+    if err:
+        return {}, "", None, err
+    period = period_or_current(args.get("period"))
+    with cursor() as cur:
+        listing = wo_api.list_orders(
+            cur,
+            tenant_id=ctx.tenant_id,
+            workspace_client_id=client["id"],
+            period=period,
+            limit=1,
+        )
+        orders = listing["orders"]
+        detail = (
+            wo_api.order_detail(cur, tenant_id=ctx.tenant_id, work_order_id=str(orders[0]["id"]))
+            if orders
+            else None
+        )
+    return client, period, detail, None
+
+
+def recon_count(recon: dict, key: str) -> int:
+    """R3 清单条数:优先落库时算好的 *_count,没有就数清单本身(两种形态的 gate 载荷都认)。"""
+    counted = recon.get(f"{key}_count")
+    if isinstance(counted, int):
+        return counted
+    return len(recon.get(key) or [])
+
+
+def to_decimal(value: Any) -> Decimal:
+    """金额 → Decimal(读不出来给 0)。合计一律走它,不过 float —— 钱的加法只有一处入口。"""
     try:
-        return str(Decimal(str(value if value is not None else "0")).quantize(Decimal("0.01")))
+        return Decimal(str(value if value is not None else "0"))
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
+
+
+def money(value: Any) -> str:
+    """金额 → decimal 两位字符串。读不出来给 "0.00" 而不是抛,答复层永远拿得到可印的值。
+
+    量化用 38 位精度的独立上下文:默认上下文只有 28 位,全所合计这种十几位的数一旦超出就抛
+    InvalidOperation 被这里吞成 "0.00" —— 把一个大数印成零比印错还危险。NaN/Infinity 仍走
+    "0.00"(它们本来就不是钱)。
+    """
+    try:
+        return str(to_decimal(value).quantize(Decimal("0.01"), context=_MONEY_CONTEXT))
     except (InvalidOperation, ValueError):
         return "0.00"
+
+
+def money_total(values) -> str:
+    """一批金额的合计 → 两位字符串。加法也在放宽精度的上下文里做 —— 默认 28 位会把全所
+    合计的低位悄悄四舍五入掉,而合计对不上明细是会计最不能忍的那类错。"""
+    with localcontext(_MONEY_CONTEXT):
+        total = sum((to_decimal(v) for v in values), Decimal("0"))
+    return money(total)

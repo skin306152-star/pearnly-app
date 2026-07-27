@@ -10,16 +10,28 @@
 用 manifest.ToolSpec:它的 bucket/confirm/writes/gate 是 LINE 写工具的语义(M1 全只读用不上),
 desc_th 字段名钉死泰文而管家提示词走中文(同 front_desk.interpret 先例,同一个 /ai 面、同一
 条 taxops.intent 车道)—— 硬塞会让字段名说谎。槽契约共用,工具契约各自诚实。
+
+每个工具的 desc 都要写「什么时候【不】用它」并点名该用哪个邻居 —— 大脑挑错工具的成因不是
+它不知道这个工具能干嘛,而是相邻两个都像(client_status vs close_readiness、push_log_query
+vs period_invoices)。选错一次 = 白跑一步 + 白花一次模型钱,还得再问一轮。守门测试
+tests/unit/test_steward_registry.py 锁「每条 desc 至少点名另一个工具」。
+
+参数槽定义与执行身份 ToolContext 在 registry_slots(体积闸下的分居,语义仍归本模块;
+ToolContext 由本模块再导出,调用方一律 registry.ToolContext)。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import date
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from services.agent.contracts import SlotSpec
-from services.sales.dates import bangkok_today
+from services.steward.registry_slots import (
+    ToolContext as ToolContext,  # 再导出:调用方一律 registry.ToolContext(搬家只为体积闸)
+    client_name_slot,
+    keyword_slot,
+    period_slot,
+)
 
 # 风险等级(B3 授权闸的判据面):read 直接执行;write 落数据、danger 落数据且难撤销
 # (推 ERP/删单据)。非 read 一律要求人批的授权令牌 —— 执行层物理拒,不是前端不显示。
@@ -95,39 +107,6 @@ def requires_authorization(tool: StewardTool) -> bool:
     return tool.risk != RISK_READ
 
 
-def _period_slot() -> SlotSpec:
-    """期间线索槽(共 3 个工具用同一份定义,避免三处各写一遍描述后漂)。
-
-    source=model_freeform:期间允许模型从「上个月」这类相对词换算,但换算结果不作数——
-    真正的接地在 orchestrator:线索经 front_desk.interpret.parse_period_hint 解析成公历,
-    再经 obligation_engine.be_period_from_ce 折成佛历账期,解不出就追问,绝不猜一个期。
-    """
-    return SlotSpec(
-        "period",
-        required=False,
-        source="model_freeform",
-        desc_th="ช่วงเวลาที่ผู้ใช้พูดถึง เช่น มิ.ย.69 / เดือนที่แล้ว / 2026-06",
-        desc_zh="期间线索原文(如「上个月」「6月」「2569-06」)· 没提到给 null",
-    )
-
-
-def _keyword_slot(desc_th: str, desc_zh: str) -> SlotSpec:
-    """票据关键词槽。source=user_text 同客户名槽:模型编一个单号会把人指到另一张票上。"""
-    return SlotSpec("keyword", required=True, source="user_text", desc_th=desc_th, desc_zh=desc_zh)
-
-
-def _client_name_slot(required: bool) -> SlotSpec:
-    """客户名槽。source=user_text:名字必须出现在用户原话里(接地闸拦编造),
-    随后还要在真实名录里命中才作数(tools 侧二次接地)—— 挂错账套是红线。"""
-    return SlotSpec(
-        "client_name",
-        required=required,
-        source="user_text",
-        desc_th="ชื่อลูกค้าตามที่ผู้ใช้พิมพ์ (คัดจากข้อความผู้ใช้เท่านั้น)",
-        desc_zh="客户名(必须原样出自用户原话·不许改写不许猜)",
-    )
-
-
 TOOLS: tuple[StewardTool, ...] = (
     StewardTool(
         name=TODAY_BRIEF,
@@ -136,26 +115,35 @@ TOOLS: tuple[StewardTool, ...] = (
             "再按紧急度给最急的几条 · 会计问「今天先干哪个」「有什么要紧的」时用 · "
             "不点名客户、不点名单张票;只要一期的家数统计用 matrix_overview"
         ),
-        slots=(_period_slot(),),
+        slots=(period_slot(),),
         handler="today_brief",
     ),
     StewardTool(
         name=MATRIX_OVERVIEW,
-        desc="查某一期的事务所矩阵总览:多少家客户、缺料/待审/进行中/未开单各多少家",
-        slots=(_period_slot(),),
+        desc=(
+            "查某一期的事务所矩阵总览:多少家客户、缺料/待审/进行中/未开单各多少家 · "
+            "问某一家跑到哪一步用 client_status;要逐张工单用 workorder_list"
+        ),
+        slots=(period_slot(),),
         handler="matrix_overview",
     ),
     StewardTool(
         name=CLIENT_STATUS,
-        desc="查某一家客户某一期的进度:工单状态、当前步骤、还缺什么材料",
-        slots=(_client_name_slot(required=True), _period_slot()),
+        desc=(
+            "查某一家客户某一期的进度:工单状态、当前步骤、还缺什么材料 · "
+            "问「能不能签能不能收」用 close_readiness;要税额数字用 tax_numbers"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
         handler="client_status",
     ),
     StewardTool(
         name=WORKORDER_LIST,
-        desc="列工单:某一期的工单有哪些,可按口径筛(缺料/进行中/待审/已冻结)",
+        desc=(
+            "列工单:某一期的工单有哪些,可按口径筛(缺料/进行中/待审/已冻结)· "
+            "只要家数统计用 matrix_overview;要找某一张票用 history_query"
+        ),
         slots=(
-            _period_slot(),
+            period_slot(),
             # 口径词而非引擎态:用户说的「还没审完」在矩阵里是 stuck+review 两态合成的
             # 「待审」。让大脑挑口径词、由 engine.resolve_status_filter 展开成引擎态,
             # 答复才与同屏矩阵数得起来(引擎态原词执行器也认,归到所属口径)。
@@ -174,7 +162,10 @@ TOOLS: tuple[StewardTool, ...] = (
     ),
     StewardTool(
         name=PUSH_LOG_QUERY,
-        desc="查推 ERP 的成败:近几天推了多少、失败几条、失败原因是什么",
+        desc=(
+            "查推 ERP 的成败:近几天推了多少、失败几条、失败原因是什么 · "
+            "它只数推过的,还没推的票不在里面(用 period_invoices);查单张票用 invoice_detail"
+        ),
         slots=(
             SlotSpec(
                 "days",
@@ -190,15 +181,19 @@ TOOLS: tuple[StewardTool, ...] = (
                 desc_th="กรองสถานะ: success / failed",
                 desc_zh="状态过滤(success/failed)· 只问失败时给 failed",
             ),
-            _client_name_slot(required=False),
+            client_name_slot(required=False),
         ),
         handler="push_log_query",
     ),
     StewardTool(
         name=HISTORY_QUERY,
-        desc="在识别记录里找某张票(按店名/单号/文件名关键词)",
+        desc=(
+            "在识别记录里找某张票(按店名/单号/文件名关键词)· "
+            "找到之后要看这张票的详情与推送去向用 invoice_detail;"
+            "要按客户列一整期的进项票用 period_invoices"
+        ),
         slots=(
-            _keyword_slot(
+            keyword_slot(
                 "คำค้น เช่น ชื่อร้านหรือเลขใบเสร็จ (คัดจากข้อความผู้ใช้เท่านั้น)",
                 "关键词(店名/单号/文件名·必须出自用户原话)",
             ),
@@ -207,16 +202,22 @@ TOOLS: tuple[StewardTool, ...] = (
     ),
     StewardTool(
         name=DUE_SOON,
-        desc="查某一期还没交完的申报义务和截止日:哪几家、什么表、还剩几天、有没有逾期",
-        slots=(_period_slot(),),
+        desc=(
+            "查某一期还没交完的申报义务和截止日:哪几家、什么表、还剩几天、有没有逾期 · "
+            "问「有什么等我审」用 review_queue;问某一家能不能收官用 close_readiness"
+        ),
+        slots=(period_slot(),),
         handler="due_soon",
     ),
     StewardTool(
         name=REVIEW_QUEUE,
-        desc="查等人审的工单队列:有什么等我审、哪些卡住待判、可按客户或严重度筛",
+        desc=(
+            "查等人审的工单队列:有什么等我审、哪些卡住待判、可按客户或严重度筛 · "
+            "问申报截止日用 due_soon;要看某一张票为什么被拦下用 invoice_detail"
+        ),
         slots=(
-            _period_slot(),
-            _client_name_slot(required=False),
+            period_slot(),
+            client_name_slot(required=False),
             SlotSpec(
                 "severity",
                 required=False,
@@ -229,8 +230,11 @@ TOOLS: tuple[StewardTool, ...] = (
     ),
     StewardTool(
         name=TAX_NUMBERS,
-        desc="查某家某期算出来的税额:销项/进项/销项税/进项税/应交多少",
-        slots=(_client_name_slot(required=True), _period_slot()),
+        desc=(
+            "查某家某期算出来的税额:销项/进项/销项税/进项税/应交多少 · "
+            "它读账上已经算好的数;会计自己报一个数要现算用 vat_calc;要全所一张表用 tax_matrix"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
         handler="tax_numbers",
     ),
     StewardTool(
@@ -240,7 +244,7 @@ TOOLS: tuple[StewardTool, ...] = (
             "会计问「所有客户/每家/全所这个月该交多少」「税额列个表」时用 · "
             "只问一家用 tax_numbers;只要家数统计不要钱用 matrix_overview"
         ),
-        slots=(_period_slot(),),
+        slots=(period_slot(),),
         handler="tax_matrix",
     ),
     StewardTool(
@@ -251,8 +255,8 @@ TOOLS: tuple[StewardTool, ...] = (
             "查单张票用 invoice_detail;只统计推过的成败用 push_log_query(没推的票不在它里面)"
         ),
         slots=(
-            _client_name_slot(required=True),
-            _period_slot(),
+            client_name_slot(required=True),
+            period_slot(),
             SlotSpec(
                 "filter",
                 required=False,
@@ -269,15 +273,21 @@ TOOLS: tuple[StewardTool, ...] = (
     ),
     StewardTool(
         name=BANK_RECON_STATUS,
-        desc="查某家某期的银行对账进度:对上几笔、缺票几笔、有票无流水几笔、差多少钱",
-        slots=(_client_name_slot(required=True), _period_slot()),
+        desc=(
+            "查某家某期的银行对账进度:对上几笔、缺票几笔、有票无流水几笔、差多少钱 · "
+            "要逐张看缺哪些票用 period_invoices;要判能不能收官用 close_readiness"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
         handler="bank_recon_status",
     ),
     StewardTool(
         name=INVOICE_DETAIL,
-        desc="查某一张票的详情:识别成什么、过账去向、推进 ERP 了没、失败原因是什么",
+        desc=(
+            "查某一张票的详情:识别成什么、过账去向、推进 ERP 了没、失败原因是什么 · "
+            "它只看一张;要列一期的票用 period_invoices;要整体推送成败统计用 push_log_query"
+        ),
         slots=(
-            _keyword_slot(
+            keyword_slot(
                 "ระบุใบที่จะดู เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
                 "要看的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
             ),
@@ -291,7 +301,7 @@ TOOLS: tuple[StewardTool, ...] = (
             "签批态,五项逐项过一遍并直说没过的差什么 · 会计问「能签了吗」「还差什么才能收」时用 · "
             "只问跑到哪一步用 client_status,只要税额数字用 tax_numbers"
         ),
-        slots=(_client_name_slot(required=True), _period_slot()),
+        slots=(client_name_slot(required=True), period_slot()),
         handler="close_readiness",
     ),
     StewardTool(
@@ -301,12 +311,15 @@ TOOLS: tuple[StewardTool, ...] = (
             "出了的直接给下载链 · 会计问「报表好了没」「把文件/草稿发我」时用 · "
             "只问能不能签用 close_readiness"
         ),
-        slots=(_client_name_slot(required=True), _period_slot()),
+        slots=(client_name_slot(required=True), period_slot()),
         handler="deliverables_list",
     ),
     StewardTool(
         name=CLIENT_LOOKUP,
-        desc="按名字或税号模糊查客户名录(用户提的客户名不确定是哪一家时先用它对一下)",
+        desc=(
+            "按名字或税号模糊查客户名录(用户提的客户名不确定是哪一家时先用它对一下)· "
+            "它只对名字,不带任何进度与金额;要进度用 client_status,要税额用 tax_numbers"
+        ),
         slots=(
             SlotSpec(
                 "keyword",
@@ -359,10 +372,12 @@ TOOLS: tuple[StewardTool, ...] = (
         name=ERP_PUSH,
         desc=(
             "把一张已识别的票推进 Express 账套(会真写客户的账 · 必须人批准后才执行)· "
-            "会计明确说要推/过账/记进 Express 时才用"
+            "会计明确说要推/过账/记进 Express 时才用 · "
+            "只是在问情况(推了没 / 推失败了吗)一律不选它,那是 invoice_detail 与 "
+            "push_log_query 的活;不确定是哪一张先用 history_query 查清再说"
         ),
         slots=(
-            _keyword_slot(
+            keyword_slot(
                 "ระบุใบที่จะส่ง เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
                 "要推的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
             ),
@@ -390,7 +405,7 @@ TOOLS: tuple[StewardTool, ...] = (
         desc=(
             "把这一轮传上来的文件转成 Excel 表并做守恒校验(台账/流水核借贷余额链,"
             "普通表核列合计)· 会计说「转成 Excel / 导出成表格 / 帮我转一下这份」时用 · "
-            "这一轮没有附件时绝不选它"
+            "这一轮没有附件时绝不选它;要查发票连号或买家汇总用 vat_report_check"
         ),
         slots=(),
         handler="file_convert",
@@ -401,7 +416,7 @@ TOOLS: tuple[StewardTool, ...] = (
         desc=(
             "对这一轮传上来的销项 VAT 报告做三查:发票连号(缺号/乱序/重复/作废)、"
             "买家分组汇总、期间一致性 · 会计说「三查 / 查连号 / 看有没有跳号 / 这份报告核一下」"
-            "时用 · 这一轮没有附件时绝不选它"
+            "时用 · 这一轮没有附件时绝不选它;只是要把这份表转成 Excel 用 file_convert"
         ),
         slots=(),
         handler="vat_report_check",
@@ -414,32 +429,6 @@ TOOLS_BY_NAME: dict[str, StewardTool] = {t.name: t for t in TOOLS}
 # 闭集全集 + 哨兵:planner 解析时枚举外一律归 OUT_OF_SCOPE(诚实拒,绝不装懂)。
 ALL_NAMES: tuple[str, ...] = tuple(TOOLS_BY_NAME)
 OUT_OF_SCOPE = "out_of_scope"
-
-
-@dataclass
-class ToolContext:
-    """工具以此身份执行 —— 复用现成 RLS/权限口径,绝不 bypass。
-
-    allowed_client_ids=None 表示不限(老板/超管/scope_mode='all');给了集合就是被分派成员
-    只看分到的账套,与 /api/tax-profile/matrix 的收窄口径同源(路由算好传进来)。
-
-    today 走曼谷日历日:服务器跑 UTC,date.today() 在曼谷 00:00–07:00 还停在昨天,逾期与
-    剩余天数会整体差一天(当天到期的义务被说成"还剩 1 天",简报的头条与桶序跟着错)。
-
-    attachment_ids 走执行上下文而非参数槽:附件 id 根本不经过模型,塞进 slots 只会让
-    services/agent/slots.py 的接地闸(source=user_text 的值必须逐字节出现在用户原话里)
-    报假阳 —— 那道闸是为「模型编了一个客户名」设计的。与 user_id/allowed_client_ids 同层。
-    """
-
-    user: dict
-    tenant_id: str
-    user_id: str
-    allowed_client_ids: Optional[frozenset] = None
-    lang: str = "zh"
-    today: date = field(default_factory=bangkok_today)
-    user_text: str = ""
-    session_id: str = ""
-    attachment_ids: tuple = ()
 
 
 def get(name: Optional[str]) -> Optional[StewardTool]:

@@ -25,6 +25,7 @@ import traceback
 from typing import Callable, Dict, Optional
 
 from . import store
+from services.embedded_worker import EmbeddedWorker
 from services.startup_lock import startup_ddl_lock
 
 logger = logging.getLogger("recon_jobs.worker")
@@ -190,32 +191,16 @@ async def run_worker(stop_event: Optional[asyncio.Event] = None) -> None:
 
 
 # ── embedded 模式(默认 · web 进程内)──────────────────────────────
-_embedded_task: Optional[asyncio.Task] = None
-_embedded_stop: Optional[asyncio.Event] = None
+_embedded = EmbeddedWorker("recon-worker", run_worker, "RECON_ASYNC", logger)
 
 
 def start_embedded() -> None:
-    """从 app.py 启动事件里调 · 在当前事件循环起后台工人任务。幂等。"""
-    global _embedded_task, _embedded_stop
-    if _embedded_task and not _embedded_task.done():
-        return
-    if os.environ.get("RECON_ASYNC", "1") != "1":
-        logger.info("[recon-worker] RECON_ASYNC!=1 · embedded worker not started")
-        return
-    _embedded_stop = asyncio.Event()
-    _embedded_task = asyncio.create_task(run_worker(_embedded_stop))
-    logger.info("[recon-worker] embedded worker started")
+    """在 web 进程内起后台工人。幂等。"""
+    _embedded.start()
 
 
 async def stop_embedded() -> None:
-    global _embedded_task, _embedded_stop
-    if _embedded_stop:
-        _embedded_stop.set()
-    if _embedded_task:
-        try:
-            await asyncio.wait_for(_embedded_task, timeout=5)
-        except Exception:  # noqa: BLE001
-            _embedded_task.cancel()
+    await _embedded.stop()
 
 
 # ── standalone 模式 ───────────────────────────────────────────────

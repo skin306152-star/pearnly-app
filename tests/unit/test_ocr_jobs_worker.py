@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 from core import db  # noqa: F401
+from services import embedded_worker
 from services.ocr.jobs import worker as w
 
 
@@ -112,11 +113,23 @@ class RunOneDispatchTests(unittest.TestCase):
 
 class FlagGateTests(unittest.TestCase):
     def test_embedded_not_started_when_flag_off(self):
+        # 起停壳收进 services/embedded_worker 后,create_task 从那边发出 —— 打桩要跟着搬,
+        # 否则打的是 worker 模块里一个再也没人调的名字,这条闸会永远绿。
         with mock.patch.dict("os.environ", {"OCR_ASYNC_WEB": "0"}, clear=False):
-            with mock.patch.object(w.asyncio, "create_task") as ct:
-                w._embedded_task = None
+            with mock.patch.object(embedded_worker.asyncio, "create_task") as ct:
+                w._embedded._task = None
                 w.start_embedded()
             ct.assert_not_called()
+
+    def test_embedded_starts_when_flag_on(self):
+        """反证:上一条报绿得是因为闸关着,不是因为桩打空了。"""
+        with mock.patch.dict("os.environ", {"OCR_ASYNC_WEB": "1"}, clear=False):
+            with mock.patch.object(embedded_worker.asyncio, "create_task") as ct:
+                with mock.patch.object(embedded_worker.asyncio, "Event"):
+                    w._embedded._task = None
+                    w.start_embedded()
+            ct.assert_called_once()
+        w._embedded._task = None
 
 
 if __name__ == "__main__":

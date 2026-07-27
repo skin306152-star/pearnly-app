@@ -22,6 +22,7 @@ import time
 from typing import Optional
 
 from services.agent.contracts import ToolResult
+from services.embedded_worker import EmbeddedWorker
 from services.steward import budget, copy, loop_run, loop_state, registry, store, tools
 from services.steward.registry import ToolContext
 
@@ -332,35 +333,20 @@ async def run_worker(stop_event: Optional[asyncio.Event] = None) -> None:
 
 
 # ── embedded 模式(默认 · web 进程内)──────────────────────────────
-_embedded_task: Optional[asyncio.Task] = None
-_embedded_stop: Optional[asyncio.Event] = None
+_embedded = EmbeddedWorker("steward-worker", run_worker, "STEWARD_ASYNC", logger)
 
 
 def start_embedded() -> None:
-    """app 启动时在当前事件循环起后台工人任务。幂等。
+    """在 web 进程内起后台工人。幂等。
 
     STEWARD_ASYNC=0 是急停口:关掉后新任务没人认领,查询侧 heal_stale 会在超时限后
-    把它们如实收 failed(queue_stalled)—— 急停也不假转圈。"""
-    global _embedded_task, _embedded_stop
-    if _embedded_task and not _embedded_task.done():
-        return
-    if os.environ.get("STEWARD_ASYNC", "1") != "1":
-        logger.info("[steward-worker] STEWARD_ASYNC=0 · embedded worker not started")
-        return
-    _embedded_stop = asyncio.Event()
-    _embedded_task = asyncio.create_task(run_worker(_embedded_stop))
-    logger.info("[steward-worker] embedded worker started")
+    把它们如实收 failed(queue_stalled)—— 急停也不假转圈。
+    """
+    _embedded.start()
 
 
 async def stop_embedded() -> None:
-    global _embedded_task, _embedded_stop
-    if _embedded_stop:
-        _embedded_stop.set()
-    if _embedded_task:
-        try:
-            await asyncio.wait_for(_embedded_task, timeout=5)
-        except Exception:  # noqa: BLE001
-            _embedded_task.cancel()
+    await _embedded.stop()
 
 
 # ── standalone 模式 ───────────────────────────────────────────────

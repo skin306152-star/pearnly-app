@@ -13,6 +13,11 @@
 体积闸(<500 行)下的分居 —— 语义边界不变,闭集与执行入口(prepare/run)一律留在本模块:
   tools_close     月结产线四问(到期义务 / 待审队列 / 应交税额 / 银行对账)
   tools_invoice   单票体检(识别结果 + 推送成败 + 为什么推不进去)
+  tools_calc      现场算账(含税↔税前↔税额互算 · 零 I/O 纯 Decimal · 数出自会计原话)
+  tools_brief     今天从哪下手(合成到期/待审/推失败三路,只分桶排序不重算)
+  tools_signoff   这家这期能不能签(order_detail 五项投影 → 一句结论)
+  tools_deliverables 交付物清单 + 每份的真下载链
+  tools_period    本期盘点(全所税额表 / 某家某期的票推完了没 · 一律批量读,不逐家回放)
   erp_push_tool   唯一的写工具(请求侧接地 + 执行侧经桥投单两段)
   tool_scope      各工具共用的作用域 / 客户名接地 / 票据定位 / 期间缺省 / 金额规范化
 
@@ -29,7 +34,19 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import authz, erp_push_tool, registry, tool_scope, tools_close, tools_invoice
+from services.steward import (
+    authz,
+    erp_push_tool,
+    registry,
+    tool_scope,
+    tools_brief,
+    tools_calc,
+    tools_close,
+    tools_deliverables,
+    tools_invoice,
+    tools_period,
+    tools_signoff,
+)
 from services.steward.registry import ToolContext
 from services.steward.tool_scope import (  # 入口仍在 tools:调用方按 tools.ERR_* 认错误码
     ERR_CLIENT_AMBIGUOUS,  # noqa: F401
@@ -289,6 +306,12 @@ _HANDLERS = {
     registry.TAX_NUMBERS: tools_close.tax_numbers,
     registry.BANK_RECON_STATUS: tools_close.bank_recon_status,
     registry.INVOICE_DETAIL: tools_invoice.invoice_detail,
+    registry.TODAY_BRIEF: tools_brief.today_brief,
+    registry.CLOSE_READINESS: tools_signoff.close_readiness,
+    registry.DELIVERABLES_LIST: tools_deliverables.deliverables_list,
+    registry.VAT_CALC: tools_calc.vat_calc,
+    registry.TAX_MATRIX: tools_period.tax_matrix,
+    registry.PERIOD_INVOICES: tools_period.period_invoices,
     registry.ERP_PUSH: erp_push_tool.erp_push,
 }
 

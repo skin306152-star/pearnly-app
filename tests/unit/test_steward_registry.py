@@ -40,8 +40,9 @@ class ClosedSetTests(unittest.TestCase):
             if not tool.readonly:
                 self.assertTrue((tool.timeout_s or 0) >= 600, tool.name)
 
-    def test_twelve_tools_registered(self):
-        self.assertEqual(len(registry.TOOLS), 12)
+    def test_tool_count_is_pinned(self):
+        """闭集大小钉死:提示词按本表现生成,悄悄多一个工具就是悄悄多一份能力。"""
+        self.assertEqual(len(registry.TOOLS), 18)
         self.assertEqual(len(registry.ALL_NAMES), len(set(registry.ALL_NAMES)))
 
     def test_unknown_names_rejected(self):

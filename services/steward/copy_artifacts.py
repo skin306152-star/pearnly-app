@@ -10,7 +10,7 @@ copy.artifacts / copy.artifact_links,不直接 import 本模块。
 
 from __future__ import annotations
 
-from services.steward import copy_close, registry
+from services.steward import copy_brief, copy_calc, copy_close, copy_period, registry
 
 DEFAULT_LANG = "zh"
 
@@ -26,6 +26,12 @@ _ARTIFACT_LABEL = {
     "queue_rows": {"zh": "等人审的工单", "th": "งานที่รอตรวจ"},
     "missing_invoice": {"zh": "缺票的流水", "th": "รายการเดินบัญชีที่ขาดใบกำกับ"},
     "push_attempts": {"zh": "这张票的推送尝试", "th": "ประวัติการส่งใบนี้"},
+    "vat_breakdown": {"zh": "拆解", "th": "รายละเอียดการคำนวณ"},
+    "today_rows": {"zh": "最紧的几条", "th": "รายการที่เร่งที่สุด"},
+    "checks": {"zh": "签批前五项", "th": "5 ข้อก่อนอนุมัติ"},
+    "deliverables": {"zh": "交付物", "th": "ชุดส่งมอบ"},
+    "tax_rows": {"zh": "全所税额表", "th": "ตารางภาษีทุกราย"},
+    "invoice_rows": {"zh": "这期的进项票", "th": "ใบกำกับซื้อในงวดนี้"},
     "board_link": {"zh": "打开看板 · 等你审", "th": "เปิดบอร์ด · รอคุณตรวจ"},
 }
 
@@ -53,6 +59,22 @@ _COLUMN_LABEL = {
     "amount": {"zh": "金额", "th": "จำนวนเงิน"},
     "description": {"zh": "摘要", "th": "รายละเอียด"},
     "category": {"zh": "失败类型", "th": "ประเภทข้อผิดพลาด"},
+    "item": {"zh": "项目", "th": "รายการ"},
+    "sales_amount": {"zh": "销项", "th": "ยอดขาย"},
+    "output_vat": {"zh": "销项税", "th": "ภาษีขาย"},
+    "purchase_amount": {"zh": "进项", "th": "ยอดซื้อ"},
+    "input_vat": {"zh": "进项税", "th": "ภาษีซื้อ"},
+    "tax_due": {"zh": "应交", "th": "ต้องชำระ"},
+    "state": {"zh": "情况", "th": "สถานะ"},
+    "vendor": {"zh": "卖方", "th": "ผู้ขาย"},
+    "kind": {"zh": "类型", "th": "ประเภท"},
+    "detail": {"zh": "事由", "th": "เรื่อง"},
+    "when": {"zh": "期限", "th": "กำหนด"},
+    "check": {"zh": "项目", "th": "รายการ"},
+    "result": {"zh": "结果", "th": "ผล"},
+    "reason": {"zh": "说明", "th": "รายละเอียด"},
+    "deliverable": {"zh": "报表", "th": "รายงาน"},
+    "file": {"zh": "文件", "th": "ไฟล์"},
 }
 
 
@@ -112,11 +134,69 @@ def build(tool: str, data: dict, lang: str) -> list[dict]:
         return _client_link(data, lang) + (
             [_table("missing_invoice", rows, cols, lang)] if rows else []
         )
+    if tool == registry.TAX_MATRIX:
+        rows = [_tax_row(r, lang) for r in (data.get("rows") or [])]
+        cols = (
+            "client_name",
+            "sales_amount",
+            "output_vat",
+            "purchase_amount",
+            "input_vat",
+            "tax_due",
+            "state",
+        )
+        out = [_link("matrix_link", "/ai#/", lang)]
+        return out + ([_table("tax_rows", rows, cols, lang)] if rows else [])
+    if tool == registry.PERIOD_INVOICES:
+        rows = [_invoice_row(r, lang) for r in (data.get("rows") or [])]
+        cols = ("invoice_no", "vendor", "invoice_date", "amount", "state")
+        return _client_link(data, lang) + (
+            [_table("invoice_rows", rows, cols, lang)] if rows else []
+        )
+    if tool == registry.VAT_CALC:
+        # 算账没有可去的落点(数不在任何页面上),只给拆解表 —— 摆一个深链就是摆个 404。
+        rows = copy_calc.breakdown_rows(data, lang)
+        return [_table("vat_breakdown", rows, ("item", "amount"), lang)]
     if tool == registry.INVOICE_DETAIL:
         rows = data.get("push_rows") or []
         cols = ("created_at", "status", "error_code", "category")
         return [_table("push_attempts", rows, cols, lang)] if rows else []
+    if tool == registry.TODAY_BRIEF:
+        rows = [copy_brief.brief_row(r, lang) for r in (data.get("rows") or [])]
+        cols = ("kind", "client_name", "detail", "when")
+        # 两个落点各管一半:矩阵看到期,看板看等你审。简报的行动横跨两屏,给一个会指错路。
+        out = [_link("matrix_link", "/ai#/", lang), _link("board_link", "/ai#/board", lang)]
+        return out + ([_table("today_rows", rows, cols, lang)] if rows else [])
+    if tool == registry.CLOSE_READINESS:
+        rows = [copy_brief.check_row(r, lang) for r in (data.get("checks") or [])]
+        cols = ("check", "result", "reason")
+        return _client_link(data, lang) + ([_table("checks", rows, cols, lang)] if rows else [])
+    if tool == registry.DELIVERABLES_LIST:
+        return _deliverables(data, lang)
     return []
+
+
+def _deliverables(data: dict, lang: str) -> list[dict]:
+    """交付物:一张清单表 + 每份已出文件一个下载链。
+
+    下载链只能各自成一条产物 —— 表格单元格是纯文本(ai-steward-render.js 的 tableHtml
+    只 esc 值,不渲染链接),把 URL 塞进格子只会印出一串裸地址。
+    """
+    rows = data.get("rows") or []
+    out = _client_link(data, lang)
+    if rows:
+        table_rows = [copy_brief.deliverable_row(r, lang) for r in rows]
+        out.append(_table("deliverables", table_rows, ("deliverable", "file"), lang))
+    out.extend(
+        {
+            "kind": "deeplink",
+            "label": copy_brief.deliverable(r.get("kind") or "", lang),
+            "href": r["href"],
+        }
+        for r in rows
+        if r.get("has_file") and r.get("href")
+    )
+    return out
 
 
 def _due_row(row: dict, lang: str) -> dict:
@@ -134,6 +214,15 @@ def _queue_row(row: dict, lang: str) -> dict:
         "status": copy_close.order_status(row.get("status"), lang),
         "severity": copy_close.severity(row.get("severity"), lang),
     }
+
+
+def _tax_row(row: dict, lang: str) -> dict:
+    """机器态在这里就翻成人话:表格里印 no_numbers 等于让人自己解码。"""
+    return {**row, "state": copy_period.tax_state(row.get("state"), lang)}
+
+
+def _invoice_row(row: dict, lang: str) -> dict:
+    return {**row, "state": copy_period.invoice_state(row.get("state"), lang)}
 
 
 def _client_link(data: dict, lang: str) -> list[dict]:

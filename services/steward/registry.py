@@ -39,6 +39,12 @@ REVIEW_QUEUE = "review_queue"
 TAX_NUMBERS = "tax_numbers"
 BANK_RECON_STATUS = "bank_recon_status"
 INVOICE_DETAIL = "invoice_detail"
+TODAY_BRIEF = "today_brief"
+CLOSE_READINESS = "close_readiness"
+DELIVERABLES_LIST = "deliverables_list"
+VAT_CALC = "vat_calc"
+TAX_MATRIX = "tax_matrix"
+PERIOD_INVOICES = "period_invoices"
 ERP_PUSH = "erp_push"
 
 # 经桥写 Express 是分钟级(桥端备份账套 → 写 DBF → 重建 CDX,全程跨 SMB),按只读工具的
@@ -106,6 +112,16 @@ def _client_name_slot(required: bool) -> SlotSpec:
 
 
 TOOLS: tuple[StewardTool, ...] = (
+    StewardTool(
+        name=TODAY_BRIEF,
+        desc=(
+            "今天先从哪下手:逾期几项 / 等你审几张 / 推 ERP 失败几条 / 缺料几家一次数完,"
+            "再按紧急度给最急的几条 · 会计问「今天先干哪个」「有什么要紧的」时用 · "
+            "不点名客户、不点名单张票;只要一期的家数统计用 matrix_overview"
+        ),
+        slots=(_period_slot(),),
+        handler="today_brief",
+    ),
     StewardTool(
         name=MATRIX_OVERVIEW,
         desc="查某一期的事务所矩阵总览:多少家客户、缺料/待审/进行中/未开单各多少家",
@@ -201,6 +217,40 @@ TOOLS: tuple[StewardTool, ...] = (
         handler="tax_numbers",
     ),
     StewardTool(
+        name=TAX_MATRIX,
+        desc=(
+            "一张表列全所每家客户本期的税额:销项/进项/销项税/进项税/应交,一家一行带合计 · "
+            "会计问「所有客户/每家/全所这个月该交多少」「税额列个表」时用 · "
+            "只问一家用 tax_numbers;只要家数统计不要钱用 matrix_overview"
+        ),
+        slots=(_period_slot(),),
+        handler="tax_matrix",
+    ),
+    StewardTool(
+        name=PERIOD_INVOICES,
+        desc=(
+            "列某家某期收到的进项票,逐张标推进 Express 了没,可只看还没推的 / 待判的 · "
+            "会计问「还有几张票没推进去」「把这期的票列一下我核有没有漏」时用 · "
+            "查单张票用 invoice_detail;只统计推过的成败用 push_log_query(没推的票不在它里面)"
+        ),
+        slots=(
+            _client_name_slot(required=True),
+            _period_slot(),
+            SlotSpec(
+                "filter",
+                required=False,
+                source="model_freeform",
+                desc_th="ตัวกรอง: not_pushed(ยังไม่ได้ส่งเข้า Express) / pending_review(รอตัดสิน) / all",
+                desc_zh=(
+                    "筛选(not_pushed 还没推进去 / pending_review 待判 / all 全部)· "
+                    "问「还有几张没推」给 not_pushed,问「还有什么要判」给 pending_review,"
+                    "只说「把票列一下」给 null"
+                ),
+            ),
+        ),
+        handler="period_invoices",
+    ),
+    StewardTool(
         name=BANK_RECON_STATUS,
         desc="查某家某期的银行对账进度:对上几笔、缺票几笔、有票无流水几笔、差多少钱",
         slots=(_client_name_slot(required=True), _period_slot()),
@@ -218,6 +268,26 @@ TOOLS: tuple[StewardTool, ...] = (
         handler="invoice_detail",
     ),
     StewardTool(
+        name=CLOSE_READINESS,
+        desc=(
+            "这家这期能不能签批收官:税额算了没 / 银行对上没 / 待判清了没 / 交付包出了没 / "
+            "签批态,五项逐项过一遍并直说没过的差什么 · 会计问「能签了吗」「还差什么才能收」时用 · "
+            "只问跑到哪一步用 client_status,只要税额数字用 tax_numbers"
+        ),
+        slots=(_client_name_slot(required=True), _period_slot()),
+        handler="close_readiness",
+    ),
+    StewardTool(
+        name=DELIVERABLES_LIST,
+        desc=(
+            "某家某期的交付物/报表包清单:ภ.พ.30 草稿、进销底稿、月度报表等各出了没,"
+            "出了的直接给下载链 · 会计问「报表好了没」「把文件/草稿发我」时用 · "
+            "只问能不能签用 close_readiness"
+        ),
+        slots=(_client_name_slot(required=True), _period_slot()),
+        handler="deliverables_list",
+    ),
+    StewardTool(
         name=CLIENT_LOOKUP,
         desc="按名字或税号模糊查客户名录(用户提的客户名不确定是哪一家时先用它对一下)",
         slots=(
@@ -230,6 +300,43 @@ TOOLS: tuple[StewardTool, ...] = (
             ),
         ),
         handler="client_lookup",
+    ),
+    StewardTool(
+        name=VAT_CALC,
+        desc=(
+            "现场算 VAT:会计自己报一个数,在含税/税前/税额之间互算(泰国 7%),她报了预扣税率就"
+            "一并算预扣和实付 · 只在数字出自她嘴里时用;要查某家某期账上已经算好的税额用 tax_numbers"
+        ),
+        slots=(
+            SlotSpec(
+                "amount",
+                required=True,
+                source="user_text",
+                desc_th="จำนวนเงินที่ผู้ใช้พูด (คัดจากข้อความผู้ใช้เท่านั้น ลอกมาทั้งจุดทั้งคอมม่า)",
+                desc_zh="会计报的那个金额(原样抄她说的数字·带逗号小数点也照抄·不许换算不许四舍五入)",
+            ),
+            # 方向判错 = 答案照样是两位小数、看不出错的假数,所以宁可追问也不给缺省:
+            # required=True 让判不出来的 null 走系统追问,不在提示词里塞一个「默认含税」。
+            SlotSpec(
+                "basis",
+                required=True,
+                source="model_freeform",
+                desc_th="ตัวเลขนี้รวม VAT แล้วหรือยัง: inclusive(รวมแล้ว) / exclusive(ยังไม่รวม)",
+                desc_zh=(
+                    "这个数含不含税(inclusive 含税 / exclusive 未含税)· "
+                    "「含税的/รวมแล้ว」给 inclusive,「税前/ยังไม่รวม」给 exclusive · 看不出来给 null 让系统问"
+                ),
+            ),
+            # 该扣几个点是税务判断不是算账:会计没把率说出口就一律 null,工具不替她挑。
+            SlotSpec(
+                "wht_rate",
+                required=False,
+                source="user_text",
+                desc_th="อัตราหัก ณ ที่จ่าย เฉพาะเมื่อผู้ใช้บอกเอง เช่น 3 (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="预扣税率百分点(会计自己说了几个点才填,如 3)· 她没说一律 null,绝不替她挑",
+            ),
+        ),
+        handler="vat_calc",
     ),
     StewardTool(
         name=ERP_PUSH,

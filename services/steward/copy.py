@@ -9,16 +9,26 @@ reply_guard 出口护栏)。
 只写 zh + th:与前端 static/ai/ai-i18n-steward.js 同一决定(管家是事务所内部工作台入口,
 照 adm-* 超管键先例先做两语,en/ja 回落 zh),对外开放再补两语——两侧同进同退,不各走各的。
 
-体积闸(<500 行)下的三块分居:产物层在 copy_artifacts,月结产线四问 + 单票体检的文案在
-copy_close,写工具 erp_push 的文案在 copy_erp_push。语义边界不变 —— 调用方一律只 import
-copy,本模块按工具/错误码委派过去。
+体积闸(<500 行)下的分居:产物层在 copy_artifacts,月结产线四问 + 单票体检的文案在
+copy_close,现场算账的文案在 copy_calc,开工简报 / 签批闸 / 交付物清单的文案在 copy_brief,
+本期盘点两问的文案在 copy_period,写工具 erp_push 的文案在 copy_erp_push。语义边界不变 —— 调用方一律只 import copy,本模块
+按工具/错误码委派过去。
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from services.steward import copy_artifacts, copy_close, copy_erp_push, registry, store
+from services.steward import (
+    copy_artifacts,
+    copy_brief,
+    copy_calc,
+    copy_close,
+    copy_erp_push,
+    copy_period,
+    registry,
+    store,
+)
 
 DEFAULT_LANG = "zh"
 _LANGS = ("zh", "th")
@@ -43,6 +53,17 @@ _TOOL_TITLE = {
     registry.CLIENT_LOOKUP: {"zh": "查客户名录", "th": "ค้นรายชื่อลูกค้า"},
     registry.ERP_PUSH: {"zh": "推票进 Express", "th": "ส่งใบเข้า Express"},
     **copy_close.TITLES,
+    **copy_calc.TITLES,
+    **copy_brief.TITLES,
+    **copy_period.TITLES,
+}
+
+# 工具名 → 答复渲染器(分居模块各自登记,copy.reply 按本表委派)。
+_REPLIES = {
+    **copy_close.REPLIES,
+    **copy_calc.REPLIES,
+    **copy_brief.REPLIES,
+    **copy_period.REPLIES,
 }
 
 _STEP_UNDERSTAND = {"zh": "听懂你要什么", "th": "ทำความเข้าใจคำสั่ง"}
@@ -60,6 +81,15 @@ _ASK = {
     "period": {
         "zh": "哪一期?说「上个月」或「2569-06」这样的都行。",
         "th": "งวดไหนคะ พิมพ์ว่า「เดือนที่แล้ว」หรือ「2569-06」ก็ได้",
+    },
+    "amount": {
+        "zh": "要算哪个数?金额直接说给我。",
+        "th": "คำนวณจากยอดไหนคะ พิมพ์จำนวนเงินมาได้เลย",
+    },
+    # 方向缺省会算出一个看不出错的假数,所以宁可多问一句(见 registry 的 basis 槽)。
+    "basis": {
+        "zh": "这个数是含税的还是没含税的?",
+        "th": "ตัวเลขนี้รวม VAT แล้วหรือยังคะ",
     },
 }
 
@@ -122,14 +152,18 @@ _FAIL_REASON = {
 
 _OUT_OF_SCOPE = {
     "zh": (
-        "这个我还做不了。我能查:本期矩阵、到期义务、待审队列、某家客户进度、工单清单、应交税额、"
-        "银行对账、推送成败、识别记录与单票详情、客户名录;"
+        "这个我还做不了。我能查:今天从哪下手、本期矩阵、到期义务、待审队列、某家客户进度、"
+        "能不能签批收官、交付物清单、工单清单、应交税额与全所税额表、"
+        "这期的票推完了没、银行对账、推送成败、识别记录与单票详情、客户名录;你报个数我还能算含税/税前/VAT;"
         "能改的只有一件 —— 把一张已识别的票推进 Express(要你先批准)。"
     ),
     "th": (
-        "เรื่องนี้ยังทำให้ไม่ได้ค่ะ ที่ค้นได้: ภาพรวมงวด · รายการใกล้ครบกำหนด · คิวรอตรวจ · "
-        "ความคืบหน้าลูกค้า · รายการงาน · ยอดภาษีที่ต้องชำระ · ผลกระทบยอดธนาคาร · "
-        "ผลส่งเข้า ERP · เอกสารที่สแกนและรายละเอียดใบเดี่ยว · รายชื่อลูกค้า; "
+        "เรื่องนี้ยังทำให้ไม่ได้ค่ะ ที่ค้นได้: งานวันนี้ต้องทำอะไรก่อน · ภาพรวมงวด · "
+        "รายการใกล้ครบกำหนด · คิวรอตรวจ · ความคืบหน้าลูกค้า · ปิดงวดได้หรือยัง · ชุดส่งมอบ · "
+        "รายการงาน · ยอดภาษีที่ต้องชำระและตารางภาษีทุกราย · ใบกำกับในงวดส่งครบหรือยัง · "
+        "ผลกระทบยอดธนาคาร · "
+        "ผลส่งเข้า ERP · เอกสารที่สแกนและรายละเอียดใบเดี่ยว · รายชื่อลูกค้า · "
+        "คำนวณ VAT จากยอดที่คุณบอก; "
         "ที่แก้ข้อมูลได้มีอย่างเดียว — ส่งใบที่สแกนแล้วเข้า Express (ต้องให้คุณอนุมัติก่อน)"
     ),
 }
@@ -287,6 +321,8 @@ def error(code: str, data: Optional[dict], lang: str) -> str:
     data = data or {}
     if code in copy_erp_push.ERRORS:
         return copy_erp_push.error(code, data, lang)
+    if code in copy_calc.ERRORS:
+        return copy_calc.error(code, data, lang)
     table = _ERROR.get(code)
     if not table:
         return _t(_ERROR_FALLBACK, lang).format(code=code)
@@ -298,7 +334,7 @@ def error(code: str, data: Optional[dict], lang: str) -> str:
 
 def reply(tool: str, data: dict, lang: str) -> str:
     """工具结果 → 一句人话。数字全部取自 data,模板不做任何计算。"""
-    renderer = copy_close.REPLIES.get(tool)
+    renderer = _REPLIES.get(tool)
     if renderer:
         return renderer(data, lang)
     if tool == registry.ERP_PUSH:

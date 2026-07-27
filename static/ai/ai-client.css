@@ -194,6 +194,14 @@
 .wo-guide {
   margin-top: 14px;
 }
+/* 卡点提示(.rv-blocked)在审核页是一张居中窄卡,搬到工单卡里就成了浮在半边的一坨、
+ * 跟它自己的按钮不在一条竖线上。这里是整块正文:占满、居左、与下面的出路按钮左对齐。 */
+.wo-guide .rv-blocked {
+  max-width: none;
+  margin: 4px 0 10px;
+  text-align: left;
+  font-size: 13px;
+}
 
 /* 工单视图:管线摘要 + 关键数字(真数据 · order_detail) */
 .wosum {

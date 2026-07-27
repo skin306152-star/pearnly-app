@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import os
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Optional
 
@@ -177,6 +178,30 @@ class Wallet:
         """钱花完了没(豁免恒 False;查库异常 fail-open 恒 False,不把跑批堵死)。"""
         st = self.status()
         return not (st.get("allowed") or st.get("is_exempt"))
+
+    def shortfall_reason(self, items_left: int) -> str:
+        """停机原因码,尽量带上「还差多少」:"insufficient_balance:6.00"。
+
+        工单卡要回答「充多少够把剩下的跑完」,只给一个裸码等于让会计自己去猜。缺口 =
+        剩余件数按当月阶梯价的估价 − 现有余额,与入料端 402 的 estimated_cost 同一条定价
+        (services/billing/pricing,Decimal 全程,不用 float 算钱)。
+
+        算不出就退回裸码(前端对无参数码有不带金额的降级句):少说一句,好过报一个错数字。
+        """
+        try:
+            st = self.status()
+            pages = max(0, int(items_left or 0)) * PAGES_PER_ITEM
+            if pages <= 0:
+                return STUCK_REASON
+            used = int(st.get("pages_used_this_month") or 0)
+            need = Decimal(str(_estimate(used, pages)))
+            short = need - Decimal(str(st.get("balance_thb") or 0))
+            if short <= 0:
+                return STUCK_REASON
+            return f"{STUCK_REASON}:{short.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
+        except Exception as exc:  # noqa: BLE001 - 估不出缺口不值得把停机诊断本身弄挂
+            logger.warning("余额缺口估算失败(原因码退回裸码): %s", exc)
+            return STUCK_REASON
 
     def settle(self, item: dict, ocr, reused_from, history_id) -> bool:
         """一件消费完 → 该扣的扣掉;返回「钱花完了,别再投料」。

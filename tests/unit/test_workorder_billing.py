@@ -439,7 +439,8 @@ class ClassifyChargeTests(_BillingTestCase):
         store = _Store(self._items(3))
         out = self._run_classify(store)
         self.assertEqual(out.status, "stuck")
-        self.assertEqual(list(out.reasons), ["insufficient_balance"])
+        # 缺口 = 3 件按当月阶梯价的估价 − 余额 0(工单卡据此说「还需 ฿4.50」)。
+        self.assertEqual(list(out.reasons), ["insufficient_balance:4.50"])
         self.assertEqual(self.ocr_calls, [])  # 零 OCR
         self.assertEqual(self.charges.calls, [])  # 零扣费
         self.assertTrue(all(it["status"] == "pending" for it in store.items))
@@ -450,7 +451,8 @@ class ClassifyChargeTests(_BillingTestCase):
         store = _Store(self._items(3))
         out = self._run_classify(store)
         self.assertEqual(out.status, "stuck")
-        self.assertEqual(list(out.reasons), ["insufficient_balance"])
+        # 缺口只算还没跑的那 1 件:已跑完的不该再让用户为它充一次钱。
+        self.assertEqual(list(out.reasons), ["insufficient_balance:1.50"])
         self.assertEqual(len(self.charges.calls), 2)  # 跑了几件收几件的钱
         self.assertEqual([it["status"] for it in store.items], ["ok", "ok", "pending"])
         classified = [e for e in store.events if e["event_type"] == "item_classified"]
@@ -548,7 +550,7 @@ class ClassifyChargeTests(_BillingTestCase):
         store = _Store(self._items(3))
         out = self._run_classify(store)
         self.assertEqual(out.status, "stuck")
-        self.assertEqual(list(out.reasons), ["ocr_quota_deferred:1", "insufficient_balance"])
+        self.assertEqual(list(out.reasons), ["ocr_quota_deferred:1", "insufficient_balance:1.50"])
         self.assertEqual([it["status"] for it in store.items], ["flagged", "ok", "pending"])
 
     def test_pipeline_only_burns_the_page_we_charge_for(self):
@@ -570,6 +572,35 @@ class ClassifyChargeTests(_BillingTestCase):
             ocr_pipeline.read_first_page("/in/30p.pdf")
         self.assertEqual(seen["max_pages"], ocr_balance.PAGES_PER_ITEM)
         self.assertIs(self.prod_ocr_image, ocr_pipeline.read_first_page)  # 生产绑定就是它
+
+    def test_shortfall_is_quoted_from_decimal_pricing_not_float_math(self):
+        # 工单卡「还需 ฿X」的那个数:同一条阶梯定价、Decimal 全程、两位小数。
+        self._statuses([_broke(pages_used_this_month=0)])
+        w = ocr_balance.Wallet(user_id=_OWNER_USER, tenant_id=_TENANT)
+        self.assertEqual(w.shortfall_reason(2), "insufficient_balance:3.00")
+
+    def test_shortfall_subtracts_whatever_is_still_in_the_wallet(self):
+        # 余额没归零(不够下一件而已)时报「还差全款」= 让人多充一笔。
+        self._statuses([_ok(allowed=False, balance_thb=1.0, pages_used_this_month=0)])
+        w = ocr_balance.Wallet(user_id=_OWNER_USER, tenant_id=_TENANT)
+        self.assertEqual(w.shortfall_reason(1), "insufficient_balance:0.50")
+
+    def test_shortfall_falls_back_to_the_bare_code_when_it_cannot_be_priced(self):
+        # 估不出/算出来不缺钱 → 裸码(前端有不带金额的降级句);报错数比不报更伤。
+        self._statuses([_ok(allowed=False, balance_thb=99.0)])
+        w = ocr_balance.Wallet(user_id=_OWNER_USER, tenant_id=_TENANT)
+        self.assertEqual(w.shortfall_reason(1), "insufficient_balance")
+        self.assertEqual(w.shortfall_reason(0), "insufficient_balance")
+
+        def _boom(used, pages):
+            raise RuntimeError("pricing down")
+
+        self._swap(_estimate=_boom)
+        self._statuses([_broke()])
+        self.assertEqual(
+            ocr_balance.Wallet(user_id=_OWNER_USER, tenant_id=_TENANT).shortfall_reason(3),
+            "insufficient_balance",
+        )
 
     def test_wallet_and_cost_cap_are_separate_reasons(self):
         # 内部成本封顶(我们付给模型厂商的钱)与用户钱包是两件事,原因码不许合并。

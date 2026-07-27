@@ -254,6 +254,9 @@ const BUNDLES = [
             'ai/ai-desk-render.js',
             'ai/ai-desk-compose-render.js',
             'ai/ai-desk.js',
+            // ai-blocked-notice.js(跑批停住那一屏的三问文案+按钮,依赖 AI.state/format/
+            // failRender 均已在上面)排在 ai-client-wo-render.js(systemBlockedHtml 调它)之前。
+            'ai/ai-blocked-notice.js',
             // ai-client-wo-render.js(S2 · 工单页状态头纯拼装,拆自 ai-client.js·单文件<500
             // 铁律,依赖 AI.state/format/router/reviewQueue 均已在上面)只需排在 ai-client.js
             // (woSummaryPanel 重画用 AI.clientWoRender)之前。

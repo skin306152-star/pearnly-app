@@ -582,6 +582,7 @@ class AiClientWoRenderPureTests(unittest.TestCase):
                 failRender: {{TOPUP_HASH: '#/settings?focus=billing'}},
             }};
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            require({json.dumps(str(AI_DIR / "ai-blocked-notice.js"))});
             require({json.dumps(str(AI_DIR / "ai-client-wo-render.js"))});
             const html = global.AI.clientWoRender.woSummaryHtml({{
                 status: 'stuck',

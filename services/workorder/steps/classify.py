@@ -94,10 +94,13 @@ def run(ctx: StepContext) -> StepResult:
     # 全复用批零成本不建账不受挡(老站「指纹缓存先于余额闸」同款)。
     wallet = ocr_balance.from_ctx(ctx, history_owner, images, reused)
     if wallet is not None and wallet.exhausted():
-        return StepResult.stuck([ocr_balance.STUCK_REASON])
+        # 一件都没跑成:缺口按「本批真要烧的件」估(复用件零成本,算进去会虚报要充的钱)。
+        to_burn = sum(1 for it in images if it["id"] not in reused)
+        return StepResult.stuck([wallet.shortfall_reason(to_burn)])
     quota_deferred = 0
     cost_capped = False
     out_of_credit = False
+    credit_items_left = 0
     # 还没投料的件数(停投判据):预算/余额见底只有在「还有料没投」时才是 stuck。最后一件把钱
     # 花光 = 该跑的全跑完了,再报 stuck 等于把「跑完了」说成「没跑完」——余额 ฿15=10 页、用户
     # 正好传 10 张就必中,工单会对一个已完成的批说「后台在这里停住」。
@@ -165,6 +168,7 @@ def run(ctx: StepContext) -> StepResult:
         # pending。remaining>0 才是 stuck——见 remaining 的定义。
         if wallet is not None and wallet.settle(item, ocr, reused_from, history_id):
             out_of_credit = remaining > 0
+            credit_items_left = remaining
             break
         # 达成本封顶即停止投料:未处理件留 pending,生成器收尾取消在队未起的 OCR(白烧至多一窗)。
         # 复用件零成本不触发封顶回查;exceeded 内部走独立短事务读台账,读完即释放锁(绝不在步事务
@@ -184,7 +188,8 @@ def run(ctx: StepContext) -> StepResult:
     if cost_capped:
         blocked.append("ocr_cost_cap_exceeded")
     if out_of_credit:
-        blocked.append(ocr_balance.STUCK_REASON)
+        # 带上「还差多少」:工单卡据此告诉会计充多少够把剩下的跑完(见 shortfall_reason)。
+        blocked.append(wallet.shortfall_reason(credit_items_left))
     if blocked:
         return StepResult.stuck(blocked)
 

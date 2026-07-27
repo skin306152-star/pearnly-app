@@ -49,6 +49,7 @@ _PRELUDE = f"""
     {_require("ai-router.js")}
     {_require("ai-review-queue.js")}
     {_require("ai-fail-render.js")}
+    {_require("ai-blocked-notice.js")}
     {_require("ai-client-wo-render.js")}
     {_require("ai-viewer.js")}
     {_require("ai-pkg-render.js")}
@@ -65,10 +66,13 @@ def _wo_html(detail: dict, lang: str = "zh") -> str:
         """
 
 
-def _stuck(*reasons) -> dict:
+def _stuck(*reasons, progress=None) -> dict:
+    """停住的工单详情。progress = 后端 classify_progress 的 {processed,total}(卡在 classify
+    步才有)——工单卡「跑了几件」那一句就靠它,拿不到时该整句不说。"""
     return {
         "status": "stuck",
         "blocked_reasons": list(reasons),
+        "progress": progress,
         "flagged": [],
         "needs": [],
         "numbers": {},
@@ -154,7 +158,114 @@ class WorkOrderCardTests(unittest.TestCase):
         # E2E 证据 s5_th-mobile 里泰文那句是 "ระบบหยุดที่นี่: insufficient_balance ..."。
         html = self._html(_stuck("insufficient_balance"), lang="th")
         self.assertNotIn("insufficient_balance", html)
-        self.assertIn("เครดิต OCR", html)
+        self.assertIn("เครดิตไม่พอ", html)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class StoppedNoticeTests(unittest.TestCase):
+    """停住那一屏必须答完三问:跑了几件(共几件)· 为什么停(差多少)· 现在点哪。
+
+    缺任何一问会计就得来问人:只说「停住了」不说跑到第几件,他不知道要不要重传;
+    只说「余额不足」不说差多少,他不知道充多少够;不说回来点哪个按钮,充完就断在那儿。"""
+
+    def _text(self, detail, lang="zh"):
+        """渲染后用户真读到的那段话(HTML 剥标签,与浏览器里 textContent 同口径)。"""
+        html = _run_node(f"""
+            {_PRELUDE}
+            global.atSetLang({json.dumps(lang)});
+            process.stdout.write(JSON.stringify(
+                global.AI.blockedNotice.html({json.dumps(detail)})
+            ));
+            """)
+        body = re.search(r'<p class="rv-blocked">(.*?)</p>', html, re.S)
+        return {"html": html, "text": body.group(1) if body else ""}
+
+    def _plan(self, detail):
+        return _run_node(f"""
+            {_PRELUDE}
+            process.stdout.write(JSON.stringify(
+                global.AI.blockedNotice.plan({json.dumps(detail)})
+            ));
+            """)
+
+    def test_plan_reads_counts_and_shortfall_off_the_detail(self):
+        p = self._plan(_stuck("insufficient_balance:6.00", progress={"processed": 8, "total": 12}))
+        self.assertEqual(
+            [p["kind"], p["shortfall"], p["done"], p["total"], p["left"]],
+            ["topup", "6.00", 8, 12, 4],
+        )
+
+    def test_out_of_credit_answers_all_three_questions(self):
+        out = self._text(
+            _stuck("insufficient_balance:6.00", progress={"processed": 8, "total": 12})
+        )
+        text, html = out["text"], out["html"]
+        self.assertIn("8", text)  # 跑了几件
+        self.assertIn("12", text)  # 共几件
+        self.assertIn("4", text)  # 还剩几件没跑
+        self.assertIn("฿6.00", text)  # 还差多少
+        self.assertIn("重试", text)  # 充完回来点哪个按钮
+        self.assertIn('href="#/settings?focus=billing"', html)  # 就地出路
+        self.assertIn('data-action="wo-retry-stuck"', html)
+        self.assertNotIn("{", text)  # 占位符没漏上屏
+
+    def test_thai_card_says_the_same_three_things(self):
+        out = self._text(
+            _stuck("insufficient_balance:6.00", progress={"processed": 8, "total": 12}), lang="th"
+        )
+        self.assertIn("เครดิตไม่พอ", out["text"])
+        self.assertIn("฿6.00", out["text"])
+        self.assertIn("ลองใหม่", out["text"])
+        self.assertNotIn("insufficient_balance", out["text"])
+        self.assertIn('href="#/settings?focus=billing"', out["html"])
+
+    def test_missing_counts_drop_that_sentence_instead_of_inventing_numbers(self):
+        # 后端没给进度(停在别的步/没有图片件)→ 少说一句,不从别处凑个数出来。
+        out = self._text(_stuck("insufficient_balance:6.00"))
+        self.assertNotIn("{", out["text"])
+        self.assertIn("余额不够了", out["text"])
+        self.assertIn("฿6.00", out["text"])
+        self.assertIn("重试", out["text"])
+
+    def test_missing_shortfall_drops_only_the_amount_sentence(self):
+        # 缺口估不出时后端回落裸码:出路照给,只是不报「还差多少」——不报错数字。
+        out = self._text(_stuck("insufficient_balance", progress={"processed": 1, "total": 3}))
+        self.assertNotIn("฿", out["text"])
+        self.assertNotIn("{", out["text"])
+        self.assertIn("余额不够了", out["text"])
+        self.assertIn('href="#/settings?focus=billing"', out["html"])
+
+    def test_cost_cap_says_it_is_our_budget_and_never_asks_for_money(self):
+        out = self._text(_stuck("ocr_cost_cap_exceeded", progress={"processed": 5, "total": 9}))
+        self.assertIn("预算上限", out["text"])
+        self.assertIn("不是你的余额", out["text"])
+        self.assertNotIn("#/settings?focus=billing", out["html"])  # 我们的成本不记到用户账上
+        self.assertIn("重试", out["text"])
+        self.assertIn("5", out["text"])  # 件数照说:两个码只有原因和出路不同
+
+    def test_both_money_codes_keep_their_own_sentence(self):
+        # 同时成立时:用户动得了的那条抢按钮,另一条退到「另外还有」仍然点名。
+        out = self._text(_stuck("ocr_cost_cap_exceeded", "insufficient_balance:2.00"))
+        self.assertIn("余额不够了", out["text"])
+        self.assertIn("另外还有", out["text"])
+        self.assertIn("预算", out["text"])
+        self.assertIn('href="#/settings?focus=billing"', out["html"])
+
+    def test_unknown_code_falls_back_to_the_plain_list_with_no_topup(self):
+        # 没有已知主因就不猜出路:原样列举 + 只给重试(充值按钮指错地方比不给更糟)。
+        out = self._text(_stuck("something_new:7"))
+        self.assertIn("something_new:7", out["text"])
+        self.assertNotIn("#/settings?focus=billing", out["html"])
+        self.assertIn('data-action="wo-retry-stuck"', out["html"])
+
+    def test_stopped_card_does_not_also_claim_it_is_still_reading(self):
+        # 卡点块已经说了「已识别 8 件,共 12 件」,上面再挂一行「识别中 8/12」是在说
+        # 一件已经停住的事还在跑。
+        html = _run_node(
+            _wo_html(_stuck("insufficient_balance:6.00", progress={"processed": 8, "total": 12}))
+        )
+        self.assertNotIn("wo-progress", html)
+        self.assertIn("识别完 8 件", html)
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

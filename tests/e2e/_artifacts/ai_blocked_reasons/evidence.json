@@ -1,34 +1,43 @@
 {
   "money_zh-desktop": {
     "view": {
-      "blocked": "后台在这里停住：有 1 张票撞上识别配额上限、OCR 余额不足。已完成的数据已保留，充值后点「重试」就从断点接着跑。",
+      "blocked": "这一单已经识别完 8 件，共 12 件。 余额不够了，剩下 4 件停在这里没跑。 把剩下的跑完大约还需 ฿6.00。 去充值，回来点下面的「重试」，就从停住的地方接着跑；已经识别过的不再收第二次钱。 另外还有：有 1 张票撞上识别配额上限。",
       "topupText": "去充值",
       "topupHref": "#/settings?focus=billing",
       "topupVisible": true,
       "topupCount": 1,
-      "retryText": "重试"
+      "retryText": "重试",
+      "progressLine": null,
+      "textLeft": 279,
+      "actionLeft": 279
     },
     "consoleErrors": []
   },
   "money_th-mobile": {
     "view": {
-      "blocked": "ระบบหยุดที่นี่: มีบิล 1 ใบชนโควตาการอ่าน、เครดิต OCR ไม่พอ ข้อมูลที่ทำเสร็จแล้วยังอยู่ครบ เติมเงินแล้วกด「ลองใหม่」จะทำต่อจากจุดที่หยุด",
+      "blocked": "ใบงานนี้อ่านไปแล้ว 8 ใบ จากทั้งหมด 12 ใบ เครดิตไม่พอ อีก 4 ใบจึงหยุดค้างอยู่ ถ้าจะอ่านส่วนที่เหลือให้จบ ต้องเติมอีกประมาณ ฿6.00 ไปเติมเงิน แล้วกลับมากด「ลองใหม่」ด้านล่าง ระบบจะทำต่อจากจุดที่หยุด ใบที่อ่านไปแล้วไม่คิดเงินซ้ำ นอกจากนี้ยังมี: มีบิล 1 ใบชนโควตาการอ่าน",
       "topupText": "ไปเติมเงิน",
       "topupHref": "#/settings?focus=billing",
       "topupVisible": true,
       "topupCount": 1,
-      "retryText": "ลองใหม่"
+      "retryText": "ลองใหม่",
+      "progressLine": null,
+      "textLeft": 100,
+      "actionLeft": 100
     },
     "consoleErrors": []
   },
   "cap_zh-desktop": {
     "view": {
-      "blocked": "后台在这里停住：这一单的识别成本到了我们这边的预算上限（不是你的余额）。已完成的数据已保留，可从断点重试。",
+      "blocked": "这一单已经识别完 5 件，共 9 件。 这一单的识别成本到了我们这边的预算上限，不是你的余额问题，剩下的先停住了。 点下面的「重试」再跑一次；还停在这里就找我们放预算，你不用充值。",
       "topupText": null,
       "topupHref": null,
       "topupVisible": false,
       "topupCount": 0,
-      "retryText": "重试"
+      "retryText": "重试",
+      "progressLine": null,
+      "textLeft": 279,
+      "actionLeft": 279
     },
     "consoleErrors": []
   }

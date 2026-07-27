@@ -30,9 +30,16 @@ const DESKTOP = { width: 1280, height: 900 };
 const MOBILE = { width: 390, height: 844 };
 
 // 没被别的用例占用的账期(每个 fixture 一张单,跑完删干净)。
+// items/classified = 逐件进度的真来源(work_order_items 里的图片件 + item_classified 事件,
+// 后端 progress.classify_progress 现算)——工单卡「跑了 8 件,共 12 件」那句靠它,不是前端编的。
 const CASES = {
-    money: { period: '2569-11', reasons: ['ocr_quota_deferred:1', 'insufficient_balance'] },
-    cap: { period: '2569-12', reasons: ['ocr_cost_cap_exceeded'] },
+    money: {
+        period: '2569-11',
+        reasons: ['ocr_quota_deferred:1', 'insufficient_balance:6.00'],
+        items: 12,
+        classified: 8,
+    },
+    cap: { period: '2569-12', reasons: ['ocr_cost_cap_exceeded'], items: 9, classified: 5 },
 };
 
 fs.mkdirSync(ART, { recursive: true });
@@ -50,13 +57,26 @@ function psql(sql) {
     ).trim();
 }
 
-function seedStuckOrder(period, reasons) {
+function seedStuckOrder({ period, reasons, items = 0, classified = 0 }) {
     dropOrder(period);
     // RETURNING 的输出后面跟着 "INSERT 0 1" 状态行(-t -A 也压不掉),取首行才是 uuid。
     const id = psql(
         `insert into work_orders (tenant_id, workspace_client_id, period, intent, status, current_step) ` +
             `values ('${TENANT}', ${CLIENT_ID}, '${period}', 'monthly_vat', 'stuck', 'classify') returning id;`
     ).split('\n')[0];
+    for (let k = 1; k <= items; k++) {
+        const itemId = psql(
+            `insert into work_order_items (tenant_id, work_order_id, source, kind, file_ref, status) ` +
+                `values ('${TENANT}', '${id}', 'upload', 'unknown', '/in/${k}.jpg', ` +
+                `'${k <= classified ? 'ok' : 'pending'}') returning id;`
+        ).split('\n')[0];
+        if (k > classified) continue;
+        psql(
+            `insert into work_order_events (tenant_id, work_order_id, step, event_type, payload, actor) ` +
+                `values ('${TENANT}', '${id}', 'classify', 'item_classified', ` +
+                `'{"item_id": "${itemId}", "kind": "purchase_invoice"}'::jsonb, 'system');`
+        );
+    }
     psql(
         `insert into work_order_events (tenant_id, work_order_id, step, event_type, payload, actor) ` +
             `values ('${TENANT}', '${id}', 'classify', 'step_stuck', ` +
@@ -125,18 +145,31 @@ async function cardView(page) {
             topupVisible: !!(box && box.width > 0 && box.height > 0 && cs.display !== 'none'),
             topupCount: document.querySelectorAll('.wo-guide ' + topup).length,
             retryText: retry ? retry.textContent.trim() : null,
+            // 卡点块自己说了件数,上面就不该再挂一行「识别中 8/12」说它还在跑。
+            progressLine: q('.wo-progress') ? q('.wo-progress').textContent.trim() : null,
+            // 「文字跟自己的按钮不在一条竖线上」只有量左边界才看得出来(断言 text-align
+            // 属性设上了= 假绿:.rv-blocked 是 margin:auto 居中的,属性一个没错照样歪)。
+            textLeft: blocked ? Math.round(blocked.getBoundingClientRect().left) : null,
+            actionLeft: retry ? Math.round((link || retry).getBoundingClientRect().left) : null,
         };
     }, TOPUP);
 }
 
 test.describe.serial('工单卡:卡点说人话 + 余额不足给出路', () => {
     for (const cfg of [
-        { lang: 'zh', viewport: DESKTOP, tag: 'zh-desktop', shot: '01', word: '余额' },
-        { lang: 'th', viewport: MOBILE, tag: 'th-mobile', shot: '02', word: 'เครดิต' },
+        { lang: 'zh', viewport: DESKTOP, tag: 'zh-desktop', shot: '01', word: '余额', how: '重试' },
+        {
+            lang: 'th',
+            viewport: MOBILE,
+            tag: 'th-mobile',
+            shot: '02',
+            word: 'เครดิต',
+            how: 'ลองใหม่',
+        },
     ]) {
         test(`跑一半没钱:人话原因 + 去充值(${cfg.tag})`, async ({ page }) => {
             test.setTimeout(120000);
-            seedStuckOrder(CASES.money.period, CASES.money.reasons);
+            seedStuckOrder(CASES.money);
             const errs = await open(page, { ...cfg, period: CASES.money.period });
             await expect(page.locator('.wo-guide .rv-blocked')).toBeVisible({ timeout: 30000 });
             const view = await cardView(page);
@@ -155,13 +188,21 @@ test.describe.serial('工单卡:卡点说人话 + 余额不足给出路', () => 
             expect(view.topupHref).toBe('#/settings?focus=billing');
             // ③ 重试还在(充值完就地重试),但不再是唯一出路
             expect(view.retryText).toBeTruthy();
+            // ④ 三问答完:跑了几件(共几件)· 差多少 · 回来点哪个按钮
+            expect(view.blocked).toContain('8');
+            expect(view.blocked).toContain('12');
+            expect(view.blocked).toContain('฿6.00');
+            expect(view.blocked).toContain(cfg.how);
+            expect(view.blocked).not.toContain('{'); // 占位符没漏上屏
+            expect(view.progressLine).toBeNull(); // 停住了就别再说「识别中」
+            expect(Math.abs(view.textLeft - view.actionLeft)).toBeLessThanOrEqual(1);
             expect(errs).toEqual([]);
         });
     }
 
     test('内部成本封顶:同一段渲染,不该出现充值按钮(zh-desktop)', async ({ page }) => {
         test.setTimeout(120000);
-        seedStuckOrder(CASES.cap.period, CASES.cap.reasons);
+        seedStuckOrder(CASES.cap);
         const errs = await open(page, { lang: 'zh', viewport: DESKTOP, period: CASES.cap.period });
         await expect(page.locator('.wo-guide .rv-blocked')).toBeVisible({ timeout: 30000 });
         const view = await cardView(page);
@@ -172,8 +213,13 @@ test.describe.serial('工单卡:卡点说人话 + 余额不足给出路', () => 
         record('cap_zh-desktop', { view, consoleErrors: errs });
         expect(view.blocked).not.toContain('ocr_cost_cap_exceeded');
         expect(view.blocked).toContain('预算');
+        expect(view.blocked).toContain('不是你的余额'); // 别让人以为该去充值
+        expect(view.blocked).toContain('5'); // 件数照说
+        expect(view.blocked).toContain('9');
         expect(view.topupCount).toBe(0); // 我们的预算问题不该记到用户账上
         expect(view.retryText).toBeTruthy();
+        expect(view.progressLine).toBeNull();
+        expect(Math.abs(view.textLeft - view.actionLeft)).toBeLessThanOrEqual(1);
         expect(errs).toEqual([]);
     });
 });

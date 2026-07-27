@@ -127,37 +127,11 @@
         });
     }
 
-    // 后台停住了的出路。原因码走 AI.format 的四语映射(此前 join('、') 原样上屏,用户读到的是
-    // "insufficient_balance" 这种生标识符);余额不足另给「去充值」并降级重试按钮 —— 没充值的
-    // 重试 100% 立刻再 stuck(classify 开跑前 wallet.exhausted() 就返),把它摆成唯一出路等于
-    // 造一个死循环。配额/内部成本封顶两个码则相反:重试就是全部出路,不该出充值按钮。
+    // 后台停住了的出路。说什么、给哪个按钮全在 ai-blocked-notice.js(两个钱码分开说,各给
+    // 各的出路);这里只管「什么时候该出这块」:有待办出口时不出,那条路更短。
     function systemBlockedHtml(d, guideCount) {
-        var reasons = d.blocked_reasons || [];
-        if (d.status !== 'stuck' || guideCount > 0 || !reasons.length) return '';
-        var fmt = root.AI.format;
-        var needsTopup = fmt.blockedNeedsTopup(reasons);
-        var topup = needsTopup
-            ? '<a class="btn sm pri" data-action="wo-topup" href="' +
-              esc(root.AI.failRender.TOPUP_HASH) +
-              '">' +
-              esc(at('fail_topup_btn')) +
-              '</a>'
-            : '';
-        return (
-            '<div class="wo-guide"><p class="rv-blocked">' +
-            esc(
-                at(needsTopup ? 'system_blocked_topup' : 'system_blocked_detail', {
-                    list: fmt.blockedReasonList(reasons),
-                })
-            ) +
-            '</p>' +
-            topup +
-            '<button type="button" class="btn sm' +
-            (needsTopup ? '' : ' pri') +
-            '" data-action="wo-retry-stuck">' +
-            esc(at('retry')) +
-            '</button></div>'
-        );
+        if (d.status !== 'stuck' || guideCount > 0 || !(d.blocked_reasons || []).length) return '';
+        return root.AI.blockedNotice.html(d);
     }
 
     function woSummaryHtml(d, clientId) {
@@ -178,8 +152,12 @@
                   '</span>'
                 : '';
         // 进度行同理只对 AI 在跑有意义,人审终态挂「0/10」=没人在读却像卡死(S2 §3-补)。
-        var progress =
-            d.status === 'running' || d.status === 'stuck' ? d.progress || d.bank_progress : null;
+        // 卡点块拿到 d.progress 时自己会说「已识别 X 件,共 Y 件」,此时再挂一行「识别中 X/Y」
+        // 既重复、又在说一件已经停住的事还在跑;银行页的 bank_progress 不在卡点块那句话里,照挂。
+        var blocked = systemBlockedHtml(d, guideCount);
+        var showProgress =
+            d.status === 'running' || (d.status === 'stuck' && !(blocked && d.progress));
+        var progress = showProgress ? d.progress || d.bank_progress : null;
         // running 期间逐件心跳续约刷 updated_at(=last_active_at),5s 轮询全量重画自然
         // 刷新,不加计时器;后端没给就不拼,不臆造「活着」。
         var lastActive =
@@ -205,7 +183,7 @@
             (cells ? '<div class="wosum">' + cells + '</div>' : '') +
             (needs ? '<div class="needs-list">' + needs + '</div>' : '') +
             guidanceHtml(d, clientId, guideCount) +
-            systemBlockedHtml(d, guideCount) +
+            blocked +
             collectingHintHtml(d, clientId) +
             '</div></div>'
         );

@@ -127,13 +127,34 @@
         });
     }
 
+    // 后台停住了的出路。原因码走 AI.format 的四语映射(此前 join('、') 原样上屏,用户读到的是
+    // "insufficient_balance" 这种生标识符);余额不足另给「去充值」并降级重试按钮 —— 没充值的
+    // 重试 100% 立刻再 stuck(classify 开跑前 wallet.exhausted() 就返),把它摆成唯一出路等于
+    // 造一个死循环。配额/内部成本封顶两个码则相反:重试就是全部出路,不该出充值按钮。
     function systemBlockedHtml(d, guideCount) {
         var reasons = d.blocked_reasons || [];
         if (d.status !== 'stuck' || guideCount > 0 || !reasons.length) return '';
+        var fmt = root.AI.format;
+        var needsTopup = fmt.blockedNeedsTopup(reasons);
+        var topup = needsTopup
+            ? '<a class="btn sm pri" data-action="wo-topup" href="' +
+              esc(root.AI.failRender.TOPUP_HASH) +
+              '">' +
+              esc(at('fail_topup_btn')) +
+              '</a>'
+            : '';
         return (
             '<div class="wo-guide"><p class="rv-blocked">' +
-            esc(at('system_blocked_detail', { list: reasons.join('、') })) +
-            '</p><button type="button" class="btn sm pri" data-action="wo-retry-stuck">' +
+            esc(
+                at(needsTopup ? 'system_blocked_topup' : 'system_blocked_detail', {
+                    list: fmt.blockedReasonList(reasons),
+                })
+            ) +
+            '</p>' +
+            topup +
+            '<button type="button" class="btn sm' +
+            (needsTopup ? '' : ' pri') +
+            '" data-action="wo-retry-stuck">' +
             esc(at('retry')) +
             '</button></div>'
         );

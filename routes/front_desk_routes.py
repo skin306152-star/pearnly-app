@@ -29,6 +29,7 @@ from core import db, feature_flags
 from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
 from services.authz.deps import check_workspace_scope
 from services.front_desk import contract_store, intents, interpret, inventory
+from services.workorder.steps import ocr_balance
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -92,13 +93,26 @@ async def create_contract(
     files: list[UploadFile] = File(default=[]),
 ):
     """建草稿合同 + 暂存投料。客户/期间/意图可空(先投料出盘点卡,后说目标填合同卡)。
-    附件先挂草稿(未确认不进工单),盘点摘要零成本按文件名分组返回。"""
+    附件先挂草稿(未确认不进工单),盘点摘要零成本按文件名分组返回。
+
+    带料时先过余额闸:不够跑整批拒 402 + detail.code=insufficient_balance(前端失败卡据此
+    出「去充值」),一个字节都没读。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     if len(files) > _MAX_FILES:
         raise HTTPException(413, detail="front_desk.too_many_files")
     if period is not None:
         _require_period_be(period)
     contract_store.ensure_once()  # 首用自愈建表(独立事务,先于下面的写事务)
+
+    # 余额闸,与工单补料端点同一条(/ai 的两条入料路径行为不许分叉)。排在读文件之前:总台此前
+    # 一条闸都没有,料读完、落盘、建了工单,用户才在工单卡上看到「没钱」——「传料那一刻就拦下、
+    # 一个字节都没读」对总台从来不成立。客户未选定 → 计费身份解不出,按租户余额判(见 ocr_balance)。
+    if files:
+        with db.get_cursor() as cur:
+            billing_user = ocr_balance.resolve_billing_user(cur, tenant_id, workspace_client_id)
+        denial = ocr_balance.batch_denial(billing_user, tenant_id, len(files))
+        if denial:
+            raise HTTPException(402, detail=denial)
 
     # 段一:读入 + 封顶(不落盘)。给了客户 id 则先验归属(不给未授权请求写盘的机会)。
     staged: list[tuple[str, bytes, str]] = []  # (original_name, content, sha256)

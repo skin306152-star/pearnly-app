@@ -80,6 +80,8 @@ class PackageBlockedStateTests(unittest.TestCase):
                 state: {{esc: String, emptyHtml: () => 'EMPTY'}},
                 format: {{
                     fieldLabel: key => key === 'sales_summary' ? '销项汇总' : key,
+                    blockedReasonLabel: String,
+                    blockedNeedsTopup: () => false,
                 }},
                 reviewQueue: {{
                     splitByDecision: () => ({{undecided: []}}),
@@ -104,7 +106,11 @@ class PackageBlockedStateTests(unittest.TestCase):
             global.at = (k, v) => v && v.list ? k + ':' + v.list : k;
             global.AI = {{
                 state: {{esc: String, emptyHtml: () => 'EMPTY'}},
-                format: {{fieldLabel: String}},
+                format: {{
+                    fieldLabel: String,
+                    blockedReasonLabel: String,
+                    blockedNeedsTopup: () => false,
+                }},
                 reviewQueue: {{
                     splitByDecision: () => ({{undecided: []}}),
                     filterPurchaseQueue: () => [],

@@ -575,8 +575,11 @@ class AiClientWoRenderPureTests(unittest.TestCase):
                     fieldLabel: String,
                     money: String,
                     priorPeriodCheckText: String,
+                    blockedReasonList: (r) => r.join('、'),
+                    blockedNeedsTopup: () => false,
                 }},
                 router: {{buildClientHash: () => '#/review'}},
+                failRender: {{TOPUP_HASH: '#/settings?focus=billing'}},
             }};
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             require({json.dumps(str(AI_DIR / "ai-client-wo-render.js"))});

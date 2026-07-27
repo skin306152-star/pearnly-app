@@ -329,8 +329,13 @@ async def add_materials(
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")
     with db.get_cursor() as cur:  # 先验归属,再落盘(不给未授权请求写磁盘的机会)
-        _load_mutable_order(cur, request, user, tenant_id, work_order_id)
-    denial = ocr_balance.batch_denial(user, tenant_id, len(files))
+        order = _load_mutable_order(cur, request, user, tenant_id, work_order_id)
+        # 闸判的必须是 classify 待会儿真去扣的那个人(账套 owner),不是发起上传的登录用户:
+        # 豁免逐人判,两处锚不同的人 = 豁免两头落空(见 ocr_balance 身份锚)。
+        billing_user = ocr_balance.resolve_billing_user(
+            cur, tenant_id, (order or {}).get("workspace_client_id")
+        )
+    denial = ocr_balance.batch_denial(billing_user, tenant_id, len(files))
     if denial:
         raise HTTPException(402, detail=denial)
 

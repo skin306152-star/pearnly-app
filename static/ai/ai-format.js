@@ -188,6 +188,34 @@
         return (keys || []).map(fieldLabel).join('、');
     }
 
+    // 后端 blocked_reasons 原因码 → 四语人话(词典 blocked_<code>)。此前是 join('、') 原样
+    // 上屏,泰国会计看到的是一串生标识符 "insufficient_balance"。带参数码按第一个冒号拆
+    // ("ocr_quota_deferred:3" → code + n),查不到的码原样回退(不臆造解释)。
+    function blockedReasonLabel(raw) {
+        var s = String(raw == null ? '' : raw);
+        var sep = s.indexOf(':');
+        var code = sep > 0 ? s.slice(0, sep) : s;
+        var arg = sep > 0 ? s.slice(sep + 1) : '';
+        var lookupKey = 'blocked_' + code;
+        if (root && typeof root.at === 'function') {
+            var label = root.at(lookupKey, arg ? { n: arg } : undefined);
+            if (label !== lookupKey) return label;
+        }
+        return s;
+    }
+
+    function blockedReasonList(reasons) {
+        return (reasons || []).map(blockedReasonLabel).join('、');
+    }
+
+    // 这批卡点里有没有「充值才解得开」的那一条。余额不足时原地重试 100% 立刻再 stuck
+    // (classify 开跑前 wallet.exhausted() 就返),出路只有充值 —— 调用方据此换按钮。
+    function blockedNeedsTopup(reasons) {
+        return (reasons || []).some(function (r) {
+            return String(r == null ? '' : r).split(':')[0] === 'insufficient_balance';
+        });
+    }
+
     // 引擎步骤 key(services/workorder/engine.py::STEPS)→ 四语人话短标签(S2:工单页
     // 此前裸显 classify/reconcile 英文键)。同 fieldLabel 的「查不到回退原值」范式。
     function stepLabel(stepKey) {
@@ -241,6 +269,9 @@
         actorDisplay: actorDisplay,
         fieldLabel: fieldLabel,
         fieldList: fieldList,
+        blockedReasonLabel: blockedReasonLabel,
+        blockedReasonList: blockedReasonList,
+        blockedNeedsTopup: blockedNeedsTopup,
         stepLabel: stepLabel,
         progressLabel: progressLabel,
         relAgo: relAgo,

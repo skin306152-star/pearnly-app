@@ -13,8 +13,13 @@
   扣 = db.charge_ocr(services/billing/charge.py 单原子事务 + SELECT FOR UPDATE + 三表齐写)。
 定价、扣费、豁免判据一行都不重写。
 
-计费单位 = 一件一页。classify._default_ocr_image 只消费 pages[0],10 页 PDF 也只读第一页;
-照 billing_quote 的物理页数收会超收十倍——按实际消费的页收,宁可少收不多收。
+计费单位 = 一件一页,且管线只跑一页(ocr_pipeline.read_first_page 传 max_pages=PAGES_PER_ITEM)。
+两者必须同步改:只收一页却让管线按默认 50 页跑,我们付 30 页的钱、用户付 1 页的钱,同一份票
+从 /home 挪到 /ai 就打 1/30——收入漏损 + 可套利的定价洞。收几页就烧几页。
+
+身份锚(闸与扣费必须是同一个人):豁免 users.is_billing_exempt 是逐人判的(account_status),
+闸看上传人、扣费看账套 owner 会让「给这个客户开豁免」两头落空——置在 owner 上则 classify 不扣
+但操作员传料仍 402,置在操作员上则传料放行而 classify 照扣。两处一律走 resolve_billing_user。
 
 幂等锚(会计看到多扣一次就不再信任):
   ① 只处理 pending 件是 classify.run 的幂等基石——reaper 收尸续跑 / 人工 /run / 补料自驱
@@ -39,13 +44,15 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from services.workorder.steps import ocr_ledger
+
 logger = logging.getLogger(__name__)
 
 # stuck 原因码 = 全站计费闸统一码(services/billing/account_status.py 单一事实源),前端
 # static/ai/ai-fail-render.js 认的也是这个词,不另造工单专属码。
 STUCK_REASON = "insufficient_balance"
 
-# 一件计一页(见模块 docstring 的计费单位);kind 用老站的 "pdf" 档(页价),不是字符价。
+# 一件计一页、也只烧一页(见模块 docstring 的计费单位);kind 用老站的 "pdf" 档(页价)。
 PAGES_PER_ITEM = 1
 _CHARGE_KIND = "pdf"
 
@@ -78,8 +85,20 @@ def _default_estimate(pages_used: int, pages: int) -> float:
     return float(db.estimate_pdf_cost_thb(pages_used, pages))
 
 
-def batch_denial(user: dict, tenant_id, file_count: int) -> Optional[dict]:
-    """补料端点的整批预检:够跑 → None;不够 → 402 的 detail 体(与老站逐字同形)。
+def resolve_billing_user(cur, tenant_id, workspace_client_id) -> Optional[str]:
+    """闸与扣费共用的计费身份 = 客户账套 owner user(见模块 docstring 的身份锚)。
+
+    解不出(未绑客户 / 无 owner / 查询出错)→ None:按租户收钱、永不豁免,与 Wallet 在
+    owner 缺失时的回落逐字同口径(from_ctx 的 user_id 也是 None)。
+    """
+    return ocr_ledger.owner_user_of_client(cur, tenant_id, workspace_client_id)
+
+
+def batch_denial(billing_user_id, tenant_id, file_count: int) -> Optional[dict]:
+    """入料端点的整批预检:够跑 → None;不够 → 402 的 detail 体(与老站逐字同形)。
+
+    /ai 两条入料路径(工单补料 / 总台建合同)共用这一条闸,行为不许分叉。billing_user_id 由
+    resolve_billing_user 给,不许直接拿登录用户——那是另一个人。
 
     闸关 / 无料 / 豁免 / 查库异常一律放行:计费问题绝不把「传料」这个动作本身弄挂,余额真见底
     还有 classify 逐件复查兜底。预估按一件一页(整批 file_count 页)。
@@ -87,7 +106,8 @@ def batch_denial(user: dict, tenant_id, file_count: int) -> Optional[dict]:
     if not enabled() or int(file_count or 0) <= 0:
         return None
     try:
-        status = _billing_status(str(user["id"]), str(tenant_id) if tenant_id else None) or {}
+        user_id = str(billing_user_id) if billing_user_id else None
+        status = _billing_status(user_id, str(tenant_id) if tenant_id else None) or {}
         if status.get("allowed") or status.get("is_exempt"):
             return None
         used = int(status.get("pages_used_this_month") or 0)
@@ -106,6 +126,9 @@ def from_ctx(ctx, owner: Optional[dict], images: list, reused: dict) -> Optional
     """按工单归属建钱包账;闸关 / 本批没有要真烧的件 → None(零查库零扣费,现状逐字节不变)。
 
     全复用批不建账,是照老站「指纹缓存先于余额闸」——命中不产生新成本,余额 0 也该给复用。
+
+    owner["user_id"] 与闸的 resolve_billing_user 出自同一个查询(ocr_ledger.owner_user_of_client),
+    豁免因此在两处判到同一个人身上。
 
     owner 解不出(工单未绑客户 / 客户无 owner user)不能像识别台账那样优雅跳过,跳过等于免费:
     work_orders.tenant_id NOT NULL 保证租户永远在,charge_ocr 的 user_id 允许 NULL,故回落成

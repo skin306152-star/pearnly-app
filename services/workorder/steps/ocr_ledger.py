@@ -19,6 +19,30 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+def owner_user_of_client(cur, tenant_id, workspace_client_id) -> Optional[str]:
+    """客户账套 → owner user id(workspace_clients.user_id)。查不到 / 出错 → None。
+
+    台账双写归属与计费身份(ocr_balance.resolve_billing_user)共用这一处查询:两边各写一遍
+    SQL,口径迟早漂——「闸看上传人、扣费看账套 owner」的两个身份就是这么分叉出来的。
+    """
+    if not workspace_client_id:
+        return None
+    try:
+        cur.execute(
+            "SELECT user_id FROM workspace_clients "
+            "WHERE id = %s AND (tenant_id = %s OR tenant_id IS NULL)",
+            (workspace_client_id, str(tenant_id)),
+        )
+        row = cur.fetchone()
+    except Exception as exc:  # noqa: BLE001 - 归属解析失败按无归属处理,调用方各自回落
+        logger.debug("workspace_client owner 解析跳过 (client=%s): %s", workspace_client_id, exc)
+        return None
+    if not row:
+        return None
+    user_id = row["user_id"] if isinstance(row, dict) else row[0]
+    return str(user_id) if user_id else None
+
+
 def resolve_owner(ctx) -> Optional[dict]:
     """双写归属:工单 → workspace_client → {owner user_id, workspace_client_id, tenant_id}。
 
@@ -30,24 +54,16 @@ def resolve_owner(ctx) -> Optional[dict]:
             ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
         )
         client_id = (wo or {}).get("workspace_client_id")
-        if not client_id:
-            return None
-        ctx.cur.execute(
-            "SELECT user_id FROM workspace_clients "
-            "WHERE id = %s AND (tenant_id = %s OR tenant_id IS NULL)",
-            (client_id, ctx.tenant_id),
-        )
-        row = ctx.cur.fetchone()
     except Exception as exc:  # noqa: BLE001 - 归属解析失败=无台账归属,旁路优雅跳过不拖垮主步
         logger.debug("workorder ocr_history 归属解析跳过: %s", exc)
         return None
-    if not row:
+    if not client_id:
         return None
-    user_id = row["user_id"] if isinstance(row, dict) else row[0]
+    user_id = owner_user_of_client(ctx.cur, ctx.tenant_id, client_id)
     if not user_id:
         return None
     return {
-        "user_id": str(user_id),
+        "user_id": user_id,
         "workspace_client_id": int(client_id),
         "tenant_id": str(ctx.tenant_id),
     }

@@ -45,12 +45,14 @@
      * insufficient_balance 是全站计费闸的统一码(services/billing/account_status.py
      * 单一事实源,recon/vat_excel/knowledge 等端点以 402 + detail.code 出线)。
      *
-     * 谁会真的送来 402:routes/workorder_routes.py::add_materials 的余额闸
+     * 谁会真的送来 402:/ai 的两条入料路径都会,它们共用同一条闸
      * (services/workorder/steps/ocr_balance.batch_denial —— 整批预估不够就整批拒,
-     * 一个字节都不读)。这条出路在 PEARNLY_WORKORDER_BILLING 开着时是活的。
+     * 一个字节都不读):routes/workorder_routes.py::add_materials(工单补料)与
+     * routes/front_desk_routes.py::create_contract(总台带料建合同)。两条都在
+     * PEARNLY_WORKORDER_BILLING 开着时是活的。
      * ::create_order 仍永远不会给 402:开单本身不计费,那边只有鉴权+归属校验。
-     * 跑批跑到一半余额见底不走这条路 —— 那是后台 stuck insufficient_balance,
-     * 出现在工单卡的 blocked_reasons 里,不是上传响应。
+     * 跑批跑到一半余额见底不走这条路 —— 那是后台 stuck insufficient_balance,出现在工单卡的
+     * blocked_reasons 里(出路由 ai-client-wo-render.js::systemBlockedHtml 给,同落 TOPUP_HASH)。
      * 闸:tests/unit/test_ai_fail_render.py::TopupBranchWiringTests。
      */
     function failureView(code, status) {

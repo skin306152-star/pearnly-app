@@ -2,18 +2,21 @@
 """前门路由契约 + fail-closed 守门(routes/front_desk_routes.py · FD-0a 验收断言①闸关四端点404)。
 
 锁:①四端点按 path+method 注册且挂进 app;②闸关(front_desk 或 m1 任一关)时四端点一律 404
-(对存量用户等于不存在);③闭集外/未开放意图在 confirm 被 422 拒(桩层诚实拒,不装懂)。
+(对存量用户等于不存在);③闭集外/未开放意图在 confirm 被 422 拒(桩层诚实拒,不装懂);
+④带料建合同先过余额闸(与工单补料端点同一条:不够跑 402,一个字节都没读)。
 闸开全链真库跑通(draft→confirm→work_order_items sha256)在 tests/integration。
 """
 
 from __future__ import annotations
 
+import os
 import unittest
 from unittest import mock
 
 from fastapi import HTTPException
 
 from routes import front_desk_routes as fr
+from services.workorder.steps import ocr_balance
 from tests.unit._route_contract_fakes import route_set as _route_set
 
 _USER = {"id": "u1", "tenant_id": "t-1"}
@@ -153,6 +156,70 @@ class BadPeriodTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as ctx:
             await self._confirm("2569-13")
         self.assertEqual(ctx.exception.status_code, 422)
+
+
+class _FakeUpload:
+    """总台上传替身:read 被调过就说明闸没拦住(料读完落盘建单之后再说「没钱」= 白读)。"""
+
+    def __init__(self, filename="a.jpg"):
+        self.filename = filename
+        self.reads = 0
+
+    async def read(self, _limit=None):
+        self.reads += 1
+        return b"\x89PNG\r\n"
+
+
+class _NoopCursor:
+    def __enter__(self):
+        return object()
+
+    def __exit__(self, *a):
+        return False
+
+
+class BalanceGateTests(unittest.IsolatedAsyncioTestCase):
+    """总台带料建合同 = /ai 第二条入料路径,与工单补料端点共用同一条余额闸,行为不许分叉。"""
+
+    def setUp(self):
+        os.environ[ocr_balance._FLAG_ENV] = "1"
+        self.addCleanup(os.environ.pop, ocr_balance._FLAG_ENV, None)
+
+    async def _post(self, upload, status):
+        with (
+            mock.patch.object(fr, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
+            mock.patch.object(
+                fr.feature_flags, "pearnly_ai_front_desk_enabled_for", return_value=True
+            ),
+            mock.patch.object(fr.contract_store, "ensure_once", lambda: None),
+            mock.patch.object(fr.db, "get_cursor", _NoopCursor),
+            mock.patch.object(ocr_balance, "_billing_status", lambda uid, tid: dict(status)),
+            mock.patch.object(ocr_balance, "_estimate", lambda used, pages: 1.5),
+            mock.patch.object(ocr_balance, "resolve_billing_user", lambda cur, tid, cid: "u-owner"),
+        ):
+            return await fr.create_contract(
+                mock.Mock(),
+                workspace_client_id=7,
+                period=None,
+                intent=None,
+                files=[upload],
+            )
+
+    async def test_insufficient_balance_blocks_before_reading_any_byte(self):
+        upload = _FakeUpload()
+        with self.assertRaises(HTTPException) as ctx:
+            await self._post(upload, {"allowed": False, "balance_thb": 0.0})
+        self.assertEqual(ctx.exception.status_code, 402)
+        self.assertEqual(ctx.exception.detail["code"], "insufficient_balance")
+        self.assertEqual(upload.reads, 0)  # 一个字节都没读
+
+    async def test_exempt_account_is_not_blocked(self):
+        # 放行即进段一读文件(下游 create_draft 未打桩会抛,但闸已经放过去了 = 本例要的信号)。
+        upload = _FakeUpload()
+        with self.assertRaises(Exception) as ctx:
+            await self._post(upload, {"allowed": False, "is_exempt": True})
+        self.assertNotIsInstance(ctx.exception, HTTPException)
+        self.assertEqual(upload.reads, 1)
 
 
 if __name__ == "__main__":

@@ -145,13 +145,27 @@
     // 故「去收料补」按钮只在 needs 非空时出现(2026-07-14 UI 记债 #3)。
     function blockedHtml(detail) {
         detail = detail || {};
+        var fmt = root.AI.format;
         var needs = detail.needs || [];
-        var reasons = [].concat(
-            needs.map(function (key) {
-                return root.AI.format.fieldLabel(key);
-            }),
-            detail.blocked_reasons || []
-        );
+        var blocked = detail.blocked_reasons || [];
+        // 原因码走同一份四语映射(工单卡 systemBlockedHtml 同款),不把生标识符上屏。
+        var reasons = [].concat(needs.map(fmt.fieldLabel), blocked.map(fmt.blockedReasonLabel));
+        // 出路优先级:能补料就去补料 > 余额不足只有充值解得开(原地重试必再 stuck)> 原地重试。
+        var action = needs.length
+            ? '<button type="button" class="btn sm pri" data-action="pkg-go-intake">' +
+              esc(at('pkg_go_intake_btn')) +
+              '</button>'
+            : fmt.blockedNeedsTopup(blocked)
+              ? '<a class="btn sm pri" data-action="pkg-topup" href="' +
+                esc(root.AI.failRender.TOPUP_HASH) +
+                '">' +
+                esc(at('fail_topup_btn')) +
+                '</a>'
+              : reasons.length
+                ? '<button type="button" class="btn sm pri" data-action="pkg-retry">' +
+                  esc(at('retry')) +
+                  '</button>'
+                : '';
         return (
             '<div class="panel"><div class="bd pkg-blocked">' +
             '<div class="t">' +
@@ -164,15 +178,7 @@
                   esc(at('pkg_blocked_reasons', { list: reasons.join('、') })) +
                   '</div>'
                 : '') +
-            (needs.length
-                ? '<button type="button" class="btn sm pri" data-action="pkg-go-intake">' +
-                  esc(at('pkg_go_intake_btn')) +
-                  '</button>'
-                : reasons.length
-                  ? '<button type="button" class="btn sm pri" data-action="pkg-retry">' +
-                    esc(at('retry')) +
-                    '</button>'
-                  : '') +
+            action +
             '</div></div>'
         );
     }

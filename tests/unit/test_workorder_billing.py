@@ -25,11 +25,13 @@ from unittest import mock
 import routes.workorder_routes as wo_routes
 from services.billing import pricing
 from services.workorder.engine import StepContext
-from services.workorder.steps import classify, ocr_balance
+from services.workorder.steps import classify, ocr_balance, ocr_ledger, ocr_pipeline
 
 _TENANT = "11111111-1111-1111-1111-111111111111"
 _OTHER_TENANT = "22222222-2222-2222-2222-222222222222"
+# 事务所里的常态:操作员上传,账套挂在老板名下 —— 闸和扣费问的必须是同一个人(老板)。
 _USER = {"id": "u-1", "tenant_id": _TENANT}
+_OWNER_USER = "u-owner"
 
 _FIELDS = {
     "seller_tax": "0735527000289",
@@ -132,9 +134,23 @@ class _FakeUpload:
         return b"\x89PNG\r\n"
 
 
+class _OwnerCursor:
+    """workspace_clients owner 查询替身:录下参数(证明参数化 + 带租户),回吐 owner user。"""
+
+    def __init__(self, user_id):
+        self._user_id = user_id
+        self.params = []
+
+    def execute(self, _sql, params):
+        self.params.append(params)
+
+    def fetchone(self):
+        return {"user_id": self._user_id} if self._user_id else None
+
+
 class _NoopCursor:
     def __enter__(self):
-        return object()
+        return _OwnerCursor(None)
 
     def __exit__(self, *a):
         return False
@@ -177,13 +193,13 @@ class MaterialsGateTests(_BillingTestCase):
 
     def test_exempt_account_is_never_blocked(self):
         st = self._statuses([_broke(is_exempt=True)])
-        self.assertIsNone(ocr_balance.batch_denial(_USER, _TENANT, 3))
+        self.assertIsNone(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 3))
         self.assertEqual(st.calls, 1)
 
     def test_flag_off_skips_billing_entirely(self):
         os.environ[ocr_balance._FLAG_ENV] = "0"
         st = self._statuses([_broke()])
-        self.assertIsNone(ocr_balance.batch_denial(_USER, _TENANT, 3))
+        self.assertIsNone(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 3))
         self.assertEqual(st.calls, 0)  # 闸关连查都不查,现状逐字节不变
 
     def test_lookup_error_fails_open(self):
@@ -191,14 +207,41 @@ class MaterialsGateTests(_BillingTestCase):
             raise RuntimeError("db down")
 
         self._swap(_billing_status=_boom)
-        self.assertIsNone(ocr_balance.batch_denial(_USER, _TENANT, 2))
+        self.assertIsNone(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 2))
 
     def test_denial_estimate_comes_from_decimal_pricing(self):
         # 钱只由 Decimal 定价算;float 只出现在 JSON 出线的那一刻(与老站 402 体同形)。
         self.assertIsInstance(pricing.estimate_pdf_cost_thb(0, 2), Decimal)
         self._statuses([_broke(pages_used_this_month=0)])
-        detail = ocr_balance.batch_denial(_USER, _TENANT, 2)
+        detail = ocr_balance.batch_denial(_OWNER_USER, _TENANT, 2)
         self.assertEqual(detail["estimated_cost"], float(pricing.estimate_pdf_cost_thb(0, 2)))
+
+    def test_gate_asks_about_the_account_owner_not_the_uploading_user(self):
+        # 豁免逐人判(users.is_billing_exempt):闸问上传人、扣费问账套 owner = 两个不同的人,
+        # 「给这个客户开豁免」会两头落空(账套 owner 上开→操作员传料仍 402)。
+        st = self._statuses([_ok()])
+        cur = _OwnerCursor(_OWNER_USER)
+        billing_user = ocr_balance.resolve_billing_user(cur, _TENANT, 7)
+        self.assertEqual(billing_user, _OWNER_USER)
+        ocr_balance.batch_denial(billing_user, _TENANT, 1)
+        self.assertEqual(st.seen, [(_OWNER_USER, _TENANT)])
+        self.assertNotEqual(_OWNER_USER, _USER["id"])
+        self.assertEqual(cur.params, [(7, _TENANT)])  # 参数化 + 带租户
+
+    def test_gate_and_charge_resolve_the_same_identity(self):
+        # 同一个客户账套:闸拿到的人 == Wallet 扣钱的人(两处共用 owner_user_of_client)。
+        cur = _OwnerCursor(_OWNER_USER)
+        gate_user = ocr_balance.resolve_billing_user(cur, _TENANT, 7)
+        ctx = StepContext(cur=cur, tenant_id=_TENANT, work_order_id="wo-1", store=_Store([]))
+        charge_user = (ocr_ledger.resolve_owner(ctx) or {}).get("user_id")
+        self.assertEqual(gate_user, charge_user)
+
+    def test_unresolvable_owner_gates_on_tenant_only(self):
+        # 未绑客户 → None:按租户余额判、永不豁免,与 Wallet 的 owner 缺失回落同口径。
+        st = self._statuses([_ok()])
+        self.assertIsNone(ocr_balance.resolve_billing_user(_OwnerCursor(None), _TENANT, None))
+        ocr_balance.batch_denial(None, _TENANT, 1)
+        self.assertEqual(st.seen, [(None, _TENANT)])
 
 
 class WalletTests(_BillingTestCase):
@@ -325,6 +368,13 @@ class _Store:
         return self.events[-1]
 
 
+class _AlwaysCapped:
+    """内部成本封顶替身:每件都判「已超预算」,用来验最后一件触顶不假 stuck。"""
+
+    def exceeded(self) -> bool:
+        return True
+
+
 class ClassifyChargeTests(_BillingTestCase):
     """跑批集成:扣得对 / 停得诚实 / 重跑不重扣。"""
 
@@ -341,6 +391,7 @@ class ClassifyChargeTests(_BillingTestCase):
             "_ocr_image",
         )
         saved = {n: getattr(classify, n) for n in names}
+        self.prod_ocr_image = saved["_ocr_image"]  # 打桩前的生产绑定
         self.addCleanup(lambda: [setattr(classify, n, v) for n, v in saved.items()])
         classify._resolve_own_tax_id = lambda ctx: "0105567178203"
         classify._resolve_own_name = lambda ctx: None
@@ -457,6 +508,68 @@ class ClassifyChargeTests(_BillingTestCase):
         self.assertEqual(out.status, "ok")
         self.assertEqual(st.calls, 0)
         self.assertEqual(self.charges.calls, [])
+
+    def test_last_item_spending_the_last_baht_is_not_stuck(self):
+        # 最后一件把余额扣光 = 该跑的全跑完了。此前 settle 一说「钱没了」就 break 判 stuck,
+        # 把「跑完了」显示成「没跑完」:฿15=10 页、用户正好传 10 张(把钱花光刚好跑完)必中。
+        self._statuses([_ok(), _ok(), _ok(), _broke()])
+        store = _Store(self._items(3))
+        out = self._run_classify(store)
+        self.assertEqual(out.status, "ok")  # 不是 stuck:零件 pending
+        self.assertEqual([it["status"] for it in store.items], ["ok", "ok", "ok"])
+        self.assertEqual(len(self.charges.calls), 3)
+
+    def test_last_item_hitting_cost_cap_is_not_stuck(self):
+        # ocr_cost_cap 是同一个写法,最后一件触顶同样不该假 stuck。
+        self._statuses([_ok()])
+        with mock.patch.object(classify.ocr_cost_cap, "from_ctx", lambda ctx, ids: _AlwaysCapped()):
+            store = _Store(self._items(2))
+            out = self._run_classify(store)
+            self.assertEqual(list(out.reasons), ["ocr_cost_cap_exceeded"])  # 第 1 件触顶:真停投
+            store = _Store(self._items(1))
+            self.assertEqual(self._run_classify(store).status, "ok")  # 唯一一件触顶:跑完了
+
+    def test_quota_and_out_of_credit_are_both_reported(self):
+        # 两个闸同时成立时「先到先返」= 第一次给的原因是假的:用户看到「配额待补,重试即可」,
+        # 白点一次重试(quota 件复位 → 开跑前 wallet.exhausted())才轮到余额说真话。
+        for env, value in (("MAX_ATTEMPTS", "1"), ("BACKOFF_SECONDS", "0")):
+            key = f"PEARNLY_WORKORDER_OCR_QUOTA_{env}"
+            os.environ[key] = value
+            self.addCleanup(os.environ.pop, key, None)
+        self._statuses([_ok(), _broke()])  # 第 1 件撞 quota 不扣钱,第 2 件扣完见底
+
+        def _first_hits_quota(path):
+            self.ocr_calls.append(path)
+            if path.endswith("1.jpg"):
+                raise RuntimeError("429 quota exhausted")
+            return _fields_for(path)
+
+        classify._ocr_image = _first_hits_quota
+        store = _Store(self._items(3))
+        out = self._run_classify(store)
+        self.assertEqual(out.status, "stuck")
+        self.assertEqual(list(out.reasons), ["ocr_quota_deferred:1", "insufficient_balance"])
+        self.assertEqual([it["status"] for it in store.items], ["flagged", "ok", "pending"])
+
+    def test_pipeline_only_burns_the_page_we_charge_for(self):
+        # 收 1 页却让管线按默认 50 页跑 = 烧 30 页收 1 页(收入漏损 + /home 挪 /ai 打 1/30)。
+        seen = {}
+
+        def _pipeline(data, name, api_key=None, max_pages=50, **kw):
+            seen["max_pages"] = max_pages
+            return object()
+
+        with (
+            mock.patch.object(ocr_pipeline.storage, "read_bytes", lambda p: b"x"),
+            mock.patch("services.ocr.entrypoints.run_pipeline_for_file", _pipeline),
+            mock.patch(
+                "services.ocr.legacy_adapter.pipeline_result_to_legacy_dict",
+                lambda r: {"pages": []},
+            ),
+        ):
+            ocr_pipeline.read_first_page("/in/30p.pdf")
+        self.assertEqual(seen["max_pages"], ocr_balance.PAGES_PER_ITEM)
+        self.assertIs(self.prod_ocr_image, ocr_pipeline.read_first_page)  # 生产绑定就是它
 
     def test_wallet_and_cost_cap_are_separate_reasons(self):
         # 内部成本封顶(我们付给模型厂商的钱)与用户钱包是两件事,原因码不许合并。

@@ -18,11 +18,11 @@ from typing import Optional
 from core import feature_flags
 from services.ai_gateway import attribution
 from services.ocr import escalation_budget
-from services.workorder import decisions, kinds, storage
+from services.workorder import decisions, kinds
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import checkpoint, gate_reason, ocr_balance, ocr_cost_cap
-from services.workorder.steps import ocr_ledger, ocr_quota, ocr_reuse, ocr_snapshots
-from services.workorder.steps import purchase_dedup, statement_regroup, taxid_alert
+from services.workorder.steps import ocr_ledger, ocr_pipeline, ocr_quota, ocr_reuse
+from services.workorder.steps import ocr_snapshots, purchase_dedup, statement_regroup, taxid_alert
 from services.workorder.steps import sort as sort_step
 from services.workorder.steps import summary_read
 from services.workspace import client_alias_store
@@ -98,6 +98,10 @@ def run(ctx: StepContext) -> StepResult:
     quota_deferred = 0
     cost_capped = False
     out_of_credit = False
+    # 还没投料的件数(停投判据):预算/余额见底只有在「还有料没投」时才是 stuck。最后一件把钱
+    # 花光 = 该跑的全跑完了,再报 stuck 等于把「跑完了」说成「没跑完」——余额 ฿15=10 页、用户
+    # 正好传 10 张就必中,工单会对一个已完成的批说「后台在这里停住」。
+    remaining = len(images)
     # 复用件直接给缓存 fields(reused_from=源 history_id),其余走并发 OCR;原序消费保查重确定性。
     ocr_stream = ocr_reuse.stream(
         images,
@@ -105,6 +109,7 @@ def run(ctx: StepContext) -> StepResult:
         lambda batch: _ocr_in_order(batch, ctx.tenant_id, governor=governor, budget=budget),
     )
     for item, ocr, reused_from in ocr_stream:
+        remaining -= 1
         # 撞配额且退避用尽:不落终局证据(留续跑重烧,免 dedupe 锁死错值),挂 quota 待补,整步 stuck 待续。
         if isinstance(ocr, Exception) and ocr_quota.is_quota_error(ocr):
             with checkpoint.item_scope(ctx):
@@ -156,26 +161,32 @@ def run(ctx: StepContext) -> StepResult:
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
         if outcome["flagged"]:
             flagged += 1
-        # 逐件结账:复用件/失败件不扣(幂等锚见 ocr_balance);扣到余额见底即停,未处理件留 pending。
+        # 逐件结账:复用件/失败件不扣(幂等锚见 ocr_balance);扣到余额见底即停投,未处理件留
+        # pending。remaining>0 才是 stuck——见 remaining 的定义。
         if wallet is not None and wallet.settle(item, ocr, reused_from, history_id):
-            out_of_credit = True
+            out_of_credit = remaining > 0
             break
         # 达成本封顶即停止投料:未处理件留 pending,生成器收尾取消在队未起的 OCR(白烧至多一窗)。
         # 复用件零成本不触发封顶回查;exceeded 内部走独立短事务读台账,读完即释放锁(绝不在步事务
-        # 里攥 ai_usage 锁,见 ocr_cost_cap 死锁根因)。
+        # 里攥 ai_usage 锁,见 ocr_cost_cap 死锁根因)。停投判据同上。
         if reused_from is None and cost_cap is not None and cost_cap.exceeded():
-            cost_capped = True
+            cost_capped = remaining > 0
             break
 
     # 撞配额待补 / 成本封顶 / 用户余额见底:整步 stuck 诚实待续(未处理件留 pending,已处理件
-    # 已落库保留;前两者人工 /run 重给预算,后者充值后点继续,三个原因码各说各的事)。
+    # 已落库保留;前两者人工 /run 重给预算,后者充值后点继续)。三个原因可以同时成立(quota 件
+    # 走 continue 不 break,后面的件继续跑继续扣),全部报出去:先到先返会让「先撞 quota 再没钱」
+    # 只说 quota,用户点一次重试才轮到余额说话——第一次给的原因是假的。
     flagged -= regroup.apply(ctx, bins)
+    blocked = []
     if quota_deferred:
-        return StepResult.stuck([f"ocr_quota_deferred:{quota_deferred}"])
+        blocked.append(f"ocr_quota_deferred:{quota_deferred}")
     if cost_capped:
-        return StepResult.stuck(["ocr_cost_cap_exceeded"])
+        blocked.append("ocr_cost_cap_exceeded")
     if out_of_credit:
-        return StepResult.stuck([ocr_balance.STUCK_REASON])
+        blocked.append(ocr_balance.STUCK_REASON)
+    if blocked:
+        return StepResult.stuck(blocked)
 
     reads: dict[str, dict] = dict(ctx.data.get("sales_summary_reads") or {})
     for item in pending:
@@ -435,33 +446,8 @@ def _default_stmt_regroup_enabled(ctx: StepContext) -> bool:
     return feature_flags.pearnly_ai_stmt_regroup_enabled_for(ctx.tenant_id)
 
 
-def _default_ocr_image(path: str) -> dict:
-    """真实现:调生产 OCR 管线(services.ocr.entrypoints.run_pipeline_for_file)。
-
-    单测全部 patch 掉这个函数,绝不触达真实付费调用。api_key=None 与
-    tests/eval 的现成用法同口径(交由 ai_gateway 按调用环境解析),业务码本身
-    不读取任何密钥文件。把 legacy 页字典的 fields 和闸报警字段(_needs_review/
-    _validation_warnings/_confidence_band)拍平成一个 dict,供 bin_ocr_fields
-    和 _gate_reason 共用同一份契约。
-    """
-    from services.ocr.entrypoints import run_pipeline_for_file
-    from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
-
-    data = storage.read_bytes(path)  # 落盘密文解回明文再喂 OCR(双轨读)
-    result = run_pipeline_for_file(data, Path(path).name, api_key=None, document_type="invoice")
-    legacy = pipeline_result_to_legacy_dict(result)
-    pages = legacy.get("pages") or []
-    if not pages:
-        return {}
-    page = pages[0]
-    fields = dict(page.get("fields") or {})
-    fields["_needs_review"] = bool(page.get("_needs_manual_review") or legacy.get("_needs_review"))
-    fields["_validation_warnings"] = list(page.get("_validation_warnings") or [])
-    fields["_confidence_band"] = page.get("_confidence_band") or legacy.get("_confidence_band")
-    fields["_ocr_engine"] = legacy.get("engine")  # 管线版本 → item_classified 证据(冻结用)
-    return fields
-
-
+# 真实现走独立模块(管线契约 + 计费页数口径的变化理由与本文件的编排不同,见 ocr_pipeline)。
+_default_ocr_image = ocr_pipeline.read_first_page
 _default_read_sales_summary = summary_read.read
 
 

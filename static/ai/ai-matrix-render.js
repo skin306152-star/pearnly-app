@@ -137,6 +137,26 @@
         );
     }
 
+    // 当期一格义务都没物化(后端把 obligation_code 全为 null 的行折成空 obligation_codes)时,
+    // 表格只剩一列「客户」——一张残缺表比空态还难读。改出正经空态:说清为什么空,并给两条
+    // 真出路(义务从画像来 → 客户档案;想直接干活 → 看板开单)。
+    function noObligationsHtml() {
+        return (
+            '<div class="mx-noobl">' +
+            AI.state.emptyHtml({
+                title: at('emp_mx_noobl_t'),
+                sub: at('emp_mx_noobl_s'),
+                actionLabel: at('emp_mx_noobl_btn'),
+                actionHref: AI.router.buildClientsHash(),
+            }) +
+            '<a class="btn sm" href="' +
+            AI.router.buildBoardHash() +
+            '">' +
+            esc(at('emp_mx_noobl_alt')) +
+            '</a></div>'
+        );
+    }
+
     // matrix: 后端 /api/tax-profile/matrix 的原始响应({period, clients, obligation_codes,
     // obligation_labels, cells})。lang: 当前语言,用于取 obligation_labels 的本地化列名。
     function tableHtml(matrix, lang) {
@@ -145,6 +165,7 @@
         if (!clients.length) {
             return AI.state.emptyHtml({ title: at('matrix_empty_t'), sub: at('matrix_empty_s') });
         }
+        if (!codes.length) return noObligationsHtml();
         var cellByKey = {};
         (matrix.cells || []).forEach(function (c) {
             cellByKey[c.client_id + ':' + c.obligation_code] = c;

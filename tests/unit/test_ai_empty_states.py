@@ -29,6 +29,17 @@ _I18N = json.dumps(str(AI_DIR / "ai-i18n-empty.js"))
 # 渲染层拼 key 的两处前缀('emp_brx_' + kind + '_s'),静态正则抓不到完整 key,补闭集。
 _BRX_KINDS = ("auto", "review", "missing", "unmatched")
 
+# 吃这份词典的渲染层全集:正反两道闸(引用的 key 都存在 / 词典里没有死 key)扫同一份
+# 清单,分两处抄会让新加的渲染层只被半边闸看见。
+_CONSUMERS = (
+    "ai-client.js",
+    "ai-client-wo-render.js",
+    "ai-recon-render.js",
+    "ai-shadow-render.js",
+    "ai-financials-render.js",
+    "ai-matrix-render.js",
+)
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class SectionEmptyHtmlTests(unittest.TestCase):
@@ -221,13 +232,7 @@ class EmptyI18nShardTests(unittest.TestCase):
     def test_every_referenced_emp_key_exists_in_dictionary(self):
         zh = set(self._shard_keys()["zh"])
         referenced = set()
-        for name in (
-            "ai-client.js",
-            "ai-client-wo-render.js",
-            "ai-recon-render.js",
-            "ai-shadow-render.js",
-            "ai-financials-render.js",
-        ):
+        for name in _CONSUMERS:
             text = (AI_DIR / name).read_text(encoding="utf-8")
             # 尾下划线的是拼 key 的前缀字面量('emp_brx_' + kind),不是完整 key。
             referenced |= {k for k in re.findall(r"\bemp_[a-z0-9_]+", text) if not k.endswith("_")}
@@ -238,16 +243,7 @@ class EmptyI18nShardTests(unittest.TestCase):
     def test_dictionary_has_no_unused_keys(self):
         """反向闸:词条只服务这几个渲染层,留了没人用的 key 就是文案漂移的温床。"""
         zh = set(self._shard_keys()["zh"])
-        text = "".join(
-            (AI_DIR / name).read_text(encoding="utf-8")
-            for name in (
-                "ai-client.js",
-                "ai-client-wo-render.js",
-                "ai-recon-render.js",
-                "ai-shadow-render.js",
-                "ai-financials-render.js",
-            )
-        )
+        text = "".join((AI_DIR / name).read_text(encoding="utf-8") for name in _CONSUMERS)
         referenced = {k for k in re.findall(r"\bemp_[a-z0-9_]+", text) if not k.endswith("_")}
         referenced |= {f"emp_brx_{kind}_s" for kind in _BRX_KINDS}
         self.assertEqual(sorted(zh - referenced), [])

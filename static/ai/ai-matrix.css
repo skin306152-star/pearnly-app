@@ -194,10 +194,17 @@
 .mx-row {
   cursor: pointer;
 }
-/* 筛选/搜索 0 结果空态(state-block 自带居中,这里只对齐按钮与留白)。 */
-.mx-noresults {
+/* 筛选/搜索 0 结果空态,以及「当期无义务」空态(state-block 自带居中,这里只对齐
+ * 出路按钮与留白)。后者的第二条出路是块外的独立链接,居中靠这条规则。 */
+.mx-noresults,
+.mx-noobl {
   text-align: center;
   padding-bottom: 18px;
+}
+/* 第二条出路是 state-block 外的独立链接:收掉那块 48px 的底距,两个按钮才读成一组
+ * 出路,而不是一个孤零零飘在下面。 */
+.mx-noobl .state-block {
+  padding-bottom: 16px;
 }
 .mx-cellbtn {
   border: none;

@@ -51,6 +51,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # 与 check_file_size.py 保持一致(人维护 · 若分歧以 check_file_size 为准)
 # db.py→core/、auth_signup.py→services/auth/(目录重组·铁律#30)· 改由前缀覆盖
+#
+# ⚠️ 2026-07-27 实测:两份清单已经漂了。本闸按路径前缀收,那边按 glob 收后缀,于是
+# services/agent/README.md 与 services/export/fonts/*.ttf|*.txt 四个文件只有本闸看得见 ——
+# 对 .ttf 二进制数行数是无意义的,只是恰好没人改过它们才一直没红。方向是让两闸共用一个
+# is_monitored,但那会改动"哪些文件受 500 行约束",属于闸的行为变更,不在结构收口范围内。
 MONITORED_ROOT_FILES = {
     "app.py",
     "home.js",

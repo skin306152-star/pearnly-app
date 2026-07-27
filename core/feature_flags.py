@@ -166,6 +166,11 @@ PEARNLY_AI_FRONT_DESK_KEY = "pearnly_ai_front_desk"
 # 一句话派工具查数(M1 全只读:查询/汇总/深链,写与授权卡归 B3)。双闸:pearnly_ai_m1 在场
 # 才有效(组合闸,同 pearnly_ai_front_desk 先例)。按 tenant 判定;消费在 routes/steward_routes.py。
 PEARNLY_AI_STEWARD_KEY = "pearnly_ai_steward"
+# 管家大脑循环闸(B6 · 一条消息可串多个工具):默认关 fail-closed。
+# 关 = 逐字节走 B3 的单次意图分类路(一次模型调用挑一个工具),线上行为零变化;
+# 开 = 大脑在 worker 里循环(观测 → 下一步),步骤流水逐条落库,写动作照旧停在授权卡上。
+# 双闸:pearnly_ai_steward 在场才有效。按 tenant 判定;消费在 services/steward/brain_entry.py。
+STEWARD_BRAIN_LOOP_KEY = "steward_brain_loop"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -389,6 +394,17 @@ def pearnly_ai_steward_enabled_for(tenant_id: Optional[str]) -> bool:
     if not pearnly_ai_m1_enabled_for(tenant_id, None):
         return False
     return _enabled(PEARNLY_AI_STEWARD_KEY, tenant_id, "pearnly_ai_steward_enabled_for")
+
+
+def steward_brain_loop_enabled_for(tenant_id: Optional[str]) -> bool:
+    """管家大脑循环闸。关 = 单次分类路逐字节现状;开 = 多步循环 + 步骤流水。
+
+    双闸:管家闸在场才有效。急停 = 把这个键关掉,在跑的循环任务由 worker 正常收尾,
+    下一条消息就回到单次路 —— 不需要回滚代码。
+    """
+    if not pearnly_ai_steward_enabled_for(tenant_id):
+        return False
+    return _enabled(STEWARD_BRAIN_LOOP_KEY, tenant_id, "steward_brain_loop_enabled_for")
 
 
 def pearnly_ai_bank_recon_enabled_for(tenant_id: Optional[str]) -> bool:

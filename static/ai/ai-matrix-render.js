@@ -7,8 +7,9 @@
  * 重新判定业务状态,后端已经算好 badge,本文件只管怎么画)。
  *
  * 纯浏览器 IIFE(不进 node 单测——拼 HTML 字符串 + 挂 DOM 事件,过滤/统计等值得单独
- * 断言的逻辑收在 ai-matrix.js 里)。依赖 window.AI.state/format/board/router 与全局
- * at(),故须排在 ai-board.js 之后、ai-matrix.js 之前加载(同 ai-kanban-render.js 先例)。
+ * 断言的逻辑收在 ai-matrix.js 里)。依赖 window.AI.state/format/board/boardTools/router 与
+ * 全局 at(),故须排在 ai-board.js、ai-board-tools-render.js 之后、ai-matrix.js 之前加载
+ * (同 ai-kanban-render.js 先例)。
  */
 (function () {
     'use strict';
@@ -28,10 +29,6 @@
         not_evaluated: 'n',
     };
 
-    // 供 ai-matrix.js 的行内筛选(缺料/待审/风险)复用同一份徽章枚举,不各自维护一份。
-    var BADGE_MISSING = 'missing_materials';
-    var BADGE_REVIEW = 'pending_review';
-
     function badgeLabel(badge) {
         var key = 'matrix_badge_' + badge;
         return at(key) === key ? badge : at(key);
@@ -49,17 +46,6 @@
     function obligationShortLabel(code) {
         var key = 'obl_short_' + code;
         return at(key) === key ? String(code).toUpperCase() : at(key);
-    }
-
-    // 单元格是否「逾期风险」:仍未办结(非无需申报/已冻结)且截止日已过今天。
-    // 截止日读顺延后的 due_efiling_deferred(MC2-B G3:周末/假日顺延),缺该字段
-    // (老缓存/降级响应)回落原始 due_efiling——周六截止顺延到周一前不算逾期。
-    function isOverdue(cell, todayIso) {
-        if (!cell) return false;
-        var due = cell.due_efiling_deferred || cell.due_efiling;
-        if (!due) return false;
-        if (cell.badge === 'no_need' || cell.badge === 'frozen') return false;
-        return due < todayIso;
     }
 
     function cellHtml(cell, obligationCode, clientId) {
@@ -195,30 +181,21 @@
     }
 
     // 行级筛选(缺料/待审/风险):无激活筛选时全部可见;有则该行只要有一格命中任一
-    // 激活筛选就保留整行(矩阵的用途是「这个客户本期有没有事」,不是逐格隐藏)。
-    function rowMatchesFilters(matrix, clientId, activeFilters, todayIso) {
-        if (!activeFilters.length) return true;
-        var rowCells = (matrix.cells || []).filter(function (c) {
-            return String(c.client_id) === String(clientId);
-        });
-        return rowCells.some(function (c) {
-            return activeFilters.some(function (f) {
-                if (f === 'missing') return c.badge === BADGE_MISSING;
-                if (f === 'review') return c.badge === BADGE_REVIEW;
-                if (f === 'risk') return isOverdue(c, todayIso);
-                return false;
-            });
-        });
-    }
-
+    // 激活筛选就保留整行(矩阵的用途是「这个客户本期有没有事」,不是逐格隐藏)。判据
+    // 本体在 AI.boardTools —— 看板那三颗同名 chip 与这里必须是同一句判断。
     function applyFilters(container, matrix, activeFilters, searchQuery) {
-        var todayIso = new Date().toISOString().slice(0, 10);
+        var byClient = AI.boardTools.cellsByClient(matrix);
+        var todayIso = AI.boardTools.todayIsoBangkok();
         var visible = 0;
         container.querySelectorAll('.mx-row').forEach(function (row) {
             var clientId = row.getAttribute('data-client-id');
             var name = row.getAttribute('data-name') || '';
             var matchesSearch = !searchQuery || name.indexOf(searchQuery) >= 0;
-            var matchesFilter = rowMatchesFilters(matrix, clientId, activeFilters, todayIso);
+            var matchesFilter = AI.boardTools.matchesFilters(
+                byClient[String(clientId)] || [],
+                activeFilters,
+                todayIso
+            );
             var show = matchesSearch && matchesFilter;
             row.style.display = show ? '' : 'none';
             if (show) visible += 1;

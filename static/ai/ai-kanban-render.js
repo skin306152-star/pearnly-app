@@ -3,7 +3,8 @@
  *
  * 纯浏览器 IIFE(不进 node 单测——拼 HTML 字符串 + 挂 DOM 事件,无值得单独断言的
  * 逻辑分支;分列/摘要的真实逻辑在 ai-board.js 里已被单测覆盖)。依赖 window.AI.state/
- * format/board/router 与全局 at(),故必须排在 ai-board.js 之后、ai-dashboard.js 之前加载。
+ * format/board/boardTools/router 与全局 at(),故必须排在 ai-board.js、
+ * ai-board-tools-render.js 之后、ai-dashboard.js 之前加载。
  */
 (function () {
     'use strict';
@@ -58,7 +59,15 @@
         ) {
             summaryVars = { list: AI.format.fieldList(entry.detail.needs) };
         }
-        var summaryText = at(entry.summary.key, summaryVars);
+        // 「本期缺单」条(缺哪几张单 + 批量勾选,见 ai-board-tools-render.js)。它已经点名
+        // 缺什么,card_no_order 那句「还没有工单」再说一遍就是废话,让位给具体的义务名。
+        var missStrip = entry.missing
+            ? AI.boardTools.missingStripHtml(entry.missing, entry.client)
+            : '';
+        var summaryText =
+            missStrip && entry.summary.key === 'card_no_order'
+                ? ''
+                : at(entry.summary.key, summaryVars);
         // 2026-07-17 Zihao 真机实测拍板(推翻 R2F-R3「常显」):本期已有工单的卡不再渲染
         // 账期下拉+开单——活工单卡上挂开单控件像在邀请再开一张,实测点出第二张单的困惑;
         // 补开历史月的入口是客户档案 → 工单历史(既有),不缺路。无本期工单的卡保留控件,
@@ -82,12 +91,12 @@
             esc(entry.client.name) +
             '">' +
             esc(entry.client.name) +
-            '</b><small title="' +
-            esc(summaryText) +
-            '">' +
-            esc(summaryText) +
-            '</small>' +
+            '</b>' +
+            (summaryText
+                ? '<small title="' + esc(summaryText) + '">' + esc(summaryText) + '</small>'
+                : '') +
             chipFor(entry) +
+            missStrip +
             openBtn +
             '</div>'
         );
@@ -106,7 +115,9 @@
             col.dot +
             '"></span>' +
             esc(at(col.titleKey)) +
-            '<span class="n">' +
+            // data-role 而非 .n 选中计数:等资料列的色点自己也带 .n(色族名),按 class 取
+            // 会先命中那颗点,筛选后的计数会被写进色点里(2026-07-27 真浏览器实测抓到)。
+            '<span class="n" data-role="col-count">' +
             items.length +
             '</span></h4>' +
             body +
@@ -135,6 +146,9 @@
             e.stopPropagation();
             return;
         }
+        // 「本期缺单」条上的勾选框(批量开单选择,ai-board-bulk.js 自己听 change)同理:
+        // 勾一下不能顺手把人导航进客户页。
+        if (e.target.closest('.kmiss')) return;
         var openBtn = e.target.closest('[data-action="open-order"]');
         if (openBtn) {
             e.stopPropagation();
@@ -174,6 +188,8 @@
         container.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             if (!e.target.closest || !e.target.closest('.kcard')) return;
+            // 空格落在勾选框上是"勾选"不是"打开卡片",preventDefault 会把原生勾选吃掉。
+            if (e.target.closest('.kmiss')) return;
             e.preventDefault();
             activate(e, onOpenOrder, onReloaded);
         });

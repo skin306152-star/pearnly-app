@@ -127,6 +127,7 @@ _ENTRY_ASSETS = {
         "/static/pearnly-ui.css",
         "/static/ai/ai-i18n.js",
         "/static/ai/ai-i18n-bank-sales.js",
+        "/static/ai/ai-i18n-board.js",
         "/static/ai/ai-i18n-empty.js",
         "/static/ai/ai-i18n-fail.js",
         "/static/ai/ai-i18n-machine-actions.js",

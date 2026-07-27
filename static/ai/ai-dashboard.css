@@ -146,7 +146,9 @@
   align-items: center;
   gap: 8px;
 }
-.kcol h4 .n {
+/* 计数徽章按 data-role 选,不按 .n:等资料列的色点也叫 .n(色族名),按 class 写会把
+ * 那颗 7px 圆点撑成一条胶囊(2026-07-27 真浏览器截图看出来的)。 */
+.kcol h4 [data-role='col-count'] {
   margin-left: auto;
   background: var(--surface);
   color: var(--mut);
@@ -264,6 +266,115 @@
     grid-template-columns: 1fr;
   }
 }
+/* 看板工具条(2026-07-27 从矩阵搬来的筛选 / 批量开单 / 缺单条)。样式自持:类名一律
+ * kb- 与 kmiss 前缀,不复用 ai-matrix.css 里 mf-chip / mx- 那一套——矩阵与看板长期并存
+ * (两种看法,不是重复),共用一份 class 会让改一个视图的间距顺手改坏另一个。 */
+.kb-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.kb-filters {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.kb-chip {
+  border: 1px solid var(--hair2);
+  background: var(--surface);
+  color: var(--ink2);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.kb-chip:hover {
+  border-color: var(--mut);
+}
+.kb-chip.on {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+/* 卡片内「本期缺单」条:整条是 <label>,点文字也能勾上(触屏命中区不止那个小方块)。 */
+.kmiss {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 7px 9px;
+  border: 1px solid var(--warn-line);
+  border-radius: 9px;
+  background: var(--warn-soft);
+  cursor: pointer;
+}
+.kmiss input {
+  width: 15px;
+  height: 15px;
+  margin: 1px 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+/* 缺的义务名最多三行,超出省略号(全文在 title);卡片其余文字是单行,这里允许折行是
+ * 因为「差哪几张单」被截断就等于没说(两行在 180px 窄列下正好切掉最后一项义务名)。 */
+.kmiss-t {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--warn);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* 批量操作条:选中 ≥1 才浮出,吸在看板底部跟着滚(选完最后一张卡不必再滚回顶部找按钮)。 */
+.kb-bulkbar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--hair2);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--sh-lift);
+}
+.kb-bulk-n {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.kb-bulk-note {
+  font-size: 11.5px;
+  color: var(--mut);
+}
+.kb-bulkbar [data-action='bulk-clear'] {
+  margin-left: auto;
+}
+/* 筛选/搜索 0 结果空态(state-block 自带居中,这里只对齐按钮与留白)。 */
+.kb-noresults {
+  text-align: center;
+  padding-bottom: 18px;
+}
+@media (pointer: coarse) {
+  .kmiss input {
+    width: 20px;
+    height: 20px;
+  }
+  .kb-chip {
+    min-height: 40px;
+  }
+}
+
 /* v4 的 .kadd(列尾「+ 收料/补料」入口)在本次没有落地——收料视图挂在客户独立页内
  * (Canon 修正#2),看板首屏没有脱离客户上下文的通用收料入口;缺工单的客户改用
  * 卡片内「开单」按钮(.btn.sm,v4 未画过此场景,按 Canon tokens 延展)。 */

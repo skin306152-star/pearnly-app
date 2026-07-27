@@ -120,7 +120,15 @@ const BUNDLES = [
             'ai/ai-gate.js',
             'ai/ai-viewer.js',
             'ai/ai-board.js',
+            // ai-board-tools-render.js(看板工具条纯函数:筛选判据 + 缺单条/批量条 HTML,
+            // 2026-07-27 从矩阵搬来的三样能力的判据落点)排在 ai-board.js 之后、消费者
+            // (ai-kanban-render.js 拼缺单条、ai-dashboard.js 筛选、ai-board-bulk.js 拼
+            // 批量条、ai-matrix-render.js 借同一份逾期/筛选判据)之前。
+            'ai/ai-board-tools-render.js',
             'ai/ai-kanban-render.js',
+            // ai-board-bulk.js(批量开单选择态 + 操作条编排)只在 ai-dashboard.js 挂载时
+            // 被调用,紧邻放置是"同属看板"的语义分组。
+            'ai/ai-board-bulk.js',
             'ai/ai-dashboard.js',
             'ai/ai-matrix-render.js',
             'ai/ai-matrix.js',

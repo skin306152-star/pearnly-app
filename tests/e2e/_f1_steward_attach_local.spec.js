@@ -519,9 +519,16 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
     test('手机端(390×844):回形针与动作按钮触控目标 ≥44px', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await boot(page);
+        // 两件事分开验:①「设计上就是 44」看 CSS 意图,②「实际没被挤扁」看画出来的框。
+        // 画出来的框要取整再比 —— headless 下 flex 行的 cross size 会落在分数上(实测量到
+        // 43.999969…),拿浮点直接比 44 会随机红,那是断言精度问题,不是触控目标真不够大。
+        const clipMinH = await page
+            .locator('.stw-clip')
+            .evaluate((el) => getComputedStyle(el).minHeight);
+        expect(clipMinH).toBe('44px');
         const clip = await page.locator('.stw-clip').boundingBox();
-        expect(clip.width).toBeGreaterThanOrEqual(44);
-        expect(clip.height).toBeGreaterThanOrEqual(44);
+        expect(Math.round(clip.width)).toBeGreaterThanOrEqual(44);
+        expect(Math.round(clip.height)).toBeGreaterThanOrEqual(44);
 
         await dragFiles(page, [{ name: 'gl.pdf', body: 'x', type: 'application/pdf' }]);
         await dropNow(page);

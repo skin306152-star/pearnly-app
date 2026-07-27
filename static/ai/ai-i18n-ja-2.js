@@ -606,6 +606,8 @@ Object.assign(window.__AI_I18N_JA__, {
     bill_exempt: 'このアカウントは課金対象外です',
     bill_topup_open: 'チャージ',
     bill_employee_hint: '残高とチャージは事務所オーナーのみ表示されます',
+    bill_employee_topup_path:
+        '残高が足りないときは事務所オーナーに連絡してください。オーナーが自分のアカウントで「設定 → OCR 残高 → チャージ」を行い、入金後はそのままアップロードを続けられます。',
     bill_employee_count: '今月の自分の読取は {n} ページ',
     bill_history_title: 'チャージ履歴',
     bill_history_empty_t: 'チャージ履歴はまだありません',

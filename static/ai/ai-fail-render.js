@@ -43,9 +43,15 @@
      * 这一类失败没有"换个地方点"的出路,原地重试就是全部出路。
      *
      * insufficient_balance 是全站计费闸的统一码(services/billing/account_status.py
-     * 单一事实源,recon/vat_excel/knowledge 等端点以 402 + detail.code 出线)。工单收料
-     * 目前不计费,这条分支要等收料上计费闸才会亮——先按契约接好,免得那天又是一句
-     * "上传失败"。
+     * 单一事实源,recon/vat_excel/knowledge 等端点以 402 + detail.code 出线)。
+     *
+     * ⚠️ 休眠分支,别当它在工作:本模块的两个调用点当前都不可能收到 402。
+     * routes/workorder_routes.py::create_order 只有鉴权+归属校验(开单本身永远不计费);
+     * ::add_materials 只有 413/422,OCR 计费发生在 _auto_advance 的后台续跑里,不以上传
+     * 响应的形式回到前端。余额耗尽时收料页得到的仍是后台 stuck / 转人工。契约先接好,
+     * 收料真上计费闸的那天不用再改前端 —— 但在那之前,任何「去充值出路已生效」的说法都不成立。
+     * 闸:tests/unit/test_ai_fail_render.py::DormantTopupBranchTests(收料上计费闸即报红,
+     * 提醒把这段注释和 E2E 的说明一起改掉)。
      */
     function failureView(code, status) {
         var c = code == null ? '' : String(code);
@@ -74,12 +80,15 @@
 
     // 原因行:徽章点名哪一步失败,后面接为什么。role=alert 让读屏器在原地播报,
     // 不是悄悄改一段 DOM(静默失败的另一种形态)。
-    function reasonHtml(stepKey, code, status) {
+    //
+    // reasonKey 可由调用方覆盖:失败发生在「已经做成的一步之后」时,(code,status) 推出来的
+    // 那句「服务器出错了」是误导——用户要知道的是那件事已经成了、只是没刷出来。
+    function reasonHtml(stepKey, code, status, reasonKey) {
         return (
             '<p class="needs-sub" role="alert"><span class="st-badge st-err">' +
             esc(t(stepKey)) +
             '</span> ' +
-            esc(t(failureView(code, status).reasonKey)) +
+            esc(t(reasonKey || failureView(code, status).reasonKey)) +
             '</p>'
         );
     }
@@ -92,10 +101,13 @@
     }
 
     // 原因 + 出路的成套版:给本来什么都没有的失败点用(如开单失败),调用方直接 innerHTML。
-    function noteHtml(stepKey, code, status) {
-        var action = actionHtml(code, status);
+    // opts.reasonKey 覆盖原因时不出出路按钮:覆盖的场景(前一步已成功)出路写在文案里,
+    // 再挂一个按 (code,status) 算出来的按钮只会指错地方。
+    function noteHtml(stepKey, code, status, opts) {
+        var reasonKey = (opts || {}).reasonKey;
+        var action = reasonKey ? '' : actionHtml(code, status);
         return (
-            reasonHtml(stepKey, code, status) +
+            reasonHtml(stepKey, code, status, reasonKey) +
             (action ? '<div class="needs-paths">' + action + '</div>' : '')
         );
     }

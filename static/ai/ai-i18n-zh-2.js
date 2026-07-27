@@ -567,6 +567,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     bill_exempt: '本账号免计费',
     bill_topup_open: '充值',
     bill_employee_hint: '余额与充值仅事务所负责人可见',
+    bill_employee_topup_path:
+        '余额不足时请找事务所负责人：让他用自己的账号进「设置 → OCR 识别余额 → 充值」，到账后你这边继续传票就行。',
     bill_employee_count: '本月我已识别 {n} 页',
     bill_history_title: '充值记录',
     bill_history_empty_t: '还没有充值记录',

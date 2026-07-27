@@ -140,6 +140,26 @@ class FailHtmlTests(unittest.TestCase):
         html = self._html("f.noteHtml('fail_step_open_order', null, 0)")
         self.assertNotIn("needs-paths", html)
 
+    def test_reason_key_override_replaces_the_computed_why(self):
+        # 失败发生在「已经做成的一步之后」时(开单成功、刷列表 500),(code,status) 推出来的
+        # 「服务器出错了」是误导:用户要知道的是单已经开出来了。
+        html = self._html(
+            "f.noteHtml('fail_step_reload_orders', 'generic', 500,"
+            " {reasonKey: 'fail_created_but_stale'})"
+        )
+        self.assertIn("fail_step_reload_orders", html)
+        self.assertIn("fail_created_but_stale", html)
+        self.assertNotIn("fail_server", html)
+
+    def test_reason_key_override_suppresses_the_computed_button(self):
+        # 覆盖原因时出路写在文案里;再挂一个按 (code,status) 算出来的按钮会把人指错地方。
+        html = self._html(
+            "f.noteHtml('fail_step_reload_orders', 'insufficient_balance', 402,"
+            " {reasonKey: 'fail_created_but_stale'})"
+        )
+        self.assertNotIn("needs-paths", html)
+        self.assertNotIn("fail_topup_btn", html)
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class FailedBatchBannerTests(unittest.TestCase):
@@ -248,17 +268,45 @@ class SettingsFocusDeepLinkTests(unittest.TestCase):
 
 
 class SettingsFocusWiringTests(unittest.TestCase):
-    """路由解析出 focus 还不够——ai.js 得把它递给 ai-settings.js,ai-settings.js 得真滚过去。
-    深链断在中间一节是老坑(见 memory:verify-target-must-be-real-content)。"""
+    """路由解析出 focus 还不够——ai.js 得把它递给 ai-settings.js。深链断在中间一节是老坑
+    (见 memory:verify-target-must-be-real-content)。
+
+    注意本类只是接线存在性的 grep 闸,「真滚到了」它验不了(源码里字符串在就绿)。滚没滚、
+    滚到哪里由 tests/e2e/_fail_ways_out_local.spec.js 在 390×844 真浏览器里断言
+    scrollY>0 + 充值按钮整颗在视口内 —— 别再拿这里的绿当落点验收。"""
 
     def test_router_focus_reaches_settings_mount(self):
         self.assertIn("focus: route.focus", (AI_DIR / "ai.js").read_text(encoding="utf-8"))
 
-    def test_settings_scrolls_billing_into_view(self):
+    def test_settings_retries_the_scroll_until_content_lands(self):
+        # 计费区挂载那一刻还是骨架、页面撑不出滚动条 → scrollIntoView 被 clamp 成 no-op。
+        # 单滚一次 = 手机上永远停在页顶(D1),必须有补滚。
         text = (AI_DIR / "ai-settings.js").read_text(encoding="utf-8")
         self.assertIn("applyFocus", text)
         self.assertIn("stBillingWrap", text)
         self.assertIn("scrollIntoView", text)
+        self.assertIn("FOCUS_RETRY_MS", text)
+
+
+class DormantTopupBranchTests(unittest.TestCase):
+    """绊线:402/insufficient_balance 那条出路当前是休眠的——failureView 的两个调用点
+    (create_order / add_materials)都没有计费闸,生产里「去充值」不会出现。收料真上闸的
+    那天这条测试会红,提醒把 ai-fail-render.js 的休眠说明与 E2E 的免责注释一起改掉,
+    别让「验过了」和「用得上」继续错位(memory:verify-target-must-be-real-content)。"""
+
+    def test_workorder_routes_still_have_no_billing_gate(self):
+        root = Path(AI_DIR).parents[1]
+        text = (root / "routes" / "workorder_routes.py").read_text(encoding="utf-8")
+        for token in ("billing", "insufficient_balance", "402"):
+            self.assertNotIn(
+                token,
+                text,
+                "收料/开单上计费闸了?去掉 ai-fail-render.js 与 _fail_ways_out_local.spec.js "
+                "里「这条分支是休眠的」的说明,并补一条真会返 402 的验收",
+            )
+
+    def test_fail_render_says_out_loud_that_the_branch_is_dormant(self):
+        self.assertIn("休眠分支", (AI_DIR / "ai-fail-render.js").read_text(encoding="utf-8"))
 
 
 class BundleWiringTests(unittest.TestCase):

@@ -85,13 +85,36 @@
         applyFocus();
     }
 
+    // 计费区挂载时还是骨架、整页撑不出滚动条,那一刻 scrollIntoView 会被 clamp 成 no-op
+    // (同 ai.js restoreScrollAfterPaint 踩过的坑);真数据落下来把页面撑高后没人补滚,
+    // 手机上「去充值」就永远停在页顶、充值按钮被折线切掉。故有限重试到真滚到位为止。
+    var FOCUS_RETRY_MS = [250, 700, 1500, 3000];
+
+    // 滚到位的判据:block:'center' 成功后元素顶边必在视口中线以上(高元素为负)。
+    // 页面不可滚时 top 停在原处(远大于中线)→ 判未到位 → 继续重试。
+    function billingCentered(el) {
+        return el.getBoundingClientRect().top < window.innerHeight / 2;
+    }
+
     // #/settings?focus=billing:失败态「去充值」深链的落点。滚一次就把 focus 消费掉,
     // 免得之后切语言 reload 又莫名其妙往下跳。
     function applyFocus() {
         if (S.focus !== 'billing') return;
         S.focus = null;
-        var el = $('stBillingWrap');
-        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+        var session = S;
+        var lastY = null;
+        var i = 0;
+        function attempt() {
+            if (S !== session) return; // 已切走(重挂载/登出)
+            var el = $('stBillingWrap');
+            if (!el || !el.scrollIntoView) return;
+            if (lastY !== null && window.scrollY !== lastY) return; // 用户自己滚了,不抢方向盘
+            el.scrollIntoView({ block: 'center' });
+            lastY = window.scrollY;
+            if (billingCentered(el) || i >= FOCUS_RETRY_MS.length) return;
+            window.setTimeout(attempt, FOCUS_RETRY_MS[i++]);
+        }
+        attempt();
     }
 
     function loadMe() {

@@ -128,6 +128,19 @@ class BalancePanelTests(unittest.TestCase):
         self.assertNotIn('data-action="bill-topup"', out)
         self.assertNotIn("฿", out)
 
+    def test_employee_landing_is_not_a_dead_end(self):
+        """这一屏是失败卡「去充值」深链的落点(#/settings?focus=billing)。只留一句
+        「余额与充值仅负责人可见」就是死胡同:文案许了出路,落地一个可点的都没有。
+        员工不能有充值按钮(后端 owner_only),但必须知道该找谁、让谁在哪儿点。"""
+        out = _run_node(f"""
+            {PRELUDE}
+            process.stdout.write(JSON.stringify(b.balancePanelHtml(
+                {{has_tenant: true, is_owner: false, my_invoice_count: 7}}
+            )));
+            """)
+        self.assertIn("bill_employee_topup_path", out)
+        self.assertNotIn('data-action="bill-topup"', out)
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class HistoryPanelTests(unittest.TestCase):

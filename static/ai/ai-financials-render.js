@@ -247,21 +247,29 @@
     // ui: {open:{bs,pl,tb,aging,depreciation}}(ai-financials.js 持有的折叠态)。
     function pageHtml(financials, ui) {
         if (!financials) {
-            // 与银行对账/影子底稿同款:后端把「还没跑到」和「跑挂了」都收敛成 null,卡死时
-            // 那句「不用管它,税一算完自动生成」是假话。三块面板在同一屏上下叠着,口径必须一致。
+            // 与影子底稿同款三分:stalled(引擎停在这步之前,可断点重试)/ degraded(这步
+            // 自己跑挂了只剩残影,重跑回不到这一步)/ 都不是(还没跑到,那句「不用管它」才成立)。
+            // 判据来自后端 financials_state,不从 status 反推——降级路径根本不打 stuck。
+            var fault = (ui && ui.fault) || '';
             var body =
-                ui && ui.stalled
+                fault === 'degraded'
                     ? root.AI.state.sectionEmptyHtml({
                           phase: 'error',
-                          title: at('emp_fin_stalled_t'),
-                          sub: at('emp_fin_stalled_s'),
-                          retryLabel: at('retry'),
-                          retryName: 'wo-retry-stuck',
+                          title: at('emp_fin_degraded_t'),
+                          sub: at('emp_fin_degraded_s'),
                       })
-                    : root.AI.state.emptyHtml({
-                          title: at('fin_disabled_t'),
-                          sub: at('fin_disabled_s'),
-                      });
+                    : fault
+                      ? root.AI.state.sectionEmptyHtml({
+                            phase: 'error',
+                            title: at('emp_fin_stalled_t'),
+                            sub: at('emp_fin_stalled_s'),
+                            retryLabel: at('retry'),
+                            retryName: 'wo-retry-stuck',
+                        })
+                      : root.AI.state.emptyHtml({
+                            title: at('fin_disabled_t'),
+                            sub: at('fin_disabled_s'),
+                        });
             return (
                 '<div class="panel"><div class="hd"><h3>' +
                 esc(at('fin_title')) +

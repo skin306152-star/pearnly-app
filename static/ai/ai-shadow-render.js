@@ -357,21 +357,29 @@
     // ui: {open:{entries, accounts, gl}}(ai-shadow.js 持有的折叠态)。
     function pageHtml(shadowDraft, ui) {
         if (!shadowDraft) {
-            // 「还没跑到」与「后台停住了」在后端都是 null(见 api.py::shadow_draft)。卡死时
-            // 那句「不用管它,跑到对账步骤会自动生成」是假话——得说没跑出来并给断点重试。
+            // 底稿为 null 有三种成因,后端 shadow_draft_state 已分好(见 api.py::_gate_view):
+            // stalled=引擎停在这步之前(可断点重试);degraded=这步自己跑挂了只剩残影,重跑
+            // 工单也回不到这一步,给重试按钮才是骗人;两者都不是才是那句「不用管它」。
+            var fault = (ui && ui.fault) || '';
             var body =
-                ui && ui.stalled
+                fault === 'degraded'
                     ? root.AI.state.sectionEmptyHtml({
                           phase: 'error',
-                          title: at('emp_sdw_stalled_t'),
-                          sub: at('emp_sdw_stalled_s'),
-                          retryLabel: at('retry'),
-                          retryName: 'wo-retry-stuck',
+                          title: at('emp_sdw_degraded_t'),
+                          sub: at('emp_sdw_degraded_s'),
                       })
-                    : root.AI.state.emptyHtml({
-                          title: at('shadow_disabled_t'),
-                          sub: at('shadow_disabled_s'),
-                      });
+                    : fault
+                      ? root.AI.state.sectionEmptyHtml({
+                            phase: 'error',
+                            title: at('emp_sdw_stalled_t'),
+                            sub: at('emp_sdw_stalled_s'),
+                            retryLabel: at('retry'),
+                            retryName: 'wo-retry-stuck',
+                        })
+                      : root.AI.state.emptyHtml({
+                            title: at('shadow_disabled_t'),
+                            sub: at('shadow_disabled_s'),
+                        });
             return (
                 '<div class="panel"><div class="hd"><h3>' +
                 esc(at('shadow_title')) +

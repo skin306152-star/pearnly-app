@@ -225,6 +225,40 @@ class ApiShadowProjectionTests(unittest.TestCase):
         self.assertIsNone(api.shadow_draft(events))
 
 
+class GateStateTests(unittest.TestCase):
+    """三态必须分得开:降级残影不会把工单打成 stuck(_run_shadow_draft 明写「绝不 stuck」),
+    读侧若只给一个 None,前端只能从 status 反推,于是跑完即降级的单永远显示「不用管它,
+    会自动生成」——那句话是假的,它不会再自己好。"""
+
+    def _state(self, events, gate):
+        return api._gate_view(events, gate)[1]
+
+    def test_missing_gate_key_is_off_not_degraded(self):
+        # 闸关 / 还没跑到 reconcile:gates 里根本没这个键。
+        self.assertEqual(self._state([], api._R5_SHADOW_GATE), api.GATE_OFF)
+        self.assertEqual(
+            self._state([_reconcile_done_with_shadow(None)], api._R5_SHADOW_GATE), api.GATE_OFF
+        )
+
+    def test_error_residue_is_degraded(self):
+        events = [_reconcile_done_with_shadow({"note": "shadow_draft_skipped", "error": "X"})]
+        self.assertEqual(self._state(events, api._R5_SHADOW_GATE), api.GATE_DEGRADED)
+
+    def test_real_payload_is_ok(self):
+        events = [_reconcile_done_with_shadow({"trial_balance": {"balanced": True}})]
+        self.assertEqual(self._state(events, api._R5_SHADOW_GATE), api.GATE_OK)
+
+    def test_financials_gate_uses_its_own_required_key(self):
+        done = {
+            "id": 30,
+            "step": "reconcile",
+            "event_type": "step_done",
+            "payload": {"gates": {"r6_financials": {"note": "financials_skipped", "error": "X"}}},
+        }
+        self.assertEqual(self._state([done], api._R6_FINANCIALS_GATE), api.GATE_DEGRADED)
+        self.assertEqual(self._state([done], api._R5_SHADOW_GATE), api.GATE_OFF)
+
+
 class PackageShadowDeliverableTests(unittest.TestCase):
     """交付物 _write_shadow:从 gates.r5_shadow 渲染建议分录/科目余额/试算平衡,只渲染不重算。"""
 

@@ -91,6 +91,10 @@
 
     // 余额面板:老板=余额/本月用量/费率三格 + 充值按钮;员工=只报自己用量,不露钱
     // (口径随后端:/api/me/credits 员工视角本就无 balance_thb,前端不猜)。
+    //
+    // 员工分支还是失败卡「去充值」深链的落点(#/settings?focus=billing)。只留一句「余额与
+    // 充值仅负责人可见」就是死胡同:文案许了出路,落地一个可点的都没有。补一句说清该找谁、
+    // 让谁在哪儿点——这是员工手上真能走的唯一一条路,不是安慰话。
     function balancePanelHtml(credits) {
         var c = credits || {};
         var body;
@@ -98,6 +102,8 @@
             body =
                 '<p class="bill-emp-hint">' +
                 esc(t('bill_employee_hint')) +
+                '</p><p class="bill-emp-path">' +
+                esc(t('bill_employee_topup_path')) +
                 '</p>' +
                 (c.my_invoice_count != null
                     ? '<p class="bill-emp-count">' +

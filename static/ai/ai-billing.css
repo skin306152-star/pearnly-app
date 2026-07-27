@@ -19,6 +19,13 @@
   font-size: 12.5px;
   color: var(--mut);
 }
+/* 员工视角唯一能走的那条路(该找谁充值)——比上面那句「看不到」更重要,给正文色 */
+.bill-emp-path {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink2);
+}
 .bill-emp-count {
   margin-top: 8px;
   font-size: 12.5px;

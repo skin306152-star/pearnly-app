@@ -30,7 +30,21 @@
         return (d || {}).status === 'stuck' && ((d || {}).blocked_reasons || []).length > 0;
     }
 
-    var pure = { guidanceCount: guidanceCount, engineStalled: engineStalled };
+    // 影子底稿 / 报表包这两区的坏法有两种,说的话也得是两种:
+    //   stalled  = 引擎整体停住(engineStalled),已完成的数据还在,可以从断点重跑;
+    //   degraded = 那一步自己跑挂了只留残影(后端 *_state='degraded'),工单照样走到 review,
+    //              status 里一点痕迹都没有 —— 只认 stuck 的话这里会一直说「不用管它,会自动
+    //              生成」,而它不会再自己好。degraded 优先:它是更具体的那个诊断。
+    function sectionFault(d, stateKey) {
+        if ((d || {})[stateKey] === 'degraded') return 'degraded';
+        return engineStalled(d) ? 'stalled' : '';
+    }
+
+    var pure = {
+        guidanceCount: guidanceCount,
+        engineStalled: engineStalled,
+        sectionFault: sectionFault,
+    };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
     // ===== 以下为浏览器 HTML 拼装(依赖 at()/AI.state/AI.format/AI.router,node 不调用)=====
@@ -180,6 +194,7 @@
     root.AI.clientWoRender = {
         guidanceCount: guidanceCount,
         engineStalled: engineStalled,
+        sectionFault: sectionFault,
         woSummaryHtml: woSummaryHtml,
         noOrderEmptyHtml: noOrderEmptyHtml,
     };

@@ -614,6 +614,8 @@ Object.assign(window.__AI_I18N_EN__, {
     bill_exempt: 'This account is billing-exempt',
     bill_topup_open: 'Top up',
     bill_employee_hint: 'Balance and top-up are visible to the firm owner only',
+    bill_employee_topup_path:
+        'Out of credit? Ask the firm owner to top up from their own account under Settings → OCR credit → Top up. Once it lands you can keep uploading.',
     bill_employee_count: 'I scanned {n} pages this month',
     bill_history_title: 'Top-up history',
     bill_history_empty_t: 'No top-ups yet',

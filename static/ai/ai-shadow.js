@@ -11,11 +11,12 @@
 
     var S = null;
 
-    function freshState(shadowDraft, stalled) {
+    function freshState(shadowDraft, fault) {
         return {
             shadowDraft: shadowDraft,
-            // 底稿没产出时用来分「还没跑到」和「后台停住了」两种 null(见 shadowRender.pageHtml)。
-            stalled: !!stalled,
+            // 底稿没产出时分「还没跑到」/「引擎停住了」/「这步跑挂了」三种 null
+            // (''|'stalled'|'degraded',见 clientWoRender.sectionFault 与 shadowRender.pageHtml)。
+            fault: fault || '',
             // 三分区默认展开——影子底稿数据量通常不大(一期工单几十条分录内),且本身
             // 就是会计要核对的主内容,折叠反而增加点击成本(同 E2 auto 默认收起取舍相反:
             // 那是"已处理好不占版面",这里是"打开就是要看的东西")。
@@ -42,8 +43,8 @@
 
     // container 由调用方(ai-client.js renderWo)传入,shadowDraft 是已取到的 order_detail
     // 字段——同一次 getOrder() 复用,不重复发请求。
-    function mount(shadowDraft, container, stalled) {
-        S = freshState(shadowDraft, stalled);
+    function mount(shadowDraft, container, fault) {
+        S = freshState(shadowDraft, fault);
         container.onclick = function (e) {
             onClick(e, container);
         };

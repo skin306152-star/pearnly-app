@@ -135,6 +135,66 @@ class EmptyPhaseDecisionTests(unittest.TestCase):
             """)
         self.assertEqual(out, [True, False, False, False, False, False])
 
+    def test_section_fault_catches_degraded_which_never_shows_up_as_stuck(self):
+        """影子/报表这两区还有第二种坏法:引擎异常降级残影。后端明写「绝不 stuck」,工单
+        照样走到 review —— 只认 stuck 的话页面会一直说「不用管它,会自动生成」,而它不会
+        再自己好。degraded 更具体,压过 stalled。"""
+        out = _run_node(f"""
+            const w = require({_WO});
+            process.stdout.write(JSON.stringify([
+                w.sectionFault({{status: 'review', shadow_draft_state: 'degraded'}}, 'shadow_draft_state'),
+                w.sectionFault({{status: 'review', shadow_draft_state: 'off'}}, 'shadow_draft_state'),
+                w.sectionFault({{status: 'review'}}, 'shadow_draft_state'),
+                w.sectionFault({{status: 'stuck', blocked_reasons: ['ocr']}}, 'shadow_draft_state'),
+                w.sectionFault(
+                    {{status: 'stuck', blocked_reasons: ['ocr'], financials_state: 'degraded'}},
+                    'financials_state'
+                ),
+                w.sectionFault({{status: 'stuck', shadow_draft_state: 'ok'}}, 'shadow_draft_state'),
+                w.sectionFault(null, 'shadow_draft_state'),
+            ]));
+            """)
+        self.assertEqual(out, ["degraded", "", "", "stalled", "degraded", "", ""])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class SectionFaultRenderTests(unittest.TestCase):
+    """三种 null 各说各的话。degraded 尤其不能给「断点重试」按钮:那一步自己挂了,重跑
+    工单回不到它,给按钮等于再骗一次。"""
+
+    def _page(self, module, key, fault):
+        return _run_node(f"""
+            global.window = global;
+            global.at = (k) => k;
+            require({_STATE});
+            require({json.dumps(str(AI_DIR / module))});
+            process.stdout.write(JSON.stringify(
+                global.AI.{key}.pageHtml(null, {{fault: {json.dumps(fault)}, open: {{}}}})
+            ));
+            """)
+
+    def test_shadow_三态各说各的(self):
+        off = self._page("ai-shadow-render.js", "shadowRender", "")
+        stalled = self._page("ai-shadow-render.js", "shadowRender", "stalled")
+        degraded = self._page("ai-shadow-render.js", "shadowRender", "degraded")
+        self.assertIn("shadow_disabled_s", off)
+        self.assertIn("emp_sdw_stalled_t", stalled)
+        self.assertIn('data-action="wo-retry-stuck"', stalled)
+        self.assertIn("emp_sdw_degraded_t", degraded)
+        self.assertNotIn("shadow_disabled_s", degraded)
+        self.assertNotIn("wo-retry-stuck", degraded)
+
+    def test_financials_三态各说各的(self):
+        off = self._page("ai-financials-render.js", "financialsRender", "")
+        stalled = self._page("ai-financials-render.js", "financialsRender", "stalled")
+        degraded = self._page("ai-financials-render.js", "financialsRender", "degraded")
+        self.assertIn("fin_disabled_s", off)
+        self.assertIn("emp_fin_stalled_t", stalled)
+        self.assertIn('data-action="wo-retry-stuck"', stalled)
+        self.assertIn("emp_fin_degraded_t", degraded)
+        self.assertNotIn("fin_disabled_s", degraded)
+        self.assertNotIn("wo-retry-stuck", degraded)
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class EmptyI18nShardTests(unittest.TestCase):

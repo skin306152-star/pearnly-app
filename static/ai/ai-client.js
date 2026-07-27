@@ -142,13 +142,21 @@
 
     // 开单失败的说明位:就在同一张卡里(失败发生在哪就在哪说),按钮回可点的同时告诉
     // 用户为什么没成——此前 catch 只默默把按钮放回去,点了跟没点一样。
-    function setOpenOrderFailure(btn, err) {
+    // created=true = 单已开出、栽在后面刷新列表那一跳:说「开单没成功」是点错了步,用户会
+    // 以为白点了(单其实躺在库里)。换徽章换文案,出路是原地再点一次(后端开单幂等)。
+    function setOpenOrderFailure(btn, err, created) {
         var host = btn && btn.closest('.order-open-empty');
         var slot = host && host.querySelector('[data-fail-slot]');
         if (!slot) return;
-        slot.innerHTML = err
-            ? AI.failRender.noteHtml('fail_step_open_order', err.code, err.status)
-            : '';
+        if (!err) {
+            slot.innerHTML = '';
+            return;
+        }
+        slot.innerHTML = created
+            ? AI.failRender.noteHtml('fail_step_reload_orders', err.code, err.status, {
+                  reasonKey: 'fail_created_but_stale',
+              })
+            : AI.failRender.noteHtml('fail_step_open_order', err.code, err.status);
     }
 
     // 开单 + 重拉订单列表 + 定位到新开的那期(wo 空态「开当期工单」/ intake 空态「开单账期
@@ -162,6 +170,7 @@
             btn.textContent = at('card_open_order_busy');
         }
         setOpenOrderFailure(btn, null); // 新一次尝试先清掉上一次的失败说明
+        var created = false; // 一个 catch 罩整条链,徽章靠它点对步(见 setOpenOrderFailure)
         S.api
             .createOrder({
                 workspace_client_id: Number(S.clientId),
@@ -169,6 +178,7 @@
                 intent: 'monthly_vat',
             })
             .then(function () {
+                created = true;
                 return S.api.listOrders({ client_id: S.clientId });
             })
             .then(function (r) {
@@ -182,7 +192,7 @@
                     btn.disabled = false;
                     btn.textContent = idleLabel;
                 }
-                setOpenOrderFailure(btn, err || {});
+                setOpenOrderFailure(btn, err || {}, created);
             });
     }
 
@@ -291,15 +301,23 @@
                 // 销项佐证区(MC1-c.1 / SA-2b):同一次 getOrder() 已带回 sales_corroboration
                 // 与 edc_corroboration,两卡并排渲染,不再二次请求。
                 AI.corrob.mount(d.sales_corroboration, $('corrobRoot'), d.edc_corroboration);
-                // 银行对账 / 影子底稿两区没产出时都只拿到 null,分不出「还没跑到」和「后台
-                // 停住了」——把这条判据一并喂下去,让它们各自说对话(见 engineStalled)。
+                // 三区没产出时都只拿到 null,分不出「还没跑到」和「坏了」——把判据一并喂下去。
+                // 影子/报表还多一种坏法(引擎降级残影),后端 *_state 直报,见 sectionFault。
                 var stalled = AI.clientWoRender.engineStalled(d);
                 // 银行对账区(E2):同一次 getOrder() 已带回 bank_recon,不再二次请求。
                 AI.recon.mount(S.api, order.id, S.clientId, d.bank_recon, $('brxRoot'), stalled);
                 // 影子底稿区(F3):同一次 getOrder() 已带回 shadow_draft,不再二次请求。
-                AI.shadow.mount(d.shadow_draft, $('shadowRoot'), stalled);
+                AI.shadow.mount(
+                    d.shadow_draft,
+                    $('shadowRoot'),
+                    AI.clientWoRender.sectionFault(d, 'shadow_draft_state')
+                );
                 // 月度报表包区(G1b):同一次 getOrder() 已带回 financials,不再二次请求。
-                AI.financials.mount(d.financials, $('financialsRoot'), stalled);
+                AI.financials.mount(
+                    d.financials,
+                    $('financialsRoot'),
+                    AI.clientWoRender.sectionFault(d, 'financials_state')
+                );
                 if (d.status !== 'archive') startWoPoll(order);
             })
             .catch(function () {

@@ -477,7 +477,6 @@ window.__AI_I18N_JA__ = {
     shadow_unbalanced_chip: '差異あり',
     shadow_diff_note: '差額 {diff}',
     shadow_entries_title: '推奨仕訳（{n}）',
-    shadow_entries_empty: '推奨仕訳はまだありません',
     shadow_accounts_title: '科目残高（{n}）',
     shadow_accounts_empty: '科目残高はまだありません',
     shadow_col_dircr: '借方/貸方',

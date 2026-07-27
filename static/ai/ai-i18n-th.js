@@ -468,7 +468,6 @@ window.__AI_I18N_TH__ = {
     shadow_unbalanced_chip: 'มีส่วนต่าง',
     shadow_diff_note: 'ส่วนต่าง {diff}',
     shadow_entries_title: 'รายการบันทึกที่แนะนำ ({n})',
-    shadow_entries_empty: 'ยังไม่มีรายการบันทึกที่แนะนำ',
     shadow_accounts_title: 'ยอดคงเหลือบัญชี ({n})',
     shadow_accounts_empty: 'ยังไม่มียอดคงเหลือบัญชี',
     shadow_col_dircr: 'เดบิต/เครดิต',

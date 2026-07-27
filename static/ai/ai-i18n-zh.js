@@ -458,7 +458,6 @@ window.__AI_I18N_ZH__ = {
     shadow_unbalanced_chip: '存在差异',
     shadow_diff_note: '差额 {diff}',
     shadow_entries_title: '建议分录（{n}）',
-    shadow_entries_empty: '暂无建议分录',
     shadow_accounts_title: '科目余额（{n}）',
     shadow_accounts_empty: '暂无科目余额',
     shadow_col_dircr: '借/贷',

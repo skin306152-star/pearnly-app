@@ -477,7 +477,6 @@ window.__AI_I18N_EN__ = {
     shadow_unbalanced_chip: 'Discrepancy found',
     shadow_diff_note: 'Difference {diff}',
     shadow_entries_title: 'Suggested entries ({n})',
-    shadow_entries_empty: 'No suggested entries',
     shadow_accounts_title: 'Account balances ({n})',
     shadow_accounts_empty: 'No account balances',
     shadow_col_dircr: 'Dr/Cr',

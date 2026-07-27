@@ -45,7 +45,7 @@
      * insufficient_balance 是全站计费闸的统一码(services/billing/account_status.py
      * 单一事实源,recon/vat_excel/knowledge 等端点以 402 + detail.code 出线)。
      *
-     * ⚠️ 休眠分支,别当它在工作:本模块的两个调用点当前都不可能收到 402。
+     * 休眠分支,别当它在工作:本模块的两个调用点当前都不可能收到 402。
      * routes/workorder_routes.py::create_order 只有鉴权+归属校验(开单本身永远不计费);
      * ::add_materials 只有 413/422,OCR 计费发生在 _auto_advance 的后台续跑里,不以上传
      * 响应的形式回到前端。余额耗尽时收料页得到的仍是后台 stuck / 转人工。契约先接好,

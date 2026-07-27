@@ -61,8 +61,14 @@ _DUE_SOON_CLEAR = {
     "th": "งวด {period}: ไม่มีรายการที่ค้างยื่น",
 }
 _DUE_NEXT = {
-    "zh": "最近一项:{client} {code},{due}({left})。",
-    "th": "ใกล้ที่สุด: {client} {code} วันที่ {due} ({left})",
+    "zh": "最近一项:{client} {code},{due}({left}){paper}。",
+    "th": "ใกล้ที่สุด: {client} {code} วันที่ {due} ({left}){paper}",
+}
+# 倒计时锚的是 e-Filing 日(与矩阵页同一把尺)。纸质日已过而电子日还没到的那一周(ภ.พ.30
+# 每月 16–23 号),只报电子日会让还在纸质申报的客户漏了真截止日,得点出来。
+_DUE_PAPER_PASSED = {
+    "zh": "(这是电子申报的日子;纸质 {paper} 已经过了)",
+    "th": " (นี่คือกำหนดยื่นออนไลน์ ส่วนกำหนดยื่นกระดาษ {paper} เลยมาแล้ว)",
 }
 _DUE_LEFT = {
     "overdue": {"zh": "已逾期 {n} 天", "th": "เลยกำหนด {n} วัน"},
@@ -186,6 +192,7 @@ def due_soon(data: dict, lang: str) -> str:
             code=head.get("obligation_code", ""),
             due=head.get("due") or "-",
             left=days_left(head.get("days_left"), lang),
+            paper=_paper_note(head, lang),
         )
         if head
         else ""
@@ -198,6 +205,16 @@ def due_soon(data: dict, lang: str) -> str:
         soon=data.get("due_soon", 0),
         next=nxt,
     )
+
+
+def _paper_note(row: dict, lang: str) -> str:
+    """纸质截止日已过、电子日还没到时补一句。两个日子一致(或纸质也没过)就不啰嗦。"""
+    paper_left, left = row.get("days_left_paper"), row.get("days_left")
+    if not isinstance(paper_left, int) or paper_left >= 0:
+        return ""
+    if isinstance(left, int) and left < 0:
+        return ""  # 两个都过了,「已逾期」那句已经说清楚
+    return _t(_DUE_PAPER_PASSED, lang).format(paper=row.get("due_paper") or "-")
 
 
 def review_queue(data: dict, lang: str) -> str:

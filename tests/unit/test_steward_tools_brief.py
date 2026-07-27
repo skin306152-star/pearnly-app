@@ -5,6 +5,8 @@
   ① 数字自己编:所有计数必须来自被合成的三个 handler,所以用例桩的是最底层的服务层读函数
      (matrix / review / push_log_queries),中间的三个 handler 真跑;
   ② 某一路挂了却渲染成 0:那会让会计判「今天没这类活」——必须进 partial 并在答复里明说。
+     两种挂法都要守:返回 ok=False 与直接抛异常(真实故障多半是后者,三条支路里两条根本
+     没有 ok=False 的分支),以及降级与清净日同时成立时不许说成「今天没活」。
 再加两条排序线:桶序(逾期 → 快到期 → 推失败 → 待审)与并列时的稳定次序(同一句话问两次
 不许换人),以及账套作用域(被分派成员在简报里也只看得见分到的账套)。零真 DB。
 """
@@ -26,6 +28,7 @@ from services.workorder import matrix, review
 
 _TODAY = date(2026, 7, 10)
 _LANGS = ("zh", "th")
+_LOGGER = "services.steward.tools_brief"
 
 
 def _ctx(allowed=None):
@@ -53,8 +56,9 @@ def _matrix_row(**over):
         "client_tax_id": None,
         "obligation_code": "pp30",
         "obligation_status": "due",
-        "due_paper": date(2026, 7, 15),
-        "due_efiling": date(2026, 7, 23),
+        # 倒计时锚 e-Filing 日(与矩阵页 isOverdue 同一把尺),固定日期一律给这一列。
+        "due_paper": date(2026, 7, 7),
+        "due_efiling": date(2026, 7, 15),
         "work_order_id": "w1",
         "order_status": "collecting",
         "display_names": None,
@@ -120,7 +124,7 @@ class CountsTests(_BriefCase):
         res = self._run(
             rows=[
                 _matrix_row(),  # 7-15,距 7-10 还剩 5 天
-                _matrix_row(client_id=2, client_name="62AHATAI", due_paper=date(2026, 7, 7)),
+                _matrix_row(client_id=2, client_name="62AHATAI", due_efiling=date(2026, 7, 7)),
             ],
             orders=[_order()],
             pushes=[_push()],
@@ -135,6 +139,8 @@ class CountsTests(_BriefCase):
         self.assertEqual(res.data["period"], "2569-07")
         self.assertEqual(res.data["today"], "2026-07-10")
         self.assertEqual(res.data["partial"], [])
+        # 推失败那个数只涵盖本人推的,作用域跟着数一起出去(答复层据此选措辞)。
+        self.assertEqual(res.data["push_scope"], tools_brief.PUSH_SCOPE_SELF)
 
     def test_missing_materials_counted_from_the_same_due_list(self):
         """缺料家数与另外三个数同一份原料;同一家两项义务只算一家,不缺料的不进这个数。"""
@@ -189,6 +195,44 @@ class PartialLaneTests(_BriefCase):
         self.assertTrue(res.ok)
         self.assertEqual(set(res.data["partial"]), {"due_soon", "review_queue"})
 
+    def test_lane_that_raises_is_partial_not_a_dead_brief(self):
+        """真实故障是抛异常(due_soon / push_log_query 根本没有 ok=False 的分支)。只认
+        ok=False 的话,异常会一路上抛到 tools.run 兜成 ERR_TOOL_FAILED —— 会计早上第一句
+        拿到的是「这条没查成」,整张简报连同降级承诺一起没了。"""
+        from services.steward import tools
+
+        for lane, owner, fn in (
+            ("due_soon", tools_close, "due_soon"),
+            ("review_queue", tools_close, "review_queue"),
+            ("push_log_query", tools, "push_log_query"),
+        ):
+            with self.assertLogs(_LOGGER, level="WARNING"):  # 吞异常必须留痕,不静默
+                with mock.patch.object(owner, fn, side_effect=RuntimeError("boom")):
+                    res = self._run(rows=[_matrix_row()], orders=[_order()], pushes=[_push()])
+            self.assertTrue(res.ok, lane)
+            self.assertEqual(res.data["partial"], [lane], lane)
+
+    def test_raising_lane_goes_through_the_real_executor_not_just_the_handler(self):
+        """经 tools.run 跑一遍:降级承诺必须在真实执行路径上成立,不能只在直调 handler 时成立。"""
+        from services.steward import tools
+
+        with (
+            self.assertLogs(_LOGGER, level="WARNING"),
+            mock.patch("services.workorder.review.review_queue", side_effect=RuntimeError("boom")),
+        ):
+            with (
+                mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
+                mock.patch.object(matrix, "fetch_rows", return_value=[_matrix_row()]),
+                mock.patch("core.feature_flags.pearnly_ai_sod_enabled_for", return_value=False),
+                mock.patch.object(
+                    push_log_queries, "list_push_logs", return_value={"items": [], "total": 0}
+                ),
+            ):
+                res = tools.run(registry.TODAY_BRIEF, _ctx(), {"period": "2569-07"})
+        self.assertTrue(res.ok, res.error_code)
+        self.assertEqual(res.data["partial"], ["review_queue"])
+        self.assertIn("待审队列", copy.reply(registry.TODAY_BRIEF, res.data, "zh"))
+
 
 class RankingTests(_BriefCase):
     def _kinds(self, res):
@@ -198,7 +242,7 @@ class RankingTests(_BriefCase):
         res = self._run(
             rows=[
                 _matrix_row(),
-                _matrix_row(client_id=2, client_name="62AHATAI", due_paper=date(2026, 7, 6)),
+                _matrix_row(client_id=2, client_name="62AHATAI", due_efiling=date(2026, 7, 6)),
             ],
             orders=[_order()],
             pushes=[_push()],
@@ -216,9 +260,9 @@ class RankingTests(_BriefCase):
     def test_most_overdue_first_and_day_zero_is_due_soon_not_overdue(self):
         res = self._run(
             rows=[
-                _matrix_row(client_id=1, client_name="A", due_paper=date(2026, 7, 10)),
-                _matrix_row(client_id=2, client_name="B", due_paper=date(2026, 6, 20)),
-                _matrix_row(client_id=3, client_name="C", due_paper=date(2026, 7, 1)),
+                _matrix_row(client_id=1, client_name="A", due_efiling=date(2026, 7, 10)),
+                _matrix_row(client_id=2, client_name="B", due_efiling=date(2026, 6, 20)),
+                _matrix_row(client_id=3, client_name="C", due_efiling=date(2026, 7, 1)),
             ]
         )
         self.assertEqual([r["client_name"] for r in res.data["rows"]], ["B", "C", "A"])
@@ -239,7 +283,7 @@ class RankingTests(_BriefCase):
         """一个月后到期、以及根本没有截止日的,挤掉今天该做的事这张简报就废了。"""
         res = self._run(
             rows=[
-                _matrix_row(client_id=1, client_name="Far", due_paper=date(2026, 9, 30)),
+                _matrix_row(client_id=1, client_name="Far", due_efiling=date(2026, 9, 30)),
                 _matrix_row(client_id=2, client_name="Undated", due_paper=None, due_efiling=None),
             ]
         )
@@ -249,7 +293,7 @@ class RankingTests(_BriefCase):
     def test_top_list_is_capped(self):
         res = self._run(
             rows=[
-                _matrix_row(client_id=i, client_name=f"C{i:02d}", due_paper=date(2026, 7, 1))
+                _matrix_row(client_id=i, client_name=f"C{i:02d}", due_efiling=date(2026, 7, 1))
                 for i in range(9)
             ]
         )
@@ -310,15 +354,44 @@ class CopyTests(unittest.TestCase):
         self.assertNotIn("-3", text)
 
     def test_quiet_day_is_its_own_sentence(self):
-        data = {
+        data = self._quiet()
+        for lang in _LANGS:
+            self.assertTrue(copy.reply(registry.TODAY_BRIEF, data, lang))
+        self.assertNotIn("最紧的一条", copy.reply(registry.TODAY_BRIEF, data, "zh"))
+
+    def _quiet(self, **over):
+        return {
             **self._DATA,
             "total": 0,
             "rows": [],
             "counts": dict.fromkeys(self._DATA["counts"], 0),
+            **over,
         }
+
+    def test_quiet_day_with_a_dead_lane_never_claims_there_is_nothing_to_do(self):
+        """一路挂了那一路的计数就是 0;其余两路当天恰好为空就会走进清净日那句话,而它是
+        肯定断言 —— 会计读到的第一句「今天没这类活」正是这个工具承诺不会说的那句。"""
+        data = self._quiet(partial=["due_soon", "review_queue", "push_log_query"])
         for lang in _LANGS:
-            self.assertTrue(copy.reply(registry.TODAY_BRIEF, data, lang))
-        self.assertNotIn("最紧的一条", copy.reply(registry.TODAY_BRIEF, data, "zh"))
+            text = copy.reply(registry.TODAY_BRIEF, data, lang)
+            self.assertTrue(text, lang)
+        zh = copy.reply(registry.TODAY_BRIEF, data, "zh")
+        self.assertNotIn("今天没有逾期的", zh)
+        for lane in ("到期义务", "待审队列", "推送日志"):
+            self.assertIn(lane, zh)
+
+    def test_quiet_day_without_partial_still_says_it_plainly(self):
+        zh = copy.reply(registry.TODAY_BRIEF, self._quiet(), "zh")
+        self.assertIn("今天没有逾期的", zh)
+
+    def test_push_count_says_whose_pushes_it_counted(self):
+        """推失败按「谁推的」算,另外三个数按「分到哪些账套」算 —— 不点破这半句,同事替
+        同一批客户推失败的票会被这句话说成不存在。"""
+        data = {**self._DATA, "push_scope": tools_brief.PUSH_SCOPE_SELF}
+        self.assertIn("你自己", copy.reply(registry.TODAY_BRIEF, data, "zh"))
+        self.assertIn("ของคุณเอง", copy.reply(registry.TODAY_BRIEF, data, "th"))
+        # 口径变了(哪天这一路改成整租户)措辞就得跟着变,不继续说旧话。
+        self.assertNotIn("你自己", copy.reply(registry.TODAY_BRIEF, self._DATA, "zh"))
 
     def test_truncation_note_is_shown(self):
         text = copy.reply(registry.TODAY_BRIEF, {**self._DATA, "truncated": True}, "zh")

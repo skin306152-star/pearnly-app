@@ -145,7 +145,7 @@ class PeriodLoopTests(unittest.TestCase):
         }
         with (
             mock.patch.object(matrix, "fetch_rows", return_value=rows),
-            mock.patch.object(matrix, "fetch_deliverable_numbers", return_value=numbers),
+            mock.patch.object(matrix, "fetch_step_numbers", return_value=numbers),
         ):
             out, finished, messages = _Loop(
                 registry.TAX_MATRIX, {"period": "上个月"}, "上个月所有客户的应交税额给我列个表"

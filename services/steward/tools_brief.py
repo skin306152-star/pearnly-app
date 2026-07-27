@@ -13,15 +13,24 @@
 
 合成不重算:每条都原样取自被合成的 handler,本模块只分桶和排序;排序键是确定性的
 (桶号 → 剩余天数 → 待判件数 → 客户名),同一份数据任何时候跑出来的前几条逐条相同。
-某一路查不出来(权限/服务层报错)如实进 partial —— 绝不让缺失的那一路在计数里长得像 0,
-会计会据此判「今天没这类活」。
+某一路查不出来(权限/服务层报错/抛异常)如实进 partial —— 绝不让缺失的那一路在计数里长得
+像 0,会计会据此判「今天没这类活」。
+
+推失败这一路的作用域与另外三路不同,答复层必须说出来(push_scope):erp_push_logs 按 user
+隔离(RLS 里没有 tenant 维度策略),list_push_logs 只查得到【本人推过的】;而到期/待审/缺料
+按分到的账套算。同事替同一批客户推失败的票不在这个数里,把四个数并排说成"今天的活"就是
+在说假话 —— 数照给,口径明说。
 """
 
 from __future__ import annotations
 
+import logging
+
 from services.agent.contracts import ToolResult
 from services.steward import tool_scope, tools_close
 from services.steward.registry import ToolContext
+
+logger = logging.getLogger(__name__)
 
 TOP_N = 5  # 一屏能扫完的条数;要全量各自去 due_soon / review_queue / push_log_query
 
@@ -41,6 +50,10 @@ _LANE_DUE = "due_soon"
 _LANE_REVIEW = "review_queue"
 _LANE_PUSH = "push_log_query"
 
+# 推失败那个数只涵盖本人推过的(见模块顶注)。答复层按它选措辞,不在文案里写死一句
+# 「你自己」—— 哪天这一路换成整租户口径,措辞得跟着改而不是继续说旧话。
+PUSH_SCOPE_SELF = "self"
+
 
 def today_brief(ctx: ToolContext, args: dict) -> ToolResult:
     """今天从哪下手:四个数 + 最紧的几条。三路各自失败互不牵连(partial 如实标)。"""
@@ -48,11 +61,13 @@ def today_brief(ctx: ToolContext, args: dict) -> ToolResult:
 
     period = tool_scope.period_or_current(args.get("period"))
     partial: list[str] = []
-    due = _lane(tools_close.due_soon(ctx, {"period": period}), _LANE_DUE, partial)
+    due = _lane(_LANE_DUE, partial, lambda: tools_close.due_soon(ctx, {"period": period}))
     # 待审队列有意不传期:上期没审完的还压在手上,今天照样要处理(review_queue 的跨期口径)。
-    queue = _lane(tools_close.review_queue(ctx, {}), _LANE_REVIEW, partial)
+    queue = _lane(_LANE_REVIEW, partial, lambda: tools_close.review_queue(ctx, {}))
     pushes = _lane(
-        tools.push_log_query(ctx, {"days": PUSH_DAYS, "status": "failed"}), _LANE_PUSH, partial
+        _LANE_PUSH,
+        partial,
+        lambda: tools.push_log_query(ctx, {"days": PUSH_DAYS, "status": "failed"}),
     )
 
     window = due.get("window_days") or tools_close.DUE_SOON_DAYS
@@ -65,6 +80,7 @@ def today_brief(ctx: ToolContext, args: dict) -> ToolResult:
             "today": ctx.today.isoformat(),
             "window_days": window,
             "push_days": pushes.get("days") or PUSH_DAYS,
+            "push_scope": PUSH_SCOPE_SELF,
             "counts": {
                 "overdue": due.get("overdue") or 0,
                 "due_soon": due.get("due_soon") or 0,
@@ -83,9 +99,19 @@ def today_brief(ctx: ToolContext, args: dict) -> ToolResult:
     )
 
 
-def _lane(res: ToolResult, name: str, partial: list) -> dict:
-    """一路取数。失败不拖垮整张简报,记进 partial 由答复层如实说这一路没查出来。"""
-    if res.ok and isinstance(res.data, dict):
+def _lane(name: str, partial: list, call) -> dict:
+    """一路取数。失败不拖垮整张简报,记进 partial 由答复层如实说这一路没查出来。
+
+    收异常而不只看 ToolResult.ok:被合成的三个 handler 在真实故障(服务层报错/权限抛)下
+    是抛出来的,due_soon 与 push_log_query 根本没有 ok=False 的分支。只认 ok=False 等于降级
+    承诺永远不生效 —— 异常会一路上抛到 tools.run 兜成 ERR_TOOL_FAILED,整张简报就没了。
+    """
+    try:
+        res = call()
+    except Exception:  # noqa: BLE001 — 一路挂了是"这一路没查出来",不是整张简报没了
+        logger.warning("[steward] brief lane %s failed", name, exc_info=True)
+        res = None
+    if res is not None and res.ok and isinstance(res.data, dict):
         return res.data
     partial.append(name)
     return {}

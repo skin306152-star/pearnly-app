@@ -3,17 +3,17 @@
 
 横着看一期(全所)和竖着看一家(全票),都是月中最常问、现有工具答不出的两句:
   tax_matrix       「这个月所有客户的应交税额列个表」
-                   services.workorder.matrix.fetch_rows + fetch_deliverable_numbers
-                   (= 矩阵页那份原料 + pp30_draft 交付物落库的 numbers)
+                   services.workorder.matrix.fetch_rows + fetch_step_numbers('compute')
+                   (= 矩阵页那份原料 + 工单详情 numbers 的同一批 compute 事件)
   period_invoices  「6 月 A 公司还有几张票没推进去」
                    services.workorder.push_coverage(与 reconcile 的推送回执比对同一份投影)
                    + services.erp.push_log_queries.list_push_logs_by_invoice_nos
 
 两条硬约束,破了就没意义:
-  ① 数字一个都不由模型出。表的结构由本模块生成,格子里的钱全部来自已落库的交付物 numbers,
+  ① 数字一个都不由模型出。表的结构由本模块生成,格子里的钱全部来自已落库的 compute 事件,
      合计走 Decimal(tool_scope.to_decimal)相加,不过 float。
-  ② 批量读。30 家客户一条 SQL 取矩阵、一条 SQL 取交付物;逐家回放事件流就是 N+1,会把
-     对话拖到超时。period_invoices 只读一家,票号集也是一条 SQL 查完推送日志。
+  ② 批量读。30 家客户一条 SQL 取矩阵、一条 SQL 取 compute 事件;逐家回放事件流就是 N+1,
+     会把对话拖到超时。period_invoices 只读一家,票号集也是一条 SQL 查完推送日志。
 
 「没有」和「零」分开报:has_numbers=False 的行不填 0,留空由文案说成「还没算到税额」——
 会计照着 0 去准备现金和照着「还没算」去催 AI,是两件完全不同的事。
@@ -28,7 +28,10 @@ from services.steward import tool_scope
 from services.steward.registry import ToolContext
 from services.workorder import push_coverage
 
-_DELIVERABLE_PP30 = "pp30_draft"  # services.workorder.steps.package 落的 ภ.พ.30 草稿
+# 认列结果落在哪一步:compute 的 step_done。工单详情的 numbers(tax_numbers / 签批闸吃的
+# 那份)回放的就是这一步,取数时点必须同一个 —— 读 package 落的交付物快照会晚整整一步,
+# 而 package 是会 stuck 停住的:同一张单会出现「单查应交 ฿35,000」而「表里还没算到」。
+_COMPUTE_STEP = "compute"
 
 # 一行客户在税额表里的三态。ready 之外一律不填钱(假零比说不知道危险得多)。
 TAX_READY = "ready"
@@ -65,9 +68,9 @@ INVOICE_STATES: tuple[str, ...] = (
 def tax_matrix(ctx: ToolContext, args: dict) -> ToolResult:
     """全所一期的税额表:每家一行,销项/进项/销项税/进项税/应交 + 合计。
 
-    数字来源是 pp30_draft 交付物落库的 numbers(compute 步认列结果的快照),与 tax_numbers
-    逐家答的那份同源、字段集同一份(tool_scope.TAX_MONEY_KEYS)—— 表里的数与点开工单看到的
-    必须逐位相同。
+    数字来源是 compute 步落的认列结果,与 tax_numbers 逐家答的那份同源(它回放同一步的
+    step_done)、字段集同一份(tool_scope.TAX_MONEY_KEYS)—— 表里的数与点开工单看到的必须
+    逐位相同,取数时点也必须是同一个(见 _COMPUTE_STEP 顶注)。
     """
     from services.workorder import matrix
 
@@ -79,8 +82,8 @@ def tax_matrix(ctx: ToolContext, args: dict) -> ToolResult:
             if tool_scope.in_scope(ctx, r["client_id"])
         ]
         order_ids = sorted({str(r["work_order_id"]) for r in rows if r.get("work_order_id")})
-        numbers_by_order = matrix.fetch_deliverable_numbers(
-            cur, tenant_id=ctx.tenant_id, work_order_ids=order_ids, kind=_DELIVERABLE_PP30
+        numbers_by_order = matrix.fetch_step_numbers(
+            cur, tenant_id=ctx.tenant_id, work_order_ids=order_ids, step=_COMPUTE_STEP
         )
 
     out_rows = _tax_rows(rows, numbers_by_order)
@@ -107,8 +110,8 @@ def tax_matrix(ctx: ToolContext, args: dict) -> ToolResult:
 def _tax_rows(rows: list[dict], numbers_by_order: dict) -> list[dict]:
     """矩阵原料(客户 × 义务,一家可能好几行)→ 每家一行的税额行。
 
-    一家客户这期可能有多张工单(ภ.พ.30 之外还有 ภ.ง.ด. 等义务),只有跑 VAT 的那张会出
-    pp30_draft —— 按"哪张有交付物"认,不去猜义务码。
+    一家客户这期可能有多张工单(ภ.พ.30 之外还有 ภ.ง.ด. 等义务),只有跑 VAT 的那张会算出
+    税额 —— 按"哪张有认列结果"认,不去猜义务码。
     """
     by_client: dict[int, dict] = {}
     for r in rows:
@@ -127,11 +130,19 @@ def _tax_rows(rows: list[dict], numbers_by_order: dict) -> list[dict]:
             continue
         if row["state"] == TAX_NO_ORDER:
             row["state"] = TAX_NO_NUMBERS
-        numbers = numbers_by_order.get(str(order_id))
+        numbers = _money_only(numbers_by_order.get(str(order_id)))
         if numbers and row["numbers"] is None:
             row["numbers"] = numbers
             row["state"] = TAX_READY
     return [_tax_row(row) for row in by_client.values()]
+
+
+def _money_only(payload) -> dict:
+    """compute 事件 payload 里的钱字段(它还带 period / gates / pp30_form 等)。一个钱字段
+    都没有 = 还没算出税额,与 tax_numbers 的 has_numbers 同判据,不拿一条空事件冒充已算。"""
+    if not isinstance(payload, dict):
+        return {}
+    return {k: payload[k] for k in tool_scope.TAX_MONEY_KEYS if payload.get(k) is not None}
 
 
 def _tax_row(row: dict) -> dict:

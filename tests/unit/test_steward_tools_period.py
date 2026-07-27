@@ -3,7 +3,7 @@
 
 薄封装不是口号,是断言:每个用例都 patch 掉被包的服务层函数,证明工具真的走了它。另外钉死
 这两个工具最容易破的六条:
-  ① 批量读:30 家客户只准打两条 SQL(矩阵一条 + 交付物一条),逐单查就是 N+1;
+  ① 批量读:30 家客户只准打两条 SQL(矩阵一条 + compute 事件一条),逐单查就是 N+1;
   ② 数字全由代码从库里取并用 Decimal 相加(负数留抵、零、超大值、分位都有边界用例);
   ③ 没算出税额的行不许填 0(假零比说不知道危险得多);
   ④ 账套作用域:被分派成员在对话里也只看得见分到的账套;
@@ -87,7 +87,7 @@ class TaxMatrixTests(unittest.TestCase):
             _no_db(),
             mock.patch.object(matrix, "fetch_rows", return_value=rows) as fetch,
             mock.patch.object(
-                matrix, "fetch_deliverable_numbers", return_value=numbers_by_order
+                matrix, "fetch_step_numbers", return_value=numbers_by_order
             ) as fetch_numbers,
         ):
             res = tools_period.tax_matrix(
@@ -95,7 +95,7 @@ class TaxMatrixTests(unittest.TestCase):
             )
         return res, fetch, fetch_numbers
 
-    def test_wraps_matrix_service_and_reads_deliverables_in_one_batch(self):
+    def test_wraps_matrix_service_and_reads_compute_events_in_one_batch(self):
         rows = [_matrix_row(), _matrix_row(2, "62AHATAI", "w2")]
         res, fetch, fetch_numbers = self._run(
             rows, {"w1": _numbers(), "w2": _numbers(tax_due="12000.00")}
@@ -105,7 +105,7 @@ class TaxMatrixTests(unittest.TestCase):
         self.assertEqual(fetch_numbers.call_count, 1)  # 逐家查 = N+1,这里钉死只查一次
         kwargs = fetch_numbers.call_args.kwargs
         self.assertEqual(sorted(kwargs["work_order_ids"]), ["w1", "w2"])
-        self.assertEqual(kwargs["kind"], "pp30_draft")
+        self.assertEqual(kwargs["step"], "compute")
         self.assertEqual(kwargs["tenant_id"], "t-1")
         self.assertEqual(res.data["client_count"], 2)
         self.assertEqual(res.data["ready"], 2)
@@ -151,6 +151,22 @@ class TaxMatrixTests(unittest.TestCase):
     def test_sub_cent_amounts_are_rounded_not_dropped(self):
         res, _f, _n = self._run([_matrix_row()], {"w1": _numbers(tax_due="0.005")})
         self.assertEqual(Decimal(res.data["rows"][0]["tax_due"]), Decimal("0.00"))
+
+    def test_numbers_come_from_the_same_step_as_the_single_client_answer(self):
+        """compute 跑完、package 卡住的单:tax_numbers 答「应交 ฿35,000」,表里必须是同一个数。
+        读 package 落的交付物快照会晚整整一步,同一家在两句答复里对不上。"""
+        payload = {**_numbers(), "period": _PERIOD, "gates": {"r5_shadow": {}}}
+        res, _f, _n = self._run([_matrix_row()], {"w1": payload})
+        row = res.data["rows"][0]
+        self.assertEqual(row["state"], tools_period.TAX_READY)
+        self.assertEqual(row["tax_due"], "35000.00")
+        self.assertEqual(res.data["totals"]["tax_due"], "35000.00")
+
+    def test_compute_event_without_money_keys_is_not_dressed_up_as_computed(self):
+        """事件在但一个钱字段都没有 = 还没算出税额,与 tax_numbers 的 has_numbers 同判据。"""
+        res, _f, _n = self._run([_matrix_row()], {"w1": {"period": _PERIOD}})
+        self.assertEqual(res.data["rows"][0]["state"], tools_period.TAX_NO_NUMBERS)
+        self.assertEqual(res.data["ready"], 0)
 
     def test_row_without_numbers_is_blank_not_zero(self):
         """还没算到税额的行填 0 会被当成"这家不用交",红线。"""

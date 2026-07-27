@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""「该推的 ↔ 推过的」共享投影(services/workorder/push_coverage.py)+ 交付物批量读。
+"""「该推的 ↔ 推过的」共享投影(services/workorder/push_coverage.py)+ 矩阵批量读。
 
 这份投影被两处消费:reconcile 的 F2-辅 推送回执比对、管家的「这期还有几张没推进 Express」。
 所以钉的是口径本身:
   ① 采信集合 = R1 合计那一份(ok 直采、flagged 裁 face_value 采、剔除/豁免不采);
   ② 「没推过」不许冒充「推失败」,未终态不许冒充任一终态;
   ③ 票号读不出的件必须留在清单里(静默丢掉 = 帮着漏推),但不进查库的票号集;
-  ④ 交付物批量读一条 SQL 吃整批(逐单查 = 30 家 30 次往返)。
+  ④ 交付物 / 步骤事件批量读各一条 SQL 吃整批(逐单查 = 30 家 30 次往返)。
 零真 DB。
 """
 
@@ -176,6 +176,37 @@ class DeliverableBatchReadTests(unittest.TestCase):
         out = matrix.fetch_deliverable_numbers(
             cur, tenant_id="t-1", work_order_ids=[], kind="pp30_draft"
         )
+        self.assertEqual(out, {})
+        cur.execute.assert_not_called()
+
+
+class StepNumbersBatchReadTests(unittest.TestCase):
+    """认列结果批量读:管家的全所税额表与「点开工单看到的数」必须同一步同一批。"""
+
+    def test_single_query_filters_by_tenant_step_and_id_array(self):
+        cur = MagicMock()
+        cur.fetchall.return_value = [{"work_order_id": "w1", "payload": {"tax_due": "1"}}]
+        out = matrix.fetch_step_numbers(
+            cur, tenant_id="t-1", work_order_ids=["w1", "w2"], step="compute"
+        )
+        self.assertEqual(cur.execute.call_count, 1)
+        sql, params = cur.execute.call_args[0]
+        self.assertIn("work_order_id = ANY(%s::uuid[])", sql)
+        self.assertIn("tenant_id = %s AND step = %s AND event_type = 'step_done'", sql)
+        self.assertIn("DISTINCT ON (work_order_id)", sql)
+        self.assertIn("ORDER BY work_order_id, id DESC", sql)  # 同一步重复 done 取最后一条
+        self.assertEqual(params, ("t-1", "compute", ["w1", "w2"]))
+        self.assertEqual(out, {"w1": {"tax_due": "1"}})
+
+    def test_null_payload_becomes_empty_dict_not_none(self):
+        cur = MagicMock()
+        cur.fetchall.return_value = [{"work_order_id": "w1", "payload": None}]
+        out = matrix.fetch_step_numbers(cur, tenant_id="t-1", work_order_ids=["w1"], step="compute")
+        self.assertEqual(out, {"w1": {}})
+
+    def test_empty_id_list_short_circuits_no_query(self):
+        cur = MagicMock()
+        out = matrix.fetch_step_numbers(cur, tenant_id="t-1", work_order_ids=[], step="compute")
         self.assertEqual(out, {})
         cur.execute.assert_not_called()
 

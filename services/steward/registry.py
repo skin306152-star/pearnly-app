@@ -19,6 +19,7 @@ from datetime import date
 from typing import Any, Optional
 
 from services.agent.contracts import SlotSpec
+from services.sales.dates import bangkok_today
 
 # 风险等级(B3 授权闸的判据面):read 直接执行;write 落数据、danger 落数据且难撤销
 # (推 ERP/删单据)。非 read 一律要求人批的授权令牌 —— 执行层物理拒,不是前端不显示。
@@ -383,6 +384,9 @@ class ToolContext:
 
     allowed_client_ids=None 表示不限(老板/超管/scope_mode='all');给了集合就是被分派成员
     只看分到的账套,与 /api/tax-profile/matrix 的收窄口径同源(路由算好传进来)。
+
+    today 走曼谷日历日:服务器跑 UTC,date.today() 在曼谷 00:00–07:00 还停在昨天,逾期与
+    剩余天数会整体差一天(当天到期的义务被说成"还剩 1 天",简报的头条与桶序跟着错)。
     """
 
     user: dict
@@ -390,7 +394,7 @@ class ToolContext:
     user_id: str
     allowed_client_ids: Optional[frozenset] = None
     lang: str = "zh"
-    today: date = field(default_factory=date.today)
+    today: date = field(default_factory=bangkok_today)
     user_text: str = ""
 
 

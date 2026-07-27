@@ -118,6 +118,27 @@ def fetch_deliverable_numbers(
     return {str(r["work_order_id"]): (r["numbers"] or {}) for r in cur.fetchall()}
 
 
+def fetch_step_numbers(cur, *, tenant_id: str, work_order_ids: list, step: str) -> dict[str, dict]:
+    """整批工单某一步最后一条 step_done 的 payload → {work_order_id: payload}。
+
+    与 store.last_step_done_payload / evidence.replay_step_done 同语义(同一步理论只 done
+    一次,取最后一条防御重复),差别只在一次吃一批 —— 逐单回放事件流是 30 家 30 次往返。
+    交付物快照(fetch_deliverable_numbers)落在 package 步,比 compute 晚一整步且 package
+    会 stuck 停住;要与「点开工单看到的数」逐位相同,就得读 compute 的事件本身。
+    """
+    if not work_order_ids:
+        return {}
+    cur.execute(
+        "SELECT DISTINCT ON (work_order_id) work_order_id, payload "
+        "FROM work_order_events "
+        "WHERE tenant_id = %s AND step = %s AND event_type = 'step_done' "
+        "AND work_order_id = ANY(%s::uuid[]) "
+        "ORDER BY work_order_id, id DESC",
+        (tenant_id, step, [str(i) for i in work_order_ids]),
+    )
+    return {str(r["work_order_id"]): (r["payload"] or {}) for r in cur.fetchall()}
+
+
 def build(rows: list[dict], *, period: str) -> dict:
     """原料行 → 矩阵视图 {period, clients, obligation_codes, obligation_labels, cells}。
 
@@ -176,7 +197,7 @@ def _cell(r: dict, client_id: int, code: str) -> dict:
         "due_paper": iso(r["due_paper"]),
         "due_efiling": iso(r["due_efiling"]),
         # 顺延(G3 · MC2-B 件2):原始日透传,顺延日现算另加。逾期锚点日以 due_efiling_deferred
-        # 为权威(前端 isOverdue 指回此处;管家 tools_close.py 仍锚纸质日晚 8 天,未收口)。
+        # 为权威(前端 isOverdue 与管家 tools_close.due_soon 都指回此处)。
         "due_paper_deferred": iso(obligation_engine.defer_optional(r["due_paper"])),
         "due_efiling_deferred": iso(obligation_engine.defer_optional(r["due_efiling"])),
         "badge": badge(r["obligation_status"], r["order_status"]),

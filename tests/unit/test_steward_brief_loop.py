@@ -123,8 +123,9 @@ class BriefLoopTests(unittest.TestCase):
                 "client_tax_id": None,
                 "obligation_code": "pp30",
                 "obligation_status": "due",
-                "due_paper": date(2026, 7, 6),
-                "due_efiling": date(2026, 7, 15),
+                # 逾期锚 e-Filing 日(与矩阵页 isOverdue 同一把尺),这一行两个日子都过了
+                "due_paper": date(2026, 6, 30),
+                "due_efiling": date(2026, 7, 6),
                 "work_order_id": "w1",
                 "order_status": "collecting",
                 "display_names": None,

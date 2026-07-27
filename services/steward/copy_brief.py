@@ -91,12 +91,21 @@ _FILE_READY = {"zh": "可下载", "th": "ดาวน์โหลดได้"}
 _FILE_PENDING = {"zh": "还没出文件", "th": "ยังไม่มีไฟล์"}
 
 _BRIEF = {
-    "zh": "{period} · 今天要盯的:逾期 {overdue} 项 · {window} 天内到期 {soon} 项 · 等你审 {orders} 张工单({flagged} 件待判) · 近 {pdays} 天推失败 {failed} 条 · 缺料 {missing} 家。{top}{note}",
-    "th": "งวด {period} · วันนี้ต้องตามอะไรบ้าง: เลยกำหนด {overdue} รายการ · ครบกำหนดใน {window} วัน {soon} รายการ · รอคุณตรวจ {orders} งาน ({flagged} รายการที่ต้องตัดสิน) · ส่งไม่สำเร็จใน {pdays} วันล่าสุด {failed} รายการ · เอกสารไม่ครบ {missing} ราย {top}{note}",
+    "zh": "{period} · 今天要盯的:逾期 {overdue} 项 · {window} 天内到期 {soon} 项 · 等你审 {orders} 张工单({flagged} 件待判) · 近 {pdays} 天{pscope}推失败 {failed} 条 · 缺料 {missing} 家。{top}{note}",
+    "th": "งวด {period} · วันนี้ต้องตามอะไรบ้าง: เลยกำหนด {overdue} รายการ · ครบกำหนดใน {window} วัน {soon} รายการ · รอคุณตรวจ {orders} งาน ({flagged} รายการที่ต้องตัดสิน) · ส่งไม่สำเร็จ{pscope}ใน {pdays} วันล่าสุด {failed} รายการ · เอกสารไม่ครบ {missing} ราย {top}{note}",
 }
+# 推失败只数得到本人推的(tools_brief.PUSH_SCOPE_SELF),与另外三个数不同轴 —— 不加这半句,
+# 同事替同一批客户推失败的票会被这句话说成"不存在"。
+_BRIEF_PUSH_SELF = {"zh": "你自己", "th": "ของคุณเอง"}
 _BRIEF_CLEAR = {
-    "zh": "{period}:今天没有逾期的、没有等你审的、也没有推失败的。{note}",
-    "th": "งวด {period}: วันนี้ไม่มีรายการเลยกำหนด ไม่มีงานรอตรวจ และไม่มีรายการส่งไม่สำเร็จ {note}",
+    "zh": "{period}:今天没有逾期的、没有等你审的、{pscope}也没有推失败的。{note}",
+    "th": "งวด {period}: วันนี้ไม่มีรายการเลยกำหนด ไม่มีงานรอตรวจ และไม่มีรายการส่งไม่สำเร็จ{pscope} {note}",
+}
+# 有一路没查出来时,「今天没活」这句话是假的:那一路的活恰好被算成了 0,而会计读到的第一句
+# 就是"今天没这类活"。清净日与降级同时成立时只说得起这一句。
+_BRIEF_CLEAR_PARTIAL = {
+    "zh": "{period}:查得到的这几路今天没活,「{lanes}」没查出来 —— 这部分有没有活我说不了。{note}",
+    "th": "งวด {period}: เท่าที่ดึงข้อมูลได้ วันนี้ไม่มีงานค้าง แต่ดึง「{lanes}」ไม่สำเร็จ จึงยังบอกไม่ได้ว่าส่วนนี้มีงานหรือไม่ {note}",
 }
 _BRIEF_TOP = {"zh": "最紧的一条:{line}。", "th": "เร่งที่สุด: {line}"}
 _BRIEF_PARTIAL = {
@@ -194,35 +203,50 @@ def deliverable(code: str, lang: str) -> str:
 
 def today_brief(data: dict, lang: str) -> str:
     counts = data.get("counts") or {}
-    note = _brief_note(data, lang)
+    lanes = _lane_names(data, lang)
+    truncated = _t(_BRIEF_TRUNCATED, lang) if data.get("truncated") else ""
+    period = data.get("period", "")
     if not data.get("total") and not any(counts.values()):
-        return _t(_BRIEF_CLEAR, lang).format(period=data.get("period", ""), note=note).strip()
+        if lanes:
+            return (
+                _t(_BRIEF_CLEAR_PARTIAL, lang)
+                .format(period=period, lanes="、".join(lanes), note=truncated)
+                .strip()
+            )
+        return (
+            _t(_BRIEF_CLEAR, lang)
+            .format(period=period, pscope=_push_scope(data, lang), note=truncated)
+            .strip()
+        )
+    partial = _t(_BRIEF_PARTIAL, lang).format(lanes="、".join(lanes)) if lanes else ""
     rows = data.get("rows") or []
     top = _t(_BRIEF_TOP, lang).format(line=_brief_line(rows[0], lang)) if rows else ""
     return _t(_BRIEF, lang).format(
-        period=data.get("period", ""),
+        period=period,
         overdue=counts.get("overdue", 0),
         window=data.get("window_days", 0),
         soon=counts.get("due_soon", 0),
         orders=counts.get("review_orders", 0),
         flagged=counts.get("review_flagged", 0),
         pdays=data.get("push_days", 0),
+        pscope=_push_scope(data, lang),
         failed=counts.get("push_failed", 0),
         missing=counts.get("missing_materials", 0),
         top=top,
-        note=note,
+        note=partial + truncated,
     )
 
 
-def _brief_note(data: dict, lang: str) -> str:
-    """哪一路没查出来 / 数得不全。缺了就明说,不让读的人以为这四个数是全量。"""
-    parts = []
-    lanes = [_t(_LANE.get(k, {}), lang) or k for k in data.get("partial") or []]
-    if lanes:
-        parts.append(_t(_BRIEF_PARTIAL, lang).format(lanes="、".join(lanes)))
-    if data.get("truncated"):
-        parts.append(_t(_BRIEF_TRUNCATED, lang))
-    return "".join(parts)
+def _lane_names(data: dict, lang: str) -> list[str]:
+    """没查出来的那几路叫什么。缺了就点名,不含糊说"部分数据缺失"。"""
+    return [_t(_LANE.get(k, {}), lang) or k for k in data.get("partial") or []]
+
+
+def _push_scope(data: dict, lang: str) -> str:
+    """推失败那个数的作用域限定语(本人推的 vs 全部)。别处的三个数按账套算,不带这半句。"""
+    if data.get("push_scope") != tools_brief.PUSH_SCOPE_SELF:
+        return ""
+    return _t(_BRIEF_PUSH_SELF, lang)
 
 
 def _brief_line(row: dict, lang: str) -> str:

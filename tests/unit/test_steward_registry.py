@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import unittest
+from datetime import date, datetime, timedelta, timezone
+from unittest import mock
 
 from services.agent.contracts import SlotSpec
 from services.steward import registry, tools
@@ -85,6 +87,31 @@ class SlotContractTests(unittest.TestCase):
             for slot in tool.slots:
                 if slot.name in ("client_name", "keyword"):
                     self.assertEqual(slot.source, "user_text", f"{tool.name}.{slot.name}")
+
+
+class ContextClockTests(unittest.TestCase):
+    """工具的「今天」必须是曼谷日历日:服务器跑 UTC,date.today() 在曼谷 00:00–07:00 还停在
+    昨天(正是会计赶 15 号申报的时段),逾期与剩余天数会整体差一天。"""
+
+    class _FrozenDatetime:
+        @staticmethod
+        def now(tz=None):
+            return datetime(2026, 7, 14, 18, 30, tzinfo=timezone.utc).astimezone(tz)
+
+    def _ctx(self):
+        return registry.ToolContext(user={"id": "u1"}, tenant_id="t-1", user_id="u1")
+
+    def test_today_defaults_to_bangkok_calendar_day(self):
+        with mock.patch("services.sales.dates.datetime", self._FrozenDatetime):
+            self.assertEqual(self._ctx().today, date(2026, 7, 15))  # UTC 那边还是 7-14
+
+    def test_today_is_not_the_utc_day(self):
+        instant = self._FrozenDatetime.now(timezone.utc)
+        utc_day = instant.date()
+        bangkok_day = (instant + timedelta(hours=7)).date()
+        self.assertNotEqual(utc_day, bangkok_day)  # 选的时刻本身要跨日,否则这条自证
+        with mock.patch("services.sales.dates.datetime", self._FrozenDatetime):
+            self.assertEqual(self._ctx().today, bangkok_day)
 
 
 class PromptCatalogTests(unittest.TestCase):

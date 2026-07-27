@@ -78,6 +78,33 @@ class DueSoonCopyTests(unittest.TestCase):
             self.assertTrue(copy.reply(registry.DUE_SOON, data, lang))
         self.assertNotIn("最近一项", copy.reply(registry.DUE_SOON, data, "zh"))
 
+    def test_paper_deadline_already_passed_is_called_out(self):
+        """倒计时锚 e-Filing 日;纸质日已过而电子日没到时不点破,纸质申报的客户会漏了真截止日。"""
+        head = {
+            **self._DATA["rows"][0],
+            "due": "2026-07-23",
+            "days_left": 5,
+            "due_paper": "2026-07-15",
+            "days_left_paper": -3,
+        }
+        for lang in _LANGS:
+            text = copy.reply(registry.DUE_SOON, {**self._DATA, "rows": [head]}, lang)
+            self.assertIn("2026-07-15", text, lang)
+        self.assertIn(
+            "还剩 5 天", copy.reply(registry.DUE_SOON, {**self._DATA, "rows": [head]}, "zh")
+        )
+
+    def test_no_paper_note_when_both_dates_are_still_ahead(self):
+        head = {**self._DATA["rows"][0], "days_left": 5, "days_left_paper": 2}
+        text = copy.reply(registry.DUE_SOON, {**self._DATA, "rows": [head]}, "zh")
+        self.assertNotIn("纸质", text)
+
+    def test_no_paper_note_when_both_dates_are_already_past(self):
+        """两个日子都过了,「已逾期」那句已经说清楚,再补一句纸质只会噪音。"""
+        head = {**self._DATA["rows"][0], "days_left": -3, "days_left_paper": -11}
+        text = copy.reply(registry.DUE_SOON, {**self._DATA, "rows": [head]}, "zh")
+        self.assertNotIn("纸质", text)
+
     def test_days_left_none_is_not_rendered_as_zero(self):
         self.assertNotIn("0", copy_close.days_left(None, "zh"))
         self.assertIn("就是今天", copy_close.days_left(0, "zh"))

@@ -53,6 +53,12 @@ def due_soon(ctx: ToolContext, args: dict) -> ToolResult:
     ②status=nil 的义务本来就不用交;③工单已冻结(archive)= 这期已交付,不再催。
     截止日经 defer_optional 现算法定顺延(遇周末/泰国政府假日逐日推),裸日期不直接示人 ——
     会计照裸日期赶工会白加一天班。
+
+    逾期锚点日 = 顺延后的 e-Filing 日,与矩阵页/看板同一把尺(matrix._cell 的
+    due_efiling_deferred,前端 isOverdue 读它)。锚纸质日会晚 8 天:ภ.พ.30 纸质 15 日、
+    e-Filing 23 日,每月 16–23 号这一周同一个格子会出现「已逾期 3 天」和「还剩 5 天」两个
+    结论,而这张清单唯一的排序依据就是它。纸质日与它的倒计时一并带出去,答复层在纸质已过
+    但电子还有时间的那一周说清楚。
     """
     from services.workorder import matrix, obligation_engine
 
@@ -70,10 +76,9 @@ def due_soon(ctx: ToolContext, args: dict) -> ToolResult:
         badge = matrix.badge(status, r.get("order_status"))
         if badge == matrix.BADGE_FROZEN:
             continue
-        # 纸质截止日是保守基准(e-Filing 只会更晚),拿它排序与倒计时;两个日期都如实带出去。
         paper = obligation_engine.defer_optional(r.get("due_paper"))
         efiling = obligation_engine.defer_optional(r.get("due_efiling"))
-        anchor = paper or efiling
+        anchor = efiling or paper  # 见函数注释:锚 e-Filing 日,与矩阵页 isOverdue 同一把尺
         pending.append(
             {
                 "client_id": int(r["client_id"]),
@@ -82,7 +87,9 @@ def due_soon(ctx: ToolContext, args: dict) -> ToolResult:
                 "badge": badge,
                 "due": _iso(anchor),
                 "due_efiling": _iso(efiling),
+                "due_paper": _iso(paper),
                 "days_left": _days_left(anchor, ctx.today),
+                "days_left_paper": _days_left(paper, ctx.today),
                 "_sort": anchor or date.max,
             }
         )

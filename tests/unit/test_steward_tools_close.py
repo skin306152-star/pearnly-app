@@ -4,7 +4,8 @@
 薄封装不是口号,是断言:每个用例都 patch 掉被包的那个服务层函数,证明工具真的走了它
 (而不是自己另抄一份 SQL/口径)。另外钉死四条容易在这几个工具上破的线:
   ① 账套作用域:被分派成员在对话里也只看得见分到的账套;
-  ② 截止日必须经法定顺延现算(裸日期直接示人 = 让会计白加一天班);
+  ② 截止日必须经法定顺延现算(裸日期直接示人 = 让会计白加一天班),且逾期锚 e-Filing 日 ——
+     与矩阵页/看板的 isOverdue 同一把尺,不然同一个格子两处结论相反;
   ③ 「还没算出来」不许渲染成 0(has_numbers / has_recon 分开报);
   ④ 枚举外的严重度不拿去查库。
 零真 DB。
@@ -34,6 +35,12 @@ def _ctx(allowed=None):
         allowed_client_ids=allowed,
         today=_TODAY,
     )
+
+
+def _ctx_on(today: date):
+    ctx = _ctx()
+    ctx.today = today
+    return ctx
 
 
 class _CurCM:
@@ -78,8 +85,8 @@ class DueSoonTests(unittest.TestCase):
 
     def test_wraps_matrix_service_and_counts_overdue(self):
         rows = [
-            _matrix_row(),  # 7-15,距 7-10 还有 5 天
-            _matrix_row(client_id=2, client_name="62AHATAI", due_paper=date(2026, 7, 7)),
+            _matrix_row(due_efiling=date(2026, 7, 15)),  # 距 7-10 还有 5 天
+            _matrix_row(client_id=2, client_name="62AHATAI", due_efiling=date(2026, 7, 7)),
         ]
         res, fetch = self._run(rows)
         self.assertEqual(fetch.call_args.kwargs["period"], "2569-07")
@@ -93,11 +100,29 @@ class DueSoonTests(unittest.TestCase):
         )
         self.assertEqual(res.data["rows"][0]["days_left"], -3)
 
+    def test_overdue_anchors_the_efiling_date_like_the_matrix_page(self):
+        """纸质 15 日已过、e-Filing 23 日还没到的那一周(ภ.พ.30 每月 16–23 号):矩阵页的
+        isOverdue 读 due_efiling_deferred 说"还剩 5 天",这里必须给同一个结论。"""
+        res, _ = self._run([_matrix_row()], ctx=_ctx_on(date(2026, 7, 18)))
+        row = res.data["rows"][0]
+        self.assertEqual(row["due"], "2026-07-23")
+        self.assertEqual(row["days_left"], 5)
+        self.assertEqual(res.data["overdue"], 0)
+        # 纸质日与它的倒计时照样带出去,答复层据此说清"这是电子申报的日子"。
+        self.assertEqual(row["due_paper"], "2026-07-15")
+        self.assertEqual(row["days_left_paper"], -3)
+
     def test_due_date_is_deferred_over_weekend(self):
         """截止日落周六 → 顺延到下个工作日。裸日期直接示人会让人按 7-18 赶工。"""
-        res, _ = self._run([_matrix_row(due_paper=date(2026, 7, 18))])
+        res, _ = self._run([_matrix_row(due_efiling=date(2026, 7, 18))])
         self.assertEqual(res.data["rows"][0]["due"], "2026-07-20")
         self.assertEqual(res.data["rows"][0]["days_left"], 10)
+
+    def test_paper_only_obligation_falls_back_to_the_paper_date(self):
+        """没有 e-Filing 日的义务(纸质申报)不能因此变成"没有截止日"。"""
+        res, _ = self._run([_matrix_row(due_efiling=None)])
+        self.assertEqual(res.data["rows"][0]["due"], "2026-07-15")
+        self.assertEqual(res.data["rows"][0]["days_left"], 5)
 
     def test_nil_and_unmaterialised_and_frozen_are_not_owed(self):
         rows = [

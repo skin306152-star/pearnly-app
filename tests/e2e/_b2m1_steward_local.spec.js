@@ -452,14 +452,14 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         await expect(page.locator('.stw-step:nth-child(2) .st-badge')).toHaveClass(/st-warn/);
         // 文案与能力一致(双向闸在 tests/unit/test_ai_steward_pure.py):闭集里已经有写工具
         // (erp_push),页面自述就必须说「会改数据的操作要你先批准」,不许再自称只查不改。
-        const noteTexts = await page.evaluate(() => [
-            document.querySelector('#v-steward .board-head .note').textContent,
-            document.querySelector('.stw-composer-note').textContent,
-        ]);
-        for (const t of noteTexts) {
-            expect(t).not.toContain('只查不改数');
-            expect(t).toContain('会改数据的操作需你先批准');
-        }
+        const headNote = await page.evaluate(
+            () => document.querySelector('#v-steward .board-head .note').textContent
+        );
+        expect(headNote).not.toContain('只查不改数');
+        expect(headNote).toContain('会改数据的操作需你先批准');
+        // 这句只在页头印一次:composer 注脚曾经复读同一句,是同屏第二遍,已删。
+        // 补一条反证守住去重结果 —— 没有附件口时那个注脚就不该存在,免得哪天又被加回来。
+        await expect(page.locator('.stw-composer-note')).toHaveCount(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '07-authz-pending-card.png'),
             fullPage: true,

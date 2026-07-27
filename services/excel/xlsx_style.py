@@ -72,19 +72,31 @@ def right():
     return Alignment(horizontal="right", vertical="center")
 
 
-def write_header_row(ws, headers: Sequence[str], widths: Optional[Sequence[int]] = None) -> None:
-    """写表头 + 列宽 + 冻结首行。所有导出表共用,保证视觉一致。"""
+def write_header_row(
+    ws,
+    headers: Sequence[str],
+    widths: Optional[Sequence[int]] = None,
+    *,
+    row: int = 1,
+    freeze: bool = True,
+) -> None:
+    """写表头 + 列宽 + 冻结。所有导出表共用,保证视觉一致。
+
+    row 可下移:账簿类表在表头之上还要留标题与「用的是哪套科目码」的横幅,那两行不能被
+    冻结区吃掉,否则会计一滚动就看不见科目码来源。
+    """
     fill, font, border, align = header_fill(), header_font(), thin_border(), center()
     for i, h in enumerate(headers, start=1):
-        c = ws.cell(row=1, column=i, value=h)
+        c = ws.cell(row=row, column=i, value=h)
         c.font = font
         c.fill = fill
         c.alignment = align
         c.border = border
         if widths and i <= len(widths):
             ws.column_dimensions[get_column_letter(i)].width = widths[i - 1]
-    ws.row_dimensions[1].height = 30
-    ws.freeze_panes = "A2"
+    ws.row_dimensions[row].height = 30
+    if freeze:
+        ws.freeze_panes = f"A{row + 1}"
 
 
 def style_cell(cell: Any, *, align=None, fmt: Optional[str] = None, fill=None) -> None:

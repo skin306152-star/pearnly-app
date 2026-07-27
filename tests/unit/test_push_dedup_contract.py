@@ -184,6 +184,38 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
         self.assertIn("ORDER BY created_at DESC", sql)
         self.assertIn("LIMIT 1", sql)
 
+    def test_name_says_recent_but_there_is_no_time_window(self):
+        """函数名里的 `recent` 是假的 —— 实际语义是 "ever"(成功过一次就恒命中)。
+
+        钉死它:哪天有人真给这条 SQL 加了时间窗,重复过账的口子就开了,而名字看起来
+        一直很合理。要改语义必须先来改这条测试,顺带被迫解释为什么。
+        """
+        cursor = _MockCursor(result=None)
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
+            db.has_recent_successful_push("h", "e", "u")
+        sql = cursor.executed[0][0].lower()
+        for window in ("interval", "now()", "current_timestamp", "created_at >"):
+            self.assertNotIn(window, sql, f"SQL 里出现了时间窗 {window!r}:去重从 ever 缩成了 recent")
+
+    def test_scope_is_the_user_not_the_tenant(self):
+        """L0 按 user_id 作用域,L1(prior_docnum)按 tenant_id —— 两把尺子,别互相当兜底。
+
+        同租户换个会计重推时 L0 判不出。写成测试是因为「L0 已经兜死了」这个误解,光靠
+        注释拦不住:名字和位置都在诱导人这么想。
+        """
+        cursor = _MockCursor(result=None)
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
+            db.has_recent_successful_push("h", "e", "u")
+        sql = cursor.executed[0][0].lower()
+        self.assertIn("user_id = %s", sql)
+        self.assertNotIn("tenant_id", sql)
+
 
 class HasRecentSuccessfulPushNegativeTests(unittest.TestCase):
     """反向 · 不命中 / 边界."""

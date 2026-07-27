@@ -79,6 +79,7 @@ class Run:
 
     entry: dict = field(default_factory=dict)
     task: dict = field(default_factory=dict)
+    created: dict = field(default_factory=dict)  # store.create_task 收到的入参
     finished: dict = field(default_factory=dict)
     messages: list = field(default_factory=list)
     steps: list = field(default_factory=list)
@@ -89,6 +90,7 @@ class Run:
     parked: list = field(default_factory=list)
     resumed: list = field(default_factory=list)
     authz_cards: list = field(default_factory=list)
+    status_checks: list = field(default_factory=list)  # 循环每步开头读到的任务状态
 
     @property
     def loop(self) -> dict:
@@ -119,7 +121,8 @@ class Harness:
     """跑一条消息的完整一圈:brain_entry 建任务 → worker 认领 → 循环 → 收尾。
 
     decisions 是大脑逐步的脚本(_Outcome 列表,用完抛断言:说明循环比预期多调了模型);
-    handlers 是 {工具名: ToolResult 或 callable(ctx,args)}。
+    handlers 是 {工具名: ToolResult 或 callable(ctx,args)};statuses 是循环每步开头读到的
+    任务状态(逐次弹出,用完回落 running)—— 会计中途点取消就靠它模拟。
     """
 
     def __init__(
@@ -132,12 +135,14 @@ class Harness:
         caps: Optional[list] = None,
         task_row: Optional[dict] = None,
         preparers: Optional[dict] = None,
+        statuses: Optional[list] = None,
     ):
         self.preparers = dict(preparers or {})
         self.decisions, self.handlers = list(decisions), dict(handlers or {})
         self.text, self.lang = text, lang
         self.caps = list(caps or [])  # budget.reserve 的逐次返回值(None = 放行)
         self.task_row = task_row
+        self.statuses = list(statuses or [])
         self.out = Run()
 
     # ── 桩 ────────────────────────────────────────────────
@@ -189,6 +194,11 @@ class Harness:
         self.out.resumed.append(dict(kw))
         return True
 
+    def _get_task(self, _cur, **kw):
+        status = self.statuses.pop(0) if self.statuses else store.TASK_RUNNING
+        self.out.status_checks.append(status)
+        return {"id": kw["task_id"], "tenant_id": kw["tenant_id"], "status": status}
+
     def _open_request(self, _cur, **kw):
         self.out.authz_cards.append(_copy.deepcopy(kw))
         self.out.timeline.append(("card", kw["tool"]))
@@ -200,6 +210,7 @@ class Harness:
 
         def create_task(_cur, **kw):
             created.update({"id": "task-1", **kw})
+            self.out.created = dict(kw)
             return created
 
         with ExitStack() as stack:
@@ -218,6 +229,7 @@ class Harness:
                 mock.patch.object(store, "touch_session", mock.Mock()),
                 mock.patch.object(store, "list_messages", lambda *a, **k: []),
                 mock.patch.object(store, "find_waiting_question", lambda *a, **k: waiting),
+                mock.patch.object(store, "get_task", self._get_task),
                 mock.patch.object(worker, "_build_context", lambda *a, **k: ctx(lang=self.lang)),
                 mock.patch.object(budget, "reserve", self._reserve),
                 mock.patch.object(budget, "settle", mock.Mock()),

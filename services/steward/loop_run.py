@@ -25,7 +25,17 @@ import logging
 from typing import Callable, Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import authz, brain_loop, budget, copy, copy_loop, registry, store, tools
+from services.steward import (
+    authz,
+    brain_loop,
+    budget,
+    copy,
+    copy_loop,
+    loop_ground,
+    registry,
+    store,
+    tools,
+)
 from services.steward.loop_state import Ledger, empty_loop
 from services.steward.registry import ToolContext
 
@@ -64,6 +74,7 @@ class _Run:
         self.tried: list = []
         self.fails = 0
         self.dup_hits = 0
+        self.blocked = 0  # 提议被接地闸/一票闸打回的次数(没跑成任何工具的空转)
 
     # ── 主流程 ────────────────────────────────────────────
     def go(self) -> None:
@@ -75,6 +86,8 @@ class _Run:
             # 全花在取数上就会出现「查完了不说话」,那比少查一步糟得多(_TAIL_RESERVE_S 同理)。
             if int(self.loop.get("calls") or 0) >= brain_loop.MAX_CALLS - 1:
                 break
+            if self._stopped():
+                return
             # force_reply 只在尾部(_wrap_up)给:LINE 侧一取到数据就催成文,那是 20 秒
             # reply_token 逼出来的,套到这里等于把「串两步」这个能力关掉。
             step = self._decide(force_reply=False)
@@ -82,17 +95,55 @@ class _Run:
                 return  # 预算触线已收尾
             if self._apply(step):
                 return
-            if self.fails >= brain_loop.MAX_CONSECUTIVE_FAILS or self.dup_hits >= 2:
-                return self._stall()
+            if self._braking():
+                return self._brake()
         self._wrap_up()
+
+    def _stopped(self) -> bool:
+        """会计在左窗点了取消 → 静默收手:不再调模型、不再跑工具、不再记账。
+
+        取消对多步循环的语义就是「别再往下走了」;跑在 worker 线程里的这一圈本来毫不知情,
+        会把剩下的步数全烧完,而结果最后被 finish_task 的终态守卫丢弃(白花钱且停不掉)。
+        这里不 finalize 也不回话:任务行已是终态,写回去只会被拒。
+        """
+        from core import db
+
+        with db.get_cursor() as cur:
+            row = store.get_task(cur, tenant_id=self.tenant_id, task_id=self.task_id)
+        status = str((row or {}).get("status") or "")
+        if status == store.TASK_RUNNING:
+            return False
+        logger.info("[steward.loop] task %s left running (%s) — stop here", self.task_id, status)
+        return True
+
+    def _braking(self) -> bool:
+        """该不该停下。接地闸打回的提议(blocked)也算打转:它一步都没跑成,fails/dup_hits
+        一个都不动,以前只有 MAX_CALLS 兜着 —— 一条消息把 6 次模型调用全烧掉,左窗还是
+        开局那两行。"""
+        return (
+            self.fails >= brain_loop.MAX_CONSECUTIVE_FAILS
+            or self.dup_hits >= 2
+            or self.blocked >= brain_loop.MAX_BLOCKED
+        )
+
+    def _brake(self) -> None:
+        """停下的方式:手上有真跑出来的数据就拿数据成文,没有才如实说试过什么。"""
+        if self.blocked and self._has_data():
+            return self._wrap_up()
+        self._stall()
 
     def _apply(self, step: brain_loop.Decision) -> bool:
         """一步裁决 → 动作。返回 True = 本轮已收尾(成文/停卡/追问),循环结束。"""
         if step.kind == brain_loop.ACT_REPLY:
-            if step.message:
-                return self._say(step.message)
-            self.fails += 1
-            return False  # 空回复:有观测就下一轮强制成文,没观测算一次故障
+            if not step.message:
+                self.fails += 1
+                return False  # 空回复:有观测就下一轮强制成文,没观测算一次故障
+            if self.blocked and not self._has_data():
+                # 提议过的工具全被闸打回、一条观测都没有 → 这句结论没有任何数据支撑。
+                # 照发就是「零工具调用的编造答案以已完成的形状交付」,宁可如实说没做出来。
+                self._stall()
+                return True
+            return self._say(step.message)
         if step.kind == brain_loop.ACT_ASK:
             return self._ask(step)
         if step.kind == brain_loop.ACT_CANT:
@@ -178,6 +229,7 @@ class _Run:
         key = f"missing:{step.tool}:{field}"
         seen = sum(1 for o in self.obs if o.get("error") == key)
         self._observe(step.tool or "", False, key)
+        self.blocked += 1
         if seen >= 1 and int(self.loop.get("asked") or 0) < brain_loop.MAX_ASKS:
             return self._ask(
                 brain_loop.Decision(kind=brain_loop.ACT_ASK, ask_field=field,
@@ -187,17 +239,22 @@ class _Run:
 
     def _ground(self, tool: str, raw_args: dict):
         """参数接地。复用 orchestrator 那一份(slots 接地闸 + 期间折佛历):接地口径只能有
-        一份,循环这边再写一遍迟早与单次路漂,漂出来的就是挂错账套。"""
+        一份,循环这边再写一遍迟早与单次路漂,漂出来的就是挂错账套。
+
+        循环比单次路多一份语料(loop_ground):上一步真查出来的值 + 她回答追问打的字。
+        少了它,client_name / keyword 这些 source="user_text" 的必填槽只要取值来自上一步
+        结果就必被判编造 —— 串两步与选择题追问这两条能力就都是空头支票。
+        """
         from services.steward import orchestrator
 
-        return orchestrator._ground(
-            self.ctx, tool, raw_args, text=self.text, history=self.payload.get("history") or []
-        )
+        history = list(self.payload.get("history") or []) + loop_ground.history_rows(self.loop)
+        return orchestrator._ground(self.ctx, tool, raw_args, text=self.text, history=history)
 
     # ── 写步:铸卡,不执行 ────────────────────────────────
     def _write(self, step: brain_loop.Decision, spec, args: dict) -> bool:
         if self.loop.get("wrote"):
             self._observe(step.tool, False, _OBS_ONE_WRITE)
+            self.blocked += 1
             return False
         prepared = tools.prepare(step.tool, self.ctx, args)
         if not prepared.ok:
@@ -302,11 +359,24 @@ class _Run:
         return True
 
     def _fallback_say(self, prefix: str) -> None:
-        text = copy_loop.grounded_summary(self.results, self.lang)
+        text = self._grounded_text()
         if text:
             self._done(f"{prefix}{text}".strip(), status=store.TASK_DONE)
             return
         self._stall()
+
+    def _has_data(self) -> bool:
+        """本任务有没有真跑成功过的工具。self.results 是【本进程内】的,任何一次续跑
+        (回答追问后、批准后)开局都是空的 —— 只认它,等于把最长最贵的那批任务全判成
+        「什么都没查到」,而它们恰恰是最可能触封顶线的那批。"""
+        return bool(self.results) or any(s.get("ok") for s in self.loop.get("steps") or [])
+
+    def _grounded_text(self) -> str:
+        """兜底成文的确定性文本。本进程的结果优先;续跑开局没有结果时回落到已落库的步骤
+        detail —— 那一行正是上一轮 copy.reply 渲染的同一句话(同一份渲染器,不会漂)。
+        不拿 digest 重渲染:它是给模型看的截断版,重渲染会把「前 5 行」当成总数说出去。"""
+        text = copy_loop.grounded_summary(self.results, self.lang)
+        return text or copy_loop.landed_detail(self.ledger.steps)
 
     def _stall(self) -> None:
         """打转/连着失败:说清试过什么就收场。静默转到超时才是最糟的那种失败。"""
@@ -358,7 +428,7 @@ class _Run:
     def _on_capped(self, gate: dict) -> None:
         """触线要有台阶不要悬崖:任务级 → 拿已有观测确定性成文收尾(查了一半不说话比多花
         ฿1 糟得多);会话级/租户级 → 才硬拒(那是失控用户的顶,给台阶就等于没有顶)。"""
-        if gate["code"] == budget.ERR_TASK and self.results:
+        if gate["code"] == budget.ERR_TASK and self._has_data():
             self._fallback_say(copy_loop.capped(self.lang) + "\n")
             return
         self._done(

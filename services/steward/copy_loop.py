@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from services.steward import copy
+from services.steward import copy, store
 
 # 单条观测进提示词的上限(字符)。见设计报告 §5 的成本表:6 步不截断 ฿2.13 → 截断后 ฿1.29。
 OBS_MAX_CHARS = 1200
@@ -103,6 +103,22 @@ def grounded_summary(results: list, lang: str) -> Optional[str]:
         if (text or "").strip():
             return text
     return None
+
+
+def landed_detail(steps: Optional[list]) -> str:
+    """已落库步骤里最后一条跑成了的 detail —— 续跑的兜底成文靠它。
+
+    续跑开局手上没有本进程的结果(观测只从 digest 重建),而 digest 是给模型看的截断版,
+    拿它重渲染会把「前 5 行」当成总数说出去。步骤 detail 是上一轮 copy.reply 渲染的原句,
+    同一份渲染器、同一句话,不会漂。
+    """
+    for step in reversed(steps or []):
+        if step.get("kind") != "tool" or step.get("state") != store.STEP_DONE:
+            continue
+        detail = str(step.get("detail") or "").strip()
+        if detail:
+            return detail
+    return ""
 
 
 def digest(tool: str, ok: bool, error: Optional[str], data: Optional[dict]) -> dict:

@@ -53,6 +53,10 @@ MAX_ASKS = 1
 MAX_SAME_TOOL = 2
 # 连续几步失败就停下说实话(不再试第三次)。
 MAX_CONSECUTIVE_FAILS = 2
+# 提议被闸打回(参数接不了地 / 一条任务只推一张票)几次就停下。这类空转一步都没跑成,
+# 连败/去重两个计数器一个都不动,左窗零痕迹 —— 不单独刹车就只剩 MAX_CALLS 兜着,
+# 也就是一条消息把整条任务的模型调用全烧掉。
+MAX_BLOCKED = 2
 
 _TIMEOUT_S = 20
 _MAX_UTTERANCE = 2000

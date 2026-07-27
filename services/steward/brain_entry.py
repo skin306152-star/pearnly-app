@@ -18,14 +18,21 @@ from __future__ import annotations
 import logging
 import os
 
-from services.steward import budget, copy, copy_loop, loop_state, store
+from services.steward import budget, copy, copy_loop, loop_state, registry, store
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
 
 _HISTORY_TURNS = 8
 _MAX_TITLE = 60
-_DEFAULT_LOOP_TIMEOUT_S = 600
+# 一圈里除了那一步写活,还要花掉批准前后的模型调用与只读步骤。
+_LOOP_WRITE_HEADROOM_S = 300
+# 循环任务的超时下限由循环里可能跑的【最长那一步】定,不能自己拍一个更短的数:erp_push
+# 声明的是 900s(registry.ERP_PUSH_TIMEOUT_S),它的轮询 deadline 840s 就是为了在这个预算
+# 之内把「还在写」如实报出来并带上 job_id。写活跑在续跑那一圈里,worker 的 wait_for 用的
+# 正是这条任务行上的 timeout_s —— 定成 600s 等于在桥还在写 DBF 时硬砍,任务落 steward.timeout,
+# 而票可能已经进了客户账套,会计连 job_id 都拿不到去对账。
+_DEFAULT_LOOP_TIMEOUT_S = registry.ERP_PUSH_TIMEOUT_S + _LOOP_WRITE_HEADROOM_S
 
 
 def loop_timeout_s() -> int:

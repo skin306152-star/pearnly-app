@@ -232,6 +232,71 @@ def update_steps(cur, *, tenant_id: str, task_id: str, steps: list) -> bool:
     return cur.rowcount > 0
 
 
+def update_payload(cur, *, tenant_id: str, task_id: str, patch: dict) -> bool:
+    """按键合并进 payload(不整份覆盖)。多步循环每跑完一步就要把「跑过的事实」落库,
+    整份覆盖会把同一行里别人写的键(authorization 是 authz 用 jsonb_set 写的)冲掉。
+    只在没收尾的任务上生效 —— 终态任务的执行上下文不该再变。"""
+    cur.execute(
+        "UPDATE steward_tasks SET payload = COALESCE(payload, '{}'::jsonb) || %s::jsonb "
+        "WHERE tenant_id = %s AND id = %s AND status = ANY(%s)",
+        (
+            json.dumps(patch or {}, ensure_ascii=False, default=str),
+            tenant_id,
+            task_id,
+            list(_FINISHABLE),
+        ),
+    )
+    return cur.rowcount > 0
+
+
+def park_waiting(cur, *, tenant_id: str, task_id: str, steps: list) -> bool:
+    """停成「等你回答」但【不收尾】:追问不是完成也不是失败,任务留着等下一条消息续跑。
+
+    与 finish_task 的差别就是不落 finished_at —— 落了就等于宣告这条任务到此为止,而
+    B3 那条「追问留一张永远挂着的等待卡」正是这么来的(建了 waiting_user 行、当场定格、
+    下一条消息又新建一条,那张卡再也没人动)。释放认领位,租约一并清掉。"""
+    cur.execute(
+        "UPDATE steward_tasks SET status = %s, steps = %s::jsonb, "
+        "worker_id = NULL, lease_until = NULL "
+        "WHERE tenant_id = %s AND id = %s AND status = ANY(%s)",
+        (
+            TASK_WAITING_USER,
+            json.dumps(steps or [], ensure_ascii=False, default=str),
+            tenant_id,
+            task_id,
+            list(_FINISHABLE),
+        ),
+    )
+    return cur.rowcount > 0
+
+
+def resume_task(cur, *, tenant_id: str, task_id: str, grace_s: int = 60) -> bool:
+    """把停在「等你回答」的任务放回待认领。带新租约当认领窗:created_at 是旧值,不续
+    租约会被失联收口的「排队超时限」判据当场误杀(与 authz._resume_running 同一取舍)。"""
+    cur.execute(
+        "UPDATE steward_tasks SET status = %s, worker_id = NULL, "
+        "lease_until = now() + make_interval(secs => timeout_s + %s) "
+        "WHERE tenant_id = %s AND id = %s AND status = %s",
+        (TASK_RUNNING, int(grace_s), tenant_id, task_id, TASK_WAITING_USER),
+    )
+    return cur.rowcount > 0
+
+
+def find_waiting_question(cur, *, tenant_id: str, session_id: str) -> Optional[dict]:
+    """本会话里那条「问了她一句、还等着回答」的循环任务(最近一条)。
+    有就把答案接回它续跑,不新建任务 —— 一个问题一条任务,状态才诚实。"""
+    cur.execute(
+        f"SELECT {_TASK_COLUMNS} FROM steward_tasks "
+        "WHERE tenant_id = %s AND session_id = %s AND status = %s "
+        "AND payload -> 'loop' -> 'pending_question' IS NOT NULL "
+        "AND payload -> 'loop' -> 'pending_question' <> 'null'::jsonb "
+        "ORDER BY created_at DESC LIMIT 1",
+        (tenant_id, session_id, TASK_WAITING_USER),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def finish_task(
     cur,
     *,
@@ -376,11 +441,17 @@ def public_message(row: dict) -> dict[str, Any]:
     return out
 
 
+def agent_count(steps: list) -> int:
+    """这条任务真调了几次工具(左窗那个数)。循环任务的工具步带 kind="tool";
+    单次路的步骤没有这个标记 → 回落 1,与 B3 时代逐字节同值。"""
+    return sum(1 for s in steps or [] if isinstance(s, dict) and s.get("kind") == "tool") or 1
+
+
 def public_task(row: dict) -> dict[str, Any]:
     """任务 → 左窗数据(前端直接喂 B1 状态组件)。
 
-    agent_count 恒 1:M1 一轮只派一个工具,诚实报 1;多 Agent 编排是 B3 以后的事,
-    这里绝不为了好看写个大于真实值的数(状态诚实)。
+    agent_count = 真实的工具调用次数(循环任务按步骤流水里带 kind="tool" 的行数;单次路
+    没有这个标记,照旧诚实报 1)。B3 时代它是硬编码的 1,循环上线后再写死就成了一处假数。
 
     payload/worker_id/lease_until 不外泄(内部执行上下文与队列机制,含身份信息);
     失败时错误码 + 人话原因一并给(四态诚实:说不清为什么失败 = 假绿的另一种写法)。
@@ -391,7 +462,7 @@ def public_task(row: dict) -> dict[str, Any]:
         "status": row.get("status") or TASK_RUNNING,
         "started_at": row["created_at"].isoformat() if row.get("created_at") else None,
         "finished_at": row["finished_at"].isoformat() if row.get("finished_at") else None,
-        "agent_count": 1,
+        "agent_count": agent_count(row.get("steps") or []),
         # 前端据此决定画不画「取消」:在跑的写活取消不了(见 cancellable),摆一个点了会 409
         # 的按钮比不摆更糟。
         "cancellable": cancellable(row),
@@ -401,9 +472,13 @@ def public_task(row: dict) -> dict[str, Any]:
     if row.get("error_code"):
         out["error_code"] = row["error_code"]
         out["error_reason"] = row.get("error_message") or ""
-    # 懒 import:authz 模块级依赖本模块,卡片投影只能函数级反向取(不然成环)。
+    # 懒 import:authz / loop_run 模块级依赖本模块,投影只能函数级反向取(不然成环)。
     from services.steward.authz import public_authorization_card
+    from services.steward.loop_state import public_loop
 
-    if card := public_authorization_card((row.get("payload") or {}).get("authorization")):
+    payload = row.get("payload") or {}
+    if card := public_authorization_card(payload.get("authorization")):
         out["authorization"] = card
+    if loop := public_loop(payload):
+        out["loop"] = loop
     return out

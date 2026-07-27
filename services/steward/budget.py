@@ -36,13 +36,18 @@ ERR_TASK = "steward.budget_task_exceeded"
 ERR_SESSION = "steward.budget_session_exceeded"
 ERR_TENANT = "steward.budget_tenant_exceeded"
 
-# 默认上限(THB)。planner 单次调用 <฿0.1,任务 ฿1/会话 ฿5 够正常用、烧不穿;
-# 租户 24h ฿50 = 十个会话的量,事务所全员正常用碰不到,失控用户碰得到。
-_DEFAULT_TASK_CAP = "1"
-_DEFAULT_SESSION_CAP = "5"
-_DEFAULT_TENANT_DAILY_CAP = "50"
+# 默认上限(THB)。口径随大脑循环上线上调一档(单次分类 ฿0.1 → 一条多步任务 ฿0.34-1.29,
+# 观测截断后的实测区间见设计报告 §5):
+#   任务 ฿2  —— ฿1 会在第 5-6 步把长任务砍在半路,「查了一半不说话」比多花 ฿1 糟得多;
+#               与步数上限 6 互为兜底,谁先到谁拦。
+#   会话 ฿12 —— 一次月结对话 20+ 条消息 × ฿0.5。
+#   租户 24h ฿150 —— 3-5 个会计的所会顶到旧的 ฿50;这一级是失控用户的顶,不是正常用量的顶。
+_DEFAULT_TASK_CAP = "2"
+_DEFAULT_SESSION_CAP = "12"
+_DEFAULT_TENANT_DAILY_CAP = "150"
 # 单次调用的预留额:占坑用,结算时改成真实成本。必须小于两级上限,否则一次都批不出去。
-_DEFAULT_CALL_RESERVE = "0.1"
+# 循环里单步实际 ฿0.13-0.25 —— 预留低于实际 = 并发封口偏松,宁可多占一点。
+_DEFAULT_CALL_RESERVE = "0.25"
 
 _TABLE = """
 CREATE TABLE IF NOT EXISTS steward_cost_entries (
@@ -139,6 +144,52 @@ def decide(
     if tenant_cap is not None and tenant_spent + estimate > tenant_cap:
         return ERR_TENANT
     return None
+
+
+def precheck(*, tenant_id: str, session_id: str) -> dict:
+    """只看不占坑的粗检(请求侧用):这条会话/这个租户还有没有额度开一条新任务。
+
+    与 reserve 的差别是不写台账 —— 循环把模型调用整体搬进了 worker,请求侧一次模型都不调,
+    再去占一次坑就会留下一串永不结算的 ฿0.25 幽灵行,把封顶判据本身撑爆。真正的闸在
+    worker 每步的 reserve 上;这里只是别让明显没额度的消息白白建一条任务。
+    """
+    session_cap, tenant_cap = session_cap_thb(), tenant_daily_cap_thb()
+    if session_cap is None and tenant_cap is None:
+        return {"allowed": True}
+    try:
+        from core import db
+
+        ensure_once()
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(SUM(cost_thb), 0) AS session_spent FROM steward_cost_entries "
+                "WHERE tenant_id = %s AND session_id = %s",
+                (tenant_id, session_id),
+            )
+            session_spent = Decimal(str((cur.fetchone() or {}).get("session_spent") or 0))
+            tenant_spent = _tenant_spent_24h(cur, tenant_id) if tenant_cap else Decimal("0")
+        code = decide(
+            session_spent=session_spent,
+            task_spent=Decimal("0"),
+            estimate=call_reserve_thb(),
+            session_cap=session_cap,
+            task_cap=None,  # 新任务的 task_spent 必然是 0,任务级由 worker 每步现判
+            tenant_spent=tenant_spent,
+            tenant_cap=tenant_cap,
+        )
+        if not code:
+            return {"allowed": True}
+        cap = session_cap if code == ERR_SESSION else tenant_cap
+        spent = session_spent if code == ERR_SESSION else tenant_spent
+        return {
+            "allowed": False,
+            "code": code,
+            "cap_thb": _display(cap),
+            "spent_thb": _display(spent),
+        }
+    except Exception:  # noqa: BLE001 — 同 reserve 的取舍:封顶基础设施故障不停全功能
+        logger.warning("[steward.budget] precheck failed; allowing turn", exc_info=True)
+        return {"allowed": True}
 
 
 def reserve(*, tenant_id: str, session_id: str, task_id: Optional[str] = None) -> dict:

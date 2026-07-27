@@ -7,6 +7,7 @@
  *     artifacts: [{ kind, label, href?,
  *                   columns?: [{key, label}], rows?: [{<key>: 值}] }],
  *     error_code?, error_reason?(没跑成时的机器码 + 人话),
+ *     cancellable(这条现在能不能取消 · 在跑的写活一律 false),
  *     authorization?(写授权卡 · 拼装在 ai-steward-authz-render.js) }
  *
  * 状态一律从 B1 状态词典取脸(docs/design-system/STATE-LANGUAGE.md · ai-states.css),
@@ -247,8 +248,9 @@
     }
 
     // 执行中给「取消」出口(取消是幂等端点,连点不炸);终态不摆一个点了没意义的按钮。
+    // 在跑的写活取消不了(后端 409:已投单,只能去对账)—— 摆一个点下去必报错的按钮更糟。
     function cancelHtml(task, busy) {
-        if (task.status !== 'running') return '';
+        if (task.status !== 'running' || task.cancellable === false) return '';
         return (
             '<div class="stw-cancel-row"><button type="button" class="btn sm" ' +
             'data-action="stw-cancel"' +

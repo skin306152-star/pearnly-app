@@ -23,9 +23,17 @@ _DIRECTION = {
     "": {"zh": "方向自动判定", "th": "ระบบจะดูทิศทางให้"},
 }
 
+# 过账去向必须上卡面:同一张票按库存记 = 真扣客户库存并结转 COGS,按服务记 = 不动库存,
+# 两者不可逆且互不相同。卡上不印,批准的人看不出这一批把「库存」办成了「服务」。
+_POSTING_KIND = {
+    "stock": {"zh": "按库存记账", "th": "ลงแบบสต๊อก"},
+    "service": {"zh": "按服务记账", "th": "ลงแบบบริการ"},
+    "": {"zh": "未声明过账去向", "th": "ยังไม่ระบุวิธีลงบัญชี"},
+}
+
 _CARD_TITLE = {
-    "zh": "把 {doc_count} 张票推进 Express 账套 {account_set} · {direction} · {invoice_no} ฿{total_amount}",
-    "th": "ส่ง {doc_count} ใบเข้า Express ชุดบัญชี {account_set} · {direction} · {invoice_no} ฿{total_amount}",
+    "zh": "把 {doc_count} 张票推进 Express 账套 {account_set} · {direction} · {posting_kind} · {invoice_no} ฿{total_amount}",
+    "th": "ส่ง {doc_count} ใบเข้า Express ชุดบัญชี {account_set} · {direction} · {posting_kind} · {invoice_no} ฿{total_amount}",
 }
 
 _REPLY_DONE = {
@@ -44,6 +52,14 @@ FAIL_REASON = {
     "steward.worker_lost": {
         "zh": "执行中断(服务重启),这条没跑完。⚠️ 别直接重推:先去「集成 · 推送日志」确认这张票有没有已经进账套。",
         "th": "งานถูกขัดจังหวะ (ระบบรีสตาร์ต) ⚠️ อย่าเพิ่งส่งซ้ำ ไปเช็กที่「การเชื่อมต่อ · ประวัติการส่ง」ก่อนว่าใบนี้เข้าชุดบัญชีไปแล้วหรือยัง",
+    },
+    "steward.task_crashed": {
+        "zh": "执行时出了意外错误,这条没跑完。⚠️ 别直接重推:错误可能出在投单之后,先去「集成 · 推送日志」看这张票有没有已经进账套。",
+        "th": "เกิดข้อผิดพลาดระหว่างทำงาน ยังทำไม่เสร็จ ⚠️ อย่าเพิ่งส่งซ้ำ ข้อผิดพลาดอาจเกิดหลังส่งงานให้สะพานแล้ว ไปดูที่「การเชื่อมต่อ · ประวัติการส่ง」ก่อนว่าใบนี้เข้าชุดบัญชีหรือยัง",
+    },
+    "steward.cancelled": {
+        "zh": "你取消了这条任务。⚠️ 如果已经批准过,桥那边可能已经在写了 —— 别重推,去「集成 · 推送日志」看这张票的最终状态。",
+        "th": "คุณยกเลิกงานนี้แล้ว ⚠️ ถ้าอนุมัติไปก่อนหน้านี้ สะพานอาจกำลังเขียนอยู่ อย่าส่งซ้ำ ไปดูสถานะสุดท้ายที่「การเชื่อมต่อ · ประวัติการส่ง」",
     },
 }
 
@@ -67,6 +83,18 @@ ERRORS = {
     "steward.invoice_changed": {
         "zh": "这张票在等你批准的时候被改过({field}),批文作废、一步都没执行。重新说一次再批。",
         "th": "ใบนี้ถูกแก้ระหว่างรออนุมัติ ({field}) ใบอนุมัติจึงเป็นโมฆะ ยังไม่ได้ทำอะไรเลย สั่งใหม่แล้วอนุมัติอีกครั้งนะคะ",
+    },
+    "steward.erp_already_pushed": {
+        "zh": "{invoice_no} 已经在 {pushed_at} 推进账套 {account_set} 了,我不会再推第二遍(同一张票记两遍就是重复入账)。要看结果去「集成 · 推送日志」。",
+        "th": "{invoice_no} ส่งเข้าชุดบัญชี {account_set} ไปแล้วเมื่อ {pushed_at} จะไม่ส่งซ้ำให้ค่ะ (ใบเดียวลงสองครั้ง = บันทึกซ้ำ) ดูผลได้ที่「การเชื่อมต่อ · ประวัติการส่ง」",
+    },
+    "steward.erp_direction_conflict": {
+        "zh": "你说这张按「{asked_label}」推,但按税号比对出来是「{detected_label}」。方向弄反了整张票的税会记到另一侧,我不替你改 —— 确认一下再说一次。",
+        "th": "คุณบอกให้ลงเป็น「{asked_label}」แต่เทียบเลขผู้เสียภาษีแล้วได้「{detected_label}」ถ้าทิศทางกลับด้าน ภาษีทั้งใบจะไปลงอีกฝั่ง ระบบจะไม่แก้ให้เอง ตรวจสอบแล้วสั่งใหม่นะคะ",
+    },
+    "steward.write_tool_failed": {
+        "zh": "这条没跑完(错误码 {code}),而且我不确定桥那边写没写进去。⚠️ 别重推 —— 先去「集成 · 推送日志」看这张票的状态,确认没进账套再说一次。",
+        "th": "งานนี้ทำไม่สำเร็จ (รหัส {code}) และยังไม่แน่ใจว่าสะพานเขียนเข้าไปแล้วหรือยัง ⚠️ อย่าส่งซ้ำ ไปดูสถานะใบนี้ที่「การเชื่อมต่อ · ประวัติการส่ง」ก่อน ถ้ายังไม่เข้าค่อยสั่งใหม่",
     },
     "steward.erp_push_blocked": {
         "zh": "这张票过不了推送前的体检({reason}),没有写进账套。去「集成 · 推送日志」看这一项要补什么。",
@@ -103,12 +131,17 @@ def direction_label(direction: Optional[str], lang: str) -> str:
     return _t(_DIRECTION.get(str(direction or ""), _DIRECTION[""]), lang)
 
 
+def posting_kind_label(posting_kind: Optional[str], lang: str) -> str:
+    return _t(_POSTING_KIND.get(str(posting_kind or ""), _POSTING_KIND[""]), lang)
+
+
 def card_title(facts: dict, lang: str) -> str:
     """授权卡标题:对哪个账套、做什么、影响几条、多少钱(数字全来自接地结果,模板不算账)。"""
     return _t(_CARD_TITLE, lang).format(
         doc_count=facts.get("doc_count", 1),
         account_set=facts.get("account_set", ""),
         direction=direction_label(facts.get("direction"), lang),
+        posting_kind=posting_kind_label(facts.get("posting_kind"), lang),
         invoice_no=facts.get("invoice_no") or "-",
         total_amount=facts.get("total_amount", "0.00"),
     )
@@ -142,4 +175,10 @@ def error(code: str, data: dict, lang: str) -> str:
         field=data.get("field", ""),
         reason=data.get("reason", ""),
         job_id=data.get("job_id", ""),
+        code=code,
+        invoice_no=data.get("invoice_no", ""),
+        pushed_at=data.get("pushed_at", ""),
+        # 方向冲突要说人话("进项/销项"),不是把机器词 purchase/sales 甩给会计。
+        asked_label=direction_label(data.get("asked"), lang),
+        detected_label=direction_label(data.get("detected"), lang),
     )

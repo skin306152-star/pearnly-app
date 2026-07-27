@@ -7,7 +7,7 @@
   GET  /api/ai/steward/sessions/{sid}          重建消息流 + 当前任务 id
   POST /api/ai/steward/sessions/{sid}/messages 说一句话 → 立即应承(+ 入队的任务 id)
   GET  /api/ai/steward/tasks/{tid}             左窗任务数据(轮询;失联任务就地收口)
-  POST /api/ai/steward/tasks/{tid}/cancel      取消还在跑的任务(幂等)
+  POST /api/ai/steward/tasks/{tid}/cancel      取消还在跑的只读任务(幂等;写工具在跑时 409)
   POST /api/ai/steward/authorizations/approve  批准写授权卡(token 走 body 不进 URL/访问日志)
   POST /api/ai/steward/authorizations/reject   拒绝写授权卡(任务收 cancelled·一步没执行)
 
@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 _C_VIEW = "tax.filing.view"
 _C_APPROVE = "tax.filing.approve"
 _NOT_FOUND = "steward.not_found"
+_CANCEL_LOCKED = "steward.cancel_locked"
 _MAX_TEXT = 2000
 
 
@@ -147,8 +148,12 @@ async def get_task(task_id: str, request: Request):
 
 @router.post("/api/ai/steward/tasks/{task_id}/cancel")
 async def cancel_task(task_id: str, request: Request):
-    """取消任务。只有还在跑的能取消;已收尾的原样返回(幂等,连点两下不报错)。
-    与 worker 收尾赛跑时先落者赢:取消落定后,晚到的执行结果被 finish 守卫拒收。"""
+    """取消任务。只有还在跑的只读任务能取消;已收尾的原样返回(幂等,连点两下不报错)。
+    与 worker 收尾赛跑时先落者赢:取消落定后,晚到的执行结果被 finish 守卫拒收。
+
+    写工具在跑 = 已经批准、多半已经 submit_write:落 cancelled 等于告诉会计「后面的步骤没有
+    跑」,而票可能已经写进账套;更糟的是作业号随之丢掉(worker 拿到 docnum 时任务已终态,
+    finish 守卫拒收,只在日志里打一行),会计连去对账的钥匙都没有。故这条路直接 409 拒。"""
     _user, tenant_id = _authorize(request)
     store.ensure_once()
     with db.get_cursor(commit=True) as cur:
@@ -156,8 +161,11 @@ async def cancel_task(task_id: str, request: Request):
         if not task:
             raise HTTPException(404, detail=_NOT_FOUND)
         if task["status"] == store.TASK_RUNNING:
+            if not store.cancellable(task):
+                raise HTTPException(409, detail=_CANCEL_LOCKED)
+            tool = str((task.get("payload") or {}).get("tool") or "")
             lang = (task.get("payload") or {}).get("lang") or steward_copy.DEFAULT_LANG
-            reason = steward_copy.fail_reason(worker.ERR_CANCELLED, lang)
+            reason = steward_copy.fail_reason(worker.ERR_CANCELLED, lang, tool=tool)
             cancelled = store.cancel_task(
                 cur,
                 tenant_id=tenant_id,

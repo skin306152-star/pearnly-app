@@ -401,6 +401,21 @@ def list_stale_tasks(
     return [dict(r) for r in cur.fetchall()]
 
 
+def cancellable(row: dict) -> bool:
+    """这条任务现在还能不能取消(路由的闸 + 前端画不画取消按钮,同一份判据)。
+
+    写工具一旦 running 就已经批准过、多半已经把活投给桥了 —— 取消只能落个 cancelled 假象
+    (「后面的步骤没有跑」),票却可能已经进了账套,作业号也一并丢。注册表外的工具名照旧
+    可取消:它在 tools.run 那里根本执行不到,取消无害。
+    """
+    from services.steward import registry
+
+    if (row.get("status") or "") != TASK_RUNNING:
+        return False
+    spec = registry.get((row.get("payload") or {}).get("tool"))
+    return spec is None or spec.readonly
+
+
 def fail_steps(steps: list, detail: str) -> list:
     """把还没跑完的步骤统一标 failed(第一个被改的步骤带上人话原因)。
     已 done 的保持 done —— 状态诚实:跑完的步骤不因整单失败被抹掉。"""
@@ -469,6 +484,9 @@ def public_task(row: dict) -> dict[str, Any]:
         "started_at": row["created_at"].isoformat() if row.get("created_at") else None,
         "finished_at": row["finished_at"].isoformat() if row.get("finished_at") else None,
         "agent_count": 1,
+        # 前端据此决定画不画「取消」:在跑的写活取消不了(见 cancellable),摆一个点了会 409
+        # 的按钮比不摆更糟。
+        "cancellable": cancellable(row),
         "steps": row.get("steps") or [],
         "artifacts": row.get("artifacts") or [],
     }

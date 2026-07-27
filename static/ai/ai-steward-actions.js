@@ -110,11 +110,16 @@
                     hooks.stopPoll();
                     hooks.renderLeft();
                 })
-                .catch(function () {
+                .catch(function (err) {
                     if (hooks.state() !== S) return;
                     S.cancelBusy = false;
-                    S.actionErr = at('stw_cancel_failed');
+                    // 409 = 这条已经投给桥了,取消没有意义(后端拒得干脆)。页面上的按钮本该
+                    // 早被 cancellable=false 收掉,能走到这里说明手里这份任务数据过时了 →
+                    // 换成「已投单,只能去对账」的话,并重拉一次现状。
+                    var locked = err && err.code === 'steward.cancel_locked';
+                    S.actionErr = at(locked ? 'stw_cancel_locked' : 'stw_cancel_failed');
                     hooks.renderLeft();
+                    if (locked) refreshTask();
                 });
         }
 

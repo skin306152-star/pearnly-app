@@ -45,6 +45,9 @@ _DEFAULT_PUSH_DAYS = 7
 _MAX_PUSH_DAYS = 90
 
 ERR_TOOL_FAILED = "steward.tool_failed"
+# 写工具炸了要单独一个码:只读版兜底文案是"再说一次",而写工具在投单之后还有一整段会抛的
+# 代码(轮询桥的写活),那句话落在这里就是在教人双写。
+ERR_WRITE_TOOL_FAILED = "steward.write_tool_failed"
 ERR_UNKNOWN_TOOL = "steward.unknown_tool"
 
 
@@ -331,7 +334,10 @@ def run(name: str, ctx: ToolContext, args: dict, grant=None) -> ToolResult:
         return handler(ctx, args or {})
     except Exception:  # noqa: BLE001 — 工具炸了是"这条查不出来",不是整个对话崩
         logger.warning("[steward] tool %s failed", name, exc_info=True)
-        return ToolResult(ok=False, error_code=ERR_TOOL_FAILED, data={"tool": name})
+        # 写工具:异常可能发生在投单【之后】(轮询桥的写活会抛),此时桥可能已经在落账 ——
+        # 只读版的"再说一次"文案会把人直接教成双写,故换一个改口"别重推"的码。
+        code = ERR_TOOL_FAILED if spec.readonly else ERR_WRITE_TOOL_FAILED
+        return ToolResult(ok=False, error_code=code, data={"tool": name})
 
 
 def _int_or(value, default: int, low: int, high: int) -> int:

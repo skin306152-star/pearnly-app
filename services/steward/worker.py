@@ -125,9 +125,9 @@ async def _execute(row: dict) -> None:
         return
     except Exception:
         logger.exception("[steward-worker] task %s crashed", task_id)
-        await asyncio.to_thread(
-            _finalize_failure, row, ERR_CRASHED, copy.fail_reason(ERR_CRASHED, lang)
-        )
+        # tool 随原因走(同超时):写工具崩在投单之后照样可能已经落账,不许说"再说一次让我重跑"。
+        reason = copy.fail_reason(ERR_CRASHED, lang, tool=tool)
+        await asyncio.to_thread(_finalize_failure, row, ERR_CRASHED, reason)
         return
     await asyncio.to_thread(_finalize_result, row, tool, lang, result)
 

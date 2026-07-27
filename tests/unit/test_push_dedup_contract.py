@@ -198,7 +198,9 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
             db.has_recent_successful_push("h", "e", "u")
         sql = cursor.executed[0][0].lower()
         for window in ("interval", "now()", "current_timestamp", "created_at >"):
-            self.assertNotIn(window, sql, f"SQL 里出现了时间窗 {window!r}:去重从 ever 缩成了 recent")
+            self.assertNotIn(
+                window, sql, f"SQL 里出现了时间窗 {window!r}:去重从 ever 缩成了 recent"
+            )
 
     def test_scope_is_the_user_not_the_tenant(self):
         """L0 按 user_id 作用域,L1(prior_docnum)按 tenant_id —— 两把尺子,别互相当兜底。

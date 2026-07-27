@@ -130,9 +130,11 @@
     function renderBoard(clients, latest, detailsByOrderId) {
         var body = $('dashBody');
         if (!clients.length) {
+            // 空态给按钮,不用一句话描述「那个入口在哪儿」——原来的副文案正是那种写法。
             body.innerHTML = AI.state.emptyHtml({
                 title: at('empty_clients_t'),
-                sub: at('empty_clients_s'),
+                actionLabel: at('clients_new_title'),
+                actionHref: AI.router.buildClientsHash(),
             });
             return;
         }
@@ -233,8 +235,11 @@
             if (badge) badge.textContent = String(n);
             var empty = col.querySelector('[data-role="col-empty"]');
             if (!empty) return;
-            empty.style.display = n ? 'none' : '';
-            if (!n) empty.textContent = at(filtering ? 'kb_col_empty_filtered' : 'col_empty');
+            // 筛选态下不再逐列写一句「这一列没有符合筛选的客户」:列头的 0 计数徽章已经
+            // 说了,五列一起印就是同一句话在一屏里重复五遍,而真正要说的「为什么全空、
+            // 现在点哪」由容器级空态那一处说。天生为空的列照旧说明白它为什么空。
+            empty.style.display = n || filtering ? 'none' : '';
+            if (!n && !filtering) empty.textContent = at('col_empty');
         });
     }
 
@@ -252,7 +257,8 @@
         var node = document.createElement('div');
         node.className = 'kb-noresults';
         node.innerHTML =
-            AI.state.emptyHtml({ title: at('mx_no_results'), sub: at('mx_no_results_sub') }) +
+            // 「换个筛选或清掉试试」删掉:清除按钮就在下一行,用文字描述按钮该怎么点是废话。
+            AI.state.emptyHtml({ title: at('mx_no_results') }) +
             '<button type="button" class="btn sm" data-action="clear-filters">' +
             AI.state.esc(at('mx_clear_filters')) +
             '</button>';

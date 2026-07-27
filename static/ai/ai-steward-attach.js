@@ -75,7 +75,9 @@
                     file: file,
                     state: code ? 'rejected' : 'queued',
                     pct: 0,
-                    err: code ? at(R().limitErrKey(code)) : null,
+                    err: code
+                        ? at(R().limitErrKey(code), R().limitErrVars(code, file, S.attLimits))
+                        : null,
                     att: null,
                     attachment_id: null,
                 };
@@ -135,7 +137,7 @@
                 })
                 .catch(function (err) {
                     if (hooks.state() !== session) return;
-                    landFailed(chip, errText(err), needsPassword(err));
+                    landFailed(chip, errText(err, chip.file), needsPassword(err));
                 });
         }
 
@@ -170,14 +172,16 @@
 
         // 422 的 detail.message 后端已是四语,直接取当前语言印(不再过前端 i18n);
         // 413 与网络级失败才落词条。
-        function errText(err) {
+        function errText(err, file) {
             var detail = err && err.detail;
             var msg = detail && detail.message;
             if (msg && typeof msg === 'object') {
                 var lang = (root.AII18N && root.AII18N.lang) || 'zh';
                 if (msg[lang] || msg.zh) return msg[lang] || msg.zh;
             }
-            return at(R().limitErrKey(err && err.code));
+            var S = hooks.state();
+            var code = err && err.code;
+            return at(R().limitErrKey(code), R().limitErrVars(code, file, S && S.attLimits));
         }
 
         // ── 盘上的动作 ──────────────────────────────────────

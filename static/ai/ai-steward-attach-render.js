@@ -166,6 +166,24 @@
         return 'stw_att_err_' + String(code).replace('steward.attachment_', '');
     }
 
+    // 拒收文案要填的数:上限与可传后缀一律从 /status 的真限额来,前端不手抄一份清单
+    // (手抄的那份漏了 .doc/.docx/.txt/.tsv,而会计手上正好有 Word 版对账单)。
+    // 拿不到 limits 时返空对象 —— at() 把 {max} 原样留着比编一个数字诚实。
+    function limitErrVars(code, file, limits) {
+        if (!limits) return {};
+        if (code === 'steward.attachment_bad_ext') {
+            return { ext: extOf(file && file.name) || '?', accept: limits.accept.join(' ') };
+        }
+        if (code === 'steward.attachment_too_large') {
+            return { max: fmtBytes(limits.maxFileBytes), size: fmtBytes(file && file.size) };
+        }
+        if (code === 'steward.attachment_batch_too_large') {
+            return { max: fmtBytes(limits.maxBatchBytes) };
+        }
+        if (code === 'steward.attachment_too_many') return { max: limits.maxFiles };
+        return {};
+    }
+
     // 后端的原件下载 deeplink → 附件 id(命中才换成带鉴权头的下载按钮;别的深链原样走 <a>)。
     function downloadIdOf(href) {
         var s = String(href == null ? '' : href);
@@ -199,6 +217,7 @@
         hasUploading: hasUploading,
         canSubmit: canSubmit,
         limitErrKey: limitErrKey,
+        limitErrVars: limitErrVars,
         downloadIdOf: downloadIdOf,
         trayItems: trayItems,
     };

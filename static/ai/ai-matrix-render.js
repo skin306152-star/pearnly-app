@@ -163,7 +163,12 @@
         var codes = matrix.obligation_codes || [];
         var clients = matrix.clients || [];
         if (!clients.length) {
-            return AI.state.emptyHtml({ title: at('matrix_empty_t'), sub: at('matrix_empty_s') });
+            // 出路是可点的按钮,不是一句「去某某页建档就会出现在这里」。
+            return AI.state.emptyHtml({
+                title: at('matrix_empty_t'),
+                actionLabel: at('clients_new_title'),
+                actionHref: AI.router.buildClientsHash(),
+            });
         }
         if (!codes.length) return noObligationsHtml();
         var cellByKey = {};
@@ -237,7 +242,7 @@
         var node = document.createElement('div');
         node.className = 'mx-noresults';
         node.innerHTML =
-            AI.state.emptyHtml({ title: at('mx_no_results'), sub: at('mx_no_results_sub') }) +
+            AI.state.emptyHtml({ title: at('mx_no_results') }) +
             '<button type="button" class="btn sm" data-action="clear-filters">' +
             esc(at('mx_clear_filters')) +
             '</button>';

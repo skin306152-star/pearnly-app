@@ -71,8 +71,15 @@
         return Math.floor(total / 60) + ':' + (sec < 10 ? '0' : '') + sec;
     }
 
-    // args 是「工具槽名 → 标量字符串」的平面对象(后端已接地),按键序摆行给人复核。
-    function argEntries(args) {
+    // 卡面明细行。后端给 args_display([{label, value}] · 已翻成会计的说法、已去掉 uuid)
+    // 时以它为准;没给(还没登记翻译的写工具)才回落原始槽名 —— 宁可摆得糙,也不静默
+    // 丢掉「批准后会写进去的东西」。
+    function argEntries(args, display) {
+        if (Array.isArray(display) && display.length) {
+            return display.map(function (r) {
+                return { k: String((r && r.label) || ''), v: String((r && r.value) || '') };
+            });
+        }
         if (!args || typeof args !== 'object' || Array.isArray(args)) return [];
         return Object.keys(args).map(function (k) {
             return { k: k, v: String(args[k] == null ? '' : args[k]) };
@@ -115,8 +122,8 @@
         return AI.state.esc(s);
     }
 
-    function argsHtml(args) {
-        var rows = argEntries(args);
+    function argsHtml(args, display) {
+        var rows = argEntries(args, display);
         if (!rows.length) return '';
         return (
             '<div class="stw-authz-args-hd">' +
@@ -173,7 +180,7 @@
             AI.statesRender.badgeHtml(riskFamily(auth.risk), at(riskKey(auth.risk))) +
             '</div>';
         var body = '<div class="stw-authz-title">' + esc(auth.title || auth.tool || '') + '</div>';
-        body += argsHtml(auth.args);
+        body += argsHtml(auth.args, auth.args_display);
         if (status === 'pending') {
             body += actionsHtml(auth, !!opts.busy);
         } else if (status === 'expired') {

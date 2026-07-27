@@ -248,9 +248,16 @@ class ConfirmFirstChainTests(_ChainTestCase):
         card = store.public_task(self.db.task)["authorization"]
         self.assertEqual(card["status"], store.AUTH_PENDING)
         self.assertEqual(card["risk"], registry.RISK_WRITE)
-        # 卡面必须自证「对哪个账套做什么、影响几条」——摆一串 uuid 等于让人闭眼签字。
-        for token in ("1 张", _ACCOUNT_SET, "RR581231-002", "401621.50"):
+        # 标题自证「对哪个账套推几张」;票面明细逐行摆在 args_display 上,用会计的说法,
+        # 不是工具槽名(direction=sales / history_id=<uuid> 摆给人签 = 让她闭眼签)。
+        for token in ("1 张", _ACCOUNT_SET):
             self.assertIn(token, card["title"])
+        rows = {r["label"]: r["value"] for r in card["args_display"]}
+        self.assertEqual(rows["票号"], "RR581231-002")
+        self.assertEqual(rows["方向"], "方向自动判定")
+        self.assertIn("401621.50", rows["金额"])
+        self.assertNotIn("purchase", str(card["args_display"]))
+        self.assertNotIn(_HISTORY_ID, str(card["args_display"]))
         self.assertEqual(card["args"]["history_id"], _HISTORY_ID)
         self.assertNotIn("args_fp", card)
         self.assertIn(store.STEP_WAITING_AUTH, [s["state"] for s in out["steps"]])
@@ -367,10 +374,12 @@ class BridgeFailureTests(_ChainTestCase):
         task = await self._push()
         self.assertEqual(task["status"], store.TASK_FAILED)
         self.assertEqual(task["error_code"], erp_push_tool.ERR_BRIDGE_OFFLINE)
-        # 指路指到真实菜单名;主语说「小助手」不说「桥」——会计只认得装在她电脑上的那个。
+        # 主语说「小助手」不说「桥」——会计只认得装在她电脑上的那个;也不许指向产品里
+        # 根本没有的那一栏(「集成 · ERP 桥」全仓不存在,照着找找不到)。
         self.assertIn("小助手", task["error_message"])
-        self.assertIn("ERP 桥", task["error_message"])
-        self.assertIn("未执行任何操作", task["error_message"])
+        self.assertNotIn("桥", task["error_message"])
+        self.assertIn(_ACCOUNT_SET, task["error_message"])
+        self.assertIn("没有写入", task["error_message"])
 
     async def test_rejected_payload_is_not_reported_as_written(self):
         self.world.submit.side_effect = BridgeRejected("借贷不平", "bridge.bad_payload")

@@ -128,6 +128,8 @@ def open_request(
         "title": title or copy.tool_title(tool, lang),
         "risk": spec.risk,
         "args": args or {},
+        # 卡面明细定格在铸卡语言下:批的是这几行,批完再换语言也不改已签的那张卡。
+        "args_display": copy.authz_arg_rows(tool, args or {}, lang),
         "args_fp": fp,
         "requested_by": str(requested_by or ""),
         "requested_at": now.isoformat(),
@@ -201,7 +203,7 @@ def decide(cur, *, tenant_id: str, token: str, actor: dict, approve: bool) -> di
     return {"ok": True, "task_id": task_id, "authorization": decided}
 
 
-_CARD_PUBLIC_KEYS = ("token", "tool", "title", "risk", "args", "status",
+_CARD_PUBLIC_KEYS = ("token", "tool", "title", "risk", "args", "args_display", "status",
                      "requested_at", "expires_at", "decided_by", "decided_at")  # fmt: skip
 
 

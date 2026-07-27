@@ -23,7 +23,8 @@ Object.assign(window.__AI_I18N_ZH__, {
         '这一单的识别成本到了我们这边的预算上限，不是你的余额问题，剩下的先停住了。',
     wo_blocked_cap_how: '点下面的「重试」再跑一次；还停在这里就找我们放预算，你不用充值。',
     wo_blocked_also: '另外还有：{list}。',
-    err_insufficient_balance: 'OCR 余额不足 · 到「设置 · 计费」充值后再传',
+    // 指到侧栏真有的那一项:充值在「设置」页里,「计费」不是一个能点开的地方。
+    err_insufficient_balance: 'OCR 余额不足 · 到「设置」充值后再传',
 });
 
 Object.assign(window.__AI_I18N_TH__, {
@@ -41,8 +42,7 @@ Object.assign(window.__AI_I18N_TH__, {
     wo_blocked_cap_how:
         'กด「ลองใหม่」ด้านล่างอีกครั้ง ถ้ายังหยุดอยู่ให้ติดต่อเรา เราจะเพิ่มงบให้ คุณไม่ต้องเติมเงิน',
     wo_blocked_also: 'นอกจากนี้ยังมี: {list}',
-    err_insufficient_balance:
-        'เครดิต OCR ไม่พอ · ไปเติมเงินที่「ตั้งค่า · การเรียกเก็บเงิน」ก่อนแล้วค่อยอัปโหลด',
+    err_insufficient_balance: 'เครดิต OCR ไม่พอ · ไปเติมเงินที่「ตั้งค่า」ก่อนแล้วค่อยอัปโหลด',
 });
 
 Object.assign(window.__AI_I18N_EN__, {

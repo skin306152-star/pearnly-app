@@ -15,7 +15,6 @@ Object.assign(window.__AI_I18N_ZH__, {
     kb_bulk_open_busy: '开单中…',
     kb_bulk_result_ok: '已开出 {n} 张单',
     kb_bulk_result_fail: '{n} 家没开成 · 重新勾选再试一次，不会重复开单',
-    kb_col_empty_filtered: '这一列没有符合筛选的客户',
 });
 
 Object.assign(window.__AI_I18N_TH__, {
@@ -28,5 +27,4 @@ Object.assign(window.__AI_I18N_TH__, {
     kb_bulk_open_busy: 'กำลังเปิดใบงาน…',
     kb_bulk_result_ok: 'เปิดใบงานแล้ว {n} ใบ',
     kb_bulk_result_fail: '{n} รายเปิดไม่สำเร็จ · เลือกใหม่แล้วลองอีกครั้ง จะไม่เกิดใบงานซ้ำ',
-    kb_col_empty_filtered: 'ไม่มีลูกค้าที่ตรงกับตัวกรองในคอลัมน์นี้',
 });

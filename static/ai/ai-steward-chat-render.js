@@ -165,28 +165,16 @@
         );
     }
 
-    // 空态指路:不摆空白,直接把四条能问的话摆出来(四态诚实 · 空态必须指路)。
-    // 有附件口时补一句「料也可以直接拖进来」—— 会计不会去猜一个没写出来的手势。
-    function emptyFeedHtml(attach) {
-        var files =
-            attach && attach.limits
-                ? '<div class="stw-feed-empty-s">' + esc(at('stw_feed_empty_files')) + '</div>'
-                : '';
-        return (
-            '<div class="stw-feed-empty"><div class="stw-feed-empty-t">' +
-            esc(at('stw_feed_empty_t')) +
-            '</div><div class="stw-feed-empty-s">' +
-            esc(at('stw_feed_empty_s')) +
-            '</div>' +
-            files +
-            chipsHtml() +
-            '</div>'
-        );
+    // 空态指路 = 直接把四条能问的话摆成可点的 chips。此前还压着一个标题(「还没说话」——
+    // 在评价用户,不给出路)和一行把同样两条问法再写一遍的说明文字:三层说同一件事,而
+    // 唯一能点的只有 chips。留 chips 就够。
+    function emptyFeedHtml() {
+        return '<div class="stw-feed-empty">' + chipsHtml() + '</div>';
     }
 
-    function feedHtml(messages, attach) {
+    function feedHtml(messages) {
         var list = messages || [];
-        if (!list.length) return emptyFeedHtml(attach);
+        if (!list.length) return emptyFeedHtml();
         return '<div class="stw-feed">' + list.map(msgHtml).join('') + '</div>';
     }
 
@@ -200,7 +188,11 @@
         // 还在传就不许送:排队送等于把「立即应承」改成等 30 秒(契约不能这么改)。
         var blocked = busy || AR.hasUploading(attach.chips);
         var err = ctx.errText ? '<div class="stw-err">' + esc(ctx.errText) + '</div>' : '';
-        var note = attach.limits ? 'stw_composer_note_files' : 'stw_composer_note';
+        // 注脚只说输入框自己给不出的那件事(文件能拖能粘)。没有附件口就没什么可补的 ——
+        // 「会改数据的要先批准」已经写在页头,注脚再说一遍就是同屏第二遍。
+        var note = attach.limits
+            ? '<div class="stw-composer-note">' + esc(at('stw_composer_note_files')) + '</div>'
+            : '';
         return (
             '<div class="stw-composer">' +
             err +
@@ -215,9 +207,9 @@
             (blocked ? ' disabled' : '') +
             '>' +
             esc(at('stw_send')) +
-            '</button></div><div class="stw-composer-note">' +
-            esc(at(note)) +
-            '</div></div>'
+            '</button></div>' +
+            note +
+            '</div>'
         );
     }
 

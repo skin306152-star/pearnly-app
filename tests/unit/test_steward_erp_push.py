@@ -367,8 +367,10 @@ class BridgeFailureTests(_ChainTestCase):
         task = await self._push()
         self.assertEqual(task["status"], store.TASK_FAILED)
         self.assertEqual(task["error_code"], erp_push_tool.ERR_BRIDGE_OFFLINE)
-        self.assertIn("桥", task["error_message"])
-        self.assertIn("一步都没执行", task["error_message"])
+        # 指路指到真实菜单名;主语说「小助手」不说「桥」——会计只认得装在她电脑上的那个。
+        self.assertIn("小助手", task["error_message"])
+        self.assertIn("ERP 桥", task["error_message"])
+        self.assertIn("未执行任何操作", task["error_message"])
 
     async def test_rejected_payload_is_not_reported_as_written(self):
         self.world.submit.side_effect = BridgeRejected("借贷不平", "bridge.bad_payload")
@@ -392,7 +394,7 @@ class BridgeFailureTests(_ChainTestCase):
         task = await self._push()
         self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_PENDING)
         self.assertIn("job-1", task["error_message"])
-        self.assertIn("别重推", task["error_message"])
+        self.assertIn("不要重推", task["error_message"])
         self.assertEqual(self.world.push_logs[-1]["status"], "pending")
 
     async def test_expired_job_is_reported_as_not_written(self):
@@ -446,12 +448,12 @@ class TenantIsolationTests(unittest.TestCase):
 
 class WriteToolCopyTests(unittest.TestCase):
     def test_timeout_copy_for_write_tools_forbids_a_blind_retry(self):
-        """同一个「超时」,只读工具可以说"再说一次让我重跑",写工具说这句就是在教人双写。"""
+        """同一个「超时」,只读工具可以叫人再说一次,写工具说这句就是在教人双写。"""
         read = copy.fail_reason("steward.timeout", "zh", seconds=30, tool=registry.CLIENT_LOOKUP)
         write = copy.fail_reason("steward.timeout", "zh", seconds=900, tool=registry.ERP_PUSH)
-        self.assertIn("重跑", read)
-        self.assertNotIn("重跑", write)
-        self.assertIn("别重推", write)
+        self.assertIn("再说一次", read)
+        self.assertNotIn("再说一次", write)
+        self.assertIn("不要重推", write)
 
     def test_every_write_error_code_has_thai_and_chinese_copy(self):
         from services.steward import copy_erp_push

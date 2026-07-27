@@ -152,7 +152,7 @@ class TaskPersistenceTests(unittest.TestCase):
         out = h.turn("本期谁缺料")
         self.assertEqual(h.tasks, [])
         self.assertIsNone(out.get("task_id"))
-        self.assertIn("连不上", out["reply"])
+        self.assertIn("无法处理指令", out["reply"])
 
     def test_out_of_scope_creates_no_task_and_uses_model_words(self):
         h = _TurnHarness(_plan(registry.OUT_OF_SCOPE, message="这一版我还不能改数据"))
@@ -164,7 +164,7 @@ class TaskPersistenceTests(unittest.TestCase):
     def test_out_of_scope_without_message_falls_back_to_capability_list(self):
         h = _TurnHarness(_plan(registry.OUT_OF_SCOPE))
         out = h.turn("今天天气怎么样")
-        self.assertIn("我能查", out["reply"])
+        self.assertIn("能查", out["reply"])
         # 能力清单必须与注册表实情一致:写工具挂上了就得说出来,不然产品在撒谎。
         self.assertIn("Express", out["reply"])
 

@@ -13,6 +13,11 @@ const PASS = 'StwVerify#2026';
 const ART = path.join(__dirname, '_artifacts', 'steward_m1_rework');
 const EVID = path.join(ART, 'evidence.json');
 
+// 本机真栈专用:登录用的是本地 docker 库里的测试号,CI 打的是 pearnly.com —— 在那边
+// 这个号不存在,跑起来必红在登录。给一道显式守卫,别让「本机验收脚本」变成 CI 的假红源。
+// 本机跑法:PEARNLY_E2E_LOCAL=1 npx playwright test tests/e2e/_b2m1_rework_verify.spec.js
+test.skip(process.env.PEARNLY_E2E_LOCAL !== '1', '需本机真栈(PEARNLY_E2E_LOCAL=1)');
+
 fs.mkdirSync(ART, { recursive: true });
 let evidence = {};
 try {

@@ -10,7 +10,7 @@ copy.artifacts / copy.artifact_links,不直接 import 本模块。
 
 from __future__ import annotations
 
-from services.steward import copy_brief, copy_calc, copy_close, copy_period, registry
+from services.steward import copy_brief, copy_calc, copy_close, copy_file, copy_period, registry
 
 DEFAULT_LANG = "zh"
 
@@ -173,6 +173,8 @@ def build(tool: str, data: dict, lang: str) -> list[dict]:
         return _client_link(data, lang) + ([_table("checks", rows, cols, lang)] if rows else [])
     if tool == registry.DELIVERABLES_LIST:
         return _deliverables(data, lang)
+    if tool in registry.ATTACHMENT_TOOLS:
+        return copy_file.artifacts(tool, data, lang)
     return []
 
 

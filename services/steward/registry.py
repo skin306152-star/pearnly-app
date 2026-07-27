@@ -47,6 +47,16 @@ VAT_CALC = "vat_calc"
 TAX_MATRIX = "tax_matrix"
 PERIOD_INVOICES = "period_invoices"
 ERP_PUSH = "erp_push"
+FILE_CONVERT = "file_convert"
+VAT_REPORT_CHECK = "vat_report_check"
+
+# 吃这一轮附件的工具(万能口)。哪个文件配哪个工具由代码按 kind 过滤,模型只挑工具不挑文件
+# ——模型选文件会挑错,且挑错无痕。判据单一事实源在这里,orchestrator/planner 一律读本表。
+ATTACHMENT_TOOLS: frozenset = frozenset({FILE_CONVERT, VAT_REPORT_CHECK})
+
+# 识别类工具比只读查询慢一个量级(整份 PDF 解析 + 可能过模型),按 5 分钟的通用任务超时会在
+# 还在正常干活时被砍成 failed。照 ERP_PUSH_TIMEOUT_S 先例单独声明,入队时定格进任务行。
+FILE_TOOL_TIMEOUT_S = 600
 
 # 经桥写 Express 是分钟级(桥端备份账套 → 写 DBF → 重建 CDX,全程跨 SMB),按只读工具的
 # 5 分钟任务超时会在桥还在正常干活时把任务砍成 failed。定格进任务行,见 store.create_task。
@@ -369,6 +379,28 @@ TOOLS: tuple[StewardTool, ...] = (
         risk=RISK_WRITE,
         timeout_s=ERP_PUSH_TIMEOUT_S,
     ),
+    StewardTool(
+        name=FILE_CONVERT,
+        desc=(
+            "把这一轮传上来的文件转成 Excel 表并做守恒校验(台账/流水核借贷余额链,"
+            "普通表核列合计)· 会计说「转成 Excel / 导出成表格 / 帮我转一下这份」时用 · "
+            "这一轮没有附件时绝不选它"
+        ),
+        slots=(),
+        handler="file_convert",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
+    StewardTool(
+        name=VAT_REPORT_CHECK,
+        desc=(
+            "对这一轮传上来的销项 VAT 报告做三查:发票连号(缺号/乱序/重复/作废)、"
+            "买家分组汇总、期间一致性 · 会计说「三查 / 查连号 / 看有没有跳号 / 这份报告核一下」"
+            "时用 · 这一轮没有附件时绝不选它"
+        ),
+        slots=(),
+        handler="vat_report_check",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
 )
 
 TOOLS_BY_NAME: dict[str, StewardTool] = {t.name: t for t in TOOLS}
@@ -387,6 +419,10 @@ class ToolContext:
 
     today 走曼谷日历日:服务器跑 UTC,date.today() 在曼谷 00:00–07:00 还停在昨天,逾期与
     剩余天数会整体差一天(当天到期的义务被说成"还剩 1 天",简报的头条与桶序跟着错)。
+
+    attachment_ids 走执行上下文而非参数槽:附件 id 根本不经过模型,塞进 slots 只会让
+    services/agent/slots.py 的接地闸(source=user_text 的值必须逐字节出现在用户原话里)
+    报假阳 —— 那道闸是为「模型编了一个客户名」设计的。与 user_id/allowed_client_ids 同层。
     """
 
     user: dict
@@ -396,6 +432,8 @@ class ToolContext:
     lang: str = "zh"
     today: date = field(default_factory=bangkok_today)
     user_text: str = ""
+    session_id: str = ""
+    attachment_ids: tuple = ()
 
 
 def get(name: Optional[str]) -> Optional[StewardTool]:

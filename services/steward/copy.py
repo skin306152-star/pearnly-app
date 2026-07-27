@@ -25,6 +25,7 @@ from services.steward import (
     copy_calc,
     copy_close,
     copy_erp_push,
+    copy_file,
     copy_period,
     registry,
     store,
@@ -56,6 +57,7 @@ _TOOL_TITLE = {
     **copy_calc.TITLES,
     **copy_brief.TITLES,
     **copy_period.TITLES,
+    **copy_file.TITLES,
 }
 
 # 工具名 → 答复渲染器(分居模块各自登记,copy.reply 按本表委派)。
@@ -64,6 +66,7 @@ _REPLIES = {
     **copy_calc.REPLIES,
     **copy_brief.REPLIES,
     **copy_period.REPLIES,
+    **copy_file.REPLIES,
 }
 
 _STEP_UNDERSTAND = {"zh": "听懂你要什么", "th": "ทำความเข้าใจคำสั่ง"}
@@ -323,6 +326,8 @@ def error(code: str, data: Optional[dict], lang: str) -> str:
         return copy_erp_push.error(code, data, lang)
     if code in copy_calc.ERRORS:
         return copy_calc.error(code, data, lang)
+    if code in copy_file.ERRORS:
+        return copy_file.error(code, data, lang)
     table = _ERROR.get(code)
     if not table:
         return _t(_ERROR_FALLBACK, lang).format(code=code)
@@ -461,6 +466,11 @@ def build_steps(
             "links": [],
         },
     ]
+
+
+def receipt_steps(lang: str) -> list[dict]:
+    """收到料之后那张回执卡的步骤流水 · 实现在 copy_file,入口留在 copy 不变。"""
+    return copy_file.receipt_steps(step_understand(lang), step_summarize(lang), lang)
 
 
 def artifact_links(artifacts: list) -> list[dict]:

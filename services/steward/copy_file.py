@@ -48,8 +48,7 @@ _BUYERS_LABEL = {"zh": "买家分组", "th": "สรุปตามผู้ซ�
 _INTAKE_LABEL = {"zh": "去客户页上传入库", "th": "ไปอัปโหลดเข้าระบบที่หน้าลูกค้า"}
 _DOWNLOAD_LABEL = {"zh": "下载转出来的 Excel", "th": "ดาวน์โหลด Excel ที่แปลงแล้ว"}
 
-# 「收到 3 份:票据照片 1 · 银行流水 2」——总数与逐类数各摆一遍是重复,逐类数自己就求和;
-# 中文没有量词直接接数字会拼出「认不出是什么 1」这种病句,所以量词进模板。
+# 总数与逐类数说两遍是重复(逐类数自己就求和);量词进模板 —— 中文「认不出是什么 1」不成句。
 _RECEIPT = {"zh": "收到:{breakdown}。{tail}", "th": "ได้รับ: {breakdown} {tail}"}
 _RECEIPT_ITEM = {"zh": "{label} {n} 份", "th": "{label} {n} ไฟล์"}
 _RECEIPT_NO_ACTION = {
@@ -164,18 +163,12 @@ def receipt_steps(understand: str, summarize: str, lang: str) -> list[dict[str, 
 
 
 def receipt_reply(counts: dict[str, int], lang: str, *, has_actions: bool) -> str:
-    """回执卡的那句话。数字全部来自逐件确定性识别的计数,一个字不经模型。
-
-    有可执行操作时不补一句「选择下面的操作」——按钮就在这句话底下,再用文字描述一遍按钮
-    在哪里,删掉一个字都不损失信息。
-    """
-    breakdown = " · ".join(
-        _t(_RECEIPT_ITEM, lang).format(label=kind_label(kind, lang), n=n)
-        for kind, n in sorted(counts.items())
-        if n
-    )
+    """回执卡那句话。数字全来自逐件确定性识别的计数,一个字不经模型;有按钮时不补一句
+    「选择下面的操作」—— 按钮就在这句话底下,再描述一遍它在哪儿等于零信息。"""
     tail = "" if has_actions else _t(_RECEIPT_NO_ACTION, lang)
-    return _t(_RECEIPT, lang).format(breakdown=breakdown, tail=tail).strip()
+    item = _t(_RECEIPT_ITEM, lang)
+    parts = [item.format(label=kind_label(k, lang), n=n) for k, n in sorted(counts.items()) if n]
+    return _t(_RECEIPT, lang).format(breakdown=" · ".join(parts), tail=tail).strip()
 
 
 def pick_file_reply(tool: str, n: int, lang: str) -> str:
@@ -220,12 +213,8 @@ def actions_block(actions: list[dict], lang: str) -> dict[str, Any]:
 
 
 def intake_link(lang: str) -> dict[str, Any]:
-    """图片料在 F1 还没有对话内的识别入库,给一个真存在的落点 —— 不摆点开落回工作台的按钮。
-
-    收料页是客户子视图(#/client/<id>/intake),而对话里没有客户 id;#/intake 这个顶层路由
-    从来不存在(ai-router.js 的 VIEWS 是客户页的 tab 集合),点了只会落回工作台。落点因此
-    给客户目录 —— 她在那里选客户就进得去收料。
-    """
+    """图片料在 F1 还没有对话内的识别入库,落点给客户目录 —— 收料是客户子视图
+    (#/client/<id>/intake),对话里没有客户 id;顶层 #/intake 在 ai-router.js 里从来不存在。"""
     return {"kind": "deeplink", "label": _t(_INTAKE_LABEL, lang), "href": "/ai#/clients"}
 
 

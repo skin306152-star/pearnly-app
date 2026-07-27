@@ -16,7 +16,7 @@ import json
 import shutil
 import unittest
 
-from tests.unit._node_harness import AI_DIR, _run_node
+from tests.unit._node_harness import AI_DIR, BAHT, _run_node
 
 # ai-profile-render.js 的 buildProfilePayload 借道 root.AI.format.parseAmount(同
 # ai-intake-render.js 的 parseAmount 先例),node 独立进程里没人挂 AI.format,先 require
@@ -44,7 +44,7 @@ class PriorPeriodCheckTests(unittest.TestCase):
             """)
         self.assertEqual(out["key"], "ppc_compared")
         self.assertEqual(out["vars"]["period"], "2569-04")
-        self.assertEqual(out["vars"]["delta"], "-฿25.50")
+        self.assertEqual(out["vars"]["delta"], f"-{BAHT}25.50")
 
     def test_missing_or_null_check_defaults_to_no_prior(self):
         out = _run_node(f"""

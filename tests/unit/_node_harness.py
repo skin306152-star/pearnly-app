@@ -12,11 +12,32 @@ unittest discovery 不收本文件当测试模块。
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AI_DIR = PROJECT_ROOT / "static" / "ai"
+
+_BAHT_DECL = re.compile(r"var BAHT = '([^']*)';")
+_JS_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def _baht_prefix() -> str:
+    """ai-format.js 里金额前缀的真值(฿ + 分隔空白)。
+
+    金额断言此前逐字写死 "฿6.00",前缀一改就集体假红,而红的是排版口径不是金额算错。
+    前缀从真源读、小数位/千分位/负号照旧写死:排版归 test_ai_money_single_exit 那道闸管,
+    这里只管数字对不对。
+    """
+    src = (AI_DIR / "ai-format.js").read_text(encoding="utf-8")
+    m = _BAHT_DECL.search(src)
+    if not m:
+        raise AssertionError("ai-format.js 里找不到 BAHT 声明 —— 判据失效比断言失败更危险")
+    return _JS_ESCAPE.sub(lambda e: chr(int(e.group(1), 16)), m.group(1))
+
+
+BAHT = _baht_prefix()
 
 
 def _run_node(js_source: str) -> dict:

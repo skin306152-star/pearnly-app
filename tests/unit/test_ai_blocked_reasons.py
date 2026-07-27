@@ -22,7 +22,7 @@ import re
 import shutil
 import unittest
 
-from tests.unit._node_harness import AI_DIR, PROJECT_ROOT, _run_node
+from tests.unit._node_harness import AI_DIR, BAHT, PROJECT_ROOT, _run_node
 
 _LANGS = ("zh", "th", "en", "ja")
 _BLOCKED_SHARD = AI_DIR / "ai-i18n-blocked.js"
@@ -203,7 +203,7 @@ class StoppedNoticeTests(unittest.TestCase):
         self.assertIn("8", text)  # 跑了几件
         self.assertIn("12", text)  # 共几件
         self.assertIn("4", text)  # 还剩几件没跑
-        self.assertIn("฿6.00", text)  # 还差多少
+        self.assertIn(f"{BAHT}6.00", text)  # 还差多少
         self.assertIn("重试", text)  # 充完回来点哪个按钮
         self.assertIn('href="#/settings?focus=billing"', html)  # 就地出路
         self.assertIn('data-action="wo-retry-stuck"', html)
@@ -214,7 +214,7 @@ class StoppedNoticeTests(unittest.TestCase):
             _stuck("insufficient_balance:6.00", progress={"processed": 8, "total": 12}), lang="th"
         )
         self.assertIn("เครดิตไม่พอ", out["text"])
-        self.assertIn("฿6.00", out["text"])
+        self.assertIn(f"{BAHT}6.00", out["text"])
         self.assertIn("ลองใหม่", out["text"])
         self.assertNotIn("insufficient_balance", out["text"])
         self.assertIn('href="#/settings?focus=billing"', out["html"])
@@ -224,7 +224,7 @@ class StoppedNoticeTests(unittest.TestCase):
         out = self._text(_stuck("insufficient_balance:6.00"))
         self.assertNotIn("{", out["text"])
         self.assertIn("余额不够了", out["text"])
-        self.assertIn("฿6.00", out["text"])
+        self.assertIn(f"{BAHT}6.00", out["text"])
         self.assertIn("重试", out["text"])
 
     def test_missing_shortfall_drops_only_the_amount_sentence(self):

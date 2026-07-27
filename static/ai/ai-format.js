@@ -20,6 +20,10 @@
         return s;
     }
 
+    // ฿ 的墨迹比它的字宽宽半像素(实测 24px/800:字宽 16.58,右墨迹 17),紧跟数字会糊成
+    // 一个看不出是什么的字。垫一个窄空格 U+2009 分开 —— 任何字体/字号/字重下都不再粘连。
+    var BAHT = '฿\u2009'; // ฿ + 窄空格 U+2009
+
     // 泰铢金额:两位小数 + 千分位,负数原样带负号(工单差额可能为负)。
     function money(v) {
         var n = Number(v);
@@ -28,7 +32,7 @@
         var s = Math.abs(n).toFixed(2);
         var parts = s.split('.');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        return sign + '฿' + parts.join('.');
+        return sign + BAHT + parts.join('.');
     }
 
     // 比率(0.925 或其字符串形态)→ 百分比串("92.5%"),解不出/非有限 → "—"。

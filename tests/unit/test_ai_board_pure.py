@@ -15,7 +15,7 @@ import json
 import shutil
 import unittest
 
-from tests.unit._node_harness import AI_DIR, _run_node
+from tests.unit._node_harness import AI_DIR, BAHT, _run_node
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -172,7 +172,7 @@ class SummarizeCardTests(unittest.TestCase):
                 {{numbers: {{tax_due: '29263.28'}}}}
             )));
             """)
-        self.assertEqual(out, {"key": "card_tax_due", "vars": {"amount": "฿29,263.28"}})
+        self.assertEqual(out, {"key": "card_tax_due", "vars": {"amount": f"{BAHT}29,263.28"}})
 
     def test_review_without_tax_due_falls_back_to_period(self):
         out = _run_node(f"""

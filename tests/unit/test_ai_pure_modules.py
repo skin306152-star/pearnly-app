@@ -15,7 +15,7 @@ import json
 import shutil
 import unittest
 
-from tests.unit._node_harness import AI_DIR, _run_node
+from tests.unit._node_harness import AI_DIR, BAHT, _run_node
 
 # ai-intake-render.js 的 parseAmount 转发给 AI.format.parseAmount(照 ai-viewer.js 的
 # esc()→AI.state.esc 先例)——node 单测独立进程里没人挂 AI.format,这里先 require
@@ -32,7 +32,16 @@ class AiFormatTests(unittest.TestCase):
                 f.money(60114.61), f.money(0), f.money(-9), f.money('1234567.5'), f.money('abc'),
             ]));
             """)
-        self.assertEqual(out, ["฿60,114.61", "฿0.00", "-฿9.00", "฿1,234,567.50", "—"])
+        self.assertEqual(
+            out,
+            [
+                f"{BAHT}60,114.61",
+                f"{BAHT}0.00",
+                f"-{BAHT}9.00",
+                f"{BAHT}1,234,567.50",
+                "—",
+            ],
+        )
 
     def test_split_period_parses_buddhist_year_month(self):
         out = _run_node(f"""

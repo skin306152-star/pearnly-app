@@ -18,7 +18,7 @@ import json
 import shutil
 import unittest
 
-from tests.unit._node_harness import AI_DIR, _run_node
+from tests.unit._node_harness import AI_DIR, BAHT, _run_node
 
 RENDER = str(AI_DIR / "ai-billing-render.js")
 API = str(AI_DIR / "ai-api-billing.js")
@@ -89,7 +89,7 @@ class StatusAndFormatTests(unittest.TestCase):
             {PRELUDE}
             process.stdout.write(JSON.stringify(b.fmtBahtInt(2000)));
             """)
-        self.assertEqual(out, "฿2,000")
+        self.assertEqual(out, f"{BAHT}2,000")
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -101,9 +101,9 @@ class BalancePanelTests(unittest.TestCase):
                 {{balance_thb: 1234.5, pages_this_month: 42, current_rate: 1.5}}
             )));
             """)
-        self.assertIn("฿1,234.50", out)
+        self.assertIn(f"{BAHT}1,234.50", out)
         self.assertIn('data-action="bill-topup"', out)
-        self.assertIn("฿1.50", out)
+        self.assertIn(f"{BAHT}1.50", out)
 
     def test_exempt_owner_gets_badge(self):
         out = _run_node(f"""
@@ -160,7 +160,7 @@ class HistoryPanelTests(unittest.TestCase):
                 {{created_at: '2026-07-02T09:00:00', amount_thb: 300, status: 'rejected', review_note: 'ยอดไม่ตรง'}},
             ])));
             """)
-        self.assertIn("฿500.00", out)
+        self.assertIn(f"{BAHT}500.00", out)
         self.assertIn("st-badge st-ok", out)
         self.assertIn("st-badge st-err", out)
         self.assertIn("ยอดไม่ตรง", out)
@@ -197,7 +197,7 @@ class ModalTests(unittest.TestCase):
         self.assertIn("230-0-91368-4", out)
         self.assertIn("ธนาคาร กรุงเทพ", out)
         self.assertIn("bill_bank_note", out)
-        self.assertIn("฿500.00", out)
+        self.assertIn(f"{BAHT}500.00", out)
 
     def test_step3_has_dropzone_and_optional_fields_and_submit(self):
         out = self._modal({"step": 3, "amount": 500, "fileName": ""})

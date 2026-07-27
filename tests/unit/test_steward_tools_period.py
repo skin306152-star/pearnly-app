@@ -110,6 +110,13 @@ class TaxMatrixTests(unittest.TestCase):
         self.assertEqual(res.data["client_count"], 2)
         self.assertEqual(res.data["ready"], 2)
 
+    def test_both_queries_carry_tenant_id(self):
+        """两条查询都必须显式带 tenant_id —— 少一条就是跨租户读。"""
+        res, fetch, fetch_numbers = self._run([_matrix_row()], {"w1": _numbers()})
+        self.assertTrue(res.ok)
+        self.assertEqual(fetch.call_args.kwargs["tenant_id"], "t-1")
+        self.assertEqual(fetch_numbers.call_args.kwargs["tenant_id"], "t-1")
+
     def test_totals_are_summed_with_decimal(self):
         rows = [_matrix_row(), _matrix_row(2, "62AHATAI", "w2")]
         numbers = {
@@ -336,6 +343,14 @@ class PeriodInvoiceTests(unittest.TestCase):
         self.assertFalse(res.data["has_order"])
         self.assertEqual(res.data["total"], 0)
         dal.assert_not_called()
+
+    def test_missing_client_name_asks_back_instead_of_picking_someone(self):
+        """客户名缺失时绝不"就用最近那家" —— 挂错账套是红线,退回可追问的错误。"""
+        with _no_db(), mock.patch.object(tool_scope, "clients", return_value=_CLIENTS):
+            for args in ({}, {"client_name": ""}, {"client_name": "   "}):
+                res = tools_period.period_invoices(_ctx(), args)
+                self.assertFalse(res.ok, args)
+                self.assertEqual(res.error_code, tool_scope.ERR_CLIENT_NOT_FOUND)
 
     def test_unknown_client_asks_back_instead_of_guessing(self):
         with _no_db(), mock.patch.object(tool_scope, "clients", return_value=_CLIENTS):

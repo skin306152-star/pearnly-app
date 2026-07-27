@@ -319,7 +319,7 @@ class _Run:
 
         if int(self.loop.get("asked") or 0) >= brain_loop.MAX_ASKS:
             return False  # 问过一次了:按最可能的做,别再问
-        question = copy_loop.question_text(step.question, step.options, self.lang)
+        question = copy_loop.question_text(step.question, self.lang)
         if not question:
             self.fails += 1
             return False

@@ -23,7 +23,9 @@ _MAX_ROWS = 5  # 列表型结果只给模型看前几行 + 总数,它要的是�
 _MAX_FIELD_CHARS = 200
 _MAX_CELL_CHARS = 60
 
-_STEP_ASK = {"zh": "问你一件事", "th": "ขอถามหนึ่งข้อ"}
+# 步骤标签只标「这一步是什么」,不复述紧跟在下一行的问题本身(「问你一件事」+ 问题
+# = 同一件事说两遍)。
+_STEP_ASK = {"zh": "待你回答", "th": "รอคำตอบ"}
 _STEP_FINAL = {"zh": "整理答复", "th": "เรียบเรียงคำตอบ"}
 
 _STALL = {
@@ -38,7 +40,6 @@ _NO_RESULT = {
     "zh": "这几步都没查到数据。指定客户和账期,或换个说法。",
     "th": "หลายขั้นที่ลองไปไม่พบข้อมูล ระบุลูกค้าและงวด หรือพิมพ์ใหม่",
 }
-_OPTIONS = {"zh": "候选:{options}", "th": "ตัวเลือก: {options}"}
 _TRIED_NONE = {"zh": "几步查询", "th": "หลายขั้นตอน"}
 _RESUMED = {"zh": "继续执行。", "th": "ทำต่อ"}
 
@@ -61,14 +62,10 @@ def intent_label(tool: str, intent: str, lang: str) -> str:
     return (intent or "").strip() or copy.tool_title(tool, lang)
 
 
-def question_text(question: str, options: Optional[list], lang: str) -> str:
-    """追问那句话 + 候选(发进对话流的那一条)。左窗那一步只落问题本身,候选在那边由
-    loop.question.options 画成可点的按钮 —— 同一屏不摆两份候选。"""
-    text = (question or "").strip()
-    picks = [str(o).strip() for o in (options or []) if str(o or "").strip()]
-    if picks:
-        text = f"{text}\n{_t(_OPTIONS, lang).format(options=' / '.join(picks))}".strip()
-    return text
+def question_text(question: str, lang: str) -> str:
+    """追问那句话(发进对话流的那一条)。只落问题本身 —— 候选由 loop.question.options 在
+    左窗画成可点的 chips,气泡里再印一份纯文字的候选,会计会去点那行点不动的字。"""
+    return (question or "").strip()
 
 
 def stall(tried: list, lang: str) -> str:

@@ -69,8 +69,8 @@ class WriteNeedsACardTests(unittest.TestCase):
         out = self._run([_push_decision()])
         card = out.authz_cards[0]
         self.assertEqual(card["args"], _GROUNDED, "卡上批的必须是接地过的参数")
-        self.assertIn("INV-7011", card["title"])
         self.assertIn("69EXP", card["title"])
+        self.assertNotIn("7-11", card["title"], "标题必须用接地结果,不复述用户打的字")
 
     def test_the_pending_step_is_frozen_into_the_payload(self):
         out = self._run([_push_decision()])
@@ -245,9 +245,16 @@ class AskAndResumeTests(unittest.TestCase):
         self.assertEqual(len(out.parked), 1)
         self.assertEqual(out.loop["asked"], 1)
         self.assertEqual(out.loop["pending_question"]["field"], "client_name")
-        self.assertIn("Sister Trading", out.reply)
-        # 追问那一行标 kind=ask(前端据此挂候选按钮),detail 只放问题本身 —— 候选是按钮,
-        # 正文再列一遍就是同一屏摆两份;agent_count 数 kind=tool,不把追问算成一次查询。
+        # 候选只留能点的那一份:气泡是问题本身,一个字都不多(旧版在正文尾巴追一行
+        # 「候选:A / B」纯文字,与左窗的可点 chips 同屏并列 —— 会计去点了那行点不动的字)。
+        self.assertEqual(out.reply, "是 Sister Makeup 还是 Sister Trading?")
+        self.assertNotIn("候选", out.reply)
+        self.assertEqual(
+            out.loop["pending_question"]["options"], ["Sister Makeup", "Sister Trading"],
+            "候选从载荷里丢了 —— 左窗就没有按钮可画,两份都没了",
+        )  # fmt: skip
+        # 追问那一行标 kind=ask(前端据此挂候选按钮),detail 只放问题本身;
+        # agent_count 数 kind=tool,不把追问算成一次查询。
         steps = out.parked[0]["steps"]
         kinds = [s.get("kind") for s in steps if s.get("kind")]
         self.assertEqual(kinds, ["ask"], "追问被记成了一次工具调用")

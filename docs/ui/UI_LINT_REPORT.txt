@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 518 个源文件全扫
+# UI 设计合规扫描报告 · 523 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -152,7 +152,7 @@
      1  static\home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 152(83 文件)
+## 小固定max-width(查是否@media) — 命中 153(84 文件)
      8  src\home\sales-detail.ts
         └ 115: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 160: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -223,8 +223,8 @@
         └ 239: <div class="sw-row" style="max-width:580px">
         └ 242: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
      2  static\ai\ai-client.css
-        └ 429: max-width: min(420px, 100%);
-        └ 435: max-width: min(560px, 100%);
+        └ 437: max-width: min(420px, 100%);
+        └ 443: max-width: min(560px, 100%);
      2  static\ai\ai-desk.css
         └ 27: max-width: min(720px, 100%);
         └ 205: max-width: min(720px, 100%);
@@ -301,6 +301,8 @@
         └ 103: max-width: min(560px, 100%);
      1  static\ai\ai-shell.css
         └ 461: max-width: min(380px, 100%);
+     1  static\ai\ai-steward-attach.css
+        └ 172: max-width: 220px;
      1  static\dms\dms-billing.css
         └ 9: max-width: min(900px, 100%);
      1  static\dms\dms-connect.js

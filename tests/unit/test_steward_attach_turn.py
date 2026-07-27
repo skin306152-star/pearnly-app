@@ -153,20 +153,18 @@ class CopyTests(unittest.TestCase):
                     self.assertTrue(artifact["label"])
 
     def test_kind_labels_cover_the_whole_closed_set(self):
-        """新增一个料却忘了配文案 = 表格里印出机器码。闸在这里,不靠自觉。"""
-        closed = {
-            ak.GL_LEDGER,
-            ak.BANK_STATEMENT,
-            ak.SALES_SUMMARY,
-            ak.VAT_REPORT,
-            ak.INVOICE,
-            ak.UNSUPPORTED,
-            ak.UNKNOWN,
-        }
-        self.assertTrue(closed.issubset(set(copy_file.KIND_LABEL)))
-        for kind in closed:
+        """新增一个料却忘了配文案 = 表格里印出机器码。闸按 ALL_KINDS 遍历,不在这里再抄一份。"""
+        self.assertTrue(set(ak.ALL_KINDS).issubset(set(copy_file.KIND_LABEL)))
+        for kind in ak.ALL_KINDS:
             for lang in ("zh", "th"):
                 self.assertTrue(copy_file.kind_label(kind, lang))
+
+    def test_every_kind_but_unknown_declares_its_default_actions(self):
+        """认出来的料必须说清默认能干什么(哪怕是空的);unknown 走的是「两条路都摆出来」。"""
+        self.assertEqual(set(ak._ACTIONS), set(ak.ALL_KINDS) - {ak.UNKNOWN})
+        for actions in ak._ACTIONS.values():
+            self.assertTrue(set(actions).issubset(registry.ATTACHMENT_TOOLS))
+        self.assertTrue(set(ak._UNKNOWN_ACTIONS).issubset(registry.ATTACHMENT_TOOLS))
 
     def test_every_attachment_tool_has_a_title_in_both_languages(self):
         for tool in registry.ATTACHMENT_TOOLS:

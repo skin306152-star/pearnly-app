@@ -43,6 +43,18 @@ INVOICE = "invoice"
 UNSUPPORTED = "unsupported"
 UNKNOWN = "unknown"
 
+# 闭集全集(单一事实源):文案表要按它配齐、测试按它遍历。加一个料却忘了配人话,表格里就会
+# 印出机器码 —— 让闸去发现,不靠自觉。
+ALL_KINDS: tuple[str, ...] = (
+    GL_LEDGER,
+    BANK_STATEMENT,
+    SALES_SUMMARY,
+    VAT_REPORT,
+    INVOICE,
+    UNSUPPORTED,
+    UNKNOWN,
+)
+
 _SHEET_EXTS = {".xlsx", ".xlsm", ".xls", ".csv"}
 _XLSX_EXTS = {".xlsx", ".xlsm"}
 _HEAD_ROWS = 15

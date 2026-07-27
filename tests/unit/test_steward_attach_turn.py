@@ -8,10 +8,22 @@
 
 from __future__ import annotations
 
+import pathlib
+import re
 import unittest
 
 from services.steward import attach_kinds as ak, attach_turn, copy_file, registry
 from services.steward.attachments import SOURCE_RULE, SOURCE_UNKNOWN
+
+_ROUTER_JS = pathlib.Path(__file__).resolve().parents[2] / "static" / "ai" / "ai-router.js"
+
+
+def _router_top_level_routes() -> set[str]:
+    """ai-router.js 里 parseHash 认得的顶层路由(`if (h === '/x')` 的那一组)+ 根路由。"""
+    source = _ROUTER_JS.read_text(encoding="utf-8")
+    routes = set(re.findall(r"h === '(/[a-z-]*)'", source))
+    assert routes, "路由表没解析出来 —— 判据失效比断言失败更危险"
+    return routes | {"/"}
 
 
 def _row(
@@ -81,7 +93,11 @@ class FilesOnlyTests(unittest.TestCase):
         row = _row("i1", "IMG.jpg", kind=ak.INVOICE, actions=(), needs_model=True)
         out = attach_turn.decide([row], tool=None, confirm_spend=False, lang="zh")
         links = [a for a in out.card["artifacts"] if a["kind"] == "deeplink"]
-        self.assertEqual([link["href"] for link in links], ["/ai#/intake"])
+        self.assertEqual(len(links), 1)
+        # 落点必须是 ai-router.js 真解析得出的顶层路由。首版写死 "/ai#/intake" 并在这里
+        # 逐字比对,两边一起错 —— #/intake 是客户页的 tab,顶层路由根本没有它,点了落回
+        # 工作台。判据因此改成「从真路由表里取」,不是再抄一遍那个字符串。
+        self.assertIn(links[0]["href"].split("#")[-1], _router_top_level_routes())
 
     def test_unsupported_files_are_counted_but_offer_nothing(self):
         row = _row("u1", "a.exe", kind=ak.UNSUPPORTED, actions=())

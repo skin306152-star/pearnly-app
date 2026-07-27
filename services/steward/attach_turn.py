@@ -104,7 +104,7 @@ def _receipt_card(items: list[dict], usable: list[dict], lang: str) -> dict[str,
         artifacts.append(copy_file.actions_block(actions, lang))
     if any(i["kind"] == ak.INVOICE for i in items):
         artifacts.append(copy_file.intake_link(lang))
-    reply = copy_file.receipt_reply(counts, len(items), lang, has_actions=bool(actions))
+    reply = copy_file.receipt_reply(counts, lang, has_actions=bool(actions))
     if dropped:
         reply = f"{reply}{copy_file.receipt_more(dropped, lang)}"
     return {"title": copy_file.receipt_title(lang), "reply": reply, "artifacts": artifacts}

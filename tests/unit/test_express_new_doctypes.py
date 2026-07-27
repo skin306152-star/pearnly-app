@@ -7,6 +7,9 @@
 
 另钉桥门面按 direction 分派:四类各自认自己的 doctype、未知 direction 仍拒、老链路
 (purchase/sales)一个字节不变。
+
+表单样例与 golden 载荷同一份(`_express_doctype_golden`)—— 契约测试喂桥端的就是它,
+两处各写一份样例,改了键名只有一处会红,另一处继续照着旧形状报绿。
 """
 
 from __future__ import annotations
@@ -28,92 +31,16 @@ from services.erp.express_push.doctypes import (  # noqa: E402
     build_stock_adjust_payload,
 )
 from services.erp.express_push.payload_keys import DOCTYPE_PAYLOAD_KEYS  # noqa: E402
+from tests.unit._express_doctype_golden import (  # noqa: E402
+    BOOK,
+    golden_payloads,
+    journal_req,
+    payment_req,
+    receipt_req,
+    stock_req,
+)
 
-BOOK = "DATAT"
 _CONFIG = {"account_set": BOOK}
-
-
-def _req(base_req, over):
-    return {**base_req, **over}
-
-
-def receipt_req(**over):
-    """整额收款:一张赊销发票 1070,转账进钱 1070。"""
-    return _req(
-        {
-            "receipt_date": "2026-01-15",
-            "customer_code": "C001",
-            "channels": [{"prefix": "TR", "kind": "transfer", "amount": "1070.00"}],
-            "allocations": [
-                {"doc_no": "IV690101-001", "rectyp": "3", "amount": "1070.00", "vat_amount": "70"}
-            ],
-            "userid": "ACC1",
-        },
-        over,
-    )
-
-
-def payment_req(**over):
-    """结清一张赊购票 1000,开支票 970 + 代扣 3% 预扣税 30。"""
-    return _req(
-        {
-            "payment_date": "2026-01-15",
-            "supplier_code": "S001",
-            "settlements": [{"doc_no": "RR690101-01", "rectyp": "3", "amount": "1000.00"}],
-            "channels": [
-                {
-                    "prefix": "QP",
-                    "kind": "cheque",
-                    "amount": "970.00",
-                    "bank_account": "1234567890",
-                }
-            ],
-            "withholding": {
-                "tax_type": "S53",
-                "tax_rate": "3",
-                "base_amount": "1000.00",
-                "tax_amount": "30.00",
-            },
-            "userid": "ACC1",
-        },
-        over,
-    )
-
-
-def journal_req(**over):
-    return _req(
-        {
-            "voucher_date": "2026-01-15",
-            "journal_code": "00",
-            "description": "ปรับปรุงค่าใช้จ่ายค้างจ่าย",
-            "lines": [
-                {"acc": "5140-10", "side": "D", "amount": "500.00"},
-                {"acc": "2130-01", "side": "C", "amount": "500.00"},
-            ],
-            "userid": "ACC1",
-        },
-        over,
-    )
-
-
-def stock_req(**over):
-    return _req(
-        {
-            "doc_date": "2026-01-15",
-            "isrun_prefix": "ZZ",
-            "remark": "ตัดสินค้าชำรุด",
-            "lines": [
-                {
-                    "stock_code": "SKU-001",
-                    "qty": "2",
-                    "unit_price": "250.00",
-                    "source_lot": "202512016OU690101-001  1",
-                }
-            ],
-            "userid": "ACC1",
-        },
-        over,
-    )
 
 
 def _ok(result):
@@ -125,10 +52,30 @@ class ReceiptPayloadTests(unittest.TestCase):
     def test_normal_assembly(self):
         p = _ok(build_receipt_payload(receipt_req(), config=_CONFIG))
         self.assertEqual((p["direction"], p["doctype"]), ("ar_receipt", "RE"))
-        self.assertEqual(p["docdate_be"], "690115")  # 公历 2026 → 佛历 69
-        self.assertEqual((p["net_amount"], p["cheque_amount"]), ("1070.00", "1070.00"))
-        self.assertEqual(p["cash_amount"], "0.00")
-        self.assertEqual(p["customer"], {"code": "C001"})
+        # 日期发公历 ISO(桥端 doc_receipt 只认 date.fromisoformat),不发佛历。
+        self.assertEqual(p["receipt_date"], "2026-01-15")
+        self.assertEqual(p["customer_code"], "C001")
+        self.assertEqual(p["channels"][0]["isrun_zr_prefix"], "TR")
+        # 代扣税腿/预收腿的科目也只能来自载荷指定的 ZR 前缀(桥端 `_zr_account` 没有兜底)。
+        self.assertEqual(p["wht_isrun_zr_prefix"], "TX")
+        self.assertEqual(p["advance"]["isrun_zr_prefix"], "M1")
+        # NETAMT/CSHRCV/CHQRCV 由桥端按 channels 自推,云端不下发派生桶。
+        self.assertFalse({"net_amount", "cash_amount", "cheque_amount"} & set(p))
+
+    def test_zr_prefix_is_mandatory_per_leg(self):
+        cases = (
+            ("代扣税腿", {"wht_isrun_zr_prefix": ""}, "no_wht_isrun_zr_prefix"),
+            (
+                "预收腿",
+                {"advance": {"doc_no": "AD-001", "amount": "70.00"}},
+                "no_advance_isrun_zr_prefix",
+            ),
+        )
+        for label, over, reason in cases:
+            with self.subTest(label=label):
+                self.assertEqual(
+                    build_receipt_payload(receipt_req(**over), config=_CONFIG).reason, reason
+                )
 
     def test_unallocated_receipt_needs_explicit_flag(self):
         # 挂账收款(ARRCPIT 0 行)是真存在的形态,但必须会计显式点头。
@@ -138,7 +85,8 @@ class ReceiptPayloadTests(unittest.TestCase):
         )
         p = _ok(
             build_receipt_payload(
-                receipt_req(allocations=[], allow_unallocated=True), config=_CONFIG
+                receipt_req(allocations=[], allow_unallocated=True, advance=None),
+                config=_CONFIG,
             )
         )
         self.assertTrue(p["allow_unallocated"])
@@ -146,7 +94,7 @@ class ReceiptPayloadTests(unittest.TestCase):
     def test_rejects(self):
         cases = (
             ("缺客户码", {"customer_code": ""}, "no_customer_code"),
-            ("缺渠道且无代扣", {"channels": []}, "no_channels"),
+            ("缺渠道且无代扣", {"channels": [], "wht_amount": "0"}, "no_channels"),
             (
                 "C3 不闭合(冲销额与实收对不上)",
                 {"allocations": [{"doc_no": "IV1", "rectyp": "3", "amount": "900.00"}]},
@@ -154,8 +102,13 @@ class ReceiptPayloadTests(unittest.TestCase):
             ),
             (
                 "金额解析不了",
-                {"channels": [{"prefix": "TR", "kind": "transfer", "amount": "一千"}]},
+                {"channels": [{"isrun_zr_prefix": "TR", "kind": "transfer", "amount": "一千"}]},
                 "bad_channel_amount",
+            ),
+            (
+                "渠道前缀超宽(截断会指到另一条真实渠道行上)",
+                {"channels": [{"isrun_zr_prefix": "TRX", "kind": "transfer", "amount": "1040"}]},
+                "bad_channel_prefix",
             ),
             ("日期非法", {"receipt_date": "2026-02-30"}, "bad_or_missing_date"),
             ("客户码超宽", {"customer_code": "C" * 11}, "customer_code_too_long"),
@@ -173,13 +126,16 @@ class PaymentPayloadTests(unittest.TestCase):
     def test_normal_assembly(self):
         p = _ok(build_payment_payload(payment_req(), config=_CONFIG))
         self.assertEqual((p["direction"], p["doctype"]), ("ap_payment", "PS"))
-        # A1 净额 = Σ结清额;A3 收付合计 = 净额 − 预扣。
-        self.assertEqual(
-            (p["net_amount"], p["cheque_amount"], p["wht_amount"]),
-            ("1000.00", "970.00", "30.00"),
-        )
+        self.assertEqual(p["payment_date"], "2026-01-15")
+        self.assertEqual((p["supplier_code"], p["wht_amount"]), ("S001", "30.00"))
+        self.assertEqual(p["channels"][0]["isrun_zp_prefix"], "QP")
         self.assertTrue(p["channels"][0]["is_cheque"])
         self.assertEqual(p["withholding"]["tax_type"], "S53")
+        # BKMAS/BKTRN.BNKACC 是银行档编码 C(2),不是银行账号 —— 发账号会在桥端写完
+        # APTRN/APRCPIT/GL 之后炸在最后一张 BKTRN 上,变成半写回滚。
+        self.assertEqual(p["channels"][0]["bank_account"], "01")
+        # NETAMT/CSHPAY/CHQPAY 由桥端按 settlements + is_cheque 自推,云端不下发派生桶。
+        self.assertFalse({"net_amount", "cash_amount", "cheque_amount"} & set(p))
 
     def test_v1_scope_narrowing_escalates(self):
         cases = (
@@ -213,7 +169,16 @@ class PaymentPayloadTests(unittest.TestCase):
                 "bad_settlement_amount",
             ),
             ("日期非法", {"payment_date": ""}, "bad_or_missing_date"),
-            ("支票缺银行账号", {"channels": [{**cheque, "bank_account": ""}]}, "bad_bank_account"),
+            (
+                "支票缺银行档编码",
+                {"channels": [{**cheque, "bank_account": ""}]},
+                "bad_bank_account",
+            ),
+            (
+                "银行档编码填成了账号",
+                {"channels": [{**cheque, "bank_account": "1234567890"}]},
+                "bad_bank_account",
+            ),
             (
                 "多张支票",
                 {"channels": [cheque, {**cheque, "amount": "0.01"}]},
@@ -232,9 +197,16 @@ class JournalPayloadTests(unittest.TestCase):
         p = _ok(build_journal_payload(journal_req(), config=_CONFIG))
         self.assertEqual((p["direction"], p["doctype"]), ("gl_journal", "GL"))
         self.assertEqual(p["total_amount"], "500.00")
-        self.assertEqual(p["journal_code"], "00")
-        # 行摘要默认抄头(真数据里行 DESCRP 从不为空)。
-        self.assertEqual(p["lines"][0]["desc"], p["description"])
+        self.assertEqual((p["voucher_date"], p["journal_code"]), ("2026-01-15", "00"))
+        # 科目列名是 account —— 桥端 doc_journal 逐行读它,发 acc 等于整行没科目。
+        self.assertEqual(p["lines"][0]["account"], "5140-10")
+        # 行级只发桥端 `Leg` 装得下的列:DESCRP 由桥端统一抄单头,phase/coscod 那儿没有位置。
+        # 发了不报错,是会计逐行敲的内容静默蒸发。
+        self.assertFalse({"desc", "phase", "coscod"} & set(p["lines"][0]))
+        self.assertEqual(p["lines"][0]["depcod"], "01")
+        # 税期发公历 ISO:桥端 `_write_isvat` 用 iso_date 取年月,佛历串会静默回落成凭证日。
+        self.assertEqual(p["vat"]["vat_period"], "2026-01-01")
+        self.assertNotIn("vat_period_be", p["vat"])
 
     def test_rejects(self):
         cases = (
@@ -244,19 +216,23 @@ class JournalPayloadTests(unittest.TestCase):
                 "借贷不平",
                 {
                     "lines": [
-                        {"acc": "5140-10", "side": "D", "amount": "500.00"},
-                        {"acc": "2130-01", "side": "C", "amount": "400.00"},
+                        {"account": "5140-10", "side": "D", "amount": "500.00"},
+                        {"account": "2130-01", "side": "C", "amount": "400.00"},
                     ]
                 },
                 "bad_journal_lines",
             ),
-            ("只有一行", {"lines": [{"acc": "5140-10", "side": "D", "amount": "500.00"}]}, None),
+            (
+                "只有一行",
+                {"lines": [{"account": "5140-10", "side": "D", "amount": "500.00"}]},
+                None,
+            ),
             (
                 "金额为负(方向只由 side 表达)",
                 {
                     "lines": [
-                        {"acc": "5140-10", "side": "D", "amount": "-500.00"},
-                        {"acc": "2130-01", "side": "C", "amount": "-500.00"},
+                        {"account": "5140-10", "side": "D", "amount": "-500.00"},
+                        {"account": "2130-01", "side": "C", "amount": "-500.00"},
                     ]
                 },
                 None,
@@ -265,8 +241,8 @@ class JournalPayloadTests(unittest.TestCase):
                 "金额解析不了",
                 {
                     "lines": [
-                        {"acc": "5140-10", "side": "D", "amount": "五百"},
-                        {"acc": "2130-01", "side": "C", "amount": "500.00"},
+                        {"account": "5140-10", "side": "D", "amount": "五百"},
+                        {"account": "2130-01", "side": "C", "amount": "500.00"},
                     ]
                 },
                 None,
@@ -285,10 +261,11 @@ class StockAdjustPayloadTests(unittest.TestCase):
     def test_normal_assembly(self):
         p = _ok(build_stock_adjust_payload(stock_req(), config=_CONFIG))
         self.assertEqual((p["direction"], p["doctype"]), ("stock_adjust", "OU"))
-        # 方向由 POSOPR 定,不看金额符号(45 号契约 X1)。
-        self.assertEqual((p["posopr"], p["subtype"]), ("6", "internal_issue"))
-        self.assertEqual(p["net_amount"], "500.00")
-        self.assertEqual(p["items"][0]["amount"], "500.00")
+        # 方向由 subtype 表达(桥端据它写 POSOPR='6'),不看金额符号(45 号契约 X1)。
+        self.assertEqual((p["subtype"], p["doc_date"]), ("internal_issue", "2026-01-15"))
+        self.assertEqual(p["lines"][0]["amount"], "500.00")
+        # 明细键是 lines(桥端 doc_stock_adjust 读它);POSOPR/NET 由桥端自推。
+        self.assertFalse({"items", "posopr", "net_amount"} & set(p))
 
     def test_quantity_keeps_four_decimals(self):
         # 库存余额靠 XTRNQTY = TRNQTY × TFACTOR 移动(都是 B(8,4)):数量跟着钱走两位,
@@ -302,9 +279,9 @@ class StockAdjustPayloadTests(unittest.TestCase):
                 config=_CONFIG,
             )
         )
-        item = p["items"][0]
-        self.assertEqual((item["qty"], item["tfactor"]), ("0.0625", "1.4080"))
-        self.assertEqual(item["amount"], "1.00")
+        line = p["lines"][0]
+        self.assertEqual((line["qty"], line["tfactor"]), ("0.0625", "1.4080"))
+        self.assertEqual(line["amount"], "1.00")
         # 四位以下的数量落位后就是 0 —— 当场退回,不推一张数量为零的调整单。
         self.assertEqual(
             build_stock_adjust_payload(
@@ -333,75 +310,41 @@ class StockAdjustPayloadTests(unittest.TestCase):
                 self.assertEqual(res.reason, reason)
 
 
-def _payloads():
-    return {
-        # 动用 70 预收 + 转账 1070 结清一张 1140 的发票(C3/C4 两条恒等式都走到)。
-        "ar_receipt": _ok(
-            build_receipt_payload(
-                receipt_req(
-                    allocations=[
-                        {"doc_no": "IV690101-001", "rectyp": "3", "amount": "1140.00"},
-                        {"doc_no": "AD-001", "rectyp": "0", "amount": "70.00"},
-                    ],
-                    advance={"doc_no": "AD-001", "amount": "70.00"},
-                    prior_docnum="RE0001",
-                ),
-                config=_CONFIG,
-            )
-        ),
-        "ap_payment": _ok(
-            build_payment_payload(payment_req(prior_docnum="PS0001"), config=_CONFIG)
-        ),
-        "gl_journal": _ok(
-            build_journal_payload(
-                journal_req(
-                    voucher_no="JV6901-004",
-                    vat={
-                        "vat_rec": "P",
-                        "vat_period": "2026-01-15",
-                        "base_amount": "500.00",
-                        "vat_amount": "35.00",
-                        "ref_no": "INV-9",
-                    },
-                ),
-                config=_CONFIG,
-            )
-        ),
-        "stock_adjust": _ok(
-            build_stock_adjust_payload(stock_req(prior_docnum="ZZ0001"), config=_CONFIG)
-        ),
-    }
-
-
 class WriteGateDispatchTests(unittest.TestCase):
     """桥门面按 direction 分派 —— 四类各认自己的 doctype,老链路不受影响。"""
 
     def test_each_doctype_passes_the_write_gate(self):
-        for direction, payload in _payloads().items():
+        for direction, payload in golden_payloads().items():
             with self.subTest(direction=direction):
                 self.assertEqual(client.build_write_payload(payload, BOOK)["direction"], direction)
 
     def test_tampered_payload_is_rejected_at_the_gate(self):
-        # 重推/回放不经组装器:总闸必须自己拦得住被改过的载荷。
-        bad = []
-        for direction, payload in _payloads().items():
-            key = "total_amount" if direction == "gl_journal" else "net_amount"
-            bad.append((direction, {**payload, key: "999999.00"}))
+        # 重推/回放不经组装器:总闸必须自己拦得住被改过的载荷。派生金额已不下发,所以
+        # 每类改的是它唯一还能被改坏的那个数(改完对应的恒等式必须当场不闭合)。
+        payloads = golden_payloads()
+        stock_lines = [{**payloads["stock_adjust"]["lines"][0], "amount": "999999.00"}]
+        bad = (
+            ("ar_receipt", {**payloads["ar_receipt"], "shortfall_amount": "999999.00"}),
+            ("ap_payment", {**payloads["ap_payment"], "wht_amount": "999999.00"}),
+            ("gl_journal", {**payloads["gl_journal"], "total_amount": "999999.00"}),
+            ("stock_adjust", {**payloads["stock_adjust"], "lines": stock_lines}),
+        )
         for direction, payload in bad:
             with self.subTest(direction=direction), self.assertRaises(BridgeRejected) as ctx:
                 client.build_write_payload(payload, BOOK)
             self.assertEqual(ctx.exception.code, "bridge.bad_payload")
 
     def test_shape_rejects(self):
-        receipt = _payloads()["ar_receipt"]
-        journal = _payloads()["gl_journal"]
+        receipt = golden_payloads()["ar_receipt"]
+        journal = golden_payloads()["gl_journal"]
         cases = (
             ("doctype 与 direction 不配", {**receipt, "doctype": "PS"}, BOOK),
             ("串用老链路票种", {**journal, "doctype": "RR"}, BOOK),
             ("未知 direction", {**receipt, "direction": "ar_refund"}, BOOK),
             ("账套与 book 不一致", receipt, "OTHER"),
             ("版本不符", {**receipt, "payload_version": 2}, BOOK),
-            ("日期形状不对", {**receipt, "docdate_be": "2026-01-15"}, BOOK),
+            # 佛历串正是 P2-B 那刀:桥端只认 ISO,发 690115 一律 INVALID_DOC_DATE。
+            ("日期发成佛历", {**receipt, "receipt_date": "690115"}, BOOK),
             ("手工凭证借贷不平", {**journal, "lines": journal["lines"][:1]}, BOOK),
         )
         for label, payload, book in cases:
@@ -429,15 +372,17 @@ class PayloadKeyContractTests(unittest.TestCase):
     """桥端按 direction 分表做白名单,契约外键 = bad_payload 整条写路熄火(桥不随主站部署)。"""
 
     def test_keys_within_registered_contract(self):
-        for direction, payload in _payloads().items():
+        for direction, payload in golden_payloads().items():
             with self.subTest(direction=direction):
                 extra = set(payload) - DOCTYPE_PAYLOAD_KEYS[direction]
                 self.assertFalse(extra, f"未登记的载荷键须同步桥端白名单: {sorted(extra)}")
 
     def test_conditional_keys_really_appear(self):
         # 条件键不出现 → 上一条"⊆"恒真变假绿。
-        payloads = _payloads()
-        self.assertLessEqual({"advance", "prior_docnum"}, set(payloads["ar_receipt"]))
+        payloads = golden_payloads()
+        self.assertLessEqual(
+            {"advance", "wht_isrun_zr_prefix", "prior_docnum"}, set(payloads["ar_receipt"])
+        )
         self.assertIn("withholding", payloads["ap_payment"])
         self.assertLessEqual({"voucher_no", "vat"}, set(payloads["gl_journal"]))
         self.assertIn("prior_docnum", payloads["stock_adjust"])

@@ -168,10 +168,19 @@
   font-size: 12.5px;
   color: var(--ink2);
 }
-/* 宽表格只在自己的容器里横滑,页面本体永不出现横向滚动条。 */
+/* 宽表格只在自己的容器里横滑,页面本体永不出现横向滚动条。滚动条常驻(overlay 滚动条
+ * 不出现时,被裁掉的列看起来就是"表格坏了"——手机上直接少两列还没有任何提示)。 */
 .stw-scroll {
   overflow-x: auto;
   margin-top: 8px;
+  scrollbar-width: thin;
+}
+.stw-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.stw-scroll::-webkit-scrollbar-thumb {
+  background: var(--hair2);
+  border-radius: 3px;
 }
 .stw-table {
   border-collapse: collapse;
@@ -409,6 +418,12 @@
   }
   .stw-msg {
     max-width: 100%;
+  }
+  /* 单栏下整页滚动,sticky 会把输入框钉在首屏底部 —— 消息流还在它下面没露头,读起来
+   * 就是「先输入框、后回复」,与桌面和所有聊天界面相反。手机上回归正常流:消息在上,
+   * 输入在下。 */
+  .stw-composer {
+    position: static;
   }
   /* 批准/拒绝是高敏动作:手机上撑满一行、触控目标 ≥44px,倒计时另起一行看得清。 */
   .stw-authz-actions .btn {

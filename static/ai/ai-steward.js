@@ -368,6 +368,8 @@
         var a = el.getAttribute('data-action');
         if (a === 'stw-send') send($('stwInput') ? $('stwInput').value : '');
         else if (a === 'stw-quick') send(el.getAttribute('data-text'));
+        // 追问的候选:送出去就是回答那一问,后端接回同一条任务续跑(不另开一条)。
+        else if (a === 'stw-ask-pick') send(el.getAttribute('data-text'));
         else if (a === 'stw-resend') resend(el.getAttribute('data-mid'));
         else if (a === 'stw-open-task') loadTask(el.getAttribute('data-tid'));
         else if (a === 'stw-poll-again' && S.taskId) loadTask(S.taskId);

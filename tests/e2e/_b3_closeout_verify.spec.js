@@ -417,7 +417,7 @@ test.describe.serial('B3 收官视觉验收', () => {
         mode.fn = () =>
             taskBody('zh', 'cancelled', {
                 error_code: 'steward.authz_rejected',
-                error_reason: '你拒绝了这次写操作,任务已取消,一步都没执行。',
+                error_reason: '这个操作被拒绝,未执行任何步骤。',
                 authorization: authzCard('zh', {
                     status: 'rejected',
                     decided_by: 'stw_e2e',

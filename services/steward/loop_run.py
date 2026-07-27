@@ -36,7 +36,7 @@ from services.steward import (
     store,
     tools,
 )
-from services.steward.loop_state import Ledger, empty_loop
+from services.steward.loop_state import STEP_ASK, Ledger, empty_loop
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -327,8 +327,11 @@ class _Run:
         self.loop["pending_question"] = {
             "field": step.ask_field, "question": step.question, "options": step.options,
         }  # fmt: skip
-        step_id = self.ledger.open(copy_loop.step_ask(self.lang))
-        self.ledger.close(step_id, state=store.STEP_DONE, detail=question)
+        # 追问那一行标 kind=ask:前端据此把 loop.question.options 画成可点的候选(不靠
+        # 匹配文案),store.agent_count 也才数得准「查了几次」。detail 只放问题本身 ——
+        # 候选已经是按钮,正文再列一遍就是同一屏摆两份。
+        step_id = self.ledger.open(copy_loop.step_ask(self.lang), kind=STEP_ASK)
+        self.ledger.close(step_id, state=store.STEP_DONE, detail=step.question.strip())
         steps = self.ledger.finish_final("", state=store.STEP_QUEUED)
         with db.get_cursor(commit=True) as cur:
             store.update_payload(cur, tenant_id=self.tenant_id, task_id=self.task_id,

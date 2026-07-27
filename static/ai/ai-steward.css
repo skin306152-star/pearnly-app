@@ -125,6 +125,14 @@
   color: var(--mut);
   margin-top: 2px;
 }
+/* 追问那一步的候选:贴着问题走,间距比快捷问法紧一档(那是入口,这是选项)。 */
+.stw-ask-opts {
+  margin-top: 6px;
+}
+.stw-ask-opts .stw-chip[disabled] {
+  cursor: default;
+  opacity: 0.5;
+}
 .stw-links {
   display: flex;
   flex-wrap: wrap;

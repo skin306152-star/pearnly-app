@@ -17,6 +17,13 @@ from services.steward.registry import ToolContext
 
 KIND = "brain_loop"  # payload.kind:worker 据此分流到本模块
 
+# 步骤账本里的行别(前端契约:steps[].kind)。tool = 真跑了一个工具,ask = 停下来问了
+# 一句。分开是因为 store.agent_count 数的是工具调用次数 —— 把追问也算进去,左窗那个数就
+# 不再是「查了几次」;前端也要靠它把候选按钮挂到追问那一行,不靠匹配文案。
+STEP_TOOL = "tool"
+STEP_ASK = "ask"
+_LEDGER_KINDS = (STEP_TOOL, STEP_ASK)
+
 
 def is_loop_task(payload: Optional[dict]) -> bool:
     return (payload or {}).get("kind") == KIND
@@ -88,12 +95,13 @@ class Ledger:
     def __init__(self, tenant_id: str, task_id: str, steps: list):
         self.tenant_id, self.task_id = tenant_id, task_id
         self.steps = [dict(s) for s in (steps or [])]
-        self._n = sum(1 for s in self.steps if s.get("kind") == "tool")
+        self._n = sum(1 for s in self.steps if s.get("kind") in _LEDGER_KINDS)
 
-    def open(self, label: str, *, state: str = store.STEP_RUNNING, detail: str = "") -> str:
+    def open(self, label: str, *, state: str = store.STEP_RUNNING, detail: str = "",
+             kind: str = STEP_TOOL) -> str:  # fmt: skip
         self._n += 1
         step_id = f"s{self._n}"
-        row = {"id": step_id, "kind": "tool", "label": label, "state": state,
+        row = {"id": step_id, "kind": kind, "label": label, "state": state,
                "detail": detail, "links": []}  # fmt: skip
         at = next((i for i, s in enumerate(self.steps) if s.get("id") == "final"), len(self.steps))
         self.steps.insert(at, row)

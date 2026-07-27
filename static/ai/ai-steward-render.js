@@ -3,7 +3,9 @@
  *
  * 吃 GET /api/ai/steward/tasks/{tid} 的载荷:
  *   { task_id, title, status, started_at, agent_count,
- *     steps: [{ id, label, state, detail, links: [{label, href}] }],
+ *     steps: [{ id, kind?('tool'|'ask'), label, state, detail, links: [{label, href}] }],
+ *     loop?: { calls, tool_calls, asked, wrote, waiting_auth,
+ *              question?: { field, text, options: [文本] } },
  *     artifacts: [{ kind, label, href?,
  *                   columns?: [{key, label}], rows?: [{<key>: 值}] }],
  *     error_code?, error_reason?(没跑成时的机器码 + 人话),
@@ -97,10 +99,38 @@
         return { done: done, total: list.length };
     }
 
-    // Agent 数:后端没给或给了非正整数就当 1(至少有管家自己在跑),不显示 "0 个 Agent"。
+    // 查询次数:后端没给或给了非正整数就当 1(至少查过一次),不显示 "查询 0 次"。
     function agentCount(task) {
         var n = Math.round(Number(task && task.agent_count));
         return isFinite(n) && n > 0 ? n : 1;
+    }
+
+    // 追问的候选按钮最多摆几个。多于此照旧可以打字回答 —— 一排按钮铺满两行比没有更难挑。
+    var MAX_OPTIONS = 8;
+
+    // 追问投影:loop.question 规整成 { text, options }。没问题、问题为空、或候选全是空串
+    // 一律 null(调用方据此整块不渲染)——摆一排空按钮比不摆更糟。
+    function loopQuestion(task) {
+        var q = task && task.loop && task.loop.question;
+        var text = q ? String(q.text == null ? '' : q.text).trim() : '';
+        if (!text) return null;
+        var seen = {};
+        var options = ((q && q.options) || [])
+            .map(function (o) {
+                return String(o == null ? '' : o).trim();
+            })
+            .filter(function (o) {
+                if (!o || seen[o]) return false;
+                seen[o] = true;
+                return true;
+            })
+            .slice(0, MAX_OPTIONS);
+        return { field: String((q && q.field) || ''), text: text, options: options };
+    }
+
+    // 候选只在「还等着她回答」时可点:终态后那一轮后端不认,点下去只会拿到一个错。
+    function optionsEnabled(task, busy) {
+        return task && task.status === 'waiting_user' && !busy;
     }
 
     // 开始时间 → 本地 HH:MM。解析不了回空串,调用方据此整块不显示(不臆造时间)。
@@ -126,6 +156,9 @@
         stepCounts: stepCounts,
         agentCount: agentCount,
         startedLabel: startedLabel,
+        loopQuestion: loopQuestion,
+        optionsEnabled: optionsEnabled,
+        MAX_OPTIONS: MAX_OPTIONS,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -152,7 +185,31 @@
         );
     }
 
-    function stepHtml(step) {
+    // 追问那一步(kind='ask')底下的候选按钮。点一下 = 把这句话当作回答送出去,后端
+    // 接回同一条任务续跑。挂在步骤行上而不是另起一块:问题和答法要在同一处。
+    function optionsHtml(q, enabled) {
+        if (!q || !q.options.length) return '';
+        return (
+            '<div class="stw-chips stw-ask-opts">' +
+            q.options
+                .map(function (o) {
+                    return (
+                        '<button type="button" class="chip stw-chip" data-action="stw-ask-pick" ' +
+                        'data-text="' +
+                        esc(o) +
+                        '"' +
+                        (enabled ? '' : ' disabled') +
+                        '>' +
+                        esc(o) +
+                        '</button>'
+                    );
+                })
+                .join('') +
+            '</div>'
+        );
+    }
+
+    function stepHtml(step, opts) {
         var state = step && step.state;
         var fam = stepFamily(state);
         var badge = AI.statesRender.badgeHtml(fam, at(stepStateKey(state)), {
@@ -162,6 +219,10 @@
             step && step.detail ? '<div class="stw-step-d">' + esc(step.detail) + '</div>' : '';
         // 执行中那一步补三点:徽章说"是什么状态",三点说"此刻还活着"(B1 §3 类三)。
         var dots = state === 'running' ? AI.statesRender.dotsHtml('run') : '';
+        var options =
+            step && step.kind === 'ask' && opts
+                ? optionsHtml(opts.question, opts.optionsEnabled)
+                : '';
         return (
             '<li class="stw-step"><span class="stw-step-badge">' +
             badge +
@@ -171,6 +232,7 @@
             '</div>' +
             detail +
             linksHtml(step && step.links) +
+            options +
             '</div></li>'
         );
     }
@@ -281,7 +343,21 @@
         opts = opts || {};
         var counts = stepCounts(task.steps);
         var fam = taskFamily(task.status);
-        var steps = (task.steps || []).map(stepHtml).join('');
+        // 候选只挂在最后一次追问上:更早那次的候选已经被回答过,再摆一遍等于让人重答旧题。
+        var list = task.steps || [];
+        var lastAsk = -1;
+        list.forEach(function (s, i) {
+            if (s && s.kind === 'ask') lastAsk = i;
+        });
+        var stepOpts = {
+            question: loopQuestion(task),
+            optionsEnabled: optionsEnabled(task, opts.busy),
+        };
+        var steps = list
+            .map(function (s, i) {
+                return stepHtml(s, i === lastAsk ? stepOpts : null);
+            })
+            .join('');
         // 卡还活着才让按钮可点(waiting_user + actions 块);终态后置灰 —— 后端那一轮不认,
         // 点下去只会拿到一个错。busy 是本地送出在途,连点会开出两个任务。
         var dead = { dead: task.status !== 'waiting_user' || !!opts.busy };

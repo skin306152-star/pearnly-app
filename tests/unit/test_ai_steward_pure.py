@@ -156,6 +156,48 @@ class TaskRenderPureTests(unittest.TestCase):
         # 缺失/非法一律兜到 1:不显示"0 个 Agent"这种自证没在干活的假状态。
         self.assertEqual(out[3:], [3, 1, 1, 1])
 
+    def test_loop_question_normalises_options_and_drops_empty_ones(self):
+        out = _run_node(f"""
+            const r = require({_RENDER});
+            process.stdout.write(JSON.stringify([
+                r.loopQuestion({{ loop: {{ question: {{ field: 'period',
+                    text: ' 哪一期? ', options: [' 上个月 ', '', '本月', '上个月', null] }} }} }}),
+                r.loopQuestion({{ loop: {{ question: {{ text: '  ', options: ['x'] }} }} }}),
+                r.loopQuestion({{ loop: {{ calls: 2 }} }}),
+                r.loopQuestion({{}}),
+                r.loopQuestion(null),
+            ]));
+            """)
+        # 去空、去重、去首尾空格,顺序照后端给的来(候选是它按数据算的,前端不重排)。
+        self.assertEqual(
+            out[0], {"field": "period", "text": "哪一期?", "options": ["上个月", "本月"]}
+        )
+        # 问题为空 = 没有追问:整块不渲染,不摆一排点了没意义的按钮。
+        self.assertEqual(out[1:], [None, None, None, None])
+
+    def test_loop_question_caps_the_number_of_options(self):
+        out = _run_node(f"""
+            const r = require({_RENDER});
+            const many = Array.from({{ length: 20 }}, (_, i) => 'o' + i);
+            const q = r.loopQuestion({{ loop: {{ question: {{ text: '选一个', options: many }} }} }});
+            process.stdout.write(JSON.stringify([r.MAX_OPTIONS, q.options.length]));
+            """)
+        self.assertEqual(out[1], out[0])
+
+    def test_options_are_clickable_only_while_the_task_still_waits(self):
+        out = _run_node(f"""
+            const r = require({_RENDER});
+            process.stdout.write(JSON.stringify([
+                r.optionsEnabled({{ status: 'waiting_user' }}, false),
+                r.optionsEnabled({{ status: 'waiting_user' }}, true),
+                r.optionsEnabled({{ status: 'running' }}, false),
+                r.optionsEnabled({{ status: 'done' }}, false),
+                r.optionsEnabled({{ status: 'cancelled' }}, false),
+            ]));
+            """)
+        # 终态后后端那一轮不认;busy 是本地送出在途,连点会送出两句。
+        self.assertEqual(out, [True, False, False, False, False])
+
     def test_started_label_is_empty_when_unparseable(self):
         out = _run_node(f"""
             const r = require({_RENDER});
@@ -166,6 +208,23 @@ class TaskRenderPureTests(unittest.TestCase):
             """)
         self.assertEqual(out[0], "09:05")
         self.assertEqual(out[1:], ["", ""])
+
+
+class ActionWiringTests(unittest.TestCase):
+    """左窗画出来的每个 data-action 都得有人接 —— 摆一个点了没反应的按钮比不摆更糟。"""
+
+    def test_every_rendered_action_has_a_handler(self):
+        rendered = set(
+            re.findall(
+                r'data-action="([a-z-]+)"', (AI_DIR / "ai-steward-render.js").read_text("utf-8")
+            )
+        )
+        handlers = "".join(
+            (AI_DIR / name).read_text("utf-8")
+            for name in ("ai-steward.js", "ai-steward-actions.js", "ai-steward-attach.js")
+        )
+        missing = sorted(a for a in rendered if f"'{a}'" not in handlers)
+        self.assertEqual(missing, [], f"这些按钮没人接:{missing}")
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

@@ -62,7 +62,8 @@ def intent_label(tool: str, intent: str, lang: str) -> str:
 
 
 def question_text(question: str, options: Optional[list], lang: str) -> str:
-    """追问那句话 + 候选。前端还没有 chips(批次 2),候选先如实摆进正文,不假装有按钮。"""
+    """追问那句话 + 候选(发进对话流的那一条)。左窗那一步只落问题本身,候选在那边由
+    loop.question.options 画成可点的按钮 —— 同一屏不摆两份候选。"""
     text = (question or "").strip()
     picks = [str(o).strip() for o in (options or []) if str(o or "").strip()]
     if picks:

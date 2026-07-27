@@ -246,6 +246,13 @@ class AskAndResumeTests(unittest.TestCase):
         self.assertEqual(out.loop["asked"], 1)
         self.assertEqual(out.loop["pending_question"]["field"], "client_name")
         self.assertIn("Sister Trading", out.reply)
+        # 追问那一行标 kind=ask(前端据此挂候选按钮),detail 只放问题本身 —— 候选是按钮,
+        # 正文再列一遍就是同一屏摆两份;agent_count 数 kind=tool,不把追问算成一次查询。
+        steps = out.parked[0]["steps"]
+        kinds = [s.get("kind") for s in steps if s.get("kind")]
+        self.assertEqual(kinds, ["ask"], "追问被记成了一次工具调用")
+        ask = [s for s in steps if s.get("kind") == "ask"][0]
+        self.assertEqual(ask["detail"], "是 Sister Makeup 还是 Sister Trading?")
 
     def test_a_required_slot_missing_twice_falls_back_to_a_deterministic_question(self):
         """判错了她看不出错的参数(含税/未含税)宁可问 —— 但先让模型自己换一次招。"""

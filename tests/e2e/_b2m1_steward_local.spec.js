@@ -275,10 +275,10 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         await expect(page.locator('.stw-msg.me .stw-bubble').first()).toContainText(chipText);
         await expect(page.locator('.stw-msg.agent .stw-bubble').first()).toContainText('还缺料');
 
-        // 左窗:任务标题 + 3 个 Agent + 五个步骤。
+        // 左窗:任务标题 + 查询次数 + 五个步骤。
         await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
         await expect(page.locator('#stwLeft .panel .hd h3')).toContainText('缺料盘点');
-        await expect(page.locator('#stwLeft .stw-meta')).toContainText('3 个 Agent');
+        await expect(page.locator('#stwLeft .stw-meta')).toContainText('查询 3 次');
         await expect(page.locator('#stwLeft .stw-step')).toHaveCount(5);
 
         // 五个 state → 五个 B1 色族类,且真有色差(同一片灰 = 状态语言白写了)。
@@ -428,7 +428,9 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         return h;
     }
 
-    test('待批卡:说清做什么 · 批/拒两动作 · 倒计时活的 · 文案不承诺没有的能力', async ({ page }) => {
+    test('待批卡:说清做什么 · 批/拒两动作 · 倒计时活的 · 文案不承诺没有的能力', async ({
+        page,
+    }) => {
         await openWithTask(page, { taskSeq: [waitingAuthzPayload()] });
         await page.waitForSelector('.stw-authz', { state: 'visible', timeout: 15000 });
 
@@ -448,17 +450,16 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         expect(cd2).not.toBe(cd1);
         // 工具步是 waiting_auth 橙(B1 既有色族,契约点名)。
         await expect(page.locator('.stw-step:nth-child(2) .st-badge')).toHaveClass(/st-warn/);
-        // 文案与能力一致(双向闸在 tests/unit/test_ai_steward_pure.py):注册表还全只读,
-        // 页面自述保持「只查不改数」、不承诺授权卡 —— 授权卡措辞随第一个写工具一起换。
+        // 文案与能力一致(双向闸在 tests/unit/test_ai_steward_pure.py):闭集里已经有写工具
+        // (erp_push),页面自述就必须说「会改数据的操作要你先批准」,不许再自称只查不改。
         const noteTexts = await page.evaluate(() => [
             document.querySelector('#v-steward .board-head .note').textContent,
             document.querySelector('.stw-composer-note').textContent,
         ]);
         for (const t of noteTexts) {
-            expect(t).not.toContain('授权卡');
+            expect(t).not.toContain('只查不改数');
+            expect(t).toContain('会改数据的操作需你先批准');
         }
-        expect(noteTexts[0]).toContain('只查不改数');
-        expect(noteTexts[1]).toContain('只查不改数');
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '07-authz-pending-card.png'),
             fullPage: true,

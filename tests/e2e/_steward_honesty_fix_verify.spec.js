@@ -48,7 +48,7 @@ async function open(page) {
     await page.waitForSelector('#stwInput', { state: 'visible', timeout: 30000 });
 }
 
-// 真敲键盘(fill() 绕过真实按键 = 假绿),等真答复落地(「开跑了」那条是应承不是答案)。
+// 真敲键盘(fill() 绕过真实按键 = 假绿),等真答复落地(「已开始」那条是应承不是答案)。
 async function ask(page, text) {
     const before = await page.locator('.stw-msg.agent .stw-bubble').count();
     await page.locator('#stwInput').click();
@@ -58,7 +58,7 @@ async function ask(page, text) {
         (n) => {
             const b = document.querySelectorAll('.stw-msg.agent .stw-bubble');
             if (b.length <= n) return false;
-            return !/开跑了|กำลังทำ/.test((b[b.length - 1].innerText || '').trim());
+            return !/已开始|เริ่ม「/.test((b[b.length - 1].innerText || '').trim());
         },
         before,
         { timeout: 180000 }

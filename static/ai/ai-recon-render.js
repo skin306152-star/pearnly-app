@@ -44,10 +44,27 @@
         };
     }
 
+    // 某张清单为空时,到底是「没料可对」还是「对完了确实没有这一类」。四张单全空 = 对账
+    // 引擎跑完但手上什么都没有(对账单没传/传了没解析出流水行),那是 idle,该指路去收料;
+    // 只要有任意一张单有行,本单的空就是真结论,该说清为什么空。
+    // 这里不产出 error:bankRecon 非 null 就意味着对账步已成功产出(见
+    // services/workorder/api.py::_bank_recon —— 没跑到/降级一律给 None),
+    // 失败态由 pageHtml 的 bankRecon==null 分支按工单是否卡死来判。
+    function listPhase(bankRecon) {
+        var r = bankRecon || {};
+        var total =
+            (r.auto_matched || []).length +
+            (r.review || []).length +
+            (r.missing_invoice || []).length +
+            (r.unmatched_invoice || []).length;
+        return total === 0 ? 'idle' : 'empty';
+    }
+
     var pure = {
         hasGap: hasGap,
         diffState: diffState,
         buildMissingStagePayload: buildMissingStagePayload,
+        listPhase: listPhase,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -183,8 +200,19 @@
         return '<span class="chip s">' + count + '</span>';
     }
 
+    // 单张清单空掉时的「为什么空」。此前四张单各只有一句「暂无 X」,会计分不清是没跑、
+    // 没料还是真没有;这里给的是跑完之后的真结论,所以一律 empty 相位——「什么都没得对」
+    // 那种情况整块面板只说一次(见 pageHtml 的 idle 分支),不在四张单里各喊一遍。
+    function sectionEmptyBody(kind, emptyKey) {
+        return root.AI.state.sectionEmptyHtml({
+            phase: 'empty',
+            title: at(emptyKey),
+            sub: at('emp_brx_' + kind + '_s'),
+        });
+    }
+
     function sectionHtml(kind, titleKey, count, open, rowsHtml, emptyKey) {
-        var body = count === 0 ? '<p class="brx-empty">' + esc(at(emptyKey)) + '</p>' : rowsHtml;
+        var body = count === 0 ? sectionEmptyBody(kind, emptyKey) : rowsHtml;
         return (
             '<div class="brx-section' +
             (open ? ' on' : '') +
@@ -212,6 +240,26 @@
     // ui: {open:{auto,review,missing,unmatched}, missing:{idx:{busy,done,errKey}}}
     function pageHtml(bankRecon, ui, clientId) {
         if (!bankRecon) {
+            // 后端把「还没跑到对账」与「跑挂了降级」都收敛成 null(见 api.py::_bank_recon),
+            // 光凭 null 分不出来——工单卡死(stuck 且后台报了 blocked_reasons)才是跑挂了,
+            // 那句「不用管它,跑到对账会自动生成」在卡死时是假话:它不会自己好。
+            if (ui && ui.stalled) {
+                return (
+                    '<div class="panel"><div class="hd"><h3>' +
+                    esc(at('brx_title')) +
+                    '</h3></div><div class="bd">' +
+                    root.AI.state.sectionEmptyHtml({
+                        phase: 'error',
+                        title: at('emp_brx_stalled_t'),
+                        sub: at('emp_brx_stalled_s'),
+                        retryLabel: at('retry'),
+                        // 复用工单页状态头那颗断点重试(cv-wo 上的点击委托覆盖本区),
+                        // 不为这一个空态另绑一套监听、更不另造第二条重试路径。
+                        retryName: 'wo-retry-stuck',
+                    }) +
+                    '</div></div>'
+                );
+            }
             // 死卡指路(§6 死路批 · 2026-07-17):文案说了「传对账单」就得给入口。period
             // 没有进到本渲染层(mount 只带 clientId),深链退化不带期 → ai-client.js 落最新期。
             var intakeLink =
@@ -231,6 +279,24 @@
                     sub: at('brx_disabled_s'),
                 }) +
                 intakeLink +
+                '</div></div>'
+            );
+        }
+        // 四张单全空 = 对账跑完但手上什么都没有。此时四个空折叠区各喊一遍「没料」纯属噪音,
+        // 整块面板只说一次并给去收料的出口(成熟做法:一个面板一个空态,不按子清单铺开)。
+        if (listPhase(bankRecon) === 'idle') {
+            return (
+                '<div class="panel"><div class="hd"><h3>' +
+                esc(at('brx_title')) +
+                '</h3></div><div class="bd">' +
+                root.AI.state.sectionEmptyHtml({
+                    phase: 'idle',
+                    title: at('emp_brx_nodata_t'),
+                    sub: at('emp_brx_nodata_s'),
+                    actionLabel: clientId != null ? at('wo_goto_intake') : '',
+                    actionHref:
+                        clientId != null ? root.AI.router.buildClientHash(clientId, 'intake') : '',
+                }) +
                 '</div></div>'
             );
         }

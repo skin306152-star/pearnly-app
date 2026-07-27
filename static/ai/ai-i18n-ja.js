@@ -83,7 +83,6 @@ window.__AI_I18N_JA__ = {
     tab_review: 'レビュー',
     tab_pkg: '提出パッケージ',
     wo_empty_t: '期間を選択',
-    wo_empty_s: 'この顧客のワークオーダーはまだありません。',
     wo_status: 'ステータス',
     wo_step: '現在のステップ',
     wo_flagged: '要判断項目',

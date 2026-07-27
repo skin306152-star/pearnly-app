@@ -24,7 +24,33 @@
         return '<div data-state="loading">' + rows + '</div>';
     }
 
-    // empty/error:图标 + 标题 + 副文案 + 可选重试按钮。titleText/subText 是调用方已翻译好的文案
+    // 空态/失败态的「出路」。两种出路各自独立可给:retryLabel 出重试按钮(调用方自己绑
+    // data-action="retry" 的点击),actionLabel+actionHref 出一个直接跳过去的链接按钮——
+    // 空态点名了去哪就得给按钮,不能让用户读完文案再自己找入口。retryName/actionName 可改写
+    // 这两者的 data-action,供调用方挂到已有的点击委托上(如工单页的 wo-retry-stuck),
+    // 不必为一个空态再绑一套监听。
+    function actionsHtml(opts) {
+        var out = opts.retryLabel
+            ? '<button type="button" class="btn" data-action="' +
+              esc(opts.retryName || 'retry') +
+              '">' +
+              esc(opts.retryLabel) +
+              '</button>'
+            : '';
+        if (opts.actionLabel && opts.actionHref) {
+            out +=
+                '<a class="btn pri" href="' +
+                esc(opts.actionHref) +
+                '"' +
+                (opts.actionName ? ' data-action="' + esc(opts.actionName) + '"' : '') +
+                '>' +
+                esc(opts.actionLabel) +
+                '</a>';
+        }
+        return out;
+    }
+
+    // empty/error:图标 + 标题 + 副文案 + 可选出路。titleText/subText 是调用方已翻译好的文案
     // (本文件不依赖 window.at,保持纯 · i18n 由调用方在挂载前解出)。
     function blockHtml(mode, opts) {
         opts = opts || {};
@@ -33,9 +59,7 @@
             mode === 'error'
                 ? '<path d="M12 9v4m0 4h.01"/><circle cx="12" cy="12" r="10"/>'
                 : '<path d="M3 3v18h18M7 14l4-4 4 4 5-5"/>';
-        var retryBtn = opts.retryLabel
-            ? '<button class="btn" data-action="retry">' + esc(opts.retryLabel) + '</button>'
-            : '';
+        var retryBtn = actionsHtml(opts);
         return (
             '<div class="' +
             cls +
@@ -49,6 +73,34 @@
             esc(opts.sub) +
             '</div>' +
             retryBtn +
+            '</div>'
+        );
+    }
+
+    // 页内小分区(分区标题下的那张清单)为空时的三态壳。与 blockHtml 分工:那个是整块面板
+    // 没内容时的居中大方块,这个是面板里某张清单为空时的一行小块,所以不带图标。
+    //
+    // phase 必须由调用方按真实数据判,不许一律传 empty——「暂无 X」分不清是没跑、没料还是
+    // 跑挂了,正是这里要根治的:
+    //   idle  还没跑到 / 压根没料  → sub 说怎么开始,配去补料的入口
+    //   empty 跑完了确实没有这一类 → sub 说为什么可能是空的(空得有理由,不是出错)
+    //   error 这步没跑出来        → 配重试
+    var SECTION_PHASES = ['idle', 'empty', 'error'];
+
+    function sectionEmptyHtml(opts) {
+        opts = opts || {};
+        var phase = SECTION_PHASES.indexOf(opts.phase) >= 0 ? opts.phase : 'empty';
+        var acts = actionsHtml(opts);
+        return (
+            '<div class="sec-empty sec-empty-' +
+            phase +
+            '" data-state="' +
+            phase +
+            '"><p class="sec-empty-t">' +
+            esc(opts.title) +
+            '</p>' +
+            (opts.sub ? '<p class="sec-empty-s">' + esc(opts.sub) + '</p>' : '') +
+            (acts ? '<p class="sec-empty-a">' + acts + '</p>' : '') +
             '</div>'
         );
     }
@@ -80,6 +132,8 @@
         errorHtml: function (opts) {
             return blockHtml('error', opts);
         },
+        SECTION_PHASES: SECTION_PHASES,
+        sectionEmptyHtml: sectionEmptyHtml,
         esc: esc,
         optionsHtml: optionsHtml,
     };

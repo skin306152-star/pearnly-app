@@ -19,12 +19,14 @@
 
     var S = null;
 
-    function freshState(api, orderId, clientId, bankRecon) {
+    function freshState(api, orderId, clientId, bankRecon, stalled) {
         return {
             api: api,
             orderId: orderId,
             clientId: clientId,
             bankRecon: bankRecon,
+            // 对账没产出时用来分「还没跑到」和「后台停住了」两种 null(见 reconRender.pageHtml)。
+            stalled: !!stalled,
             // 自动匹配默认折叠(已处理好的,不占版面);其余三张默认展开(需要会计过目)。
             open: { auto: false, review: true, missing: true, unmatched: true },
             missing: {}, // idx -> {busy, done, errKey}(推 LINE 待问状态,按缺票行独立持有)
@@ -140,8 +142,8 @@
     // container 由调用方(ai-client.js renderWo)传入,bankRecon 是已取到的 order_detail
     // 字段——同一次 getOrder() 复用,不重复发请求。
 
-    function mount(api, orderId, clientId, bankRecon, container) {
-        S = freshState(api, orderId, clientId, bankRecon);
+    function mount(api, orderId, clientId, bankRecon, container, stalled) {
+        S = freshState(api, orderId, clientId, bankRecon, stalled);
         container.onclick = function (e) {
             onClick(e, container);
         };

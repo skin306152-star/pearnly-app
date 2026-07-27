@@ -342,6 +342,8 @@
   font-weight: 600;
   border-radius: 9px;
   padding: 8px 16px;
+  /* 空态出路用 <a class="btn"> 当按钮(要能 hash 跳转),不去掉下划线就是一颗带下划线的按钮。 */
+  text-decoration: none;
   border: 1px solid var(--hair2);
   background: var(--surface);
   color: var(--ink);
@@ -462,6 +464,43 @@
 }
 .state-block .btn {
   margin-top: 16px;
+}
+.state-block .btn + .btn {
+  margin-left: 8px;
+}
+
+/* 页内小分区空态(AI.state.sectionEmptyHtml)· 三态靠左侧色条区分:
+   idle=待办黄(还没开始)/ empty=中性灰(空得有理由)/ error=危险红(跑挂了)。 */
+.sec-empty {
+  padding: 10px 12px;
+  border-left: 2px solid var(--hair2);
+  background: var(--surface2);
+  border-radius: 0 8px 8px 0;
+  margin: 4px 0;
+}
+.sec-empty-t {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.sec-empty-s {
+  font-size: 12px;
+  color: var(--mut);
+  line-height: 1.7;
+  margin-top: 3px;
+}
+.sec-empty-a {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sec-empty-idle {
+  border-left-color: var(--warn-line);
+}
+.sec-empty-error {
+  border-left-color: var(--crit-line);
+  background: var(--crit-soft);
 }
 .skel {
   background: linear-gradient(90deg, var(--surface2) 25%, var(--hair) 50%, var(--surface2) 75%);

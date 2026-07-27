@@ -10,9 +10,11 @@
 
     var S = null;
 
-    function freshState(financials) {
+    function freshState(financials, stalled) {
         return {
             financials: financials,
+            // 报表包没产出时用来分「还没跑到」和「后台停住了」两种 null(见 financialsRender.pageHtml)。
+            stalled: !!stalled,
             // 五分区默认展开——报表包是会计要核对的主内容,账龄/折旧的「未接入」占位
             // 也要一进页面就可见(不能靠点击才发现降级状态),同 ai-shadow.js 的取舍。
             open: { bs: true, pl: true, tb: true, aging: true, depreciation: true },
@@ -38,8 +40,8 @@
 
     // container 由调用方(ai-client.js renderWo)传入,financials 是已取到的 order_detail
     // 字段——同一次 getOrder() 复用,不重复发请求。
-    function mount(financials, container) {
-        S = freshState(financials);
+    function mount(financials, container, stalled) {
+        S = freshState(financials, stalled);
         container.onclick = function (e) {
             onClick(e, container);
         };

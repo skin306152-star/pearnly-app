@@ -23,7 +23,14 @@
         return 0;
     }
 
-    var pure = { guidanceCount: guidanceCount };
+    // 「后台停住了」的单一判据:stuck 且后端报了 blocked_reasons(缺料造成的 stuck 不报
+    // reasons,那是等人补料不是跑挂了)。银行对账/影子底稿两区拿它把「还没跑到」和「跑挂了」
+    // 两种 null 分开——与状态头那条 systemBlockedHtml 同一判据,不另造第二套认定。
+    function engineStalled(d) {
+        return (d || {}).status === 'stuck' && ((d || {}).blocked_reasons || []).length > 0;
+    }
+
+    var pure = { guidanceCount: guidanceCount, engineStalled: engineStalled };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
     // ===== 以下为浏览器 HTML 拼装(依赖 at()/AI.state/AI.format/AI.router,node 不调用)=====
@@ -93,6 +100,19 @@
         );
     }
 
+    // 审核 / 交付包 tab 在本客户还没有工单时的空态。两个 tab 共用一份:它们的先决条件是
+    // 同一个(工单),分头写迟早漂。旧文案「请先在其它入口开单」既不点名也不给按钮,而那个
+    // 入口就是紧挨着的「工单」tab —— 这里点名 tab 名并直接给跳过去的按钮。
+    // 不带 period:本客户一张工单都没有,没有「当期」可带,落到 ai-client.js 的默认选期。
+    function noOrderEmptyHtml(clientId) {
+        return root.AI.state.emptyHtml({
+            title: at('emp_wo_none_t'),
+            sub: at('emp_wo_none_s'),
+            actionLabel: at('emp_wo_none_btn'),
+            actionHref: root.AI.router.buildClientHash(clientId, 'wo'),
+        });
+    }
+
     function systemBlockedHtml(d, guideCount) {
         var reasons = d.blocked_reasons || [];
         if (d.status !== 'stuck' || guideCount > 0 || !reasons.length) return '';
@@ -159,6 +179,8 @@
     root.AI = root.AI || {};
     root.AI.clientWoRender = {
         guidanceCount: guidanceCount,
+        engineStalled: engineStalled,
         woSummaryHtml: woSummaryHtml,
+        noOrderEmptyHtml: noOrderEmptyHtml,
     };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

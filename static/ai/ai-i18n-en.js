@@ -83,7 +83,6 @@ window.__AI_I18N_EN__ = {
     tab_review: 'Review',
     tab_pkg: 'Package',
     wo_empty_t: 'Pick a period',
-    wo_empty_s: 'No work order yet for this client.',
     wo_status: 'Status',
     wo_step: 'Current step',
     wo_flagged: 'Flagged items',

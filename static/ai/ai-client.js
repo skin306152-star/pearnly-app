@@ -128,10 +128,12 @@
         );
     }
 
+    // 副文案用 emp_wo_pick_s 不用 wo_empty_s:开单按钮就在同一张卡上,旧那句「请先在其它
+    // 入口开单」把人往别处支,与眼前的按钮打架。
     function woEmptyHtml() {
         return orderOpenEmptyHtml(
             at('wo_empty_t'),
-            at('wo_empty_s'),
+            at('emp_wo_pick_s'),
             'woEmptyPeriodSel',
             'wo-open-first',
             at('wo_open_first_btn')
@@ -289,12 +291,15 @@
                 // 销项佐证区(MC1-c.1 / SA-2b):同一次 getOrder() 已带回 sales_corroboration
                 // 与 edc_corroboration,两卡并排渲染,不再二次请求。
                 AI.corrob.mount(d.sales_corroboration, $('corrobRoot'), d.edc_corroboration);
+                // 银行对账 / 影子底稿两区没产出时都只拿到 null,分不出「还没跑到」和「后台
+                // 停住了」——把这条判据一并喂下去,让它们各自说对话(见 engineStalled)。
+                var stalled = AI.clientWoRender.engineStalled(d);
                 // 银行对账区(E2):同一次 getOrder() 已带回 bank_recon,不再二次请求。
-                AI.recon.mount(S.api, order.id, S.clientId, d.bank_recon, $('brxRoot'));
+                AI.recon.mount(S.api, order.id, S.clientId, d.bank_recon, $('brxRoot'), stalled);
                 // 影子底稿区(F3):同一次 getOrder() 已带回 shadow_draft,不再二次请求。
-                AI.shadow.mount(d.shadow_draft, $('shadowRoot'));
+                AI.shadow.mount(d.shadow_draft, $('shadowRoot'), stalled);
                 // 月度报表包区(G1b):同一次 getOrder() 已带回 financials,不再二次请求。
-                AI.financials.mount(d.financials, $('financialsRoot'));
+                AI.financials.mount(d.financials, $('financialsRoot'), stalled);
                 if (d.status !== 'archive') startWoPoll(order);
             })
             .catch(function () {
@@ -321,10 +326,7 @@
     function renderReview() {
         var order = currentOrder();
         if (!order) {
-            $('cv-review').innerHTML = AI.state.emptyHtml({
-                title: at('wo_empty_t'),
-                sub: at('wo_empty_s'),
-            });
+            $('cv-review').innerHTML = AI.clientWoRender.noOrderEmptyHtml(S.clientId);
             return;
         }
         AI.review.mount(S.api, order, S.clientId);
@@ -333,10 +335,7 @@
     function renderPkg() {
         var order = currentOrder();
         if (!order) {
-            $('cv-pkg').innerHTML = AI.state.emptyHtml({
-                title: at('wo_empty_t'),
-                sub: at('wo_empty_s'),
-            });
+            $('cv-pkg').innerHTML = AI.clientWoRender.noOrderEmptyHtml(S.clientId);
             return;
         }
         AI.pkg.mount(S.api, order, S.clientId);

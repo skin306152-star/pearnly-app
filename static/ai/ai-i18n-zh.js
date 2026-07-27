@@ -83,7 +83,6 @@ window.__AI_I18N_ZH__ = {
     tab_review: '审核',
     tab_pkg: '交付包',
     wo_empty_t: '选一个账期',
-    wo_empty_s: '该客户暂无工单，请先在其它入口开单。',
     wo_status: '状态',
     wo_step: '当前步骤',
     wo_flagged: '待裁决项',

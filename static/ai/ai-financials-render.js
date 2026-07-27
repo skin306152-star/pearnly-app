@@ -247,14 +247,26 @@
     // ui: {open:{bs,pl,tb,aging,depreciation}}(ai-financials.js 持有的折叠态)。
     function pageHtml(financials, ui) {
         if (!financials) {
+            // 与银行对账/影子底稿同款:后端把「还没跑到」和「跑挂了」都收敛成 null,卡死时
+            // 那句「不用管它,税一算完自动生成」是假话。三块面板在同一屏上下叠着,口径必须一致。
+            var body =
+                ui && ui.stalled
+                    ? root.AI.state.sectionEmptyHtml({
+                          phase: 'error',
+                          title: at('emp_fin_stalled_t'),
+                          sub: at('emp_fin_stalled_s'),
+                          retryLabel: at('retry'),
+                          retryName: 'wo-retry-stuck',
+                      })
+                    : root.AI.state.emptyHtml({
+                          title: at('fin_disabled_t'),
+                          sub: at('fin_disabled_s'),
+                      });
             return (
                 '<div class="panel"><div class="hd"><h3>' +
                 esc(at('fin_title')) +
                 '</h3></div><div class="bd">' +
-                root.AI.state.emptyHtml({
-                    title: at('fin_disabled_t'),
-                    sub: at('fin_disabled_s'),
-                }) +
+                body +
                 '</div></div>'
             );
         }

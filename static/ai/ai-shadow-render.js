@@ -163,9 +163,15 @@
     function entriesSectionHtml(entries, sources, open) {
         var n = (entries || []).length;
         var header = '<span>' + esc(at('shadow_entries_title', { n: n })) + '</span>';
+        // 底稿跑出来了却一条分录都没有 = 这期压根没有已识别归类的票,是 idle 不是 empty:
+        // 说清「为什么空」并指路收料,而不是干瘪一句「暂无建议分录」让人以为出了错。
         var body =
             n === 0
-                ? '<p class="sdw-empty">' + esc(at('shadow_entries_empty')) + '</p>'
+                ? root.AI.state.sectionEmptyHtml({
+                      phase: 'idle',
+                      title: at('emp_sdw_noentry_t'),
+                      sub: at('emp_sdw_noentry_s'),
+                  })
                 : groupEntriesBySource(entries, sources).map(voucherGroupHtml).join('');
         return foldSectionHtml('entries', header, open, body);
     }
@@ -192,9 +198,15 @@
         accounts = accounts || [];
         var header =
             '<span>' + esc(at('shadow_accounts_title', { n: accounts.length })) + '</span>';
+        // 科目余额是分录汇出来的,空的原因永远是上游没分录——说清这层因果,让人知道
+        // 该往上看「建议分录」,而不是在这张表上等。
         var body =
             accounts.length === 0
-                ? '<p class="sdw-empty">' + esc(at('shadow_accounts_empty')) + '</p>'
+                ? root.AI.state.sectionEmptyHtml({
+                      phase: 'empty',
+                      title: at('shadow_accounts_empty'),
+                      sub: at('emp_sdw_acct_s'),
+                  })
                 : '<div class="mx-scroll"><table class="mx-table"><thead><tr>' +
                   '<th>' +
                   esc(at('shadow_col_code')) +
@@ -345,14 +357,26 @@
     // ui: {open:{entries, accounts, gl}}(ai-shadow.js 持有的折叠态)。
     function pageHtml(shadowDraft, ui) {
         if (!shadowDraft) {
+            // 「还没跑到」与「后台停住了」在后端都是 null(见 api.py::shadow_draft)。卡死时
+            // 那句「不用管它,跑到对账步骤会自动生成」是假话——得说没跑出来并给断点重试。
+            var body =
+                ui && ui.stalled
+                    ? root.AI.state.sectionEmptyHtml({
+                          phase: 'error',
+                          title: at('emp_sdw_stalled_t'),
+                          sub: at('emp_sdw_stalled_s'),
+                          retryLabel: at('retry'),
+                          retryName: 'wo-retry-stuck',
+                      })
+                    : root.AI.state.emptyHtml({
+                          title: at('shadow_disabled_t'),
+                          sub: at('shadow_disabled_s'),
+                      });
             return (
                 '<div class="panel"><div class="hd"><h3>' +
                 esc(at('shadow_title')) +
                 '</h3></div><div class="bd">' +
-                root.AI.state.emptyHtml({
-                    title: at('shadow_disabled_t'),
-                    sub: at('shadow_disabled_s'),
-                }) +
+                body +
                 '</div></div>'
             );
         }

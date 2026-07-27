@@ -10,6 +10,8 @@
      交回异常(classify 据此 flag ocr_error:quota、诚实待补,续跑再试)。
   ② 全局降速:任一 worker 撞 quota 即抬高一个共享「暂停窗」,所有 worker 起跑前先睡够这段窗
      (不许并发池继续硬冲)。
+  ③ 待补件词汇与复位:quota 待补的 flag_reason 与「续跑起手复位回 pending」同属本模块
+     (classify 只负责编排,不该拿着别人的词汇表)。
 
 配额判据只读异常(isinstance 已知 quota 类型 + 兜底子串),不改 OCR 判读/路由;时钟与 sleep
 可注入,便于脱时钟脱真等待地断言调用时间轴。
@@ -31,6 +33,9 @@ try:
 except Exception:  # noqa: BLE001 - 判据兜底,导入不可用不影响运行
     _QUOTA_TYPES = ()
 
+# quota 待补件的 flag_reason(单一事实源在此:classify 写 flag、reset_deferred 复位都认这个词)。
+DEFERRED_FLAG = "ocr_error:quota"
+
 
 def is_quota_error(exc: object) -> bool:
     """异常是否为配额/限流类。先认已知 quota 异常类型,再兜底认名字/消息里的 quota 字样。"""
@@ -39,6 +44,18 @@ def is_quota_error(exc: object) -> bool:
     if not isinstance(exc, Exception):
         return False
     return "quota" in f"{type(exc).__name__} {exc}".lower()
+
+
+def reset_deferred(ctx) -> None:
+    """续跑起手把上次 quota 待补件(flagged, DEFERRED_FLAG)复位回 pending 供重烧(它们当时未落
+    终局证据事件,dedupe_key 不会锁死错值,重烧与不中断跑等价;当时也没扣过钱,重烧不重扣)。
+    走独立提交事务(有 factory 时)释放行锁,免与后续 item_scope 逐件子事务互等自死锁。"""
+    kw = dict(tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id, flag_reason=DEFERRED_FLAG)
+    if ctx.cursor_factory is None:
+        ctx.store.reset_quota_deferred_items(ctx.cur, **kw)
+    else:
+        with ctx.cursor_factory() as cur:
+            ctx.store.reset_quota_deferred_items(cur, **kw)
 
 
 def max_attempts() -> int:

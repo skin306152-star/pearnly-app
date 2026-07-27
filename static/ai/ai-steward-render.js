@@ -133,6 +133,23 @@
         return task && task.status === 'waiting_user' && !busy;
     }
 
+    // 后端把「没跑成的原因」同时写进三处:任务 error_reason(左窗红条)、失败步的 detail、
+    // 会话里那条回复(右窗气泡)—— 一字不差,一屏印三遍(泰文更长,三块各折三行)。分工:
+    //   气泡  = 结论 + 出路(会计读答复的地方,那句话的家)
+    //   步骤  = 这一步发生了什么(与红条同句时留白,由 stepHtml 判)
+    //   红条  = 只在气泡里没有这句时才出现(深链直接开左窗、或消息还没回来)
+    // 这里判「气泡里有没有」:同一条任务的管家消息正文与原因逐字相同即算已印过。
+    function reasonIsEchoed(task, messages) {
+        var reason = String((task && task.error_reason) || '').trim();
+        if (!reason) return false;
+        var tid = String((task && task.task_id) || '');
+        return (messages || []).some(function (m) {
+            if (!m || m.role === 'user') return false;
+            if (m.task_id && tid && String(m.task_id) !== tid) return false;
+            return String(m.text == null ? '' : m.text).trim() === reason;
+        });
+    }
+
     // 开始时间 → 本地 HH:MM。解析不了回空串,调用方据此整块不显示(不臆造时间)。
     function startedLabel(iso) {
         var t = Date.parse(String(iso || ''));
@@ -156,6 +173,7 @@
         stepCounts: stepCounts,
         agentCount: agentCount,
         startedLabel: startedLabel,
+        reasonIsEchoed: reasonIsEchoed,
         loopQuestion: loopQuestion,
         optionsEnabled: optionsEnabled,
         MAX_OPTIONS: MAX_OPTIONS,
@@ -215,10 +233,14 @@
         var badge = AI.statesRender.badgeHtml(fam, at(stepStateKey(state)), {
             pulse: state === 'running',
         });
-        var detail =
-            step && step.detail ? '<div class="stw-step-d">' + esc(step.detail) + '</div>' : '';
+        // 失败步的 detail 就是任务级 error_reason 那一句(store.fail_steps 复制过去的)。
+        // 上面的红条已经印过它,这里再印一遍 = 同一屏同一句话两遍。
+        var text = step && step.detail ? String(step.detail) : '';
+        if (opts && opts.reason && text === opts.reason) text = '';
+        var detail = text ? '<div class="stw-step-d">' + esc(text) + '</div>' : '';
         // 执行中那一步补三点:徽章说"是什么状态",三点说"此刻还活着"(B1 §3 类三)。
         var dots = state === 'running' ? AI.statesRender.dotsHtml('run') : '';
+        // 候选只挂在最后一次追问那一步上:调用方只给那一步传 question,别的步骤拿不到。
         var options =
             step && step.kind === 'ask' && opts
                 ? optionsHtml(opts.question, opts.optionsEnabled)
@@ -312,7 +334,10 @@
 
     // 没跑成的任务把原因摆在脸上(error_reason 是后端按任务语言写好的人话,error_code
     // 小字随行给排障用)。cancelled 是人主动停的,用中性灰,不套错误红。
-    function reasonHtml(task) {
+    // echoed = 这句话已经在右窗气泡里了:徽章已经说了「失败」,红条再印一遍只是把同一屏
+    // 的字数翻倍(见 reasonIsEchoed)。
+    function reasonHtml(task, echoed) {
+        if (echoed) return '';
         if (!task.error_reason && !task.error_code) return '';
         return (
             '<div class="stw-reason' +
@@ -349,13 +374,15 @@
         list.forEach(function (s, i) {
             if (s && s.kind === 'ask') lastAsk = i;
         });
+        var reason = String(task.error_reason || '');
         var stepOpts = {
             question: loopQuestion(task),
             optionsEnabled: optionsEnabled(task, opts.busy),
         };
         var steps = list
             .map(function (s, i) {
-                return stepHtml(s, i === lastAsk ? stepOpts : null);
+                var o = i === lastAsk ? stepOpts : {};
+                return stepHtml(s, Object.assign({ reason: reason }, o));
             })
             .join('');
         // 卡还活着才让按钮可点(waiting_user + actions 块);终态后置灰 —— 后端那一轮不认,
@@ -392,7 +419,7 @@
             AI.statesRender.countHtml(counts.done, counts.total, at('stw_steps_hd')) +
             '</div>' +
             stalled +
-            reasonHtml(task) +
+            reasonHtml(task, opts.reasonEchoed) +
             actionErr +
             authz +
             (steps ? '<ul class="stw-steps">' + steps + '</ul>' : '') +

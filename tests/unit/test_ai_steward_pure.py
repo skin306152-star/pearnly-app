@@ -175,6 +175,30 @@ class TaskRenderPureTests(unittest.TestCase):
         # 问题为空 = 没有追问:整块不渲染,不摆一排点了没意义的按钮。
         self.assertEqual(out[1:], [None, None, None, None])
 
+    def test_the_failure_sentence_is_printed_once_per_screen(self):
+        """后端把同一句失败原因写进红条 / 失败步 detail / 回复气泡三处(一字不差)。
+
+        气泡里已经有了 → 左窗红条让位;气泡里没有(深链直接开左窗、消息还没回来)→ 红条
+        照印,不能让失败的任务只剩一个「失败」徽章、说不出为什么。
+        """
+        out = _run_node(f"""
+            const r = require({_RENDER});
+            const reason = '小助手离线,69EXP 没有写入。小助手上线后再说一次。';
+            const task = {{ task_id: 't1', error_reason: reason }};
+            const bubble = {{ role: 'steward', task_id: 't1', text: reason }};
+            process.stdout.write(JSON.stringify([
+                r.reasonIsEchoed(task, [bubble]),
+                r.reasonIsEchoed(task, [{{ role: 'steward', task_id: 't1', text: ' ' + reason + ' ' }}]),
+                r.reasonIsEchoed(task, []),
+                r.reasonIsEchoed(task, [{{ role: 'user', task_id: 't1', text: reason }}]),
+                r.reasonIsEchoed(task, [{{ role: 'steward', task_id: 't2', text: reason }}]),
+                r.reasonIsEchoed(task, [{{ role: 'steward', task_id: 't1', text: '推好了' }}]),
+                r.reasonIsEchoed({{ task_id: 't1' }}, [bubble]),
+            ]));
+            """)
+        # 用户自己打的字、别条任务的气泡、内容不同的回复都不算「已经印过」。
+        self.assertEqual(out, [True, True, False, False, False, False, False])
+
     def test_loop_question_caps_the_number_of_options(self):
         out = _run_node(f"""
             const r = require({_RENDER});
@@ -354,13 +378,11 @@ class StewardI18nShardTests(unittest.TestCase):
         # 【跑真函数取 key】,不手抄一份后缀清单 —— 首版就是手抄的,limitErrKey 实际吐的是
         # stw_att_err_attachment_too_large,清单里写的是 stw_att_err_too_large,闸全绿而
         # 产品里每条被拒的料都印一串原始 key。被验的标识符必须来自真实产物。
-        referenced |= set(
-            _run_node(f"""
+        referenced |= set(_run_node(f"""
             const a = require({_ATTACH_RENDER});
             process.stdout.write(JSON.stringify(
                 a.KINDS.map(a.kindKey).concat(a.REJECT_CODES.map(a.limitErrKey))));
-            """)
-        )
+            """))
         missing = sorted(referenced - zh)
         self.assertEqual(missing, [], f"引用了词典里不存在的 key: {missing}")
 
@@ -381,13 +403,21 @@ class CopyMatchesCapabilityTests(unittest.TestCase):
     授权卡」,而闭集里一个写工具都没有 —— 用户照文案提改数请求只会吃 out_of_scope。
     此闸双向:全只读 ⇒ 不许承诺授权卡;第一个写工具挂上 ⇒ 不许再自称只读(逼文案随能力换)。"""
 
+    # 承诺过「会改数的先批准」的那几处注脚。哪几处会随排版增删(composer 注脚已在
+    # 2026-07-27 去重时撤掉 —— 同一条规则整页只说一遍),故按「存在就查」收,不写死清单;
+    # 页头那条是唯一必须在的,它没了等于页面不再自述能力。
+    _NOTE_KEYS = ("stw_note", "stw_composer_note", "stw_composer_note_files")
+
     def _notes(self):
         text = (AI_DIR / "ai-i18n-steward.js").read_text(encoding="utf-8")
         out = {}
-        for key in ("stw_note", "stw_composer_note"):
+        for key in self._NOTE_KEYS:
             values = re.findall(rf"{key}: '([^']*)'", text)
+            if not values:
+                continue
             self.assertEqual(len(values), 2, f"{key} 应 zh/th 各一条")
             out[key] = values
+        self.assertIn("stw_note", out, "页头自述没了 —— 页面不再说明会改数的要先批准")
         return out
 
     def test_notes_promise_exactly_what_the_registry_can_do(self):

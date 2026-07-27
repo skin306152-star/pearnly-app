@@ -86,6 +86,8 @@
             });
         } else {
             el.innerHTML = AI.stewardRender.panelHtml(S.task, {
+                // 失败那句话在右窗气泡里已经有了就别再印红条(同一屏同一句两遍)
+                reasonEchoed: AI.stewardRender.reasonIsEchoed(S.task, S.messages),
                 stalled: S.stalled,
                 authzBusy: S.authzBusy,
                 cancelBusy: S.cancelBusy,
@@ -114,7 +116,7 @@
         var av = attach.view();
         el.innerHTML =
             AI.stewardAttachRender.dropOverlayHtml() +
-            AI.stewardChatRender.feedHtml(S.messages, av) +
+            AI.stewardChatRender.feedHtml(S.messages) +
             AI.stewardChatRender.composerHtml({ busy: S.busy, errText: S.errText, attach: av });
         var feed = el.querySelector('.stw-feed');
         if (feed) feed.scrollTop = feed.scrollHeight;
@@ -173,6 +175,7 @@
                     })
                 );
                 renderRight();
+                renderLeft(); // 消息流变了,左窗那条红条要不要印跟着变(见 reasonIsEchoed)
                 if (resp.current_task_id && !S.taskId) loadTask(resp.current_task_id);
             })
             .catch(function () {
@@ -208,6 +211,7 @@
                     });
                 }
                 renderRight({ focus: true });
+                renderLeft();
                 if (resp && resp.task_id) loadTask(resp.task_id);
             })
             .catch(function (err) {

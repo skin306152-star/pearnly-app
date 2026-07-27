@@ -83,9 +83,11 @@
         return (root.AI && root.AI.format) || null;
     }
 
+    // 金额只有 AI.format.money 一个出口。它缺席时(node 单测 / 加载顺序出事)原样返数字,
+    // 不在这里自拼货币串 —— 第二个出口迟早跟主出口漂成两种排版。
     function money(v) {
         var f = fmt();
-        return f && typeof f.money === 'function' ? f.money(v) : '฿' + v;
+        return f && typeof f.money === 'function' ? f.money(v) : String(v);
     }
 
     function reasonList(reasons) {

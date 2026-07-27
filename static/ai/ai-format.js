@@ -261,6 +261,7 @@
     }
 
     var api = {
+        BAHT: BAHT,
         parseAmount: parseAmount,
         money: money,
         pct: pct,

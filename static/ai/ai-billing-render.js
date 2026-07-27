@@ -49,10 +49,12 @@
         return String(v);
     }
 
-    // 快捷金额是整千整百,不带小数位(照老站 ฿100/฿500 的显示口径)。฿ 与数字之间的窄空格
-    // 同 AI.format.money —— 不垫开这两个字形会糊成一团。
+    // 快捷金额是整千整百,不带小数位(照老站快捷档的显示口径)。货币前缀借 AI.format.BAHT,
+    // 这里不写第二份 —— 两处各写各的,垫不垫那个窄空格早晚在同一屏上打架。
     function fmtBahtInt(n) {
-        return '฿\u2009' + Number(n || 0).toLocaleString('en-US');
+        var v = Number(n || 0).toLocaleString('en-US');
+        var f = root && root.AI && root.AI.format;
+        return f && f.BAHT ? f.BAHT + v : v;
     }
 
     // 金额校验:整数化后 <10/解不出 → invalid,>500000 → max,合法 → null(错误即 i18n key)。

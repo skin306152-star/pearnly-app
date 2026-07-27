@@ -8,7 +8,8 @@
  *   成本封顶 messages 响应可选键 budget:
  *     { code: steward.budget_session_exceeded|steward.budget_task_exceeded|
  *       steward.budget_tenant_exceeded,
- *       cap_thb, spent_thb }(两位小数字符串,decimal 序列化,前端原样展示不做算术)
+ *       cap_thb, spent_thb }(两位小数字符串,decimal 序列化;前端只过 AI.format.money
+ *       排版成 ฿ 串,不做算术)
  *
  * pending 但已过 expires_at 的卡服务端读侧已折成 expired,本层不自己比时间判状态;
  * 倒计时(remainingMs/countdownLabel)只是给人看的进度,归零由挂载层重拉任务收口。
@@ -200,7 +201,12 @@
             : '';
         return (
             '<div class="stw-budget">' +
-            esc(at('stw_budget_spent', { spent: budget.spent_thb, cap: budget.cap_thb })) +
+            esc(
+                at('stw_budget_spent', {
+                    spent: AI.format.money(budget.spent_thb),
+                    cap: AI.format.money(budget.cap_thb),
+                })
+            ) +
             action +
             '</div>'
         );

@@ -16,7 +16,12 @@ from services.recon.field_comparator import normalize_tax_id, normalize_branch
 # v118.35.0.3 · 包装 pydantic ValidationError 为单行用户友好提示
 from services.ocr.error_format import short_error as _short_err
 
-from services.vat.vat_parser_common import _to_float, _filter_garbage_rows, PARSER_VERSION
+from services.vat.vat_parser_common import (
+    _to_float,
+    _filter_garbage_rows,
+    MIN_DETERMINISTIC_ROWS,
+    PARSER_VERSION,
+)
 from services.vat.vat_parser_excel import parse_excel
 from services.vat.vat_parser_pdf import parse_pdf_text, _parse_vat_pdf_text_lines
 from services.vat.vat_parser_gemini import (
@@ -152,7 +157,7 @@ def _parse_vat_report_impl(
         if text_result and text_result.get("rows"):
             # v118.32.5.5.3 · 先过滤再判定 · 过滤后 ≥ 3 行才信
             cleaned = _filter_garbage_rows(text_result["rows"])
-            if len(cleaned) >= 3:
+            if len(cleaned) >= MIN_DETERMINISTIC_ROWS:
                 text_result["rows"] = cleaned
                 text_result["row_count"] = len(cleaned)
                 logger.info(f"[vat] pdf_text 过滤后剩 {len(cleaned)} 行 · 用表抽取结果")
@@ -163,7 +168,7 @@ def _parse_vat_report_impl(
         if result is None:
             regex_rows = _parse_vat_pdf_text_lines(file_bytes)
             regex_cleaned = _filter_garbage_rows(regex_rows or [])
-            if len(regex_cleaned) >= 3:
+            if len(regex_cleaned) >= MIN_DETERMINISTIC_ROWS:
                 logger.info(f"[vat] pdf_text_regex 抽到 {len(regex_cleaned)} 行 · 跳过 Gemini")
                 result = {
                     "ok": True,

@@ -176,16 +176,12 @@ async def add_attachments(
     with db.get_cursor() as cur:
         _session_or_404(cur, tenant_id=tenant_id, session_id=session_id, user_id=str(user["id"]))
 
-    pairs = []
-    for upload in files:
-        content = await upload.read(attachments.MAX_FILE_BYTES + 1)
-        pairs.append((upload.filename or "", content))
     try:
         landed = attach_intake.accept(
             user=user,
             tenant_id=tenant_id,
             session_id=session_id,
-            pairs=pairs,
+            pairs=await _read_uploads(files),
             password=password,
         )
     except attach_intake.AttachmentLimitError as e:
@@ -198,6 +194,33 @@ async def add_attachments(
             422, detail={"code": e.code, "message": e.message_map(), **e.context}
         ) from e
     return {"attachments": landed, "count": len(landed)}
+
+
+async def _read_uploads(files: list[UploadFile]) -> list[tuple[str, bytes]]:
+    """读 part → [(文件名, 字节)]。三道闸判在读的过程中,不留到读完再一起判(照
+    workorder_routes.add_materials 的先例):件数在【读第一件之前】判,单件与单批总量在
+    【每读完一件】判。全交给 accept 里的 check_limits 等于先把整批攒进内存 —— 一个登录用户
+    POST 1000 个 20MB 的 part,进程要先吃 ~20GB 才轮到那句「一次最多 20 件」;规规矩矩传
+    20 件也要先吃 400MB 才发现单批 35MB 超了。单批上限本身就是「这批不该被读完」的声明。"""
+    if len(files) > attachments.MAX_FILES_PER_MESSAGE:
+        raise attach_intake.AttachmentLimitError(
+            attach_intake.ERR_TOO_MANY, attachments.MAX_FILES_PER_MESSAGE, len(files)
+        )
+    pairs: list[tuple[str, bytes]] = []
+    total = 0
+    for upload in files:
+        content = await upload.read(attachments.MAX_FILE_BYTES + 1)
+        if len(content) > attachments.MAX_FILE_BYTES:
+            raise attach_intake.AttachmentLimitError(
+                attach_intake.ERR_TOO_LARGE, attachments.MAX_FILE_BYTES, len(content)
+            )
+        total += len(content)
+        if total > attachments.MAX_BATCH_BYTES:
+            raise attach_intake.AttachmentLimitError(
+                attach_intake.ERR_BATCH_TOO_LARGE, attachments.MAX_BATCH_BYTES, total
+            )
+        pairs.append((upload.filename or "", content))
+    return pairs
 
 
 @router.post("/api/ai/steward/sessions/{session_id}/messages")

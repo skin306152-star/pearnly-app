@@ -131,6 +131,13 @@ class ToolPickedTests(unittest.TestCase):
             [row], tool=registry.FILE_CONVERT, confirm_spend=True, lang="zh"
         )
         self.assertEqual(confirmed.tool, registry.FILE_CONVERT)
+        # 点过的那一下要随活走:执行侧凭 model_ok 才允许过模型(tools_file 的回退闸)。
+        self.assertEqual(confirmed.args, {"model_ok": True})
+
+    def test_a_run_nobody_confirmed_carries_no_permission_to_spend(self):
+        out = attach_turn.decide([_row()], tool=registry.FILE_CONVERT, confirm_spend=False,
+                                 lang="zh")  # fmt: skip
+        self.assertEqual(out.args, {})
 
 
 class ButtonBudgetTests(unittest.TestCase):

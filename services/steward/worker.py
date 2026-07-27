@@ -22,7 +22,7 @@ import time
 from typing import Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import copy, loop_run, loop_state, store, tools
+from services.steward import budget, copy, loop_run, loop_state, registry, store, tools
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,13 @@ async def _execute(row: dict) -> None:
         return
     if not loop_state.is_loop_task(payload):
         await asyncio.to_thread(_mark_tool_running, row, tool, lang)
+        gate = await asyncio.to_thread(_reserve_model_budget, row, tool)
+        if not gate["allowed"]:
+            reason = copy.fail_reason(gate["code"], lang, cap=gate.get("cap_thb"))
+            await asyncio.to_thread(_finalize_failure, row, gate["code"], reason)
+            return
+    else:
+        gate = {"allowed": True, "entry_id": None}
     try:
         if loop_state.is_loop_task(payload):
             # 大脑循环任务:整圈(模型 ↔ 工具)在这里跑,收尾由循环自己按真实结果调 _finalize。
@@ -143,8 +150,33 @@ async def _execute(row: dict) -> None:
         # tool 随原因走(同超时):写工具崩在投单之后照样可能已经落账,不许说"再说一次让我重跑"。
         reason = copy.fail_reason(ERR_CRASHED, lang, tool=tool)
         await asyncio.to_thread(_finalize_failure, row, ERR_CRASHED, reason)
-        return
-    await asyncio.to_thread(_finalize_result, row, tool, lang, result)
+    else:
+        await asyncio.to_thread(_finalize_result, row, tool, lang, result)
+    finally:
+        if gate.get("entry_id"):
+            await asyncio.to_thread(
+                budget.settle,
+                tenant_id=str(row["tenant_id"]),
+                entry_id=gate["entry_id"],
+                cost_thb=None,
+            )
+
+
+def _reserve_model_budget(row: dict, tool: str) -> dict:
+    """会调模型的单工具过一次三级封顶(任务/会话/租户日额)。
+
+    在此之前 worker 的单工具路一次 reserve 都没有 —— 那时管家工具全是只读 DB 查询,不产生
+    模型成本。识别类工具挂进来之后,唯一真正烧模型的动作恰好落在唯一没有封顶的执行路上:
+    请求侧的 _attachment_outcome 明确跳过了 reserve(理由「一次模型都不调」对请求侧成立,
+    对 worker 侧不成立)。cost_thb 拿不回来,故结算保留预留额(保守多计,封顶不放水)。"""
+    if tool not in registry.MODEL_CALL_TOOLS:
+        return {"allowed": True, "entry_id": None}
+    return budget.reserve(
+        tenant_id=str(row["tenant_id"]),
+        session_id=str(row.get("session_id") or ""),
+        task_id=str(row["id"]),
+        estimate=budget.file_call_reserve_thb(),
+    )
 
 
 def _mark_tool_running(row: dict, tool: str, lang: str) -> None:

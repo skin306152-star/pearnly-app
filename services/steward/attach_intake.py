@@ -24,6 +24,14 @@ logger = logging.getLogger(__name__)
 ERR_TOO_MANY = "steward.attachment_too_many"
 ERR_TOO_LARGE = "steward.attachment_too_large"
 ERR_BATCH_TOO_LARGE = "steward.attachment_batch_too_large"
+# 解包后才发现超限的那两条要单出码:她手上只有一个压缩包,「先送出一批再传下一批」这句话
+# 她没法执行 —— 得告诉她拆的是 zip。intake_prep 的 zip 预算(200 件/200MB)按工单档案面
+# 定,收窄它会连坐收料口,故在这一层用自己的口径说话。
+ERR_ZIP_TOO_MANY = "steward.attachment_zip_too_many"
+ERR_ZIP_TOO_LARGE = "steward.attachment_zip_too_large"
+
+_PLAIN_CODES = (ERR_TOO_MANY, ERR_TOO_LARGE, ERR_BATCH_TOO_LARGE)
+_ZIP_CODES = (ERR_ZIP_TOO_MANY, ERR_TOO_LARGE, ERR_ZIP_TOO_LARGE)
 
 
 class AttachmentLimitError(Exception):
@@ -36,18 +44,20 @@ class AttachmentLimitError(Exception):
         super().__init__(code)
 
 
-def check_limits(pairs: list[tuple[str, bytes]]) -> None:
-    """件数 / 单件 / 单批总量三道闸。上限单一事实源在 attachments,前端从 /status 读同一份。"""
+def check_limits(pairs: list[tuple[str, bytes]], *, codes: tuple = _PLAIN_CODES) -> None:
+    """件数 / 单件 / 单批总量三道闸。上限单一事实源在 attachments,前端从 /status 读同一份。
+    codes 只换说法不换上限:同一道闸,料是拖进来的还是从 zip 里解出来的,人要做的事不一样。"""
+    too_many, too_large, batch_too_large = codes
     if len(pairs) > attachments.MAX_FILES_PER_MESSAGE:
-        raise AttachmentLimitError(ERR_TOO_MANY, attachments.MAX_FILES_PER_MESSAGE, len(pairs))
+        raise AttachmentLimitError(too_many, attachments.MAX_FILES_PER_MESSAGE, len(pairs))
     total = 0
     for _name, content in pairs:
         size = len(content or b"")
         if size > attachments.MAX_FILE_BYTES:
-            raise AttachmentLimitError(ERR_TOO_LARGE, attachments.MAX_FILE_BYTES, size)
+            raise AttachmentLimitError(too_large, attachments.MAX_FILE_BYTES, size)
         total += size
     if total > attachments.MAX_BATCH_BYTES:
-        raise AttachmentLimitError(ERR_BATCH_TOO_LARGE, attachments.MAX_BATCH_BYTES, total)
+        raise AttachmentLimitError(batch_too_large, attachments.MAX_BATCH_BYTES, total)
 
 
 def accept(
@@ -64,8 +74,12 @@ def accept(
 
     check_limits(pairs)
     prepared = [nf for nf in intake_prep.normalize_batch(pairs, password=password) if nf.register]
-    # 解包后件数可能暴涨(一个 zip 里 200 张),再过一次同一道闸。
-    check_limits([(nf.original_name, nf.content) for nf in prepared])
+    # 解包后件数可能暴涨(一个 zip 里 200 张),再过一次同一道闸 —— 换成 zip 口径的码,
+    # 因为这时候要人去拆的是压缩包,不是「先送出一批」。
+    check_limits(
+        [(nf.original_name, nf.content) for nf in prepared],
+        codes=_ZIP_CODES if len(prepared) > len(pairs) else _PLAIN_CODES,
+    )
 
     landed: list[str] = []
     out: list[dict[str, Any]] = []

@@ -48,6 +48,12 @@ MAX_FILES_PER_MESSAGE = 20
 
 _DEFAULT_TTL_DAYS = 30
 
+# 运输皮:不是「能识别的格式」而是「装料的壳」,所以不归 OCR 白名单管。收料口一律先拆壳
+# (zip 解包 / HEIC 转 JPEG,见 workorder.intake_prep),真正进识别的是壳里的叶子件。
+# 漏了这几个后果是静默的:<input accept> 在文件对话框里就把 zip 滤掉,拖进来的也被前端
+# 当坏格式灰掉 —— 后端的拆壳代码在管家这条路上一次都跑不到。
+TRANSPORT_EXTENSIONS = (".zip", ".heic", ".heif")
+
 STATUS_READY = "ready"
 STATUS_PROMOTED = "promoted"
 # 工具产出的文件(转换出来的 xlsx 等)也落这张表:同一份加密/防穿越/租户隔离/到期清理白拿,
@@ -80,7 +86,7 @@ def limits() -> dict[str, Any]:
         "max_file_bytes": MAX_FILE_BYTES,
         "max_batch_bytes": MAX_BATCH_BYTES,
         "max_files": MAX_FILES_PER_MESSAGE,
-        "accept": sorted(SUPPORTED_OCR_EXTENSIONS),
+        "accept": sorted(set(SUPPORTED_OCR_EXTENSIONS) | set(TRANSPORT_EXTENSIONS)),
         "ttl_days": ttl_days(),
     }
 

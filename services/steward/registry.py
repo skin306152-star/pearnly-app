@@ -54,6 +54,12 @@ VAT_REPORT_CHECK = "vat_report_check"
 # ——模型选文件会挑错,且挑错无痕。判据单一事实源在这里,orchestrator/planner 一律读本表。
 ATTACHMENT_TOOLS: frozenset = frozenset({FILE_CONVERT, VAT_REPORT_CHECK})
 
+# 执行时可能自己调模型的工具(≠ planner 那一次调用)。管家其余工具全是只读 DB 查询,worker
+# 跑它们一分钱模型费都不产生;这两只不同:file_convert 对扫描件走 fileconv.ocr_bridge 逐页
+# 栅格化(50 页 = 50 次多模态调用),vat_report_check 在人点过「会过一次模型」后走 Gemini。
+# worker 的单工具路据此决定要不要过 budget 三级封顶 —— 全都过会给只读查询留一串幽灵占坑行。
+MODEL_CALL_TOOLS: frozenset = frozenset({FILE_CONVERT, VAT_REPORT_CHECK})
+
 # 识别类工具比只读查询慢一个量级(整份 PDF 解析 + 可能过模型),按 5 分钟的通用任务超时会在
 # 还在正常干活时被砍成 failed。照 ERP_PUSH_TIMEOUT_S 先例单独声明,入队时定格进任务行。
 FILE_TOOL_TIMEOUT_S = 600

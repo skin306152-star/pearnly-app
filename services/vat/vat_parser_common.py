@@ -8,6 +8,11 @@ from services.recon.field_comparator import normalize_tax_id, normalize_branch, 
 
 PARSER_VERSION = "1.1.0"
 
+# 确定性路(pdfplumber 抽表 / 文字行 regex)过滤后至少要出这么多行才认,不够就回退 Gemini。
+# 单一事实源:回退判据在 vat_report_parser,而「这份 PDF 会不会过模型」的预判在
+# steward.attach_kinds —— 两处用同一个门槛,否则按钮上写「不过模型」执行侧却调了一次。
+MIN_DETERMINISTIC_ROWS = 3
+
 # ── 列名关键词(泰/英/中/日 · 跟随用户 UI 语言生成的模板都要认) ──────────
 # 加中/日时避开"税"裸字:税号/税前/税额/含税 子串会互抢,故只用更长的具体词。
 _DATE_H = {"วันที่", "date", "วัน/เดือน/ปี", "วันที่ใบกำกับ", "วันที่เอกสาร", "日期", "日付"}

@@ -15,7 +15,7 @@ import unittest
 from unittest import mock
 
 from services.agent.contracts import ToolResult
-from services.steward import copy, orchestrator, registry, store, tools, worker
+from services.steward import budget, copy, orchestrator, registry, store, tools, worker
 from services.steward.registry import ToolContext
 
 
@@ -211,6 +211,76 @@ class WorkerExecutionTests(unittest.IsolatedAsyncioTestCase):
         ):
             await worker._execute(_task_row())
         self.assertEqual(finish.call_args.kwargs["error_code"], worker.ERR_CONTEXT_LOST)
+
+
+class WorkerModelBudgetTests(unittest.IsolatedAsyncioTestCase):
+    """识别类工具是管家里唯一会自己烧模型的动作,而它落在 worker 的单工具路上 ——
+    请求侧对附件轮次明确跳过了 reserve(「一次模型都不调」对请求侧成立,对这里不成立)。"""
+
+    def _file_task(self):
+        payload = {
+            "tool": registry.FILE_CONVERT,
+            "args": {},
+            "lang": "zh",
+            "user_id": "u1",
+            "allowed_client_ids": None,
+            "attachment_ids": ["a-1"],
+        }
+        return _task_row(payload=payload, title="转成 Excel")
+
+    def _patches(self, run, finish):
+        return (
+            mock.patch.object(worker, "_build_context", lambda *a: _ctx()),
+            mock.patch.object(tools, "run", run),
+            mock.patch.object(store, "update_steps", mock.Mock(return_value=True)),
+            mock.patch.object(store, "finish_task", finish),
+            mock.patch.object(store, "add_message", mock.Mock(return_value={"id": "m1"})),
+            mock.patch.object(store, "touch_session", mock.Mock()),
+            mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
+        )
+
+    async def _execute(self, row, run, gate):
+        finish = mock.Mock(return_value=True)
+        p = self._patches(run, finish)
+        with (
+            p[0], p[1], p[2], p[3], p[4], p[5], p[6],
+            mock.patch.object(worker.budget, "reserve", return_value=gate) as reserve,
+            mock.patch.object(worker.budget, "settle") as settle,
+        ):  # fmt: skip
+            await worker._execute(row)
+        return finish, reserve, settle
+
+    async def test_a_model_calling_tool_reserves_and_settles_its_own_budget(self):
+        run = mock.Mock(return_value=ToolResult(ok=True, data={"filename": "gl.pdf", "issues": []}))
+        finish, reserve, settle = await self._execute(
+            self._file_task(), run, {"allowed": True, "entry_id": "e-1"}
+        )
+        kwargs = reserve.call_args.kwargs
+        self.assertEqual(kwargs["task_id"], "task-1")
+        self.assertEqual(kwargs["session_id"], "s-1")
+        # 逐页栅格化远贵于循环里一步分类,拿同一个 ฿0.25 占坑 = 封顶名存实亡
+        self.assertEqual(kwargs["estimate"], worker.budget.file_call_reserve_thb())
+        self.assertEqual(settle.call_args.kwargs["entry_id"], "e-1")
+        self.assertEqual(finish.call_args.kwargs["status"], store.TASK_DONE)
+
+    async def test_over_the_cap_the_tool_never_runs(self):
+        run = mock.Mock(side_effect=AssertionError("capped task must not run the tool"))
+        gate = {"allowed": False, "code": budget.ERR_TENANT, "cap_thb": "150.00"}
+        finish, _reserve, settle = await self._execute(self._file_task(), run, gate)
+        failed = finish.call_args.kwargs
+        self.assertEqual(failed["status"], store.TASK_FAILED)
+        self.assertEqual(failed["error_code"], budget.ERR_TENANT)
+        self.assertIn("150.00", failed["error_message"])  # 人话说清卡在哪条线
+        settle.assert_not_called()
+
+    async def test_a_read_only_query_tool_takes_no_budget_at_all(self):
+        """只读 DB 查询不产生模型成本;给它占坑会在台账里留一串永不结算的幽灵行。"""
+        run = mock.Mock(return_value=ToolResult(ok=True, data=_MATRIX_DATA))
+        _finish, reserve, settle = await self._execute(
+            _task_row(), run, {"allowed": True, "entry_id": "e-1"}
+        )
+        reserve.assert_not_called()
+        settle.assert_not_called()
 
 
 class WorkerContextTests(unittest.TestCase):

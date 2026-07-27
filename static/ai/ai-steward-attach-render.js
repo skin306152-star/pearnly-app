@@ -148,6 +148,8 @@
     // 413 的机器码 → 词条 key。422 的 detail.message 后端已给四语,直接印那份,不过这里。
     // 词典守门(test_ai_steward_pure)按这个闭集跑一遍真函数取 key —— 手抄一份后缀清单
     // 就会像首版那样:闸绿着,产品里每条被拒的料都印一串 stw_att_err_attachment_*。
+    // 后两条只可能从后端回来(413):zip 解开之后才知道装了多少件,而她手上只有一个压缩包
+    // ——「先送出一批再传下一批」那句话对着一个 zip 没法执行,得单说一句拆包的话。
     var REJECT_CODES = [
         'steward.attachment_too_many',
         'steward.attachment_too_large',
@@ -155,6 +157,8 @@
         'steward.attachment_bad_ext',
         'steward.attachment_empty',
         'steward.attachment_closed',
+        'steward.attachment_zip_too_many',
+        'steward.attachment_zip_too_large',
     ];
 
     function limitErrKey(code) {

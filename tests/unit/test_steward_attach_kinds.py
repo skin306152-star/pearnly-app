@@ -122,6 +122,71 @@ class PdfTests(unittest.TestCase):
         self.assertEqual(out.kind_reason, "pdf_kind_unclear")
 
 
+class VatModelSpendTests(unittest.TestCase):
+    """销项报告的 needs_model 必须把 parse_vat_report 的模型回退算进去 —— 那是「按钮说不
+    过模型、执行侧却调了一次」的成因,而按钮上的 cost.model_call 直接读这个字段。"""
+
+    def _rows(self, n):
+        return [
+            {"report_invoice_no": f"IV69/{i:05d}", "report_ref_no": ""} for i in range(1, n + 1)
+        ]
+
+    def _probe(self, table_rows, regex_rows):
+        return (
+            mock.patch(
+                "services.vat.vat_parser_pdf.parse_pdf_text",
+                return_value={"rows": self._rows(table_rows)},
+            ),
+            mock.patch(
+                "services.vat.vat_parser_pdf._parse_vat_pdf_text_lines",
+                return_value=self._rows(regex_rows),
+            ),
+        )
+
+    def test_excel_report_reads_locally_and_stays_zero_click(self):
+        self.assertFalse(ak.vat_check_needs_model(b"", "รายงานภาษีขาย 06.xlsx"))
+
+    def test_csv_report_goes_through_the_ocr_pipeline_so_it_costs_a_model_call(self):
+        """csv/docx/txt/tiff 在 parse_vat_report 里一律走 pipeline —— 那就是过模型。"""
+        self.assertTrue(ak.vat_check_needs_model(b"a,b\n", "รายงานภาษีขาย 06.csv"))
+
+    def test_pdf_whose_tables_extract_needs_no_model(self):
+        p1, p2 = self._probe(table_rows=5, regex_rows=0)
+        with p1, p2:
+            self.assertFalse(ak.vat_check_needs_model(b"%PDF", "vat.pdf"))
+
+    def test_pdf_falls_back_to_the_line_regex_before_calling_it_a_spend(self):
+        p1, p2 = self._probe(table_rows=1, regex_rows=4)
+        with p1, p2:
+            self.assertFalse(ak.vat_check_needs_model(b"%PDF", "vat.pdf"))
+
+    def test_text_layer_pdf_whose_tables_come_out_empty_is_a_model_spend(self):
+        """泰文声调错位的电子版 PDF:有文字层但两条确定性路都出不到 3 行 → 回退 Gemini。"""
+        p1, p2 = self._probe(table_rows=1, regex_rows=1)
+        with p1, p2:
+            self.assertTrue(ak.vat_check_needs_model(b"%PDF", "vat.pdf"))
+
+    def test_probe_failure_counts_as_a_spend_rather_than_deciding_for_her(self):
+        with mock.patch(
+            "services.vat.vat_parser_pdf.parse_pdf_text", side_effect=RuntimeError("pdfplumber")
+        ):
+            self.assertTrue(ak.vat_check_needs_model(b"%PDF", "vat.pdf"))
+
+    def test_detect_marks_the_garbled_report_pdf_as_needing_a_model(self):
+        p1, p2 = self._probe(table_rows=0, regex_rows=0)
+        with (
+            _quote(page_count=3),
+            mock.patch("services.fileconv.text_layer.extract_pages", return_value=["x" * 200]),
+            mock.patch("services.fileconv.classify.classify", return_value="vat_report"),
+            p1,
+            p2,
+        ):
+            out = ak.detect(b"%PDF-1.4", "รายงานภาษีขาย.pdf", user=_USER)
+        self.assertEqual(out.kind, ak.VAT_REPORT)
+        self.assertTrue(out.needs_model)
+        self.assertFalse(out.auto_runnable)  # 出确认卡,不静默开跑
+
+
 class ImageTests(unittest.TestCase):
     def test_image_is_a_receipt_that_costs_a_model_call(self):
         with _quote():

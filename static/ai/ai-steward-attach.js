@@ -156,9 +156,16 @@
             pump();
         }
 
+        // 密码错也要把密码行留着:只认 required 的话,第一次填错之后密码框就再也不出现,
+        // 会计唯一的出路是叉掉重拖 —— 而这条线正是为「一叠密码各不相同的银行流水」建的。
+        var PASSWORD_CODES = [
+            'workorder.intake.pdf_password_required',
+            'workorder.intake.pdf_password_wrong',
+        ];
+
         function needsPassword(err) {
-            var code = err && err.detail && err.detail.code;
-            return code === 'workorder.intake.pdf_password_required';
+            var code = (err && err.detail && err.detail.code) || '';
+            return PASSWORD_CODES.indexOf(code) >= 0;
         }
 
         // 422 的 detail.message 后端已是四语,直接取当前语言印(不再过前端 i18n);
@@ -194,6 +201,13 @@
         function retry(cid) {
             var chip = byId(cid);
             if (!chip || chip.state !== 'failed') return;
+            // 重传前扔掉上一次那个密码:密码填错时它还留在 chip 上,pump 会拿着同一个错密码
+            // 再传一次、回同一个 422,会计只能把这件叉掉重拖一遍。
+            chip.password = null;
+            requeue(chip);
+        }
+
+        function requeue(chip) {
             chip.state = 'queued';
             chip.err = null;
             hooks.renderRight();
@@ -205,10 +219,10 @@
             var S = hooks.state();
             var chip = byId(cid);
             var input = hooks.getEl('stwAttPw');
-            if (!S || !chip || !input || !input.value) return;
+            if (!S || !chip || !input || !input.value || chip.state !== 'failed') return;
             chip.password = input.value;
             S.attPwFor = null;
-            retry(cid);
+            requeue(chip);
         }
 
         // ── 送出 ────────────────────────────────────────────

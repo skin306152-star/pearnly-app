@@ -36,6 +36,9 @@ class Decision:
 
     tool: Optional[str] = None
     attachment_ids: tuple = ()
+    # 执行参数。目前只有 model_ok:「人在卡上点过『会过一次模型』」的凭据,执行侧据此才允许
+    # 走模型回退(tools_file.vat_report_check)。派活时点击已经发生,凭据必须随活走。
+    args: dict = field(default_factory=dict)
     card: Optional[dict] = None
     error_code: Optional[str] = None
     error_data: dict = field(default_factory=dict)
@@ -82,7 +85,11 @@ def decide(rows: list[dict], *, tool: Optional[str], confirm_spend: bool, lang: 
     only = usable[0]
     if only["needs_model"] and not confirm_spend:
         return Decision(card=_spend_card(tool, only, lang))
-    return Decision(tool=tool, attachment_ids=(only["id"],))
+    return Decision(
+        tool=tool,
+        attachment_ids=(only["id"],),
+        args={"model_ok": True} if confirm_spend else {},
+    )
 
 
 # ── 卡面(全部确定性渲染,模型一个字不写)──────────────────

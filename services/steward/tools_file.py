@@ -29,6 +29,7 @@ ERR_MANY_ATTACHMENTS = "steward.attachment_ambiguous"
 ERR_UNREADABLE = "steward.attachment_unreadable"
 ERR_CONVERT_REJECTED = "steward.convert_rejected"
 ERR_REPORT_UNPARSED = "steward.report_unparsed"
+ERR_REPORT_NEEDS_MODEL = "steward.report_needs_model"
 
 _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 _EXCEL_EXTS = (".xlsx", ".xlsm", ".xls", ".csv")
@@ -160,7 +161,12 @@ def _save_xlsx(ctx: ToolContext, content: bytes, source_name: str) -> dict[str, 
 
 
 def vat_report_check(ctx: ToolContext, args: dict) -> ToolResult:
-    """销项 VAT 报告三查:连号 / 买家分组 / 期间一致性。钱全程 Decimal,出线转定点字符串。"""
+    """销项 VAT 报告三查:连号 / 买家分组 / 期间一致性。钱全程 Decimal,出线转定点字符串。
+
+    args.model_ok 是「人在卡上点过『会过一次模型』」的凭据(attach_turn.decide 落的)。
+    没有这张凭据就绝不让 parse_vat_report 走它的模型回退分支 —— 那条路上会计既没被告知
+    也没点过头,而回执卡上的按钮明写着 cost.model_call=false。"""
+    from services.steward import attach_kinds
     from services.vat.vat_report_checks import run_report_checks, to_jsonable
     from services.vat.vat_report_parser import parse_vat_report
 
@@ -168,6 +174,8 @@ def vat_report_check(ctx: ToolContext, args: dict) -> ToolResult:
     if err:
         return err
     name = row.get("original_name") or "report.pdf"
+    if not args.get("model_ok") and attach_kinds.vat_check_needs_model(row["content"], name):
+        return ToolResult(ok=False, error_code=ERR_REPORT_NEEDS_MODEL, data={"filename": name})
     api_key = (
         (ctx.user or {}).get("gemini_api_key")
         or (ctx.user or {}).get("custom_gemini_api_key")

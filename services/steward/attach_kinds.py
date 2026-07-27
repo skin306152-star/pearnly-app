@@ -59,6 +59,11 @@ _SHEET_EXTS = {".xlsx", ".xlsm", ".xls", ".csv"}
 _XLSX_EXTS = {".xlsx", ".xlsm"}
 _HEAD_ROWS = 15
 
+# 销项三查里【确定性读得完】的两个格式:parse_vat_report 的 xlsx/xls 分支是纯本地 openpyxl。
+# 其余格式(csv/tsv/docx/txt/tiff…)一律经 OCR pipeline,PDF 则在两条确定性路都出不到
+# MIN_DETERMINISTIC_ROWS 行时静默回退 Gemini —— 见 vat_check_needs_model。
+_VAT_LOCAL_EXTS = {".xlsx", ".xls"}
+
 # 表头里的销项报表强词(_head_is_sales 的词表含 ภาษีขาย,VAT 报表也有这列 —— 报表判据必须
 # 排在汇总表之前,否则一份 ภ.พ.30 附表会被归成 POS 销售汇总)。
 _VAT_HEADER_KW = ("รายงานภาษีขาย", "ภ.พ.30", "ภพ.30", "vat report", "ภาษีขาย")
@@ -169,6 +174,42 @@ def _sized(
     )
 
 
+def vat_check_needs_model(content: bytes, original_name: str) -> bool:
+    """跑一次 vat_report_check 会不会调模型 —— 确定性预判,零成本,不发一次请求。
+
+    parse_vat_report 有两处会静默过模型:①PDF 的表抽取与文字行 regex 都出不到
+    MIN_DETERMINISTIC_ROWS 行 → parse_with_gemini_paged;②csv/docx/txt/tiff 等一律走 OCR
+    pipeline。泰文声调错位/编码烂的电子版 PDF 正好落在①上(有文字层,表却抽空)——
+    只看「有没有文字层」就把 needs_model 判成 False,按钮上写着「不过模型」而执行侧调了
+    一次:红线是「不静默烧钱」,不是「大概不烧」。判不出一律按会烧算(宁可多问一次)。
+    """
+    ext = Path(original_name or "").suffix.lower()
+    if ext in _VAT_LOCAL_EXTS:
+        return False
+    if ext != ".pdf":
+        return True
+    return not _vat_pdf_reads_locally(content)
+
+
+def _vat_pdf_reads_locally(content: bytes) -> bool:
+    """跑 parse_vat_report 那两条确定性路(顺序一致),够行数即「不用过模型」。
+
+    抽表这一趟确实不便宜(pdfplumber extract_tables 整份跑一遍),但它只对【已经认成销项
+    报告】的 PDF 跑一次,而替代方案是让人为每份销项报告多点一次确认按钮。"""
+    from services.vat.vat_parser_common import _filter_garbage_rows, MIN_DETERMINISTIC_ROWS
+    from services.vat.vat_parser_pdf import _parse_vat_pdf_text_lines, parse_pdf_text
+
+    try:
+        table_rows = (parse_pdf_text(content) or {}).get("rows") or []
+        if len(_filter_garbage_rows(table_rows)) >= MIN_DETERMINISTIC_ROWS:
+            return True
+        regex_rows = _parse_vat_pdf_text_lines(content) or []
+        return len(_filter_garbage_rows(regex_rows)) >= MIN_DETERMINISTIC_ROWS
+    except Exception:  # noqa: BLE001 — 判不出按「会过模型」算,不静默替她决定花这份钱
+        logger.warning("[steward.attach] vat local-parse probe failed", exc_info=True)
+        return False
+
+
 def _quote(content: bytes, original_name: str, user: dict) -> dict[str, Any]:
     """报价 + 页数 + 格式硬闸(纯本地解 PDF 页数,不烧钱)。
 
@@ -208,7 +249,8 @@ def _detect_sheet(
     if sort._bank_from_filename(name) or sort._head_is_bank(head):
         return _sized(BANK_STATEMENT, SOURCE_RULE, "bank_name_or_head", pages, False, quote)
     if _filename_guess(name) == "vat_report" or _head_has(head, _VAT_HEADER_KW):
-        return _sized(VAT_REPORT, SOURCE_RULE, "vat_name_or_head", pages, False, quote)
+        needs_model = vat_check_needs_model(content, original_name)
+        return _sized(VAT_REPORT, SOURCE_RULE, "vat_name_or_head", pages, needs_model, quote)
     if sort._is_sales_summary_name(name) or sort._head_is_sales(head):
         return _sized(SALES_SUMMARY, SOURCE_RULE, "sales_name_or_head", pages, False, quote)
     # 四家都不像 = 这就是一次盲猜。sort.py 对同一情形的纪律是「归堆但标 flagged 交人确认」;
@@ -238,7 +280,9 @@ def _detect_pdf(content: bytes, original_name: str, pages: Optional[int], quote:
     if sort._bank_from_filename(name) or doc_type == fc_model.BANK_STATEMENT:
         return _sized(BANK_STATEMENT, SOURCE_RULE, "bank_name_or_text", pages, False, quote)
     if _filename_guess(name) == "vat_report" or doc_type == fc_model.VAT_REPORT:
-        return _sized(VAT_REPORT, SOURCE_RULE, "vat_name_or_text", pages, False, quote)
+        # 有文字层 ≠ 抽得出表:泰文声调错位的电子版 PDF 会一路落到 Gemini 回退上。
+        needs_model = vat_check_needs_model(content, original_name)
+        return _sized(VAT_REPORT, SOURCE_RULE, "vat_name_or_text", pages, needs_model, quote)
     if sort._is_sales_summary_name(name):
         return _sized(SALES_SUMMARY, SOURCE_RULE, "sales_name", pages, False, quote)
     # classify 的 GENERIC_TABLE 是「没认出模板标记词」,不是「认出来是通用表」——

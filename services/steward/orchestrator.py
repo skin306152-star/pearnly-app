@@ -251,7 +251,7 @@ def _attachment_outcome(
     return _enqueue(
         ctx,
         decision.tool,
-        {},
+        decision.args,
         lang,
         session_id=session_id,
         attachment_ids=decision.attachment_ids,

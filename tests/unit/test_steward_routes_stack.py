@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""管家八端点走真 ASGI 栈(routes/steward_routes.py · B3)。
+"""管家十端点走真 ASGI 栈(routes/steward_routes.py · B3 + 万能口 F1)。
 
 直调 handler 跑绿不等于路由真接上 —— 模型/依赖/注册任一断都只在这层看得出来
 (照 test_erp_bridge_routes.AsgiSmokeTests 先例)。锁:①匿名一律不给 200;②消息体
@@ -13,15 +13,24 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
+# 第三项是 requests 的关键字参数(json / files / 空)—— 上传口收的是 multipart,拿 json 打
+# 它会先吃框架层 422,那样「匿名一律不给 200」就是靠形状校验蒙出来的假绿。
 _ENDPOINTS = (
-    ("get", "/api/ai/steward/status", None),
-    ("post", "/api/ai/steward/sessions", {}),
-    ("get", "/api/ai/steward/sessions/s-1", None),
-    ("post", "/api/ai/steward/sessions/s-1/messages", {"text": "本期谁缺料"}),
-    ("get", "/api/ai/steward/tasks/t-1", None),
-    ("post", "/api/ai/steward/tasks/t-1/cancel", {}),
-    ("post", "/api/ai/steward/authorizations/approve", {"token": "tok-12345678"}),
-    ("post", "/api/ai/steward/authorizations/reject", {"token": "tok-12345678"}),
+    ("get", "/api/ai/steward/status", {}),
+    ("post", "/api/ai/steward/sessions", {"json": {}}),
+    ("get", "/api/ai/steward/sessions/s-1", {}),
+    ("post", "/api/ai/steward/sessions/s-1/messages", {"json": {"text": "本期谁缺料"}}),
+    # 全组里唯一会写磁盘的与唯一会吐文件字节的两条,偏偏最初没进这张表。
+    (
+        "post",
+        "/api/ai/steward/sessions/s-1/attachments",
+        {"files": {"files": ("gl.pdf", b"%PDF-1.4", "application/pdf")}},
+    ),
+    ("get", "/api/ai/steward/attachments/a-1/download", {}),
+    ("get", "/api/ai/steward/tasks/t-1", {}),
+    ("post", "/api/ai/steward/tasks/t-1/cancel", {"json": {}}),
+    ("post", "/api/ai/steward/authorizations/approve", {"json": {"token": "tok-12345678"}}),
+    ("post", "/api/ai/steward/authorizations/reject", {"json": {"token": "tok-12345678"}}),
 )
 
 
@@ -42,14 +51,13 @@ class AsgiSmokeTests(unittest.TestCase):
 
         cls.client = TestClient(_app())
 
-    def _call(self, method, path, body):
-        call = getattr(self.client, method)
-        return call(path, json=body) if body is not None else call(path)
+    def _call(self, method, path, kwargs):
+        return getattr(self.client, method)(path, **kwargs)
 
     def test_no_endpoint_serves_anonymous(self):
-        for method, path, body in _ENDPOINTS:
+        for method, path, kwargs in _ENDPOINTS:
             with self.subTest(path=path, method=method):
-                res = self._call(method, path, body)
+                res = self._call(method, path, kwargs)
                 self.assertIn(res.status_code, (401, 403, 404))
 
     def test_empty_message_still_needs_login_before_anything_else(self):

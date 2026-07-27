@@ -48,6 +48,10 @@ _DEFAULT_TENANT_DAILY_CAP = "150"
 # 单次调用的预留额:占坑用,结算时改成真实成本。必须小于两级上限,否则一次都批不出去。
 # 循环里单步实际 ฿0.13-0.25 —— 预留低于实际 = 并发封口偏松,宁可多占一点。
 _DEFAULT_CALL_RESERVE = "0.25"
+# 识别类工具(file_convert / vat_report_check)一次跑完可能是几十次多模态调用(50 页 PDF 逐页
+# 栅格化),拿 ฿0.25 给它占坑等于封顶名存实亡:真花 ฿5 只记 ฿0.25,租户日额 20 倍放水。
+# 这两只工具的真实成本目前拿不回来(fileconv/vat 不回报 usage),所以按保守的固定额占坑。
+_DEFAULT_FILE_CALL_RESERVE = "1"
 
 _TABLE = """
 CREATE TABLE IF NOT EXISTS steward_cost_entries (
@@ -125,6 +129,13 @@ def call_reserve_thb() -> Decimal:
     return max(Decimal("0"), _env_decimal("STEWARD_CALL_COST_RESERVE_THB", _DEFAULT_CALL_RESERVE))
 
 
+def file_call_reserve_thb() -> Decimal:
+    """识别类工具单次跑完的预留额(env STEWARD_FILE_COST_RESERVE_THB)。"""
+    return max(
+        Decimal("0"), _env_decimal("STEWARD_FILE_COST_RESERVE_THB", _DEFAULT_FILE_CALL_RESERVE)
+    )
+
+
 def decide(
     *,
     session_spent: Decimal,
@@ -192,11 +203,18 @@ def precheck(*, tenant_id: str, session_id: str) -> dict:
         return {"allowed": True}
 
 
-def reserve(*, tenant_id: str, session_id: str, task_id: Optional[str] = None) -> dict:
+def reserve(
+    *,
+    tenant_id: str,
+    session_id: str,
+    task_id: Optional[str] = None,
+    estimate: Optional[Decimal] = None,
+) -> dict:
     """一次模型调用的预留闸。放行 → {allowed: True, entry_id}(调用后必须 settle);
     超限 → {allowed: False, code, cap_thb, spent_thb}(金额是两位小数字符串,直接进响应)。
+    estimate 缺省是循环里单步的口径;贵得多的动作(识别类工具)按自己的额占坑。
     """
-    estimate = call_reserve_thb()
+    estimate = call_reserve_thb() if estimate is None else max(Decimal("0"), estimate)
     session_cap, task_cap = session_cap_thb(), task_cap_thb()
     tenant_cap = tenant_daily_cap_thb()
     if session_cap is None and task_cap is None and tenant_cap is None:

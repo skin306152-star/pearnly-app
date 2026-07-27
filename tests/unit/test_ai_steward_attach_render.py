@@ -91,9 +91,7 @@ class RejectAtPickTimeTests(unittest.TestCase):
 
     def test_zero_byte_and_bad_extension_and_oversize(self):
         self.assertEqual(self._reject({"name": "a.pdf", "size": 0}), "steward.attachment_empty")
-        self.assertEqual(
-            self._reject({"name": "a.zip", "size": 10}), "steward.attachment_bad_ext"
-        )
+        self.assertEqual(self._reject({"name": "a.zip", "size": 10}), "steward.attachment_bad_ext")
         self.assertEqual(
             self._reject({"name": "a.pdf", "size": 20971521}), "steward.attachment_too_large"
         )
@@ -161,9 +159,7 @@ class SubmitGateTests(unittest.TestCase):
     def test_nothing_at_all_is_not_sendable(self):
         self.assertFalse(self._can({"text": "  ", "chips": [], "busy": False}))
         # 被拒/失败的件不算数(它们没有 attachment_id,后端会 422 empty_turn)
-        self.assertFalse(
-            self._can({"text": "", "chips": [{"state": "rejected"}], "busy": False})
-        )
+        self.assertFalse(self._can({"text": "", "chips": [{"state": "rejected"}], "busy": False}))
 
     def test_in_flight_turn_blocks_send(self):
         ctx = {"text": "hi", "chips": [], "busy": True}
@@ -179,7 +175,8 @@ class SmallPureTests(unittest.TestCase):
                 ['gl_ledger', 'converted', 'other', ''].map(r.kindKey)));
             """)
         self.assertEqual(
-            out, ["stw_kind_gl_ledger", "stw_kind_converted", "stw_kind_unknown", "stw_kind_unknown"]
+            out,
+            ["stw_kind_gl_ledger", "stw_kind_converted", "stw_kind_unknown", "stw_kind_unknown"],
         )
 
     def test_short_name_keeps_the_tail(self):
@@ -232,8 +229,17 @@ class TrayHtmlTests(unittest.TestCase):
 
     def test_uploading_chip_has_progress_bar_and_no_retry(self):
         out = self._tray(
-            {"chips": [{"local_id": "a1", "name": "gl.pdf", "size": 2048, "state": "uploading",
-                        "pct": 42}]}
+            {
+                "chips": [
+                    {
+                        "local_id": "a1",
+                        "name": "gl.pdf",
+                        "size": 2048,
+                        "state": "uploading",
+                        "pct": 42,
+                    }
+                ]
+            }
         )
         self.assertIn("st-bar", out)
         self.assertIn("--p:42", out)
@@ -241,23 +247,50 @@ class TrayHtmlTests(unittest.TestCase):
 
     def test_ready_chip_shows_what_it_was_recognised_as(self):
         out = self._tray(
-            {"chips": [{"local_id": "a1", "name": "gl.pdf", "size": 2048, "state": "ready",
-                        "att": {"kind": "gl_ledger", "page_count": 3}}]}
+            {
+                "chips": [
+                    {
+                        "local_id": "a1",
+                        "name": "gl.pdf",
+                        "size": 2048,
+                        "state": "ready",
+                        "att": {"kind": "gl_ledger", "page_count": 3},
+                    }
+                ]
+            }
         )
         self.assertIn("stw_kind_gl_ledger", out)
         self.assertIn("stw_att_pages", out)
 
     def test_unrecognised_file_says_so_and_does_not_fall_back_to_other(self):
         out = self._tray(
-            {"chips": [{"local_id": "a1", "name": "x.pdf", "size": 10, "state": "ready",
-                        "att": {"kind": "unknown", "kind_source": "unknown"}}]}
+            {
+                "chips": [
+                    {
+                        "local_id": "a1",
+                        "name": "x.pdf",
+                        "size": 10,
+                        "state": "ready",
+                        "att": {"kind": "unknown", "kind_source": "unknown"},
+                    }
+                ]
+            }
         )
         self.assertIn("stw_kind_unknown", out)
 
     def test_failed_chip_offers_retry_with_its_own_reason(self):
         out = self._tray(
-            {"chips": [{"local_id": "a1", "name": "x.pdf", "size": 10, "state": "failed",
-                        "err": "ไฟล์เสียหาย"}]}
+            {
+                "chips": [
+                    {
+                        "local_id": "a1",
+                        "name": "x.pdf",
+                        "size": 10,
+                        "state": "failed",
+                        "err": "ไฟล์เสียหาย",
+                    }
+                ]
+            }
         )
         self.assertIn('data-action="stw-att-retry"', out)
         self.assertIn('data-cid="a1"', out)
@@ -266,17 +299,24 @@ class TrayHtmlTests(unittest.TestCase):
     def test_rejected_chip_stays_visible_with_its_reason(self):
         """静默丢掉被拒的件 = 让人以为拖进来的 12 份都传上去了。"""
         out = self._tray(
-            {"chips": [{"local_id": "a1", "name": "x.zip", "size": 10, "state": "rejected",
-                        "err": "格式吃不了"}]}
+            {
+                "chips": [
+                    {
+                        "local_id": "a1",
+                        "name": "x.zip",
+                        "size": 10,
+                        "state": "rejected",
+                        "err": "格式吃不了",
+                    }
+                ]
+            }
         )
         self.assertIn("stw-att-chip rejected", out)
         self.assertIn("格式吃不了", out)
         self.assertIn('data-action="stw-att-remove"', out)
 
     def test_password_row_appears_for_the_named_file(self):
-        out = self._tray(
-            {"chips": [], "pwChip": {"local_id": "a7", "name": "kbank.pdf"}}
-        )
+        out = self._tray({"chips": [], "pwChip": {"local_id": "a7", "name": "kbank.pdf"}})
         self.assertIn('id="stwAttPw"', out)
         self.assertIn('data-action="stw-att-pw-go"', out)
         self.assertIn('data-cid="a7"', out)
@@ -358,7 +398,7 @@ class AttachActionsTests(unittest.TestCase):
         require({json.dumps(RENDER)});
         const mod = require({json.dumps(ATTACH)});
         const flush = () => new Promise((r) => setImmediate(r));
-        function harness(api) {{
+        function harness(api, els) {{
             const S = {{
                 api: api, sessionId: 's1', busy: false, errText: null,
                 attChips: [], attPwFor: null,
@@ -368,7 +408,7 @@ class AttachActionsTests(unittest.TestCase):
             const box = {{ S: S }};
             const a = mod.create({{
                 state: () => box.S,
-                getEl: () => null,
+                getEl: (id) => (els && els[id]) || null,
                 renderRight: () => {{}},
                 sendTurn: (body, atts) => sent.push({{ body, atts }}),
             }});
@@ -455,6 +495,46 @@ class AttachActionsTests(unittest.TestCase):
         self.assertEqual(out["pwFor"], out["cid"])
         # 422 的四语 message 直接印,不再过前端 i18n
         self.assertEqual(out["err"], "这份 PDF 有密码")
+
+    def test_a_wrong_password_keeps_the_password_row_and_never_replays_the_bad_one(self):
+        """填错一次密码 = 后端换成 pdf_password_wrong。只认 required 的话密码行再也不出现,
+        而重传还拿着那个错密码 —— 会计唯一的出路变成叉掉重拖一遍。"""
+        out = _run_node(f"""
+            {self.SETUP}
+            (async () => {{
+                const seen = [];
+                const pw = {{ value: '' }};
+                const h = harness({{
+                    uploadStewardAttachments: (sid, files, password) => {{
+                        seen.push(password === undefined ? null : password);
+                        return Promise.reject({{
+                            status: 422,
+                            detail: {{
+                                code: seen.length === 1
+                                    ? 'workorder.intake.pdf_password_required'
+                                    : 'workorder.intake.pdf_password_wrong',
+                                message: {{ zh: seen.length === 1 ? '有密码' : '密码不正确' }},
+                            }},
+                        }});
+                    }},
+                }}, {{ stwAttPw: pw }});
+                h.a.addFiles([{{ name: 'kbank.pdf', size: 10 }}]);
+                await flush(); await flush();
+                const cid = h.S.attChips[0].local_id;
+
+                pw.value = '0000';
+                h.a.submitPassword(cid);
+                await flush(); await flush();
+                const afterWrong = {{ pwFor: h.S.attPwFor, err: h.S.attChips[0].err }};
+
+                h.a.onClick('stw-att-retry', {{ getAttribute: () => cid }});
+                await flush(); await flush();
+                process.stdout.write(JSON.stringify({{ seen, afterWrong, cid }}));
+            }})();
+            """)
+        self.assertEqual(out["seen"], [None, "0000", None])  # 重传不再带那个错密码
+        self.assertEqual(out["afterWrong"]["pwFor"], out["cid"])  # 密码行还在
+        self.assertEqual(out["afterWrong"]["err"], "密码不正确")
 
     def test_submit_moves_only_ready_files_into_the_turn(self):
         out = _run_node(f"""

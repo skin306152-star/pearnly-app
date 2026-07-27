@@ -58,7 +58,9 @@ const LIMITS = {
     max_file_bytes: 20971520,
     max_batch_bytes: 36700160,
     max_files: 20,
-    accept: ['.csv', '.jpg', '.pdf', '.png', '.xls', '.xlsx'],
+    // 运输皮(zip/heic)必须在 accept 里:漏了它们,<input accept> 在文件对话框就把 zip
+    // 滤掉,拖进来的也被当坏格式灰掉 —— 后端「zip 自动展开 / HEIC 转 JPEG」永远跑不到。
+    accept: ['.csv', '.heic', '.jpg', '.pdf', '.png', '.xls', '.xlsx', '.zip'],
     ttl_days: 30,
 };
 
@@ -287,7 +289,9 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         const h = await boot(page);
         await dragFiles(page, [
             { name: 'big.pdf', body: 'z'.repeat(21 * 1024 * 1024), type: 'application/pdf' },
-            { name: 'a.zip', body: 'zz', type: 'application/zip' },
+            // 坏格式拿 .rar(收料口明说只吃 zip)。这里原来放的是 a.zip —— 那条断言把
+            // 「zip 传不上去」当成了预期,把真 bug 焊成了绿灯。
+            { name: 'a.rar', body: 'zz', type: 'application/x-rar' },
             { name: 'empty.pdf', body: '', type: 'application/pdf' },
         ]);
         await dropNow(page);
@@ -306,6 +310,23 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         expect(h.posts.length).toBe(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '03-chips-rejected-zh.png'),
+            fullPage: true,
+        });
+    });
+
+    test('zip 与 HEIC 是运输皮不是坏格式:真传上去,不在选文件那一刻被灰掉', async ({ page }) => {
+        const h = await boot(page);
+        await dragFiles(page, [
+            { name: 'มิ.ย.69.zip', body: 'PK', type: 'application/zip' },
+            { name: 'IMG_2647.heic', body: 'x', type: 'image/heic' },
+        ]);
+        await dropNow(page);
+
+        await expect(page.locator('.stw-att-chip.rejected')).toHaveCount(0);
+        await expect(page.locator('.stw-att-chip.ready')).toHaveCount(2);
+        expect(h.uploads.length).toBe(2); // 拆壳在后端,前端不许自己判它「吃不了」
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '03b-zip-heic-accepted-zh.png'),
             fullPage: true,
         });
     });
@@ -375,6 +396,63 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await expect.poll(() => h.uploads.length).toBeGreaterThan(before);
         // 重传入口也在(失败的件不静默消失)。
         await expect(page.locator('[data-action="stw-att-retry"]')).toBeVisible();
+    });
+
+    test('密码填错不是死胡同:密码框再长出来 · 重传不带旧密码', async ({ page }) => {
+        await boot(page);
+        const bodies = [];
+        // 第一次要密码,之后一律「密码不对」——会计填错一次就到这个状态。
+        await page.route('**/api/ai/steward/sessions/*/attachments', (r) => {
+            bodies.push(r.request().postData() || '');
+            const first = bodies.length === 1;
+            return r.fulfill({
+                status: 422,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    detail: {
+                        code: first
+                            ? 'workorder.intake.pdf_password_required'
+                            : 'workorder.intake.pdf_password_wrong',
+                        message: {
+                            zh: first
+                                ? '这份 PDF 有密码,填了才解得开。'
+                                : 'PDF 密码不正确,请重试。',
+                            th: first ? 'ไฟล์นี้มีรหัสผ่าน' : 'รหัสผ่าน PDF ไม่ถูกต้อง',
+                            en: '',
+                            ja: '',
+                        },
+                        filename: 'kbank.pdf',
+                    },
+                }),
+            });
+        });
+        await dragFiles(page, [{ name: 'kbank.pdf', body: 'x', type: 'application/pdf' }]);
+        await dropNow(page);
+        await expect(page.locator('#stwAttPw')).toBeVisible();
+
+        await page.locator('#stwAttPw').fill('0000');
+        await page.locator('[data-action="stw-att-pw-go"]').click();
+        await expect.poll(() => bodies.length).toBe(2);
+        expect(bodies[1]).toContain('0000');
+
+        // 这里是原来的死胡同:密码框不再出现,重传永远带着那个错密码。
+        await expect(page.locator('.stw-chip-err')).toContainText('密码不正确');
+        await expect(page.locator('#stwAttPw')).toBeVisible();
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '05b-password-wrong-zh.png'),
+            fullPage: true,
+        });
+
+        await page.locator('#stwAttPw').fill('5678');
+        await page.locator('[data-action="stw-att-pw-go"]').click();
+        await expect.poll(() => bodies.length).toBe(3);
+        expect(bodies[2]).toContain('5678');
+        expect(bodies[2]).not.toContain('0000');
+
+        // 直接点「重传」也不许再拿那个错密码去撞同一个 422。
+        await page.locator('[data-action="stw-att-retry"]').click();
+        await expect.poll(() => bodies.length).toBe(4);
+        expect(bodies[3]).not.toContain('name="password"');
     });
 
     test('纯文件送出 → 气泡下有只读原件行 · 回执卡按钮把参数原样带回', async ({ page }) => {

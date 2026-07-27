@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 import unittest
 from contextlib import ExitStack
@@ -146,6 +147,36 @@ class IntakeAcceptTests(_Sandbox):
         # 落盘的是明文可读的同一份字节,sha256 记的也是明文
         self.assertTrue(attachments.read_content(rows[0]["file_ref"]))
 
+    def test_a_zip_with_more_leaves_than_the_batch_allows_is_refused_in_zip_words(self):
+        """解包后的第二道闸:一个 zip 解出 21 件同样过不了「一条消息 20 件」。
+        码换成 zip 口径 —— 她手上只有一个压缩包,「先送出一批」那句话没法执行。"""
+        import io as _io
+        import zipfile
+
+        buf = _io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for i in range(attachments.MAX_FILES_PER_MESSAGE + 1):
+                zf.writestr(f"note{i}.txt", "hello")
+        with self.assertRaises(attach_intake.AttachmentLimitError) as ctx:
+            self._accept([("batch.zip", buf.getvalue())])
+        self.assertEqual(ctx.exception.code, attach_intake.ERR_ZIP_TOO_MANY)
+        self.assertEqual(ctx.exception.limit, attachments.MAX_FILES_PER_MESSAGE)
+        self.assertEqual(list(Path(self._dir.name).rglob("*.txt")), [])  # 一件都没落盘
+
+    def test_a_zip_whose_leaves_add_up_past_the_batch_cap_is_refused(self):
+        import io as _io
+        import zipfile
+
+        one = b"x" * (attachments.MAX_BATCH_BYTES // 2 + 1)
+        buf = _io.BytesIO()
+        # 压着存:一个 3MB 的包解出 35MB+ 才是真实场景(单件闸拦的是包本身,不是解出来的量)
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for i in range(2):
+                zf.writestr(f"scan{i}.txt", one)
+        with self.assertRaises(attach_intake.AttachmentLimitError) as ctx:
+            self._accept([("batch.zip", buf.getvalue())])
+        self.assertEqual(ctx.exception.code, attach_intake.ERR_ZIP_TOO_LARGE)
+
     def test_zero_byte_file_is_named_and_refused_before_anything_lands(self):
         from services.workorder import intake_prep
 
@@ -170,6 +201,65 @@ def _xlsx_bytes() -> bytes:
     buf = _io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+class _AnchorCur:
+    """按 SQL 里【真实存在的】WHERE 锚点过滤内存行 —— 少一个锚,别人的行当场漏出来。
+
+    路由那层的 get_owned/list_by_ids 一律被 mock 掉(测的是「拿到 None 返 404」),所以
+    「三锚齐不齐」零覆盖:把 WHERE 删成 `id = %s` 也全绿。这个仿真让变异当场红。"""
+
+    _COND = re.compile(r"(\w+)(?:::text)?\s*=\s*(ANY\(%s\)|%s)")
+
+    def __init__(self, rows):
+        self._rows = rows
+        self._out: list[dict] = []
+
+    def execute(self, sql, params=()):
+        where = sql.split("WHERE", 1)[1] if "WHERE" in sql else ""
+        conds = list(self._COND.finditer(where))
+        assert len(conds) == len(params), f"占位符与参数对不上:{where!r} {params!r}"
+        rows = list(self._rows)
+        for cond, value in zip(conds, params):
+            column, is_any = cond.group(1), cond.group(2).startswith("ANY")
+            wanted = [str(v) for v in value] if is_any else [str(value)]
+            rows = [r for r in rows if str(r.get(column)) in wanted]
+        self._out = rows
+
+    def fetchone(self):
+        return self._out[0] if self._out else None
+
+    def fetchall(self):
+        return self._out
+
+
+_MINE = {"id": "a-1", "tenant_id": "t-1", "session_id": "s-1", "user_id": "u1"}
+_OTHER_TENANT = {**_MINE, "id": "a-2", "tenant_id": "t-9"}
+_OTHER_USER = {**_MINE, "id": "a-3", "user_id": "u2"}
+_OTHER_SESSION = {**_MINE, "id": "a-4", "session_id": "s-9"}
+_ALL_ROWS = [_MINE, _OTHER_TENANT, _OTHER_USER, _OTHER_SESSION]
+
+
+class OwnershipAnchorTests(unittest.TestCase):
+    """下载/取料两条路的归属锚(提交信息把「租户 + id + 上传人三锚」当卖点写了,那就得有闸)。"""
+
+    def test_download_row_needs_all_three_anchors(self):
+        cur = _AnchorCur(_ALL_ROWS)
+        got = attachments.get_owned(cur, tenant_id="t-1", attachment_id="a-1", user_id="u1")
+        self.assertEqual(got["id"], "a-1")
+
+    def test_another_tenants_or_another_users_attachment_is_not_downloadable(self):
+        for row in (_OTHER_TENANT, _OTHER_USER):
+            cur = _AnchorCur(_ALL_ROWS)
+            got = attachments.get_owned(cur, tenant_id="t-1", attachment_id=row["id"], user_id="u1")
+            self.assertIsNone(got, row["id"])
+
+    def test_list_by_ids_is_anchored_on_tenant_and_session(self):
+        cur = _AnchorCur(_ALL_ROWS)
+        ids = [r["id"] for r in _ALL_ROWS]
+        got = attachments.list_by_ids(cur, tenant_id="t-1", session_id="s-1", ids=ids)
+        # 别的租户、别的会话的 id 拼进来一行都取不到(同一租户的别人的件仍在,归属由工具侧再验)
+        self.assertEqual([r["id"] for r in got], ["a-1", "a-3"])
 
 
 class PublicViewTests(unittest.TestCase):
@@ -220,6 +310,13 @@ class PublicViewTests(unittest.TestCase):
         self.assertEqual(limits["max_files"], attachments.MAX_FILES_PER_MESSAGE)
         self.assertIn(".xlsx", limits["accept"])
         self.assertGreaterEqual(limits["ttl_days"], 1)
+
+    def test_accept_lets_the_transport_wrappers_through(self):
+        """accept 是前端的双闸(<input accept> + 选文件当下的判据)。漏了 zip/HEIC 的后果是
+        静默的:落区写着「zip 都吃」,拖进来却被灰掉,后端拆壳的代码一次都跑不到。"""
+        accept = attachments.limits()["accept"]
+        for ext in attachments.TRANSPORT_EXTENSIONS:
+            self.assertIn(ext, accept)
 
 
 if __name__ == "__main__":

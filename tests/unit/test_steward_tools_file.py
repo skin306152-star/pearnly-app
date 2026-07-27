@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from services.steward import attachments, copy, registry, tools, tools_file
+from services.steward import attach_kinds, attachments, copy, registry, tools, tools_file
 from services.steward.registry import ToolContext
 from tests.unit._route_contract_fakes import CurCM, FakeCur
 
@@ -167,9 +167,46 @@ class VatReportCheckTests(_Sandbox):
                 return_value={"ok": False, "rows": [], "error": "unsupported"},
             ),
         ):
-            res = tools_file.vat_report_check(_ctx(), {})
+            # model_ok = 人在卡上点过「会过一次模型」;点过之后还是读不出,就如实说读不出
+            res = tools_file.vat_report_check(_ctx(), {"model_ok": True})
         self.assertFalse(res.ok)
         self.assertEqual(res.error_code, tools_file.ERR_REPORT_UNPARSED)
+
+
+class VatModelSpendGateTests(_Sandbox):
+    """没人点过头就绝不走 parse_vat_report 的模型回退 —— 那条路上按钮明写着「不过模型」,
+    而 orchestrator 对附件轮次连 budget.reserve 都跳过了(理由是「一次模型都不调」)。"""
+
+    def _run(self, args, needs_model=True):
+        path = self._land(b"junk", name="vat.pdf")
+        p1, p2 = self._with_rows([_row(path, name="vat.pdf")])
+        with (
+            p1,
+            p2,
+            mock.patch(
+                "services.vat.vat_report_parser.parse_vat_report",
+                return_value={"ok": True, "rows": VatReportCheckTests._ROWS},
+            ) as parse,
+            mock.patch.object(attach_kinds, "vat_check_needs_model", return_value=needs_model),
+        ):
+            return tools_file.vat_report_check(_ctx(), args), parse
+
+    def test_a_model_fallback_without_a_click_is_refused_before_parsing(self):
+        res, parse = self._run({})
+        self.assertFalse(res.ok)
+        self.assertEqual(res.error_code, tools_file.ERR_REPORT_NEEDS_MODEL)
+        self.assertEqual(res.data["filename"], "vat.pdf")
+        parse.assert_not_called()
+
+    def test_the_click_lets_it_through(self):
+        res, parse = self._run({"model_ok": True})
+        self.assertTrue(res.ok)
+        parse.assert_called_once()
+
+    def test_a_report_that_parses_locally_never_asks(self):
+        res, parse = self._run({}, needs_model=False)
+        self.assertTrue(res.ok)
+        parse.assert_called_once()
 
 
 class RegistrationTests(unittest.TestCase):
@@ -206,6 +243,7 @@ class RegistrationTests(unittest.TestCase):
                 tools_file.ERR_UNREADABLE,
                 tools_file.ERR_CONVERT_REJECTED,
                 tools_file.ERR_REPORT_UNPARSED,
+                tools_file.ERR_REPORT_NEEDS_MODEL,
             ):
                 text = copy.error(code, {"n": 2, "filename": "a.pdf", "status": "x"}, lang)
                 self.assertTrue(text)

@@ -89,6 +89,49 @@ class UploadTests(unittest.IsolatedAsyncioTestCase):
         upload.read.assert_awaited_once_with(attachments.MAX_FILE_BYTES + 1)
 
 
+class ReadLoopGateTests(unittest.IsolatedAsyncioTestCase):
+    """三道闸判在读的过程里,不留到读完 —— 否则 1000 个 20MB 的 part 要先攒进内存
+    (~20GB)才轮到那句「一次最多 20 件」。断言的是「读了几件」,不是「返了几号码」。"""
+
+    def _upload(self, name, content):
+        upload = mock.Mock()
+        upload.filename = name
+        upload.read = mock.AsyncMock(return_value=content)
+        return upload
+
+    async def _post(self, files):
+        with ExitStack() as stack:
+            _open_gate(stack)
+            stack.enter_context(mock.patch.object(sr.attach_intake, "accept", return_value=[]))
+            with self.assertRaises(HTTPException) as ctx:
+                await sr.add_attachments("s-1", mock.Mock(), files=files)
+        return ctx.exception
+
+    async def test_too_many_parts_are_refused_before_a_single_byte_is_read(self):
+        files = [
+            self._upload(f"{i}.pdf", b"x") for i in range(attachments.MAX_FILES_PER_MESSAGE + 1)
+        ]
+        err = await self._post(files)
+        self.assertEqual(err.status_code, 413)
+        self.assertEqual(err.detail["code"], attach_intake.ERR_TOO_MANY)
+        for upload in files:
+            upload.read.assert_not_awaited()
+
+    async def test_an_oversized_part_stops_the_loop_right_there(self):
+        big = self._upload("big.pdf", b"x" * (attachments.MAX_FILE_BYTES + 1))
+        rest = self._upload("after.pdf", b"x")
+        err = await self._post([big, rest])
+        self.assertEqual(err.detail["code"], attach_intake.ERR_TOO_LARGE)
+        rest.read.assert_not_awaited()  # 后面那些 part 一件都不读
+
+    async def test_the_batch_ceiling_stops_the_loop_mid_way(self):
+        half = b"x" * (attachments.MAX_BATCH_BYTES // 2 + 1)
+        files = [self._upload(f"{i}.pdf", half) for i in range(3)]
+        err = await self._post(files)
+        self.assertEqual(err.detail["code"], attach_intake.ERR_BATCH_TOO_LARGE)
+        files[2].read.assert_not_awaited()
+
+
 class DownloadTests(unittest.IsolatedAsyncioTestCase):
     async def _download(self, *patches):
         with ExitStack() as stack:
@@ -175,26 +218,28 @@ class NoModelPathTests(unittest.TestCase):
                 mock.patch.object(store, "set_title_if_empty"),
                 mock.patch.object(store, "touch_session"),
                 mock.patch.object(store, "list_messages", return_value=[]),
-                mock.patch.object(store, "create_task", return_value={"id": "task-1"}),
                 mock.patch.object(store, "finish_task", return_value=True),
                 mock.patch.object(attachments, "attach_to_message", return_value=1),
             ):
                 stack.enter_context(patch)
+            task = stack.enter_context(
+                mock.patch.object(store, "create_task", return_value={"id": "task-1"})
+            )
             plan = stack.enter_context(mock.patch.object(orchestrator.planner, "plan"))
             reserve = stack.enter_context(mock.patch.object(orchestrator.budget, "reserve"))
             ctx = mock.Mock(tenant_id="t-1", user_id="u1", lang="zh", allowed_client_ids=None)
             out = orchestrator.handle_message(ctx, session_id="s-1", **over)
-        return out, plan, reserve
+        return out, plan, reserve, task
 
     def test_files_only_turn_never_calls_the_planner(self):
-        out, plan, reserve = self._run(text="", attachment_ids=("a-1",))
+        out, plan, reserve, _ = self._run(text="", attachment_ids=("a-1",))
         plan.assert_not_called()
         reserve.assert_not_called()
         self.assertEqual(out["task_status"], store.TASK_RUNNING)  # 唯一零成本动作 → 直接跑
         self.assertEqual(out["attachments"][0]["attachment_id"], "a-1")
 
     def test_button_click_never_calls_the_planner(self):
-        out, plan, _ = self._run(
+        out, plan, _, _task = self._run(
             text="",
             attachment_ids=("a-1",),
             action={"tool": "file_convert", "attachment_ids": ["a-1"], "confirm_spend": False},
@@ -202,9 +247,18 @@ class NoModelPathTests(unittest.TestCase):
         plan.assert_not_called()
         self.assertEqual(out["task_status"], store.TASK_RUNNING)
 
+    def test_the_click_that_agreed_to_a_model_call_is_recorded_on_the_task(self):
+        """点过「会过一次模型」才带得走 model_ok —— 执行侧凭它开模型回退那条路。"""
+        _out, _plan, _reserve, task = self._run(
+            text="",
+            attachment_ids=("a-1",),
+            action={"tool": "vat_report_check", "attachment_ids": ["a-1"], "confirm_spend": True},
+        )
+        self.assertEqual(task.call_args.kwargs["payload"]["args"], {"model_ok": True})
+
     def test_a_tool_name_outside_the_closed_set_gets_no_task(self):
         """按钮上的工具名是客户端来的,当不可信输入:闭集外一律派不出活。"""
-        out, plan, _ = self._run(
+        out, plan, _, _task = self._run(
             text="",
             attachment_ids=("a-1",),
             action={"tool": "erp_push", "attachment_ids": ["a-1"], "confirm_spend": True},

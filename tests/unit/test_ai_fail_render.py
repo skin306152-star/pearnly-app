@@ -288,25 +288,27 @@ class SettingsFocusWiringTests(unittest.TestCase):
         self.assertIn("FOCUS_RETRY_MS", text)
 
 
-class DormantTopupBranchTests(unittest.TestCase):
-    """绊线:402/insufficient_balance 那条出路当前是休眠的——failureView 的两个调用点
-    (create_order / add_materials)都没有计费闸,生产里「去充值」不会出现。收料真上闸的
-    那天这条测试会红,提醒把 ai-fail-render.js 的休眠说明与 E2E 的免责注释一起改掉,
-    别让「验过了」和「用得上」继续错位(memory:verify-target-must-be-real-content)。"""
+class TopupBranchWiringTests(unittest.TestCase):
+    """「去充值」这条出路不许再退回休眠:后端真有一处会返 402 + insufficient_balance,
+    前端的说明也得指得到它。前身是 DormantTopupBranchTests(断言收料【没有】计费闸),
+    2026-07-27 收料上闸后翻面——两边一起改,别让「验过了」和「用得上」再错位
+    (memory:verify-target-must-be-real-content)。真扣费/真停机的契约在
+    tests/unit/test_workorder_billing.py。"""
 
-    def test_workorder_routes_still_have_no_billing_gate(self):
+    def test_materials_endpoint_really_raises_402_insufficient_balance(self):
         root = Path(AI_DIR).parents[1]
         text = (root / "routes" / "workorder_routes.py").read_text(encoding="utf-8")
-        for token in ("billing", "insufficient_balance", "402"):
-            self.assertNotIn(
-                token,
-                text,
-                "收料/开单上计费闸了?去掉 ai-fail-render.js 与 _fail_ways_out_local.spec.js "
-                "里「这条分支是休眠的」的说明,并补一条真会返 402 的验收",
-            )
+        self.assertIn("ocr_balance.batch_denial", text)
+        self.assertIn("HTTPException(402, detail=denial)", text)
+        gate = (root / "services" / "workorder" / "steps" / "ocr_balance.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('STUCK_REASON = "insufficient_balance"', gate)
 
-    def test_fail_render_says_out_loud_that_the_branch_is_dormant(self):
-        self.assertIn("休眠分支", (AI_DIR / "ai-fail-render.js").read_text(encoding="utf-8"))
+    def test_fail_render_points_at_the_real_402_source(self):
+        text = (AI_DIR / "ai-fail-render.js").read_text(encoding="utf-8")
+        self.assertNotIn("休眠分支", text)
+        self.assertIn("ocr_balance.batch_denial", text)
 
 
 class BundleWiringTests(unittest.TestCase):

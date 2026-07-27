@@ -45,13 +45,13 @@
      * insufficient_balance 是全站计费闸的统一码(services/billing/account_status.py
      * 单一事实源,recon/vat_excel/knowledge 等端点以 402 + detail.code 出线)。
      *
-     * 休眠分支,别当它在工作:本模块的两个调用点当前都不可能收到 402。
-     * routes/workorder_routes.py::create_order 只有鉴权+归属校验(开单本身永远不计费);
-     * ::add_materials 只有 413/422,OCR 计费发生在 _auto_advance 的后台续跑里,不以上传
-     * 响应的形式回到前端。余额耗尽时收料页得到的仍是后台 stuck / 转人工。契约先接好,
-     * 收料真上计费闸的那天不用再改前端 —— 但在那之前,任何「去充值出路已生效」的说法都不成立。
-     * 闸:tests/unit/test_ai_fail_render.py::DormantTopupBranchTests(收料上计费闸即报红,
-     * 提醒把这段注释和 E2E 的说明一起改掉)。
+     * 谁会真的送来 402:routes/workorder_routes.py::add_materials 的余额闸
+     * (services/workorder/steps/ocr_balance.batch_denial —— 整批预估不够就整批拒,
+     * 一个字节都不读)。这条出路在 PEARNLY_WORKORDER_BILLING 开着时是活的。
+     * ::create_order 仍永远不会给 402:开单本身不计费,那边只有鉴权+归属校验。
+     * 跑批跑到一半余额见底不走这条路 —— 那是后台 stuck insufficient_balance,
+     * 出现在工单卡的 blocked_reasons 里,不是上传响应。
+     * 闸:tests/unit/test_ai_fail_render.py::TopupBranchWiringTests。
      */
     function failureView(code, status) {
         var c = code == null ? '' : String(code);

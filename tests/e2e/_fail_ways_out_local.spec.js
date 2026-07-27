@@ -9,9 +9,10 @@
 //     「去充值」直达设置页计费区(重传一百次也不会好的失败不能只给重传)。
 // 截图存 tests/e2e/_artifacts/fail_ways_out/。
 //
-// ⚠️ 402 那几条验的是契约不是现状:create_order / add_materials 当前都没有计费闸,生产里
-// 这条分支不会亮(见 static/ai/ai-fail-render.js 的休眠说明)。别把这里的绿读成
-// 「余额耗尽时用户已经能看到去充值」。
+// 402 的落点:add_materials 已接余额闸(routes/workorder_routes.py → ocr_balance.batch_denial,
+// PEARNLY_WORKORDER_BILLING 开时余额不足整批拒),所以「收料 402 → 去充值」验的是真出路。
+// create_order 那两条仍是契约验证:开单本身永远不计费,生产里不会从开单收到 402。
+// 本 spec 用 stub 兜响应验前端渲染;后端真会返 402 由 tests/unit/test_workorder_billing.py 锁。
 //
 // 起法:npx playwright test tests/e2e/_fail_ways_out_local.spec.js
 /* global window, document */

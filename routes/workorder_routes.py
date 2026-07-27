@@ -24,7 +24,7 @@ from core.route_helpers import (
 from services.audit import file_access as audit_file_access
 from services.authz.deps import check_workspace_scope
 from services.workorder import api, archive, engine, intake_prep, runner, storage, store
-from services.workorder.steps import intake
+from services.workorder.steps import intake, ocr_balance
 from routes.workorder_schemas import (
     DecisionIn,
     OrderCreate,
@@ -320,12 +320,19 @@ async def add_materials(
     (走 intake 幂等指纹)。默认登记后自动续跑；批量投料可 defer_run，收齐后再显式 /run。
 
     密码 PDF 随传 password 参数即当场解开;不传则 422 pdf_password_required 要密码(密码只用于
-    解密,不留存)。整批先读+校验齐全再落盘,任一件不合规=整批拒且盘上零孤儿。"""
+    解密,不留存)。整批先读+校验齐全再落盘,任一件不合规=整批拒且盘上零孤儿。
+
+    余额闸(拦在花钱之前)排在读文件之前:识别按老站同一份定价从同一个钱包扣,余额不够整批拒
+    并返 402 + detail.code=insufficient_balance(前端失败卡据此出「去充值」)。闸关/豁免/查库
+    异常一律放行,见 services/workorder/steps/ocr_balance。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")
     with db.get_cursor() as cur:  # 先验归属,再落盘(不给未授权请求写磁盘的机会)
         _load_mutable_order(cur, request, user, tenant_id, work_order_id)
+    denial = ocr_balance.batch_denial(user, tenant_id, len(files))
+    if denial:
+        raise HTTPException(402, detail=denial)
 
     # 段一:整批读入 + 预处理(不落盘)。封顶读法:最多读上限+1 字节,超限即 413。段内抛错=盘上零残留。
     pairs = []

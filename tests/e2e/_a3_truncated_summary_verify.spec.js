@@ -86,8 +86,10 @@ test.describe('A-3 · 截断汇总表在工单页的停机呈现', () => {
         // 机器前缀 sales_rows_truncated[...] 原样显示,与既有 sales_total_mismatch[...]/
         // trial_balance_unbalanced 等停机原因同一呈现口径(全站停机原因都带前缀,A-3 不另搞一套)。
 
-        // 重试出口在场(既有 wo-retry-stuck 按钮),截断修表后可重跑。
-        await expect(page.locator('[data-action="wo-retry-stuck"]')).toBeVisible();
+        // 重试出口在场(既有 wo-retry-stuck 按钮),截断修表后可重跑。选择器收在停机卡
+        // .wo-guide 里:空态出路那批也复用了同一个 wo-retry-stuck 委托(三块面板各一个),
+        // 全页找会撞出四个。这里要验的是「停机原因旁边就有重试」,不是页面上共有几个。
+        await expect(page.locator('.wo-guide [data-action="wo-retry-stuck"]')).toBeVisible();
     });
 
     test('手机端不横向溢出', async ({ page }) => {

@@ -101,8 +101,9 @@ test.describe('B-6 · 超期进项票在工单页的停机呈现', () => {
         expect(Number(shown.opacity)).toBeGreaterThan(0);
         expect(shown.height).toBeGreaterThan(0);
 
-        // 重试出口在场:会计改完数可就地重跑,不用回头找入口。
-        await expect(page.locator('[data-action="wo-retry-stuck"]')).toBeVisible();
+        // 重试出口在场:会计改完数可就地重跑,不用回头找入口。选择器收在停机卡 .wo-guide 里
+        // ——空态出路那批复用了同一个 wo-retry-stuck 委托,全页找会撞出四个。
+        await expect(page.locator('.wo-guide [data-action="wo-retry-stuck"]')).toBeVisible();
     });
 
     test('手机端不横向溢出', async ({ page }) => {

@@ -75,6 +75,8 @@ tests/fixtures/*
 !tests/fixtures/__init__.py
 # 乱料验收包(IN-0a 常设制度):进料口守门资产,须入库
 !tests/fixtures/messy_intake_pack/
+# 四类手录单据的跨仓交接物:桥仓测试按路径读它,不入库桥端就没得验
+!tests/fixtures/express_doctype_golden.json
 tests/pipeline-results.json
 tests/pipeline-results-before-fix.json
 tests/pipeline-benchmark-*.json

@@ -1,0 +1,161 @@
+{
+  "ar_receipt": {
+    "direction": "ar_receipt",
+    "doc_type": "ar_receipt",
+    "doctype": "RE",
+    "account_set": "DATAT",
+    "receipt_date": "2026-01-15",
+    "customer_code": "C001",
+    "wht_amount": "30.00",
+    "shortfall_amount": "0.00",
+    "allocations": [
+      {
+        "doc_no": "IV690101-001",
+        "rectyp": "3",
+        "amount": "1140.00",
+        "vat_amount": "70.00"
+      },
+      {
+        "doc_no": "AD-001",
+        "rectyp": "0",
+        "amount": "70.00",
+        "vat_amount": "0.00"
+      }
+    ],
+    "channels": [
+      {
+        "isrun_zr_prefix": "TR",
+        "kind": "transfer",
+        "amount": "1040.00"
+      }
+    ],
+    "userid": "ACC1",
+    "depcod": "",
+    "source": {
+      "ref": "",
+      "note": ""
+    },
+    "wht_isrun_zr_prefix": "TX",
+    "advance": {
+      "doc_no": "AD-001",
+      "amount": "70.00",
+      "isrun_zr_prefix": "M1"
+    },
+    "prior_docnum": "RE0001",
+    "payload_version": 1
+  },
+  "ap_payment": {
+    "direction": "ap_payment",
+    "doc_type": "ap_payment",
+    "doctype": "PS",
+    "account_set": "DATAT",
+    "payment_date": "2026-01-15",
+    "supplier_code": "S001",
+    "payee_code": "",
+    "wht_amount": "30.00",
+    "settlements": [
+      {
+        "doc_no": "RR690101-01",
+        "rectyp": "3",
+        "amount": "1000.00",
+        "vat_amount": "65.42"
+      }
+    ],
+    "channels": [
+      {
+        "isrun_zp_prefix": "QP",
+        "kind": "cheque",
+        "amount": "970.00",
+        "is_cheque": true,
+        "bank_account": "01"
+      }
+    ],
+    "userid": "ACC1",
+    "depcod": "",
+    "source": {
+      "ref": "",
+      "note": ""
+    },
+    "withholding": {
+      "tax_type": "S53",
+      "tax_rate": "3.00",
+      "base_amount": "1000.00",
+      "tax_amount": "30.00",
+      "tax_desc": "ค่าบริการ",
+      "tax_cond": ""
+    },
+    "prior_docnum": "PS0001",
+    "payload_version": 1
+  },
+  "gl_journal": {
+    "direction": "gl_journal",
+    "doc_type": "gl_journal",
+    "doctype": "GL",
+    "account_set": "DATAT",
+    "voucher_date": "2026-01-15",
+    "journal_code": "00",
+    "description": "ปรับปรุงค่าใช้จ่ายค้างจ่าย",
+    "total_amount": "500.00",
+    "lines": [
+      {
+        "account": "5140-10",
+        "side": "D",
+        "amount": "500.00",
+        "depcod": "01"
+      },
+      {
+        "account": "2130-01",
+        "side": "C",
+        "amount": "500.00"
+      }
+    ],
+    "userid": "ACC1",
+    "source": {
+      "ref": "",
+      "note": ""
+    },
+    "voucher_no": "JV6901-004",
+    "vat": {
+      "vat_rec": "P",
+      "vat_period": "2026-01-01",
+      "ref_no": "INV-9",
+      "base_amount": "500.00",
+      "vat_amount": "35.00",
+      "tax_id": "",
+      "prename": "",
+      "depcod": ""
+    },
+    "payload_version": 1
+  },
+  "stock_adjust": {
+    "direction": "stock_adjust",
+    "doc_type": "stock_adjust",
+    "doctype": "OU",
+    "subtype": "internal_issue",
+    "account_set": "DATAT",
+    "doc_date": "2026-01-15",
+    "isrun_prefix": "ZZ",
+    "loccod": "01",
+    "remark": "ตัดสินค้าชำรุด",
+    "offset_account": "",
+    "lines": [
+      {
+        "stock_code": "SKU-001",
+        "qty": "2.0000",
+        "unit": "PC",
+        "unit_price": "250.0000",
+        "amount": "500.00",
+        "tfactor": "12.0000",
+        "source_lot": "202512016OU690101-001  1"
+      }
+    ],
+    "userid": "ACC1",
+    "depcod": "",
+    "source": {
+      "ref": "",
+      "note": ""
+    },
+    "prior_docnum": "ZZ0001",
+    "payload_version": 1
+  }
+}

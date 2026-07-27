@@ -12,6 +12,15 @@
   BRIDGE_REQUIRED_KEYS   桥 `writepath/doc_*.validate` 硬要的顶层键 —— 缺一个即拒单
   BRIDGE_REQUIRED_ROW_KEYS 桥逐行读的子表键 —— 名字不对不报错,是**静默丢字段**
 
+来源(逐字抄自 pearnly-companion,只读,不在本仓改桥):
+  `bridge/cloud_jobs.py` 的 `_WRITE_PAYLOAD_KEYS` / `_DOC_PAYLOAD_KEYS`
+  `bridge/writepath/doc_{receipt,payment,journal,stock_adjust}.py` 的 `validate` / `_plan_*`
+
+同步方式(**桥端改了这里也要跟着改**,否则这份镜像会开始放行桥端已经不认的载荷):
+  改完这里跑 `python -m unittest tests.unit.test_express_bridge_contract`。有桥仓的机器上
+  `test_mirror_matches_bridge_whitelist_exactly` 会把镜像与桥端白名单逐键对等比一次,抄漏
+  当场红;没有桥仓的机器(CI)比不了 —— 所以谁改契约谁在本机跑,别指望 CI 兜。
+
 改这里的唯一合法理由是桥端真的改了(且桥已发版、装机量滚完)。反过来云端想加键:先去桥
 仓登记 + bump 桥版本 + 发版,再回来改这份镜像 —— 桥不随主站 webhook 部署,顺序反了就是
 一段"云端已上线、桥还认不得"的空窗。

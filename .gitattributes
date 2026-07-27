@@ -7,3 +7,8 @@ scripts/git-hooks/* text eol=lf
 # 所有 shell 脚本同理钉 LF(批次 C 记债 #0):部署目标是 Ubuntu 服务器,
 # Windows 工作树若引入 CRLF,服务器上 bash 会因行尾 \r 报 "bad interpreter"。
 *.sh text eol=lf
+
+# 跨仓交接的 golden 载荷:两仓在同一台 Windows 机器上,但 core.autocrlf=true 会在检出时
+# 把它转成 CRLF,而 `--write` 永远写 LF —— 不钉死就是每次跑闸都冒出一份纯行尾的假 diff,
+# 真正的键名改动被淹在里面。
+tests/fixtures/express_doctype_golden.json text eol=lf

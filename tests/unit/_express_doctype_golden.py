@@ -10,7 +10,14 @@ P2-B 的假绿正是两边各照自己的镜子照出来的:云端断言"产物 
 + 预收腿,付款踩 A3/W1 + 支票行,凭证带 VAT 块与显式凭证号,库存调整带来源批与换算单位。
 只走最简形态的 golden 会让"条件键根本没出现"这种假绿再来一次。
 
-导出:`python -m tests.unit._express_doctype_golden`(打印 JSON,给桥仓联调时喂)。
+产物落盘成 `tests/fixtures/express_doctype_golden.json` —— 桥仓装不了云端这套依赖,只能读
+文件,所以磁盘上这份是跨仓唯一的交接物。它由 `--write` 现产、不手改;
+`test_express_bridge_contract` 每次跑都拿它和现产的比一次,改了组装却忘了刷新当场红,
+桥仓不会拿到一份过期的"真产物"。
+
+用法:
+  python -m tests.unit._express_doctype_golden            打印 JSON
+  python -m tests.unit._express_doctype_golden --write    刷新落盘 fixture
 """
 
 from __future__ import annotations
@@ -23,6 +30,8 @@ from typing import Any, Dict
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+GOLDEN_JSON = PROJECT_ROOT / "tests" / "fixtures" / "express_doctype_golden.json"
 
 from services.erp.express_push.doctypes import (  # noqa: E402
     build_journal_payload,
@@ -148,5 +157,25 @@ def golden_payloads() -> Dict[str, Dict[str, Any]]:
     }
 
 
+def _serialize(payloads: Dict[str, Dict[str, Any]]) -> str:
+    # 序列化必须是确定性的:同一份产物重跑两次要逐字节相同,否则 --write 会刷出一堆
+    # 只有排版差异的 diff,真正的键名改动被淹在里面没人看得见。不排序 = 保留组装顺序,
+    # 让 diff 读起来跟 build_*_payload 里的落键顺序对得上。
+    return json.dumps(payloads, ensure_ascii=False, indent=2) + "\n"
+
+
+def load_golden() -> Dict[str, Dict[str, Any]]:
+    """读磁盘上那份 —— 桥仓拿到的就是它,断言必须针对它而不是内存里现产的。"""
+    return json.loads(GOLDEN_JSON.read_text(encoding="utf-8"))
+
+
+def write_golden() -> Path:
+    GOLDEN_JSON.write_text(_serialize(golden_payloads()), encoding="utf-8", newline="\n")
+    return GOLDEN_JSON
+
+
 if __name__ == "__main__":
-    print(json.dumps(golden_payloads(), ensure_ascii=False, indent=2))
+    if "--write" in sys.argv[1:]:
+        print(f"written: {write_golden()}")
+    else:
+        print(_serialize(golden_payloads()), end="")

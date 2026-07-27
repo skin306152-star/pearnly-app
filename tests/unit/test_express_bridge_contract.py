@@ -12,6 +12,10 @@ bad_payload,唯一过白名单的手工凭证死在 INVALID_DOC_DATE)。缺的�
      与桥端白名单**逐键对等**比一次 —— 镜像抄漏/抄错在这里当场红。开发机(改契约的地方)
      一定有桥仓,所以这一层落在"谁改谁被抓"的位置上,而不是等上线后由会计发现。
 
+断言一律针对**磁盘上那份 fixture**(`tests/fixtures/express_doctype_golden.json`),不针对内存
+里现产的:桥仓装不了云端依赖,它读到的只能是文件,验内存等于验一个桥永远见不到的东西。
+文件与现产的一致性由 `test_fixture_is_the_current_build` 单独钉死,漂了当场红。
+
 桥仓路径:环境变量 PEARNLY_COMPANION_DIR,缺省取 pearnly-app 的兄弟目录。桥仓只读 import,
 不改它一个字节(桥要发版 + 等装机量滚动,窗口期以天计)。
 """
@@ -35,7 +39,12 @@ from services.erp.express_push.bridge_contract import (  # noqa: E402
     BRIDGE_REQUIRED_ROW_KEYS,
     DOC_TYPES,
 )
-from tests.unit._express_doctype_golden import BOOK, golden_payloads  # noqa: E402
+from tests.unit._express_doctype_golden import (  # noqa: E402
+    BOOK,
+    GOLDEN_JSON,
+    golden_payloads,
+    load_golden,
+)
 
 # 四类各自的单据日键。老链路的佛历 `docdate_be` 一个都不该出现 —— 桥端
 # `doc_payload.iso_date` 只认 date.fromisoformat,佛历串在那边一律 INVALID_DOC_DATE。
@@ -83,11 +92,20 @@ class BridgeMirrorContractTests(unittest.TestCase):
     """产物 vs 桥端契约镜像。桥仓不在也跑得动,是 CI 里的那道闸。"""
 
     def setUp(self):
-        self.payloads = golden_payloads()
+        self.payloads = load_golden()
 
     def test_every_doctype_has_a_golden_payload(self):
         # golden 少一类 = 下面每条断言在那一类上恒真,整组闸静默失效。
         self.assertEqual(set(self.payloads), set(DOC_TYPES))
+
+    def test_fixture_is_the_current_build(self):
+        # fixture 是交给桥仓的那份"云端真产物"。组装改了却没 --write 刷新,桥仓验的就是
+        # 一份考古载荷 —— 两边全绿而线上整条不通,正是 P2-B 那次的翻版。
+        self.assertEqual(
+            self.payloads,
+            golden_payloads(),
+            f"fixture 过期,跑:python -m tests.unit._express_doctype_golden --write ({GOLDEN_JSON})",
+        )
 
     def test_top_level_keys_within_bridge_whitelist(self):
         # 桥端 cloud_jobs 对顶层键做白名单:多一个键不是少验一道闸,是整单 bad_payload。
@@ -157,14 +175,14 @@ class BridgeLiveValidateTests(unittest.TestCase):
         self.assertFalse(diff, f"bridge_contract 镜像与桥端白名单不一致: {diff}")
 
     def test_each_payload_passes_bridge_validate(self):
-        for doc_type, payload in golden_payloads().items():
+        for doc_type, payload in load_golden().items():
             with self.subTest(doc_type=doc_type):
                 result = _BRIDGE["validate"][doc_type](payload, (BOOK,))
                 self.assertTrue(result.ok, f"{result.error_code}: {result.detail}")
 
     def test_bridge_rejects_the_buddhist_date_we_used_to_send(self):
         # 反证:真桥层不是"喂什么都绿"。P2-B 那刀原样重放一次。
-        payload = {**golden_payloads()["ar_receipt"], "receipt_date": "690115"}
+        payload = {**load_golden()["ar_receipt"], "receipt_date": "690115"}
         result = _BRIDGE["validate"]["ar_receipt"](payload, (BOOK,))
         self.assertFalse(result.ok)
         self.assertEqual(result.error_code, "INVALID_DOC_DATE")

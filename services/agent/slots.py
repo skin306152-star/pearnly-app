@@ -33,7 +33,7 @@ def _texts(user_text: str, history: Optional[list]) -> str:
 
 
 def _as_number(text: str) -> Optional[Decimal]:
-    """"10,700" / "฿10700" / "3%" → Decimal;不是纯数字一律 None(走原字面接地)。"""
+    """排版剥干净后转 Decimal:「10,700」「฿10700」「3%」都认;不是纯数字一律 None。"""
     cleaned = (text or "").translate(_NUM_NOISE)
     if not cleaned:
         return None

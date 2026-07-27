@@ -86,7 +86,7 @@ class SectionEmptyHtmlTests(unittest.TestCase):
             ));
             """)
         self.assertIn("a&lt;b", out)
-        self.assertNotIn('<b', out.replace("&lt;b", ""))
+        self.assertNotIn("<b", out.replace("&lt;b", ""))
 
     def test_block_empty_can_name_a_destination_and_link_to_it(self):
         """缺口 3:审核/交付包的无工单空态得点名去哪 + 给直达按钮,不能只留一句话。"""
@@ -185,7 +185,7 @@ class EmptyI18nShardTests(unittest.TestCase):
                 "ai-client-wo-render.js",
                 "ai-recon-render.js",
                 "ai-shadow-render.js",
-            "ai-financials-render.js",
+                "ai-financials-render.js",
             )
         )
         referenced = {k for k in re.findall(r"\bemp_[a-z0-9_]+", text) if not k.endswith("_")}

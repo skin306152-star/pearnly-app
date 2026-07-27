@@ -65,7 +65,11 @@ test.describe('A-2 · 换过眼睛的钱数在审核队列里的呈现', () => {
         expect(narrative).toContain('4069.05');
         expect(narrative).toContain('62198.40');
         // 「自洽」不等于「读对」这层意思必须写在脸上,否则会计以为系统验过了。
-        expect(narrative).toContain('第二个模型');
+        // 这两句是本例守的意图,故意逐字写死,不从词典取 —— 从词典取就成了同义反复,
+        // 哪天这层意思被改没了也照样绿。措辞本身归 tests/unit/test_ui_copy_register.py
+        // 的语域闸管(内部黑话不许上屏),这里只管意思还在不在。
+        expect(narrative).toContain('只验过算术');
+        expect(narrative).toContain('请照原图核这三个数');
         expect(narrative).not.toContain('verdict_');
 
         const text = await item.innerText();

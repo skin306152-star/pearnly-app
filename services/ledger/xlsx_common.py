@@ -22,6 +22,7 @@ VAT_DENOMINATOR = 107
 
 TITLE_ROW = 1
 BANNER_ROW = 2
+HINT_ROW = 3
 HEADER_ROW = 4
 FIRST_DATA_ROW = HEADER_ROW + 1
 
@@ -55,6 +56,13 @@ def write_title(ws, text: str, *, banner: str = "") -> None:
         cell = ws.cell(row=BANNER_ROW, column=1, value=banner)
         cell.font = sty.Font(italic=True, color="9C4221")
         cell.alignment = sty.left()
+
+
+def write_hint(ws, text: str) -> None:
+    """表头之上的操作提示。放在冻结区之上,滚到表尾也还看得见 —— 提示要在她动手的地方。"""
+    cell = ws.cell(row=HINT_ROW, column=1, value=text)
+    cell.font = sty.Font(bold=True, color="2C5282")
+    cell.alignment = sty.left()
 
 
 def write_header(

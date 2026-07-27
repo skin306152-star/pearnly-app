@@ -78,10 +78,14 @@ def write_journal_sheet(
         row += 1
 
     last = max(row - 1, xc.FIRST_DATA_ROW)
-    xc.text_cell(ws, row, COL_MEMO, _TOTAL_LABEL, align=sty.right())
+    # 合计行绝不能落进自己 SUM 的区间:全批都进待判时 legs 为空,合计就写在第一数据行上,
+    # 成了 =SUM(E5:E5) 自己加自己 —— Excel/WPS 一打开弹循环引用警告、两格显示 0,会计的
+    # 第一反应是「这文件坏了」。空批时把合计往下挪一行,区间里留那一行空的。
+    total_row = max(row, last + 1)
+    xc.text_cell(ws, total_row, COL_MEMO, _TOTAL_LABEL, align=sty.right())
     for col, letter in ((COL_DEBIT, "E"), (COL_CREDIT, "F")):
-        xc.money_cell(ws, row, col, f"=SUM({letter}{xc.FIRST_DATA_ROW}:{letter}{last})")
-    xc.bold_row(ws, row, (COL_MEMO, COL_DEBIT, COL_CREDIT))
+        xc.money_cell(ws, total_row, col, f"=SUM({letter}{xc.FIRST_DATA_ROW}:{letter}{last})")
+    xc.bold_row(ws, total_row, (COL_MEMO, COL_DEBIT, COL_CREDIT))
 
     return JournalRefs(
         sheet=SHEET_JOURNAL,

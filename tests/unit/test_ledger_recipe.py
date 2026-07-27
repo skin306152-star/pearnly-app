@@ -1,31 +1,33 @@
 # -*- coding: utf-8 -*-
-"""销售票四表账簿配方 —— 拿金标那三张 Ocha 小票的真数据当尺子。
-
-金标(Sister Makeup 2569-05)：
-  02000138 合计 489.00(内含 VAT 31.99 / 净 457.01)
-  02000139 合计 470.00(30.75 / 439.25)
-  02000143 合计 2,690.00(175.98 / 2,514.02)
-  合计 3,649.00 / VAT 238.72 / 净额 3,410.28
+"""销售票四表账簿配方 —— 拿金标那三张 Ocha 小票的真数据当尺子(金标见 _ledger_golden)。
 
 金标有三处**故意不照抄**,这里逐条守着:
   ① 科目码:金标 1010=银行 / 2010=销项税,本仓 1010 是现金、2010 是应付账款 → 必须 1020 / 2030
   ② 跨表引用:金标用绝对单元格,删行即 #REF! → 必须按票号 SUMIF
   ③ 日期:金标 02000139 取的是 Time in(同月无害,跨月会挪错申报期)→ 必须取 Time out
+
+表里公式算出来的数与权威值逐格对,在 test_ledger_workbook_math.py。
 """
 
-import io
 import re
 import unittest
 from decimal import Decimal
 
-from openpyxl import load_workbook
-
 from services.ledger import accounts as acct
-from services.ledger.models import (
+from services.ledger import fields as fld
+from services.ledger.doc_date import (
+    DATE_FROM_PRINTED,
+    DATE_FROM_TIME_OUT,
     REASON_CROSS_MONTH,
+    REASON_NO_DATE,
+)
+from services.ledger.models import (
+    REASON_DUPLICATE_INVOICE,
+    REASON_NO_INVOICE_NUMBER,
     REASON_NO_SETTLEMENT,
     SETTLE_BANK,
     SETTLE_CASH,
+    parse_sales_doc,
     parse_sales_docs,
 )
 from services.ledger.recipes import sales_books
@@ -35,77 +37,21 @@ from services.ledger.sheets.journal import SHEET_JOURNAL
 from services.ledger.sheets.ledger import SHEET_LEDGER
 from services.ledger.sheets.pending import SHEET_PENDING
 from services.ledger.sheets.trial_balance import SHEET_TRIAL_BALANCE
+from tests.unit._ledger_golden import (
+    GOLDEN_DOC_TOTALS,
+    GOLDEN_GROSS,
+    GOLDEN_LINES,
+    GOLDEN_NET,
+    GOLDEN_SESSION_RAW,
+    GOLDEN_VAT,
+    build_golden,
+    formulas,
+    golden_records,
+    load,
+    record,
+)
 
 D = Decimal
-
-GOLDEN_LINES = {
-    "02000138": [("Cool Betty Inliner", 1, 290), ("Eyelash Curler", 1, 120), ("Tweezers", 1, 79)],
-    "02000139": [("Clinicare", 1, 470)],
-    "02000143": [
-        ("SM powder(01)", 1, 390),
-        ("SM powder(02)", 1, 390),
-        ("Content Lens", 1, 150),
-        ("Case Contact Lens", 2, 100),
-        ("Earring", 1, 120),
-        ("Giffarine Foundation 04", 1, 200),
-        ("Giffarine Foundation 05", 1, 200),
-        ("Foundation Cool Betty", 1, 390),
-        ("Giffarine FS32", 1, 300),
-        ("Focallure Eye base", 1, 150),
-        ("Pallets", 1, 300),
-    ],
-}
-GOLDEN_DOC_TOTALS = {
-    "02000138": (D("489.00"), D("31.99"), D("457.01")),
-    "02000139": (D("470.00"), D("30.75"), D("439.25")),
-    "02000143": (D("2690.00"), D("175.98"), D("2514.02")),
-}
-GOLDEN_GROSS, GOLDEN_VAT, GOLDEN_NET = D("3649.00"), D("238.72"), D("3410.28")
-
-
-def _items(invoice):
-    return [{"name": n, "qty": str(q), "subtotal": str(a)} for n, q, a in GOLDEN_LINES[invoice]]
-
-
-def _record(invoice, *, dates, payment="transfer", **extra):
-    fields = {
-        "invoice_number": invoice,
-        "payment_method": payment,
-        "buyer_name": "ลูกค้าเงินสด",
-        "items": _items(invoice),
-    }
-    fields.update(dates)
-    fields.update(extra)
-    return {"history_id": f"h-{invoice}", "merged_fields": fields}
-
-
-def golden_records():
-    """佛历票面日期。02000139 只有 Time in/out —— 口径钉的就是这张票该取 out。"""
-    return [
-        _record("02000138", dates={"date": "27/05/2569"}),
-        _record("02000139", dates={"time_in": "27/05/2569", "time_out": "28/05/2569"}),
-        _record("02000143", dates={"date": "28/05/2569"}),
-    ]
-
-
-def build_golden(**kwargs):
-    docs = parse_sales_docs(golden_records())
-    return docs, sales_books.build(docs, title="Sister Makeup", period_label="2569-05", **kwargs)
-
-
-def load(result):
-    return load_workbook(io.BytesIO(result.content))
-
-
-def formulas(wb):
-    """(sheet, 坐标, 公式) 全集 —— 公式策略的断言都扫这一份。"""
-    out = []
-    for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            for cell in row:
-                if isinstance(cell.value, str) and cell.value.startswith("="):
-                    out.append((ws.title, cell.coordinate, cell.value))
-    return out
 
 
 class GoldenNumbersTests(unittest.TestCase):
@@ -172,8 +118,11 @@ class GoldenNumbersTests(unittest.TestCase):
         by_invoice = {d.invoice_number: d for d in self.docs}
         self.assertEqual(by_invoice["02000138"].doc_date.isoformat(), "2026-05-27")
         self.assertEqual(by_invoice["02000143"].doc_date.isoformat(), "2026-05-28")
-        # 金标这张取的是 Time in(27),口径钉的是 Time out —— 这里必须与金标不同。
-        self.assertEqual(by_invoice["02000139"].doc_date.isoformat(), "2026-05-28")
+        # 02000139 喂的是上游真会给的形状:date=模型挑的那个时刻(27,即 Time in),
+        # date_raw=票面原样。口径钉的是 Time out,所以必须盖过 date 那个 27。
+        session = by_invoice["02000139"]
+        self.assertEqual(session.doc_date.isoformat(), "2026-05-28")
+        self.assertEqual(session.date_source, DATE_FROM_TIME_OUT)
 
 
 class AccountCodeTests(unittest.TestCase):
@@ -241,9 +190,7 @@ class PaymentMethodTests(unittest.TestCase):
 
     def _debit_account(self, payment):
         """借方那一腿挂的科目 —— 日记账第一行就是它(三腿顺序固定:借收款 / 贷收入 / 贷税)。"""
-        docs = parse_sales_docs(
-            [_record("02000138", dates={"date": "27/05/2569"}, payment=payment)]
-        )
+        docs = parse_sales_docs([record("02000138", dates={"date": "27/05/2569"}, payment=payment)])
         ws = load(sales_books.build(docs, title="SM", period_label="2569-05"))[SHEET_JOURNAL]
         self.assertIsNotNone(ws.cell(row=5, column=5).value, "第一腿必须落在借方")
         return ws.cell(row=5, column=4).value
@@ -257,18 +204,23 @@ class PaymentMethodTests(unittest.TestCase):
         self.assertEqual(self._debit_account("เงินสด"), "1010 เงินสด")
 
     def test_settlement_recorded_on_document_summary(self):
-        docs = parse_sales_docs([_record("02000139", dates={"date": "27/05/2569"}, payment="cash")])
+        docs = parse_sales_docs([record("02000139", dates={"date": "27/05/2569"}, payment="cash")])
         result = sales_books.build(docs, title="SM", period_label="2569-05")
         self.assertEqual(result.documents[0]["settlement"], SETTLE_CASH)
         self.assertEqual(parse_sales_docs(golden_records())[0].settlement, SETTLE_BANK)
 
 
 class PendingTests(unittest.TestCase):
-    """待判:跨月场次、读不出付款方式的票不入账,但要看得见。"""
+    """待判:跨月场次、读不出付款方式、票号缺失或撞车的票不入账,但要看得见。"""
 
     def test_cross_month_session_goes_pending(self):
         docs = parse_sales_docs(
-            [_record("02000139", dates={"time_in": "30/04/2569", "time_out": "01/05/2569"})]
+            [
+                record(
+                    "02000139",
+                    dates={"date_raw": "Time In 30/04/2569 22:40 Time Out 01/05/2569 00:20"},
+                )
+            ]
         )
         self.assertEqual(docs[0].pending_reason, REASON_CROSS_MONTH)
         result = sales_books.build(docs, title="SM", period_label="2569-05")
@@ -279,10 +231,44 @@ class PendingTests(unittest.TestCase):
         self.assertIn("ข้ามเดือน", str(ws["F5"].value))
 
     def test_unreadable_payment_method_goes_pending(self):
-        docs = parse_sales_docs([_record("02000138", dates={"date": "27/05/2569"}, payment="card")])
+        docs = parse_sales_docs([record("02000138", dates={"date": "27/05/2569"}, payment="card")])
         self.assertEqual(docs[0].pending_reason, REASON_NO_SETTLEMENT)
         result = sales_books.build(docs, title="SM", period_label="2569-05")
         self.assertEqual(result.numbers["doc_count"], 0)
+
+    def test_missing_invoice_number_goes_pending(self):
+        """票号是全表的主键:空票号时 SUMIF 的 criteria 也空,三张派生表全显示 0。"""
+        rec = record("02000138", dates={"date": "27/05/2569"})
+        rec["merged_fields"]["invoice_number"] = ""
+        docs = parse_sales_docs([rec])
+        self.assertEqual(docs[0].pending_reason, REASON_NO_INVOICE_NUMBER)
+        result = sales_books.build(docs, title="SM", period_label="2569-05")
+        self.assertEqual(result.numbers["doc_count"], 0)
+        self.assertEqual(result.numbers["gross_total"], D("0"))
+
+    def test_duplicate_invoice_number_sends_both_to_pending(self):
+        """重号会让两张票的分录互相灌进对方,借贷仍相等 —— 自检格照样绿,必须拦在入账前。"""
+        first = record("02000138", dates={"date": "27/05/2569"})
+        second = record("02000143", dates={"date": "28/05/2569"})
+        second["merged_fields"]["invoice_number"] = "02000138"
+        second["history_id"] = "h-dup"
+        docs = parse_sales_docs([first, second])
+        self.assertEqual(len(docs), 2)
+        for doc in docs:
+            self.assertIn("02000138", doc.pending_reason)
+            self.assertEqual(doc.pending_reason, REASON_DUPLICATE_INVOICE.format(inv="02000138"))
+        result = sales_books.build(docs, title="SM", period_label="2569-05")
+        self.assertEqual(result.numbers["doc_count"], 0)
+        self.assertEqual(len(result.pending), 2)
+
+    def test_build_flags_duplicates_even_when_docs_were_not_parsed_together(self):
+        """docs 也可能是别处拼出来的 —— 守住工作簿的是 build,不能只靠解析侧。"""
+        fields = record("02000138", dates={"date": "27/05/2569"})["merged_fields"]
+        docs = [parse_sales_doc(fields), parse_sales_doc(fields)]
+        self.assertTrue(all(d.bookable for d in docs), "单张解析时看不见重号,这是前提")
+        result = sales_books.build(docs, title="SM", period_label="2569-05")
+        self.assertEqual(result.numbers["doc_count"], 0)
+        self.assertEqual(len(result.pending), 2)
 
     def test_pending_sheet_written_even_when_empty(self):
         _, result = build_golden()
@@ -362,6 +348,39 @@ class FormulaSafetyTests(unittest.TestCase):
         for value in amounts:
             self.assertIn("SUMIF(", value)
             self.assertIn(detail_sheet.SHEET_DETAIL, value)
+        # 三腿的口径各不相同,得分开验:销项税必须是内含 7/107,净额必须是毛额减它。
+        # 写成外加 7% 时借贷两侧一起变、仍然相等,试算平衡照样 Balanced —— 只扫「有没有
+        # SUMIF」看不出来。
+        gross_legs = [v for v in amounts if "ROUND(" not in v]
+        vat_legs = [v for v in amounts if v.startswith("=ROUND(")]
+        net_legs = [v for v in amounts if v.startswith("=SUMIF(") and "-ROUND(" in v]
+        self.assertEqual([len(gross_legs), len(vat_legs), len(net_legs)], [3, 3, 3])
+        for value in vat_legs + net_legs:
+            self.assertIn("*7/107,2)", value)
+
+    def test_detail_amount_column_is_source_data_not_a_formula(self):
+        """行金额写成 =ROUND(数量*单价,2):票面单价被四舍五入过时(3×33.33)表里算 99.99,
+        而回执和推 ERP 的是票面的 100.00 —— 「她看的那份 = 推的那份」在第一格就断。"""
+        docs = parse_sales_docs(
+            [
+                record(
+                    "02000139",
+                    dates={"date": "27/05/2569"},
+                    items=[{"name": "ค่าบริการ", "qty": "3", "price": "33.33", "subtotal": "100"}],
+                )
+            ]
+        )
+        result = sales_books.build(docs, title="SM", period_label="2569-05")
+        ws = load(result)[detail_sheet.SHEET_DETAIL]
+        amount = ws.cell(row=5, column=detail_sheet.COL_AMOUNT).value
+        self.assertNotIsInstance(amount, str, f"行金额不能是公式: {amount!r}")
+        self.assertEqual(D(str(amount)), D("100"))
+        self.assertEqual(ws.cell(row=5, column=detail_sheet.COL_PRICE).value, 33.33)
+        self.assertEqual(result.numbers["gross_total"], D("100"))
+
+    def test_add_row_hint_tells_her_where_to_put_a_missed_item(self):
+        ws = self.wb[detail_sheet.SHEET_DETAIL]
+        self.assertIn("แถวว่าง", str(ws.cell(row=3, column=1).value))
 
     def test_self_check_cell_is_labelled_advisory(self):
         ws = self.wb[SHEET_TRIAL_BALANCE]
@@ -377,39 +396,6 @@ class FormulaSafetyTests(unittest.TestCase):
         for name in (SHEET_JOURNAL, SHEET_LEDGER, SHEET_TRIAL_BALANCE):
             self.assertTrue(self.wb[name].protection.sheet, name)
         self.assertFalse(self.wb[detail_sheet.SHEET_DETAIL].protection.sheet)
-
-
-class DeleteRowsTests(unittest.TestCase):
-    """会计核对的标准动作:把核对无误的行删掉。删完不能炸,汇总仍要算得出来。"""
-
-    def setUp(self):
-        _docs, self.result = build_golden()
-        wb = load(self.result)
-        ws = wb[detail_sheet.SHEET_DETAIL]
-        ws.delete_rows(5, 3)  # 删掉 02000138 的三行(会计核对无误后的真实动作)
-        buf = io.BytesIO()
-        wb.save(buf)
-        self.wb = load_workbook(io.BytesIO(buf.getvalue()))
-
-    def test_no_ref_error_anywhere(self):
-        for _sheet, coord, formula in formulas(self.wb):
-            self.assertNotIn("#REF", formula, coord)
-
-    def test_remaining_documents_still_sum(self):
-        """按 SUMIF 的语义在剩余行上重算:02000138 归零,另外两张原样。"""
-        ws = self.wb[detail_sheet.SHEET_DETAIL]
-        rows = [
-            (ws.cell(row=r, column=1).value, ws.cell(row=r, column=6).value)
-            for r in range(5, ws.max_row + 1)
-            if ws.cell(row=r, column=1).value
-            and isinstance(ws.cell(row=r, column=6).value, (int, float))
-        ]
-        totals = {}
-        for invoice, amount in rows:
-            totals[invoice] = totals.get(invoice, D(0)) + D(str(amount))
-        self.assertNotIn("02000138", totals)
-        self.assertEqual(totals["02000139"], D("470"))
-        self.assertEqual(totals["02000143"], D("2690"))
 
 
 class RegistryTests(unittest.TestCase):

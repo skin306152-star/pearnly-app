@@ -18,7 +18,7 @@ from openpyxl import Workbook
 
 from services.ledger import entries
 from services.ledger.accounts import ChartResolution, resolve_chart
-from services.ledger.models import SalesDoc
+from services.ledger.models import SalesDoc, flag_duplicate_invoice_numbers
 from services.ledger.registry import RecipeResult, RecipeSpec, register
 from services.ledger.sheets.detail import SHEET_DETAIL, write_detail_sheet
 from services.ledger.sheets.journal import SHEET_JOURNAL, write_journal_sheet
@@ -105,7 +105,9 @@ def build(
 ) -> RecipeResult:
     """一批销售票 → 四表账簿工作簿。chart 省略时按「未接账套」退回通用科目码并在表头标注。"""
     chart = chart or resolve_chart()
-    docs = tuple(docs or ())
+    # 票号是这份工作簿的主键(每一格都 SUMIF 回它),重号会让两张票互灌金额且借贷仍相等。
+    # 解析侧已经查过一遍,这里再查一遍是因为 docs 也可能是别处拼出来的 —— 守的是工作簿。
+    docs = flag_duplicate_invoice_numbers(tuple(docs or ()))
     booked = tuple(d for d in docs if d.bookable)
     pending = tuple(d for d in docs if not d.bookable)
 

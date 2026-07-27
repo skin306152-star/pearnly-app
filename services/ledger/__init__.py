@@ -17,12 +17,29 @@
 """
 
 from services.ledger.accounts import AccountRef, ChartResolution, resolve_chart
-from services.ledger.models import SalesDoc, SalesLine, parse_sales_docs
+from services.ledger.doc_date import REASON_CROSS_MONTH, REASON_NO_DATE
+from services.ledger.models import (
+    REASON_DUPLICATE_INVOICE,
+    REASON_NO_INVOICE_NUMBER,
+    REASON_NO_LINES,
+    REASON_NO_SETTLEMENT,
+    REASON_TOTAL_MISMATCH,
+    SalesDoc,
+    SalesLine,
+    parse_sales_docs,
+)
 from services.ledger.registry import RecipeResult, RecipeSpec, get_recipe, list_recipes
 
 __all__ = [
     "AccountRef",
     "ChartResolution",
+    "REASON_CROSS_MONTH",
+    "REASON_DUPLICATE_INVOICE",
+    "REASON_NO_DATE",
+    "REASON_NO_INVOICE_NUMBER",
+    "REASON_NO_LINES",
+    "REASON_NO_SETTLEMENT",
+    "REASON_TOTAL_MISMATCH",
     "RecipeResult",
     "RecipeSpec",
     "SalesDoc",

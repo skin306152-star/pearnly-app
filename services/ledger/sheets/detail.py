@@ -5,6 +5,9 @@
 所以这一张表是唯一可编辑的数据表 —— 会计改一个数,VAT/净额/分录/分类账/试算平衡当场
 全动,这才是会计用 Excel 的方式。
 
+正因为它是源头,「จำนวนเงิน」这一列只写票面读到的那个数,一格公式都不写:那一列写成
+数量×单价,表里算出来的就和我们推给 ERP 的对不上(票面单价被四舍五入过时必然对不上)。
+
 同类工作簿的金标在这里把 VAT 写成了死值,链条断在中间:改了行金额,小计动了、VAT 不动,
 试算平衡照样显示「Balanced」。那种自检比没有自检更坏。这里 VAT 一律写成公式。
 """
@@ -13,8 +16,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Sequence, Tuple
-
-from openpyxl.utils import get_column_letter
 
 from services.excel import xlsx_style as sty
 from services.ledger import xlsx_common as xc
@@ -53,6 +54,16 @@ _SUMMARY_HEADERS: Tuple[str, ...] = (
     "รายได้สุทธิ (ไม่รวม VAT)",
 )
 _TOTAL_LABEL = "รวมทั้งสิ้น"
+
+# 明细区末尾预留的空行:会计核对时补一件漏识别的商品,和删行一样是标准动作,而写在
+# SUMIF 区间之外的行 Excel 不会自动扩边界 —— 那 300 บาท 在三张派生表里静默蒸发,借贷
+# 两侧同时少一笔,自检格仍然绿。留缓冲行 + 表头写清楚往哪儿加,比事后查这种差额便宜。
+SPARE_ROWS = 20
+_ADD_ROW_HINT = (
+    "เพิ่มรายการที่ตกหล่นในแถวว่างสีอ่อนท้ายตาราง (สำรองไว้ {n} แถว) · "
+    "อย่าเพิ่มใต้บล็อกสรุป มิฉะนั้นยอดจะไม่ถูกนับ "
+    "(补漏的商品行请写在表尾浅色空行内,写在汇总块下面不计入)"
+)
 
 # 付款方式印在**每一行**而不是只印首行:会计核对时会删掉核对无误的行,只印首行的话
 # 删掉第一行整张票就看不出是现金还是转账了。
@@ -98,20 +109,29 @@ def _write_line(ws, row: int, doc: SalesDoc, line, payment: str) -> None:
     qty = ws.cell(row=row, column=COL_QTY, value=line.qty)
     sty.style_cell(qty, align=sty.right(), fmt=sty.QTY_FMT)
     xc.money_cell(ws, row, COL_PRICE, line.unit_price)
-    # 有单价就写公式,改数量当场生效;没单价时行金额本身就是源数据 —— 写公式等于凭空
-    # 造一个我们没从票面读到的单价出来。
-    amount = line.amount
-    if line.unit_price is not None:
-        amount = f"=ROUND({get_column_letter(COL_QTY)}{row}*{get_column_letter(COL_PRICE)}{row},2)"
-    xc.money_cell(ws, row, COL_AMOUNT, amount)
+    # 行金额写票面那个数,不写 =ROUND(数量*单价,2)。泰国小票印的单价几乎都是四舍五入过的
+    # (数量 3 · 单价 33.33 · 票面行金额 100.00),写成乘积表里就算出 99.99,而回执和推给
+    # ERP 的是 100.00 —— 「她看的那份 = 推的那份」在最靠前的一格就断了。这一列本来就是
+    # 源数据:会计要改数量,直接改这一格。
+    xc.money_cell(ws, row, COL_AMOUNT, line.amount)
     xc.text_cell(ws, row, COL_PAYMENT, payment, align=sty.center())
     xc.text_cell(ws, row, COL_CUSTOMER, doc.customer_name)
     xc.text_cell(ws, row, COL_ROW_KEY, doc.row_key)
 
 
+def _mark_spare_rows(ws, first_spare: int) -> int:
+    """给缓冲行铺浅色底 —— 会计一眼看得出「能往这儿加」。返回明细区最后一行。"""
+    fill = sty.fill_reused()
+    for row in range(first_spare, first_spare + SPARE_ROWS):
+        for col in range(1, COL_ROW_KEY + 1):
+            sty.style_cell(ws.cell(row=row, column=col), fill=fill)
+    return first_spare + SPARE_ROWS - 1
+
+
 def write_detail_sheet(ws, docs: Sequence[SalesDoc], *, title: str, banner: str) -> DetailRefs:
     """写明细表,返回下游取数用的跨表区间引用。"""
     xc.write_title(ws, f"{title} · {SHEET_DETAIL} / Tax Invoice (ABB)", banner=banner)
+    xc.write_hint(ws, _ADD_ROW_HINT.format(n=SPARE_ROWS))
     xc.write_header(ws, _HEADERS, _WIDTHS)
     xc.hide_column(ws, COL_ROW_KEY)
 
@@ -122,7 +142,7 @@ def write_detail_sheet(ws, docs: Sequence[SalesDoc], *, title: str, banner: str)
             _write_line(ws, row, doc, line, payment)
             row += 1
 
-    last_data = max(row - 1, xc.FIRST_DATA_ROW)
+    last_data = _mark_spare_rows(ws, row)
     _write_summary_block(ws, docs, _refs(None, last_data), start_row=last_data + 2)
     return _refs(SHEET_DETAIL, last_data)
 

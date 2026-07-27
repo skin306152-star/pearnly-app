@@ -39,6 +39,8 @@ _MAX_UTTERANCE = 2000
 _MAX_HISTORY_TURNS = 6
 _MAX_ARG_LEN = 200
 _TIMEOUT_S = 15
+# manifest 进 prompt 的件数上限:单条消息最多 20 件,全列进去会把 _MAX_UTTERANCE 那套预算撑爆。
+_MAX_MANIFEST_FILES = 20
 
 _PROMPT_TEMPLATE = """你是泰国代账事务所的智能管家,坐在会计的工作台上。会计说一句话,你判断该用哪个工具,
 然后把工具名和参数交给系统去执行。你只负责听懂和挑工具——查数、算数、组织数字、要不要人批准
@@ -63,21 +65,50 @@ _PROMPT_TEMPLATE = """你是泰国代账事务所的智能管家,坐在会计的
 4. message 只在 tool 是 "out_of_scope" 时写,用会计说话的语言解释你为什么帮不上、能帮什么。
    选了工具时 message 留空字符串。
 5. 任何情况下都不要在 message 里写数字(金额、条数、家数、日期)——你没查过库,数字由系统填。
-6. 只输出一个 JSON 对象,不带任何其他文字。
-{history}
+6. 会计这一轮传了文件时,下面会列出「这一轮的附件」。你只判断她想拿这些文件做什么、该挑哪个
+   工具;【不要】判断文件是什么类型(系统已经用确定性规则认过并写在清单里),【不要】指定用
+   哪一个文件(系统按类型自己挑,挑不定会问她),清单以外的文件一律当不存在。
+   没有附件清单时,吃附件的工具一个都不许选。
+7. 只输出一个 JSON 对象,不带任何其他文字。
+{history}{attachments}
 会计说:{utterance}
 
 输出 JSON 形状:
 {{"tool": "...", "args": {{}}, "message": ""}}"""
 
 
-def build_prompt(utterance: str, history: Optional[list] = None) -> str:
-    """确定性拼 prompt(判卷与真调同源)。history 是最近几轮 [{role, text}],只作上下文。"""
+def build_prompt(
+    utterance: str, history: Optional[list] = None, attachments: Optional[list] = None
+) -> str:
+    """确定性拼 prompt(判卷与真调同源)。history 是最近几轮 [{role, text}],只作上下文;
+    attachments 是这一轮附件的 manifest。"""
     return _PROMPT_TEMPLATE.format(
         catalog=registry.catalog(),
         slot_hints=registry.slot_hints(),
         history=_history_block(history),
+        attachments=_attachment_block(attachments),
         utterance=utterance,
+    )
+
+
+def _attachment_block(attachments: Optional[list]) -> str:
+    """附件 manifest:只给文件名 + 已认出的类型 + 页数 + 大小。
+
+    绝不给字节、绝不给正文 —— 模型在这条路上的职责是「听懂她想干嘛」,认字与算账全在确定性
+    代码那边。给了内容它就会开始替系统判类型,而类型判错的代价是白花钱且结果全错。
+    """
+    lines = [
+        f"  - {a.get('name', '')}(系统认成:{a.get('kind') or 'unknown'}"
+        + (f" · {a['page_count']} 页" if a.get("page_count") else "")
+        + f" · {int(a.get('size_bytes') or 0) // 1024}KB)"
+        for a in (attachments or [])[:_MAX_MANIFEST_FILES]
+    ]
+    if not lines:
+        return ""
+    return (
+        "\n这一轮的附件(系统已用确定性规则认过,你不要重判类型、不要指定用哪个):\n"
+        + "\n".join(lines)
+        + "\n"
     )
 
 
@@ -163,11 +194,12 @@ def plan(
     tenant_id: Optional[str] = None,
     trace_id: Optional[str] = None,
     history: Optional[list] = None,
+    attachments: Optional[list] = None,
 ) -> dict:
     """一句话 → {degraded, reason, tool, args, message}。任何炸法收敛成 degraded,绝不上抛。"""
     from services.ai_gateway.attribution import reset_attribution, set_attribution
 
-    prompt = build_prompt((utterance or "")[:_MAX_UTTERANCE], history)
+    prompt = build_prompt((utterance or "")[:_MAX_UTTERANCE], history, attachments)
     token = set_attribution(TASK, tenant_id=tenant_id, trace_id=trace_id)
     try:
         outcome = ask_model(prompt, tenant_id=tenant_id, trace_id=trace_id)

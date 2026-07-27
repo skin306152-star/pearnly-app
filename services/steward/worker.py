@@ -72,7 +72,7 @@ def _tool_of(row: dict) -> str:
     return str((row.get("payload") or {}).get("tool") or "")
 
 
-def _build_context(payload: dict, tenant_id: str) -> Optional[ToolContext]:
+def _build_context(payload: dict, tenant_id: str, session_id: str = "") -> Optional[ToolContext]:
     """重建执行身份:user 按 id 现查(封号/权限变更即时生效,不拿入队时的旧快照),
     租户对不上一律不跑 —— 异步执行没有请求上下文,身份闸在这里补,绝不越权。"""
     from services.auth.user_lookup import find_user_by_id
@@ -90,6 +90,10 @@ def _build_context(payload: dict, tenant_id: str) -> Optional[ToolContext]:
         user_id=user_id,
         allowed_client_ids=None if allowed is None else frozenset(int(i) for i in allowed),
         lang=str(payload.get("lang") or copy.DEFAULT_LANG),
+        # 附件的取盘钥匙是 (租户, 会话, id) 三元组:会话跟任务行走,id 跟 payload 走,
+        # 两个都齐了工具才拿得到那份料 —— 单给 id 取不出任何东西。
+        session_id=str(session_id or ""),
+        attachment_ids=tuple(str(i) for i in (payload.get("attachment_ids") or ())),
     )
 
 
@@ -101,7 +105,9 @@ async def _execute(row: dict) -> None:
     lang = _lang_of(row)
     timeout_s = float(row.get("timeout_s") or store.default_timeout_s())
 
-    ctx = await asyncio.to_thread(_build_context, payload, str(row["tenant_id"]))
+    ctx = await asyncio.to_thread(
+        _build_context, payload, str(row["tenant_id"]), str(row.get("session_id") or "")
+    )
     if ctx is None:
         await asyncio.to_thread(
             _finalize_failure, row, ERR_CONTEXT_LOST, copy.fail_reason(ERR_CONTEXT_LOST, lang)

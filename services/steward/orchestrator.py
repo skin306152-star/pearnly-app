@@ -16,6 +16,10 @@ task_id;工具真跑在 worker(认领/超时/失联收口都在那边)。追问(
 编造的进 rejected 绝不流到执行);期间线索复用 front_desk.interpret.parse_period_hint 解析,
 再经 obligation_engine.be_period_from_ce 折成佛历账期 —— 解不出就追问,绝不猜一个期。
 接地留在请求侧:追问要趁用户还在,入队后才发现缺参就只能让任务失败。
+
+万能口(F1)在这一层多两条不过模型的路:①会计一个字没打、只把料拖进来 → 确定性回执卡;
+②会计在卡上点了一个闭集按钮 → 直接派活。歧义已经被一次点击解决,再过一遍 planner 就是
+把解决掉的问题重新引进来。裁决在 attach_turn(纯函数),落库仍只在本层。
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ import logging
 from typing import Optional
 
 from services.agent.contracts import AgentAction, AgentContext
-from services.steward import budget, copy, planner, registry, store
+from services.steward import attach_turn, attachments, budget, copy, planner, registry, store
 from services.steward.registry import ToolContext
 
 logger = logging.getLogger(__name__)
@@ -32,10 +36,19 @@ logger = logging.getLogger(__name__)
 _HISTORY_TURNS = 8
 
 
-def handle_message(ctx: ToolContext, *, session_id: str, text: str) -> dict:
-    """一轮对话。返回 {message_id, reply, task_id?}(task_id 只在挑中工具时有)。"""
+def handle_message(
+    ctx: ToolContext,
+    *,
+    session_id: str,
+    text: str,
+    attachment_ids: tuple = (),
+    action: Optional[dict] = None,
+) -> dict:
+    """一轮对话。返回 {message_id, reply, task_id?}(task_id 只在挑中工具或出卡时有)。"""
     from core import db
 
+    ids = [str(i) for i in (attachment_ids or ())]
+    rows = _attachment_rows(ctx, session_id, ids)
     with db.get_cursor(commit=True) as cur:
         user_msg = store.add_message(
             cur,
@@ -44,19 +57,39 @@ def handle_message(ctx: ToolContext, *, session_id: str, text: str) -> dict:
             role=store.ROLE_USER,
             text=text,
         )
-        store.set_title_if_empty(cur, tenant_id=ctx.tenant_id, session_id=session_id, title=text)
+        if ids:
+            attachments.attach_to_message(
+                cur,
+                tenant_id=ctx.tenant_id,
+                session_id=session_id,
+                ids=ids,
+                message_id=user_msg["id"],
+            )
+        store.set_title_if_empty(
+            cur, tenant_id=ctx.tenant_id, session_id=session_id, title=_title(text, rows)
+        )
         store.touch_session(cur, tenant_id=ctx.tenant_id, session_id=session_id)
         history = [
             store.public_message(m)
             for m in store.list_messages(cur, tenant_id=ctx.tenant_id, session_id=session_id)
         ][-_HISTORY_TURNS:]
 
-    # 成本硬封顶(B3):模型调用前占坑、回来结算 —— 超限的轮次一次模型都不调,人话拒。
-    gate = budget.reserve(tenant_id=ctx.tenant_id, session_id=session_id)
-    if gate["allowed"]:
+    lang = copy.pick_lang(text, ctx.lang)
+    if action or (not text and rows):
+        # 不过模型的两条路:成本封顶也用不上(一次模型都不调),按钮/纯文件手势当场裁决。
+        outcome = _attachment_outcome(
+            ctx,
+            rows,
+            tool=(action or {}).get("tool"),
+            confirm_spend=bool((action or {}).get("confirm_spend")),
+            lang=lang,
+            session_id=session_id,
+        )
+    elif (gate := budget.reserve(tenant_id=ctx.tenant_id, session_id=session_id))["allowed"]:
+        # 成本硬封顶(B3):模型调用前占坑、回来结算 —— 超限的轮次一次模型都不调,人话拒。
         outcome = None
         try:
-            outcome = _turn(ctx, text=text, history=history, session_id=session_id)
+            outcome = _turn(ctx, text=text, history=history, session_id=session_id, rows=rows)
         finally:
             budget.settle(
                 tenant_id=ctx.tenant_id,
@@ -64,7 +97,7 @@ def handle_message(ctx: ToolContext, *, session_id: str, text: str) -> dict:
                 cost_thb=(outcome or {}).get("cost_thb"),
             )
     else:
-        outcome = _budget_blocked(gate, lang=copy.pick_lang(text, ctx.lang))
+        outcome = _budget_blocked(gate, lang=lang)
     with db.get_cursor(commit=True) as cur:
         steward_msg = store.add_message(
             cur,
@@ -95,7 +128,37 @@ def handle_message(ctx: ToolContext, *, session_id: str, text: str) -> dict:
         out["task_status"] = outcome["task_status"]
     if outcome.get("budget"):
         out["budget"] = outcome["budget"]
+    if rows:
+        out["attachments"] = [attachments.public_attachment(r) for r in rows]
     return out
+
+
+def _attachment_rows(ctx: ToolContext, session_id: str, ids: list) -> list[dict]:
+    """本轮附件行。id 只按 (租户, 会话) 取 —— 别的会话的 id 拼进来一行都取不到。"""
+    from core import db
+
+    if not ids:
+        return []
+    with db.get_cursor() as cur:
+        return attachments.list_by_ids(cur, tenant_id=ctx.tenant_id, session_id=session_id, ids=ids)
+
+
+def _title(text: str, rows: list[dict]) -> str:
+    """会话标题:有话用话,纯文件手势用第一份文件名(留个空标题在列表里没法认)。"""
+    return text or (rows[0].get("original_name") or "" if rows else "")
+
+
+def _manifest(rows: list[dict]) -> list[dict]:
+    """进 planner 的附件清单:文件名 + 已认出的类型 + 页数 + 大小。绝不含字节、绝不含正文。"""
+    return [
+        {
+            "name": r.get("original_name") or "",
+            "kind": r.get("kind") or "",
+            "page_count": (r.get("detect") or {}).get("page_count"),
+            "size_bytes": r.get("size_bytes") or 0,
+        }
+        for r in rows
+    ]
 
 
 def _budget_blocked(gate: dict, *, lang: str) -> dict:
@@ -109,18 +172,36 @@ def _budget_blocked(gate: dict, *, lang: str) -> dict:
     return out
 
 
-def _turn(ctx: ToolContext, *, text: str, history: list, session_id: str) -> dict:
+def _turn(
+    ctx: ToolContext, *, text: str, history: list, session_id: str, rows: Optional[list] = None
+) -> dict:
     """挑工具 → 接地 → 执行。不碰会话表,便于单测(DB 只在 handle_message 那两段)。
     cost_thb 是本轮模型真实花费,随结果出去给 handle_message 结算预算占坑。"""
     lang = copy.pick_lang(text, ctx.lang)
-    plan = planner.plan(text, tenant_id=ctx.tenant_id, trace_id=session_id, history=history)
-    out = _turn_outcome(ctx, plan, lang=lang, text=text, history=history, session_id=session_id)
+    files = rows or []
+    plan = planner.plan(
+        text,
+        tenant_id=ctx.tenant_id,
+        trace_id=session_id,
+        history=history,
+        attachments=_manifest(files),
+    )
+    out = _turn_outcome(
+        ctx, plan, lang=lang, text=text, history=history, session_id=session_id, rows=files
+    )
     out["cost_thb"] = plan.get("cost_thb")
     return out
 
 
 def _turn_outcome(
-    ctx: ToolContext, plan: dict, *, lang: str, text: str, history: list, session_id: str
+    ctx: ToolContext,
+    plan: dict,
+    *,
+    lang: str,
+    text: str,
+    history: list,
+    session_id: str,
+    rows: Optional[list] = None,
 ) -> dict:
     if plan["degraded"]:
         return _talk_only(
@@ -130,10 +211,77 @@ def _turn_outcome(
         return _talk_only(plan["message"] or copy.out_of_scope(lang), [])
 
     tool = plan["tool"]
+    if attach_turn.is_attachment_tool(tool):
+        # 吃附件的工具不走 slots 接地:它的参数是文件,而文件根本不经过模型(见 ToolContext
+        # 顶注)。哪一份由 attach_turn 按确定性判据挑,挑不定就出卡让人点。
+        return _attachment_outcome(
+            ctx, rows or [], tool=tool, confirm_spend=False, lang=lang, session_id=session_id
+        )
     args, ask_field = _ground(ctx, tool, plan["args"], text=text, history=history)
     if ask_field:
         return _waiting_user(ctx, tool, lang, ask=copy.ask(ask_field, lang), session_id=session_id)
     return _enqueue(ctx, tool, args, lang, session_id=session_id)
+
+
+def _attachment_outcome(
+    ctx: ToolContext,
+    rows: list,
+    *,
+    tool: Optional[str],
+    confirm_spend: bool,
+    lang: str,
+    session_id: str,
+) -> dict:
+    """料这一轮该怎么处理:派活 / 出卡 / 诚实说派不出。闭集外的工具名一律当没这回事。"""
+    from services.steward import tools
+
+    if tool is not None and not attach_turn.is_attachment_tool(tool):
+        return _talk_only(
+            copy.out_of_scope(lang),
+            [{"tool": tool, "ok": False, "error": tools.ERR_UNKNOWN_TOOL}],
+        )
+    decision = attach_turn.decide(rows, tool=tool, confirm_spend=confirm_spend, lang=lang)
+    if decision.error_code:
+        return _talk_only(
+            copy.error(decision.error_code, decision.error_data, lang),
+            [{"tool": tool, "ok": False, "error": decision.error_code}],
+        )
+    if decision.card:
+        return _card(ctx, decision.card, lang, session_id=session_id, tool=tool)
+    return _enqueue(
+        ctx,
+        decision.tool,
+        {},
+        lang,
+        session_id=session_id,
+        attachment_ids=decision.attachment_ids,
+    )
+
+
+def _card(ctx: ToolContext, card: dict, lang: str, *, session_id: str, tool: Optional[str]) -> dict:
+    """确定性回执卡落一条 waiting_user 任务行 —— 刷新页面卡还在,不是只活在这一次响应里。
+    措辞与状态都不冒领「开跑了」:料收了、认过了,活还没派。"""
+    from core import db
+
+    steps = copy.receipt_steps(lang)
+    with db.get_cursor(commit=True) as cur:
+        task = store.create_task(
+            cur,
+            tenant_id=ctx.tenant_id,
+            session_id=session_id,
+            title=card["title"],
+            status=store.TASK_WAITING_USER,
+            steps=steps,
+            artifacts=card["artifacts"],
+        )
+    return {
+        "reply": card["reply"],
+        "task_id": str(task["id"]),
+        "task_status": store.TASK_WAITING_USER,
+        "steps": steps,
+        "artifacts": card["artifacts"],
+        "tool_trace": [{"tool": tool, "ok": None, "error": None}],
+    }
 
 
 def _ground(
@@ -172,7 +320,15 @@ def _to_be_period(hint: str, ctx: ToolContext) -> Optional[str]:
     return obligation_engine.be_period_from_ce(parse_period_hint(hint, ctx.today))
 
 
-def _enqueue(ctx: ToolContext, tool: str, args: dict, lang: str, *, session_id: str) -> dict:
+def _enqueue(
+    ctx: ToolContext,
+    tool: str,
+    args: dict,
+    lang: str,
+    *,
+    session_id: str,
+    attachment_ids: tuple = (),
+) -> dict:
     """接地过的活入队,立即应承。只读工具 status=running(worker_id 空 = 待认领);
     写/危险工具走 confirm-first:先跑工具自己的接地器(tools.prepare)把目标落实,再在同一
     事务里入队 + 铸授权卡(authz.open_request),任务停 waiting_user 等人批 —— 提交时已是
@@ -225,6 +381,9 @@ def _enqueue(ctx: ToolContext, tool: str, args: dict, lang: str, *, session_id: 
             if ctx.allowed_client_ids is None
             else sorted(int(i) for i in ctx.allowed_client_ids)
         ),
+        # 附件走 payload 不走 args:它不进授权卡指纹(指纹是「批的就是执行的」那一层,附件由
+        # 代码定不由人改),也不进 slots 接地闸(那道闸判的是「模型是不是编了一个值」)。
+        "attachment_ids": [str(i) for i in (attachment_ids or ())],
     }
     with db.get_cursor(commit=True) as cur:
         task = store.create_task(

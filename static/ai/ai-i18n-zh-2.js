@@ -482,7 +482,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     intake_excluded_failed: '改判失败，请重试。',
     intake_resume_continue: '继续上传',
     intake_resume_dismiss: '忽略',
-    intake_failed_batch_n: '{n} 件因网络问题未传成功',
+    intake_failed_batch_n: '共 {n} 件没传成功',
     intake_retry_failed: '重试失败的文件',
     // FD-0d · 总台(#/desk · 目标驱动前门)
     nav_desk: '总台',

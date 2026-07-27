@@ -75,8 +75,10 @@
         if (h === '/clients') return { name: 'clients' };
         // 报表中心(EN-clients · 侧栏「报表」转正):选客户+期间查报表包,独立顶层路由。
         if (h === '/reports') return { name: 'reports' };
-        // 设置(EN-clients · 侧栏「设置」转正):语言/账号/退出,独立顶层路由。
-        if (h === '/settings') return { name: 'settings' };
+        // 设置(EN-clients · 侧栏「设置」转正):语言/账号/退出 + 计费区,独立顶层路由。
+        // ?focus=billing 是失败态「去充值」出路的落点(ai-fail-render.js):把人送到设置页
+        // 还不够,得直接落在计费区——让用户读完文案再自己找入口就等于没给出路。
+        if (h === '/settings') return { name: 'settings', focus: split.query.focus || null };
         // 状态词典(B1 · 状态语言底座):15 类状态的活样例页,规范配套
         // docs/design-system/STATE-LANGUAGE.md。故意不进侧栏——是给装配新页面的人查的
         // 词典,不是日常业务入口,URL 直达即可。

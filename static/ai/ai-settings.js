@@ -82,6 +82,16 @@
             '</button>';
         // 计费区(B5 #16):余额/充值/记录自带四态与轮询,数据编排全在 AI.billing。
         AI.billing.mount(S.api, $('stBillingWrap'));
+        applyFocus();
+    }
+
+    // #/settings?focus=billing:失败态「去充值」深链的落点。滚一次就把 focus 消费掉,
+    // 免得之后切语言 reload 又莫名其妙往下跳。
+    function applyFocus() {
+        if (S.focus !== 'billing') return;
+        S.focus = null;
+        var el = $('stBillingWrap');
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
     }
 
     function loadMe() {
@@ -138,8 +148,14 @@
     }
 
     // opts.onLogout 由 ai.js 注入(清 token + 回到登录门面,同 AI.gate.mountInvited 先例)。
+    // opts.focus 来自路由 ?focus=(目前只有 'billing')。
     function mount(api, opts) {
-        S = { api: api, me: null, onLogout: (opts && opts.onLogout) || null };
+        S = {
+            api: api,
+            me: null,
+            focus: (opts && opts.focus) || null,
+            onLogout: (opts && opts.onLogout) || null,
+        };
         wireOnce();
         loadMe();
     }

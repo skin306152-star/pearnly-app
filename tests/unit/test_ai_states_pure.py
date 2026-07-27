@@ -218,7 +218,7 @@ class StatesRouteTests(unittest.TestCase):
             """)
         self.assertEqual(out[0], {"name": "states"})
         self.assertEqual(out[1], {"name": "states"})
-        self.assertEqual(out[2], {"name": "settings"})
+        self.assertEqual(out[2], {"name": "settings", "focus": None})
         # 未知路径仍落工作台默认,不被新路由前缀劫走。
         self.assertEqual(out[3], {"name": "dashboard", "sub": "matrix"})
 

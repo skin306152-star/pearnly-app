@@ -309,19 +309,34 @@
     }
 
     // 失败批横幅(网络级失败,非内容拒收):一键只重传这一批,不牵连已成功/尚未发出的批。
+    // 先说清为什么失败——光给「重传」的话,余额不足/登录过期这类重传一百次也不会好的失败
+    // 会把用户困在原地空转。多批各失败各的原因就逐条列,不拿第一条冒充全部。
     function failedBatchesHtml(batches) {
         if (!batches || !batches.length) return '';
-        var n = batches.reduce(function (s, b) {
-            return s + b.files.length;
-        }, 0);
+        var fr = root.AI.failRender;
+        var n = 0;
+        var seen = {};
+        var reasons = '';
+        var action = '';
+        batches.forEach(function (b) {
+            n += b.files.length;
+            var sig = String(b.code) + '|' + String(b.status);
+            if (seen[sig]) return;
+            seen[sig] = true;
+            reasons += fr.reasonHtml('fail_step_upload', b.code, b.status);
+            if (!action) action = fr.actionHtml(b.code, b.status);
+        });
         return (
             '<div class="panel needs-card"><div class="bd">' +
+            reasons +
             '<p class="needs-sub">' +
             esc(at('intake_failed_batch_n', { n: n })) +
             '</p>' +
-            '<button class="btn pri" data-action="ik-retry-failed">' +
+            '<div class="needs-paths"><button class="btn pri" data-action="ik-retry-failed">' +
             esc(at('intake_retry_failed')) +
-            '</button></div></div>'
+            '</button>' +
+            action +
+            '</div></div></div>'
         );
     }
 

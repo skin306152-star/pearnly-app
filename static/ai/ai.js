@@ -373,6 +373,7 @@
         if (route.name === 'settings') {
             restoreScroll(route);
             AI.settings.mount(api, {
+                focus: route.focus,
                 onLogout: function () {
                     expireSession();
                 },

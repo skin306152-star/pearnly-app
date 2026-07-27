@@ -511,7 +511,7 @@ Object.assign(window.__AI_I18N_TH__, {
     intake_excluded_failed: 'เปลี่ยนประเภทไม่สำเร็จ กรุณาลองใหม่',
     intake_resume_continue: 'อัปโหลดต่อ',
     intake_resume_dismiss: 'ปิด',
-    intake_failed_batch_n: '{n} ไฟล์ล้มเหลวจากปัญหาเครือข่าย',
+    intake_failed_batch_n: 'รวม {n} ไฟล์ที่อัปโหลดไม่สำเร็จ',
     intake_retry_failed: 'ลองไฟล์ที่ล้มเหลวใหม่',
     // FD-0d · เคาน์เตอร์ทำงาน(#/desk · ประตูหน้าขับเคลื่อนด้วยเป้าหมาย)
     nav_desk: 'เคาน์เตอร์',

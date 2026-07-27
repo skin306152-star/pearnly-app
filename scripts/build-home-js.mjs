@@ -110,6 +110,10 @@ const BUNDLES = [
             // 银行倒推四端点(run/progress/单行/批量裁决)，拆出避免 ai-api.js 顶格。
             'ai/ai-api-bank-sales.js',
             'ai/ai-api.js',
+            // ai-fail-render.js(失败态出路:错误码→人话原因+至多一个下一步)延迟读
+            // AI.api.mapApiErrorKey / AI.state.esc(调用时才取,非加载期),排在 ai-api.js
+            // 之后、消费者(ai-client.js 开单失败、ai-intake-manifest.js 失败批横幅)之前。
+            'ai/ai-fail-render.js',
             // ai-gate.js(Z1-a 登录卡/邀请制门面)只依赖 AI.state.esc(可选)与全局 at()/
             // atSetLang,排在 ai-state.js/ai-api.js 之后、ai.js(boot 调 AI.gate.mountLogin/
             // mountInvited)之前即可,不依赖看板/客户页那批渲染模块。

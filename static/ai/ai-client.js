@@ -124,7 +124,7 @@
             action +
             '">' +
             esc(buttonLabel) +
-            '</button></div></section>'
+            '</button></div><div data-fail-slot></div></section>'
         );
     }
 
@@ -138,14 +138,28 @@
         );
     }
 
+    // 开单失败的说明位:就在同一张卡里(失败发生在哪就在哪说),按钮回可点的同时告诉
+    // 用户为什么没成——此前 catch 只默默把按钮放回去,点了跟没点一样。
+    function setOpenOrderFailure(btn, err) {
+        var host = btn && btn.closest('.order-open-empty');
+        var slot = host && host.querySelector('[data-fail-slot]');
+        if (!slot) return;
+        slot.innerHTML = err
+            ? AI.failRender.noteHtml('fail_step_open_order', err.code, err.status)
+            : '';
+    }
+
     // 开单 + 重拉订单列表 + 定位到新开的那期(wo 空态「开当期工单」/ intake 空态「开单账期
     // 选择器」共用同一段联网时序,只是各自的按钮态字/落定期不同)。
+    // 后端开单是幂等的(同账套同期同意图返既有单),故「该期已有工单」不是失败路径,
+    // 会走 then 落到那一期上——失败只剩网络断/登录过期/无权限/服务端出错四类。
     function createOrderAndReload(period, btn, idleLabel, onDone) {
         if (btn) {
             if (btn.disabled) return;
             btn.disabled = true;
             btn.textContent = at('card_open_order_busy');
         }
+        setOpenOrderFailure(btn, null); // 新一次尝试先清掉上一次的失败说明
         S.api
             .createOrder({
                 workspace_client_id: Number(S.clientId),
@@ -161,11 +175,12 @@
                 renderPeriodPicker();
                 if (onDone) onDone();
             })
-            .catch(function () {
+            .catch(function (err) {
                 if (btn) {
                     btn.disabled = false;
                     btn.textContent = idleLabel;
                 }
+                setOpenOrderFailure(btn, err || {});
             });
     }
 

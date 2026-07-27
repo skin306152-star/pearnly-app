@@ -52,6 +52,18 @@
   padding-inline: 22px;
 }
 
+/* 开单失败的说明位:与上面的账期表单同宽同轴,失败原因和「去充值」才不会孤零零
+   贴在卡片左边缘,读起来仍是同一列。 */
+.order-open-empty [data-fail-slot] {
+  width: min(360px, 100%);
+  margin: 14px auto 0;
+  text-align: left;
+}
+
+.order-open-empty [data-fail-slot] .needs-sub {
+  margin-bottom: 10px;
+}
+
 @media (max-width: 480px) {
   .order-open-empty {
     margin: 12px auto;

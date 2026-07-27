@@ -319,7 +319,8 @@ class AiRouterTests(unittest.TestCase):
             [
                 {"name": "clients"},
                 {"name": "reports"},
-                {"name": "settings"},
+                # focus 是 ?focus=billing 深链位(失败态「去充值」的落点),不带就是 None。
+                {"name": "settings", "focus": None},
                 "#/clients",
                 "#/reports",
                 "#/settings",

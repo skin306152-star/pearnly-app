@@ -526,7 +526,7 @@ Object.assign(window.__AI_I18N_EN__, {
     intake_excluded_failed: 'Reclassification failed. Try again.',
     intake_resume_continue: 'Continue upload',
     intake_resume_dismiss: 'Dismiss',
-    intake_failed_batch_n: '{n} files failed due to a network issue',
+    intake_failed_batch_n: '{n} files did not upload',
     intake_retry_failed: 'Retry failed files',
     // FD-0d · Front Desk (#/desk · goal-driven front door)
     nav_desk: 'Front Desk',

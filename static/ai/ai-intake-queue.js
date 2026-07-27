@@ -180,7 +180,7 @@
             })
             .catch(function (err) {
                 var detail = err && err.detail;
-                if (detail && typeof detail === 'object' && detail.code) {
+                if (AI.failRender.isPerFileReject(err && err.status, detail)) {
                     return handleReject(
                         api,
                         orderId,
@@ -191,10 +191,13 @@
                         onProgress
                     );
                 }
+                // 带上原始 code/status 而不是先翻成文案:失败卡要按这两样分「重传能解决」
+                // 与「换个地方点才解得开」(见 ai-fail-render.js),翻早了就没得判。
                 onOutcome({
                     type: 'network_fail',
                     files: files,
-                    errKey: AI.api.mapApiErrorKey(err && err.code),
+                    code: (err && err.code) || null,
+                    status: (err && err.status) || 0,
                 });
             });
     }
@@ -342,7 +345,11 @@
                         });
                     } else if (evt.type === 'network_fail') {
                         session.uploadDone += evt.files.length;
-                        session.failedBatches.push({ files: evt.files });
+                        session.failedBatches.push({
+                            files: evt.files,
+                            code: evt.code,
+                            status: evt.status,
+                        });
                     }
                     session.passwordCard = null;
                     render();

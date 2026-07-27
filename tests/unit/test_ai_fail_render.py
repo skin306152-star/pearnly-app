@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+tests/unit/test_ai_fail_render.py
+
+/ai 失败态出路守门(缺口①「点开当期工单失败页面零反应」/ 缺口②「上传失败只报通用错误」):
+
+  1. ai-fail-render.js 的 (code, status) → 原因/出路判读:四类失败各自认得出,余额不足
+     是唯一带「换个地方点」出路的那类,且落点是设置页计费区的真实深链。
+  2. 失败卡 HTML 真把原因说出来(而不是只有一个重传按钮),余额不足那类真出「去充值」。
+  3. ai-intake-manifest.js 失败批横幅:多批不同原因逐条列、同原因不重复列、count 照旧。
+  4. ai-i18n-fail.js 分片 zh/th key 集合一致 + 每个 fail_ 词条都真被引用(主词典的四语
+     一致性测试不装本分片,自己的闸自己带 · 同 ai-i18n-states.js 先例)。
+  5. ai-router.js 的 #/settings?focus=billing 深链解析(出路点了要真落在计费区)。
+
+同 test_ai_billing_render.py 的 node subprocess require 手法——真 node 跑源文件。
+node 侧无 window.at → t() 回退原 key,HTML 断言直接认 key 字符串。
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import unittest
+from pathlib import Path
+
+from tests.unit._node_harness import AI_DIR, _run_node
+
+FAIL = str(AI_DIR / "ai-fail-render.js")
+STATE = str(AI_DIR / "ai-state.js")
+API = str(AI_DIR / "ai-api.js")
+MANIFEST = str(AI_DIR / "ai-intake-manifest.js")
+ROUTER = str(AI_DIR / "ai-router.js")
+
+# failureView 的兜底分支借 AI.api.mapApiErrorKey(不在本文件抄第二份码表),esc 借
+# AI.state——先 require 两个依赖挂上 global.AI,再 require 被测文件(同 ai.html 加载顺序)。
+PRELUDE = f"""
+    global.window = global;
+    require({json.dumps(STATE)});
+    require({json.dumps(API)});
+    const f = require({json.dumps(FAIL)});
+    """
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class FailureViewTests(unittest.TestCase):
+    def _view(self, code, status):
+        return _run_node(f"""
+            {PRELUDE}
+            process.stdout.write(JSON.stringify(
+                f.failureView({json.dumps(code)}, {json.dumps(status)})
+            ));
+            """)
+
+    def test_no_code_no_status_is_network_drop(self):
+        # fetch TypeError / xhr onerror:请求根本没出去,两样都没有。
+        v = self._view(None, 0)
+        self.assertEqual(v["reasonKey"], "fail_network")
+        self.assertIsNone(v["actionKey"])
+
+    def test_401_says_session_expired(self):
+        self.assertEqual(self._view("generic", 401)["reasonKey"], "fail_auth")
+
+    def test_5xx_says_server_error_not_generic(self):
+        self.assertEqual(self._view("generic", 500)["reasonKey"], "fail_server")
+
+    def test_workorder_not_found_says_out_of_scope(self):
+        # 越权/闸关/单已删后端一律收在这个码上,对用户是同一件事。
+        self.assertEqual(self._view("workorder.not_found", 404)["reasonKey"], "fail_no_access")
+
+    def test_insufficient_balance_code_gives_topup_way_out(self):
+        v = self._view("insufficient_balance", 402)
+        self.assertEqual(v["reasonKey"], "fail_credits")
+        self.assertEqual(v["actionKey"], "fail_topup_btn")
+        self.assertEqual(v["href"], "#/settings?focus=billing")
+
+    def test_bare_402_without_code_still_gives_topup_way_out(self):
+        self.assertEqual(self._view("generic", 402)["actionKey"], "fail_topup_btn")
+
+    def _per_file(self, status, detail):
+        return _run_node(f"""
+            {PRELUDE}
+            process.stdout.write(JSON.stringify(
+                f.isPerFileReject({json.dumps(status)}, {json.dumps(detail)})
+            ));
+            """)
+
+    def test_422_with_named_file_is_a_per_file_reject(self):
+        # IN-0a 两段法:整批 422 该批零落盘,拿掉点名那件重传其余才安全。
+        self.assertTrue(
+            self._per_file(422, {"code": "workorder.intake.pdf_password_required", "filename": "a"})
+        )
+
+    def test_402_with_structured_detail_is_not_a_per_file_reject(self):
+        # 只看 detail.code 分派的老写法会把计费闸的 402 当成"某一件坏料"逐个剥,
+        # 于是整批被判拒收、真原因一句没说。
+        self.assertFalse(self._per_file(402, {"code": "insufficient_balance"}))
+
+    def test_bare_string_detail_is_not_a_per_file_reject(self):
+        self.assertFalse(self._per_file(413, None))
+
+    def test_known_error_code_reuses_existing_dictionary(self):
+        # 已有 err_* 词条的码走 ai-api.js 既有映射,不在失败层另起一套文案。
+        v = self._view("workorder.file_too_large", 413)
+        self.assertEqual(v["reasonKey"], "err_workorder_file_too_large")
+        self.assertIsNone(v["actionKey"])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class FailHtmlTests(unittest.TestCase):
+    def _html(self, expr):
+        return _run_node(f"""
+            {PRELUDE}
+            process.stdout.write(JSON.stringify({expr}));
+            """)
+
+    def test_reason_line_names_the_step_and_the_why(self):
+        html = self._html("f.reasonHtml('fail_step_open_order', null, 0)")
+        self.assertIn("fail_step_open_order", html)
+        self.assertIn("fail_network", html)
+        self.assertIn('role="alert"', html)
+
+    def test_no_extra_button_when_retry_is_the_only_way_out(self):
+        # 调用方自己已有重试入口(开单按钮回可点 / 失败批「重传」),这里不再摆第二个。
+        self.assertEqual(self._html("f.actionHtml(null, 0)"), "")
+        self.assertEqual(self._html("f.actionHtml('generic', 500)"), "")
+
+    def test_topup_action_is_a_real_deep_link(self):
+        html = self._html("f.actionHtml('insufficient_balance', 402)")
+        self.assertIn('href="#/settings?focus=billing"', html)
+        self.assertIn("fail_topup_btn", html)
+
+    def test_note_html_pairs_reason_with_way_out(self):
+        html = self._html("f.noteHtml('fail_step_open_order', 'insufficient_balance', 402)")
+        self.assertIn("fail_credits", html)
+        self.assertIn("needs-paths", html)
+
+    def test_note_html_without_way_out_has_no_empty_action_row(self):
+        html = self._html("f.noteHtml('fail_step_open_order', null, 0)")
+        self.assertNotIn("needs-paths", html)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class FailedBatchBannerTests(unittest.TestCase):
+    """收料失败批横幅:此前只有「N 个文件上传失败 + 重传」,原因被整个吞掉。"""
+
+    def _banner(self, batches):
+        return _run_node(f"""
+            {PRELUDE}
+            global.at = (k, v) => (v ? k + ' ' + Object.values(v).join(' ') : k);
+            const m = require({json.dumps(MANIFEST)});
+            process.stdout.write(JSON.stringify(
+                global.AI.intakeManifest.failedBatchesHtml({json.dumps(batches)})
+            ));
+            """)
+
+    def test_empty_when_nothing_failed(self):
+        self.assertEqual(self._banner([]), "")
+
+    def test_states_reason_and_keeps_the_count(self):
+        html = self._banner([{"files": [{"name": "a.pdf"}, {"name": "b.pdf"}], "status": 500}])
+        self.assertIn("fail_step_upload", html)
+        self.assertIn("fail_server", html)
+        self.assertIn("intake_failed_batch_n 2", html)
+        self.assertIn("ik-retry-failed", html)
+
+    def test_credits_failure_offers_topup_next_to_retry(self):
+        html = self._banner([{"files": [{"name": "a.pdf"}], "code": "insufficient_balance"}])
+        self.assertIn("fail_credits", html)
+        self.assertIn('href="#/settings?focus=billing"', html)
+
+    def test_distinct_reasons_each_get_a_line(self):
+        html = self._banner(
+            [
+                {"files": [{"name": "a.pdf"}], "status": 500},
+                {"files": [{"name": "b.pdf"}], "status": 401},
+            ]
+        )
+        self.assertIn("fail_server", html)
+        self.assertIn("fail_auth", html)
+        self.assertIn("intake_failed_batch_n 2", html)
+
+    def test_same_reason_twice_is_not_repeated(self):
+        html = self._banner(
+            [
+                {"files": [{"name": "a.pdf"}], "status": 500},
+                {"files": [{"name": "b.pdf"}], "status": 500},
+            ]
+        )
+        self.assertEqual(html.count("fail_server"), 1)
+        self.assertIn("intake_failed_batch_n 2", html)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class FailI18nShardTests(unittest.TestCase):
+    """zh/th key 一致 + 被引用 key 必须真实存在(分片不在主四语一致性测试的装载清单里,
+    自己的闸自己带 · 同 ai-i18n-states.js 先例)。"""
+
+    def _shard_keys(self):
+        return _run_node(f"""
+            global.window = global;
+            global.__AI_I18N_ZH__ = {{}};
+            global.__AI_I18N_TH__ = {{}};
+            require({json.dumps(str(AI_DIR / "ai-i18n-fail.js"))});
+            process.stdout.write(JSON.stringify({{
+                zh: Object.keys(global.__AI_I18N_ZH__).sort(),
+                th: Object.keys(global.__AI_I18N_TH__).sort(),
+            }}));
+            """)
+
+    def test_zh_and_th_key_sets_identical(self):
+        keys = self._shard_keys()
+        self.assertTrue(keys["zh"], "分片 zh 词条为空")
+        self.assertEqual(keys["zh"], keys["th"], "th 词典 key 集合与 zh 不一致")
+
+    def test_every_fail_key_is_referenced_and_every_reference_exists(self):
+        zh = set(self._shard_keys()["zh"])
+        referenced = set()
+        for name in ("ai-fail-render.js", "ai-client.js", "ai-intake-manifest.js"):
+            text = (AI_DIR / name).read_text(encoding="utf-8")
+            referenced |= set(re.findall(r"\bfail_[a-z0-9_]+", text))
+        missing = sorted(k for k in referenced if k not in zh)
+        self.assertEqual(missing, [], f"代码引用了词典里不存在的 key: {missing}")
+        unused = sorted(k for k in zh if k not in referenced)
+        self.assertEqual(unused, [], f"词典里有没人引用的死 key: {unused}")
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class SettingsFocusDeepLinkTests(unittest.TestCase):
+    def _parse(self, hash_str):
+        return _run_node(f"""
+            const r = require({json.dumps(ROUTER)});
+            process.stdout.write(JSON.stringify(r.parseHash({json.dumps(hash_str)})));
+            """)
+
+    def test_focus_billing_survives_the_hop(self):
+        self.assertEqual(
+            self._parse("#/settings?focus=billing"),
+            {
+                "name": "settings",
+                "focus": "billing",
+            },
+        )
+
+    def test_plain_settings_has_no_focus(self):
+        self.assertEqual(self._parse("#/settings"), {"name": "settings", "focus": None})
+
+
+class SettingsFocusWiringTests(unittest.TestCase):
+    """路由解析出 focus 还不够——ai.js 得把它递给 ai-settings.js,ai-settings.js 得真滚过去。
+    深链断在中间一节是老坑(见 memory:verify-target-must-be-real-content)。"""
+
+    def test_router_focus_reaches_settings_mount(self):
+        self.assertIn("focus: route.focus", (AI_DIR / "ai.js").read_text(encoding="utf-8"))
+
+    def test_settings_scrolls_billing_into_view(self):
+        text = (AI_DIR / "ai-settings.js").read_text(encoding="utf-8")
+        self.assertIn("applyFocus", text)
+        self.assertIn("stBillingWrap", text)
+        self.assertIn("scrollIntoView", text)
+
+
+class BundleWiringTests(unittest.TestCase):
+    """新模块不进 bundle / 新词典不进 ai.html = 上线即死代码。"""
+
+    def test_fail_render_is_in_the_ai_bundle(self):
+        root = Path(AI_DIR).parents[1]
+        text = (root / "scripts" / "build-home-js.mjs").read_text(encoding="utf-8")
+        self.assertIn("'ai/ai-fail-render.js'", text)
+
+    def test_fail_dictionary_is_loaded_by_ai_html(self):
+        self.assertIn("ai-i18n-fail.js", (AI_DIR / "ai.html").read_text(encoding="utf-8"))
+
+
+if __name__ == "__main__":
+    unittest.main()

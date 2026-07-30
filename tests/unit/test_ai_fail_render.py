@@ -280,6 +280,23 @@ class CreditsFactsTests(unittest.TestCase):
             ));
             """)
 
+    def _facts(self, code, status):
+        """factsHtml = 「这一类该不该补数」的唯一判点(noteHtml 与失败批横幅都走它)。"""
+        return _run_node(f"""
+            {REAL_PRELUDE}
+            process.stdout.write(JSON.stringify(
+                f.factsHtml({json.dumps(code)}, {json.dumps(status)},
+                    {json.dumps(self._FULL)}, 1)
+            ));
+            """)
+
+    def test_facts_html_gates_on_the_failure_class_not_on_the_caller(self):
+        self.assertIn(f"{BAHT}1.50", self._facts("insufficient_balance", 402))
+        # 同一份 detail 喂给别的失败类:一个数都不许漏出去(两个调用方共用这一道判)。
+        for code, status in (("generic", 500), ("no_access", 403), ("", 0)):
+            with self.subTest(code=code, status=status):
+                self.assertEqual(self._facts(code, status), "")
+
     def test_note_html_carries_the_numbers_and_the_way_out_together(self):
         html = self._note("insufficient_balance", 402, {"detail": self._FULL, "fileCount": 1})
         self.assertIn("余额不足", html)

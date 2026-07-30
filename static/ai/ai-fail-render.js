@@ -142,6 +142,13 @@
         return '<p class="needs-sub">' + lines.map(esc).join(' ') + '</p>';
     }
 
+    // 补充数字行的总口:哪一类失败该补数,只在这里判一次。此前 noteHtml 与
+    // ai-intake-manifest.js 各写一遍 reasonKey === 'fail_credits',加第二类必漏一处。
+    function factsHtml(code, status, detail, fileCount) {
+        if (failureView(code, status).reasonKey !== 'fail_credits') return '';
+        return creditsFactsHtml(detail, fileCount);
+    }
+
     // 出路按钮:只有"换个地方点才解得开"的失败才出,其余返空串(调用方自己的重试按钮就够)。
     function actionHtml(code, status) {
         var v = failureView(code, status);
@@ -155,13 +162,11 @@
     // 指错地方,而余额那几个数在"这一步其实成了"的语境里同样是误导。
     function noteHtml(stepKey, code, status, opts) {
         var o = opts || {};
-        var view = o.reasonKey ? null : failureView(code, status);
-        var action = view ? actionHtml(code, status) : '';
+        if (o.reasonKey) return reasonHtml(stepKey, code, status, o.reasonKey);
+        var action = actionHtml(code, status);
         return (
-            reasonHtml(stepKey, code, status, o.reasonKey) +
-            (view && view.reasonKey === 'fail_credits'
-                ? creditsFactsHtml(o.detail, o.fileCount)
-                : '') +
+            reasonHtml(stepKey, code, status) +
+            factsHtml(code, status, o.detail, o.fileCount) +
             (action ? '<div class="needs-paths">' + action + '</div>' : '')
         );
     }
@@ -172,6 +177,7 @@
         isPerFileReject: isPerFileReject,
         reasonHtml: reasonHtml,
         creditsFactsHtml: creditsFactsHtml,
+        factsHtml: factsHtml,
         actionHtml: actionHtml,
         noteHtml: noteHtml,
     };

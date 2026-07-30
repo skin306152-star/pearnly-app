@@ -17,6 +17,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +31,26 @@ _spec.loader.exec_module(gate)
 E2E_DIR = ROOT / "tests" / "e2e"
 STEWARD_ROUTES = ROOT / "routes" / "steward_routes.py"
 LIMITS_FIXTURE = E2E_DIR / "_fixtures_steward_limits.json"
+
+
+def _tracked_specs():
+    """git 跟踪的 spec(仓库相对 · posix)。
+
+    覆盖率只按跟踪文件算:开发机上常年躺着一批未跟踪的本机验收脚本(实测 2 个文件贡献
+    4 处桩点),拿它们凑数会让「真树上读出了几处」在本机虚高、到 CI 少一截。
+    """
+    out = subprocess.run(
+        ["git", "ls-files", "tests/e2e/*.spec.js"],
+        cwd=str(ROOT),
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    files = {line.strip() for line in out.stdout.splitlines() if line.strip()}
+    if not files:
+        raise AssertionError("git ls-files 一个 spec 都没列出来 —— 覆盖率判据会空转")
+    return files
+
 
 STATUS_STUB = """const { test } = require('@playwright/test');
 test('x', async ({ page }) => {
@@ -99,7 +120,8 @@ class CoverageTests(unittest.TestCase):
     """② 登记表里的端点都真被桩过 —— 没人桩的登记项 = 迟早烂掉没人发现。"""
 
     def setUp(self):
-        self.sites = [s for s in gate.all_sites(E2E_DIR) if not s.loose]
+        tracked = _tracked_specs()
+        self.sites = [s for s in gate.all_sites(E2E_DIR) if not s.loose and s.rel in tracked]
 
     def test_every_contract_is_stubbed_by_some_spec(self):
         stubbed = {s.contract["id"] for s in self.sites}
@@ -111,10 +133,17 @@ class CoverageTests(unittest.TestCase):
                     "登记了却没有任何 spec 桩它:要么端点没了(删登记),要么闸认不出这种写法",
                 )
 
-    def test_gate_reads_shapes_not_just_paths(self):
-        # 闸报绿也可能是「一处形状都没读出来」。真树上得读得出成打的桩点。
+    def test_every_contract_has_a_readable_stub(self):
+        # 闸报绿也可能是「一处形状都没读出来」。判据按登记端点逐个来,不数总数 ——
+        # 总数会随开发机上未跟踪的本机脚本上下浮动,写死一个门槛就是本机绿 CI 红。
         readable = [s for s in self.sites if s.keys]
-        self.assertGreaterEqual(len(readable), 8)
+        self.assertTrue(readable, "跟踪的 spec 里一处回包形状都没读出来 —— 闸在空扫")
+        for contract in gate.CONTRACTS:
+            with self.subTest(contract["id"]):
+                self.assertTrue(
+                    any(s.contract["id"] == contract["id"] for s in readable),
+                    "这个端点只被认出路径、形状一处都没读出来 —— 少键那半截判据形同虚设",
+                )
 
     def test_real_tree_is_green(self):
         buf = io.StringIO()

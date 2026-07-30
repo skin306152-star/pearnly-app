@@ -95,38 +95,12 @@ function taskPayload(status) {
     };
 }
 
-// GET /status 的第二个键,逐键抄 services/steward/attachments.limits()。真后端
+// GET /status 的第二个键,值取自 services/steward/attachments.limits()(fixture 与后端
+// 逐键相等由 tests/unit/test_e2e_stub_contract_gate.py 锁住)。真后端
 // (routes/steward_routes.get_status)【无条件】把它带出去,闸关也带 —— 桩此前只回
 // {enabled},于是这批用例里 composer 一路走的都是「没有附件口」那条分支:回形针没渲染、
 // 输入区注脚没渲染、占位符是短的那句,连截图证据一起失真了。桩比真后端少给东西 = 假绿。
-const ATTACH_LIMITS = {
-    max_file_bytes: 20971520,
-    max_batch_bytes: 36700160,
-    max_files: 20,
-    accept: [
-        '.bmp',
-        '.csv',
-        '.doc',
-        '.docx',
-        '.gif',
-        '.heic',
-        '.heif',
-        '.jpeg',
-        '.jpg',
-        '.pdf',
-        '.png',
-        '.tif',
-        '.tiff',
-        '.tsv',
-        '.txt',
-        '.webp',
-        '.xls',
-        '.xlsm',
-        '.xlsx',
-        '.zip',
-    ],
-    ttl_days: 30,
-};
+const ATTACH_LIMITS = require('./_fixtures_steward_limits.json');
 
 const REPLY = '这一期有 2 家还缺料,清单贴在左边。';
 // 任务落终态时服务端往会话追写的收尾那句(worker._finalize_result)。POST /messages 的即时

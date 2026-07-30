@@ -13,9 +13,9 @@
 | 问题 | 答案 |
 |---|---|
 | 管家是什么 | `/ai` 工作台上的对话入口。会计说一句人话,管家挑工具去查真数据,把结论用她的语言说回来;要写 ERP 时先出授权卡等人点 |
-| 后端在哪 | `services/steward/` 40 个 `.py` · 9906 行 · 单文件最大 `store.py` 484 行(全部在 500 行闸下) |
-| HTTP 在哪 | `routes/steward_routes.py` 346 行 · 10 个端点 |
-| 前端在哪 | `static/ai/ai-steward*.js` 等 12 个文件 · 3429 行 · 页面路由 `#/steward` |
+| 后端在哪 | `services/steward/` 40 个 `.py` · 9885 行 · 单文件最大 `store.py` 484 行(全部在 500 行闸下) |
+| HTTP 在哪 | `routes/steward_routes.py` 345 行 · 10 个端点 |
+| 前端在哪 | `static/ai/ai-steward*.js` 等 12 个文件 · 3484 行 · 页面路由 `#/steward` |
 | 活干在哪 | **embedded worker**,随 web 进程起(`services/startup.py:326-328`),不是独立服务。急停 `STEWARD_ASYNC=0` |
 | 队列在哪 | 没有独立队列组件。`steward_tasks` 表自己就是队列,`FOR UPDATE SKIP LOCKED` + 租约抢单 |
 | 存在哪 | 5 张表:`steward_sessions` / `steward_messages` / `steward_tasks` / `steward_attachments` / `steward_cost_entries`,全部挂 tenant RLS |
@@ -203,17 +203,17 @@ pearnly_ai_m1  ─and─  pearnly_ai_steward  ─and─  steward_brain_loop
 
 | 文件 | 行 | 职责 | 打包去向 |
 |---|---|---|---|
-| `static/ai/ai-steward.js` | 503 | `#/steward` 双栏页编排:闸探针三态 + 路由收口 + 建会话 / 送出 / 5s 轮询。**状态单一事实源是本文件的 `S`**;左右两块独立重画,不冲掉正在打的字 | `static/dist/ai.js` |
-| `static/ai/ai-steward-render.js` | 434 | 左窗「执行状态」拼装:吃 `GET /tasks/{tid}` 载荷(steps/loop/artifacts/error/cancellable/authorization)。状态脸一律取 B1 状态词典;上半段纯函数供 node 断言 | `static/dist/ai.js` |
+| `static/ai/ai-steward.js` | 511 | `#/steward` 双栏页编排:闸探针三态 + 路由收口 + 建会话 / 送出 / 5s 轮询。**状态单一事实源是本文件的 `S`**;左右两块独立重画,不冲掉正在打的字 | `static/dist/ai.js` |
+| `static/ai/ai-steward-render.js` | 450 | 左窗「执行状态」拼装:吃 `GET /tasks/{tid}` 载荷(steps/loop/artifacts/error/cancellable/authorization)。状态脸一律取 B1 状态词典;上半段纯函数供 node 断言 | `static/dist/ai.js` |
 | `static/ai/ai-steward-chat-render.js` | 227 | 右窗对话流 + 工作台命令条共用拼装(角色 → 气泡类、送出态闭集 sent/sending/failed、四条快捷 chips 闭集) | `static/dist/ai.js` |
 | `static/ai/ai-steward-attach.js` | 363 | 万能口动作层:选 / 拖 / 粘 → XHR 上传(字节级进度、并发 3、逐件独立状态机不连坐)→ 送出。附上即传与送出解耦,还在传就不许送。零模块级状态 | `static/dist/ai.js` |
 | `static/ai/ai-steward-attach-render.js` | 442 | 附件盘四态 / 用户气泡下的只读原件行 / 拖拽落区 / 回执卡按钮。上限一律读 `GET /status` 的 attachments 块,本层不硬编码任何数字 | `static/dist/ai.js` |
 | `static/ai/ai-steward-authz-render.js` | 220 | 写授权卡 + 成本封顶提示拼装。token 只在 DOM data 属性过手不落 localStorage;不自己比时间判 expired | `static/dist/ai.js` |
-| `static/ai/ai-steward-actions.js` | 141 | 左窗动作层:授权批准 / 拒绝、取消任务、倒计时刷新。工厂注入钩子,零模块级状态 | `static/dist/ai.js` |
+| `static/ai/ai-steward-actions.js` | 161 | 左窗动作层:授权批准 / 拒绝、取消任务、倒计时刷新。工厂注入钩子,零模块级状态 | `static/dist/ai.js` |
 | `static/ai/ai-steward-bar.js` | 73 | 工作台顶部命令条挂载(一行输入 + 四个高频 chips)→ `AI.steward.openWith()` 记下这句话并跳 `#/steward`,自己不发任何请求。闸关整条不渲染 | `static/dist/ai.js` |
 | `static/ai/ai-api-steward.js` | 130 | 十端点调用薄层。上传单开 XHR 拿进度;下载单开 fetch 带 Authorization 头(`<a href>` 发不了自定义头 = 点了 401 的假出口) | `static/dist/ai.js` |
-| `static/ai/ai-i18n-steward.js` | 222 | 管家词条 zh + th(en/ja 由 `at()` 回落 zh,照 `adm-*` 先例),键前缀 `stw_` + `nav_steward` | **独立 script** `ai.html:399`(`?v=11`) |
-| `static/ai/ai-steward.css` | 436 | 命令条 + 双栏页布局。一条状态样式都不写(脸来自 `ai-states.css`),颜色全 `var()` 令牌零裸 hex | `static/dist/ai.css` |
+| `static/ai/ai-i18n-steward.js` | 227 | 管家词条 zh + th(en/ja 由 `at()` 回落 zh,照 `adm-*` 先例),键前缀 `stw_` + `nav_steward` | **独立 script** `ai.html:399` |
+| `static/ai/ai-steward.css` | 442 | 命令条 + 双栏页布局。一条状态样式都不写(脸来自 `ai-states.css`),颜色全 `var()` 令牌零裸 hex | `static/dist/ai.css` |
 | `static/ai/ai-steward-attach.css` | 238 | 附件口样式:落区(盖满整个对话栏不是只盖输入框)/ 附件盘四态 / 原件行 / 动作按钮。与上一份分家只因行数 | `static/dist/ai.css` |
 
 打包点:`scripts/build-home-js.mjs:100`(api 层)与 `:313-329`(其余 8 个);`scripts/build-home-css.mjs:231`、`:234`。
@@ -227,7 +227,7 @@ pearnly_ai_m1  ─and─  pearnly_ai_steward  ─and─  steward_brain_loop
 | 工作台命令条 `#stwBar` | `static/ai/ai.html:145-146` | `display:none` 且内容为空,由 `ai-steward-bar.js` 闸开后填 |
 | 页面容器 `#v-steward` / `#stwBody` | `static/ai/ai.html:277-284` | — |
 
-改完 `static/ai/*.js` 或 `*.css` **必须重跑 `npm run build` 并 bump `static/ai/ai.html` 的 `?v`**(当前 `ai.js?v=110`(`:401`)/ `ai.css?v=73`(`:11`))。不 bump = 用户拿到的还是旧包。
+改完 `static/ai/*.js` 或 `*.css` **必须重跑 `npm run build` 并 bump `static/ai/ai.html` 的 `?v`**(两个 `?v` 写在 `ai.html:401` 与 `:11`,每次改动都动,这里不抄具体值)。不 bump = 用户拿到的还是旧包。
 
 ---
 

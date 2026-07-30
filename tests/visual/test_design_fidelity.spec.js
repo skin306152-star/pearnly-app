@@ -300,15 +300,19 @@ const API = {
 // layout: 仅查生产容器左对齐(marginLeft=0)。
 const MAPPINGS = [
     {
+        // 2026-06-28 首页改版(627aa1d6「订阅与计费」)删掉了余额带 .band 与快捷格 .qa/.qb,
+        // 主按钮改为余额卡底的充值钮 #dash-topup-btn(.btn.pri),图标改为卡头 .sub-card-ico svg。
+        // dashboard-final.html 快照保留作令牌基线:订阅屏没有独立设计稿,而 .btn/.panel 的
+        // Purple v2 主色/圆角/阴影/字号未随改版变,仍是这页该照搬的那套值。
         name: '首页 dashboard(样板 · A组屏)',
         design: 'dashboard-final.html',
         route: 'dashboard',
-        ready: '#page-dashboard .band .btn.pri',
+        ready: '#dash-topup-btn', // 余额卡异步渲染(loadCreditsCard)· 钮在=数据到位
         layout: { sel: '#page-dashboard .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
                 design: '.btn',
-                prod: '#page-dashboard .band .btn.pri',
+                prod: '#dash-topup-btn',
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
             {
@@ -317,8 +321,8 @@ const MAPPINGS = [
                 props: ['borderRadius', 'boxShadow'],
             },
         ],
-        bluemust: '#page-dashboard .band .btn.pri',
-        nosvgemoji: '#page-dashboard .qa .qb svg',
+        bluemust: '#dash-topup-btn',
+        nosvgemoji: '#page-dashboard .sub-card-ico svg',
     },
     {
         name: '识别记录 history(A组屏)',
@@ -511,7 +515,9 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .save',
-        nosvgemoji: '.pur .addcat svg',
+        // 无 nosvgemoji:费用科目 chip 墙 2026-07-07(0f5a5fad)搬去「商品 › 费用数据」独立页,
+        // 本页只剩开关/数字/保存,稿(pur-settings.html)与生产都零 svg 零 emoji · 旧探针
+        // .pur .addcat svg 指的是那颗已删的「+ 加科目」钮,对现页零覆盖。
     },
     {
         name: '做账主屏(01 收拢版)',

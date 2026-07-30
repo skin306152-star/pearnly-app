@@ -1,6 +1,6 @@
 // 商户采购 · 屏5 采购设置 · 收拢版(照搬设计稿 05-采购设置收拢版 · DESIGN_LANGUAGE)。
 // 一个面板分段(税与库存 / 费用科目 / 付款)· 不再三飘卡。配一次,以后拍票/记费用都按这套自动来。
-// GET/PUT /settings · GET/POST /categories · owner/会计可改。四态(loading/错误重试/空)。
+// GET/PUT /settings · owner/会计可改。四态(loading/错误重试/空)。
 /* global t, escapeHtml, showToast */
 import {
     papi,
@@ -26,13 +26,6 @@ const PAGE_CSS = `
 .pur.cfg .inp{height:36px;min-width:90px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-size:13px;background:var(--card);gap:4px;}
 .pur.cfg .inp input{border:0;outline:0;background:transparent;width:48px;text-align:right;font-size:13px;font-weight:600;}
 .pur.cfg .inp .u{color:var(--ink3);}
-.pur.cfg .cats{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
-.pur.cfg .chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12.5px;}
-.pur.cfg .chip .nm{cursor:text;border-radius:5px;padding:1px 4px;margin:-1px -2px;}
-.pur.cfg .chip .nm:hover{background:var(--line2);}
-.pur.cfg .chip .x{color:var(--ink3);cursor:pointer;}
-.pur.cfg .addcat{height:32px;padding:0 13px;border:1px dashed var(--accent);border-radius:999px;color:var(--accent);font-size:12.5px;background:var(--card);cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
-.pur.cfg .addcat-input{height:32px;padding:0 13px;border:1px solid var(--accent);border-radius:999px;font-size:12.5px;outline:0;min-width:130px;}
 .pur.cfg .foot{display:flex;justify-content:flex-end;padding:14px 22px;}
 .pur.cfg .save{height:40px;padding:0 22px;border-radius:11px;border:1px solid var(--accent);background:var(--accent);color:var(--card);font-weight:650;font-size:14px;cursor:pointer;}
 .pur.cfg .save:hover{background:var(--accent-deep);}

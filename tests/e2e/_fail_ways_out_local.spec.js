@@ -142,22 +142,27 @@ async function pickAndUpload(page) {
     await page.locator('[data-action="ik-upload"]').click();
 }
 
-// 开单成功(默认 stub 200)→ 选一份料 → 上传撞 402,停在失败批横幅上。
-async function open402Card(page, lang) {
-    await boot(page, { lang: lang, materials: { status: 402, code: 'insufficient_balance' } });
+const INTAKE_ORDER =
+    '{"orders":[{"id":"wo-1","period":"2569-07","intent":"monthly_vat","status":"intake","current_step":"intake"}]}';
+
+// 开单成功(默认 stub 200)→ 进收料区 → 选一份料 → 上传撞 materials 指定的失败,
+// 停在失败批横幅上。上传失败态的每条用例都得先走这一趟,差别只在撞哪个码。
+async function openUploadFailureCard(page, materials, lang) {
+    await boot(page, { lang: lang, materials: materials });
     await page.goto(`${BASE}/static/dist/ai.html#/client/1/intake`);
     const openBtn = page.locator('[data-action="intake-open-order"]');
     await expect(openBtn).toBeVisible({ timeout: 15000 });
     await page.unroute('**/api/workorder/orders?**');
     await page.route('**/api/workorder/orders?**', (r) =>
-        r.fulfill({
-            contentType: 'application/json',
-            body: '{"orders":[{"id":"wo-1","period":"2569-07","intent":"monthly_vat","status":"intake","current_step":"intake"}]}',
-        })
+        r.fulfill({ contentType: 'application/json', body: INTAKE_ORDER })
     );
     await openBtn.click();
     await pickAndUpload(page);
     return page.locator('.needs-card');
+}
+
+function open402Card(page, lang) {
+    return openUploadFailureCard(page, { status: 402, code: 'insufficient_balance' }, lang);
 }
 
 test.describe('/ai 失败态出路(本地 stub · 真构建产物)', () => {
@@ -371,23 +376,8 @@ test.describe('/ai 失败态出路(本地 stub · 真构建产物)', () => {
     });
 
     test('收料上传:401 → 失败批说的是登录过期,不是干巴巴「上传失败」', async ({ page }) => {
-        await boot(page, { materials: { status: 401 } });
-        await page.goto(`${BASE}/static/dist/ai.html#/client/1/intake`);
-        const openBtn = page.locator('[data-action="intake-open-order"]');
-        await expect(openBtn).toBeVisible({ timeout: 15000 });
-        // 开单成功(默认 stub 200)后才有上传区;这里只验上传失败态。
-        await page.unroute('**/api/workorder/orders?**');
-        await page.route('**/api/workorder/orders?**', (r) =>
-            r.fulfill({
-                contentType: 'application/json',
-                body: '{"orders":[{"id":"wo-1","period":"2569-07","intent":"monthly_vat","status":"intake","current_step":"intake"}]}',
-            })
-        );
-        await openBtn.click();
-
-        await pickAndUpload(page);
-
-        const banner = page.locator('.needs-card [role="alert"]');
+        const card = await openUploadFailureCard(page, { status: 401 });
+        const banner = card.locator('[role="alert"]');
         await expect(banner).toBeVisible({ timeout: 15000 });
         await expect(banner).toContainText('这些文件没传上去');
         await expect(banner).toContainText('登录已过期');

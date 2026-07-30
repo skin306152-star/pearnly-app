@@ -44,9 +44,11 @@ erp-log-card.ts 漏补 erp-dup-field-other 的),表里那 56 个键看不见。�
 erp-log-enhance}.js 虽然也打进 home 页的 pre/post bundle,但它们各带各的自含字典
 (erp-mrerp-connect 的 T[key]),不吃 window.I18N,不在本闸射程。
 
-存量基线:2026-07-31 建闸时全树 3353 处引用里只有 1 处落空,记在
-scripts/home_i18n_refs_baseline.txt 里免罪 —— 补它要写 4 语文案,属用户可见改动,得配真
-浏览器验收,不混进建闸这一笔。基线只许降不许升:新增一处即红,修好了跑 --update-baseline 收紧。
+存量基线:建闸时(2026-07-31)全树 3353 处引用里只有 1 处落空
+(auto-erp-subtab-connect-only),当天记在 scripts/home_i18n_refs_baseline.txt 里免罪 ——
+补它要写 4 语文案,属用户可见改动,不混进建闸那一笔。**同日补齐并配了真浏览器四语验收,
+基线随之删除,本闸现在是 0 容忍**;--update-baseline 的机制留着,但用它免罪要同步改掉
+tests/unit/test_home_i18n_refs_gate.py 里那条 0 容忍断言,免不成默默的。
 
 用法: python scripts/check_home_i18n_refs.py [--root .] [--update-baseline]
 退出码 0 = 没有基线之外的落空, 1 = 有新增落空(FAIL 模式 · CI lint job)。
@@ -218,14 +220,13 @@ _BASELINE_HEAD = """\
 # data-i18n 落空的症状:applyLang 的 `if (I18N[lang][key])` 守卫不成立 → 元素被跳过 →
 # 模板里写死的中文原地不动,泰语用户看中文且没有任何报错。
 #
-# auto-erp-subtab-connect-only:推送日志从集成页拆成独立 tab 后,「连接」按钮改指了这个新
-# 键,词典没跟上(旧键 auto-erp-subtab-connect = "连接 & 推送日志" 还在,但文案已经不对了)。
-# 补法是照旧键的四语砍掉后半截:zh 连接 / en Connections / th การเชื่อมต่อ / ja 接続。
-# 是用户可见文案改动,要配真浏览器四语验收,不混进建闸这一笔。
+# ⚠️ 本闸现在是 0 容忍,正常情况下这个文件不该存在(建闸时唯一那处存量已还清)。
+# 它躺在树上就意味着有人拿 --update-baseline 免了一笔债 —— 那笔债得在 PR 里写明理由,
+# 并同步改掉 tests/unit/test_home_i18n_refs_gate.py 的 0 容忍断言,否则单测先红。
 #
 # 只许降不许升:新增一处闸就红。修好了跑
 #   python scripts/check_home_i18n_refs.py --update-baseline
-# 收紧本文件(顺手把这行债从账上划掉)。
+# 收紧本文件;收到 0 处时把文件删掉,别留个空壳。
 """
 
 

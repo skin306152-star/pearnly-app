@@ -302,16 +302,19 @@ class RealTreeTests(unittest.TestCase):
         self.assertEqual(sorted(parsed - truth), [], "正则多认了这些键(真词典里没有)")
         self.assertEqual(sorted(truth - parsed), [], "正则漏认了这些键(真词典里有)")
 
-    def test_baseline_entries_are_still_dangling(self):
-        """基线里的每一条今天仍然落空 —— 防止基线腐烂成一张没人看的免罪符。
+    def test_gate_is_zero_tolerance_no_baseline_left(self):
+        """存量已清零 → 基线文件不该还在。
 
-        路径写错、键改名、债其实已经还了,都会让基线悄悄多免一份罪;真出新债时它就成了
-        挡箭牌。这里逐条验:还欠着才留在账上,还完了这条测试红,跑 --update-baseline 收紧。
+        建闸时唯一那处存量(auto-erp-subtab-connect-only)已补上四语文案,基线随之删掉,
+        闸切成 0 容忍。留一个空基线文件的坏处是它随时能被人添一行当免罪符,而空文件
+        本身不会让任何测试红。这里两头都钉:文件不许回来,树上不许有落空。
         """
-        live = {(rel, key) for rel, _, key in refs_gate.dangling(PROJECT_ROOT)}
-        base = refs_gate.load_baseline(refs_gate.BASELINE)
-        self.assertTrue(base, "基线空了?那就该把闸切成 0 容忍,别留个空文件")
-        self.assertEqual(sorted(base - live), [], "基线这几条已经不落空了,跑 --update-baseline")
+        self.assertFalse(
+            refs_gate.BASELINE.exists(),
+            "基线文件回来了 —— 新债要么当场修,要么明写理由再改这条测试,别默默免罪",
+        )
+        live = sorted((rel, key) for rel, _, key in refs_gate.dangling(PROJECT_ROOT))
+        self.assertEqual(live, [], "有引用落空了,补词典条目;真要免罪得先改掉这条测试")
 
 
 if __name__ == "__main__":

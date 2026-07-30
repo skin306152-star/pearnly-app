@@ -5035,6 +5035,7 @@ window.I18N = {
         'client-export-btn': '导出报表',
         // v118.27.0 · ERP 字段映射底座
         'auto-erp-subtab-connect': '连接 & 推送日志',
+        'auto-erp-subtab-connect-only': '连接',
         // v118.27.0.1 · 全局确认弹窗
         'confirm-default-title': '请确认',
         'confirm-ok': '确定',
@@ -10116,6 +10117,7 @@ window.I18N = {
         'client-export-btn': 'Export Report',
         // v118.27.0 · ERP field mappings
         'auto-erp-subtab-connect': 'Connections & logs',
+        'auto-erp-subtab-connect-only': 'Connections',
         // v118.27.0.1 · global confirm modal
         'confirm-default-title': 'Please confirm',
         'confirm-ok': 'OK',
@@ -15189,6 +15191,7 @@ window.I18N = {
         'client-export-btn': 'ส่งออกรายงาน',
         // v118.27.0 · การแมปฟิลด์ ERP
         'auto-erp-subtab-connect': 'การเชื่อมต่อ & บันทึก',
+        'auto-erp-subtab-connect-only': 'การเชื่อมต่อ',
         // v118.27.0.1 · ป๊อปอัพยืนยันรวม
         'confirm-default-title': 'ยืนยัน',
         'confirm-ok': 'ตกลง',
@@ -20258,6 +20261,7 @@ window.I18N = {
         'client-export-btn': 'レポート出力',
         // v118.27.0 · ERP フィールドマッピング
         'auto-erp-subtab-connect': '接続 & 送信ログ',
+        'auto-erp-subtab-connect-only': '接続',
         // v118.27.0.1 · 共通確認ダイアログ
         'confirm-default-title': 'ご確認ください',
         'confirm-ok': 'OK',

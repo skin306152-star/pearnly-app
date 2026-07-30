@@ -96,6 +96,9 @@ function taskPayload(status) {
 }
 
 const REPLY = '这一期有 2 家还缺料,清单贴在左边。';
+// 任务落终态时服务端往会话追写的收尾那句(worker._finalize_result)。POST /messages 的即时
+// 应承里没有它,只有 GET /sessions 吐得出来 —— 前端不去拉,这句就永远上不了屏。
+const CLOSEOUT = '查完了:SM、MR.ERP 两家缺料,清单已经贴在左边。';
 
 // 授权卡桩:形状逐键抄 services/steward/authz.py 的 _CARD_PUBLIC_KEYS(冻结契约),
 // 不多不少 —— args_fp 等内部字段后端永不外泄,桩里也不许有。
@@ -149,7 +152,8 @@ async function boot(page, opts) {
     opts = opts || {};
     const gate = opts.stewardEnabled !== false;
     const taskStates = opts.taskStates || ['running'];
-    let taskCall = 0;
+    // 各 GET 端点被打了几次:「补一次就够」「没多打一遍」这类幂等断言 DOM 上看不出来。
+    const hits = { task: 0, session: 0 };
     // 记下打到管家端点的每个 POST(路径 + body),断言「点了按钮真发了什么」用。
     const posts = [];
     let sessionPosts = 0;
@@ -205,26 +209,31 @@ async function boot(page, opts) {
             return json(r, { message_id: 'm1', reply: REPLY, task_id: 't1' });
         }
         if (p.indexOf('/steward/tasks/') >= 0) {
+            const nth = hits.task;
+            hits.task += 1;
             // taskSeq 优先(整份载荷桩,授权卡/终态流转用);否则按状态名走老路。
             if (opts.taskSeq) {
-                const payload = opts.taskSeq[Math.min(taskCall, opts.taskSeq.length - 1)];
-                taskCall += 1;
-                return json(r, payload);
+                return json(r, opts.taskSeq[Math.min(nth, opts.taskSeq.length - 1)]);
             }
-            const state = taskStates[Math.min(taskCall, taskStates.length - 1)];
-            taskCall += 1;
-            return json(r, taskPayload(state));
+            return json(r, taskPayload(taskStates[Math.min(nth, taskStates.length - 1)]));
         }
         // GET /sessions/{sid}:服务端权威消息流(前端回本页/任务收尾时重建)。
         if (/\/steward\/sessions\/[^/]+$/.test(p)) {
-            return json(r, {
-                session_id: 's1',
-                messages: [
-                    { role: 'user', text: '本期谁缺料', ts: '2026-07-26T09:05:00Z' },
-                    { role: 'steward', text: REPLY, ts: '2026-07-26T09:05:04Z', task_id: 't1' },
-                ],
-                current_task_id: 't1',
-            });
+            hits.session += 1;
+            const messages = [
+                { role: 'user', text: '本期谁缺料', ts: '2026-07-26T09:05:00Z' },
+                { role: 'steward', text: REPLY, ts: '2026-07-26T09:05:04Z', task_id: 't1' },
+            ];
+            // closeout:任务已收尾的账套 —— 服务端多吐一条收尾追写(默认关,老用例不受影响)。
+            if (opts.closeout) {
+                messages.push({
+                    role: 'steward',
+                    text: CLOSEOUT,
+                    ts: '2026-07-26T09:05:09Z',
+                    task_id: 't1',
+                });
+            }
+            return json(r, { session_id: 's1', messages, current_task_id: 't1' });
         }
         if (p.endsWith('/steward/sessions')) sessionPosts += 1;
         return json(r, { session_id: 's' + sessionPosts });
@@ -240,7 +249,7 @@ async function boot(page, opts) {
         window.localStorage.setItem('mrpilot_lang', 'zh');
     });
     await page.goto(`${BASE}/static/dist/ai.html${opts.hash || ''}`);
-    return { posts };
+    return { posts, hits };
 }
 
 async function bg(page, selector) {
@@ -342,6 +351,58 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
             path: path.join(ARTIFACT_DIR, '03-task-done-after-poll.png'),
             fullPage: true,
         });
+    });
+
+    // 工具比第一拍还快时任务已经是终态,轮询压根不启动 —— 收尾追写此前只挂在轮询的
+    // onTerminal 上,于是右窗停在「我去查」,答复要等人离页回页才补得上。
+    test('首拍就是终态:收尾那句当场补回来,不用离页回页', async ({ page }) => {
+        const h = await boot(page, { taskStates: ['done'], closeout: true });
+        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
+        await page.locator('#stwBar .stw-chip').first().click();
+        await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
+        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-ok/);
+
+        // 收尾那句真上屏:管家气泡两条(即时应承 + 服务端追写),末条是收尾。
+        const agent = page.locator('.stw-msg.agent .stw-bubble');
+        await expect(agent).toHaveCount(2, { timeout: 15000 });
+        await expect(agent.last()).toContainText(CLOSEOUT);
+
+        // 反证一:全程没离开过管家页 —— 补上来的不是 mount 那次 syncSession 的功劳。
+        expect(page.url()).toContain('#/steward');
+        await page.waitForTimeout(500); // 数「没多打」之前先让后续请求有机会发出来
+        // 反证二:任务只拉了一次(终态没启动轮询),修的确实是首拍这条路。
+        expect(h.hits.task).toBe(1);
+        // 反证三:会话只补一次 —— 多打一次就是把 syncSession 触发成了两遍。
+        expect(h.hits.session).toBe(1);
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '12-first-poll-terminal-closeout.png'),
+            fullPage: true,
+        });
+    });
+
+    // fromSync 守卫的反证:syncSession → loadTask(终态)→ syncSession 会串成两次拉取。
+    test('回页时手上没有任务:会话端点只补一次,不来回串', async ({ page }) => {
+        const h = await boot(page, { taskStates: ['done'], closeout: true, hash: '#/steward' });
+        // 首次挂载只建会话不同步,等空态出来说明会话已落地。
+        await page.waitForSelector('.stw-feed-empty', { state: 'visible', timeout: 15000 });
+        expect(h.hits.session).toBe(0);
+
+        await page.evaluate(() => {
+            window.location.hash = '#/';
+        });
+        await expect(page.locator('#v-steward')).not.toHaveClass(/\bon\b/);
+        await page.evaluate(() => {
+            window.location.hash = '#/steward';
+        });
+        await expect(page.locator('.stw-msg.agent .stw-bubble').last()).toContainText(CLOSEOUT, {
+            timeout: 15000,
+        });
+        // 回页拉一次会话 → 发现有在跑的任务 → 拉任务发现已终态。这一串只该打一次 /sessions。
+        // 多出来的那次是在任务回包之后才发的,收尾句上屏时它还没走 —— 等这串跑完再数。
+        await expect.poll(() => h.hits.task).toBe(1);
+        await page.waitForTimeout(500);
+        expect(h.hits.session).toBe(1);
+        expect(h.hits.task).toBe(1);
     });
 
     test('深链点了真跳客户页并带期间', async ({ page }) => {

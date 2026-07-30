@@ -69,24 +69,21 @@ const TS = '2026-07-27T09:05:00Z';
 const REPLY = '收到 2 份:1 份 GL 台账,1 份认不出是什么。想让我做哪一样?';
 
 // services/steward/attachments.public_attachment() 逐键。
-function attachment(id, name, kind, extra) {
-    return Object.assign(
-        {
-            attachment_id: id,
-            name,
-            size_bytes: 4,
-            mime: 'application/pdf',
-            kind,
-            kind_source: kind === 'unknown' ? 'unknown' : 'rule',
-            kind_reason: 'gl_name_or_text',
-            page_count: 3,
-            needs_model: false,
-            actions: kind === 'gl_ledger' ? ['file_convert'] : [],
-            quote: { allowed: true, error_code: null, kind: 'pdf', units: 3, page_count: 3 },
-            status: 'ready',
-        },
-        extra || {}
-    );
+function attachment(id, name, kind) {
+    return {
+        attachment_id: id,
+        name,
+        size_bytes: 4,
+        mime: 'application/pdf',
+        kind,
+        kind_source: kind === 'unknown' ? 'unknown' : 'rule',
+        kind_reason: 'gl_name_or_text',
+        page_count: 3,
+        needs_model: false,
+        actions: kind === 'gl_ledger' ? ['file_convert'] : [],
+        quote: { allowed: true, error_code: null, kind: 'pdf', units: 3, page_count: 3 },
+        status: 'ready',
+    };
 }
 
 // 这个桩认识的两件料。上传口按顺序发它们,POST /messages 的回包与会话重建口回同一份 ——
@@ -518,6 +515,9 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await expect(pills.first()).toContainText('gl.pdf');
         await expect(pills.nth(1)).toContainText('认不出是什么');
         expect(await page.locator('.stw-msg.me a').count()).toBe(0);
+        // 劈成两段的前提:此刻重建口一次都没被打过。少了这句,上面那条 route glob 哪天不匹配
+        // 了,两段会塌成一段(第一段量到的其实是重建后的画面)而测试照绿。
+        expect(h.sessionGets.length).toBe(0);
 
         // 放行任务口 → 首拍即终态 → 重建会话。重建是整份替换,那一轮连人带件必须活下来。
         releaseTask();
@@ -557,6 +557,10 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await boot(page, { noLimits: true });
         expect(await page.locator('.stw-clip').count()).toBe(0);
         expect(await page.locator('#stwAttFile').count()).toBe(0);
+        // 注脚只说「文件能拖能粘」,没有附件口时整条该消失 —— 不留一句做不到的承诺,也别让
+        // 它退化成复读页头那句。这条断言原先挂在 _b2m1_steward_local 的待批卡用例上,但那边
+        // 的「没有附件口」是桩漏给 attachments 造出来的假前提;真设得出这个前提的是这里。
+        expect(await page.locator('.stw-composer-note').count()).toBe(0);
         // 纯文字仍然能用(降级不是把整页弄死)。
         await expect(page.locator('#stwInput')).toBeEnabled();
         await expect(page.locator('[data-action="stw-send"]')).toBeEnabled();

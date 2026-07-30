@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 523 个源文件全扫
+# UI 设计合规扫描报告 · 535 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -105,7 +105,7 @@
         └ 1916: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 308: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 341: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static\home-12-drawer-search.css
@@ -217,8 +217,8 @@
         └ 37: .onb-pane{width:100%;max-width:min(600px,100%);}
         └ 39: .onb-steps{display:flex;align-items:center;margin:6px auto 30px;max-width:min(440px,100%);
      2  src\home\sales-products.ts
-        └ 130: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
-        └ 242: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 148: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
+        └ 308: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      2  src\home\sales-wizard-steps.ts
         └ 239: <div class="sw-row" style="max-width:580px">
         └ 242: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
@@ -372,8 +372,8 @@
         └ 13: <div class="modal" style="max-width:420px;">
         └ 30: <div class="modal" style="max-width:420px;">
      2  src\home\sales-products.ts
-        └ 130: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
-        └ 242: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 148: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
+        └ 308: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      2  static\home-05-overlays.css
         └ 9: .drawer {
         └ 17: .drawer.show { transform: translateX(0); }
@@ -403,7 +403,7 @@
      1  src\home\sales-detail.ts
         └ 436: : confirm(t('sx-del-draft-confirm'));
      1  src\home\sales-products.ts
-        └ 226: } else if (!confirm(t('sx-p-del-confirm'))) return;
+        └ 289: } else if (!confirm(t('sx-p-del-confirm'))) return;
      1  src\home\session-heartbeat.ts
         └ 52: alert('Session expired');
 

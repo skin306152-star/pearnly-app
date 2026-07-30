@@ -142,8 +142,36 @@ class ProductsDalTenantIsolationTests(unittest.TestCase):
         cur = FakeCursor(rowcount=1)
         ok = dal.deactivate_product(cur, tenant_id="t-1", workspace_client_id=1, product_id="p")
         self.assertTrue(ok)
-        self.assertIn("is_active = FALSE", cur.last_sql)
-        self.assertNotIn("DELETE", cur.last_sql)
+        sqls = [sql for sql, _params in cur.calls]
+        self.assertTrue(any("is_active = FALSE" in s for s in sqls))
+        self.assertFalse(any("DELETE" in s for s in sqls))
+        # 停用要连单位码一起让出:product_units 的唯一索引看不见 is_active,靠本表的
+        # product_active 谓词让位 —— 但绝不许抹掉 barcode 值(抹了就复活不回来)。
+        self.assertTrue(any("product_active = %s" in s for s in sqls))
+        self.assertFalse(any("barcode = NULL" in s for s in sqls))
+
+    def test_deactivate_on_a_foreign_product_touches_nothing_else(self):
+        """行没改到(别人的/别套账的)就不能顺手清人家的单位码。"""
+        cur = FakeCursor(rowcount=0)
+        ok = dal.deactivate_product(cur, tenant_id="t-1", workspace_client_id=1, product_id="p")
+        self.assertFalse(ok)
+        self.assertEqual(len(cur.calls), 1)
+
+    def test_patch_to_inactive_is_the_other_soft_delete_path(self):
+        cur = FakeCursor(fetchone=ROW)
+        dal.update_product(
+            cur, tenant_id="t-1", workspace_client_id=1, product_id="p", fields={"is_active": False}
+        )
+        sqls = [sql for sql, _params in cur.calls]
+        self.assertTrue(any("product_active = %s" in s for s in sqls))
+        self.assertFalse(any("barcode = NULL" in s for s in sqls))
+
+    def test_ordinary_patch_leaves_unit_barcodes_alone(self):
+        cur = FakeCursor(fetchone=ROW)
+        dal.update_product(
+            cur, tenant_id="t-1", workspace_client_id=1, product_id="p", fields={"unit": "ea"}
+        )
+        self.assertEqual(len(cur.calls), 1)
 
     def test_lookup_rejects_unknown_key(self):
         cur = FakeCursor(fetchone=ROW)

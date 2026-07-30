@@ -1,0 +1,70 @@
+{
+  "gunIntoBatchWithOneLongTask": {
+    "ok": false,
+    "stall": true,
+    "typedBatch": "L2027",
+    "maxGap": 136,
+    "beforeRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L2027"
+      },
+      {
+        "product": "",
+        "qty": "",
+        "batch": ""
+      }
+    ],
+    "afterRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L20274901234567894"
+      },
+      {
+        "product": "",
+        "qty": "",
+        "batch": ""
+      }
+    ],
+    "asked": [],
+    "msgText": "เพิ่ม นมสด 1L แล้ว",
+    "why": "这一发枪扫既没加行也没查码,屏上零提示,码原样怼在店员填好的批号里"
+  },
+  "gunIntoBatchClean": {
+    "ok": true,
+    "stall": false,
+    "typedBatch": "L2027",
+    "maxGap": 23,
+    "beforeRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L2027"
+      },
+      {
+        "product": "",
+        "qty": "",
+        "batch": ""
+      }
+    ],
+    "afterRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L2027"
+      },
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": ""
+      }
+    ],
+    "asked": [
+      "4901234567894"
+    ],
+    "msgText": "ขึ้นบรรทัดใหม่ให้ นมสด 1L — สินค้าคุมล็อตแต่ละลังอาจคนละล็อต/วันหมดอายุ กรุณากรอกของลังนี้",
+    "why": ""
+  }
+}

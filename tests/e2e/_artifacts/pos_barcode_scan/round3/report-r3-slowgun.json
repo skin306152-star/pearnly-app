@@ -1,0 +1,130 @@
+{
+  "slowGunReplacesDirtyField": {
+    "ok": false,
+    "before": "8850999320014",
+    "after": "88509993200148851234567895",
+    "wanted": "8851234567895",
+    "measuredGaps": [
+      81,
+      77,
+      76,
+      74,
+      73,
+      86,
+      88,
+      77,
+      83,
+      84,
+      74,
+      88
+    ],
+    "maxGap": 88,
+    "state": {
+      "text": "ยังไม่มีสินค้าอื่นใช้บาร์โค้ดนี้",
+      "cls": "sx-bc-state"
+    },
+    "postedBarcode": null,
+    "asked": [
+      "8850999320014",
+      "88509993200148851234567895"
+    ],
+    "why": "慢枪(88ms/字符)扫进已有码的框:框里成了新旧相接的一串"
+  },
+  "slowGunIntoEmptyField": {
+    "ok": true,
+    "after": "8851234567895",
+    "wanted": "8851234567895",
+    "maxGap": 86
+  },
+  "fastGunReplacesDirtyField": {
+    "ok": true,
+    "after": "8851234567895",
+    "wanted": "8851234567895",
+    "maxGap": 21
+  },
+  "slowGunSweep": {
+    "ok": false,
+    "rows": [
+      {
+        "delay": 30,
+        "measuredMax": 48,
+        "value": "8851234567895",
+        "replaced": true
+      },
+      {
+        "delay": 45,
+        "measuredMax": 62,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 55,
+        "measuredMax": 72,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 70,
+        "measuredMax": 81,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 90,
+        "measuredMax": 107,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 110,
+        "measuredMax": 126,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 140,
+        "measuredMax": 158,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      }
+    ],
+    "broken": [
+      {
+        "delay": 45,
+        "measuredMax": 62,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 55,
+        "measuredMax": 72,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 70,
+        "measuredMax": 81,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 90,
+        "measuredMax": 107,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 110,
+        "measuredMax": 126,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      },
+      {
+        "delay": 140,
+        "measuredMax": 158,
+        "value": "88509993200148851234567895",
+        "replaced": false
+      }
+    ]
+  }
+}

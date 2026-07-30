@@ -125,6 +125,9 @@ def check_manifest_complete(fails):
     _check_spa_bundled(
         fails, css_manifest, js_manifest, "pos", {"pos-i18n.js", "pos-sw.js", "cashier-sw.js"}
     )
+    # 扫码地基(static/scan/):常驻两件进 pos.js/pre.js,摄像头两件进懒加载的 dist/scan.js。
+    # 四件都必须在清单里 —— 新加一个 scan/*.js 忘了进 bundle 就是裸发源码 + 运行时找不到。
+    _check_spa_bundled(fails, css_manifest, js_manifest, "scan", set())
 
 
 def main():

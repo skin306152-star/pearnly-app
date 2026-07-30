@@ -1,0 +1,58 @@
+{
+  "s1_deployWindow": {
+    "ok": true,
+    "reg": {
+      "ok": true,
+      "scope": "http://127.0.0.1:55989/cashier"
+    },
+    "beforeKeys": [
+      "pearnly-cashier-v11911102"
+    ],
+    "beforeShell": true,
+    "offlineBefore": "CASHIER-SHELL",
+    "midKeys": [
+      "pearnly-cashier-v11911102",
+      "pearnly-cashier-v12043121"
+    ],
+    "midShell": true,
+    "offlineMid": "CASHIER-SHELL",
+    "afterKeys": [
+      "pearnly-cashier-v12043121"
+    ],
+    "afterShell": true,
+    "offlineAfter": "CASHIER-SHELL"
+  },
+  "s2_twoScopes": {
+    "ok": false,
+    "posReg": {
+      "ok": true,
+      "scope": "http://127.0.0.1:55989/pos"
+    },
+    "cashReg": {
+      "ok": true,
+      "scope": "http://127.0.0.1:55989/cashier"
+    },
+    "afterPos": [
+      "pearnly-pos-v12043121"
+    ],
+    "posShellCached": true,
+    "posOfflineBefore": "POS-SHELL",
+    "afterCash": [
+      "pearnly-cashier-v12043121"
+    ],
+    "posStillCached": false,
+    "posOfflineAfter": "NAV_FAILED · 浏览器错误页 [] "
+  },
+  "s3_posVisitEatsCashier": {
+    "ok": false,
+    "beforeKeys": [
+      "pearnly-cashier-v12043121"
+    ],
+    "cashOfflineBefore": "CASHIER-SHELL",
+    "afterKeys": [
+      "pearnly-pos-v12043121"
+    ],
+    "cashStillCached": false,
+    "cashOfflineAfter": "NAV_FAILED · 浏览器错误页 [] "
+  }
+}

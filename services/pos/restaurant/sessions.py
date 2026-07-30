@@ -104,6 +104,10 @@ def add_lines(
         qty = Decimal(str(ln.get("qty", 0)))
         if qty <= 0:
             raise PosError("pos.line_invalid", 422, detail="bad_qty")
+        # 没设价(unit_price 为 NULL)不许当 ฿0 加菜:客人点了、厨房做了、结账时这道菜白送,
+        # 账单上跟真的免费赠品一模一样,月底对不出来。让服务员当场看见"这道菜还没定价"。
+        if prod["unit_price"] is None:
+            raise PosError("pos.line_invalid", 422, detail="no_price")
         order_store.insert_line(
             cur,
             tenant_id=tenant_id,
@@ -113,7 +117,7 @@ def add_lines(
                 "sell_unit": ln.get("sell_unit") or prod["base_unit"],
                 "unit_factor": 1,
                 "qty": qty,
-                "unit_price": prod["unit_price"] if prod["unit_price"] is not None else 0,
+                "unit_price": prod["unit_price"],
                 "line_discount": ln.get("line_discount", 0),
                 "vat_applicable": bool(prod["vat_applicable"]),
                 "note": (ln.get("note") or None),

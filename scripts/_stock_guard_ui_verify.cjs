@@ -106,7 +106,7 @@ async function run() {
     // ② 删除确认弹窗必须写明「删了可以再推一次」
     await page.locator('[data-log-cb="log-1"]').first().check();
     await page.waitForSelector('#erp-logs-batch-bar:not([style*="display: none"])', { timeout: 5000 });
-    await page.locator('#btn-erp-batch-delete').first().click();
+    await page.locator('#btn-erp-batch-delete').click();
     // 面板有淡入动画:不等它停就截图会拍到半透明面板(底下内容透出来 · 像渲染坏了)。
     // 等到 opacity=1 同时蕴含「弹窗已出现且有尺寸」,故只需这一段等待。
     await page.waitForFunction(

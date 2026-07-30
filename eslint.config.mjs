@@ -18,6 +18,9 @@ export default [
             // 脸0 品牌门户自托管的第三方运行时(React/THREE/GSAP/support.js dc-runtime)·
             // 生成式 bundle + 第三方源码 · 非本项目交付前端源码 · 不 lint(同 static/dist 策略)。
             'static/landing/vendor/**',
+            // 第三方条码解码器(zxing-js/library 0.21.3 · Apache-2.0)· 上游产物逐字节保真 ·
+            // 全量 lint 会刷出上千条 no-unused-vars/no-fallthrough 假阳性(同 static/dist 策略)。
+            'static/vendor/**',
             '_pkg/**',
             '_pkg_tmpstatic/**',
             'probes/**',
@@ -29,6 +32,11 @@ export default [
             'tests/eval/**/generate.cjs', // 对抗语料生成器(Node 脚本 · 非交付前端源码 · 同 corpus generate.py 策略)
             'scripts/_*.cjs', // 截图/探针等一次性脚本(下划线前缀 = 临时 · 非交付源码 · 同 _mock 策略)
             'scripts/_*.js',
+            // 同一条规则的仓库根版本:一次性验收脚本落在根目录的一样不是交付源码。
+            // 只豁免了 scripts/ 下那份时,根目录的 _verify_*.cjs 每次都把 lint 刷成红的,
+            // 红的原因还全是别人跑完就该删的临时脚本 —— 真问题被淹在里面没人看。
+            '_*.cjs',
+            '_*.js',
             'scripts/_ui_audit_full/**',
             '_uitest/**', // 本地真站点 UI 实测脚本(gitignore · 非交付源码)
             'home.js', // REFACTOR-C1 拆解目标

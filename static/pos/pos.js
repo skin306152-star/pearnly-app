@@ -50,6 +50,7 @@
         POS.applyI18n(lang);
         updateLangButtons();
         rerenderActive(); // 重渲当前屏的 JS 动态内容(静态 data-i18n 已由 applyI18n 处理)
+        if (POS.scan) POS.scan.relang(); // 扫码失败清单是跨屏常驻浮层,rerenderActive 覆不到
     };
     function rerenderActive() {
         const active = VIEWS.find((v) => {

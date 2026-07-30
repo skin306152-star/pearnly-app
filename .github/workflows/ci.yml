@@ -87,6 +87,13 @@ jobs:
       - name: check_ai_i18n_refs (/ai 词典引用闸 · 取词的键必须有定义)
         run: python scripts/check_ai_i18n_refs.py
 
+      # check_i18n 只比「某语言比别的语言少哪些键」—— 四语一起缺就没有参照物,它一眼都
+      # 看不出来。2026-07-31 的 sx-p-bc-dup-unit / posui.bscan.fails_n 正是这么把裸键名
+      # 送上界面的(check_i18n --strict 同时报 0 missing)。本闸补的是纵向那条轴:
+      # 源码 t()/POS.t()/data-i18n 用到的键,词典里必须存在。
+      - name: check_i18n_refs (主 SPA + POS 词典引用闸 · 四语一起缺也拦得住)
+        run: python scripts/check_i18n_refs.py
+
       - name: npm audit (REFACTOR-A6 · 生产依赖 CVE · high 拦门)
         # --omit=dev:本项目 dependencies 为空,vite/esbuild/eslint 等全是 devDependencies
         # (构建/测试工具 · 不随打包产物发给用户)。构建工具的安装期 CVE(如 esbuild

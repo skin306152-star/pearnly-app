@@ -14,7 +14,7 @@
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
     <link rel="manifest" href="/static/pos/cashier.webmanifest?v=11871100" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/pos.css?v=11911201" />
+    <link rel="stylesheet" href="/static/dist/pos.css?v=12043003" />
   </head>
   <body>
     <!-- ── 设备绑定(未绑店铺 · 照稿 12②)── -->
@@ -854,6 +854,31 @@
           </div>
         </div>
       </div>
+
+      <!-- 摄像头连扫层(pos-scan.js)· video 由扫码引擎 append 进 #bscan-stage。
+           文案不挂 data-i18n:全由 JS 按当前语言渲染(这层开着时语言栏被它盖住,
+           扫码途中切不到语言),同一句话只在字典里存一份。 -->
+      <div class="bscan-mask" id="bscan-mask">
+        <div class="bscan-stage" id="bscan-stage">
+          <div class="bscan-frame" id="bscan-frame"></div>
+          <div class="bscan-hint" id="bscan-hint"></div>
+          <div class="bscan-card" id="bscan-card">
+            <div class="bscan-card-in">
+              <div class="bscan-card-msg" id="bscan-card-msg"></div>
+              <div class="bscan-acts" id="bscan-acts"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bscan-bar">
+          <div class="bscan-count tnum" id="bscan-count"></div>
+          <div class="bscan-last" id="bscan-last"></div>
+          <button class="bscan-done" id="bscan-done" type="button"></button>
+        </div>
+      </div>
+
+      <!-- 扫码失败清单(pos-scan.js)· 累积:队列里第 N 件的失败提示不许被第 N+1 件抹掉。
+           故意排在取景层之外 —— 枪那条路上没有取景层,这份清单照样得撑在收银主屏上。 -->
+      <div class="bscan-fails" id="bscan-fails"></div>
     </section>
 
     <!-- ── 屏 3 · 挂单 / 取单 ── -->
@@ -1392,7 +1417,7 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11911105"></script>
-    <script src="/static/dist/pos.js?v=11931103" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=12043007"></script>
+    <script src="/static/dist/pos.js?v=12043121" defer></script>
   </body>
 </html>

@@ -103,6 +103,9 @@ _bank_samples/
 # v118.35.0.64 · OCR 持久化缓存目录(运行期产物 · 不进 git)
 .ocr_cache/
 
+# 扫码验收用的假摄像头素材(13MB 原始 y4m · 由 scripts/_scan_ean_y4m.py 现生成,不入库)
+*.y4m
+
 # v118.35.0.65 · OCR 评测集:运行产物 + 真实标准答案(隐私)不进 git;
 #   只有 run_eval.py / README / ground_truth/example_synthetic.json 进 git
 tests/eval/_runs/

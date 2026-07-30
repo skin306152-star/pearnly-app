@@ -360,7 +360,11 @@
             const s = q.toLowerCase();
             items = items.filter((p) => {
                 const hit = Object.values(p.name).join(' ').toLowerCase().includes(s);
-                const code = (p.units || []).some((u) => (u.barcode || '').includes(q));
+                // 商品主码也得搜:离线取件先用它缩范围再取等值命中,这里漏了主码,
+                // 后面的 matchBarcode 连这个商品都看不见(见 localBarcodeOrThrow)。
+                const code =
+                    String(p.barcode || '').includes(q) ||
+                    (p.units || []).some((u) => (u.barcode || '').includes(q));
                 return hit || code;
             });
         }
@@ -369,6 +373,29 @@
     function filterProducts(q, cat) {
         return POS.filterCatalog(MOCK_PRODUCTS, q, cat);
     }
+
+    // 本地目录按条码精确等值取件(mock 预览 + 离线快照共用)· 与后端 product_by_barcode 同口径:
+    // 先配单位码(箱码≠瓶码),再配商品主码 products.barcode。
+    // 主码必须单独再扫一遍:只有「一条 product_units 行都没有」的商品才会把主码放进
+    // units[0].barcode 下发,有单位行的商品主码在 units 里根本不出现 —— 少这一遍,离线扫主码
+    // 会被说成「本机目录里没有」,而这个货明明就在目录里。命中按后端口径落到基本单位。
+    // 命中回一份带 matched_unit 的浅拷贝(不改快照本身,免得连扫把缓存越改越花)。
+    // 只认等值:包含匹配会让扫「8850999320013」命中「…320013X」,收错钱比查不到糟得多。
+    POS.matchBarcode = function (list, code) {
+        const want = String(code || '').trim();
+        if (!want) return null;
+        const items = list || [];
+        for (const p of items) {
+            const unit = (p.units || []).find((u) => String(u.barcode || '') === want);
+            if (unit) return Object.assign({}, p, { matched_unit: unit.unit_name });
+        }
+        for (const p of items) {
+            if (String(p.barcode || '') === want) {
+                return Object.assign({}, p, { matched_unit: p.base_unit });
+            }
+        }
+        return null;
+    };
 
     // ════════════════ 高层数据方法 ════════════════
     const data = (POS.data = {});
@@ -502,6 +529,40 @@
             if (POS.isRouteMissing(e) && POS.offline && POS.offline.hasSnapshot())
                 return POS.offline.filterCached(q, cat);
             throw e;
+        }
+    };
+
+    // 扫码取件:条码精确查单品(不是模糊搜),命中带 matched_unit。
+    // 离线 / 路由缺失时查本机目录,但绝不把「查不了」说成「没这个货」——
+    // 查过没有 → detail='snapshot_miss';连目录都没有 → detail='no_catalog';UI 据此说人话。
+    // 这两个 PosErr 标 enveloped:它们是本地给出的确定答案,不该再被当成"路由缺失"往下回落。
+    function localBarcodeOrThrow(code) {
+        let item = null;
+        let why = 'no_catalog';
+        if (POS.allowMock()) {
+            item = POS.matchBarcode(MOCK_PRODUCTS, code);
+            why = 'snapshot_miss';
+        } else if (POS.offline && POS.offline.hasSnapshot()) {
+            // filterCached 是包含匹配 = 精确匹配的超集,先缩范围再用 matchBarcode 取等值命中。
+            item = POS.matchBarcode(POS.offline.filterCached(code, null), code);
+            why = 'snapshot_miss';
+        }
+        if (item) return item;
+        throw new PosErr('pos.product_not_found', 404, why, true);
+    }
+
+    data.productByBarcode = async function (code) {
+        const want = String(code || '').trim();
+        if (!state.online) return localBarcodeOrThrow(want);
+        const qs = new URLSearchParams({
+            workspace_client_id: state.workspaceClientId || '',
+            code: want,
+        });
+        try {
+            return await apiFetch('GET', '/api/pos/products/by-barcode?' + qs.toString());
+        } catch (e) {
+            if (POS.isRouteMissing(e)) return localBarcodeOrThrow(want);
+            throw e; // 带信封的业务失败(404 pos.product_not_found 等)照抛
         }
     };
 

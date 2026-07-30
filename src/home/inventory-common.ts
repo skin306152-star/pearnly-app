@@ -50,6 +50,9 @@ export type StockFilter = 'all' | 'low' | 'out';
 export interface InLine {
     product_id: string;
     qty: string;
+    // 入库单位(扫到箱码时带回来)· 后端 resolve_factor 按 product_units.factor_to_base 折算;
+    // 缺省 = 基本单位。前端不自己乘系数:系数改一次两处漂。
+    unit_name?: string;
     unit_cost?: string;
     batch_no?: string;
     expiry_date?: string;
@@ -212,6 +215,32 @@ export function fmtMoney(v: number | string | null | undefined): string {
 // 真零成本仍是数字 0 → ฿0.00,只有 null 才是被遮蔽。
 export function fmtCost(v: number | string | null | undefined): string {
     return v == null ? '--' : '฿' + fmtMoney(v);
+}
+
+// 效期的年份带子。上限是 4 位年份这条硬线;下限挡的是 0490-12-31 这种「四位但明显不是人填的」
+// 值 —— 店里不会有 1900 年之前到期的货。
+const EXPIRY_YEARS = { min: 1900, max: 2999 };
+
+/**
+ * 「这个框里现在是一个人填完了的日期」。type=date 的控件自己收得下 6 位年份:一串条码打进去
+ * (枪扫时字符照旧落在光标所在的框里)留下的是 49012-03-31,人填完留下的一定是 4 位年份 ——
+ * 扫码侧靠这一条把机器打的一串跟人手填的分开,不必去猜速度。
+ */
+export function isPlausibleDate(value: string): boolean {
+    const v = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    const year = Number(v.slice(0, 4));
+    return year >= EXPIRY_YEARS.min && year <= EXPIRY_YEARS.max;
+}
+
+/**
+ * 效期要么没填,要么是个像样的日期。49012-03-31 提交出去后端照收,那批货从此永远不会进近效期
+ * 名单、FEFO 也永远把它排在最后。扫码侧已经把码从框里退回去了,但粘贴/回填/别的浏览器都绕得过
+ * 那一层 —— 进流水之前必须还有这一道。
+ */
+export function isSaneExpiry(value: string): boolean {
+    const v = String(value || '').trim();
+    return !v || isPlausibleDate(v);
 }
 
 // 数量:整数不带小数,非整数最多 3 位且去尾零(拆零/称重)。

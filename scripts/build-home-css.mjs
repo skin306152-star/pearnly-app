@@ -70,6 +70,9 @@ const HOME_CSS = [
     'home-55-upload-zone.css',
     'home-56-posting-editor.css',
     'home-57-guide.css',
+    // 入库弹窗扫码加行(PO-A4)· 吃 home-41-inventory.css 的 .inv-field/.inv-mbtn 外壳,
+    // 故必须排它之后;类名 .inv-scan* 全新不覆盖存量,排最后即可。
+    'home-58-inventory-scan.css',
 ];
 
 const ADMIN_CSS = [
@@ -135,7 +138,9 @@ const LANDING_CSS = [
 const CONSOLE_CSS = ['console/console-theme.css', 'console/console.css'];
 
 // POS 收银 SPA:零售/药房基础样式在前,餐厅作用域样式在后(固化原 pos.html 顺序)。
-const POS_CSS = ['pos/pos.css', 'pos/pos-restaurant.css'];
+// pos-scan.css(摄像头连扫层)吃 pos.css 的 :root 令牌,排在它之后即可;类名 .bscan-* 自成
+// 一族,不与任何屏的作用域类同名,放末尾不覆盖谁。
+const POS_CSS = ['pos/pos.css', 'pos/pos-restaurant.css', 'pos/pos-scan.css'];
 
 // Pearnly AI SPA(M1-W1 · 独立工作台):令牌源在前,骨架/选客户层/客户页依次叠加
 // (固化原 ai.html 引用顺序)。ai-viewer.css(原件查看器 .pv-*)排最后——挂载点

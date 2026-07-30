@@ -1,0 +1,258 @@
+{
+  "freshProduct": {
+    "ok": true,
+    "inCache": false,
+    "focus": {
+      "tag": "BUTTON",
+      "id": "inv-btn-in"
+    },
+    "afterScan": [
+      {
+        "product": "p-yog",
+        "label": "酸奶杯",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "",
+        "label": "—",
+        "qty": "",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": false
+      }
+    ],
+    "afterReselect": [
+      {
+        "product": "p-yog",
+        "label": "酸奶杯",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "",
+        "label": "—",
+        "qty": "",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": false
+      }
+    ],
+    "posted": [
+      {
+        "workspace_client_id": 1,
+        "ref_type": "purchase",
+        "lines": [
+          {
+            "product_id": "p-yog",
+            "qty": "1",
+            "batch_no": "Y-77",
+            "expiry_date": "2027-03-15"
+          }
+        ]
+      }
+    ]
+  },
+  "gunFromDateField": {
+    "ok": true,
+    "focusDate": {
+      "k": "expiry_date",
+      "type": "date"
+    },
+    "atDate": {
+      "tag": "INPUT",
+      "id": ""
+    },
+    "focusBatch": {
+      "k": "batch_no",
+      "type": "text"
+    },
+    "before": [
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "",
+        "label": "—",
+        "qty": "",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": false
+      }
+    ],
+    "afterGun": [
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      }
+    ],
+    "afterSlow": [
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "p-cola",
+        "label": "可乐 325ml",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": false
+      }
+    ],
+    "afterHuman": [
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "2027-05-20",
+        "batchCellShown": true
+      },
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "p-cola",
+        "label": "可乐 325ml",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": false
+      }
+    ],
+    "afterBatchField": [
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "L-2026",
+        "expiry": "2027-05-20",
+        "batchCellShown": true
+      },
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "p-cola",
+        "label": "可乐 325ml",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": false
+      },
+      {
+        "product": "p-yog",
+        "label": "酸奶杯",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      }
+    ]
+  },
+  "failuresSurvive": {
+    "ok": true,
+    "msg": {
+      "text": "2 件没加进这张收货单\n知道了\n扫到 9999999999992,但这个条码还没建成商品\n用这个码建商品\n扫到 9999999999991,但这个条码还没建成商品\n用这个码建商品\n可乐 325ml 数量 +1",
+      "tone": "inv-scan-msg warn",
+      "codes": [
+        "9999999999992",
+        "9999999999991"
+      ],
+      "lines": 4
+    },
+    "wantHit": "可乐 325ml 数量 +1",
+    "wantCount": "2 件没加进这张收货单",
+    "afterFix": {
+      "codes": [
+        "9999999999992"
+      ],
+      "text": "1 件没加进这张收货单\n知道了\n扫到 9999999999992,但这个条码还没建成商品\n用这个码建商品\n已加入 酸奶杯"
+    }
+  },
+  "badExpiryBlocked": {
+    "ok": true,
+    "wrecked": "49012-03-31",
+    "beforeFill": [
+      {
+        "product": "p-milk",
+        "label": "鲜奶 1L",
+        "qty": "1",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": true
+      },
+      {
+        "product": "",
+        "label": "—",
+        "qty": "",
+        "batchNo": "",
+        "expiry": "",
+        "batchCellShown": false
+      }
+    ],
+    "err": {
+      "text": "有一行的到期日不对(年份要 4 位)· 请改好再提交",
+      "open": true
+    },
+    "want": "有一行的到期日不对(年份要 4 位)· 请改好再提交",
+    "posted": [
+      {
+        "workspace_client_id": 1,
+        "ref_type": "purchase",
+        "lines": [
+          {
+            "product_id": "p-milk",
+            "qty": "1",
+            "batch_no": "L-9",
+            "expiry_date": "2027-01-31"
+          }
+        ]
+      }
+    ]
+  }
+}

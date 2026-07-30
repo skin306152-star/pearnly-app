@@ -162,6 +162,7 @@ function check(name, ok) {
         check(`list rows ${theme}`, (await page.locator('#acct-body .row').count()) === 2);
         await page.screenshot({ path: path.join(OUT, `acct-list-${theme}.png`) });
         // 行展开(借贷表)
+        // SELECTOR-INDEX-OK: 列表就两行(上一行已断言 count===2),展开的是第一行
         await page.locator('#acct-body .row').first().click();
         await page.waitForTimeout(600);
         check(`list expand led ${theme}`, await page.locator('#acct-body .open .led').isVisible());

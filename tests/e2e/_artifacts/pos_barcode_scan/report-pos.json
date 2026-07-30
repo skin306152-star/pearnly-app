@@ -1,0 +1,172 @@
+{
+  "posCart": {
+    "ok": true,
+    "focus1": {
+      "tag": "BODY",
+      "id": ""
+    },
+    "focus2": {
+      "tag": "BODY",
+      "id": ""
+    },
+    "first": {
+      "lineCount": 1,
+      "qtys": ["1"],
+      "names": ["可乐 325ml"],
+      "grand": "350.00",
+      "sub": "1 件 · 1 种",
+      "search": ""
+    },
+    "second": {
+      "lineCount": 1,
+      "qtys": ["2"],
+      "names": ["可乐 325ml"],
+      "grand": "700.00",
+      "sub": "2 件 · 1 种",
+      "search": ""
+    },
+    "lineVisible": true,
+    "lineBox": {
+      "h": 59,
+      "inView": true,
+      "onTop": true,
+      "qtyText": "2",
+      "qtyVisible": true,
+      "opacity": "1"
+    },
+    "third": {
+      "lineCount": 2,
+      "qtys": ["2", "1"],
+      "names": ["可乐 325ml", "可乐 325ml"],
+      "grand": "715.00",
+      "sub": "3 件 · 2 种",
+      "search": ""
+    },
+    "toast": {
+      "txt": "已加入 可乐 325ml",
+      "opacity": "0.924938"
+    },
+    "hits": ["8850999320014", "8850999320014", "8850999320007"]
+  },
+  "posSearchTyping": {
+    "ok": true,
+    "focusIn": {
+      "id": "main-search",
+      "tag": "INPUT"
+    },
+    "cn": {
+      "value": "可乐",
+      "active": "main-search"
+    },
+    "digits": "8850999320014",
+    "after": {
+      "lineCount": 0,
+      "qtys": [],
+      "names": [],
+      "grand": "0.00",
+      "sub": "尚未添加商品",
+      "search": "8850999320014"
+    },
+    "hitsWhileTyping": 0,
+    "focusOut": {
+      "id": "",
+      "tag": "BODY"
+    },
+    "control": {
+      "lineCount": 1,
+      "qtys": ["1"],
+      "names": ["可乐 325ml"],
+      "grand": "350.00",
+      "sub": "1 件 · 1 种",
+      "search": "8850999320014"
+    },
+    "hits": ["8850999320014"]
+  },
+  "posNegatives": {
+    "ok": true,
+    "slowFocus": {
+      "tag": "BODY",
+      "id": ""
+    },
+    "afterSlow": {
+      "lineCount": 0,
+      "qtys": [],
+      "names": [],
+      "grand": "0.00",
+      "sub": "尚未添加商品",
+      "search": ""
+    },
+    "slowHits": 0,
+    "afterShort": {
+      "lineCount": 0,
+      "qtys": [],
+      "names": [],
+      "grand": "0.00",
+      "sub": "尚未添加商品",
+      "search": ""
+    },
+    "shortHits": 0,
+    "control": {
+      "lineCount": 1,
+      "qtys": ["1"],
+      "names": ["可乐 325ml"],
+      "grand": "350.00",
+      "sub": "1 件 · 1 种",
+      "search": ""
+    }
+  },
+  "posGapThreshold": {
+    "ok": true,
+    "probe": [
+      {
+        "delay": 170,
+        "hits": 0
+      },
+      {
+        "delay": 60,
+        "hits": 1
+      }
+    ],
+    "note": "MAX_GAP_MS=150 · 170ms/字符不算枪,60ms/字符算"
+  },
+  "posModalGuard": {
+    "ok": true,
+    "focus": {
+      "tag": "BUTTON",
+      "id": "cart-pay-btn"
+    },
+    "state": {
+      "lineCount": 1,
+      "qty": "1",
+      "grand": "350.00",
+      "payShown": true,
+      "payVisible": true,
+      "payDue": "350.00"
+    },
+    "hits": ["8850999320014"]
+  },
+  "posTouchSink": {
+    "ok": true,
+    "sink": {
+      "inputmode": "none",
+      "opacity": "0",
+      "w": "4px"
+    },
+    "focus": {
+      "tag": "BODY",
+      "id": ""
+    },
+    "cart": {
+      "lineCount": 1,
+      "qtys": ["1"],
+      "names": ["可乐 325ml"],
+      "grand": "350.00",
+      "sub": "1 件 · 1 种",
+      "search": ""
+    },
+    "sinkAfter": {
+      "value": "",
+      "focused": true
+    }
+  }
+}

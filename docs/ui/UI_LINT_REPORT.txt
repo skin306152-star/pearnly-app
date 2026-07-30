@@ -318,7 +318,7 @@
      1  static\erp-mrerp-connect.css
         └ 176: width: min(820px, 100%);
      1  static\erp-mrerp-connect.js
-        └ 895: '<div class="mrerp-wizard" style="max-width:520px">' +
+        └ 882: '<div class="mrerp-wizard" style="max-width:520px">' +
      1  static\home-06-responsive-rd.css
         └ 144: max-width: 600px;
      1  static\home-07-history-automation.css

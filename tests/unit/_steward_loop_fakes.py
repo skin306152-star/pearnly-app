@@ -14,6 +14,7 @@ import copy as _copy
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from datetime import date
+from decimal import Decimal
 from typing import Optional
 from unittest import mock
 
@@ -23,6 +24,10 @@ from services.steward import brain_entry, brain_loop, budget, loop_state, store,
 from services.steward.registry import ToolContext
 
 TODAY = date(2026, 7, 10)
+
+# 台账模式下要真跑的那两只:必须在任何 patch 之前抓住原函数,否则抓到的是桩自己。
+_REAL_RESERVE = budget.reserve
+_REAL_SETTLE = budget.settle
 
 
 def ctx(**over) -> ToolContext:
@@ -38,11 +43,64 @@ def ctx(**over) -> ToolContext:
 
 
 class _CurCM:
+    def __init__(self, cur=None):
+        self.cur = cur if cur is not None else object()
+
     def __enter__(self):
-        return object()
+        return self.cur
 
     def __exit__(self, *a):
         return False
+
+
+class LedgerCur:
+    """成本台账假游标:租户咨询锁 / 会话汇总(粗检)/ 会话+任务汇总 / 租户 24h 汇总 /
+    占坑 / 结算,各一分支。假台账的每一行都视为 24h 内(reserve 只插当下,滚动窗语义由
+    真 SQL 承担)。认不出的 SQL 直接炸 —— budget 的 fail-open 会把异常吞成一条 warning,
+    不炸就会变成「台账没记账但测试全绿」。"""
+
+    def __init__(self, entries):
+        self.entries = entries
+        self._ret = None
+
+    def execute(self, sql, params=()):
+        if "pg_advisory_xact_lock" in sql:
+            self._ret = None
+        elif "FILTER (WHERE task_id" in sql:
+            task_id, tid, sid = params
+            rows = self._session_rows(tid, sid)
+            self._ret = {
+                "session_spent": sum(e["cost_thb"] for e in rows),
+                "task_spent": sum(e["cost_thb"] for e in rows if e["task_id"] == task_id),
+            }
+        elif "AS session_spent FROM steward_cost_entries" in sql:
+            tid, sid = params
+            self._ret = {"session_spent": sum(e["cost_thb"] for e in self._session_rows(tid, sid))}
+        elif "interval '24 hours'" in sql:
+            (tid,) = params
+            rows = [e for e in self.entries if e["tenant_id"] == tid]
+            self._ret = {"tenant_spent": sum(e["cost_thb"] for e in rows)}
+        elif "INSERT INTO steward_cost_entries" in sql:
+            tid, sid, task_id, cost = params
+            entry = {"id": f"e{len(self.entries) + 1}", "tenant_id": tid, "session_id": sid,
+                     "task_id": task_id, "cost_thb": Decimal(cost), "settled": False}  # fmt: skip
+            self.entries.append(entry)
+            self._ret = {"id": entry["id"]}
+        elif "UPDATE steward_cost_entries" in sql:
+            actual, tid, eid = params
+            for e in self.entries:
+                if e["id"] == eid and e["tenant_id"] == tid:
+                    e["settled"] = True
+                    if actual is not None:
+                        e["cost_thb"] = Decimal(actual)
+        else:
+            raise AssertionError(f"unexpected sql: {sql[:80]}")
+
+    def _session_rows(self, tid, sid) -> list:
+        return [e for e in self.entries if e["tenant_id"] == tid and e["session_id"] == sid]
+
+    def fetchone(self):
+        return self._ret
 
 
 @dataclass
@@ -123,6 +181,9 @@ class Harness:
     decisions 是大脑逐步的脚本(_Outcome 列表,用完抛断言:说明循环比预期多调了模型);
     handlers 是 {工具名: ToolResult 或 callable(ctx,args)};statuses 是循环每步开头读到的
     任务状态(逐次弹出,用完回落 running)—— 会计中途点取消就靠它模拟。
+
+    ledger 传一个列表 = 成本闸打真台账:precheck/reserve/settle 全走真 SQL 分支,行落进
+    这个列表。不传就沿用注入式的 caps —— 那条路验得了台阶文案,验不了「钱真记上了没」。
     """
 
     def __init__(
@@ -136,6 +197,7 @@ class Harness:
         task_row: Optional[dict] = None,
         preparers: Optional[dict] = None,
         statuses: Optional[list] = None,
+        ledger: Optional[list] = None,
     ):
         self.preparers = dict(preparers or {})
         self.decisions, self.handlers = list(decisions), dict(handlers or {})
@@ -143,6 +205,7 @@ class Harness:
         self.caps = list(caps or [])  # budget.reserve 的逐次返回值(None = 放行)
         self.task_row = task_row
         self.statuses = list(statuses or [])
+        self.ledger = ledger
         self.out = Run()
 
     # ── 桩 ────────────────────────────────────────────────
@@ -162,8 +225,14 @@ class Harness:
 
     def _reserve(self, **kw):
         self.out.reserves.append(dict(kw))
+        if self.ledger is not None:
+            return _REAL_RESERVE(**kw)
         gate = self.caps.pop(0) if self.caps else None
         return gate or {"allowed": True, "entry_id": f"e{len(self.out.reserves)}"}
+
+    def _settle(self, **kw):
+        if self.ledger is not None:
+            _REAL_SETTLE(**kw)
 
     def _update_steps(self, _cur, **kw):
         steps = _copy.deepcopy(kw["steps"])
@@ -213,9 +282,14 @@ class Harness:
             self.out.created = dict(kw)
             return created
 
+        ledger = self.ledger
+
+        def cursor(*_a, **_k):
+            return _CurCM(LedgerCur(ledger) if ledger is not None else None)
+
         with ExitStack() as stack:
             for patch in (
-                mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
+                mock.patch("core.db.get_cursor", cursor),
                 mock.patch("core.feature_flags.steward_brain_loop_enabled_for", return_value=True),
                 mock.patch.object(brain_loop, "ask_model", self._ask),
                 mock.patch.object(store, "create_task", create_task),
@@ -232,13 +306,19 @@ class Harness:
                 mock.patch.object(store, "get_task", self._get_task),
                 mock.patch.object(worker, "_build_context", lambda *a, **k: ctx(lang=self.lang)),
                 mock.patch.object(budget, "reserve", self._reserve),
-                mock.patch.object(budget, "settle", mock.Mock()),
-                mock.patch.object(budget, "precheck", lambda **k: {"allowed": True}),
+                mock.patch.object(budget, "settle", self._settle),
                 mock.patch.object(tools, "_HANDLERS", {n: self._handler(n) for n in self.handlers}),
                 mock.patch.object(tools, "_PREPARERS", dict(self.preparers)),
                 mock.patch("services.steward.authz.open_request", side_effect=self._open_request),
             ):
                 stack.enter_context(patch)
+            if ledger is None:
+                stack.enter_context(
+                    mock.patch.object(budget, "precheck", lambda **k: {"allowed": True})
+                )
+            else:
+                # 台账模式下 precheck 也真跑;_ensured 置真免得 ensure_tables 往假游标上打 DDL。
+                stack.enter_context(mock.patch.object(budget, "_ensured", True))
             if self.task_row is None:
                 self.out.entry = brain_entry.handle_message(
                     ctx(lang=self.lang), session_id="s-1", text=self.text

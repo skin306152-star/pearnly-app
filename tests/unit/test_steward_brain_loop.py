@@ -12,15 +12,28 @@ from __future__ import annotations
 
 import json
 import unittest
+from decimal import Decimal
 from unittest import mock
 
-from services.steward import brain_loop, budget, copy, copy_loop, loop_run, loop_state
+from services.ai_gateway.costing import estimate_thb
+from services.ai_gateway.providers.openai import taxops_intent_model
+from services.steward import brain_loop, budget, copy, copy_loop, loop_ground, loop_run, loop_state
 from services.steward import registry, store
 from tests.unit._steward_loop_fakes import Harness, bad_tool, broken, ok_tool, says
 
 _TEXT = "sister 这期的票推完了没"
-_LOOKUP = ok_tool(keyword="sister", total=2, clients=[{"name": "Sister Makeup"}])
+_FOUND = "Sister Makeup"
+_LOOKUP = ok_tool(keyword="sister", total=2, clients=[{"name": _FOUND}])
 _PUSHES = ok_tool(days=7, total=3, success=2, failed=1, truncated=False)
+# 串两步走 period_invoices 而不是 push_log_query:它的 client_name 是必填槽,值只能来自
+# 上一步查出来的名字 —— 绕开必填槽的题证不了「串两步」,那正是这份考卷曾经的盲区。
+_INVOICES = ok_tool(
+    client_name=_FOUND, period="2569-06", filter="not_pushed", has_order=True, work_order_id="w1",
+    total=3, counts={"pushed": 2, "failed": 0, "in_flight": 0, "never": 1}, not_pushed=1, shown=1,
+    rows=[{"invoice_no": "IV-2", "vendor": "7-11", "invoice_date": "2026-06-30",
+           "amount": "107.00", "state": "never"}],
+    truncated=False,
+)  # fmt: skip
 
 
 def _lookup(intent="看看 sister 是哪一家"):
@@ -29,6 +42,13 @@ def _lookup(intent="看看 sister 是哪一家"):
 
 def _pushes(intent="查推送成败"):
     return says(kind="tool", tool=registry.PUSH_LOG_QUERY, args={}, intent=intent)
+
+
+def _invoices(name=_FOUND, intent="数这家还有几张没推"):
+    return says(
+        kind="tool", tool=registry.PERIOD_INVOICES, intent=intent,
+        args={"client_name": name, "filter": "not_pushed"},
+    )  # fmt: skip
 
 
 class DecisionLayerTests(unittest.TestCase):
@@ -70,18 +90,18 @@ class ChainTests(unittest.TestCase):
         return Harness(
             [
                 _lookup(),
-                _pushes(),
-                says(kind="reply", message="两家里 Sister Makeup 这期推了 2 张,失败 1 张。"),
+                _invoices(),
+                says(kind="reply", message="两家里 Sister Makeup 这期还差 1 张没推。"),
             ],
-            {registry.CLIENT_LOOKUP: _LOOKUP, registry.PUSH_LOG_QUERY: _PUSHES},
+            {registry.CLIENT_LOOKUP: _LOOKUP, registry.PERIOD_INVOICES: _INVOICES},
             text=_TEXT,
         ).run()
 
     def test_each_tool_call_lands_its_own_step(self):
         out = self._run()
-        self.assertEqual(out.called_tools, [registry.CLIENT_LOOKUP, registry.PUSH_LOG_QUERY])
+        self.assertEqual(out.called_tools, [registry.CLIENT_LOOKUP, registry.PERIOD_INVOICES])
         self.assertEqual(
-            [s["label"] for s in out.tool_steps], ["看看 sister 是哪一家", "查推送成败"]
+            [s["label"] for s in out.tool_steps], ["看看 sister 是哪一家", "数这家还有几张没推"]
         )
         self.assertEqual([s["state"] for s in out.tool_steps], [store.STEP_DONE, store.STEP_DONE])
         self.assertEqual(out.finished["status"], store.TASK_DONE)
@@ -101,8 +121,28 @@ class ChainTests(unittest.TestCase):
 
     def test_the_second_decision_can_see_the_first_tools_result(self):
         out = self._run()
-        self.assertNotIn("Sister Makeup", out.prompts[0])
-        self.assertIn("Sister Makeup", out.prompts[1], "观测没串上 = 循环等于两次独立提问")
+        self.assertNotIn(_FOUND, out.prompts[0])
+        self.assertIn(_FOUND, out.prompts[1], "观测没串上 = 循环等于两次独立提问")
+
+    def test_the_second_step_really_runs_on_the_name_the_first_step_found(self):
+        """看得见 ≠ 用得上:必填槽的值出自上一步结果,接地闸放行了那一步才真跑起来。"""
+        out = self._run()
+        executed = [e[2] for e in out.timeline if e[0] == "tool"]
+        self.assertEqual(executed[1]["client_name"], _FOUND, "必填槽被接地闸打回 = 串两步不成立")
+        self.assertEqual(
+            out.tool_steps[1]["detail"], copy.reply(registry.PERIOD_INVOICES, _INVOICES.data, "zh")
+        )
+
+    def test_without_the_prior_result_corpus_the_second_step_cannot_run(self):
+        """反证:掐掉「上一步结果」这份接地语料,上面那条必须当场红,而不是判空即绿。"""
+        with mock.patch.object(loop_ground, "history_rows", lambda _loop: []):
+            out = Harness(
+                [_lookup(), _invoices(), _invoices(intent="再试一次")],
+                {registry.CLIENT_LOOKUP: _LOOKUP, registry.PERIOD_INVOICES: _INVOICES},
+                text=_TEXT,
+            ).run()
+        self.assertEqual(out.called_tools, [registry.CLIENT_LOOKUP])
+        self.assertTrue(out.parked, "槽缺第二次该转成确定性追问,不该继续烧步数")
 
     def test_details_are_rendered_from_tool_data_not_written_by_the_model(self):
         out = self._run()
@@ -254,7 +294,48 @@ class ControlRuleTests(unittest.TestCase):
         self.assertEqual(brain_loop.MAX_SAME_TOOL, 2)
 
 
+_LEDGER_ENV = {
+    "STEWARD_TASK_COST_CAP_THB": "2",
+    "STEWARD_SESSION_COST_CAP_THB": "12",
+    "STEWARD_TENANT_DAILY_CAP_THB": "150",
+    "STEWARD_CALL_COST_RESERVE_THB": "0.25",
+}
+
+
 class CostTests(unittest.TestCase):
+    def test_the_ledger_really_accumulates_one_settled_row_per_call(self):
+        """台账真跑一遍:占坑 → 结算,一次模型调用一行。注入现成 gate 的题验不到这一层
+        —— 台账恒 0 也照样全绿,而封顶判据读的就是这张表。"""
+        entries: list = []
+        with mock.patch.dict("os.environ", _LEDGER_ENV):
+            out = Harness(
+                [_lookup(), _invoices(), says(kind="reply", message="还差 1 张。")],
+                {registry.CLIENT_LOOKUP: _LOOKUP, registry.PERIOD_INVOICES: _INVOICES},
+                text=_TEXT,
+                ledger=entries,
+            ).run()
+        self.assertEqual(out.finished["status"], store.TASK_DONE)
+        self.assertEqual(len(entries), 3, "三次模型调用必须在台账上留三行")
+        self.assertTrue(all(e["settled"] for e in entries), "占坑行没结算 = 封顶永远按预留额算")
+        self.assertTrue(all(e["task_id"] == "task-1" for e in entries))
+        self.assertEqual(sum(e["cost_thb"] for e in entries), Decimal("0.36"))
+
+    def test_the_task_cap_trips_off_the_real_ledger_not_an_injected_gate(self):
+        """封顶从真累加触线:第一步结算 ฿0.12,第二次预留 ฿0.25 → ฿0.37 破 ฿0.30 的线。"""
+        entries: list = []
+        with mock.patch.dict("os.environ", {**_LEDGER_ENV, "STEWARD_TASK_COST_CAP_THB": "0.30"}):
+            out = Harness(
+                [_lookup(), says(kind="reply", message="不该说到这一句。")],
+                {registry.CLIENT_LOOKUP: _LOOKUP},
+                text=_TEXT,
+                ledger=entries,
+            ).run()
+        self.assertEqual(len(out.prompts), 1, "第二次模型调用没被真台账拦住")
+        self.assertEqual(entries and [e["cost_thb"] for e in entries], [Decimal("0.12")])
+        self.assertEqual(out.finished["status"], store.TASK_DONE)
+        self.assertIn(copy_loop.capped("zh"), out.reply)
+        self.assertIn(copy.reply(registry.CLIENT_LOOKUP, _LOOKUP.data, "zh"), out.reply)
+
     def test_every_model_call_reserves_against_this_task(self):
         """任务级封顶此前是死闸(不传 task_id → FILTER 恒 NULL → task_spent 永远 0)。"""
         out = Harness(
@@ -294,7 +375,25 @@ class CostTests(unittest.TestCase):
         self.assertEqual(str(budget.task_cap_thb()), "2")
         self.assertEqual(str(budget.session_cap_thb()), "12")
         self.assertEqual(str(budget.tenant_daily_cap_thb()), "150")
-        self.assertEqual(str(budget.call_reserve_thb()), "0.25")
+        # ฿0.30 不是随手取的:贴着实测单步上沿 ฿0.34,又不越过「6 步全额占坑仍批得出去」
+        # 的 ฿0.333 —— 两头的依据由下面那条关系闸看着,这里只锁住今天生效的那个值。
+        self.assertEqual(str(budget.call_reserve_thb()), "0.30")
+
+    def test_call_reserve_stays_pinned_to_the_measured_ceiling(self):
+        """预留额与实测成本上沿的关系闸:单价一动这里先红,不靠人肉去发现封顶在放水。
+
+        3,689 in / 1,002 out 是 taxops.intent 车道 62 次真调用里最贵的一步(2026-07 实测,
+        区间 ฿0.13-0.34);估价与车道选型都是纯函数(只查单价表),不连网不连库,可进 CI。
+        两头都得卡:低于上沿太多 —— 结算拿不到 usage 时按预留额落账会系统性少记(settle
+        的回落);六步全额占坑超过任务上限 —— 一条任务还没真花钱就被自己的占坑额封顶。
+        涨价顶破哪一头都必须重定预留额(或重定上限),而不是让它继续偏。
+        """
+        worst = Decimal(str(estimate_thb(taxops_intent_model(), 3689, 1002)))
+        reserve = budget.call_reserve_thb()
+        self.assertGreaterEqual(reserve, worst * Decimal("0.85"), "预留额掉出实测上沿的 85%")
+        self.assertLessEqual(
+            reserve * brain_loop.MAX_CALLS, budget.task_cap_thb(), "六步全额占坑就撞任务上限"
+        )
 
 
 if __name__ == "__main__":

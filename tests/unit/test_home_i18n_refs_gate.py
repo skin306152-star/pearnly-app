@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _node_harness import PROJECT_ROOT, _run_node
+from tests.unit._node_harness import PROJECT_ROOT, _run_node
 
 _MOD_PATH = PROJECT_ROOT / "scripts" / "check_home_i18n_refs.py"
 _spec = importlib.util.spec_from_file_location("check_home_i18n_refs", _MOD_PATH)

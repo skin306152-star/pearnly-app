@@ -12,9 +12,7 @@ tests/unit/test_steward_authz.py 用 FakeCursor 只能钉「SQL 长这样、参�
 每条真闸都配反证(见 *_without_* / *_when_* 命名的用例):把锁那句吞掉、把 RLS 关掉之后
 对应断言必须翻红。没有「改坏必红」,清单式的绿分不清「代码对」和「闸根本没看」。
 
-只认显式本地 DSN(env PEARNLY_PG_SMOKE_URL 或 compose 默认),绝不回落 DATABASE_URL
-(防误连生产);连不上(docker 没开 / CI 无 Postgres 服务)则整类 skip。照
-tests/unit/test_erp_bridge_pg_smoke.py 的既有范式,CI 一旦配上 postgres service 两份一起亮。
+连哪个库、连不上怎么办,全在 tests/unit/_pg_smoke.py(两份 smoke 共用,理由写在那)。
 
 本地跑:
     docker compose up -d pearnly-db
@@ -42,10 +40,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from services.steward import budget  # noqa: E402
-
-_LOCAL_DSN = os.environ.get(
-    "PEARNLY_PG_SMOKE_URL", "postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly"
-)
+from tests.unit._pg_smoke import connect as _connect  # noqa: E402
+from tests.unit._pg_smoke import connect_or_skip  # noqa: E402
 
 _TABLE = "steward_cost_entries"
 _APP_ROLE = "pearnly_app"
@@ -53,12 +49,6 @@ _APP_ROLE = "pearnly_app"
 # 并发用例的竞态窗口:reserve 读完合计、写占坑行之前停这么久。
 # 拿不到竞态就等于没验,所以窗口要大到「没有锁必然重叠」,又小到测试还能秒回。
 _HOLD_SECONDS = 0.6
-
-
-def _connect():
-    import psycopg2
-
-    return psycopg2.connect(_LOCAL_DSN, connect_timeout=3)
 
 
 class _NoAdvisoryLockCursor:
@@ -164,10 +154,7 @@ class _LedgerPgTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        try:
-            _connect().close()
-        except Exception as exc:
-            raise unittest.SkipTest(f"本地 pearnly-db 不可达({exc!r})· 起 docker compose 后再跑")
+        connect_or_skip().close()
         cls._patch = mock.patch("core.db.get_cursor", _own_cursor)
         cls._patch.start()
         cls._ensured_before = budget._ensured

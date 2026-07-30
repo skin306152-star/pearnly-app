@@ -53,6 +53,9 @@ Object.assign(window.__AI_I18N_ZH__, {
     stw_cancel_task: '取消任务',
     stw_cancel_failed: '取消没成功,网络或服务出错,再点一次',
     stw_cancel_locked: '已送进 Express,取消不了。去「推送日志」看这张票的最终状态,不要重推。',
+    // 红条尾巴上那串错误码是会计要转给我们的排障凭据,10.5px 灰字选不中,配一颗复制按钮。
+    stw_code_copy: '复制错误码',
+    stw_code_copied: '已复制',
     stw_authz_hd: '写操作授权',
     stw_authz_pending: '待批准',
     stw_authz_approved: '已批准',
@@ -163,6 +166,8 @@ Object.assign(window.__AI_I18N_TH__, {
     stw_cancel_failed: 'ยกเลิกไม่สำเร็จ เครือข่ายหรือระบบขัดข้อง กดอีกครั้ง',
     stw_cancel_locked:
         'ส่งเข้า Express แล้ว ยกเลิกไม่ได้ ดูสถานะสุดท้ายของใบนี้ที่「บันทึกการส่ง」 อย่าส่งซ้ำ',
+    stw_code_copy: 'คัดลอกรหัส',
+    stw_code_copied: 'คัดลอกแล้ว',
     stw_authz_hd: 'ขออนุมัติแก้ข้อมูล',
     stw_authz_pending: 'รออนุมัติ',
     stw_authz_approved: 'อนุมัติแล้ว',

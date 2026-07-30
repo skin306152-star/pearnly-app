@@ -398,6 +398,42 @@ class StewardI18nShardTests(unittest.TestCase):
             self.assertIn(k, keys["th"])
 
 
+def _unwired(emitted, dispatched) -> list:
+    """画出来了却没人接的 data-action。闸与反证共用这一份判据。"""
+    return sorted(set(emitted) - set(dispatched))
+
+
+class StewardActionWiringTests(unittest.TestCase):
+    """render 层吐的每个 data-action 都得在某个 onClick 链里有一支 —— 名字对不上就是一颗
+    点了没反应的按钮,静态上完全看不出来(A 文件引用 B 文件的 id 必须配闸,老坑)。"""
+
+    _EMITTERS = ("ai-steward-render.js", "ai-steward-authz-render.js", "ai-steward-chat-render.js",
+                 "ai-steward-attach-render.js", "ai-steward-bar.js")  # fmt: skip
+    # 三处 onClick:主壳 / 附件盘自己认的六个 / 顶栏那颗。
+    _DISPATCHERS = ("ai-steward.js", "ai-steward-attach.js", "ai-steward-bar.js")
+
+    def _scan(self, names, pattern):
+        found = set()
+        for name in names:
+            found |= set(re.findall(pattern, (AI_DIR / name).read_text(encoding="utf-8")))
+        return found
+
+    def _sets(self):
+        emitted = self._scan(self._EMITTERS, r'data-action="(stw-[a-z0-9-]+)"')
+        dispatched = self._scan(self._DISPATCHERS, r"=== '(stw-[a-z0-9-]+)'")
+        self.assertTrue(emitted, "一个 data-action 都没扫到 —— 正则或文件清单漂了")
+        return emitted, dispatched
+
+    def test_every_emitted_action_has_a_handler(self):
+        emitted, dispatched = self._sets()
+        self.assertEqual(_unwired(emitted, dispatched), [])
+
+    def test_gate_flags_an_action_nobody_handles(self):
+        """反证:塞一个没人接的动作名,闸必须点名它。"""
+        emitted, dispatched = self._sets()
+        self.assertEqual(_unwired(emitted | {"stw-ghost"}, dispatched), ["stw-ghost"])
+
+
 class CopyMatchesCapabilityTests(unittest.TestCase):
     """页面自述必须与注册表真实能力一致(状态诚实):B3 曾把文案提前改成「要改数的会先出
     授权卡」,而闭集里一个写工具都没有 —— 用户照文案提改数请求只会吃 out_of_scope。

@@ -1,5 +1,6 @@
 /*
- * Pearnly AI · ai-steward-actions.js · 智能管家(B3)左窗动作层:授权决断 / 取消 / 倒计时
+ * Pearnly AI · ai-steward-actions.js · 智能管家(B3)左窗动作层:授权决断 / 取消 / 倒计时 /
+ * 复制错误码
  *
  * ai-steward.js 已顶到 500 行预算线,把「点了按钮之后发生什么」抽到这层。工厂注入钩子
  * (状态取用/渲染/轮询/找元素),本文件零模块级状态 —— 状态全落在 ai-steward.js 的 S 上
@@ -71,6 +72,24 @@
                 });
         }
 
+        // 红条尾巴上的错误码取走。只碰按钮自己的文字,不进 S、不重画 —— 复制反馈跟任务
+        // 状态无关,走一遍 renderLeft 反而会把刚点下去的那颗按钮换掉。
+        function copyCode(btn) {
+            var code = (btn && btn.getAttribute('data-code')) || '';
+            function flash() {
+                var prev = btn.textContent;
+                btn.textContent = at('stw_code_copied');
+                root.setTimeout(function () {
+                    btn.textContent = prev;
+                }, 1500);
+            }
+            try {
+                root.navigator.clipboard.writeText(code).then(flash, flash);
+            } catch {
+                flash();
+            }
+        }
+
         function decide(approve, token) {
             var S = hooks.state();
             if (!S || S.authzBusy || !token) return;
@@ -126,6 +145,7 @@
         return {
             decide: decide,
             cancel: cancel,
+            copyCode: copyCode,
             refreshTask: refreshTask,
             syncCountdown: syncCountdown,
             stopCountdown: stopCountdown,

@@ -344,8 +344,24 @@
             (task.status === 'cancelled' ? ' off' : '') +
             '">' +
             esc(task.error_reason || '') +
-            (task.error_code ? '<code>' + esc(task.error_code) + '</code>' : '') +
+            (task.error_code ? codeHtml(task.error_code) : '') +
             '</div>'
+        );
+    }
+
+    // 错误码是会计转给我们排障用的那串东西,她自己看不懂也用不上 —— 所以它压在 10.5px 灰字
+    // 里,但那个尺寸手机上既选不中也复制不走。配一颗按钮把它取走(形状照 ai-billing 的
+    // copyAcct:原地文字闪回,不弹 toast,剪贴板不可用也照样给反馈)。
+    function codeHtml(code) {
+        return (
+            '<span class="stw-code"><code>' +
+            esc(code) +
+            '</code><button type="button" class="btn sm" data-action="stw-copy-code" ' +
+            'data-code="' +
+            esc(code) +
+            '">' +
+            esc(at('stw_code_copy')) +
+            '</button></span>'
         );
     }
 

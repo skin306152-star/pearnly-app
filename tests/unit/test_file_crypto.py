@@ -91,13 +91,18 @@ class StartupFailFast(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k != "PEARNLY_FILE_KMS_KEY"}
         env["FILE_ENC_MODE"] = "on"
         env.pop("PEARNLY_FILE_KMS_KEY", None)
+        # 子进程的 stderr 编码写死 utf-8 并按同一套解:否则在 cp874 控制台上,
+        # 子进程按继承来的 PYTHONIOENCODING 写 utf-8、父进程按 locale 解 → 整条 stderr
+        # 变 None,断言崩在 TypeError 上(pre-push 正好 export PYTHONIOENCODING=utf-8)。
+        env["PYTHONIOENCODING"] = "utf-8"
         repo = Path(__file__).resolve().parents[2]
         proc = subprocess.run(
             [sys.executable, "-c", "import core.file_crypto"],
             cwd=str(repo),
             env=env,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         self.assertNotEqual(proc.returncode, 0)  # 起不来
         self.assertIn("PEARNLY_FILE_KMS_KEY", proc.stderr)

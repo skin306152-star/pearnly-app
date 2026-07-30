@@ -148,6 +148,11 @@ if [ -n "$FE_CHANGED" ]; then
   python scripts/check_ai_i18n_refs.py \
     || fail "/ai 词典引用闸(见上方:这个键没定义 · at() 会把 key 原样印到页面上)"
 
+  # /home 词典引用闸(2026-07-31 加)· 同一个洞的另一棵树,还大 3 倍(3354 处引用)。
+  echo "  · check_home_i18n_refs(/home 取词的键必须在 window.I18N 里有定义)"
+  python scripts/check_home_i18n_refs.py \
+    || fail "/home 词典引用闸(见上方:这个键没定义 · 界面要么印 key 要么永远不翻译)"
+
   # TS 类型检查(C5 · .ts 的等价 node --check)· 只在改了 .ts 时跑
   if [ -n "$TS_CHANGED" ]; then
     echo "  · tsc --noEmit(TypeScript 类型检查)"
@@ -204,6 +209,10 @@ python scripts/check_ui_consistency.py --quiet \
 echo "  · check_theme_responsive(暗夜色走令牌 + 入口页 viewport · 棘轮 · 2026-06-15)"
 python scripts/check_theme_responsive.py --gate --quiet \
   || fail "暗夜/移动端闸:新增了暗夜不翻面的写死色(3位hex/white·black/不透明rgb → 改 var(--token))· 或入口页缺 viewport · 见 docs/ui/THEME_RESPONSIVE_VERIFY.md"
+
+echo "  · check_e2e_stub_contracts(E2E 桩回包的顶层键 ≥ 真后端投影 · 2026-07-31)"
+python scripts/check_e2e_stub_contracts.py --quiet \
+  || fail "E2E 桩契约闸:桩比真后端少给键(见上方)· 截图会拍到产品里不存在的界面 · 登记表在 scripts/check_e2e_stub_contracts.py"
 
 echo "  · check_authz_coverage(每路由必声明权限或上公开白名单 · 第 8 道 · docs/permissions/05)"
 PEARNLY_SKIP_HEAVY_INIT=1 python scripts/check_authz_coverage.py --quiet \

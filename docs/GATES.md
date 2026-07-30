@@ -4,7 +4,7 @@
 > **本页的用法:① 开工第 0 步把"全套自查"跑一遍拿基线(知道哪些红是别窗口/存量的) ② 干活中途随时跑单道 ③ 收尾跑全套,绿了才 push。**
 > 一键全套(等价 pre-push,不用真推):`sh scripts/git-hooks/pre-push`(在 Git Bash)或逐条跑下表命令。
 
-## 22 道闸 · 查什么 · 怎么提前自查 · 豁免法
+## 25 道闸 · 查什么 · 怎么提前自查 · 豁免法
 
 | 闸 | 触发条件 | 查什么 | 提前自查命令 | 豁免/注意 |
 |---|---|---|---|---|
@@ -20,6 +20,7 @@
 | eslint | 改前端 | 前端真 bug | `npm run lint` | 无 |
 | check_ai_smell | 改前端 | 注释 emoji/console.log 残留 | `python scripts/check_ai_smell.py <files>` | 无,去 AI 味是家规 |
 | check_ai_i18n_refs | 改 /ai 前端 | `at()`/`t()`/`data-at` 引的键必须在某份 `static/ai/ai-i18n*.js` 里有定义(落空 = 标识符原样印上屏) | `python scripts/check_ai_i18n_refs.py` | **check_i18n 看不见这片**(它只管 static/i18n-data.js);只查"引用得到定义",不查四语齐(各分片语种策略不同);拼接键 `at('pre_' + x)` 不查,由调用方测试兜;反证 `tests/unit/test_ai_i18n_refs_gate.py` |
+| check_home_i18n_refs | 改 /home 前端 | `t()`/`_t()`/`kbT()`/`data-i18n` 引的键必须在 `static/i18n-data.js` 的 window.I18N 里有定义(落空 = 要么把 key 原样印上屏,要么整个元素跳过、模板里写死的中文永不翻译) | `python scripts/check_home_i18n_refs.py` | **check_i18n 只对拍四语之间齐不齐,从不问键有没有人引、引对没有**;只查"引用得到定义",不查四语齐;拼接键 `t('pre-' + x)` 与常量键表 `t(TBL[x])` 不查(闸顶注写明);存量落空记 `scripts/home_i18n_refs_baseline.txt`,只许降不许升,修好跑 `--update-baseline`;反证 `tests/unit/test_home_i18n_refs_gate.py` |
 | tsc | 改 .ts | 类型错 | `npm run typecheck` | **已进 CI lint job(2026-07-30 · 硬闸)**;eslint 的 flat config 不收 src/**/*.ts,tsc 是 TS 源唯一的机械闸,别指望 eslint 兜 |
 | build+dist 一致 | 改前端 | 改源没重打包=prod 跑旧 bundle | `npm run build` 后 `git add static/dist` + bump `?v=` | main.js/map 的 drift 不算 |
 | check_asset_bundling | 改前端 | 源页明文引资源(view-source 退化)· 覆盖 home/login/admin/console/pos | `python scripts/check_asset_bundling.py` | 新资产进打包清单(pos/console 新 JS 逻辑必进 bundle·仅 *-i18n 数据/pos-sw 可独立) |
@@ -28,7 +29,9 @@
 | check_line_ratchet | 任何改动 | 监控文件行数净增 | `python scripts/check_line_ratchet.py --base origin/master --head HEAD --quiet` | 合理增长:commit 写 `RATCHET-EXEMPT: <file> +<N> · <理由>`;**新文件一律先豁免** |
 | check_ui_consistency | 任何改动 | D1 禁新抽屉(用 .modal)/D2 按钮禁黑底(用 var(--btn-blue)) | `python scripts/check_ui_consistency.py --quiet` | 只导航栏可黑 |
 | check_theme_responsive 棘轮 | 任何改动 | 暗夜不翻面的写死色(3位hex/white·black/不透明rgb·补 6 位 hex 闸的漏)+ 入口页 viewport 必须在,命中**只许降** | `python scripts/check_theme_responsive.py --gate --quiet` | 半透明 rgba(阴影/遮罩)豁免;颜色一律 var(--token);存量降了跑 `--update-baseline` 收紧;**手机端"合理"机械保证不了,真机验收见 docs/ui/THEME_RESPONSIVE_VERIFY.md** |
+| check_e2e_stub_contracts | 任何改动 | E2E 桩(`page.route`)回包的顶层键不得少于真后端该端点的**无条件**投影;登记为 not_null 的键不许写成 `null`/`undefined` | `python scripts/check_e2e_stub_contracts.py --list` | 登记表在脚本顶部 CONTRACTS(现收 steward 的 status/sessions 三口);后端加键 → `tests/unit/test_e2e_stub_contract_gate.py` 的防漂测试先红,改表再补各 spec 的桩。**tasks/{id}、messages 故意没登记**(投影带条件分支,登记进去会误报)。非 2xx 的故障注入桩不判;分支里先做了别的事才 fulfill 的桩跟不到,`--list` 里点数,宁可漏不误报 |
 | check_authz_coverage | 任何改动 | 每路由必声明权限或上公开白名单(第 8 道) | `PEARNLY_SKIP_HEAVY_INIT=1 python scripts/check_authz_coverage.py --quiet` | 公开路由进 PUBLIC_ROUTES 带注释;自定义门函数要登记进闸的 helper 清单(`_auth` 误判先例) |
+| pg-smoke(真库冒烟) | 改 SQL / schema / RLS 策略 | mock 单测钉不住的那层:方言、`numeric(12,6)` 精度、`pg_advisory_xact_lock` 真串行、RLS 真隔离。CI 独立 job(带 postgres:16 service),**skip 也判红**(连不上库 = 这道闸没跑) | 本机 docker `pearnly-db` 起着,`PEARNLY_PG_SMOKE_URL=postgresql://pearnly:pearnly_local_dev@127.0.0.1:5432/pearnly python -m unittest discover -s tests/unit -p "test_*_pg_smoke.py"` | 新 smoke 文件按 `test_*_pg_smoke.py` 命名即自动进闸,无需登记;测试只认 `PEARNLY_PG_SMOKE_URL`,**绝不回落 DATABASE_URL**(防误连生产);tests/integration 那 70 份 require_db 仍未进 CI,是另一次拍板 |
 | 视觉照搬闸 | 改 POS/库存/采购照搬页 | 关键令牌 == 设计快照 | `node tests/visual/test_design_fidelity.spec.js` | 改设计=同步更新 tests/visual/design/ 快照 |
 
 ## 多窗口并行的三条铁纪律(闸之外最常见的"被拦"原因)

@@ -1,0 +1,15 @@
+# /home 词典引用闸的存量基线(scripts/check_home_i18n_refs.py)
+#
+# 每行 = 一处"引用了 window.I18N 里没有的键"的存量债,格式 `相对路径<TAB>键`。
+# data-i18n 落空的症状:applyLang 的 `if (I18N[lang][key])` 守卫不成立 → 元素被跳过 →
+# 模板里写死的中文原地不动,泰语用户看中文且没有任何报错。
+#
+# auto-erp-subtab-connect-only:推送日志从集成页拆成独立 tab 后,「连接」按钮改指了这个新
+# 键,词典没跟上(旧键 auto-erp-subtab-connect = "连接 & 推送日志" 还在,但文案已经不对了)。
+# 补法是照旧键的四语砍掉后半截:zh 连接 / en Connections / th การเชื่อมต่อ / ja 接続。
+# 是用户可见文案改动,要配真浏览器四语验收,不混进建闸这一笔。
+#
+# 只许降不许升:新增一处闸就红。修好了跑
+#   python scripts/check_home_i18n_refs.py --update-baseline
+# 收紧本文件(顺手把这行债从账上划掉)。
+src/home/page-automation-panes-1.ts	auto-erp-subtab-connect-only

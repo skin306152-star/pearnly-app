@@ -64,6 +64,10 @@ const LIMITS = {
     ttl_days: 30,
 };
 
+const TASK_ID = 't1';
+const TS = '2026-07-27T09:05:00Z';
+const REPLY = '收到 2 份:1 份 GL 台账,1 份认不出是什么。想让我做哪一样?';
+
 // services/steward/attachments.public_attachment() 逐键。
 function attachment(id, name, kind, extra) {
     return Object.assign(
@@ -85,13 +89,20 @@ function attachment(id, name, kind, extra) {
     );
 }
 
+// 这个桩认识的两件料。上传口按顺序发它们,POST /messages 的回包与会话重建口回同一份 ——
+// 真后端三处读的是同一张 steward_attachments,各编各的就会桩自洽而产品里对不上。
+const STUB_FILES = [
+    attachment('u1', 'gl.pdf', 'gl_ledger'),
+    attachment('u2', 'mystery.pdf', 'unknown'),
+];
+
 // attach_turn._receipt_card() 的产物形状(copy_file.files_table + actions_block)。
 function receiptTask() {
     return {
-        task_id: 't1',
+        task_id: TASK_ID,
         title: '收到的文件',
         status: 'waiting_user',
-        started_at: '2026-07-27T09:05:00Z',
+        started_at: TS,
         agent_count: 1,
         cancellable: false,
         steps: [
@@ -131,40 +142,27 @@ function receiptTask() {
     };
 }
 
-const TASK_ID = 't1';
-const TS = '2026-07-27T09:05:00Z';
-const REPLY = '收到 2 份:1 份 GL 台账,1 份认不出是什么。想让我做哪一样?';
-
-// 送出那一轮回的两件。POST /messages 与会话重建口读的是同一张 steward_attachments,
-// 所以两处必须给同一份 —— 各编各的,桩就自洽了而产品里对不上。
-function sentAttachments() {
-    return [attachment('u1', 'gl.pdf', 'gl_ledger'), attachment('u2', 'mystery.pdf', 'unknown')];
-}
-
 // GET /sessions/{sid} 的投影,逐键抄 routes.get_session:
 //   store.public_message() → id / role / text / ts (+ task_id)
 //   attachments.files_of() → 有件才带 attachments 键
-// ⚠️ 这口回空是编了一个真后端做不出的状态:add_message 与 attach_to_message 落在
-// orchestrator 的同一个事务里(orchestrator.py:54-67),POST /messages 一旦回了
-// user_message_id,这条 GET 就再报不出「本会话零条消息」。而 syncSession 是整份替换,
-// 桩一回空,刚上屏的那一轮连人带件全被冲掉。
+// ⚠️ 别把这口改回 messages: [] —— 那是真后端做不出的状态(add_message 与 attach_to_message
+// 在 orchestrator.handle_message 的同一个事务里),而 syncSession 是整份替换,回空就把刚上屏
+// 的那一轮连人带件冲掉。
 function sessionView(posts) {
-    const messages = [];
-    posts.forEach((body, i) => {
+    const messages = posts.flatMap((body, i) => {
+        // ids 的取法逐字镜像 steward_routes.py 的 `action["attachment_ids"] if action else ...`。
         const ids = (body.action ? body.action.attachment_ids : body.attachment_ids) || [];
-        const files = sentAttachments().filter((a) => ids.indexOf(a.attachment_id) >= 0);
+        const files = STUB_FILES.filter((a) => ids.includes(a.attachment_id));
         const user = { id: 'um' + (i + 1), role: 'user', text: body.text || '', ts: TS };
         if (files.length) user.attachments = files;
-        messages.push(user, {
-            id: 'm' + (i + 1),
-            role: 'steward',
-            text: REPLY,
-            ts: TS,
-            task_id: TASK_ID,
-        });
+        return [
+            user,
+            { id: 'm' + (i + 1), role: 'steward', text: REPLY, ts: TS, task_id: TASK_ID },
+        ];
     });
-    if (!messages.length) return { session_id: 's1', messages };
-    return { session_id: 's1', messages, current_task_id: TASK_ID };
+    const view = { session_id: 's1', messages };
+    if (messages.length) view.current_task_id = TASK_ID;
+    return view;
 }
 
 function json(route, payload) {
@@ -175,7 +173,7 @@ async function boot(page, opts) {
     opts = opts || {};
     const posts = [];
     const uploads = [];
-    const sessionGets = { n: 0 };
+    const sessionGets = [];
 
     await page.route('**/api/me**', (r) =>
         r.fulfill({ contentType: 'application/json', body: '{"username":"skin"}' })
@@ -199,10 +197,9 @@ async function boot(page, opts) {
                     body: JSON.stringify({ detail: opts.uploadDetail }),
                 });
             }
-            const n = uploads.length;
-            const kind = n === 1 ? 'gl_ledger' : 'unknown';
-            const name = n === 1 ? 'gl.pdf' : 'mystery.pdf';
-            return json(r, { attachments: [attachment('u' + n, name, kind)], count: 1 });
+            // 按上传顺序从 STUB_FILES 里领,不另编一份:传第三件会拿到 undefined 而当场红,
+            // 那正好是「桩只认这两件」该有的响亮失败。
+            return json(r, { attachments: [STUB_FILES[uploads.length - 1]], count: 1 });
         }
         if (p.endsWith('/messages') && method === 'POST') {
             posts.push(r.request().postDataJSON());
@@ -212,14 +209,14 @@ async function boot(page, opts) {
                 reply: REPLY,
                 task_id: TASK_ID,
                 task_status: 'waiting_user',
-                attachments: sentAttachments(),
+                attachments: STUB_FILES,
             });
         }
         if (p.indexOf('/steward/tasks/') >= 0) return json(r, receiptTask());
         // 回执卡这类 waiting_user 任务首拍就是终态,前端据此重建一次会话(ai-steward.js
         // loadTask 的终态分支)—— 这口给的是服务端权威消息流,不是空盘。
         if (/\/steward\/sessions\/[^/]+$/.test(p)) {
-            sessionGets.n += 1;
+            sessionGets.push(p);
             return json(r, sessionView(posts));
         }
         return json(r, { session_id: 's1' });
@@ -379,10 +376,7 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         // 那样这条用例会在 uploading 的一瞬间擦边过,验的其实是竞态不是闸。
         await page.route('**/api/ai/steward/sessions/*/attachments', async (r) => {
             await gate;
-            return json(r, {
-                attachments: [attachment('u1', 'gl.pdf', 'gl_ledger')],
-                count: 1,
-            });
+            return json(r, { attachments: [STUB_FILES[0]], count: 1 });
         });
         await dragFiles(page, [{ name: 'gl.pdf', body: 'x', type: 'application/pdf' }]);
         await dropNow(page);
@@ -527,7 +521,7 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
 
         // 放行任务口 → 首拍即终态 → 重建会话。重建是整份替换,那一轮连人带件必须活下来。
         releaseTask();
-        await expect.poll(() => h.sessionGets.n).toBeGreaterThan(0);
+        await expect.poll(() => h.sessionGets.length).toBeGreaterThan(0);
         await expect(pills).toHaveCount(2);
         await expect(page.locator('.stw-msg.agent .stw-bubble')).toContainText('想让我做哪一样');
 

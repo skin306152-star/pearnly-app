@@ -25,9 +25,9 @@ from services.steward.registry import ToolContext
 
 TODAY = date(2026, 7, 10)
 
-# 台账模式下要真跑的那两只:必须在任何 patch 之前抓住原函数,否则抓到的是桩自己。
+# 台账模式下 reserve 要真跑:_reserve 两种模式都得记一笔,所以只能包一层,原函数必须在
+# 任何 patch 之前抓住,否则抓到的是桩自己。settle 不用 —— 台账模式直接不打它那道 patch。
 _REAL_RESERVE = budget.reserve
-_REAL_SETTLE = budget.settle
 
 
 def ctx(**over) -> ToolContext:
@@ -42,9 +42,12 @@ def ctx(**over) -> ToolContext:
     return ToolContext(**kw)
 
 
-class _CurCM:
-    def __init__(self, cur=None):
-        self.cur = cur if cur is not None else object()
+class CurCM:
+    """core.db.get_cursor 的替身。游标必须显式给 —— 默认成一个哨兵会让「本用例根本不碰
+    游标」和「本用例要拿 None」两种意图长得一样。"""
+
+    def __init__(self, cur):
+        self.cur = cur
 
     def __enter__(self):
         return self.cur
@@ -230,10 +233,6 @@ class Harness:
         gate = self.caps.pop(0) if self.caps else None
         return gate or {"allowed": True, "entry_id": f"e{len(self.out.reserves)}"}
 
-    def _settle(self, **kw):
-        if self.ledger is not None:
-            _REAL_SETTLE(**kw)
-
     def _update_steps(self, _cur, **kw):
         steps = _copy.deepcopy(kw["steps"])
         self.out.steps.append(steps)
@@ -282,10 +281,9 @@ class Harness:
             self.out.created = dict(kw)
             return created
 
-        ledger = self.ledger
-
         def cursor(*_a, **_k):
-            return _CurCM(LedgerCur(ledger) if ledger is not None else None)
+            # 非台账模式没人碰游标,给个不响应任何调用的哨兵:真被用上会当场 AttributeError。
+            return CurCM(LedgerCur(self.ledger) if self.ledger is not None else object())
 
         with ExitStack() as stack:
             for patch in (
@@ -306,18 +304,20 @@ class Harness:
                 mock.patch.object(store, "get_task", self._get_task),
                 mock.patch.object(worker, "_build_context", lambda *a, **k: ctx(lang=self.lang)),
                 mock.patch.object(budget, "reserve", self._reserve),
-                mock.patch.object(budget, "settle", self._settle),
                 mock.patch.object(tools, "_HANDLERS", {n: self._handler(n) for n in self.handlers}),
                 mock.patch.object(tools, "_PREPARERS", dict(self.preparers)),
                 mock.patch("services.steward.authz.open_request", side_effect=self._open_request),
             ):
                 stack.enter_context(patch)
-            if ledger is None:
+            if self.ledger is None:
+                # 注入式:钱那一层整块换成常绿桩(settle 不打 patch 就会去碰真库)。
                 stack.enter_context(
                     mock.patch.object(budget, "precheck", lambda **k: {"allowed": True})
                 )
+                stack.enter_context(mock.patch.object(budget, "settle", mock.Mock()))
             else:
-                # 台账模式下 precheck 也真跑;_ensured 置真免得 ensure_tables 往假游标上打 DDL。
+                # 台账模式:precheck / settle 都真跑,落进 LedgerCur 那张假表;_ensured 置真
+                # 免得 ensure_tables 往假游标上打 DDL。
                 stack.enter_context(mock.patch.object(budget, "_ensured", True))
             if self.task_row is None:
                 self.out.entry = brain_entry.handle_message(

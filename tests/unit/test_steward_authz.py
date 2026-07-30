@@ -26,6 +26,7 @@ from fastapi import HTTPException
 from services.agent.contracts import ToolResult
 from services.steward import authz, budget, copy, orchestrator, registry, store, tools, worker
 from services.steward.registry import StewardTool, ToolContext
+from tests.unit._steward_loop_fakes import CurCM as _CurCM
 from tests.unit._steward_loop_fakes import LedgerCur as _LedgerCur
 
 _WRITE_TOOL = "erp_push_draft"
@@ -538,17 +539,6 @@ class MintMinutesTests(unittest.TestCase):
         sql, params = executed[0]
         self.assertIn("make_interval(mins => %s)", sql)
         self.assertEqual(params[-1], 5)
-
-
-class _CurCM:
-    def __init__(self, cur):
-        self.cur = cur
-
-    def __enter__(self):
-        return self.cur
-
-    def __exit__(self, *a):
-        return False
 
 
 class BudgetTests(unittest.TestCase):

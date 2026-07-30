@@ -220,11 +220,10 @@ def key_references(ai_dir):
     return sorted(set(refs))
 
 
-def collect_failures(ai_dir):
-    known = defined_keys(ai_dir)
+def collect_failures(refs, known):
     return [
         f"{rel}:{line} 引用了词典里没有的键 `{key}` —— 页面会原样印出这个标识符"
-        for rel, line, key in key_references(ai_dir)
+        for rel, line, key in refs
         if key not in known
     ]
 
@@ -240,7 +239,7 @@ def main(argv=None):
         return 1
 
     refs = key_references(ai_dir)
-    fails = collect_failures(ai_dir)
+    fails = collect_failures(refs, defined_keys(ai_dir))
 
     print("=" * 70)
     print("/ai 词典引用闸(at()/t()/data-at 的字面量键 → 必须在某个 ai-i18n*.js 分片里有定义)")

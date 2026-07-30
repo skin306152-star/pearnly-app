@@ -61,7 +61,30 @@ const _AGENT_REASON_I18N: Record<string, string> = {
     // 防重单闸:改了票号回导重推,而上一版单据还在 Express 里。此前没接进来 → 前端翻译返空
     // → 原样显示小助手那句写死中文 + 方括号里的英文码,泰国会计看不懂也不知道要删哪张。
     PRIOR_DOC_STILL_IN_ERP: 'erp-reason-prior-doc',
+    // 查重闸:同一张票之前推过,而这次的数字跟账上那张对不上 → 一个字节都没写。同上一条的
+    // 坑:不接进来就原样显示小助手那句中文,而那句话末尾还教人「带 duplicate_confirmed=true
+    // 重推」—— 产品里没有任何地方能带这个参数,照做只会让她以为是自己操作不对。
+    DUPLICATE_CONTENT_DIFFERS: 'erp-reason-duplicate-differs',
 };
+
+// 查重闸差异行的字段名 → 文案键。小助手回执里的 label 是写死中文,后端 derive_duplicate_fix
+// 已把它丢掉,标签在这里按机器名现翻;认不出的字段落通用键,不把机器名摆上屏。
+const _DUP_FIELD_I18N: Record<string, string> = {
+    base_amount: 'erp-dup-field-base',
+    vat_amount: 'erp-dup-field-vat',
+    total_amount: 'erp-dup-field-total',
+    doc_date: 'erp-dup-field-date',
+};
+
+function _dupDiffText(log: any): string {
+    const fields = (log && log.duplicate_fix && log.duplicate_fix.fields) || [];
+    return fields
+        .map(
+            (f: any) =>
+                `${t(_DUP_FIELD_I18N[f.field] || 'erp-dup-field-other')} ${f.in_erp} → ${f.incoming}`
+        )
+        .join(' · ');
+}
 
 // 过账去向留人工(raw 形如 "EXPRESS_MANUAL: posting_needs_review:perpetual")· 冒号后是这家
 // 账套的客观库存用法,它决定该跟会计说哪一句,所以按后缀分文案,取不到后缀回落通用句。
@@ -79,10 +102,13 @@ function _expressFriendlyReason(raw: string, log?: any): string {
     }
     if (_AGENT_REASON_I18N[code]) {
         const text = t(_AGENT_REASON_I18N[code]);
-        // 单据号从后端派生的结构化字段取(载荷里的 prior_docnum),不从错误串抠。
-        // 只说"有旧单挡着"而不说是哪一号,会计没法动手。
-        const doc = (log && log.prior_doc_fix && log.prior_doc_fix.docnum) || '';
-        return text.replace('{doc}', doc);
+        // 单据号从后端派生的结构化字段取(载荷里的 prior_docnum / 回执里的 duplicate.docnum),
+        // 不从错误串抠。只说"有旧单挡着"而不说是哪一号,会计没法动手。
+        const doc =
+            (log && log.prior_doc_fix && log.prior_doc_fix.docnum) ||
+            (log && log.duplicate_fix && log.duplicate_fix.docnum) ||
+            '';
+        return text.replace(/\{doc\}/g, doc).replace('{diff}', _dupDiffText(log));
     }
     const key = _EXPRESS_REASON_I18N[code];
     return key ? t(key) : '';
@@ -312,7 +338,7 @@ function buildErpLogCard(log: any): string {
     const whyLink = statusClass === 'fail' ? guideWhyLink(log.error_msg || '') : '';
     const reasonStrip =
         statusClass === 'fail' && reasonText
-            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(reasonText)}</span>${whyLink}</div>`
+            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span title="${escapeHtml(reasonText)}">${escapeHtml(reasonText)}</span>${whyLink}</div>`
             : '';
 
     return `

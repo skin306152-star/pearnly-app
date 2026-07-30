@@ -31,6 +31,7 @@ from services.erp.push_exception_classify import (  # noqa: F401
     classify_push_exception,
     derive_account_fix,
     derive_bind_fix,
+    derive_duplicate_fix,
     derive_prior_doc_fix,
     derive_stock_fix,
 )
@@ -251,6 +252,9 @@ def list_push_logs(
                         it["prior_doc_fix"] = derive_prior_doc_fix(
                             it.get("error_msg"), it.get("request_body")
                         )
+                    elif it["category"] == "duplicate_differs":
+                        # 差异在回执里(小助手报的账上现值),不在我们发下去的载荷里。
+                        it["duplicate_fix"] = derive_duplicate_fix(it.get("error_msg"), body)
                     elif it["category"] == "stock_opening_needed":
                         it["stock_fix"] = derive_stock_fix(
                             it.get("error_msg"),
@@ -319,6 +323,11 @@ def get_push_log_detail(
             # 前端回退 humanizeError)· 详情抽屉「失败原因」优先显本语言,不裸透泰文。
             detail["error_friendly"] = friendly_any(detail.get("error_msg"))
             detail["push_type"] = _classify_push_type(detail)
+            # 抽屉与列表卡共用同一句失败摘要模板({doc}/{diff} 由前端填),详情不派生的话
+            # 同一条日志在卡上写着差异、点开却是一对空括号。
+            detail["duplicate_fix"] = derive_duplicate_fix(
+                detail.get("error_msg"), detail.get("response_body")
+            )
             return detail
     except Exception as e:
         logger.error(f"get_push_log_detail failed: {e}")

@@ -34,6 +34,11 @@ _STOCK_FIX_REASONS = (
 # 有 test_prior_docnum 的契约用例钉着。
 PRIOR_DOC_CODE = "PRIOR_DOC_STILL_IN_ERP"
 
+# 查重闸的码(companion/bridge writepath/duplicate_gate.ERR_DUPLICATE_DIFFERS)。与 PRIOR_DOC
+# 分家:那条是「上一版单据还在」,这条是「同一张票之前推过,而这次的数字跟账上那张对不上」——
+# 两者该跟会计说的话不一样(去删旧单 vs 去改原单),混成一句她不知道该动哪一张。
+DUPLICATE_DIFFERS_CODE = "DUPLICATE_CONTENT_DIFFERS"
+
 
 def classify_push_exception(error_msg: Optional[str]) -> str:
     """把 ERP 推送失败错误码归到异常子类(前端 chip 用 · 通用 · 不写死 MR.ERP)。"""
@@ -50,6 +55,10 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
     # 须先于下面的通用分支 —— 这条有专属指引(要说清删哪一号),掉进 other 就只剩一句裸码。
     if PRIOR_DOC_CODE in msg:
         return "prior_doc_exists"
+    # 同钥匙内容不同:小助手一个字节都没写,差异要逐字段摆出来让会计判该改哪边。掉进 other
+    # 的话卡上只剩小助手那句写死中文(还带着一个会计按不出来的 duplicate_confirmed 参数)。
+    if DUPLICATE_DIFFERS_CODE in msg:
+        return "duplicate_differs"
     # 库存路推不动(缺存货科目组 / 缺主档 / 库存零负)→ 会计自助可救(选科目组或补期初)。
     # 须先于 account_set,因 stock_no_master_in_account_set 串里含 "account_set" 会被下面误吞。
     if any(k in msg for k in _STOCK_FIX_REASONS):
@@ -139,6 +148,38 @@ def derive_prior_doc_fix(
     payload = (body or {}).get("payload") if isinstance(body, dict) else None
     src = payload if isinstance(payload, dict) else (body if isinstance(body, dict) else {})
     return {"docnum": str((src or {}).get("prior_docnum") or "").strip()}
+
+
+def derive_duplicate_fix(
+    error_msg: Optional[str], response_body: Any = None
+) -> Optional[Dict[str, Any]]:
+    """查重闸检出「同钥匙内容不同」时,把「账上那张是多少 / 这次推的是多少」摆给会计。
+
+    料取自小助手回执的 `meta.duplicate`(duplicate_gate.differs_meta),不从错误串里抠数字。
+    只吃机器名 `field` 与两侧的值:回执里的 `label` 是写死中文(「税前金额」),泰国会计读
+    不了 —— 字段名一律由前端按 field 现翻,这与 PRIOR_DOC 那条把中文提示挡在云端外是同一
+    条口径。`confirm_param` 也不透传:产品里没有那个按钮,摆出来只会让下游拼出一句会计
+    照做不了的指令。
+    """
+    if DUPLICATE_DIFFERS_CODE not in (error_msg or ""):
+        return None
+    body = _coerce_body(response_body)
+    meta = (body or {}).get("meta") if isinstance(body, dict) else None
+    dup = (meta or {}).get("duplicate") if isinstance(meta, dict) else None
+    dup = dup if isinstance(dup, dict) else {}
+    fields = []
+    for f in dup.get("fields") or []:
+        name = str(f.get("field") or "").strip() if isinstance(f, dict) else ""
+        if not name:
+            continue
+        fields.append(
+            {
+                "field": name,
+                "in_erp": str(f.get("in_erp") or ""),
+                "incoming": str(f.get("incoming") or ""),
+            }
+        )
+    return {"docnum": str(dup.get("docnum") or "").strip(), "fields": fields}
 
 
 def derive_bind_fix(error_msg: Optional[str]) -> Optional[Dict[str, Any]]:

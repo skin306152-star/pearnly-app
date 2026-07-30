@@ -53,16 +53,11 @@ test.afterAll(() => {
     if (server) server.kill();
 });
 
-// services/steward/attachments.limits() 逐键。
-const LIMITS = {
-    max_file_bytes: 20971520,
-    max_batch_bytes: 36700160,
-    max_files: 20,
-    // 运输皮(zip/heic)必须在 accept 里:漏了它们,<input accept> 在文件对话框就把 zip
-    // 滤掉,拖进来的也被当坏格式灰掉 —— 后端「zip 自动展开 / HEIC 转 JPEG」永远跑不到。
-    accept: ['.csv', '.heic', '.jpg', '.pdf', '.png', '.xls', '.xlsx', '.zip'],
-    ttl_days: 30,
-};
+// 上传限额:真后端 GET /status 无条件带这一块,值取自 attachments.limits(),不在这里手抄。
+// 手抄那份的 accept 只列了 8 个扩展名,而后端认 20 个 —— .docx/.txt/.webp 之流在这份桩里
+// 会被当坏格式灰掉,拍出来的就是产品里不存在的界面;它还游离在
+// test_limits_fixture_matches_backend 那道锁之外,后端加一种格式它不会红。
+const LIMITS = require('./_fixtures_steward_limits.json');
 
 const TASK_ID = 't1';
 const TS = '2026-07-27T09:05:00Z';

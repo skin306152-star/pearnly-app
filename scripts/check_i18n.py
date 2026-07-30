@@ -31,6 +31,10 @@ import sys
 from pathlib import Path
 from typing import Dict, Set
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from js_key_scan import DICT_KEY_DEF  # noqa: E402
+
 _ROOT = Path(__file__).resolve().parents[1]
 # REFACTOR-C1(2026-05-25)· I18N 字典从 home.js 抽到 static/i18n-data.js(window.I18N)·
 # 优先读 i18n-data.js · 不存在则回退 home.js(兼容老结构 / 万一回滚)
@@ -67,9 +71,6 @@ def parse_i18n_blocks(text: str) -> Dict[str, Set[str]]:
     # 从 i18n_start 开始 · 找 4 个 ^    lang: { 块
     # 每个块的结束: 同缩进 ^    }, (跟开始 lang: { 的缩进相同)
     lang_block_re = re.compile(r"^    (\w+):\s*\{\s*$")
-    # 块内的 key: 'value' 形式 · 注意带 quote 的 key (zh-TW 可能用引号包裹)
-    # · 但 home.js 的 lang key 是 zh/en/th/ja 这种简单 ident,所以 \w+ 够.
-    key_in_block_re = re.compile(r"^\s*['\"]([^'\"]+)['\"]\s*:")
 
     current_lang = None
     current_keys: Set[str] = set()
@@ -93,9 +94,11 @@ def parse_i18n_blocks(text: str) -> Dict[str, Set[str]]:
                 current_lang = None
                 # 不 break 因为还有下一个 lang 块
                 continue
-            km = key_in_block_re.match(ln)
-            if km:
-                current_keys.add(km.group(1))
+            # 逐行 finditer,不是 match:一行挤两条词条时 match 只认第一条,后一条从上线起
+            # 就没被对拍过(实测 14 个键:contact-line-label / dxi-st1s… / user-menu-logout),
+            # 闸自报「4 语各 4975 keys · 0 missing」而真值是 4989。判据见 DICT_KEY_DEF。
+            for km in DICT_KEY_DEF.finditer(ln):
+                current_keys.add(km.group(1) or km.group(2))
 
     return blocks
 

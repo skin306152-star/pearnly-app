@@ -61,7 +61,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from js_key_scan import call_keys, in_comment, line_of  # noqa: E402
+from js_key_scan import DICT_KEY_DEF, call_keys, in_comment, line_of  # noqa: E402
 
 # 报告是中文的,而 Windows 控制台默认码页(本机 cp874)编不了 —— 不接管 stdout 的话第一行
 # print 就 UnicodeEncodeError 退 1,跟真 FAIL 同一个退出码,分不出是闸红还是环境崩。
@@ -72,16 +72,6 @@ else:
 
 ROOT = Path(__file__).resolve().parent.parent
 BASELINE = ROOT / "scripts" / "home_i18n_refs_baseline.txt"
-
-# window.I18N 是两层:`    zh: {` 之下全是 `'key': '文案',`。⚠️ 别按缩进认键 —— 一行里挤
-# 着两条词条的地方有的是(i18n-data.js:1073 就是 'help-modal-title' 和 'help-modal-tip'
-# 同行),按行首认会漏掉后一条,于是闸把一个明明有定义的键报成落空。建闸时正是这么假红了
-# 8 处。判据 = 前面是 { 或 , 或行首、后面紧跟冒号,charset 按真源(只有 - . _ 三种非字母)。
-# tests 里有 node eval 交叉验证锁着这条正则:多认一个少认一个,那条测试先红。
-_DEF = re.compile(
-    r"(?:^|[{,])\s*(?:'([A-Za-z_$][\w.$-]*)'|\"([A-Za-z_$][\w.$-]*)\")\s*:",
-    re.M,
-)
 
 # /home 的键带连字符和点:dxb-up-title / agent.ok.notifications / set-group-about。
 # ⚠️ 跟 /ai 那道闸(键只有 [A-Za-z_]\w*)不同,别互抄。
@@ -123,7 +113,7 @@ def defined_keys(root):
     if not src.is_file():
         return set()
     text = src.read_text(encoding="utf-8")
-    return {m.group(1) or m.group(2) for m in _DEF.finditer(text)}
+    return {m.group(1) or m.group(2) for m in DICT_KEY_DEF.finditer(text)}
 
 
 def _defines_getter(text, name):

@@ -13,12 +13,26 @@ check_e2e_stub_contracts 扫的是桩的回包对象,跟词典半点关系没有
 
 上层调用方需要提供的只有一样:键的字符集正则(/ai 是 `[A-Za-z_]\\w*`,/home 的键带连字符
 和点,如 `dxb-up-title` / `agent.ok.notifications`)。
+
+另有一条 DICT_KEY_DEF 管「词典本尊里哪些字面量是词条键」,与上面两层无关,但同样被两道闸
+共用(check_home_i18n_refs 的定义侧、check_i18n 的语言块对拍)—— 它踩过的坑写在常量上面。
 """
 
 import re
 
 _QUOTES = "'\"`"
 _SCAN_LIMIT = 2000
+
+# static/i18n-data.js 的 window.I18N 是两层:`    zh: {` 之下全是 `'key': '文案',`。
+# ⚠️ 别按行首认键 —— 一行里挤着两条词条的地方有的是(i18n-data.js:1073 就是
+# 'help-modal-title' 和 'help-modal-tip' 同行)。按行首认会漏掉后一条:/home 那道闸建闸当天
+# 因此把 8 个有定义的键报成落空;check_i18n 因此有 14 个键从上线起就没被对拍过。
+# 判据 = 前面是行首 / { / ,,后面紧跟冒号,charset 按真源(只有 - . _ 三种非字母)。
+# 两侧的 node eval 交叉验证锁着它:多认一个少认一个,那两条测试先红。
+DICT_KEY_DEF = re.compile(
+    r"(?:^|[{,])\s*(?:'([A-Za-z_$][\w.$-]*)'|\"([A-Za-z_$][\w.$-]*)\")\s*:",
+    re.M,
+)
 
 # 字面量得站在「键位」上才算键:左邻是 ( ? : || &&,右邻是 ) , : ? || &&。
 # 这条邻居规则排掉两类同样是字面量、却不是键的东西 ——

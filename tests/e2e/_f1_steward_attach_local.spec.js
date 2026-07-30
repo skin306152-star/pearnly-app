@@ -131,6 +131,42 @@ function receiptTask() {
     };
 }
 
+const TASK_ID = 't1';
+const TS = '2026-07-27T09:05:00Z';
+const REPLY = '收到 2 份:1 份 GL 台账,1 份认不出是什么。想让我做哪一样?';
+
+// 送出那一轮回的两件。POST /messages 与会话重建口读的是同一张 steward_attachments,
+// 所以两处必须给同一份 —— 各编各的,桩就自洽了而产品里对不上。
+function sentAttachments() {
+    return [attachment('u1', 'gl.pdf', 'gl_ledger'), attachment('u2', 'mystery.pdf', 'unknown')];
+}
+
+// GET /sessions/{sid} 的投影,逐键抄 routes.get_session:
+//   store.public_message() → id / role / text / ts (+ task_id)
+//   attachments.files_of() → 有件才带 attachments 键
+// ⚠️ 这口回空是编了一个真后端做不出的状态:add_message 与 attach_to_message 落在
+// orchestrator 的同一个事务里(orchestrator.py:54-67),POST /messages 一旦回了
+// user_message_id,这条 GET 就再报不出「本会话零条消息」。而 syncSession 是整份替换,
+// 桩一回空,刚上屏的那一轮连人带件全被冲掉。
+function sessionView(posts) {
+    const messages = [];
+    posts.forEach((body, i) => {
+        const ids = (body.action ? body.action.attachment_ids : body.attachment_ids) || [];
+        const files = sentAttachments().filter((a) => ids.indexOf(a.attachment_id) >= 0);
+        const user = { id: 'um' + (i + 1), role: 'user', text: body.text || '', ts: TS };
+        if (files.length) user.attachments = files;
+        messages.push(user, {
+            id: 'm' + (i + 1),
+            role: 'steward',
+            text: REPLY,
+            ts: TS,
+            task_id: TASK_ID,
+        });
+    });
+    if (!messages.length) return { session_id: 's1', messages };
+    return { session_id: 's1', messages, current_task_id: TASK_ID };
+}
+
 function json(route, payload) {
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(payload) });
 }
@@ -139,6 +175,7 @@ async function boot(page, opts) {
     opts = opts || {};
     const posts = [];
     const uploads = [];
+    const sessionGets = { n: 0 };
 
     await page.route('**/api/me**', (r) =>
         r.fulfill({ contentType: 'application/json', body: '{"username":"skin"}' })
@@ -172,18 +209,18 @@ async function boot(page, opts) {
             return json(r, {
                 message_id: 'm1',
                 user_message_id: 'um1',
-                reply: '收到 2 份:1 份 GL 台账,1 份认不出是什么。想让我做哪一样?',
-                task_id: 't1',
+                reply: REPLY,
+                task_id: TASK_ID,
                 task_status: 'waiting_user',
-                attachments: [
-                    attachment('u1', 'gl.pdf', 'gl_ledger'),
-                    attachment('u2', 'mystery.pdf', 'unknown'),
-                ],
+                attachments: sentAttachments(),
             });
         }
         if (p.indexOf('/steward/tasks/') >= 0) return json(r, receiptTask());
+        // 回执卡这类 waiting_user 任务首拍就是终态,前端据此重建一次会话(ai-steward.js
+        // loadTask 的终态分支)—— 这口给的是服务端权威消息流,不是空盘。
         if (/\/steward\/sessions\/[^/]+$/.test(p)) {
-            return json(r, { session_id: 's1', messages: [] });
+            sessionGets.n += 1;
+            return json(r, sessionView(posts));
         }
         return json(r, { session_id: 's1' });
     });
@@ -199,7 +236,7 @@ async function boot(page, opts) {
     });
     await page.goto(`${BASE}/static/dist/ai.html#/steward`);
     await page.waitForSelector('#v-steward.on #stwInput', { state: 'visible', timeout: 15000 });
-    return { posts, uploads };
+    return { posts, uploads, sessionGets };
 }
 
 // 拖拽:构造真 DataTransfer 再派发真 dragenter/drop(不是直接调 addFiles —— 那样
@@ -457,6 +494,14 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
 
     test('纯文件送出 → 气泡下有只读原件行 · 回执卡按钮把参数原样带回', async ({ page }) => {
         const h = await boot(page);
+        // 任务口先扣住:回执卡首拍即终态会顺手重建一次会话,不扣住就分不清气泡下那两颗
+        // 件是 POST 回包给的还是重建口给的 —— 两条路各断一次,坏哪条都红。
+        let releaseTask;
+        const taskHeld = new Promise((resolve) => (releaseTask = resolve));
+        await page.route('**/api/ai/steward/tasks/**', async (r) => {
+            await taskHeld;
+            await r.fallback();
+        });
         await dragFiles(page, [
             { name: 'gl.pdf', body: 'x', type: 'application/pdf' },
             { name: 'mystery.pdf', body: 'y', type: 'application/pdf' },
@@ -473,11 +518,18 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await expect(page.locator('.stw-att-chip')).toHaveCount(0);
 
         // 用户气泡下的只读原件行:带鉴权头下载的按钮,不是会 401 的裸 <a>。
+        // 这一遍读的是 POST /messages 回包里的 attachments(会话还没重建)。
         const pills = page.locator('.stw-msg.me .stw-file-pill');
         await expect(pills).toHaveCount(2);
         await expect(pills.first()).toContainText('gl.pdf');
         await expect(pills.nth(1)).toContainText('认不出是什么');
         expect(await page.locator('.stw-msg.me a').count()).toBe(0);
+
+        // 放行任务口 → 首拍即终态 → 重建会话。重建是整份替换,那一轮连人带件必须活下来。
+        releaseTask();
+        await expect.poll(() => h.sessionGets.n).toBeGreaterThan(0);
+        await expect(pills).toHaveCount(2);
+        await expect(page.locator('.stw-msg.agent .stw-bubble')).toContainText('想让我做哪一样');
 
         // 左窗回执卡:表格是渲好的人话,三步不许把「等你选」画成「在跑」。
         await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });

@@ -134,15 +134,25 @@ def _defines_getter(text, name):
     return False
 
 
-def exported_getters(files):
+def documents(root):
+    """[(相对路径, 正文)] · 全树读一遍。
+
+    下面两趟(先找共享取词桥、再收引用)吃的是同一份正文;各读各的等于把 3MB 的 src/home
+    读两遍,而第二趟拿到的还可能是中途被改过的另一个版本。
+    """
+    return [
+        (p.relative_to(root).as_posix(), p.read_text(encoding="utf-8")) for p in source_files(root)
+    ]
+
+
+def exported_getters(docs):
     """全树扫一遍:哪些名字是 `export function` 出去的取词桥(今天只有 kbT)。"""
     names = set()
-    for path in files:
-        text = path.read_text(encoding="utf-8")
+    for _rel, text in docs:
         for name in _WRAPPERS:
-            if re.search(r"export\s+function\s+%s\s*\(" % re.escape(name), text):
-                if _defines_getter(text, name):
-                    names.add(name)
+            exported = re.search(r"export\s+function\s+%s\s*\(" % re.escape(name), text)
+            if exported and _defines_getter(text, name):
+                names.add(name)
     return names
 
 
@@ -164,12 +174,10 @@ def _active_getters(text, shared):
 
 def key_references(root):
     """[(相对路径, 行号, 键)] · 按文件、行号排。"""
-    files = source_files(root)
-    shared = exported_getters(files)
+    docs = documents(root)
+    shared = exported_getters(docs)
     refs = []
-    for path in files:
-        text = path.read_text(encoding="utf-8")
-        rel = path.relative_to(root).as_posix()
+    for rel, text in docs:
         names = _active_getters(text, shared)
         # 空集合拼进 (?:%s) 会变成"匹配任何左括号",把 ('GET') 这种普通字面量当键报出来。
         if names:

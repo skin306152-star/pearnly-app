@@ -35,6 +35,13 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# 引号/注释这层扫描跟两道词典引用闸逐字相同(js_key_scan 顶注写了为什么它不能各抄一份):
+# 转义、未闭合、注释里的撇号,每一条都是踩过才补上的,分家就等于以后每个 bug 修两遍。
+# 上面那半截「哪些字面量算键」不共用 —— 本闸认的是回包对象的键位,不是取词调用点。
+from js_key_scan import in_comment, line_of, read_string, skip_comment  # noqa: E402
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 else:
@@ -104,37 +111,13 @@ class Site:
         self.keys, self.loose = keys, loose
 
 
-def _read_string(text, i):
-    quote = text[i]
-    j = i + 1
-    while j < len(text):
-        if text[j] == "\\":
-            j += 2
-            continue
-        if text[j] == quote:
-            return text[i + 1 : j], j + 1
-        j += 1
-    return None, len(text)
-
-
-def _skip_comment(text, i):
-    nxt = text[i + 1 : i + 2]
-    if nxt == "/":
-        end = text.find("\n", i)
-        return len(text) if end < 0 else end
-    if nxt == "*":
-        end = text.find("*/", i)
-        return len(text) if end < 0 else end + 2
-    return i
-
-
 def _skip_ws(text, i):
     while i < len(text):
         if text[i].isspace():
             i += 1
             continue
         if text[i] == "/":
-            j = _skip_comment(text, i)
+            j = skip_comment(text, i)
             if j != i:
                 i = j
                 continue
@@ -148,12 +131,12 @@ def _skip_value(text, i):
     while i < len(text):
         c = text[i]
         if c == "/":
-            j = _skip_comment(text, i)
+            j = skip_comment(text, i)
             if j != i:
                 i = j
                 continue
         if c in _QUOTES:
-            _, i = _read_string(text, i)
+            _, i = read_string(text, i)
             continue
         if c in "([{":
             depth += 1
@@ -182,7 +165,7 @@ def entries(text, i):
         if text.startswith("...", j):
             return None
         if text[j] in "'\"":
-            key, j = _read_string(text, j)
+            key, j = read_string(text, j)
             if key is None:
                 return None
         else:
@@ -287,7 +270,7 @@ def _fulfill_keys(text, paren):
         if m:
             return expr_keys(text, m.end(), _skip_value(text, m.end()))
         if text[start] in _QUOTES:
-            body, _ = _read_string(text, start)
+            body, _ = read_string(text, start)
             return _json_string_keys(body) if body else None
     return None
 
@@ -300,20 +283,14 @@ def _norm(raw):
     return s.rstrip("$").split("?", 1)[0]
 
 
-def _in_comment(text, pos):
-    line_start = text.rfind("\n", 0, pos) + 1
-    prefix = _STR.sub("", text[line_start:pos])
-    return "//" in prefix or prefix.lstrip().startswith(("*", "/*"))
-
-
 def _carriers(text):
     """(路径判据结束下标, 归一化路径) —— 字符串与 /re/.test() 两种写法都收。"""
     for m in _STR.finditer(text):
         raw = m.group(1) or m.group(2) or m.group(3) or ""
-        if "/steward" in raw and not _in_comment(text, m.start()):
+        if "/steward" in raw and not in_comment(text, m.start()):
             yield m.end(), _norm(raw)
     for m in _RE_TEST.finditer(text):
-        if "steward" in m.group(1) and not _in_comment(text, m.start()):
+        if "steward" in m.group(1) and not in_comment(text, m.start()):
             yield _skip_value(text, m.end()) + 1, _norm(m.group(1))
 
 
@@ -324,7 +301,7 @@ def scan(path, rel):
         contract = next((c for c in CONTRACTS if c["path"].search(url)), None)
         if not contract:
             continue
-        line = text.count("\n", 0, end) + 1
+        line = line_of(text, end)
         head = _HEAD.search(text, end, end + _HEAD_WINDOW)
         if not head or not _GLUE.match(text[end : head.start()]):
             # 跟不到回包:可能是计数分支、断言里的路径比较,也可能是先做了别的事才 fulfill。

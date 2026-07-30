@@ -519,6 +519,8 @@ Object.assign(window.__AI_I18N_JA__, {
     intake_excluded_failed: 'タイプを変更できませんでした。再試行してください。',
     intake_resume_continue: 'アップロードを続行',
     intake_resume_dismiss: '閉じる',
+    intake_failed_batch_n:
+        'この {n} 件はまだシステムに入っていません。再試行では該当ファイルだけを送信し、受け入れ済みの資料には影響しません。',
     intake_retry_failed: '失敗したファイルを再試行',
     // FD-0d · フロントデスク(#/desk · ゴール駆動フロントドア)
     nav_desk: 'フロントデスク',

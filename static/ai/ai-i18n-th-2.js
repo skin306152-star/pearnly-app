@@ -509,6 +509,8 @@ Object.assign(window.__AI_I18N_TH__, {
     intake_excluded_failed: 'เปลี่ยนประเภทไม่สำเร็จ กรุณาลองใหม่',
     intake_resume_continue: 'อัปโหลดต่อ',
     intake_resume_dismiss: 'ปิด',
+    intake_failed_batch_n:
+        'ไฟล์ {n} รายการนี้ยังไม่เข้าระบบ · การลองใหม่จะส่งเฉพาะไฟล์เหล่านี้ ไฟล์ที่รับแล้วไม่ได้รับผลกระทบ',
     intake_retry_failed: 'ลองไฟล์ที่ล้มเหลวใหม่',
     // FD-0d · เคาน์เตอร์ทำงาน(#/desk · ประตูหน้าขับเคลื่อนด้วยเป้าหมาย)
     nav_desk: 'เคาน์เตอร์',

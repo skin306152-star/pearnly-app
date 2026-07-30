@@ -482,6 +482,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     intake_excluded_failed: '改判失败，请重试。',
     intake_resume_continue: '继续上传',
     intake_resume_dismiss: '忽略',
+    // 失败批横幅上原因行与「重试失败的文件」之间那一句:只答「还有几件在你这边、重传发的是哪几件」。
+    intake_failed_batch_n: '这 {n} 个文件还没进系统,重传只发它们,已收进的不受影响。',
     intake_retry_failed: '重试失败的文件',
     // FD-0d · 总台(#/desk · 目标驱动前门)
     nav_desk: '总台',

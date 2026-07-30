@@ -234,23 +234,6 @@ class TaskRenderPureTests(unittest.TestCase):
         self.assertEqual(out[1:], ["", ""])
 
 
-class ActionWiringTests(unittest.TestCase):
-    """左窗画出来的每个 data-action 都得有人接 —— 摆一个点了没反应的按钮比不摆更糟。"""
-
-    def test_every_rendered_action_has_a_handler(self):
-        rendered = set(
-            re.findall(
-                r'data-action="([a-z-]+)"', (AI_DIR / "ai-steward-render.js").read_text("utf-8")
-            )
-        )
-        handlers = "".join(
-            (AI_DIR / name).read_text("utf-8")
-            for name in ("ai-steward.js", "ai-steward-actions.js", "ai-steward-attach.js")
-        )
-        missing = sorted(a for a in rendered if f"'{a}'" not in handlers)
-        self.assertEqual(missing, [], f"这些按钮没人接:{missing}")
-
-
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class ChatRenderPureTests(unittest.TestCase):
     def test_role_class_only_user_is_me(self):
@@ -405,7 +388,10 @@ def _unwired(emitted, dispatched) -> list:
 
 class StewardActionWiringTests(unittest.TestCase):
     """render 层吐的每个 data-action 都得在某个 onClick 链里有一支 —— 名字对不上就是一颗
-    点了没反应的按钮,静态上完全看不出来(A 文件引用 B 文件的 id 必须配闸,老坑)。"""
+    点了没反应的按钮,静态上完全看不出来(A 文件引用 B 文件的 id 必须配闸,老坑)。
+
+    收编了此前只扫 ai-steward-render.js 的那道弱闸:它拿 `'名字' in 拼起来的源码` 当判据,
+    动作名在注释里被提一句就算「有人接」。两道闸并存时弱的那道会先绿,掩掉强的那道。"""
 
     _EMITTERS = ("ai-steward-render.js", "ai-steward-authz-render.js", "ai-steward-chat-render.js",
                  "ai-steward-attach-render.js", "ai-steward-bar.js")  # fmt: skip

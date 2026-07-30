@@ -25,7 +25,7 @@ import shutil
 import unittest
 from pathlib import Path
 
-from tests.unit._node_harness import AI_DIR, _run_node
+from tests.unit._node_harness import AI_DIR, BAHT, _run_node
 
 FAIL = str(AI_DIR / "ai-fail-render.js")
 STATE = str(AI_DIR / "ai-state.js")
@@ -41,6 +41,29 @@ PRELUDE = f"""
     require({json.dumps(API)});
     const f = require({json.dumps(FAIL)});
     """
+
+_LANGS = ("zh", "th", "en", "ja")
+
+
+def _require(name: str) -> str:
+    return f"require({json.dumps(str(AI_DIR / name))});\n"
+
+
+# 带真词典 + 真 at() + 真 money() 的变体:402 那几个数要断言用户真读到的那句话和那个金额
+# (key 对了金额还能是 "฿ 0.00" 这种假零),不是 key(同 test_ai_blocked_reasons.py 手法)。
+REAL_PRELUDE = (
+    """
+    global.window = global;
+    global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+    """
+    + "".join(_require(f"ai-i18n-{lang}.js") + _require(f"ai-i18n-{lang}-2.js") for lang in _LANGS)
+    + _require("ai-i18n-fail.js")
+    + _require("ai-i18n.js")
+    + _require("ai-state.js")
+    + _require("ai-format.js")
+    + _require("ai-api.js")
+    + f"const f = require({json.dumps(FAIL)});\n"
+)
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -162,6 +185,123 @@ class FailHtmlTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class CreditsFactsTests(unittest.TestCase):
+    """402 的三个数上屏(handover §3.10):此前失败卡只说「OCR 余额不足」,后端明明把
+    余额 / 这批要花多少 / 本月已识别几页都送到浏览器了,前端一个都没说。
+
+    产地只有一处 —— services/workorder/steps/ocr_balance.batch_denial(+ shortfall「还差
+    多少」)。另有六个端点同码返 402 但不带这些数,所以每一句都必须能单独消失。"""
+
+    def _text(self, detail, file_count=0, lang="zh"):
+        """渲染后用户真读到的那段话(剥标签,与浏览器 textContent 同口径)。"""
+        html = _run_node(f"""
+            {REAL_PRELUDE}
+            global.atSetLang({json.dumps(lang)});
+            process.stdout.write(JSON.stringify(
+                f.creditsFactsHtml({json.dumps(detail)}, {json.dumps(file_count)})
+            ));
+            """)
+        return {"html": html, "text": re.sub(r"<[^>]+>", "", html)}
+
+    # 真实体:ocr_balance.batch_denial 的五键(余额 0 / 一件一页 ฿1.50 / 本月已识别 12 页)。
+    _FULL = {
+        "code": "insufficient_balance",
+        "balance": 0.0,
+        "estimated_cost": 1.5,
+        "pages_used_this_month": 12,
+        "shortfall": 1.5,
+    }
+
+    def test_all_three_numbers_reach_the_card(self):
+        out = self._text(self._FULL, file_count=1)
+        self.assertIn("1 个文件", out["text"])
+        self.assertIn(f"{BAHT}1.50", out["text"])  # 这批要花多少 / 还差多少
+        self.assertIn(f"{BAHT}0.00", out["text"])  # 账上还有多少(真零,不是缺数)
+        self.assertIn("至少充", out["text"])
+        self.assertIn("12 页", out["text"])
+        self.assertNotIn("{", out["text"])  # 占位符没漏上屏
+
+    def test_thai_card_says_the_same_numbers(self):
+        out = self._text(self._FULL, file_count=1, lang="th")
+        self.assertIn("ยอดคงเหลือ", out["text"])
+        self.assertIn(f"{BAHT}1.50", out["text"])
+        self.assertIn("เดือนนี้อ่านไปแล้ว 12 หน้า", out["text"])
+        self.assertNotIn("balance", out["text"])
+
+    def test_unknown_file_count_drops_only_the_count(self):
+        out = self._text(self._FULL)
+        self.assertIn(f"{BAHT}1.50", out["text"])
+        self.assertNotIn("个文件", out["text"])
+
+    def test_body_without_shortfall_degrades_instead_of_inventing_one(self):
+        # 另外六个 402 端点(recon / vat_excel / knowledge …)不带 shortfall。
+        body = dict(self._FULL)
+        del body["shortfall"]
+        out = self._text(body, file_count=1)
+        self.assertIn(f"{BAHT}1.50", out["text"])
+        self.assertNotIn("至少充", out["text"])
+        for ghost in ("undefined", "NaN", "—", "{"):
+            self.assertNotIn(ghost, out["text"], f"缺 shortfall 时渲染出了 {ghost}")
+
+    def test_null_shortfall_is_the_same_as_absent(self):
+        # 余额够却仍被拒时后端给 null(batch_denial),不是 0。
+        out = self._text(dict(self._FULL, shortfall=None), file_count=1)
+        self.assertNotIn("至少充", out["text"])
+        self.assertNotIn("undefined", out["text"])
+
+    def test_zero_pages_this_month_says_nothing(self):
+        # 「这个月已经识别了 0 页」是零信息,占一行还让人以为出了什么事。
+        out = self._text(dict(self._FULL, pages_used_this_month=0), file_count=1)
+        self.assertNotIn("这个月", out["text"])
+        self.assertIn("至少充", out["text"])
+
+    def test_missing_balance_drops_the_sentence_rather_than_printing_a_fake_zero(self):
+        # money(null) 吐 ฿ 0.00(Number(null)===0):把「不知道余额」说成「余额是零」。
+        out = self._text(dict(self._FULL, balance=None), file_count=1)
+        self.assertNotIn("账上还有", out["text"])
+        self.assertNotIn(f"{BAHT}0.00", out["text"])
+        self.assertIn("至少充", out["text"])  # 还差多少照说
+
+    def test_string_numbers_are_not_trusted(self):
+        # 后端给的是 JSON number;是串就说明这不是那条契约,别硬渲染。
+        out = self._text({"balance": "0", "estimated_cost": "1.5"}, file_count=1)
+        self.assertEqual(out["html"], "")
+
+    def test_no_numbers_at_all_renders_nothing(self):
+        self.assertEqual(self._text({"code": "insufficient_balance"}, file_count=2)["html"], "")
+        self.assertEqual(self._text(None)["html"], "")
+
+    def _note(self, code, status, opts):
+        return _run_node(f"""
+            {REAL_PRELUDE}
+            process.stdout.write(JSON.stringify(
+                f.noteHtml('fail_step_upload', {json.dumps(code)}, {json.dumps(status)},
+                    {json.dumps(opts)})
+            ));
+            """)
+
+    def test_note_html_carries_the_numbers_and_the_way_out_together(self):
+        html = self._note("insufficient_balance", 402, {"detail": self._FULL, "fileCount": 1})
+        self.assertIn("余额不足", html)
+        self.assertIn(f"{BAHT}1.50", html)
+        self.assertIn('href="#/settings?focus=billing"', html)
+
+    def test_non_credit_failures_never_show_money(self):
+        html = self._note("generic", 500, {"detail": self._FULL, "fileCount": 1})
+        self.assertNotIn("฿", html)
+
+    def test_reason_key_override_suppresses_the_numbers_too(self):
+        # 覆盖场景 = 前一步其实已经成了,这时报「这批要花多少」同样是误导。
+        html = self._note(
+            "insufficient_balance",
+            402,
+            {"reasonKey": "fail_created_but_stale", "detail": self._FULL, "fileCount": 1},
+        )
+        self.assertNotIn("฿", html)
+        self.assertNotIn("needs-paths", html)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class FailedBatchBannerTests(unittest.TestCase):
     """收料失败批横幅:此前只有「N 个文件上传失败 + 重传」,原因被整个吞掉。"""
 
@@ -210,6 +350,74 @@ class FailedBatchBannerTests(unittest.TestCase):
         )
         self.assertEqual(html.count("fail_server"), 1)
         self.assertIn("intake_failed_batch_n 2", html)
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class UploadDetailReachesTheCardTests(unittest.TestCase):
+    """整条链跑真模块:api 抛的 402 → 队列事件 → session.failedBatches → 卡上的字。
+
+    渲染层单独测绿是不够的 —— 这三个数在浏览器里躺了一个月没上屏,断点就在队列层把
+    err.detail 丢了(渲染函数写得再对也没数可渲染,见 memory:verify-target-must-be-real-content)。
+    这里连 ai-intake-queue.js / ai-intake-render.js / ai-intake-manifest.js 一起真 require,
+    只有 api 是替身。"""
+
+    _BODY = {
+        "code": "insufficient_balance",
+        "balance": 0.0,
+        "estimated_cost": 1.5,
+        "pages_used_this_month": 12,
+        "shortfall": 1.5,
+    }
+
+    def _upload_failing_with(self, err_props):
+        """跑一趟真上传(api 直接拒),返回落进会话的失败批 + 横幅 HTML。"""
+        return _run_node(f"""
+            {REAL_PRELUDE}
+            {_require("ai-intake-render.js")}
+            {_require("ai-intake-manifest.js")}
+            {_require("ai-intake-queue.js")}
+            const session = {{
+                api: {{ addMaterials: function () {{
+                    return Promise.reject(Object.assign(new Error('x'), {json.dumps(err_props)}));
+                }} }},
+                orderId: 'wo-1',
+                manifest: {{ accepted: 0, rejected: [], zipExpanded: 0 }},
+                failedBatches: [],
+            }};
+            const actions = global.AI.intakeQueue.create(() => session, () => {{}});
+            actions.upload([{{ name: 'a.pdf', size: 10 }}]).then(function () {{
+                process.stdout.write(JSON.stringify({{
+                    batches: session.failedBatches,
+                    html: global.AI.intakeManifest.failedBatchesHtml(session.failedBatches),
+                }}));
+            }});
+            """)
+
+    def test_the_402_body_survives_the_queue_and_lands_on_the_card(self):
+        out = self._upload_failing_with(
+            {"code": "insufficient_balance", "status": 402, "detail": self._BODY}
+        )
+        self.assertEqual(out["batches"][0]["detail"], self._BODY)  # 队列没把 detail 丢掉
+        html = out["html"]
+        self.assertIn("OCR 余额不足", html)
+        self.assertIn(f"{BAHT}1.50", html)  # 这批要花多少 / 还差多少
+        self.assertIn("1 个文件", html)
+        self.assertIn("12 页", html)
+        self.assertIn('href="#/settings?focus=billing"', html)
+
+    def test_a_402_with_no_body_still_renders_a_clean_card(self):
+        # 别的端点的 402(recon / vat_excel / knowledge)不带这些数:少说几句,不出空壳。
+        out = self._upload_failing_with({"code": "insufficient_balance", "status": 402})
+        html = out["html"]
+        self.assertIsNone(out["batches"][0]["detail"])
+        self.assertIn("OCR 余额不足", html)
+        self.assertIn('href="#/settings?focus=billing"', html)
+        for ghost in ("฿", "undefined", "NaN", "{"):
+            self.assertNotIn(ghost, html, f"没有数的 402 卡上出现了 {ghost}")
+
+    def test_a_non_money_failure_never_grows_a_money_line(self):
+        out = self._upload_failing_with({"code": "generic", "status": 500})
+        self.assertNotIn("฿", out["html"])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

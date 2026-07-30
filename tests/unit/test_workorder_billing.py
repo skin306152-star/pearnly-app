@@ -188,6 +188,7 @@ class MaterialsGateTests(_BillingTestCase):
         self.assertEqual(ctx.exception.detail["balance"], 0.0)
         self.assertEqual(ctx.exception.detail["estimated_cost"], 1.5)
         self.assertEqual(ctx.exception.detail["pages_used_this_month"], 5)
+        self.assertEqual(ctx.exception.detail["shortfall"], 1.5)  # 余额 0 → 这批全得充
         self.assertEqual(upload.reads, 0)  # 一个字节都没读
         self.assertEqual(self.charges.calls, [])  # 零扣费
 
@@ -215,6 +216,31 @@ class MaterialsGateTests(_BillingTestCase):
         self._statuses([_broke(pages_used_this_month=0)])
         detail = ocr_balance.batch_denial(_OWNER_USER, _TENANT, 2)
         self.assertEqual(detail["estimated_cost"], float(pricing.estimate_pdf_cost_thb(0, 2)))
+
+    def test_denial_says_how_much_short_across_the_price_tier(self):
+        # 失败卡要回答「充多少够」。跨档:198 页已用 + 5 页 → 2×1.50 + 3×0.75 = 5.25,
+        # 余额 2.25 → 还差 3.00。缺口与 estimated_cost 出自同一条 Decimal 定价。
+        self._statuses([_ok(allowed=False, balance_thb=2.25, pages_used_this_month=198)])
+        detail = ocr_balance.batch_denial(_OWNER_USER, _TENANT, 5)
+        self.assertEqual(detail["estimated_cost"], float(pricing.estimate_pdf_cost_thb(198, 5)))
+        self.assertEqual(detail["shortfall"], 3.0)
+
+    def test_negative_balance_is_part_of_the_hole_to_fill(self):
+        # 余额欠着的账号:缺口不填上窟窿,用户照着数字充完还是跑不动。
+        self._statuses([_ok(allowed=False, balance_thb=-1.5)])
+        self._swap(_estimate=lambda used, pages: 1.5)
+        self.assertEqual(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 1)["shortfall"], 3.0)
+
+    def test_no_shortfall_when_the_balance_already_covers_the_batch(self):
+        # 余额够却仍被拒(非余额原因)→ 缺口给 null,不报「还差 ฿0.00」把人支去充值。
+        self._statuses([_ok(allowed=False, balance_thb=99.0)])
+        self._swap(_estimate=lambda used, pages: 1.5)
+        self.assertIsNone(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 1)["shortfall"])
+
+    def test_zero_estimate_never_asks_for_money(self):
+        self._statuses([_broke()])
+        self._swap(_estimate=lambda used, pages: 0.0)
+        self.assertIsNone(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 1)["shortfall"])
 
     def test_gate_asks_about_the_account_owner_not_the_uploading_user(self):
         # 豁免逐人判(users.is_billing_exempt):闸问上传人、扣费问账套 owner = 两个不同的人,

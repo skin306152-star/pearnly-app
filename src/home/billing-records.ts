@@ -481,3 +481,6 @@ async function onExport() {
         renderExportBtn();
     }
 }
+
+// ES module(隔离本文件的 _t/_auth 等同名局部 · 不落进脚本全局作用域跟同组文件互撞)。
+export {};

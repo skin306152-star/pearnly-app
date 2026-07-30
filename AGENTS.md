@@ -103,6 +103,7 @@ sh scripts/git-hooks/pre-push     # Git Bash
 | **ERP 复核工作簿 / 回导闭环** | `docs/erp/ROUNDTRIP-REVIEW-WORKBOOK.md`(会计导出→改→回导重推 · 方向靠 Sheet 不靠猜 · 四个反复踩的坑) |
 | **LINE 进票据(做后端前必读)** | `docs/line-platform/02-procurement-canon.md`(采购进项产品正本·旧讨论冲突裁决·P1E口径)+ `docs/smart-intake/09`(图片识别核心)+ `docs/smart-intake/10`(文本路:回复护栏/意图路由/模糊字段映射)· 两条腿共用字段 schema/确认卡/下游 |
 | **对话 Agent(当前主线 · M1 WP1~5 已上线)** | `docs/agent/MASTER-PLAN.md`(全景 + 为啥"插座插头" + 里程碑 + 工作包)· `docs/agent/M1-SOCKET-DESIGN.md`(技术总纲)· `docs/agent/CONVERSATION-SPEC.md`(对话文案规范)· `services/agent/README.md`(每文件职责) |
+| **智能管家 steward(/ai 对话入口 · 后端 40 模块 20 工具)** | `docs/ai/STEWARD-MAP.md`(模块地图 + 工具表 + 一条请求的全链 + 两个 flag 的真实可见面 + 本地跑法与 worker 抢单的坑) |
 | **产品北极星 · 模块化平台(防跑偏)** | `docs/PRODUCT_VISION_MODULAR.md`(身份一句话 + 底座/模块/出口三层 + 模块化六原则 + 业态套餐)· 加功能前先对一遍 |
 | 为啥这么决策 | `docs/refactor/adr-*.md`(ADR-001~011) |
 | 坑 / 业务红线 / 硬线 | `CLAUDE.md/CLAUDE.md`(轻量版 · 约 90 行) |

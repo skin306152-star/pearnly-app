@@ -142,6 +142,12 @@ if [ -n "$FE_CHANGED" ]; then
   # shellcheck disable=SC2086
   python scripts/check_ai_smell.py $FE_CHANGED || fail "check_ai_smell(源码有 AI 味:注释 emoji / console.log)"
 
+  # /ai 词典引用闸(2026-07-30 加)· check_i18n 只看 static/i18n-data.js,static/ai 那套
+  # 独立词典没人管 → at('intake_failed_batch_n') 落空,标识符原样印在 402 卡上。
+  echo "  · check_ai_i18n_refs(/ai 取词的键必须在某份词典分片里有定义)"
+  python scripts/check_ai_i18n_refs.py \
+    || fail "/ai 词典引用闸(见上方:这个键没定义 · at() 会把 key 原样印到页面上)"
+
   # TS 类型检查(C5 · .ts 的等价 node --check)· 只在改了 .ts 时跑
   if [ -n "$TS_CHANGED" ]; then
     echo "  · tsc --noEmit(TypeScript 类型检查)"

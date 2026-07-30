@@ -75,6 +75,18 @@ jobs:
       - name: eslint (前端模块 lint)
         run: npm run lint
 
+      # eslint 的 flat config 不收 src/**/*.ts(跑上去只报 "no matching configuration"),
+      # tsc 是 TypeScript 源唯一的机械闸。之前只挂在没人装的 pre-push 钩子上 → 20 条
+      # error 在 master 上躺了两周,含一条运行期 ReferenceError。
+      - name: tsc --noEmit (TypeScript 类型闸)
+        run: npm run typecheck
+
+      # /ai 那套独立词典(static/ai/ai-i18n-*.js)不在 check_i18n 的射程里 —— 它只看
+      # static/i18n-data.js。2026-07-30 真浏览器验收因此在 402 卡上抓到生 key
+      # intake_failed_batch_n 原样上屏,而 check_i18n --strict 同时报「0 missing」。
+      - name: check_ai_i18n_refs (/ai 词典引用闸 · 取词的键必须有定义)
+        run: python scripts/check_ai_i18n_refs.py
+
       - name: npm audit (REFACTOR-A6 · 生产依赖 CVE · high 拦门)
         # --omit=dev:本项目 dependencies 为空,vite/esbuild/eslint 等全是 devDependencies
         # (构建/测试工具 · 不随打包产物发给用户)。构建工具的安装期 CVE(如 esbuild

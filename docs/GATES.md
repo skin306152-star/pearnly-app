@@ -4,7 +4,7 @@
 > **本页的用法:① 开工第 0 步把"全套自查"跑一遍拿基线(知道哪些红是别窗口/存量的) ② 干活中途随时跑单道 ③ 收尾跑全套,绿了才 push。**
 > 一键全套(等价 pre-push,不用真推):`sh scripts/git-hooks/pre-push`(在 Git Bash)或逐条跑下表命令。
 
-## 21 道闸 · 查什么 · 怎么提前自查 · 豁免法
+## 22 道闸 · 查什么 · 怎么提前自查 · 豁免法
 
 | 闸 | 触发条件 | 查什么 | 提前自查命令 | 豁免/注意 |
 |---|---|---|---|---|
@@ -19,7 +19,8 @@
 | prettier | 改前端 | 格式(按**提交内容**校验,非工作区) | `npx prettier --check <file>`(home.html/home.js 在 .prettierignore,**禁 prettier --write 它们**) | CRLF 巨石文件别碰格式化 |
 | eslint | 改前端 | 前端真 bug | `npm run lint` | 无 |
 | check_ai_smell | 改前端 | 注释 emoji/console.log 残留 | `python scripts/check_ai_smell.py <files>` | 无,去 AI 味是家规 |
-| tsc | 改 .ts | 类型错 | `npm run typecheck` | 无 |
+| check_ai_i18n_refs | 改 /ai 前端 | `at()`/`t()`/`data-at` 引的键必须在某份 `static/ai/ai-i18n*.js` 里有定义(落空 = 标识符原样印上屏) | `python scripts/check_ai_i18n_refs.py` | **check_i18n 看不见这片**(它只管 static/i18n-data.js);只查"引用得到定义",不查四语齐(各分片语种策略不同);拼接键 `at('pre_' + x)` 不查,由调用方测试兜;反证 `tests/unit/test_ai_i18n_refs_gate.py` |
+| tsc | 改 .ts | 类型错 | `npm run typecheck` | **已进 CI lint job(2026-07-30 · 硬闸)**;eslint 的 flat config 不收 src/**/*.ts,tsc 是 TS 源唯一的机械闸,别指望 eslint 兜 |
 | build+dist 一致 | 改前端 | 改源没重打包=prod 跑旧 bundle | `npm run build` 后 `git add static/dist` + bump `?v=` | main.js/map 的 drift 不算 |
 | check_asset_bundling | 改前端 | 源页明文引资源(view-source 退化)· 覆盖 home/login/admin/console/pos | `python scripts/check_asset_bundling.py` | 新资产进打包清单(pos/console 新 JS 逻辑必进 bundle·仅 *-i18n 数据/pos-sw 可独立) |
 | ui_design_lint 棘轮 | 改前端 | 裸 hex/emoji 图标/自曝文案等,命中数**只许降** | `node scripts/ui_design_lint.mjs --gate` | **注释里的 hex 也计数**;存量降了跑 `--update-baseline` 收紧;写色一律 var() |

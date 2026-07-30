@@ -27,9 +27,17 @@ check_i18n.py --strict 报「4 语 各 4969 keys · 0 missing」:那道闸只看
 """
 
 import argparse
+import io
 import re
 import sys
 from pathlib import Path
+
+# 报告是中文的,而 Windows 控制台默认码页(本机 cp874)编不了 —— 不接管 stdout 的话第一行
+# print 就 UnicodeEncodeError 退 1,跟真 FAIL 同一个退出码,分不出是闸红还是环境崩。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+else:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent.parent
 AI_DIR = ROOT / "static" / "ai"

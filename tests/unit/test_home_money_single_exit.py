@@ -93,7 +93,7 @@ class HomeMoneyPrefixSingleExitTests(unittest.TestCase):
         # 与 /ai 那一侧同一个前缀:两片各有出口,但不是两套口径。两边都从真源解出值再比,
         # 不比字面 —— 字面里那个窄空格可以写成转义,也可以是个看不见的真字符。
         self.assertEqual(_declared_prefix(src), BAHT)
-        self.assertEqual([hex(ord(c)) for c in BAHT], ['0xe3f', '0x2009'])
+        self.assertEqual([hex(ord(c)) for c in BAHT], ["0xe3f", "0x2009"])
 
     def test_currency_glyph_is_never_glued_to_a_number(self):
         offenders = {
@@ -119,7 +119,7 @@ class HomeMoneyPrefixSingleExitTests(unittest.TestCase):
         self.assertTrue(_GLUED_TO_NUMBER.search("'topup-amount-invalid': '最低 ฿10',"))
         self.assertTrue(_GLUED_TO_NUMBER.search("'pur-pay-after-partial': '剩余 ฿{remain}',"))
         self.assertTrue(_GLUED_TO_NUMBER.search("`<span>฿${fmtMoney(v)}</span>`"))
-        self.assertTrue(_SUFFIX_FORM.search("<span class=\"v\">{n}฿</span>"))
+        self.assertTrue(_SUFFIX_FORM.search('<span class="v">{n}฿</span>'))
         # 反过来也别乱咬:฿ 后面是空白/汉字/右括号的注释与文案合法,后缀形态也不该被
         # 「紧贴数字」那条重复报一次。
         self.assertIsNone(_GLUED_TO_NUMBER.search("// ฿ 的墨迹比字宽宽半像素"))

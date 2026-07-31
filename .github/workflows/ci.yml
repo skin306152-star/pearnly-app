@@ -429,8 +429,13 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
 
     steps:
-      - name: Checkout
+      # 单测里有一条拿本仓真 git 历史跑的用例(test_line_ratchet_gate.RealRepoStillJudges)——
+      # 默认 depth=1 的 checkout 上 HEAD~1 压根不存在,棘轮只能报「判不了」。那不是闸坏了,
+      # 是这次 checkout 没有可比的基线;基线该由环境给,不该靠把闸改回 fail-open 来绕。
+      - name: Checkout (full history · 棘轮的真仓用例需要 HEAD~1)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 全历史 · 否则 HEAD~1 在 shallow clone 里不存在
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5

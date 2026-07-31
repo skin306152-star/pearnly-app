@@ -58,14 +58,19 @@ def _commit(tmp: Path, relpath: str, lines: int, message: str) -> None:
 class CannotJudgeMeansRed(unittest.TestCase):
     """判不了 = 红。这三条就是原来那三个 `return 0`。"""
 
+    def _assert_cannot_judge(self, code: int, out: str) -> None:
+        """退 1,并且输出里一个 PASS 都不许有 —— fail-closed 守的就是「PASS 只能意味着查过了」。"""
+        self.assertEqual(code, 1, out)
+        self.assertIn("判不了", out)
+        self.assertNotIn("PASS", out)
+
     def test_not_a_git_repo_is_red(self) -> None:
         """空目录里没有 .git,git rev-parse 退 128 —— 以前打一行警告就放行。"""
         plain = Path(tempfile.mkdtemp(prefix="line_ratchet_norepo_"))
         self.addCleanup(shutil.rmtree, plain, True)
         with detached_host_git_env():
             code, out = _run(plain, "--quiet")
-        self.assertEqual(code, 1, out)
-        self.assertIn("判不了", out)
+        self._assert_cannot_judge(code, out)
 
     def test_git_binary_missing_is_red(self) -> None:
         """PATH 里没有 git —— 真的让 subprocess 抛 FileNotFoundError,不是 mock。"""
@@ -78,23 +83,27 @@ class CannotJudgeMeansRed(unittest.TestCase):
                 code, out = _run(tmp, "--quiet")
             finally:
                 os.environ["PATH"] = saved_path
-        self.assertEqual(code, 1, out)
-        self.assertIn("判不了", out)
+        self._assert_cannot_judge(code, out)
 
     def test_missing_base_ref_is_red(self) -> None:
-        """只有一笔 commit 时 HEAD~1 不存在 —— 以前当「首次 commit」放行。"""
+        """只有一笔 commit 时 HEAD~1 不存在 —— 以前当「首次 commit」放行。
+
+        CI 的浅克隆(actions/checkout 默认 depth=1)落进的正是这一支:同样红,但报的是
+        「base ref 不存在 + 去拉全历史」,跟「git 不可用」分得开,不必看代码就知道该修哪。
+        """
         with temp_git_repo() as tmp:
             _commit(tmp, MONITORED, 10, "only")
             code, out = _run(tmp, "--quiet")
-        self.assertEqual(code, 1, out)
+        self._assert_cannot_judge(code, out)
         self.assertIn("base ref", out)
+        self.assertIn("fetch-depth", out)
 
     def test_bad_base_ref_is_red(self) -> None:
         with temp_git_repo() as tmp:
             _commit(tmp, MONITORED, 10, "base")
             _commit(tmp, MONITORED, 5, "head")
             code, out = _run(tmp, "--base", "origin/does-not-exist", "--quiet")
-        self.assertEqual(code, 1, out)
+        self._assert_cannot_judge(code, out)
         self.assertIn("base ref", out)
 
 
@@ -156,7 +165,19 @@ class MonitoredPathRules(unittest.TestCase):
 
 
 class RealRepoStillJudges(unittest.TestCase):
-    """本仓上 git 接线没坏 —— 只验它能算出 diff,不断言绿红(工作树随时在变)。"""
+    """本仓上 git 接线没坏 —— 只验它能算出 diff,不断言绿红(工作树随时在变)。
+
+    判得动的前提是有基线可比,而「拿不到 base ref」跟「git 坏了」是两回事:actions/checkout
+    默认 depth=1,HEAD~1 在 runner 上压根不存在。所以前提单独断一条 —— 浅克隆时红在那一句、
+    指名道姓说是 checkout 的事(CI 侧对应 unit job 的 fetch-depth: 0),不至于让人读成「闸把
+    自己判死了」进而回头改回 fail-open。
+    """
+
+    def test_this_checkout_has_a_baseline_to_compare(self) -> None:
+        try:
+            ratchet.git("rev-parse", "--verify", "HEAD~1")
+        except (RuntimeError, FileNotFoundError) as exc:
+            self.fail(f"当前 checkout 取不到 HEAD~1(浅克隆?CI 的 unit job 需 fetch-depth: 0):{exc}")
 
     def test_gate_reaches_a_verdict_on_this_repo(self) -> None:
         buf = io.StringIO()

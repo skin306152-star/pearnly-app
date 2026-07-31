@@ -9,14 +9,19 @@
   margin-bottom: 18px;
   flex-wrap: wrap;
 }
-/* 一行安静摘要条(v5 §五4,撤三张大统计卡):小字号 pill,数据源不变。 */
+/* 一行安静摘要条(v5 §五4,撤三张大统计卡):小字号 pill,数据源不变。
+ * min-width 用 min-content 而不是 0(2026-07-31 修):min-width:0 允许这条被压到比一颗
+ * pill 还窄,而 pill 自身 white-space:nowrap —— 压不动就整颗溢出到右边,滑到 .search
+ * 底下(390 实测 en「Needs your review 1」与 th「รอคุณตัดสินใจ 1」的数字整个被盖住,
+ * 只有 zh/ja 因文案短侥幸不撞)。min-content = 最宽那颗 pill:装不下就让 .toolrow 自己
+ * 换行,与译文长短无关,不靠断点猜。 */
 .sumline {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   flex: 1;
-  min-width: 0;
+  min-width: min-content;
 }
 .sum-pill {
   display: inline-flex;
@@ -282,6 +287,11 @@
 @media (max-width: 640px) {
   .kanban {
     grid-template-columns: 1fr;
+  }
+  /* 手机上摘要 pill 与搜索框各占一行:换行由 .sumline 的 min-content 决定,这里只负责
+   * 让掉到第二行的搜索框铺满(否则停在 min-width:220px,右边空一截像没画完)。 */
+  .search {
+    width: 100%;
   }
 }
 /* 看板工具条(2026-07-27 从矩阵搬来的筛选 / 批量开单 / 缺单条)。样式自持:类名一律

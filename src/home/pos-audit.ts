@@ -59,6 +59,7 @@ let errCode = '';
 let drill: { cashier: string | null; kind: Kind } | null = null;
 let drillEvents: Ev[] = [];
 let drillLoading = false;
+let drillErr = ''; // 拉不到 ≠ 这个指标没有事件(同 errCode/shiftErr 口径,别落「没有事件」空态)
 // 交接班台账 tab(与异常汇总同页两视角:异常按人汇总 vs 班次连号对账)。
 let tab: Tab = 'audit';
 let shiftRows: ShiftRow[] = [];
@@ -243,6 +244,8 @@ function cardHtml(r: Row, isTotal: boolean): string {
 function drillHtml(): string {
     if (drillLoading)
         return `<div class="drill"><div class="dstate">${escapeHtml(t('rpay.loading'))}</div></div>`;
+    if (drillErr)
+        return `<div class="drill"><div class="dstate">${escapeHtml(posErrMsg(drillErr, 'rep-error'))}</div></div>`;
     if (!drillEvents.length)
         return `<div class="drill"><div class="dstate">${escapeHtml(t('posaudit.no_events'))}</div></div>`;
     const body = drillEvents
@@ -434,6 +437,7 @@ async function onDrill(cashier: string, kind: Kind): Promise<void> {
     }
     drill = { cashier: cashier || null, kind };
     drillEvents = [];
+    drillErr = '';
     drillLoading = true;
     render();
     try {
@@ -441,8 +445,13 @@ async function onDrill(cashier: string, kind: Kind): Promise<void> {
         if (cashier) extra.cashier_id = cashier;
         const r = await fetch('/api/pos/admin/audit/events?' + qs(extra), { headers: hdr() });
         const env = await r.json();
-        drillEvents = (env && env.ok === true && env.data && env.data.events) || [];
-    } catch (_) {
+        // 信封没说 ok 就不是数据:此前 `|| []` 把 500 的错误信封悄悄变成空数组,
+        // 面板照「没有事件」渲染 —— 老板会以为这个收银员这项确实干净。
+        if (!env || env.ok !== true)
+            throw new Error((env && env.error && env.error.code) || 'pos.unexpected');
+        drillEvents = env.data.events || [];
+    } catch (e) {
+        drillErr = e instanceof Error ? e.message : 'pos.unexpected';
         drillEvents = [];
     } finally {
         drillLoading = false;

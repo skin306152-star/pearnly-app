@@ -43,6 +43,7 @@ _K_DIRECTION = "verdict_direction_ambiguous"
 _K_LOW_CONF = "verdict_ocr_low_conf"
 _K_VALIDATION = "verdict_ocr_validation"
 _K_OCR_ERROR = "verdict_ocr_error"
+_K_OCR_ERROR_QUOTA = "verdict_ocr_error_quota"
 _K_DUPLICATE = "verdict_duplicate"
 _K_DUPLICATE_SUSPECT = "verdict_duplicate_suspect"
 _K_VAT_UNREADABLE = "verdict_vat_unreadable"
@@ -125,8 +126,24 @@ def _money_read_params(money: dict, _tail: str) -> dict:
     }
 
 
+# classify 把 OCR 异常的类型名原样塞进 flag_reason 尾巴(ocr_error:Layer1AuthError)。
+# 那串东西是给我们排障的,会计既读不懂也用不上 —— 印进人话句子里只会让她以为出了另一种
+# 事故("OCR 识别失败:Layer1AuthError" 四语都这么印过)。故句子里不再留 {error} 槽,
+# 机器码改走 error_code,由前端压成可复制的小字(照 /ai 管家任务卡 error_code 先例)。
 def _error_params(_money: dict, tail: str) -> dict:
-    return {"error": tail or None}
+    return {"error_code": tail or None}
+
+
+# 撞配额与「这张读不出来」是两回事:件根本没读、没扣钱、续跑会自动重试(ocr_quota
+# 的 DEFERRED_FLAG = "ocr_error:quota" / reset_deferred),会计对它无事可裁。给它自己的
+# 模板,别混进「读失败」让人去猜要不要重传。尾巴词与 ocr_quota.DEFERRED_FLAG 同源。
+_QUOTA_TAIL = "quota"
+
+
+def _ocr_error_narrative(tail: str) -> tuple[str, dict]:
+    if tail == _QUOTA_TAIL:
+        return _K_OCR_ERROR_QUOTA, {}
+    return _K_OCR_ERROR, _error_params({}, tail)
 
 
 def _dup_params(_money: dict, tail: str) -> dict:
@@ -212,6 +229,8 @@ def hint(*, flag_reason: Optional[str], ocr_read: Optional[dict] = None) -> dict
         }
     if head == "amount_math_fail":
         key, params = _math_narrative(ocr_read or {})
+    elif head == "ocr_error":
+        key, params = _ocr_error_narrative(tail)
     else:
         key, params = entry.narrative_key, entry.params(ocr_read or {}, tail)
     return {

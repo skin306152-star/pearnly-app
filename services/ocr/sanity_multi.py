@@ -31,9 +31,20 @@ def multi_invoice_reasons(invoice) -> List[str]:
     for i, extra in enumerate(extras, start=2):
         reasons.extend(f"同页第{i}张: {r}" for r in _core_reasons(extra))
     # 规则 7:行和 ≠ 小计即转人工(单边规则 6 在多票页收紧为双边,见 line_sum_mismatch)。
+    # 补传 VAT/合计,让 VAT 内含票(ABB 小票)在这里也摘得出去 —— 同页几张 ABB 不该
+    # 因为同页就被判成跨票错配。豁免要求「行和 ≈ 本票合计」,跨票错配恰恰打破这一条
+    # (偷来的合计配不上本票的行),规则 7 的牙齿不受影响。
+    # 折扣【不】传:那会连带打开 line_sum_mismatch 的折扣分支(判据比 VAT 内含宽,
+    # 且不查 VAT 勾稽),规则 7 收紧成双边就是为了防跨票错配,没有实测依据不放宽。
     for i, inv in enumerate([invoice] + extras, start=1):
         sub = _money(getattr(inv, "subtotal", None))
-        line_sum = line_sum_mismatch(sub, _line_subtotals(inv), symmetric=True)
+        line_sum = line_sum_mismatch(
+            sub,
+            _line_subtotals(inv),
+            symmetric=True,
+            total=_money(getattr(inv, "total_amount", None)),
+            vat=_money(getattr(inv, "vat", None)),
+        )
         if line_sum is not None:
             reasons.append(
                 f"同页第{i}张: 明细行和 {line_sum:.2f} ≠ 小计 {sub} — 多票页疑金额跨票错配"

@@ -313,6 +313,8 @@ Object.assign(window.__AI_I18N_EN__, {
     riq_conf_low: 'Low confidence',
     riq_bulk_result: '{ok} succeeded · {fail} failed',
     riq_view_img_btn: 'View original',
+    riq_code_copy: 'Copy error code',
+    riq_code_copied: 'Copied',
     riq_item_frozen: 'Frozen · read-only',
     // S4 · plain-language sub-line under each flag group (unknown reason → no sub-line)
     riq_expl_amount_math_fail:
@@ -356,7 +358,10 @@ Object.assign(window.__AI_I18N_EN__, {
     verdict_ocr_low_conf: 'Low OCR confidence ({band}) — please verify against the original',
     verdict_ocr_validation:
         'OCR reading conflicts with a validation rule — please verify against the original',
-    verdict_ocr_error: 'OCR could not read this document: {error}',
+    verdict_ocr_error:
+        'OCR could not read this document — the file is still here; re-upload it or try a clearer copy',
+    verdict_ocr_error_quota:
+        'Not read yet — the OCR quota for this period ran out; the next run retries it automatically',
     verdict_table_kind_unclear:
         'This table’s header looks like neither a general ledger nor a bank statement, and carries no sales-related column names. The system took it as a sales summary by default — that is a guess, not a determination. If it is actually a ledger or a statement, its figures will be counted as this period’s sales. Please confirm it really is a sales summary; if not, exclude it and re-upload under the correct type.',
     verdict_vat_unreadable:

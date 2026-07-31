@@ -4,6 +4,7 @@
 /* global escapeHtml, showConfirm */
 import { S, _sellerState } from './clients-store.js';
 import { apiClient } from './clients-helpers.js';
+import { listErrorHtml } from './list-error-state.js';
 import { MORE_SVG } from './more-menu.js';
 
 // ==========================================================
@@ -49,9 +50,13 @@ async function loadSellerCache() {
     try {
         const data = await apiClient('/api/workspace/clients');
         S.sellerClients = (data && (data.clients || data.items)) || [];
+        S.sellerFailed = false;
         window._workspaceClientsCache = S.sellerClients;
     } catch (e) {
         console.error('loadSellerCache fail', e);
+        // 同 loadClientsCache:失败位必须留痕,否则渲染层把 500 说成「还没有账套主体」/
+        // 「等管理员分配」——后者更糟,会把人支去找管理员而不是重试。
+        S.sellerFailed = true;
         S.sellerClients = [];
     }
     return S.sellerClients;
@@ -72,6 +77,10 @@ function renderSellerList() {
     const owner = _isWsOwner();
     const newBtn = document.getElementById('btn-seller-new');
     if (newBtn) newBtn.style.display = owner ? '' : 'none';
+    if (S.sellerFailed) {
+        tb.innerHTML = listErrorHtml('seller-error-title', 'data-seller-retry');
+        return;
+    }
     const items = _sellerFiltered();
     const activeId =
         typeof window.getActiveWorkspaceClientId === 'function'

@@ -309,6 +309,8 @@ Object.assign(window.__AI_I18N_JA__, {
     riq_conf_low: '信頼度：低',
     riq_bulk_result: '成功 {ok} 件 · 失敗 {fail} 件',
     riq_view_img_btn: '原本を見る',
+    riq_code_copy: 'エラーコードをコピー',
+    riq_code_copied: 'コピーしました',
     riq_item_frozen: '凍結済み · 読み取り専用',
     // S4 · グループ見出し下の平易な説明行(flag_reason → 一文;辞書に無い reason は非表示)
     riq_expl_amount_math_fail: '金額が合わないため AI は自動記帳しません。判断してください。',
@@ -349,7 +351,10 @@ Object.assign(window.__AI_I18N_JA__, {
         '仕入か売上か判定不能(売り手税番号 {seller_tax})、手動で指定してください',
     verdict_ocr_low_conf: 'OCR の信頼度が低い({band})、原本と照合してください',
     verdict_ocr_validation: 'OCR の読取値が検証ルールと食い違い、原本と照合してください',
-    verdict_ocr_error: 'OCR 読取に失敗:{error}',
+    verdict_ocr_error:
+        'OCR がこの書類を読み取れませんでした。ファイルは残っています。再アップロードするか、より鮮明なものをお試しください',
+    verdict_ocr_error_quota:
+        'まだ読み取っていません — 今期の読取枠を使い切りました。次回の続行実行で自動的に再試行します',
     verdict_table_kind_unclear:
         'この表のヘッダーは総勘定元帳にも銀行明細にも見えず、売上に関する列名もありません。システムは既定で売上サマリーとして取り込みました——これは判定ではなく推測です。実際に元帳や明細だった場合、その数値が当期の売上として計上されます。売上サマリーであることをご確認ください。違う場合は除外し、正しい種別で再アップロードしてください。',
     verdict_vat_unreadable:

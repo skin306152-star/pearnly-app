@@ -186,6 +186,19 @@
   line-height: 1.5;
   color: var(--ink);
 }
+/* OCR 异常的机器码:码本身保持最低存在感(会计看不懂),同排那颗复制按钮才是可点的
+   那一半。窄屏折行不挤 —— 与管家红条 .stw-code 同一形状。 */
+.riq-code {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.riq-code code {
+  font-size: 10.5px;
+  color: var(--faint);
+}
 .riq-item-actions {
   display: flex;
   flex-wrap: wrap;

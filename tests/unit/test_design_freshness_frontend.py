@@ -56,6 +56,16 @@ console.log('OK');
 """
 
 
+def _body_of(path: Path) -> str:
+    """只取 <body> 之后:样式表里留着旧 class 的定义不算「稿上还画着它」。"""
+    html = path.read_text(encoding="utf-8")
+    return html[html.index("<body") :]
+
+
+def _uses_class(body: str, cls: str) -> bool:
+    return re.search(r'class="[^"]*(?<![\w-])' + cls + r"(?![\w-])", body) is not None
+
+
 class DesignFreshnessTests(unittest.TestCase):
     def test_freshness_judgement_node(self) -> None:
         node = shutil.which("node")
@@ -90,14 +100,37 @@ class DesignFreshnessTests(unittest.TestCase):
 
     def test_purchase_settings_chip_wall_stays_dead(self) -> None:
         # 0f5a5fad(2026-07-07)把费用科目搬去「商品 › 费用数据」· 基准里那面 chip 墙留到 7-31 才清。
-        html = (DESIGN_DIR / "pur-settings.html").read_text(encoding="utf-8")
-        body = html[html.index("<body") :]
+        body = _body_of(DESIGN_DIR / "pur-settings.html")
         for cls in ("cats", "chip", "addc"):
-            self.assertIsNone(
-                re.search(r'class="[^"]*(?<![\w-])' + cls + r"(?![\w-])", body),
+            self.assertFalse(
+                _uses_class(body, cls),
                 f"pur-settings 基准又出现 .{cls} —— 生产这页早没有费用科目 chip 墙了",
             )
         self.assertIn("去费用数据", body, "基准该留生产实际那行「去费用数据 →」跳转")
+
+    def test_purchase_screens_are_one_sheet(self) -> None:
+        # 采购录入/详情两屏生产早改成一体化 .sheet 白卡(左 .preview-pane + 右 .form-pane +
+        # 底部 .editfoot),基准的左右两栏 .grid 留到 2026-07-31 才重画。.grid 回来 = 稿又旧了。
+        for name in ("pur-form.html", "pur-detail.html"):
+            body = _body_of(DESIGN_DIR / name)
+            self.assertFalse(
+                _uses_class(body, "grid"),
+                f"{name} 又出现 .grid —— 生产这两屏是一体化 .sheet,不是左右两栏",
+            )
+            for cls in ("sheet", "preview-pane", "form-pane", "editfoot"):
+                self.assertTrue(_uses_class(body, cls), f"{name} 缺生产骨架的 .{cls}")
+
+    def test_dashboard_balance_band_stays_dead(self) -> None:
+        # 627aa1d6(2026-06-28)首页改版把余额带 .band(.bl 标题 / .bn 金额)整块删了,
+        # 换成两张 .sub-card;基准留到 2026-07-31 才跟上。
+        body = _body_of(DESIGN_DIR / "dashboard-final.html")
+        for cls in ("bl", "bn", "band"):
+            self.assertFalse(
+                _uses_class(body, cls),
+                f"dashboard-final 又出现 .{cls} —— 首页 6-28 起是订阅屏,没有余额带了",
+            )
+        for cls in ("sub-card", "sub-card-n", "sub-topup-btn"):
+            self.assertTrue(_uses_class(body, cls), f"dashboard-final 缺生产余额卡的 .{cls}")
 
 
 if __name__ == "__main__":

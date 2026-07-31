@@ -314,8 +314,9 @@ const MAPPINGS = [
     {
         // 2026-06-28 首页改版(627aa1d6「订阅与计费」)删掉了余额带 .band 与快捷格 .qa/.qb,
         // 主按钮改为余额卡底的充值钮 #dash-topup-btn(.btn.pri),图标改为卡头 .sub-card-ico svg。
-        // dashboard-final.html 快照保留作令牌基线:订阅屏没有独立设计稿,而 .btn/.panel 的
-        // Purple v2 主色/圆角/阴影/字号未随改版变,仍是这页该照搬的那套值。
+        // 基准 2026-07-31 按生产实况重画了整个内容区(两张 .sub-card + .sub-plans + .rec-*),
+        // 此前它还画着改版前那一屏 —— 稿里主按钮也跟着改成生产同名的 .btn.pri(基类 .btn
+        // 在生产 kit 里不带底色,拿它比主色等于比了另一个东西)。
         name: '首页 dashboard(样板 · A组屏)',
         design: 'dashboard-final.html',
         route: 'dashboard',
@@ -323,7 +324,7 @@ const MAPPINGS = [
         layout: { sel: '#page-dashboard .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
-                design: '.btn',
+                design: '.btn.pri',
                 prod: '#dash-topup-btn',
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
@@ -471,7 +472,9 @@ const MAPPINGS = [
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
             // 一体化复核屏:整屏融成一张白卡(.sheet 承载圆角 16 + 阴影,内部 card 去壳)。
-            { design: '.card', prod: '.pur.f .sheet', props: ['borderRadius', 'boxShadow'] },
+            // 稿 2026-07-31 起也叫 .sheet(此前稿是两栏 .grid + 一堆浮 .card,拿 .card 当尺子
+            // 等于用「已去壳的内层卡」比「外层白卡」—— 只是碰巧两边数值一样)。
+            { design: '.sheet', prod: '.pur.f .sheet', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
         nosvgemoji: '.pur .viewer .vtools svg',
@@ -490,7 +493,8 @@ const MAPPINGS = [
                 props: ['backgroundColor', 'borderRadius'],
             },
             // 详情屏一体化:整屏融成一张白卡(.sheet 承载圆角 16 + 阴影,内部 card 去壳)。
-            { design: '.card', prod: '.pur.d .sheet', props: ['borderRadius', 'boxShadow'] },
+            // 稿 2026-07-31 起也叫 .sheet(同 pur-form:此前拿已去壳的内层 .card 当尺子)。
+            { design: '.sheet', prod: '.pur.d .sheet', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
         nosvgemoji: '.pur .img svg',

@@ -4,6 +4,20 @@
 > **本页的用法:① 开工第 0 步把"全套自查"跑一遍拿基线(知道哪些红是别窗口/存量的) ② 干活中途随时跑单道 ③ 收尾跑全套,绿了才 push。**
 > 一键全套(等价 pre-push,不用真推):`sh scripts/git-hooks/pre-push`(在 Git Bash)或逐条跑下表命令。
 
+## 装钩子(一句话 · 复制就跑)
+
+```sh
+git config core.hooksPath scripts/git-hooks
+```
+
+装没装上:`git config --get core.hooksPath` 有输出 = 装上了(没输出/退出码 1 = 没装,闸一道都不跑)。卸:`git config --unset core.hooksPath`。
+
+三件事先知道,别装完才发现:
+
+1. **它写进 `.git/config`,不是写进某个 worktree** —— 共享同一个 `.git` 的所有 worktree(`git worktree list` 列出来的每一个)从此每次 push 都走这道闸。逐 worktree 单独开关做不到,除非先开 `extensions.worktreeConfig` 再用 `git config --worktree`。
+2. **路径是相对的,按「谁在 push」各自解析** —— githooks(5):钩子跑之前 git 会 `cd` 到该 worktree 的根。所以 A worktree push 跑的是 `A/scripts/git-hooks/pre-push`,B 跑 B 的。老分支跑老版本的闸;分支里没这个文件 = 那次 push 静悄悄没有闸。
+3. **代价**:改动只含文档/纯文本约 40 秒;含 `.py`(要跑全量 unittest)或前端(要跑 eslint + vite build)实测约 3 分钟起。`git push --dry-run` 也会触发本钩子(但不会真推),可拿来空跑验证。
+
 ## 25 道闸 · 查什么 · 怎么提前自查 · 豁免法
 
 | 闸 | 触发条件 | 查什么 | 提前自查命令 | 豁免/注意 |

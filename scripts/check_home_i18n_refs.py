@@ -20,12 +20,11 @@ missing」—— 那道闸只对拍四个语言块之间齐不齐,从没问过"�
   · 不查四语齐全 —— 那是 check_i18n --strict 的活,两道闸各管一层,混在一起谁都说不清。
   · 只认字面量键。t('bill_st_' + status) 这类拼出来的键静态查不了,由调用方自己的测试兜。
 
-已知照不到的一块(说清楚,别让人以为查过了):常量键表 —— `const _DUP_FIELD_I18N:
-Record<string, string> = { doc_date: 'erp-dup-field-date', ... }` 这种把键名存进表、再
-`t(表[变量] || '兜底键')` 取出来的写法。兜底键那半截本闸看得见(2026-07-31 就是这么抓到
-erp-log-card.ts 漏补 erp-dup-field-other 的),表里那 56 个键看不见。没顺手扩进来的理由是
-判据不干净:光靠命名(*_I18N / *_KEYS)会把 `const STORAGE_KEYS = {token:'mrpilot_token'}`
-这类非 i18n 的键表也当词条报,而误报会让人把闸静音,等于没有。要扩就得先有个准判据。
+常量键表(2026-07-31 补进射程):`const _DUP_FIELD_I18N: Record<string, string> =
+{ doc_date: 'erp-dup-field-date', ... }` 这种把键名存进表、再 `t(表[变量] || '兜底键')`
+取出来的写法。兜底键那半截建闸当天就看得见(erp-log-card.ts 漏补 erp-dup-field-other
+就是这么抓到的),表里的键此前完全在射程外 —— 实测 16 张表 117 个键,不是原先估的 6 张 56 个。
+判据见 table_keys() 的注释:不靠命名猜,靠对拍词典,今天 0 落空 0 误报。
 
 取词入口(新增第五个入口时记得同步这里):
   · 全局 t(key, params) —— core.ts 定义 + `window.t = t`,62 个文件写 `/* global t */` 裸调。
@@ -63,7 +62,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from js_key_scan import DICT_KEY_DEF, call_keys, in_comment, line_of  # noqa: E402
+from js_key_scan import (  # noqa: E402
+    DICT_KEY_DEF,
+    call_keys,
+    in_comment,
+    line_of,
+    read_string,
+    skip_comment,
+)
 
 # 报告是中文的,而 Windows 控制台默认码页(本机 cp874)编不了 —— 不接管 stdout 的话第一行
 # print 就 UnicodeEncodeError 退 1,跟真 FAIL 同一个退出码,分不出是闸红还是环境崩。
@@ -98,6 +104,13 @@ _I18N_INDEX = re.compile(
     r"(?<![\w.$])(?:window\.)?I18N\[[^\]\n]+\]\[\s*(?:'([^']+)'|\"([^\"]+)\")\s*\]",
 )
 _IMPORT_NAMES = re.compile(r"import\s*\{([^}]*)\}\s*from")
+
+# 常量键表:具名对象字面量,冒号右边放词条键,再 t(表[变量]) 取出来。
+_TABLE_DECL = re.compile(r"\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*(?::[^=\n]*)?=\s*\{")
+_TABLE_VALUE = re.compile(r":\s*'([^'\n]*)'")
+_TABLE_MIN_KEYS = 2
+# 判据取自真词典(4993 条):最短的键 4 个字符,没有一条不含小写字母。
+_KEY_MIN_LEN = 4
 
 
 def source_files(root):
@@ -164,9 +177,75 @@ def _active_getters(text, shared):
     return active
 
 
-def key_references(root):
-    """[(相对路径, 行号, 键)] · 按文件、行号排。"""
+def _looks_like_key(value):
+    """值本身长得像不像 /home 的词条键(字符集 + 长度 + 含小写)。
+
+    排掉的是键表里混放的非键值:archive-settings.ts 的 FIELD_META 同时存着 'YYYY-MM-DD'
+    和 '_',它俩过得了字符集,过不了「最短 4 字符 + 含小写」。
+    """
+    return (
+        bool(_KEY.match(value)) and len(value) >= _KEY_MIN_LEN and any(c.islower() for c in value)
+    )
+
+
+def _object_body(text, open_at):
+    """从左花括号读到配对的右花括号;字符串与注释里的括号不计数。"""
+    depth = 0
+    i = open_at
+    while i < len(text):
+        char = text[i]
+        if char == "/":
+            after = skip_comment(text, i)
+            if after != i:
+                i = after
+                continue
+        if char in "'\"`":
+            _, i = read_string(text, i)
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_at : i + 1], open_at
+        i += 1
+    return "", open_at
+
+
+def table_keys(text, known):
+    """常量键表里的键 → [(下标, 键)]。
+
+    「这张表是不是键表」不靠命名猜 —— 全树 16 张里只有 4 张叫 *_I18N,按命名收只能收到
+    四分之一;而反过来按命名收又会把 `const STORAGE_KEYS = {token:'mrpilot_token'}` 这类
+    非 i18n 的表当词条报。判据改成对拍词典:一张具名对象字面量里至少两个像键的值、且至少
+    一个真在 window.I18N 里,才当键表,表里其余对不上的值就是落空。
+    实测这条在本树上是干净二分:66 张具名表里 50 张一个都对不上、16 张全对上,没有中间态。
+
+    刻意不放宽到数组字面量与匿名对象:那些地方 i18n 键跟状态码/字段名/CSS 类混在一起
+    (`[cond ? 'stw-done' : 'matched', ...]`),实测放宽后 87 个字面量里 47 个会报出假落空 ——
+    交一个会误报的闸比不交更糟。这一块仍在射程外,谁要扩得先拿出新判据的实测数。
+    """
+    out = []
+    for m in _TABLE_DECL.finditer(text):
+        open_at = m.end() - 1
+        if in_comment(text, open_at):
+            continue
+        body, base = _object_body(text, open_at)
+        values = [(base + v.start(1), v.group(1)) for v in _TABLE_VALUE.finditer(body)]
+        values = [(pos, val) for pos, val in values if _looks_like_key(val)]
+        if len(values) < _TABLE_MIN_KEYS or not any(val in known for _, val in values):
+            continue
+        out.extend(values)
+    return out
+
+
+def key_references(root, known=None):
+    """[(相对路径, 行号, 键)] · 按文件、行号排。
+
+    known(词典键集合)只给常量键表那一路用 —— 它得先对拍词典才能判「这张表是不是键表」。
+    """
     docs = documents(root)
+    known = defined_keys(root) if known is None else known
     shared = exported_getters(docs)
     refs = []
     for rel, text in docs:
@@ -191,12 +270,14 @@ def key_references(root):
         for m in _I18N_INDEX.finditer(text):
             if not in_comment(text, m.start()):
                 refs.append((rel, line_of(text, m.start()), m.group(1) or m.group(2)))
+        for pos, key in table_keys(text, known):
+            refs.append((rel, line_of(text, pos), key))
     return sorted(set(refs))
 
 
 def dangling(root):
     known = defined_keys(root)
-    return [r for r in key_references(root) if r[2] not in known]
+    return [r for r in key_references(root, known) if r[2] not in known]
 
 
 def load_baseline(path):
@@ -248,8 +329,8 @@ def main(argv=None):
     root = Path(args.root)
     baseline_path = Path(args.baseline) if args.baseline else BASELINE
 
-    refs = key_references(root)
     known = defined_keys(root)
+    refs = key_references(root, known)
     live = {(rel, key) for rel, _, key in refs if key not in known}
     base = load_baseline(baseline_path)
 

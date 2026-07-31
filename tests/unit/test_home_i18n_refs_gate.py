@@ -263,6 +263,55 @@ class NoFalseAlarmTests(GateFixture):
         self.assertGreen()
 
 
+class ConstantKeyTableTests(GateFixture):
+    """常量键表 —— `const M = { code: '键' }` 再 t(M[code]) 取出来的那一路。
+
+    2026-07-31 之前这块完全在射程外(实测 16 张表 117 个键)。判据不靠命名靠对拍词典,
+    所以这里既要证「表里的坏键会红」,也要证「非 i18n 的常量表不会被误当键表」。
+    """
+
+    def test_unknown_key_inside_a_key_table_fails(self):
+        self.src("x.ts", "const M = { a: 'known-a', b: 'ghost-in-table' };\n")
+        self.assertRed("ghost-in-table")
+
+    def test_typed_record_declaration_also_counted(self):
+        # 真树上的写法带类型标注:const _DUP_FIELD_I18N: Record<string, string> = {...}
+        self.src(
+            "x.ts",
+            "const _T: Record<string, string> = { a: 'known-a', b: 'ghost-in-typed' };\n",
+        )
+        self.assertRed("ghost-in-typed")
+
+    def test_braces_inside_string_values_do_not_break_matching(self):
+        self.src(
+            "x.ts",
+            "const M = { a: 'known-a', b: '{n} 件', c: 'ghost-after-brace' };\nconst z = 1;\n",
+        )
+        self.assertRed("ghost-after-brace")
+
+    def test_non_i18n_constant_table_is_not_treated_as_keys(self):
+        """一个词典键都对不上的表 = 不是键表。误报会让人把闸静音,等于没装。"""
+        self.src("x.ts", "const STORAGE_KEYS = { token: 'mrpilot_token', lang: 'mrpilot_lang' };\n")
+        self.assertGreen()
+
+    def test_non_key_shaped_values_in_a_mixed_table_are_ignored(self):
+        """archive-settings.ts 的 FIELD_META 真长这样:键和日期格式混着放。"""
+        self.src(
+            "x.ts",
+            "const FIELD_META = { a: 'known-a', b: 'known-b', fmt: 'YYYY-MM-DD', sep: '_' };\n",
+        )
+        self.assertGreen()
+
+    def test_single_key_table_is_out_of_range_on_purpose(self):
+        """只有一个像键的值时判不出这是不是键表 —— 宁漏不误报,写在这儿别当它查过了。"""
+        self.src("x.ts", "const M = { only: 'ghost-single' };\n")
+        self.assertGreen()
+
+    def test_table_inside_a_comment_is_ignored(self):
+        self.src("x.ts", "// const M = { a: 'known-a', b: 'ghost-commented' };\nconst z = 1;\n")
+        self.assertGreen()
+
+
 class RealTreeTests(unittest.TestCase):
     def test_repo_home_tree_has_no_new_dangling_key(self):
         buf = io.StringIO()
@@ -278,6 +327,20 @@ class RealTreeTests(unittest.TestCase):
         keys = {key for _, _, key in found}
         self.assertIn("set-page-title", keys)  # data-i18n 属性这一路
         self.assertIn("col-conf-tip", keys)  # 裸调 t() 这一路
+        self.assertIn("erp-dup-field-date", keys)  # 常量键表这一路(_DUP_FIELD_I18N)
+
+    def test_constant_key_tables_are_really_reached(self):
+        """常量键表那一路单独防空扫:全树 16 张表 117 个键,数量骤降说明判据被改瞎了。"""
+        known = refs_gate.defined_keys(PROJECT_ROOT)
+        total = 0
+        tables = 0
+        for _rel, text in refs_gate.documents(PROJECT_ROOT):
+            found = refs_gate.table_keys(text, known)
+            if found:
+                tables += 1
+                total += len(found)
+        self.assertGreaterEqual(tables, 10, "键表数量骤降 · 判据是不是被改窄了")
+        self.assertGreaterEqual(total, 100, f"只扫到 {total} 个表内键 · 建闸日是 117 个")
 
     def test_defined_keys_match_a_real_eval(self):
         """定义侧交叉验证:正则认出来的键 == node 真 eval window.I18N 拿到的键。

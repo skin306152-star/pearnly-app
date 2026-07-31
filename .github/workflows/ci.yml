@@ -106,6 +106,15 @@ jobs:
       - name: check_test_git_writes (测试禁止对当前仓库做 git 写操作)
         run: python scripts/check_test_git_writes.py
 
+      # 2026-07-31:tests/integration 里 28 个模块在 setUpClass/tearDownClass 里
+      # `DROP TABLE IF EXISTS users, clients, ocr_history … CASCADE`,打的是 DATABASE_URL
+      # 指到哪就是哪。照它们自己 docstring 的跑法跑一遍就把本机开发库拆了(62 张表没了,
+      # clients 从 18 列剩 1 列);而这几张基础表从来没进过版本控制,alembic 从空库升不到
+      # head,掉了只能从 prod 拉 schema dump 灌回。运行期由 require_disposable_db() 的哨兵表
+      # 拦,本闸保证没有哪个新写的 DROP 忘了接上它。反证 tests/unit/test_destructive_db_test_gate.py。
+      - name: check_destructive_db_tests (DROP 真表的测试必须先验目标库可丢弃)
+        run: python scripts/check_destructive_db_tests.py
+
       - name: npm audit (REFACTOR-A6 · 生产依赖 CVE · high 拦门)
         # --omit=dev:本项目 dependencies 为空,vite/esbuild/eslint 等全是 devDependencies
         # (构建/测试工具 · 不随打包产物发给用户)。构建工具的安装期 CVE(如 esbuild
@@ -504,6 +513,14 @@ jobs:
 
       - name: Install Chromium system deps
         run: npx playwright install-deps chromium
+
+      # 视觉照搬闸 + 基准过期检测 · 2026-07-31 起进 CI(此前只挂 pre-push)。
+      # 触发面本来只有 static/pos/ · src/home/{pos,inventory,purchase}- · tests/visual/design/,
+      # 而它的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条 route ——
+      # dashboard 那条选择器 6-28 就烂了,直到有人碰巧改 purchase-settings.ts 才撞出来,三周零报警。
+      # 无条件跑(复用上面的 npm run build 与 chromium · 本机实测 21 秒)。
+      - name: 视觉照搬闸 · 关键令牌全等设计稿 + 基准不过期(FAIL mode)
+        run: node tests/visual/test_design_fidelity.spec.js
 
       - name: E2E smoke (Playwright · pearnly.com)
         run: npx playwright test

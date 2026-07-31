@@ -234,9 +234,9 @@ function switchBuyerType(type: string) {
     st.buyer.branchNo = '';
     render();
 }
-// 没设价的商品不许进发票行 —— 口径同收银台 addToCart 的 priced():那边 ฿0 进车是客人白付一箱
-// 钱,这边 ฿0 上票是开出一张金额为 0 的税票,一样没人看得见。指路指到「去商品数据填价」,
-// 别让人对着一张点不动的卡片猜。真的 ฿0 赠品照旧点得进来(那是老板拍过板的价)。
+// 没设价的商品不许进发票行 —— 口径同收银台 addToCart 的 priced():那边 ฿ 0 进车是客人白付一箱
+// 钱,这边 ฿ 0 上票是开出一张金额为 0 的税票,一样没人看得见。指路指到「去商品数据填价」,
+// 别让人对着一张点不动的卡片猜。真的 ฿ 0 赠品照旧点得进来(那是老板拍过板的价)。
 function addProduct(i: number) {
     const p = getProducts()[i];
     if (!p) return;

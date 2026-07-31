@@ -7,6 +7,8 @@
 // window.loadSubscription 由 dashboard.ts 的 loadDashboard 触发。
 // ============================================================
 
+import { BAHT } from './money.js';
+
 interface SubPlan {
     code: string;
     quota: number;
@@ -42,7 +44,7 @@ function _auth() {
     return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
 }
 function _money(n: number): string {
-    return '฿ ' + Number(n || 0).toFixed(2);
+    return BAHT + Number(n || 0).toFixed(2);
 }
 function _esc(s: unknown): string {
     return typeof window.escapeHtml === 'function'
@@ -204,8 +206,9 @@ function renderPlans(sub: SubState | null) {
                 '</span><div><div class="sub-plan-name">Package ' +
                 _esc(p.code) +
                 '</div><div class="sub-plan-price">' +
+                BAHT +
                 Number(p.fee).toFixed(0) +
-                '<span>฿/' +
+                '<span>/' +
                 perMonth +
                 '</span></div></div></div>' +
                 '<ul class="sub-plan-feats"><li>' +

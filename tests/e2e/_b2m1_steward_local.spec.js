@@ -95,6 +95,13 @@ function taskPayload(status) {
     };
 }
 
+// GET /status 的第二个键,值取自 services/steward/attachments.limits()(fixture 与后端
+// 逐键相等由 tests/unit/test_e2e_stub_contract_gate.py 锁住)。真后端
+// (routes/steward_routes.get_status)【无条件】把它带出去,闸关也带 —— 桩此前只回
+// {enabled},于是这批用例里 composer 一路走的都是「没有附件口」那条分支:回形针没渲染、
+// 输入区注脚没渲染、占位符是短的那句,连截图证据一起失真了。桩比真后端少给东西 = 假绿。
+const ATTACH_LIMITS = require('./_fixtures_steward_limits.json');
+
 const REPLY = '这一期有 2 家还缺料,清单贴在左边。';
 // 任务落终态时服务端往会话追写的收尾那句(worker._finalize_result)。POST /messages 的即时
 // 应承里没有它,只有 GET /sessions 吐得出来 —— 前端不去拉,这句就永远上不了屏。
@@ -171,7 +178,9 @@ async function boot(page, opts) {
         if (r.request().method() === 'POST') {
             posts.push({ path: p, body: r.request().postDataJSON() });
         }
-        if (p.endsWith('/steward/status')) return json(r, { enabled: gate });
+        // 限额跟着闸态一起回:真后端不看闸开没开,attachments 一律带(见 get_status)。
+        if (p.endsWith('/steward/status'))
+            return json(r, { enabled: gate, attachments: ATTACH_LIMITS });
         // B3 决断二端点:成功响应 {task_id, authorization}(状态已翻)——冻结契约。
         if (p.endsWith('/authorizations/approve')) {
             return json(r, { task_id: 't1', authorization: authzCard('approved') });
@@ -449,6 +458,20 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
             () => document.documentElement.scrollWidth - window.innerWidth
         );
         expect(overflow).toBeLessThanOrEqual(0);
+
+        // 输入区是完整件:回形针 + 「或拖入文件」占位符 + 注脚。这两张手机图是几何证据,
+        // 缺件的输入区量出来的宽度全是假的 —— 回形针挤掉 52px 之后送出按钮才是真的窄。
+        await expect(page.locator('.stw-clip')).toBeVisible();
+        expect(await page.locator('#stwInput').getAttribute('placeholder')).toContain('拖入文件');
+        // 回形针挤掉一截行宽之后,剩下两件不许被压到裁字 —— 判据是 clientWidth 装不装得下
+        // scrollWidth,不是「框还在」。触控目标那条在 _f1_steward_attach_local,不重复一遍。
+        const squeezed = await page.evaluate(() =>
+            ['#stwInput', '.stw-composer [data-action="stw-send"]'].filter((s) => {
+                const el = document.querySelector(s);
+                return el.clientWidth < el.scrollWidth;
+            })
+        );
+        expect(squeezed).toEqual([]);
         await page.screenshot({ path: path.join(ARTIFACT_DIR, '05-mobile-390-top.png') });
 
         // 滚到底:sticky 输入条不许压住最后一条消息(手机上被输入条盖掉的对话 = 看不见)。
@@ -518,9 +541,14 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         );
         expect(headNote).not.toContain('只查不改数');
         expect(headNote).toContain('会改数据的操作需你先批准');
-        // 这句只在页头印一次:composer 注脚曾经复读同一句,是同屏第二遍,已删。
-        // 补一条反证守住去重结果 —— 没有附件口时那个注脚就不该存在,免得哪天又被加回来。
-        await expect(page.locator('.stw-composer-note')).toHaveCount(0);
+        // 这句只在页头印一次:composer 注脚曾经复读同一句,是同屏第二遍,已删。守的是
+        // 「同屏不复读」,不是「注脚不许存在」—— 有附件口时注脚回来,但只说输入框自己
+        // 给不出的那件事(文件能拖能粘)。原来那条 toHaveCount(0) 只在「没有附件口」的
+        // 前提下成立,而那个前提是桩漏给 attachments 造出来的,产品里不存在。
+        await expect(page.locator('.stw-composer-note')).toHaveCount(1);
+        const composerNote = await page.locator('.stw-composer-note').innerText();
+        expect(composerNote).toContain('文件');
+        expect(composerNote).not.toContain(headNote.trim());
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '07-authz-pending-card.png'),
             fullPage: true,

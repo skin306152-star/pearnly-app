@@ -22,6 +22,18 @@ logger = logging.getLogger(__name__)
 _LEASE_SECONDS = 120
 _MAX_ATTEMPTS = 3
 
+# 「知道了,还是推」的载荷位(桥/小助手 writepath/duplicate_gate.CONFIRM_PARAM)。带这一位的
+# 载荷会**关掉写侧的幂等闸**,所以它不能享受这个队列默认的 at-least-once:租约一过期就重投,
+# 而一次真写是分钟级,重投等于账上再多一张。判真值取「有这个键且不是明摆着的假」——
+# 宁可把不确定的也当成确认(至多一次是安全侧),也不能漏判一个真确认(那就是重复过账)。
+_CONFIRMED = (
+    "lower(coalesce(request_body->>'duplicate_confirmed', 'false')) "
+    "NOT IN ('false', '0', '', 'null', 'no', 'off')"
+)
+# 租约过期没等到 ack 的确认推送:落人工 + 这个原因码(前端按码翻四语)。绝不能悄悄躺回
+# pending —— 那既不重投也不告诉人,会计以为还在排队,而账套里可能已经多了一张。
+REASON_CONFIRMED_UNACKED = "confirmed_push_unacked"
+
 
 def hash_token(plaintext: str) -> str:
     return hashlib.sha256((plaintext or "").encode("utf-8")).hexdigest()
@@ -127,24 +139,96 @@ from services.erp.express_push.agent_reporting import (  # noqa: E402,F401
 )
 
 
+def close_unacked_confirmed(cur, endpoint_id: str) -> int:
+    """确认推送领走后没回 ack、租约已过期 → 落 manual 并如实说「可能写了也可能没写」。
+
+    这是「至多一次」的收尾。这类行不能重投(见 _CONFIRMED),但也绝不能留在 pending 装作
+    还在排队:桥/小助手那边可能已经写完只是 ack 丢了,也可能根本没开始写,系统分不出来 ——
+    分不出来就得说分不出来,由会计去 Express 看一眼。返回被收尾的行数。
+    """
+    from services.erp.express_push import common as C
+    from services.erp.express_push.enqueue import MANUAL_PREFIX
+
+    cur.execute(
+        f"""
+        UPDATE erp_push_logs
+        SET status = 'manual',
+            error_msg = %s,
+            response_body = jsonb_build_object(
+                'ok', false,
+                'express_docnum', NULL,
+                'meta', jsonb_build_object(
+                    'stage', %s,
+                    'reason', %s,
+                    'ref_no', invoice_no
+                )
+            )::text,
+            lease_owner = NULL,
+            lease_expires_at = NULL
+        WHERE endpoint_id = %s AND status = 'pending' AND {_CONFIRMED}
+          AND lease_owner IS NOT NULL
+          AND (lease_expires_at IS NULL OR lease_expires_at < NOW())
+        RETURNING id, history_id
+        """,
+        (
+            f"{MANUAL_PREFIX}: {REASON_CONFIRMED_UNACKED}",
+            C.STAGE_NEEDS_REVIEW,
+            REASON_CONFIRMED_UNACKED,
+            endpoint_id,
+        ),
+    )
+    swept = cur.fetchall() or []
+    history_ids = [r["history_id"] for r in swept if r.get("history_id")]
+    if history_ids:
+        # 单据记录那边同步落 manual —— 只改推送日志的话,记录页会一直显示"等待中",
+        # 会计据此重推,而这张票的下场恰恰是"不知道推没推进去"。
+        cur.execute(
+            "UPDATE ocr_history SET last_push_status = 'manual', last_pushed_at = NOW() "
+            "WHERE id = ANY(%s::uuid[])",
+            ([str(h) for h in history_ids],),
+        )
+    if swept:
+        logger.warning(
+            "确认推送租约过期未 ack · 已落人工待核对: endpoint=%s n=%d",
+            str(endpoint_id)[:8],
+            len(swept),
+        )
+    return len(swept)
+
+
 def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, Any]]:
     """领取该 endpoint 未被有效租约占用的 pending 日志(原子置租约)· 返回载荷列表。
 
     SKIP LOCKED + 租约到期可重领:Agent 崩溃后队列不卡死。owner 标识领取者。
+
+    **带 duplicate_confirmed 的行例外,只领 lease_owner IS NULL 的**(至多一次)。默认的
+    at-least-once 靠写侧 find_existing 幂等兜底,而这个键关掉的就是那道闸;租约 120s 而一次
+    真写(备份→写 DBF→重建 CDX)是分钟级,照默认走就是「丢一次 ack 多一张」。已领走又超时的
+    这类行由 close_unacked_confirmed 就地落 manual —— 不重投,也不装作还在排队。收尾单开一笔
+    事务:PG 里一条语句报错整个事务就作废,把它并进领活那笔,收尾一出问题整条队列就停派。
     """
     n = max(1, min(int(max_n or 1), 50))
     try:
         from core import db
 
         with db.get_cursor(commit=True) as cur:
+            close_unacked_confirmed(cur, endpoint_id)
+    except Exception as e:
+        logger.error(f"close_unacked_confirmed failed: {e}")
+
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
-                """
+                f"""
                 WITH due AS (
                     SELECT id FROM erp_push_logs
                     WHERE endpoint_id = %s AND status = 'pending'
                       AND (lease_owner IS NULL
-                           OR lease_expires_at IS NULL
-                           OR lease_expires_at < NOW())
+                           OR (NOT ({_CONFIRMED})
+                               AND (lease_expires_at IS NULL
+                                    OR lease_expires_at < NOW())))
                     ORDER BY created_at ASC
                     LIMIT %s
                     FOR UPDATE SKIP LOCKED

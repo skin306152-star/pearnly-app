@@ -143,4 +143,8 @@ export const WSG_CSS = `
 .orgsw-fa:hover{background:var(--line2);color:var(--accent);}
 .orgsw-fa .wsg-i{width:15px;height:15px;}
 .orgsw-empty{padding:14px;color:var(--ink3);font-size:12px;text-align:center;}
+/* 手机端触控目标(Canon §7 ≥44):切账套按错 = 把票录进另一家公司的账,是这一屏
+   最贵的误触;退出登录在「一个主体都没有」的成员空态下是屏上唯一的控件。实测两颗
+   分别只有 36 / 34 高,窄屏下一并抬到 44,桌面按原尺寸不动。 */
+@media(max-width:768px){.wsw,.wsg-logout{min-height:44px;}}
 `;

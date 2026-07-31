@@ -18,6 +18,9 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const PORT = 8993;
 const BASE = `http://127.0.0.1:${PORT}`;
 const ART = path.join(__dirname, '_artifacts', 'steward_loop_ui');
+// 上传限额:真后端 GET /status 无条件带这一块(routes/steward_routes.py::get_status),
+// 前端拿它才画回形针与输入区说明。同 TASK 一样,值取自真代码(attachments.limits()),不手写。
+const LIMITS = require('./_fixtures_steward_limits.json');
 
 // GENERATOR(改契约后重跑它,把输出贴回来):
 //   python - <<'PY'
@@ -128,7 +131,9 @@ async function boot(page, opts) {
         if (r.request().method() === 'POST') {
             posts.push({ path: p, body: r.request().postDataJSON() });
         }
-        if (p.endsWith('/steward/status')) return json(r, { enabled: true });
+        if (p.endsWith('/steward/status')) {
+            return json(r, { enabled: true, attachments: LIMITS });
+        }
         if (p.endsWith('/messages')) {
             return json(r, { message_id: 'm2', user_message_id: 'um2', task_id: 'task-1' });
         }

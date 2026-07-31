@@ -9,6 +9,7 @@ import {
     type DocDetail,
     type Supplier,
 } from './purchase-common.js';
+import { BAHT } from './money.js';
 
 const CSS = `
 .purm-scrim{position:fixed;inset:0;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1200;}
@@ -91,9 +92,9 @@ window.openPurchasePay = function (docArg, onDone) {
         <div class="mb">
             <div class="who">${escapeHtml(t('pur-pay-to'))} <b>${escapeHtml((d.supplier && d.supplier.name) || '—')}</b>${d.doc_no ? ' · ' + escapeHtml(d.doc_no) : ''}</div>
             <div class="recap">
-                <div class="row"><span>${escapeHtml(t('pur-payable'))}</span><span class="tnum">฿${fmtMoney(d.net_payable)}</span></div>
-                <div class="row"><span>${escapeHtml(t('pur-paid'))}</span><span class="tnum">฿${fmtMoney(d.paid_amount)}</span></div>
-                <div class="row due"><span>${escapeHtml(t('pur-due-balance'))}</span><span class="tnum"><span class="a">฿${fmtMoney(due)}</span></span></div>
+                <div class="row"><span>${escapeHtml(t('pur-payable'))}</span><span class="tnum">${BAHT}${fmtMoney(d.net_payable)}</span></div>
+                <div class="row"><span>${escapeHtml(t('pur-paid'))}</span><span class="tnum">${BAHT}${fmtMoney(d.paid_amount)}</span></div>
+                <div class="row due"><span>${escapeHtml(t('pur-due-balance'))}</span><span class="tnum"><span class="a">${BAHT}${fmtMoney(due)}</span></span></div>
             </div>
             <div class="field"><label>${escapeHtml(t('pur-pay-amount'))}</label><div class="inp"><span class="cur">฿</span><input class="tnum" id="purm-amt" type="number" value="${due.toFixed(2)}"></div><div class="quick" id="purm-payfull">${escapeHtml(t('pur-pay-full'))}</div></div>
             <div class="field"><label>${escapeHtml(t('pur-pay-method'))}</label><div class="seg" id="purm-method"><div class="o on" data-m="cash">${escapeHtml(t('pur-m-cash'))}</div><div class="o" data-m="transfer">${escapeHtml(t('pur-m-transfer'))}</div><div class="o" data-m="promptpay">PromptPay</div></div></div>
@@ -187,7 +188,7 @@ window.openPurchaseMatch = function (lineArg, onDone) {
         qty?: number;
         unit_price?: number;
     };
-    const from = `${escapeHtml(ln.description || '—')}${ln.qty ? ' · ' + ln.qty + ' × ฿' + fmtMoney(ln.unit_price) : ''}`;
+    const from = `${escapeHtml(ln.description || '—')}${ln.qty ? ' · ' + ln.qty + ' × ' + BAHT + fmtMoney(ln.unit_price) : ''}`;
     const isService = ln.item_type === 'service';
     const inner = `<div class="purm w480"><div class="mh"><div class="t">${escapeHtml(t('pur-match-title'))}</div><div class="x" data-close>×</div></div>
         <div class="mb">

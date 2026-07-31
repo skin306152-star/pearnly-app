@@ -30,7 +30,7 @@ export interface Product {
     name_en?: string;
     name_zh?: string;
     unit?: string;
-    // null = 没设过价(≠ 免费)· 收银台靠这个区分「忘了填」和「真的 ฿0」,见 pos-cashier.priced
+    // null = 没设过价(≠ 免费)· 收银台靠这个区分「忘了填」和「真的 ฿ 0」,见 pos-cashier.priced
     unit_price: number | null;
     vat_applicable: boolean;
     track_batch?: boolean;
@@ -186,8 +186,8 @@ function openEdit(p: Product | null, barcodePrefill?: string) {
 }
 
 // 价格留空发 null,不发 0:这个表单最常走的那条路就是抱着货只填个名字建档(扫到未建档的码
-// → 「去建这个商品」)。发 0 的话后端存 0.00、收银台的零元闸看到「有值」就放行,整件货 ฿0
-// 进车、฿0 出门,小票/日结/报表全看着正常。null 才让「没设过价」和「真的免费」分得开。
+// → 「去建这个商品」)。发 0 的话后端存 0.00、收银台的零元闸看到「有值」就放行,整件货 ฿ 0
+// 进车、฿ 0 出门,小票/日结/报表全看着正常。null 才让「没设过价」和「真的免费」分得开。
 // 人自己打的 0 照样发 0 —— 那是人做的决定,小票上看得见;这里堵的是系统替人编出来的价。
 function priceOrNull(raw: string): number | null {
     if (!raw) return null;

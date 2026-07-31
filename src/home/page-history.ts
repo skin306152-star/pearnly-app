@@ -148,6 +148,19 @@
                 </div>
             </div>
 
+            <!-- 取数失败 ≠ 没有记录:后端 500 时给错误态 + 重试,别拿空态糊弄(状态诚实)。
+                 脸走共享设计系统 static/pearnly-ui.css 的 .pu-error/.pu-btn,不自造第三套。 -->
+            <div class="pu-error" id="history-error" style="display:none;">
+                <span class="pu-error__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/>
+                    </svg>
+                </span>
+                <div class="pu-error__title" data-i18n="history-error-title">没能加载识别记录</div>
+                <p class="pu-error__msg" data-i18n="history-error-desc">记录还在,是这次没取回来。重试一次;一直不行请联系我们。</p>
+                <button type="button" class="pu-btn pu-btn--primary" id="history-retry" data-i18n="history-retry">重试</button>
+            </div>
+
             <div class="empty-state" id="history-empty" style="display:none;">
                 <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
                     <rect x="8" y="10" width="32" height="30" rx="2"/>

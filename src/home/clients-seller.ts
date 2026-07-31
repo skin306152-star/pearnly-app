@@ -108,7 +108,7 @@ function renderSellerList() {
             return `<div class="cust-row seller-grid" data-wid="${c.id}">
             <div class="cust-cell-name"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.55"><rect x="2" y="5" width="12" height="9" rx="1"/><path d="M10 14V4a1 1 0 00-1-1H7a1 1 0 00-1 1v10"/></svg><span class="cust-name-text">${escapeHtml(c.name || '#' + c.id)}</span></div>
             <div class="cust-cell-tax">${escapeHtml(c.tax_id || '—')}</div>
-            <div class="align-right">${c.invoice_count || 0}</div>
+            <div class="cust-cell-count align-right"><span class="cust-cell-count-label" data-i18n="seller-col-count">${escapeHtml(t('seller-col-count'))}</span>${c.invoice_count || 0}</div>
             <div class="cust-row-actions">${current}${ownerBtns}</div>
         </div>`;
         })

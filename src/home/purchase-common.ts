@@ -4,6 +4,7 @@
 // 全接口要 workspace_client_id(按套账隔离);个人模式/未选账套 → null,调用方提示先选公司。
 /* global t, token */
 import { mockHandle } from './purchase-mock.js';
+import { BAHT } from './money.js';
 
 export type DocKind = 'purchase_invoice' | 'purchase_order' | 'expense';
 export type PaymentStatus = 'unpaid' | 'partial' | 'paid';
@@ -267,13 +268,13 @@ export function fmtMoney(v: number | string | null | undefined): string {
     });
 }
 
-// KPI / 列表用:฿62,400 风格(整数无小数,有角分时显 2 位)。
+// KPI / 列表用:62,400 风格(整数无小数,有角分时显 2 位)。
 export function fmtBaht(v: number | string | null | undefined): string {
     const n = Number(v || 0);
     const opts = Number.isInteger(n)
         ? { maximumFractionDigits: 0 }
         : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-    return '฿' + n.toLocaleString('en-US', opts);
+    return BAHT + n.toLocaleString('en-US', opts);
 }
 
 export function fmtQty(v: number | string | null | undefined): string {

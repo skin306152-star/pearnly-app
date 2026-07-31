@@ -3,6 +3,8 @@
 // 接真接口 /api/inventory/*(PO-A3 · routes/inventory_routes.py)· 全部端点要 workspace_client_id(按账套隔离)。
 /* global t, currentLang, token */
 
+import { BAHT } from './money.js';
+
 export interface InvName {
     th: string | null;
     en: string | null;
@@ -212,9 +214,9 @@ export function fmtMoney(v: number | string | null | undefined): string {
 }
 
 // 成本/货值列:无 field.cost.view 码的角色,后端把均价/货值返 null(G4 遮蔽)→ 显「--」;
-// 真零成本仍是数字 0 → ฿0.00,只有 null 才是被遮蔽。
+// 真零成本仍是数字 0 → 显示成 0.00,只有 null 才是被遮蔽。
 export function fmtCost(v: number | string | null | undefined): string {
-    return v == null ? '--' : '฿' + fmtMoney(v);
+    return v == null ? '--' : BAHT + fmtMoney(v);
 }
 
 // 效期的年份带子。上限是 4 位年份这条硬线;下限挡的是 0490-12-31 这种「四位但明显不是人填的」
@@ -253,7 +255,7 @@ const MAX_QTY_DIGITS = 7;
 
 // 进货单价的位数上限。跟数量同一个数,但理由是另一条 —— 两处的上限各按各的业务顶算,
 // 谁也不该因为另一头改了就跟着动。泰国小零售单件最贵的真实进货是金饰店:一公斤金条
-// ≈ ฿2,400,000(七位)。7 位(≤ ฿9,999,999.99/件)因此把最贵的那档真货留了四倍余量,
+// ≈ ฿ 2,400,000(七位)。7 位(≤ ฿ 9,999,999.99/件)因此把最贵的那档真货留了四倍余量,
 // 同时仍在「整串条码留下的 8 位起」之下 —— 拦得住掉进来的码,挡不着真买卖。
 const MAX_COST_DIGITS = 7;
 
@@ -288,7 +290,7 @@ export function isSaneQty(value: string): boolean {
  * 「这个进货单价不是一串条码掉进来的」。
  *
  * 单价框比数量框更该有这一道,因为它错了没人看得见:数量错了架上一点就对不上,单价错了
- * 只改库存估值与移动加权成本 —— 真浏览器实测(枪扫时光标停在单价格)฿8850999320014/瓶
+ * 只改库存估值与移动加权成本 —— 真浏览器实测(枪扫时光标停在单价格)฿ 8850999320014/瓶
  * 原样进了 POST /api/inventory/in,屏上一个字都没有,弹窗照常关掉报成功。
  *
  * 同 isSaneQty:只挡量级这一档,残串短到跟真价格同形时谁也分不出来。

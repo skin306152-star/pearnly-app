@@ -222,7 +222,7 @@ Existing gates (from discovery):
 - `scripts/ui_design_lint.mjs --gate` — HARD-FAIL, walks all `static/` but bare-hex is a RATCHET (baseline-baked), not a forbid. CI `lint-ui` (`ci.yml:176`), pre-push (`:163`).
 - `scripts/check_theme_responsive.py --gate` — HARD-FAIL, covers home+pos+console only. CI `lint-ui` (`ci.yml:166`), pre-push (`:195`).
 - `scripts/check_cachebust.py` — CI **`lint-size`** (`ci.yml:128`). `CACHE_BUST_PAIRS` (`check_cachebust.py:51-66`) gates only `dist/ai.css↔ai.html` among CSS.
-- `scripts/git-hooks/pre-push` — CAVEAT: `core.hooksPath` currently points at `.git/hooks` (no pre-push installed). Run `git config core.hooksPath scripts/git-hooks` to activate.
+- `scripts/git-hooks/pre-push` — active since 2026-07-31 (`core.hooksPath` = `scripts/git-hooks`, set in the shared `.git/config`, so every worktree runs it). Verify with `git config --get core.hooksPath`.
 
 **NEW gate — `scripts/check_spa_consistency.py`** (zero-dependency stdlib, mirrors `check_ui_consistency.py` style; driven by an explicit SPA registry so it is not home-hardcoded):
 

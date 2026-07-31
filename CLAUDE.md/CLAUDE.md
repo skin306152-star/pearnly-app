@@ -58,7 +58,7 @@ FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主�
 
 机械闸清单 + 逐道自查命令 + 豁免语法:`docs/GATES.md`。棘轮豁免写在 commit message:`RATCHET-EXEMPT: <file> +<N> · <理由>`;新增 `ensure_*` 写 `NEW-DEBT-EXEMPT: <理由>`。
 
-⚠️ **本地 pre-push 钩子目前是关的**(`core.hooksPath` 没指向 `scripts/git-hooks`)→ 真正拦你的只有 CI 事后红,所以 push 前自己手跑:`PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`(不设编码变量会假红)。为什么还没挂上、要清什么债才能挂:`docs/context-engineering/2026-07-25-claude-md-simplify.md` 文末遗留表。
+⚠️ **本地 pre-push 钩子 2026-07-31 起已挂上**(`core.hooksPath` = `scripts/git-hooks`)→ 推坏码会当场被拦,不用等 CI。它在 `.git/config` 里,**所有共享 worktree 一起生效**。想提前知道会不会被拦,别等 push:`PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`(不设编码变量会假红),或 `git push --dry-run`(照样触发,不会真推)。装法与影响面:`docs/GATES.md` 顶部「装钩子」。
 
 ## 5. 文档地图(用 `@` 引用,别通读)
 

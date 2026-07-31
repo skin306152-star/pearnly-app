@@ -16,13 +16,14 @@ tests/unit/test_anti_bigfile.py · REFACTOR-WC-P1 (2026-05-28 窗口 C · 防屎
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from tests.unit._git_sandbox import git, scrubbed_env
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
@@ -137,48 +138,14 @@ class CheckFileSizeTests(unittest.TestCase):
             tmp.unlink(missing_ok=True)
 
 
-def _scrubbed_env() -> dict:
-    """剥掉 git hook 注入的 GIT_DIR/GIT_WORK_TREE 等定位变量。
-
-    pre-push hook 里跑本测试时,这些变量指向真仓:不剥的话 mini-repo 的
-    `git init/commit` 会打进宿主仓(主仓被翻 bare / worktree HEAD 被劫持·2026-06-10 血泪)。
-    """
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-
-
-def _git(repo: Path, *args: str) -> str:
-    """跑 git 命令 · 失败 raise(测试用)"""
-    env = _scrubbed_env()
-    # CI / 干净环境兜底 · 配 user 不然 git commit 报 author error
-    env["GIT_AUTHOR_NAME"] = "test"
-    env["GIT_AUTHOR_EMAIL"] = "test@example.com"
-    env["GIT_COMMITTER_NAME"] = "test"
-    env["GIT_COMMITTER_EMAIL"] = "test@example.com"
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"git {' '.join(args)} 失败:exit={result.returncode}\n"
-            f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        )
-    return result.stdout
-
-
 class CheckLineRatchetTests(unittest.TestCase):
     """棘轮测试 · 用真的 git mini-repo · 验脚本能抓出净增长"""
 
     def setUp(self) -> None:
         self.tmpdir = Path(tempfile.mkdtemp(prefix="pearnly_ratchet_"))
-        _git(self.tmpdir, "init", "--initial-branch=master")
-        _git(self.tmpdir, "config", "user.email", "test@example.com")
-        _git(self.tmpdir, "config", "user.name", "test")
+        git(self.tmpdir, "init", "--initial-branch=master")
+        git(self.tmpdir, "config", "user.email", "test@example.com")
+        git(self.tmpdir, "config", "user.name", "test")
         # 拷脚本进 mini-repo(脚本自带 ROOT 推导 · 用 mini-repo 当 ROOT)
         scripts_dst = self.tmpdir / "scripts"
         scripts_dst.mkdir()
@@ -195,27 +162,33 @@ class CheckLineRatchetTests(unittest.TestCase):
             text=True,
             encoding="utf-8",
             errors="replace",
-            env=_scrubbed_env(),
+            env=scrubbed_env(),
         )
         return result.returncode, result.stdout + result.stderr
 
-    def test_ratchet_passes_on_first_commit(self) -> None:
-        """首个 commit 没有 HEAD~1 · 优雅退出 0"""
+    def test_ratchet_fails_on_first_commit(self) -> None:
+        """首个 commit 没有 HEAD~1 → 判不了 → 红(2026-07-31 从 fail-open 翻过来)。
+
+        原来这里断言的是「优雅退出 0」。可退 0 就是「PASS」,与「真没净增长」在 CI 日志里
+        分不出来 —— 闸判不了就该红,逃生门是显式给 --base。整套判不了的路径见
+        tests/unit/test_line_ratchet_gate.py。
+        """
         (self.tmpdir / "app.py").write_bytes(b"a\nb\nc\n")
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "init")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "init")
         rc, out = self._run_ratchet()
-        self.assertEqual(rc, 0, msg=out)
+        self.assertEqual(rc, 1, msg=out)
+        self.assertIn("base ref", out)
 
     def test_ratchet_passes_when_monitored_file_shrinks(self) -> None:
         """监控文件 app.py 缩减 · 棘轮放行"""
         app = self.tmpdir / "app.py"
         app.write_bytes(b"line\n" * 100)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "init app.py 100")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "init app.py 100")
         app.write_bytes(b"line\n" * 50)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "refactor: 缩减 app.py")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "refactor: 缩减 app.py")
         rc, out = self._run_ratchet()
         self.assertEqual(rc, 0, msg=out)
 
@@ -223,11 +196,11 @@ class CheckLineRatchetTests(unittest.TestCase):
         """监控文件 app.py 净增长 · 棘轮 fail"""
         app = self.tmpdir / "app.py"
         app.write_bytes(b"line\n" * 100)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "init")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "init")
         app.write_bytes(b"line\n" * 150)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "feat: 加 50 行业务逻辑(违规)")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "feat: 加 50 行业务逻辑(违规)")
         rc, out = self._run_ratchet()
         self.assertEqual(rc, 1, msg=f"应 fail · 但 exit={rc}\n{out}")
         self.assertIn("app.py", out)
@@ -236,11 +209,11 @@ class CheckLineRatchetTests(unittest.TestCase):
         """commit message 有 `RATCHET-EXEMPT: app.py +50 · 理由` · 放行"""
         app = self.tmpdir / "app.py"
         app.write_bytes(b"line\n" * 100)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "init")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "init")
         app.write_bytes(b"line\n" * 150)
-        _git(self.tmpdir, "add", ".")
-        _git(
+        git(self.tmpdir, "add", ".")
+        git(
             self.tmpdir,
             "commit",
             "-m",
@@ -256,11 +229,11 @@ class CheckLineRatchetTests(unittest.TestCase):
         d.mkdir()
         doc = d / "foo.md"
         doc.write_bytes(b"a\n")
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "init docs")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "init docs")
         doc.write_bytes(b"a\n" * 100)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "docs: 扩")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "docs: 扩")
         rc, out = self._run_ratchet()
         self.assertEqual(rc, 0, msg=out)
 
@@ -270,11 +243,11 @@ class CheckLineRatchetTests(unittest.TestCase):
         d.mkdir(parents=True)
         f = d / "charge.py"
         f.write_bytes(b"line\n" * 10)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "init")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "init")
         f.write_bytes(b"line\n" * 60)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "feat: charge 加业务")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "feat: charge 加业务")
         rc, out = self._run_ratchet()
         self.assertEqual(rc, 1, msg=f"services 净增长应 fail · 但 exit={rc}\n{out}")
         self.assertIn("charge.py", out)
@@ -283,11 +256,11 @@ class CheckLineRatchetTests(unittest.TestCase):
         """*_routes.py 也是监控范围"""
         f = self.tmpdir / "billing_routes.py"
         f.write_bytes(b"line\n" * 10)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "init")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "init")
         f.write_bytes(b"line\n" * 60)
-        _git(self.tmpdir, "add", ".")
-        _git(self.tmpdir, "commit", "-m", "feat: 加路由")
+        git(self.tmpdir, "add", ".")
+        git(self.tmpdir, "commit", "-m", "feat: 加路由")
         rc, out = self._run_ratchet()
         self.assertEqual(rc, 1, msg=f"routes 净增长应 fail · 但 exit={rc}\n{out}")
         self.assertIn("billing_routes.py", out)

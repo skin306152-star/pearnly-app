@@ -14,6 +14,7 @@ import {
 import { getSellers, getProducts } from './sales-wizard-io.js';
 import { previewArea } from './sales-wizard-preview.js';
 import { wt, wpack, getWizardLang } from './sales-wizard-i18n.js';
+import { BAHT } from './money.js';
 
 export const ICO = {
     check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -131,15 +132,15 @@ function branchBlock(st: WState): string {
         ${b.branchType === 'branch' ? `<input type="text" id="sw-brno" value="${escapeHtml(b.branchNo)}" placeholder="${escapeHtml(wt('brno'))} (5)">${bad ? `<div class="sw-hint err">${escapeHtml(wt('brErr'))}</div>` : ''}` : ''}</div>`;
 }
 
-// 没设价的商品卡:画"未设价"而不是 ฿0.00 —— money(null) 是 "0.00",画出来就等于替老板宣布
-// 这货免费,点一下还真能以 ฿0 上票。卡片同时置灰 + 说清出路(去商品数据填价),点它有 toast。
+// 没设价的商品卡:画"未设价"而不是 ฿ 0.00 —— money(null) 是 "0.00",画出来就等于替老板宣布
+// 这货免费,点一下还真能以 ฿ 0 上票。卡片同时置灰 + 说清出路(去商品数据填价),点它有 toast。
 function priceTag(p: { unit_price: number | null; vat_applicable: boolean }): string {
     const free = p.vat_applicable
         ? ''
         : ` <span class="sw-muted" style="font-size:10px">${escapeHtml(wt('taxFree'))}</span>`;
     if (!priced(p.unit_price))
         return `<span class="sw-noprice">${escapeHtml(wt('noPrice'))}</span>`;
-    return `฿${money(Number(p.unit_price))}${free}`;
+    return `${BAHT}${money(Number(p.unit_price))}${free}`;
 }
 
 export function step3(st: WState): string {
@@ -163,7 +164,7 @@ export function step3(st: WState): string {
             <div class="sw-crow2"><div class="sw-cqty"><button data-q="${i}" data-d="-1">−</button><span>${l.qty}</span><button data-q="${i}" data-d="1">+</button></div>
               <div class="sw-cfield"><label>${escapeHtml(wt('linePrice'))}</label><input type="number" data-ln="${i}" data-f="price" value="${priced(l.price) ? l.price : ''}" class="${priced(l.price) ? '' : 'noprice'}" placeholder="${escapeHtml(wt('noPrice'))}" min="0" step="0.01"></div>
               <div class="sw-cfield"><label>${escapeHtml(wt('lineDisc'))}</label><input type="number" data-ln="${i}" data-f="disc" value="${l.disc}" min="0" step="0.01"></div>
-              <span class="sw-amt">${priced(l.price) ? `฿${money(lineAmount(l))}` : `<span class="sw-noprice">${escapeHtml(wt('noPrice'))}</span>`}</span></div>
+              <span class="sw-amt">${priced(l.price) ? `${BAHT}${money(lineAmount(l))}` : `<span class="sw-noprice">${escapeHtml(wt('noPrice'))}</span>`}</span></div>
             ${l.custom ? `<label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:var(--ink-3);cursor:pointer"><input type="checkbox" style="width:auto" data-save="${i}" ${l.save ? 'checked' : ''}> ${escapeHtml(wt('saveCatalog'))}</label>` : ''}</div>`
               )
               .join('')
@@ -182,7 +183,7 @@ export function step3(st: WState): string {
                 ${c.hd > 0 ? `<div class="sw-tr disc"><span>${escapeHtml(wt('hdisc'))}</span><span class="v">-${money(c.hd)}</span></div>` : ''}
                 <div class="sw-tr"><span>${escapeHtml(wt('vat'))} ${st.vatRate}%</span><span class="v">${money(c.vat)}</span></div>
                 ${c.wht > 0 ? `<div class="sw-tr disc"><span>${escapeHtml(wt('whtL'))} ${st.whtRate}%</span><span class="v">-${money(c.wht)}</span></div>` : ''}
-                <div class="sw-tr grand"><span>${escapeHtml(wt('grand'))}</span><span class="v">฿ ${money(c.grand)}</span></div></div></div>
+                <div class="sw-tr grand"><span>${escapeHtml(wt('grand'))}</span><span class="v">${BAHT}${money(c.grand)}</span></div></div></div>
         </div></div>`;
 }
 
@@ -211,7 +212,7 @@ export function step4(st: WState): string {
                 ? `<div class="sw-row3">
             <div class="sw-field"><label>${escapeHtml(wt('payMethod'))}</label><select id="sw-pm">${methodOpts}</select></div>
             <div class="sw-field"><label>${escapeHtml(wt('payDate'))}</label><input type="date" id="sw-pdate" value="${p.date}"></div>
-            ${p.status === 'partial' ? `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="number" id="sw-paid" value="${p.paidAmt != null ? p.paidAmt : ''}" placeholder="${money(c.grand)}"></div>` : `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="text" value="฿ ${money(c.grand)}" disabled></div>`}</div>`
+            ${p.status === 'partial' ? `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="number" id="sw-paid" value="${p.paidAmt != null ? p.paidAmt : ''}" placeholder="${money(c.grand)}"></div>` : `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="text" value="${BAHT}${money(c.grand)}" disabled></div>`}</div>`
                 : ''
         }
         ${dateBlock(st)}</div>`;

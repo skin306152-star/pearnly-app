@@ -4,6 +4,7 @@
 /* global t, escapeHtml */
 import type { FormState } from './purchase-form-types.js';
 import { computeForm, overrideConsistent } from './purchase-form-lines.js';
+import { BAHT } from './money.js';
 
 export function totalsCardHtml(st: FormState): string {
     return `<div class="card"><div class="hd">${escapeHtml(t('pur-totals'))}
@@ -20,13 +21,13 @@ export function totalsHtml(st: FormState): string {
     const cell = (key: keyof FormState['override'], val: string) =>
         m
             ? `<input class="medit tnum" type="number" data-ov="${key}" value="${st.override[key]}">`
-            : `<span class="tnum">฿${val}</span>`;
+            : `<span class="tnum">${BAHT}${val}</span>`;
     const vatRow = st.hasVat
         ? `<div class="sum"><span>${escapeHtml(t('pur-vat-in'))} <span class="pill ok">${escapeHtml(t('pur-creditable'))}</span></span>${cell('vat', r.vat_amount)}</div>`
         : '';
     const whtRow =
         Number(r.wht_amount) > 0
-            ? `<div class="sum"><span>${escapeHtml(t('pur-wht'))} <span class="pill warn">${escapeHtml(t('pur-withheld'))}</span></span><span class="tnum wht">−฿${r.wht_amount}</span></div>`
+            ? `<div class="sum"><span>${escapeHtml(t('pur-wht'))} <span class="pill warn">${escapeHtml(t('pur-withheld'))}</span></span><span class="tnum wht">−${BAHT}${r.wht_amount}</span></div>`
             : '';
     const consist = m
         ? overrideConsistent(st)
@@ -38,7 +39,7 @@ export function totalsHtml(st: FormState): string {
         ${vatRow}
         <div class="sum mid"><span>${escapeHtml(t('pur-grand'))}</span>${cell('grand', r.grand_total)}</div>
         ${whtRow}
-        <div class="sum tot"><span>${escapeHtml(t('pur-net-payable'))}</span><span class="tnum">฿${r.net_payable}</span></div>
+        <div class="sum tot"><span>${escapeHtml(t('pur-net-payable'))}</span><span class="tnum">${BAHT}${r.net_payable}</span></div>
         ${consist}`;
 }
 
@@ -87,5 +88,5 @@ function refreshTotalsOnly(st: FormState): void {
         consist.textContent = okC ? t('pur-consist-ok') : t('pur-consist-bad');
     }
     const net = box.querySelector('.sum.tot .tnum');
-    if (net) net.textContent = '฿' + computeForm(st).net_payable;
+    if (net) net.textContent = BAHT + computeForm(st).net_payable;
 }

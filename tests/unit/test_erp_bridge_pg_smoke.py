@@ -7,14 +7,12 @@ lease 才炸。本文件对本地 docker pearnly-db(docker-compose.yml 那套)�
 入队 write+query 各一条 → 验证各自租约秒数真落进 lease_expires_at,再把超龄扫尾、
 租约回收、expire 语义(在途写活不 expire)、迟到 ack 落结果四条路各真跑一遍。
 
-只认显式本地 DSN(env PEARNLY_PG_SMOKE_URL 或 compose 默认),绝不回落 DATABASE_URL
-(防误连生产);连不上(docker 没开 / CI 无 Postgres 服务)则整类 skip。
+连哪个库、连不上怎么办,全在 tests/unit/_pg_smoke.py(两份 smoke 共用,理由写在那)。
 """
 
 from __future__ import annotations
 
 import contextlib
-import os
 import sys
 import unittest
 import uuid
@@ -26,20 +24,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from services.erp.bridge import schema, store, write_gate  # noqa: E402
-
-# docker-compose.yml 里 pearnly-db 的固定本地 DSN;真身在别的端口时用 env 覆盖。
-_LOCAL_DSN = os.environ.get(
-    "PEARNLY_PG_SMOKE_URL", "postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly"
-)
+from tests.unit._pg_smoke import connect_or_skip  # noqa: E402
 
 TENANT = str(uuid.uuid4())
 BRIDGE_ID = str(uuid.uuid4())
-
-
-def _connect():
-    import psycopg2
-
-    return psycopg2.connect(_LOCAL_DSN, connect_timeout=3)
 
 
 def _bridge(effective="write"):
@@ -56,10 +44,7 @@ class BridgeStorePgSmokeTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        try:
-            cls.conn = _connect()
-        except Exception as e:
-            raise unittest.SkipTest(f"本地 pearnly-db 不可达({e!r})· 起 docker compose 后再跑")
+        cls.conn = connect_or_skip()
         from psycopg2.extras import RealDictCursor
 
         @contextlib.contextmanager

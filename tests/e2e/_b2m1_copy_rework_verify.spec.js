@@ -26,6 +26,9 @@ test.skip(process.env.PEARNLY_E2E_LOCAL !== '1', '需本机真栈(PEARNLY_E2E_LO
 const FIX = JSON.parse(
     fs.readFileSync(path.join(__dirname, '_fixtures_steward_copy.json'), 'utf8')
 );
+// 上传限额:真后端 GET /status 无条件带这一块(routes/steward_routes.py::get_status),
+// 前端据此才画回形针与输入区说明。桩里漏了或写成 null,拍出来的就是产品里不存在的界面。
+const LIMITS = require('./_fixtures_steward_limits.json');
 
 fs.mkdirSync(ART, { recursive: true });
 
@@ -121,17 +124,22 @@ function taskPendingAuthz(lang) {
 // 正题之前先真送几轮:390px 下一屏装不下才谈得上「谁在上谁在下」—— 内容短到不用滚,
 // sticky 与 static 长得一模一样,量出来的数字对两种写法都成立(假绿)。
 const FILLER_TURNS = 6;
+const FILLER_ASK = '这期 Sister 推完了吗';
+const FILLER_LAST = '把这张票推进 69EXP';
 const FILLER_REPLY = '这期 Sister Trading 有 12 张进项票,已推 9 张,剩下 3 张缺过账去向。';
 
+// 服务端消息流是权威的:任务落终态时产品会拿它整份重建右窗(ai-steward.js syncSession)。
+// 所以这里必须逐轮还原【真送出去过的每一句】—— 只回最后一轮,重建当场把前六轮抹掉,
+// 手机端那把「谁在上谁在下」的尺子量的就是一屏装得下的短对话(又一版桩比真后端少给)。
 function session(task, replyText) {
-    return {
-        session_id: 's-1',
-        current_task_id: task.task_id,
-        messages: [
-            { id: 'm1', role: 'user', text: '把这张票推进 69EXP' },
-            { id: 'm2', role: 'steward', text: replyText, task_id: task.task_id },
-        ],
-    };
+    const messages = [];
+    for (let i = 0; i < FILLER_TURNS; i++) {
+        messages.push({ id: `u${i}`, role: 'user', text: FILLER_ASK });
+        messages.push({ id: `m${i}`, role: 'steward', text: FILLER_REPLY });
+    }
+    messages.push({ id: 'u-last', role: 'user', text: FILLER_LAST });
+    messages.push({ id: 'm-last', role: 'steward', text: replyText, task_id: task.task_id });
+    return { session_id: 's-1', current_task_id: task.task_id, messages };
 }
 
 // 真交互驱动:打开管家页 → 在真输入框里打字 → 点真「送出」。送出的回包与随后的任务查询
@@ -139,7 +147,7 @@ function session(task, replyText) {
 async function open(page, { lang, task, reply, width, height }) {
     await page.setViewportSize({ width: width || 1280, height: height || 900 });
     await page.route('**/api/ai/steward/status', (r) =>
-        r.fulfill({ json: { enabled: true, attachments: null } })
+        r.fulfill({ json: { enabled: true, attachments: LIMITS } })
     );
     await page.route('**/api/ai/steward/sessions', (r) =>
         r.fulfill({ json: { session_id: 's-1' } })
@@ -171,7 +179,7 @@ async function open(page, { lang, task, reply, width, height }) {
     await page.waitForSelector('#stwInput', { timeout: 20000 });
     for (let i = 0; i <= FILLER_TURNS; i++) {
         await page.click('#stwInput');
-        await page.keyboard.type(i < FILLER_TURNS ? '这期 Sister 推完了吗' : '把这张票推进 69EXP');
+        await page.keyboard.type(i < FILLER_TURNS ? FILLER_ASK : FILLER_LAST);
         await page.click('[data-action="stw-send"]');
         await page.waitForFunction(
             (n) => document.querySelectorAll('.stw-feed .stw-msg').length >= n,

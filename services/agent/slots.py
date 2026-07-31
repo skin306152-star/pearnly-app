@@ -23,10 +23,17 @@ _MAX_FREEFORM = 100
 # token 里不含空白 —— "1 ใบ 200 บาท" 合成 1200 会把两个数字粘成一个不存在的金额。
 _NUM_TOKEN = re.compile(r"\d[\d,]*(?:\.\d+)?")
 _NUM_NOISE = str.maketrans("", "", ", ฿%")
+# 一个数的「里面」:千分位与小数点都在数的内部,字面比切在这里等于凭空造出一个新值。
+_NUM_INSIDE = frozenset("0123456789,.")
+# 标识符(税号/身份证/电话/银行账号)常带分隔符印:0-1055-35134-27-8。只比数字串不比排版,
+# 但 10 位起才算一个号 —— 否则「2026-07-30」凑出来的 8 位数字就成了一个可接地的标识。
+_ID_RUN = re.compile(r"\d[\d\-]*\d")
+_MIN_ID_DIGITS = 10
+_NON_DIGIT = re.compile(r"\D")
 
 
 def _texts(user_text: str, history: Optional[list]) -> str:
-    """用户原话 + 近期对话,小写拼一起供子串接地。"""
+    """用户原话 + 近期对话,小写拼一起供接地比对。"""
     parts = [user_text or ""]
     parts += [h.get("content", "") for h in (history or []) if (h.get("content") or "").strip()]
     return "\n".join(parts).lower()
@@ -54,23 +61,57 @@ def _numbers_in(blob: str) -> set:
     return out
 
 
+def _ids_in(blob: str) -> set:
+    """用户原话里出现过的标识符,按数字串收(分隔符是排版,不进比对)。"""
+    return {_NON_DIGIT.sub("", run) for run in _ID_RUN.findall(blob)}
+
+
+def _id_digits(value: str) -> str:
+    """值是标识符写法就返回它的数字串;不是就空串(不走标识符这条路)。"""
+    if not _ID_RUN.fullmatch(value):
+        return ""
+    digits = _NON_DIGIT.sub("", value)
+    return digits if len(digits) >= _MIN_ID_DIGITS else ""
+
+
+def _literal_hit(value: str, blob: str) -> bool:
+    """字面接地,但两端不许切在一个数的中间。
+
+    子串比曾是唯一判据,于是「107」能从「10,700」里蹭出来:模型削掉几位就得到一个会计
+    从没说过的金额,闸却判它已接地。把一个数切开就是新造了一个值;把名字切开不是
+    (「7-eleven」出自「บิล 7-eleven」),所以只在值本身的端点落在数里时才管这条边界
+    —— 端点含千分位/小数点也算,否则「9.00」削成「.00」照旧从左边溜进来。
+    """
+    head, tail = value[0] in _NUM_INSIDE, value[-1] in _NUM_INSIDE
+    if not (head or tail):
+        return value in blob
+    for m in re.finditer(re.escape(value), blob):
+        if head and m.start() and blob[m.start() - 1] in _NUM_INSIDE:
+            continue
+        if tail and m.end() < len(blob) and blob[m.end()] in _NUM_INSIDE:
+            continue
+        return True
+    return False
+
+
 def _appears_in_text(value: str, blob: str) -> bool:
-    """字面接地;字面对不上且值是纯数字时,再按【数值】接地一次。
+    """三条接地路,命中任一即可信:字面(不许切在数中间)/ 按数值 / 按标识符的数字串。
 
     金额天生带排版:会计打「10,700 含税的」,模型交回 10700,逐字比会把真数判成编造,
-    追问一轮等于逼人重打一遍。数值面只认用户原话里真出现过的那些数(集合取自 blob),
-    编造的数照样进不来。
-
-    只加不减:字面能接地的一律照旧放行 —— 这道闸是 LINE Agent 与管家共用的安全核心,
-    收紧字面判据会连带改掉别处的单号/税号接地口径,不在本次改动的射程里。
+    追问一轮等于逼人重打一遍。税号同理 —— 票面印的是「0-1055-35134-27-8」,模型交回
+    13 位数字。两条都只认用户原话里真出现过的那个数 / 那串数字:削位数、切千分位、
+    丢分位一律接不了地,编造的数更进不来。
     """
     v = (value or "").strip().lower()
     if not v:
         return False
-    if v in blob:
+    if _literal_hit(v, blob):
         return True
     number = _as_number(v)
-    return number is not None and number in _numbers_in(blob)
+    if number is not None and number in _numbers_in(blob):
+        return True
+    ident = _id_digits(v)
+    return bool(ident) and ident in _ids_in(blob)
 
 
 def _ground(

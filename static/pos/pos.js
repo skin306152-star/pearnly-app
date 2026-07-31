@@ -16,8 +16,8 @@
         const err = type === 'error';
         txt.textContent = msg;
         el.classList.toggle('error', err);
-        // 红档原先只换底色:「没加进购物车」旁边立着的还是「已加入」那枚 ✓(实测两句话的 path
-        // 一模一样)。底色分得开的是细看的人,柜台前抬头一瞥的那个只读得到字形。
+        // 红档原先只换底色:「没加进购物车」旁边立着的还是「已加入」那个对勾(实测两句话的
+        // path 一模一样)。底色分得开的是细看的人,柜台前抬头一瞥的那个只读得到字形。
         const ic = $('pos-toast-ic');
         if (ic) ic.setAttribute('d', err ? ic.dataset.err : ic.dataset.ok);
         el.classList.add('show');

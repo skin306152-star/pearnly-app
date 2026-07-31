@@ -514,4 +514,32 @@
   .ctabs button {
     flex: 0 0 auto;
   }
+  /* 还有 tab 没露头的那一侧画一道渐隐:横滚容器自己没有任何「还能滑」的信号,用户看到的
+   * 是一条到头了的 tab 条(2026-07-30 手机 390 实测 scrollWidth 324 > clientWidth 296)。
+   * mask 画在元素自己的盒子上,内容滚过去它不跟着走;两个类由 ai-tabs-scroll.js 按实测
+   * 滚动位置挂,滚到底那一侧就摘掉——不画假的边。 */
+  .ctabs.tabs-more-r {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  }
+  .ctabs.tabs-more-l {
+    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 22px), transparent);
+    mask-image: linear-gradient(to left, #000 calc(100% - 22px), transparent);
+  }
+  .ctabs.tabs-more-l.tabs-more-r {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 22px,
+      #000 calc(100% - 22px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 22px,
+      #000 calc(100% - 22px),
+      transparent
+    );
+  }
 }

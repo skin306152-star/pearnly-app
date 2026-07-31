@@ -13,7 +13,9 @@
     /* v86 · 手机端:topbar-left 不再占 sidebar 宽度 · 汉堡按钮显示 */
     .topbar { padding: 0 14px; }
     .topbar-left { width: auto; padding-left: 0; gap: 8px; }
-    .topbar-hamburger { display: flex; }
+    /* 手机端唯一的主导航键(点开 off-canvas 侧栏)。实测 36×36,拇指按不准 ——
+     * Canon §7 的 ≥44 在这里不是好看不好看的问题:按空了就没有别的路进导航。 */
+    .topbar-hamburger { display: flex; width: 44px; height: 44px; }
     /* v86 · 侧栏收回时隐藏其内部的 toggle 按钮(手机端用 topbar 上的) */
     .sidebar-toggle-in { display: none; }
     /* v86 · 手机端打开侧栏时的遮罩 */

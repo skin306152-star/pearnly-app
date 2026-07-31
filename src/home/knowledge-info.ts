@@ -5,6 +5,7 @@
 // 费用金额为示意占位(标「待定」),最终定价由 Zihao 拍板后填真数。用 .modal 体系。
 // ============================================================
 import { KB_CAT, kbEsc, kbIcon, kbModalShell, kbT, type KbModal } from './knowledge-api.js';
+import { BAHT } from './money.js';
 
 let _shell: KbModal | null = null;
 
@@ -90,8 +91,8 @@ function render(): void {
             <div class="kb-info-h"><span class="l"></span>${kbEsc(kbT('kb-info-cost-h', '费用怎么算'))}</div>
             <p style="font-size:12.5px;color:var(--ink-2,#555);margin:0 0 11px;line-height:1.55">${kbEsc(kbT('kb-info-cost-lead', '从你的泰铢余额按用量扣，不用不花，跟 OCR 共用一个余额池：'))}</p>
             <div class="kb-info-price">
-                ${priceRow(kbIcon('upload'), 'kb-info-c1-n', '上传建库', 'kb-info-c1-d', 'PDF / 图片按页、文档按字符 —— 跟现在 OCR 同价', 'kb-info-c1-amt', '฿1.50/页起')}
-                ${priceRow(kbIcon('message'), 'kb-info-c2-n', 'AI 问答', 'kb-info-c2-d', '每次带合同原文出处的回答', 'kb-info-c2-amt', '฿0.50/次')}
+                ${priceRow(kbIcon('upload'), 'kb-info-c1-n', '上传建库', 'kb-info-c1-d', 'PDF / 图片按页、文档按字符 —— 跟现在 OCR 同价', 'kb-info-c1-amt', BAHT + '1.50/页起')}
+                ${priceRow(kbIcon('message'), 'kb-info-c2-n', 'AI 问答', 'kb-info-c2-d', '每次带合同原文出处的回答', 'kb-info-c2-amt', BAHT + '0.50/次')}
                 ${priceRow(kbIcon('shield-check'), 'kb-info-c3-n', '自动发票检查', 'kb-info-c3-d', '死规则:算术 / 税号 / 查重 / 客户规矩', 'kb-info-c3-amt', '免费')}
             </div>
             <div class="kb-info-tbd"><span>${kbEsc(kbT('kb-info-note', '充值与扣费跟现有 OCR 共用同一个泰铢余额；问答按真实成本加合理毛利定价（与 OCR 同档）。'))}</span></div>

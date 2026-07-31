@@ -87,6 +87,35 @@ function renderHistorySummary() {
     });
 }
 
+// 四态互斥,单一出口:list/loading 都要面板在场(骨架长在表体里),empty/error 各占一屏。
+type HistoryView = 'loading' | 'list' | 'empty' | 'error' | 'blocked';
+function showHistoryView(view: HistoryView) {
+    const main = document.getElementById('history-main');
+    const empty = document.getElementById('history-empty');
+    const err = document.getElementById('history-error');
+    if (main) main.style.display = view === 'loading' || view === 'list' ? '' : 'none';
+    if (empty) empty.style.display = view === 'empty' ? '' : 'none';
+    if (err) err.style.display = view === 'error' ? '' : 'none';
+}
+
+// 骨架行沿用真实行的 7 列栅格 → 数据到位不跳版;条子本身用共享设计系统的 .pu-skeleton。
+// 刻意不带 .history-row:那个类是「一条真记录」的语义,点击委托与既有 spec 都按它计数。
+const HISTORY_SKELETON_ROWS = 6;
+function historySkeletonHtml(): string {
+    const cell = (cls: string) => `<div class="${cls}"><span class="pu-skeleton"></span></div>`;
+    const row =
+        `<div class="hist-skel history-row-v2" aria-hidden="true">` +
+        cell('history-cell-check') +
+        cell('history-cell-date') +
+        cell('history-cell-file') +
+        cell('history-cell-buyer') +
+        cell('history-cell-amount') +
+        cell('history-cell-status') +
+        cell('history-cell-menu') +
+        `</div>`;
+    return row.repeat(HISTORY_SKELETON_ROWS);
+}
+
 async function loadHistoryPage() {
     if (!_userInfo) {
         setTimeout(() => loadHistoryPage(), 300);
@@ -102,13 +131,18 @@ async function loadHistoryPage() {
 
     if (!_userInfo.can_view_history) {
         freeBlock.style.display = '';
-        main.style.display = 'none';
-        empty.style.display = 'none';
+        showHistoryView('blocked');
         return;
     }
     freeBlock.style.display = 'none';
 
     _historyState.loading = true;
+    showHistoryView('loading');
+    const tbody = document.getElementById('history-tbody');
+    if (tbody) {
+        tbody.setAttribute('aria-busy', 'true');
+        tbody.innerHTML = historySkeletonHtml();
+    }
     try {
         const offset = _historyState.page * _historyState.pageSize;
         const params = new URLSearchParams({
@@ -145,6 +179,8 @@ async function loadHistoryPage() {
             window.location.href = window.loginUrl!();
             return;
         }
+        // 后端挂了不是「没有记录」:吞掉非 2xx 会渲染成空态,用户以为自己的票没了。
+        if (!resp.ok) throw new Error('history http ' + resp.status);
         const data = await resp.json();
         _historyState.items = data.items || [];
         _historyState.total = data.total || 0;
@@ -162,16 +198,15 @@ async function loadHistoryPage() {
             if (!currentIds.has(id as string)) _historySelected.delete(id);
         }
         renderHistoryList();
-    } catch (e) {
-        console.error('load history failed', e);
+    } catch (_) {
+        showHistoryView('error');
     } finally {
         _historyState.loading = false;
+        if (tbody) tbody.removeAttribute('aria-busy');
     }
 }
 
 function renderHistoryList() {
-    const main = document.getElementById('history-main');
-    const empty = document.getElementById('history-empty');
     const items = _historyState.items as HistoryRow[];
 
     // v0.11 · 更新匹配计数
@@ -183,12 +218,10 @@ function renderHistoryList() {
     }
 
     if (items.length === 0 && _historyState.total === 0 && !_historyState.keyword) {
-        main!.style.display = 'none';
-        empty!.style.display = '';
+        showHistoryView('empty');
         return;
     }
-    main!.style.display = '';
-    empty!.style.display = 'none';
+    showHistoryView('list');
 
     // 头部统计
     let highCount = 0;
@@ -378,6 +411,8 @@ function initHistoryFilters() {
     document.getElementById('history-act-upload')?.addEventListener('click', () => {
         if (typeof window.routeTo === 'function') window.routeTo('dms-intake');
     });
+    // 取数失败态的唯一出路
+    document.getElementById('history-retry')?.addEventListener('click', () => loadHistoryPage());
 }
 
 // 桥回 home.js + history-drawer.js

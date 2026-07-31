@@ -90,9 +90,38 @@ jobs:
       # check_i18n 只比「某语言比别的语言少哪些键」—— 四语一起缺就没有参照物,它一眼都
       # 看不出来。2026-07-31 的 sx-p-bc-dup-unit / posui.bscan.fails_n 正是这么把裸键名
       # 送上界面的(check_i18n --strict 同时报 0 missing)。本闸补的是纵向那条轴:
-      # 源码 t()/POS.t()/data-i18n 用到的键,词典里必须存在。
+      # 源码 t()/POS.t()/data-i18n 用到的键,词典里必须存在。POS 那片只有它在看;/home
+      # 那片下面的 check_home_i18n_refs 扫得更深(还认 data-i18n 属性与常量键表)。
       - name: check_i18n_refs (主 SPA + POS 词典引用闸 · 四语一起缺也拦得住)
         run: python scripts/check_i18n_refs.py
+
+      # /home 那棵树有一模一样的洞:src/home/core.ts:109 的 t() 取不到就返回 key 本身,
+      # data-i18n 取不到则整个元素跳过 —— 模板里写死的中文原地不动,泰语用户永远看中文。
+      # check_i18n 只对拍四个语言块之间齐不齐,从没问过这 4989 条有没有人引、引的人写对没有。
+      - name: check_home_i18n_refs (/home 词典引用闸 · 取词的键必须有定义)
+        run: python scripts/check_home_i18n_refs.py
+
+      # 桩比真后端少给一个键,验收截图拍的就是产品里不存在的界面 —— 2026-07-30/31 两天
+      # 栽两次(GET /sessions 漏 attachments、GET /status 漏 attachments),第三处还当
+      # 验收证据躺在仓库里。登记表 + 反证见 tests/unit/test_e2e_stub_contract_gate.py。
+      - name: check_e2e_stub_contracts (E2E 桩回包契约闸 · 桩的顶层键不得少于真后端)
+        run: python scripts/check_e2e_stub_contracts.py
+
+      # 2026-07-31 P0:测试里 `subprocess.run(["git","init"], cwd=tmp)` 看着无害,可 git 给
+      # 钩子注入的 GIT_DIR/GIT_INDEX_FILE 盖过 cwd —— pre-push 跑全量单测时,那两条造真
+      # commit 的用例把 init/add/commit 全打进了宿主仓(4838 files / -794172),再一步就
+      # push 到 master(本仓 push 即上线)。反证见 tests/unit/test_git_write_isolation.py。
+      - name: check_test_git_writes (测试禁止对当前仓库做 git 写操作)
+        run: python scripts/check_test_git_writes.py
+
+      # 2026-07-31:tests/integration 里 28 个模块在 setUpClass/tearDownClass 里
+      # `DROP TABLE IF EXISTS users, clients, ocr_history … CASCADE`,打的是 DATABASE_URL
+      # 指到哪就是哪。照它们自己 docstring 的跑法跑一遍就把本机开发库拆了(62 张表没了,
+      # clients 从 18 列剩 1 列);而这几张基础表从来没进过版本控制,alembic 从空库升不到
+      # head,掉了只能从 prod 拉 schema dump 灌回。运行期由 require_disposable_db() 的哨兵表
+      # 拦,本闸保证没有哪个新写的 DROP 忘了接上它。反证 tests/unit/test_destructive_db_test_gate.py。
+      - name: check_destructive_db_tests (DROP 真表的测试必须先验目标库可丢弃)
+        run: python scripts/check_destructive_db_tests.py
 
       - name: npm audit (REFACTOR-A6 · 生产依赖 CVE · high 拦门)
         # --omit=dev:本项目 dependencies 为空,vite/esbuild/eslint 等全是 devDependencies
@@ -333,6 +362,71 @@ jobs:
       - name: 闸-Q4 · 业务逻辑禁硬编码模型名(依赖倒置 · 见 CODE_QUALITY_CANON.md)
         run: python scripts/check_no_hardcoded_model.py
 
+  # 真库冒烟闸(2026-07-31 · 交接单 §二.7 拍板加 Postgres 服务)
+  #   mock 单测只能钉「SQL 字符串长这样」,钉不住方言、精度、锁、RLS —— 本仓踩过的坑。
+  #   这道闸给一台空 Postgres,让 tests/unit/test_*_pg_smoke.py 在上面真跑:
+  #     · steward 成本台账:numeric(12,6) 精度 / pg_advisory_xact_lock 真串行 / RLS 真隔离
+  #     · 桥任务信箱:make_interval(CASE WHEN) 等方言与按 kind 的租约/超龄语义
+  #   独立成 job 而不是塞进 test:DB 起不来时红的是这一条,不连坐 11000 条单测;
+  #   也不设 DATABASE_URL / PEARNLY_INTEGRATION_DB —— 那会把 tests/integration 那 70 份
+  #   从没在 CI 跑过的用例一起拉进来,是另一次拍板。
+  #   skip 即红:连不上库时用例会 clean skip,那正是「闸报绿≠闸看过」的形态,下面显式拦掉。
+  pg-smoke:
+    name: pg-smoke (真 Postgres · 台账精度/串行/RLS · FAIL mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pearnly
+          POSTGRES_PASSWORD: pearnly_local_dev
+          POSTGRES_DB: pearnly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pearnly -d pearnly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONIOENCODING: utf-8
+      # 与 docker-compose.yml 的本地 DSN 同款;测试只认这个 env,绝不回落 DATABASE_URL。
+      PEARNLY_PG_SMOKE_URL: postgresql://pearnly:pearnly_local_dev@127.0.0.1:5432/pearnly
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+
+      - name: 真库冒烟 · tests/unit/test_*_pg_smoke.py(skip 也算红)
+        run: |
+          python - <<'PY'
+          import sys, unittest
+
+          suite = unittest.defaultTestLoader.discover("tests/unit", pattern="test_*_pg_smoke.py")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if result.skipped:
+              sys.exit(f"::error::{len(result.skipped)} 条被 skip —— 连不上 Postgres 就等于这道闸没跑")
+          if result.testsRun == 0:
+              sys.exit("::error::零条 pg_smoke 用例被发现 —— 命名约定漂了,闸在空跑")
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY
+
   test:
     name: import + i18n + unit + vite-build + e2e
     runs-on: ubuntu-latest
@@ -343,8 +437,13 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
 
     steps:
-      - name: Checkout
+      # 单测里有一条拿本仓真 git 历史跑的用例(test_line_ratchet_gate.RealRepoStillJudges)——
+      # 默认 depth=1 的 checkout 上 HEAD~1 压根不存在,棘轮只能报「判不了」。那不是闸坏了,
+      # 是这次 checkout 没有可比的基线;基线该由环境给,不该靠把闸改回 fail-open 来绕。
+      - name: Checkout (full history · 棘轮的真仓用例需要 HEAD~1)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 全历史 · 否则 HEAD~1 在 shallow clone 里不存在
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -435,6 +534,14 @@ jobs:
 
       - name: Install Chromium system deps
         run: npx playwright install-deps chromium
+
+      # 视觉照搬闸 + 基准过期检测 · 2026-07-31 起进 CI(此前只挂 pre-push)。
+      # 触发面本来只有 static/pos/ · src/home/{pos,inventory,purchase}- · tests/visual/design/,
+      # 而它的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条 route ——
+      # dashboard 那条选择器 6-28 就烂了,直到有人碰巧改 purchase-settings.ts 才撞出来,三周零报警。
+      # 无条件跑(复用上面的 npm run build 与 chromium · 本机实测 21 秒)。
+      - name: 视觉照搬闸 · 关键令牌全等设计稿 + 基准不过期(FAIL mode)
+        run: node tests/visual/test_design_fidelity.spec.js
 
       - name: E2E smoke (Playwright · pearnly.com)
         run: npx playwright test

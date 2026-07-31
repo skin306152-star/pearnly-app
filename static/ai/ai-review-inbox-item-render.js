@@ -124,6 +124,12 @@
         );
     }
 
+    // 文件名行:剥掉落盘 hash 前缀后仍可能顶格 60 字,卡上截断显示,全名进 title 供悬停看。
+    function fileNameHtml(item) {
+        var name = AI.reviewQueue.fileName(item.file_ref);
+        return '<span class="riq-item-file" title="' + esc(name) + '">' + esc(name) + '</span>';
+    }
+
     // 裁决卡三件套:读值(fldt)/判据人话(riq-narrative)/置信度徽标(chip)——三者都是
     // isVisible 断言的直接对象,不藏进折叠面板。冻结单的件(frozen)收起全部裁决钮改只读
     // 徽章(清单 #3 · 四态诚实:后端 archive 只读闸会拒,UI 不许先摆出可点的样子),
@@ -148,9 +154,7 @@
             item.item_id +
             '">' +
             '<div class="riq-item-hd">' +
-            '<span class="riq-item-file">' +
-            esc(AI.reviewQueue.fileName(item.file_ref)) +
-            '</span>' +
+            fileNameHtml(item) +
             confidenceChipHtml(item) +
             itemStatusHtml(local) +
             doneChip +

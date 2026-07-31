@@ -104,4 +104,15 @@
   .cl-prog {
     display: none;
   }
+  /* 收了税号与进度环之后,行里只剩公司名 + 义务计数 + 箭头,名字仍不够放:390 实测
+   * 「บริษัท สยามพัฒนาก่อสร้างและวิศวกรรม จำกัด (มหาชน)」需 322px、可视 201px。这是整行
+   * 唯一能认出是哪家客户的东西,而触屏没有 hover、title 兜不住,给两行。 */
+  .cl-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }

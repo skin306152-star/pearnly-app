@@ -9,6 +9,7 @@
 /* global escapeHtml, showToast, showConfirm */
 import type { ClientRuleRow } from './rules-settings-data.js';
 import { RS_STYLE, rsL, rsSvg } from './rules-settings-data.js';
+import { BAHT } from './money.js';
 
 let rsBuilt = false;
 let rsRules: ClientRuleRow[] = [];
@@ -35,7 +36,7 @@ async function rsApi(method: string, path: string, body?: unknown): Promise<Resp
 
 function rsMoney(n: unknown): string {
     const v = Number(n);
-    return Number.isFinite(v) ? '฿ ' + v.toLocaleString('en-US') : String(n);
+    return Number.isFinite(v) ? BAHT + v.toLocaleString('en-US') : String(n);
 }
 
 function rsSevOptions(sel: string | null): string {

@@ -153,6 +153,24 @@
   height: 26px;
   stroke: currentColor;
 }
+/* 服务不可用门面:同一张卡换配色(紫=邀请制,红=出错),不另起一套版式 */
+.gate-ic-warn {
+  background: var(--amber-weak);
+  color: var(--err);
+}
+/* 负上边距抵掉正文那 18px:HTTP 码要贴住正文读成一组,别飘在正文与按钮中间 */
+.gate-code {
+  font-size: 12px;
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+  margin: -12px 0 16px;
+}
+.gate-acts {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
 .gate-help {
   width: min(92vw, 400px);
   border: 1px solid var(--line);

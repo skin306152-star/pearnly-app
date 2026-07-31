@@ -32,6 +32,10 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from js_key_scan import call_keys, in_comment, line_of  # noqa: E402
+
 # 报告是中文的,而 Windows 控制台默认码页(本机 cp874)编不了 —— 不接管 stdout 的话第一行
 # print 就 UnicodeEncodeError 退 1,跟真 FAIL 同一个退出码,分不出是闸红还是环境崩。
 if hasattr(sys.stdout, "reconfigure"):
@@ -40,10 +44,6 @@ else:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-from scripts import _i18n_ref_scan as scan  # noqa: E402  (上一行的 sys.path 是它的前提)
-
 AI_DIR = ROOT / "static" / "ai"
 
 DICT_PREFIX = "ai-i18n"
@@ -97,14 +97,16 @@ def key_references(ai_dir):
         if _has_t_wrapper(text):
             heads.extend(_T_HEAD.finditer(text))
         rel = path.relative_to(root).as_posix()
-        for line, key in scan.scan_calls(text, heads, _KEY):
-            refs.append((rel, line, key))
+        for head in heads:
+            if in_comment(text, head.start()):
+                continue
+            for pos, key in call_keys(text, head.end(), _KEY):
+                refs.append((rel, line_of(text, pos), key))
     for path in sorted(ai_dir.rglob("*.html")):
         text = path.read_text(encoding="utf-8")
         rel = path.relative_to(root).as_posix()
-        # HTML 属性里的键不过 _KEY:data-at 写什么就是什么,现拼的写法这套页面里不存在
         for m in _ATTR_KEY.finditer(text):
-            refs.append((rel, scan.line_of(text, m.start(1)), m.group(1)))
+            refs.append((rel, line_of(text, m.start(1)), m.group(1)))
     return sorted(set(refs))
 
 

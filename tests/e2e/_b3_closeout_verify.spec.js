@@ -196,17 +196,20 @@ test.describe.serial('B3 收官视觉验收', () => {
         });
         const { errs } = await open(page, { lang: 'zh' });
 
-        // ⑧ 文案与能力一致:注册表零写工具期间自述「只查不改数」,不承诺授权卡
-        //(双向闸 tests/unit/test_ai_steward_pure.py:第一个写工具挂上时逼文案一起换)
+        // ⑧ 文案与能力一致:注册表挂上写工具后,页头自述必须跟着换成「会改数的先批准」,
+        // 且全页不许再留只读期的「只查不改数」—— 那句话现在是谎。词典侧由双向闸
+        // tests/unit/test_ai_steward_pure.py::CopyMatchesCapabilityTests 管,这里管真渲染上屏那份。
         await page.waitForSelector('#stwInput', { state: 'visible', timeout: 30000 });
         const note = (
             await page.locator('#v-steward .note[data-at="stw_note"]').innerText()
         ).trim();
         const composerNote = (await page.locator('.stw-composer-note').innerText()).trim();
         const bodyText = await page.evaluate(() => document.body.innerText);
-        expect(note).toContain('只查不改数');
-        expect(composerNote).toContain('只查不改数');
-        expect(bodyText).not.toContain('授权卡');
+        expect(note).toContain('需你先批准');
+        expect(bodyText).not.toContain('只查不改数');
+        // 同一条规则整页只说一遍(2026-07-27 去重):注脚只补输入框自己说不出的那件事。
+        expect(composerNote).toContain('文件可拖入或粘贴');
+        expect(composerNote).not.toContain('批准');
 
         // ⑤ 空态:左窗指路空态 + 右窗空态带 4 个快捷 chips
         await page.waitForSelector('#stwLeft [data-state="empty"]', {
@@ -317,6 +320,8 @@ test.describe.serial('B3 收官视觉验收', () => {
                 body: '{"detail":"boom"}',
             });
         });
+        const stubAsk = '把 SM 六月销项税改成 12500 重新过账';
+        const stubReply = '这个操作会改数,我先出授权卡,你批准后我才动手。';
         await page.route('**/api/ai/steward/sessions/*/messages', (r) => {
             if (r.request().method() !== 'POST') return r.fallback();
             r.fulfill({
@@ -325,12 +330,32 @@ test.describe.serial('B3 收官视觉验收', () => {
                 body: JSON.stringify({
                     message_id: 'stub-m1',
                     user_message_id: 'stub-u1',
-                    reply: '这个操作会改数,我先出授权卡,你批准后我才动手。',
+                    reply: stubReply,
                     task_id: TID,
                 }),
             });
         });
-        await typeAndSend(page, '把 SM 六月销项税改成 12500 重新过账');
+        // 服务端消息流是权威的:任务一落 waiting_user(终态之一)产品就用 syncSession 整份
+        // 重建右窗(ai-steward.js)。送出走的是桩,真库那条会话一条消息都没有 —— 不把
+        // GET /sessions/{id} 一起桩上,重建当场把刚上屏的两条抹掉,气泡下「回到那条任务」
+        // 的入口跟着消失。T1 长期红,T2-T9 从没跑到,这条一直没人撞见。
+        await page.route('**/api/ai/steward/sessions/*', (r) => {
+            if (r.request().method() !== 'GET') return r.fallback();
+            const sid = r.request().url().split('?')[0].split('/').pop();
+            r.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    session_id: sid,
+                    current_task_id: TID,
+                    messages: [
+                        { id: 'stub-u1', role: 'user', text: stubAsk },
+                        { id: 'stub-m1', role: 'steward', text: stubReply, task_id: TID },
+                    ],
+                }),
+            });
+        });
+        await typeAndSend(page, stubAsk);
         await page.waitForSelector('#stwLeft [data-state="loading"]', {
             state: 'visible',
             timeout: 10000,
@@ -596,8 +621,10 @@ test.describe.serial('B3 收官视觉验收', () => {
         const note = (
             await page.locator('#v-steward .note[data-at="stw_note"]').innerText()
         ).trim();
-        expect(note).toContain('อ่านอย่างเดียว ไม่แก้ตัวเลข');
-        expect(note).not.toContain('การ์ดขออนุมัติ');
+        // 与 T1 同一条口径的泰语面:有写工具了,页头自述必须是「改数要先批准」,
+        // 不许还留着只读期的 อ่านอย่างเดียว ไม่แก้ตัวเลข。
+        expect(note).toContain('ต้องให้คุณอนุมัติก่อน');
+        expect(note).not.toContain('อ่านอย่างเดียว');
         await typeAndSend(page, 'แก้ยอดภาษีขายของ SM งวด มิ.ย. เป็น 12500');
         await page.waitForSelector('#stwLeft .stw-authz', { state: 'visible', timeout: 30000 });
         const card = page.locator('#stwLeft .stw-authz');
@@ -637,9 +664,9 @@ test.describe.serial('B3 收官视觉验收', () => {
             const stwText = await page.evaluate(
                 () => document.getElementById('v-steward').innerText
             );
-            expect(note).toContain('只查不改数'); // 回落 zh 的诚实文案
+            expect(note).toContain('需你先批准'); // 回落 zh 的诚实文案
             expect(stwText).not.toMatch(/\bstw_[a-z_]+\b/);
-            expect(stwText).not.toContain('授权卡');
+            expect(stwText).not.toContain('只查不改数');
             const shot = lang === 'en' ? '14-steward-en-desktop.png' : '15-steward-ja-desktop.png';
             await page.screenshot({ path: path.join(ART, shot), fullPage: true });
             out[lang] = { note };

@@ -1,0 +1,42 @@
+{
+  "items": [
+    {
+      "id": "log-pk-1",
+      "endpoint_id": "ep-1",
+      "history_id": "h-pk-1",
+      "invoice_no": "RR690715-004",
+      "seller_name": "บริษัท ปตท จำกัด (มหาชน)",
+      "ocr_buyer_name": "Sister Makeup Steward Co., Ltd.",
+      "total_amount": "2289.80",
+      "status": "manual",
+      "http_status": 0,
+      "error_msg": "EXPRESS_MANUAL: posting_needs_review:perpetual",
+      "attempt": 1,
+      "elapsed_ms": 12,
+      "trigger": "auto",
+      "created_at": "2026-07-31T09:15:00",
+      "retry_count": 0,
+      "max_retries": 3,
+      "next_retry_at": null,
+      "endpoint_name": "Express · DATAT",
+      "endpoint_adapter": "express",
+      "push_type": "invoice",
+      "push_stage": "needs_review",
+      "category": "posting_kind_needed",
+      "posting_fix": {
+        "usage": "perpetual",
+        "items": [
+          {
+            "name": "แชมพู 500ml",
+            "stkcod": ""
+          },
+          {
+            "name": "ครีมนวดผม 250ml",
+            "stkcod": ""
+          }
+        ]
+      }
+    }
+  ],
+  "total": 1
+}

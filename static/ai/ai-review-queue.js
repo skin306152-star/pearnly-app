@@ -266,11 +266,22 @@
         return _CHIP_KEY[decision.decision] || null;
     }
 
+    // 落盘名是 `{uuid}__{原名词干}{ext}`(services/workorder/storage.py:save_material),会计
+    // 认票靠的是词干那半截,不是那串 hex。判据与后端 storage.original_name_of 同一份:__ 前
+    // 那段像 hex 才当存储前缀剥,否则原名里本来就有的双下划线会被切掉。前端 import 不到后端,
+    // 改那边的落盘名格式要同步改这里(tests/unit/test_ai_review_queue_pure.py 有一条两边对拍)。
+    var STORAGE_PREFIX_RE = /^[0-9a-f]{8,32}$/;
+
     // file_ref(服务器本地绝对路径,盘符/正反斜杠都可能出现)→ 给人看的文件名。
     function fileName(fileRef) {
         var s = String(fileRef || '');
         var parts = s.split(/[\\/]/);
-        return parts[parts.length - 1] || s;
+        var name = parts[parts.length - 1] || s;
+        var sep = name.indexOf('__');
+        if (sep > 0 && STORAGE_PREFIX_RE.test(name.slice(0, sep)) && name.length > sep + 2) {
+            return name.slice(sep + 2);
+        }
+        return name;
     }
 
     // D2-S9:「推 LINE 待问」按票面已知信息猜一个默认 question_type,会计仍可在选择面板

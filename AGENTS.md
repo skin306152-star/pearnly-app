@@ -57,13 +57,13 @@
 
 ## 4. 机械闸(改完必跑全绿才 commit)
 
-清单 + 触发条件 + 逐道自查命令 + 豁免语法:**`docs/GATES.md`(21 道)**。一键全套(等价 pre-push,不用真推):
+清单 + 触发条件 + 逐道自查命令 + 豁免语法:**`docs/GATES.md`(道数以那页标题为准,别信这里的手写数字)**。一键全套(等价 pre-push,不用真推):
 
 ```bash
 sh scripts/git-hooks/pre-push     # Git Bash
 ```
 
-**本地钩子当前是关的**(`core.hooksPath` 指 `.git/hooks`)→ 只剩 CI 兜,push 前请手跑上面那条。想挂:`git config core.hooksPath scripts/git-hooks`(逐机器/逐 worktree 各设一次)· 代价 = 每次 push 本地先跑全套约 8 分钟,共用工作树的窗口自己权衡。
+**本地钩子 2026-07-31 起是开的**(`core.hooksPath` = `scripts/git-hooks`,Zihao 拍板装)→ push 前闸自己会跑,拦不住的才轮到 CI。装法/影响面/代价见 `docs/GATES.md` 顶部「装钩子」。要点:它写在 `.git/config` 里,**共享同一个 `.git` 的所有 worktree 一起生效**;路径按「谁在 push」各自解析(A 跑 A 的那份 `scripts/git-hooks/pre-push`);想空跑不真推用 `git push --dry-run`,一样会触发。
 
 > 2026-07-25 修过这道的两笔债:① authz 覆盖闸此前只挂 pre-push 而钩子从没挂上 = **两边都没跑过** → 已加进 CI 主 job(FAIL mode);报红 85 条逐条读源码后**零真缺口**(68 条有门闸认不出 · 14 条真公开面 · 3 条封死端点),闸改成顺着调用看两层 + `tests/unit/test_authz_gate_detection.py` 锁住"真没门的照样报"。② 闸脚本中文输出撞 Windows cp874 会假红(exit 1)→ 钩子入口已 `export PYTHONIOENCODING=utf-8`;**手跑单个脚本时自己带上这个变量**。详见 `docs/context-engineering/2026-07-25-claude-md-simplify.md`。
 

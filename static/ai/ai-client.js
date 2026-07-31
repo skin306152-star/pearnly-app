@@ -95,6 +95,8 @@
         VIEWS.forEach(function (v) {
             $('cv-' + v).classList.toggle('on', v === S.view);
         });
+        // 深链能直接落在最后一个 tab 上,窄视口下它默认在屏外(见 ai-tabs-scroll.js)。
+        AI.tabsScroll.reveal($('clientTabs'));
     }
 
     // 零数据首跑旅程收口(方案 §5:"填画像 → 开当期工单 → 传料",零死路):brand-new

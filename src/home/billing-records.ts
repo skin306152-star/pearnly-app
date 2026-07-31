@@ -12,6 +12,8 @@
 // window.loadBillingRecords 由 subscription.ts 的 loadSubscription 触发。
 // ============================================================
 
+import { BAHT } from './money.js';
+
 type RecTab = 'usage' | 'topup' | 'ocr';
 type Period = 'all' | 'day' | 'month' | 'year';
 
@@ -35,7 +37,7 @@ function _auth() {
     return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
 }
 function _money(n: number): string {
-    return '฿ ' + Number(n || 0).toFixed(2);
+    return BAHT + Number(n || 0).toFixed(2);
 }
 function _esc(s: unknown): string {
     return typeof window.escapeHtml === 'function'

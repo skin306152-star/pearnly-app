@@ -285,6 +285,13 @@ window.__AI_I18N_EN__ = {
     gate_invite_title: 'Pearnly AI workbench is invite-only',
     gate_invite_body: 'Please contact the Pearnly team to request access.',
     gate_logout_btn: 'Log out',
+    gate_down_title: 'The server hit an error',
+    gate_down_body:
+        'This is not about your access — your account is still valid. The server could not handle this request. Wait a moment and hit retry; if it keeps happening, send us the time it occurred.',
+    gate_offline_title: 'Cannot reach the server',
+    gate_offline_body:
+        'The request never went out — the network is down or blocked. Reconnect, then hit retry.',
+    gate_retry_btn: 'Retry',
     tab_profile: 'Profile',
     ppc_no_prior: 'No prior period to compare',
     ppc_compared: 'vs prior period ({period}): diff {delta}',

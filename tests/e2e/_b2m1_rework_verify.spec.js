@@ -87,7 +87,9 @@ async function askChip(page, idx) {
 }
 
 async function ask(page, text) {
-    await page.locator('.stw-composer textarea, .stw-composer input').first().fill(text);
+    // 认 id 不认标签:F1 附件口上线后 .stw-composer 里排在文字框前面的是隐藏的
+    // <input type=file id=stwAttFile>(display:none · 0×0),.first() 会解析到它 → fill 超时。
+    await page.locator('#stwInput').fill(text);
     const before = await page.locator('.stw-msg.agent .stw-bubble').count();
     await page.keyboard.press('Enter');
     await page.waitForFunction(
@@ -98,8 +100,27 @@ async function ask(page, text) {
     return (await page.locator('.stw-msg.agent .stw-bubble').last().innerText()).trim();
 }
 
-// 左窗表格 → {headers, rows}
-async function readTable(page) {
+// 等【这一问】的任务真落终态。两层都必须验:
+//   ① 管家先回一条「已开始」的 ack 气泡,答复与产物晚一拍 —— 只等气泡就往下走会读到半成品;
+//   ② 上一问的任务此刻还挂在左窗且已经是终态,光看徽章会当场放行,随后左窗换成新任务、
+//      刚拿到的表格节点被摘走,evaluate 落在游离节点上超时。故按标题认准是哪一条任务。
+async function waitTaskTerminal(page, title) {
+    await page.waitForFunction(
+        (t) => {
+            const hd = document.querySelector('#stwLeft .panel .hd');
+            if (!hd) return false;
+            const badge = hd.querySelector('.st-badge');
+            const done = !!badge && ['已完成', '失败'].indexOf(badge.textContent.trim()) >= 0;
+            return done && (!t || hd.textContent.indexOf(t) >= 0);
+        },
+        title || null,
+        { timeout: 120000 }
+    );
+}
+
+// 左窗表格 → {headers, rows}。title = 这一问的原话(左窗面板标题就是它)。
+async function readTable(page, title) {
+    await waitTaskTerminal(page, title);
     await page.waitForSelector('#stwLeft .stw-table', { state: 'visible', timeout: 30000 });
     return page
         .locator('#stwLeft .stw-table')
@@ -120,12 +141,14 @@ test.describe.serial('B2-M1 返工复验(真后端)', () => {
 
         // 工具 A:矩阵/缺料 —— chip「本期谁缺料」
         const a = await askChip(page, 0);
-        const tableA = await readTable(page);
+        const tableA = await readTable(page, a.chip);
         await page.screenshot({ path: path.join(ART, '01-table-missing.png'), fullPage: true });
 
-        // 工具 B:工单清单 —— chip「谁还没审完」
-        const b = await ask(page, '上个月谁缺料');
-        const tableB = await readTable(page);
+        // 工具 B:工单清单 —— chip「谁还没审完」。原来问的是「上个月谁缺料」,那还是工具 A
+        // (换个期间而已),既没验到第二个工具,又押注上个月一定有缺料的客户 —— 本机库里
+        // 2569-06 缺料 0 张,管家如实答「没有客户缺料」,不画表,rows>0 当场落空。
+        const b = await ask(page, '谁还没审完');
+        const tableB = await readTable(page, '谁还没审完');
         await page.screenshot({ path: path.join(ART, '02-table-lastmonth.png'), fullPage: true });
 
         const all = JSON.stringify([tableA, tableB]);
@@ -143,10 +166,10 @@ test.describe.serial('B2-M1 返工复验(真后端)', () => {
         const { errs, seen } = await open(page, { lang: 'zh', hash: '#/steward' });
         await page.waitForSelector('#v-steward.on', { state: 'visible', timeout: 30000 });
         const r1 = await ask(page, '本期全所矩阵总览');
-        const t1 = await readTable(page);
+        const t1 = await readTable(page, '本期全所矩阵总览');
         await page.screenshot({ path: path.join(ART, '01b-table-matrix.png'), fullPage: true });
         const r2 = await ask(page, '我手上有哪些客户');
-        const t2 = await readTable(page);
+        const t2 = await readTable(page, '我手上有哪些客户');
         await page.screenshot({ path: path.join(ART, '01c-table-clients.png'), fullPage: true });
         record('req1b', { r1, t1, r2, t2, consoleErrors: errs });
         record('rawSteward1b', seen);
@@ -215,7 +238,7 @@ test.describe.serial('B2-M1 返工复验(真后端)', () => {
         await page.screenshot({ path: path.join(ART, '05-matrix-badges.png'), fullPage: true });
 
         const r = await askChip(page, 1); // chip「谁还没审完」
-        const table = await readTable(page);
+        const table = await readTable(page, r.chip);
         await page.screenshot({ path: path.join(ART, '06-review-vs-matrix.png'), fullPage: true });
         record('req3', { matrix, chip: r, table, consoleErrors: errs });
         expect(JSON.stringify(table)).not.toContain('[object Object]');
@@ -278,6 +301,9 @@ test.describe.serial('B2-M1 返工复验(真后端)', () => {
         await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 30000 });
         await askChip(page, 0);
         await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 30000 });
+        // 终态之后才开始数:任务还在跑时轮询本来就该继续拉,那时候取基线等于拿运行期的
+        // 计数去断「终态不再拉」,这条闸从来没验到过它要守的东西。
+        await waitTaskTerminal(page);
         const badge = await page.locator('#stwLeft .panel .hd .st-badge').getAttribute('class');
         const afterFirst = hits.length;
         await page.waitForTimeout(13000); // > 2 个 5s 轮询周期

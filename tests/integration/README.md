@@ -53,11 +53,31 @@ CI 默认没 DB → 干净 skip(不让 CI 红)。本地 / staging 配齐 env 才
 | 闸 | 条件 | 缺了的行为 |
 |---|---|---|
 | `require_db()` | `PEARNLY_INTEGRATION_DB=1` + `DATABASE_URL` | SkipTest |
+| `require_disposable_db()` | 上面这条 + 目标库里有哨兵表 `_pearnly_disposable_test_db` | 没哨兵表 = **报错(红)**,连不上 = SkipTest |
 | `require_test_user()` | `PEARNLY_E2E_USER` + `PEARNLY_E2E_PASS` | SkipTest |
 | `require_admin_user()` | `PEARNLY_ADMIN_USER` + `PEARNLY_ADMIN_PASS` | SkipTest |
 | `get_test_client()` | `app` 可 import(DB 连得上) | SkipTest |
 
 覆盖域:billing / recon / vat_excel / ocr / erp(mrerp 适配器与同步)/ auth / signup / clients / team / archive / importer mapping / 健康与版本契约。
+
+### ⚠️ 其中 28 个模块会把目标库拆掉
+
+`*_rls_real_tables.py` 与 `*_real_db.py` 这批在 setUpClass / tearDownClass 里跑
+`DROP TABLE IF EXISTS users, clients, ocr_history, erp_push_logs … CASCADE`,
+**打的是 `DATABASE_URL` 指到哪就是哪**,没有临时 schema、没有事务回滚。
+
+而 `users` / `tenants` / `ocr_history` / `clients` 这几张基础表**从来没进过版本控制**
+(`ensure_*` 只做 ALTER、假设表已存在;alembic 从空库升不到 head)——
+掉了只能从 prod 拉 schema-only dump 灌回,没有第二条路。
+本机 2026-07-11 中过一次,2026-07-31 又中一次(62 张表没了、`clients` 从 18 列剩 1 列)。
+
+所以这批统一走 `require_disposable_db()`:目标库里得先有哨兵表才放行。
+指错库时它红在 setUpClass,一张表都不会掉。两道闸看着它:
+运行期是这个函数,静态是 `scripts/check_destructive_db_tests.py`(新加 DROP 忘接哨兵就红)。
+
+它们也**不是互相隔离的**:同一次 `discover` 里,靠前的模块 tearDown 掉 `users`,
+靠后的模块就 `UndefinedTable`。实测同一个库连跑两遍,红从 28 条涨到 32 条。
+要判某个模块本身绿不绿,得一个模块一个库单独跑。
 
 ## 跑法
 
@@ -65,12 +85,17 @@ CI 默认没 DB → 干净 skip(不让 CI 红)。本地 / staging 配齐 env 才
 # 只跑纯函数安全网(无需任何 env · CI 跑的就是这批)
 python -m unittest discover -s tests/integration
 
-# 跑真集成(需本地/staging DB + 测试账号)
+# 跑真集成:先造一个丢了也无所谓的库,别指开发库
+createdb pearnly_throwaway   # 或 psql -c 'CREATE DATABASE pearnly_throwaway'
+psql "$DSN" -c 'CREATE TABLE IF NOT EXISTS _pearnly_disposable_test_db(note text);'
 export PEARNLY_INTEGRATION_DB=1
-export DATABASE_URL=postgresql://...
+export DATABASE_URL=postgresql://.../pearnly_throwaway
 export PEARNLY_E2E_USER=...   PEARNLY_E2E_PASS=...
 python -m unittest discover -s tests/integration
 ```
+
+新库是空的,而基础表不在迁移史里 —— 拿 prod 的 schema-only dump 灌一遍再跑
+(配方见记忆 `local-db-restore-from-prod-schema`)。
 
 无 env 时纯函数安全网照常跑、真集成自动 skip,退出码仍为 0。
 

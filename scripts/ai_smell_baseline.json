@@ -1,0 +1,55 @@
+{
+  "_notes": {
+    "为什么有基线": "2026-07-31 放开射程(.ts + static/,并改成认行尾注释)当天的存量:404 个纳管源里 22 行命中。按「文件 + 类别」记数,只许降不许升,新增即红。修好之后跑 python scripts/check_ai_smell.py --all --update-baseline 收紧,tests/unit/test_ai_smell_gate.py 有一条断言基线不许比现实松(免得记着的债其实早还完了)。",
+    "static/erp-mrerp-connect.js": "这条是真的调试残留:1193 行 console.log('[mrerp] wizard not yet attached'),躺在会计天天开的 ERP 集成页里。没在建闸这笔里清,是因为它进 home 页的 pre/post bundle —— 改它要重新 npm run build 并 bump home.html 的 ?v,属于前端改动,不混进闸的改动。",
+    "其余 21 行": "除上一条外全是注释里的装饰符号:🔴 标高敏、⚠ 标注意、★ 标重点,以及引用界面上真实图标的 ✓ ✗ ✕。前两类是标准 AI 味,后一类是「注释里抄了一遍 UI 上的字形」—— 闸不做这个区分(要区分就得猜作者意图,准判据不存在),一律记账,清的时候把符号换成词即可。"
+  },
+  "src/home/acct-review.ts": {
+    "emoji": 1
+  },
+  "src/home/core.ts": {
+    "emoji": 1
+  },
+  "src/home/erp-integration.ts": {
+    "emoji": 1
+  },
+  "src/home/erp-log-card.ts": {
+    "emoji": 1
+  },
+  "src/home/history-drawer.ts": {
+    "emoji": 1
+  },
+  "src/home/line-panel.ts": {
+    "emoji": 1
+  },
+  "src/home/purchase-form.ts": {
+    "emoji": 1
+  },
+  "src/home/recon-job-poll.ts": {
+    "emoji": 1
+  },
+  "src/home/recon-subtab-settings.ts": {
+    "emoji": 1
+  },
+  "src/main.js": {
+    "emoji": 4
+  },
+  "static/admin/admin.js": {
+    "emoji": 1
+  },
+  "static/ai/ai-desk-render.js": {
+    "emoji": 1
+  },
+  "static/dms/dms-billing-html.js": {
+    "emoji": 1
+  },
+  "static/erp-mrerp-connect.js": {
+    "console": 1
+  },
+  "static/i18n-data.js": {
+    "emoji": 4
+  },
+  "static/landing/landing-tour-i18n.js": {
+    "emoji": 1
+  }
+}

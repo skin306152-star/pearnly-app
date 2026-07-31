@@ -42,6 +42,10 @@
             // loadActiveTab() 整个重渲染覆盖,不清白留没有好处)。
             if (tab !== S.tab) el.innerHTML = '';
         });
+        // 档案页深链能直接落在第三个 tab 上,390 实测泰语「ประวัติใบงาน」右边被切掉 54.7px
+        // (条 scrollWidth 354 > clientWidth 296,scrollLeft 一直是 0),tab 条自己也不画
+        // 「还能滑」的边——同 ai-client.js 的 #clientTabs 走同一份 AI.tabsScroll。
+        AI.tabsScroll.reveal($('caTabs'));
     }
 
     function loadProfileTab() {

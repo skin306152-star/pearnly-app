@@ -252,7 +252,7 @@ async function persistSavedLines(st: WState): Promise<void> {
         try {
             const resp = await apiPost('/api/sales/products', {
                 name_th: l.desc.trim(),
-                // 没定价就别替人填 0:发 0 建出来的商品在收银台是"有价"的,整件货 ฿0 出门。
+                // 没定价就别替人填 0:发 0 建出来的商品在收银台是"有价"的,整件货 ฿ 0 出门。
                 // 后端 ProductCreate.unit_price 默认 None,不发这个键就是"没设价"(见迁移 0093)。
                 unit_price: priced(l.price) ? Number(l.price) : null,
                 vat_applicable: !!l.vat,

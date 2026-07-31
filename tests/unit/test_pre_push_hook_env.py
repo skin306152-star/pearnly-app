@@ -17,6 +17,11 @@
 
 断言的方式是【真跑】:拿钩子里 export 出来的那份环境去跑那两个模块。把 export 那行当字符串
 断言的话,下次有人改成 PYTHONIOENCODING=utf8(少个横杠)照样绿 —— 而本机会当场假红。
+
+后续(2026-07-31 合上游):上游 9f282bf5 在 test_file_crypto 里把子进程编码钉死了,那一条
+金丝雀在旧设法下不再炸。所以「旧设法会红」的反证改钉机制本身(见
+test_the_old_setting_leaves_pipe_decoding_on_the_locale)—— 钉在受害模块上的反证,会随
+那个模块被修而悄悄失效,而闸看上去还是绿的。
 """
 
 from __future__ import annotations
@@ -64,12 +69,13 @@ def run_canaries(overrides: dict[str, str]) -> subprocess.CompletedProcess:
     )
 
 
-def native_encoding() -> str:
-    """这台机器【没设任何 Python 编码变量时】的 locale 编码。
+def preferred_encoding(overrides: dict[str, str]) -> str:
+    """给定这几个环境变量时,这台机器的 locale 编码 —— 也就是 text=True 解管道用的那个。
 
-    不能直接问 locale:本测试自己很可能就跑在 UTF-8 模式下,问出来的是 utf-8。
+    不能直接问本进程的 locale:本测试自己很可能就跑在 UTF-8 模式下,问出来的永远是 utf-8。
     """
     env = {k: v for k, v in os.environ.items() if k not in _ENCODING_VARS}
+    env.update(overrides)
     proc = subprocess.run(
         [sys.executable, "-c", "import locale;print(locale.getpreferredencoding(False))"],
         env=env,
@@ -80,11 +86,16 @@ def native_encoding() -> str:
     return (proc.stdout or "").strip().lower()
 
 
-_NATIVE_IS_UTF8 = locale.normalize(native_encoding() or "utf-8").split(".")[-1] in (
-    "utf-8",
-    "utf8",
-    "utf_8",
-)
+def native_encoding() -> str:
+    """这台机器【没设任何 Python 编码变量时】的 locale 编码。"""
+    return preferred_encoding({})
+
+
+def is_utf8(name: str) -> bool:
+    return locale.normalize(name or "utf-8").split(".")[-1] in ("utf-8", "utf8", "utf_8")
+
+
+_NATIVE_IS_UTF8 = is_utf8(native_encoding())
 
 
 class HookEnvContract(unittest.TestCase):
@@ -112,12 +123,25 @@ class CanaryModules(unittest.TestCase):
         proc = run_canaries(hook_exports())
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
-    @unittest.skipIf(_NATIVE_IS_UTF8, "这台机器 locale 本来就是 UTF-8 · 两种设法都不会炸")
-    def test_the_old_hook_setting_really_did_fail_here(self):
-        """反证:换回钩子改之前那一行,金丝雀必须真的红 —— 否则上面那条绿得没有意义。"""
-        proc = run_canaries({"PYTHONIOENCODING": "utf-8"})
-        self.assertNotEqual(proc.returncode, 0, "旧设法在这台机器上没炸,反证不成立")
-        self.assertIn("test_file_crypto", proc.stdout + proc.stderr)
+    @unittest.skipIf(_NATIVE_IS_UTF8, "这台机器 locale 本来就是 UTF-8 · 两种设法没有差别")
+    def test_the_old_setting_leaves_pipe_decoding_on_the_locale(self):
+        """反证:两种设法差在哪 —— 管道解码吃的是 locale,而 PYTHONIOENCODING 动不了它。
+
+        这条原先拿 test_file_crypto 当金丝雀(旧设法下它必红)。上游 9f282bf5 在那个模块里
+        把子进程编码钉死了,它于是不再炸,反证的前提当场消失 —— 钉在某个受害模块上的反证,
+        会随那个模块被修而失效。改钉机制本身:subprocess.run(text=True) 解码用
+        locale.getpreferredencoding(),PYTHONIOENCODING 只改本进程 stdio、够不着它;
+        PYTHONUTF8=1 是 UTF-8 模式,两者一起改。下一个写 text=True 的人不必再自己钉一遍。
+        """
+        old = preferred_encoding({"PYTHONIOENCODING": "utf-8"})
+        self.assertFalse(
+            is_utf8(old),
+            f"旧设法把 locale 也变成了 {old} —— 那两种设法就没差别了,本反证不成立",
+        )
+        self.assertTrue(
+            is_utf8(preferred_encoding({"PYTHONUTF8": "1"})),
+            "UTF-8 模式没把 locale 编码改过来 —— 钩子那行就白设了",
+        )
 
     @unittest.skipIf(_NATIVE_IS_UTF8, "这台机器 locale 本来就是 UTF-8 · 两种设法都不会炸")
     def test_setting_nothing_also_fails_here(self):

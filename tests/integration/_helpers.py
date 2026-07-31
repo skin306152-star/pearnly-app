@@ -87,6 +87,64 @@ def require_db() -> None:
     require_env("DATABASE_URL")
 
 
+_DISPOSABLE_MARK = "_pearnly_disposable_test_db"
+_DISPOSABLE_CHECKED: dict[str, bool] = {}
+
+
+def require_disposable_db() -> None:
+    """会 DROP 真表的用例走这个口:目标库得先自己证明「丢了也无所谓」。
+
+    本目录 28 个模块在 setUpClass / tearDownClass 里 `DROP TABLE IF EXISTS users, clients,
+    ocr_history, erp_push_logs … CASCADE`,打的是 DATABASE_URL 指到哪就是哪;而 require_db()
+    只看 env 有没有值,不问那是什么库。于是「照 docstring 里的跑法跑一遍集成测试」=
+    把那个库拆了。2026-07-11 中过一次,2026-07-31 又中一次:本机开发库 62 张表没了、
+    clients 从 18 列剩 1 列。基础表(users / tenants / ocr_history / clients)从来没进过版本
+    控制,ensure_* 只做 ALTER 假设表已存在、alembic 从空库升不到 head —— 掉了只能从 prod
+    拉 schema-only dump 灌回,没有第二条路。
+
+    判据用「库里有没有这张哨兵表」而不是「env 里有没有某个变量」:env 是一句承诺,
+    误 export 一次就没了;哨兵表是操作者对着这个具体的库亲手做过的一件事,真库不会有。
+    也不用主机名黑名单 —— 那种表随基建变,过期之后给的是虚假的安心。
+
+    判不了 = 红,不是 skip:没设 PEARNLY_INTEGRATION_DB 时上面 require_db() 已经干净 skip 掉
+    了;能走到这儿说明操作者明确要跑,那就必须对着一个可丢的库跑。连不上库仍然是 skip
+    (那是「没有库」,不是「指错库」)。
+    """
+    require_db()
+    dsn = os.environ["DATABASE_URL"].strip()
+    if _DISPOSABLE_CHECKED.get(dsn):
+        return
+
+    try:
+        import psycopg2
+    except ImportError as e:  # pragma: no cover - 环境缺依赖时与 require_db 同款处理
+        raise unittest.SkipTest(f"psycopg2 不可用:{e}")
+
+    try:
+        conn = psycopg2.connect(
+            dsn, connect_timeout=10, sslmode=os.environ.get("PGSSLMODE", "require")
+        )
+    except Exception as e:
+        raise unittest.SkipTest(f"DATABASE_URL 连不上,没有库可跑:{e}")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass(%s)", (_DISPOSABLE_MARK,))
+            marked = cur.fetchone()[0] is not None
+    finally:
+        conn.close()
+
+    if not marked:
+        raise RuntimeError(
+            f"拒绝在这个库上跑破坏性集成测试:里面没有哨兵表 {_DISPOSABLE_MARK}。\n"
+            f"这些用例会 DROP TABLE users / clients / ocr_history … CASCADE,\n"
+            f"而这几张基础表不在版本控制里,掉了只能从 prod 拉 schema dump 灌回。\n"
+            f"确认这个库丢了也无所谓,再对它执行一次:\n"
+            f"  CREATE TABLE IF NOT EXISTS {_DISPOSABLE_MARK}(note text);\n"
+            f"别在开发库 / staging / prod 上建这张表 —— 建了就等于交出这个库。"
+        )
+    _DISPOSABLE_CHECKED[dsn] = True
+
+
 def require_test_user() -> dict[str, str]:
     """需要测试账号凭据(走真账号 E2E env)· 没设 SkipTest。"""
     return require_env("PEARNLY_E2E_USER", "PEARNLY_E2E_PASS")

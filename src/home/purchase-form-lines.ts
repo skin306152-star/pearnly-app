@@ -5,6 +5,7 @@
 import { fmtMoney, type DocLine, type Category } from './purchase-common.js';
 import { computePurchaseTotals } from './purchase-calc.js';
 import type { FormState } from './purchase-form-types.js';
+import { BAHT } from './money.js';
 
 export interface FormTotals {
     subtotal: string;
@@ -175,7 +176,7 @@ function lineHtml(l: DocLine, i: number, cats: Category[]): string {
             <div class="f"><label>${escapeHtml(t('pur-cat-sub'))}</label><div class="inp sm"><select class="fsel" data-fld="${i}:subcategory_id">${subCatOptions(cats, l.category_id, l.subcategory_id)}</select></div></div>
             <div class="f"><label>VAT</label><div class="inp sm"><select class="fsel" data-fld="${i}:vat_rate"><option value="0" ${l.vat_rate == 0 ? 'selected' : ''}>0%</option><option value="7" ${l.vat_rate == 7 ? 'selected' : ''}>7%</option></select></div></div>
         </div>
-        <div class="iextra"><span data-lt="${i}">${escapeHtml(t('pur-line-total'))} ฿${fmtMoney(lineTotal(l))}</span>${extra ? ' · ' + extra : ''}</div>
+        <div class="iextra"><span data-lt="${i}">${escapeHtml(t('pur-line-total'))} ${BAHT}${fmtMoney(lineTotal(l))}</span>${extra ? ' · ' + extra : ''}</div>
         ${whtRow(l, i)}
         ${discRow}
     </div>`;
@@ -255,7 +256,7 @@ function bindLines(): void {
             const lt = document.querySelector<HTMLElement>(`[data-lt="${iS}"]`);
             if (lt)
                 lt.textContent =
-                    t('pur-line-total') + ' ฿' + fmtMoney(lineTotal(LST!.lines[Number(iS)]));
+                    t('pur-line-total') + ' ' + BAHT + fmtMoney(lineTotal(LST!.lines[Number(iS)]));
             LREFRESH();
         };
         if (el.tagName === 'SELECT') el.onchange = onChange;

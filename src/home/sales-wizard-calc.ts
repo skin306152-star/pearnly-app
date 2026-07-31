@@ -65,7 +65,7 @@ export function money(v: number): string {
 /**
  * 这个价是人定过的吗。口径与收银台的 pos-cashier.priced 同一份:空 / null / 非数 = 没定过。
  *
- * 人自己打的 0 照旧算定过价 —— 赠品是老板拍板的,票面上写着 ฿0 谁都看得见;这里堵的是系统
+ * 人自己打的 0 照旧算定过价 —— 赠品是老板拍板的,票面上写着 ฿ 0 谁都看得见;这里堵的是系统
  * 替人编出来的 0(`money(null)` 画成 "0.00"、`+l.price || 0` 发出去 0)。同一套判据后端也有
  * 一份(services/sales/issue_gates.amount_gate),前端只是让人早一步看见。
  */
@@ -242,7 +242,7 @@ export function compliance(st: WState): Check[] {
             req: isFull,
             na: st.docType === 'quotation',
         },
-        // 报价单也算:฿0 的报价一样是漏填,只是漏的代价晚一点到。
+        // 报价单也算:฿ 0 的报价一样是漏填,只是漏的代价晚一点到。
         { key: 'ckPrice', descKey: 'ckPriceD', pass: priceOk, req: true, na: false },
         { key: 'ckVat', descKey: 'ckVatD', pass: true, req: isTax, na: !isTax },
         {

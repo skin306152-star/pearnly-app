@@ -222,6 +222,13 @@ window.__DMS_I18N_EN__ = {
     gate_invite_title: 'DMS customer intake is invite-only',
     gate_invite_body: 'Please contact the Pearnly team to request access.',
     gate_logout_btn: 'Log out',
+    gate_down_title: 'The server hit an error',
+    gate_down_body:
+        'This is not about your access — your account is still valid. The server could not handle this request. Wait a moment and hit retry; if it keeps happening, send us the time it occurred.',
+    gate_offline_title: 'Cannot reach the server',
+    gate_offline_body:
+        'The request never went out — the network is down or blocked. Reconnect, then hit retry.',
+    gate_retry_btn: 'Retry',
     'dms-app-word': 'DMS Customers',
     'dms-nav-intake': 'ID Card Intake',
     'dms-nav-records': 'Push History',

@@ -6,37 +6,51 @@ scripts/check_file_size.py · REFACTOR-WC-P1 (2026-05-28 窗口 C · 防屎山�
 铁律 #27.1 · 任何代码文件超 500 行 = push 失败 · 必须先拆。
 
 监控清单 = 历史巨石 + 整顿期产出的所有模块化新文件:
-  - 历史巨石(per-file ceiling · 暂不到 500 也算违规但短期豁免):
-      app.py / db.py / auth_signup.py / home.js / home.html / home.css
-  - 所有 *_routes.py(整顿期 B 阶段拆出的 FastAPI 路由)
-  - 所有 services/**/*.py(整顿期 B 阶段拆出的业务层)
-  - 所有 src/home/**/*.{js,css}(整顿期 C 阶段拆出的 Vite 模块)
+  - 根目录 *.py(整顿收官后根目录只剩业务代码 · 无基础设施文件)
+  - routes/ core/ services/ 下的所有 *.py
+  - src/home/**/*.{js,ts,css}(整顿期 C 阶段拆出的 Vite 模块)
+  - static/ai/**/*.js(2026-08-01 补 · 理由见下)
+
+static/ai 为什么拖到 2026-08-01 才进监控:
+  /ai 是独立 SPA,资产由 ai.html 直接 <script> 引,不走 src/home 那条 vite 打包 —— 于是
+  它 119 个 .js 从建站起整片在闸外。收进来当天就抓到 7 个越线文件(ai-review.js 770 行居首,
+  最新的 ai-steward.js 511 行是这一轮刚写的)。闸没查过的地方,标准就等于不存在。
+
+存量基线(scripts/file_size_baseline.json):
+  一收 static/ai 立刻红 7 个,当天拆不动(全是在写的活面),但也不能就此把 500 行标准放掉。
+  按本仓既有范式(ui_design_lint / check_theme_responsive / check_home_i18n_refs)记基线:
+    · 基线内的文件 —— 行数只许 ≤ 记录值,涨一行就红(存量不许再长)。
+    · 基线外的文件 —— 越线即红,没有宽限(新债一行都不许欠)。
+    · 降下来了 —— 打提示叫人跑 --update-baseline 收紧;拆到 ≤ 上限就把条目删掉。
+  基线键是仓库相对路径。2026-08-01 之前那份 EXEMPT_CURRENT_BIG_FILES 按 basename 匹配,
+  任何目录下的同名文件都会跟着免罪(彼时是空字典,没出过事);两套豁免机制并存必漂,
+  所以直接由基线接管,不留第二套。
 
 退出码:
-  0 = 全部监控文件 ≤ 500 行(或在豁免段)
+  0 = 全部监控文件 ≤ 上限(或在基线记录值以内)
   1 = 至少 1 个文件违规
 
 用法:
-  python scripts/check_file_size.py              # 全报告
-  python scripts/check_file_size.py --quiet      # 只在违规时输出(CI 友好)
-  python scripts/check_file_size.py --ceiling N  # 改阈值(默认 500)
+  python scripts/check_file_size.py                    # 全报告
+  python scripts/check_file_size.py --quiet            # 只输出违规 + 可收紧提示(CI / pre-push 用)
+  python scripts/check_file_size.py --ceiling N        # 改阈值(默认 500)
+  python scripts/check_file_size.py --update-baseline  # 把当前越线现状写回基线(拆完之后才跑)
 
 CI 接入:
-  .github/workflows/ci.yml `lint-size` job 跑
-  当前(2026-05-28)`continue-on-error: true` · warning 模式 · 红但不挡 push
-  等 Loop 1 拆完巨石(平均代码规模 ≥ 80%)再切 false 进入 fail 模式
-
-例外 / 豁免清单:
-  历史巨石短期豁免(写在 EXEMPT_CURRENT_BIG_FILES 字典)·
-  豁免值 = 当前实际行数 ceiling · 只准减不准增(本脚本不验棘轮 · 见 check_line_ratchet.py)。
+  .github/workflows/ci.yml `lint-size` job + scripts/git-hooks/pre-push · 均 FAIL 模式
+  (2026-06-03 整顿收官切硬门)。
+  反证测试 tests/unit/test_file_size_gate.py:新越线要红 / 基线涨要红 / 降了要提示 /
+  干净样本不许误报 / 词典豁免面必须真的是纯词典。
 """
 
 from __future__ import annotations
 
 import argparse
 import io
+import json
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 # Windows 默认 GBK 控制台 · 强制 stdout UTF-8 以支持 emoji + 中文
 if hasattr(sys.stdout, "reconfigure"):
@@ -46,8 +60,9 @@ else:
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CEILING = 500
+BASELINE_PATH = PROJECT_ROOT / "scripts" / "file_size_baseline.json"
 
-# 显式监控的根目录文件(每个文件都要检查 · 即使在豁免清单也报)
+# 显式监控的根目录文件(每个文件都要检查)
 # db.py→core/、auth_signup.py→services/auth/(目录重组·铁律#30)· 改由 core/ services/ glob 覆盖
 MONITORED_ROOT_FILES = [
     "app.py",
@@ -70,20 +85,8 @@ MONITORED_GLOBS = [
     "src/home/**/*.js",
     "src/home/**/*.ts",  # C5 TypeScript 迁移产物(.js→.ts)· 同 ≤500 约束 · 防脱离监控
     "src/home/**/*.css",
+    "static/ai/**/*.js",  # 2026-08-01 · /ai SPA 不走 vite,此前整片在闸外(见文件头)
 ]
-
-# ── 历史巨石短期豁免 ──
-# 这些文件目前已经远超 500 · 不可能本周拆完 · 给一个"当前实际值"作豁免上限。
-# 棘轮(check_line_ratchet.py)会强制只准减不准增。
-# 等行数被拆到 ≤ 500 · 从本字典里删条目即可。
-# 数字以 2026-05-28 STATE_PEARNLY.md 头部为准。
-EXEMPT_CURRENT_BIG_FILES = {
-    # 2026-06-02 清理:5 大巨石全部 <500(app.py 491/db.py 344/auth_signup 428/
-    # home.html 397/home.css 0/home.js 已全迁 src/home 文件不存在)→ 全从豁免删除 ·
-    # 改由默认 500 硬上限正常约束(只升不降棘轮另管 check_line_ratchet.py)。
-    # 2026-06-03:login.html 着陆页换新(分层设计 · 壳 26 行 · 资产入 static/landing/)·
-    # 巨石退场 → 删豁免 · 改由默认 500 正常约束。存量豁免已清空。
-}
 
 # 路径模式豁免(纯数据 / 自动生成 · 不算业务代码)
 EXEMPT_PATH_PATTERNS = [
@@ -95,7 +98,26 @@ EXEMPT_PATH_PATTERNS = [
     ".venv/",
     "venv/",
     "static/i18n-data.js",  # 词典文件 · 真是数据
+    # /ai 的词典分片:`window.__AI_I18N_XX__ = {…}` / `Object.assign(window.__AI_I18N_XX__, {…})`
+    # 的键值表,行数由文案条数决定,拿 500 行代码上限量它没有意义(同 static/i18n-data.js)。
+    # 判据卡在中划线上:装配层 `ai-i18n.js`(detectLang / at() / atSetLang)是代码,照常监控。
+    # 「名字里带 i18n 就免罪」本身是个洞 —— 豁免面由 tests/unit/test_file_size_gate.py 逐个文件
+    # 验「真的只有词典字面量(无 function / 无 =>)」,谁往这个名下塞逻辑,测试当场红。
+    "static/ai/ai-i18n-",
 ]
+
+
+class Row(NamedTuple):
+    """一个被检查文件的判定结果。
+
+    status ∈ {"OK", "BASELINE", "FAIL"};limit = 实际适用的上限(硬上限或基线记录值)。
+    """
+
+    status: str
+    rel: str
+    lines: int
+    limit: int
+    reason: str = ""
 
 
 def count_lines(path: Path) -> int:
@@ -122,6 +144,14 @@ def is_exempt_path(rel_path: str) -> bool:
     return False
 
 
+def load_baseline() -> dict[str, int]:
+    """读存量基线 · 下划线开头的键是给人看的说明,不参与判定。"""
+    if not BASELINE_PATH.exists():
+        return {}
+    raw = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    return {k: int(v) for k, v in raw.items() if not k.startswith("_")}
+
+
 def collect_files() -> list[Path]:
     """收集所有需要检查的文件"""
     files: set[Path] = set()
@@ -138,73 +168,131 @@ def collect_files() -> list[Path]:
     return sorted(files)
 
 
-def check_one(path: Path, ceiling: int) -> tuple[str, str, int, int]:
-    """检查单个文件 · 返回 (status, rel_path, lines, applied_ceiling)
-    status ∈ {"OK", "EXEMPT", "FAIL"}
-    """
+def check_one(path: Path, ceiling: int, baseline: dict[str, int]) -> Row:
+    """检查单个文件。基线内只比记录值(只许降),基线外比硬上限(越线即红)。"""
     rel = path.relative_to(PROJECT_ROOT).as_posix()
     lines = count_lines(path)
-    rel_basename = rel.split("/")[-1] if "/" in rel else rel
-    if rel_basename in EXEMPT_CURRENT_BIG_FILES:
-        applied = EXEMPT_CURRENT_BIG_FILES[rel_basename]
-        if lines > applied:
-            return ("FAIL", rel, lines, applied)
-        return ("EXEMPT", rel, lines, applied)
-    if lines > ceiling:
-        return ("FAIL", rel, lines, ceiling)
-    return ("OK", rel, lines, ceiling)
+    if lines <= ceiling:
+        return Row("OK", rel, lines, ceiling)
+    recorded = baseline.get(rel)
+    if recorded is None:
+        return Row("FAIL", rel, lines, ceiling, "新越线(基线里没有这个文件)")
+    if lines > recorded:
+        return Row("FAIL", rel, lines, recorded, f"存量文件又长了 {lines - recorded} 行")
+    return Row("BASELINE", rel, lines, recorded)
+
+
+def collect_hints(rows: list[Row], baseline: dict[str, int], ceiling: int) -> list[str]:
+    """可以收紧的地方 —— 不算违规,但不说就没人知道基线松了。"""
+    seen = {r.rel for r in rows}
+    hints: list[str] = []
+    for r in rows:
+        if r.status == "BASELINE" and r.lines < r.limit:
+            hints.append(f"{r.rel} 已降到 {r.lines} 行(基线 {r.limit})· 跑 --update-baseline 收紧")
+        elif r.status == "OK" and r.rel in baseline:
+            hints.append(f"{r.rel} 已拆到 {r.lines} ≤ {ceiling} 行 · 跑 --update-baseline 删掉这条")
+    for rel in sorted(set(baseline) - seen):
+        hints.append(f"{rel} 已不在监控范围(文件没了 / 改名了)· 跑 --update-baseline 清掉这条")
+    return hints
+
+
+def update_baseline(rows: list[Row], ceiling: int) -> int:
+    """把当前越线现状写回基线 · 保留下划线开头的说明键。"""
+    raw: dict[str, object] = {}
+    if BASELINE_PATH.exists():
+        raw = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    notes = {k: v for k, v in raw.items() if k.startswith("_")}
+    before = {k: int(v) for k, v in raw.items() if not k.startswith("_")}
+    after = {r.rel: r.lines for r in sorted(rows, key=lambda x: x.rel) if r.lines > ceiling}
+
+    payload: dict[str, object] = {**notes, **after}
+    BASELINE_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+    print(f"✅ 基线已写回 {BASELINE_PATH.relative_to(PROJECT_ROOT).as_posix()}(共 {len(after)} 条)")
+    for rel in sorted(set(after) | set(before)):
+        old, new = before.get(rel), after.get(rel)
+        if old is None:
+            print(f"  [+] {rel:50s} {new} 行  ← 新记的越线文件,确认这是有意为之")
+        elif new is None:
+            print(f"  [-] {rel:50s} 已拆到 ≤ {ceiling} 行,条目删除")
+        elif old != new:
+            print(f"  [~] {rel:50s} {old} → {new} 行")
+    return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Pearnly 防屎山闸 #1 · 监控文件行数 ≤ 500(铁律 #27.1)")
-    ap.add_argument("--quiet", action="store_true", help="只在违规时输出")
+    ap.add_argument("--quiet", action="store_true", help="只输出违规与可收紧提示")
     ap.add_argument(
         "--ceiling",
         type=int,
         default=DEFAULT_CEILING,
         help=f"行数硬上限(默认 {DEFAULT_CEILING})",
     )
+    ap.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="把当前越线现状写回 scripts/file_size_baseline.json(拆完之后才跑)",
+    )
     args = ap.parse_args()
 
-    files = collect_files()
-    results = [check_one(p, args.ceiling) for p in files]
+    baseline = load_baseline()
+    rows = [check_one(p, args.ceiling, baseline) for p in collect_files()]
 
-    fails = [r for r in results if r[0] == "FAIL"]
-    exempts = [r for r in results if r[0] == "EXEMPT"]
-    oks = [r for r in results if r[0] == "OK"]
+    if args.update_baseline:
+        return update_baseline(rows, args.ceiling)
 
-    if args.quiet and not fails:
-        return 0
+    fails = [r for r in rows if r.status == "FAIL"]
+    held = [r for r in rows if r.status == "BASELINE"]
+    oks = [r for r in rows if r.status == "OK"]
+    hints = collect_hints(rows, baseline, args.ceiling)
+
+    if args.quiet:
+        if not fails and not hints:
+            return 0
+        if not fails:
+            print("🟢 存量基线可以收紧(不算违规):")
+            for h in hints:
+                print(f"  · {h}")
+            return 0
 
     print("=" * 72)
     print("🚧 Pearnly 防屎山闸 #1 · 文件行数检查(铁律 #27.1)")
     print("=" * 72)
     print(f"  硬上限           : {args.ceiling} 行(超出 = 违规)")
-    print(f"  检查文件总数     : {len(results)}")
+    print(f"  检查文件总数     : {len(rows)}")
     print(f"  ✅ OK            : {len(oks)}")
-    print(f"  🟡 EXEMPT(豁免) : {len(exempts)}")
+    print(f"  🟡 存量基线内    : {len(held)}")
     print(f"  🔴 FAIL          : {len(fails)}")
     print()
 
     if fails:
         print("🔴 违规文件(必须拆 · 否则下个 commit 阻挡 push):")
         print("-" * 72)
-        for _, rel, lines, applied in fails:
-            print(f"  [FAIL] {rel:50s} {lines:6d} 行  (上限 {applied})")
+        for r in fails:
+            print(f"  [FAIL] {r.rel:50s} {r.lines:6d} 行  (上限 {r.limit} · {r.reason})")
         print()
 
-    if exempts and not args.quiet:
-        print("🟡 历史巨石豁免(短期容忍 · 棘轮只准减不准增 · 见 check_line_ratchet.py):")
+    if held and not args.quiet:
+        print("🟡 存量基线(只许降不许升 · scripts/file_size_baseline.json):")
         print("-" * 72)
-        for _, rel, lines, applied in exempts:
-            print(f"  [EXEMPT] {rel:48s} {lines:6d} 行  (豁免上限 {applied})")
+        for r in held:
+            print(f"  [BASE] {r.rel:48s} {r.lines:6d} 行  (基线 {r.limit})")
+        print()
+
+    if hints:
+        print("🟢 可以收紧的地方(不算违规):")
+        print("-" * 72)
+        for h in hints:
+            print(f"  · {h}")
         print()
 
     if not args.quiet:
         print("✅ 合规文件(≤ 上限):", len(oks))
-        # 只在 verbose 时列前 10 个
-        for _, rel, lines, _ in oks[:10]:
-            print(f"  [OK]   {rel:50s} {lines:6d} 行")
+        for r in oks[:10]:
+            print(f"  [OK]   {r.rel:50s} {r.lines:6d} 行")
         if len(oks) > 10:
             print(f"  ...(略 {len(oks) - 10} 个)")
         print()
@@ -212,9 +300,9 @@ def main() -> int:
     print("=" * 72)
     if fails:
         print("结果:🔴 FAIL · 至少 1 个文件超出上限 · 必须先拆")
-        print("提示:1) 改文件 ≤ 500 行  2) 真没法本期拆 · 在 EXEMPT_CURRENT_BIG_FILES 加豁免值")
+        print("提示:1) 拆到 ≤ 上限  2) 存量文件降回基线记录值以内(基线只许降不许升)")
     else:
-        print("结果:✅ PASS · 所有监控文件在上限内(或豁免范围内)")
+        print("结果:✅ PASS · 所有监控文件在上限内(或基线记录值以内)")
     print("=" * 72)
 
     return 1 if fails else 0

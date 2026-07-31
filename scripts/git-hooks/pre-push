@@ -239,8 +239,11 @@ fi
 # 整顿前这两道在 CI 是 warning 模式(怕误红拆分中的 split commit);整顿收官后
 # 全文件 <500 · 在此切成本地硬拦:文件超 500 / 监控文件行数净增 → push 中止。
 echo "▶ 防屎山闸(文件 ≤500 行 + 行数棘轮只降不升)"
-echo "  · check_file_size(任何监控文件 >500 行 = 拦 · 先拆)"
-python scripts/check_file_size.py --quiet || fail "check_file_size(有文件超 500 行 · 先拆到 <500)"
+# 2026-08-01 扩面:static/ai/**/*.js 进监控(/ai 是独立 SPA · 不走 vite · 此前整片在闸外 ·
+# 收进来当场 7 个越线)。存量记 scripts/file_size_baseline.json,只许降不许升;基线外越线即红。
+# --quiet 下仍会打「可以收紧基线」的提示 —— 钩子只用 quiet,那里不打就等于这条提示不存在。
+echo "  · check_file_size(任何监控文件 >500 行 = 拦 · 先拆 · static/ai 存量走基线只降不升)"
+python scripts/check_file_size.py --quiet || fail "check_file_size(有文件超 500 行 / 存量文件涨过基线 · 先拆到 <500)"
 
 # base 跟上面算 CHANGED 用同一个(merge-base)· 别再分叉成两套范围:此前这里写死
 # --base origin/master,于是「哪些文件算你改的」和「哪些文件算你加的行」用的是两个口径。

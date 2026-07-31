@@ -18,7 +18,7 @@ git config core.hooksPath scripts/git-hooks
 2. **路径是相对的,按「谁在 push」各自解析** —— githooks(5):钩子跑之前 git 会 `cd` 到该 worktree 的根。所以 A worktree push 跑的是 `A/scripts/git-hooks/pre-push`,B 跑 B 的。老分支跑老版本的闸;分支里没这个文件 = 那次 push 静悄悄没有闸。
 3. **代价**:改动只含文档/纯文本约 40 秒;含 `.py`(要跑全量 unittest)或前端(要跑 eslint + vite build)实测约 3 分钟起。**「改了什么」按 merge-base 算**,所以分支自己没动 `.py` 就不跑那趟全量单测 —— 停摆分支不会再因为 master 往前跑而白跑 3 分钟(2026-07-31)。那趟单测有意保留:它是钩子里唯一盖「改一处崩别处」的闸,而 push 即上线、CI 是事后报警器;按 import 反查裁剪的路验过不通(1038 个测试模块里 213 个靠扫文件/起子进程验,没有 import 边)。`git push --dry-run` 也会触发本钩子(但不会真推),可拿来空跑验证。
 
-## 27 道闸 · 查什么 · 怎么提前自查 · 豁免法
+## 28 道闸 · 查什么 · 怎么提前自查 · 豁免法
 
 | 闸 | 触发条件 | 查什么 | 提前自查命令 | 豁免/注意 |
 |---|---|---|---|---|
@@ -39,7 +39,8 @@ git config core.hooksPath scripts/git-hooks
 | build+dist 一致 | 改前端 | 改源没重打包=prod 跑旧 bundle | `npm run build` 后 `git add static/dist` + bump `?v=` | main.js/map 的 drift 不算 |
 | check_asset_bundling | 改前端 | 源页明文引资源(view-source 退化)· 覆盖 home/login/admin/console/pos | `python scripts/check_asset_bundling.py` | 新资产进打包清单(pos/console 新 JS 逻辑必进 bundle·仅 *-i18n 数据/pos-sw 可独立) |
 | ui_design_lint 棘轮 | 改前端 | 裸 hex/emoji 图标/自曝文案等,命中数**只许降** | `node scripts/ui_design_lint.mjs --gate` | **注释里的 hex 也计数**;存量降了跑 `--update-baseline` 收紧;写色一律 var() |
-| check_file_size | 任何改动 | 任何监控文件 >500 行 | `python scripts/check_file_size.py --quiet` | 先拆,无豁免 |
+| check_file_size | 任何改动 | 任何监控文件 >500 行(监控面 = 根 `*.py` / `routes` `core` `services` 下的 `.py` / `src/home/**` / **`static/ai/**/*.js`(2026-08-01 才收进来)**) | `python scripts/check_file_size.py --quiet` | 先拆,无豁免;**`static/ai` 此前整片在闸外** —— /ai 是独立 SPA 不走 vite 打包,收进监控当天就抓到 7 个越线文件(`ai-review.js` 770 行居首),存量按下一行的基线记账 |
+| check_file_size 存量基线 | 任何改动 | 基线里的文件行数只许降不许升(涨一行就红);基线**外**的文件越线即红,没有宽限 | `python scripts/check_file_size.py --quiet`(同一道命令、两层判据) | 基线在 `scripts/file_size_baseline.json`(2026-08-01 建,7 条,全是 `static/ai`);拆下来后跑 `--update-baseline` 收紧,闸自己会提示哪条能收(`--quiet` 下也打,因为钩子只用 quiet);**词典分片 `ai-i18n-*.js` 不在监控面**(纯键值表,拿行数量没意义;装配层 `ai-i18n.js` 带 `at()`,照常监控);往基线里加条目要连 `tests/unit/test_file_size_gate.py` 那条「只许缩」的断言一起改,免不成默默的;反证 `tests/unit/test_file_size_gate.py` |
 | check_line_ratchet | 任何改动 | 监控文件行数净增 | `python scripts/check_line_ratchet.py --base "$(git merge-base origin/master HEAD)" --head HEAD --quiet` | 合理增长:commit 写 `RATCHET-EXEMPT: <file> +<N> · <理由>`;**新文件一律先豁免**;**base 必须是 merge-base,不能写 origin/master** —— `git diff A..B` 是两棵树的差,master 往前跑一笔就算到你头上(2026-07-31 实测:停摆分支自己只改 1 个 .md,却被红 19 个它没碰过的监控文件;13 条分支两点红 12、三点红 4),反证 `tests/unit/test_prepush_diff_range.py` |
 | check_ui_consistency | 任何改动 | D1 禁新抽屉(用 .modal)/D2 按钮禁黑底(用 var(--btn-blue)) | `python scripts/check_ui_consistency.py --quiet` | 只导航栏可黑 |
 | check_theme_responsive 棘轮 | 任何改动 | 暗夜不翻面的写死色(3位hex/white·black/不透明rgb·补 6 位 hex 闸的漏)+ 入口页 viewport 必须在,命中**只许降** | `python scripts/check_theme_responsive.py --gate --quiet` | 半透明 rgba(阴影/遮罩)豁免;颜色一律 var(--token);存量降了跑 `--update-baseline` 收紧;**手机端"合理"机械保证不了,真机验收见 docs/ui/THEME_RESPONSIVE_VERIFY.md** |

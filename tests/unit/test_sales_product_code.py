@@ -38,16 +38,16 @@ class _ReviveCursor:
         return {"id": "dead1"} if self._n == 1 else {"id": "dead1", "is_active": True}
 
 
-class NormCodeTests(unittest.TestCase):
+class NormUniqueKeysTests(unittest.TestCase):
     def test_blank_code_becomes_none(self):
-        self.assertIsNone(products_dal._norm_code({"code": "   "})["code"])
+        self.assertIsNone(products_dal._norm_unique_keys({"code": "   "})["code"])
 
     def test_code_stripped(self):
-        self.assertEqual(products_dal._norm_code({"code": "  ABC "})["code"], "ABC")
+        self.assertEqual(products_dal._norm_unique_keys({"code": "  ABC "})["code"], "ABC")
 
     def test_none_and_missing_pass_through(self):
-        self.assertIsNone(products_dal._norm_code({"code": None})["code"])
-        self.assertNotIn("code", products_dal._norm_code({"name_th": "x"}))
+        self.assertIsNone(products_dal._norm_unique_keys({"code": None})["code"])
+        self.assertNotIn("code", products_dal._norm_unique_keys({"name_th": "x"}))
 
     def test_blank_code_omitted_from_insert(self):
         """空白 code 归一为 NULL → 不进 INSERT 列 → 不触唯一索引(可多建无编码商品)。"""

@@ -1,7 +1,16 @@
 // 销项开票向导 PO-10 · 发票预览(核对步用)· 从 index.html 样稿移植
 // 文档语言(印在票上的语言)独立于界面语言;省纸正副本同页;热敏窄版。
 /* global escapeHtml */
-import { type WState, calc, money, bahtText, cnText, payApplicable } from './sales-wizard-calc.js';
+import {
+    type WState,
+    calc,
+    money,
+    bahtText,
+    cnText,
+    lineAmount,
+    payApplicable,
+    priced,
+} from './sales-wizard-calc.js';
 import { getSellers } from './sales-wizard-io.js';
 import { BAHT } from './money.js';
 
@@ -75,7 +84,9 @@ function invoiceHTML(st: WState, kind: 'original' | 'copy'): string {
     const items = st.lines
         .map(
             (l, i) =>
-                `<tr><td>${i + 1}</td><td>${escapeHtml(l.desc) || '-'}</td><td class="r">${money(+l.qty || 0)}</td><td class="r">${money(+l.price || 0)}</td><td class="r">${+l.disc > 0 ? '-' + money(+l.disc) : '-'}</td><td class="r">${money(Math.max(0, (+l.qty || 0) * (+l.price || 0) - (+l.disc || 0)))}</td></tr>`
+                // 没定价的行在票面上留 "—" 而不是 0.00:这张票本来就开不出去(合规清单的
+                // ckPrice 拦着),预览里画一个 ฿ 0.00 等于告诉人"这行没问题、就是免费"。
+                `<tr><td>${i + 1}</td><td>${escapeHtml(l.desc) || '-'}</td><td class="r">${money(+l.qty || 0)}</td><td class="r">${priced(l.price) ? money(Number(l.price)) : '—'}</td><td class="r">${+l.disc > 0 ? '-' + money(+l.disc) : '-'}</td><td class="r">${priced(l.price) ? money(lineAmount(l)) : '—'}</td></tr>`
         )
         .join('');
     const payBox =

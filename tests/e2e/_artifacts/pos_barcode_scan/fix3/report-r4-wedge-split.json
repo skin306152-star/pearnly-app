@@ -1,0 +1,88 @@
+{
+  "w1_cashierSplit": {
+    "ok": true,
+    "focusWas": "BODY",
+    "blockedMs": 300,
+    "stampMax": 20.5,
+    "perfMax": 313.7,
+    "asked": [
+      "8850999320014"
+    ],
+    "cart": {
+      "names": [
+        "โค้ก"
+      ],
+      "qtys": [
+        "1"
+      ],
+      "grand": "15.00",
+      "fails": []
+    },
+    "why": ""
+  },
+  "w2_batchSplit": {
+    "ok": true,
+    "before": "LOT-B240301",
+    "after": "LOT-B240301",
+    "blockedMs": 300,
+    "stampMax": 30.1,
+    "perfMax": 315.7,
+    "asked": [
+      "8850999320014"
+    ],
+    "rows": 2,
+    "msg": "เพิ่ม โค้ก แล้ว",
+    "why": ""
+  },
+  "w3_heldKeyOnMain": {
+    "ok": true,
+    "repeatFlags": 11,
+    "stampMax": 38.5,
+    "asked": [],
+    "cart": {
+      "names": [],
+      "qtys": [],
+      "grand": "0.00",
+      "fails": []
+    },
+    "why": ""
+  },
+  "w4_gapTaskSplit": {
+    "ok": true,
+    "blockedMs": 300,
+    "stampMax": 21,
+    "perfMax": 300.5,
+    "asked": [
+      "8850999320014"
+    ],
+    "cart": {
+      "names": [
+        "โค้ก"
+      ],
+      "qtys": [
+        "1"
+      ],
+      "grand": "15.00",
+      "fails": []
+    },
+    "why": ""
+  },
+  "w5_scanDuringPayModal": {
+    "ok": true,
+    "seededQtys": [
+      "1"
+    ],
+    "toastClearedBeforeScan": true,
+    "askedDuringModal": [],
+    "after": {
+      "toastShown": true,
+      "toastText": "มีหน้าต่างเปิดอยู่ · 8850999320014 ไม่ได้เข้าตะกร้า",
+      "failRows": 1,
+      "payOpen": true,
+      "qtys": [
+        "1"
+      ]
+    },
+    "why": ""
+  }
+}

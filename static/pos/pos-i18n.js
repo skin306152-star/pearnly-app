@@ -92,6 +92,12 @@
             'posui.cart.refund': 'คืนสินค้า',
             'posui.cart.items': '{n} ชิ้น · {k} รายการ',
             'posui.cart.unit': '/ ชิ้น',
+            'posui.cart.unit_no_price':
+                'หน่วย「{unit}」ยังไม่ได้ตั้งราคา · ยังไม่ได้เพิ่ม {name} ลงตะกร้า',
+            'posui.cart.unit_unknown':
+                'รหัสที่สแกนตรงกับหน่วย「{unit}」แต่ข้อมูลสินค้า {name} ไม่มีหน่วยนี้ · ยังไม่ได้เพิ่มลงตะกร้า',
+            'posui.cart.fix_in_backoffice':
+                'หน้า "สินค้า" ในระบบหลังร้านแก้ได้แค่ราคาและบาร์โค้ดของตัวสินค้า · หน่วยอย่างลัง/ขวดยังไม่มีหน้าจัดการ ตอนนี้ให้เลือกสินค้าจากรายการ ตรวจหน่วยและราคาก่อนค่อยรับเงิน',
             'posui.qty.title': 'จำนวน',
             'posui.qty.confirm': 'ตกลง',
             'posui.pay.title': 'รับชำระ',
@@ -189,6 +195,41 @@
             'posui.discount.title': 'ส่วนลดทั้งบิล (฿)',
             'posui.discount.reason.ph': 'เหตุผล (ไม่บังคับ)',
             'posui.scan.title': 'สแกนหรือใส่บาร์โค้ด',
+            'posui.bscan.starting': 'กำลังเปิดกล้อง…',
+            'posui.bscan.aim': 'เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ',
+            'posui.bscan.count': 'สแกนแล้ว {n} ชิ้น',
+            'posui.bscan.done': 'เสร็จสิ้น',
+            'posui.bscan.added': 'เพิ่มแล้ว {name}',
+            'posui.bscan.fails_n': 'ไม่ได้เข้าตะกร้า {n} รายการ',
+            'posui.bscan.fails_ack': 'รับทราบ',
+            'posui.bscan.queued': 'มีอีก {n} รายการรออยู่ · จะถูกเพิ่มลงตะกร้าทั้งหมด',
+            'posui.bscan.modal_busy': 'มีหน้าต่างเปิดอยู่ · {code} ไม่ได้เข้าตะกร้า',
+            'posui.bscan.modal_hint': 'ปิดหน้าต่างนี้แล้วสแกนใหม่อีกครั้ง',
+            'posui.bscan.typed': 'ถือว่าพิมพ์ด้วยมือ · {code} ไม่ได้อ่านเป็นบาร์โค้ด',
+            'posui.bscan.typed_hint': 'ถ้ายิงจากเครื่องสแกน ให้ยิงอีกครั้ง',
+            'posui.bscan.search_code': 'ค้นหาสินค้าด้วยรหัสนี้',
+            'posui.bscan.same_code': 'อ่านรหัส {code} ซ้ำ · นับเป็นชิ้นเดิม',
+            'posui.bscan.same_code_hint':
+                'ถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า',
+            'posui.bscan.add_one': '+1 · เป็นชิ้นที่สอง',
+            'posui.bscan.create_where':
+                'ให้เจ้าของเพิ่มสินค้าในระบบหลังร้าน (สินค้า → เพิ่มสินค้า) แล้วใส่บาร์โค้ดนี้ในช่อง "บาร์โค้ด" ครั้งต่อไปสแกนขายได้เลย',
+            'posui.bscan.offline_miss':
+                'ออฟไลน์ · ไม่พบ {code} ในรายการสินค้าที่เก็บไว้ในเครื่อง ต่อเน็ตแล้วสแกนอีกครั้ง',
+            'posui.bscan.offline_nocatalog':
+                'ออฟไลน์ · เครื่องนี้ยังไม่มีรายการสินค้า ต่อเน็ตแล้วสแกนอีกครั้ง',
+            'bscan.notfound': 'ไม่มีสินค้าที่ใช้บาร์โค้ด {code}',
+            'bscan.manual': 'พิมพ์บาร์โค้ดเอง',
+            'bscan.err.insecure': 'สแกนด้วยกล้องต้องใช้ HTTPS · เปิดหน้าร้านผ่านลิงก์ https',
+            'bscan.err.unsupported':
+                'อุปกรณ์นี้เปิดกล้องในแอปไม่ได้ · ใช้เครื่องยิงบาร์โค้ดหรือพิมพ์รหัส',
+            'bscan.err.permission':
+                'ไม่ได้รับสิทธิ์กล้อง · เปิดสิทธิ์กล้องในตั้งค่าเบราว์เซอร์แล้วลองใหม่',
+            'bscan.err.no_camera': 'ไม่พบกล้องบนอุปกรณ์นี้ · ใช้เครื่องยิงบาร์โค้ดหรือพิมพ์รหัส',
+            'bscan.err.busy': 'กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่',
+            'bscan.err.timeout': 'เปิดกล้องไม่ทัน · ลองอีกครั้ง',
+            'bscan.err.decoder': 'โหลดตัวอ่านบาร์โค้ดไม่สำเร็จ · เช็กเน็ตแล้วลองใหม่',
+            'bscan.err.unknown': 'เปิดกล้องไม่ได้ · พิมพ์บาร์โค้ดเองได้',
             'posui.done.title': 'ชำระเงินสำเร็จ',
             'posui.done.change': 'เงินทอน',
             'posui.done.receipt': 'เลขที่ใบเสร็จ',
@@ -356,6 +397,12 @@
             'posui.cart.refund': 'Refund',
             'posui.cart.items': '{n} items · {k} types',
             'posui.cart.unit': '/ ea',
+            'posui.cart.unit_no_price':
+                'The unit "{unit}" has no price yet · {name} was not added to the cart',
+            'posui.cart.unit_unknown':
+                'The scanned code maps to the unit "{unit}", but {name} has no such unit · not added to the cart',
+            'posui.cart.fix_in_backoffice':
+                'The back office Products page only edits the item price and barcode — units (box/bottle) have no screen yet · for now pick the product from the list, check its unit and price, then charge',
             'posui.qty.title': 'Quantity',
             'posui.qty.confirm': 'OK',
             'posui.pay.title': 'Payment',
@@ -452,6 +499,44 @@
             'posui.discount.title': 'Order discount (฿)',
             'posui.discount.reason.ph': 'Reason (optional)',
             'posui.scan.title': 'Scan or enter a barcode',
+            'posui.bscan.starting': 'Opening camera…',
+            'posui.bscan.aim': 'Aim the product barcode inside the frame',
+            'posui.bscan.count': '{n} items scanned',
+            'posui.bscan.done': 'Done',
+            'posui.bscan.added': 'Added {name}',
+            'posui.bscan.fails_n': '{n} not added to the cart',
+            'posui.bscan.fails_ack': 'Got it',
+            'posui.bscan.queued': '{n} more in the queue · all of them will be added',
+            'posui.bscan.modal_busy': 'A window was open · {code} did not go into the cart',
+            'posui.bscan.modal_hint': 'Close the window and scan it again',
+            'posui.bscan.typed': 'Treated as typing · {code} was not read as a barcode',
+            'posui.bscan.typed_hint': 'If that was a scan, scan it again',
+            'posui.bscan.search_code': 'Search products with this code',
+            'posui.bscan.same_code': 'Code {code} read again · counted as the same item',
+            'posui.bscan.same_code_hint':
+                'If that was a second identical item, tap +1 to put it in the cart',
+            'posui.bscan.add_one': '+1 · it was a second item',
+            'posui.bscan.create_where':
+                'Ask the owner to add it in the back office (Products → New product) and put this barcode in the "Barcode" field — after that it scans straight into the cart',
+            'posui.bscan.offline_miss':
+                'Offline · {code} is not in the catalog cached on this device. Reconnect and scan again',
+            'posui.bscan.offline_nocatalog':
+                'Offline · this device has no product catalog yet. Reconnect and scan again',
+            'bscan.notfound': 'No product with barcode {code}',
+            'bscan.manual': 'Type the barcode',
+            'bscan.err.insecure':
+                'Camera scanning needs HTTPS · open the store link that starts with https',
+            'bscan.err.unsupported':
+                "This device can't open the camera in-app · use a barcode scanner or type the code",
+            'bscan.err.permission':
+                'Camera permission denied · allow the camera in browser settings, then try again',
+            'bscan.err.no_camera':
+                'No camera found on this device · use a barcode scanner or type the code',
+            'bscan.err.busy': 'The camera is in use by another app · close it and try again',
+            'bscan.err.timeout': 'The camera took too long to start · try again',
+            'bscan.err.decoder':
+                "Couldn't load the barcode reader · check the connection and try again",
+            'bscan.err.unknown': "Couldn't open the camera · you can type the barcode instead",
             'posui.done.title': 'Payment complete',
             'posui.done.change': 'Change',
             'posui.done.receipt': 'Receipt no.',
@@ -621,6 +706,11 @@
             'posui.cart.refund': '退货',
             'posui.cart.items': '{n} 件 · {k} 种',
             'posui.cart.unit': '/ 件',
+            'posui.cart.unit_no_price': '「{unit}」这个单位还没设售价 · {name} 没加进购物车',
+            'posui.cart.unit_unknown':
+                '扫到的码对应单位「{unit}」,但 {name} 的商品资料里没有这个单位 · 没加进购物车',
+            'posui.cart.fix_in_backoffice':
+                '后台「商品」页只能改这件货本身的售价和条码,箱/瓶这类单位还没有维护界面 · 眼下先从商品列表点这件货、看清单位和价格再收钱',
             'posui.qty.title': '数量',
             'posui.qty.confirm': '确定',
             'posui.pay.title': '收款',
@@ -713,6 +803,36 @@
             'posui.discount.title': '整单折扣(฿)',
             'posui.discount.reason.ph': '折扣理由(选填)',
             'posui.scan.title': '扫描或输入条码',
+            'posui.bscan.starting': '正在打开相机…',
+            'posui.bscan.aim': '把商品条码对准框内',
+            'posui.bscan.count': '已扫 {n} 件',
+            'posui.bscan.done': '完成',
+            'posui.bscan.added': '已加入 {name}',
+            'posui.bscan.fails_n': '{n} 件没加进购物车',
+            'posui.bscan.fails_ack': '知道了',
+            'posui.bscan.queued': '还有 {n} 件在排队 · 都会加进购物车',
+            'posui.bscan.modal_busy': '窗口开着 · {code} 没加进购物车',
+            'posui.bscan.modal_hint': '关掉这个窗口再扫一次',
+            'posui.bscan.typed': '按手打的处理了 · {code} 没当条码读',
+            'posui.bscan.typed_hint': '确实是扫的就再扫一次',
+            'posui.bscan.search_code': '用这个码搜商品',
+            'posui.bscan.same_code': '同一个码 {code} 又读到一次 · 已按同一件算',
+            'posui.bscan.same_code_hint': '如果这是第二件同款货,点「+1」把它加进购物车',
+            'posui.bscan.add_one': '+1 · 这是第二件',
+            'posui.bscan.create_where':
+                '让老板在后台「商品 → 新建商品」把这个码填进「条码」,之后扫码就能直接卖',
+            'posui.bscan.offline_miss': '离线 · 本机缓存的商品目录里没有 {code},联网后再扫',
+            'posui.bscan.offline_nocatalog': '离线 · 这台设备还没有商品目录,联网后再扫',
+            'bscan.notfound': '没有条码 {code} 的商品',
+            'bscan.manual': '手动输入条码',
+            'bscan.err.insecure': '摄像头扫码要走 HTTPS · 请用 https 开头的链接打开收银台',
+            'bscan.err.unsupported': '这台设备用不了应用内相机 · 请用条码枪或手输条码',
+            'bscan.err.permission': '没拿到摄像头权限 · 到浏览器设置里允许相机后再试',
+            'bscan.err.no_camera': '这台设备上找不到摄像头 · 请用条码枪或手输条码',
+            'bscan.err.busy': '相机被别的应用占着 · 关掉那个应用后重试',
+            'bscan.err.timeout': '相机没能及时打开 · 再试一次',
+            'bscan.err.decoder': '条码解码器没下载下来 · 检查网络后重试',
+            'bscan.err.unknown': '相机打不开 · 可以改用手输条码',
             'posui.done.title': '收款完成',
             'posui.done.change': '找零',
             'posui.done.receipt': '小票号',
@@ -880,6 +1000,12 @@
             'posui.cart.refund': '返品',
             'posui.cart.items': '{n}点 · {k}種',
             'posui.cart.unit': '/ 個',
+            'posui.cart.unit_no_price':
+                '単位「{unit}」に価格が未設定 · {name} はカートに追加していません',
+            'posui.cart.unit_unknown':
+                'スキャンしたコードは単位「{unit}」ですが、{name} の商品情報にその単位がありません · カートに追加していません',
+            'posui.cart.fix_in_backoffice':
+                '管理画面の「商品」ページで直せるのは商品自体の価格とバーコードだけで、ケース/本などの単位を編集する画面はまだありません · 今は商品一覧から選び、単位と価格を確認してから会計してください',
             'posui.qty.title': '数量',
             'posui.qty.confirm': '確定',
             'posui.pay.title': '会計',
@@ -974,6 +1100,45 @@
             'posui.discount.title': '伝票全体の割引(฿)',
             'posui.discount.reason.ph': '理由(任意)',
             'posui.scan.title': 'バーコードをスキャン/入力',
+            'posui.bscan.starting': 'カメラを起動中…',
+            'posui.bscan.aim': '商品のバーコードを枠内に合わせて',
+            'posui.bscan.count': 'スキャン済み {n} 点',
+            'posui.bscan.done': '完了',
+            'posui.bscan.added': '{name} を追加',
+            'posui.bscan.fails_n': 'カート未追加 {n} 点',
+            'posui.bscan.fails_ack': '了解',
+            'posui.bscan.queued': 'あと {n} 件が順番待ち · すべてカートに追加されます',
+            'posui.bscan.modal_busy':
+                'ウィンドウが開いていました · {code} はカートに入っていません',
+            'posui.bscan.modal_hint': 'ウィンドウを閉じてもう一度スキャン',
+            'posui.bscan.typed': '手入力として処理 · {code} はバーコードとして読んでいません',
+            'posui.bscan.typed_hint': 'スキャンだった場合はもう一度スキャン',
+            'posui.bscan.search_code': 'このコードで商品を検索',
+            'posui.bscan.same_code':
+                '同じコード {code} をもう一度読み取り · 同じ 1 点として扱いました',
+            'posui.bscan.same_code_hint': '同じ商品の 2 点目なら「+1」でカートに追加してください',
+            'posui.bscan.add_one': '+1 · 2 点目です',
+            'posui.bscan.create_where':
+                'オーナーに管理画面(商品 → 商品を追加)でこのバーコードを「バーコード」欄に登録してもらえば、次回からスキャンで売れます',
+            'posui.bscan.offline_miss':
+                'オフライン · この端末に保存した商品リストに {code} はありません。接続後にもう一度スキャンしてください',
+            'posui.bscan.offline_nocatalog':
+                'オフライン · この端末には商品リストがまだありません。接続後にもう一度スキャンしてください',
+            'bscan.notfound': 'バーコード {code} の商品はありません',
+            'bscan.manual': 'バーコードを手入力',
+            'bscan.err.insecure':
+                'カメラでのスキャンには HTTPS が必要 · https で始まるリンクから開いてください',
+            'bscan.err.unsupported':
+                'この端末はアプリ内カメラを使えません · バーコードリーダーか手入力をご利用ください',
+            'bscan.err.permission':
+                'カメラ権限がありません · ブラウザ設定でカメラを許可して再試行してください',
+            'bscan.err.no_camera':
+                'この端末にカメラが見つかりません · バーコードリーダーか手入力をご利用ください',
+            'bscan.err.busy': 'カメラが他のアプリで使用中 · そのアプリを閉じて再試行してください',
+            'bscan.err.timeout': 'カメラの起動に時間がかかりすぎました · もう一度お試しください',
+            'bscan.err.decoder':
+                'バーコードリーダーを読み込めませんでした · 通信を確認して再試行してください',
+            'bscan.err.unknown': 'カメラを開けませんでした · 手入力に切り替えられます',
             'posui.done.title': '会計完了',
             'posui.done.change': 'おつり',
             'posui.done.receipt': 'レシート番号',

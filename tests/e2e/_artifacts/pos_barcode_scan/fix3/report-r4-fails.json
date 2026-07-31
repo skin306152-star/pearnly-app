@@ -1,0 +1,87 @@
+{
+  "f0_escIsInertWithoutCamera": {
+    "ok": true,
+    "note": "取景层没开 → Escape 分支短路,close() 一次都没被调用",
+    "cameraOpenBefore": false,
+    "before": [
+      "8850111000046",
+      "8850111000039"
+    ],
+    "after": [
+      "8850111000046",
+      "8850111000039"
+    ]
+  },
+  "f1_escWithCameraOpen": {
+    "ok": true,
+    "before": {
+      "cameraOpen": true,
+      "failCodes": [
+        "8850111000046",
+        "8850111000039"
+      ],
+      "head": "ไม่ได้เข้าตะกร้า 2 รายการ",
+      "cartNames": []
+    },
+    "after": {
+      "cameraOpen": false,
+      "failCodes": [
+        "8850111000046",
+        "8850111000039"
+      ],
+      "head": "ไม่ได้เข้าตะกร้า 2 รายการ",
+      "cartNames": []
+    },
+    "why": ""
+  },
+  "f2_resolveOnHit": {
+    "ok": true,
+    "before": {
+      "cameraOpen": false,
+      "failCodes": [
+        "8850111000053"
+      ],
+      "head": "ไม่ได้เข้าตะกร้า 1 รายการ",
+      "cartNames": []
+    },
+    "after": {
+      "cameraOpen": false,
+      "failCodes": [],
+      "head": "",
+      "cartNames": [
+        "โยเกิร์ต"
+      ]
+    },
+    "why": ""
+  },
+  "f3_dedupeSameCode": {
+    "ok": true,
+    "head": "ไม่ได้เข้าตะกร้า 1 รายการ",
+    "want": "ไม่ได้เข้าตะกร้า 1 รายการ",
+    "failCodes": [
+      "8850111000039"
+    ],
+    "why": ""
+  },
+  "f4_clearedOnSaleEnd": {
+    "ok": true,
+    "before": {
+      "cameraOpen": false,
+      "failCodes": [
+        "8850111000046",
+        "8850111000039"
+      ],
+      "head": "ไม่ได้เข้าตะกร้า 2 รายการ",
+      "cartNames": [
+        "โยเกิร์ต"
+      ]
+    },
+    "after": {
+      "cameraOpen": false,
+      "failCodes": [],
+      "head": "",
+      "cartNames": []
+    },
+    "why": ""
+  }
+}

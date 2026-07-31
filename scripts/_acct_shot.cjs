@@ -28,9 +28,33 @@ const VOUCHER = {
     total_debit: 18190,
     total_credit: 18190,
     lines: [
-        { id: 'l1', account_id: 'a1', account_code: '1150', account_name: '库存商品', dr_cr: 'debit', amount: 17000, memo: null },
-        { id: 'l2', account_id: 'a2', account_code: '1140', account_name: '进项税', dr_cr: 'debit', amount: 1190, memo: null },
-        { id: 'l3', account_id: 'a3', account_code: '2010', account_name: '应付账款', dr_cr: 'credit', amount: 18190, memo: null },
+        {
+            id: 'l1',
+            account_id: 'a1',
+            account_code: '1150',
+            account_name: '库存商品',
+            dr_cr: 'debit',
+            amount: 17000,
+            memo: null,
+        },
+        {
+            id: 'l2',
+            account_id: 'a2',
+            account_code: '1140',
+            account_name: '进项税',
+            dr_cr: 'debit',
+            amount: 1190,
+            memo: null,
+        },
+        {
+            id: 'l3',
+            account_id: 'a3',
+            account_code: '2010',
+            account_name: '应付账款',
+            dr_cr: 'credit',
+            amount: 18190,
+            memo: null,
+        },
     ],
 };
 const PENDING = {
@@ -45,10 +69,42 @@ const PENDING = {
     rule_key: 'R2',
 };
 const ACCOUNTS = [
-    { id: 'a1', code: '1150', name_zh: '库存商品', name_th: 'สินค้าคงเหลือ', acct_type: 'asset', is_preset: true, is_active: true },
-    { id: 'a2', code: '1140', name_zh: '进项税', name_th: 'ภาษีซื้อ', acct_type: 'asset', is_preset: true, is_active: true },
-    { id: 'a3', code: '2010', name_zh: '应付账款', name_th: 'เจ้าหนี้การค้า', acct_type: 'liability', is_preset: true, is_active: true },
-    { id: 'a4', code: '4010', name_zh: '销售收入', name_th: 'รายได้จากการขาย', acct_type: 'revenue', is_preset: true, is_active: true },
+    {
+        id: 'a1',
+        code: '1150',
+        name_zh: '库存商品',
+        name_th: 'สินค้าคงเหลือ',
+        acct_type: 'asset',
+        is_preset: true,
+        is_active: true,
+    },
+    {
+        id: 'a2',
+        code: '1140',
+        name_zh: '进项税',
+        name_th: 'ภาษีซื้อ',
+        acct_type: 'asset',
+        is_preset: true,
+        is_active: true,
+    },
+    {
+        id: 'a3',
+        code: '2010',
+        name_zh: '应付账款',
+        name_th: 'เจ้าหนี้การค้า',
+        acct_type: 'liability',
+        is_preset: true,
+        is_active: true,
+    },
+    {
+        id: 'a4',
+        code: '4010',
+        name_zh: '销售收入',
+        name_th: 'รายได้จากการขาย',
+        acct_type: 'revenue',
+        is_preset: true,
+        is_active: true,
+    },
 ];
 const API = {
     'GET /api/accounting/vouchers': {
@@ -79,7 +135,9 @@ const API = {
         },
     },
     'GET /api/accounting/learned': {
-        items: [{ id: 'lr1', scope_key: 'supplier:abc-design', decision: { confirmed_rule: 'R2' } }],
+        items: [
+            { id: 'lr1', scope_key: 'supplier:abc-design', decision: { confirmed_rule: 'R2' } },
+        ],
     },
 };
 
@@ -129,7 +187,9 @@ function check(name, ok) {
         route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify(hit !== undefined ? { ok: true, data: hit } : { ok: true, data: {} }),
+            body: JSON.stringify(
+                hit !== undefined ? { ok: true, data: hit } : { ok: true, data: {} }
+            ),
         });
     });
     await ctx.addInitScript(() => {
@@ -162,6 +222,7 @@ function check(name, ok) {
         check(`list rows ${theme}`, (await page.locator('#acct-body .row').count()) === 2);
         await page.screenshot({ path: path.join(OUT, `acct-list-${theme}.png`) });
         // 行展开(借贷表)
+        // SELECTOR-INDEX-OK: 列表就两行(上一行已断言 count===2),展开的是第一行
         await page.locator('#acct-body .row').first().click();
         await page.waitForTimeout(600);
         check(`list expand led ${theme}`, await page.locator('#acct-body .open .led').isVisible());
@@ -180,7 +241,10 @@ function check(name, ok) {
         // 改科目弹窗(.modal 非原生)
         await page.locator('#page-acct-review [data-act="override"]').click();
         await page.waitForTimeout(700);
-        check(`review picker modal ${theme}`, await page.locator('.acctm select[data-line]').count() === 3);
+        check(
+            `review picker modal ${theme}`,
+            (await page.locator('.acctm select[data-line]').count()) === 3
+        );
         await page.screenshot({ path: path.join(OUT, `acct-review-modal-${theme}.png`) });
         await page.locator('.acctm .x').click();
         await page.waitForTimeout(300);
@@ -189,14 +253,20 @@ function check(name, ok) {
         await page.evaluate(() => window.routeTo('acct-accounts'));
         await page.waitForTimeout(1000);
         check(`accounts rows ${theme}`, (await page.locator('#acct-acc-body .row').count()) === 4);
-        check(`accounts preset ${theme}`, await page.locator('#acct-acc-body .preset').first().isVisible());
+        check(
+            `accounts preset ${theme}`,
+            await page.locator('#acct-acc-body .preset').first().isVisible()
+        );
         await page.screenshot({ path: path.join(OUT, `acct-accounts-${theme}.png`) });
 
         // 屏5 设置:开关 + 粒度规则 + 可见规则
         await page.evaluate(() => window.routeTo('acct-settings'));
         await page.waitForTimeout(1000);
         check(`settings sw ${theme}`, await page.locator('#acct-sw-auto').isVisible());
-        check(`settings rule R1 on ${theme}`, await page.locator('#acct-rule-sw-R1.on').isVisible());
+        check(
+            `settings rule R1 on ${theme}`,
+            await page.locator('#acct-rule-sw-R1.on').isVisible()
+        );
         check(`settings learned ${theme}`, await page.locator('.learned-row').first().isVisible());
         await page.screenshot({ path: path.join(OUT, `acct-settings-${theme}.png`) });
 

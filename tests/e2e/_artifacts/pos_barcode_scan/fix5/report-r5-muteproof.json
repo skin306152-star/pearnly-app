@@ -1,0 +1,66 @@
+{
+  "away": {
+    "away0800": {
+      "legMs": 800,
+      "cyclesInWindow": 8,
+      "rescans": 0,
+      "noticeFires": 0,
+      "worstGapMs": 0,
+      "noticeOnScreen": false,
+      "noticeText": "",
+      "plusOne": null,
+      "state": {
+        "count": "สแกนแล้ว 1 ชิ้น",
+        "qtys": [
+          "1"
+        ],
+        "grand": "350.00",
+        "noticeText": "",
+        "actLabel": "",
+        "coveredBy": "nothing",
+        "visible": false,
+        "fires": 0,
+        "worstGapMs": 0
+      },
+      "ok": false
+    },
+    "away1200": {
+      "legMs": 1200,
+      "cyclesInWindow": 5,
+      "rescans": 0,
+      "noticeFires": 0,
+      "worstGapMs": 0,
+      "noticeOnScreen": false,
+      "noticeText": "",
+      "plusOne": null,
+      "state": {
+        "count": "สแกนแล้ว 1 ชิ้น",
+        "qtys": [
+          "1"
+        ],
+        "grand": "350.00",
+        "noticeText": "",
+        "actLabel": "",
+        "coveredBy": "nothing",
+        "visible": false,
+        "fires": 0,
+        "worstGapMs": 0
+      },
+      "ok": false
+    }
+  },
+  "hold": {},
+  "mixed": {
+    "mix1200-2000": {
+      "y4m": ".blinkmix.y4m",
+      "rearms": 2,
+      "noticeFires": 0,
+      "appeared": 0,
+      "vanished": 0,
+      "pollSamples": 131,
+      "qtys": "3",
+      "noticeOnScreen": false,
+      "ok": false
+    }
+  }
+}

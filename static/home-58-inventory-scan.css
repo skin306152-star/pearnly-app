@@ -1,0 +1,194 @@
+/* POS 项目 · PO-A4 入库弹窗「扫码加行」(src/home/inventory-scan.ts)
+ *
+ * 与 home-41-inventory.css 分家只因行数(那张已到 450 行,单文件 <500 铁律)。依赖面相同:
+ * 令牌全取全局 home-01-base :root(浅+暗夜随令牌翻面),外壳 .inv-field/.inv-mbtn 也在
+ * home-41 里定义,故本文件必须排它之后。类名 .inv-scan* 全新,不覆盖任何存量。
+ * 本文件不在 TOKEN_CSS 白名单 —— 颜色只准写 var(令牌),不许裸 hex。
+ */
+
+.inv-scan {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 12px;
+    background: var(--line2);
+}
+.inv-scan-bar {
+    display: flex;
+    gap: 8px;
+}
+.inv-scan-bar .inv-field {
+    flex: 1;
+}
+.inv-scan-bar .inv-mbtn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+}
+.inv-scan-hint {
+    color: var(--ink3);
+    font-size: 11.5px;
+    margin-top: 6px;
+}
+
+/* 入库行的数量格 = 数量 + 入库单位。扫到箱码时这一行入的是「1 箱」,不写出来屏上只剩一个
+   没有单位的「1」,店员没法分辨入的是 1 瓶还是 12 瓶(单位由 setRowUnit 填,手选商品时空着)。
+   类名挂在 inventory-modals 的行上,但只有扫码会填它,故与扫码同文件。 */
+.inv-qtycell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+}
+/* 贴着自己那个数量框(行间距 8px,单位再往下掉就分不清是这一行的还是下一行的)。 */
+.inv-runit {
+    max-width: 100%;
+    margin-top: 1px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--line2);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--ink2);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.inv-runit[hidden] {
+    display: none;
+}
+
+/* 取景框:比例由 JS 按引擎的 cropRatio 现算(见 inventory-scan-camera.ts paintFrame),
+   这里只管长相 —— 两处各写一份比例必然漂,漂了就是「框里对准却读不出」。 */
+.inv-scan-stage {
+    position: relative;
+    margin-top: 10px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--ink);
+    aspect-ratio: 4 / 3;
+    max-height: 40vh;
+}
+.inv-scan-stage[hidden] {
+    display: none;
+}
+.inv-scan-stage .bscan-video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.inv-scan-frame {
+    position: absolute;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    box-shadow: 0 0 0 9999px rgba(11, 26, 43, 0.4);
+    pointer-events: none;
+}
+
+/* 四态都落这一块:busy 正在开相机/正在查 · ok 命中 · warn 没这个码/这台机器扫不了 · err 失败。
+   空态靠 :empty 收起 —— 用 class 控显隐会漏掉某一档(tip 那档第一版就漏了,文字设了但看不见)。
+   竖着堆:一格里可能同时挂着几条「这个码没建档」和最新那条「已加入」(见 inventory-scan-ui
+   的待办队列),横排会把它们挤成一行看不出是几件事。 */
+.inv-scan-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--ink2);
+}
+.inv-scan-msg:empty {
+    display: none;
+}
+/* 一条 = 一件事(某个码没落地 / 最新那句状态),各自横排、各自上色 */
+.inv-scan-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.inv-scan-line.ok {
+    color: var(--green);
+}
+.inv-scan-line.warn {
+    color: var(--amber);
+}
+.inv-scan-line.err {
+    color: var(--red);
+}
+.inv-scan-line.tip {
+    color: var(--ink3);
+}
+.inv-scan-msg .c {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+/* 查失败那条要带上是哪个码 —— 一句「查条码失败」说不出是哪件货没进来 */
+.inv-scan-code {
+    flex: 0 0 auto;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: var(--line2);
+    color: var(--ink2);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+/* 等待要看得出在等(不然「正在开相机」跟结果长得一样,像卡住了) */
+.inv-scan-msg.busy .c,
+.inv-scan-line.busy .c {
+    animation: inv-scan-pulse 1.1s ease-in-out infinite;
+}
+@keyframes inv-scan-pulse {
+    50% {
+        opacity: 0.45;
+    }
+}
+/* 取景提示比状态弱一档:它是引导,不是结论 */
+.inv-scan-msg.tip {
+    color: var(--ink3);
+}
+.inv-scan-msg.ok {
+    color: var(--green);
+}
+.inv-scan-msg.warn {
+    color: var(--amber);
+}
+.inv-scan-msg.err {
+    color: var(--red);
+}
+.inv-scan-act {
+    flex: 0 0 auto;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--accent);
+    font-size: 12.5px;
+    cursor: pointer;
+}
+.inv-scan-act:hover {
+    border-color: var(--accent);
+}
+
+/* 手机端:按钮文字换行会把输入框挤没,扫码是单手动作 —— 按钮压成一行图标+短词 */
+@media (max-width: 520px) {
+    .inv-scan-bar {
+        flex-wrap: wrap;
+    }
+    .inv-scan-bar .inv-field {
+        flex: 1 1 100%;
+    }
+    .inv-scan-bar .inv-mbtn {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+    .inv-scan-stage {
+        max-height: 52vh;
+    }
+}

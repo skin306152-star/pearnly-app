@@ -90,13 +90,10 @@ const CARD_READY = '.dx-erp-card[data-erp="express"] [data-erp-status]';
 async function boot(ctx, lang) {
     const page = await ctx.newPage();
     // 没有 token 前端停在未认证态,routeTo 永远不会挂上 window。
-    await page.addInitScript(
-        (lg) => {
-            localStorage.setItem('mrpilot_token', 'tok');
-            localStorage.setItem('mrpilot_lang', lg);
-        },
-        lang
-    );
+    await page.addInitScript((lg) => {
+        localStorage.setItem('mrpilot_token', 'tok');
+        localStorage.setItem('mrpilot_lang', lg);
+    }, lang);
     await page.route('**/api/**', (route) => {
         const u = route.request().url();
         if (u.includes('/api/erp/endpoints'))

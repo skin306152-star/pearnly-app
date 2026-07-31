@@ -43,19 +43,19 @@ _ERR_HTTP = {
     # 审批工作流(§F):草稿在审批模式下不能直开 / 单据不在待审状态。
     "approval_required": 409,
     "not_pending": 409,
-    # 买方完整性 / 收款闸:不合规请求,语义错误(422),不占号。
+    # 买方完整性 / 收款 / 零额闸(services.sales.issue_gates):不合规请求,语义错误(422),不占号。
     "buyer_incomplete": 422,
     "buyer_tax_id_invalid": 422,
     "buyer_branch_required": 422,
     "buyer_branch_no_invalid": 422,
     "payment_required": 422,
+    "zero_amount": 422,
     # 报价转换(§L3)/ PromptPay(§L1)。
     "bad_target_type": 400,
     "not_a_quotation": 409,
     "promptpay_unset": 422,
     "already_paid": 409,
 }
-
 
 _VALID_PAPER = {"A4", "A5", "thermal_80", "thermal_58"}
 _VALID_LANG = {"th", "th_en", "th_zh"}

@@ -29,11 +29,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, Set
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from js_key_scan import DICT_KEY_DEF  # noqa: E402
+from typing import Dict, Iterator, List, Set, Tuple
 
 _ROOT = Path(__file__).resolve().parents[1]
 # REFACTOR-C1(2026-05-25)· I18N 字典从 home.js 抽到 static/i18n-data.js(window.I18N)·
@@ -46,61 +42,94 @@ def _i18n_source_file() -> Path:
     return I18N_SRC if I18N_SRC.exists() else HOME_JS
 
 
-def parse_i18n_blocks(text: str) -> Dict[str, Set[str]]:
-    """从 home.js 文本里抽出 4 个语言块的 key 集合.
+# 词典按【文本】读,不 import 也不 eval:JS 对象在求值那一刻就把重复键合并掉了,而重复键
+# 正是 duplicate_keys() 要抓的东西 —— 求值一次,证据就没了。
+#
+# 也不按行读。旧解析器一行只认第一个键(`^\s*'key'\s*:`),而字典里有 12 行是一行写好几条
+# (`'a': '甲', 'b': '乙', 'c': '丙',`),于是每种语言各漏数 14 个键(2026-07-31 实测
+# 5019 → 5033,user-menu-logout / set-group-* / help-modal-tip 全在射程外);更要命的是它拿
+# `ln.count("{")` 算块深度,而 989 行的值里带 `{n}` 占位符 —— 今天恰好每行花括号成对才没出事,
+# 哪天有人写一句「用 { 开头」块边界就当场算歪,闸会去比两个错的键集然后报绿。
+# 故按 token 扫:字符串和注释整段吃掉,只有结构位置上的花括号才算深度。
+_TOKEN = re.compile(
+    r"""
+      (?P<comment>//[^\n]*|/\*.*?\*/)
+    | (?P<string>'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`)
+    | (?P<name>[A-Za-z_$][\w$]*)
+    | (?P<punct>[{}:,])
+    """,
+    re.VERBOSE | re.DOTALL,
+)
+_I18N_HEAD = re.compile(r"^(?:const\s+I18N|window\.I18N)\s*=\s*\{", re.M)
 
-    用 brace-depth tracking 找每个语言块的 start/end 行 ·
-    然后正则抽块内的 'key': value 行.
 
-    Returns: { 'zh': {key1, key2, ...}, 'en': {...}, ... }
-    """
-    lines = text.splitlines()
-    blocks: Dict[str, Set[str]] = {}
+def _unquote(token: str) -> str:
+    if token[:1] in "'\"`":
+        return re.sub(r"\\(.)", r"\1", token[1:-1])
+    return token
 
-    # 找 I18N 起始行(兼容 `const I18N = {`(老 home.js)与 `window.I18N = {`(新 i18n-data.js))
-    i18n_start = None
-    for i, ln in enumerate(lines):
-        if re.match(r"^(?:const\s+I18N|window\.I18N)\s*=\s*\{", ln):
-            i18n_start = i
-            break
-    if i18n_start is None:
+
+def iter_i18n_entries(text: str) -> Iterator[Tuple[str, str, int]]:
+    """按出现顺序吐 (语言, 键, 行号)· 同一个键写了两遍就吐两遍(重复键闸靠这个)。"""
+    head = _I18N_HEAD.search(text)
+    if head is None:
         raise ValueError(
             "没找到 `const I18N = {` 或 `window.I18N = {` · 是不是 i18n 源文件改了结构?"
         )
 
-    # 从 i18n_start 开始 · 找 4 个 ^    lang: { 块
-    # 每个块的结束: 同缩进 ^    }, (跟开始 lang: { 的缩进相同)
-    lang_block_re = re.compile(r"^    (\w+):\s*\{\s*$")
+    depth = 0
+    lang: str | None = None
+    name: str | None = None  # 冒号左边刚读到的那个名字
+    opening: str | None = None  # 冒号右边的值还没开始 —— 它若是 `{` 就是语言块
+    at, line = head.end() - 1, text.count("\n", 0, head.start()) + 1
 
-    current_lang = None
-    current_keys: Set[str] = set()
-    brace_depth = 0
-
-    for i in range(i18n_start, len(lines)):
-        ln = lines[i]
-        m = lang_block_re.match(ln)
-        if m and current_lang is None:
-            current_lang = m.group(1)
-            current_keys = set()
-            brace_depth = 1  # 进入 { 之后
+    for tok in _TOKEN.finditer(text, at):
+        line += text.count("\n", at, tok.start())
+        at = tok.start()
+        kind, raw = tok.lastgroup, tok.group()
+        if kind == "comment":
             continue
-        if current_lang is not None:
-            # 追踪 brace depth 找块结束
-            brace_depth += ln.count("{")
-            brace_depth -= ln.count("}")
-            if brace_depth <= 0:
-                # 该块结束
-                blocks[current_lang] = current_keys
-                current_lang = None
-                # 不 break 因为还有下一个 lang 块
-                continue
-            # 逐行 finditer,不是 match:一行挤两条词条时 match 只认第一条,后一条从上线起
-            # 就没被对拍过(实测 14 个键:contact-line-label / dxi-st1s… / user-menu-logout),
-            # 闸自报「4 语各 4975 keys · 0 missing」而真值是 4989。判据见 DICT_KEY_DEF。
-            for km in DICT_KEY_DEF.finditer(ln):
-                current_keys.add(km.group(1) or km.group(2))
+        if kind != "punct":
+            name = _unquote(raw)
+            continue
+        if raw == ":":
+            if lang and depth == 2 and name is not None:
+                yield lang, name, line
+            opening, name = name, None
+            continue
+        if raw == "{":
+            depth += 1
+            if depth == 2 and opening:  # `zh: {` —— 语言块从这里开始
+                lang = opening
+        elif raw == "}":
+            if depth == 2:
+                lang = None
+            depth -= 1
+        opening = name = None
 
+
+def parse_i18n_blocks(text: str) -> Dict[str, Set[str]]:
+    """{ 'zh': {key1, key2, ...}, 'en': {...}, ... }"""
+    blocks: Dict[str, Set[str]] = {}
+    for lang, key, _line in iter_i18n_entries(text):
+        blocks.setdefault(lang, set()).add(key)
     return blocks
+
+
+def duplicate_keys(text: str) -> Dict[str, List[str]]:
+    """同一语言块里写了两遍的键 —— 后写的那条静静盖掉先写的。
+
+    这种翻车四语一起数都对得上、missing/extra 全是 0,靠上面那道完整性闸一辈子看不见:
+    界面上显示的是文件里靠后那一条,而改文案的人多半在改靠前那一条,改完没反应。
+    """
+    at: Dict[Tuple[str, str], List[int]] = {}
+    for lang, key, line in iter_i18n_entries(text):
+        at.setdefault((lang, key), []).append(line)
+    dupes: Dict[str, List[str]] = {}
+    for (lang, key), lines in sorted(at.items()):
+        if len(lines) > 1:
+            dupes.setdefault(lang, []).append(f"{key}(行 {', '.join(str(n) for n in lines)})")
+    return dupes
 
 
 def diff_keysets(blocks: Dict[str, Set[str]], source: str = "zh") -> Dict[str, Dict[str, list]]:
@@ -169,14 +198,27 @@ def main(argv=None) -> int:
                 if len(e) > 20:
                     print(f"     ... 还有 {len(e) - 20} 个")
 
+    dupes = duplicate_keys(text)
+    total_dupes = sum(len(v) for v in dupes.values())
+    for lang in sorted(dupes):
+        print(f"[X] [{lang}] 同一语言块里重复定义了 {len(dupes[lang])} 个键(后写的盖掉先写的):")
+        for line in dupes[lang][:20]:
+            print(f"     - {line}")
+        if len(dupes[lang]) > 20:
+            print(f"     ... 还有 {len(dupes[lang]) - 20} 个")
+
     if args.quiet:
         print(
-            f"i18n: source={args.source} · total_missing={total_missing} · total_extra={total_extra}"
+            f"i18n: source={args.source} · total_missing={total_missing} · "
+            f"total_extra={total_extra} · total_duplicate={total_dupes}"
         )
     else:
         print()
-        print(f"汇总: {total_missing} missing · {total_extra} extra")
+        print(f"汇总: {total_missing} missing · {total_extra} extra · {total_dupes} duplicate")
 
+    # 重复键在 --strict 之外也拦:它不是「宽严之别」,是这份文件本身自相矛盾。
+    if total_dupes:
+        return 1
     if args.strict:
         return 0 if (total_missing == 0 and total_extra == 0) else 1
     return 0 if total_missing == 0 else 1

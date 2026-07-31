@@ -21,7 +21,8 @@ require(path.join(ROOT, 'static/i18n-data.js'));
 const ZH = global.window.I18N.zh;
 RCX = RCX.replace(/data-i18n="([^"]+)"/g, (full, k) => full).replace(
     /<([a-z0-9]+)([^>]*?)data-i18n="([^"]+)"([^>]*)>([\s\S]*?)<\/\1>/gi,
-    (full, tag, pre, key, post, inner) => `<${tag}${pre}data-i18n="${key}"${post}>${ZH[key] || inner}</${tag}>`
+    (full, tag, pre, key, post, inner) =>
+        `<${tag}${pre}data-i18n="${key}"${post}>${ZH[key] || inner}</${tag}>`
 );
 
 // 3) 填充卡片 / 余额 / 结果(预览态 · 仅 harness)
@@ -35,14 +36,20 @@ const cardEmpty = (side, title) => `
   </div>
   <div class="rcx-recommend"><div class="rcx-spark">✦</div><div><b>${ZH['rcx-reco-title']}</b><span>${ZH['rcx-reco-sub']}</span></div></div>
   <div class="rcx-format-line">${ZH['rcx-format-line']}</div>`;
-RCX = RCX.replace('<div class="rcx-upload-card" id="rcx-card-left" data-side="left"></div>',
-    `<div class="rcx-upload-card" id="rcx-card-left" data-side="left">${cardEmpty('left', ZH['rcx-doc-statement'])}</div>`);
-RCX = RCX.replace('<div class="rcx-upload-card" id="rcx-card-right" data-side="right"></div>',
-    `<div class="rcx-upload-card" id="rcx-card-right" data-side="right">${cardEmpty('right', ZH['rcx-doc-gl'])}</div>`);
+RCX = RCX.replace(
+    '<div class="rcx-upload-card" id="rcx-card-left" data-side="left"></div>',
+    `<div class="rcx-upload-card" id="rcx-card-left" data-side="left">${cardEmpty('left', ZH['rcx-doc-statement'])}</div>`
+);
+RCX = RCX.replace(
+    '<div class="rcx-upload-card" id="rcx-card-right" data-side="right"></div>',
+    `<div class="rcx-upload-card" id="rcx-card-right" data-side="right">${cardEmpty('right', ZH['rcx-doc-gl'])}</div>`
+);
 // 余额输入
 ['rcx-gl-end', 'rcx-st-end', 'rcx-st-start', 'rcx-gl-start'].forEach((id) => {
-    RCX = RCX.replace(`<div class="rcx-balance-value" id="${id}">—</div>`,
-        `<div class="rcx-balance-value" id="${id}"><input class="rcx-bal-input" placeholder="${ZH['rcx-optional']}" /></div>`);
+    RCX = RCX.replace(
+        `<div class="rcx-balance-value" id="${id}">—</div>`,
+        `<div class="rcx-balance-value" id="${id}"><input class="rcx-bal-input" placeholder="${ZH['rcx-optional']}" /></div>`
+    );
 });
 
 const css = fs.readFileSync(path.join(ROOT, 'static/dist/home.css'), 'utf8');
@@ -55,16 +62,26 @@ const page = (extra) => `<!doctype html><html><head><meta charset="utf-8"><style
     const widths = [1440, 1280, 390];
     // A) 我方:初始工作区态
     for (const w of widths) {
-        const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, deviceScaleFactor: 1 });
+        const ctx = await browser.newContext({
+            viewport: { width: w, height: 900 },
+            deviceScaleFactor: 1,
+        });
         const p = await ctx.newPage();
         await p.setContent(page(), { waitUntil: 'networkidle' });
         await p.screenshot({ path: path.join(OUT, `rcx-${w}.png`), fullPage: true });
         await ctx.close();
     }
     // B) 参考稿
-    const refUrl = 'file://' + path.join(ROOT, 'design-reference/pearnly_reconciliation_redesign_v2.html').replace(/\\/g, '/');
+    const refUrl =
+        'file://' +
+        path
+            .join(ROOT, 'design-reference/pearnly_reconciliation_redesign_v2.html')
+            .replace(/\\/g, '/');
     for (const w of widths) {
-        const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, deviceScaleFactor: 1 });
+        const ctx = await browser.newContext({
+            viewport: { width: w, height: 900 },
+            deviceScaleFactor: 1,
+        });
         const p = await ctx.newPage();
         await p.goto(refUrl, { waitUntil: 'networkidle' });
         await p.screenshot({ path: path.join(OUT, `ref-${w}.png`), fullPage: true });

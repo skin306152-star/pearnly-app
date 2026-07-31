@@ -14,7 +14,7 @@
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
     <link rel="manifest" href="/static/pos/cashier.webmanifest?v=11871100" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/pos.css?v=11911201" />
+    <link rel="stylesheet" href="/static/dist/pos.css?v=12043201" />
   </head>
   <body>
     <!-- ── 设备绑定(未绑店铺 · 照稿 12②)── -->
@@ -232,6 +232,11 @@
               </svg>
             </div>
           </div>
+          <!-- 扫码失败清单(pos-scan.js)· 累积:队列里第 N 件的失败提示不许被第 N+1 件抹掉。
+               排在搜索条之下、分类之上,而不是浮在屏上:它自己那颗「用这个码搜商品」正是把码
+               填进上面的 #main-search 再重画下面的 #main-grid —— 浮层版把这两样都盖住了
+               (390×780 实测遮 34%),店员点完看不见自己刚要来的结果。 -->
+          <div class="bscan-fails" id="bscan-fails"></div>
           <div class="cats" id="main-cats"></div>
           <div class="grid" id="main-grid"></div>
         </div>
@@ -854,6 +859,27 @@
           </div>
         </div>
       </div>
+
+      <!-- 摄像头连扫层(pos-scan.js)· video 由扫码引擎 append 进 #bscan-stage。
+           文案不挂 data-i18n:全由 JS 按当前语言渲染(这层开着时语言栏被它盖住,
+           扫码途中切不到语言),同一句话只在字典里存一份。 -->
+      <div class="bscan-mask" id="bscan-mask">
+        <div class="bscan-stage" id="bscan-stage">
+          <div class="bscan-frame" id="bscan-frame"></div>
+          <div class="bscan-hint" id="bscan-hint"></div>
+          <div class="bscan-card" id="bscan-card">
+            <div class="bscan-card-in">
+              <div class="bscan-card-msg" id="bscan-card-msg"></div>
+              <div class="bscan-acts" id="bscan-acts"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bscan-bar">
+          <div class="bscan-count tnum" id="bscan-count"></div>
+          <div class="bscan-last" id="bscan-last"></div>
+          <button class="bscan-done" id="bscan-done" type="button"></button>
+        </div>
+      </div>
     </section>
 
     <!-- ── 屏 3 · 挂单 / 取单 ── -->
@@ -1387,12 +1413,17 @@
         stroke="currentColor"
         stroke-width="2.5"
       >
-        <path d="M20 6L9 17l-5-5" />
+        <path
+          id="pos-toast-ic"
+          data-ok="M20 6L9 17l-5-5"
+          data-err="M6 6l12 12M18 6L6 18"
+          d="M20 6L9 17l-5-5"
+        />
       </svg>
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11911105"></script>
-    <script src="/static/dist/pos.js?v=11931103" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=12043401"></script>
+    <script src="/static/dist/pos.js?v=12043501" defer></script>
   </body>
 </html>

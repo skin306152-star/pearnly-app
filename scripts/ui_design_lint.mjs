@@ -21,10 +21,12 @@ const ROOTS = ['src/home', 'static'];
 const TOKEN_SOURCE =
     /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css|console-theme\.css|home-48-recon-redesign\.css|ai-theme\.css|dms-shell\.css|dms-intake\.css|pearnly-ui\.css/i;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|_mock|\.map$/i;
-// vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体),不是 Pearnly 应用设计
-// 系统的一部分,且成百上千个 minified 文件无法逐个加标记 → 只能按目录整块排除。
+// vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体 + static/vendor 的 ZXing),
+// 不是 Pearnly 应用设计系统的一部分,且成百上千个 minified 文件无法逐个加标记 → 只能按目录整块
+// 排除。这里必须连 static/vendor/ 一起收:上游源码里的装饰性注释(ZXing 有 8 处 emoji)与裸 hex
+// 会顶穿棘轮,而把 baseline 抬上去等于给自己的代码也开了 8 个 emoji 的额度。
 // 单文件的营销页/自包含独立页(portal.dc / *-login / reset)改走文件头标记(见 STANDALONE_MARKER)。
-const MARKETING_EXCLUDE = /static[\\/]landing[\\/]vendor[\\/]/i;
+const MARKETING_EXCLUDE = /static[\\/](?:landing[\\/])?vendor[\\/]/i;
 // 文件头标记豁免:自包含独立页(登录/重置/门户营销稿)页内自带局部 :root 令牌,不接应用设计
 // 系统的 CSS 变量基建,整版配色/emoji 即设计稿本身。在文件前 5 行放 `<!-- ui-lint: standalone -->`
 // 即整文件跳过——比文件名正则稳:文件挪目录/改名不会意外落回扫描(reset.html 从此不再靠"住仓库根"侥幸)。

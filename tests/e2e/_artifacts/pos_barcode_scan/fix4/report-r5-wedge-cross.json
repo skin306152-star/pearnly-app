@@ -1,0 +1,65 @@
+{
+  "c1_crossBoundaryGun": {
+    "ok": true,
+    "focusWas": "BODY",
+    "focusJumped": true,
+    "qtyBefore": "1",
+    "qtyAfter": "1",
+    "stampMax": 20.7,
+    "asked": [
+      "8850999320014"
+    ],
+    "rows": 2,
+    "why": ""
+  },
+  "c1b_crossBoundaryInDispatch": {
+    "ok": true,
+    "focusWas": "BODY",
+    "focusJumped": true,
+    "qtyBefore": "1",
+    "qtyAfter": "1",
+    "stampMax": 29.5,
+    "asked": [
+      "8850999320014"
+    ],
+    "rows": 2,
+    "why": ""
+  },
+  "c2_heldKeyOnCashierMain": {
+    "ok": true,
+    "focusWas": "BODY",
+    "repeatFlags": 11,
+    "stampMax": 34.4,
+    "asked": [],
+    "fails": [],
+    "why": ""
+  },
+  "c3_realGunOnCashierMain": {
+    "ok": true,
+    "focusWas": "BODY",
+    "stampMax": 19.9,
+    "asked": [
+      "8850999320014"
+    ],
+    "cart": {
+      "focus": "BODY",
+      "qtys": [
+        "1"
+      ],
+      "grand": "15.00",
+      "fails": []
+    },
+    "why": ""
+  },
+  "c4_gunIntoFilledBatch": {
+    "ok": true,
+    "batchBefore": "LOT-B240301",
+    "batchAfter": "LOT-B240301",
+    "stampMax": 21.9,
+    "asked": [
+      "8850999320014"
+    ],
+    "rows": 2,
+    "why": ""
+  }
+}

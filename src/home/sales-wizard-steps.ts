@@ -6,8 +6,10 @@ import {
     calc,
     money,
     compliance,
+    lineAmount,
     payRequired,
     payApplicable,
+    priced,
 } from './sales-wizard-calc.js';
 import { getSellers, getProducts } from './sales-wizard-io.js';
 import { previewArea } from './sales-wizard-preview.js';
@@ -130,28 +132,39 @@ function branchBlock(st: WState): string {
         ${b.branchType === 'branch' ? `<input type="text" id="sw-brno" value="${escapeHtml(b.branchNo)}" placeholder="${escapeHtml(wt('brno'))} (5)">${bad ? `<div class="sw-hint err">${escapeHtml(wt('brErr'))}</div>` : ''}` : ''}</div>`;
 }
 
+// 没设价的商品卡:画"未设价"而不是 ฿ 0.00 —— money(null) 是 "0.00",画出来就等于替老板宣布
+// 这货免费,点一下还真能以 ฿ 0 上票。卡片同时置灰 + 说清出路(去商品数据填价),点它有 toast。
+function priceTag(p: { unit_price: number | null; vat_applicable: boolean }): string {
+    const free = p.vat_applicable
+        ? ''
+        : ` <span class="sw-muted" style="font-size:10px">${escapeHtml(wt('taxFree'))}</span>`;
+    if (!priced(p.unit_price))
+        return `<span class="sw-noprice">${escapeHtml(wt('noPrice'))}</span>`;
+    return `${BAHT}${money(Number(p.unit_price))}${free}`;
+}
+
 export function step3(st: WState): string {
     const c = calc(st);
     const products = getProducts();
     const grid = products
         .map(
             (p, i) =>
-                `<div class="sw-pcard" data-add="${i}"><div class="sw-pimg" style="background:${PCOLORS[i % PCOLORS.length]}">${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="">` : ICO.box}</div><div class="sw-pn">${escapeHtml(pname(p))}</div><div class="sw-pp">${BAHT}${money(p.unit_price)}${p.vat_applicable ? '' : ` <span class="sw-muted" style="font-size:10px">${escapeHtml(wt('taxFree'))}</span>`}</div></div>`
+                `<div class="sw-pcard${priced(p.unit_price) ? '' : ' noprice'}" data-add="${i}" title="${priced(p.unit_price) ? '' : escapeHtml(wt('noPriceHint'))}"><div class="sw-pimg" style="background:${PCOLORS[i % PCOLORS.length]}">${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="">` : ICO.box}</div><div class="sw-pn">${escapeHtml(pname(p))}</div><div class="sw-pp">${priceTag(p)}</div></div>`
         )
         .join('');
     const empty = products.length
         ? ''
         : `<div class="sw-muted" style="padding:20px;text-align:center">—</div>`;
-    const has = st.lines.some((l) => l.desc || +l.price || l.custom);
+    const has = st.lines.some((l) => l.desc || Number(l.price) || l.custom);
     const cart = has
         ? st.lines
               .map(
                   (l, i) => `<div class="sw-citem">
             <div class="sw-crow1"><input type="text" data-ln="${i}" data-f="desc" value="${escapeHtml(l.desc)}" placeholder="${escapeHtml(wt('lineNamePh'))}" style="border:0;font-weight:600;padding:2px;flex:1;background:transparent"><button class="sw-iconbtn" data-rm="${i}">${ICO.trash}</button></div>
             <div class="sw-crow2"><div class="sw-cqty"><button data-q="${i}" data-d="-1">−</button><span>${l.qty}</span><button data-q="${i}" data-d="1">+</button></div>
-              <div class="sw-cfield"><label>${escapeHtml(wt('linePrice'))}</label><input type="number" data-ln="${i}" data-f="price" value="${l.price}" min="0" step="0.01"></div>
+              <div class="sw-cfield"><label>${escapeHtml(wt('linePrice'))}</label><input type="number" data-ln="${i}" data-f="price" value="${priced(l.price) ? l.price : ''}" class="${priced(l.price) ? '' : 'noprice'}" placeholder="${escapeHtml(wt('noPrice'))}" min="0" step="0.01"></div>
               <div class="sw-cfield"><label>${escapeHtml(wt('lineDisc'))}</label><input type="number" data-ln="${i}" data-f="disc" value="${l.disc}" min="0" step="0.01"></div>
-              <span class="sw-amt">${BAHT}${money(Math.max(0, (+l.qty || 0) * (+l.price || 0) - (+l.disc || 0)))}</span></div>
+              <span class="sw-amt">${priced(l.price) ? `${BAHT}${money(lineAmount(l))}` : `<span class="sw-noprice">${escapeHtml(wt('noPrice'))}</span>`}</span></div>
             ${l.custom ? `<label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:var(--ink-3);cursor:pointer"><input type="checkbox" style="width:auto" data-save="${i}" ${l.save ? 'checked' : ''}> ${escapeHtml(wt('saveCatalog'))}</label>` : ''}</div>`
               )
               .join('')

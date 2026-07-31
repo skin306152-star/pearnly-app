@@ -2,7 +2,14 @@
 // 接真接口 GET /api/sales/sellers · /api/sales/products · POST /api/rd/verify|lookup ·
 // POST /api/sales/documents(+/{id}/issue)。把向导状态映射成后端 DocumentIn 契约。
 /* global apiGet, apiPost */
-import { type WState, type WBuyer, calc, payApplicable } from './sales-wizard-calc.js';
+import {
+    type WState,
+    type WBuyer,
+    billableLines,
+    calc,
+    payApplicable,
+    priced,
+} from './sales-wizard-calc.js';
 
 export interface WSeller {
     id: number;
@@ -20,7 +27,8 @@ export interface WProduct {
     name_en?: string;
     name_zh?: string;
     unit?: string;
-    unit_price: number;
+    // null = 没设过价(≠ 免费)· 后端 /api/sales/products 原样下发 null,见 routes.products_routes._out
+    unit_price: number | null;
     vat_applicable: boolean;
     image_url?: string;
 }
@@ -110,7 +118,9 @@ export function docToState(base: WState, docRaw: unknown): WState {
     s.lines = (d.lines || []).map((l) => ({
         desc: l.description || '',
         qty: Number(l.qty || 0),
-        price: Number(l.unit_price || 0),
+        // 收到 null 就照实当"没定价"回填,别 `|| 0` 成一个人没拍过的价。今天列上是
+        // `NOT NULL DEFAULT 0`(alembic 0006)所以拿不到 null —— 见文件尾 KNOWN 那段。
+        price: l.unit_price == null ? '' : Number(l.unit_price),
         disc: Number(l.discount || 0),
         vat: l.vat_applicable !== false,
         product_id: l.product_id || undefined,
@@ -167,16 +177,16 @@ export async function rdLookup(taxId: string, branch = 0): Promise<RdLookup> {
 function buildPayload(st: WState) {
     const seller = sellers[st.sellerIdx];
     const c = calc(st);
-    const lines = st.lines
-        .filter((l) => (l.desc || '').trim())
-        .map((l) => ({
-            description: l.desc.trim(),
-            product_id: l.product_id || null,
-            qty: +l.qty || 0,
-            unit_price: +l.price || 0,
-            discount: +l.disc || 0,
-            vat_applicable: !!l.vat,
-        }));
+    const lines = billableLines(st).map((l) => ({
+        description: l.desc.trim(),
+        product_id: l.product_id || null,
+        qty: +l.qty || 0,
+        // 没定价的行只可能落在草稿里(开出被 ckPrice 拦住 · 见 sales-wizard-calc.compliance),
+        // 而 sales_document_lines.unit_price 是 NOT NULL —— 存草稿只能落 0。
+        unit_price: priced(l.price) ? Number(l.price) : 0,
+        discount: +l.disc || 0,
+        vat_applicable: !!l.vat,
+    }));
     let payment = null;
     if (payApplicable(st)) {
         const paid =
@@ -242,7 +252,9 @@ async function persistSavedLines(st: WState): Promise<void> {
         try {
             const resp = await apiPost('/api/sales/products', {
                 name_th: l.desc.trim(),
-                unit_price: +l.price || 0,
+                // 没定价就别替人填 0:发 0 建出来的商品在收银台是"有价"的,整件货 ฿ 0 出门。
+                // 后端 ProductCreate.unit_price 默认 None,不发这个键就是"没设价"(见迁移 0093)。
+                unit_price: priced(l.price) ? Number(l.price) : null,
                 vat_applicable: !!l.vat,
             });
             if (!resp || !resp.ok) continue;

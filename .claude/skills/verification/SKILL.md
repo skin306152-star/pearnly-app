@@ -20,11 +20,14 @@ description: 改完代码怎么算"验过了" —— 批次边界(什么必须�
 
 ## 2. 机械闸:开工先拿基线,收尾跑全套
 
-- 全套(等价 pre-push,不用真推):Git Bash 跑 `PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`
+- 全套(等价 pre-push,不用真推):Git Bash 跑 `PYTHONUTF8=1 sh scripts/git-hooks/pre-push`
 - 逐道命令 + 触发条件 + 豁免法:`docs/GATES.md`
 - 开工第 0 步先跑一遍,才知道哪些红是别窗口/存量的,不然会替别人的债背锅
 - **闸别接管道**:`cmd | tee` / `| grep` 会吞掉退出码,判绿只认脚本自己的退出码
-- **Windows 上必须带 `PYTHONIOENCODING=utf-8`**:闸脚本打印中文撞 cp874 会 `UnicodeEncodeError` 退 1 —— 检查其实通过了也报红,而且失败清单印不出来(已复现于 `check_ai_smell` / `check_authz_coverage`)
+- **Windows 上必须 `PYTHONUTF8=1`,不是 `PYTHONIOENCODING=utf-8`**(2026-07-31 实测两头都会假红):
+  - 只设 `PYTHONIOENCODING` → 它只管本进程的 stdout/stderr;测试里 `subprocess.run(text=True)` 读子进程管道用的是 locale 编码(本机 cp874),子进程照 UTF-8 写、父进程照 cp874 读 → `proc.stderr` 变 `None` → `test_file_crypto` 当场 TypeError
+  - 什么都不设 → 子进程 print 中文进 cp874 管道 `UnicodeEncodeError` 退 1 → `test_agent_capability_audit` 假红(`check_ai_smell` / `check_authz_coverage` 同坑)
+  - `PYTHONUTF8=1` 是 UTF-8 模式,连 locale 编码一起改,两个方向才对齐;钩子已改成它,守门测试 `tests/unit/test_pre_push_hook_env.py` 拿钩子导出的环境真跑那两个模块
 - 本地钩子当前没挂(原因见 `docs/context-engineering/2026-07-25-claude-md-simplify.md` 遗留表),所以**手跑不是可选项**
 
 ## 3. UI / 视觉验收:真浏览器,截图为证
@@ -38,6 +41,22 @@ description: 改完代码怎么算"验过了" —— 批次边界(什么必须�
 3. 手机视口(390×844)+ 桌面(1280×900)各过一遍;暗色主题看 `docs/ui/THEME_RESPONSIVE_VERIFY.md`
 4. **动手改之前先确认要改的组件是生产真实活着的路径** —— 测试脚本能到达 ≠ 生产在用(踩过:改了"集成抽屉"全绿,生产根本没这抽屉,全白干)
 5. `fill()` 绕过真实按键,验输入用 `keyboard.type` + 查 `activeElement`
+
+### 验收脚本规范(写 `scripts/_*.cjs` 时逐条对,review 时逐条问)
+
+1. **每条「我验的是 X」旁边必须有一个只有走 X 才会变的量。** 两条路都会变的量当判据 = 走错路也绿。
+   踩过:cameraFlow 注释写「关弹窗走 unmountInvScan」,选择器实际点中摄像头按钮走的是 `stopCamera()`;
+   断言的是「相机灯灭了」—— 两条路都会灭,所以一直绿,而 unmount 那条(楔子反注册)从没被覆盖过。
+   判别量应该是 `wedgeSubs === 0`:只有走 unmount 才会变。
+   *机械化不了(判不了两条路的结果是否重合),靠 review 逐条问「这个量走另一条路会不会也变?」*
+2. **点击必须唯一定位。** `.first()/.last()/.nth(n)` 关掉了 Playwright 的严格模式 —— 选择器打偏时不会抛,只会静默点到隔壁。
+   用 id / `data-*` / role+name / 文本;真要按位置点就在同行或上一行写 `// SELECTOR-INDEX-OK: <点的是哪一个>`。
+   *这条有闸:`tests/unit/test_verify_script_selector_gate.py`*
+3. **期望值现场从页面里的真词典取**,脚本一个字都不注入 —— 自带副本 = 拿自己比自己,漏译永远照绿。
+   *这条有闸:`tests/unit/test_verify_script_i18n_injection_gate.py`*
+4. **喂会出事的输入,不喂理想输入。** 完美静止的假摄像头素材(单帧成功率≈100%)验不出解码抖动;
+   官方印刷分组验不出尾段/子串碎片;三个码全命中的 burst 验不出队列中间失败。
+   报告里写清:这条反证喂的是什么输入、为什么它覆盖真实失败场景、用理想输入会怎样。
 
 ## 4. 测试硬规
 

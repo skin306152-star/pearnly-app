@@ -92,15 +92,16 @@ class CreateUnitTests(unittest.TestCase):
             product_id="p-1",
             fields={"unit_name": "กล่อง", "factor_to_base": 100, "price": 90},
         )
-        self.assertIn("INSERT INTO product_units", cur.last_sql)
-        self.assertIn("RETURNING", cur.last_sql)
-        self.assertEqual(cur.last_params[0], "t-1")
-        self.assertEqual(cur.last_params[1], 7)
-        self.assertEqual(cur.last_params[2], "p-1")
+        # INSERT 之后还跟一条同步语句(product_active 按商品当前状态落),所以不看 last_sql。
+        sql, params = next(c for c in cur.calls if "INSERT INTO product_units" in c[0])
+        self.assertIn("RETURNING", sql)
+        self.assertEqual(params[0], "t-1")
+        self.assertEqual(params[1], 7)
+        self.assertEqual(params[2], "p-1")
         # numeric 走 Decimal · 值不拼进 SQL
-        self.assertIn(Decimal("100"), cur.last_params)
-        self.assertIn(Decimal("90"), cur.last_params)
-        self.assertNotIn("กล่อง", cur.last_sql)
+        self.assertIn(Decimal("100"), params)
+        self.assertIn(Decimal("90"), params)
+        self.assertNotIn("กล่อง", sql)
 
     def test_default_sell_clears_others_first(self):
         cur = FakeCursor(fetchone=ROW)

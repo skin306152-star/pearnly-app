@@ -1,0 +1,90 @@
+{
+  "invGun": {
+    "ok": true,
+    "barVisible": true,
+    "focus1": {
+      "tag": "BUTTON",
+      "id": "inv-btn-in"
+    },
+    "first": [
+      {
+        "product": "p-cola",
+        "label": "可乐 325ml",
+        "qty": "1"
+      },
+      {
+        "product": "",
+        "label": "—",
+        "qty": ""
+      }
+    ],
+    "focusAfter": {
+      "k": "qty",
+      "tag": "INPUT",
+      "optIn": true
+    },
+    "msg1": "已加入 可乐 325ml",
+    "focus2": {
+      "tag": "INPUT",
+      "id": ""
+    },
+    "second": [
+      {
+        "product": "p-cola",
+        "label": "可乐 325ml",
+        "qty": "2"
+      },
+      {
+        "product": "",
+        "label": "—",
+        "qty": ""
+      }
+    ],
+    "hits": [
+      "8850999320014",
+      "8850999320014"
+    ]
+  },
+  "invExclusive": {
+    "ok": true,
+    "before": 1,
+    "during": 2,
+    "probeDuring": [],
+    "after": 1,
+    "probeAfter": [
+      "8850999320014"
+    ]
+  },
+  "invDetached": {
+    "ok": true,
+    "beforeOpen": 0,
+    "hitsInModal": 1,
+    "focus": {
+      "tag": "BODY",
+      "id": ""
+    },
+    "state": {
+      "subs": 0,
+      "rows": 1,
+      "modal": false
+    },
+    "hits": [
+      "8850999320014"
+    ]
+  },
+  "invNotFoundCreate": {
+    "ok": true,
+    "card": {
+      "text": "1 件没加进这张收货单\n知道了\n扫到 9999999999994,但这个条码还没建成商品\n用这个码建商品",
+      "tone": "inv-scan-msg warn",
+      "code": "9999999999994",
+      "btnH": 30,
+      "bridge": "undefined"
+    },
+    "afterClick": {
+      "text": "1 件没加进这张收货单\n知道了\n扫到 9999999999994,但这个条码还没建成商品\n用这个码建商品",
+      "productForm": true,
+      "barcodeValue": "9999999999994"
+    }
+  }
+}

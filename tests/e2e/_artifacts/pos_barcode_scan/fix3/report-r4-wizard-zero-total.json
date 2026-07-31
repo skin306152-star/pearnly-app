@@ -1,0 +1,29 @@
+{
+  "z1_giftOnly": {
+    "posted": [
+      "/api/sales/documents",
+      "/api/sales/documents/doc-1/issue"
+    ],
+    "failingChecks": [],
+    "grandOnScreen": "",
+    "toast": "ยังออกไม่ได้: ยังมีบรรทัดที่ไม่ได้ใส่ราคา — ถ้าแถมฟรีให้ใส่ 0 อย่าเว้นว่าง",
+    "step": "รายการสินค้า",
+    "reachedIssue": true,
+    "gotNumber": false,
+    "ok": true
+  },
+  "z2_fullDiscount": {
+    "hasDiscountBox": true,
+    "posted": [
+      "/api/sales/documents",
+      "/api/sales/documents/doc-1/issue"
+    ],
+    "failingChecks": [],
+    "grandOnScreen": "",
+    "toast": "ยังออกไม่ได้: ยังมีบรรทัดที่ไม่ได้ใส่ราคา — ถ้าแถมฟรีให้ใส่ 0 อย่าเว้นว่าง",
+    "step": "รายการสินค้า",
+    "reachedIssue": true,
+    "gotNumber": false,
+    "ok": true
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "slowGunIntoDirtyFieldIsNotSilent": {
+    "ok": true,
+    "before": "8850999320014",
+    "after": "88509993200148851234567895",
+    "recovered": "8851234567895",
+    "stitched": true,
+    "inGunBand": true,
+    "measured": {
+      "n": 14,
+      "blockedMs": 0,
+      "stampGaps": [
+        72.3,
+        78.4,
+        82.8,
+        77.8,
+        82.5,
+        79.1,
+        78.1,
+        81.1,
+        79.3,
+        76.7,
+        75.5,
+        75.1,
+        78.5
+      ],
+      "perfGaps": [
+        72.1,
+        78.3,
+        82.9,
+        77.7,
+        82.5,
+        79.2,
+        77.9,
+        81.2,
+        79.3,
+        76.7,
+        75.4,
+        75.2,
+        79.4
+      ],
+      "stampMax": 82.8,
+      "perfMax": 82.9,
+      "repeats": 0
+    },
+    "state": {
+      "text": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด8851234567895ใช้เป็นบาร์โค้ด",
+      "html": "<div class=\"sx-bc-warn\">ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด<b class=\"tnum\">8851234567895</b><button type=\"button\" class=\"sx-bc-link\" data-scan-typed=\"8851234567895\" id=\"sx-bc-usetyped\">ใช้เป็นบาร์โค้ด</button></div>",
+      "blessed": false,
+      "visible": true,
+      "hasWayBack": true
+    },
+    "askedAfterRecovery": [
+      "8851234567895"
+    ],
+    "why": ""
+  },
+  "slowGunIntoEmptyField": {
+    "ok": true,
+    "after": "8851234567895",
+    "wanted": "8851234567895",
+    "measured": {
+      "n": 14,
+      "blockedMs": 0,
+      "stampGaps": [
+        71.7,
+        76.6,
+        75.1,
+        75.6,
+        77.2,
+        79.9,
+        72.5,
+        76.6,
+        78.1,
+        77.6,
+        77.1,
+        78.5,
+        77.2
+      ],
+      "perfGaps": [
+        71.6,
+        76.9,
+        74.7,
+        75.6,
+        77.1,
+        79.9,
+        72.4,
+        76.7,
+        78.1,
+        77.6,
+        77.1,
+        78.6,
+        77.4
+      ],
+      "stampMax": 79.9,
+      "perfMax": 79.9,
+      "repeats": 0
+    }
+  },
+  "fastGunReplacesDirtyField": {
+    "ok": true,
+    "after": "8851234567895",
+    "wanted": "8851234567895",
+    "measured": {
+      "n": 14,
+      "blockedMs": 0,
+      "stampGaps": [
+        12.6,
+        16.3,
+        14.9,
+        15.3,
+        12.2,
+        15.5,
+        15,
+        14.7,
+        15.9,
+        15.9,
+        15.4,
+        15.3,
+        15.4
+      ],
+      "perfGaps": [
+        12.5,
+        16.3,
+        15,
+        15.1,
+        12.2,
+        16,
+        14.6,
+        14.7,
+        15.9,
+        16,
+        15.3,
+        15.5,
+        16.5
+      ],
+      "stampMax": 16.3,
+      "perfMax": 16.5,
+      "repeats": 0
+    }
+  },
+  "sweepNeverBlessesAStitchedCode": {
+    "ok": true,
+    "rows": [
+      {
+        "delay": 30,
+        "stampMax": 34.9,
+        "value": "8851234567895",
+        "replaced": true,
+        "stitched": false,
+        "blessed": true,
+        "stateText": "ยังไม่มีสินค้าอื่นใช้บาร์โค้ดนี้"
+      },
+      {
+        "delay": 45,
+        "stampMax": 58.4,
+        "value": "88509993200148851234567895",
+        "replaced": false,
+        "stitched": true,
+        "blessed": false,
+        "stateText": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด8851234567895ใช้เป็นบาร์โค้ด"
+      },
+      {
+        "delay": 55,
+        "stampMax": 67.3,
+        "value": "88509993200148851234567895",
+        "replaced": false,
+        "stitched": true,
+        "blessed": false,
+        "stateText": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด8851234567895ใช้เป็นบาร์โค้ด"
+      },
+      {
+        "delay": 70,
+        "stampMax": 82.2,
+        "value": "88509993200148851234567895",
+        "replaced": false,
+        "stitched": true,
+        "blessed": false,
+        "stateText": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด8851234567895ใช้เป็นบาร์โค้ด"
+      },
+      {
+        "delay": 90,
+        "stampMax": 105.3,
+        "value": "88509993200148851234567895",
+        "replaced": false,
+        "stitched": true,
+        "blessed": false,
+        "stateText": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด8851234567895ใช้เป็นบาร์โค้ด"
+      },
+      {
+        "delay": 110,
+        "stampMax": 126.3,
+        "value": "88509993200148851234567895",
+        "replaced": false,
+        "stitched": true,
+        "blessed": false,
+        "stateText": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด8851234567895ใช้เป็นบาร์โค้ด"
+      },
+      {
+        "delay": 140,
+        "stampMax": 155.3,
+        "value": "88509993200148851234567895",
+        "replaced": false,
+        "stitched": true,
+        "blessed": true,
+        "stateText": "ยังไม่มีสินค้าอื่นใช้บาร์โค้ดนี้"
+      }
+    ],
+    "inBandCount": 5,
+    "blessed": [],
+    "why": ""
+  }
+}

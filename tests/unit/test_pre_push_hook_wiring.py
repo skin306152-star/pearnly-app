@@ -85,8 +85,12 @@ class HookFileTests(unittest.TestCase):
     def test_hook_forces_utf8_output(self):
         # Windows 控制台默认 cp874,闸脚本打中文会 UnicodeEncodeError → 退出码 1 →
         # 通过的闸报假红。这行掉了会让所有窗口在本机撞一堵看不懂的墙。
+        #
+        # 认 PYTHONUTF8 而不是 PYTHONIOENCODING:后者只管本进程的 stdout/stderr,子进程管道
+        # 仍按 locale(本机 cp874)解码,test_file_crypto 那类 subprocess.run(text=True) 照样炸。
+        # UTF-8 模式连 locale 编码一起改,两个方向才都对齐。反证在 test_pre_push_hook_env.py。
         body = HOOK_PATH.read_text(encoding="utf-8")
-        self.assertIn("PYTHONIOENCODING=utf-8", body)
+        self.assertIn("PYTHONUTF8=1", body)
 
     @unittest.skipIf(
         os.name == "nt" and shutil.which("sh") is None,

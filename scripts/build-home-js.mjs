@@ -12,8 +12,21 @@
 import { transformSync } from 'esbuild';
 import { readSource, writeDist } from './build-lib.mjs';
 
+// 扫码地基的常驻层:条码枪楔子(枪可能在页面刚开就被扫,必须首屏挂上)+ 懒加载门面
+// (首屏只答「能不能扫」,真要扫才拉 dist/scan.js)。两个文件零依赖、不碰 DOM 结构,
+// 排在各 bundle 最前 —— 后面任何模块想订阅枪都已经能拿到 window.PearnlyScanWedge。
+const SCAN_RESIDENT = ['scan/scan-loader.js', 'scan/scan-wedge.js'];
+
 const BUNDLES = [
-    { out: 'static/dist/pre.js', files: ['recon-mapping.js', 'recon-review.js'] },
+    { out: 'static/dist/pre.js', files: [...SCAN_RESIDENT, 'recon-mapping.js', 'recon-review.js'] },
+    // 摄像头解码层:只在店员真的点了扫码时由 scan-loader.js 现拉,不进任何页面首屏。
+    // scan-errors.js 必须排在引擎【之前】:引擎在加载期就把 scanError/withTimeout 抓进闭包,
+    // 顺序反了是加载期直接抛(引擎头部有硬 guard,不静默降级)。shim 排哪都行,放前面只为可读性
+    // (引擎是在解码时才引用 PearnlyScanZXing,不在加载期)。
+    {
+        out: 'static/dist/scan.js',
+        files: ['scan/scan-zxing-shim.js', 'scan/scan-errors.js', 'scan/scan-camera.js'],
+    },
     {
         out: 'static/dist/post.js',
         files: ['erp-mrerp-connect.js', 'erp-log-enhance.js'],
@@ -42,6 +55,7 @@ const BUNDLES = [
     {
         out: 'static/dist/pos.js',
         files: [
+            ...SCAN_RESIDENT,
             'pos/pos-totals.js',
             'pos/pos-data.js',
             'pos/pos-offline.js',
@@ -49,6 +63,12 @@ const BUNDLES = [
             'pos/pos-ops.js',
             'pos/pos-shift.js',
             'pos/pos-cashier.js',
+            // pos-scan-fails.js 在加载期就要 window.POS(取 t/tf/nm/posErrMsg),而 pos-scan.js
+            // 在加载期就 create() 它 → 这两条顺序都是硬的,反了是加载期直接抛。
+            'pos/pos-scan-fails.js',
+            // pos-scan.js 用 POS.cashier 的加货/手输弹窗 → 必须排在 pos-cashier.js 之后
+            // (它只在点击/扫码时才取那几个方法,但先后写清楚免得下个窗口把它挪到前面)。
+            'pos/pos-scan.js',
             'pos/pos-restaurant.js',
             'pos/pos-restaurant-ops.js',
             'pos/pos.js',
@@ -379,3 +399,25 @@ for (const b of BUNDLES) {
         .join(';\n');
     writeDist(b.out, code);
 }
+
+// ── 第三方:ZXing 条码解码器(Apache-2.0)──────────────────────────────
+// 单独一个产物、不跟任何东西 concat:它只在浏览器没有原生 BarcodeDetector 时才被
+// scan-camera.js 现拉(iOS Safari 全系 + 桌面 Firefox/Safari),压完仍有几百 KB,
+// 并进首屏 bundle 等于让每台收银机每次开机都为一个未必用到的功能付流量。
+// 来源与许可见 static/vendor/zxing/README.md;LICENSE 全文随仓库分发。
+const ZXING_BANNER =
+    '/*! ZXing for JS (zxing-js/library) 0.21.3 | Apache-2.0 |' +
+    ' https://github.com/zxing-js/library | LICENSE: static/vendor/zxing/LICENSE */\n';
+
+// keepNames:库内的异常类靠构造函数名产出 err.name,压掉名字后 scan-zxing-shim.js 想按
+// 名字认「这一帧没读出码」就会认错(它已改用 instanceof + getKind() 两条兜,这里再保一层,
+// 顺带让线上堆栈还能读)。sourceMappingURL 指向未随仓库分发的 index.js.map,一并去掉。
+writeDist(
+    'static/dist/zxing.js',
+    ZXING_BANNER +
+        transformSync(readSource('static/vendor/zxing/zxing-library.js'), {
+            loader: 'js',
+            minify: true,
+            keepNames: true,
+        }).code.replace(/\/\/#\s*sourceMappingURL=\S*\s*$/, '')
+);

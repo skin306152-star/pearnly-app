@@ -394,6 +394,22 @@
     font-weight: 700;
     margin-top: 2px;
 }
+/* 没设价的商品:置灰 + 琥珀色说明。点得动(要给 toast 指路),但一眼看得出它不是 ฿0.00。 */
+.sw-pcard.noprice {
+    border-style: dashed;
+    background: var(--bg);
+}
+.sw-pcard.noprice .sw-pn {
+    color: var(--ink-3);
+}
+.sw-noprice {
+    color: var(--amber);
+    font-weight: 600;
+    font-size: 11px;
+}
+.sw-cfield input.noprice {
+    border-color: var(--amber);
+}
 .sw-cart {
     border: 1px solid var(--line);
     border-radius: 10px;

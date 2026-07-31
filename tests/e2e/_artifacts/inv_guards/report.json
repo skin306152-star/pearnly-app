@@ -1,0 +1,192 @@
+{
+  "dupNoticeBelowFloor": {
+    "ok": true,
+    "first": true,
+    "appeared": true,
+    "qtyBefore": "1",
+    "qtyAfter": "2",
+    "rows": 2,
+    "err": false,
+    "note": {
+      "found": true,
+      "w": 300,
+      "h": 54,
+      "display": "flex",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "刚才这一下当成同一件了(相机没看见它离开)\n8850999320014\n是第二件 · 加 1"
+    },
+    "btn": {
+      "found": true,
+      "w": 110,
+      "h": 30,
+      "display": "block",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "是第二件 · 加 1"
+    },
+    "copy": "刚才这一下当成同一件了(相机没看见它离开)",
+    "lookups": 2
+  },
+  "secondBoxAboveFloor": {
+    "ok": true,
+    "first": true,
+    "counted": true,
+    "nagged": false,
+    "err": false,
+    "text": "可乐 325ml 数量 +1",
+    "lookups": [
+      "8850999320014",
+      "8850999320014"
+    ]
+  },
+  "dupNoticeSurvivesMixed": {
+    "ok": true,
+    "first": true,
+    "appeared": 1,
+    "vanished": 0,
+    "samples": 143,
+    "rearms": 2,
+    "qty": "3",
+    "rows": 2,
+    "note": {
+      "found": true,
+      "w": 300,
+      "h": 54,
+      "display": "flex",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "刚才这一下当成同一件了(相机没看见它离开)\n8850999320014\n是第二件 · 加 1"
+    }
+  },
+  "camRevokedSpeaksUp": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "tracks": [
+      {
+        "st": "ended"
+      }
+    ],
+    "spoke": true,
+    "qtyBefore": "2",
+    "qtyFrozen": "2",
+    "qtyAfter": "3",
+    "lookupsBefore": 2,
+    "lookupsFrozen": 2,
+    "line": {
+      "found": true,
+      "w": 300,
+      "h": 30,
+      "display": "flex",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "摄像头被别的程序占用了,关掉它再试\n重试"
+    },
+    "btn": {
+      "found": true,
+      "w": 51,
+      "h": 30,
+      "display": "block",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "重试"
+    },
+    "copy": "摄像头被别的程序占用了,关掉它再试",
+    "retryCopy": "重试",
+    "resumed": true,
+    "errAfter": false,
+    "lookups": 3
+  },
+  "barcodeAsQuantityStopped": {
+    "ok": true,
+    "posted": [],
+    "err": {
+      "found": true,
+      "w": 322,
+      "h": 32,
+      "display": "block",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "有一行的数量不对(位数太多 · 多半是条码落进了数量格)· 请改好再提交"
+    },
+    "copy": "有一行的数量不对(位数太多 · 多半是条码落进了数量格)· 请改好再提交",
+    "focused": true,
+    "open": true
+  },
+  "realBulkStillPosts": {
+    "ok": true,
+    "closed": true,
+    "posted": [
+      {
+        "workspace_client_id": 1,
+        "ref_type": "purchase",
+        "lines": [
+          {
+            "product_id": "p-cola",
+            "qty": "250000"
+          }
+        ]
+      }
+    ]
+  },
+  "costGunLandsAsARow": {
+    "ok": true,
+    "costBefore": "9.5",
+    "costAfter": "9.5",
+    "lookups": [
+      "8850999320014"
+    ],
+    "qty": "1",
+    "msg": {
+      "found": true,
+      "w": 300,
+      "h": 16,
+      "display": "flex",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "可乐 325ml 数量 +1"
+    }
+  },
+  "barcodeAsCostStopped": {
+    "ok": true,
+    "posted": [],
+    "err": {
+      "found": true,
+      "w": 322,
+      "h": 32,
+      "display": "block",
+      "visibility": "visible",
+      "opacity": "1",
+      "inView": true,
+      "text": "有一行的进货单价不对(位数太多 · 多半是条码落进了单价格)· 请改好再提交"
+    },
+    "copy": "有一行的进货单价不对(位数太多 · 多半是条码落进了单价格)· 请改好再提交",
+    "focused": true,
+    "open": true
+  },
+  "realHighCostStillPosts": {
+    "ok": true,
+    "closed": true,
+    "posted": [
+      {
+        "workspace_client_id": 1,
+        "ref_type": "purchase",
+        "lines": [
+          {
+            "product_id": "p-cola",
+            "qty": "2",
+            "unit_cost": "2400000"
+          }
+        ]
+      }
+    ]
+  }
+}

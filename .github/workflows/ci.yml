@@ -87,6 +87,14 @@ jobs:
       - name: check_ai_i18n_refs (/ai 词典引用闸 · 取词的键必须有定义)
         run: python scripts/check_ai_i18n_refs.py
 
+      # check_i18n 只比「某语言比别的语言少哪些键」—— 四语一起缺就没有参照物,它一眼都
+      # 看不出来。2026-07-31 的 sx-p-bc-dup-unit / posui.bscan.fails_n 正是这么把裸键名
+      # 送上界面的(check_i18n --strict 同时报 0 missing)。本闸补的是纵向那条轴:
+      # 源码 t()/POS.t()/data-i18n 用到的键,词典里必须存在。POS 那片只有它在看;/home
+      # 那片下面的 check_home_i18n_refs 扫得更深(还认 data-i18n 属性与常量键表)。
+      - name: check_i18n_refs (主 SPA + POS 词典引用闸 · 四语一起缺也拦得住)
+        run: python scripts/check_i18n_refs.py
+
       # /home 那棵树有一模一样的洞:src/home/core.ts:109 的 t() 取不到就返回 key 本身,
       # data-i18n 取不到则整个元素跳过 —— 模板里写死的中文原地不动,泰语用户永远看中文。
       # check_i18n 只对拍四个语言块之间齐不齐,从没问过这 4989 条有没有人引、引的人写对没有。
@@ -467,6 +475,14 @@ jobs:
       # 每条路由必须有可见守门,或登记进 PUBLIC_ROUTES / DELEGATED_ROUTES / SEALED_ROUTES。
       - name: 路由权限覆盖闸 · 每条路由必有守门或显式登记(FAIL mode)
         run: python scripts/check_authz_coverage.py --quiet
+        env:
+          PYTHONIOENCODING: utf-8
+
+      # 条码枪楔子默认让开输入框,要接枪的框必须写 data-enable-barcode="gun"。裸声明在运行期
+      # 看不出毛病(引擎按最安全那档兜底),但它等于「这个框接不接枪没人明写过」—— 引擎删掉
+      # 第二档之后,四处声明点漏写档位一处都不会红。本闸就是那道没人盯的缝。
+      - name: 条码枪 opt-in 声明闸 · 声明必须带显式档位值
+        run: python scripts/check_scan_optin.py --quiet
         env:
           PYTHONIOENCODING: utf-8
 

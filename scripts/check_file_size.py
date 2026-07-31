@@ -86,6 +86,13 @@ MONITORED_GLOBS = [
     "src/home/**/*.ts",  # C5 TypeScript 迁移产物(.js→.ts)· 同 ≤500 约束 · 防脱离监控
     "src/home/**/*.css",
     "static/ai/**/*.js",  # 2026-08-01 · /ai SPA 不走 vite,此前整片在闸外(见文件头)
+    # 2026-07-31 补:POS 收银 SPA 与扫码地基。同 /ai 的理由 —— plain-script,不进 Vite,
+    # src/home/** 照不到,整个 /pos 从来没被这道闸管过(pos-scan.js 一路涨到 530 行,
+    # 闸报 PASS 是真的没看见,不是判它合格)。存量四个巨石记在基线里。
+    "static/pos/**/*.js",
+    "static/pos/**/*.css",
+    "static/pos/**/*.html",
+    "static/scan/**/*.js",
 ]
 
 # 路径模式豁免(纯数据 / 自动生成 · 不算业务代码)
@@ -104,6 +111,9 @@ EXEMPT_PATH_PATTERNS = [
     # 「名字里带 i18n 就免罪」本身是个洞 —— 豁免面由 tests/unit/test_file_size_gate.py 逐个文件
     # 验「真的只有词典字面量(无 function / 无 =>)」,谁往这个名下塞逻辑,测试当场红。
     "static/ai/ai-i18n-",
+    # POS SPA 的词典(window.POSI18N)· 与上面两份同一类:4 语翻译数据,行数只跟界面里有
+    # 多少句话成正比,拆开只会让「同一句话的四语」散在两个文件里。永久豁免,不设 deadline。
+    "static/pos/pos-i18n.js",
 ]
 
 

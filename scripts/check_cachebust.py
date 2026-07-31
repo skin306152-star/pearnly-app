@@ -178,6 +178,25 @@ CACHE_BUST_DIRS = (
         # 不 bump 就永远发旧图。E2E 闸 scripts/_guide_page_verify.cjs 逐张核 ?v 等于页面指纹。
         why="教程配图 URL 的 ?v 与正文共用页面里 main.js 的那个指纹(重拍同名图靠它换新)",
     ),
+    # 扫码的两个懒加载产物(摄像头引擎 + ZXing 兜底)不写在任何 HTML 里,是 scan-loader.js
+    # 运行时现拼 URL 拉的,?v 抠自页面上 dist bundle 的 ?v(assetVersion())。所以「改了
+    # scan-camera.js 要去 bump 引它那个页面的 bundle ?v」不是笔误 —— 两者共用一个指纹,
+    # 不 bump 就是店员的机器永远拿旧的解码器,而文件明明已经新了。
+    # 一个产物两页各借一次:POS 借 pos.js 的,主站借 pre.js 的(loader 就住在这两个 bundle 里)。
+    *(
+        CacheBustDir(
+            prefix=prefix,
+            html=html,
+            ref=ref,
+            why="扫码懒加载产物的 ?v 抠自页面上常驻 bundle 的 ?v"
+            "(static/scan/scan-loader.js · assetVersion())",
+        )
+        for prefix in ("static/dist/scan.js", "static/dist/zxing.js")
+        for html, ref in (
+            ("static/pos/pos.html", "/static/dist/pos.js"),
+            ("home.html", "/static/dist/pre.js"),
+        )
+    ),
 )
 
 

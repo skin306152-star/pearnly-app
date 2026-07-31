@@ -1,0 +1,74 @@
+{
+  "low-native-glare1200": {
+    "expect": "double",
+    "why": "把地板压到 1.2s:一次 1.2 秒的反光在快机器上直接被判成「货走了」",
+    "doubled": true,
+    "ok": true,
+    "lookups": 2,
+    "count": "สแกนแล้ว 3 ชิ้น",
+    "qtys": [
+      "3"
+    ],
+    "noticeText": "",
+    "noticeOnScreen": false,
+    "sampleHitRate": 14,
+    "maxGapMs": 1334,
+    "failCycleMs": 16,
+    "failDecodeMs": 0,
+    "samples": 218
+  },
+  "low-native-glare1200-control": {
+    "expect": "single",
+    "why": "对照:同机器同素材,门槛不动",
+    "doubled": false,
+    "ok": true,
+    "lookups": 0,
+    "count": "สแกนแล้ว 1 ชิ้น",
+    "qtys": [
+      "1"
+    ],
+    "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+    "noticeOnScreen": true,
+    "sampleHitRate": 15,
+    "maxGapMs": 1265,
+    "failCycleMs": 16,
+    "failDecodeMs": 0,
+    "samples": 217
+  },
+  "low-slow-cap2500": {
+    "expect": "double",
+    "why": "给采样尺封顶 ≈2.5s:老机器上一次 2.8 秒的反光就把一次持握记成两件",
+    "doubled": true,
+    "ok": true,
+    "lookups": 1,
+    "count": "สแกนแล้ว 2 ชิ้น",
+    "qtys": [
+      "2"
+    ],
+    "noticeText": "",
+    "noticeOnScreen": false,
+    "sampleHitRate": 38,
+    "maxGapMs": 3594,
+    "failCycleMs": 419,
+    "failDecodeMs": 405,
+    "samples": 16
+  },
+  "low-slow-cap2500-control": {
+    "expect": "single",
+    "why": "对照:同机器同素材,采样尺不封顶",
+    "doubled": false,
+    "ok": true,
+    "lookups": 0,
+    "count": "สแกนแล้ว 1 ชิ้น",
+    "qtys": [
+      "1"
+    ],
+    "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+    "noticeOnScreen": true,
+    "sampleHitRate": 35,
+    "maxGapMs": 3404,
+    "failCycleMs": 422,
+    "failDecodeMs": 405,
+    "samples": 17
+  }
+}

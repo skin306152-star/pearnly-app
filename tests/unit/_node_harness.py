@@ -40,12 +40,14 @@ def _baht_prefix() -> str:
 BAHT = _baht_prefix()
 
 
-def _run_node(js_source: str) -> dict:
+def _run_node(js_source: str, timeout: float = 15) -> dict:
+    """timeout 可调:按真实节拍跑的剧本(见 _scan_camera_harness.py)一条就要好几秒,
+    15 秒的默认值会把「剧本还没演完」变成一条看不懂的 TimeoutExpired。"""
     proc = subprocess.run(
         ["node", "-e", js_source],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
-        timeout=15,
+        timeout=timeout,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"node failed: {proc.stderr.decode('utf-8', 'replace')}")

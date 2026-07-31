@@ -56,7 +56,7 @@ function shell(): string {
             ${toggleRow('dedupe_block', 'pur-set-dedupe', 'pur-set-dedupe-d')}
 
             <div class="grp">${escapeHtml(t('pur-set-cats'))}</div>
-            <div class="item"><div class="l"><div class="t2">${escapeHtml(t('pur-set-cats-moved'))}</div></div><div class="ctl"><a class="cat-goto" href="#/expense-data">${escapeHtml(t('pur-set-cats-goto'))} →</a></div></div>
+            <div class="item"><div class="l"><div class="t2">${escapeHtml(t('pur-set-cats-moved'))}</div></div><div class="ctl"><a class="btn" href="#/expense-data">${escapeHtml(t('pur-set-cats-goto'))} →</a></div></div>
 
             <div class="grp">${escapeHtml(t('pur-set-pay'))}</div>
             ${numRow('pur-set-due', 'pur-set-due', 'pur-set-due-d', cfg.default_due_days, t('pur-unit-days'))}

@@ -2871,10 +2871,10 @@ window.I18N = {
         'erp-dup-field-total': '含税总额',
         'erp-dup-field-date': '单据日期',
         'erp-dup-field-other': '其他字段',
-        // 这条只出现在 ✗ 失败卡的摘要条上(erp-log-card 的 reasonStrip 只在 statusClass=fail
-        // 渲染)。真会自动重领的那条路(小助手队列 ack waiting_lock)保持 pending，显示的是
-        // ⟳「等待账套释放」，压根走不到这里 —— 所以这句话面向的永远是「不会再自动推」的那一张,
-        // 旧文案的「稍后自动重试」在它唯一的落点上是假的。别改回去。
+        // 这条只出现在失败卡的摘要条上(erp-log-card 的 reasonStrip 只在 statusClass=fail
+        // 渲染)。真会自动重领的那条路(小助手队列 ack waiting_lock)保持 pending,显示的是
+        // erp-status-waiting-lock「等待账套释放」,压根走不到这里 —— 所以这句话面向的永远是
+        // 「不会再自动推」的那一张,旧文案的「稍后自动重试」在它唯一的落点上是假的。别改回去。
         'erp-reason-account-busy': '有人在 Express 里开着这个账套 · 这张一个字节都没写进去 · 关掉后点「重试推送」',
         'erp-status-skipped': '已推送过',
         'erp-retry-attempt': '已重试 {n}/{max} 次',

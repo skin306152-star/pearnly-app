@@ -166,13 +166,19 @@ class CheckLineRatchetTests(unittest.TestCase):
         )
         return result.returncode, result.stdout + result.stderr
 
-    def test_ratchet_passes_on_first_commit(self) -> None:
-        """首个 commit 没有 HEAD~1 · 优雅退出 0"""
+    def test_ratchet_fails_on_first_commit(self) -> None:
+        """首个 commit 没有 HEAD~1 → 判不了 → 红(2026-07-31 从 fail-open 翻过来)。
+
+        原来这里断言的是「优雅退出 0」。可退 0 就是「PASS」,与「真没净增长」在 CI 日志里
+        分不出来 —— 闸判不了就该红,逃生门是显式给 --base。整套判不了的路径见
+        tests/unit/test_line_ratchet_gate.py。
+        """
         (self.tmpdir / "app.py").write_bytes(b"a\nb\nc\n")
         git(self.tmpdir, "add", ".")
         git(self.tmpdir, "commit", "-m", "init")
         rc, out = self._run_ratchet()
-        self.assertEqual(rc, 0, msg=out)
+        self.assertEqual(rc, 1, msg=out)
+        self.assertIn("base ref", out)
 
     def test_ratchet_passes_when_monitored_file_shrinks(self) -> None:
         """监控文件 app.py 缩减 · 棘轮放行"""

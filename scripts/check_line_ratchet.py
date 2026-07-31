@@ -21,7 +21,10 @@ scripts/check_line_ratchet.py · REFACTOR-WC-P1 (2026-05-28 窗口 C · 防屎�
 
 退出码:
   0 = 所有监控文件净增长 ≤ 0(或被透明豁免)
-  1 = 至少 1 个文件净增长 > 0 且没豁免
+  1 = 至少 1 个文件净增长 > 0 且没豁免 · 或者【判不了】(git 不可用 / base ref 不存在 /
+      git diff 失败)—— 2026-07-31 改成 fail-closed,此前这三种情况一律 return 0 判绿,
+      「PASS」于是同时意味着「真没净增长」和「压根没查」。反证在
+      tests/unit/test_line_ratchet_gate.py。
 
 用法:
   python scripts/check_line_ratchet.py                # 默认 HEAD~1..HEAD
@@ -164,27 +167,32 @@ def main() -> int:
     ap.add_argument("--quiet", action="store_true", help="只在违规时输出")
     args = ap.parse_args()
 
-    # 验证 git 可用
+    # fail-closed(2026-07-31 改)· 以下三处原本 git 一出问题就 `return 0`,于是「棘轮 PASS」
+    # 同时意味着「真没净增长」和「压根没查」,而在 CI 日志里这两者长得一模一样。闸判不了就该
+    # 红:环境坏了去修环境,不该顺手把屎山放过去。逃生门是显式给 --base,不是静默放行。
     try:
         git("rev-parse", "--git-dir")
     except (RuntimeError, FileNotFoundError) as e:
-        print(f"⚠️  不在 git 仓库或 git 不可用 · 跳过棘轮检查:{e}")
-        return 0
+        print(f"🔴 FAIL · 不在 git 仓库或 git 不可用,棘轮判不了(判不了 = 红,不放行):{e}")
+        return 1
 
     commit_range = f"{args.base}..{args.head}"
 
-    # 第一次 commit 没有 HEAD~1 · 优雅退出
     try:
         git("rev-parse", "--verify", args.base)
-    except RuntimeError:
-        print(f"⚠️  base ref `{args.base}` 不存在(可能首次 commit)· 跳过棘轮检查")
-        return 0
+    except (RuntimeError, FileNotFoundError):
+        print(
+            f"🔴 FAIL · base ref `{args.base}` 不存在,棘轮判不了(判不了 = 红,不放行)。\n"
+            f"       浅克隆请把历史拉全(actions/checkout 的 fetch-depth: 0),\n"
+            f"       真的只有一笔 commit 就显式指定 --base <ref>。"
+        )
+        return 1
 
     try:
         numstat_out = git("diff", commit_range, "--numstat")
-    except RuntimeError as e:
-        print(f"⚠️  git diff 失败 · 跳过:{e}")
-        return 0
+    except (RuntimeError, FileNotFoundError) as e:
+        print(f"🔴 FAIL · git diff {commit_range} 失败,棘轮判不了(判不了 = 红,不放行):{e}")
+        return 1
 
     rows = parse_numstat(numstat_out)
     exempt_files = collect_exempt_files_from_messages(commit_range)

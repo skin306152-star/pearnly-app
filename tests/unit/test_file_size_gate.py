@@ -38,7 +38,15 @@ _SPEC.loader.exec_module(gate)
 
 # 建基线当天记下的 7 个越线文件 —— 只许从这个集合里减。想往基线里加新条目,
 # 得先改这条断言,免不成默默的(同 check_home_i18n_refs 的 0 容忍断言先例)。
-BASELINE_AT_BIRTH = {
+#
+# 里面两批,来路不同:
+#   · static/ai 七个 —— 2026-08-01 把 static/ai/**/*.js 收进监控当天记的存量。
+#   · static/pos 四个 —— 上游 2026-07-31 把 static/pos/** 收进监控时的存量,原本记在
+#     check_file_size.py 的 EXEMPT_CURRENT_BIG_FILES;合并那笔(`6dc3536a`)按原值平移进
+#     baseline.json,不是新债,是换了个记账的地方。deadline 在 baseline 的 _notes 里:
+#     三个 .js 2026-09-30、pos.html 2026-12-31,到期直接删条目让它红。
+# 这条断言在合并当天真拦住过一次:POS 四条进来时它当场红,逼这一笔显式认账。
+BASELINE_ALLOWED = {
     "static/ai/ai-review.js",
     "static/ai/ai-intake.js",
     "static/ai/ai.js",
@@ -46,6 +54,10 @@ BASELINE_AT_BIRTH = {
     "static/ai/ai-intake-render.js",
     "static/ai/ai-steward.js",
     "static/ai/ai-review-render.js",
+    "static/pos/pos-cashier.js",
+    "static/pos/pos-data.js",
+    "static/pos/pos.js",
+    "static/pos/pos.html",
 }
 
 
@@ -221,7 +233,7 @@ class RealTreeCoverage(unittest.TestCase):
             self.assertLessEqual(lines, recorded, f"{rel} 涨过基线({lines} > {recorded})")
 
     def test_baseline_only_shrinks(self) -> None:
-        extra = set(self.baseline) - BASELINE_AT_BIRTH
+        extra = set(self.baseline) - BASELINE_ALLOWED
         self.assertEqual(extra, set(), f"基线新增了条目:{sorted(extra)} —— 新债该拆不该记账")
 
     def test_no_over_limit_static_ai_file_escapes_the_baseline(self) -> None:

@@ -124,6 +124,79 @@
             .join('');
     }
 
+    // 下拉三态:载入中 / 读取失败 / 真的一个都没有。三种处境此前共用同一个占位符
+    // (「选择客户 / เลือกลูกค้า…」),会计分不清该等一下、该重试、还是该先去建客户 ——
+    // 而报表中心与工资表申报这两页除了这个下拉没有别的入口。phase 必须按真实加载状态给,
+    // 不许一律传 ready。error 态额外出一颗重试(下拉本身禁用,不摆一个选不出东西的控件)。
+    // labels 由调用方翻译好(本文件不依赖 at(),保持纯)。
+    var PICKER_PHASES = ['loading', 'ready', 'error'];
+
+    function pickerHtml(opts) {
+        opts = opts || {};
+        var phase = PICKER_PHASES.indexOf(opts.phase) >= 0 ? opts.phase : 'ready';
+        var items = opts.items || [];
+        var L = opts.labels || {};
+        var state = phase === 'ready' && !items.length ? 'empty' : phase;
+        var head =
+            state === 'loading'
+                ? L.loading
+                : state === 'error'
+                  ? L.error
+                  : state === 'empty'
+                    ? L.empty
+                    : L.placeholder;
+        var body =
+            state === 'ready'
+                ? items
+                      .map(function (it) {
+                          var v = String(opts.valueOf(it));
+                          return (
+                              '<option value="' +
+                              esc(v) +
+                              '"' +
+                              (v === String(opts.selected == null ? '' : opts.selected)
+                                  ? ' selected'
+                                  : '') +
+                              '>' +
+                              esc(opts.labelOf(it)) +
+                              '</option>'
+                          );
+                      })
+                      .join('')
+                : '';
+        var retry =
+            state === 'error' && opts.retryLabel
+                ? '<button type="button" class="btn sm" data-action="' +
+                  esc(opts.retryAction || 'retry') +
+                  '">' +
+                  esc(opts.retryLabel) +
+                  '</button>'
+                : '';
+        var select =
+            '<select id="' +
+            esc(opts.id) +
+            '" data-state="' +
+            state +
+            '"' +
+            (state === 'ready' ? '' : ' disabled') +
+            '><option value="">' +
+            esc(head) +
+            '</option>' +
+            body +
+            '</select>';
+        // 重试钮排在 <label> 之外:label 是列向 flex,塞进去会被拉成整行宽,而且点按钮
+        // 会连带激活 label 关联的 select(语义打架)。
+        return opts.labelText != null
+            ? '<label class="' +
+                  esc(opts.labelCls || '') +
+                  '">' +
+                  esc(opts.labelText) +
+                  select +
+                  '</label>' +
+                  retry
+            : select + retry;
+    }
+
     // 机器码那一行:码是会计转给我们排障用的那串东西,她自己看不懂也用不上 —— 所以它
     // 只以最低存在感出现,同排的复制按钮才是可点的那一半(10.5px 灰字在手机上既选不中
     // 也复制不走)。管家任务卡与异常裁决卡共用这一份,别各拼一套。
@@ -157,6 +230,8 @@
         sectionEmptyHtml: sectionEmptyHtml,
         esc: esc,
         optionsHtml: optionsHtml,
+        PICKER_PHASES: PICKER_PHASES,
+        pickerHtml: pickerHtml,
         codeChipHtml: codeChipHtml,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

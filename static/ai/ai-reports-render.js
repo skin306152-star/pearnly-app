@@ -57,31 +57,37 @@
         });
     }
 
+    // 客户下拉走 AI.state.pickerHtml 的三态(载入中/读取失败+重试/还没有客户),
+    // 与工资表申报共用同一份 —— 此前三种处境长得一模一样,只剩一个「选择客户」占位符。
+    function clientSelectHtml(ctx) {
+        return root.AI.state.pickerHtml({
+            id: 'rptClientSel',
+            labelText: at('reports_client_label'),
+            labelCls: 'pr-lb',
+            phase: ctx.clientsPhase,
+            items: ctx.clients || [],
+            selected: ctx.clientId,
+            valueOf: function (c) {
+                return c.id;
+            },
+            labelOf: function (c) {
+                return c.name;
+            },
+            labels: {
+                placeholder: at('reports_pick_client'),
+                loading: at('loading_t'),
+                error: at('error_t'),
+                empty: at('clients_empty_t'),
+            },
+            retryLabel: at('retry'),
+            retryAction: 'rpt-clients-retry',
+        });
+    }
+
     function pickerHtml(ctx) {
-        var options =
-            '<option value="">' +
-            esc(at('reports_pick_client')) +
-            '</option>' +
-            (ctx.clients || [])
-                .map(function (c) {
-                    return (
-                        '<option value="' +
-                        esc(c.id) +
-                        '"' +
-                        (String(c.id) === String(ctx.clientId) ? ' selected' : '') +
-                        '>' +
-                        esc(c.name) +
-                        '</option>'
-                    );
-                })
-                .join('');
         return (
             '<div class="pr-setup-row">' +
-            '<label class="pr-lb">' +
-            esc(at('reports_client_label')) +
-            '<select id="rptClientSel">' +
-            options +
-            '</select></label>' +
+            clientSelectHtml(ctx) +
             '<label class="pr-lb">' +
             esc(at('reports_period_label')) +
             '<select id="rptPeriodInput">' +

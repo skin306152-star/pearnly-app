@@ -144,31 +144,36 @@
         });
     }
 
+    // 三态同报表中心:共用 AI.state.pickerHtml,别各写一套(载入中/读取失败+重试/还没有客户)。
+    function clientSelectHtml(ctx) {
+        return root.AI.state.pickerHtml({
+            id: 'prClientSel',
+            labelText: at('payroll_client_label'),
+            labelCls: 'pr-lb',
+            phase: ctx.clientsPhase,
+            items: ctx.clients || [],
+            selected: ctx.clientId,
+            valueOf: function (c) {
+                return c.id;
+            },
+            labelOf: function (c) {
+                return c.name;
+            },
+            labels: {
+                placeholder: at('payroll_pick_client'),
+                loading: at('loading_t'),
+                error: at('error_t'),
+                empty: at('clients_empty_t'),
+            },
+            retryLabel: at('retry'),
+            retryAction: 'pr-clients-retry',
+        });
+    }
+
     function clientPickerHtml(ctx) {
-        var options =
-            '<option value="">' +
-            esc(at('payroll_pick_client')) +
-            '</option>' +
-            (ctx.clients || [])
-                .map(function (c) {
-                    return (
-                        '<option value="' +
-                        esc(c.id) +
-                        '"' +
-                        (String(c.id) === String(ctx.clientId) ? ' selected' : '') +
-                        '>' +
-                        esc(c.name) +
-                        '</option>'
-                    );
-                })
-                .join('');
         return (
             '<div class="pr-setup-row">' +
-            '<label class="pr-lb">' +
-            esc(at('payroll_client_label')) +
-            '<select id="prClientSel">' +
-            options +
-            '</select></label>' +
+            clientSelectHtml(ctx) +
             '<label class="pr-lb">' +
             esc(at('payroll_period_label')) +
             '<select id="prPeriodInput">' +

@@ -28,6 +28,7 @@
         return {
             api: api,
             clients: [],
+            clientsPhase: 'loading', // loading|ready|error(下拉三态 · 见 loadClients)
             clientId: '',
             period: AI.payrollRender.defaultPeriod(),
             order: null,
@@ -133,16 +134,25 @@
             });
     }
 
+    // 三态诚实:此前失败只留个空下拉,与「还没有客户」「正在读」长得一模一样 ——
+    // 而本页除了这个下拉没有别的入口,分不清就等于卡死在这一屏。
     function loadClients() {
+        if (!S) return;
+        S.clientsPhase = 'loading';
+        renderPicker();
+        var session = S;
         S.api
             .listClients()
             .then(function (r) {
-                if (!S) return;
+                if (S !== session) return;
                 S.clients = (r && r.clients) || [];
+                S.clientsPhase = 'ready';
                 renderPicker();
             })
             .catch(function () {
-                /* 客户下拉加载失败不阻断本页其余功能,选择器留空重试即可 */
+                if (S !== session) return;
+                S.clientsPhase = 'error';
+                renderPicker();
             });
     }
 
@@ -226,6 +236,7 @@
         else if (a === 'reports-download') download(el.getAttribute('data-kind'));
         else if (a === 'reports-download-financials')
             downloadFinancials(el.getAttribute('data-format'));
+        else if (a === 'rpt-clients-retry') loadClients();
     }
 
     function onChange(e) {

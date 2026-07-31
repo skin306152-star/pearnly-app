@@ -261,6 +261,9 @@ const BUNDLES = [
             // 铁律,依赖 AI.state/format/router/reviewQueue 均已在上面)只需排在 ai-client.js
             // (woSummaryPanel 重画用 AI.clientWoRender)之前。
             'ai/ai-client-wo-render.js',
+            // ai-tabs-scroll.js(横滚 tab 条的「当前项看得见」· 零依赖纯 DOM 工具)只需排在
+            // ai-client.js(renderTabs 每次调 AI.tabsScroll.reveal)之前。
+            'ai/ai-tabs-scroll.js',
             'ai/ai-client.js',
             // EN-clients(2026-07-13)· 客户目录/单客户档案页/报表中心/设置——三个侧栏占位
             // 收口转正。ai-clients-render.js(目录纯拼装,依赖 AI.matrixRender.BADGE_CHIP)

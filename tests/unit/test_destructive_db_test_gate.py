@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 import tempfile
 import types
@@ -25,6 +26,14 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 import check_destructive_db_tests as gate  # noqa: E402
 
 GUARD_LINE = "from tests.integration._helpers import require_disposable_db\n"
+
+
+def _restore_env(key: str, value: str | None) -> None:
+    """把一个 env 键还原成取快照时的样子(原本没有 → 删掉,而不是留个空串)。"""
+    if value is None:
+        os.environ.pop(key, None)
+    else:
+        os.environ[key] = value
 
 
 def _scan_source(source: str, *, name: str = "test_probe.py"):
@@ -190,7 +199,13 @@ class DisposableGuardTests(unittest.TestCase):
     真库那一路由手工反证覆盖(记在提交信息里)。"""
 
     def setUp(self) -> None:
+        # tests/integration/_helpers.py 在 import 期 setdefault("RATE_LIMIT_ENABLED","false")。
+        # 全量 discovery 里这一句会活到进程结束,而 test_ratelimit_limiter 排在本模块之后、
+        # 在构造中间件时读这个 env —— 于是限流器被关掉,三条限流用例集体假绿式地"请求打到了
+        # 应用层"。谁把 env 弄脏谁负责还原。
+        env_before = os.environ.get("RATE_LIMIT_ENABLED")
         self.helpers = importlib.import_module("tests.integration._helpers")
+        self.addCleanup(_restore_env, "RATE_LIMIT_ENABLED", env_before)
         self.helpers._DISPOSABLE_CHECKED.clear()
         self.addCleanup(self.helpers._DISPOSABLE_CHECKED.clear)
 
@@ -218,19 +233,13 @@ class DisposableGuardTests(unittest.TestCase):
         return conns
 
     def _env(self, **values: str) -> None:
-        import os
-
         for key, value in values.items():
             old = os.environ.get(key)
             if value is None:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
-            self.addCleanup(
-                lambda k=key, v=old: (
-                    os.environ.__setitem__(k, v) if v is not None else os.environ.pop(k, None)
-                )
-            )
+            self.addCleanup(_restore_env, key, old)
 
     def test_without_integration_env_it_skips_like_before(self) -> None:
         self._env(PEARNLY_INTEGRATION_DB="", DATABASE_URL="postgresql://x/y")

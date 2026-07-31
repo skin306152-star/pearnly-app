@@ -201,6 +201,9 @@
         }
 
         function releaseCamera() {
+            // 作废这一轮:srcObject 置空后 readyState 回 0,waitFrames 等不到帧又只认 stale 退场;
+            // 不作废就每 intervalMs 空转、把 video/canvas/回调吊到下次 start。start/stop 的 bump 不受影响。
+            runToken += 1;
             if (timer) {
                 clearTimeout(timer);
                 timer = null;

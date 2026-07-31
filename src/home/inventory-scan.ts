@@ -11,7 +11,7 @@
 // 过来,不在这里另写一套。
 /* global t, escapeHtml */
 import { salesFetch, salesErrMsg } from './sales-common.js';
-import { localizedName } from './inventory-common.js';
+import { localizedName, fmtQty } from './inventory-common.js';
 import {
     ackFails,
     blockedText,
@@ -130,8 +130,9 @@ export function planRow(rows: ScanRow[], hit: ScanHit): RowPlan {
 /** 扫一次 = 一件。空/非数字当 0 起算;拆零品可能是小数,乘一千取整免得浮点尾巴。 */
 export function bumpQty(current: string): string {
     const n = Number(String(current || '').trim());
-    const next = (Number.isFinite(n) ? n : 0) + 1;
-    return String(Math.round(next * 1000) / 1000);
+    // 取整交给 fmtQty(整数不带小数 · 非整数 3 位去尾零)—— 库存那边的数量都按这条规矩印,
+    // 自己再写一份「乘一千取整」等于同一条规矩两处维护,漂了就是两屏显示不一样。
+    return fmtQty((Number.isFinite(n) ? n : 0) + 1);
 }
 
 /**

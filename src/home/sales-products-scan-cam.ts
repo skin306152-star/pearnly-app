@@ -67,6 +67,8 @@ const STYLE = `
 @media(max-width:520px){.sx-bcm{padding:0;}.sx-bcm-box{width:100%;max-width:none;border-radius:0;}}
 `;
 
+// 同 sales-products-scan.ts:与 acct-common.ts 的 injectStyle 同形,收成一处要连 node
+// harness 一起改(它 stub 掉 acct-common)—— 见交接单。
 function ensureStyle(): void {
     if (document.getElementById('sx-bcm-style')) return;
     const st = document.createElement('style');

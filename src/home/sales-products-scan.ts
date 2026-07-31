@@ -58,6 +58,8 @@ const STYLE = `
 .sx-bc-link{border:0;padding:0;background:transparent;color:inherit;font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer;}
 `;
 
+// 与 acct-common.ts 的 injectStyle 同形。收成一处要连 tests/unit 的 node harness 一起改
+// (它 stub 掉 acct-common,现在直接 import 会 TypeError),不是纯替换 —— 见交接单。
 function ensureStyle(): void {
     if (document.getElementById('sx-bc-style')) return;
     const st = document.createElement('style');

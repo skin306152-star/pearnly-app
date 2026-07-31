@@ -457,7 +457,8 @@ body.settings-modal-open { overflow: hidden; }
     margin: 0;
 }
 #history-main .history-table-head,
-#history-main .history-row {
+#history-main .history-row,
+#history-main .hist-skel {
     /* 内部右 padding 收到 16px · 加 main 的 28px · ⋮ 距屏幕边 = 44px(还能再紧) */
     padding-left: 20px;
     padding-right: 16px;

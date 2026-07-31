@@ -261,6 +261,12 @@ class DecisionChipKeyTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class FileNameTests(unittest.TestCase):
+    def _names(self, refs: list) -> list:
+        return _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify({json.dumps(refs)}.map(q.fileName)));
+            """)
+
     def test_extracts_basename_from_windows_and_posix_paths(self):
         out = _run_node(f"""
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
@@ -272,6 +278,49 @@ class FileNameTests(unittest.TestCase):
             ]));
             """)
         self.assertEqual(out, ["IMG_2647.JPG", "IMG_2648.JPG", "", ""])
+
+    def test_strips_storage_hash_prefix_but_keeps_user_double_underscores(self):
+        # 落盘名 {uuid}__{词干}{ext}(storage.save_material)。会计认票靠词干,那串 hex 不该
+        # 出现在人眼前;但用户自己命名里的 __ 一个都不许被当前缀切掉。
+        self.assertEqual(
+            self._names(
+                [
+                    "/opt/storage/wo/3ccdcc7a71104c1b89d6eb9b75915366__IMG_2485.jpg",
+                    "MAY__RECEIPT_07.jpg",  # 前缀不是 hex → 原样
+                    "2026__report.pdf",  # 纯数字但只有 4 位 → 短于 8,不是落盘前缀
+                    "deadbeef__note.txt",  # 8 位 hex → 是落盘前缀(与后端 {8,32} 同界)
+                    "3CCDCC7A71104C1B89D6EB9B75915366__UP.jpg",  # 大写 hex 不是落盘格式
+                    "__leading.jpg",  # 前缀空 → 不剥
+                    "3ccdcc7a71104c1b89d6eb9b75915366__",  # 剥完是空 → 宁可留原样
+                ]
+            ),
+            [
+                "IMG_2485.jpg",
+                "MAY__RECEIPT_07.jpg",
+                "2026__report.pdf",
+                "note.txt",
+                "3CCDCC7A71104C1B89D6EB9B75915366__UP.jpg",
+                "__leading.jpg",
+                "3ccdcc7a71104c1b89d6eb9b75915366__",
+            ],
+        )
+
+    def test_matches_backend_original_name_of_on_the_same_table(self):
+        # 两边对拍(前端 import 不到后端,只能锁住输出一致):后端哪天改了落盘名格式,
+        # 这条会红,提醒同步改 ai-review-queue.js —— 而不是等会计在队列上看见一串 hex。
+        from services.workorder import storage
+
+        refs = [
+            "/opt/storage/wo/3ccdcc7a71104c1b89d6eb9b75915366__IMG_2485.jpg",
+            "/opt/storage/wo/deadbeef__note.txt",
+            "/opt/storage/wo/MAY__RECEIPT_07.jpg",
+            "/opt/storage/wo/2026__report.pdf",
+            "/opt/storage/wo/IMG_2650.JPG",
+            "/opt/storage/wo/3CCDCC7A71104C1B89D6EB9B75915366__UP.jpg",
+        ]
+        self.assertEqual(
+            self._names(refs), [storage.original_name_of(r) for r in refs]
+        )
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

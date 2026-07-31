@@ -160,10 +160,17 @@
   gap: 8px;
   margin-bottom: 8px;
 }
+/* 顶格长名(落盘词干限长 60)在 .riq-item-hd 这个 flex 行里会把整页顶出横向滚动条
+ * (2026-07-30 手机 390 实测 documentElement 溢出 13px,越界的就是这个 span)。overflow
+ * 一旦不是 visible,flex 子项的自动最小尺寸就归零、肯缩了,再由 ellipsis 收口;全名在
+ * title 里(见 ai-review-inbox-item-render.js::fileNameHtml)。 */
 .riq-item-file {
   font-size: 12px;
   font-weight: 600;
   color: var(--ink2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .riq-fldt {
   background: var(--surface);
@@ -218,6 +225,11 @@
   .riq-item-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+  /* 复核通过 / 签批冻结 / 驳回 = 会计在队列上仅有的三个决断动作,.btn.sm 画出来只有 30px 高,
+   * 手机上按不准(2026-07-30 实测 30×254)。只抬这一组,全站 .btn.sm 另算。 */
+  .riq-wo-steps .btn {
+    min-height: 44px;
   }
   .riq-vat-input {
     width: 100%;

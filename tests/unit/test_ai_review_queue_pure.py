@@ -318,9 +318,7 @@ class FileNameTests(unittest.TestCase):
             "/opt/storage/wo/IMG_2650.JPG",
             "/opt/storage/wo/3CCDCC7A71104C1B89D6EB9B75915366__UP.jpg",
         ]
-        self.assertEqual(
-            self._names(refs), [storage.original_name_of(r) for r in refs]
-        )
+        self.assertEqual(self._names(refs), [storage.original_name_of(r) for r in refs])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

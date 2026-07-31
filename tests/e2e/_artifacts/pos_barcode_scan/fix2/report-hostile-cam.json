@@ -17,13 +17,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.080812
+      "videoTime": 7.074776
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 734
+        "at": 756
       }
     ],
     "gaps": [],
@@ -47,13 +47,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.810923
+      "videoTime": 7.813093
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 1489
+        "at": 1467
       }
     ],
     "gaps": [],
@@ -77,13 +77,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.606652
+      "videoTime": 7.534156
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 1291
+        "at": 1227
       }
     ],
     "gaps": [],
@@ -107,13 +107,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.143554
+      "videoTime": 7.072903
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 742
+        "at": 737
       }
     ],
     "gaps": [],
@@ -137,13 +137,13 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 7.067837
+      "videoTime": 7.078969
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 696
+        "at": 734
       }
     ],
     "gaps": [],
@@ -175,7 +175,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 4.0045
+      "videoTime": 4.207168
     },
     "after": {
       "count": "สแกนแล้ว 2 ชิ้น",
@@ -237,7 +237,7 @@
       ],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 0.077867
+      "videoTime": 0.07662
     },
     "busy": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
     "retryLabel": "ลองใหม่",
@@ -266,7 +266,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 4.143891
+      "videoTime": 4.212957
     },
     "after": {
       "count": "สแกนแล้ว 3 ชิ้น",
@@ -284,7 +284,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 11.201748
+      "videoTime": 11.272253
     },
     "counted": [
       2,
@@ -356,7 +356,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 31.474037
+      "videoTime": 11.074445
     },
     "after": {
       "count": "สแกนแล้ว 4 ชิ้น",
@@ -374,7 +374,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 32.602931
+      "videoTime": 12.213414
     },
     "resumed": true,
     "lookupsBefore": 3,
@@ -401,7 +401,7 @@
       "acts": [],
       "videoReadyState": 4,
       "videoW": 640,
-      "videoTime": 4.212379
+      "videoTime": 4.003905
     },
     "after": {
       "count": "สแกนแล้ว 2 ชิ้น",

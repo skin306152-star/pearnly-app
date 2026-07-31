@@ -14,7 +14,7 @@ fetch_examples / record_correction_from_edit),在真 postgres 验:租户 A 的�
 import os
 import unittest
 
-from tests.integration._helpers import require_db
+from tests.integration._helpers import require_disposable_db
 
 A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -25,7 +25,7 @@ UB = "22222222-2222-2222-2222-222222222222"
 class OcrFeedbackRlsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        require_db()
+        require_disposable_db()
         os.environ.setdefault("PGSSLMODE", "disable")
         os.environ["RLS_ROLE"] = "pearnly_app"
 

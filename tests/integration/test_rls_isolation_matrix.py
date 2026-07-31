@@ -8,7 +8,9 @@
 在真 postgres 上验证 RLS 真隔离 —— 不是 mock。CI 默认 skip(无真 DB),本地 / 恢复库跑:
 
     set PEARNLY_INTEGRATION_DB=1
-    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly
+    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly_throwaway
+    (这个库会被 DROP TABLE 拆掉,别指开发库;先对它执行
+     CREATE TABLE IF NOT EXISTS _pearnly_disposable_test_db(note text);)
     set RLS_ROLE=pearnly_app
     set PGSSLMODE=disable
     python -m unittest tests.integration.test_rls_isolation_matrix -v
@@ -19,13 +21,13 @@ P3 逐域开 RLS 时,每域代表表按矩阵选对应模板 apply,再对真表�
 import os
 import unittest
 
-from tests.integration._helpers import require_db
+from tests.integration._helpers import require_disposable_db
 
 
 class RlsIsolationMatrixTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        require_db()  # 无真 DB → skip 整类
+        require_disposable_db()  # 无真 DB → skip 整类
         os.environ.setdefault("PGSSLMODE", "disable")
         os.environ["RLS_ROLE"] = "pearnly_app"
 

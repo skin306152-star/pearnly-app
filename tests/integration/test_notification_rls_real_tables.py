@@ -6,7 +6,9 @@
 经 bypass 仍能跨租户读全表(否则通知漏推)。CI 默认 skip,本地跑:
 
     set PEARNLY_INTEGRATION_DB=1
-    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly
+    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly_throwaway
+    (这个库会被 DROP TABLE 拆掉,别指开发库;先对它执行
+     CREATE TABLE IF NOT EXISTS _pearnly_disposable_test_db(note text);)
     set RLS_ROLE=pearnly_app
     set PGSSLMODE=disable
     python -m unittest tests.integration.test_notification_rls_real_tables -v
@@ -15,7 +17,7 @@
 import os
 import unittest
 
-from tests.integration._helpers import require_db
+from tests.integration._helpers import require_disposable_db
 
 A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -26,7 +28,7 @@ UB = "22222222-2222-2222-2222-222222222222"
 class NotificationRlsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        require_db()
+        require_disposable_db()
         os.environ.setdefault("PGSSLMODE", "disable")
         os.environ["RLS_ROLE"] = "pearnly_app"
 

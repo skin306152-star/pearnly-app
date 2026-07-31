@@ -14,6 +14,15 @@ pos-scan.js 长到 530,而闸一路报 PASS。**闸报绿不等于闸看过**,�
   正向  在真的 static/pos/ 下放一个 501 行文件 → 闸必须当场抓到(闸真的看得见这个目录)
   反向  把某条基线豁免摘掉 → 那个真存在的巨石必须当场变红(豁免真的在挡红,不是摆设)
 两条都用真仓库里的真文件跑,不喂假路径 —— 拿桩验桩的话,glob 写错一个字符照样全绿。
+
+2026-08-01 改口径:存量豁免从 check_file_size.py 里那本 basename 字典
+(EXEMPT_CURRENT_BIG_FILES)换成了 scripts/file_size_baseline.json —— 键改成仓库相对路径,
+且只此一套(两套豁免机制并存必漂,理由写在闸的文件头)。本文件的每条断言原样保留,
+只把"豁免"这个词指向新的那本账。
+
+与 tests/unit/test_file_size_gate.py 的分工:那边验**机制**(新越线要红 / 基线涨要红 /
+降了要提示 / 词典豁免面必须真是纯词典);这边验**射程与账本**(/pos 与 /scan 真在射程里、
+每条记账都真在挡红、不留余量、不跨目录串味)。改闸时两份都要跑。
 """
 
 from __future__ import annotations
@@ -34,12 +43,19 @@ POS_SENTINEL = "static/pos/pos-scan.js"
 SCAN_SENTINEL = "static/scan/scan-wedge.js"
 
 
-def _statuses(ceiling: int = gate.DEFAULT_CEILING) -> dict[str, tuple[str, int, int]]:
-    """跑一遍真实收集 + 判定,按仓库相对路径索引。"""
+def _statuses(
+    ceiling: int = gate.DEFAULT_CEILING, baseline: dict[str, int] | None = None
+) -> dict[str, tuple[str, int, int]]:
+    """跑一遍真实收集 + 判定,按仓库相对路径索引。
+
+    baseline 省略时读真账本(scripts/file_size_baseline.json);要验"摘掉某条记账会不会红"
+    就把改过的那本传进来 —— 不再像旧字典那样去改模块全局,免得用例之间互相串。
+    """
+    base = gate.load_baseline() if baseline is None else baseline
     out = {}
     for path in gate.collect_files():
-        status, rel, lines, applied = gate.check_one(path, ceiling)
-        out[rel] = (status, lines, applied)
+        row = gate.check_one(path, ceiling, base)
+        out[row.rel] = (row.status, row.lines, row.limit)
     return out
 
 
@@ -97,39 +113,35 @@ class ExemptionsAreLoadBearing(unittest.TestCase):
     上面"全仓当前是干净的"那条照样绿 —— 那时闸就是在替一个不存在的东西开门。
     """
 
+    def setUp(self):
+        self.baseline = gate.load_baseline()
+        # 判据自检:账本读空的话下面每条都会"通过"得毫无意义(_notes 那类下划线键不算数)。
+        self.assertGreater(len(self.baseline), 0, "基线读不出条目 —— 判据失效比断言失败更危险")
+
     def test_every_exemption_points_at_a_real_monitored_file(self):
         seen = _statuses()
-        missing = [k for k in gate.EXEMPT_CURRENT_BIG_FILES if "/" in k and k not in seen]
-        self.assertEqual(missing, [], "豁免指到了射程外/不存在的文件 —— 这条豁免谁都没用上")
+        missing = [k for k in self.baseline if k not in seen]
+        self.assertEqual(missing, [], "基线指到了射程外/不存在的文件 —— 这条记账谁都没用上")
 
     def test_dropping_each_exemption_turns_that_file_red(self):
-        original = dict(gate.EXEMPT_CURRENT_BIG_FILES)
-        self.addCleanup(lambda: gate.EXEMPT_CURRENT_BIG_FILES.update(original))
-        for key in [k for k in original if "/" in k]:
+        for key in self.baseline:
             with self.subTest(exempt=key):
-                gate.EXEMPT_CURRENT_BIG_FILES.clear()
-                gate.EXEMPT_CURRENT_BIG_FILES.update(
-                    {k: v for k, v in original.items() if k != key}
-                )
-                got = _statuses().get(key)
+                without = {k: v for k, v in self.baseline.items() if k != key}
+                got = _statuses(baseline=without).get(key)
                 self.assertIsNotNone(got, f"{key} 不在射程里")
-                self.assertEqual(got[0], "FAIL", f"摘掉 {key} 的豁免它却不红 —— 这条豁免是摆设")
-            gate.EXEMPT_CURRENT_BIG_FILES.clear()
-            gate.EXEMPT_CURRENT_BIG_FILES.update(original)
+                self.assertEqual(got[0], "FAIL", f"摘掉 {key} 的记账它却不红 —— 这条记账是摆设")
 
     def test_no_exemption_carries_headroom(self):
-        """豁免值必须钉死在当前行数:留余量 = 悄悄发一张"还能再涨 N 行"的通行证。
+        """记账值必须钉死在当前行数:留余量 = 悄悄发一张"还能再涨 N 行"的通行证。
 
-        文件真拆小了,把这个数改成新行数即可(棘轮只准往下走)。
+        文件真拆小了,跑 `--update-baseline` 把这个数收到新行数即可(棘轮只准往下走)。
         """
         padded = []
-        for key, ceiling in gate.EXEMPT_CURRENT_BIG_FILES.items():
-            if "/" not in key:
-                continue
+        for key, recorded in self.baseline.items():
             actual = gate.count_lines(PROJECT_ROOT / key)
-            if ceiling > actual:
-                padded.append(f"{key}: 豁免 {ceiling} > 实际 {actual}")
-        self.assertEqual(padded, [], "豁免留了余量 · 改成实际行数")
+            if recorded > actual:
+                padded.append(f"{key}: 基线 {recorded} > 实际 {actual}")
+        self.assertEqual(padded, [], "基线留了余量 · 跑 --update-baseline 收紧")
 
 
 class DictionaryDataIsExemptByPath(unittest.TestCase):
@@ -147,8 +159,8 @@ class DictionaryDataIsExemptByPath(unittest.TestCase):
 class ExemptionDoesNotBleedAcrossDirectories(unittest.TestCase):
     """`static/pos/pos.js` 的 538 行口子,不许被别处任何一个 pos.js 白捡。
 
-    旧字典按 basename 认键(那时全是根目录巨石,不会串);新条目一律写路径 —— 这一条守的正是
-    "换了目录还认不认"。
+    旧字典按 basename 认键(那时全是根目录巨石,不会串);2026-08-01 起基线一律写仓库相对
+    路径 —— 这一条守的正是"换了目录还认不认"。
     """
 
     def test_same_basename_elsewhere_gets_the_plain_ceiling(self):
@@ -159,10 +171,10 @@ class ExemptionDoesNotBleedAcrossDirectories(unittest.TestCase):
         original_root = gate.PROJECT_ROOT
         gate.PROJECT_ROOT = root
         self.addCleanup(lambda: setattr(gate, "PROJECT_ROOT", original_root))
-        status, rel, lines, applied = gate.check_one(other, gate.DEFAULT_CEILING)
-        self.assertEqual(rel, "src/home/pos.js")
-        self.assertEqual(status, "FAIL")
-        self.assertEqual(applied, 500, "它拿到了 static/pos/pos.js 的豁免值 —— 串味了")
+        row = gate.check_one(other, gate.DEFAULT_CEILING, gate.load_baseline())
+        self.assertEqual(row.rel, "src/home/pos.js")
+        self.assertEqual(row.status, "FAIL")
+        self.assertEqual(row.limit, 500, "它拿到了 static/pos/pos.js 的基线值 —— 串味了")
 
 
 if __name__ == "__main__":

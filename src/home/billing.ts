@@ -14,6 +14,12 @@
 // ============================================================
 
 import { BAHT } from './money.js';
+import { copy as copyFlash } from './copy-flash.js';
+
+// 卡面显示带分隔线,复制进剪贴板的是不带的那串(网银粘进去就能用)。摆一起,免得改了账号
+// 只改显示的那一处,复制按钮还在发旧号。
+const BANK_ACCT = '230-0-91368-4';
+const BANK_DIGITS = BANK_ACCT.replace(/-/g, '');
 
 function _bt(k: string): string {
     return (typeof window.t === 'function' ? window.t(k) : null) || k;
@@ -114,7 +120,7 @@ function _render() {
         '      <div class="topup-v2-bank-card">',
         '        <div class="topup-v2-bank-name">ธนาคาร กรุงเทพ</div>',
         '        <div class="topup-v2-bank-branch">สาขาโชคชัย 4 ลาดพร้าว</div>',
-        '        <div class="topup-v2-bank-acct">230-0-91368-4</div>',
+        '        <div class="topup-v2-bank-acct">' + BANK_ACCT + '</div>',
         '        <div class="topup-v2-bank-holder">บจ. มิสเตอร์ อี อาร์ พี</div>',
         '        <button class="topup-v2-copy" id="tv2-copy"></button>',
         '      </div>',
@@ -256,18 +262,11 @@ function _bindEvents() {
             });
             _clrErr('tv2-ae');
         });
-    // copy
+    // copy · 反馈走 copy-flash(连点不卡死 + 非安全上下文也给反馈,见该模块文件头)
     var copyBtn = _g('tv2-copy');
     if (copyBtn)
         copyBtn.addEventListener('click', function () {
-            if (!navigator.clipboard) return;
-            navigator.clipboard.writeText('2300913684').then(function () {
-                var orig = copyBtn!.textContent;
-                copyBtn!.textContent = _bt('topup-copied');
-                setTimeout(function () {
-                    copyBtn!.textContent = orig;
-                }, 1500);
-            });
+            copyFlash(copyBtn, BANK_DIGITS, _bt('topup-copied'));
         });
     // drop zone
     var drop = _g('tv2-drop'),

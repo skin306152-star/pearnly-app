@@ -292,7 +292,7 @@
 
     function copyAcct(e) {
         var btn = e.target.closest('[data-action="bill-copy"]');
-        root.AI.copyFlash.copy(btn, R().BANK.digits, root.at('bill_copied'), { win: root });
+        root.CopyFlash.copy(btn, R().BANK.digits, root.at('bill_copied'), { win: root });
     }
 
     function onKeydown(e) {

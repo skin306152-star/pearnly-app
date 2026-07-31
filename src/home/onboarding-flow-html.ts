@@ -77,6 +77,10 @@ export const ONB_CSS = `
 .onb-note.warn{background:var(--warn-bg);}
 .onb-note.warn .ic{color:var(--warn);}
 .onb-note.warn b{color:var(--warn);}
+/* err = 后端把这次提交驳回了(warn 是「这么填会有后果」的提醒,两者不能同色)。 */
+.onb-note.err{background:var(--danger-bg);}
+.onb-note.err .ic{color:var(--danger);}
+.onb-note.err b{color:var(--danger);}
 .onb-acts{display:flex;align-items:center;margin-top:30px;gap:10px;}
 .onb-acts .grp{display:flex;gap:10px;align-items:center;margin-left:auto;}
 .onb-lnk{background:none;border:0;color:var(--ink2);font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}

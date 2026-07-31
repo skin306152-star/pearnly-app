@@ -28,6 +28,7 @@ const S = {
     loading: false, // 套账列表加载中 → 门壳先盖屏(防系统 UI 闪 1-3s)
     subject: newSubjectState(),
     busy: false,
+    createErr: '' as string, // 建主体被后端驳回的原话(留在表单上,不随 toast 2.5s 走掉)
     onCreated: null as ((id: number) => void) | null,
 };
 const esc = (s: unknown) => escapeHtml(String(s == null ? '' : s));
@@ -105,6 +106,18 @@ function pickPane(): string {
     );
 }
 
+// 被驳回的原因留在表单上。此前只发 toast:门期间 body.workspace-gate-preboot 把 body 直系
+// 子节点(#mp-toast-wrap 正是其一)整片按成 visibility:hidden,那句话一个像素没进用户眼睛;
+// 就算看得见,一条 2.5 秒就走的冒泡也不该是「表单该怎么填」的唯一载体。
+function createErrHtml(): string {
+    if (!S.createErr) return '';
+    return (
+        '<div class="onb-note err" id="wsg-create-err" role="alert">' +
+        onbIcon('warn', 'ic') +
+        `<div>${esc(S.createErr)}</div></div>`
+    );
+}
+
 function createPane(): string {
     // 副操作(确定按钮左侧 · 次级按钮 · 醒目可点):返回列表 / 退出登录 / 取消(见 escapeAction)。
     const e = escapeAction();
@@ -113,6 +126,7 @@ function createPane(): string {
         `<div class="onb-h1">${esc(t('wsg-create-title'))}</div>` +
         `<div class="onb-sub">${esc(t('wsg-create-sub'))}</div>` +
         subjectPaneInner(S.subject) +
+        createErrHtml() +
         `<div class="onb-acts">${back}` +
         subjectActionsHtml(S.subject, t('wsg-confirm'), S.busy) +
         '</div>'
@@ -171,6 +185,7 @@ async function onClick(e: Event): Promise<void> {
     if (t0.closest('[data-wsg-new]')) {
         S.view = 'create';
         S.subject = newSubjectState();
+        S.createErr = '';
         return render();
     }
     if (t0.closest('[data-wsg-back]')) {
@@ -204,6 +219,7 @@ async function doLookup(): Promise<void> {
 async function doCreate(): Promise<void> {
     if (S.busy) return;
     S.busy = true;
+    S.createErr = '';
     render();
     try {
         const created = await createSubject(S.subject);
@@ -215,7 +231,7 @@ async function doCreate(): Promise<void> {
         }
     } catch (err) {
         S.busy = false;
-        showToast(subjectErrorText(err), 'fail');
+        S.createErr = subjectErrorText(err); // 见 createErrHtml:原因留在表单上,不发会被门罩住的 toast
         render();
     }
 }
@@ -256,6 +272,7 @@ window.openSubjectCreate = function (opts?: { onCreated?: (id: number) => void }
     S.view = 'create';
     S.gated = false;
     S.subject = newSubjectState();
+    S.createErr = '';
     S.subjects = [];
     S.onCreated = (opts && opts.onCreated) || null;
     render();

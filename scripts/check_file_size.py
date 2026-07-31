@@ -11,6 +11,7 @@ scripts/check_file_size.py · REFACTOR-WC-P1 (2026-05-28 窗口 C · 防屎山�
   - 所有 *_routes.py(整顿期 B 阶段拆出的 FastAPI 路由)
   - 所有 services/**/*.py(整顿期 B 阶段拆出的业务层)
   - 所有 src/home/**/*.{js,css}(整顿期 C 阶段拆出的 Vite 模块)
+  - 所有 static/pos/** 与 static/scan/**(POS 收银 SPA + 扫码地基 · 2026-07-31 补)
 
 退出码:
   0 = 全部监控文件 ≤ 500 行(或在豁免段)
@@ -70,19 +71,43 @@ MONITORED_GLOBS = [
     "src/home/**/*.js",
     "src/home/**/*.ts",  # C5 TypeScript 迁移产物(.js→.ts)· 同 ≤500 约束 · 防脱离监控
     "src/home/**/*.css",
+    # 2026-07-31 补:POS 收银 SPA(plain-script,不进 Vite,所以 src/home/** 一直照不到它)
+    # 与扫码地基。整个 /pos 从来没被这道闸管过 —— 本批新写的 static/pos/pos-scan.js 一路涨到
+    # 530 行,闸报 PASS 是真的没看见,不是判它合格。存量巨石见下面的基线豁免。
+    # 故意没同步进 check_line_ratchet.py(它按路径前缀收,清单本来就与本闸有漂,见该文件注释):
+    # 那道闸按 commit 判净增长,而"不许再涨"这件事在这里已经由基线豁免钉死值做到了 ——
+    # 再加一道只会让 POS 的每个正常 commit 都要写一次 RATCHET-EXEMPT,红成噪音。
+    "static/pos/**/*.js",
+    "static/pos/**/*.css",
+    "static/pos/**/*.html",
+    "static/scan/**/*.js",
 ]
 
 # ── 历史巨石短期豁免 ──
 # 这些文件目前已经远超 500 · 不可能本周拆完 · 给一个"当前实际值"作豁免上限。
-# 棘轮(check_line_ratchet.py)会强制只准减不准增。
+# 豁免值钉死在当前行数(不留余量):再涨一行就红 = 「现值不红、但不许再涨」。
 # 等行数被拆到 ≤ 500 · 从本字典里删条目即可。
-# 数字以 2026-05-28 STATE_PEARNLY.md 头部为准。
+# 键写仓库相对路径(旧条目按 basename 也仍然认 · 见 check_one):basename 会跨目录串味 ——
+# 给 static/pos/pos.js 开的口子不该让将来任何一个叫 pos.js 的新文件跟着白拿 538 行。
 EXEMPT_CURRENT_BIG_FILES = {
     # 2026-06-02 清理:5 大巨石全部 <500(app.py 491/db.py 344/auth_signup 428/
     # home.html 397/home.css 0/home.js 已全迁 src/home 文件不存在)→ 全从豁免删除 ·
     # 改由默认 500 硬上限正常约束(只升不降棘轮另管 check_line_ratchet.py)。
     # 2026-06-03:login.html 着陆页换新(分层设计 · 壳 26 行 · 资产入 static/landing/)·
     # 巨石退场 → 删豁免 · 改由默认 500 正常约束。存量豁免已清空。
+    #
+    # 2026-07-31 · POS 收银 SPA 进监控带来的四条基线豁免。它们不是本批写出来的,是本批第一次
+    # 被这道闸看见 —— 当场按现值封顶,谁再往里塞谁红。deadline 到期没拆就把这条改成 FAIL 值
+    # (直接删条目)· 拆的时候照 pos-scan-fails.js 那样按职责切,别按行数腰斩。
+    # 屏1/3/4/5 一锅 · 拆解入口:收款流程 / 购物车 / 商品网格三块各自能独立验
+    "static/pos/pos-cashier.js": 1252,  # deadline 2026-09-30
+    # 取数 + 缓存 + 离线快照三件事在一个文件里
+    "static/pos/pos-data.js": 831,  # deadline 2026-09-30
+    # SPA 骨架(路由/切屏/语言)· 离 500 最近,最先该拆的一个
+    "static/pos/pos.js": 538,  # deadline 2026-09-30
+    # 三业态收银台的整张外壳(零售/药房/餐厅 + 全部弹窗骨架)· 模板类巨石,
+    # 拆法是按屏切片而不是切行,工程量最大 → deadline 给到最后
+    "static/pos/pos.html": 1429,  # deadline 2026-12-31
 }
 
 # 路径模式豁免(纯数据 / 自动生成 · 不算业务代码)
@@ -95,6 +120,9 @@ EXEMPT_PATH_PATTERNS = [
     ".venv/",
     "venv/",
     "static/i18n-data.js",  # 词典文件 · 真是数据
+    # POS SPA 的词典(window.POSI18N)· 与上面那份同一类东西:4 语翻译数据,行数只跟界面里
+    # 有多少句话成正比,拆开只会让"同一句话的四语"散在两个文件里。永久豁免,不设 deadline。
+    "static/pos/pos-i18n.js",
 ]
 
 
@@ -144,9 +172,12 @@ def check_one(path: Path, ceiling: int) -> tuple[str, str, int, int]:
     """
     rel = path.relative_to(PROJECT_ROOT).as_posix()
     lines = count_lines(path)
+    # 先按完整路径认,再回落 basename:老条目(app.py 那批)写的是裸文件名,而新条目一律写
+    # 路径 —— 否则一个 static/pos/pos.js 的豁免会顺手盖住任何同名新文件。
     rel_basename = rel.split("/")[-1] if "/" in rel else rel
-    if rel_basename in EXEMPT_CURRENT_BIG_FILES:
-        applied = EXEMPT_CURRENT_BIG_FILES[rel_basename]
+    key = rel if rel in EXEMPT_CURRENT_BIG_FILES else rel_basename
+    if key in EXEMPT_CURRENT_BIG_FILES:
+        applied = EXEMPT_CURRENT_BIG_FILES[key]
         if lines > applied:
             return ("FAIL", rel, lines, applied)
         return ("EXEMPT", rel, lines, applied)

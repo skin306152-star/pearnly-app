@@ -340,6 +340,9 @@
         discountReason = '';
         closeSheet();
         renderCart();
+        // 车空了 = 这一位客人的事完了(收完 / 挂单 / 店员清空)。扫码失败清单记的是这一单还欠
+        // 哪几件货,不跟着归零就会顶在下一位客人的屏上 —— 店员照着它去补一件不属于这单的货。
+        if (POS.scan) POS.scan.saleEnded();
     }
 
     // 移动端底部购物车 sheet(桌面 .cart-peek/.cart-scrim 为 display:none,这些类无副作用)

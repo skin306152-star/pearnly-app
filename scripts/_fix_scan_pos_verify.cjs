@@ -26,7 +26,7 @@ const { ROOT, PHONE, serve, gun, shotter, runCases } = require('./_gun_wedge_lib
 const STEADY_Y4M = path.resolve(process.argv[2] || '.scan_fixture.y4m');
 const BLINK_Y4M = path.resolve(process.argv[3] || '.scan_blink.y4m');
 const ONLY = process.argv[4] || '';
-const SHOTS = path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/fix');
+const SHOTS = path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/fix-pos');
 const shot = shotter(SHOTS);
 
 const BOX = '8850999320014'; // y4m 里那张码 · 挂在「ลัง」单位上 ฿350
@@ -415,19 +415,26 @@ async function zeroPriceBlocked(browser, origin) {
     await gun(page, NO_PRICE);
     let shown = true;
     try {
-        await page.waitForSelector('#bscan-card.show', { timeout: 10000 });
+        // 拒收落在 #bscan-fails 清单上,不再是那张会被下一件顶掉的单卡
+        await page.waitForSelector('#bscan-fails.show .bscan-fail', { timeout: 10000 });
     } catch (_) {
         shown = false;
     }
     const card = await page.evaluate(() => {
-        const msg = document.getElementById('bscan-card-msg');
-        const box = msg.getBoundingClientRect();
-        const cs = getComputedStyle(msg);
+        const row = document.querySelector('#bscan-fails .bscan-fail');
+        if (!row) return { text: '', hint: '', visible: false, maskShown: false };
+        const msg = row.querySelector('.bscan-fail-msg');
+        const box = row.getBoundingClientRect();
+        const cs = getComputedStyle(row);
+        const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
         return {
             text: msg.textContent,
-            hint: document.getElementById('bscan-card-hint').textContent,
+            hint: (row.querySelector('.bscan-fail-hint') || {}).textContent || '',
             visible: cs.display !== 'none' && cs.visibility !== 'hidden' && box.height > 0,
+            // 枪那条路上没有取景层:清单必须独立于它 —— 靠撑一层暗底来显形的旧拒收卡在枪扫时
+            // 会凭空糊住整个收银主屏,而店员这一刻正要接着扫下一件。
             maskShown: document.getElementById('bscan-mask').classList.contains('show'),
+            onTop: !!(top && row.contains(top)),
         };
     });
     const after = await cart(page);
@@ -437,7 +444,8 @@ async function zeroPriceBlocked(browser, origin) {
         ok:
             shown &&
             card.visible &&
-            card.maskShown &&
+            card.onTop &&
+            card.maskShown === false &&
             card.text ===
                 th.copy['posui.cart.unit_no_price']
                     .replace('{unit}', 'ลัง')

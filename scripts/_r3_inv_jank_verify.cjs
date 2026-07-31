@@ -17,7 +17,17 @@
  */
 const path = require('path');
 const { chromium } = require('@playwright/test');
-const { ROOT, DESKTOP, serve, shotter, runCases } = require('./_gun_wedge_lib.cjs');
+const {
+    ROOT,
+    DESKTOP,
+    serve,
+    cdpGun,
+    armLongTask,
+    armTwoRulers,
+    readTwoRulers,
+    shotter,
+    runCases,
+} = require('./_gun_wedge_lib.cjs');
 
 const SHOTS = path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/round3');
 const shot = shotter(SHOTS);
@@ -74,7 +84,9 @@ async function boot(browser, bag, origin) {
         return route.fulfill({ json: { ok: true, data: {}, items: [] } });
     });
     await page.goto(`${origin}/home.html`);
-    await page.waitForFunction(() => typeof window.routeTo === 'function', null, { timeout: 25000 });
+    await page.waitForFunction(() => typeof window.routeTo === 'function', null, {
+        timeout: 25000,
+    });
     await page.evaluate(() => {
         window.isOwner = () => true;
         window.getActiveWorkspaceClientId = () => 1;
@@ -109,26 +121,6 @@ async function primeBatchRow(page) {
     return await cell.inputValue();
 }
 
-async function armStall(page, nth, ms) {
-    await page.evaluate(
-        ([n, blockMs]) => {
-            window.__n = 0;
-            window.__stalled = null;
-            window.__stallProbe = () => {
-                window.__n += 1;
-                if (window.__n !== n) return;
-                const t0 = performance.now();
-                while (performance.now() - t0 < blockMs) {
-                    /* 长任务 */
-                }
-                window.__stalled = Math.round(performance.now() - t0);
-            };
-            document.addEventListener('keydown', window.__stallProbe, true);
-        },
-        [nth, ms]
-    );
-}
-
 async function snapshot(page) {
     return page.evaluate(() => {
         const rows = Array.from(document.querySelectorAll('#inv-in-mask [data-row]'));
@@ -151,20 +143,12 @@ async function gunIntoBatch(browser, origin, stall) {
     const typedBatch = await primeBatchRow(page);
     const before = await snapshot(page);
     bag.asked.length = 0;
-    if (stall) await armStall(page, 4, STALL_MS);
+    const cdp = await page.context().newCDPSession(page);
+    await armTwoRulers(page);
+    if (stall) await armLongTask(page, 4, STALL_MS);
     // 第二箱:枪 6ms/字符打进批号框(光标就停在店员刚填批号的地方 —— 这是真实动作顺序)
-    await page.evaluate(() => {
-        window.__ks = [];
-        window.__kp = () => window.__ks.push(performance.now());
-        document.addEventListener('keydown', window.__kp, true);
-    });
-    await page.keyboard.type(MILK, { delay: 6 });
-    await page.keyboard.press('Enter');
-    const raw = await page.evaluate(() => {
-        document.removeEventListener('keydown', window.__kp, true);
-        return window.__ks;
-    });
-    const gaps = raw.slice(1).map((t, i) => Math.round(t - raw[i]));
+    await cdpGun(cdp, MILK, 6, 'Enter');
+    const m = await readTwoRulers(page);
     await page.waitForTimeout(1100);
     const after = await snapshot(page);
     await shot(page, stall ? 'i1-gun-into-batch-with-stall.png' : 'i2-gun-into-batch-clean.png');
@@ -172,19 +156,25 @@ async function gunIntoBatch(browser, origin, stall) {
     const filled = (rs) => rs.filter((r) => r.product).length;
     const addedRow = filled(after.rows) > filled(before.rows);
     const batchRestored = after.rows[0] && after.rows[0].batch === typedBatch;
-    const ok = addedRow && batchRestored && bag.asked.includes(MILK);
+    // 卡那一例的前提:页面真的卡了(处理时刻跨过 100ms)而枪自己没被拖慢(产生时刻仍在枪速内)。
+    // 少了这两条,「加行了」也可能只是「这次没卡起来」—— 那种绿什么都没保住。
+    const jankHappened = !stall || (m.perfMax > 100 && m.stampMax <= 50);
+    const ok = jankHappened && addedRow && batchRestored && bag.asked.includes(MILK);
     return {
         ok,
         stall: !!stall,
+        jankHappened,
         typedBatch,
-        maxGap: gaps.length ? Math.max(...gaps) : 0,
+        measured: m,
         beforeRows: before.rows,
         afterRows: after.rows,
         asked: bag.asked,
         msgText: after.msgText,
         why: ok
             ? ''
-            : '这一发枪扫既没加行也没查码,屏上零提示,码原样怼在店员填好的批号里',
+            : !jankHappened
+              ? `没造出「页面卡了但枪没慢」这个前提:处理 ${m.perfMax}ms / 产生 ${m.stampMax}ms`
+              : '这一发枪扫既没加行也没查码,屏上零提示,码原样怼在店员填好的批号里',
     };
 }
 

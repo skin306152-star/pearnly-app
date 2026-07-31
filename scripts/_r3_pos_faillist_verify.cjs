@@ -29,7 +29,9 @@ const WATER_ITEM = {
     base_price: '10.00',
     image_url: null,
     vat_applicable: true,
-    units: [{ unit_name: 'ขวด', factor: '1.000', barcode: WATER, price: '10.00', default_sell: true }],
+    units: [
+        { unit_name: 'ขวด', factor: '1.000', barcode: WATER, price: '10.00', default_sell: true },
+    ],
     track_batch: false,
     is_weighed: false,
     stock: { qty_base: '48.000', near_expiry: false },
@@ -39,7 +41,9 @@ const LATER_ITEM = Object.assign({}, WATER_ITEM, {
     id: 'p-later',
     name: { th: 'ขนมปัง', en: 'Bread', zh: '面包', ja: 'パン' },
     base_price: '25.00',
-    units: [{ unit_name: 'ถุง', factor: '1.000', barcode: LATER, price: '25.00', default_sell: true }],
+    units: [
+        { unit_name: 'ถุง', factor: '1.000', barcode: LATER, price: '25.00', default_sell: true },
+    ],
     base_unit: 'ถุง',
     matched_unit: 'ถุง',
 });
@@ -190,7 +194,7 @@ async function coversTheTill(browser, origin) {
             pts.push({
                 y: Math.round(y),
                 top: top ? top.className || top.tagName : null,
-                under: under ? (under.id || under.className || under.tagName) : null,
+                under: under ? under.id || under.className || under.tagName : null,
                 underText: under ? (under.textContent || '').trim().slice(0, 40) : '',
             });
         }

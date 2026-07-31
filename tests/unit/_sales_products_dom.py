@@ -24,6 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCAN_TS = PROJECT_ROOT / "src" / "home" / "sales-products-scan.ts"
 CAM_TS = PROJECT_ROOT / "src" / "home" / "sales-products-scan-cam.ts"
 PRODUCTS_TS = PROJECT_ROOT / "src" / "home" / "sales-products.ts"
+WEDGE_JS = PROJECT_ROOT / "static" / "scan" / "scan-wedge.js"
 
 # ── 宿主桩 + 模块装载(所有场景共用)───────────────────────────────────────
 PRELUDE = """
@@ -32,8 +33,11 @@ const fs = require('fs');
 
 const nodes = {};
 const TAG_WITH_ID = /<[a-z][^>]*\sid="([^"]+)"[^>]*>/gi;
-// 元素表由产品自己吐的 HTML 现建:id / value / checked 都读它写的那一份,
-// 浏览器会把这些属性同步成属性值,桩也照做。
+const DATA_ATTR = /\s(data-[a-z0-9-]+)="([^"]*)"/gi;
+const camel = (name) => name.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+// 元素表由产品自己吐的 HTML 现建:id / value / checked / data-* 都读它写的那一份,
+// 浏览器会把这些属性同步成属性值和 dataset,桩也照做 —— 楔子的 declaresGun 正是读这两样,
+// 桩不同步就等于「产品声明了接枪」这件事在测试里从来没成立过。
 function registerIds(html) {
     let m;
     while ((m = TAG_WITH_ID.exec(html))) {
@@ -44,6 +48,12 @@ function registerIds(html) {
         if (/\schecked[\s>]/.test(tag)) el.checked = true;
         const name = /^<([a-z]+)/i.exec(tag);
         if (name) el.tagName = name[1].toUpperCase();
+        let d;
+        DATA_ATTR.lastIndex = 0;
+        while ((d = DATA_ATTR.exec(tag))) {
+            el.attrs[d[1]] = d[2];
+            el.dataset[camel(d[1])] = d[2];
+        }
     }
 }
 function makeEl(id) {
@@ -58,12 +68,16 @@ function makeEl(id) {
         checked: false,
         focused: 0,
         style: {},
+        attrs: {},
         dataset: {},
         options: [],
         kids: [],
         get innerHTML() { return html; },
         // 产品自己渲染的 HTML 就是元素表的来源:断言的 id 只可能来自真实产物
         set innerHTML(v) { html = String(v); registerIds(html); },
+        // 楔子 declaresGun 先看 dataset 再回落 getAttribute:两条都得在,不然只验到了一条
+        getAttribute(k) { return Object.prototype.hasOwnProperty.call(el.attrs, k) ? el.attrs[k] : null; },
+        setAttribute(k, v) { el.attrs[k] = v; },
         focus() { el.focused += 1; },
         remove() { delete nodes[el.id]; },
         appendChild(c) { if (c && c.id) nodes[c.id] = c; el.kids.push(c); return c; },
@@ -74,12 +88,18 @@ function makeEl(id) {
     if (id) nodes[id] = el;
     return el;
 }
+const keyHandlers = [];
 global.document = {
     getElementById: (id) => nodes[id] || null,
     createElement: (tag) => {
         const e = makeEl('');
         e.tagName = String(tag || 'div').toUpperCase();
         return e;
+    },
+    addEventListener: (type, fn) => { if (type === 'keydown') keyHandlers.push(fn); },
+    removeEventListener: (type, fn) => {
+        const i = keyHandlers.indexOf(fn);
+        if (i >= 0) keyHandlers.splice(i, 1);
     },
     head: makeEl('head'),
     body: makeEl('body'),
@@ -147,13 +167,46 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 忙等:枪速那几毫秒不能交给调度器(setTimeout 在负载下会漂到 50ms 以上,那就不是枪了)
 const spin = (ms) => { const until = Date.now() + ms; while (Date.now() < until) {} };
 const out = (o) => process.stdout.write(JSON.stringify(o));
+
+// ── 真楔子(不是桩)────────────────────────────────────────────────────
+// 装上 static/scan/scan-wedge.js 本体,让建品表单像在浏览器里那样从它那里收回调。
+// 用桩楔子只能验「产品收到 X 时怎么办」;而这一批要验的恰恰是【X 会不会发生】——
+// 判据只有一份、在楔子里,桩楔子直接喂碎片等于绕过判据自问自答。
+function installRealWedge() {
+    const wedge = require(process.argv[4]);
+    global.window.PearnlyScanWedge = wedge;
+    return wedge;
+}
+// 一次按键:先跑 keydown 处理器(楔子挂在这),再照浏览器的顺序把字符落进框 + 发 input 事件。
+// stamp = 事件【产生】的时刻(KeyboardEvent.timeStamp)· 楔子的尺子量的就是它,不是墙钟。
+function press(key, target, stamp) {
+    let prevented = 0;
+    keyHandlers.forEach((h) =>
+        h({ key, target, timeStamp: stamp, repeat: false, preventDefault: () => { prevented += 1; } })
+    );
+    if (key.length === 1 && target && typeof target.value === 'string') {
+        target.value += key;
+        if (typeof target.oninput === 'function') target.oninput();
+    }
+    return prevented;
+}
+/** 按 gapMs 一个字符地把 code 打进 target;真 sleep,让楔子那只 150ms 计时器照常跑。 */
+async function typeAt(code, target, gapMs, t0) {
+    let stamp = t0 === undefined ? 1000 : t0;
+    for (const ch of code) {
+        press(ch, target, stamp);
+        stamp += gapMs;
+        await sleep(gapMs);
+    }
+    return stamp;
+}
 """
 
 
 def run(body: str) -> dict:
     """PRELUDE + body 在 node 里跑一遍,返回 body 用 out() 吐的 JSON。"""
     proc = subprocess.run(
-        ["node", "-e", PRELUDE + body, str(CAM_TS), str(SCAN_TS), str(PRODUCTS_TS)],
+        ["node", "-e", PRELUDE + body, str(CAM_TS), str(SCAN_TS), str(PRODUCTS_TS), str(WEDGE_JS)],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         timeout=90,

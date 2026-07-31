@@ -29,7 +29,9 @@ const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html
 const COLA = '8850999320014'; // 假摄像头素材里的那张码
 const MILK = '4901234567894'; // 批次品 · 用来验批号/效期格真的露出来
 const BOX = '8850999320021'; // 同一件可乐的箱码(挂在 product_units 上 · 12 瓶一箱)
-const GHOST = '9999999999999'; // 库里没有 · 未命中卡
+// 库里没有。不写成全 9：一串一模一样的字符会被楔子当「按住键不放」挡掉
+// （looksLikeGun 的 hasTwoDistinct），在声明接枪的框里整发静默丢掉，验的就不是未命中了。
+const GHOST = '9999999999994';
 const BOX_UNIT = 'ลัง';
 
 const P_COLA = {

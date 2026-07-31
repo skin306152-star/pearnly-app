@@ -194,6 +194,9 @@ class CreateSaleCostWiringTests(unittest.TestCase):
         product = {
             "id": "prod1",
             "base_unit": "ea",
+            # 挂牌价:真行里这一列一直都在(可为 NULL),桩以前省着不写是因为没人读它。
+            # 卖货那条路现在要读 —— 没挂牌价的货不许卖(见 test_pos_sale_unpriced_unit)。
+            "unit_price": Decimal("10"),
             "track_batch": True,
             "vat_applicable": True,
             "name_th": "โค้ก",

@@ -269,11 +269,11 @@ async function countScans(browser, origin, ms) {
     return got;
 }
 
-// 举着不动 4.2s:反光/对焦让整段整段地读不出(最长 ≈733ms,观测空白约 1.1s,贴着 clearAfterMs
-// 的 1200ms 上限),但那件货一次都没离开取景框 → 只能记 1 件。按时间节流的更早那版在这里记
-// 3~4 件 —— 客人被收三四份钱,屏上不报任何错。按帧数判「离开」的那版在【原生解码器】上同样
-// 会多记(4 帧 ≈ 500ms);这台跑的是 ZXing 回落,一个「读不出」的采样就要 240ms,红不出来 ——
-// 那条路的红证在 tests/unit/test_scan_camera_runtime.py(解码耗时在那里是可控变量)。
+// 举着不动 4.2s:反光/对焦让整段整段地读不出(最长 ≈733ms,观测空白被解码耗时撑到约 1.1s),
+// 但那件货一次都没离开取景框 → 只能记 1 件。按时间节流的更早那版在这里记 3~4 件 —— 客人被收
+// 三四份钱,屏上不报任何错。这一版判「离开」要两把尺子同时够(连着 N 次采样没解出它 + 距最后
+// 一次解出它够久),733ms 这一段两把都远没到。判据本身的红证在
+// tests/unit/test_scan_camera_runtime.py(那里解码耗时是可控变量,而它正是病根所在)。
 async function holdStill(browser, origin) {
     const got = await countScans(browser, origin, 4200);
     return { ok: got.n === 1 && got.errs.length === 0, ...got };

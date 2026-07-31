@@ -28,7 +28,7 @@ DIST = PROJECT_ROOT / "static" / "dist"
 BUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build-home-js.mjs"
 
 RESIDENT = ("scan-loader.js", "scan-wedge.js")  # 必须首屏就在(枪可能一开页面就被扫)
-LAZY = ("scan-camera.js", "scan-zxing-shim.js")  # 点了扫码才拉
+LAZY = ("scan-camera.js", "scan-errors.js", "scan-zxing-shim.js")  # 点了扫码才拉
 SCAN_SOURCES = RESIDENT + LAZY
 FIRST_PAINT_BUNDLES = ("pos.js", "pre.js")
 
@@ -176,6 +176,19 @@ class SourceContractTests(unittest.TestCase):
             r"getTracks\(\)\.forEach\(function \(t\) \{\s*t\.stop\(\);",
         )
 
+    def test_engine_watches_the_track_it_decodes_on_both_paths(self):
+        # 相机被系统收走之后 <video> 停在最后一帧(readyState 仍是 4、videoWidth 仍是 640),
+        # videoReady() 于是恒真 —— 不盯轨道就会一直解同一张死图,屏上照旧说「对准条码」。
+        # 两条路缺一不可,所以两条都钉:事件那条管「立刻」,轮询那条管「stop() 不发事件」
+        # (页面外部收走轨道走的正是它,只订事件对整类全盲)。行为归 test_scan_camera_runtime。
+        engine = _read(SCAN_DIR / "scan-camera.js")
+        self.assertIn("shell.watchTracks(", engine, "引擎没挂轨道生死看门人")
+        self.assertRegex(engine, r"if \(lost\(token\)\) return;", "tick 里没有每拍轮询那一侧")
+        watch = _read(SCAN_DIR / "scan-errors.js")
+        self.assertIn("addEventListener('ended'", watch, "事件那一侧没订")
+        self.assertIn("readyState !== 'ended'", watch, "轮询那一侧没判 readyState")
+        self.assertIn("visibilityState", watch, "后台期间仍在给冻结画面计时 · 回来会误判相机坏")
+
     def test_start_has_a_timeout_not_a_busy_wait(self):
         # Odoo 那个 FIXME 的位置:它 `while (!ready) await delay(10)` 死等。三把尺子各管一段:
         # 权限弹窗(人的时间)/ 相机出帧 / 解码器下载 —— 共用一把就会答非所问。
@@ -209,8 +222,36 @@ class SourceContractTests(unittest.TestCase):
 
     def test_error_keys_and_ui_keys_share_one_namespace(self):
         # 引擎不翻译,只回 i18n 键;两个 SPA 各自的字典里放同名键。键名散了就会有一档漏翻译。
-        keys = set(re.findall(r"'(bscan\.[\w.]+)'", _read(SCAN_DIR / "scan-camera.js")))
+        keys = set(re.findall(r"'(bscan\.[\w.]+)'", _read(SCAN_DIR / "scan-errors.js")))
         self.assertGreaterEqual(len(keys), 8, f"bscan.* 键抓取异常: {keys}")
+
+    def test_error_module_loads_before_the_engine(self):
+        # 引擎在【加载期】就把 scanError/withTimeout 抓进闭包 —— 顺序反了不是少一个函数,
+        # 是整个 dist/scan.js 加载即抛。清单和产物两处都验:清单可以用变量拼,产物里的
+        # 先后才是真正的执行时序(同 test_wedge_precedes_cashier_logic_in_pos_bundle)。
+        manifest = _read(BUILD_SCRIPT)
+        block = manifest[manifest.index("out: 'static/dist/scan.js'") :]
+        block = block[: block.index("],")]
+        self.assertLess(
+            block.index("scan/scan-errors.js"),
+            block.index("scan/scan-camera.js"),
+            "构建清单里 scan-errors.js 排在引擎之后了",
+        )
+        code = _read(DIST / "scan.js")
+        anchor = "NotReadableError"  # 只出现在 scan-errors.js 的 MEDIA_ERRORS 表
+        self.assertIn(anchor, code, "scan-errors.js 的锚点没了 · 判据失效比断言失败更危险")
+        self.assertLess(
+            code.index(anchor),
+            code.index("cropRatio"),  # 只出现在 scan-camera.js
+            "dist/scan.js 里错误分档排在引擎之后了",
+        )
+
+    def test_engine_refuses_to_start_without_the_error_module(self):
+        # 硬 guard 不是装饰:少了错误分档就无声跑起来,第一次报错时 scanError 是 undefined,
+        # 店员看到的是白屏而不是「相机被别的应用占着」。
+        src = _read(SCAN_DIR / "scan-camera.js")
+        self.assertRegex(src, r"typeof shell\.scanError !== 'function'")
+        self.assertIn("scan-errors.js", src, "抛的话里没说缺的是哪个文件")
 
     def test_engine_does_not_call_a_translator_itself(self):
         # 翻译函数由调用方传进来(POS 是 POS.t,主站是全局 t)。引擎里写死任何一个都会让

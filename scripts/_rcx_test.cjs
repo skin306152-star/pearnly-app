@@ -10,7 +10,8 @@ const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 let passed = 0,
     failed = 0;
-const ok = (c, m) => (c ? (passed++, console.log('  ✓ ' + m)) : (failed++, console.log('  ✗ ' + m)));
+const ok = (c, m) =>
+    c ? (passed++, console.log('  ✓ ' + m)) : (failed++, console.log('  ✗ ' + m));
 
 (async () => {
     // 1) 打包真控制器(IIFE · 浏览器可直接 eval)
@@ -70,13 +71,18 @@ const ok = (c, m) => (c ? (passed++, console.log('  ✓ ' + m)) : (failed++, con
     ok((await page.locator('#rcx-results.rcx-show').count()) === 0, '初始不显结果指标');
     ok(await page.isVisible('#rcx-balance'), '银行 tab 显余额预检');
 
-    const hasShow = (sel) => page.evaluate((s) => document.querySelector(s).classList.contains('rcx-show'), sel);
-    const hasHidden = (sel) => page.evaluate((s) => document.querySelector(s).classList.contains('rcx-hidden'), sel);
+    const hasShow = (sel) =>
+        page.evaluate((s) => document.querySelector(s).classList.contains('rcx-show'), sel);
+    const hasHidden = (sel) =>
+        page.evaluate((s) => document.querySelector(s).classList.contains('rcx-hidden'), sel);
 
     // 模板中心抽屉(银行:2 模板)· 抽屉用 transform 隐藏 → 判 rcx-show 类
     await page.click('#rcx-template-btn');
     ok(await hasShow('#rcx-tplpanel'), '点模板中心→抽屉打开');
-    ok((await page.locator('#rcx-template-list .rcx-template-card').count()) === 2, '银行抽屉=2 个模板');
+    ok(
+        (await page.locator('#rcx-template-list .rcx-template-card').count()) === 2,
+        '银行抽屉=2 个模板'
+    );
     ok((await page.locator('[data-rcx-dl-doc="statement"]').count()) === 1, '含 statement 模板');
     ok((await page.locator('[data-rcx-dl-doc="gl"]').count()) === 1, '含 gl 模板');
     await page.keyboard.press('Escape');
@@ -91,7 +97,10 @@ const ok = (c, m) => (c ? (passed++, console.log('  ✓ ' + m)) : (failed++, con
     // 切到收入对账:标题/模板换,余额隐藏
     await page.click('[data-rcx-tab="income"]');
     ok((await page.textContent('#rcx-card-left h3')) === '总账（GL）', '收入对账左卡=总账');
-    ok((await page.textContent('#rcx-card-right h3')) === '税表（VAT 报告）', '收入对账右卡=税表VAT');
+    ok(
+        (await page.textContent('#rcx-card-right h3')) === '税表（VAT 报告）',
+        '收入对账右卡=税表VAT'
+    );
     ok(await hasHidden('#rcx-balance'), '收入对账隐藏余额预检');
     await page.click('#rcx-template-btn');
     ok((await page.locator('[data-rcx-dl-doc="vat"]').count()) === 1, '收入抽屉含 vat 模板');
@@ -100,7 +109,10 @@ const ok = (c, m) => (c ? (passed++, console.log('  ✓ ' + m)) : (failed++, con
     // 切到销项税核查
     await page.click('[data-rcx-tab="tax"]');
     ok((await page.textContent('#rcx-card-left h3')) === '销项税报告', '销项税左卡=销项税报告');
-    ok((await page.textContent('#rcx-card-right h3')) === '销售发票明细', '销项税右卡=销售发票明细');
+    ok(
+        (await page.textContent('#rcx-card-right h3')) === '销售发票明细',
+        '销项税右卡=销售发票明细'
+    );
 
     // 回银行 tab,真传两份文件 → 启用开始
     await page.click('[data-rcx-tab="bank"]');

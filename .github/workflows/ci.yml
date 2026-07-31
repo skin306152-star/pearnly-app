@@ -375,6 +375,14 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
 
+      # 条码枪楔子默认让开输入框,要接枪的框必须写 data-enable-barcode="gun"。裸声明在运行期
+      # 看不出毛病(引擎按最安全那档兜底),但它等于「这个框接不接枪没人明写过」—— 引擎删掉
+      # 第二档之后,四处声明点漏写档位一处都不会红。本闸就是那道没人盯的缝。
+      - name: 条码枪 opt-in 声明闸 · 声明必须带显式档位值
+        run: python scripts/check_scan_optin.py --quiet
+        env:
+          PYTHONIOENCODING: utf-8
+
       # Node deps must be installed BEFORE unit tests: the *_frontend node
       # gates (format-date / ui-templates / with-loading) require esbuild to
       # compile the src/home TS, else they fail with "Cannot find module

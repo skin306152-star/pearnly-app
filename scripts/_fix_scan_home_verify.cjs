@@ -18,7 +18,7 @@
  */
 const path = require('path');
 const { chromium } = require('@playwright/test');
-const { ROOT, DESKTOP, serve, gun, shotter, runCases } = require('./_gun_wedge_lib.cjs');
+const { ROOT, DESKTOP, GHOST, serve, gun, shotter, runCases } = require('./_gun_wedge_lib.cjs');
 
 const ONLY = process.argv[2] || '';
 const SHOTS = path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/fix');
@@ -26,7 +26,6 @@ const shot = shotter(SHOTS);
 
 const COLA = '8850999320014'; // 非批次品
 const MILK = '4901234567894'; // 批次品
-const GHOST = '9999999999999'; // 库里没有
 // 手打分段:每段内部是正常打字速度(段内攒得起来),段间停 400ms(远超楔子 150ms 的收尾线)。
 // 断在哪由人在哪停顿决定,不由条码的印刷分组决定。只验官方分组 8/850999/320014 会全绿 ——
 // 它每一段都恰好是框里那串的前缀,老规则正好盖住;店里真出事的是下面那几种尾段/中段。

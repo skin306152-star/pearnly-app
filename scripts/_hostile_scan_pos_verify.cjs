@@ -141,9 +141,12 @@ const failsState = (page) =>
             head: (box.querySelector('.bscan-fails-n') || { textContent: '' }).textContent,
             rows: [...box.querySelectorAll('.bscan-fail')].map((r) => ({
                 msg: (r.querySelector('.bscan-fail-msg') || { textContent: '' }).textContent,
-                code: (r.querySelector('.bscan-code') || r.querySelector('.bscan-fail-code') || {
-                    textContent: '',
-                }).textContent,
+                code: (
+                    r.querySelector('.bscan-code') ||
+                    r.querySelector('.bscan-fail-code') || {
+                        textContent: '',
+                    }
+                ).textContent,
                 hint: (r.querySelector('.bscan-fail-hint') || { textContent: '' }).textContent,
             })),
         };

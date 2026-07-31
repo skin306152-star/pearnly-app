@@ -1,0 +1,88 @@
+{
+  "phoneBlocksNothing": {
+    "ok": true,
+    "list": {
+      "isVisible": true,
+      "display": "block",
+      "position": "relative",
+      "h": 265,
+      "top": 128,
+      "onTop": true,
+      "topTag": "bscan-fail-hint"
+    },
+    "searchBox": {
+      "isVisible": true,
+      "display": "block",
+      "position": "static",
+      "h": 20,
+      "top": 80,
+      "onTop": true,
+      "topTag": "main-search"
+    },
+    "searchCoverage": {
+      "points": 25,
+      "blocked": 0,
+      "ratio": 0,
+      "offscreen": false
+    },
+    "gridCoverage": {
+      "points": 36,
+      "blocked": 0,
+      "ratio": 0,
+      "offscreen": false
+    }
+  },
+  "desktopBlocksNothing": {
+    "ok": true,
+    "list": {
+      "isVisible": true,
+      "display": "block",
+      "position": "relative",
+      "h": 272,
+      "top": 132,
+      "onTop": true,
+      "topTag": "bscan-fail"
+    },
+    "searchBox": {
+      "isVisible": true,
+      "display": "block",
+      "position": "static",
+      "h": 20,
+      "top": 84,
+      "onTop": true,
+      "topTag": "main-search"
+    },
+    "searchCoverage": {
+      "points": 25,
+      "blocked": 0,
+      "ratio": 0,
+      "offscreen": false
+    },
+    "gridCoverage": {
+      "points": 36,
+      "blocked": 0,
+      "ratio": 0,
+      "offscreen": false
+    }
+  },
+  "aboveCameraLayer": {
+    "ok": true,
+    "maskUp": true,
+    "list": {
+      "isVisible": true,
+      "display": "block",
+      "position": "relative",
+      "h": 265,
+      "top": 128,
+      "onTop": true,
+      "topTag": "bscan-fail-hint"
+    }
+  },
+  "searchSettlesOneRow": {
+    "ok": true,
+    "before": 2,
+    "after": 1,
+    "searchValue": "8850111000022",
+    "otherStays": true
+  }
+}

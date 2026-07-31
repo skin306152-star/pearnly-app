@@ -8,8 +8,10 @@
  */
 // 版本号跟 pos.html 里 dist/pos.js 的 ?v= 保持一致:外壳 bundle 一变(本次并入扫码常驻层)
 // 就换缓存名,否则离线缓存里那份旧 bundle 永远不会被换掉,店里那台机器扫码功能压根不存在。
-const V = '12043121';
-const CACHE = 'pearnly-pos-v' + V;
+const V = '12043501';
+// 前缀 = 「这一族缓存是我的」的唯一凭据(见 dropStaleCaches)。CACHE 由它拼出来,两处不分家。
+const PREFIX = 'pearnly-pos-v';
+const CACHE = PREFIX + V;
 const SHELL = ['/pos'];
 // 扫码那两个产物不写在 HTML 里,是 scan-loader.js 运行时现拼 URL 拉的(?v 抠自页面上 pos.js
 // 的 ?v,所以这里跟 CACHE 共用同一个 V,漂不开)。不预缓存 = 断网还能卖货却扫不了码,而
@@ -45,10 +47,18 @@ self.addEventListener('activate', (e) => {
     );
 });
 
+// 只删自己这一族。CacheStorage 是按源的、不按 SW 作用域分家:caches.keys() 在这里同样列得出
+// /cashier 那个 SW 的缓存,而删除时没有任何作用域保护。「不是我这个就删」于是变成:老设备点一下
+// /pos,在用的收银台离线外壳被整族抹掉 —— 那台机器断网再开是浏览器网络错误页,不是离线模式,
+// 是彻底打不开、货卖不了(反过来同理)。认不出来历的缓存宁可留着:多占几 MB 换不掉一台收银机。
 function dropStaleCaches() {
     return caches
         .keys()
-        .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))));
+        .then((keys) =>
+            Promise.all(
+                keys.filter((k) => k.startsWith(PREFIX) && k !== CACHE).map((k) => caches.delete(k))
+            )
+        );
 }
 
 self.addEventListener('fetch', (e) => {

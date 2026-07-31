@@ -65,13 +65,15 @@ export function scanPart(maskId: string, name: string): HTMLElement | null {
 // 这一格消息位原先只装得下一句话:后一件的「已加入」把前一件的「这个码没建档」盖掉,店员按
 // 屏上反馈收货,被盖掉的那件就是「扫了、没进单、也没人告诉他」的货 —— 一整箱凭空从收货单上
 // 消失。所以没落地的码进一份失败清单,成功/进行中只占最后那一行瞬时位,永远不覆盖清单。
-// 清单只由四件事变动:同一个码后来真加进去了(resolveFail)、那条的出路被走过了(replaceFail)、
-// 店员自己点掉(ackFails)、这轮扫码结束(resetFeedback)。
+// 清单只由五件事变动:同一个码后来真加进去了(resolveFail)、那条的出路被走过了(replaceFail)、
+// 店员点掉那一行自己的出路(dropFail)、店员点「知道了」(ackFails)、这轮扫码结束(resetFeedback)。
 // 收银台那一侧(static/pos/pos-scan.js 的 fails)是同一套:累积 + 计数 + 只有店员点得掉。
 // 这边多一条按码去重 —— 收货时同一箱货常被反复扫,同一个码叠出一摞一模一样的卡没有意义。
 interface ScanFail {
     code: string;
     html: string;
+    /** 「刚才那一下被当成同一件挡下了」那一行 —— 销账规矩跟别的不一样,见 resolveFail。 */
+    dup?: boolean;
 }
 const FAILS_MAX = 20; // 只防无限长撑破弹窗;真实一轮收货不会有 20 个码进不来
 let fails: ScanFail[] = [];
@@ -112,11 +114,21 @@ export function paintNote(el: HTMLElement | null, tone: string, html: string): v
 }
 
 /** 这个码没落地 —— 排进失败清单。最新的排最上面(不滚动也看得见刚扫那件),同码只刷新一条。 */
-export function pushFail(el: HTMLElement | null, code: string, html: string): void {
+export function pushFail(
+    el: HTMLElement | null,
+    code: string,
+    html: string,
+    opts?: { dup?: boolean }
+): void {
     fails = fails.filter((f) => f.code !== code);
-    fails.unshift({ code, html });
+    fails.unshift({ code, html, dup: !!(opts && opts.dup) });
     fails.length = Math.min(fails.length, FAILS_MAX);
     render(el);
+}
+
+/** 这个码已经欠着一笔了吗 —— 调用方靠它决定要不要再排一条(见 inventory-scan.ts 的 onCameraDup)。 */
+export function hasFail(code: string): boolean {
+    return fails.some((f) => f.code === code);
 }
 
 /** 店员点「知道了」:清单归零,瞬时行不动(那是另一件事的状态)。 */
@@ -132,8 +144,24 @@ export function replaceFail(el: HTMLElement | null, code: string, html: string):
     render(el);
 }
 
-/** 这个码这次真加进行里了(建完品回来重扫)→ 它的待办到此为止。 */
+/**
+ * 这个码这次真加进行里了(建完品回来重扫)→ 它的待办到此为止。
+ *
+ * dup 那一行是唯一的例外:它说的是【那一箱】可能没进单,而这个码后来又真记上一件,记的是
+ * 【再一箱】—— 拿后者销前者等于把没进单的那箱悄悄抹掉,屏上于是跟全都收上了一模一样。
+ * 真浏览器实测(1.2s 与 2.0s 空档交替、无人触碰、14.1 秒):不加这条例外时那行被自动抹掉
+ * 2 次,收货单最后 3 件而柜台上过了 6 箱。所以它只有店员销得掉 —— 点「是第二件 · 加 1」
+ * (走 dropFail)或点「知道了」。收银台同一招(static/pos/pos-scan.js 的 resolveFail)。
+ */
 export function resolveFail(el: HTMLElement | null, code: string): void {
+    const at = fails.findIndex((f) => f.code === code && !f.dup);
+    if (at < 0) return;
+    fails.splice(at, 1);
+    render(el);
+}
+
+/** 店员点掉了那一行自己的出路 → 这笔账由他那一下结掉,不管它是哪一档。 */
+export function dropFail(el: HTMLElement | null, code: string): void {
     const at = fails.findIndex((f) => f.code === code);
     if (at < 0) return;
     fails.splice(at, 1);
@@ -161,6 +189,40 @@ export function notFoundHtml(code: string): string {
         `data-scan-create="${escapeHtml(code)}"`,
         'bscan.notfound_create'
     )}`;
+}
+
+/**
+ * 楔子把这一串当成人在打字了(见 static/scan/scan-wedge.js 的 onTyped)。
+ *
+ * 它不是错误 —— 店员多半真的在填批号/效期,所以走最弱的那一档(tip)、只占瞬时行、不进
+ * 待办队列。但必须看得见:慢枪扫的那一发也长这样,静默丢掉就是三轮实测的「整箱从收货单
+ * 消失、屏上零字」。带上那串字符是唯一能让店员认出「原来是我刚才那一枪」的凭据,再给一条
+ * 出路 —— 判不准时机器偏向人手,判错的那一半由店员一点补回来。
+ */
+export function typedHtml(code: string): string {
+    return (
+        `<span class="c">${escapeHtml(t('inv-scan-typed'))}</span>` +
+        `<b class="inv-scan-code">${escapeHtml(code)}</b>` +
+        actionHtml(`data-scan-typed="${escapeHtml(code)}"`, 'inv-scan-typed-use')
+    );
+}
+
+/**
+ * 摄像头把这一次当成「同一件还在画面里」挡下了(见 static/scan/scan-camera.js 的 onDuplicate)。
+ *
+ * 它进【待办队列】,不占瞬时行。曾经按「这只是一句可能的问话,别给队列注水」放在瞬时行,
+ * 而瞬时行只有一格:下一次扫码的第一句(lookup 开头那句「正在查这个条码」)就把整格盖掉。
+ * 真浏览器实测(1.2s/2.0s 空档交替、无人触碰、14.1 秒):那行出现 3 次、自己消失 2 次,
+ * 柜台上过了 6 箱而收货单只有 3 件 —— 少的三箱屏上零痕迹。可能没进单的一箱跟确定没进单的
+ * 一箱,对存货估值与之后每一笔 COGS 是同一种错,理该同一份账本记着。
+ * 引擎那道地板以下,真第二箱与一次长反光在解码结果上分不开,只有站在货前面的店员分得开。
+ */
+export function duplicateHtml(code: string): string {
+    return (
+        `<span class="c">${escapeHtml(t('inv-scan-dup'))}</span>` +
+        `<b class="inv-scan-code">${escapeHtml(code)}</b>` +
+        actionHtml(`data-scan-dup="${escapeHtml(code)}"`, 'inv-scan-dup-add')
+    );
 }
 
 // 可重试的档给重试;不可重试的(没相机/非 HTTPS/权限要去系统设置改)给「手动输入条码」

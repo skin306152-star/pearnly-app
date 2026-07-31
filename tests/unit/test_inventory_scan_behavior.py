@@ -24,50 +24,10 @@ from __future__ import annotations
 import shutil
 import unittest
 
-from tests.unit._inventory_scan_dom import run
+from tests.unit._inventory_scan_dom import scenario
 
-# 货架与查码应答:内容是造的(那是网络),但落地的每个字段名都照 routes/products_routes.py
-# 的 /lookup 信封写,读它的是产品自己的代码。
-_FIXTURE = r"""
-const COLA = '8850999320014';
-const BOX = '8850999320021';   // 同一件可乐的箱码(挂在 product_units 上)
-const MILK = '4901234567894';  // 批次品
-const GHOST = '9999999999999'; // 库里没有
-const P_COLA = { id: 'p-cola', name_th: 'coke', name_en: 'Coke', name_zh: 'kele', track_batch: false };
-const P_MILK = { id: 'p-milk', name_th: 'nom', name_en: 'Milk', name_zh: 'niunai', track_batch: true };
-const LOOKUP = {
-    [COLA]: { product: P_COLA, matched_by: 'product', matched_unit: 'khuad' },
-    [BOX]: { product: P_COLA, matched_by: 'unit', matched_unit: 'lang' },
-    [MILK]: { product: P_MILK, matched_by: 'product', matched_unit: 'klong' },
-};
-reply = (url) => {
-    const code = decodeURIComponent(String(url).split('barcode=')[1] || '');
-    return LOOKUP[code] ? answer(LOOKUP[code]) : answer({ detail: 'sales.product_not_found' }, 404);
-};
-shelf = [
-    { product_id: 'p-cola', name: { th: 'coke', en: 'Coke', zh: 'kele' }, track_batch: false, batches: [] },
-];
-
-// 扫码只从产品自己的入口进:扫码框里回车(mountInvScan 绑的 onkeydown)。
-async function feed(code) {
-    const input = document.getElementById('inv-in-mask-scan-code');
-    input.value = code;
-    input.onkeydown({ key: 'Enter', preventDefault() {} });
-    await tick();
-    await tick();
-}
-function closeIn() {
-    // 走产品自己的关窗按钮(页脚那个「取消」),不直接调 unmountInvScan —— 直接调等于
-    // 绕过 closeModal 这条真路,「关窗到底放没放开」就没被验到
-    const mask = document.getElementById('inv-in-mask');
-    const foot = mask.querySelector('.inv-modal-foot');
-    foot.querySelector('[data-inv-close]').click();
-}
-"""
-
-
-def scenario(body: str) -> dict:
-    return run(_FIXTURE + body)
+# 货架/查码应答与 scenario() 在 _inventory_scan_dom.py(两份用例文件共用一份,见那边 FIXTURE)。
+# 「摄像头把第二箱挡下」与「提交前的数量兜底」两组在 test_inventory_scan_guards.py。
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过真 DOM 行为测试")
@@ -220,6 +180,19 @@ class UnmatchedCode(unittest.TestCase):
         self.assertTrue(got["maskStillOpen"])
         self.assertEqual(2, got["rows"], "已扫进去的行被清掉了")
 
+    def test_a_failed_code_survives_the_next_scan(self):
+        """后一件的「已加入」不许把前一件的「这个码没建档」盖掉 —— 被盖掉的那件就是
+        「扫了、没进单、也没人告诉他」的货,店员按屏上反馈收货,一整箱凭空消失。"""
+        got = scenario("""
+(async () => { openIn(); await feed(GHOST); await feed(COLA);
+               out({ text: msgEl().textContent,
+                     cards: msgEl().querySelectorAll('[data-scan-create]').length }); })();
+""")
+        self.assertIn("bscan.notfound", got["text"], "没建档那条被下一件的「已加入」盖掉了")
+        self.assertIn("9999999999999", got["text"], "盖掉之后连是哪个码都看不见了")
+        self.assertIn("inv-scan-added", got["text"], "最新那件的状态也得在")
+        self.assertEqual(1, got["cards"])
+
     def test_bridge_saying_no_falls_back_honestly(self):
         """桥没接上/它说打不开 → 不许假装成功,得给一句带着那串码的人话。"""
         got = scenario("""
@@ -234,6 +207,151 @@ class UnmatchedCode(unittest.TestCase):
 """)
         self.assertIn("inv-scan-create-manual", got["text"], "桥打不开时没给诚实回落")
         self.assertIn("9999999999999", got["text"], "回落文案里没有那串码")
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过真 DOM 行为测试")
+class GunIntoARowField(unittest.TestCase):
+    """枪扫进行内那几个框(数量/批号)。按键是真的:楔子挂在 document 上,这里按物理节拍发。"""
+
+    def test_gun_into_the_batch_field_lands_a_row_and_leaves_the_field_clean(self):
+        """批号框对枪 opt-in 的实际效果 —— 不 opt-in 就是整发被吞(零回调、行不出现),
+        而那串数字照旧留在批号框里。5ms/字符 = 枪速。"""
+        got = scenario("""
+(async () => {
+    openIn();
+    await feed(MILK);                                  // 批次品 → 批号格露出来
+    const batch = rowField(0, 'batch_no');
+    typeInto(COLA, batch, 5, 'Enter');
+    await tick(); await tick();
+    out({ lookups, batch: batch.value, rows: snapshot(), prevented });
+})();
+""")
+        self.assertEqual(
+            [
+                "/api/sales/products/lookup?barcode=4901234567894",
+                "/api/sales/products/lookup?barcode=8850999320014",
+            ],
+            got["lookups"],
+            "枪扫进批号框整发被吞 —— 这一箱货没进单也没人知道",
+        )
+        self.assertEqual("", got["batch"], "码留在批号框里 · 楔子没把框还原成扫之前")
+        self.assertEqual(["p-milk", "p-cola"], [r["product"] for r in got["rows"]])
+        self.assertEqual(1, got["prevented"], "枪的回车没吃掉 · 半张入库单会被顺手提交")
+
+    def test_the_open_modal_takes_the_gun_away_from_the_page_underneath(self):
+        """独占:弹窗开着时底下页面的订阅者收不到(不然枪扫的货会同时进两个地方),
+        关了弹窗才轮到它。探针用真 wedge 注册,不替换实现。"""
+        got = scenario("""
+(async () => {
+    const probe = [];
+    const off = window.PearnlyScanWedge.register((code) => probe.push(code));
+    openIn();
+    typeInto(COLA, null, 5, 'Enter');                  // 框外的一串 · 楔子该收
+    await tick(); await tick();
+    const during = probe.slice();
+    const landed = snapshot()[0].product;
+    closeIn();
+    typeInto(COLA, null, 5, 'Enter');
+    await tick();
+    const after = probe.slice();
+    off();
+    out({ during, after, landed });
+})();
+""")
+        self.assertEqual([], got["during"], "弹窗开着时底下那一页也收到了同一发枪")
+        self.assertEqual("p-cola", got["landed"], "弹窗自己没收到 · 这组断言没有区分力")
+        self.assertEqual(["8850999320014"], got["after"], "关了弹窗独占没撤 · 全站扫码从此进不来")
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过真 DOM 行为测试")
+class BurstJudgedAsTyping(unittest.TestCase):
+    """判成「人在打字」的那一发也必须看得见。
+
+    三轮实测的那一幕:慢枪扫的第二箱被判成人打字 → 楔子不回调 → 屏上零字、消息还停在上一件
+    的「已加入」→ 店员以为枪没响,再扫一次又被吞,整箱货从收货单上消失且没人看得见。
+    判据本身是对的(慢枪与打字快的人分不开,只能偏向人手),错的是不吭声。
+    """
+
+    LINE = "inv-scan-typed{code}{name}{unit}{n}"  # t() 桩的回值:钉住用的是哪一句
+
+    def test_a_slow_burst_in_the_qty_field_says_so_instead_of_vanishing(self):
+        got = scenario("""
+(async () => {
+    openIn();
+    await feed(COLA);                                  // 第一箱进单 · 光标停在数量框
+    const was = msgEl().textContent;
+    typeInto(MILK, rowField(0, 'qty'), 90, 'Enter');    // 90ms/字符:过不了 50ms 那条
+    await tick();
+    const btn = msgEl().querySelector('[data-scan-typed]');
+    const line = msgEl().querySelector('.c');
+    out({ was, line: line ? line.textContent : '', text: msgEl().textContent,
+          lookups: lookups.length, btnCode: btn ? btn.dataset.scanTyped : null,
+          milk: MILK, prevented });
+})();
+""")
+        self.assertIn("inv-scan-added", got["was"], "第一箱没进单 · 这轮的前提不成立")
+        self.assertEqual(1, got["lookups"], "慢枪那一发被当成扫码收了 · 这轮验的不是这件事")
+        self.assertEqual(0, got["prevented"], "人手打的回车被吃掉 · 表单再也提交不了")
+        self.assertEqual(self.LINE, got["line"], "屏上一个字都没有 —— 这一发去哪了没人知道")
+        self.assertNotIn("inv-scan-added", got["text"], "消息还停在上一件的「已加入」")
+        self.assertIn(got["milk"], got["text"], "没带上那串字符 · 店员认不出是自己刚才那一枪")
+        self.assertEqual(got["milk"], got["btnCode"], "没给出路 · 慢枪扫的这箱货补不回来")
+
+    def test_the_way_out_restores_the_field_and_looks_the_code_up(self):
+        """店员说「这一串确实是扫的」:码要真查、框要还原 ——
+        不还原就是数量 = 1 + 一串条码跟着整张收货单提交上去。"""
+        got = scenario("""
+(async () => {
+    openIn();
+    await feed(COLA);
+    const qty = rowField(0, 'qty');
+    typeInto(MILK, qty, 90, 'Enter');
+    await tick();
+    const dirty = qty.value;                           // 楔子没动过框:码还留在里面
+    const way = msgEl().querySelector('[data-scan-typed]');
+    if (way) way.click();
+    await tick(); await tick();
+    out({ dirty, qty: rowField(0, 'qty').value, rows: snapshot(), lookups, milk: MILK });
+})();
+""")
+        self.assertEqual("1" + got["milk"], got["dirty"], "码没真落进数量框 · 这轮证明不了还原")
+        self.assertEqual("1", got["qty"], "点了「当条码用」却把那串码留在数量框里")
+        self.assertEqual(2, len(got["lookups"]), "点了没去查这个码 · 出路是假的")
+        self.assertEqual(["p-cola", "p-milk"], [r["product"] for r in got["rows"]])
+
+    def test_typing_a_quantity_says_nothing(self):
+        """不打扰的另一半:数量框里打个 240 不值得说什么,一有按键就冒一句话等于噪音。"""
+        got = scenario("""
+(async () => {
+    openIn();
+    await feed(COLA);
+    typeInto('240', rowField(0, 'qty'), 90, 'Tab');
+    await tick();
+    out({ text: msgEl().textContent, qty: rowField(0, 'qty').value,
+          typed: !!msgEl().querySelector('[data-scan-typed]') });
+})();
+""")
+        self.assertFalse(got["typed"], "人打三位数量也弹一句 · 这句话很快就没人看了")
+        self.assertIn("inv-scan-added", got["text"], "上一件的状态被一句打字提示顶掉了")
+        self.assertEqual("1240", got["qty"], "楔子动了人手打进去的数量")
+
+    def test_a_real_gun_in_the_same_field_still_just_scans(self):
+        """防修过头:同一个框、同一串码,5ms/字符照旧当扫码 —— 不该冒那句打字提示。"""
+        got = scenario("""
+(async () => {
+    openIn();
+    await feed(COLA);
+    typeInto(BOX, rowField(0, 'qty'), 5, 'Enter');
+    await tick(); await tick();
+    out({ rows: snapshot(), lookups: lookups.length, qty: rowField(0, 'qty').value,
+          typed: !!msgEl().querySelector('[data-scan-typed]'), prevented });
+})();
+""")
+        self.assertEqual(2, got["lookups"], "真枪打进数量框被吞了")
+        self.assertFalse(got["typed"], "枪速的一串也被说成「按手输处理」")
+        self.assertEqual("1", got["qty"], "枪扫的码留在了数量框里")
+        self.assertEqual(1, got["prevented"], "枪的回车没吃掉")
+        self.assertEqual("lang", got["rows"][1]["unit"], "箱码没落成按箱入库的那一行")
 
 
 if __name__ == "__main__":

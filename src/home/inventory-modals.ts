@@ -7,7 +7,9 @@ import {
     activeWsId,
     invErrMsg,
     fmtQty,
+    isSaneCost,
     isSaneExpiry,
+    isSaneQty,
     type InLine,
     type CountLine,
 } from './inventory-common.js';
@@ -40,22 +42,28 @@ function inRowHtml(): string {
     const id = 'invr-' + rowSeq++;
     // 批号/效期默认藏起来:只有选中的商品在商品资料里勾了「批次管理」才显(applyBatchVisibility)。
     // 普通百货不碰批次 → 货进散装桶、收银台直接可卖(否则批次桶货够不着 = 看得见卖不出)。
-    // 数量框带 data-enable-barcode:扫完一件光标就停在这儿,枪的下一发照旧要收得到
-    // (楔子默认让开输入框)。落进框里的字符由 inventory-scan 摘回去,数量不会变成一串条码。
+    // 四个可编辑框都带 data-enable-barcode="gun":楔子默认让开输入框,不声明 = 枪的下一发整发被吞。
+    // 单价框漏声明过一次,真浏览器实测的后果:光标停在单价格时来一发枪,฿8850999320014/瓶
+    // 原样提交、零查码、屏上零字 —— 库存估值与移动加权成本从此按万亿算,而架上件数是对的,
+    // 谁也不会去看。
+    // 声明的是「只收枪打的那种串」那一档 —— 人手在这三个框里打数量/批号/效期照旧归框自己,
+    // 认成枪扫时楔子把框还原成扫之前的样子(判据与还原都在 static/scan/scan-wedge.js,
+    // 使用方不再各判一遍)。档位值必须写全,scripts/check_scan_optin.py 盯着。
     // 数量旁边留一格入库单位:扫到箱码时这一行是「1 箱」不是「1 瓶」,单位随行提交给后端
     // 按 factor_to_base 换算(前端不自己乘)。手选商品时它空着,后端按基本单位落账。
     return `<div class="inv-frow" data-row="${id}">
         <select class="inv-field" data-k="product_id"><option value="">—</option>${productOptions()}</select>
         <span class="inv-qtycell">
-            <input class="inv-field" data-k="qty" type="number" min="0" step="0.001" placeholder="0" data-enable-barcode>
+            <input class="inv-field" data-k="qty" type="number" min="0" step="0.001" placeholder="0" data-enable-barcode="gun">
             <input type="hidden" data-k="unit_name">
             <span class="inv-runit" data-runit hidden></span>
         </span>
-        <input class="inv-field" data-k="unit_cost" type="number" min="0" step="0.01" placeholder="0.00">
-        <span style="display:flex;gap:6px;align-items:center">
+        <input class="inv-field" data-k="unit_cost" type="number" min="0" step="0.01" placeholder="0.00" data-enable-barcode="gun">
+        <span class="inv-brow">
             <span class="inv-batchcell" data-batchcell style="display:none;gap:6px;align-items:center;flex:1">
-                <input class="inv-field" data-k="batch_no" placeholder="${escapeHtml(t('inv-f-batch'))}" data-enable-barcode>
-                <input class="inv-field" data-k="expiry_date" type="date" data-enable-barcode>
+                <span class="inv-blabel">${escapeHtml(t('inv-f-batch-exp'))}</span>
+                <input class="inv-field" data-k="batch_no" placeholder="${escapeHtml(t('inv-f-batch'))}" data-enable-barcode="gun">
+                <input class="inv-field" data-k="expiry_date" type="date" data-enable-barcode="gun">
             </span>
             <button type="button" class="inv-rowx" data-rowx="${id}" aria-label="${escapeHtml(t('inv-row-remove'))}">×</button>
         </span>
@@ -159,8 +167,10 @@ function modalHtml(cfg: ModalCfg, rows: string): string {
     </div>`;
 }
 
+// 表头只管第一行那三列:批号/效期是批次品才露的第二行,标题跟着它走(inRowHtml 里的
+// .inv-blabel)—— 留在表头就是一个指着空列的标题,而且批次格藏着时它还常驻在那儿。
 const IN_LABELS = () =>
-    `<div class="inv-flabels"><span>${escapeHtml(t('inv-col-product'))}</span><span>${escapeHtml(t('inv-f-qty'))}</span><span>${escapeHtml(t('inv-f-cost'))}</span><span>${escapeHtml(t('inv-f-batch-exp'))}</span></div>`;
+    `<div class="inv-flabels"><span>${escapeHtml(t('inv-col-product'))}</span><span>${escapeHtml(t('inv-f-qty'))}</span><span>${escapeHtml(t('inv-f-cost'))}</span></div>`;
 
 const COUNT_LABELS = () =>
     `<div class="inv-flabels count"><span>${escapeHtml(t('inv-col-product'))}</span><span>${escapeHtml(t('inv-f-counted'))}</span></div>`;
@@ -182,6 +192,17 @@ function collectRows(maskId: string): Record<string, string>[] {
 function showErr(maskId: string, msg: string) {
     const el = document.getElementById(maskId + '-err');
     if (el) el.textContent = msg;
+}
+
+// 拦下来还得指到是哪一行:十几行的收货单上只说「有一行不对」等于让店员自己一行行找。
+function focusRowField(maskId: string, index: number, key: string) {
+    const wrap = document.getElementById(maskId + '-rows');
+    const row = wrap ? wrap.querySelectorAll<HTMLElement>('[data-row]')[index] : null;
+    const field = row ? row.querySelector<HTMLInputElement>(`[data-k="${key}"]`) : null;
+    if (!field) return;
+    field.focus();
+    field.select();
+    field.scrollIntoView({ block: 'nearest' });
 }
 
 function openModal(cfg: ModalCfg) {
@@ -248,6 +269,16 @@ async function doSubmit(cfg: ModalCfg, submit: HTMLButtonElement) {
         return;
     }
     const raw = collectRows(cfg.maskId);
+    // 数量格里那串东西根本不是数量(一整串条码掉了进来)→ 停下来让店员看一眼。盘点这一侧
+    // 一起拦:它连楔子那层保护都没有(counted_qty 不声明接枪,枪打的字符原样落进框),而
+    // 盘点写的是「架上就是这么多」,一次就把这件货的库存改成天文数字。
+    const qtyKey = cfg.isCount ? 'counted_qty' : 'qty';
+    const badQty = raw.findIndex((r) => !isSaneQty(r[qtyKey]));
+    if (badQty >= 0) {
+        showErr(cfg.maskId, t('inv-err-bad-qty'));
+        focusRowField(cfg.maskId, badQty, qtyKey);
+        return;
+    }
     if (cfg.isCount) {
         const lines: CountLine[] = raw
             .filter((r) => r.product_id && r.counted_qty !== '')
@@ -270,10 +301,20 @@ async function doSubmit(cfg: ModalCfg, submit: HTMLButtonElement) {
         }
         return;
     }
+    // 单价格同理,而且更隐蔽:数量错了架上一点就对不上,单价错了只动库存估值与移动加权
+    // 成本,单子当场看不出任何异常。
+    const badCost = raw.findIndex((r) => !isSaneCost(r.unit_cost));
+    if (badCost >= 0) {
+        showErr(cfg.maskId, t('inv-err-bad-cost'));
+        focusRowField(cfg.maskId, badCost, 'unit_cost');
+        return;
+    }
     // 坏效期不许溜进流水:49012-03-31 这种值(一串条码被打进 type=date)后端照收,那批货
     // 从此永远不会进近效期名单。宁可在这里停下来让店员看一眼,也不能默默把日期抹掉再提交。
-    if (raw.some((r) => !isSaneExpiry(r.expiry_date))) {
+    const badExpiry = raw.findIndex((r) => !isSaneExpiry(r.expiry_date));
+    if (badExpiry >= 0) {
         showErr(cfg.maskId, t('inv-err-bad-expiry'));
+        focusRowField(cfg.maskId, badExpiry, 'expiry_date');
         return;
     }
     // 空批号/效期不发(后端 Optional · 空串会把效期当坏日期);单价缺省 0。

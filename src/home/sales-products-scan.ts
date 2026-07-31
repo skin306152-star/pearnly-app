@@ -18,32 +18,29 @@ import {
 } from './sales-products-scan-cam.js';
 import type { Product } from './sales-products.js';
 
+// 「这一发是枪打的还是人打的」不在这里判 —— 判据只有一份,在楔子里(见 static/scan/
+// scan-wedge.js 文件头)。这一层拿到回调就是拿到结论。判成「人在打字」的那一发楔子也说一声
+// (onTyped),那一路不是第二个判据,只负责让屏上有字。
 interface ScanWedge {
     register(
         cb: (code: string, target: EventTarget | null) => void,
-        opts?: { exclusive?: boolean }
+        opts?: {
+            exclusive?: boolean;
+            onTyped?: (code: string, target: EventTarget | null) => void;
+        }
     ): () => void;
-    // 速度尺子:枪 ≤GUN_MAX_GAP_MS/字符,超过 MAX_GAP_MS 就算另起一串(见 static/scan/scan-wedge.js)
-    GUN_MAX_GAP_MS?: number;
-    MAX_GAP_MS?: number;
 }
 
 function wedge(): ScanWedge | null {
     return (window as unknown as { PearnlyScanWedge?: ScanWedge }).PearnlyScanWedge || null;
 }
 
-// 楔子在没挂上时(首屏 JS 还没到)也得有个尺子;数值以楔子那份为准,这里只是回落。
-function gapMs(name: 'GUN_MAX_GAP_MS' | 'MAX_GAP_MS', fallback: number): number {
-    const v = wedge()?.[name];
-    return typeof v === 'number' && v > 0 ? v : fallback;
-}
-
 const INPUT_ID = 'sx-pf-barcode'; // 沿用既有 id:readForm() 仍按它取值
 const STATE_ID = 'sx-pf-bc-state';
 const SCAN_BTN_ID = 'sx-pf-bc-scan';
 
-// 零售条码最短是 EAN-8/UPC-E 的 8 位。跟 inventory-scan.ts 同一个尺子,别一处 8 一处没有。
-const MIN_LEN_IN_FIELD = 8;
+// 楔子的下限,这里再挡一道:相机那条路不经过楔子,别人改了那边不至于漏进来。
+const MIN_CODE_LEN = 3;
 
 const IC_SCAN =
     '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M7 8v8M10 8v8M13.5 8v8M17 8v8"/></svg>';
@@ -119,7 +116,10 @@ function openFormWithBarcode(code: unknown, opts?: { overlay?: boolean }): boole
 ).openProductFormWithBarcode = openFormWithBarcode;
 
 // ── 撞码检查 ────────────────────────────────────────────────────────────
-type CheckState = 'idle' | 'checking' | 'free' | 'self' | 'dup' | 'error';
+// typed = 楔子把这一发交还给人了(慢枪与人手在 50~100ms 这一段是叠着的,引擎宁可判人)。
+// 它必须自成一档:那串字符已经落在框里跟旧码接成了一条新串,而查重照旧会去问那条串,
+// 回一句绿色的「没人用这个码」—— 店员照着那句话点保存,落库的条码 POS 永远扫不出来。
+type CheckState = 'idle' | 'checking' | 'free' | 'self' | 'dup' | 'error' | 'typed';
 
 // GET /api/sales/products/lookup 的信封(routes/products_routes.py::api_lookup_product)。
 // 字段名照后端那三个写,别自创:曾经这里读的是 d.unit.unit_name,后端从来没发过这个形状,
@@ -141,6 +141,8 @@ let checkSeq = 0;
 let ownProductId: string | null = null;
 let openOther: ((p: Product) => void) | null = null;
 let wedgeOff: (() => void) | null = null;
+// 被判成打字的那一串 + 它落进来之前框里是什么(点「当条码用」时按它还原)
+let typedBurst: { code: string; before: string } | null = null;
 
 export function productLabel(p: { name_th?: string; name_en?: string; name_zh?: string }): string {
     return p.name_th || p.name_en || p.name_zh || '—';
@@ -191,6 +193,17 @@ function renderState(): void {
             };
         return;
     }
+    if (checkState === 'typed') {
+        const code = typedBurst ? typedBurst.code : '';
+        // 文案与入库侧共用一份(同一件事,两个屏上不能有两种说法)
+        el.innerHTML =
+            `<div class="sx-bc-warn">${escapeHtml(t('inv-scan-typed'))}` +
+            `<b class="tnum">${escapeHtml(code)}</b>` +
+            `<button type="button" class="sx-bc-link" data-scan-typed="${escapeHtml(code)}" id="sx-bc-usetyped">${escapeHtml(t('inv-scan-typed-use'))}</button></div>`;
+        const use = document.getElementById('sx-bc-usetyped');
+        if (use) use.onclick = () => useTypedBurst();
+        return;
+    }
     el.innerHTML = `<div class="sx-bc-warn dup">${escapeHtml(barcodeConflictText())}<button type="button" class="sx-bc-link" id="sx-bc-goedit">${escapeHtml(t('sx-p-bc-dup-open'))}</button></div>`;
     const go = document.getElementById('sx-bc-goedit');
     if (go)
@@ -211,7 +224,7 @@ async function runCheck(code: string): Promise<void> {
         renderState();
         return;
     }
-    checkState = 'checking';
+    checkState = typedBurst ? 'typed' : 'checking';
     hitProduct = null;
     hitUnit = '';
     renderState();
@@ -240,7 +253,9 @@ async function runCheck(code: string): Promise<void> {
     if (seq !== checkSeq) return; // 码又变了 / 弹窗已关:旧回包作废
     hitProduct = next === 'dup' ? found : null;
     hitUnit = next === 'dup' || next === 'self' ? unit : '';
-    checkState = next;
+    // 只压住绿字那一档:框里是「旧码 + 刚判成打字的那一串」时,说它「没人用」等于替一串
+    // 不是码的东西背书。撞码与查不了照旧显示 —— 那两档压下去就是把硬拦路藏起来了。
+    checkState = typedBurst && next === 'free' ? 'typed' : next;
     renderState();
 }
 
@@ -258,10 +273,11 @@ export async function settleBarcodeCheck(): Promise<Product | null> {
     return barcodeConflict();
 }
 
-// 框里每落进一个字符:先记速度(判枪/人手要用),再走手打的防抖查重。
+// 框里每落进一个字符走一次手打的防抖查重。枪扫也会一个个落进来,但楔子最迟 150ms 收尾,
+// 早于这里的 400ms —— 半截码的查重发不出去,整串到齐后由 applyCode 直接查。
 function onFieldInput(): void {
-    noteFieldChar();
     clearTimeout(checkTimer);
+    typedBurst = null; // 店员自己动过框了 —— 那条回路指的已经不是框里这串东西
     const code = inputEl()?.value.trim() || '';
     if (!code) {
         void runCheck('');
@@ -270,84 +286,54 @@ function onFieldInput(): void {
     checkTimer = window.setTimeout(() => void runCheck(code), 400);
 }
 
-// ── 落进条码框的那一发:枪打的还是人手打的 ─────────────────────────────
-// 楔子的回调只给 (code, target),它内部算过的字符间隔没发出来,所以这里按同一套尺子自己量:
-// 字符落进框会发 input 事件,记下相邻两次的间隔就够。只有全串跑到枪速才算枪扫。
-let burstGap = 0; // 本串里最大的字符间隔
-let burstChars = 0; // 本串已落进框的字符数
-let burstAt = 0;
-
-function resetBurst(): void {
-    burstGap = 0;
-    burstChars = 0;
-}
-
-function noteFieldChar(): void {
-    const now = Date.now();
-    const gap = burstChars ? now - burstAt : Infinity;
-    burstAt = now;
-    // 间隔超过 MAX_GAP_MS = 楔子已经把上一串收尾了,这里跟着另起一串
-    if (gap > gapMs('MAX_GAP_MS', 150)) {
-        burstGap = 0;
-        burstChars = 1;
-        return;
-    }
-    burstGap = Math.max(burstGap, gap);
-    burstChars += 1;
-}
-
 /**
- * 这一发是枪扫吗 —— 整串都以枪速连着落进框才算。
+ * 扫到 / 枪打到一个码:整框写进去 + 立刻查(不走手打的防抖,一整串已经到齐了)。
  *
- * 人手进不到这个区间:键盘自动重复要按住 ~500ms 才起,那早被楔子按 MAX_GAP_MS 收尾了,
- * 凑不出一串全 ≤GUN_MAX_GAP_MS 的输入(与 scan-wedge 的 endKeyFromGun 同一个判据)。
- * burstChars 少于这串的位数 = 有一部分字符不是这一发打进来的(或压根没落进框),同样不算。
- *
- * 判错的方向是安全的:把真枪扫误判成人打,框里留的是枪刚敲进去的那串字符本身,只有
- * 「框里原本有旧码、要用扫码替换掉」这一种会退化成新旧相接 —— 看得见、当场能改。
+ * 这里不再判「这一发是枪还是人」。光标在条码框里时字符确实先落进了框,但那个框声明的是
+ * data-enable-barcode="gun":人手打的楔子根本不发过来,发过来的它已经先把框还原成扫之前的
+ * 样子。三轮里「新码接在旧码后面凑成 26 位、绿字还说没人用这个码」那条路死在这一步 ——
+ * 覆盖时框里是旧值本身,不是「旧值 + 刚落进来的一串」。
  */
-function burstIsGunSpeed(code: string): boolean {
-    return burstChars >= code.length && burstGap <= gapMs('GUN_MAX_GAP_MS', 50);
-}
-
-/**
- * 楔子/相机送来一串码时,条码框最终该是什么值(null = 别动这个框)。
- *
- * fromField = 这串字符已经由浏览器落进条码框里了(楔子只吃 Enter/Tab,不吃字符)。这一档
- * 的整框覆盖只有一种正当用途:框里有旧码,扫一枪把它换掉。人在框里手打时楔子照样会按
- * 150ms 静默把输入切成碎片吐过来,拿碎片覆盖就把已经打好的位数吃掉了 —— 剩下的那截看着
- * 仍是个合法条码,存下去 POS 永远扫不出这件货,后台却一切正常。
- *
- * 位数、前缀都分不开这两者:手打 EAN-13 停一下,后半截 '999320014' 有 9 位、也不是框里
- * 那串的前缀。能分开的只有速度。
- * fromField=false(相机扫,或光标不在条码框里时枪扫)没有这个歧义:整框写进去。
- */
-function scanFieldValue(code: string, fromField: boolean): string | null {
-    if (code.length < 3) return null; // 楔子的下限;这里再挡一道,别人改了那边不至于漏进来
-    if (!fromField) return code;
-    if (code.length < MIN_LEN_IN_FIELD) return null;
-    return burstIsGunSpeed(code) ? code : null;
-}
-
-// 扫到 / 枪打到一个码:填进框 + 立刻查(不走手打的防抖,一整串已经到齐了)。
-function applyCode(raw: string, fromField = false): void {
+function applyCode(raw: string): void {
     const code = String(raw || '').trim();
     const input = inputEl();
-    if (!input) return;
-    const next = scanFieldValue(code, fromField);
-    if (next === null) return;
+    if (!input || code.length < MIN_CODE_LEN) return;
     closeScanModal();
-    input.value = next;
+    typedBurst = null;
+    input.value = code;
     input.focus();
-    resetBurst(); // 这一串已经被消费掉,别让它继续给下一发背书
     clearTimeout(checkTimer);
-    void runCheck(next);
+    void runCheck(code);
 }
 
-// 光标在条码框里时字符已经落进框了(这个框对枪 opt-in),这一发只能当碎片处置;光标在别处
-// 时枪的按键被楔子截走,框里什么都没有,整串写进去。
-function onWedge(code: string, target: EventTarget | null): void {
-    applyCode(code, target === inputEl());
+/**
+ * 楔子把这一发交还给人了(见 static/scan/scan-wedge.js 的 onTyped)。
+ *
+ * 只在【框里本来就有东西】时出声。落进空框的那一串,框里的值就等于那个码本身,没有歧义,
+ * 再弹一句提示只是噪音;而接在旧码后面的那一串是另一回事:框里成了一条 26 位的东西,
+ * 400ms 的防抖照旧拿它去查重,回一句绿色的「没人用这个码」—— 屏上每一处都在说「可以存」,
+ * 落库之后 POS 永远扫不出这件货。所以这一档要摆出来 + 给一条一点就补回来的路。
+ */
+function onTyped(code: string, target: EventTarget | null): void {
+    const input = inputEl();
+    const el = target as HTMLInputElement | null;
+    if (!input || el !== input || code.length < MIN_CODE_LEN) return;
+    // before 由这一层自己算:楔子交还的那一串原封不动挂在框尾
+    const now = input.value;
+    const before = now.endsWith(code) ? now.slice(0, -code.length) : now;
+    if (!before) return;
+    typedBurst = { code, before };
+    checkState = 'typed';
+    renderState();
+}
+
+/** 店员说「这一串确实是扫的」:框先还原成这一发之前的样子,再整框按条码走。 */
+function useTypedBurst(): void {
+    const pending = typedBurst;
+    const input = inputEl();
+    if (!pending || !input) return;
+    input.value = pending.before;
+    applyCode(pending.code);
 }
 
 // ── 对外:条码位的 HTML + 接线 ──────────────────────────────────────────
@@ -362,7 +348,7 @@ export function barcodeFieldHtml(barcode?: string | null): string {
         : '';
     return `<label>${escapeHtml(t('sx-p-f-barcode'))}</label>
         <div class="sx-bc-row">
-            <input type="text" id="${INPUT_ID}" value="${htmlVal(barcode)}" maxlength="100" autocomplete="off" data-enable-barcode>
+            <input type="text" id="${INPUT_ID}" value="${htmlVal(barcode)}" maxlength="100" autocomplete="off" data-enable-barcode="gun">
             ${btn}
         </div>
         <div class="sx-field-hint">${escapeHtml(t('sx-p-bc-hint'))}</div>
@@ -383,18 +369,17 @@ export function bindBarcodeField(
     ownProductId = productId;
     openOther = onEditOther;
     const btn = document.getElementById(SCAN_BTN_ID);
-    // 相机扫到的码光标不在框里 → fromField=false,整框写进去;「手动输入」把焦点还回来。
+    // 相机扫到的码整框写进去;「手动输入」把焦点还回来。
     if (btn)
         btn.onclick = () =>
             openScanModal(
                 (code) => applyCode(code),
                 () => inputEl()?.focus()
             );
-    resetBurst();
     const input = inputEl();
     if (input) input.oninput = onFieldInput;
     // 独占:建品弹窗开着时,枪扫到的码只该落进这个框,底下页面的订阅者不该也吃一份。
-    wedgeOff = wedge()?.register(onWedge, { exclusive: true }) || null;
+    wedgeOff = wedge()?.register((code) => applyCode(code), { exclusive: true, onTyped }) || null;
     // 带码进来的(别处扫到未建档)立刻查一次:它正是最该当场拦的撞码场景。
     const prefilled = input?.value.trim() || '';
     if (prefilled) void runCheck(prefilled);
@@ -404,8 +389,8 @@ export function bindBarcodeField(
 export function releaseBarcodeField(): void {
     closeScanModal();
     clearTimeout(checkTimer);
-    resetBurst();
     checkSeq++;
+    typedBurst = null;
     if (wedgeOff) {
         wedgeOff();
         wedgeOff = null;

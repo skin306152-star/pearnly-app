@@ -11,11 +11,14 @@
 // 过来,不在这里另写一套。
 /* global t, escapeHtml */
 import { salesFetch, salesErrMsg } from './sales-common.js';
-import { isPlausibleDate, localizedName } from './inventory-common.js';
+import { localizedName } from './inventory-common.js';
 import {
     ackFails,
     blockedText,
+    dropFail,
+    duplicateHtml,
     failLineHtml,
+    hasFail,
     notFoundHtml,
     paintNote,
     pushFail,
@@ -23,6 +26,7 @@ import {
     resetFeedback,
     resolveFail,
     scanPart,
+    typedHtml,
 } from './inventory-scan-ui.js';
 import {
     cameraBlockedReason,
@@ -34,23 +38,28 @@ import {
     type CamHost,
 } from './inventory-scan-camera.js';
 
-// 光标在数量框里时人正在打数量,三四位数字打得快也会被楔子当成一串码。零售条码最短是
-// EAN-8/UPC-E 的 8 位,店里不存在 8 位数的数量 —— 用长度把「打字」和「扫码」分开。
-const MIN_LEN_IN_FIELD = 8;
-// 长度在批号/效期这两个框里不够用:批号「L2026-08」是 8 位,日期打成「07312026」也是 8 位。
-// 行内的框里人一直在打字,把「枪」和「人」分开只剩速度这一个可靠信号(楔子自己也是这么判
-// 该不该吃回车的)。两个阈值都向楔子要,拿不到才用这份兜底 —— 别在这里另立一个会漂的数。
-const GUN_GAP_FALLBACK_MS = 50;
-const BURST_GAP_FALLBACK_MS = 150;
-
 // ── 共享地基的类型面(window 上的全局,故在此就地声明;引擎本身是 plain script)──
+//
+// 「这一串是枪打的还是人打的」不在这一层判:行内那三个框(数量/批号/效期)都声明了
+// data-enable-barcode="gun",楔子按同一把尺子判完、把框还原成扫之前的样子,才发过来。
+// 这里再判一遍就是第二把尺子,而两把尺子必然漂 —— 三轮里批号框被打成 L20274901234567894、
+// 第二箱整箱从收货单消失且零提示,就是这么来的。故这里只 register,判据一个字都不抄。
+// onTyped 不是判据的第二个出口:它只说「刚才那一串我按人在打字处理了」,给屏上留句话。
+interface WedgeBurst {
+    gap: number;
+    repeat: boolean;
+    field: boolean;
+    /** 那个框在这一串开始之前的内容 · 楔子没动过它,要当条码用得由这边还原 */
+    before: string | null;
+}
 interface WedgeApi {
     register: (
         cb: (code: string, target: EventTarget | null) => void,
-        opts?: { exclusive?: boolean }
+        opts?: {
+            exclusive?: boolean;
+            onTyped?: (code: string, target: EventTarget | null, info: WedgeBurst) => void;
+        }
     ) => () => void;
-    GUN_MAX_GAP_MS?: number;
-    MAX_GAP_MS?: number;
 }
 
 // 契约(跨页带码桥):建品侧挂到 window,返回 true = 表单真的打开了。
@@ -126,24 +135,6 @@ export function bumpQty(current: string): string {
 }
 
 /**
- * 枪扫进数量框时字符照旧落进了那个框(楔子只吃 Enter/Tab,不吃字符),把这串码摘回去,
- * 数量才不会变成一串条码。光标被人挪到中间时是插入,故先看尾再看中间。
- */
-export function stripScanned(value: string, code: string): string {
-    if (!code || !value) return value;
-    if (value === code) return '';
-    if (value.endsWith(code)) return value.slice(0, -code.length);
-    const at = value.indexOf(code);
-    return at >= 0 ? value.slice(0, at) + value.slice(at + code.length) : value;
-}
-
-/** 落在输入框里的按键串要够长才当条码,否则手打的数量会被当成扫了一件货。 */
-export function acceptsCode(code: string, fromField: boolean): boolean {
-    if (code.length < 3) return false;
-    return !fromField || code.length >= MIN_LEN_IN_FIELD;
-}
-
-/**
  * 箱码与瓶码是两个码同一件货,命中的是哪个单位由后端答:matched_by='unit' 时 matched_unit
  * 是那个单位名。前端只把它原样带进这一行,换算成基本单位是后端 resolve_factor 的活 ——
  * 前端替它乘一遍 = 系数改一次两处漂。
@@ -163,33 +154,18 @@ interface Active {
 let active: Active | null = null;
 // 串行化:摄像头连扫与枪扫可能撞在一起,两个查询同时回来会把同一件货加成两行。
 let chain: Promise<void> = Promise.resolve();
-
-/**
- * 一串按键的快照。value 是按第一个字符之前框里的东西 —— 判成枪扫时原样放回去(见 onWedge);
- * maxGap 答的是「这串到底是枪打的还是人打的」,人手打不出 ≤50ms/字符,这是行内框里唯一
- * 分得开两者的信号(批号也好日期也好,长度都不够用)。
- */
-interface Burst {
-    el: HTMLInputElement;
-    value: string;
-    at: number;
-    maxGap: number;
+// 最近一串被当成「人在打字」的输入 —— 店员点「当条码用」时要把那个框还原回去(见 useTyped)。
+// 只留最新一条:这句话本身就是瞬时行,下一发进来时上一条已经不在屏上了。
+interface TypedBurst {
+    code: string;
+    el: HTMLInputElement | null;
+    before: string | null;
 }
-let burst: Burst | null = null;
+let typed: TypedBurst | null = null;
 
 function wedgeApi(): WedgeApi | null {
     const w = window as unknown as { PearnlyScanWedge?: WedgeApi };
     return w.PearnlyScanWedge || null;
-}
-
-function gunGapMs(): number {
-    const api = wedgeApi();
-    return (api && api.GUN_MAX_GAP_MS) || GUN_GAP_FALLBACK_MS;
-}
-
-function burstGapMs(): number {
-    const api = wedgeApi();
-    return (api && api.MAX_GAP_MS) || BURST_GAP_FALLBACK_MS;
 }
 
 function part(name: string): HTMLElement | null {
@@ -203,7 +179,21 @@ function camHost(): CamHost {
         maskId: opened ? opened.host.maskId : '',
         alive: () => active === opened,
         onCode: enqueue,
+        onDup: onCameraDup,
     };
+}
+
+// 引擎把这一次当成「同一件还在画面里」挡下了 —— 被挡下的可能正是第二箱,那一箱的唯一线索
+// 就是这一行,所以它得进【累积清单】(pushFail),不能占瞬时行:瞬时行只有一格,下一次扫的
+// 第一句 setMsg('busy') 就把它整格盖掉(实测数字见 inventory-scan-ui.ts 的 duplicateHtml)。
+// 这里不再判一遍「到底是不是第二件」:判据在引擎里只有一份(两把尺子 AND),这一层照它的
+// 结论说话。真第二箱与一次长反光在地板以下同形,分得开的只有站在货前面的那个人。
+// 这个码已经欠着一笔就什么都不做:一是举着不动会反复触发,重记只让它一直往清单顶上跳,把
+// 真正新失败的那件挤下去;二是那一笔要是「这个码没建档」,换成 dup 行之后「去建品」那条
+// 线索没有第二个地方还记得,而那颗「加 1」按下去只会再吃一次 404。
+function onCameraDup(code: string): void {
+    if (!active || hasFail(code)) return;
+    pushFail(part('msg'), code, duplicateHtml(code), { dup: true });
 }
 
 function rowEls(): HTMLElement[] {
@@ -236,6 +226,12 @@ function failCode(code: string, html: string): void {
 function focusCodeInput(): void {
     const input = part('code') as HTMLInputElement | null;
     if (input) input.focus();
+}
+
+/** 扫码框里有字 = 有人(或一把还没打完的枪)正在往里输 —— 这时候谁都别抢焦点。 */
+function scanBoxBusy(): boolean {
+    const input = part('code') as HTMLInputElement | null;
+    return !!input && input.value.length > 0;
 }
 
 // ── 查商品 → 落行 ─────────────────────────────────────────────────────
@@ -339,8 +335,13 @@ function applyHit(code: string, product: LookupProduct, unit: string): void {
     const qty = row.querySelector<HTMLInputElement>('[data-k="qty"]');
     if (qty) {
         qty.value = bumpQty(qty.value);
-        // 光标落数量框:扫完就能改数(整箱 24 支);枪的下一发也照旧收得到(见 onWedge)
-        qty.focus();
+        // 光标落数量框:扫完就能改数(整箱 24 支)。枪的下一发照旧收得到 —— 那个框声明了
+        // data-enable-barcode="gun",楔子在框里也认枪(判据见 static/scan/scan-wedge.js)。
+        // 但扫码框里还有字就别抢:那是「枪比网络快」—— 这一件的查码还在路上,下一发已经在
+        // 往扫码框里打了,此刻抢焦点等于把后半串塞进数量格。真浏览器实测(查码 220ms):
+        // 数量变成 167894 且照样提交得出去,而第二箱那个码一次都没查过 —— 整箱悄悄没了。
+        // 楔子救不了这一档:扫码框没声明接枪,它在那里一个键都不收,拿不到前半串就无从还原。
+        if (!scanBoxBusy()) qty.focus();
     }
     row.scrollIntoView({ block: 'nearest' });
     setMsg('ok', hitMsg(plan.kind, before, hit, name));
@@ -348,53 +349,29 @@ function applyHit(code: string, product: LookupProduct, unit: string): void {
     resolveFail(part('msg'), code);
 }
 
-// ── 装配 ──────────────────────────────────────────────────────────────
-function rowField(target: EventTarget | null): HTMLInputElement | null {
-    const el = target as HTMLElement | null;
-    if (!el || !(el instanceof HTMLInputElement)) return null;
-    return rowEls().some((row) => row.contains(el)) ? el : null;
+// ── 判成「人在打字」的那一发 ──────────────────────────────────────────
+// 楔子判不出是枪打的就交还给人:不回调、不动框里的内容。屏上于是什么都没有 —— 三轮实测
+// 正是这样,第二箱整箱从收货单消失,消息还停在上一件的「已加入」,店员以为枪没响再扫一次。
+// 所以这一发也要落成一句状态。它不是错误(店员多半真的在打字),故走最弱的 tip 档、只占
+// 瞬时行;真是慢枪扫的那一发,店员点一下就能补回来。
+function onTyped(code: string, target: EventTarget | null, info: WedgeBurst): void {
+    if (!active) return;
+    const el = target as HTMLInputElement | null;
+    typed = { code, el: el && typeof el.value === 'string' ? el : null, before: info.before };
+    setMsg('tip', typedHtml(code));
 }
 
-// 一串按键的起点:楔子按 150ms 间隔把「一串」切出来,这里跟着同一根节拍记下按第一个字符
-// 之前框里是什么,并量这串的最大字符间隔。非打印键不动快照(Enter/Tab 不改 value)。
-function onRowKeydown(ev: KeyboardEvent): void {
-    if (!ev.key || ev.key.length !== 1) return;
-    const el = rowField(ev.target);
-    if (!el) return;
-    const now = Date.now();
-    const gap = burst && burst.el === el ? now - burst.at : Infinity;
-    if (gap > burstGapMs()) burst = { el, value: el.value, at: now, maxGap: 0 };
-    else if (burst) {
-        burst.maxGap = Math.max(burst.maxGap, gap);
-        burst.at = now;
-    }
-}
-
-/**
- * 落在行内框里的一串是枪打的才算条码:批号「L2026-08」够 8 位,长度分不开人和枪,只有速度
- * 分得开(人手打不出 ≤50ms/字符)。效期框还有第二个与速度无关的判据 —— 人填完一个日期,框里
- * 剩下的一定是个 4 位年份的像样日期;一串条码打进去剩下的是 49012-03-31,只有机器打得出来,
- * 所以慢枪打进效期框也照样按枪算。
- * 剩下那档(慢枪打进批号框)那串码照旧留在框里看得见,店员改得掉,不会静默进流水。
- *
- * 判成枪就把框还原成这一串开始之前的样子:数量框还能靠 stripScanned 把码摘回去,type=date
- * 摘不了 —— 一串数字打进去 value 已经变成 49012-03-31,那串码在 value 里根本找不到。
- */
-function onWedge(code: string, target: EventTarget | null): void {
-    const field = rowField(target);
-    if (!acceptsCode(code, !!field)) return;
-    if (!field) {
-        enqueue(code);
-        return;
-    }
-    const snap = burst && burst.el === field ? burst : null;
-    burst = null;
-    const machine = field.type === 'date' && !isPlausibleDate(field.value);
-    if (snap && snap.maxGap > gunGapMs() && !machine) return;
-    field.value = snap ? snap.value : stripScanned(field.value, code);
+// 店员说「这一串确实是扫的」:先把框还原成这一串开始前的样子,再当条码查。
+// 不还原 = 那串码留在数量框里跟着整张收货单提交(数量 8850999320014)。
+function useTyped(code: string): void {
+    const pending = typed;
+    typed = null;
+    if (pending && pending.code === code && pending.el) pending.el.value = pending.before || '';
+    clearMsg();
     enqueue(code);
 }
 
+// ── 装配 ──────────────────────────────────────────────────────────────
 // 带码建品必须【叠在本弹窗之上】:跳走会把半张入库单连行一起丢掉。建完回来再扫一次即命中,
 // 不做回调链。桥没接上或它自己说打不开(返回非 true)时不假装成功,由调用方给诚实回落。
 function openCreateForm(code: string): boolean {
@@ -404,11 +381,24 @@ function openCreateForm(code: string): boolean {
 
 function onMsgClick(ev: MouseEvent): void {
     const el = (ev.target as HTMLElement | null)?.closest<HTMLElement>(
-        '[data-scan-create],[data-scan-retry],[data-scan-manual],[data-scan-ack]'
+        '[data-scan-create],[data-scan-retry],[data-scan-manual],[data-scan-ack],[data-scan-typed],[data-scan-dup]'
     );
     if (!el) return;
     if (el.dataset.scanRetry) {
         retryCamera(camHost());
+        return;
+    }
+    if (el.dataset.scanTyped) {
+        useTyped(el.dataset.scanTyped);
+        return;
+    }
+    // 「是第二件」:走跟真扫一次完全相同的那条路(查码 → 落行),不在这里另写一套加数量 ——
+    // 另写一套就会漏掉批次品另起一行、箱码带单位这些落行规矩。
+    // 先销后查:这一行的账由店员这一下结掉(resolveFail 已经不再碰它),留着它等回包等于
+    // 同一颗按钮可以被连点两下,收货单上凭空多一件。真落行失败的话那条路自己会挂一行。
+    if (el.dataset.scanDup) {
+        dropFail(part('msg'), el.dataset.scanDup);
+        enqueue(el.dataset.scanDup);
         return;
     }
     if (el.dataset.scanAck) {
@@ -433,8 +423,8 @@ function onMsgClick(ev: MouseEvent): void {
 export function mountInvScan(host: ScanHost): void {
     unmountInvScan();
     active = { host, offWedge: null };
+    typed = null;
     resetFeedback();
-    document.addEventListener('keydown', onRowKeydown, true);
 
     const btn = part('cam') as HTMLButtonElement | null;
     if (btn)
@@ -451,9 +441,10 @@ export function mountInvScan(host: ScanHost): void {
     const msg = part('msg');
     if (msg) msg.onclick = onMsgClick;
 
-    // 弹窗开着时独占楔子:枪扫的码不该漏进底下的库存页
+    // 弹窗开着时独占楔子:枪扫的码不该漏进底下的库存页。收到什么就查什么 —— 落在行内框里
+    // 的那几发,楔子已经判过是枪打的并把框还原了(见 WedgeApi 上面那段)。
     const gun = wedgeApi();
-    if (gun) active.offWedge = gun.register(onWedge, { exclusive: true });
+    if (gun) active.offWedge = gun.register((code) => enqueue(code), { exclusive: true, onTyped });
 
     const blocked = cameraBlockedReason();
     if (blocked) {
@@ -465,11 +456,11 @@ export function mountInvScan(host: ScanHost): void {
 export function unmountInvScan(): void {
     if (!active) return;
     if (active.offWedge) active.offWedge();
-    document.removeEventListener('keydown', onRowKeydown, true);
     // 不放就是相机灯一直亮着、别的应用再也打不开相机
     releaseCamera();
     // 这轮收货结束 = 那几条「没落地的码」的事也结束了(DOM 本来就要被清掉,状态得跟着走)
     resetFeedback();
-    burst = null;
+    // 那个框跟着弹窗一起没了,留着引用只会让下一轮把值写进一个已经不在页面上的元素
+    typed = null;
     active = null;
 }

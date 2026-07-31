@@ -127,6 +127,9 @@ class El {
     }
     contains(el) { let n = el; while (n) { if (n === this) return true; n = n.parentNode; } return false; }
     focus() { this.focused += 1; document.activeElement = this; }
+    // 真 input 有 select():拦下一行坏数量时产品会把它整段选中,店员直接改数就行。
+    // 少这一个方法,产品那一句会在 harness 里抛 TypeError —— 那是 harness 的债,不是产品的。
+    select() { this.selected = (this.selected || 0) + 1; }
     scrollIntoView() {}
     addEventListener() {}
     removeEventListener() {}
@@ -207,6 +210,9 @@ function parseInto(html, parent) {
     }
 }
 
+// keydown 必须是真的:条码枪楔子(static/scan/scan-wedge.js)整个挂在 document 上,
+// 监听器是个空函数的话「枪扫进这个框会怎样」这条路一次都跑不到,而那正是这批最容易错的一段。
+const keyHandlers = [];
 const document = {
     body: makeEl('body'),
     head: makeEl('head'),
@@ -215,8 +221,11 @@ const document = {
     getElementById(id) { return document.body.querySelectorAll('#' + id)[0] || null; },
     querySelector(sel) { return document.body.querySelector(sel); },
     querySelectorAll(sel) { return document.body.querySelectorAll(sel); },
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, fn) { if (type === 'keydown') keyHandlers.push(fn); },
+    removeEventListener(type, fn) {
+        const at = keyHandlers.indexOf(fn);
+        if (type === 'keydown' && at >= 0) keyHandlers.splice(at, 1);
+    },
 };
 global.document = document;
 global.HTMLInputElement = HTMLInputElement;
@@ -257,8 +266,11 @@ const camLog = { created: 0, destroyed: 0, started: 0, blocked: null };
 global.PearnlyScanCamera = {
     unsupportedReason: () => camLog.blocked,
     ensureLoaded: async () => global.PearnlyScanCamera,
-    create: () => {
+    create: (opts) => {
         camLog.created += 1;
+        // 产品传进来的那几个回调原样留着:用例要照【真引擎】的名字回调它们(onScan /
+        // onDuplicate 都是 static/scan/scan-camera.js 里真在叫的名字,不是这份 harness 编的)
+        camLog.opts = opts || {};
         return {
             start: async () => { camLog.started += 1; return true; },
             retry: async () => true,
@@ -327,6 +339,31 @@ function snapshot() {
 }
 const wedgeSubs = () => window.PearnlyScanWedge.subscriberCount();
 const msgEl = () => document.getElementById('inv-in-mask-scan-msg');
+
+/**
+ * 一串真按键。事件戳按物理节拍算(gapMs),与这段代码跑得多快无关 —— 楔子量的就是这个戳,
+ * 用墙钟造节拍的话「节拍」会变成「node 跑得多快」,那种绿是假的。
+ * 字符照旧落进框里(浏览器会做的那一步,楔子不吃字符键),楔子认成枪扫才把它还原回去。
+ * end='Enter' 当场收口;不给就靠楔子自己那只 MAX_GAP_MS 计时器。
+ */
+let prevented = 0;
+function typeInto(text, el, gapMs, end) {
+    if (el && el.focus) el.focus();
+    const target = el || document.body;
+    let stamp = 1000;
+    const press = (key) => {
+        keyHandlers.slice().forEach((h) =>
+            h({ key, target, repeat: false, timeStamp: stamp, preventDefault: () => { prevented += 1; } })
+        );
+    };
+    for (let i = 0; i < text.length; i++) {
+        if (i) stamp += gapMs;
+        press(text[i]);
+        if (el && typeof el.value === 'string') el.value += text[i];
+    }
+    if (end) { stamp += gapMs; press(end); }
+}
+const rowField = (i, k) => field(rows()[i], k);
 """
 
 PRELUDE = _DOM + _BOOT
@@ -347,3 +384,49 @@ def run(body: str) -> dict:
     if not raw.strip():
         raise AssertionError(f"node 没有输出 JSON\n{stderr}")
     return json.loads(raw)
+
+
+# ── 这一批用例共用的货架与查码应答 ────────────────────────────────────────
+# 内容是造的(那是网络),但落地的每个字段名都照 routes/products_routes.py 的 /lookup 信封写,
+# 读它的是产品自己的代码。两份用例文件(behavior / guards)共用同一份 —— 各抄一份必然漂,
+# 漂了就会出现「同一个码在两份测试里是两件货」。
+FIXTURE = r"""
+const COLA = '8850999320014';
+const BOX = '8850999320021';   // 同一件可乐的箱码(挂在 product_units 上)
+const MILK = '4901234567894';  // 批次品
+const GHOST = '9999999999999'; // 库里没有
+const P_COLA = { id: 'p-cola', name_th: 'coke', name_en: 'Coke', name_zh: 'kele', track_batch: false };
+const P_MILK = { id: 'p-milk', name_th: 'nom', name_en: 'Milk', name_zh: 'niunai', track_batch: true };
+const LOOKUP = {
+    [COLA]: { product: P_COLA, matched_by: 'product', matched_unit: 'khuad' },
+    [BOX]: { product: P_COLA, matched_by: 'unit', matched_unit: 'lang' },
+    [MILK]: { product: P_MILK, matched_by: 'product', matched_unit: 'klong' },
+};
+reply = (url) => {
+    const code = decodeURIComponent(String(url).split('barcode=')[1] || '');
+    return LOOKUP[code] ? answer(LOOKUP[code]) : answer({ detail: 'sales.product_not_found' }, 404);
+};
+shelf = [
+    { product_id: 'p-cola', name: { th: 'coke', en: 'Coke', zh: 'kele' }, track_batch: false, batches: [] },
+];
+
+// 扫码只从产品自己的入口进:扫码框里回车(mountInvScan 绑的 onkeydown)。
+async function feed(code) {
+    const input = document.getElementById('inv-in-mask-scan-code');
+    input.value = code;
+    input.onkeydown({ key: 'Enter', preventDefault() {} });
+    await tick();
+    await tick();
+}
+function closeIn() {
+    // 走产品自己的关窗按钮(页脚那个「取消」),不直接调 unmountInvScan —— 直接调等于
+    // 绕过 closeModal 这条真路,「关窗到底放没放开」就没被验到
+    const mask = document.getElementById('inv-in-mask');
+    const foot = mask.querySelector('.inv-modal-foot');
+    foot.querySelector('[data-inv-close]').click();
+}
+"""
+
+
+def scenario(body: str) -> dict:
+    return run(FIXTURE + body)

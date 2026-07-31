@@ -70,12 +70,28 @@ def newest_mtime(paths: list[Path]) -> float:
     return max((p.stat().st_mtime for p in paths if p.exists()), default=0.0)
 
 
+def shots_of(spec: dict) -> list[Path]:
+    """这个条目自己的那批截图。
+
+    写成目录 = 整个目录;写成通配 = 只认匹配到的那些。后者是给「几个脚本共用一个目录」用的:
+    共用目录而各认各的文件名前缀时,拿整个目录判新旧就是跑 A 让 B 也显得新鲜 —— 本仓的
+    pos_barcode_scan/ 一度有六个条目指着同一个目录,任何一个跑过,另外五个的新旧闸就废了。
+    """
+    pattern = str(spec["artifacts"]).replace("\\", "/")
+    if "*" not in pattern:
+        pattern += "/*.png"
+    at = Path(pattern)
+    # 反证用例喂的是临时目录的绝对路径;真台账一律相对仓库根
+    base = Path(at.anchor) if at.is_absolute() else PROJECT_ROOT
+    rel = at.relative_to(at.anchor).as_posix() if at.is_absolute() else pattern
+    return sorted(base.glob(rel))
+
+
 def stale_entries(ledger: dict) -> list[str]:
     """covers 比产物新 = 这些行为在当前版本上没验过。没有任何产物的条目单独归类。"""
     out = []
     for name, spec in ledger["scripts"].items():
-        shots = PROJECT_ROOT / spec["artifacts"]
-        pics = sorted(shots.glob("*.png")) if shots.is_dir() else []
+        pics = shots_of(spec)
         if not pics:
             continue  # 从没跑过 —— 由 never_run() 单独报,别混进「过期」里
         sources = [PROJECT_ROOT / c for c in spec["covers"]] + [SCRIPTS_DIR / name]
@@ -102,11 +118,19 @@ def unacked_stale(ledger: dict, today: str) -> list[str]:
 
 
 def never_run(ledger: dict) -> list[str]:
-    return [
-        name
-        for name, spec in ledger["scripts"].items()
-        if not sorted((PROJECT_ROOT / spec["artifacts"]).glob("*.png"))
-    ]
+    return [name for name, spec in ledger["scripts"].items() if not shots_of(spec)]
+
+
+def shared_shots(ledger: dict) -> list[str]:
+    """两个条目认到同一张图 = 跑其中一个,另一个的新旧闸跟着一起变绿。"""
+    owner: dict[Path, str] = {}
+    clashes = []
+    for name, spec in sorted(ledger["scripts"].items()):
+        for pic in shots_of(spec):
+            first = owner.setdefault(pic, name)
+            if first != name:
+                clashes.append(f"{first} 与 {name} 都认了 {pic.name}")
+    return clashes
 
 
 class LedgerIsComplete(unittest.TestCase):
@@ -161,6 +185,19 @@ class LedgerIsComplete(unittest.TestCase):
                 bad.append(f"{name}: artifacts 不在 tests/e2e/_artifacts/ 下({art})")
         self.assertEqual(bad, [], "台账写错了 —— 闸会去盯错文件,报绿也没意义")
 
+    def test_no_two_entries_watch_the_same_screenshots(self):
+        """本闸最容易失效的一种写法:几条都指着同一个目录。
+
+        那样跑任何一个都会把整批的时间戳刷新,另外几条于是永远「新鲜」—— 闸还在,判据没了。
+        2026-07-31 实测本仓一度有六条指着 pos_barcode_scan/,其中 _sx_barcode_copy_accept
+        连目录都写错(它落在 camera/ 子目录),它的新旧从来是别人的截图在替它作答。
+        """
+        self.assertEqual(
+            shared_shots(self.ledger),
+            [],
+            "两个条目认同一张图 —— 给各自写通配(dir/前缀*.png)或各落各的子目录",
+        )
+
     def test_not_e2e_entries_carry_a_reason(self):
         blank = [n for n, why in self.ledger["not_e2e"].items() if len(str(why).strip()) < 6]
         self.assertEqual(blank, [], "not_e2e 是逃生门 · 不写原因等于把闸关掉")
@@ -210,18 +247,14 @@ class E2EIsNotStale(unittest.TestCase):
         ]
         self.assertEqual(too_long, [])
 
-    def test_never_run_scripts_are_reported(self):
-        """从没跑过的照实说:台账刚建时这里会亮,那是实话,不是判据坏了。"""
-        pending = never_run(self.ledger)
-        self.assertLessEqual(
-            len(pending),
-            len(self.ledger["scripts"]),
-            "never_run 判据坏了",
+    def test_every_entry_has_screenshots_of_its_own(self):
+        """一张图都认不到 = 要么这条从没跑过,要么它的 artifacts 写错了(通配打偏一个字符
+        就什么都不匹配)。两种都得红:此前这条只 print 不 fail,写偏了没人知道。"""
+        self.assertEqual(
+            sorted(never_run(self.ledger)),
+            [],
+            "这些条目一张产物截图都认不到 —— 跑一次它,或把 artifacts 写对",
         )
-        if pending:
-            print("\n[e2e-ledger] 这些脚本还没有任何产物截图 · 它们保的行为一次都没验过:")
-            for name in sorted(pending):
-                print(f"  · {name} → {self.ledger['scripts'][name]['artifacts']}")
 
 
 class GateHasTeeth(unittest.TestCase):
@@ -274,6 +307,55 @@ class GateHasTeeth(unittest.TestCase):
         led = {"scripts": {"fake.cjs": {"artifacts": str(shots), "covers": [str(LEDGER)]}}}
         self.assertEqual(stale_entries(led), [])
         self.assertEqual(never_run(led), ["fake.cjs"])
+
+    def _two_entries(self, art_a: str, art_b: str) -> dict:
+        shots = self.dir / "shots"
+        shots.mkdir()
+        for name in ("a-1.png", "b-1.png"):
+            (shots / name).write_bytes(b"x")
+        return {
+            "scripts": {
+                "a.cjs": {"artifacts": art_a, "covers": [str(LEDGER)]},
+                "b.cjs": {"artifacts": art_b, "covers": [str(LEDGER)]},
+            }
+        }
+
+    def test_two_entries_on_one_directory_are_caught(self):
+        """会出事的那种写法:两条都写整个目录 —— 跑 a 就把 b 也刷新了。"""
+        shots = str(self.dir / "shots")
+        self.assertTrue(shared_shots(self._two_entries(shots, shots)), "共用目录没被抓住")
+
+    def test_prefix_globs_split_one_directory_cleanly(self):
+        """反面:各认各的前缀就不该报 —— 误报一次,大家就会退回共用目录。"""
+        shots = str(self.dir / "shots")
+        led = self._two_entries(shots + "/a-*.png", shots + "/b-*.png")
+        self.assertEqual(shared_shots(led), [])
+        self.assertEqual(never_run(led), [])
+
+    def test_a_glob_that_matches_nothing_is_reported(self):
+        """通配写偏一个字符 = 一张都不匹配。此前这只 print,于是「写偏了」永远没人知道。"""
+        shots = str(self.dir / "shots")
+        led = self._two_entries(shots + "/a-*.png", shots + "/typo-*.png")
+        self.assertEqual(never_run(led), ["b.cjs"])
+
+    def test_only_its_own_shots_decide_freshness(self):
+        """共用目录时,别人刚跑出来的新图不许替这一条作答。"""
+        shots = self.dir / "shots"
+        shots.mkdir()
+        src = self.dir / "src.ts"
+        (shots / "a-1.png").write_bytes(b"x")
+        os.utime(shots / "a-1.png", (1_700_000_000, 1_700_000_000))
+        src.write_bytes(b"y")
+        os.utime(src, (1_750_000_000, 1_750_000_000))
+        (shots / "b-1.png").write_bytes(b"z")  # 别人刚跑的,时间戳是现在
+        led = {
+            "scripts": {
+                "a.cjs": {"artifacts": str(shots) + "/a-*.png", "covers": [str(src)]},
+            }
+        }
+        self.assertTrue(stale_entries(led), "拿别人的新图把这一条判成新鲜的了")
+        led["scripts"]["a.cjs"]["artifacts"] = str(shots)  # 退回「整个目录」= 当场假绿
+        self.assertEqual(stale_entries(led), [])
 
 
 if __name__ == "__main__":

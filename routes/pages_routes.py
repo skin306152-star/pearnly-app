@@ -170,7 +170,11 @@ async def pos_service_worker():
 @router.get("/cashier-sw.js")
 async def cashier_service_worker():
     # 收银台新家的 Service Worker:从根路径出 → 可注册 scope=/cashier(控 /cashier 导航、离线重开壳)。
-    # 与 /pos-sw.js 各自独立作用域,互不影响(老设备的 /pos 旧 SW 原样保留)。
+    # 与 /pos-sw.js 各自独立作用域,互不抢导航(老设备的 /pos 旧 SW 原样保留)。
+    # 「互不影响」只对导航成立,对缓存不成立:CacheStorage 是按源的,两个 SW 的 caches.keys()
+    # 互相看得见、删得掉。两边的 dropStaleCaches 因此都按缓存名前缀只删自己那一族 —— 无差别删
+    # 就是装一个 SW 抹掉另一台机器的离线外壳(2026-07-31 实测:开一次 /cashier,断网回 /pos 直接
+    # ERR_FAILED)。改任一 SW 的缓存命名前先看那两个函数。
     return FileResponse(
         "static/pos/cashier-sw.js", media_type="application/javascript", headers=_NO_CACHE
     )

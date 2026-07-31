@@ -9,11 +9,18 @@
     "登记项不是文档,是判据:covers 写错 = 闸看错文件,only_e2e 写空 = 闸自检当场红。"
   ],
   "_fields": {
-    "artifacts": "跑完落截图的目录(相对仓库根)· 新旧由它的 mtime 判",
+    "artifacts": "跑完落截图的目录,或 目录/前缀*.png(几个脚本共用一个目录时必须写通配)",
     "covers": "这份 E2E 是谁的最后一道防线 · 这些文件改了就该重跑它",
     "only_e2e": "只有它能保的行为 · 每条都要说清『为什么单测保不了』",
     "fixtures": "跑之前要先造的素材(没有就填 []）"
   },
+  "_artifacts_rule": [
+    "两个条目不许认到同一张图:跑其中一个会把另一个的时间戳也刷新,新旧闸当场失效。",
+    "2026-07-31 实测本仓一度有六条都指着 pos_barcode_scan/,其中 _sx_barcode_copy_accept",
+    "连目录都写错(它落在子目录里),它的新旧一直是别人的截图在替它作答。现在这条由",
+    "test_no_two_entries_watch_the_same_screenshots 硬拦;认不到任何图也照红(通配写偏一个",
+    "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
+  ],
   "scripts": {
     "_scan_smoke.cjs": {
       "artifacts": "tests/e2e/_artifacts/scan_base",
@@ -53,6 +60,23 @@
         "单位标签在 390 宽下只在自己那格里收边、不把行撑宽:要真 CSS 才量得出"
       ]
     },
+    "_inv_typed_feedback_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/inv_typed_feedback",
+      "covers": [
+        "src/home/inventory-scan.ts",
+        "src/home/inventory-scan-ui.ts",
+        "src/home/inventory-modals.ts",
+        "static/scan/scan-wedge.js",
+        "static/home-41-inventory.css",
+        "static/i18n-data.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "「这一发我按人在打字处理了」那句话在屏上真看得见:单测断得了变量里有这句话,断不了它有面积、没被 display/visibility 藏起来 —— 要 getComputedStyle + getBoundingClientRect",
+        "慢枪(90ms/字符)与人手的分界线量的是真键盘事件的时间戳:只有 keyboard.type 造得出,fill() 一个 keydown 都不发",
+        "390 宽下批号/效期框到底多少像素、一串真批号在框里看不看得全:要真 CSS 网格 + 真字体度量,grep 类名或「CSS 属性设上了」都不算(本仓吃过这个亏)"
+      ]
+    },
     "_inv_p1_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/inv_p1",
       "covers": [
@@ -66,11 +90,26 @@
       "only_e2e": [
         "一串条码被慢到楔子都不认的速度打进 type=date 框:date 控件把它变成 49012-03-31 这件事只有真控件做得到",
         "楔子按【字符间隔】分枪扫与人手打字:间隔是真键盘事件的时间戳,单测造不出",
+        "慢枪那一档(80ms/字符)判成打字之后屏上给得出「当条码用」,点了框还原 + 加行:整条链跨真键盘、真 date 控件、真点击",
         "失败夹在队列中间时那张卡仍然 getComputedStyle 可见:重绘时机要真浏览器"
       ]
     },
+    "_gun_ruler_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/ruler",
+      "covers": [
+        "static/scan/scan-wedge.js",
+        "src/home/inventory-scan.ts",
+        "src/home/sales-products-scan.ts"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "「主线程被长任务堵住时 KeyboardEvent.timeStamp 跟不跟着晚」—— 整把尺子的地基。实测处理时刻 135ms / 产生时刻 22ms,两者分道扬镳这件事只有真渲染线程做得出;而且枪必须走 CDP 发了就走(keyboard.type 自己也会被卡住,长任务就被偷换成「枪打得慢」)",
+        "<input type=date> 吃了一串数字之后 value 到底长什么样:人打的与机器打的残渣互相穿帮,这是「像不像日期」那条代理判据被删掉的现场证据",
+        "键盘自动重复的真 repeat 标志与真实节拍(实测 40~48ms,落在枪速区间内):Playwright 重复 down() 才发得出,单测里那是脚本自己填的布尔"
+      ]
+    },
     "_gun_wedge_inv_verify.cjs": {
-      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan",
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/*-inv-*.png",
       "covers": [
         "static/scan/scan-wedge.js",
         "src/home/inventory-scan.ts",
@@ -83,7 +122,7 @@
       ]
     },
     "_gun_wedge_pos_verify.cjs": {
-      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan",
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/*-pos-*.png",
       "covers": ["static/scan/scan-wedge.js", "static/pos/pos-scan.js"],
       "fixtures": [],
       "only_e2e": [
@@ -93,15 +132,21 @@
     },
     "_pos_scan_smoke.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_scan",
-      "covers": ["static/pos/pos-scan.js", "static/scan/scan-camera.js"],
+      "covers": [
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js",
+        "static/scan/scan-camera.js",
+        "static/pos/pos.html"
+      ],
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "真 ZXing 从假摄像头画面里解出真 EAN-13 → 真进购物车:桌面 Chromium 没有原生 BarcodeDetector,走的是真解码器",
-        "#bscan-* 那几个真节点的显隐与文案:单测里这层 DOM 不存在"
+        "#bscan-* 那几个真节点的显隐与文案:单测里这层 DOM 不存在",
+        "失败清单画在取景层(z=60)之上、点得到:靠 elementFromPoint 在真排版下问「这一点点到的是谁」"
       ]
     },
     "_pos_scan_accept.cjs": {
-      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan",
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/accept",
       "covers": [
         "static/pos/pos-scan.js",
         "static/scan/scan-camera.js",
@@ -117,15 +162,30 @@
     },
     "_pos_fail_list_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_fail_list",
-      "covers": ["static/pos/pos-scan.js"],
+      "covers": ["static/pos/pos-scan.js", "static/pos/pos-scan-fails.js"],
       "fixtures": [],
       "only_e2e": [
         "失败排在队列【中间】时那张卡有没有被下一件当场换掉:要真往返延时才排得出队列,且要 getComputedStyle 才算「屏上还看得见」",
         "只建了箱单位的货扫主码时按基本单位价真进车:要真购物车的金额"
       ]
     },
+    "_pos_fails_overlap_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fails-overlap",
+      "covers": [
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js",
+        "static/pos/pos-scan.css",
+        "static/pos/pos.html"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "失败清单撑着时店员还点不点得到 #main-search 与 #main-grid:判据是 document.elementFromPoint 在真排版下这一点点到的是谁 —— 清单是 fixed 浮层时两边的样式各自都「正确」,盒子却叠在一起(390×780 实测搜索框 25/25 采样点被接走),类名/z-index/单测都答不了这个问题",
+        "清单改成 in-flow 之后还画不画在摄像头取景层(z=60)之上:靠的是 z-index 与「.left 到 .pos-view 之间没人另起层叠上下文」,那是渲染期才成立的事",
+        "点「用这个码搜商品」之后搜索结果真的看得见:那颗按钮干的正是填 #main-search + 重画 #main-grid,而浮层版把这两样一起盖住 —— 动作成功了、店员看不见,单测断得到清单少一条,断不到这一层"
+      ]
+    },
     "_fix_scan_home_verify.cjs": {
-      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan",
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix",
       "covers": [
         "src/home/sales-products-scan.ts",
         "src/home/sales-products.ts",
@@ -139,28 +199,292 @@
       ]
     },
     "_fix_scan_pos_verify.cjs": {
-      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan",
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix-pos",
       "covers": [
         "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js",
         "static/scan/scan-camera.js",
         "static/scan/scan-zxing-shim.js"
       ],
       "fixtures": [
         "python scripts/_scan_ean_y4m.py .scan_fixture.y4m",
-        "python scripts/_scan_ean_blink_y4m.py .scan_fixture.blink.y4m"
+        "python scripts/_scan_ean_blink_y4m.py .scan_blink.y4m"
       ],
       "only_e2e": [
         "码举在框里 6 秒不动 = 1 件、离开画面再回来能再收一件:判据是真连续帧,静止素材验不出",
         "授权超时之后 stream 才兑现 → 那条 track 必须被 stop:竞态只有真 getUserMedia 排得出来",
-        "屏上取景框映射回源像素 == 引擎真解的那块:要真视频尺寸与真 CSS 盒子"
+        "屏上取景框映射回源像素 == 引擎真解的那块:要真视频尺寸与真 CSS 盒子",
+        "枪那条路上没有取景层时失败清单自己立得住(不靠撑一层暗底):要真排版 + elementFromPoint"
       ]
     },
     "_sx_barcode_copy_accept.cjs": {
-      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan",
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/sx-copy",
       "covers": ["src/home/sales-products-scan.ts", "static/i18n-data.js"],
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "泰文界面上画的到底是不是泰文:期望值现场从真 window.I18N.th 取,屏上逐字对 —— 单测里没有页面语言这回事"
+      ]
+    },
+    "_hostile_scan_cam_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix2/[cx]-*.png",
+      "covers": ["static/scan/scan-camera.js", "static/pos/pos-scan.js"],
+      "fixtures": [
+        "python scripts/_scan_ean_pjitter_y4m.py .p80.y4m 0.8 13",
+        "python scripts/_scan_ean_pjitter_y4m.py .p60.y4m 0.6 5",
+        "python scripts/_scan_ean_pjitter_y4m.py .p50.y4m 0.5 3",
+        "python scripts/_scan_ean_jitter_y4m.py .g600.y4m 8850999320014 19 9",
+        "python scripts/_scan_ean_jitter_y4m.py .g800.y4m 8850999320014 19 12"
+      ],
+      "only_e2e": [
+        "单帧成功率 0.8/0.6/0.5 的随机丢帧素材下连扫仍只记一件:随机丢帧要真解码器逐帧解才成立,桩引擎回什么都是脚本自己定的",
+        "「一次长反光」600/800ms 的空白被解码器自身耗时撑成多长:那一截正是「不能只信墙钟」的现场数字,只有真 ZXing 量得出"
+      ]
+    },
+    "_hostile_scan_home_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix2/h[0-9]*.png",
+      "covers": [
+        "src/home/sales-products-scan.ts",
+        "src/home/inventory-scan.ts",
+        "src/home/inventory-scan-ui.ts",
+        "static/scan/scan-wedge.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "「按住一个键不放」的真 autoRepeat:repeat=true 的 keydown 只有浏览器发得出,单测里那是脚本自己填的布尔,而这一路正是「速度够、长度够」却必须被挡住的那一档",
+        "打一半退格改掉再打完:退格也发 input 事件,而速度判据按事件点 —— 要真键盘",
+        "中速(120ms/字符)按段填日期时框里最后剩什么:段序跟浏览器 locale 走,只有真 date 控件答得了"
+      ]
+    },
+    "_hostile_scan_pos_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix2/p[0-9]*.png",
+      "covers": [
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js",
+        "static/pos/pos-cashier.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "连扫五件里第 2、4 件失败:要真往返延时才排得出队列,失败落在中间那种顺序单测排不出来",
+        "两条失败并存时点其中一条的「拿这个码去搜」/ 按 Esc:另一条不许跟着一起消失 —— 判据是屏上还剩几行",
+        "只建了箱单位的货扫主码、只填名字建出来的货(unit_price=null)进收银台:算的是真购物车金额"
+      ]
+    },
+    "_hostile_sw_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix2/s[0-9]*.png",
+      "covers": ["static/pos/cashier-sw.js", "static/pos/pos-sw.js"],
+      "fixtures": [],
+      "only_e2e": [
+        "部署中新版 SW 装不上时老缓存还在不在、断网还开不开得了 /cashier:CacheStorage 是按源分家的,node 里的 caches 桩看不见这件事",
+        "/pos 与 /cashier 两个作用域各装各的 SW「互不干扰」是不是真的:要真 navigator.serviceWorker.register"
+      ]
+    },
+    "_r3_jank_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/round3/j[0-9]*.png",
+      "covers": ["static/scan/scan-wedge.js", "src/home/sales-products-scan.ts"],
+      "fixtures": [],
+      "only_e2e": [
+        "建品条码框上:主线程卡 120ms 的那一发真枪仍然被判成枪(处理时刻 135ms / 产生时刻 19ms)。前提本身就是浏览器事实 —— 长任务、事件排队、两把时钟分家,node 里一样都没有",
+        "枪必须走 CDP 发了就走:keyboard.type 会 await 每一发,页面一卡它自己也停,这一例就退化成「枪打得慢」"
+      ]
+    },
+    "_r3_inv_jank_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/round3/i[0-9]*.png",
+      "covers": ["static/scan/scan-wedge.js", "src/home/inventory-scan.ts"],
+      "fixtures": [],
+      "only_e2e": [
+        "入库批号框上同一件事:卡 120ms 之后这一箱要么进单要么出声,不许既不加行也不查码还一个字都不出",
+        "店员填了一半的批号在这一发之后必须原样留着:框里的值是真 DOM 的值,不是回调参数"
+      ]
+    },
+    "_r3_slowgun_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/round3/r[0-9]*.png",
+      "covers": ["static/scan/scan-wedge.js", "src/home/sales-products-scan.ts"],
+      "fixtures": [],
+      "only_e2e": [
+        "50~150ms 这一段(蓝牙 HID / 带 transmit delay 的枪)判成打字之后屏上不许出绿字「没人用这个码」——「屏上这一刻画的是什么」只有真渲染答得出,单测断得到状态变量,断不到那句话是绿的",
+        "30~140ms 每 10ms 一档扫过去,实测节拍由浏览器现场量(不信 delay 参数自称):脚本自称的节拍与真事件戳差一截,判据落在哪一档全看后者",
+        "点「当条码用」之后框真的补回来、且系统真按那个码去查:跨真点击 + 真输入框 + 真网络请求"
+      ]
+    },
+    "_r3_pos_faillist_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/round3/f[0-9]*.png",
+      "covers": [
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js",
+        "static/pos/pos-scan.css"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "码 A 没建档 → 老板补建 → 同一个码再扫真进车了,那条旧欠账有没有跟着销掉:要真的走完两轮往返",
+        "同一个未建档的码连扫三次只留一条:判据是屏上真的有几行",
+        "清单挂着时它盖住了收银主屏的哪一块:elementFromPoint 在真排版下才答得出"
+      ]
+    },
+    "_r4_cam_rearm_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix3/r-*.png",
+      "covers": [
+        "static/scan/scan-camera.js",
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js"
+      ],
+      "fixtures": [
+        "python scripts/_scan_ean_blink_y4m.py .blink20.y4m 8850999320014 2.0",
+        "python scripts/_scan_ean_blink_y4m.py .blink18.y4m 8850999320014 1.8",
+        "python scripts/_scan_ean_blink_y4m.py .blink16.y4m 8850999320014 1.6",
+        "python scripts/_scan_ean_blink_y4m.py .blink12.y4m 8850999320014 1.2",
+        "python scripts/_scan_ean_blink_y4m.py .blink08.y4m 8850999320014 0.8"
+      ],
+      "only_e2e": [
+        "去重地板【落在哪一档】:地板 = clearAfterMisses × 一次解不出的采样有多久,后一项是真 ZXing 解真像素烧出来的 —— node 里那个数是测试自己填的,改了门槛也照样绿",
+        "顺着梯子的单调性:地板以上每一档都必须自然重记(空档 1.6s 认得出而 2.0s 认不出 = 尺子本身坏了)。这条要同一台机器上逐档跑真素材才量得出,算术给不出",
+        "地板以下不许静默:那行提示得是真 DOM(有盒子、不透明、在视口内、那块像素上站的就是它)—— 清单挂在收银主屏上而取景层是 z-index 46 的整屏遮罩,断 classList 有没有 show 的那种绿骗过前几轮",
+        "那颗「+1」不是装饰:点下去真发 by-barcode 请求、购物车数量真从 1 变 2 —— 断函数被调用过不算,那条路上还有单位/缺价/离线三道会拦下它的判定"
+      ]
+    },
+    "_r4_fails_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix3/f[0-9]*.png",
+      "covers": [
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js",
+        "static/pos/pos-cashier.js",
+        "static/pos/pos-i18n.js",
+        "static/pos/pos.html"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "Esc 那条路上一轮的绿是空转出来的:产品里写的是 `Escape && cameraOpen()`,取景层没开就短路 —— 「这一例到底走没走到 close()」只有真页面上的取景层开关状态答得出,单测里 close() 是直接调的",
+        "取景层真开着时按 Esc:关掉它顺不顺手把失败清单一起清了,判据是屏上还剩几行真 DOM",
+        "老板补录条码后重扫 → 那条欠账销不销:要真的走完两轮 by-barcode 往返(第一轮 404、第二轮 200),桩里两次调用之间没有「后端改了」这件事",
+        "「还欠 1 条」那句话的期望值现场从真 window.POS_I18N 取,屏上逐字对 —— 单测里没有页面语言这回事",
+        "点真的「清空」按钮(不是 POS.scan.saleEnded())之后上一位客人的欠账还在不在:那颗按钮在手机版收在视口外的 sheet 里,要真布局 + 桌面视口才点得到"
+      ]
+    },
+    "_r4_wedge_split_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix3/w[0-9]*.png",
+      "covers": [
+        "static/scan/scan-wedge.js",
+        "static/pos/pos-scan.js",
+        "static/pos/pos.html",
+        "src/home/inventory-scan.ts",
+        "src/home/inventory-modals.ts"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "长任务比楔子的断串计时器(MAX_GAP_MS=150)还长时一发枪会不会被拆成两发:setTimeout 在主线程被堵住时延后、解封后跟排队的后半串字符抢先后 —— 「谁先谁后」是浏览器的调度事实,node 里那个顺序由测试自己编",
+        "长任务落在两发按键【之间】(排进宏任务队列)而不是某一发的派发里:那时 clearTimeout 来不及,150ms 计时器真的会在堵的过程中到期 —— 这两种堵法的差别只有真事件循环做得出",
+        "枪必须走 CDP 发了就走:keyboard.type 会 await 每一发,页面一卡它自己也停,这一例就退化成「枪打得慢」",
+        "店员手写在批号框里的那半截批号在这一发之后还在不在:框里的值是真 DOM 的值,不是回调参数",
+        "收款弹窗开着时扫的那一发不许静默丢掉:判据是 toast 真显示 + 失败清单真多一行,而 toast 挂 2600ms 才自己收 —— 不等它退场就读到的是上一发的,那种绿正好复刻这条 bug 骗人的方式"
+      ]
+    },
+    "_r5_cam_floor_by_speed_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix5/r5f-*.png",
+      "covers": [
+        "static/scan/scan-camera.js",
+        "static/scan/scan-loader.js",
+        "static/scan/scan-zxing-shim.js",
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js"
+      ],
+      "fixtures": [
+        "python scripts/_scan_ean_blink_y4m.py .blink04.y4m 8850999320014 0.4",
+        "python scripts/_scan_ean_blink_y4m.py .blink06.y4m 8850999320014 0.6",
+        "python scripts/_scan_ean_blink_y4m.py .blink14.y4m 8850999320014 1.4",
+        "python scripts/_scan_ean_blink_y4m.py .blink16.y4m 8850999320014 1.6",
+        "python scripts/_scan_ean_blink_y4m.py .blink40.y4m 8850999320014 4.0",
+        "python scripts/_scan_ean_blink_y4m.py .blink60.y4m 8850999320014 6.0",
+        "python scripts/_scan_ean_pjitter_y4m.py .p50.y4m 0.5 3",
+        "python scripts/_scan_ean_jitter_y4m.py .g1200.y4m 8850999320014 19 18",
+        "python scripts/_scan_ean_jitter_y4m.py .g2800.y4m 8850999320014 19 42"
+      ],
+      "only_e2e": [
+        "clearAfterMs / clearAfterMisses 这两个数一动就得重跑的那份报告:地板 = max(墙钟, 采样数 × 一次失败解码耗时),后一项是真 ZXing 解真像素烧出来的 —— node 里它是测试自己填的模型,改了门槛也照样绿",
+        "同一份判据换三档解码器(native 桩 / 本仓 dist/zxing.js / 再压 280ms 的老平板)地板会不会翻倍:自变量是「解码有多快」,而解码耗时只有真解码器给得出",
+        "地板【以下】那几档不许一声不吭:那行提示得是真 DOM(有盒子、不透明、在视口内),断 classList 有没有 show 的那种绿骗过前几轮",
+        "还静默着的那一段有多宽、够不够得着人手换货的下限(SWAP_FLOOR_MS=700):这个数是逐档跑真素材量出来的,算术给不出",
+        "R5_LOWFLOOR=1 的反证:把地板真按「压到 1.2 秒 / 给采样尺封顶」改下去再跑,带同机同素材的对照组 —— 只有改了门槛那一跑多记货,才说得清多记是门槛改的"
+      ]
+    },
+    "_r5_pos_blocked_input_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/r5/c[0-9]*.png",
+      "covers": [
+        "static/pos/pos-scan.js",
+        "static/pos/pos-scan-fails.js",
+        "static/pos/pos.js",
+        "static/pos/pos.html",
+        "static/scan/scan-wedge.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "「没加进购物车」那句话旁边画的是哪个字形:图标写死在 pos.html、颜色在 pos.css、挑哪条 path 在 pos.js —— 三个文件拼出来的那一眼,node 桩里 toast 是个记录调用的数组,断得到 type='error' 断不到店员看见了什么(这条正是本轮的红:两句话的 d 一模一样都是对勾)",
+        "失败清单有没有压在收款窗上:清单在流里横跨整个商品列,z-index 与类名都答不了「关闭键点不点得动」——只有真排版下的 elementFromPoint + 真点一下答得了",
+        "那句 toast 有没有遮住应付金额:.pos-toast 是 pointer-events:none,命中测试在它身上失效,只能量真布局下两个盒子的交叠面积",
+        "楔子把一串按键判成「人在打字」还是「枪」:判据量的是事件产生时刻,而 node 里这个时刻由测试自己填 —— 真键盘发出来的 115ms 间隔才证明这一串真落在人手那一档"
+      ]
+    },
+    "_r5_wedge_cross_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix4/c[0-9]*.png",
+      "covers": [
+        "static/scan/scan-wedge.js",
+        "src/home/inventory-scan.ts",
+        "static/pos/pos-scan.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "一串枪打到一半光标被 focus() 挪进数量框:哪个字符落进哪个框,是浏览器「keydown 派发完才执行默认动作」定的先后 —— node 桩里这个顺序由测试自己编,编错了就成了自己验自己",
+        "键盘自动重复的 autoRepeat 标志:只有真键盘/CDP 发得出(实测 12 发里 11 发带 repeat、事件戳最大间隔 41.8ms,正好落在枪速判据之内),node 里它是测试自己填的字段",
+        "收银主屏的焦点常态是 activeElement=BODY:由真布局与自动聚焦决定,桩里给什么就是什么,而框外这条路正是判据原先漏掉的那半条",
+        "一发枪最后真发出去几次查码、屏上多没多出一张失败卡:断的是网络请求与真渲染,不是某个函数回了什么"
+      ]
+    },
+    "_r5_cam_dupnotice_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix5/r5-*.png",
+      "covers": ["static/scan/scan-camera.js", "static/pos/pos-scan.js"],
+      "fixtures": [
+        "python scripts/_scan_ean_blink_y4m.py .blink08.y4m 8850999320014 0.8",
+        "python scripts/_scan_ean_blink_y4m.py .blink10.y4m 8850999320014 1.0",
+        "python scripts/_scan_ean_blink_y4m.py .blink12.y4m 8850999320014 1.2",
+        "python scripts/_scan_ean_blink_y4m.py .blink14.y4m 8850999320014 1.4",
+        "python scripts/_scan_ean_blink_y4m.py .blink16.y4m 8850999320014 1.6",
+        "python scripts/_scan_ean_blink_y4m.py .blink18.y4m 8850999320014 1.8",
+        "python scripts/_scan_ean_blink_y4m.py .blink20.y4m 8850999320014 2.0",
+        "python scripts/_scan_ean_pjitter_y4m.py .p50.y4m 0.5 3",
+        "python scripts/_scan_ean_jitter_y4m.py .g600.y4m 8850999320014 19 9",
+        "python scripts/_scan_ean_jitter_y4m.py .g800.y4m 8850999320014 19 12",
+        "python scripts/_scan_ean_jitter_y4m.py .g1200.y4m 8850999320014 19 18"
+      ],
+      "only_e2e": [
+        "去重判据的【地板在哪】:地板 = max(墙钟, 采样数 × 一次失败解码的耗时),而后一项只有真 ZXing 解真像素才给得出真值 —— node 里那个数是测试自己填的模型",
+        "地板【以下】拿走 A 再举同款 B 时屏上到底看不看得见:判据是真 DOM 的盒子大小/透明度/在不在视口里,断 classList 有没有 show 的那种绿骗过前几轮",
+        "那颗「+1」是不是装饰:点下去真发查码请求、购物车数量真从 1 变 2 —— 断函数被调用过不算,那条路上还有单位/缺价/离线三道会拦下它的判定",
+        "举着不动那一侧的误报率:p=0.5 散帧素材每跑一遍相位都不同,同一份素材在真浏览器里走出的采样序列每次都不一样,算术给不出这个数",
+        "R5_MUTE_PROOF=1 把告警门槛推到够不着,同一批判据必须全红 —— 证明这些绿是这条提示给的,不是别的原因"
+      ]
+    },
+    "_inv_guards_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/inv_guards",
+      "covers": [
+        "src/home/inventory-scan.ts",
+        "src/home/inventory-scan-ui.ts",
+        "src/home/inventory-scan-camera.ts",
+        "src/home/inventory-modals.ts",
+        "src/home/inventory-common.ts",
+        "static/scan/scan-camera.js",
+        "static/scan/scan-wedge.js",
+        "static/i18n-data.js"
+      ],
+      "fixtures": [
+        "python scripts/_scan_ean_blink_y4m.py .blink12.y4m 8850999320014 1.2",
+        "python scripts/_scan_ean_blink_y4m.py .blink20.y4m 8850999320014 2.0",
+        "python scripts/_scan_ean_blink_y4m.py .blinkmix.y4m 8850999320014 1.2 2.0"
+      ],
+      "only_e2e": [
+        "地板【以下】被挡下的那一次在入库单上出不出声:gapMs/misses 是真 ZXing 解真像素烧出来的,单测里那两个数是喂进去的 —— 喂什么就验出什么",
+        "地板【以上】的第二箱不许多冒那句问话:同一份判据的另一侧,只有换一份真素材(离开 2.0s)才量得到",
+        "那句问话【活不活得下来】:被挡下与后面真记上一件必须在同一跑里先后发生(.blinkmix 长短空档交替),而且要按真节拍连着来 —— 单测能造这个次序,造不出「无人触碰下 14 秒里被顶掉几次」这个数(实测修前 appeared 3 / vanished 2、修后 3 / 0)",
+        "枪打进单价格之后单价格里剩下什么:字符落进框是浏览器干的,楔子还原也是在真 DOM 上做的,node 里没有这两件事",
+        "拦下来那句话在屏上真看得见 + 焦点真落到出问题的那一格:要 getComputedStyle + 面积 + activeElement",
+        "฿2,400,000/件这种真实高价照旧提交得出去:证据是真发出去的 POST 载荷,不是函数返回值"
       ]
     }
   },
@@ -169,29 +493,10 @@
     "闸就不拦了,但欠的账留在文件里,谁都看得见。until 过了闸照红,不许把欠条改成永久。",
     "别删条目当没发生过:删掉 = 那些行为在当前版本上从没验过,而闸会当场把它报出来。"
   ],
-  "stale_ack": {
-    "_inv_scan_smoke.cjs": {
-      "why": "2026-07-31 inventory-scan.ts 当天被重写过几轮(队列/失败清单/burst 还原);这份 smoke 的摄像头与真键盘那几条要重跑。批次收尾时统一跑。",
-      "until": "2026-08-02"
-    },
-    "_inv_p1_verify.cjs": {
-      "why": "2026-07-31 扫码批次多窗口在跑,inventory-scan* 一天之内被重写过几轮;跑一次 E2E 十分钟后就又过期了。批次收尾时统一重跑。",
-      "until": "2026-08-02"
-    },
-    "_gun_wedge_inv_verify.cjs": { "why": "同上 · 入库侧枪扫", "until": "2026-08-02" },
-    "_gun_wedge_pos_verify.cjs": { "why": "同上 · 收银侧枪扫", "until": "2026-08-02" },
-    "_pos_scan_smoke.cjs": { "why": "同上 · pos-scan.js 本批在改", "until": "2026-08-02" },
-    "_pos_scan_accept.cjs": { "why": "同上 · pos-scan.js 本批在改", "until": "2026-08-02" },
-    "_fix_scan_home_verify.cjs": { "why": "同上 · 主站扫码复验", "until": "2026-08-02" },
-    "_fix_scan_pos_verify.cjs": { "why": "同上 · 收银台扫码复验", "until": "2026-08-02" },
-    "_sx_barcode_copy_accept.cjs": {
-      "why": "同上 · 建品条码文案(i18n-data.js 本批被多个窗口改)",
-      "until": "2026-08-02"
-    }
-  },
+  "stale_ack": {},
   "not_e2e": {
     "_verify_shared.cjs": "公共库(起静态服务 / 截图 / 跑用例)· 自己不跑",
-    "_gun_wedge_lib.cjs": "条码枪验收的公共库 · 自己不跑",
+    "_gun_wedge_lib.cjs": "条码枪验收的公共库(含真枪 CDP 发法与两把尺子)· 自己不跑",
     "_products_barcode_ui_verify.cjs": "建品条码位的施工者回归脚本 · 文案那条洞由 _sx_barcode_copy_accept 补(见它的头注释)"
   }
 }

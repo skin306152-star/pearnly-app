@@ -13,9 +13,11 @@ tests/unit/test_scan_wedge_pure.py
   3. Enter / Tab 立即收尾并 preventDefault(否则枪的回车把表单顺手提交了)。
   4. 焦点在 input/textarea/contenteditable 上不抢(店员在改数量,截走按键=输入框吞字);
      该元素带 data-enable-barcode 才例外。
-  5. data-enable-barcode="gun" 的框只收「枪打的那种串」,人手打的照旧归那个框 ——
-     批号/效期这类框走这一档(见 WedgeGunOnlyFieldTests)。
+  5. 声明接枪的框只收「枪打的那种串」,人手打的照旧归那个框(见 WedgeGunOnlyFieldTests)。
   6. exclusive 订阅者在场时独占(modal 开着,底下页面不该偷偷把货加进购物车)。
+
+「枪打的那种串」这把尺子本身的反证在 test_scan_wedge_ruler.py:那边验的是判据(节拍从哪
+算、自动重复、慢串、人手填日期),这边验的是收发机制(攒串、收尾、让焦点、独占)。
 """
 
 from __future__ import annotations
@@ -36,13 +38,17 @@ WEDGE = PROJECT_ROOT / "static" / "scan" / "scan-wedge.js"
 def _prelude(touch: bool = False) -> str:
     return f"""
         const handlers = [];
+        const focusins = [];
         const created = [];
         {"global.ontouchstart = undefined;" if touch else ""}
+        // 按事件类型分开派发。混在一个数组里 = keydown 也会喂给 focusin 处理器,那种桩会让
+        // 「焦点挪走时取快照」这条永远看起来是对的(每发按键都替它 mark 了一遍)。
         global.document = {{
-            addEventListener: (t, f) => handlers.push(f),
+            addEventListener: (t, f) => (t === 'focusin' ? focusins : handlers).push(f),
             removeEventListener: (t, f) => {{
-                const i = handlers.indexOf(f);
-                if (i >= 0) handlers.splice(i, 1);
+                const list = t === 'focusin' ? focusins : handlers;
+                const i = list.indexOf(f);
+                if (i >= 0) list.splice(i, 1);
             }},
             createElement: () => {{
                 const el = {{
@@ -76,6 +82,8 @@ def _prelude(touch: bool = False) -> str:
             if (key.length === 1 && typeof el.accept === 'function') el.accept(key);
         }}
         function type(keys, target) {{ keys.forEach((k) => press(k, target)); }}
+        // 浏览器在 focus() 里【同步】发 focusin,那一刻新框还没接到这一串的任何字符。
+        function focusTo(el) {{ focusins.forEach((h) => h({{ target: el }})); }}
         const out = (o) => process.stdout.write(JSON.stringify(o));
         const GAP = wedge.MAX_GAP_MS;
     """
@@ -205,14 +213,13 @@ class WedgeEndKeyOwnershipTests(unittest.TestCase):
             """ % (json.dumps(keys), target, self._HUMAN_GAP))
 
     def test_human_typed_tab_in_optin_field_keeps_moving_focus(self):
-        # 入库数量框带 data-enable-barcode(扫完一件光标就停在那儿,下一枪照旧要收得到)。
-        # 店员在里面打「1000」再按 Tab:那是导航键。只看长度就吃掉的话,焦点纹丝不动,
-        # 店员只能看出「弹窗卡住了」。
+        # 入库数量框声明了接枪(扫完一件光标就停在那儿,下一枪照旧要收得到)。店员在里面
+        # 打「1000」再按 Tab:那是导航键。吃掉它焦点就纹丝不动,店员只能看出「弹窗卡住了」。
         got = self._typed_slowly(
             ["1", "0", "0", "0", "Tab"],
-            "{ tagName: 'INPUT', dataset: { enableBarcode: '' } }",
+            "{ tagName: 'INPUT', dataset: { enableBarcode: 'gun' } }",
         )
-        self.assertEqual(got["seen"], ["1000"], "串被拆开了 · 这轮的 prevented 不作数")
+        self.assertEqual(got["seen"], [], "店员填的数量被当成扫了一件货")
         self.assertEqual(got["prevented"], 0, "人手打的 Tab 被吃掉 · 焦点走不了")
 
     def test_gun_speed_tab_in_optin_field_is_swallowed(self):
@@ -220,7 +227,7 @@ class WedgeEndKeyOwnershipTests(unittest.TestCase):
         # 不吃焦点就被顺手挪走,下一枪落到别的控件上。
         got = _run_node(_prelude() + """
             const seen = [];
-            const qty = { tagName: 'INPUT', dataset: { enableBarcode: '' } };
+            const qty = { tagName: 'INPUT', dataset: { enableBarcode: 'gun' } };
             wedge.register((code) => seen.push(code));
             type(['8','8','5','0','9','9','9','3','2','0','0','1','4','Tab'], qty);
             out({ seen, prevented, gunGap: wedge.GUN_MAX_GAP_MS });
@@ -291,10 +298,7 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
     """
 
     def test_gun_burst_into_date_field_is_delivered_and_field_restored(self):
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const box = dateField('gun');
             wedge.register((code, target) => seen.push([code, target === box]));
@@ -302,9 +306,7 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
                 press('Enter', box);
                 out({ seen, prevented, value: box.value, typed: box.typed });
             });
-            """
-            % COKE_KEYS
-        )
+            """ % COKE_KEYS)
         self.assertEqual(got["seen"], [["4901234567894", True]], "枪扫进效期框被整发吞掉了")
         self.assertEqual(got["typed"], "4901234567894", "这一串没真打进框里 · 这轮证明不了还原")
         self.assertEqual(got["value"], "", f"垃圾日期留在格子里了: {got['value']}")
@@ -312,10 +314,7 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
 
     def test_restore_puts_back_what_was_already_typed(self):
         # 店员先手写了批号,再扫下一箱 —— 还原是「回到扫之前」,不是把整格清空。
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const box = textField('gun', 'LOT-B240301');
             wedge.register((code) => seen.push(code));
@@ -323,19 +322,14 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
                 press('Enter', box);
                 out({ seen, value: box.value });
             });
-            """
-            % COKE_KEYS
-        )
+            """ % COKE_KEYS)
         self.assertEqual(got["seen"], ["4901234567894"])
         self.assertEqual(got["value"], "LOT-B240301", "还原把店员先前填好的批号一起抹了")
 
     def test_human_typed_date_digits_are_left_in_the_field(self):
         # 最要命的那种输入:人手打的「31032027」有 8 位,长度这条判据一个人都拦不住,
         # 全靠速度分开。被抢走 = 店员填的效期当场消失,还平白多出一条「扫到 31032027」。
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const box = dateField('gun');
             wedge.register((code) => seen.push(code));
@@ -343,8 +337,7 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
                 press('Tab', box);
                 out({ seen, prevented, typed: box.typed, value: box.value });
             });
-            """
-        )
+            """)
         self.assertEqual(got["seen"], [], "人手填的日期被当成扫码抢走了")
         self.assertEqual(got["typed"], "31032027", "串没打进框 · 这轮不作数")
         self.assertEqual(got["value"], "49012-03-31", "楔子动了人手填的内容")
@@ -353,28 +346,21 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
     def test_held_key_autorepeat_is_not_a_scan(self):
         # 按住一个键不放:系统自动重复约 30ms 一发,速度和长度两条判据都过得去。
         # 只有「至少两种不同字符」拦得住它 —— 拦不住就是店员按住 0 不放,框被清空。
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const box = textField('gun');
             wedge.register((code) => seen.push(code));
             typeAt(['0','0','0','0','0','0','0','0','0','0'], box, 30, () => {
                 setTimeout(() => out({ seen, value: box.value }), wedge.MAX_GAP_MS + 80);
             });
-            """
-        )
+            """)
         self.assertEqual(got["seen"], [], "按住一个键不放被当成扫了一件货")
         self.assertEqual(got["value"], "0000000000", "自动重复被当成扫码 · 框被清了")
 
     def test_short_fast_burst_is_not_a_scan(self):
         # 「2027」四位打得飞快(手指熟练的店员填年份就是这样)。零售码最短 8 位,
         # 长度这条判据在这里是唯一的拦网。
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const box = textField('gun');
             wedge.register((code) => seen.push(code));
@@ -382,58 +368,48 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
                 setTimeout(() => out({ seen, value: box.value, min: wedge.GUN_MIN_LENGTH }),
                     wedge.MAX_GAP_MS + 80);
             });
-            """
-        )
+            """)
         self.assertEqual(got["seen"], [], "四位快打被当成扫了一件货")
         self.assertEqual(got["value"], "2027")
         self.assertGreaterEqual(got["min"], 8, "枪扫长度下限低于 EAN-8 的 8 位 · 判据没有区分力")
 
     def test_gun_burst_without_end_key_still_delivered(self):
         # 有的枪不发后缀,靠 MAX_GAP_MS 收尾。这一档同样要还原 + 送出。
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const box = dateField('gun');
             wedge.register((code) => seen.push(code));
             typeAt(%s, box, 0, () => {
                 setTimeout(() => out({ seen, value: box.value }), wedge.MAX_GAP_MS + 80);
             });
-            """
-            % COKE_KEYS
-        )
+            """ % COKE_KEYS)
         self.assertEqual(got["seen"], ["4901234567894"], "不带后缀的枪在这个框里被吞了")
         self.assertEqual(got["value"], "", "垃圾日期留在格子里了")
 
-    def test_always_mode_field_keeps_what_was_typed_into_it(self):
-        # 另一档(裸 data-enable-barcode,入库数量框)不还原:那串字符归使用方摘
-        # (inventory-scan.ts::stripScanned,它拿得到原串)。两档的差别写在这条上,
-        # 免得下一个人顺手把还原做成全局的,把数量框的摘取逻辑架空。
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+    def test_bare_declaration_falls_back_to_the_safe_tier(self):
+        # 漏写档位值(裸声明)在运行期按最安全的那档走 —— 跟写全了一样,只收枪打的那种串,
+        # 并且照样还原。裸声明本身归 scripts/check_scan_optin.py 那道闸拦,不靠运行期区分。
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const qty = textField('', '1');
+            const human = textField('', '');
             wedge.register((code) => seen.push(code));
             typeAt(%s, qty, 0, () => {
                 press('Enter', qty);
-                out({ seen, value: qty.value });
+                typeAt(['3','1','0','3','2','0','2','7'], human, 90, () => {
+                    press('Tab', human);
+                    out({ seen, value: qty.value, typed: human.value });
+                });
             });
-            """
-            % COKE_KEYS
-        )
-        self.assertEqual(got["seen"], ["4901234567894"])
-        self.assertEqual(got["value"], "14901234567894", "裸声明那档被引擎顺手还原了")
+            """ % COKE_KEYS)
+        self.assertEqual(got["seen"], ["4901234567894"], "裸声明的框没收到枪扫")
+        self.assertEqual(got["value"], "1", "裸声明那档没走还原 · 码跟原内容接成了一串")
+        self.assertEqual(got["typed"], "31032027", "裸声明把人手打的也抢走了")
 
     def test_undeclared_editable_field_is_still_left_alone(self):
         # 这一档是「别把人手填日期也抢走」的底线:没声明就一律让开,跟改动前一样。
         # 声明由使用方按框逐个给(入库那两个框归 D 组),引擎不替它们做主。
-        got = _run_node(
-            _prelude()
-            + _FIELDS
-            + """
+        got = _run_node(_prelude() + _FIELDS + """
             const seen = [];
             const box = dateField(null);
             wedge.register((code) => seen.push(code));
@@ -445,21 +421,21 @@ class WedgeGunOnlyFieldTests(unittest.TestCase):
                     capture: {
                         none: wedge.shouldCapture(dateField(null)),
                         gun: wedge.shouldCapture(dateField('gun')),
+                        bare: wedge.shouldCapture(dateField('')),
+                        button: wedge.shouldCapture({ tagName: 'BUTTON' }),
                     },
-                    mode: {
-                        none: wedge.barcodeMode(dateField(null)),
-                        gun: wedge.barcodeMode(dateField('gun')),
-                        bare: wedge.barcodeMode(dateField('')),
+                    declares: {
+                        none: wedge.declaresGun(dateField(null)),
+                        gun: wedge.declaresGun(dateField('gun')),
+                        bare: wedge.declaresGun(dateField('')),
                     },
                 });
             });
-            """
-            % COKE_KEYS
-        )
+            """ % COKE_KEYS)
         self.assertEqual(got["seen"], [], "没声明的框被抢了")
         self.assertEqual(got["prevented"], 0)
-        self.assertEqual(got["capture"], {"none": False, "gun": True})
-        self.assertEqual(got["mode"], {"none": "", "gun": "gun", "bare": "always"})
+        self.assertEqual(got["capture"], {"none": False, "gun": True, "bare": True, "button": True})
+        self.assertEqual(got["declares"], {"none": False, "gun": True, "bare": True})
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -492,14 +468,17 @@ class WedgeFocusTests(unittest.TestCase):
         self.assertEqual(got["seen"], [])
 
     def test_input_with_data_enable_barcode_opts_in(self):
+        # 声明接枪 = 楔子不再让开这个框。收下之后还要过一遍「是不是枪打的」,所以这里喂的
+        # 是一整串枪扫(4 位那种短快按由 test_scan_wedge_ruler 管)。
         got = _run_node(_prelude() + """
             const seen = [];
-            const box = { tagName: 'INPUT', dataset: { enableBarcode: '' } };
+            const box = { tagName: 'INPUT', dataset: { enableBarcode: 'gun' } };
             wedge.register((code) => seen.push(code));
-            type(['4', '9', '0', '1'], box);
-            setTimeout(() => out({ seen }), GAP + 80);
+            type(['8','8','5','0','9','9','9','3','2','0','0','1','4'], box);
+            setTimeout(() => out({ seen, capture: wedge.shouldCapture(box) }), GAP + 80);
             """)
-        self.assertEqual(got["seen"], ["4901"])
+        self.assertEqual(got["seen"], ["8850999320014"])
+        self.assertTrue(got["capture"], "声明接枪的框被让开了")
 
     def test_non_editable_target_captured_and_passed_back(self):
         got = _run_node(_prelude() + """
@@ -552,14 +531,17 @@ class WedgeKeyFilterTests(unittest.TestCase):
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class WedgeSubscriptionTests(unittest.TestCase):
     def test_no_global_listener_until_first_register(self):
+        # keydown 与 focusin 两条一起进退:留一条在门上就是「不扫码的页面白挂一个全局监听器」,
+        # 而留下的那条还拿着已卸弹窗里的 DOM 引用。
         got = _run_node(_prelude() + """
-            const before = handlers.length;
+            const count = () => handlers.length + focusins.length;
+            const before = count();
             const off = wedge.register(() => {});
-            const during = handlers.length;
+            const during = count();
             off();
-            out({ before, during, after: handlers.length, subs: wedge.subscriberCount() });
+            out({ before, during, after: count(), subs: wedge.subscriberCount() });
             """)
-        self.assertEqual(got, {"before": 0, "during": 1, "after": 0, "subs": 0})
+        self.assertEqual(got, {"before": 0, "during": 2, "after": 0, "subs": 0})
 
     def test_unregister_stops_delivery(self):
         got = _run_node(_prelude() + """

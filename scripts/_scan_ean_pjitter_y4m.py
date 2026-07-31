@@ -8,9 +8,10 @@
 本文件按给定的单帧成功率 p 逐帧掷骰子(seed 写死,丢帧位置随机而结论可复现),首尾两帧钉成
 清晰:否则整段的起止都糊着,验的就不是「举着不动」而是「货还没进画面」。
 
-上限仍由现判据 clearAfterMs(1200ms)反推:p 越低,连续读不出的最长一段就越可能超过 1.2s,
-那时按契约本来就该算「离开画面」,再断「只记一件」是在验一条不存在的规矩。所以生成时把最长
-连续失败段算出来印在结果里 —— 素材自己说得清它有没有越界,不靠跑的人记。
+上限仍由判据反推:p 越低,连续读不出的最长一段就越可能越过阈值,那时按契约本来就该算「离开
+画面」,再断「只记一件」是在验一条不存在的规矩。所以生成时把最长连续失败段算出来印在结果里
+—— 素材自己说得清它有没有越界,不靠跑的人记。阈值现值在 static/scan/scan-camera.js
+(clearAfterMs / clearAfterMisses),这里不抄第二份。
 
 用法: python scripts/_scan_ean_pjitter_y4m.py <out.y4m> <p> [seed] [13位码] [秒数]
 例:   python scripts/_scan_ean_pjitter_y4m.py .p50.y4m 0.5 3
@@ -72,7 +73,7 @@ def main() -> None:
     print(
         f"{out} {out.stat().st_size} bytes code={code} seed={seed} "
         f"目标p={p:.0%} 实得p={hit / total:.0%} 帧数={total} "
-        f"最长连续读不出={longest_gap_ms(plan)}ms(clearAfterMs=1200)"
+        f"最长连续读不出={longest_gap_ms(plan)}ms(阈值见 scan-camera.js 的 clearAfterMs)"
     )
 
 

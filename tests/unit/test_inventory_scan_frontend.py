@@ -7,12 +7,15 @@ tests/unit/test_inventory_scan_frontend.py
 
 两层:
   1. 真 node 跑 TS(esbuild 现转,同 test_format_date_frontend 的招):落行判定 / 数量累加 /
-     数量框里被枪写进去的码怎么摘回来 / 单位码信封 / 取景框几何。这几条是店员真实动作的判据
-     ——「同一个码扫两次要落回同一行」错了就是一箱货加出十几行,而「批次品也合并」错了是
-     第二箱的效期被悄悄换成第一箱的(POS 的 FEFO 与近效期告警从此按错日期算)。
-  2. 接缝断言:扫码只挂在收货弹窗、数量框对枪 opt-in、查商品走既有 lookup 端点、
-     批次显隐借 onProductChange 一套、带码建品走跨页带码桥的那个名字、关弹窗必放相机。
-     这些跨文件约定 node 里跑不到,但漂了功能就是坏的(且都能在源里确定性地读出来)。
+     单位码信封 / 效期合理性 / 取景框几何。这几条是店员真实动作的判据 ——「同一个码扫两次
+     要落回同一行」错了就是一箱货加出十几行,而「批次品也合并」错了是第二箱的效期被悄悄
+     换成第一箱的(POS 的 FEFO 与近效期告警从此按错日期算)。
+  2. 接缝断言:查商品走既有 lookup 端点、批次显隐借 onProductChange 一套、带码建品走跨页
+     带码桥的那个名字、后端确实收 unit_name。这些跨文件/跨语言约定 node 里跑不到,但漂了
+     功能就是坏的(且都能在源里确定性地读出来)。
+
+「跑一遍就能读出来」的都不在这里 —— 独占楔子、枪扫进批号框、失败清单不被下一件盖掉,
+全在 test_inventory_scan_behavior.py 里真跑真断。原因见那份的文件头。
 """
 
 from __future__ import annotations
@@ -60,9 +63,9 @@ function load(name) {
     return mod.exports;
 }
 
-const { planRow, bumpQty, stripScanned, acceptsCode, matchedUnit } = load('inventory-scan');
+const { planRow, bumpQty, matchedUnit } = load('inventory-scan');
 const { frameBox, notFoundHtml } = load('inventory-scan-ui');
-const { isPlausibleDate, isSaneExpiry } = load('inventory-common');
+const { isPlausibleDate, isSaneExpiry, isSaneQty, isSaneCost } = load('inventory-common');
 
 let bad = 0;
 function eq(got, want, msg) {
@@ -114,24 +117,14 @@ eq(bumpQty('0.1'), '1.1', 'no float tail on 0.1+1');
 eq(bumpQty('abc'), '1', 'garbage -> 1');
 eq(bumpQty('  7 '), '8', 'trims');
 
-// 枪扫进数量框:字符照旧落进了框里(楔子只吃 Enter/Tab),得摘回去
-eq(stripScanned('8850999320014', '8850999320014'), '', 'whole value was the code');
-eq(stripScanned('248850999320014', '8850999320014'), '24', 'code appended after a real qty');
-eq(stripScanned('28850999320014' + '4', '8850999320014'), '24', 'code inserted mid value');
-eq(stripScanned('24', '8850999320014'), '24', 'no code in there -> untouched');
-eq(stripScanned('', '8850999320014'), '', 'empty stays empty');
+// 「这一串是枪打的还是人打的」不在这一层:三个框都声明了 data-enable-barcode="gun",判据
+// 只在 static/scan/scan-wedge.js 一份(反证见 test_scan_wedge_ruler.py),消费方收到回调
+// 就是拿到结论。此处曾有两把自带的尺子(acceptsCode 按长度、stripScanned 事后摘码),
+// 两把尺子跟引擎那把必然漂 —— 漂出来的就是「批号框被打成 L20274901234567894」。
 
-// 光标在数量框里时人可能正在打数量:三四位打得快也会被楔子当一串码,靠长度分开。
-// 零售条码最短 8 位(EAN-8/UPC-E),店里没有 8 位数的数量。
-eq(acceptsCode('24', true), false, 'typed qty is not a barcode');
-eq(acceptsCode('240', true), false, 'three fast digits in a field is not a barcode');
-eq(acceptsCode('12345678', true), true, 'EAN-8 length passes in a field');
-eq(acceptsCode('8850999320014', true), true, 'EAN-13 passes in a field');
-eq(acceptsCode('123456', false), true, 'short code ok when focus is not in a field');
-eq(acceptsCode('12', false), false, 'below wedge MIN_LENGTH always rejected');
-
-// 效期:一串条码打进 type=date 会留下 49012-03-31(date 控件收得下 6 位年份)。扫码那层靠
-// 「框里现在不是个像样日期」认出这是机器打的(不必猜速度),提交那层靠它把坏值拦在流水外。
+// 效期:一串条码打进 type=date 会留下 49012-03-31(date 控件收得下 6 位年份)。
+// 扫码那层不看它(残渣是内容形状,人手打的和机器打的方向刚好反过来,见 wedge ruler 那组),
+// 提交那层靠它把坏值拦在流水外。
 eq(isPlausibleDate('2027-05-20'), true, 'a date a person finished typing');
 eq(isPlausibleDate('49012-03-31'), false, 'five-digit year is what a barcode leaves behind');
 eq(isPlausibleDate('0490-12-31'), false, 'four digits but nobody stocks goods expiring in year 490');
@@ -143,6 +136,34 @@ eq(isSaneExpiry('   '), true, 'blank is still no expiry');
 eq(isSaneExpiry('2027-05-20'), true, 'a normal expiry passes');
 eq(isSaneExpiry('49012-03-31'), false, 'the barcode-wrecked date is refused');
 eq(isSaneExpiry('0490-12-31'), false, 'implausible year is refused');
+
+// 数量的同类兜底:楔子在框那一层漏一次,数量框里就是「1 + 剩下半串码」。上限贴着「零售码
+// 最短 8 位」这条线定,真实的大批量(十万件级)离它还有两个数量级 —— 两侧各断,免得只量一头。
+eq(isSaneQty('1'), true, 'one carton is one carton');
+eq(isSaneQty('250000'), true, 'a real bulk receipt must not be blocked');
+eq(isSaneQty('9999999'), true, 'the last allowed value still goes through');
+eq(isSaneQty('1234.567'), true, 'weighed goods keep three decimals');
+eq(isSaneQty(''), true, 'a blank row must not jam the whole sheet');
+eq(isSaneQty('0'), true, 'zero on hand is a legal count answer');
+eq(isSaneQty('10000000'), false, 'eight digits is exactly where a full retail barcode starts');
+eq(isSaneQty('1999320015'), false, 'the qty box after a wedge leak: 1 followed by the rest of the code');
+eq(isSaneQty('8850999320014'), false, 'a whole EAN-13 is not a quantity');
+eq(isSaneQty('01234567'), false, 'EAN-8 with a leading zero is worth only 1234567 - digits catch it');
+eq(isSaneQty('1e10'), false, 'exponent form carries two digits but means ten billion');
+eq(isSaneQty('abc'), false, 'not a number at all');
+
+// 单价的同类兜底。上限按泰国小零售单件最贵的真货定(一公斤金条 ≈ ฿2,400,000),
+// 仍在「整串条码留下 8 位起」之下 —— 两侧各断,别只量「拦得住码」那一头。
+eq(isSaneCost('9.5'), true, 'an ordinary bottle cost');
+eq(isSaneCost('2400000'), true, 'a kilo gold bar is a real unit cost in a Thai shop');
+eq(isSaneCost('9999999.99'), true, 'the last allowed value still goes through');
+eq(isSaneCost(''), true, 'cost is optional - a blank must not jam the sheet');
+eq(isSaneCost('0'), true, 'free goods are received at zero cost');
+eq(isSaneCost('10000000'), false, 'eight digits is where a full retail barcode starts');
+eq(isSaneCost('8850999320014'), false, 'the cost box after a gun burst landed in it');
+eq(isSaneCost('01234567'), false, 'EAN-8 with a leading zero is worth only 1234567 - digits catch it');
+eq(isSaneCost('1e10'), false, 'exponent form carries two digits but means ten billion');
+eq(isSaneCost('abc'), false, 'not a number at all');
 
 // 未命中卡必须把扫到的码带进 DOM:店员靠它分辨码贴错了还是这货没建档
 globalThis.t = (k) => k;
@@ -185,7 +206,7 @@ class InventoryScanPureTests(unittest.TestCase):
 class InventoryScanWiringTests(unittest.TestCase):
     """跨文件的约定 —— node 里跑不到、只能在源里确定性读出来的那几条。
 
-    ⚠️ 2026-07-31 起,凡是「跑一遍就能读出来」的都不在这里了,搬去
+    2026-07-31 起,凡是「跑一遍就能读出来」的都不在这里了,搬去
     `test_inventory_scan_behavior.py` 真跑真断。原因是实锤:把 `unmountInvScan()` 的函数体
     整个包进 `if (false)`(字面一个字没删),这一堆字符串断言照样全绿 —— 相机灯永远亮着、
     楔子永不反注册,没有一条会红。留在这里的只剩两类:
@@ -200,11 +221,6 @@ class InventoryScanWiringTests(unittest.TestCase):
         cls.ui = UI_TS.read_text(encoding="utf-8")
         cls.cam = CAM_TS.read_text(encoding="utf-8")
         cls.modals = MODALS_TS.read_text(encoding="utf-8")
-
-    def test_wedge_is_exclusive_while_modal_open(self):
-        # 独占与否是楔子内部的事(subs 里那个 exclusive 标记不对外),从外面读不出来 ——
-        # 只能在这里钉源码。真实效果(枪扫的码不漏进底下的库存页)归 E2E。
-        self.assertIn("{ exclusive: true }", self.scan)
 
     def test_create_bridge_is_the_one_the_product_form_exports(self):
         # 上一轮这里调的是一个全仓没有定义的名字(死胡同:点了没反应)。桥的名字只有一个,
@@ -242,27 +258,34 @@ class InventoryScanWiringTests(unittest.TestCase):
         self.assertIn("scannedTrackBatch.set(id, scanned)", self.modals)
         self.assertIn("const isBatch = !!id && tracksBatch(id);", self.modals)
 
-    def test_batch_fields_take_the_gun_and_expiry_has_a_backstop(self):
-        # 批号/效期框不 opt-in = 枪扫整发被吞(零回调、行不出现),而那串数字照旧落进 date 控件。
-        row = self.modals.split("data-batchcell")[1].split("</span>")[0]
-        for field in ('data-k="batch_no"', 'data-k="expiry_date"'):
-            decl = row.split(field)[1].split(">")[0]
-            self.assertIn("data-enable-barcode", decl, f"{field} 没对枪 opt-in")
+    def test_expiry_has_a_backstop(self):
+        # 「这两个框对枪 opt-in 了没有」不在这里读源码了:档位值由 scripts/check_scan_optin.py
+        # 盯着,真效果(枪扫进批号框会不会整发被吞)在 behavior 那份里真跑真断。
+        # 切到删除键为止 —— 批次格里还有别的 <span>(第二行自带的标题),按 </span> 断会
+        # 在标题那里就切掉,后面 split 到不存在的字段直接 IndexError 而不是静默放行。
+        decl = self.modals.split("data-batchcell")[1].split("data-rowx")[0]
         # 效期框不许写 max:实测一旦写上,人手逐段敲日期敲不出结果,而条码会被夹成
         # 0490-12-31 这种「看着正常」的假日期 —— 比 49012 更难被发现。
-        self.assertNotIn("max=", row.split('data-k="expiry_date"')[1].split(">")[0])
-        # 进流水前的最后一道
-        self.assertIn("if (raw.some((r) => !isSaneExpiry(r.expiry_date)))", self.modals)
+        self.assertNotIn("max=", decl.split('data-k="expiry_date"')[1].split(">")[0])
+        # 进流水前的最后一道(拦下来之后指到是哪一行:真跑那条在 behavior 那份里)
+        self.assertIn("!isSaneExpiry(r.expiry_date)", self.modals)
         self.assertIn("inv-err-bad-expiry", self.modals)
 
-    def test_failed_codes_survive_the_next_item(self):
-        # 一格消息位共用一个 setMsg 时,后一件的「已加入」把前一件的「这个码没建档」盖掉:
-        # 店员按屏上反馈收货,被盖掉的那件就是扫了没进单也没人告诉他的货。
+    def test_the_cost_box_is_covered_on_both_layers(self):
+        # 单价框漏了枪 opt-in:真浏览器实测枪打进去 → ฿8850999320014/瓶 原样 POST、零查码、
+        # 屏上零字(scripts/_inv_guards_verify.cjs::costGunLandsAsARow 真跑这条)。两层都要有:
+        # 楔子那层让这一发落成一行,提交那层兜住楔子哪天又漏。
+        cost_decl = self.modals.split('data-k="unit_cost"')[1].split(">")[0]
+        self.assertIn('data-enable-barcode="gun"', cost_decl, "单价框没对枪 opt-in")
+        self.assertIn("!isSaneCost(r.unit_cost)", self.modals)
+        self.assertIn("inv-err-bad-cost", self.modals)
+
+    def test_the_camera_panel_writes_into_the_same_slot_without_wiping_it(self):
+        # 「失败清单不被下一件盖掉」已在 behavior 那份里真跑真断;这里只剩相机面板这一头 ——
+        # 它在另一个文件里往同一格写字,而 node 那边的相机是桩(真引擎要 getUserMedia)。
         ui = UI_TS.read_text(encoding="utf-8")
         for fn in ("pushFail", "replaceFail", "resolveFail", "resetFeedback", "paintNote"):
             self.assertIn(f"export function {fn}", ui, f"待办队列缺 {fn}")
-        self.assertIn("pushFail(part('msg'), code, html)", self.scan, "失败没进队列")
-        self.assertIn("resolveFail(part('msg'), code)", self.scan, "命中后没销掉那一条")
         # 相机面板往同一格里写字:它也必须走瞬时行,否则一开相机就把待办全抹了
         self.assertIn("paintNote(scanPart(host.maskId, 'msg')", self.cam)
         self.assertNotIn("paintMsg", self.scan + self.cam + ui, "旧的单格画法还留着 = 两套并存")

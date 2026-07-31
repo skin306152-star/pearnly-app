@@ -203,7 +203,15 @@
             'posui.bscan.fails_n': 'ไม่ได้เข้าตะกร้า {n} รายการ',
             'posui.bscan.fails_ack': 'รับทราบ',
             'posui.bscan.queued': 'มีอีก {n} รายการรออยู่ · จะถูกเพิ่มลงตะกร้าทั้งหมด',
+            'posui.bscan.modal_busy': 'มีหน้าต่างเปิดอยู่ · {code} ไม่ได้เข้าตะกร้า',
+            'posui.bscan.modal_hint': 'ปิดหน้าต่างนี้แล้วสแกนใหม่อีกครั้ง',
+            'posui.bscan.typed': 'ถือว่าพิมพ์ด้วยมือ · {code} ไม่ได้อ่านเป็นบาร์โค้ด',
+            'posui.bscan.typed_hint': 'ถ้ายิงจากเครื่องสแกน ให้ยิงอีกครั้ง',
             'posui.bscan.search_code': 'ค้นหาสินค้าด้วยรหัสนี้',
+            'posui.bscan.same_code': 'อ่านรหัส {code} ซ้ำ · นับเป็นชิ้นเดิม',
+            'posui.bscan.same_code_hint':
+                'ถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า',
+            'posui.bscan.add_one': '+1 · เป็นชิ้นที่สอง',
             'posui.bscan.create_where':
                 'ให้เจ้าของเพิ่มสินค้าในระบบหลังร้าน (สินค้า → เพิ่มสินค้า) แล้วใส่บาร์โค้ดนี้ในช่อง "บาร์โค้ด" ครั้งต่อไปสแกนขายได้เลย',
             'posui.bscan.offline_miss':
@@ -499,7 +507,15 @@
             'posui.bscan.fails_n': '{n} not added to the cart',
             'posui.bscan.fails_ack': 'Got it',
             'posui.bscan.queued': '{n} more in the queue · all of them will be added',
+            'posui.bscan.modal_busy': 'A window was open · {code} did not go into the cart',
+            'posui.bscan.modal_hint': 'Close the window and scan it again',
+            'posui.bscan.typed': 'Treated as typing · {code} was not read as a barcode',
+            'posui.bscan.typed_hint': 'If that was a scan, scan it again',
             'posui.bscan.search_code': 'Search products with this code',
+            'posui.bscan.same_code': 'Code {code} read again · counted as the same item',
+            'posui.bscan.same_code_hint':
+                'If that was a second identical item, tap +1 to put it in the cart',
+            'posui.bscan.add_one': '+1 · it was a second item',
             'posui.bscan.create_where':
                 'Ask the owner to add it in the back office (Products → New product) and put this barcode in the "Barcode" field — after that it scans straight into the cart',
             'posui.bscan.offline_miss':
@@ -795,7 +811,14 @@
             'posui.bscan.fails_n': '{n} 件没加进购物车',
             'posui.bscan.fails_ack': '知道了',
             'posui.bscan.queued': '还有 {n} 件在排队 · 都会加进购物车',
+            'posui.bscan.modal_busy': '窗口开着 · {code} 没加进购物车',
+            'posui.bscan.modal_hint': '关掉这个窗口再扫一次',
+            'posui.bscan.typed': '按手打的处理了 · {code} 没当条码读',
+            'posui.bscan.typed_hint': '确实是扫的就再扫一次',
             'posui.bscan.search_code': '用这个码搜商品',
+            'posui.bscan.same_code': '同一个码 {code} 又读到一次 · 已按同一件算',
+            'posui.bscan.same_code_hint': '如果这是第二件同款货,点「+1」把它加进购物车',
+            'posui.bscan.add_one': '+1 · 这是第二件',
             'posui.bscan.create_where':
                 '让老板在后台「商品 → 新建商品」把这个码填进「条码」,之后扫码就能直接卖',
             'posui.bscan.offline_miss': '离线 · 本机缓存的商品目录里没有 {code},联网后再扫',
@@ -1085,7 +1108,16 @@
             'posui.bscan.fails_n': 'カート未追加 {n} 点',
             'posui.bscan.fails_ack': '了解',
             'posui.bscan.queued': 'あと {n} 件が順番待ち · すべてカートに追加されます',
+            'posui.bscan.modal_busy':
+                'ウィンドウが開いていました · {code} はカートに入っていません',
+            'posui.bscan.modal_hint': 'ウィンドウを閉じてもう一度スキャン',
+            'posui.bscan.typed': '手入力として処理 · {code} はバーコードとして読んでいません',
+            'posui.bscan.typed_hint': 'スキャンだった場合はもう一度スキャン',
             'posui.bscan.search_code': 'このコードで商品を検索',
+            'posui.bscan.same_code':
+                '同じコード {code} をもう一度読み取り · 同じ 1 点として扱いました',
+            'posui.bscan.same_code_hint': '同じ商品の 2 点目なら「+1」でカートに追加してください',
+            'posui.bscan.add_one': '+1 · 2 点目です',
             'posui.bscan.create_where':
                 'オーナーに管理画面(商品 → 商品を追加)でこのバーコードを「バーコード」欄に登録してもらえば、次回からスキャンで売れます',
             'posui.bscan.offline_miss':

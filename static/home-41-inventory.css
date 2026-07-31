@@ -369,14 +369,38 @@
     padding: 14px 18px;
     border-top: 1px solid var(--line);
 }
+/* 收货行:商品 / 数量 / 进货单价 / 删除 占第一行,批号+效期占满第二行。
+   为什么批号不挤在第一行:它在的那一列最宽只分得到 1fr ≈ 190px,而原生 date 控件自己就要
+   129px —— 批号框实测只剩 55~76px(填不完一个 LOT-B240301),390 宽下更是塌到 22px。
+   第二行只在批次品上出现(批号格默认 display:none,不占 grid 行),普通百货那些行还是一行。 */
 .inv-frow {
     display: grid;
-    grid-template-columns: 1fr 90px 110px 1fr;
+    grid-template-columns: 1fr 90px 110px 22px;
     gap: 8px;
     margin-bottom: 8px;
 }
 .inv-frow.count {
     grid-template-columns: 1fr 260px;
+}
+/* 批号/效期与删除键各自落位,故这一层不参与布局(display:contents)。它必须是类不是内联
+   style —— 内联压得过样式表,拆不动。 */
+.inv-brow {
+    display: contents;
+}
+.inv-frow:not(.count) .inv-batchcell {
+    grid-row: 2;
+    grid-column: 1 / -1;
+}
+/* 显式钉回第一行第四列:批次格占的是第 2 行,自动排位会把它后面的 × 挤到第 3 行去 */
+.inv-frow:not(.count) .inv-rowx {
+    grid-row: 1;
+    grid-column: 4;
+}
+/* 第二行自带标题(表头只管第一行那三列):批次品才有这一行,标题跟着字段走才对得上 */
+.inv-blabel {
+    flex: 0 0 auto;
+    font-size: 11.5px;
+    color: var(--ink2);
 }
 .inv-field {
     height: 36px;
@@ -394,7 +418,7 @@
 }
 .inv-flabels {
     display: grid;
-    grid-template-columns: 1fr 90px 110px 1fr;
+    grid-template-columns: 1fr 90px 110px 22px;
     gap: 8px;
     margin-bottom: 5px;
     font-size: 11.5px;
@@ -449,4 +473,14 @@
     font-size: 12.5px;
     margin-top: 10px;
     min-height: 16px;
+}
+
+/* 手机端(390px 实测):三列硬挤 → 商品下拉只剩 22px,连一个字都显不全。数量/成本各收窄一档,
+   把宽度让回商品名(实测 108px,「牛奶 180ml」这种真商品名刚好显得全)。批号那一行不用动 ——
+   它本来就独占整宽。盘点行只有两列,不在此列。 */
+@media (max-width: 680px) {
+    .inv-frow:not(.count),
+    .inv-flabels:not(.count) {
+        grid-template-columns: 1fr 72px 96px 22px;
+    }
 }

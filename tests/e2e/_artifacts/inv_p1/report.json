@@ -107,6 +107,11 @@
         "batchCellShown": true
       }
     ],
+    "typedOffer": {
+      "shown": true,
+      "code": "8850999320014",
+      "residue": "88509-09-14"
+    },
     "afterSlow": [
       {
         "product": "p-milk",

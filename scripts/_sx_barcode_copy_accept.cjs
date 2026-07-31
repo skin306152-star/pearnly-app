@@ -19,7 +19,7 @@ const { chromium } = require('@playwright/test');
 const ROOT = path.resolve(__dirname, '..');
 const Y4M = path.resolve(process.argv[2] || '.scan_fixture.y4m');
 const SHOTS = path.resolve(
-    process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/camera')
+    process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/sx-copy')
 );
 const CODE = '8850999320014';
 const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };

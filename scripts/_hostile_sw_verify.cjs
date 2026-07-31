@@ -11,7 +11,8 @@
  *
  * 真的东西:static/pos/cashier-sw.js 与 static/pos/pos-sw.js 是本仓真文件,由真
  * navigator.serviceWorker.register 装进真浏览器;缓存与断网都是浏览器自己的。上一版 SW 用
- * 同一份文件把 V 换成 pos.js 里真出现过的旧版本号(11911102)得到 —— 那就是它的上一版。
+ * 同一份文件把 V 换成「当前版本减一」得到,当前版本现读真文件 —— 抄一份常量在这里,别人
+ * bump 一次这份验收就为了两个数字对不上而红。
  * 桩只有承载页面(注册用的空壳)与 /cashier、/pos 两个 URL 的回包状态。
  *
  * 跑法(仓库根目录):node scripts/_hostile_sw_verify.cjs [用例名]
@@ -28,13 +29,19 @@ const shot = shotter(SHOTS);
 
 const CASHIER_SW = fs.readFileSync(path.join(ROOT, 'static/pos/cashier-sw.js'), 'utf8');
 const POS_SW = fs.readFileSync(path.join(ROOT, 'static/pos/pos-sw.js'), 'utf8');
-const NEW_V = '12043121'; // 真文件里的当前版本
-const OLD_V = '11911102'; // pos.js 注册 URL 上真出现过的旧版本号 = 它的上一版
+// 版本号现场从真文件里读,不抄一份常量:抄的那份跟着别人 bump 一次就过期,而过期的表现是
+// 「素材换不成功」抛异常(2026-07-31 真栽过一次)—— 一个纯粹为了对齐两个数字而红的验收。
+const V_RE = /const V = '(\d+)'/;
+function versionOf(src) {
+    const m = src.match(V_RE);
+    if (!m) throw new Error('SW 里找不到 const V —— 文件结构变了,这份素材已经不成立');
+    return m[1];
+}
+const NEW_V = versionOf(CASHIER_SW);
+const OLD_V = String(Number(NEW_V) - 1); // 「它的上一版」只需要不是当前这个
 
 function swAt(src, version) {
-    const out = src.replace(`const V = '${NEW_V}'`, `const V = '${version}'`);
-    if (out === src && version !== NEW_V) throw new Error('SW 版本常量没换成功,素材是假的');
-    return out;
+    return src.replace(V_RE, `const V = '${version}'`);
 }
 
 // 承载页:只做注册,不掺产品逻辑 —— 被验的是 SW 文件本身。
@@ -84,23 +91,24 @@ async function gotoText(page, url) {
         await page.evaluate((u) => (window.location.href = u), url).catch(() => {});
         await page.waitForTimeout(1500);
         const title = await page.title().catch(() => '');
-        const body = await page.evaluate(() => document.body.innerText.slice(0, 120)).catch(() => '');
+        const body = await page
+            .evaluate(() => document.body.innerText.slice(0, 120))
+            .catch(() => '');
         return `NAV_FAILED · 浏览器错误页 [${title}] ${body.replace(/\s+/g, ' ').trim()}`;
     }
 }
 
 const hasShell = (page, key, url) =>
-    page.evaluate(
-        ([k, u]) => caches.open(k).then((c) => c.match(u).then((m) => !!m)),
-        [key, url]
-    );
+    page.evaluate(([k, u]) => caches.open(k).then((c) => c.match(u).then((m) => !!m)), [key, url]);
 
 async function registerSw(page, script, scope) {
     return page.evaluate(
         ([s, sc]) =>
             navigator.serviceWorker
                 .register(s, { scope: sc })
-                .then((r) => navigator.serviceWorker.ready.then(() => ({ ok: true, scope: r.scope })))
+                .then((r) =>
+                    navigator.serviceWorker.ready.then(() => ({ ok: true, scope: r.scope }))
+                )
                 .catch((e) => ({ ok: false, err: String(e) })),
         [script, scope]
     );

@@ -11,16 +11,24 @@
     },
     "first": {
       "lineCount": 1,
-      "qtys": ["1"],
-      "names": ["可乐 325ml"],
+      "qtys": [
+        "1"
+      ],
+      "names": [
+        "可乐 325ml"
+      ],
       "grand": "350.00",
       "sub": "1 件 · 1 种",
       "search": ""
     },
     "second": {
       "lineCount": 1,
-      "qtys": ["2"],
-      "names": ["可乐 325ml"],
+      "qtys": [
+        "2"
+      ],
+      "names": [
+        "可乐 325ml"
+      ],
       "grand": "700.00",
       "sub": "2 件 · 1 种",
       "search": ""
@@ -36,17 +44,27 @@
     },
     "third": {
       "lineCount": 2,
-      "qtys": ["2", "1"],
-      "names": ["可乐 325ml", "可乐 325ml"],
+      "qtys": [
+        "2",
+        "1"
+      ],
+      "names": [
+        "可乐 325ml",
+        "可乐 325ml"
+      ],
       "grand": "715.00",
       "sub": "3 件 · 2 种",
       "search": ""
     },
     "toast": {
       "txt": "已加入 可乐 325ml",
-      "opacity": "0.924938"
+      "opacity": "0.924921"
     },
-    "hits": ["8850999320014", "8850999320014", "8850999320007"]
+    "hits": [
+      "8850999320014",
+      "8850999320014",
+      "8850999320007"
+    ]
   },
   "posSearchTyping": {
     "ok": true,
@@ -74,13 +92,19 @@
     },
     "control": {
       "lineCount": 1,
-      "qtys": ["1"],
-      "names": ["可乐 325ml"],
+      "qtys": [
+        "1"
+      ],
+      "names": [
+        "可乐 325ml"
+      ],
       "grand": "350.00",
       "sub": "1 件 · 1 种",
       "search": "8850999320014"
     },
-    "hits": ["8850999320014"]
+    "hits": [
+      "8850999320014"
+    ]
   },
   "posNegatives": {
     "ok": true,
@@ -108,8 +132,12 @@
     "shortHits": 0,
     "control": {
       "lineCount": 1,
-      "qtys": ["1"],
-      "names": ["可乐 325ml"],
+      "qtys": [
+        "1"
+      ],
+      "names": [
+        "可乐 325ml"
+      ],
       "grand": "350.00",
       "sub": "1 件 · 1 种",
       "search": ""
@@ -143,7 +171,9 @@
       "payVisible": true,
       "payDue": "350.00"
     },
-    "hits": ["8850999320014"]
+    "hits": [
+      "8850999320014"
+    ]
   },
   "posTouchSink": {
     "ok": true,
@@ -158,8 +188,12 @@
     },
     "cart": {
       "lineCount": 1,
-      "qtys": ["1"],
-      "names": ["可乐 325ml"],
+      "qtys": [
+        "1"
+      ],
+      "names": [
+        "可乐 325ml"
+      ],
       "grand": "350.00",
       "sub": "1 件 · 1 种",
       "search": ""

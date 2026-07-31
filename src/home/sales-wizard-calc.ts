@@ -4,7 +4,9 @@
 export interface WLine {
     desc: string;
     qty: number | string;
-    price: number | string;
+    // null / 空串 = 这一行还没定价(≠ 免费)。两者在票面上是同一个数字,在钱上不是:
+    // 前者是漏填,后者是老板拍板送的。混成一个值就没人看得出票开短了。
+    price: number | string | null;
     disc: number | string;
     vat: boolean;
     custom?: boolean;
@@ -60,6 +62,28 @@ export function money(v: number): string {
     });
 }
 
+/**
+ * 这个价是人定过的吗。口径与收银台的 pos-cashier.priced 同一份:空 / null / 非数 = 没定过。
+ *
+ * 人自己打的 0 照旧算定过价 —— 赠品是老板拍板的,票面上写着 ฿0 谁都看得见;这里堵的是系统
+ * 替人编出来的 0(`money(null)` 画成 "0.00"、`+l.price || 0` 发出去 0)。同一套判据后端也有
+ * 一份(services/sales/issue_gates.amount_gate),前端只是让人早一步看见。
+ */
+export function priced(v: unknown): boolean {
+    if (v === null || v === undefined || String(v).trim() === '') return false;
+    return Number.isFinite(Number(v));
+}
+
+/** 真会印上票的行。合规清单和 buildPayload 共用这一条,免得「查过的行」和「发出去的行」两套。 */
+export function billableLines(st: WState): WLine[] {
+    return st.lines.filter((l) => (l.desc || '').trim());
+}
+
+/** 一行的净额(数量×单价−折扣 · 不为负)· 合计/购物车/票面预览共用,免得三套算法各自漂。 */
+export function lineAmount(l: WLine): number {
+    return Math.max(0, (+l.qty || 0) * (Number(l.price) || 0) - (+l.disc || 0));
+}
+
 export interface Totals {
     sub: number;
     hd: number;
@@ -72,7 +96,7 @@ export function calc(st: WState): Totals {
     let sub = 0;
     let vatBase = 0;
     st.lines.forEach((l) => {
-        const lt = Math.max(0, (+l.qty || 0) * (+l.price || 0) - (+l.disc || 0));
+        const lt = lineAmount(l);
         sub += lt;
         if (l.vat) vatBase += lt;
     });
@@ -199,6 +223,8 @@ export function compliance(st: WState): Check[] {
     if (['company', 'individual'].includes(b.type) && b.tin) tinOk = /^\d{13}$/.test(b.tin);
     if (b.type === 'foreigner' && b.tin) tinOk = /^[A-Za-z0-9]{4,20}$/.test(b.tin);
     const payOk = !payRequired(st) || st.pay.status !== 'unpaid';
+    // 上票的行(有品名的那些 · 与 buildPayload 的过滤同一条)每一行都得有价。
+    const priceOk = billableLines(st).every((l) => priced(l.price));
     const isTax = isFull || st.docType === 'tax_invoice_simple';
     // key/descKey 用向导自含字典(sales-wizard-i18n)的键名,经 wt() 取文案。
     return [
@@ -216,6 +242,8 @@ export function compliance(st: WState): Check[] {
             req: isFull,
             na: st.docType === 'quotation',
         },
+        // 报价单也算:฿0 的报价一样是漏填,只是漏的代价晚一点到。
+        { key: 'ckPrice', descKey: 'ckPriceD', pass: priceOk, req: true, na: false },
         { key: 'ckVat', descKey: 'ckVatD', pass: true, req: isTax, na: !isTax },
         {
             key: 'ckPay',

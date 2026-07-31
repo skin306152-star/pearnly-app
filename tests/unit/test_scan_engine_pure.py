@@ -25,6 +25,7 @@ from tests.unit._node_harness import PROJECT_ROOT, _run_node
 
 SCAN_DIR = PROJECT_ROOT / "static" / "scan"
 LOADER = SCAN_DIR / "scan-loader.js"
+ERRORS = SCAN_DIR / "scan-errors.js"
 CAMERA = SCAN_DIR / "scan-camera.js"
 SHIM = SCAN_DIR / "scan-zxing-shim.js"
 ZXING_DIST = PROJECT_ROOT / "static" / "dist" / "zxing.js"
@@ -36,11 +37,13 @@ def _jp(path) -> str:
 
 # scan-camera.js 加载期就要求 scan-loader.js 已在(它只可能被 ensureLoaded 拉进来),
 # 这里给一个最小外壳桩;不给 document,因为被验的都是不碰 DOM 的纯判定。
+# scan-errors.js 往同一个壳上补错误分档,顺序同 dist/scan.js(它排在引擎之前)。
 _CAMERA_PRELUDE = f"""
     global.PearnlyScanCamera = {{
         loadScript: () => Promise.resolve(),
         unsupportedReason: () => null,
     }};
+    require({_jp(ERRORS)});
     const cam = require({_jp(CAMERA)});
     const out = (o) => process.stdout.write(JSON.stringify(o));
 """
@@ -290,6 +293,35 @@ class CameraErrorTaxonomyTests(unittest.TestCase):
         )
         for junk in ("qr_code", "data_matrix", "aztec", "pdf417"):
             self.assertNotIn(junk, got["formats"], f"{junk} 白耗每帧 CPU · 商品条码里没有它")
+
+    def test_track_state_separates_ended_from_merely_frozen(self):
+        # 「相机还在我们手上吗」的那把纯尺子(watchTracks 与引擎每拍轮询共用的同一份判据)。
+        # ended 收不回来,muted 是画面冻住而轨道还活着 —— 混成一档就会把「切出去接个电话再
+        # 回来接着扫」判成相机坏了。空清单当 ended:一条轨道都没有的 stream 出不了一帧。
+        # 多轨道那两条只有这里验得到:真 getUserMedia(audio:false)永远只给一条。
+        got = _run_node(_CAMERA_PRELUDE + """
+            // 走 PearnlyScanCamera 这个共享壳:引擎自己也是从这里拿(shell.watchTracks),
+            // 不是从 require() 的返回值拿 —— 判据得跟产品走同一条取法。
+            const S = global.PearnlyScanCamera;
+            const T = (st, muted) => ({ readyState: st, muted: !!muted });
+            out({
+                live: S.trackState([T('live')]),
+                ended: S.trackState([T('ended')]),
+                frozen: S.trackState([T('live', true)]),
+                empty: S.trackState([]),
+                missing: S.trackState(null),
+                oneStillLive: S.trackState([T('ended'), T('live')]),
+                oneStillAwake: S.trackState([T('live', true), T('live')]),
+            });
+            """)
+        self.assertEqual(got["live"], "")
+        self.assertEqual(got["ended"], "ended")
+        self.assertEqual(got["frozen"], "muted")
+        self.assertEqual(got["empty"], "ended")
+        self.assertEqual(got["missing"], "ended")
+        # 还有一条活着就不算没了 —— 宁可晚报,也别把还能扫的相机判死。
+        self.assertEqual(got["oneStillLive"], "")
+        self.assertEqual(got["oneStillAwake"], "")
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

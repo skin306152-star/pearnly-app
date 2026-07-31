@@ -26,12 +26,12 @@
     "wantDup": "บาร์โค้ดนี้เป็นของ \"โค้ก 325ml\" อยู่แล้ว"
   },
   "h2_heldKeyBarcodeField": {
-    "ok": false,
+    "ok": true,
     "before": "8850999320014",
-    "after": "0000000000",
+    "after": "88509993200140000000000",
     "wantPrefix": "8850999320014",
     "asked": [
-      "0000000000"
+      "88509993200140000000000"
     ],
     "state": "ยังไม่มีสินค้าอื่นใช้บาร์โค้ดนี้",
     "held": {
@@ -48,27 +48,25 @@
         true
       ],
       "gaps": [
-        35,
-        44,
-        32,
-        33,
-        31,
-        31,
-        30,
-        42,
-        31
+        15,
+        16,
+        16,
+        16,
+        16,
+        15,
+        16,
+        15,
+        16
       ],
-      "maxGap": 44
+      "maxGap": 16
     }
   },
   "h3_heldKeyBatchField": {
-    "ok": false,
+    "ok": true,
     "before": "L2026",
-    "after": "L2026",
-    "asked": [
-      "0000000000"
-    ],
-    "msg": "ไม่ได้เข้าใบรับสินค้านี้ 1 รายการ\nรับทราบ\nสแกนได้ 0000000000 แต่ยังไม่มีสินค้าที่ผูกบาร์โค้ดนี้\nสร้างสินค้าจากบาร์โค้ดนี้",
+    "after": "L20260000000000",
+    "asked": [],
+    "msg": "เพิ่ม นมสด 1L แล้ว",
     "held": {
       "flags": [
         false,
@@ -83,40 +81,38 @@
         true
       ],
       "gaps": [
-        31,
-        32,
-        31,
-        47,
-        31,
-        31,
-        31,
-        31,
-        31
+        15,
+        16,
+        17,
+        15,
+        16,
+        16,
+        16,
+        15,
+        16
       ],
-      "maxGap": 47
+      "maxGap": 17
     }
   },
   "h4_midSpeedDateBox": {
-    "ok": false,
+    "ok": true,
     "focus": {
       "k": "expiry_date",
       "type": "date"
     },
-    "value": "",
-    "asked": [
-      "12312027"
-    ],
-    "msg": "ไม่ได้เข้าใบรับสินค้านี้ 1 รายการ\nรับทราบ\nสแกนได้ 12312027 แต่ยังไม่มีสินค้าที่ผูกบาร์โค้ดนี้\nสร้างสินค้าจากบาร์โค้ดนี้"
+    "value": "2027-12-31",
+    "asked": [],
+    "msg": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด\n20271231\nใช้เป็นบาร์โค้ด"
   },
   "h5_onlyNameCreate": {
     "ok": true,
     "opened": true,
-    "prefill": "9999999999999",
+    "prefill": "9999999999994",
     "priceBefore": "",
     "body": {
       "name_th": "โยเกิร์ต",
       "code": null,
-      "barcode": "9999999999999",
+      "barcode": "9999999999994",
       "name_en": null,
       "name_zh": null,
       "unit": null,
@@ -141,7 +137,7 @@
     ]
   },
   "h7_dateBoxSpeedSweep": {
-    "ok": false,
+    "ok": true,
     "firstSeg": "",
     "runs": [
       {
@@ -173,30 +169,24 @@
         "keys": "20271231",
         "delay": 120,
         "value": "",
-        "asked": [
-          "20271231"
-        ],
-        "phantomScan": true
+        "asked": [],
+        "phantomScan": false
       },
       {
         "label": "plain-8-at-100ms",
         "keys": "20271231",
         "delay": 100,
         "value": "",
-        "asked": [
-          "20271231"
-        ],
-        "phantomScan": true
+        "asked": [],
+        "phantomScan": false
       },
       {
         "label": "with-slash-at-120ms",
         "keys": "2027/12/31",
         "delay": 120,
         "value": "",
-        "asked": [
-          "2027/12/31"
-        ],
-        "phantomScan": true
+        "asked": [],
+        "phantomScan": false
       }
     ]
   },

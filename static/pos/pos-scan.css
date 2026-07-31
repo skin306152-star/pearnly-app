@@ -8,7 +8,10 @@
  * 同 pos.css 策略:.prettierignore 豁免 · 保紧凑。
  */
 
-.bscan-mask { position: fixed; inset: 0; background: rgba(17, 24, 39, .94); display: none; flex-direction: column; z-index: 60; }
+/* 46/47 这两级夹在「手机版购物车抽屉(45)」与「收款等弹窗(50)」之间,不是随手挑的:
+   取景层要压住抽屉(否则画面上顶着一条把手),而失败清单必须让开弹窗 —— 清单原来在 70,
+   收款弹窗开着时它整条压在弹窗上,把关闭键的点击接走了(真浏览器实测点不动)。 */
+.bscan-mask { position: fixed; inset: 0; background: rgba(17, 24, 39, .94); display: none; flex-direction: column; z-index: 46; }
 .bscan-mask.show { display: flex; }
 .bscan-stage { position: relative; flex: 1; overflow: hidden; display: grid; place-items: center; }
 /* contain 不是审美选择:cover 会把原生帧裁掉一大半(390 宽的屏配 640×480 只看得见 38% 的
@@ -35,9 +38,13 @@
 
 /* 失败清单:一件一行、累积到店员点「知道了」为止。单张卡会被队列里下一件当场换掉 ——
    连扫 10 件里第 3 件失败,店员扫完屏上什么都没有,那件货就这么没进账。
-   z 压在取景层(60)之上且 fixed:枪那条路上没有取景层,清单照样得撑在收银主屏上;
-   顶部居中(不占底部)是为了不压住手机版那张固定在底边的购物车 sheet 与结算按钮。 */
-.bscan-fails { position: fixed; z-index: 70; top: 62px; left: 50%; transform: translateX(-50%); width: min(420px, calc(100vw - 24px)); max-height: 34vh; overflow-y: auto; display: none; padding: 12px 14px 14px; border-radius: 14px; border: 1px solid var(--red); background: var(--card); color: var(--ink); box-shadow: 0 18px 44px rgba(17, 24, 39, .28); }
+   在流里(搜索条与分类之间)而不是 fixed 浮层:浮层版实测把 #main-search 和 #main-grid 顶部
+   一起盖住(390×780 上 34%),而清单自己那颗「用这个码搜商品」干的正是「把码填进 #main-search
+   再重画 #main-grid」—— 店员点完看不见自己刚要来的结果。在流里改成把内容推下去,零遮挡。
+   z 压在取景层(46)之上、收款等弹窗(50)之下:连扫时清单要浮在画面上,而弹窗开着时它一格
+   都不许压在弹窗上(压住就把关闭键的点击接走了)。.left 一路到 .pos-view 都没有定位/transform,
+   不另起层叠上下文,z-index 直接可比(改那几个类前先看这一行)。 */
+.bscan-fails { position: relative; z-index: 47; margin-bottom: 14px; max-height: 34vh; overflow-y: auto; display: none; padding: 12px 14px 14px; border-radius: 14px; border: 1px solid var(--red); background: var(--card); color: var(--ink); box-shadow: 0 18px 44px rgba(17, 24, 39, .28); }
 .bscan-fails.show { display: block; }
 .bscan-fails-head { display: flex; align-items: center; gap: 12px; }
 .bscan-fails-n { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; color: var(--red); }

@@ -63,3 +63,6 @@ design-reference/
 # 文档目录:设计简报 / 交接 / 原型 HTML / 架构图 —— 文档不是 app 代码 · 永久豁免
 # (.md 本就不在 prettier glob;此处豁免 docs 下的 html/json/css 等设计产物,免得收录文档就红 lint)
 docs/
+# E2E 验收产物(截图 + 跑批报告 JSON)· 脚本 JSON.stringify 吐出来的东西,prettier 会把
+# 短数组折成一行 —— 每跑一次验收 lint 就红一次,而它不是人写的代码 · 同 static/dist 策略
+tests/e2e/_artifacts/

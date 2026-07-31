@@ -71,7 +71,9 @@ const LOGS = {
         },
     ],
 };
-const EPS = { items: [{ id: 'e1', adapter: 'express', name: 'Express', enabled: true, config: {} }] };
+const EPS = {
+    items: [{ id: 'e1', adapter: 'express', name: 'Express', enabled: true, config: {} }],
+};
 
 (async () => {
     fs.mkdirSync(OUT, { recursive: true });
@@ -117,7 +119,8 @@ const EPS = { items: [{ id: 'e1', adapter: 'express', name: 'Express', enabled: 
         const g = document.getElementById('workspace-gate-root');
         if (g) g.remove();
         const st = document.createElement('style');
-        st.textContent = '#ws-modal{display:none!important;}#workspace-gate-root{display:none!important;}';
+        st.textContent =
+            '#ws-modal{display:none!important;}#workspace-gate-root{display:none!important;}';
         document.head.appendChild(st);
     });
 
@@ -140,7 +143,9 @@ const EPS = { items: [{ id: 'e1', adapter: 'express', name: 'Express', enabled: 
                 if (q) q.value = String(50 + i * 30);
                 if (c) c.value = String(4.5 + i);
                 if (d) d.value = '2026-06-01';
-                [q, c, d].forEach((el) => el && el.dispatchEvent(new Event('input', { bubbles: true })));
+                [q, c, d].forEach(
+                    (el) => el && el.dispatchEvent(new Event('input', { bubbles: true }))
+                );
             });
         });
         return page.evaluate(() => {

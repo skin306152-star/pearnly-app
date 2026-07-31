@@ -238,7 +238,9 @@ async function liveHit(browser, origin, viewport, tag) {
     return { ok, lang: th.lang, starting, live, closed };
 }
 
-// ── ② 未命中:码 + 建品指路 + 两条出路 ──────────────────────────────────
+// ── ② 未命中:码 + 建品指路 + 拿码去搜 ──────────────────────────────────
+// 未命中不再弹单张卡(那张卡会被队列里下一件当场换掉),落在 #bscan-fails 这份清单上 ——
+// 断言因此改读真行:一件失败 = 一行,行里带码、带指路、带那颗「拿这个码去搜」。
 async function notFound(browser, origin) {
     const page = await browser.newPage({ viewport: PHONE });
     await page.addInitScript(seed);
@@ -246,37 +248,55 @@ async function notFound(browser, origin) {
     await login(page, origin);
     const th = await dict(page);
     await page.click('#main-scan-btn');
-    await page.waitForSelector('#bscan-card.show', { timeout: 25000 });
-    await page.screenshot({ path: path.join(SHOTS, '04-notfound-card.png') });
+    await page.waitForSelector('#bscan-fails.show .bscan-fail', { timeout: 25000 });
+    await page.screenshot({ path: path.join(SHOTS, '04-notfound-fail-row.png') });
     const card = await page.evaluate(() => {
-        const acts = [...document.querySelectorAll('#bscan-acts .bscan-act')];
+        const box = document.getElementById('bscan-fails');
+        const row = box.querySelector('.bscan-fail');
+        const act = row.querySelector('.bscan-fail-act');
+        const cs = getComputedStyle(box);
+        const rect = row.getBoundingClientRect();
         return {
-            msg: document.getElementById('bscan-card-msg').textContent,
-            code: (document.querySelector('#bscan-card-msg .bscan-code') || {}).textContent || '',
-            hint: document.getElementById('bscan-card-hint').textContent,
-            labels: acts.map((b) => b.textContent),
-            heights: acts.map((b) => b.getBoundingClientRect().height),
-            barStillClickable: getComputedStyle(document.querySelector('.bscan-bar')).display,
+            rows: box.querySelectorAll('.bscan-fail').length,
+            msg: row.querySelector('.bscan-fail-msg').textContent,
+            code: (row.querySelector('.bscan-code') || {}).textContent || '',
+            hint: (row.querySelector('.bscan-fail-hint') || {}).textContent || '',
+            actLabel: act.textContent,
+            actHeight: act.getBoundingClientRect().height,
+            headN: box.querySelector('.bscan-fails-n').textContent,
+            ackLabel: box.querySelector('.bscan-fails-ack').textContent,
+            // 摄像头层还开着(z=60)· 清单画在它之上才看得见 —— 「有面积」不等于「露在外面」
+            onScreen: cs.display !== 'none' && cs.visibility !== 'hidden' && rect.height > 0,
+            onTop: document
+                .elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+                ?.closest('#bscan-fails')
+                ? true
+                : false,
         };
     });
-    // 「用这个码搜商品」= 关层 + 把码填进搜索框(已建档但没录条码的货靠这条救)
-    await page.click('#bscan-acts .bscan-act:nth-child(2)');
+    // 「用这个码搜商品」= 关层 + 把码填进搜索框 + 销掉这一条(已建档但没录条码的货靠这条救)
+    await page.click('#bscan-fails .bscan-fail-act');
     const after = await page.evaluate(() => ({
         search: document.getElementById('main-search').value,
         hidden: getComputedStyle(document.getElementById('bscan-mask')).display === 'none',
+        left: document.querySelectorAll('#bscan-fails .bscan-fail').length,
     }));
     await page.close();
     const ok =
         th.lang === 'th' &&
+        card.rows === 1 &&
         card.code === CODE &&
         card.msg === th.copy['bscan.notfound'].replace('{code}', CODE) &&
         card.hint.trim() === th.copy['posui.bscan.create_where'] &&
-        card.labels.join('|') ===
-            [th.copy['posui.bscan.continue'], th.copy['posui.bscan.search_code']].join('|') &&
-        card.heights.every((h) => h >= 44) &&
-        card.barStillClickable !== 'none' &&
+        card.actLabel === th.copy['posui.bscan.search_code'] &&
+        card.actHeight >= 44 &&
+        card.headN === th.copy['posui.bscan.fails_n'].replace('{n}', '1') &&
+        card.ackLabel === th.copy['posui.bscan.fails_ack'] &&
+        card.onScreen &&
+        card.onTop &&
         after.search === CODE &&
-        after.hidden;
+        after.hidden &&
+        after.left === 0; // 带去搜索框了 = 这笔欠账销掉,别让店员照着清单再补一件
     return { ok, lang: th.lang, card, after };
 }
 
@@ -438,34 +458,44 @@ async function refusals(browser, origin) {
     await login(page, origin);
     const th = await dict(page);
 
-    const card = () =>
+    // 拒收两档也进 #bscan-fails 清单 —— 读最新那一行(pushFail 把新的排最上面)。
+    const topFail = () =>
         page.evaluate(() => {
-            const msg = document.getElementById('bscan-card-msg');
-            const box = msg.getBoundingClientRect();
-            const cs = getComputedStyle(msg);
+            const row = document.querySelector('#bscan-fails .bscan-fail');
+            const msg = row.querySelector('.bscan-fail-msg');
+            const cs = getComputedStyle(row);
             return {
                 text: msg.textContent,
-                hint: document.getElementById('bscan-card-hint').textContent,
-                visible: cs.display !== 'none' && cs.visibility !== 'hidden' && box.height > 0,
+                hint: (row.querySelector('.bscan-fail-hint') || {}).textContent || '',
+                code: (row.querySelector('.bscan-fail-code') || {}).textContent || '',
+                visible:
+                    cs.display !== 'none' &&
+                    cs.visibility !== 'hidden' &&
+                    row.getBoundingClientRect().height > 0,
                 grand: document.getElementById('cart-grand').textContent,
             };
         });
+    const failRows = () => page.locator('#bscan-fails .bscan-fail').count();
     const gunScan = async (code) => {
         await page.keyboard.type(code, { delay: 0 });
         await page.keyboard.press('Enter');
     };
 
     await gunScan(NO_PRICE);
-    await page.waitForSelector('#bscan-card.show', { timeout: 8000 });
+    await page.waitForSelector('#bscan-fails.show .bscan-fail', { timeout: 8000 });
     await page.screenshot({ path: path.join(SHOTS, '08-unit-no-price.png') });
-    const noPrice = await card();
-    await page.click('#bscan-acts .bscan-act');
+    const noPrice = await topFail();
 
     await gunScan(UNIT_GONE);
-    await page.waitForSelector('#bscan-card.show', { timeout: 8000 });
+    await page.waitForFunction(
+        () => document.querySelectorAll('#bscan-fails .bscan-fail').length === 2,
+        { timeout: 8000 }
+    );
     await page.screenshot({ path: path.join(SHOTS, '09-unit-unknown.png') });
-    const unitGone = await card();
-    await page.click('#bscan-acts .bscan-act');
+    const unitGone = await topFail();
+    // 两条并存 = 清单不被下一件抹掉。清一遍再验连扫,免得混淆。
+    const bothKept = await failRows();
+    await page.click('#bscan-fails .bscan-fails-ack');
 
     // 连扫:三个码在第一件查回来之前全打进去,一件都不许少。toast 是转瞬即逝的,
     // 包一层把每条都记下来(只旁听,原函数照跑)。
@@ -508,11 +538,12 @@ async function refusals(browser, origin) {
                 .replace('{unit}', 'ขวด')
                 .replace('{name}', 'โค้กยกลัง') &&
         unitGone.grand === '0.00' && // 也没按箱价 ฿350 收
+        bothKept === 2 && // 第二件失败没把第一件顶掉
         burst.grand === '53.00' &&
         burst.lines.join('|') === 'น้ำเปล่า|ขนมปัง|นมจืด' && // 落地顺序 = 扫的顺序
         burst.toasts.includes(q(1)) &&
         burst.toasts.includes(q(2));
-    return { ok, lang: th.lang, noPrice, unitGone, burst };
+    return { ok, lang: th.lang, noPrice, unitGone, bothKept, burst };
 }
 
 (async () => {

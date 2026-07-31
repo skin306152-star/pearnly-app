@@ -1,0 +1,228 @@
+{
+  "ruler": {
+    "ok": true,
+    "measured": {
+      "n": 14,
+      "blockedMs": 120,
+      "stampGaps": [
+        9.8,
+        15.3,
+        15.5,
+        15.6,
+        15.8,
+        15.8,
+        15,
+        17.2,
+        15.5,
+        14.7,
+        15,
+        12.9,
+        19.8
+      ],
+      "perfGaps": [
+        9.9,
+        15.2,
+        16.1,
+        134.3,
+        1,
+        0.5,
+        0.6,
+        0.5,
+        0.4,
+        0.5,
+        0.3,
+        2,
+        17.5
+      ],
+      "stampMax": 19.8,
+      "perfMax": 134.3,
+      "repeats": 0
+    },
+    "batchValue": "LOT-B240301",
+    "wantedBatch": "LOT-B240301",
+    "asked": [
+      "8850999320014"
+    ],
+    "why": ""
+  },
+  "dateResidue": {
+    "ok": true,
+    "humanTyped": {
+      "text": "20271231",
+      "gapMs": 120,
+      "residue": "202712-03-01"
+    },
+    "machineIntoEmpty": {
+      "text": "4901234567894",
+      "gapMs": 70,
+      "residue": "49012-03-31"
+    },
+    "machineIntoFilled": {
+      "text": "4901234567894",
+      "gapMs": 70,
+      "seed": "2027-12-31",
+      "residue": "49012-03-31"
+    },
+    "humanLooksMachine": true,
+    "machineLooksHuman": false,
+    "why": "残渣判据被实测推翻(所以引擎里没有它)"
+  },
+  "gunIntoFilledExpiry": {
+    "ok": true,
+    "expiryAfter": "2027-12-31",
+    "wanted": "2027-12-31",
+    "asked": [
+      "8850999320014"
+    ],
+    "rows": 2,
+    "why": ""
+  },
+  "humanTypesExpiry": {
+    "ok": true,
+    "rows": [
+      {
+        "delay": 100,
+        "measuredMax": 115.4,
+        "value": "202712-03-01",
+        "asked": [],
+        "stolen": false
+      },
+      {
+        "delay": 120,
+        "measuredMax": 137,
+        "value": "202712-03-01",
+        "asked": [],
+        "stolen": false
+      },
+      {
+        "delay": 140,
+        "measuredMax": 157.4,
+        "value": "202712-03-01",
+        "asked": [],
+        "stolen": false
+      },
+      {
+        "delay": 180,
+        "measuredMax": 194.6,
+        "value": "202712-03-01",
+        "asked": [],
+        "stolen": false
+      },
+      {
+        "delay": 260,
+        "measuredMax": 277.4,
+        "value": "202712-03-01",
+        "asked": [],
+        "stolen": false
+      }
+    ],
+    "broken": [],
+    "why": ""
+  },
+  "heldKey": {
+    "ok": true,
+    "keys": 14,
+    "repeatFlags": 11,
+    "gaps": [
+      33.5,
+      27.2,
+      28.8,
+      33.2,
+      33.5,
+      31.9,
+      32.8,
+      30.3,
+      32,
+      30.8,
+      30.8,
+      31.2,
+      29.8
+    ],
+    "inGunBand": true,
+    "typedRun": "00000000000057",
+    "distinctChars": 3,
+    "onlyRepeatCanBlock": true,
+    "value": "885099932001400000000000057",
+    "state": {
+      "text": "ยังไม่มีสินค้าอื่นใช้บาร์โค้ดนี้",
+      "cls": "sx-bc-state"
+    },
+    "asked": [
+      "885099932001400000000000057"
+    ],
+    "downstream": [
+      "885099932001400000000000057"
+    ],
+    "why": ""
+  },
+  "slowBurstSweep": {
+    "ok": true,
+    "rows": [
+      {
+        "delay": 55,
+        "measuredMax": 68.8,
+        "value": "88509993200148851234567895",
+        "wedgeTookIt": false,
+        "asked": [
+          "88509993200148851234567895"
+        ]
+      },
+      {
+        "delay": 70,
+        "measuredMax": 87.4,
+        "value": "88509993200148851234567895",
+        "wedgeTookIt": false,
+        "asked": [
+          "88509993200148851234567895"
+        ]
+      },
+      {
+        "delay": 90,
+        "measuredMax": 106.9,
+        "value": "88509993200148851234567895",
+        "wedgeTookIt": false,
+        "asked": [
+          "88509993200148851234567895"
+        ]
+      },
+      {
+        "delay": 110,
+        "measuredMax": 123.5,
+        "value": "88509993200148851234567895",
+        "wedgeTookIt": false,
+        "asked": [
+          "88509993200148851234567895"
+        ]
+      },
+      {
+        "delay": 140,
+        "measuredMax": 156.6,
+        "value": "88509993200148851234567895",
+        "wedgeTookIt": false,
+        "asked": [
+          "88509993200148851234567895"
+        ]
+      },
+      {
+        "delay": 149,
+        "measuredMax": 168.1,
+        "value": "88509993200148851234567895",
+        "wedgeTookIt": false,
+        "asked": [
+          "88509993200148851234567895"
+        ]
+      }
+    ],
+    "stolen": [],
+    "note": "慢串归人手是选出来的结论:没有哪个阈值分得开「慢枪 50~100ms」和「打字快的人 100~260ms」。字符原样留在框里是可见的(店员看得见能改),比静默改效期轻得多。",
+    "downstream": [
+      "88509993200148851234567895",
+      "88509993200148851234567895",
+      "88509993200148851234567895",
+      "88509993200148851234567895",
+      "88509993200148851234567895",
+      "88509993200148851234567895"
+    ],
+    "why": ""
+  }
+}

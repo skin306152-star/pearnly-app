@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 535 个源文件全扫
+# UI 设计合规扫描报告 · 537 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -86,8 +86,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 201(28 文件)
     96  static\i18n-data.js
-        └ 1410: 'billing-accuracy-good': '✅ 准',
-        └ 1411: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1408: 'billing-accuracy-good': '✅ 准',
+        └ 1409: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -105,7 +105,7 @@
         └ 1916: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 341: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 349: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static\home-12-drawer-search.css
@@ -140,7 +140,7 @@
      1  src\home\recon-job-poll.ts
         └ 14: * ⚠️ 暂塞 home.js(全局 window 工具 · 三个 recon IIFE 共用)· 迁出 deadline = REFACTOR-C1
      1  src\home\sales-wizard-io.ts
-        └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
+        └ 39: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
      1  static\admin\admin.html
         └ 884: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
      1  static\dms\dms-intake.js
@@ -206,7 +206,7 @@
         └ 473: max-width: 360px; overflow: hidden;
      3  static\home-40-sales-wizard.css
         └ 20: max-width: 880px;
-        └ 727: max-width: 330px;
+        └ 743: max-width: 330px;
      2  src\home\acct-common.ts
         └ 231: .acctm{background:var(--card);border-radius:16px;width:100%;max-width:460px;box-shadow:var
         └ 232: .acctm.w560{max-width:560px;}
@@ -220,8 +220,8 @@
         └ 148: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
         └ 308: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      2  src\home\sales-wizard-steps.ts
-        └ 239: <div class="sw-row" style="max-width:580px">
-        └ 242: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
+        └ 252: <div class="sw-row" style="max-width:580px">
+        └ 255: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
      2  static\ai\ai-client.css
         └ 437: max-width: min(420px, 100%);
         └ 443: max-width: min(560px, 100%);
@@ -288,7 +288,7 @@
      1  src\home\rules-settings.ts
         └ 222: `<div class="rs-pop" style="max-width:460px;">` +
      1  src\home\sales-wizard.ts
-        └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 319: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      1  src\home\workspace-gate-html.ts
         └ 106: .wsg-empty-d{color:var(--ink2);font-size:13px;line-height:1.7;max-width:min(380px,100%);ma
      1  static\ai\ai-client-empty.css
@@ -390,7 +390,7 @@
      1  src\home\modal-notif-new.ts
         └ 14: <div class="modal" style="max-width:520px;">
      1  src\home\sales-wizard.ts
-        └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 319: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      1  static\home-19-exceptions-alerts.css
         └ 377: width: 920px;  /* 默认宽度覆盖 .drawer 的 480 */
 
@@ -436,8 +436,8 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1217: 'time-min-ago-suffix': ' 分钟前',
-        └ 1218: 'time-hour-ago-suffix': ' 小时前',
+        └ 1215: 'time-min-ago-suffix': ' 分钟前',
+        └ 1216: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 476: 'time-hours-ago': '{n} 小时前',
         └ 477: 'time-days-ago': '{n} 天前',

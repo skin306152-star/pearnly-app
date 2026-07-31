@@ -22,6 +22,7 @@ interface CameraApi {
         onScan?: (code: string) => void;
         onError?: (err: ScanError) => void;
         onState?: (state: string) => void;
+        onDuplicate?: (code: string, info: { gapMs: number; misses: number }) => void;
     }) => CameraHandle;
 }
 
@@ -31,6 +32,12 @@ export interface CamHost {
     /** 等解码器那几秒里弹窗可能已被关掉/重开 —— 回 false 就别再往旧那张脸上画。 */
     alive: () => boolean;
     onCode: (code: string) => void;
+    /**
+     * 引擎把这一次当成「同一件还在画面里」挡下了(static/scan/scan-camera.js 的 onDuplicate)。
+     * 那道地板 ≈1.6s 降不下来:1.2 秒的真空档与 1.2 秒的反光在解码结果上同形。所以地板以下
+     * 的第二箱只能问店员 —— 一声不吭就是「扫了没反应」,而收货单上少一箱谁也看不出来。
+     */
+    onDup: (code: string) => void;
 }
 
 let cam: CameraHandle | null = null;
@@ -115,6 +122,7 @@ export async function openCamera(host: CamHost): Promise<void> {
         onScan: host.onCode,
         onError: (err) => msg(host, 'err', errorHtml(err)),
         onState: (state) => onState(host, state),
+        onDuplicate: (code) => host.onDup(code),
     });
     cam = handle;
     paintFrame(stage, handle.cropRatio());

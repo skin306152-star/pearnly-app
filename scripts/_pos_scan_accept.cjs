@@ -26,7 +26,7 @@ const { chromium } = require('@playwright/test');
 const ROOT = path.resolve(__dirname, '..');
 const Y4M = path.resolve(process.argv[2] || '.scan_fixture.y4m');
 const SHOTS = path.resolve(
-    process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan')
+    process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/accept')
 );
 const CODE = '8850999320014'; // 假摄像头画面里那张真 EAN-13(泰国 GS1 前缀 885)
 const BOTTLE = '8850999320007'; // 同商品的瓶码 · 用来证明扫箱码不是碰巧对上默认单位
@@ -292,6 +292,7 @@ async function cameraToCart(browser, origin, viewport, tag) {
 }
 
 // ── ② 未命中:扫到的那串码真的显示在屏幕上 ────────────────────────────────
+// 未命中落在 #bscan-fails 清单上(单张卡会被队列里下一件顶掉)· 断言随之改读真行。
 async function missShowsCode(browser, origin) {
     const page = await browser.newPage({ viewport: PHONE });
     await page.addInitScript(seed, 'th');
@@ -299,13 +300,13 @@ async function missShowsCode(browser, origin) {
     await login(page, origin);
     const th = await dict(page, 'th');
     await page.click('#main-scan-btn');
-    await page.waitForSelector('#bscan-card.show', { timeout: 30000 });
-    const code = await seen(page, '#bscan-card-msg .bscan-code');
-    const msg = await seen(page, '#bscan-card-msg');
-    const hint = await seen(page, '#bscan-card-hint');
+    await page.waitForSelector('#bscan-fails.show .bscan-fail', { timeout: 30000 });
+    const code = await seen(page, '#bscan-fails .bscan-fail-msg .bscan-code');
+    const msg = await seen(page, '#bscan-fails .bscan-fail-msg');
+    const hint = await seen(page, '#bscan-fails .bscan-fail-hint');
     await page.screenshot({ path: path.join(SHOTS, 'cam-03-notfound-code-390.png') });
     const acts = await page.evaluate(() =>
-        [...document.querySelectorAll('#bscan-acts .bscan-act')].map((b) => ({
+        [...document.querySelectorAll('#bscan-fails .bscan-fail-act')].map((b) => ({
             label: b.textContent,
             h: Math.round(b.getBoundingClientRect().height),
             visible: getComputedStyle(b).display !== 'none',
@@ -314,26 +315,27 @@ async function missShowsCode(browser, origin) {
     const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );
-    await page.click('#bscan-acts .bscan-act:nth-child(2)');
+    await page.click('#bscan-fails .bscan-fail-act');
     const after = await page.evaluate(() => ({
         search: document.getElementById('main-search').value,
         hidden: getComputedStyle(document.getElementById('bscan-mask')).display === 'none',
+        left: document.querySelectorAll('#bscan-fails .bscan-fail').length,
     }));
     await page.close();
     return {
         ok:
             painted(code) &&
-            code.onTop &&
+            code.onTop && // 清单压在取景层(z=60)之上才看得见
             code.text === CODE &&
             msg.text === fmt(th['bscan.notfound'], { code: CODE }) &&
             hint.text === th['posui.bscan.create_where'] &&
-            acts.length === 2 &&
+            acts.length === 1 &&
             acts.every((a) => a.visible && a.h >= 44) &&
-            acts[0].label === th['posui.bscan.continue'] &&
-            acts[1].label === th['posui.bscan.search_code'] &&
+            acts[0].label === th['posui.bscan.search_code'] &&
             overflow <= 0 &&
             after.search === CODE &&
-            after.hidden,
+            after.hidden &&
+            after.left === 0, // 带去搜索框 = 这笔欠账销掉
         code,
         msg,
         hint,
@@ -353,16 +355,21 @@ async function langCopy(browser, origin) {
         await login(page, origin);
         const d = await dict(page, lang);
         await page.click('#main-scan-btn');
-        await page.waitForSelector('#bscan-card.show', { timeout: 30000 });
-        const got = await page.evaluate(() => ({
-            msg: document.getElementById('bscan-card-msg').textContent.trim(),
-            hint: document.getElementById('bscan-card-hint').textContent.trim(),
-            code: (document.querySelector('#bscan-card-msg .bscan-code') || {}).textContent || '',
-            done: document.getElementById('bscan-done').textContent,
-            acts: [...document.querySelectorAll('#bscan-acts .bscan-act')].map(
-                (b) => b.textContent
-            ),
-        }));
+        await page.waitForSelector('#bscan-fails.show .bscan-fail', { timeout: 30000 });
+        const got = await page.evaluate(() => {
+            const row = document.querySelector('#bscan-fails .bscan-fail');
+            return {
+                msg: row.querySelector('.bscan-fail-msg').textContent.trim(),
+                hint: row.querySelector('.bscan-fail-hint').textContent.trim(),
+                code: (row.querySelector('.bscan-code') || {}).textContent || '',
+                done: document.getElementById('bscan-done').textContent,
+                headN: document.querySelector('#bscan-fails .bscan-fails-n').textContent,
+                ack: document.querySelector('#bscan-fails .bscan-fails-ack').textContent,
+                acts: [...document.querySelectorAll('#bscan-fails .bscan-fail-act')].map(
+                    (b) => b.textContent
+                ),
+            };
+        });
         if (lang === 'zh' || lang === 'en') {
             await page.screenshot({ path: path.join(SHOTS, `cam-10-notfound-${lang}.png`) });
         }
@@ -373,8 +380,9 @@ async function langCopy(browser, origin) {
                 got.hint === d['posui.bscan.create_where'].trim() &&
                 got.code === CODE &&
                 got.done === d['posui.bscan.done'] &&
-                got.acts.join('|') ===
-                    [d['posui.bscan.continue'], d['posui.bscan.search_code']].join('|'),
+                got.headN === fmt(d['posui.bscan.fails_n'], { n: 1 }) &&
+                got.ack === d['posui.bscan.fails_ack'] &&
+                got.acts.join('|') === d['posui.bscan.search_code'],
             got,
         };
     }

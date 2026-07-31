@@ -1,0 +1,49 @@
+{
+  "A_heldKeyOffField": {
+    "ok": false,
+    "premise": true,
+    "focusBefore": "BODY",
+    "stampMax": 41.2,
+    "repeats": 11,
+    "lookups": [
+      "00000000000057"
+    ],
+    "failsBefore": 0,
+    "failsAfter": 1,
+    "failText": "1 件没加进购物车 知道了 没有条码 00000000000057 的商品 让老板在后台「商品 → 新建商品」把这个码填进「条码」,之后扫码就能直接卖 用这个码搜商品",
+    "cartLines": 0
+  },
+  "B_focusStealMidBurst": {
+    "ok": false,
+    "focusAtBurstStart": "BODY",
+    "qtyBefore": "1",
+    "qtyAfter": "1999320015",
+    "rows": 2,
+    "lookupsInBurst": [
+      "8850999320014"
+    ],
+    "polluted": true
+  },
+  "C_stampUnderRepeat": {
+    "ok": true,
+    "stampMax": 39.9,
+    "perfMax": 229.4,
+    "repeats": 11,
+    "stampGaps": [
+      28.4,
+      32,
+      30,
+      30.4,
+      39.9,
+      30.3,
+      30.5,
+      30.5,
+      30.7,
+      30.3,
+      30.4,
+      28.4,
+      28.8,
+      28.9
+    ]
+  }
+}

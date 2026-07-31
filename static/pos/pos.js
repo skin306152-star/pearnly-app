@@ -13,8 +13,13 @@
         const el = $('pos-toast');
         const txt = $('pos-toast-txt');
         if (!el || !txt) return;
+        const err = type === 'error';
         txt.textContent = msg;
-        el.classList.toggle('error', type === 'error');
+        el.classList.toggle('error', err);
+        // 红档原先只换底色:「没加进购物车」旁边立着的还是「已加入」那枚 ✓(实测两句话的 path
+        // 一模一样)。底色分得开的是细看的人,柜台前抬头一瞥的那个只读得到字形。
+        const ic = $('pos-toast-ic');
+        if (ic) ic.setAttribute('d', err ? ic.dataset.err : ic.dataset.ok);
         el.classList.add('show');
         if (toastTimer) clearTimeout(toastTimer);
         toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
@@ -502,6 +507,10 @@
         // /cashier-sw.js 注册 + scope:/cashier → SW 能控 /cashier 导航(断网重开外壳)。只注销更旧的
         // /static/pos/ 作用域残留;老 /pos 作用域 SW 故意保留 —— 迁移中的老设备靠它离线兜底老壳,
         // 落到 /cashier 后各管各的作用域,互不抢导航。
+        // 注意:作用域只隔离导航,不隔离缓存 —— CacheStorage 按源共享,两个 SW 删得掉对方的缓存。
+        // 隔离靠的是两边 dropStaleCaches 各按缓存名前缀只删自己那一族(static/pos/*-sw.js)。
+        // 注册 URL 的指纹跟页面走(assetVersion 抠的是 <script src=dist/pos.js?v=>):写死一个数
+        // 就会像它此前那样停在 11911102 不动,而外壳早已发到 12043xxx —— 各造一套版本号必然漂。
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
                 .getRegistrations()
@@ -511,8 +520,9 @@
                     });
                 })
                 .catch(() => {});
+            const swV = (window.PearnlyScanCamera && window.PearnlyScanCamera.assetVersion()) || '';
             navigator.serviceWorker
-                .register('/cashier-sw.js?v=11911102', { scope: '/cashier' })
+                .register('/cashier-sw.js' + (swV ? '?v=' + swV : ''), { scope: '/cashier' })
                 .catch(() => {});
         }
         tick();

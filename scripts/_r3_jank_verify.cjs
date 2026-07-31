@@ -9,11 +9,25 @@
  * 这里用一个「一次性同步阻塞」把停顿做出来:它模拟的是真实页面上任何一次长任务,
  * 与枪本身的速度无关(枪跑 8ms/字符,比任何真枪都快)。
  *
+ * 枪必须走 CDP 发了就走(_gun_wedge_lib.cjs 的 cdpGun)。page.keyboard.type 会 await 每一发
+ * 的派发,主线程一卡它自己也跟着停 —— 「长任务」就被偷换成「枪打得慢」,这一例于是在验一件
+ * 真枪身上不会发生的事(第一版就栽在这:实测事件产生时刻也跟着出现 136ms 的坎)。
+ *
  * 跑法(仓库根目录):node scripts/_r3_jank_verify.cjs
  */
 const path = require('path');
 const { chromium } = require('@playwright/test');
-const { ROOT, DESKTOP, serve, shotter, runCases } = require('./_gun_wedge_lib.cjs');
+const {
+    ROOT,
+    DESKTOP,
+    serve,
+    cdpGun,
+    armLongTask,
+    armTwoRulers,
+    readTwoRulers,
+    shotter,
+    runCases,
+} = require('./_gun_wedge_lib.cjs');
 
 const SHOTS = path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/round3');
 const shot = shotter(SHOTS);
@@ -51,7 +65,9 @@ async function boot(browser, bag, origin) {
     await page.addInitScript(INIT);
     await stubApi(page, bag);
     await page.goto(`${origin}/home.html`);
-    await page.waitForFunction(() => typeof window.routeTo === 'function', null, { timeout: 25000 });
+    await page.waitForFunction(() => typeof window.routeTo === 'function', null, {
+        timeout: 25000,
+    });
     await page.evaluate(() => {
         window.isOwner = () => true;
         window.getActiveWorkspaceClientId = () => 1;
@@ -77,68 +93,39 @@ async function openFormWith(page, code) {
     await page.keyboard.press('End');
 }
 
-// 在这一串的第 n 个字符落地时,让主线程同步忙 STALL_MS —— 之后那个字符的 gap 就跨过 50。
-async function armStall(page, afterNthChar, ms) {
-    await page.evaluate(
-        ([n, blockMs]) => {
-            window.__n = 0;
-            window.__stalled = null;
-            window.__stallProbe = () => {
-                window.__n += 1;
-                if (window.__n !== n) return;
-                const t0 = performance.now();
-                while (performance.now() - t0 < blockMs) {
-                    /* 同步长任务 · 与真实重渲/GC 同形 */
-                }
-                window.__stalled = Math.round(performance.now() - t0);
-            };
-            document.addEventListener('keydown', window.__stallProbe, true);
-        },
-        [afterNthChar, ms]
-    );
-}
-
-async function typeMeasured(page, text, delayMs) {
-    await page.evaluate(() => {
-        window.__ks = [];
-        window.__kp = () => window.__ks.push(performance.now());
-        document.addEventListener('keydown', window.__kp, true);
-    });
-    await page.keyboard.type(text, { delay: delayMs });
-    const raw = await page.evaluate(() => {
-        document.removeEventListener('keydown', window.__kp, true);
-        return window.__ks;
-    });
-    const gaps = raw.slice(1).map((t, i) => Math.round(t - raw[i]));
-    return { gaps, maxGap: gaps.length ? Math.max(...gaps) : 0 };
-}
-
 // ── j1 · 快枪 8ms/字符,中间主线程卡 120ms ────────────────────────────
 async function fastGunSurvivesOneLongTask(browser, origin) {
     const bag = { asked: [], created: [] };
     const page = await boot(browser, bag, origin);
     await openFormWith(page, OLD);
-    await armStall(page, 5, STALL_MS);
-    const timing = await typeMeasured(page, NEW, 8);
-    await page.keyboard.press('Enter');
+    const cdp = await page.context().newCDPSession(page);
+    await armTwoRulers(page);
+    await armLongTask(page, 5, STALL_MS);
+    await cdpGun(cdp, NEW, 8, 'Enter');
+    const m = await readTwoRulers(page);
     await page.waitForTimeout(1200);
     const after = await page.inputValue('#sx-pf-barcode');
     const state = await page.evaluate(() => {
         const el = document.getElementById('sx-pf-bc-state');
         return el ? el.textContent.trim() : '';
     });
-    const stalled = await page.evaluate(() => window.__stalled);
     await shot(page, 'j1-fast-gun-one-long-task.png');
+    // 前提得先立住:长任务真的发生了(perfMax 跨过 50),而枪自己没被拖慢(stampMax 仍在枪速内)。
+    // 少了这两条,after === NEW 也可能只是「这次没卡起来」,那种绿什么都没保住。
+    const jankHappened = m.perfMax > 100 && m.stampMax <= 50;
     return {
-        ok: after === NEW,
+        ok: jankHappened && after === NEW,
         after,
         wanted: NEW,
-        stalledMs: stalled,
-        gaps: timing.gaps,
-        maxGap: timing.maxGap,
+        jankHappened,
+        measured: m,
         state,
         asked: bag.asked,
-        why: after === NEW ? '' : '真枪(8ms/字符)只因主线程卡了一次就被判成人打字 → 新旧码相接',
+        why: !jankHappened
+            ? `没造出「页面卡了但枪没慢」这个前提:处理 ${m.perfMax}ms / 产生 ${m.stampMax}ms`
+            : after === NEW
+              ? ''
+              : '真枪(8ms/字符)只因主线程卡了一次就被判成人打字 → 新旧码相接',
     };
 }
 
@@ -147,11 +134,13 @@ async function fastGunNoStall(browser, origin) {
     const bag = { asked: [], created: [] };
     const page = await boot(browser, bag, origin);
     await openFormWith(page, OLD);
-    const timing = await typeMeasured(page, NEW, 8);
-    await page.keyboard.press('Enter');
+    const cdp = await page.context().newCDPSession(page);
+    await armTwoRulers(page);
+    await cdpGun(cdp, NEW, 8, 'Enter');
+    const m = await readTwoRulers(page);
     await page.waitForTimeout(1200);
     const after = await page.inputValue('#sx-pf-barcode');
-    return { ok: after === NEW, after, maxGap: timing.maxGap };
+    return { ok: after === NEW, after, measured: m };
 }
 
 const CASES = [

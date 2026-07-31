@@ -11,7 +11,8 @@
  *                          只在楔子的 MODE_GUN 里,建品条码框是裸声明(MODE_ALWAYS)
  *   h3 heldKeyBatchField   入库批号框里按住一个键不放 —— 同一发输入换个屏
  *   h4 midSpeedDateBox     效期框里按【中速】(120ms/字符)敲日期:比人手 260ms 快、比枪 50ms 慢,
- *                          楔子攒得起一串,而 machine 判据在日期没敲完时为真
+ *                          楔子攒得成一串却判不成枪 —— 店员填的那个日期必须留在框里,
+ *                          也不许被当成一发码查出去
  *   h5 onlyNameCreate      扫到未建档 → 去建这个商品 → 只填名字保存,截真 POST body
  *   h6 notInCacheBatch     列表缓存里没有这件货 → 扫码加行 → 批次格 + 真提交载荷
  *
@@ -22,7 +23,16 @@
  */
 const path = require('path');
 const { chromium } = require('@playwright/test');
-const { ROOT, DESKTOP, serve, gun, shotter, runCases } = require('./_gun_wedge_lib.cjs');
+const {
+    ROOT,
+    DESKTOP,
+    GHOST,
+    serve,
+    gun,
+    typeDateByHand,
+    shotter,
+    runCases,
+} = require('./_gun_wedge_lib.cjs');
 
 const ONLY = process.argv[2] || '';
 const SHOTS = path.join(ROOT, 'tests/e2e/_artifacts/pos_barcode_scan/fix2');
@@ -31,7 +41,6 @@ const shot = shotter(SHOTS);
 const COLA = '8850999320014';
 const MILK = '4901234567894';
 const YOG = '8858899000012'; // 只在查码应答里存在 · /api/inventory/stock 里没有它
-const GHOST = '9999999999999'; // 全库没有:建品那条路必须真的能存下去
 
 const P_COLA = { id: 'p-cola', name_th: 'โค้ก 325ml', name_zh: '可乐 325ml', track_batch: false };
 const P_MILK = { id: 'p-milk', name_th: 'นมสด 1L', name_zh: '鲜奶 1L', track_batch: true };
@@ -154,7 +163,8 @@ async function waitQuiet(page, fn, timeout = 6000) {
  *
  * 间隔不靠 waitForTimeout 造:那条路一个来回就 40~60ms,已经掉出 GUN_MAX_GAP_MS(50)的区间,
  * 于是「按住不放」被自己的节拍救了 —— 那种绿是假的。这里背靠背发,并把浏览器里量到的真实
- * 间隔一起带回去当证据(Windows 真实自动重复约 33ms,同样 ≤50,判据落在同一档)。
+ * 间隔一起带回去当证据。目标节拍取 15ms 而不是 Windows 实测的 33ms:33 离 50 只剩一档,
+ * 机器一忙调度抖一下就量到 52,这一例的前提当场不成立(实测栽过一次)。
  */
 async function holdKey(page, key, times, targetGapMs) {
     await page.evaluate(() => {
@@ -270,7 +280,10 @@ async function heldKeyBarcodeField(browser, origin) {
     await page.waitForTimeout(900);
     const before = await page.inputValue('#sx-pf-barcode');
     bag.asked.length = 0;
-    const held = await holdKey(page, '0', 10, 33); // 按住不放 · Windows 真实重复率 ≈33ms
+    // 目标节拍留足余量：这一例的前提是「速度这条线拦不住它，只有 repeat 标志拦得住」，
+    // 而 33ms 离 GUN_MAX_GAP_MS（50）太近 —— 机器一忙调度抖一下就量到 52，前提当场不成立
+    // （那不是产品的问题，是这一例自己没造出该造的输入）。15ms 仍是真键盘做得到的重复率。
+    const held = await holdKey(page, '0', 10, 15);
     await page.waitForTimeout(900);
     const after = await page.inputValue('#sx-pf-barcode');
     const state = await page.evaluate(() =>
@@ -310,7 +323,7 @@ async function heldKeyBatchField(browser, origin) {
     await page.waitForTimeout(400);
     const before = await box.inputValue();
     bag.asked.length = 0;
-    const held = await holdKey(page, '0', 10, 33);
+    const held = await holdKey(page, '0', 10, 15); // 同上：留余量，见 h2
     await page.waitForTimeout(900);
     const after = await box.inputValue();
     const msg = await page.locator('#inv-in-mask-scan-msg').innerText();
@@ -354,7 +367,10 @@ async function midSpeedDateBox(browser, origin) {
         return { k: el && el.dataset ? el.dataset.k : '', type: el ? el.type : '' };
     });
     bag.asked.length = 0;
-    await page.keyboard.type('12312027', { delay: 120 }); // 一个完整、正确的日期,只是打得快
+    // 真人填日期的打法(段内打数字、按 → 换段),只是节拍快到 120ms/字符:比人手典型的 260ms
+    // 快、比枪速上限 50ms 慢,楔子攒得成一串却判不成枪。一口气打 8 个数字不是这一例要验的东西
+    // ——那样填出来的是什么由浏览器区域设置决定(ISO 那一档年份段会吃掉六位),断的就成了 locale。
+    await typeDateByHand(page, '2027-12-31', 120);
     await page.waitForTimeout(900);
     const value = await box.inputValue();
     const msg = await page.locator('#inv-in-mask-scan-msg').innerText();

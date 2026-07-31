@@ -20,7 +20,15 @@
  */
 const path = require('path');
 const { chromium } = require('@playwright/test');
-const { ROOT, DESKTOP, serve, gun, shotter, runCases } = require('./_gun_wedge_lib.cjs');
+const {
+    ROOT,
+    DESKTOP,
+    serve,
+    gun,
+    typeDateByHand,
+    shotter,
+    runCases,
+} = require('./_gun_wedge_lib.cjs');
 
 const SHOTS = path.resolve(process.argv[2] || path.join(ROOT, 'tests/e2e/_artifacts/inv_p1'));
 const shot = shotter(SHOTS);
@@ -172,22 +180,6 @@ async function submitIn(page) {
     await quiet(page, () => !document.getElementById('inv-in-mask').classList.contains('show'));
 }
 
-// 真人填日期的打法:段内打数字、按 → 换段(Chrome 的 date 控件就是这么用的;一口气打 8 个
-// 数字在任何段序下都填不出日期)。段序跟浏览器区域设置走,故现场问 Intl,不押死在某个国家。
-async function typeDateByHand(page, iso, delay) {
-    const order = await page.evaluate(() =>
-        new Intl.DateTimeFormat()
-            .formatToParts(new Date())
-            .map((p) => p.type)
-            .filter((t) => t === 'year' || t === 'month' || t === 'day')
-    );
-    const seg = { year: iso.slice(0, 4), month: iso.slice(5, 7), day: iso.slice(8, 10) };
-    for (let i = 0; i < order.length; i++) {
-        await page.keyboard.type(seg[order[i]], { delay });
-        if (i < order.length - 1) await page.keyboard.press('ArrowRight');
-    }
-}
-
 // 点进 date 框的左边那一段。点正中间落到的是中间那一段,后面打进去的东西会随区域设置飘 ——
 // 这一串到底落在哪一段决定了框里最后剩什么,前提不钉死,同一份断言在别的机器上就是另一回事。
 const clickDateBox = (box) => box.click({ position: { x: 8, y: 10 } });
@@ -257,6 +249,9 @@ async function freshProduct(browser, origin) {
 // 零回调、第二箱那一行不出现、屏上一句话都没有,而 13 位数字照旧落进 date 控件 →
 // 效期变 49012-03-31(date 收 6 位年份,提交也不拦)。
 // 数量框那条路验不出这个:那边早就 opt-in 了,还有 stripScanned 兜着。
+// 三档一起验:枪速(判枪 · 直接加行)/ 慢枪(判人 · 但屏上给得出「当条码用」这条出路)/
+// 人手填日期(判人 · 日期必须留住)。中间那一档是引擎故意选的:50~100ms 与人手叠着,
+// 分不开时宁可把慢枪当人打的 —— 代价由那颗按钮兜,不是靠静默丢掉。
 async function gunFromDateField(browser, origin) {
     const { page } = await openModal(browser, origin);
     await gun(page, MILK); // 先造出一行带批次格的货
@@ -277,9 +272,30 @@ async function gunFromDateField(browser, origin) {
     });
     const afterGun = await page.evaluate(rows);
 
-    // 慢枪(80ms/字符):判不成枪速,但日期被打坏这件事与速度无关 —— 照样得还原 + 加行
+    // 慢枪(80ms/字符)判不成枪速 —— 引擎宁可当成人在打字(50~100ms 这一档与人手填日期
+    // 是叠着的,没有哪个阈值分得开;见 static/scan/scan-wedge.js 的 GUN_MAX_GAP_MS)。
+    // 判错的那一半必须给店员一条一点就补回来的路:屏上出「这一串按手动输入处理了」+「当条码用」。
+    // 静默丢掉才是三轮那一幕(整箱从收货单消失、屏上零字)。
     await clickDateBox(dateBox);
     await gun(page, COLA, SLOW_GUN_MS);
+    const useTyped = page.locator('#inv-in-mask-scan-msg [data-scan-typed]');
+    await quiet(page, () => !!document.querySelector('#inv-in-mask-scan-msg [data-scan-typed]'));
+    const typedOffer = {
+        shown: await useTyped.isVisible(),
+        code: await page.evaluate(
+            () =>
+                (
+                    document.querySelector('#inv-in-mask-scan-msg [data-scan-typed]') || {
+                        dataset: {},
+                    }
+                ).dataset.scanTyped || ''
+        ),
+        residue: await page.evaluate(
+            () => document.querySelector('#inv-in-mask-rows [data-k="expiry_date"]').value
+        ),
+    };
+    // 点「当条码用」:框先还原成扫之前的样子(不还原就带着 88509-09-14 一起提交),再当条码查
+    await useTyped.click();
     await quiet(page, () => {
         const r = document.querySelectorAll('#inv-in-mask-rows [data-row]');
         return [...r].some((x) => x.querySelector('[data-k="product_id"]').value === 'p-cola');
@@ -320,7 +336,11 @@ async function gunFromDateField(browser, origin) {
             // 扫码真的被处理了:第二箱另起了一行
             afterGun[1].product === 'p-milk' &&
             afterGun[1].batchCellShown === true &&
-            // 慢枪:日期还原 + 货照旧加进来
+            // 慢枪:不静默 —— 屏上给得出那条出路,且它带的就是刚扫那串码
+            typedOffer.shown &&
+            typedOffer.code === COLA &&
+            typedOffer.residue !== '' && // 前提:这一发确实把日期框写坏了,不然验的是空档
+            // 点过之后:框还原成扫之前的样子 + 货加进来
             afterSlow[0].expiry === '' &&
             afterSlow.some((r) => r.product === 'p-cola') &&
             // 人手填的日期留住了,且没被当成一件货
@@ -334,6 +354,7 @@ async function gunFromDateField(browser, origin) {
         focusBatch,
         before,
         afterGun,
+        typedOffer,
         afterSlow,
         afterHuman,
         afterBatchField,

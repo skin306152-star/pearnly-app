@@ -243,6 +243,62 @@ export function isSaneExpiry(value: string): boolean {
     return !v || isPlausibleDate(v);
 }
 
+// 数量的位数上限。这条线不是拍脑袋的:零售条码最短的一档(EAN-8 / UPC-E)就是 8 位数字,
+// 所以一整串条码掉进数量框,留下的必然是 8 位起的一串;而单子上某一行填到八位数(一千万件
+// 起)在便利店/小零售不存在 —— 真的大批量是按箱收的,箱数仍是三四位数,「箱」由那一行的
+// unit_name 表达(后端按 factor_to_base 折算成基本单位)。7 位因此是「拦得住整串条码」与
+// 「挡不着真实大批量」之间唯一有物理依据的位置,离最夸张的真实用量(十万件级)还有两个
+// 数量级的余地。
+const MAX_QTY_DIGITS = 7;
+
+// 进货单价的位数上限。跟数量同一个数,但理由是另一条 —— 两处的上限各按各的业务顶算,
+// 谁也不该因为另一头改了就跟着动。泰国小零售单件最贵的真实进货是金饰店:一公斤金条
+// ≈ ฿2,400,000(七位)。7 位(≤ ฿9,999,999.99/件)因此把最贵的那档真货留了四倍余量,
+// 同时仍在「整串条码留下的 8 位起」之下 —— 拦得住掉进来的码,挡不着真买卖。
+const MAX_COST_DIGITS = 7;
+
+/** 整数部分的位数与量级各挡一头。少一条就有漏,见两个调用点的注释。 */
+function withinDigits(value: string, maxDigits: number): boolean {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return false;
+    const digits = (value.split('.')[0].match(/\d/g) || []).length;
+    return digits <= maxDigits && Math.abs(n) < Math.pow(10, maxDigits);
+}
+
+/**
+ * 「这个数量不是一串条码掉进来的」。
+ *
+ * 楔子已经在框那一层把枪打的串还原回去了,但那一层漏一次(焦点在两个框之间被异步挪走、
+ * 换个浏览器、粘贴)就是 19 亿件跟着整张单子进库存和成本 —— 同 isSaneExpiry 的道理,
+ * 进流水之前必须还有这一道。
+ *
+ * 只挡量级这一档:残串只剩三四位时跟真实数量长得一模一样,谁也分不出来,那一半只有楔子
+ * 修得了。0 / 负数不归这里管(入库按 >0 过滤,盘点的 0 是「架上真没有」这个合法答案)。
+ *
+ * 位数与量级各挡一头,少一条就有漏:EAN-8 的 01234567 数值只有 1234567(量级那条放它过),
+ * 而 1e10 这种写法只有两个数字(位数那条放它过)。
+ */
+export function isSaneQty(value: string): boolean {
+    const v = String(value || '').trim();
+    if (!v) return true; // 空 = 这一行本来就不提交,不在射程内
+    return withinDigits(v, MAX_QTY_DIGITS);
+}
+
+/**
+ * 「这个进货单价不是一串条码掉进来的」。
+ *
+ * 单价框比数量框更该有这一道,因为它错了没人看得见:数量错了架上一点就对不上,单价错了
+ * 只改库存估值与移动加权成本 —— 真浏览器实测(枪扫时光标停在单价格)฿8850999320014/瓶
+ * 原样进了 POST /api/inventory/in,屏上一个字都没有,弹窗照常关掉报成功。
+ *
+ * 同 isSaneQty:只挡量级这一档,残串短到跟真价格同形时谁也分不出来。
+ */
+export function isSaneCost(value: string): boolean {
+    const v = String(value || '').trim();
+    if (!v) return true; // 空 = 单价缺省,后端按 0 落账
+    return withinDigits(v, MAX_COST_DIGITS);
+}
+
 // 数量:整数不带小数,非整数最多 3 位且去尾零(拆零/称重)。
 export function fmtQty(v: number | string | null | undefined): string {
     const n = Number(v || 0);

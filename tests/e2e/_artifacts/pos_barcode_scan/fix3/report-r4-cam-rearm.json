@@ -1,0 +1,138 @@
+{
+  "floorMs": 1600,
+  "floorBracket": "(1200, 1600]",
+  "legs": {
+    "leg2000": {
+      "state": {
+        "count": "สแกนแล้ว 4 ชิ้น",
+        "qtys": [
+          "4"
+        ],
+        "grand": "1,400.00",
+        "noticeText": "",
+        "coveredBy": "nothing",
+        "noticeOnScreen": false
+      },
+      "asked": [
+        3998,
+        8004,
+        12258
+      ],
+      "rescans": 3,
+      "rearmMs": 3998,
+      "plusOne": null,
+      "legMs": 2000,
+      "cyclesInWindow": 3,
+      "side": "above",
+      "ok": true,
+      "why": ""
+    },
+    "leg1800": {
+      "state": {
+        "count": "สแกนแล้ว 4 ชิ้น",
+        "qtys": [
+          "4"
+        ],
+        "grand": "1,400.00",
+        "noticeText": "",
+        "coveredBy": "nothing",
+        "noticeOnScreen": false
+      },
+      "asked": [
+        3537,
+        7330,
+        11081
+      ],
+      "rescans": 3,
+      "rearmMs": 3537,
+      "plusOne": null,
+      "legMs": 1800,
+      "cyclesInWindow": 3,
+      "side": "above",
+      "ok": true,
+      "why": ""
+    },
+    "leg1600": {
+      "state": {
+        "count": "สแกนแล้ว 5 ชิ้น",
+        "qtys": [
+          "5"
+        ],
+        "grand": "1,750.00",
+        "noticeText": "",
+        "coveredBy": "nothing",
+        "noticeOnScreen": false
+      },
+      "asked": [
+        3214,
+        6591,
+        9748,
+        13066
+      ],
+      "rescans": 4,
+      "rearmMs": 3214,
+      "plusOne": null,
+      "legMs": 1600,
+      "cyclesInWindow": 4,
+      "side": "above",
+      "ok": true,
+      "why": ""
+    },
+    "leg1200": {
+      "state": {
+        "count": "สแกนแล้ว 1 ชิ้น",
+        "qtys": [
+          "1"
+        ],
+        "grand": "350.00",
+        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "coveredBy": "",
+        "noticeOnScreen": true
+      },
+      "asked": [
+        14373
+      ],
+      "rescans": 0,
+      "rearmMs": null,
+      "plusOne": {
+        "before": "1",
+        "after": "2",
+        "lookups": 1,
+        "added": true
+      },
+      "legMs": 1200,
+      "cyclesInWindow": 5,
+      "side": "below",
+      "ok": true,
+      "why": ""
+    },
+    "leg0800": {
+      "state": {
+        "count": "สแกนแล้ว 1 ชิ้น",
+        "qtys": [
+          "1"
+        ],
+        "grand": "350.00",
+        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "coveredBy": "",
+        "noticeOnScreen": true
+      },
+      "asked": [
+        14181
+      ],
+      "rescans": 0,
+      "rearmMs": null,
+      "plusOne": {
+        "before": "1",
+        "after": "2",
+        "lookups": 1,
+        "added": true
+      },
+      "legMs": 800,
+      "cyclesInWindow": 8,
+      "side": "below",
+      "ok": true,
+      "why": ""
+    }
+  }
+}

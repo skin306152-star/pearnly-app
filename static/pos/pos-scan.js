@@ -32,7 +32,8 @@
         const el = $('view-main');
         return !!(el && el.classList.contains('is-active'));
     }
-    // 收款/数量/折扣/成交/税票弹窗开着 → 枪扫到的码不许偷偷加进购物车(店员正在办别的事)。
+    // 收款/数量/折扣/成交/税票弹窗开着 → 枪扫到的码不许偷偷加进购物车(店员正在办别的事),
+    // 但也不许一声不吭地丢掉 —— 那一发的去向见 notAdded。
     function modalOpen() {
         return !!document.querySelector('#view-main .mask.show');
     }
@@ -45,21 +46,6 @@
     // ════════════════ 卡片(相机 / 解码器起不来)════════════════
     function clear(el) {
         while (el.firstChild) el.removeChild(el.firstChild);
-    }
-
-    // 扫到的码必须原样看得见 —— 店员靠它判断是货没建档还是码印错了。码嵌在译文中间,按 {code}
-    // 切开拼节点:不拿 innerHTML 塞刚扫进来的字符串。
-    function renderMsg(el, text, code) {
-        const parts = String(text).split('{code}');
-        clear(el);
-        el.appendChild(document.createTextNode(parts[0]));
-        if (parts.length > 1) {
-            const b = document.createElement('b');
-            b.className = 'bscan-code tnum';
-            b.textContent = code;
-            el.appendChild(b);
-            el.appendChild(document.createTextNode(parts[1]));
-        }
     }
 
     function renderActs(list) {
@@ -100,92 +86,26 @@
     }
 
     // ════════════════ 失败清单(累积 · 不被下一件抹掉)════════════════
-    // 队列里第 N 件失败、第 N+1 件几个 microtask 之后就落地:单张卡会被下一件当场换掉,浏览器
-    // 连重绘的机会都没有 —— 码是处理了,提示没了,对钱的效果跟「码被丢掉」一模一样(顾客那件
-    // 货没进账、店员零提示)。失败因此落在一份只有店员点得掉的清单上:连扫 10 件里第 3 件失败,
-    // 扫完回头仍看得见失败的是哪一件、哪个码。清单独立于取景层 —— 枪那条路上没有取景层。
-    const fails = [];
-    const FAILS_MAX = 20; // 只防无限长撑破布局;真实一轮不会有 20 件失败
-
-    // o = { msgKey, vars, name(多语名对象), errCode, code, hintKey, searchable }
-    // 存的是键不是译好的句子:清单会一直挂到店员点掉,期间切语言只会重画 —— 句子存死了就只有
-    // 半张卡跟着换语言(标题泰文、正文中文,真截图上抓到过)。名字同理:POS.nm 也是按当时的
-    // 语言取的,得留原始对象到画的时候再取。
-    function pushFail(o) {
-        fails.unshift(o); // 最新的排最上面:不滚动也看得见刚扫的那一件
-        if (fails.length > FAILS_MAX) fails.length = FAILS_MAX;
-        renderFails();
-    }
-    function clearFails() {
-        fails.length = 0;
-        renderFails();
-    }
-
-    function failMsg(f) {
-        if (f.errCode) return POS.posErrMsg(f.errCode, 'pos.unexpected');
-        if (!f.vars && !f.name) return POS.t(f.msgKey); // 不插值:{code} 留给 renderMsg 切
-        const vars = Object.assign({}, f.vars);
-        if (f.name) vars.name = POS.nm(f.name);
-        return POS.tf(f.msgKey, vars);
-    }
-
-    function failRow(f) {
-        const row = document.createElement('div');
-        row.className = 'bscan-fail';
-        const text = failMsg(f);
-        const msg = document.createElement('div');
-        msg.className = 'bscan-fail-msg';
-        renderMsg(msg, text, f.code || '');
-        row.appendChild(msg);
-        // 话里没嵌码的那几档(单位不对 / 没设价)也得把码摆出来:店员拿它去后台核对这件货。
-        if (f.code && text.indexOf('{code}') < 0) {
-            const c = document.createElement('div');
-            c.className = 'bscan-fail-code tnum';
-            c.textContent = f.code;
-            row.appendChild(c);
-        }
-        if (f.hintKey) {
-            const h = document.createElement('div');
-            h.className = 'bscan-fail-hint';
-            h.textContent = POS.t(f.hintKey);
-            row.appendChild(h);
-        }
+    // 「这一单还欠几件货」那本账在 pos-scan-fails.js —— 它的生死跟相机开不开、码从哪个入口进来
+    // 无关(见该文件头)。这边只留下清单要往外做的那两件事:关取景层、把码交回取件那条路。
+    const FAILS = window.PearnlyPosScanFails.create({
         // 已建档但没录条码的商品照这条救回来:拿这个码去商品名/编码里搜(原「扫码填搜索框」)。
-        if (f.searchable) {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'bscan-fail-act';
-            b.textContent = POS.t('posui.bscan.search_code');
-            b.addEventListener('click', function () {
-                close();
-                clearFails();
-                POS.cashier.searchFor(f.code);
-            });
-            row.appendChild(b);
-        }
-        return row;
-    }
-
-    function renderFails() {
-        const box = $('bscan-fails');
-        clear(box);
-        box.classList.toggle('show', fails.length > 0);
-        if (!fails.length) return;
-        const head = document.createElement('div');
-        head.className = 'bscan-fails-head';
-        const n = document.createElement('div');
-        n.className = 'bscan-fails-n';
-        n.textContent = POS.tf('posui.bscan.fails_n', { n: fails.length });
-        const ack = document.createElement('button');
-        ack.type = 'button';
-        ack.className = 'bscan-fails-ack';
-        ack.textContent = POS.t('posui.bscan.fails_ack');
-        ack.addEventListener('click', clearFails);
-        head.appendChild(n);
-        head.appendChild(ack);
-        box.appendChild(head);
-        fails.forEach((f) => box.appendChild(failRow(f)));
-    }
+        // 顺序照旧:先关层,再销这一条,最后才把码送进搜索框。
+        onSearch: function (code) {
+            close();
+            FAILS.resolve(code);
+            POS.cashier.searchFor(code);
+        },
+        // 「刚才那次重读是第二件」:走跟扫码完全同一条取件路(查码 → 加进车 → 成功销账),
+        // 不在这里另写一遍加购。单位/缺价/离线那几档判定只该有一处,分叉出去就是两套收钱规则。
+        // 这一行的账由店员这一下结掉(resolve 不再碰它)。先销后取件:取件是异步的,留着它等
+        // 回包就等于同一颗按钮可以被连点两下,车里凭空多一件。取件真失败/被拒的话,那条路自己
+        // 会挂一条说明白的,待办不会凭空消失。
+        onAddOne: function (code) {
+            FAILS.drop(code);
+            submit(code);
+        },
+    });
 
     // ════════════════ 取件 ════════════════
     // 串行化走 promise 链,不是「在忙就把这一码丢掉」的布尔:枪连扫三件不同的货时,后两件
@@ -206,11 +126,16 @@
     function release() {
         pending -= 1;
     }
+    // 「当下这一句」说在哪:取景层开着时说在层里那条底栏 —— 那一轮的状态(件数 / 最后一件 /
+    // 排队)全在那儿,这句落到别处店员就得在两个地方找。err 走红档:说的是「没加进车」,
+    // 长得跟「已加入」一样就等于没说。
+    function announce(msg, err) {
+        if (cameraOpen()) $('bscan-last').textContent = msg;
+        else POS.toast(msg, err ? 'error' : '');
+    }
     // 积压必须看得见:枪比后端快,店员看不到「还有 2 件在排队」就会当成没扫上,同一件再扫一遍。
     function queuedNote(n) {
-        const msg = POS.tf('posui.bscan.queued', { n: n });
-        if (cameraOpen()) $('bscan-last').textContent = msg;
-        else POS.toast(msg);
+        announce(POS.tf('posui.bscan.queued', { n: n }));
     }
 
     async function lookup(code) {
@@ -228,6 +153,9 @@
             return;
         }
         scanned += 1;
+        // 老板刚在后台把这个码补进商品资料,店员回头重扫 —— 这件货已经在车里了,清单上那笔欠账
+        // 必须跟着销掉,否则屏上还写着「这件货没进车」,店员按它再补一件就是收两遍钱。
+        FAILS.resolve(code);
         onHit(item);
     }
 
@@ -244,7 +172,7 @@
     // 加不进购物车的两档都得停下来说清楚:这两档原先都是静默的 —— 一个把整箱按 ฿0 加进车,
     // 一个悄悄改按别的单位收钱,屏上、小票上、报表上都看不出异常。
     function onRefused(code, item, refused) {
-        pushFail({
+        FAILS.push({
             msgKey: refused.key,
             vars: { unit: refused.unit },
             name: item.name,
@@ -258,15 +186,15 @@
     function onMiss(code, e) {
         const notFound = !!e && e.code === 'pos.product_not_found';
         if (notFound && e.detail === 'no_catalog') {
-            pushFail({ msgKey: 'posui.bscan.offline_nocatalog', code: code });
+            FAILS.push({ msgKey: 'posui.bscan.offline_nocatalog', code: code });
             return;
         }
         if (notFound && e.detail === 'snapshot_miss') {
-            pushFail({ msgKey: 'posui.bscan.offline_miss', code: code, searchable: true });
+            FAILS.push({ msgKey: 'posui.bscan.offline_miss', code: code, searchable: true });
             return;
         }
         if (notFound) {
-            pushFail({
+            FAILS.push({
                 msgKey: 'bscan.notfound',
                 code: code,
                 hintKey: 'posui.bscan.create_where',
@@ -274,7 +202,53 @@
             });
             return;
         }
-        pushFail({ errCode: e && e.code, code: code });
+        FAILS.push({ errCode: e && e.code, code: code });
+    }
+
+    // 引擎说:这个码又读到了,但空档没够到「离开过取景框」的判据,于是当成同一件挡下了
+    // (见 scan-camera.js 的 accept)。它分不出「举着不动被反光糊了一秒」和「拿开 A 换上同款
+    // 的 B」—— 解码结果上是同一串「连着 N 次没解出」。分得出的只有店员,所以摆到他面前。
+    // 落进失败清单而不是底部那行字:底部那行会被下一件当场换掉,而这一条正是「这件货可能
+    // 没进车」。
+    // 已经欠着一笔就什么都不做(不是照常 FAILS.push 顶掉它):那一笔要么是这条提示本身 ——
+    // 举着不动会反复触发,重记只让它一直往清单顶上跳,把真正新失败的那件挤下去;要么是更该
+    // 处理的失败 —— 码没建档时清单上写的是「去后台建品」,换成「按 +1 加进车」之后那颗 +1
+    // 走同一条取件路,按下去只会再吃一次 404,而这件货要建档的线索没有第二个地方还记得。
+    function onDuplicate(code) {
+        if (FAILS.has(code)) return;
+        FAILS.push({
+            msgKey: 'posui.bscan.same_code',
+            code: code,
+            hintKey: 'posui.bscan.same_code_hint',
+            addOne: true,
+        });
+    }
+
+    // ════════════════ 收下了却没进车的那一发 ════════════════
+    // 枪响了、灯闪了,屏上什么都没变 —— 店员没有任何办法知道这一件没算进去,那件货就跟着
+    // 顾客出门了。两处都要说:toast 说当下(2.6 秒就走,而他那会儿正低头收钱),清单留到他
+    // 处理掉(清单在弹窗后面,当场看不见)。少任何一处都还是「响过但没人知道」。
+    // 一个键两处用:toast 拿插好码的整句,清单存键(切语言要重画),渲染时才把 {code} 切出来。
+    function notAdded(code, msgKey, hintKey) {
+        announce(POS.tf(msgKey, { code: code }), true);
+        FAILS.push({ msgKey: msgKey, code: code, hintKey: hintKey });
+    }
+
+    // 楔子判成「人在打字」的那一发(scan-wedge.js 的 onTyped)。这里不第二次判它是不是枪 ——
+    // 结论只有 looksLikeGun 那一份,这一路只负责让屏上有字;框里那串按人打的算,所以不还原。
+    // 收银台今天没有框声明接枪,这一路因此不会响;备着是因为漏接的代价是静默丢掉一发输入,
+    // 而那正是入库侧栽过的坑(慢枪扫的第二箱整箱从收货单消失)。
+    function onTyped(code) {
+        notAdded(code, 'posui.bscan.typed', 'posui.bscan.typed_hint');
+    }
+
+    // 枪那一发落在哪:没进收银主屏(登录 / 开班)时没有车可加,也没人在等结果;弹窗开着照旧
+    // 不加进车(收款中改车会让金额跟已经报给顾客的应付对不上),但必须说一声 —— 收款窗开着
+    // 正是最后一件货最容易被补扫的时刻,不说那件货就跟着顾客出门。
+    function onGun(code) {
+        if (!isMainActive()) return;
+        if (modalOpen()) return notAdded(code, 'posui.bscan.modal_busy', 'posui.bscan.modal_hint');
+        submit(code);
     }
 
     // ════════════════ 摄像头层 ════════════════
@@ -342,6 +316,7 @@
             container: $('bscan-stage'),
             t: POS.t,
             onScan: submit,
+            onDuplicate: onDuplicate,
             onError: onCamError,
             onState: paintState,
         });
@@ -363,7 +338,7 @@
         $('bscan-last').textContent = '';
         hideCard();
         paintState('starting');
-        if (!offWedge) offWedge = WEDGE.register(submit, { exclusive: true });
+        if (!offWedge) offWedge = WEDGE.register(submit, { exclusive: true, onTyped: onTyped });
         let api;
         try {
             api = await CAM.ensureLoaded();
@@ -385,7 +360,8 @@
     }
 
     // 失败清单不跟着关:那几件货还没建档 / 单位还没修好,店员关掉取景层正是要去处理它们。
-    // 只有点「知道了」才清。
+    // 清单只由三件事变小:那个码这次真进车了 / 那一条被带去搜索框了(FAILS.resolve)、店员点
+    // 「知道了」、这一单结束了(saleEnded)。
     function close() {
         $('bscan-mask').classList.remove('show');
         hideCard();
@@ -403,26 +379,26 @@
 
     function wire() {
         $('bscan-done').addEventListener('click', close);
+        // Esc 只关取景层。清单不跟着走:Esc 是「关掉眼前这层」的手势,顺手兼一份「这几件货我
+        // 不管了」就是让店员在想关相机时静默抹掉几件没进车的货 —— 抹完没有任何地方还记得它们。
+        // 清单自己头上有「知道了」那个显式出口,一份待办有一个出口就够。
         document.addEventListener('keydown', (e) => {
-            if (e.key !== 'Escape') return;
-            if (cameraOpen()) close();
-            else clearFails();
+            if (e.key === 'Escape' && cameraOpen()) close();
         });
         // 框的尺寸是按当时的画面盒子算出来的 px:转屏/软键盘改了舞台大小就得重算。
         window.addEventListener('resize', function () {
             if (cameraOpen()) sizeFrame();
         });
-        // 页面刚开就订阅条码枪,而不是「进主屏才订阅」:枪可能在任何时刻被扫,该不该收在回调里判。
-        WEDGE.register(function (code) {
-            if (!isMainActive() || modalOpen()) return;
-            submit(code);
-        });
+        // 页面刚开就订阅条码枪,而不是「进主屏才订阅」:枪可能在任何时刻被扫,该不该收在 onGun 里判。
+        WEDGE.register(onGun, { onTyped: onTyped });
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
     else wire();
 
-    // relang:失败清单是常驻浮层,不属于任何一屏 → pos.js 的 rerenderActive() 覆不到它。
+    // relang:失败清单挂在收银主屏里但由本文件渲染 → pos.js 的 rerenderActive() 覆不到它。
     // 清单会一直挂到店员点掉,期间切语言只重渲那一屏 = 清单永远停在旧语言。
-    POS.scan = { open, close, submit, relang: renderFails };
+    // saleEnded:清单是「这一单还欠几件货」的账本 —— 一单结束(收完 / 挂单 / 清空车)必须归零,
+    // 否则上一位客人那件没进车的货顶在下一位客人的屏上,店员会照着它补一件不属于这单的货。
+    POS.scan = { open, close, submit, saleEnded: FAILS.clear, relang: FAILS.render };
 })();

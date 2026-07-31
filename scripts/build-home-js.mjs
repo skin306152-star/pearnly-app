@@ -20,10 +20,12 @@ const SCAN_RESIDENT = ['scan/scan-loader.js', 'scan/scan-wedge.js'];
 const BUNDLES = [
     { out: 'static/dist/pre.js', files: [...SCAN_RESIDENT, 'recon-mapping.js', 'recon-review.js'] },
     // 摄像头解码层:只在店员真的点了扫码时由 scan-loader.js 现拉,不进任何页面首屏。
-    // shim 排在引擎前只为可读性(引擎是在解码时才引用 PearnlyScanZXing,不在加载期)。
+    // scan-errors.js 必须排在引擎【之前】:引擎在加载期就把 scanError/withTimeout 抓进闭包,
+    // 顺序反了是加载期直接抛(引擎头部有硬 guard,不静默降级)。shim 排哪都行,放前面只为可读性
+    // (引擎是在解码时才引用 PearnlyScanZXing,不在加载期)。
     {
         out: 'static/dist/scan.js',
-        files: ['scan/scan-zxing-shim.js', 'scan/scan-camera.js'],
+        files: ['scan/scan-zxing-shim.js', 'scan/scan-errors.js', 'scan/scan-camera.js'],
     },
     {
         out: 'static/dist/post.js',
@@ -61,6 +63,9 @@ const BUNDLES = [
             'pos/pos-ops.js',
             'pos/pos-shift.js',
             'pos/pos-cashier.js',
+            // pos-scan-fails.js 在加载期就要 window.POS(取 t/tf/nm/posErrMsg),而 pos-scan.js
+            // 在加载期就 create() 它 → 这两条顺序都是硬的,反了是加载期直接抛。
+            'pos/pos-scan-fails.js',
             // pos-scan.js 用 POS.cashier 的加货/手输弹窗 → 必须排在 pos-cashier.js 之后
             // (它只在点击/扫码时才取那几个方法,但先后写清楚免得下个窗口把它挪到前面)。
             'pos/pos-scan.js',

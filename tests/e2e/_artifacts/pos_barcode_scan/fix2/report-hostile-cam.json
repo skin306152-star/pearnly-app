@@ -1,325 +1,442 @@
 {
-  "p80#1": {
-    "label": "p80#1",
+  "p80": {
+    "label": "p80",
     "state": {
       "count": "สแกนแล้ว 1 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
         "1"
       ],
-      "grand": "350.00"
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.080812
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 775
+        "at": 734
       }
     ],
     "gaps": [],
     "ok": true
   },
-  "p80#2": {
-    "label": "p80#2",
+  "p60": {
+    "label": "p60",
     "state": {
       "count": "สแกนแล้ว 1 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
         "1"
       ],
-      "grand": "350.00"
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.810923
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 711
+        "at": 1489
       }
     ],
     "gaps": [],
     "ok": true
   },
-  "p80#3": {
-    "label": "p80#3",
+  "p50": {
+    "label": "p50",
     "state": {
       "count": "สแกนแล้ว 1 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
         "1"
       ],
-      "grand": "350.00"
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.606652
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 694
+        "at": 1291
       }
     ],
     "gaps": [],
     "ok": true
   },
-  "p60#1": {
-    "label": "p60#1",
+  "gap600": {
+    "label": "gap600",
     "state": {
       "count": "สแกนแล้ว 1 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
         "1"
       ],
-      "grand": "350.00"
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.143554
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 1454
+        "at": 742
       }
     ],
     "gaps": [],
     "ok": true
   },
-  "p60#2": {
-    "label": "p60#2",
+  "gap800": {
+    "label": "gap800",
     "state": {
       "count": "สแกนแล้ว 1 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
         "1"
       ],
-      "grand": "350.00"
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.067837
     },
     "lookups": 1,
     "asked": [
       {
         "code": "8850999320014",
-        "at": 1172
+        "at": 696
       }
     ],
     "gaps": [],
     "ok": true
   },
-  "p60#3": {
-    "label": "p60#3",
-    "state": {
-      "count": "สแกนแล้ว 1 ชิ้น",
-      "last": "เพิ่มแล้ว โค้ก ลัง",
-      "qtys": [
-        "1"
-      ],
-      "grand": "350.00"
-    },
-    "lookups": 1,
-    "asked": [
+  "camRevoked": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "tracks": [
       {
-        "code": "8850999320014",
-        "at": 1409
+        "st": "ended",
+        "muted": false
       }
     ],
-    "gaps": [],
-    "ok": true
-  },
-  "p50#1": {
-    "label": "p50#1",
-    "state": {
+    "before": {
       "count": "สแกนแล้ว 2 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
         "2"
       ],
-      "grand": "700.00"
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 4.0045
     },
-    "lookups": 2,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 1080
-      },
-      {
-        "code": "8850999320014",
-        "at": 6543
-      }
-    ],
-    "gaps": [
-      5463
-    ],
-    "ok": false
-  },
-  "p50#2": {
-    "label": "p50#2",
-    "state": {
+    "after": {
       "count": "สแกนแล้ว 2 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": true,
       "qtys": [
         "2"
       ],
-      "grand": "700.00"
+      "grand": "700.00",
+      "cardClass": true,
+      "cardShown": true,
+      "cardMsg": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+      "acts": [
+        {
+          "label": "ลองใหม่",
+          "w": 125,
+          "h": 48,
+          "inView": true
+        },
+        {
+          "label": "พิมพ์บาร์โค้ดเอง",
+          "w": 180,
+          "h": 48,
+          "inView": true
+        }
+      ],
+      "videoReadyState": 0,
+      "videoW": 0,
+      "videoTime": 0
     },
-    "lookups": 2,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 1005
-      },
-      {
-        "code": "8850999320014",
-        "at": 3152
-      }
-    ],
-    "gaps": [
-      2147
-    ],
-    "ok": false
-  },
-  "p50#3": {
-    "label": "p50#3",
-    "state": {
+    "back": {
       "count": "สแกนแล้ว 3 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
         "3"
       ],
-      "grand": "1,050.00"
+      "grand": "1,050.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+      "acts": [
+        {
+          "label": "ลองใหม่",
+          "w": 0,
+          "h": 0,
+          "inView": false
+        },
+        {
+          "label": "พิมพ์บาร์โค้ดเอง",
+          "w": 0,
+          "h": 0,
+          "inView": false
+        }
+      ],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 0.077867
     },
-    "lookups": 3,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 1016
-      },
-      {
-        "code": "8850999320014",
-        "at": 2367
-      },
-      {
-        "code": "8850999320014",
-        "at": 4370
-      }
-    ],
-    "gaps": [
-      1351,
-      2003
-    ],
-    "ok": false
+    "busy": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+    "retryLabel": "ลองใหม่",
+    "resumed": true,
+    "lookupsBefore": 2,
+    "lookupsFrozen": 2,
+    "lookupsAfter": 3
   },
-  "gap600#1": {
-    "label": "gap600#1",
-    "state": {
+  "camStaysLive": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "before": {
+      "count": "สแกนแล้ว 2 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "2"
+      ],
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 4.143891
+    },
+    "after": {
+      "count": "สแกนแล้ว 3 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "3"
+      ],
+      "grand": "1,050.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 11.201748
+    },
+    "counted": [
+      2,
+      3
+    ],
+    "lookupsBefore": 2,
+    "lookupsAfter": 3
+  },
+  "camCloseIsNotErr": {
+    "ok": true,
+    "first": true,
+    "reopened": true,
+    "afterDone": {
       "count": "สแกนแล้ว 1 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": false,
       "qtys": [
         "1"
       ],
-      "grand": "350.00"
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": -1,
+      "videoW": 0,
+      "videoTime": -1
     },
-    "lookups": 1,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 739
-      }
-    ],
-    "gaps": [],
-    "ok": true
-  },
-  "gap600#2": {
-    "label": "gap600#2",
-    "state": {
+    "afterEsc": {
       "count": "สแกนแล้ว 1 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": false,
       "qtys": [
-        "1"
+        "2"
       ],
-      "grand": "350.00"
-    },
-    "lookups": 1,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 694
-      }
-    ],
-    "gaps": [],
-    "ok": true
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": -1,
+      "videoW": 0,
+      "videoTime": -1
+    }
   },
-  "gap600#3": {
-    "label": "gap600#3",
-    "state": {
-      "count": "สแกนแล้ว 1 ชิ้น",
+  "camFrozenHidden": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "froze": true,
+    "back": true,
+    "hidden": {
+      "count": "สแกนแล้ว 3 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
-        "1"
+        "3"
       ],
-      "grand": "350.00"
+      "grand": "1,050.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 31.474037
     },
-    "lookups": 1,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 700
-      }
-    ],
-    "gaps": [],
-    "ok": true
+    "after": {
+      "count": "สแกนแล้ว 4 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "4"
+      ],
+      "grand": "1,400.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 32.602931
+    },
+    "resumed": true,
+    "lookupsBefore": 3,
+    "lookupsAfter": 4
   },
-  "gap800#1": {
-    "label": "gap800#1",
-    "state": {
-      "count": "สแกนแล้ว 1 ชิ้น",
+  "camFrozenWatching": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "froze": true,
+    "before": {
+      "count": "สแกนแล้ว 2 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
       "qtys": [
-        "1"
+        "2"
       ],
-      "grand": "350.00"
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 4.212379
     },
-    "lookups": 1,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 683
-      }
-    ],
-    "gaps": [],
-    "ok": true
-  },
-  "gap800#2": {
-    "label": "gap800#2",
-    "state": {
-      "count": "สแกนแล้ว 1 ชิ้น",
+    "after": {
+      "count": "สแกนแล้ว 2 ชิ้น",
       "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": true,
       "qtys": [
-        "1"
+        "2"
       ],
-      "grand": "350.00"
-    },
-    "lookups": 1,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 687
-      }
-    ],
-    "gaps": [],
-    "ok": true
-  },
-  "gap800#3": {
-    "label": "gap800#3",
-    "state": {
-      "count": "สแกนแล้ว 1 ชิ้น",
-      "last": "เพิ่มแล้ว โค้ก ลัง",
-      "qtys": [
-        "1"
+      "grand": "700.00",
+      "cardClass": true,
+      "cardShown": true,
+      "cardMsg": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+      "acts": [
+        {
+          "label": "ลองใหม่",
+          "w": 125,
+          "h": 48,
+          "inView": true
+        },
+        {
+          "label": "พิมพ์บาร์โค้ดเอง",
+          "w": 180,
+          "h": 48,
+          "inView": true
+        }
       ],
-      "grand": "350.00"
+      "videoReadyState": 0,
+      "videoW": 0,
+      "videoTime": 0
     },
-    "lookups": 1,
-    "asked": [
-      {
-        "code": "8850999320014",
-        "at": 762
-      }
-    ],
-    "gaps": [],
-    "ok": true
+    "busy": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+    "retryLabel": "ลองใหม่",
+    "lookupsBefore": 2,
+    "lookupsAfter": 2
   }
 }

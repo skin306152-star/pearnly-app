@@ -21,20 +21,13 @@ tests/unit/test_pos_scan_pipeline.py
 
 from __future__ import annotations
 
-import json
 import re
 import shutil
-import subprocess
 import unittest
 from decimal import Decimal
-from pathlib import Path
 
 from services.pos import catalog as pos_catalog
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-POS_DIR = PROJECT_ROOT / "static" / "pos"
-SCAN_DIR = PROJECT_ROOT / "static" / "scan"
-LANGS = ("th", "en", "zh", "ja")
+from tests.unit._pos_scan_dom import POS_DIR, run as run_scan_harness
 
 # 桩字典只放本测断言要用到的键(真字典的 4 语完整性归 test_pos_spa_i18n.py 那道闸)。
 DICT_ZH = {
@@ -58,196 +51,7 @@ DICT_ZH = {
     "pos.unexpected": "出了点问题",
 }
 
-NODE_HARNESS = r"""
-const fs = require('fs');
-const dir = process.argv[1];
-const DICT = JSON.parse(process.argv[2]);
-const scanDir = process.argv[3];
-
-// ── 最小 DOM 桩:只做被测代码真正用到的那几样 ──────────────────────────
-function mkEl(tag) {
-    const el = {
-        tagName: (tag || 'div').toUpperCase(),
-        children: [],
-        style: {},
-        dataset: {},
-        value: '',
-        className: '',
-        innerHTML: '',
-        disabled: false,
-        _text: '',
-        _cls: new Set(),
-        _on: {},
-        get firstChild() {
-            return this.children.length ? this.children[0] : null;
-        },
-        appendChild(c) {
-            this.children.push(c);
-            return c;
-        },
-        removeChild(c) {
-            const i = this.children.indexOf(c);
-            if (i >= 0) this.children.splice(i, 1);
-            return c;
-        },
-        set textContent(v) {
-            this._text = String(v);
-            this.children = [];
-        },
-        get textContent() {
-            if (this.children.length) return this.children.map((c) => c.textContent).join('');
-            return this._text;
-        },
-        addEventListener(t, f) {
-            (this._on[t] = this._on[t] || []).push(f);
-        },
-        // 真引擎(static/scan/scan-camera.js)建 video/canvas 时会用到这两样;node 里没有
-        // 布局与画布,给最小实现即可 —— 本测不验解码,只验取景框算得对不对。
-        setAttribute(n, v) {
-            this[n] = v;
-        },
-        getContext() {
-            return { drawImage() {} };
-        },
-        clientWidth: 0,
-        clientHeight: 0,
-        click() {
-            (this._on.click || []).forEach((f) => f({ currentTarget: this }));
-        },
-        querySelectorAll() {
-            return [];
-        },
-        closest() {
-            return null;
-        },
-    };
-    el.classList = {
-        add: (c) => el._cls.add(c),
-        remove: (c) => el._cls.delete(c),
-        contains: (c) => el._cls.has(c),
-        toggle: (c, on) => {
-            const want = on === undefined ? !el._cls.has(c) : !!on;
-            if (want) el._cls.add(c);
-            else el._cls.delete(c);
-            return want;
-        },
-    };
-    return el;
-}
-
-const byId = {};
-let QS_ONE = {}; // document.querySelector(选择器) → 元素 / null
-global.document = {
-    readyState: 'complete',
-    getElementById: (id) => (byId[id] = byId[id] || mkEl('div')),
-    createElement: (tag) => mkEl(tag),
-    createTextNode: (t) => ({ textContent: String(t) }),
-    querySelector: (sel) => QS_ONE[sel] || null,
-    querySelectorAll: () => [],
-    addEventListener: () => {},
-    body: mkEl('body'),
-};
-const win = { addEventListener: () => {} };
-global.window = win;
-win.POS_I18N = { zh: DICT };
-
-// 扫码地基桩:摄像头那层在 node 里没有可测的东西(真浏览器验收归 scan_base),这里只需要
-// 「能不能开」的答复 + 记下楔子是怎么被订阅的。
-let UNSUPPORTED = null;
-let CAM_API = null; // 非空 = 解码器"拉下来了";默认 null → 走「解码器拉不下来」那张卡
-const wedgeSubs = [];
-win.PearnlyScanCamera = {
-    unsupportedReason: () => UNSUPPORTED,
-    ensureLoaded: () =>
-        CAM_API
-            ? Promise.resolve(CAM_API)
-            : Promise.reject(new Error('camera layer not loaded in node')),
-};
-
-// 摄像头引擎用真的(static/scan/scan-camera.js):取景框比例必须来自真产物 —— 在测里自己写
-// 一个 0.9/0.5 的桩等于拿桩验桩,引擎改了比例这条闸照样绿。引擎挂 globalThis(它自己找
-// self/globalThis),与上面那份 win.PearnlyScanCamera 分开:后者是「解码器拉没拉下来」的开关。
-global.PearnlyScanCamera = {
-    loadScript: () => Promise.resolve(),
-    unsupportedReason: () => null,
-};
-(0, eval)(fs.readFileSync(scanDir + '/scan-camera.js', 'utf8'));
-const ENGINE = global.PearnlyScanCamera;
-
-// 真 create() 建真 handle(真 cropRatio、真 video 元素),只把 start() 换成「直接报出帧」:
-// 相机开不开得起来在 node 里不可验,那条归真浏览器验收(scripts/_pos_scan_accept.cjs)。
-let LAST_CAM = null; // 真 handle · 取景框的期望值只许从它的 cropRatio() 反查
-function camApi(videoW, videoH) {
-    return {
-        create(opts) {
-            const h = ENGINE.create(opts);
-            h.video.videoWidth = videoW;
-            h.video.videoHeight = videoH;
-            LAST_CAM = h;
-            return Object.assign({}, h, {
-                start() {
-                    opts.onState('starting');
-                    opts.onState('scanning');
-                    return Promise.resolve(true);
-                },
-            });
-        },
-    };
-}
-win.PearnlyScanWedge = {
-    MIN_LENGTH: 3,
-    register(cb, opts) {
-        const entry = { cb, exclusive: !!(opts && opts.exclusive) };
-        wedgeSubs.push(entry);
-        return () => {
-            const i = wedgeSubs.indexOf(entry);
-            if (i >= 0) wedgeSubs.splice(i, 1);
-        };
-    },
-};
-// 楔子的真实语义:有 exclusive 订阅者时只有它收(scan-wedge.js 的 receivers())。
-// 页面级订阅者不把取件的 promise 传回来(生产里没人 await 它),所以扫完要让在飞的活落地
-// 再断状态 —— 真实时间线上两次扫码本来也不在同一毫秒。
-function gunScan(code) {
-    let last = null;
-    wedgeSubs.forEach((s) => {
-        if (s.exclusive) last = s;
-    });
-    const targets = last ? [last] : wedgeSubs.slice();
-    return Promise.all(targets.map((s) => s.cb(code, document.body))).then(settle);
-}
-function settle() {
-    return new Promise((r) => setTimeout(r, 0));
-}
-
-// ── 网络桩 ────────────────────────────────────────────────────────────
-let LAST_URL = null;
-let CALLS = 0;
-let NEXT = null; // {status, body} 或 'network'
-let BY_CODE = null; // code → {status, body}(连扫多个不同码时按码回不同商品)
-let DELAY = 0; // 后端往返耗时(ms)· 连扫要复现的正是「上一件还没回来」
-global.fetch = (url) => {
-    LAST_URL = url;
-    CALLS += 1;
-    if (NEXT === 'network') return Promise.reject(new Error('offline'));
-    const m = String(url).match(/[?&]code=([^&]*)/);
-    const ans = (BY_CODE && BY_CODE[m ? decodeURIComponent(m[1]) : '']) || NEXT;
-    return new Promise((r) =>
-        setTimeout(() => r({ status: ans.status, json: () => Promise.resolve(ans.body) }), DELAY)
-    );
-};
-
-function load(name) {
-    (0, eval)(fs.readFileSync(dir + '/' + name, 'utf8'));
-}
-load('pos-data.js');
-const POS = win.POS;
-POS.state.lang = 'zh';
-POS.state.workspaceClientId = 7; // 真租户(不是纯本地预览 → 不走 mock 目录)
-const toasts = [];
-POS.toast = (msg, type) => toasts.push({ msg: msg, type: type || '' });
-load('pos-cashier.js');
-load('pos-scan.js');
+NODE_MAIN = r"""
 
 // ── 语料:同一商品两个单位两个码(瓶 15 / 箱 350)──────────────────────
 function coke() {
@@ -684,15 +488,7 @@ main().catch((e) => {
 class PosScanPipelineTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        proc = subprocess.run(
-            ["node", "-e", NODE_HARNESS, "--", str(POS_DIR), json.dumps(DICT_ZH), str(SCAN_DIR)],
-            cwd=str(PROJECT_ROOT),
-            capture_output=True,
-            timeout=60,
-        )
-        if proc.returncode != 0:
-            raise AssertionError("node 跑挂了:\n" + proc.stderr.decode("utf-8", "replace"))
-        cls.r = json.loads(proc.stdout.decode("utf-8"))
+        cls.r = run_scan_harness(NODE_MAIN, DICT_ZH)
 
     # ── 1. 精确等值匹配 ──
     def test_unit_barcode_wins_over_product_barcode(self):
@@ -777,11 +573,13 @@ class PosScanPipelineTest(unittest.TestCase):
     def test_notfound_tells_where_to_create_the_product(self):
         self.assertIn(DICT_ZH["posui.bscan.create_where"], self.r["notfound_text"])
 
-    def test_search_action_fills_the_search_box_and_clears_the_list(self):
+    def test_search_action_fills_the_search_box_and_settles_that_row(self):
         self.assertTrue(self.r["search_btn_found"], "未命中那行没有「用这个码搜商品」= 死胡同")
         self.assertEqual(self.r["search_box_value"], "9999999999999")
         self.assertFalse(self.r["closed_after_search"])
         # 这一件已经被带去搜索框处理了,留在清单上只会让店员以为还有一件没管。
+        # 此刻清单上只有它一条,所以「只销这一条」和「清整份」在这里长得一样 ——
+        # 分得开的那条反证(两条并存,只点其中一条)在 test_pos_scan_fail_ledger。
         self.assertFalse(self.r["fails_cleared_after_search"])
 
     # ── 5/6/7. 离线诚实 ──

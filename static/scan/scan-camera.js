@@ -1,21 +1,21 @@
 /*
  * Pearnly · scan-camera.js · 摄像头扫商品条码引擎(无界面)
  *
- * 职责边界:本文件只管「开相机 → 裁取景框 → 解码 → 回调」和「出错时给出一个能翻译成人话
- * 的错误对象」。弹窗长什么样、错误卡怎么画、重试按钮放哪,全归调用方 —— POS 和主站 SPA
- * 各有一套设计语言与翻译函数,引擎里写死任何一套都会让另一套变形。
+ * 职责边界:本文件只管「开相机 → 裁取景框 → 解码 → 回调」和「出错时给出一个能翻译成人话的错误
+ * 对象」。弹窗长什么样、错误卡怎么画、重试按钮放哪,全归调用方 —— POS 和主站 SPA 各有一套设计
+ * 语言与翻译函数,引擎里写死任何一套都会让另一套变形。
  *
- * 依赖 scan-loader.js(首屏 bundle 里):能力探针 + 同源 loadScript。本文件只可能被
- * loader 的 ensureLoaded() 拉进来,所以那层一定在。
+ * 依赖 scan-loader.js(首屏 bundle 里):能力探针 + 同源 loadScript。本文件只可能被 loader 的
+ * ensureLoaded() 拉进来,所以那层一定在。错误分档(scanError / withTimeout)在同一个懒加载
+ * 产物里的 scan-errors.js,排在本文件之前。
  *
- * 与 Odoo(addons/web/.../barcode_video_scanner.js)的四处刻意不同 —— 它那四处都是店员
- * 会当场骂人的地方:
- *  1. 它等视频就绪是 `while (!ready) await delay(10)` 且源码自带 FIXME 说该加超时 → 这里
- *     startTimeoutMs 到点就报 timeout,永远不会转着圈死等。
- *  2. 它 detect() 报错只丢一个通知、getUserMedia 报错文案是拼英文 message → 这里错误按
- *     code 分档(权限/没相机/被占用/超时/解码器拉不下来),每档一个 i18n 键。
+ * 与 Odoo(addons/web/.../barcode_video_scanner.js)的四处刻意不同,都是店员会当场骂人的地方:
+ *  1. 它等视频就绪是 `while (!ready) await delay(10)`(源码自带 FIXME)→ 这里 startTimeoutMs
+ *     到点就报 timeout,不会转着圈死等。
+ *  2. 它报错只丢一个通知、文案是拼英文 message → 这里按 code 分档(权限/没相机/被占用/超时/
+ *     解码器拉不下来),每档一个 i18n 键。
  *  3. 它在非 HTTPS 下让扫码按钮静默消失 → insecure_context 是一档明确的错误码,调用方拿
- *     PearnlyScanCamera.unsupportedReason() 在首屏就能说清「为什么这里没有扫码」。
+ *     unsupportedReason() 在首屏就能说清「为什么这里没有扫码」。
  *  4. 它原生那条路解全帧再按 boundingBox 过滤取景框 → 这里两条路都只把取景框那块像素画进
  *     canvas 再解,手机上少解掉一多半像素。
  */
@@ -24,11 +24,16 @@
 
     var doc = root && root.document;
     var shell = (root && root.PearnlyScanCamera) || null;
-    if (!shell || typeof shell.loadScript !== 'function') {
+    if (!shell || typeof shell.loadScript !== 'function' || typeof shell.scanError !== 'function') {
         throw new Error(
-            'scan-camera.js 需要 scan-loader.js 先加载(它在 dist/pos.js 与 dist/pre.js 里)'
+            'scan-camera.js 需要 scan-loader.js(dist/pos.js 与 dist/pre.js)与 scan-errors.js' +
+                '(dist/scan.js 里排在本文件之前)先加载'
         );
     }
+    var scanError = shell.scanError;
+    var isScanError = shell.isScanError;
+    var mediaErrorCode = shell.mediaErrorCode;
+    var withTimeout = shell.withTimeout;
 
     var RETAIL_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf'];
     var ZXING_BUNDLE = '/static/dist/zxing.js';
@@ -36,100 +41,47 @@
     var DEFAULTS = {
         facingMode: 'environment',
         // 取景框占画面的比例。条码是宽扁的,竖直方向给太多只是多解无用像素。
-        // 调用方屏幕上的取景框 CSS 必须跟这个比例对上,否则「框里对准了却读不出」。
         cropRatio: { width: 0.9, height: 0.5 },
+        // 常态采样间隔:没有码在跟踪、或跟踪中的码这一拍解出来了 —— 不急,省电。
         intervalMs: 120,
-        // 一个码有这么久没再被解出来 = 它离开了取景框,之后再出现才算新的一次扫描。
-        // 为什么量墙钟而不是帧数、1200 这个数是怎么定的:见 sweep() 上方。
-        clearAfterMs: 1200,
-        // 拿到 stream 之后到画面真的出帧的超时,包住 play() —— Odoo 那个 FIXME 的位置,
-        // 而且 play() 本身在「有 stream 却永远不出帧」时也不会 settle(实测拿 captureStream(0)
-        // 就能复现),只给等帧那段加超时仍然是死等。
+        // 「跟踪中的码这一拍没解出来」时改用的间隔:这段里每一拍都是一次证据,空等一个完整的
+        // intervalMs 等于把证据尺的刻度调粗一倍(见 sweep 上方)。不取 0 是给主线程留口气。
+        probeIntervalMs: 15,
+        // 判「离开取景框」的两把尺子,两把都够才算离开(为什么要两把:见 sweep 上方)。1600 ≈ 实测
+        // 最长一次反光(800ms)的两倍。12 次采样这个数由最慢的那台定:一次采样 400ms 的老机器上,
+        // p=0.5 抖动素材(8 个 seed)最长一次连着没解出走到 10 次 —— 12 只剩两次余量,再往下调
+        // 那台机器就会把一次持握记成两件。两个数落在不同机器上才分得出谁在挡:快的那台墙钟挡
+        // (原生 12 次采样只要 ≈200ms),慢的那台采样数挡(老机器 12 次采样 ≈5s)。
+        // 代价是地板跟着机器走。按引擎自己的墙钟是 ≈1.6s / ≈1.8s / ≈5.0s;换成店员看得见的
+        // 「货真的离开画面多久」,真浏览器三档机器逐档扫出来是:原生与店里那台一样落在
+        // 1.4~1.6s(快的这两台都是墙钟先到点,采样数只在老机器上才轮得到它挡)、老机器 4~6s。
+        // 地板以下的真离开认不出来 —— 那一段交给 dupNotice* 出声,见下。逐档数字与跑法在
+        // scripts/_r5_cam_floor_by_speed_verify.cjs;要动这两个数,先把那份报告重跑一遍。
+        clearAfterMs: 1600,
+        clearAfterMisses: 12,
+        // 「够不到上面那两把尺子、于是被当成同一件挡下」的告警门槛(见 accept)。门槛按【人的
+        // 动作】定,不按机器速度定:同一句提示在三台机器上说的是同一件事,才谈得上排障。
+        //  · 800ms:人把 A 拿开再举 B 的物理下限。
+        //  · 2 次采样:只挡「一帧没解出来」这种单点噪声。别按 clearAfterMisses 的比例取 ——
+        //    一次采样 400ms 的老机器上 6 次就是 2.4 秒,它的静默区(0~5s)于是有一半照不到,
+        //    而那台机器恰恰是静默丢货最凶的。真正定门槛的是墙钟,采样数只兜最退化的情形。
+        // 误报是明码标价买来的:p=0.5 抖动素材上举着不动,一次没解出的最长空档实测原生 ≤598ms
+        // (零误报)、店里那台 ≤1185ms、老机器 ≤4255ms —— 后两台会喊。买到的是它们的静默区
+        // (1.8s / 5.0s)不再一声不吭。误报的话术是条件句(「若是第二件…」),而且调用方按码
+        // 只留一行:一次持握最多摊上一行,店员点掉就是了。
+        // 门槛底下那一段仍然一声不吭,宽度同一份报告里量过:真空档 ≤400ms(店里那台)、
+        // ≤600ms(原生 / 老机器)—— 人把 A 拿开再举 B 快不到那个份上。反过来说,这两个数
+        // 只要往上调,静默区就爬进人手够得到的区间了。
+        dupNoticeMs: 800,
+        dupNoticeMisses: 2,
+        // 拿到 stream 之后到画面真的出帧的超时,包住 play()(为什么必须包住:见 cameraReady)。
         startTimeoutMs: 8000,
-        // getUserMedia 本身的兜底超时。权限弹窗是人在操作,给足 30s;超过就是卡住了,
-        // 不能让调用方永远停在「正在打开相机」。
+        // 权限弹窗是人在操作,给足 30s;再久就是卡住了,不能永远停在「正在打开相机」。
         grantTimeoutMs: 30000,
-        // 解码器(dist/zxing.js ~340KB)下载的超时。跟相机那 8s 分开:泰国移动网络上光下载
-        // 就可能好几秒,用相机的尺子量它会把「网慢」误判成「相机坏」。
+        // 解码器(dist/zxing.js ~340KB)下载超时,跟相机那 8s 分开:泰国移动网络上光下载就好
+        // 几秒,合用一把尺子会把「网慢」误判成「相机坏」。
         decoderTimeoutMs: 20000,
     };
-
-    var ERROR_KEYS = {
-        insecure_context: 'bscan.err.insecure',
-        no_camera_api: 'bscan.err.unsupported',
-        permission_denied: 'bscan.err.permission',
-        no_camera: 'bscan.err.no_camera',
-        camera_busy: 'bscan.err.busy',
-        timeout: 'bscan.err.timeout',
-        decoder_unavailable: 'bscan.err.decoder',
-        unknown: 'bscan.err.unknown',
-    };
-
-    // 重试有意义的档:超时/被占用/解码器没拉下来都可能下一次就好了。
-    // 没有摄像头、非 HTTPS、权限被拒(要去系统设置改)重试一万次也一样。
-    var RETRYABLE = { timeout: 1, camera_busy: 1, decoder_unavailable: 1 };
-
-    // getUserMedia 的 DOMException 名字 → 我们的错误码。分档的意义在于话术不同:
-    // 权限被拒要教怎么开权限,设备被占用要说关掉别的应用,没有摄像头只能改手输。
-    // 表里的旧名(PermissionDeniedError / DevicesNotFoundError / TrackStartError)是老 WebRTC
-    // 时代的叫法,安卓上仍有厂商浏览器在发。NotSupportedError 是策略/系统层把摄像头关了
-    // (真 Chromium 拒权限实测发的就是它),对用户等于「这台机器扫不了」。
-    var MEDIA_ERRORS = {
-        NotAllowedError: 'permission_denied',
-        PermissionDeniedError: 'permission_denied',
-        SecurityError: 'permission_denied',
-        NotFoundError: 'no_camera',
-        DevicesNotFoundError: 'no_camera',
-        OverconstrainedError: 'no_camera',
-        NotSupportedError: 'no_camera_api',
-        NotReadableError: 'camera_busy',
-        TrackStartError: 'camera_busy',
-        AbortError: 'camera_busy',
-    };
-
-    // 认不出的 DOMException 一律 unknown,但原名会进 detail —— 线上真冒出新名字时,
-    // 日志里看得见「该给它单独一档了」,而不是无声吞掉。
-    function mediaErrorCode(err) {
-        return MEDIA_ERRORS[err && err.name] || 'unknown';
-    }
-
-    function scanError(code, cause) {
-        var known = ERROR_KEYS[code] ? code : 'unknown';
-        var detail = cause && (cause.name || cause.message);
-        return {
-            code: known,
-            messageKey: ERROR_KEYS[known],
-            retryable: !!RETRYABLE[known],
-            detail: detail ? String(detail) : '',
-        };
-    }
-
-    // 「这个异常已经是我们自己的 scanError 了吗」。必须连 ERROR_KEYS 一起验:光看有没有
-    // .code 会被 DOMException 骗过去 —— 它带一个数字型 legacy code(NotFoundError=8、
-    // SecurityError=18、AbortError=20),真机上「没有摄像头」会因此绕过分档掉进 unknown,
-    // 店员看到的是一句最没用的通用报错。NotAllowedError 的 legacy code 恰好是 0,所以只测
-    // 「权限被拒」时一切正常 —— 这个坑靠单测一档一档验才照得出来。
-    function isScanError(e) {
-        return !!(e && typeof e.code === 'string' && ERROR_KEYS[e.code]);
-    }
-
-    function withTimeout(promise, ms, code) {
-        return new Promise(function (resolve, reject) {
-            var timer = setTimeout(function () {
-                reject(scanError(code));
-            }, ms);
-            promise.then(
-                function (v) {
-                    clearTimeout(timer);
-                    resolve(v);
-                },
-                function (e) {
-                    clearTimeout(timer);
-                    reject(e);
-                }
-            );
-        });
-    }
 
     // 原生 BarcodeDetector 对不认识的格式名会直接抛,所以先跟它自报的支持集求交集。
     function nativeDetector() {
@@ -163,8 +115,7 @@
         );
     }
 
-    // 原生优先:安卓 Chrome 上它跑在 native 里,比 ZXing 的 JS 解码省一大截电。
-    // 原生存在但建不起来(格式全不支持等)时仍回落 ZXing,别让用户卡死在这。
+    // 原生优先(安卓 Chrome 上跑在 native 里,比 ZXing 省一大截电);建不起来时仍回落 ZXing,别卡死。
     function makeDetector() {
         if ('BarcodeDetector' in root) {
             return nativeDetector().catch(function () {
@@ -187,8 +138,7 @@
         return video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0;
     }
 
-    // cancelled() 为真时直接 resolve —— 用户按了取消,后续 .then 会按 token 短路,
-    // 不该因为超时把一个「用户主动关掉」变成错误卡。超时由调用点统一加(见 start)。
+    // cancelled() 为真直接 resolve:用户主动关掉不该被超时变成错误卡;超时由调用点统一加(见 start)。
     function waitFrames(video, intervalMs, cancelled) {
         return new Promise(function (resolve) {
             (function poll() {
@@ -225,17 +175,18 @@
         var ownsVideo = !o.video;
         var video = o.video || makeVideo(o.container);
         var canvas = doc.createElement('canvas');
-        // 两条解码路都要把 canvas 的像素读回 JS(ZXing 走 getImageData,原生走 ImageBitmap),
-        // 不声明 willReadFrequently 的话 Chrome 会把它当 GPU 纹理用,每帧回读都要同步等 GPU。
+        // 两条解码路都要把 canvas 像素读回 JS,不声明 willReadFrequently 的话 Chrome 当它 GPU 纹理用,每帧回读同步等 GPU。
         var ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         var stream = null;
+        var watch = null; // 轨道生死看门人(scan-errors.js 的 watchTracks)· 拿到 stream 才有
         var detector = null;
         var timer = null;
         var decoding = false; // 互斥:上一帧还没解完就不排下一帧,防两次扫码打架
         var state = 'idle';
-        // 当前认为「还在画面里」的码:code → { at: 最后一次解出它的时刻 }
+        // 「还在画面里」的码:code → { at: 最后一次解出它的时刻, missed: 之后连着几次采样没见它 }
         var seen = Object.create(null);
+        var probing = false; // 有跟踪中的码上一拍没解出来 → 下一拍别空等(见 schedule)
         var destroyed = false;
         var runToken = 0; // start/stop 交错时用它废掉上一轮的异步尾巴
 
@@ -256,6 +207,9 @@
             }
             // 画面没了就没有「还在画面里」的码;不清空,重开一轮时第一次扫会被当成重复丢掉。
             seen = Object.create(null);
+            probing = false;
+            if (watch) watch.release();
+            watch = null;
             if (stream) {
                 stopTracks(stream);
                 stream = null;
@@ -268,14 +222,12 @@
             if (translate) e.message = translate(e.messageKey);
             releaseCamera();
             setState('error');
-            // 只 console.error 就等于用户什么都看不到(Odoo 的原病)。onError 是硬要求,
-            // 调用方真没给就退回控制台,至少留下痕迹。
+            // 只 console.error 就等于用户什么都看不到(Odoo 的原病);onError 是硬要求,没给才退控制台。
             if (o.onError) o.onError(e);
             else console.error('scan-camera', e.code, e.detail);
         }
 
-        // 取景框那块像素画进 canvas。原生与 ZXing 两条路解的都是这一块,
-        // 屏幕上画的框只要跟 cropRatio 对上,「框里」就名副其实。
+        // 取景框那块像素画进 canvas:两条解码路解的都是这一块,屏上的框跟 cropRatio 对上就名副其实。
         function drawCrop() {
             var w = Math.max(1, Math.round(video.videoWidth * cfg.cropRatio.width));
             var h = Math.max(1, Math.round(video.videoHeight * cfg.cropRatio.height));
@@ -286,54 +238,96 @@
             ctx.drawImage(video, x, y, w, h, 0, 0, w, h);
         }
 
-        // 「这是不是新的一次扫描」用时间节流答不了 —— 连扫模式下三种真实场景各错一种:
-        //  · 整箱货举在框里不动 6 秒:纯时间节流每过一个窗口就再计一次,店员一个动作没做,
-        //    客人被收五箱的钱;
-        //  · 两瓶真的一样的可乐连着扫:第二瓶落在窗口内,被当重复丢掉,少收一瓶;
-        //  · 一件货上贴两个码同时入框:只记「上一个码」的话每帧都被改写,节流全程失效。
-        // 判据改成「这个码有多久没再被解出来」,量墙钟不量帧数,两处都要紧:
-        //  · 帧不是墙钟。一帧【解不出】的开销随解码器差一个量级(实测:原生几毫秒,ZXing 回落
-        //    120ms),「4 帧」在两台机器上就是 0.5 秒和 1 秒两条不同的规则。
-        //  · 阈值必须远离抖动量级。解不出是常态(scan-zxing-shim.js:「每秒好几帧都这样」),
-        //    反光/曲面/对焦拉扯会连着几帧读不出而货没动过;阈值落进抖动量级,举一箱 ฿350
-        //    可乐等后端就被记成两三箱,且屏上不报错。
-        // 1200ms = 复现里最长一段抖动(480ms · 反光与对焦各一次)的 2.5 倍;而真换一件货
-        // (放下、拿起下一箱、重新对准)在手机上从来不止 1.2 秒。方向刻意偏「宁可少记」:多记是
-        // 客人多付钱且没人看得见,少记是屏上数量对不上,店员当场就补。Odoo 靠「扫中就关掉扫描器」
-        // 绕开整件事,那等于举着不动每停一次解码就再记一件 —— 我们做了连扫模式,绕不开。
+        // 「这是不是新的一次扫描」= 「这个码离开过取景框没有」。三种真实场景否掉了别的写法:举一箱
+        // 不动 6 秒(纯时间节流每过一个窗口就再收一次钱)、两瓶一样的可乐连着扫(第二瓶落在窗口内
+        // 被当重复丢掉)、一件货贴两个码同时入框(只记「上一个码」则每帧改写,节流全程失效)。难在
+        // 【拿什么量】—— 单独任何一把尺子都会被它要量的东西污染,所以要两把,AND:
+        //  · missed = 连着几次【采样】没解出它。一次采样记一次,不管这次采样花了 2ms 还是 400ms,
+        //    解码器再慢也推不动它。只量墙钟就栽在这:要数的正是「解不出的帧」,而 ZXing 每解不出
+        //    一帧就往墙钟里塞 114~121ms(本仓实测),失败采样周期 ≈240ms,连 5 帧就吃满 1200ms;
+        //    真浏览器实测(p=0.5、货全程没离开)一件可乐记成 2~3 件。
+        //  · at = 距最后一次解出它的墙钟毫秒。它同样会被解码耗时撑大,但在 AND 里撑大只让它更容易
+        //    点头,点不点头由 missed 兜着;它管另一头 —— 原生 BarcodeDetector 一帧几毫秒,半秒就
+        //    攒够 missed,一次扫过箱面的反光会被判成「货走了」。
+        // 两把尺子失效方向相反(墙钟被慢解码器撑大、采样数被快解码器缩水),AND 起来谁慢听谁的。
+        // 方向刻意偏「宁可少记」:多记是客人多付钱且没人看得见,少记是屏上数量对不上,店员当场就
+        // 补。Odoo 靠「扫中就关掉扫描器」绕开整件事,那等于举着不动每停一次解码就再记一件。
         function sweep(hits) {
             var now = Date.now();
+            var doubt = false;
             for (var code in seen) {
-                if (hits.indexOf(code) < 0 && now - seen[code].at >= cfg.clearAfterMs) {
+                if (hits.indexOf(code) >= 0) continue;
+                var e = seen[code];
+                e.missed += 1;
+                if (e.missed >= cfg.clearAfterMisses && now - e.at >= cfg.clearAfterMs) {
                     delete seen[code];
+                } else {
+                    doubt = true; // 悬而未决 → 下一拍走 probeIntervalMs 去补证据
                 }
             }
+            probing = doubt;
         }
 
+        // 被挡下的那一次必须说出去。上面两把尺子只把「别记成两件」这一侧量得很细,另一侧
+        // (同款第二件还认不认)是有代价的:AND 起来的地板实测 ≈1.6s(原生)/ ≈1.8s(店里那台)
+        // / ≈5.0s(老机器),地板以下拿走 A 再举 B 会一声不吭 —— 没震动、没查码、件数不动,
+        // 屏上跟成功扫码一模一样,顾客拿两件付一件的钱。
+        // 地板降不下来:1.2 秒的真空档跟 1.2 秒的反光在解码结果上是同一串「连着 N 次没解出」,
+        // 信息上就分不开。两条压地板的路都真跑过(R5_LOWFLOOR=1 那份报告,每条都配同机同素材
+        // 的对照组,不然多记赖不到门槛头上):
+        //  · 门槛压到 1.2s(clearAfterMs 1200 / clearAfterMisses 8):一次 1.2 秒的反光就被判成
+        //    「货走了」,一箱可乐记成 3 件(对照组不动门槛:1 件)。
+        //  · 给采样尺加「墙钟到点就放行」的封顶来砍老机器那 5 秒:封顶 ≈2.5s 时,老机器上一次
+        //    2.8 秒的糊把一次持握记成 2 件(对照组不封顶:1 件)。那台机器举着不动实测糊得出
+        //    3.0 秒的空档,任何低于它的封顶都是拿多记货去赌。
+        // 多记一件屏上小票上报表上全看不出来,所以这个方向宁可不动。
+        // 分不开就交给唯一分得开的人:够到告警门槛的那次压制报给调用方,店员当场点掉或补一件。
         function accept(code) {
             var now = Date.now();
             var e = seen[code];
             if (e) {
-                e.at = now; // last-seen:还在画面里 = 还是刚才那一次扫描
+                var gapMs = now - e.at; // 归零之前先取证据:这次压制是贴着地板还是刚扫完一秒
+                var misses = e.missed;
+                e.at = now; // 还在画面里 = 还是刚才那一次扫描,两把尺子一起归零
+                e.missed = 0;
+                // gapMs 是墙钟,含引擎自己解码烧掉的时间 —— 它比「画面真的糊了多久」系统性地
+                // 多出最多一次采样(店里那台 ≈135ms、老机器 ≈415ms)。方向是安全的(宁可早喊
+                // 一点也别漏),但调用方拿它做二次判断前得知道这条偏差。
+                if (o.onDuplicate && misses >= cfg.dupNoticeMisses && gapMs >= cfg.dupNoticeMs) {
+                    o.onDuplicate(code, { gapMs: gapMs, misses: misses });
+                }
                 return;
             }
-            seen[code] = { at: now };
+            seen[code] = { at: now, missed: 0 };
             if (root.navigator && typeof root.navigator.vibrate === 'function') {
                 root.navigator.vibrate(100);
             }
             if (o.onScan) o.onScan(code);
         }
 
+        // 相机被系统收走 = 这一轮到此为止。走 camera_busy 那一档:它说的就是「相机在别人手上,
+        // 处理掉再试」,而且已经标了可重试 —— 店员挂掉电话点「重试」就接着扫,不用关层重开。
+        // 事件与轮询两条路都进这里,后到的那条看见 stream 已是 null(fail 里已经收摊)直接退。
+        function lost(token) {
+            if (stale(token) || !stream || !watch || !watch.check()) return false;
+            fail(scanError('camera_busy'));
+            return true;
+        }
+
         function schedule(token) {
             if (stale(token) || !stream) return;
+            var wait = probing ? cfg.probeIntervalMs : cfg.intervalMs;
             timer = setTimeout(function () {
                 tick(token);
-            }, cfg.intervalMs);
+            }, wait);
         }
 
         function tick(token) {
             if (stale(token) || !stream || decoding) return;
+            if (lost(token)) return; // 死图照样满足 videoReady(),所以必须排在它前面
             if (!videoReady(video)) {
+                // 没像素就采不到样,催也是空转;码留在 seen 里 —— 没证据不判它走,「卡住」≠「走了」。
+                probing = false;
                 schedule(token);
                 return;
             }
@@ -383,14 +377,19 @@
                         return null;
                     }
                     stream = s;
+                    // 轨道自己死掉不在 start/stop/destroy/onError 这四条路里 —— 没人盯着它,
+                    // 相机被收走之后屏上会一直说在扫(见 scan-errors.js 的 watchTracks)。
+                    watch = shell.watchTracks(s, function () {
+                        lost(token);
+                    });
                     video.srcObject = s;
                     return s;
                 },
                 function (e) {
-                    // 超时报出去之后用户仍可能点「允许」:那条 MediaStream 会在没人认领的情况下
-                    // 兑现 —— stream 变量还是 null,releaseCamera() 无从下手,相机灯亮到关页面,
-                    // 重试还会被自己占住的相机顶成 NotReadableError(而那档话术说的是「被别的
-                    // 应用占着」,把人指到错的地方)。迟到的兑现照样得收。
+                    // 超时报出去之后用户仍可能点「允许」:那条 MediaStream 会在没人认领的情况下兑现
+                    // —— stream 变量还是 null,releaseCamera() 无从下手,相机灯亮到关页面,重试还会
+                    // 被自己占住的相机顶成 NotReadableError(那档话术说的是「被别的应用占着」,把人
+                    // 指到错的地方)。迟到的兑现照样得收。
                     granted.then(stopTracks, function () {});
                     throw isScanError(e) ? e : scanError(mediaErrorCode(e), e);
                 }
@@ -426,8 +425,7 @@
             return openStream(token)
                 .then(function (s) {
                     if (!s) return false;
-                    // 相机预热与解码器下载并行:两件事互不依赖,串起来只是白等。
-                    // 各用自己的超时尺子(见 DEFAULTS 注释),超时话术才不会答非所问。
+                    // 相机预热与解码器下载并行(互不依赖),各用自己的超时尺子,话术才不会答非所问。
                     return Promise.all([
                         withTimeout(cameraReady(token), cfg.startTimeoutMs, 'timeout'),
                         withTimeout(makeDetector(), cfg.decoderTimeoutMs, 'decoder_unavailable'),
@@ -472,18 +470,20 @@
             state: function () {
                 return state;
             },
-            // 屏上取景框的唯一事实源:宽高按它现算,CSS 里别再写第二份 —— 两处一漂就是
-            // 「框里明明对准了却读不出」,而这种病不报任何错,只会被当成「扫码不好使」。
+            // 屏上取景框的唯一事实源,CSS 里别写第二份 —— 两处一漂就是「对准了却读不出」,
+            // 而这种病不报任何错,只会被当成「扫码不好使」。
             cropRatio: function () {
                 return { width: cfg.cropRatio.width, height: cfg.cropRatio.height };
             },
         };
     }
 
+    // 错误分档那几样原样转出去:调用方(POS / 主站 SPA / 单测)一直只认 PearnlyScanCamera
+    // 这一个名字,拆文件是内部事,不该逼它们改引用。
     var api = {
         create: create,
         FORMATS: RETAIL_FORMATS,
-        ERROR_KEYS: ERROR_KEYS,
+        ERROR_KEYS: shell.ERROR_KEYS,
         scanError: scanError,
         mediaErrorCode: mediaErrorCode,
         isScanError: isScanError,

@@ -1,0 +1,217 @@
+{
+  "c1_payModalScanSpeaksUp": {
+    "ok": true,
+    "staleToastShownBeforeScan": false,
+    "staleToastText": "เพิ่มแล้ว โค้ก",
+    "burst": {
+      "n": 14,
+      "stampMax": 17.4,
+      "perfMax": 17.3
+    },
+    "toast": {
+      "shown": true,
+      "error": true,
+      "opacity": 1,
+      "pointerEvents": "none",
+      "text": "มีหน้าต่างเปิดอยู่ · 8850999320014 ไม่ได้เข้าตะกร้า",
+      "rect": {
+        "x": 458.03125,
+        "y": 24,
+        "w": 363.9375,
+        "h": 46
+      }
+    },
+    "wantText": "มีหน้าต่างเปิดอยู่ · 8850999320014 ไม่ได้เข้าตะกร้า",
+    "rows": [
+      {
+        "code": "8850999320014",
+        "text": "มีหน้าต่างเปิดอยู่ · 8850999320014 ไม่ได้เข้าตะกร้าปิดหน้าต่างนี้แล้วสแกนใหม่อีกครั้ง"
+      }
+    ],
+    "askedDuringModal": [],
+    "sceneBefore": {
+      "payShown": true,
+      "due": "15.00",
+      "grand": "15.00",
+      "qtys": [
+        "1"
+      ],
+      "dueBox": {
+        "x": 605.71875,
+        "y": 209.5,
+        "w": 93.828125,
+        "h": 51
+      },
+      "modalBox": {
+        "x": 410,
+        "y": 105.5,
+        "w": 460,
+        "h": 689
+      },
+      "confirmBox": {
+        "x": 432,
+        "y": 718.5,
+        "w": 416,
+        "h": 54
+      },
+      "focus": "BUTTON#cart-pay-btn"
+    },
+    "sceneAfter": {
+      "payShown": true,
+      "due": "15.00",
+      "grand": "15.00",
+      "qtys": [
+        "1"
+      ],
+      "dueBox": {
+        "x": 605.71875,
+        "y": 209.5,
+        "w": 93.828125,
+        "h": 51
+      },
+      "modalBox": {
+        "x": 410,
+        "y": 105.5,
+        "w": 460,
+        "h": 689
+      },
+      "confirmBox": {
+        "x": 432,
+        "y": 718.5,
+        "w": 416,
+        "h": 54
+      },
+      "focus": "BUTTON#cart-pay-btn"
+    },
+    "overlapPx": {
+      "due": 0,
+      "modal": 0,
+      "confirm": 0
+    },
+    "why": ""
+  },
+  "c2_listNeverBlocksPay": {
+    "ok": true,
+    "seededRows": [
+      {
+        "code": "8850111000039",
+        "text": "ไม่มีสินค้าที่ใช้บาร์โค้ด 8850111000039ให้เจ้าของเพิ่มสินค้าในระบบหลังร้าน (สินค้า → เพิ่มสินค้า) แล้วใส่บาร์โค้ดนี้ในช่อง \"บาร์โค้ด\" ครั้งต่อไปสแกนขายได้เลยค้นหาสินค้าด้วยรหัสนี้"
+      }
+    ],
+    "modalHits": {
+      "points": 36,
+      "stolen": 0
+    },
+    "closeHits": {
+      "points": 9,
+      "stolen": 0
+    },
+    "confirmHits": {
+      "points": 9,
+      "stolen": 0
+    },
+    "closeClicked": true,
+    "rowsAfter": [
+      {
+        "code": "8850111000039",
+        "text": "ไม่มีสินค้าที่ใช้บาร์โค้ด 8850111000039ให้เจ้าของเพิ่มสินค้าในระบบหลังร้าน (สินค้า → เพิ่มสินค้า) แล้วใส่บาร์โค้ดนี้ในช่อง \"บาร์โค้ด\" ครั้งต่อไปสแกนขายได้เลยค้นหาสินค้าด้วยรหัสนี้"
+      }
+    ],
+    "why": ""
+  },
+  "c3_rescanAfterCloseAddsOnce": {
+    "ok": true,
+    "blockedRows": [
+      {
+        "code": "8850999320014",
+        "text": "มีหน้าต่างเปิดอยู่ · 8850999320014 ไม่ได้เข้าตะกร้าปิดหน้าต่างนี้แล้วสแกนใหม่อีกครั้ง"
+      }
+    ],
+    "askedOnRescan": [
+      "8850999320014"
+    ],
+    "qtysAfter": [
+      "2"
+    ],
+    "rowsAfter": [],
+    "why": ""
+  },
+  "c4_typedBurstSpeaksUp": {
+    "ok": true,
+    "ruler": {
+      "n": 14,
+      "stampMax": 117.3,
+      "perfMax": 117.2
+    },
+    "inHandBand": true,
+    "toast": {
+      "shown": true,
+      "error": true,
+      "opacity": 1,
+      "pointerEvents": "none",
+      "text": "ถือว่าพิมพ์ด้วยมือ · 8850999320014 ไม่ได้อ่านเป็นบาร์โค้ด",
+      "rect": {
+        "x": 438.015625,
+        "y": 24,
+        "w": 403.96875,
+        "h": 46
+      }
+    },
+    "wantText": "ถือว่าพิมพ์ด้วยมือ · 8850999320014 ไม่ได้อ่านเป็นบาร์โค้ด",
+    "rows": [
+      {
+        "code": "8850999320014",
+        "text": "ถือว่าพิมพ์ด้วยมือ · 8850999320014 ไม่ได้อ่านเป็นบาร์โค้ดถ้ายิงจากเครื่องสแกน ให้ยิงอีกครั้ง"
+      }
+    ],
+    "askedDuringTyping": [],
+    "searchBoxKept": "8850999320014",
+    "shortBurst": {
+      "toastShown": false,
+      "rowsBefore": 1,
+      "rowsAfterShort": [
+        {
+          "code": "8850999320014",
+          "text": "ถือว่าพิมพ์ด้วยมือ · 8850999320014 ไม่ได้อ่านเป็นบาร์โค้ดถ้ายิงจากเครื่องสแกน ให้ยิงอีกครั้ง"
+        }
+      ]
+    },
+    "why": ""
+  },
+  "c5_notAddedLooksNothingLikeAdded": {
+    "ok": true,
+    "staleToastShownBetween": {
+      "beforeErr": false,
+      "beforeBack": false
+    },
+    "added": {
+      "icon": {
+        "d": "M20 6L9 17l-5-5",
+        "stroke": "rgb(52, 211, 153)",
+        "bg": "rgb(17, 24, 39)"
+      },
+      "text": "เพิ่มแล้ว โค้ก",
+      "error": false
+    },
+    "notAdded": {
+      "icon": {
+        "d": "M6 6l12 12M18 6L6 18",
+        "stroke": "rgb(252, 165, 165)",
+        "bg": "rgb(127, 29, 29)"
+      },
+      "text": "มีหน้าต่างเปิดอยู่ · 8850999320014 ไม่ได้เข้าตะกร้า",
+      "error": true
+    },
+    "addedAgain": {
+      "icon": {
+        "d": "M20 6L9 17l-5-5",
+        "stroke": "rgb(52, 211, 153)",
+        "bg": "rgb(17, 24, 39)"
+      },
+      "text": "เพิ่มแล้ว โค้ก",
+      "error": false
+    },
+    "rowsAfter": [],
+    "why": ""
+  }
+}

@@ -166,16 +166,39 @@ npx playwright show-report
 ## 5. 视觉照搬机械闸(test_design_fidelity.spec.js · docs/pos/12)
 
 与上面的 screenshot 回归不同:这是 **令牌级照搬闸** —— 把【设计稿快照】与【生产页本地渲染】的关键
-元素 `getComputedStyle` 逐项比对(主色 #2563EB / 圆角 / box-shadow / font-size / 容器左对齐),
+元素 `getComputedStyle` 逐项比对(主色 Purple v2 #7C4DFF / 圆角 / box-shadow / font-size / 容器左对齐),
 不一致 = 退出码 1 + 打印"哪页/哪选择器/稿 X 生产 Y"。治"施工不照搬设计稿反复返工"。
 
 **自洽**:内置静态服务器伺服 repo + Playwright stub 所有 `/api/**`,渲染本地真 bundle,**无需真账号/
 真后端**。设计稿快照入库在 `tests/visual/design/*.html`(不依赖桌面 · CI 也能跑)。
 
-**跑法**:`node tests/visual/test_design_fidelity.spec.js`
+**跑法**:`node tests/visual/test_design_fidelity.spec.js`(加 `--list` 看基准过期检测的逐页清单)
 
-**挂在哪**:pre-push(改 `static/pos/**` 或 `src/home/{pos,inventory,purchase}-*` 或 `tests/visual/design/*`
-触发)。红了就是没照搬,自己回去对齐,不用肉眼抓。
+**挂在哪**:CI 的 test job **每次无条件跑**,外加 pre-push 按路径触发(改 `static/pos/**` 或
+`src/home/{pos,inventory,purchase}-*` 或 `tests/visual/design/*`)。红了就是没照搬,自己回去对齐,不用肉眼抓。
+2026-07-31 之前只有 pre-push 那条路径触发,而 MAPPINGS 管着 20 条 route —— dashboard 的选择器
+6-28 就烂了,直到有人碰巧改了 `purchase-settings.ts` 才撞出来,中间三周零报警,所以进了 CI。
+
+### 5b. 基准过期检测(第二把尺 · design-freshness.js)
+
+尺子自己也会旧:`pur-settings.html` 里那面费用科目 chip 墙,生产 `0f5a5fad`(7-07)就搬去
+「商品 › 费用数据」删光了,基准原样留了三周 —— 主闸只比 MAPPINGS 点名的那几个选择器,点不到
+的地方烂了没人知道,而人改页时是照着基准改的。
+
+**判据**(窄射程 · 宁可漏不误报):基准 `<body>` 用到的某个 class,只有在「生产该页容器渲染出的
+DOM 里没有」**且**「生产文档加载的所有样式表里也没有任何规则提到它」时才判过期。只满足前一条不算
+—— 那多半是 stub 只渲染到一态。
+
+**红了怎么办**(二选一,别第三种):
+
+- 生产真删了这块 → **改基准**,按生产实况重画那一段(pur-settings 就是这么修的:chip 墙换成
+  生产实际那行「去费用数据 →」跳转)。
+- 是设计稿的装饰件/说明水印,或稿画了而闸根本不比的外壳区 → 登记进
+  `tests/visual/design/_freshness-allow.json` 并**写清理由**(逐条,理由太短会被
+  `tests/unit/test_design_freshness_frontend.py` 拦)。登记的条目在 `--list` 里逐条打印,不静默跳过。
+
+登记表里已经不再是孤儿的条目也报红(逼人删掉失效登记),防这张表烂成免死金牌。
+闸每次跑先自检:往第一份基准里塞一个毒 class,必须只逮住它 —— 逮不着说明尺子瞎了,后面全绿不算数。
 
 **加新照搬页怎么补映射**(3 步 · 无隐藏步骤):
 1. 把设计稿拷进 `tests/visual/design/<短名>.html`(设计稿改版也更新这份)。

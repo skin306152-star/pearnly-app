@@ -17,10 +17,21 @@
 
     // 判据人话:narrative_key 有值走 i18n 模板,否则诚实回退 flag_reason 原文(verdict.py
     // 顶注约定 + ai-review-verdict.js narrativeOf)。
+    // params.error_code 是 OCR 异常的类型名(Layer1AuthError 这类):内部标识不进句子,
+    // 压成同排的可复制小字交给排障(形状与管家任务卡共用 AI.state.codeChipHtml)。
     function narrativeHtml(item) {
         var n = AI.reviewVerdict.narrativeOf(item.verdict_hint, item.flag_reason);
         var text = n.key ? at(n.key, n.vars) : n.fallbackText;
-        return '<p class="riq-narrative">' + esc(text) + '</p>';
+        var code = n.vars && n.vars.error_code;
+        var codeHtml = code
+            ? AI.state.codeChipHtml({
+                  cls: 'riq-code',
+                  code: code,
+                  action: 'riq-copy-code',
+                  copyLabel: at('riq_code_copy'),
+              })
+            : '';
+        return '<p class="riq-narrative">' + esc(text) + codeHtml + '</p>';
     }
 
     function confidenceChipHtml(item) {

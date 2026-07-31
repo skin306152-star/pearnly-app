@@ -124,6 +124,27 @@
             .join('');
     }
 
+    // 机器码那一行:码是会计转给我们排障用的那串东西,她自己看不懂也用不上 —— 所以它
+    // 只以最低存在感出现,同排的复制按钮才是可点的那一半(10.5px 灰字在手机上既选不中
+    // 也复制不走)。管家任务卡与异常裁决卡共用这一份,别各拼一套。
+    // cls/action 由调用方给(两处各有自己的样式作用域与事件委托前缀),labels 已翻译好。
+    function codeChipHtml(opts) {
+        opts = opts || {};
+        return (
+            '<span class="' +
+            esc(opts.cls) +
+            '"><code>' +
+            esc(opts.code) +
+            '</code><button type="button" class="btn sm" data-action="' +
+            esc(opts.action) +
+            '" data-code="' +
+            esc(opts.code) +
+            '">' +
+            esc(opts.copyLabel) +
+            '</button></span>'
+        );
+    }
+
     var api = {
         loadingHtml: loadingHtml,
         emptyHtml: function (opts) {
@@ -136,6 +157,7 @@
         sectionEmptyHtml: sectionEmptyHtml,
         esc: esc,
         optionsHtml: optionsHtml,
+        codeChipHtml: codeChipHtml,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

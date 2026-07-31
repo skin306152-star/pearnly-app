@@ -98,10 +98,24 @@ class ColonSuffixTests(unittest.TestCase):
         self.assertEqual(h["confidence"], verdict.HIGH)  # 指纹精确命中
         self.assertEqual(h["params"]["of"], "IMG_2640.jpg")
 
-    def test_ocr_error_carries_exception_name(self):
-        h = verdict.hint(flag_reason="ocr_error:TimeoutError")
+    def test_ocr_error_keeps_exception_name_out_of_the_sentence(self):
+        """异常类型名只作排障用:走 error_code(前端压成可复制小字),不再有 {error} 槽 ——
+        「OCR 识别失败:Layer1AuthError」印给会计,她会以为出了另一种事故。"""
+        h = verdict.hint(flag_reason="ocr_error:Layer1AuthError")
         self.assertEqual(h["narrative_key"], "verdict_ocr_error")
-        self.assertEqual(h["params"]["error"], "TimeoutError")
+        self.assertEqual(h["params"], {"error_code": "Layer1AuthError"})
+        self.assertNotIn("error", h["params"])
+
+    def test_ocr_quota_has_its_own_narrative(self):
+        """撞配额没读、没扣钱、续跑自动重试,会计无事可裁 —— 不能混进「读失败」。"""
+        h = verdict.hint(flag_reason="ocr_error:quota")
+        self.assertEqual(h["narrative_key"], "verdict_ocr_error_quota")
+        self.assertEqual(h["params"], {})
+
+    def test_ocr_error_without_tail_gives_no_code(self):
+        h = verdict.hint(flag_reason="ocr_error")
+        self.assertEqual(h["narrative_key"], "verdict_ocr_error")
+        self.assertIsNone(h["params"]["error_code"])
 
 
 class SeverityPolicyTests(unittest.TestCase):

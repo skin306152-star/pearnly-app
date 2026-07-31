@@ -4,6 +4,7 @@
 /* global escapeHtml, showConfirm */
 import { S, _buyerState, _buyerSelected } from './clients-store.js';
 import { apiClient, getActiveColor } from './clients-helpers.js';
+import { listErrorHtml } from './list-error-state.js';
 import { BAHT } from './money.js';
 
 type Client = {
@@ -29,9 +30,13 @@ async function loadClientsCache() {
     try {
         const data = await apiClient('/api/clients');
         S.clients = data.clients || [];
+        S.clientsFailed = false;
         window._clientsCache = S.clients as { [key: string]: unknown; id?: unknown }[];
     } catch (e) {
         console.error('loadClientsCache fail', e);
+        // 取数失败要留痕:清成 [] 之后渲染层只看得见「长度 0」,会照空态渲染成
+        // 「还没有客户」——后端 500 被说成「你没有客户」(状态诚实红线)。
+        S.clientsFailed = true;
         S.clients = [];
     }
     // v118.21.0 · 通知异常栏客户下拉刷新
@@ -133,6 +138,17 @@ function _buyerPageItems() {
 function renderBuyerList() {
     const tb = document.getElementById('buyer-tbody');
     if (!tb) return;
+    if (S.clientsFailed) {
+        tb.innerHTML = listErrorHtml('clients-error-title', 'data-buyer-retry');
+        // 页码/翻页键跟着停:失败态下「1–12 / 0」是在替后端编一个总数。
+        const pi = document.getElementById('buyer-pager-info');
+        if (pi) pi.textContent = '';
+        for (const id of ['buyer-prev', 'buyer-next']) {
+            const b = document.getElementById(id) as HTMLButtonElement | null;
+            if (b) b.disabled = true;
+        }
+        return;
+    }
     const { items, start, ps, total, maxPage } = _buyerPageItems();
     if (!total) {
         tb.innerHTML = `<div class="cust-empty">${escapeHtml(t(_buyerState.keyword ? 'cust-no-match' : 'clients-empty'))}</div>`;

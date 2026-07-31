@@ -133,6 +133,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const buyerTbody = document.getElementById('buyer-tbody');
     if (buyerTbody) {
         buyerTbody.addEventListener('click', (e) => {
+            // 取数失败态里那颗重试(listErrorHtml 渲染的),排在所有行内动作之前
+            if ((e.target as HTMLElement).closest('[data-buyer-retry]')) {
+                loadClientsCache().then(renderBuyerList);
+                return;
+            }
             const cb = (e.target as HTMLElement).closest(
                 '.buyer-row-check'
             ) as HTMLInputElement | null;
@@ -236,6 +241,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const sellerTbody = document.getElementById('seller-tbody');
     if (sellerTbody) {
         sellerTbody.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).closest('[data-seller-retry]')) {
+                loadSellerCache().then(renderSellerList);
+                return;
+            }
             const btn = (e.target as HTMLElement).closest('[data-saction]') as HTMLElement | null;
             if (!btn) return;
             e.stopPropagation();

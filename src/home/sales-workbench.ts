@@ -3,6 +3,7 @@
 // 视觉照桌面样稿 Pearnly开票UI预览/app.html vInv;令牌复用 home-39-sales.css。
 /* global t, escapeHtml, apiGet, showToast, routeTo */
 import { type SalesDoc, docTypeLabel, fmtMoney, fmtDate } from './sales-common.js';
+import { BAHT } from './money.js';
 
 const ICON_INV =
     '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>';
@@ -90,9 +91,9 @@ function listInnerHtml(): string {
     const empty = !docs.length;
     return `<div class="sx-cards">
         <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-month'))}</div><div class="sx-v">${s.count} <small>${escapeHtml(t('sx-unit-docs'))}</small></div></div>
-        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-amount'))}</div><div class="sx-v">฿ ${fmtMoney(s.amount)}</div></div>
+        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-amount'))}</div><div class="sx-v">${BAHT}${fmtMoney(s.amount)}</div></div>
         <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-draft'))}</div><div class="sx-v">${s.drafts}</div></div>
-        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-due'))}</div><div class="sx-v warn">฿ ${fmtMoney(s.due)}</div></div>
+        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-due'))}</div><div class="sx-v warn">${BAHT}${fmtMoney(s.due)}</div></div>
     </div>
     <div class="sx-toolbar">
         <div class="sx-seg">${seg}</div>

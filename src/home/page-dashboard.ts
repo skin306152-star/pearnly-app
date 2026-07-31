@@ -8,6 +8,8 @@
 // 余额卡 id(dash-kpi-balance-card / dash-kpi-balance / dash-kpi-balance-sub)被
 // dashboard.ts 依赖;充值弹窗经 window._openTopupModal(billing.ts)。静态文案走 data-i18n。
 // ============================================================
+import { BAHT } from './money.js';
+
 (function () {
     'use strict';
     const sec = document.getElementById('page-dashboard');
@@ -31,7 +33,7 @@
                     <div class="sub-card-bd">
                         <div class="sub-card-l" data-i18n="dash-kpi-balance">账户余额</div>
                         <div class="n sub-card-n" id="dash-kpi-balance">—</div>
-                        <div class="sub-card-hint" id="dash-kpi-balance-sub" data-i18n="topup-pricing-note">未订阅按量计费:每月前 200 张 ฿1.50/张 · 超出 ฿0.75/张;文档(Excel/Word/CSV)按字符量折算计费。</div>
+                        <div class="sub-card-hint" id="dash-kpi-balance-sub" data-i18n="topup-pricing-note">未订阅按量计费:每月前 200 张 ${BAHT}1.50/张 · 超出 ${BAHT}0.75/张;文档(Excel/Word/CSV)按字符量折算计费。</div>
                         <div class="sub-card-foot" id="dash-kpi-balance-foot" style="display:none">
                             <span class="sub-foot-hint" data-i18n="dash-balance-low-hint">余额不足时将影响超额扣费</span>
                             <button class="btn pri sub-topup-btn" id="dash-topup-btn" data-i18n="dash-topup">去充值</button>

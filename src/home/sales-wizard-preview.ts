@@ -3,6 +3,7 @@
 /* global escapeHtml */
 import { type WState, calc, money, bahtText, cnText, payApplicable } from './sales-wizard-calc.js';
 import { getSellers } from './sales-wizard-io.js';
+import { BAHT } from './money.js';
 
 // 印在票面的字段标签(th / en / zh · 不走 UI i18n · 跟随单据语言设置)
 const DOCL: Record<string, { th: string; en: string; zh: string }> = {
@@ -79,7 +80,7 @@ function invoiceHTML(st: WState, kind: 'original' | 'copy'): string {
         .join('');
     const payBox =
         payApplicable(st) && st.pay.status !== 'unpaid'
-            ? `<div class="sw-inv-pay"><b>${dl(st, 'paid')}:</b> ${METHODS_TH[st.pay.method] || st.pay.method} · ${fmtDate(st, st.pay.date)} · ${st.pay.status === 'partial' ? '฿ ' + money(+(st.pay.paidAmt || 0)) : '฿ ' + money(c.grand)}</div>`
+            ? `<div class="sw-inv-pay"><b>${dl(st, 'paid')}:</b> ${METHODS_TH[st.pay.method] || st.pay.method} · ${fmtDate(st, st.pay.date)} · ${st.pay.status === 'partial' ? BAHT + money(+(st.pay.paidAmt || 0)) : BAHT + money(c.grand)}</div>`
             : '';
     const words = st.docLang === 'th_zh' ? cnText(c.grand) : bahtText(c.grand);
     const isCopy = kind === 'copy';
@@ -109,7 +110,7 @@ function invoiceHTML(st: WState, kind: 'original' | 'copy'): string {
             <div class="sw-tr"><span>${dl(st, 'subtotal')}</span><span>${money(c.subAfter)}</span></div>
             <div class="sw-tr"><span>VAT ${st.vatRate}%</span><span>${money(c.vat)}</span></div>
             ${c.wht > 0 ? `<div class="sw-tr"><span>${dl(st, 'wht')}</span><span>-${money(c.wht)}</span></div>` : ''}
-            <div class="sw-tr g"><span>${dl(st, 'grand')}</span><span>฿ ${money(c.grand)}</span></div>
+            <div class="sw-tr g"><span>${dl(st, 'grand')}</span><span>${BAHT}${money(c.grand)}</span></div>
         </div>
         <div class="sw-inv-words"><b>${dl(st, 'words')}:</b> ${words}</div>
         ${payBox}

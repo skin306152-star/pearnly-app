@@ -12,6 +12,7 @@ import {
 import { getSellers, getProducts } from './sales-wizard-io.js';
 import { previewArea } from './sales-wizard-preview.js';
 import { wt, wpack, getWizardLang } from './sales-wizard-i18n.js';
+import { BAHT } from './money.js';
 
 export const ICO = {
     check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -135,7 +136,7 @@ export function step3(st: WState): string {
     const grid = products
         .map(
             (p, i) =>
-                `<div class="sw-pcard" data-add="${i}"><div class="sw-pimg" style="background:${PCOLORS[i % PCOLORS.length]}">${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="">` : ICO.box}</div><div class="sw-pn">${escapeHtml(pname(p))}</div><div class="sw-pp">฿${money(p.unit_price)}${p.vat_applicable ? '' : ` <span class="sw-muted" style="font-size:10px">${escapeHtml(wt('taxFree'))}</span>`}</div></div>`
+                `<div class="sw-pcard" data-add="${i}"><div class="sw-pimg" style="background:${PCOLORS[i % PCOLORS.length]}">${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="">` : ICO.box}</div><div class="sw-pn">${escapeHtml(pname(p))}</div><div class="sw-pp">${BAHT}${money(p.unit_price)}${p.vat_applicable ? '' : ` <span class="sw-muted" style="font-size:10px">${escapeHtml(wt('taxFree'))}</span>`}</div></div>`
         )
         .join('');
     const empty = products.length
@@ -150,7 +151,7 @@ export function step3(st: WState): string {
             <div class="sw-crow2"><div class="sw-cqty"><button data-q="${i}" data-d="-1">−</button><span>${l.qty}</span><button data-q="${i}" data-d="1">+</button></div>
               <div class="sw-cfield"><label>${escapeHtml(wt('linePrice'))}</label><input type="number" data-ln="${i}" data-f="price" value="${l.price}" min="0" step="0.01"></div>
               <div class="sw-cfield"><label>${escapeHtml(wt('lineDisc'))}</label><input type="number" data-ln="${i}" data-f="disc" value="${l.disc}" min="0" step="0.01"></div>
-              <span class="sw-amt">฿${money(Math.max(0, (+l.qty || 0) * (+l.price || 0) - (+l.disc || 0)))}</span></div>
+              <span class="sw-amt">${BAHT}${money(Math.max(0, (+l.qty || 0) * (+l.price || 0) - (+l.disc || 0)))}</span></div>
             ${l.custom ? `<label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:var(--ink-3);cursor:pointer"><input type="checkbox" style="width:auto" data-save="${i}" ${l.save ? 'checked' : ''}> ${escapeHtml(wt('saveCatalog'))}</label>` : ''}</div>`
               )
               .join('')
@@ -169,7 +170,7 @@ export function step3(st: WState): string {
                 ${c.hd > 0 ? `<div class="sw-tr disc"><span>${escapeHtml(wt('hdisc'))}</span><span class="v">-${money(c.hd)}</span></div>` : ''}
                 <div class="sw-tr"><span>${escapeHtml(wt('vat'))} ${st.vatRate}%</span><span class="v">${money(c.vat)}</span></div>
                 ${c.wht > 0 ? `<div class="sw-tr disc"><span>${escapeHtml(wt('whtL'))} ${st.whtRate}%</span><span class="v">-${money(c.wht)}</span></div>` : ''}
-                <div class="sw-tr grand"><span>${escapeHtml(wt('grand'))}</span><span class="v">฿ ${money(c.grand)}</span></div></div></div>
+                <div class="sw-tr grand"><span>${escapeHtml(wt('grand'))}</span><span class="v">${BAHT}${money(c.grand)}</span></div></div></div>
         </div></div>`;
 }
 
@@ -198,7 +199,7 @@ export function step4(st: WState): string {
                 ? `<div class="sw-row3">
             <div class="sw-field"><label>${escapeHtml(wt('payMethod'))}</label><select id="sw-pm">${methodOpts}</select></div>
             <div class="sw-field"><label>${escapeHtml(wt('payDate'))}</label><input type="date" id="sw-pdate" value="${p.date}"></div>
-            ${p.status === 'partial' ? `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="number" id="sw-paid" value="${p.paidAmt != null ? p.paidAmt : ''}" placeholder="${money(c.grand)}"></div>` : `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="text" value="฿ ${money(c.grand)}" disabled></div>`}</div>`
+            ${p.status === 'partial' ? `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="number" id="sw-paid" value="${p.paidAmt != null ? p.paidAmt : ''}" placeholder="${money(c.grand)}"></div>` : `<div class="sw-field"><label>${escapeHtml(wt('paidAmt'))}</label><input type="text" value="${BAHT}${money(c.grand)}" disabled></div>`}</div>`
                 : ''
         }
         ${dateBlock(st)}</div>`;

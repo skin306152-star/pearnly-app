@@ -12,6 +12,7 @@ import {
     salesErrMsg,
     IC_X,
 } from './sales-common.js';
+import { BAHT } from './money.js';
 
 const I = {
     x: IC_X,
@@ -83,7 +84,7 @@ function miniInvoice(d: SalesDoc): string {
             <div class="sx-tr"><span>${escapeHtml(t('sx-subtotal'))}</span><span>${fmtMoney(d.subtotal)}</span></div>
             <div class="sx-tr"><span>VAT ${fmtMoney(d.vat_rate)}%</span><span>${fmtMoney(d.vat_amount)}</span></div>
             ${Number(d.wht_amount || 0) ? `<div class="sx-tr"><span>WHT</span><span>-${fmtMoney(d.wht_amount)}</span></div>` : ''}
-            <div class="sx-tr g"><span>${escapeHtml(t('sx-grand'))}</span><span>฿ ${fmtMoney(d.grand_total)}</span></div>
+            <div class="sx-tr g"><span>${escapeHtml(t('sx-grand'))}</span><span>${BAHT}${fmtMoney(d.grand_total)}</span></div>
         </div>
     </div>`;
 }
@@ -162,7 +163,7 @@ async function promptpay(d: SalesDoc) {
                 <button class="modal-close" id="sx-pp-close">${I.x}</button></div>
             <div class="modal-body" style="text-align:center">
                 <div class="sx-qr"><img src="${url}" alt="PromptPay QR"></div>
-                <div style="font-weight:700;font-size:16px">฿ ${fmtMoney(due)}</div>
+                <div style="font-weight:700;font-size:16px">${BAHT}${fmtMoney(due)}</div>
                 <div style="color:var(--ink-3);font-size:12px;margin-top:4px">${escapeHtml(t('sx-pp-scan'))}</div>
             </div></div>`;
         actionMask().style.display = 'flex';

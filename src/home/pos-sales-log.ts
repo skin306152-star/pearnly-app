@@ -5,6 +5,7 @@
 // view 级权限(同销售报表 pos.report.view,非"收款设置"那类老板专属改配置)。四态齐。
 /* global t, token, showToast, escapeHtml */
 import { activeWsId, posErrMsg, fmtQty } from './inventory-common';
+import { BAHT } from './money.js';
 
 interface LogItem {
     id: string;
@@ -187,7 +188,7 @@ function rowHtml(item: LogItem): string {
         <td>${escapeHtml(item.cashier_name || '—')}</td>
         <td>${escapeHtml(item.items)}</td>
         <td class="num">${escapeHtml(fmtQty(item.qty_total))}</td>
-        <td class="num">฿${bahtInt(item.grand_total)}</td>
+        <td class="num">${BAHT}${bahtInt(item.grand_total)}</td>
         <td>${escapeHtml(item.method)}</td>
         <td>${escapeHtml(shiftLabel(item))}</td>
     </tr>`;
@@ -200,7 +201,7 @@ function groupHtml(g: DayGroup): string {
         <svg class="chev" viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 5l6 5-6 5"/></svg>
         <span class="d">${escapeHtml(g.date)}</span>
         <span class="n">${escapeHtml(t('poslog.group_count', { n: String(g.rows.length) }))}</span>
-        <span class="t">${escapeHtml(t('poslog.group_total'))} ฿${bahtInt(g.total)}</span>
+        <span class="t">${escapeHtml(t('poslog.group_total'))} ${BAHT}${bahtInt(g.total)}</span>
     </div>
     <div class="grp-body"${open ? '' : ' style="display:none;"'}>
         <table><thead><tr>

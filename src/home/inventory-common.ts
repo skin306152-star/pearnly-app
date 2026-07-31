@@ -3,6 +3,8 @@
 // 接真接口 /api/inventory/*(PO-A3 · routes/inventory_routes.py)· 全部端点要 workspace_client_id(按账套隔离)。
 /* global t, currentLang, token */
 
+import { BAHT } from './money.js';
+
 export interface InvName {
     th: string | null;
     en: string | null;
@@ -209,9 +211,9 @@ export function fmtMoney(v: number | string | null | undefined): string {
 }
 
 // 成本/货值列:无 field.cost.view 码的角色,后端把均价/货值返 null(G4 遮蔽)→ 显「--」;
-// 真零成本仍是数字 0 → ฿0.00,只有 null 才是被遮蔽。
+// 真零成本仍是数字 0 → 显示成 0.00,只有 null 才是被遮蔽。
 export function fmtCost(v: number | string | null | undefined): string {
-    return v == null ? '--' : '฿' + fmtMoney(v);
+    return v == null ? '--' : BAHT + fmtMoney(v);
 }
 
 // 数量:整数不带小数,非整数最多 3 位且去尾零(拆零/称重)。

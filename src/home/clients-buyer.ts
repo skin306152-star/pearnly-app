@@ -4,6 +4,7 @@
 /* global escapeHtml, showConfirm */
 import { S, _buyerState, _buyerSelected } from './clients-store.js';
 import { apiClient, getActiveColor } from './clients-helpers.js';
+import { BAHT } from './money.js';
 
 type Client = {
     id: string;
@@ -83,7 +84,7 @@ function renderClientsGrid() {
                 </div>
                 <div>
                     <div class="client-card-stat-label">${escapeHtml(t('client-card-amount'))}</div>
-                    <div class="client-card-stat-value">฿${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                    <div class="client-card-stat-value">${BAHT}${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                 </div>
             </div>
             <div class="client-card-actions">
@@ -146,7 +147,7 @@ function renderBuyerList() {
                     ${c.tax_id ? `<div class="cust-cell-sub">${escapeHtml(c.tax_id)}</div>` : ''}
                 </div>
                 <div class="align-right">${c.invoice_count || 0}</div>
-                <div class="align-right cust-cell-amount">฿${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                <div class="align-right cust-cell-amount">${BAHT}${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                 <div class="cust-row-actions">
                     <button class="cust-row-btn" data-action="edit" data-cid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 3-7 7H2v-3z"/></svg><span>${escapeHtml(t('client-card-edit'))}</span></button>
                     <button class="cust-row-btn" data-action="export" data-cid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7M4 6l3 3 3-3M2 11h10"/></svg><span>${escapeHtml(t('client-card-export'))}</span></button>

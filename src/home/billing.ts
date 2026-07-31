@@ -13,6 +13,8 @@
 //          <script type=module src=/static/dist/main.js> defer 自动后跑
 // ============================================================
 
+import { BAHT } from './money.js';
+
 function _bt(k: string): string {
     return (typeof window.t === 'function' ? window.t(k) : null) || k;
 }
@@ -97,10 +99,10 @@ function _render() {
         '    <div id="tv2-s1">',
         '      <label class="topup-v2-label" id="tv2-al"></label>',
         '      <div class="topup-v2-qamts">',
-        '        <button class="topup-v2-qamt" data-val="100">฿100</button>',
-        '        <button class="topup-v2-qamt" data-val="500">฿500</button>',
-        '        <button class="topup-v2-qamt" data-val="1000">฿1,000</button>',
-        '        <button class="topup-v2-qamt" data-val="2000">฿2,000</button>',
+        '        <button class="topup-v2-qamt" data-val="100">' + BAHT + '100</button>',
+        '        <button class="topup-v2-qamt" data-val="500">' + BAHT + '500</button>',
+        '        <button class="topup-v2-qamt" data-val="1000">' + BAHT + '1,000</button>',
+        '        <button class="topup-v2-qamt" data-val="2000">' + BAHT + '2,000</button>',
         '      </div>',
         '      <input id="tv2-amt" type="number" min="10" step="1" class="topup-v2-input" placeholder="฿ ...">',
         '      <div id="tv2-ae" class="topup-v2-err" style="display:none"></div>',
@@ -187,7 +189,7 @@ function _setStep(n: number) {
         if (bn)
             bn.innerHTML = _bt('topup-bank-note').replace(
                 '{amount}',
-                '<strong>฿' + Number(_amount).toLocaleString() + '</strong>'
+                '<strong>' + BAHT + Number(_amount).toLocaleString() + '</strong>'
             );
     }
 }
@@ -316,7 +318,7 @@ async function _step1Next() {
         _showErr('tv2-ae', _bt('topup-amount-invalid'));
         return;
     }
-    // v118.35.0.21 · 前端兜底:超过单次上限 ฿500,000 立即提示
+    // v118.35.0.21 · 前端兜底:超过单次上限(500,000 铢)立即提示
     if (amt > 500000) {
         _showErr('tv2-ae', _bt('topup-amount-too-large'));
         return;

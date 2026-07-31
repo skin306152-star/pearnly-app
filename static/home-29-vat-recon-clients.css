@@ -91,6 +91,8 @@
 .cust-cell-sub { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
 .cust-cell-amount { font-weight: 600; }
 .cust-cell-tax { color: var(--ink-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 发票数的行内标签只在窄屏出面 —— 那里表头被收起,数字得自己带名字 */
+.cust-cell-count-label { display: none; margin-inline-end: 5px; color: var(--ink-3); }
 
 .cust-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .cust-row-btn {
@@ -176,7 +178,19 @@
 
 @media (max-width: 720px) {
     .buyer-grid  { grid-template-columns: 30px 1fr 56px 84px auto; }
-    .seller-grid { grid-template-columns: 1fr 90px 50px auto; }
+    /* 账套主体行在窄屏改三行卡片(与识别记录窄屏堆叠同款):公司名是这行的主语,
+       独占首行拿满宽。原「1fr 90px 50px auto」里操作列光图标就 165px(泰文 180px),
+       .cust-cell-name 的 min-width:0 又允许 1fr 一路塌到 0 —— 公司名整列实测宽 0px。 */
+    .cust-table-head.seller-grid { display: none; }
+    .cust-row.seller-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 8px;
+    }
+    .cust-row.seller-grid .cust-cell-name  { grid-area: 1 / 1 / 2 / 3; font-size: 14px; }
+    .cust-row.seller-grid .cust-cell-tax   { grid-area: 2 / 1 / 3 / 2; }
+    .cust-row.seller-grid .cust-cell-count { grid-area: 2 / 2 / 3 / 3; }
+    .cust-row.seller-grid .cust-row-actions { grid-area: 3 / 1 / 4 / 3; }
+    .cust-cell-count-label { display: inline; }
     .cust-row-btn span { display: none; }
 }
 

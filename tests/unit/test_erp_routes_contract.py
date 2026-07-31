@@ -57,6 +57,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/logs/{log_id}/express-account-fix"),
             ("POST", "/api/erp/logs/{log_id}/express-bind-subject"),
             ("POST", "/api/erp/logs/{log_id}/express-stock-opening"),
+            ("POST", "/api/erp/logs/{log_id}/express-posting-kind"),
             ("POST", "/api/erp/logs/batch-retry"),
             ("POST", "/api/erp/logs/batch-delete"),
             ("POST", "/api/erp/mrerp-xlsx-batch"),
@@ -64,7 +65,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/posting-profile"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 28)
+        self.assertEqual(len(router.routes), 29)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""

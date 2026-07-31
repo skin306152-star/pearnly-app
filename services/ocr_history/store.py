@@ -33,3 +33,6 @@ from services.ocr_history.mutations import (  # noqa: F401
     update_ocr_history_pdf_storage,
     update_history_official_name,
 )
+from services.ocr_history.posting_kind_store import (  # noqa: F401
+    update_history_posting_kind,
+)

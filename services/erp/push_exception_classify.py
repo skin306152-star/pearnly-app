@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from services.erp.express_push.posting_profile import ESCALATE_REASON_PREFIX
 from services.erp.express_push.stock_acc_group import (
     REASON_ACC_GROUP_MISSING,
     REASON_ACC_GROUP_REQUIRED,
@@ -63,6 +64,11 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
     # 须先于 account_set,因 stock_no_master_in_account_set 串里含 "account_set" 会被下面误吞。
     if any(k in msg for k in _STOCK_FIX_REASONS):
         return "stock_opening_needed"
+    # 没人声明过账去向,而这家账套的画像不许系统替人决定 → 会计在失败卡上补选一次即可重推。
+    # 归到 other 的话卡上一个可点的东西都没有(status=manual 连裸重试按钮都不渲染),
+    # 而摘要那句话教人回上传页重新识别 —— 那要重扣一次 OCR 费。
+    if ESCALATE_REASON_PREFIX in msg:
+        return "posting_kind_needed"
     # Express 留人工(EXPRESS_MANUAL:<reason>)· 按可补救路径分桶。
     # 账套配错(小助手连到不可写账套)先于科目判:account_set_not_allowed/no_account_set。
     if "account_set" in msg:
@@ -182,6 +188,48 @@ def derive_duplicate_fix(
     return {"docnum": str(dup.get("docnum") or "").strip(), "fields": fields}
 
 
+def _payload_items(request_body: Any) -> List[Dict[str, Any]]:
+    """从我们发下去的载荷里取票面商品行(去重 · 只留有名字或有码的)。
+
+    补救卡共用:闸在载荷构造之前退出时,mapper 会把商品行挂在 request_body.items 上,
+    卡靠它让会计看见这张票涉及哪些商品。取不到则空列表(卡显空态,不崩)。
+    """
+    body = _coerce_body(request_body)
+    payload = (body or {}).get("payload") if isinstance(body, dict) else None
+    src = payload.get("items") if isinstance(payload, dict) else None
+    if not isinstance(src, list):
+        src = (body or {}).get("items") if isinstance(body, dict) else None
+    items: List[Dict[str, Any]] = []
+    seen = set()
+    for it in src or []:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("name") or it.get("description") or "").strip()
+        stkcod = str(it.get("stkcod") or it.get("erp_item_code") or "").strip()
+        key = stkcod or name
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        items.append({"name": name, "stkcod": stkcod})
+    return items
+
+
+def derive_posting_fix(
+    error_msg: Optional[str], request_body: Any = None
+) -> Optional[Dict[str, Any]]:
+    """「没声明过账去向」留人工时,给失败卡渲染补选卡要的料。
+
+    usage = 这家账套的客观库存用法(perpetual / mixed / …),决定卡上该说哪一句;后缀取不到
+    就留空,前端回落通用句 —— 不拿 "unknown" 冒充一个后端没说过的判断。
+    items 是票面商品行:选库存还是服务是会计的判断,判断要有据可依。
+    """
+    msg = error_msg or ""
+    if ESCALATE_REASON_PREFIX not in msg:
+        return None
+    tail = msg.rsplit(ESCALATE_REASON_PREFIX, 1)[1].lstrip(":").strip()
+    return {"usage": tail, "items": _payload_items(request_body)}
+
+
 def derive_bind_fix(error_msg: Optional[str]) -> Optional[Dict[str, Any]]:
     """direction_unknown 异常能否靠「绑主体」自助救(消前端 !/direction_not_enabled/ 正则)。
 
@@ -218,23 +266,7 @@ def derive_stock_fix(
     msg = error_msg or ""
     if not any(k in msg for k in _STOCK_FIX_REASONS):
         return None
-    body = _coerce_body(request_body)
-    payload = (body or {}).get("payload") if isinstance(body, dict) else None
-    src = payload.get("items") if isinstance(payload, dict) else None
-    if not isinstance(src, list):
-        src = (body or {}).get("items") if isinstance(body, dict) else None
-    items = []
-    seen = set()
-    for it in src or []:
-        if not isinstance(it, dict):
-            continue
-        name = str(it.get("name") or it.get("description") or "").strip()
-        stkcod = str(it.get("stkcod") or it.get("erp_item_code") or "").strip()
-        key = stkcod or name
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        items.append({"name": name, "stkcod": stkcod})
+    items = _payload_items(request_body)
     needs = "acc_group" if any(r in msg for r in _ACC_GROUP_REASONS) else "opening"
     groups = [g for g in (acc_groups or []) if isinstance(g, dict)]
     return {

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Express 待补科目卡:给缺科目留人工的票补选科目 → 覆盖重推(可选记住为账套默认)。
+"""Express 失败卡的自助修复:补科目 / 绑主体 / 补期初 / 补选过账去向 → 覆盖重推。
 
-UI 落点②(推送异常 tab)。从 erp_push_log_routes 拆出,保持两文件均 <500(铁律 #27)。
+UI 落点是推送日志的失败卡。从 erp_push_log_routes 拆出,保持两文件均 <500(铁律 #27)。
 所选科目须 ∈ 该账套上报科目表(GLACC 白名单 · 闸2);重推走 push_to_endpoint 更新原行。
 """
 
@@ -20,6 +20,7 @@ from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
 from services.erp import erp_push as _erp
 from services.erp.express_push import chart_codes
+from services.erp.express_push.posting_kind import normalize as normalize_posting_kind
 
 logger = logging.getLogger("mr-pilot")
 
@@ -34,6 +35,24 @@ _EXPRESS_ACC_SLOTS = {
     "ap_acc",
     "vat_input_acc",
 }
+
+
+def _express_repair_target(user: dict, log_id: str) -> tuple:
+    """失败卡自助修复共用的前置:取原日志行 + 它的 Express 端点(顺带校验这条能不能修)。
+
+    四张修复卡此前各抄一遍这段查找与四个 HTTPException,detail 串靠人肉保持一致。返回
+    (log, endpoint);history 各路自取 —— 绑主体那张是写完才读,不能提前锁死。"""
+    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
+    if not log:
+        raise HTTPException(404, detail="erp.log_not_found")
+    if not log.get("history_id") or not log.get("endpoint_id"):
+        raise HTTPException(400, detail="erp.log_missing_refs")
+    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
+    if not endpoint:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    if (endpoint.get("adapter") or "").lower() != "express":
+        raise HTTPException(400, detail="erp.not_express_endpoint")
+    return log, endpoint
 
 
 async def _repush_and_finalize(log: dict, push_ep: dict, history: dict, *, posting_kind=None):
@@ -77,16 +96,7 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
     user = get_current_user_from_request(request)
     _check_push_access(user)
 
-    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
-    if not log:
-        raise HTTPException(404, detail="erp.log_not_found")
-    if not log.get("history_id") or not log.get("endpoint_id"):
-        raise HTTPException(400, detail="erp.log_missing_refs")
-    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
-    if not endpoint:
-        raise HTTPException(404, detail="erp.endpoint_not_found")
-    if (endpoint.get("adapter") or "").lower() != "express":
-        raise HTTPException(400, detail="erp.not_express_endpoint")
+    log, endpoint = _express_repair_target(user, log_id)
     history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=_tid(user))
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
@@ -140,16 +150,7 @@ async def erp_express_bind_subject(
     user = get_current_user_from_request(request)
     _check_push_access(user)
 
-    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
-    if not log:
-        raise HTTPException(404, detail="erp.log_not_found")
-    if not log.get("history_id") or not log.get("endpoint_id"):
-        raise HTTPException(400, detail="erp.log_missing_refs")
-    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
-    if not endpoint:
-        raise HTTPException(404, detail="erp.endpoint_not_found")
-    if (endpoint.get("adapter") or "").lower() != "express":
-        raise HTTPException(400, detail="erp.not_express_endpoint")
+    log, endpoint = _express_repair_target(user, log_id)
 
     tid = _tid(user)
     wc = db.get_workspace_client(req.workspace_client_id, user["id"], tenant_id=tid)
@@ -209,16 +210,7 @@ async def erp_express_stock_opening(
     user = get_current_user_from_request(request)
     _check_push_access(user)
 
-    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
-    if not log:
-        raise HTTPException(404, detail="erp.log_not_found")
-    if not log.get("history_id") or not log.get("endpoint_id"):
-        raise HTTPException(400, detail="erp.log_missing_refs")
-    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
-    if not endpoint:
-        raise HTTPException(404, detail="erp.endpoint_not_found")
-    if (endpoint.get("adapter") or "").lower() != "express":
-        raise HTTPException(400, detail="erp.not_express_endpoint")
+    log, endpoint = _express_repair_target(user, log_id)
     history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=_tid(user))
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
@@ -237,4 +229,43 @@ async def erp_express_stock_opening(
         "ok": final_status in ("pending", "success", "skipped_dup"),
         "status": final_status,
         "error_msg": result.get("error_msg"),
+    }
+
+
+class ErpExpressPostingKindRequest(BaseModel):
+    posting_kind: str = Field(..., description="stock | service · 这张票的过账去向")
+
+
+@router.post("/api/erp/logs/{log_id}/express-posting-kind")
+async def erp_express_posting_kind(
+    log_id: str, req: ErpExpressPostingKindRequest, request: Request
+):
+    """给「没声明过账去向」留人工的票补选一次去向 → 写回票上 → 重推。
+
+    写回 ocr_history 而不是只当这一次推送的入参:声明跟着票走(见 express_push.posting_kind
+    顶注),四条推送腿都读票上那一列。只当入参传的话,这次点通了,轮到自动重试仍会 escalate。
+    值走 mapper 同一个 normalize:认不出的一律拒,绝不静默当成 stock(错记库存会真扣客户
+    库存并结转 COGS,Express 里不可逆)。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+
+    kind = normalize_posting_kind(req.posting_kind)
+    if not kind:
+        raise HTTPException(400, detail="erp.posting_kind_invalid")
+
+    log, endpoint = _express_repair_target(user, log_id)
+    tid = _tid(user)
+    if not db.update_history_posting_kind(log["history_id"], kind, user["id"], tenant_id=tid):
+        raise HTTPException(404, detail="erp.history_not_found")
+    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=tid)
+    if not history:
+        raise HTTPException(404, detail="erp.history_not_found")
+
+    final_status, result = await _repush_and_finalize(log, endpoint, history, posting_kind=kind)
+    return {
+        "ok": final_status in ("pending", "success", "skipped_dup"),
+        "status": final_status,
+        "error_msg": result.get("error_msg"),
+        "posting_kind": kind,
     }

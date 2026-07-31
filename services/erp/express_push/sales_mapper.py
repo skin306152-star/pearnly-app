@@ -203,7 +203,8 @@ def build_express_sales_payload(
     # 非库存(收入式入账,永续账套里的真服务本就不动库存)。自动 escalate 只兜「没显式选」的情形
     # (系统拿不准,不硬落)。放行库存侧安全:小助手匹配不到真库存品仍兜底 escalate(ERR_STOCK_NOT_FOUND)。
     if posting_kind not in VALID_POSTING_KINDS and profile.blocks_auto_posting():
-        return fail(profile.escalate_reason())
+        # 带上票面商品行:补选卡靠它让会计看见这张票卖的是什么再判库存/服务(同科目组卡口径)。
+        return fail(profile.escalate_reason(), line_item_names(fields))
 
     stock_acccod = str(config.get("stock_acccod") or "").strip()
     acc_group_auto = False

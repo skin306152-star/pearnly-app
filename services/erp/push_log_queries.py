@@ -32,6 +32,7 @@ from services.erp.push_exception_classify import (  # noqa: F401
     derive_account_fix,
     derive_bind_fix,
     derive_duplicate_fix,
+    derive_posting_fix,
     derive_prior_doc_fix,
     derive_stock_fix,
 )
@@ -255,6 +256,10 @@ def list_push_logs(
                     elif it["category"] == "duplicate_differs":
                         # 差异在回执里(小助手报的账上现值),不在我们发下去的载荷里。
                         it["duplicate_fix"] = derive_duplicate_fix(it.get("error_msg"), body)
+                    elif it["category"] == "posting_kind_needed":
+                        it["posting_fix"] = derive_posting_fix(
+                            it.get("error_msg"), it.get("request_body")
+                        )
                     elif it["category"] == "stock_opening_needed":
                         it["stock_fix"] = derive_stock_fix(
                             it.get("error_msg"),

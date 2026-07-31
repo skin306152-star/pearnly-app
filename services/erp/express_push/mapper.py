@@ -207,7 +207,8 @@ def build_express_payload(
     # 库存。自动 escalate 只兜「没人声明」的票 —— 系统拿不准就不硬落(镜像 sales_mapper 口径)。
     declared = posting_kind in VALID_POSTING_KINDS
     if not is_expense and not declared and profile.blocks_auto_posting():
-        return fail(profile.escalate_reason())
+        # 带上票面商品行:补选卡靠它让会计看见这张票卖的是什么再判库存/服务(同科目组卡口径)。
+        return fail(profile.escalate_reason(), line_item_names(fields))
 
     item_mode = _goods_item_mode(posting_kind, profile)
     stock_acccod = str(config.get("stock_acccod") or "").strip()

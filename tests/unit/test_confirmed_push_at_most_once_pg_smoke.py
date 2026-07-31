@@ -10,7 +10,7 @@
 
 判据必须在真库上跑:`request_body->>'duplicate_confirmed'` 的真值判断、jsonb_build_object、
 以及「先收尾再回收」的语句顺序,FakeCursor 只能证明 SQL 字符串长这样,证不了它选中了哪些行。
-连库口见 tests/unit/_pg_smoke(连不上整类 skip)。
+连库口见 tests/unit/_pg_smoke(连不上整类 skip);建表见下面 _LEGACY_TABLES_DDL。
 """
 
 from __future__ import annotations
@@ -40,6 +40,64 @@ ENDPOINT_ID = str(uuid.uuid4())
 
 CONFIRMED_PAYLOAD = {"ref_no": "IV69/09001", "duplicate_confirmed": True}
 PLAIN_PAYLOAD = {"ref_no": "IV69/09002"}
+
+# 桥那条队列的表由 bridge_schema.ensure_tables() 建;小助手这条队列踩的四张是 legacy 表 ——
+# 建表 DDL 从来没进过版本控制(alembic 里一个 create_table 都没有,只有 ALTER;见
+# scripts/check_destructive_db_tests.py 开头那段出身),而 CI 的 pg-smoke 起的是一次性空库,
+# 于是这里必须自带建表,否则整类 setUpClass 直接 UndefinedTable。
+#
+# 列定义逐列抄自本机开发库的 information_schema/pg_constraint,只留本用例与 agent_store
+# 真读写的那些;CREATE TABLE IF NOT EXISTS 让开发机上整段 no-op —— 那边跑的仍是生产同款
+# 结构,真有列型漂移会在本机先红。status CHECK 一并带上:这条用例断的就是状态落点,
+# 少了它 CI 上 'manual' 写得进去而 prod 写不进去(白名单正本在
+# services/erp/push_schema.py::ensure_erp_push_logs_status_constraint)。
+_LEGACY_TABLES_DDL = """
+CREATE TABLE IF NOT EXISTS users (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username      TEXT NOT NULL,
+    password_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS erp_endpoints (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    adapter    TEXT NOT NULL,
+    config     JSONB NOT NULL DEFAULT '{}'::jsonb,
+    enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT erp_endpoints_adapter_chk CHECK (adapter IN (
+        'webhook', 'xero', 'flowaccount', 'mrerp', 'mrerp_dms', 'express'))
+);
+CREATE TABLE IF NOT EXISTS ocr_history (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    filename         TEXT NOT NULL,
+    pages            JSONB NOT NULL,
+    last_pushed_at   TIMESTAMPTZ,
+    last_push_status TEXT,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS erp_push_logs (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint_id      UUID REFERENCES erp_endpoints(id) ON DELETE SET NULL,
+    history_id       UUID,
+    invoice_no       TEXT,
+    status           TEXT NOT NULL,
+    http_status      INTEGER,
+    request_body     JSONB,
+    response_body    TEXT,
+    error_msg        TEXT,
+    attempt          INTEGER NOT NULL DEFAULT 1,
+    elapsed_ms       INTEGER,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    trigger          TEXT NOT NULL DEFAULT 'manual',
+    lease_owner      TEXT,
+    lease_expires_at TIMESTAMPTZ,
+    CONSTRAINT erp_push_logs_status_chk CHECK (status IN (
+        'success', 'failed', 'skipped_dup', 'pending', 'retrying', 'manual'))
+);
+"""
 
 
 def _bridge():
@@ -78,6 +136,7 @@ class _PgFixture(unittest.TestCase):
         # erp_push_logs / ocr_history 都有外键指回 users 与 erp_endpoints,拿造好的 uuid 直插
         # 会被外键挡下 —— 种一个本用例专属的用户 + Express 连接,tearDown 原路删掉。
         with _cursor() as cur:
+            cur.execute(_LEGACY_TABLES_DDL)
             cur.execute(
                 "INSERT INTO users (id, username, password_hash) VALUES (%s, %s, 'x') "
                 "ON CONFLICT DO NOTHING",

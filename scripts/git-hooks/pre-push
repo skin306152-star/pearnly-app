@@ -61,6 +61,15 @@ fail() {
   exit 1
 }
 
+# ── 测试 git 写操作闸(第一道 · 位置是死的,别往后挪)────────────
+# 2026-07-31 P0:钩子自己往环境里带 GIT_DIR/GIT_INDEX_FILE,它俩盖过 subprocess 的 cwd=,
+# 于是「在临时目录造 commit」的测试在下面那步「全量 unittest」里把 init/add/commit 全打进
+# 了宿主仓(4838 files / -794172 · 分支上多出四笔 base/head)。所以本闸必须跑在 unittest
+# 之前 —— 排在后面等于事后收尸,仓库那时已经被写坏了。
+echo "▶ 测试 git 写操作闸(测试不许动当前仓库 · 造 commit 走 tests/unit/_git_sandbox.py)"
+python scripts/check_test_git_writes.py --quiet \
+  || fail "测试对当前仓库做了 git 写操作(见上方)· 临时仓库走 tests/unit/_git_sandbox.py 的 temp_git_repo/git,光靠 cwd= 挡不住钩子注入的 GIT_DIR"
+
 # ── Python 闸(改了任何 .py 才跑)──────────────────────────────
 if [ -n "$PY_CHANGED" ]; then
   echo "▶ 改动含 .py · 跑 Python 守门"

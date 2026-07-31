@@ -18,7 +18,7 @@ git config core.hooksPath scripts/git-hooks
 2. **路径是相对的,按「谁在 push」各自解析** —— githooks(5):钩子跑之前 git 会 `cd` 到该 worktree 的根。所以 A worktree push 跑的是 `A/scripts/git-hooks/pre-push`,B 跑 B 的。老分支跑老版本的闸;分支里没这个文件 = 那次 push 静悄悄没有闸。
 3. **代价**:改动只含文档/纯文本约 40 秒;含 `.py`(要跑全量 unittest)或前端(要跑 eslint + vite build)实测约 3 分钟起。`git push --dry-run` 也会触发本钩子(但不会真推),可拿来空跑验证。
 
-## 25 道闸 · 查什么 · 怎么提前自查 · 豁免法
+## 26 道闸 · 查什么 · 怎么提前自查 · 豁免法
 
 | 闸 | 触发条件 | 查什么 | 提前自查命令 | 豁免/注意 |
 |---|---|---|---|---|
@@ -43,6 +43,7 @@ git config core.hooksPath scripts/git-hooks
 | check_line_ratchet | 任何改动 | 监控文件行数净增 | `python scripts/check_line_ratchet.py --base origin/master --head HEAD --quiet` | 合理增长:commit 写 `RATCHET-EXEMPT: <file> +<N> · <理由>`;**新文件一律先豁免** |
 | check_ui_consistency | 任何改动 | D1 禁新抽屉(用 .modal)/D2 按钮禁黑底(用 var(--btn-blue)) | `python scripts/check_ui_consistency.py --quiet` | 只导航栏可黑 |
 | check_theme_responsive 棘轮 | 任何改动 | 暗夜不翻面的写死色(3位hex/white·black/不透明rgb·补 6 位 hex 闸的漏)+ 入口页 viewport 必须在,命中**只许降** | `python scripts/check_theme_responsive.py --gate --quiet` | 半透明 rgba(阴影/遮罩)豁免;颜色一律 var(--token);存量降了跑 `--update-baseline` 收紧;**手机端"合理"机械保证不了,真机验收见 docs/ui/THEME_RESPONSIVE_VERIFY.md** |
+| check_test_git_writes | 任何改动(钩子里排第一道) | 测试里起 `git` 的子命令必须只读;写操作(init/add/commit/config…)或看不出是什么的转发(`["git", *args]`)= 拦 | `python scripts/check_test_git_writes.py --list` | 造真 commit 唯一合法入口 `tests/unit/_git_sandbox.py`(它是唯一豁免文件,改个名放同样的代码照样红);**位置是死的,必须排在「全量 unittest」之前** —— 2026-07-31 P0 就是钩子注入的 GIT_DIR/GIT_INDEX_FILE 盖过 `cwd=`,unittest 里的 `git add -A`/`commit` 打进宿主仓(4838 files / -794172,差一步 push 上线);`GIT_DIR` 类环境变量与 `.git` 路径字面量判不了好坏,进 `--list` 当 NOTE 摆着不判红,宁可漏不误报;反证 `tests/unit/test_git_write_isolation.py` |
 | check_e2e_stub_contracts | 任何改动 | E2E 桩(`page.route`)回包的顶层键不得少于真后端该端点的**无条件**投影;登记为 not_null 的键不许写成 `null`/`undefined` | `python scripts/check_e2e_stub_contracts.py --list` | 登记表在脚本顶部 CONTRACTS(现收 steward 的 status/sessions 三口);后端加键 → `tests/unit/test_e2e_stub_contract_gate.py` 的防漂测试先红,改表再补各 spec 的桩。**tasks/{id}、messages 故意没登记**(投影带条件分支,登记进去会误报)。非 2xx 的故障注入桩不判;分支里先做了别的事才 fulfill 的桩跟不到,`--list` 里点数,宁可漏不误报 |
 | check_authz_coverage | 任何改动 | 每路由必声明权限或上公开白名单(第 8 道) | `PEARNLY_SKIP_HEAVY_INIT=1 python scripts/check_authz_coverage.py --quiet` | 公开路由进 PUBLIC_ROUTES 带注释;自定义门函数要登记进闸的 helper 清单(`_auth` 误判先例) |
 | pg-smoke(真库冒烟) | 改 SQL / schema / RLS 策略 | mock 单测钉不住的那层:方言、`numeric(12,6)` 精度、`pg_advisory_xact_lock` 真串行、RLS 真隔离。CI 独立 job(带 postgres:16 service),**skip 也判红**(连不上库 = 这道闸没跑) | 本机 docker `pearnly-db` 起着,`PEARNLY_PG_SMOKE_URL=postgresql://pearnly:pearnly_local_dev@127.0.0.1:5432/pearnly python -m unittest discover -s tests/unit -p "test_*_pg_smoke.py"` | 新 smoke 文件按 `test_*_pg_smoke.py` 命名即自动进闸,无需登记;测试只认 `PEARNLY_PG_SMOKE_URL`,**绝不回落 DATABASE_URL**(防误连生产);tests/integration 那 70 份 require_db 仍未进 CI,是另一次拍板 |

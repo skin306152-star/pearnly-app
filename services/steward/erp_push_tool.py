@@ -340,14 +340,15 @@ def _submit(
         "docnum": (outcome["result"] or {}).get("docnum") or "",
     }
     status = outcome["status"]
-    if status == "done":
+    result = outcome["result"] or {}
+    if status == "done" and result.get("ok") is not False:
         _log_push(ctx, endpoint, history, payload, "success", data)
         return ToolResult(ok=True, data=data)
     if status == "pending":
         # 桥还在写:不是失败也不是成功,如实报"在途"并交出 job_id(重推 = 双写)。
         _log_push(ctx, endpoint, history, payload, "pending", data, leased=True)
         return ToolResult(ok=False, error_code=ERR_PUSH_PENDING, data=data)
-    err = outcome["error"] or {}
+    err = outcome["error"] or _business_error(result)
     data["reason"] = str(err.get("message") or err.get("code") or "")
     if err.get("code") == bridge_write_gate.CONFIRMED_UNACKED_CODE:
         # 领了没回执:结果未知,不能落"失败"(她会重推,那就是两张)。这一行的真相是"投出去了,
@@ -358,6 +359,21 @@ def _submit(
     code = ERR_PUSH_EXPIRED if status == "expired" else ERR_PUSH_FAILED
     _log_push(ctx, endpoint, history, payload, "failed", data)
     return ToolResult(ok=False, error_code=code, data=data)
+
+
+def _business_error(result: dict) -> dict:
+    """桥自报的业务失败 → 与 job.error 同形的 {code,message}。
+
+    job 落 done 只说明「桥执行完并回了话」:业务成败在结果体的 ok 位上(桥一律 ack
+    transport-ok,见 bridge/cloud_jobs 文件头)。拿 done 当成功,会把桥辛苦区分出来的
+    每一种诚实失败 —— 同钥匙内容不同、账套被占用、读回校验没过、回滚 —— 一律报成
+    「推成功了」,而账套里一个字节都没有。docnum 也拿不到(失败结果体不带这个键),
+    于是会计连去 Express 核对哪一张都无从下手。
+    """
+    return {
+        "code": str(result.get("error_code") or "bridge.failed"),
+        "message": str(result.get("error") or ""),
+    }
 
 
 def _refused(

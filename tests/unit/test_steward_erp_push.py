@@ -441,6 +441,69 @@ class BridgeFailureTests(_ChainTestCase):
         self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_BLOCKED)
         self.assertEqual(self.world.submit.call_args_list, [])
 
+    async def test_done_with_a_business_failure_is_not_reported_as_written(self):
+        """job 落 done 只说明桥回了话 —— 业务成败在结果体的 ok 位上。
+
+        结果体照抄 2026-07-31 本地靶场真跑出来的那一份(云端派活 → 桥真写 69EXP_test →
+        ack):桥把「同钥匙内容不同」挡了下来、一个字节没写,而 bridge_jobs 仍是 done
+        (桥对传输层一律 ack ok=True,见 bridge/cloud_jobs 文件头)。拿 done 当成功,
+        会计看到的就是「推成功了」而账套里什么都没有 —— 本仓栽过的那种假成功。
+        """
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": False,
+                "error": "这张票之前推过,ERP 里是 RR690531-001(含税总额 1,070.00 → 2,140.00)"
+                "· 本次一个字节都没写",
+                "error_code": "DUPLICATE_CONTENT_DIFFERS",
+                "outcome": "needs_review",
+                "meta": {"written": False, "docnum": "RR690531-001"},
+            },
+            "error": None,
+        }
+        task = await self._push()
+        self.assertEqual(task["status"], store.TASK_FAILED)
+        self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_FAILED)
+        self.assertEqual(self.world.push_logs[-1]["status"], "failed")
+
+    async def test_a_business_failure_keeps_the_bridge_own_wording(self):
+        """桥那句人话是会计唯一能照着动手的线索,别在最后一跳丢掉。"""
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": False,
+                "error": "另一写者正持有该账套写互斥(PEARNLY_WRITE.LCK)",
+                "error_code": "ACCOUNT_BUSY_LOCKED",
+                "outcome": "waiting_lock",
+                "meta": {"written": False},
+            },
+            "error": None,
+        }
+        await self._push()
+        self.assertIn("PEARNLY_WRITE.LCK", self.world.push_logs[-1]["error_msg"])
+
+    async def test_idempotent_skip_still_counts_as_written(self):
+        """幂等命中(ok=true / written=false):票确实在 Express 里,报成功不算撒谎。
+
+        钉住这一条,是免得上面两条被人「顺手」收紧成「written=false 一律算失败」——
+        那会把系统自己的重投变成红,会计再推一次,才是真造出第二张。
+        """
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": True,
+                "docnum": "RR690531-001",
+                "meta": {"written": False, "duplicate_skipped": True},
+            },
+            "error": None,
+        }
+        task = await self._push()
+        self.assertEqual(task["status"], store.TASK_DONE)
+        self.assertEqual(self.world.push_logs[-1]["status"], "success")
+
 
 class TenantIsolationTests(unittest.TestCase):
     """跨租户/跨账套:别人家的票在这条链上一步都走不动。"""

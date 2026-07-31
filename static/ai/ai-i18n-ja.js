@@ -285,6 +285,13 @@ window.__AI_I18N_JA__ = {
     gate_invite_title: 'Pearnly AI ワークベンチは招待制です',
     gate_invite_body: 'アクセス権限については Pearnly チームまでお問い合わせください。',
     gate_logout_btn: 'ログアウト',
+    gate_down_title: 'サーバーで一時的にエラーが発生しました',
+    gate_down_body:
+        '権限の問題ではなく、アカウントは有効なままです。サーバーが今回の要求を処理できませんでした。少し待ってから再試行してください。続く場合は発生時刻をお知らせください。',
+    gate_offline_title: 'サーバーに接続できません',
+    gate_offline_body:
+        'リクエストが送信されませんでした。ネットワークが切断されているか遮断されています。接続してから再試行してください。',
+    gate_retry_btn: '再試行',
     tab_profile: 'プロフィール',
     ppc_no_prior: '前期データなし',
     ppc_compared: '前期比較({period}) 差額 {delta}',

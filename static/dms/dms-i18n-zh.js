@@ -216,6 +216,12 @@ window.__DMS_I18N_ZH__ = {
     gate_invite_title: 'DMS 客户录入为邀请制',
     gate_invite_body: '请联系 Pearnly 团队开通访问权限。',
     gate_logout_btn: '退出登录',
+    gate_down_title: '服务器暂时出错了',
+    gate_down_body:
+        '不是你的权限有问题，账号照常有效——服务器刚才没能处理这次请求。稍等一会儿点重试；一直这样请把时间点发给我们。',
+    gate_offline_title: '连不上服务器',
+    gate_offline_body: '请求没发出去——网络断了或被拦了。连上网后点重试。',
+    gate_retry_btn: '重试',
     'dms-app-word': 'DMS 客户',
     'dms-nav-intake': '身份证录入',
     'dms-nav-records': '推送记录',

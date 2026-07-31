@@ -218,6 +218,13 @@ window.__DMS_I18N_JA__ = {
     gate_invite_title: 'DMS 顧客登録は招待制です',
     gate_invite_body: 'アクセス権限については Pearnly チームまでお問い合わせください。',
     gate_logout_btn: 'ログアウト',
+    gate_down_title: 'サーバーで一時的にエラーが発生しました',
+    gate_down_body:
+        '権限の問題ではなく、アカウントは有効なままです。サーバーが今回の要求を処理できませんでした。少し待ってから再試行してください。続く場合は発生時刻をお知らせください。',
+    gate_offline_title: 'サーバーに接続できません',
+    gate_offline_body:
+        'リクエストが送信されませんでした。ネットワークが切断されているか遮断されています。接続してから再試行してください。',
+    gate_retry_btn: '再試行',
     'dms-app-word': 'DMS 顧客',
     'dms-nav-intake': '身分証登録',
     'dms-nav-records': '送信履歴',

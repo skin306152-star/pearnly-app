@@ -476,6 +476,21 @@
         });
     }
 
+    // 服务器故障/断网:留在原地给重试,不冒充权限判定(退出登录只是次动作)。
+    function showUnavailable(kind, status) {
+        showGate();
+        AI.gate.mountUnavailable($('gateRoot'), {
+            kind: kind,
+            status: status,
+            onRetry: function () {
+                boot();
+            },
+            onLogout: function () {
+                expireSession();
+            },
+        });
+    }
+
     // 门禁非 401 时用 /api/me 分辨失效令牌与有效但未受邀的账号。
     function resolveGateClosed(api) {
         api.getMe()
@@ -503,15 +518,16 @@
                 enterApp(api);
             })
             .catch(function (err) {
-                if (err && err.status === 401) {
+                var outcome = AI.gate.classifyBootFailure(err);
+                if (outcome === 'expired') {
                     expireSession();
                     return;
                 }
-                if (!err || err.status == null) {
-                    showLogin('gate_err_network');
+                if (outcome === 'denied') {
+                    resolveGateClosed(api);
                     return;
                 }
-                resolveGateClosed(api);
+                showUnavailable(outcome, err && err.status);
             });
     }
 

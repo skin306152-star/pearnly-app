@@ -1,6 +1,7 @@
 /* Pearnly DMS · 启动入口(闸判定 + i18n 应用 + 壳导航)· 移植 /ai boot 范式。
- * 闸行为:启动调门禁探针(GET /api/dms/session · 只跑入口守卫),就地渲染两种门面——
- *   无 token 或 401 → 登录卡;token 有效但探针 404/403(未受邀/非 dms 入口)→ 邀请制提示。
+ * 闸行为:启动调门禁探针(GET /api/dms/session · 只跑入口守卫),就地渲染三种门面——
+ *   无 token 或 401 → 登录卡;探针 404/403(未受邀/非 dms 入口)→ 邀请制提示;
+ *   探针 5xx / 断网 → 服务不可用提示 + 重试。分档判据在 DXGATE.classifyBootFailure。
  * 通过闸的用户走双视图工作台(录入 / 记录);连接配置在录入页底部连接卡内,不设独立面。 */
 (function (root) {
     'use strict';
@@ -135,7 +136,23 @@
         });
     }
 
-    // 探针非 401(404/403 = 闸关/非 dms 入口)时,借 /api/me 分辨"token 失效"与"未受邀"。
+    // 服务器故障/断网:留在原地给重试,不冒充权限判定,也不删令牌(退出登录是次动作)。
+    function showUnavailable(kind, status) {
+        showGate();
+        root.DXGATE.mountUnavailable($('gateRoot'), {
+            kind: kind,
+            status: status,
+            onRetry: function () {
+                boot();
+            },
+            onLogout: function () {
+                localStorage.removeItem('mrpilot_token');
+                boot();
+            },
+        });
+    }
+
+    // 探针判成 denied(404/403 = 闸关/非 dms 入口)时,借 /api/me 分辨"token 失效"与"未受邀"。
     function resolveGateClosed(api) {
         api.getMe()
             .then(function () {
@@ -161,12 +178,17 @@
                 enterApp(session || {});
             })
             .catch(function (err) {
-                if (err && err.status === 401) {
+                var outcome = root.DXGATE.classifyBootFailure(err);
+                if (outcome === 'expired') {
                     localStorage.removeItem('mrpilot_token');
                     showLogin();
                     return;
                 }
-                resolveGateClosed(api);
+                if (outcome === 'denied') {
+                    resolveGateClosed(api);
+                    return;
+                }
+                showUnavailable(outcome, err && err.status);
             });
     }
 

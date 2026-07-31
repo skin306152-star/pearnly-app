@@ -412,6 +412,28 @@ class BridgeFailureTests(_ChainTestCase):
         task = await self._push()
         self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_EXPIRED)
 
+    async def test_confirmed_write_without_an_ack_is_not_reported_as_not_written(self):
+        """同样是 expired,「领了没回执」与「没人来领」必须说两句不同的话。
+
+        确认放行的写单关掉了桥端的幂等闸,系统分不出它写没写。照 ERR_PUSH_EXPIRED 那句
+        「多为小助手一直不在线,上线后再说一次」去做,就是账上两张 —— 这里必须落在
+        「先去核对再决定」那一支,推送日志也不能记成 failed。
+        """
+        from services.erp.bridge import write_gate as bridge_write_gate
+
+        self.world.status.return_value = {"job_id": "job-1", "status": "expired", "result": {},
+                                          "error": {"code": bridge_write_gate.CONFIRMED_UNACKED_CODE,
+                                                    "message": "领了没回结果"}}  # fmt: skip
+        task = await self._push()
+        self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_UNCERTAIN)
+        self.assertIn("job-1", task["error_message"])
+        self.assertNotIn("上线后再说一次", task["error_message"])
+        log = self.world.push_logs[-1]
+        self.assertEqual(log["status"], "pending")
+        # 占位租约必须在:pending 是 Express 旧队列的保留态,不占住,小助手会把这份
+        # 带确认位的载荷领走再写一遍。
+        self.assertEqual(log["lease_owner"], erp_push_tool._PENDING_LEASE_OWNER)
+
     async def test_preflight_block_stops_before_the_bridge(self):
         """票过不了推送前体检(这里:账套没配)→ 不投桥,如实说要补什么。"""
         self.world.history = _history(invoice_date=None)

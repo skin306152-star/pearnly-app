@@ -52,6 +52,10 @@ ERR_PUSH_REJECTED = "steward.erp_push_rejected"
 ERR_PUSH_FAILED = "steward.erp_push_failed"
 ERR_PUSH_EXPIRED = "steward.erp_push_expired"
 ERR_PUSH_PENDING = "steward.erp_push_pending"
+# 确认放行的写单被领走后没回结果:与 ERR_PUSH_EXPIRED 同一个 job 状态(expired),但事实相反
+# —— 那条是"没人来领,肯定没写",这条是"领了,写没写不知道"。共用一句文案就等于替她断定
+# 没写,而她照着再说一次就是账上两张。
+ERR_PUSH_UNCERTAIN = "steward.erp_push_uncertain"
 
 AUDIT_SUBMITTED = "steward.erp_push_submitted"
 AUDIT_REFUSED = "steward.erp_push_refused"
@@ -313,6 +317,7 @@ def _submit(
 ) -> ToolResult:
     """投单 + 等终态 + 落推送日志/审计。桥层异常一律翻成人话错误码,不上抛。"""
     from services.erp.bridge import client as bridge_client
+    from services.erp.bridge import write_gate as bridge_write_gate
 
     try:
         job_id = bridge_client.submit_write(ctx.tenant_id, account_set, payload)
@@ -344,6 +349,12 @@ def _submit(
         return ToolResult(ok=False, error_code=ERR_PUSH_PENDING, data=data)
     err = outcome["error"] or {}
     data["reason"] = str(err.get("message") or err.get("code") or "")
+    if err.get("code") == bridge_write_gate.CONFIRMED_UNACKED_CODE:
+        # 领了没回执:结果未知,不能落"失败"(她会重推,那就是两张)。这一行的真相是"投出去了,
+        # 收不到回音",与上面在途那条同形 —— 同样占住远期租约,否则小助手会把同一份载荷领走
+        # 再写一遍,而这份载荷带着确认位、写侧幂等闸是关的。
+        _log_push(ctx, endpoint, history, payload, "pending", data, leased=True)
+        return ToolResult(ok=False, error_code=ERR_PUSH_UNCERTAIN, data=data)
     code = ERR_PUSH_EXPIRED if status == "expired" else ERR_PUSH_FAILED
     _log_push(ctx, endpoint, history, payload, "failed", data)
     return ToolResult(ok=False, error_code=code, data=data)

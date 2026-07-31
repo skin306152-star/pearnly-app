@@ -8,13 +8,32 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any, Dict, List
 
 from services.erp.bridge import BridgeRejected, BridgeUnavailable
-from services.erp.bridge.schema import BRIDGES, heal
+from services.erp.bridge.schema import BRIDGES, JOBS, heal
+
+logger = logging.getLogger(__name__)
 
 JOB_KINDS = ("query", "write")
 KIND_WRITE = "write"
+
+# 「知道了,还是推」的载荷位(桥 writepath/duplicate_gate.CONFIRM_PARAM)。它关掉的正是桥端
+# 写侧那道「同 ref_no + 对手方码就当重投」的幂等闸,所以带这一位的写活不能享受「租约过期退回
+# 队列」——退回去再派一次就是账上再多一张,而一次真写(备份→写 DBF→重建 CDX)是分钟级,
+# 租约 300s 罩不住慢盘。判真值取「有这个键且不是明摆着的假」:宁可把不确定的也按至多一次
+# 处置,也不能漏判一个真确认。
+_CONFIRMED = (
+    "lower(coalesce(payload->>'duplicate_confirmed', 'false')) "
+    "NOT IN ('false', '0', '', 'null', 'no', 'off')"
+)
+# 领走了没回结果的确认写活落这个码。状态仍取 expired 而非 failed:桥可能已经写完只是回执丢了,
+# finish_job 对 expired 的写活会收下迟到的 result(里面的 docnum 是改票号重推时防重单链的唯一
+# 钥匙)。码另开一个,是因为「没人来领」与「领了没回」该跟会计说的话正相反 —— 前者可以放心
+# 再说一次,后者绝不能(见 services/steward/copy_erp_push)。
+CONFIRMED_UNACKED_CODE = "bridge.confirmed_write_unacked"
 
 # 写活租约/超龄:跨 SMB 的备份+写+CDX 重建是分钟级(查询 60/120 秒不动)。
 # 租约 300s = 桥崩溃后写活最多压 5 分钟才退回队列;超龄 600s = 排队半天没桥领,
@@ -24,6 +43,36 @@ KIND_WRITE = "write"
 # result 里的 docnum,别把 expired 一律当「没推进去」展示给会计。
 WRITE_LEASE_SECONDS = 300
 WRITE_JOB_TTL_SECONDS = 600
+
+
+def close_unacked_confirmed_writes(cur, bridge_id: str) -> int:
+    """确认放行的写活领走后没回结果、租约已过期 → 落 expired,**不退回队列**(至多一次)。
+
+    必须排在「租约过期退回队列」那一句之前:它一旦把这类活改回 queued,下一拍就又派出去了。
+    这里说的是实话 —— 系统分不出桥是没写还是写完丢了回执,分不出就交给会计去 Express 看。
+    返回被收尾的活数。
+    """
+    error = json.dumps(
+        {
+            "code": CONFIRMED_UNACKED_CODE,
+            "message": "确认放行的写单被领走后没回结果:可能已写进账套,也可能没有",
+        },
+        ensure_ascii=False,
+    )
+    cur.execute(
+        f"UPDATE {JOBS} SET status = 'expired', finished_at = now(), error = %s, "
+        "lease_owner = NULL, lease_expires_at = NULL "
+        f"WHERE bridge_id = %s AND status = 'leased' AND kind = %s AND {_CONFIRMED} "
+        "AND lease_expires_at < now()",
+        (error, bridge_id, KIND_WRITE),
+    )
+    if cur.rowcount:
+        logger.warning(
+            "确认写活租约过期未回执 · 已落 expired 待人工核对: bridge=%s n=%d",
+            bridge_id[:8],
+            cur.rowcount,
+        )
+    return cur.rowcount
 
 
 def assert_enqueue_allowed(bridge: Dict[str, Any], kind: str) -> None:

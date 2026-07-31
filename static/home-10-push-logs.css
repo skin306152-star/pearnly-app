@@ -198,6 +198,13 @@
     .erp-log-card-main { grid-template-columns: 20px 30px 1fr auto; row-gap: 8px; }
     .erp-log-party { grid-column: 3; }
     .erp-log-act { grid-column: 4; grid-row: 1 / 3; }
+    /* 带自助修复入口的卡有两个按钮,390px 下把买方/目标系统那两列挤到 40px(实测:
+       单按钮时 132px)—— 名字只剩两个字。操作区自己占一行,宽度还给内容。 */
+    .erp-log-card.has-acctfix .erp-log-act {
+        grid-column: 1 / -1; grid-row: auto; justify-content: flex-start;
+    }
+    /* 带自助修复入口的卡有两个按钮,390px 下把买方/目标系统那两列挤到 40px(实测:
+       单按钮时 132px)—— 名字只剩两个字。操作区自己占一行,宽度还给内容。 */
 }
 
 /* 推送详情 · 右侧抽屉(草稿对齐 · 取代居中 modal) */

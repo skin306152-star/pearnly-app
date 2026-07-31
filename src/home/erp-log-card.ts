@@ -9,6 +9,7 @@ import {
     _erpExcAcctPanel,
     _erpExcAccGroupPanel,
     _erpExcBindPanel,
+    _erpExcPostingKindPanel,
     _erpExcStockOpeningPanel,
 } from './erp-exc-actions.js';
 import { extractReasonCode, guideWhyLink } from './guide-links.js';
@@ -35,6 +36,9 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     // 合格的都没有(或小助手还没报上来)。指引不同故分两句,别合成一条。
     stock_acc_group_required: 'erp-reason-stock-acc-group',
     stock_acc_group_missing: 'erp-reason-stock-acc-group-missing',
+    // 会计确认「还是推」的那一次被小助手领走后没回执:租约到期,队列不会自动再推(再推就是
+    // 账上多一张,那份载荷关掉了写侧幂等)。系统分不出写没写,只能请她去 Express 看一眼。
+    confirmed_push_unacked: 'erp-reason-confirmed-unacked',
     low_confidence: 'erp-reason-low-confidence',
     enqueue_error: 'erp-reason-enqueue-error',
     amounts_not_consistent: 'erp-reason-amounts',
@@ -111,7 +115,9 @@ function _expressFriendlyReason(raw: string, log?: any): string {
         return text.replace(/\{doc\}/g, doc).replace('{diff}', _dupDiffText(log));
     }
     const key = _EXPRESS_REASON_I18N[code];
-    return key ? t(key) : '';
+    // {doc} 在这一支回落成票面号:「去 Express 核对」不点名核对哪一张,等于没说。
+    // 卡头虽然也印着票号,但摘要条常被单独复制走(title 属性就是整句),句子得自带主语。
+    return key ? t(key).replace(/\{doc\}/g, String((log && log.invoice_no) || '')) : '';
 }
 
 function buildErpLogCard(log: any): string {
@@ -302,6 +308,9 @@ function buildErpLogCard(log: any): string {
         _cat === 'stock_opening_needed' &&
         !isAccGrpFix &&
         !!(_sf.items || []).length;
+    // 没声明过账去向被留人工:此前这张卡上一个可点的东西都没有(status=manual 连裸重试都不
+    // 渲染),摘要还教人回上传页重新识别 —— 那要重扣一次 OCR 费。补选一次即可就地重推。
+    const isPostKindFix = statusClass === 'fail' && _cat === 'posting_kind_needed';
     let repairBtn = '';
     if (isAcctFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-acctfix-open'))}</button>`;
@@ -311,6 +320,8 @@ function buildErpLogCard(log: any): string {
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-stockopen-open'))}</button>`;
     else if (isAccGrpFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-accgrp-open'))}</button>`;
+    else if (isPostKindFix)
+        repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-postkind-open'))}</button>`;
     else if (canMapFix)
         repairBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(log.id)}">${escapeHtml(_cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer'))}</button>`;
     const repairPanel = isAcctFix
@@ -321,11 +332,18 @@ function buildErpLogCard(log: any): string {
             ? _erpExcStockOpeningPanel(log)
             : isAccGrpFix
               ? _erpExcAccGroupPanel(log)
-              : '';
+              : isPostKindFix
+                ? _erpExcPostingKindPanel(log)
+                : '';
 
     // 存货科目组卡不进这个排除表:选组只写端点配置、不重推,重试按钮得留着让会计选完自己点。
     const retryBtn =
-        log.status === 'failed' && !isRetrying && !isAcctFix && !isBindFix && !isStockFix
+        log.status === 'failed' &&
+        !isRetrying &&
+        !isAcctFix &&
+        !isBindFix &&
+        !isStockFix &&
+        !isPostKindFix
             ? `<button class="btn btn-sm btn-secondary" data-log-retry="${escapeHtml(log.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`
             : '';
 

@@ -1,5 +1,5 @@
 // ============================================================
-// ERP 推送失败卡 · 自助修复动作(待补科目 / 绑主体 / 补期初 / 选存货科目组)
+// ERP 推送失败卡 · 自助修复动作(待补科目 / 绑主体 / 补期初 / 选存货科目组 / 补选过账去向)
 //
 // 「推送异常」tab 并入「推送日志」后(2026-06-26)· 这些修复入口挂在推送日志的失败卡上。
 // 卡内下拉/表单面板 + 提交(补科目重推 / 绑主体重推 / 写期初重推 / 存货科目组存端点)·
@@ -36,6 +36,8 @@ type RepairItem = {
         // 小助手上报过候选没有(端点 config 的 stock_acc_groups_seen_at)· 空候选两种成因靠它分。
         groups_reported?: boolean;
     };
+    // 没声明过账去向留人工:usage=这家账套的客观库存用法(决定卡上说哪一句)· items=票面商品行。
+    posting_fix?: { usage?: string; items?: Array<{ name?: string; stkcod?: string }> };
 };
 
 // 待补科目卡:科目槽 → 角色文案键(收入/应收/销项税 + 采购/应付/进项税)。
@@ -103,6 +105,7 @@ function _erpExcAcctPanel(it: RepairItem): string {
 // 走哪条修复路由由面板自报的 data-fix-kind 决定 —— 新增修复卡在这里加分支,不动委托层。
 async function _erpExcAccountFix(logId: string, panel: HTMLElement, btn: HTMLButtonElement | null) {
     if (panel.dataset.fixKind === 'accgroup') return _erpExcAccGroupFix(panel, btn);
+    if (panel.dataset.fixKind === 'postingkind') return _erpExcPostingKindFix(logId, panel, btn);
     return _erpExcAccountSlotsFix(logId, panel, btn);
 }
 
@@ -408,6 +411,71 @@ async function _erpExcAccGroupFix(panel: HTMLElement, btn: HTMLButtonElement | n
     _erpExcReload();
 }
 
+// 补选过账去向卡:上传时没选「库存 / 服务」的票被留人工 → 就地补选一次即可重推。
+// 此前这张卡上没有任何可点的东西,摘要那句话教人回上传页重新识别 —— 重识别要重扣一次 OCR 费。
+// 两个选项都是会真动账的决定,所以先把票面商品行摆出来(判据),再说清选了会发生什么(hint)
+// 与推成功后还能不能改(warn)。选项只有两个仍用下拉:与同列另外三张修复卡同款,不新增样式。
+function _erpExcPostingKindPanel(it: RepairItem): string {
+    const fix = it.posting_fix || {};
+    const names = (fix.items || [])
+        .map((p) => String(p.name || p.stkcod || '').trim())
+        .filter(Boolean);
+    const itemsLine = names.length
+        ? `<div class="erp-exc-acctfix-nochart">${escapeHtml(t('erp-postkind-items', { list: names.join(' · ') }))}</div>`
+        : '';
+    return `<div class="erp-exc-acctfix erp-exc-postkind" data-acctfix-panel="${escapeHtml(it.id)}"
+        data-fix-kind="postingkind" hidden>
+        ${itemsLine}
+        <div class="erp-exc-acctfix-nochart">${escapeHtml(t('erp-postkind-hint'))}</div>
+        <div class="erp-exc-acctfix-slots"><label class="erp-exc-acctfix-slot"><span>${escapeHtml(t('erp-postkind-label'))}</span>
+        <select data-postkind-select><option value="">${escapeHtml(t('erp-postkind-pick'))}</option>
+        <option value="stock">${escapeHtml(t('erp-postkind-stock'))}</option>
+        <option value="service">${escapeHtml(t('erp-postkind-service'))}</option></select></label></div>
+        <div class="erp-exc-acctfix-nochart">${escapeHtml(t('erp-postkind-warn'))}</div>
+        <div class="erp-exc-acctfix-act">
+            <button class="btn btn-sm btn-primary" type="button" data-acctfix-submit="${escapeHtml(it.id)}">${escapeHtml(t('erp-postkind-submit'))}</button>
+            <button class="btn btn-sm btn-ghost" type="button" data-acctfix-cancel="${escapeHtml(it.id)}">${escapeHtml(t('erp-acctfix-cancel'))}</button>
+        </div></div>`;
+}
+
+async function _erpExcPostingKindFix(
+    logId: string,
+    panel: HTMLElement,
+    btn: HTMLButtonElement | null
+) {
+    const sel = panel.querySelector('[data-postkind-select]') as HTMLSelectElement | null;
+    const kind = (sel ? sel.value : '').trim();
+    if (!kind) {
+        showToast(t('erp-postkind-need-pick'), 'error');
+        return;
+    }
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('erp-exc-retrying');
+    }
+    try {
+        const resp = await fetch(
+            '/api/erp/logs/' + encodeURIComponent(logId) + '/express-posting-kind',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: 'Bearer ' + _erpExcTok(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ posting_kind: kind }),
+            }
+        );
+        const data = await resp.json().catch(() => ({}));
+        showToast(
+            resp.ok && data.ok ? t('erp-postkind-ok') : t('erp-postkind-fail'),
+            resp.ok && data.ok ? 'success' : 'error'
+        );
+    } catch (e) {
+        showToast(t('erp-postkind-fail'), 'error');
+    }
+    _erpExcReload();
+}
+
 export type { RepairItem };
 export {
     _erpExcAcctPanel,
@@ -415,6 +483,7 @@ export {
     _erpExcAccGroupPanel,
     _erpExcBindPanel,
     _erpExcBindSubject,
+    _erpExcPostingKindPanel,
     _erpExcStockOpeningPanel,
     _erpExcStockOpening,
     _erpExcEnsureClients,

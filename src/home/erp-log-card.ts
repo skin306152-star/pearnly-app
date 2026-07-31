@@ -112,12 +112,22 @@ function _expressFriendlyReason(raw: string, log?: any): string {
             (log && log.prior_doc_fix && log.prior_doc_fix.docnum) ||
             (log && log.duplicate_fix && log.duplicate_fix.docnum) ||
             '';
-        return text.replace(/\{doc\}/g, doc).replace('{diff}', _dupDiffText(log));
+        return _filled(text.replace(/\{doc\}/g, doc).replace('{diff}', _dupDiffText(log)));
     }
     const key = _EXPRESS_REASON_I18N[code];
     // {doc} 在这一支回落成票面号:「去 Express 核对」不点名核对哪一张,等于没说。
     // 卡头虽然也印着票号,但摘要条常被单独复制走(title 属性就是整句),句子得自带主语。
-    return key ? t(key).replace(/\{doc\}/g, String((log && log.invoice_no) || '')) : '';
+    return key ? _filled(t(key).replace(/\{doc\}/g, String((log && log.invoice_no) || ''))) : '';
+}
+
+// 占位符没填上就当这条文案不可用,让调用方回落到原始错误串。
+//
+// 这些句子里的 {doc}/{diff} 来自后端在推送日志行上派生的结构化字段(prior_doc_fix /
+// duplicate_fix),而派生要有回执体才做得出来 —— 管家桥直写那条路 response_body 是空的,
+// 于是「请先在 Express 删掉它,再重推」会渲染成删掉『』。半句话比英文原码更坑:
+// 会计照着做不了,还以为是自己没看懂。
+function _filled(text: string): string {
+    return /\{[a-z_]+\}/i.test(text) ? '' : text;
 }
 
 function buildErpLogCard(log: any): string {

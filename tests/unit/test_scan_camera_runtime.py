@@ -497,15 +497,28 @@ class WallClockCeilingWouldCostMoreThanItBuysTests(unittest.TestCase):
     下面把那个数量出来:封顶要真安全就得高于它,而高于它之后省不下多少静默区,不值。
     """
 
+    # 「能糊出多长」是【存在】命题:有一次到得了那个数,封顶就得高于它。所以取多轮里的最大值,
+    # 不是单跑一轮就把那一轮当最坏 —— 剧本(seed 固定)是死的,采样点却是活的:引擎按真墙钟
+    # 起拍(harness 里是 Date.now + setTimeout),机器一忙,一拍的间隔就拉长、采到的帧变稀,
+    # 同一份素材这一轮根本演不到那段长空档。2026-07-31 实测:空跑八轮 2315~3579 全过,而全量
+    # 12152 条压着跑的那一轮掉到 1464 —— 闸红的是机器当时在忙,不是尺子变了。
+    # 一轮就够时不跑第二轮,空闲机器上仍是原来的开销。
+    _BLIND_ATTEMPTS = 3
+    _BLIND_FLOOR_MS = 2000
+
     def test_a_held_item_can_stay_blind_for_seconds_on_the_slow_machine(self):
         # p=0.5 的散帧抖动(货全程没离开),老机器上一次采样 400ms → 连着几次没解出就是好几秒。
-        got = run_timeline(_material(0.5, 3), hit_ms=DECODE_HIT_MS, miss_ms=SLOW_MISS_MS)
-        self.assertEqual(codes(got), [COKE], "举着不动被记成两件 · 这条剧本先得是安全的")
-        worst = max((gap for gap, _ in dups(got)), default=0)
+        worst = 0
+        for _ in range(self._BLIND_ATTEMPTS):
+            got = run_timeline(_material(0.5, 3), hit_ms=DECODE_HIT_MS, miss_ms=SLOW_MISS_MS)
+            self.assertEqual(codes(got), [COKE], "举着不动被记成两件 · 这条剧本先得是安全的")
+            worst = max(worst, *(gap for gap, _ in dups(got)), 0)
+            if worst >= self._BLIND_FLOOR_MS:
+                break
         self.assertGreaterEqual(
             worst,
-            2000,
-            "这台机器上举着不动的最长空档没到 2 秒 —— 封顶的代价评估要重做",
+            self._BLIND_FLOOR_MS,
+            f"{self._BLIND_ATTEMPTS} 轮里举着不动的最长空档都没到 2 秒 —— 封顶的代价评估要重做",
         )
 
 

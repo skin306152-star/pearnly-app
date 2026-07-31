@@ -35,13 +35,26 @@ echo "────────────────────────�
 echo "🔒 pre-push 机械闸 · 推送前本地守门(防坏码上线)"
 echo "──────────────────────────────────────────────────────────"
 
-# 本次要推的提交范围:origin/master..HEAD(没有 origin/master 则退化为 HEAD~1..HEAD)
+# 本次要推的提交范围:merge-base(origin/master, HEAD)..HEAD —— 只算这条分支自己加的提交。
+#
+# 为什么不是 origin/master..HEAD(2026-07-31 实测改):`git diff A..B` 等价于 `git diff A B`,
+# 是两棵【树】的差,不是「B 比 A 多出来的提交」。master 每往前跑一笔都会算到推送者头上,而且
+# 方向是反的 —— master 删掉的行,在这个 diff 里变成本分支「新增」。停摆 10 天的
+# worktree-erp-posting-profile 自己只动了 1 个 .md,两点却报 1286 个改动文件、棘轮红 19 个它
+# 根本没碰过的监控文件;13 条有自有提交的本地分支,两点红 12 条,三点只红 4 条,8 条是纯误伤。
+# 误伤的闸迟早被 --no-verify 绕过去,那才是真损失。
+#
+# 这不是把闸放松:真能 fast-forward 到 master 的 push,HEAD 必然已含 origin/master,此时
+# merge-base == origin/master,三点与两点输出逐字节相同(已实测)。落后的分支本来就推不上
+# master,替它算 master 的账没有意义。
 if git rev-parse --verify --quiet origin/master >/dev/null 2>&1; then
-  RANGE="origin/master..HEAD"
+  BASE="$(git merge-base origin/master HEAD 2>/dev/null)"
+  # 无共同祖先(嫁接 / 孤儿分支):退回两点 · 宁可多查不可漏查
+  [ -z "$BASE" ] && BASE="origin/master"
 else
-  RANGE="HEAD~1..HEAD"
+  BASE="HEAD~1"
 fi
-CHANGED="$(git diff --name-only "$RANGE" 2>/dev/null)"
+CHANGED="$(git diff --name-only "$BASE" HEAD 2>/dev/null)"
 if [ -z "$CHANGED" ]; then
   echo "ℹ️  本次 push 无新增改动文件 · 跳过守门 · 放行"
   exit 0
@@ -50,8 +63,11 @@ fi
 PY_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.py$' || true)"
 FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.(js|mjs|ts|css|html|json)$' || true)"
 TS_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.ts$' || true)"
-# 视觉照搬闸触发:改了 POS 收银前台 / POS·库存·采购的主程序页 / 设计快照(docs/pos/12)
-DESIGN_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(static/pos/|src/home/(pos|inventory|purchase)-|tests/visual/design/)' || true)"
+# 视觉照搬闸触发面(docs/pos/12)· 2026-07-31 从 pos|inventory|purchase 三个前缀放宽到整个
+# src/home/ 与 dist:闸的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条
+# route,旧写法对其中十几条本地完全不设防 —— dashboard 那条选择器烂了三周没人报警。push 即
+# 秒上线、CI 是事后报警器,本地拦住才是真拦。代价:任何前端 push 多 21 秒。
+DESIGN_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(static/pos/|src/home/|static/dist/|tests/visual/design/)' || true)"
 
 fail() {
   echo ""
@@ -69,6 +85,14 @@ fail() {
 echo "▶ 测试 git 写操作闸(测试不许动当前仓库 · 造 commit 走 tests/unit/_git_sandbox.py)"
 python scripts/check_test_git_writes.py --quiet \
   || fail "测试对当前仓库做了 git 写操作(见上方)· 临时仓库走 tests/unit/_git_sandbox.py 的 temp_git_repo/git,光靠 cwd= 挡不住钩子注入的 GIT_DIR"
+
+# ── 破坏性 DB 测试闸(2026-07-31 加)────────────────────────────
+# tests/integration 那 28 个模块会 `DROP TABLE IF EXISTS users, clients, ocr_history …
+# CASCADE`,打的是 DATABASE_URL 指到哪就是哪。新写的 DROP 忘了接 require_disposable_db()
+# 就等着下一个人照 docstring 跑一遍、把自己的开发库拆了(本机已中两次)。
+echo "▶ 破坏性 DB 测试闸(DROP 真表前必须验目标库可丢弃)"
+python scripts/check_destructive_db_tests.py --quiet \
+  || fail "有测试会 DROP 真表却没接 require_disposable_db()(见上方)· 哨兵在 tests/integration/_helpers.py"
 
 # ── Python 闸(改了任何 .py 才跑)──────────────────────────────
 if [ -n "$PY_CHANGED" ]; then
@@ -115,8 +139,24 @@ if [ -n "$PY_CHANGED" ]; then
   echo "  · check_i18n(home.js 4 语完整)"
   python scripts/check_i18n.py --strict --quiet || fail "check_i18n(4 语缺翻译)"
 
-  echo "  · 全量 unittest(catch errors=N · 改一处崩别处)"
-  python -m unittest discover -s tests/unit -p "test_*.py" || fail "全量 unittest 红"
+  # 这趟 ~150s 是钩子里最贵的一步,但它是钩子里【唯一】盖「改一处崩别处」的闸:ruff/black 看
+  # 语法与格式,import app 只看启动,谁都看不见回归。push 即上线(webhook ~20s),CI 是几分钟
+  # 后的报警器 —— 把它交给 CI 等于「红了才发现已经上线」。所以不砍,只砍「本来就不该跑」的场景:
+  # 上面的范围改成 merge-base 之后,分支自己没动 .py 就整块不进来(实测两条停摆分支 390/1030 个
+  # 假 .py → 0 个)。按 import 反查只跑受影响模块这条路验过不通:1038 个测试模块里 213 个
+  # (2593 条 / 84.7s = 全程 57%)是扫仓库文件、起子进程跑脚本来验的,跟被测对象之间根本没有
+  # import 边,而且它们守的多半是 .ts/.js/.html —— Python 的 import 图看不见。这 213 个必须无条件
+  # 全跑,剩下 64s 里按中位数只能砍掉九成 ≈ 57s,拿一套会漏判的影响面分析换 38%,不划算。
+  #
+  # 剥掉 git 注入的 GIT_* 再跑(2026-07-31 P0 的机制性收口):钩子进程自带 GIT_DIR/
+  # GIT_INDEX_FILE,它俩盖过 subprocess 的 cwd=,于是「在临时目录造 commit」的测试把 init/add/
+  # commit 全打进了宿主仓(4838 files / -794172)。第 26 道闸拦的是「测试源码里出现 git 写操作」
+  # 这种写法,拦不住间接绕道(第三方库自己调 git、脚本再起脚本);把变量摘掉断的是机制本身,
+  # 两道并存。顺带让钩子里这趟跑在与 CI 相同的环境里 —— CI 容器里本来就没有这些变量。
+  echo "  · 全量 unittest(catch errors=N · 改一处崩别处 · 剥 GIT_* 跑)"
+  env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX \
+      -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_QUARANTINE_PATH \
+      python -m unittest discover -s tests/unit -p "test_*.py" || fail "全量 unittest 红"
 
   echo "  · 新债 diff 闸(禁新增 ensure_*/巨石路由 · 铁律 #5/#17)"
   python scripts/check_new_debt.py || fail "新债 diff 闸(新增 ensure_* 或 app.py 巨石路由)"
@@ -202,14 +242,11 @@ echo "▶ 防屎山闸(文件 ≤500 行 + 行数棘轮只降不升)"
 echo "  · check_file_size(任何监控文件 >500 行 = 拦 · 先拆)"
 python scripts/check_file_size.py --quiet || fail "check_file_size(有文件超 500 行 · 先拆到 <500)"
 
+# base 跟上面算 CHANGED 用同一个(merge-base)· 别再分叉成两套范围:此前这里写死
+# --base origin/master,于是「哪些文件算你改的」和「哪些文件算你加的行」用的是两个口径。
 echo "  · check_line_ratchet(监控文件净增长 = 拦 · 合理增长在 commit 写 RATCHET-EXEMPT)"
-if git rev-parse --verify --quiet origin/master >/dev/null 2>&1; then
-  python scripts/check_line_ratchet.py --base origin/master --head HEAD --quiet \
-    || fail "check_line_ratchet(监控文件行数净增 · 拆/移到独立文件 · 或 commit 加 RATCHET-EXEMPT: <file> +<N> · <理由>)"
-else
-  python scripts/check_line_ratchet.py --quiet \
-    || fail "check_line_ratchet(监控文件行数净增 · 见上)"
-fi
+python scripts/check_line_ratchet.py --base "$BASE" --head HEAD --quiet \
+  || fail "check_line_ratchet(监控文件行数净增 · 拆/移到独立文件 · 或 commit 加 RATCHET-EXEMPT: <file> +<N> · <理由>)"
 
 echo "  · check_ui_consistency(全站弹窗 + 按钮/切换蓝不用黑 · 硬规 D1/D2 · Zihao 2026-06-05)"
 python scripts/check_ui_consistency.py --quiet \

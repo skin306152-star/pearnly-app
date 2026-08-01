@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 541 个源文件全扫
+# UI 设计合规扫描报告 · 542 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -124,7 +124,7 @@
      1  src\home\dms-intake-invoice-submit.ts
         └ 102: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\erp-log-card.ts
-        └ 144: statusIcon = '⏭';
+        └ 154: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
         └ 299: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts

@@ -28,7 +28,9 @@ UB = "22222222-2222-2222-2222-222222222222"
 _OCR_STUB = (
     "CREATE TABLE ocr_history (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), "
     "user_id UUID, tenant_id UUID, filename TEXT, invoice_date DATE, "
-    "confidence TEXT, client_id BIGINT)"
+    # pages:2026-07-20(8929e7c6)日期口径收口后 list_exceptions 直接 SELECT h.pages 取票面日期,
+    # 桩没跟上 → 整条查询 UndefinedColumn 返空,而这测试正是数它返回了谁的行。
+    "confidence TEXT, client_id BIGINT, pages JSONB NOT NULL DEFAULT '[]'::jsonb)"
 )
 
 

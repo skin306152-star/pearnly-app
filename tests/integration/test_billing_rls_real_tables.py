@@ -39,12 +39,11 @@ _STUBS = (
     "CREATE TABLE monthly_page_usage ("
     "  tenant_id UUID NOT NULL, year_month TEXT NOT NULL, pages_used INT DEFAULT 0,"
     "  updated_at TIMESTAMPTZ DEFAULT NOW(), PRIMARY KEY (tenant_id, year_month))",
-    "CREATE TABLE ocr_cost_log ("
-    "  id BIGSERIAL PRIMARY KEY, user_id UUID NOT NULL, tenant_id UUID, history_id TEXT,"
-    "  engine TEXT NOT NULL DEFAULT 'gemini', pages INT DEFAULT 1, input_tokens INT DEFAULT 0,"
-    "  output_tokens INT DEFAULT 0, cost_thb NUMERIC(10,4) DEFAULT 0, elapsed_ms INT DEFAULT 0,"
-    "  created_at TIMESTAMPTZ DEFAULT NOW())",
 )
+# ocr_cost_log 不手抄:2026-07-04(6ee9a32f)产品给它加了 model/mode/l3_fired/status 四列,
+# 手抄桩没跟上 → log_ocr_cost 的 INSERT 撞 UndefinedColumn,而这测试正是验它。
+# 改走产品自己的 ensure_ocr_cost_log_table()(它同时 enroll tenant_or_user)· 桩不再有第二份真相。
+# 另三张钱表继续手抄:产品 DDL 带 tenants/users 外键,拉进来就得连坐两张基础表。
 _TABLES = ("tenant_credits", "credit_transactions", "monthly_page_usage", "ocr_cost_log")
 
 
@@ -64,9 +63,12 @@ class BillingRlsTests(unittest.TestCase):
             cur.execute(f"DROP TABLE IF EXISTS {', '.join(_TABLES)} CASCADE")
             for ddl in _STUBS:
                 cur.execute(ddl)
-            # 单一来源模板:tenant 维度 3 表 + tenant_or_user 的 ocr_cost_log
+            # 单一来源模板:tenant 维度 3 表(ocr_cost_log 由产品 ensure_* 自己 enroll)
             rls.apply_tenant_rls(cur, "tenant_credits", "credit_transactions", "monthly_page_usage")
-            rls.apply_tenant_or_user_rls(cur, "ocr_cost_log")
+
+        cost.ensure_ocr_cost_log_table()
+
+        with db.get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(f"GRANT SELECT,INSERT,UPDATE,DELETE ON {', '.join(_TABLES)} TO pearnly_app")
             cur.execute("GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO pearnly_app")
             # FORCE:本地恢复库 owner 也受 policy 约束才能真测隔离(prod 靠非 owner 角色)

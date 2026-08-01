@@ -184,24 +184,34 @@ def auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+# 登录口:routes/login_routes.py:75 的 POST /api/login,响应体 {token, user}。
+# 这里原先写的是 /api/auth/login + data["access_token"] —— 那条路由全仓从未存在过
+# (git log -S 无任何命中),返 404 被下面的 SkipTest 吞成"凭据 / DB / Migration 问题",
+# 于是 11 个 *_integration 模块的登录态用例从 2026-05-28 建目录起一次都没真跑过。
+_LOGIN_PATH = "/api/login"
+
+
 def login_for_token(client, username: str, password: str) -> str:  # type: ignore[no-untyped-def]
     """登录拿 JWT · 失败 SkipTest(不让网络抖动 / 凭据无效红 CI)。"""
     try:
         resp = client.post(
-            "/api/auth/login",
+            _LOGIN_PATH,
             json={"username": username, "password": password},
             timeout=10,
         )
     except Exception as e:
-        raise unittest.SkipTest(f"/api/auth/login 不可达:{e}")
+        raise unittest.SkipTest(f"{_LOGIN_PATH} 不可达:{e}")
+    if resp.status_code == 404:
+        # 路由没了 ≠ 凭据不对:这种情况必须红,不能装作"环境没配好"接着 skip。
+        raise AssertionError(f"{_LOGIN_PATH} 返 404 —— 登录路由不在了,别把它当成缺凭据 skip 掉")
     if resp.status_code != 200:
         raise unittest.SkipTest(
-            f"/api/auth/login 返 {resp.status_code} · 凭据 / DB / Migration 问题:{resp.text[:200]}"
+            f"{_LOGIN_PATH} 返 {resp.status_code} · 凭据 / DB / Migration 问题:{resp.text[:200]}"
         )
     data = resp.json()
-    token = data.get("access_token")
+    token = data.get("token")
     if not token:
-        raise unittest.SkipTest(f"/api/auth/login 没返 access_token:{data}")
+        raise unittest.SkipTest(f"{_LOGIN_PATH} 没返 token:{data}")
     return token
 
 

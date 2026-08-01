@@ -3,7 +3,7 @@
     "ok": true,
     "reg": {
       "ok": true,
-      "scope": "http://127.0.0.1:61516/cashier"
+      "scope": "http://127.0.0.1:62969/cashier"
     },
     "beforeKeys": [
       "pearnly-cashier-v12044202"
@@ -26,11 +26,11 @@
     "ok": true,
     "posReg": {
       "ok": true,
-      "scope": "http://127.0.0.1:61516/pos"
+      "scope": "http://127.0.0.1:62969/pos"
     },
     "cashReg": {
       "ok": true,
-      "scope": "http://127.0.0.1:61516/cashier"
+      "scope": "http://127.0.0.1:62969/cashier"
     },
     "afterPos": [
       "pearnly-pos-v12044203"

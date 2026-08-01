@@ -265,8 +265,8 @@
             S.flagged.viewImage(el.getAttribute('data-wo'), itemId);
         } else if (action === 'riq-copy-code') {
             // OCR 异常的机器码:会计要把它转给我们排障,10.5px 灰字在手机上选不中。
-            // 闪回走共享 AI.copyFlash(与管家红条同一份,剪贴板不可用也照样给反馈)。
-            AI.copyFlash.copy(el, el.getAttribute('data-code'), at('riq_code_copied'));
+            // 闪回走共享 CopyFlash(与管家红条同一份,剪贴板不可用也照样给反馈)。
+            CopyFlash.copy(el, el.getAttribute('data-code'), at('riq_code_copied'));
         }
     }
 

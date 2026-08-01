@@ -92,11 +92,14 @@ class CheckFileSizeTests(unittest.TestCase):
         tmp = PROJECT_ROOT / "_tmp_test_anti_bigfile_oversize.py"
         try:
             tmp.write_bytes(b"line\n" * 600)
-            status, rel, lines, ceiling = self.mod.check_one(tmp, ceiling=500)
-            self.assertEqual(status, "FAIL")
-            self.assertEqual(lines, 600)
-            self.assertEqual(ceiling, 500)
-            self.assertEqual(rel, "_tmp_test_anti_bigfile_oversize.py")
+            # 2026-08-01:存量豁免从 basename 字典换成 file_size_baseline.json,check_one
+            # 因此多收一个 baseline 参数、返回具名 Row(多一个 reason 字段)。这里给空基线,
+            # 验的是"没记账的文件按硬上限判"。
+            row = self.mod.check_one(tmp, ceiling=500, baseline={})
+            self.assertEqual(row.status, "FAIL")
+            self.assertEqual(row.lines, 600)
+            self.assertEqual(row.limit, 500)
+            self.assertEqual(row.rel, "_tmp_test_anti_bigfile_oversize.py")
         finally:
             tmp.unlink(missing_ok=True)
 
@@ -105,9 +108,9 @@ class CheckFileSizeTests(unittest.TestCase):
         tmp = PROJECT_ROOT / "_tmp_test_anti_bigfile_at_limit.py"
         try:
             tmp.write_bytes(b"line\n" * 500)
-            status, _, lines, _ = self.mod.check_one(tmp, ceiling=500)
-            self.assertEqual(status, "OK")
-            self.assertEqual(lines, 500)
+            row = self.mod.check_one(tmp, ceiling=500, baseline={})
+            self.assertEqual(row.status, "OK")
+            self.assertEqual(row.lines, 500)
         finally:
             tmp.unlink(missing_ok=True)
 

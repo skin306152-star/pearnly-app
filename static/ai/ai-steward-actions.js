@@ -76,7 +76,7 @@
         // 状态无关,走一遍 renderLeft 反而会把刚点下去的那颗按钮换掉。
         function copyCode(btn) {
             var code = (btn && btn.getAttribute('data-code')) || '';
-            root.AI.copyFlash.copy(btn, code, at('stw_code_copied'), { win: root });
+            root.CopyFlash.copy(btn, code, at('stw_code_copied'), { win: root });
         }
 
         function decide(approve, token) {

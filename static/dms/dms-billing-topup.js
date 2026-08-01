@@ -239,22 +239,12 @@
         if (S.step === 3) return void setStep(2);
         setStep(1);
     }
+    // 复制反馈走共享出口(static/shared/copy-flash.js · 与 /ai 同一份):私版 flash() 在
+    // 点击时才抓原文,1.5 秒内连点第二次抓到的是「已复制」,按钮就永远卡在那儿了。
     function copyAcct() {
-        var digits = '2300913684';
-        var btn = $('tv-copy');
-        function flash() {
-            if (!btn) return;
-            var prev = btn.textContent;
-            btn.textContent = t('dms-bill-topup-copied');
-            setTimeout(function () {
-                btn.textContent = prev;
-            }, 1500);
-        }
-        try {
-            navigator.clipboard.writeText(digits).then(flash, flash);
-        } catch (e) {
-            flash();
-        }
+        root.CopyFlash.copy($('tv-copy'), H().BANK.digits, t('dms-bill-topup-copied'), {
+            win: root,
+        });
     }
     function onFile(f) {
         if (!f) return;

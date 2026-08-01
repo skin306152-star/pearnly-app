@@ -26,7 +26,7 @@ from tests.integration._helpers import (  # noqa: E402
 
 
 class AuthLoginAndMeIntegrationTest(unittest.TestCase):
-    """POST /api/auth/login → GET /api/me · 端到端拿 token + 查身份"""
+    """POST /api/login → GET /api/me · 端到端拿 token + 查身份"""
 
     def setUp(self) -> None:
         require_db()
@@ -50,7 +50,7 @@ class AuthLoginAndMeIntegrationTest(unittest.TestCase):
 
 
 class AuthLoginInvalidPasswordRejectedIntegrationTest(unittest.TestCase):
-    """POST /api/auth/login 错密码 · 必须 401 不是 500(防爆栈泄露)"""
+    """POST /api/login 错密码 · 必须 401 不是 500(防爆栈泄露)"""
 
     def setUp(self) -> None:
         require_db()
@@ -60,7 +60,7 @@ class AuthLoginInvalidPasswordRejectedIntegrationTest(unittest.TestCase):
 
     def test_wrong_password_returns_401_not_500(self) -> None:
         resp = self.client.post(
-            "/api/auth/login",
+            "/api/login",
             json={"username": self.user, "password": "definitely-wrong-password-xyz-123"},
         )
         # 验证类失败应是 4xx 不是 5xx

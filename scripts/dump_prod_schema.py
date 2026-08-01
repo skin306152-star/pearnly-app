@@ -7,7 +7,7 @@
     0021 之后的迁移全是留档,从没在生产跑过(多条迁移自己的 docstring 就写着"留档性质")。
   · 真正建表的是运行期 `ensure_tables()` 里的 `CREATE TABLE IF NOT EXISTS`。
   · 还有 26 张在产表连这个都没有:建表语句在仓库里根本不存在(见
-    tests/unit/test_schema_ddl_coverage.py 的 KNOWN_UNCOVERED)。空库重建不出来,
+    tests/unit/test_schema_ddl_coverage_gate.py 的 KNOWN_UNCOVERED)。空库重建不出来,
     只能从"谁的开发库还活着"里抄 —— 生产结构没有版本化的事实源。
 
 本脚本先补最便宜的一环:把生产结构落进版本控制当**只读参照**。
@@ -38,10 +38,15 @@ HEADER = """-- Pearnly · 生产库表结构快照(自动生成 · 只读参照 
 --
 -- 生成:python scripts/dump_prod_schema.py docs/db/prod-schema.sql
 -- 事实源说明见该脚本文件头。这份文件不被任何运行期代码读取或执行;
--- 它的读者是①灾备重建 ②DDL 覆盖闸(tests/unit/test_schema_ddl_coverage.py)③ PR reviewer。
+-- 它的读者是①灾备重建 ②DDL 覆盖闸(tests/unit/test_schema_ddl_coverage_gate.py)③ PR reviewer。
 --
--- 不含:数据、权限/角色、RLS 策略、触发器、扩展。只有表/列/约束/索引。
+-- 不含:数据、权限/角色、RLS 策略、触发器、扩展。只有序列/表/列/约束/索引。
 -- 生成顺序按表名排序,便于 diff;因此 FOREIGN KEY 单独列在末尾而非表内联。
+--
+-- 空库重放(扩展得先自己装 · 本文件不建):
+--   psql -d <空库> -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto'      -- gen_random_uuid()
+--                  -c 'CREATE EXTENSION IF NOT EXISTS vector'        -- knowledge_embeddings
+--                  -f prod-schema.sql
 """
 
 
@@ -114,26 +119,48 @@ def _constraints(cur) -> Tuple[Dict[str, List[str]], List[str]]:
 
 
 def _indexes(cur) -> Dict[str, List[str]]:
+    """独立索引。约束自带的索引不在内 —— 判据用 pg_constraint.conindid,不用名字里有没有 _pkey:
+    UNIQUE 约束的索引名是 <表>_<列>_key,按名字过滤漏掉它们,重放时 20 处 "already exists"。"""
     rows = _q(
         cur,
         """
-        SELECT tablename, indexdef
-        FROM pg_indexes
-        WHERE schemaname = 'public'
-        ORDER BY tablename, indexname
+        SELECT c.relname, pg_get_indexdef(i.indexrelid)
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indrelid
+        JOIN pg_class ic ON ic.oid = i.indexrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'r'
+          AND NOT EXISTS (SELECT 1 FROM pg_constraint con WHERE con.conindid = i.indexrelid)
+        ORDER BY c.relname, ic.relname
         """,
     )
     out: Dict[str, List[str]] = {}
     for table, definition in rows:
-        # 主键/唯一约束的索引由约束定义带出,重复输出会在重放时冲突。
-        if "CREATE UNIQUE INDEX" in definition and "_pkey" in definition:
-            continue
         out.setdefault(table, []).append(definition + ";")
     return out
 
 
-def render(cols, inline, fks, idx) -> str:
+def _sequences(cur) -> List[str]:
+    """serial 列的 DEFAULT nextval('x') 引用的序列。不导出 = 空库重放时这些表一张都建不出来
+    (2026-07-31 首版快照 176 张里 54 张卡在这:ERROR relation "x_id_seq" does not exist)。"""
+    rows = _q(
+        cur,
+        """
+        SELECT c.relname
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'S'
+        ORDER BY c.relname
+        """,
+    )
+    return [f'CREATE SEQUENCE IF NOT EXISTS "{name}";' for (name,) in rows]
+
+
+def render(cols, inline, fks, idx, seqs=()) -> str:
     parts = [HEADER]
+    if seqs:
+        parts.append("\n-- 序列(先于表:表的 DEFAULT nextval() 直接引用它们)")
+        parts.extend(seqs)
     for table in sorted(cols):
         body = cols[table] + inline.get(table, [])
         parts.append(f'\nCREATE TABLE IF NOT EXISTS "{table}" (\n' + ",\n".join(body) + "\n);")
@@ -153,14 +180,17 @@ def main() -> int:
             cols = _columns(cur)
             inline, fks = _constraints(cur)
             idx = _indexes(cur)
+            seqs = _sequences(cur)
         conn.rollback()
     finally:
         conn.close()
-    text = render(cols, inline, fks, idx)
+    text = render(cols, inline, fks, idx, seqs)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with io.open(out_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
-    print(f"wrote {out_path} · {len(cols)} tables · {len(fks)} foreign keys")
+    print(
+        f"wrote {out_path} · {len(cols)} tables · {len(seqs)} sequences · {len(fks)} foreign keys"
+    )
     return 0
 
 

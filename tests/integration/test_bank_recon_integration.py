@@ -40,13 +40,21 @@ class BankReconUploadValidationIntegrationTest(unittest.TestCase):
 
     def setUp(self) -> None:
         require_db()
+        creds = require_test_user()
         self.client = get_test_client()
+        # 原来这两条不带 token 就发,拿到的一直是 401 而不是 400 —— 路由第一行是
+        # require_perm(request, "recon.create")(routes/bank_recon_routes.py:48),
+        # 鉴权先于格式校验本就是对的顺序,断言不该迁就它。带上 token 才验得到真正要锁的那道闸。
+        self.h = auth_header(
+            login_for_token(self.client, creds["PEARNLY_E2E_USER"], creds["PEARNLY_E2E_PASS"])
+        )
 
     def test_unsupported_format_rejected_400(self) -> None:
         """非白名单扩展名(.txt)· 必须 400 unsupported_format(早于 file.read / 解析)"""
         resp = self.client.post(
             "/api/bank-recon/upload",
             files={"file": ("bad.txt", io.BytesIO(b"not a statement"), "text/plain")},
+            headers=self.h,
         )
         self.assertEqual(
             resp.status_code,
@@ -64,6 +72,7 @@ class BankReconUploadValidationIntegrationTest(unittest.TestCase):
         resp = self.client.post(
             "/api/bank-recon/upload",
             files={"file": ("tiny.pdf", io.BytesIO(b"x"), "application/pdf")},
+            headers=self.h,
         )
         self.assertEqual(
             resp.status_code,

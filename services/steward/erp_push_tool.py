@@ -30,12 +30,11 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from decimal import Decimal
 from typing import Optional
 
 from services.agent.contracts import ToolResult
 from services.erp.bridge import BridgeError, BridgeUnavailable
-from services.steward import tool_scope
+from services.steward import erp_push_trail as trail, tool_scope
 from services.steward.registry import ToolContext
 from services.steward.tool_scope import ERR_INVOICE_AMBIGUOUS, ERR_INVOICE_NOT_FOUND  # noqa: F401
 
@@ -56,9 +55,13 @@ ERR_PUSH_PENDING = "steward.erp_push_pending"
 # —— 那条是"没人来领,肯定没写",这条是"领了,写没写不知道"。共用一句文案就等于替她断定
 # 没写,而她照着再说一次就是账上两张。
 ERR_PUSH_UNCERTAIN = "steward.erp_push_uncertain"
+# Express 正开着这个账套 → 桥连备份都没做就快拒。旧队列(小助手来领)撞上它会自己重领,
+# 桥直写这条路不会 —— 共用 ERR_PUSH_FAILED 的"查清原因后再说一次"等于让会计去查一件
+# 她一眼就能解决的事(把 Express 关掉),而她无从知道那才是原因。
+ERR_PUSH_ACCOUNT_BUSY = "steward.erp_push_account_busy"
+# 桥端占用码(companion bridge/writepath/orchestrator.ERR_WAITING_LOCK)。云端不产它,只认。
+BRIDGE_ACCOUNT_BUSY_CODE = "ACCOUNT_BUSY_LOCKED"
 
-AUDIT_SUBMITTED = "steward.erp_push_submitted"
-AUDIT_REFUSED = "steward.erp_push_refused"
 
 # 快照字段:铸卡时定格、执行前重比。票面变了(会计改了金额/票号/过账去向)旧批文就不作数
 # —— posting_kind 在列里是因为它决定这张票按库存还是按服务记账,批的是哪一种就得写哪一种。
@@ -79,13 +82,6 @@ ARG_KEYS = (
 # ——被 worker 的 wait_for 硬砍掉的话,job_id 就丢了,会计没有东西可以对账。
 _POLL_INTERVAL_S = 2.0
 _POLL_DEADLINE_S = 840.0
-
-# 在途那一行的占位租约。Express 旧推送腿的队列 = 本表 status='pending' 且
-# (lease_owner IS NULL OR lease_expires_at < NOW()) 的行(agent_store.lease_pending),
-# 而这份载荷的 account_set 恰好过得了它的白名单 —— 不占住租约,桥这边还在写,小助手就把
-# 同一份载荷领走再写一遍,ack 还会把如实记的「在途」抹成「已完成」。
-_PENDING_LEASE_OWNER = "steward-bridge"
-_PENDING_LEASE_S = 10 * 365 * 24 * 3600  # 十年 = 实际上永不释放(这行不是给人领的活)
 
 
 @dataclass
@@ -328,7 +324,7 @@ def _submit(
         # 形状被拒(BridgeRejected)与其它桥层异常同归一路:都是"没写进去",指路文案一致。
         return _refused(ctx, endpoint, history, payload, account_set, ERR_PUSH_REJECTED, str(e))
 
-    _audit(ctx, history, payload, job_id)
+    trail.audit(ctx, history, payload, job_id)
     outcome = _await_write(ctx.tenant_id, job_id)
     data = {
         "job_id": job_id,
@@ -342,23 +338,41 @@ def _submit(
     status = outcome["status"]
     result = outcome["result"] or {}
     if status == "done" and result.get("ok") is not False:
-        _log_push(ctx, endpoint, history, payload, "success", data)
+        trail.log_push(ctx, endpoint, history, payload, "success", data)
         return ToolResult(ok=True, data=data)
     if status == "pending":
         # 桥还在写:不是失败也不是成功,如实报"在途"并交出 job_id(重推 = 双写)。
-        _log_push(ctx, endpoint, history, payload, "pending", data, leased=True)
+        trail.log_push(ctx, endpoint, history, payload, "pending", data, leased=True)
         return ToolResult(ok=False, error_code=ERR_PUSH_PENDING, data=data)
     err = outcome["error"] or _business_error(result)
-    data["reason"] = str(err.get("message") or err.get("code") or "")
-    if err.get("code") == bridge_write_gate.CONFIRMED_UNACKED_CODE:
+    bridge_code = str(err.get("code") or "")
+    data["reason"] = str(err.get("message") or bridge_code or "")
+    if bridge_code == bridge_write_gate.CONFIRMED_UNACKED_CODE:
         # 领了没回执:结果未知,不能落"失败"(她会重推,那就是两张)。这一行的真相是"投出去了,
         # 收不到回音",与上面在途那条同形 —— 同样占住远期租约,否则小助手会把同一份载荷领走
         # 再写一遍,而这份载荷带着确认位、写侧幂等闸是关的。
-        _log_push(ctx, endpoint, history, payload, "pending", data, leased=True)
+        trail.log_push(
+            ctx, endpoint, history, payload, "pending", data, leased=True, code=bridge_code
+        )
         return ToolResult(ok=False, error_code=ERR_PUSH_UNCERTAIN, data=data)
+    if bridge_code == BRIDGE_ACCOUNT_BUSY_CODE and not _bridge_wrote(result):
+        # 账套被占是唯一「会计自己一步就能解开、且解完重推确定安全」的失败:桥在备份之前就
+        # 快拒(write_jobs 的占用预探测),或写到一半拿不到锁并已回滚,两条都一个字节没写。
+        # 只在桥自己说没写时才敢这么讲 —— 它说写了就照旧走通用失败,别拿"放心重推"赌一张重单。
+        trail.log_push(ctx, endpoint, history, payload, "failed", data, code=bridge_code)
+        return ToolResult(ok=False, error_code=ERR_PUSH_ACCOUNT_BUSY, data=data)
     code = ERR_PUSH_EXPIRED if status == "expired" else ERR_PUSH_FAILED
-    _log_push(ctx, endpoint, history, payload, "failed", data)
+    trail.log_push(ctx, endpoint, history, payload, "failed", data, code=bridge_code)
     return ToolResult(ok=False, error_code=code, data=data)
+
+
+def _bridge_wrote(result: dict) -> bool:
+    """桥是否自报「往账套写了字节」(meta.written)。缺这个键 = 桥没表态,按没写算。
+
+    只有桥知道真相,云端无从判断;这个判据单独拎出来,是因为它决定敢不敢跟会计说「放心重推」。
+    """
+    meta = result.get("meta")
+    return bool(isinstance(meta, dict) and meta.get("written") is True)
 
 
 def _business_error(result: dict) -> dict:
@@ -391,87 +405,6 @@ def _refused(
     桥拒收尤其要留 request_body —— 载荷形状被拒说明 mapper 产物有问题,不留就无从查起。
     """
     data = {"account_set": account_set, "reason": reason, "job_id": ""}
-    _log_push(ctx, endpoint, history, payload, "failed", data, http_status=0)
-    _audit(ctx, history, payload, "", action=AUDIT_REFUSED, reason=reason)
+    trail.log_push(ctx, endpoint, history, payload, "failed", data, http_status=0)
+    trail.audit(ctx, history, payload, "", action=trail.AUDIT_REFUSED, reason=reason)
     return ToolResult(ok=False, error_code=code, data=data)
-
-
-def _log_push(
-    ctx: ToolContext,
-    endpoint: dict,
-    history: dict,
-    payload: dict,
-    status: str,
-    data: dict,
-    *,
-    http_status: int = 202,
-    leased: bool = False,
-) -> None:
-    """落 erp_push_logs 一行(推送状态唯一事实源;不落的话管家自己的推送查询看不见这次)。
-
-    不设 next_retry_at:重试队列是给旧 pending 路径用的,桥直写的单绝不由后台自动重推。
-    leased=True(在途那一行)另钉一个远期占位租约:pending 是 Express 旧队列的保留态,
-    不占住租约,小助手会把同一份载荷领走再写一遍 —— 防的不是重试扫描,是 lease_pending。
-    审计/日志写挂不回滚已经发生的写 —— 桥那边可能已经落账,吞掉状态才是真事故。
-    """
-    from core import db
-
-    try:
-        db.insert_push_log(
-            user_id=ctx.user_id,
-            endpoint_id=str(endpoint.get("id") or ""),
-            history_id=str(history.get("id") or ""),
-            invoice_no=payload.get("ref_no"),
-            seller_name=str(history.get("seller_name") or ""),
-            total_amount=Decimal(_money(payload.get("total_amount"))),
-            status=status,
-            http_status=http_status,
-            request_body=payload,
-            response_body=None,
-            error_msg=data.get("reason") or None,
-            attempt=1,
-            elapsed_ms=0,
-            trigger="steward",
-            lease_owner=_PENDING_LEASE_OWNER if leased else None,
-            lease_seconds=_PENDING_LEASE_S if leased else 0,
-        )
-    except Exception:  # noqa: BLE001 — 日志写失败不改变桥那边的既成事实
-        logger.warning("[steward.erp_push] push log write failed job=%s", data.get("job_id"))
-
-
-def _audit(
-    ctx: ToolContext,
-    history: dict,
-    payload: dict,
-    job_id: str,
-    *,
-    action: str = AUDIT_SUBMITTED,
-    reason: str = "",
-) -> None:
-    """写操作留痕:谁把哪张票投进了哪个账套(投单即记,不等结果 —— 结果可能永远等不到)。
-    桥没收下的那两条走 AUDIT_REFUSED:没写进去也要有「谁在什么时候试图往哪个账套写」。"""
-    try:
-        from services.audit import store as audit_store
-
-        audit_store.insert_operation_log(
-            tenant_id=ctx.tenant_id,
-            actor_user_id=ctx.user_id,
-            actor_username=ctx.user.get("username"),
-            actor_is_super=bool(ctx.user.get("is_super_admin")),
-            action=action,
-            target_type="ocr_history",
-            target_id=str(history.get("id") or ""),
-            target_name=payload.get("ref_no"),
-            details={
-                "job_id": job_id,
-                "account_set": payload.get("account_set"),
-                "direction": payload.get("direction"),
-                "doctype": payload.get("doctype"),
-                "total_amount": payload.get("total_amount"),
-                # 载荷里只有逐行 item_mode,过账去向的原始声明在票上 —— 审计要留的是声明。
-                "posting_kind": str(history.get("posting_kind") or ""),
-                "reason": reason,
-            },
-        )
-    except Exception:  # noqa: BLE001 — 审计挂不阻断已投出去的写活
-        logger.warning("[steward.erp_push] audit write failed job=%s", job_id, exc_info=True)

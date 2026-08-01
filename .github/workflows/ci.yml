@@ -130,7 +130,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   # REFACTOR-WC-P1 · 防屎山闸(铁律 #27 · 窗口 C · 2026-05-28)
-  #   #1 check_file_size.py : 任何监控代码文件 > 500 行 → fail(历史巨石短期豁免在脚本里)
+  #   #1 check_file_size.py : 任何监控代码文件 > 500 行 → fail(存量基线在 scripts/file_size_baseline.json)
   #   #2 check_line_ratchet.py: 任何监控文件净增长 > 0 → fail(透明豁免:commit 加 RATCHET-EXEMPT)
   # 模式 = FAIL(2026-06-03 整顿收官 · 全文件 <500 · Zihao 拍板切硬门)·
   # 任何监控文件 >500 行 或 行数净增长 → CI 红 → 挡合并 · 屎山不再复辟。
@@ -153,7 +153,11 @@ jobs:
 
       # 两个脚本只用标准库 · 不装任何依赖(故意 · 零依赖 · 任何环境跑得动)
 
-      - name: 防屎山闸 #1 · 文件行数 ≤ 500(铁律 #27.1)
+      # 2026-08-01 扩面:`static/ai/**/*.js` 收进监控。/ai 是独立 SPA(不走 src/home 的 vite
+      # 打包),它 119 个 .js 从建站起整片在闸外,收进来当场 7 个越线。存量记
+      # scripts/file_size_baseline.json(只许降不许升),基线外越线即红 —— 新债一行都不许欠。
+      # 词典分片 ai-i18n-*.js 不算代码,豁免判据由 tests/unit/test_file_size_gate.py 兜。
+      - name: 防屎山闸 #1 · 文件行数 ≤ 500 + static/ai 存量基线(铁律 #27.1)
         run: python scripts/check_file_size.py
 
       - name: 防屎山闸 #2 · 棘轮 · 监控文件只许减不许增(铁律 #27.2)

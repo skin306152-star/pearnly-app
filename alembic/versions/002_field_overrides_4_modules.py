@@ -16,7 +16,7 @@ Schema 形态:`{field_name: {"ocr": <value>, "user": <value>, "ts": <iso8601>}, 
 不做数据迁移(field_overrides 默认 NULL · M4 现有 summary_json._anchor_overrides 暂不动 · P1.2 切单源时一并 backfill)
 
 Revision ID: 002_field_overrides_4_modules
-Revises: 001_baseline
+Revises: 001a_legacy_tables
 Create Date: 2026-05-23
 """
 
@@ -25,7 +25,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "002_field_overrides_4_modules"
-down_revision: Union[str, Sequence[str], None] = "001_baseline"
+down_revision: Union[str, Sequence[str], None] = "001a_legacy_tables"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

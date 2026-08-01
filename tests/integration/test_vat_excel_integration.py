@@ -7,7 +7,7 @@ tests/integration/test_vat_excel_integration.py · REFACTOR-WC-D3
 本文件:3 个集成测试 · env-gated
 
 只验「访问闸 + 上传校验契约」· 不传真发票/报告 → 不触发并行 OCR(不烧 Gemini):
-  - GET  /api/vat_excel/check  匿名 → 200 {allowed:False}(优雅闸 · 非 401/500)
+  - GET  /api/vat_excel/check  匿名 → 401 auth.missing_token(不泄栈)
   - POST /api/vat_excel/build  未登录 → 401(auth 先于一切)
   - POST /api/vat_excel/build  已登录但空上传 → 400(必须 1 发票 + 1 报告)
 锁定的契约:对账入口必须先卡登录、再卡"至少一发票一报告" —— 重构 vat_excel_routes
@@ -24,7 +24,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tests.integration._helpers import (  # noqa: E402
-    assert_json_response,
     auth_header,
     get_test_client,
     login_for_token,
@@ -40,14 +39,23 @@ class VatExcelAccessGateIntegrationTest(unittest.TestCase):
         require_db()
         self.client = get_test_client()
 
-    def test_check_anonymous_returns_not_allowed_200(self) -> None:
-        """GET /check 匿名 · 必须优雅 200 + allowed:False(不是 401/500)"""
+    def test_check_anonymous_returns_401(self) -> None:
+        """GET /check 匿名 · 401 auth.missing_token(不是 500 · 不泄栈)
+
+        原断言是「优雅 200 + allowed:False」,对着的是 routes/vat_excel_routes.py:77-78
+        那两行 `if not user: return {allowed: False}`。但 get_current_user_from_request
+        (core/auth.py:268)无 token 时是 raise 401,从不返 None —— 那两行是死代码,
+        这条契约产品从来没提供过,而全仓也没有任何前端在匿名探测 /check。
+        改成锁真正成立的那条:匿名到不了这个口,且错误体不泄内部细节。
+        """
         resp = self.client.get("/api/vat_excel/check")
-        data = assert_json_response(self, resp, expect_status=200)
-        self.assertFalse(
-            data.get("allowed", True),
-            msg=f"匿名访问 /check 应 allowed:False · 实际 {data}",
+        self.assertEqual(
+            resp.status_code,
+            401,
+            msg=f"匿名 /check 应 401 · 实际 {resp.status_code} body={resp.text[:200]}",
         )
+        body = resp.text.lower()
+        self.assertNotIn("traceback", body, msg="匿名响应里有 traceback · 泄露内部!")
 
     def test_build_unauthenticated_returns_401(self) -> None:
         """POST /build 未登录 · 必须 401(auth 早于文件处理 · 防匿名烧 OCR)"""

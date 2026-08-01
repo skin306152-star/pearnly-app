@@ -9,9 +9,9 @@ git-deploy 没有 `alembic upgrade` 钩子 —— 0021 之后 70 多条迁移从
 某台开发机的活库里。空库重建不出来 —— 真库测试一碰就炸,只能在测试文件里手抄 DDL,
 而手抄的 DDL 又不是事实源(抄错了没人知道)。
 
-本闸不解决历史欠账(那需要一条 baseline 迁移,风险另议),只钉住两件事:
-  ① 新表不许再以这种状态出生 —— 建表 DDL 必须落在产品代码里;
-  ② 历史欠账只准变少:KNOWN_UNCOVERED 里的表一旦补上 DDL,必须同步从名单删掉。
+历史欠账已于 2026-08-01 还清:迁移 001a_legacy_tables(载荷 alembic/sql/001a_legacy_tables.sql)
+把那 26 张表的建表 DDL 逐字从快照补进了迁移史,KNOWN_UNCOVERED 因此清空。
+闸从此是硬门:生产在用的表,产品代码里必须有建表 DDL,一张都不许缺。
 
 判据来源:
   · "生产有哪些表" = docs/db/prod-schema.sql(scripts/dump_prod_schema.py 生成的只读快照)
@@ -42,45 +42,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT = PROJECT_ROOT / "docs" / "db" / "prod-schema.sql"
 
 # 扫描范围:产品代码。tests/ docs/ 不在内(见文件头"判据来源")。
-_SCAN_DIRS = ("alembic/versions", "services", "core", "routes", "scripts/sql")
+_SCAN_DIRS = ("alembic/versions", "alembic/sql", "services", "core", "routes", "scripts/sql")
 _SCAN_ROOT_FILES = ("app.py", "db.py")
 _SKIP_PARTS = ("node_modules", "__pycache__", ".git", "venv", "dist")
 
 _CREATE_RE = re.compile(r"create\s+table\s+(?:if\s+not\s+exists\s+)?[\"']?([a-z0-9_]+)", re.I)
 
-# 历史欠账(2026-07-31 盘点 · 176 张在产表里的 26 张):建表 DDL 在产品代码里根本不存在。
-# 前 11 张全仓只有 tests/integration 的手抄桩,后 15 张连桩都没有。
-# 修的方向是一条 baseline 迁移把它们补进迁移史;在那之前本名单只准变短。
-KNOWN_UNCOVERED: Dict[str, str] = {
-    # 只在 tests/integration 的 RLS 真库测试里手抄过 DDL
-    "automation_rules": "tests/integration/test_automation_rls_real_tables.py 手抄",
-    "bank_reconcile_candidates": "tests/integration/test_bank_recon_rls_real_tables.py 手抄",
-    "bank_reconcile_sessions": "tests/integration/test_bank_recon_rls_real_tables.py 手抄",
-    "bank_reconcile_transactions": "tests/integration/test_bank_recon_rls_real_tables.py 手抄",
-    "email_ingest_accounts": "tests/integration/test_email_ingest_rls_real_tables.py 手抄",
-    "email_ingest_logs": "tests/integration/test_email_ingest_rls_real_tables.py 手抄",
-    "email_ingest_seen_uids": "tests/integration/test_email_ingest_rls_real_tables.py 手抄",
-    "erp_endpoints": "tests/integration/test_erp_push_rls_real_tables.py 手抄",
-    "erp_push_logs": "tests/integration/test_erp_push_rls_real_tables.py 手抄",
-    "ocr_history": "tests/integration/test_clients_ocr_history_rls_real_tables.py 手抄(被 16 条迁移 ALTER 过)",
-    "users": "tests/integration/test_clients_ocr_history_rls_real_tables.py 手抄",
-    # 全仓无任何建表语句
-    "api_keys": "全仓无 CREATE",
-    "erp_oauth_states": "全仓无 CREATE",
-    "erp_oauth_tokens": "全仓无 CREATE",
-    "excel_templates": "全仓无 CREATE",
-    "expense_draft": "全仓无 CREATE",
-    "ip_usage": "全仓无 CREATE",
-    "line_binding_codes": "全仓无 CREATE",
-    "line_bindings": "全仓无 CREATE",
-    "mrerp_credentials": "全仓无 CREATE",
-    "operation_logs": "全仓无 CREATE",
-    "rd_cache": "全仓无 CREATE",
-    "rd_daily_usage": "全仓无 CREATE",
-    "supplier_client_mapping": "全仓无 CREATE",
-    "tenants": "全仓无 CREATE",
-    "user_settings": "全仓无 CREATE",
-}
+# 历史欠账清单。2026-07-31 建闸时装了 26 张,2026-08-01 由 001a_legacy_tables 全部还清,
+# 现在是空的 —— 空 = 生产每张表都有 DDL,新表欠债当场红。留着这个入口是为了下次真需要
+# 记债时有个透明位置(条目要写清欠的是什么、谁还),不是为了给人塞新债。
+KNOWN_UNCOVERED: Dict[str, str] = {}
 
 
 def snapshot_tables(snapshot_text: str) -> Set[str]:

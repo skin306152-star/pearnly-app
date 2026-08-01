@@ -40,16 +40,17 @@ class FieldOverridesMigrationContractTests(unittest.TestCase):
     EXPECTED_TABLES = ("ocr_history", "reconciliation_row", "gl_vat_tasks", "bank_recon_v2_tasks")
 
     def test_alembic_002_file_present_and_revision_chain_correct(self):
-        """P1.1 契约 1 · 002 文件存在 + revision = 002 + down_revision = 001_baseline"""
+        """P1.1 契约 1 · 002 文件存在 + revision = 002 + down_revision 挂在 baseline 段末尾"""
         self.assertTrue(os.path.exists(self.migration_path), "Alembic 002 migration file missing")
         m_rev = re.search(r'revision:\s*str\s*=\s*"([^"]+)"', self.migration_src)
         self.assertIsNotNone(m_rev, "revision = ... not declared")
         self.assertEqual(m_rev.group(1), "002_field_overrides_4_modules")
-        # down_revision 必须指向 baseline(链不能断)
+        # 2026-08-01:001_baseline 与 002 之间插进了 001a_legacy_tables(把 26 张遗留表的
+        # 建表 DDL 补进迁移史)。002 的前驱因此换人 —— 链没断,只是 baseline 变成两段。
         self.assertIn(
-            'down_revision: Union[str, Sequence[str], None] = "001_baseline"',
+            'down_revision: Union[str, Sequence[str], None] = "001a_legacy_tables"',
             self.migration_src,
-            "down_revision must point to 001_baseline (Alembic version chain)",
+            "down_revision must point to 001a_legacy_tables (Alembic version chain)",
         )
 
     def test_upgrade_adds_4_columns(self):

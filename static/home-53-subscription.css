@@ -276,11 +276,105 @@
     justify-content: center;
 }
 
+/* 计费规则浮层(2026-08-01)· 挂在套餐区标题行右侧
+   规则文案四语一直都在,但 c240b84a 把「计费规则 + 最近账单」整片换成记录框时一起端走了,
+   之后产品里没有任何地方讲周期怎么算 —— 客户只能来问「月底扣我多少」。规则讲的就是这几张
+   卡怎么算钱,挂在它们的标题行上找它的路径最短。 */
+.ui .sub-plans-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s3);
+}
+.ui .sub-rules {
+    position: relative;
+    flex-shrink: 0;
+}
+.ui .sub-rules-btn {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 12.5px;
+    background: var(--accent-weak);
+    color: var(--accent);
+    border-color: transparent;
+}
+.ui .sub-rules-btn svg {
+    width: 15px;
+    height: 15px;
+}
+.ui .sub-rules-pop {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 5;
+    width: min(430px, calc(100vw - var(--s4) * 4));
+    padding: var(--s3) var(--s4) var(--s4);
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    background: var(--card);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease,
+        visibility 0.15s;
+}
+/* 三个触发口:鼠标悬停 / 键盘聚焦 / 手指点开(.open 由 page-dashboard.ts 挂)
+   少了最后一个,规则在手机上就等于不存在。 */
+.ui .sub-rules:hover .sub-rules-pop,
+.ui .sub-rules:focus-within .sub-rules-pop,
+.ui .sub-rules.open .sub-rules-pop {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+.ui .sub-rules-pop-h {
+    font-size: 12px;
+    color: var(--ink3);
+    padding-bottom: var(--s2);
+    margin-bottom: var(--s2);
+    border-bottom: 1px solid var(--line);
+}
+.ui .sub-rules-pop ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 7px;
+}
+.ui .sub-rules-pop li {
+    position: relative;
+    padding-left: 14px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--ink2);
+}
+.ui .sub-rules-pop li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--accent);
+}
+
 @media (max-width: 800px) {
     .ui .sub-top {
         grid-template-columns: 1fr;
     }
     .ui .sub-plans {
         grid-template-columns: 1fr;
+    }
+    /* 窄屏标题行竖排,浮层改左对齐:右对齐会把 430px 的框推出屏幕外 */
+    .ui .sub-plans-head {
+        flex-direction: column;
+    }
+    .ui .sub-rules-pop {
+        right: auto;
+        left: 0;
     }
 }

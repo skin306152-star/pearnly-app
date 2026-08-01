@@ -189,7 +189,9 @@ function renderPlans(sub: SubState | null) {
         return;
     }
     const sheet = _esc(_t('sub-sheet', '张'));
-    const perMonth = _esc(_t('sub-per-month', '月'));
+    // 计费周期 = 订阅日起 30 天(pricing.SUBSCRIPTION_CYCLE_DAYS),不是自然月。
+    // 写「月」会让人以为月底结算,真有客户照此算错过账单。
+    const perMonth = _esc(_t('sub-per-month', '30 天'));
     el.innerHTML = _plans
         .map((p) => {
             const isCur = !!sub && sub.plan_code === p.code;
@@ -212,7 +214,7 @@ function renderPlans(sub: SubState | null) {
                 perMonth +
                 '</span></div></div></div>' +
                 '<ul class="sub-plan-feats"><li>' +
-                _esc(_t('sub-feat-quota', '每月额度')) +
+                _esc(_t('sub-feat-quota', '每周期额度')) +
                 ' ' +
                 p.quota +
                 ' ' +
@@ -253,7 +255,7 @@ async function onSubscribe(code: string) {
         ' · ' +
         _money(plan.fee) +
         '/' +
-        _t('sub-per-month', '月') +
+        _t('sub-per-month', '30 天') +
         '?';
     const ok =
         typeof window.showConfirm === 'function'

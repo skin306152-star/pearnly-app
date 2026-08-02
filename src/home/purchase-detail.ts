@@ -19,6 +19,7 @@ import {
     type DocLine,
 } from './purchase-common.js';
 import { PURCHASE_DETAIL_CSS } from './purchase-detail-css.js';
+import { BAHT } from './money.js';
 
 let pendingId: string | null = null;
 let cur: DocDetail | null = null;
@@ -52,7 +53,7 @@ function summaryStrip(d: DocDetail): string {
         [t('pur-supplier'), escapeHtml((d.supplier && d.supplier.name) || '—'), ''],
         [t('pur-doc-date'), escapeHtml(d.doc_date || '—'), ''],
         [t('pur-type'), escapeHtml(t(kindLabelKey(d.doc_kind))), ''],
-        [t('pur-grand'), '฿' + fmtMoney(d.grand_total), 'total'],
+        [t('pur-grand'), BAHT + fmtMoney(d.grand_total), 'total'],
     ];
     return `<section class="summary">${items
         .map(
@@ -119,18 +120,18 @@ function itemsCard(d: DocDetail): string {
 function amountCard(d: DocDetail): string {
     if (d.doc_kind === 'expense' && !d.has_vat) {
         return `<article class="card"><div class="hd"><div class="ct"><span class="ico">${ICON.money}</span>${escapeHtml(t('pur-amount'))}</div></div>
-            <div class="mlist"><div class="mrow total"><span>${escapeHtml(t('pur-grand'))}</span><strong>฿${fmtMoney(d.grand_total)}</strong></div></div></article>`;
+            <div class="mlist"><div class="mrow total"><span>${escapeHtml(t('pur-grand'))}</span><strong>${BAHT}${fmtMoney(d.grand_total)}</strong></div></div></article>`;
     }
     const wht =
         d.wht_amount > 0
-            ? `<div class="mrow"><span>${escapeHtml(t('pur-wht'))}</span><strong>−฿${fmtMoney(d.wht_amount)}</strong></div>`
+            ? `<div class="mrow"><span>${escapeHtml(t('pur-wht'))}</span><strong>−${BAHT}${fmtMoney(d.wht_amount)}</strong></div>`
             : '';
     return `<article class="card"><div class="hd"><div class="ct"><span class="ico">${ICON.money}</span>${escapeHtml(t('pur-amount'))}</div></div>
         <div class="mlist">
-            <div class="mrow"><span>${escapeHtml(t('pur-subtotal-ex'))}</span><strong>฿${fmtMoney(d.subtotal)}</strong></div>
-            <div class="mrow tax"><span>${escapeHtml(t('pur-vat-in'))} <span class="pill ok">${escapeHtml(t('pur-creditable'))}</span></span><strong>฿${fmtMoney(d.vat_amount)}</strong></div>
+            <div class="mrow"><span>${escapeHtml(t('pur-subtotal-ex'))}</span><strong>${BAHT}${fmtMoney(d.subtotal)}</strong></div>
+            <div class="mrow tax"><span>${escapeHtml(t('pur-vat-in'))} <span class="pill ok">${escapeHtml(t('pur-creditable'))}</span></span><strong>${BAHT}${fmtMoney(d.vat_amount)}</strong></div>
             ${wht}
-            <div class="mrow total"><span>${escapeHtml(t('pur-grand'))}</span><strong>฿${fmtMoney(d.grand_total)}</strong></div>
+            <div class="mrow total"><span>${escapeHtml(t('pur-grand'))}</span><strong>${BAHT}${fmtMoney(d.grand_total)}</strong></div>
         </div></article>`;
 }
 
@@ -139,9 +140,9 @@ function payCard(d: DocDetail): string {
     const pst = d.status === 'void' ? 'void' : d.payment_status;
     return `<article class="card"><div class="hd"><div class="ct"><span class="ico">${ICON.pay}</span>${escapeHtml(t('pur-payment'))}</div><span class="badge ${pst}">${escapeHtml(t(d.status === 'void' ? 'pur-status-void' : 'pur-pay-' + d.payment_status))}</span></div>
         <div class="mlist">
-            <div class="mrow"><span>${escapeHtml(t('pur-payable'))}</span><strong>฿${fmtMoney(d.net_payable)}</strong></div>
-            <div class="mrow"><span>${escapeHtml(t('pur-paid'))}</span><strong>฿${fmtMoney(d.paid_amount)}</strong></div>
-            <div class="mrow unpaid"><span>${escapeHtml(t('pur-due-balance'))}</span><strong>฿${fmtMoney(due)}</strong></div>
+            <div class="mrow"><span>${escapeHtml(t('pur-payable'))}</span><strong>${BAHT}${fmtMoney(d.net_payable)}</strong></div>
+            <div class="mrow"><span>${escapeHtml(t('pur-paid'))}</span><strong>${BAHT}${fmtMoney(d.paid_amount)}</strong></div>
+            <div class="mrow unpaid"><span>${escapeHtml(t('pur-due-balance'))}</span><strong>${BAHT}${fmtMoney(due)}</strong></div>
         </div></article>`;
 }
 

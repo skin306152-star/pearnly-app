@@ -315,11 +315,17 @@
   background: var(--surface2);
   border-color: var(--hair);
 }
+/* 错误码那一行:码本身保持最低存在感,同排的复制按钮才是可点的那一半(窄屏折行不挤)。 */
+.stw-code {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 5px;
+}
 .stw-reason code {
-  display: block;
   font-size: 10.5px;
   color: var(--faint);
-  margin-top: 3px;
 }
 
 /* ---------- 写操作授权卡(状态徽章/按钮取 B1 与 .btn,这里只管卡怎么摆) ---------- */

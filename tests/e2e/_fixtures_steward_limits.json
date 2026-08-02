@@ -1,0 +1,28 @@
+{
+  "max_file_bytes": 20971520,
+  "max_batch_bytes": 36700160,
+  "max_files": 20,
+  "accept": [
+    ".bmp",
+    ".csv",
+    ".doc",
+    ".docx",
+    ".gif",
+    ".heic",
+    ".heif",
+    ".jpeg",
+    ".jpg",
+    ".pdf",
+    ".png",
+    ".tif",
+    ".tiff",
+    ".tsv",
+    ".txt",
+    ".webp",
+    ".xls",
+    ".xlsm",
+    ".xlsx",
+    ".zip"
+  ],
+  "ttl_days": 30
+}

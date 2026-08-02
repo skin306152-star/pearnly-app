@@ -125,7 +125,11 @@ class LeasePerKindTests(unittest.TestCase):
 
     def test_write_ttl_is_600s_and_query_stays_120s(self):
         cur = self._lease("write")
-        sql, params = next((s, p) for s, p in cur.executed if "SET status = 'expired'" in s)
+        # 认「排队超龄」那一句而不是笼统的 status='expired' —— 确认写活的诚实收尾也落
+        # expired,只按状态挑会挑中它,然后断言一个跟超龄无关的语句。
+        sql, params = next(
+            (s, p) for s, p in cur.executed if "status = 'queued' AND created_at" in s
+        )
         self.assertIn("CASE WHEN kind = 'write'", sql)
         self.assertEqual(params, (BRIDGE_A, 600, 120))
         self.assertEqual(write_gate.WRITE_JOB_TTL_SECONDS, 600)

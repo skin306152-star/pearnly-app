@@ -7,6 +7,8 @@
 // window.loadSubscription 由 dashboard.ts 的 loadDashboard 触发。
 // ============================================================
 
+import { BAHT } from './money.js';
+
 interface SubPlan {
     code: string;
     quota: number;
@@ -42,7 +44,7 @@ function _auth() {
     return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
 }
 function _money(n: number): string {
-    return '฿ ' + Number(n || 0).toFixed(2);
+    return BAHT + Number(n || 0).toFixed(2);
 }
 function _esc(s: unknown): string {
     return typeof window.escapeHtml === 'function'
@@ -187,7 +189,9 @@ function renderPlans(sub: SubState | null) {
         return;
     }
     const sheet = _esc(_t('sub-sheet', '张'));
-    const perMonth = _esc(_t('sub-per-month', '月'));
+    // 计费周期 = 订阅日起 30 天(pricing.SUBSCRIPTION_CYCLE_DAYS),不是自然月。
+    // 写「月」会让人以为月底结算,真有客户照此算错过账单。
+    const perMonth = _esc(_t('sub-per-month', '30 天'));
     el.innerHTML = _plans
         .map((p) => {
             const isCur = !!sub && sub.plan_code === p.code;
@@ -204,12 +208,13 @@ function renderPlans(sub: SubState | null) {
                 '</span><div><div class="sub-plan-name">Package ' +
                 _esc(p.code) +
                 '</div><div class="sub-plan-price">' +
+                BAHT +
                 Number(p.fee).toFixed(0) +
-                '<span>฿/' +
+                '<span>/' +
                 perMonth +
                 '</span></div></div></div>' +
                 '<ul class="sub-plan-feats"><li>' +
-                _esc(_t('sub-feat-quota', '每月额度')) +
+                _esc(_t('sub-feat-quota', '每周期额度')) +
                 ' ' +
                 p.quota +
                 ' ' +
@@ -250,7 +255,7 @@ async function onSubscribe(code: string) {
         ' · ' +
         _money(plan.fee) +
         '/' +
-        _t('sub-per-month', '月') +
+        _t('sub-per-month', '30 天') +
         '?';
     const ok =
         typeof window.showConfirm === 'function'
@@ -300,4 +305,5 @@ async function onCancel() {
     }
 }
 
+// ES module(隔离本文件的 _t/_auth 等同名局部 · 不落进脚本全局作用域跟同组文件互撞)。
 export {};

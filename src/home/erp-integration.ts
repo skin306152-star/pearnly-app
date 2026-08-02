@@ -134,7 +134,7 @@ async function loadErpLogs(silent?: boolean) {
             }, 4000);
         }
         if (items.length === 0) {
-            // 后端已剔除 DMS 行(exclude_push_type)· 整页为空即真到末页 → 回退上一页。
+            // 后端已按 exclude_push_type 剔除隐藏行且 total 同口径,空页即真到末页 · 回退不会循环。
             if (_logTotal > 0 && _logPage > 0) {
                 _logPage--;
                 loadErpLogs(silent);

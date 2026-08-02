@@ -123,10 +123,10 @@ async function boot(page, opts = {}) {
     if (opts.materials) {
         await page.route('**/materials', (r) => fail(r, opts.materials));
     }
-    await page.addInitScript(() => {
+    await page.addInitScript((lang) => {
         window.localStorage.setItem('mrpilot_token_ai', 'tok-failways');
-        window.localStorage.setItem('mrpilot_lang', 'zh');
-    });
+        window.localStorage.setItem('mrpilot_lang', lang);
+    }, opts.lang || 'zh');
 }
 
 // 收料区选一份料再点上传。文件框是 ai-intake.js 运行时建的隐藏 #ikFileInput,
@@ -140,6 +140,29 @@ async function pickAndUpload(page) {
         buffer: Buffer.from('%PDF-1.4 test'),
     });
     await page.locator('[data-action="ik-upload"]').click();
+}
+
+const INTAKE_ORDER =
+    '{"orders":[{"id":"wo-1","period":"2569-07","intent":"monthly_vat","status":"intake","current_step":"intake"}]}';
+
+// 开单成功(默认 stub 200)→ 进收料区 → 选一份料 → 上传撞 materials 指定的失败,
+// 停在失败批横幅上。上传失败态的每条用例都得先走这一趟,差别只在撞哪个码。
+async function openUploadFailureCard(page, materials, lang) {
+    await boot(page, { lang: lang, materials: materials });
+    await page.goto(`${BASE}/static/dist/ai.html#/client/1/intake`);
+    const openBtn = page.locator('[data-action="intake-open-order"]');
+    await expect(openBtn).toBeVisible({ timeout: 15000 });
+    await page.unroute('**/api/workorder/orders?**');
+    await page.route('**/api/workorder/orders?**', (r) =>
+        r.fulfill({ contentType: 'application/json', body: INTAKE_ORDER })
+    );
+    await openBtn.click();
+    await pickAndUpload(page);
+    return page.locator('.needs-card');
+}
+
+function open402Card(page, lang) {
+    return openUploadFailureCard(page, { status: 402, code: 'insufficient_balance' }, lang);
 }
 
 test.describe('/ai 失败态出路(本地 stub · 真构建产物)', () => {
@@ -353,23 +376,8 @@ test.describe('/ai 失败态出路(本地 stub · 真构建产物)', () => {
     });
 
     test('收料上传:401 → 失败批说的是登录过期,不是干巴巴「上传失败」', async ({ page }) => {
-        await boot(page, { materials: { status: 401 } });
-        await page.goto(`${BASE}/static/dist/ai.html#/client/1/intake`);
-        const openBtn = page.locator('[data-action="intake-open-order"]');
-        await expect(openBtn).toBeVisible({ timeout: 15000 });
-        // 开单成功(默认 stub 200)后才有上传区;这里只验上传失败态。
-        await page.unroute('**/api/workorder/orders?**');
-        await page.route('**/api/workorder/orders?**', (r) =>
-            r.fulfill({
-                contentType: 'application/json',
-                body: '{"orders":[{"id":"wo-1","period":"2569-07","intent":"monthly_vat","status":"intake","current_step":"intake"}]}',
-            })
-        );
-        await openBtn.click();
-
-        await pickAndUpload(page);
-
-        const banner = page.locator('.needs-card [role="alert"]');
+        const card = await openUploadFailureCard(page, { status: 401 });
+        const banner = card.locator('[role="alert"]');
         await expect(banner).toBeVisible({ timeout: 15000 });
         await expect(banner).toContainText('这些文件没传上去');
         await expect(banner).toContainText('登录已过期');
@@ -380,22 +388,7 @@ test.describe('/ai 失败态出路(本地 stub · 真构建产物)', () => {
     });
 
     test('收料上传:余额不足 402 → 重传旁边多一个「去充值」', async ({ page }) => {
-        await boot(page, { materials: { status: 402, code: 'insufficient_balance' } });
-        await page.goto(`${BASE}/static/dist/ai.html#/client/1/intake`);
-        const openBtn = page.locator('[data-action="intake-open-order"]');
-        await expect(openBtn).toBeVisible({ timeout: 15000 });
-        await page.unroute('**/api/workorder/orders?**');
-        await page.route('**/api/workorder/orders?**', (r) =>
-            r.fulfill({
-                contentType: 'application/json',
-                body: '{"orders":[{"id":"wo-1","period":"2569-07","intent":"monthly_vat","status":"intake","current_step":"intake"}]}',
-            })
-        );
-        await openBtn.click();
-
-        await pickAndUpload(page);
-
-        const card = page.locator('.needs-card');
+        const card = await open402Card(page, 'zh');
         await expect(card.locator('[role="alert"]')).toContainText('OCR 余额不足');
         await expect(card.locator('[data-action="ik-retry-failed"]')).toBeVisible();
         await expect(card.locator('a.btn.pri')).toHaveText('去充值');
@@ -404,4 +397,21 @@ test.describe('/ai 失败态出路(本地 stub · 真构建产物)', () => {
             fullPage: true,
         });
     });
+
+    // 原因行与「重传」之间那一句此前是 intake_failed_batch_n 原样上屏(四份词典都没这条,
+    // at() 回落成 key 本身),中泰两语的 402 卡上肉眼可见。断言盯这句话的字 + 反证卡上
+    // 没有下划线标识符;机械面由 scripts/check_ai_i18n_refs.py 兜底,不让它再犯第二次。
+    for (const c of [
+        { lang: 'zh', says: '还没进系统', shot: '07-upload-402-count-zh.png' },
+        { lang: 'th', says: 'ยังไม่เข้าระบบ', shot: '07-upload-402-count-th.png' },
+    ]) {
+        test(`收料上传 402:件数那句是人话不是生 key(${c.lang})`, async ({ page }) => {
+            const card = await open402Card(page, c.lang);
+            const line = card.locator('p.needs-sub').last();
+            await expect(line).toBeVisible();
+            await expect(line).toContainText(c.says);
+            await expect(card).not.toContainText('intake_failed_batch_n');
+            await page.screenshot({ path: path.join(ARTIFACT_DIR, c.shot), fullPage: true });
+        });
+    }
 });

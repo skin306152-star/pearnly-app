@@ -72,6 +72,7 @@ def _stock_by_product(
 
 def _row_to_item(r, units: dict, stock: dict) -> dict:
     pid = str(r["id"])
+    base_price = f"{r['unit_price']:.2f}" if r["unit_price"] is not None else None
     base_units = units.get(pid)
     if not base_units:
         base_units = [
@@ -79,7 +80,7 @@ def _row_to_item(r, units: dict, stock: dict) -> dict:
                 "unit_name": r["base_unit"],
                 "factor": "1.000",
                 "barcode": r["barcode"],
-                "price": f"{r['unit_price']:.2f}" if r["unit_price"] is not None else None,
+                "price": base_price,
                 "default_sell": True,
             }
         ]
@@ -89,6 +90,11 @@ def _row_to_item(r, units: dict, stock: dict) -> dict:
         "name": _name(r),
         "category_id": r["category_id"],
         "base_unit": r["base_unit"],
+        # 建了命名单位行(箱/打)的商品,units 里就只有那几行,基本单位的挂牌价一个字都没下发。
+        # 扫商品主码时后端把 matched_unit 填成基本单位(见 product_by_barcode)→ 前端在 units 里
+        # 找不到它,只能一律拒收,这瓶货在收银台就卖不出去了。后端本来认基本单位
+        # (services/pos/sale.py 的 _resolve_unit 走 products.unit_price),缺的只是这一行。
+        "base_price": base_price,
         "image_url": r["image_url"],
         "vat_applicable": bool(r["vat_applicable"]),
         "units": base_units,
@@ -146,29 +152,40 @@ def list_products(
 
 
 def product_by_barcode(cur, *, tenant_id: str, workspace_client_id: int, code: str) -> dict:
-    """扫码取单品。先配单位码(箱码≠瓶码),再配商品主码;命中单位回 matched_unit。"""
+    """扫码取单品。先配单位码(箱码≠瓶码),再配商品主码;命中单位回 matched_unit。
+
+    单位码查询带 product_active:停用商品的单位行保留 barcode 值(靠谓词让位 · 见
+    services/sales/products._set_unit_visibility),不筛就有多条同码行,`LIMIT 1` 无 ORDER BY
+    挑中哪条全看运气 —— 那是钱路径。命中单位但商品已停用(老库里 product_active 回填前的
+    残留行)时回落主码,跟主 SPA 的 find_by 同一套口径:两边分叉过一次,POS 认得的箱码在
+    建品查重那边显示"没人用",绿字骗人还放行重码。不回落就是收银员对着列表里明明在的商品
+    看 404「商品不存在」,台前没处可查。
+    """
     cur.execute(
         "SELECT product_id, unit_name FROM product_units "
-        "WHERE tenant_id = %s AND workspace_client_id = %s AND barcode = %s LIMIT 1",
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND barcode = %s "
+        "AND product_active LIMIT 1",
         (tenant_id, workspace_client_id, code),
     )
     u = cur.fetchone()
     matched_unit = None
+    row = None
     if u:
-        product_id = str(u["product_id"])
-        matched_unit = u["unit_name"]
         cur.execute(
             f"SELECT {_PROD_COLS} FROM products "
             "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s AND is_active = TRUE",
-            (tenant_id, workspace_client_id, product_id),
+            (tenant_id, workspace_client_id, str(u["product_id"])),
         )
-    else:
+        row = cur.fetchone()
+        if row:
+            matched_unit = u["unit_name"]
+    if not row:
         cur.execute(
             f"SELECT {_PROD_COLS} FROM products WHERE tenant_id = %s AND workspace_client_id = %s "
             "AND barcode = %s AND is_active = TRUE LIMIT 1",
             (tenant_id, workspace_client_id, code),
         )
-    row = cur.fetchone()
+        row = cur.fetchone()
     if not row:
         from core.pos_api import PosError
 

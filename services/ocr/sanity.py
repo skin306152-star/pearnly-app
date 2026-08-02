@@ -49,6 +49,36 @@ def _line_subtotals(invoice) -> List[float]:
     return out
 
 
+def vat_inclusive_lines(
+    line_sum: float,
+    sub: float,
+    vat: float | None,
+    total: float | None,
+    discount: float | None = None,
+) -> bool:
+    """明细列印的是含税价(VAT 内含)吗 — 是的话行和 > 小计是票面本来的样子,不是读错。
+
+    泰国 ABB 小票(ใบกำกับภาษีอย่างย่อ · Ocha/POS 出单)逐行印含税价,表尾才把含税
+    合计倒推成税前小计 + VAT:行和 2690.00 配小计 2514.02,差的 175.98 正是那笔税。
+    规则 6 原样判会把这一整类票当成「结构不可能」,每张都白回落一次 Vision 重跑。
+
+    三条同时成立才放行,比折扣分支还紧:
+      ① 行和 ≈ 含税合计   — 含税印法的直接证据;任一行读错就对不上,照样被抓
+      ② 小计 + VAT ≈ 合计 — 税前/税/含税三者自洽
+      ③ VAT ≈ 净额 × 7%   — 小计是按法定税率倒推的,不是随手一个数
+    ② ③ 与规则 4b/4c 判据重复是刻意的:豁免必须自证,不能因为别处闸被改松而跟着变宽。
+    判据全走数字不看 document_type —— 票种是模型自己标的,ABB 常被标成 tax_invoice,
+    拿它当前提等于把误杀留给标错的那批。
+    """
+    if vat is None or vat <= 0 or total is None or total <= 0:
+        return False
+    if abs(line_sum - total) > max(_TOL, total * _RECON_REL):
+        return False
+    if abs(sub - (discount or 0.0) + vat - total) > max(_TOL, total * _RECON_REL):
+        return False
+    return vat_ratio_mismatch(sub, vat, discount) is None
+
+
 def line_sum_mismatch(
     sub,
     lines: List[float],
@@ -56,6 +86,7 @@ def line_sum_mismatch(
     *,
     discount: float | None = None,
     total: float | None = None,
+    vat: float | None = None,
 ) -> float | None:
     """明细行和是否与小计不平,不平则返回行和(供调用方拼消息),平则 None。
 
@@ -79,6 +110,8 @@ def line_sum_mismatch(
         if total is not None and abs(after_discount - total) <= max(tol, total * _RECON_REL):
             return None
     if line_sum > sub + tol or (symmetric and line_sum < sub - tol):
+        if vat_inclusive_lines(line_sum, sub, vat, total, discount):
+            return None
         return line_sum
     return None
 
@@ -193,7 +226,8 @@ def _core_reasons(invoice) -> List[str]:
     # 行只会漏读不会多出钱)。抓「重影把 8 糊成 3」这类同一位错同时进小计与总额的自洽性
     # 误读——双读/勾稽全绿,但票面明细行和把真数供出来了。只单向判(行和小于小计=漏行,
     # 合法,不误杀);相对 2% + 绝对 0.5 双容差吸掉四舍五入。
-    line_sum = line_sum_mismatch(sub, lines, discount=discount, total=total)
+    # VAT 内含票(ABB 小票)行和天然 > 小计,由 vat_inclusive_lines 摘出去,见其文档字符串。
+    line_sum = line_sum_mismatch(sub, lines, discount=discount, total=total, vat=vat)
     if line_sum is not None:
         reasons.append(f"明细行和 {line_sum:.2f} > 小计 {sub} — 结构不可能(疑小计/总额读错一位)")
 

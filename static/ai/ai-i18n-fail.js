@@ -15,6 +15,10 @@ Object.assign(window.__AI_I18N_ZH__, {
     fail_server: '服务器出错了 · 稍等一会儿再试;一直失败请把时间点发给我们',
     fail_no_access: '这个客户或工单当前不在你的可见范围 · 回工作台重新点进来',
     fail_credits: 'OCR 余额不足 · 充值后才能继续识别票据',
+    fail_credits_need_n: '这批 {n} 个文件大约要 {need},账上还有 {have}。',
+    fail_credits_need: '这批大约要 {need},账上还有 {have}。',
+    fail_credits_short: '至少充 {short} 才够把这批识别完。',
+    fail_credits_month: '这个月已经识别了 {used} 页。',
     fail_topup_btn: '去充值',
 });
 
@@ -30,5 +34,9 @@ Object.assign(window.__AI_I18N_TH__, {
     fail_no_access:
         'ตอนนี้ลูกค้าหรือใบงานนี้ไม่อยู่ในสิทธิ์ที่คุณเห็น · กลับหน้าโต๊ะงานแล้วเข้ามาใหม่',
     fail_credits: 'เครดิต OCR ไม่พอ · เติมเงินก่อนจึงจะอ่านบิลต่อได้',
+    fail_credits_need_n: 'ชุดนี้ {n} ไฟล์ ประมาณ {need} ยอดคงเหลือ {have}',
+    fail_credits_need: 'ชุดนี้ประมาณ {need} ยอดคงเหลือ {have}',
+    fail_credits_short: 'ต้องเติมอย่างน้อย {short} จึงจะอ่านชุดนี้จนจบ',
+    fail_credits_month: 'เดือนนี้อ่านไปแล้ว {used} หน้า',
     fail_topup_btn: 'ไปเติมเงิน',
 });

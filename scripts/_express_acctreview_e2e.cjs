@@ -67,7 +67,10 @@ function log(direction, accountReview) {
     );
 
     // i18n 真解析(非裸键),且非空
-    chk('expd-acct-review i18n 已解析(非裸键)', r.reviewText && r.reviewText !== 'expd-acct-review');
+    chk(
+        'expd-acct-review i18n 已解析(非裸键)',
+        r.reviewText && r.reviewText !== 'expd-acct-review'
+    );
     console.log('  待核文案=', JSON.stringify(r.reviewText));
 
     // account_review=true → 渲染 .exp-je-note + 含解析后的待核文案

@@ -1,7 +1,8 @@
 /*
  * Pearnly AI · ai-fail-render.js · 失败态出路(哪一步失败 / 为什么 / 现在能做什么)
  *
- * 全站失败卡共用一份判读:后端错误码 + HTTP 状态 → 一句人话原因 + 至多一个下一步。
+ * 全站失败卡共用一份判读:后端错误码 + HTTP 状态 → 一句人话原因(余额不足那一类再加上
+ * 402 体里的钱数)+ 至多一个下一步。
  * 「至多一个」是刻意的:调用方通常自己已经有重试入口(开单按钮回可点、失败批「重传」),
  * 这里只补它给不出的那种出路(去充值),不再摆第二个按钮让人挑。
  *
@@ -19,8 +20,21 @@
 
     // 浏览器走 at()(ai-i18n.js 必先加载);node(单测)无词典 → 回退原 key,
     // 让"映射到了哪条文案"在 node 里可断言(同 ai-billing-render.js 的 t() 先例)。
-    function t(k) {
-        return typeof root.at === 'function' ? root.at(k) : k;
+    function t(k, vars) {
+        return typeof root.at === 'function' ? root.at(k, vars) : k;
+    }
+
+    // 金额只有 AI.format.money 一个出口(排版口径闸 tests/unit/test_ai_money_single_exit.py:
+    // ฿ 与数字之间垫窄空格)。它缺席时原样返数字,不在这里拼第二个 ฿。
+    function money(v) {
+        var f = root.AI && root.AI.format;
+        return f && typeof f.money === 'function' ? f.money(v) : String(v);
+    }
+
+    // 「这个数真的在」才说得出口:money(null) 会吐 ฿ 0.00(Number(null)===0),把"不知道
+    // 余额"说成"余额是零"比不说更糟。字符串数字同样不认——后端给的是 JSON number。
+    function num(v) {
+        return typeof v === 'number' && isFinite(v) ? v : null;
     }
 
     function esc(s) {
@@ -95,6 +109,46 @@
         );
     }
 
+    /**
+     * 余额不足那一类才有的补充行:账上还有多少、这批要花多少、还差多少、本月已识别几页。
+     * "OCR 余额不足"一句话回答不了会计唯一关心的问题——充多少够。
+     *
+     * detail = 402 的 detail 体(services/workorder/steps/ocr_balance.batch_denial 给全套);
+     * fileCount = 这批传了几个文件,不知道就别传。每句独立降级:同一个 402 码另有六个端点
+     * 在返(recon / vat_excel / knowledge …),它们只带其中一两个数,缺哪个就少说哪一句,
+     * 绝不为凑一句话补一个来路不明的数(同 ai-blocked-notice.js sentences 的成例)。
+     */
+    function creditsFactsHtml(detail, fileCount) {
+        var d = detail || {};
+        var need = num(d.estimated_cost);
+        var have = num(d.balance);
+        var short = num(d.shortfall);
+        var used = num(d.pages_used_this_month);
+        var n = Number(fileCount) || 0;
+        var lines = [];
+        if (need !== null && have !== null) {
+            var vars = { n: n, need: money(need), have: money(have) };
+            lines.push(t(n > 0 ? 'fail_credits_need_n' : 'fail_credits_need', vars));
+        }
+        if (short !== null && short > 0) {
+            lines.push(t('fail_credits_short', { short: money(short) }));
+        }
+        // 本月 0 页时这句零信息(这个月还没识别过),不占一行。分档单价不写进文案——
+        // 它跟 services/billing/pricing.py 一漂就是在钱上撒谎。
+        if (used !== null && used > 0) {
+            lines.push(t('fail_credits_month', { used: used }));
+        }
+        if (!lines.length) return '';
+        return '<p class="needs-sub">' + lines.map(esc).join(' ') + '</p>';
+    }
+
+    // 补充数字行的总口:哪一类失败该补数,只在这里判一次。此前 noteHtml 与
+    // ai-intake-manifest.js 各写一遍 reasonKey === 'fail_credits',加第二类必漏一处。
+    function factsHtml(code, status, detail, fileCount) {
+        if (failureView(code, status).reasonKey !== 'fail_credits') return '';
+        return creditsFactsHtml(detail, fileCount);
+    }
+
     // 出路按钮:只有"换个地方点才解得开"的失败才出,其余返空串(调用方自己的重试按钮就够)。
     function actionHtml(code, status) {
         var v = failureView(code, status);
@@ -102,14 +156,17 @@
         return '<a class="btn pri" href="' + esc(v.href) + '">' + esc(t(v.actionKey)) + '</a>';
     }
 
-    // 原因 + 出路的成套版:给本来什么都没有的失败点用(如开单失败),调用方直接 innerHTML。
-    // opts.reasonKey 覆盖原因时不出出路按钮:覆盖的场景(前一步已成功)出路写在文案里,
-    // 再挂一个按 (code,status) 算出来的按钮只会指错地方。
+    // 原因 + 数 + 出路的成套版:给本来什么都没有的失败点用(如开单失败),调用方直接 innerHTML。
+    // opts = {reasonKey, detail, fileCount}。opts.reasonKey 覆盖原因时既不出数也不出按钮:
+    // 覆盖的场景(前一步已成功)出路写在文案里,再挂一个按 (code,status) 算出来的按钮只会
+    // 指错地方,而余额那几个数在"这一步其实成了"的语境里同样是误导。
     function noteHtml(stepKey, code, status, opts) {
-        var reasonKey = (opts || {}).reasonKey;
-        var action = reasonKey ? '' : actionHtml(code, status);
+        var o = opts || {};
+        if (o.reasonKey) return reasonHtml(stepKey, code, status, o.reasonKey);
+        var action = actionHtml(code, status);
         return (
-            reasonHtml(stepKey, code, status, reasonKey) +
+            reasonHtml(stepKey, code, status) +
+            factsHtml(code, status, o.detail, o.fileCount) +
             (action ? '<div class="needs-paths">' + action + '</div>' : '')
         );
     }
@@ -119,6 +176,8 @@
         failureView: failureView,
         isPerFileReject: isPerFileReject,
         reasonHtml: reasonHtml,
+        creditsFactsHtml: creditsFactsHtml,
+        factsHtml: factsHtml,
         actionHtml: actionHtml,
         noteHtml: noteHtml,
     };

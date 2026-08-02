@@ -41,6 +41,9 @@
         branch: 'สาขาโชคชัย 4 ลาดพร้าว',
         acct: '230-0-91368-4',
         holder: 'บจ. มิสเตอร์ อี อาร์ พี',
+        // 复制进剪贴板的是不带分隔线的那串(网银粘进去就能用)。跟 acct 摆一起,免得改了
+        // 账号只改显示的那一处,复制按钮还在发旧号。
+        digits: '2300913684',
     };
     var CHECK =
         '<svg class="dms-bill-ck" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>';

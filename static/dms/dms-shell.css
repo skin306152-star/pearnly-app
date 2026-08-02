@@ -387,8 +387,12 @@ body {
     overflow-x: auto;
     padding: 8px 10px;
   }
+  /* DMS 是手机上用的(车行操作员拿手机拍身份证录入),这四条横滑的项就是整个壳的导航;
+   * 实测只有 35~37px 高,拇指按不准(Canon §7 要 ≥44)。只抬这一组:语言键、退出、连接
+   * ERP 都是设一次就不再碰的,不跟着放大。 */
   .dms-nav-item {
     white-space: nowrap;
+    min-height: 44px;
   }
   .dms-main {
     padding: 14px;

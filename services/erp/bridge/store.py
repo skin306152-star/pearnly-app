@@ -260,9 +260,10 @@ def enqueue_job(
 def lease_jobs(bridge: Dict[str, Any], max_n: int = 1) -> List[Dict[str, Any]]:
     """领任务(置租约:query 60s / write 300s)· 只领本桥的、book_id 仍在其上报清单内的。
 
-    同一事务里先做两件自愈:租约过期的退回队列(桥崩溃过),超龄的落 expired
-    (门面早不等了;写活超龄放宽到 600s,见 write_gate)。派活用 SKIP LOCKED,
-    多进程同时 lease 不会重复派同一条;可领 kind 按生效角色现算(降级兜底)。
+    同一事务里先做三件自愈:确认放行的写活过期后诚实收尾(write_gate 那一份 · 必须排最前,
+    否则下一句就把它改回 queued 又派出去了),其余租约过期的退回队列(桥崩溃过),超龄的落
+    expired(门面早不等了;写活超龄放宽到 600s,见 write_gate)。派活用 SKIP LOCKED,多进程
+    同时 lease 不会重复派同一条;可领 kind 按生效角色现算(降级兜底)。
     """
     from core import db
 
@@ -274,6 +275,7 @@ def lease_jobs(bridge: Dict[str, Any], max_n: int = 1) -> List[Dict[str, Any]]:
 
     def _run():
         with db.get_cursor_rls(tenant_id, commit=True) as cur:
+            write_gate.close_unacked_confirmed_writes(cur, bid)
             cur.execute(
                 f"UPDATE {JOBS} SET status = 'queued', lease_owner = NULL, lease_expires_at = NULL "
                 "WHERE bridge_id = %s AND status = 'leased' AND lease_expires_at < now()",

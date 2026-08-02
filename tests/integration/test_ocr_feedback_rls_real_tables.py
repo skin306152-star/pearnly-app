@@ -14,18 +14,27 @@ fetch_examples / record_correction_from_edit),在真 postgres 验:租户 A 的�
 import os
 import unittest
 
-from tests.integration._helpers import require_db
+from tests.integration._helpers import require_disposable_db
 
 A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 UA = "11111111-1111-1111-1111-111111111111"
 UB = "22222222-2222-2222-2222-222222222222"
 
+# record_correction_from_edit 从 ocr_history.ai_raw 读 AI 基线 → 本模块得有这张表。
+# 原来不建、直接往库里现成的那张插:恢复库上 pages 是 NOT NULL 无默认,seed 撞 NotNullViolation;
+# 而在只跑本模块之外的库上它又"碰巧"能过 —— 结果取决于前面哪个模块刚好留下了什么形状的表。
+# 自己建自己拆,模块顺序不再影响结论(只留本测试真正要用的列)。
+_OCR_STUB = (
+    "CREATE TABLE ocr_history (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), "
+    "user_id UUID, tenant_id UUID, filename TEXT, ai_raw JSONB)"
+)
+
 
 class OcrFeedbackRlsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        require_db()
+        require_disposable_db()
         os.environ.setdefault("PGSSLMODE", "disable")
         os.environ["RLS_ROLE"] = "pearnly_app"
 
@@ -35,26 +44,30 @@ class OcrFeedbackRlsTests(unittest.TestCase):
         cls.db, cls.store = db, store
         with db.get_cursor_rls(bypass=True, commit=True) as cur:
             rls.ensure_rls_app_role(cur)
-            cur.execute("DROP TABLE IF EXISTS ocr_correction_examples CASCADE")
+            cur.execute("DROP TABLE IF EXISTS ocr_correction_examples, ocr_history CASCADE")
+            cur.execute(_OCR_STUB)
+            rls.apply_tenant_or_user_rls(cur, "ocr_history")
 
         schema.ensure_ocr_feedback_table()
 
         with db.get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
-                "GRANT SELECT,INSERT,UPDATE,DELETE ON ocr_correction_examples TO pearnly_app"
+                "GRANT SELECT,INSERT,UPDATE,DELETE ON ocr_correction_examples, ocr_history "
+                "TO pearnly_app"
             )
             cur.execute("GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO pearnly_app")
-            cur.execute("ALTER TABLE ocr_correction_examples FORCE ROW LEVEL SECURITY")
+            for t in ("ocr_correction_examples", "ocr_history"):
+                cur.execute(f"ALTER TABLE {t} FORCE ROW LEVEL SECURITY")
 
     @classmethod
     def tearDownClass(cls):
         if getattr(cls, "db", None):
             with cls.db.get_cursor_rls(bypass=True, commit=True) as cur:
-                cur.execute("DROP TABLE IF EXISTS ocr_correction_examples CASCADE")
+                cur.execute("DROP TABLE IF EXISTS ocr_correction_examples, ocr_history CASCADE")
 
     def setUp(self):
         with self.db.get_cursor_rls(bypass=True, commit=True) as cur:
-            cur.execute("TRUNCATE ocr_correction_examples RESTART IDENTITY")
+            cur.execute("TRUNCATE ocr_correction_examples, ocr_history RESTART IDENTITY")
 
     def _corr(self, field="invoice_number", ai="IV1", fixed="IV-001"):
         return [{"field_name": field, "ai_value": ai, "corrected_value": fixed}]

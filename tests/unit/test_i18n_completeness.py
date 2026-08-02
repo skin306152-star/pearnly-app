@@ -16,6 +16,7 @@ tests/unit/test_i18n_completeness.py · v118.34.34 (Zihao 2026-05-19 拍板)
 
 from __future__ import annotations
 
+import shutil
 import sys
 import unittest
 from pathlib import Path
@@ -23,6 +24,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
+from tests.unit._node_harness import _run_node  # noqa: E402
 
 from check_i18n import diff_keysets, parse_i18n_blocks, _i18n_source_file  # noqa: E402
 
@@ -73,6 +75,35 @@ class I18nDictCompletenessTests(unittest.TestCase):
                 if len(keys) > 20:
                     lines.append(f"    ... 还有 {len(keys) - 20} 个")
             self.fail("\n".join(lines))
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过 node eval 交叉验证")
+class ParserSeesEveryKeyTests(unittest.TestCase):
+    """解析器认出来的键 == 浏览器真拿到的键。
+
+    「0 missing」有两种来法:真齐了,或者解析器压根没看那几个键。原来的 `^\\s*['\"]…`
+    + `.match()` 一行只认第一条,于是一行挤两条词条的地方后一条从上线起就在射程外
+    (实测 14 个:contact-line-label / contact-phone-label / dxi-st1s~4s / help-modal-tip /
+    set-group-{about,company,system,workflow} / set-page-sub / user-menu-{help,logout}),
+    闸自报每块 4975 而真值 4989 —— 那 14 个键任意一语丢了,闸照报 0 missing。
+    所以不拿正则自证,拿浏览器同款求值对拍;正则再被人动一次,这里先红。
+    """
+
+    def test_parsed_keys_match_a_real_eval(self):
+        blocks = _run_node(
+            "global.window = {};"
+            "require('./static/i18n-data.js');"
+            "const out = {};"
+            "for (const l of Object.keys(window.I18N)) out[l] = Object.keys(window.I18N[l]);"
+            "console.log(JSON.stringify(out));"
+        )
+        parsed = parse_i18n_blocks(I18N_SRC.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(parsed), sorted(blocks))
+        for lang in sorted(blocks):
+            truth = set(blocks[lang])
+            with self.subTest(lang):
+                self.assertEqual(sorted(parsed[lang] - truth), [], "解析器多认了这些键")
+                self.assertEqual(sorted(truth - parsed[lang]), [], "解析器漏认了这些键")
 
 
 if __name__ == "__main__":

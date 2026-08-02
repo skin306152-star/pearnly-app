@@ -13,6 +13,14 @@
 //          <script type=module src=/static/dist/main.js> defer 自动后跑
 // ============================================================
 
+import { BAHT } from './money.js';
+import { copy as copyFlash } from './copy-flash.js';
+
+// 卡面显示带分隔线,复制进剪贴板的是不带的那串(网银粘进去就能用)。摆一起,免得改了账号
+// 只改显示的那一处,复制按钮还在发旧号。
+const BANK_ACCT = '230-0-91368-4';
+const BANK_DIGITS = BANK_ACCT.replace(/-/g, '');
+
 function _bt(k: string): string {
     return (typeof window.t === 'function' ? window.t(k) : null) || k;
 }
@@ -97,10 +105,10 @@ function _render() {
         '    <div id="tv2-s1">',
         '      <label class="topup-v2-label" id="tv2-al"></label>',
         '      <div class="topup-v2-qamts">',
-        '        <button class="topup-v2-qamt" data-val="100">฿100</button>',
-        '        <button class="topup-v2-qamt" data-val="500">฿500</button>',
-        '        <button class="topup-v2-qamt" data-val="1000">฿1,000</button>',
-        '        <button class="topup-v2-qamt" data-val="2000">฿2,000</button>',
+        '        <button class="topup-v2-qamt" data-val="100">' + BAHT + '100</button>',
+        '        <button class="topup-v2-qamt" data-val="500">' + BAHT + '500</button>',
+        '        <button class="topup-v2-qamt" data-val="1000">' + BAHT + '1,000</button>',
+        '        <button class="topup-v2-qamt" data-val="2000">' + BAHT + '2,000</button>',
         '      </div>',
         '      <input id="tv2-amt" type="number" min="10" step="1" class="topup-v2-input" placeholder="฿ ...">',
         '      <div id="tv2-ae" class="topup-v2-err" style="display:none"></div>',
@@ -112,7 +120,7 @@ function _render() {
         '      <div class="topup-v2-bank-card">',
         '        <div class="topup-v2-bank-name">ธนาคาร กรุงเทพ</div>',
         '        <div class="topup-v2-bank-branch">สาขาโชคชัย 4 ลาดพร้าว</div>',
-        '        <div class="topup-v2-bank-acct">230-0-91368-4</div>',
+        '        <div class="topup-v2-bank-acct">' + BANK_ACCT + '</div>',
         '        <div class="topup-v2-bank-holder">บจ. มิสเตอร์ อี อาร์ พี</div>',
         '        <button class="topup-v2-copy" id="tv2-copy"></button>',
         '      </div>',
@@ -187,7 +195,7 @@ function _setStep(n: number) {
         if (bn)
             bn.innerHTML = _bt('topup-bank-note').replace(
                 '{amount}',
-                '<strong>฿' + Number(_amount).toLocaleString() + '</strong>'
+                '<strong>' + BAHT + Number(_amount).toLocaleString() + '</strong>'
             );
     }
 }
@@ -254,18 +262,11 @@ function _bindEvents() {
             });
             _clrErr('tv2-ae');
         });
-    // copy
+    // copy · 反馈走 copy-flash(连点不卡死 + 非安全上下文也给反馈,见该模块文件头)
     var copyBtn = _g('tv2-copy');
     if (copyBtn)
         copyBtn.addEventListener('click', function () {
-            if (!navigator.clipboard) return;
-            navigator.clipboard.writeText('2300913684').then(function () {
-                var orig = copyBtn!.textContent;
-                copyBtn!.textContent = _bt('topup-copied');
-                setTimeout(function () {
-                    copyBtn!.textContent = orig;
-                }, 1500);
-            });
+            copyFlash(copyBtn, BANK_DIGITS, _bt('topup-copied'));
         });
     // drop zone
     var drop = _g('tv2-drop'),
@@ -316,7 +317,7 @@ async function _step1Next() {
         _showErr('tv2-ae', _bt('topup-amount-invalid'));
         return;
     }
-    // v118.35.0.21 · 前端兜底:超过单次上限 ฿500,000 立即提示
+    // v118.35.0.21 · 前端兜底:超过单次上限(500,000 铢)立即提示
     if (amt > 500000) {
         _showErr('tv2-ae', _bt('topup-amount-too-large'));
         return;

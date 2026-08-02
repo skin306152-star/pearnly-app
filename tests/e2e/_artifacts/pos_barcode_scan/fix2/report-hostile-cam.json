@@ -1,0 +1,442 @@
+{
+  "p80": {
+    "label": "p80",
+    "state": {
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "1"
+      ],
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.074776
+    },
+    "lookups": 1,
+    "asked": [
+      {
+        "code": "8850999320014",
+        "at": 756
+      }
+    ],
+    "gaps": [],
+    "ok": true
+  },
+  "p60": {
+    "label": "p60",
+    "state": {
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "1"
+      ],
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.813093
+    },
+    "lookups": 1,
+    "asked": [
+      {
+        "code": "8850999320014",
+        "at": 1467
+      }
+    ],
+    "gaps": [],
+    "ok": true
+  },
+  "p50": {
+    "label": "p50",
+    "state": {
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "1"
+      ],
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.534156
+    },
+    "lookups": 1,
+    "asked": [
+      {
+        "code": "8850999320014",
+        "at": 1227
+      }
+    ],
+    "gaps": [],
+    "ok": true
+  },
+  "gap600": {
+    "label": "gap600",
+    "state": {
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "1"
+      ],
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.072903
+    },
+    "lookups": 1,
+    "asked": [
+      {
+        "code": "8850999320014",
+        "at": 737
+      }
+    ],
+    "gaps": [],
+    "ok": true
+  },
+  "gap800": {
+    "label": "gap800",
+    "state": {
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "1"
+      ],
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 7.078969
+    },
+    "lookups": 1,
+    "asked": [
+      {
+        "code": "8850999320014",
+        "at": 734
+      }
+    ],
+    "gaps": [],
+    "ok": true
+  },
+  "camRevoked": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "tracks": [
+      {
+        "st": "ended",
+        "muted": false
+      }
+    ],
+    "before": {
+      "count": "สแกนแล้ว 2 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "2"
+      ],
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 4.207168
+    },
+    "after": {
+      "count": "สแกนแล้ว 2 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": true,
+      "qtys": [
+        "2"
+      ],
+      "grand": "700.00",
+      "cardClass": true,
+      "cardShown": true,
+      "cardMsg": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+      "acts": [
+        {
+          "label": "ลองใหม่",
+          "w": 125,
+          "h": 48,
+          "inView": true
+        },
+        {
+          "label": "พิมพ์บาร์โค้ดเอง",
+          "w": 180,
+          "h": 48,
+          "inView": true
+        }
+      ],
+      "videoReadyState": 0,
+      "videoW": 0,
+      "videoTime": 0
+    },
+    "back": {
+      "count": "สแกนแล้ว 3 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "3"
+      ],
+      "grand": "1,050.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+      "acts": [
+        {
+          "label": "ลองใหม่",
+          "w": 0,
+          "h": 0,
+          "inView": false
+        },
+        {
+          "label": "พิมพ์บาร์โค้ดเอง",
+          "w": 0,
+          "h": 0,
+          "inView": false
+        }
+      ],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 0.07662
+    },
+    "busy": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+    "retryLabel": "ลองใหม่",
+    "resumed": true,
+    "lookupsBefore": 2,
+    "lookupsFrozen": 2,
+    "lookupsAfter": 3
+  },
+  "camStaysLive": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "before": {
+      "count": "สแกนแล้ว 2 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "2"
+      ],
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 4.212957
+    },
+    "after": {
+      "count": "สแกนแล้ว 3 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "3"
+      ],
+      "grand": "1,050.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 11.272253
+    },
+    "counted": [
+      2,
+      3
+    ],
+    "lookupsBefore": 2,
+    "lookupsAfter": 3
+  },
+  "camCloseIsNotErr": {
+    "ok": true,
+    "first": true,
+    "reopened": true,
+    "afterDone": {
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": false,
+      "qtys": [
+        "1"
+      ],
+      "grand": "350.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": -1,
+      "videoW": 0,
+      "videoTime": -1
+    },
+    "afterEsc": {
+      "count": "สแกนแล้ว 1 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": false,
+      "qtys": [
+        "2"
+      ],
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": -1,
+      "videoW": 0,
+      "videoTime": -1
+    }
+  },
+  "camFrozenHidden": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "froze": true,
+    "back": true,
+    "hidden": {
+      "count": "สแกนแล้ว 3 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "3"
+      ],
+      "grand": "1,050.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 11.074445
+    },
+    "after": {
+      "count": "สแกนแล้ว 4 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "4"
+      ],
+      "grand": "1,400.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 12.213414
+    },
+    "resumed": true,
+    "lookupsBefore": 3,
+    "lookupsAfter": 4
+  },
+  "camFrozenWatching": {
+    "ok": true,
+    "first": true,
+    "grew": true,
+    "froze": true,
+    "before": {
+      "count": "สแกนแล้ว 2 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "เล็งบาร์โค้ดสินค้าให้อยู่ในกรอบ",
+      "frameLive": true,
+      "maskShown": true,
+      "qtys": [
+        "2"
+      ],
+      "grand": "700.00",
+      "cardClass": false,
+      "cardShown": false,
+      "cardMsg": "",
+      "acts": [],
+      "videoReadyState": 4,
+      "videoW": 640,
+      "videoTime": 4.003905
+    },
+    "after": {
+      "count": "สแกนแล้ว 2 ชิ้น",
+      "last": "เพิ่มแล้ว โค้ก ลัง",
+      "hint": "",
+      "frameLive": false,
+      "maskShown": true,
+      "qtys": [
+        "2"
+      ],
+      "grand": "700.00",
+      "cardClass": true,
+      "cardShown": true,
+      "cardMsg": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+      "acts": [
+        {
+          "label": "ลองใหม่",
+          "w": 125,
+          "h": 48,
+          "inView": true
+        },
+        {
+          "label": "พิมพ์บาร์โค้ดเอง",
+          "w": 180,
+          "h": 48,
+          "inView": true
+        }
+      ],
+      "videoReadyState": 0,
+      "videoW": 0,
+      "videoTime": 0
+    },
+    "busy": "กล้องถูกแอปอื่นใช้อยู่ · ปิดแอปนั้นแล้วลองใหม่",
+    "retryLabel": "ลองใหม่",
+    "lookupsBefore": 2,
+    "lookupsAfter": 2
+  }
+}

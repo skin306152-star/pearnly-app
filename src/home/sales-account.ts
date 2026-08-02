@@ -3,6 +3,7 @@
 // + template_id/brand_color/logo_url/seal_url/signature_url/footer_text · §L4 后端已支持)。
 /* global t, escapeHtml, apiGet, showToast */
 import { salesFetch, htmlVal, imageFieldHtml, bindImageField } from './sales-common.js';
+import { BAHT } from './money.js';
 
 interface Seller {
     id: number;
@@ -109,7 +110,7 @@ function accPreview(): string {
         </div>
         <div class="sx-prev-row"><span>1 · รายการตัวอย่าง</span><span>1,000.00</span></div>
         <div class="sx-prev-row sx-prev-vat"><span>VAT 7%</span><span>70.00</span></div>
-        <div class="sx-prev-tot"><span>${escapeHtml(t('sx-grand'))}</span><span>฿ 1,070.00</span></div>
+        <div class="sx-prev-tot"><span>${escapeHtml(t('sx-grand'))}</span><span>${BAHT}1,070.00</span></div>
         ${s.footer_text ? `<div class="sx-prev-foot">${escapeHtml(s.footer_text)}</div>` : ''}
     </div>`;
 }

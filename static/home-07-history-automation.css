@@ -90,7 +90,8 @@
     background: var(--card);
 }
 .history-table-head,
-.history-row {
+.history-row,
+.hist-skel {
     display: grid;
     /* v118.32.3.7 · 进一步收紧右侧 · 金额/置信/⋮ 贴右 · 跟主流财务表格(QuickBooks/Xero)对齐 */
     grid-template-columns: 28px 96px 1fr 88px 76px 28px;
@@ -688,7 +689,8 @@
    必须 #history-main 作用域 + !important —— home-30 有
    `#history-main .history-row{grid-template-columns:… !important}` 的 6 列收紧规则要压过。*/
 #history-main .history-table-head.history-table-head-v2,
-#history-main .history-row.history-row-v2 {
+#history-main .history-row.history-row-v2,
+#history-main .hist-skel.history-row-v2 {
     grid-template-columns: 26px 58px minmax(190px, 1.4fr) minmax(110px, .85fr) 112px 108px 24px !important;
 }
 .history-row-v2 .history-cell-amount { min-width: 0; }
@@ -718,11 +720,20 @@
 .hist-src-tag.src-line   { background: var(--success-bg); color: var(--success); }
 .hist-src-tag.src-email  { background: var(--danger-bg); color: var(--danger); }
 
+/* 载入中骨架:与真实行同一套栅格(选择器并进上面的规则,模板不抄第二份),
+   但不带 .history-row —— 那个类是「一条真记录」,点击委托与既有 spec 都按它计数。
+   条子本身是共享设计系统 static/pearnly-ui.css 的 .pu-skeleton。 */
+.hist-skel { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.hist-skel .pu-skeleton { height: 11px; }
+.hist-skel .history-cell-file .pu-skeleton { height: 13px; }
+.hist-skel .history-cell-check .pu-skeleton { height: 14px; border-radius: 4px; }
+
 /* 窄屏:卡片两列 + 行堆叠 */
 @media (max-width: 920px) {
     .hist-summary { grid-template-columns: repeat(2, 1fr); }
     #history-main .history-table-head.history-table-head-v2 { display: none !important; }
-    #history-main .history-row.history-row-v2 { grid-template-columns: 22px 1fr auto !important; row-gap: 6px; align-items: start; }
+    #history-main .history-row.history-row-v2,
+    #history-main .hist-skel.history-row-v2 { grid-template-columns: 22px 1fr auto !important; row-gap: 6px; align-items: start; }
     .history-row-v2 .history-cell-check { grid-column: 1; grid-row: 1; }
     .history-row-v2 .history-cell-file { grid-column: 2; grid-row: 1; }
     .history-row-v2 .history-cell-date { grid-column: 2; grid-row: 2; }

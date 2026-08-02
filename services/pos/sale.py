@@ -134,6 +134,13 @@ def create_sale(
             prod=prod,
             sell_unit=ln.get("sell_unit"),
         )
+        # 没挂牌价(基本单位看 products.unit_price,箱/打看 product_units.price)不许卖:
+        # 客户端 `unit_price` 缺键就是 0,整箱货 ฿0 出门、฿0 落账,小票和日结都看不出异常。
+        # 收银台前端已经拦了一道(pos-cashier.priced),这里是后端那一道 —— 拦的是"没定价",
+        # 不是"定价为 0":真的赠品 list_price 是 0,照旧卖得出去。餐厅那条路同款闸见
+        # services/pos/restaurant/sessions.add_lines。
+        if list_price is None:
+            raise PosError("pos.line_invalid", 422, detail="no_price")
         unit_price = Decimal(str(ln.get("unit_price", 0)))
         line_discount = Decimal(str(ln.get("line_discount") or 0))
         vat_app = bool(prod["vat_applicable"])

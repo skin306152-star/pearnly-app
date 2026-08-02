@@ -2,9 +2,12 @@
  * Pearnly AI · ai-gate.js · 未登录/未受邀两种门面(登录卡 + 邀请制提示)
  *
  * Zihao 拍板(Z1-a · 2026-07-10):boot 探针原来对 401/404 无差别整页跳 /home——
- * 现改就地渲染,不再假装 AI 工作台不存在。两条门面(挂载/判别由 ai.js boot() 编排):
+ * 现改就地渲染,不再假装 AI 工作台不存在。三条门面(挂载/判别由 ai.js boot() 编排,
+ * 状态码分档见 classifyBootFailure):
  *   A. 无 token 或 token 失效(401)→ 登录卡,走现有 POST /api/login
  *   B. token 有效但工单闸探针 404(/api/me 200 而 listOrders 404)→ 邀请制提示
+ *   C. 探针 5xx / 断网 → 服务不可用提示 + 重试(2026-07-31 补:此前混进 B,
+ *      服务器抖一下就告诉已受邀的用户"你没被邀请")
  * 硬性红线(Zihao 截图点名删除):卡面禁注册入口 / Google 登录 / LINE 登录 / 服务条款行——
  * 这是独立 AI 工作台的邀请制前脸,不是主站获客着陆页,少即是对,不比样式。
  *
@@ -34,6 +37,22 @@
         return 'err_' + String(err.code || 'generic').replace(/\./g, '_');
     }
 
+    // 启动探针失败 → 落哪一种门面。四类的分界就是这张表(ai.js boot() 与
+    // dms-boot.js 同口径,两个壳不许有两个说法):
+    //   401            expired     令牌失效 → 清令牌回登录卡
+    //   403/404/其余4xx denied      真的没这个权限(未受邀/非本入口)→ 借 /api/me 分辨
+    //   5xx/408/429    unavailable 服务器这次没答上来,与权限无关 → 可重试的故障态
+    //   无 status      offline     请求没发出去(断网/被拦)→ 同上,文案换成连不上
+    // 2026-07-31 修正前 5xx 落在 denied 里:服务器抖一下,已受邀的用户被告知"未受邀",
+    // 临时故障被说成永久的权限判定,只剩退出登录一条路。
+    function classifyBootFailure(err) {
+        if (!err || err.status == null) return 'offline';
+        var status = err.status;
+        if (status === 401) return 'expired';
+        if (status >= 500 || status === 408 || status === 429) return 'unavailable';
+        return 'denied';
+    }
+
     // ============ HTML 拼装 ============
 
     function esc(s) {
@@ -60,6 +79,10 @@
     );
     var IC_LOCK = icon(
         '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'
+    );
+    // 故障态用惊叹三角,不复用邀请卡那把锁——锁 = 你没权限,正是这一屏要洗掉的误解。
+    var IC_ALERT = icon(
+        '<path d="M10.3 4 2 18.2A2 2 0 0 0 3.7 21h16.6a2 2 0 0 0 1.7-2.8L13.7 4a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4"/><path d="M12 17.2h.01"/>'
     );
 
     function langbarHtml() {
@@ -177,6 +200,37 @@
         );
     }
 
+    // 服务不可用门面:主动作是重试(留在原地再探一次),退出登录降为次动作——
+    // 故障不该把人赶去重新登录。HTTP 码单起一行给支持用,不进翻译(是数字不是话)。
+    function unavailableHtml(kind, status) {
+        var offline = kind === 'offline';
+        return (
+            '<div class="gate-wrap">' +
+            '<div class="gate-card gate-card-invite">' +
+            brandHtml() +
+            '<div class="gate-invite-ic gate-ic-warn">' +
+            IC_ALERT +
+            '</div>' +
+            '<h1 class="gate-h1" id="gateDownTitle">' +
+            esc(t(offline ? 'gate_offline_title' : 'gate_down_title')) +
+            '</h1>' +
+            '<p class="gate-sub" id="gateDownBody">' +
+            esc(t(offline ? 'gate_offline_body' : 'gate_down_body')) +
+            '</p>' +
+            (status ? '<p class="gate-code">HTTP ' + esc(String(status)) + '</p>' : '') +
+            '<div class="gate-acts">' +
+            '<button class="btn pri" id="gateRetryBtn" type="button">' +
+            esc(t('gate_retry_btn')) +
+            '</button>' +
+            '<button class="btn" id="gateLogoutBtn" type="button">' +
+            esc(t('gate_logout_btn')) +
+            '</button>' +
+            '</div></div>' +
+            helpCardHtml() +
+            '</div>'
+        );
+    }
+
     // ============ DOM 挂载 ============
 
     function setMsg(container, text, kind) {
@@ -267,11 +321,26 @@
         });
     }
 
+    function mountUnavailable(container, opts) {
+        opts = opts || {};
+        container.innerHTML = unavailableHtml(opts.kind, opts.status);
+        var retry = container.querySelector('#gateRetryBtn');
+        retry.addEventListener('click', function () {
+            retry.disabled = true;
+            if (typeof opts.onRetry === 'function') opts.onRetry();
+        });
+        container.querySelector('#gateLogoutBtn').addEventListener('click', function () {
+            if (typeof opts.onLogout === 'function') opts.onLogout();
+        });
+    }
+
     var api = {
         validateLoginInput: validateLoginInput,
         resolveLoginErrorKey: resolveLoginErrorKey,
+        classifyBootFailure: classifyBootFailure,
         mountLogin: mountLogin,
         mountInvited: mountInvited,
+        mountUnavailable: mountUnavailable,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

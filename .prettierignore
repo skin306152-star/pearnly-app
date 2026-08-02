@@ -6,6 +6,9 @@ static/dist/
 # 非 app 源码 · 设计稿逐字保真不许 prettier 重排(会破像素级布局)· 整块豁免格式化。
 static/landing/portal.dc.html
 static/landing/vendor/
+# 第三方条码解码器(zxing-js/library · Apache-2.0)· 上游产物逐字节保真 · 改它等于让下次
+# 升级把改动无声吞掉(要改行为改 static/scan/scan-zxing-shim.js)· 见该目录 README.md
+static/vendor/
 # agent / IDE 配置目录 —— 非 app 代码 · 不受项目 prettier 管(否则权限/hook 配置改一下就红 lint)
 .claude/
 package-lock.json
@@ -60,3 +63,6 @@ design-reference/
 # 文档目录:设计简报 / 交接 / 原型 HTML / 架构图 —— 文档不是 app 代码 · 永久豁免
 # (.md 本就不在 prettier glob;此处豁免 docs 下的 html/json/css 等设计产物,免得收录文档就红 lint)
 docs/
+# E2E 验收产物(截图 + 跑批报告 JSON)· 脚本 JSON.stringify 吐出来的东西,prettier 会把
+# 短数组折成一行 —— 每跑一次验收 lint 就红一次,而它不是人写的代码 · 同 static/dist 策略
+tests/e2e/_artifacts/

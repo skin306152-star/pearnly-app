@@ -1,0 +1,70 @@
+{
+  "typedFeedback": {
+    "ok": true,
+    "focus": {
+      "k": "qty",
+      "optIn": true
+    },
+    "hits": [
+      "8850999320014",
+      "4901234567894"
+    ],
+    "note": {
+      "found": true,
+      "w": 582,
+      "h": 30,
+      "display": "flex",
+      "visibility": "visible",
+      "opacity": "1",
+      "text": "这一串按手动输入处理了,没当成扫码\n4901234567894\n当条码用"
+    },
+    "btn": {
+      "found": true,
+      "w": 76,
+      "h": 30,
+      "display": "block",
+      "visibility": "visible",
+      "opacity": "1",
+      "text": "当条码用"
+    },
+    "dirtyQty": "14901234567894",
+    "typedCopy": "这一串按手动输入处理了,没当成扫码",
+    "rows": [
+      {
+        "product": "p-cola",
+        "qty": "1"
+      },
+      {
+        "product": "p-milk",
+        "qty": "1"
+      }
+    ]
+  },
+  "rowAt390": {
+    "ok": true,
+    "geo": {
+      "product": 108,
+      "qty": 72,
+      "batch": 124,
+      "expiry": 129,
+      "rowWidth": 322,
+      "bodyWidth": 358,
+      "spill": 0
+    },
+    "lot": {
+      "value": "LOT-B240301",
+      "scrollW": 122,
+      "clientW": 122
+    }
+  },
+  "rowOnDesktop": {
+    "ok": true,
+    "geo": {
+      "product": 358,
+      "batch": 268,
+      "expiry": 268,
+      "dateFits": true,
+      "rows": 2
+    }
+  }
+}

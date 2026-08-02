@@ -5,6 +5,7 @@
 // view 级权限(同报表 pos.report.view)。
 /* global t, token, escapeHtml */
 import { activeWsId, posErrMsg } from './inventory-common';
+import { BAHT } from './money.js';
 
 type Kind = 'void' | 'refund' | 'discount';
 
@@ -58,6 +59,7 @@ let errCode = '';
 let drill: { cashier: string | null; kind: Kind } | null = null;
 let drillEvents: Ev[] = [];
 let drillLoading = false;
+let drillErr = ''; // 拉不到 ≠ 这个指标没有事件(同 errCode/shiftErr 口径,别落「没有事件」空态)
 // 交接班台账 tab(与异常汇总同页两视角:异常按人汇总 vs 班次连号对账)。
 let tab: Tab = 'audit';
 let shiftRows: ShiftRow[] = [];
@@ -204,7 +206,7 @@ function metricHtml(
     const cnt = count > 0 ? `<span class="cnt">×${count}</span>` : '';
     return `<button class="${cls}" data-cashier="${escapeHtml(r.cashier_id || '')}" data-kind="${kind}">
         <div class="lbl">${escapeHtml(label)}</div>
-        <div><span class="val">฿${baht(amount)}</span>${cnt}</div>
+        <div><span class="val">${BAHT}${baht(amount)}</span>${cnt}</div>
     </button>`;
 }
 
@@ -215,7 +217,7 @@ function cashHtml(r: Row): string {
     const cls = ['m', 'static', sev].filter(Boolean).join(' ');
     return `<div class="${cls}">
         <div class="lbl">${escapeHtml(t('posaudit.cash_diff'))}</div>
-        <div><span class="val">${sign}฿${baht(Math.abs(n))}</span></div>
+        <div><span class="val">${sign}${BAHT}${baht(Math.abs(n))}</span></div>
     </div>`;
 }
 
@@ -227,7 +229,7 @@ function cardHtml(r: Row, isTotal: boolean): string {
     return `<div class="card${isTotal ? ' total' : ''}">
         <div class="chead">
             <span class="nm">${escapeHtml(name)}</span>
-            <span class="sc">${escapeHtml(t('posaudit.sales_n', { n: String(r.sales_count) }))} · ฿${baht(r.sales_amount)}</span>
+            <span class="sc">${escapeHtml(t('posaudit.sales_n', { n: String(r.sales_count) }))} · ${BAHT}${baht(r.sales_amount)}</span>
         </div>
         <div class="met">
             ${metricHtml(r, 'void', t('posaudit.void'), r.void_count, r.void_amount, 'bad')}
@@ -242,6 +244,8 @@ function cardHtml(r: Row, isTotal: boolean): string {
 function drillHtml(): string {
     if (drillLoading)
         return `<div class="drill"><div class="dstate">${escapeHtml(t('rpay.loading'))}</div></div>`;
+    if (drillErr)
+        return `<div class="drill"><div class="dstate">${escapeHtml(posErrMsg(drillErr, 'rep-error'))}</div></div>`;
     if (!drillEvents.length)
         return `<div class="drill"><div class="dstate">${escapeHtml(t('posaudit.no_events'))}</div></div>`;
     const body = drillEvents
@@ -249,7 +253,7 @@ function drillHtml(): string {
             (e) => `<tr>
             <td>${escapeHtml(fmtTime(e.sold_at))}</td>
             <td>${escapeHtml(e.receipt_no)}</td>
-            <td class="num">฿${baht(e.amount)}</td>
+            <td class="num">${BAHT}${baht(e.amount)}</td>
             <td>${escapeHtml(e.authorized_by || '—')}</td>
         </tr>`
         )
@@ -281,15 +285,15 @@ function tabsHtml(): string {
 function shiftDiffCell(v: string | null): string {
     if (v == null) return '<td class="num">—</td>';
     const n = Number(v) || 0;
-    if (!n) return '<td class="num">฿0</td>';
+    if (!n) return '<td class="num">' + BAHT + '0</td>';
     const cls = n < 0 ? 'neg' : 'over';
-    return `<td class="num ${cls}">${n > 0 ? '+' : '−'}฿${baht(Math.abs(n))}</td>`;
+    return `<td class="num ${cls}">${n > 0 ? '+' : '−'}${BAHT}${baht(Math.abs(n))}</td>`;
 }
 
 function shiftRowHtml(r: ShiftRow): string {
     const isOpen = r.status === 'open';
     const stLbl = isOpen ? t('posaudit.sh_st_open') : t('posaudit.sh_st_closed');
-    const money = (v: string | null) => (v == null ? '—' : '฿' + baht(v));
+    const money = (v: string | null) => (v == null ? '—' : BAHT + baht(v));
     return `<tr>
         <td>#${r.shift_seq == null ? '—' : r.shift_seq}</td>
         <td>${escapeHtml(r.cashier_name || t('posaudit.unknown_cashier'))}</td>
@@ -433,6 +437,7 @@ async function onDrill(cashier: string, kind: Kind): Promise<void> {
     }
     drill = { cashier: cashier || null, kind };
     drillEvents = [];
+    drillErr = '';
     drillLoading = true;
     render();
     try {
@@ -440,8 +445,13 @@ async function onDrill(cashier: string, kind: Kind): Promise<void> {
         if (cashier) extra.cashier_id = cashier;
         const r = await fetch('/api/pos/admin/audit/events?' + qs(extra), { headers: hdr() });
         const env = await r.json();
-        drillEvents = (env && env.ok === true && env.data && env.data.events) || [];
-    } catch (_) {
+        // 信封没说 ok 就不是数据:此前 `|| []` 把 500 的错误信封悄悄变成空数组,
+        // 面板照「没有事件」渲染 —— 老板会以为这个收银员这项确实干净。
+        if (!env || env.ok !== true)
+            throw new Error((env && env.error && env.error.code) || 'pos.unexpected');
+        drillEvents = env.data.events || [];
+    } catch (e) {
+        drillErr = e instanceof Error ? e.message : 'pos.unexpected';
         drillEvents = [];
     } finally {
         drillLoading = false;

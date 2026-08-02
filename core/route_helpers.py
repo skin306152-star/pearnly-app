@@ -63,17 +63,22 @@ def lang_or_default(lang) -> str:
 
 
 @contextmanager
-def translate_unique_violation(code: str):
+def translate_unique_violation(code: str, by_constraint: Optional[Dict[str, str]] = None):
     """把 DB 唯一约束冲突翻成干净 409(而非裸 500)。
 
     面向用户的创建/改名接口在写 DB 那段包一层:用户重复输入唯一键(商品编码/规则主题等)
     本是可预期的客户端错误,该回 409 + 明确码,不该 500。务必包在打开事务的游标块内,
     让 UniqueViolation 先在此翻成 HTTPException,再由 get_cursor_rls 回滚已 abort 的事务。
+
+    by_constraint:一张表上有多个唯一键时按撞到的索引名给码(products 同时约束 code 和
+    barcode,一律报"编码已存在"就是说谎)。索引名取 exc.diag.constraint_name,认不出回落 code。
     """
     try:
         yield
     except psycopg2.errors.UniqueViolation as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail=code) from exc
+        constraint = getattr(getattr(exc, "diag", None), "constraint_name", "") or ""
+        detail = (by_constraint or {}).get(constraint, code)
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=detail) from exc
 
 
 def _require_super_admin(request: Request) -> Dict[str, Any]:

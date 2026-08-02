@@ -11,8 +11,18 @@ import {
     salesErrMsg,
     IC_X,
 } from './sales-common.js';
+import {
+    barcodeConflictText,
+    barcodeFieldHtml,
+    bindBarcodeField,
+    productLabel,
+    registerProductFormOpener,
+    releaseBarcodeField,
+    settleBarcodeCheck,
+    takePendingBarcode,
+} from './sales-products-scan.js';
 
-interface Product {
+export interface Product {
     id: string;
     code?: string;
     barcode?: string;
@@ -20,7 +30,8 @@ interface Product {
     name_en?: string;
     name_zh?: string;
     unit?: string;
-    unit_price: number;
+    // null = 没设过价(≠ 免费)· 收银台靠这个区分「忘了填」和「真的 ฿ 0」,见 pos-cashier.priced
+    unit_price: number | null;
     vat_applicable: boolean;
     track_batch?: boolean;
     image_url?: string;
@@ -62,7 +73,7 @@ function rowsHtml(): string {
         return `<tr><td colspan="7"><div class="sx-state">${escapeHtml(t('sx-products-empty'))}</div></td></tr>`;
     return list
         .map((p) => {
-            const name = p.name_th || p.name_en || p.name_zh || '—';
+            const name = productLabel(p);
             const img = p.image_url
                 ? `<img data-aimg="${escapeHtml(p.image_url)}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover">`
                 : `<div class="sx-thumb">${IC_BOX}</div>`;
@@ -71,7 +82,7 @@ function rowsHtml(): string {
                 <td style="color:var(--ink-3)">${escapeHtml(p.code || '—')}</td>
                 <td><b>${escapeHtml(name)}</b></td>
                 <td>${escapeHtml(p.unit || '—')}</td>
-                <td class="r">${fmtMoney(p.unit_price)}</td>
+                <td class="r">${p.unit_price == null ? escapeHtml(t('sx-p-noprice')) : fmtMoney(p.unit_price)}</td>
                 <td>${p.vat_applicable ? '<span class="sx-badge issued">7%</span>' : '<span class="sx-badge draft">—</span>'}</td>
                 <td class="r"><button class="sx-chev" data-edit="${escapeHtml(p.id)}">${IC_EDIT}</button><button class="sx-chev" data-del="${escapeHtml(p.id)}">${IC_TRASH}</button></td>
             </tr>`;
@@ -125,7 +136,14 @@ function bindRowActions() {
     });
 }
 
-function openEdit(p: Product | null) {
+// 关弹窗要连扫码那套一起收(相机 track / 条码枪独占订阅),漏一处 = 相机灯不灭、枪失灵。
+function closeProdModal() {
+    releaseBarcodeField();
+    closeMask('sales-prod-mask');
+}
+
+// barcodePrefill:别处扫到未建档的码跳进来建品(见 sales-products-scan 的跨页带码)。
+function openEdit(p: Product | null, barcodePrefill?: string) {
     const mask = ensureMask('sales-prod-mask');
     mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
         <div class="modal-header"><div class="modal-title">${escapeHtml(t(p ? 'sx-p-edit' : 'sx-p-new'))}</div>
@@ -133,7 +151,7 @@ function openEdit(p: Product | null) {
         <div class="modal-body">
             <div class="form-row form-row-2col">
                 <div><label>${escapeHtml(t('sx-p-f-code'))}</label><input type="text" id="sx-pf-code" value="${htmlVal(p?.code)}" maxlength="25"><div class="sx-field-hint">${escapeHtml(t('sx-p-f-code-hint'))}</div><div class="sx-field-err" id="sx-pf-code-err"></div></div>
-                <div><label>${escapeHtml(t('sx-p-f-barcode'))}</label><input type="text" id="sx-pf-barcode" value="${htmlVal(p?.barcode)}" maxlength="100"></div>
+                <div>${barcodeFieldHtml(p ? p.barcode : barcodePrefill)}</div>
             </div>
             <div class="form-row"><label>${escapeHtml(t('sx-p-f-name-th'))} *</label><input type="text" id="sx-pf-th" value="${htmlVal(p?.name_th)}" maxlength="100"><div class="sx-field-hint">${escapeHtml(t('sx-p-f-name-hint'))}</div></div>
             <div class="form-row form-row-2col">
@@ -142,7 +160,7 @@ function openEdit(p: Product | null) {
             </div>
             <div class="form-row form-row-2col">
                 <div><label>${escapeHtml(t('sx-p-f-unit'))}</label><input type="text" id="sx-pf-unit" value="${htmlVal(p?.unit)}" maxlength="50"></div>
-                <div><label>${escapeHtml(t('sx-p-f-price'))}</label><input type="number" id="sx-pf-price" value="${p ? p.unit_price : ''}" min="0" step="0.01"></div>
+                <div><label>${escapeHtml(t('sx-p-f-price'))}</label><input type="number" id="sx-pf-price" value="${htmlVal(p?.unit_price)}" min="0" step="0.01"><div class="sx-field-hint">${escapeHtml(t('sx-p-f-price-hint'))}</div></div>
             </div>
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-vat" ${!p || p.vat_applicable ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-vat'))}</label></div>
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-batch" ${p && p.track_batch ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-batch'))}</label><div class="sx-field-hint">${escapeHtml(t('sx-p-f-batch-hint'))}</div></div>
@@ -153,25 +171,43 @@ function openEdit(p: Product | null) {
             <button class="btn btn-primary" id="sx-p-save">${escapeHtml(t('sx-p-save'))}</button>
         </div></div>`;
     mask.style.display = 'flex';
-    document.getElementById('sx-p-close')!.onclick = () => closeMask('sales-prod-mask');
-    document.getElementById('sx-p-cancel')!.onclick = () => closeMask('sales-prod-mask');
+    document.getElementById('sx-p-close')!.onclick = closeProdModal;
+    document.getElementById('sx-p-cancel')!.onclick = closeProdModal;
     mask.onclick = (e) => {
-        if (e.target === mask) closeMask('sales-prod-mask');
+        if (e.target === mask) closeProdModal();
     };
     document.getElementById('sx-p-save')!.onclick = () => save(p);
     bindImageField('sx-pf-image');
+    // 撞码时「去编辑那个商品」= 换成那个商品的编辑态,不再多开一层弹窗。
+    bindBarcodeField(p ? p.id : null, (other) => {
+        closeProdModal();
+        openEdit(other);
+    });
+}
+
+// 价格留空发 null,不发 0:这个表单最常走的那条路就是抱着货只填个名字建档(扫到未建档的码
+// → 「去建这个商品」)。发 0 的话后端存 0.00、收银台的零元闸看到「有值」就放行,整件货 ฿ 0
+// 进车、฿ 0 出门,小票/日结/报表全看着正常。null 才让「没设过价」和「真的免费」分得开。
+// 人自己打的 0 照样发 0 —— 那是人做的决定,小票上看得见;这里堵的是系统替人编出来的价。
+function priceOrNull(raw: string): number | null {
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
 }
 
 function readForm() {
     const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value.trim();
     return {
         name_th: val('sx-pf-th'),
+        // 清空 = 发 null,且每次都把全部键发齐:PATCH 那侧按 exclude_unset 分「这次没改」与
+        // 「改成空」(routes.products_routes._patch_fields),键不发出去就等于没改 —— 清空条码
+        // 会静默变成不改还回 ok:true,回去存另一件货照旧撞码,人没有出路。
         code: val('sx-pf-code') || null,
         barcode: val('sx-pf-barcode') || null,
         name_en: val('sx-pf-en') || null,
         name_zh: val('sx-pf-zh') || null,
         unit: val('sx-pf-unit') || null,
-        unit_price: Number(val('sx-pf-price')) || 0,
+        unit_price: priceOrNull(val('sx-pf-price')),
         vat_applicable: (document.getElementById('sx-pf-vat') as HTMLInputElement).checked,
         track_batch: (document.getElementById('sx-pf-batch') as HTMLInputElement).checked,
         image_url: val('sx-pf-image') || null,
@@ -188,10 +224,37 @@ function setCodeErr(msg: string) {
     if (el) el.textContent = msg;
 }
 
+// 查重要几百毫秒:这段时间保存键必须说清自己在等什么,并且点不动(不然连点两下就是两条商品)。
+async function withSaveBusy<T>(job: () => Promise<T>): Promise<T> {
+    const btn = document.getElementById('sx-p-save') as HTMLButtonElement | null;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('sx-p-bc-checking');
+    }
+    try {
+        return await job();
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = t('sx-p-save');
+        }
+    }
+}
+
 async function save(p: Product | null) {
     const payload = readForm();
     setCodeErr('');
     if (!payload.name_th) return showToast(t('sx-p-name-required'), 'error');
+    // 撞码不许存:同一个码落两个商品,POS 扫出来永远是先建的那个,收银员在台前分辨不了。
+    // 查重是异步的,不等它落定就等于「贴上码立刻点保存」能绕过去 —— settleBarcodeCheck 会把
+    // 在飞的推完/没查过的现查。只有真查到别的商品才拦(查不了 ≠ 撞码,不凭一次网络失败拦人)。
+    const dup = await withSaveBusy(settleBarcodeCheck);
+    if (dup) {
+        // 状态行同时画出「去编辑那个商品」那条出路,焦点挪回条码框让它进视野
+        showToast(barcodeConflictText(), 'error');
+        document.getElementById('sx-pf-barcode')?.focus();
+        return;
+    }
     const url = p ? `/api/sales/products/${p.id}` : '/api/sales/products';
     try {
         const r = await salesFetch(url, {
@@ -211,7 +274,7 @@ async function save(p: Product | null) {
             showToast(salesErrMsg(detail, 'sx-p-save-fail'), 'error');
             return;
         }
-        closeMask('sales-prod-mask');
+        closeProdModal();
         showToast(t('sx-p-saved'), 'success');
         await load();
     } catch (_) {
@@ -238,6 +301,9 @@ async function del(id: string) {
 }
 
 function openImport() {
+    // 两个弹窗共用一张 mask:导入把建品表单的 DOM 覆盖掉,但条码枪的独占订阅不会自己退,
+    // 不在这里收掉就会永久截走全站的枪输入。
+    releaseBarcodeField();
     const mask = ensureMask('sales-prod-mask');
     mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
         <div class="modal-header"><div class="modal-title">${escapeHtml(t('sx-p-import-title'))}</div>
@@ -296,6 +362,9 @@ async function refreshRows() {
 }
 
 async function load() {
+    // 建品表单可能是叠在别的屏上开的(入库单扫到未建档的码),那时商品页根本没挂载:再去重画
+    // 列表会在 bindList 里撞上不存在的按钮抛错,把一次成功的保存显示成「保存失败」。
+    if (!document.getElementById('sx-p-body')) return;
     renderBody(`<div class="sx-state">${escapeHtml(t('sx-loading'))}</div>`);
     try {
         products = await fetchProducts();
@@ -310,6 +379,16 @@ async function load() {
     }
 }
 
+// 别处扫到未建档的码 → window.openProductFormWithBarcode(code, {overlay:true}) 把建品表单叠在
+// 调用方自己的弹窗之上(入库单跳页就会连半张单一起丢)。桥挂在扫码模块上,开表单的手在这里;
+// 反向 import 会成环,所以开机把手注册过去。
+registerProductFormOpener((code) => {
+    openEdit(null, code);
+    // 真开出来了才回 true:调用方靠它决定要不要显示「先去商品数据页建品」的诚实回落文案
+    const mask = document.getElementById('sales-prod-mask');
+    return !!mask && mask.style.display === 'flex';
+});
+
 window.loadSalesProducts = function () {
     const sec = document.getElementById('page-sales-products');
     if (!sec) return;
@@ -317,7 +396,12 @@ window.loadSalesProducts = function () {
         sec.innerHTML = `<div class="sx-page"><div class="sx-head"><h2>${escapeHtml(t('nav-sales-products'))}</h2></div><div id="sx-p-body"></div></div>`;
         sec.dataset.sxInit = '1';
     }
-    load();
+    // 别处扫到未建档的码跳进来 → 列表就绪后直接开新建表单,码已填好(等 load 是为了让
+    // 「去编辑那个商品」拿得到最新列表,不是表单本身要等)。
+    void load().then(() => {
+        const code = takePendingBarcode();
+        if (code) openEdit(null, code);
+    });
 };
 
 // 切账套重载已统一收口到 core-boot 全局 pearnly:workspace-changed → reloadCurrentRoute。

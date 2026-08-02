@@ -12,3 +12,10 @@ scripts/git-hooks/* text eol=lf
 # 把它转成 CRLF,而 `--write` 永远写 LF —— 不钉死就是每次跑闸都冒出一份纯行尾的假 diff,
 # 真正的键名改动被淹在里面。
 tests/fixtures/express_doctype_golden.json text eol=lf
+
+# 扫码地基:tests/unit/test_scan_assets.test_sources_are_lf_only 断言这些源文件是 LF
+# (bundle 把各文件 minify 后用 `;\n` 拼起来,混进 CRLF 只会制造纯行尾的假 diff)。
+# 库里存的一直是 LF,但 Windows 上 core.autocrlf=true 会在【检出时】转成 CRLF ——
+# 于是那条断言在每一台 Windows 机器上都是红的,而 CI(Linux)一路绿,没人看得见。
+# 断言要成立就得把契约钉在检出这一步,不能只写在测试里。
+static/scan/* text eol=lf

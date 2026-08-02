@@ -11,6 +11,7 @@ import {
     type Voucher,
 } from './acct-common.js';
 import { fmtMoney } from './purchase-common.js';
+import { BAHT } from './money.js';
 
 export async function fetchAccounts(): Promise<Account[]> {
     const data = (await aapi('GET', withWs('/api/accounting/accounts'))) as {
@@ -58,7 +59,7 @@ export function openAcctAccountPicker(
             box.innerHTML = lines
                 .map(
                     (l) => `<div class="field">
-                    <label>${escapeHtml(t(l.dr_cr === 'debit' ? 'acct-dr' : 'acct-cr'))} · ฿${fmtMoney(l.amount)}${l.memo ? ' · ' + escapeHtml(l.memo) : ''}</label>
+                    <label>${escapeHtml(t(l.dr_cr === 'debit' ? 'acct-dr' : 'acct-cr'))} · ${BAHT}${fmtMoney(l.amount)}${l.memo ? ' · ' + escapeHtml(l.memo) : ''}</label>
                     <select class="inp" data-line="${escapeHtml(l.id)}">${accountOptions(accounts, l.account_id)}</select>
                 </div>`
                 )

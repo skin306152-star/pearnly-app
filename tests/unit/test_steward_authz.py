@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -25,6 +26,8 @@ from fastapi import HTTPException
 from services.agent.contracts import ToolResult
 from services.steward import authz, budget, copy, orchestrator, registry, store, tools, worker
 from services.steward.registry import StewardTool, ToolContext
+from tests.unit._steward_loop_fakes import CurCM as _CurCM
+from tests.unit._steward_loop_fakes import LedgerCur as _LedgerCur
 
 _WRITE_TOOL = "erp_push_draft"
 _ARGS = {"invoice_no": "INV-9", "amount": "107.00"}
@@ -412,6 +415,113 @@ class PublicCardTests(unittest.TestCase):
         self.assertNotIn("authorization", store.public_task(_task_row()))
 
 
+# 卡面参数行的「机器味」判据。标签是纯 ascii 蛇形 = 工具槽名原样上卡(没翻译);值里带
+# uuid = 摆了一串会计对不上的东西。两者都通向同一个后果:她跳过整块参数直接点批准。
+_RAW_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
+
+# d93b13b6 之前铸的卡:payload 里根本没有 args_display 这一项,代码更新也不会回填它。
+_LEGACY_CARD = {
+    "token": "tok-legacy",
+    "tool": registry.ERP_PUSH,
+    "title": "把 1 张票推进 Express 账套 69EXP",
+    "risk": registry.RISK_WRITE,
+    "args": {
+        "account_set": "69EXP",
+        "direction": "sales",
+        "posting_kind": "stock",
+        "invoice_no": "INV-2569-0012",
+        "seller_name": "บริษัท ทดสอบ จำกัด",
+        "total_amount": "12840.00",
+        "history_id": "3f2b9c14-77aa-4a11-9d3e-0c1e5a7b2f88",
+    },
+    "args_fp": "fp",
+    "status": store.AUTH_PENDING,
+    "requested_at": "2026-07-20T03:00:00+00:00",
+    "expires_at": "2099-01-01T00:00:00+00:00",
+}
+
+
+def machine_row_violations(rows) -> list[str]:
+    """卡面参数行里残留的机器味,逐条列出(空 = 干净)。闸与反证共用这一份判据 —— 判据只有
+    一份,才谈得上「反证红了」证明「正例绿了」不是闸没看。
+
+    一行都没有也算脏:前端 argEntries 在 display 空时回落原样摆 args,屏幕上照样是原始键。
+    """
+    if not rows:
+        return ["参数行为空 —— 前端会回落原始键值"]
+    out = []
+    for row in rows:
+        label = str((row or {}).get("label") or "")
+        value = str((row or {}).get("value") or "")
+        if not label or _RAW_KEY_RE.match(label):
+            out.append(f"未翻译的机器键 label={label!r}")
+        if _UUID_RE.search(value):
+            out.append(f"卡面摆了 uuid {label}={value!r}")
+    return out
+
+
+class AuthzCardArgRowsTests(unittest.TestCase):
+    """授权卡参数行不许再出现原始键 / uuid。
+
+    唯一真验它的是 tests/e2e/_b2m1_copy_rework_verify.spec.js,而那条要本机真栈 + stw_e2e
+    账号,CI 里恒 skip —— 这一组是 CI 里唯一的防线,所以判据抽成函数并配反证。
+    """
+
+    def _rows(self, lang, auth=None):
+        card = authz.public_authorization_card(auth or dict(_LEGACY_CARD), lang)
+        return card["args_display"]
+
+    def test_legacy_card_without_display_is_computed_on_read(self):
+        """老卡读侧现算:zh/th 都出人话,history_id 那串 uuid 一行都不上卡。"""
+        self.assertNotIn("args_display", _LEGACY_CARD, "样例卡必须是「没有这一项」的老卡形态")
+        zh = self._rows("zh")
+        th = self._rows("th")
+        self.assertEqual([r["label"] for r in zh], ["票号", "对方", "方向", "记账方式", "金额"])
+        self.assertEqual([r["label"] for r in th][:1], ["เลขที่ใบ"])
+        # 机器枚举值也得翻:sales→销项/ขาย,stock→按库存记账/ลงแบบสต๊อก。
+        self.assertIn("销项", [r["value"] for r in zh])
+        self.assertIn("ขาย", [r["value"] for r in th])
+
+    def test_rows_carry_no_machine_key_or_uuid(self):
+        for lang in copy.LANGS:
+            with self.subTest(lang=lang):
+                self.assertEqual(machine_row_violations(self._rows(lang)), [])
+
+    def test_gate_flags_a_raw_card(self):
+        """反证:喂一张原始键 + uuid 的卡,判据必须红 —— 不然上面那条绿只是没看。"""
+        raw = [
+            {"label": "history_id", "value": "3f2b9c14-77aa-4a11-9d3e-0c1e5a7b2f88"},
+            {"label": "direction", "value": "sales"},
+            {"label": "票号", "value": "INV-2569-0012"},
+        ]
+        found = machine_row_violations(raw)
+        self.assertEqual(len(found), 3, found)  # 两个机器键 + 一个 uuid,人话那行不算
+        self.assertTrue(any("uuid" in f for f in found), found)
+        # 同一张卡走一遍真投影(args_display 已有就不再现算)也必须被判脏。
+        card = authz.public_authorization_card({**_LEGACY_CARD, "args_display": raw})
+        self.assertEqual(card["args_display"], raw)
+        self.assertTrue(machine_row_violations(card["args_display"]))
+
+    def test_gate_reddens_when_the_backfill_stops_working(self):
+        """反证之二:把读侧现算掐掉(老卡回填失效),这组闸必须当场红,而不是判空即绿。"""
+        with mock.patch.object(copy, "authz_arg_rows", return_value=[]):
+            self.assertTrue(machine_row_violations(self._rows("zh")))
+
+    def test_every_write_tool_translates_its_card_rows(self):
+        """挂第二个写工具却忘了登记文案 → authz_arg_rows 返空 → 前端回落原始键值。
+        那条路今天跑不到只是因为闭集里只有 erp_push,不是因为有人守着。"""
+        writes = [t.name for t in registry.TOOLS_BY_NAME.values() if not t.readonly]
+        self.assertTrue(writes, "闭集里一个写工具都没有,这条闸失去意义")
+        for name in writes:
+            for lang in copy.LANGS:
+                with self.subTest(tool=name, lang=lang):
+                    self.assertTrue(
+                        copy.authz_arg_rows(name, dict(_LEGACY_CARD["args"]), lang),
+                        f"{name} 没登记卡面文案,授权卡会摆原始键",
+                    )
+
+
 class MintMinutesTests(unittest.TestCase):
     def test_mint_supports_minute_ttl(self):
         from services.line_binding import line_action_nonce
@@ -429,59 +539,6 @@ class MintMinutesTests(unittest.TestCase):
         sql, params = executed[0]
         self.assertIn("make_interval(mins => %s)", sql)
         self.assertEqual(params[-1], 5)
-
-
-class _LedgerCur:
-    """成本台账假游标:租户咨询锁 / 会话汇总 / 租户 24h 汇总 / 占坑 / 结算,各一分支。
-    假台账的每一行都视为 24h 内(reserve 只插当下,滚动窗语义由真 SQL 承担)。"""
-
-    def __init__(self, entries):
-        self.entries = entries
-        self._ret = None
-
-    def execute(self, sql, params=()):
-        if "pg_advisory_xact_lock" in sql:
-            self._ret = None
-        elif "FILTER (WHERE task_id" in sql:
-            task_id, tid, sid = params
-            rows = [e for e in self.entries if e["tenant_id"] == tid and e["session_id"] == sid]
-            self._ret = {
-                "session_spent": sum(e["cost_thb"] for e in rows),
-                "task_spent": sum(e["cost_thb"] for e in rows if e["task_id"] == task_id),
-            }
-        elif "interval '24 hours'" in sql:
-            (tid,) = params
-            rows = [e for e in self.entries if e["tenant_id"] == tid]
-            self._ret = {"tenant_spent": sum(e["cost_thb"] for e in rows)}
-        elif "INSERT INTO steward_cost_entries" in sql:
-            tid, sid, task_id, cost = params
-            entry = {"id": f"e{len(self.entries) + 1}", "tenant_id": tid, "session_id": sid,
-                     "task_id": task_id, "cost_thb": Decimal(cost), "settled": False}  # fmt: skip
-            self.entries.append(entry)
-            self._ret = {"id": entry["id"]}
-        elif "UPDATE steward_cost_entries" in sql:
-            actual, tid, eid = params
-            for e in self.entries:
-                if e["id"] == eid and e["tenant_id"] == tid:
-                    e["settled"] = True
-                    if actual is not None:
-                        e["cost_thb"] = Decimal(actual)
-        else:
-            raise AssertionError(f"unexpected sql: {sql[:80]}")
-
-    def fetchone(self):
-        return self._ret
-
-
-class _CurCM:
-    def __init__(self, cur):
-        self.cur = cur
-
-    def __enter__(self):
-        return self.cur
-
-    def __exit__(self, *a):
-        return False
 
 
 class BudgetTests(unittest.TestCase):

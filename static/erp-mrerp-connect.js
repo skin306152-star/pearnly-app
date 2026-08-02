@@ -621,19 +621,6 @@
             zh_TW: '已儲存',
             ja: '保存しました',
         },
-        // v118.34.4 · the new 3-way ERP subtab split (连接 / 推送日志 /
-        // 字段映射). "推送日志" reuses home.js's existing erp-logs-title
-        // key. "连接" needs its own translation since the original key
-        // (auto-erp-subtab-connect) meant "连接 & 推送日志" — which is
-        // now misleading. We don't touch home.js dict per Zihao's rule,
-        // so we localize this tab from our own IIFE in _localizeSubtabs().
-        'auto-erp-subtab-connect-only': {
-            zh: '连接',
-            en: 'Connect',
-            th: 'เชื่อมต่อ',
-            zh_TW: '連接',
-            ja: '接続',
-        },
     };
 
     function _activeLang() {
@@ -1182,8 +1169,6 @@
     async function _bootstrap() {
         const host = document.getElementById('erp-connect-cards');
         if (!host) return;
-        // v118.34.4 · localize the new "连接" tab (key not in home.js dict).
-        _localizeSubtabs();
         const endpoints = await _loadEndpoints();
         const mrerpEp =
             endpoints.find(function (e) {
@@ -1195,15 +1180,6 @@
             // pill 已固定显示「已停用」· 跑 check 反而会把它覆盖成 testing.
             _refreshCardHealth(mrerpEp.id, false);
         }
-    }
-
-    // v118.34.4 · localize the new "连接" tab. The new "推送日志" tab
-    // uses data-i18n="erp-logs-title" which IS in home.js's dict, so
-    // home.js's applyLang() handles it automatically. "连接" uses a
-    // new key (auto-erp-subtab-connect-only) we own here.
-    function _localizeSubtabs() {
-        const connectTab = document.querySelector('.erp-subtab[data-erp-subtab="connect"]');
-        if (connectTab) connectTab.textContent = t('auto-erp-subtab-connect-only');
     }
 
     // Expose so home.js can re-invoke after page navigation.

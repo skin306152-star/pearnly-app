@@ -193,6 +193,115 @@ class LineSumExceedsSubtotalTests(unittest.TestCase):
         self.assertFalse(any("明细行和" in r for r in evaluate_sanity(inv)))
 
 
+class VatInclusiveLinesTests(unittest.TestCase):
+    """VAT 内含的 ABB 小票:逐行印含税价,行和天然 > 税前小计(SM 真语料 Ocha 出单)。
+
+    豁免必须窄:只在「行和 ≈ 含税合计 且 小计+VAT ≈ 合计 且 VAT ≈ 净额7%」三条同时
+    成立时放行,任一条不成立仍按规则 6 判 —— 下面每个 not_exempt 用例各拆一条。
+    """
+
+    def _items(self, *subs):
+        from services.ocr.schemas import LineItem
+
+        return [LineItem(name=f"i{i}", subtotal=s) for i, s in enumerate(subs)]
+
+    def _abb(self, **kw):
+        base = dict(
+            subtotal="2514.02",
+            vat="175.98",
+            total_amount="2690.00",
+            items=self._items("1290.00", "1400.00"),
+        )
+        base.update(kw)
+        return _inv(**base)
+
+    def test_abb_receipt_not_flagged(self):
+        self.assertEqual(evaluate_sanity(self._abb()), [])
+
+    def test_abb_with_simplified_doc_type_not_flagged(self):
+        self.assertEqual(evaluate_sanity(self._abb(document_type="simplified_tax_invoice")), [])
+
+    def test_line_misread_still_flagged(self):
+        # 行读错 → 行和不再等于含税合计,豁免前提破,规则 6 照样抓
+        inv = self._abb(items=self._items("1290.00", "1900.00"))
+        self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_zero_vat_not_exempt(self):
+        # 免税/零税票没有「内含的税」可解释这段差额 → 不豁免
+        inv = self._abb(subtotal="2514.02", vat="0.00", total_amount="2514.02")
+        self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_subtotal_misread_not_exempt(self):
+        # 小计读错一位:行和仍 ≈ 合计,但 小计+VAT ≠ 合计 → 不豁免
+        inv = self._abb(subtotal="2014.02")
+        self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_vat_not_seven_percent_not_exempt(self):
+        # 三者互相凑平但 VAT 不是净额的 7%(自洽性幻觉)→ 不豁免
+        inv = self._abb(subtotal="2390.00", vat="300.00")
+        self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_trap08_shape_still_flagged_with_vat_present(self):
+        # 重影误读那类:行和 1896.68 与合计 1346.68 差一截,豁免够不着
+        inv = _inv(
+            subtotal="1258.58",
+            vat="88.10",
+            total_amount="1346.68",
+            items=self._items("396.68", "1500.00"),
+        )
+        self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_multi_page_abb_slips_not_flagged(self):
+        # 同页两张 ABB:规则 7 也吃同一套判据,不因为同页就把两张都判成跨票错配
+        extra = self._abb(
+            subtotal="934.58",
+            vat="65.42",
+            total_amount="1000.00",
+            items=self._items("600.00", "400.00"),
+        )
+        inv = self._abb(additional_invoices=[extra])
+        self.assertEqual(evaluate_sanity(inv), [])
+
+    def test_multi_page_discount_branch_stays_off(self):
+        # 刻意的边界:折扣不传进规则 7,所以「折前含税行和 − 折扣 = 合计」这类
+        # 单票页放行的形态,在多票页仍按跨票错配拦。规则 7 收紧成双边就是防错配,
+        # 没有实测语料证明多票页也需要这条豁免之前不放宽。改这里要先拿真票。
+        extra = self._abb(
+            subtotal="934.58",
+            vat="65.42",
+            total_amount="1000.00",
+            items=self._items("600.00", "400.00"),
+        )
+        inv = _inv(
+            subtotal="9016.82",
+            vat="631.18",
+            total_amount="9648.00",
+            discount="3162.00",
+            items=self._items("5210.00", "3800.00", "3800.00"),
+            additional_invoices=[extra],
+        )
+        reasons = evaluate_sanity(inv)
+        self.assertTrue(any("跨票错配" in r for r in reasons), reasons)
+        self.assertFalse(any("结构不可能" in r for r in reasons), reasons)
+
+    def test_multi_page_stolen_total_still_flagged(self):
+        # 偷来的合计配不上本票的行 → 豁免前提(行和 ≈ 本票合计)破,规则 7 照样抓
+        extra = self._abb(
+            subtotal="934.58",
+            vat="65.42",
+            total_amount="1000.00",
+            items=self._items("600.00", "400.00"),
+        )
+        inv = self._abb(
+            subtotal="934.58",
+            vat="65.42",
+            total_amount="1000.00",
+            items=self._items("1290.00", "1400.00"),
+            additional_invoices=[extra],
+        )
+        self.assertTrue(any("跨票错配" in r for r in evaluate_sanity(inv)))
+
+
 class MultiInvoicePageTests(unittest.TestCase):
     # 规则 7 + 附加票过闸(trap11 实案 2026-07-05):同页三张小票,主票被整片偷走
     # 另一张的自洽三元组(759/0/759)→ 单票勾稽全平静默放行;行和 700 供出真数。

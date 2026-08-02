@@ -1,0 +1,39 @@
+{
+  "unpricedCard": {
+    "cardPrice": "ยังไม่ตั้งราคา",
+    "color": "rgb(201, 130, 12)",
+    "toast": "สินค้านี้ยังไม่ตั้งราคา ไปตั้งราคาที่หน้าสินค้าก่อน (ถ้าแถมฟรีให้ใส่ 0)"
+  },
+  "zeroInvoiceBlocked": {
+    "posted": [],
+    "checks": [
+      "ทุกบรรทัดมีราคา *"
+    ],
+    "toast": "ยังออกไม่ได้: ยังมีบรรทัดที่ไม่ได้ใส่ราคา — ถ้าแถมฟรีให้ใส่ 0 อย่าเว้นว่าง",
+    "step": "รายการสินค้า"
+  },
+  "explicitGiftIssues": {
+    "posted": [
+      "/api/sales/documents",
+      "/api/sales/documents/doc-1/issue"
+    ],
+    "lines": [
+      {
+        "description": "โค้ก 325ml",
+        "product_id": "p-cola",
+        "qty": 1,
+        "unit_price": 120,
+        "discount": 0,
+        "vat_applicable": true
+      },
+      {
+        "description": "ของแถม",
+        "product_id": null,
+        "qty": 1,
+        "unit_price": 0,
+        "discount": 0,
+        "vat_applicable": true
+      }
+    ]
+  }
+}

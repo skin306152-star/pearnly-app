@@ -17,10 +17,21 @@
 
     // 判据人话:narrative_key 有值走 i18n 模板,否则诚实回退 flag_reason 原文(verdict.py
     // 顶注约定 + ai-review-verdict.js narrativeOf)。
+    // params.error_code 是 OCR 异常的类型名(Layer1AuthError 这类):内部标识不进句子,
+    // 压成同排的可复制小字交给排障(形状与管家任务卡共用 AI.state.codeChipHtml)。
     function narrativeHtml(item) {
         var n = AI.reviewVerdict.narrativeOf(item.verdict_hint, item.flag_reason);
         var text = n.key ? at(n.key, n.vars) : n.fallbackText;
-        return '<p class="riq-narrative">' + esc(text) + '</p>';
+        var code = n.vars && n.vars.error_code;
+        var codeHtml = code
+            ? AI.state.codeChipHtml({
+                  cls: 'riq-code',
+                  code: code,
+                  action: 'riq-copy-code',
+                  copyLabel: at('riq_code_copy'),
+              })
+            : '';
+        return '<p class="riq-narrative">' + esc(text) + codeHtml + '</p>';
     }
 
     function confidenceChipHtml(item) {
@@ -124,6 +135,12 @@
         );
     }
 
+    // 文件名行:剥掉落盘 hash 前缀后仍可能顶格 60 字,卡上截断显示,全名进 title 供悬停看。
+    function fileNameHtml(item) {
+        var name = AI.reviewQueue.fileName(item.file_ref);
+        return '<span class="riq-item-file" title="' + esc(name) + '">' + esc(name) + '</span>';
+    }
+
     // 裁决卡三件套:读值(fldt)/判据人话(riq-narrative)/置信度徽标(chip)——三者都是
     // isVisible 断言的直接对象,不藏进折叠面板。冻结单的件(frozen)收起全部裁决钮改只读
     // 徽章(清单 #3 · 四态诚实:后端 archive 只读闸会拒,UI 不许先摆出可点的样子),
@@ -148,9 +165,7 @@
             item.item_id +
             '">' +
             '<div class="riq-item-hd">' +
-            '<span class="riq-item-file">' +
-            esc(AI.reviewQueue.fileName(item.file_ref)) +
-            '</span>' +
+            fileNameHtml(item) +
             confidenceChipHtml(item) +
             itemStatusHtml(local) +
             doneChip +

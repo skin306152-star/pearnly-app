@@ -344,9 +344,20 @@
             (task.status === 'cancelled' ? ' off' : '') +
             '">' +
             esc(task.error_reason || '') +
-            (task.error_code ? '<code>' + esc(task.error_code) + '</code>' : '') +
+            (task.error_code ? codeHtml(task.error_code) : '') +
             '</div>'
         );
+    }
+
+    // 形状收口在 AI.state.codeChipHtml(异常裁决卡也用同一份);按钮点下去的闪回照
+    // ai-billing 的 copyAcct:原地文字闪回,不弹 toast,剪贴板不可用也照样给反馈。
+    function codeHtml(code) {
+        return AI.state.codeChipHtml({
+            cls: 'stw-code',
+            code: code,
+            action: 'stw-copy-code',
+            copyLabel: at('stw_code_copy'),
+        });
     }
 
     // 执行中给「取消」出口(取消是幂等端点,连点不炸);终态不摆一个点了没意义的按钮。

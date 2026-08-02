@@ -1,0 +1,88 @@
+{
+  "t1": {
+    "note": "会改数据的操作需你先批准",
+    "composerNote": "文件可拖入或粘贴",
+    "taskPolls": [
+      {
+        "status": "running",
+        "stepsDone": 1,
+        "stepsTotal": 2
+      },
+      {
+        "status": "running",
+        "stepsDone": 1,
+        "stepsTotal": 2
+      },
+      {
+        "status": "running",
+        "stepsDone": 2,
+        "stepsTotal": 3
+      },
+      {
+        "status": "done",
+        "stepsDone": 3,
+        "stepsTotal": 3
+      }
+    ],
+    "agentMsgs": [
+      "「本期谁缺料」已开始,结果回到这里。\n看执行状态",
+      "本期有1家缺料：Siam Silk Trading，目前处于收集材料阶段。\n看执行状态"
+    ],
+    "consoleErrors": []
+  },
+  "t2": {
+    "sessionErrText": "会话建不起来\n服务无响应或权限不足,点重试\n重试",
+    "taskErrText": "任务状态拉不到\n网络或服务出错,点重试\n重试",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    ]
+  },
+  "t3": {
+    "cd1": "3:59 内有效",
+    "cd2": "3:58 内有效",
+    "errLine": "这张卡已被处理过,以最新状态为准。",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ]
+  },
+  "t4": {
+    "consoleErrors": []
+  },
+  "t5": {
+    "budgetText": "已用 ฿ 5.02 / 上限 ฿ 5.00\n开个新会话继续",
+    "sessionIds": ["81ea6f34-29d5-4f74-869b-82274cf26c24", "257927ea-5d0b-43c1-bedf-fb67a75c8207"],
+    "consoleErrors": []
+  },
+  "t6": {
+    "note": "งานที่แก้ข้อมูลต้องให้คุณอนุมัติก่อน",
+    "consoleErrors": []
+  },
+  "t7": {
+    "en": {
+      "note": "会改数据的操作需你先批准"
+    },
+    "ja": {
+      "note": "会改数据的操作需你先批准"
+    }
+  },
+  "t8_real": {
+    "geo": {
+      "overflow": 0,
+      "sameColumn": true,
+      "leftAboveRight": true,
+      "leftWidth": 296
+    },
+    "consoleErrors": []
+  },
+  "t9": {
+    "geo": {
+      "overflow": 0,
+      "cardRight": 354,
+      "vw": 390,
+      "approveW": 108.5,
+      "approveH": 44
+    },
+    "consoleErrors": []
+  }
+}

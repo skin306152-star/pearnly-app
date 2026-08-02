@@ -6,7 +6,9 @@
 CI 默认 skip(无真 DB),本地跑:
 
     set PEARNLY_INTEGRATION_DB=1
-    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly
+    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly_throwaway
+    (这个库会被 DROP TABLE 拆掉,别指开发库;先对它执行
+     CREATE TABLE IF NOT EXISTS _pearnly_disposable_test_db(note text);)
     set RLS_ROLE=pearnly_app
     set PGSSLMODE=disable
     python -m unittest tests.integration.test_exceptions_rls_real_tables -v
@@ -15,7 +17,7 @@ CI 默认 skip(无真 DB),本地跑:
 import os
 import unittest
 
-from tests.integration._helpers import require_db
+from tests.integration._helpers import require_disposable_db
 
 A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -26,14 +28,16 @@ UB = "22222222-2222-2222-2222-222222222222"
 _OCR_STUB = (
     "CREATE TABLE ocr_history (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), "
     "user_id UUID, tenant_id UUID, filename TEXT, invoice_date DATE, "
-    "confidence TEXT, client_id BIGINT)"
+    # pages:2026-07-20(8929e7c6)日期口径收口后 list_exceptions 直接 SELECT h.pages 取票面日期,
+    # 桩没跟上 → 整条查询 UndefinedColumn 返空,而这测试正是数它返回了谁的行。
+    "confidence TEXT, client_id BIGINT, pages JSONB NOT NULL DEFAULT '[]'::jsonb)"
 )
 
 
 class ExceptionsRlsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        require_db()
+        require_disposable_db()
         os.environ.setdefault("PGSSLMODE", "disable")
         os.environ["RLS_ROLE"] = "pearnly_app"
 

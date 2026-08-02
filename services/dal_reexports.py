@@ -311,6 +311,7 @@ _REEXPORTS = {
         "insert_ocr_history",
         "update_ocr_history_pdf_storage",
         "update_history_official_name",
+        "update_history_posting_kind",
         "get_history_pdf_info",
         "find_ocr_by_hash",
         "find_ocr_by_hashes",

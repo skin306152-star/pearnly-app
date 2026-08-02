@@ -9,6 +9,7 @@ import {
     _erpExcAcctPanel,
     _erpExcAccGroupPanel,
     _erpExcBindPanel,
+    _erpExcPostingKindPanel,
     _erpExcStockOpeningPanel,
 } from './erp-exc-actions.js';
 import { extractReasonCode, guideWhyLink } from './guide-links.js';
@@ -35,6 +36,9 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     // 合格的都没有(或小助手还没报上来)。指引不同故分两句,别合成一条。
     stock_acc_group_required: 'erp-reason-stock-acc-group',
     stock_acc_group_missing: 'erp-reason-stock-acc-group-missing',
+    // 会计确认「还是推」的那一次被小助手领走后没回执:租约到期,队列不会自动再推(再推就是
+    // 账上多一张,那份载荷关掉了写侧幂等)。系统分不出写没写,只能请她去 Express 看一眼。
+    confirmed_push_unacked: 'erp-reason-confirmed-unacked',
     low_confidence: 'erp-reason-low-confidence',
     enqueue_error: 'erp-reason-enqueue-error',
     amounts_not_consistent: 'erp-reason-amounts',
@@ -61,7 +65,30 @@ const _AGENT_REASON_I18N: Record<string, string> = {
     // 防重单闸:改了票号回导重推,而上一版单据还在 Express 里。此前没接进来 → 前端翻译返空
     // → 原样显示小助手那句写死中文 + 方括号里的英文码,泰国会计看不懂也不知道要删哪张。
     PRIOR_DOC_STILL_IN_ERP: 'erp-reason-prior-doc',
+    // 查重闸:同一张票之前推过,而这次的数字跟账上那张对不上 → 一个字节都没写。同上一条的
+    // 坑:不接进来就原样显示小助手那句中文,而那句话末尾还教人「带 duplicate_confirmed=true
+    // 重推」—— 产品里没有任何地方能带这个参数,照做只会让她以为是自己操作不对。
+    DUPLICATE_CONTENT_DIFFERS: 'erp-reason-duplicate-differs',
 };
+
+// 查重闸差异行的字段名 → 文案键。小助手回执里的 label 是写死中文,后端 derive_duplicate_fix
+// 已把它丢掉,标签在这里按机器名现翻;认不出的字段落通用键,不把机器名摆上屏。
+const _DUP_FIELD_I18N: Record<string, string> = {
+    base_amount: 'erp-dup-field-base',
+    vat_amount: 'erp-dup-field-vat',
+    total_amount: 'erp-dup-field-total',
+    doc_date: 'erp-dup-field-date',
+};
+
+function _dupDiffText(log: any): string {
+    const fields = (log && log.duplicate_fix && log.duplicate_fix.fields) || [];
+    return fields
+        .map(
+            (f: any) =>
+                `${t(_DUP_FIELD_I18N[f.field] || 'erp-dup-field-other')} ${f.in_erp} → ${f.incoming}`
+        )
+        .join(' · ');
+}
 
 // 过账去向留人工(raw 形如 "EXPRESS_MANUAL: posting_needs_review:perpetual")· 冒号后是这家
 // 账套的客观库存用法,它决定该跟会计说哪一句,所以按后缀分文案,取不到后缀回落通用句。
@@ -79,13 +106,28 @@ function _expressFriendlyReason(raw: string, log?: any): string {
     }
     if (_AGENT_REASON_I18N[code]) {
         const text = t(_AGENT_REASON_I18N[code]);
-        // 单据号从后端派生的结构化字段取(载荷里的 prior_docnum),不从错误串抠。
-        // 只说"有旧单挡着"而不说是哪一号,会计没法动手。
-        const doc = (log && log.prior_doc_fix && log.prior_doc_fix.docnum) || '';
-        return text.replace('{doc}', doc);
+        // 单据号从后端派生的结构化字段取(载荷里的 prior_docnum / 回执里的 duplicate.docnum),
+        // 不从错误串抠。只说"有旧单挡着"而不说是哪一号,会计没法动手。
+        const doc =
+            (log && log.prior_doc_fix && log.prior_doc_fix.docnum) ||
+            (log && log.duplicate_fix && log.duplicate_fix.docnum) ||
+            '';
+        return _filled(text.replace(/\{doc\}/g, doc).replace('{diff}', _dupDiffText(log)));
     }
     const key = _EXPRESS_REASON_I18N[code];
-    return key ? t(key) : '';
+    // {doc} 在这一支回落成票面号:「去 Express 核对」不点名核对哪一张,等于没说。
+    // 卡头虽然也印着票号,但摘要条常被单独复制走(title 属性就是整句),句子得自带主语。
+    return key ? _filled(t(key).replace(/\{doc\}/g, String((log && log.invoice_no) || ''))) : '';
+}
+
+// 占位符没填上就当这条文案不可用,让调用方回落到原始错误串。
+//
+// 这些句子里的 {doc}/{diff} 来自后端在推送日志行上派生的结构化字段(prior_doc_fix /
+// duplicate_fix),而派生要有回执体才做得出来 —— 管家桥直写那条路 response_body 是空的,
+// 于是「请先在 Express 删掉它,再重推」会渲染成删掉『』。半句话比英文原码更坑:
+// 会计照着做不了,还以为是自己没看懂。
+function _filled(text: string): string {
+    return /\{[a-z_]+\}/i.test(text) ? '' : text;
 }
 
 function buildErpLogCard(log: any): string {
@@ -276,6 +318,9 @@ function buildErpLogCard(log: any): string {
         _cat === 'stock_opening_needed' &&
         !isAccGrpFix &&
         !!(_sf.items || []).length;
+    // 没声明过账去向被留人工:此前这张卡上一个可点的东西都没有(status=manual 连裸重试都不
+    // 渲染),摘要还教人回上传页重新识别 —— 那要重扣一次 OCR 费。补选一次即可就地重推。
+    const isPostKindFix = statusClass === 'fail' && _cat === 'posting_kind_needed';
     let repairBtn = '';
     if (isAcctFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-acctfix-open'))}</button>`;
@@ -285,6 +330,8 @@ function buildErpLogCard(log: any): string {
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-stockopen-open'))}</button>`;
     else if (isAccGrpFix)
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-accgrp-open'))}</button>`;
+    else if (isPostKindFix)
+        repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-postkind-open'))}</button>`;
     else if (canMapFix)
         repairBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(log.id)}">${escapeHtml(_cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer'))}</button>`;
     const repairPanel = isAcctFix
@@ -295,11 +342,18 @@ function buildErpLogCard(log: any): string {
             ? _erpExcStockOpeningPanel(log)
             : isAccGrpFix
               ? _erpExcAccGroupPanel(log)
-              : '';
+              : isPostKindFix
+                ? _erpExcPostingKindPanel(log)
+                : '';
 
     // 存货科目组卡不进这个排除表:选组只写端点配置、不重推,重试按钮得留着让会计选完自己点。
     const retryBtn =
-        log.status === 'failed' && !isRetrying && !isAcctFix && !isBindFix && !isStockFix
+        log.status === 'failed' &&
+        !isRetrying &&
+        !isAcctFix &&
+        !isBindFix &&
+        !isStockFix &&
+        !isPostKindFix
             ? `<button class="btn btn-sm btn-secondary" data-log-retry="${escapeHtml(log.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`
             : '';
 
@@ -312,7 +366,7 @@ function buildErpLogCard(log: any): string {
     const whyLink = statusClass === 'fail' ? guideWhyLink(log.error_msg || '') : '';
     const reasonStrip =
         statusClass === 'fail' && reasonText
-            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(reasonText)}</span>${whyLink}</div>`
+            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span title="${escapeHtml(reasonText)}">${escapeHtml(reasonText)}</span>${whyLink}</div>`
             : '';
 
     return `

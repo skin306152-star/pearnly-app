@@ -1,0 +1,146 @@
+{
+  "gunIntoBatchWithOneLongTask": {
+    "ok": true,
+    "stall": true,
+    "jankHappened": true,
+    "typedBatch": "L2027",
+    "measured": {
+      "n": 14,
+      "blockedMs": 120,
+      "stampGaps": [
+        19.4,
+        20.3,
+        21.7,
+        14.9,
+        25.5,
+        15.6,
+        16.1,
+        15.8,
+        16,
+        16.2,
+        20.5,
+        18.5,
+        19.6
+      ],
+      "perfGaps": [
+        19.5,
+        20.6,
+        140.9,
+        0.8,
+        0.3,
+        0.4,
+        0.2,
+        0.3,
+        0.3,
+        0.4,
+        18.3,
+        18.5,
+        21.2
+      ],
+      "stampMax": 25.5,
+      "perfMax": 140.9,
+      "repeats": 0
+    },
+    "beforeRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L2027"
+      },
+      {
+        "product": "",
+        "qty": "",
+        "batch": ""
+      }
+    ],
+    "afterRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L2027"
+      },
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": ""
+      }
+    ],
+    "asked": [
+      "4901234567894"
+    ],
+    "msgText": "ขึ้นบรรทัดใหม่ให้ นมสด 1L — สินค้าคุมล็อตแต่ละลังอาจคนละล็อต/วันหมดอายุ กรุณากรอกของลังนี้",
+    "why": ""
+  },
+  "gunIntoBatchClean": {
+    "ok": true,
+    "stall": false,
+    "jankHappened": true,
+    "typedBatch": "L2027",
+    "measured": {
+      "n": 14,
+      "blockedMs": 0,
+      "stampGaps": [
+        18.7,
+        20.1,
+        15.4,
+        19.4,
+        15.3,
+        22,
+        20.2,
+        21.4,
+        21.1,
+        22.2,
+        21.3,
+        20.6,
+        22.1
+      ],
+      "perfGaps": [
+        18.9,
+        19.9,
+        15.6,
+        19.2,
+        15.3,
+        22.2,
+        20.2,
+        21.4,
+        21,
+        22.3,
+        21.4,
+        20.4,
+        23.9
+      ],
+      "stampMax": 22.2,
+      "perfMax": 23.9,
+      "repeats": 0
+    },
+    "beforeRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L2027"
+      },
+      {
+        "product": "",
+        "qty": "",
+        "batch": ""
+      }
+    ],
+    "afterRows": [
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": "L2027"
+      },
+      {
+        "product": "p-milk",
+        "qty": "1",
+        "batch": ""
+      }
+    ],
+    "asked": [
+      "4901234567894"
+    ],
+    "msgText": "ขึ้นบรรทัดใหม่ให้ นมสด 1L — สินค้าคุมล็อตแต่ละลังอาจคนละล็อต/วันหมดอายุ กรุณากรอกของลังนี้",
+    "why": ""
+  }
+}

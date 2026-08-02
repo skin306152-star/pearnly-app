@@ -384,6 +384,42 @@ class AiStateTests(unittest.TestCase):
         self.assertIn('data-state="error"', error_html)
         self.assertIn('data-action="retry"', error_html)
 
+    def test_picker_html_tells_loading_error_empty_apart(self):
+        """客户下拉三态:载入中 / 读取失败 / 真的一个都没有,三种处境必须长得不一样 ——
+        报表中心与工资表申报除了这个下拉没有别的入口(D-4)。"""
+        out = _run_node(f"""
+            const s = require({json.dumps(str(AI_DIR / "ai-state.js"))});
+            const base = {{
+                id: 'sel', selected: '',
+                valueOf: (c) => c.id, labelOf: (c) => c.name,
+                labels: {{placeholder: 'pick', loading: 'loading…', error: 'failed', empty: 'none yet'}},
+                retryLabel: 'retry', retryAction: 'x-retry',
+            }};
+            const items = [{{id: 7, name: 'A<b'}}];
+            process.stdout.write(JSON.stringify([
+                s.pickerHtml(Object.assign({{}}, base, {{phase: 'loading', items: []}})),
+                s.pickerHtml(Object.assign({{}}, base, {{phase: 'error', items: []}})),
+                s.pickerHtml(Object.assign({{}}, base, {{phase: 'ready', items: []}})),
+                s.pickerHtml(Object.assign({{}}, base, {{phase: 'ready', items, selected: '7'}})),
+            ]));
+            """)
+        loading, error, empty, ready = out
+        self.assertIn('data-state="loading"', loading)
+        self.assertIn("loading…", loading)
+        self.assertIn(" disabled", loading)  # 读不出来时不摆一个选不出东西的控件
+        self.assertIn('data-state="error"', error)
+        self.assertIn('data-action="x-retry"', error)  # 失败必须给出路
+        self.assertIn('data-state="empty"', empty)
+        self.assertIn("none yet", empty)
+        self.assertNotIn("retry", empty)  # 「还没有客户」不是错误,不该出重试
+        self.assertIn('data-state="ready"', ready)
+        self.assertIn('<option value="7" selected>', ready)
+        self.assertIn("A&lt;b", ready)  # 客户名转义
+        self.assertNotIn(" disabled", ready)
+        # 四种处境的 data-state 两两不同 —— 这条就是 D-4 的机器判据
+        states = [h.split('data-state="')[1].split('"')[0] for h in out]
+        self.assertEqual(len(set(states)), 4, states)
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiApiPureTests(unittest.TestCase):

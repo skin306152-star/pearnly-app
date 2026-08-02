@@ -3,6 +3,7 @@
 // 视觉照桌面样稿 Pearnly开票UI预览/app.html vInv;令牌复用 home-39-sales.css。
 /* global t, escapeHtml, apiGet, showToast, routeTo */
 import { type SalesDoc, docTypeLabel, fmtMoney, fmtDate } from './sales-common.js';
+import { BAHT } from './money.js';
 
 const ICON_INV =
     '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>';
@@ -52,11 +53,7 @@ function summary() {
 
 function rowsHtml(): string {
     const list = docs;
-    if (!list.length) {
-        return `<tr><td colspan="8"><div class="sx-state">${ICON_INV}<div>${escapeHtml(
-            t('sx-empty')
-        )}</div></div></td></tr>`;
-    }
+    if (!list.length) return '';
     return list
         .map((d) => {
             const pay = payState(d);
@@ -75,6 +72,14 @@ function rowsHtml(): string {
         .join('');
 }
 
+// 空态卡是表格的兄弟节点、不是 <td colspan>:窄屏下 .sx-panel 横向滚、表格 min-width 640,
+// 放进单元格就按表格滚动宽度居中 → 「暂无发票」被推到视口外(手机 390 实测半张卡在屏外)。
+function emptyHtml(show: boolean): string {
+    return `<div class="sx-state" id="sx-wb-empty"${show ? '' : ' hidden'}>${ICON_INV}<div>${escapeHtml(
+        t('sx-empty')
+    )}</div></div>`;
+}
+
 function listInnerHtml(): string {
     const s = summary();
     const seg = (['all', 'draft', 'issued', 'void'] as Filter[])
@@ -83,17 +88,18 @@ function listInnerHtml(): string {
                 `<button data-flt="${f}" class="${filter === f ? 'on' : ''}">${escapeHtml(t('sx-f-' + f))}</button>`
         )
         .join('');
+    const empty = !docs.length;
     return `<div class="sx-cards">
         <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-month'))}</div><div class="sx-v">${s.count} <small>${escapeHtml(t('sx-unit-docs'))}</small></div></div>
-        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-amount'))}</div><div class="sx-v">฿ ${fmtMoney(s.amount)}</div></div>
+        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-amount'))}</div><div class="sx-v">${BAHT}${fmtMoney(s.amount)}</div></div>
         <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-draft'))}</div><div class="sx-v">${s.drafts}</div></div>
-        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-due'))}</div><div class="sx-v warn">฿ ${fmtMoney(s.due)}</div></div>
+        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-due'))}</div><div class="sx-v warn">${BAHT}${fmtMoney(s.due)}</div></div>
     </div>
     <div class="sx-toolbar">
         <div class="sx-seg">${seg}</div>
         <div class="sx-search"><input type="text" id="sx-wb-search" value="${escapeHtml(keyword)}" placeholder="${escapeHtml(t('sx-search-ph'))}"></div>
     </div>
-    <div class="sx-panel"><table class="sx-tbl">
+    <div class="sx-panel"><table class="sx-tbl" id="sx-wb-tbl"${empty ? ' hidden' : ''}>
         <thead><tr>
             <th>${escapeHtml(t('sx-col-no'))}</th><th>${escapeHtml(t('sx-col-date'))}</th>
             <th>${escapeHtml(t('sx-col-type'))}</th><th>${escapeHtml(t('sx-col-client'))}</th>
@@ -101,7 +107,7 @@ function listInnerHtml(): string {
             <th>${escapeHtml(t('sx-col-status'))}</th><th></th>
         </tr></thead>
         <tbody id="sx-wb-tbody">${rowsHtml()}</tbody>
-    </table></div>`;
+    </table>${emptyHtml(empty)}</div>`;
 }
 
 function pageShell(): string {
@@ -124,9 +130,14 @@ function renderBody(html: string) {
     if (body) body.innerHTML = html;
 }
 
+// 搜索/筛选只换行,不重渲整页(重渲会丢搜索框焦点)· 有数据与没数据的互换在这里同步表格与空态卡。
 function rerenderRows() {
     const tb = document.getElementById('sx-wb-tbody');
     if (tb) tb.innerHTML = rowsHtml();
+    const tbl = document.getElementById('sx-wb-tbl');
+    const empty = document.getElementById('sx-wb-empty');
+    if (tbl) (tbl as HTMLElement).hidden = !docs.length;
+    if (empty) (empty as HTMLElement).hidden = !!docs.length;
     bindRows();
 }
 

@@ -5,6 +5,7 @@
 // 字段编辑/RD 校验/保存/推送逻辑全不改)· 共享抽屉的其它消费方(对账中心)完全不受影响。
 /* global escapeHtml, token, t, showToast */
 import { imageViewerHtml, remountImageViewer } from './image-viewer.js';
+import { BAHT } from './money.js';
 
 type HistDetail = {
     id?: string;
@@ -103,7 +104,7 @@ function historizeDrawer(detail: HistDetail) {
     strip.className = 'hd-summary';
     strip.innerHTML = `
         <div class="hd-stat"><label>${escapeHtml(t('hd-sum-buyer'))}</label><strong>${buyer ? escapeHtml(buyer) : '—'}</strong></div>
-        <div class="hd-stat"><label>${escapeHtml(t('hd-sum-total'))}</label><strong>${total ? '฿' + escapeHtml(total) : '—'}</strong></div>
+        <div class="hd-stat"><label>${escapeHtml(t('hd-sum-total'))}</label><strong>${total ? BAHT + escapeHtml(total) : '—'}</strong></div>
         <div class="hd-stat"><label>${escapeHtml(t('hd-sum-status'))}</label><strong><span class="hist-status-pill ${st}">${escapeHtml(t(stKey))}</span></strong></div>`;
 
     // tab 条

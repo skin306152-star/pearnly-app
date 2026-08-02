@@ -23,6 +23,9 @@ _UCOLS = (
     "is_default_sell, created_at, updated_at"
 )
 _UWRITABLE = ("unit_name", "factor_to_base", "barcode", "price", "is_default_sell")
+# 可空列:PATCH 收到显式 None = 清空,得真写 NULL(箱码印错了要能删掉,不能只能改成别的码)。
+# 其余是 NOT NULL 列,None 只可能是"这次没传"。路由层用 exclude_unset 保证键=客户端真发过。
+NULLABLE_UNIT_FIELDS = {"barcode", "price"}
 # numeric 列经 str→Decimal 存(避免 float 精度)。
 _NUMERIC = {"factor_to_base", "price"}
 
@@ -79,6 +82,49 @@ def ensure_schema() -> None:
         logger.info("✅ products 多单位列 + product_units 表已就绪 (POS PO-A2)")
     except Exception as e:
         logger.warning(f"ensure_schema product_units 失败(跳过 · 等 alembic 0022/0030): {e}")
+    _apply_price_nullability()
+    _apply_barcode_uniqueness()
+
+
+def _apply_price_nullability() -> None:
+    """products.unit_price 去 NOT NULL/DEFAULT 0(alembic 0093 双跑 · prod 不跑 alembic)。
+
+    单开事务:这一条失败不该连累建索引那条,反过来也一样。失败按 error 记——列还带着
+    DEFAULT 0 时"没设价"照旧静默变成 ฿0,收银台的零元闸对它毫无办法,不能只当个 warning。
+    """
+    from core import db
+    from services.sales import products as products_dal
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            products_dal.relax_price_not_null(cur)
+    except Exception as e:
+        logger.error(f"unit_price 仍是 NOT NULL:没设价会落成 ฿0(等 alembic 0093): {e}")
+
+
+def _apply_barcode_uniqueness() -> None:
+    """条码部分唯一索引(alembic 0092/0093 双跑 · prod 不跑 alembic)。
+
+    单开一个事务:存量真有重码时 CREATE UNIQUE INDEX 会报错,混在上面那段里会把
+    product_units 建表一起回滚掉。有冲突时不建索引但按 error 记清冲突组——静默跳过等于
+    让人以为已经拦住了,而撞码要到收银台才暴露。
+
+    补列必须在体检之前:体检按 product_active 归组(只看在售商品的单位行),列不在直接报错。
+    """
+    from core import db
+    from services.sales import products as products_dal
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            products_dal.ensure_unit_visibility_column(cur)
+            conflicts = products_dal.barcode_conflicts(cur)
+            dirty = {t: g for t, g in conflicts.items() if g}
+            if dirty:
+                logger.error(f"条码唯一索引未建:存量有重复条码待清理 {dirty}")
+                return
+            products_dal.create_barcode_unique_indexes(cur)
+    except Exception as e:
+        logger.warning(f"条码唯一索引未建(等 alembic 0092/0093): {e}")
 
 
 def _num(v: Any) -> Any:
@@ -131,17 +177,37 @@ def create_unit(
             vals.append(_num(fields[k]) if k in _NUMERIC else fields[k])
     placeholders = ", ".join(["%s"] * len(vals))
     cur.execute(
-        f"INSERT INTO product_units ({', '.join(cols)}) VALUES ({placeholders}) "
-        f"RETURNING {_UCOLS}",
+        f"INSERT INTO product_units ({', '.join(cols)}) VALUES ({placeholders}) RETURNING {_UCOLS}",
         vals,
     )
-    return cur.fetchone()
+    row = cur.fetchone()
+    _sync_product_active(cur, tenant_id=tenant_id, unit_id=row["id"])
+    return row
+
+
+def _sync_product_active(cur, *, tenant_id: str, unit_id) -> None:
+    """新单位行的"所属商品在售"标记按商品当前状态落(默认值 TRUE 只对在售商品才对)。
+
+    单位可以挂到已停用的商品上("含停用"列表里点进去,给下次上架先把箱码配好)。默认 TRUE
+    的话这行立刻占着码,而查重那边(services/sales/products.find_by)筛掉了不在售的商品,
+    一律回"没人用" —— 僵尸码就是这么长出来的:绿字放行,真存撞唯一索引,占码的看不见。
+    """
+    cur.execute(
+        "UPDATE product_units pu SET product_active = p.is_active FROM products p "
+        "WHERE p.id = pu.product_id AND pu.tenant_id = %s AND pu.id = %s "
+        "AND pu.product_active IS DISTINCT FROM p.is_active",
+        (tenant_id, unit_id),
+    )
 
 
 def update_unit(
     cur, *, tenant_id: str, workspace_client_id: int, product_id: str, unit_id: str, fields: dict
 ) -> Optional[dict]:
-    updates = {k: fields[k] for k in _UWRITABLE if fields.get(k) is not None}
+    updates = {
+        k: fields[k]
+        for k in _UWRITABLE
+        if k in fields and (fields[k] is not None or k in NULLABLE_UNIT_FIELDS)
+    }
     if not updates:
         return get_unit(
             cur,

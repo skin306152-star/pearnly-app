@@ -3,7 +3,7 @@
 // 从工作台「开票」按钮启动:window.openSalesWizard()。
 /* global escapeHtml, showToast */
 import { openDocPdf, salesErrText } from './sales-common.js';
-import { type WState, compliance } from './sales-wizard-calc.js';
+import { type WState, compliance, priced } from './sales-wizard-calc.js';
 import {
     loadWizardData,
     getProducts,
@@ -158,9 +158,10 @@ function bindEvents() {
             el.onblur = render;
         });
     const ac = document.getElementById('sw-addcustom');
+    // 新行的价留空,不预填 0:预填 0 是系统替人拍的价,过得了零元闸也过得了合规清单。
     if (ac)
         ac.onclick = () => (
-            st.lines.push({ desc: '', qty: 1, price: 0, disc: 0, vat: true, custom: true }),
+            st.lines.push({ desc: '', qty: 1, price: '', disc: 0, vat: true, custom: true }),
             render()
         );
     mask()
@@ -233,9 +234,13 @@ function switchBuyerType(type: string) {
     st.buyer.branchNo = '';
     render();
 }
+// 没设价的商品不许进发票行 —— 口径同收银台 addToCart 的 priced():那边 ฿ 0 进车是客人白付一箱
+// 钱,这边 ฿ 0 上票是开出一张金额为 0 的税票,一样没人看得见。指路指到「去商品数据填价」,
+// 别让人对着一张点不动的卡片猜。真的 ฿ 0 赠品照旧点得进来(那是老板拍过板的价)。
 function addProduct(i: number) {
     const p = getProducts()[i];
     if (!p) return;
+    if (!priced(p.unit_price)) return void showToast(wt('noPriceHint'), 'error');
     const nm = pname(p);
     const ex = st.lines.find((l) => l.product_id === p.id);
     if (ex) ex.qty = (+ex.qty || 0) + 1;
@@ -243,7 +248,7 @@ function addProduct(i: number) {
         st.lines.push({
             desc: nm,
             qty: 1,
-            price: p.unit_price,
+            price: Number(p.unit_price),
             disc: 0,
             vat: p.vat_applicable,
             product_id: p.id,
@@ -353,7 +358,7 @@ async function doSaveDraft() {
     } else showToast(salesErrText(r.error) || wt('saveFail'), 'error');
 }
 // 合规检查 / 服务端错误码 → 该去哪一步补(0:类型 1:买卖双方 2:商品 3:收款 4:核对)。
-const CHECK_STEP: Record<string, number> = { ckBuyer: 1, ckTin: 1, ckPay: 3 };
+const CHECK_STEP: Record<string, number> = { ckBuyer: 1, ckTin: 1, ckPrice: 2, ckPay: 3 };
 // 服务端开票错误码 → 复用第5步合规清单的具体说明键(descKey)+ 跳转步骤。不新增文案。
 const SERVER_ERR: Record<string, { descKey: string; step: number }> = {
     buyer_incomplete: { descKey: 'ckBuyerD', step: 1 },
@@ -361,6 +366,8 @@ const SERVER_ERR: Record<string, { descKey: string; step: number }> = {
     buyer_branch_no_invalid: { descKey: 'ckBuyerD', step: 1 },
     buyer_tax_id_invalid: { descKey: 'ckTinD', step: 1 },
     payment_required: { descKey: 'ckPayD', step: 3 },
+    // 后端零额闸(services/sales/issue_gates.amount_gate)· 前端 ckPrice 漏掉的走这条兜底。
+    zero_amount: { descKey: 'ckPriceD', step: 2 },
 };
 
 function goStep(step: number) {

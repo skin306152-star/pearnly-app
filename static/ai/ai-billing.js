@@ -292,19 +292,7 @@
 
     function copyAcct(e) {
         var btn = e.target.closest('[data-action="bill-copy"]');
-        function flash() {
-            if (!btn) return;
-            var prev = btn.textContent;
-            btn.textContent = root.at('bill_copied');
-            root.setTimeout(function () {
-                btn.textContent = prev;
-            }, 1500);
-        }
-        try {
-            root.navigator.clipboard.writeText(R().BANK.digits).then(flash, flash);
-        } catch {
-            flash();
-        }
+        root.CopyFlash.copy(btn, R().BANK.digits, root.at('bill_copied'), { win: root });
     }
 
     function onKeydown(e) {

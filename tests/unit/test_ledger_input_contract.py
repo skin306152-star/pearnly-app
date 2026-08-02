@@ -16,7 +16,7 @@ from services.ledger.doc_date import (
     REASON_NO_DATE,
 )
 from services.ledger.models import parse_sales_doc
-from tests.unit._ledger_golden import GOLDEN_SESSION_RAW
+from tests.unit._ledger_golden import GOLDEN_SESSION_OCR_DATE_RAW, GOLDEN_SESSION_RAW
 
 D = Decimal
 
@@ -47,6 +47,20 @@ class DocDateRuleTests(unittest.TestCase):
     @staticmethod
     def _date(**fields):
         return parse_sales_doc({"invoice_number": "X1", "items": [{"subtotal": "10"}], **fields})
+
+    def test_ocr_shape_today_cannot_reach_the_session_rule(self):
+        """现状诚实闸 —— 钉的是「线上真拿到什么」,不是「口径应该判成什么」。
+
+        2026-07-31 拿 IMG_2574(02000139,票面 Time in 27-05 / Time out 28-05)跑真
+        pipeline,12 次运行无一例外:date_raw 只有 "27-05-2569"、notes 是 "Thank You Ka~",
+        带标签的场次文本一次都没进来过。所以这张真件目前按 27 入账,不是按口径钉的 28。
+        这条测试红了 = 上游终于把场次时刻送进来了,那时要连着 doc_date 文件头一起更新。
+        """
+        doc = self._date(
+            date="27/05/2569", date_raw=GOLDEN_SESSION_OCR_DATE_RAW, notes="Thank You Ka~"
+        )
+        self.assertEqual(doc.doc_date.isoformat(), "2026-05-27")
+        self.assertEqual(doc.date_source, DATE_FROM_PRINTED)
 
     def test_session_times_read_from_printed_text(self):
         doc = self._date(date="27/05/2569", date_raw=GOLDEN_SESSION_RAW)

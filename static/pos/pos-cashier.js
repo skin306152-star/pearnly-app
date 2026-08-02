@@ -119,7 +119,15 @@
             .forEach((el) => {
                 el.addEventListener('click', () => {
                     if (el.classList.contains('out')) return;
-                    addToCart(items.find((p) => p.id === el.dataset.pid));
+                    const p = items.find((x) => x.id === el.dataset.pid);
+                    const refused = p && addToCart(p);
+                    // 点了没反应是最难排查的一种坏:没加进车必须当场说为什么。
+                    if (refused) {
+                        POS.toast(
+                            POS.tf(refused.key, { name: POS.nm(p.name), unit: refused.unit }),
+                            'error'
+                        );
+                    }
                 });
             });
     }
@@ -155,10 +163,41 @@
     }
 
     // ════════════════ 购物车 ════════════════
+    // 单位没设价时 price 是 null,Number(null) 是 0 —— 整箱货会以 ฿0.00 进车、฿0 出门,
+    // 而后端 SaleLine 允许 0、改价闸也不拦,小票和报表上一样看不出异常。
+    function priced(unit) {
+        const raw = unit.price;
+        if (raw === null || raw === undefined || String(raw).trim() === '') return false;
+        return Number.isFinite(Number(raw));
+    }
+
+    // 「扫中的单位在 units 里找不到」只有一种成因:后端拿 products.barcode 命中,matched_unit
+    // 回的是基本单位,而这个商品只建了命名单位行(箱/打)。基本单位挂了牌价 → 按它卖(后端
+    // 认 base_unit);没挂价 → 回 null,由调用方照旧拒收 —— ฿0 进车比卖不出去更糟。
+    function baseUnitFallback(p) {
+        if (!p.base_unit || p.matched_unit !== p.base_unit) return null;
+        if (!priced({ price: p.base_price })) return null;
+        return { unit_name: p.base_unit, price: p.base_price };
+    }
+
+    // 回 null = 加进车了;回 {key, unit} = 没加,由调用方决定用卡片还是 toast 说(扫码那条路
+    // 屏幕被取景层盖着,toast 在层后面看不见)。绝不静默换单位或按 ฿0 加。
     function addToCart(p) {
-        if (!p) return;
-        const unit = (p.units || []).find((u) => u.default_sell) ||
-            (p.units || [])[0] || { unit_name: '', price: '0' };
+        if (!p) return null;
+        const units = p.units || [];
+        // 扫码取件带 matched_unit(箱码≠瓶码)→ 按扫中的那个单位加;网格点选没有它 → 默认售卖单位。
+        const scanned = p.matched_unit ? units.find((u) => u.unit_name === p.matched_unit) : null;
+        // 后端拿商品主码命中时会把 matched_unit 填成基本单位,而这个商品可能只建了「箱」一条
+        // 单位行 → units 里找不到它。三条分界:基本单位有挂牌价就按基本单位卖(后端认它,
+        // 见 services/pos/sale.py 的 _resolve_unit);价不明才拒。绝不回落到别的单位 ——
+        // 那是扫一瓶收一箱 ฿350 的钱、库存按箱扣 24 瓶,而屏上一个字都没有。
+        const base = scanned ? null : baseUnitFallback(p);
+        if (p.matched_unit && !scanned && !base) {
+            return { key: 'posui.cart.unit_unknown', unit: p.matched_unit };
+        }
+        const unit = scanned || base || units.find((u) => u.default_sell) || units[0];
+        if (!unit) return { key: 'posui.cart.unit_unknown', unit: p.base_unit || '' };
+        if (!priced(unit)) return { key: 'posui.cart.unit_no_price', unit: unit.unit_name };
         const ex = cart.find((c) => c.id === p.id && c.sell_unit === unit.unit_name);
         if (ex) ex.qty++;
         else
@@ -171,6 +210,7 @@
                 vat_applicable: p.vat_applicable !== false,
             });
         renderCart();
+        return null;
     }
     function changeQty(i, d) {
         cart[i].qty += d;
@@ -266,7 +306,7 @@
     }
     // 折扣:百分比模式只存原始百分比(单一事实源),不折成固定金额——预览按当前小计实时复算
     // (见 discountFor),购物车加减商品后总计才不漂移、与后端 pct 复算口径一致。金额模式存绝对额。
-    // 扫码:命中即回填搜索框触发同款商品查找,空码不动作。
+    // 手输的码走 POS.scan 那条精确取件路(与摄像头/条码枪同一条),不再自己回填搜索框模糊搜。
     function confirmPad() {
         if (!padCtx) return;
         if (padCtx.kind === 'discount') {
@@ -285,10 +325,9 @@
             renderCart();
         } else if (padCtx.kind === 'scan') {
             const code = padCtx.buf;
-            if (code) {
-                $('main-search').value = code;
-                loadGrid();
-            }
+            closePad();
+            if (code) POS.scan.submit(code);
+            return;
         }
         closePad();
     }
@@ -301,6 +340,9 @@
         discountReason = '';
         closeSheet();
         renderCart();
+        // 车空了 = 这一位客人的事完了(收完 / 挂单 / 店员清空)。扫码失败清单记的是这一单还欠
+        // 哪几件货,不跟着归零就会顶在下一位客人的屏上 —— 店员照着它去补一件不属于这单的货。
+        if (POS.scan) POS.scan.saleEnded();
     }
 
     // 移动端底部购物车 sheet(桌面 .cart-peek/.cart-scrim 为 display:none,这些类无副作用)
@@ -404,8 +446,15 @@
             reasonValue: discountReason,
         });
     }
-    function openScanPad() {
-        openPad({ kind: 'scan', title: POS.t('posui.scan.title'), maxLen: 24 });
+    // note = 为什么落到手输(相机用不了/权限被拒…)· 显在弹窗里而不是身后的 toast:
+    // 遮罩会把 toast 压暗,而店员这时眼睛在弹窗上。
+    function openScanPad(note) {
+        openPad({ kind: 'scan', title: POS.t('posui.scan.title'), label: note || '', maxLen: 24 });
+    }
+    // 拿一个词填进搜索框并重查(扫到的码没建档时的出路:商品可能建了但没录这个条码)。
+    function searchFor(q) {
+        $('main-search').value = q;
+        loadGrid();
     }
 
     // ════════════════ 收款弹窗 ════════════════
@@ -1081,7 +1130,7 @@
             if (searchTimer) clearTimeout(searchTimer);
             searchTimer = setTimeout(loadGrid, 220);
         });
-        $('main-scan-btn').addEventListener('click', openScanPad);
+        $('main-scan-btn').addEventListener('click', () => POS.scan.open());
         $('cart-peek').addEventListener('click', toggleSheet);
         $('cart-scrim').addEventListener('click', closeSheet);
         $('cart-hold-btn').addEventListener('click', holdCurrent);
@@ -1195,5 +1244,9 @@
         enterMain,
         applyCashier,
         renderHold,
+        // 扫码取件(pos-scan.js)用:加货 / 手输回落弹窗 / 未命中时拿码去搜
+        addToCart,
+        openScanPad,
+        searchFor,
     };
 })();

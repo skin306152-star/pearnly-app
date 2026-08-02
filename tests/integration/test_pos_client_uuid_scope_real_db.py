@@ -2,13 +2,13 @@ import os
 import unittest
 import uuid
 
-from tests.integration._helpers import require_db
+from tests.integration._helpers import require_disposable_db
 
 
 class PosClientUuidScopeRealDbTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        require_db()
+        require_disposable_db()
         try:
             import psycopg2
         except ImportError as exc:

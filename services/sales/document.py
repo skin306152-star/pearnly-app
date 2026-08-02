@@ -16,6 +16,7 @@ from psycopg2.extras import Json
 from services.accounting import hooks as acct_hooks
 from services.sales import archive
 from services.sales import buyer as buyer_mod
+from services.sales import issue_gates
 from services.sales import numbering
 from services.sales import seller_profile
 from services.sales.document_cols import _DOC_COLS, _LINE_COLS
@@ -44,9 +45,9 @@ DEFAULT_PREFIX = {
     "quotation": "QT",
 }
 
-# 收据 / 合并单开出前必须已收款(docs/16 §J3:收钱凭证无款不开)。
-REQUIRE_PAYMENT = ("receipt", "tax_invoice_receipt")
-PAYMENT_STATUSES = ("unpaid", "partial", "paid")
+# 取号前的闸(收款 §J3 / 零额)搬去 issue_gates;这里 re-export 保持 doc_svc.* 的既有调用面。
+REQUIRE_PAYMENT = issue_gates.REQUIRE_PAYMENT
+PAYMENT_STATUSES = issue_gates.PAYMENT_STATUSES
 
 
 def _ws_and(workspace_client_id: Optional[int]) -> tuple:
@@ -106,17 +107,6 @@ def _write_terms(cur, tenant_id, doc_id, due_date, payment_terms) -> None:
         f"UPDATE sales_documents SET {', '.join(sets)} WHERE tenant_id=%s AND id=%s",
         params + [tenant_id, doc_id],
     )
-
-
-def _payment_gate(row: dict) -> Optional[str]:
-    """§J3:收据/合并单开出时必须已收款(状态非 unpaid + 方式/日期齐)。"""
-    if row["doc_type"] not in REQUIRE_PAYMENT:
-        return None
-    if (row.get("payment_status") or "unpaid") == "unpaid":
-        return "payment_required"
-    if not row.get("payment_method") or not row.get("payment_date"):
-        return "payment_required"
-    return None
 
 
 # 卖方快照字段:法定信息(§A 冻结)+ 品牌/模板(§L4 · 随单冻结,保证买方那联与存档一致)。
@@ -345,11 +335,14 @@ def update_draft(
 def lock_for_issue(
     cur, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
 ) -> Optional[dict]:
-    """取号前锁行,读出闸校验所需字段(buyer/payment/seller)。供开出/审批通过共用。
-    PO-7:按当前主体过滤(rollout-safe),不能跨主体开别套账的单。"""
+    """取号前锁行,读出闸校验所需字段(buyer/payment/seller/合计)。供开出/审批通过共用。
+    PO-7:按当前主体过滤(rollout-safe),不能跨主体开别套账的单。
+
+    grand_total 必须在这条 SELECT 里:零额闸拿不到这一列时 row.get 回 None,闸要么放行一切、
+    要么拦死一切 —— 闸能不能成立取决于锁行时读没读它,而不是取决于闸本身写得对不对。"""
     ws_sql, ws_params = _ws_and(workspace_client_id)
     cur.execute(
-        "SELECT status, doc_type, seller_workspace_client_id, "
+        "SELECT status, doc_type, seller_workspace_client_id, grand_total, "
         "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
         "payment_status, payment_method, payment_date "
         f"FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql} FOR UPDATE",
@@ -377,15 +370,17 @@ def finalize_issue(
     approved_by=None,
     tenant_prefix=None,
 ) -> tuple[Optional[dict], Optional[str]]:
-    """已锁行 → 完整性/收款闸 → 取连号(前缀走 numbering.resolve_prefix:显式>主体>租户>默认)
+    """已锁行 → 完整性/收款/零额闸 → 取连号(前缀走 numbering.resolve_prefix:显式>主体>租户>默认)
     → status=issued + 冻结快照(不占号)。approved_by 非空记审批人/时间(§F)。issue/approve 共用。
     """
     berr = buyer_mod.validate_buyer(buyer_mod.from_row(row), row["doc_type"])
     if berr:
         return None, berr
-    perr = _payment_gate(row)
-    if perr:
-        return None, perr
+    # 闸全部跑在 allocate 之前:不合规的单据一个号都不许占(占了再退 = 跳号)。
+    for gate in (issue_gates.payment_gate, issue_gates.amount_gate):
+        err = gate(row)
+        if err:
+            return None, err
     ws = workspace_for_numbering(cur, tenant_id, row)
     ws_prefix = numbering.workspace_doc_prefix(cur, tenant_id, ws)
     default_prefix = DEFAULT_PREFIX.get(row["doc_type"], "DOC")

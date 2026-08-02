@@ -24,12 +24,9 @@
   .sw{width:42px;height:24px;border-radius:999px;background:#E2E8F0;position:relative;cursor:pointer;}
   .sw.on{background:var(--blue);} .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s;} .sw.on i{left:21px;}
   .inp{height:36px;min-width:90px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 12px;font-size:13px;background:#fff;}
-  .cats{padding:14px 22px;border-bottom:1px solid var(--line2);display:flex;flex-wrap:wrap;gap:9px;}
-  .chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12.5px;}
-  .chip .x{color:var(--ink3);cursor:pointer;}
-  .addc{height:32px;padding:0 13px;border:1px dashed var(--blue);border-radius:999px;color:var(--blue);font-size:12.5px;background:#fff;cursor:pointer;}
   .foot{display:flex;justify-content:flex-end;padding:14px 22px;}
-  .btn{height:40px;padding:0 22px;border-radius:11px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-weight:650;font-size:14px;cursor:pointer;}
+  .btn{height:40px;padding:0 15px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-size:13.5px;display:inline-flex;align-items:center;gap:7px;text-decoration:none;cursor:pointer;}
+  .save{height:40px;padding:0 22px;border-radius:11px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-weight:650;font-size:14px;cursor:pointer;}
   .ptag{position:fixed;left:12px;bottom:12px;background:rgba(22,163,74,.92);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
 </style>
 </head>
@@ -38,24 +35,25 @@
   <div class="ph"><div class="t">采购设置</div><div class="sub">配一次以后拍票/记费用都按这套自动来</div></div>
 
   <div class="panel">
+    <div class="grp">录入</div>
+    <div class="item"><div class="l"><div class="t2">自动入账</div><div class="d">拍照、上传、LINE 进来的票据,自动记账入册,不用逐张确认(随时可编辑、撤销)· 默认关</div></div><div class="ctl"><div class="sw"><i></i></div></div></div>
+
     <div class="grp">税与库存</div>
     <div class="item"><div class="l"><div class="t2">默认进项 VAT 率</div><div class="d">拍票抽不到时按此填,可逐张改</div></div><div class="ctl"><div class="inp tnum" style="min-width:70px;">7 %</div></div></div>
     <div class="item"><div class="l"><div class="t2">进货自动入库</div><div class="d">拍进货票确认后,品项自动进库存(库存模块开时)</div></div><div class="ctl"><div class="sw"><i></i></div></div></div>
     <div class="item"><div class="l"><div class="t2">重复票拦截</div><div class="d">同一张进项票重复录时提醒(防重复抵税)</div></div><div class="ctl"><div class="sw on"><i></i></div></div></div>
 
     <div class="grp">费用科目(自动归类用 · 可增删)</div>
-    <div class="cats">
-      <span class="chip">进货 <span class="x">×</span></span><span class="chip">交通费 <span class="x">×</span></span><span class="chip">水电费 <span class="x">×</span></span><span class="chip">办公费 <span class="x">×</span></span><span class="chip">清洁费 <span class="x">×</span></span><span class="chip">租金 <span class="x">×</span></span><span class="chip">广告费 <span class="x">×</span></span><span class="chip">维修费 <span class="x">×</span></span><button class="addc">+ 加科目</button>
-    </div>
+    <div class="item"><div class="l"><div class="t2">费用科目已移到「商品 › 费用数据」,可在那里管理大类和小类</div></div><div class="ctl"><a class="btn" href="#/expense-data">去费用数据 →</a></div></div>
 
     <div class="grp">付款</div>
     <div class="item"><div class="l"><div class="t2">默认账期</div><div class="d">供应商赊账天数(0=现结)</div></div><div class="ctl"><div class="inp tnum" style="min-width:70px;">0 天</div></div></div>
     <div class="item"><div class="l"><div class="t2">服务默认预扣率</div><div class="d">服务类付款代供应商扣缴的默认率</div></div><div class="ctl"><div class="inp tnum" style="min-width:70px;">3 %</div></div></div>
     <div class="item"><div class="l"><div class="t2">付款需审批</div><div class="d">付供应商前要老板批(大店用)</div></div><div class="ctl"><div class="sw"><i></i></div></div></div>
 
-    <div class="foot"><button class="btn">保存</button></div>
+    <div class="foot"><button class="save">保存</button></div>
   </div>
 </div>
-<div class="ptag">采购 · 采购设置(收拢版)· 一个面板分段(税与库存/费用科目/付款)·不再三飘卡 · 照 DESIGN_LANGUAGE</div>
+<div class="ptag">采购 · 采购设置(收拢版)· 一个面板分段(录入/税与库存/费用科目/付款)·不再三飘卡 · 照 DESIGN_LANGUAGE</div>
 </body>
 </html>

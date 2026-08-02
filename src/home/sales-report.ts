@@ -4,6 +4,7 @@
 // 数据=收银卖货自动长出,无手录;不造假(概念稿的「较上周 +%」是 mock,接口无此项→不展示)。
 /* global t, token, escapeHtml, currentLang */
 import { activeWsId, localizedName, posErrMsg, fmtQty, type InvName } from './inventory-common.js';
+import { BAHT } from './money.js';
 
 interface Kpi {
     gross: string;
@@ -80,7 +81,7 @@ function bahtInt(v: string | number): string {
 
 // 毛利/成本可能诚实置空(老单据无成本快照)——跟真 0 分开渲染,不拿 "—" 冒充 0,也不拿 0 冒充有数据。
 function moneyOrUnknown(v: string | null): string {
-    return v == null ? '—' : '฿' + bahtInt(v);
+    return v == null ? '—' : BAHT + bahtInt(v);
 }
 
 async function fetchReport(): Promise<Report> {
@@ -128,10 +129,10 @@ function kpiCards(k: Kpi): string {
         }>${value}</div></div>`;
     const profitUnknown = k.gross_profit == null;
     return `<div class="kpis">
-        ${card(t('rep-kpi-gross'), '฿' + bahtInt(k.gross))}
+        ${card(t('rep-kpi-gross'), BAHT + bahtInt(k.gross))}
         ${card(t('rep-kpi-count'), String(k.sales_count))}
-        ${card(t('rep-kpi-avg'), '฿' + bahtInt(k.avg_ticket))}
-        ${card(t('rep-kpi-refund'), '฿' + bahtInt(k.refund))}
+        ${card(t('rep-kpi-avg'), BAHT + bahtInt(k.avg_ticket))}
+        ${card(t('rep-kpi-refund'), BAHT + bahtInt(k.refund))}
         ${card(
             t('rep-kpi-profit'),
             moneyOrUnknown(k.gross_profit),
@@ -148,13 +149,13 @@ function chartPanel(byDay: DayRow[], byMethod: Record<string, string>): string {
               .map((d) => {
                   const h = Math.max(3, Math.round(((Number(d.gross) || 0) / max) * 100));
                   const lbl = d.date.slice(5).replace('-', '/'); // MM/DD
-                  const tip = `${t('rep-kpi-gross')} ฿${bahtInt(d.gross)} · ${t('rep-kpi-profit')} ${moneyOrUnknown(d.gross_profit)}`;
+                  const tip = `${t('rep-kpi-gross')} ${BAHT}${bahtInt(d.gross)} · ${t('rep-kpi-profit')} ${moneyOrUnknown(d.gross_profit)}`;
                   return `<div class="col" title="${escapeHtml(tip)}"><div class="b" style="height:${h}%"></div><div class="x">${escapeHtml(lbl)}</div></div>`;
               })
               .join('')
         : `<div class="rep-state">${escapeHtml(t('rep-empty'))}</div>`;
     const pm = (color: string, label: string, amount: string) =>
-        `<div class="pm"><div class="l"><span class="dot" style="background:var(--${color})"></span>${escapeHtml(label)}</div><div class="v tnum">฿${bahtInt(amount)}</div></div>`;
+        `<div class="pm"><div class="l"><span class="dot" style="background:var(--${color})"></span>${escapeHtml(label)}</div><div class="v tnum">${BAHT}${bahtInt(amount)}</div></div>`;
     return `<div class="panel">
         <div class="h">${escapeHtml(t('rep-chart-daily'))}</div>
         <div class="chart">${cols}</div>
@@ -173,7 +174,7 @@ function listsPanel(top: TopProduct[], cashiers: CashierRow[]): string {
                   const profitUnknown = p.gross_profit == null;
                   return `<div class="row"><span class="rk">${i + 1}</span><span class="nm">${escapeHtml(
                       localizedName(p.name)
-                  )} <span class="q">· ${escapeHtml(fmtQty(p.qty))} ${escapeHtml(t('rep-unit-items'))}</span></span><span class="v-col"><span class="v tnum">฿${bahtInt(
+                  )} <span class="q">· ${escapeHtml(fmtQty(p.qty))} ${escapeHtml(t('rep-unit-items'))}</span></span><span class="v-col"><span class="v tnum">${BAHT}${bahtInt(
                       p.gross
                   )}</span><span class="pf tnum${profitUnknown ? ' unknown' : ''}">${escapeHtml(
                       t('rep-kpi-profit')
@@ -185,7 +186,7 @@ function listsPanel(top: TopProduct[], cashiers: CashierRow[]): string {
         ? cashiers
               .map(
                   (c) =>
-                      `<div class="row"><span class="nm">${escapeHtml(c.name || '—')}</span><span class="q">${c.sales_count} ${escapeHtml(t('rep-unit-orders'))}</span><span class="v tnum">฿${bahtInt(c.gross)}</span></div>`
+                      `<div class="row"><span class="nm">${escapeHtml(c.name || '—')}</span><span class="q">${c.sales_count} ${escapeHtml(t('rep-unit-orders'))}</span><span class="v tnum">${BAHT}${bahtInt(c.gross)}</span></div>`
               )
               .join('')
         : `<div class="rep-state sm">${escapeHtml(t('rep-empty'))}</div>`;

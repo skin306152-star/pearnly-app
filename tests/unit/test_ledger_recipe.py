@@ -118,8 +118,9 @@ class GoldenNumbersTests(unittest.TestCase):
         by_invoice = {d.invoice_number: d for d in self.docs}
         self.assertEqual(by_invoice["02000138"].doc_date.isoformat(), "2026-05-27")
         self.assertEqual(by_invoice["02000143"].doc_date.isoformat(), "2026-05-28")
-        # 02000139 喂的是上游真会给的形状:date=模型挑的那个时刻(27,即 Time in),
+        # 02000139 喂的是「票面文本真进得来时」的形状:date=模型挑的那个时刻(27,即 Time in),
         # date_raw=票面原样。口径钉的是 Time out,所以必须盖过 date 那个 27。
+        # ⚠️ 这是合成夹具:实测 OCR 目前送不出带标签的场次文本,见 _ledger_golden 的注释。
         session = by_invoice["02000139"]
         self.assertEqual(session.doc_date.isoformat(), "2026-05-28")
         self.assertEqual(session.date_source, DATE_FROM_TIME_OUT)

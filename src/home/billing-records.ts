@@ -12,6 +12,8 @@
 // window.loadBillingRecords 由 subscription.ts 的 loadSubscription 触发。
 // ============================================================
 
+import { BAHT } from './money.js';
+
 type RecTab = 'usage' | 'topup' | 'ocr';
 type Period = 'all' | 'day' | 'month' | 'year';
 
@@ -35,7 +37,7 @@ function _auth() {
     return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
 }
 function _money(n: number): string {
-    return '฿ ' + Number(n || 0).toFixed(2);
+    return BAHT + Number(n || 0).toFixed(2);
 }
 function _esc(s: unknown): string {
     return typeof window.escapeHtml === 'function'
@@ -482,4 +484,5 @@ async function onExport() {
     }
 }
 
+// ES module(隔离本文件的 _t/_auth 等同名局部 · 不落进脚本全局作用域跟同组文件互撞)。
 export {};

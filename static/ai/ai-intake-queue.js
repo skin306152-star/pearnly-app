@@ -193,11 +193,14 @@
                 }
                 // 带上原始 code/status 而不是先翻成文案:失败卡要按这两样分「重传能解决」
                 // 与「换个地方点才解得开」(见 ai-fail-render.js),翻早了就没得判。
+                // detail 是 402 那三个数(余额/这批要花多少/本月已识别几页)唯一的来路,
+                // 丢在这里 = 失败卡只剩一句「余额不足」,会计还是不知道该充多少。
                 onOutcome({
                     type: 'network_fail',
                     files: files,
                     code: (err && err.code) || null,
                     status: (err && err.status) || 0,
+                    detail: (err && err.detail) || null,
                 });
             });
     }
@@ -349,6 +352,7 @@
                             files: evt.files,
                             code: evt.code,
                             status: evt.status,
+                            detail: evt.detail || null,
                         });
                     }
                     session.passwordCard = null;

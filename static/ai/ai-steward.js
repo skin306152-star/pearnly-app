@@ -176,7 +176,9 @@
                 );
                 renderRight();
                 renderLeft(); // 消息流变了,左窗那条红条要不要印跟着变(见 reasonIsEchoed)
-                if (resp.current_task_id && !S.taskId) loadTask(resp.current_task_id);
+                if (resp.current_task_id && !S.taskId) {
+                    loadTask(resp.current_task_id, { fromSync: true });
+                }
             })
             .catch(function () {
                 // 重建失败不动本地流:那是刚刚真发生过的对话,不能因为一次网络抖动清空。
@@ -293,7 +295,8 @@
         session.poller.start();
     }
 
-    function loadTask(taskId) {
+    // opts.fromSync:这次是 syncSession 叫起来的,终态分支别回头再同步一遍(会多打一次 GET)。
+    function loadTask(taskId, opts) {
         stopPoll();
         S.taskId = taskId;
         S.taskLoading = true;
@@ -309,7 +312,11 @@
                 S.taskLoading = false;
                 S.task = task;
                 renderLeft();
+                // 首拍就是终态(工具比这一拍还快 / 回访一条已收尾的任务)时不进轮询,而收尾
+                // 那句是服务端在任务落终态时追写进会话的,此前只有轮询的 onTerminal 补得到 ——
+                // 不在这里也补一次,右窗就停在「我去查」,要等人离页回页才看得到答复。
                 if (!AI.stewardRender.isTerminalStatus(task && task.status)) startPoll(taskId);
+                else if (!(opts && opts.fromSync)) syncSession();
             })
             .catch(function () {
                 if (S !== session) return;
@@ -380,6 +387,7 @@
         else if (a === 'stw-cancel') actions.cancel();
         else if (a === 'stw-authz-approve') actions.decide(true, el.getAttribute('data-token'));
         else if (a === 'stw-authz-reject') actions.decide(false, el.getAttribute('data-token'));
+        else if (a === 'stw-copy-code') actions.copyCode(el);
         else if (a === 'stw-new-session') newSession();
         else if (attach.onClick(a, el))
             return; // 万能口的六个动作归 attach 层自己认

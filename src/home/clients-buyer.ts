@@ -4,6 +4,8 @@
 /* global escapeHtml, showConfirm */
 import { S, _buyerState, _buyerSelected } from './clients-store.js';
 import { apiClient, getActiveColor } from './clients-helpers.js';
+import { listErrorHtml } from './list-error-state.js';
+import { BAHT } from './money.js';
 
 type Client = {
     id: string;
@@ -28,9 +30,13 @@ async function loadClientsCache() {
     try {
         const data = await apiClient('/api/clients');
         S.clients = data.clients || [];
+        S.clientsFailed = false;
         window._clientsCache = S.clients as { [key: string]: unknown; id?: unknown }[];
     } catch (e) {
         console.error('loadClientsCache fail', e);
+        // 取数失败要留痕:清成 [] 之后渲染层只看得见「长度 0」,会照空态渲染成
+        // 「还没有客户」——后端 500 被说成「你没有客户」(状态诚实红线)。
+        S.clientsFailed = true;
         S.clients = [];
     }
     // v118.21.0 · 通知异常栏客户下拉刷新
@@ -83,7 +89,7 @@ function renderClientsGrid() {
                 </div>
                 <div>
                     <div class="client-card-stat-label">${escapeHtml(t('client-card-amount'))}</div>
-                    <div class="client-card-stat-value">฿${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                    <div class="client-card-stat-value">${BAHT}${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                 </div>
             </div>
             <div class="client-card-actions">
@@ -132,6 +138,17 @@ function _buyerPageItems() {
 function renderBuyerList() {
     const tb = document.getElementById('buyer-tbody');
     if (!tb) return;
+    if (S.clientsFailed) {
+        tb.innerHTML = listErrorHtml('clients-error-title', 'data-buyer-retry');
+        // 页码/翻页键跟着停:失败态下「1–12 / 0」是在替后端编一个总数。
+        const pi = document.getElementById('buyer-pager-info');
+        if (pi) pi.textContent = '';
+        for (const id of ['buyer-prev', 'buyer-next']) {
+            const b = document.getElementById(id) as HTMLButtonElement | null;
+            if (b) b.disabled = true;
+        }
+        return;
+    }
     const { items, start, ps, total, maxPage } = _buyerPageItems();
     if (!total) {
         tb.innerHTML = `<div class="cust-empty">${escapeHtml(t(_buyerState.keyword ? 'cust-no-match' : 'clients-empty'))}</div>`;
@@ -146,7 +163,7 @@ function renderBuyerList() {
                     ${c.tax_id ? `<div class="cust-cell-sub">${escapeHtml(c.tax_id)}</div>` : ''}
                 </div>
                 <div class="align-right">${c.invoice_count || 0}</div>
-                <div class="align-right cust-cell-amount">฿${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                <div class="align-right cust-cell-amount">${BAHT}${(c.total_amount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                 <div class="cust-row-actions">
                     <button class="cust-row-btn" data-action="edit" data-cid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 3-7 7H2v-3z"/></svg><span>${escapeHtml(t('client-card-edit'))}</span></button>
                     <button class="cust-row-btn" data-action="export" data-cid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7M4 6l3 3 3-3M2 11h10"/></svg><span>${escapeHtml(t('client-card-export'))}</span></button>

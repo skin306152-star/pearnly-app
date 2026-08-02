@@ -2,6 +2,7 @@
 // 按当前 tab 拉真历史列表;点单条 → 复用 fetchResult 载入新结果视图(KPI/明细/导出)。
 import { RX, rxToken, rxEsc, tt, type RxState } from './recon-center-x-store.js';
 import { fetchResult, renderResult } from './recon-center-x-results.js';
+import { listErrorHtml } from './list-error-state.js';
 
 const $ = (id: string) => document.getElementById(id);
 const fmtTime = (s: unknown) => (s ? String(s).slice(0, 16).replace('T', ' ') : '');
@@ -68,11 +69,21 @@ function normalize(tab: RxState['tab'], t: any): HistRow {
     };
 }
 
+// 重试:错误态那颗钮由本模块渲染,委托也收在本模块(挂一次,后续重渲不重复绑)。
+function bindRetry(list: HTMLElement): void {
+    if (list.dataset.rcxHistRetryBound) return;
+    list.dataset.rcxHistRetryBound = '1';
+    list.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('[data-rcx-hist-retry]')) loadHistory();
+    });
+}
+
 export async function loadHistory() {
     const tab = RX.tab;
     const list = $('rcx-history-list');
     const empty = $('rcx-history-empty');
     if (!list) return;
+    bindRetry(list);
     try {
         // 跟随账套:带 X-Workspace-Client-Id 头(后端按 active workspace 过滤)。切账套→core-boot
         // 全局 reloadCurrentRoute→loadReconcilePage→这里带新账套重拉。三个 tab 共用此 fetch。
@@ -82,6 +93,9 @@ export async function loadHistory() {
                 typeof window._wsHeader === 'function' ? window._wsHeader() : {}
             ),
         });
+        // 后端挂了不是「暂无对账记录」:不看 res.ok 就解响应体,500 的 {detail:...} 里没有
+        // tasks 字段 → rows 为空 → 直接渲染成空态,用户以为自己的对账记录被清了。
+        if (!res.ok) throw new Error('recon history http ' + res.status);
         const data = await res.json();
         const tasks: any[] = (data && (data.tasks || data.items)) || [];
         // 切 tab 期间可能已变,丢弃过期响应
@@ -111,10 +125,8 @@ export async function loadHistory() {
             )
             .join('');
     } catch {
-        if (empty) {
-            empty.textContent = tt('rcx-hist-load-fail', '历史加载失败');
-            empty.style.display = '';
-        }
+        if (empty) empty.style.display = 'none';
+        list.innerHTML = listErrorHtml('rcx-hist-load-fail', 'data-rcx-hist-retry');
     }
 }
 

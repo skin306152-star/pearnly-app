@@ -27,6 +27,7 @@ from services.steward import (
     authz,
     copy,
     erp_push_tool,
+    erp_push_trail,
     orchestrator,
     registry,
     store,
@@ -319,7 +320,7 @@ class ConfirmFirstChainTests(_ChainTestCase):
         log = self.world.push_logs[-1]
         self.assertEqual((log["status"], log["trigger"]), ("success", "steward"))
         self.assertEqual(log["total_amount"], Decimal("401621.50"))  # 钱走 decimal
-        self.assertEqual(self.world.audits[-1]["action"], erp_push_tool.AUDIT_SUBMITTED)
+        self.assertEqual(self.world.audits[-1]["action"], erp_push_trail.AUDIT_SUBMITTED)
         self.assertEqual(self.world.audits[-1]["details"]["job_id"], "job-1")
 
     async def test_rejecting_cancels_the_task_and_writes_nothing(self):
@@ -412,12 +413,147 @@ class BridgeFailureTests(_ChainTestCase):
         task = await self._push()
         self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_EXPIRED)
 
+    async def test_confirmed_write_without_an_ack_is_not_reported_as_not_written(self):
+        """同样是 expired,「领了没回执」与「没人来领」必须说两句不同的话。
+
+        确认放行的写单关掉了桥端的幂等闸,系统分不出它写没写。照 ERR_PUSH_EXPIRED 那句
+        「多为小助手一直不在线,上线后再说一次」去做,就是账上两张 —— 这里必须落在
+        「先去核对再决定」那一支,推送日志也不能记成 failed。
+        """
+        from services.erp.bridge import write_gate as bridge_write_gate
+
+        self.world.status.return_value = {"job_id": "job-1", "status": "expired", "result": {},
+                                          "error": {"code": bridge_write_gate.CONFIRMED_UNACKED_CODE,
+                                                    "message": "领了没回结果"}}  # fmt: skip
+        task = await self._push()
+        self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_UNCERTAIN)
+        self.assertIn("job-1", task["error_message"])
+        self.assertNotIn("上线后再说一次", task["error_message"])
+        log = self.world.push_logs[-1]
+        self.assertEqual(log["status"], "pending")
+        # 占位租约必须在:pending 是 Express 旧队列的保留态,不占住,小助手会把这份
+        # 带确认位的载荷领走再写一遍。
+        self.assertEqual(log["lease_owner"], erp_push_trail._PENDING_LEASE_OWNER)
+
     async def test_preflight_block_stops_before_the_bridge(self):
         """票过不了推送前体检(这里:账套没配)→ 不投桥,如实说要补什么。"""
         self.world.history = _history(invoice_date=None)
         task = await self._push()
         self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_BLOCKED)
         self.assertEqual(self.world.submit.call_args_list, [])
+
+    async def test_done_with_a_business_failure_is_not_reported_as_written(self):
+        """job 落 done 只说明桥回了话 —— 业务成败在结果体的 ok 位上。
+
+        结果体照抄 2026-07-31 本地靶场真跑出来的那一份(云端派活 → 桥真写 69EXP_test →
+        ack):桥把「同钥匙内容不同」挡了下来、一个字节没写,而 bridge_jobs 仍是 done
+        (桥对传输层一律 ack ok=True,见 bridge/cloud_jobs 文件头)。拿 done 当成功,
+        会计看到的就是「推成功了」而账套里什么都没有 —— 本仓栽过的那种假成功。
+        """
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": False,
+                "error": "这张票之前推过,ERP 里是 RR690531-001(含税总额 1,070.00 → 2,140.00)"
+                "· 本次一个字节都没写",
+                "error_code": "DUPLICATE_CONTENT_DIFFERS",
+                "outcome": "needs_review",
+                "meta": {"written": False, "docnum": "RR690531-001"},
+            },
+            "error": None,
+        }
+        task = await self._push()
+        self.assertEqual(task["status"], store.TASK_FAILED)
+        self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_FAILED)
+        self.assertEqual(self.world.push_logs[-1]["status"], "failed")
+
+    async def test_a_business_failure_keeps_the_bridge_own_wording(self):
+        """桥那句人话是会计唯一能照着动手的线索,别在最后一跳丢掉。"""
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": False,
+                "error": "另一写者正持有该账套写互斥(PEARNLY_WRITE.LCK)",
+                "error_code": "ACCOUNT_BUSY_LOCKED",
+                "outcome": "waiting_lock",
+                "meta": {"written": False},
+            },
+            "error": None,
+        }
+        await self._push()
+        self.assertIn("PEARNLY_WRITE.LCK", self.world.push_logs[-1]["error_msg"])
+
+    async def test_account_busy_says_close_express_not_wait_for_a_retry(self):
+        """账套被占:桥直写这条路没有任何后台会重推,别让会计等一个不会来的重试。
+
+        通用失败那句「查清原因后再说一次」也不行 —— 原因就一个,而且她抬手就能解开。
+        """
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": False,
+                "error": "account busy: Express is holding this book open",
+                "error_code": "ACCOUNT_BUSY_LOCKED",
+                "outcome": "waiting_lock",
+                "meta": {"rolled_back": False},
+            },
+            "error": None,
+        }
+        task = await self._push()
+        self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_ACCOUNT_BUSY)
+        msg = task["error_message"]
+        self.assertIn("Express", msg)
+        self.assertIn(_ACCOUNT_SET, msg)
+        for promise in ("自动重试", "自动重推", "自动再推", "稍后"):
+            self.assertNotIn(promise, msg, "桥直写不自动重推,这句话是空头支票")
+        log = self.world.push_logs[-1]
+        self.assertEqual(log["status"], "failed")
+        # 机器码必须进 error_msg:推送日志前端靠 [CODE] 抽码翻文案 + 挂教程深链,
+        # 只落桥那句英文的话,泰国会计看到的就是一串英文原码。
+        self.assertIn("[ACCOUNT_BUSY_LOCKED]", log["error_msg"])
+        self.assertIn("account busy", log["error_msg"])
+        # 不设 next_retry_at = 后台重试队列永远扫不到这一行,这正是文案必须说实话的原因。
+        self.assertIsNone(log.get("next_retry_at"))
+
+    async def test_account_busy_that_may_have_written_falls_back_to_the_cautious_copy(self):
+        """桥说写进去了(meta.written)就不许再讲「放心重推」—— 宁可含糊,不赌一张重单。"""
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": False,
+                "error": "lock lost mid-write",
+                "error_code": "ACCOUNT_BUSY_LOCKED",
+                "meta": {"written": True},
+            },
+            "error": None,
+        }
+        task = await self._push()
+        self.assertEqual(task["error_code"], erp_push_tool.ERR_PUSH_FAILED)
+        self.assertIn("不要在没查清前重推", task["error_message"])
+
+    async def test_idempotent_skip_still_counts_as_written(self):
+        """幂等命中(ok=true / written=false):票确实在 Express 里,报成功不算撒谎。
+
+        钉住这一条,是免得上面两条被人「顺手」收紧成「written=false 一律算失败」——
+        那会把系统自己的重投变成红,会计再推一次,才是真造出第二张。
+        """
+        self.world.status.return_value = {
+            "job_id": "job-1",
+            "status": "done",
+            "result": {
+                "ok": True,
+                "docnum": "RR690531-001",
+                "meta": {"written": False, "duplicate_skipped": True},
+            },
+            "error": None,
+        }
+        task = await self._push()
+        self.assertEqual(task["status"], store.TASK_DONE)
+        self.assertEqual(self.world.push_logs[-1]["status"], "success")
 
 
 class TenantIsolationTests(unittest.TestCase):

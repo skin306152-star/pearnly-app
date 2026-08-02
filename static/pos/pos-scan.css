@@ -1,0 +1,56 @@
+/*
+ * Pearnly POS · pos-scan.css · 摄像头连扫层(逻辑在 static/pos/pos-scan.js)
+ * 独立一张表而不是并进 pos.css:那张已经 494 行,顶在单文件 <500 铁律线上。
+ * 颜色只用 pos.css 的 :root 令牌 + 半透明 rgba —— 取景层压在真实视频上,不透明裸色在这里
+ * 既没意义也过不了暗夜/裸色闸(它逐行数 static/pos/*.css)。
+ * 取景框尺寸不写死:pos-scan.js 按引擎 cropRatio() × 画面实际盒子现设(px),屏上的框才等于
+ * 真正被解码的那块 —— 拿舞台的百分比画会差一层 letterbox。
+ * 同 pos.css 策略:.prettierignore 豁免 · 保紧凑。
+ */
+
+/* 46/47 这两级夹在「手机版购物车抽屉(45)」与「收款等弹窗(50)」之间,不是随手挑的:
+   取景层要压住抽屉(否则画面上顶着一条把手),而失败清单必须让开弹窗 —— 清单原来在 70,
+   收款弹窗开着时它整条压在弹窗上,把关闭键的点击接走了(真浏览器实测点不动)。 */
+.bscan-mask { position: fixed; inset: 0; background: rgba(17, 24, 39, .94); display: none; flex-direction: column; z-index: 46; }
+.bscan-mask.show { display: flex; }
+.bscan-stage { position: relative; flex: 1; overflow: hidden; display: grid; place-items: center; }
+/* contain 不是审美选择:cover 会把原生帧裁掉一大半(390 宽的屏配 640×480 只看得见 38% 的
+   画面宽),而引擎解的是整帧的中央 90%×50% —— 紧挨着的另一件货在真实视野里、在预览外,
+   照样被解出来直接进购物车。可见即可解,取景框由 pos-scan.js 按画面盒子反算。 */
+.bscan-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 0; }
+/* 视频由引擎 append 到 stage(排在框/提示之后)→ 框必须自己抬一层,否则被画面盖住 */
+.bscan-frame { position: relative; z-index: 1; border: 3px solid rgba(255, 255, 255, .45); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(17, 24, 39, .45); transition: border-color .15s; }
+.bscan-frame.live { border-color: rgba(255, 255, 255, .92); }
+.bscan-hint { position: absolute; z-index: 1; left: 0; right: 0; bottom: 16px; padding: 0 20px; text-align: center; font-size: 14px; color: rgba(255, 255, 255, .92); text-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+/* 卡片只盖取景区,不盖底部条:出错/未命中时「完成」仍点得到 */
+.bscan-card { position: absolute; z-index: 2; inset: 0; display: none; place-items: center; padding: 20px; background: rgba(17, 24, 39, .62); }
+.bscan-card.show { display: grid; }
+.bscan-card-in { width: 420px; max-width: 92vw; padding: 22px; background: var(--card); color: var(--ink); border-radius: 18px; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+.bscan-card-msg { font-size: 16px; font-weight: 700; line-height: 1.5; }
+.bscan-code { display: inline-block; padding: 1px 8px; margin: 0 3px; border-radius: 6px; background: var(--accent-weak); color: var(--accent-d); letter-spacing: .5px; }
+.bscan-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.bscan-act { flex: 1 1 auto; min-height: 48px; padding: 0 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer; }
+.bscan-act.primary { border-color: var(--accent); background: var(--accent); color: rgba(255, 255, 255, .98); }
+.bscan-bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(17, 24, 39, .96); border-top: 1px solid rgba(255, 255, 255, .12); }
+.bscan-count { font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, .95); }
+.bscan-last { flex: 1; min-width: 0; font-size: 13px; color: rgba(255, 255, 255, .7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bscan-done { height: 48px; padding: 0 26px; border: 0; border-radius: 12px; background: var(--accent); color: rgba(255, 255, 255, .98); font-size: 16px; font-weight: 700; cursor: pointer; }
+
+/* 失败清单:一件一行、累积到店员点「知道了」为止。单张卡会被队列里下一件当场换掉 ——
+   连扫 10 件里第 3 件失败,店员扫完屏上什么都没有,那件货就这么没进账。
+   在流里(搜索条与分类之间)而不是 fixed 浮层:浮层版实测把 #main-search 和 #main-grid 顶部
+   一起盖住(390×780 上 34%),而清单自己那颗「用这个码搜商品」干的正是「把码填进 #main-search
+   再重画 #main-grid」—— 店员点完看不见自己刚要来的结果。在流里改成把内容推下去,零遮挡。
+   z 压在取景层(46)之上、收款等弹窗(50)之下:连扫时清单要浮在画面上,而弹窗开着时它一格
+   都不许压在弹窗上(压住就把关闭键的点击接走了)。.left 一路到 .pos-view 都没有定位/transform,
+   不另起层叠上下文,z-index 直接可比(改那几个类前先看这一行)。 */
+.bscan-fails { position: relative; z-index: 47; margin-bottom: 14px; max-height: 34vh; overflow-y: auto; display: none; padding: 12px 14px 14px; border-radius: 14px; border: 1px solid var(--red); background: var(--card); color: var(--ink); box-shadow: 0 18px 44px rgba(17, 24, 39, .28); }
+.bscan-fails.show { display: block; }
+.bscan-fails-head { display: flex; align-items: center; gap: 12px; }
+.bscan-fails-n { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; color: var(--red); }
+.bscan-fails-ack { flex: 0 0 auto; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; }
+.bscan-fail { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.bscan-fail-msg { font-size: 14px; font-weight: 600; line-height: 1.5; }
+.bscan-fail-code { margin-top: 5px; font-size: 13px; letter-spacing: .5px; color: var(--accent-d); }
+.bscan-fail-hint { margin-top: 5px; font-size: 12.5px; line-height: 1.6; color: var(--ink2); }
+.bscan-fail-act { margin-top: 9px; min-height: 44px; padding: 0 16px; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-weak); color: var(--accent-d); font-size: 14px; font-weight: 600; cursor: pointer; }

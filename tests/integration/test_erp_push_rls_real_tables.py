@@ -11,7 +11,9 @@
 CI 默认 skip,本地跑:
 
     set PEARNLY_INTEGRATION_DB=1
-    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly
+    set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly_throwaway
+    (这个库会被 DROP TABLE 拆掉,别指开发库;先对它执行
+     CREATE TABLE IF NOT EXISTS _pearnly_disposable_test_db(note text);)
     set RLS_ROLE=pearnly_app
     set PGSSLMODE=disable
     python -m unittest tests.integration.test_erp_push_rls_real_tables -v
@@ -20,7 +22,7 @@ CI 默认 skip,本地跑:
 import os
 import unittest
 
-from tests.integration._helpers import require_db
+from tests.integration._helpers import require_disposable_db
 
 TA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"  # tenant A
 UA = "11111111-1111-1111-1111-111111111111"  # user A
@@ -39,7 +41,10 @@ _STUBS = (
     "  status TEXT, http_status INT, request_body JSONB, response_body TEXT, error_msg TEXT,"
     "  attempt INT DEFAULT 1, elapsed_ms INT DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW(),"
     "  trigger TEXT DEFAULT 'manual', retry_count INT DEFAULT 0, max_retries INT DEFAULT 3,"
-    "  next_retry_at TIMESTAMPTZ, lease_owner TEXT, lease_expires_at TIMESTAMPTZ)",
+    "  next_retry_at TIMESTAMPTZ, lease_owner TEXT, lease_expires_at TIMESTAMPTZ,"
+    # 2026-07-14(3a29e228)产品给 erp_push_logs 加了 work_order_id 并写进 insert_push_log;
+    # 这张表全仓只有这份手抄 DDL,漏补 → insert_push_log 整条 INSERT 撞 UndefinedColumn。
+    "  work_order_id UUID)",
     "CREATE TABLE ocr_history ("
     "  id TEXT PRIMARY KEY, user_id UUID, tenant_id UUID, client_id BIGINT,"
     "  workspace_client_id BIGINT, pages JSONB DEFAULT '[]'::jsonb)",
@@ -53,7 +58,7 @@ _TABLES = ("erp_push_logs", "erp_endpoints", "ocr_history", "clients", "workspac
 class ErpPushRlsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        require_db()
+        require_disposable_db()
         os.environ.setdefault("PGSSLMODE", "disable")
         os.environ["RLS_ROLE"] = "pearnly_app"
 

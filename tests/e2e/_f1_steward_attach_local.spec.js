@@ -53,45 +53,48 @@ test.afterAll(() => {
     if (server) server.kill();
 });
 
-// services/steward/attachments.limits() 逐键。
-const LIMITS = {
-    max_file_bytes: 20971520,
-    max_batch_bytes: 36700160,
-    max_files: 20,
-    // 运输皮(zip/heic)必须在 accept 里:漏了它们,<input accept> 在文件对话框就把 zip
-    // 滤掉,拖进来的也被当坏格式灰掉 —— 后端「zip 自动展开 / HEIC 转 JPEG」永远跑不到。
-    accept: ['.csv', '.heic', '.jpg', '.pdf', '.png', '.xls', '.xlsx', '.zip'],
-    ttl_days: 30,
-};
+// 上传限额:真后端 GET /status 无条件带这一块,值取自 attachments.limits(),不在这里手抄。
+// 手抄那份的 accept 只列了 8 个扩展名,而后端认 20 个 —— .docx/.txt/.webp 之流在这份桩里
+// 会被当坏格式灰掉,拍出来的就是产品里不存在的界面;它还游离在
+// test_limits_fixture_matches_backend 那道锁之外,后端加一种格式它不会红。
+const LIMITS = require('./_fixtures_steward_limits.json');
+
+const TASK_ID = 't1';
+const TS = '2026-07-27T09:05:00Z';
+const REPLY = '收到 2 份:1 份 GL 台账,1 份认不出是什么。想让我做哪一样?';
 
 // services/steward/attachments.public_attachment() 逐键。
-function attachment(id, name, kind, extra) {
-    return Object.assign(
-        {
-            attachment_id: id,
-            name,
-            size_bytes: 4,
-            mime: 'application/pdf',
-            kind,
-            kind_source: kind === 'unknown' ? 'unknown' : 'rule',
-            kind_reason: 'gl_name_or_text',
-            page_count: 3,
-            needs_model: false,
-            actions: kind === 'gl_ledger' ? ['file_convert'] : [],
-            quote: { allowed: true, error_code: null, kind: 'pdf', units: 3, page_count: 3 },
-            status: 'ready',
-        },
-        extra || {}
-    );
+function attachment(id, name, kind) {
+    return {
+        attachment_id: id,
+        name,
+        size_bytes: 4,
+        mime: 'application/pdf',
+        kind,
+        kind_source: kind === 'unknown' ? 'unknown' : 'rule',
+        kind_reason: 'gl_name_or_text',
+        page_count: 3,
+        needs_model: false,
+        actions: kind === 'gl_ledger' ? ['file_convert'] : [],
+        quote: { allowed: true, error_code: null, kind: 'pdf', units: 3, page_count: 3 },
+        status: 'ready',
+    };
 }
+
+// 这个桩认识的两件料。上传口按顺序发它们,POST /messages 的回包与会话重建口回同一份 ——
+// 真后端三处读的是同一张 steward_attachments,各编各的就会桩自洽而产品里对不上。
+const STUB_FILES = [
+    attachment('u1', 'gl.pdf', 'gl_ledger'),
+    attachment('u2', 'mystery.pdf', 'unknown'),
+];
 
 // attach_turn._receipt_card() 的产物形状(copy_file.files_table + actions_block)。
 function receiptTask() {
     return {
-        task_id: 't1',
+        task_id: TASK_ID,
         title: '收到的文件',
         status: 'waiting_user',
-        started_at: '2026-07-27T09:05:00Z',
+        started_at: TS,
         agent_count: 1,
         cancellable: false,
         steps: [
@@ -131,6 +134,29 @@ function receiptTask() {
     };
 }
 
+// GET /sessions/{sid} 的投影,逐键抄 routes.get_session:
+//   store.public_message() → id / role / text / ts (+ task_id)
+//   attachments.files_of() → 有件才带 attachments 键
+// ⚠️ 别把这口改回 messages: [] —— 那是真后端做不出的状态(add_message 与 attach_to_message
+// 在 orchestrator.handle_message 的同一个事务里),而 syncSession 是整份替换,回空就把刚上屏
+// 的那一轮连人带件冲掉。
+function sessionView(posts) {
+    const messages = posts.flatMap((body, i) => {
+        // ids 的取法逐字镜像 steward_routes.py 的 `action["attachment_ids"] if action else ...`。
+        const ids = (body.action ? body.action.attachment_ids : body.attachment_ids) || [];
+        const files = STUB_FILES.filter((a) => ids.includes(a.attachment_id));
+        const user = { id: 'um' + (i + 1), role: 'user', text: body.text || '', ts: TS };
+        if (files.length) user.attachments = files;
+        return [
+            user,
+            { id: 'm' + (i + 1), role: 'steward', text: REPLY, ts: TS, task_id: TASK_ID },
+        ];
+    });
+    const view = { session_id: 's1', messages };
+    if (messages.length) view.current_task_id = TASK_ID;
+    return view;
+}
+
 function json(route, payload) {
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(payload) });
 }
@@ -139,6 +165,7 @@ async function boot(page, opts) {
     opts = opts || {};
     const posts = [];
     const uploads = [];
+    const sessionGets = [];
 
     await page.route('**/api/me**', (r) =>
         r.fulfill({ contentType: 'application/json', body: '{"username":"skin"}' })
@@ -162,28 +189,27 @@ async function boot(page, opts) {
                     body: JSON.stringify({ detail: opts.uploadDetail }),
                 });
             }
-            const n = uploads.length;
-            const kind = n === 1 ? 'gl_ledger' : 'unknown';
-            const name = n === 1 ? 'gl.pdf' : 'mystery.pdf';
-            return json(r, { attachments: [attachment('u' + n, name, kind)], count: 1 });
+            // 按上传顺序从 STUB_FILES 里领,不另编一份:传第三件会拿到 undefined 而当场红,
+            // 那正好是「桩只认这两件」该有的响亮失败。
+            return json(r, { attachments: [STUB_FILES[uploads.length - 1]], count: 1 });
         }
         if (p.endsWith('/messages') && method === 'POST') {
             posts.push(r.request().postDataJSON());
             return json(r, {
                 message_id: 'm1',
                 user_message_id: 'um1',
-                reply: '收到 2 份:1 份 GL 台账,1 份认不出是什么。想让我做哪一样?',
-                task_id: 't1',
+                reply: REPLY,
+                task_id: TASK_ID,
                 task_status: 'waiting_user',
-                attachments: [
-                    attachment('u1', 'gl.pdf', 'gl_ledger'),
-                    attachment('u2', 'mystery.pdf', 'unknown'),
-                ],
+                attachments: STUB_FILES,
             });
         }
         if (p.indexOf('/steward/tasks/') >= 0) return json(r, receiptTask());
+        // 回执卡这类 waiting_user 任务首拍就是终态,前端据此重建一次会话(ai-steward.js
+        // loadTask 的终态分支)—— 这口给的是服务端权威消息流,不是空盘。
         if (/\/steward\/sessions\/[^/]+$/.test(p)) {
-            return json(r, { session_id: 's1', messages: [] });
+            sessionGets.push(p);
+            return json(r, sessionView(posts));
         }
         return json(r, { session_id: 's1' });
     });
@@ -199,7 +225,7 @@ async function boot(page, opts) {
     });
     await page.goto(`${BASE}/static/dist/ai.html#/steward`);
     await page.waitForSelector('#v-steward.on #stwInput', { state: 'visible', timeout: 15000 });
-    return { posts, uploads };
+    return { posts, uploads, sessionGets };
 }
 
 // 拖拽:构造真 DataTransfer 再派发真 dragenter/drop(不是直接调 addFiles —— 那样
@@ -342,10 +368,7 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         // 那样这条用例会在 uploading 的一瞬间擦边过,验的其实是竞态不是闸。
         await page.route('**/api/ai/steward/sessions/*/attachments', async (r) => {
             await gate;
-            return json(r, {
-                attachments: [attachment('u1', 'gl.pdf', 'gl_ledger')],
-                count: 1,
-            });
+            return json(r, { attachments: [STUB_FILES[0]], count: 1 });
         });
         await dragFiles(page, [{ name: 'gl.pdf', body: 'x', type: 'application/pdf' }]);
         await dropNow(page);
@@ -457,6 +480,14 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
 
     test('纯文件送出 → 气泡下有只读原件行 · 回执卡按钮把参数原样带回', async ({ page }) => {
         const h = await boot(page);
+        // 任务口先扣住:回执卡首拍即终态会顺手重建一次会话,不扣住就分不清气泡下那两颗
+        // 件是 POST 回包给的还是重建口给的 —— 两条路各断一次,坏哪条都红。
+        let releaseTask;
+        const taskHeld = new Promise((resolve) => (releaseTask = resolve));
+        await page.route('**/api/ai/steward/tasks/**', async (r) => {
+            await taskHeld;
+            await r.fallback();
+        });
         await dragFiles(page, [
             { name: 'gl.pdf', body: 'x', type: 'application/pdf' },
             { name: 'mystery.pdf', body: 'y', type: 'application/pdf' },
@@ -473,11 +504,21 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await expect(page.locator('.stw-att-chip')).toHaveCount(0);
 
         // 用户气泡下的只读原件行:带鉴权头下载的按钮,不是会 401 的裸 <a>。
+        // 这一遍读的是 POST /messages 回包里的 attachments(会话还没重建)。
         const pills = page.locator('.stw-msg.me .stw-file-pill');
         await expect(pills).toHaveCount(2);
         await expect(pills.first()).toContainText('gl.pdf');
         await expect(pills.nth(1)).toContainText('认不出是什么');
         expect(await page.locator('.stw-msg.me a').count()).toBe(0);
+        // 劈成两段的前提:此刻重建口一次都没被打过。少了这句,上面那条 route glob 哪天不匹配
+        // 了,两段会塌成一段(第一段量到的其实是重建后的画面)而测试照绿。
+        expect(h.sessionGets.length).toBe(0);
+
+        // 放行任务口 → 首拍即终态 → 重建会话。重建是整份替换,那一轮连人带件必须活下来。
+        releaseTask();
+        await expect.poll(() => h.sessionGets.length).toBeGreaterThan(0);
+        await expect(pills).toHaveCount(2);
+        await expect(page.locator('.stw-msg.agent .stw-bubble')).toContainText('想让我做哪一样');
 
         // 左窗回执卡:表格是渲好的人话,三步不许把「等你选」画成「在跑」。
         await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
@@ -511,6 +552,10 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await boot(page, { noLimits: true });
         expect(await page.locator('.stw-clip').count()).toBe(0);
         expect(await page.locator('#stwAttFile').count()).toBe(0);
+        // 注脚只说「文件能拖能粘」,没有附件口时整条该消失 —— 不留一句做不到的承诺,也别让
+        // 它退化成复读页头那句。这条断言原先挂在 _b2m1_steward_local 的待批卡用例上,但那边
+        // 的「没有附件口」是桩漏给 attachments 造出来的假前提;真设得出这个前提的是这里。
+        expect(await page.locator('.stw-composer-note').count()).toBe(0);
         // 纯文字仍然能用(降级不是把整页弄死)。
         await expect(page.locator('#stwInput')).toBeEnabled();
         await expect(page.locator('[data-action="stw-send"]')).toBeEnabled();

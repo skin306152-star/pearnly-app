@@ -148,16 +148,20 @@ async def admin_layout_page(rest: str):
 # POS 收银前台 SPA(PS-5 迁址 · 2026-07-10)· 收银台新家在 /cashier(与老板后台 /pos 分家,
 # 消除混淆)· 独立 plain-script SPA(参考 admin layout)。/cashier · /cashier/{rest:path} 全返回
 # static/pos/pos.html;鉴权由前端 pos.js 落地(PIN 登录 + 收银员 token)。老径 /pos 改作老板后台
-# 登录页(见下,带老设备接回 /cashier 的 guard);老收银设备装的旧 PWA(scope /pos + cache-first
-# service worker)继续吐缓存老壳照常收银,零感知。
+# 登录页 —— 那张页里「按残留店铺令牌跳 /cashier」的迁移拐杖已经拆掉(见 static/pos/pos-login.html
+# 头注),所以「老 PWA 继续吐老壳照常收银,零感知」这句今天不成立:老设备一旦重装 SW,缓存里
+# 的老收银壳会被这张登录页顶掉,且没有任何东西把它接回 /cashier(见 /pos-sw.js 那条注)。
 def _cashier_page() -> FileResponse:
     return FileResponse("static/dist/pos.html", headers=_CASHIER_HEADERS)
 
 
 @router.get("/pos-sw.js")
 async def pos_service_worker():
-    # 老收银设备的 service worker(scope /pos)· 字节保持不动 → 旧 PWA 不触发更新、继续缓存老壳。
-    # no-cache:SW 字节若变更要即时被浏览器拾取。新收银台走 /cashier-sw.js(scope /cashier)。
+    # 老收银设备的 service worker(scope /pos)。⚠️「字节保持不动 → 旧 PWA 永不更新」这条不变式
+    # 早在 2026-07-11(b5cbbb98,PS-5 迁址的次日)就被自己打破,本批 bump 缓存名又破一次:老设备
+    # 一联网就会重装 SW、重取 /pos —— 而 /pos 现在返回的是老板登录页,拿它换掉缓存里那张老收银壳。
+    # 判断老设备行为时别再照这条不变式推。no-cache 仍必要:SW 字节变更要即时被浏览器拾取。
+    # 新收银台走 /cashier-sw.js(scope /cashier)。
     return FileResponse(
         "static/pos/pos-sw.js", media_type="application/javascript", headers=_NO_CACHE
     )
@@ -166,7 +170,11 @@ async def pos_service_worker():
 @router.get("/cashier-sw.js")
 async def cashier_service_worker():
     # 收银台新家的 Service Worker:从根路径出 → 可注册 scope=/cashier(控 /cashier 导航、离线重开壳)。
-    # 与 /pos-sw.js 各自独立作用域,互不影响(老设备的 /pos 旧 SW 原样保留)。
+    # 与 /pos-sw.js 各自独立作用域,互不抢导航(老设备的 /pos 旧 SW 原样保留)。
+    # 「互不影响」只对导航成立,对缓存不成立:CacheStorage 是按源的,两个 SW 的 caches.keys()
+    # 互相看得见、删得掉。两边的 dropStaleCaches 因此都按缓存名前缀只删自己那一族 —— 无差别删
+    # 就是装一个 SW 抹掉另一台机器的离线外壳(2026-07-31 实测:开一次 /cashier,断网回 /pos 直接
+    # ERR_FAILED)。改任一 SW 的缓存命名前先看那两个函数。
     return FileResponse(
         "static/pos/cashier-sw.js", media_type="application/javascript", headers=_NO_CACHE
     )

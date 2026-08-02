@@ -4,6 +4,8 @@
 /* global escapeHtml, showConfirm, currentLang, humanizeError */
 
 // v118.20.5 · 简易 i18n 占位替换({n} 等)
+import { BAHT } from './money.js';
+
 function _tn(key: string, vars?: Record<string, unknown>) {
     let s = t(key) || key;
     if (vars)
@@ -45,7 +47,7 @@ function _fmtMoney(n: unknown) {
     const v = parseFloat(String(n));
     if (isNaN(v)) return '—';
     return (
-        '฿ ' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        BAHT + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     );
 }
 
@@ -66,7 +68,7 @@ function _money(n: unknown) {
     const v = typeof n === 'number' ? n : parseFloat(String(n).replace(/,/g, ''));
     if (isNaN(v)) return escapeHtml(String(n));
     return (
-        '฿ ' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        BAHT + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     );
 }
 

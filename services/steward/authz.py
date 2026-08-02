@@ -9,9 +9,8 @@ line_action_nonces(mint/consume 原子消费,不另造一张 nonce 表):
   ③ 执行闸 execution_error:tools.run 逐次校验批文 —— 工具名 + 参数指纹逐字对上才放行,
      写工具没批文物理拒,不是靠前端不显示按钮。
 
-参数指纹是「批的就是执行的」的落点:铸卡时对 (tool, args) 做 SHA-256 定格进 token ref,
-批准时与任务里的现参数重算比对,执行时再比一次 —— 铸卡后任何一层改了参数,旧令牌即失效
-(push_confirm 的金额快照校验同一思路,这里推广到全参数)。
+参数指纹是「批的就是执行的」的落点:铸卡时对 (tool, args) 做 SHA-256 定格进 token ref,批准时
+与现参数重算比对,执行时再比一次 —— 铸卡后动过参数旧令牌即失效(同 push_confirm 的金额快照)。
 
 审计走 services/audit/store.insert_operation_log(操作日志唯一落点,fail-open 不阻断主流程):
 谁在什么时候批/拒了哪条任务的哪个工具,含参数指纹与 token 前缀(不落完整 token —— 它是凭证)。
@@ -35,9 +34,8 @@ REF_KIND = "steward_write"
 # 批文过期(分钟)。授权卡是"看一眼就点"的语境,5 分钟外的卡视为人已走开,重新发起。
 _DEFAULT_TTL_MINUTES = 5
 
-# 批准复跑后给 worker 的认领窗(秒):approve 把任务放回 running 且 created_at 已是旧值,
-# 不带新租约会被 heal_stale 的「排队超时限」判据当场误杀。与 worker.STALE_GRACE_S 同口径,
-# 不 import worker(worker→tools→本模块,反向引用成环)。
+# 批准复跑后给 worker 的认领窗(秒):approve 把任务放回 running 但 created_at 是旧值,不续
+# 租约会被 heal_stale 的「排队超时限」当场误杀。口径同 worker.STALE_GRACE_S(不 import,成环)。
 _RESUME_GRACE_S = 60
 
 ERR_AUTHZ_REQUIRED = "steward.authz_required"
@@ -207,12 +205,14 @@ _CARD_PUBLIC_KEYS = ("token", "tool", "title", "risk", "args", "args_display", "
                      "requested_at", "expires_at", "decided_by", "decided_at")  # fmt: skip
 
 
-def public_authorization_card(auth) -> Optional[dict]:
+def public_authorization_card(auth, lang: str = "") -> Optional[dict]:
     """授权卡 → 前端视图:args_fp 等内部字段不外泄;pending 但过时效的卡读侧就地标 expired
     —— 不等人点了批准才发现是死按钮(状态诚实)。store.public_task 与决断端点共用。"""
     if not isinstance(auth, dict) or not auth.get("token"):
         return None
     card = {k: auth.get(k) for k in _CARD_PUBLIC_KEYS}
+    if not card["args_display"]:  # 老卡(2026-07-27 前铸)payload 没这行且不回填,读侧现算
+        card["args_display"] = copy.authz_arg_rows(card["tool"], card["args"] or {}, lang)
     if card["status"] == store.AUTH_PENDING and _iso_past(card.get("expires_at")):
         card["status"] = store.AUTH_EXPIRED
     return card

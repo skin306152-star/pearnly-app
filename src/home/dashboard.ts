@@ -7,6 +7,8 @@
 // 保留(billing.ts 充值关闭后调它刷新余额)。
 // ============================================================
 
+import { BAHT } from './money.js';
+
 function _t(k: string, fb?: string) {
     try {
         return typeof window.t === 'function' ? window.t(k) : fb;
@@ -65,8 +67,7 @@ async function loadCreditsCard() {
         const bal = typeof data.balance_thb === 'number' ? data.balance_thb : 0;
         const low = bal < 50;
         if (balVal) {
-            // ฿ 与数字间垫窄空格 · 泰铢符号字形偏宽与首位数字贴撞
-            balVal.textContent = '฿ ' + bal.toFixed(2);
+            balVal.textContent = BAHT + bal.toFixed(2);
             balVal.className = 'n sub-card-n' + (low ? ' dash-red' : '');
         }
         // 副标题=计费说明(i18n 主供 topup-pricing-note);低余额提示 + 去充值钮在卡底 footer。
@@ -101,4 +102,5 @@ if (typeof window.subscribeI18n === 'function') {
     });
 }
 
+// ES module(隔离本文件的 _t/_auth 等同名局部 · 不落进脚本全局作用域跟同组文件互撞)。
 export {};

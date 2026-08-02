@@ -1,0 +1,53 @@
+{
+  "staleAfterFix": {
+    "ok": true,
+    "beforeRows": 1,
+    "afterRows": 0,
+    "afterTexts": [],
+    "afterHead": "",
+    "cart": {
+      "lines": 1,
+      "peek": "1",
+      "total": "25.00"
+    },
+    "why": ""
+  },
+  "duplicateRows": {
+    "ok": true,
+    "rows": 1,
+    "head": "ไม่ได้เข้าตะกร้า 1 รายการ",
+    "texts": [
+      "ไม่มีสินค้าที่ใช้บาร์โค้ด 8850111000039"
+    ],
+    "why": ""
+  },
+  "coversTheTill": {
+    "ok": true,
+    "rows": 4,
+    "rect": {
+      "top": 128,
+      "h": 265,
+      "z": "47"
+    },
+    "occluded": [
+      {
+        "y": 155,
+        "top": "bscan-fails-n",
+        "under": "left",
+        "underText": "ไม่ได้เข้าตะกร้า 4 รายการรับทราบไม่มีสิน"
+      },
+      {
+        "y": 261,
+        "top": "bscan-fail-hint",
+        "under": "left",
+        "underText": "ไม่ได้เข้าตะกร้า 4 รายการรับทราบไม่มีสิน"
+      },
+      {
+        "y": 367,
+        "top": "bscan-code tnum",
+        "under": "left",
+        "underText": "ไม่ได้เข้าตะกร้า 4 รายการรับทราบไม่มีสิน"
+      }
+    ]
+  }
+}

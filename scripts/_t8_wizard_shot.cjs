@@ -23,7 +23,10 @@ const NEWKEYS = {
     const page = await ctx.newPage();
     const resp = await page.request.post(BASE + '/api/login', { data: ACCT });
     const token = (await resp.json()).token;
-    if (!token) { console.log('login FAIL'); process.exit(1); }
+    if (!token) {
+        console.log('login FAIL');
+        process.exit(1);
+    }
     await page.addInitScript((t) => localStorage.setItem('mrpilot_token', t), token);
     await page.goto(BASE + '/home', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.t === 'function', { timeout: 25000 });
@@ -32,14 +35,15 @@ const NEWKEYS = {
         document.body.classList.remove('workspace-gate-preboot');
         document.getElementById('workspace-gate-root')?.remove();
         const st = document.createElement('style');
-        st.textContent = '#ws-modal{display:none!important}#workspace-gate-root{display:none!important}';
+        st.textContent =
+            '#ws-modal{display:none!important}#workspace-gate-root{display:none!important}';
         document.head.appendChild(st);
     });
     await page.waitForTimeout(1500);
     // 注入新 i18n key(prod 旧 bundle 没有这些)+ 覆盖为本地新 build 的组件
     await page.evaluate((nk) => {
         const orig = window.t;
-        window.t = (k) => (nk[k] !== undefined ? nk[k] : (orig ? orig(k) : k));
+        window.t = (k) => (nk[k] !== undefined ? nk[k] : orig ? orig(k) : k);
     }, NEWKEYS);
     await page.addScriptTag({ content: stepsJs });
     await page.addScriptTag({ content: wizardJs });
@@ -65,7 +69,8 @@ const NEWKEYS = {
     await shot('1-download-optional-and-wait-mirror', () => window.ExpressWizard.open({}));
     // 2) 已选账套镜像(小助手已上报 cfg.account_set)
     await shot('2-selected-mirror', () =>
-        window.ExpressWizard.open({ config: { account_set: 'DATAT' } }));
+        window.ExpressWizard.open({ config: { account_set: 'DATAT' } })
+    );
 
     console.log('shots ->', OUT);
     await b.close();

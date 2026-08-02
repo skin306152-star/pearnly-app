@@ -95,14 +95,23 @@ def resolve_billing_user(cur, tenant_id, workspace_client_id) -> Optional[str]:
     return ocr_ledger.owner_user_of_client(cur, tenant_id, workspace_client_id)
 
 
+def _shortfall(cost, balance) -> Optional[Decimal]:
+    """还差多少才够跑完;够跑(≤0)→ None,那一句就别说,不报「还差 0.00」。钱全程 Decimal。"""
+    short = Decimal(str(cost or 0)) - Decimal(str(balance or 0))
+    return short.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if short > 0 else None
+
+
 def batch_denial(billing_user_id, tenant_id, file_count: int) -> Optional[dict]:
-    """入料端点的整批预检:够跑 → None;不够 → 402 的 detail 体(与老站逐字同形)。
+    """入料端点的整批预检:够跑 → None;不够 → 402 的 detail 体(老站四键 + shortfall)。
 
     /ai 两条入料路径(工单补料 / 总台建合同)共用这一条闸,行为不许分叉。billing_user_id 由
     resolve_billing_user 给,不许直接拿登录用户——那是另一个人。
 
     闸关 / 无料 / 豁免 / 查库异常一律放行:计费问题绝不把「传料」这个动作本身弄挂,余额真见底
     还有 classify 逐件复查兜底。预估按一件一页(整批 file_count 页)。
+
+    shortfall(还差多少)是给失败卡回答「充多少够」的:余额够却仍被拒(非余额原因)时为 null,
+    前端据此少说那一句——报一个算错的缺口比不报更糟。
     """
     if not enabled() or int(file_count or 0) <= 0:
         return None
@@ -112,11 +121,15 @@ def batch_denial(billing_user_id, tenant_id, file_count: int) -> Optional[dict]:
         if status.get("allowed") or status.get("is_exempt"):
             return None
         used = int(status.get("pages_used_this_month") or 0)
+        cost = _estimate(used, int(file_count))
+        balance = status.get("balance_thb", 0.0)
+        short = _shortfall(cost, balance)
         return {
             "code": STUCK_REASON,
-            "balance": status.get("balance_thb", 0.0),
-            "estimated_cost": _estimate(used, int(file_count)),
+            "balance": balance,
+            "estimated_cost": cost,
             "pages_used_this_month": used,
+            "shortfall": float(short) if short else None,
         }
     except Exception as exc:  # noqa: BLE001 - 预检失败按放行(fail-open,与老站闸同口径)
         logger.warning("工单补料余额预检跳过(放行): %s", exc)
@@ -194,11 +207,8 @@ class Wallet:
             if pages <= 0:
                 return STUCK_REASON
             used = int(st.get("pages_used_this_month") or 0)
-            need = Decimal(str(_estimate(used, pages)))
-            short = need - Decimal(str(st.get("balance_thb") or 0))
-            if short <= 0:
-                return STUCK_REASON
-            return f"{STUCK_REASON}:{short.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
+            short = _shortfall(_estimate(used, pages), st.get("balance_thb"))
+            return f"{STUCK_REASON}:{short}" if short else STUCK_REASON
         except Exception as exc:  # noqa: BLE001 - 估不出缺口不值得把停机诊断本身弄挂
             logger.warning("余额缺口估算失败(原因码退回裸码): %s", exc)
             return STUCK_REASON

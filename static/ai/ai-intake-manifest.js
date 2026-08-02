@@ -324,6 +324,9 @@
             if (seen[sig]) return;
             seen[sig] = true;
             reasons += fr.reasonHtml('fail_step_upload', b.code, b.status);
+            // 余额不足这一类再补上数(账上还有多少 / 这批要花多少 / 还差多少):没有数的
+            // 「余额不足」等于让会计自己去猜充多少够。该不该补由 factsHtml 一处判,不在这里判。
+            reasons += fr.factsHtml(b.code, b.status, b.detail, b.files.length);
             if (!action) action = fr.actionHtml(b.code, b.status);
         });
         return (

@@ -1,0 +1,19 @@
+{
+  "_notes": {
+    "这是什么": "check_file_size 的存量基线:键 = 仓库相对路径,值 = 建基线当天的行数。基线内只许降不许升(涨一行就红),基线外越线即红。下划线开头的键不参与判定。",
+    "2026-08-01 建基线": "static/ai/**/*.js 这天才收进闸(/ai 是独立 SPA,不走 src/home 的 vite 打包,119 个 .js 从建站起整片在闸外)。收进来当场红 7 个 —— 全是在写的活面,当天拆不动,原样记账。词典分片 ai-i18n-*.js 不在监控面(纯键值表),判据写在 check_file_size.py 的 EXEMPT_PATH_PATTERNS。",
+    "怎么销账": "把文件拆到 ≤500 行,跑 python scripts/check_file_size.py --update-baseline 收紧;闸自己会提示哪条可以收。新增条目要连 tests/unit/test_file_size_gate.py 里那条『基线只许缩』的断言一起改,免不成默默的。",
+    "2026-07-31 POS 并入": "上游同期把 static/pos/** 与 static/scan/** 收进监控,存量四个巨石原本记在 check_file_size.py 的 EXEMPT_CURRENT_BIG_FILES 里;2026-08-01 那笔已把那套字典撤掉(两套豁免机制并存必漂),合并时原值平移进本文件,判据与销账方式随之统一。deadline:三个 .js 2026-09-30,pos.html 2026-12-31 —— 到期没拆就直接删条目让它红。"
+  },
+  "static/ai/ai-desk.js": 513,
+  "static/ai/ai-intake-render.js": 512,
+  "static/ai/ai-intake.js": 556,
+  "static/ai/ai-review-render.js": 505,
+  "static/ai/ai-review.js": 770,
+  "static/ai/ai-steward.js": 511,
+  "static/ai/ai.js": 539,
+  "static/pos/pos-cashier.js": 1252,
+  "static/pos/pos-data.js": 831,
+  "static/pos/pos.html": 1429,
+  "static/pos/pos.js": 538
+}

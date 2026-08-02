@@ -5,8 +5,14 @@
  * 主色 Purple v2 #7C4DFF(rgb(124,77,255))/ 圆角 / box-shadow / font-size / font-family / 无 emoji(线性 svg);
  * 容器另查"左对齐不居中飘"(marginLeft=0,不 auto)。不一致 = 退出码 1 + 打印 哪页/哪选择器/稿X 生产Y。
  *
+ * 第二把尺(2026-07-31 加)· 基准过期检测:稿里出现、生产已经彻底没有的 class 一律报红,
+ * 治"尺子自己是旧的" —— 判据与登记表见 design-freshness.js + design/_freshness-allow.json。
+ *
  * 自洽跑(无需真账号 / 真后端):内置静态服务器伺服 repo + stub 所有 /api/**,渲染本地 dist 真 bundle。
- * 跑法:node tests/visual/test_design_fidelity.spec.js  · 挂 pre-push(改 static/pos 或 src/home/{pos,inventory,purchase}-*)。
+ * 跑法:node tests/visual/test_design_fidelity.spec.js(加 --list 看基准过期检测逐页清单)。
+ * 谁在跑:CI 的 test job 每次无条件跑一遍 + pre-push 按改动路径触发。
+ * 2026-07-31 前只有 pre-push 那条路径触发,而 MAPPINGS 管着 20 条 route —— dashboard 那条
+ * 选择器 6-28 就烂了,直到有人碰巧改了 purchase-settings.ts 才被撞出来,中间三周零报警。
  * 加新页怎么补映射:见 README「视觉照搬闸」段 + 本文件 MAPPINGS 数组。
  */
 /* eslint-disable no-undef, no-console */
@@ -14,6 +20,12 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
+const { loadAllow, classesOf, styledClassesOf, checkFreshness } = require('./design-freshness.js');
+
+// --list:额外打印基准过期检测的逐页清单(判了哪些、登记豁免了哪些及理由)。只加打印,不改判红。
+const LIST = process.argv.includes('--list');
+// 闸自检用的毒样本 class(生产任何页都不会有 · 见下方 0) 自检)
+const SELFPROBE = 'pearnly-freshness-selfprobe';
 
 const ROOT = path.resolve(__dirname, '..', '..');
 // 设计稿快照入库(tests/visual/design/)→ 闸自洽:pre-push + CI 都能跑(不依赖桌面)。
@@ -300,17 +312,20 @@ const API = {
 // layout: 仅查生产容器左对齐(marginLeft=0)。
 const MAPPINGS = [
     {
-        // 2026-06-28 dashboard 改版成「订阅与计费」(page-dashboard.ts):北极星带(.band)
-        // 和快捷区(.qa)已不存在 · 选择器跟现实走(充值主按钮 .btn.pri + 余额卡线性图标)。
-        name: '首页 dashboard(订阅与计费 · A组屏)',
+        // 2026-06-28 首页改版(627aa1d6「订阅与计费」)删掉了余额带 .band 与快捷格 .qa/.qb,
+        // 主按钮改为余额卡底的充值钮 #dash-topup-btn(.btn.pri),图标改为卡头 .sub-card-ico svg。
+        // 基准 2026-07-31 按生产实况重画了整个内容区(两张 .sub-card + .sub-plans + .rec-*),
+        // 此前它还画着改版前那一屏 —— 稿里主按钮也跟着改成生产同名的 .btn.pri(基类 .btn
+        // 在生产 kit 里不带底色,拿它比主色等于比了另一个东西)。
+        name: '首页 dashboard(样板 · A组屏)',
         design: 'dashboard-final.html',
         route: 'dashboard',
-        ready: '#page-dashboard .pagehead',
+        ready: '#dash-topup-btn', // 余额卡异步渲染(loadCreditsCard)· 钮在=数据到位
         layout: { sel: '#page-dashboard .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
-                design: '.btn',
-                prod: '#page-dashboard .btn.pri',
+                design: '.btn.pri',
+                prod: '#dash-topup-btn',
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
             {
@@ -319,7 +334,7 @@ const MAPPINGS = [
                 props: ['borderRadius', 'boxShadow'],
             },
         ],
-        bluemust: '#page-dashboard .btn.pri',
+        bluemust: '#dash-topup-btn',
         nosvgemoji: '#page-dashboard .sub-card-ico svg',
     },
     {
@@ -457,7 +472,9 @@ const MAPPINGS = [
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
             // 一体化复核屏:整屏融成一张白卡(.sheet 承载圆角 16 + 阴影,内部 card 去壳)。
-            { design: '.card', prod: '.pur.f .sheet', props: ['borderRadius', 'boxShadow'] },
+            // 稿 2026-07-31 起也叫 .sheet(此前稿是两栏 .grid + 一堆浮 .card,拿 .card 当尺子
+            // 等于用「已去壳的内层卡」比「外层白卡」—— 只是碰巧两边数值一样)。
+            { design: '.sheet', prod: '.pur.f .sheet', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
         nosvgemoji: '.pur .viewer .vtools svg',
@@ -476,7 +493,8 @@ const MAPPINGS = [
                 props: ['backgroundColor', 'borderRadius'],
             },
             // 详情屏一体化:整屏融成一张白卡(.sheet 承载圆角 16 + 阴影,内部 card 去壳)。
-            { design: '.card', prod: '.pur.d .sheet', props: ['borderRadius', 'boxShadow'] },
+            // 稿 2026-07-31 起也叫 .sheet(同 pur-form:此前拿已去壳的内层 .card 当尺子)。
+            { design: '.sheet', prod: '.pur.d .sheet', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
         nosvgemoji: '.pur .img svg',
@@ -505,16 +523,19 @@ const MAPPINGS = [
         ready: '.pur .save',
         layout: { sel: '.pur .wrap', maxWidth: 'none', centered: true },
         tokens: [
+            // 稿里主按钮 2026-07-31 起跟生产同名叫 .save(此前叫 .btn,而生产的 .btn 是次级钮 →
+            // 稿上同名不同物 · 且稿加了「去费用数据」次级钮后 querySelector('.btn') 会先抓到它)
             {
-                design: '.btn',
+                design: '.save',
                 prod: '.pur .save',
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .save',
-        // 分类区已搬去 expense-data(purchase-settings.ts 只留指路链接):addcat 按钮不存在,
-        // 该页已无 svg 图标 → 图标检查移除。
+        // 无 nosvgemoji:费用科目 chip 墙 2026-07-07(0f5a5fad)搬去「商品 › 费用数据」独立页,
+        // 本页只剩开关/数字/保存,稿(pur-settings.html)与生产都零 svg 零 emoji · 旧探针
+        // .pur .addcat svg 指的是那颗已删的「+ 加科目」钮,对现页零覆盖。
     },
     {
         name: '做账主屏(01 收拢版)',
@@ -724,6 +745,7 @@ async function styleOf(page, sel, props) {
 }
 
 (async () => {
+    const allow = loadAllow();
     const srv = await serveStatic();
     const browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -743,6 +765,29 @@ async function styleOf(page, sel, props) {
         localStorage.setItem('pearnly_work_mode', 'personal');
     });
 
+    // 0) 自检:往第一份基准里塞一个生产绝不会有的 class,基准过期检测必须只报它这一条。
+    // 报不出 = 尺子瞎了(闸在但扫不到 · 后面全绿也不算数);多报 = 判据漏了别的东西。
+    const probeDesign = MAPPINGS[0].design;
+    await page.goto('file://' + path.join(DESIGN_DIR, probeDesign).replace(/\\/g, '/'), {
+        waitUntil: 'domcontentloaded',
+    });
+    await page.evaluate((c) => {
+        document.body.insertAdjacentHTML('beforeend', `<div class="${c}"></div>`);
+    }, SELFPROBE);
+    const probeAll = await classesOf(page, null);
+    const probeRes = checkFreshness(
+        probeDesign,
+        probeAll,
+        probeAll.filter((c) => c !== SELFPROBE),
+        [],
+        allow
+    );
+    console.log('[自检 · 基准过期检测认不认得出生产没有的 class]');
+    ok(
+        probeRes.orphans.length === 1 && probeRes.orphans[0] === SELFPROBE,
+        `自检:毒样本 .${SELFPROBE} 被逮住且只逮它(got ${JSON.stringify(probeRes.orphans)})`
+    );
+
     for (const m of MAPPINGS) {
         console.log('\n[' + m.name + ']');
         // 1) 设计稿基线
@@ -750,6 +795,7 @@ async function styleOf(page, sel, props) {
         await page.goto(designFile, { waitUntil: 'domcontentloaded' });
         const expected = {};
         for (const tk of m.tokens) expected[tk.design] = await styleOf(page, tk.design, tk.props);
+        const designClasses = await classesOf(page, null);
 
         // 2) 生产页本地渲染
         await page
@@ -838,6 +884,26 @@ async function styleOf(page, sel, props) {
             const hasSvg = await page.$(m.nosvgemoji);
             ok(!!hasSvg, `图标为线性 svg(无 emoji)· ${m.nosvgemoji}`);
         }
+
+        // 6) 基准过期检测:基准用到的 class 在生产该页容器里必须还找得到(见 design-freshness.js)
+        const prodClasses = await classesOf(page, m.layout.sel);
+        const styled = await styledClassesOf(page);
+        const fresh = checkFreshness(m.design, designClasses, prodClasses || [], styled, allow);
+        ok(
+            fresh.orphans.length === 0,
+            `基准不过期 ${m.design}(生产已无此 class:${fresh.orphans.join(' ') || '无'})`
+        );
+        ok(
+            fresh.dead.length === 0,
+            `豁免登记不过期 _freshness-allow.json[${m.design}](生产已有、该删登记:${fresh.dead.join(' ') || '无'})`
+        );
+        console.log(
+            `  · 基准过期检测:判 ${fresh.judged} 个 class,豁免 ${fresh.skipped.length} 个` +
+                (LIST || fresh.skipped.length === 0 ? '' : '(--list 看清单)')
+        );
+        if (LIST) {
+            for (const s of fresh.skipped) console.log(`     豁免未判 .${s.cls} —— ${s.why}`);
+        }
     }
 
     await browser.close();
@@ -845,8 +911,8 @@ async function styleOf(page, sel, props) {
     console.log(
         '\n' +
             (fails.length
-                ? `❌ 视觉照搬闸 FAIL · ${fails.length} 项不一致(回去对齐设计稿)`
-                : '✅ 视觉照搬闸 PASS · 关键令牌全等设计稿')
+                ? `❌ 视觉照搬闸 FAIL · ${fails.length} 项不一致(生产与稿对不上 → 改生产;稿比生产旧 → 改稿)`
+                : '✅ 视觉照搬闸 PASS · 关键令牌全等设计稿 · 基准无过期结构')
     );
     process.exit(fails.length ? 1 : 0);
 })().catch((e) => {

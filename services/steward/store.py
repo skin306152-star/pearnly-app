@@ -477,7 +477,7 @@ def public_task(row: dict) -> dict[str, Any]:
     from services.steward.loop_state import public_loop
 
     payload = row.get("payload") or {}
-    if card := public_authorization_card(payload.get("authorization")):
+    if card := public_authorization_card(payload.get("authorization"), payload.get("lang") or ""):
         out["authorization"] = card
     if loop := public_loop(payload):
         out["loop"] = loop

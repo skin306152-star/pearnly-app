@@ -4,6 +4,7 @@
 /* global escapeHtml, showConfirm */
 import { S, _sellerState } from './clients-store.js';
 import { apiClient } from './clients-helpers.js';
+import { listErrorHtml } from './list-error-state.js';
 import { MORE_SVG } from './more-menu.js';
 
 // ==========================================================
@@ -49,9 +50,13 @@ async function loadSellerCache() {
     try {
         const data = await apiClient('/api/workspace/clients');
         S.sellerClients = (data && (data.clients || data.items)) || [];
+        S.sellerFailed = false;
         window._workspaceClientsCache = S.sellerClients;
     } catch (e) {
         console.error('loadSellerCache fail', e);
+        // 同 loadClientsCache:失败位必须留痕,否则渲染层把 500 说成「还没有账套主体」/
+        // 「等管理员分配」——后者更糟,会把人支去找管理员而不是重试。
+        S.sellerFailed = true;
         S.sellerClients = [];
     }
     return S.sellerClients;
@@ -72,6 +77,10 @@ function renderSellerList() {
     const owner = _isWsOwner();
     const newBtn = document.getElementById('btn-seller-new');
     if (newBtn) newBtn.style.display = owner ? '' : 'none';
+    if (S.sellerFailed) {
+        tb.innerHTML = listErrorHtml('seller-error-title', 'data-seller-retry');
+        return;
+    }
     const items = _sellerFiltered();
     const activeId =
         typeof window.getActiveWorkspaceClientId === 'function'
@@ -108,7 +117,7 @@ function renderSellerList() {
             return `<div class="cust-row seller-grid" data-wid="${c.id}">
             <div class="cust-cell-name"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.55"><rect x="2" y="5" width="12" height="9" rx="1"/><path d="M10 14V4a1 1 0 00-1-1H7a1 1 0 00-1 1v10"/></svg><span class="cust-name-text">${escapeHtml(c.name || '#' + c.id)}</span></div>
             <div class="cust-cell-tax">${escapeHtml(c.tax_id || '—')}</div>
-            <div class="align-right">${c.invoice_count || 0}</div>
+            <div class="cust-cell-count align-right"><span class="cust-cell-count-label" data-i18n="seller-col-count">${escapeHtml(t('seller-col-count'))}</span>${c.invoice_count || 0}</div>
             <div class="cust-row-actions">${current}${ownerBtns}</div>
         </div>`;
         })

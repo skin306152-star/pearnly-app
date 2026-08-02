@@ -1,0 +1,178 @@
+{
+  "ai-500-zh": {
+    "titleText": "服务器暂时出错了",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 59,
+      "h": 34,
+      "top": 387
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(165, 83, 58)",
+    "codeLine": "HTTP 500"
+  },
+  "ai-503-zh": {
+    "titleText": "服务器暂时出错了",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 59,
+      "h": 34,
+      "top": 387
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(165, 83, 58)",
+    "codeLine": "HTTP 503"
+  },
+  "ai-offline-zh": {
+    "titleText": "连不上服务器",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 59,
+      "h": 34,
+      "top": 364
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(165, 83, 58)",
+    "codeLine": null
+  },
+  "ai-500-th": {
+    "titleText": "เซิร์ฟเวอร์ขัดข้องชั่วคราว",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 76,
+      "h": 34,
+      "top": 387
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(165, 83, 58)",
+    "codeLine": "HTTP 500"
+  },
+  "ai-503-th": {
+    "titleText": "เซิร์ฟเวอร์ขัดข้องชั่วคราว",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 76,
+      "h": 34,
+      "top": 387
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(165, 83, 58)",
+    "codeLine": "HTTP 503"
+  },
+  "ai-offline-th": {
+    "titleText": "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 76,
+      "h": 34,
+      "top": 364
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(165, 83, 58)",
+    "codeLine": null
+  },
+  "ai-mobile390": {
+    "retry": {
+      "left": 118.5,
+      "right": 177.5,
+      "w": 59,
+      "h": 34
+    },
+    "logout": {
+      "left": 187.5,
+      "right": 271.5,
+      "w": 84,
+      "h": 34
+    },
+    "vw": 390,
+    "docW": 390
+  },
+  "dms-500-zh": {
+    "titleText": "服务器暂时出错了",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 56,
+      "h": 36,
+      "top": 411
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(179, 38, 30)",
+    "codeLine": "HTTP 500"
+  },
+  "dms-503-zh": {
+    "titleText": "服务器暂时出错了",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 56,
+      "h": 36,
+      "top": 411
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(179, 38, 30)",
+    "codeLine": "HTTP 503"
+  },
+  "dms-offline-zh": {
+    "titleText": "连不上服务器",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 56,
+      "h": 36,
+      "top": 382
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(179, 38, 30)",
+    "codeLine": null
+  },
+  "dms-500-th": {
+    "titleText": "เซิร์ฟเวอร์ขัดข้องชั่วคราว",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 78,
+      "h": 36,
+      "top": 411
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(179, 38, 30)",
+    "codeLine": "HTTP 500"
+  },
+  "dms-503-th": {
+    "titleText": "เซิร์ฟเวอร์ขัดข้องชั่วคราว",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 78,
+      "h": 36,
+      "top": 411
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(179, 38, 30)",
+    "codeLine": "HTTP 503"
+  },
+  "dms-offline-th": {
+    "titleText": "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้",
+    "titleVisible": "visible",
+    "retryBox": {
+      "w": 78,
+      "h": 36,
+      "top": 392
+    },
+    "retryDisabled": false,
+    "warnIconStroke": "rgb(179, 38, 30)",
+    "codeLine": null
+  },
+  "dms-mobile390": {
+    "retry": {
+      "left": 121,
+      "right": 177,
+      "w": 56,
+      "h": 36
+    },
+    "logout": {
+      "left": 187,
+      "right": 269,
+      "w": 82,
+      "h": 36
+    },
+    "vw": 390,
+    "docW": 390
+  }
+}

@@ -7,8 +7,12 @@ import { S } from './bank-recon-store.js';
 import { formatDate, formatPeriod, esc } from './bank-recon-helpers.js';
 import { loadSessionDetail, renderDetailMeta, renderTxTable } from './bank-recon-detail.js';
 import { _renderClientBadge } from './bank-recon-picker.js';
+import { listErrorHtml } from './list-error-state.js';
 
 type Session = Record<string, any>;
+
+// 取数失败 ≠ 一份对账都没传过。清成 [] 就只剩「长度 0」这一个信号,渲染必然落空态。
+let _sessionsFailed = false;
 
 // ---------- API 调用 ----------
 async function refreshSessions() {
@@ -18,9 +22,11 @@ async function refreshSessions() {
         });
         if (!resp.ok) throw new Error('sessions:' + resp.status);
         S.sessions = await resp.json();
+        _sessionsFailed = false;
         renderSessionList();
     } catch (e) {
         console.warn('[bank-recon] loadSessions failed', e);
+        _sessionsFailed = true;
         S.sessions = [];
         renderSessionList();
     }
@@ -30,6 +36,9 @@ async function refreshSessions() {
 function refreshSummary() {
     const pill = document.getElementById('bank-status-summary');
     if (!pill) return;
+    // 拉不到就别摆状态:此前 total===0 一律说「还没有对账」,失败时那句话是替后端编的。
+    pill.style.display = _sessionsFailed ? 'none' : '';
+    if (_sessionsFailed) return;
     const total = S.sessions.length;
     if (total === 0) {
         pill.textContent = t('bank-pill-none');
@@ -49,6 +58,17 @@ function refreshSummary() {
 function renderSessionList() {
     const list = document.getElementById('bank-sessions-list');
     if (!list) return;
+    // 重试委托挂一次(错误态的钮由本模块渲染,后续重渲不重复绑)。
+    if (!(list as HTMLElement).dataset.bankSessRetryBound) {
+        (list as HTMLElement).dataset.bankSessRetryBound = '1';
+        list.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).closest('[data-bank-sess-retry]')) refreshSessions();
+        });
+    }
+    if (_sessionsFailed) {
+        list.innerHTML = listErrorHtml('bank-sessions-error-title', 'data-bank-sess-retry');
+        return;
+    }
     // 筛选
     let visible = S.sessions || [];
     if (S.sessionFilter === 'parsed') {

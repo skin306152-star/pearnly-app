@@ -7,11 +7,11 @@
 import contextlib
 import importlib.util
 import io
-import subprocess
 import sys
-import tempfile
 import unittest
 from pathlib import Path
+
+from tests.unit._git_sandbox import git, temp_git_repo
 
 _SPEC = importlib.util.spec_from_file_location(
     "check_cachebust",
@@ -130,25 +130,24 @@ class GitPlumbingTests(unittest.TestCase):
 
     单测桩喂的是现成的 changed 集合;真实失效可能发生在「diff 根本没把这些路径喂进来」。
     这条造真 commit 走真 git diff,是对「闸报绿≠闸看过」的直接反证。
+
+    仓库一律由 `_git_sandbox` 造:它把宿主的 GIT_DIR/GIT_INDEX_FILE 摘掉,连 main() 自己
+    fork 出去的 git 也一起干净。光靠 `cwd=` 挡不住 —— 2026-07-31 就是这么把宿主仓写空的。
     """
 
-    def _repo(self, tmp: Path, guide_text: str, vparam: str, stage: str) -> None:
+    def _commit_stage(self, tmp: Path, guide_text: str, vparam: str, stage: str) -> None:
         (tmp / "static/dist/guide-content").mkdir(parents=True, exist_ok=True)
         (tmp / GUIDE_JSON).write_text(guide_text, encoding="utf-8")
         (tmp / HTML).write_text(_html(vparam), encoding="utf-8")
-        subprocess.run(["git", "add", "-A"], cwd=tmp, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", stage], cwd=tmp, check=True, capture_output=True)
+        git(tmp, "add", "-A")
+        git(tmp, "commit", "-m", stage)
 
     def _run(self, guide_text: str, vparam: str) -> tuple[int, str]:
         """返回 (退出码, 闸的输出) · 输出捕走,免得反证用例的红字混进测试日志被当成真失败。"""
         buf = io.StringIO()
-        with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(buf):
-            tmp = Path(d)
-            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True, capture_output=True)
-            for k, v in (("user.email", "t@t"), ("user.name", "t")):
-                subprocess.run(["git", "config", k, v], cwd=tmp, check=True, capture_output=True)
-            self._repo(tmp, '{"chapters": []}', "12017001", "base")
-            self._repo(tmp, guide_text, vparam, "head")
+        with temp_git_repo() as tmp, contextlib.redirect_stdout(buf):
+            self._commit_stage(tmp, '{"chapters": []}', "12017001", "base")
+            self._commit_stage(tmp, guide_text, vparam, "head")
             original, cachebust.PROJECT_ROOT = cachebust.PROJECT_ROOT, tmp
             argv, sys.argv = sys.argv, ["check_cachebust.py", "--quiet"]
             try:

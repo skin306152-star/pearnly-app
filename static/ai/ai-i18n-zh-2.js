@@ -287,6 +287,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_conf_low: '低置信',
     riq_bulk_result: '{ok} 张成功 · {fail} 张失败',
     riq_view_img_btn: '查看原图',
+    riq_code_copy: '复制错误码',
+    riq_code_copied: '已复制',
     riq_item_frozen: '已冻结 · 只读',
     // S4 · 分组头人话副行(flag_reason → 一句大白话;词典没有的 reason 不渲染副行)
     riq_expl_amount_math_fail: '票面三个金额互相对不上,需你确认',
@@ -320,7 +322,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_direction_ambiguous: '进项/销项方向判不出（卖方税号 {seller_tax}），需人工指定',
     verdict_ocr_low_conf: 'OCR 识别置信度偏低（{band}），建议核对票面',
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
-    verdict_ocr_error: 'OCR 识别失败：{error}',
+    verdict_ocr_error: 'OCR 没能读出这张票，票还在，重传一次或换一张更清晰的',
+    verdict_ocr_error_quota: '这张还没读——本期识别额度用完了，续跑时会自动重试',
     verdict_table_kind_unclear:
         '这份表的表头既不像总账、也不像银行流水、也没有销售相关的列名。系统按默认把它当销项汇总收了 —— 这是一次猜测,不是判断。如果它其实是总账或流水,里面的数字会被当成本期销售额。请确认它确实是销项汇总;不是的话请剔除后按正确类别重传。',
     verdict_vat_unreadable:
@@ -482,6 +485,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     intake_excluded_failed: '改判失败，请重试。',
     intake_resume_continue: '继续上传',
     intake_resume_dismiss: '忽略',
+    // 失败批横幅上原因行与「重试失败的文件」之间那一句:只答「还有几件在你这边、重传发的是哪几件」。
+    intake_failed_batch_n: '这 {n} 个文件还没进系统,重传只发它们,已收进的不受影响。',
     intake_retry_failed: '重试失败的文件',
     // FD-0d · 总台(#/desk · 目标驱动前门)
     nav_desk: '总台',

@@ -1,0 +1,269 @@
+{
+  "h1_typedWithBackspace": {
+    "ok": true,
+    "seen": [
+      "8850",
+      "885099993",
+      "8850999",
+      "8850999320014"
+    ],
+    "want": [
+      "8850",
+      "885099993",
+      "8850999",
+      "8850999320014"
+    ],
+    "asked": [
+      "8850",
+      "885099993",
+      "8850999",
+      "8850999320014"
+    ],
+    "state": {
+      "text": "บาร์โค้ดนี้เป็นของ \"โค้ก 325ml\" อยู่แล้วไปแก้สินค้านั้น",
+      "h": 55
+    },
+    "wantDup": "บาร์โค้ดนี้เป็นของ \"โค้ก 325ml\" อยู่แล้ว"
+  },
+  "h2_heldKeyBarcodeField": {
+    "ok": true,
+    "before": "8850999320014",
+    "after": "88509993200140000000000",
+    "wantPrefix": "8850999320014",
+    "asked": [
+      "88509993200140000000000"
+    ],
+    "state": "ยังไม่มีสินค้าอื่นใช้บาร์โค้ดนี้",
+    "held": {
+      "flags": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "gaps": [
+        22,
+        1,
+        21,
+        21,
+        3,
+        20,
+        17,
+        16,
+        16
+      ],
+      "maxGap": 22
+    }
+  },
+  "h3_heldKeyBatchField": {
+    "ok": true,
+    "before": "L2026",
+    "after": "L20260000000000",
+    "asked": [],
+    "msg": "เพิ่ม นมสด 1L แล้ว",
+    "held": {
+      "flags": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "gaps": [
+        15,
+        15,
+        16,
+        8,
+        16,
+        17,
+        17,
+        15,
+        16
+      ],
+      "maxGap": 17
+    }
+  },
+  "h4_midSpeedDateBox": {
+    "ok": true,
+    "focus": {
+      "k": "expiry_date",
+      "type": "date"
+    },
+    "value": "2027-12-31",
+    "asked": [],
+    "msg": "ถือว่าพิมพ์เอง ไม่ใช่การยิงบาร์โค้ด\n20271231\nใช้เป็นบาร์โค้ด"
+  },
+  "h5_onlyNameCreate": {
+    "ok": true,
+    "opened": true,
+    "prefill": "9999999999994",
+    "priceBefore": "",
+    "body": {
+      "name_th": "โยเกิร์ต",
+      "code": null,
+      "barcode": "9999999999994",
+      "name_en": null,
+      "name_zh": null,
+      "unit": null,
+      "unit_price": null,
+      "vat_applicable": true,
+      "track_batch": false,
+      "image_url": null
+    }
+  },
+  "h6_notInCacheBatch": {
+    "ok": true,
+    "inCache": false,
+    "shown": true,
+    "shownAgain": true,
+    "lines": [
+      {
+        "product_id": "p-yog",
+        "qty": "1",
+        "batch_no": "Y-77",
+        "expiry_date": "2026-09-30"
+      }
+    ]
+  },
+  "h7_dateBoxSpeedSweep": {
+    "ok": true,
+    "firstSeg": "",
+    "runs": [
+      {
+        "label": "plain-8-at-260ms(上一轮验的那一档)",
+        "keys": "20271231",
+        "delay": 260,
+        "value": "202712-03-01",
+        "asked": [],
+        "phantomScan": false
+      },
+      {
+        "label": "plain-8-at-180ms",
+        "keys": "20271231",
+        "delay": 180,
+        "value": "",
+        "asked": [],
+        "phantomScan": false
+      },
+      {
+        "label": "plain-8-at-140ms",
+        "keys": "20271231",
+        "delay": 140,
+        "value": "",
+        "asked": [],
+        "phantomScan": false
+      },
+      {
+        "label": "plain-8-at-120ms",
+        "keys": "20271231",
+        "delay": 120,
+        "value": "",
+        "asked": [],
+        "phantomScan": false
+      },
+      {
+        "label": "plain-8-at-100ms",
+        "keys": "20271231",
+        "delay": 100,
+        "value": "",
+        "asked": [],
+        "phantomScan": false
+      },
+      {
+        "label": "with-slash-at-120ms",
+        "keys": "2027/12/31",
+        "delay": 120,
+        "value": "",
+        "asked": [],
+        "phantomScan": false
+      }
+    ]
+  },
+  "h8_unevenSplits": {
+    "ok": true,
+    "runs": [
+      {
+        "split": "885/09993/20014",
+        "seen": [
+          "885",
+          "88509993",
+          "8850999320014"
+        ],
+        "want": [
+          "885",
+          "88509993",
+          "8850999320014"
+        ],
+        "value": "8850999320014",
+        "asked": [
+          "885",
+          "88509993",
+          "8850999320014"
+        ],
+        "ok": true
+      },
+      {
+        "split": "88509993/2/0014",
+        "seen": [
+          "88509993",
+          "885099932",
+          "8850999320014"
+        ],
+        "want": [
+          "88509993",
+          "885099932",
+          "8850999320014"
+        ],
+        "value": "8850999320014",
+        "asked": [
+          "88509993",
+          "885099932",
+          "8850999320014"
+        ],
+        "ok": true
+      },
+      {
+        "split": "8850999320/0/14",
+        "seen": [
+          "8850999320",
+          "88509993200",
+          "8850999320014"
+        ],
+        "want": [
+          "8850999320",
+          "88509993200",
+          "8850999320014"
+        ],
+        "value": "8850999320014",
+        "asked": [
+          "8850999320",
+          "88509993200",
+          "8850999320014"
+        ],
+        "ok": true
+      }
+    ]
+  },
+  "h9_realGunIntoDateBox": {
+    "ok": true,
+    "value": "2026-12-31",
+    "asked": [
+      "8850999320014"
+    ],
+    "rows": [
+      "p-milk",
+      "p-cola"
+    ]
+  }
+}

@@ -54,6 +54,16 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
             resp.headers["content-security-policy-report-only"],
         )
 
+    def test_line_liff_sdk_whitelisted(self):
+        # 回归守门:LIFF SDK 由 purchase-liff 动态 <script> 注入(静态扫描盲区),prod 真机
+        # 违规实锤(2026-08-02 LINE 深链复核屏白屏)。两档 script-src 必须放行 LINE CDN。
+        resp = _client().get("/ping")
+        self.assertIn("static.line-scdn.net", resp.headers["content-security-policy"])
+        self.assertIn(
+            "static.line-scdn.net",
+            resp.headers["content-security-policy-report-only"],
+        )
+
     def test_report_uri_present_in_both(self):
         # 违规上报目标:两档都要带 report-uri,否则违规收不到、无法数据驱动升格
         resp = _client().get("/ping")

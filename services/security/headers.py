@@ -10,20 +10,23 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 # CSP(安全评估 2026-07-07 L2)· 分两档下发:
 #  ① 强制档 _ENFORCE_CSP:只含真浏览器登录+面板复验过零误伤的指令(script/object/base)。
-#     script-src 白名单取自前端全量扫描 + prod 真机 CSP 违规抓取(仅 CF beacon 需加白)。
+#     script-src 白名单取自前端全量扫描 + prod 真机 CSP 违规抓取(CF beacon;LINE LIFF SDK
+#     由 purchase-liff 动态 <script> 注入,静态扫描盲区 —— 2026-08-02 prod 真机违规实锤:
+#     深链复核屏被拦成白屏,LINE CDN 必须放行)。
 #     它挡住"从外域注入脚本 / <object> 插件 / <base> 注入"这些真 XSS 载体;点击劫持已由
 #     X-Frame-Options: DENY 覆盖。img-src/connect-src/frame/form 涉收据图、OAuth 表单跳转、
 #     LIFF 等合成浏览难穷尽的路径,先不强制免误伤。
 #  ② 观察档 _REPORT_CSP:完整策略以 report-only 下发,持续观察真实流量违规,零误伤确认后再升格强制。
 _ENFORCE_CSP = (
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
-    "https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; "
+    "https://cdnjs.cloudflare.com https://static.cloudflareinsights.com "
+    "https://static.line-scdn.net; "
     "object-src 'none'; base-uri 'self'; report-uri /api/csp-report"
 )
 _REPORT_CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com "
-    "https://static.cloudflareinsights.com; "
+    "https://static.cloudflareinsights.com https://static.line-scdn.net; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com data:; "
     "img-src 'self' data: blob: https://api.qrserver.com https://*.line-scdn.net "

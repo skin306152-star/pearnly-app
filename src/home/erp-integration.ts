@@ -134,8 +134,8 @@ async function loadErpLogs(silent?: boolean) {
             }, 4000);
         }
         if (items.length === 0) {
-            // 整页无可呈现行 · 仅当原始页也为空(真到末页)才回退,避免整页 DMS 行触发回退循环。
-            if (rawItems.length === 0 && _logTotal > 0 && _logPage > 0) {
+            // 后端已剔除 DMS 行(exclude_push_type)· 整页为空即真到末页 → 回退上一页。
+            if (_logTotal > 0 && _logPage > 0) {
                 _logPage--;
                 loadErpLogs(silent);
                 return;

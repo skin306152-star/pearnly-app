@@ -100,3 +100,5 @@ if (typeof window.subscribeI18n === 'function') {
         if ((location.hash || '').replace(/^#\//, '') === 'dashboard') loadDashboard();
     });
 }
+
+export {};

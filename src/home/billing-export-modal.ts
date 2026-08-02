@@ -111,3 +111,5 @@ function pickExportRange(): Promise<{ from: string; to: string } | null> {
 }
 
 window._pickExportRange = pickExportRange;
+
+export {};

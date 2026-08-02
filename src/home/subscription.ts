@@ -299,3 +299,5 @@ async function onCancel() {
         _toast(_t('sub-failed', '操作失败 · 请稍后再试'), 'error');
     }
 }
+
+export {};

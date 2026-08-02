@@ -92,12 +92,16 @@ class StartupFailFast(unittest.TestCase):
         env["FILE_ENC_MODE"] = "on"
         env.pop("PEARNLY_FILE_KMS_KEY", None)
         repo = Path(__file__).resolve().parents[2]
+        # encoding 必须显式钉 utf-8:报错文本含中文,若按 locale(泰文机 = cp874)解码,
+        # 环境带 PYTHONIOENCODING=utf-8 时 reader 线程炸 → stderr 拿到 None(假 flake)。
         proc = subprocess.run(
             [sys.executable, "-c", "import core.file_crypto"],
             cwd=str(repo),
             env=env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         self.assertNotEqual(proc.returncode, 0)  # 起不来
         self.assertIn("PEARNLY_FILE_KMS_KEY", proc.stderr)

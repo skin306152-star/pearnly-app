@@ -168,16 +168,12 @@ if [ -n "$PY_CHANGED" ]; then
   # commit 全打进了宿主仓(4838 files / -794172)。第 26 道闸拦的是「测试源码里出现 git 写操作」
   # 这种写法,拦不住间接绕道(第三方库自己调 git、脚本再起脚本);把变量摘掉断的是机制本身,
   # 两道并存。顺带让钩子里这趟跑在与 CI 相同的环境里 —— CI 容器里本来就没有这些变量。
-  # 触发面裁剪(2026-08-02):test_scan_camera_runtime 起真 node 仿真时间线,单模块 ~5.4 分钟
-  # = 全量的下限。它守的是 static/scan/*.js —— 本次 push 没碰扫码时它不可能因此变红,跳过
-  # 零质量损失(与视觉闸 DESIGN_CHANGED 同款触发面逻辑;CI 的 unit job 仍无条件全量)。
-  SCAN_TOUCHED="$(printf '%s\n' "$CHANGED" | grep -E '^(static/scan/|tests/unit/test_scan_)' || true)"
-  UT_EXCLUDE=""
-  [ -z "$SCAN_TOUCHED" ] && UT_EXCLUDE="--exclude tests.unit.test_scan_camera_runtime"
+  # (2026-08-03 撤触发面裁剪:scan_camera 装虚拟时钟后 323s→5s,唯一裁剪理由消失,
+  #  钩子回到无条件全量 —— 裁剪清单本身就是被蚕食的风险面,能不留就不留。)
   echo "  · 全量 unittest(分片并行 · 覆盖面与单进程 discover 相同 · 剥 GIT_* 跑)"
   env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX \
       -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_QUARANTINE_PATH \
-      python scripts/run_unit_sharded.py --quiet $UT_EXCLUDE || fail "全量 unittest 红"
+      python scripts/run_unit_sharded.py --quiet || fail "全量 unittest 红"
 
   echo "  · 新债 diff 闸(禁新增 ensure_*/巨石路由 · 铁律 #5/#17)"
   python scripts/check_new_debt.py || fail "新债 diff 闸(新增 ensure_* 或 app.py 巨石路由)"

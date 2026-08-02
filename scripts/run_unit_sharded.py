@@ -136,6 +136,14 @@ def main() -> int:
     shards = make_shards(mods, max(1, args.workers), load_times())
 
     t0 = time.monotonic()
+    # 预热:N 个 worker 同时冷 import 全家桶会在磁盘/杀软实时扫描上互相拖慢(实测单模块
+    # 单跑 3s、并行桶里记账 140-376s 全是这水分)。先单进程把 import 树焐进系统缓存。
+    subprocess.run(
+        [sys.executable, "-c", "import app"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=str(_REPO_ROOT),
+    )
     procs = [
         subprocess.Popen(
             [sys.executable, __file__, "--worker", *shard],

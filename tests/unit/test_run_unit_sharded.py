@@ -36,16 +36,15 @@ class ShardsPartitionExactly(unittest.TestCase):
         self.assertEqual([m for s in shards for m in s], ["tests.unit.test_a", "tests.unit.test_b"])
 
 
-class HookExcludeIsNarrow(unittest.TestCase):
-    """钩子的触发面裁剪只许点名 scan_camera 一个模块,且必须配 SCAN_TOUCHED 条件。
+class HookRunsFullSuite(unittest.TestCase):
+    """钩子对 runner 不许带 --exclude:全量就是全量,裁剪清单是会被蚕食的风险面。
 
-    裁剪清单悄悄长大 = 全量闸被蚕食;条件没了 = 改了扫码也不跑它的测试。"""
+    2026-08-03 曾因 scan_camera 单模块 323s 裁剪过一天;虚拟时钟治本(→5s)后撤掉。
+    再要裁剪,先治慢模块本身。"""
 
-    def test_hook_excludes_exactly_scan_camera_behind_touch_guard(self):
+    def test_hook_invokes_runner_without_exclude(self):
         hook = (Path(UNIT_DIR).parents[1] / "scripts" / "git-hooks" / "pre-push").read_text(
             encoding="utf-8"
         )
-        self.assertEqual(hook.count("--exclude"), 1)
-        self.assertIn('UT_EXCLUDE="--exclude tests.unit.test_scan_camera_runtime"', hook)
-        self.assertIn('[ -z "$SCAN_TOUCHED" ] && UT_EXCLUDE=', hook)
-        self.assertIn("static/scan/", hook.split("SCAN_TOUCHED=")[1].split("\n")[0])
+        self.assertIn("python scripts/run_unit_sharded.py --quiet", hook)
+        self.assertNotIn("--exclude", hook)

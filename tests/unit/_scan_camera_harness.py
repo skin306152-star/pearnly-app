@@ -92,6 +92,44 @@ _RUN = r"""
     let videoAt = 0;    // 视频第一帧被解的时刻 —— 时间线的零点
 
     // 剧本 = 15fps 的视频帧计划(每帧解得出哪些码),不是「第 n 次 detect 吐第 n 帧」。
+    // ── 虚拟时钟(2026-08-03 · 提速零改判据)────────────────────
+    // 引擎/错误分档/本桩只用 Date.now 与 setTimeout(grep 钉死),把两者虚拟化后时间线
+    // 瞬时推进:一条 6 秒剧本从真等 6 秒变毫秒级,整模块 ~323s → 秒级。语义不变 ——
+    // 解码非对称成本仍把虚拟钟推进同样毫秒数,时间戳反而零漂移(文件头抱怨的「采样
+    // 相位一路漂」在此归零,反证只会红得更稳;各用例内置的 A/B 自证仍逐条生效)。
+    const __realSetTimeout = setTimeout;
+    let __vnow = 0, __vseq = 0;
+    const __vq = [];
+    const __RealDate = Date;
+    global.Date = class extends __RealDate {
+        constructor(...a) { a.length ? super(...a) : super(__vnow); }
+        static now() { return __vnow; }
+    };
+    global.setTimeout = function (fn, ms) {
+        const args = Array.prototype.slice.call(arguments, 2);
+        const t = { at: __vnow + Math.max(0, Number(ms) || 0), seq: __vseq++, fn, args, dead: false };
+        __vq.push(t);
+        return t;
+    };
+    global.clearTimeout = function (t) { if (t && typeof t === 'object') t.dead = true; };
+    async function __drainMicro() { for (let i = 0; i < 64; i++) await null; }
+    async function __pump() {
+        for (;;) {
+            await __drainMicro();
+            if (done) return;
+            let best = -1;
+            for (let i = 0; i < __vq.length; i++) {
+                const t = __vq[i];
+                if (t.dead) continue;
+                if (best < 0 || t.at < __vq[best].at || (t.at === __vq[best].at && t.seq < __vq[best].seq)) best = i;
+            }
+            if (best < 0) return;
+            const t = __vq.splice(best, 1)[0];
+            if (t.at > __vnow) __vnow = t.at;
+            t.fn.apply(null, t.args);
+        }
+    }
+
     const PLAN = __PLAN__;
     const FRAME_MS = __FRAME_MS__;
     const HIT_MS = __HIT_MS__;
@@ -204,7 +242,11 @@ _RUN = r"""
     }
 
     handle.start();
-    const deadline = setTimeout(finish, __DEADLINE__);
+    const deadline = setTimeout(finish, __DEADLINE__); // 虚拟钟上的兜底,语义同前
+    // 真墙钟保险丝:虚拟队列若死循环,30s 强制收尾;unref 让队列排空后进程立即退出。
+    const __fuse = __realSetTimeout(() => { if (!done) finish(); }, 30000);
+    if (__fuse && __fuse.unref) __fuse.unref();
+    __pump().then(() => { if (!done) finish(); });
 """
 
 

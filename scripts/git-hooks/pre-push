@@ -155,24 +155,29 @@ if [ -n "$PY_CHANGED" ]; then
   python scripts/check_i18n_refs.py >/dev/null \
     || { python scripts/check_i18n_refs.py | tail -20; fail "check_i18n_refs(有键在词典里查不到 · 屏上会印裸键名)"; }
 
-  # 这趟 ~150s 是钩子里最贵的一步,但它是钩子里【唯一】盖「改一处崩别处」的闸:ruff/black 看
+  # 这趟是钩子里最贵的一步,但它是钩子里【唯一】盖「改一处崩别处」的闸:ruff/black 看
   # 语法与格式,import app 只看启动,谁都看不见回归。push 即上线(webhook ~20s),CI 是几分钟
-  # 后的报警器 —— 把它交给 CI 等于「红了才发现已经上线」。所以不砍,只砍「本来就不该跑」的场景:
-  # 上面的范围改成 merge-base 之后,分支自己没动 .py 就整块不进来(实测两条停摆分支 390/1030 个
-  # 假 .py → 0 个)。按 import 反查只跑受影响模块这条路验过不通:1038 个测试模块里 213 个
-  # (2593 条 / 84.7s = 全程 57%)是扫仓库文件、起子进程跑脚本来验的,跟被测对象之间根本没有
-  # import 边,而且它们守的多半是 .ts/.js/.html —— Python 的 import 图看不见。这 213 个必须无条件
-  # 全跑,剩下 64s 里按中位数只能砍掉九成 ≈ 57s,拿一套会漏判的影响面分析换 38%,不划算。
+  # 后的报警器 —— 把它交给 CI 等于「红了才发现已经上线」。所以【全量不砍,改成分片并行】
+  # (2026-08-02):tests/unit 长到 1089 模块/11k 用例,单进程 discover 串行 ~9.5 分钟只用 1 核;
+  # run_unit_sharded 按字母序连续切 6 段并行跑 —— 跑什么/什么顺序都与 discover 相同(有测试
+  # 钉住),只是摊到多核,实测 ~9.5 分钟 → 2-3 分钟。按 import 反查只跑受影响模块的路早验过
+  # 不通(213 个扫仓库/起子进程的模块没有 import 边,详见 git 历史此段旧注)。
   #
   # 剥掉 git 注入的 GIT_* 再跑(2026-07-31 P0 的机制性收口):钩子进程自带 GIT_DIR/
   # GIT_INDEX_FILE,它俩盖过 subprocess 的 cwd=,于是「在临时目录造 commit」的测试把 init/add/
   # commit 全打进了宿主仓(4838 files / -794172)。第 26 道闸拦的是「测试源码里出现 git 写操作」
   # 这种写法,拦不住间接绕道(第三方库自己调 git、脚本再起脚本);把变量摘掉断的是机制本身,
   # 两道并存。顺带让钩子里这趟跑在与 CI 相同的环境里 —— CI 容器里本来就没有这些变量。
-  echo "  · 全量 unittest(catch errors=N · 改一处崩别处 · 剥 GIT_* 跑)"
+  # 触发面裁剪(2026-08-02):test_scan_camera_runtime 起真 node 仿真时间线,单模块 ~5.4 分钟
+  # = 全量的下限。它守的是 static/scan/*.js —— 本次 push 没碰扫码时它不可能因此变红,跳过
+  # 零质量损失(与视觉闸 DESIGN_CHANGED 同款触发面逻辑;CI 的 unit job 仍无条件全量)。
+  SCAN_TOUCHED="$(printf '%s\n' "$CHANGED" | grep -E '^(static/scan/|tests/unit/test_scan_)' || true)"
+  UT_EXCLUDE=""
+  [ -z "$SCAN_TOUCHED" ] && UT_EXCLUDE="--exclude tests.unit.test_scan_camera_runtime"
+  echo "  · 全量 unittest(分片并行 · 覆盖面与单进程 discover 相同 · 剥 GIT_* 跑)"
   env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX \
       -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_QUARANTINE_PATH \
-      python -m unittest discover -s tests/unit -p "test_*.py" || fail "全量 unittest 红"
+      python scripts/run_unit_sharded.py --quiet $UT_EXCLUDE || fail "全量 unittest 红"
 
   echo "  · 新债 diff 闸(禁新增 ensure_*/巨石路由 · 铁律 #5/#17)"
   python scripts/check_new_debt.py || fail "新债 diff 闸(新增 ensure_* 或 app.py 巨石路由)"

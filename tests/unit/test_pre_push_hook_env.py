@@ -111,7 +111,7 @@ class HookEnvContract(unittest.TestCase):
         text = hook_text()
         self.assertLess(
             text.index("export PYTHONUTF8=1"),
-            text.index("python -m unittest"),
+            text.index("python scripts/run_unit_sharded.py"),
             "PYTHONUTF8 设在跑测试之后了",
         )
 

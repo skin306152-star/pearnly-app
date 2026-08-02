@@ -10,7 +10,7 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
     "format": "prettier --write \"**/*.{js,mjs,ts,css,html,json}\"",
     "format:check": "prettier --check \"**/*.{js,mjs,ts,css,html,json}\""
   },

@@ -127,12 +127,13 @@ async function liffEntry(
     }
 }
 
-// 回到带 token 的 /home 后:深链落点 —— doc 开复核屏对应单(等路由就绪)。
+// 回到带 token 的 /home 后:深链落点 —— doc 开复核屏对应单;无 doc 而 view=list
+// (月报「看明细」)开采购列表主屏(等路由就绪)。
 function liffResume(): void {
     const doc = sessionStorage.getItem(LIFF_DOC_KEY);
     const view = sessionStorage.getItem(LIFF_VIEW_KEY);
     const ws = sessionStorage.getItem(LIFF_WS_KEY);
-    if (!doc) return;
+    if (!doc && view !== 'list') return;
     sessionStorage.removeItem(LIFF_DOC_KEY);
     sessionStorage.removeItem(LIFF_VIEW_KEY);
     sessionStorage.removeItem(LIFF_WS_KEY);
@@ -148,6 +149,12 @@ function liffResume(): void {
             }
             window.satisfyWorkspaceGate(Number(ws));
             wsApplied = true;
+        }
+        // view=list(月报「看明细」)→ 采购列表主屏,无单据可开。
+        if (view === 'list') {
+            if (typeof window.routeTo === 'function') window.routeTo('purchase');
+            else if (tries++ < 40) setTimeout(open, 120);
+            return;
         }
         // view=receipt(PO-7)→ 只读详情页(看/出替代收据);否则编辑复核屏。
         if (view === 'receipt') {

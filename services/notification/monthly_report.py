@@ -86,6 +86,14 @@ def _month_stats(user_id, tenant_id, period, prior_period) -> Optional[dict]:
                 params + [period],
             )
             out["cats"] = [r["category_tag"] for r in cur.fetchall()]
+            cur.execute(
+                f"SELECT workspace_client_id AS ws, COUNT(*) AS c FROM ocr_history "
+                f"WHERE {vis} AND {_BKK_MONTH} = %s AND workspace_client_id IS NOT NULL "
+                f"GROUP BY workspace_client_id ORDER BY c DESC LIMIT 1",
+                params + [period],
+            )
+            top = cur.fetchone()
+            out["top_ws"] = top["ws"] if top else None
             return out
     except Exception:
         logger.warning("[monthly_report] stats failed", exc_info=True)
@@ -155,8 +163,14 @@ def _message(stats: dict, period: str, lang: str) -> dict:
     body = _t(_COPY, lang).format(
         p=period, n=stats["n"], total=stats["total"], delta=delta, cats=cats
     )
+    # 看明细直达采购列表,不落选套账页(2026-08-02 Zihao)。月报统计跨套账,落点套账取
+    # 上月单量最多者(LIFF 鉴权后自动选中跳过套账门);无套账归属时留空,选一次套账后仍落列表。
     uri = line_card_sections.liff_link(
-        os.getenv("LINE_LIFF_ID", "").strip(), "https://pearnly.com/home", ""
+        os.getenv("LINE_LIFF_ID", "").strip(),
+        "https://pearnly.com/home",
+        "",
+        view="list",
+        ws=str(stats.get("top_ws") or ""),
     )
     return {
         "type": "template",

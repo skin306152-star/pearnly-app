@@ -6,6 +6,7 @@
 退订 postback,退订回执幂等。
 """
 
+import os
 import unittest
 from contextlib import contextmanager
 from datetime import date
@@ -97,6 +98,23 @@ class TestSend(unittest.TestCase):
     def test_delta_positive_in_text(self):
         _, pushed, _ = self._send(stats=_STATS)
         self.assertIn("+12%", pushed[0][0]["template"]["text"])
+
+    def test_detail_uri_deep_links_to_purchase_list(self):
+        # 看明细直达采购列表(带上月单量最多套账),不落选套账页(2026-08-02 Zihao)。
+        with patch.dict(os.environ, {"LINE_LIFF_ID": "LID"}):
+            _, pushed, _ = self._send(stats={**_STATS, "top_ws": 7})
+        self.assertEqual(
+            pushed[0][0]["template"]["actions"][0]["uri"],
+            "https://liff.line.me/LID?liff=purchase&view=list&ws=7",
+        )
+
+    def test_detail_uri_without_liff_id_falls_back_to_home(self):
+        # 未配 LIFF ID → 回退 /home(站内 /liff 路由必须带单据号,页面级落点无等价物)。
+        with patch.dict(os.environ, {"LINE_LIFF_ID": ""}):
+            _, pushed, _ = self._send(stats=_STATS)
+        self.assertEqual(
+            pushed[0][0]["template"]["actions"][0]["uri"], "https://pearnly.com/home"
+        )
 
 
 class TestUnsub(unittest.TestCase):

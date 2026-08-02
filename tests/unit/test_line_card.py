@@ -475,6 +475,15 @@ class RecordDeepLinkTests(unittest.TestCase):
     def test_no_ref_falls_back_to_web(self):
         self.assertEqual(line_card_sections.liff_link("", self.WEB, ""), self.WEB)
 
+    def test_view_only_link_for_page_level_deep_link(self):
+        # 月报「看明细」:无单据、view=list → LIFF 页面级落点(采购列表·带套账直选);
+        # 未配 LIFF ID 无站内等价路由(/liff/purchase 必须带单据)→ 回 web_url。
+        self.assertEqual(
+            line_card_sections.liff_link("LID", self.WEB, "", "list", "7"),
+            "https://liff.line.me/LID?liff=purchase&view=list&ws=7",
+        )
+        self.assertEqual(line_card_sections.liff_link("", self.WEB, "", "list", "7"), self.WEB)
+
     def test_card_footer_embeds_deep_link(self):
         import json
 

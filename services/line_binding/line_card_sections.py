@@ -255,10 +255,14 @@ def liff_link(liff_id: str, web_url: str, ref: str, view: str = "", ws: str = ""
     用 LINE 身份登录);未配 → 回退站内 /liff 路由(至少能打开)。无 ref → 通用页(不死链)。
 
     ws=该单所属套账 id:带上 → 复核屏自动切到该套账并跳过套账门(记录只在它自己的套账可见)。
+    无 ref 但有 view(月报「看明细」view=list)→ 页面级落点,仅 LIFF 形态支持;
+    未配 LIFF ID 时站内 /liff 路由必须带单据号,仍回 web_url。
     """
-    if not ref:
-        return web_url
     extra = (f"&view={view}" if view else "") + (f"&ws={ws}" if ws else "")
+    if not ref:
+        if liff_id and view:
+            return f"https://liff.line.me/{liff_id}?liff=purchase{extra}"
+        return web_url
     if liff_id:
         return f"https://liff.line.me/{liff_id}?liff=purchase&doc={ref}{extra}"
     base = web_url.split("/home")[0].rstrip("/") or "https://pearnly.com"

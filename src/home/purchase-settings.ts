@@ -31,8 +31,6 @@ const PAGE_CSS = `
 .pur.cfg .chip .nm{cursor:text;border-radius:5px;padding:1px 4px;margin:-1px -2px;}
 .pur.cfg .chip .nm:hover{background:var(--line2);}
 .pur.cfg .chip .x{color:var(--ink3);cursor:pointer;}
-.pur.cfg .addcat{height:32px;padding:0 13px;border:1px dashed var(--accent);border-radius:999px;color:var(--accent);font-size:12.5px;background:var(--card);cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
-.pur.cfg .addcat-input{height:32px;padding:0 13px;border:1px solid var(--accent);border-radius:999px;font-size:12.5px;outline:0;min-width:130px;}
 .pur.cfg .foot{display:flex;justify-content:flex-end;padding:14px 22px;}
 .pur.cfg .save{height:40px;padding:0 22px;border-radius:11px;border:1px solid var(--accent);background:var(--accent);color:var(--card);font-weight:650;font-size:14px;cursor:pointer;}
 .pur.cfg .save:hover{background:var(--accent-deep);}

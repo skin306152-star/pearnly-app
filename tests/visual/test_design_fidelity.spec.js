@@ -300,15 +300,17 @@ const API = {
 // layout: 仅查生产容器左对齐(marginLeft=0)。
 const MAPPINGS = [
     {
-        name: '首页 dashboard(样板 · A组屏)',
+        // 2026-06-28 dashboard 改版成「订阅与计费」(page-dashboard.ts):北极星带(.band)
+        // 和快捷区(.qa)已不存在 · 选择器跟现实走(充值主按钮 .btn.pri + 余额卡线性图标)。
+        name: '首页 dashboard(订阅与计费 · A组屏)',
         design: 'dashboard-final.html',
         route: 'dashboard',
-        ready: '#page-dashboard .band .btn.pri',
+        ready: '#page-dashboard .pagehead',
         layout: { sel: '#page-dashboard .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
                 design: '.btn',
-                prod: '#page-dashboard .band .btn.pri',
+                prod: '#page-dashboard .btn.pri',
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
             {
@@ -317,8 +319,8 @@ const MAPPINGS = [
                 props: ['borderRadius', 'boxShadow'],
             },
         ],
-        bluemust: '#page-dashboard .band .btn.pri',
-        nosvgemoji: '#page-dashboard .qa .qb svg',
+        bluemust: '#page-dashboard .btn.pri',
+        nosvgemoji: '#page-dashboard .sub-card-ico svg',
     },
     {
         name: '识别记录 history(A组屏)',
@@ -511,7 +513,8 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .save',
-        nosvgemoji: '.pur .addcat svg',
+        // 分类区已搬去 expense-data(purchase-settings.ts 只留指路链接):addcat 按钮不存在,
+        // 该页已无 svg 图标 → 图标检查移除。
     },
     {
         name: '做账主屏(01 收拢版)',

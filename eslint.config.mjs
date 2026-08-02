@@ -29,6 +29,12 @@ export default [
             'tests/eval/**/generate.cjs', // 对抗语料生成器(Node 脚本 · 非交付前端源码 · 同 corpus generate.py 策略)
             'scripts/_*.cjs', // 截图/探针等一次性脚本(下划线前缀 = 临时 · 非交付源码 · 同 _mock 策略)
             'scripts/_*.js',
+            'tests/e2e/_*.spec.js', // 本机一次性验收脚本(gitignored · CI 有闸拦它混入 · 同 scripts/_* 策略)
+            '_scratch/**', // 本地草稿(gitignored · 非源码)
+            '_ocr_test/**', // 本地 OCR 评测场(gitignored · 内含 Python venv 的 vendored JS)
+            'outputs/**', // 本地跑批/验收产物(gitignored · 非源码)
+            '_*.cjs', // 根级下划线临时脚本(gitignored · 同 scripts/_* 策略)
+            '_*.js',
             'scripts/_ui_audit_full/**',
             '_uitest/**', // 本地真站点 UI 实测脚本(gitignore · 非交付源码)
             'home.js', // REFACTOR-C1 拆解目标

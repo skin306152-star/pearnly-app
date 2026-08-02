@@ -112,9 +112,7 @@ class TestSend(unittest.TestCase):
         # 未配 LIFF ID → 回退 /home(站内 /liff 路由必须带单据号,页面级落点无等价物)。
         with patch.dict(os.environ, {"LINE_LIFF_ID": ""}):
             _, pushed, _ = self._send(stats=_STATS)
-        self.assertEqual(
-            pushed[0][0]["template"]["actions"][0]["uri"], "https://pearnly.com/home"
-        )
+        self.assertEqual(pushed[0][0]["template"]["actions"][0]["uri"], "https://pearnly.com/home")
 
 
 class TestUnsub(unittest.TestCase):

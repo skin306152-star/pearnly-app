@@ -38,9 +38,7 @@ def ensure_upgrade_schema() -> None:
     from core import db
 
     with db.get_cursor(commit=True) as cur:
-        cur.execute(
-            "ALTER TABLE sales_documents ADD COLUMN IF NOT EXISTS source_receipt_no text"
-        )
+        cur.execute("ALTER TABLE sales_documents ADD COLUMN IF NOT EXISTS source_receipt_no text")
 
 
 def _to_buyer(raw: Optional[dict]) -> dict:

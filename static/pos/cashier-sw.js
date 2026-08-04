@@ -9,7 +9,7 @@
  */
 // 版本号跟 pos.html 里 dist/pos.js 的 ?v= 保持一致(同 pos-sw.js):/cashier 是收银台现在的家,
 // 外壳 cache-first,不换缓存名就等于在用的机器永远拿旧 pos.html —— 新加的扫码层在店里压根不存在。
-const V = '12060010';
+const V = '12060011';
 // 前缀 = 「这一族缓存是我的」的唯一凭据(见 dropStaleCaches)。CACHE 由它拼出来,两处不分家。
 const PREFIX = 'pearnly-cashier-v';
 const CACHE = PREFIX + V;

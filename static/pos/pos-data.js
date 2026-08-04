@@ -689,17 +689,6 @@
         }
     };
 
-    // 税号 → RD 官方名称/地址(G2 补开买方表单带出)。返回 {found, name, address, …};
-    // 查不到/超时后端也回 found:false(不 4xx),这里不设 mock——查询失败诚实转手填。
-    data.taxLookup = async function (taxId) {
-        return await apiFetch(
-            'GET',
-            '/api/pos/tax-lookup?tax_id=' +
-                encodeURIComponent(taxId) +
-                (state.workspaceClientId ? '&workspace_client_id=' + state.workspaceClientId : '')
-        );
-    };
-
     // 单笔详情(退货详情 · 与 findReceipt 同信封 {sale, lines, payments})。
     data.saleDetail = async function (saleId) {
         try {
@@ -791,28 +780,8 @@
         }
     };
 
-    // 小票升级正式税票(04 §6 · B4/G2)。买方公司/个人字段集见屏2;saveBuyer=存回客户档。
-    // 离线不可开税票(税票需联网连号 · 08 ADR v1 范围),仅纯本地预览回落 mock 演示。
-    data.fullTaxInvoice = async function (saleId, buyer, saveBuyer) {
-        try {
-            return await apiFetch('POST', '/api/pos/sales/' + saleId + '/full-tax-invoice', {
-                workspace_client_id: state.workspaceClientId,
-                buyer,
-                save_buyer: !!saveBuyer,
-            });
-        } catch (e) {
-            if (POS.isRouteMissing(e) && POS.allowMock()) {
-                return {
-                    document: {
-                        id: POS.uuid(),
-                        doc_number: 'INV-LOCAL-' + Math.floor(Math.random() * 90000 + 10000),
-                        doc_type: 'tax_invoice',
-                    },
-                };
-            }
-            throw e;
-        }
-    };
+    // 税票域 API(fullTaxInvoice / taxLookup)定义在 pos-taxinv.js,仍挂 POS.data.*
+    // (餐厅紧凑弹窗等消费方的挂载点不变,定义处随域走)。
 
     // 离线批量补传(04 §6 · B5)。逐张幂等,部分失败不卡其余;失败项端上保留重试。
     data.syncSales = function (items) {

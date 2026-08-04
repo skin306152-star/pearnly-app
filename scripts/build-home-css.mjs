@@ -139,8 +139,9 @@ const CONSOLE_CSS = ['console/console-theme.css', 'console/console.css'];
 
 // POS 收银 SPA:零售/药房基础样式在前,餐厅作用域样式在后(固化原 pos.html 顺序)。
 // pos-scan.css(摄像头连扫层)吃 pos.css 的 :root 令牌,排在它之后即可;类名 .bscan-* 自成
-// 一族,不与任何屏的作用域类同名,放末尾不覆盖谁。
-const POS_CSS = ['pos/pos.css', 'pos/pos-restaurant.css', 'pos/pos-scan.css'];
+// 一族,不与任何屏的作用域类同名,放末尾不覆盖谁。pos-taxinv.css(G2 税票弹窗+补开视图)
+// 同理吃令牌,#tax-mask/.pos-view--taxinv 作用域自成一族,排 pos.css 之后。
+const POS_CSS = ['pos/pos.css', 'pos/pos-taxinv.css', 'pos/pos-restaurant.css', 'pos/pos-scan.css'];
 
 // Pearnly AI SPA(M1-W1 · 独立工作台):令牌源在前,骨架/选客户层/客户页依次叠加
 // (固化原 ai.html 引用顺序)。ai-viewer.css(原件查看器 .pv-*)排最后——挂载点

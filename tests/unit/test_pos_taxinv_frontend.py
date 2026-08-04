@@ -12,8 +12,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 HTML = (ROOT / "static/pos/pos.html").read_text("utf-8")
 CSS = (ROOT / "static/pos/pos.css").read_text("utf-8")
+TAXCSS = (ROOT / "static/pos/pos-taxinv.css").read_text("utf-8")
 TAXINV = (ROOT / "static/pos/pos-taxinv.js").read_text("utf-8")
 BUILD = (ROOT / "scripts/build-home-js.mjs").read_text("utf-8")
+BUILD_CSS = (ROOT / "scripts/build-home-css.mjs").read_text("utf-8")
 POSJS = (ROOT / "static/pos/pos.js").read_text("utf-8")
 I18N = (ROOT / "static/pos/pos-i18n.js").read_text("utf-8")
 
@@ -27,6 +29,12 @@ class BundleRegistrationTests(unittest.TestCase):
         self.assertLess(i_data, i_taxinv)
         self.assertLess(i_taxinv, i_cashier)
 
+    def test_taxinv_css_registered_after_tokens(self):
+        """pos-taxinv.css 吃 pos.css 的 :root 令牌 → 必须登记且排它之后。"""
+        i_base = BUILD_CSS.index("pos/pos.css")
+        i_tax = BUILD_CSS.index("pos/pos-taxinv.css")
+        self.assertLess(i_base, i_tax)
+
 
 class DomLayoutTests(unittest.TestCase):
     def test_view_and_entries_present(self):
@@ -36,28 +44,31 @@ class DomLayoutTests(unittest.TestCase):
             'id="taxinv-receipt"',
             'id="taxinv-find-btn"',
             'id="taxinv-body"',
-            'id="tax-lookup-btn"',
-            'id="tax-save-buyer"',
-            'id="tax-lookup-hint"',
         ):
             self.assertIn(needle, HTML, needle)
 
-    def test_tax_mask_outside_view_sections(self):
-        """弹窗必须在最后一个 </section> 之后:留在 view-main 里,补开视图开弹窗
-        会被 .pos-view{display:none} 吞掉(视觉上「点了没反应」)。"""
-        self.assertGreater(HTML.index('id="tax-mask"'), HTML.rindex("</section>"))
+    def test_tax_mask_is_js_injected_not_in_html(self):
+        """弹窗由 pos-taxinv.js 注入 body(任何视图都能开):留在 view-main 里会被
+        .pos-view{display:none} 吞掉(视觉上「点了没反应」)。"""
+        self.assertNotIn('id="tax-mask"', HTML)
+        self.assertIn("mask.id = 'tax-mask'", TAXINV)
+        self.assertIn("document.body.appendChild(mask)", TAXINV)
+        for mid in ("tax-lookup-btn", "tax-save-buyer", "tax-lookup-hint", "tax-taxid-bad"):
+            self.assertIn(mid, TAXINV, mid)
 
     def test_view_registered_in_router(self):
-        self.assertIn("'taxinv'", POSJS)
+        # VIEWS 从 DOM 派生(新增屏只写 pos.html 不用登记);taxinv 的进入钩子仍显式。
+        self.assertIn("querySelectorAll('section.pos-view')", POSJS)
         self.assertIn("POS.taxinv.resetView()", POSJS)
         self.assertIn("POS.taxinv.init()", POSJS)
 
 
 class CssScopeTests(unittest.TestCase):
-    def test_tax_styles_rescoped_to_mask_id(self):
+    def test_tax_styles_scoped_to_mask_id_in_own_file(self):
         self.assertNotIn(".pos-view--main .tax-", CSS)
-        self.assertIn("#tax-mask.show", CSS)
-        self.assertIn("#tax-mask .tax-modal", CSS)
+        self.assertNotIn("#tax-mask", CSS)  # 税票样式单一归属 pos-taxinv.css
+        self.assertIn("#tax-mask.show", TAXCSS)
+        self.assertIn("#tax-mask .tax-modal", TAXCSS)
 
     def test_taxinv_view_reuses_refund_visuals(self):
         m = re.search(r'<section class="([^"]*)" id="view-taxinv"', HTML)

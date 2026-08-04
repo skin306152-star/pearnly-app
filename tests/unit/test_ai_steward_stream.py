@@ -31,12 +31,10 @@ class ParseFramesTests(unittest.TestCase):
         self.assertEqual(out["buffer"], "")
 
     def test_half_frame_stays_in_buffer_until_next_chunk(self):
-        first = self._parse("", "event: task\ndata: {\"a\"")
+        first = self._parse("", 'event: task\ndata: {"a"')
         self.assertEqual(first["events"], [])
         second = self._parse(first["buffer"], ':1}\n\nevent: end\ndata: {"reason":"terminal"}\n\n')
-        self.assertEqual(
-            [e["event"] for e in second["events"]], ["task", "end"]
-        )
+        self.assertEqual([e["event"] for e in second["events"]], ["task", "end"])
         self.assertEqual(second["events"][0]["data"], '{"a":1}')
 
     def test_comment_frames_are_dropped(self):

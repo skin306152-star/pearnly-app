@@ -4,7 +4,9 @@
 从 pos_sales 流水聚合:KPI(营业额/单数/客单价/退款)、按天、按支付方式、畅销品、按收银员。
 每个分区一条独立聚合查询——绝不把 lines 与 payments join 进同一句(那会笛卡尔积翻倍金额,
 见 [[pos-po-a1-shipped]] 库存翻倍血泪)。应用层每句 WHERE tenant_id + workspace_client_id,
-全参数化;日期窗口 [from, to+1d) 半开区间;钱 Decimal 字符串化、量 3 位小数。
+全参数化;日期窗口 [from, to+1d) 半开区间,按曼谷日切(sold_at 是 timestamptz,边界把
+「曼谷日零点」换算成绝对时刻,按天分组同用 Asia/Bangkok——店主的「一天」不从 UTC 0 点
+即曼谷早上 7 点起算);钱 Decimal 字符串化、量 3 位小数。
 """
 
 from __future__ import annotations
@@ -27,13 +29,17 @@ def _qty(v) -> str:
 
 
 def _range(col: str, date_from: Optional[date], date_to: Optional[date]) -> tuple[str, list]:
-    """sold_at 时间窗口片段(半开 [from, to+1天)· 含 to 当天)。无界则不加条件。"""
+    """sold_at 时间窗口片段(半开 [from, to+1天)· 含 to 当天 · 曼谷日切)。无界则不加条件。
+
+    sold_at 是 timestamptz:日期参数先转 naive 午夜再按 Asia/Bangkok 解释成绝对时刻。
+    裸比较 date 会按会话时区(UTC)切日,把曼谷凌晨 0–7 点的单划进前一天。
+    """
     clause, params = "", []
     if date_from:
-        clause += f" AND {col} >= %s"
+        clause += f" AND {col} >= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
         params.append(date_from)
     if date_to:
-        clause += f" AND {col} < %s"
+        clause += f" AND {col} < (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
         params.append(date_to + timedelta(days=1))
     return clause, params
 
@@ -83,11 +89,10 @@ def sales_report(
 
 
 def _heat(cur, base, date_to: Optional[date]) -> list:
-    """近 14 天 × 钟点的营业额格子(天与小时都按曼谷钟切,两者必须同轴:凌晨单跨 UTC 日)。
+    """近 14 天 × 钟点的营业额格子(天与小时都按曼谷钟切,凌晨单跨 UTC 日也落对格)。
 
-    锚 = 窗口终点 date_to(热力跟着看的时期走),无锚用曼谷今天。窗口边界沿用 _range 的
-    UTC 日切——首日曼谷 0–7 点会缺、尾后多出一个曼谷日,但前端只画 8:00–22:00 × 锚前 14 天,
-    展示面完整;为对齐边界引第二套窗口口径不值得。
+    锚 = 窗口终点 date_to(热力跟着看的时期走),无锚用曼谷今天。窗口与格子同轴:_range
+    已按曼谷日切,[锚−13天 0:00, 锚+1天 0:00) 恰好罩住 14 个完整曼谷日。
     """
     anchor = date_to or bangkok_today()
     rng, rp = _range("sold_at", anchor - timedelta(days=_HEAT_DAYS - 1), anchor)
@@ -202,7 +207,8 @@ def _cost_agg(cur, base, date_from, date_to) -> tuple[Decimal, bool]:
 def _by_day(cur, base, date_from, date_to) -> list:
     rng, rp = _range("sold_at", date_from, date_to)
     cur.execute(
-        "SELECT (sold_at AT TIME ZONE 'UTC')::date AS d, COALESCE(SUM(grand_total),0) AS gross, "
+        "SELECT (sold_at AT TIME ZONE 'Asia/Bangkok')::date AS d, "
+        "COALESCE(SUM(grand_total),0) AS gross, "
         "COUNT(*) AS sales_count "
         "FROM pos_sales "
         "WHERE tenant_id=%s AND workspace_client_id=%s AND status='completed' AND sale_type='sale'"
@@ -226,7 +232,7 @@ def _cost_by_day(cur, base, date_from, date_to) -> dict:
     """按天聚合的 COGS + 完整性(供 _by_day 拼装毛利)。"""
     rng, rp = _range("s.sold_at", date_from, date_to)
     cur.execute(
-        "SELECT (s.sold_at AT TIME ZONE 'UTC')::date AS d, "
+        "SELECT (s.sold_at AT TIME ZONE 'Asia/Bangkok')::date AS d, "
         "COALESCE(SUM(l.cost_total),0) AS cost, "
         "COALESCE(BOOL_AND(l.cost_total IS NOT NULL), TRUE) AS complete "
         "FROM pos_sale_lines l JOIN pos_sales s ON s.id = l.sale_id "

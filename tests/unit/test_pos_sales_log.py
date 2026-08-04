@@ -9,7 +9,7 @@
 
 import json
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from services.pos import sales_log as svc
@@ -85,7 +85,8 @@ class ListSalesTests(unittest.TestCase):
         self.assertIn("s.cashier_id = %s", rows_sql)
         self.assertIn("c9", rows_params)
 
-    def test_date_range_appends_from_and_to(self):
+    def test_date_range_appends_from_and_to_bangkok(self):
+        """窗口按曼谷日切(同 report.py 口径):日期参数在 SQL 里按 Asia/Bangkok 解释。"""
         cur = FakeCursor(fetch_queue=[{"n": 0}], fetchall_queue=[[]])
         svc.list_sales(
             cur,
@@ -95,9 +96,18 @@ class ListSalesTests(unittest.TestCase):
             date_to=date(2026, 7, 8),
         )
         rows_sql, rows_params = cur.calls[1]
-        self.assertIn("s.sold_at >= %s", rows_sql)
-        self.assertIn("s.sold_at < %s", rows_sql)
+        self.assertIn("s.sold_at >= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", rows_sql)
+        self.assertIn("s.sold_at < (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", rows_sql)
         self.assertIn(date(2026, 7, 1), rows_params)
+        self.assertIn(date(2026, 7, 9), rows_params)  # to + 1 天(半开上界)
+
+    def test_iso_renders_aware_timestamps_in_bangkok(self):
+        """真库给 tz-aware(timestamptz):输出转曼谷本地——前端/CSV 直接切串显示,
+        UTC 串会把曼谷凌晨单显示成前一天,跟曼谷日切的窗口对不上。"""
+        utc_early = datetime(2026, 8, 4, 18, 30, tzinfo=timezone.utc)  # 曼谷 05 日 01:30
+        cur = FakeCursor(fetch_queue=[{"n": 1}], fetchall_queue=[[_row(sold_at=utc_early)]])
+        out = svc.list_sales(cur, tenant_id="t-1", workspace_client_id=7)
+        self.assertEqual(out["items"][0]["sold_at"], "2026-08-05T01:30:00+07:00")
 
     def test_no_shift_or_cashier_defaults_blank(self):
         cur = FakeCursor(

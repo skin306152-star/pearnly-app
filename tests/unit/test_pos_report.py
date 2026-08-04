@@ -44,17 +44,31 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(report._money(None), "0.00")
         self.assertEqual(report._qty("412"), "412.000")
 
-    def test_range_half_open(self):
-        clause, params = report._range("sold_at", date(2026, 6, 1), date(2026, 6, 7))
-        self.assertIn(">= %s", clause)
-        self.assertIn("< %s", clause)
-        self.assertEqual(params[0], date(2026, 6, 1))
-        self.assertEqual(params[1], date(2026, 6, 8))  # to + 1 天(含 to 当天)
+    def test_range_half_open_bangkok(self):
+        """窗口两端都按曼谷日切:日期参数在 SQL 里按 Asia/Bangkok 解释成绝对时刻。
+
+        曼谷 2026-08-05 单日窗口 = [08-04T17:00Z, 08-05T17:00Z):必须含 08-04T18:30Z
+        (曼谷 05 日 01:30)、必须排 08-04T16:59Z(曼谷 04 日 23:59)——该语义由真库
+        E2E(docs/pos/_e2e_report_bkk_daycut.py)验证,此处守 SQL 形状与参数。"""
+        clause, params = report._range("sold_at", date(2026, 8, 5), date(2026, 8, 5))
+        self.assertEqual(clause.count("AT TIME ZONE 'Asia/Bangkok'"), 2)
+        self.assertIn("sold_at >= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", clause)
+        self.assertIn("sold_at < (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", clause)
+        self.assertEqual(params, [date(2026, 8, 5), date(2026, 8, 6)])  # to + 1 天(含 to 当天)
 
     def test_range_unbounded(self):
         clause, params = report._range("sold_at", None, None)
         self.assertEqual(clause, "")
         self.assertEqual(params, [])
+
+    def test_by_day_groups_on_bangkok_date(self):
+        """按天分组必须与窗口同轴(曼谷日),禁回退 UTC 日切——否则跨曼谷 0–7 点的单
+        在窗口内却被归进前一天,报表列与 KPI 对不上。"""
+        cur = _Cur([(None, []), (None, [])])  # by_day + cost_by_day
+        report._by_day(cur, ("t", 9), date(2026, 8, 5), date(2026, 8, 5))
+        for sql, _ in cur.queries:
+            self.assertIn("AT TIME ZONE 'Asia/Bangkok')::date", sql)
+            self.assertNotIn("'UTC'", sql)
 
 
 class AssemblyTests(unittest.TestCase):

@@ -128,6 +128,22 @@ class SummaryMergeTests(unittest.TestCase):
         self.assertIn("pos.sale.voided", void_sql)
         self.assertIn("operator_cashier_id", void_sql)
 
+    def test_window_is_bangkok_day_cut(self):
+        """窗口按曼谷日切(同 report.py 口径):与营业额报表同路由同日期参数,必须同轴。"""
+        cur = self._cur()
+        ar.summary(
+            cur,
+            tenant_id=TID,
+            workspace_client_id=WS,
+            date_from=datetime.date(2026, 8, 5),
+            date_to=datetime.date(2026, 8, 5),
+        )
+        for sql, params in cur.calls:
+            self.assertIn(">= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", sql)
+            self.assertIn("< (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", sql)
+            self.assertIn(datetime.date(2026, 8, 5), params)
+            self.assertIn(datetime.date(2026, 8, 6), params)  # to + 1 天(半开上界)
+
 
 class EventsTests(unittest.TestCase):
     def test_maps_rows_with_authorized_by(self):
@@ -155,6 +171,27 @@ class EventsTests(unittest.TestCase):
         self.assertEqual(ev["receipt_no"], "R-001")
         self.assertEqual(ev["authorized_by"], "Manager Nok")
         self.assertTrue(ev["sold_at"].startswith("2026-07-11"))
+
+    def test_event_time_rendered_in_bangkok(self):
+        """事件时刻按曼谷输出:UTC 晚间的作废单是曼谷次日凌晨,切串显示不得差一天。"""
+        when = datetime.datetime(2026, 8, 4, 18, 30, tzinfo=datetime.timezone.utc)
+        cur = FakeCursor(
+            {
+                "events": [
+                    _row(
+                        sold_at=when,
+                        cashier_name="Aya",
+                        amount=100,
+                        receipt_no="R-002",
+                        authorized_by=None,
+                    )
+                ]
+            }
+        )
+        out = ar.events(
+            cur, tenant_id=TID, workspace_client_id=WS, date_from=None, date_to=None, kind="void"
+        )
+        self.assertEqual(out["events"][0]["sold_at"], "2026-08-05T01:30:00+07:00")
 
     def test_void_kind_uses_operator_join_and_scoped(self):
         cur = FakeCursor({"events": []})

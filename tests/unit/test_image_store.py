@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""图片上传存储守门:Pillow 验真 / 2MB 上限 / uuid 落地 / 沙盒路径(防穿越)/ 外链不解析。"""
+"""图片上传存储守门:Pillow 验真 / 归一化(EXIF 转正·长边 1600·剥元数据)/ 25MB 上限 /
+uuid 落地 / 沙盒路径(防穿越)/ 外链不解析。"""
 
 import io
 import os
@@ -63,14 +64,54 @@ class ImageStoreTests(unittest.TestCase):
             st.save_image("t", big)
         self.assertEqual(c.exception.code, "file_too_large")
 
-    def test_reject_unsupported_format(self):
-        with self.assertRaises(st.UploadError) as c:
-            st.save_image("t", _png(fmt="GIF"))
-        self.assertEqual(c.exception.code, "unsupported_type")
+    def test_other_formats_normalized_not_rejected(self):
+        # 2026-08-04 拍板:不设格式白名单(手机相册什么都有)。非核心格式落 JPEG/PNG。
+        res = st.save_image("t", _png(fmt="GIF"))
+        self.assertTrue(res["url"].endswith(".jpg"))
+        self.assertEqual((res["width"], res["height"]), (20, 10))
 
     def test_jpeg_and_webp_ok(self):
         self.assertTrue(st.save_image("t", _png(fmt="JPEG"))["url"].endswith(".jpg"))
         self.assertTrue(st.save_image("t", _png(fmt="WEBP"))["url"].endswith(".webp"))
+
+    def test_huge_photo_downscaled_to_max_edge(self):
+        res = st.save_image("t", _png(4000, 3000, fmt="JPEG"))
+        self.assertEqual((res["width"], res["height"]), (1600, 1200))
+        with Image.open(st.local_path_from_url(res["url"])) as im:
+            self.assertEqual(im.size, (1600, 1200))
+
+    def test_alpha_preserved_as_png(self):
+        buf = io.BytesIO()
+        Image.new("RGBA", (20, 10), (10, 20, 30, 0)).save(buf, "PNG")
+        res = st.save_image("t", buf.getvalue())
+        self.assertTrue(res["url"].endswith(".png"))
+        with Image.open(st.local_path_from_url(res["url"])) as im:
+            self.assertEqual(im.convert("RGBA").getpixel((0, 0))[3], 0)
+
+    def test_exif_orientation_applied_and_stripped(self):
+        # 手机竖拍常见:像素横放 + EXIF Orientation=6(顺时针转 90°)。归一化必须把方向
+        # 落实成真像素(缩略图/PDF 不吃 EXIF),并且不把整包 EXIF(含 GPS)带到落盘文件。
+        buf = io.BytesIO()
+        im = Image.new("RGB", (40, 20), (10, 20, 30))
+        exif = Image.Exif()
+        exif[274] = 6  # Orientation
+        im.save(buf, "JPEG", exif=exif)
+        res = st.save_image("t", buf.getvalue())
+        self.assertEqual((res["width"], res["height"]), (20, 40))
+        with Image.open(st.local_path_from_url(res["url"])) as out:
+            self.assertEqual(dict(out.getexif()), {})
+
+    def test_heic_accepted_when_plugin_available(self):
+        try:
+            import pillow_heif
+        except ImportError:
+            self.skipTest("pillow-heif not installed")
+        buf = io.BytesIO()
+        pillow_heif.register_heif_opener()
+        Image.new("RGB", (30, 20), (10, 20, 30)).save(buf, "HEIF")
+        res = st.save_image("t", buf.getvalue())
+        self.assertTrue(res["url"].endswith(".jpg"))
+        self.assertEqual((res["width"], res["height"]), (30, 20))
 
     def test_traversal_blocked(self):
         self.assertIsNone(st.local_path("t1", "../../../etc/passwd"))

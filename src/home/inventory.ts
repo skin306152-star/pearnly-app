@@ -91,7 +91,7 @@ function bodyHtml(): string {
         <div class="chip${lowOut ? ' on' : ''}" id="inv-chip-lowout">${escapeHtml(t('inv-chip-lowout'))}</div>
         <div class="chip${lowOut ? '' : ' on'}" id="inv-chip-all">${escapeHtml(t('inv-chip-all'))}</div>
     </div>
-    <table>
+    <div class="tblwrap"><table>
         <thead><tr>
             <th>${escapeHtml(t('inv-col-product'))}</th>
             <th>${escapeHtml(t('inv-col-barcode'))}</th>
@@ -101,7 +101,7 @@ function bodyHtml(): string {
             <th>${escapeHtml(t('inv-col-status'))}</th>
         </tr></thead>
         <tbody id="inv-tbody">${tbodyHtml()}</tbody>
-    </table>`;
+    </table></div>`;
 }
 
 function shellHtml(): string {

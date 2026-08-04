@@ -136,10 +136,34 @@ export function salesErrMsg(detail: string | null | undefined, fallbackKey: stri
     return salesErrText(detail) || t(fallbackKey);
 }
 
+// 手机直拍的 JPEG 动辄 3~8MB,端上先缩到商品图够用的尺寸再传(泰国移动网,省一大截上行)。
+// 只缩 JPEG:PNG/WebP 可能带透明(logo/印章),重编码成 JPEG 会把透明底涂死;
+// 解不动的格式(HEIC 等)原样上传,服务端 Pillow 统一归一化兜底。
+const UP_SHRINK_OVER = 600 * 1024;
+const UP_MAX_EDGE = 1600;
+async function shrinkForUpload(f: File): Promise<Blob> {
+    if (f.type !== 'image/jpeg' || f.size <= UP_SHRINK_OVER) return f;
+    try {
+        const bmp = await createImageBitmap(f);
+        const k = Math.min(1, UP_MAX_EDGE / Math.max(bmp.width, bmp.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(bmp.width * k));
+        cv.height = Math.max(1, Math.round(bmp.height * k));
+        const cx = cv.getContext('2d');
+        if (!cx) return f;
+        cx.drawImage(bmp, 0, 0, cv.width, cv.height);
+        bmp.close();
+        const blob = await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/jpeg', 0.85));
+        return blob && blob.size < f.size ? blob : f;
+    } catch (_) {
+        return f;
+    }
+}
+
 // 真上传一张图(POST /api/uploads/image · multipart)→ 返回可存进 image_url/logo_url 的 URL。
 export async function uploadImage(file: File): Promise<{ url?: string; error?: string }> {
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', await shrinkForUpload(file), file.name || 'photo.jpg');
     try {
         const r = await salesFetch('/api/uploads/image', { method: 'POST', body: fd });
         const d = await r.json().catch(() => ({}));
@@ -161,7 +185,7 @@ export function imageFieldHtml(id: string, label: string, url?: string | null): 
     const u = url || '';
     return `<div class="sx-dropwrap">
         <div class="sx-drop${u ? ' has' : ''}" id="${id}-drop">
-            <input type="file" id="${id}-file" accept="image/png,image/jpeg,image/webp" hidden>
+            <input type="file" id="${id}-file" accept="image/*" hidden>
             <input type="hidden" id="${id}" value="${escapeHtml(u)}">
             <!-- 预览 src 由 bindImageField 经 loadAuthedImg 注入(鉴权图不能直接当 src 否则 401) -->
             <img id="${id}-prev" alt="" style="${u ? '' : 'display:none'}">

@@ -136,6 +136,8 @@
 /* —— toolbar —— */
 .invp .bar {
     display: flex;
+    /* 塞不下时 chip 整个换行;不换行时 chip 会被压成一字竖排(2026-08-04 真机 390px) */
+    flex-wrap: wrap;
     gap: 10px;
     align-items: center;
     margin-bottom: 12px;
@@ -172,6 +174,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /* 不许被压瘦:压瘦 = 文字逐字竖排 */
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 .invp .chip.on {
     background: var(--amber-weak);
@@ -180,6 +185,11 @@
 }
 
 /* —— table —— */
+.invp .tblwrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+}
 .invp table {
     width: 100%;
     border-collapse: collapse;
@@ -482,5 +492,14 @@
     .inv-frow:not(.count),
     .inv-flabels:not(.count) {
         grid-template-columns: 1fr 72px 96px 22px;
+    }
+    /* 页面级窄屏降级(2026-08-04 真机 390px:四卡硬挤 + 六列表格逐字竖排):
+       统计卡 2×2;表格列不折行,靠 .tblwrap 横滚。 */
+    .invp .stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .invp th,
+    .invp td {
+        white-space: nowrap;
     }
 }

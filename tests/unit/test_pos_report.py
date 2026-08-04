@@ -410,17 +410,14 @@ class DashboardSectionsTests(unittest.TestCase):
             {"d": date(2026, 8, 3), "h": 9, "gross": Decimal("120")},
             {"d": date(2026, 8, 4), "h": 18, "gross": Decimal("260")},
         ]
-        scripted = (
-            list(self._MAIN)
-            + [
-                ({"gross": Decimal("0"), "sales_count": 0, "refund": Decimal("0")}, None),
-                ({"cost": Decimal("0"), "complete": True}, None),
-                (None, []),  # by_hour(单日窗口)
-                (None, heat_rows),  # heat
-                ({"last_sale_at": None}, None),  # live · 最新一单
-                (None, None),  # live · 无在班班次
-            ]
-        )
+        scripted = list(self._MAIN) + [
+            ({"gross": Decimal("0"), "sales_count": 0, "refund": Decimal("0")}, None),
+            ({"cost": Decimal("0"), "complete": True}, None),
+            (None, []),  # by_hour(单日窗口)
+            (None, heat_rows),  # heat
+            ({"last_sale_at": None}, None),  # live · 最新一单
+            (None, None),  # live · 无在班班次
+        ]
         cur = _Cur(scripted)
         out = report.sales_report(
             cur,

@@ -79,6 +79,40 @@ class ChecksumMirrorTests(unittest.TestCase):
         self.assertIn("tax-save-buyer", TAXINV)
 
 
+class MainSiteRowActionTests(unittest.TestCase):
+    """主站交易明细行内动作(工单 G2 第二入口):列 + 弹窗 + Mod-11 镜像 + 四语键。"""
+
+    MODAL = (ROOT / "src/home/pos-taxinv-modal.ts").read_text("utf-8")
+    LOG = (ROOT / "src/home/pos-sales-log.ts").read_text("utf-8")
+    I18N_MAIN = (ROOT / "static/i18n-data.js").read_text("utf-8")
+
+    def test_log_wires_taxinv_column_and_modal(self):
+        self.assertIn("poslog.col_taxinv", self.LOG)
+        self.assertIn("openPosTaxinvModal", self.LOG)
+        self.assertIn("data-tiv-make", self.LOG)
+        self.assertIn("data-tiv-open", self.LOG)
+        self.assertIn("full_invoice_no", self.LOG)
+
+    def test_modal_has_mod11_mirror_and_pos_endpoints(self):
+        self.assertIn("function th13Ok", self.MODAL)
+        self.assertIn("(11 - (sum % 11)) % 10", self.MODAL)
+        self.assertIn("/api/pos/tax-lookup", self.MODAL)
+        self.assertIn("full-tax-invoice", self.MODAL)
+        self.assertIn("full-invoice-pdf", self.MODAL)
+        self.assertIn("save_buyer", self.MODAL)
+
+    def test_main_i18n_keys_four_langs(self):
+        for key in (
+            "poslog.col_taxinv",
+            "poslog.tiv_make",
+            "postax.title",
+            "postax.lookup_miss",
+            "postax.checksum_bad",
+            "postax.save_buyer",
+        ):
+            self.assertEqual(self.I18N_MAIN.count(f"'{key}'"), 4, f"{key} 应四语各一份")
+
+
 class I18nKeysTests(unittest.TestCase):
     def test_new_keys_exist_in_all_four_langs(self):
         keys = (

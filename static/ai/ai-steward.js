@@ -333,15 +333,10 @@
             return S;
         },
         getEl: $,
-        renderLeft: function () {
-            renderLeft();
-        },
-        loadTask: function (id) {
-            loadTask(id);
-        },
-        startPoll: function (id) {
-            startPoll(id);
-        },
+        // 三个钩子直传函数声明(已提升·从不重绑),包一层箭头是纯脂肪。
+        renderLeft: renderLeft,
+        loadTask: loadTask,
+        startPoll: startPoll,
         stopPoll: stopPoll,
         isTerminal: function (status) {
             return AI.stewardRender.isTerminalStatus(status);
@@ -486,7 +481,7 @@
     function onRoute(api, route) {
         var mine = route.name === 'steward';
         $('navSteward').classList.toggle('on', mine);
-        $('v-steward').classList.toggle('on', mine && gateOpen === true);
+        $('v-steward').classList.toggle('on', mine && gateOpen !== false);
         if (!mine) {
             stopPoll();
             actions.stopCountdown();
@@ -496,8 +491,10 @@
             window.location.hash = AI.router.buildDashboardHash();
             return true;
         }
-        // gateOpen === null(探针在途):不挂载,等 applyGate() 落地补挂或补跳转。
-        if (gateOpen === true) mount(api);
+        // 探针在途(gateOpen === null)先亮加载骨架——深链/刷新落在本页时不能白屏,
+        // applyGate() 落地后补挂载或回落工作台;闸已知开则直接挂载。
+        if (gateOpen === null) $('stwBody').innerHTML = AI.state.loadingHtml();
+        else mount(api);
         return true;
     }
 

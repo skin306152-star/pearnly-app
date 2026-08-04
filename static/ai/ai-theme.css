@@ -38,6 +38,8 @@
   --sage-deep: #5b673d;
   --sage-soft: #e9ecd9;
   --sage-line: #d3d9ba;
+  /* sage 实底上的反白字(导航当前项/头像),同 --accent-ink 一对。 */
+  --sage-ink: #fff;
   --good: #5c7040;
   --good-soft: #e8eed9;
   --good-line: #d1dcb7;

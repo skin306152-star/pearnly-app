@@ -106,37 +106,27 @@
             });
         if (chromeWired) return;
         chromeWired = true;
-        $('navClients').addEventListener('click', function () {
-            window.location.hash = AI.router.buildClientsHash();
-        });
-        $('navReports').addEventListener('click', function () {
-            window.location.hash = AI.router.buildReportsHash();
-        });
-        // 设置入口 = 左下角用户块(2026-07-26 起不再占一条主导航位)。页面本身没变,
-        // 还是右侧 v-settings 那一页。
-        $('footUser').addEventListener('click', function () {
-            window.location.hash = AI.router.buildSettingsHash();
-        });
-        $('brandHome').addEventListener('click', function () {
-            window.location.hash = AI.router.buildDashboardHash();
-        });
-        $('navDash').addEventListener('click', function () {
-            window.location.hash = AI.router.buildDashboardHash();
-        });
-        $('navTodo').addEventListener('click', function () {
-            window.location.hash = AI.router.buildPoolHash();
-        });
-        $('navDesk').addEventListener('click', function () {
-            window.location.hash = AI.router.buildDeskHash();
-        });
-        $('navVatcheck').addEventListener('click', function () {
-            window.location.hash = AI.router.buildVatcheckHash();
-        });
-        $('navFileconv').addEventListener('click', function () {
-            window.location.hash = AI.router.buildFileconvHash();
-        });
-        $('navPayroll').addEventListener('click', function () {
-            window.location.hash = AI.router.buildPayrollHash();
+        // 侧栏/品牌/用户块所有「点了就跳 hash」的入口一张表接线:逐个手写漏一行按钮
+        // 就是死的(navSteward 曾漏绑,闸开可见却点不动,2026-08-05 生产实锤)。
+        // navSteward/navDesk 闸关时隐藏,接线常驻无副作用;设置入口 = 左下角用户块
+        // (2026-07-26 起不再占一条主导航位),页面本身还是右侧 v-settings 那一页。
+        var navJumps = {
+            brandHome: AI.router.buildDashboardHash,
+            navSteward: AI.router.buildStewardHash,
+            navDesk: AI.router.buildDeskHash,
+            navDash: AI.router.buildDashboardHash,
+            navTodo: AI.router.buildPoolHash,
+            navVatcheck: AI.router.buildVatcheckHash,
+            navFileconv: AI.router.buildFileconvHash,
+            navPayroll: AI.router.buildPayrollHash,
+            navClients: AI.router.buildClientsHash,
+            navReports: AI.router.buildReportsHash,
+            footUser: AI.router.buildSettingsHash,
+        };
+        Object.keys(navJumps).forEach(function (id) {
+            $(id).addEventListener('click', function () {
+                window.location.hash = navJumps[id]();
+            });
         });
         // 矩阵/看板视图切换 pill(C4):矩阵是默认,看板降辅助——两个 hash 各自的
         // build 函数已知道自己的默认子视图,这里只管点了跳哪。

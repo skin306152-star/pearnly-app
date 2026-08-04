@@ -406,10 +406,12 @@ class StoreQueueSqlTests(unittest.TestCase):
 
 class CancelRouteTests(unittest.IsolatedAsyncioTestCase):
     def _base_patches(self):
+        from routes import steward_common as sc
         from routes import steward_routes as sr
 
         return sr, (
-            mock.patch.object(sr, "authorize_pearnly_ai", return_value=({"id": "u1"}, "t-1")),
+            # 业务端点的门收口在 routes/steward_common(S1),鉴权桩打在那边。
+            mock.patch.object(sc, "authorize_pearnly_ai", return_value=({"id": "u1"}, "t-1")),
             mock.patch.object(
                 sr.feature_flags, "pearnly_ai_steward_enabled_for", return_value=True
             ),

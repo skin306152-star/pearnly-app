@@ -829,8 +829,10 @@ class RoutePermissionTests(unittest.IsolatedAsyncioTestCase):
             return {"id": "u1"}, "t-1"
 
         decide = mock.Mock()
+        from routes import steward_common as sc
+
         with (
-            mock.patch.object(sr, "authorize_pearnly_ai", side_effect=guard),
+            mock.patch.object(sc, "authorize_pearnly_ai", side_effect=guard),
             mock.patch.object(sr.authz, "decide", decide),
         ):
             with self.assertRaises(HTTPException) as ctx:
@@ -848,9 +850,11 @@ class RoutePermissionTests(unittest.IsolatedAsyncioTestCase):
             seen.append(perm)
             return {"id": "u1"}, "t-1"
 
+        from routes import steward_common as sc
+
         decision = {"ok": True, "task_id": "task-1", "authorization": _grant()}
         with (
-            mock.patch.object(sr, "authorize_pearnly_ai", side_effect=guard),
+            mock.patch.object(sc, "authorize_pearnly_ai", side_effect=guard),
             mock.patch.object(sr.feature_flags, "pearnly_ai_steward_enabled_for", lambda t: True),
             mock.patch.object(store, "ensure_once", mock.Mock()),
             mock.patch.object(sr.authz, "decide", mock.Mock(return_value=decision)),
@@ -865,9 +869,11 @@ class RoutePermissionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_error_envelope_becomes_http_error(self):
         sr = self._sr()
+        from routes import steward_common as sc
+
         err = {"ok": False, "http": 409, "code": authz.ERR_AUTHZ_USED}
         with (
-            mock.patch.object(sr, "authorize_pearnly_ai", return_value=({"id": "u1"}, "t-1")),
+            mock.patch.object(sc, "authorize_pearnly_ai", return_value=({"id": "u1"}, "t-1")),
             mock.patch.object(sr.feature_flags, "pearnly_ai_steward_enabled_for", lambda t: True),
             mock.patch.object(store, "ensure_once", mock.Mock()),
             mock.patch.object(sr.authz, "decide", mock.Mock(return_value=err)),

@@ -61,12 +61,8 @@
             },
             // 消息游标分页:before = 已拿到的最早那条消息 id,不带 = 最新一页。
             getStewardSession: function (sessionId, opts) {
-                var query =
-                    opts && opts.before ? '?before=' + encodeURIComponent(opts.before) : '';
-                return call(
-                    'GET',
-                    BASE + '/sessions/' + encodeURIComponent(sessionId) + query
-                );
+                var query = opts && opts.before ? '?before=' + encodeURIComponent(opts.before) : '';
+                return call('GET', BASE + '/sessions/' + encodeURIComponent(sessionId) + query);
             },
             // 还没送出的附件从盘上删(已随消息送出的后端 409 保留痕)。
             deleteStewardAttachment: function (attachmentId) {
@@ -77,17 +73,14 @@
             },
             // 成本余额(读侧)。
             getStewardBudget: function (sessionId) {
-                return call(
-                    'GET',
-                    BASE + '/budget?session_id=' + encodeURIComponent(sessionId)
-                );
+                return call('GET', BASE + '/budget?session_id=' + encodeURIComponent(sessionId));
             },
             // 任务事件流(SSE)。只发起请求;读帧/回落在 ai-steward-stream.js。
             streamStewardTask: function (taskId, signal) {
-                return net.fetch(
-                    BASE + '/tasks/' + encodeURIComponent(taskId) + '/events',
-                    { headers: authHeaders(), signal: signal }
-                );
+                return net.fetch(BASE + '/tasks/' + encodeURIComponent(taskId) + '/events', {
+                    headers: authHeaders(),
+                    signal: signal,
+                });
             },
             // body 三形态互斥(action > 纯文件 > 有话),形状由调用方拼好原样送:这层不替
             // 它判该带哪个键 —— 判据在 ai-steward-attach.js,两处各判一次必漂。

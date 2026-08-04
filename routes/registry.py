@@ -84,6 +84,7 @@ from routes.pos_restaurant_routes import router as pos_restaurant_router
 from routes.pos_sales_log_routes import router as pos_sales_log_router
 from routes.pos_sales_routes import router as pos_sales_router
 from routes.pos_sheets_routes import router as pos_sheets_router
+from routes.pos_taxinv_routes import router as pos_taxinv_router
 from routes.pos_shift_routes import router as pos_shift_router
 from routes.products_routes import router as products_router
 from routes.purchase_config_routes import router as purchase_config_router
@@ -139,6 +140,7 @@ ROUTERS = (
     pos_shift_router,  # 开/交班(连号+审计)
     pos_report_router,  # 报表 + 交接班台账
     pos_sales_log_router,  # 交易明细日志 + CSV 导出
+    pos_taxinv_router,  # 补开全式税票(税号带出 + 发票 PDF · G2)
     pos_modules_router,
     pos_restaurant_router,
     pos_restaurant_admin_router,

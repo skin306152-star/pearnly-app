@@ -5,7 +5,8 @@
 短路防呆、回填 UPDATE 的参数化形状。建草稿/取连号/冻结的重流程由 _e2e_po_b4 真库覆盖。"""
 
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from unittest.mock import patch
 
 from core.pos_api import PosError
 from services.pos import sales_store, upgrade
@@ -54,13 +55,43 @@ class BuyerMappingTests(unittest.TestCase):
 
 
 class IssueDateTests(unittest.TestCase):
-    def test_datetime_to_utc_date(self):
-        d = upgrade._resolve_issue_date(datetime(2026, 6, 7, 23, 30, tzinfo=timezone.utc))
-        self.assertEqual(d.isoformat(), "2026-06-07")
+    """开票日必须按曼谷日历日(固定时刻断言,禁 now();UTC 口径会在 0:00–7:00 窗口错桶)。"""
 
-    def test_none_falls_back_to_today(self):
-        d = upgrade._resolve_issue_date(None)
-        self.assertEqual(d.year >= 2026, True)
+    def test_bangkok_day_rolls_over_utc_evening(self):
+        # UTC 6/7 23:30 = 曼谷 6/8 06:30 → 票面日必须是 6/8(UTC 口径给 6/7 即为 bug)。
+        d = upgrade._resolve_issue_date(datetime(2026, 6, 7, 23, 30, tzinfo=timezone.utc))
+        self.assertEqual(d.isoformat(), "2026-06-08")
+
+    def test_month_boundary_first_day_before_7am(self):
+        # UTC 7/31 17:30 = 曼谷 8/1 00:30 → 归 8 月(旧 UTC 口径盖 7/31:VAT 期错位+月号段错桶)。
+        d = upgrade._resolve_issue_date(datetime(2026, 7, 31, 17, 30, tzinfo=timezone.utc))
+        self.assertEqual(d.isoformat(), "2026-08-01")
+
+    def test_year_boundary_new_year_before_7am(self):
+        # UTC 12/31 18:00 = 曼谷次年 1/1 01:00 → 归新年(旧口径盖 12/31 即跨年错桶)。
+        d = upgrade._resolve_issue_date(datetime(2026, 12, 31, 18, 0, tzinfo=timezone.utc))
+        self.assertEqual(d.isoformat(), "2027-01-01")
+
+    def test_same_day_inside_bangkok_window(self):
+        # 曼谷白天售出(UTC 上午)不跨日:两口径同日,守恒不回归。
+        d = upgrade._resolve_issue_date(datetime(2026, 6, 8, 4, 0, tzinfo=timezone.utc))
+        self.assertEqual(d.isoformat(), "2026-06-08")
+
+    def test_aware_non_utc_offset_normalized(self):
+        # 非 UTC 的 tz-aware(如 +9)也按曼谷折算:东京 8/1 01:30 = 曼谷 7/31 23:30。
+        tokyo = timezone(timedelta(hours=9))
+        d = upgrade._resolve_issue_date(datetime(2026, 8, 1, 1, 30, tzinfo=tokyo))
+        self.assertEqual(d.isoformat(), "2026-07-31")
+
+    def test_naive_treated_as_bangkok_local(self):
+        # naive 视为已是曼谷值(同 dates.iso_bangkok 约定),日期原样取。
+        d = upgrade._resolve_issue_date(datetime(2026, 8, 1, 0, 30))
+        self.assertEqual(d.isoformat(), "2026-08-01")
+
+    def test_none_falls_back_to_bangkok_today(self):
+        with patch.object(upgrade, "bangkok_today", return_value=date(2026, 8, 1)):
+            d = upgrade._resolve_issue_date(None)
+        self.assertEqual(d.isoformat(), "2026-08-01")
 
 
 class GuardTests(unittest.TestCase):

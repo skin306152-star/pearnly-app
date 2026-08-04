@@ -13,7 +13,7 @@ compute_totals 复算校验一致性以复用销项写入路径。同一笔重�
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -21,6 +21,7 @@ from core.pos_api import PosError
 from services.pos import sale as sale_svc, sales_store
 from services.sales import document as doc_svc
 from services.sales import settings as settings_svc
+from services.sales.dates import BANGKOK, bangkok_today
 
 # 全式税票固定走 tax_invoice 序列(与销项手开税票同一连号池,保证连号真连续)。
 _DOC_TYPE = "tax_invoice"
@@ -68,9 +69,15 @@ def _sale_lines_as_doc_lines(cur, *, tenant_id: str, sale_id: str) -> tuple[list
 
 
 def _resolve_issue_date(sold_at) -> date:
+    """开票日 = 售出时刻的曼谷日历日(域规同 dates.validate_issue_date,票面日必须曼谷口径)。
+
+    此前取 UTC 日:曼谷每月 1 号 0:00–7:00 补开会盖上月日期 → VAT 归属期错位 + 连号
+    period_key 错桶。naive 视为已是曼谷值(同 dates.iso_bangkok 约定,不按机器时区猜)。
+    """
     if isinstance(sold_at, datetime):
-        return sold_at.astimezone(timezone.utc).date()
-    return datetime.now(timezone.utc).date()
+        local = sold_at.astimezone(BANGKOK) if sold_at.tzinfo else sold_at
+        return local.date()
+    return bangkok_today()
 
 
 def upgrade_to_full_tax_invoice(

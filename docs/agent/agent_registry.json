@@ -73,6 +73,8 @@
   "exceptions_routes": "B",
   "front_desk_routes": "C",
   "steward_routes": "C",
+  "steward_session_routes": "C",
+  "steward_stream_routes": "C",
   "export_routes": {
     "bucket": "A",
     "agent": "exempt:file-export",

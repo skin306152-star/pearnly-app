@@ -10,6 +10,7 @@
 
 import json
 import unittest
+from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -156,7 +157,8 @@ class SyncSaleTests(unittest.TestCase):
                     "grand_total": Decimal("290.00"),
                     "paid_total": Decimal("300.00"),
                     "change_amount": Decimal("10.00"),
-                    "sold_at": None,
+                    # 真库 timestamptz:UTC 晚间 = 曼谷次日凌晨,留档列必须按曼谷业务日
+                    "sold_at": datetime(2026, 8, 4, 18, 30, tzinfo=timezone.utc),
                 },
             ),
             patch(
@@ -175,6 +177,8 @@ class SyncSaleTests(unittest.TestCase):
         self.assertEqual(args[1], "POS")
         row = args[2]
         self.assertEqual(row[0], "R001")
+        self.assertEqual(row[1], "2026-08-05")  # 曼谷业务日,不是 UTC 的 08-04
+        self.assertEqual(row[2], "01:30:00")
         self.assertEqual(row[3], "Earn")
         self.assertIn("บลัชออน x1", row[4])
         self.assertEqual(row[10], "银行转账")  # header_lang=zh → 中文付款方式标签

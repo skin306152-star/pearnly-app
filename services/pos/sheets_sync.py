@@ -14,6 +14,7 @@ import re
 
 from core.rls import apply_tenant_rls
 from services.pos import sheets_labels
+from services.sales.dates import BANGKOK
 
 logger = logging.getLogger("mr-pilot")
 
@@ -195,7 +196,11 @@ def _sale_row(cur, *, tenant_id: str, sale: dict, lang: str) -> list:
 
     payments = sales_store.list_payments(cur, tenant_id=tenant_id, sale_id=sale["id"])
     method = payments[0]["method"] if payments else ""
+    # 留档行与产品内报表/CSV 是同一事实面(曼谷业务日):UTC 直切会让同一单两面日期对不上,
+    # 且每行时间列都偏 7 小时。
     sold_at = sale.get("sold_at")
+    if sold_at and sold_at.tzinfo:
+        sold_at = sold_at.astimezone(BANGKOK)
     date_s = sold_at.strftime("%Y-%m-%d") if sold_at else ""
     time_s = sold_at.strftime("%H:%M:%S") if sold_at else ""
 

@@ -35,6 +35,15 @@ _SELLER = {
 _BUYER = {"name": "ลูกค้า บี", "tax_id": "0105557654321", "address": "456 เชียงใหม่"}
 
 
+def _page_text(data: bytes) -> str:
+    """真渲染 + pymupdf 抽文本(同 test_pos_receipt_render 口径:字样在票面就是在)。"""
+    import fitz
+
+    assert data.startswith(b"%PDF")
+    with fitz.open(stream=data, filetype="pdf") as f:
+        return "".join(page.get_text() for page in f)
+
+
 class PdfRenderTests(unittest.TestCase):
     def test_renders_valid_pdf(self):
         data = pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER)
@@ -193,6 +202,51 @@ class PdfRenderTests(unittest.TestCase):
             _DOC, _SELLER, _BUYER, page="thermal_80", copies_layout="two_up"
         )
         self.assertTrue(data.startswith(b"%PDF"))
+
+    def test_amount_in_words_on_invoice(self):
+        """จำนวนเงินตัวอักษร:合计 107.00 → 泰文大写上票(docs/16 §262 标配)。"""
+        t = _page_text(pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, deterministic=True))
+        self.assertIn("(หนึ่งร้อยเจ็ดบาทถ้วน)", t)
+
+    def test_source_receipt_reference_line(self):
+        """G2 补开:有 source_receipt_no 才印 ออกแทน 引用整行,没有不印空标签。"""
+        doc = dict(_DOC, source_receipt_no="ABB-T1-2026-00187")
+        t = _page_text(pdf.render_invoice_pdf(doc, _SELLER, _BUYER, deterministic=True))
+        self.assertIn("ออกแทนใบกำกับภาษีอย่างย่อเลขที่ ABB-T1-2026-00187", t)
+        t_plain = _page_text(pdf.render_invoice_pdf(_DOC, _SELLER, _BUYER, deterministic=True))
+        self.assertNotIn("ออกแทน", t_plain)
+
+    def test_full_invoice_legal_elements_company_and_individual(self):
+        """全式票法定要素矩阵(工单验收「票面渲染逐要件断言」):公司/个人买方各一张。"""
+        doc = dict(
+            _DOC,
+            source_receipt_no="ABB-T1-2026-00187",
+            price_includes_vat=True,
+            subtotal="107.00",
+            vat_amount="7.00",
+            grand_total="107.00",
+        )
+        cases = (
+            {"type": "company", "tax_id": "0107544000108", "branch_type": "hq"},
+            {"type": "individual", "tax_id": "1234567890121"},
+        )
+        for over in cases:
+            b = dict(_BUYER, **over)
+            t = _page_text(pdf.render_invoice_pdf(doc, _SELLER, b, deterministic=True))
+            for needle in (
+                "ใบกำกับภาษี",  # 法定抬头
+                "ต้นฉบับ",  # 正本角标
+                _SELLER["tax_id"],  # 卖方税号
+                b["tax_id"],  # 买方税号
+                b["name"],  # 买方名称
+                "ออกแทนใบกำกับภาษีอย่างย่อเลขที่",  # 替代原小票引用
+                "มูลค่าก่อนภาษี",  # 税基(价内反算)
+                "ภาษีมูลค่าเพิ่ม",  # VAT 拆列
+                "(หนึ่งร้อยเจ็ดบาทถ้วน)",  # 金额大写
+            ):
+                self.assertIn(needle, t, f"{over['type']} 缺 {needle}")
+            if over["type"] == "company":
+                self.assertIn("สำนักงานใหญ่", t)  # 总/分公司标识(§86/4 第 13 项)
 
     def test_archival_sha256_deterministic(self):
         """§E3 留底:确定性渲染同输入同哈希,可复算核验未篡改。"""

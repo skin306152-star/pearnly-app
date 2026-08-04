@@ -14,6 +14,7 @@ from decimal import Decimal
 
 from services.sales import pdf_brand
 from services.sales import templates
+from services.sales.baht_text import baht_text
 from services.sales.dates import to_thai_date
 from services.sales.totals import _d
 from services.sales.wht import pdf_label as wht_label
@@ -207,8 +208,18 @@ def render_invoice_pdf(
         story += [
             P(_doc_label(doc.get("doc_type"), L), True, TA_CENTER, 15, color=accent),
             P(L(*_COPY_LABEL[ck]), True, TA_CENTER, 9),
-            Spacer(1, 4 * mm),
         ]
+        # G2 补开:全式票替代原 POS 简式小票的法定引用(有值才印;法规文本泰文,不吃语言切换)。
+        if doc.get("source_receipt_no"):
+            story.append(
+                P(
+                    f"ออกแทนใบกำกับภาษีอย่างย่อเลขที่ {doc['source_receipt_no']}",
+                    True,
+                    TA_CENTER,
+                    9,
+                )
+            )
+        story.append(Spacer(1, 4 * mm))
         meta = Table(
             [
                 [
@@ -320,6 +331,9 @@ def render_invoice_pdf(
             )
         )
         story.append(totals)
+        # 泰文金额大写(จำนวนเงินตัวอักษร):泰国收据/发票标配(docs/16 §262),空额不印。
+        if doc.get("grand_total") not in (None, ""):
+            story.append(P(f"({baht_text(doc['grand_total'])})", align=TA_RIGHT, size=9))
 
         pay = _payment_block(doc, P, cw, Table, TableStyle, colors, mm, Spacer, lang)
         if pay:

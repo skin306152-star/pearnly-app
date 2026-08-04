@@ -35,6 +35,9 @@ GATE_PATTERNS = [
     ("login_only", r"\bget_current_user_from_request\s*\("),
     # core.route_helpers.authorize_pearnly_ai:登录 + M1 闸(关→404 fail-closed)+ require_perm
     ("pearnly_ai_gate", r"\bauthorize_pearnly_ai\s*\("),
+    # routes/steward_common.authorize_steward:上面那道 + pearnly_ai_steward 双闸(S1 起
+    # steward 三个路由文件共用的跨文件门 —— 跨文件不吃 helper 跟随,按名字登记)
+    ("steward_gate", r"\bauthorize_steward\s*\("),
     # core.pos_api 写/读事务信封:内部 require_perm_pos → 模块闸 → 账套归属(单一事实源)
     # services.pos.approval.execute_gated_write 挂在 pos_write 上(退货/作废的授权闸+审计)
     ("pos_envelope", r"\b(pos_write|pos_read|execute_gated_write)\s*\(|\bpos_api\.subject\s*\("),

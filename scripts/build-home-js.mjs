@@ -338,28 +338,29 @@ const BUNDLES = [
             // 用 AI.states.mount)之前——同 ai-vatcheck/ai-fileconv 先例(顶层独立视图)。
             'ai/ai-states-render.js',
             'ai/ai-states.js',
-            // 智能管家(B2-M1 · #/steward + 工作台命令条)四文件。两个 render(左窗任务 /
-            // 右窗对话+命令条)都依赖 AI.state 与 AI.statesRender(B1 状态词典组件),故
-            // 必须排在 ai-states-render.js 之后;ai-steward.js(编排:会话/送出/轮询/闸)
-            // 用两个 render + AI.poll + AI.router,排它们之后;ai-steward-bar.js(命令条挂载)
-            // 在 applyGate 时才引用 AI.steward.openWith(不是加载期),但 ai-steward.js 的
-            // applyGate 会调 AI.stewardBar.applyGate,故排在其后、ai.js(onRoute 调
-            // AI.steward.onRoute + enterApp 调 probe)之前。
+            // 智能管家(S1 会话流 · #/steward + 工作台命令条)。render 族都依赖 AI.state 与
+            // AI.statesRender(B1 状态词典组件),必须排在 ai-states-render.js 之后;
+            // 动作层(actions/attach/sessions)被 ai-steward.js 在【加载期】create(),
+            // 必须排在它之前;ai-steward-bar.js(命令条挂载)在 applyGate 时才引用
+            // AI.steward.openWith,但 ai-steward.js 的 applyGate 会调 AI.stewardBar.applyGate,
+            // 故排在其后、ai.js(onRoute 调 AI.steward.onRoute + enterApp 调 probe)之前。
+            // ai-steward-md.js(正文 markdown,纯函数)与三个 render 都是调用期引用,
+            // 排在编排文件之前即可;ai-steward-stream.js(SSE 客户端)同理。
+            'ai/ai-steward-md.js',
             'ai/ai-steward-attach-render.js',
             'ai/ai-steward-render.js',
+            'ai/ai-steward-flow-render.js',
+            'ai/ai-steward-sessions-render.js',
             'ai/ai-steward-chat-render.js',
-            // B3 追加两件:ai-steward-authz-render.js(写授权卡/预算块拼装,steward-render
-            // 与 chat-render 只在调用期引用它,排在 ai-steward.js 之前即可);
-            // ai-steward-actions.js(决断/取消/倒计时动作层)被 ai-steward.js 在【加载期】
-            // create(),必须排在它之前。
             'ai/ai-steward-authz-render.js',
             'ai/ai-steward-actions.js',
-            // F1 万能口两件:ai-steward-attach-render.js(附件盘/原件行/落区/动作按钮拼装,
-            // 被 steward-render 与 chat-render 在调用期引用)必须排在两个 render 之前 ——
-            // freshState() 在【加载期之后的挂载期】就调它的 normalizeLimits;
-            // ai-steward-attach.js(选/拖/粘 → 传 → 送出的动作层)被 ai-steward.js 在
-            // 【加载期】create(),必须排在它之前。
             'ai/ai-steward-attach.js',
+            'ai/ai-steward-sessions.js',
+            'ai/ai-steward-stream.js',
+            // 分区渲染层与任务盯梢层被 ai-steward.js 在【加载期】create(),必须在它之前。
+            'ai/ai-steward-view.js',
+            'ai/ai-steward-tasks.js',
+            'ai/ai-steward-gate.js',
             'ai/ai-steward.js',
             'ai/ai-steward-bar.js',
             'ai/ai.js',

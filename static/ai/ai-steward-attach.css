@@ -4,10 +4,8 @@
  * 状态的脸仍全部来自 B1 状态词典(.st-bar/.st-badge),颜色一律 var() 令牌,零裸 hex。
  */
 
-/* 落区盖住整个对话栏(不是只盖输入框):拖着一叠文件的手不该被要求瞄准一个小框。 */
-.stw-col.stw-right {
-  position: relative;
-}
+/* 落区盖住整个会话区(不是只盖输入框):拖着一叠文件的手不该被要求瞄准一个小框。
+ * 定位锚是 S1 会话流的外壳(#stwBody · ai-steward-chat.css 里设 relative)。 */
 .stw-drop {
   position: absolute;
   inset: 0;

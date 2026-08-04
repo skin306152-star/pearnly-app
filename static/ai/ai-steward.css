@@ -1,9 +1,8 @@
-/* Pearnly AI · ai-steward.css · 智能管家(B2-M1)命令条 + #/steward 双栏页布局。
+/* Pearnly AI · ai-steward.css · 智能管家命令条 + 任务部件(步骤/产物/授权卡/预算)。
  *
- * 状态的「脸」全部来自 B1 状态词典(ai-states.css 的 .st-badge/.st-dots/.st-steps/
- * .st-count/.st-pulse),本文件一条状态样式都不写 —— 只管两栏怎么排、气泡怎么摆。
- * 徽章/按钮/面板复用 ai-shell.css 的 .panel/.btn/.chip 原子,颜色一律 var() 令牌
- * (ai-theme.css),零裸 hex。
+ * S1 会话流改版后,页面布局(侧栏/消息流/输入条/过程条)在 ai-steward-chat.css,
+ * 本文件留:工作台命令条 + 任务部件(步骤行/深链/产物表格/失败原因/授权卡/预算块)。
+ * 状态的「脸」全部来自 B1 状态词典(ai-states.css),颜色一律 var() 令牌,零裸 hex。
  */
 
 /* ---------- 工作台顶部命令条(收起态) ---------- */
@@ -51,37 +50,11 @@
   color: var(--sage-deep);
 }
 
-/* ---------- #/steward 双栏(左=执行状态,右=对话) ---------- */
-.stw-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 18px;
-  align-items: start;
-}
-.stw-col {
-  min-width: 0;
-}
-.stw-col-hd {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--mut);
-  margin-bottom: 9px;
-}
-
-/* ---------- 左窗:任务面板 ---------- */
+/* ---------- 任务部件:元信息 / 停摆条 / 步骤 ---------- */
 .stw-meta {
   font-size: 12px;
   color: var(--mut);
-  margin-bottom: 10px;
-}
-.stw-prog {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .stw-stalled {
   display: flex;
@@ -199,54 +172,7 @@
   font-weight: 600;
 }
 
-/* ---------- 右窗:对话流 ---------- */
-.stw-feed {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 62vh;
-  overflow-y: auto;
-  padding-right: 4px;
-  margin-bottom: 12px;
-}
-.stw-msg {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  max-width: min(560px, 92%);
-}
-.stw-msg.me {
-  align-self: flex-end;
-  align-items: flex-end;
-}
-.stw-who {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--faint);
-  letter-spacing: 0.02em;
-}
-.stw-bubble {
-  font-size: 13.5px;
-  line-height: 1.65;
-  white-space: pre-wrap;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 1px solid var(--hair);
-  background: var(--surface);
-  color: var(--ink);
-}
-.stw-msg.me .stw-bubble {
-  background: var(--sage-soft);
-  border-color: var(--sage-line);
-}
-.stw-msg-foot {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 7px;
-  font-size: 11.5px;
-  color: var(--mut);
-}
+/* ---------- 行内链接钮(部件与消息脚共用) ---------- */
 .stw-linkbtn {
   border: 0;
   background: none;
@@ -261,29 +187,6 @@
   color: var(--acc-h);
   text-decoration: underline;
 }
-.stw-feed-empty {
-  border: 1px dashed var(--hair2);
-  border-radius: 12px;
-  padding: 20px 18px;
-  margin-bottom: 12px;
-  background: var(--surface);
-}
-.stw-feed-empty-t {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink2);
-}
-.stw-feed-empty-s {
-  font-size: 12px;
-  color: var(--mut);
-  margin-top: 4px;
-}
-.stw-composer {
-  position: sticky;
-  bottom: 0;
-  background: var(--paper);
-  padding-top: 10px;
-}
 .stw-err {
   font-size: 12px;
   color: var(--crit);
@@ -292,11 +195,6 @@
   border-radius: 9px;
   padding: 7px 11px;
   margin-bottom: 8px;
-}
-.stw-composer-note {
-  font-size: 11.5px;
-  color: var(--mut);
-  margin-top: 7px;
 }
 
 /* ---------- 没跑成的原因(failed=错误红 / cancelled=中性灰,人停的不是错) ---------- */
@@ -408,30 +306,8 @@
   margin-top: 7px;
 }
 
-/* ---------- 任务取消入口(只在执行中出现) ---------- */
-.stw-cancel-row {
-  margin-top: 12px;
-}
-
-/* ---------- 移动端(390px 基准):单栏,执行状态卡内嵌在对话流上方 ---------- */
+/* ---------- 移动端:批准/拒绝是高敏动作,撑满一行、触控目标 ≥44px ---------- */
 @media (max-width: 900px) {
-  .stw-grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-  .stw-feed {
-    max-height: none;
-  }
-  .stw-msg {
-    max-width: 100%;
-  }
-  /* 单栏下整页滚动,sticky 会把输入框钉在首屏底部 —— 消息流还在它下面没露头,读起来
-   * 就是「先输入框、后回复」,与桌面和所有聊天界面相反。手机上回归正常流:消息在上,
-   * 输入在下。 */
-  .stw-composer {
-    position: static;
-  }
-  /* 批准/拒绝是高敏动作:手机上撑满一行、触控目标 ≥44px,倒计时另起一行看得清。 */
   .stw-authz-actions .btn {
     flex: 1 1 40%;
     min-height: 44px;

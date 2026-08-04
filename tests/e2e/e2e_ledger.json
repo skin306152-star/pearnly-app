@@ -522,6 +522,30 @@
         "拦下来那句话在屏上真看得见 + 焦点真落到出问题的那一格:要 getComputedStyle + 面积 + activeElement",
         "฿2,400,000/件这种真实高价照旧提交得出去:证据是真发出去的 POST 载荷,不是函数返回值"
       ]
+    },
+    "_steward_chat_v2_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/steward-chat-v2",
+      "covers": [
+        "static/ai/ai-steward.js",
+        "static/ai/ai-steward-chat-render.js",
+        "static/ai/ai-steward-flow-render.js",
+        "static/ai/ai-steward-sessions-render.js",
+        "static/ai/ai-steward-sessions.js",
+        "static/ai/ai-steward-stream.js",
+        "static/ai/ai-steward-md.js",
+        "static/ai/ai-steward-chat.css",
+        "static/ai/ai-steward.css",
+        "static/ai/ai-i18n-steward-chat.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "SSE 帧真驱动过程条逐步点亮再自动折叠成摘要:fetch 流解析+分区重画的时序只有真浏览器答得出",
+        "发送键三形态(发送/停止/写活锁死)跟任务状态实时换脸:composerMode 与 SSE 帧的联动是渲染期事实",
+        "授权卡入流可点批准且倒计时在走:卡在消息流里的真实几何与可点性,单测是桩",
+        "用户气泡右对齐、markdown 表格金额列右对齐:getComputedStyle/getBoundingClientRect 只有真渲染给得出",
+        "切会话后历史任务过程条后台补拉且默认折叠:跨请求的异步补拉链路要真页面",
+        "390 宽侧栏收成抽屉(真隐身/真滑入/遮罩关闭)且零横向溢出:媒体查询+过渡延迟是浏览器行为"
+      ]
     }
   },
   "_stale_ack_rule": [

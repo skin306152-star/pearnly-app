@@ -1,5 +1,8 @@
 /*
- * Pearnly AI · ai-steward-render.js · 智能管家(B2-M1)左窗「执行状态」拼装
+ * Pearnly AI · ai-steward-render.js · 智能管家任务投影的判据与部件拼装
+ *
+ * S1 会话流改版后不再有独立左窗:本文件出【部件】(步骤列表 / 产物 / 失败原因),
+ * 由 ai-steward-flow-render.js 组进对话流的过程条与收尾卡。
  *
  * 吃 GET /api/ai/steward/tasks/{tid} 的载荷:
  *   { task_id, title, status, started_at, agent_count,
@@ -325,13 +328,6 @@
         return '<div class="stw-art">' + title + body + '</div>';
     }
 
-    function metaHtml(task) {
-        var parts = [at('stw_meta_agents', { n: agentCount(task) })];
-        var started = startedLabel(task.started_at);
-        if (started) parts.push(at('stw_meta_started', { t: started }));
-        return '<div class="stw-meta">' + esc(parts.join(' · ')) + '</div>';
-    }
-
     // 没跑成的任务把原因摆在脸上(error_reason 是后端按任务语言写好的人话,error_code
     // 小字随行给排障用)。cancelled 是人主动停的,用中性灰,不套错误红。
     // echoed = 这句话已经在右窗气泡里了:徽章已经说了「失败」,红条再印一遍只是把同一屏
@@ -360,26 +356,10 @@
         });
     }
 
-    // 执行中给「取消」出口(取消是幂等端点,连点不炸);终态不摆一个点了没意义的按钮。
-    // 在跑的写活取消不了(后端 409:已投单,只能去对账)—— 摆一个点下去必报错的按钮更糟。
-    function cancelHtml(task, busy) {
-        if (task.status !== 'running' || task.cancellable === false) return '';
-        return (
-            '<div class="stw-cancel-row"><button type="button" class="btn sm" ' +
-            'data-action="stw-cancel"' +
-            (busy ? ' disabled' : '') +
-            '>' +
-            esc(at('stw_cancel_task')) +
-            '</button></div>'
-        );
-    }
-
-    // 任务面板。stalled/授权卡的 busy 与错误由挂载层传入 —— 面板不猜"还在不在跑"。
-    function panelHtml(task, opts) {
+    // 步骤列表(S1 起挂在对话流的过程条里,不再有独立左窗)。候选只挂在最后一次追问上:
+    // 更早那次的候选已经被回答过,再摆一遍等于让人重答旧题。
+    function stepListHtml(task, opts) {
         opts = opts || {};
-        var counts = stepCounts(task.steps);
-        var fam = taskFamily(task.status);
-        // 候选只挂在最后一次追问上:更早那次的候选已经被回答过,再摆一遍等于让人重答旧题。
         var list = task.steps || [];
         var lastAsk = -1;
         list.forEach(function (s, i) {
@@ -396,50 +376,29 @@
                 return stepHtml(s, Object.assign({ reason: reason }, o));
             })
             .join('');
-        // 卡还活着才让按钮可点(waiting_user + actions 块);终态后置灰 —— 后端那一轮不认,
-        // 点下去只会拿到一个错。busy 是本地送出在途,连点会开出两个任务。
-        var dead = { dead: task.status !== 'waiting_user' || !!opts.busy };
-        var arts = (task.artifacts || [])
+        return steps ? '<ul class="stw-steps">' + steps + '</ul>' : '';
+    }
+
+    // 产物列表。终态(waiting_user 之外)把回执卡按钮置灰 —— 后端那一轮不认,
+    // 点下去只会拿到一个错;busy 是本地送出在途,连点会开出两个任务。
+    function artifactsHtml(task, opts) {
+        var dead = {
+            dead: (opts && opts.dead) != null ? opts.dead : task.status !== 'waiting_user',
+        };
+        return (task.artifacts || [])
             .map(function (a) {
                 return artifactHtml(a, dead);
             })
             .join('');
-        var stalled = opts.stalled
-            ? '<div class="stw-stalled">' +
-              esc(at('stw_poll_stopped')) +
-              '<button type="button" class="btn sm" data-action="stw-poll-again">' +
-              esc(at('stw_poll_refresh')) +
-              '</button></div>'
-            : '';
-        var authz = task.authorization
-            ? AI.stewardAuthzRender.cardHtml(task.authorization, { busy: opts.authzBusy })
-            : '';
-        var actionErr = opts.actionErr
-            ? '<div class="stw-err">' + esc(opts.actionErr) + '</div>'
-            : '';
-        return (
-            '<div class="panel stw-task"><div class="hd"><h3>' +
-            esc(task.title || '') +
-            AI.statesRender.badgeHtml(fam, at(taskStatusKey(task.status)), {
-                pulse: task.status === 'running',
-            }) +
-            '</h3></div><div class="bd">' +
-            metaHtml(task) +
-            '<div class="stw-prog">' +
-            AI.statesRender.stepsHtml(fam, counts.done, counts.total || 1) +
-            AI.statesRender.countHtml(counts.done, counts.total, at('stw_steps_hd')) +
-            '</div>' +
-            stalled +
-            reasonHtml(task, opts.reasonEchoed) +
-            actionErr +
-            authz +
-            (steps ? '<ul class="stw-steps">' + steps + '</ul>' : '') +
-            (arts ? '<div class="stw-arts-hd">' + esc(at('stw_arts_hd')) + '</div>' + arts : '') +
-            cancelHtml(task, opts.cancelBusy) +
-            '</div></div>'
-        );
     }
 
     root.AI = root.AI || {};
-    root.AI.stewardRender = Object.assign({ panelHtml: panelHtml }, pure);
+    root.AI.stewardRender = Object.assign(
+        {
+            stepListHtml: stepListHtml,
+            artifactsHtml: artifactsHtml,
+            reasonHtml: reasonHtml,
+        },
+        pure
+    );
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

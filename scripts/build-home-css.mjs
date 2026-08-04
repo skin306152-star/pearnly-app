@@ -230,12 +230,14 @@ const AI_CSS = [
     // 动画/按钮七态/可解释卡)+ #/states 样例页布局。令牌值全引 ai-theme.css(排首位
     // 已定),组件类名(st-*/sts-*)全新不覆盖任何存量,排最后即可。
     'ai/ai-states.css',
-    // ai-steward.css(B2-M1 · 智能管家命令条 + #/steward 双栏页)只补两栏栅格/气泡/命令条
-    // 这些布局,状态的脸全取自 ai-states.css 的 .st-* 组件,故必须排在其后;与其余视图
-    // 互斥显示(命令条挂在工作台,类名 stw-* 全新不覆盖任何存量),层叠零影响。
+    // ai-steward.css(智能管家命令条 + 任务部件:步骤/产物/授权卡/预算)状态的脸全取自
+    // ai-states.css 的 .st-* 组件,故必须排在其后;类名 stw-* 全新不覆盖任何存量。
     'ai/ai-steward.css',
-    // ai-steward-attach.css(F1 · 万能口附件口:落区/附件盘四态/原件行/动作按钮)与
-    // ai-steward.css 分家只因行数,依赖面相同(.st-bar 取自 ai-states.css),紧随其后。
+    // ai-steward-chat.css(S1 · 会话流布局:侧栏/消息流/过程条/欢迎屏/输入卡)与
+    // ai-steward.css 分家按职责(布局 vs 部件),依赖面相同,紧随其后。
+    'ai/ai-steward-chat.css',
+    // ai-steward-attach.css(F1 · 万能口附件口:落区/附件盘四态/原件行/动作按钮)
+    // 依赖面相同(.st-bar 取自 ai-states.css),紧随其后。
     'ai/ai-steward-attach.css',
     // ai-billing.css(B5 #16 · 设置页计费区+三步充值弹窗)复用 .panel/.btn/.wosum/
     // .pkg-mask/.st-badge,只补 bill-* 独有布局;徽章脸取自 ai-states.css 故排其后,

@@ -5,11 +5,12 @@
   "旧色/旧蓝(应改令牌)": 3,
   "旧token名(应用全局emerald)": 198,
   "emoji当图标(应换Lucide)": 201,
-  "小固定max-width(查是否@media)": 153,
+  "小固定max-width(查是否@media)": 155,
   "内联旧弹窗/抽屉": 58,
   "自曝/AI文案": 0,
   "原生弹窗(禁)": 4,
   "超高z-index": 13,
   "i18n原始键残留": 24,
-  "裸hex": 872
+  "裸hex": 872,
+  "_小固定max-width_155": "2026-08-05 S1 管家会话流 +2(ai-steward-chat.css 的 .stw-feed/.stw-composer max-width:780px):Claude/GPT 式居中对话列是原型拍板的设计本体(阅读行长),非「铺满不聚拢」类债"
 }

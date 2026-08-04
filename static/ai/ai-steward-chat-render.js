@@ -1,13 +1,18 @@
 /*
- * Pearnly AI · ai-steward-chat-render.js · 智能管家(B2-M1)右窗对话流 + 工作台命令条
+ * Pearnly AI · ai-steward-chat-render.js · 会话流外壳 + 输入条 + 工作台命令条(S1 改版)
  *
- * 两处是同一件事的两个尺寸:命令条是「收起态」的输入口(工作台顶部,只有一行输入 +
- * 高频 chips),对话流是「展开态」(#/steward)。快捷 chips 的闭集两处共用一份,
- * 不各写一份文案(改一处漂一处是碎片化的起手式)。
+ * 三块:①命令条(工作台顶部收起态,openWith 交棒逻辑不变);②会话页外壳
+ * (会话侧栏 + 主列:页头/消息流/输入条,≤800px 侧栏收成抽屉);③输入条
+ * (自动长高 textarea + 回形针 + 发送/停止一颗键)。消息流本体在
+ * ai-steward-flow-render.js,侧栏在 ai-steward-sessions-render.js。
+ *
+ * 发送键的三形态由挂载层判定后传入(mode):
+ *   send        平时(能不能点由送出闸 syncSendGate 动态定)
+ *   stop        当前任务在跑且可取消 → 点了停任务
+ *   stop-locked 在跑的写活(后端 409 不可停)→ 键诚实置灰 + title 说为什么
  *
  * 上半段零 DOM 零 i18n 纯函数(角色→气泡类、送出态闭集、可送出判据、chips 闭集),
- * node 直接 require 断言;下半段拼装依赖全局 at()/AI.state —— 同 ai-states-render.js
- * 的双段先例。管家气泡的正文全部来自后端返回的 reply,本层不生成任何业务措辞。
+ * node 直接 require 断言;下半段拼装依赖全局 at()/AI.state —— 双段先例同前。
  */
 (function (root) {
     'use strict';
@@ -17,14 +22,16 @@
     // 失败留在原地可重发,不静默吞掉用户打的字。
     var SEND_STATES = ['sent', 'sending', 'failed'];
 
-    // 高频快捷问法闭集(工作台命令条 + 对话空态各用一次)。四条都是能被参数接地的问法
-    // (期间/状态/天数),不放「SM 这期做到哪了」这类写死客户名的——不是每个租户都有 SM。
+    // 高频快捷问法闭集(工作台命令条用)。四条都是能被参数接地的问法。
     var QUICK_KEYS = [
         'stw_quick_missing',
         'stw_quick_review',
         'stw_quick_pushfail',
         'stw_quick_progress',
     ];
+
+    // 发送键形态闭集。集合外的值按 send 兜底 —— 键不能消失,消失=没法说话。
+    var SEND_MODES = ['send', 'stop', 'stop-locked'];
 
     function roleClass(role) {
         return role === 'user' ? 'me' : 'agent';
@@ -43,14 +50,20 @@
         return !busy && normalizeText(text).length > 0;
     }
 
+    function sendMode(mode) {
+        return SEND_MODES.indexOf(mode) >= 0 ? mode : 'send';
+    }
+
     var pure = {
         MSG_ROLES: MSG_ROLES,
         SEND_STATES: SEND_STATES,
         QUICK_KEYS: QUICK_KEYS,
+        SEND_MODES: SEND_MODES,
         roleClass: roleClass,
         sendState: sendState,
         normalizeText: normalizeText,
         canSend: canSend,
+        sendMode: sendMode,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -60,6 +73,17 @@
     function esc(s) {
         return AI.state.esc(s);
     }
+
+    var SEND_SVG =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+    var STOP_SVG =
+        '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+        '<rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+    var MENU_SVG =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
 
     function chipsHtml() {
         return (
@@ -91,124 +115,96 @@
         );
     }
 
-    // 双栏骨架(左=执行状态,右=对话)。挂载层只管往两个坑里填,不在编排文件里拼 HTML。
+    // 会话页外壳。侧栏/页头标题/消息流/输入条四个坑位由挂载层分别填 ——
+    // 整壳只画一次,之后各坑独立重画,不互相冲(输入框里打了一半的字是不可再生资源)。
     function shellHtml() {
         return (
-            '<div class="stw-grid"><section class="stw-col stw-left"><h3 class="stw-col-hd">' +
-            esc(at('stw_pane_task')) +
-            '</h3><div id="stwLeft"></div></section><section class="stw-col stw-right">' +
-            '<h3 class="stw-col-hd">' +
-            esc(at('stw_pane_chat')) +
-            '</h3><div id="stwRight"></div></section></div>'
+            '<div class="stw-chat">' +
+            '<div class="stw-scrim" id="stwScrim" hidden></div>' +
+            '<aside class="stw-side" id="stwSide"></aside>' +
+            '<div class="stw-chat-main">' +
+            '<header class="stw-chat-hd">' +
+            '<button type="button" class="stw-menu-btn" id="stwMenuBtn" data-action="stw-drawer" ' +
+            'aria-label="' +
+            esc(at('stw_open_sessions')) +
+            '">' +
+            MENU_SVG +
+            '</button>' +
+            '<div class="stw-chat-title" id="stwChatTitle"></div>' +
+            '<span class="stw-chat-tag">' +
+            esc(at('stw_title')) +
+            '</span></header>' +
+            '<div class="stw-feed-wrap" id="stwFeedWrap">' +
+            '<div class="stw-feed" id="stwFeed"></div></div>' +
+            '<div class="stw-composer-wrap"><div class="stw-composer" id="stwComposer"></div></div>' +
+            '</div></div>'
         );
     }
 
-    function msgFootHtml(msg) {
-        var state = sendState(msg.state);
-        if (state === 'sending') {
+    function sendBtnHtml(mode) {
+        var m = sendMode(mode);
+        if (m === 'stop') {
             return (
-                '<div class="stw-msg-foot">' +
-                AI.statesRender.dotsHtml('off') +
-                esc(at('stw_msg_sending')) +
-                '</div>'
-            );
-        }
-        if (state === 'failed') {
-            return (
-                '<div class="stw-msg-foot">' +
-                AI.statesRender.badgeHtml('err', at('stw_msg_failed')) +
-                '<button type="button" class="stw-linkbtn" data-action="stw-resend" data-mid="' +
-                esc(msg.local_id || '') +
+                '<button type="button" class="stw-send-btn stop" id="stwSendBtn" ' +
+                'data-action="stw-stop" aria-label="' +
+                esc(at('stw_stop')) +
+                '" title="' +
+                esc(at('stw_stop')) +
                 '">' +
-                esc(at('stw_msg_resend')) +
-                '</button></div>'
+                STOP_SVG +
+                '</button>'
             );
         }
-        // 管家回复带 task_id:给一个回到那条任务的入口(一个会话里会有多条任务,
-        // 点旧消息能把左窗切回那次执行)。
-        if (msg.task_id) {
+        if (m === 'stop-locked') {
             return (
-                '<div class="stw-msg-foot"><button type="button" class="stw-linkbtn" ' +
-                'data-action="stw-open-task" data-tid="' +
-                esc(msg.task_id) +
+                '<button type="button" class="stw-send-btn stop" id="stwSendBtn" disabled ' +
+                'aria-label="' +
+                esc(at('stw_stop_locked')) +
+                '" title="' +
+                esc(at('stw_stop_locked')) +
                 '">' +
-                esc(at('stw_open_task')) +
-                '</button></div>'
+                STOP_SVG +
+                '</button>'
             );
         }
-        return '';
-    }
-
-    function msgHtml(msg) {
-        var cls = roleClass(msg.role);
-        // 超限轮的回复气泡下面挂预算块(已用/上限 + 会话级的「开新会话」出口):
-        // reply 人话说为什么停,这块给数字和下一步 —— 两者都来自后端,本层不算钱。
-        var budget = msg.budget ? AI.stewardAuthzRender.budgetHtml(msg.budget) : '';
-        // 这一轮带的原件永久留在气泡下面(会话重建时后端把 attachments 一并回来)。
-        // 纯文件手势下 text 是空串,气泡本体不渲染 —— 否则是一个空框吊着几个文件。
-        var files = AI.stewardAttachRender.bubbleFilesHtml(msg.attachments);
-        var foot = msgFootHtml(msg);
-        var bubble =
-            msg.text || !files
-                ? '<div class="stw-bubble">' + esc(msg.text || '') + foot + '</div>'
-                : foot;
+        // 可不可点由 syncSendGate 按送出闸动态设,初始按禁用画(空输入送不出去)。
         return (
-            '<div class="stw-msg ' +
-            cls +
-            '"><div class="stw-who">' +
-            esc(at(msg.role === 'user' ? 'stw_you' : 'stw_agent')) +
-            '</div>' +
-            files +
-            bubble +
-            budget +
-            '</div>'
+            '<button type="button" class="stw-send-btn" id="stwSendBtn" data-action="stw-send" ' +
+            'disabled aria-label="' +
+            esc(at('stw_send')) +
+            '" title="' +
+            esc(at('stw_send')) +
+            '">' +
+            SEND_SVG +
+            '</button>'
         );
     }
 
-    // 空态指路 = 直接把四条能问的话摆成可点的 chips。此前还压着一个标题(「还没说话」——
-    // 在评价用户,不给出路)和一行把同样两条问法再写一遍的说明文字:三层说同一件事,而
-    // 唯一能点的只有 chips。留 chips 就够。
-    function emptyFeedHtml() {
-        return '<div class="stw-feed-empty">' + chipsHtml() + '</div>';
-    }
-
-    function feedHtml(messages) {
-        var list = messages || [];
-        if (!list.length) return emptyFeedHtml();
-        return '<div class="stw-feed">' + list.map(msgHtml).join('') + '</div>';
-    }
-
-    // ctx.attach 是附件盘视图(AI.stewardAttach.view());没有附件口时它是 null,
-    // composer 退回纯文字形态 —— 不摆一个点了必失败的回形针。
+    // 输入条。ctx = { busy, errText, attach(附件盘视图), mode(发送键形态), value(重画时
+    // 保住已打的字) }。附件口读不到限额时回形针整个不摆(点了必失败的按钮更糟)。
     function composerHtml(ctx) {
         ctx = ctx || {};
-        var busy = !!ctx.busy;
         var attach = ctx.attach || {};
         var AR = AI.stewardAttachRender;
-        // 还在传就不许送:排队送等于把「立即应承」改成等 30 秒(契约不能这么改)。
-        var blocked = busy || AR.hasUploading(attach.chips);
         var err = ctx.errText ? '<div class="stw-err">' + esc(ctx.errText) + '</div>' : '';
-        // 注脚只说输入框自己给不出的那件事(文件能拖能粘)。没有附件口就没什么可补的 ——
-        // 「会改数据的要先批准」已经写在页头,注脚再说一遍就是同屏第二遍。
-        var note = attach.limits
-            ? '<div class="stw-composer-note">' + esc(at('stw_composer_note_files')) + '</div>'
-            : '';
+        var note = at(attach.limits ? 'stw_composer_note_files' : 'stw_composer_note');
         return (
-            '<div class="stw-composer">' +
             err +
+            '<div class="stw-comp-card">' +
             AR.trayHtml(attach) +
-            '<div class="stw-bar-row">' +
+            '<div class="stw-comp-row">' +
             AR.pickerHtml(attach) +
-            '<input id="stwInput" class="stw-bar-input" type="text" placeholder="' +
+            '<textarea id="stwInput" class="stw-input" rows="1" placeholder="' +
             esc(at(attach.limits ? 'stw_input_ph_files' : 'stw_input_ph')) +
             '"' +
-            (busy ? ' disabled' : '') +
-            ' /><button type="button" class="btn pri sm" data-action="stw-send"' +
-            (blocked ? ' disabled' : '') +
+            (ctx.busy ? ' disabled' : '') +
             '>' +
-            esc(at('stw_send')) +
-            '</button></div>' +
-            note +
+            esc(ctx.value || '') +
+            '</textarea>' +
+            sendBtnHtml(ctx.mode) +
+            '</div></div>' +
+            '<div class="stw-comp-note">' +
+            esc(note) +
             '</div>'
         );
     }
@@ -219,8 +215,8 @@
             barHtml: barHtml,
             shellHtml: shellHtml,
             chipsHtml: chipsHtml,
-            feedHtml: feedHtml,
             composerHtml: composerHtml,
+            sendBtnHtml: sendBtnHtml,
         },
         pure
     );

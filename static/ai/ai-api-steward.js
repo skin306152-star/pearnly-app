@@ -1,5 +1,5 @@
 /*
- * Pearnly AI · ai-api-steward.js · 智能管家(B2-M1/B3/F1)十端点的后端调用薄层(拆自 ai-api.js)
+ * Pearnly AI · ai-api-steward.js · 智能管家全组端点的后端调用薄层(拆自 ai-api.js)
  *
  * 单文件<500 行铁律:ai-api.js 已在预算线上,管家端点自成一族 —— 同 ai-api-desk.js/
  * ai-api-payroll.js 先例拆出去,调用方感知不到这层拆分。
@@ -7,12 +7,18 @@
  * 契约(前缀 /api/ai/steward,Bearer 鉴权,权限比照 /ai):
  *   GET  /status                     → {enabled, attachments:{max_file_bytes,...}}
  *   POST /sessions                   → {session_id}
- *   GET  /sessions/{sid}             → {session_id, messages[], current_task_id?}
+ *   GET  /sessions                   → {sessions: [{session_id, title, last_active_at}]}
+ *   GET  /sessions/{sid}?before=&limit= → {session_id, messages[], has_more?, current_task_id?}
+ *   POST /sessions/{sid}/rename      → {ok, title}
+ *   POST /sessions/{sid}/delete      → {ok}
  *   POST /sessions/{sid}/attachments → {attachments[], count}(multipart · 见下)
  *   POST /sessions/{sid}/messages    → {message_id, user_message_id, reply, task_id?, ...}
  *   GET  /attachments/{aid}/download → 二进制原件(Content-Disposition 泰文名走 RFC 5987)
- *   GET  /tasks/{tid}                → 左窗任务数据(见 ai-steward-render.js 顶注)
- *   POST /tasks/{tid}/cancel         → 同左窗任务数据(幂等 · 已收尾的原样返回)
+ *   POST /attachments/{aid}/delete   → {ok}(仅还没送出的;已送出 409 保留痕)
+ *   GET  /budget?session_id=         → {available, session:{spent_thb,cap_thb}, tenant_day:{...}}
+ *   GET  /tasks/{tid}                → 任务投影(见 ai-steward-render.js 顶注)
+ *   GET  /tasks/{tid}/events         → SSE(event: task/end · 见 ai-steward-stream.js)
+ *   POST /tasks/{tid}/cancel         → 同任务投影(幂等 · 已收尾的原样返回)
  *   POST /authorizations/approve     → {task_id, authorization}(body {token})
  *   POST /authorizations/reject      → 同上(token 走 body 不进 URL/访问日志)
  *
@@ -36,8 +42,52 @@
             createStewardSession: function () {
                 return call('POST', BASE + '/sessions');
             },
-            getStewardSession: function (sessionId) {
-                return call('GET', BASE + '/sessions/' + encodeURIComponent(sessionId));
+            // S1 会话流:侧栏历史列表 + 改名 + 删除。
+            listStewardSessions: function () {
+                return call('GET', BASE + '/sessions');
+            },
+            renameStewardSession: function (sessionId, title) {
+                return call(
+                    'POST',
+                    BASE + '/sessions/' + encodeURIComponent(sessionId) + '/rename',
+                    { title: title }
+                );
+            },
+            deleteStewardSession: function (sessionId) {
+                return call(
+                    'POST',
+                    BASE + '/sessions/' + encodeURIComponent(sessionId) + '/delete'
+                );
+            },
+            // 消息游标分页:before = 已拿到的最早那条消息 id,不带 = 最新一页。
+            getStewardSession: function (sessionId, opts) {
+                var query =
+                    opts && opts.before ? '?before=' + encodeURIComponent(opts.before) : '';
+                return call(
+                    'GET',
+                    BASE + '/sessions/' + encodeURIComponent(sessionId) + query
+                );
+            },
+            // 还没送出的附件从盘上删(已随消息送出的后端 409 保留痕)。
+            deleteStewardAttachment: function (attachmentId) {
+                return call(
+                    'POST',
+                    BASE + '/attachments/' + encodeURIComponent(attachmentId) + '/delete'
+                );
+            },
+            // 成本余额(读侧)。
+            getStewardBudget: function (sessionId) {
+                return call(
+                    'GET',
+                    BASE + '/budget?session_id=' + encodeURIComponent(sessionId)
+                );
+            },
+            // 任务事件流(SSE)。只发起请求;读帧/回落在 ai-steward-stream.js。
+            streamStewardTask: function (taskId, signal) {
+                return net.fetch(
+                    BASE + '/tasks/' + encodeURIComponent(taskId) + '/events',
+                    { headers: authHeaders(), signal: signal }
+                );
             },
             // body 三形态互斥(action > 纯文件 > 有话),形状由调用方拼好原样送:这层不替
             // 它判该带哪个键 —— 判据在 ai-steward-attach.js,两处各判一次必漂。

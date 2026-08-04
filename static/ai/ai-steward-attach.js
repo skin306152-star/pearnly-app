@@ -141,9 +141,9 @@
                 });
         }
 
-        // 进度条每 XHR 事件重画整个右窗 = 打断正在打字的输入框。只改那一件的 --p。
+        // 进度条每 XHR 事件重画整个输入条 = 打断正在打字的输入框。只改那一件的 --p。
         function paintProgress(chip) {
-            var host = hooks.getEl('stwRight');
+            var host = hooks.getEl('stwComposer');
             var bar = host && host.querySelector('[data-chip="' + chip.local_id + '"] .st-bar');
             if (bar) bar.style.setProperty('--p', chip.pct);
         }
@@ -194,10 +194,16 @@
         function remove(cid) {
             var S = hooks.state();
             if (!S) return;
+            var chip = byId(cid);
             S.attChips = chips().filter(function (c) {
                 return c.local_id !== cid;
             });
             if (S.attPwFor === cid) S.attPwFor = null;
+            // 已传上去的一并从服务端删(S1 新端点)。失败静默:盘上已经拿掉、送出不会带它,
+            // 服务端那份最坏活到 30 天 TTL 清扫 —— 为一次删除失败打断会计不值。
+            if (chip && chip.attachment_id) {
+                S.api.deleteStewardAttachment(chip.attachment_id).catch(function () {});
+            }
             hooks.renderRight();
             pump();
         }

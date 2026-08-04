@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/ai.css?v=78" />
+    <link rel="stylesheet" href="/static/dist/ai.css?v=79" />
   </head>
   <body>
     <div id="gateRoot" class="gate-root"></div>
@@ -274,12 +274,9 @@
             <div id="fdBody"></div>
           </section>
 
-          <!-- 智能管家(B2-M1 · #/steward)双栏页:左=执行状态窗,右=对话流。 -->
+          <!-- 智能管家(#/steward · S1 会话流):会话侧栏 + 对话列,壳由 ai-steward.js
+               渲染(页头/欢迎屏/输入条都在壳里,这里只留挂载点)。 -->
           <section class="view" id="v-steward">
-            <div class="board-head">
-              <h2 data-at="stw_title"></h2>
-              <span class="note" data-at="stw_note"></span>
-            </div>
             <div id="stwBody"></div>
           </section>
 
@@ -396,8 +393,9 @@
     <script src="/static/ai/ai-i18n-blocked.js?v=3"></script>
     <script src="/static/ai/ai-i18n-board.js?v=4"></script>
     <script src="/static/ai/ai-i18n-states.js?v=1"></script>
-    <script src="/static/ai/ai-i18n-steward.js?v=12"></script>
+    <script src="/static/ai/ai-i18n-steward.js?v=13"></script>
+    <script src="/static/ai/ai-i18n-steward-chat.js?v=1"></script>
     <script src="/static/ai/ai-i18n.js?v=10"></script>
-    <script src="/static/dist/ai.js?v=117" defer></script>
+    <script src="/static/dist/ai.js?v=118" defer></script>
   </body>
 </html>

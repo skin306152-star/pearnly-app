@@ -29,6 +29,7 @@ _CHAT = json.dumps(str(AI_DIR / "ai-steward-chat-render.js"))
 _ROUTER = json.dumps(str(AI_DIR / "ai-router.js"))
 _ATTACH_RENDER = json.dumps(str(AI_DIR / "ai-steward-attach-render.js"))
 _I18N = json.dumps(str(AI_DIR / "ai-i18n-steward.js"))
+_I18N_CHAT = json.dumps(str(AI_DIR / "ai-i18n-steward-chat.js"))
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -310,11 +311,16 @@ class StewardI18nShardTests(unittest.TestCase):
     里,自己的闸自己带 · 同 ai-i18n-states.js 先例)。"""
 
     def _shard_keys(self):
+        # 两个分片一起装:旧词条(zh/th)在 ai-i18n-steward.js,S1 会话流新词条(四语)
+        # 在 ai-i18n-steward-chat.js —— 引用检查看的是合并后的 zh 集合。
         return _run_node(f"""
             global.window = global;
             global.__AI_I18N_ZH__ = {{}};
             global.__AI_I18N_TH__ = {{}};
+            global.__AI_I18N_EN__ = {{}};
+            global.__AI_I18N_JA__ = {{}};
             require({_I18N});
+            require({_I18N_CHAT});
             process.stdout.write(JSON.stringify({{
                 zh: Object.keys(global.__AI_I18N_ZH__).sort(),
                 th: Object.keys(global.__AI_I18N_TH__).sort(),
@@ -326,11 +332,40 @@ class StewardI18nShardTests(unittest.TestCase):
         self.assertTrue(keys["zh"], "分片 zh 词条为空")
         self.assertEqual(keys["zh"], keys["th"], "th 词典 key 集合与 zh 不一致")
 
+    def test_chat_shard_ships_all_four_languages(self):
+        """S1 新词条按拍板一步到位四语:chat 分片单独装,四份 key 集合必须逐一相同。"""
+        keys = _run_node(f"""
+            global.window = global;
+            global.__AI_I18N_ZH__ = {{}};
+            global.__AI_I18N_TH__ = {{}};
+            global.__AI_I18N_EN__ = {{}};
+            global.__AI_I18N_JA__ = {{}};
+            require({_I18N_CHAT});
+            process.stdout.write(JSON.stringify({{
+                zh: Object.keys(global.__AI_I18N_ZH__).sort(),
+                th: Object.keys(global.__AI_I18N_TH__).sort(),
+                en: Object.keys(global.__AI_I18N_EN__).sort(),
+                ja: Object.keys(global.__AI_I18N_JA__).sort(),
+            }}));
+            """)
+        self.assertTrue(keys["zh"], "chat 分片 zh 词条为空")
+        self.assertEqual(keys["zh"], keys["th"], "th 与 zh key 集合不一致")
+        self.assertEqual(keys["zh"], keys["en"], "en 与 zh key 集合不一致")
+        self.assertEqual(keys["zh"], keys["ja"], "ja 与 zh key 集合不一致")
+
     def test_every_referenced_key_exists_in_dictionary(self):
         zh = set(self._shard_keys()["zh"])
         sources = (
             "ai-steward-render.js",
             "ai-steward-chat-render.js",
+            "ai-steward-flow-render.js",
+            "ai-steward-sessions-render.js",
+            "ai-steward-sessions.js",
+            "ai-steward-md.js",
+            "ai-steward-stream.js",
+            "ai-steward-view.js",
+            "ai-steward-tasks.js",
+            "ai-steward-gate.js",
             "ai-steward-authz-render.js",
             "ai-steward-actions.js",
             "ai-steward-attach-render.js",
@@ -394,9 +429,11 @@ class StewardActionWiringTests(unittest.TestCase):
     动作名在注释里被提一句就算「有人接」。两道闸并存时弱的那道会先绿,掩掉强的那道。"""
 
     _EMITTERS = ("ai-steward-render.js", "ai-steward-authz-render.js", "ai-steward-chat-render.js",
+                 "ai-steward-flow-render.js", "ai-steward-sessions-render.js", "ai-steward-md.js",
                  "ai-steward-attach-render.js", "ai-steward-bar.js")  # fmt: skip
-    # 三处 onClick:主壳 / 附件盘自己认的六个 / 顶栏那颗。
-    _DISPATCHERS = ("ai-steward.js", "ai-steward-attach.js", "ai-steward-bar.js")
+    # 四处 onClick:主壳 / 附件盘自己认的六个 / 侧栏动作层 / 顶栏那颗。
+    _DISPATCHERS = ("ai-steward.js", "ai-steward-attach.js", "ai-steward-sessions.js",
+                    "ai-steward-bar.js")  # fmt: skip
 
     def _scan(self, names, pattern):
         found = set()

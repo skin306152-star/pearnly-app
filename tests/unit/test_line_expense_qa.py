@@ -115,7 +115,7 @@ class ReplyPoolOverrideTests(unittest.TestCase):
         with mock.patch.object(
             dates,
             "bangkok_now",
-            return_value=dates.datetime(2026, 6, 20, 21, 44, tzinfo=dates._BANGKOK),
+            return_value=dates.datetime(2026, 6, 20, 21, 44, tzinfo=dates.BANGKOK),
         ):
             msg = _pool(kind="time_query", override_body=None)
         self.assertIn("21:44", msg["text"])

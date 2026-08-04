@@ -21,11 +21,12 @@ WHERE tenant_id + workspace_client_id 全参数化;钱 Decimal、序列化成 2 
 
 from __future__ import annotations
 
-from datetime import date, timedelta, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-_BANGKOK = timezone(timedelta(hours=7))  # 泰国固定 UTC+7 无夏令时(同 services/sales/dates)
+from services.pos.report_window import bangkok_day_range as _range
+from services.sales.dates import iso_bangkok
 
 # 各指标下钻的过滤/金额口径 + 授权覆盖动作(events 的 authorized_by 来源)。
 _KIND_WHERE = {
@@ -57,27 +58,6 @@ _EVENTS_CAP = 500
 
 def _money(v) -> str:
     return f"{Decimal(str(v if v is not None else 0)):.2f}"
-
-
-def _iso_bkk(v) -> Optional[str]:
-    """时刻按曼谷本地输出:前端直接切 ISO 串显示,UTC 串会跟曼谷日切窗口自相矛盾。
-    真库 timestamptz 给 tz-aware;naive 视为已是本地值原样输出,不按机器时区猜。"""
-    if not v:
-        return None
-    return (v.astimezone(_BANGKOK) if v.tzinfo else v).isoformat()
-
-
-def _range(col: str, date_from: Optional[date], date_to: Optional[date]) -> tuple[str, list]:
-    """时间窗口片段(半开 [from, to+1天)·含 to 当天·曼谷日切,同 report.py 口径:
-    与营业额报表同一路由同一日期参数,窗口不同轴则两页同日数字对不上)。无界则不加条件。"""
-    clause, params = "", []
-    if date_from:
-        clause += f" AND {col} >= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
-        params.append(date_from)
-    if date_to:
-        clause += f" AND {col} < (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
-        params.append(date_to + timedelta(days=1))
-    return clause, params
 
 
 def _cashier_filter(expr: str, cashier_id: Optional[str]) -> tuple[str, list]:
@@ -320,7 +300,7 @@ def events(
     return {
         "events": [
             {
-                "sold_at": _iso_bkk(r["sold_at"]),
+                "sold_at": iso_bangkok(r["sold_at"]),
                 "kind": kind,
                 "cashier_name": r["cashier_name"],
                 "amount": _money(r["amount"]),

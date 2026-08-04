@@ -2,7 +2,7 @@
 """开票日期/历法守门测试(曼谷本地日 + 倒填护栏 + 佛历 · docs/16 §G · 不连库)。"""
 
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 
 from services.sales import dates
 
@@ -49,6 +49,20 @@ class ThaiDateTests(unittest.TestCase):
 class BangkokTodayTests(unittest.TestCase):
     def test_returns_a_date(self):
         self.assertIsInstance(dates.bangkok_today(), date)
+
+
+class IsoBangkokTests(unittest.TestCase):
+    def test_aware_converts_to_bangkok(self):
+        """UTC 晚间 = 曼谷次日凌晨:消费端直接切串,转错会把凌晨单显示成前一天。"""
+        v = datetime(2026, 8, 4, 18, 30, tzinfo=timezone.utc)
+        self.assertEqual(dates.iso_bangkok(v), "2026-08-05T01:30:00+07:00")
+
+    def test_naive_passes_through(self):
+        """naive 视为已是本地值原样输出,不按机器时区猜(CI 是 UTC 机,猜会假红)。"""
+        self.assertEqual(dates.iso_bangkok(datetime(2026, 7, 8, 9, 16, 11)), "2026-07-08T09:16:11")
+
+    def test_empty_gives_none(self):
+        self.assertIsNone(dates.iso_bangkok(None))
 
 
 if __name__ == "__main__":

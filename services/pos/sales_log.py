@@ -8,13 +8,13 @@ payments 进主查询——那样会因一对多复制主行,见 report.py 同�
 
 from __future__ import annotations
 
-from datetime import date, timedelta, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
 from services.pos import sheets_labels
-
-_BANGKOK = timezone(timedelta(hours=7))  # 泰国固定 UTC+7 无夏令时(同 services/sales/dates)
+from services.pos.report_window import bangkok_day_range
+from services.sales.dates import iso_bangkok
 
 _ROW_SQL = """
 SELECT s.id, s.receipt_no, s.sold_at, s.cashier_id, c.display_name AS cashier_name,
@@ -39,23 +39,13 @@ _EXPORT_CAP = 5000
 
 
 def _range(date_from: Optional[date], date_to: Optional[date]) -> tuple[str, list]:
-    """s.sold_at 时间窗口(半开 [from, to+1天)·含 to 当天·曼谷日切)。同 report.py 口径。"""
-    clause, params = "", []
-    if date_from:
-        clause += " AND s.sold_at >= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
-        params.append(date_from)
-    if date_to:
-        clause += " AND s.sold_at < (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
-        params.append(date_to + timedelta(days=1))
-    return clause, params
+    """s.sold_at 窗口(曼谷日切·单一事实源在 report_window,与报表页同轴)。"""
+    return bangkok_day_range("s.sold_at", date_from, date_to)
 
 
 def _iso(v) -> str:
-    """时刻按曼谷本地输出。前端与 CSV 都直接切这个串的日期/时间段,不做本地化,
-    输出 UTC 会跟曼谷日切的窗口自相矛盾(筛 05 日、行上写 04 日)。"""
-    if not v:
-        return ""
-    return (v.astimezone(_BANGKOK) if v.tzinfo else v).isoformat()
+    """同 iso_bangkok(前端与 CSV 直接切串),空值按本模块 CSV 契约给空串。"""
+    return iso_bangkok(v) or ""
 
 
 def _money(v) -> str:

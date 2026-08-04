@@ -44,22 +44,12 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(report._money(None), "0.00")
         self.assertEqual(report._qty("412"), "412.000")
 
-    def test_range_half_open_bangkok(self):
-        """窗口两端都按曼谷日切:日期参数在 SQL 里按 Asia/Bangkok 解释成绝对时刻。
+    def test_range_is_shared_bangkok_window(self):
+        """窗口构造收口单一事实源(report_window·三个报表面同轴):此处只守接线,
+        形状/参数测试在 test_report_window.py,真库语义在 docs/pos/_e2e_report_bkk_daycut.py。"""
+        from services.pos.report_window import bangkok_day_range
 
-        曼谷 2026-08-05 单日窗口 = [08-04T17:00Z, 08-05T17:00Z):必须含 08-04T18:30Z
-        (曼谷 05 日 01:30)、必须排 08-04T16:59Z(曼谷 04 日 23:59)——该语义由真库
-        E2E(docs/pos/_e2e_report_bkk_daycut.py)验证,此处守 SQL 形状与参数。"""
-        clause, params = report._range("sold_at", date(2026, 8, 5), date(2026, 8, 5))
-        self.assertEqual(clause.count("AT TIME ZONE 'Asia/Bangkok'"), 2)
-        self.assertIn("sold_at >= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", clause)
-        self.assertIn("sold_at < (%s::timestamp AT TIME ZONE 'Asia/Bangkok')", clause)
-        self.assertEqual(params, [date(2026, 8, 5), date(2026, 8, 6)])  # to + 1 天(含 to 当天)
-
-    def test_range_unbounded(self):
-        clause, params = report._range("sold_at", None, None)
-        self.assertEqual(clause, "")
-        self.assertEqual(params, [])
+        self.assertIs(report._range, bangkok_day_range)
 
     def test_by_day_groups_on_bangkok_date(self):
         """按天分组必须与窗口同轴(曼谷日),禁回退 UTC 日切——否则跨曼谷 0–7 点的单

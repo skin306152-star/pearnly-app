@@ -16,6 +16,7 @@ prod 运行:ssh pearnly → cd /opt/mrpilot → set -a;. ./.env;set +a →
 
 import os
 import sys
+import traceback
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -30,32 +31,17 @@ from services.pos import sales_log as sales_log_svc  # noqa: E402
 
 results = []
 
-# (备注, UTC 时刻, 金额, 所属曼谷日) —— 曼谷 = UTC+7,05 日窗口 = [04T17:00Z, 05T17:00Z)
+# (备注, UTC 时刻, 金额)—— 曼谷 = UTC+7,05 日窗口 = [04T17:00Z, 05T17:00Z);
+# 各笔所属曼谷日见备注,期望值按测试惯例字面写在下方 want。
 _FIXTURE = [
     (
         "曼谷05日 01:30(凌晨单·UTC 还是 04 号)",
         datetime(2026, 8, 4, 18, 30, tzinfo=timezone.utc),
         "100",
-        "2026-08-05",
     ),
-    (
-        "曼谷04日 23:59(差 1 分钟进 05)",
-        datetime(2026, 8, 4, 16, 59, tzinfo=timezone.utc),
-        "7",
-        "2026-08-04",
-    ),
-    (
-        "曼谷05日 23:59:59(收尾一秒)",
-        datetime(2026, 8, 5, 16, 59, 59, tzinfo=timezone.utc),
-        "30",
-        "2026-08-05",
-    ),
-    (
-        "曼谷06日 00:00(半开上界·恰好出窗)",
-        datetime(2026, 8, 5, 17, 0, tzinfo=timezone.utc),
-        "9",
-        "2026-08-06",
-    ),
+    ("曼谷04日 23:59(差 1 分钟进 05)", datetime(2026, 8, 4, 16, 59, tzinfo=timezone.utc), "7"),
+    ("曼谷05日 23:59:59(收尾一秒)", datetime(2026, 8, 5, 16, 59, 59, tzinfo=timezone.utc), "30"),
+    ("曼谷06日 00:00(半开上界·恰好出窗)", datetime(2026, 8, 5, 17, 0, tzinfo=timezone.utc), "9"),
 ]
 
 
@@ -75,7 +61,7 @@ def main() -> int:
     try:
         cur.execute("SET LOCAL app.bypass_rls = 'on'")
         tid, ws = str(uuid.uuid4()), 999999901
-        for _, sold_at, amount, _ in _FIXTURE:
+        for _, sold_at, amount in _FIXTURE:
             cur.execute(
                 "INSERT INTO pos_sales (tenant_id, workspace_client_id, sale_type, status, "
                 "grand_total, sold_at) VALUES (%s,%s,'sale','completed',%s,%s)",
@@ -135,12 +121,9 @@ def main() -> int:
         )
 
         conn.rollback()
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        import traceback
-
         traceback.print_exc()
-        print(f"E2E 异常: {e}", file=sys.stderr)
         return 2
     finally:
         cur.close()

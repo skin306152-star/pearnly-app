@@ -7,19 +7,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time
 
 from services.pos import sales_store
 from services.pos.sale import _money
-
-_BANGKOK = timezone(timedelta(hours=7))  # 泰国固定 UTC+7 无夏令时(同 services/sales/dates)
+from services.sales.dates import BANGKOK, bangkok_today
 
 
 def _bangkok_day_start() -> datetime:
     """今日(曼谷本地)零点的绝对时刻。sold_at 存 UTC · 用 tz-aware 边界比较不差午夜那一天。"""
-    from services.sales.dates import bangkok_today
-
-    return datetime.combine(bangkok_today(), time.min, tzinfo=_BANGKOK)
+    return datetime.combine(bangkok_today(), time.min, tzinfo=BANGKOK)
 
 
 def list_today(cur, *, tenant_id: str, workspace_client_id: int) -> dict:

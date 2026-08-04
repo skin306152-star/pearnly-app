@@ -6,6 +6,8 @@
 - validate_issue_date: 禁未来日(税点未到);倒填不得跨出当前 VAT 申报期(自然月),否则
   连号与 ภ.พ.30 申报错位(§G2)。
 - to_thai_date: PDF 日期按佛历 พ.ศ. = 公历 + 543 展示(数据仍存公历 · §G3)。
+- BANGKOK / iso_bangkok: 曼谷时区常量与「时刻→曼谷本地 ISO」单一出口(POS 报表面共用,
+  此前各模块自拷常量+注释指认此处,漂移过一次)。
 """
 
 from __future__ import annotations
@@ -13,17 +15,25 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-_BANGKOK = timezone(timedelta(hours=7))
+BANGKOK = timezone(timedelta(hours=7))
 _BE_OFFSET = 543
 
 
 def bangkok_today() -> date:
-    return datetime.now(_BANGKOK).date()
+    return datetime.now(BANGKOK).date()
 
 
 def bangkok_now() -> datetime:
     """当前曼谷本地时间(UTC+7·无夏令时)。答「现在几点」用,绝不让模型编时间。"""
-    return datetime.now(_BANGKOK)
+    return datetime.now(BANGKOK)
+
+
+def iso_bangkok(v) -> Optional[str]:
+    """时刻按曼谷本地 ISO 输出(消费端直接切串显示/入 CSV,UTC 串会与曼谷日切窗口自相矛盾)。
+    tz-aware 转曼谷;naive 视为已是本地值原样输出,不按机器时区猜(CI 是 UTC 机)。空值给 None。"""
+    if not v:
+        return None
+    return (v.astimezone(BANGKOK) if v.tzinfo else v).isoformat()
 
 
 def validate_issue_date(on: date, today: Optional[date] = None) -> Optional[str]:

@@ -15,6 +15,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
+from services.pos.report_window import bangkok_day_range as _range
 from services.sales.dates import bangkok_today
 
 _HEAT_DAYS = 14
@@ -26,22 +27,6 @@ def _money(v) -> str:
 
 def _qty(v) -> str:
     return f"{Decimal(str(v if v is not None else 0)):.3f}"
-
-
-def _range(col: str, date_from: Optional[date], date_to: Optional[date]) -> tuple[str, list]:
-    """sold_at 时间窗口片段(半开 [from, to+1天)· 含 to 当天 · 曼谷日切)。无界则不加条件。
-
-    sold_at 是 timestamptz:日期参数先转 naive 午夜再按 Asia/Bangkok 解释成绝对时刻。
-    裸比较 date 会按会话时区(UTC)切日,把曼谷凌晨 0–7 点的单划进前一天。
-    """
-    clause, params = "", []
-    if date_from:
-        clause += f" AND {col} >= (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
-        params.append(date_from)
-    if date_to:
-        clause += f" AND {col} < (%s::timestamp AT TIME ZONE 'Asia/Bangkok')"
-        params.append(date_to + timedelta(days=1))
-    return clause, params
 
 
 def sales_report(

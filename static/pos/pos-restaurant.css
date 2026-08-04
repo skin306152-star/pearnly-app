@@ -2,7 +2,7 @@
  * Pearnly POS 餐厅业态 · 4 屏样式(docs/pos/restaurant · 视觉照搬桌面 Pearnly_餐厅POS_UI预览)
  * 逐字移植概念稿 01 桌台总览 / 02 点单 / 03 厨房单 KOT / 04 埋单结账 的 :root 令牌 + <style>,
  * 数值一个不改;按屏作用域(.pos-view--rtables/rorder/rkitchen + .rt-*)隔离,不碰零售 .pos-view--main。
- * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
+ * 复用 pos.css 顶层旧蓝/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
  */
 
 /* 餐厅状态色(总览 + 厨房共用)*/

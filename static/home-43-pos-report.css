@@ -1,226 +1,645 @@
-/* POS 屏9 销售报表 · 视觉照搬概念稿 桌面/Pearnly_POS_UI预览/09-销售报表.html(09 §H)。
-   作用域 .posrep 防污染主程序;令牌按概念稿裸 hex 整块移植(同 home-41/42 · TOKEN_CSS 处理)。
-   唯一偏离:区间选中 + 重试按钮用蓝(var(--accent))不用黑 —— 全站按钮蓝硬规则(Zihao 2026-06-05)覆盖概念稿黑底。 */
+/* POS 屏9 销售仪表盘(2026-08-04 按 Zihao 定稿交互原型 v2 重建:Hero 大横幅内嵌全局日期器 ·
+   走势按月一页 · 商品构成环图 top5+其他 · 分时热力近 14 天)。作用域 .posrep 防污染主程序。
+   --ch-* = 收款分类色(绑实体:1现金 2PromptPay 3刷卡 4转账),亮/暗两套跑过 dataviz 校验;
+   --chp-* = 商品构成分类色(绑 top5 槽位 + 其他);--hm-* = Hero 渐变与热力共用的蓝紫梯
+   (取值 = 现成的蓝紫阶 200/400/600/800,亮暗各自成梯)。全部取现成令牌,无新 hex。
+   Hero 上的半透明白(rgba)是叠在渐变上的罩层,不随主题翻面,属令牌定义面(本文件在
+   theme/consistency 两闸的令牌白名单里)。 */
 .posrep {
     color: var(--ink);
     font-size: 13px;
+    --ch-1: var(--green);
+    --ch-2: var(--accent);
+    --ch-3: var(--amber);
+    --ch-4: var(--sky-500);
+    --chp-1: var(--accent);
+    --chp-2: var(--green);
+    --chp-3: var(--sky-500);
+    --chp-4: var(--amber);
+    --chp-5: var(--red);
+    --chp-x: var(--ink3);
+    --hm-1: var(--blue-200);
+    --hm-2: var(--blue-400);
+    --hm-3: var(--blue-600);
+    --hm-4: var(--blue-800);
+}
+:root.dark .posrep {
+    --ch-4: var(--sky-700);
+    --chp-3: var(--sky-700);
 }
 .posrep .tnum {
     font-variant-numeric: tabular-nums;
 }
-.posrep .ph {
+.posrep .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--sh);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+.posrep .hd {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line2);
     flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 16px;
 }
-.posrep .ph .t {
-    font-size: 19px;
+.posrep .hd .t {
     font-weight: 700;
+    font-size: 13.5px;
 }
-.posrep .range {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.posrep .range button {
-    height: 34px;
-    padding: 0 13px;
-    border: 1px solid var(--line);
-    background: var(--card);
-    border-radius: 8px;
-    font-size: 12.5px;
-    cursor: pointer;
-    color: var(--ink2);
-}
-.posrep .range button.on {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border-color: var(--accent);
-}
-/* S9 4-bis · 时间段 4 独立按钮 → segmented control(单框分段 · 选中实心) */
-.posrep .range .seg {
+/* —— 日期器件(seg + 前后翻页 + input):Hero 与走势卡共用 —— */
+.posrep .seg {
     display: inline-flex;
     border: 1px solid var(--line);
     border-radius: 8px;
     overflow: hidden;
 }
-.posrep .range .seg button {
+.posrep .seg button {
+    height: 30px;
+    padding: 0 12px;
     border: 0;
     border-right: 1px solid var(--line);
-    border-radius: 0;
+    background: var(--card);
+    color: var(--ink2);
+    font-size: 12.5px;
     font-family: inherit;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
 }
-.posrep .range .seg button:last-child {
+.posrep .seg button:last-child {
     border-right: 0;
 }
-.posrep .range input[type='date'] {
-    height: 34px;
+.posrep .seg button.on {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+.posrep .datebar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.posrep .datebar input {
+    height: 30px;
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0 8px;
     font-size: 12.5px;
+    font-family: inherit;
     color: var(--ink);
-}
-.posrep .range .rep-dash {
-    color: var(--ink3);
-}
-.posrep .kpis {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
-}
-.posrep .kpi {
     background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 15px 16px;
-    box-shadow: var(--sh);
 }
-.posrep .kpi .l {
+.posrep .datebar .nav {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    cursor: pointer;
     color: var(--ink2);
-    font-size: 12px;
-}
-.posrep .kpi .v {
-    font-size: 24px;
-    font-weight: 800;
-    margin-top: 6px;
-}
-/* 毛利/成本无快照(老单据)诚实置空 —— 灰弱字重跟真实数字分开,不拿"—"冒充有数据的样子。 */
-.posrep .kpi .v.unknown {
-    color: var(--ink3);
-    font-weight: 600;
-    font-size: 20px;
-}
-.posrep .cards2 {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 16px;
+    place-items: center;
 }
-.posrep .panel {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 14px;
+/* —— ① Hero 大横幅(渐变走 --hm-* 梯;暗夜取该梯的深端,白字两套主题都压得住)—— */
+.posrep .hero {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    color: #fff;
+    margin-bottom: 16px;
+    background: linear-gradient(120deg, var(--hm-4) 0%, var(--hm-3) 55%, var(--hm-2) 100%);
     box-shadow: var(--sh);
+}
+:root.dark .posrep .hero {
+    background: linear-gradient(120deg, var(--hm-2) 0%, var(--hm-1) 100%);
+}
+.posrep .hero .in {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 20px 26px 22px;
+    flex-wrap: wrap;
+}
+.posrep .hero .cap {
+    font-size: 12.5px;
+    opacity: 0.85;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.posrep .hero .capdate {
+    opacity: 0.75;
+}
+.posrep .hero .big {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.15;
+}
+.posrep .hero .cmp {
+    font-size: 12.5px;
+    opacity: 0.95;
+    margin-top: 2px;
+}
+.posrep .hero .cmp b {
+    font-weight: 800;
+}
+/* 环比色:浅档 green/red 阶在深紫渐变上两套主题都读得清 */
+.posrep .hero .cmp .up {
+    color: var(--green-300);
+}
+.posrep .hero .cmp .down {
+    color: var(--red-300);
+}
+.posrep .hero .mid {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+}
+.posrep .hero .cap2 {
+    font-size: 11px;
+    opacity: 0.75;
+}
+.posrep .hero .spark-line {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.92);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+}
+.posrep .hero .spark-area {
+    fill: rgba(255, 255, 255, 0.18);
+}
+.posrep .hero .spark-dot {
+    fill: #fff;
+}
+.posrep .hero .r {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+    min-width: 210px;
+}
+.posrep .hero .badge {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    font-size: 12.5px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 9px;
+    padding: 7px 12px;
+}
+.posrep .hero .badge b {
+    font-weight: 800;
+}
+/* Hero 里的日期器白瓷化(半透明白罩层叠在渐变上) */
+.posrep .hero .ctl {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+.posrep .hero .seg {
+    border-color: rgba(255, 255, 255, 0.4);
+}
+.posrep .hero .seg button {
+    background: rgba(255, 255, 255, 0.14);
+    border-right-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+}
+.posrep .hero .seg button.on {
+    background: #fff;
+    color: var(--accent-deep);
+}
+:root.dark .posrep .hero .seg button.on {
+    color: var(--hm-2); /* 暗夜 accent-deep 翻成浅紫,白底上压不住 → 换梯的深端 */
+}
+.posrep .hero .datebar .nav {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+}
+.posrep .hero .datebar input {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+    color-scheme: dark;
+}
+/* —— ② 走势卡:标题行实时数 + 月翻页 + 柱/线切换 —— */
+.posrep .livebar {
+    display: flex;
+    gap: 18px;
+    align-items: baseline;
+    font-size: 12.5px;
+    color: var(--ink2);
+    flex-wrap: wrap;
+}
+.posrep .livebar b {
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 800;
+}
+.posrep .hdctl {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.posrep .ch-toggle {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
     overflow: hidden;
 }
-.posrep .panel .h {
-    padding: 13px 16px;
-    border-bottom: 1px solid var(--line2);
-    font-weight: 700;
-    font-size: 13.5px;
+.posrep .ch-toggle button {
+    height: 28px;
+    width: 34px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: var(--card);
+    color: var(--ink3);
+    cursor: pointer;
 }
-.posrep .panel .h.border-top {
-    border-top: 1px solid var(--line2);
+.posrep .ch-toggle button.on {
+    background: var(--accent);
+    color: var(--accent-ink);
 }
-.posrep .chart {
-    padding: 18px 16px;
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    height: 200px;
+/* —— 趋势图(柱/线共用骨架:网格退后 · hover 命中列)—— */
+.posrep .ch-plot {
+    position: relative;
+    height: 240px;
+    margin: 18px 16px 4px 46px;
 }
-.posrep .col {
-    flex: 1;
-    max-width: 70px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 7px;
-    height: 100%;
-    justify-content: flex-end;
-    min-width: 0;
+.posrep .ch-grid {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed var(--line2);
+    pointer-events: none;
 }
-.posrep .col .b {
-    width: 60%;
-    min-height: 3px;
-    background: linear-gradient(180deg, var(--accent), var(--accent));
-    border-radius: 6px 6px 0 0;
-}
-.posrep .col .b.skel {
-    background: var(--line2);
-}
-.posrep .col .x {
+.posrep .ch-ylab {
+    position: absolute;
+    left: -40px;
+    top: -7px;
+    width: 34px;
+    text-align: right;
     font-size: 10.5px;
     color: var(--ink3);
-    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
-.posrep .pmrow {
+.posrep .ch-cols {
+    position: absolute;
+    inset: 0;
     display: flex;
-    padding: 14px 16px;
-    gap: 16px;
-    border-top: 1px solid var(--line2);
-}
-.posrep .pmrow .pm {
-    flex: 1;
-    text-align: center;
-}
-.posrep .pmrow .pm .l {
-    font-size: 12px;
-    color: var(--ink2);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    justify-content: center;
-}
-.posrep .pmrow .pm .l .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-.posrep .pmrow .pm .v {
-    font-size: 19px;
-    font-weight: 800;
-    margin-top: 5px;
-}
-.posrep .rows {
-    padding: 6px 0;
-}
-.posrep .row {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--line2);
-    font-size: 13.5px;
-}
-.posrep .row:last-child {
-    border-bottom: 0;
-}
-.posrep .row .rk {
-    width: 20px;
-    color: var(--ink3);
-    font-weight: 700;
-}
-.posrep .row .nm {
-    flex: 1;
-    min-width: 0;
-}
-.posrep .row .q {
-    color: var(--ink2);
-    font-size: 12px;
-}
-.posrep .row .v {
-    font-weight: 700;
-}
-.posrep .row .v-col {
-    display: flex;
-    flex-direction: column;
     align-items: flex-end;
     gap: 2px;
 }
-.posrep .row .pf {
+.posrep .ch-col {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+    min-width: 0;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.posrep [data-mode='bar'] .ch-col:hover {
+    background: var(--line2);
+}
+.posrep .ch-bar {
+    width: 62%;
+    max-width: 26px;
+    min-height: 0;
+    background: var(--accent);
+    border-radius: 4px 4px 0 0;
+}
+.posrep .ch-col:hover .ch-bar,
+.posrep .ch-col.today .ch-bar {
+    background: var(--accent-deep);
+}
+.posrep .ch-bar.skel {
+    background: var(--line2);
+}
+.posrep .ch-cross {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    border-left: 1px dashed var(--ink3);
+    opacity: 0;
+    pointer-events: none;
+}
+.posrep .ch-col:hover .ch-cross {
+    opacity: 0.55;
+}
+.posrep .ch-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+.posrep .ch-area {
+    fill: var(--accent-weak);
+    stroke: none;
+}
+.posrep .ch-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+.posrep .ch-dot {
+    fill: var(--card);
+    stroke: var(--accent);
+    stroke-width: 2;
+    opacity: 0;
+}
+.posrep .ch-dot.on {
+    opacity: 1;
+}
+.posrep .ch-xrow {
+    display: flex;
+    gap: 2px;
+    margin: 6px 16px 14px 46px;
+}
+.posrep .ch-x {
+    flex: 1;
+    text-align: center;
+    font-size: 10.5px;
+    color: var(--ink3);
+    white-space: nowrap;
+    overflow: hidden;
+}
+.posrep .hint {
+    font-size: 11.5px;
+    color: var(--ink3);
+    padding: 0 16px 12px;
+}
+/* —— ③ 商品销售构成:环图 | 图例 | 当期数据 —— */
+.posrep .topgrid {
+    position: relative;
+    display: grid;
+    grid-template-columns: 250px 1fr 330px;
+    gap: 8px;
+    padding: 18px 16px;
+    align-items: center;
+}
+.posrep .dn-wrap {
+    position: relative;
+    width: 210px;
+    margin: 0 auto;
+}
+.posrep .dn-svg {
+    width: 210px;
+    height: 210px;
+    transform: rotate(0.25turn) scale(-1, 1); /* 12 点起笔 · 顺时针 */
+}
+.posrep .dn-seg {
+    fill: none;
+    stroke-width: 5.2;
+    cursor: pointer;
+    transition: stroke-width 0.12s;
+}
+.posrep .dn-seg:hover {
+    stroke-width: 7;
+}
+.posrep .dn-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    pointer-events: none;
+}
+.posrep .dn-cv {
+    font-size: 21px;
+    font-weight: 800;
+}
+.posrep .dn-cl {
     font-size: 11px;
+    color: var(--ink3);
+    margin-top: 2px;
+}
+.posrep .plegend {
+    padding: 0 8px;
+}
+.posrep .plegend .r {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line2);
+    font-size: 12.5px;
+}
+.posrep .plegend .r:last-child {
+    border-bottom: 0;
+}
+.posrep .plegend .dot,
+.posrep .paychips .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    display: inline-block;
+}
+.posrep .plegend .nm {
+    flex: 1;
+    color: var(--ink2);
+    min-width: 0;
+}
+.posrep .plegend .q {
+    color: var(--ink3);
+    font-size: 11.5px;
+}
+.posrep .plegend .pc {
+    color: var(--ink3);
+    width: 36px;
+    text-align: right;
+}
+.posrep .plegend .v {
+    font-weight: 700;
+    min-width: 70px;
+    text-align: right;
+}
+.posrep .stats .s {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line2);
+}
+.posrep .stats .s:last-of-type {
+    border-bottom: 0;
+}
+.posrep .stats .l {
+    color: var(--ink2);
+    font-size: 12.5px;
+}
+.posrep .stats .v {
+    font-weight: 800;
+    font-size: 16px;
+}
+/* 毛利无成本快照(老单据)诚实置空 —— 灰弱字重跟真实数字分开,不拿"—"冒充有数据。 */
+.posrep .stats .v.unknown {
+    color: var(--ink3);
+    font-weight: 600;
+}
+.posrep .kdelta {
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 7px;
+    font-variant-numeric: tabular-nums;
+}
+.posrep .kdelta.good {
+    color: var(--green);
+}
+.posrep .kdelta.bad {
+    color: var(--red);
+}
+.posrep .kdelta.none {
+    color: var(--ink3);
     font-weight: 500;
+}
+/* 收款构成细条(sky 档对比 WARN 的救济 = 色点旁可见金额) */
+.posrep .paymix {
+    margin-top: 12px;
+}
+.posrep .paymix .pt {
+    font-size: 11.5px;
+    color: var(--ink3);
+    margin-bottom: 6px;
+}
+.posrep .paybar {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    gap: 2px;
+}
+.posrep .paybar i {
+    display: block;
+    height: 100%;
+}
+.posrep .paychips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 7px;
+    font-size: 11.5px;
     color: var(--ink2);
 }
-.posrep .row .pf.unknown {
+.posrep .paychips .dot {
+    margin-right: 4px;
+}
+/* —— ④ 分时热力(近 14 天 × 8:00–22:00 · 五档全走现成令牌)—— */
+.posrep .heatwrap {
+    padding: 14px 16px;
+    overflow-x: auto;
+}
+.posrep .hrow {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    margin-bottom: 3px;
+}
+.posrep .hrow .d,
+.posrep .hx .d {
+    width: 44px;
+    flex: 0 0 44px;
+    font-size: 10.5px;
+    color: var(--ink3);
+    text-align: right;
+    padding-right: 4px;
+    font-variant-numeric: tabular-nums;
+}
+.posrep .cell {
+    flex: 1;
+    min-width: 14px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--line2);
+    cursor: pointer;
+}
+.posrep .hx {
+    display: flex;
+    gap: 3px;
+    margin-top: 2px;
+}
+.posrep .hx span {
+    flex: 1;
+    min-width: 14px;
+    text-align: center;
+    font-size: 9.5px;
     color: var(--ink3);
 }
+.posrep .heatlegend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--ink3);
+    padding: 0 16px 12px;
+}
+.posrep .heatlegend i {
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+}
+/* —— 提示卡(整页一张 · fixed 跟指针 · 挂 body 上,不入 .posrep 作用域)—— */
+.rep-tip {
+    position: fixed;
+    z-index: 60;
+    min-width: 130px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--sh);
+    padding: 9px 12px;
+    font-size: 12px;
+    color: var(--ink2);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.08s;
+}
+.rep-tip.on {
+    opacity: 1;
+}
+.rep-tip b {
+    display: block;
+    color: var(--ink);
+    font-size: 12.5px;
+    margin-bottom: 4px;
+}
+.rep-tip span {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+}
+.rep-tip em {
+    font-style: normal;
+    font-weight: 700;
+    color: var(--ink);
+}
+.rep-tip .tnum {
+    font-variant-numeric: tabular-nums;
+}
+/* —— 四态:骨架 / 空 / 错 —— */
 .posrep .rep-state {
     text-align: center;
     color: var(--ink3);
@@ -228,7 +647,8 @@
     font-size: 13.5px;
 }
 .posrep .rep-state.sm {
-    padding: 24px 16px;
+    padding: 24px 0;
+    text-align: left;
 }
 .posrep .rep-state.error {
     color: var(--ink2);
@@ -241,7 +661,7 @@
     border: 0;
     border-radius: 9px;
     background: var(--accent);
-    color: var(--card);
+    color: var(--accent-ink);
     font-weight: 700;
     font-size: 13px;
     cursor: pointer;
@@ -250,22 +670,57 @@
     background: var(--accent-deep);
 }
 .posrep .rep-skel {
+    display: block;
     height: 56px;
     border-radius: 8px;
-    background: linear-gradient(90deg, var(--line2) 25%, var(--line2) 50%, var(--line2) 75%);
-    background-size: 200% 100%;
-    animation: rep-shimmer 1.2s infinite;
+    background: var(--line2);
+    animation: rep-shimmer 1.2s ease-in-out infinite;
+}
+.posrep .rep-skel.line {
+    height: 14px;
+    margin: 8px 0;
+}
+.posrep .rep-skel.big {
+    height: 44px;
+    width: 190px;
+}
+.posrep .rep-skel.round {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    margin: 10px auto;
+}
+.posrep .hero .rep-skel {
+    background: rgba(255, 255, 255, 0.22);
 }
 @keyframes rep-shimmer {
-    to {
-        background-position: -200% 0;
+    50% {
+        opacity: 0.55;
     }
 }
+/* —— ≤900px 竖排降级:构成卡一列 · Hero 中缝脉搏让位 —— */
 @media (max-width: 900px) {
-    .posrep .kpis {
-        grid-template-columns: repeat(2, 1fr);
+    .posrep .hero .in {
+        padding: 16px 16px 18px;
     }
-    .posrep .cards2 {
+    .posrep .hero .mid {
+        display: none;
+    }
+    .posrep .hero .big {
+        font-size: 34px;
+    }
+    .posrep .hero .r {
+        min-width: 0;
+        width: 100%;
+    }
+    .posrep .topgrid {
         grid-template-columns: 1fr;
+        gap: 14px;
+    }
+    .posrep .ch-plot {
+        margin-left: 40px;
+    }
+    .posrep .ch-xrow {
+        margin-left: 40px;
     }
 }

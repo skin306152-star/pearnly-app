@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 542 个源文件全扫
+# UI 设计合规扫描报告 · 546 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -9,22 +9,22 @@
      1  static\pos\pos-data.js
         └ 349: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
-## 旧token名(应用全局emerald) — 命中 200(28 文件)
+## 旧token名(应用全局emerald) — 命中 198(28 文件)
     59  static\pos\pos.css
         └ 14: --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
         └ 41: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
-    22  static\pos\pos-restaurant.css
-        └ 5: * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
+    21  static\pos\pos-restaurant.css
         └ 18: .pos-view--rtables .rtop .brand .dot { width: 9px; height: 9px; border-radius: 50%; backgr
-    21  static\home-01-base.css
-        └ 39: /* 旧蓝调色板收口为 accent(S1 收编 · Purple v2 随令牌翻紫):238 处 --blue 引用一次性换肤 */
+        └ 91: .pos-view--rorder .acts .send { background: var(--blue); color: #fff; }
+    20  static\home-01-base.css
         └ 40: --blue: #7C4DFF;
+        └ 41: --blue-weak: #EEE5FF;
     18  static\home-37-html-inline.css
         └ 26: accent-color: var(--blue);
         └ 38: border: 1px solid var(--blue-200);
-    13  src\home\rules-settings-data.ts
-        └ 6: // media query)· 不碰 CSS bundle。配色走全局令牌(--blue 系 · 选中黑)。
+    12  src\home\rules-settings-data.ts
         └ 282: .rs-tag{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-weak);borde
+        └ 293: .rs-addbtn{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:12.5p
     10  static\home-10-push-logs.css
         └ 69: .erp-exc-chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
         └ 336: .erp-exc-cb, .erp-exc-cb-all { accent-color: var(--blue); width: 16px; height: 16px; curso
@@ -43,9 +43,9 @@
      5  static\home-39-sales.css
         └ 285: background: var(--blue-100);
         └ 286: color: var(--blue-800);
-     3  static\home-45-kit.css
-        └ 482: background: var(--blue-weak);
-        └ 483: border-color: var(--blue);
+     4  static\home-43-pos-report.css
+        └ 21: --hm-1: var(--blue-200);
+        └ 22: --hm-2: var(--blue-400);
      2  static\erp-mrerp-connect.css
         └ 79: background: var(--blue-weak);
         └ 80: color: var(--blue-800);

@@ -5,7 +5,7 @@
 SQL(笛卡尔积防护)由 _e2e_po_b6 真库覆盖。"""
 
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from services.pos import report
@@ -28,6 +28,14 @@ class _Cur:
 
     def fetchall(self):
         return self._cur[1]
+
+
+# sales_report 尾部固定跑 heat(1 句)+ live(2 句),与窗口无关;各装配测试统一拼这段回放。
+_DASH_TAIL = [
+    (None, []),  # heat
+    ({"last_sale_at": None}, None),  # live · 最新一单
+    (None, None),  # live · 无在班班次
+]
 
 
 class FormatTests(unittest.TestCase):
@@ -54,7 +62,7 @@ class AssemblyTests(unittest.TestCase):
         scripted = [
             ({"gross": Decimal("300"), "sales_count": 2, "refund": Decimal("20")}, None),  # kpi
             ({"cost": Decimal("120"), "complete": True}, None),  # kpi cost_agg
-            (None, [{"d": date(2026, 6, 1), "gross": Decimal("300")}]),  # by_day
+            (None, [{"d": date(2026, 6, 1), "gross": Decimal("300"), "sales_count": 2}]),  # by_day
             (
                 None,
                 [{"d": date(2026, 6, 1), "cost": Decimal("120"), "complete": True}],
@@ -81,7 +89,7 @@ class AssemblyTests(unittest.TestCase):
                 None,
                 [{"cashier_id": "c1", "name": "Nok", "sales_count": 2, "gross": Decimal("300")}],
             ),
-        ]
+        ] + _DASH_TAIL
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertEqual(out["kpi"]["gross"], "300.00")
         self.assertEqual(out["kpi"]["avg_ticket"], "150.00")  # 300/2
@@ -94,6 +102,7 @@ class AssemblyTests(unittest.TestCase):
             {
                 "date": "2026-06-01",
                 "gross": "300.00",
+                "sales_count": 2,
                 "cost": "120.00",
                 "gross_profit": "180.00",
                 "cost_complete": True,
@@ -116,7 +125,7 @@ class AssemblyTests(unittest.TestCase):
             ({"chg": Decimal("0")}, None),  # by_method change
             (None, []),  # top_products
             (None, []),  # by_cashier
-        ]
+        ] + _DASH_TAIL
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertEqual(out["kpi"]["avg_ticket"], "0.00")  # 不除零
         self.assertEqual(out["kpi"]["gross_profit"], "0.00")
@@ -135,7 +144,7 @@ class CostHonestyTests(unittest.TestCase):
             ({"chg": Decimal("0")}, None),  # by_method change
             (None, []),  # top_products
             (None, []),  # by_cashier
-        ]
+        ] + _DASH_TAIL
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertIsNone(out["kpi"]["gross_profit"])
         self.assertFalse(out["kpi"]["cost_complete"])
@@ -145,7 +154,7 @@ class CostHonestyTests(unittest.TestCase):
         scripted = [
             ({"gross": Decimal("100"), "sales_count": 1, "refund": Decimal("0")}, None),
             ({"cost": Decimal("0"), "complete": True}, None),
-            (None, [{"d": date(2026, 6, 2), "gross": Decimal("100")}]),
+            (None, [{"d": date(2026, 6, 2), "gross": Decimal("100"), "sales_count": 1}]),
             (None, [{"d": date(2026, 6, 2), "cost": Decimal("40"), "complete": False}]),
             (None, []),  # by_method tendered
             ({"chg": Decimal("0")}, None),  # by_method change
@@ -165,7 +174,7 @@ class CostHonestyTests(unittest.TestCase):
                 ],
             ),
             (None, []),
-        ]
+        ] + _DASH_TAIL
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertIsNone(out["by_day"][0]["gross_profit"])
         self.assertFalse(out["by_day"][0]["cost_complete"])
@@ -177,13 +186,13 @@ class CostHonestyTests(unittest.TestCase):
         scripted = [
             ({"gross": Decimal("50"), "sales_count": 1, "refund": Decimal("0")}, None),
             ({"cost": Decimal("0"), "complete": True}, None),
-            (None, [{"d": date(2026, 6, 3), "gross": Decimal("50")}]),
+            (None, [{"d": date(2026, 6, 3), "gross": Decimal("50"), "sales_count": 1}]),
             (None, []),  # cost_by_day 空 · 无该日分组
             (None, []),  # by_method tendered
             ({"chg": Decimal("0")}, None),  # by_method change
             (None, []),  # top_products
             (None, []),  # by_cashier
-        ]
+        ] + _DASH_TAIL
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertIsNone(out["by_day"][0]["cost"])
         self.assertIsNone(out["by_day"][0]["gross_profit"])
@@ -205,7 +214,7 @@ class RefundNetProfitTests(unittest.TestCase):
             ({"chg": Decimal("0")}, None),  # by_method change
             (None, []),  # top_products
             (None, []),  # by_cashier
-        ]
+        ] + _DASH_TAIL
         return report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
 
     def test_full_refund_zeroes_profit(self):
@@ -270,6 +279,183 @@ class ByMethodChangeNettingTests(unittest.TestCase):
         # 纯非现金单:无找零(change=0),口径与旧实现一致(回归)
         out, _ = self._run([{"method": "transfer", "amount": Decimal("100")}], change=0)
         self.assertEqual(out, {"transfer": "100.00"})
+
+
+class ComparePrevAndHourlyTests(unittest.TestCase):
+    """仪表盘环比与分时(2026-08-04):有界窗口才有「上一等长周期」,单日窗口才有分时。"""
+
+    _MAIN = [
+        ({"gross": Decimal("300"), "sales_count": 2, "refund": Decimal("0")}, None),  # kpi
+        ({"cost": Decimal("120"), "complete": True}, None),  # kpi cost_agg
+        (None, []),  # by_day
+        (None, []),  # by_day cost
+        (None, []),  # by_method tendered
+        ({"chg": Decimal("0")}, None),  # by_method change
+        (None, []),  # top_products
+        (None, []),  # by_cashier
+    ]
+
+    def test_unbounded_window_has_no_prev_or_hourly(self):
+        out = report.sales_report(
+            _Cur(list(self._MAIN) + _DASH_TAIL), tenant_id="t", workspace_client_id=9
+        )
+        self.assertIsNone(out["prev_kpi"])
+        self.assertIsNone(out["prev_range"])
+        self.assertIsNone(out["by_hour"])
+
+    def test_prev_window_is_equal_length_and_adjacent(self):
+        scripted = (
+            list(self._MAIN)
+            + [
+                (
+                    {"gross": Decimal("100"), "sales_count": 1, "refund": Decimal("0")},
+                    None,
+                ),  # prev kpi
+                ({"cost": Decimal("40"), "complete": True}, None),  # prev cost_agg
+            ]
+            + _DASH_TAIL
+        )
+        cur = _Cur(scripted)
+        out = report.sales_report(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            date_from=date(2026, 6, 1),
+            date_to=date(2026, 6, 7),
+        )
+        self.assertEqual(out["prev_range"], {"from": "2026-05-25", "to": "2026-05-31"})
+        self.assertEqual(out["prev_kpi"]["gross"], "100.00")
+        self.assertIsNone(out["by_hour"])  # 多日窗口无分时
+        # 环比查询真的落在上一窗口:prev kpi 那句(尾部 heat+live 三句之前的第二句)的参数
+        # 含 05-25 与 06-01(半开上界)
+        prev_params = cur.queries[-5][1]
+        self.assertIn(date(2026, 5, 25), prev_params)
+        self.assertIn(date(2026, 6, 1), prev_params)
+
+    def test_single_day_window_gets_hourly_buckets(self):
+        scripted = (
+            list(self._MAIN)
+            + [
+                (
+                    {"gross": Decimal("0"), "sales_count": 0, "refund": Decimal("0")},
+                    None,
+                ),  # prev kpi
+                ({"cost": Decimal("0"), "complete": True}, None),  # prev cost_agg
+                (
+                    None,
+                    [
+                        {"h": 9, "gross": Decimal("120"), "sales_count": 3},
+                        {"h": 14, "gross": Decimal("180"), "sales_count": 4},
+                    ],
+                ),  # by_hour
+            ]
+            + _DASH_TAIL
+        )
+        out = report.sales_report(
+            _Cur(scripted),
+            tenant_id="t",
+            workspace_client_id=9,
+            date_from=date(2026, 8, 4),
+            date_to=date(2026, 8, 4),
+        )
+        self.assertEqual(out["prev_range"], {"from": "2026-08-03", "to": "2026-08-03"})
+        self.assertEqual(
+            out["by_hour"],
+            [
+                {"hour": 9, "gross": "120.00", "sales_count": 3},
+                {"hour": 14, "gross": "180.00", "sales_count": 4},
+            ],
+        )
+
+
+class DashboardSectionsTests(unittest.TestCase):
+    """仪表盘重建新增(2026-08-04):环比窗口可由前端指定语义 + heat/live 分区形状。"""
+
+    _MAIN = ComparePrevAndHourlyTests._MAIN
+
+    def test_prev_override_takes_precedence(self):
+        """前端给了 prev_from/prev_to(上周同日)就用它,不再回落相邻等长窗口。"""
+        scripted = (
+            list(self._MAIN)
+            + [
+                (
+                    {"gross": Decimal("90"), "sales_count": 1, "refund": Decimal("0")},
+                    None,
+                ),  # prev kpi
+                ({"cost": Decimal("30"), "complete": True}, None),  # prev cost_agg
+                (None, []),  # by_hour(单日窗口)
+            ]
+            + _DASH_TAIL
+        )
+        cur = _Cur(scripted)
+        out = report.sales_report(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            date_from=date(2026, 8, 4),
+            date_to=date(2026, 8, 4),
+            prev_from=date(2026, 7, 28),
+            prev_to=date(2026, 7, 28),
+        )
+        self.assertEqual(out["prev_range"], {"from": "2026-07-28", "to": "2026-07-28"})
+        self.assertEqual(out["prev_kpi"]["gross"], "90.00")
+        # prev kpi 查询(by_hour+heat+live 四句之前的第二句)参数真的落在 07-28 半开窗口
+        prev_params = cur.queries[-6][1]
+        self.assertIn(date(2026, 7, 28), prev_params)
+        self.assertIn(date(2026, 7, 29), prev_params)
+
+    def test_heat_window_anchored_to_date_to(self):
+        """heat = 以 date_to 为锚的近 14 天,行形如 {date, hour, gross}(曼谷日 × 曼谷钟点)。"""
+        heat_rows = [
+            {"d": date(2026, 8, 3), "h": 9, "gross": Decimal("120")},
+            {"d": date(2026, 8, 4), "h": 18, "gross": Decimal("260")},
+        ]
+        scripted = (
+            list(self._MAIN)
+            + [
+                ({"gross": Decimal("0"), "sales_count": 0, "refund": Decimal("0")}, None),
+                ({"cost": Decimal("0"), "complete": True}, None),
+                (None, []),  # by_hour(单日窗口)
+                (None, heat_rows),  # heat
+                ({"last_sale_at": None}, None),  # live · 最新一单
+                (None, None),  # live · 无在班班次
+            ]
+        )
+        cur = _Cur(scripted)
+        out = report.sales_report(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            date_from=date(2026, 8, 4),
+            date_to=date(2026, 8, 4),
+        )
+        self.assertEqual(
+            out["heat"],
+            [
+                {"date": "2026-08-03", "hour": 9, "gross": "120.00"},
+                {"date": "2026-08-04", "hour": 18, "gross": "260.00"},
+            ],
+        )
+        heat_sql, heat_params = cur.queries[-3]
+        self.assertIn("Asia/Bangkok", heat_sql)
+        self.assertIn(date(2026, 7, 22), heat_params)  # 锚往回 13 天
+        self.assertIn(date(2026, 8, 5), heat_params)  # 半开上界 = 锚 + 1 天
+
+    def test_live_shape_with_open_shift(self):
+        last_sale = datetime(2026, 8, 4, 6, 7, tzinfo=timezone.utc)
+        scripted = list(self._MAIN) + [
+            (None, []),  # heat
+            ({"last_sale_at": last_sale}, None),  # live · 最新一单
+            ({"shift_seq": 4, "cashier_name": "earn"}, None),  # live · 在班班次
+        ]
+        out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
+        self.assertEqual(
+            out["live"],
+            {
+                "last_sale_at": "2026-08-04T06:07:00+00:00",
+                "open_shift": {"cashier_name": "earn", "shift_seq": 4},
+            },
+        )
 
 
 if __name__ == "__main__":

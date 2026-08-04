@@ -1,295 +1,378 @@
-// POS 屏9 · 销售报表(主程序内 · window.loadSalesReport)
-// 视觉照搬概念稿 桌面/Pearnly_POS_UI预览/09-销售报表.html(09 §H):结构移植到 .posrep 作用域,
-// 只改三处 —— ① 假数据→GET /api/pos/admin/report(04 §7 · B6)② 写死文案→i18n(4 语)③ 补四态(07)。
-// 数据=收银卖货自动长出,无手录;不造假(概念稿的「较上周 +%」是 mock,接口无此项→不展示)。
-/* global t, token, escapeHtml, currentLang */
-import { activeWsId, localizedName, posErrMsg, fmtQty, type InvName } from './inventory-common.js';
-import { BAHT } from './money.js';
+// POS 屏9 · 销售仪表盘(主程序内 · window.loadSalesReport)
+// 2026-08-04 按 Zihao 定稿交互原型(交互原型v2)重建:① Hero 大横幅(内嵌全局日期器,按日/按月,
+// 横幅与商品构成一起切,见 sales-report-hero)② 营业额走势(按月一页 · 点某天 → 全局切到那天)
+// ③ 商品销售构成(sales-report-mix)④ 分时热力(近 14 天 × 8:00–22:00)。
+// 环比口径:按日=上周同日(零售星期节律),按月=上一自然月,窗口语义由这里传 prev_from/prev_to。
+// 本文件只管状态编排 + 走势/热力两卡;图表件在 sales-report-charts,类型与取数在 sales-report-common。
+/* global t, escapeHtml */
+import { activeWsId, posErrMsg } from './inventory-common.js';
+import {
+    barChartHtml,
+    lineChartHtml,
+    tipHide,
+    tipShow,
+    type XyBucket,
+} from './sales-report-charts.js';
+import {
+    CHEV_L,
+    CHEV_R,
+    type DayRow,
+    type Granularity,
+    type Report,
+    type SectionState,
+    addDays,
+    addMonths,
+    axisFmt,
+    baht,
+    fetchReport,
+    moneyOrUnknown,
+    monthDays,
+    pad2,
+    parseYmd,
+    ymd,
+} from './sales-report-common.js';
+import { renderHero } from './sales-report-hero.js';
+import { renderMix } from './sales-report-mix.js';
 
-interface Kpi {
-    gross: string;
-    sales_count: number;
-    avg_ticket: string;
-    refund: string;
-    cost: string;
-    gross_profit: string | null;
-    cost_complete: boolean;
+// ── 全局状态:一个日期器管横幅 + 商品构成;走势卡自己按月翻页 ──
+let gran: Granularity = 'day';
+let gDate = ymd(new Date());
+let gMonth = gDate.slice(0, 7);
+let tMonth = gDate.slice(0, 7);
+let mainData: Report | null = null;
+let mainTo = ''; // 本次全局窗口的 to(热力网格锚 · 与后端 heat 窗口同源)
+let trendRows: TrendRow[] = [];
+
+// 图型偏好跨会话记住:店主每天看同一张图,别让他每天点一次。
+const CHART_MODE_LS = 'pearnly_rep_chart_mode';
+let chartMode: 'bar' | 'line' = 'bar';
+try {
+    if (localStorage.getItem(CHART_MODE_LS) === 'line') chartMode = 'line';
+} catch (_) {
+    /* 私模/配额:回落默认柱状 */
 }
-interface DayRow {
+
+const HEAT_DAYS = 14;
+const HOUR_LO = 8;
+const HOUR_HI = 22;
+
+// 全局窗口 + 环比窗口(按日=上周同日 · 按月=上一自然月;当月截到今天,热力锚才不会落在未来)
+function globalRange(): { from: string; to: string; prev_from: string; prev_to: string } {
+    if (gran === 'day') {
+        const prev = addDays(gDate, -7);
+        return { from: gDate, to: gDate, prev_from: prev, prev_to: prev };
+    }
+    const today = ymd(new Date());
+    const last = gMonth + '-' + pad2(monthDays(gMonth));
+    const pm = addMonths(gMonth, -1);
+    return {
+        from: gMonth + '-01',
+        to: gMonth === today.slice(0, 7) ? today : last,
+        prev_from: pm + '-01',
+        prev_to: pm + '-' + pad2(monthDays(pm)),
+    };
+}
+
+function periodLabel(): string {
+    return gran === 'day' ? gDate : gMonth;
+}
+
+// ── ② 营业额走势(按月一页)──
+interface TrendRow {
     date: string;
-    gross: string;
-    cost: string | null;
-    gross_profit: string | null;
-    cost_complete: boolean;
-}
-interface TopProduct {
-    product_id: string;
-    name: InvName;
-    qty: string;
-    gross: string;
-    cost: string;
-    gross_profit: string | null;
-    cost_complete: boolean;
-}
-interface CashierRow {
-    cashier_id: string;
-    name: string;
-    sales_count: number;
-    gross: string;
-}
-interface Report {
-    kpi: Kpi;
-    by_day: DayRow[];
-    by_method: Record<string, string>;
-    top_products: TopProduct[];
-    by_cashier: CashierRow[];
+    gross: number;
+    profit: string | null;
+    orders: number;
+    has: boolean;
 }
 
-type RangeKey = 'today' | 'week' | 'month' | 'custom';
-let range: RangeKey = 'week';
-let customFrom = '';
-let customTo = '';
-
-function ymd(d: Date): string {
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + day;
-}
-
-// 区间 → [from, to](本地日期 · 含端点)
-function resolveRange(): { from: string; to: string } {
-    const now = new Date();
-    const today = ymd(now);
-    if (range === 'today') return { from: today, to: today };
-    if (range === 'month') {
-        const first = new Date(now.getFullYear(), now.getMonth(), 1);
-        return { from: ymd(first), to: today };
-    }
-    if (range === 'custom') {
-        return { from: customFrom || today, to: customTo || today };
-    }
-    // week:本周一 → 今天(周一为周首)
-    const dow = (now.getDay() + 6) % 7; // 周一=0
-    const mon = new Date(now);
-    mon.setDate(now.getDate() - dow);
-    return { from: ymd(mon), to: today };
-}
-
-function bahtInt(v: string | number): string {
-    return Math.round(Number(v) || 0).toLocaleString('en-US');
-}
-
-// 毛利/成本可能诚实置空(老单据无成本快照)——跟真 0 分开渲染,不拿 "—" 冒充 0,也不拿 0 冒充有数据。
-function moneyOrUnknown(v: string | null): string {
-    return v == null ? '—' : BAHT + bahtInt(v);
-}
-
-async function fetchReport(): Promise<Report> {
-    const wsId = activeWsId();
-    const { from, to } = resolveRange();
-    const params = new URLSearchParams({ workspace_client_id: String(wsId), from, to });
-    let body: { ok?: boolean; data?: Report; error?: { code?: string } };
-    try {
-        const headers: Record<string, string> = {
-            Authorization: 'Bearer ' + (typeof token === 'string' ? token : ''),
-        };
-        const ws = window._wsHeader && window._wsHeader();
-        if (ws) for (const k in ws) if (ws[k] != null) headers[k] = ws[k] as string;
-        const r = await fetch('/api/pos/admin/report?' + params.toString(), {
-            headers: headers as HeadersInit,
+function buildTrendRows(byDay: DayRow[]): TrendRow[] {
+    const byDate = new Map(byDay.map((d) => [d.date, d]));
+    const rows: TrendRow[] = [];
+    for (let day = 1; day <= monthDays(tMonth); day++) {
+        const date = tMonth + '-' + pad2(day);
+        const r = byDate.get(date);
+        rows.push({
+            date,
+            gross: r ? Number(r.gross) || 0 : 0,
+            profit: r ? r.gross_profit : null,
+            orders: r ? r.sales_count : 0,
+            has: !!r,
         });
-        body = await r.json();
-    } catch (_) {
-        throw new Error('pos.unexpected');
     }
-    if (body && body.ok === true && body.data) return body.data;
-    throw new Error((body && body.error && body.error.code) || 'pos.unexpected');
+    return rows;
 }
 
-// ── 渲染片段 ──
-function rangeBar(): string {
-    const btn = (k: RangeKey, label: string) =>
-        `<button class="${range === k ? 'on' : ''}" data-range="${k}">${escapeHtml(label)}</button>`;
-    const custom =
-        range === 'custom'
-            ? `<input type="date" id="rep-from" value="${escapeHtml(customFrom)}" />
-               <span class="rep-dash">–</span>
-               <input type="date" id="rep-to" value="${escapeHtml(customTo)}" />`
-            : '';
-    return `<div class="range">
-        <div class="seg">${btn('today', t('rep-range-today'))}${btn('week', t('rep-range-week'))}${btn('month', t('rep-range-month'))}${btn('custom', t('rep-range-custom'))}</div>
-        ${custom}
-    </div>`;
+function trendTipHtml(row: TrendRow): string {
+    return `<b>${row.date}</b>
+        <span>${escapeHtml(t('rep-kpi-gross'))} <em class="tnum">${baht(row.gross)}</em></span>
+        <span>${escapeHtml(t('rep-kpi-profit'))} <em class="tnum">${moneyOrUnknown(row.profit)}</em></span>
+        <span>${escapeHtml(t('rep-kpi-count'))} <em class="tnum">${row.orders}</em></span>`;
 }
 
-function kpiCards(k: Kpi): string {
-    const card = (label: string, value: string, unknown?: boolean, title?: string) =>
-        `<div class="kpi"><div class="l">${escapeHtml(label)}</div><div class="v tnum${unknown ? ' unknown' : ''}"${
-            title ? ` title="${escapeHtml(title)}"` : ''
-        }>${value}</div></div>`;
-    const profitUnknown = k.gross_profit == null;
-    return `<div class="kpis">
-        ${card(t('rep-kpi-gross'), BAHT + bahtInt(k.gross))}
-        ${card(t('rep-kpi-count'), String(k.sales_count))}
-        ${card(t('rep-kpi-avg'), BAHT + bahtInt(k.avg_ticket))}
-        ${card(t('rep-kpi-refund'), BAHT + bahtInt(k.refund))}
-        ${card(
-            t('rep-kpi-profit'),
-            moneyOrUnknown(k.gross_profit),
-            profitUnknown,
-            profitUnknown ? t('rep-profit-unknown') : undefined
-        )}
-    </div>`;
+function renderLivebar(row: TrendRow | null): void {
+    const el = document.getElementById('rep-livebar');
+    if (!el) return;
+    if (!row) {
+        el.innerHTML = '';
+        return;
+    }
+    const avg = row.orders ? row.gross / row.orders : 0;
+    const seg = (label: string, value: string) =>
+        `<span>${escapeHtml(label)} <b class="tnum">${value}</b></span>`;
+    el.innerHTML =
+        `<span>${row.date}</span>` +
+        seg(t('rep-kpi-gross'), baht(row.gross)) +
+        seg(t('rep-kpi-profit'), moneyOrUnknown(row.profit)) +
+        seg(t('rep-kpi-count'), String(row.orders)) +
+        seg(t('rep-kpi-avg'), baht(avg));
 }
 
-function chartPanel(byDay: DayRow[], byMethod: Record<string, string>): string {
-    const max = byDay.reduce((m, d) => Math.max(m, Number(d.gross) || 0), 0) || 1;
-    const cols = byDay.length
-        ? byDay
-              .map((d) => {
-                  const h = Math.max(3, Math.round(((Number(d.gross) || 0) / max) * 100));
-                  const lbl = d.date.slice(5).replace('-', '/'); // MM/DD
-                  const tip = `${t('rep-kpi-gross')} ${BAHT}${bahtInt(d.gross)} · ${t('rep-kpi-profit')} ${moneyOrUnknown(d.gross_profit)}`;
-                  return `<div class="col" title="${escapeHtml(tip)}"><div class="b" style="height:${h}%"></div><div class="x">${escapeHtml(lbl)}</div></div>`;
-              })
-              .join('')
-        : `<div class="rep-state">${escapeHtml(t('rep-empty'))}</div>`;
-    const pm = (color: string, label: string, amount: string) =>
-        `<div class="pm"><div class="l"><span class="dot" style="background:var(--${color})"></span>${escapeHtml(label)}</div><div class="v tnum">${BAHT}${bahtInt(amount)}</div></div>`;
-    return `<div class="panel">
-        <div class="h">${escapeHtml(t('rep-chart-daily'))}</div>
-        <div class="chart">${cols}</div>
-        <div class="pmrow">
-            ${pm('rep-green', t('rep-pm-cash'), byMethod.cash || '0')}
-            ${pm('rep-blue', t('rep-pm-promptpay'), byMethod.promptpay || '0')}
-            ${pm('rep-amber', t('rep-pm-card'), byMethod.card || '0')}
+function renderTrend(state: SectionState, errCode?: string): void {
+    const el = document.getElementById('rep-trend-card');
+    if (!el) return;
+    const modeBtn = (m: 'bar' | 'line', label: string, icon: string) =>
+        `<button data-chart-mode="${m}" class="${chartMode === m ? 'on' : ''}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</button>`;
+    let body = '';
+    if (state === 'loading') {
+        body = `<div class="ch-plot">${'<div class="ch-col"><div class="ch-bar skel" style="height:55%"></div></div>'.repeat(12)}</div>`;
+    } else if (state === 'error') {
+        body = errorHtml(errCode || 'pos.unexpected', 'rep-t-retry');
+    } else {
+        const buckets: XyBucket[] = trendRows.map((r) => ({
+            label: pad2(parseYmd(r.date).getDate()),
+            value: r.gross,
+            tip: '',
+        }));
+        body = trendRows.some((r) => r.has)
+            ? (chartMode === 'line' ? lineChartHtml : barChartHtml)(buckets, axisFmt)
+            : `<div class="rep-state">${escapeHtml(t('rep-empty'))}</div>`;
+    }
+    el.innerHTML = `<div class="hd">
+        <div class="t">${escapeHtml(t('rep-trend-title'))}</div>
+        <div class="livebar" id="rep-livebar"></div>
+        <div class="hdctl">
+            <div class="datebar">
+                <button class="nav" id="rep-t-prev" aria-label="prev">${CHEV_L}</button>
+                <input type="month" id="rep-t-month" value="${tMonth}">
+                <button class="nav" id="rep-t-next" aria-label="next">${CHEV_R}</button>
+            </div>
+            <div class="ch-toggle" role="group">
+                ${modeBtn('bar', t('rep-view-bar'), '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="6" width="4" height="15" rx="1"/><rect x="17" y="9" width="4" height="12" rx="1"/></svg>')}
+                ${modeBtn('line', t('rep-view-line'), '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/></svg>')}
+            </div>
         </div>
-    </div>`;
+    </div>
+    <div class="plotwrap" id="rep-t-plot">${body}</div>
+    <div class="hint">${escapeHtml(t('rep-trend-hint'))}</div>`;
+    bindTrendCtl();
+    if (state === 'ready') {
+        const withData = trendRows.filter((r) => r.has);
+        renderLivebar(withData.length ? withData[withData.length - 1] : null);
+        bindTrendPlot();
+    }
 }
 
-function listsPanel(top: TopProduct[], cashiers: CashierRow[]): string {
-    const topRows = top.length
-        ? top
-              .map((p, i) => {
-                  const profitUnknown = p.gross_profit == null;
-                  return `<div class="row"><span class="rk">${i + 1}</span><span class="nm">${escapeHtml(
-                      localizedName(p.name)
-                  )} <span class="q">· ${escapeHtml(fmtQty(p.qty))} ${escapeHtml(t('rep-unit-items'))}</span></span><span class="v-col"><span class="v tnum">${BAHT}${bahtInt(
-                      p.gross
-                  )}</span><span class="pf tnum${profitUnknown ? ' unknown' : ''}">${escapeHtml(
-                      t('rep-kpi-profit')
-                  )} ${moneyOrUnknown(p.gross_profit)}</span></span></div>`;
-              })
-              .join('')
-        : `<div class="rep-state sm">${escapeHtml(t('rep-empty'))}</div>`;
-    const cashierRows = cashiers.length
-        ? cashiers
-              .map(
-                  (c) =>
-                      `<div class="row"><span class="nm">${escapeHtml(c.name || '—')}</span><span class="q">${c.sales_count} ${escapeHtml(t('rep-unit-orders'))}</span><span class="v tnum">${BAHT}${bahtInt(c.gross)}</span></div>`
-              )
-              .join('')
-        : `<div class="rep-state sm">${escapeHtml(t('rep-empty'))}</div>`;
-    return `<div class="panel">
-        <div class="h">${escapeHtml(t('rep-top-products'))}</div>
-        <div class="rows">${topRows}</div>
-        <div class="h border-top">${escapeHtml(t('rep-by-cashier'))}</div>
-        <div class="rows">${cashierRows}</div>
-    </div>`;
-}
-
-function skeleton(): string {
-    const kp = '<div class="kpi"><div class="rep-skel"></div></div>'.repeat(5);
-    return `<div class="kpis">${kp}</div>
-        <div class="cards2">
-            <div class="panel"><div class="chart">${'<div class="col"><div class="b skel" style="height:60%"></div></div>'.repeat(7)}</div></div>
-            <div class="panel"><div class="rows">${'<div class="row"><div class="rep-skel"></div></div>'.repeat(5)}</div></div>
-        </div>`;
-}
-
-function setBody(html: string) {
-    const b = document.getElementById('rep-body');
-    if (b) b.innerHTML = html;
-}
-
-function bindRange() {
-    document.querySelectorAll<HTMLElement>('#page-sales-report [data-range]').forEach((b) => {
+function bindTrendCtl(): void {
+    const stepT = (k: number) => {
+        tMonth = addMonths(tMonth, k);
+        loadTrend();
+    };
+    const prev = document.getElementById('rep-t-prev');
+    const next = document.getElementById('rep-t-next');
+    if (prev) prev.onclick = () => stepT(-1);
+    if (next) next.onclick = () => stepT(1);
+    const monthIn = document.getElementById('rep-t-month') as HTMLInputElement | null;
+    if (monthIn)
+        monthIn.onchange = () => {
+            if (monthIn.value) tMonth = monthIn.value;
+            loadTrend();
+        };
+    document.querySelectorAll<HTMLElement>('#rep-trend-card [data-chart-mode]').forEach((b) => {
         b.onclick = () => {
-            range = b.dataset.range as RangeKey;
-            if (range === 'custom') {
-                const today = ymd(new Date());
-                if (!customTo) customTo = today;
-                if (!customFrom) customFrom = today;
+            chartMode = b.dataset.chartMode as 'bar' | 'line';
+            try {
+                localStorage.setItem(CHART_MODE_LS, chartMode);
+            } catch (_) {
+                /* 私模/配额:本次会话内仍生效 */
             }
-            renderHead();
-            load();
+            renderTrend('ready');
         };
     });
-    const from = document.getElementById('rep-from') as HTMLInputElement | null;
-    const to = document.getElementById('rep-to') as HTMLInputElement | null;
-    if (from)
-        from.onchange = () => {
-            customFrom = from.value;
-            load();
-        };
-    if (to)
-        to.onchange = () => {
-            customTo = to.value;
-            load();
-        };
 }
 
-function renderHead() {
-    const head = document.getElementById('rep-head');
-    if (head) head.innerHTML = `<div class="t">${escapeHtml(t('rep-title'))}</div>${rangeBar()}`;
-    bindRange();
+function bindTrendPlot(): void {
+    const plot = document.getElementById('rep-t-plot');
+    if (!plot) return;
+    const dots = plot.querySelectorAll<SVGElement>('.ch-dot');
+    const todayIso = ymd(new Date());
+    plot.querySelectorAll<HTMLElement>('.ch-col').forEach((col) => {
+        const i = Number(col.dataset.tipI);
+        const row = trendRows[i];
+        if (!row) return;
+        if (row.date === todayIso) col.classList.add('today');
+        const show = (ev: PointerEvent) => {
+            renderLivebar(row);
+            tipShow(ev, trendTipHtml(row));
+            dots.forEach((d) =>
+                d.classList.toggle('on', d.getAttribute('data-dot-i') === String(i))
+            );
+        };
+        col.onpointerenter = show;
+        col.onpointermove = show;
+        col.onpointerleave = () => {
+            tipHide();
+            dots.forEach((d) => d.classList.remove('on'));
+        };
+        // 联动:点一天 → 全局切到那天(横幅 + 商品构成)并滚回顶部
+        col.onclick = () => {
+            gran = 'day';
+            gDate = row.date;
+            loadMain();
+            document
+                .getElementById('page-sales-report')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+    });
 }
 
-async function load() {
-    setBody(skeleton());
-    let data: Report;
+// ── ④ 分时热力(近 14 天 × 8:00–22:00)──
+// 五档色阶:--hm-* 定义收敛在 home-43(取值 = 现成蓝紫阶令牌 200/400/600/800,亮暗各自成梯)
+function heatShadeVar(v: number, mx: number): string {
+    const k = v / mx;
+    if (k < 0.08) return '--line2';
+    if (k < 0.3) return '--hm-1';
+    if (k < 0.55) return '--hm-2';
+    if (k < 0.8) return '--hm-3';
+    return '--hm-4';
+}
+
+function renderHeat(state: SectionState, errCode?: string): void {
+    const el = document.getElementById('rep-heat-card');
+    if (!el) return;
+    let body: string;
+    if (state === 'loading') {
+        body = `<div class="heatwrap">${'<div class="rep-skel line"></div>'.repeat(6)}</div>`;
+    } else if (state === 'error') {
+        body = errorHtml(errCode || 'pos.unexpected', 'rep-h-retry');
+    } else {
+        const cells = new Map(
+            (mainData?.heat || []).map((c) => [c.date + '#' + c.hour, Number(c.gross) || 0])
+        );
+        const days: string[] = [];
+        for (let i = HEAT_DAYS - 1; i >= 0; i--) days.push(addDays(mainTo, -i));
+        let mx = 0;
+        for (const d of days)
+            for (let h = HOUR_LO; h <= HOUR_HI; h++) mx = Math.max(mx, cells.get(d + '#' + h) || 0);
+        mx = mx || 1;
+        const rows = days
+            .map((d) => {
+                const cols = [];
+                for (let h = HOUR_LO; h <= HOUR_HI; h++) {
+                    const v = cells.get(d + '#' + h) || 0;
+                    cols.push(
+                        `<i class="cell" data-d="${d}" data-h="${h}" data-v="${v}" style="background:var(${heatShadeVar(v, mx)})"></i>`
+                    );
+                }
+                return `<div class="hrow"><span class="d">${d.slice(5).replace('-', '/')}</span>${cols.join('')}</div>`;
+            })
+            .join('');
+        const xlabels = Array.from(
+            { length: HOUR_HI - HOUR_LO + 1 },
+            (_, j) => `<span>${HOUR_LO + j}</span>`
+        ).join('');
+        body = `<div class="heatwrap" id="rep-heat">${rows}<div class="hx"><span class="d"></span>${xlabels}</div></div>
+            <div class="heatlegend">${escapeHtml(t('rep-heat-less'))}
+                <i style="background:var(--line2)"></i><i style="background:var(--hm-1)"></i><i style="background:var(--hm-2)"></i><i style="background:var(--hm-3)"></i><i style="background:var(--hm-4)"></i>
+            ${escapeHtml(t('rep-heat-more'))}</div>`;
+    }
+    el.innerHTML = `<div class="hd"><div class="t">${escapeHtml(t('rep-heat-title'))}</div></div>${body}`;
+    el.querySelectorAll<HTMLElement>('.cell').forEach((c) => {
+        const show = (ev: PointerEvent) =>
+            tipShow(
+                ev,
+                `<b>${c.dataset.d} · ${c.dataset.h}:00</b><span>${escapeHtml(t('rep-kpi-gross'))} <em class="tnum">${baht(Number(c.dataset.v))}</em></span>`
+            );
+        c.onpointerenter = show;
+        c.onpointermove = show;
+        c.onpointerleave = tipHide;
+    });
+}
+
+// ── 四态 · 装配 ──
+function errorHtml(code: string, retryCls: string): string {
+    return `<div class="rep-state error">${escapeHtml(posErrMsg(code, 'rep-error'))}<br><button class="rep-retry ${retryCls}">${escapeHtml(t('rep-retry'))}</button></div>`;
+}
+
+function paintMain(state: SectionState, errCode?: string): void {
+    renderHero({ gran, gDate, gMonth, state, errCode, data: mainData, onChange: applyGlobal });
+    renderMix({
+        periodLabel: periodLabel(),
+        state,
+        errCode,
+        data: mainData,
+        errorHtml: (code) => errorHtml(code, 'rep-m-retry'),
+    });
+    renderHeat(state, errCode);
+}
+
+function applyGlobal(next: { gran?: Granularity; gDate?: string; gMonth?: string }): void {
+    if (next.gran) gran = next.gran;
+    if (next.gDate) gDate = next.gDate;
+    if (next.gMonth) gMonth = next.gMonth;
+    loadMain();
+}
+
+async function loadMain(): Promise<void> {
+    mainData = null;
+    paintMain('loading');
+    const range = globalRange();
+    mainTo = range.to;
     try {
-        data = await fetchReport();
+        mainData = await fetchReport(range);
     } catch (e) {
         const code = e instanceof Error ? e.message : 'pos.unexpected';
-        setBody(
-            `<div class="rep-state error">${escapeHtml(posErrMsg(code, 'rep-error'))}<br><button class="rep-retry" id="rep-retry">${escapeHtml(t('rep-retry'))}</button></div>`
-        );
-        const retry = document.getElementById('rep-retry');
-        if (retry) retry.onclick = () => load();
+        paintMain('error', code);
+        document.querySelectorAll<HTMLElement>('.rep-m-retry, .rep-h-retry').forEach((b) => {
+            b.onclick = () => loadMain();
+        });
         return;
     }
-    const empty =
-        (!data.kpi || data.kpi.sales_count === 0) && (!data.by_day || data.by_day.length === 0);
-    if (empty) {
-        setBody(`<div class="rep-state">${escapeHtml(t('rep-empty'))}</div>`);
+    paintMain('ready');
+}
+
+async function loadTrend(): Promise<void> {
+    renderTrend('loading');
+    try {
+        const data = await fetchReport({
+            from: tMonth + '-01',
+            to: tMonth + '-' + pad2(monthDays(tMonth)),
+        });
+        trendRows = buildTrendRows(data.by_day || []);
+    } catch (e) {
+        const code = e instanceof Error ? e.message : 'pos.unexpected';
+        renderTrend('error', code);
+        document.querySelectorAll<HTMLElement>('.rep-t-retry').forEach((b) => {
+            b.onclick = () => loadTrend();
+        });
         return;
     }
-    setBody(
-        kpiCards(data.kpi) +
-            `<div class="cards2">${chartPanel(data.by_day || [], data.by_method || {})}${listsPanel(
-                data.top_products || [],
-                data.by_cashier || []
-            )}</div>`
-    );
+    renderTrend('ready');
 }
 
 function needWorkspaceHtml(): string {
-    return `<div class="rep-state">${escapeHtml(t('rep-need-workspace'))}
-        <button class="rep-retry" id="rep-pick-ws">${escapeHtml(t('rep-pick-workspace'))}</button></div>`;
+    return `<div class="card"><div class="rep-state">${escapeHtml(t('rep-need-workspace'))}
+        <br><button class="rep-retry" id="rep-pick-ws">${escapeHtml(t('rep-pick-workspace'))}</button></div></div>`;
 }
 
 window.loadSalesReport = function () {
     const sec = document.getElementById('page-sales-report');
     if (!sec) return;
-    if (sec.dataset.repInit !== '1') {
-        sec.classList.add('ui');
-        sec.innerHTML = `<div class="posrep"><div class="wrap"><div class="ph" id="rep-head"></div><div id="rep-body"></div></div></div>`;
-        sec.dataset.repInit = '1';
-    }
-    renderHead();
+    // 不挂设计 kit 的 .ui 命名空间:kit 里 .ui .seg(2px 进度条)/.ui .dot 会压过本页同名件,
+    // 本页样式全部自包含在 .posrep 作用域里
+    sec.classList.remove('ui');
     if (activeWsId() == null) {
-        setBody(needWorkspaceHtml());
+        sec.innerHTML = `<div class="posrep">${needWorkspaceHtml()}</div>`;
         const pick = document.getElementById('rep-pick-ws');
         if (pick)
             pick.onclick = () =>
@@ -298,5 +381,19 @@ window.loadSalesReport = function () {
                     : window.openWorkspaceChooserUI?.();
         return;
     }
-    load();
+    sec.innerHTML = `<div class="posrep" role="region" aria-label="${escapeHtml(t('rep-title'))}">
+        <div class="hero" id="rep-hero"></div>
+        <div class="card" id="rep-trend-card"></div>
+        <div class="card" id="rep-mix-card"></div>
+        <div class="card" id="rep-heat-card"></div>
+    </div>`;
+    loadMain();
+    loadTrend();
 };
+
+if (typeof window.subscribeI18n === 'function') {
+    window.subscribeI18n('sales-report', () => {
+        if (document.getElementById('page-sales-report')?.querySelector('.posrep'))
+            window.loadSalesReport?.();
+    });
+}

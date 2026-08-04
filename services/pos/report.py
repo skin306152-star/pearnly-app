@@ -9,9 +9,13 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
+
+# 店内钟点固定 +7:泰国无夏令时,不依赖服务器 tzdata(SQL 侧仍用 Postgres 的 'Asia/Bangkok')。
+_BKK = timezone(timedelta(hours=7))
+_HEAT_DAYS = 14
 
 
 def _money(v) -> str:
@@ -42,15 +46,107 @@ def sales_report(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     top_n: int = 10,
+    prev_from: Optional[date] = None,
+    prev_to: Optional[date] = None,
 ) -> dict:
     base = (tenant_id, workspace_client_id)
-    return {
+    out = {
         "kpi": _kpi(cur, base, date_from, date_to),
         "by_day": _by_day(cur, base, date_from, date_to),
         "by_method": _by_method(cur, base, date_from, date_to),
         "top_products": _top_products(cur, base, date_from, date_to, top_n),
         "by_cashier": _by_cashier(cur, base, date_from, date_to),
     }
+    # 环比对照窗口:前端可显式指定语义窗口(按日=上周同日,零售有星期节律;按月=上一自然月),
+    # 没给回落相邻等长上一窗口。窗口无界(全程)没有对照物,诚实给 None,前端不显示环比
+    # 而不是显示 Odoo 式的「↑∞%」。
+    if not (prev_from and prev_to) and date_from and date_to:
+        span = (date_to - date_from).days + 1
+        prev_to = date_from - timedelta(days=1)
+        prev_from = prev_to - timedelta(days=span - 1)
+    if prev_from and prev_to:
+        out["prev_kpi"] = _kpi(cur, base, prev_from, prev_to)
+        out["prev_range"] = {"from": prev_from.isoformat(), "to": prev_to.isoformat()}
+    else:
+        out["prev_kpi"] = None
+        out["prev_range"] = None
+    # 单日窗口给分时序列(店内钟点 Asia/Bangkok:分时图是给店主看的,UTC 钟点没人看得懂)。
+    # 窗口本身仍沿用全表的既有口径,分时桶只是窗口内流水的另一种切法,总额与 KPI 恒等。
+    out["by_hour"] = (
+        _by_hour(cur, base, date_from, date_to)
+        if (date_from and date_to and date_from == date_to)
+        else None
+    )
+    out["heat"] = _heat(cur, base, date_to)
+    out["live"] = _live(cur, base)
+    return out
+
+
+def _heat(cur, base, date_to: Optional[date]) -> list:
+    """近 14 天 × 钟点的营业额格子(天与小时都按曼谷钟切,两者必须同轴:凌晨单跨 UTC 日)。
+
+    锚 = 窗口终点 date_to(热力跟着看的时期走),无锚用曼谷今天。窗口边界沿用 _range 的
+    UTC 日切——首日曼谷 0–7 点会缺、尾后多出一个曼谷日,但前端只画 8:00–22:00 × 锚前 14 天,
+    展示面完整;为对齐边界引第二套窗口口径不值得。
+    """
+    anchor = date_to or datetime.now(_BKK).date()
+    rng, rp = _range("sold_at", anchor - timedelta(days=_HEAT_DAYS - 1), anchor)
+    cur.execute(
+        "SELECT (sold_at AT TIME ZONE 'Asia/Bangkok')::date AS d, "
+        "EXTRACT(HOUR FROM (sold_at AT TIME ZONE 'Asia/Bangkok'))::int AS h, "
+        "COALESCE(SUM(grand_total),0) AS gross "
+        "FROM pos_sales "
+        "WHERE tenant_id=%s AND workspace_client_id=%s AND status='completed' AND sale_type='sale'"
+        + rng
+        + " GROUP BY 1, 2 ORDER BY 1, 2",
+        list(base) + rp,
+    )
+    return [
+        {"date": r["d"].isoformat(), "hour": int(r["h"]), "gross": _money(r["gross"])}
+        for r in cur.fetchall()
+    ]
+
+
+def _live(cur, base) -> dict:
+    """实时侧写(横幅右徽章):最新一单时刻 + 当前未交班班次。有意不吃窗口——徽章说的是「现在」。"""
+    cur.execute(
+        "SELECT MAX(sold_at) AS last_sale_at FROM pos_sales "
+        "WHERE tenant_id=%s AND workspace_client_id=%s AND status='completed' AND sale_type='sale'",
+        list(base),
+    )
+    row = cur.fetchone() or {}
+    last = row.get("last_sale_at")
+    cur.execute(
+        "SELECT sh.shift_seq, c.display_name AS cashier_name "
+        "FROM pos_shifts sh LEFT JOIN pos_cashiers c ON c.id = sh.cashier_id "
+        "WHERE sh.tenant_id=%s AND sh.workspace_client_id=%s AND sh.status='open' "
+        "ORDER BY sh.opened_at DESC LIMIT 1",
+        list(base),
+    )
+    sh = cur.fetchone()
+    return {
+        "last_sale_at": last.isoformat() if last else None,
+        "open_shift": (
+            {"cashier_name": sh["cashier_name"], "shift_seq": sh["shift_seq"]} if sh else None
+        ),
+    }
+
+
+def _by_hour(cur, base, date_from, date_to) -> list:
+    rng, rp = _range("sold_at", date_from, date_to)
+    cur.execute(
+        "SELECT EXTRACT(HOUR FROM (sold_at AT TIME ZONE 'Asia/Bangkok'))::int AS h, "
+        "COALESCE(SUM(grand_total),0) AS gross, COUNT(*) AS sales_count "
+        "FROM pos_sales "
+        "WHERE tenant_id=%s AND workspace_client_id=%s AND status='completed' AND sale_type='sale'"
+        + rng
+        + " GROUP BY 1 ORDER BY 1",
+        list(base) + rp,
+    )
+    return [
+        {"hour": int(r["h"]), "gross": _money(r["gross"]), "sales_count": int(r["sales_count"])}
+        for r in cur.fetchall()
+    ]
 
 
 def _kpi(cur, base, date_from, date_to) -> dict:
@@ -106,7 +202,8 @@ def _cost_agg(cur, base, date_from, date_to) -> tuple[Decimal, bool]:
 def _by_day(cur, base, date_from, date_to) -> list:
     rng, rp = _range("sold_at", date_from, date_to)
     cur.execute(
-        "SELECT (sold_at AT TIME ZONE 'UTC')::date AS d, COALESCE(SUM(grand_total),0) AS gross "
+        "SELECT (sold_at AT TIME ZONE 'UTC')::date AS d, COALESCE(SUM(grand_total),0) AS gross, "
+        "COUNT(*) AS sales_count "
         "FROM pos_sales "
         "WHERE tenant_id=%s AND workspace_client_id=%s AND status='completed' AND sale_type='sale'"
         + rng
@@ -119,7 +216,7 @@ def _by_day(cur, base, date_from, date_to) -> list:
     for r in rows:
         d = r["d"].isoformat()
         gross = Decimal(str(r["gross"]))
-        entry = {"date": d, "gross": _money(gross)}
+        entry = {"date": d, "gross": _money(gross), "sales_count": int(r["sales_count"])}
         entry.update(_profit_fields(gross, cost_by_day.get(d)))
         out.append(entry)
     return out

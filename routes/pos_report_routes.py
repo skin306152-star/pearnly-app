@@ -38,8 +38,14 @@ async def api_report(
     workspace_client_id: int = Query(...),
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
+    prev_from: Optional[str] = Query(None),
+    prev_to: Optional[str] = Query(None),
 ):
-    """销售报表:KPI / 按天 / 按支付 / 畅销 / 按收银员。数据从 pos_sales 流水聚合。"""
+    """销售报表:KPI / 按天 / 按支付 / 畅销 / 按收银员 / 分时热力 / 实时侧写。
+
+    prev_from/prev_to 是环比对照窗口,语义由前端给(按日=上周同日,按月=上一自然月),
+    缺省回落相邻等长上一窗口。数据从 pos_sales 流水聚合。
+    """
     tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
@@ -50,6 +56,8 @@ async def api_report(
             workspace_client_id=workspace_client_id,
             date_from=_parse_date(date_from),
             date_to=_parse_date(date_to),
+            prev_from=_parse_date(prev_from),
+            prev_to=_parse_date(prev_to),
         )
     return ok(data)
 

@@ -3,7 +3,7 @@
 //
 // 与 rules-settings.ts(逻辑)分文件以守 <500 行。自包含 4 语言(zh/th/en/ja)
 // 镜像 _showSessionRevokedModal 范式 · 不动 i18n-data;注入式 scoped CSS(含手机端
-// media query)· 不碰 CSS bundle。配色走全局令牌(--blue 系 · 选中黑)。
+// media query)· 不碰 CSS bundle。配色走全局令牌(旧蓝系 · 选中黑)。
 // ============================================================
 
 export interface ClientRuleRow {

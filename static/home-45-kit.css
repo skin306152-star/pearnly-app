@@ -479,9 +479,10 @@
     border: 1px solid;
 }
 .ui .bnr.i {
-    background: var(--blue-weak);
-    border-color: var(--blue);
-    color: var(--blue);
+    /* 旧蓝令牌与 accent 亮暗同值(home-01-base 定义即互为别名),换名零行为变化 */
+    background: var(--accent-weak);
+    border-color: var(--accent);
+    color: var(--accent);
 }
 .ui .bnr.w {
     background: var(--amber-weak);

@@ -248,7 +248,10 @@ async function doLogout(): Promise<void> {
     window.location.href = window.loginUrl!();
 }
 
-// 每次登录强制门:无 active 套账 → 起门(业务被全屏门盖住=锁;1 个也要选)。
+// 登录门:2026-08-04 Zihao 拍板从「每次登录强制手选」改成「默认恢复上次用的套账」。
+// 上次的 id(localStorage 持久 · logout 不清)仍在本账号可用列表里 → 静默进系统,
+// 跟 pos_only 壳同一逻辑;失效 / 换账号被移权 / 头一回用这台设备 → 照旧弹门强制选。
+// 手动换店走顶栏切换器,不经过这里。
 window.showWorkspaceGate = async function () {
     S.view = 'pick';
     S.gated = true;
@@ -262,6 +265,14 @@ window.showWorkspaceGate = async function () {
             ? ((await window.fetchWorkspaceClients()) as Subject[])
             : [];
     window._workspaceClientsCache = S.subjects as [];
+    const last =
+        typeof window.getActiveWorkspaceClientId === 'function'
+            ? (window.getActiveWorkspaceClientId() as number | null)
+            : null;
+    if (last && S.subjects.some((s) => s.id === last)) {
+        await enter(last); // 成员校验过才敢用:列表是按当前登录账号取的
+        return;
+    }
     S.owner = ownerNow(); // fetch 等待期 _userInfo 可能才就绪 → 再校正一次
     S.loading = false;
     render();

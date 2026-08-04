@@ -131,7 +131,7 @@ const STYLE = `
 .poslog table{width:100%;border-collapse:collapse;font-size:13px;}
 .poslog th{text-align:left;padding:9px 10px;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;}
 .poslog td{padding:9px 10px;border-bottom:1px solid var(--line2);vertical-align:top;}
-.poslog td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.poslog .num{text-align:right;font-variant-numeric:tabular-nums;}
 .poslog .more{width:100%;height:42px;margin-top:14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:13px;cursor:pointer;}
 .poslog .state{padding:44px 0;text-align:center;color:var(--ink3);font-size:13.5px;}
 `;
@@ -209,8 +209,8 @@ function groupHtml(g: DayGroup): string {
             <th>${escapeHtml(t('poslog.col_receipt'))}</th>
             <th>${escapeHtml(t('poslog.col_cashier'))}</th>
             <th>${escapeHtml(t('poslog.col_items'))}</th>
-            <th>${escapeHtml(t('poslog.col_qty'))}</th>
-            <th>${escapeHtml(t('poslog.col_amount'))}</th>
+            <th class="num">${escapeHtml(t('poslog.col_qty'))}</th>
+            <th class="num">${escapeHtml(t('poslog.col_amount'))}</th>
             <th>${escapeHtml(t('poslog.col_method'))}</th>
             <th>${escapeHtml(t('poslog.col_shift'))}</th>
         </tr></thead><tbody>${rows}</tbody></table>

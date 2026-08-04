@@ -132,7 +132,7 @@ const STYLE = `
 .posaud table{width:100%;border-collapse:collapse;font-size:12.5px;}
 .posaud th{text-align:left;padding:8px 14px;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--line2);white-space:nowrap;}
 .posaud td{padding:8px 14px;border-bottom:1px solid var(--line2);vertical-align:top;}
-.posaud td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.posaud .num{text-align:right;font-variant-numeric:tabular-nums;}
 .posaud .tabs{display:flex;gap:24px;border-bottom:1px solid var(--line2);margin-bottom:18px;}
 .posaud .tabs button{border:0;background:none;color:var(--ink2);padding:9px 2px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;}
 .posaud .tabs button.on{color:var(--ink);border-bottom-color:var(--btn-blue,var(--accent));}
@@ -261,7 +261,7 @@ function drillHtml(): string {
     return `<div class="drill"><table><thead><tr>
         <th>${escapeHtml(t('posaudit.ev_time'))}</th>
         <th>${escapeHtml(t('posaudit.ev_receipt'))}</th>
-        <th>${escapeHtml(t('posaudit.ev_amount'))}</th>
+        <th class="num">${escapeHtml(t('posaudit.ev_amount'))}</th>
         <th>${escapeHtml(t('posaudit.ev_auth'))}</th>
     </tr></thead><tbody>${body}</tbody></table></div>`;
 }
@@ -331,10 +331,13 @@ function shiftsBodyHtml(): string {
     const warn = shiftMissing.length
         ? `<div class="gapwarn">${escapeHtml(t('posaudit.sh_gap_warn', { n: String(shiftMissing.length) }))}</div>`
         : '';
-    const th = (k: string) => `<th>${escapeHtml(t(k))}</th>`;
+    // 数字列表头必须跟 td 同为 .num:通用 th{text-align:left} 会把裸表头钉在左边,
+    // 表头与内容左右错开(2026-08-04 真机反馈 · 全站反复犯的同一个坑)。
+    const th = (k: string, cls = '') =>
+        `<th${cls ? ` class="${cls}"` : ''}>${escapeHtml(t(k))}</th>`;
     return `${warn}<div class="tablecard"><table><thead><tr>
         ${th('posaudit.sh_seq')}${th('posaudit.sh_cashier')}${th('posaudit.sh_opened')}${th('posaudit.sh_closed')}
-        ${th('posaudit.sh_expected')}${th('posaudit.sh_counted')}${th('posaudit.sh_diff')}${th('posaudit.sh_status')}
+        ${th('posaudit.sh_expected', 'num')}${th('posaudit.sh_counted', 'num')}${th('posaudit.sh_diff', 'num')}${th('posaudit.sh_status')}
     </tr></thead><tbody>${shiftBodyRows()}</tbody></table></div>`;
 }
 

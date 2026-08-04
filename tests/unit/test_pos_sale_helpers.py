@@ -156,6 +156,65 @@ class PaymentSettlementTests(unittest.TestCase):
         self.assertEqual(change, Decimal("0"))
 
 
+class ReceiptDocKindTests(unittest.TestCase):
+    """G1:单据身份服务端权威 —— VAT 注册出 ABB,未注册/查无出 RCP,不信 payload。"""
+
+    def test_vat_registered_issues_abbrev_tax_invoice(self):
+        cur = _Cur(ones=[{"vat_registered": True}])
+        kind = sale._receipt_doc_kind(cur, tenant_id="t1", workspace_client_id=9)
+        self.assertEqual(kind, "abbrev_tax_invoice")
+        sql, params = cur.calls[0]
+        self.assertIn("vat_registered", sql)
+        self.assertEqual(params, ("t1", 9))
+
+    def test_unregistered_or_missing_row_issues_plain_receipt(self):
+        for ones in ([{"vat_registered": False}], []):
+            with self.subTest(ones=ones):
+                cur = _Cur(ones=ones)
+                self.assertEqual(
+                    sale._receipt_doc_kind(cur, tenant_id="t1", workspace_client_id=9), "receipt"
+                )
+
+    def test_create_sale_numbers_by_vat_state_not_payload(self):
+        cur = _Cur(ones=[{"vat_registered": True}])
+        with (
+            mock.patch.object(
+                sale,
+                "_resolve_sale_binding",
+                return_value={"terminal_id": 1, "cashier_id": "cashier-1"},
+            ),
+            mock.patch.object(
+                sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
+            ),
+            mock.patch.object(
+                sale.numbering, "next_number", return_value=("ABB-T1-2026-00001", 1)
+            ) as nn,
+            mock.patch.object(
+                sale.sales_store,
+                "insert_sale",
+                return_value={
+                    "id": "sale1",
+                    "receipt_no": "ABB-T1-2026-00001",
+                    "grand_total": Decimal("0"),
+                    "vat_amount": Decimal("0"),
+                    "paid_total": Decimal("0"),
+                    "change_amount": Decimal("0"),
+                    "status": "completed",
+                },
+            ) as ins,
+            mock.patch.object(sale.acct_hooks, "enqueue_posting"),
+        ):
+            sale.create_sale(
+                cur,
+                tenant_id="t1",
+                workspace_client_id=9,
+                # payload 硬塞 receipt 也拗不过账套 VAT 状态(老前端兼容 · 合规服务端权威)
+                payload={"shift_id": "shift1", "doc_kind": "receipt", "lines": [], "payments": []},
+            )
+        self.assertEqual(nn.call_args.kwargs["kind"], "abbrev_tax_invoice")
+        self.assertEqual(ins.call_args.kwargs["fields"]["doc_kind"], "abbrev_tax_invoice")
+
+
 class IdempotencyTests(unittest.TestCase):
     def test_dedup_short_circuits_without_numbering_or_stock(self):
         existing = {

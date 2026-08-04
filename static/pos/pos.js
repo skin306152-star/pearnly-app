@@ -317,8 +317,7 @@
                 state.workspaceClientId = sw ? Number(sw) : null;
                 state.store = localStorage.getItem(STORE_NAME_KEY) || '';
             }
-            // 小票抬头地址:离线打印用,来源见 pos-data.js pay.ensure() 拉到 bootstrap.store 后回写缓存。
-            state.storeAddress = localStorage.getItem(STORE_ADDR_KEY) || '';
+            state.storeAddress = localStorage.getItem(STORE_ADDR_KEY) || ''; // 离线打印小票抬头用
         } catch (_) {}
     }
 
@@ -338,6 +337,7 @@
         if (!store) return;
         state.store = store.name || state.store;
         state.storeAddress = store.address || '';
+        POS.receiptInfo.save(store); // G1 合规字段(税号/VAT/RegisterNo/页脚)· pos-receipt.js
         try {
             if (store.name) localStorage.setItem(STORE_NAME_KEY, store.name);
             localStorage.setItem(STORE_ADDR_KEY, state.storeAddress);

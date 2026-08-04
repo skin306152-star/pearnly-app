@@ -844,11 +844,11 @@
         if (!lastSale.offline && lastSale.id && !POS.allowMock()) {
             printServerReceipt(lastSale.id);
         } else {
-            printLocalReceipt(lastSale);
+            POS.receipt.printLocal(lastSale);
         }
     }
 
-    // 在线真单:取后端热敏 PDF(带 Bearer)新窗打印;取不到回落本地小票
+    // 在线真单:取后端热敏 PDF(带 Bearer)新窗打印;取不到回落本地小票(pos-receipt.js)
     async function printServerReceipt(saleId) {
         try {
             const res = await fetch('/api/pos/sales/' + saleId + '/receipt-pdf', {
@@ -859,80 +859,8 @@
             window.open(url, '_blank');
             setTimeout(() => URL.revokeObjectURL(url), 60000);
         } catch (_) {
-            printLocalReceipt(lastSale);
+            POS.receipt.printLocal(lastSale);
         }
-    }
-
-    // 本地热敏小票(离线 / 取不到服务端 PDF 时)· 弹窗即打印
-    function printLocalReceipt(sale) {
-        const rows = (sale.lines || [])
-            .map(
-                (l) =>
-                    '<tr><td>' +
-                    POS.esc(POS.nm(l.name)) +
-                    ' ×' +
-                    l.qty +
-                    '</td><td class="r">฿' +
-                    fmt(l.price * l.qty) +
-                    '</td></tr>'
-            )
-            .join('');
-        const addrLine = state.storeAddress
-            ? '<div class="meta">' + POS.esc(state.storeAddress) + '</div>'
-            : '';
-        const methodLine = (sale.payments || [])
-            .map(
-                (p) =>
-                    '<tr><td>' +
-                    POS.t('posui.pay.' + (p.method === 'qr' ? 'promptpay' : p.method)) +
-                    (p.ref ? ' · ' + POS.esc(p.ref) : '') +
-                    '</td><td class="r">฿' +
-                    fmt(p.amount) +
-                    '</td></tr>'
-            )
-            .join('');
-        const changeLine =
-            sale.change_amount != null && Number(sale.change_amount) > 0
-                ? '<tr><td>' +
-                  POS.t('posui.done.change') +
-                  '</td><td class="r">฿' +
-                  fmt(sale.change_amount) +
-                  '</td></tr>'
-                : '';
-        const html =
-            '<!doctype html><html><head><meta charset="utf-8"><title>' +
-            POS.esc(sale.receipt_no || '') +
-            '</title><style>body{font:12px monospace;width:280px;margin:0 auto;padding:12px;color:#111}' +
-            'h3{text-align:center;margin:0 0 8px}table{width:100%;border-collapse:collapse}' +
-            'td{padding:2px 0}.r{text-align:right}.tot td{border-top:1px dashed #000;padding-top:6px;font-weight:700}' +
-            '.meta{color:#555;margin-bottom:8px}</style></head><body><h3>' +
-            POS.esc(state.store || 'Pearnly POS') +
-            '</h3>' +
-            addrLine +
-            '<div class="meta">' +
-            POS.esc(sale.receipt_no || '') +
-            ' · ' +
-            POS.hm(sale.sold_at || new Date()) +
-            '</div><table>' +
-            rows +
-            '<tr class="tot"><td>' +
-            POS.t('posui.done.total') +
-            '</td><td class="r">฿' +
-            fmt(sale.grand_total) +
-            '</td></tr>' +
-            methodLine +
-            changeLine +
-            '</table>' +
-            '<scr' +
-            'ipt>window.onload=function(){window.print()}</scr' +
-            'ipt></body></html>';
-        const w = window.open('', '_blank', 'width=320,height=620');
-        if (!w) {
-            POS.toast(POS.t('posui.done.print'));
-            return;
-        }
-        w.document.write(html);
-        w.document.close();
     }
 
     function openTaxModal() {

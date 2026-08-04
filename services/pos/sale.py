@@ -73,6 +73,21 @@ def _assert_shift_open(cur, *, tenant_id: str, shift_id: Optional[str]) -> None:
         raise PosError("pos.shift_closed", 409)
 
 
+def _receipt_doc_kind(cur, *, tenant_id: str, workspace_client_id: int) -> str:
+    """小票单据身份(G1):账套已登记 VAT → 简式税票(ABB 号段+版式),否则普通收据(RCP)。
+
+    合规判定服务端权威,不信 payload(未注册户绝不发 ABB 号 = 冒开税票违法;注册户
+    漏出 RCP = 少开税票)。唯一读源 = workspace_clients.vat_registered(tax_settings
+    里的第二份事实本批不读,收口另批)。
+    """
+    cur.execute(
+        "SELECT vat_registered FROM workspace_clients WHERE tenant_id = %s AND id = %s",
+        (tenant_id, workspace_client_id),
+    )
+    row = cur.fetchone()
+    return "abbrev_tax_invoice" if row and row["vat_registered"] else "receipt"
+
+
 def _header_discount(hd: dict) -> tuple:
     hd = hd or {}
     t, val = hd.get("type"), hd.get("value", 0)
@@ -191,13 +206,12 @@ def create_sale(
     )
 
     terminal_id = binding["terminal_id"]
-    doc_kind = payload.get("doc_kind", "receipt")
-    num_kind = doc_kind if doc_kind in ("receipt", "abbrev_tax_invoice") else "receipt"
+    doc_kind = _receipt_doc_kind(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     receipt_no, _n = numbering.next_number(
         cur,
         tenant_id=tenant_id,
         terminal_id=terminal_id,
-        kind=num_kind,
+        kind=doc_kind,
         on=sold_at.date(),
         workspace_client_id=workspace_client_id,
     )

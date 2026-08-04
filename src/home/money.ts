@@ -9,3 +9,9 @@
 // 守门在 tests/unit/test_home_money_single_exit.py。
 
 export const BAHT = '฿\u2009'; // ฿ + 窄空格 U+2009
+
+// 整数泰铢排版(四舍五入 + 千分位):报表/榜单用。此前 pos-sales-log / pos-audit /
+// 销售仪表盘三处逐字各写一份,口径(舍入规则 · locale)漂了没人拦 —— 收进单出口。
+export function bahtInt(v: string | number): string {
+    return Math.round(Number(v) || 0).toLocaleString('en-US');
+}

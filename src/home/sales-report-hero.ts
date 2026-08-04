@@ -14,7 +14,10 @@ import {
     addDays,
     addMonths,
     baht,
+    HOUR_HI,
+    HOUR_LO,
     moneyOrUnknown,
+    pctVsPrev,
     pad2,
     parseYmd,
     ymd,
@@ -29,9 +32,6 @@ export interface HeroCtx {
     data: Report | null;
     onChange(next: { gran?: Granularity; gDate?: string; gMonth?: string }): void;
 }
-
-const HOUR_LO = 8;
-const HOUR_HI = 22;
 
 function ctlHtml(ctx: HeroCtx): string {
     const segBtn = (g: Granularity, label: string) =>
@@ -52,8 +52,7 @@ function cmpHtml(ctx: HeroCtx, k: Kpi, prev: Kpi | null): string {
         ctx.gran === 'day'
             ? t('rep-vs-day').replace('{wd}', t('rep-wd-' + parseYmd(ctx.gDate).getDay()))
             : t('rep-vs-month');
-    const pg = prev ? Number(prev.gross) : 0;
-    const pct = prev && pg > 0 ? ((Number(k.gross) - pg) / pg) * 100 : null;
+    const pct = pctVsPrev(Number(k.gross), prev ? Number(prev.gross) : null);
     const pctHtml =
         pct == null
             ? `<b title="${escapeHtml(t('rep-prev-none'))}">—</b>`

@@ -7,11 +7,9 @@
 export interface XyBucket {
     label: string;
     value: number;
-    tip: string; // hover 卡内 HTML(调用方已转义)
 }
 
 export interface DonutSlice {
-    key: string;
     label: string;
     value: number;
     colorVar: string; // CSS 令牌名(--ch-1 …)· 绑实体
@@ -110,6 +108,15 @@ export function donutHtml(slices: DonutSlice[], centerLabel: string, centerValue
         .join('');
     return `<div class="dn-wrap"><svg class="dn-svg" viewBox="0 0 42 42" role="img">${segs}</svg>
         <div class="dn-center"><div class="dn-cv tnum">${escapeHtml(centerValue)}</div><div class="dn-cl">${escapeHtml(centerLabel)}</div></div></div>`;
+}
+
+// 提示卡内容统一语法:标题 + 若干「标签 值」行。走势/环图/热力三处共用,改结构只动这里。
+// title/label 这里转义;value 由调用方给成品(金额/数量已带货币符与千分位)。
+export function tipCardHtml(title: string, rows: [string, string][]): string {
+    return (
+        `<b>${escapeHtml(title)}</b>` +
+        rows.map(([l, v]) => `<span>${escapeHtml(l)} <em class="tnum">${v}</em></span>`).join('')
+    );
 }
 
 // 共用提示卡:整页一张,fixed 跟指针走。触屏没有 hover,点按走同一套 pointer 事件天然可用。

@@ -5,7 +5,8 @@
 // view 级权限(同报表 pos.report.view)。
 /* global t, token, escapeHtml */
 import { activeWsId, posErrMsg } from './inventory-common';
-import { BAHT } from './money.js';
+import { BAHT, bahtInt as baht } from './money.js';
+import { ymdIso as ymd } from './format-date.js';
 
 type Kind = 'void' | 'refund' | 'discount';
 
@@ -67,12 +68,6 @@ let shiftMissing: number[] = [];
 let shiftLoaded = false;
 let shiftErr = '';
 
-function ymd(d: Date): string {
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + day;
-}
-
 function resolveRange(): { from: string; to: string } {
     const now = new Date();
     const today = ymd(now);
@@ -90,10 +85,6 @@ function resolveRange(): { from: string; to: string } {
 
 function hdr(): Record<string, string> {
     return { Authorization: 'Bearer ' + (typeof token === 'string' ? token : '') };
-}
-
-function baht(v: string | number): string {
-    return Math.round(Number(v) || 0).toLocaleString('en-US');
 }
 
 function fmtTime(iso: string | null): string {

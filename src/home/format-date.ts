@@ -52,6 +52,13 @@ export function toDate(input: unknown): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
+// 机读 ISO(YYYY-MM-DD · 本地时区):API 参数/字典键用,永远公历 —— 跟 formatDate
+// (用户偏好渲染 · 可佛历)是两种用途,别混:参数走它,屏上显示走 formatDate。
+export function ymdIso(d: Date): string {
+    const p2 = (n: number) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+}
+
 export function formatDate(input: unknown, opts?: { style?: string; calendar?: Calendar }): string {
     const d = toDate(input);
     if (!d) return '';

@@ -99,7 +99,7 @@ function authHeaders(): Record<string, string> {
     return h;
 }
 
-async function invGet(url: string): Promise<unknown> {
+export async function invGet(url: string): Promise<unknown> {
     let body: Envelope;
     try {
         const r = await fetch(url, { headers: authHeaders() as HeadersInit });

@@ -3,13 +3,20 @@
 // 「银行转账」整笔吞掉(2026-08-04 真机对出 935−835=100 正是那笔转账),这条账务修复不许回退。
 /* global t, escapeHtml */
 import { fmtQty, localizedName } from './inventory-common.js';
-import { donutHtml, tipHide, tipShow, type DonutSlice } from './sales-report-charts.js';
+import {
+    donutHtml,
+    tipCardHtml,
+    tipHide,
+    tipShow,
+    type DonutSlice,
+} from './sales-report-charts.js';
 import {
     type Kpi,
     type Report,
     type SectionState,
     baht,
     moneyOrUnknown,
+    pctVsPrev,
 } from './sales-report-common.js';
 
 export interface MixCtx {
@@ -20,6 +27,9 @@ export interface MixCtx {
     errorHtml(code: string): string; // 错误态由主模块统一出(重试按钮的绑定也在那边)
 }
 
+// 支付方式实体集在仓里另有三处平行枚举:services/pos/sheets_labels.py(后端标签单点)、
+// pos-payment-settings.ts(开关面)、收银台 posui.pay.*。加新方式四处都要到;这里漏配
+// 只降级成「裸 key + 中性色」,不丢账(2026-08-04 转账被写死三种吞掉的教训,兜底不许删)。
 const PM_META: Record<string, { colorVar: string; key: string }> = {
     cash: { colorVar: '--ch-1', key: 'rep-pm-cash' },
     promptpay: { colorVar: '--ch-2', key: 'rep-pm-promptpay' },
@@ -32,7 +42,6 @@ function paySlices(byMethod: Record<string, string>): DonutSlice[] {
     for (const m of Object.keys(byMethod)) if (!PM_META[m]) order.push(m);
     return order
         .map((m) => ({
-            key: m,
             label: PM_META[m] ? t(PM_META[m].key) : m,
             value: Number(byMethod[m]) || 0,
             colorVar: PM_META[m] ? PM_META[m].colorVar : '--ink3',
@@ -49,7 +58,6 @@ function mixSlices(data: Report): MixSlice[] {
     const slices: MixSlice[] = top
         .filter((p) => Number(p.gross) > 0)
         .map((p, i) => ({
-            key: p.product_id,
             label: localizedName(p.name),
             value: Number(p.gross),
             colorVar: `--chp-${i + 1}`,
@@ -58,7 +66,6 @@ function mixSlices(data: Report): MixSlice[] {
     const other = (Number(data.kpi.gross) || 0) - slices.reduce((s, x) => s + x.value, 0);
     if (other > 0.005)
         slices.push({
-            key: '__other',
             label: t('rep-mix-other'),
             value: other,
             colorVar: '--chp-x',
@@ -68,21 +75,19 @@ function mixSlices(data: Report): MixSlice[] {
 }
 
 function tipHtml(s: MixSlice, total: number): string {
-    const qtyRow =
-        s.qty != null
-            ? `<span>${escapeHtml(t('rep-tip-qty'))} <em class="tnum">${escapeHtml(fmtQty(s.qty))}</em></span>`
-            : '';
-    return `<b>${escapeHtml(s.label)}</b>${qtyRow}
-        <span>${escapeHtml(t('rep-tip-amount'))} <em class="tnum">${baht(s.value)}</em></span>
-        <span>${escapeHtml(t('rep-tip-share'))} <em class="tnum">${total ? Math.round((s.value / total) * 100) : 0}%</em></span>`;
+    const rows: [string, string][] = [];
+    if (s.qty != null) rows.push([t('rep-tip-qty'), escapeHtml(fmtQty(s.qty))]);
+    rows.push([t('rep-tip-amount'), baht(s.value)]);
+    rows.push([t('rep-tip-share'), `${total ? Math.round((s.value / total) * 100) : 0}%`]);
+    return tipCardHtml(s.label, rows);
 }
 
-// 环比徽章:上期为 0 没有比率可言 → 「—」+ 悬浮说明,绝不显示 ∞%。invert=涨了是坏事(退货)。
+// 环比徽章:比率口径共用 pctVsPrev(与 hero 副行同源)。invert=涨了是坏事(退货)。
 function deltaChip(cur: number, prev: number | null, invert = false): string {
     if (prev == null) return '';
-    if (prev === 0)
+    const pct = pctVsPrev(cur, prev);
+    if (pct == null)
         return `<span class="kdelta none" title="${escapeHtml(t('rep-prev-none'))}">—</span>`;
-    const pct = ((cur - prev) / prev) * 100;
     if (Math.abs(pct) < 0.05) return '<span class="kdelta none">0%</span>';
     const up = pct > 0;
     const good = invert ? !up : up;
@@ -147,6 +152,7 @@ function statsHtml(data: Report): string {
 export function renderMix(ctx: MixCtx): void {
     const el = document.getElementById('rep-mix-card');
     if (!el) return;
+    let readySlices: MixSlice[] | null = null; // ready 分支算一次,拼图例与绑提示共用
     let body: string;
     if (ctx.state === 'loading') {
         body = `<div class="topgrid"><div class="rep-skel round"></div><div>${'<div class="rep-skel line"></div>'.repeat(5)}</div><div>${'<div class="rep-skel line"></div>'.repeat(6)}</div></div>`;
@@ -155,7 +161,8 @@ export function renderMix(ctx: MixCtx): void {
     } else if (!ctx.data || (ctx.data.kpi.sales_count === 0 && Number(ctx.data.kpi.gross) === 0)) {
         body = `<div class="rep-state">${escapeHtml(t('rep-empty'))}</div>`;
     } else {
-        const slices = mixSlices(ctx.data);
+        readySlices = mixSlices(ctx.data);
+        const slices = readySlices;
         const total = slices.reduce((s, x) => s + x.value, 0);
         const legend = slices
             .map(
@@ -175,7 +182,7 @@ export function renderMix(ctx: MixCtx): void {
     }
     el.innerHTML = `<div class="hd"><div class="t">${escapeHtml(t('rep-mix-title'))} · <span class="tnum">${ctx.periodLabel}</span></div></div>${body}`;
     if (ctx.state === 'ready' && ctx.data) {
-        const slices = mixSlices(ctx.data);
+        const slices = readySlices || mixSlices(ctx.data);
         const total = slices.reduce((s, x) => s + x.value, 0);
         el.querySelectorAll<HTMLElement>('.dn-seg').forEach((seg) => {
             const s = slices[Number(seg.dataset.tipI)];

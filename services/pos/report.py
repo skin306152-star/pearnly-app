@@ -9,12 +9,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
-# 店内钟点固定 +7:泰国无夏令时,不依赖服务器 tzdata(SQL 侧仍用 Postgres 的 'Asia/Bangkok')。
-_BKK = timezone(timedelta(hours=7))
+from services.sales.dates import bangkok_today
+
 _HEAT_DAYS = 14
 
 
@@ -89,7 +89,7 @@ def _heat(cur, base, date_to: Optional[date]) -> list:
     UTC 日切——首日曼谷 0–7 点会缺、尾后多出一个曼谷日,但前端只画 8:00–22:00 × 锚前 14 天,
     展示面完整;为对齐边界引第二套窗口口径不值得。
     """
-    anchor = date_to or datetime.now(_BKK).date()
+    anchor = date_to or bangkok_today()
     rng, rp = _range("sold_at", anchor - timedelta(days=_HEAT_DAYS - 1), anchor)
     cur.execute(
         "SELECT (sold_at AT TIME ZONE 'Asia/Bangkok')::date AS d, "

@@ -136,13 +136,14 @@ export function salesErrMsg(detail: string | null | undefined, fallbackKey: stri
     return salesErrText(detail) || t(fallbackKey);
 }
 
-// 手机直拍的 JPEG 动辄 3~8MB,端上先缩到商品图够用的尺寸再传(泰国移动网,省一大截上行)。
-// 只缩 JPEG:PNG/WebP 可能带透明(logo/印章),重编码成 JPEG 会把透明底涂死;
+// 手机直拍动辄 3~8MB,端上先缩到商品图够用的尺寸再传(泰国移动网,省一大截上行)。
+// 按原格式重编码(JPEG→JPEG · PNG→PNG · WebP→WebP),透明底不会被涂死;
 // 解不动的格式(HEIC 等)原样上传,服务端 Pillow 统一归一化兜底。
 const UP_SHRINK_OVER = 600 * 1024;
 const UP_MAX_EDGE = 1600;
+const UP_SHRINK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 async function shrinkForUpload(f: File): Promise<Blob> {
-    if (f.type !== 'image/jpeg' || f.size <= UP_SHRINK_OVER) return f;
+    if (!UP_SHRINK_TYPES.includes(f.type) || f.size <= UP_SHRINK_OVER) return f;
     try {
         const bmp = await createImageBitmap(f);
         const k = Math.min(1, UP_MAX_EDGE / Math.max(bmp.width, bmp.height));
@@ -153,7 +154,7 @@ async function shrinkForUpload(f: File): Promise<Blob> {
         if (!cx) return f;
         cx.drawImage(bmp, 0, 0, cv.width, cv.height);
         bmp.close();
-        const blob = await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/jpeg', 0.85));
+        const blob = await new Promise<Blob | null>((res) => cv.toBlob(res, f.type, 0.85));
         return blob && blob.size < f.size ? blob : f;
     } catch (_) {
         return f;

@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
 from core.auth import get_current_user_from_request
@@ -44,7 +45,9 @@ async def api_upload_image(request: Request, file: UploadFile = File(...)):
     # 只读到上限+1 字节:超限即拒,不把超大文件整个读进内存。
     content = await file.read(image_store.MAX_BYTES + 1)
     try:
-        result = image_store.save_image(tid, content)
+        # Pillow 解码/缩放/重编码是同步重活(大图 0.3~2s),直接调会冻住整个事件循环;
+        # 丢线程池跑(Pillow 编解码释放 GIL,真并行),事件循环只等不堵。
+        result = await run_in_threadpool(image_store.save_image, tid, content)
     except image_store.UploadError as exc:
         raise HTTPException(_ERR_HTTP.get(exc.code, 400), detail=f"uploads.{exc.code}")
     return {"ok": True, **result}

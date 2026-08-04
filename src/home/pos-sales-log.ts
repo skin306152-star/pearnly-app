@@ -5,7 +5,8 @@
 // view 级权限(同销售报表 pos.report.view,非"收款设置"那类老板专属改配置)。四态齐。
 /* global t, token, showToast, escapeHtml */
 import { activeWsId, posErrMsg, fmtQty } from './inventory-common';
-import { BAHT } from './money.js';
+import { BAHT, bahtInt } from './money.js';
+import { ymdIso as ymd } from './format-date.js';
 
 interface LogItem {
     id: string;
@@ -43,12 +44,6 @@ let total = 0;
 let expandedDates = new Set<string>();
 const PAGE_SIZE = 50;
 
-function ymd(d: Date): string {
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + day;
-}
-
 function resolveRange(): { from: string; to: string } {
     const now = new Date();
     const today = ymd(now);
@@ -66,10 +61,6 @@ function resolveRange(): { from: string; to: string } {
 
 function hdr(): Record<string, string> {
     return { Authorization: 'Bearer ' + (typeof token === 'string' ? token : '') };
-}
-
-function bahtInt(v: string | number): string {
-    return Math.round(Number(v) || 0).toLocaleString('en-US');
 }
 
 function fmtTime(iso: string): { d: string; t: string } {

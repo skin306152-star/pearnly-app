@@ -9,6 +9,7 @@ import { activeWsId, posErrMsg } from './inventory-common.js';
 import {
     barChartHtml,
     lineChartHtml,
+    tipCardHtml,
     tipHide,
     tipShow,
     type XyBucket,
@@ -18,6 +19,9 @@ import {
     CHEV_R,
     type DayRow,
     type Granularity,
+    HEAT_DAYS,
+    HOUR_HI,
+    HOUR_LO,
     type Report,
     type SectionState,
     addDays,
@@ -51,10 +55,6 @@ try {
 } catch (_) {
     /* 私模/配额:回落默认柱状 */
 }
-
-const HEAT_DAYS = 14;
-const HOUR_LO = 8;
-const HOUR_HI = 22;
 
 // 全局窗口 + 环比窗口(按日=上周同日 · 按月=上一自然月;当月截到今天,热力锚才不会落在未来)
 function globalRange(): { from: string; to: string; prev_from: string; prev_to: string } {
@@ -104,10 +104,11 @@ function buildTrendRows(byDay: DayRow[]): TrendRow[] {
 }
 
 function trendTipHtml(row: TrendRow): string {
-    return `<b>${row.date}</b>
-        <span>${escapeHtml(t('rep-kpi-gross'))} <em class="tnum">${baht(row.gross)}</em></span>
-        <span>${escapeHtml(t('rep-kpi-profit'))} <em class="tnum">${moneyOrUnknown(row.profit)}</em></span>
-        <span>${escapeHtml(t('rep-kpi-count'))} <em class="tnum">${row.orders}</em></span>`;
+    return tipCardHtml(row.date, [
+        [t('rep-kpi-gross'), baht(row.gross)],
+        [t('rep-kpi-profit'), moneyOrUnknown(row.profit)],
+        [t('rep-kpi-count'), String(row.orders)],
+    ]);
 }
 
 function renderLivebar(row: TrendRow | null): void {
@@ -142,7 +143,6 @@ function renderTrend(state: SectionState, errCode?: string): void {
         const buckets: XyBucket[] = trendRows.map((r) => ({
             label: pad2(parseYmd(r.date).getDate()),
             value: r.gross,
-            tip: '',
         }));
         body = trendRows.some((r) => r.has)
             ? (chartMode === 'line' ? lineChartHtml : barChartHtml)(buckets, axisFmt)
@@ -291,7 +291,9 @@ function renderHeat(state: SectionState, errCode?: string): void {
         const show = (ev: PointerEvent) =>
             tipShow(
                 ev,
-                `<b>${c.dataset.d} · ${c.dataset.h}:00</b><span>${escapeHtml(t('rep-kpi-gross'))} <em class="tnum">${baht(Number(c.dataset.v))}</em></span>`
+                tipCardHtml(`${c.dataset.d} · ${c.dataset.h}:00`, [
+                    [t('rep-kpi-gross'), baht(Number(c.dataset.v))],
+                ])
             );
         c.onpointerenter = show;
         c.onpointermove = show;

@@ -32,7 +32,7 @@ BUYER = {
     "buyer_type": "individual",
     "buyer_name": "สมชาย ใจดี",
     "buyer_address": "12 ถนนสุขุมวิท กรุงเทพฯ",
-    "buyer_tax_id": "1234567890123",
+    "buyer_tax_id": "1234567890121",  # 校验位合法的假号(Mod-11 过),夹具必须过买方闸
     "buyer_branch_type": "hq",
     "buyer_branch_no": None,
 }

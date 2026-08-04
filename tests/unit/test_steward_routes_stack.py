@@ -68,10 +68,12 @@ class AsgiSmokeTests(unittest.TestCase):
 
     def test_gate_closed_is_404_for_a_logged_in_user(self):
         """闸关 = 对存量用户等于不存在。登录态由鉴权 helper 注入,闸判定走真请求路径。"""
+        from routes import steward_common as sc
         from routes import steward_routes as sr
 
         with (
             mock.patch.object(sr, "authorize_pearnly_ai", return_value=({"id": "u1"}, "t-1")),
+            mock.patch.object(sc, "authorize_pearnly_ai", return_value=({"id": "u1"}, "t-1")),
             mock.patch.object(
                 sr.feature_flags, "pearnly_ai_steward_enabled_for", return_value=False
             ),
@@ -119,9 +121,12 @@ class AuthzDecisionStackTests(unittest.TestCase):
         from routes import steward_routes as sr
         from services.steward import store
 
+        from routes import steward_common as sc
+
         actor = ({"id": "boss", "username": "boss"}, "t-1")
         patches = (
             mock.patch.object(sr, "authorize_pearnly_ai", return_value=actor),
+            mock.patch.object(sc, "authorize_pearnly_ai", return_value=actor),
             mock.patch.object(sr.feature_flags, "pearnly_ai_steward_enabled_for", lambda t: True),
             mock.patch.object(store, "ensure_once", mock.Mock()),
             mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),

@@ -100,6 +100,8 @@ from routes.sales_settings_routes import router as sales_settings_router
 from routes.security_routes import router as security_router
 from routes.settings_routes import router as settings_router
 from routes.steward_routes import router as steward_router
+from routes.steward_session_routes import router as steward_session_router
+from routes.steward_stream_routes import router as steward_stream_router
 from routes.summary_import_routes import router as summary_import_router
 from routes.supplier_posting_routes import router as supplier_posting_router
 from routes.tax_profile_routes import router as tax_profile_router
@@ -175,6 +177,8 @@ ROUTERS = (
     workorder_bank_sales_router,  # 银行流水倒推销项建议
     front_desk_router,  # 目标驱动前门(m1+front_desk 双闸)
     steward_router,  # 智能管家(m1+steward 双闸 · 全只读)
+    steward_session_router,  # 管家会话管理(列表/改名/删除 + 附件删除 + 余额 · 同双闸)
+    steward_stream_router,  # 管家任务事件 SSE(步骤账本增量 · 同双闸)
     tax_profile_router,  # 税务画像/别名/义务清单(m1 闸)
     client_pool_router,  # LINE 待问客户池(m1+client_pool 双闸)
     settings_router,

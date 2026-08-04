@@ -203,6 +203,40 @@ def precheck(*, tenant_id: str, session_id: str) -> dict:
         return {"allowed": True}
 
 
+def snapshot(*, tenant_id: str, session_id: str) -> dict:
+    """余额面板的读侧(GET /budget):会话与租户 24h 两级的已用/上限,只读不占坑。
+    金额是两位小数字符串(同 reserve 的 _display 口径,前端只排版不做算术);某级封顶
+    关闭时 cap_thb 为 None。判据基础设施故障时如实报 available=False —— 这是给人看的
+    余额,编一个 0 出来比说「暂时拿不到」更糟。"""
+    session_cap, tenant_cap = session_cap_thb(), tenant_daily_cap_thb()
+    try:
+        from core import db
+
+        ensure_once()
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(SUM(cost_thb), 0) AS session_spent FROM steward_cost_entries "
+                "WHERE tenant_id = %s AND session_id = %s",
+                (tenant_id, session_id),
+            )
+            session_spent = Decimal(str((cur.fetchone() or {}).get("session_spent") or 0))
+            tenant_spent = _tenant_spent_24h(cur, tenant_id)
+        return {
+            "available": True,
+            "session": {
+                "spent_thb": _display(session_spent),
+                "cap_thb": _display(session_cap) if session_cap is not None else None,
+            },
+            "tenant_day": {
+                "spent_thb": _display(tenant_spent),
+                "cap_thb": _display(tenant_cap) if tenant_cap is not None else None,
+            },
+        }
+    except Exception:  # noqa: BLE001 — 只读面板,故障不连坐对话主路径
+        logger.warning("[steward.budget] snapshot failed", exc_info=True)
+        return {"available": False}
+
+
 def reserve(
     *,
     tenant_id: str,

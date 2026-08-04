@@ -14,6 +14,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
+from routes import steward_common as sc
 from routes import steward_routes as sr
 from tests.unit._route_contract_fakes import CurCM, FakeCur, route_set as _route_set
 
@@ -46,8 +47,11 @@ class RouteContractTests(unittest.TestCase):
 
 class GateClosedTests(unittest.IsolatedAsyncioTestCase):
     def _patches(self):
+        # 业务端点的门收口在 routes/steward_common(S1),status 探针仍在本模块拿
+        # authorize_pearnly_ai —— 两处都桩,单一用例才能同时覆盖两条路径。
         return (
             mock.patch.object(sr, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
+            mock.patch.object(sc, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
             mock.patch.object(
                 sr.feature_flags, "pearnly_ai_steward_enabled_for", return_value=False
             ),
@@ -60,8 +64,8 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.detail, "steward.not_found")
 
     async def test_business_endpoints_404_when_gate_closed(self):
-        p1, p2 = self._patches()
-        with p1, p2:
+        p1, p2, p3 = self._patches()
+        with p1, p2, p3:
             await self._assert_404(sr.create_session(mock.Mock()))
             await self._assert_404(sr.get_session("s-1", mock.Mock()))
             await self._assert_404(sr.get_task("t-9", mock.Mock()))
@@ -76,8 +80,8 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
             await self._assert_404(sr.reject_authorization(decision, mock.Mock()))
 
     async def test_status_probe_reports_false_instead_of_404(self):
-        p1, p2 = self._patches()
-        with p1, p2:
+        p1, p2, p3 = self._patches()
+        with p1, p2, p3:
             out = await sr.get_status(mock.Mock())
         self.assertFalse(out["enabled"])
 
@@ -111,12 +115,12 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
 class SessionOwnershipTests(unittest.IsolatedAsyncioTestCase):
     async def test_other_persons_session_is_404(self):
         with (
-            mock.patch.object(sr, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
+            mock.patch.object(sc, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
             mock.patch.object(
                 sr.feature_flags, "pearnly_ai_steward_enabled_for", return_value=True
             ),
             mock.patch.object(sr.store, "ensure_once"),
-            mock.patch.object(sr.store, "get_session", return_value=None) as get_session,
+            mock.patch.object(sc.store, "get_session", return_value=None) as get_session,
             mock.patch("core.db.get_cursor", lambda *a, **k: CurCM(FakeCur())),
         ):
             with self.assertRaises(HTTPException) as ctx:

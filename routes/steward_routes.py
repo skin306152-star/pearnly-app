@@ -34,6 +34,9 @@ from pydantic import BaseModel, Field
 
 from core import db, feature_flags
 from core.route_helpers import authorize_pearnly_ai, content_disposition
+from routes.steward_common import NOT_FOUND as _NOT_FOUND
+from routes.steward_common import authorize_steward as _authorize
+from routes.steward_common import session_or_404 as _session_or_404
 from services.audit import file_access as audit_file_access
 from services.authz.deps import get_authz
 from services.steward import (
@@ -42,6 +45,7 @@ from services.steward import (
     authz,
     brain_entry,
     copy as steward_copy,
+    sessions_dal,
     store,
     worker,
 )
@@ -53,10 +57,10 @@ logger = logging.getLogger(__name__)
 
 _C_VIEW = "tax.filing.view"
 _C_APPROVE = "tax.filing.approve"
-_NOT_FOUND = "steward.not_found"
 _CANCEL_LOCKED = "steward.cancel_locked"
 _EMPTY_TURN = "steward.empty_turn"
 _MAX_TEXT = 2000
+_MAX_PAGE = 200
 
 
 class ActionIn(BaseModel):
@@ -83,12 +87,7 @@ class AuthzDecisionIn(BaseModel):
     token: str = Field(..., min_length=8, max_length=64, description="授权卡一次性令牌")
 
 
-def _authorize(request: Request, perm: str = _C_VIEW) -> tuple[dict, str]:
-    """登录 + 双闸(pearnly_ai_m1 叠加 pearnly_ai_steward · 关→404 fail-closed)+ 动作权限。"""
-    user, tenant_id = authorize_pearnly_ai(request, perm, not_found=_NOT_FOUND)
-    if not feature_flags.pearnly_ai_steward_enabled_for(tenant_id):
-        raise HTTPException(404, detail=_NOT_FOUND)
-    return user, tenant_id
+# 鉴权双闸与会话归属判定收口在 routes/steward_common.py(三个 steward 路由文件同一套门)。
 
 
 def _context(request: Request, user: dict, tenant_id: str, lang: str = "") -> ToolContext:
@@ -104,13 +103,6 @@ def _context(request: Request, user: dict, tenant_id: str, lang: str = "") -> To
         allowed_client_ids=allowed,
         lang=lang,
     )
-
-
-def _session_or_404(cur, *, tenant_id: str, session_id: str, user_id: str) -> dict:
-    session = store.get_session(cur, tenant_id=tenant_id, session_id=session_id, user_id=user_id)
-    if not session:
-        raise HTTPException(404, detail=_NOT_FOUND)
-    return session
 
 
 @router.get("/api/ai/steward/status")
@@ -137,14 +129,25 @@ async def create_session(request: Request):
 
 
 @router.get("/api/ai/steward/sessions/{session_id}")
-async def get_session(session_id: str, request: Request):
+async def get_session(
+    session_id: str,
+    request: Request,
+    before: Optional[str] = None,
+    limit: int = 60,
+):
     """重建消息流(刷新页面靠服务端重建,不在浏览器存对话)。附件按消息分组一并回:
-    用户气泡下面那行附件是永久留痕,刷新后不该消失。"""
+    用户气泡下面那行附件是永久留痕,刷新后不该消失。
+
+    游标分页(S1):默认回最近一页;before=已拿到的最早那条消息 id 时回更早一页。
+    还有更早的才给 has_more=true(条件键,老前端与既有 E2E 桩不受影响)。"""
     user, tenant_id = _authorize(request)
     store.ensure_once()
+    page = max(1, min(int(limit), _MAX_PAGE))
     with db.get_cursor() as cur:
         _session_or_404(cur, tenant_id=tenant_id, session_id=session_id, user_id=str(user["id"]))
-        messages = store.list_messages(cur, tenant_id=tenant_id, session_id=session_id)
+        messages, has_more = sessions_dal.list_messages_page(
+            cur, tenant_id=tenant_id, session_id=session_id, before_id=before, limit=page
+        )
         current = store.latest_task_id(cur, tenant_id=tenant_id, session_id=session_id)
         files = attachments.list_for_message(cur, tenant_id=tenant_id, session_id=session_id)
     by_message = attachments.group_by_message(files)
@@ -155,6 +158,8 @@ async def get_session(session_id: str, request: Request):
             for m in messages
         ],
     }
+    if has_more:
+        out["has_more"] = True
     if current:
         out["current_task_id"] = current
     return out

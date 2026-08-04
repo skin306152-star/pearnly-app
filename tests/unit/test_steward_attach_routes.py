@@ -14,6 +14,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
+from routes import steward_common as sc
 from routes import steward_routes as sr
 from services.steward import attach_intake, attachments, orchestrator, store
 from services.workorder import intake_prep
@@ -26,10 +27,10 @@ _SESSION = {"id": "s-1", "tenant_id": "t-1", "user_id": "u1"}
 def _open_gate(stack: ExitStack) -> None:
     """登录 + 闸开 + 会话归属命中 + 假游标(编排走真码,只桩边界)。"""
     for patch in (
-        mock.patch.object(sr, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
+        mock.patch.object(sc, "authorize_pearnly_ai", return_value=(_USER, "t-1")),
         mock.patch.object(sr.feature_flags, "pearnly_ai_steward_enabled_for", return_value=True),
         mock.patch.object(sr.store, "ensure_once"),
-        mock.patch.object(sr.store, "get_session", return_value=_SESSION),
+        mock.patch.object(sc.store, "get_session", return_value=_SESSION),
         mock.patch("core.db.get_cursor", lambda *a, **k: CurCM(FakeCur())),
         mock.patch.object(sr, "_context", return_value=mock.Mock(tenant_id="t-1")),
     ):

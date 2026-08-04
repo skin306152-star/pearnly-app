@@ -2,20 +2,26 @@
 <html lang="th">
 <head><meta charset="utf-8">
 <style>
-/* 销售报表 POS 屏9 — 仅供 getComputedStyle 快照断言 */
-.ui .wrap { width: 100%; max-width: none; margin: 0; }
-/* .posrep .ph .t 照搬 home-43-pos-report.css 原始值 */
-.ph .t { font-size: 19px; font-weight: 700; }
+/* 销售仪表盘 POS 屏9(2026-08-04 按 Zihao 定稿交互原型 v2 重建)— 仅供 getComputedStyle 快照断言 */
+.posrep { width: 100%; max-width: none; margin: 0; }
+/* Hero 大数字 / 卡头字号 照搬 home-43-pos-report.css 原始值 */
+.posrep .hero .big { font-size: 44px; font-weight: 800; }
+.posrep .hd .t { font-size: 13.5px; font-weight: 700; }
 </style>
 </head>
 <body>
-<section id="page-sales-report" class="ui">
+<section id="page-sales-report">
   <div class="posrep">
-    <div class="wrap">
-      <div class="ph" id="rep-head">
-        <div class="t">销售报表</div>
+    <div class="hero" id="rep-hero">
+      <div class="in">
+        <div class="l">
+          <div class="big">฿ 5,350</div>
+          <div class="ctl"></div>
+        </div>
       </div>
-      <div id="rep-body"></div>
+    </div>
+    <div class="card" id="rep-trend-card">
+      <div class="hd"><div class="t">营业额走势</div></div>
     </div>
   </div>
 </section>

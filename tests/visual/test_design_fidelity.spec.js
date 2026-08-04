@@ -400,13 +400,16 @@ const MAPPINGS = [
         name: '销售报表 sales-report(A组屏)',
         design: 'sales-report.html',
         route: 'sales-report',
-        ready: '.posrep .ph .t',
-        layout: { sel: '.posrep .wrap', maxWidth: 'none', centered: true },
+        // 2026-08-04 按定稿交互原型 v2 重建:页头换成 Hero 大横幅(.ph 已退役),
+        // ready 用 Hero 里的日期器(骨架/空/错/正常四态都在)
+        ready: '.posrep .hero .ctl',
+        layout: { sel: '.posrep', maxWidth: 'none', centered: true },
         tokens: [
-            // 报表头字体照搬 home-43-pos-report.css(.posrep .ph .t) · 19px 非 kit 22px
-            { design: '.ph .t', prod: '.posrep .ph .t', props: ['fontSize', 'fontWeight'] },
+            // Hero 大数字 44/800 · 卡头 13.5/700 照搬 home-43-pos-report.css
+            { design: '.hero .big', prod: '.posrep .hero .big', props: ['fontSize', 'fontWeight'] },
+            { design: '.hd .t', prod: '.posrep .hd .t', props: ['fontSize', 'fontWeight'] },
         ],
-        // 无 bluemust:报表页无 primary 按钮 · 无 nosvgemoji:范围选择栏文字按钮无 SVG
+        // 无 bluemust:报表页无 primary 按钮 · 无 nosvgemoji:翻页 chevron 已是线性 svg 但初始态在骨架下
     },
     {
         name: '桌台管理(05 v2)',

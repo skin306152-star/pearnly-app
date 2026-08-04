@@ -844,11 +844,11 @@
         if (!lastSale.offline && lastSale.id && !POS.allowMock()) {
             printServerReceipt(lastSale.id);
         } else {
-            printLocalReceipt(lastSale);
+            POS.receipt.printLocal(lastSale);
         }
     }
 
-    // 在线真单:取后端热敏 PDF(带 Bearer)新窗打印;取不到回落本地小票
+    // 在线真单:取后端热敏 PDF(带 Bearer)新窗打印;取不到回落本地小票(pos-receipt.js)
     async function printServerReceipt(saleId) {
         try {
             const res = await fetch('/api/pos/sales/' + saleId + '/receipt-pdf', {
@@ -859,130 +859,8 @@
             window.open(url, '_blank');
             setTimeout(() => URL.revokeObjectURL(url), 60000);
         } catch (_) {
-            printLocalReceipt(lastSale);
+            POS.receipt.printLocal(lastSale);
         }
-    }
-
-    // 本地热敏小票(离线 / 取不到服务端 PDF 时)· 弹窗即打印。
-    // G1:与服务端 PDF 同轴 —— 法定抬头按 vat_registered 切、税号/含税声明/收银员/VAT 拆行/
-    // Register No.(有号才印)。票面法定文案是法规文本(泰文为主),不吃 UI 语言切换。
-    // 二维码(G4)不做本地兜底:离线造不出可用码,印死码不如不印。
-    function printLocalReceipt(sale) {
-        const info = state.storeReceipt;
-        // 缓存缺失时按票号前缀兜底,方向安全:宁印普通收据,不给未注册户冒印税票字样。
-        const isVat = info ? !!info.vat_registered : /^ABB-/.test(sale.receipt_no || '');
-        const inclVat = !state.payment || state.payment.price_includes_vat !== false;
-        const dt = sale.sold_at ? new Date(sale.sold_at) : new Date();
-        const thaiDate =
-            String(dt.getDate()).padStart(2, '0') +
-            '/' +
-            String(dt.getMonth() + 1).padStart(2, '0') +
-            '/' +
-            (dt.getFullYear() + 543) +
-            ' ' +
-            POS.hm(dt);
-        const head = [
-            state.storeAddress
-                ? '<div class="meta c">' + POS.esc(state.storeAddress) + '</div>'
-                : '',
-            info && info.phone ? '<div class="meta c">โทร ' + POS.esc(info.phone) + '</div>' : '',
-            info && info.tax_id
-                ? '<div class="c">เลขประจำตัวผู้เสียภาษี ' + POS.esc(info.tax_id) + '</div>'
-                : '',
-            info && info.register_no
-                ? '<div class="meta c">เครื่องบันทึกเงินสดเลขที่ (Register No.): ' +
-                  POS.esc(info.register_no) +
-                  '</div>'
-                : '',
-            '<hr>',
-            isVat
-                ? '<div class="ttl">ใบกำกับภาษีอย่างย่อ</div><div class="c">Receipt / Tax Invoice (ABB)</div>' +
-                  (inclVat
-                      ? '<div class="meta c">ราคารวมภาษีมูลค่าเพิ่มแล้ว (VAT Included)</div>'
-                      : '')
-                : '<div class="ttl">ใบเสร็จรับเงิน</div><div class="c">Receipt</div>',
-            '<hr>',
-            '<div>เลขที่ (No.) <b>' + POS.esc(sale.receipt_no || '-') + '</b></div>',
-            '<div>วันที่ (Date) ' + thaiDate + '</div>',
-            state.cashier && state.cashier.display_name
-                ? '<div>พนักงาน (Cashier) ' + POS.esc(state.cashier.display_name) + '</div>'
-                : '',
-        ].join('');
-        const rows = (sale.lines || [])
-            .map(
-                (l) =>
-                    '<tr><td>' +
-                    POS.esc(POS.nm(l.name)) +
-                    ' ×' +
-                    l.qty +
-                    '</td><td class="r">฿' +
-                    fmt(l.price * l.qty) +
-                    '</td></tr>'
-            )
-            .join('');
-        const vatLine =
-            isVat && sale.vat_amount != null
-                ? '<tr><td>ภาษีมูลค่าเพิ่ม 7%' +
-                  (inclVat ? ' (รวมใน)' : ' (VAT)') +
-                  '</td><td class="r">' +
-                  fmt(sale.vat_amount) +
-                  '</td></tr>'
-                : '';
-        const methodLine = (sale.payments || [])
-            .map(
-                (p) =>
-                    '<tr><td>' +
-                    POS.t('posui.pay.' + (p.method === 'qr' ? 'promptpay' : p.method)) +
-                    (p.ref ? ' · ' + POS.esc(p.ref) : '') +
-                    '</td><td class="r">฿' +
-                    fmt(p.amount) +
-                    '</td></tr>'
-            )
-            .join('');
-        const changeLine =
-            sale.change_amount != null && Number(sale.change_amount) > 0
-                ? '<tr><td>เงินทอน (Change)</td><td class="r">฿' +
-                  fmt(sale.change_amount) +
-                  '</td></tr>'
-                : '';
-        const foot =
-            '<hr><div class="c">ขอบคุณค่ะ / Thank You</div>' +
-            (info && info.footer_text
-                ? '<div class="meta c">' + POS.esc(info.footer_text) + '</div>'
-                : '') +
-            '<div class="meta c">Powered by Pearnly POS</div>';
-        const html =
-            '<!doctype html><html><head><meta charset="utf-8"><title>' +
-            POS.esc(sale.receipt_no || '') +
-            '</title><style>body{font:12px monospace;width:280px;margin:0 auto;padding:12px;color:#111}' +
-            'h3{text-align:center;margin:0 0 4px}table{width:100%;border-collapse:collapse}' +
-            'td{padding:2px 0}.r{text-align:right}.tot td{border-top:1px dashed #000;padding-top:6px;font-weight:700}' +
-            '.meta{color:#555}.c{text-align:center}.ttl{text-align:center;font-weight:700;font-size:14px}' +
-            'hr{border:none;border-top:1px dashed #777;margin:6px 0}</style></head><body><h3>' +
-            POS.esc(state.store || 'Pearnly POS') +
-            '</h3>' +
-            head +
-            '<table>' +
-            rows +
-            // 合计标签同服务端 PDF 固定写法(票面法规文本不跟 UI 语言走)
-            '<tr class="tot"><td>ยอดสุทธิ (Total)</td><td class="r">฿' +
-            fmt(sale.grand_total) +
-            '</td></tr>' +
-            vatLine +
-            methodLine +
-            changeLine +
-            '</table>' +
-            foot +
-            '<scr' +
-            'ipt>window.onload=function(){window.print()}</scr' +
-            'ipt></body></html>';
-        const w = window.open('', '_blank', 'width=320,height=620');
-        if (!w) {
-            POS.toast(POS.t('posui.done.print'));
-            return;
-        }
-        w.document.write(html);
-        w.document.close();
     }
 
     function openTaxModal() {

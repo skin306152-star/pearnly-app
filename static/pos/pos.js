@@ -304,7 +304,6 @@
     const STORE_WS_KEY = 'pos_store_ws';
     const STORE_NAME_KEY = 'pos_store_name';
     const STORE_ADDR_KEY = 'pos_store_addr';
-    const STORE_RECEIPT_KEY = 'pos_store_receipt';
 
     function readEnv() {
         try {
@@ -318,10 +317,7 @@
                 state.workspaceClientId = sw ? Number(sw) : null;
                 state.store = localStorage.getItem(STORE_NAME_KEY) || '';
             }
-            // 小票抬头地址:离线打印用,来源见 pos-data.js pay.ensure() 拉到 bootstrap.store 后回写缓存。
-            state.storeAddress = localStorage.getItem(STORE_ADDR_KEY) || '';
-            // G1 合规字段(税号/VAT 状态/收银机登记号/页脚):离线兜底小票与服务端 PDF 同轴。
-            state.storeReceipt = JSON.parse(localStorage.getItem(STORE_RECEIPT_KEY) || 'null');
+            state.storeAddress = localStorage.getItem(STORE_ADDR_KEY) || ''; // 离线打印小票抬头用
         } catch (_) {}
     }
 
@@ -341,21 +337,10 @@
         if (!store) return;
         state.store = store.name || state.store;
         state.storeAddress = store.address || '';
-        // 合规字段没下发(老后端)时保留旧缓存,别把 vat_registered 抹成 false 改掉票面身份。
-        if ('vat_registered' in store) {
-            state.storeReceipt = {
-                tax_id: store.tax_id || '',
-                phone: store.phone || '',
-                vat_registered: !!store.vat_registered,
-                register_no: store.pos_register_no || '',
-                footer_text: store.footer_text || '',
-            };
-        }
+        POS.receiptInfo.save(store); // G1 合规字段(税号/VAT/RegisterNo/页脚)· pos-receipt.js
         try {
             if (store.name) localStorage.setItem(STORE_NAME_KEY, store.name);
             localStorage.setItem(STORE_ADDR_KEY, state.storeAddress);
-            if ('vat_registered' in store)
-                localStorage.setItem(STORE_RECEIPT_KEY, JSON.stringify(state.storeReceipt));
         } catch (_) {}
     };
 

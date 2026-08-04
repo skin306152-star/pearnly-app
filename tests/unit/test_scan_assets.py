@@ -28,7 +28,7 @@ DIST = PROJECT_ROOT / "static" / "dist"
 BUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build-home-js.mjs"
 
 RESIDENT = ("scan-loader.js", "scan-wedge.js")  # 必须首屏就在(枪可能一开页面就被扫)
-LAZY = ("scan-camera.js", "scan-errors.js", "scan-zxing-shim.js")  # 点了扫码才拉
+LAZY = ("scan-camera.js", "scan-errors.js", "scan-track.js", "scan-zxing-shim.js")  # 点了扫码才拉
 SCAN_SOURCES = RESIDENT + LAZY
 FIRST_PAINT_BUNDLES = ("pos.js", "pre.js")
 

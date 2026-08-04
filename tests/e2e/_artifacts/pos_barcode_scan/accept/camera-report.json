@@ -72,7 +72,7 @@
       ]
     },
     "zxingHits": [
-      "http://127.0.0.1:55073/static/dist/zxing.js?v=12044203"
+      "http://127.0.0.1:56922/static/dist/zxing.js?v=12044204"
     ]
   },
   "desktopCameraToCart": {
@@ -148,7 +148,7 @@
       ]
     },
     "zxingHits": [
-      "http://127.0.0.1:55073/static/dist/zxing.js?v=12044203"
+      "http://127.0.0.1:56922/static/dist/zxing.js?v=12044204"
     ]
   },
   "missShowsCode": {
@@ -352,8 +352,8 @@
     "ok": true,
     "nativeBarcodeDetectorPresent": false,
     "requests": [
-      "http://127.0.0.1:55073/static/dist/scan.js?v=12044203",
-      "http://127.0.0.1:55073/static/dist/zxing.js?v=12044203"
+      "http://127.0.0.1:56922/static/dist/scan.js?v=12044204",
+      "http://127.0.0.1:56922/static/dist/zxing.js?v=12044204"
     ]
   },
   "nativePathSkipsZxing": {

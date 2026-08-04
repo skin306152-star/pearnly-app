@@ -33,9 +33,15 @@ class CameraSuppressedAScan(unittest.TestCase):
     """
 
     def test_the_engine_really_calls_this_hook(self):
-        """被回调的名字必须来自真引擎:桩自己造一个名字出来验自己,是这批栽过的那种假绿。"""
+        """被回调的名字必须来自真引擎:桩自己造一个名字出来验自己,是这批栽过的那种假绿。
+
+        2026-08-04 裁决拆进 scan-track.js 后调用点分了两层:tracker 产出 dups 证据,
+        引擎逐条转给 o.onDuplicate —— 两层各钉一句,断链任何一层这里都红。
+        """
         engine = (PROJECT_ROOT / "static" / "scan" / "scan-camera.js").read_text(encoding="utf-8")
-        self.assertIn("o.onDuplicate(code, { gapMs: gapMs, misses: misses })", engine)
+        self.assertIn("o.onDuplicate(d.code, { gapMs: d.gapMs, misses: d.misses })", engine)
+        track = (PROJECT_ROOT / "static" / "scan" / "scan-track.js").read_text(encoding="utf-8")
+        self.assertIn("ev.dups.push({ code: v, gapMs: gapMs, misses: misses })", track)
         self.assertIn(
             "onDuplicate: (code) => host.onDup(code)",
             (HOME_DIR / "inventory-scan-camera.ts").read_text(encoding="utf-8"),

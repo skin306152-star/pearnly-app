@@ -14,12 +14,12 @@
         "noticeOnScreen": false
       },
       "asked": [
-        4072,
-        7995,
-        12144
+        4138,
+        8150,
+        12112
       ],
       "rescans": 3,
-      "rearmMs": 4072,
+      "rearmMs": 4138,
       "plusOne": null,
       "legMs": 2000,
       "cyclesInWindow": 3,
@@ -39,12 +39,12 @@
         "noticeOnScreen": false
       },
       "asked": [
-        3655,
-        7296,
-        11003
+        3735,
+        7272,
+        10981
       ],
       "rescans": 3,
-      "rearmMs": 3655,
+      "rearmMs": 3735,
       "plusOne": null,
       "legMs": 1800,
       "cyclesInWindow": 3,
@@ -64,13 +64,13 @@
         "noticeOnScreen": false
       },
       "asked": [
-        3197,
-        6465,
-        9754,
-        13111
+        3251,
+        6431,
+        9704,
+        13123
       ],
       "rescans": 4,
-      "rearmMs": 3197,
+      "rearmMs": 3251,
       "plusOne": null,
       "legMs": 1600,
       "cyclesInWindow": 4,
@@ -90,7 +90,7 @@
         "noticeOnScreen": true
       },
       "asked": [
-        14254
+        14253
       ],
       "rescans": 0,
       "rearmMs": null,
@@ -118,7 +118,7 @@
         "noticeOnScreen": true
       },
       "asked": [
-        14087
+        14084
       ],
       "rescans": 0,
       "rearmMs": null,

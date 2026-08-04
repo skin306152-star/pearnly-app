@@ -20,12 +20,18 @@ const SCAN_RESIDENT = ['scan/scan-loader.js', 'scan/scan-wedge.js'];
 const BUNDLES = [
     { out: 'static/dist/pre.js', files: [...SCAN_RESIDENT, 'recon-mapping.js', 'recon-review.js'] },
     // 摄像头解码层:只在店员真的点了扫码时由 scan-loader.js 现拉,不进任何页面首屏。
-    // scan-errors.js 必须排在引擎【之前】:引擎在加载期就把 scanError/withTimeout 抓进闭包,
-    // 顺序反了是加载期直接抛(引擎头部有硬 guard,不静默降级)。shim 排哪都行,放前面只为可读性
-    // (引擎是在解码时才引用 PearnlyScanZXing,不在加载期)。
+    // scan-errors.js 与 scan-track.js 必须排在引擎【之前】:引擎在加载期就把 scanError/
+    // withTimeout 与 PearnlyScanTrack 抓进闭包,顺序反了是加载期直接抛(引擎头部有硬 guard,
+    // 不静默降级)。shim 排哪都行,放前面只为可读性(引擎是在解码时才引用 PearnlyScanZXing,
+    // 不在加载期)。
     {
         out: 'static/dist/scan.js',
-        files: ['scan/scan-zxing-shim.js', 'scan/scan-errors.js', 'scan/scan-camera.js'],
+        files: [
+            'scan/scan-zxing-shim.js',
+            'scan/scan-errors.js',
+            'scan/scan-track.js',
+            'scan/scan-camera.js',
+        ],
     },
     {
         out: 'static/dist/post.js',

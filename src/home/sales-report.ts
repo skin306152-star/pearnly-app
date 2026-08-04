@@ -330,6 +330,8 @@ async function loadMain(): Promise<void> {
     mainTo = range.to;
     try {
         mainData = await fetchReport(range);
+        // 信封 ok 但形状不对(缺 kpi)→ 当空数据诚实渲染,不让渲染层崩在 kpi.xx 上
+        if (!mainData || !mainData.kpi) mainData = null;
     } catch (e) {
         const code = e instanceof Error ? e.message : 'pos.unexpected';
         paintMain('error', code);

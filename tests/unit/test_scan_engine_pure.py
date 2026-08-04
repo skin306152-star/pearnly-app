@@ -26,6 +26,7 @@ from tests.unit._node_harness import PROJECT_ROOT, _run_node
 SCAN_DIR = PROJECT_ROOT / "static" / "scan"
 LOADER = SCAN_DIR / "scan-loader.js"
 ERRORS = SCAN_DIR / "scan-errors.js"
+TRACK = SCAN_DIR / "scan-track.js"
 CAMERA = SCAN_DIR / "scan-camera.js"
 SHIM = SCAN_DIR / "scan-zxing-shim.js"
 ZXING_DIST = PROJECT_ROOT / "static" / "dist" / "zxing.js"
@@ -37,13 +38,15 @@ def _jp(path) -> str:
 
 # scan-camera.js 加载期就要求 scan-loader.js 已在(它只可能被 ensureLoaded 拉进来),
 # 这里给一个最小外壳桩;不给 document,因为被验的都是不碰 DOM 的纯判定。
-# scan-errors.js 往同一个壳上补错误分档,顺序同 dist/scan.js(它排在引擎之前)。
+# scan-errors.js 往壳上补错误分档、scan-track.js 挂裁决状态机,顺序同 dist/scan.js
+# (两个都排在引擎之前,引擎头部的硬 guard 缺谁都当场抛)。
 _CAMERA_PRELUDE = f"""
     global.PearnlyScanCamera = {{
         loadScript: () => Promise.resolve(),
         unsupportedReason: () => null,
     }};
     require({_jp(ERRORS)});
+    require({_jp(TRACK)});
     const cam = require({_jp(CAMERA)});
     const out = (o) => process.stdout.write(JSON.stringify(o));
 """

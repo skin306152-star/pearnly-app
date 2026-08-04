@@ -213,8 +213,11 @@ def bootstrap(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
     modules = modules_store.get_modules(cur, tenant_id=tenant_id)
     pos_cfg = modules.get("pos", {}).get("config", {}) or {}
     near_days = int(pos_cfg.get("near_expiry_days", _DEFAULT_NEAR_EXPIRY_DAYS))
+    # 合规字段(G1)随店档下发:离线/兜底本地小票要与服务端 PDF 同轴(法定抬头按
+    # vat_registered 切、Register No. 有号才印、footer_text 页脚)。
     cur.execute(
-        "SELECT id, name, address, tax_id, phone, promptpay_id FROM workspace_clients "
+        "SELECT id, name, address, tax_id, phone, promptpay_id, "
+        "vat_registered, pos_register_no, footer_text FROM workspace_clients "
         "WHERE id = %s AND tenant_id = %s",
         (workspace_client_id, tenant_id),
     )

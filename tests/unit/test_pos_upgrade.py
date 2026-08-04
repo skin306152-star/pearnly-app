@@ -128,6 +128,64 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(ctx.exception.http_status, 404)
 
 
+class SaveBuyerClientTests(unittest.TestCase):
+    """买方档存回客户管理:已有档复用不覆盖 · 税号校验位不合法/无操作人不建档。"""
+
+    _BUYER = {
+        "type": "company",
+        "name": "ACME",
+        "address": "BKK",
+        "tax_id": "0107544000108",
+        "branch_type": "hq",
+    }
+
+    def test_existing_client_reused_no_create(self):
+        cur = _Cur(ones=[{"id": 77}])
+        with patch("services.clients.store.create_client") as create:
+            cid = upgrade._save_buyer_client(
+                cur, tenant_id="t", created_by="u", buyer=dict(self._BUYER)
+            )
+        self.assertEqual(cid, 77)
+        create.assert_not_called()
+        sql, params = cur.calls[0]
+        self.assertIn("FROM clients WHERE tenant_id = %s AND tax_id = %s", sql)
+        self.assertEqual(params, ("t", "0107544000108"))
+
+    def test_new_client_created_with_buyer_fields(self):
+        cur = _Cur(ones=[None])
+        with patch("services.clients.store.create_client", return_value=88) as create:
+            cid = upgrade._save_buyer_client(
+                cur,
+                tenant_id="t",
+                created_by="u",
+                buyer={**self._BUYER, "branch_type": "branch", "branch_no": "00002"},
+            )
+        self.assertEqual(cid, 88)
+        create.assert_called_once_with(
+            "u",
+            "t",
+            "ACME",
+            tax_id="0107544000108",
+            address="BKK",
+            party_type="company",
+            branch="00002",
+        )
+
+    def test_checksum_invalid_tax_id_not_saved(self):
+        cur = _Cur()
+        cid = upgrade._save_buyer_client(
+            cur, tenant_id="t", created_by="u", buyer={**self._BUYER, "tax_id": "1234567890123"}
+        )
+        self.assertIsNone(cid)
+        self.assertEqual(cur.calls, [])  # 连查重都不查,直接不存
+
+    def test_missing_operator_not_saved(self):
+        cid = upgrade._save_buyer_client(
+            _Cur(), tenant_id="t", created_by=None, buyer=dict(self._BUYER)
+        )
+        self.assertIsNone(cid)
+
+
 class BackfillTests(unittest.TestCase):
     def test_set_full_invoice_id_parameterized_with_tenant(self):
         cur = _Cur()

@@ -16,7 +16,8 @@ _DOC_COLS = (
     "parties_snapshot, payment_status, paid_amount, payment_method, payment_date, "
     "due_date, payment_terms, approved_by, approved_at, rejected_reason, "
     "pdf_sha256, pdf_url, "
-    "issued_at, created_by, references_document_id, reference_reason, created_at, updated_at"
+    "issued_at, created_by, references_document_id, reference_reason, source_receipt_no, "
+    "created_at, updated_at"
 )
 _LINE_COLS = (
     "id, document_id, line_no, product_id, description, qty, unit_price, "

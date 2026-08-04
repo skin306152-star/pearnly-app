@@ -211,10 +211,11 @@
 ### GET /api/pos/sales/{id}/receipt-pdf — 热敏小票 PDF(复用 pdf_thermal.py · 58/80mm)
 
 ### POST /api/pos/sales/{id}/full-tax-invoice — 小票升级正式税票
-请求:`{ "buyer":{"party_type":"company|individual","name","tax_id","branch_type":"head|branch","branch_no","address"} }`
-成功:`data: { "document":{"id","doc_number","doc_type":"tax_invoice"} }`(落 sales_documents·复用销项合规连号/冻结/不可改)
+请求:`{ "buyer":{"party_type":"company|individual","name","tax_id","branch_type":"head|branch","branch_no","address"}, "save_buyer":false }`
+成功:`data: { "document":{"id","doc_number","doc_type":"tax_invoice"}, "buyer_client_id":null|int }`(落 sales_documents·复用销项合规连号/冻结/不可改)
 > 同一笔不重复计 VAT:简式小票标记被全式取代(`pos_sales.full_invoice_id` 回填);合规规则见 03 §9 + 销项 docs/16。
-错误:`pos.tax_id_invalid`(422)· `pos.already_upgraded`(409)
+> G2:单据记 `source_receipt_no`(票面 ออกแทน 引用原小票号);`save_buyer:true` 时买方档存回客户管理(合法税号才建·同税号已有档复用不覆盖,`buyer_client_id` 回传落点)。
+错误:`pos.tax_id_invalid`(422,含税号 Mod-11 校验位不过)· `pos.already_upgraded`(409)
 
 ---
 

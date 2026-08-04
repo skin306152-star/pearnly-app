@@ -29,6 +29,20 @@ _DOC_TYPE = "tax_invoice"
 _BRANCH_MAP = {"head": "hq", "branch": "branch"}
 
 
+def ensure_upgrade_schema() -> None:
+    """幂等加列(startup 经 bootstrap_pos_schema 调 · DDL 必须 commit=True · alembic 0095 同源)。
+
+    source_receipt_no:全式税票票面法定引用「ออกแทน…เลขที่」的原 POS 小票号。
+    references_document_id 是 sales_documents 自引用 UUID,装不下小票号字符串,故独立一列。
+    """
+    from core import db
+
+    with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            "ALTER TABLE sales_documents ADD COLUMN IF NOT EXISTS source_receipt_no text"
+        )
+
+
 def _to_buyer(raw: Optional[dict]) -> dict:
     """升级请求买方块 → 买方模块 canonical 入参(party_type→type · head→hq)。"""
     raw = raw or {}
@@ -80,6 +94,40 @@ def _resolve_issue_date(sold_at) -> date:
     return bangkok_today()
 
 
+def _save_buyer_client(cur, *, tenant_id: str, created_by, buyer: dict) -> Optional[int]:
+    """买方档存回客户管理(工单 G2「买方档可存回」)。返回 client_id 或 None(没存)。
+
+    只对「校验位合法的 13 位税号 + 有名称」建档(无税号同名异主体错并风险大,同
+    buyer_resolve 域规:无税号只建议不建);已有同税号活档直接复用,绝不覆盖(防静默改档)。
+    查重走本事务 cur;建档复用 clients store 规范写路径(自带连接/截断/RLS),在开出成功后
+    才调,失败不影响已开出的票。
+    """
+    from services.sales import buyer as buyer_mod
+
+    tax_id = (buyer.get("tax_id") or "").strip()
+    name = (buyer.get("name") or "").strip()
+    if not name or not created_by or not buyer_mod.th13_checksum_ok(tax_id):
+        return None
+    cur.execute(
+        "SELECT id FROM clients WHERE tenant_id = %s AND tax_id = %s AND is_active LIMIT 1",
+        (tenant_id, tax_id),
+    )
+    row = cur.fetchone()
+    if row:
+        return int(row["id"])
+    from services.clients import store as clients_store
+
+    return clients_store.create_client(
+        str(created_by),
+        tenant_id,
+        name,
+        tax_id=tax_id,
+        address=buyer.get("address"),
+        party_type=buyer.get("type"),
+        branch=buyer.get("branch_no") if buyer.get("branch_type") == "branch" else None,
+    )
+
+
 def upgrade_to_full_tax_invoice(
     cur,
     *,
@@ -88,6 +136,7 @@ def upgrade_to_full_tax_invoice(
     sale_id: str,
     buyer: Optional[dict],
     created_by: Optional[str] = None,
+    save_buyer: bool = False,
 ) -> dict:
     """小票 → 全式税票。单事务(调用方 commit):校验 → 建草稿 → 取连号开出冻结 → 回填标记。"""
     sale = sales_store.get_sale(
@@ -123,6 +172,11 @@ def upgrade_to_full_tax_invoice(
         price_includes_vat=bool(sale["price_includes_vat"]),
     )
     doc_id = draft["id"]
+    # 票面法定引用:全式票替代的原简式小票号(ออกแทน…เลขที่)。开出前写入,随单冻结。
+    cur.execute(
+        "UPDATE sales_documents SET source_receipt_no = %s WHERE tenant_id = %s AND id = %s",
+        (sale.get("receipt_no"), tenant_id, doc_id),
+    )
 
     st = settings_svc.get_settings(cur, tenant_id=tenant_id)
     # 升级在收银台直开,不走销项审批工作流(approval_mode 固定 none)。
@@ -141,10 +195,16 @@ def upgrade_to_full_tax_invoice(
         raise PosError("pos.tax_id_invalid", 422, detail=err)
 
     sales_store.set_full_invoice_id(cur, tenant_id=tenant_id, sale_id=sale_id, doc_id=doc_id)
+    buyer_client_id = (
+        _save_buyer_client(cur, tenant_id=tenant_id, created_by=created_by, buyer=nb)
+        if save_buyer
+        else None
+    )
     return {
         "document": {
             "id": str(doc["id"]),
             "doc_number": doc["doc_number"],
             "doc_type": doc["doc_type"],
-        }
+        },
+        "buyer_client_id": buyer_client_id,
     }

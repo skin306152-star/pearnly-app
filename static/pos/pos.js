@@ -80,6 +80,7 @@
         'main',
         'hold',
         'refund',
+        'taxinv',
         'shift',
         'rtables',
         'rorder',
@@ -94,6 +95,7 @@
         if (fatal) fatal.style.display = name === 'fatal' ? 'grid' : 'none';
         if (name === 'hold' && POS.cashier) POS.cashier.renderHold();
         if (name === 'refund' && POS.ops) POS.ops.resetRefund();
+        if (name === 'taxinv' && POS.taxinv) POS.taxinv.resetView();
         if (name === 'shift' && POS.shift) POS.shift.renderShift();
         if (name === 'rkitchen' && POS.restaurant) POS.restaurant.renderKitchen();
     };
@@ -486,6 +488,7 @@
         updateLangButtons();
         if (POS.cashier) POS.cashier.init();
         if (POS.ops) POS.ops.init();
+        if (POS.taxinv) POS.taxinv.init();
         if (POS.approve) POS.approve.init();
         if (POS.restaurant) POS.restaurant.init();
         if (POS.offline) POS.offline.init();

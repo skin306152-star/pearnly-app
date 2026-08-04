@@ -158,9 +158,11 @@ global.PearnlyScanCamera = {
     loadScript: () => Promise.resolve(),
     unsupportedReason: () => null,
 };
-// 顺序照 dist/scan.js 的真实拼法(scripts/build-home-js.mjs):错误分档排在引擎之前 ——
-// 引擎在加载期就把 scanError/withTimeout 抓进闭包,晚一步它自己会抛「地基没到齐」。
+// 顺序照 dist/scan.js 的真实拼法(scripts/build-home-js.mjs):错误分档与裁决状态机都排在
+// 引擎之前 —— 引擎在加载期就把 scanError/withTimeout 与 PearnlyScanTrack 抓进闭包,
+// 晚一步它自己会抛「地基没到齐」。
 (0, eval)(fs.readFileSync(scanDir + '/scan-errors.js', 'utf8'));
+(0, eval)(fs.readFileSync(scanDir + '/scan-track.js', 'utf8'));
 (0, eval)(fs.readFileSync(scanDir + '/scan-camera.js', 'utf8'));
 const ENGINE = global.PearnlyScanCamera;
 

@@ -26,6 +26,7 @@
       "artifacts": "tests/e2e/_artifacts/scan_base",
       "covers": [
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/scan/scan-loader.js",
         "static/scan/scan-zxing-shim.js"
       ],
@@ -49,6 +50,7 @@
         "src/home/inventory-scan-camera.ts",
         "src/home/inventory-modals.ts",
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/scan/scan-wedge.js"
       ],
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
@@ -136,6 +138,7 @@
         "static/pos/pos-scan.js",
         "static/pos/pos-scan-fails.js",
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/pos/pos.html"
       ],
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
@@ -150,6 +153,7 @@
       "covers": [
         "static/pos/pos-scan.js",
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/scan/scan-loader.js"
       ],
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
@@ -204,6 +208,7 @@
         "static/pos/pos-scan.js",
         "static/pos/pos-scan-fails.js",
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/scan/scan-zxing-shim.js"
       ],
       "fixtures": [
@@ -227,7 +232,11 @@
     },
     "_hostile_scan_cam_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix2/[cx]-*.png",
-      "covers": ["static/scan/scan-camera.js", "static/pos/pos-scan.js"],
+      "covers": [
+        "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
+        "static/pos/pos-scan.js"
+      ],
       "fixtures": [
         "python scripts/_scan_ean_pjitter_y4m.py .p80.y4m 0.8 13",
         "python scripts/_scan_ean_pjitter_y4m.py .p60.y4m 0.6 5",
@@ -324,6 +333,7 @@
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix3/r-*.png",
       "covers": [
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/pos/pos-scan.js",
         "static/pos/pos-scan-fails.js"
       ],
@@ -381,6 +391,7 @@
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix5/r5f-*.png",
       "covers": [
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/scan/scan-loader.js",
         "static/scan/scan-zxing-shim.js",
         "static/pos/pos-scan.js",
@@ -439,7 +450,11 @@
     },
     "_r5_cam_dupnotice_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix5/r5-*.png",
-      "covers": ["static/scan/scan-camera.js", "static/pos/pos-scan.js"],
+      "covers": [
+        "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
+        "static/pos/pos-scan.js"
+      ],
       "fixtures": [
         "python scripts/_scan_ean_blink_y4m.py .blink08.y4m 8850999320014 0.8",
         "python scripts/_scan_ean_blink_y4m.py .blink10.y4m 8850999320014 1.0",
@@ -470,6 +485,7 @@
         "src/home/inventory-modals.ts",
         "src/home/inventory-common.ts",
         "static/scan/scan-camera.js",
+        "static/scan/scan-track.js",
         "static/scan/scan-wedge.js",
         "static/i18n-data.js"
       ],
@@ -493,20 +509,7 @@
     "闸就不拦了,但欠的账留在文件里,谁都看得见。until 过了闸照红,不许把欠条改成永久。",
     "别删条目当没发生过:删掉 = 那些行为在当前版本上从没验过,而闸会当场把它报出来。"
   ],
-  "stale_ack": {
-    "_inv_guards_verify.cjs": {
-      "why": "2026-08-04 批次A只改了 home-41-inventory.css/i18n 文案面;本机正跑 Odoo lab 给 Zihao 研究仪表盘,时序类断言全是交接单§4记过的压机假红(数量对、多弹提示)。扫码引擎批次(多帧确认)会在空闲机上串行重跑本支销账。",
-      "until": "2026-08-06"
-    },
-    "_inv_typed_feedback_verify.cjs": {
-      "why": "同上:批次A的 CSS/i18n 改动不碰键盘时序判据,本机被 Odoo lab 压住跑不出可信绿;扫码引擎批次空闲机重跑销账。",
-      "until": "2026-08-06"
-    },
-    "_sx_barcode_copy_accept.cjs": {
-      "why": "同上:批次A只动 i18n 文案键值,本机被 Odoo lab 压住;扫码引擎批次空闲机重跑销账。",
-      "until": "2026-08-06"
-    }
-  },
+  "stale_ack": {},
   "not_e2e": {
     "_verify_shared.cjs": "公共库(起静态服务 / 截图 / 跑用例)· 自己不跑",
     "_gun_wedge_lib.cjs": "条码枪验收的公共库(含真枪 CDP 发法与两把尺子)· 自己不跑",

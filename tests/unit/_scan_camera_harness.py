@@ -29,6 +29,7 @@ from tests.unit._node_harness import PROJECT_ROOT, _run_node
 
 CAMERA = PROJECT_ROOT / "static" / "scan" / "scan-camera.js"
 ERRORS = PROJECT_ROOT / "static" / "scan" / "scan-errors.js"
+TRACK = PROJECT_ROOT / "static" / "scan" / "scan-track.js"
 PROBE_DOC = PROJECT_ROOT / "scripts" / "_scan_ean_jitter_y4m.py"
 
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
@@ -199,6 +200,7 @@ _RUN = r"""
         unsupportedReason: () => null,
     };
     require(__ERRORS__);   // 错误分档往同一个壳上补,顺序同 dist/scan.js(排在引擎之前)
+    require(__TRACK__);    // 裁决状态机挂 PearnlyScanTrack,顺序同 dist/scan.js(排在引擎之前)
     const cam = require(__CAMERA__);
 
     global.BarcodeDetector = function () {};
@@ -292,6 +294,7 @@ def run_timeline(
     js = (
         _RUN.replace("__CAMERA__", json.dumps(str(CAMERA)))
         .replace("__ERRORS__", json.dumps(str(ERRORS)))
+        .replace("__TRACK__", json.dumps(str(TRACK)))
         .replace("__PLAN__", json.dumps(plan))
         .replace("__FRAME_MS__", repr(FRAME_MS))
         .replace("__HIT_MS__", str(hit_ms))

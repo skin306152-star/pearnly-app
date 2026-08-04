@@ -14,11 +14,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 17,
-        "maxGapMs": 497,
-        "failCycleMs": 16,
+        "sampleHitRate": 22,
+        "maxGapMs": 510,
+        "failCycleMs": 29,
         "failDecodeMs": 0,
-        "samples": 258
+        "samples": 198
       },
       "600": {
         "legMs": 600,
@@ -30,11 +30,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 17,
-        "maxGapMs": 636,
-        "failCycleMs": 16,
+        "sampleHitRate": 23,
+        "maxGapMs": 651,
+        "failCycleMs": 26,
         "failDecodeMs": 0,
-        "samples": 254
+        "samples": 195
       },
       "1400": {
         "legMs": 1400,
@@ -46,11 +46,11 @@
         ],
         "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
         "noticeOnScreen": true,
-        "sampleHitRate": 14,
-        "maxGapMs": 1472,
-        "failCycleMs": 16,
+        "sampleHitRate": 19,
+        "maxGapMs": 1492,
+        "failCycleMs": 18,
         "failDecodeMs": 0,
-        "samples": 284
+        "samples": 217
       },
       "1600": {
         "legMs": 1600,
@@ -62,11 +62,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 14,
-        "maxGapMs": 1740,
-        "failCycleMs": 16,
+        "sampleHitRate": 19,
+        "maxGapMs": 1732,
+        "failCycleMs": 28,
         "failDecodeMs": 0,
-        "samples": 276
+        "samples": 208
       },
       "6000": {
         "legMs": 6000,
@@ -78,11 +78,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 27,
-        "maxGapMs": 6098,
-        "failCycleMs": 17,
+        "sampleHitRate": 31,
+        "maxGapMs": 6148,
+        "failCycleMs": 29,
         "failDecodeMs": 0,
-        "samples": 346
+        "samples": 315
       }
     },
     "hold": {
@@ -93,18 +93,18 @@
       ],
       "noticeText": "",
       "noticeOnScreen": false,
-      "sampleHitRate": 27,
-      "maxGapMs": 538,
+      "sampleHitRate": 22,
+      "maxGapMs": 528,
       "failCycleMs": 16,
       "failDecodeMs": 0,
-      "samples": 154
+      "samples": 180
     },
     "ok": true
   },
   "zxing": {
-    "floorMs": 1600,
-    "floorBracket": "(1400, 1600]",
-    "silentBelowMs": 600,
+    "floorMs": 6000,
+    "floorBracket": "(1600, 6000]",
+    "silentBelowMs": 400,
     "away": {
       "400": {
         "legMs": 400,
@@ -116,11 +116,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 53,
-        "maxGapMs": 587,
-        "failCycleMs": 123,
-        "failDecodeMs": 106,
-        "samples": 73
+        "sampleHitRate": 59,
+        "maxGapMs": 511,
+        "failCycleMs": 112,
+        "failDecodeMs": 97,
+        "samples": 74
       },
       "600": {
         "legMs": 600,
@@ -130,13 +130,13 @@
         "qtys": [
           "1"
         ],
-        "noticeText": "",
-        "noticeOnScreen": false,
-        "sampleHitRate": 54,
-        "maxGapMs": 762,
-        "failCycleMs": 115,
-        "failDecodeMs": 102,
-        "samples": 74
+        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeOnScreen": true,
+        "sampleHitRate": 58,
+        "maxGapMs": 876,
+        "failCycleMs": 196,
+        "failDecodeMs": 175,
+        "samples": 60
       },
       "1400": {
         "legMs": 1400,
@@ -148,27 +148,27 @@
         ],
         "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
         "noticeOnScreen": true,
-        "sampleHitRate": 54,
-        "maxGapMs": 1565,
-        "failCycleMs": 124,
-        "failDecodeMs": 108,
-        "samples": 72
+        "sampleHitRate": 64,
+        "maxGapMs": 1731,
+        "failCycleMs": 223,
+        "failDecodeMs": 202,
+        "samples": 58
       },
       "1600": {
         "legMs": 1600,
         "cyclesInWindow": 2,
-        "lookups": 2,
-        "count": "สแกนแล้ว 3 ชิ้น",
+        "lookups": 0,
+        "count": "สแกนแล้ว 1 ชิ้น",
         "qtys": [
-          "3"
+          "1"
         ],
-        "noticeText": "",
-        "noticeOnScreen": false,
-        "sampleHitRate": 52,
-        "maxGapMs": 1797,
-        "failCycleMs": 113,
-        "failDecodeMs": 97,
-        "samples": 73
+        "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
+        "noticeOnScreen": true,
+        "sampleHitRate": 57,
+        "maxGapMs": 1730,
+        "failCycleMs": 119,
+        "failDecodeMs": 103,
+        "samples": 69
       },
       "6000": {
         "legMs": 6000,
@@ -180,11 +180,11 @@
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 59,
-        "maxGapMs": 6249,
+        "sampleHitRate": 60,
+        "maxGapMs": 6213,
         "failCycleMs": 223,
-        "failDecodeMs": 99,
-        "samples": 158
+        "failDecodeMs": 100,
+        "samples": 159
       }
     },
     "hold": {
@@ -195,11 +195,11 @@
       ],
       "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
       "noticeOnScreen": true,
-      "sampleHitRate": 37,
-      "maxGapMs": 892,
-      "failCycleMs": 123,
-      "failDecodeMs": 107,
-      "samples": 60
+      "sampleHitRate": 36,
+      "maxGapMs": 1000,
+      "failCycleMs": 126,
+      "failDecodeMs": 111,
+      "samples": 58
     },
     "ok": true
   },
@@ -218,11 +218,11 @@
         ],
         "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
         "noticeOnScreen": true,
-        "sampleHitRate": 55,
-        "maxGapMs": 1226,
-        "failCycleMs": 406,
-        "failDecodeMs": 388,
-        "samples": 22
+        "sampleHitRate": 52,
+        "maxGapMs": 1231,
+        "failCycleMs": 405,
+        "failDecodeMs": 387,
+        "samples": 23
       },
       "1600": {
         "legMs": 1600,
@@ -234,11 +234,11 @@
         ],
         "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
         "noticeOnScreen": true,
-        "sampleHitRate": 55,
-        "maxGapMs": 2060,
-        "failCycleMs": 404,
+        "sampleHitRate": 52,
+        "maxGapMs": 2400,
+        "failCycleMs": 405,
         "failDecodeMs": 389,
-        "samples": 22
+        "samples": 23
       },
       "4000": {
         "legMs": 4000,
@@ -250,27 +250,27 @@
         ],
         "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
         "noticeOnScreen": true,
-        "sampleHitRate": 53,
-        "maxGapMs": 4506,
+        "sampleHitRate": 57,
+        "maxGapMs": 4542,
         "failCycleMs": 407,
-        "failDecodeMs": 389,
-        "samples": 43
+        "failDecodeMs": 390,
+        "samples": 44
       },
       "6000": {
         "legMs": 6000,
         "cyclesInWindow": 2,
-        "lookups": 1,
-        "count": "สแกนแล้ว 2 ชิ้น",
+        "lookups": 2,
+        "count": "สแกนแล้ว 3 ชิ้น",
         "qtys": [
-          "2"
+          "3"
         ],
         "noticeText": "",
         "noticeOnScreen": false,
-        "sampleHitRate": 53,
-        "maxGapMs": 6080,
-        "failCycleMs": 408,
-        "failDecodeMs": 391,
-        "samples": 57
+        "sampleHitRate": 52,
+        "maxGapMs": 6480,
+        "failCycleMs": 407,
+        "failDecodeMs": 389,
+        "samples": 58
       }
     },
     "hold": {
@@ -281,11 +281,11 @@
       ],
       "noticeText": "อ่านรหัส 8850999320014 ซ้ำ · นับเป็นชิ้นเดิมถ้าเป็นสินค้าชิ้นที่สอง (แบบเดียวกัน) กด +1 เพื่อเพิ่มลงตะกร้า+1 · เป็นชิ้นที่สอง",
       "noticeOnScreen": true,
-      "sampleHitRate": 61,
-      "maxGapMs": 1242,
-      "failCycleMs": 410,
-      "failDecodeMs": 392,
-      "samples": 18
+      "sampleHitRate": 42,
+      "maxGapMs": 2493,
+      "failCycleMs": 418,
+      "failDecodeMs": 404,
+      "samples": 19
     },
     "ok": true
   }

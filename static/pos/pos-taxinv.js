@@ -84,7 +84,7 @@
             '<div class="modal-head"><div class="t">' +
             t('posui.tax.title') +
             '</div>' +
-            '<button class="icbtn" style="background: #f0f0ec; color: #6b7280" id="tax-close">' +
+            '<button class="icbtn" style="background: var(--line); color: var(--ink2)" id="tax-close">' +
             SVG_X +
             '</button></div>' +
             '<div class="tax-body">' +

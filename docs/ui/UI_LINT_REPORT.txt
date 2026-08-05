@@ -9,7 +9,7 @@
      1  static\pos\pos-data.js
         └ 349: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
-## 旧token名(应用全局emerald) — 命中 204(29 文件)
+## 旧token名(应用全局emerald) — 命中 190(28 文件)
     51  static\pos\pos.css
         └ 14: --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
         └ 41: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
@@ -22,9 +22,6 @@
     18  static\home-37-html-inline.css
         └ 26: accent-color: var(--blue);
         └ 38: border: 1px solid var(--blue-200);
-    14  static\pos\pos-taxinv.css
-        └ 14: #tax-mask .tax-seg button.active { border-color: var(--blue); background: var(--blue-l); c
-        └ 24: #tax-mask .tax-branch button.active { border-color: var(--blue); background: var(--blue-l)
     12  src\home\rules-settings-data.ts
         └ 282: .rs-tag{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-weak);borde
         └ 293: .rs-addbtn{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:12.5p
@@ -448,7 +445,7 @@
         └ 476: 'time-hours-ago': '{n} 小时前',
         └ 477: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 881(62 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 863(59 文件)
    157  static\home-18-admin-users.css
     78  static\pos\pos.css
     68  static\admin\admin.js
@@ -465,7 +462,6 @@
     17  static\landing\landing-static-bg-mobile.css
     16  src\home\modal-client-edit.ts
     14  static\pos\pos.html
-    13  static\pos\pos-taxinv.css
     12  static\home-40-sales-wizard.css
     12  static\landing\landing-tour.js
     10  static\landing\landing-tour.css
@@ -484,7 +480,6 @@
      4  src\home\core.ts
      4  src\home\line-panel.ts
      4  static\erp-mrerp-connect.js
-     3  src\home\pos-taxinv-modal.ts
      3  static\landing\auth-modal.css
      3  static\landing\landing-tour-scenes.js
      3  static\landing\responsive.css
@@ -496,7 +491,6 @@
      2  static\dms\dms-intake-confirm.js
      2  static\home-10-push-logs.css
      2  static\landing\mascot-effects.css
-     2  static\pos\pos-taxinv.js
      1  src\home\clients-buyer.ts
      1  src\home\clients-helpers.ts
      1  src\home\confirm-modal.ts

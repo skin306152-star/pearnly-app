@@ -5379,16 +5379,16 @@ ${p.raw_text||p.text||""}`).join(`
 .postax label{display:block;font-size:12.5px;color:var(--ink2);margin:0 0 5px;}
 .postax .fld{display:flex;align-items:center;gap:8px;height:40px;border:1px solid var(--line);border-radius:9px;padding:0 10px;margin-bottom:12px;background:var(--card);}
 .postax .fld input{border:0;outline:0;background:transparent;flex:1;min-width:0;font-size:13.5px;color:var(--ink);}
-.postax .fld.bad{border-color:var(--red,#dc2626);}
+.postax .fld.bad{border-color:var(--red);}
 .postax .fld .lk{flex:0 0 auto;height:28px;padding:0 10px;border:1px solid var(--btn-blue,var(--accent));border-radius:7px;background:none;color:var(--btn-blue,var(--accent));font-size:12.5px;cursor:pointer;}
 .postax .fld .lk:disabled{border-color:var(--line);color:var(--ink3);cursor:not-allowed;}
-.postax .hint{min-height:15px;margin:-8px 0 8px;font-size:12px;color:var(--amber,#b45309);}
+.postax .hint{min-height:15px;margin:-8px 0 8px;font-size:12px;color:var(--amber);}
 .postax .brrow{display:flex;gap:8px;margin-bottom:12px;}
 .postax .brrow button{flex:1;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink2);cursor:pointer;font-size:12.5px;}
 .postax .brrow button.on{border-color:var(--btn-blue,var(--accent));color:var(--btn-blue,var(--accent));font-weight:600;}
 .postax .brrow .bno{flex:0 0 110px;margin:0;height:36px;}
 .postax .save{display:flex;align-items:center;gap:8px;margin:2px 0 10px;font-size:12.5px;color:var(--ink2);cursor:pointer;}
-.postax .err{min-height:16px;color:var(--red,#dc2626);font-size:12.5px;margin-bottom:4px;}
+.postax .err{min-height:16px;color:var(--red);font-size:12.5px;margin-bottom:4px;}
 .postax .ft{display:flex;gap:10px;padding:8px 20px 18px;}
 .postax .ft .ghost{flex:0 0 auto;height:42px;padding:0 16px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink2);cursor:pointer;font-size:13px;}
 .postax .ft .go{flex:1;height:42px;border:0;border-radius:9px;background:var(--btn-blue,var(--accent));color:var(--accent-ink);font-weight:700;font-size:13.5px;cursor:pointer;}

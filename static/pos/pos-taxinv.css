@@ -3,33 +3,33 @@
    吃 pos.css 的 :root 令牌,拼包排它之后(build-home-css POS_CSS)。 */
 #tax-mask .tax-modal { width: 520px; }
 #tax-mask .tax-body { padding: 18px 22px 4px; max-height: 70vh; overflow-y: auto; }
-#tax-mask .tax-ref { display: flex; align-items: center; gap: 12px; background: #f8f8f5; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
-#tax-mask .tax-ref .ico { width: 36px; height: 36px; border-radius: 9px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink2); flex: 0 0 36px; }
+#tax-mask .tax-ref { display: flex; align-items: center; gap: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
+#tax-mask .tax-ref .ico { width: 36px; height: 36px; border-radius: 9px; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink2); flex: 0 0 36px; }
 #tax-mask .tax-ref .info { flex: 1; min-width: 0; }
 #tax-mask .tax-ref .info .a { font-size: 13.5px; font-weight: 600; }
 #tax-mask .tax-ref .info .b { font-size: 12px; color: var(--ink2); margin-top: 2px; }
 #tax-mask .tax-ref .amt { font-weight: 700; }
 #tax-mask .tax-seg { display: flex; gap: 8px; margin-bottom: 16px; }
-#tax-mask .tax-seg button { flex: 1; height: 46px; border: 1.5px solid var(--line); border-radius: 11px; background: #fff; cursor: pointer; font-size: 14px; color: var(--ink2); }
-#tax-mask .tax-seg button.active { border-color: var(--blue); background: var(--blue-l); color: var(--blue); }
+#tax-mask .tax-seg button { flex: 1; height: 46px; border: 1.5px solid var(--line); border-radius: 11px; background: var(--card); cursor: pointer; font-size: 14px; color: var(--ink2); }
+#tax-mask .tax-seg button.active { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); }
 #tax-mask .tax-body label { display: block; font-size: 12.5px; color: var(--ink2); margin: 0 0 6px; }
-#tax-mask .tax-fld { height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; background: #fbfbf9; }
+#tax-mask .tax-fld { height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; background: var(--bg); }
 #tax-mask .tax-fld input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; font-size: 14.5px; color: var(--ink); }
 #tax-mask .tax-fld input::placeholder { color: var(--ink3); }
-#tax-mask .tax-fld.ok-on { border-color: #bbf7d0; background: #f0fdf4; }
+#tax-mask .tax-fld.ok-on { border-color: rgba(22, 163, 74, .35); background: rgba(22, 163, 74, .08); }
 #tax-mask .tax-fld .ok { display: none; align-items: center; gap: 5px; font-size: 12.5px; color: var(--green); flex: 0 0 auto; }
 #tax-mask .tax-fld.ok-on .ok { display: flex; }
 #tax-mask .tax-branch { display: flex; gap: 8px; margin-bottom: 14px; }
-#tax-mask .tax-branch button { flex: 1; height: 40px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink2); cursor: pointer; font-size: 13px; }
-#tax-mask .tax-branch button.active { border-color: var(--blue); background: var(--blue-l); color: var(--blue); }
+#tax-mask .tax-branch button { flex: 1; height: 40px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink2); cursor: pointer; font-size: 13px; }
+#tax-mask .tax-branch button.active { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); }
 #tax-mask .tax-branch .bno { flex: 0 0 120px; margin: 0; }
-#tax-mask .tax-lock { display: flex; gap: 10px; background: #fff8ec; border: 1px solid #fde9c8; border-radius: 11px; padding: 11px 13px; margin: 6px 0 8px; font-size: 12.5px; color: #92600c; line-height: 1.5; }
+#tax-mask .tax-lock { display: flex; gap: 10px; background: rgba(245, 158, 11, .1); border: 1px solid rgba(245, 158, 11, .32); border-radius: 11px; padding: 11px 13px; margin: 6px 0 8px; font-size: 12.5px; color: var(--amber); line-height: 1.5; }
 #tax-mask .tax-lock svg { flex: 0 0 16px; color: var(--amber); margin-top: 1px; }
 #tax-mask .tax-foot { padding: 8px 22px 20px; display: flex; gap: 10px; }
-#tax-mask .tax-foot .ghost { flex: 0 0 auto; height: 50px; padding: 0 18px; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink2); cursor: pointer; font-size: 14px; }
-#tax-mask .tax-foot .primary { flex: 1; height: 50px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px; }
-#tax-mask .tax-foot .primary:hover { background: var(--blue-d); }
-#tax-mask .tax-foot .primary:disabled { background: #c7cdd6; cursor: not-allowed; }
+#tax-mask .tax-foot .ghost { flex: 0 0 auto; height: 50px; padding: 0 18px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink2); cursor: pointer; font-size: 14px; }
+#tax-mask .tax-foot .primary { flex: 1; height: 50px; border: 0; border-radius: 11px; background: var(--accent); color: var(--card); font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px; }
+#tax-mask .tax-foot .primary:hover { background: var(--accent-d); }
+#tax-mask .tax-foot .primary:disabled { background: rgba(17, 24, 39, .16); cursor: not-allowed; }
 #tax-mask .tax-modal.buyer-individual #tax-company-fields { display: none; }
 /* 弹窗搬出 .pos-view--main 作用域(G2:补开视图/结账完成页共用)→ 遮罩/壳基线自带 */
 #tax-mask { position: fixed; inset: 0; background: rgba(17, 24, 39, .45); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 50; }
@@ -38,23 +38,23 @@
 #tax-mask .modal-head { padding: 18px 22px; border-bottom: 1px solid var(--line-2); display: flex; justify-content: space-between; align-items: center; }
 #tax-mask .modal-head .t { font-weight: 700; font-size: 16px; }
 /* 税号带出(G2):13 位且校验位对才可点;busy 转圈由禁用态兜 */
-#tax-mask .tax-fld .lookup { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border: 1px solid var(--blue); border-radius: 8px; background: var(--blue-l); color: var(--blue); font-size: 12.5px; font-weight: 600; cursor: pointer; flex: 0 0 auto; }
-#tax-mask .tax-fld .lookup:disabled { border-color: var(--line); background: #f4f4f0; color: var(--ink3); cursor: not-allowed; }
+#tax-mask .tax-fld .lookup { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-weak); color: var(--accent); font-size: 12.5px; font-weight: 600; cursor: pointer; flex: 0 0 auto; }
+#tax-mask .tax-fld .lookup:disabled { border-color: var(--line); background: var(--bg); color: var(--ink3); cursor: not-allowed; }
 #tax-mask .tax-fld .lookup.busy { opacity: .6; }
 #tax-mask .tax-lookup-hint { min-height: 16px; margin: -8px 0 8px; font-size: 12px; color: var(--amber); }
 /* 13 位但校验位错:红态(别等开票被 422 才知道打错一位) */
 #tax-mask .tax-fld .bad { display: none; align-items: center; font-size: 12.5px; color: var(--red); flex: 0 0 auto; }
-#tax-mask .tax-fld.bad-on { border-color: #fecaca; background: #fef2f2; }
+#tax-mask .tax-fld.bad-on { border-color: rgba(220, 38, 38, .32); background: rgba(220, 38, 38, .06); }
 #tax-mask .tax-fld.bad-on .bad { display: flex; }
 /* 买方档存回勾选(G2 save_buyer) */
 #tax-mask .tax-save { display: flex; align-items: center; gap: 9px; margin: 2px 0 10px; font-size: 13px; color: var(--ink2); cursor: pointer; }
-#tax-mask .tax-save input { width: 17px; height: 17px; accent-color: var(--blue); }
+#tax-mask .tax-save input { width: 17px; height: 17px; accent-color: var(--accent); }
 /* ── 补开视图专属:已开过卡片(列表/搜索样式复用退货屏 · 双类)── */
 .pos-view--taxinv .issued-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 6px 20px rgba(17, 24, 39, .07); padding: 26px 22px; text-align: center; }
-.pos-view--taxinv .ic-badge { width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 50%; background: #dcfce7; color: var(--green); display: grid; place-items: center; }
+.pos-view--taxinv .ic-badge { width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 50%; background: rgba(22, 163, 74, .14); color: var(--green); display: grid; place-items: center; }
 .pos-view--taxinv .ic-title { font-weight: 700; font-size: 15px; margin-bottom: 14px; }
-.pos-view--taxinv .ic-row { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid #f4f4f0; font-size: 13.5px; color: var(--ink2); }
+.pos-view--taxinv .ic-row { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid var(--bg); font-size: 13.5px; color: var(--ink2); }
 .pos-view--taxinv .ic-row .b { font-weight: 700; color: var(--ink); }
-.pos-view--taxinv .ic-print { width: 100%; height: 48px; margin-top: 18px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; font-size: 14.5px; cursor: pointer; }
-.pos-view--taxinv .ic-print:hover { background: var(--blue-d); }
-.pos-view--taxinv .ic-back { width: 100%; height: 44px; margin-top: 10px; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink2); font-size: 14px; cursor: pointer; }
+.pos-view--taxinv .ic-print { width: 100%; height: 48px; margin-top: 18px; border: 0; border-radius: 11px; background: var(--accent); color: var(--card); font-weight: 700; font-size: 14.5px; cursor: pointer; }
+.pos-view--taxinv .ic-print:hover { background: var(--accent-d); }
+.pos-view--taxinv .ic-back { width: 100%; height: 44px; margin-top: 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink2); font-size: 14px; cursor: pointer; }

@@ -5,8 +5,8 @@
     "staleToastText": "เพิ่มแล้ว โค้ก",
     "burst": {
       "n": 14,
-      "stampMax": 16.2,
-      "perfMax": 18.1
+      "stampMax": 16.9,
+      "perfMax": 16.8
     },
     "toast": {
       "shown": true,
@@ -140,8 +140,8 @@
     "ok": true,
     "ruler": {
       "n": 14,
-      "stampMax": 120.1,
-      "perfMax": 120.7
+      "stampMax": 116.1,
+      "perfMax": 116.6
     },
     "inHandBand": true,
     "toast": {

@@ -2,8 +2,9 @@
   "_notes": {
     "小固定max-width(查是否@media)": "120 → 153(2026-07-26,+33):探测器补全暴露的存量债,不是新增违规。补全前规则只认 `max-width:NNNpx`,漏了层叠结果逐像素相同的两种等价写法 `width:min(100%,NNNpx)` / `max-width:min(NNNpx,100%)`;补全后一起认,原本就写在库里的 34 处一次性现形。其中本批自己新写的 static/home-57-guide.css 一处当场清掉(改成容器铺满 + 段落 max-inline-size),剩下 33 处是别的模块的用户可见版面,超出本批范围,原样欠着:/ai 17 · /dms 8 · src/home 5 · console 2 · static/erp-mrerp-connect.css 1,逐处清单见 docs/ui/UI_LINT_REPORT.txt 同名小节。基线只许降不许升:这 33 处要还,不许再添。"
   },
+  "_小固定max-width_155": "2026-08-05 S1 管家会话流 +2(ai-steward-chat.css 的 .stw-feed/.stw-composer max-width:780px):Claude/GPT 式居中对话列是原型拍板的设计本体(阅读行长),非「铺满不聚拢」类债",
   "旧色/旧蓝(应改令牌)": 3,
-  "旧token名(应用全局emerald)": 198,
+  "旧token名(应用全局emerald)": 190,
   "emoji当图标(应换Lucide)": 201,
   "小固定max-width(查是否@media)": 155,
   "内联旧弹窗/抽屉": 58,
@@ -11,6 +12,5 @@
   "原生弹窗(禁)": 4,
   "超高z-index": 13,
   "i18n原始键残留": 24,
-  "裸hex": 872,
-  "_小固定max-width_155": "2026-08-05 S1 管家会话流 +2(ai-steward-chat.css 的 .stw-feed/.stw-composer max-width:780px):Claude/GPT 式居中对话列是原型拍板的设计本体(阅读行长),非「铺满不聚拢」类债"
+  "裸hex": 863
 }

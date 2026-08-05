@@ -128,10 +128,24 @@ def validate_buyer(buyer: Optional[dict], doc_type: str) -> Optional[str]:
 
 def _tax_id_ok(validator: str, value: str) -> bool:
     if validator == "th13":
-        return bool(_TH13.match(value))
+        return bool(_TH13.match(value)) and th13_checksum_ok(value)
     if validator == "passport":
         return bool(_PASSPORT.match(value))
     return True
+
+
+def th13_checksum_ok(value: str) -> bool:
+    """泰国 13 位税号校验位(公民身份证与法人税号同式 Mod-11)。
+
+    前 12 位按权重 13..2 加权求和,校验位 = (11 - sum mod 11) mod 10 须等于第 13 位。
+    真号必过(RD 发号即按此式),随手编号约九成被拦——把「税号打错一位」挡在开票前,
+    不用等买家抵扣被退才发现。仅算式校验;存在性仍靠 RD 官方接口。
+    """
+    if not _TH13.match(value):
+        return False
+    digits = [int(c) for c in value]
+    check = (11 - sum(d * (13 - i) for i, d in enumerate(digits[:12])) % 11) % 10
+    return digits[12] == check
 
 
 def to_columns(buyer: dict) -> dict:

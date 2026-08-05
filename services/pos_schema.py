@@ -21,6 +21,7 @@ def bootstrap_pos_schema() -> None:
     from services.pos import receipt_settings as pos_receipt
     from services.pos import sheets_sync as pos_sheets
     from services.pos import store_binding as pos_store_binding
+    from services.pos import upgrade as pos_upgrade
     from services.pos.restaurant import schema as restaurant_schema
     from services.products import units as product_units
 
@@ -34,6 +35,7 @@ def bootstrap_pos_schema() -> None:
         ("pos_store_codes", pos_store_binding.ensure_store_schema),
         ("pos_payment_settings", pos_payment.ensure_payment_schema),
         ("pos_receipt_compliance", pos_receipt.ensure_receipt_schema),
+        ("pos_full_invoice_source", pos_upgrade.ensure_upgrade_schema),
         ("pos_sheets_settings", pos_sheets.ensure_schema),
         ("pos_entitlements", pos_entitlements.ensure_pos_entitlement_schema),
     )

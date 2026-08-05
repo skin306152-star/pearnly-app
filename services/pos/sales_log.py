@@ -27,7 +27,10 @@ SELECT s.id, s.receipt_no, s.sold_at, s.cashier_id, c.display_name AS cashier_na
        (SELECT COALESCE(SUM(l.qty), 0) FROM pos_sale_lines l
         WHERE l.tenant_id = s.tenant_id AND l.sale_id = s.id) AS qty_total,
        (SELECT p.method FROM pos_payments p
-        WHERE p.tenant_id = s.tenant_id AND p.sale_id = s.id ORDER BY p.id LIMIT 1) AS method
+        WHERE p.tenant_id = s.tenant_id AND p.sale_id = s.id ORDER BY p.id LIMIT 1) AS method,
+       s.full_invoice_id,
+       (SELECT d.doc_number FROM sales_documents d
+        WHERE d.tenant_id = s.tenant_id AND d.id = s.full_invoice_id) AS full_invoice_no
 FROM pos_sales s
 LEFT JOIN pos_cashiers c ON c.id = s.cashier_id
 LEFT JOIN pos_shifts sh ON sh.id = s.shift_id
@@ -68,6 +71,9 @@ def _row_to_item(r: dict, lang: str) -> dict:
         "paid_total": _money(r["paid_total"]),
         "change_amount": _money(r["change_amount"]),
         "method": sheets_labels.method_label(r["method"] or "", lang),
+        # 全式税票状态(G2 行内动作:没开过给「补开」入口,开过显票号+重打)。
+        "full_invoice_id": str(r["full_invoice_id"]) if r.get("full_invoice_id") else None,
+        "full_invoice_no": r.get("full_invoice_no") or None,
         "shift_id": str(r["shift_id"]) if r["shift_id"] else None,
         "shift_opened_at": _iso(r["shift_opened_at"]),
         "shift_closed_at": _iso(r["shift_closed_at"]),

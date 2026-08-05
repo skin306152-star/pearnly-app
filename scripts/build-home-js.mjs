@@ -69,6 +69,9 @@ const BUNDLES = [
             'pos/pos-offline.js',
             'pos/pos-approve.js',
             'pos/pos-ops.js',
+            // pos-taxinv.js(G2 补开全式税票)加载期只挂 window.POS.taxinv,运行期被
+            // pos-cashier(done-tax)与 pos.js(showView/init)调 → 排它俩之前即可。
+            'pos/pos-taxinv.js',
             'pos/pos-shift.js',
             'pos/pos-cashier.js',
             // pos-scan-fails.js 在加载期就要 window.POS(取 t/tf/nm/posErrMsg),而 pos-scan.js

@@ -780,27 +780,8 @@
         }
     };
 
-    // 小票升级正式税票(04 §6 · B4)。买方公司/个人字段集见屏2。
-    // 离线不可开税票(税票需联网连号 · 08 ADR v1 范围),仅纯本地预览回落 mock 演示。
-    data.fullTaxInvoice = async function (saleId, buyer) {
-        try {
-            return await apiFetch('POST', '/api/pos/sales/' + saleId + '/full-tax-invoice', {
-                workspace_client_id: state.workspaceClientId,
-                buyer,
-            });
-        } catch (e) {
-            if (POS.isRouteMissing(e) && POS.allowMock()) {
-                return {
-                    document: {
-                        id: POS.uuid(),
-                        doc_number: 'INV-LOCAL-' + Math.floor(Math.random() * 90000 + 10000),
-                        doc_type: 'tax_invoice',
-                    },
-                };
-            }
-            throw e;
-        }
-    };
+    // 税票域 API(fullTaxInvoice / taxLookup)定义在 pos-taxinv.js,仍挂 POS.data.*
+    // (餐厅紧凑弹窗等消费方的挂载点不变,定义处随域走)。
 
     // 离线批量补传(04 §6 · B5)。逐张幂等,部分失败不卡其余;失败项端上保留重试。
     data.syncSales = function (items) {

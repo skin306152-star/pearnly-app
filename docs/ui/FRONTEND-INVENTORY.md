@@ -48,8 +48,8 @@
 ### 1.2 pos(收银台 SPA)
 - **壳**:`static/pos/pos.html` → `static/dist/pos.html`;`/cashier` + `/cashier/{rest}`(`_CASHIER_HEADERS` 严格 CSP);PWA `cashier-sw.js`(scope /cashier)+ 遗留 `pos-sw.js`(scope /pos)。
 - **入口**:`/pos`(老板后台登录 `pos-login.html`,bespoke)+ `/pos/{rest}` 兜底。
-- **设计系统**:链 pearnly-ui.css ✔;`pos.css`/`pos-restaurant.css` bespoke。
-- **10 个屏幕**(`static/pos/pos.html` `#view-*`):bind(设备绑定 :21)· login(收银登录 :74)· main(收银/卖 :132)· hold(挂单 :860)· refund(退货 :902)· shift(开/关班 :1012)· rtables(餐桌 floor :1035)· rorder(餐桌点单 :1084)· rkitchen(KDS 厨显 :1165)· fatal(错误屏 :1190)。
+- **设计系统**:链 pearnly-ui.css ✔;`pos.css`/`pos-taxinv.css`/`pos-restaurant.css` bespoke。
+- **11 个屏幕**(`static/pos/pos.html` `#view-*` · 行号会漂,权威=真文件):bind(设备绑定)· login(收银登录)· main(收银/卖)· hold(挂单)· refund(退货)· taxinv(补开全式税票 · G2)· shift(开/关班)· rtables(餐桌 floor)· rorder(餐桌点单)· rkitchen(KDS 厨显)· fatal(错误屏)。税票弹窗 `#tax-mask` 不在 HTML —— `pos-taxinv.js` 注入 body(任何视图可开)。
 - **组件**:pin pad/numpad(bespoke)· modal 6 · button 7。
 
 ### 1.3 ai(Pearnly AI SPA)

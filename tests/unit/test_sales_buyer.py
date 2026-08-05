@@ -81,7 +81,8 @@ class ValidateTests(unittest.TestCase):
             "type": "company",
             "name": "ACME",
             "address": "BKK",
-            "tax_id": "1234567890123",
+            # 校验位合法的假号(Mod-11 过);夹具必须过闸,同真号发号规则。
+            "tax_id": "0105551234567",
             "branch_type": "hq",
         }
         base.update(over)
@@ -109,6 +110,13 @@ class ValidateTests(unittest.TestCase):
             "buyer_tax_id_invalid",
         )
 
+    def test_th13_checksum_typo_rejected(self):
+        """位数对但校验位不对(打错一位)也拦:Mod-11 是发号规则,真号必过。"""
+        self.assertEqual(
+            buyer.validate_buyer(self._company(tax_id="0105551234568"), "tax_invoice"),
+            "buyer_tax_id_invalid",
+        )
+
     def test_passport_validator_for_foreigner(self):
         b = {"type": "foreigner", "name": "John", "address": "TH", "tax_id": "AB12"}
         self.assertIsNone(buyer.validate_buyer(b, "tax_invoice"))
@@ -131,6 +139,26 @@ class ValidateTests(unittest.TestCase):
 
     def test_receipt_does_not_force_full_buyer(self):
         self.assertIsNone(buyer.validate_buyer({"type": "anonymous"}, "receipt"))
+
+
+class Th13ChecksumTests(unittest.TestCase):
+    def test_real_juristic_tins_pass(self):
+        # 真实上市公司税号(公开信息):PTT / Siam Cement / Kasikornbank。
+        for tin in ("0107544000108", "0107537000114", "0107536000315"):
+            self.assertTrue(buyer.th13_checksum_ok(tin), tin)
+
+    def test_single_digit_mutation_fails(self):
+        # 真号改动校验位必不过——「读错/打错一位即不过」。
+        base = "0107544000108"
+        for last in "0123456789":
+            mutated = base[:12] + last
+            if mutated == base:
+                continue
+            self.assertFalse(buyer.th13_checksum_ok(mutated), mutated)
+
+    def test_length_and_charset_guard(self):
+        for bad in ("", "123", "01075440001080", "010754400010x"):
+            self.assertFalse(buyer.th13_checksum_ok(bad), bad)
 
 
 class ColumnMappingTests(unittest.TestCase):

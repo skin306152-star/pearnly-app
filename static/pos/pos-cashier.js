@@ -26,8 +26,6 @@
         lastSale.temporary_receipt = false;
         if ($('done-receipt')) $('done-receipt').textContent = synced.receipt_no || '—';
     });
-    let taxBuyerType = 'company';
-    let taxBranch = 'head';
     const HELD_KEY = 'pos_held_orders';
 
     // ── topbar ──
@@ -863,102 +861,6 @@
         }
     }
 
-    function openTaxModal() {
-        if (!lastSale || lastSale.offline || !lastSale.id) return;
-        taxBuyerType = 'company';
-        taxBranch = 'head';
-        $('tax-ref-no').textContent = POS.t('posui.tax.ref') + ' ' + (lastSale.receipt_no || '');
-        const items = (lastSale.lines || []).reduce((s, l) => s + l.qty, 0);
-        $('tax-ref-sub').textContent = POS.tf('posui.cart.items', {
-            n: items,
-            k: (lastSale.lines || []).length,
-        });
-        $('tax-ref-amt').textContent = '฿' + fmt(lastSale.grand_total);
-        ['tax-name', 'tax-taxid', 'tax-branchno', 'tax-address'].forEach((id) => {
-            const e = $(id);
-            if (e) e.value = '';
-        });
-        $('tax-err').textContent = '';
-        applyTaxBuyerType();
-        applyTaxBranch();
-        validateTaxId();
-        $('tax-mask').classList.add('show');
-    }
-
-    function applyTaxBuyerType() {
-        document
-            .querySelector('#tax-mask .tax-modal')
-            .classList.toggle('buyer-individual', taxBuyerType === 'individual');
-        document
-            .querySelectorAll('#tax-seg button')
-            .forEach((b) => b.classList.toggle('active', b.dataset.bt === taxBuyerType));
-        const lbl = $('tax-l-name');
-        const lblKey = taxBuyerType === 'company' ? 'posui.tax.f.company' : 'posui.tax.f.name';
-        lbl.setAttribute('data-i18n', lblKey);
-        lbl.textContent = POS.t(lblKey);
-        const nameInput = $('tax-name');
-        const phKey = taxBuyerType === 'company' ? 'posui.tax.ph.company' : 'posui.tax.ph.name';
-        nameInput.setAttribute('data-i18n-placeholder', phKey);
-        nameInput.setAttribute('placeholder', POS.t(phKey));
-    }
-
-    function applyTaxBranch() {
-        document
-            .querySelectorAll('.tax-branch button[data-branch]')
-            .forEach((b) => b.classList.toggle('active', b.dataset.branch === taxBranch));
-        const bno = $('tax-branchno').closest('.bno');
-        if (bno) bno.style.display = taxBranch === 'branch' ? 'flex' : 'none';
-    }
-
-    function validateTaxId() {
-        const v = ($('tax-taxid').value || '').replace(/\D/g, '');
-        $('tax-taxid-fld').classList.toggle('ok-on', v.length === 13);
-        updateTaxSubmit();
-    }
-
-    function updateTaxSubmit() {
-        const name = ($('tax-name').value || '').trim();
-        const tid = ($('tax-taxid').value || '').replace(/\D/g, '');
-        // 公司:名 + 13 位税号必填;个人:仅名必填(税号可选)
-        const ok = taxBuyerType === 'company' ? !!name && tid.length === 13 : !!name;
-        $('tax-submit').disabled = !ok;
-    }
-
-    async function doIssueTax() {
-        if (!lastSale || !lastSale.id) return;
-        const btn = $('tax-submit');
-        const tid = ($('tax-taxid').value || '').replace(/\D/g, '');
-        const buyer = {
-            party_type: taxBuyerType,
-            name: ($('tax-name').value || '').trim() || null,
-            tax_id: tid || null,
-            branch_type: taxBuyerType === 'company' ? taxBranch : null,
-            branch_no:
-                taxBuyerType === 'company' && taxBranch === 'branch'
-                    ? ($('tax-branchno').value || '').trim() || null
-                    : null,
-            address: ($('tax-address').value || '').trim() || null,
-        };
-        btn.disabled = true;
-        $('tax-err').textContent = '';
-        try {
-            await POS.data.fullTaxInvoice(lastSale.id, buyer);
-            $('tax-mask').classList.remove('show');
-            $('done-mask').classList.remove('show');
-            POS.toast(POS.t('posui.tax.done'));
-        } catch (e) {
-            // 已升级过:关弹窗 + toast(07 屏2);其余(税号无效等)弹窗内红字可改重试
-            if (e.code === 'pos.already_upgraded') {
-                $('tax-mask').classList.remove('show');
-                $('done-mask').classList.remove('show');
-                POS.toast(POS.posErrMsg('pos.already_upgraded'), 'error');
-            } else {
-                $('tax-err').textContent = POS.posErrMsg(e.code, 'pos.tax_id_invalid');
-                btn.disabled = false;
-            }
-        }
-    }
-
     // ════════════════ 屏 3 · 挂单 / 取单 ════════════════
     function loadHeld() {
         try {
@@ -1134,29 +1036,12 @@
         // 成交成功面板
         $('done-print').addEventListener('click', openReceipt);
         $('done-tax').addEventListener('click', () => {
+            // 弹窗归 pos-taxinv(G2 与补开通路共用);离线/无 id 单开不了,openFor 自防呆。
+            if (!lastSale || lastSale.offline || !lastSale.id || !POS.taxinv) return;
             $('done-mask').classList.remove('show');
-            openTaxModal();
+            POS.taxinv.openFor(lastSale, 'done');
         });
         $('done-next').addEventListener('click', () => $('done-mask').classList.remove('show'));
-        // 屏2 升级税票
-        $('tax-close').addEventListener('click', () => $('tax-mask').classList.remove('show'));
-        $('tax-cancel').addEventListener('click', () => $('tax-mask').classList.remove('show'));
-        $('tax-submit').addEventListener('click', doIssueTax);
-        document.querySelectorAll('#tax-seg button').forEach((b) =>
-            b.addEventListener('click', () => {
-                taxBuyerType = b.dataset.bt;
-                applyTaxBuyerType();
-                updateTaxSubmit();
-            })
-        );
-        document.querySelectorAll('.tax-branch button[data-branch]').forEach((b) =>
-            b.addEventListener('click', () => {
-                taxBranch = b.dataset.branch;
-                applyTaxBranch();
-            })
-        );
-        $('tax-name').addEventListener('input', updateTaxSubmit);
-        $('tax-taxid').addEventListener('input', validateTaxId);
     }
 
     function enterMain() {

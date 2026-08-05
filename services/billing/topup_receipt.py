@@ -37,8 +37,8 @@ _SELLER = {
     "contact": "โทร: 02-000-0000   อีเมล: billing@pearnly.com",
 }
 
-_THAI_NUM = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"]
-_THAI_POS = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน"]
+# 金额大写单一定义处已挪发票域(G2 全式税票同要素);此处 re-export 保住既有引用面。
+from services.sales.baht_text import baht_text  # noqa: F401,E402
 
 
 def _register_thai_font():
@@ -59,48 +59,6 @@ def _register_thai_font():
             logger.warning("[topup_receipt] Sarabun register failed: %s", str(e)[:120])
             _FONT_OK = False
     return ("Sarabun", "Sarabun-Bold") if _FONT_OK else ("Helvetica", "Helvetica-Bold")
-
-
-def _read_group(s: str) -> str:
-    """读一段 ≤6 位数字(无 ล้าน)。"""
-    s = s.lstrip("0")
-    if not s:
-        return ""
-    text = ""
-    length = len(s)
-    for i, ch in enumerate(s):
-        d = int(ch)
-        pos = length - 1 - i
-        if d == 0:
-            continue
-        if pos == 0 and d == 1 and length > 1:
-            text += "เอ็ด"
-        elif pos == 1 and d == 2:
-            text += "ยี่สิบ"
-        elif pos == 1 and d == 1:
-            text += "สิบ"
-        else:
-            text += _THAI_NUM[d] + _THAI_POS[pos]
-    return text
-
-
-def _read_int(n: int) -> str:
-    if n == 0:
-        return "ศูนย์"
-    s = str(n)
-    if len(s) > 6:  # ล้าน 递归(支持 ล้านล้าน)
-        return _read_int(int(s[:-6])) + "ล้าน" + _read_group(s[-6:])
-    return _read_group(s)
-
-
-def baht_text(amount) -> str:
-    """泰文金额大写:整数部分 + บาท + (ถ้วน | สตางค์)。"""
-    q = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    baht = int(q)
-    satang = int((q - baht) * 100)
-    out = _read_int(baht) + "บาท"
-    out += "ถ้วน" if satang == 0 else _read_group(str(satang)) + "สตางค์"
-    return out
 
 
 def _money(v) -> str:

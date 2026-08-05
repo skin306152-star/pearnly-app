@@ -363,6 +363,8 @@ OCR 识别/上传、history、ERP push/endpoints、对账 v0 杂项、clients/ca
 | POST | `/api/pos/sales/{sale_id}/full-tax-invoice` | helper_gated | — | routes/pos_sales_routes.py |
 | GET | `/api/pos/sales/{sale_id}/promptpay-qr` | helper_gated | — | routes/pos_sales_routes.py |
 | GET | `/api/pos/sales/{sale_id}/receipt-pdf` | helper_gated | — | routes/pos_sales_routes.py |
+| GET | `/api/pos/sales/{sale_id}/full-invoice-pdf` | helper_gated | — | routes/pos_taxinv_routes.py |
+| GET | `/api/pos/tax-lookup` | helper_gated | — | routes/pos_taxinv_routes.py |
 | POST | `/api/pos/sales/{sale_id}/refund` | helper_gated | — | routes/pos_sales_routes.py |
 | POST | `/api/pos/sales/{sale_id}/void` | helper_gated | — | routes/pos_sales_routes.py |
 | POST | `/api/pos/shifts/open` | helper_gated | — | routes/pos_sales_routes.py |

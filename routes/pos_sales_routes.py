@@ -364,6 +364,8 @@ class FullInvoiceBuyer(BaseModel):
 class FullInvoiceRequest(BaseModel):
     workspace_client_id: Optional[int] = None
     buyer: Optional[FullInvoiceBuyer] = None
+    # 买方档存回客户管理(工单 G2):有合法税号才建档,已有同税号档复用不覆盖。
+    save_buyer: bool = False
 
 
 @router.post("/sales/{sale_id}/full-tax-invoice")
@@ -380,6 +382,7 @@ async def api_full_tax_invoice(sale_id: str, req: FullInvoiceRequest, request: R
             sale_id=sale_id,
             buyer=buyer,
             created_by=_created_by(user),
+            save_buyer=req.save_buyer,
         ),
     )
 

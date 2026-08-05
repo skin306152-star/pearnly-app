@@ -74,17 +74,9 @@
     }
 
     // ── 路由 ──
-    const VIEWS = [
-        'bind',
-        'login',
-        'main',
-        'hold',
-        'refund',
-        'shift',
-        'rtables',
-        'rorder',
-        'rkitchen',
-    ];
+    // 视图集从 DOM 派生(bundle defer,执行时 section 全在):新增屏只写 pos.html,
+    // 不用回这里登记(G2 前手工清单漏登过一次)。#view-fatal 是 .pos-fatal 不在此列。
+    const VIEWS = [...document.querySelectorAll('section.pos-view')].map((s) => s.id.slice(5));
     POS.showView = function (name) {
         VIEWS.forEach((v) => {
             const el = $('view-' + v);
@@ -94,6 +86,7 @@
         if (fatal) fatal.style.display = name === 'fatal' ? 'grid' : 'none';
         if (name === 'hold' && POS.cashier) POS.cashier.renderHold();
         if (name === 'refund' && POS.ops) POS.ops.resetRefund();
+        if (name === 'taxinv' && POS.taxinv) POS.taxinv.resetView();
         if (name === 'shift' && POS.shift) POS.shift.renderShift();
         if (name === 'rkitchen' && POS.restaurant) POS.restaurant.renderKitchen();
     };
@@ -486,6 +479,7 @@
         updateLangButtons();
         if (POS.cashier) POS.cashier.init();
         if (POS.ops) POS.ops.init();
+        if (POS.taxinv) POS.taxinv.init();
         if (POS.approve) POS.approve.init();
         if (POS.restaurant) POS.restaurant.init();
         if (POS.offline) POS.offline.init();

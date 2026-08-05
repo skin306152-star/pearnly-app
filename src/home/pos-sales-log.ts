@@ -7,6 +7,7 @@
 import { activeWsId, posErrMsg, fmtQty } from './inventory-common';
 import { BAHT, bahtInt } from './money.js';
 import { ymdIso as ymd } from './format-date.js';
+import { openPosTaxinvModal, openInvoicePdf } from './pos-taxinv-modal';
 
 interface LogItem {
     id: string;
@@ -18,6 +19,8 @@ interface LogItem {
     qty_total: string;
     grand_total: string;
     method: string;
+    full_invoice_id: string | null;
+    full_invoice_no: string | null;
     shift_opened_at: string;
     shift_closed_at: string;
 }
@@ -125,6 +128,8 @@ const STYLE = `
 .poslog .num{text-align:right;font-variant-numeric:tabular-nums;}
 .poslog .more{width:100%;height:42px;margin-top:14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:13px;cursor:pointer;}
 .poslog .state{padding:44px 0;text-align:center;color:var(--ink3);font-size:13.5px;}
+.poslog .tiv{height:28px;padding:0 10px;border:1px solid var(--btn-blue,var(--accent));border-radius:8px;background:none;color:var(--btn-blue,var(--accent));font-size:12px;cursor:pointer;white-space:nowrap;}
+.poslog .tiv.done{border-color:var(--line);color:var(--ink2);font-variant-numeric:tabular-nums;}
 `;
 
 function ensureStyle(): void {
@@ -171,6 +176,13 @@ function toolbarHtml(): string {
     </div>`;
 }
 
+// 税票列(G2 行内动作):已开 → 票号钮(点开 A4 PDF 重打);未开 → 「补开」钮进买方弹窗。
+function taxinvCell(item: LogItem): string {
+    if (item.full_invoice_no)
+        return `<button class="tiv done" data-tiv-open="${escapeHtml(item.id)}" title="${escapeHtml(t('poslog.tiv_reprint'))}">${escapeHtml(item.full_invoice_no)}</button>`;
+    return `<button class="tiv" data-tiv-make="${escapeHtml(item.id)}">${escapeHtml(t('poslog.tiv_make'))}</button>`;
+}
+
 function rowHtml(item: LogItem): string {
     const { t: tm } = fmtTime(item.sold_at);
     return `<tr>
@@ -182,6 +194,7 @@ function rowHtml(item: LogItem): string {
         <td class="num">${BAHT}${bahtInt(item.grand_total)}</td>
         <td>${escapeHtml(item.method)}</td>
         <td>${escapeHtml(shiftLabel(item))}</td>
+        <td>${taxinvCell(item)}</td>
     </tr>`;
 }
 
@@ -204,6 +217,7 @@ function groupHtml(g: DayGroup): string {
             <th class="num">${escapeHtml(t('poslog.col_amount'))}</th>
             <th>${escapeHtml(t('poslog.col_method'))}</th>
             <th>${escapeHtml(t('poslog.col_shift'))}</th>
+            <th>${escapeHtml(t('poslog.col_taxinv'))}</th>
         </tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
@@ -251,6 +265,32 @@ function bindToolbar(): void {
             else expandedDates.add(date);
             render();
         };
+    });
+    document.querySelectorAll<HTMLElement>('#poslog-body [data-tiv-make]').forEach((b) => {
+        b.onclick = () => {
+            const item = items.find((x) => x.id === b.dataset.tivMake);
+            if (!item) return;
+            openPosTaxinvModal(
+                {
+                    saleId: item.id,
+                    receiptNo: item.receipt_no,
+                    grandTotal: BAHT + bahtInt(item.grand_total),
+                    ws,
+                },
+                (saleId, docNumber) => {
+                    // 票号即时上行,不重拉整页(分页/折叠态都保住)。
+                    const row = items.find((x) => x.id === saleId);
+                    if (row) {
+                        row.full_invoice_no = docNumber || row.full_invoice_no;
+                        row.full_invoice_id = row.full_invoice_id || 'issued';
+                    }
+                    render();
+                }
+            );
+        };
+    });
+    document.querySelectorAll<HTMLElement>('#poslog-body [data-tiv-open]').forEach((b) => {
+        b.onclick = () => openInvoicePdf(b.dataset.tivOpen || '', ws);
     });
 }
 

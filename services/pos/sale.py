@@ -410,11 +410,30 @@ def get_sale_by_receipt(cur, *, tenant_id: str, workspace_client_id: int, receip
     return _detail_view(cur, tenant_id=tenant_id, sale=sale)
 
 
+def _full_invoice_view(cur, *, tenant_id: str, sale: dict) -> Optional[dict]:
+    """已升级的小票带出全式票摘要(补开面预判「已开过」并支持重打,不用等 409)。"""
+    if not sale.get("full_invoice_id"):
+        return None
+    cur.execute(
+        "SELECT id, doc_number, issue_date FROM sales_documents WHERE tenant_id = %s AND id = %s",
+        (tenant_id, str(sale["full_invoice_id"])),
+    )
+    doc = cur.fetchone()
+    if not doc:
+        return None
+    return {
+        "id": str(doc["id"]),
+        "doc_number": doc["doc_number"],
+        "issue_date": doc["issue_date"].isoformat() if doc.get("issue_date") else None,
+    }
+
+
 def _detail_view(cur, *, tenant_id: str, sale: dict) -> dict:
     lines = sales_store.list_lines(cur, tenant_id=tenant_id, sale_id=str(sale["id"]))
     payments = sales_store.list_payments(cur, tenant_id=tenant_id, sale_id=str(sale["id"]))
     return {
         "sale": _header_view(sale),
+        "full_invoice": _full_invoice_view(cur, tenant_id=tenant_id, sale=sale),
         "lines": [
             {
                 "id": str(ln["id"]),
@@ -452,6 +471,7 @@ def _header_view(sale: dict) -> dict:
         "change_amount": _money(sale["change_amount"]),
         "status": sale["status"],
         "sold_at": sale["sold_at"].isoformat() if sale.get("sold_at") else None,
+        "full_invoice_id": str(sale["full_invoice_id"]) if sale.get("full_invoice_id") else None,
     }
 
 

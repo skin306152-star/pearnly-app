@@ -264,7 +264,7 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await dragFiles(page, [{ name: 'gl.pdf', body: 'x', type: 'application/pdf' }]);
         await expect(page.locator('#stwDrop')).toBeVisible();
         const box = await page.locator('#stwDrop').boundingBox();
-        const col = await page.locator('.stw-col.stw-right').boundingBox();
+        const col = await page.locator('.stw-chat-main').boundingBox();
         // 落区要盖住整条对话栏,不是只盖输入框那一条(拖着一叠文件的手不该被要求瞄准)。
         expect(box.height).toBeGreaterThan(col.height * 0.9);
         await page.screenshot({
@@ -330,9 +330,9 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         // 单测只比了「六个 key 互不相同」所以全绿 —— 断言得盯真渲染出来的字)。
         expect(errs.join('|')).not.toMatch(/\bstw_[a-z0-9_]+/);
         expect(h.uploads.length).toBe(0);
-        // 被拒的不算数:一个字没打时送不出去。
-        await expect(page.locator('[data-action="stw-send"]')).toBeEnabled();
-        await page.locator('[data-action="stw-send"]').click();
+        // 被拒的不算数:一个字没打时送不出去(S1 空输入发送键就是置灰的)。
+        await expect(page.locator('[data-action="stw-send"]')).toBeDisabled();
+        await page.locator('[data-action="stw-send"]').click({ force: true });
         expect(h.posts.length).toBe(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '03-chips-rejected-zh.png'),
@@ -497,7 +497,7 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
 
         // 一个字不打,直接送出(万能口的核心手势)。
         await page.locator('[data-action="stw-send"]').click();
-        await expect(page.locator('.stw-msg.agent .stw-bubble')).toContainText('想让我做哪一样');
+        await expect(page.locator('.stw-msg.agent .stw-ai-body')).toContainText('想让我做哪一样');
         expect(h.posts[0].text).toBe('');
         expect(h.posts[0].attachment_ids).toEqual(['u1', 'u2']);
         // 送出后附件盘清空(件搬进气泡了,不该在盘里留一份)。
@@ -518,19 +518,24 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         releaseTask();
         await expect.poll(() => h.sessionGets.length).toBeGreaterThan(0);
         await expect(pills).toHaveCount(2);
-        await expect(page.locator('.stw-msg.agent .stw-bubble')).toContainText('想让我做哪一样');
+        await expect(page.locator('.stw-msg.agent .stw-ai-body')).toContainText('想让我做哪一样');
 
         // 左窗回执卡:表格是渲好的人话,三步不许把「等你选」画成「在跑」。
-        await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
-        const cells = await page.locator('#stwLeft .stw-table td').allInnerTexts();
+        await page.waitForSelector('.stw-msg.agent .stw-proc', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        const cells = await page
+            .locator('.stw-msg.agent .stw-ai-flow .stw-table td')
+            .allInnerTexts();
         expect(cells.join('|')).not.toContain('[object Object]');
         expect(cells).toContain('GL 台账');
-        await expect(page.locator('#stwLeft .stw-step:nth-child(3) .st-badge')).toHaveClass(
-            /st-off/
-        );
+        await expect(
+            page.locator('.stw-msg.agent .stw-proc .stw-steps .stw-step:nth-child(3) .st-badge')
+        ).toHaveClass(/st-off/);
 
         // 闭集动作按钮:label 直接当文字,点一下把 tool/ids/confirm_spend 原样回传。
-        const act = page.locator('#stwLeft .stw-act');
+        const act = page.locator('.stw-msg.agent .stw-ai-flow .stw-acts .stw-act');
         await expect(act).toHaveCount(1);
         await expect(act).toContainText('转成 Excel · gl.pdf');
         await expect(act).toBeEnabled();
@@ -555,9 +560,16 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         // 注脚只说「文件能拖能粘」,没有附件口时整条该消失 —— 不留一句做不到的承诺,也别让
         // 它退化成复读页头那句。这条断言原先挂在 _b2m1_steward_local 的待批卡用例上,但那边
         // 的「没有附件口」是桩漏给 attachments 造出来的假前提;真设得出这个前提的是这里。
-        expect(await page.locator('.stw-composer-note').count()).toBe(0);
+        // 注脚不说做不到的承诺:没有附件口时,「文件能拖能粘」整句该消失 —— 不留一句
+        // 做不到的承诺,也别让它退化成复读页头那句。这条断言原先挂在 _b2m1_steward_local
+        // 的待批卡用例上,但那边的「没有附件口」是桩漏给 attachments 造出来的假前提;
+        // 真设得出这个前提的是这里。S1 起注脚常驻但按限额降级:无附件口时只说 Enter 发送。
+        const note = await page.locator('.stw-comp-note').innerText();
+        expect(note).not.toContain('拖入文件');
+        expect(note).not.toContain('拖或粘');
         // 纯文字仍然能用(降级不是把整页弄死)。
         await expect(page.locator('#stwInput')).toBeEnabled();
+        await page.locator('#stwInput').fill('x');
         await expect(page.locator('[data-action="stw-send"]')).toBeEnabled();
     });
 
@@ -579,8 +591,13 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await dropNow(page);
         await expect(page.locator('.stw-att-chip.ready')).toHaveCount(1);
         await page.locator('[data-action="stw-send"]').click();
-        await page.waitForSelector('#stwLeft .stw-act', { state: 'visible', timeout: 15000 });
-        const act = await page.locator('#stwLeft .stw-act').boundingBox();
+        await page.waitForSelector('.stw-msg.agent .stw-ai-flow .stw-acts .stw-act', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        const act = await page
+            .locator('.stw-msg.agent .stw-ai-flow .stw-acts .stw-act')
+            .boundingBox();
         expect(act.height).toBeGreaterThanOrEqual(44);
         // 页面本体永不横滚。
         const overflow = await page.evaluate(
@@ -590,7 +607,7 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         // 输入口在流里排在对话之后(composer 是 sticky,fullPage 截图会把它钉在视口底
         // 拼进画面中段 —— 那是截图的拼接位,不是真实排序,所以顺序看 DOM 不看图)。
         const order = await page.evaluate(() =>
-            [...document.querySelector('#stwRight').children].map((e) => e.className)
+            [...document.querySelector('.stw-chat-main').children].map((e) => e.className)
         );
         expect(order[order.length - 1]).toContain('stw-composer');
         // 视口截图(非 fullPage)= 手机上真正看到的那一屏。
@@ -610,7 +627,7 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await expect(page.locator('.stw-att-chip.ready')).toHaveCount(1);
         const tray = await page.locator('.stw-att-tray').innerText();
         expect(tray).not.toMatch(/\bstw_[a-z0-9_]+/);
-        const note = await page.locator('.stw-composer-note').innerText();
+        const note = await page.locator('.stw-comp-note').innerText();
         expect(note).not.toMatch(/\bstw_[a-z0-9_]+/);
         // 回形针挤掉了输入行的宽度:送出按钮不许被压到把字裁掉(泰文比中文长,先在这儿炸)。
         const send = await page

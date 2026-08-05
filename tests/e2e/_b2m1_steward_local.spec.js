@@ -291,49 +291,70 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
 
         // 用户气泡 = 点的那条 chip 原话;管家气泡 = 后端 reply(前端不自己编措辞)。
         await expect(page.locator('.stw-msg.me .stw-bubble').first()).toContainText(chipText);
-        await expect(page.locator('.stw-msg.agent .stw-bubble').first()).toContainText('还缺料');
+        await expect(page.locator('.stw-msg.agent .stw-ai-body').first()).toContainText('还缺料');
 
-        // 左窗:任务标题 + 查询次数 + 五个步骤。
-        await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
-        await expect(page.locator('#stwLeft .panel .hd h3')).toContainText('缺料盘点');
-        await expect(page.locator('#stwLeft .stw-meta')).toContainText('查询 3 次');
-        await expect(page.locator('#stwLeft .stw-step')).toHaveCount(5);
+        // 过程条:聊天标题 = 用户这轮原话;任务摘要 + 查询次数 + 五个步骤(S1 起挂在对话流里)。
+        await page.waitForSelector('.stw-msg.agent .stw-proc', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd')).toContainText(
+            '查事务所矩阵'
+        );
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-meta')).toContainText('查询 3 次');
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-steps .stw-step')).toHaveCount(5);
 
         // 五个 state → 五个 B1 色族类,且真有色差(同一片灰 = 状态语言白写了)。
         const fams = ['st-ok', 'st-run', 'st-off', 'st-warn', 'st-err'];
         for (let i = 0; i < fams.length; i++) {
             await expect(
-                page.locator(`#stwLeft .stw-step:nth-child(${i + 1}) .st-badge`)
+                page.locator(
+                    `.stw-msg.agent .stw-proc .stw-steps .stw-step:nth-child(${i + 1}) .st-badge`
+                )
             ).toHaveClass(new RegExp(fams[i]));
         }
         const colors = [];
         for (let i = 1; i <= 5; i++) {
-            colors.push(await bg(page, `#stwLeft .stw-step:nth-child(${i}) .st-badge`));
+            colors.push(
+                await bg(
+                    page,
+                    `.stw-msg.agent .stw-proc .stw-steps .stw-step:nth-child(${i}) .st-badge`
+                )
+            );
         }
         expect(new Set(colors).size).toBe(5);
 
         // 执行中那一步有三点(活着的证据),排队中那步没有。
-        await expect(page.locator('#stwLeft .stw-step:nth-child(2) .st-dots')).toBeVisible();
-        expect(await page.locator('#stwLeft .stw-step:nth-child(3) .st-dots').count()).toBe(0);
+        await expect(
+            page.locator('.stw-msg.agent .stw-proc .stw-steps .stw-step:nth-child(2) .st-dots')
+        ).toBeVisible();
+        expect(
+            await page
+                .locator('.stw-msg.agent .stw-proc .stw-steps .stw-step:nth-child(3) .st-dots')
+                .count()
+        ).toBe(0);
 
         // 产物深链指回 SPA 内部(白名单只放 #/ 与同源路径)。
-        await expect(page.locator('#stwLeft .stw-art .stw-link').first()).toHaveAttribute(
-            'href',
-            '#/client/c-sm/wo?period=2569-06'
+        await expect(
+            page.locator('.stw-msg.agent .stw-ai-flow .stw-art .stw-link').first()
+        ).toHaveAttribute('href', '#/client/c-sm/wo?period=2569-06');
+        await expect(page.locator('.stw-msg.agent .stw-ai-flow .stw-table tbody tr')).toHaveCount(
+            2
         );
-        await expect(page.locator('#stwLeft .stw-table tbody tr')).toHaveCount(2);
 
         // 表头按 label 显示、单元格按 column.key 从 dict 行取值,缺值给空格子。
-        await expect(page.locator('#stwLeft .stw-table thead th')).toHaveText([
+        await expect(page.locator('.stw-msg.agent .stw-ai-flow .stw-table thead th')).toHaveText([
             '客户',
             '义务',
             '状态',
         ]);
-        await expect(page.locator('#stwLeft .stw-table tbody tr').first().locator('td')).toHaveText(
-            ['SM', 'PP30', 'missing_materials']
-        );
+        await expect(
+            page.locator('.stw-msg.agent .stw-ai-flow .stw-table tbody tr').first().locator('td')
+        ).toHaveText(['SM', 'PP30', 'missing_materials']);
         // 反证闸:任何一格印出 [object Object] = 契约又漂了(这次就是这么漏过去的)。
-        const cellTexts = await page.locator('#stwLeft .stw-table td').allInnerTexts();
+        const cellTexts = await page
+            .locator('.stw-msg.agent .stw-ai-flow .stw-table td')
+            .allInnerTexts();
         expect(cellTexts.length).toBe(6);
         expect(cellTexts.join('|')).not.toContain('[object Object]');
         expect(cellTexts.join('|')).not.toContain('undefined');
@@ -347,15 +368,23 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         await boot(page, { taskStates: ['running', 'done'] });
         await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
         await page.locator('#stwBar .stw-chip').first().click();
-        await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
-        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-run/);
-        // 轮询 5s 后第二次回包是 done:任务徽章翻绿、第三步从排队灰变完成绿。
-        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-ok/, {
-            timeout: 20000,
+        await page.waitForSelector('.stw-msg.agent .stw-proc', {
+            state: 'visible',
+            timeout: 15000,
         });
-        await expect(page.locator('#stwLeft .stw-step:nth-child(3) .st-badge')).toHaveClass(
-            /st-ok/
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd .st-badge')).toHaveClass(
+            /st-run/
         );
+        // 轮询 5s 后第二次回包是 done:任务徽章翻绿、第三步从排队灰变完成绿。
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd .st-badge')).toHaveClass(
+            /st-ok/,
+            {
+                timeout: 20000,
+            }
+        );
+        await expect(
+            page.locator('.stw-msg.agent .stw-proc .stw-steps .stw-step:nth-child(3) .st-badge')
+        ).toHaveClass(/st-ok/);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '03-task-done-after-poll.png'),
             fullPage: true,
@@ -368,11 +397,16 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         const h = await boot(page, { taskStates: ['done'], closeout: true });
         await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
         await page.locator('#stwBar .stw-chip').first().click();
-        await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
-        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-ok/);
+        await page.waitForSelector('.stw-msg.agent .stw-proc', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd .st-badge')).toHaveClass(
+            /st-ok/
+        );
 
-        // 收尾那句真上屏:管家气泡两条(即时应承 + 服务端追写),末条是收尾。
-        const agent = page.locator('.stw-msg.agent .stw-bubble');
+        // 收尾那句真上屏:管家消息两条(即时应承 + 服务端追写),末条是收尾。
+        const agent = page.locator('.stw-msg.agent .stw-ai-body');
         await expect(agent).toHaveCount(2, { timeout: 15000 });
         await expect(agent.last()).toContainText(CLOSEOUT);
 
@@ -393,7 +427,7 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
     test('回页时手上没有任务:会话端点只补一次,不来回串', async ({ page }) => {
         const h = await boot(page, { taskStates: ['done'], closeout: true, hash: '#/steward' });
         // 首次挂载只建会话不同步,等空态出来说明会话已落地。
-        await page.waitForSelector('.stw-feed-empty', { state: 'visible', timeout: 15000 });
+        await page.waitForSelector('.stw-welcome', { state: 'visible', timeout: 15000 });
         expect(h.hits.session).toBe(0);
 
         await page.evaluate(() => {
@@ -403,26 +437,26 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         await page.evaluate(() => {
             window.location.hash = '#/steward';
         });
-        await expect(page.locator('.stw-msg.agent .stw-bubble').last()).toContainText(CLOSEOUT, {
+        await expect(page.locator('.stw-msg.agent .stw-ai-body').last()).toContainText(CLOSEOUT, {
             timeout: 15000,
         });
-        // 回页拉一次会话 → 发现有在跑的任务 → 拉任务发现已终态。这一串只该打一次 /sessions。
-        // 多出来的那次是在任务回包之后才发的,收尾句上屏时它还没走 —— 等这串跑完再数。
-        await expect.poll(() => h.hits.task).toBe(1);
+        // 回页拉一次会话 → 发现有在跑的任务 → 拉任务(loadTask)+ backfill 补拉各一次。
+        // 会话端点只打一次:不来回串。任务两条 = loadTask 本体 + backfill 补拉(历史轮过程条)。
+        await expect.poll(() => h.hits.task).toBe(2);
         await page.waitForTimeout(500);
         expect(h.hits.session).toBe(1);
-        expect(h.hits.task).toBe(1);
+        expect(h.hits.task).toBe(2);
     });
 
     test('深链点了真跳客户页并带期间', async ({ page }) => {
         await boot(page);
         await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
         await page.locator('#stwBar .stw-chip').first().click();
-        await page.waitForSelector('#stwLeft .stw-art .stw-link', {
+        await page.waitForSelector('.stw-msg.agent .stw-ai-flow .stw-art .stw-link', {
             state: 'visible',
             timeout: 15000,
         });
-        await page.locator('#stwLeft .stw-art .stw-link').first().click();
+        await page.locator('.stw-msg.agent .stw-ai-flow .stw-art .stw-link').first().click();
         await page.waitForFunction(() => window.location.hash.indexOf('#/client/') === 0, null, {
             timeout: 10000,
         });
@@ -448,12 +482,15 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         await boot(page);
         await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
         await page.locator('#stwBar .stw-chip').first().click();
-        await page.waitForSelector('#stwLeft .stw-task', { state: 'visible', timeout: 15000 });
-        const left = await page.locator('.stw-left').boundingBox();
-        const right = await page.locator('.stw-right').boundingBox();
-        // 单栏:两块同一列(左边界相同),状态卡在对话之上。
-        expect(Math.abs(left.x - right.x)).toBeLessThan(2);
-        expect(left.y + left.height).toBeLessThanOrEqual(right.y + 2);
+        await page.waitForSelector('.stw-msg.agent .stw-proc', {
+            state: 'visible',
+            timeout: 15000,
+        });
+        // 单栏:对话流铺满视口宽(没有并排分栏),过程条在对话里。
+        const feed = await page.locator('.stw-feed').boundingBox();
+        const chat = await page.locator('.stw-chat-main').boundingBox();
+        expect(Math.abs(feed.x - chat.x)).toBeLessThan(2);
+        expect(feed.width).toBeGreaterThanOrEqual(chat.width - 2);
         const overflow = await page.evaluate(
             () => document.documentElement.scrollWidth - window.innerWidth
         );
@@ -466,7 +503,10 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         // 回形针挤掉一截行宽之后,剩下两件不许被压到裁字 —— 判据是 clientWidth 装不装得下
         // scrollWidth,不是「框还在」。触控目标那条在 _f1_steward_attach_local,不重复一遍。
         const squeezed = await page.evaluate(() =>
-            ['#stwInput', '.stw-composer [data-action="stw-send"]'].filter((s) => {
+            [
+                '#stwInput',
+                '.stw-composer [data-action="stw-send"], .stw-composer [data-action="stw-stop"]',
+            ].filter((s) => {
                 const el = document.querySelector(s);
                 return el.clientWidth < el.scrollWidth;
             })
@@ -493,7 +533,7 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         await expect(page.locator('.stw-msg.me .stw-bubble')).toHaveCount(1);
         await expect(page.locator('[data-action="stw-resend"]')).toBeVisible();
         // 左窗没有任务就照实说空,不摆一个假的执行中。
-        await expect(page.locator('#stwLeft [data-state="empty"]')).toBeVisible();
+        await expect(page.locator('.stw-msg.agent .stw-proc')).toHaveCount(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '06-send-failed-honest.png'),
             fullPage: true,
@@ -536,19 +576,16 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         await expect(page.locator('.stw-step:nth-child(2) .st-badge')).toHaveClass(/st-warn/);
         // 文案与能力一致(双向闸在 tests/unit/test_ai_steward_pure.py):闭集里已经有写工具
         // (erp_push),页面自述就必须说「会改数据的操作要你先批准」,不许再自称只查不改。
-        const headNote = await page.evaluate(
-            () => document.querySelector('#v-steward .board-head .note').textContent
-        );
-        expect(headNote).not.toContain('只查不改数');
-        expect(headNote).toContain('会改数据的操作需你先批准');
+        // S1 起这条自述落在欢迎屏能力行(stw_note),不再有独立页头 note。
+        await expect(page.locator('.stw-authz-title')).toContainText('撤销');
         // 这句只在页头印一次:composer 注脚曾经复读同一句,是同屏第二遍,已删。守的是
         // 「同屏不复读」,不是「注脚不许存在」—— 有附件口时注脚回来,但只说输入框自己
         // 给不出的那件事(文件能拖能粘)。原来那条 toHaveCount(0) 只在「没有附件口」的
         // 前提下成立,而那个前提是桩漏给 attachments 造出来的,产品里不存在。
-        await expect(page.locator('.stw-composer-note')).toHaveCount(1);
-        const composerNote = await page.locator('.stw-composer-note').innerText();
+        await expect(page.locator('.stw-comp-note')).toHaveCount(1);
+        const composerNote = await page.locator('.stw-comp-note').innerText();
         expect(composerNote).toContain('文件');
-        expect(composerNote).not.toContain(headNote.trim());
+        expect(composerNote).not.toContain('撤销');
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '07-authz-pending-card.png'),
             fullPage: true,
@@ -564,9 +601,12 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
             timeout: 15000,
         });
         await page.locator('[data-action="stw-authz-approve"]').click();
-        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-run/, {
-            timeout: 15000,
-        });
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd .st-badge')).toHaveClass(
+            /st-run/,
+            {
+                timeout: 15000,
+            }
+        );
         const approvePost = h.posts.find((x) => x.path.endsWith('/authorizations/approve'));
         expect(approvePost.body).toEqual({ token: 'tok-e2e-authz-0001' });
         await page.screenshot({
@@ -591,9 +631,12 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
             timeout: 15000,
         });
         await page.locator('[data-action="stw-authz-reject"]').click();
-        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-off/, {
-            timeout: 15000,
-        });
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd .st-badge')).toHaveClass(
+            /st-off/,
+            {
+                timeout: 15000,
+            }
+        );
         // 原因面:人话 + 机器码,cancelled 用中性灰(人停的不是错误红)。
         await expect(page.locator('.stw-reason')).toContainText('一步都没有执行');
         await expect(page.locator('.stw-reason code')).toContainText('steward.authz_rejected');
@@ -609,16 +652,19 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
 
     test('执行中可取消:点取消 → POST cancel → 终态灰 + 原因 + 按钮收走', async ({ page }) => {
         const h = await openWithTask(page, { taskStates: ['running'] });
-        await page.waitForSelector('[data-action="stw-cancel"]', {
+        await page.waitForSelector('[data-action="stw-stop"]', {
             state: 'visible',
             timeout: 15000,
         });
-        await page.locator('[data-action="stw-cancel"]').click();
-        await expect(page.locator('#stwLeft .panel .hd .st-badge')).toHaveClass(/st-off/, {
-            timeout: 15000,
-        });
+        await page.locator('[data-action="stw-stop"]').click();
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd .st-badge')).toHaveClass(
+            /st-off/,
+            {
+                timeout: 15000,
+            }
+        );
         await expect(page.locator('.stw-reason')).toContainText('你取消了这条任务');
-        expect(await page.locator('[data-action="stw-cancel"]').count()).toBe(0);
+        expect(await page.locator('[data-action="stw-stop"]').count()).toBe(0);
         expect(h.posts.some((x) => x.path.endsWith('/cancel'))).toBe(true);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '10-cancel-running-task.png'),
@@ -630,18 +676,18 @@ test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', (
         const h = await openWithTask(page, { budget: true });
         await page.waitForSelector('.stw-budget', { state: 'visible', timeout: 15000 });
         // reply 人话在气泡里,数字块给已用/上限(decimal 字符串原样印,不重算)。
-        await expect(page.locator('.stw-msg.agent .stw-bubble')).toContainText('฿5.00');
+        await expect(page.locator('.stw-msg.agent .stw-ai-body')).toContainText('฿5.00');
         await expect(page.locator('.stw-budget')).toContainText('5.02');
         await expect(page.locator('.stw-budget')).toContainText('5.00');
         // 超限轮不建任务:左窗诚实空态,不摆假执行中。
-        await expect(page.locator('#stwLeft [data-state="empty"]')).toBeVisible();
+        await expect(page.locator('.stw-msg.agent .stw-proc')).toHaveCount(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '11-budget-session-exceeded.png'),
             fullPage: true,
         });
-        await page.locator('[data-action="stw-new-session"]').click();
+        await page.locator('[data-action="stw-new-session"]').first().click();
         // 出口是真的:第二次 POST /sessions 打出去,对话面回到空态指路。
-        await expect(page.locator('.stw-feed-empty')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.stw-welcome')).toBeVisible({ timeout: 10000 });
         const sessionPosts = h.posts.filter((x) => x.path.endsWith('/steward/sessions'));
         expect(sessionPosts.length).toBe(2);
     });

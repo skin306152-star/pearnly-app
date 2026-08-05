@@ -168,17 +168,19 @@ async function boot(page, opts) {
     await page.waitForSelector('#stwInput', { state: 'visible', timeout: 15000 });
     await page.locator('#stwInput').fill('sister 这期报完了没');
     await page.locator('#stwInput').press('Enter');
-    await page.waitForSelector('.stw-steps .stw-step', { state: 'visible', timeout: 15000 });
+    await page.waitForSelector('.stw-msg.agent .stw-proc', { state: 'visible', timeout: 15000 });
     return { posts };
 }
 
 test.describe('大脑循环左窗(本地 stub · 真构建产物)', () => {
     test('步骤按真实条数渲染,失败那步留得住', async ({ page }) => {
         await boot(page);
-        const steps = page.locator('.stw-steps .stw-step');
+        const steps = page.locator('.stw-msg.agent .stw-proc .stw-steps .stw-step');
         await expect(steps).toHaveCount(TASK.steps.length); // 不是写死三步
         // 失败的中间步不许被收尾抹掉:会计要看得见它撞了哪堵墙。
-        const failed = page.locator('.stw-steps .stw-step', { hasText: '查应交税额' });
+        const failed = page.locator('.stw-msg.agent .stw-proc .stw-steps .stw-step', {
+            hasText: '查应交税额',
+        });
         await expect(failed).toBeVisible();
         await expect(failed.locator('.stw-step-d')).toContainText('指明是哪一家');
         await page.screenshot({ path: path.join(ART, '01-steps-with-failed.png'), fullPage: true });
@@ -186,7 +188,7 @@ test.describe('大脑循环左窗(本地 stub · 真构建产物)', () => {
 
     test('追问那步把候选画成能点的按钮', async ({ page }) => {
         await boot(page);
-        const chips = page.locator('.stw-ask-opts .stw-chip');
+        const chips = page.locator('.stw-msg.agent .stw-proc .stw-ask-opts .stw-chip');
         await expect(chips).toHaveCount(2);
         await expect(chips.nth(0)).toHaveText('Sister Makeup');
         await expect(chips.nth(1)).toHaveText('Sister Trading');
@@ -197,7 +199,7 @@ test.describe('大脑循环左窗(本地 stub · 真构建产物)', () => {
         expect(box.height).toBeGreaterThan(16);
         // 候选摆在追问那一行里,不是另起一块飘在下面。
         const inAskStep = await page
-            .locator('.stw-steps .stw-step', { hasText: '问你一件事' })
+            .locator('.stw-msg.agent .stw-proc .stw-steps .stw-step', { hasText: '问你一件事' })
             .locator('.stw-ask-opts')
             .count();
         expect(inAskStep).toBe(1);
@@ -206,7 +208,11 @@ test.describe('大脑循环左窗(本地 stub · 真构建产物)', () => {
 
     test('点候选 = 把这句话当回答送出去', async ({ page }) => {
         const { posts } = await boot(page);
-        await page.locator('.stw-ask-opts .stw-chip', { hasText: 'Sister Trading' }).click();
+        await page
+            .locator('.stw-msg.agent .stw-proc .stw-ask-opts .stw-chip', {
+                hasText: 'Sister Trading',
+            })
+            .click();
         await page.waitForTimeout(400);
         const sent = posts.filter((p) => p.path.endsWith('/messages'));
         expect(sent.length).toBe(2); // 开场那句 + 点候选这一下
@@ -216,7 +222,9 @@ test.describe('大脑循环左窗(本地 stub · 真构建产物)', () => {
 
     test('任务已终态时候选置灰 —— 不摆点下去必报错的按钮', async ({ page }) => {
         await boot(page, { taskOverride: { status: 'done', cancellable: false } });
-        const chips = page.locator('.stw-ask-opts .stw-chip');
+        // 终态过程条默认折叠:先展开,候选才看得见(折叠态 = 根本不该见)。
+        await page.locator('.stw-msg.agent .stw-proc .stw-proc-hd').first().click();
+        const chips = page.locator('.stw-msg.agent .stw-proc .stw-ask-opts .stw-chip');
         await expect(chips).toHaveCount(2);
         await expect(chips.nth(0)).toBeDisabled();
         const opacity = await chips
@@ -228,7 +236,7 @@ test.describe('大脑循环左窗(本地 stub · 真构建产物)', () => {
 
     test('左窗那个数说的是查询次数,不是 Agent', async ({ page }) => {
         await boot(page);
-        const meta = await page.locator('.stw-meta').innerText();
+        const meta = await page.locator('.stw-msg.agent .stw-proc .stw-meta').innerText();
         expect(meta).toContain('查询 2 次'); // agent_count = kind=tool 的行数,追问不算
         expect(meta).not.toContain('Agent');
     });

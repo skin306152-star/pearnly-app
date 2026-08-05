@@ -145,6 +145,7 @@
   "pos_sales_routes": "C",
   "pos_sheets_routes": "C",
   "pos_shift_routes": "C",
+  "pos_taxinv_routes": "C",
   "products_routes": "B",
   "purchase_config_routes": "C",
   "purchase_intake_routes": "B",

@@ -31,25 +31,24 @@
     "lookups": 2
   },
   "secondBoxAboveFloor": {
-    "ok": true,
+    "ok": false,
     "first": true,
-    "counted": true,
-    "nagged": false,
+    "counted": false,
+    "nagged": true,
     "err": false,
-    "text": "可乐 325ml 数量 +1",
+    "text": "1 件没加进这张收货单\n知道了\n刚才这一下当成同一件了(相机没看见它离开)\n8850999320014\n是第二件 · 加 1\n已加入 可乐 325ml",
     "lookups": [
-      "8850999320014",
       "8850999320014"
     ]
   },
   "dupNoticeSurvivesMixed": {
-    "ok": true,
+    "ok": false,
     "first": true,
     "appeared": 1,
     "vanished": 0,
-    "samples": 141,
-    "rearms": 2,
-    "qty": "3",
+    "samples": 85,
+    "rearms": 0,
+    "qty": "1",
     "rows": 2,
     "note": {
       "found": true,
@@ -63,20 +62,20 @@
     }
   },
   "camRevokedSpeaksUp": {
-    "ok": true,
+    "ok": false,
     "first": true,
-    "grew": true,
+    "grew": false,
     "tracks": [
       {
         "st": "ended"
       }
     ],
     "spoke": true,
-    "qtyBefore": "2",
-    "qtyFrozen": "2",
-    "qtyAfter": "3",
-    "lookupsBefore": 2,
-    "lookupsFrozen": 2,
+    "qtyBefore": "1",
+    "qtyFrozen": "1",
+    "qtyAfter": "2",
+    "lookupsBefore": 1,
+    "lookupsFrozen": 1,
     "line": {
       "found": true,
       "w": 300,
@@ -101,7 +100,7 @@
     "retryCopy": "重试",
     "resumed": true,
     "errAfter": false,
-    "lookups": 3
+    "lookups": 2
   },
   "barcodeAsQuantityStopped": {
     "ok": true,
@@ -137,23 +136,8 @@
     ]
   },
   "costGunLandsAsARow": {
-    "ok": true,
-    "costBefore": "9.5",
-    "costAfter": "9.5",
-    "lookups": [
-      "8850999320014"
-    ],
-    "qty": "1",
-    "msg": {
-      "found": true,
-      "w": 300,
-      "h": 16,
-      "display": "flex",
-      "visibility": "visible",
-      "opacity": "1",
-      "inView": true,
-      "text": "可乐 325ml 数量 +1"
-    }
+    "ok": false,
+    "crash": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#inv-btn-in')\u001b[22m\n\u001b[2m    - locator resolved to <button id=\"inv-btn-in\" class=\"btn primary\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is not stable\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <div class=\"wsg-empty\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <div class=\"wsg-empty\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  2 × retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m      - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <div class=\"onb-pane\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  13 × retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m       - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <div class=\"wsg-empty\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m       - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <div class=\"wsg-empty\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m       - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <div class=\"onb-pane\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m       - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <div class=\"onb-pane\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  2 × retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\u001b[2m      - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <div class=\"wsg-empty\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <div class=\"onb-pane\">…</div> from <div class=\"onb-root\" data-wsg-bound=\"1\" id=\"workspace-gate-root\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 500ms\u001b[22m\n"
   },
   "barcodeAsCostStopped": {
     "ok": true,

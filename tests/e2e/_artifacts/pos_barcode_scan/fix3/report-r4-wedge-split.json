@@ -3,8 +3,8 @@
     "ok": true,
     "focusWas": "BODY",
     "blockedMs": 300,
-    "stampMax": 17.3,
-    "perfMax": 312.9,
+    "stampMax": 16.4,
+    "perfMax": 316.4,
     "asked": [
       "8850999320014"
     ],
@@ -25,8 +25,8 @@
     "before": "LOT-B240301",
     "after": "LOT-B240301",
     "blockedMs": 300,
-    "stampMax": 17.5,
-    "perfMax": 314.4,
+    "stampMax": 16.6,
+    "perfMax": 310.6,
     "asked": [
       "8850999320014"
     ],
@@ -37,7 +37,7 @@
   "w3_heldKeyOnMain": {
     "ok": true,
     "repeatFlags": 11,
-    "stampMax": 40.7,
+    "stampMax": 35.1,
     "asked": [],
     "cart": {
       "names": [],
@@ -50,8 +50,8 @@
   "w4_gapTaskSplit": {
     "ok": true,
     "blockedMs": 300,
-    "stampMax": 16.7,
-    "perfMax": 299.8,
+    "stampMax": 15.7,
+    "perfMax": 300.4,
     "asked": [
       "8850999320014"
     ],

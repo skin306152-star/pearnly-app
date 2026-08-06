@@ -19,8 +19,8 @@
   卡再拒,多一次点击。
 - **真红两笔(闸的胜利)**:496c4438 曾漏 pos.html ?v 与双 SW 三处同步(worker 揪出已修);G3 新
   路由漏合同测试登记(已补)。
-- **⚠️CI 挂账**:GitHub Actions 全平台积压(run 不建/排队数小时/0-job cancelled 连累 conclusion),
-  四班 CI 判决未落;本地全量闸×4 + 生产核验×4 已兜底,监视器挂着,绿了此行销账。
+- **CI 已销账**:Actions 积压整夜后 `5f5a3670`(含一至四班全部代码)10 job 全绿 ✓;期间兜底=
+  本地全量闸×5 + 生产核验×5。积压期间的 0-job cancelled/failure 均为基建噪音非代码红。
 - **simplify 跳过账**:ai-purge onEvent 包装并入下次 ai.js 改动(免 ?v 白刷);vat_summary 多句 SQL
   与 doc_qa 双 cursor 判不值得动;复用角「并轨 ingest 解码序」判错已撤销(那份序刻意无 gbk)。
 - **下一步**:CI 落地销账;SM 批次 G1-G4 全收官;Stock Card 等老丈人口径回执再开工。

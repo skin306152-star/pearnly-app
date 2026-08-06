@@ -557,9 +557,6 @@ test.describe('万能口 F1(本地 stub · 真构建产物)', () => {
         await boot(page, { noLimits: true });
         expect(await page.locator('.stw-clip').count()).toBe(0);
         expect(await page.locator('#stwAttFile').count()).toBe(0);
-        // 注脚只说「文件能拖能粘」,没有附件口时整条该消失 —— 不留一句做不到的承诺,也别让
-        // 它退化成复读页头那句。这条断言原先挂在 _b2m1_steward_local 的待批卡用例上,但那边
-        // 的「没有附件口」是桩漏给 attachments 造出来的假前提;真设得出这个前提的是这里。
         // 注脚不说做不到的承诺:没有附件口时,「文件能拖能粘」整句该消失 —— 不留一句
         // 做不到的承诺,也别让它退化成复读页头那句。这条断言原先挂在 _b2m1_steward_local
         // 的待批卡用例上,但那边的「没有附件口」是桩漏给 attachments 造出来的假前提;

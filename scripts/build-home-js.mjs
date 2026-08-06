@@ -121,6 +121,10 @@ const BUNDLES = [
             // 只需排在四个消费者(ai-intake.js/ai-review.js/ai-dashboard.js/ai-client.js)
             // 之前,紧邻 ai-state.js 是"同属零依赖基础设施"的语义分组。
             'ai/ai-poll.js',
+            // ai-stream-pump.js(S1 · fetch 流读帧公共泵,零依赖)只需排在两个消费者
+            // (ai-purge.js 的 NDJSON 泵、ai-steward-stream.js 的 SSE 泵)之前,与
+            // ai-poll.js 同属零依赖基础设施,紧邻放置。
+            'ai/ai-stream-pump.js',
             // shared/copy-flash.js(复制反馈按钮闪一下再还原,零依赖)只在点击时被
             // ai-steward-actions.js / ai-billing.js / ai-review-inbox.js 调,排哪儿都行——
             // 与 ai-poll.js 同为零依赖基础设施,紧邻放置。/dms 的 bundle 也列了同一份。

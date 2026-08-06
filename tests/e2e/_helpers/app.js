@@ -39,6 +39,10 @@ async function dismissWorkspaceGate(page) {
 
 // 进主应用 · storageState 已注入 mrpilot_token → home.js 不该把我们踢回着陆页
 async function enterApp(page) {
+    // 同 auth.doUiLogin:掐掉 CF 边缘注入的分析信标,防黑洞网络卡死 DCL。
+    await page.route('**://static.cloudflareinsights.com/**', (r) =>
+        r.fulfill({ status: 204, body: '' })
+    );
     await page.goto('/home');
     // 多账套启动闸先过(否则 sidebar 一直 visibility:hidden)
     await dismissWorkspaceGate(page);

@@ -185,10 +185,11 @@ def _jpeg_name(name: str) -> str:
 def _convert_heic(content: bytes, filename: str) -> bytes:
     """HEIC/HEIF → JPEG 字节。依赖 pillow-heif(懒加载:非 HEIC 路径不 import)。转换失败诚实报错。"""
     try:
-        import pillow_heif
         from PIL import Image
 
-        pillow_heif.register_heif_opener()
+        from services.imaging.heif import register_heif
+
+        register_heif()
         img = Image.open(io.BytesIO(content)).convert("RGB")
         out = io.BytesIO()
         img.save(out, format="JPEG", quality=90)

@@ -103,11 +103,13 @@ class ImageStoreTests(unittest.TestCase):
 
     def test_heic_accepted_when_plugin_available(self):
         try:
-            import pillow_heif
+            import pillow_heif  # noqa: F401
         except ImportError:
             self.skipTest("pillow-heif not installed")
+        from services.imaging.heif import register_heif
+
         buf = io.BytesIO()
-        pillow_heif.register_heif_opener()
+        register_heif()
         Image.new("RGB", (30, 20), (10, 20, 30)).save(buf, "HEIF")
         res = st.save_image("t", buf.getvalue())
         self.assertTrue(res["url"].endswith(".jpg"))
@@ -152,6 +154,24 @@ class ImageStoreTests(unittest.TestCase):
         name = res["url"].rsplit("/", 1)[-1]
         st.delete_image("t2", name)  # 别的租户同名文件不存在 → 幂等成功但不该删到 t1 的
         self.assertTrue(st.local_path("t1", name).is_file())
+
+
+class HeifRegisterTests(unittest.TestCase):
+    """register_heif 幂等:重复调用不炸、不重复挂 opener,HEIC 解不开的语义由上层兜。"""
+
+    def test_register_is_idempotent(self):
+        from services.imaging.heif import register_heif
+
+        register_heif()
+        register_heif()  # 第二次:扩展表已带 .heic → 幂等短路,不该抛
+        self.assertIn(".heic", Image.registered_extensions())
+
+    def test_already_registered_does_not_reopen(self):
+        from services.imaging.heif import register_heif
+
+        before = Image.registered_extensions().get(".heic")
+        register_heif()
+        self.assertEqual(Image.registered_extensions().get(".heic"), before)
 
 
 if __name__ == "__main__":

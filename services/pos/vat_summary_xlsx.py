@@ -13,20 +13,13 @@ from decimal import Decimal
 from typing import Any
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+from openpyxl.styles import Font
 
+from services.excel import xlsx_style as sty
 from services.pos import sheets_labels
 
-_BORDER = Border(*(Side(style="thin", color="D8DEE8"),) * 4)
-_HEAD_FILL = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
-_HEAD_FONT = Font(name="Tahoma", size=10.5, bold=True, color="FFFFFF")
-_CELL_FONT = Font(name="Tahoma", size=10)
-_TOTAL_FONT = Font(name="Tahoma", size=10, bold=True)
+# 视觉语言一律取 services/excel/xlsx_style 的共用件(全站导出统一),不在这里另起一套。
 _NOTE_FONT = Font(name="Tahoma", size=9.5, italic=True)
-_RIGHT = Alignment(horizontal="right", vertical="center")
-_LEFT = Alignment(horizontal="left", vertical="center")
-_MONEY_FMT = "#,##0.00"
 
 _LABELS = {
     "sheet_days": "สรุปรายวัน (Daily Summary)",
@@ -73,25 +66,17 @@ def build_xlsx(data: dict[str, Any]) -> bytes:
     return buf.getvalue()
 
 
-def _header(ws, labels: list[str], widths: list[int]) -> None:
-    for i, (label, width) in enumerate(zip(labels, widths), start=1):
-        cell = ws.cell(row=1, column=i, value=label)
-        cell.font = _HEAD_FONT
-        cell.fill = _HEAD_FILL
-        cell.alignment = _LEFT
-        ws.column_dimensions[get_column_letter(i)].width = width
-    ws.freeze_panes = "A2"
-
-
-def _row(ws, r: int, values: list, *, money_cols: frozenset = frozenset(), font=_CELL_FONT) -> None:
+def _row(ws, r: int, values: list, *, money_cols: frozenset = frozenset(), font=None) -> None:
     for c, v in enumerate(values, start=1):
         money = c in money_cols
         cell = ws.cell(row=r, column=c, value=float(v) if money else v)
-        cell.font = font
-        cell.border = _BORDER
-        cell.alignment = _RIGHT if money else _LEFT
-        if money:
-            cell.number_format = _MONEY_FMT
+        sty.style_cell(
+            cell,
+            align=sty.right() if money else sty.left(),
+            fmt=sty.MONEY_FMT if money else None,
+        )
+        if font is not None:
+            cell.font = font
 
 
 def _append_notes(ws, start_row: int) -> None:
@@ -105,7 +90,7 @@ def _append_notes(ws, start_row: int) -> None:
 
 def _days_sheet(ws, data: dict) -> None:
     ws.title = _LABELS["sheet_days"]
-    _header(
+    sty.write_header_row(
         ws,
         [
             _LABELS[k]
@@ -150,14 +135,16 @@ def _days_sheet(ws, data: dict) -> None:
             totals["gross"],
         ],
         money_cols=frozenset({3, 4, 5, 6}),
-        font=_TOTAL_FONT,
+        font=sty.Font(bold=True),
     )
     _append_notes(ws, r)
 
 
 def _method_sheet(ws, data: dict) -> None:
     ws.title = _LABELS["sheet_method"]
-    _header(ws, [_LABELS[k] for k in ("col_method", "col_count", "col_amount")], [22, 12, 14])
+    sty.write_header_row(
+        ws, [_LABELS[k] for k in ("col_method", "col_count", "col_amount")], [22, 12, 14]
+    )
     r = 1
     total_count, total_amount = 0, Decimal("0")
     for method, v in data["by_method"].items():
@@ -176,13 +163,13 @@ def _method_sheet(ws, data: dict) -> None:
         r,
         [_LABELS["row_total"], total_count, f"{total_amount:.2f}"],
         money_cols=frozenset({3}),
-        font=_TOTAL_FONT,
+        font=sty.Font(bold=True),
     )
 
 
 def _invoices_sheet(ws, data: dict) -> None:
     ws.title = _LABELS["sheet_invoices"]
-    _header(
+    sty.write_header_row(
         ws,
         [
             _LABELS[k]
@@ -223,7 +210,7 @@ def _invoices_sheet(ws, data: dict) -> None:
 
 def _abb_sheet(ws, data: dict) -> None:
     ws.title = _LABELS["sheet_abb"]
-    _header(
+    sty.write_header_row(
         ws,
         [_LABELS[k] for k in ("col_date", "col_receipt_min", "col_receipt_max", "col_count")],
         [12, 20, 20, 10],
@@ -235,5 +222,5 @@ def _abb_sheet(ws, data: dict) -> None:
         total_count += day["count"]
         _row(ws, r, [day["date"], day["receipt_min"], day["receipt_max"], day["count"]])
     r += 1
-    _row(ws, r, [_LABELS["row_total"], "", "", total_count], font=_TOTAL_FONT)
+    _row(ws, r, [_LABELS["row_total"], "", "", total_count], font=sty.Font(bold=True))
     _append_notes(ws, r)

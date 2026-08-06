@@ -18,7 +18,6 @@ from __future__ import annotations
 import re
 from calendar import monthrange
 from datetime import date
-from decimal import Decimal
 
 from services.pos import report as report_svc
 from services.pos.report_window import bangkok_day_range as _range
@@ -36,10 +35,6 @@ def parse_month(month: str) -> tuple[date, date]:
         raise MonthInvalid(month)
     year, mon = int(month[:4]), int(month[5:7])
     return date(year, mon, 1), date(year, mon, monthrange(year, mon)[1])
-
-
-def _money(v) -> str:
-    return f"{Decimal(str(v if v is not None else 0)):.2f}"
 
 
 def month_summary(cur, *, tenant_id: str, workspace_client_id: int, month: str) -> dict:
@@ -74,10 +69,10 @@ def _days(cur, base, date_from, date_to) -> list:
         {
             "date": r["d"].isoformat(),
             "sales_count": int(r["sales_count"]),
-            "subtotal": _money(r["subtotal"]),
-            "discount_total": _money(r["discount_total"]),
-            "vat_amount": _money(r["vat_amount"]),
-            "gross": _money(r["grand_total"]),
+            "subtotal": report_svc._money(r["subtotal"]),
+            "discount_total": report_svc._money(r["discount_total"]),
+            "vat_amount": report_svc._money(r["vat_amount"]),
+            "gross": report_svc._money(r["grand_total"]),
         }
         for r in cur.fetchall()
     ]
@@ -116,12 +111,12 @@ def _totals(cur, base, date_from, date_to) -> dict:
     )
     row = cur.fetchone() or {}
     return {
-        "subtotal": _money(row.get("subtotal")),
-        "discount_total": _money(row.get("discount_total")),
-        "vat_amount": _money(row.get("vat_amount")),
-        "gross": _money(row.get("gross")),
+        "subtotal": report_svc._money(row.get("subtotal")),
+        "discount_total": report_svc._money(row.get("discount_total")),
+        "vat_amount": report_svc._money(row.get("vat_amount")),
+        "gross": report_svc._money(row.get("gross")),
         "sales_count": int(row.get("sales_count") or 0),
-        "refund": _money(row.get("refund")),
+        "refund": report_svc._money(row.get("refund")),
     }
 
 
@@ -170,10 +165,10 @@ def _full_invoices(cur, base, date_from, date_to) -> list:
             "source_receipt_no": r["source_receipt_no"],
             "buyer_name": r["buyer_name"],
             "buyer_tax_id": r["buyer_tax_id"],
-            "subtotal": _money(r["subtotal"]),
-            "discount_total": _money(r["discount_total"]),
-            "vat_amount": _money(r["vat_amount"]),
-            "gross": _money(r["grand_total"]),
+            "subtotal": report_svc._money(r["subtotal"]),
+            "discount_total": report_svc._money(r["discount_total"]),
+            "vat_amount": report_svc._money(r["vat_amount"]),
+            "gross": report_svc._money(r["grand_total"]),
         }
         for r in cur.fetchall()
     ]

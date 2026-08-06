@@ -400,7 +400,8 @@ class _SettingsFakeCursor:
             tenant_id, ws_id = params
             row = self.tax_settings.get((tenant_id, ws_id))
             self._one = dict(row) if row else None
-        elif s.startswith("SELECT vat_registered FROM workspace_clients"):
+        elif s.startswith("SELECT id, name, tax_id"):
+            # seller_profile.get_seller 的 SELECT(vat_registered 在其中)
             tenant_id, ws_id = params
             row = self.workspace_clients.get((tenant_id, ws_id))
             self._one = dict(row) if row else None

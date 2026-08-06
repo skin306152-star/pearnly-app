@@ -29,10 +29,11 @@ def _jpeg(color=(200, 120, 60), size=(48, 32)) -> bytes:
 
 
 def _heic(color=(60, 140, 200), size=(48, 32)) -> bytes:
-    import pillow_heif
     from PIL import Image
 
-    pillow_heif.register_heif_opener()
+    from services.imaging.heif import register_heif
+
+    register_heif()
     buf = io.BytesIO()
     Image.new("RGB", size, color).save(buf, format="HEIF")
     return buf.getvalue()

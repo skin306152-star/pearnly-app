@@ -108,6 +108,35 @@ def _summarize_failure(idx: int, total: int, code: int, out: str) -> None:
     print(f"  全文: {dump}")
 
 
+def _is_load_failure(returncode: int, out: str) -> bool:
+    """判红原因是否「负载/初始化类」——可安全单进程串行复跑一次再判。
+
+    - 任何 FAIL:(断言失败)都不是负载,复跑是在掩盖确定性失败,直接红。
+    - returncode 0xC0000142(3221225794)= Windows 子进程初始化失败,典型并行抢资源。
+    - 其余情况:失败清单全部是 ERROR: setUpClass(冷 import 在并行争抢时炸的典型)才自愈;
+      混进任何普通 ERROR: 都是测试自身报错,复跑大概率复现,不浪费一次全片重跑。
+    """
+    if returncode == 0:
+        return False  # exit 0 不是红,轮不到自愈
+    if "FAIL:" in out:
+        return False
+    if returncode == 3221225794:
+        return True
+    err_lines = [ln for ln in out.splitlines() if ln.startswith("ERROR:")]
+    if not err_lines:
+        return False  # 无 FAIL 也无 ERROR 却非零退出 → 未知红,不自愈
+    return all(ln.startswith("ERROR: setUpClass") for ln in err_lines)
+
+
+def _collect_times(out: str, all_times: dict[str, float]) -> None:
+    for ln in out.splitlines():
+        if ln.startswith(_TIMES_MARK):
+            try:
+                all_times.update(json.loads(ln[len(_TIMES_MARK) :]))
+            except ValueError:
+                pass
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="tests/unit 分片并行 runner(保字母序连续切段)")
     ap.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 4))
@@ -159,13 +188,29 @@ def main() -> int:
     all_times: dict[str, float] = load_times()
     for i, p in enumerate(procs):
         out, _ = p.communicate()
-        for ln in out.splitlines():
-            if ln.startswith(_TIMES_MARK):
-                try:
-                    all_times.update(json.loads(ln[len(_TIMES_MARK) :]))
-                except ValueError:
-                    pass
+        _collect_times(out, all_times)
         if p.returncode != 0:
+            if _is_load_failure(p.returncode, out):
+                # 负载/初始化型红:单进程串行复跑一次(不抢资源),绿了就放过——真负载是偶发,
+                # 复现不了的红不该当确定性失败判掉整片。
+                retry = subprocess.run(
+                    [sys.executable, __file__, "--worker", *shards[i]],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                _collect_times(retry.stdout, all_times)
+                if retry.returncode == 0:
+                    if not args.quiet:
+                        print(
+                            f"shard {i + 1}/{len(procs)}: {len(shards[i])} modules OK ⚠ 负载重试后绿"
+                        )
+                    continue
+                failed = True
+                _summarize_failure(i + 1, len(procs), retry.returncode, retry.stdout)
+                continue
             failed = True
             _summarize_failure(i + 1, len(procs), p.returncode, out)
         elif not args.quiet:

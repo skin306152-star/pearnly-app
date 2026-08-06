@@ -40,11 +40,14 @@ async def api_report(
     date_to: Optional[str] = Query(None, alias="to"),
     prev_from: Optional[str] = Query(None),
     prev_to: Optional[str] = Query(None),
+    sections: Optional[str] = Query(None),
 ):
     """销售报表:KPI / 按天 / 按支付 / 畅销 / 按收银员 / 分时热力 / 实时侧写。
 
     prev_from/prev_to 是环比对照窗口,语义由前端给(按日=上周同日,按月=上一自然月),
     缺省回落相邻等长上一窗口。数据从 pos_sales 流水聚合。
+    sections=逗号分隔分区名(by_day,kpi,…),传了则只聚合命中分区——翻页省白拉 SQL;
+    不传 = 全量(旧客户端兼容)。
     """
     tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
@@ -58,6 +61,7 @@ async def api_report(
             date_to=_parse_date(date_to),
             prev_from=_parse_date(prev_from),
             prev_to=_parse_date(prev_to),
+            sections=({s.strip() for s in sections.split(",") if s.strip()} if sections else None),
         )
     return ok(data)
 

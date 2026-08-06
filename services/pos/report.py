@@ -29,6 +29,19 @@ def _qty(v) -> str:
     return f"{Decimal(str(v if v is not None else 0)):.3f}"
 
 
+_SECTIONS = {
+    "kpi",
+    "by_day",
+    "by_method",
+    "top_products",
+    "by_cashier",
+    "prev_kpi",
+    "by_hour",
+    "heat",
+    "live",
+}
+
+
 def sales_report(
     cur,
     *,
@@ -39,45 +52,58 @@ def sales_report(
     top_n: int = 10,
     prev_from: Optional[date] = None,
     prev_to: Optional[date] = None,
+    sections: Optional[set[str]] = None,
 ) -> dict:
+    """聚合报表。sections=None 全量(兼容旧调用);给集合则只算命中的分区,未请求键省略——
+    翻页只取 by_day 时省掉其余 4 句 SQL 与 by_method 的 join 面。未知分区名一律忽略。"""
     base = (tenant_id, workspace_client_id)
-    out = {
-        "kpi": _kpi(cur, base, date_from, date_to),
-        "by_day": _by_day(cur, base, date_from, date_to),
-        "by_method": _by_method(cur, base, date_from, date_to),
-        "top_products": _top_products(cur, base, date_from, date_to, top_n),
-        "by_cashier": _by_cashier(cur, base, date_from, date_to),
-    }
+    want = sections if sections else _SECTIONS
+    out = {}
+    if "kpi" in want:
+        out["kpi"] = _kpi(cur, base, date_from, date_to)
+    if "by_day" in want:
+        out["by_day"] = _by_day(cur, base, date_from, date_to)
+    if "by_method" in want:
+        out["by_method"] = _by_method(cur, base, date_from, date_to)
+    if "top_products" in want:
+        out["top_products"] = _top_products(cur, base, date_from, date_to, top_n)
+    if "by_cashier" in want:
+        out["by_cashier"] = _by_cashier(cur, base, date_from, date_to)
     # 环比对照窗口:前端可显式指定语义窗口(按日=上周同日,零售有星期节律;按月=上一自然月),
     # 没给回落相邻等长上一窗口。窗口无界(全程)没有对照物,诚实给 None,前端不显示环比
     # 而不是显示 Odoo 式的「↑∞%」。
-    if not (prev_from and prev_to) and date_from and date_to:
-        span = (date_to - date_from).days + 1
-        prev_to = date_from - timedelta(days=1)
-        prev_from = prev_to - timedelta(days=span - 1)
-    if prev_from and prev_to:
-        out["prev_kpi"] = _kpi(cur, base, prev_from, prev_to)
-        out["prev_range"] = {"from": prev_from.isoformat(), "to": prev_to.isoformat()}
-    else:
-        out["prev_kpi"] = None
-        out["prev_range"] = None
+    if "prev_kpi" in want:
+        if not (prev_from and prev_to) and date_from and date_to:
+            span = (date_to - date_from).days + 1
+            prev_to = date_from - timedelta(days=1)
+            prev_from = prev_to - timedelta(days=span - 1)
+        if prev_from and prev_to:
+            out["prev_kpi"] = _kpi(cur, base, prev_from, prev_to)
+            out["prev_range"] = {"from": prev_from.isoformat(), "to": prev_to.isoformat()}
+        else:
+            out["prev_kpi"] = None
+            out["prev_range"] = None
     # 单日窗口给分时序列(店内钟点 Asia/Bangkok:分时图是给店主看的,UTC 钟点没人看得懂)。
     # 窗口本身仍沿用全表的既有口径,分时桶只是窗口内流水的另一种切法,总额与 KPI 恒等。
-    out["by_hour"] = (
-        _by_hour(cur, base, date_from, date_to)
-        if (date_from and date_to and date_from == date_to)
-        else None
-    )
-    out["heat"] = _heat(cur, base, date_to)
-    out["live"] = _live(cur, base)
+    if "by_hour" in want:
+        out["by_hour"] = (
+            _by_hour(cur, base, date_from, date_to)
+            if (date_from and date_to and date_from == date_to)
+            else None
+        )
+    if "heat" in want:
+        out["heat"], out["heat_range"] = _heat(cur, base, date_to)
+    if "live" in want:
+        out["live"] = _live(cur, base)
     return out
 
 
-def _heat(cur, base, date_to: Optional[date]) -> list:
+def _heat(cur, base, date_to: Optional[date]) -> tuple[list, dict]:
     """近 14 天 × 钟点的营业额格子(天与小时都按曼谷钟切,凌晨单跨 UTC 日也落对格)。
 
     锚 = 窗口终点 date_to(热力跟着看的时期走),无锚用曼谷今天。窗口与格子同轴:_range
     已按曼谷日切,[锚−13天 0:00, 锚+1天 0:00) 恰好罩住 14 个完整曼谷日。
+    返回 (格子, heat_range)——范围与查询同源,前端标题标注期间不再自己推算。
     """
     anchor = date_to or bangkok_today()
     rng, rp = _range("sold_at", anchor - timedelta(days=_HEAT_DAYS - 1), anchor)
@@ -91,10 +117,15 @@ def _heat(cur, base, date_to: Optional[date]) -> list:
         + " GROUP BY 1, 2 ORDER BY 1, 2",
         list(base) + rp,
     )
-    return [
+    rows = [
         {"date": r["d"].isoformat(), "hour": int(r["h"]), "gross": _money(r["gross"])}
         for r in cur.fetchall()
     ]
+    heat_range = {
+        "from": (anchor - timedelta(days=_HEAT_DAYS - 1)).isoformat(),
+        "to": anchor.isoformat(),
+    }
+    return rows, heat_range
 
 
 def _live(cur, base) -> dict:

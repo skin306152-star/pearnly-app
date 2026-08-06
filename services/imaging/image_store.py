@@ -25,13 +25,10 @@ URL_PREFIX = "/api/uploads/image/"
 _EXT_MEDIA = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}
 
 # iPhone 相册原生是 HEIC。注册失败(依赖没装)不致命:HEIC 会按「解不开」走 not_an_image,
-# 其他格式照常。
-try:
-    from pillow_heif import register_heif_opener
+# 其他格式照常。注册统一走 heif 模块(幂等,已注册不重复)。
+from services.imaging.heif import register_heif
 
-    register_heif_opener()
-except ImportError:
-    pass
+register_heif()
 
 
 class UploadError(ValueError):

@@ -8,7 +8,8 @@
  * 模态外壳复用 .pkg-mask/.pkg-modal(ai-pkg.css · 同 ai-client-import.js 先例),
  * 不为这一个弹窗再画一套。不可撤销,所以确认步单独一屏,不跟选择挤在一起。
  *
- * 依赖全局 at() 与 AI.state.esc / AI.token,排在 ai-clients.js 之前加载。
+ * 依赖全局 at() 与 AI.state.esc / AI.token,排在 ai-clients.js 之前加载。读帧循环
+ * 共享 ai-stream-pump.js(与 ai-steward-stream.js 的 SSE 泵同源),排在它之前加载。
  */
 (function () {
     'use strict';
@@ -219,18 +220,18 @@
         setProgress(evt);
     }
 
-    // NDJSON:一行一个事件。按行切分,最后一段可能是半行,留到下一块再拼。
-    // flush=true(流已结束)时把残段也当完整一行处理 —— 末行没带换行符就丢掉的话,
+    // NDJSON:一行一个事件。按行切分,最后一段可能是半行,留给 ai-stream-pump.js 的
+    // 缓冲拼到下一块;它 done 时把残段交回 onDone,兜住没换行符结尾的末行 —— 丢掉的话
     // finished 事件永远收不到,弹窗会一直停在「正在清除…」。
-    function consume(text, carry, flush) {
-        var lines = (carry + text).split('\n');
-        var rest = lines.pop();
-        lines.forEach(handle);
-        if (flush && rest) {
-            handle(rest);
-            return '';
-        }
-        return rest;
+    function splitLines(buffer, chunk) {
+        var parts = (buffer + chunk).split('\n');
+        var rest = parts.pop();
+        return { buffer: rest, events: parts };
+    }
+
+    function reportFailed() {
+        var status = document.getElementById('pgStatus');
+        if (status) status.textContent = at('purge_failed');
     }
 
     // 账期拉不到不阻断:下拉只剩「全部账期」,清整套账仍然可用(不拿假选项冒充)。
@@ -271,29 +272,19 @@
             )
             .then(function (r) {
                 if (!r.ok || !r.body) throw new Error('purge_failed');
-                var reader = r.body.getReader();
-                var decoder = new TextDecoder();
-                var carry = '';
-                function pump() {
-                    return reader.read().then(function (chunk) {
-                        if (chunk.done) {
-                            consume('', carry, true);
-                            return;
-                        }
-                        carry = consume(
-                            decoder.decode(chunk.value, { stream: true }),
-                            carry,
-                            false
-                        );
-                        return pump();
-                    });
-                }
-                return pump();
+                AI.streamPump.pump(r.body.getReader(), {
+                    parse: splitLines,
+                    onEvent: function (line) {
+                        handle(line);
+                        return false;
+                    },
+                    onDone: function (leftover) {
+                        if (leftover) handle(leftover);
+                    },
+                    onError: reportFailed,
+                });
             })
-            .catch(function () {
-                var status = document.getElementById('pgStatus');
-                if (status) status.textContent = at('purge_failed');
-            });
+            .catch(reportFailed);
     }
 
     // 只换那一行提示语。整屏重渲会把用户正在用的 <select> 连同 option 一起销毁重建,

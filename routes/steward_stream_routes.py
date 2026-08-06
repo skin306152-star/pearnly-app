@@ -31,6 +31,7 @@ from fastapi.responses import StreamingResponse
 
 from core import db
 from routes.steward_common import NOT_FOUND, authorize_steward
+from routes.stream_common import NO_BUFFER_HEADERS, sse_frame
 from services.steward import store, worker
 
 router = APIRouter()
@@ -57,10 +58,6 @@ def _read_task(tenant_id: str, task_id: str, heal: bool) -> Optional[dict]:
     return store.public_task(task) if task else None
 
 
-def _frame(event: str, payload: dict) -> str:
-    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
-
-
 async def _event_stream(tenant_id: str, task_id: str):
     last = ""
     for tick in range(_MAX_TICKS):
@@ -69,24 +66,24 @@ async def _event_stream(tenant_id: str, task_id: str):
         task = await asyncio.to_thread(_read_task, tenant_id, task_id, heal)
         if task is None:
             # 任务行没了(会话被删):流如实收口,前端按 end 处理。
-            yield _frame("end", {"reason": REASON_TERMINAL})
+            yield sse_frame("end", {"reason": REASON_TERMINAL})
             return
         snapshot = json.dumps(task, sort_keys=True, ensure_ascii=False, default=str)
         if snapshot != last:
             last = snapshot
-            yield _frame("task", task)
+            yield sse_frame("task", task)
         if task.get("status") in (
             store.TASK_DONE,
             store.TASK_FAILED,
             store.TASK_WAITING_USER,
             store.TASK_CANCELLED,
         ):
-            yield _frame("end", {"reason": REASON_TERMINAL})
+            yield sse_frame("end", {"reason": REASON_TERMINAL})
             return
         if tick and tick % _PING_EVERY == 0:
             yield ": ping\n\n"
         await asyncio.sleep(_TICK_S)
-    yield _frame("end", {"reason": REASON_TIMEOUT})
+    yield sse_frame("end", {"reason": REASON_TIMEOUT})
 
 
 @router.get("/api/ai/steward/tasks/{task_id}/events")
@@ -103,9 +100,5 @@ async def task_events(task_id: str, request: Request):
     return StreamingResponse(
         _event_stream(tenant_id, task_id),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-store",
-            # nginx 反代默认攒缓冲,SSE 会被整段扣到连接关闭才吐 —— 必须关。
-            "X-Accel-Buffering": "no",
-        },
+        headers=NO_BUFFER_HEADERS,
     )

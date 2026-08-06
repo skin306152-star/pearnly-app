@@ -532,6 +532,7 @@
         "static/ai/ai-steward-sessions-render.js",
         "static/ai/ai-steward-sessions.js",
         "static/ai/ai-steward-stream.js",
+        "static/ai/ai-stream-pump.js",
         "static/ai/ai-steward-md.js",
         "static/ai/ai-steward-chat.css",
         "static/ai/ai-steward.css",

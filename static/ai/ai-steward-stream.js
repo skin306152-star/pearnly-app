@@ -7,8 +7,9 @@
  *                 任务可能还在跑,调用方回落轮询接着盯)
  *
  * 为什么不用 EventSource:那组端点只认 Authorization 头,EventSource 发不了自定义头。
- * 走 fetch + ReadableStream 手解帧;浏览器不支持流式读取或连接失败时,onError 一次,
- * 由调用方(ai-steward.js)回落现有 5s 轮询 —— 渐进增强,老路一直在。
+ * 走 fetch + ReadableStream 手解帧,读帧循环共享 ai-stream-pump.js(与 ai-purge.js 的
+ * NDJSON 泵同源);浏览器不支持流式读取或连接失败时,onError 一次,由调用方
+ * (ai-steward.js)回落现有 5s 轮询 —— 渐进增强,老路一直在。
  *
  * 上半段 parseFrames 是纯函数(node tests/unit/test_ai_steward_stream.py 直接断言):
  * 缓冲按空行切帧、event/data 行取值、注释行(: ping)丢弃、半帧留在缓冲等下一段。
@@ -93,29 +94,17 @@
                     fail();
                     return;
                 }
-                var reader = resp.body.getReader();
-                var decoder = new TextDecoder();
-                var buffer = '';
-                function pump() {
-                    reader.read().then(function (chunk) {
-                        if (!alive) return;
-                        if (chunk.done) {
-                            // 服务端没发 end 就断了(反代掐线/部署重启):当错误回落轮询。
-                            fail();
-                            return;
-                        }
-                        var out = parseFrames(
-                            buffer,
-                            decoder.decode(chunk.value, { stream: true })
-                        );
-                        buffer = out.buffer;
-                        for (var i = 0; i < out.events.length; i++) {
-                            if (dispatch(out.events[i])) return;
-                        }
-                        pump();
-                    }, fail);
-                }
-                pump();
+                AI.streamPump.pump(resp.body.getReader(), {
+                    // stop() 可能在 read() 飞行途中被调:分帧前先看 alive,与原实现在每次
+                    // read() resolve 时先判断的是同一处生效点。
+                    parse: function (buffer, text) {
+                        return alive ? parseFrames(buffer, text) : { stop: true };
+                    },
+                    onEvent: dispatch,
+                    // 服务端没发 end 就断了(反代掐线/部署重启):当错误回落轮询。
+                    onDone: fail,
+                    onError: fail,
+                });
             })
             .catch(fail);
 

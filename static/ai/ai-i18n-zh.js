@@ -336,9 +336,11 @@ window.__AI_I18N_ZH__ = {
     profile_sbt_cta_txt: 'SBT 登记状态没有官方数据来源，需要你确认一次。',
     profile_sbt_cta_btn: '让管家帮你确认（要一张 ภ.พ.20）',
     profile_sbt_cta_prefill: '帮我确认一下这家客户的 SBT（特定营业税）登记状态，需要一张 ภ.พ.20。',
-    profile_evidence_pays_individuals_hit: '{period} 期已过账采购票中发现 {count} 笔向个人付款（含预扣）',
+    profile_evidence_pays_individuals_hit:
+        '{period} 期已过账采购票中发现 {count} 笔向个人付款（含预扣）',
     profile_evidence_pays_individuals_miss: '{period} 期已过账采购票中，未发现向个人付款的预扣记录',
-    profile_evidence_pays_juristic_hit: '{period} 期已过账采购票中发现 {count} 笔向法人付款（含预扣）',
+    profile_evidence_pays_juristic_hit:
+        '{period} 期已过账采购票中发现 {count} 笔向法人付款（含预扣）',
     profile_evidence_pays_juristic_miss: '{period} 期已过账采购票中，未发现向法人付款的预扣记录',
     profile_toast_added: '当期义务已重算：新增 {names}',
     err_invalid_enum_value: '取值不合法，请重新选择',

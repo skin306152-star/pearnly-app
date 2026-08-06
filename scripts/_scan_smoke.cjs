@@ -36,7 +36,10 @@ const SCAN_INTO_DATE = '4901234567894';
 
 // 自带静态服务:懒加载走的是同源 /static/dist/*.js,file:// 下不成立。
 const serve = () =>
-    startStaticServer({ root: ROOT, notFoundBody: '<!doctype html><title>scan smoke</title><body>' });
+    startStaticServer({
+        root: ROOT,
+        notFoundBody: '<!doctype html><title>scan smoke</title><body>',
+    });
 
 async function fresh(browser, origin, initScript, arg) {
     const page = await browser.newPage({ viewport: { width: 390, height: 780 } });

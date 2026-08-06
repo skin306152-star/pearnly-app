@@ -296,7 +296,8 @@ window.__AI_I18N_JA__ = {
     ppc_no_prior: '前期データなし',
     ppc_compared: '前期比較({period}) 差額 {delta}',
     profile_title: '税務プロフィール',
-    profile_sub: '自動で入力し出所を明記します。あなたはひと目で確認するだけ。不足している項目は執事が聞きに来ます。',
+    profile_sub:
+        '自動で入力し出所を明記します。あなたはひと目で確認するだけ。不足している項目は執事が聞きに来ます。',
     profile_group_employ: '雇用と源泉徴収',
     profile_group_filing: '申告方式',
     profile_group_special: '特殊',
@@ -342,7 +343,8 @@ window.__AI_I18N_JA__ = {
     profile_conflict_title: 'プロフィールが矛盾しています。どちらか選んでください',
     profile_conflict_manual_label: '手入力済み：',
     profile_conflict_inferred_label: 'システム推定：',
-    profile_sbt_cta_txt: 'SBT(特定事業税)の登録状況には公式データがありません。一度確認してください。',
+    profile_sbt_cta_txt:
+        'SBT(特定事業税)の登録状況には公式データがありません。一度確認してください。',
     profile_sbt_cta_btn: '執事に確認してもらう（ภ.พ.20 の写真が必要）',
     profile_sbt_cta_prefill:
         'このお客様のSBT(特定事業税)の登録状況を確認してください。ภ.พ.20 の写真が必要です。',

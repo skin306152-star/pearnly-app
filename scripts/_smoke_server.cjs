@@ -23,7 +23,12 @@ const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html
  *        命中前缀先于静态文件响应的桩表(供需要假 API 的脚本用)
  * @returns {Promise<http.Server>} 已监听 127.0.0.1 随机端口
  */
-function startStaticServer({ root, index = '', notFoundBody = '<!doctype html><title>404</title>', routes = [] }) {
+function startStaticServer({
+    root,
+    index = '',
+    notFoundBody = '<!doctype html><title>404</title>',
+    routes = [],
+}) {
     const server = http.createServer((req, res) => {
         const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
         for (const r of routes) {

@@ -39,7 +39,11 @@ const FULL_INV_S1 = { id: 'd1', doc_number: 'TIV-2026-00099', issue_date: '2026-
 const FULL_INV_S2 = { id: 'd2', doc_number: 'TIV-2026-00042', issue_date: '2026-08-05' };
 
 function ok(data) {
-    return { status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) };
+    return {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data }),
+    };
 }
 
 async function posSide(ctx) {
@@ -91,26 +95,41 @@ async function posSide(ctx) {
             return route.fulfill(ok({ document: { ...FULL_INV_S1, doc_type: 'tax_invoice' } }));
         }
         if (url.includes('full-invoice-pdf'))
-            return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 stub' });
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/pdf',
+                body: '%PDF-1.4 stub',
+            });
         if (url.includes('/sales/by-receipt'))
             return route.fulfill(
                 ok({
                     ...DETAIL_S1,
-                    sale: { ...DETAIL_S1.sale, id: 's2', receipt_no: 'ABB-T1-2026-00185', full_invoice_id: 'd2' },
+                    sale: {
+                        ...DETAIL_S1.sale,
+                        id: 's2',
+                        receipt_no: 'ABB-T1-2026-00185',
+                        full_invoice_id: 'd2',
+                    },
                     full_invoice: FULL_INV_S2,
                 })
             );
         if (url.includes('/sales/s1'))
             return route.fulfill(
                 s1Issued
-                    ? ok({ ...DETAIL_S1, sale: { ...DETAIL_S1.sale, full_invoice_id: 'd1' }, full_invoice: FULL_INV_S1 })
+                    ? ok({
+                          ...DETAIL_S1,
+                          sale: { ...DETAIL_S1.sale, full_invoice_id: 'd1' },
+                          full_invoice: FULL_INV_S1,
+                      })
                     : ok(DETAIL_S1)
             );
         return route.fulfill(ok({}));
     });
     const errs = [];
     page.on('pageerror', (e) => errs.push(String(e)));
-    await page.goto(`http://localhost:${PORT}/static/dist/pos.html`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`http://localhost:${PORT}/static/dist/pos.html`, {
+        waitUntil: 'domcontentloaded',
+    });
     await page.waitForFunction(() => window.POS && window.POS.taxinv && window.POS.showView);
     await page.evaluate(() => {
         window.POS.state.token = 'tok';
@@ -120,7 +139,10 @@ async function posSide(ctx) {
 
     // 1) 补开视图:今日列表可见(计算样式作证,不是 grep 类名)
     await page.waitForSelector('#taxinv-body .titem');
-    chk('POS 补开视图可见(display=block)', (await page.$eval('#view-taxinv', (el) => getComputedStyle(el).display)) === 'block');
+    chk(
+        'POS 补开视图可见(display=block)',
+        (await page.$eval('#view-taxinv', (el) => getComputedStyle(el).display)) === 'block'
+    );
     chk('今日列表两笔', (await page.$$('#taxinv-body .titem')).length === 2);
     await page.screenshot({ path: path.join(SHOTS, 'pos-01-视图-今日列表.png') });
 
@@ -131,7 +153,10 @@ async function posSide(ctx) {
         const cs = getComputedStyle(el);
         return { display: cs.display, position: cs.position };
     });
-    chk('弹窗真显示(display=flex · position=fixed · 跨视图不被吞)', maskCss.display === 'flex' && maskCss.position === 'fixed');
+    chk(
+        '弹窗真显示(display=flex · position=fixed · 跨视图不被吞)',
+        maskCss.display === 'flex' && maskCss.position === 'fixed'
+    );
     chk('弹窗引用原小票号', (await page.textContent('#tax-ref-no')).includes('ABB-T1-2026-00187'));
     await page.screenshot({ path: path.join(SHOTS, 'pos-02-弹窗-买方表单.png') });
 
@@ -139,7 +164,10 @@ async function posSide(ctx) {
     await page.click('#tax-taxid');
     await page.keyboard.type('1234567890123');
     await page.waitForSelector('#tax-taxid-fld.bad-on');
-    const badVisible = await page.$eval('#tax-taxid-bad', (el) => getComputedStyle(el).display !== 'none');
+    const badVisible = await page.$eval(
+        '#tax-taxid-bad',
+        (el) => getComputedStyle(el).display !== 'none'
+    );
     chk('Mod-11 错号红态可见', badVisible);
     chk('错号时提交禁用', await page.$eval('#tax-submit', (b) => b.disabled));
     await page.screenshot({ path: path.join(SHOTS, 'pos-03-税号校验位错-红态.png') });
@@ -159,7 +187,10 @@ async function posSide(ctx) {
     await page.check('#tax-save-buyer');
     await page.click('#tax-submit');
     await page.waitForSelector('#taxinv-reprint');
-    chk('开出后回已开过卡(票号上墙)', (await page.textContent('#taxinv-body')).includes('TIV-2026-00099'));
+    chk(
+        '开出后回已开过卡(票号上墙)',
+        (await page.textContent('#taxinv-body')).includes('TIV-2026-00099')
+    );
     await page.screenshot({ path: path.join(SHOTS, 'pos-05-开出后已开过卡.png') });
 
     // 6) 凭小票号召回一张已开过的 → 直接给已开过卡(不进弹窗撞 409)
@@ -168,7 +199,10 @@ async function posSide(ctx) {
     await page.fill('#taxinv-receipt', 'ABB-T1-2026-00185');
     await page.click('#taxinv-find-btn');
     await page.waitForSelector('#taxinv-reprint');
-    chk('已开过单召回给重打卡', (await page.textContent('#taxinv-body')).includes('TIV-2026-00042'));
+    chk(
+        '已开过单召回给重打卡',
+        (await page.textContent('#taxinv-body')).includes('TIV-2026-00042')
+    );
     await page.screenshot({ path: path.join(SHOTS, 'pos-06-召回已开过-重打卡.png') });
 
     // 7) 四态:空态 / 错误态(改桩后 resetView)
@@ -254,18 +288,37 @@ async function mainSide(ctx) {
                     })
                 )
             );
-            await page.route('**/api/pos/admin/cashiers**', (route) => route.fulfill(ok({ cashiers: [] })));
+            await page.route('**/api/pos/admin/cashiers**', (route) =>
+                route.fulfill(ok({ cashiers: [] }))
+            );
             await page.route('**/api/pos/tax-lookup**', (route) =>
                 route.fulfill(
-                    ok({ found: true, name: 'บริษัท เมคอัพสตูดิโอ จำกัด', address: '55 ถ.สุขุมวิท กรุงเทพฯ', vat_registered: true })
+                    ok({
+                        found: true,
+                        name: 'บริษัท เมคอัพสตูดิโอ จำกัด',
+                        address: '55 ถ.สุขุมวิท กรุงเทพฯ',
+                        vat_registered: true,
+                    })
                 )
             );
             await page.route('**/api/pos/sales/s1/full-tax-invoice', (route) => {
                 issued = true;
-                return route.fulfill(ok({ document: { id: 'd1', doc_number: 'TIV-2026-00099', doc_type: 'tax_invoice' } }));
+                return route.fulfill(
+                    ok({
+                        document: {
+                            id: 'd1',
+                            doc_number: 'TIV-2026-00099',
+                            doc_type: 'tax_invoice',
+                        },
+                    })
+                );
             });
             await page.route('**/full-invoice-pdf**', (route) =>
-                route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 stub' })
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/pdf',
+                    body: '%PDF-1.4 stub',
+                })
             );
         },
     });
@@ -278,12 +331,23 @@ async function mainSide(ctx) {
     await page.waitForSelector('#poslog-body .tiv', { timeout: 15000 });
 
     chk('主站税票列:未开行有补开钮', (await page.$('#poslog-body [data-tiv-make="s1"]')) !== null);
-    chk('主站税票列:已开行显票号', ((await page.textContent('#poslog-body [data-tiv-open="s2"]')) || '').includes('TIV-2026-00042'));
-    await page.screenshot({ path: path.join(SHOTS, 'main-01-交易明细-税票列.png'), fullPage: false });
+    chk(
+        '主站税票列:已开行显票号',
+        ((await page.textContent('#poslog-body [data-tiv-open="s2"]')) || '').includes(
+            'TIV-2026-00042'
+        )
+    );
+    await page.screenshot({
+        path: path.join(SHOTS, 'main-01-交易明细-税票列.png'),
+        fullPage: false,
+    });
 
     await page.click('#poslog-body [data-tiv-make="s1"]');
     await page.waitForSelector('#postax-mask.show');
-    chk('主站弹窗真显示(display=flex)', (await page.$eval('#postax-mask', (el) => getComputedStyle(el).display)) === 'flex');
+    chk(
+        '主站弹窗真显示(display=flex)',
+        (await page.$eval('#postax-mask', (el) => getComputedStyle(el).display)) === 'flex'
+    );
     await page.click('#postax-taxid');
     await page.keyboard.type('0107544000108');
     await page.waitForFunction(() => !document.getElementById('postax-lookup').disabled);

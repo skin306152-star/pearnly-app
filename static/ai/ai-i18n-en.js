@@ -296,7 +296,8 @@ window.__AI_I18N_EN__ = {
     ppc_no_prior: 'No prior period to compare',
     ppc_compared: 'vs prior period ({period}): diff {delta}',
     profile_title: 'Tax profile',
-    profile_sub: 'We fill what we can and label where it came from — you just glance and confirm; anything missing, the steward will ask you for it.',
+    profile_sub:
+        'We fill what we can and label where it came from — you just glance and confirm; anything missing, the steward will ask you for it.',
     profile_group_employ: 'Employment & withholding',
     profile_group_filing: 'Filing arrangement',
     profile_group_special: 'Special',
@@ -342,7 +343,8 @@ window.__AI_I18N_EN__ = {
     profile_conflict_title: 'Conflicting values — pick one',
     profile_conflict_manual_label: 'Manually entered: ',
     profile_conflict_inferred_label: 'System inferred: ',
-    profile_sbt_cta_txt: 'SBT registration status has no official data source — please confirm it once.',
+    profile_sbt_cta_txt:
+        'SBT registration status has no official data source — please confirm it once.',
     profile_sbt_cta_btn: 'Ask the steward — needs a ภ.พ.20 photo',
     profile_sbt_cta_prefill:
         "Please help me confirm this client's SBT (Specific Business Tax) registration status — I'll need a ภ.พ.20 photo.",

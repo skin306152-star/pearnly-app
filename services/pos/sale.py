@@ -8,7 +8,7 @@ numeric(14,3)、应用层 WHERE tenant_id。
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -17,6 +17,7 @@ from services.accounting import hooks as acct_hooks
 from services.inventory import store as inv_store
 from services.pos import numbering, payment_settlement, sale_caps, sales_store, stock, void
 from services.pos.sale_binding import resolve as _resolve_sale_binding
+from services.sales.dates import BANGKOK, bangkok_today
 from services.sales.totals import compute_totals
 
 VAT_RATE = Decimal("7")  # 泰国标准 VAT(价内外均按此 · 复用 totals.py)
@@ -33,6 +34,18 @@ def _parse_sold_at(raw) -> datetime:
         return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
     except ValueError:
         return datetime.now(timezone.utc)
+
+
+def _sold_at_bkk_date(v) -> date:
+    """连号年桶按售出时刻的曼谷日历日切(naive 视为已是曼谷值,同 dates.iso_bangkok 约定)。
+
+    旧口径直接取 UTC 日:曼谷每月 1 号 0:00–7:00 的单会落进上月/上年桶,连号与 VAT 申报期
+    错位(同 upgrade._resolve_issue_date 域规,票面日与连号日必须同轴)。
+    """
+    if isinstance(v, datetime):
+        local = v.astimezone(BANGKOK) if v.tzinfo else v
+        return local.date()
+    return bangkok_today()
 
 
 def _to_decimal(v) -> Optional[Decimal]:
@@ -212,7 +225,7 @@ def create_sale(
         tenant_id=tenant_id,
         terminal_id=terminal_id,
         kind=doc_kind,
-        on=sold_at.date(),
+        on=_sold_at_bkk_date(sold_at),
         workspace_client_id=workspace_client_id,
     )
 

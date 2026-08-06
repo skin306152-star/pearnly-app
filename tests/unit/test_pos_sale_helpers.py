@@ -5,7 +5,7 @@
 不再发号/扣库存)。重流程(发号/扣库存/落库)由 _e2e_po_b2 真库覆盖。"""
 
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest import mock
 
@@ -367,6 +367,72 @@ class CreateSalePaymentGateTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "pos.payment_invalid")
         self.assertEqual(ctx.exception.detail, "underpaid")
         next_number.assert_not_called()
+
+
+class NumberingBucketDateTests(unittest.TestCase):
+    """连号年桶按曼谷日切(2026-08-06):12-31T17:30Z 的曼谷时刻是 1-1 00:30,必须落新年桶;
+    平常日不变。全部固定时刻断言,禁 now()。"""
+
+    def test_year_rollover_lands_in_new_year_bucket(self):
+        # 2025-12-31T17:30:00Z = 曼谷 2026-01-01 00:30 → 新年桶(旧 UTC 口径会落 12-31)
+        self.assertEqual(
+            sale._sold_at_bkk_date(datetime(2025, 12, 31, 17, 30, tzinfo=timezone.utc)),
+            date(2026, 1, 1),
+        )
+
+    def test_regular_day_unchanged(self):
+        # 2026-06-15T12:00Z = 曼谷 19:00 → 同日,不漂
+        self.assertEqual(
+            sale._sold_at_bkk_date(datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)),
+            date(2026, 6, 15),
+        )
+
+    def test_naive_sold_at_treated_as_bangkok_value(self):
+        # naive 视为已是曼谷值(同 dates.iso_bangkok 约定,不按机器时区猜)
+        self.assertEqual(sale._sold_at_bkk_date(datetime(2026, 1, 1, 0, 30)), date(2026, 1, 1))
+
+    def test_create_sale_feeds_bangkok_date_to_numbering(self):
+        cur = _Cur(ones=[{"vat_registered": True}])
+        with (
+            mock.patch.object(
+                sale,
+                "_resolve_sale_binding",
+                return_value={"terminal_id": 1, "cashier_id": "cashier-1"},
+            ),
+            mock.patch.object(
+                sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
+            ),
+            mock.patch.object(
+                sale.numbering, "next_number", return_value=("ABB-T1-2026-00001", 1)
+            ) as nn,
+            mock.patch.object(
+                sale.sales_store,
+                "insert_sale",
+                return_value={
+                    "id": "sale1",
+                    "receipt_no": "ABB-T1-2026-00001",
+                    "grand_total": Decimal("0"),
+                    "vat_amount": Decimal("0"),
+                    "paid_total": Decimal("0"),
+                    "change_amount": Decimal("0"),
+                    "status": "completed",
+                },
+            ),
+            mock.patch.object(sale.acct_hooks, "enqueue_posting"),
+        ):
+            sale.create_sale(
+                cur,
+                tenant_id="t1",
+                workspace_client_id=9,
+                payload={
+                    "shift_id": "shift1",
+                    "sold_at": "2025-12-31T17:30:00Z",
+                    "lines": [],
+                    "payments": [],
+                },
+            )
+        # 跨午夜的单:on= 是曼谷 1-1,不是 UTC 的 12-31 —— 号桶跟着票面日走
+        self.assertEqual(nn.call_args.kwargs["on"], date(2026, 1, 1))
 
 
 if __name__ == "__main__":

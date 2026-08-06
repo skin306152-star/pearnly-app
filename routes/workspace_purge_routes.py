@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Iterator, Optional
 
@@ -19,6 +18,7 @@ from fastapi.responses import StreamingResponse
 
 from core import db
 from core.route_helpers import _tid, _log_op
+from routes.stream_common import NO_BUFFER_HEADERS, ndjson_line
 from services.authz.deps import require_perm
 from services.workspace import purge as purge_svc
 from services.workspace import purge_files as files_svc
@@ -55,7 +55,7 @@ def _stream(tenant_id: str, ws_id: int, period: Optional[str]) -> Iterator[bytes
                 leftover_detail = list(evt.get("leftover_detail") or [])
                 deleted_total = int(evt.get("deleted_total") or 0)
                 continue
-            yield (json.dumps(evt, ensure_ascii=False) + "\n").encode()
+            yield ndjson_line(evt)
     # 事务已提交,再动盘上文件
     files_removed = files_svc.purge(targets)
     # 有残留 = 这次清除【没成功】,按 error 记 —— 上一版记 info,线上漏删 1648 行子数据
@@ -65,20 +65,16 @@ def _stream(tenant_id: str, ws_id: int, period: Optional[str]) -> Iterator[bytes
         f"files={files_removed} leftover={leftover_detail}"
     )
     logger.error(msg) if leftover else logger.info(msg)
-    yield (
-        json.dumps(
-            {
-                "step": "finished",
-                "deleted_total": deleted_total,
-                "files_removed": files_removed,
-                "leftover": leftover,
-                "leftover_detail": leftover_detail,
-                "ok": not leftover,
-            },
-            ensure_ascii=False,
-        )
-        + "\n"
-    ).encode()
+    yield ndjson_line(
+        {
+            "step": "finished",
+            "deleted_total": deleted_total,
+            "files_removed": files_removed,
+            "leftover": leftover,
+            "leftover_detail": leftover_detail,
+            "ok": not leftover,
+        }
+    )
 
 
 @router.get("/api/workspace/clients/{workspace_client_id}/purge-periods")
@@ -124,5 +120,5 @@ async def purge_workspace_client_data(
     return StreamingResponse(
         _stream(tenant_id, workspace_client_id, period),
         media_type="application/x-ndjson",
-        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        headers=NO_BUFFER_HEADERS,
     )

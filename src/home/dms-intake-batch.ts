@@ -40,6 +40,8 @@ export interface BatchConstants {
     direction: 'sales' | 'purchase';
     counterparty_name: string;
     counterparty_tax: string;
+    counterparty_branch: string;
+    counterparty_address: string;
     product_name: string;
     product_code: string;
     payment_method: string;
@@ -89,6 +91,8 @@ export const B = {
         direction: 'sales',
         counterparty_name: '',
         counterparty_tax: '',
+        counterparty_branch: '',
+        counterparty_address: '',
         product_name: '',
         product_code: '',
         payment_method: '',
@@ -304,6 +308,8 @@ function constHtml(): string {
         periodFld +
         field('counterparty_name', 'dxb-f-counterparty', '', true, 'dxb-h-counterparty') +
         field('counterparty_tax', 'dxb-f-tax', t('dxb-f-tax-ph'), false, 'dxb-h-tax') +
+        field('counterparty_branch', 'dxb-f-branch', t('dxb-f-branch-ph'), false, 'dxb-h-branch') +
+        field('counterparty_address', 'dxb-f-addr', '', false, 'dxb-h-addr') +
         chk('cash_walkin', 'dxb-f-walkin', 'dxb-h-walkin') +
         field('product_name', 'dxb-f-product', '', true, 'dxb-h-product') +
         field('product_code', 'dxb-f-code', t('dxb-f-code-ph'), false, 'dxb-h-code') +

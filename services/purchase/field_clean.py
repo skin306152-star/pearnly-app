@@ -66,6 +66,18 @@ def clean_tax_id(raw) -> str:
     return digits if len(digits) == 13 else ""
 
 
+def clean_branch_no(raw) -> str:
+    """分店号 → 5 位数字串('18'/'สาขาที่ 18'→'00018')。空/非数字/超 5 位 → ''(=未提供)。
+
+    未提供必须留空而不是归一成总店 00000:连锁同税号多分店档靠它区分,
+    没填当总店会把分店票硬配到总店头上。
+    """
+    digits = re.sub(r"\D", "", str(raw or ""))
+    if not digits or len(digits) > 5:
+        return ""
+    return digits.zfill(5)
+
+
 def clean_seller(raw) -> str:
     """卖家清洗:剥空白;纯金额/字段标签/完整日期/无内容/过短(<2)→ ''(不展示假值)。
 

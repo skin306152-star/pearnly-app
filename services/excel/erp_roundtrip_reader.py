@@ -137,6 +137,7 @@ def _read_sales_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
                 "date": _text(_cell(ws, row, hmap, rt.SALES_COL_DATE)),
                 "buyer_name": _text(_cell(ws, row, hmap, rt.SALES_COL_PARTY)),
                 "buyer_tax": _text(_cell(ws, row, hmap, rt.COL_PARTY_TAX)),
+                "buyer_branch": _text(_cell(ws, row, hmap, rt.COL_PARTY_BRANCH)),
                 "erp_docnum": _text(_cell(ws, row, hmap, rt.COL_ERP_DOCNUM)),
                 "erp_party_code": _text(_cell(ws, row, hmap, rt.COL_ERP_PARTY)),
                 "items": [],
@@ -181,6 +182,11 @@ def _read_purchase_sheet(ws, hmap: Dict[str, int]) -> List[Dict[str, Any]]:
                     "seller_tax": (
                         _text(_cell(ws, row, hmap, rt.PURCHASE_COL_PARTY_TAX))
                         or _text(_cell(ws, row, hmap, rt.COL_PARTY_TAX))
+                    ),
+                    # 法定列 สาขา 优先(会计习惯填那里 · 写侧一直在写),回落回导列。
+                    "seller_branch": (
+                        _text(_cell(ws, row, hmap, rt.PURCHASE_COL_BRANCH))
+                        or _text(_cell(ws, row, hmap, rt.COL_PARTY_BRANCH))
                     ),
                     "category": _text(_cell(ws, row, hmap, rt.PURCHASE_COL_CATEGORY)),
                     "amount_before_vat": base,

@@ -258,6 +258,7 @@ def write_sales_sheet(ws, records: List[Dict[str, Any]]) -> int:
         erp_party = _str(f.get("erp_party_code"))
         # 对手方税号:销项看买方 · ภ.พ.30 销项附表要它,合同 12 列里没有,故进回导列
         party_tax = _str(f.get("buyer_tax")) or _str(f.get("buyer_tax_id"))
+        party_branch = _str(f.get("buyer_branch"))
         # 票面税额原样带走:合同里的 VAT 列是每行的,多行票逐行相加与它可能差分币,
         # 而它才是要进 ภ.พ.30 的法定数字
         doc_vat = _to_float(f.get("vat_amount")) or _to_float(f.get("vat"))
@@ -317,6 +318,7 @@ def write_sales_sheet(ws, records: List[Dict[str, Any]]) -> int:
             # 回导列 · 第 15 列起(合同列位之后追加)
             rt = roundtrip_values(
                 party_tax=party_tax,
+                party_branch=party_branch,
                 doc_vat=doc_vat,
                 docnum=erp_docnum,
                 item_code=it.get("erp_item_code"),

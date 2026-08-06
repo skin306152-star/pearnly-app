@@ -209,7 +209,7 @@ def store_reported_stock_acc_groups(endpoint_id: str, candidates: Any) -> int:
 # reported_products/customers 供 catalog_resolver 判「复用现有 vs 新建」;catalog_fingerprint
 # 供 posting_profile 推库存模式。目录可上万条 → 限量;整体快照替换(与账套列表同语义,非累加)。
 _PRODUCT_KEYS = ("code", "name", "kind")  # kind = stock | non_stock(companion 从 STKTYP 派生)
-_CUSTOMER_KEYS = ("code", "name", "tax_id", "kind")
+_CUSTOMER_KEYS = ("code", "name", "tax_id", "kind", "branch")  # branch=ARMAS ORGNUM(5 位分店号)
 _FINGERPRINT_INT_KEYS = ("stock_master_count", "stcrd_lines", "stcrd_lines_moving_stock")
 _MAX_CATALOG = 20000
 

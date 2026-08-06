@@ -76,6 +76,7 @@ from services.erp.express_push.posting_profile import (
 from services.erp.express_push.stock_acc_group import resolve_stock_acc_group
 from services.purchase.field_clean import (
     clean_address,
+    clean_branch_no,
     clean_invoice_no,
     clean_seller,
     clean_tax_id,
@@ -129,9 +130,11 @@ def _resolve_supplier(
     name: str,
     tax_id: str,
     address: str = "",
+    branch: str = "",
 ) -> Dict[str, Any]:
     """供应商身份块。命中 erp_client_mappings(express)→ 带 code、supplier_new=False;
-    否则 supplier_new=True 让 Agent 在 APMAS 建档(带 tax_id+address 落档)。"""
+    否则 supplier_new=True 让 Agent 在 APMAS 建档(带 tax_id+address 落档)。
+    branch=5 位分店号(空=未提供):连锁同税号多分店档,小助手靠它 + 名字定唯一档。"""
     code = ""
     client_id = history.get("client_id")
     if client_id is not None:
@@ -147,6 +150,7 @@ def _resolve_supplier(
         "name": name,
         "tax_id": tax_id,
         "address": address,
+        "branch": branch,
         "prename": detect_prename(name),
         "supplier_new": not bool(code),
     }
@@ -243,7 +247,10 @@ def build_express_payload(
     name = clean_seller(official or fields.get("seller_name") or history.get("seller_name"))
     tax_id = clean_tax_id(fields.get("seller_tax") or fields.get("seller_tax_id"))
     address = clean_address(fields.get("seller_addr"))
-    supplier = _resolve_supplier(mappings.get("clients") or [], history, name, tax_id, address)
+    branch = clean_branch_no(fields.get("seller_branch"))
+    supplier = _resolve_supplier(
+        mappings.get("clients") or [], history, name, tax_id, address, branch
+    )
     ref_no = clean_invoice_no(history.get("invoice_no") or fields.get("invoice_number"))
 
     lines: List[Dict[str, str]] = [

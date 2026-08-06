@@ -13,7 +13,7 @@ import re
 from typing import Any, Dict, List
 
 from services.erp.express_push.common import DOC_TYPE_SOURCE_SYNTHETIC
-from services.purchase.field_clean import clean_tax_id
+from services.purchase.field_clean import clean_branch_no, clean_tax_id
 from services.summary_import.dates import resolve_date, to_ad_year
 
 CASH_COUNTERPARTY = "เงินสด"  # 与 MRERP_CASH_CUSTOMER / Express CASH_CUSTOMER_NAME 同串
@@ -57,17 +57,20 @@ def _own_party(workspace: Dict[str, Any]) -> Dict[str, str]:
         "name": str((workspace or {}).get("name") or "").strip(),
         "tax": clean_tax_id((workspace or {}).get("tax_id")),
         "addr": str((workspace or {}).get("address") or "").strip(),
+        "branch": "",
     }
 
 
 def _counterparty(constants: Dict[str, Any], *, walkin: bool) -> Dict[str, str]:
-    """对方(客户/供应商)身份。散客开关命中 → 归一现金客户,清空税号(走两个 ERP 的现金兜底)。"""
+    """对方(客户/供应商)身份。散客开关命中 → 归一现金客户,清空税号(走两个 ERP 的现金兜底)。
+    branch=对方分店号(连锁同税号多分店档的匹配判据,空=未提供)。"""
     if walkin:
-        return {"name": CASH_COUNTERPARTY, "tax": "", "addr": ""}
+        return {"name": CASH_COUNTERPARTY, "tax": "", "addr": "", "branch": ""}
     return {
         "name": str(constants.get("counterparty_name") or "").strip(),
         "tax": clean_tax_id(constants.get("counterparty_tax")),
         "addr": str(constants.get("counterparty_address") or "").strip(),
+        "branch": clean_branch_no(constants.get("counterparty_branch")),
     }
 
 
@@ -82,9 +85,11 @@ def _assign_parties(
     fields["seller_name"] = seller["name"]
     fields["seller_tax"] = seller["tax"]
     fields["seller_addr"] = seller["addr"]
+    fields["seller_branch"] = seller["branch"]
     fields["buyer_name"] = buyer["name"]
     fields["buyer_tax"] = buyer["tax"]
     fields["buyer_addr"] = buyer["addr"]
+    fields["buyer_branch"] = buyer["branch"]
     # sales_mapper 另读 customer_name/customer_tax → 镜像买方,避免销项侧漏字段。
     fields["customer_name"] = buyer["name"]
     fields["customer_tax"] = buyer["tax"]

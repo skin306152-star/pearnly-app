@@ -37,11 +37,7 @@ def _parse_sold_at(raw) -> datetime:
 
 
 def _sold_at_bkk_date(v) -> date:
-    """连号年桶按售出时刻的曼谷日历日切(naive 视为已是曼谷值,同 dates.iso_bangkok 约定)。
-
-    旧口径直接取 UTC 日:曼谷每月 1 号 0:00–7:00 的单会落进上月/上年桶,连号与 VAT 申报期
-    错位(同 upgrade._resolve_issue_date 域规,票面日与连号日必须同轴)。
-    """
+    """连号年桶按售出时刻的曼谷日历日切(naive 视为已是曼谷值,同 dates.iso_bangkok 约定;旧口径取 UTC 日,曼谷 1 号 0:00–7:00 的单会落错桶)。"""
     if isinstance(v, datetime):
         local = v.astimezone(BANGKOK) if v.tzinfo else v
         return local.date()

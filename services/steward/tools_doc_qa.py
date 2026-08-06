@@ -30,7 +30,6 @@ from typing import Any, Optional
 
 from services.agent import reply_guard
 from services.agent.contracts import ToolResult
-from services.knowledge.ingest import TEXT_DECODE_ORDER
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 
@@ -48,9 +47,10 @@ _TABLE_EXTS = (".xlsx", ".xlsm", ".xls")
 _RAW_TEXT_EXTS = (".csv", ".tsv", ".txt")
 SUPPORTED_EXTS = (".pdf",) + _TABLE_EXTS + _RAW_TEXT_EXTS
 
-# 常见编码级联共用 services.knowledge.ingest.TEXT_DECODE_ORDER(单一事实源):UTF-8 BOM →
-# UTF-8 → 泰文 cp874 → latin-1 兜底。与 ingest 的差异只在回落:这边试完仍失败给 None 由
-# 调用方判 ERR_UNREADABLE_TABLE,而不是 errors=replace 硬解 —— 纯文本读不出就该诚实拒。
+# 常见编码级联(同 services.recon.bank_table_io._load_csv_sheets 的顺序:UTF-8 BOM → UTF-8 →
+# 泰文 cp874 → 中文 gbk → latin-1 兜底),纯文本没有 openpyxl 那样的结构探针,只能按序试解码。
+# 不并轨 services.knowledge.ingest.TEXT_DECODE_ORDER:那份序刻意不含 gbk,语义不同。
+_TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp874", "gbk", "latin-1")
 
 # 提示词预算:整份文一次性喂给模型的字符上限。电子台账/长合同动辄十几万字,原样塞满一是撑爆
 # 模型上下文窗口,二是每字都算 token 钱;而一个问题通常只落在其中一两页,所以走「按关键词
@@ -127,7 +127,7 @@ def doc_read_qa(ctx: ToolContext, args: dict) -> ToolResult:
 
 
 def _decode_text(content: bytes) -> Optional[str]:
-    for enc in TEXT_DECODE_ORDER:
+    for enc in _TEXT_ENCODINGS:
         try:
             return content.decode(enc)
         except (UnicodeDecodeError, LookupError):

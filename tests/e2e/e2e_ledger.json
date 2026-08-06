@@ -558,6 +558,28 @@
         "390 宽侧栏收成抽屉(真隐身/真滑入/遮罩关闭)且零横向溢出:媒体查询+过渡延迟是浏览器行为"
       ]
     },
+    "_steward_toolbox_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/steward_toolbox",
+      "covers": [
+        "services/steward/registry.py",
+        "services/steward/tools.py",
+        "services/steward/tools_doc_qa.py",
+        "services/steward/tools_table.py",
+        "services/steward/copy.py",
+        "services/steward/copy_doc.py",
+        "services/steward/copy_table.py",
+        "services/steward/copy_artifacts.py"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "两只新工具零新增前端组件——产物形状要靠今天已经在跑的通用渲染器(kind:table/deeplink)",
+        "真画出来才算数,单测只能断言 ToolResult.data 的形状,断不出 DOM 里到底有没有那张表",
+        "table_generate 完成卡的下载按钮走 downloadIdOf 的正则校验(8-64 位 id 才换成按钮),",
+        "这条判据只有真渲染 + 真按钮查找能验,copy_table.py 的单测看不到按钮到底出没出来",
+        "doc_read_qa 的答案正文与 citations 表是两块不同的 DOM(消息气泡 vs 任务产物卡),",
+        "两者都要在真页面里各自找到对应文本,不是随便哪里出现这句话就算过"
+      ]
+    },
     "_profile_card_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/profile_card",
       "covers": [

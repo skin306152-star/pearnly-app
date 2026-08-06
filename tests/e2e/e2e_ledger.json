@@ -24,10 +24,7 @@
   "scripts": {
     "_pos_vat_summary_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_vat_summary",
-      "covers": [
-        "src/home/sales-report.ts",
-        "static/home-43-pos-report.css"
-      ],
+      "covers": ["src/home/sales-report.ts", "static/home-43-pos-report.css"],
       "fixtures": [],
       "only_e2e": [
         "走势卡工具条里的下载按钮真的渲染且可见(几何量真 getBoundingClientRect · 不 grep 类名)",
@@ -86,9 +83,7 @@
         "static/scan/scan-track.js",
         "static/scan/scan-wedge.js"
       ],
-      "fixtures": [
-        "python scripts/_scan_ean_y4m.py .scan_fixture.y4m"
-      ],
+      "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "摄像头真解出码 → 真落成入库行:单测里摄像头引擎是桩,只验到「谁被调用了」",
         "取景框真的落在被解码的那块区域之内:object-fit:cover 只裁不补,要真布局才量得出",
@@ -160,10 +155,7 @@
     },
     "_gun_wedge_pos_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/*-pos-*.png",
-      "covers": [
-        "static/scan/scan-wedge.js",
-        "static/pos/pos-scan.js"
-      ],
+      "covers": ["static/scan/scan-wedge.js", "static/pos/pos-scan.js"],
       "fixtures": [],
       "only_e2e": [
         "收银主屏上枪扫是否被当成扫码(by-barcode 的调用次数是硬证据):要真键盘 + 真焦点",
@@ -179,9 +171,7 @@
         "static/scan/scan-track.js",
         "static/pos/pos.html"
       ],
-      "fixtures": [
-        "python scripts/_scan_ean_y4m.py .scan_fixture.y4m"
-      ],
+      "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "真 ZXing 从假摄像头画面里解出真 EAN-13 → 真进购物车:桌面 Chromium 没有原生 BarcodeDetector,走的是真解码器",
         "#bscan-* 那几个真节点的显隐与文案:单测里这层 DOM 不存在",
@@ -196,9 +186,7 @@
         "static/scan/scan-track.js",
         "static/scan/scan-loader.js"
       ],
-      "fixtures": [
-        "python scripts/_scan_ean_y4m.py .scan_fixture.y4m"
-      ],
+      "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "真被拒的摄像头权限 / 授权超时:只有真 getUserMedia 抛得出那几种 DOMException",
         "解码器拉不下来时的重试入口:要真的让 dist/zxing.js 这一次请求失败",
@@ -208,10 +196,7 @@
     },
     "_pos_fail_list_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_fail_list",
-      "covers": [
-        "static/pos/pos-scan.js",
-        "static/pos/pos-scan-fails.js"
-      ],
+      "covers": ["static/pos/pos-scan.js", "static/pos/pos-scan-fails.js"],
       "fixtures": [],
       "only_e2e": [
         "失败排在队列【中间】时那张卡有没有被下一件当场换掉:要真往返延时才排得出队列,且要 getComputedStyle 才算「屏上还看得见」",
@@ -269,13 +254,8 @@
     },
     "_sx_barcode_copy_accept.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/sx-copy",
-      "covers": [
-        "src/home/sales-products-scan.ts",
-        "static/i18n-data.js"
-      ],
-      "fixtures": [
-        "python scripts/_scan_ean_y4m.py .scan_fixture.y4m"
-      ],
+      "covers": ["src/home/sales-products-scan.ts", "static/i18n-data.js"],
+      "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "泰文界面上画的到底是不是泰文:期望值现场从真 window.I18N.th 取,屏上逐字对 —— 单测里没有页面语言这回事"
       ]
@@ -330,10 +310,7 @@
     },
     "_hostile_sw_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/fix2/s[0-9]*.png",
-      "covers": [
-        "static/pos/cashier-sw.js",
-        "static/pos/pos-sw.js"
-      ],
+      "covers": ["static/pos/cashier-sw.js", "static/pos/pos-sw.js"],
       "fixtures": [],
       "only_e2e": [
         "部署中新版 SW 装不上时老缓存还在不在、断网还开不开得了 /cashier:CacheStorage 是按源分家的,node 里的 caches 桩看不见这件事",
@@ -342,10 +319,7 @@
     },
     "_r3_jank_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/round3/j[0-9]*.png",
-      "covers": [
-        "static/scan/scan-wedge.js",
-        "src/home/sales-products-scan.ts"
-      ],
+      "covers": ["static/scan/scan-wedge.js", "src/home/sales-products-scan.ts"],
       "fixtures": [],
       "only_e2e": [
         "建品条码框上:主线程卡 120ms 的那一发真枪仍然被判成枪(处理时刻 135ms / 产生时刻 19ms)。前提本身就是浏览器事实 —— 长任务、事件排队、两把时钟分家,node 里一样都没有",
@@ -354,10 +328,7 @@
     },
     "_r3_inv_jank_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/round3/i[0-9]*.png",
-      "covers": [
-        "static/scan/scan-wedge.js",
-        "src/home/inventory-scan.ts"
-      ],
+      "covers": ["static/scan/scan-wedge.js", "src/home/inventory-scan.ts"],
       "fixtures": [],
       "only_e2e": [
         "入库批号框上同一件事:卡 120ms 之后这一箱要么进单要么出声,不许既不加行也不查码还一个字都不出",
@@ -366,10 +337,7 @@
     },
     "_r3_slowgun_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/round3/r[0-9]*.png",
-      "covers": [
-        "static/scan/scan-wedge.js",
-        "src/home/sales-products-scan.ts"
-      ],
+      "covers": ["static/scan/scan-wedge.js", "src/home/sales-products-scan.ts"],
       "fixtures": [],
       "only_e2e": [
         "50~150ms 这一段(蓝牙 HID / 带 transmit delay 的枪)判成打字之后屏上不许出绿字「没人用这个码」——「屏上这一刻画的是什么」只有真渲染答得出,单测断得到状态变量,断不到那句话是绿的",

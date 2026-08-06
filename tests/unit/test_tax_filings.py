@@ -377,22 +377,95 @@ class HooksTests(unittest.TestCase):
         self.assertIn("RELEASE SAVEPOINT tax_enqueue", [sql for sql, _ in cur.executed])
 
 
+class _SettingsFakeCursor:
+    """tax_settings + workspace_clients 双表内存假游标(按 SQL 前缀分发)。
+
+    读写代理跨两张表,FIFO 队列型假游标(通用 FakeCursor)配不出精确断言——改用
+    可寻址内存表,直接钉死"vat_registered 只活在 workspace_clients 里"这条契约。
+    """
+
+    def __init__(self):
+        self.tax_settings: dict = {}
+        self.workspace_clients: dict = {}
+        self.executed: list = []
+        self._one = None
+
+    def seed_vat_registered(self, tenant_id, workspace_client_id, value):
+        self.workspace_clients[(tenant_id, workspace_client_id)] = {"vat_registered": value}
+
+    def execute(self, sql, params=None):
+        s = " ".join(sql.split())
+        self.executed.append((s, params))
+        if s.startswith("SELECT branch_type"):
+            tenant_id, ws_id = params
+            row = self.tax_settings.get((tenant_id, ws_id))
+            self._one = dict(row) if row else None
+        elif s.startswith("SELECT vat_registered FROM workspace_clients"):
+            tenant_id, ws_id = params
+            row = self.workspace_clients.get((tenant_id, ws_id))
+            self._one = dict(row) if row else None
+        elif s.startswith("UPDATE workspace_clients"):
+            value, tenant_id, ws_id = params
+            self.workspace_clients[(tenant_id, ws_id)] = {"vat_registered": value}
+            self._one = None
+        elif s.startswith("INSERT INTO tax_settings"):
+            tenant_id, ws_id, branch_type, branch_no, remind_days_before, file_zero = params
+            self.tax_settings[(tenant_id, ws_id)] = {
+                "branch_type": branch_type,
+                "branch_no": branch_no,
+                "efiling_connected": False,
+                "remind_days_before": remind_days_before,
+                "file_zero": file_zero,
+            }
+            self._one = None
+        else:
+            raise AssertionError(f"unexpected SQL: {s}")
+
+    def fetchone(self):
+        return self._one
+
+
 class SettingsTests(unittest.TestCase):
     def test_defaults_when_no_row(self):
-        out = tax_settings.get_settings(FakeCursor(), tenant_id="t", workspace_client_id=1)
+        out = tax_settings.get_settings(_SettingsFakeCursor(), tenant_id="t", workspace_client_id=1)
         self.assertEqual(out, tax_settings.DEFAULTS)
         self.assertFalse(out["efiling_connected"])
 
+    def test_vat_registered_reads_from_workspace_clients_true(self):
+        cur = _SettingsFakeCursor()
+        cur.seed_vat_registered("t", 1, True)
+        out = tax_settings.get_settings(cur, tenant_id="t", workspace_client_id=1)
+        self.assertEqual(out["vat_registered"], True)
+
+    def test_vat_registered_reads_from_workspace_clients_false(self):
+        cur = _SettingsFakeCursor()
+        cur.seed_vat_registered("t", 1, False)
+        out = tax_settings.get_settings(cur, tenant_id="t", workspace_client_id=1)
+        self.assertEqual(out["vat_registered"], False)
+
     def test_update_merges_partial(self):
-        merged = {**tax_settings.DEFAULTS, "file_zero": False}
-        cur = FakeCursor(ones=[None, merged])
+        cur = _SettingsFakeCursor()
+        cur.seed_vat_registered("t", 1, True)
         out = tax_settings.update_settings(
             cur, tenant_id="t", workspace_client_id=1, data={"file_zero": False}
         )
-        self.assertFalse(out["file_zero"])
-        upsert_sql, params = cur.executed[1]
-        self.assertIn("ON CONFLICT (tenant_id, workspace_client_id)", upsert_sql)
-        self.assertTrue(params[2])  # vat_registered 未传 → 保默认 True
+        self.assertEqual(out["file_zero"], False)
+        self.assertEqual(out["vat_registered"], True)  # 未传的字段跟着 workspace_clients 现值走
+
+    def test_update_writes_vat_registered_to_workspace_clients_only(self):
+        cur = _SettingsFakeCursor()
+        cur.seed_vat_registered("t", 1, True)
+        out = tax_settings.update_settings(
+            cur, tenant_id="t", workspace_client_id=1, data={"vat_registered": False}
+        )
+        self.assertEqual(out["vat_registered"], False)
+        self.assertEqual(cur.workspace_clients[("t", 1)]["vat_registered"], False)
+        tax_settings_sql = [sql for sql, _ in cur.executed if "tax_settings" in sql]
+        self.assertTrue(tax_settings_sql, "应至少写读过一次 tax_settings")
+        self.assertTrue(
+            all("vat_registered" not in sql for sql in tax_settings_sql),
+            "tax_settings 旧列不应再被读写",
+        )
 
 
 class SchemaTests(unittest.TestCase):

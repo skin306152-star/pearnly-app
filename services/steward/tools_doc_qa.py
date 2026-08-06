@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """读文问答(S2 工具箱)—— 只答文件里写了什么,不算账、不编数字。
 
-复用 tools_file._single 取明文字节(同一套租户/会话/防穿越三锚,私有名跨模块借用是有意的
-——同一件事两处各写一遍必漂,见 attachments.py 顶注同一先例)。文本提取按格式分流:
+取明文字节走 tool_scope.single_attachment(与 table_generate/file_convert 同一套租户/会话/
+防穿越三锚);「问题是什么」走 tool_scope.attached_message_text(见下)。文本提取按格式分流:
   PDF          services.fileconv.text_layer.extract_pages(无文字层诚实拒绝,不进 OCR——
                OCR 归 file_convert/vat_report_check 的计费路,本工具不悄悄绕进去烧一次
                整份图识别);
@@ -30,9 +30,9 @@ from typing import Any, Optional
 
 from services.agent import reply_guard
 from services.agent.contracts import ToolResult
-from services.steward import store
+from services.knowledge.ingest import TEXT_DECODE_ORDER
+from services.steward import tool_scope
 from services.steward.registry import ToolContext
-from services.steward.tools_file import _named, _single
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,9 @@ _TABLE_EXTS = (".xlsx", ".xlsm", ".xls")
 _RAW_TEXT_EXTS = (".csv", ".tsv", ".txt")
 SUPPORTED_EXTS = (".pdf",) + _TABLE_EXTS + _RAW_TEXT_EXTS
 
-# 常见编码级联(同 services.recon.bank_table_io._load_csv_sheets 的顺序:UTF-8 BOM → UTF-8 →
-# 泰文 cp874 → 中文 gbk → latin-1 兜底),纯文本没有 openpyxl 那样的结构探针,只能按序试解码。
-_TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp874", "gbk", "latin-1")
+# 常见编码级联共用 services.knowledge.ingest.TEXT_DECODE_ORDER(单一事实源):UTF-8 BOM →
+# UTF-8 → 泰文 cp874 → latin-1 兜底。与 ingest 的差异只在回落:这边试完仍失败给 None 由
+# 调用方判 ERR_UNREADABLE_TABLE,而不是 errors=replace 硬解 —— 纯文本读不出就该诚实拒。
 
 # 提示词预算:整份文一次性喂给模型的字符上限。电子台账/长合同动辄十几万字,原样塞满一是撑爆
 # 模型上下文窗口,二是每字都算 token 钱;而一个问题通常只落在其中一两页,所以走「按关键词
@@ -87,23 +87,29 @@ PROMPT = """你是泰国代账事务所的文档问答助手。下面是一份�
 
 def doc_read_qa(ctx: ToolContext, args: dict) -> ToolResult:
     """读文问答的执行入口:取件 → 取问题 → 抽文本 → 挑相关页 → 问模型 → 核对引用。"""
-    row, err = _single(ctx)
+    row, err = tool_scope.single_attachment(ctx)
     if err:
         return err
     name = row.get("original_name") or "file"
-    question = _question_of(ctx, row)
+    question = tool_scope.attached_message_text(ctx, row)
     if not question:
-        return ToolResult(ok=False, error_code=ERR_NO_QUESTION, data=_named(row))
+        return ToolResult(
+            ok=False, error_code=ERR_NO_QUESTION, data=tool_scope.attachment_name(row)
+        )
     pages, err = _pages_of(row, name)
     if err:
         return err
     kept = select_pages(pages, question, max_chars=MAX_PROMPT_CHARS)
     outcome = ask_model(_build_prompt(kept, question), ctx=ctx)
     if not outcome.ok:
-        return ToolResult(ok=False, error_code=ERR_MODEL_FAILED, data=_named(row))
+        return ToolResult(
+            ok=False, error_code=ERR_MODEL_FAILED, data=tool_scope.attachment_name(row)
+        )
     parsed = parse_answer(outcome.data, kept)
     if parsed is None:
-        return ToolResult(ok=False, error_code=ERR_MODEL_FAILED, data=_named(row))
+        return ToolResult(
+            ok=False, error_code=ERR_MODEL_FAILED, data=tool_scope.attachment_name(row)
+        )
     return ToolResult(
         ok=True,
         data={
@@ -117,25 +123,11 @@ def doc_read_qa(ctx: ToolContext, args: dict) -> ToolResult:
     )
 
 
-def _question_of(ctx: ToolContext, row: dict) -> str:
-    """随文件一起说的那句话(见模块顶注)。"""
-    from core import db
-
-    with db.get_cursor() as cur:
-        text = store.message_text(
-            cur,
-            tenant_id=ctx.tenant_id,
-            session_id=ctx.session_id,
-            message_id=row.get("message_id"),
-        )
-    return text.strip()
-
-
 # ── 取文本(逐页,citations 的页码单位) ──────────────────────
 
 
 def _decode_text(content: bytes) -> Optional[str]:
-    for enc in _TEXT_ENCODINGS:
+    for enc in TEXT_DECODE_ORDER:
         try:
             return content.decode(enc)
         except (UnicodeDecodeError, LookupError):
@@ -162,7 +154,9 @@ def _pages_of(row: dict, name: str) -> tuple[Optional[list], Optional[ToolResult
     if ext == ".pdf":
         pages = text_layer.extract_pages(content)
         if not text_layer.has_text_layer(pages):
-            return None, ToolResult(ok=False, error_code=ERR_NO_TEXT_LAYER, data=_named(row))
+            return None, ToolResult(
+                ok=False, error_code=ERR_NO_TEXT_LAYER, data=tool_scope.attachment_name(row)
+            )
         return pages, None
     if ext in _TABLE_EXTS:
         result = convert_excel(content, source_name=name)
@@ -170,18 +164,20 @@ def _pages_of(row: dict, name: str) -> tuple[Optional[list], Optional[ToolResult
             return None, ToolResult(
                 ok=False,
                 error_code=ERR_UNREADABLE_TABLE,
-                data={**_named(row), "status": result.status},
+                data={**tool_scope.attachment_name(row), "status": result.status},
             )
         return [_table_text(t) for t in result.tables], None
     if ext in _RAW_TEXT_EXTS:
         text = _decode_text(content)
         if text is None:
-            return None, ToolResult(ok=False, error_code=ERR_UNREADABLE_TABLE, data=_named(row))
+            return None, ToolResult(
+                ok=False, error_code=ERR_UNREADABLE_TABLE, data=tool_scope.attachment_name(row)
+            )
         return [text], None
     return None, ToolResult(
         ok=False,
         error_code=ERR_UNSUPPORTED_TYPE,
-        data={**_named(row), "ext": ext or "(none)"},
+        data={**tool_scope.attachment_name(row), "ext": ext or "(none)"},
     )
 
 
@@ -237,20 +233,7 @@ def _build_prompt(kept: list[tuple[int, str]], question: str) -> str:
 # ── 模型调用与输出核对 ──────────────────────────────────────
 
 
-def _default_ask(prompt: str, *, ctx: ToolContext):
-    from services.ai_gateway import transport
-
-    return transport.text_to_json(
-        prompt,
-        task=TASK,
-        timeout_s=_MODEL_TIMEOUT_S,
-        tenant_id=ctx.tenant_id,
-        user_id=ctx.user_id,
-        trace_id=ctx.session_id,
-    )
-
-
-ask_model = _default_ask  # 注入点:测试直接 patch,零真调用(同 planner.ask_model 先例)
+ask_model = tool_scope.make_ask_model(TASK, _MODEL_TIMEOUT_S)
 
 
 def _as_int(value: Any) -> Optional[int]:

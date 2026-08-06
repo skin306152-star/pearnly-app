@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.steward import registry
-from services.steward.copy_lang import t as _t
+from services.steward.copy_lang import download_deeplink, t as _t
 
 TITLES = {registry.TABLE_GENERATE: {"zh": "表格生成", "th": "สร้างตารางใหม่"}}
 
@@ -71,15 +71,9 @@ def artifacts(data: dict, lang: str) -> list[dict]:
     if not data.get("row_count"):
         return []  # 诚实空态:过滤后零行不出下载链、不出空表(与 tools_table 的空态口径同一件事)
     out: list[dict] = []
-    download = data.get("download") or {}
-    if download.get("attachment_id"):
-        out.append(
-            {
-                "kind": "deeplink",
-                "label": _t(_DOWNLOAD_LABEL, lang),
-                "href": f"/api/ai/steward/attachments/{download['attachment_id']}/download",
-            }
-        )
+    link = download_deeplink(data.get("download") or {}, _DOWNLOAD_LABEL, lang)
+    if link:
+        out.append(link)
     columns = data.get("columns") or []
     preview = data.get("preview") or []
     if columns and preview:

@@ -16,17 +16,26 @@
 
 工单详情的取法(client_order)也收在这里:税额 / 银行对账 / 签批闸三个工具都是「客户名 + 期
 → 那张工单的投影」,取法漂了会让同一家同一期在三句答复里对不上。
+
+S2 附件工具(file_convert / vat_report_check / doc_read_qa / table_generate)的共用接地件也
+住这里:取本轮唯一那件料、产物落回附件表、随文件说的那句话、ask_model 注入点 —— 四个模块
+都 import 本模块,私有名不再跨模块借用。
 """
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from decimal import Context, Decimal, InvalidOperation, localcontext
 from typing import Any, Optional
 
 from fastapi import HTTPException
 
 from services.agent.contracts import ToolResult
+from services.steward import attachments, store
 from services.steward.registry import ToolContext
+
+logger = logging.getLogger(__name__)
 
 LIST_LIMIT = 20  # 对话里回的清单只给前几条,详情去深链看
 
@@ -38,6 +47,11 @@ ERR_CLIENT_AMBIGUOUS = "steward.client_ambiguous"
 ERR_HISTORY_FORBIDDEN = "steward.history_forbidden"
 ERR_INVOICE_NOT_FOUND = "steward.invoice_not_found"
 ERR_INVOICE_AMBIGUOUS = "steward.invoice_ambiguous"
+
+# 附件三锚错误的码也收在这里(single_attachment 是四个附件工具共用的取件路)。
+ERR_NO_ATTACHMENT = "steward.attachment_missing"
+ERR_MANY_ATTACHMENTS = "steward.attachment_ambiguous"
+ERR_UNREADABLE = "steward.attachment_unreadable"
 
 # 量化金额用的独立上下文(见 money 的注释:默认 28 位精度撑不住全所合计)。舍入沿用默认的
 # ROUND_HALF_EVEN —— 只放宽位数,不顺手改既有工具算出来的分位。
@@ -231,3 +245,112 @@ def money_total(values) -> str:
     with localcontext(_MONEY_CONTEXT):
         total = sum((to_decimal(v) for v in values), Decimal("0"))
     return money(total)
+
+
+# ── S2 附件工具共用件 ────────────────────────────────────────
+
+
+def single_attachment(ctx: ToolContext) -> tuple[Optional[dict], Optional[ToolResult]]:
+    """取本轮唯一那件料 + 明文字节。租户/会话/上传人三锚再验一次(worker 没有请求可依附,
+    身份闸在这里补);盘上路径再过一次防穿越 —— 库里存的字符串不当可信输入。"""
+    from core import db
+
+    ids = [str(i) for i in (ctx.attachment_ids or ())]
+    if not ids:
+        return None, ToolResult(ok=False, error_code=ERR_NO_ATTACHMENT)
+    if len(ids) > 1:
+        return None, ToolResult(ok=False, error_code=ERR_MANY_ATTACHMENTS, data={"n": len(ids)})
+    with db.get_cursor() as cur:
+        rows = attachments.list_by_ids(
+            cur, tenant_id=ctx.tenant_id, session_id=ctx.session_id, ids=ids
+        )
+    row = rows[0] if rows else None
+    if not row or str(row.get("user_id") or "") != str(ctx.user_id):
+        return None, ToolResult(ok=False, error_code=ERR_NO_ATTACHMENT)
+    path = attachments.resolve_within_session(
+        ctx.tenant_id, ctx.session_id, row.get("file_ref") or ""
+    )
+    if not path:
+        return None, ToolResult(ok=False, error_code=ERR_UNREADABLE, data=attachment_name(row))
+    try:
+        row = {**row, "content": attachments.read_content(str(path))}
+    except OSError:
+        return None, ToolResult(ok=False, error_code=ERR_UNREADABLE, data=attachment_name(row))
+    return row, None
+
+
+def attachment_name(row: dict) -> dict[str, Any]:
+    """错误/答复里点名是哪一份料的最小投影(文件名)。"""
+    return {"filename": row.get("original_name") or ""}
+
+
+def save_xlsx(ctx: ToolContext, content: bytes, source_name: str) -> dict[str, Any]:
+    """产物落回附件表。落不下(盘满/库炸)不翻已经跑成的转换 —— 如实回空,答复少一个下载链,
+    不把一次成功的转换报成失败。"""
+    from core import db
+
+    out_name = f"{Path(source_name).stem or 'convert'}.xlsx"
+    try:
+        path = attachments.save(
+            content,
+            tenant_id=ctx.tenant_id,
+            session_id=ctx.session_id,
+            original_name=out_name,
+        )
+        with db.get_cursor(commit=True) as cur:
+            row = attachments.insert(
+                cur,
+                tenant_id=ctx.tenant_id,
+                session_id=ctx.session_id,
+                user_id=ctx.user_id,
+                original_name=out_name,
+                file_ref=str(path),
+                size_bytes=len(content),
+                sha256=attachments.sha256_of(content),
+                mime=attachments.guess_mime(out_name),
+                kind="converted",
+                kind_source=attachments.SOURCE_RULE,
+                kind_reason="file_convert_output",
+                status=attachments.STATUS_ARTIFACT,
+            )
+    except Exception:  # noqa: BLE001
+        logger.warning("[steward] artifact save failed", exc_info=True)
+        return {}
+    return {"attachment_id": str(row["id"]), "name": out_name, "size_bytes": len(content)}
+
+
+def attached_message_text(ctx: ToolContext, row: dict) -> str:
+    """随文件一起说的那句话(问题/整理指令):附件不经模型 slot,从挂着这份附件的那条用户
+    消息(attachment.message_id)原样取回,同一次 handle_message 落的,不新开机制。"""
+    from core import db
+
+    with db.get_cursor() as cur:
+        text = store.message_text(
+            cur,
+            tenant_id=ctx.tenant_id,
+            session_id=ctx.session_id,
+            message_id=row.get("message_id"),
+        )
+    return text.strip()
+
+
+def make_ask_model(task: str, timeout_s: int):
+    """生成模块级 ask_model 注入点:测试直接 patch 模块属性,零真调用(同 planner 先例)。
+
+    两套 S2 工具各带自己的 TASK/超时,逐字 6 行 wiring 收成一份工厂;模块级名字保留不动,
+    否则 monkeypatch 打桩的测试全部落空。
+    """
+
+    def _default_ask(prompt: str, *, ctx: ToolContext):
+        from services.ai_gateway import transport
+
+        return transport.text_to_json(
+            prompt,
+            task=task,
+            timeout_s=timeout_s,
+            tenant_id=ctx.tenant_id,
+            user_id=ctx.user_id,
+            trace_id=ctx.session_id,
+        )
+
+    return _default_ask

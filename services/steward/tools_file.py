@@ -5,8 +5,10 @@
   file_convert      services.fileconv.{convert,excel_in,xlsx_out}  (= /api/fileconv/convert)
   vat_report_check  services.vat.{vat_report_parser,vat_report_checks} (= /api/vat_report_checks/run)
 
-哪个文件由代码定,不由模型定:执行侧只认 ctx.attachment_ids(请求侧已按 kind 过滤/追问过),
-到这里必须恰好一件 —— 多了少了都是编排出了问题,如实返错误码而不是自己挑一个跑。
+取件(single_attachment)与产物落库(save_xlsx)在 tool_scope —— doc_read_qa/table_generate
+共用同一套三锚与防穿越,不在这里各写一份。哪个文件由代码定,不由模型定:执行侧只认
+ctx.attachment_ids(请求侧已按 kind 过滤/追问过),到这里必须恰好一件 —— 多了少了都是编排
+出了问题,如实返错误码而不是自己挑一个跑。
 
 产物落回同一张附件表(status=artifact):加密/防穿越/租户隔离/到期清理白拿,而且转出来的
 xlsx 下一轮还能当料继续用。工具只出数据,人话在 copy_file 按数据渲染(模型碰不到数字)。
@@ -14,19 +16,17 @@ xlsx 下一轮还能当料继续用。工具只出数据,人话在 copy_file 按
 
 from __future__ import annotations
 
-import logging
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from services.agent.contracts import ToolResult
-from services.steward import attachments
+from services.steward import tool_scope
 from services.steward.registry import ToolContext
+from services.steward.tool_scope import (  # 入口仍在 tools_file:调用方按 tools_file.ERR_* 认错误码
+    ERR_MANY_ATTACHMENTS,  # noqa: F401
+    ERR_NO_ATTACHMENT,  # noqa: F401
+    ERR_UNREADABLE,  # noqa: F401
+)
 
-logger = logging.getLogger(__name__)
-
-ERR_NO_ATTACHMENT = "steward.attachment_missing"
-ERR_MANY_ATTACHMENTS = "steward.attachment_ambiguous"
-ERR_UNREADABLE = "steward.attachment_unreadable"
 ERR_CONVERT_REJECTED = "steward.convert_rejected"
 ERR_REPORT_UNPARSED = "steward.report_unparsed"
 ERR_REPORT_NEEDS_MODEL = "steward.report_needs_model"
@@ -40,39 +40,6 @@ _ISSUES_PREVIEW = 20
 _ROWS_PREVIEW = 20
 
 
-def _single(ctx: ToolContext) -> tuple[Optional[dict], Optional[ToolResult]]:
-    """取本轮唯一那件料 + 明文字节。租户/会话/上传人三锚再验一次(worker 没有请求可依附,
-    身份闸在这里补);盘上路径再过一次防穿越 —— 库里存的字符串不当可信输入。"""
-    from core import db
-
-    ids = [str(i) for i in (ctx.attachment_ids or ())]
-    if not ids:
-        return None, ToolResult(ok=False, error_code=ERR_NO_ATTACHMENT)
-    if len(ids) > 1:
-        return None, ToolResult(ok=False, error_code=ERR_MANY_ATTACHMENTS, data={"n": len(ids)})
-    with db.get_cursor() as cur:
-        rows = attachments.list_by_ids(
-            cur, tenant_id=ctx.tenant_id, session_id=ctx.session_id, ids=ids
-        )
-    row = rows[0] if rows else None
-    if not row or str(row.get("user_id") or "") != str(ctx.user_id):
-        return None, ToolResult(ok=False, error_code=ERR_NO_ATTACHMENT)
-    path = attachments.resolve_within_session(
-        ctx.tenant_id, ctx.session_id, row.get("file_ref") or ""
-    )
-    if not path:
-        return None, ToolResult(ok=False, error_code=ERR_UNREADABLE, data=_named(row))
-    try:
-        row = {**row, "content": attachments.read_content(str(path))}
-    except OSError:
-        return None, ToolResult(ok=False, error_code=ERR_UNREADABLE, data=_named(row))
-    return row, None
-
-
-def _named(row: dict) -> dict[str, Any]:
-    return {"filename": row.get("original_name") or ""}
-
-
 def file_convert(ctx: ToolContext, args: dict) -> ToolResult:
     """PDF/图片/Excel → 结构化表 + 守恒校验,产物 xlsx 落回附件表供下载。"""
     from services.fileconv.convert import convert_image, convert_pdf
@@ -80,7 +47,7 @@ def file_convert(ctx: ToolContext, args: dict) -> ToolResult:
     from services.fileconv.model import REJECT_STATUSES
     from services.fileconv.xlsx_out import build_xlsx
 
-    row, err = _single(ctx)
+    row, err = tool_scope.single_attachment(ctx)
     if err:
         return err
     name = row.get("original_name") or "upload.pdf"
@@ -99,7 +66,7 @@ def file_convert(ctx: ToolContext, args: dict) -> ToolResult:
             error_code=ERR_CONVERT_REJECTED,
             data={"filename": name, "status": result.status},
         )
-    produced = _save_xlsx(ctx, build_xlsx(result), name)
+    produced = tool_scope.save_xlsx(ctx, build_xlsx(result), name)
     return ToolResult(
         ok=True,
         data={
@@ -128,41 +95,6 @@ def file_convert(ctx: ToolContext, args: dict) -> ToolResult:
     )
 
 
-def _save_xlsx(ctx: ToolContext, content: bytes, source_name: str) -> dict[str, Any]:
-    """产物落回附件表。落不下(盘满/库炸)不翻已经跑成的转换 —— 如实回空,答复少一个下载链,
-    不把一次成功的转换报成失败。"""
-    from core import db
-
-    out_name = f"{Path(source_name).stem or 'convert'}.xlsx"
-    try:
-        path = attachments.save(
-            content,
-            tenant_id=ctx.tenant_id,
-            session_id=ctx.session_id,
-            original_name=out_name,
-        )
-        with db.get_cursor(commit=True) as cur:
-            row = attachments.insert(
-                cur,
-                tenant_id=ctx.tenant_id,
-                session_id=ctx.session_id,
-                user_id=ctx.user_id,
-                original_name=out_name,
-                file_ref=str(path),
-                size_bytes=len(content),
-                sha256=attachments.sha256_of(content),
-                mime=attachments.guess_mime(out_name),
-                kind="converted",
-                kind_source=attachments.SOURCE_RULE,
-                kind_reason="file_convert_output",
-                status=attachments.STATUS_ARTIFACT,
-            )
-    except Exception:  # noqa: BLE001
-        logger.warning("[steward.file_convert] artifact save failed", exc_info=True)
-        return {}
-    return {"attachment_id": str(row["id"]), "name": out_name, "size_bytes": len(content)}
-
-
 def vat_report_check(ctx: ToolContext, args: dict) -> ToolResult:
     """销项 VAT 报告三查:连号 / 买家分组 / 期间一致性。钱全程 Decimal,出线转定点字符串。
 
@@ -173,7 +105,7 @@ def vat_report_check(ctx: ToolContext, args: dict) -> ToolResult:
     from services.vat.vat_report_checks import run_report_checks, to_jsonable
     from services.vat.vat_report_parser import parse_vat_report
 
-    row, err = _single(ctx)
+    row, err = tool_scope.single_attachment(ctx)
     if err:
         return err
     name = row.get("original_name") or "report.pdf"

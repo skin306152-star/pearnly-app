@@ -16,8 +16,7 @@ desc_th 字段名钉死泰文而管家提示词走中文(同 front_desk.interpre
 vs period_invoices)。选错一次 = 白跑一步 + 白花一次模型钱,还得再问一轮。守门测试
 tests/unit/test_steward_registry.py 锁「每条 desc 至少点名另一个工具」。
 
-参数槽定义与执行身份 ToolContext 在 registry_slots(体积闸下的分居,语义仍归本模块;
-ToolContext 由本模块再导出,调用方一律 registry.ToolContext)。
+参数槽定义与执行身份 ToolContext 在 registry_slots(体积闸下的分居,语义仍归本模块)。
 """
 
 from __future__ import annotations
@@ -68,6 +67,7 @@ TABLE_GENERATE = "table_generate"
 # ——模型选文件会挑错,且挑错无痕。判据单一事实源在这里,orchestrator/planner 一律读本表。
 # doc_read_qa/table_generate(S2)同一套接地:附件不进 slots,问题/整理指令从挂着这份附件
 # 的用户消息(attachment.message_id)原样取回(tools_doc_qa/tools_table 顶注),不新开机制。
+# ⚠️ 与 MODEL_CALL_TOOLS 是两条独立轴(吃附件 vs 会调模型),今日字面相同是偶合,勿据此合并。
 ATTACHMENT_TOOLS: frozenset = frozenset(
     {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
 )
@@ -76,6 +76,7 @@ ATTACHMENT_TOOLS: frozenset = frozenset(
 # 跑它们一分钱模型费都不产生;file_convert/vat_report_check 走 fileconv.ocr_bridge/Gemini,
 # doc_read_qa/table_generate 走 ai_gateway.transport 直调。worker 的单工具路据此决定要不要
 # 过 budget 三级封顶 —— 全都过会给只读查询留一串幽灵占坑行。
+# ⚠️ 与 ATTACHMENT_TOOLS 是两条独立轴(会调模型 vs 吃附件),今日字面相同是偶合,勿据此合并。
 MODEL_CALL_TOOLS: frozenset = frozenset(
     {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
 )
@@ -475,8 +476,7 @@ def is_known(name: Optional[str]) -> bool:
 def catalog() -> str:
     """提示词里的工具表(从注册表现生成:加工具即改本表,提示词自动跟着变)。
 
-    写/危险工具在表里带标记:大脑必须看得见「这个会真改客户的账」,才可能只在会计明说时挑它
-    —— 提示词里手写一份工具清单迟早与注册表漂,标记也一并从 risk 现算。
+    写/危险工具在表里带标记:大脑必须看得见「这个会真改客户的账」,才可能只在会计明说时挑它;标记与清单都从注册表现算,不手写第二份。
     """
     lines = []
     for t in TOOLS:

@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from services.steward import attach_kinds as ak, registry, store
-from services.steward.copy_lang import t as _t
+from services.steward.copy_lang import download_deeplink, t as _t
 
 TITLES = {
     registry.FILE_CONVERT: {"zh": "转成 Excel", "th": "แปลงเป็น Excel"},
@@ -266,15 +266,9 @@ def artifacts(tool: str, data: dict, lang: str) -> list[dict]:
 
 def _convert_artifacts(data: dict, lang: str) -> list[dict]:
     out: list[dict] = []
-    download = data.get("download") or {}
-    if download.get("attachment_id"):
-        out.append(
-            {
-                "kind": "deeplink",
-                "label": _t(_DOWNLOAD_LABEL, lang),
-                "href": f"/api/ai/steward/attachments/{download['attachment_id']}/download",
-            }
-        )
+    link = download_deeplink(data.get("download") or {}, _DOWNLOAD_LABEL, lang)
+    if link:
+        out.append(link)
     issues = data.get("issues") or []
     if issues:
         out.append(

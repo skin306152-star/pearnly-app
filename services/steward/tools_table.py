@@ -7,10 +7,10 @@
 拒绝重新问一次更危险)。校验通过之后才交给零 I/O 的纯函数 execute() 用 Decimal 实算,模型
 全程只看得到表头 + 前 5 行样例,看不到一个真实数字。
 
-产物落回附件表(status=artifact),抄 tools_file._save_xlsx 的现成写法;xlsx 出件抄
+产物落回附件表(status=artifact),走 tool_scope.save_xlsx 的现成写法;xlsx 出件抄
 fileconv.xlsx_out.build_xlsx(把结果包成一份单表 ConvertResult),不重写一套表头/样式代码。
 
-问题/整理指令不经模型槧参数,取法与 tools_doc_qa 同源(见 store.message_text)。
+问题/整理指令不经模型槧参数,取法走 tool_scope.attached_message_text(见 store.message_text)。
 """
 
 from __future__ import annotations
@@ -22,9 +22,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from services.agent.contracts import ToolResult
-from services.steward import store
+from services.steward import tool_scope
 from services.steward.registry import ToolContext
-from services.steward.tools_file import _named, _save_xlsx, _single
 
 logger = logging.getLogger(__name__)
 
@@ -279,33 +278,22 @@ def _build_prompt(columns: list, sample_rows: list, instruction: str) -> str:
     )
 
 
-def _default_ask(prompt: str, *, ctx: ToolContext):
-    from services.ai_gateway import transport
-
-    return transport.text_to_json(
-        prompt,
-        task=TASK,
-        timeout_s=_MODEL_TIMEOUT_S,
-        tenant_id=ctx.tenant_id,
-        user_id=ctx.user_id,
-        trace_id=ctx.session_id,
-    )
-
-
-ask_model = _default_ask  # 注入点:测试直接 patch,零真调用(同 planner.ask_model 先例)
-
-
 # ── 执行入口 ────────────────────────────────────────────────
 
 
+ask_model = tool_scope.make_ask_model(TASK, _MODEL_TIMEOUT_S)
+
+
 def table_generate(ctx: ToolContext, args: dict) -> ToolResult:
-    row, err = _single(ctx)
+    row, err = tool_scope.single_attachment(ctx)
     if err:
         return err
     name = row.get("original_name") or "file"
-    instruction = _instruction_of(ctx, row)
+    instruction = tool_scope.attached_message_text(ctx, row)
     if not instruction:
-        return ToolResult(ok=False, error_code=ERR_NO_INSTRUCTION, data=_named(row))
+        return ToolResult(
+            ok=False, error_code=ERR_NO_INSTRUCTION, data=tool_scope.attachment_name(row)
+        )
 
     table, err = _first_table(row, name)
     if err:
@@ -313,11 +301,15 @@ def table_generate(ctx: ToolContext, args: dict) -> ToolResult:
 
     outcome = ask_model(_build_prompt(table.columns, table.rows, instruction), ctx=ctx)
     if not outcome.ok:
-        return ToolResult(ok=False, error_code=ERR_MODEL_FAILED, data=_named(row))
+        return ToolResult(
+            ok=False, error_code=ERR_MODEL_FAILED, data=tool_scope.attachment_name(row)
+        )
     spec, reason = parse_spec(outcome.data, table.columns)
     if spec is None:
         return ToolResult(
-            ok=False, error_code=ERR_SPEC_REJECTED, data={**_named(row), "reason": reason}
+            ok=False,
+            error_code=ERR_SPEC_REJECTED,
+            data={**tool_scope.attachment_name(row), "reason": reason},
         )
 
     result_table = execute(spec, table.columns, table.rows)
@@ -329,7 +321,7 @@ def table_generate(ctx: ToolContext, args: dict) -> ToolResult:
             data={"filename": name, "instruction": instruction, "row_count": 0},
         )
 
-    produced = _save_xlsx(
+    produced = tool_scope.save_xlsx(
         ctx, _build_result_xlsx(result_table), f"{Path(name).stem or 'table'}_result.xlsx"
     )
     return ToolResult(
@@ -354,7 +346,7 @@ def _first_table(row: dict, name: str):
         return None, ToolResult(
             ok=False,
             error_code=ERR_UNREADABLE_TABLE,
-            data={**_named(row), "status": result.status},
+            data={**tool_scope.attachment_name(row), "status": result.status},
         )
     table = result.tables[0]
     if result.doc_type == GENERIC_TABLE:
@@ -374,19 +366,6 @@ def _promote_header_row(table):
     header, *rest = table.rows
     columns = [str(c).strip() or f"col{i + 1}" for i, c in enumerate(header)]
     return Table(name=table.name, columns=columns, rows=rest)
-
-
-def _instruction_of(ctx: ToolContext, row: dict) -> str:
-    from core import db
-
-    with db.get_cursor() as cur:
-        text = store.message_text(
-            cur,
-            tenant_id=ctx.tenant_id,
-            session_id=ctx.session_id,
-            message_id=row.get("message_id"),
-        )
-    return text.strip()
 
 
 def _build_result_xlsx(table) -> bytes:

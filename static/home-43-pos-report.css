@@ -273,6 +273,30 @@
     background: var(--accent);
     color: var(--accent-ink);
 }
+/* 销项汇总包下载(月度对账用 · G3):工具条里的次级动作,不与柱/线切换抢视觉,
+   贴走势卡当前翻到的月(tMonth),不跟全局按日/按月粒度联动。 */
+.posrep .vatpkg {
+    height: 28px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink2);
+    font-size: 12px;
+    font-family: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.posrep .vatpkg:hover {
+    background: var(--line2);
+    color: var(--ink);
+}
+.posrep .vatpkg svg {
+    flex: 0 0 auto;
+}
 /* —— 趋势图(柱/线共用骨架:网格退后 · hover 命中列)—— */
 .posrep .ch-plot {
     position: relative;

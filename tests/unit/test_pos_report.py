@@ -459,5 +459,79 @@ class DashboardSectionsTests(unittest.TestCase):
         )
 
 
+class SectionFilterTests(unittest.TestCase):
+    """sections 轻参数(2026-08-06):只算命中的分区,未请求键省略——翻页只取 by_day 时
+    SQL 句数从 8+ 掉到 2,热力标题又借 heat_range 标注窗口。"""
+
+    def test_by_day_only_runs_two_queries(self):
+        cur = _Cur([(None, []), (None, [])])  # by_day + cost_by_day
+        out = report.sales_report(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            date_from=date(2026, 8, 1),
+            date_to=date(2026, 8, 31),
+            sections={"by_day"},
+        )
+        self.assertEqual(list(out), ["by_day"])
+        self.assertEqual(len(cur.queries), 2)
+
+    def test_kpi_only_runs_two_queries(self):
+        cur = _Cur(
+            [
+                ({"gross": Decimal("1"), "sales_count": 1, "refund": Decimal("0")}, None),
+                ({"cost": Decimal("0"), "complete": True}, None),
+            ]
+        )
+        out = report.sales_report(cur, tenant_id="t", workspace_client_id=9, sections={"kpi"})
+        self.assertEqual(list(out), ["kpi"])
+        self.assertEqual(len(cur.queries), 2)
+
+    def test_heat_section_carries_range(self):
+        cur = _Cur([(None, [])])  # heat 单句
+        out = report.sales_report(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            date_from=date(2026, 8, 4),
+            date_to=date(2026, 8, 4),
+            sections={"heat"},
+        )
+        self.assertEqual(list(out), ["heat", "heat_range"])
+        self.assertEqual(len(cur.queries), 1)
+        self.assertEqual(out["heat_range"], {"from": "2026-07-22", "to": "2026-08-04"})
+
+    def test_unknown_section_name_ignored(self):
+        cur = _Cur([])
+        out = report.sales_report(cur, tenant_id="t", workspace_client_id=9, sections={"bogus"})
+        self.assertEqual(out, {})
+
+    def test_heat_range_defaults_to_bangkok_today(self):
+        """无 date_to 时锚 = 曼谷今天,范围仍是 14 个曼谷日(from = to − 13 天)。"""
+        from datetime import timedelta
+
+        cur = _Cur([(None, [])])
+        out = report.sales_report(cur, tenant_id="t", workspace_client_id=9, sections={"heat"})
+        to = date.fromisoformat(out["heat_range"]["to"])
+        frm = date.fromisoformat(out["heat_range"]["from"])
+        self.assertEqual(frm, to - timedelta(days=13))
+
+    def test_heat_range_matches_heat_window_query(self):
+        """回显范围与 _heat 实际查询窗口同源:半开上界 = to + 1 天。"""
+        cur = _Cur([(None, [])])
+        out = report.sales_report(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            date_to=date(2026, 8, 4),
+            sections={"heat"},
+        )
+        self.assertEqual(out["heat_range"], {"from": "2026-07-22", "to": "2026-08-04"})
+        sql, params = cur.queries[0]
+        self.assertIn("Asia/Bangkok", sql)
+        self.assertIn(date(2026, 7, 22), params)
+        self.assertIn(date(2026, 8, 5), params)
+
+
 if __name__ == "__main__":
     unittest.main()

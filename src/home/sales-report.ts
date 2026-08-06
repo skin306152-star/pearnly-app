@@ -250,6 +250,8 @@ function heatShadeVar(v: number, mx: number): string {
 function renderHeat(state: SectionState, errCode?: string): void {
     const el = document.getElementById('rep-heat-card');
     if (!el) return;
+    // 后端随 heat 回显实际锚窗(曼谷日),标题标注期间,不自己推算
+    const hr = mainData?.heat_range;
     let body: string;
     if (state === 'loading') {
         body = `<div class="heatwrap">${'<div class="rep-skel line"></div>'.repeat(6)}</div>`;
@@ -286,7 +288,9 @@ function renderHeat(state: SectionState, errCode?: string): void {
                 <i style="background:var(--line2)"></i><i style="background:var(--hm-1)"></i><i style="background:var(--hm-2)"></i><i style="background:var(--hm-3)"></i><i style="background:var(--hm-4)"></i>
             ${escapeHtml(t('rep-heat-more'))}</div>`;
     }
-    el.innerHTML = `<div class="hd"><div class="t">${escapeHtml(t('rep-heat-title'))}</div></div>${body}`;
+    el.innerHTML = `<div class="hd"><div class="t">${escapeHtml(t('rep-heat-title'))}${
+        hr ? `<span class="sub">${escapeHtml(hr.from)} – ${escapeHtml(hr.to)}</span>` : ''
+    }</div></div>${body}`;
     el.querySelectorAll<HTMLElement>('.cell').forEach((c) => {
         const show = (ev: PointerEvent) =>
             tipShow(
@@ -348,9 +352,11 @@ async function loadMain(): Promise<void> {
 async function loadTrend(): Promise<void> {
     renderTrend('loading');
     try {
+        // 走势翻页只画按月 by_day 一条曲线:轻参数只取该分区,省掉白拉的 4 句 SQL。
         const data = await fetchReport({
             from: tMonth + '-01',
             to: tMonth + '-' + pad2(monthDays(tMonth)),
+            sections: 'by_day',
         });
         trendRows = buildTrendRows(data.by_day || []);
     } catch (e) {

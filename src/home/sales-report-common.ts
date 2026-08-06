@@ -40,6 +40,10 @@ export interface Live {
     last_sale_at: string | null;
     open_shift: { cashier_name: string | null; shift_seq: number | null } | null;
 }
+export interface HeatRange {
+    from: string;
+    to: string;
+}
 export interface Report {
     kpi: Kpi;
     by_day: DayRow[];
@@ -48,6 +52,7 @@ export interface Report {
     top_products: TopProduct[];
     prev_kpi: Kpi | null;
     heat: HeatCell[];
+    heat_range?: HeatRange;
     live: Live;
 }
 

@@ -5,6 +5,7 @@
 /* global document, getComputedStyle */
 
 const { expect } = require('@playwright/test');
+const { blockCfInsights } = require('./console-guard');
 
 // 登录后「账套软弹」(workspace-switcher.js 的 #ws-modal · 2026-05-27 上线)是全屏 overlay,
 // 会拦截一切点击。它在 /api/me 回来后自动弹,时机略晚于侧栏渲染。进应用后探测并用 ✕ 关掉
@@ -39,10 +40,7 @@ async function dismissWorkspaceGate(page) {
 
 // 进主应用 · storageState 已注入 mrpilot_token → home.js 不该把我们踢回着陆页
 async function enterApp(page) {
-    // 同 auth.doUiLogin:掐掉 CF 边缘注入的分析信标,防黑洞网络卡死 DCL。
-    await page.route('**://static.cloudflareinsights.com/**', (r) =>
-        r.fulfill({ status: 204, body: '' })
-    );
+    await blockCfInsights(page);
     await page.goto('/home');
     // 多账套启动闸先过(否则 sidebar 一直 visibility:hidden)
     await dismissWorkspaceGate(page);

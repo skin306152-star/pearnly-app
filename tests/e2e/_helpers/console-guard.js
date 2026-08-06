@@ -9,15 +9,22 @@
 // 都不在内 · 仍会让 spec 变红。
 // ============================================================
 
+// CF 边缘自动注入的分析信标域(不在源码里):defer 脚本卡 DCL,对该域黑洞的网络里
+// goto 必超时。桩成 204(而非 abort:abort 自身会产生 console.error);桩响应过不了
+// 标签自带的 SRI 校验 → 下方 IGNORE 放行它的 integrity 报错。route 与放行同源于
+// 这一个常量,换域名只改这里。
+const CF_INSIGHTS_GLOB = '**://static.cloudflareinsights.com/**';
+async function blockCfInsights(page) {
+    await page.route(CF_INSIGHTS_GLOB, (r) => r.fulfill({ status: 204, body: '' }));
+}
+
 // 已知良性噪声(与被测功能无关)· 命中即忽略 · 保持最小
 const IGNORE = [
     /favicon/i, // favicon 404
     /ResizeObserver loop/i, // 浏览器布局回调噪声 · 非错误
     /Failed to load resource.*\b(analytics|gtag|googletagmanager|sentry|clarity|hotjar|facebook|fbevents)\b/i,
     /net::ERR_.*\b(analytics|gtag|googletagmanager|sentry|clarity|hotjar|facebook)\b/i,
-    // CF 边缘自动注入的分析信标(不在源码里)· helper 已 route 成 204 防黑洞网络卡 DCL,
-    // 该桩响应过不了标签自带的 SRI 校验 → integrity 报错,与被测功能零关系。
-    /cloudflareinsights/i,
+    /cloudflareinsights/i, // 见 blockCfInsights
 ];
 
 function isIgnorable(text) {
@@ -49,4 +56,4 @@ function assertNoConsoleErrors(expect, guard, { allow = [] } = {}) {
     expect(consoleErrors, `console.error: ${consoleErrors.join(' | ')}`).toEqual([]);
 }
 
-module.exports = { attachConsoleGuard, assertNoConsoleErrors, isIgnorable };
+module.exports = { attachConsoleGuard, assertNoConsoleErrors, isIgnorable, blockCfInsights };

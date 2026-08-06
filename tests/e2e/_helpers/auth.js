@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { blockCfInsights } = require('./console-guard');
 
 const AUTH_DIR = path.join(__dirname, '..', '.auth');
 
@@ -52,11 +53,7 @@ async function doUiLogin(page) {
         throw new Error('缺少 PEARNLY_E2E_USER / PEARNLY_E2E_PASS 环境变量');
     }
 
-    // CF 边缘自动注入的分析信标(不在源码里):defer 脚本卡 DCL,对该域黑洞的网络里
-    // goto 必超时 —— 与被测功能零关系,E2E 一律掐掉。
-    await page.route('**://static.cloudflareinsights.com/**', (r) =>
-        r.fulfill({ status: 204, body: '' })
-    );
+    await blockCfInsights(page);
     // 脸0(2026-07-10):`/` 改为品牌门户,登录表单挪到 `/login`(门户四卡「登录」按钮亦指此)。
     await page.goto('/login');
 

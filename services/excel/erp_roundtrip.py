@@ -64,9 +64,13 @@ ROUNDTRIP_HEADERS: Tuple[str, ...] = (
 )
 ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 12, 16, 18, 16, 14, 16, 26)
 
-# 表头指纹的必需集:不含后加的可选列(COL_PARTY_BRANCH)。会计手上还有旧版导出的
-# 工作簿,新列进必需集会让旧文件回导认不出、静默退回通用表格路。
-_REQUIRED_HEADERS: Tuple[str, ...] = tuple(h for h in ROUNDTRIP_HEADERS if h != COL_PARTY_BRANCH)
+# 可选列登记表:进了这里的列不参与表头指纹判定。会计手上还有旧版导出的工作簿,
+# 可选列混进必需集会让旧文件回导认不出、静默退回通用表格路——加第二个可选列时
+# 只登记这一行。
+OPTIONAL_HEADERS = frozenset({COL_PARTY_BRANCH})
+_REQUIRED_HEADERS: Tuple[str, ...] = tuple(
+    h for h in ROUNDTRIP_HEADERS if h not in OPTIONAL_HEADERS
+)
 
 
 def hide_machine_columns(ws, headers: Sequence[str]) -> None:

@@ -1,6 +1,29 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-05 深夜 · G2 全式税票通路全量上线 + S1 验收欠账结清 · CI 全绿)
+## 当前状态卡(2026-08-06 晚 · ★Big C 同税号多分店错配彻底修全链上线 · 双仓 CI/发版全绿)
+
+- **战役**:老丈人(Korn)真账实锤——连锁客户全分店共用税号,小助手按税号取第一条把分店
+  票静默记总店。当天彻底修:**companion v1.1.61**(级联匹配:税号唯一→ORGNUM 分店号→
+  名字精确→歧义转人工 CUSTOMER/SUPPLIER_BRANCH_AMBIGUOUS,绝不取第一条;建档落
+  ORGNUM+地址;catalog 上报带 branch)+ **云端 3 笔**(94f0100f/c683b5d3/simplify 尾笔):
+  ThaiInvoice 增 buyer/seller_branch(防合并层蒸发)、载荷/汇总表/回导工作簿全链采集
+  (销项新增可选列 สาขาคู่ค้า·OPTIONAL_HEADERS 登记制·旧工作簿指纹兼容)。
+- **顺修两存量 bug**:批量导入对方地址前端缺字段致建档地址恒空;进项工作簿 สาขา 列写而不读。
+- **验证矩阵全绿**:companion 431 测✓·云端 12400 测✓·生产 E2E 双 spec+新字段截图✓·
+  本地真 Express 账套(影子副本 70EXP/TEST)`tools/branch_match_live_check.py` 4/4 PASS✓·CI ✓。
+- **等老丈人回执(两件)**:①升 v1.1.61 按已发泰文流程实测(还原实验税号+新票号重推,同号
+  会被防重单闸跳过)——回执才算终局;②Stock Card 口径三问(期初/负库存/未入账清单,泰语已
+  发)——**新需求「商品收发存报表」等他回复再开工**,立案见记忆 stock-card-report-pending。
+- **省额度体系今日落地**:铁律#6 施工分层(opencode worker=DeepSeek 免费施工+子代理禁裸派+
+  子步级派单+撞墙降级),全局 CLAUDE.md/skill dispatch-worker/记忆三处写死;worker 首战
+  两胜一翻车(顶掉 i18n 旧键,refs 闸+主控全量回归兜住,防护句已入 skill)。
+- **遗留另派**:catalog_resolver.resolve_customer 云端死代码同缺陷(接线前必须同步级联);
+  BACKLOG:949 VAT 对账同款税号+分店债;ARMAS 按 mtime 缓存(efficiency consider);
+  E2E 新基建=CF 信标 blockCfInsights 统一掐(大陆网络黑洞卡 DCL)。
+
+---
+
+## 上一窗状态卡(2026-08-05 深夜 · G2 全式税票通路全量上线 + S1 验收欠账结清 · CI 全绿)
 
 - **G2 全式税票通路 16 笔 commit 全推上线,CI 10 job 全 ✓**(含收尾 3 commit):
   ①收银台/主站双入口补开全式票(税号 RD 带出+Mod-11 校验+买方档存回+开票日曼谷口径)

@@ -241,17 +241,13 @@ if __name__ == "__main__":
 
 class CleanBranchNoTests(unittest.TestCase):
     def test_normalizes_to_five_digits(self):
-        from services.purchase.field_clean import clean_branch_no
-
-        self.assertEqual(clean_branch_no("18"), "00018")
-        self.assertEqual(clean_branch_no("00018"), "00018")
-        self.assertEqual(clean_branch_no("สาขาที่ 18"), "00018")
-        self.assertEqual(clean_branch_no("0"), "00000")
+        self.assertEqual(fc.clean_branch_no("18"), "00018")
+        self.assertEqual(fc.clean_branch_no("00018"), "00018")
+        self.assertEqual(fc.clean_branch_no("สาขาที่ 18"), "00018")
+        self.assertEqual(fc.clean_branch_no("0"), "00000")
 
     def test_missing_or_invalid_is_empty_not_hq(self):
-        from services.purchase.field_clean import clean_branch_no
-
-        self.assertEqual(clean_branch_no(""), "")
-        self.assertEqual(clean_branch_no(None), "")
-        self.assertEqual(clean_branch_no("สาขา"), "")
-        self.assertEqual(clean_branch_no("123456"), "")
+        self.assertEqual(fc.clean_branch_no(""), "")
+        self.assertEqual(fc.clean_branch_no(None), "")
+        self.assertEqual(fc.clean_branch_no("สาขา"), "")
+        self.assertEqual(fc.clean_branch_no("123456"), "")

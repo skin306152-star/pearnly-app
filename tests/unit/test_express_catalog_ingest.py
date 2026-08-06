@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
 class CustomerBranchIngestTests(unittest.TestCase):
     def test_customer_branch_kept_in_snapshot(self):
-        from services.erp.express_push.agent_reporting import _CUSTOMER_KEYS, _sanitize_catalog
+        from services.erp.express_push.agent_reporting import _CUSTOMER_KEYS
 
         raw = [
             {"code": "C1", "name": "บิ๊กซี สาขา 18", "tax_id": "0107536000633", "branch": "00018"}

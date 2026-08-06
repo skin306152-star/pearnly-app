@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-"""客户税务画像 schema 双跑入口(启动调一次 · 与 alembic 0064 同源幂等 DDL)。
+"""客户税务画像 schema 双跑入口(启动调一次 · 与 alembic 0064/0096 同源幂等 DDL)。
 
 prod 无自动迁移钩子 → startup 经 ensure_tax_profile_schema() 幂等建 4 表 + RLS policy +
 defs seed(alembic/versions/0064_client_tax_profile.py 留档)。DDL 与迁移逐字对齐
 (改一处必同改两处 · tests/unit/test_tax_profile_schema.py 静态守)。失败仅告警不
 raise(不挡主服务)。tax_obligation_defs 是全租户共享法定常量表,不进 RLS 清单。
+
+field_meta 列(画像卡智能判断批次 · alembic 0096)0064 建表时还没有,用 ALTER ...
+ADD COLUMN IF NOT EXISTS 幂等补列——不改 0064 的历史 DDL(已上线迁移不改写)。
 """
 
 from __future__ import annotations
@@ -37,6 +40,7 @@ _TABLES = (
         source                  text    NOT NULL DEFAULT 'onboarding',
         confidence              numeric(4,3),
         profile_version         integer NOT NULL DEFAULT 1,
+        field_meta              jsonb   NOT NULL DEFAULT '{}'::jsonb,
         updated_by              text    NOT NULL DEFAULT 'system',
         updated_at              timestamptz NOT NULL DEFAULT now(),
         created_at              timestamptz NOT NULL DEFAULT now(),
@@ -107,6 +111,12 @@ _INDEXES = (
     "ON client_period_obligations (tenant_id, due_efiling)",
 )
 
+# 补列(alembic 0096 同源):_TABLES 的建表语句只在全新装时把 field_meta 一起建出来——
+# prod 表早在 0064 就建好、没有这一列,ALTER 才是让存量表跟上的那一半。
+_ALTER_COLUMNS = (
+    "ALTER TABLE client_tax_profiles ADD COLUMN IF NOT EXISTS field_meta jsonb NOT NULL DEFAULT '{}'::jsonb",
+)
+
 # 义务 defs seed(方案 §3.2 九行 · 截止日两轨 + 证据级 · 换版改 seed 不改码)。
 _SEED_DEFS = """
     INSERT INTO tax_obligation_defs
@@ -167,6 +177,8 @@ def ensure_tax_profile_schema() -> None:
     with db.get_cursor(commit=True) as cur:
         for ddl in _TABLES:
             cur.execute(ddl)
+        for alter in _ALTER_COLUMNS:
+            cur.execute(alter)
         for idx in _INDEXES:
             cur.execute(idx)
         cur.execute(_SEED_DEFS)

@@ -36,6 +36,7 @@ class RouteContractTests(unittest.TestCase):
         expected = {
             ("GET", "/api/workspace/clients/{workspace_client_id}/tax-profile"),
             ("PUT", "/api/workspace/clients/{workspace_client_id}/tax-profile"),
+            ("POST", "/api/workspace/clients/{workspace_client_id}/tax-profile/confirm"),
             ("GET", "/api/workspace/clients/{workspace_client_id}/aliases"),
             ("POST", "/api/workspace/clients/{workspace_client_id}/aliases"),
             (
@@ -182,8 +183,11 @@ class GetProfileTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(out["profile"]["vat_credit_carry"], str)
         self.assertEqual(out["profile"]["updated_at"], "2026-07-10T03:00:00")
         self.assertIsNone(out["profile"]["created_at"])
-        # 档案页 0% CTA 消费的完整度(6 个默认 unknown 字段全未答 → 0.0)。
-        self.assertEqual(out["completeness"], 0.0)
+        # 档案页完整度条消费(画像卡智能判断批次改口径:全 14 字段,见 matrix.py 顶注)——
+        # sbt_status='none'/filing_disposition 缺省回落'active' 结构性天然算已答(2),
+        # 3 个恒答字段(has_multi_branch/tax_agent_authorized/vat_credit_carry)+ 3 个
+        # 条件字段父开关全未打开、隐藏视为已答(3),共 8/14。
+        self.assertEqual(out["completeness"], 0.57)
 
     async def test_profile_not_found_404(self):
         from routes import tax_profile_routes as tr
@@ -259,6 +263,102 @@ class PutProfileTests(unittest.IsolatedAsyncioTestCase):
                 self.enterContext(p)
             out = await tr.put_tax_profile(7, tr.TaxProfileUpdate(has_employees="yes"), mock.Mock())
         self.assertEqual(out["profile"]["has_employees"], "yes")
+
+    async def test_added_obligations_diffs_before_and_after(self):
+        """新增义务码 = 保存后物化表里多出的 obligation_code(画像卡确认后 toast 消费此值)。"""
+        from routes import tax_profile_routes as tr
+
+        profile = {"has_employees": "yes"}
+        cur = _Cur(fetchone_value=(1,))
+        calls = iter([[], [{"obligation_code": "pnd1"}, {"obligation_code": "sso"}]])
+        cur.fetchall = lambda: next(calls)
+        with (
+            mock.patch.object(tr.tax_profile_store, "upsert_profile"),
+            mock.patch.object(tr.tax_profile_store, "get_profile", return_value=profile),
+            mock.patch.object(tr.tax_profile_store, "load_active_defs", return_value={}),
+            mock.patch.object(tr.obligation_engine, "generate_obligations", return_value=[]),
+            mock.patch.object(tr.obligation_engine, "materialize_obligations"),
+        ):
+            for p in _common_patches(tr, cur):
+                self.enterContext(p)
+            out = await tr.put_tax_profile(7, tr.TaxProfileUpdate(has_employees="yes"), mock.Mock())
+        self.assertEqual(out["added_obligations"], ["pnd1", "sso"])
+
+
+class ConfirmProfileFieldsTests(unittest.IsolatedAsyncioTestCase):
+    """确认端点(画像卡智能判断批次):把 GET 里带出的推断候选转正。"""
+
+    async def test_confirm_writes_live_proposal_and_returns_added_obligations(self):
+        from routes import tax_profile_routes as tr
+
+        profile_before = {"pays_individuals": "unknown", "field_meta": {}}
+        profile_after = {"pays_individuals": "yes", "field_meta": {"pays_individuals": {}}}
+        cur = _Cur(fetchone_value=(1,))
+        calls = iter([[], [{"obligation_code": "pnd3"}]])
+        cur.fetchall = lambda: next(calls)
+        with (
+            mock.patch.object(
+                tr.tax_profile_store, "get_profile", side_effect=[profile_before, profile_after]
+            ),
+            mock.patch.object(
+                tr.wht_signals,
+                "scan_period_wht_signals_isolated",
+                return_value={"has_any_material": True},
+            ),
+            mock.patch.object(
+                tr.profile_inference,
+                "compute_proposals",
+                return_value={
+                    "pays_individuals": {"value": "yes", "confidence": "high", "evidence": "e"}
+                },
+            ),
+            mock.patch.object(tr.tax_profile_store, "confirm_field_proposals") as m_confirm,
+            mock.patch.object(tr.tax_profile_store, "load_active_defs", return_value={}),
+            mock.patch.object(tr.obligation_engine, "generate_obligations", return_value=[]),
+            mock.patch.object(tr.obligation_engine, "materialize_obligations"),
+        ):
+            for p in _common_patches(tr, cur):
+                self.enterContext(p)
+            out = await tr.confirm_tax_profile_fields(
+                7, tr.TaxProfileConfirm(fields=["pays_individuals"]), mock.Mock()
+            )
+        m_confirm.assert_called_once()
+        self.assertEqual(
+            m_confirm.call_args.kwargs["proposals"]["pays_individuals"]["value"], "yes"
+        )
+        self.assertEqual(out["profile"]["pays_individuals"], "yes")
+        self.assertEqual(out["added_obligations"], ["pnd3"])
+
+    async def test_stale_proposal_field_returns_409(self):
+        """两次请求之间信号已经变了(候选跟不上)→ 诚实报冲突,不假装还是原来那份候选。"""
+        from routes import tax_profile_routes as tr
+
+        profile = {"pays_individuals": "unknown", "field_meta": {}}
+        with (
+            mock.patch.object(tr.tax_profile_store, "get_profile", return_value=profile),
+            mock.patch.object(tr.wht_signals, "scan_period_wht_signals_isolated", return_value={}),
+            mock.patch.object(tr.profile_inference, "compute_proposals", return_value={}),
+        ):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await tr.confirm_tax_profile_fields(
+                    7, tr.TaxProfileConfirm(fields=["pays_individuals"]), mock.Mock()
+                )
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertEqual(ctx.exception.detail, "tax_profile.proposal_stale")
+
+    async def test_profile_not_found_404(self):
+        from routes import tax_profile_routes as tr
+
+        with mock.patch.object(tr.tax_profile_store, "get_profile", return_value=None):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await tr.confirm_tax_profile_fields(
+                    7, tr.TaxProfileConfirm(fields=["pays_individuals"]), mock.Mock()
+                )
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 class AliasCreateTests(unittest.IsolatedAsyncioTestCase):
@@ -472,7 +572,9 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
                     "name": "A",
                     "missing_order": True,
                     "tax_id": None,
-                    "profile_completeness": 0.0,
+                    # 行里没带任何 p_ 画像列(fixture 没模拟画像 JOIN)→ 全 14 字段按各自
+                    # DDL 默认回落,与 profile_completeness({}) 同值(matrix.py 顶注)。
+                    "profile_completeness": 0.57,
                 }
             ],
         )
@@ -581,7 +683,9 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
                     "name": "B",
                     "missing_order": True,
                     "tax_id": None,
-                    "profile_completeness": 0.0,
+                    # 行里没带任何 p_ 画像列(fixture 没模拟画像 JOIN)→ 全 14 字段按各自
+                    # DDL 默认回落,与 profile_completeness({}) 同值(matrix.py 顶注)。
+                    "profile_completeness": 0.57,
                 }
             ],
         )
@@ -666,26 +770,18 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
             out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
         self.assertFalse(out["clients"][0]["missing_order"])
 
-    def test_profile_completeness_counts_answered_unknown_defaultable_fields(self):
-        """纯函数:6 个默认 unknown 的画像字段答了几个,0..1(EN-clients 客户目录 · 矩阵行
-        画像列带 p_ 前缀走 prefix 参数;GET tax-profile 的 profile dict 不带前缀)。"""
+    def test_profile_completeness_full_14_field_algorithm(self):
+        """纯函数:全 14 字段口径(画像卡智能判断批次改口径,见 matrix.py 顶注三类判据)。
+        EN-clients 客户目录 · 矩阵行画像列带 p_ 前缀走 prefix 参数;GET tax-profile 的
+        profile dict 不带前缀。"""
         from services.workorder import matrix
 
-        self.assertEqual(matrix.profile_completeness({}), 0.0)
-        self.assertEqual(
-            matrix.profile_completeness(
-                {
-                    "p_has_employees": "yes",
-                    "p_pays_individuals": "no",
-                    "p_pays_juristic": "unknown",
-                    "p_pays_foreign": "unknown",
-                    "p_pays_interest_dividend": "unknown",
-                    "p_efiling_enrolled": "unknown",
-                },
-                prefix="p_",
-            ),
-            0.33,
-        )
+        # 全空(缺全部画像列)→ 按各字段 DDL 默认回落:sbt_status='none'/
+        # filing_disposition='active' 结构性天然算已答(2/8 枚举)+ 3 个恒答字段(3/3)+
+        # 3 个条件字段父开关全未打开、隐藏视为已答(3/3)= 8/14。
+        self.assertEqual(matrix.profile_completeness({}), 0.57)
+
+        # 6 个真会卡在 unknown 的枚举字段全部答了 + 其余字段维持结构默认 → 满分。
         self.assertEqual(
             matrix.profile_completeness(
                 {
@@ -698,6 +794,41 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
                 }
             ),
             1.0,
+        )
+
+        # 父开关打开却没填条件字段(branch_count 仍是结构默认值 1)→ 该项不算已答;
+        # tax_agent_ref 打开且真填了偏离默认值 → 算已答。其余枚举字段维持默认
+        # (sbt_status='none'/filing_disposition='active' 已答,另 6 个未答)。
+        # 2(枚举)+ 3(恒答)+ 2(条件:sbt_business_type 隐藏已答 + tax_agent_ref 已答,
+        # branch_count 未答)= 7/14。
+        self.assertEqual(
+            matrix.profile_completeness(
+                {
+                    "has_multi_branch": True,
+                    "branch_count": 1,  # 打开了但还是默认值 1 → 未答
+                    "tax_agent_authorized": True,
+                    "tax_agent_ref": "REF-9",  # 打开且真填了 → 已答
+                }
+            ),
+            0.5,
+        )
+
+        # 矩阵行(p_ 前缀)同一份字段表,取值口径不变:has_employees/pays_individuals
+        # 非 unknown(2)+ sbt_status/filing_disposition 缺列回落已答(2)= 4/8 枚举
+        # + 3 恒答 + 3 条件字段(父开关全缺列回落 False/'none' → 全隐藏已答)= 10/14。
+        self.assertEqual(
+            matrix.profile_completeness(
+                {
+                    "p_has_employees": "yes",
+                    "p_pays_individuals": "no",
+                    "p_pays_juristic": "unknown",
+                    "p_pays_foreign": "unknown",
+                    "p_pays_interest_dividend": "unknown",
+                    "p_efiling_enrolled": "unknown",
+                },
+                prefix="p_",
+            ),
+            0.71,
         )
 
     async def test_client_row_carries_tax_id_and_profile_completeness(self):
@@ -735,7 +866,10 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
         ):
             out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
         self.assertEqual(out["clients"][0]["tax_id"], "1234567890123")
-        self.assertEqual(out["clients"][0]["profile_completeness"], 0.5)
+        # 全 14 字段口径(画像卡智能判断批次):3 个枚举已答(has_employees/pays_individuals/
+        # pays_juristic)+ sbt_status/filing_disposition 缺列回落已答(2)+ 3 恒答 + 3 条件
+        # 字段父开关缺列回落隐藏已答 = 11/14。
+        self.assertEqual(out["clients"][0]["profile_completeness"], 0.79)
 
 
 if __name__ == "__main__":

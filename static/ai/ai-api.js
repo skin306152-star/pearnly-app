@@ -316,6 +316,17 @@
                     body
                 );
             },
+            // 画像卡智能判断批次:把推断候选(field_meta[key].proposal)转正——单个字段或
+            // "全部确认(N)"批量都走这一个端点,fields 是字段键数组。
+            confirmTaxProfileFields: function (clientId, fields) {
+                return call(
+                    'POST',
+                    '/api/workspace/clients/' +
+                        encodeURIComponent(clientId) +
+                        '/tax-profile/confirm',
+                    { fields: fields }
+                );
+            },
             listAliases: function (clientId) {
                 return call(
                     'GET',

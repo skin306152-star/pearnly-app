@@ -546,6 +546,26 @@
         "切会话后历史任务过程条后台补拉且默认折叠:跨请求的异步补拉链路要真页面",
         "390 宽侧栏收成抽屉(真隐身/真滑入/遮罩关闭)且零横向溢出:媒体查询+过渡延迟是浏览器行为"
       ]
+    },
+    "_profile_card_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/profile_card",
+      "covers": [
+        "static/ai/ai-profile-render.js",
+        "static/ai/ai-profile-card-render.js",
+        "static/ai/ai-profile.js",
+        "static/ai/ai-profile-panels-actions.js",
+        "static/ai/ai-profile.css",
+        "static/ai/ai-api.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "字段展示态(confirmed/pending/conflict/unknown/blocked)真渲染成对的圆点+徽章+推断依据框:deriveFieldStatus 是纯函数,但拼没拼对 DOM/CSS 类只有真页面答得出",
+        "点「确认」/「全部确认(N)」后真发一次 PUT/confirm 请求、拿回新画像重渲、待确认圆点真的消失:异步落库→重渲染的时序只有真浏览器走得完",
+        "冲突二选一点「采纳推断」后来源徽章真的从手填变成票据推断:conflict 状态转移要真点击+真重渲染",
+        "确认后弹出「当期义务已重算」toast(真 DOM 节点+.on 过渡类):toast 的存在与文案是渲染期事实",
+        "SBT CTA 按钮点击真调用 AI.steward.openWith(带预填句):模块间调用链路,node 单测里没有 AI.steward",
+        "完整度百分比与进度条宽度随确认动作实时变化:getComputedStyle/文本节点只有真渲染给得出"
+      ]
     }
   },
   "_stale_ack_rule": [

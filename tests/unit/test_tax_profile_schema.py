@@ -14,6 +14,7 @@ import unittest
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 _MIGRATION = "alembic/versions/0064_client_tax_profile.py"
 _ENSURE = "services/workspace/tax_profile_schema.py"
+_FIELD_META_MIGRATION = "alembic/versions/0096_tax_profile_field_meta.py"
 
 _EXPECTED_TABLES = {
     "client_tax_profiles",
@@ -139,6 +140,33 @@ class TaxProfileSchemaParityTests(unittest.TestCase):
                 "work_order_id       uuid   REFERENCES work_orders (id) ON DELETE SET NULL",
                 _text(path),
             )
+
+
+class FieldMetaColumnParityTests(unittest.TestCase):
+    """画像卡智能判断批次:field_meta 列(0064 建表时还没有)由 0096 用 ALTER ...
+    ADD COLUMN IF NOT EXISTS 补上;ensure 侧两处都要有(CREATE TABLE 内联给全新装,
+    ALTER 给 0064 已建过的存量表),两处逐字一致才不会一边有一边没有。"""
+
+    _ALTER_NEEDLE = (
+        "ALTER TABLE client_tax_profiles "
+        "ADD COLUMN IF NOT EXISTS field_meta jsonb NOT NULL DEFAULT '{}'::jsonb"
+    )
+
+    def test_migration_alters_field_meta_column(self):
+        text = _text(_FIELD_META_MIGRATION)
+        self.assertIn(self._ALTER_NEEDLE, text)
+        self.assertIn('down_revision = "0095_full_invoice_source_receipt"', text)
+
+    def test_ensure_alters_field_meta_column_for_existing_installs(self):
+        self.assertIn(self._ALTER_NEEDLE, _text(_ENSURE))
+
+    def test_ensure_create_table_also_carries_field_meta_for_fresh_installs(self):
+        text = _text(_ENSURE)
+        self.assertIn("field_meta              jsonb   NOT NULL DEFAULT '{}'::jsonb", text)
+
+    def test_migration_has_matching_downgrade(self):
+        text = _text(_FIELD_META_MIGRATION)
+        self.assertIn("DROP COLUMN IF EXISTS field_meta", text)
 
 
 if __name__ == "__main__":

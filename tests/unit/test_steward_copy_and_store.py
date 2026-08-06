@@ -259,5 +259,44 @@ class PublicViewTests(unittest.TestCase):
         self.assertEqual(out["role"], "steward")
 
 
+class _StubMessageCur:
+    """message_text 的假游标:只认自己那一条 SQL,不解析真实 SQL 文本(同 FakeCur 先例,
+    但按 message_id 分流返回值,而不是恒定返回一个预置行)。"""
+
+    def __init__(self, rows: dict):
+        self._rows = rows
+        self.executed = False
+
+    def execute(self, sql, params):
+        self.executed = True
+        self._last_id = params[-1]
+
+    def fetchone(self):
+        row = self._rows.get(self._last_id)
+        return {"text": row} if row is not None else None
+
+
+class MessageTextTests(unittest.TestCase):
+    """doc_read_qa/table_generate 找「随文件一起说的那句话」的取值路(见 tools_doc_qa/
+    tools_table 顶注):附件不经模型 slot,问题/整理指令从挂着这份附件的那条用户消息
+    (attachment.message_id)原样取回。"""
+
+    def test_returns_the_message_text(self):
+        cur = _StubMessageCur({"m-1": "这份合同的付款期限是多久"})
+        text = store.message_text(cur, tenant_id="t-1", session_id="s-1", message_id="m-1")
+        self.assertEqual(text, "这份合同的付款期限是多久")
+
+    def test_missing_message_id_short_circuits_without_a_query(self):
+        cur = _StubMessageCur({})
+        text = store.message_text(cur, tenant_id="t-1", session_id="s-1", message_id=None)
+        self.assertEqual(text, "")
+        self.assertFalse(cur.executed)
+
+    def test_message_not_found_returns_empty_string_not_none(self):
+        cur = _StubMessageCur({})
+        text = store.message_text(cur, tenant_id="t-1", session_id="s-1", message_id="m-x")
+        self.assertEqual(text, "")
+
+
 if __name__ == "__main__":
     unittest.main()

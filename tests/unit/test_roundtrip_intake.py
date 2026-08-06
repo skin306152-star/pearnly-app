@@ -163,3 +163,41 @@ class PendingReasonTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BranchSurvivalTests(unittest.TestCase):
+    """分店号写 → 读 → ThaiInvoice 全环存活。
+
+    合并层按 model_fields 重建 dict,不进模型的键会静默蒸发(回导方向链血泪同款);
+    这两条断言就是防蒸发回归闸。
+    """
+
+    def test_sales_buyer_branch_survives_roundtrip(self):
+        rows = [
+            _sales(
+                "h9",
+                "SA9-0806",
+                [{"description": "ICE", "qty": 1, "unit_price": 100}],
+                buyer_tax="0107536000633",
+                buyer_branch="00018",
+            )
+        ]
+        res = try_parse_roundtrip(build_review_workbook(sales=rows), "review.xlsx")
+        self.assertEqual(res.pages[0].invoice.buyer_branch, "00018")
+
+    def test_purchase_seller_branch_survives_roundtrip(self):
+        rec = {
+            "merged_fields": {
+                "history_id": "h10",
+                "invoice_number": "PV-806",
+                "date": "2026-07-20",
+                "seller_name": "เซเว่น สาขาประชุม",
+                "seller_tax": "0107536000117",
+                "seller_branch": "00054",
+                "amount_before_vat": 1000.0,
+                "vat_amount": 70.0,
+                "total_amount": 1070.0,
+            }
+        }
+        res = try_parse_roundtrip(build_review_workbook(purchase=[rec]), "review.xlsx")
+        self.assertEqual(res.pages[0].invoice.seller_branch, "00054")

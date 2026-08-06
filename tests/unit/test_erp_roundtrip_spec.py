@@ -118,3 +118,19 @@ class RoundtripValuesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BranchColumnTests(unittest.TestCase):
+    def test_branch_column_optional_for_signature(self):
+        """旧版导出的工作簿没有分店列,必须照样认出(不然会计手上的旧文件回导全废)。"""
+        legacy = ["วันที่", *(h for h in rt.ROUNDTRIP_HEADERS if h != rt.COL_PARTY_BRANCH)]
+        self.assertTrue(rt.is_roundtrip_sheet(legacy))
+
+    def test_branch_value_lands_under_branch_header(self):
+        vals = rt.roundtrip_values(party_tax="0107536000633", party_branch="00018")
+        by_header = dict(zip(rt.ROUNDTRIP_HEADERS, vals))
+        self.assertEqual(by_header[rt.COL_PARTY_BRANCH], "00018")
+        self.assertEqual(by_header[rt.COL_PARTY_TAX], "0107536000633")
+
+    def test_widths_cover_all_headers(self):
+        self.assertEqual(len(rt.ROUNDTRIP_WIDTHS), len(rt.ROUNDTRIP_HEADERS))

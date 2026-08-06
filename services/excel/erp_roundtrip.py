@@ -37,6 +37,11 @@ DATA_SHEETS: Tuple[str, ...] = (SHEET_SALES, SHEET_PURCHASE, SHEET_PENDING)
 # 更要命的是会计把一张进项票剪到销项表时税号会整个丢掉(真跑实测)。故追加在合同列后。
 COL_PARTY_TAX = "เลขประจำตัวผู้เสียภาษีคู่ค้า"
 
+# 对方分店号(5 位,เช่น 00018;สำนักงานใหญ่=00000)。连锁(Big C/Lotus's)全部分店共用
+# 一个税号,ERP 里却是一分店一档 —— 只有税号会把分店票记到总店头上(2026-08-06 真账实锤)。
+# 与进项合同列「สาขา」刻意不同名:同表两列同名会让按列名索引二义。
+COL_PARTY_BRANCH = "สาขาคู่ค้า"
+
 # 单据税额(票面印的那个)。销项合同 12 列里的 VAT 是【每行】的,多行票逐行相加与
 # 单据税额可能差分币;而票面税额是要进 ภ.พ.30 的法定数字,不能靠我们重算。故原样带走。
 COL_DOC_VAT = "ภาษีมูลค่าเพิ่มรวม"
@@ -49,6 +54,7 @@ COL_ROW_KEY = "รหัสอ้างอิงระบบ"
 
 ROUNDTRIP_HEADERS: Tuple[str, ...] = (
     COL_PARTY_TAX,
+    COL_PARTY_BRANCH,
     COL_DOC_VAT,
     COL_ERP_DOCNUM,
     COL_ERP_ITEM,
@@ -56,7 +62,11 @@ ROUNDTRIP_HEADERS: Tuple[str, ...] = (
     COL_PUSH_STATUS,
     COL_ROW_KEY,
 )
-ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 16, 18, 16, 14, 16, 26)
+ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 12, 16, 18, 16, 14, 16, 26)
+
+# 表头指纹的必需集:不含后加的可选列(COL_PARTY_BRANCH)。会计手上还有旧版导出的
+# 工作簿,新列进必需集会让旧文件回导认不出、静默退回通用表格路。
+_REQUIRED_HEADERS: Tuple[str, ...] = tuple(h for h in ROUNDTRIP_HEADERS if h != COL_PARTY_BRANCH)
 
 
 def hide_machine_columns(ws, headers: Sequence[str]) -> None:
@@ -108,6 +118,7 @@ PURCHASE_COL_DATE = PURCHASE_HEADERS[1]
 PURCHASE_COL_INVOICE = PURCHASE_HEADERS[2]
 PURCHASE_COL_PARTY = PURCHASE_HEADERS[3]
 PURCHASE_COL_PARTY_TAX = PURCHASE_HEADERS[4]
+PURCHASE_COL_BRANCH = PURCHASE_HEADERS[5]
 PURCHASE_COL_PRE_VAT = PURCHASE_HEADERS[6]
 PURCHASE_COL_VAT = PURCHASE_HEADERS[7]
 PURCHASE_COL_TOTAL = PURCHASE_HEADERS[8]
@@ -180,10 +191,10 @@ def decode_row_key(raw: Any) -> Optional[Tuple[str, int]]:
 
 # ── 表头指纹:认出这是我们自己导出的工作簿 ────────────────────────────────
 def is_roundtrip_sheet(headers: Sequence[Any]) -> bool:
-    """表头是否带全回导列。命中 → 走确定性解析(纯读单元格·不过大模型);
-    不命中 → 交回原有的通用表格路,不抢别人的活。"""
+    """表头是否带全回导必需列(可选列不参与判定 · 旧版导出的工作簿也要认得)。
+    命中 → 走确定性解析(纯读单元格·不过大模型);不命中 → 交回原有的通用表格路。"""
     got = {str(h).strip() for h in (headers or []) if str(h or "").strip()}
-    return all(h in got for h in ROUNDTRIP_HEADERS)
+    return all(h in got for h in _REQUIRED_HEADERS)
 
 
 def sheet_direction(sheet_name: Any) -> Optional[str]:
@@ -198,6 +209,7 @@ def is_data_sheet(sheet_name: Any) -> bool:
 def roundtrip_values(
     *,
     party_tax: Any = "",
+    party_branch: Any = "",
     doc_vat: Any = "",
     docnum: Any = "",
     item_code: Any = "",
@@ -209,6 +221,7 @@ def roundtrip_values(
     """按 ROUNDTRIP_HEADERS 顺序生成这几格的值(写侧唯一入口·保证顺序不漂)。"""
     return [
         str(party_tax or "").strip(),
+        str(party_branch or "").strip(),
         doc_vat if isinstance(doc_vat, (int, float)) else (str(doc_vat or "").strip() or None),
         str(docnum or "").strip(),
         str(item_code or "").strip(),

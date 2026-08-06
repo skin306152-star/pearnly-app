@@ -120,6 +120,7 @@ _UNDECLARED_PAYLOAD = {
     "source": {"filename": None, "history_id": "hist-stock-1"},
     "supplier": {
         "address": "",
+        "branch": "",
         "code": "",
         "name": "บริษัท ซัพพลาย จำกัด",
         "prename": "บริษัท",

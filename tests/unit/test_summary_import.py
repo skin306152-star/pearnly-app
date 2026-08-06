@@ -279,3 +279,37 @@ class RealSheetShapeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BranchAddressTests(unittest.TestCase):
+    """对方分店号/地址常量 → fields 落位(连锁同税号多分店匹配判据 + ARMAS 建档地址)。"""
+
+    def _map(self, constants):
+        parsed = parse_svc.parse_table(_CSV, "sales.csv")
+        return mapping_svc.map_rows(
+            parsed, column_map=_COLMAP, constants=constants, workspace=_WORKSPACE
+        )
+
+    def test_sales_branch_and_address_land_on_buyer(self):
+        f = self._map(
+            _sales_constants(counterparty_branch="18", counterparty_address="99 Sukhumvit")
+        )[0]["fields"]
+        self.assertEqual(f["buyer_branch"], "00018")  # 归一 5 位
+        self.assertEqual(f["buyer_addr"], "99 Sukhumvit")
+        self.assertEqual(f["seller_branch"], "")
+
+    def test_purchase_branch_lands_on_seller(self):
+        f = self._map(_sales_constants(direction="purchase", counterparty_branch="00054"))[0][
+            "fields"
+        ]
+        self.assertEqual(f["seller_branch"], "00054")
+        self.assertEqual(f["buyer_branch"], "")
+
+    def test_walkin_clears_branch(self):
+        f = self._map(_sales_constants(cash_walkin=True, counterparty_branch="18"))[0]["fields"]
+        self.assertEqual(f["buyer_branch"], "")
+
+    def test_invalid_branch_left_empty_not_hq(self):
+        # 非数字/超长 → ''(未提供),绝不归一成总店 00000 硬配。
+        f = self._map(_sales_constants(counterparty_branch="123456"))[0]["fields"]
+        self.assertEqual(f["buyer_branch"], "")

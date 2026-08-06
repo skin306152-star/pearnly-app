@@ -59,6 +59,7 @@ from services.erp.express_push.posting_profile import (
 from services.erp.express_push.stock_acc_group import resolve_stock_acc_group
 from services.purchase.field_clean import (
     clean_address,
+    clean_branch_no,
     clean_invoice_no,
     clean_seller,
     clean_tax_id,
@@ -91,9 +92,11 @@ def _resolve_customer(
     name: str,
     tax_id: str,
     address: str = "",
+    branch: str = "",
 ) -> Dict[str, Any]:
     """客户身份块。命中 erp_client_mappings(express)→ 带 code、customer_new=False;
-    否则 customer_new=True 让 Agent 在 ARMAS 建档(带 tax_id+address 落档,开全额税票用)。"""
+    否则 customer_new=True 让 Agent 在 ARMAS 建档(带 tax_id+address 落档,开全额税票用)。
+    branch=5 位分店号(空=未提供):连锁同税号多分店档,小助手靠它 + 名字定唯一档。"""
     code = ""
     client_id = history.get("client_id")
     if client_id is not None:
@@ -109,6 +112,7 @@ def _resolve_customer(
         "name": name,
         "tax_id": tax_id,
         "address": address,
+        "branch": branch,
         "prename": detect_prename(name),
         "customer_new": not bool(code),
     }
@@ -166,6 +170,7 @@ def build_express_sales_payload(
         fields.get("buyer_tax") or fields.get("buyer_tax_id") or fields.get("customer_tax")
     )
     address = clean_address(fields.get("buyer_addr"))
+    branch = clean_branch_no(fields.get("buyer_branch"))
     if _is_cash_buyer(raw_buyer):
         name = CASH_CUSTOMER_NAME
         # 现金/散客客户用现成档(不新建)→ 不带地址(简易税票无须买方地址)。
@@ -174,12 +179,15 @@ def build_express_sales_payload(
             "name": CASH_CUSTOMER_NAME,
             "tax_id": tax_id,
             "address": "",
+            "branch": "",
             "prename": "",
             "customer_new": False,
         }
     else:
         name = clean_seller(raw_buyer)
-        customer = _resolve_customer(mappings.get("clients") or [], history, name, tax_id, address)
+        customer = _resolve_customer(
+            mappings.get("clients") or [], history, name, tax_id, address, branch
+        )
     ref_no = clean_invoice_no(history.get("invoice_no") or fields.get("invoice_number"))
 
     # 分录反向:借 应收(含税) = 贷 销售收入(税前) + 贷 销项税。

@@ -67,6 +67,15 @@ test.describe('录入工作台 · 汇总表批量建单', () => {
         // ── 批次常量:刻意留空客户税号 + 勾选散客(专测现金兜底路径)──
         await page.locator('[data-bk="counterparty_name"]').fill('7-11');
         await page.locator('[data-bk="counterparty_tax"]').fill(''); // 留空
+        // 连锁分店匹配判据 + ARMAS 建档地址:两个常量字段必须真实渲染(散客路径留空即可)。
+        await expect(
+            page.locator('[data-bk="counterparty_branch"]'),
+            '对方分店号输入框在场'
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-bk="counterparty_address"]'),
+            '对方地址输入框在场'
+        ).toBeVisible();
         await page.locator('[data-bk="cash_walkin"]').check();
         await page.locator('[data-bk="product_name"]').fill('น้ำแข็งแพ็ค');
         const pat = 'E2E-' + Date.now() + '-{seq}';

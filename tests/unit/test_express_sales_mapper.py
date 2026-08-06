@@ -459,3 +459,22 @@ class ExpressSalesStockMasterPreflightTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class CustomerBranchTests(unittest.TestCase):
+    def test_buyer_branch_flows_to_customer_block(self):
+        r = build_express_sales_payload(
+            _sales_history(fields={"buyer_branch": "18"}), config=_CONFIG
+        )
+        self.assertEqual(r.payload["customer"]["branch"], "00018")  # 归一 5 位
+
+    def test_branch_defaults_empty_not_hq(self):
+        # 没提供分店号必须是 ''(小助手跳过分店判据),不是总店 00000。
+        r = build_express_sales_payload(_sales_history(), config=_CONFIG)
+        self.assertEqual(r.payload["customer"]["branch"], "")
+
+    def test_cash_buyer_branch_empty(self):
+        r = build_express_sales_payload(
+            _sales_history(fields={"buyer_name": "เงินสด", "buyer_branch": "18"}), config=_CONFIG
+        )
+        self.assertEqual(r.payload["customer"]["branch"], "")

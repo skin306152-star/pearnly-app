@@ -64,3 +64,14 @@ class SanitizeFingerprintTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CustomerBranchIngestTests(unittest.TestCase):
+    def test_customer_branch_kept_in_snapshot(self):
+        from services.erp.express_push.agent_reporting import _CUSTOMER_KEYS, _sanitize_catalog
+
+        raw = [
+            {"code": "C1", "name": "บิ๊กซี สาขา 18", "tax_id": "0107536000633", "branch": "00018"}
+        ]
+        out = _sanitize_catalog(raw, _CUSTOMER_KEYS)
+        self.assertEqual(out[0]["branch"], "00018")

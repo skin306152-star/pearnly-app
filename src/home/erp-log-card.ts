@@ -60,6 +60,8 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
 const _AGENT_REASON_I18N: Record<string, string> = {
     SUPPLIER_DUP_SUSPECTED: 'erp-reason-supplier-dup',
     CUSTOMER_DUP_SUSPECTED: 'erp-reason-customer-dup',
+    CUSTOMER_BRANCH_AMBIGUOUS: 'erp-reason-customer-branch-ambiguous',
+    SUPPLIER_BRANCH_AMBIGUOUS: 'erp-reason-supplier-branch-ambiguous',
     CDX_REINDEX_FAILED: 'erp-reason-cdx-failed',
     ACCOUNT_BUSY_LOCKED: 'erp-reason-account-busy',
     // 防重单闸:改了票号回导重推,而上一版单据还在 Express 里。此前没接进来 → 前端翻译返空

@@ -68,6 +68,8 @@ const REASON_CHAPTER: Record<string, ChapterRef> = inSection('stuck', {
     // 小助手在会计电脑上落库时报回来的
     SUPPLIER_DUP_SUSPECTED: 'exc-dup-suspected',
     CUSTOMER_DUP_SUSPECTED: 'exc-dup-suspected',
+    SUPPLIER_BRANCH_AMBIGUOUS: 'exc-dup-suspected',
+    CUSTOMER_BRANCH_AMBIGUOUS: 'exc-dup-suspected',
     CDX_REINDEX_FAILED: 'exc-write-rollback',
     ACCOUNT_BUSY_LOCKED: 'exc-waiting-lock',
     PRIOR_DOC_STILL_IN_ERP: 'exc-prior-doc',

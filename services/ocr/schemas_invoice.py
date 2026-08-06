@@ -165,10 +165,15 @@ class ThaiInvoice(BaseModel):
     seller_name: str = Field(default="")
     seller_tax: str = Field(default="", description="13-digit Thai tax ID or empty")
     seller_addr: str = Field(default="")
+    # 分店号(สาขาที่ · 5 位,总店=00000;空=票面没印/未提供)。连锁全分店共用税号,
+    # ERP 一分店一档 —— 只有税号会把分店票记到总店头上。当前由回导/汇总表人工提供,
+    # OCR 提取指令未接(prompt 不出此键 → 默认空,不影响识别行为)。
+    seller_branch: str = Field(default="", description="branch no. as printed, e.g. 00018")
 
     buyer_name: str = Field(default="")
     buyer_tax: str = Field(default="", description="13-digit Thai tax ID or empty")
     buyer_addr: str = Field(default="")
+    buyer_branch: str = Field(default="", description="branch no. as printed, e.g. 00018")
 
     subtotal: str = Field(default="", description="number-as-string, no commas")
     vat: str = Field(default="", description="number-as-string, no commas")
@@ -238,9 +243,11 @@ class ThaiInvoice(BaseModel):
         "seller_name",
         "seller_tax",
         "seller_addr",
+        "seller_branch",
         "buyer_name",
         "buyer_tax",
         "buyer_addr",
+        "buyer_branch",
         "subtotal",
         "vat",
         "wht_rate",

@@ -15,6 +15,9 @@ const IGNORE = [
     /ResizeObserver loop/i, // 浏览器布局回调噪声 · 非错误
     /Failed to load resource.*\b(analytics|gtag|googletagmanager|sentry|clarity|hotjar|facebook|fbevents)\b/i,
     /net::ERR_.*\b(analytics|gtag|googletagmanager|sentry|clarity|hotjar|facebook)\b/i,
+    // CF 边缘自动注入的分析信标(不在源码里)· helper 已 route 成 204 防黑洞网络卡 DCL,
+    // 该桩响应过不了标签自带的 SRI 校验 → integrity 报错,与被测功能零关系。
+    /cloudflareinsights/i,
 ];
 
 function isIgnorable(text) {

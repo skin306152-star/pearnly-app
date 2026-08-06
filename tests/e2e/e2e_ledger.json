@@ -22,6 +22,16 @@
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
   "scripts": {
+    "_pos_vat_summary_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/pos_vat_summary",
+      "covers": ["src/home/sales-report.ts", "static/home-43-pos-report.css"],
+      "fixtures": [],
+      "only_e2e": [
+        "走势卡工具条里的下载按钮真的渲染且可见(几何量真 getBoundingClientRect · 不 grep 类名)",
+        "点击后真实 fetch 请求带对的 workspace_client_id/month/format=xlsx,且触发真 download 事件、落盘字节与响应体一致:单测里 fetch/Blob/a.click() 全是浏览器 API,node 里没有",
+        "端点失败时 toast 用现有 .mp-toast 机制真的弹出且文案是新增 i18n 键,不是裸 pos.unexpected 兜底:DOM 动画态与 class 切换只有真渲染答得出"
+      ]
+    },
     "_sales_dashboard_smoke.cjs": {
       "artifacts": "tests/e2e/_artifacts/sales_dashboard",
       "covers": [

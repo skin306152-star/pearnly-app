@@ -4,7 +4,7 @@
 // ③ 商品销售构成(sales-report-mix)④ 分时热力(近 14 天 × 8:00–22:00)。
 // 环比口径:按日=上周同日(零售星期节律),按月=上一自然月,窗口语义由这里传 prev_from/prev_to。
 // 本文件只管状态编排 + 走势/热力两卡;图表件在 sales-report-charts,类型与取数在 sales-report-common。
-/* global t, escapeHtml */
+/* global t, escapeHtml, token, showToast */
 import { activeWsId, posErrMsg } from './inventory-common.js';
 import {
     barChartHtml,
@@ -111,6 +111,37 @@ function trendTipHtml(row: TrendRow): string {
     ]);
 }
 
+// 销项汇总包(G3):走势卡当前翻到的月(tMonth),同 CSV 导出的 fetch-blob 落盘做法
+// (照抄 pos-sales-log.ts 的 exportCsv),不随全局按日/按月粒度切换。
+function hdr(): Record<string, string> {
+    return { Authorization: 'Bearer ' + (typeof token === 'string' ? token : '') };
+}
+
+async function downloadVatSummary(): Promise<void> {
+    const q = new URLSearchParams({
+        workspace_client_id: String(activeWsId()),
+        month: tMonth,
+        format: 'xlsx',
+    });
+    try {
+        const r = await fetch('/api/pos/admin/vat-summary?' + q.toString(), { headers: hdr() });
+        if (!r.ok) throw new Error('pos.unexpected');
+        const blob = await r.blob();
+        const a = document.createElement('a');
+        const objUrl = URL.createObjectURL(blob);
+        a.href = objUrl;
+        a.download = `pearnly_pos_vat_summary_${tMonth}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            URL.revokeObjectURL(objUrl);
+            a.remove();
+        }, 100);
+    } catch (_) {
+        showToast(t('rep-vat-pkg-fail'), 'error');
+    }
+}
+
 function renderLivebar(row: TrendRow | null): void {
     const el = document.getElementById('rep-livebar');
     if (!el) return;
@@ -161,6 +192,10 @@ function renderTrend(state: SectionState, errCode?: string): void {
                 ${modeBtn('bar', t('rep-view-bar'), '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="6" width="4" height="15" rx="1"/><rect x="17" y="9" width="4" height="12" rx="1"/></svg>')}
                 ${modeBtn('line', t('rep-view-line'), '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/></svg>')}
             </div>
+            <button class="vatpkg" id="rep-t-vatpkg" aria-label="${escapeHtml(t('rep-vat-pkg'))}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+                <span>${escapeHtml(t('rep-vat-pkg'))}</span>
+            </button>
         </div>
     </div>
     <div class="plotwrap" id="rep-t-plot">${body}</div>
@@ -188,6 +223,8 @@ function bindTrendCtl(): void {
             if (monthIn.value) tMonth = monthIn.value;
             loadTrend();
         };
+    const vatPkg = document.getElementById('rep-t-vatpkg');
+    if (vatPkg) vatPkg.onclick = () => downloadVatSummary();
     document.querySelectorAll<HTMLElement>('#rep-trend-card [data-chart-mode]').forEach((b) => {
         b.onclick = () => {
             chartMode = b.dataset.chartMode as 'bar' | 'line';

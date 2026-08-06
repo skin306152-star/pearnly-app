@@ -7,17 +7,21 @@ services/pos/report 聚合。统一 POS 信封。只读(get_cursor_rls 不 commi
 
 from __future__ import annotations
 
+import io
 from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import StreamingResponse
 
 from core import db
-from core.pos_api import assert_module_enabled, ok, require_workspace_access
+from core.pos_api import PosError, assert_module_enabled, ok, require_workspace_access
 from services.authz.deps import require_perm_pos_tid
 from services.pos import audit_report as audit_svc
 from services.pos import report as report_svc
 from services.pos import shift_report as shift_report_svc
+from services.pos import vat_summary as vat_summary_svc
+from services.pos import vat_summary_xlsx
 
 router = APIRouter(prefix="/api/pos", tags=["pos-report"])
 
@@ -64,6 +68,36 @@ async def api_report(
             sections=({s.strip() for s in sections.split(",") if s.strip()} if sections else None),
         )
     return ok(data)
+
+
+@router.get("/admin/vat-summary")
+async def api_vat_summary(
+    request: Request,
+    workspace_client_id: int = Query(...),
+    month: str = Query(...),
+    format: Optional[str] = Query(None),
+):
+    """销项月度汇总包(G3):代账做 ภ.พ.30 申报用。金额只读 pos_sales(不重复计 VAT,见
+    docs/pos/04 §6);format=xlsx 回 4-sheet 附件,缺省回 JSON。"""
+    tid, _uid = require_perm_pos_tid(request, "pos.report.view")
+    with db.get_cursor_rls(tid) as cur:
+        assert_module_enabled(cur, tid, "pos")
+        require_workspace_access(cur, request, tid, workspace_client_id)
+        try:
+            data = vat_summary_svc.month_summary(
+                cur, tenant_id=tid, workspace_client_id=workspace_client_id, month=month
+            )
+        except vat_summary_svc.MonthInvalid as exc:
+            raise PosError("pos.month_invalid", 422, detail=str(exc)) from exc
+    if format != "xlsx":
+        return ok(data)
+    xlsx_bytes = vat_summary_xlsx.build_xlsx(data)
+    filename = f"pearnly_pos_vat_summary_{month}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/admin/audit/summary")

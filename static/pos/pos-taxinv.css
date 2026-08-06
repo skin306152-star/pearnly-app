@@ -16,14 +16,14 @@
 #tax-mask .tax-fld { height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; background: var(--bg); }
 #tax-mask .tax-fld input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; font-size: 14.5px; color: var(--ink); }
 #tax-mask .tax-fld input::placeholder { color: var(--ink3); }
-#tax-mask .tax-fld.ok-on { border-color: rgba(22, 163, 74, .35); background: rgba(22, 163, 74, .08); }
+#tax-mask .tax-fld.ok-on { border-color: color-mix(in srgb, var(--green) 35%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
 #tax-mask .tax-fld .ok { display: none; align-items: center; gap: 5px; font-size: 12.5px; color: var(--green); flex: 0 0 auto; }
 #tax-mask .tax-fld.ok-on .ok { display: flex; }
 #tax-mask .tax-branch { display: flex; gap: 8px; margin-bottom: 14px; }
 #tax-mask .tax-branch button { flex: 1; height: 40px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink2); cursor: pointer; font-size: 13px; }
 #tax-mask .tax-branch button.active { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); }
 #tax-mask .tax-branch .bno { flex: 0 0 120px; margin: 0; }
-#tax-mask .tax-lock { display: flex; gap: 10px; background: rgba(245, 158, 11, .1); border: 1px solid rgba(245, 158, 11, .32); border-radius: 11px; padding: 11px 13px; margin: 6px 0 8px; font-size: 12.5px; color: var(--amber); line-height: 1.5; }
+#tax-mask .tax-lock { display: flex; gap: 10px; background: color-mix(in srgb, var(--amber) 10%, transparent); border: 1px solid color-mix(in srgb, var(--amber) 32%, transparent); border-radius: 11px; padding: 11px 13px; margin: 6px 0 8px; font-size: 12.5px; color: var(--amber); line-height: 1.5; }
 #tax-mask .tax-lock svg { flex: 0 0 16px; color: var(--amber); margin-top: 1px; }
 #tax-mask .tax-foot { padding: 8px 22px 20px; display: flex; gap: 10px; }
 #tax-mask .tax-foot .ghost { flex: 0 0 auto; height: 50px; padding: 0 18px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink2); cursor: pointer; font-size: 14px; }
@@ -44,14 +44,14 @@
 #tax-mask .tax-lookup-hint { min-height: 16px; margin: -8px 0 8px; font-size: 12px; color: var(--amber); }
 /* 13 位但校验位错:红态(别等开票被 422 才知道打错一位) */
 #tax-mask .tax-fld .bad { display: none; align-items: center; font-size: 12.5px; color: var(--red); flex: 0 0 auto; }
-#tax-mask .tax-fld.bad-on { border-color: rgba(220, 38, 38, .32); background: rgba(220, 38, 38, .06); }
+#tax-mask .tax-fld.bad-on { border-color: color-mix(in srgb, var(--red) 32%, transparent); background: color-mix(in srgb, var(--red) 6%, transparent); }
 #tax-mask .tax-fld.bad-on .bad { display: flex; }
 /* 买方档存回勾选(G2 save_buyer) */
 #tax-mask .tax-save { display: flex; align-items: center; gap: 9px; margin: 2px 0 10px; font-size: 13px; color: var(--ink2); cursor: pointer; }
 #tax-mask .tax-save input { width: 17px; height: 17px; accent-color: var(--accent); }
 /* ── 补开视图专属:已开过卡片(列表/搜索样式复用退货屏 · 双类)── */
 .pos-view--taxinv .issued-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 6px 20px rgba(17, 24, 39, .07); padding: 26px 22px; text-align: center; }
-.pos-view--taxinv .ic-badge { width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 50%; background: rgba(22, 163, 74, .14); color: var(--green); display: grid; place-items: center; }
+.pos-view--taxinv .ic-badge { width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 50%; background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); display: grid; place-items: center; }
 .pos-view--taxinv .ic-title { font-weight: 700; font-size: 15px; margin-bottom: 14px; }
 .pos-view--taxinv .ic-row { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid var(--bg); font-size: 13.5px; color: var(--ink2); }
 .pos-view--taxinv .ic-row .b { font-weight: 700; color: var(--ink); }

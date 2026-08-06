@@ -41,7 +41,7 @@ _SETUP = f"""
             getEl: () => null,
             renderLeft: () => calls.push('renderLeft'),
             loadTask: (id) => calls.push('loadTask:' + id),
-            startPoll: (id) => calls.push('startPoll:' + id),
+            startWatch: (id) => calls.push('startWatch:' + id),
             stopPoll: () => calls.push('stopPoll'),
             isTerminal: (st) =>
                 ['done', 'failed', 'waiting_user', 'cancelled'].indexOf(st) >= 0,
@@ -95,7 +95,7 @@ class StewardActionsTests(unittest.TestCase):
         self.assertEqual(out["err"], "stw_authz_err_used")
         # 轻刷把服务端现状拉了回来;waiting_user 是收口态,不许重启轮询。
         self.assertEqual(out["task"]["status"], "waiting_user")
-        self.assertNotIn("startPoll:t1", out["calls"])
+        self.assertNotIn("startWatch:t1", out["calls"])
         self.assertNotIn("loadTask:t1", out["calls"])
 
     def test_decide_ignores_second_click_while_busy(self):

@@ -141,7 +141,7 @@ class SaveBuyerClientTests(unittest.TestCase):
 
     def test_existing_client_reused_no_create(self):
         cur = _Cur(ones=[{"id": 77}])
-        with patch("services.clients.store.create_client") as create:
+        with patch("core.db.create_client") as create:
             cid = upgrade._save_buyer_client(
                 cur, tenant_id="t", created_by="u", buyer=dict(self._BUYER)
             )
@@ -153,7 +153,7 @@ class SaveBuyerClientTests(unittest.TestCase):
 
     def test_new_client_created_with_buyer_fields(self):
         cur = _Cur(ones=[None])
-        with patch("services.clients.store.create_client", return_value=88) as create:
+        with patch("core.db.create_client", return_value=88) as create:
             cid = upgrade._save_buyer_client(
                 cur,
                 tenant_id="t",

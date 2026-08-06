@@ -107,7 +107,7 @@
         getEl: $,
         renderLeft: view.renderTaskFace,
         loadTask: tasksLayer.loadTask,
-        startPoll: tasksLayer.startWatch,
+        startWatch: tasksLayer.startWatch,
         stopPoll: tasksLayer.stopWatch,
         isTerminal: function (status) {
             return AI.stewardRender.isTerminalStatus(status);

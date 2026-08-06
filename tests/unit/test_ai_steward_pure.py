@@ -141,21 +141,16 @@ class TaskRenderPureTests(unittest.TestCase):
             [{"label": "看工单", "href": "#/client/c1/wo"}, {"label": "#/", "href": "#/"}],
         )
 
-    def test_step_counts_and_agent_count_floor(self):
+    def test_agent_count_floor(self):
         out = _run_node(f"""
             const r = require({_RENDER});
             process.stdout.write(JSON.stringify([
-                r.stepCounts([{{state:'done'}},{{state:'running'}},{{state:'done'}}]),
-                r.stepCounts([]), r.stepCounts(undefined),
                 r.agentCount({{agent_count: 3}}), r.agentCount({{agent_count: 0}}),
                 r.agentCount({{}}), r.agentCount(null),
             ]));
             """)
-        self.assertEqual(out[0], {"done": 2, "total": 3})
-        self.assertEqual(out[1], {"done": 0, "total": 0})
-        self.assertEqual(out[2], {"done": 0, "total": 0})
         # 缺失/非法一律兜到 1:不显示"0 个 Agent"这种自证没在干活的假状态。
-        self.assertEqual(out[3:], [3, 1, 1, 1])
+        self.assertEqual(out, [3, 1, 1, 1])
 
     def test_loop_question_normalises_options_and_drops_empty_ones(self):
         out = _run_node(f"""

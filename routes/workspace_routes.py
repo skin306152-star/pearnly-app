@@ -132,24 +132,17 @@ async def workspace_tax_lookup(tax_id: str, request: Request, branch: int = 0):
     {tax_id, name, address, branch_no, branch_label, post_code, province, vat_registered}。
     """
     require_perm(request, "settings.workspace.manage")
-    from services.rd.rd_api import lookup_vat
+    from services.rd.rd_api import lookup_vat, normalize_lookup
 
     # lookup_vat 是同步阻塞 SOAP(requests · 5s 超时)· 丢线程池跑,别堵 async worker 的 event loop。
     result = await asyncio.to_thread(lookup_vat, tax_id, branch or 0)
     if not result.get("ok"):
         return {"ok": False, "error": result.get("error") or "not_found"}
-    src = result.get("data") or {}
-    data = {
-        "tax_id": src.get("tax_id"),
-        "name": src.get("name"),
-        "address": src.get("address"),
-        "branch_no": src.get("branch_no"),
-        "branch_label": src.get("branch_label"),
-        "post_code": src.get("post_code"),
-        "province": src.get("province"),
-        "vat_registered": True,  # 能在 VAT 服务查到 = 已注册 VAT
+    return {
+        "ok": True,
+        "data": normalize_lookup(result.get("data") or {}),
+        "cached": bool(result.get("cached")),
     }
-    return {"ok": True, "data": data, "cached": bool(result.get("cached"))}
 
 
 def _create_validated_client(

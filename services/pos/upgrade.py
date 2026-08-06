@@ -97,29 +97,22 @@ def _save_buyer_client(cur, *, tenant_id: str, created_by, buyer: dict) -> Optio
 
     只对「校验位合法的 13 位税号 + 有名称」建档(无税号同名异主体错并风险大,同
     buyer_resolve 域规:无税号只建议不建);已有同税号活档直接复用,绝不覆盖(防静默改档)。
-    查重走本事务 cur;建档复用 clients store 规范写路径(自带连接/截断/RLS),在开出成功后
-    才调,失败不影响已开出的票。
+    查重/建档收口在 recon_resolve._find_or_create_client_with_cur(本函数只留差异门槛),
+    失败不影响已开出的票(clients_store 自带错误吞掉返 None)。
     """
     from services.sales import buyer as buyer_mod
+    from services.recon.recon_resolve import _find_or_create_client_with_cur
 
     tax_id = (buyer.get("tax_id") or "").strip()
     name = (buyer.get("name") or "").strip()
     if not name or not created_by or not buyer_mod.th13_checksum_ok(tax_id):
         return None
-    cur.execute(
-        "SELECT id FROM clients WHERE tenant_id = %s AND tax_id = %s AND is_active LIMIT 1",
-        (tenant_id, tax_id),
-    )
-    row = cur.fetchone()
-    if row:
-        return int(row["id"])
-    from services.clients import store as clients_store
-
-    return clients_store.create_client(
-        str(created_by),
-        tenant_id,
-        name,
+    return _find_or_create_client_with_cur(
+        cur,
+        user_id=str(created_by),
+        tenant_id=tenant_id,
         tax_id=tax_id,
+        name=name,
         address=buyer.get("address"),
         party_type=buyer.get("type"),
         branch=buyer.get("branch_no") if buyer.get("branch_type") == "branch" else None,
@@ -193,16 +186,13 @@ def upgrade_to_full_tax_invoice(
         raise PosError("pos.tax_id_invalid", 422, detail=err)
 
     sales_store.set_full_invoice_id(cur, tenant_id=tenant_id, sale_id=sale_id, doc_id=doc_id)
-    buyer_client_id = (
+    if save_buyer:
+        # 落库动作照常(合法税号 + 有名称才建);返回值无人消费,不装进响应。
         _save_buyer_client(cur, tenant_id=tenant_id, created_by=created_by, buyer=nb)
-        if save_buyer
-        else None
-    )
     return {
         "document": {
             "id": str(doc["id"]),
             "doc_number": doc["doc_number"],
             "doc_type": doc["doc_type"],
         },
-        "buyer_client_id": buyer_client_id,
     }

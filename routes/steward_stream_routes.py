@@ -64,7 +64,8 @@ def _frame(event: str, payload: dict) -> str:
 async def _event_stream(tenant_id: str, task_id: str):
     last = ""
     for tick in range(_MAX_TICKS):
-        heal = tick % _HEAL_EVERY == 0
+        # 首轮(tick=0)不自愈:毫秒前 task_events() 的常规 GET 预检刚 heal 过。
+        heal = tick > 0 and tick % _HEAL_EVERY == 0
         task = await asyncio.to_thread(_read_task, tenant_id, task_id, heal)
         if task is None:
             # 任务行没了(会话被删):流如实收口,前端按 end 处理。
@@ -91,10 +92,12 @@ async def _event_stream(tenant_id: str, task_id: str):
 @router.get("/api/ai/steward/tasks/{task_id}/events")
 async def task_events(task_id: str, request: Request):
     """任务事件流。首帧前先确认任务存在(404 与 GET /tasks/{tid} 同口径),
-    避免对不存在的 id 挂一条只会发 end 的空流。"""
+    避免对不存在的 id 挂一条只会发 end 的空流。预检只查存在不 heal ——
+    heal 交给流内第 5 拍起(打开视图三连读收敛:同窗口毫秒内连续读同一行)。
+    """
     _user, tenant_id = authorize_steward(request)
     store.ensure_once()
-    task = await asyncio.to_thread(_read_task, tenant_id, task_id, True)
+    task = await asyncio.to_thread(_read_task, tenant_id, task_id, False)
     if task is None:
         raise HTTPException(404, detail=NOT_FOUND)
     return StreamingResponse(

@@ -183,34 +183,47 @@ def get_client_by_id(client_id: int, *, tenant_id=None, user_id=None) -> Optiona
         return None
 
 
+def _find_or_create_client_with_cur(
+    cur,
+    *,
+    user_id: str,
+    tenant_id: Optional[str],
+    tax_id: str,
+    name: str,
+    **create_kwargs,
+) -> Optional[int]:
+    """按税号找活档 · 找不到就建(recon 屏 B 与 POS 升级共用 · 查重用调用方游标)。
+
+    create_kwargs 透传给 db.create_client(clients/store):两侧建档字段不同
+    (颜色 / 地址 / 分店等),差异由调用侧给,这里不掺和。"""
+    if tenant_id:
+        cur.execute(
+            "SELECT id FROM clients WHERE tenant_id = %s AND tax_id = %s "
+            "AND is_active = TRUE LIMIT 1",
+            (str(tenant_id), tax_id),
+        )
+    else:
+        cur.execute(
+            "SELECT id FROM clients WHERE user_id = %s AND tax_id = %s "
+            "AND is_active = TRUE LIMIT 1",
+            (str(user_id), tax_id),
+        )
+    row = cur.fetchone()
+    if row:
+        return int(row["id"])
+    new_id = db.create_client(user_id, tenant_id, name, tax_id=tax_id, **create_kwargs)
+    if new_id:
+        logger.info(f"auto-created client id={new_id} tax_id={tax_id} name={name}")
+    return new_id
+
+
 def find_or_create_client_by_tax_id(
     user_id: str, tenant_id: Optional[str], tax_id: str, name: str = ""
 ) -> Optional[int]:
-    """v118.32.2 · 屏 B 自动建客户:按税号找 · 找不到就建 · 复用 create_client"""
+    """v118.32.2 · 屏 B 自动建客户:按税号找 · 找不到就建(找/建收口在
+    _find_or_create_client_with_cur,POS 升级走同一份)。"""
     if not tax_id or len(tax_id) != 13:
         return None
-    try:
-        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
-            if tenant_id:
-                cur.execute(
-                    "SELECT id FROM clients WHERE tenant_id = %s AND tax_id = %s "
-                    "AND is_active = TRUE LIMIT 1",
-                    (str(tenant_id), tax_id),
-                )
-            else:
-                cur.execute(
-                    "SELECT id FROM clients WHERE user_id = %s AND tax_id = %s "
-                    "AND is_active = TRUE LIMIT 1",
-                    (str(user_id), tax_id),
-                )
-            row = cur.fetchone()
-            if row:
-                return int(row["id"])
-    except Exception as e:
-        logger.error(f"find_or_create_client_by_tax_id lookup failed: {e}")
-        return None
-
-    # 没找到 · 建一个 · 复用现有 create_client
     palette = [
         "#3b82f6",
         "#10b981",
@@ -224,16 +237,19 @@ def find_or_create_client_by_tax_id(
         "#a855f7",
     ]
     color = palette[hash(tax_id) % len(palette)]
-    new_id = db.create_client(
-        user_id=str(user_id),
-        tenant_id=str(tenant_id) if tenant_id else None,
-        name=(name or f"客户 {tax_id[-4:]}"),
-        tax_id=tax_id,
-        color=color,
-    )
-    if new_id:
-        logger.info(f"[v118.32.2] auto-created client id={new_id} tax_id={tax_id} name={name}")
-    return new_id
+    try:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
+            return _find_or_create_client_with_cur(
+                cur,
+                user_id=str(user_id),
+                tenant_id=str(tenant_id) if tenant_id else None,
+                tax_id=tax_id,
+                name=(name or f"客户 {tax_id[-4:]}"),
+                color=color,
+            )
+    except Exception as e:
+        logger.error(f"find_or_create_client_by_tax_id lookup failed: {e}")
+        return None
 
 
 from core import db  # noqa: E402 · 循环 import 解法

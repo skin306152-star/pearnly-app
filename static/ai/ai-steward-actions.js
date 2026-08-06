@@ -13,9 +13,9 @@
  *   state()        → S(读写 authzBusy/cancelBusy/actionErr/task/stalled/cdTimer/taskId/poller)
  *   getEl(id)      → element|null(倒计时只改文字不重画)
  *   renderLeft()   重画左窗
- *   loadTask(id)   完整重载(loading 骨架 + 重启轮询)
- *   startPoll(id)  只重启轮询
- *   stopPoll()     停轮询(取消落定后没必要再拉)
+ *   loadTask(id)    完整重载(loading 骨架 + 重启盯梢)
+ *   startWatch(id)  重启盯梢:优先挂 SSE 事件流,连不上/断了自动回落 5s 轮询
+ *   stopPoll()      停轮询(取消落定后没必要再拉)
  *   isTerminal(st) 轮询收口判据
  */
 (function (root) {
@@ -64,7 +64,7 @@
                     S.task = task;
                     hooks.renderLeft();
                     if (!hooks.isTerminal(task && task.status) && !S.poller) {
-                        hooks.startPoll(S.taskId);
+                        hooks.startWatch(S.taskId);
                     }
                 })
                 .catch(function () {

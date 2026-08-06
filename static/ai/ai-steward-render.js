@@ -94,14 +94,6 @@
             .filter(Boolean);
     }
 
-    function stepCounts(steps) {
-        var list = steps || [];
-        var done = list.filter(function (s) {
-            return s && s.state === 'done';
-        }).length;
-        return { done: done, total: list.length };
-    }
-
     // 查询次数:后端没给或给了非正整数就当 1(至少查过一次),不显示 "查询 0 次"。
     function agentCount(task) {
         var n = Math.round(Number(task && task.agent_count));
@@ -173,7 +165,6 @@
         isTerminalStatus: isTerminalStatus,
         safeHref: safeHref,
         safeLinks: safeLinks,
-        stepCounts: stepCounts,
         agentCount: agentCount,
         startedLabel: startedLabel,
         reasonIsEchoed: reasonIsEchoed,

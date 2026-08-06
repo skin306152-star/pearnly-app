@@ -450,3 +450,18 @@ def lookup_vat(raw_tax_id: str, branch: int = 0) -> Dict[str, Any]:
 
     _cache_set(tin, branch, "vat", payload, True)
     return {"ok": True, "data": payload, "cached": False}
+
+
+def normalize_lookup(src: dict) -> dict:
+    """lookup_vat 的 data → 主体登记绿卡要的归一字段(workspace 与 POS 税号带出共用,
+    各抄一份必漂:漏一个字段就是一个端点少带一截)。能在 VAT 服务查到 = 已注册 VAT。"""
+    return {
+        "tax_id": src.get("tax_id"),
+        "name": src.get("name"),
+        "address": src.get("address"),
+        "branch_no": src.get("branch_no"),
+        "branch_label": src.get("branch_label"),
+        "post_code": src.get("post_code"),
+        "province": src.get("province"),
+        "vat_registered": True,
+    }

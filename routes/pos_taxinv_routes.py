@@ -39,21 +39,21 @@ async def api_pos_tax_lookup(
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
         require_workspace_access(cur, request, tid, ws)
-    from services.rd.rd_api import lookup_vat
+    from services.rd.rd_api import lookup_vat, normalize_lookup
 
     result = await asyncio.to_thread(lookup_vat, tax_id, branch or 0)
     if not result.get("ok"):
         return ok({"found": False, "error": result.get("error") or "not_found"})
-    src = result.get("data") or {}
+    norm = normalize_lookup(result.get("data") or {})
     return ok(
         {
             "found": True,
-            "tax_id": src.get("tax_id"),
-            "name": src.get("name"),
-            "address": src.get("address"),
-            "branch_no": src.get("branch_no"),
-            "branch_label": src.get("branch_label"),
-            "vat_registered": True,
+            "tax_id": norm["tax_id"],
+            "name": norm["name"],
+            "address": norm["address"],
+            "branch_no": norm["branch_no"],
+            "branch_label": norm["branch_label"],
+            "vat_registered": norm["vat_registered"],
         }
     )
 

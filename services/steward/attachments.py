@@ -237,13 +237,23 @@ def attach_to_message(cur, *, tenant_id: str, session_id: str, ids: list[str], m
     return cur.rowcount
 
 
-def list_for_message(cur, *, tenant_id: str, session_id: str) -> list[dict]:
-    """会话重建用:已挂到消息上的附件(按消息分组交给上层投影)。"""
+def list_for_message(
+    cur, *, tenant_id: str, session_id: str, message_ids: Optional[list] = None
+) -> list[dict]:
+    """会话重建用:已挂到消息上的附件(按消息分组交给上层投影)。
+
+    message_ids 可选:传了只取这些消息下的附件(消息分页端点用,页外不白查);
+    None = 保持现行为,取整个会话已挂的。"""
+    params: list = [tenant_id, session_id]
+    scope = "AND message_id IS NOT NULL"
+    if message_ids:
+        scope += " AND message_id = ANY(%s)"
+        params.append([str(m) for m in message_ids])
     cur.execute(
         f"SELECT {_COLUMNS} FROM steward_attachments "
-        "WHERE tenant_id = %s AND session_id = %s AND message_id IS NOT NULL "
+        f"WHERE tenant_id = %s AND session_id = %s {scope} "
         "ORDER BY created_at, id",
-        (tenant_id, session_id),
+        params,
     )
     return [dict(r) for r in cur.fetchall()]
 

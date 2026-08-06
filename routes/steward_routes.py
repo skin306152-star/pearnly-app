@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from core import db, feature_flags
 from core.route_helpers import authorize_pearnly_ai, content_disposition
+from routes.steward_common import C_VIEW as _C_VIEW
 from routes.steward_common import NOT_FOUND as _NOT_FOUND
 from routes.steward_common import authorize_steward as _authorize
 from routes.steward_common import session_or_404 as _session_or_404
@@ -55,7 +56,6 @@ from services.workorder import intake_prep
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_C_VIEW = "tax.filing.view"
 _C_APPROVE = "tax.filing.approve"
 _CANCEL_LOCKED = "steward.cancel_locked"
 _EMPTY_TURN = "steward.empty_turn"
@@ -149,7 +149,18 @@ async def get_session(
             cur, tenant_id=tenant_id, session_id=session_id, before_id=before, limit=page
         )
         current = store.latest_task_id(cur, tenant_id=tenant_id, session_id=session_id)
-        files = attachments.list_for_message(cur, tenant_id=tenant_id, session_id=session_id)
+        # 附件随消息分页收窄:只查本页消息的附件;页内无消息直接跳过查询。
+        page_ids = [m["id"] for m in messages]
+        files = (
+            attachments.list_for_message(
+                cur,
+                tenant_id=tenant_id,
+                session_id=session_id,
+                message_ids=page_ids,
+            )
+            if page_ids
+            else []
+        )
     by_message = attachments.group_by_message(files)
     out = {
         "session_id": session_id,

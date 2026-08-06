@@ -61,16 +61,28 @@ PERIOD_INVOICES = "period_invoices"
 ERP_PUSH = "erp_push"
 FILE_CONVERT = "file_convert"
 VAT_REPORT_CHECK = "vat_report_check"
+DOC_READ_QA = "doc_read_qa"
+TABLE_GENERATE = "table_generate"
 
 # 吃这一轮附件的工具(万能口)。哪个文件配哪个工具由代码按 kind 过滤,模型只挑工具不挑文件
 # ——模型选文件会挑错,且挑错无痕。判据单一事实源在这里,orchestrator/planner 一律读本表。
-ATTACHMENT_TOOLS: frozenset = frozenset({FILE_CONVERT, VAT_REPORT_CHECK})
+# doc_read_qa/table_generate 是 S2 工具箱新增的两只:与前两只同一套接地(附件不进 slots,
+# ctx.attachment_ids 由 attach_turn 按确定性判据挑),问题/整理指令不经模型 slot ——
+# 从挂着这份附件的那条用户消息(attachment.message_id)原样取回(tools_doc_qa/tools_table
+# 顶注),不新开一条「附件也是槧」的机制。
+ATTACHMENT_TOOLS: frozenset = frozenset(
+    {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
+)
 
 # 执行时可能自己调模型的工具(≠ planner 那一次调用)。管家其余工具全是只读 DB 查询,worker
-# 跑它们一分钱模型费都不产生;这两只不同:file_convert 对扫描件走 fileconv.ocr_bridge 逐页
-# 栅格化(50 页 = 50 次多模态调用),vat_report_check 在人点过「会过一次模型」后走 Gemini。
-# worker 的单工具路据此决定要不要过 budget 三级封顶 —— 全都过会给只读查询留一串幽灵占坑行。
-MODEL_CALL_TOOLS: frozenset = frozenset({FILE_CONVERT, VAT_REPORT_CHECK})
+# 跑它们一分钱模型费都不产生;这四只不同:file_convert 对扫描件走 fileconv.ocr_bridge 逐页
+# 栅格化(50 页 = 50 次多模态调用),vat_report_check 在人点过「会过一次模型」后走 Gemini,
+# doc_read_qa 问一次「文中写了什么」,table_generate 问一次「整理规格」——后两只都走
+# ai_gateway.transport 直调,不经 OCR 计费路。worker 的单工具路据此决定要不要过 budget
+# 三级封顶 —— 全都过会给只读查询留一串幽灵占坑行。
+MODEL_CALL_TOOLS: frozenset = frozenset(
+    {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
+)
 
 # 识别类工具比只读查询慢一个量级(整份 PDF 解析 + 可能过模型),按 5 分钟的通用任务超时会在
 # 还在正常干活时被砍成 failed。照 ERP_PUSH_TIMEOUT_S 先例单独声明,入队时定格进任务行。
@@ -420,6 +432,31 @@ TOOLS: tuple[StewardTool, ...] = (
         ),
         slots=(),
         handler="vat_report_check",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
+    StewardTool(
+        name=DOC_READ_QA,
+        desc=(
+            "针对这一轮传上来的文件回答一个问题:只在文件写了的原文里找答案,并标出第几页,"
+            "文中没写就直说没找到,绝不算账绝不编数字 · 会计问「这份合同/发票里写了什么」"
+            "「第几条怎么说的」时用 · 这一轮没有附件时绝不选它;要按条件汇总/统计出一张新表"
+            "用 table_generate;只是要把这份表转成规整 Excel(不改数据不汇总)用 file_convert"
+        ),
+        slots=(),
+        handler="doc_read_qa",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
+    StewardTool(
+        name=TABLE_GENERATE,
+        desc=(
+            "按会计说的条件把这一轮传上来的表格重新汇总/筛选/分组,生成一张新表可下载:"
+            "模型只挑列名和算法,数字全部由代码用 Decimal 精确算,模型不碰任何数字 · "
+            "会计说「按 XX 汇总」「只要金额大于 YY 的」「算个平均」时用 · "
+            "这一轮没有附件时绝不选它;只答文件里写了什么、不汇总不筛选用 doc_read_qa;"
+            "只是要把这份表转成规整 Excel(原样不改)用 file_convert"
+        ),
+        slots=(),
+        handler="table_generate",
         timeout_s=FILE_TOOL_TIMEOUT_S,
     ),
 )

@@ -19,6 +19,8 @@
   tools_deliverables 交付物清单 + 每份的真下载链
   tools_period    本期盘点(全所税额表 / 某家某期的票推完了没 · 一律批量读,不逐家回放)
   tools_file      吃这一轮附件的两只(文件转 Excel / 销项报告三查 · 哪个文件由代码定不由模型定)
+  tools_doc_qa    读文问答(S2 · 只答文中写了什么,标页码,文中没有的数不许算不许编)
+  tools_table     表格生成(S2 · 模型只挑列名/算法规格,数字全由代码 Decimal 实算)
   erp_push_tool   唯一的写工具(请求侧接地 + 执行侧经桥投单两段)
   tool_scope      各工具共用的作用域 / 客户名接地 / 票据定位 / 期间缺省 / 金额规范化
 
@@ -44,10 +46,12 @@ from services.steward import (
     tools_calc,
     tools_close,
     tools_deliverables,
+    tools_doc_qa,
     tools_file,
     tools_invoice,
     tools_period,
     tools_signoff,
+    tools_table,
 )
 from services.steward.registry import ToolContext
 from services.steward.tool_scope import (  # 入口仍在 tools:调用方按 tools.ERR_* 认错误码
@@ -317,6 +321,8 @@ _HANDLERS = {
     registry.ERP_PUSH: erp_push_tool.erp_push,
     registry.FILE_CONVERT: tools_file.file_convert,
     registry.VAT_REPORT_CHECK: tools_file.vat_report_check,
+    registry.DOC_READ_QA: tools_doc_qa.doc_read_qa,
+    registry.TABLE_GENERATE: tools_table.table_generate,
 }
 
 # 铸卡前的接地器(只写工具有):把用户嘴里的目标落成执行级参数 + 卡面事实。见 prepare()。

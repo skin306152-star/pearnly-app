@@ -10,7 +10,16 @@ copy.artifacts / copy.artifact_links,不直接 import 本模块。
 
 from __future__ import annotations
 
-from services.steward import copy_brief, copy_calc, copy_close, copy_file, copy_period, registry
+from services.steward import (
+    copy_brief,
+    copy_calc,
+    copy_close,
+    copy_doc,
+    copy_file,
+    copy_period,
+    copy_table,
+    registry,
+)
 from services.steward.copy_lang import t as _t
 
 _ARTIFACT_LABEL = {
@@ -168,6 +177,13 @@ def build(tool: str, data: dict, lang: str) -> list[dict]:
         return _client_link(data, lang) + ([_table("checks", rows, cols, lang)] if rows else [])
     if tool == registry.DELIVERABLES_LIST:
         return _deliverables(data, lang)
+    # 两只 S2 工具各有自己的产物形状(引用表 / 预览表+下载链),必须在下面这条通用
+    # ATTACHMENT_TOOLS 兜底之前拦下来——否则会被 copy_file.artifacts 接管,而那边只认
+    # file_convert/vat_report_check 两个名字,对其余名字一律返回空产物(静默丢产物)。
+    if tool == registry.DOC_READ_QA:
+        return copy_doc.artifacts(data, lang)
+    if tool == registry.TABLE_GENERATE:
+        return copy_table.artifacts(data, lang)
     if tool in registry.ATTACHMENT_TOOLS:
         return copy_file.artifacts(tool, data, lang)
     return []

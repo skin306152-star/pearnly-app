@@ -153,6 +153,21 @@ def list_messages(cur, *, tenant_id: str, session_id: str, limit: int = 200) -> 
     return [dict(r) for r in cur.fetchall()]
 
 
+def message_text(cur, *, tenant_id: str, session_id: str, message_id) -> str:
+    """给定消息 id 取正文。查无/message_id 为空一律返回空串,不当异常——附件工具(见
+    tools_doc_qa/tools_table)靠它找「跟文件一起说的那句话」:那两只工具的参数是文件,
+    不经模型/slots 接地(registry_slots 顶注),问题/整理指令因此拿不到槧值,改从挂着这份
+    附件的那条用户消息(attachment.message_id)原样取回,不新开一条「附件也是槧」的机制。"""
+    if not message_id:
+        return ""
+    cur.execute(
+        "SELECT text FROM steward_messages WHERE tenant_id = %s AND session_id = %s AND id = %s",
+        (tenant_id, session_id, message_id),
+    )
+    row = cur.fetchone()
+    return str((row or {}).get("text") or "")
+
+
 # ── 任务 ────────────────────────────────────────────────────
 
 

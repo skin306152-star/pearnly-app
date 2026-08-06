@@ -12,7 +12,7 @@ import pathlib
 import re
 import unittest
 
-from services.steward import attach_kinds as ak, attach_turn, copy_file, registry
+from services.steward import attach_kinds as ak, attach_turn, copy, copy_file, registry
 from services.steward.attachments import SOURCE_RULE, SOURCE_UNKNOWN
 
 _ROUTER_JS = pathlib.Path(__file__).resolve().parents[2] / "static" / "ai" / "ai-router.js"
@@ -190,9 +190,12 @@ class CopyTests(unittest.TestCase):
         self.assertTrue(set(ak._UNKNOWN_ACTIONS).issubset(registry.ATTACHMENT_TOOLS))
 
     def test_every_attachment_tool_has_a_title_in_both_languages(self):
+        """按钮标签走 copy.tool_title(全局委派表,不是每个附件工具都在 copy_file.TITLES
+        里——doc_read_qa/table_generate 各有自己的文案模块,同一份闭集只认一个真源。"""
         for tool in registry.ATTACHMENT_TOOLS:
             for lang in ("zh", "th"):
-                self.assertTrue(copy_file.TITLES[tool][lang])
+                self.assertTrue(copy.tool_title(tool, lang))
+                self.assertNotEqual(copy.tool_title(tool, lang), tool)
 
 
 if __name__ == "__main__":

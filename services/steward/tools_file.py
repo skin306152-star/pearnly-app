@@ -32,7 +32,10 @@ ERR_REPORT_UNPARSED = "steward.report_unparsed"
 ERR_REPORT_NEEDS_MODEL = "steward.report_needs_model"
 
 _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
-_EXCEL_EXTS = (".xlsx", ".xlsm", ".xls", ".csv")
+# excel_in.convert_excel 的 _ALL_EXTS 早已收 tsv/txt(表格族的三种分隔文本变体);这里漏抄
+# 过一次 —— 漏掉的两个后果不是「拒收」而是悄悄落进下面的 else 分支当 PDF 解,一份 .tsv 的
+# 字节喂给 convert_pdf 必然读不出页,白跑一趟且报错文案会说「转不出来」而不是格式不支持。
+_EXCEL_EXTS = (".xlsx", ".xlsm", ".xls", ".csv", ".tsv", ".txt")
 _ISSUES_PREVIEW = 20
 _ROWS_PREVIEW = 20
 

@@ -24,9 +24,11 @@ from services.steward import (
     copy_brief,
     copy_calc,
     copy_close,
+    copy_doc,
     copy_erp_push,
     copy_file,
     copy_period,
+    copy_table,
     registry,
     store,
 )
@@ -56,6 +58,8 @@ _TOOL_TITLE = {
     **copy_brief.TITLES,
     **copy_period.TITLES,
     **copy_file.TITLES,
+    **copy_doc.TITLES,
+    **copy_table.TITLES,
 }
 
 # 工具名 → 答复渲染器(分居模块各自登记,copy.reply 按本表委派)。
@@ -65,6 +69,8 @@ _REPLIES = {
     **copy_brief.REPLIES,
     **copy_period.REPLIES,
     **copy_file.REPLIES,
+    **copy_doc.REPLIES,
+    **copy_table.REPLIES,
 }
 
 # 步骤标签写这一步做了什么,不写管家「听懂了没有」——拟人化的自述不是状态,中泰两语也
@@ -333,6 +339,10 @@ def error(code: str, data: Optional[dict], lang: str) -> str:
         return copy_calc.error(code, data, lang)
     if code in copy_file.ERRORS:
         return copy_file.error(code, data, lang)
+    if code in copy_doc.ERRORS:
+        return copy_doc.error(code, data, lang)
+    if code in copy_table.ERRORS:
+        return copy_table.error(code, data, lang)
     table = _ERROR.get(code)
     if not table:
         return _t(_ERROR_FALLBACK, lang).format(code=code)

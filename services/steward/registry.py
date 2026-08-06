@@ -66,20 +66,16 @@ TABLE_GENERATE = "table_generate"
 
 # 吃这一轮附件的工具(万能口)。哪个文件配哪个工具由代码按 kind 过滤,模型只挑工具不挑文件
 # ——模型选文件会挑错,且挑错无痕。判据单一事实源在这里,orchestrator/planner 一律读本表。
-# doc_read_qa/table_generate 是 S2 工具箱新增的两只:与前两只同一套接地(附件不进 slots,
-# ctx.attachment_ids 由 attach_turn 按确定性判据挑),问题/整理指令不经模型 slot ——
-# 从挂着这份附件的那条用户消息(attachment.message_id)原样取回(tools_doc_qa/tools_table
-# 顶注),不新开一条「附件也是槧」的机制。
+# doc_read_qa/table_generate(S2)同一套接地:附件不进 slots,问题/整理指令从挂着这份附件
+# 的用户消息(attachment.message_id)原样取回(tools_doc_qa/tools_table 顶注),不新开机制。
 ATTACHMENT_TOOLS: frozenset = frozenset(
     {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
 )
 
 # 执行时可能自己调模型的工具(≠ planner 那一次调用)。管家其余工具全是只读 DB 查询,worker
-# 跑它们一分钱模型费都不产生;这四只不同:file_convert 对扫描件走 fileconv.ocr_bridge 逐页
-# 栅格化(50 页 = 50 次多模态调用),vat_report_check 在人点过「会过一次模型」后走 Gemini,
-# doc_read_qa 问一次「文中写了什么」,table_generate 问一次「整理规格」——后两只都走
-# ai_gateway.transport 直调,不经 OCR 计费路。worker 的单工具路据此决定要不要过 budget
-# 三级封顶 —— 全都过会给只读查询留一串幽灵占坑行。
+# 跑它们一分钱模型费都不产生;file_convert/vat_report_check 走 fileconv.ocr_bridge/Gemini,
+# doc_read_qa/table_generate 走 ai_gateway.transport 直调。worker 的单工具路据此决定要不要
+# 过 budget 三级封顶 —— 全都过会给只读查询留一串幽灵占坑行。
 MODEL_CALL_TOOLS: frozenset = frozenset(
     {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
 )

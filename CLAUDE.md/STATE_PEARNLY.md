@@ -1,6 +1,33 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-06 晚 · ★Big C 同税号多分店错配彻底修全链上线 · 双仓 CI/发版全绿)
+## 当前状态卡(2026-08-07 凌晨 · ★夜航自主闭环:四班推送全上线 —— G3 销项汇总包 + S2 管家工具箱 + 画像卡 + 收口三小批)
+
+- **四班推送**(本地全量闸真绿×4 · 生产 ssh+?v 逐班核验):
+  ①`7b11c1c5`:simplify 收口批 + 税务画像卡(field_meta 提案/确认/推断诚实边界)+ 机械七件包
+  (报表 sections 轻参数/heat_range 回显/bump_v.py/smoke 服务器抽取/heif 收敛/连号年桶曼谷日切/
+  分片器抗负载自愈)+ Big C 批合并;
+  ②`50075af2`:#24 VAT 登记态读写代理(单一事实源=workspace_clients)+ #23 流式帧泵收口
+  (routes/stream_common.py + ai-stream-pump.js)+ **G3 销项月度汇总包**;
+  ③`c546b0e9`:**S2 管家工具箱第一波**(doc_read_qa 读文问答 + table_generate 表格生成);
+  ④`5f5a3670`:整夜 simplify 四路裁决 9 项落修(xlsx 样式并轨 xlsx_style/steward 共用件收口
+  tool_scope/settings 复用 seller_profile)+ gbk 解码序修正。
+- **G3 命门口径**:金额只读 pos_sales 一张表(升级票金额留原行,计一次即正确);sales_documents
+  只出全式票附录且按原单 sold_at 曼谷月归属——结构性防双计。入口=POS 报表页月模式「销项汇总包」
+  xlsx 四表(日汇总/支付方式/全式税票/ABB 区间+口径)。
+- **S2 命门**:doc_qa 引用必须逐字命中原文否则丢弃、提示词禁算数禁编数;table_generate 模型只出
+  规格 JSON(闭集校验,未知列/op 拒整份),数字全 Decimal 代码算。已知毛边:扫描件先弹 OCR 计费
+  卡再拒,多一次点击。
+- **真红两笔(闸的胜利)**:496c4438 曾漏 pos.html ?v 与双 SW 三处同步(worker 揪出已修);G3 新
+  路由漏合同测试登记(已补)。
+- **⚠️CI 挂账**:GitHub Actions 全平台积压(run 不建/排队数小时/0-job cancelled 连累 conclusion),
+  四班 CI 判决未落;本地全量闸×4 + 生产核验×4 已兜底,监视器挂着,绿了此行销账。
+- **simplify 跳过账**:ai-purge onEvent 包装并入下次 ai.js 改动(免 ?v 白刷);vat_summary 多句 SQL
+  与 doc_qa 双 cursor 判不值得动;复用角「并轨 ingest 解码序」判错已撤销(那份序刻意无 gbk)。
+- **下一步**:CI 落地销账;SM 批次 G1-G4 全收官;Stock Card 等老丈人口径回执再开工。
+
+---
+
+## 上一窗状态卡(2026-08-06 晚 · ★Big C 同税号多分店错配彻底修全链上线 · 双仓 CI/发版全绿)
 
 - **战役**:老丈人(Korn)真账实锤——连锁客户全分店共用税号,小助手按税号取第一条把分店
   票静默记总店。当天彻底修:**companion v1.1.61**(级联匹配:税号唯一→ORGNUM 分店号→

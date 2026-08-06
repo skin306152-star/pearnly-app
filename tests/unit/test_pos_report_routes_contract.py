@@ -12,6 +12,7 @@ from routes.pos_report_routes import router
 
 EXPECTED = {
     ("GET", "/api/pos/admin/report"),
+    ("GET", "/api/pos/admin/vat-summary"),
     ("GET", "/api/pos/admin/audit/summary"),
     ("GET", "/api/pos/admin/audit/events"),
     ("GET", "/api/pos/admin/shifts"),

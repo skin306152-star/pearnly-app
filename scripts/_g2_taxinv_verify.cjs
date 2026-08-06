@@ -88,7 +88,7 @@ async function posSide(ctx) {
             );
         if (m === 'POST' && url.includes('/sales/s1/full-tax-invoice')) {
             s1Issued = true;
-            return route.fulfill(ok({ document: { ...FULL_INV_S1, doc_type: 'tax_invoice' }, buyer_client_id: 12 }));
+            return route.fulfill(ok({ document: { ...FULL_INV_S1, doc_type: 'tax_invoice' } }));
         }
         if (url.includes('full-invoice-pdf'))
             return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 stub' });
@@ -262,7 +262,7 @@ async function mainSide(ctx) {
             );
             await page.route('**/api/pos/sales/s1/full-tax-invoice', (route) => {
                 issued = true;
-                return route.fulfill(ok({ document: { id: 'd1', doc_number: 'TIV-2026-00099', doc_type: 'tax_invoice' }, buyer_client_id: 12 }));
+                return route.fulfill(ok({ document: { id: 'd1', doc_number: 'TIV-2026-00099', doc_type: 'tax_invoice' } }));
             });
             await page.route('**/full-invoice-pdf**', (route) =>
                 route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 stub' })

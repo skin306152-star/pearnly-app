@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
 from services.authz.deps import check_workspace_scope, get_authz
-from services.workorder import matrix, obligation_engine, wht_signals
+from services.workorder import matrix, obligation_engine, profile_inference, wht_signals
 from services.workorder.obligation_engine import PERIOD_RE, iso_or_none as _iso
 from services.workspace import client_alias_store, tax_profile_store
 from services.workspace.client_alias_store import AliasError
@@ -75,6 +75,14 @@ class AliasCreate(BaseModel):
     match_mode: str = Field("exact", max_length=20)
 
 
+class TaxProfileConfirm(BaseModel):
+    """画像卡「确认」动作(画像卡智能判断批次):把 GET 响应里带出的推断候选转正。"""
+
+    fields: list[str] = Field(
+        ..., min_length=1, max_length=len(tax_profile_store.TRACKED_FIELD_KEYS)
+    )
+
+
 def _authorize(request: Request) -> tuple[dict, str]:
     """登录 + M1 闸(关→404 fail-closed)+ 动作权限。返回 (user, tenant_id)。"""
     return authorize_pearnly_ai(request, _PERM, not_found="workspace.not_found")
@@ -83,6 +91,47 @@ def _authorize(request: Request) -> tuple[dict, str]:
 def _assert_owns_workspace(cur, request: Request, user: dict, tenant_id: str, ws_id: int) -> None:
     """越权/不存在一律 404(不泄漏存在性),照 workorder_routes 同名 helper。"""
     assert_owns_workspace(cur, request, user, tenant_id, ws_id, not_found="workspace.not_found")
+
+
+def _obligation_codes(cur, tenant_id: str, workspace_client_id: int, period: str) -> set:
+    """当期已物化的义务码集合(画像变动前后各查一次,差集就是「新增义务」)。"""
+    cur.execute(
+        "SELECT obligation_code FROM client_period_obligations "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND period = %s",
+        (tenant_id, workspace_client_id, period),
+    )
+    return {r["obligation_code"] for r in cur.fetchall()}
+
+
+def _rematerialize_and_diff(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    period: str,
+    profile: dict,
+    prev_codes: set,
+    data_signals: Optional[dict] = None,
+) -> list:
+    """画像一变(手填/确认)就重算当期义务,返回新增的义务码(供前端 toast)。
+
+    data_signals 与开单接线同源(wht_signals),两入口一致——独立只读连接扫描,绝不用
+    本次写事务的游标(防交接债 #2 静默丢画像 upsert)。调用方(confirm 端点)若这次请求
+    已经扫过一遍当期信号,原样传进来复用,不用为重算再扫一遍——GET/PUT 没有现成信号,
+    留空走默认扫描。"""
+    if data_signals is None:
+        data_signals = wht_signals.scan_period_wht_signals_isolated(
+            tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
+        )
+    obligation_engine.rematerialize_for_profile(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        period=period,
+        profile=profile,
+        data_signals=data_signals,
+    )
+    return sorted(_obligation_codes(cur, tenant_id, workspace_client_id, period) - prev_codes)
 
 
 def _serialize_profile(profile: dict) -> dict:
@@ -113,20 +162,42 @@ async def get_tax_profile(workspace_client_id: int, request: Request):
     if profile is None:
         raise HTTPException(404, detail="workspace.not_found")
     check_workspace_scope(request, user, workspace_client_id)
-    # completeness 给档案页 0% CTA(前端消费此值,不再手抄字段表)。
+
+    # 诚实推断(画像卡智能判断批次):每次 GET 现算,不落库、不加定时任务——只有
+    # pays_individuals/pays_juristic 两项有数据源(services.workorder.wht_signals),
+    # 现算的候选合并进 field_meta[field].proposal 这一次响应,用户点确认才真正落库。
+    period = obligation_engine.current_be_period()
+    data_signals = wht_signals.scan_period_wht_signals_isolated(
+        tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
+    )
+    proposals = profile_inference.compute_proposals(
+        profile=profile,
+        field_meta=profile.get("field_meta") or {},
+        data_signals=data_signals,
+        period=period,
+    )
+    serialized = _serialize_profile(profile)
+    serialized["field_meta"] = profile_inference.merge_proposals_into_field_meta(
+        serialized.get("field_meta") or {}, proposals
+    )
+    # completeness 给档案页完整度条 + 客户目录 0% CTA(前端消费此值,不再手抄字段表)。
     return {
-        "profile": _serialize_profile(profile),
+        "profile": serialized,
         "completeness": matrix.profile_completeness(profile),
     }
 
 
 @router.put("/api/workspace/clients/{workspace_client_id}/tax-profile")
 async def put_tax_profile(workspace_client_id: int, req: TaxProfileUpdate, request: Request):
-    """upsert(部分字段);保存后对当期(今日所在佛历月)重物化义务清单。"""
+    """upsert(部分字段,手填即确认);保存后对当期重物化义务清单,返回新增义务码
+    (画像卡确认后 toast「当期义务已重算:+新增项」消费此值)。"""
     user, tenant_id = _authorize(request)
     payload = req.model_dump(exclude_none=True)
+    added: list = []
     with db.get_cursor(commit=True) as cur:
         _assert_owns_workspace(cur, request, user, tenant_id, workspace_client_id)
+        period = obligation_engine.current_be_period()
+        prev_codes = _obligation_codes(cur, tenant_id, workspace_client_id, period)
         try:
             tax_profile_store.upsert_profile(
                 cur,
@@ -141,23 +212,77 @@ async def put_tax_profile(workspace_client_id: int, req: TaxProfileUpdate, reque
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
         )
         if profile is not None:
-            period = obligation_engine.current_be_period()
-            # 画像一变即重算当期义务;WHT 信号与开单接线同源(wht_signals),两入口一致。
-            # 独立只读连接扫描——绝不用本 PUT 的写游标(防交接债 #2 静默丢画像 upsert)。
-            data_signals = wht_signals.scan_period_wht_signals_isolated(
-                tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
-            )
-            obligation_engine.rematerialize_for_profile(
+            added = _rematerialize_and_diff(
                 cur,
                 tenant_id=tenant_id,
                 workspace_client_id=workspace_client_id,
                 period=period,
                 profile=profile,
-                data_signals=data_signals,
+                prev_codes=prev_codes,
             )
     if profile is None:
         raise HTTPException(404, detail="workspace.not_found")
-    return {"profile": _serialize_profile(profile)}
+    return {"profile": _serialize_profile(profile), "added_obligations": added}
+
+
+@router.post("/api/workspace/clients/{workspace_client_id}/tax-profile/confirm")
+async def confirm_tax_profile_fields(
+    workspace_client_id: int, req: TaxProfileConfirm, request: Request
+):
+    """把 GET 响应里带出的推断候选(field_meta[field].proposal)转正。
+
+    每个字段用「这一刻重新现算」的候选核对(不信任前端回传的旧候选)——两次请求之间
+    数据可能已经变了(同事又过账了一张票),候选跟不上就诚实报 409,不假装还是原来
+    那份候选;成功转正的字段与 PUT 同款返回新增义务码,前端同一套 toast 逻辑复用。
+    """
+    user, tenant_id = _authorize(request)
+    added: list = []
+    with db.get_cursor(commit=True) as cur:
+        _assert_owns_workspace(cur, request, user, tenant_id, workspace_client_id)
+        profile = tax_profile_store.get_profile(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+        )
+        if profile is None:
+            raise HTTPException(404, detail="workspace.not_found")
+        period = obligation_engine.current_be_period()
+        data_signals = wht_signals.scan_period_wht_signals_isolated(
+            tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
+        )
+        live_proposals = profile_inference.compute_proposals(
+            profile=profile,
+            field_meta=profile.get("field_meta") or {},
+            data_signals=data_signals,
+            period=period,
+        )
+        to_confirm = {}
+        for field in req.fields:
+            if field not in live_proposals:
+                raise HTTPException(409, detail="tax_profile.proposal_stale")
+            to_confirm[field] = live_proposals[field]
+        prev_codes = _obligation_codes(cur, tenant_id, workspace_client_id, period)
+        tax_profile_store.confirm_field_proposals(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            updated_by=f"user:{user['id']}",
+            proposals=to_confirm,
+        )
+        profile = tax_profile_store.get_profile(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+        )
+        if profile is not None:
+            added = _rematerialize_and_diff(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                period=period,
+                profile=profile,
+                prev_codes=prev_codes,
+                data_signals=data_signals,  # 这次请求已经扫过一遍,不重复扫描
+            )
+    if profile is None:
+        raise HTTPException(404, detail="workspace.not_found")
+    return {"profile": _serialize_profile(profile), "added_obligations": added}
 
 
 @router.get("/api/workspace/clients/{workspace_client_id}/aliases")

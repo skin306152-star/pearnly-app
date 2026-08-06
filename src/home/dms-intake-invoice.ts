@@ -110,10 +110,13 @@ export function resetInvoice() {
 export function rerenderInvoice() {
     if (IV.view === 'review') renderReview();
     else if (IV.view === 'submit') renderSubmit();
-    else {
-        renderInvoiceUpload();
-        showStepInv(1, 'dx-s-upload');
-    }
+    else backToUploadStep();
+}
+// 回到步骤①(上传):四处入口(切任务重渲/复核页返回/推送前预览未声明过账去向的
+// 回退按钮/完成后开新一批)共用同一对渲染+步进调用,不重复四份。
+function backToUploadStep() {
+    renderInvoiceUpload();
+    showStepInv(1, 'dx-s-upload');
 }
 export function ext(name: string) {
     const m = /\.([a-z0-9]+)$/i.exec(name);
@@ -341,8 +344,8 @@ async function startRecognize() {
     }
     if (!IV.results.length) {
         showToast(t('dxi-rev-empty'), 'error');
-        renderInvoiceUpload();
-        return showStepInv(1, 'dx-s-upload');
+        backToUploadStep();
+        return;
     }
     if (failN)
         showToast(
@@ -421,11 +424,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     }
     // 复核区就地展开/查看器/确认 → 交给 review 模块(返回 true 即已处理)
     if (IV.view === 'review' && onReviewClick(tg)) return true;
-    if (hit('dx-inv-rev-back')) {
-        renderInvoiceUpload();
-        showStepInv(1, 'dx-s-upload');
-        return true;
-    }
+    if (hit('dx-inv-rev-back')) return (backToUploadStep(), true);
     if (hit('dx-inv-rev-next')) return (void enterSubmit(), true);
     const out = tg.closest('[data-iv-out]') as HTMLElement | null;
     if (out) {
@@ -443,6 +442,9 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     }
     if (hit('dx-inv-go-int')) return (focusDxErpCards(), true);
     if (hit('dx-inv-sub-back')) return (renderReview(), true);
+    // 步④「未声明过账去向」诚实提示态的回退按钮(dms-intake-posting-preview.ts 渲染,
+    // 那份模块不直接依赖本文件的 showStepInv/renderInvoiceUpload,防循环依赖)。
+    if (tg.closest('[data-iv-pp-back-step1]')) return (backToUploadStep(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
     if (hit('dx-inv-view-rec')) return (go('history'), true);
     // 推送日志早已从集成页拆成独立页(nav「Pearnly Cowork → 推送日志」),这里一直还在
@@ -450,8 +452,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     if (hit('dx-inv-view-push')) return (go('push-logs'), true);
     if (hit('dx-inv-new')) {
         resetInvoice();
-        renderInvoiceUpload();
-        showStepInv(1, 'dx-s-upload');
+        backToUploadStep();
         return true;
     }
     return false;

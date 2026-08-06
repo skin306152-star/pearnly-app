@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.workorder import engine, obligation_engine
+from services.workspace.tax_profile_store import _ROW_DEFAULTS as _PROFILE_FIELD_DEFAULTS
 
 # 矩阵格子徽章(C4 · UI-Canon-v4 §1 四色族:good=顺畅/完结,warn=缺料/催,
 # crit=等人判/卡点,sage=AI 在做)。由工单态推出的四个徽章名与 engine.STATUS_GROUPS 的
@@ -28,31 +29,61 @@ BADGE_PENDING_REVIEW = engine.group_of(engine.STATUS_REVIEW)
 BADGE_FROZEN = engine.group_of(engine.STATUS_ARCHIVE)
 BADGE_NOT_EVALUATED = "not_evaluated"
 
-# 客户目录(EN-clients · 2026-07-13)「画像完整度」= 这 6 个默认落 unknown 的画像字段
-# 里已被人工确认几个,0..1。挂在矩阵响应(同一 LEFT JOIN,零额外往返,列带 p_ 前缀)
-# 与 GET tax-profile 出参(档案页 0% CTA 消费,前端不再手抄一份字段表),不是画像表单
-# FIELD_DEFS 全集——sbt_status/filing_disposition 默认值本身就是"已答"(none/active),
-# 计入分母只会让每个新客户显得比实际更"完整",故只数真正默认 unknown 的字段。
-_COMPLETENESS_FIELDS = (
+# 客户目录(EN-clients · 2026-07-13)「画像完整度」= static/ai/ai-profile-render.js
+# FIELD_META 的全 14 个可确认字段里已答几个,0..1(画像卡智能判断批次改口径:原先只数
+# 6 个"字面默认就是 unknown"的字段,拍板改成全 14 字段——分母从画像表单可见字段的全集
+# 走,不再手挑子集)。挂在矩阵响应(同一 LEFT JOIN,零额外往返,列带 p_ 前缀)与
+# GET tax-profile 出参(档案页完整度条消费),两处共用本模块。
+#
+# 三类"已答"判据(纯函数 profile_completeness):
+#   ① 枚举字段(_ENUM_FIELDS,8 个):字面值 != 'unknown' 才算答了——sbt_status/
+#      filing_disposition 的 DDL 默认恰好不是 'unknown'(是 'none'/'active'),结构性
+#      天然算已答,与另 6 个"真会卡在 unknown"的字段判据一致,不特例处理。
+#   ② 恒答字段(_ALWAYS_ANSWERED_FIELDS,3 个):bool/money 类型没有"未响应"哨兵值
+#      (False/0.00 本身就是合法答案),无法区分"从未碰过"与"确认过就是这个值"。
+#   ③ 条件字段(_CONDITIONAL_FIELDS,3 个):父开关关闭时该字段在卡片上隐藏,视为
+#      已答;打开时按是否偏离结构默认值判定。
+# 已确认的推断候选(proposal)不落库进本值列,故任何在这里被判定"已答"的字段值,
+# 按 field_meta 的存储契约必然是人确认过/手填过的——proposal 未确认不计入已答这条
+# 天然满足,不用额外读 field_meta。
+_ENUM_FIELDS = (
+    "sbt_status",
     "has_employees",
     "pays_individuals",
     "pays_juristic",
     "pays_foreign",
     "pays_interest_dividend",
+    "filing_disposition",
     "efiling_enrolled",
 )
+_ALWAYS_ANSWERED_FIELDS = ("has_multi_branch", "tax_agent_authorized", "vat_credit_carry")
+# 条件字段:名字 -> (父开关字段, 父值判"已展开"的函数, 展开时的结构默认值)
+_CONDITIONAL_FIELDS = {
+    "sbt_business_type": ("sbt_status", lambda v: v != "none", ""),
+    "branch_count": ("has_multi_branch", bool, 1),
+    "tax_agent_ref": ("tax_agent_authorized", bool, ""),
+}
+_COMPLETENESS_FIELDS = _ENUM_FIELDS + _ALWAYS_ANSWERED_FIELDS + tuple(_CONDITIONAL_FIELDS)
 
 _ROWS_SQL = """
     SELECT wc.id AS client_id, wc.name AS client_name, wc.tax_id AS client_tax_id,
            o.obligation_code, o.status AS obligation_status,
            o.due_paper, o.due_efiling, o.work_order_id,
            wo.status AS order_status, d.display_names,
+           COALESCE(p.sbt_status, 'none') AS p_sbt_status,
+           COALESCE(p.sbt_business_type, '') AS p_sbt_business_type,
            COALESCE(p.has_employees, 'unknown') AS p_has_employees,
            COALESCE(p.pays_individuals, 'unknown') AS p_pays_individuals,
            COALESCE(p.pays_juristic, 'unknown') AS p_pays_juristic,
            COALESCE(p.pays_foreign, 'unknown') AS p_pays_foreign,
            COALESCE(p.pays_interest_dividend, 'unknown') AS p_pays_interest_dividend,
-           COALESCE(p.efiling_enrolled, 'unknown') AS p_efiling_enrolled
+           COALESCE(p.has_multi_branch, false) AS p_has_multi_branch,
+           COALESCE(p.branch_count, 1) AS p_branch_count,
+           COALESCE(p.filing_disposition, 'active') AS p_filing_disposition,
+           COALESCE(p.efiling_enrolled, 'unknown') AS p_efiling_enrolled,
+           COALESCE(p.tax_agent_authorized, false) AS p_tax_agent_authorized,
+           COALESCE(p.tax_agent_ref, '') AS p_tax_agent_ref,
+           COALESCE(p.vat_credit_carry, 0) AS p_vat_credit_carry
     FROM workspace_clients wc
     LEFT JOIN client_period_obligations o
         ON o.tenant_id = wc.tenant_id
@@ -69,9 +100,19 @@ _ROWS_SQL = """
 
 def profile_completeness(row: dict, prefix: str = "") -> float:
     """0..1,round 到 2 位。prefix 供矩阵行(画像列 SQL 别名带 p_)复用同一份字段表;
-    行里没有画像列(旧调用点/测试 fixture 没带)一律按全 unknown 算,不假装完整——
-    client_tax_profiles 缺档时 COALESCE 已在 SQL 层退到 'unknown'。"""
-    answered = sum(1 for f in _COMPLETENESS_FIELDS if row.get(prefix + f, "unknown") != "unknown")
+    行里缺某个画像列(旧调用点/测试 fixture 没带全 14 个)一律按该字段的表 DEFAULT
+    补齐再判——不能笼统按 'unknown' 兜底,bool/int 字段的字面默认从来不是这个词。"""
+
+    def g(field: str):
+        return row.get(prefix + field, _PROFILE_FIELD_DEFAULTS[field])
+
+    answered = sum(1 for f in _ENUM_FIELDS if g(f) != "unknown")
+    answered += len(_ALWAYS_ANSWERED_FIELDS)
+    for field, (parent, expanded, default) in _CONDITIONAL_FIELDS.items():
+        if not expanded(g(parent)):
+            answered += 1  # 父开关未打开 → 该字段在卡片上隐藏,视为已答
+        elif g(field) != default:
+            answered += 1
     return round(answered / len(_COMPLETENESS_FIELDS), 2)
 
 

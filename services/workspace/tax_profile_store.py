@@ -2,18 +2,28 @@
 """客户税务画像 DAL(B2-b · client_tax_profiles · 每客户一行 · 套账隔离)。
 
 方案:税务画像-方案-B1.md §2(字段表)/§5(schema)。表结构见
-services/workspace/tax_profile_schema.py(与 alembic 0064 逐字对齐)。
+services/workspace/tax_profile_schema.py(与 alembic 0064/0096 逐字对齐)。
 
 隔离=每句 WHERE tenant_id;PK (tenant_id, workspace_client_id) 天然幂等 upsert。
 vat_status/branch 派生自 workspace_clients(vat_registered/branch),画像表不重复存,
 读时 JOIN——单一事实源(方案 §2.2 注)。金额字段(vat_credit_carry)全程 Decimal,
 不经 float。枚举字段非法值一律拒绝(不吞不猜),抛 TaxProfileError。
+
+field_meta(画像卡智能判断批次 · alembic 0096)是「每个字段的出处账本」:字段本值列
+(下面 14 个 TRACKED_FIELD_KEYS)只存人确认过/手填的值,field_meta[field] 额外记
+{source, confidence, evidence, confirmed_at, confirmed_by}——手填走 upsert_profile
+即时盖 source='manual' 戳(手填本身就是确认,不需要再点一次"确认");推断候选走
+confirm_field_proposals,盖 source='inferred' 戳,值同一时刻写进本值列。两条路径都
+只在这里合并(SQL 层 JSONB `||` 只替换被改的字段名,没被这次改动碰到的字段原样留着)。
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
+
+from psycopg2.extras import Json
 
 
 class TaxProfileError(ValueError):
@@ -71,6 +81,42 @@ _ROW_DEFAULTS: dict = {
 
 _MUTABLE_FIELDS = tuple(_ROW_DEFAULTS)  # 顺序固定,upsert/select 复用
 
+# 画像卡(static/ai/ai-profile-render.js FIELD_META)展示/可确认的 14 个字段键——
+# field_meta 只记这些字段的出处,source/confidence/profile_version 等是画像整体的
+# 账本属性,不是某个具体字段的出处,不进 field_meta。
+TRACKED_FIELD_KEYS = (
+    "sbt_status",
+    "sbt_business_type",
+    "has_employees",
+    "pays_individuals",
+    "pays_juristic",
+    "pays_foreign",
+    "pays_interest_dividend",
+    "has_multi_branch",
+    "branch_count",
+    "filing_disposition",
+    "efiling_enrolled",
+    "tax_agent_authorized",
+    "tax_agent_ref",
+    "vat_credit_carry",
+)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _manual_stamp(updated_by: str) -> dict:
+    """手填字段的出处戳——手填本身就是确认,confirmed_at 立刻盖,不留待确认态。"""
+    return {
+        "source": "manual",
+        "confidence": None,
+        "evidence": None,
+        "proposal": None,
+        "confirmed_at": _now_iso(),
+        "confirmed_by": updated_by,
+    }
+
 
 def _to_decimal(value: Any, *, field: str) -> Decimal:
     if isinstance(value, Decimal):
@@ -113,6 +159,7 @@ def get_profile(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[di
     cur.execute(
         f"""
         SELECT wc.vat_registered AS vat_registered, wc.branch AS ws_branch,
+               p.field_meta AS field_meta,
                {_SELECT_COLUMNS}
         FROM workspace_clients wc
         LEFT JOIN client_tax_profiles p
@@ -131,6 +178,7 @@ def get_profile(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[di
         "workspace_client_id": workspace_client_id,
         "vat_status": "registered" if row.get("vat_registered") else "unregistered",
         "branch": row.get("ws_branch") or "สำนักงานใหญ่",
+        "field_meta": row.get("field_meta") or {},
     }
     for field, default in _ROW_DEFAULTS.items():
         value = row.get(field)
@@ -202,10 +250,77 @@ def upsert_profile(
         if value is not None
     }
 
+    # 手填出处戳(画像卡智能判断批次):这次实际改动的 14 个展示字段各盖一笔
+    # source='manual'/confirmed_at=now() 的 field_meta 记录——手填即确认,不留待确认态,
+    # 也顺手清掉该字段身上任何残留的 proposal(用户已经手动决定了,旧推断候选不再算数)。
+    field_meta_delta = {
+        field: _manual_stamp(updated_by) for field in provided if field in TRACKED_FIELD_KEYS
+    }
+
     columns = ["tenant_id", "workspace_client_id", "updated_by"] + list(provided)
     values = [tenant_id, workspace_client_id, updated_by] + list(provided.values())
-    placeholders = ", ".join(["%s"] * len(columns))
     update_sets = ["updated_by = EXCLUDED.updated_by", "updated_at = now()"]
+    update_sets += [f"{field} = EXCLUDED.{field}" for field in provided]
+    if field_meta_delta:
+        columns.append("field_meta")
+        values.append(Json(field_meta_delta))
+        # JSONB `||` 只替换被点名的字段(顶层键),没被这次改动碰到的字段原样留着——
+        # 不能整列覆盖,否则每次手填一个字段就把其它字段的出处历史全部抹掉。
+        update_sets.append(
+            "field_meta = COALESCE(client_tax_profiles.field_meta, '{}'::jsonb) "
+            "|| EXCLUDED.field_meta"
+        )
+    placeholders = ", ".join(["%s"] * len(columns))
+
+    cur.execute(
+        f"INSERT INTO client_tax_profiles ({', '.join(columns)}) "
+        f"VALUES ({placeholders}) "
+        "ON CONFLICT (tenant_id, workspace_client_id) DO UPDATE SET "
+        f"{', '.join(update_sets)}",
+        tuple(values),
+    )
+
+
+def confirm_field_proposals(
+    cur, *, tenant_id: str, workspace_client_id: int, updated_by: str, proposals: dict
+) -> None:
+    """把「已现算好的推断候选」转正:写真值列 + field_meta 出处戳(source='inferred')。
+
+    proposals = {field: {"value", "confidence", "evidence"}}——由调用方(路由层现算的
+    services.workorder.profile_inference.compute_proposals)传入,本函数只管落库这一半,
+    不重新判断信号(单一事实源仍是 wht_signals + profile_inference)。空字典是合法调用
+    (no-op),让调用方不必先判空。"""
+    if not proposals:
+        return
+    updated_by = str(updated_by or "").strip()
+    if not updated_by:
+        raise TaxProfileError("updated_by_required", field="updated_by")
+
+    now = _now_iso()
+    provided = {}
+    field_meta_delta = {}
+    for field, prop in proposals.items():
+        provided[field] = _validate_and_coerce(field, prop["value"])
+        field_meta_delta[field] = {
+            "source": "inferred",
+            "confidence": prop.get("confidence"),
+            "evidence": prop.get("evidence"),
+            "proposal": None,
+            "confirmed_at": now,
+            "confirmed_by": updated_by,
+        }
+
+    columns = ["tenant_id", "workspace_client_id", "updated_by", "field_meta"] + list(provided)
+    values = [tenant_id, workspace_client_id, updated_by, Json(field_meta_delta)] + list(
+        provided.values()
+    )
+    placeholders = ", ".join(["%s"] * len(columns))
+    update_sets = [
+        "updated_by = EXCLUDED.updated_by",
+        "updated_at = now()",
+        "field_meta = COALESCE(client_tax_profiles.field_meta, '{}'::jsonb) "
+        "|| EXCLUDED.field_meta",
+    ]
     update_sets += [f"{field} = EXCLUDED.{field}" for field in provided]
 
     cur.execute(

@@ -39,6 +39,7 @@ class FakeCursor:
                 return
             profile = self.profiles.get((tenant_id, ws_id), {})
             row = {"vat_registered": client["vat_registered"], "ws_branch": client["branch"]}
+            row["field_meta"] = profile.get("field_meta")
             row.update({f: profile.get(f) for f in store._MUTABLE_FIELDS})
             self._one = row
         elif s.startswith("INSERT INTO client_tax_profiles"):
@@ -47,9 +48,17 @@ class FakeCursor:
             values = dict(zip(columns, params))
             key = (values["tenant_id"], values["workspace_client_id"])
             row = self.profiles.setdefault(key, {})
+            # field_meta 走 SQL `||` 合并(逐字段替换顶层键),不是整列覆盖——假游标须
+            # 真的模拟这一步,否则测不出"没被这次改动碰到的字段原样留着"这条契约。
+            field_meta_delta = values.pop("field_meta", None)
             row.update(
                 {k: v for k, v in values.items() if k not in ("tenant_id", "workspace_client_id")}
             )
+            if field_meta_delta is not None:
+                delta = getattr(field_meta_delta, "adapted", field_meta_delta)
+                merged = dict(row.get("field_meta") or {})
+                merged.update(delta)
+                row["field_meta"] = merged
         else:
             raise AssertionError(f"unexpected SQL: {s}")
 
@@ -195,6 +204,151 @@ class UpsertProfileTests(unittest.TestCase):
         got = store.get_profile(cur, tenant_id=TENANT_A, workspace_client_id=11)
         self.assertIs(got["has_multi_branch"], True)
         self.assertEqual(got["branch_count"], 3)
+
+
+class FieldMetaManualStampTests(unittest.TestCase):
+    """手填(upsert_profile)即时盖 field_meta 出处戳(画像卡智能判断批次)。"""
+
+    def test_manual_write_stamps_source_and_confirmed_at(self):
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 20)
+        store.upsert_profile(
+            cur,
+            tenant_id=TENANT_A,
+            workspace_client_id=20,
+            updated_by="acct-1",
+            has_employees="yes",
+        )
+        got = store.get_profile(cur, tenant_id=TENANT_A, workspace_client_id=20)
+        meta = got["field_meta"]["has_employees"]
+        self.assertEqual(meta["source"], "manual")
+        self.assertEqual(meta["confirmed_by"], "acct-1")
+        self.assertIsNotNone(meta["confirmed_at"])
+        self.assertIsNone(meta["proposal"])
+
+    def test_untouched_fields_keep_no_field_meta_entry(self):
+        """只碰了 has_employees,field_meta 里不该无端多出 pays_individuals 这一条。"""
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 21)
+        store.upsert_profile(
+            cur,
+            tenant_id=TENANT_A,
+            workspace_client_id=21,
+            updated_by="acct-1",
+            has_employees="yes",
+        )
+        got = store.get_profile(cur, tenant_id=TENANT_A, workspace_client_id=21)
+        self.assertNotIn("pays_individuals", got["field_meta"])
+
+    def test_second_manual_write_does_not_erase_first_fields_meta(self):
+        """两次各改一个不同字段,field_meta 须同时留着两条(JSONB `||` 只替换被点名的键)。"""
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 22)
+        store.upsert_profile(
+            cur,
+            tenant_id=TENANT_A,
+            workspace_client_id=22,
+            updated_by="acct-1",
+            has_employees="yes",
+        )
+        store.upsert_profile(
+            cur, tenant_id=TENANT_A, workspace_client_id=22, updated_by="acct-2", pays_juristic="no"
+        )
+        got = store.get_profile(cur, tenant_id=TENANT_A, workspace_client_id=22)
+        self.assertEqual(got["field_meta"]["has_employees"]["confirmed_by"], "acct-1")
+        self.assertEqual(got["field_meta"]["pays_juristic"]["confirmed_by"], "acct-2")
+
+    def test_non_tracked_kwargs_leave_no_field_meta(self):
+        """source/confidence/profile_version 是画像整体的账本属性,不是某个字段的出处。"""
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 23)
+        store.upsert_profile(
+            cur, tenant_id=TENANT_A, workspace_client_id=23, updated_by="acct-1", confidence="0.9"
+        )
+        got = store.get_profile(cur, tenant_id=TENANT_A, workspace_client_id=23)
+        self.assertEqual(got["field_meta"], {})
+
+
+class ConfirmFieldProposalsTests(unittest.TestCase):
+    """推断候选转正(confirm 端点消费的落库函数)——source='inferred',值同一时刻写进本值列。"""
+
+    def test_confirm_writes_value_and_inferred_meta(self):
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 30)
+        store.confirm_field_proposals(
+            cur,
+            tenant_id=TENANT_A,
+            workspace_client_id=30,
+            updated_by="acct-1",
+            proposals={
+                "pays_individuals": {
+                    "value": "yes",
+                    "confidence": "high",
+                    "evidence": "pays_individuals:hit:3:2569-07",
+                }
+            },
+        )
+        got = store.get_profile(cur, tenant_id=TENANT_A, workspace_client_id=30)
+        self.assertEqual(got["pays_individuals"], "yes")
+        meta = got["field_meta"]["pays_individuals"]
+        self.assertEqual(meta["source"], "inferred")
+        self.assertEqual(meta["confidence"], "high")
+        self.assertEqual(meta["evidence"], "pays_individuals:hit:3:2569-07")
+        self.assertIsNone(meta["proposal"])
+
+    def test_empty_proposals_is_noop(self):
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 31)
+        store.confirm_field_proposals(
+            cur, tenant_id=TENANT_A, workspace_client_id=31, updated_by="acct-1", proposals={}
+        )
+        self.assertEqual(cur.calls, [])
+
+    def test_missing_updated_by_rejected(self):
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 32)
+        with self.assertRaises(store.TaxProfileError) as ctx:
+            store.confirm_field_proposals(
+                cur,
+                tenant_id=TENANT_A,
+                workspace_client_id=32,
+                updated_by="",
+                proposals={"pays_individuals": {"value": "yes"}},
+            )
+        self.assertEqual(ctx.exception.code, "updated_by_required")
+
+    def test_invalid_enum_value_rejected(self):
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 33)
+        with self.assertRaises(store.TaxProfileError):
+            store.confirm_field_proposals(
+                cur,
+                tenant_id=TENANT_A,
+                workspace_client_id=33,
+                updated_by="acct-1",
+                proposals={"pays_individuals": {"value": "maybe"}},
+            )
+
+    def test_confirm_does_not_clobber_other_confirmed_field(self):
+        cur = FakeCursor()
+        cur.add_client(TENANT_A, 34)
+        store.upsert_profile(
+            cur,
+            tenant_id=TENANT_A,
+            workspace_client_id=34,
+            updated_by="acct-1",
+            has_employees="yes",
+        )
+        store.confirm_field_proposals(
+            cur,
+            tenant_id=TENANT_A,
+            workspace_client_id=34,
+            updated_by="acct-1",
+            proposals={"pays_individuals": {"value": "yes", "confidence": "high", "evidence": "e"}},
+        )
+        got = store.get_profile(cur, tenant_id=TENANT_A, workspace_client_id=34)
+        self.assertEqual(got["field_meta"]["has_employees"]["source"], "manual")
+        self.assertEqual(got["field_meta"]["pays_individuals"]["source"], "inferred")
 
 
 class _DefsFakeCursor:

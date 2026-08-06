@@ -16,6 +16,12 @@ obligation_engine 的义务判定吃 data_signals(个人/法人 WHT、境外付�
 失败诚实返空信号、绝不抛。但「在共享写游标上 SELECT 失败会 abort 事务、后续 commit 静默
 变 rollback 丢工单/画像」这一层,靠 scan_period_wht_signals_isolated 用独立只读连接根治:
 独立连接的失败只回滚它自己,永不污染调用方的写事务。开单、画像保存两处接线都走 isolated。
+
+wht_individuals_count / wht_juristic_count(画像卡智能判断批次新增)是附加计数键,不进
+obligation_engine._DATA_SIGNAL_KEYS/_empty_data_signals 的固定形状——义务判定只要布尔
+命中即可,但 services.workorder.profile_inference 的推断依据文案要带「真实笔数」,同一次
+扫描顺手计数,不为此再起一遍查询。DB 失败兜底路径(_empty_data_signals())不含这两个键,
+消费方一律用 dict.get(key, 0) 读,不假设一定存在。
 """
 
 from __future__ import annotations
@@ -79,6 +85,11 @@ def scan_period_wht_signals(cur, *, tenant_id: str, workspace_client_id: int, pe
         )
         return obligation_engine._empty_data_signals()
 
+    # 计数(画像卡智能判断批次新增,附加键·不进 obligation_engine._DATA_SIGNAL_KEYS):
+    # 义务判定只要布尔命中,但画像卡的推断依据文案要带"真实笔数"(诚实边界不许只说
+    # "有/没有",得说清楚数了几笔),故在同一次扫描里顺手计数,不为此再起一遍查询。
+    signals["wht_individuals_count"] = 0
+    signals["wht_juristic_count"] = 0
     for row in rows:
         signals["has_any_material"] = True  # 有任何 posted 采购料件 = 当期有料
         if not _positive(row["wht_amount"]):
@@ -88,8 +99,10 @@ def scan_period_wht_signals(cur, *, tenant_id: str, workspace_client_id: int, pe
         payee_type, _missing = classify_payee(row["payee_tax_id"])
         if payee_type == "juristic":
             signals["wht_juristic"] = True
+            signals["wht_juristic_count"] += 1
         else:
             signals["wht_individuals"] = True
+            signals["wht_individuals_count"] += 1
     return signals
 
 

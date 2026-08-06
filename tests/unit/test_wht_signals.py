@@ -89,6 +89,23 @@ class ScanSignalTests(unittest.TestCase):
         self.assertTrue(signals["wht_juristic"])
         self.assertFalse(signals["wht_individuals"])
 
+    def test_counts_track_matched_rows_by_payee_type(self):
+        """画像卡智能判断批次新增计数键——推断依据文案要带真实笔数,不能只说有/没有。"""
+        signals, _ = _scan(
+            [
+                _doc_row(wht_amount="4.20", tax_id=_INDIVIDUAL_TAX_ID),
+                _doc_row(wht_amount="5.10", tax_id=_INDIVIDUAL_TAX_ID),
+                _doc_row(wht_amount="30.00", tax_id=_JURISTIC_TAX_ID),
+            ]
+        )
+        self.assertEqual(signals["wht_individuals_count"], 2)
+        self.assertEqual(signals["wht_juristic_count"], 1)
+
+    def test_counts_zero_when_no_material(self):
+        signals, _ = _scan([])
+        self.assertEqual(signals["wht_individuals_count"], 0)
+        self.assertEqual(signals["wht_juristic_count"], 0)
+
     def test_foreign_and_dividend_always_false_m1(self):
         # 即便当期有个人+法人 WHT,境外/利息股息也恒 False(M1 无数据源,不虚报 PND54/PND2)。
         signals, _ = _scan(

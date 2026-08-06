@@ -1,8 +1,11 @@
 // Pearnly E2E · 23 步4 推送前预览(记账画像 gate)四态真浏览器渲染 + 截图为证
 // ============================================================
 // 纯渲染验收(不需登录/baseURL):加载真 static/dist/home.css,渲染四态 gate HTML,
-// 抓 getComputedStyle 断言视觉(ok 蓝底 / escalate 琥珀左框 3px / confirm 双按钮 / decide 例外行),
-// 截图落 _artifacts/。全流程数据驱动(真 companion 目录 → preview)属真客户验收门,见交接。
+// 抓 getComputedStyle 断言视觉(ok 蓝底 / escalate 琥珀左框 3px / confirm_profile 诚实提示态
+// 回退按钮可见 / decide 例外行),截图落 _artifacts/。confirm_profile 态已在 2026-08-06 拍板
+// 补刀改造:两按钮收集画像弹卡删除,换成「回第①步」的诚实提示(同款琥珀左框,见
+// src/home/dms-intake-posting-preview.ts::renderGate)。全流程数据驱动(真 companion 目录 →
+// preview)属真客户验收门,见交接。
 // ============================================================
 /* global getComputedStyle */ // page.$eval 回调在浏览器上下文跑,getComputedStyle 是浏览器全局
 const { test, expect } = require('@playwright/test');
@@ -13,7 +16,7 @@ const CSS = path.resolve(__dirname, '../../static/dist/home.css');
 const GATES = `<div class="dmsx" style="padding:24px;max-width:520px;display:flex;flex-direction:column;gap:16px;background:var(--bg,#f6f5fb)">
   <div class="dx-pp"><div class="dx-pp-ok">3 项复用现有 · 2 项新建</div></div>
   <div class="dx-pp"><div class="dx-pp-warn">这家按永续库存记账 · 商品行需人工录入 · 本批留人工</div></div>
-  <div class="dx-pp"><div class="dx-pp-confirm"><p>这家客户在 Express 里管库存吗？</p><div class="dx-pp-btns"><button class="btn">不管 · 自动记账</button><button class="btn">管库存 · 逐单人工</button></div></div></div>
+  <div class="dx-pp"><div class="dx-pp-noprofile"><p>该批未声明过账去向，请回第①步选择「服务 / 库存」后重新提交</p><button type="button" class="btn" data-iv-pp-back-step1="1">回第①步</button></div></div>
   <div class="dx-pp"><div class="dx-pp-decide"><p>以下商品需你确认落点：</p><div class="dx-pp-row"><b>น้ำแข็งหลอด</b><span>已在库存目录 · 默认另建非库存</span></div><div class="dx-pp-note">默认按 firm-safe 另建独立非库存档</div></div></div>
 </div>`;
 
@@ -32,9 +35,11 @@ test('步4 推送前预览四态真浏览器渲染 + 截图为证', async ({ pag
         'rgb(245, 158, 11)'
     );
     expect(await page.$eval('.dx-pp-warn', (e) => getComputedStyle(e).borderLeftWidth)).toBe('3px');
-    // gate=confirm_profile:两按钮可见
-    await expect(page.locator('.dx-pp-confirm .btn')).toHaveCount(2);
-    await expect(page.locator('.dx-pp-confirm .btn').first()).toBeVisible();
+    // gate=confirm_profile(诚实提示态):同款琥珀左框 + 回第①步按钮可见,不再是两按钮弹卡。
+    expect(await page.$eval('.dx-pp-noprofile', (e) => getComputedStyle(e).borderLeftColor)).toBe(
+        'rgb(245, 158, 11)'
+    );
+    await expect(page.locator('.dx-pp-noprofile [data-iv-pp-back-step1]')).toBeVisible();
     // gate=decide_items:例外行可见
     await expect(page.locator('.dx-pp-row')).toBeVisible();
 

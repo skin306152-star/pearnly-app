@@ -68,7 +68,9 @@ ROUNDTRIP_WIDTHS: Tuple[int, ...] = (22, 12, 16, 18, 16, 14, 16, 26)
 # 可选列混进必需集会让旧文件回导认不出、静默退回通用表格路——加第二个可选列时
 # 只登记这一行。
 OPTIONAL_HEADERS = frozenset({COL_PARTY_BRANCH})
-_REQUIRED_HEADERS: Tuple[str, ...] = tuple(h for h in ROUNDTRIP_HEADERS if h not in OPTIONAL_HEADERS)
+_REQUIRED_HEADERS: Tuple[str, ...] = tuple(
+    h for h in ROUNDTRIP_HEADERS if h not in OPTIONAL_HEADERS
+)
 
 
 def hide_machine_columns(ws, headers: Sequence[str]) -> None:

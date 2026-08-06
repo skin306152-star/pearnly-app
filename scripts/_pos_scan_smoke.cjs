@@ -14,31 +14,17 @@
  * 退出码 0 = 全过。截图默认落 tests/e2e/_artifacts/pos_scan/。
  */
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
+const { startStaticServer } = require('./_smoke_server.cjs');
 const { chromium } = require('@playwright/test');
 
 const ROOT = path.resolve(__dirname, '..');
 const Y4M = path.resolve(process.argv[2] || '.scan_fixture.y4m');
 const SHOTS = path.resolve(process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/pos_scan'));
 const CODE = '8850999320014'; // 假摄像头画面里那个码(泰国 GS1 前缀 885)
-const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };
 const PHONE = { width: 390, height: 780 };
 
-function serve() {
-    const server = http.createServer((req, res) => {
-        const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
-        const fp = path.join(ROOT, rel);
-        const ok = fp.startsWith(ROOT) && fs.existsSync(fp) && !fs.statSync(fp).isDirectory();
-        // /api/* 落到这里 = 404 无信封 → POS 走纯本地预览 mock(正是要的)
-        res.writeHead(ok ? 200 : 404, {
-            'content-type': ok ? MIME[path.extname(fp)] || 'application/octet-stream' : 'text/html',
-        });
-        if (ok) fs.createReadStream(fp).pipe(res);
-        else res.end('not found');
-    });
-    return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
+const serve = () => startStaticServer({ root: ROOT, notFoundBody: 'not found' });
 
 function seed() {
     // 设备已绑店(过绑定屏)但不带账套 id → POS.allowMock() 为真,商品/店员走本地预览。

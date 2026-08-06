@@ -17,14 +17,13 @@
  * 退出码 0 = 全过。截图默认落 tests/e2e/_artifacts/inv_scan/。
  */
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
+const { startStaticServer } = require('./_smoke_server.cjs');
 const { chromium } = require('@playwright/test');
 
 const ROOT = path.resolve(__dirname, '..');
 const Y4M = path.resolve(process.argv[2] || '.scan_fixture.y4m');
 const SHOTS = path.resolve(process.argv[3] || path.join(ROOT, 'tests/e2e/_artifacts/inv_scan'));
-const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };
 
 const COLA = '8850999320014'; // 假摄像头素材里的那张码
 const MILK = '4901234567894'; // 批次品 · 用来验批号/效期格真的露出来
@@ -87,22 +86,7 @@ const STOCK_ITEMS = [
     },
 ];
 
-function serve() {
-    const server = http.createServer((req, res) => {
-        const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
-        const fp = path.join(ROOT, rel || 'home.html');
-        if (!fp.startsWith(ROOT) || !fs.existsSync(fp) || fs.statSync(fp).isDirectory()) {
-            res.writeHead(404, { 'content-type': 'text/html' });
-            res.end('<!doctype html><title>404</title>');
-            return;
-        }
-        res.writeHead(200, {
-            'content-type': MIME[path.extname(fp)] || 'application/octet-stream',
-        });
-        fs.createReadStream(fp).pipe(res);
-    });
-    return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
+const serve = () => startStaticServer({ root: ROOT, index: 'home.html' });
 
 async function stubApi(page, posted) {
     await page.route('https://cdnjs.cloudflare.com/**', (r) => r.abort());

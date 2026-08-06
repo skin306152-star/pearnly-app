@@ -18,8 +18,8 @@
  * 退出码 0 = 全过。截图默认落 tests/e2e/_artifacts/scan_base/。
  */
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
+const { startStaticServer } = require('./_smoke_server.cjs');
 const { chromium } = require('@playwright/test');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -33,25 +33,10 @@ const BLINK = sibling('.blink.y4m');
 const EXPECT_CODE = '8850999320014';
 // 打进 type=date 会变成 49012-03-31 的那一串(date 控件收 6 位年份、提交不拦)。
 const SCAN_INTO_DATE = '4901234567894';
-const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };
 
 // 自带静态服务:懒加载走的是同源 /static/dist/*.js,file:// 下不成立。
-function serve() {
-    const server = http.createServer((req, res) => {
-        const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
-        const fp = path.join(ROOT, rel);
-        if (!fp.startsWith(ROOT) || !fs.existsSync(fp) || fs.statSync(fp).isDirectory()) {
-            res.writeHead(fs.existsSync(fp) ? 200 : 404, { 'content-type': 'text/html' });
-            res.end('<!doctype html><title>scan smoke</title><body>');
-            return;
-        }
-        res.writeHead(200, {
-            'content-type': MIME[path.extname(fp)] || 'application/octet-stream',
-        });
-        fs.createReadStream(fp).pipe(res);
-    });
-    return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
+const serve = () =>
+    startStaticServer({ root: ROOT, notFoundBody: '<!doctype html><title>scan smoke</title><body>' });
 
 async function fresh(browser, origin, initScript, arg) {
     const page = await browser.newPage({ viewport: { width: 390, height: 780 } });

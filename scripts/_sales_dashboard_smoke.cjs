@@ -17,15 +17,14 @@
  * 退出码 0 = 全过。截图默认落 tests/e2e/_artifacts/sales_dashboard/。
  */
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
+const { startStaticServer } = require('./_smoke_server.cjs');
 const { chromium } = require('@playwright/test');
 
 const ROOT = path.resolve(__dirname, '..');
 const SHOTS = path.resolve(
     process.argv[2] || path.join(ROOT, 'tests/e2e/_artifacts/sales_dashboard')
 );
-const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };
 
 const p2 = (n) => String(n).padStart(2, '0');
 const ymd = (d) => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
@@ -82,6 +81,11 @@ function heatRows(anchorIso) {
     return rows;
 }
 
+function heatRange(anchorIso) {
+    const [y, m, d] = anchorIso.split('-').map(Number);
+    return { from: ymd(new Date(y, m - 1, d - 13)), to: anchorIso };
+}
+
 function monthByDay(fromIso) {
     const [y, m] = fromIso.split('-').map(Number);
     const out = [];
@@ -129,6 +133,7 @@ function reportFor(params) {
             prev_kpi: PREV_KPI,
             prev_range: { from: params.get('prev_from'), to: params.get('prev_to') },
             heat: heatRows(to),
+            heat_range: heatRange(to),
             live,
         };
     }
@@ -142,26 +147,12 @@ function reportFor(params) {
         prev_kpi: PREV_KPI,
         prev_range: null,
         heat: heatRows(to),
+        heat_range: heatRange(to),
         live,
     };
 }
 
-function serve() {
-    const server = http.createServer((req, res) => {
-        const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
-        const fp = path.join(ROOT, rel || 'home.html');
-        if (!fp.startsWith(ROOT) || !fs.existsSync(fp) || fs.statSync(fp).isDirectory()) {
-            res.writeHead(404, { 'content-type': 'text/html' });
-            res.end('<!doctype html><title>404</title>');
-            return;
-        }
-        res.writeHead(200, {
-            'content-type': MIME[path.extname(fp)] || 'application/octet-stream',
-        });
-        fs.createReadStream(fp).pipe(res);
-    });
-    return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
+const serve = () => startStaticServer({ root: ROOT, index: 'home.html' });
 
 async function stubApi(page) {
     await page.route('https://cdnjs.cloudflare.com/**', (r) => r.abort());
@@ -475,6 +466,9 @@ async function heatFlow(page) {
     await page.evaluate(() =>
         document.getElementById('rep-heat-card').scrollIntoView({ block: 'center' })
     );
+    const title = await page.evaluate(
+        () => document.querySelector('#rep-heat-card .hd .t').textContent
+    );
     const grid = await page.evaluate(() => {
         const rows = document.querySelectorAll('#rep-heat-card .hrow');
         return {
@@ -503,6 +497,8 @@ async function heatFlow(page) {
     await shot(page, '07-heat-tip.png');
     return {
         ok:
+            title.includes(heatRange(anchor).from) &&
+            title.includes(heatRange(anchor).to) &&
             grid.rows === 14 &&
             grid.cellsFirstRow === 15 &&
             grid.shades >= 4 &&

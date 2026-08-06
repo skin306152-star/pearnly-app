@@ -237,10 +237,26 @@ query:`copy=original|copy`(非法值回落 original)。作用域:只出 `sale.fu
   "by_cashier":[{"cashier_id","name","sales_count":238,"gross":"34200.00"}] }
 ```
 
+### GET /api/pos/admin/vat-summary?workspace_client_id=&month=YYYY-MM[&format=xlsx] — 销项月度汇总包(G3)
+代账每月做 ภ.พ.30 申报用。`month` 非法格式(非 `YYYY-MM`)→ `pos.month_invalid`(422)。`format=xlsx` 回附件(4 sheet:日汇总/支付方式/全式税票/ABB 票号区间),缺省回 JSON `data:`
+```json
+{ "month":"2026-06","date_from":"2026-06-01","date_to":"2026-06-30",
+  "days":[{"date":"2026-06-01","sales_count":25,"subtotal":"5000.00","discount_total":"0.00",
+           "vat_amount":"350.00","gross":"5350.00"}],
+  "by_method":{"cash":{"amount":"2650.00","count":10},"promptpay":{"amount":"1500.00","count":8}},
+  "totals":{"subtotal":"80000.00","discount_total":"1200.00","vat_amount":"5516.00",
+            "gross":"84316.00","sales_count":600,"refund":"1240.00"},
+  "abb_ranges":[{"date":"2026-06-01","receipt_min":"RCP-T1-2026-00001","receipt_max":"RCP-T1-2026-00025","count":25}],
+  "full_invoices":[{"doc_number":"INV2026-00042","issued_date":"2026-06-03","source_receipt_no":"RCP-T1-2026-00010",
+                     "buyer_name":"บริษัท เอบีซี จำกัด","buyer_tax_id":"0105500000001",
+                     "subtotal":"500.00","discount_total":"0.00","vat_amount":"35.00","gross":"535.00"}] }
+```
+> 金额只读 pos_sales 一张表(计一次即正确,不重复计 VAT——见 §6);`full_invoices` 按原小票 `sold_at` 的曼谷月归属(不按 `issue_date`),升级发生在下月的票仍回收进原单所属月的包,只出现一次。`totals` 的口径与 §7 report `_kpi` 同一 FILTER(sale_type='sale' 拆列营收 · 'refund' 单独净额)。
+
 ---
 
 ## 8. 错误码(全集 + 4 语文案见 06)
-本文件出现的:`pos.pin_invalid · pos.cashier_inactive · pos.product_not_found · pos.out_of_stock · pos.shift_already_open · pos.shift_closed · pos.line_invalid · pos.void_not_allowed · pos.tax_id_invalid · pos.already_upgraded · pos.module_disabled · pos.forbidden`。06 给每个配 th/en/zh/ja + 用户可读文案(绝不裸露 code)。
+本文件出现的:`pos.pin_invalid · pos.cashier_inactive · pos.product_not_found · pos.out_of_stock · pos.shift_already_open · pos.shift_closed · pos.line_invalid · pos.void_not_allowed · pos.tax_id_invalid · pos.already_upgraded · pos.month_invalid · pos.module_disabled · pos.forbidden`。06 给每个配 th/en/zh/ja + 用户可读文案(绝不裸露 code)。
 
 ## 9. 契约测试要求(每个端点 ≥1)
 - 信封一致性:成功 `ok:true+data`、失败 `ok:false+error.code`。

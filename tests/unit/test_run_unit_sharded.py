@@ -8,7 +8,13 @@
 import unittest
 from pathlib import Path
 
-from scripts.run_unit_sharded import UNIT_DIR, collect_modules, make_shards
+from scripts.run_unit_sharded import (
+    UNIT_DIR,
+    _collect_times,
+    _is_load_failure,
+    collect_modules,
+    make_shards,
+)
 
 
 class CollectMatchesDiscover(unittest.TestCase):
@@ -48,3 +54,53 @@ class HookRunsFullSuite(unittest.TestCase):
         )
         self.assertIn("python scripts/run_unit_sharded.py --quiet", hook)
         self.assertNotIn("--exclude", hook)
+
+
+class LoadFailureClassificationTests(unittest.TestCase):
+    """抗负载自愈分类核(2026-08-06):只该把「初始化/负载型」红判成可复跑,
+    任何 FAIL:(断言失败)必须直接红——复跑是在掩盖确定性失败。"""
+
+    _SETUPCLASS = (
+        "ERROR: setUpClass (tests.unit.test_some_module)\n"
+        "----------------------------------------------------------------------\n"
+        "Traceback (most recent call last):\n"
+        "  File ...\n"
+    )
+
+    def test_all_setupclass_errors_are_healable(self):
+        self.assertTrue(_is_load_failure(1, self._SETUPCLASS))
+
+    def test_crashed_worker_rc_is_healable(self):
+        # 0xC0000142 = 3221225794:Windows 子进程初始化失败(并行抢资源典型)
+        self.assertTrue(_is_load_failure(3221225794, ""))
+
+    def test_any_fail_line_is_never_healable(self):
+        out = self._SETUPCLASS + "FAIL: test_assert (tests.unit.test_x)\n"
+        self.assertFalse(_is_load_failure(1, out))
+        # 即使 returncode 是 0xC0000142,有 FAIL 也直接红(断言失败优先级最高)
+        self.assertFalse(_is_load_failure(3221225794, out))
+
+    def test_plain_test_error_is_not_healable(self):
+        out = "ERROR: test_foo (tests.unit.test_x)\n" + self._SETUPCLASS
+        self.assertFalse(_is_load_failure(1, out))
+
+    def test_nonzero_exit_without_failure_lines_is_not_healable(self):
+        # 无 FAIL 无 ERROR 却非零退出:未知红,不浪费一次全片重跑
+        self.assertFalse(_is_load_failure(2, "Ran 0 tests\n"))
+
+    def test_zero_exit_with_error_text_is_not_healable(self):
+        # exit 0 根本走不到复跑,但分类函数本身不把 0 当红
+        self.assertFalse(_is_load_failure(0, self._SETUPCLASS))
+
+
+class TimesCollectTests(unittest.TestCase):
+    def test_collect_times_merges_shard_mark_lines(self):
+        all_times = {}
+        _collect_times('SHARD_TIMES_JSON:{"tests.unit.test_a": 1.5}\n', all_times)
+        _collect_times('noise\nSHARD_TIMES_JSON:{"tests.unit.test_b": 2.5}\n', all_times)
+        self.assertEqual(all_times, {"tests.unit.test_a": 1.5, "tests.unit.test_b": 2.5})
+
+    def test_collect_times_ignores_bad_json(self):
+        all_times = {"keep": 1.0}
+        _collect_times("SHARD_TIMES_JSON:{not json}\n", all_times)
+        self.assertEqual(all_times, {"keep": 1.0})

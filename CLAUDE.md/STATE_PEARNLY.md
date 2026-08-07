@@ -1,34 +1,24 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-08 凌晨 · ★★Stock Card 全战役日:收发存报表+确认落单桥+管家三能力+/ai 六项 UI 全上线)
+## 当前状态卡(2026-08-08 收尾 · CI 返工根因 P1-P4 已闭环)
 
-- **收发存报表(老丈人当日派单当日上线)**:事务所端「商品→收发存报表」全套(移动加权平均
-  滚存/期初表/未入账清单/归并),三口径照回执落地;**无灰度直接全量**(Zihao 两次拍板已改写
-  工程标准 §10.9,stock_card_report 闸从代码整个拆除)。金标=修正后算例(老丈人信息图有算术
-  笔误 30,500 非 31,000,已告知)。
-- **确认落单桥(当晚真机踩出的根缺口当晚修)**:识别确认≠过账、销项 OCR 票无建单路径→报表
-  恒空。`services/intake_bridge/`:确认全部/单张/进第4步三时机自动落正式单据(进项复用
-  create_doc→post_doc 走 item_verdict 单一判据;销项直落 issued 票面号不占号+seller_ws 必打;
-  0098 双表 ocr_history_id 溯源列=幂等钥匙)。**汇总表通道同拍板接桥**(旧「不建单据」注释已
-  改写);存量 summary_table_batch 不自动回填要 Zihao 点名。Zihao 22 张已回填:5 落销售单
-  (ws92),5 no_direction 照实跳。
-- **管家三能力**:stock_card_lookup 只读查询(数据源锁 services/stockcard 严禁 POS inventory)、
-  erp_push 过账去向对话后补(落档回写「声明跟着票走」,escalate 死胡同销账)、close_readiness
-  负库存警讯(WARN 态不拦签批)。registry 破 500 行→拆 catalog(数据)/slots(机制)/门面。
-- **/ai 六项 UI**:删工作台询问栏、主菜单+会话栏折叠、历史会话 bug 根治(根因=catch 静默吞错
-  +欢迎屏冒充空态,修成骨架屏/错误态/重试)、回形针居中、执行态默认恒折叠。
-- **UI 拍板同批**:录入结果预览默认全字段(删展开/收起)、识别记录横幅删除、报表表头对齐随内容
-  +金额表头去「(บาท)」(无多币种)。
-- **Big C 分店战役终局**:IV69/00564 生产实测落分店档「BIG C -002」(companion 1.1.61 确认);
-  老丈人 18:12「还是错」=小助手离线队列挂 2.5h 的时间差,非缺陷。
-- **🛑CI 返工根因定性**(Zihao 凌晨质问):.spec.js 不在台账 covers/代理不跑推送级闸/动画瞬态/
-  陈腐 pyc;两 SOP 已固化(frontend-change skill+派单模板),**治根四项目待立**(impact.py 影响
-  面计算器/推送闸分层/simplify 分档/pyc+reducedMotion)——细账见记忆
-  ci-rework-rootcause-and-hardening。
-- **待办**:老丈人确认暂存 15 张→他的报表出数+回 LINE;_sa2:198 CI 时序 flake 观察;
-  scan_camera flake 专项;B4 桥路分店真账补测;summary-import 存量回填等点名。
+- **P1**: `scripts/impact.py` 已接入 pre-push;测试-only unit 变更跑子集,生产 Python 回退全量;103 个 Playwright spec 已进影响面台账。
+- **P2**: hook 开头清理 `__pycache__/*.pyc`,导出 `PYTHONDONTWRITEBYTECODE=1`;Windows Git Bash 探测修复,全量 unit 不再假红。
+- **P3**: simplify 分档、复验分档、非紧急推送列车规则已写入现有 skills。
+- **P4**: 闸体系审计报告已落 `docs/refactor/CI_GATE_AUDIT_2026-08-08.md`,未删除无证据闸。
+- **验证**:本地 1120 模块/6 分片全绿;最新 CI `31221873757` 全绿;线上 `/api/version` 返回 `12060022`。
+- **提交**:`f16daf98`、`799c5deb`、`2f0bb840` 已推 `master`;未 push commit:无。
+- **当前 task**:本窗口已收工,不再追加代码。
+- **剩余风险**:工作树仍有其他窗口 Stock Card 改动,本窗口未读取其语义、未修改、未清理。
+- **下一步**:下一窗口接 Stock Card 施工/验收;本窗口不再动作。
+- **等 Zihao**:无;如继续开发,先确认 Stock Card 窗口的文件 ownership。
 
 ---
+
+## 历史 · 2026-08-08 Stock Card 全战役
+
+- 收发存报表、确认落单桥、管家三能力与 `/ai` 六项 UI 已上线;Big C 分店战役已以小助手离线队列时间差定性收尾。
+- 暂存 15 张、`_sa2:198` CI 时序、scan_camera flake、B4 分店真账补测与 summary-import 存量回填仍由后续窗口处理。
 
 ## 上一窗状态卡(2026-08-07 凌晨 · ★夜航自主闭环:四班推送全上线 —— G3 销项汇总包 + S2 管家工具箱 + 画像卡 + 收口三小批)
 

@@ -255,9 +255,17 @@ test.describe('事务所端 · 商品收发存报表', () => {
         // 表头对齐随内容(2026-08-07 Zihao 验收意见 · 本仓具体度陷阱前科):单列文字头
         // 靠左、数字头靠右、只有跨列色带头居中 —— 全部量 computed 值,不看 class。
         const align = (loc) => loc.evaluate((el) => getComputedStyle(el).textAlign);
-        expect(await align(page.locator('.stc thead .stc-grp th').first()), '商品表头左对齐').toBe('left');
-        expect(await align(page.locator('.stc thead .stc-grp th.num').first()), '期初数字表头右对齐').toBe('right');
-        expect(await align(page.locator('.stc thead th[colspan]').first()), '跨列色带组头居中').toBe('center');
+        expect(await align(page.locator('.stc thead .stc-grp th').first()), '商品表头左对齐').toBe(
+            'left'
+        );
+        expect(
+            await align(page.locator('.stc thead .stc-grp th.num').first()),
+            '期初数字表头右对齐'
+        ).toBe('right');
+        expect(
+            await align(page.locator('.stc thead th[colspan]').first()),
+            '跨列色带组头居中'
+        ).toBe('center');
 
         const negCellBg = await negRow
             .locator('td')

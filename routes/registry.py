@@ -103,6 +103,7 @@ from routes.settings_routes import router as settings_router
 from routes.steward_routes import router as steward_router
 from routes.steward_session_routes import router as steward_session_router
 from routes.steward_stream_routes import router as steward_stream_router
+from routes.stock_card_routes import router as stock_card_router
 from routes.summary_import_routes import router as summary_import_router
 from routes.supplier_posting_routes import router as supplier_posting_router
 from routes.tax_profile_routes import router as tax_profile_router
@@ -159,6 +160,7 @@ ROUTERS = (
     accounting_router,
     accounting_books_router,
     accounting_bank_router,
+    stock_card_router,  # 商品收发存报表(Stock Card · 移动加权平均 · stock_card_report 闸)
     tax_router,
     sales_router,
     sales_seller_router,

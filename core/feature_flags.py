@@ -171,6 +171,11 @@ PEARNLY_AI_STEWARD_KEY = "pearnly_ai_steward"
 # 开 = 大脑在 worker 里循环(观测 → 下一步),步骤流水逐条落库,写动作照旧停在授权卡上。
 # 双闸:pearnly_ai_steward 在场才有效。按 tenant 判定;消费在 services/steward/brain_entry.py。
 STEWARD_BRAIN_LOOP_KEY = "steward_brain_loop"
+# 商品收发存报表闸(Stock Card · 事务所端按客户账套出进销存流水):默认关 fail-closed。
+# 关 = /api/stockcard/* 业务端点一律 403(status 探针例外,照 pearnly_ai_steward 先例回
+# {enabled:false});开 = 移动加权平均报表 + 期初维护 + 商品归并对该账套放行。按 tenant
+# 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);消费在 routes/stock_card_routes.py。
+STOCK_CARD_REPORT_KEY = "stock_card_report"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -463,3 +468,12 @@ def pearnly_ai_stmt_regroup_enabled_for(tenant_id: Optional[str]) -> bool:
     _enabled 内部(基建抖动绝不误开回收路)。
     """
     return _enabled(PEARNLY_AI_STMT_REGROUP_KEY, tenant_id, "pearnly_ai_stmt_regroup_enabled_for")
+
+
+def stock_card_report_enabled_for(tenant_id: Optional[str]) -> bool:
+    """商品收发存报表闸。关 = 业务端点 403(现状零变化,报表功能不存在);开 = 该账套放行。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);超管在平台后台把该
+    事务所 tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(STOCK_CARD_REPORT_KEY, tenant_id, "stock_card_report_enabled_for")

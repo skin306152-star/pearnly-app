@@ -174,6 +174,14 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 采购 schema 失败(等 alembic 0031-0033): {e}")
 
+    # 商品收发存报表(Stock Card)期初表 schema 双跑 · 与 alembic 0097 同源幂等 DDL。
+    try:
+        from services.stockcard.schema import ensure_stock_card_schema
+
+        ensure_stock_card_schema()
+    except Exception as e:
+        logger.warning(f"启动 商品收发存 schema 失败(等 alembic 0097): {e}")
+
     # 进项外流(Google 归档)schema + 注册 export 异步 handler(复用 recon_jobs worker)。
     try:
         from services.export.schema import ensure_export_schema

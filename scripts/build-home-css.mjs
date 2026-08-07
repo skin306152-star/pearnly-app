@@ -73,6 +73,9 @@ const HOME_CSS = [
     // 入库弹窗扫码加行(PO-A4)· 吃 home-41-inventory.css 的 .inv-field/.inv-mbtn 外壳,
     // 故必须排它之后;类名 .inv-scan* 全新不覆盖存量,排最后即可。
     'home-58-inventory-scan.css',
+    // 事务所端 · 商品收发存报表(2026-08-07)· 只吃全局令牌 + .btn/.modal 原子(home-38/home-05),
+    // 类名 .stc-* 全新不覆盖任何存量,排最后即可。
+    'home-59-stock-card.css',
 ];
 
 const ADMIN_CSS = [

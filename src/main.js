@@ -102,6 +102,7 @@ import './home/sales-wizard.js'; // 销项 PO-10 · 开票向导(window.openSale
 import './home/module-nav.js'; // POS PO-A1 配套 · 导航按 GET /api/me/modules 显隐(收银业务组默认隐藏 · inventory/pos 开才显)
 import './home/inventory.js'; // POS PO-A4 · 库存后台主页(屏7 · window.loadInventoryPage · 接 GET /api/inventory/stock · 四态)
 import './home/inventory-modals.js'; // POS PO-A4 · 入库/盘点弹窗(window.openInventoryIn/openInventoryCount · POST /api/inventory/in|count · .modal)
+import './home/stock-card.js'; // 事务所端 · 商品收发存报表(2026-08-07 · 路由 stock-card · window.loadStockCard · 吃 inventory-common 的 activeWsId/fmtQty)
 import './home/pos-onboarding.js'; // POS PO-B1 · 开通收银(屏8 · window.loadPosOnboardingPage · PUT /api/pos/admin/onboarding · 选业态/建收银员)
 import './home/onboarding-flow.js'; // 用户引导闭环 · 注册后向导(window.startOnboardingFlow · 主体→账务→完成清单 · 业态默认静默套 firm · 复用 subject-create)
 import './home/company-profile.js'; // 用户引导闭环 · 公司资料页(window.loadCompanyProfile · GET/PATCH /api/workspace/clients/{id} · 行内编辑)

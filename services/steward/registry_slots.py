@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
-"""工具的输入面:参数槽定义(模型该填什么)+ 执行身份(以谁的身份跑)。
+"""工具的输入面:一个工具长什么样(StewardTool)+ 参数槽定义(模型该填什么)+ 执行身份
+(以谁的身份跑,ToolContext)。
 
 从 registry 分出来只为体积闸(单文件 <500 行),不是语义分家 —— registry 仍是唯一入口,
-调用方一律 `from services.steward.registry import ToolContext`(registry 再导出)。
+调用方一律 `from services.steward.registry import StewardTool/ToolContext`(registry 再
+导出)。StewardTool 住在这里而不是 registry_catalog:后者是纯数据(TOOLS 元组把 StewardTool
+实例化出 23 份),数据模块不能反过来依赖门面模块要 registry_catalog import 该型,门面模块
+又要 import 回 registry_catalog 的 TOOLS 就成了环 —— 型定义放在两边都能单向依赖的这片叶子
+模块,闭环物理上不存在。
 
 槽定义共 3 个工厂函数而不是逐个工具写一份:同一个槽在 3 个工具里各写一遍描述,改一处
 另外两处就漂,而槽描述直接进提示词 —— 漂出来的那句就是大脑填错参数的成因。
@@ -16,6 +21,13 @@ from typing import Optional
 
 from services.agent.contracts import SlotSpec
 from services.sales.dates import bangkok_today
+
+# 风险等级(B3 授权闸的判据面):read 直接执行;write 落数据、danger 落数据且难撤销
+# (推 ERP/删单据)。非 read 一律要求人批的授权令牌 —— 执行层物理拒,不是前端不显示。
+RISK_READ = "read"
+RISK_WRITE = "write"
+RISK_DANGER = "danger"
+RISK_LEVELS = (RISK_READ, RISK_WRITE, RISK_DANGER)
 
 
 def period_slot() -> SlotSpec:
@@ -49,6 +61,32 @@ def client_name_slot(required: bool) -> SlotSpec:
         desc_th="ชื่อลูกค้าตามที่ผู้ใช้พิมพ์ (คัดจากข้อความผู้ใช้เท่านั้น)",
         desc_zh="客户名(必须原样出自用户原话·不许改写不许猜)",
     )
+
+
+@dataclass(frozen=True)
+class StewardTool:
+    """一个管家能调的能力。风险等级是授权闸的唯一判据:readonly 从 risk 推导而非独立字段
+    ——两个字段会漂(readonly=True 而 risk=write 的工具就是后门),单一事实源杜绝。"""
+
+    name: str
+    desc: str  # 中文:这个工具干嘛(进提示词,大脑据此挑)
+    slots: tuple[SlotSpec, ...]
+    handler: str  # services/steward/tools.py 里的函数名
+    risk: str = RISK_READ
+    timeout_s: Optional[int] = None  # 本工具的任务超时(缺省走 store.default_timeout_s)
+
+    def __post_init__(self) -> None:
+        if self.risk not in RISK_LEVELS:
+            raise ValueError(f"steward tool {self.name}: unknown risk {self.risk!r}")
+
+    @property
+    def readonly(self) -> bool:
+        return self.risk == RISK_READ
+
+
+def requires_authorization(tool: StewardTool) -> bool:
+    """写/危险工具必须持人批的授权令牌才准执行(闸在 tools.run,物理拒)。"""
+    return tool.risk != RISK_READ
 
 
 @dataclass

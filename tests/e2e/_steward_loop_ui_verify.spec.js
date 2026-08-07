@@ -169,6 +169,8 @@ async function boot(page, opts) {
     await page.locator('#stwInput').fill('sister 这期报完了没');
     await page.locator('#stwInput').press('Enter');
     await page.waitForSelector('.stw-msg.agent .stw-proc', { state: 'visible', timeout: 15000 });
+    // 2026-08-07 拍板:过程条默认恒折叠 —— 本 spec 验的是展开后的内容,先点开。
+    await page.locator('.stw-msg.agent .stw-proc .stw-proc-hd').click();
     return { posts };
 }
 

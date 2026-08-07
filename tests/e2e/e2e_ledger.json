@@ -562,6 +562,8 @@
       "artifacts": "tests/e2e/_artifacts/steward_toolbox",
       "covers": [
         "services/steward/registry.py",
+        "services/steward/registry_slots.py",
+        "services/steward/registry_catalog.py",
         "services/steward/tools.py",
         "services/steward/tools_doc_qa.py",
         "services/steward/tools_table.py",

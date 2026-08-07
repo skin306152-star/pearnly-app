@@ -31,14 +31,13 @@
     "lookups": 2
   },
   "secondBoxAboveFloor": {
-    "ok": true,
+    "ok": false,
     "first": true,
-    "counted": true,
-    "nagged": false,
+    "counted": false,
+    "nagged": true,
     "err": false,
-    "text": "可乐 325ml 数量 +1",
+    "text": "1 件没加进这张收货单\n知道了\n刚才这一下当成同一件了(相机没看见它离开)\n8850999320014\n是第二件 · 加 1\n已加入 可乐 325ml",
     "lookups": [
-      "8850999320014",
       "8850999320014"
     ]
   },
@@ -47,7 +46,7 @@
     "first": true,
     "appeared": 1,
     "vanished": 0,
-    "samples": 143,
+    "samples": 131,
     "rearms": 2,
     "qty": "3",
     "rows": 2,
@@ -63,20 +62,20 @@
     }
   },
   "camRevokedSpeaksUp": {
-    "ok": true,
+    "ok": false,
     "first": true,
-    "grew": true,
+    "grew": false,
     "tracks": [
       {
         "st": "ended"
       }
     ],
     "spoke": true,
-    "qtyBefore": "2",
-    "qtyFrozen": "2",
-    "qtyAfter": "3",
-    "lookupsBefore": 2,
-    "lookupsFrozen": 2,
+    "qtyBefore": "1",
+    "qtyFrozen": "1",
+    "qtyAfter": "2",
+    "lookupsBefore": 1,
+    "lookupsFrozen": 1,
     "line": {
       "found": true,
       "w": 300,
@@ -101,7 +100,7 @@
     "retryCopy": "重试",
     "resumed": true,
     "errAfter": false,
-    "lookups": 3
+    "lookups": 2
   },
   "barcodeAsQuantityStopped": {
     "ok": true,

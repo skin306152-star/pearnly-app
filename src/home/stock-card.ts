@@ -255,8 +255,10 @@ async function loadExcluded(): Promise<void> {
 }
 
 // ── 期初库存弹窗 ────────────────────────────────────────────────────
+// 行身份用归组钥匙 key(p:<id> / n:<清洗名>):名字轨行没有 product_id,发 pid 等于把期初
+// 挂到不存在的商品上 —— 后端 OpeningIn 本来就吃「product_id 或 name」双轨。
 function openingRowHtml(p: StcProduct): string {
-    return `<tr data-op-pid="${esc(p.product_id)}">
+    return `<tr data-op-key="${esc(p.key)}">
         <td>${esc(p.name)}</td>
         <td class="num"><input type="number" min="0" step="0.001" class="stc-in" data-op-qty value="${p.opening_qty == null ? '' : esc(fmtQty(p.opening_qty))}"></td>
         <td class="num"><input type="number" min="0" step="0.01" class="stc-in" data-op-cost placeholder="0.00"></td>
@@ -304,12 +306,14 @@ async function saveOpenings(btn: HTMLButtonElement, close: () => void): Promise<
     const wsId = activeWsId();
     if (wsId == null) return;
     const rows: StcOpeningRow[] = [];
-    document.querySelectorAll<HTMLElement>('#stc-op-tbl [data-op-pid]').forEach((tr) => {
+    document.querySelectorAll<HTMLElement>('#stc-op-tbl [data-op-key]').forEach((tr) => {
         const qty = (tr.querySelector('[data-op-qty]') as HTMLInputElement)?.value.trim();
         if (!qty) return; // 空 = 这个商品不填期初,跳过(不是 0)
         const cost = (tr.querySelector('[data-op-cost]') as HTMLInputElement)?.value.trim() || '0';
         const date = (tr.querySelector('[data-op-date]') as HTMLInputElement)?.value || dateFrom;
-        rows.push({ product_id: tr.dataset.opPid, qty, unit_cost: cost, as_of_date: date });
+        const key = tr.dataset.opKey || '';
+        const who = key.startsWith('p:') ? { product_id: key.slice(2) } : { name: key.slice(2) };
+        rows.push({ ...who, qty, unit_cost: cost, as_of_date: date });
     });
     const err = document.getElementById('stc-op-err');
     if (!rows.length) {
@@ -329,20 +333,23 @@ async function saveOpenings(btn: HTMLButtonElement, close: () => void): Promise<
 }
 
 // ── 归并弹窗 ────────────────────────────────────────────────────────
+// 勾选默认只勾入口那一行:其余名字是不是同一件货只有会计知道,默认全勾在真机上把
+// 冰块和美妆并成了一件货 —— 勾选必须是明确动作。目标下拉用 key 当 value(名字轨的
+// product_id 恒空,v1 拿它当 value 是这功能从没成功过的断口之一);已建档商品也进
+// 目标列表,把散名并进真商品档。
 function openMergeModal(selfKey: string): void {
     const mask = document.getElementById('stc-mg-mask');
     const self = products.find((p) => p.key === selfKey);
     if (!mask || !self) return;
     const others = products.filter((p) => !p.matched && p.key !== selfKey);
-    const candidates = [self, ...others];
-    const checks = candidates
+    const checks = [self, ...others]
         .map(
             (p) =>
-                `<label class="stc-mg-row"><input type="checkbox" checked data-mg-cb value="${esc(p.key)}"> ${esc(p.name)}</label>`
+                `<label class="stc-mg-row"><input type="checkbox"${p.key === selfKey ? ' checked' : ''} data-mg-cb value="${esc(p.key)}"> ${esc(p.name)}</label>`
         )
         .join('');
-    const options = candidates
-        .map((p) => `<option value="${esc(p.product_id)}">${esc(p.name)}</option>`)
+    const options = [self, ...products.filter((p) => p.matched), ...others]
+        .map((p) => `<option value="${esc(p.key)}">${esc(p.name)}</option>`)
         .join('');
     mask.innerHTML = `<div class="modal modal-md stc">
         <div class="modal-header"><div class="modal-title">${esc(t('stc-mg-title'))}</div><button type="button" class="modal-close" id="stc-mg-close">&times;</button></div>
@@ -372,21 +379,34 @@ function openMergeModal(selfKey: string): void {
     confirm.onclick = () => void saveMerge(confirm, close);
 }
 
+// key → 后端吃的裸清洗名(去掉归组钥匙的 n: 前缀 · 与 services/stockcard/grouping.py 同约定)。
+function mergeNameOf(key: string): string {
+    return key.replace(/^n:/, '');
+}
+
 async function saveMerge(btn: HTMLButtonElement, close: () => void): Promise<void> {
     const wsId = activeWsId();
     if (wsId == null) return;
     const nameKeys = Array.from(
         document.querySelectorAll<HTMLInputElement>('[data-mg-cb]:checked')
-    ).map((cb) => cb.value);
-    const target = (document.getElementById('stc-mg-target') as HTMLSelectElement)?.value;
+    ).map((cb) => mergeNameOf(cb.value));
+    const targetKey = (document.getElementById('stc-mg-target') as HTMLSelectElement)?.value;
+    const target = products.find((p) => p.key === targetKey);
     const err = document.getElementById('stc-mg-err');
-    if (nameKeys.length < 2 || !target) {
-        if (err) err.textContent = t('stc-mg-fail');
+    // 名字轨目标自己的名字必须入组,否则并完留一个同名空卡。
+    if (target && !target.matched && !nameKeys.includes(mergeNameOf(targetKey))) {
+        nameKeys.push(mergeNameOf(targetKey));
+    }
+    if (!target || !nameKeys.length) {
+        if (err) err.textContent = t('stc-mg-none');
         return;
     }
+    const payload = target.matched
+        ? { name_keys: nameKeys, target_product_id: target.product_id }
+        : { name_keys: nameKeys, new_product_name: target.name, unit: target.unit || undefined };
     btn.disabled = true;
     try {
-        await stcPostMerge(wsId, { name_keys: nameKeys, target_product_id: target });
+        await stcPostMerge(wsId, payload);
         showToast(t('stc-mg-ok'), 'success');
         close();
         loadSummary();

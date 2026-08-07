@@ -63,17 +63,20 @@ export interface StcExcludedRow {
     reason: StcExcludedReason;
     side: string;
 }
+// 与 routes/stock_card_routes.py 的 OpeningIn 同形(product_id 或 name 二选一)。
 export interface StcOpeningRow {
     product_id?: string;
-    name_key?: string;
+    name?: string;
     qty: string;
     unit_cost: string;
     as_of_date: string;
 }
+// 与 routes/stock_card_routes.py 的 MergeIn 同形(契约测试锁字段面,别单侧改)。
 export interface StcMergePayload {
     name_keys: string[];
     target_product_id?: string;
     new_product_name?: string;
+    unit?: string;
 }
 
 export class StcError extends Error {
@@ -162,19 +165,21 @@ export async function stcGetExcluded(
     return (body.rows as StcExcludedRow[]) || [];
 }
 
+// 两条写路径的 workspace_client_id 走 URL query —— 路由签名是 Query(...),塞 body 会被
+// FastAPI 422 拒之门外(2026-08-08 实锤:期初/归并上线以来从没成功过一次)。
 export async function stcPostOpenings(wsId: number, rows: StcOpeningRow[]): Promise<void> {
-    await stcFetch('/api/stockcard/openings', {
+    await stcFetch(`/api/stockcard/openings?workspace_client_id=${wsId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspace_client_id: wsId, rows }),
+        body: JSON.stringify({ rows }),
     });
 }
 
 export async function stcPostMerge(wsId: number, payload: StcMergePayload): Promise<void> {
-    await stcFetch('/api/stockcard/merge', {
+    await stcFetch(`/api/stockcard/merge?workspace_client_id=${wsId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspace_client_id: wsId, ...payload }),
+        body: JSON.stringify(payload),
     });
 }
 

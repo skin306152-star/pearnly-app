@@ -52,8 +52,16 @@ class OpeningsIn(BaseModel):
 
 
 class MergeIn(BaseModel):
-    name_key: str = Field(..., min_length=1, description="要归并的 name: 轨清洗品名")
-    product_id: str = Field(..., min_length=1, description="并入的目标商品(须已存在于本账套)")
+    """目标二选一:target_product_id(已建档)或 new_product_name(名字轨当目标 → 代客建档)。
+    与 src/home/stock-card-api.ts 的 StcMergePayload 同形 —— 2026-08-08 实锤前后端各写一套
+    字段名(name_key/product_id vs name_keys/target_product_id),上线即 422,契约测试锁住。"""
+
+    name_keys: list[str] = Field(..., min_length=1, max_length=200, description="要归并的清洗品名")
+    target_product_id: Optional[str] = Field(None, description="并入已存在于本账套的商品")
+    new_product_name: Optional[str] = Field(
+        None, max_length=200, description="目标没建档时按此名代建最小商品档"
+    )
+    unit: Optional[str] = Field(None, max_length=50, description="代建商品档带上的计量单位")
 
 
 def _public_opening(row: dict) -> dict:
@@ -178,8 +186,10 @@ async def api_merge(req: MergeIn, request: Request, workspace_client_id: int = Q
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
-            name_key=req.name_key,
-            product_id=req.product_id,
+            name_keys=req.name_keys,
+            target_product_id=req.target_product_id,
+            new_product_name=req.new_product_name,
+            unit=req.unit,
             actor=user,
         )
     if result is None:

@@ -22,9 +22,12 @@ const {
 
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'stock-card');
 
+// key 忠实于真后端形状(services/stockcard/grouping.py):商品档轨 p:<id> · 名字轨 n:<清洗名>
+// 且名字轨 product_id 为 null —— 旧夹具给名字轨编了个假 product_id,恰好把「归并弹窗拿
+// product_id 当 value 而它恒空」的真断裂藏住了(标识符必须来自真实产物,前科见记忆)。
 const PRODUCTS = [
     {
-        key: 'wpc',
+        key: 'p:WPC-001',
         product_id: 'WPC-001',
         name: 'WPC 仿木条 2 寸',
         unit: '条',
@@ -38,7 +41,7 @@ const PRODUCTS = [
         matched: true,
     },
     {
-        key: 'water',
+        key: 'p:WTR-600',
         product_id: 'WTR-600',
         name: '山牌饮用水 600ml',
         unit: '箱',
@@ -52,8 +55,8 @@ const PRODUCTS = [
         matched: true,
     },
     {
-        key: 'paper1',
-        product_id: 'AUTO-0001',
+        key: 'n:กระดาษ a4',
+        product_id: null,
         name: 'กระดาษ A4',
         unit: 'รีม',
         opening_qty: null,
@@ -62,6 +65,20 @@ const PRODUCTS = [
         bal_qty: '6',
         bal_unit_cost: '95.00',
         bal_value: '570.00',
+        negative: false,
+        matched: false,
+    },
+    {
+        key: 'n:กระดาษ เอ4',
+        product_id: null,
+        name: 'กระดาษ เอ4',
+        unit: 'รีม',
+        opening_qty: null,
+        in_qty: '2',
+        out_qty: '0',
+        bal_qty: '2',
+        bal_unit_cost: '95.00',
+        bal_value: '190.00',
         negative: false,
         matched: false,
     },
@@ -133,7 +150,8 @@ const CARD_ROWS = [
     },
 ];
 
-async function stubApi(page) {
+// captures:写路径真实出站请求(URL + 载荷)落在这,供契约断言 —— 桩只回信封,不吞形状。
+async function stubApi(page, captures = {}) {
     await page.route('**/api/**', async (route) => {
         const url = new URL(route.request().url());
         const p = url.pathname;
@@ -166,6 +184,10 @@ async function stubApi(page) {
             });
         }
         if (p === '/api/stockcard/openings' || p === '/api/stockcard/merge') {
+            captures[p.split('/').pop()] = {
+                search: url.search,
+                body: route.request().postDataJSON(),
+            };
             return route.fulfill({ json: { ok: true } });
         }
         // 其余 /api/**(套账/权限探针等)不是本 spec 的验证对象,给中性成功信封放行。
@@ -212,7 +234,8 @@ test.describe('事务所端 · 商品收发存报表', () => {
             // 固定起始语言避免和「⑤ 泰语切换」那段的语言状态互相干扰。
             localStorage.setItem('mrpilot_lang', 'zh');
         });
-        await stubApi(page);
+        const captures = {};
+        await stubApi(page, captures);
 
         // 带 #/stock-card 深链进场:core-boot bootstrap 读 location.hash 决定 initialRoute
         // (core-boot.ts:415),让 SPA 自己的路由器从第一帧起就认定当前路由是 stock-card——
@@ -226,12 +249,13 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await neutralizeWorkspaceGate(page);
         await page.evaluate(() => window.routeTo('stock-card'));
 
-        // ── ① 列表态:三行落地(含负库存 + 未归并)──
-        await expect(page.locator('.stc-row')).toHaveCount(3);
+        // ── ① 列表态:四行落地(含负库存 + 两条未归并名字轨)──
+        await expect(page.locator('.stc-row')).toHaveCount(4);
         const negRow = page.locator('.stc-row.neg');
         await expect(negRow).toHaveCount(1);
         await expect(negRow).toContainText('山牌饮用水');
-        await expect(page.locator('.stc-chip-um')).toContainText('未归并');
+        await expect(page.locator('.stc-chip-um')).toHaveCount(2);
+        await expect(page.locator('.stc-chip-um').first()).toContainText('未归并');
         await expect(page.locator('#stc-excluded-cnt')).toHaveText('3');
 
         // 三段式表头 + 负库存行:真拿 computed 值与同令牌探针比对(不是看 class 在不在)。
@@ -289,7 +313,7 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await page.screenshot({ path: path.join(OUT, '01-list.png'), fullPage: true });
 
         // ── ② 单品卡详情:点行进流水 ──
-        await page.locator('.stc-row[data-stc-key="wpc"]').click();
+        await page.locator('.stc-row[data-stc-key="p:WPC-001"]').click();
         await expect(page.locator('#stc-view-detail')).toBeVisible();
         await expect(page.locator('#stc-view-list')).toBeHidden();
         await expect(page.locator('#stc-tbl-detail tbody tr')).toHaveCount(3);
@@ -309,17 +333,28 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await page.screenshot({ path: path.join(OUT, '03-excluded.png'), fullPage: true });
         await page.locator('#stc-tab-report').click();
 
-        // ── ④ 期初库存弹窗(按当前商品列表铺行)──
+        // ── ④ 期初库存弹窗(按当前商品列表铺行 · 行身份双轨)──
         await page.locator('#stc-btn-opening').click();
         await expect(page.locator('#stc-op-mask')).toBeVisible();
-        await expect(page.locator('#stc-op-tbl tr[data-op-pid]')).toHaveCount(3);
+        await expect(page.locator('#stc-op-tbl tr[data-op-key]')).toHaveCount(4);
         // .modal 有 200ms 进场动画(home-05-overlays.css modalIn:透明度+缩放一起变)·
         // 截图撞在动画中途会拍到一帧半透明/未缩放到位的过渡态,看着像背景"漏"上来,
         // 实测等动画放完再截就是干净的一张,不是页面坏了。
         await page.waitForTimeout(300);
         await page.screenshot({ path: path.join(OUT, '04-opening-modal.png'), fullPage: false });
-        await page.locator('#stc-op-cancel').click();
+        // 填一条商品档轨 + 一条名字轨,保存后断言出站契约:workspace_client_id 走 query,
+        // 行身份按轨发 product_id / name —— 名字轨发假 pid、workspace 塞 body 是
+        // 2026-08-08 修掉的真断裂(上线以来这条写路径从没成功过)。
+        await page.fill('tr[data-op-key="p:WPC-001"] [data-op-qty]', '5');
+        await page.fill('tr[data-op-key="n:กระดาษ a4"] [data-op-qty]', '7');
+        await page.locator('#stc-op-save').click();
         await expect(page.locator('#stc-op-mask')).toBeHidden();
+        expect(captures.openings.search).toContain('workspace_client_id=1');
+        expect(captures.openings.body.workspace_client_id).toBeUndefined();
+        expect(captures.openings.body.rows).toEqual([
+            expect.objectContaining({ product_id: 'WPC-001', qty: '5' }),
+            expect.objectContaining({ name: 'กระดาษ a4', qty: '7' }),
+        ]);
 
         // ── ⑤ 泰语切换:期望值现场从页面里的 window.I18N.th 真词典取,不自带副本 ──
         await page.evaluate(() => window.applyLang('th'));
@@ -337,6 +372,31 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await page.screenshot({ path: path.join(OUT, '05-thai.png'), fullPage: true });
         await page.evaluate(() => window.applyLang('zh'));
 
+        // ── ⑥ 归并弹窗:默认只勾入口行 + 名字轨目标代建的出站契约 ──
+        await page.locator('[data-stc-merge]').first().click();
+        await expect(page.locator('#stc-mg-mask')).toBeVisible();
+        const mgCbs = page.locator('[data-mg-cb]');
+        await expect(mgCbs).toHaveCount(2);
+        await expect(mgCbs.nth(0), '入口行自己默认勾上').toBeChecked();
+        await expect(mgCbs.nth(1), '其他名字默认不勾——是不是同一件货由会计定').not.toBeChecked();
+        // 目标下拉 value 用归组钥匙 key(名字轨 product_id 恒空,拿它当 value 从没成功过);
+        // 顺序 = 入口行 → 已建档商品 → 其余名字轨。
+        const optVals = await page
+            .locator('#stc-mg-target option')
+            .evaluateAll((os) => os.map((o) => o.value));
+        expect(optVals).toEqual(['n:กระดาษ a4', 'p:WPC-001', 'p:WTR-600', 'n:กระดาษ เอ4']);
+        await mgCbs.nth(1).check();
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: path.join(OUT, '06-merge-modal.png'), fullPage: false });
+        await page.locator('#stc-mg-confirm').click();
+        await expect(page.locator('#stc-mg-mask')).toBeHidden();
+        expect(captures.merge.search).toContain('workspace_client_id=1');
+        expect(captures.merge.body).toEqual({
+            name_keys: ['กระดาษ a4', 'กระดาษ เอ4'],
+            new_product_name: 'กระดาษ A4',
+            unit: 'รีม',
+        });
+
         assertNoConsoleErrors(expect, guard);
     });
 
@@ -351,7 +411,7 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await page.waitForFunction(() => typeof window.loadStockCard === 'function');
         await neutralizeWorkspaceGate(page);
         await page.evaluate(() => window.routeTo('stock-card'));
-        await expect(page.locator('.stc-row')).toHaveCount(3);
+        await expect(page.locator('.stc-row')).toHaveCount(4);
 
         // 页面本体不得横向溢出(响应式硬规)· 表格容器自己横滚。
         const bodyOverflow = await page.evaluate(

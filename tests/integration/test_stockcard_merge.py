@@ -31,6 +31,7 @@ _USER = os.environ.get("PEARNLY_LOCAL_E2E_USER") or "stw_e2e"
 
 _ITEM = "STOCKCARD_TEST_MERGE_ITEM"
 _OTHER_ITEM = "STOCKCARD_TEST_MERGE_OTHER"
+_CREATE_ITEM = "STOCKCARD_TEST_MERGE_CREATE_ITEM"
 _PRODUCT_A_NAME = "STOCKCARD_TEST_MERGE_PRODUCT_A"
 _PRODUCT_B_NAME = "STOCKCARD_TEST_MERGE_PRODUCT_B"
 
@@ -68,14 +69,18 @@ class StockCardMergeRealTests(unittest.TestCase):
             cls.sales_line_id = cls._sales_line(cur, cls.ws_a, _ITEM, date(2031, 5, 2))
             # 反证:同账套、同样 product_id 留空,但清洗名不同 → 不该被并进来。
             cls.decoy_line_id = cls._purchase_line(cur, cls.ws_a, _OTHER_ITEM, date(2031, 5, 1))
+            # 代建路的待并行(名字轨当目标 → 服务代建商品档)。
+            cls.create_line_id = cls._purchase_line(cur, cls.ws_a, _CREATE_ITEM, date(2031, 5, 1))
 
             # 正路:并进本账套自己的商品。
             cls.merge_result = merge_svc.merge_into_product(
                 cur,
                 tenant_id=cls.tenant_id,
                 workspace_client_id=cls.ws_a,
-                name_key=_ITEM,
-                product_id=cls.product_a,
+                name_keys=[_ITEM],
+                target_product_id=cls.product_a,
+                new_product_name=None,
+                unit=None,
                 actor=cls.actor,
             )
             # 反证:目标商品挂在别的账套(product_b 属于 ws_b),在 ws_a 视角下必须查无此商品。
@@ -83,10 +88,25 @@ class StockCardMergeRealTests(unittest.TestCase):
                 cur,
                 tenant_id=cls.tenant_id,
                 workspace_client_id=cls.ws_a,
-                name_key=_ITEM,
-                product_id=cls.product_b,
+                name_keys=[_ITEM],
+                target_product_id=cls.product_b,
+                new_product_name=None,
+                unit=None,
                 actor=cls.actor,
             )
+            # 代建路:目标没建档,按名字代建最小商品档并认领自己的行。
+            cls.create_result = merge_svc.merge_into_product(
+                cur,
+                tenant_id=cls.tenant_id,
+                workspace_client_id=cls.ws_a,
+                name_keys=[_CREATE_ITEM],
+                target_product_id=None,
+                new_product_name=_CREATE_ITEM,
+                unit="ถุง",
+                actor=cls.actor,
+            )
+            if cls.create_result:
+                cls._product_ids.append(cls.create_result["product_id"])
 
     # ── 夹具落库 ──────────────────────────────────────────────────
 
@@ -252,6 +272,27 @@ class StockCardMergeRealTests(unittest.TestCase):
         self.assertEqual(card["product"]["name"], _PRODUCT_A_NAME)
         self.assertEqual(card["totals"]["in_qty"], "1.000")
         self.assertEqual(card["totals"]["out_qty"], "1.000")
+
+    # ── ⑥ 名字轨当目标 → 代建商品档并认领自己的行 ───────────────────
+
+    def test_create_path_creates_product_and_claims_own_lines(self):
+        self.assertIsNotNone(self.create_result, "目标没建档的代建路被拒")
+        self.assertTrue(self.create_result["product_created"])
+        self.assertEqual(self.create_result["purchase_lines_merged"], 1)
+        with self.db.get_cursor() as cur:
+            cur.execute(
+                "SELECT name_th, unit, workspace_client_id FROM products "
+                "WHERE tenant_id=%s AND id=%s",
+                (self.tenant_id, self.create_result["product_id"]),
+            )
+            row = cur.fetchone()
+        self.assertEqual(row["name_th"], _CREATE_ITEM)
+        self.assertEqual(row["unit"], "ถุง")
+        self.assertEqual(int(row["workspace_client_id"]), self.ws_a)
+        self.assertEqual(
+            str(self._line_product_id("purchase_lines", self.create_line_id)),
+            self.create_result["product_id"],
+        )
 
     def test_no_audit_log_for_the_rejected_cross_workspace_attempt(self):
         with self.db.get_cursor() as cur:

@@ -2,7 +2,7 @@
 """对话流拼装的纯函数(static/ai/ai-steward-flow-render.js)。
 
 锁:①轮分组 —— 连续 steward 消息聚一轮、taskIds 按首现去重(过程条一条任务只画一次);
-②折叠默认值 —— done/cancelled 折起、failed/running/waiting 展开;③摘要选型 ——
+②折叠默认值 —— 恒折叠(2026-08-07 拍板),用户手动点开的优先级不变;③摘要选型 ——
 running 优先用正在跑那一步的 label,不编;各终态给对应词条 key。
 """
 
@@ -47,14 +47,16 @@ class GroupTurnsTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class ProcDefaultsTests(unittest.TestCase):
-    def test_collapse_defaults_follow_status(self):
+    def test_collapse_defaults_are_always_true(self):
         out = _run_node(f"""
             const f = require({_FLOW});
             process.stdout.write(JSON.stringify(
                 ['done', 'cancelled', 'failed', 'running', 'waiting_user'].map(f.defaultCollapsed)));
             """)
-        # 跑完/人停的折起;failed 展开(哪一步断的是排障第一问);live 的展开。
-        self.assertEqual(out, [True, True, False, False, False])
+        # 恒折叠(2026-08-07 拍板):过程条默认只留一行摘要,不管状态。用户手动点开的
+        # 那条不受影响 —— procHtml() 的 opts.open(读 S.procOpen[tid])优先级更高,
+        # 这条闸测的是"没人点过时"的默认态。
+        self.assertEqual(out, [True, True, True, True, True])
 
     def test_summary_prefers_running_step_label(self):
         out = _run_node(f"""

@@ -6,8 +6,9 @@
  *   管家轮 = 头标 + flow(执行过程条 → 正文 markdown → 授权卡 → 完成卡 → 预算条)。
  *
  * 过程条是旧执行状态窗的化身:同一份 GET /tasks/{tid} 投影,live 时逐步点亮,
- * 收尾自动折叠成一行摘要,点头部随时展开看明细。历史轮的任务数据按需补拉
- * (ctx.tasks 缓存没有 → 摆一条可点的「查看执行过程」占位,不假装知道内容)。
+ * 默认恒折叠成一行摘要(2026-08-07 拍板),点头部随时展开看明细,点开的状态记在
+ * S.procOpen[tid] 优先于默认值。历史轮的任务数据按需补拉(ctx.tasks 缓存没有 →
+ * 摆一条可点的「查看执行过程」占位,不假装知道内容)。
  *
  * 上半段零 DOM 零 i18n 纯函数(轮分组/折叠默认值/摘要选型),node
  * (tests/unit/test_ai_steward_flow_render.py)直接 require 断言;下半段拼装依赖
@@ -40,10 +41,11 @@
         return turns;
     }
 
-    // 折叠默认值:跑完/人停的折起(信息已在摘要与正文里),failed 展开(哪一步断的
-    // 是排障第一问),running/waiting 展开(live 过程就是这个设计的意义)。
+    // 折叠默认值:恒折叠(信息已在摘要/正文/授权卡里,过程条只留一行摘要不占屏)。
+    // 用户手动点开的那条不受影响 —— procHtml() 的 opts.open(读 S.procOpen[tid])
+    // 优先于本函数,这里只管"没人点过时"的默认态。
     function defaultCollapsed(status) {
-        return status === 'done' || status === 'cancelled';
+        return true;
     }
 
     // 摘要选型(纯):返回 {key, vars} 交给调用方过词典。running 时优先用正在跑的

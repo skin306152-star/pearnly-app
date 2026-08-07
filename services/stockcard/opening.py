@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -22,15 +23,26 @@ def _dec(v, *, field: str) -> Decimal:
         raise PosError("stockcard.opening_invalid", 422, detail=field) from e
 
 
-def _normalize(row: dict) -> tuple[Optional[str], Optional[str], Decimal, Decimal, str]:
+def _parse_as_of_date(raw) -> date:
+    """烂字符串在这里挡下,不留到 SQL 层才炸(那会是诚实的 422 变成不诚实的 500)。"""
+    if isinstance(raw, date):
+        return raw
+    try:
+        return date.fromisoformat(str(raw).strip())
+    except (ValueError, TypeError) as e:
+        raise PosError("stockcard.opening_invalid", 422, detail="as_of_date") from e
+
+
+def _normalize(row: dict) -> tuple[Optional[str], Optional[str], Decimal, Decimal, date]:
     """一行期初入参 → (product_id, name_key, qty, unit_cost, as_of_date)。恰一身份非空。"""
     product_id = row.get("product_id") or None
     name_key = None if product_id else grouping.name_key(row.get("name") or "")
     if not product_id and not name_key:
         raise PosError("stockcard.opening_invalid", 422, detail="missing_identity")
-    as_of_date = row.get("as_of_date")
-    if not as_of_date:
+    raw_date = row.get("as_of_date")
+    if not raw_date:
         raise PosError("stockcard.opening_invalid", 422, detail="missing_as_of_date")
+    as_of_date = _parse_as_of_date(raw_date)
     qty = _dec(row.get("qty", 0), field="qty")
     unit_cost = _dec(row.get("unit_cost", 0), field="unit_cost")
     return product_id, name_key, qty, unit_cost, as_of_date

@@ -29,6 +29,7 @@ export const VALID_ROUTES = [
     'sales-invoices',
     'sales-products',
     'expense-data',
+    'stock-card',
     'sales-account',
     'reconcile',
     'cloud',
@@ -91,6 +92,7 @@ export const MAIN_ENTRY_ROUTES = new Set<string>([
     'templates',
     'api-keys',
     'guide',
+    'stock-card',
 ]);
 
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
@@ -114,6 +116,7 @@ export const ROUTE_LOADERS: Record<string, string> = {
     'sales-invoices': 'loadSalesWorkbench',
     'sales-products': 'loadSalesProducts',
     'expense-data': 'loadExpenseData',
+    'stock-card': 'loadStockCard',
     'sales-account': 'loadSalesAccount',
     purchase: 'loadPurchaseList',
     'purchase-suppliers': 'loadPurchaseSuppliers',

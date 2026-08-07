@@ -76,6 +76,32 @@ export const SIDEBAR_HTML = `
         </div>
     </div>
 
+    <!-- 商品(事务所端) ▼ 可折叠组(2026-08-07 · 商品收发存报表 · 与上方「商品」组[data-collapsible=products·
+         POS 商户端商品数据/费用数据/库存]各是各的,互不相碰)· 清单门控见 nav-presets NAV_NODES.firmGoods +
+         FIRM_PRESET.show(POS_PRESET 不含)· 默认隐藏,由 applyNavPreset 按业态显、stock-card.ts 探针按
+         entitlement 收(两路径互不冲突,见 applyNavPreset 尾部注释)。 -->
+    <div class="nav-group nav-collapsible" data-collapsible="firm-goods" id="nav-group-firm-goods" style="display:none;">
+        <div class="nav-group-toggle" data-toggle-group="firm-goods">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 7l7-4 7 4v6l-7 4-7-4V7z"/>
+                <path d="M3 7l7 4 7-4M10 11v6"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-firm-goods">商品</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="stock-card">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 3.5h9a2 2 0 012 2V17l-3-2-3 2-3-2-2 2V3.5z"/>
+                    <path d="M7 7h6M7 10h6M7 13h4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-stock-card">收发存报表</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 进项管理 ▼ 可折叠组(采购 Phase 1 · 3 子项:采购/进项 · 供应商 · 采购设置)· 门控 expense -->
     <div class="nav-group nav-collapsible" data-collapsible="expense">
         <div class="nav-group-toggle" data-toggle-group="expense">

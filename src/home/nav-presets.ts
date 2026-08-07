@@ -31,7 +31,8 @@ const POS_AVATAR_HIDE = [...FIRM_AVATAR_HIDE, 'avatar-menu-console'];
 export const NAV_NODES: Record<string, string> = {
     dashboard: '.nav-item[data-route="dashboard"]',
     cowork: '[data-collapsible="firm"]', // Pearnly Cowork(录入 / 识别 / 推送 / 对账)
-    products: '[data-collapsible="products"]', // 商品系统
+    products: '[data-collapsible="products"]', // 商品系统(POS/商户端:商品数据/费用数据/库存)
+    firmGoods: '[data-collapsible="firm-goods"]', // 商品(事务所端:收发存报表 · 与 products 各是各的)
     purchases: '[data-collapsible="expense"]', // 采购系统
     sales: '[data-collapsible="sales"]', // 销售系统
     accounting: '[data-collapsible="accounting"]', // 做账
@@ -50,6 +51,7 @@ export const FIRM_PRESET: NavPreset = {
     show: [
         'dashboard',
         'cowork',
+        'firmGoods',
         'purchases',
         'clients',
         'company',
@@ -108,5 +110,9 @@ export function applyNavPreset(preset: NavPreset): void {
             el.querySelectorAll<HTMLElement>('[data-module]').forEach((s) => show(s, true));
         }
     });
+    // 商品收发存报表:清单只回答「这个业态可能有」,真开没开还要看后端 entitlement 探针
+    // (stock-card.ts probeStockCardStatus)。探针与本函数谁先跑到不定——探针那边算完也会
+    // 直接把元素收起,这里再按已知结果收一遍,两处双写但只收不显,顺序不影响收敛结果。
+    if (window._stockCardDisabled) show(document.getElementById('nav-group-firm-goods'), false);
     redirectOffHidden(preset.home);
 }

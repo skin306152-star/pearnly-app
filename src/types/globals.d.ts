@@ -320,6 +320,12 @@ interface Window {
     // POS · 操作记录/异常页(view 级 · 路由 pos-audit · 平铺 section · 防内盗汇总+下钻)
     loadPosAudit?: () => void;
     loadInventoryPage?: () => void;
+    // 事务所端 · 商品收发存报表(路由 stock-card · firm 业态专属)
+    loadStockCard?: () => void;
+    // 收发存 entitlement 探针结果(module-nav 的 applyNavPreset 与 stock-card.ts 的探针
+    // 两处都可能先跑到,双写收敛:未知/开通 = undefined,关闭 = true,见 nav-presets.ts)。
+    _stockCardDisabled?: boolean;
+    _stockCardProbed?: boolean;
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;
     loadPosCashiers?: () => void;

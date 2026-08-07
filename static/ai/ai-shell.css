@@ -584,6 +584,10 @@ body.side-collapsed .side .foot {
 @media (max-width: 1100px) {
   .side {
     width: 64px;
+    /* 窄屏断点靠视口尺寸切换,不该带动画:视口缩小的一瞬 .side 还在 240ms 过渡途中,
+     * 内容区已按新宽度回流,叠出瞬态横向溢出(_ui1 溢出探针真机抓获)。动画只留给
+     * 手动 toggle(≥1100px 才有那颗按钮)。 */
+    transition: none;
   }
   .brand-row {
     justify-content: center;

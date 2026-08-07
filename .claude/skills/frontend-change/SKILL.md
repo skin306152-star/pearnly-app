@@ -50,6 +50,13 @@ python scripts/check_theme_responsive.py --gate --quiet
 python scripts/check_asset_bundling.py
 ```
 
+删 UI 特性或改默认行为(默认展开/折叠、入口位置、控件存废)时,先全量扫存量 E2E:
+`grep -rn "<特性的 id/class/文案>" tests/e2e/*.spec.js scripts/_*.cjs`,断言旧行为的
+测试与实现同批改掉——`.spec.js` 不在 cjs 台账 covers 里,漏扫只能等 CI 红
+(2026-08-08 一夜三轮返工的根因,别再犯)。给元素加 transition/animation 也算行为
+改变:视口断点切换处的动画会让"改尺寸后立刻断言几何"的测试抓到瞬态,断点内显式
+`transition: none` 或让测试等动画收敛。
+
 ## 5. 验收
 
 UI 改动一律真浏览器 + 截图为证(抓 `isVisible` / `getComputedStyle`)。详见 `verification` skill 第 3 节。

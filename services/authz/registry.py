@@ -106,6 +106,14 @@ POS_CODES = (
 
 INTAKE_CODES = ("intake.upload",)
 
+# 商品收发存报表(Stock Card · acct.books 族惯例:同挂 accounting 模块,鉴权走
+# routes/accounting_common 的 auth_member/gate)。report.view=看报表/期初记录(读);
+# opening.manage=填期初/商品归并(写,回填历史行分类·不影响任何已过账金额)。
+STOCKCARD_CODES = (
+    "stockcard.report.view",
+    "stockcard.opening.manage",
+)
+
 # 敏感字段可见性(G4 · 字段级遮蔽,非模块动作)。缺码 → 成本/工资列读侧返 null。
 # 不挂任何模块开关(横切),预设角色除收银员外按现状全开;自定义角色可关。
 FIELD_CODES = (
@@ -125,6 +133,7 @@ ALL_CODES: frozenset[str] = frozenset(
     + INV_CODES
     + POS_CODES
     + INTAKE_CODES
+    + STOCKCARD_CODES
     + FIELD_CODES
 )
 
@@ -142,6 +151,7 @@ _PREFIX_MODULE = {
     "inv": "inventory",
     "pos": "pos",
     "intake": "expense",
+    "stockcard": "accounting",
     "team": None,
     "billing": None,
     "ownership": None,
@@ -177,6 +187,7 @@ _VIEW_EXPORT = (
     "inv.view",
     "inv.report.view",
     "pos.report.view",
+    "stockcard.report.view",
     # 预设角色按现状可见成本/工资(G4:默认全开,自定义角色才关)
     "field.cost.view",
     "field.payroll.view",
@@ -208,6 +219,7 @@ _CLERK = (
     "inv.create",
     "inv.report.view",
     "intake.upload",
+    "stockcard.report.view",
     "field.cost.view",
     "field.payroll.view",
 )
@@ -229,6 +241,7 @@ _ACCOUNTANT = _CLERK + (
     "recon.export",
     "inv.approve",
     "pos.report.view",
+    "stockcard.opening.manage",
 )
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {

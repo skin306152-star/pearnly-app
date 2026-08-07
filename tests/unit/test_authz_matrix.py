@@ -48,7 +48,12 @@ def _expected(role, code):
             return True
         if code in {"pos.report.view", "acct.entry.review", "tax.filing.review", "tax.filing.file"}:
             return True
-        if code in {"acct.coa.manage", "sales.product.manage", "purchase.supplier.manage"}:
+        if code in {
+            "acct.coa.manage",
+            "sales.product.manage",
+            "purchase.supplier.manage",
+            "stockcard.opening.manage",
+        }:
             return True
         return code in BUSINESS - POS and _verb(code) in {"approve", "export"}
     raise AssertionError(f"unknown role {role}")

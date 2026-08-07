@@ -19,7 +19,7 @@
 
 依据:QBO Advanced 自定义角色的 view/create/edit/delete/approve 五动作是行业最标准实现;Xero Draft only vs Approve and pay 证明 create 与 approve 必须分档(NIST RBAC2 职责分离同构)。
 
-## 权限点全集(registry · 58 个)
+## 权限点全集(registry · 67 个)
 
 ### 横切域(不挂模块开关)
 
@@ -44,6 +44,8 @@ expense:    purchase.doc.view  purchase.doc.create  purchase.doc.edit  purchase.
 accounting: acct.entry.view  acct.entry.review   # 逐笔审例外
             acct.entry.approve  # 过账/关账(不可逆)
             acct.coa.manage  acct.ledger.export  acct.settings.manage
+            stockcard.report.view   # 商品收发存报表(移动加权平均)
+            stockcard.opening.manage   # 期初结存 + 商品归并(回填分类,不碰金额)
 tax:        tax.filing.view  tax.filing.create   # 生成税表草稿
             tax.filing.review   # 复核签批(C3 四权分立·制单人不得自审)
             tax.filing.approve  # 提交(不可逆·已报不可改)

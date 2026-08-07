@@ -166,6 +166,13 @@ function renderListTable(): void {
     });
 }
 
+// shellHtml() 里徽章文案是静态占位「0」,语言切换整壳重渲后必须用这份状态补一次真值,
+// 不然刚拉到手的 excludedCount 会被模板里那个「0」悄悄顶掉(真实复现过:切语言后角标归零)。
+function syncExcludedBadge(): void {
+    const badge = document.getElementById('stc-excluded-cnt');
+    if (badge) badge.textContent = String(excludedCount);
+}
+
 async function loadSummary(): Promise<void> {
     const tbl = document.getElementById('stc-tbl-list');
     if (tbl) tbl.innerHTML = stcListHead() + stcSkeletonBody(9);
@@ -176,8 +183,7 @@ async function loadSummary(): Promise<void> {
         products = resp.products;
         excludedCount = resp.excluded_count;
         excludedRows = null; // 日期范围可能已变,强制未入账清单下次切 tab 重拉
-        const badge = document.getElementById('stc-excluded-cnt');
-        if (badge) badge.textContent = String(excludedCount);
+        syncExcludedBadge();
         renderListTable();
         backToList();
     } catch (_) {
@@ -261,7 +267,7 @@ function openOpeningsModal(): void {
     const mask = document.getElementById('stc-op-mask');
     if (!mask) return;
     const rows = products.map(openingRowHtml).join('');
-    mask.innerHTML = `<div class="modal modal-md">
+    mask.innerHTML = `<div class="modal modal-md stc">
         <div class="modal-header"><div class="modal-title">${esc(t('stc-op-title'))}</div><button type="button" class="modal-close" id="stc-op-close">&times;</button></div>
         <div class="modal-body">
             <p class="stc-hint">${esc(t('stc-op-hint'))}</p>
@@ -337,7 +343,7 @@ function openMergeModal(selfKey: string): void {
     const options = candidates
         .map((p) => `<option value="${esc(p.product_id)}">${esc(p.name)}</option>`)
         .join('');
-    mask.innerHTML = `<div class="modal modal-md">
+    mask.innerHTML = `<div class="modal modal-md stc">
         <div class="modal-header"><div class="modal-title">${esc(t('stc-mg-title'))}</div><button type="button" class="modal-close" id="stc-mg-close">&times;</button></div>
         <div class="modal-body">
             <p class="stc-hint">${esc(t('stc-mg-hint'))}</p>
@@ -467,6 +473,7 @@ if (typeof window.subscribeI18n === 'function') {
         if (!sec || !sec.querySelector('.stc')) return;
         setBody(shellHtml());
         bindShell();
+        syncExcludedBadge();
         renderListTable();
         applyViewVisibility();
         if (currentTab === 'excluded' && excludedRows) loadExcluded();

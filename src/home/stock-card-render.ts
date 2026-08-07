@@ -140,15 +140,23 @@ export function stcDetailRow(r: StcCardRow): string {
 
 // 后端 totals 缺的字段从 rows 现算兜底(口径与后端一致:按 kind 分组求和;结存取最后一行,
 // 无行则回落 0/null)——不让页面因为 totals 形状不齐就崩或印错数。
-function sumKind(rows: StcCardRow[], kind: StcCardRow['kind']): { qty: number; amt: number } {
+// amt 只要这组里有一行金额未知就整组置 null(不拿 0 顶替未知再求和):否则「有几行没成本」
+// 混几行有成本一起加,和会悄悄把「不知道」印成一个看着精确的数字,踩任务口径明文禁的
+// 「不四舍五入造假」——空值必须一路传导到合计,不能在中途被 Number(null)||0 焊死成 0。
+function sumKind(
+    rows: StcCardRow[],
+    kind: StcCardRow['kind']
+): { qty: number; amt: number | null } {
     let qty = 0;
     let amt = 0;
+    let amtKnown = true;
     for (const r of rows) {
         if (r.kind !== kind) continue;
         qty += Number(r.qty) || 0;
-        amt += Number(r.amount) || 0;
+        if (r.amount == null) amtKnown = false;
+        else amt += Number(r.amount) || 0;
     }
-    return { qty, amt };
+    return { qty, amt: amtKnown ? amt : null };
 }
 
 export function stcDetailFoot(card: StcCardResp): string {

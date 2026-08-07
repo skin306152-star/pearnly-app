@@ -19,6 +19,7 @@ from routes.history_routes import (
     HistoryBatchDeleteRequest,
     HistoryPostingRequest,
     HistoryUpdateRequest,
+    OcrConvertRequest,
     _check_history_access,
     router,
 )
@@ -40,6 +41,7 @@ class HistoryRoutesContractTests(unittest.TestCase):
             ("GET", "/api/history/{record_id}/page/{page}.png"),
             ("POST", "/api/history/batch-delete"),
             ("POST", "/api/ocr/commit"),
+            ("POST", "/api/ocr/convert-documents"),  # intake_bridge · 确认→正式单据
             ("GET", "/api/v1/history"),
             ("GET", "/api/v1/history/{record_id}"),
             ("PUT", "/api/v1/history/{record_id}"),
@@ -49,7 +51,7 @@ class HistoryRoutesContractTests(unittest.TestCase):
             ("PATCH", "/api/history/{record_id}/posting"),  # F5 · 人工裁决现/赊、货/费
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 15)
+        self.assertEqual(len(router.routes), 16)
 
     def test_app_includes_history_router(self):
         """防 include_router 漏挂 · app 必须能路由到 history"""
@@ -80,6 +82,9 @@ class HistoryRoutesContractTests(unittest.TestCase):
         self.assertEqual(set(HistoryUpdateRequest.model_fields.keys()), {"pages"})
         self.assertEqual(set(HistoryBatchDeleteRequest.model_fields.keys()), {"ids"})
         self.assertEqual(set(HistoryPostingRequest.model_fields.keys()), {"payment", "item_type"})
+        self.assertEqual(
+            set(OcrConvertRequest.model_fields.keys()), {"history_ids", "workspace_client_id"}
+        )
 
 
 if __name__ == "__main__":

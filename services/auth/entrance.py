@@ -40,6 +40,8 @@ ALL_ENTRANCES = (MAIN, POS, AI, DMS)
 #     AI SPA 工单(static/ai/ai-api*.js → /api/workorder,四权分立映射 tax.filing.*)都调 tax.* 码。
 #   - acct/recon/kb/ar = {main}:做账/对账/知识库/应收是会计主壳专属,POS/AI 壳无这些菜单
 #     (AI 工单内部对账走 tax.filing.* 码,不走 recon.*)。
+#   - stockcard = {main}:商品收发存报表是事务所端按客户账套出的会计报表,与 acct/recon
+#     同款会计主壳专属,POS/AI/DMS 会话不该调得到 /api/stockcard/*。
 #   - pos = {pos}:收银专属。
 # 未列前缀(team/billing/ownership/settings/audit/field 等横切中性码)与未知前缀 → None(中性,
 # 不归任何入口,_check 里短路放行,否则登录 bootstrap 的 /api/me 系列全崩)。
@@ -48,6 +50,7 @@ _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
     "tax": frozenset({MAIN, AI}),
     "acct": frozenset({MAIN}),
     "recon": frozenset({MAIN}),
+    "stockcard": frozenset({MAIN}),
     "kb": frozenset({MAIN}),
     "ar": frozenset({MAIN}),
     "sales": frozenset({MAIN, POS}),

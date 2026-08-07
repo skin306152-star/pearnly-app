@@ -222,8 +222,12 @@ class StockCardReportRealTests(unittest.TestCase):
     def _card(self, ws, key, d_from, d_to):
         with self.db.get_cursor() as cur:
             return self.report.card(
-                cur, tenant_id=self.tenant_id, workspace_client_id=ws, key=key,
-                date_from=d_from, date_to=d_to,
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=ws,
+                key=key,
+                date_from=d_from,
+                date_to=d_to,
             )
 
     # ── ① 跨账套隔离 ──────────────────────────────────────────────
@@ -254,8 +258,11 @@ class StockCardReportRealTests(unittest.TestCase):
     def test_excluded_list_has_all_three_reasons(self):
         with self.db.get_cursor() as cur:
             rows = self.report.excluded(
-                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
-                date_from=date(2031, 4, 1), date_to=date(2031, 4, 30),
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=self.ws_a,
+                date_from=date(2031, 4, 1),
+                date_to=date(2031, 4, 30),
             )
         by_reason = {r["reason"]: r for r in rows}
         self.assertEqual(set(by_reason), {"service", "no_qty_price", "total_only"})
@@ -274,12 +281,18 @@ class StockCardReportRealTests(unittest.TestCase):
         d_from, d_to = date(2031, 4, 1), date(2031, 4, 30)
         with self.db.get_cursor() as cur:
             summary = self.report.summary(
-                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
-                date_from=d_from, date_to=d_to,
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=self.ws_a,
+                date_from=d_from,
+                date_to=d_to,
             )
             rows = self.report.excluded(
-                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
-                date_from=d_from, date_to=d_to,
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=self.ws_a,
+                date_from=d_from,
+                date_to=d_to,
             )
         self.assertEqual(summary["excluded_count"], len(rows))
         self.assertEqual(summary["excluded_count"], 3)  # ③ 三个 reason 各一例,同期间内
@@ -289,12 +302,18 @@ class StockCardReportRealTests(unittest.TestCase):
         d_from, d_to = date(2031, 4, 3), date(2031, 4, 3)
         with self.db.get_cursor() as cur:
             summary = self.report.summary(
-                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
-                date_from=d_from, date_to=d_to,
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=self.ws_a,
+                date_from=d_from,
+                date_to=d_to,
             )
             rows = self.report.excluded(
-                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
-                date_from=d_from, date_to=d_to,
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=self.ws_a,
+                date_from=d_from,
+                date_to=d_to,
             )
         self.assertEqual(summary["excluded_count"], len(rows))
         self.assertEqual(summary["excluded_count"], 1)
@@ -323,8 +342,11 @@ class StockCardReportRealTests(unittest.TestCase):
     def test_summary_reports_the_same_opening_and_balance_as_card(self):
         with self.db.get_cursor() as cur:
             summary = self.report.summary(
-                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
-                date_from=date(2031, 2, 1), date_to=date(2031, 2, 28),
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=self.ws_a,
+                date_from=date(2031, 2, 1),
+                date_to=date(2031, 2, 28),
             )
         row = next(p for p in summary["products"] if p["key"] == f"n:{_GADGET}")
         self.assertEqual(row["opening_qty"], "20.000")

@@ -126,7 +126,9 @@ def summary(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_to
     return {"products": out, "excluded_count": excluded_count}
 
 
-def card(cur, *, tenant_id: str, workspace_client_id: int, key: str, date_from, date_to) -> Optional[dict]:
+def card(
+    cur, *, tenant_id: str, workspace_client_id: int, key: str, date_from, date_to
+) -> Optional[dict]:
     data = mv_svc.load(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
     )

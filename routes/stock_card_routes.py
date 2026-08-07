@@ -71,9 +71,11 @@ def _public_opening(row: dict) -> dict:
         "name_key": row.get("name_key"),
         "qty": str(row["qty"]),
         "unit_cost": str(row["unit_cost"]),
-        "as_of_date": row["as_of_date"].isoformat()
-        if hasattr(row["as_of_date"], "isoformat")
-        else row["as_of_date"],
+        "as_of_date": (
+            row["as_of_date"].isoformat()
+            if hasattr(row["as_of_date"], "isoformat")
+            else row["as_of_date"]
+        ),
     }
 
 

@@ -71,13 +71,21 @@ class StockCardMergeRealTests(unittest.TestCase):
 
             # 正路:并进本账套自己的商品。
             cls.merge_result = merge_svc.merge_into_product(
-                cur, tenant_id=cls.tenant_id, workspace_client_id=cls.ws_a,
-                name_key=_ITEM, product_id=cls.product_a, actor=cls.actor,
+                cur,
+                tenant_id=cls.tenant_id,
+                workspace_client_id=cls.ws_a,
+                name_key=_ITEM,
+                product_id=cls.product_a,
+                actor=cls.actor,
             )
             # 反证:目标商品挂在别的账套(product_b 属于 ws_b),在 ws_a 视角下必须查无此商品。
             cls.cross_account_result = merge_svc.merge_into_product(
-                cur, tenant_id=cls.tenant_id, workspace_client_id=cls.ws_a,
-                name_key=_ITEM, product_id=cls.product_b, actor=cls.actor,
+                cur,
+                tenant_id=cls.tenant_id,
+                workspace_client_id=cls.ws_a,
+                name_key=_ITEM,
+                product_id=cls.product_b,
+                actor=cls.actor,
             )
 
     # ── 夹具落库 ──────────────────────────────────────────────────
@@ -149,7 +157,8 @@ class StockCardMergeRealTests(unittest.TestCase):
             )
             for doc_id in cls._purchase_doc_ids:
                 cur.execute(
-                    "DELETE FROM purchase_docs WHERE tenant_id=%s AND id=%s", (cls.tenant_id, doc_id)
+                    "DELETE FROM purchase_docs WHERE tenant_id=%s AND id=%s",
+                    (cls.tenant_id, doc_id),
                 )
             for doc_id in cls._sales_doc_ids:
                 cur.execute(
@@ -231,8 +240,12 @@ class StockCardMergeRealTests(unittest.TestCase):
 
         with self.db.get_cursor() as cur:
             card = report_svc.card(
-                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
-                key=f"p:{self.product_a}", date_from=date(2031, 5, 1), date_to=date(2031, 5, 2),
+                cur,
+                tenant_id=self.tenant_id,
+                workspace_client_id=self.ws_a,
+                key=f"p:{self.product_a}",
+                date_from=date(2031, 5, 1),
+                date_to=date(2031, 5, 2),
             )
         self.assertIsNotNone(card, "并完的商品键在报表里查不到")
         self.assertEqual(card["product"]["product_id"], self.product_a)

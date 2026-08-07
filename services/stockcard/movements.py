@@ -75,28 +75,44 @@ _SALES_SQL = (
 def _classify_purchase(row: dict, out: MovementSet) -> None:
     if row["line_id"] is None:
         out.add_excluded(
-            date=row["doc_date"], doc_no=row["doc_no"], desc="", amount=row["grand_total"],
-            reason=REASON_TOTAL_ONLY, side="purchase",
+            date=row["doc_date"],
+            doc_no=row["doc_no"],
+            desc="",
+            amount=row["grand_total"],
+            reason=REASON_TOTAL_ONLY,
+            side="purchase",
         )
         return
     if row["doc_kind"] not in _GOODS_KINDS or row["item_type"] != "goods":
         out.add_excluded(
-            date=row["doc_date"], doc_no=row["doc_no"], desc=row["description"],
-            amount=row["line_total"], reason=REASON_SERVICE, side="purchase",
+            date=row["doc_date"],
+            doc_no=row["doc_no"],
+            desc=row["description"],
+            amount=row["line_total"],
+            reason=REASON_SERVICE,
+            side="purchase",
         )
         return
     qty = row["qty"]
     if qty is None or Decimal(qty) <= 0 or row["line_total"] is None:
         out.add_excluded(
-            date=row["doc_date"], doc_no=row["doc_no"], desc=row["description"],
-            amount=row["line_total"], reason=REASON_NO_QTY_PRICE, side="purchase",
+            date=row["doc_date"],
+            doc_no=row["doc_no"],
+            desc=row["description"],
+            amount=row["line_total"],
+            reason=REASON_NO_QTY_PRICE,
+            side="purchase",
         )
         return
     key = grouping.group_key(product_id=row["product_id"], description=row["description"])
     if key is None:
         out.add_excluded(
-            date=row["doc_date"], doc_no=row["doc_no"], desc=row["description"],
-            amount=row["line_total"], reason=REASON_NO_QTY_PRICE, side="purchase",
+            date=row["doc_date"],
+            doc_no=row["doc_no"],
+            desc=row["description"],
+            amount=row["line_total"],
+            reason=REASON_NO_QTY_PRICE,
+            side="purchase",
         )
         return
     qty_d = Decimal(qty)
@@ -104,8 +120,12 @@ def _classify_purchase(row: dict, out: MovementSet) -> None:
     out.add_movement(
         key,
         Movement(
-            date=row["doc_date"], doc_no=row["doc_no"] or "", desc=row["description"] or "",
-            direction="in", qty=qty_d, price=price,
+            date=row["doc_date"],
+            doc_no=row["doc_no"] or "",
+            desc=row["description"] or "",
+            direction="in",
+            qty=qty_d,
+            price=price,
             sort_key=(row["doc_date"], row["doc_created_at"], row["line_no"] or 0),
         ),
     )
@@ -114,30 +134,46 @@ def _classify_purchase(row: dict, out: MovementSet) -> None:
 def _classify_sale(row: dict, out: MovementSet) -> None:
     if row["line_id"] is None:
         out.add_excluded(
-            date=row["issue_date"], doc_no=row["doc_number"], desc="", amount=row["grand_total"],
-            reason=REASON_TOTAL_ONLY, side="sale",
+            date=row["issue_date"],
+            doc_no=row["doc_number"],
+            desc="",
+            amount=row["grand_total"],
+            reason=REASON_TOTAL_ONLY,
+            side="sale",
         )
         return
     qty = row["qty"]
     if qty is None or Decimal(qty) <= 0:
         out.add_excluded(
-            date=row["issue_date"], doc_no=row["doc_number"], desc=row["description"],
-            amount=row["line_total"], reason=REASON_NO_QTY_PRICE, side="sale",
+            date=row["issue_date"],
+            doc_no=row["doc_number"],
+            desc=row["description"],
+            amount=row["line_total"],
+            reason=REASON_NO_QTY_PRICE,
+            side="sale",
         )
         return
     key = grouping.group_key(product_id=row["product_id"], description=row["description"])
     if key is None:
         out.add_excluded(
-            date=row["issue_date"], doc_no=row["doc_number"], desc=row["description"],
-            amount=row["line_total"], reason=REASON_NO_QTY_PRICE, side="sale",
+            date=row["issue_date"],
+            doc_no=row["doc_number"],
+            desc=row["description"],
+            amount=row["line_total"],
+            reason=REASON_NO_QTY_PRICE,
+            side="sale",
         )
         return
     direction = "in" if row["doc_type"] == "credit_note" else "out"
     out.add_movement(
         key,
         Movement(
-            date=row["issue_date"], doc_no=row["doc_number"] or "", desc=row["description"] or "",
-            direction=direction, qty=Decimal(qty), price=None,
+            date=row["issue_date"],
+            doc_no=row["doc_number"] or "",
+            desc=row["description"] or "",
+            direction=direction,
+            qty=Decimal(qty),
+            price=None,
             sort_key=(row["issue_date"], row["doc_created_at"], row["line_no"] or 0),
         ),
     )

@@ -15,8 +15,12 @@ from services.stockcard.rolling import Movement, ZERO_BALANCE, opening_balance, 
 
 def _mv(direction, qty, price=None, date=1, doc_no="D", line=1):
     return Movement(
-        date=date, doc_no=doc_no, desc="", direction=direction,
-        qty=Decimal(str(qty)), price=None if price is None else Decimal(str(price)),
+        date=date,
+        doc_no=doc_no,
+        desc="",
+        direction=direction,
+        qty=Decimal(str(qty)),
+        price=None if price is None else Decimal(str(price)),
         sort_key=(date, date, line),
     )
 

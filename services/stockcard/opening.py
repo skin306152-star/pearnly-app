@@ -79,7 +79,15 @@ def upsert_openings(
         if product_id:
             cur.execute(
                 _UPSERT_PRODUCT,
-                (tenant_id, workspace_client_id, product_id, qty, unit_cost, as_of_date, created_by),
+                (
+                    tenant_id,
+                    workspace_client_id,
+                    product_id,
+                    qty,
+                    unit_cost,
+                    as_of_date,
+                    created_by,
+                ),
             )
         else:
             cur.execute(

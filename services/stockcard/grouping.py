@@ -36,9 +36,9 @@ def is_product_key(key: str) -> bool:
 
 def key_product_id(key: str) -> Optional[str]:
     """key 是 p: 轨才有意义,否则 None。"""
-    return key[len(PRODUCT_PREFIX):] if is_product_key(key) else None
+    return key[len(PRODUCT_PREFIX) :] if is_product_key(key) else None
 
 
 def key_name(key: str) -> Optional[str]:
     """key 是 n: 轨才有意义,否则 None。"""
-    return key[len(NAME_PREFIX):] if key.startswith(NAME_PREFIX) else None
+    return key[len(NAME_PREFIX) :] if key.startswith(NAME_PREFIX) else None

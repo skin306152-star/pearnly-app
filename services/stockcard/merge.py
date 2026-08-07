@@ -90,10 +90,18 @@ def merge_into_product(
         return None
 
     purchase_ids = _merge_purchase_lines(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, key=key, product_id=product_id
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        key=key,
+        product_id=product_id,
     )
     sales_ids = _merge_sales_lines(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, key=key, product_id=product_id
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        key=key,
+        product_id=product_id,
     )
 
     audit_store.insert_operation_log(

@@ -134,7 +134,9 @@ class StockCardRoutesContractTests(unittest.TestCase):
     # ── 期初:同一条 Query 契约 ────────────────────────────────────
 
     def test_openings_accepts_frontend_shape(self):
-        rows = [{"name": "น้ำแข็งหลอด", "qty": "10", "unit_cost": "5.00", "as_of_date": "2026-08-01"}]
+        rows = [
+            {"name": "น้ำแข็งหลอด", "qty": "10", "unit_cost": "5.00", "as_of_date": "2026-08-01"}
+        ]
         r = self.client.post("/api/stockcard/openings?workspace_client_id=1", json={"rows": rows})
         self.assertEqual(r.status_code, 200, r.text)
 

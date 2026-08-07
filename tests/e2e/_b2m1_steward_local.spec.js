@@ -266,38 +266,40 @@ async function bg(page, selector) {
 }
 
 test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
-    test('闸开:命令条在矩阵上方 · 四个 chips · 侧栏有管家', async ({ page }) => {
+    test('闸开:工作台无命令条(2026-08-07 拍板删除)· 侧栏有管家', async ({ page }) => {
         await boot(page);
-        await page.waitForSelector('#stwBar .stw-bar-row', { state: 'visible', timeout: 15000 });
+        await page.waitForSelector('#matrixSection', { state: 'visible', timeout: 15000 });
         await expect(page.locator('#navSteward')).toBeVisible();
-        await expect(page.locator('#stwBar .stw-chip')).toHaveCount(4);
-        // 「上方」不是看代码顺序,是看真实几何:命令条底边必须在矩阵区顶边之上。
-        const bar = await page.locator('#stwBar').boundingBox();
-        const matrix = await page.locator('#matrixSection').boundingBox();
-        expect(bar.y + bar.height).toBeLessThanOrEqual(matrix.y);
+        // 命令条整块已按拍板删除:工作台只留矩阵/看板,问事情去管家页。
+        await expect(page.locator('#stwBar')).toHaveCount(0);
+        await expect(page.locator('.stw-bar-row')).toHaveCount(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '01-bar-on-dashboard.png'),
             fullPage: true,
         });
     });
 
-    test('点 chip → 进管家页 · 对话上屏 · 左窗五态各是各的色族', async ({ page }) => {
-        await boot(page);
-        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
-        const chipText = await page.locator('#stwBar .stw-chip').first().innerText();
-        await page.locator('#stwBar .stw-chip').first().click();
+    test('管家页打字提问 · 对话上屏 · 左窗五态各是各的色族', async ({ page }) => {
+        // 命令条已删,入口=侧栏进管家页自己打字(与真实用户动线一致)。
+        const chipText = '本期谁缺料';
+        await boot(page, { hash: '#/steward' });
         await page.waitForSelector('#v-steward.on', { state: 'visible', timeout: 15000 });
         expect(page.url()).toContain('#/steward');
+        await page.fill('#stwInput', chipText);
+        await page.locator('.stw-send-btn').click();
 
-        // 用户气泡 = 点的那条 chip 原话;管家气泡 = 后端 reply(前端不自己编措辞)。
+        // 用户气泡 = 打的原话;管家气泡 = 后端 reply(前端不自己编措辞)。
         await expect(page.locator('.stw-msg.me .stw-bubble').first()).toContainText(chipText);
         await expect(page.locator('.stw-msg.agent .stw-ai-body').first()).toContainText('还缺料');
 
         // 过程条:聊天标题 = 用户这轮原话;任务摘要 + 查询次数 + 五个步骤(S1 起挂在对话流里)。
+        // 2026-08-07 拍板:执行过程条默认恒折叠 —— 先断言默认收起,再点开验内容。
         await page.waitForSelector('.stw-msg.agent .stw-proc', {
             state: 'visible',
             timeout: 15000,
         });
+        await expect(page.locator('.stw-msg.agent .stw-proc .stw-steps')).not.toBeVisible();
+        await page.locator('.stw-msg.agent .stw-proc .stw-proc-hd').click();
         await expect(page.locator('.stw-msg.agent .stw-proc .stw-proc-hd')).toContainText(
             '查事务所矩阵'
         );
@@ -366,8 +368,13 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
 
     test('轮询把 running 翻成 done(5s 一跳 · 终态收口)', async ({ page }) => {
         await boot(page, { taskStates: ['running', 'done'] });
-        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
-        await page.locator('#stwBar .stw-chip').first().click();
+        // 命令条已删(2026-08-07 拍板):入场=管家页打字发送,与真实动线一致。
+        await page.evaluate(() => {
+            location.hash = '#/steward';
+        });
+        await page.waitForSelector('#stwInput', { state: 'visible', timeout: 15000 });
+        await page.fill('#stwInput', '本期谁缺料');
+        await page.locator('.stw-send-btn').click();
         await page.waitForSelector('.stw-msg.agent .stw-proc', {
             state: 'visible',
             timeout: 15000,
@@ -395,8 +402,13 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
     // onTerminal 上,于是右窗停在「我去查」,答复要等人离页回页才补得上。
     test('首拍就是终态:收尾那句当场补回来,不用离页回页', async ({ page }) => {
         const h = await boot(page, { taskStates: ['done'], closeout: true });
-        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
-        await page.locator('#stwBar .stw-chip').first().click();
+        // 命令条已删(2026-08-07 拍板):入场=管家页打字发送,与真实动线一致。
+        await page.evaluate(() => {
+            location.hash = '#/steward';
+        });
+        await page.waitForSelector('#stwInput', { state: 'visible', timeout: 15000 });
+        await page.fill('#stwInput', '本期谁缺料');
+        await page.locator('.stw-send-btn').click();
         await page.waitForSelector('.stw-msg.agent .stw-proc', {
             state: 'visible',
             timeout: 15000,
@@ -450,8 +462,13 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
 
     test('深链点了真跳客户页并带期间', async ({ page }) => {
         await boot(page);
-        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
-        await page.locator('#stwBar .stw-chip').first().click();
+        // 命令条已删(2026-08-07 拍板):入场=管家页打字发送,与真实动线一致。
+        await page.evaluate(() => {
+            location.hash = '#/steward';
+        });
+        await page.waitForSelector('#stwInput', { state: 'visible', timeout: 15000 });
+        await page.fill('#stwInput', '本期谁缺料');
+        await page.locator('.stw-send-btn').click();
         await page.waitForSelector('.stw-msg.agent .stw-ai-flow .stw-art .stw-link', {
             state: 'visible',
             timeout: 15000,
@@ -468,8 +485,7 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
         await page.waitForSelector('#v-dashboard.on', { state: 'visible', timeout: 15000 });
         await page.waitForFunction(() => window.location.hash === '#/', null, { timeout: 10000 });
         await expect(page.locator('#navSteward')).toBeHidden();
-        await expect(page.locator('#stwBar')).toBeHidden();
-        expect(await page.locator('#stwBar').innerHTML()).toBe('');
+        await expect(page.locator('#stwBar')).toHaveCount(0);
         await expect(page.locator('#v-steward')).toBeHidden();
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '04-gate-closed-dashboard.png'),
@@ -480,8 +496,13 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
     test('手机 390px:单栏 · 状态卡在对话上方 · 无横向滚动', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await boot(page);
-        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
-        await page.locator('#stwBar .stw-chip').first().click();
+        // 命令条已删(2026-08-07 拍板):入场=管家页打字发送,与真实动线一致。
+        await page.evaluate(() => {
+            location.hash = '#/steward';
+        });
+        await page.waitForSelector('#stwInput', { state: 'visible', timeout: 15000 });
+        await page.fill('#stwInput', '本期谁缺料');
+        await page.locator('.stw-send-btn').click();
         await page.waitForSelector('.stw-msg.agent .stw-proc', {
             state: 'visible',
             timeout: 15000,
@@ -525,8 +546,13 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
 
     test('送不出去时说人话:错误横幅 + 用户那条留在原地可重发', async ({ page }) => {
         await boot(page, { sendFails: true });
-        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
-        await page.locator('#stwBar .stw-chip').first().click();
+        // 命令条已删(2026-08-07 拍板):入场=管家页打字发送,与真实动线一致。
+        await page.evaluate(() => {
+            location.hash = '#/steward';
+        });
+        await page.waitForSelector('#stwInput', { state: 'visible', timeout: 15000 });
+        await page.fill('#stwInput', '本期谁缺料');
+        await page.locator('.stw-send-btn').click();
         await page.waitForSelector('#v-steward.on', { state: 'visible', timeout: 15000 });
         await expect(page.locator('.stw-err')).toBeVisible();
         // 用户打的字不被吞:气泡还在,旁边有「重发」。
@@ -546,8 +572,13 @@ test.describe('智能管家 B2-M1(本地 stub · 真构建产物)', () => {
 test.describe('智能管家 B3(授权卡 · 取消 · 预算 · 本地 stub)', () => {
     async function openWithTask(page, opts) {
         const h = await boot(page, opts);
-        await page.waitForSelector('#stwBar .stw-chip', { state: 'visible', timeout: 15000 });
-        await page.locator('#stwBar .stw-chip').first().click();
+        // 命令条已删(2026-08-07 拍板):入场=管家页打字发送,与真实动线一致。
+        await page.evaluate(() => {
+            location.hash = '#/steward';
+        });
+        await page.waitForSelector('#stwInput', { state: 'visible', timeout: 15000 });
+        await page.fill('#stwInput', '本期谁缺料');
+        await page.locator('.stw-send-btn').click();
         await page.waitForSelector('#v-steward.on', { state: 'visible', timeout: 15000 });
         return h;
     }

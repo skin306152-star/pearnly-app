@@ -182,6 +182,14 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 商品收发存 schema 失败(等 alembic 0097): {e}")
 
+    # OCR 确认→正式单据转换桥 schema 双跑 · 与 alembic 0098 同源幂等 DDL。
+    try:
+        from services.intake_bridge.schema import ensure_intake_bridge_schema
+
+        ensure_intake_bridge_schema()
+    except Exception as e:
+        logger.warning(f"启动 intake_bridge schema 失败(等 alembic 0098): {e}")
+
     # 进项外流(Google 归档)schema + 注册 export 异步 handler(复用 recon_jobs worker)。
     try:
         from services.export.schema import ensure_export_schema

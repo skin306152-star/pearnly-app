@@ -13,7 +13,35 @@ import unittest
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SCRIPT = os.path.join(REPO_ROOT, "scripts", "ops", "pearnly_backup.sh")
-BASH = shutil.which("bash")
+
+
+def _find_bash():
+    """Prefer Git Bash on Windows over the legacy WSL launcher shim."""
+    candidates = []
+    if os.name == "nt":
+        for root in (os.environ.get("ProgramFiles"), os.environ.get("ProgramW6432")):
+            if root:
+                candidates.append(os.path.join(root, "Git", "bin", "bash.exe"))
+    path_bash = shutil.which("bash")
+    if path_bash:
+        candidates.append(path_bash)
+    for candidate in candidates:
+        if not os.path.isfile(candidate):
+            continue
+        try:
+            probe = subprocess.run(
+                [candidate, "--version"],
+                capture_output=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0:
+            return candidate
+    return None
+
+
+BASH = _find_bash()
 
 
 def _find_rclone():

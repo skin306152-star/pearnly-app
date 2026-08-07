@@ -39,6 +39,13 @@ cd "$ROOT" || exit 1
 #   PYTHONUTF8=1 是 UTF-8 模式,连 locale 编码一起改成 UTF-8,两个方向才对齐。
 # 反证在 tests/unit/test_pre_push_hook_env.py:拿本钩子导出的环境真跑那两个模块。
 export PYTHONUTF8=1
+export PYTHONDONTWRITEBYTECODE=1
+
+# Stale bytecode can win over a newer source file in a dirty development tree.
+# Remove generated caches before any Python gate, then prevent this hook from
+# creating another cache while it runs.
+find . -type d -name '__pycache__' -prune -exec rm -rf '{}' +
+find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
 echo "──────────────────────────────────────────────────────────"
 echo "🔒 pre-push 机械闸 · 推送前本地守门(防坏码上线)"
@@ -70,8 +77,10 @@ if [ -z "$CHANGED" ]; then
 fi
 
 PY_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.py$' || true)"
-FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.(js|mjs|ts|css|html|json)$' || true)"
+PY_PRODUCT_CHANGED="$(printf '%s\n' "$PY_CHANGED" | grep -E '^(app\.py|db\.py|routes/|core/|services/)' || true)"
+FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '(^src/|^static/|(^|/)(home|login)\.html$|\.(js|mjs|ts|css|html)$|^(package\.json|package-lock\.json|tsconfig\.json|vite\.config\.|eslint\.config\.)' || true)"
 TS_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.ts$' || true)"
+E2E_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(tests/e2e/.*\.spec\.js|tests/e2e/e2e_ledger\.json|scripts/_.*\.cjs|tests/unit/test_e2e_ledger_gate\.py)$' || true)"
 # 视觉照搬闸触发面(docs/pos/12)· 2026-07-31 从 pos|inventory|purchase 三个前缀放宽到整个
 # src/home/ 与 dist:闸的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条
 # route,旧写法对其中十几条本地完全不设防 —— dashboard 那条选择器烂了三周没人报警。push 即
@@ -155,28 +164,21 @@ if [ -n "$PY_CHANGED" ]; then
   python scripts/check_i18n_refs.py >/dev/null \
     || { python scripts/check_i18n_refs.py | tail -20; fail "check_i18n_refs(有键在词典里查不到 · 屏上会印裸键名)"; }
 
-  # 这趟是钩子里最贵的一步,但它是钩子里【唯一】盖「改一处崩别处」的闸:ruff/black 看
-  # 语法与格式,import app 只看启动,谁都看不见回归。push 即上线(webhook ~20s),CI 是几分钟
-  # 后的报警器 —— 把它交给 CI 等于「红了才发现已经上线」。所以【全量不砍,改成分片并行】
-  # (2026-08-02):tests/unit 长到 1089 模块/11k 用例,单进程 discover 串行 ~9.5 分钟只用 1 核;
-  # run_unit_sharded 按字母序连续切 6 段并行跑 —— 跑什么/什么顺序都与 discover 相同(有测试
-  # 钉住),只是摊到多核,实测 ~9.5 分钟 → 2-3 分钟。按 import 反查只跑受影响模块的路早验过
-  # 不通(213 个扫仓库/起子进程的模块没有 import 边,详见 git 历史此段旧注)。
-  #
-  # 剥掉 git 注入的 GIT_* 再跑(2026-07-31 P0 的机制性收口):钩子进程自带 GIT_DIR/
-  # GIT_INDEX_FILE,它俩盖过 subprocess 的 cwd=,于是「在临时目录造 commit」的测试把 init/add/
-  # commit 全打进了宿主仓(4838 files / -794172)。第 26 道闸拦的是「测试源码里出现 git 写操作」
-  # 这种写法,拦不住间接绕道(第三方库自己调 git、脚本再起脚本);把变量摘掉断的是机制本身,
-  # 两道并存。顺带让钩子里这趟跑在与 CI 相同的环境里 —— CI 容器里本来就没有这些变量。
-  # (2026-08-03 撤触发面裁剪:scan_camera 装虚拟时钟后 323s→5s,唯一裁剪理由消失,
-  #  钩子回到无条件全量 —— 裁剪清单本身就是被蚕食的风险面,能不留就不留。)
-  echo "  · 全量 unittest(分片并行 · 覆盖面与单进程 discover 相同 · 剥 GIT_* 跑)"
-  env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX \
-      -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_QUARANTINE_PATH \
-      python scripts/run_unit_sharded.py --quiet || fail "全量 unittest 红"
+  # 影响面引擎只裁剪「纯 unit 测试文件变更」:它不改变生产依赖,可安全只跑点名模块。
+  # 任何生产 Python 变更仍由 impact.py 回退到分片全量,不靠不完整的 import 反查冒险漏测。
+  # 子进程里的 GIT_* 由 impact.py 清掉,防测试造临时仓时把 init/add/commit 写回宿主仓。
+  echo "  · impact.py unit 影响面(测试-only 变更跑子集 · 生产 Python 仍全量分片)"
+  python scripts/impact.py --base "$BASE" --head HEAD --run-unit \
+    || fail "impact.py 规划的 unit 测试红"
 
   echo "  · 新债 diff 闸(禁新增 ensure_*/巨石路由 · 铁律 #5/#17)"
   python scripts/check_new_debt.py || fail "新债 diff 闸(新增 ensure_* 或 app.py 巨石路由)"
+fi
+
+if [ -n "$E2E_CHANGED" ] && [ -z "$PY_CHANGED" ]; then
+  echo "▶ E2E 影响面台账(所有 spec 必须登记 covers/only_e2e)"
+  python -m unittest tests.unit.test_e2e_ledger_gate \
+    || fail "E2E 影响面台账红(新增/改动 spec 未登记或 covers 失效)"
 fi
 
 # ── 前端闸(改了 js/css/html/json 才跑)────────────────────────
@@ -268,21 +270,27 @@ echo "  · check_line_ratchet(监控文件净增长 = 拦 · 合理增长在 com
 python scripts/check_line_ratchet.py --base "$BASE" --head HEAD --quiet \
   || fail "check_line_ratchet(监控文件行数净增 · 拆/移到独立文件 · 或 commit 加 RATCHET-EXEMPT: <file> +<N> · <理由>)"
 
-echo "  · check_ui_consistency(全站弹窗 + 按钮/切换蓝不用黑 · 硬规 D1/D2 · Zihao 2026-06-05)"
-python scripts/check_ui_consistency.py --quiet \
-  || fail "UI 硬规:新增了抽屉(用 .modal 弹窗)· 或按钮/切换黑底(改 var(--btn-blue) · 只导航栏可黑)"
+if [ -n "$FE_CHANGED" ]; then
+  echo "  · check_ui_consistency(全站弹窗 + 按钮/切换蓝不用黑 · 硬规 D1/D2 · Zihao 2026-06-05)"
+  python scripts/check_ui_consistency.py --quiet \
+    || fail "UI 硬规:新增了抽屉(用 .modal 弹窗)· 或按钮/切换黑底(改 var(--btn-blue) · 只导航栏可黑)"
 
-echo "  · check_theme_responsive(暗夜色走令牌 + 入口页 viewport · 棘轮 · 2026-06-15)"
-python scripts/check_theme_responsive.py --gate --quiet \
-  || fail "暗夜/移动端闸:新增了暗夜不翻面的写死色(3位hex/white·black/不透明rgb → 改 var(--token))· 或入口页缺 viewport · 见 docs/ui/THEME_RESPONSIVE_VERIFY.md"
+  echo "  · check_theme_responsive(暗夜色走令牌 + 入口页 viewport · 棘轮 · 2026-06-15)"
+  python scripts/check_theme_responsive.py --gate --quiet \
+    || fail "暗夜/移动端闸:新增了暗夜不翻面的写死色(3位hex/white·black·不透明rgb → 改 var(--token))· 或入口页缺 viewport · 见 docs/ui/THEME_RESPONSIVE_VERIFY.md"
+fi
 
-echo "  · check_e2e_stub_contracts(E2E 桩回包的顶层键 ≥ 真后端投影 · 2026-07-31)"
-python scripts/check_e2e_stub_contracts.py --quiet \
-  || fail "E2E 桩契约闸:桩比真后端少给键(见上方)· 截图会拍到产品里不存在的界面 · 登记表在 scripts/check_e2e_stub_contracts.py"
+if [ -n "$PY_PRODUCT_CHANGED$E2E_CHANGED" ]; then
+  echo "  · check_e2e_stub_contracts(E2E 桩回包的顶层键 ≥ 真后端投影 · 2026-07-31)"
+  python scripts/check_e2e_stub_contracts.py --quiet \
+    || fail "E2E 桩契约闸:桩比真后端少给键(见上方)· 截图会拍到产品里不存在的界面 · 登记表在 scripts/check_e2e_stub_contracts.py"
+fi
 
-echo "  · check_authz_coverage(每路由必声明权限或上公开白名单 · 第 8 道 · docs/permissions/05)"
-PEARNLY_SKIP_HEAVY_INIT=1 python scripts/check_authz_coverage.py --quiet \
-  || fail "authz 覆盖闸:有路由无守门且不在公开白名单(加 require_perm 或登记 PUBLIC_ROUTES)"
+if [ -n "$PY_PRODUCT_CHANGED" ]; then
+  echo "  · check_authz_coverage(每路由必声明权限或上公开白名单 · 第 8 道 · docs/permissions/05)"
+  PEARNLY_SKIP_HEAVY_INIT=1 python scripts/check_authz_coverage.py --quiet \
+    || fail "authz 覆盖闸:有路由无守门且不在公开白名单(加 require_perm 或登记 PUBLIC_ROUTES)"
+fi
 
 echo ""
 echo "✅ 全部守门绿 · 放行推送"

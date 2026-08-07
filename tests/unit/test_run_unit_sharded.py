@@ -42,18 +42,17 @@ class ShardsPartitionExactly(unittest.TestCase):
         self.assertEqual([m for s in shards for m in s], ["tests.unit.test_a", "tests.unit.test_b"])
 
 
-class HookRunsFullSuite(unittest.TestCase):
-    """钩子对 runner 不许带 --exclude:全量就是全量,裁剪清单是会被蚕食的风险面。
+class HookUsesImpactPlanner(unittest.TestCase):
+    """钩子通过 impact.py 分流,生产 Python 仍由 planner 保留 full fallback。"""
 
-    2026-08-03 曾因 scan_camera 单模块 323s 裁剪过一天;虚拟时钟治本(→5s)后撤掉。
-    再要裁剪,先治慢模块本身。"""
-
-    def test_hook_invokes_runner_without_exclude(self):
+    def test_hook_invokes_impact_and_planner_keeps_full_runner(self):
         hook = (Path(UNIT_DIR).parents[1] / "scripts" / "git-hooks" / "pre-push").read_text(
             encoding="utf-8"
         )
-        self.assertIn("python scripts/run_unit_sharded.py --quiet", hook)
-        self.assertNotIn("--exclude", hook)
+        impact = (Path(UNIT_DIR).parents[1] / "scripts" / "impact.py").read_text(encoding="utf-8")
+        self.assertIn("python scripts/impact.py --base", hook)
+        self.assertIn("scripts/run_unit_sharded.py", impact)
+        self.assertNotIn("--exclude", impact)
 
 
 class LoadFailureClassificationTests(unittest.TestCase):

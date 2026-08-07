@@ -610,6 +610,631 @@
       ]
     }
   },
+  "specs": {
+    "_b2m1_copy_rework_verify.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/steward_copy_rework",
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "管家返工文案在真实渲染结构中的失败、追问与待授权状态"
+      ]
+    },
+    "_b2m1_rework_verify.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/steward_m1_rework",
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "真实管家循环与询问栏在浏览器中的可见性和交互链路"
+      ]
+    },
+    "_b2m1_steward_local.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/b2m1_steward",
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "管家步骤条、命令栏和产物表格在真实页面中的状态渲染"
+      ]
+    },
+    "_steward_loop_ui_verify.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/steward_loop_ui",
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "管家循环步骤、失败态和追问候选在真实页面中的几何与可点性"
+      ]
+    },
+    "_steward_ui_batch0807_verify.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/steward_ui_batch0807",
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "管家菜单、历史会话、回形针和执行条状态在真实页面中的布局"
+      ]
+    },
+    "01-login.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "真账号登录过套账门进主应用、特征元素真可见且无 console error"
+      ]
+    },
+    "02-app-lang-switch.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "设置里切 zh/en/ja/th 后 html lang 真变、侧栏文字真换、无报错"
+      ]
+    },
+    "03-clients.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "客户两 tab 渲染、列表与空状态、搜索框真可用"
+      ]
+    },
+    "04-history.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "识别历史页真渲染、详情抽屉可打开"
+      ]
+    },
+    "05-exceptions.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "异常栏侧栏无入口、深链回落、命令面板搜不到且客户入口没被误伤"
+      ]
+    },
+    "06-reconcile.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "销项税核查与收入对账两个入口真渲染、上传区可见"
+      ]
+    },
+    "08-erp-push.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "ERP 卡片、配置入口、推送日志 tab、配置抽屉真可见"
+      ]
+    },
+    "09-recharge.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "点充值入口弹窗真打开、金额选项可见(绝不真付)"
+      ]
+    },
+    "10-subscription.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "订阅两卡与套餐卡 hover 动态、服务端 402 守卫真弹充值"
+      ]
+    },
+    "11-billing-security.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "未登录 401、伪造套餐码 400、服务端按目录真价判(渗透面)"
+      ]
+    },
+    "11-charge-ocr-closure.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "充值申请→Earn 审核→台账闭环,balance 真增"
+      ]
+    },
+    "12-billing-records.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "账单记录三 tab、筛选、导出 xlsx、凭证 PDF 真下载"
+      ]
+    },
+    "12-rls-isolation.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "non-admin 403、Earn 跑 RLS 5 测试真全过(行级隔离)"
+      ]
+    },
+    "13-password-change.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "改密后旧 token 真 401、新密码登录通、末尾回滚保凭据有效"
+      ]
+    },
+    "14-line-binding.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "生成 LINE 绑定码、反查、解绑真走完"
+      ]
+    },
+    "15-session-heartbeat.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "第二设备登录后第一设备 token 立即 401(active_jti 被改写)"
+      ]
+    },
+    "16-ocr-recognize.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "上传真电子发票 200、history_id 与 balance/pages 台账真动"
+      ]
+    },
+    "17-email-code-flow.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "忘记密码/邮箱验证码四条端点 smoke 真状态码"
+      ]
+    },
+    "18-cpw-visual.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "忘记密码链接可见、改密框 pill 圆角、忘记弹窗能开"
+      ]
+    },
+    "19-step-resume.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "有步号记忆但内存态空时回落第 1 步并清记忆"
+      ]
+    },
+    "20-recon-step-resume.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "有结果态记忆但内存无结果时回工作区并清记忆"
+      ]
+    },
+    "21-sales-wizard-step-resume.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "销项向导新页面有步号记忆但内存无 st 时重开回第 1 步并清记忆"
+      ]
+    },
+    "22-erp-context-cards.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "发票任务露 MR.ERP 与 Express 两卡、身份证下架、切汇总表仍两卡"
+      ]
+    },
+    "23-posting-preview-render.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "步 4 推送前预览四态真浏览器渲染 + 截图为证"
+      ]
+    },
+    "23-summary-import.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "汇总表→批量建单全链、直接填模式逐日建单真机走完"
+      ]
+    },
+    "24-pos-only-nav-gate.spec.js": {
+      "covers": ["static/pos/**", "static/scan/**", "static/dist/pos.*", "tests/e2e/_helpers/**", "src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js"],
+      "only_e2e": [
+        "pos_only 登录免强制选套账门、侧栏 6 组头像只留 3 项,清单外真隐藏"
+      ]
+    },
+    "25-full-account-nav-unchanged.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "firm 侧栏 8 项白名单、头像留团队与权限、强制选套账门不破"
+      ]
+    },
+    "26-entrance-token-isolation.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "static/pos/**", "static/scan/**", "static/dist/pos.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "同一 Chrome 的 AI 与 POS 登录互不覆盖,入口 403 如实显示并锁提交"
+      ]
+    },
+    "26-purchase-product-wiring.spec.js": {
+      "covers": ["static/pos/**", "static/scan/**", "static/dist/pos.*", "tests/e2e/_helpers/**", "src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js"],
+      "only_e2e": [
+        "采购行匹配读统一商品目录,点名选中真回填 product_id"
+      ]
+    },
+    "27-dms-copy-honesty.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "DMS 录入页标题四语同义、选车面板过期屏给可执行指路且说明不必重拍身份证"
+      ]
+    },
+    "28-dms-intake-write-honesty.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "客户地址镜像默认关/开真提示、清空的地址字段不进 payload"
+      ]
+    },
+    "29-stock-card-report.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "收发存报表列表/单品卡/未入账/期初弹窗/泰语切换,手机 390 不横溢"
+      ]
+    },
+    "30-intake-convert.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "确认全部真调转换桥、转换跳过出琥珀色 chip、识别记录页范围条已整块删除"
+      ]
+    },
+    "_a1_discount_inferred_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "系统补的折扣行在审核队列说人话、严重度红、无按建议处理的安全默认"
+      ]
+    },
+    "_a2_totals_rescued_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "第二模型重读的钱数在审核队列说清只验过算术,不提供安全默认"
+      ]
+    },
+    "_a3_truncated_summary_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "汇总表截断时工单卡停机点名并说清少算与拆表重传"
+      ]
+    },
+    "_a4_bank_amount_rewritten_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "银行流水金额被余额链改写必须进队列,未裁决签批冻结被挡"
+      ]
+    },
+    "_a5_unreadable_money_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "票面钱读不出时停机点名到票到字段并带机器原文"
+      ]
+    },
+    "_ai_blocked_reasons_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "后台卡点成本封顶时同一段渲染不出充值按钮"
+      ]
+    },
+    "_ai_gaps_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "开单失败泰语不落 key、重复点击先清旧说明、移动端不出界"
+      ]
+    },
+    "_ai_mobile_reach_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "手机端深链滚进可视区、文件名不越视口、触控目标足寸"
+      ]
+    },
+    "_ai_toolrow_overlap_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "工作台摘要行统计 pill 不被搜索框压住,390 四语"
+      ]
+    },
+    "_b1_states_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "状态词典 15 节全渲染、八色族真有色差、按钮七态真禁用"
+      ]
+    },
+    "_b1_table_kind_unclear_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "认不出类别的表格进队列说清是猜的且无批量安全默认"
+      ]
+    },
+    "_b2_vat_unreadable_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "VAT 读不出的票交人定向给方向三键而非金额三键,未裁决签批冻结"
+      ]
+    },
+    "_b3_closeout_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "管家主动汇报、四态错误恢复、授权卡 pending→cancelled 全链真栈"
+      ]
+    },
+    "_b5_billing_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "老板/员工视角计费区真显隐,三步充值全流程落记录、错误态可重试"
+      ]
+    },
+    "_b5_duplicate_suspect_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "缺票号的疑似重复票进队列点名撞上的那张,不许自动扔"
+      ]
+    },
+    "_b6_claim_window_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "超 6 个月进项票工单停机点名到票到字段带原文"
+      ]
+    },
+    "_board_tools_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "看板批量开单/三个筛选/缺单点名,勾选浮出操作条真打端点"
+      ]
+    },
+    "_board_tools_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "矩阵空态与看板来回切、缺单条诚实回落、筛选只留命中的卡"
+      ]
+    },
+    "_c3_bulk_skips_decided_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "组头批量只发未裁决票,已改数的票不在载荷里且不催人重判"
+      ]
+    },
+    "_confirmed_unacked_card_local.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "推送确认放行没等到回执时失败卡说人话点名票号,中泰各说各话"
+      ]
+    },
+    "_deliverable_download_real_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "界面点下载文件真落盘且字节与 API 一致,无 token 拿不到文件"
+      ]
+    },
+    "_dupdiff_card_local.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "推送日志失败卡认得出同钥匙内容不同并摆差异,不提会计按不出的参数"
+      ]
+    },
+    "_empty_states_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "空态 idle/empty/error 三态 data-state 与左色条真区分"
+      ]
+    },
+    "_f1_steward_attach_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "回形针/拖拽/粘贴三入口,超限坏格式当下拒、传输中禁用发送"
+      ]
+    },
+    "_fail_ways_out_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "开单 500/列表 500/断网/402 四种失败态文案真区分且可恢复"
+      ]
+    },
+    "_fd0d_desk_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "总台两批拖拽合批计数、降级卡手动开单、手机单列不横溢"
+      ]
+    },
+    "_gate_probe_honesty_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "启动探针 500 落服务不可用卡,重试真能救回,390 按钮可点"
+      ]
+    },
+    "_gbatch_financials_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "月度报表包 BS/PL/TB+账龄折旧四态真渲染,数字与后端逐一吻合"
+      ]
+    },
+    "_gcd45_wo_copy_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "工单缺料键人话化、逐笔对账空态文案诚实化"
+      ]
+    },
+    "_gce1_th_align_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "报表页钱数列表头随数据右对齐(shadow/financials/vatcheck 全表)"
+      ]
+    },
+    "_h1b_payroll_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "工资表空态/列映射/确认/黄灯 issues/模板命中五态真渲染"
+      ]
+    },
+    "_home_ux_fix5_local.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "客户手机端公司名独占首行、识别记录 500 重试可救、采购按钮非浏览器默认蓝"
+      ]
+    },
+    "_in0b_intake_honesty_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "文件夹拖入盘点条、密码 PDF 供钥卡、嵌套 zip 真解出计数"
+      ]
+    },
+    "_in0d_client_import_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "客户批量导入模态预览三态逐行可见,零 valid 行禁确认"
+      ]
+    },
+    "_jb_realtime_guidance_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "分批上传末批才触发、读对账单 5s 内自刷、终态后轮询停"
+      ]
+    },
+    "_jc_review_memory_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "客户页队列待处理优先聚焦已处理折叠,末张保存自动续跑"
+      ]
+    },
+    "_k1b_fileconv_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "文件转换空/加载/黄灯/中性/错误五态真渲染,413 四语可重试"
+      ]
+    },
+    "_k1c_fileconv_ocr_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "图片识别中态诚实,ocr_incomplete/unavailable 拒绝横幅无假成功"
+      ]
+    },
+    "_k2_fileconv_excel_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "xlsx 守恒绿横幅/不平黄横幅/坏文件诚实拒,不借恒真假背书"
+      ]
+    },
+    "_m13key_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "交付包三键出口真可用,签批显名退回翻 running,手机 390 不横溢"
+      ]
+    },
+    "_matrix_empty_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "矩阵当期无义务出正经空态两条出路可点,泰语整句泰文"
+      ]
+    },
+    "_mc1b2_review_inbox_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "审核收件箱三分区+65 张键盘流裁决+签批闭环 SoD 拒绝冻结"
+      ]
+    },
+    "_pnd1a_annual_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "年度聚合面板空态/无数据 404/有数据绿态清单/下载真发 GET"
+      ]
+    },
+    "_postkind_fix_local.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "未指定过账去向选库存重推载荷真带 posting_kind,四语各说各话"
+      ]
+    },
+    "_purge_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "按账套清空数据确认屏点名目标,进度推进完成后重拉列表"
+      ]
+    },
+    "_r2b_r4_taxid_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "税号错录守护卡有权限可一键改、无权限诚实降级、无嫌疑不渲染"
+      ]
+    },
+    "_r2f_r3_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "账期深链开任意历史期单、切 tab 往返 period 不丢、刷新不丢"
+      ]
+    },
+    "_sa1_machine_actions_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "机器自动改动三条全可见、表外类型露原始 type、无改动面板不出现"
+      ]
+    },
+    "_sa2_edc_corrob_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "EDC 聚合佐证卡逐票并排真渲染,无数据不渲染,逾期徽章顺延"
+      ]
+    },
+    "_settings_entry_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "设置入口从侧栏移到左下角用户块,点开右出设置页"
+      ]
+    },
+    "_single_store_removed_verify.spec.js": {
+      "covers": ["static/pos/**", "static/scan/**", "static/dist/pos.*", "tests/e2e/_helpers/**", "src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js"],
+      "only_e2e": [
+        "pos_only 老板可见新建主体入口,建第二主体不再被 403 拦"
+      ]
+    },
+    "_steward_honesty_fix_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "开工简报说清推失败数、到期清单锚 e-Filing 顺延日、税额表与单查同数"
+      ]
+    },
+    "_ui1_design_tokens_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "统计大卡撤净摘要条带真数、focus 柔环命中赤陶橙、冻结列实底不透明"
+      ]
+    },
+    "_ui_audit_full.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "全站 21 路由桌面/手机×浅/暗四象限抓图,无 console error"
+      ]
+    },
+    "_ui_batch3_badges_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "队列头徽章未决数随裁决下降,全裁转灰不显 0"
+      ]
+    },
+    "_ui_tier3_local.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "开单按钮整颗留卡内、长泰文客户名折两行、导航≥44 触控目标四语双端"
+      ]
+    },
+    "_uidebt0714_verify.spec.js": {
+      "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "提示条与徽章口径一致、needs 非空按钮落收料 tab、390 不横溢"
+      ]
+    },
+    "_w3_roster_billing_verify.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "DMS 操作员花名册 list/empty/bind-code/non-owner + 计费订阅态对齐主站"
+      ]
+    },
+    "gc0719_bank_recovery.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "被排除物料折叠可见且重分配后消失、缺对账日期显降级提示"
+      ]
+    },
+    "gc0719_bank_sales_batch.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "120 行后台跑、组确认后解锁 apply 真走完"
+      ]
+    },
+    "ps1_refund_approval.spec.js": {
+      "covers": ["static/pos/**", "static/scan/**", "static/dist/pos.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "退货被拦弹店长授权窗 PIN 覆盖成功,取消则不发生退货"
+      ]
+    },
+    "ps5_cashier_route.spec.js": {
+      "covers": ["static/pos/**", "static/scan/**", "static/dist/pos.*", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "/cashier 渲染绑定页+PWA 作用域,/pos 出老板登录页不被残留令牌劫持"
+      ]
+    },
+    "purchase_categories_inline_edit.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "点科目名行内编辑 Esc 取消/Enter 存/reload 持久,改完复原"
+      ]
+    },
+    "smoke.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "着陆页加载+SPA 渲染+4 语切换+无 console error"
+      ]
+    },
+    "zz-sales-uiverify.spec.js": {
+      "covers": ["src/home/**", "static/home-*.css", "home.html", "login.html", "static/i18n-data.js", "tests/e2e/_helpers/**"],
+      "only_e2e": [
+        "销项每屏+向导走查截图,无 console error"
+      ]
+    }
+  },
   "_stale_ack_rule": [
     "改了 covers 里的源码却还没重跑对应脚本时,唯一合法的过法是在这里写一条带日期的欠条 ——",
     "闸就不拦了,但欠的账留在文件里,谁都看得见。until 过了闸照红,不许把欠条改成永久。",

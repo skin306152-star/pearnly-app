@@ -111,8 +111,21 @@ class HookEnvContract(unittest.TestCase):
         text = hook_text()
         self.assertLess(
             text.index("export PYTHONUTF8=1"),
-            text.index("python scripts/run_unit_sharded.py"),
+            text.index("python scripts/impact.py --base"),
             "PYTHONUTF8 设在跑测试之后了",
+        )
+
+    def test_hook_disables_bytecode_before_python_gates(self):
+        self.assertEqual(
+            hook_exports().get("PYTHONDONTWRITEBYTECODE"),
+            "1",
+            "钩子没有禁止生成 pyc,陈腐缓存会污染后续验证",
+        )
+        text = hook_text()
+        self.assertLess(
+            text.index("find . -type d -name '__pycache__'"),
+            text.index("python scripts/check_test_git_writes.py"),
+            "清理 pyc 必须发生在第一道 Python 闸之前",
         )
 
 

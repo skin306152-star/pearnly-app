@@ -48,7 +48,10 @@ _HOOK_MUST_CONTAIN = (
     ("git merge-base origin/master HEAD", "范围没走 merge-base"),
     ('[ -z "$BASE" ] && BASE="origin/master"', "merge-base 算不出来时没兜底"),
     ('check_line_ratchet.py --base "$BASE" --head HEAD', "棘轮没跟 CHANGED 共用同一个 base"),
-    ("env -u GIT_DIR -u GIT_INDEX_FILE", "全量单测没剥掉 git 注入的定位变量"),
+    (
+        'python scripts/impact.py --base "$BASE" --head HEAD --run-unit',
+        "unit 没通过 impact.py 统一分流",
+    ),
 )
 _HOOK_MUST_NOT_CONTAIN = (("origin/master..HEAD", "又回到两点口径了"),)
 
@@ -222,7 +225,7 @@ class HookUsesMergeBase(unittest.TestCase):
       BASE 兜底         : 嫁接/孤儿分支上 merge-base 算不出来,BASE 留空 → git diff 出 0 个
                           文件 → CHANGED 空 → 钩子 exit 0,26 道闸一道不跑,还一声不吭
       棘轮共用 BASE     : 否则「算你改了哪些文件」和「算你加了多少行」是两个口径
-      env -u GIT_DIR    : 2026-07-31 P0,钩子自带的定位变量盖过 subprocess 的 cwd=
+       impact runner     : 2026-07-31 P0,unit 子进程必须摘掉钩子注入的 GIT_* 定位变量
     """
 
     def test_hook_is_wired_to_merge_base(self) -> None:
@@ -251,7 +254,7 @@ class HookUsesMergeBase(unittest.TestCase):
                 'BASE="$(git merge-base origin/master HEAD 2>/dev/null)"',
                 '[ -z "$BASE" ] && BASE="origin/master"',
                 'python scripts/check_line_ratchet.py --base "$BASE" --head HEAD --quiet',
-                "env -u GIT_DIR -u GIT_INDEX_FILE python -m unittest discover -s tests/unit",
+                'python scripts/impact.py --base "$BASE" --head HEAD --run-unit',
             )
         )
         self.assertEqual(hook_wiring_problems(good), [])

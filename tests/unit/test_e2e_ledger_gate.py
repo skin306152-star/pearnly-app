@@ -36,6 +36,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 LEDGER = PROJECT_ROOT / "tests" / "e2e" / "e2e_ledger.json"
+E2E_DIR = PROJECT_ROOT / "tests" / "e2e"
 
 # 「这份脚本要开浏览器吗」:直接 require playwright,或走这两个公共库(它们 require)。
 _BROWSER = re.compile(r"@playwright/test|_verify_shared\.cjs|_gun_wedge_lib\.cjs")
@@ -64,6 +65,11 @@ def scan_surface_scripts() -> set[str]:
         if _BROWSER.search(text) and _SCAN_SURFACE.search(text):
             out.add(path.name)
     return out
+
+
+def playwright_specs() -> set[str]:
+    """All first-class Playwright specs that need an impact declaration."""
+    return {path.name for path in E2E_DIR.glob("*.spec.js")}
 
 
 def newest_mtime(paths: list[Path]) -> float:
@@ -201,6 +207,48 @@ class LedgerIsComplete(unittest.TestCase):
     def test_not_e2e_entries_carry_a_reason(self):
         blank = [n for n, why in self.ledger["not_e2e"].items() if len(str(why).strip()) < 6]
         self.assertEqual(blank, [], "not_e2e 是逃生门 · 不写原因等于把闸关掉")
+
+
+class PlaywrightLedgerIsComplete(unittest.TestCase):
+    """Every Playwright spec must participate in impact selection."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ledger = load_ledger()
+        cls.found = playwright_specs()
+        cls.declared = set(cls.ledger.get("specs", {}))
+
+    def test_every_playwright_spec_is_declared(self):
+        self.assertEqual(
+            sorted(self.found - self.declared),
+            [],
+            "这些 Playwright spec 没有 covers 声明 —— 改产品源码时 impact.py 会漏跑:\n"
+            + "\n".join(sorted(self.found - self.declared)),
+        )
+
+    def test_declared_playwright_specs_exist(self):
+        missing = sorted(self.declared - self.found)
+        self.assertEqual(missing, [], "台账登记了不存在的 Playwright spec")
+
+    def test_playwright_entries_have_coverage_and_reason(self):
+        bad = []
+        for name, spec in self.ledger.get("specs", {}).items():
+            if not spec.get("covers"):
+                bad.append(f"{name}: covers 是空的")
+            if not spec.get("only_e2e"):
+                bad.append(f"{name}: only_e2e 是空的")
+            if any(len(str(line).strip()) < 12 for line in spec.get("only_e2e", [])):
+                bad.append(f"{name}: only_e2e 有一条太短说不清事")
+        self.assertEqual(bad, [])
+
+    def test_playwright_coverage_patterns_match_real_files(self):
+        bad = []
+        for name, spec in self.ledger.get("specs", {}).items():
+            for pattern in spec.get("covers", []):
+                normalized = str(pattern).replace("\\", "/").lstrip("./")
+                if not list(PROJECT_ROOT.glob(normalized)):
+                    bad.append(f"{name}: covers 没匹配到仓库文件 {pattern}")
+        self.assertEqual(bad, [])
 
 
 @unittest.skipIf(

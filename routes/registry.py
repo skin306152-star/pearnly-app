@@ -160,7 +160,7 @@ ROUTERS = (
     accounting_router,
     accounting_books_router,
     accounting_bank_router,
-    stock_card_router,  # 商品收发存报表(Stock Card · 移动加权平均 · stock_card_report 闸)
+    stock_card_router,  # 商品收发存报表(Stock Card · 移动加权平均 · accounting 模块闸)
     tax_router,
     sales_router,
     sales_seller_router,

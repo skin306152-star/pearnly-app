@@ -3,9 +3,9 @@
 
 复用 accounting_common 的鉴权/套账解析/模块门控(与 acct.books 同一套四段式:auth_member
 → get_cursor_rls → gate(accounting 模块) → resolve_ws),权限码另立 stockcard.* 两档
-(report.view 读;opening.manage 写期初/归并 · 见 services/authz/registry.py)。业务闸再叠
-stock_card_report 灰度(默认关 · 超管在平台后台按租户放量):status 探针闸关也 200(前端
-按 enabled 挂三态);其余业务端点闸关一律 403,不裸露"这功能存在但你用不了"之外的信息。
+(report.view 读;opening.manage 写期初/归并 · 见 services/authz/registry.py)。
+不设灰度闸(Zihao 2026-08-07 拍板:做完测完直接全开,accounting 模块闸 + 权限码就是
+全部控制面);status 探针保留,回答的是「本租户 accounting 模块开没开」,供前端挂菜单三态。
 
 数字字段一律输出字符串(core/route_helpers 惯例:Decimal 经默认 JSON 编码器会被前端当
 float 解析,精度漂移在钱这里不可接受)。
@@ -19,7 +19,7 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
-from core import db, feature_flags
+from core import db
 from core.pos_api import PosError
 from routes.accounting_common import auth_member, gate, resolve_ws
 from services.stockcard import merge as merge_svc
@@ -30,12 +30,6 @@ router = APIRouter(prefix="/api/stockcard", tags=["stockcard"])
 
 _C_VIEW = "stockcard.report.view"
 _C_MANAGE = "stockcard.opening.manage"
-
-
-def _require_enabled(tenant_id: str) -> None:
-    """业务端点闸关一律 403(status 探针例外 · 见 api_status)。"""
-    if not feature_flags.stock_card_report_enabled_for(tenant_id):
-        raise PosError("stockcard.disabled", 403)
 
 
 def _parse_date(raw: str, *, field: str) -> date:
@@ -81,7 +75,7 @@ def _public_opening(row: dict) -> dict:
 
 @router.get("/status")
 async def api_status(request: Request):
-    """闸态探针:闸关也 200(照 routes/steward_routes.py 惯例,前端挂三态)。"""
+    """模块态探针:accounting 模块关也 200(照 routes/steward_routes.py 惯例,前端挂三态)。"""
     _, tenant_id = auth_member(request, _C_VIEW)
     with db.get_cursor_rls(tenant_id) as cur:
         try:
@@ -89,8 +83,7 @@ async def api_status(request: Request):
             module_on = True
         except PosError:
             module_on = False
-    enabled = module_on and feature_flags.stock_card_report_enabled_for(tenant_id)
-    return {"ok": True, "enabled": enabled}
+    return {"ok": True, "enabled": module_on}
 
 
 @router.get("/summary")
@@ -105,7 +98,6 @@ async def api_summary(
     d_to = _parse_date(date_to, field="date_to")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
-        _require_enabled(tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         payload = report_svc.summary(
             cur, tenant_id=tid, workspace_client_id=ws, date_from=d_from, date_to=d_to
@@ -126,7 +118,6 @@ async def api_card(
     d_to = _parse_date(date_to, field="date_to")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
-        _require_enabled(tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         payload = report_svc.card(
             cur, tenant_id=tid, workspace_client_id=ws, key=key, date_from=d_from, date_to=d_to
@@ -148,7 +139,6 @@ async def api_excluded(
     d_to = _parse_date(date_to, field="date_to")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
-        _require_enabled(tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         rows = report_svc.excluded(
             cur, tenant_id=tid, workspace_client_id=ws, date_from=d_from, date_to=d_to
@@ -161,7 +151,6 @@ async def api_list_openings(request: Request, workspace_client_id: int = Query(.
     _, tid = auth_member(request, _C_VIEW)
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
-        _require_enabled(tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         rows = opening_svc.list_openings(cur, tenant_id=tid, workspace_client_id=ws)
     return {"ok": True, "rows": [_public_opening(r) for r in rows]}
@@ -174,7 +163,6 @@ async def api_upsert_openings(
     user, tid = auth_member(request, _C_MANAGE)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
-        _require_enabled(tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         rows = opening_svc.upsert_openings(
             cur,
@@ -191,7 +179,6 @@ async def api_merge(req: MergeIn, request: Request, workspace_client_id: int = Q
     user, tid = auth_member(request, _C_MANAGE)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
-        _require_enabled(tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         result = merge_svc.merge_into_product(
             cur,

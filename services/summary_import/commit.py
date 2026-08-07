@@ -1,17 +1,29 @@
 # -*- coding: utf-8 -*-
-"""汇总表批量落库:每行 → 一条 ocr_history(ERP 推送/记账的唯一读源)。
+"""汇总表批量落库:每行 → 一条 ocr_history,并当场转正式单据(purchase_docs/sales_documents)。
 
-事务所拿客户汇总表是**替客户记账、推 ERP**,不是替客户**开票**——客户的销售早已开过票/或是
-现金流水,Pearnly 这里再往账本/发票工作台建"待开"草稿=把记账和开票两件事混在一起、造重复幻单。
-故本模块**只写 ocr_history**(MR.ERP/Express 推送读源;记录落"识别记录",从那里推 ERP),不建
-账本单据。逐行独立:某行失败只该行落 failed,不连坐其它行(真实失败要看得见,不是全成功的假象)。
+2026-08-07 拍板改向(推翻此前"只写 ocr_history 不建单据"的产品判断):商品收发存报表读的是
+purchase_docs(posted)/sales_documents(issued),只写识别记录会让汇总表导入的行永远进不了
+报表 —— 报表需要正式单据当数据源,这条硬需求盖过了先前"记账/开票混同=造幻单"的顾虑。
+建单据不是替客户"新开一张票":doc_number 仍是表里的原始票号(见 intake_bridge.sales_leg
+"登记不发号"的注释),系统只是把事务所早就在做的记账动作接上正式单据。写完 ocr_history 后
+调 services.intake_bridge.convert.convert_histories,与录入工作台「确认」按钮走同一套桥
+(方向判定/幂等/防重不重复实现,一处改全处生效)。
+
+存量边界(2026-08-07 拍板 · 明确不做):source='summary_table_batch' 的历史记录**不自动
+回填**——那是真租户真账,批量突变必须 Zihao 单独拍板;本桥只接管新 commit 之后写入的行。
+
+逐行独立:某行失败只该行落 failed,不连坐其它行(真实失败要看得见,不是全成功的假象)。
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from core import db
+from services.intake_bridge import convert as convert_svc
+
+logger = logging.getLogger("mr-pilot")
 
 _SUMMARY_SOURCE = "summary_table_batch"
 
@@ -22,8 +34,9 @@ def _clean_fields(fields: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _write_ocr_history(*, created_by, tenant_id, ws_id, fields, batch_ref, index) -> Optional[str]:
-    """写推送/记账读源。不建账本单据故 source_ref 留空;workspace_client_id 让推送时能解析账套
-    税号判方向。"""
+    """写推送/记账读源。source_ref 留空(没有上游票据文件可反指);正式单据事后由
+    _bridge_to_documents 反过来挂 ocr_history_id,不是这里正向填 source_ref。
+    workspace_client_id 让推送/建单时都能解析账套税号判方向。"""
     return db.insert_ocr_history(
         user_id=created_by,
         filename=f"summary-{batch_ref}-{index + 1}",
@@ -40,6 +53,24 @@ def _write_ocr_history(*, created_by, tenant_id, ws_id, fields, batch_ref, index
     )
 
 
+def _bridge_to_documents(
+    *, tenant_id: str, created_by: Optional[str], history_ids: List[str]
+) -> tuple:
+    """新写的 history_ids → intake_bridge 当场转正式单据。失败不影响已写入的记账料
+    (ocr_history 早已各自 commit),只把桥结果如实回传;无 created_by 没法归属就不转。"""
+    if not history_ids or not created_by:
+        return [], []
+    try:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=created_by, commit=True) as cur:
+            bridged = convert_svc.convert_histories(
+                cur, tenant_id=tenant_id, user_id=created_by, history_ids=history_ids
+            )
+        return bridged["converted"], bridged["skipped"]
+    except Exception as e:
+        logger.warning(f"summary-import → intake_bridge convert 失败(记账料已写入,不受影响): {e}")
+        return [], []
+
+
 def commit_rows(
     *,
     tenant_id: str,
@@ -47,11 +78,13 @@ def commit_rows(
     created_by: Optional[str],
     rows: List[Dict[str, Any]],
     batch_ref: str = "batch",
-) -> List[Dict[str, Any]]:
-    """整批写记账料。rows = [{row_index, fields}](已过 mapping;judge 的硬阻断行不应传进来)。
+) -> Dict[str, Any]:
+    """整批写记账料 + 当场转正式单据。rows = [{row_index, fields}](已过 mapping;judge 的
+    硬阻断行不应传进来)。
 
-    每行写一条 ocr_history(insert_ocr_history 自管事务)。返回逐行结果
-    [{row_index, status(created|failed), ocr_history_id?, error?}]。
+    每行写一条 ocr_history(insert_ocr_history 自管事务)。返回
+    {rows:[{row_index,status(created|failed),ocr_history_id?,error?}],
+     converted:[...], skipped:[...]}(converted/skipped 结构见 services.intake_bridge.convert)。
     """
     results: List[Dict[str, Any]] = []
     for i, r in enumerate(rows):
@@ -80,4 +113,10 @@ def commit_rows(
                     "error": str(getattr(e, "code", None) or e)[:200],
                 }
             )
-    return results
+    new_ids = [
+        r["ocr_history_id"] for r in results if r["status"] == "created" and r["ocr_history_id"]
+    ]
+    converted, skipped = _bridge_to_documents(
+        tenant_id=tenant_id, created_by=created_by, history_ids=new_ids
+    )
+    return {"rows": results, "converted": converted, "skipped": skipped}

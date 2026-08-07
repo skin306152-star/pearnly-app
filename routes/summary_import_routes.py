@@ -3,7 +3,7 @@
 
 parse    上传 xlsx/csv → 表头 + 行(供列映射)
 validate 列映射 + 批次常量 → 逐行方向/落点判定 + 缺字段警告(前端预览据此,不前端假装判定)
-commit   同一入参 + 已确认 → 逐行写 ocr_history(推 ERP 记账料;不建账本/发票草稿)
+commit   同一入参 + 已确认 → 逐行写 ocr_history,当场转正式单据(services.intake_bridge · 2026-08-07 拍板改向,见 services/summary_import/commit.py 顶部注释)
 
 薄层:auth → 套账解析(purchase_common 同款)→ 调 services/summary_import。判定/写库逻辑全在服务层。
 统一 POS 信封(前缀已入 core.pos_api._POS_PREFIXES)。模块门控走 expense(与采购同域)。
@@ -128,13 +128,14 @@ async def api_commit(cfg: MapConfig, request: Request):
         else:
             to_commit.append(m)
 
-    results = commit_svc.commit_rows(
+    bridged = commit_svc.commit_rows(
         tenant_id=tid,
         workspace_client_id=ws,
         created_by=_uid(user),
         rows=to_commit,
         batch_ref=str(cfg.parsed.get("sheet_name") or "batch")[:24],
     )
+    results = bridged["rows"]
     all_rows = results + skipped
     return ok(
         {
@@ -143,5 +144,10 @@ async def api_commit(cfg: MapConfig, request: Request):
             "failed": sum(1 for r in results if r["status"] == "failed"),
             "skipped": len(skipped),
             "total": len(all_rows),
+            # 当场转正式单据的结果(intake_bridge)· 汇总数供前端「已入账 N 笔」展示,
+            # 明细留给需要排障的人自己翻 converted/document_skipped。
+            "converted": bridged["converted"],
+            "document_skipped": bridged["skipped"],
+            "documents_booked": len(bridged["converted"]),
         }
     )

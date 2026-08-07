@@ -2,7 +2,8 @@
 """汇总表 → 批量建单 单测(纯函数 · 不连库)。
 
 覆盖:解析(CSV·合计行标注)/ 映射(甲乙方落位·散客归一·单号生成·重号)/ 判定(税号复核方向·
-现金赊账·缺字段警告三态)/ commit(只写 ocr_history 记账料·不建账本单据)。真 DB 写入由真账号 E2E 守。
+现金赊账·缺字段警告三态)/ commit(写 ocr_history 记账料 + 当场转正式单据的桥接调用,intake_bridge
+自身口径由 tests/unit/test_intake_bridge_convert.py 覆盖)。真 DB 写入由真账号 E2E 守。
 """
 
 import unittest
@@ -174,25 +175,55 @@ class CommitHelperTests(unittest.TestCase):
         self.assertIn("buyer_tax", cleaned)
         self.assertNotIn("_direction", cleaned)
 
-    def test_commit_writes_ocr_history_only_no_ledger_draft(self):
-        # 记账推 ERP,不开票:commit 只写 ocr_history(source_ref 留空·剥内部字段),绝不建账本单据。
+    def test_commit_writes_ocr_history_then_bridges_to_documents(self):
+        # 写 ocr_history(source_ref 留空·剥内部字段)后当场调 intake_bridge 转正式单据
+        # (2026-08-07 拍板改向,commit.py 顶部注释已说明为什么)。
         calls = []
 
         def _fake_insert(**kw):
             calls.append(kw)
             return "ocr-1"
 
-        with mock.patch.object(commit_svc.db, "insert_ocr_history", _fake_insert):
+        bridge_calls = []
+
+        def _fake_convert(cur, *, tenant_id, user_id, history_ids):
+            bridge_calls.append({"tenant_id": tenant_id, "user_id": user_id, "ids": history_ids})
+            return {
+                "converted": [
+                    {"history_id": "ocr-1", "doc_type": "sales", "doc_id": "d1", "doc_no": "N1"}
+                ],
+                "skipped": [],
+            }
+
+        with (
+            mock.patch.object(commit_svc.db, "insert_ocr_history", _fake_insert),
+            mock.patch.object(commit_svc.db, "get_cursor_rls", mock.MagicMock()),
+            mock.patch.object(commit_svc.convert_svc, "convert_histories", _fake_convert),
+        ):
             rows = [{"row_index": 0, "fields": {"buyer_tax": _CP_TAX, "_direction": "sales"}}]
-            res = commit_svc.commit_rows(
+            out = commit_svc.commit_rows(
                 tenant_id="t", workspace_client_id=9, created_by="u", rows=rows, batch_ref="b"
             )
+        res = out["rows"]
         self.assertEqual(res[0]["status"], "created")
         self.assertEqual(res[0]["ocr_history_id"], "ocr-1")
         self.assertEqual(len(calls), 1)
-        self.assertIsNone(calls[0]["source_ref"])  # 无账本单据可反指
+        self.assertIsNone(calls[0]["source_ref"])  # 无账本单据可反指(反指靠 ocr_history_id 溯源列)
         self.assertEqual(calls[0]["source"], commit_svc._SUMMARY_SOURCE)
         self.assertNotIn("_direction", calls[0]["pages"][0]["fields"])  # 内部字段已剥
+        self.assertEqual(bridge_calls[0]["ids"], ["ocr-1"])
+        self.assertEqual(out["converted"][0]["doc_id"], "d1")
+        self.assertEqual(out["skipped"], [])
+
+    def test_no_created_by_skips_bridge_without_erroring(self):
+        # 没有 created_by 没法归属新单据的 created_by 列,宁可不转,不瞎归到 None。
+        with mock.patch.object(commit_svc.db, "insert_ocr_history", return_value="ocr-2"):
+            rows = [{"row_index": 0, "fields": {"buyer_tax": _CP_TAX}}]
+            out = commit_svc.commit_rows(
+                tenant_id="t", workspace_client_id=9, created_by=None, rows=rows, batch_ref="b"
+            )
+        self.assertEqual(out["converted"], [])
+        self.assertEqual(out["skipped"], [])
 
 
 class AmountDerivationTests(unittest.TestCase):

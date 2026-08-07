@@ -8,7 +8,7 @@ tests/unit/test_ai_steward_pure.py
      映射闭集、契约外的值一律落空白族(状态诚实,不冒充某个具体状态)、轮询终态判据、
      深链白名单(javascript:/外站/协议相对一律丢弃)、步数统计与 agent 数兜底。
   2. ai-steward-chat-render.js 纯函数——角色→气泡类、本地送出态收敛、可送出判据
-     (空串/上一句还在路上都不许再送)、快捷问法 chips 闭集。
+     (空串/上一句还在路上都不许再送)。
   3. ai-i18n-steward.js 分片 zh/th key 集合一致 + 页面/渲染层引用的每个 stw_*(含
      nav_steward)都真实存在于 zh 词典——A 表引用 B 表的 id 必须配闸(防「深链 35 条
      全落空却报绿」的老坑)。
@@ -263,21 +263,6 @@ class ChatRenderPureTests(unittest.TestCase):
             """)
         self.assertEqual(out, [True, False, False, False, False])
 
-    def test_quick_keys_are_the_four_agreed_chips(self):
-        out = _run_node(f"""
-            const c = require({_CHAT});
-            process.stdout.write(JSON.stringify(c.QUICK_KEYS));
-            """)
-        self.assertEqual(
-            out,
-            [
-                "stw_quick_missing",
-                "stw_quick_review",
-                "stw_quick_pushfail",
-                "stw_quick_progress",
-            ],
-        )
-
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class StewardRouteTests(unittest.TestCase):
@@ -366,7 +351,6 @@ class StewardI18nShardTests(unittest.TestCase):
             "ai-steward-attach-render.js",
             "ai-steward-attach.js",
             "ai-steward.js",
-            "ai-steward-bar.js",
             "ai.html",
         )
         referenced = {"nav_steward"}
@@ -399,17 +383,6 @@ class StewardI18nShardTests(unittest.TestCase):
         missing = sorted(referenced - zh)
         self.assertEqual(missing, [], f"引用了词典里不存在的 key: {missing}")
 
-    def test_quick_chip_keys_are_all_translated(self):
-        """chips 闭集来自 ai-steward-chat-render.js,四条都必须在 zh/th 里有真文案。"""
-        keys = self._shard_keys()
-        quick = _run_node(f"""
-            const c = require({_CHAT});
-            process.stdout.write(JSON.stringify(c.QUICK_KEYS));
-            """)
-        for k in quick:
-            self.assertIn(k, keys["zh"])
-            self.assertIn(k, keys["th"])
-
 
 def _unwired(emitted, dispatched) -> list:
     """画出来了却没人接的 data-action。闸与反证共用这一份判据。"""
@@ -425,10 +398,9 @@ class StewardActionWiringTests(unittest.TestCase):
 
     _EMITTERS = ("ai-steward-render.js", "ai-steward-authz-render.js", "ai-steward-chat-render.js",
                  "ai-steward-flow-render.js", "ai-steward-sessions-render.js", "ai-steward-md.js",
-                 "ai-steward-attach-render.js", "ai-steward-bar.js")  # fmt: skip
-    # 四处 onClick:主壳 / 附件盘自己认的六个 / 侧栏动作层 / 顶栏那颗。
-    _DISPATCHERS = ("ai-steward.js", "ai-steward-attach.js", "ai-steward-sessions.js",
-                    "ai-steward-bar.js")  # fmt: skip
+                 "ai-steward-attach-render.js")  # fmt: skip
+    # 三处 onClick:主壳 / 附件盘自己认的六个 / 侧栏动作层。
+    _DISPATCHERS = ("ai-steward.js", "ai-steward-attach.js", "ai-steward-sessions.js")  # fmt: skip
 
     def _scan(self, names, pattern):
         found = set()

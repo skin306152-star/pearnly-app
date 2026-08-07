@@ -2,14 +2,15 @@
  * Pearnly AI · ai-steward-gate.js · 闸探针与路由收口(S1 · 拆自 ai-steward.js)
  *
  * B2-M1 语义原样保留:闸(pearnly_ai_steward · tenant 级默认关 · fail-closed)三态、
- * 闸关 = 侧栏项不显示 + 命令条不渲染 + #/steward 落回工作台、探针 401 走整站唯一的
- * 过期出口、命令条 openWith 交棒。会话页满高靠 body 上的 stw-chat-mode 类,进出路由
- * 时在这里挂/摘(ai-steward-chat.css 消费)。
+ * 闸关 = 侧栏项不显示 + #/steward 落回工作台、探针 401 走整站唯一的过期出口。
+ * openWith(text) 供外部入口(画像卡 CTA · 见 ai-profile.js)记下第一句话再跳
+ * #/steward,展开态建好会话立刻替用户送出。会话页满高靠 body 上的 stw-chat-mode 类,
+ * 进出路由时在这里挂/摘(ai-steward-chat.css 消费)。
  *
  * hooks 契约:
  *   mount(api)        挂载会话页(编排层)
  *   stopWatchers()    离开本页时停 SSE/轮询/倒计时
- *   setPending(text)  记下命令条带来的第一句话(建好会话后由编排层送出)
+ *   setPending(text)  记下 openWith 带来的第一句话(建好会话后由编排层送出)
  *   setLimits(raw)    探针带回的上传限额(单一事实源)
  *   getEl(id)         → element|null
  */
@@ -23,7 +24,7 @@
             root.document.body.classList.toggle('stw-chat-mode', !!on);
         }
 
-        // 命令条(收起态)交棒:记下第一句话再跳,展开态建好会话立刻替用户送出。
+        // 外部入口交棒(画像卡 CTA):记下第一句话再跳,展开态建好会话立刻替用户送出。
         function openWith(text) {
             hooks.setPending(AI.stewardChatRender.normalizeText(text) || null);
             root.location.hash = AI.router.buildStewardHash();
@@ -32,7 +33,6 @@
         function applyGate(api, open) {
             gateOpen = open;
             hooks.getEl('navSteward').style.display = open ? '' : 'none';
-            AI.stewardBar.applyGate(open);
             var current = AI.router.parseHash(root.location.hash);
             if (current.name !== 'steward') return;
             if (!open) {

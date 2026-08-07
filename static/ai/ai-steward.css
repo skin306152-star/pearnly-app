@@ -1,19 +1,13 @@
-/* Pearnly AI · ai-steward.css · 智能管家命令条 + 任务部件(步骤/产物/授权卡/预算)。
+/* Pearnly AI · ai-steward.css · 任务部件(步骤/产物/授权卡/预算)+ 命令条遗留共享类。
  *
  * S1 会话流改版后,页面布局(侧栏/消息流/输入条/过程条)在 ai-steward-chat.css,
- * 本文件留:工作台命令条 + 任务部件(步骤行/深链/产物表格/失败原因/授权卡/预算块)。
+ * 本文件留:任务部件(步骤行/深链/产物表格/失败原因/授权卡/预算块)+ 两组共享类
+ * (.stw-bar-row/.stw-bar-input 被附件密码框/会话改名框复用;.stw-chips/.stw-chip
+ * 被会话页追问候选 .stw-ask-opts 复用)——工作台命令条本身已随其唯一消费者
+ * ai-steward-bar.js 一起删除,这两组类不属于它专属,留着。
  * 状态的「脸」全部来自 B1 状态词典(ai-states.css),颜色一律 var() 令牌,零裸 hex。
  */
 
-/* ---------- 工作台顶部命令条(收起态) ---------- */
-.stw-bar {
-  background: var(--surface);
-  border: 1px solid var(--hair);
-  border-radius: 14px;
-  box-shadow: var(--sh-card);
-  padding: 12px 14px;
-  margin-bottom: 14px;
-}
 .stw-bar-row {
   display: flex;
   gap: 8px;

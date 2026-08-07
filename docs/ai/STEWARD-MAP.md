@@ -210,7 +210,6 @@ pearnly_ai_m1  ─and─  pearnly_ai_steward  ─and─  steward_brain_loop
 | `static/ai/ai-steward-attach-render.js` | 442 | 附件盘四态 / 用户气泡下的只读原件行 / 拖拽落区 / 回执卡按钮。上限一律读 `GET /status` 的 attachments 块,本层不硬编码任何数字 | `static/dist/ai.js` |
 | `static/ai/ai-steward-authz-render.js` | 220 | 写授权卡 + 成本封顶提示拼装。token 只在 DOM data 属性过手不落 localStorage;不自己比时间判 expired | `static/dist/ai.js` |
 | `static/ai/ai-steward-actions.js` | 161 | 左窗动作层:授权批准 / 拒绝、取消任务、倒计时刷新。工厂注入钩子,零模块级状态 | `static/dist/ai.js` |
-| `static/ai/ai-steward-bar.js` | 73 | 工作台顶部命令条挂载(一行输入 + 四个高频 chips)→ `AI.steward.openWith()` 记下这句话并跳 `#/steward`,自己不发任何请求。闸关整条不渲染 | `static/dist/ai.js` |
 | `static/ai/ai-api-steward.js` | 130 | 十端点调用薄层。上传单开 XHR 拿进度;下载单开 fetch 带 Authorization 头(`<a href>` 发不了自定义头 = 点了 401 的假出口) | `static/dist/ai.js` |
 | `static/ai/ai-i18n-steward.js` | 227 | 管家词条 zh + th(en/ja 由 `at()` 回落 zh,照 `adm-*` 先例),键前缀 `stw_` + `nav_steward` | **独立 script** `ai.html:399` |
 | `static/ai/ai-steward.css` | 442 | 命令条 + 双栏页布局。一条状态样式都不写(脸来自 `ai-states.css`),颜色全 `var()` 令牌零裸 hex | `static/dist/ai.css` |
@@ -224,7 +223,6 @@ pearnly_ai_m1  ─and─  pearnly_ai_steward  ─and─  steward_brain_loop
 |---|---|---|
 | hash 路由 `#/steward` | `static/ai/ai-router.js:64` 解析(`buildStewardHash` @`:139-141`) | — |
 | 侧栏项 `#navSteward` | `static/ai/ai.html:25-31` | `display:none`,闸探针成功才摘 |
-| 工作台命令条 `#stwBar` | `static/ai/ai.html:145-146` | `display:none` 且内容为空,由 `ai-steward-bar.js` 闸开后填 |
 | 页面容器 `#v-steward` / `#stwBody` | `static/ai/ai.html:277-284` | — |
 
 改完 `static/ai/*.js` 或 `*.css` **必须重跑 `npm run build` 并 bump `static/ai/ai.html` 的 `?v`**(两个 `?v` 写在 `ai.html:401` 与 `:11`,每次改动都动,这里不抄具体值)。不 bump = 用户拿到的还是旧包。

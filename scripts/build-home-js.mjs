@@ -352,12 +352,10 @@ const BUNDLES = [
             // 用 AI.states.mount)之前——同 ai-vatcheck/ai-fileconv 先例(顶层独立视图)。
             'ai/ai-states-render.js',
             'ai/ai-states.js',
-            // 智能管家(S1 会话流 · #/steward + 工作台命令条)。render 族都依赖 AI.state 与
+            // 智能管家(S1 会话流 · #/steward)。render 族都依赖 AI.state 与
             // AI.statesRender(B1 状态词典组件),必须排在 ai-states-render.js 之后;
             // 动作层(actions/attach/sessions)被 ai-steward.js 在【加载期】create(),
-            // 必须排在它之前;ai-steward-bar.js(命令条挂载)在 applyGate 时才引用
-            // AI.steward.openWith,但 ai-steward.js 的 applyGate 会调 AI.stewardBar.applyGate,
-            // 故排在其后、ai.js(onRoute 调 AI.steward.onRoute + enterApp 调 probe)之前。
+            // 必须排在它之前,ai.js(onRoute 调 AI.steward.onRoute + enterApp 调 probe)之前。
             // ai-steward-md.js(正文 markdown,纯函数)与三个 render 都是调用期引用,
             // 排在编排文件之前即可;ai-steward-stream.js(SSE 客户端)同理。
             'ai/ai-steward-md.js',
@@ -376,7 +374,6 @@ const BUNDLES = [
             'ai/ai-steward-tasks.js',
             'ai/ai-steward-gate.js',
             'ai/ai-steward.js',
-            'ai/ai-steward-bar.js',
             'ai/ai.js',
         ],
     },

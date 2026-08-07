@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 568 个源文件全扫
+# UI 设计合规扫描报告 · 567 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -229,8 +229,8 @@
         └ 27: max-width: min(720px, 100%);
         └ 205: max-width: min(720px, 100%);
      2  static\ai\ai-steward-chat.css
-        └ 228: max-width: 780px;
-        └ 534: max-width: 780px;
+        └ 277: max-width: 780px;
+        └ 583: max-width: 780px;
      2  static\console\console.css
         └ 508: width: min(560px, 100%);
         └ 970: width: min(420px, 100%);
@@ -303,9 +303,9 @@
      1  static\ai\ai-recon.css
         └ 103: max-width: min(560px, 100%);
      1  static\ai\ai-shell.css
-        └ 461: max-width: min(380px, 100%);
+        └ 523: max-width: min(380px, 100%);
      1  static\ai\ai-steward-attach.css
-        └ 170: max-width: 220px;
+        └ 175: max-width: 220px;
      1  static\dms\dms-billing.css
         └ 9: max-width: min(900px, 100%);
      1  static\dms\dms-connect.js

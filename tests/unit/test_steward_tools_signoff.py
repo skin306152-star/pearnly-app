@@ -19,8 +19,9 @@ from unittest import mock
 from core import (
     db as _core_db,
 )  # noqa: F401 —— 先落 core.db,再 import 下面的 DAL(否则撞 dal_reexports 的循环导入)
-from services.steward import copy, copy_artifacts, registry, tool_scope, tools_signoff
+from services.steward import copy, copy_artifacts, copy_brief, registry, tool_scope, tools_signoff
 from services.steward.registry import ToolContext
+from services.stockcard import report as report_svc
 from services.workorder import api as wo_api
 
 _LANGS = ("zh", "th")
@@ -28,6 +29,8 @@ _CLIENTS = [
     {"id": 1, "name": "Sister Makeup", "tax_id": "0105500001234"},
     {"id": 2, "name": "62AHATAI", "tax_id": "0105500009999"},
 ]
+# 六项里第五项(负库存)默认查得到、没有负结存 —— 与其余四项互不相关的用例不必逐个再写一份桩。
+_NO_NEGATIVE_STOCK = {"products": [], "excluded_count": 0}
 
 
 def _ctx(allowed=None):
@@ -65,17 +68,23 @@ def _detail(**over):
 
 
 class _SignoffCase(unittest.TestCase):
-    def _run(self, detail, args=None, ctx=None, orders=("w1",)):
+    def _run(self, detail, args=None, ctx=None, orders=("w1",), stock_summary=None):
         listing = {"orders": [{"id": o} for o in orders], "count": len(orders)}
         with (
             mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
             mock.patch.object(tool_scope, "clients", return_value=_CLIENTS),
             mock.patch.object(wo_api, "list_orders", return_value=listing) as lst,
             mock.patch.object(wo_api, "order_detail", return_value=detail) as det,
+            mock.patch.object(
+                report_svc,
+                "summary",
+                return_value=stock_summary if stock_summary is not None else _NO_NEGATIVE_STOCK,
+            ) as stk,
         ):
             res = tools_signoff.close_readiness(
                 ctx or _ctx(), {"client_name": "makeup", "period": "2569-07", **(args or {})}
             )
+        self.stock_mock = stk
         return res, lst, det
 
     def _state(self, res, check):
@@ -90,7 +99,7 @@ class VerdictTests(_SignoffCase):
         self.assertEqual(det.call_args.kwargs["tenant_id"], "t-1")
         self.assertEqual(res.data["verdict"], tools_signoff.VERDICT_READY)
         self.assertEqual(res.data["blocking"], 0)
-        self.assertEqual(len(res.data["checks"]), 5)
+        self.assertEqual(len(res.data["checks"]), 6)
 
     def test_signed_is_reported_before_anything_else(self):
         res, _lst, _det = self._run(
@@ -202,6 +211,75 @@ class CheckTests(_SignoffCase):
         self.assertEqual(self._state(res, tools_signoff.CHECK_SIGNOFF)["state"], "blocked")
 
 
+class NegativeStockCheckTests(_SignoffCase):
+    """第六项(提示不拦截):负库存查得到就如实说,但绝不进签批前置(见模块顶注)。"""
+
+    def test_negative_products_warn_without_blocking(self):
+        res, _lst, _det = self._run(
+            _detail(),
+            stock_summary={
+                "products": [
+                    {"name": "แชมพู", "negative": True},
+                    {"name": "สบู่", "negative": True},
+                    {"name": "ผ้าเช็ดตัว", "negative": False},
+                ],
+                "excluded_count": 0,
+            },
+        )
+        row = self._state(res, tools_signoff.CHECK_NEGATIVE_STOCK)
+        self.assertEqual(row["state"], tools_signoff.STATE_WARN)
+        self.assertEqual(row["n"], 2)
+        # 提示项不进前置:四项都过时仍然 ready、blocking 仍然 0。
+        self.assertEqual(res.data["verdict"], tools_signoff.VERDICT_READY)
+        self.assertEqual(res.data["blocking"], 0)
+
+    def test_zero_negative_products_reads_ok(self):
+        res, _lst, _det = self._run(_detail())
+        row = self._state(res, tools_signoff.CHECK_NEGATIVE_STOCK)
+        self.assertEqual(row["state"], tools_signoff.STATE_OK)
+        self.assertEqual(row["reason"], "no_negative_stock")
+
+    def test_queries_the_same_client_and_period_as_the_signoff_call(self):
+        self._run(_detail())
+        self.assertEqual(self.stock_mock.call_args.kwargs["workspace_client_id"], 1)
+        self.assertEqual(self.stock_mock.call_args.kwargs["tenant_id"], "t-1")
+        self.assertEqual(self.stock_mock.call_args.kwargs["date_from"].isoformat(), "2026-07-01")
+        self.assertEqual(self.stock_mock.call_args.kwargs["date_to"].isoformat(), "2026-07-31")
+
+    def test_query_failure_reads_unknown_and_does_not_crash_the_other_four_checks(self):
+        with (
+            mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
+            mock.patch.object(tool_scope, "clients", return_value=_CLIENTS),
+            mock.patch.object(
+                wo_api, "list_orders", return_value={"orders": [{"id": "w1"}], "count": 1}
+            ),
+            mock.patch.object(wo_api, "order_detail", return_value=_detail()),
+            mock.patch.object(report_svc, "summary", side_effect=RuntimeError("stock db down")),
+        ):
+            res = tools_signoff.close_readiness(
+                _ctx(), {"client_name": "makeup", "period": "2569-07"}
+            )
+        self.assertTrue(res.ok)  # 库存查询挂了不该把整个签批闸判成失败
+        row = self._state(res, tools_signoff.CHECK_NEGATIVE_STOCK)
+        self.assertEqual(row["state"], tools_signoff.STATE_UNKNOWN)
+        # 其余四项照常算,没被这一项的异常拖垮。
+        self.assertEqual(self._state(res, tools_signoff.CHECK_NUMBERS)["state"], "ok")
+        self.assertEqual(res.data["verdict"], tools_signoff.VERDICT_READY)
+
+    def test_blocked_reply_keeps_the_count_and_the_item_list_in_sync(self):
+        """负库存 warn + 一项真前置(银行)没过:「差 N 项」的 N 与列出的理由必须逐一对应,
+        负库存那句不许混进"没过"的清单里(它压根不是前置)。"""
+        res, _lst, _det = self._run(
+            _detail(bank_recon={"missing_invoice_count": 3, "review_count": 0}),
+            stock_summary={"products": [{"name": "แชมพู", "negative": True}], "excluded_count": 0},
+        )
+        self.assertEqual(res.data["blocking"], 1)
+        text = copy.reply(registry.CLOSE_READINESS, res.data, "zh")
+        self.assertIn("差 1 项", text)
+        self.assertIn("还有 3 笔缺票或待人审", text)
+        self.assertNotIn("负结存", text)  # 提示项的理由不出现在"差 N 项"清单里
+
+
 class CopyTests(unittest.TestCase):
     _DATA = {
         "client_id": 1,
@@ -241,8 +319,6 @@ class CopyTests(unittest.TestCase):
         self.assertEqual(len(seen), 8)  # 四种结论 × 两语,没有一句复用别的
 
     def test_unknown_state_is_not_worded_as_failed(self):
-        from services.steward import copy_brief
-
         self.assertNotEqual(copy_brief.state("unknown", "zh"), copy_brief.state("blocked", "zh"))
 
     def test_table_shape_and_humanised_cells(self):
@@ -269,10 +345,20 @@ class CopyTests(unittest.TestCase):
                 )
 
     def test_unknown_future_codes_are_not_dressed_up(self):
-        from services.steward import copy_brief
-
         self.assertEqual(copy_brief.check("some_future_check", "zh"), "some_future_check")
         self.assertEqual(copy_brief.reason("some_future_reason", None, "zh"), "some_future_reason")
+
+    def test_negative_stock_check_state_and_reason_render_in_both_languages(self):
+        for lang in _LANGS:
+            self.assertTrue(copy_brief.check(tools_signoff.CHECK_NEGATIVE_STOCK, lang))
+            self.assertTrue(copy_brief.state(tools_signoff.STATE_WARN, lang))
+            text = copy_brief.reason("negative_stock", 3, lang)
+            self.assertIn("3", text)
+        # 「提醒」不是「没过」——不同状态不能渲染成同一句话(与 test_unknown_state_is_not_worded_as_failed 同一条口径)。
+        self.assertNotEqual(
+            copy_brief.state(tools_signoff.STATE_WARN, "zh"),
+            copy_brief.state(tools_signoff.STATE_BLOCKED, "zh"),
+        )
 
 
 def _assert_table(case: unittest.TestCase, art: dict) -> None:

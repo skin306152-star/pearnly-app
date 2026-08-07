@@ -14,7 +14,11 @@
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');
-const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
+const {
+    attachConsoleGuard,
+    assertNoConsoleErrors,
+    blockCfInsights,
+} = require('./_helpers/console-guard');
 
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'stock-card');
 
@@ -201,6 +205,7 @@ async function resolvedVar(page, cssVar) {
 test.describe('事务所端 · 商品收发存报表', () => {
     test('列表/单品卡/未入账/期初弹窗/泰语切换 —— 真浏览器桩数据验收', async ({ page }) => {
         const guard = attachConsoleGuard(page);
+        await blockCfInsights(page);
         await page.addInitScript(() => {
             localStorage.setItem('mrpilot_token', 'e2e-stock-card-token');
             // 默认语言是 th(state.ts 无偏好回落)· 本测试前半段断言写死中文,
@@ -213,7 +218,7 @@ test.describe('事务所端 · 商品收发存报表', () => {
         // (core-boot.ts:415),让 SPA 自己的路由器从第一帧起就认定当前路由是 stock-card——
         // 不然直接调 window.loadStockCard() 只是手填了 DOM,routeTo 内部的 currentRoute 仍是
         // 默认 dms-intake,boot 收尾的 reloadCurrentRoute 一来就把页面切回默认路由盖掉。
-        await page.goto('/static/dist/home.html#/stock-card');
+        await page.goto('/home#/stock-card'); // 走服务端路由(no-cache)· 直连 /static/dist/home.html 会吃 CF 30 天 immutable 缓存的旧壳(CI 美国节点已实锤)
         await page.waitForFunction(() => typeof window.loadStockCard === 'function');
         // 绕开套账硬门(本 spec 验的是 stock-card 页面本身,不是套账选择流程)· 首帧自动路由
         // 触发的那次 loadStockCard 早于本行,用的还是未接管的 getActiveWorkspaceClientId
@@ -337,11 +342,12 @@ test.describe('事务所端 · 商品收发存报表', () => {
 
     test('手机视口(390×844)· 工具栏竖排 + 表格容器独立横滚', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
+        await blockCfInsights(page);
         await page.addInitScript(() => {
             localStorage.setItem('mrpilot_token', 'e2e-stock-card-token-mobile');
         });
         await stubApi(page);
-        await page.goto('/static/dist/home.html#/stock-card');
+        await page.goto('/home#/stock-card');
         await page.waitForFunction(() => typeof window.loadStockCard === 'function');
         await neutralizeWorkspaceGate(page);
         await page.evaluate(() => window.routeTo('stock-card'));

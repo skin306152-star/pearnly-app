@@ -10,14 +10,18 @@ import { IV, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, Endpoint } from './dms-intake-invoice.js';
 import { pushHistory } from './dms-intake-erp-push.js';
 import { postingPreviewContainer, refreshPostingPreview } from './dms-intake-posting-preview.js';
-import { confirmedHistoryIds, convertHistoryIds } from './dms-intake-review.js';
+import { confirmIndices, confirmedIndices } from './dms-intake-review.js';
 
 // ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
-    await loadEndpoints();
-    // 兜底:用户跳过步骤3 的「确认」按钮直接点到这里 → 已确认项里仍有没转换的,这里补一次
-    // (convertHistoryIds 内部已按 history_id 去重,不会对已转换项重复调用)。
-    await convertHistoryIds(confirmedHistoryIds());
+    // loadEndpoints(拉推送目标列表)与「兜底把已确认但未转换的 history 补转换」互不依赖
+    // 对方结果,顺序 await 两次是白等——并行跑省一轮网络等待。
+    await Promise.all([
+        loadEndpoints(),
+        // 兜底:用户跳过步骤3 的「确认」按钮直接点到这里 → 已确认项里仍有没转换的,这里补一次
+        // (confirmIndices → convertHistoryIds 内部已按 history_id 去重,不会对已转换项重复调用)。
+        confirmIndices(confirmedIndices()),
+    ]);
     renderSubmit();
 }
 async function loadEndpoints() {

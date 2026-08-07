@@ -5,6 +5,7 @@
 // 取数收在 stock-card-api.ts,本文件只管状态编排 + 事件绑定(单一职责 · <500 行预算)。
 /* global t, escapeHtml, showToast */
 import { ymdIso } from './format-date.js';
+import { listErrorHtml } from './list-error-state.js';
 import {
     activeWsId,
     fmtQty,
@@ -24,7 +25,6 @@ import {
     stcDetailHead,
     stcDetailRow,
     stcEmptyRow,
-    stcErrorHtml,
     stcExcludedHead,
     stcExcludedRow,
     stcListHead,
@@ -187,8 +187,8 @@ async function loadSummary(): Promise<void> {
         renderListTable();
         backToList();
     } catch (_) {
-        if (tbl) tbl.innerHTML = stcErrorHtml(t('stc-error'), 'stc-list-retry');
-        const retry = document.getElementById('stc-list-retry');
+        if (tbl) tbl.innerHTML = listErrorHtml('stc-error', 'data-stc-list-retry');
+        const retry = tbl?.querySelector<HTMLElement>('[data-stc-list-retry]');
         if (retry) retry.onclick = () => loadSummary();
     }
 }
@@ -227,8 +227,9 @@ async function openDetail(key: string): Promise<void> {
                 `<tbody>${detailData.rows.map(stcDetailRow).join('')}</tbody>` +
                 stcDetailFoot(detailData);
     } catch (_) {
-        if (tbl) tbl.innerHTML = stcDetailHead() + stcErrorHtml(t('stc-error'), 'stc-detail-retry');
-        const retry = document.getElementById('stc-detail-retry');
+        if (tbl)
+            tbl.innerHTML = stcDetailHead() + listErrorHtml('stc-error', 'data-stc-detail-retry');
+        const retry = tbl?.querySelector<HTMLElement>('[data-stc-detail-retry]');
         if (retry) retry.onclick = () => openDetail(key);
     }
 }
@@ -247,8 +248,8 @@ async function loadExcluded(): Promise<void> {
                 : stcExcludedHead() + stcEmptyRow(t('stc-empty-excluded'));
     } catch (_) {
         excludedRows = null;
-        if (tbl) tbl.innerHTML = stcErrorHtml(t('stc-error'), 'stc-excluded-retry');
-        const retry = document.getElementById('stc-excluded-retry');
+        if (tbl) tbl.innerHTML = listErrorHtml('stc-error', 'data-stc-excluded-retry');
+        const retry = tbl?.querySelector<HTMLElement>('[data-stc-excluded-retry]');
         if (retry) retry.onclick = () => loadExcluded();
     }
 }

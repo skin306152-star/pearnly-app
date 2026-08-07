@@ -105,16 +105,34 @@ export async function convertHistoryIds(ids: string[]): Promise<void> {
     }
 }
 
-// 已确认文件的全部 history_ids(供 invoice-submit 进第4步前兜底补转换)。
-export function confirmedHistoryIds(): string[] {
-    const ids: string[] = [];
-    IV.results.forEach((r, i) => {
-        if (IV.confirmed.has(i)) ids.push(...r.history_ids);
+// 已确认文件的全部下标(供 invoice-submit 进第4步前兜底补转换 · confirmIndices 的入参)。
+export function confirmedIndices(): number[] {
+    const idxs: number[] = [];
+    IV.results.forEach((_r, i) => {
+        if (IV.confirmed.has(i)) idxs.push(i);
     });
-    return ids;
+    return idxs;
 }
 
-const CONVERT_REASON_KEY: Record<string, string> = {
+// 单一入口:把 idxs 标记为已确认 + 收集其 history_ids + 提交转换桥(convertHistoryIds
+// 内部按 history_id 去重,已转换过的不重复调用)。此前「单张确认」「确认全部」「步骤4 兜底」
+// 三处各写一遍"IV.confirmed.add + 收集 ids + convertHistoryIds",口径一旦漂移就是某条路
+// 确认了却没转换。不在这里重渲——三个调用点各自的后续动作不同(单张要挪到下一条待办、
+// confirm-all 全部展开重排、enterSubmit 兜底则接着进第4步),交回调用方处理。
+export async function confirmIndices(idxs: number[]): Promise<void> {
+    const ids: string[] = [];
+    idxs.forEach((i) => {
+        const r = IV.results[i];
+        if (!r) return;
+        IV.confirmed.add(i);
+        ids.push(...r.history_ids);
+    });
+    if (ids.length) await convertHistoryIds(ids);
+}
+
+// convert_histories 的跳过原因 → i18n 键(导出供 dms-intake-batch-submit.ts 复用,不
+// 另造一份文案 · duplicate/already_converted 不进这张表,走下面 convertChipHtml 的专属分支)。
+export const CONVERT_REASON_KEY: Record<string, string> = {
     no_items: 'dxi-conv-r-no-items',
     no_direction: 'dxi-conv-r-no-direction',
     no_workspace: 'dxi-conv-r-no-workspace',
@@ -382,26 +400,24 @@ export function onReviewClick(tg: HTMLElement): boolean {
     }
     if (tg.closest('.dx-confirm-one')) {
         if (IV.openIdx >= 0) {
-            const confirmedIds = IV.results[IV.openIdx]?.history_ids.filter(Boolean) || [];
-            IV.confirmed.add(IV.openIdx);
-            IV.openIdx = nextUnconfirmed(IV.openIdx);
+            const idx = IV.openIdx;
+            const done = confirmIndices([idx]);
+            IV.openIdx = nextUnconfirmed(idx);
             renderReview();
             showToast(t('dxi-rev-confirmed-toast'), 'success');
-            if (confirmedIds.length) void convertHistoryIds(confirmedIds).then(renderReview);
+            void done.then(renderReview);
         }
         return true;
     }
     if (tg.closest('#dx-inv-confirm-all')) {
-        const newIds: string[] = [];
-        IV.results.forEach((r, i) => {
-            if (passable(r)) {
-                IV.confirmed.add(i);
-                newIds.push(...r.history_ids);
-            }
-        });
+        const idxs = IV.results.reduce<number[]>((acc, r, i) => {
+            if (passable(r)) acc.push(i);
+            return acc;
+        }, []);
+        const done = confirmIndices(idxs);
         renderReview();
         showToast(t('dxi-rev-confirmed-all'), 'success');
-        if (newIds.length) void convertHistoryIds(newIds).then(renderReview);
+        void done.then(renderReview);
         return true;
     }
     return false;

@@ -86,7 +86,7 @@ function unwrap(body: Envelope): unknown {
     throw new InvError(code);
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
     const h: Record<string, string> = {
         Authorization: 'Bearer ' + (typeof token === 'string' ? token : ''),
     };

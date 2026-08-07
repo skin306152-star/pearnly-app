@@ -205,10 +205,6 @@ export function stcExcludedRow(x: StcExcludedRow): string {
 }
 
 // ── 四态公共壳 ──────────────────────────────────────────────────────
-export function stcErrorHtml(msg: string, retryId: string): string {
-    return `<div class="stc-state error">${escapeHtml(msg)}<br><button type="button" class="btn btn-secondary btn-sm" id="${retryId}">${escapeHtml(t('stc-retry'))}</button></div>`;
-}
-
 export function stcNeedWorkspaceHtml(): string {
     return `<div class="stc-state">${escapeHtml(t('stc-need-workspace'))}<br><button type="button" class="btn btn-primary btn-sm" id="stc-pick-ws">${escapeHtml(t('stc-pick-workspace'))}</button></div>`;
 }

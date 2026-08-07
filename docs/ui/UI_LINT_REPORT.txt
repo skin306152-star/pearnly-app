@@ -86,8 +86,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 201(28 文件)
     96  static\i18n-data.js
-        └ 1412: 'billing-accuracy-good': '✅ 准',
-        └ 1413: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1413: 'billing-accuracy-good': '✅ 准',
+        └ 1414: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -122,7 +122,7 @@
      1  src\home\app-shell-sidebar-html.ts
         └ 371: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
-        └ 106: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+        └ 110: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\erp-log-card.ts
         └ 156: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
@@ -439,8 +439,8 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1219: 'time-min-ago-suffix': ' 分钟前',
-        └ 1220: 'time-hour-ago-suffix': ' 小时前',
+        └ 1220: 'time-min-ago-suffix': ' 分钟前',
+        └ 1221: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 476: 'time-hours-ago': '{n} 小时前',
         └ 477: 'time-days-ago': '{n} 天前',

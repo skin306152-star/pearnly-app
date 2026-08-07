@@ -1,8 +1,8 @@
 // 事务所端 · 商品收发存报表(Stock Card)· 数据适配层(类型 / 取数 / 金额与数量格式化)
 // 契约信封与 /api/inventory/* 不同(顶层直出 products/rows/excluded_count,不套一层 data),
-// 故不复用 inventory-common 的 invGet/unwrap,只借它的 activeWsId/fmtQty/fmtMoney(单出口,不重复造)。
-/* global token */
-import { activeWsId, fmtMoney, fmtQty } from './inventory-common.js';
+// 故不复用 inventory-common 的 invGet/unwrap,只借它的 activeWsId/authHeaders/fmtQty/fmtMoney
+// (单出口,不重复造)。
+import { activeWsId, authHeaders, fmtMoney, fmtQty } from './inventory-common.js';
 import { BAHT } from './money.js';
 
 export { activeWsId, fmtQty };
@@ -84,19 +84,6 @@ export class StcError extends Error {
     }
 }
 
-function authHeaders(): Record<string, string> {
-    const h: Record<string, string> = {
-        Authorization: 'Bearer ' + (typeof token === 'string' ? token : ''),
-    };
-    try {
-        const ws = window._wsHeader && window._wsHeader();
-        if (ws) for (const k in ws) if (ws[k] != null) h[k] = ws[k] as string;
-    } catch (_) {
-        /* 切换器未就绪 · 静默 */
-    }
-    return h;
-}
-
 interface StcEnvelope {
     ok?: boolean;
     error?: { code?: string };
@@ -116,6 +103,22 @@ async function stcFetch(url: string, init?: RequestInit): Promise<StcEnvelope> {
     return body;
 }
 
+// summary/card/excluded 三个 GET 都按账套 + 期间查询,card 多带一个 key —— 拼装收成一处,
+// 不留三份逐字重复的 URLSearchParams 样板。
+function stcRangeParams(
+    wsId: number,
+    dateFrom: string,
+    dateTo: string,
+    extra?: Record<string, string>
+): URLSearchParams {
+    return new URLSearchParams({
+        workspace_client_id: String(wsId),
+        date_from: dateFrom,
+        date_to: dateTo,
+        ...extra,
+    });
+}
+
 export async function stcGetStatus(): Promise<boolean> {
     const body = await stcFetch('/api/stockcard/status');
     return body.enabled === true;
@@ -126,11 +129,7 @@ export async function stcGetSummary(
     dateFrom: string,
     dateTo: string
 ): Promise<StcSummaryResp> {
-    const q = new URLSearchParams({
-        workspace_client_id: String(wsId),
-        date_from: dateFrom,
-        date_to: dateTo,
-    });
+    const q = stcRangeParams(wsId, dateFrom, dateTo);
     const body = await stcFetch('/api/stockcard/summary?' + q.toString());
     return {
         products: (body.products as StcProduct[]) || [],
@@ -144,12 +143,7 @@ export async function stcGetCard(
     dateFrom: string,
     dateTo: string
 ): Promise<StcCardResp> {
-    const q = new URLSearchParams({
-        workspace_client_id: String(wsId),
-        key,
-        date_from: dateFrom,
-        date_to: dateTo,
-    });
+    const q = stcRangeParams(wsId, dateFrom, dateTo, { key });
     const body = await stcFetch('/api/stockcard/card?' + q.toString());
     return {
         product: body.product as StcCardResp['product'],
@@ -163,11 +157,7 @@ export async function stcGetExcluded(
     dateFrom: string,
     dateTo: string
 ): Promise<StcExcludedRow[]> {
-    const q = new URLSearchParams({
-        workspace_client_id: String(wsId),
-        date_from: dateFrom,
-        date_to: dateTo,
-    });
+    const q = stcRangeParams(wsId, dateFrom, dateTo);
     const body = await stcFetch('/api/stockcard/excluded?' + q.toString());
     return (body.rows as StcExcludedRow[]) || [];
 }

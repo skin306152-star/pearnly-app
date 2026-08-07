@@ -13,6 +13,7 @@ import {
     type ErpEndpoint,
 } from './dms-intake-erp-push.js';
 import { focusDxErpCards } from './dms-intake-erp-cards.js';
+import { CONVERT_REASON_KEY } from './dms-intake-review.js';
 
 function t(k: string): string {
     const w = window as unknown as { t?: (k: string) => string };
@@ -30,6 +31,10 @@ interface RowResult {
     error?: string;
     warnings?: string[];
 }
+interface DocSkip {
+    history_id: string;
+    reason: string;
+}
 interface CommitData {
     results: RowResult[];
     created: number;
@@ -38,6 +43,42 @@ interface CommitData {
     total: number;
     // 建成的记账料当场转正式单据(intake_bridge · 同一批 commit 内完成,不必再点别的按钮)。
     documents_booked: number;
+    // 记账料建成但没能转正式单据的明细(intake_bridge convert_histories 的 skipped·
+    // reason 见 dms-intake-review.ts 的 CONVERT_REASON_KEY)。此前只有 documents_booked
+    // 一个汇总数,这批为什么没全转成正式单据无从查——四态里少了"部分失败"这一态。
+    document_skipped: DocSkip[];
+}
+
+// duplicate/already_converted 不进 CONVERT_REASON_KEY(dms-intake-review.ts 里走
+// convertChipHtml 的专属徽章分支),这里的分组同样单独归一桶,其余走那张表、查不到落
+// 通用错误桶——与 convertChipHtml 同一套映射,不重开一套口径。
+const DOC_SKIP_DUP_REASONS = new Set(['duplicate', 'already_converted']);
+function docSkipLabelKey(reason: string): string {
+    if (DOC_SKIP_DUP_REASONS.has(reason)) return 'dxi-conv-dup';
+    return CONVERT_REASON_KEY[reason] || 'dxi-conv-r-error';
+}
+
+function docSkipBreakdownHtml(skipped: DocSkip[]): string {
+    if (!skipped.length) return '';
+    const counts = new Map<string, number>();
+    skipped.forEach((s) => {
+        const key = docSkipLabelKey(s.reason);
+        counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const chips = Array.from(counts.entries())
+        .map(([key, n]) => `<span class="dx-badge amber">${esc(t(key))}×${n}</span>`)
+        .join(' ');
+    return `<div class="dx-note" style="margin-top:6px">${chips}</div>`;
+}
+
+// 「已入账 N · 跳过 M」:N/M 两个数字与顶部 documents_booked 统计卡同源,但这里紧挨着
+// 跳过原因分组一起看,不用再去数 document_skipped 数组长度。
+function docSummaryLineHtml(d: CommitData): string {
+    const skipped = d.document_skipped || [];
+    const line = t('dxb-doc-summary')
+        .replace('{n}', String(d.documents_booked || 0))
+        .replace('{m}', String(skipped.length));
+    return `<div class="dx-note" style="margin-top:10px">${esc(line)}</div>${docSkipBreakdownHtml(skipped)}`;
 }
 
 let _data: CommitData | null = null;
@@ -127,6 +168,7 @@ function render() {
         `<div class="dx-rbanner"><div class="dx-rsym">✓</div><div class="dx-rc">` +
         `<b>${esc(t('dxb-done-t'))}</b><p>${esc(t('dxb-done-s'))}</p></div></div>` +
         statHtml(d) +
+        docSummaryLineHtml(d) +
         pushPanelHtml() +
         `<div class="dxb-rlist">${d.results.map(rowLine).join('')}</div>` +
         '<div class="dx-actions" style="margin-top:14px">' +

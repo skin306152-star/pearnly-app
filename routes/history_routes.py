@@ -44,6 +44,7 @@ from core.auth import get_current_user_from_request
 from routes.history_assign_routes import router as _assign_router
 from core.route_helpers import _check_history_access, _tid, content_disposition
 from services.exceptions.exception_checks import _async_run_exception_checks, _parse_money
+from services.intake_bridge import convert as convert_svc
 from services.ocr_history.posting_manual import (
     _ITEM_TYPE_VALUES,
     _PAYMENT_VALUES,
@@ -129,6 +130,36 @@ async def ocr_commit(req: OcrCommitRequest, request: Request):
     _check_history_access(user)
     n = commit_staged_ocr_history(str(user["id"]), list(req.ids), tenant_id=_tid(user))
     return {"ok": True, "committed": n}
+
+
+class OcrConvertRequest(BaseModel):
+    history_ids: List[str] = Field(..., min_length=1, max_length=500)
+    workspace_client_id: int
+
+
+@router.post("/api/ocr/convert-documents")
+async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
+    """录入工作台「确认」的真正落点:草稿 history → 正式单据(purchase_docs/sales_documents)。
+
+    此前「确认」只经 /api/ocr/commit 翻 staged,不落正式单据 → 商品收发存报表读 posted/issued
+    恒空("识别完≠过账完")。本端点把确认接上真实建账,幂等(services.intake_bridge.convert,
+    重复调用已转换项直接回 already_converted)。workspace_client_id 仅作用域校验(同本文件
+    /api/ocr/commit 的鉴权写法),每张单据真正落哪个账套仍按各自 history.workspace_client_id。
+    """
+    user = get_current_user_from_request(request)
+    _check_history_access(user)
+    tenant_id = _tid(user)
+    with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user["id"]), commit=True) as cur:
+        cur.execute(
+            "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+            (req.workspace_client_id, tenant_id),
+        )
+        if not cur.fetchone():
+            raise HTTPException(403, detail="workspace.forbidden")
+        result = convert_svc.convert_histories(
+            cur, tenant_id=tenant_id, user_id=str(user["id"]), history_ids=req.history_ids
+        )
+    return result
 
 
 def _derive_dates_from_printed(pages: Optional[List[dict]]) -> Optional[str]:

@@ -11,6 +11,11 @@ services.workorder.api.order_detail 的返回里,只是从来没有一处把它�
   交付包   deliverables            package 步一次出整批
   签批态   signoff                 sod.signoff_projection(P0-1 单一事实源)
 
+第六项负库存(见 _check_negative_stock)不在这份投影里,单独查 services.stockcard.report
+—— 与前四项不同,它不是签批前置:缺票是警讯不是硬闸,会计可能明知有缺仍照签(货已经卖了,
+补票是后面事务所的事,不能因为它拦住整期收官)。checks 列表里带着,但绝不进 _PREREQ,
+verdict/blocking 两个字段都不因它而变。
+
 与 client_status 不重叠:那个答「引擎跑到哪一步」,这个答「够不够格签」——引擎跑完了但
 银行还有 3 笔缺票时,两个问题的答案分岔,而签字担责的是后者。
 
@@ -20,21 +25,28 @@ services.workorder.api.order_detail 的返回里,只是从来没有一处把它�
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from services.agent.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 
+logger = logging.getLogger(__name__)
+
 CHECK_NUMBERS = "numbers"
 CHECK_BANK = "bank_recon"
 CHECK_FLAGGED = "flagged"
 CHECK_DELIVERABLES = "deliverables"
+CHECK_NEGATIVE_STOCK = "negative_stock"
 CHECK_SIGNOFF = "signoff"
 
 STATE_OK = "ok"
 STATE_BLOCKED = "blocked"
 STATE_UNKNOWN = "unknown"
+# 提示态:查得到确定的结果,但不拦签批,只是要说给会计听(与"过/没过/不知道"三态并列,
+# 目前只有 CHECK_NEGATIVE_STOCK 用得上)。
+STATE_WARN = "warn"
 
 VERDICT_NOT_STARTED = "not_started"
 VERDICT_SIGNED = "signed"
@@ -42,7 +54,7 @@ VERDICT_RESIGN = "resign_needed"
 VERDICT_READY = "ready"
 VERDICT_BLOCKED = "blocked"
 
-# 签批的前置四项(签批态本身不在内 —— 它是结果不是条件)。
+# 签批的前置四项(签批态本身不在内 —— 它是结果不是条件;负库存也不在内 —— 见模块顶注)。
 _PREREQ = (CHECK_NUMBERS, CHECK_BANK, CHECK_FLAGGED, CHECK_DELIVERABLES)
 
 
@@ -72,6 +84,7 @@ def close_readiness(ctx: ToolContext, args: dict) -> ToolResult:
         _check_bank(detail),
         _check_flagged(detail),
         _check_deliverables(detail),
+        _check_negative_stock(ctx, client, period),
         _check_signoff(detail),
     ]
     signoff = detail.get("signoff") or {}
@@ -147,6 +160,34 @@ def _check_deliverables(detail: dict) -> dict:
     if n:
         return _check(CHECK_DELIVERABLES, STATE_OK, "packaged", n)
     return _check(CHECK_DELIVERABLES, STATE_BLOCKED, "not_packaged")
+
+
+def _check_negative_stock(ctx: ToolContext, client: dict, period: str) -> dict:
+    """负库存商品数(提示项,见模块顶注 —— 查得到就如实说,绝不因此拦签批)。
+
+    数据源与 stock_card_lookup 同一份 services.stockcard.report.summary,不是这里另起一套
+    判据 —— 两处对同一期报出的负库存家数必须一致。查询本身抖动(报表侧异常)不该拖垮整张
+    签批闸的其余四项,失败当"不知道"处理而不是让 close_readiness 整个报错。
+    """
+    from services.stockcard import report as report_svc
+
+    try:
+        date_from, date_to = tool_scope.period_month_range(period)
+        with tool_scope.cursor() as cur:
+            summary = report_svc.summary(
+                cur,
+                tenant_id=ctx.tenant_id,
+                workspace_client_id=client["id"],
+                date_from=date_from,
+                date_to=date_to,
+            )
+    except Exception:  # noqa: BLE001 — 提示项查不到不该把签批闸其余四项一起拖挂
+        logger.warning("[steward] negative stock check failed", exc_info=True)
+        return _check(CHECK_NEGATIVE_STOCK, STATE_UNKNOWN, "stock_check_failed")
+    n = sum(1 for p in summary["products"] if p.get("negative"))
+    if n:
+        return _check(CHECK_NEGATIVE_STOCK, STATE_WARN, "negative_stock", n)
+    return _check(CHECK_NEGATIVE_STOCK, STATE_OK, "no_negative_stock")
 
 
 def _check_signoff(detail: dict) -> dict:

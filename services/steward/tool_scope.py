@@ -180,6 +180,27 @@ def period_or_current(period: Optional[str]) -> str:
     return period or obligation_engine.current_be_period()
 
 
+def period_month_range(period: str) -> tuple:
+    """佛历期「YYYY-MM」→ 该期对应公历月的 [月首, 月末](闭区间)。
+
+    收发存报表(stockcard.report)按真实日历日筛,不认账期串,取数前要先落成一对 date。
+    换算走 core.thai_date.gregorian_period —— 该模块顶注点名它是当前的换算权威(另外三处
+    旧实现待收编),新代码一律走这条,不再另起一份 +543/-543。传入的 period 一律先经
+    period_or_current,格式已经是印证过的「YYYY-MM」,解不出来当输入非法直接抛,交
+    tools.run 的兜底转成"这条没查成",不静默拿今天的月份顶替(那会把查错期的人蒙混过去)。
+    """
+    from calendar import monthrange
+    from datetime import date as _date
+
+    from core import thai_date
+
+    ad_period = thai_date.gregorian_period(period)
+    if not ad_period:
+        raise ValueError(f"steward: invalid period {period!r}")
+    year, month = int(ad_period[:4]), int(ad_period[5:7])
+    return _date(year, month, 1), _date(year, month, monthrange(year, month)[1])
+
+
 def client_order(
     ctx: ToolContext, args: dict
 ) -> tuple[dict, str, Optional[dict], Optional[ToolResult]]:

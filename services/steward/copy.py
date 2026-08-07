@@ -11,8 +11,9 @@ reply_guard 出口护栏)。
 
 体积闸(<500 行)下的分居:产物层在 copy_artifacts,月结产线四问 + 单票体检的文案在
 copy_close,现场算账的文案在 copy_calc,开工简报 / 签批闸 / 交付物清单的文案在 copy_brief,
-本期盘点两问的文案在 copy_period,写工具 erp_push 的文案在 copy_erp_push。语义边界不变 —— 调用方一律只 import copy,本模块
-按工具/错误码委派过去。语言机制(支持语种 / 回落 / 取词)在 copy_lang,九个模块共用一份。
+本期盘点两问的文案在 copy_period,商品收发存查询的文案在 copy_stockcard,写工具 erp_push
+的文案在 copy_erp_push。语义边界不变 —— 调用方一律只 import copy,本模块按工具/错误码
+委派过去。语言机制(支持语种 / 回落 / 取词)在 copy_lang,十个模块共用一份。
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from services.steward import (
     copy_erp_push,
     copy_file,
     copy_period,
+    copy_stockcard,
     copy_table,
     registry,
     store,
@@ -57,6 +59,7 @@ _TOOL_TITLE = {
     **copy_calc.TITLES,
     **copy_brief.TITLES,
     **copy_period.TITLES,
+    **copy_stockcard.TITLES,
     **copy_file.TITLES,
     **copy_doc.TITLES,
     **copy_table.TITLES,
@@ -68,6 +71,7 @@ _REPLIES = {
     **copy_calc.REPLIES,
     **copy_brief.REPLIES,
     **copy_period.REPLIES,
+    **copy_stockcard.REPLIES,
     **copy_file.REPLIES,
     **copy_doc.REPLIES,
     **copy_table.REPLIES,
@@ -343,6 +347,8 @@ def error(code: str, data: Optional[dict], lang: str) -> str:
         return copy_doc.error(code, data, lang)
     if code in copy_table.ERRORS:
         return copy_table.error(code, data, lang)
+    if code in copy_stockcard.ERRORS:
+        return copy_stockcard.error(code, data, lang)
     table = _ERROR.get(code)
     if not table:
         return _t(_ERROR_FALLBACK, lang).format(code=code)

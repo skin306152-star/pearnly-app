@@ -31,12 +31,13 @@ _LANE = {
     "push_log_query": {"zh": "推送日志", "th": "ประวัติการส่ง"},
 }
 
-# 签批五项(tools_signoff.CHECK_*)的人话。
+# 签批六项(tools_signoff.CHECK_*)的人话。
 _CHECK = {
     tools_signoff.CHECK_NUMBERS: {"zh": "税额", "th": "ยอดภาษี"},
     tools_signoff.CHECK_BANK: {"zh": "银行对账", "th": "กระทบยอดธนาคาร"},
     tools_signoff.CHECK_FLAGGED: {"zh": "待判件", "th": "รายการที่ต้องตัดสิน"},
     tools_signoff.CHECK_DELIVERABLES: {"zh": "交付包", "th": "ชุดส่งมอบ"},
+    tools_signoff.CHECK_NEGATIVE_STOCK: {"zh": "库存", "th": "สต็อก"},
     tools_signoff.CHECK_SIGNOFF: {"zh": "签批", "th": "การอนุมัติ"},
 }
 _STATE = {
@@ -44,6 +45,8 @@ _STATE = {
     tools_signoff.STATE_BLOCKED: {"zh": "没过", "th": "ไม่ผ่าน"},
     # 「不知道」是第三态而不是"没过":没收到银行流水的客户不该被判成不合格。
     tools_signoff.STATE_UNKNOWN: {"zh": "不知道", "th": "ยังไม่ทราบ"},
+    # 「提醒」不是"没过":负库存不拦签批,只是要说给会计听(见 tools_signoff 模块顶注)。
+    tools_signoff.STATE_WARN: {"zh": "提醒", "th": "เตือน"},
 }
 _REASON = {
     "computed": {"zh": "已算出应交税额", "th": "คำนวณภาษีที่ต้องชำระแล้ว"},
@@ -61,6 +64,15 @@ _REASON = {
     "pending": {"zh": "还有 {n} 件等人判", "th": "ยังมี {n} รายการรอตัดสิน"},
     "packaged": {"zh": "已出 {n} 份", "th": "ออกแล้ว {n} รายการ"},
     "not_packaged": {"zh": "交付包还没出", "th": "ยังไม่ได้ออกชุดส่งมอบ"},
+    "negative_stock": {
+        "zh": "{n} 个商品负结存 · 采购票可能没送齐",
+        "th": "สินค้า {n} รายการยอดคงเหลือติดลบ · บิลซื้ออาจไม่ครบ",
+    },
+    "no_negative_stock": {"zh": "没有负结存商品", "th": "ไม่มีสินค้ายอดคงเหลือติดลบ"},
+    "stock_check_failed": {
+        "zh": "这次没查到库存数据,情况未知",
+        "th": "รอบนี้ดึงข้อมูลสต็อกไม่สำเร็จ ยังไม่ทราบสถานะ",
+    },
     "signed": {"zh": "已签批", "th": "อนุมัติแล้ว"},
     "unsigned": {"zh": "还没人签", "th": "ยังไม่มีใครอนุมัติ"},
     "stale": {
@@ -294,13 +306,18 @@ def close_readiness(data: dict, lang: str) -> str:
     )
 
 
+# 签批(结果不是条件)与负库存(提示项,不拦签批)两项不进"差 N 项"的枚举 —— data['blocking']
+# 只数四项前置(tools_signoff._PREREQ),这里列的说明必须和那个数逐一对应,漏排会出现
+# "还不能签,差 2 项"却列出 3 条理由的错位。
+_NON_BLOCKING_ITEMS = (tools_signoff.CHECK_SIGNOFF, tools_signoff.CHECK_NEGATIVE_STOCK)
+
+
 def _blocking_items(data: dict, lang: str) -> list[str]:
     """没过那几项的短说明。逐项来自 checks 的 reason 码,不做归纳总结。"""
     return [
         reason(c.get("reason") or "", c.get("n"), lang)
         for c in data.get("checks") or []
-        if c.get("check") != tools_signoff.CHECK_SIGNOFF
-        and c.get("state") != tools_signoff.STATE_OK
+        if c.get("check") not in _NON_BLOCKING_ITEMS and c.get("state") != tools_signoff.STATE_OK
     ]
 
 

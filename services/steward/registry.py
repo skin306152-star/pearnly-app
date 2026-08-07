@@ -57,6 +57,7 @@ DELIVERABLES_LIST = "deliverables_list"
 VAT_CALC = "vat_calc"
 TAX_MATRIX = "tax_matrix"
 PERIOD_INVOICES = "period_invoices"
+STOCK_CARD_LOOKUP = "stock_card_lookup"
 ERP_PUSH = "erp_push"
 FILE_CONVERT = "file_convert"
 VAT_REPORT_CHECK = "vat_report_check"
@@ -281,6 +282,30 @@ TOOLS: tuple[StewardTool, ...] = (
         handler="period_invoices",
     ),
     StewardTool(
+        name=STOCK_CARD_LOOKUP,
+        desc=(
+            "查某家某期的商品收发存:期初/入/出/结存,有没有负库存;可只看一个商品 · "
+            "会计问「这个月库存怎么样」「XX 还有多少」「有没有负库存」时用 · "
+            "只问工单跑到哪一步/还缺什么材料用 client_status(它不管库存数量);"
+            "要看完整逐笔流水或导出对账,让客户去事务所端「商品 → 收发存报表」页面,"
+            "本工具在对话里答不了整份流水"
+        ),
+        slots=(
+            client_name_slot(required=True),
+            period_slot(),
+            SlotSpec(
+                "keyword",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อหรือรหัสสินค้า เฉพาะเมื่อผู้ใช้พูดถึงสินค้าตัวใดตัวหนึ่ง "
+                "(คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="商品名或编码(用户点名某个具体商品才填·必须原样出自用户原话)· "
+                "没点名就给 null,答全表",
+            ),
+        ),
+        handler="stock_card_lookup",
+    ),
+    StewardTool(
         name=BANK_RECON_STATUS,
         desc=(
             "查某家某期的银行对账进度:对上几笔、缺票几笔、有票无流水几笔、差多少钱 · "
@@ -403,6 +428,13 @@ TOOLS: tuple[StewardTool, ...] = (
                 source="model_freeform",
                 desc_th="ทิศทาง: purchase(ซื้อ) / sales(ขาย)",
                 desc_zh="方向(purchase 进项 / sales 销项)· 用户没说给 null,系统按税号自己判",
+            ),
+            SlotSpec(
+                "posting_kind",
+                required=False,
+                source="model_freeform",
+                desc_th="วิธีลงบัญชี: stock(สต๊อก) / service(บริการ) ระบุเฉพาะเมื่อผู้ใช้บอกเอง",
+                desc_zh="过账去向(stock 库存 / service 服务)· 用户明确说了才填,没说给 null",
             ),
         ),
         handler="erp_push",

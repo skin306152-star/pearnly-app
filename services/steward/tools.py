@@ -18,6 +18,7 @@
   tools_signoff   这家这期能不能签(order_detail 五项投影 → 一句结论)
   tools_deliverables 交付物清单 + 每份的真下载链
   tools_period    本期盘点(全所税额表 / 某家某期的票推完了没 · 一律批量读,不逐家回放)
+  tools_stockcard 商品收发存查询(services.stockcard.report 记账台账 · 不是 POS 商户库存)
   tools_file      吃这一轮附件的两只(文件转 Excel / 销项报告三查 · 哪个文件由代码定不由模型定)
   tools_doc_qa    读文问答(S2 · 只答文中写了什么,标页码,文中没有的数不许算不许编)
   tools_table     表格生成(S2 · 模型只挑列名/算法规格,数字全由代码 Decimal 实算)
@@ -51,6 +52,7 @@ from services.steward import (
     tools_invoice,
     tools_period,
     tools_signoff,
+    tools_stockcard,
     tools_table,
 )
 from services.steward.registry import ToolContext
@@ -318,6 +320,7 @@ _HANDLERS = {
     registry.VAT_CALC: tools_calc.vat_calc,
     registry.TAX_MATRIX: tools_period.tax_matrix,
     registry.PERIOD_INVOICES: tools_period.period_invoices,
+    registry.STOCK_CARD_LOOKUP: tools_stockcard.stock_card_lookup,
     registry.ERP_PUSH: erp_push_tool.erp_push,
     registry.FILE_CONVERT: tools_file.file_convert,
     registry.VAT_REPORT_CHECK: tools_file.vat_report_check,

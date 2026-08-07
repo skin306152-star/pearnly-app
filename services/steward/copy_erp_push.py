@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from services.erp.express_push.posting_profile import ESCALATE_REASON_PREFIX
 from services.steward.copy_lang import t as _t
 
 # ฿ 的墨迹比字宽宽半像素,紧跟数字会糊成一团(粗体大字最明显)。垫一个窄空格分开。
@@ -155,6 +156,19 @@ ERRORS = {
         "zh": "Express 还在写这张单(作业号 {job_id}),等不到结果先回复。不要重推 —— 过几分钟去「推送日志」看这张票的最终状态。",
         "th": "Express ยังเขียนใบนี้อยู่ (เลขงาน {job_id}) รอผลไม่ทันจึงตอบก่อน อย่าส่งซ้ำ — อีกสักครู่ดูสถานะสุดท้ายที่「บันทึกการส่ง」",
     },
+    "steward.posting_kind_write_failed": {
+        "zh": "这次说的过账去向没能存到票上,推送没有执行。稍后再说一次;如果一直不行,去「推送日志」反馈。",
+        "th": "บันทึกวิธีลงบัญชีที่บอกไว้ลงในใบไม่สำเร็จ จึงยังไม่ได้ส่งใบนี้ ลองสั่งใหม่อีกครั้ง ถ้ายังไม่ได้ให้แจ้งที่「บันทึกการส่ง」",
+    },
+}
+
+
+# 被拦原因是「没声明过账去向」(posting_profile.ESCALATE_REASON_PREFIX 族)时,补一句怎么
+# 解开 —— 别的拦截原因(账套没配 / 单据防呆没过 / GLACC 没有科目组...)加这句是瞎指路,
+# 只在这一族追加(error() 按 reason 前缀判断)。
+_BLOCKED_POSTING_COACH = {
+    "zh": "直接告诉我「按库存过账」或「按服务过账」,再推一次就行。",
+    "th": "บอกผมว่า「ลงแบบสต๊อก」หรือ「ลงแบบบริการ」แล้วสั่งส่งใหม่ได้เลย",
 }
 
 
@@ -211,7 +225,7 @@ def error(code: str, data: dict, lang: str) -> str:
         " ".join(x for x in (c.get("invoice_no"), c.get("seller_name")) if x)
         for c in candidates[:5]
     )
-    return _t(ERRORS[code], lang).format(
+    text = _t(ERRORS[code], lang).format(
         keyword=data.get("keyword", ""),
         n=data.get("total", len(candidates)),
         names=names,
@@ -230,3 +244,8 @@ def error(code: str, data: dict, lang: str) -> str:
         asked_label=direction_label(data.get("asked"), lang),
         detected_label=direction_label(data.get("detected"), lang),
     )
+    if code == "steward.erp_push_blocked" and str(data.get("reason") or "").startswith(
+        ESCALATE_REASON_PREFIX
+    ):
+        text += " " + _t(_BLOCKED_POSTING_COACH, lang)
+    return text

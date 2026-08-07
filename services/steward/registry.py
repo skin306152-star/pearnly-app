@@ -429,6 +429,13 @@ TOOLS: tuple[StewardTool, ...] = (
                 desc_th="ทิศทาง: purchase(ซื้อ) / sales(ขาย)",
                 desc_zh="方向(purchase 进项 / sales 销项)· 用户没说给 null,系统按税号自己判",
             ),
+            SlotSpec(
+                "posting_kind",
+                required=False,
+                source="model_freeform",
+                desc_th="วิธีลงบัญชี: stock(สต๊อก) / service(บริการ) ระบุเฉพาะเมื่อผู้ใช้บอกเอง",
+                desc_zh="过账去向(stock 库存 / service 服务)· 用户明确说了才填,没说给 null",
+            ),
         ),
         handler="erp_push",
         risk=RISK_WRITE,

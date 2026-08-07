@@ -23,6 +23,11 @@ push_log_query 会答「近 7 天 0 条」;投单没投出去的两条路(桥不
 双写的另外两个口子一并堵在本模块:①同 history × endpoint 已 success 过就不再推
 (别家推送腿都有这道闸);②大脑给的 direction 只当复核 —— 它是 model_freeform 槽,认它
 就等于让一个词盖过税号锚点的确定性判定。
+
+过账去向(posting_kind)可在对话里后补:这次会计明确说了「按库存/服务过账」就以这次说的为
+准,没说才照旧读票上已存的声明(prepare 里 resolve_posting_kind 定优先级)。执行前先把声明
+回写进 ocr_history.posting_kind(_reconcile_posting_kind)——四条推送腿共用这一列,聊天里
+的声明不落档,下一条腿(重试/其它入口)读到的还是旧值,照样把票 escalate 给会计。
 """
 
 from __future__ import annotations
@@ -55,6 +60,9 @@ ERR_PUSH_PENDING = "steward.erp_push_pending"
 # —— 那条是"没人来领,肯定没写",这条是"领了,写没写不知道"。共用一句文案就等于替她断定
 # 没写,而她照着再说一次就是账上两张。
 ERR_PUSH_UNCERTAIN = "steward.erp_push_uncertain"
+# 声明跟着票走(见 _reconcile_posting_kind 顶注):回写 ocr_history.posting_kind 失败当硬
+# 失败,绝不装作这次推送已经用上了声明的过账去向。
+ERR_POSTING_KIND_WRITE_FAILED = "steward.posting_kind_write_failed"
 # Express 正开着这个账套 → 桥连备份都没做就快拒。旧队列(小助手来领)撞上它会自己重领,
 # 桥直写这条路不会 —— 共用 ERR_PUSH_FAILED 的"查清原因后再说一次"等于让会计去查一件
 # 她一眼就能解决的事(把 Express 关掉),而她无从知道那才是原因。
@@ -118,6 +126,7 @@ def express_endpoint(user_id: str) -> Optional[dict]:
 def prepare(ctx: ToolContext, args: dict) -> PrepareResult:
     """用户级参数 → 可执行参数 + 卡面事实。任何一步接不了地都不铸卡(绝不批一张空头卡)。"""
     from services.erp.express_push.direction import normalize as normalize_direction
+    from services.erp.express_push.posting_kind import resolve_posting_kind
 
     endpoint = express_endpoint(ctx.user_id)
     if not endpoint:
@@ -160,7 +169,9 @@ def prepare(ctx: ToolContext, args: dict) -> PrepareResult:
         "history_id": history_id,
         "account_set": account_set,
         "direction": normalize_direction(args.get("direction")) or "",
-        "posting_kind": str(detail.get("posting_kind") or ""),
+        # 这次说了「按库存/服务过账」就以这次说的为准,没说才照旧读票上已存的声明 ——
+        # resolve_posting_kind 是这道优先级的单一权威(explicit 非法值当没给,自动回落)。
+        "posting_kind": resolve_posting_kind(args.get("posting_kind"), detail) or "",
         "invoice_no": str(row.get("invoice_no") or ""),
         "seller_name": str(row.get("seller_name") or ""),
         "total_amount": _money(row.get("total_amount")),
@@ -216,14 +227,46 @@ def _snapshot_drift(history: dict, args: dict) -> Optional[str]:
     return None
 
 
+def _reconcile_posting_kind(ctx: ToolContext, history: dict, args: dict) -> Optional[ToolResult]:
+    """批文里声明的过账去向落回票上(声明跟着票走 · 铁律)。
+
+    四条推送腿(手动 / 识别后自动 / 失败重试 / 批量分拣)共用 ocr_history.posting_kind 这一
+    列 —— 这次在对话里说的「按库存/服务过账」只落在这次调用的参数里不落档的话,下一条腿读到
+    的还是旧值,照样 escalate 交会计。写在 _snapshot_drift 之前跑:批文声明与票上旧值本来
+    就会不同(声明就是为了改它),先落档同步,票面对比才不会把这次声明误判成"等批的空档被
+    人偷改过"。
+
+    只在真声明了(合法值)且与票上现值不同才写库,没声明 / 声明和现值一致都不必要地写一次。
+    回写失败当硬失败:不能假装这次推送已经用上了声明的去向,推送继续走下去只会把票记到会计
+    没说过的那一侧。
+    """
+    from services.erp.express_push.posting_kind import normalize as normalize_posting_kind
+    from services.ocr_history.posting_kind_store import update_history_posting_kind
+
+    declared = normalize_posting_kind(args.get("posting_kind"))
+    if not declared or declared == str(history.get("posting_kind") or ""):
+        return None
+    history_id = str(args.get("history_id") or "")
+    if not update_history_posting_kind(history_id, declared, ctx.user_id, ctx.tenant_id):
+        return ToolResult(
+            ok=False, error_code=ERR_POSTING_KIND_WRITE_FAILED, data={"history_id": history_id}
+        )
+    history["posting_kind"] = declared
+    return None
+
+
 def _build_payload(
-    endpoint: dict, history: dict, direction: str
+    endpoint: dict, history: dict, direction: str, declared_posting_kind: Optional[str] = None
 ) -> tuple[Optional[dict], str, str]:
     """走 preflight 的全套体检 + mapper 装配,返回 (express payload v1, 错误码, 细节)。
 
     过账去向必须显式解析后传进去:preflight 自己不读票上的声明(那是 enqueue 那条腿干的),
     漏传 = 上传向导里明确选了「库存」的票被按服务记账 —— 采购不建库存品不入库、销售不扣
     库存不结转 COGS,或者画像判 blocks_auto_posting 的账套直接 escalate、这张票永远推不动。
+
+    declared_posting_kind 是这次批文里的声明(经 _reconcile_posting_kind 落档、与 history
+    已同步)—— 传给 resolve_posting_kind 让它优先于票上的值,聊天里刚说的这次和上传向导选的
+    上次同等权威,不因为走的是对话这条腿就矮一头。
 
     大脑给的方向只当复核:direction 是 model_freeform 槽,接地闸不要求它出现在用户原话里,
     认它就等于让一个词盖过税号锚点的确定性判定(进项票走 sales_mapper → 记成收入 + 销项税,
@@ -232,7 +275,8 @@ def _build_payload(
     from services.erp.express_push.posting_kind import resolve_posting_kind
     from services.erp.express_push.preflight import preflight_express
 
-    pf = preflight_express(endpoint, history, posting_kind=resolve_posting_kind(None, history))
+    kind = resolve_posting_kind(declared_posting_kind, history)
+    pf = preflight_express(endpoint, history, posting_kind=kind)
     if pf.disabled:
         return None, ERR_PUSH_BLOCKED, "express_disabled"
     if pf.blocked:
@@ -278,6 +322,10 @@ def erp_push(ctx: ToolContext, args: dict) -> ToolResult:
     wcid = history.get("workspace_client_id")
     if wcid and ctx.allowed_client_ids is not None and int(wcid) not in ctx.allowed_client_ids:
         return ToolResult(ok=False, error_code=ERR_INVOICE_NOT_FOUND, data={"keyword": ""})
+
+    kind_err = _reconcile_posting_kind(ctx, history, args)
+    if kind_err:
+        return kind_err
     drift = _snapshot_drift(history, args)
     if drift:
         return ToolResult(ok=False, error_code=ERR_INVOICE_CHANGED, data={"field": drift})
@@ -296,7 +344,7 @@ def erp_push(ctx: ToolContext, args: dict) -> ToolResult:
         )
 
     direction = str(args.get("direction") or "")
-    payload, code, detail = _build_payload(endpoint, history, direction)
+    payload, code, detail = _build_payload(endpoint, history, direction, args.get("posting_kind"))
     if not payload:
         data = (
             {"asked": direction, "detected": detail}

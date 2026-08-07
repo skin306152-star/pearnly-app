@@ -42,6 +42,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     stw_sessions_empty: '暂无会话记录,发送第一条消息后在此显示。',
     stw_budget_line: '本会话已用 {spent} / 上限 {cap}',
     stw_side_toggle: '会话历史面板',
+    stw_history_err_t: '这段对话没能加载出来',
+    stw_history_err_s: '网络或服务异常,历史消息还在,点击重试。',
 });
 Object.assign(window.__AI_I18N_TH__, {
     stw_welcome_t: 'ผู้ช่วยอัจฉริยะ Pearnly ของคุณ',
@@ -85,6 +87,8 @@ Object.assign(window.__AI_I18N_TH__, {
     stw_sessions_empty: 'ยังไม่มีประวัติการสนทนา จะแสดงที่นี่เมื่อคุณส่งข้อความแรก',
     stw_budget_line: 'แชตนี้ใช้ไป {spent} / เพดาน {cap}',
     stw_side_toggle: 'แผงประวัติการสนทนา',
+    stw_history_err_t: 'โหลดบทสนทนานี้ไม่สำเร็จ',
+    stw_history_err_s: 'เครือข่ายหรือระบบขัดข้อง ข้อความเดิมยังอยู่ กดลองใหม่',
 });
 Object.assign(window.__AI_I18N_EN__, {
     stw_welcome_t: 'Your Pearnly assistant',
@@ -128,6 +132,8 @@ Object.assign(window.__AI_I18N_EN__, {
     stw_sessions_empty: 'No chats yet. Your first conversation will appear here.',
     stw_budget_line: 'This chat: {spent} used / {cap} limit',
     stw_side_toggle: 'Chat history panel',
+    stw_history_err_t: 'Could not load this conversation',
+    stw_history_err_s: 'Network or service error. Your messages are still there — tap retry.',
 });
 Object.assign(window.__AI_I18N_JA__, {
     stw_welcome_t: 'Pearnly スマートアシスタント',
@@ -171,4 +177,7 @@ Object.assign(window.__AI_I18N_JA__, {
     stw_sessions_empty: 'チャット履歴はまだありません。最初のメッセージを送ると表示されます。',
     stw_budget_line: 'このチャット:{spent} 使用 / 上限 {cap}',
     stw_side_toggle: 'チャット履歴パネル',
+    stw_history_err_t: 'この会話を読み込めませんでした',
+    stw_history_err_s:
+        'ネットワークまたはシステムエラーです。メッセージは残っています。再試行してください。',
 });

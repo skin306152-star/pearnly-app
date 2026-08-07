@@ -41,6 +41,11 @@
             sessionId: null,
             creating: false,
             createErr: false,
+            // 切会话触发的这次历史拉取(见 syncSession 的 afterSwitch),与
+            // creating/createErr(建新会话)各管各的四态坑位——两组不会同时为真
+            // (换会话时 sessionId 已非空,不会再 ensureSession)。
+            historyLoading: false,
+            historyErr: false,
             messages: [],
             hasMore: false,
             loadingEarlier: false,
@@ -177,15 +182,37 @@
 
     // 服务端的消息流是权威的,回到本页或任务收尾时重建一次;本地只留还没落库的
     // (sending/failed)接在后面。送出在途时整轮跳过,避免与回包抢写。
-    function syncSession() {
+    //
+    // opts.afterSwitch = true:刚 resetTo() 切过来的这次拉取(见 switchSession/
+    // newSession)。这次必须让人看得见——resetTo() 已把 S.messages 清空、画出
+    // 「欢迎屏」空态,那一屏与「这个会话本来就没消息」长得一模一样;网络慢或这次
+    // 请求真失败,用户看到的就是「点了历史记录,什么都没有」(2026-08-07 真机复现:
+    // 桩 2.5s 延迟/500 两种条件,空态原样卡住、catch 不留痕迹,详见对应 E2E spec)。
+    // 因此这条路径要:立刻亮一个跟「空会话」区分得开的骨架屏,失败要落 S.historyErr
+    // 出错误态 + 重试(data-action="stw-history-retry"),不能悄悄吞。后台静默刷新
+    // (mount() 回访时那次,afterSwitch 不传)维持老规矩不吵——那份数据早就在屏幕上,
+    // 一次网络抖动不该把它换成错误态。
+    function syncSession(opts) {
         if (!S || !S.sessionId || S.busy || pending) return;
+        var afterSwitch = !!(opts && opts.afterSwitch);
         var session = S;
         var sid = S.sessionId;
+        if (afterSwitch) {
+            S.historyLoading = true;
+            S.historyErr = false;
+            view.renderFeed();
+        }
         S.api
             .getStewardSession(sid)
             .then(function (resp) {
                 if (S !== session || S.busy || S.sessionId !== sid) return;
-                if (!resp || !Array.isArray(resp.messages)) return;
+                S.historyLoading = false;
+                if (!resp || !Array.isArray(resp.messages)) {
+                    // 200 但契约漂了:切会话场景不能装作"这个会话真的没消息"。
+                    if (afterSwitch) S.historyErr = true;
+                    view.renderFeed();
+                    return;
+                }
                 S.messages = resp.messages.concat(
                     S.messages.filter(function (m) {
                         return m.state === 'sending' || m.state === 'failed';
@@ -200,7 +227,14 @@
                 }
             })
             .catch(function () {
-                // 重建失败不动本地流:那是刚刚真发生过的对话,不能因一次网络抖动清空。
+                if (S !== session || S.busy || S.sessionId !== sid) return;
+                S.historyLoading = false;
+                // 切会话触发的这次失败必须露脸(见上方函数注释);后台静默刷新那份
+                // 数据本来就在屏幕上,一次抖动不动它,老规矩不变。
+                if (afterSwitch) {
+                    S.historyErr = true;
+                    view.renderFeed();
+                }
             });
     }
 
@@ -266,7 +300,7 @@
             return;
         }
         resetTo(sid);
-        syncSession();
+        syncSession({ afterSwitch: true });
         sessions.refreshBudget();
     }
 
@@ -385,6 +419,7 @@
         else if (a === 'stw-proc-toggle') tasksLayer.toggleProc(el.getAttribute('data-tid'));
         else if (a === 'stw-proc-load') tasksLayer.fetchOne(el.getAttribute('data-tid'));
         else if (a === 'stw-load-earlier') loadEarlier();
+        else if (a === 'stw-history-retry') syncSession({ afterSwitch: true });
         else if (a === 'stw-poll-again' && S.taskId) tasksLayer.loadTask(S.taskId);
         else if (a === 'stw-authz-approve') actions.decide(true, el.getAttribute('data-token'));
         else if (a === 'stw-authz-reject') actions.decide(false, el.getAttribute('data-token'));

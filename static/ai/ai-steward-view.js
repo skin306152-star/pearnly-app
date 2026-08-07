@@ -96,6 +96,22 @@
                 });
                 return;
             }
+            // 切会话拉取那段历史(见 ai-steward.js syncSession 的 afterSwitch):
+            // 骨架屏与"这个会话本来就没消息"的欢迎屏必须长得不一样,失败要有出路,
+            // 不能悄悄留在欢迎屏上装作没这回事(2026-08-07 真机复现的那条 bug)。
+            if (s.historyLoading) {
+                el.innerHTML = AI.state.loadingHtml();
+                return;
+            }
+            if (s.historyErr) {
+                el.innerHTML = AI.state.errorHtml({
+                    title: at('stw_history_err_t'),
+                    sub: at('stw_history_err_s'),
+                    retryLabel: at('stw_retry'),
+                    retryName: 'stw-history-retry',
+                });
+                return;
+            }
             el.innerHTML = AI.stewardFlowRender.feedHtml(s.messages, {
                 tasks: s.tasks,
                 taskLoading: s.taskLoading,

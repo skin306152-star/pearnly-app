@@ -41,8 +41,11 @@ def _merge_purchase_lines(
     )
     ids = [r["id"] for r in cur.fetchall() if grouping.name_key(r["description"]) == key]
     if ids:
+        # id 是 uuid 列:psycopg2 把 Python list 适配成 text[],无 ::uuid[] 转型会炸
+        # "operator does not exist: uuid = text"(仓库血泪·同 test_workorder_uuid_any_cast.py)。
         cur.execute(
-            "UPDATE purchase_lines SET product_id = %s WHERE tenant_id = %s AND id = ANY(%s)",
+            "UPDATE purchase_lines SET product_id = %s "
+            "WHERE tenant_id = %s AND id = ANY(%s::uuid[])",
             (product_id, tenant_id, ids),
         )
     return ids
@@ -60,7 +63,8 @@ def _merge_sales_lines(
     ids = [r["id"] for r in cur.fetchall() if grouping.name_key(r["description"]) == key]
     if ids:
         cur.execute(
-            "UPDATE sales_document_lines SET product_id = %s WHERE tenant_id = %s AND id = ANY(%s)",
+            "UPDATE sales_document_lines SET product_id = %s "
+            "WHERE tenant_id = %s AND id = ANY(%s::uuid[])",
             (product_id, tenant_id, ids),
         )
     return ids

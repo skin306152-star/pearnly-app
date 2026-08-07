@@ -7,6 +7,7 @@
     "agent": "exempt:app-report",
     "why": "账本报表界面·对话给不了表格体验·留 App"
   },
+  "stock_card_routes": "B",
   "admin_logs_routes": "D",
   "admin_agent_routes": "D",
   "admin_cost_routes": "D",

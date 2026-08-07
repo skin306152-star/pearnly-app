@@ -38,18 +38,67 @@ body.stw-chat-mode #v-steward.on {
   background: var(--surface2);
   border-right: 1px solid var(--hair);
   min-height: 0;
+  transition: width var(--dur-base) var(--ease);
 }
 .stw-side-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 14px 14px 8px;
 }
 .stw-new-chat {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   justify-content: flex-start;
   gap: 8px;
 }
 .stw-new-chat svg {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
+}
+.stw-side-toggle {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--hair2);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.stw-side-toggle:hover {
+  background: var(--nav-hover);
+}
+.stw-side-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ---------- 折叠态(桌面手动 toggle · 与下方 ≤800px 抽屉态各管各的) ----------
+ * 收窄到只留「新对话」图标 + toggle 本身,历史列表/分组标题/余额脚注整块藏 ——
+ * 会话标题是文本,收窄成图标栏没有意义,不硬凑一份图标映射。 */
+.stw-side.collapsed {
+  width: 56px;
+}
+.stw-side.collapsed .stw-side-label,
+.stw-side.collapsed .stw-side-sec,
+.stw-side.collapsed .stw-sess-list,
+.stw-side.collapsed .stw-side-foot {
+  display: none;
+}
+.stw-side.collapsed .stw-side-hd {
+  flex-direction: column;
+  padding: 14px 8px 8px;
+}
+.stw-side.collapsed .stw-new-chat {
+  width: 34px;
+  flex: none;
+  padding: 0;
+  justify-content: center;
 }
 .stw-side-sec {
   font-size: 10.5px;
@@ -648,6 +697,34 @@ body.stw-chat-mode #v-steward.on {
   }
   .stw-menu-btn {
     display: inline-flex;
+  }
+  /* 桌面折叠 toggle 在窄屏让位给抽屉汉堡(.stw-menu-btn):两套收起机制别打架 ——
+   * 抽屉已经默认收着(translateX(-100%)),折叠态的窄宽度反而会让展开时的抽屉
+   * 挤成一条看不清标题的窄条。桌面 .collapsed 若在切到窄屏前已置位,这里连同
+   * 内部元素一并还原成展开态原样(只撤 .collapsed 加的那几条 display:none/宽度)。 */
+  .stw-side-toggle {
+    display: none;
+  }
+  .stw-side.collapsed {
+    width: 256px;
+  }
+  .stw-side.collapsed .stw-side-label {
+    display: inline;
+  }
+  .stw-side.collapsed .stw-side-sec,
+  .stw-side.collapsed .stw-sess-list,
+  .stw-side.collapsed .stw-side-foot {
+    display: block;
+  }
+  .stw-side.collapsed .stw-side-hd {
+    flex-direction: row;
+    padding: 14px 14px 8px;
+  }
+  .stw-side.collapsed .stw-new-chat {
+    width: auto;
+    flex: 1;
+    padding: 8px 16px;
+    justify-content: flex-start;
   }
   .stw-w-prompts {
     grid-template-columns: 1fr;

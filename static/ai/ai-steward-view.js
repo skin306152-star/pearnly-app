@@ -32,6 +32,7 @@
             var el = hooks.getEl('stwSide');
             if (!el) return;
             var s = S();
+            el.classList.toggle('collapsed', !!s.sideCollapsed);
             el.innerHTML = AI.stewardSessionsRender.sidebarHtml({
                 sessions: s.sessions,
                 loading: s.sessionsLoading,
@@ -41,6 +42,7 @@
                 deletingId: s.deletingId,
                 busy: s.sessBusy,
                 budget: s.budget,
+                collapsed: s.sideCollapsed,
             });
             renderTitle();
         }

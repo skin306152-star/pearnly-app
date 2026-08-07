@@ -33,6 +33,10 @@
             deletingId: null,
             sessBusy: false,
             budget: null,
+            // 会话历史面板折叠(2026-08-07):桌面态手动 toggle,随会话切换保留
+            // (resetTo() 的 keep 写法,同 procOpen 先例),不落 localStorage
+            // ——只在本次打开 /ai 期间记,刷新页面回到展开态。
+            sideCollapsed: false,
             // 当前会话
             sessionId: null,
             creating: false,
@@ -237,11 +241,18 @@
     function resetTo(sid) {
         tasksLayer.stopWatch();
         actions.stopCountdown();
-        var keep = { sessions: S.sessions, api: S.api, tasks: S.tasks, procOpen: S.procOpen };
+        var keep = {
+            sessions: S.sessions,
+            api: S.api,
+            tasks: S.tasks,
+            procOpen: S.procOpen,
+            sideCollapsed: S.sideCollapsed,
+        };
         S = freshState(keep.api);
         S.sessions = keep.sessions;
         S.tasks = keep.tasks;
         S.procOpen = keep.procOpen;
+        S.sideCollapsed = keep.sideCollapsed;
         S.sessionId = sid;
         view.closeDrawer();
         view.renderSide();
@@ -349,6 +360,12 @@
         postMessage(msg);
     }
 
+    // 会话历史面板折叠:纯 UI 态,不发请求,只重画侧栏。
+    function toggleSideCollapsed() {
+        S.sideCollapsed = !S.sideCollapsed;
+        view.renderSide();
+    }
+
     // ---------- 交互 ----------
 
     function onClick(e) {
@@ -375,6 +392,7 @@
         else if (a === 'stw-copy-md-code') copyMdCode(el);
         else if (a === 'stw-new-session') newSession();
         else if (a === 'stw-drawer') view.openDrawer();
+        else if (a === 'stw-side-toggle') toggleSideCollapsed();
         else if (sessions.onClick(a, el)) return;
         else if (attach.onClick(a, el)) return;
         // 四态壳的重试:消息流区(建会话失败)重建会话。

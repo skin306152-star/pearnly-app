@@ -14,14 +14,76 @@
   position: sticky;
   top: 0;
   height: 100vh;
+  transition: width var(--dur-base) var(--ease);
+}
+/* 折叠态(手动 toggle · localStorage 持久化):收窄成只留图标的 rail,视觉同
+ * <1100px 断点一致,但由 body 类控制、不看视口宽度。宽屏优先级更高时两者叠加也
+ * 不冲(同样的最终宽度)。 */
+body.side-collapsed .side {
+  width: 64px;
+}
+body.side-collapsed .brand {
+  justify-content: center;
+}
+body.side-collapsed .brand .word {
+  display: none;
+}
+body.side-collapsed .brand-row {
+  padding: 22px 0 18px;
+  justify-content: center;
+}
+body.side-collapsed .side-toggle {
+  flex-shrink: 0;
+}
+body.side-collapsed .snav .lbl,
+body.side-collapsed .snav a span,
+body.side-collapsed .snav a .n,
+body.side-collapsed .side .foot small {
+  display: none;
+}
+body.side-collapsed .snav a {
+  justify-content: center;
+}
+body.side-collapsed .side .foot {
+  justify-content: center;
+  padding: 16px 0;
+}
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 14px 18px 22px;
 }
 .brand {
-  padding: 22px 22px 18px;
+  min-width: 0;
+  flex: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 10px;
   text-decoration: none;
+}
+/* 折叠/展开侧栏(2026-08-07):挨着品牌区,持久化态见 ai.js chromeWired。 */
+.side-toggle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--mut);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.side-toggle:hover {
+  background: var(--nav-hover);
+  color: var(--ink2);
+}
+.side-toggle svg {
+  width: 16px;
+  height: 16px;
 }
 .brand .mono {
   width: 30px;
@@ -523,9 +585,14 @@
   .side {
     width: 64px;
   }
-  .brand {
+  .brand-row {
     justify-content: center;
     padding: 22px 0 18px;
+  }
+  /* 窄屏本就已经是图标栏,手动折叠 toggle 没有再收一档的空间,藏起来
+   * (同 ai-steward-chat.css 里 ≤800px 藏 .stw-side-toggle 的先例)。 */
+  .side-toggle {
+    display: none;
   }
   .brand .word,
   .snav .lbl,

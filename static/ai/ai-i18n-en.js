@@ -9,6 +9,7 @@ window.__AI_I18N_EN__ = {
     nav_clients: 'Clients',
     nav_reports: 'Reports',
     nav_settings: 'Settings',
+    side_toggle_aria: 'Collapse or expand sidebar',
     firm_name: 'Accounting Firm',
     firm_meta: 'Workspace · {n} members',
     crumb_dash: 'Dashboard',

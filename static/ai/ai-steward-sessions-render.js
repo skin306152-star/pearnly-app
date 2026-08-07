@@ -56,6 +56,12 @@
     var PLUS_SVG =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
         'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    // 折叠/展开会话历史面板(2026-08-07)。图标不随态改变——展开态靠 aria-expanded
+    // 说给屏幕阅读器,人眼靠面板本身收没收(同一颗按钮两个方向都点它,不必猜哪颗)。
+    var SIDE_TOGGLE_SVG =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>';
     var PEN_SVG =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -154,8 +160,10 @@
             .join('');
     }
 
-    // 侧栏骨架:新对话按钮 + 历史列表 + 余额脚注(读得到才显示;余额是给人看的参考,
-    // 拿不到就整行不摆,不编数字)。
+    // 侧栏骨架:新对话按钮 + 折叠 toggle + 历史列表 + 余额脚注(读得到才显示;余额是
+    // 给人看的参考,拿不到就整行不摆,不编数字)。折叠态由 ai-steward-view.js 把
+    // ctx.collapsed 同时落在 #stwSide 的 class 上(见该文件 renderSide)——CSS 只认
+    // 那个 class,这里的 aria-expanded 只管无障碍语义。
     function sidebarHtml(ctx) {
         ctx = ctx || {};
         var budget = ctx.budget && ctx.budget.session && ctx.budget.session.cap_thb;
@@ -173,7 +181,17 @@
             '<div class="stw-side-hd"><button type="button" class="btn stw-new-chat" ' +
             'data-action="stw-new-session">' +
             PLUS_SVG +
+            '<span class="stw-side-label">' +
             esc(at('stw_new_chat')) +
+            '</span></button><button type="button" class="stw-side-toggle" ' +
+            'data-action="stw-side-toggle" aria-expanded="' +
+            (ctx.collapsed ? 'false' : 'true') +
+            '" aria-label="' +
+            esc(at('stw_side_toggle')) +
+            '" title="' +
+            esc(at('stw_side_toggle')) +
+            '">' +
+            SIDE_TOGGLE_SVG +
             '</button></div>' +
             '<div class="stw-side-sec">' +
             esc(at('stw_sessions_hd')) +

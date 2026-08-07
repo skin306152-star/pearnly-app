@@ -25,6 +25,9 @@ def convert_histories(cur, *, tenant_id: str, user_id: str, history_ids: list) -
     converted: list = []
     skipped: list = []
     ids = [str(h) for h in (history_ids or []) if h][:_MAX_HISTORY_IDS]
+    # 同批常是同一账套的多张票:own_tax_id 按 workspace_client_id 缓存,避免每张都查一遍
+    # workspace_clients(批量确认/汇总表导入常见几十张同账套票)。
+    tax_id_cache: dict = {}
     for hid in ids:
         try:
             cur.execute(f"SAVEPOINT {_SAVEPOINT}")
@@ -33,22 +36,26 @@ def convert_histories(cur, *, tenant_id: str, user_id: str, history_ids: list) -
             skipped.append({"history_id": hid, "reason": "error:savepoint_failed"})
             continue
         try:
-            result = _convert_one(cur, tenant_id=tenant_id, user_id=user_id, history_id=hid)
+            result = _convert_one(
+                cur, tenant_id=tenant_id, user_id=user_id, history_id=hid, tax_id_cache=tax_id_cache
+            )
             cur.execute(f"RELEASE SAVEPOINT {_SAVEPOINT}")
             converted.append({"history_id": hid, **result})
-        except SkipConversion as skip:
-            cur.execute(f"ROLLBACK TO SAVEPOINT {_SAVEPOINT}")
-            cur.execute(f"RELEASE SAVEPOINT {_SAVEPOINT}")
-            skipped.append({"history_id": hid, "reason": skip.reason})
         except Exception as e:
+            # 单张失败/跳过绝不回滚同批已转换的其它张 —— 只撤这一张的 SAVEPOINT。SkipConversion
+            # 是预期内的跳过(no_direction/duplicate 等),不当错误记警告日志;其它异常才记。
             cur.execute(f"ROLLBACK TO SAVEPOINT {_SAVEPOINT}")
             cur.execute(f"RELEASE SAVEPOINT {_SAVEPOINT}")
-            logger.warning(f"intake_bridge convert 失败(history_id={hid}): {e}")
-            skipped.append({"history_id": hid, "reason": f"error:{e}"[:200]})
+            if isinstance(e, SkipConversion):
+                reason = e.reason
+            else:
+                logger.warning(f"intake_bridge convert 失败(history_id={hid}): {e}")
+                reason = f"error:{e}"[:200]
+            skipped.append({"history_id": hid, "reason": reason})
     return {"converted": converted, "skipped": skipped}
 
 
-def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str) -> dict:
+def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_cache: dict) -> dict:
     history = _load_history(cur, tenant_id=tenant_id, history_id=history_id)
     if history is None:
         raise SkipConversion("not_found")
@@ -60,7 +67,9 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str) -> dict:
         raise SkipConversion("no_items")
 
     workspace_client_id = history.get("workspace_client_id")
-    own_tax_id = _own_tax_id(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    own_tax_id = _cached_own_tax_id(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, cache=tax_id_cache
+    )
     direction = direction_mod.resolve_direction(
         {"fields": fields, "workspace_client_id": workspace_client_id},
         history,
@@ -99,7 +108,7 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str) -> dict:
 
 def _load_history(cur, *, tenant_id: str, history_id: str) -> Optional[dict]:
     cur.execute(
-        "SELECT pages, workspace_client_id, posting_kind FROM ocr_history "
+        "SELECT pages, workspace_client_id FROM ocr_history "
         "WHERE id = %s::uuid AND tenant_id = %s::uuid",
         (history_id, tenant_id),
     )
@@ -149,6 +158,14 @@ def _own_tax_id(cur, *, tenant_id: str, workspace_client_id) -> str:
     )
     row = cur.fetchone()
     return str((row or {}).get("tax_id") or "").strip()
+
+
+def _cached_own_tax_id(cur, *, tenant_id: str, workspace_client_id, cache: dict) -> str:
+    if workspace_client_id not in cache:
+        cache[workspace_client_id] = _own_tax_id(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+        )
+    return cache[workspace_client_id]
 
 
 def _stamp_ocr_history_id(cur, *, table: str, tenant_id: str, doc_id, history_id: str) -> None:

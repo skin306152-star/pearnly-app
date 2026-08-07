@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal, InvalidOperation
 
 _AMOUNT_RE = re.compile(r"^[\d,]+(?:\.\d+)?$")
 _GARBLE_RE = re.compile(r"[?�]")  # ? 与替换符 · 乱码标志
@@ -54,6 +55,15 @@ _SELLER_STOPWORDS = frozenset(
         "สาขา",
     }
 )
+
+
+def to_decimal(v) -> Decimal:
+    """票面数字字段(逗号千分位 / 空串 / None)→ Decimal,认不出 → 0(不炸,由调用方判是否为
+    有效金额)。intake.py 与 intake_bridge.sales_leg 此前各自维护一份同款实现,单一事实源。"""
+    try:
+        return Decimal(str(v).replace(",", "").strip()) if v not in (None, "") else Decimal("0")
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
 
 
 def clean_tax_id(raw) -> str:

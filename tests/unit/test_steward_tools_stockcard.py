@@ -111,6 +111,7 @@ class _LookupCase(unittest.TestCase):
         with (
             mock.patch("core.db.get_cursor", lambda *a, **k: _CurCM()),
             mock.patch.object(tool_scope, "clients", return_value=_CLIENTS),
+            mock.patch.object(report_svc, "load_context", return_value=("data-stub", {})),
             mock.patch.object(
                 report_svc, "summary", return_value=summary if summary is not None else _SUMMARY
             ) as sm,
@@ -161,12 +162,14 @@ class SummaryViewTests(_LookupCase):
 
 class KeywordLookupTests(_LookupCase):
     def test_unique_hit_calls_card_and_returns_product_summary(self):
-        res, _sm, cd = self._run(args={"keyword": "Shampoo"})
+        res, sm, cd = self._run(args={"keyword": "Shampoo"})
         self.assertTrue(res.ok)
         self.assertEqual(res.data["product"]["name"], "Shampoo")
         self.assertEqual(res.data["opening_qty"], "10")  # rows[0] 的合成"期初"行
         self.assertEqual(res.data["totals"]["bal_qty"], "-5")
         self.assertEqual(cd.call_args.kwargs["key"], "p:abc")
+        # summary/card 共用同一次 load_context 装载,不重复全表扫描。
+        self.assertIs(sm.call_args.kwargs["context"], cd.call_args.kwargs["context"])
 
     def test_no_match_asks_instead_of_guessing(self):
         res, _sm, _cd = self._run(args={"keyword": "不存在的商品"})

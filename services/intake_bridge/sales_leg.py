@@ -14,7 +14,7 @@ qty×unit_price 反算,与销项模块其余单据的算钱口径保持单一事
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 import psycopg2
 
@@ -26,19 +26,13 @@ from services.purchase.field_clean import (
     clean_invoice_no,
     clean_seller,
     clean_tax_id,
+    to_decimal,
 )
 from services.sales import buyer as buyer_mod
 from services.sales.document_writes import replace_lines
 from services.sales.totals import compute_totals
 
 _DOC_TYPE = "tax_invoice"
-
-
-def _to_decimal(v) -> Decimal:
-    try:
-        return Decimal(str(v).replace(",", "").strip()) if v not in (None, "") else Decimal("0")
-    except (InvalidOperation, ValueError):
-        return Decimal("0")
 
 
 def _build_lines(fields: dict) -> list:
@@ -51,9 +45,9 @@ def _build_lines(fields: dict) -> list:
         name = str(it.get("name") or "").strip()
         if not name:
             continue
-        qty = _to_decimal(it.get("qty")) or Decimal("1")
-        price = _to_decimal(it.get("price"))
-        sub = _to_decimal(it.get("subtotal"))
+        qty = to_decimal(it.get("qty")) or Decimal("1")
+        price = to_decimal(it.get("price"))
+        sub = to_decimal(it.get("subtotal"))
         if price <= 0 and sub > 0:
             price = (sub / qty) if qty else sub
         if price <= 0:
@@ -84,7 +78,7 @@ def issue_from_history(cur, *, tenant_id, workspace_client_id, created_by, field
     if issue_date is None:
         raise SkipConversion("no_date")
 
-    vat = _to_decimal(fields.get("vat"))
+    vat = to_decimal(fields.get("vat"))
     vat_rate = Decimal("7") if vat > 0 else Decimal("0")
 
     buyer_tax = clean_tax_id(fields.get("buyer_tax"))

@@ -34,11 +34,9 @@ _C_MANAGE = "stockcard.opening.manage"
 
 def _parse_date(raw: str, *, field: str) -> date:
     """报表层用真 date 对象比较(report.py 拿 psycopg2 读回的 date 逐行比大小),query
-    string 在这里一次性转好,不把字符串漏进服务层跟 date 混比。"""
-    try:
-        return date.fromisoformat(raw.strip())
-    except (ValueError, AttributeError) as e:
-        raise PosError("stockcard.bad_date", 422, detail=field) from e
+    string 在这里一次性转好,不把字符串漏进服务层跟 date 混比。解析逻辑单一来源见
+    services.stockcard.opening.parse_iso_date(与期初层共用,错误码各自的 stockcard.bad_date)。"""
+    return opening_svc.parse_iso_date(raw, code="stockcard.bad_date", field=field)
 
 
 class OpeningIn(BaseModel):
@@ -65,11 +63,7 @@ def _public_opening(row: dict) -> dict:
         "name_key": row.get("name_key"),
         "qty": str(row["qty"]),
         "unit_cost": str(row["unit_cost"]),
-        "as_of_date": (
-            row["as_of_date"].isoformat()
-            if hasattr(row["as_of_date"], "isoformat")
-            else row["as_of_date"]
-        ),
+        "as_of_date": report_svc.iso_or_raw(row["as_of_date"]),
     }
 
 

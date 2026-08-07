@@ -45,12 +45,18 @@ def stock_card_lookup(ctx: ToolContext, args: dict) -> ToolResult:
     }
 
     with tool_scope.cursor() as cur:
+        # 同一次提问常先答概况再钻某个商品(下面的 card 分支),两次各自全表 load 是重复
+        # 扫描 —— 装一次传给 summary/card 共用(services.stockcard.report.load_context)。
+        context = report_svc.load_context(
+            cur, tenant_id=ctx.tenant_id, workspace_client_id=client["id"], date_to=date_to
+        )
         summary = report_svc.summary(
             cur,
             tenant_id=ctx.tenant_id,
             workspace_client_id=client["id"],
             date_from=date_from,
             date_to=date_to,
+            context=context,
         )
     products = summary["products"]
 
@@ -83,6 +89,7 @@ def stock_card_lookup(ctx: ToolContext, args: dict) -> ToolResult:
             key=hits[0]["key"],
             date_from=date_from,
             date_to=date_to,
+            context=context,
         )
     if not card:
         # summary 刚给过这个 key,card 理应查得到;查无当查询抖动处理,不硬凑一份假数据。

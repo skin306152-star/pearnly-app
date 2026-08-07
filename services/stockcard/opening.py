@@ -23,14 +23,18 @@ def _dec(v, *, field: str) -> Decimal:
         raise PosError("stockcard.opening_invalid", 422, detail=field) from e
 
 
-def _parse_as_of_date(raw) -> date:
-    """烂字符串在这里挡下,不留到 SQL 层才炸(那会是诚实的 422 变成不诚实的 500)。"""
+def parse_iso_date(raw, *, code: str, field: str) -> date:
+    """ISO 日期字符串(或已是 date 对象)→ date。烂字符串在这里挡下,不留到 SQL 层才炸
+    (那会是诚实的 422 变成不诚实的 500)。错误码/字段名由调用方传(期初层
+    stockcard.opening_invalid、报表层 routes/stock_card_routes.py 的 stockcard.bad_date
+    各自的错误码不同),解析逻辑单一来源(此前 routes/stock_card_routes.py 另有一份同款
+    _parse_date)。"""
     if isinstance(raw, date):
         return raw
     try:
         return date.fromisoformat(str(raw).strip())
     except (ValueError, TypeError) as e:
-        raise PosError("stockcard.opening_invalid", 422, detail="as_of_date") from e
+        raise PosError(code, 422, detail=field) from e
 
 
 def _normalize(row: dict) -> tuple[Optional[str], Optional[str], Decimal, Decimal, date]:
@@ -42,7 +46,7 @@ def _normalize(row: dict) -> tuple[Optional[str], Optional[str], Decimal, Decima
     raw_date = row.get("as_of_date")
     if not raw_date:
         raise PosError("stockcard.opening_invalid", 422, detail="missing_as_of_date")
-    as_of_date = _parse_as_of_date(raw_date)
+    as_of_date = parse_iso_date(raw_date, code="stockcard.opening_invalid", field="as_of_date")
     qty = _dec(row.get("qty", 0), field="qty")
     unit_cost = _dec(row.get("unit_cost", 0), field="unit_cost")
     return product_id, name_key, qty, unit_cost, as_of_date
@@ -50,23 +54,28 @@ def _normalize(row: dict) -> tuple[Optional[str], Optional[str], Decimal, Decima
 
 _COLS = "id, product_id, name_key, qty, unit_cost, as_of_date, created_at, updated_at"
 
-_UPSERT_PRODUCT = (
-    f"INSERT INTO stock_card_openings (tenant_id, workspace_client_id, product_id, "
-    f"qty, unit_cost, as_of_date, created_by) VALUES (%s,%s,%s,%s,%s,%s,%s) "
-    f"ON CONFLICT (tenant_id, workspace_client_id, product_id) WHERE product_id IS NOT NULL "
-    f"DO UPDATE SET qty = EXCLUDED.qty, unit_cost = EXCLUDED.unit_cost, "
-    f"as_of_date = EXCLUDED.as_of_date, updated_at = now() "
-    f"RETURNING {_COLS}"
-)
+_UPSERT_ID_COLS = frozenset({"product_id", "name_key"})
 
-_UPSERT_NAME = (
-    f"INSERT INTO stock_card_openings (tenant_id, workspace_client_id, name_key, "
-    f"qty, unit_cost, as_of_date, created_by) VALUES (%s,%s,%s,%s,%s,%s,%s) "
-    f"ON CONFLICT (tenant_id, workspace_client_id, name_key) WHERE name_key IS NOT NULL "
-    f"DO UPDATE SET qty = EXCLUDED.qty, unit_cost = EXCLUDED.unit_cost, "
-    f"as_of_date = EXCLUDED.as_of_date, updated_at = now() "
-    f"RETURNING {_COLS}"
-)
+
+def _upsert_sql(id_col: str) -> str:
+    """product_id/name_key 两条 upsert 语句共用同一模板,只身份列名不同(WHERE 子句挡的是
+    两条 partial unique 索引各自的一半:product_id 行不撞 name_key 索引,反之亦然)。id_col
+    白名单断言 —— 当前调用点都是硬编码常量,断言是防以后改成外部可控值时悄悄开一个
+    SQL 拼接注入面,不是当前就有洞。"""
+    if id_col not in _UPSERT_ID_COLS:
+        raise ValueError(f"unsupported id_col: {id_col!r}")
+    return (
+        f"INSERT INTO stock_card_openings (tenant_id, workspace_client_id, {id_col}, "
+        f"qty, unit_cost, as_of_date, created_by) VALUES (%s,%s,%s,%s,%s,%s,%s) "
+        f"ON CONFLICT (tenant_id, workspace_client_id, {id_col}) WHERE {id_col} IS NOT NULL "
+        f"DO UPDATE SET qty = EXCLUDED.qty, unit_cost = EXCLUDED.unit_cost, "
+        f"as_of_date = EXCLUDED.as_of_date, updated_at = now() "
+        f"RETURNING {_COLS}"
+    )
+
+
+_UPSERT_PRODUCT = _upsert_sql("product_id")
+_UPSERT_NAME = _upsert_sql("name_key")
 
 
 def upsert_openings(

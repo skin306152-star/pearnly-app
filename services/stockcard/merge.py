@@ -30,13 +30,34 @@ def _product_exists(cur, *, tenant_id: str, workspace_client_id: int, product_id
     return cur.fetchone() is not None
 
 
-def _merge_purchase_lines(
-    cur, *, tenant_id: str, workspace_client_id: int, key: str, product_id: str
+#  target → (行表, 头表, 行→头的外键列, 头表上的账套归属列)。两侧结构一致,只列名不同;
+# 白名单常量(不是外部输入),防以后改成动态目标时悄悄开 SQL 拼接注入面。
+_MERGE_TARGETS = {
+    "purchase": {
+        "lines_table": "purchase_lines",
+        "docs_table": "purchase_docs",
+        "join_col": "purchase_doc_id",
+        "ws_col": "workspace_client_id",
+    },
+    "sales": {
+        "lines_table": "sales_document_lines",
+        "docs_table": "sales_documents",
+        "join_col": "document_id",
+        "ws_col": "seller_workspace_client_id",
+    },
+}
+
+
+def _merge_lines(
+    cur, *, tenant_id: str, workspace_client_id: int, key: str, product_id: str, target: str
 ) -> list:
+    """归并一侧(采购/销售)清洗品名命中 key 的历史行 → product_id。target 取 _MERGE_TARGETS
+    白名单键。"""
+    spec = _MERGE_TARGETS[target]
     cur.execute(
-        "SELECT l.id, l.description FROM purchase_lines l "
-        "JOIN purchase_docs d ON d.id = l.purchase_doc_id AND d.tenant_id = l.tenant_id "
-        "WHERE l.tenant_id = %s AND d.workspace_client_id = %s AND l.product_id IS NULL",
+        f"SELECT l.id, l.description FROM {spec['lines_table']} l "
+        f"JOIN {spec['docs_table']} d ON d.id = l.{spec['join_col']} AND d.tenant_id = l.tenant_id "
+        f"WHERE l.tenant_id = %s AND d.{spec['ws_col']} = %s AND l.product_id IS NULL",
         (tenant_id, workspace_client_id),
     )
     ids = [r["id"] for r in cur.fetchall() if grouping.name_key(r["description"]) == key]
@@ -44,30 +65,37 @@ def _merge_purchase_lines(
         # id 是 uuid 列:psycopg2 把 Python list 适配成 text[],无 ::uuid[] 转型会炸
         # "operator does not exist: uuid = text"(仓库血泪·同 test_workorder_uuid_any_cast.py)。
         cur.execute(
-            "UPDATE purchase_lines SET product_id = %s "
+            f"UPDATE {spec['lines_table']} SET product_id = %s "
             "WHERE tenant_id = %s AND id = ANY(%s::uuid[])",
             (product_id, tenant_id, ids),
         )
     return ids
+
+
+def _merge_purchase_lines(
+    cur, *, tenant_id: str, workspace_client_id: int, key: str, product_id: str
+) -> list:
+    return _merge_lines(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        key=key,
+        product_id=product_id,
+        target="purchase",
+    )
 
 
 def _merge_sales_lines(
     cur, *, tenant_id: str, workspace_client_id: int, key: str, product_id: str
 ) -> list:
-    cur.execute(
-        "SELECT l.id, l.description FROM sales_document_lines l "
-        "JOIN sales_documents d ON d.id = l.document_id AND d.tenant_id = l.tenant_id "
-        "WHERE l.tenant_id = %s AND d.seller_workspace_client_id = %s AND l.product_id IS NULL",
-        (tenant_id, workspace_client_id),
+    return _merge_lines(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        key=key,
+        product_id=product_id,
+        target="sales",
     )
-    ids = [r["id"] for r in cur.fetchall() if grouping.name_key(r["description"]) == key]
-    if ids:
-        cur.execute(
-            "UPDATE sales_document_lines SET product_id = %s "
-            "WHERE tenant_id = %s AND id = ANY(%s::uuid[])",
-            (product_id, tenant_id, ids),
-        )
-    return ids
 
 
 def merge_into_product(

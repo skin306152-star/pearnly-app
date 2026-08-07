@@ -150,12 +150,9 @@ async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
     _check_history_access(user)
     tenant_id = _tid(user)
     with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user["id"]), commit=True) as cur:
-        cur.execute(
-            "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-            (req.workspace_client_id, tenant_id),
+        wc.assert_workspace_in_tenant(
+            cur, tenant_id=tenant_id, workspace_client_id=req.workspace_client_id
         )
-        if not cur.fetchone():
-            raise HTTPException(403, detail="workspace.forbidden")
         result = convert_svc.convert_histories(
             cur, tenant_id=tenant_id, user_id=str(user["id"]), history_ids=req.history_ids
         )

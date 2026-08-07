@@ -5,7 +5,11 @@
 products.id / purchase_lines.id / sales_document_lines.id 是 uuid;`uuid = ANY(text[])`
 无隐式转换 → "operator does not exist: uuid = text"。movements.product_names 用假的
 purchase-only 夹具(全走 n: 名称轨)时不会命中这条查询,直到集成测试真种一个 p: 商品键
-才炸出来——本测试静态钉死三处,防止哪天有人"顺手"改掉转型又不巧只跑了名称轨的用例。
+才炸出来——本测试静态钉死,防止哪天有人"顺手"改掉转型又不巧只跑了名称轨的用例。
+
+merge.py 的采购/销售两条 UPDATE(2026-08 收口重复代码后)共用同一个 _merge_lines 模板,
+源码里 ANY(%s::uuid[]) 只写一次、两条运行路径都吃这一份转型——比此前两处各自一份更不容易
+漂移,故这里门槛降到 1(不是"少了一处",是"两处从此不可能各判各的")。
 """
 
 from __future__ import annotations
@@ -35,7 +39,7 @@ class StockcardUuidCastTest(unittest.TestCase):
             for p in _UUID_FILES
         }
         self.assertGreaterEqual(counts["movements.py"], 1, f"实得 {counts}")
-        self.assertGreaterEqual(counts["merge.py"], 2, f"实得 {counts}")
+        self.assertGreaterEqual(counts["merge.py"], 1, f"实得 {counts}")
 
 
 if __name__ == "__main__":

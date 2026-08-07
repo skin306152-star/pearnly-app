@@ -239,6 +239,40 @@ class PurchaseLegTests(unittest.TestCase):
                     fields=dict(_FIELDS),
                 )
 
+    def test_manual_expense_beats_judge_direction_purchase_signal(self):
+        # 票面证据齐全(完整税票+VAT+买方身份)judge_direction 会判 purchase_invoice,
+        # 但复核屏人工裁决 posting_item_type_manual=expense 必须优先生效(item_verdict 口径)。
+        fields = dict(_FIELDS)
+        fields.update({"document_type": "tax_invoice", "posting_item_type_manual": "expense"})
+        captured: dict = {}
+
+        def _fake_build_draft(_fields, *, kind, categories=None):
+            captured["kind"] = kind
+            return {"lines": []}
+
+        with (
+            mock.patch.object(
+                purchase_leg.intake_svc, "build_draft_from_invoice", side_effect=_fake_build_draft
+            ),
+            mock.patch.object(
+                purchase_leg.settings_svc, "get_settings", return_value={"auto_stock_in": False}
+            ),
+            mock.patch.object(
+                purchase_leg.docs_svc, "create_doc", return_value={"doc": {"id": "doc-1"}}
+            ),
+            mock.patch.object(
+                purchase_leg.posting_svc, "post_doc", return_value={"doc": {"doc_no": "PO-1"}}
+            ),
+        ):
+            purchase_leg.book_from_history(
+                mock.Mock(),
+                tenant_id="t1",
+                workspace_client_id=9,
+                created_by="u1",
+                fields=fields,
+            )
+        self.assertEqual(captured["kind"], "expense")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,8 +29,17 @@ _SUMMARY_SOURCE = "summary_table_batch"
 
 
 def _clean_fields(fields: Dict[str, Any]) -> Dict[str, Any]:
-    """剥内部下划线字段(_direction/_walkin/_product_code)→ ERP mapper / ocr_history 读的干净 fields。"""
-    return {k: v for k, v in fields.items() if not k.startswith("_")}
+    """剥内部下划线字段(_direction/_walkin/_product_code)→ ERP mapper / ocr_history 读的干净 fields。
+
+    _direction(批次声明的方向)剥前先映射进 fields.direction —— intake_bridge.resolve_direction
+    读的是这一列,不映射的话批量导入永远只能靠税号锚点判方向,账套没税号时就 no_direction 卡死。
+    已有 direction 值不覆盖(与 direction.apply_batch_direction 同一条"逐行裁决优先"准则)。
+    """
+    declared = str(fields.get("_direction") or "").strip()
+    out = {k: v for k, v in fields.items() if not k.startswith("_")}
+    if declared and not out.get("direction"):
+        out["direction"] = declared
+    return out
 
 
 def _write_ocr_history(*, created_by, tenant_id, ws_id, fields, batch_ref, index) -> Optional[str]:

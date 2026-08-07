@@ -26,7 +26,9 @@ def _str(v) -> Optional[str]:
     return None if v is None else str(v)
 
 
-def _iso(v):
+def iso_or_raw(v):
+    """date/datetime → ISO 字符串;非日期值原样透传。报表内部与 routes/stock_card_routes.py
+    的 _public_opening 共用同一个判等值(此前两处各自写一份 hasattr(isoformat) 三元)。"""
     return v.isoformat() if hasattr(v, "isoformat") else v
 
 
@@ -60,7 +62,7 @@ def _roll_key(movs: list, opening_row: Optional[dict], date_from, date_to):
 
 def _fmt_row(r: dict) -> dict:
     return {
-        "date": _iso(r["date"]),
+        "date": iso_or_raw(r["date"]),
         "doc_no": r["doc_no"],
         "kind": r["kind"],
         "desc": r["desc"],
@@ -83,12 +85,32 @@ def _sum_amount(rows: list, kind: str) -> Decimal:
     )
 
 
-def summary(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_to) -> dict:
+def load_context(cur, *, tenant_id: str, workspace_client_id: int, date_to) -> tuple:
+    """movements + openings 一次装载,供 summary()/card() 共用同一次全表扫描结果。
+
+    同一次提问常先答 summary 再钻某个商品的 card(services/steward/tools_stockcard.py 的
+    关键词命中路径)——两次各自 load() 是对同一账套同一 date_to 的重复全表扫描,调用方
+    装一次传下去即可省掉第二遍。"""
     data = mv_svc.load(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
     )
     openings = opening_svc.load_by_key(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    )
+    return data, openings
+
+
+def summary(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    date_from,
+    date_to,
+    context: Optional[tuple] = None,
+) -> dict:
+    data, openings = context or load_context(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
     )
 
     keys = sorted(set(data.by_key) | set(openings))
@@ -96,8 +118,13 @@ def summary(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_to
     products = mv_svc.product_names(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, product_ids=product_ids
     )
-    name_units = mv_svc.purchase_units(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
+    has_name_keys = any(not grouping.is_product_key(k) for k in keys)
+    name_units = (
+        mv_svc.purchase_units(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
+        )
+        if has_name_keys
+        else {}
     )
 
     out = []
@@ -127,14 +154,19 @@ def summary(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_to
 
 
 def card(
-    cur, *, tenant_id: str, workspace_client_id: int, key: str, date_from, date_to
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    key: str,
+    date_from,
+    date_to,
+    context: Optional[tuple] = None,
 ) -> Optional[dict]:
-    data = mv_svc.load(
+    data, openings = context or load_context(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
     )
-    opening_row = opening_svc.load_by_key(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
-    ).get(key)
+    opening_row = openings.get(key)
     movs = data.by_key.get(key, [])
     if not movs and not opening_row:
         return None  # 路由层翻 404:这个 key 在本账套从未出现过
@@ -156,7 +188,7 @@ def card(
     carried, final, period_rows = _roll_key(movs, opening_row, date_from, date_to)
     rows = [
         {
-            "date": _iso(date_from),
+            "date": iso_or_raw(date_from),
             "doc_no": "",
             "kind": "open",
             "desc": "",
@@ -200,7 +232,7 @@ def excluded(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_t
     )
     return [
         {
-            "date": _iso(r["date"]),
+            "date": iso_or_raw(r["date"]),
             "doc_no": r["doc_no"],
             "desc": r["desc"],
             "amount": _str(r["amount"]),

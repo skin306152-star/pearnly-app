@@ -11,10 +11,11 @@
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Optional
 
 from services.purchase import totals as totals_svc
+from services.purchase.field_clean import to_decimal
 from services.purchase.ocr_corrections import normalize_fields
 from services.purchase.expense_keywords import EXPENSE_KEYWORDS as _EXPENSE_KEYWORDS
 
@@ -31,11 +32,7 @@ _SUMMARY_ITEM_RE = re.compile(
 _MARKER_ITEM_RE = re.compile(r"^(?:original|copy|duplicate|สำเนา|ต้นฉบับ)$", re.IGNORECASE)
 
 
-def _to_decimal(v) -> Decimal:
-    try:
-        return Decimal(str(v).replace(",", "").strip()) if v not in (None, "") else Decimal("0")
-    except (InvalidOperation, ValueError):
-        return Decimal("0")
+_to_decimal = to_decimal  # 本模块内一路 _to_decimal(...) 调用点不动;实现单一来源见 field_clean.py
 
 
 def judge_direction(fields: dict) -> tuple[str, str]:

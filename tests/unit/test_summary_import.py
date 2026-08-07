@@ -174,6 +174,12 @@ class CommitHelperTests(unittest.TestCase):
         )
         self.assertIn("buyer_tax", cleaned)
         self.assertNotIn("_direction", cleaned)
+        self.assertEqual(cleaned["direction"], "sales")  # 批次声明透传给 resolve_direction
+
+    def test_clean_fields_does_not_override_explicit_direction(self):
+        # 逐行裁决(回导落的 direction)比批级声明更具体,批级声明不许覆盖它。
+        cleaned = commit_svc._clean_fields({"direction": "purchase", "_direction": "sales"})
+        self.assertEqual(cleaned["direction"], "purchase")
 
     def test_commit_writes_ocr_history_then_bridges_to_documents(self):
         # 写 ocr_history(source_ref 留空·剥内部字段)后当场调 intake_bridge 转正式单据
@@ -211,6 +217,7 @@ class CommitHelperTests(unittest.TestCase):
         self.assertIsNone(calls[0]["source_ref"])  # 无账本单据可反指(反指靠 ocr_history_id 溯源列)
         self.assertEqual(calls[0]["source"], commit_svc._SUMMARY_SOURCE)
         self.assertNotIn("_direction", calls[0]["pages"][0]["fields"])  # 内部字段已剥
+        self.assertEqual(calls[0]["pages"][0]["fields"]["direction"], "sales")  # 声明透传
         self.assertEqual(bridge_calls[0]["ids"], ["ocr-1"])
         self.assertEqual(out["converted"][0]["doc_id"], "d1")
         self.assertEqual(out["skipped"], [])

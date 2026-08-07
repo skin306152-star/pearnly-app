@@ -162,9 +162,11 @@ def product_names(cur, *, tenant_id: str, workspace_client_id: int, product_ids:
     """批量取商品展示名(name_th 优先 · th→en→zh 兜底链)+ 计量单位,供 summary/card 组名字段。"""
     if not product_ids:
         return {}
+    # id 是 uuid 列:不转型的裸 ANY 会被 psycopg2 把入参适配成 text[] 去比 uuid,炸
+    # "operator does not exist: uuid = text"(仓库血泪·同 test_workorder_uuid_any_cast.py)。
     cur.execute(
         "SELECT id, name_th, name_en, name_zh, unit FROM products "
-        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = ANY(%s)",
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = ANY(%s::uuid[])",
         (tenant_id, workspace_client_id, product_ids),
     )
     out = {}
@@ -194,10 +196,16 @@ def purchase_units(cur, *, tenant_id: str, workspace_client_id: int, date_to) ->
     return out
 
 
+def filter_excluded_by_period(rows: list, date_from, date_to) -> list:
+    """未入账清单按期间过滤(date 为 None 的行两边都不数)。excluded_only 与 report.summary
+    的 excluded_count 共用同一口径 —— 两处各算各的,前端 tab 徽章数会跟清单行数对不上。"""
+    return [r for r in rows if r["date"] is not None and date_from <= r["date"] <= date_to]
+
+
 def excluded_only(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_to) -> list:
     """/excluded 端点专用:未入账清单不分账期滚存,直接按 [date_from, date_to] 过滤展示。"""
     full = load(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to)
-    return [r for r in full.excluded if r["date"] is not None and date_from <= r["date"] <= date_to]
+    return filter_excluded_by_period(full.excluded, date_from, date_to)
 
 
 def key_display_name(key: str, product_lookup: dict, name_unit_lookup: dict) -> tuple:

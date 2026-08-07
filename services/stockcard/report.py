@@ -122,7 +122,8 @@ def summary(cur, *, tenant_id: str, workspace_client_id: int, date_from, date_to
                 "matched": grouping.is_product_key(key),
             }
         )
-    return {"products": out, "excluded_count": len(data.excluded)}
+    excluded_count = len(mv_svc.filter_excluded_by_period(data.excluded, date_from, date_to))
+    return {"products": out, "excluded_count": excluded_count}
 
 
 def card(cur, *, tenant_id: str, workspace_client_id: int, key: str, date_from, date_to) -> Optional[dict]:

@@ -10,9 +10,13 @@ stock_card_openings 表的 SQL 交互(照 test_workorder_deliverable_download_re
   ① 同一清洗品名分落两个账套(workspace_client_id)→ 查账套 A 拿不到账套 B 的数量
   ② sales_documents.seller_workspace_client_id = NULL 的老单据 → 不进任何账套的报表
      (movements.py 的 SQL 用严格等于,不 OR IS NULL —— 这里验的正是那个 WHERE 子句)
-  ③ 未入账清单三个 reason(service/no_qty_price/total_only)各命中一例
+  ③ 未入账清单三个 reason(service/no_qty_price/total_only)各命中一例,summary.excluded_count
+     与 /excluded 列表用同一套 [date_from, date_to] 过滤口径(两窗口宽度各验一次,不是巧合命中)
   ④ 期初 + 期间移动加权平均滚动数字正确(迷你版金标,期初非零 · 验 opening_qty 正确
      carry 到期间首行)
+
+商品归并(merge_into_product)另开 tests/integration/test_stockcard_merge.py:单独一套账套
+夹具,不与本文件共用,防止两份夹具互相拖累行数与可读性。
 
 跑法(要真库;CI 不跑 tests/integration):
     set PEARNLY_INTEGRATION_DB=1
@@ -263,6 +267,37 @@ class StockCardReportRealTests(unittest.TestCase):
 
         self.assertEqual(by_reason["total_only"]["amount"], "777.00")
         self.assertEqual(by_reason["total_only"]["side"], "purchase")
+
+    def test_summary_excluded_count_matches_excluded_endpoint_same_period(self):
+        """summary.excluded_count 与 /excluded 列表用同一套 [date_from, date_to] 过滤口径 ——
+        两处各算各的会让前端 tab 徽章数跟点开清单看到的行数对不上(打回③)。"""
+        d_from, d_to = date(2031, 4, 1), date(2031, 4, 30)
+        with self.db.get_cursor() as cur:
+            summary = self.report.summary(
+                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
+                date_from=d_from, date_to=d_to,
+            )
+            rows = self.report.excluded(
+                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
+                date_from=d_from, date_to=d_to,
+            )
+        self.assertEqual(summary["excluded_count"], len(rows))
+        self.assertEqual(summary["excluded_count"], 3)  # ③ 三个 reason 各一例,同期间内
+
+    def test_summary_excluded_count_narrows_with_a_tighter_window(self):
+        """收窄期间(只剩 total_only 那一例落在窗内)两口径仍须一致,不是巧合命中 3。"""
+        d_from, d_to = date(2031, 4, 3), date(2031, 4, 3)
+        with self.db.get_cursor() as cur:
+            summary = self.report.summary(
+                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
+                date_from=d_from, date_to=d_to,
+            )
+            rows = self.report.excluded(
+                cur, tenant_id=self.tenant_id, workspace_client_id=self.ws_a,
+                date_from=d_from, date_to=d_to,
+            )
+        self.assertEqual(summary["excluded_count"], len(rows))
+        self.assertEqual(summary["excluded_count"], 1)
 
     # ── ④ 期初 + 期间移动加权平均滚动 ──────────────────────────────
 

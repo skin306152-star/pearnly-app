@@ -19,6 +19,10 @@ from services.steward.copy_lang import download_deeplink, t as _t
 TITLES = {
     registry.FILE_CONVERT: {"zh": "转成 Excel", "th": "แปลงเป็น Excel"},
     registry.VAT_REPORT_CHECK: {"zh": "销项报告三查", "th": "ตรวจรายงานภาษีขาย 3 ข้อ"},
+    # attach_turn 的卡面(_button/_spend_card/_pick_file_card)直接调本模块的 action_label,
+    # 不经 copy.tool_title 那层聚合 —— doc_read_qa 的题名要在这里也留一份,否则卡标题会
+    # 掉回落成裸的工具名(copy_doc.TITLES 那份只喂得到 copy.tool_title)。
+    registry.DOC_READ_QA: {"zh": "读文问答", "th": "ถามตอบจากไฟล์"},
 }
 
 RECEIPT_TITLE = {"zh": "收到的文件", "th": "ไฟล์ที่ได้รับ"}
@@ -65,6 +69,17 @@ _SPEND_CONFIRM = {
     "zh": "「{name}」是扫描件或取不出表格行,需 OCR 识别才能读出内容。",
     "th": "「{name}」เป็นไฟล์สแกนหรือดึงตารางไม่ออก ต้องใช้ OCR จึงจะอ่านเนื้อหาได้",
 }
+# doc_read_qa 是问答口吻,不是「转换」:_SPEND_CONFIRM 那句「才能读出内容」在文件转换/三查
+# 语境下贴切,但套在「回答你的问题」上会读着像是转表格给她——按工具分居一份措辞,别硬编码
+# 判断字符串,新工具照样按 tool 加一条(参见 _SPEND_CONFIRM_BY_TOOL)。
+_SPEND_CONFIRM_DOC_QA = {
+    "zh": "「{name}」是扫描件或图片,要回答你的问题需先过一次 OCR 识别(按量计费,与识别票据同一个计费口)。",
+    "th": (
+        "「{name}」เป็นไฟล์สแกนหรือรูปภาพ ต้องอ่านด้วย OCR ก่อนจึงตอบคำถามได้ "
+        "(คิดค่าใช้จ่ายตามปริมาณ ใช้ช่องคิดเงินเดียวกับตอนอ่านใบเสร็จ)"
+    ),
+}
+_SPEND_CONFIRM_BY_TOOL = {registry.DOC_READ_QA: _SPEND_CONFIRM_DOC_QA}
 _SPEND_LABEL = {"zh": "用 OCR 识别", "th": "อ่านด้วย OCR"}
 _NOTE_NEEDS_MODEL = {"zh": "需 OCR 识别", "th": "ต้องใช้ OCR อ่าน"}
 _RECEIPT_MORE = {
@@ -170,8 +185,9 @@ def pick_file_reply(tool: str, n: int, lang: str) -> str:
     return _t(_RECEIPT_PICK_FILE, lang).format(n=n, title=_t(TITLES.get(tool, {}), lang) or tool)
 
 
-def spend_confirm_reply(filename: str, lang: str) -> str:
-    return _t(_SPEND_CONFIRM, lang).format(name=filename)
+def spend_confirm_reply(tool: str, filename: str, lang: str) -> str:
+    table = _SPEND_CONFIRM_BY_TOOL.get(tool, _SPEND_CONFIRM)
+    return _t(table, lang).format(name=filename)
 
 
 def spend_confirm_label(lang: str) -> str:

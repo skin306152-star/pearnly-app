@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """读文问答(services/steward/tools_doc_qa.py)+ 它的注册面与文案。
 
-锁四件:①格式分流(pdf 有/无文字层、表格族、拒绝类型)全走确定性规则,不猜;②提示词
+锁五件:①格式分流(pdf 有/无文字层、表格族、拒绝类型)全走确定性规则,不猜;②提示词
 写死「只答文中写了什么 / 不许算数 / 算数引去 table_generate」三条命门;③模型输出的引用
 必须真能在送去的原文里找到,找不到的一条都不许端上桌;④注册表闭集里的位置(附件工具/
-模型调用工具/正确 handler)。
+模型调用工具/正确 handler);⑤扫描件 PDF/图片的 OCR 计费网关(OcrGateTests)—— 没有
+model_ok 绝不调 convert_pdf/convert_image,有文字层的 PDF 无论 model_ok 是什么值都绝不
+落 OCR(钱路防线,mock 断言调用次数,不只看返回值)。
 """
 
 from __future__ import annotations
@@ -49,6 +51,20 @@ def _outcome(data):
     return ProviderOutcome(ok=True, data=data)
 
 
+def _ocr_table():
+    from services.fileconv.model import Table
+
+    return Table(name="Table", columns=["date", "amount"], rows=[["2026-06-01", "500"]])
+
+
+def _ocr_convert_result():
+    from services.fileconv.model import STATUS_OK, ConvertResult
+
+    return ConvertResult(
+        doc_type="generic_table", status=STATUS_OK, source_name="x", tables=[_ocr_table()]
+    )
+
+
 class _Sandbox(unittest.TestCase):
     def setUp(self):
         self._dir = tempfile.TemporaryDirectory()
@@ -73,7 +89,9 @@ class _Sandbox(unittest.TestCase):
 class DispatchTests(_Sandbox):
     """格式分流:走桩,不真解析 PDF/Excel(那两条已由 fileconv 自己的测试覆盖)。"""
 
-    def test_pdf_without_text_layer_is_refused_honestly(self):
+    def test_pdf_without_text_layer_needs_model_confirmation_first(self):
+        """无文字层不再是永久拒绝——它现在是"要过一次模型",没 model_ok 就停在这里
+        (真正的"绝不调 convert_pdf"钱路断言在 OcrGateTests,这里只锁错误码)。"""
         path = self._land(b"%PDF-scan", name="scan.pdf")
         p1, p2, p3 = self._with_rows([_row(path, name="scan.pdf")])
         with (
@@ -84,7 +102,7 @@ class DispatchTests(_Sandbox):
         ):
             res = tools_doc_qa.doc_read_qa(_ctx(), {})
         self.assertFalse(res.ok)
-        self.assertEqual(res.error_code, tools_doc_qa.ERR_NO_TEXT_LAYER)
+        self.assertEqual(res.error_code, tools_doc_qa.ERR_NEEDS_MODEL)
         self.assertEqual(res.data["filename"], "scan.pdf")
 
     def test_pdf_with_text_layer_reaches_the_model(self):
@@ -156,6 +174,123 @@ class DispatchTests(_Sandbox):
         self.assertFalse(res.ok)
         self.assertEqual(res.error_code, tools_doc_qa.ERR_NO_QUESTION)
         ask.assert_not_called()
+
+
+class OcrGateTests(_Sandbox):
+    """扫描件 PDF / 图片走与 file_convert 同一条 OCR 计费轨,但要先有 model_ok 这张凭据。
+    四条钱路防线:①没 model_ok 绝不调 convert_pdf/convert_image;②有 model_ok 恰好调一次;
+    ③引用核验/禁算数逻辑不变(与 ParseAnswerTests/PromptContractTests 共用同一份,这里不
+    重复断言,只跑一次端到端确认没被绕开);④有文字层的 PDF 无论 model_ok 是什么值都绝不
+    落 OCR。"""
+
+    def test_scanned_pdf_without_model_ok_never_calls_convert_pdf(self):
+        path = self._land(b"%PDF-scan", name="scan.pdf")
+        p1, p2, p3 = self._with_rows([_row(path, name="scan.pdf")])
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch("services.fileconv.text_layer.extract_pages", return_value=None),
+            mock.patch("services.fileconv.convert.convert_pdf") as convert,
+        ):
+            res = tools_doc_qa.doc_read_qa(_ctx(), {})
+        self.assertFalse(res.ok)
+        self.assertEqual(res.error_code, tools_doc_qa.ERR_NEEDS_MODEL)
+        convert.assert_not_called()
+
+    def test_scanned_pdf_with_model_ok_calls_convert_pdf_once_and_answers(self):
+        path = self._land(b"%PDF-scan", name="scan.pdf")
+        p1, p2, p3 = self._with_rows([_row(path, name="scan.pdf")], question="总金额是多少")
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch("services.fileconv.text_layer.extract_pages", return_value=None),
+            mock.patch(
+                "services.fileconv.convert.convert_pdf", return_value=_ocr_convert_result()
+            ) as convert,
+            mock.patch.object(
+                tools_doc_qa,
+                "ask_model",
+                return_value=_outcome(
+                    {"answer": "500", "citations": [{"page": 1, "quote": "500"}]}
+                ),
+            ) as ask,
+        ):
+            res = tools_doc_qa.doc_read_qa(_ctx(), {"model_ok": True})
+        self.assertTrue(res.ok)
+        convert.assert_called_once()
+        self.assertEqual(convert.call_args.kwargs["tenant_id"], "t-1")
+        self.assertIn("500", ask.call_args.args[0])
+        self.assertEqual(len(res.data["citations"]), 1)  # 引用核验对 OCR 出的页照样生效
+
+    def test_image_without_model_ok_never_calls_convert_image(self):
+        path = self._land(b"\x89PNG-bytes", name="receipt.png")
+        p1, p2, p3 = self._with_rows([_row(path, name="receipt.png")])
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch("services.fileconv.convert.convert_image") as convert,
+        ):
+            res = tools_doc_qa.doc_read_qa(_ctx(), {})
+        self.assertFalse(res.ok)
+        self.assertEqual(res.error_code, tools_doc_qa.ERR_NEEDS_MODEL)
+        convert.assert_not_called()
+
+    def test_image_with_model_ok_calls_convert_image_once_and_answers(self):
+        path = self._land(b"\x89PNG-bytes", name="receipt.png")
+        p1, p2, p3 = self._with_rows([_row(path, name="receipt.png")], question="总金额是多少")
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch(
+                "services.fileconv.convert.convert_image", return_value=_ocr_convert_result()
+            ) as convert,
+            mock.patch.object(
+                tools_doc_qa, "ask_model", return_value=_outcome({"answer": "500", "citations": []})
+            ),
+        ):
+            res = tools_doc_qa.doc_read_qa(_ctx(), {"model_ok": True})
+        self.assertTrue(res.ok)
+        convert.assert_called_once()
+
+    def test_pdf_with_text_layer_never_touches_ocr_even_with_model_ok(self):
+        path = self._land(b"%PDF-1.4 real text", name="contract.pdf")
+        p1, p2, p3 = self._with_rows([_row(path, name="contract.pdf")])
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch(
+                "services.fileconv.text_layer.extract_pages", return_value=["第一页正文" * 20]
+            ),
+            mock.patch("services.fileconv.convert.convert_pdf") as convert,
+            mock.patch.object(
+                tools_doc_qa, "ask_model", return_value=_outcome({"answer": "x", "citations": []})
+            ),
+        ):
+            res = tools_doc_qa.doc_read_qa(_ctx(), {"model_ok": True})
+        self.assertTrue(res.ok)
+        convert.assert_not_called()
+
+    def test_ocr_rejection_status_is_reported_not_swallowed(self):
+        """OCR 桥判读不全(截断/不可用)——绝不出半截文本假装答得出来。"""
+        path = self._land(b"\x89PNG-bytes", name="receipt.png")
+        p1, p2, p3 = self._with_rows([_row(path, name="receipt.png")])
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch(
+                "services.fileconv.convert.convert_image",
+                return_value=mock.Mock(status="ocr_incomplete", tables=[]),
+            ),
+        ):
+            res = tools_doc_qa.doc_read_qa(_ctx(), {"model_ok": True})
+        self.assertFalse(res.ok)
+        self.assertEqual(res.error_code, tools_doc_qa.ERR_UNREADABLE_TABLE)
 
 
 class PromptContractTests(unittest.TestCase):
@@ -279,7 +414,7 @@ class RegistrationTests(unittest.TestCase):
     def test_errors_render_in_both_languages(self):
         for lang in ("zh", "th"):
             for code in (
-                tools_doc_qa.ERR_NO_TEXT_LAYER,
+                tools_doc_qa.ERR_NEEDS_MODEL,
                 tools_doc_qa.ERR_UNREADABLE_TABLE,
                 tools_doc_qa.ERR_UNSUPPORTED_TYPE,
                 tools_doc_qa.ERR_NO_QUESTION,

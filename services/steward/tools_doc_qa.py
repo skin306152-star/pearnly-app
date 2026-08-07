@@ -3,12 +3,15 @@
 
 取明文字节走 tool_scope.single_attachment(与 table_generate/file_convert 同一套租户/会话/
 防穿越三锚);「问题是什么」走 tool_scope.attached_message_text(见下)。文本提取按格式分流:
-  PDF          services.fileconv.text_layer.extract_pages(无文字层诚实拒绝,不进 OCR——
-               OCR 归 file_convert/vat_report_check 的计费路,本工具不悄悄绕进去烧一次
-               整份图识别);
+  PDF(有文字层) services.fileconv.text_layer.extract_pages,纯函数,零成本,绝不落 OCR;
+  PDF(无文字层)/图片  与 file_convert 同一条 OCR 计费轨(services.fileconv.convert.
+               convert_pdf/convert_image,tenant_id 传入归因)——但只在 args.model_ok 为真
+               时才碰这一支,没这张「人点过头」的凭据绝不悄悄烧一次模型钱(见 _ocr_pages);
+               没 model_ok 时返回 ERR_NEEDS_MODEL,与 attach_turn 弹计费卡同一套机制
+               (tools_file.vat_report_check 的模型回退闸先例),不新开一条计费口子;
   xlsx/xlsm/xls services.fileconv.excel_in.convert_excel 转文本网格(一张 sheet = 一"页");
   csv/tsv/txt  按常见编码级联原样解码成文本(单一"页")。
-  其余格式(docx/图片等)诚实拒绝,拒绝文案里说清目前支持哪些。
+  其余格式(docx 等)诚实拒绝,拒绝文案里说清目前支持哪些。
 
 问题不经模型槧参数:附件工具的参数是文件,file 根本不经过 slots 接地(registry_slots
 顶注的「附件走执行上下文而非参数槧」),于是「问题是什么」也拿不到槧值——改从挂着这份附件
@@ -37,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 TASK = "steward_doc_qa"
 
-ERR_NO_TEXT_LAYER = "steward.doc_qa_no_text_layer"
+ERR_NEEDS_MODEL = "steward.doc_qa_needs_model"
 ERR_UNREADABLE_TABLE = "steward.doc_qa_unreadable"
 ERR_UNSUPPORTED_TYPE = "steward.doc_qa_unsupported_type"
 ERR_NO_QUESTION = "steward.doc_qa_no_question"
@@ -45,7 +48,10 @@ ERR_MODEL_FAILED = "steward.doc_qa_model_failed"
 
 _TABLE_EXTS = (".xlsx", ".xlsm", ".xls")
 _RAW_TEXT_EXTS = (".csv", ".tsv", ".txt")
-SUPPORTED_EXTS = (".pdf",) + _TABLE_EXTS + _RAW_TEXT_EXTS
+# 与 tools_file._IMAGE_EXTS 同一份小常量各自持有(两个模块的取件路各自独立,不为四个扩展名
+# 拉一条跨模块 import)。
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+SUPPORTED_EXTS = (".pdf",) + _IMAGE_EXTS + _TABLE_EXTS + _RAW_TEXT_EXTS
 
 # 常见编码级联(同 services.recon.bank_table_io._load_csv_sheets 的顺序:UTF-8 BOM → UTF-8 →
 # 泰文 cp874 → 中文 gbk → latin-1 兜底),纯文本没有 openpyxl 那样的结构探针,只能按序试解码。
@@ -96,7 +102,7 @@ def doc_read_qa(ctx: ToolContext, args: dict) -> ToolResult:
         return ToolResult(
             ok=False, error_code=ERR_NO_QUESTION, data=tool_scope.attachment_name(row)
         )
-    pages, err = _pages_of(row, name)
+    pages, err = _pages_of(row, name, args=args, ctx=ctx)
     if err:
         return err
     kept = select_pages(pages, question, max_chars=MAX_PROMPT_CHARS)
@@ -143,8 +149,12 @@ def _table_text(table) -> str:
     return "\n".join(lines)
 
 
-def _pages_of(row: dict, name: str) -> tuple[Optional[list], Optional[ToolResult]]:
-    """字节 → 逐页文本。认不出的格式/无文字层一律诚实拒绝,不猜、不进 OCR。"""
+def _pages_of(
+    row: dict, name: str, *, args: dict, ctx: ToolContext
+) -> tuple[Optional[list], Optional[ToolResult]]:
+    """字节 → 逐页文本。表格族/有文字层的 PDF 走本地纯函数,零成本;扫描件 PDF/图片走
+    _ocr_pages(与 file_convert 同一条 OCR 计费轨,但要先有 model_ok 这张凭据)。认不出的
+    格式(docx 等)一律诚实拒绝,不猜。"""
     from services.fileconv import text_layer
     from services.fileconv.excel_in import convert_excel
     from services.fileconv.model import REJECT_STATUSES
@@ -153,11 +163,11 @@ def _pages_of(row: dict, name: str) -> tuple[Optional[list], Optional[ToolResult
     ext = Path(name).suffix.lower()
     if ext == ".pdf":
         pages = text_layer.extract_pages(content)
-        if not text_layer.has_text_layer(pages):
-            return None, ToolResult(
-                ok=False, error_code=ERR_NO_TEXT_LAYER, data=tool_scope.attachment_name(row)
-            )
-        return pages, None
+        if text_layer.has_text_layer(pages):
+            return pages, None
+        return _ocr_pages(content, name, row, args, ctx, is_image=False)
+    if ext in _IMAGE_EXTS:
+        return _ocr_pages(content, name, row, args, ctx, is_image=True)
     if ext in _TABLE_EXTS:
         result = convert_excel(content, source_name=name)
         if result.status in REJECT_STATUSES or not result.tables:
@@ -179,6 +189,38 @@ def _pages_of(row: dict, name: str) -> tuple[Optional[list], Optional[ToolResult
         error_code=ERR_UNSUPPORTED_TYPE,
         data={**tool_scope.attachment_name(row), "ext": ext or "(none)"},
     )
+
+
+def _ocr_pages(
+    content: bytes, name: str, row: dict, args: dict, ctx: ToolContext, *, is_image: bool
+) -> tuple[Optional[list], Optional[ToolResult]]:
+    """扫描件 PDF / 图片的取文本路:convert_pdf/convert_image 与 file_convert 同参数同姿势
+    (tenant_id=ctx.tenant_id 归因)——计费走的是既有 OCR 桥,本工具不另开收费点。
+
+    args.model_ok 是「人在计费卡上点过『会过一次模型』」的凭据(attach_turn.decide 落的,
+    同 tools_file.vat_report_check 的模型回退闸一个纪律):没有这张凭据绝不调 convert_*,
+    直接返回 ERR_NEEDS_MODEL 让上层弹卡等一次点击(钱路防线①②)。
+
+    ConvertResult 通常只出一张合并过的 Table(扫描多页会被 ocr_bridge 按台账/流水链拼成一张,
+    或按 generic 网格逐页拼行)——「一张 Table = 一'页'」,与 _TABLE_EXTS 分支「一张 sheet
+    = 一'页'」同一约定,citations 的页号因此多半落在 1,这是已知的简化,不是 bug。
+    """
+    if not args.get("model_ok"):
+        return None, ToolResult(
+            ok=False, error_code=ERR_NEEDS_MODEL, data=tool_scope.attachment_name(row)
+        )
+    from services.fileconv.convert import convert_image, convert_pdf
+    from services.fileconv.model import REJECT_STATUSES
+
+    convert = convert_image if is_image else convert_pdf
+    result = convert(content, source_name=name, tenant_id=ctx.tenant_id)
+    if result.status in REJECT_STATUSES or not result.tables:
+        return None, ToolResult(
+            ok=False,
+            error_code=ERR_UNREADABLE_TABLE,
+            data={**tool_scope.attachment_name(row), "status": result.status},
+        )
+    return [_table_text(t) for t in result.tables], None
 
 
 # ── 相关页截断 ──────────────────────────────────────────────

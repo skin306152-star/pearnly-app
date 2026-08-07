@@ -568,7 +568,9 @@
         "services/steward/copy.py",
         "services/steward/copy_doc.py",
         "services/steward/copy_table.py",
-        "services/steward/copy_artifacts.py"
+        "services/steward/copy_artifacts.py",
+        "services/steward/copy_file.py",
+        "services/steward/attach_turn.py"
       ],
       "fixtures": [],
       "only_e2e": [
@@ -577,7 +579,12 @@
         "table_generate 完成卡的下载按钮走 downloadIdOf 的正则校验(8-64 位 id 才换成按钮),",
         "这条判据只有真渲染 + 真按钮查找能验,copy_table.py 的单测看不到按钮到底出没出来",
         "doc_read_qa 的答案正文与 citations 表是两块不同的 DOM(消息气泡 vs 任务产物卡),",
-        "两者都要在真页面里各自找到对应文本,不是随便哪里出现这句话就算过"
+        "两者都要在真页面里各自找到对应文本,不是随便哪里出现这句话就算过",
+        "场景③(doc_read_qa 的 OCR 计费网关):计费确认卡是否真的可点、点了是否真的把",
+        "model_ok 带回去让工具续跑、卡的文案是否真走了 doc_qa 口吻而不是掉回落成裸的",
+        "工具名——这条链路跨 attach_turn.decide → orchestrator._card/_enqueue → 前端",
+        "data-action=stw-act 点击委派 → 二次 sendTurn,单测各段分别绿也证明不了这条链",
+        "真的接得通(此前的真实缺陷就是:卡弹出来了,点了却因 handler 不认 model_ok 而白点)"
       ]
     },
     "_profile_card_verify.cjs": {

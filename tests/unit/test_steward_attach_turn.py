@@ -150,6 +150,24 @@ class ToolPickedTests(unittest.TestCase):
         # 点过的那一下要随活走:执行侧凭 model_ok 才允许过模型(tools_file 的回退闸)。
         self.assertEqual(confirmed.args, {"model_ok": True})
 
+    def test_doc_read_qa_spend_card_uses_its_own_title_and_question_flavoured_wording(self):
+        """doc_read_qa 挑中时同一套裁决机制照跑,但卡面文案要走它自己的问答口吻,不是
+        file_convert 那句「转换…才能读出内容」(copy_file._SPEND_CONFIRM_BY_TOOL)。"""
+        row = _row(needs_model=True)
+        blocked = attach_turn.decide(
+            [row], tool=registry.DOC_READ_QA, confirm_spend=False, lang="zh"
+        )
+        self.assertIsNone(blocked.tool)
+        self.assertEqual(blocked.card["title"], "读文问答")  # 不掉回落成裸的工具名
+        self.assertIn("OCR", blocked.card["reply"])
+        self.assertNotIn("转换", blocked.card["reply"])
+
+        confirmed = attach_turn.decide(
+            [row], tool=registry.DOC_READ_QA, confirm_spend=True, lang="zh"
+        )
+        self.assertEqual(confirmed.tool, registry.DOC_READ_QA)
+        self.assertEqual(confirmed.args, {"model_ok": True})
+
     def test_a_run_nobody_confirmed_carries_no_permission_to_spend(self):
         out = attach_turn.decide([_row()], tool=registry.FILE_CONVERT, confirm_spend=False,
                                  lang="zh")  # fmt: skip

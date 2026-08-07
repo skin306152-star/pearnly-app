@@ -133,7 +133,7 @@ def _spend_card(tool: str, item: dict, lang: str) -> dict[str, Any]:
     action["label"] = copy_file.spend_confirm_label(lang)
     return {
         "title": copy_file.action_label(tool, lang),
-        "reply": copy_file.spend_confirm_reply(item["name"], lang),
+        "reply": copy_file.spend_confirm_reply(tool, item["name"], lang),
         "artifacts": [copy_file.actions_block([action], lang)],
     }
 

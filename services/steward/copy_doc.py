@@ -25,22 +25,26 @@ _NO_CITATION_HINT = {
 }
 
 ERRORS = {
-    "steward.doc_qa_no_text_layer": {
-        "zh": "「{filename}」是扫描件或图片,没有文字层——请从录入口走 OCR 识别后再问。",
+    # 这条是防御性回检的口(attach_turn 已按 detect 时的 needs_model 先弹过一次计费卡;
+    # 真到这里说明那次判断与工具实际所需不一致),文案说清「要点确认才能继续」而不是「没法读」
+    # ——扫描件/图片不是永久拒绝,补一次点击就能过(见 tools_doc_qa._ocr_pages)。
+    "steward.doc_qa_needs_model": {
+        "zh": "「{filename}」是扫描件或图片,要回答你的问题需先过一次 OCR 识别——点确认按钮授权这次识别。",
         "th": (
-            "「{filename}」เป็นไฟล์สแกนหรือรูปภาพ ไม่มีชั้นตัวอักษร "
-            "กรุณาอัปโหลดที่ช่องรับเอกสารให้ OCR อ่านก่อนแล้วค่อยถาม"
+            "「{filename}」เป็นไฟล์สแกนหรือรูปภาพ ต้องอ่านด้วย OCR ก่อนจึงตอบคำถามได้ "
+            "กดยืนยันเพื่ออนุญาตให้อ่านครั้งนี้"
         ),
     },
     "steward.doc_qa_unreadable": {
-        "zh": "「{filename}」取不出表格内容({status}),换一份可读的文件重传。",
-        "th": "「{filename}」ดึงเนื้อหาตารางไม่ได้ ({status}) ส่งไฟล์ที่อ่านได้มาใหม่",
+        "zh": "「{filename}」取不出内容({status}),换一份可读的文件重传。",
+        "th": "「{filename}」ดึงเนื้อหาไม่ได้ ({status}) ส่งไฟล์ที่อ่านได้มาใหม่",
     },
     "steward.doc_qa_unsupported_type": {
-        "zh": "「{filename}」暂不支持读文问答({ext})。目前支持:PDF(有文字层)/Excel/CSV/TSV/TXT。",
+        "zh": "「{filename}」暂不支持读文问答({ext})。目前支持:PDF(含扫描件,经 OCR)/"
+        "图片(经 OCR)/Excel/CSV/TSV/TXT。",
         "th": (
             "「{filename}」ยังไม่รองรับถามตอบจากไฟล์ ({ext}) "
-            "ตอนนี้รองรับ: PDF(มีชั้นตัวอักษร)/Excel/CSV/TSV/TXT"
+            "ตอนนี้รองรับ: PDF(รวมไฟล์สแกน ผ่าน OCR)/รูปภาพ(ผ่าน OCR)/Excel/CSV/TSV/TXT"
         ),
     },
     "steward.doc_qa_no_question": {

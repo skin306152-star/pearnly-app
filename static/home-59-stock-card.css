@@ -155,8 +155,12 @@
     text-align: right;
 }
 .stc thead .stc-grp th {
-    text-align: center;
     font-size: 12.5px;
+}
+/* 表头对齐随内容:单列表头文字左/数字右(继承基础规则),只有跨多列的色带组头居中。
+   数字列 .num 右对齐由 .stc th.num 承接,别再写整行居中压过它(具体度陷阱前科)。 */
+.stc thead th[colspan] {
+    text-align: center;
 }
 .stc thead th {
     background: var(--accent);

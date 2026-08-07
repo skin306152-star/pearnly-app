@@ -25,22 +25,12 @@
         document.querySelectorAll('[data-at-ph]').forEach(function (el) {
             el.placeholder = at(el.getAttribute('data-at-ph'));
         });
-        document.querySelectorAll('[data-at-aria]').forEach(function (el) {
-            el.setAttribute('aria-label', at(el.getAttribute('data-at-aria')));
-        });
         // 手机窄栏侧栏只剩图标没有字:title 回填让悬停/长按至少知道是什么。语言切换走
         // 整页 reload(ai-settings.js)重进 boot() → 本函数,四语都跟得上。
         document.querySelectorAll('.snav a').forEach(function (a) {
             var span = a.querySelector('span');
             if (span && span.textContent) a.title = span.textContent;
         });
-    }
-
-    // 左侧主菜单折叠(2026-08-07):持久化态在脚本加载期就应用(仿 src/home/sidebar-nav.ts
-    // 的模式),赶在首帧之前定形,不闪一下展开态再收起。
-    var SIDE_COLLAPSED_KEY = 'mrpilot_ai_side_collapsed';
-    if (window.localStorage && localStorage.getItem(SIDE_COLLAPSED_KEY) === '1') {
-        document.body.classList.add('side-collapsed');
     }
 
     // Z1-a 之前 boot() 只跑一次,renderChrome() 的 addEventListener 从不重复挂载;现在
@@ -151,16 +141,6 @@
         wirePillClick('statPendingV', AI.router.buildPoolHash);
         wirePillClick('statClientsV', AI.router.buildClientsHash);
         wirePillClick('statRunningV', AI.router.buildBoardHash);
-        // 左侧主菜单折叠(2026-08-07):toggle 是独立按钮(不在 navJumps 里,不跳
-        // hash),点了就翻 body 类 + 落 localStorage,下次开 /ai 直接是上次的收展态。
-        $('sideToggle').addEventListener('click', function () {
-            var collapsed = document.body.classList.toggle('side-collapsed');
-            try {
-                localStorage.setItem(SIDE_COLLAPSED_KEY, collapsed ? '1' : '0');
-            } catch (e) {
-                // 隐私模式等 localStorage 不可用:折叠本身仍生效,只是不跨次记住。
-            }
-        });
     }
 
     function wirePillClick(valueId, buildHash) {

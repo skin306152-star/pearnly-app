@@ -372,8 +372,18 @@ const BUNDLES = [
             // 分区渲染层与任务盯梢层被 ai-steward.js 在【加载期】create(),必须在它之前。
             'ai/ai-steward-view.js',
             'ai/ai-steward-tasks.js',
+            // ai-steward-history-sync.js(会话历史拉取 sync/loadEarlier,拆自
+            // ai-steward.js·单文件<500 铁律·2026-08-08)同样被 ai-steward.js 在
+            // 【加载期】create(),排它之前即可,与 tasksLayer 谁前谁后互不影响
+            // (两者创建时只互相读对方已挂好的方法引用,不循环依赖)。
+            'ai/ai-steward-history-sync.js',
             'ai/ai-steward-gate.js',
             'ai/ai-steward.js',
+            // ai-side-toggle.js(左侧主菜单折叠,拆自 ai.js·单文件<500 铁律·2026-08-08)
+            // 零依赖、不导出任何东西给别的模块用(#sideToggle 是静态元素,脚本加载期
+            // 自己找自己接线,同 sidebar-nav.ts 先例)——排哪儿都行,紧邻 ai.js 之前
+            // 只是语义上的收尾分组。
+            'ai/ai-side-toggle.js',
             'ai/ai.js',
         ],
     },

@@ -4,8 +4,9 @@
  * 视图从「左执行窗 + 右对话」双栏折成一条对话流:会话侧栏(历史/新对话/改名/删除)+
  * 主列(页头/消息流/输入条)。分区渲染在 ai-steward-view.js,任务盯梢(SSE 优先、
  * 断线回落轮询)在 ai-steward-tasks.js,授权决断/取消在 ai-steward-actions.js,
- * 附件在 ai-steward-attach.js,侧栏动作在 ai-steward-sessions.js —— 状态全落本文件
- * 的 S(单一事实源),各层只读写注入的那份。
+ * 附件在 ai-steward-attach.js,侧栏动作在 ai-steward-sessions.js,会话历史拉取
+ * (sync/loadEarlier)在 ai-steward-history-sync.js —— 状态全落本文件的 S
+ * (单一事实源),各层只读写注入的那份。
  *
  * 送出的三种形态(说人话 / 只把料拖进来 / 点回执卡上的按钮)仍共用 sendTurn 一条路;
  * 命令条交棒(openWith)、闸探针三态、路由收口保持 B2-M1 语义不变。
@@ -41,9 +42,9 @@
             sessionId: null,
             creating: false,
             createErr: false,
-            // 切会话触发的这次历史拉取(见 syncSession 的 afterSwitch),与
-            // creating/createErr(建新会话)各管各的四态坑位——两组不会同时为真
-            // (换会话时 sessionId 已非空,不会再 ensureSession)。
+            // 切会话触发的这次历史拉取(见 ai-steward-history-sync.js 的 sync()
+            // afterSwitch),与 creating/createErr(建新会话)各管各的四态坑位——
+            // 两组不会同时为真(换会话时 sessionId 已非空,不会再 ensureSession)。
             historyLoading: false,
             historyErr: false,
             messages: [],
@@ -98,7 +99,7 @@
         renderFeed: view.renderFeed,
         renderTaskFace: view.renderTaskFace,
         syncSession: function () {
-            syncSession();
+            historySync.sync();
         },
         onSettled: function () {
             sessions.load();
@@ -106,6 +107,20 @@
         },
         isTerminal: function (status) {
             return AI.stewardRender.isTerminalStatus(status);
+        },
+    });
+
+    var historySync = AI.stewardHistorySync.create({
+        state: function () {
+            return S;
+        },
+        getEl: $,
+        renderFeed: view.renderFeed,
+        renderTitle: view.renderTitle,
+        backfill: tasksLayer.backfill,
+        loadTask: tasksLayer.loadTask,
+        pending: function () {
+            return pending;
         },
     });
 
@@ -180,96 +195,8 @@
         send(text);
     }
 
-    // 服务端的消息流是权威的,回到本页或任务收尾时重建一次;本地只留还没落库的
-    // (sending/failed)接在后面。送出在途时整轮跳过,避免与回包抢写。
-    //
-    // opts.afterSwitch = true:刚 resetTo() 切过来的这次拉取(见 switchSession/
-    // newSession)。这次必须让人看得见——resetTo() 已把 S.messages 清空、画出
-    // 「欢迎屏」空态,那一屏与「这个会话本来就没消息」长得一模一样;网络慢或这次
-    // 请求真失败,用户看到的就是「点了历史记录,什么都没有」(2026-08-07 真机复现:
-    // 桩 2.5s 延迟/500 两种条件,空态原样卡住、catch 不留痕迹,详见对应 E2E spec)。
-    // 因此这条路径要:立刻亮一个跟「空会话」区分得开的骨架屏,失败要落 S.historyErr
-    // 出错误态 + 重试(data-action="stw-history-retry"),不能悄悄吞。后台静默刷新
-    // (mount() 回访时那次,afterSwitch 不传)维持老规矩不吵——那份数据早就在屏幕上,
-    // 一次网络抖动不该把它换成错误态。
-    function syncSession(opts) {
-        if (!S || !S.sessionId || S.busy || pending) return;
-        var afterSwitch = !!(opts && opts.afterSwitch);
-        var session = S;
-        var sid = S.sessionId;
-        if (afterSwitch) {
-            S.historyLoading = true;
-            S.historyErr = false;
-            view.renderFeed();
-        }
-        S.api
-            .getStewardSession(sid)
-            .then(function (resp) {
-                if (S !== session || S.busy || S.sessionId !== sid) return;
-                S.historyLoading = false;
-                if (!resp || !Array.isArray(resp.messages)) {
-                    // 200 但契约漂了:切会话场景不能装作"这个会话真的没消息"。
-                    if (afterSwitch) S.historyErr = true;
-                    view.renderFeed();
-                    return;
-                }
-                S.messages = resp.messages.concat(
-                    S.messages.filter(function (m) {
-                        return m.state === 'sending' || m.state === 'failed';
-                    })
-                );
-                S.hasMore = !!resp.has_more;
-                view.renderFeed();
-                view.renderTitle();
-                tasksLayer.backfill();
-                if (resp.current_task_id && !S.taskId) {
-                    tasksLayer.loadTask(resp.current_task_id, { fromSync: true });
-                }
-            })
-            .catch(function () {
-                if (S !== session || S.busy || S.sessionId !== sid) return;
-                S.historyLoading = false;
-                // 切会话触发的这次失败必须露脸(见上方函数注释);后台静默刷新那份
-                // 数据本来就在屏幕上,一次抖动不动它,老规矩不变。
-                if (afterSwitch) {
-                    S.historyErr = true;
-                    view.renderFeed();
-                }
-            });
-    }
-
-    // 更早一页接在顶上,滚动位置钉在原地(不接住的话内容一插,读的那行就飞了)。
-    function loadEarlier() {
-        var oldest = S.messages.filter(function (m) {
-            return m.id;
-        })[0];
-        if (!S.sessionId || !oldest || S.loadingEarlier) return;
-        S.loadingEarlier = true;
-        view.renderFeed();
-        var session = S;
-        S.api
-            .getStewardSession(S.sessionId, { before: oldest.id })
-            .then(function (resp) {
-                if (S !== session) return;
-                S.loadingEarlier = false;
-                if (!resp || !Array.isArray(resp.messages)) {
-                    view.renderFeed();
-                    return;
-                }
-                var wrap = $('stwFeedWrap');
-                var bottomGap = wrap ? wrap.scrollHeight - wrap.scrollTop : 0;
-                S.messages = resp.messages.concat(S.messages);
-                S.hasMore = !!resp.has_more;
-                view.renderFeed();
-                if (wrap) wrap.scrollTop = wrap.scrollHeight - bottomGap;
-                tasksLayer.backfill();
-            })
-            .catch(function () {
-                if (S !== session) return;
-                S.loadingEarlier = false;
-                view.renderFeed();
-            });
-    }
+    // 会话历史拉取(sync/loadEarlier)拆到 ai-steward-history-sync.js(见 historySync
+    // 创建块 · 单文件<500 铁律)。
 
     // 换会话 = 换一份会话态,侧栏与任务缓存留着(任务按 id 存,跨会话无歧义)。
     function resetTo(sid) {
@@ -300,7 +227,7 @@
             return;
         }
         resetTo(sid);
-        syncSession({ afterSwitch: true });
+        historySync.sync({ afterSwitch: true });
         sessions.refreshBudget();
     }
 
@@ -418,8 +345,8 @@
         else if (a === 'stw-resend') resend(el.getAttribute('data-mid'));
         else if (a === 'stw-proc-toggle') tasksLayer.toggleProc(el.getAttribute('data-tid'));
         else if (a === 'stw-proc-load') tasksLayer.fetchOne(el.getAttribute('data-tid'));
-        else if (a === 'stw-load-earlier') loadEarlier();
-        else if (a === 'stw-history-retry') syncSession({ afterSwitch: true });
+        else if (a === 'stw-load-earlier') historySync.loadEarlier();
+        else if (a === 'stw-history-retry') historySync.sync({ afterSwitch: true });
         else if (a === 'stw-poll-again' && S.taskId) tasksLayer.loadTask(S.taskId);
         else if (a === 'stw-authz-approve') actions.decide(true, el.getAttribute('data-token'));
         else if (a === 'stw-authz-reject') actions.decide(false, el.getAttribute('data-token'));
@@ -501,7 +428,7 @@
             tasksLayer.startWatch(S.taskId);
         }
         flushPending();
-        syncSession(); // 离开这段时间服务端追写的消息补回来(送出在途时它自己跳过)
+        historySync.sync(); // 离开这段时间服务端追写的消息补回来(送出在途时它自己跳过)
         sessions.refreshBudget();
     }
 

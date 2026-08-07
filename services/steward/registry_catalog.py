@@ -1,0 +1,473 @@
+# -*- coding: utf-8 -*-
+"""管家工具闭集的数据本体:23 个 StewardTool 实例 + 提示词生成。
+
+分工(体积闸逼出的第二次分居 · 2026-08-07 registry.py 撞 500 行硬线):本模块=数据,
+services/steward/registry.py=机制+门面。catalog 只装「有哪些工具、每个工具长什么样」这份
+纯数据(TOOLS 元组、工具名常量、timeout 常量、由本表现生成的 catalog()/slot_hints()),
+不装 StewardTool 这个型本身(型在 registry_slots,原因见该模块顶注:数据模块不能反过来
+依赖门面模块,否则跟 registry.py 互相 import 成环)。
+
+registry.py 把本模块的公共名逐个显式 re-export(不用 `import *`),门面对外一个字不变 ——
+全仓 23 处调用方一律 `registry.TOOLS` / `registry.MATRIX_OVERVIEW` 这样引用,拆分对它们
+物理透明:调用方不知道也不需要知道数据实际住在哪个文件里。加一个新工具只改本模块。
+"""
+
+from __future__ import annotations
+
+from services.agent.contracts import SlotSpec
+from services.steward.registry_slots import (
+    RISK_WRITE,
+    StewardTool,
+    client_name_slot,
+    keyword_slot,
+    period_slot,
+)
+
+# 工具名(单一事实源:planner/tools/copy 一律 import 这些常量,不各打字符串)。
+MATRIX_OVERVIEW = "matrix_overview"
+CLIENT_STATUS = "client_status"
+WORKORDER_LIST = "workorder_list"
+PUSH_LOG_QUERY = "push_log_query"
+HISTORY_QUERY = "history_query"
+CLIENT_LOOKUP = "client_lookup"
+DUE_SOON = "due_soon"
+REVIEW_QUEUE = "review_queue"
+TAX_NUMBERS = "tax_numbers"
+BANK_RECON_STATUS = "bank_recon_status"
+INVOICE_DETAIL = "invoice_detail"
+TODAY_BRIEF = "today_brief"
+CLOSE_READINESS = "close_readiness"
+DELIVERABLES_LIST = "deliverables_list"
+VAT_CALC = "vat_calc"
+TAX_MATRIX = "tax_matrix"
+PERIOD_INVOICES = "period_invoices"
+STOCK_CARD_LOOKUP = "stock_card_lookup"
+ERP_PUSH = "erp_push"
+FILE_CONVERT = "file_convert"
+VAT_REPORT_CHECK = "vat_report_check"
+DOC_READ_QA = "doc_read_qa"
+TABLE_GENERATE = "table_generate"
+
+# 吃这一轮附件的工具(万能口)。哪个文件配哪个工具由代码按 kind 过滤,模型只挑工具不挑文件
+# ——模型选文件会挑错,且挑错无痕。判据单一事实源在这里,orchestrator/planner 一律读本表。
+# doc_read_qa/table_generate(S2)同一套接地:附件不进 slots,问题/整理指令从挂着这份附件
+# 的用户消息(attachment.message_id)原样取回(tools_doc_qa/tools_table 顶注),不新开机制。
+# ⚠️ 与 MODEL_CALL_TOOLS 是两条独立轴(吃附件 vs 会调模型),今日字面相同是偶合,勿据此合并。
+ATTACHMENT_TOOLS: frozenset = frozenset(
+    {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
+)
+
+# 执行时可能自己调模型的工具(≠ planner 那一次调用)。管家其余工具全是只读 DB 查询,worker
+# 跑它们一分钱模型费都不产生;file_convert/vat_report_check 走 fileconv.ocr_bridge/Gemini,
+# doc_read_qa/table_generate 走 ai_gateway.transport 直调。worker 的单工具路据此决定要不要
+# 过 budget 三级封顶 —— 全都过会给只读查询留一串幽灵占坑行。
+# ⚠️ 与 ATTACHMENT_TOOLS 是两条独立轴(会调模型 vs 吃附件),今日字面相同是偶合,勿据此合并。
+MODEL_CALL_TOOLS: frozenset = frozenset(
+    {FILE_CONVERT, VAT_REPORT_CHECK, DOC_READ_QA, TABLE_GENERATE}
+)
+
+# 识别类工具比只读查询慢一个量级(整份 PDF 解析 + 可能过模型),按 5 分钟的通用任务超时会在
+# 还在正常干活时被砍成 failed。照 ERP_PUSH_TIMEOUT_S 先例单独声明,入队时定格进任务行。
+FILE_TOOL_TIMEOUT_S = 600
+
+# 经桥写 Express 是分钟级(桥端备份账套 → 写 DBF → 重建 CDX,全程跨 SMB),按只读工具的
+# 5 分钟任务超时会在桥还在正常干活时把任务砍成 failed。定格进任务行,见 store.create_task。
+ERP_PUSH_TIMEOUT_S = 900
+
+
+TOOLS: tuple[StewardTool, ...] = (
+    StewardTool(
+        name=TODAY_BRIEF,
+        desc=(
+            "今天先从哪下手:逾期几项 / 等你审几张 / 推 ERP 失败几条 / 缺料几家一次数完,"
+            "再按紧急度给最急的几条 · 会计问「今天先干哪个」「有什么要紧的」时用 · "
+            "不点名客户、不点名单张票;只要一期的家数统计用 matrix_overview"
+        ),
+        slots=(period_slot(),),
+        handler="today_brief",
+    ),
+    StewardTool(
+        name=MATRIX_OVERVIEW,
+        desc=(
+            "查某一期的事务所矩阵总览:多少家客户、缺料/待审/进行中/未开单各多少家 · "
+            "问某一家跑到哪一步用 client_status;要逐张工单用 workorder_list"
+        ),
+        slots=(period_slot(),),
+        handler="matrix_overview",
+    ),
+    StewardTool(
+        name=CLIENT_STATUS,
+        desc=(
+            "查某一家客户某一期的进度:工单状态、当前步骤、还缺什么材料 · "
+            "问「能不能签能不能收」用 close_readiness;要税额数字用 tax_numbers"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
+        handler="client_status",
+    ),
+    StewardTool(
+        name=WORKORDER_LIST,
+        desc=(
+            "列工单:某一期的工单有哪些,可按口径筛(缺料/进行中/待审/已冻结)· "
+            "只要家数统计用 matrix_overview;要找某一张票用 history_query"
+        ),
+        slots=(
+            period_slot(),
+            # 口径词而非引擎态:用户说的「还没审完」在矩阵里是 stuck+review 两态合成的
+            # 「待审」。让大脑挑口径词、由 engine.resolve_status_filter 展开成引擎态,
+            # 答复才与同屏矩阵数得起来(引擎态原词执行器也认,归到所属口径)。
+            SlotSpec(
+                "status",
+                required=False,
+                source="model_freeform",
+                desc_th="ขอบเขต: missing_materials/in_progress/pending_review/frozen",
+                desc_zh=(
+                    "筛选口径(missing_materials 缺料 / in_progress 进行中 / "
+                    "pending_review 待审 / frozen 已冻结)· 执行器再验"
+                ),
+            ),
+        ),
+        handler="workorder_list",
+    ),
+    StewardTool(
+        name=PUSH_LOG_QUERY,
+        desc=(
+            "查推 ERP 的成败:近几天推了多少、失败几条、失败原因是什么 · "
+            "它只数推过的,还没推的票不在里面(用 period_invoices);查单张票用 invoice_detail"
+        ),
+        slots=(
+            SlotSpec(
+                "days",
+                required=False,
+                source="model_freeform",
+                desc_th="ย้อนหลังกี่วัน (ตัวเลข ค่าเริ่มต้น 7)",
+                desc_zh="回看天数(数字·缺省 7)",
+            ),
+            SlotSpec(
+                "status",
+                required=False,
+                source="model_freeform",
+                desc_th="กรองสถานะ: success / failed",
+                desc_zh="状态过滤(success/failed)· 只问失败时给 failed",
+            ),
+            client_name_slot(required=False),
+        ),
+        handler="push_log_query",
+    ),
+    StewardTool(
+        name=HISTORY_QUERY,
+        desc=(
+            "在识别记录里找某张票(按店名/单号/文件名关键词)· "
+            "找到之后要看这张票的详情与推送去向用 invoice_detail;"
+            "要按客户列一整期的进项票用 period_invoices"
+        ),
+        slots=(
+            keyword_slot(
+                "คำค้น เช่น ชื่อร้านหรือเลขใบเสร็จ (คัดจากข้อความผู้ใช้เท่านั้น)",
+                "关键词(店名/单号/文件名·必须出自用户原话)",
+            ),
+        ),
+        handler="history_query",
+    ),
+    StewardTool(
+        name=DUE_SOON,
+        desc=(
+            "查某一期还没交完的申报义务和截止日:哪几家、什么表、还剩几天、有没有逾期 · "
+            "问「有什么等我审」用 review_queue;问某一家能不能收官用 close_readiness"
+        ),
+        slots=(period_slot(),),
+        handler="due_soon",
+    ),
+    StewardTool(
+        name=REVIEW_QUEUE,
+        desc=(
+            "查等人审的工单队列:有什么等我审、哪些卡住待判、可按客户或严重度筛 · "
+            "问申报截止日用 due_soon;要看某一张票为什么被拦下用 invoice_detail"
+        ),
+        slots=(
+            period_slot(),
+            client_name_slot(required=False),
+            SlotSpec(
+                "severity",
+                required=False,
+                source="model_freeform",
+                desc_th="ระดับความรุนแรง: crit(ร้ายแรง) / warn(เตือน)",
+                desc_zh="严重度(crit 严重 / warn 提醒)· 只问严重的才给 crit,否则 null",
+            ),
+        ),
+        handler="review_queue",
+    ),
+    StewardTool(
+        name=TAX_NUMBERS,
+        desc=(
+            "查某家某期算出来的税额:销项/进项/销项税/进项税/应交多少 · "
+            "它读账上已经算好的数;会计自己报一个数要现算用 vat_calc;要全所一张表用 tax_matrix"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
+        handler="tax_numbers",
+    ),
+    StewardTool(
+        name=TAX_MATRIX,
+        desc=(
+            "一张表列全所每家客户本期的税额:销项/进项/销项税/进项税/应交,一家一行带合计 · "
+            "会计问「所有客户/每家/全所这个月该交多少」「税额列个表」时用 · "
+            "只问一家用 tax_numbers;只要家数统计不要钱用 matrix_overview"
+        ),
+        slots=(period_slot(),),
+        handler="tax_matrix",
+    ),
+    StewardTool(
+        name=PERIOD_INVOICES,
+        desc=(
+            "列某家某期收到的进项票,逐张标推进 Express 了没,可只看还没推的 / 待判的 · "
+            "会计问「还有几张票没推进去」「把这期的票列一下我核有没有漏」时用 · "
+            "查单张票用 invoice_detail;只统计推过的成败用 push_log_query(没推的票不在它里面)"
+        ),
+        slots=(
+            client_name_slot(required=True),
+            period_slot(),
+            SlotSpec(
+                "filter",
+                required=False,
+                source="model_freeform",
+                desc_th="ตัวกรอง: not_pushed(ยังไม่ได้ส่งเข้า Express) / pending_review(รอตัดสิน) / all",
+                desc_zh=(
+                    "筛选(not_pushed 还没推进去 / pending_review 待判 / all 全部)· "
+                    "问「还有几张没推」给 not_pushed,问「还有什么要判」给 pending_review,"
+                    "只说「把票列一下」给 null"
+                ),
+            ),
+        ),
+        handler="period_invoices",
+    ),
+    StewardTool(
+        name=STOCK_CARD_LOOKUP,
+        desc=(
+            "查某家某期的商品收发存:期初/入/出/结存,有没有负库存;可只看一个商品 · "
+            "会计问「这个月库存怎么样」「XX 还有多少」「有没有负库存」时用 · "
+            "只问工单跑到哪一步/还缺什么材料用 client_status(它不管库存数量);"
+            "要看完整逐笔流水或导出对账,让客户去事务所端「商品 → 收发存报表」页面,"
+            "本工具在对话里答不了整份流水"
+        ),
+        slots=(
+            client_name_slot(required=True),
+            period_slot(),
+            SlotSpec(
+                "keyword",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อหรือรหัสสินค้า เฉพาะเมื่อผู้ใช้พูดถึงสินค้าตัวใดตัวหนึ่ง "
+                "(คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="商品名或编码(用户点名某个具体商品才填·必须原样出自用户原话)· "
+                "没点名就给 null,答全表",
+            ),
+        ),
+        handler="stock_card_lookup",
+    ),
+    StewardTool(
+        name=BANK_RECON_STATUS,
+        desc=(
+            "查某家某期的银行对账进度:对上几笔、缺票几笔、有票无流水几笔、差多少钱 · "
+            "要逐张看缺哪些票用 period_invoices;要判能不能收官用 close_readiness"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
+        handler="bank_recon_status",
+    ),
+    StewardTool(
+        name=INVOICE_DETAIL,
+        desc=(
+            "查某一张票的详情:识别成什么、过账去向、推进 ERP 了没、失败原因是什么 · "
+            "它只看一张;要列一期的票用 period_invoices;要整体推送成败统计用 push_log_query"
+        ),
+        slots=(
+            keyword_slot(
+                "ระบุใบที่จะดู เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
+                "要看的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
+            ),
+        ),
+        handler="invoice_detail",
+    ),
+    StewardTool(
+        name=CLOSE_READINESS,
+        desc=(
+            "这家这期能不能签批收官:税额算了没 / 银行对上没 / 待判清了没 / 交付包出了没 / "
+            "签批态,五项逐项过一遍并直说没过的差什么 · 会计问「能签了吗」「还差什么才能收」时用 · "
+            "只问跑到哪一步用 client_status,只要税额数字用 tax_numbers"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
+        handler="close_readiness",
+    ),
+    StewardTool(
+        name=DELIVERABLES_LIST,
+        desc=(
+            "某家某期的交付物/报表包清单:ภ.พ.30 草稿、进销底稿、月度报表等各出了没,"
+            "出了的直接给下载链 · 会计问「报表好了没」「把文件/草稿发我」时用 · "
+            "只问能不能签用 close_readiness"
+        ),
+        slots=(client_name_slot(required=True), period_slot()),
+        handler="deliverables_list",
+    ),
+    StewardTool(
+        name=CLIENT_LOOKUP,
+        desc=(
+            "按名字或税号模糊查客户名录(用户提的客户名不确定是哪一家时先用它对一下)· "
+            "它只对名字,不带任何进度与金额;要进度用 client_status,要税额用 tax_numbers"
+        ),
+        slots=(
+            SlotSpec(
+                "keyword",
+                required=True,
+                source="user_text",
+                desc_th="ชื่อลูกค้าหรือเลขผู้เสียภาษี (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="客户名或税号片段(必须出自用户原话)",
+            ),
+        ),
+        handler="client_lookup",
+    ),
+    StewardTool(
+        name=VAT_CALC,
+        desc=(
+            "现场算 VAT:会计自己报一个数,在含税/税前/税额之间互算(泰国 7%),她报了预扣税率就"
+            "一并算预扣和实付 · 只在数字出自她嘴里时用;要查某家某期账上已经算好的税额用 tax_numbers"
+        ),
+        slots=(
+            SlotSpec(
+                "amount",
+                required=True,
+                source="user_text",
+                desc_th="จำนวนเงินที่ผู้ใช้พูด (คัดจากข้อความผู้ใช้เท่านั้น ลอกมาทั้งจุดทั้งคอมม่า)",
+                desc_zh="会计报的那个金额(原样抄她说的数字·带逗号小数点也照抄·不许换算不许四舍五入)",
+            ),
+            # 方向判错 = 答案照样是两位小数、看不出错的假数,所以宁可追问也不给缺省:
+            # required=True 让判不出来的 null 走系统追问,不在提示词里塞一个「默认含税」。
+            SlotSpec(
+                "basis",
+                required=True,
+                source="model_freeform",
+                desc_th="ตัวเลขนี้รวม VAT แล้วหรือยัง: inclusive(รวมแล้ว) / exclusive(ยังไม่รวม)",
+                desc_zh=(
+                    "这个数含不含税(inclusive 含税 / exclusive 未含税)· "
+                    "「含税的/รวมแล้ว」给 inclusive,「税前/ยังไม่รวม」给 exclusive · 看不出来给 null 让系统问"
+                ),
+            ),
+            # 该扣几个点是税务判断不是算账:会计没把率说出口就一律 null,工具不替她挑。
+            SlotSpec(
+                "wht_rate",
+                required=False,
+                source="user_text",
+                desc_th="อัตราหัก ณ ที่จ่าย เฉพาะเมื่อผู้ใช้บอกเอง เช่น 3 (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="预扣税率百分点(会计自己说了几个点才填,如 3)· 她没说一律 null,绝不替她挑",
+            ),
+        ),
+        handler="vat_calc",
+    ),
+    StewardTool(
+        name=ERP_PUSH,
+        desc=(
+            "把一张已识别的票推进 Express 账套(会真写客户的账 · 必须人批准后才执行)· "
+            "会计明确说要推/过账/记进 Express 时才用 · "
+            "只是在问情况(推了没 / 推失败了吗)一律不选它,那是 invoice_detail 与 "
+            "push_log_query 的活;不确定是哪一张先用 history_query 查清再说"
+        ),
+        slots=(
+            keyword_slot(
+                "ระบุใบที่จะส่ง เช่น เลขที่ใบกำกับหรือชื่อร้าน (คัดจากข้อความผู้ใช้เท่านั้น)",
+                "要推的那张票(单号/店名/文件名·必须出自用户原话)· 系统据此定位唯一一张",
+            ),
+            SlotSpec(
+                "account_set",
+                required=False,
+                source="user_text",
+                desc_th="ชุดบัญชีปลายทางถ้าผู้ใช้ระบุ (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="目标账套代码(用户说了才填·没说给 null,系统用连接里配的那个)",
+            ),
+            SlotSpec(
+                "direction",
+                required=False,
+                source="model_freeform",
+                desc_th="ทิศทาง: purchase(ซื้อ) / sales(ขาย)",
+                desc_zh="方向(purchase 进项 / sales 销项)· 用户没说给 null,系统按税号自己判",
+            ),
+            SlotSpec(
+                "posting_kind",
+                required=False,
+                source="model_freeform",
+                desc_th="วิธีลงบัญชี: stock(สต๊อก) / service(บริการ) ระบุเฉพาะเมื่อผู้ใช้บอกเอง",
+                desc_zh="过账去向(stock 库存 / service 服务)· 用户明确说了才填,没说给 null",
+            ),
+        ),
+        handler="erp_push",
+        risk=RISK_WRITE,
+        timeout_s=ERP_PUSH_TIMEOUT_S,
+    ),
+    StewardTool(
+        name=FILE_CONVERT,
+        desc=(
+            "把这一轮传上来的文件转成 Excel 表并做守恒校验(台账/流水核借贷余额链,"
+            "普通表核列合计)· 会计说「转成 Excel / 导出成表格 / 帮我转一下这份」时用 · "
+            "这一轮没有附件时绝不选它;要查发票连号或买家汇总用 vat_report_check"
+        ),
+        slots=(),
+        handler="file_convert",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
+    StewardTool(
+        name=VAT_REPORT_CHECK,
+        desc=(
+            "对这一轮传上来的销项 VAT 报告做三查:发票连号(缺号/乱序/重复/作废)、"
+            "买家分组汇总、期间一致性 · 会计说「三查 / 查连号 / 看有没有跳号 / 这份报告核一下」"
+            "时用 · 这一轮没有附件时绝不选它;只是要把这份表转成 Excel 用 file_convert"
+        ),
+        slots=(),
+        handler="vat_report_check",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
+    StewardTool(
+        name=DOC_READ_QA,
+        desc=(
+            "针对这一轮传上来的文件回答一个问题:只在文件写了的原文里找答案,并标出第几页,"
+            "文中没写就直说没找到,绝不算账绝不编数字 · 会计问「这份合同/发票里写了什么」"
+            "「第几条怎么说的」时用 · 这一轮没有附件时绝不选它;要按条件汇总/统计出一张新表"
+            "用 table_generate;只是要把这份表转成规整 Excel(不改数据不汇总)用 file_convert"
+        ),
+        slots=(),
+        handler="doc_read_qa",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
+    StewardTool(
+        name=TABLE_GENERATE,
+        desc=(
+            "按会计说的条件把这一轮传上来的表格重新汇总/筛选/分组,生成一张新表可下载:"
+            "模型只挑列名和算法,数字全部由代码用 Decimal 精确算,模型不碰任何数字 · "
+            "会计说「按 XX 汇总」「只要金额大于 YY 的」「算个平均」时用 · "
+            "这一轮没有附件时绝不选它;只答文件里写了什么、不汇总不筛选用 doc_read_qa;"
+            "只是要把这份表转成规整 Excel(原样不改)用 file_convert"
+        ),
+        slots=(),
+        handler="table_generate",
+        timeout_s=FILE_TOOL_TIMEOUT_S,
+    ),
+)
+
+TOOLS_BY_NAME: dict[str, StewardTool] = {t.name: t for t in TOOLS}
+
+
+def catalog() -> str:
+    """提示词里的工具表(从注册表现生成:加工具即改本表,提示词自动跟着变)。
+
+    写/危险工具在表里带标记:大脑必须看得见「这个会真改客户的账」,才可能只在会计明说时挑它;标记与清单都从注册表现算,不手写第二份。
+    """
+    lines = []
+    for t in TOOLS:
+        slot_names = ", ".join(s.name for s in t.slots) or "无"
+        mark = "" if t.readonly else "【会改数据·须人批准】"
+        lines.append(f"  - {t.name}: {mark}{t.desc}(参数: {slot_names})")
+    return "\n".join(lines)
+
+
+def slot_hints() -> str:
+    """参数说明块(中文 desc_zh),让大脑知道每个参数该填什么、什么时候留空。"""
+    lines = []
+    for t in TOOLS:
+        for s in t.slots:
+            lines.append(f"  - {t.name}.{s.name}: {s.desc_zh}")
+    return "\n".join(lines)

@@ -643,29 +643,9 @@
 
 /* ============================================================
    识别记录 · 销项重做(对齐交互草稿 v1)· 2026-06-20
-   范围条 / 汇总卡 / 状态药丸 / 来源标签 / 买方列 / 7 列栅格
+   汇总卡 / 状态药丸 / 来源标签 / 买方列 / 7 列栅格
    ============================================================ */
 .hist-pagehead-actions { display: flex; gap: 8px; align-items: center; }
-
-/* 范围条:这页只展示销项发票/收据 */
-.hist-scope {
-    display: flex; align-items: center; gap: 11px;
-    min-height: 48px; padding: 10px 13px; margin-bottom: 12px;
-    border: 1px solid var(--accent-soft); background: var(--accent-soft);
-    border-radius: 13px;
-}
-.hist-scope-icon {
-    width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
-    display: grid; place-items: center; background: var(--card); color: var(--brand);
-}
-.hist-scope-icon svg { width: 16px; height: 16px; }
-.hist-scope-copy { flex: 1; min-width: 0; }
-.hist-scope-copy b { display: block; font-size: 12px; color: var(--ink); }
-.hist-scope-copy span { display: block; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
-.hist-scope-tag {
-    flex: 0 0 auto; border-radius: 999px; padding: 5px 9px;
-    background: var(--card); color: var(--brand); font-size: 10px; font-weight: 800;
-}
 
 /* 汇总卡 · 点击按状态筛选 */
 .hist-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }

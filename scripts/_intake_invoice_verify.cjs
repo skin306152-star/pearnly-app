@@ -332,10 +332,9 @@ async function run() {
             .then((s) => s === '100%')
     );
     await page.screenshot({ path: path.join(OUT, 'inv-1review.png') });
-    // ★ 展开全部字段 → 更多字段 + 明细行表
-    await page.click('.dx-acc-item.open .dx-extra-toggle');
+    // ★ 结果预览默认展开全部字段(2026-08-07 拍板:不再需要点「展开全部字段」)
     await chk(
-        '★展开全部字段(更多字段显示)',
+        '★全部字段默认展开(更多字段可见)',
         page
             .locator('.dx-acc-item.open .dx-rv')
             .count()

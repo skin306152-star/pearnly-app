@@ -1,6 +1,6 @@
 // ============================================================
 // 录入工作台 · 汇总表批量建单 · 步骤4 提交 + 推送 ERP
-// 硬阻断行后端已跳过(skipped);建成的写入 ocr_history(记账料·可推 ERP),不建账本/发票草稿。
+// 硬阻断行后端已跳过(skipped);建成的写入 ocr_history 并当场转正式单据(intake_bridge)。
 // 建单后就地选目标账套推 ERP —— 推送逻辑复用发票任务的共享单元(dms-intake-erp-push)。
 // ============================================================
 import { esc, $, showStep } from './dms-intake-core.js';
@@ -36,6 +36,8 @@ interface CommitData {
     failed: number;
     skipped: number;
     total: number;
+    // 建成的记账料当场转正式单据(intake_bridge · 同一批 commit 内完成,不必再点别的按钮)。
+    documents_booked: number;
 }
 
 let _data: CommitData | null = null;
@@ -65,6 +67,7 @@ function statHtml(d: CommitData): string {
         chip(d.created, 'dxb-st-created', 'green') +
         chip(d.failed, 'dxb-st-failed', 'red') +
         chip(d.skipped, 'dxb-st-skipped', 'blue') +
+        chip(d.documents_booked || 0, 'dxb-st-booked', 'green') +
         '</div>'
     );
 }
@@ -201,7 +204,7 @@ export function onBatchSubmitClick(tg: HTMLElement): boolean {
         return true;
     }
     if (tg.closest('#dxb-view-list')) {
-        // 记账料落「识别记录」,从那里也能推 ERP(不建账本/发票单,故不去销项/采购列表)。
+        // 记账料落「识别记录」,从那里也能推 ERP;正式单据已当场转好(购销文档在各自列表页看)。
         goRoute('history');
         return true;
     }

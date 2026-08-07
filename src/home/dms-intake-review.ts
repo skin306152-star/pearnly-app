@@ -58,6 +58,84 @@ function passable(r: IvResult): boolean {
     return !r.needs_review && fileWarns(r) === 0;
 }
 
+// ── 确认 → 正式单据(转换桥)──────────────────────────────────
+// 「确认」此前只是纯前端视觉态,后端只翻 ocr_history.staged,不落 purchase_docs/
+// sales_documents —— 商品收发存报表读的正是这两张表,于是"确认完"≠"过账完",报表恒空。
+// 这里把确认接上真实建账(POST /api/ocr/convert-documents),按 history_id 记住转换结果,
+// 就地渲染 chip:四态诚实,跳过原因不吞。
+interface ConvertResult {
+    status: 'converted' | 'skipped';
+    reason?: string;
+}
+const convertStatus = new Map<string, ConvertResult>();
+
+function activeWorkspaceId(): number | null {
+    const w = window as unknown as { getActiveWorkspaceClientId?: () => number | null };
+    return typeof w.getActiveWorkspaceClientId === 'function'
+        ? w.getActiveWorkspaceClientId()
+        : null;
+}
+
+export async function convertHistoryIds(ids: string[]): Promise<void> {
+    const pending = Array.from(new Set(ids.filter((id) => id && !convertStatus.has(id))));
+    if (!pending.length) return;
+    const ws = activeWorkspaceId();
+    if (!ws) {
+        pending.forEach((id) =>
+            convertStatus.set(id, { status: 'skipped', reason: 'no_workspace' })
+        );
+        return;
+    }
+    try {
+        const r = await fetch('/api/ocr/convert-documents', {
+            method: 'POST',
+            headers: authHeaders(true),
+            body: JSON.stringify({ history_ids: pending, workspace_client_id: ws }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(String(r.status));
+        (d.converted || []).forEach((c: { history_id: string }) =>
+            convertStatus.set(c.history_id, { status: 'converted' })
+        );
+        (d.skipped || []).forEach((s: { history_id: string; reason: string }) =>
+            convertStatus.set(s.history_id, { status: 'skipped', reason: s.reason })
+        );
+    } catch {
+        pending.forEach((id) => convertStatus.set(id, { status: 'skipped', reason: 'error' }));
+    }
+}
+
+// 已确认文件的全部 history_ids(供 invoice-submit 进第4步前兜底补转换)。
+export function confirmedHistoryIds(): string[] {
+    const ids: string[] = [];
+    IV.results.forEach((r, i) => {
+        if (IV.confirmed.has(i)) ids.push(...r.history_ids);
+    });
+    return ids;
+}
+
+const CONVERT_REASON_KEY: Record<string, string> = {
+    no_items: 'dxi-conv-r-no-items',
+    no_direction: 'dxi-conv-r-no-direction',
+    no_workspace: 'dxi-conv-r-no-workspace',
+    no_doc_no: 'dxi-conv-r-no-doc-no',
+    no_date: 'dxi-conv-r-no-date',
+    not_found: 'dxi-conv-r-error',
+};
+
+function convertChipHtml(historyId: string | null): string {
+    if (!historyId) return '';
+    const st = convertStatus.get(historyId);
+    if (!st) return '';
+    if (st.status === 'converted')
+        return `<span class="dx-badge green">${esc(t('dxi-conv-done'))}</span>`;
+    if (st.reason === 'duplicate' || st.reason === 'already_converted')
+        return `<span class="dx-badge blue">${esc(t('dxi-conv-dup'))}</span>`;
+    const reasonKey = CONVERT_REASON_KEY[st.reason || ''] || 'dxi-conv-r-error';
+    const phrase = t(reasonKey);
+    return `<span class="dx-badge amber">${esc(t('dxi-conv-skip').replace('{reason}', phrase))}</span>`;
+}
+
 // 原图查看器复用识别记录/异常同款共享件(image-viewer.ts · 按物理页翻 + 缩放/旋转/全屏)·
 // 同一刻只一个面板挂载,重渲先清旧实例。
 let viewerCleanup: (() => void) | null = null;
@@ -128,7 +206,6 @@ function accPanelHtml(r: IvResult, i: number): string {
         `<b>${esc(r.filename)} · ${esc(t('dxi-rev-h'))}</b>` +
         `<span class="dx-acc-tip">${esc(t('dxi-rev-panel-tip'))}</span></div>` +
         '<div class="dx-acc-top-a">' +
-        `<button class="dx-toggle dx-extra-toggle">${esc(t('dxi-rev-toggle-all'))}</button>` +
         `<button class="dx-toggle dx-collapse-one">${esc(t('dxi-rev-collapse'))}</button></div></div>` +
         `<div class="dx-rgrid${gridCls}"><div class="dx-fields">${groups}${fieldsFootHtml()}</div>` +
         imageCardHtml(r) +
@@ -146,7 +223,7 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
         inv.total > 1
             ? esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))
             : '';
-    const headInner = label + fmtChip;
+    const headInner = label + fmtChip + convertChipHtml(inv.history_id);
     const head = headInner ? `<div class="dx-inv-head">${headInner}</div>` : '';
     const cell = ([k, lk]: [string, string]) => {
         const warn = warns.has(k) ? ' warn' : '';
@@ -299,32 +376,32 @@ export function onReviewClick(tg: HTMLElement): boolean {
             );
         return true;
     }
-    if (tg.closest('.dx-extra-toggle')) {
-        const btn = tg.closest('.dx-extra-toggle') as HTMLElement;
-        const panel = openPanel();
-        const on = !!panel && panel.classList.toggle('extra-on');
-        btn.textContent = t(on ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all');
-        return true;
-    }
     if (tg.closest('.dx-save-one')) {
         void saveOpenFileEdits(tg.closest('.dx-save-one'));
         return true;
     }
     if (tg.closest('.dx-confirm-one')) {
         if (IV.openIdx >= 0) {
+            const confirmedIds = IV.results[IV.openIdx]?.history_ids.filter(Boolean) || [];
             IV.confirmed.add(IV.openIdx);
             IV.openIdx = nextUnconfirmed(IV.openIdx);
             renderReview();
             showToast(t('dxi-rev-confirmed-toast'), 'success');
+            if (confirmedIds.length) void convertHistoryIds(confirmedIds).then(renderReview);
         }
         return true;
     }
     if (tg.closest('#dx-inv-confirm-all')) {
+        const newIds: string[] = [];
         IV.results.forEach((r, i) => {
-            if (passable(r)) IV.confirmed.add(i);
+            if (passable(r)) {
+                IV.confirmed.add(i);
+                newIds.push(...r.history_ids);
+            }
         });
         renderReview();
         showToast(t('dxi-rev-confirmed-all'), 'success');
+        if (newIds.length) void convertHistoryIds(newIds).then(renderReview);
         return true;
     }
     return false;

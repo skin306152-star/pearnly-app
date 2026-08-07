@@ -27,18 +27,6 @@
                 </div>
             </div>
 
-            <!-- 范围条:这页只展示销项发票/收据识别结果 -->
-            <div class="hist-scope">
-                <div class="hist-scope-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 11h6M9 15h6"/></svg>
-                </div>
-                <div class="hist-scope-copy">
-                    <b data-i18n="history-scope-title">这里只展示发票、收据和票据表格记录</b>
-                    <span data-i18n="history-scope-desc">身份证订车记录请在「录入工作台」或「集成 → 推送记录」中查看。</span>
-                </div>
-                <span class="hist-scope-tag" data-i18n="history-scope-tag">仅票据</span>
-            </div>
-
             <!-- 汇总卡:点击按状态筛选(计数由 history-list 填充)-->
             <div class="hist-summary" id="history-summary">
                 <button class="hist-card active" type="button" data-status-filter="all">

@@ -259,8 +259,7 @@
 .dmsx .dx-rgrid.image-left .dx-fields{order:2}
 .dmsx .dx-rgrid.image-left .dx-imgcard{order:1}
 .dmsx .dx-fields{min-width:0}
-.dmsx .dx-extra{display:none;margin-top:9px}
-.dmsx .dx-acc-panel.extra-on .dx-extra{display:block}
+.dmsx .dx-extra{margin-top:9px}
 .dmsx .dx-item-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
 .dmsx .dx-item-tbl th{text-align:left;color:var(--ink2);font-size:9px;font-weight:750;padding:4px 7px}
 .dmsx .dx-item-tbl th.r,.dmsx .dx-item-tbl td.r{text-align:right}

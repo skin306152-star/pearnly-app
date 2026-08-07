@@ -37,6 +37,7 @@ INSTALL_COMMAND = f"git config core.hooksPath {HOOKS_PATH_VALUE}"
 
 # 闸脚本引用:python scripts/x.py / node scripts/x.mjs 里的那个路径。
 GATE_SCRIPT_RE = re.compile(r"scripts/[A-Za-z0-9_./-]+\.(?:py|mjs)")
+GREP_E_RE = re.compile(r"grep -E '([^']*)'")
 
 # GATES.md 表体行:以 "| " 起头。表头也长这样,分隔行 "|---" 不是。
 TABLE_ROW_RE = re.compile(r"^\| ", re.MULTILINE)
@@ -91,6 +92,13 @@ class HookFileTests(unittest.TestCase):
         # UTF-8 模式连 locale 编码一起改,两个方向才都对齐。反证在 test_pre_push_hook_env.py。
         body = HOOK_PATH.read_text(encoding="utf-8")
         self.assertIn("PYTHONUTF8=1", body)
+
+    def test_hook_changed_file_filters_are_valid_regexes(self):
+        body = HOOK_PATH.read_text(encoding="utf-8")
+        patterns = GREP_E_RE.findall(body)
+        self.assertGreaterEqual(len(patterns), 5, "钩子 changed-file 过滤器没有被测试看到")
+        for pattern in patterns:
+            re.compile(pattern)
 
     @unittest.skipIf(
         os.name == "nt" and shutil.which("sh") is None,

@@ -78,7 +78,7 @@ fi
 
 PY_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.py$' || true)"
 PY_PRODUCT_CHANGED="$(printf '%s\n' "$PY_CHANGED" | grep -E '^(app\.py|db\.py|routes/|core/|services/)' || true)"
-FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '(^src/|^static/|(^|/)(home|login)\.html$|\.(js|mjs|ts|css|html)$|^(package\.json|package-lock\.json|tsconfig\.json|vite\.config\.|eslint\.config\.)' || true)"
+FE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '(^src/|^static/|(^|/)(home|login)\.html$|\.(js|mjs|ts|css|html)$|^(package\.json|package-lock\.json|tsconfig\.json|vite\.config\.|eslint\.config\.))' || true)"
 TS_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.ts$' || true)"
 E2E_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(tests/e2e/.*\.spec\.js|tests/e2e/e2e_ledger\.json|scripts/_.*\.cjs|tests/unit/test_e2e_ledger_gate\.py)$' || true)"
 # 视觉照搬闸触发面(docs/pos/12)· 2026-07-31 从 pos|inventory|purchase 三个前缀放宽到整个

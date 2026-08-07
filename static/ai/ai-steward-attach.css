@@ -34,11 +34,16 @@
   color: var(--mut);
 }
 
+/* 高度显式钉在 34px(与 .stw-send-btn 一致):父容器 .stw-comp-row 是
+ * align-items:flex-end(多行输入时两颗键要钉在底部,不能跟着 textarea 一起变高),
+ * 两颗键高度不一致就会在单行态出现"回形针偏上/偏下"——不是没居中,是两个盒子本来
+ * 就不等高,text-align/place-items 都救不了盒子尺寸本身。 */
 .stw-clip {
   flex-shrink: 0;
   display: grid;
   place-items: center;
   width: 38px;
+  height: 34px;
   border: 1px solid var(--hair2);
   border-radius: 11px;
   background: var(--surface2);

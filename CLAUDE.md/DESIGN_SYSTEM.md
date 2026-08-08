@@ -1138,3 +1138,24 @@ if (ok) doDelete();
 | B | Google 服务分散在多个分组 | 必须聚拢成「Google 服务」一段 · 顶部加授权信息条 |
 | C | 集成行无连接状态视觉 | `.connected` class 必须改边框 + 底色 |
 | D | 行内 actions 一堆按钮 | 最多 2 个(配置 + 断开)· 主操作放右侧 · 视觉对齐 |
+
+## 21. 表格对齐规范(2026-08-08 Zihao 拍板 · 全站硬标准 · 有机械闸)
+
+> 起因:Stock Card 各表"文字左/数字右/占位符两种写法"混排,观感东倒西歪。Zihao 拍板:
+> 所有涉及的表必须居中;内容长就居中靠左,内容不长全居中。此条推翻 2026-08-07
+> "数字一律右对齐"的旧口径,以本节为准。
+
+规则(th/td 两级):
+
+1. **表头(th)一律水平居中**,包括跨列色带组头与子表头。
+2. **短内容数据格(td)水平居中**:数字、金额、数量、单价、日期、状态 chip、编号、单位、
+   布尔/图标格。金额列不再右对齐。
+3. **长文本数据格(td)靠左**:商品/客户/公司名称、描述、摘要、地址、文件名等自由文本列
+   ——列在表里照常排,格内文本 `text-align: left`(即"居中布局下靠左")。
+4. **占位符与所在列同对齐**,全站统一用 `—`(em dash),禁止 `-`/`–`/空串混用。
+5. 新写表格 CSS 禁止对 th/td 声明 `text-align: right`;存量右对齐在
+   `scripts/ui_lint_baseline.json` 里只许降不许升(棘轮)。
+
+机械闸:`node scripts/ui_design_lint.mjs --gate` 的 `table-align-right` 类别扫全部
+`static/*.css` 中选择器含 th/td 且声明 `text-align: right` 的规则;E2E 层以
+`getComputedStyle` 断言真实对齐(参照 tests/e2e/29-stock-card-report.spec.js)。

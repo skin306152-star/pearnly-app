@@ -45,7 +45,9 @@ const PRODUCTS = [
         product_id: 'WTR-600',
         name: '山牌饮用水 600ml',
         unit: '箱',
-        opening_qty: null,
+        // -30 = 模拟「计算结转」的负期初:它不是用户手填的期初,期初弹窗预填不得带上它
+        // (2026-08-08 口径 · 预填只认 GET /openings 的已存用户期初)。
+        opening_qty: '-30',
         in_qty: '100',
         out_qty: '130',
         bal_qty: '-30',
@@ -183,6 +185,11 @@ async function stubApi(page, captures = {}) {
                 },
             });
         }
+        // 期初 GET(POST 同一路径,靠方法分流):显式空桩 —— 弹窗预填回归锁用(见下),
+        // 别拦到下面的 POST 分支(captures 记录出站请求那条逻辑必须保留)。
+        if (p === '/api/stockcard/openings' && route.request().method() === 'GET') {
+            return route.fulfill({ json: { ok: true, rows: [] } });
+        }
         if (p === '/api/stockcard/openings' || p === '/api/stockcard/merge') {
             captures[p.split('/').pop()] = {
                 search: url.search,
@@ -281,20 +288,24 @@ test.describe('事务所端 · 商品收发存报表', () => {
         expect(balBg, '结存表头色 = --violet-800 真实解析值').toBe(expBal);
         expect(new Set([inBg, outBg, balBg]).size, '三段表头三种不同颜色').toBe(3);
 
-        // 表头对齐随内容(2026-08-07 Zihao 验收意见 · 本仓具体度陷阱前科):单列文字头
-        // 靠左、数字头靠右、只有跨列色带头居中 —— 全部量 computed 值,不看 class。
+        // 表头对齐新标准(2026-08-08 Zihao 拍板表格对齐新标准 · DESIGN_SYSTEM §21,
+        // 推翻 08-07「单列文字左/数字右」口径):表头一律居中、短内容格(数字)居中、
+        // 长文本格(商品名)靠左 —— 全部量 computed 值,不看 class。
         const align = (loc) => loc.evaluate((el) => getComputedStyle(el).textAlign);
-        expect(await align(page.locator('.stc thead .stc-grp th').first()), '商品表头左对齐').toBe(
-            'left'
+        expect(await align(page.locator('.stc thead .stc-grp th').first()), '商品表头居中').toBe(
+            'center'
         );
         expect(
             await align(page.locator('.stc thead .stc-grp th.num').first()),
-            '期初数字表头右对齐'
-        ).toBe('right');
+            '期初数字表头居中'
+        ).toBe('center');
         expect(
             await align(page.locator('.stc thead th[colspan]').first()),
             '跨列色带组头居中'
         ).toBe('center');
+        expect(await align(page.locator('.stc-row td').first()), '商品名格靠左').toBe('left');
+        expect(await align(page.locator('.stc-row td.num').first()), '数字格居中').toBe('center');
+        expect(await align(page.locator('.stc-row td.c').first()), '单位格居中').toBe('center');
 
         const negCellBg = await negRow
             .locator('td')
@@ -312,11 +323,37 @@ test.describe('事务所端 · 商品收发存报表', () => {
 
         await page.screenshot({ path: path.join(OUT, '01-list.png'), fullPage: true });
 
+        // 悬停回归锁(2026-08-08):负库存行悬停整行统一亮 —— 钉死「悬停时唯独入库格
+        // 不跟着亮」的复发面(旧规则 tr.neg td.stc-c-in 与悬停规则同为 (0,3,3) 且写在
+        // 其后,单压入库格;已整条删除,非悬停仍整行统一红底)。
+        const negInCell = negRow.locator('td.stc-c-in');
+        const negInBgBefore = await negInCell.evaluate(
+            (el) => getComputedStyle(el).backgroundColor
+        );
+        await negRow.hover();
+        const negInBgHover = await negInCell.evaluate((el) => getComputedStyle(el).backgroundColor);
+        const negFirstBgHover = await negRow
+            .locator('td')
+            .first()
+            .evaluate((el) => getComputedStyle(el).backgroundColor);
+        expect(negInBgHover, '悬停时入库格与同行普通格同底色(整行统一亮)').toBe(negFirstBgHover);
+        expect(negInBgHover, '悬停时入库格底色确实变了(不再被单压)').not.toBe(negInBgBefore);
+        await page.screenshot({ path: path.join(OUT, '07-hover-row.png'), fullPage: false });
+        await page.mouse.move(0, 0);
+
         // ── ② 单品卡详情:点行进流水 ──
         await page.locator('.stc-row[data-stc-key="p:WPC-001"]').click();
         await expect(page.locator('#stc-view-detail')).toBeVisible();
         await expect(page.locator('#stc-view-list')).toBeHidden();
         await expect(page.locator('#stc-tbl-detail tbody tr')).toHaveCount(3);
+        // 结存段内子列分隔线回归锁(2026-08-08):数量/单价/金额三子列之间至少 1px 细分隔线,
+        // 不随色带底色糊成一片。
+        const balMid = page.locator('#stc-tbl-detail tbody tr td.stc-c-bal').nth(1);
+        const balMidBorder = await balMid.evaluate((el) => getComputedStyle(el).borderLeftWidth);
+        expect(
+            parseFloat(balMidBorder),
+            '结存段中间子列(单价)左分隔线 ≥ 1px'
+        ).toBeGreaterThanOrEqual(1);
         await expect(page.locator('#stc-det-info')).toContainText('WPC-001');
         await page.screenshot({ path: path.join(OUT, '02-detail.png'), fullPage: true });
 
@@ -337,6 +374,12 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await page.locator('#stc-btn-opening').click();
         await expect(page.locator('#stc-op-mask')).toBeVisible();
         await expect(page.locator('#stc-op-tbl tr[data-op-key]')).toHaveCount(4);
+        // 回归锁(2026-08-08):期初预填只认 GET /openings 的已存用户期初(空桩 → 全空),
+        // 不预填 product.opening_qty —— 那是计算结转(-30),不是用户手填的期初。
+        await expect(
+            page.locator('tr[data-op-key="p:WTR-600"] [data-op-qty]'),
+            '计算结转的 opening_qty 不进期初弹窗预填'
+        ).toHaveValue('');
         // .modal 有 200ms 进场动画(home-05-overlays.css modalIn:透明度+缩放一起变)·
         // 截图撞在动画中途会拍到一帧半透明/未缩放到位的过渡态,看着像背景"漏"上来,
         // 实测等动画放完再截就是干净的一张,不是页面坏了。

@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 569 个源文件全扫
+# UI 设计合规扫描报告 · 570 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -444,6 +444,44 @@
      4  static\admin\admin-i18n.js
         └ 476: 'time-hours-ago': '{n} 小时前',
         └ 477: 'time-days-ago': '{n} 天前',
+
+## table-align-right — 命中 21(13 文件)
+> DESIGN_SYSTEM §21 表格对齐规范:表头居中、短内容格居中、长文本格靠左,禁止 th/td 右对齐
+     5  static\home-31-navia-topbar.css
+        └ 318: .glv-table thead th.glv-num { text-align: right }
+        └ 326: .glv-table tbody td.glv-num { text-align: right }
+     3  static\home-37-html-inline.css
+        └ 377: .results-table th.amount-col { text-align: right }
+        └ 1179: .bank-tx-table thead th.bank-col-amt { text-align: right }
+     3  static\home-49-dms-intake.css
+        └ 264: .dmsx .dx-item-tbl th.r,.dmsx .dx-item-tbl td.r { text-align: right }
+        └ 270: .dmsx .dx-item-tbl td.r .dx-item-in { text-align: right }
+     1  static\ai\ai-matrix.css
+        └ 125: .mx-table thead th.num { text-align: right }
+     1  static\ai\ai-shadow.css
+        └ 119: .sdw-table td.num,
+.sdw-table th.num { text-align: right }
+     1  static\ai\ai-steward-chat.css
+        └ 397: .stw-ai-body td.num,
+.stw-ai-body th.num { text-align: right }
+     1  static\ai\ai-vatcheck.css
+        └ 116: .mx-table td.num { text-align: right }
+     1  static\home-30-settings-modal.css
+        └ 849: .vex-task-table th:last-child,
+.vex-task-table td:last-child { text-align: right }
+     1  static\home-35-bankrecon-v2.css
+        └ 166: .brv2-table th.num, .brv2-table td.num { text-align: right }
+     1  static\home-39-sales.css
+        └ 153: .sx-tbl td.r,
+.sx-tbl th.r { text-align: right }
+     1  static\home-40-sales-wizard.css
+        └ 692: .sw-inv-items td.r,
+.sw-inv-items th.r { text-align: right }
+     1  static\home-46-acct-bankmj.css
+        └ 99: .mjx .mj th.r,.mjx .mj td.r { text-align: right }
+     1  static\home-59-stock-card.css
+        └ 376: #stc-op-mask td.num .stc-in,
+#stc-op-mask input[type='number'] { text-align: right }
 
 ## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 863(59 文件)
    157  static\home-18-admin-users.css

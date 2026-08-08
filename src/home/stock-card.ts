@@ -2,22 +2,19 @@
 // 视觉规格照搬桌面原型 stock-card-prototype-v1.html(Zihao 拍板稿):三段式表头(入绿/出粉/
 // 结存紫)+ 商品列表→点行进单品卡 + 负库存整行标红 + 未入账清单 tab + 期初弹窗 + 归并弹窗。
 // 令牌换本仓 static/pearnly-ui.css + home-01-base.css,标记/HTML 拼装收在 stock-card-render.ts,
-// 取数收在 stock-card-api.ts,本文件只管状态编排 + 事件绑定(单一职责 · <500 行预算)。
+// 取数收在 stock-card-api.ts,期初/归并弹窗收在 stock-card-modals.ts,本文件只管状态编排
+// + 事件绑定(单一职责 · <500 行预算)。
 /* global t, escapeHtml, showToast */
 import { ymdIso } from './format-date.js';
 import { listErrorHtml } from './list-error-state.js';
 import {
     activeWsId,
-    fmtQty,
     stcGetCard,
     stcGetExcluded,
     stcGetStatus,
     stcGetSummary,
-    stcPostMerge,
-    stcPostOpenings,
     type StcCardResp,
     type StcExcludedRow,
-    type StcOpeningRow,
     type StcProduct,
 } from './stock-card-api.js';
 import {
@@ -33,6 +30,7 @@ import {
     stcNotEnabledHtml,
     stcSkeletonBody,
 } from './stock-card-render.js';
+import { openMergeModal, openOpeningsModal } from './stock-card-modals.js';
 
 type ReportSub = 'list' | 'detail';
 let currentTab: 'report' | 'excluded' = 'report';
@@ -85,11 +83,11 @@ function shellHtml(): string {
         </div>
         <div class="stc-rules">
             <b>${esc(t('stc-rules-title'))}</b>
-            <ol>
-                <li>${esc(t('stc-rule-opening'))}</li>
-                <li>${esc(t('stc-rule-negative'))}</li>
-                <li>${esc(t('stc-rule-excluded'))}</li>
-            </ol>
+            <div class="stc-rules-list">
+                <div>${esc(t('stc-rule-opening'))}</div>
+                <div>${esc(t('stc-rule-negative'))}</div>
+                <div>${esc(t('stc-rule-excluded'))}</div>
+            </div>
         </div>
         <div class="stc-tabs">
             <div class="stc-tab on" id="stc-tab-report">${esc(t('stc-tab-report'))}</div>
@@ -161,7 +159,10 @@ function renderListTable(): void {
     tbl.querySelectorAll<HTMLElement>('[data-stc-merge]').forEach((btn) => {
         btn.onclick = (e) => {
             e.stopPropagation();
-            openMergeModal(btn.dataset.stcMerge || '');
+            openMergeModal(
+                { products, wsId: activeWsId()!, onSaved: loadSummary, defaultDate: dateFrom },
+                btn.dataset.stcMerge || ''
+            );
         };
     });
 }
@@ -198,9 +199,9 @@ function renderDetailInfo(card: StcCardResp): void {
     const info = document.getElementById('stc-det-info');
     if (info)
         info.innerHTML = `
-        <dt>${esc(t('stc-info-code'))}</dt><dd>${esc(card.product.product_id)}</dd>
+        <dt>${esc(t('stc-info-code'))}</dt><dd>${esc(card.product.product_id || '—')}</dd>
         <dt>${esc(t('stc-info-name'))}</dt><dd>${esc(card.product.name)}</dd>
-        <dt>${esc(t('stc-col-unit'))}</dt><dd>${esc(card.product.unit)}</dd>
+        <dt>${esc(t('stc-col-unit'))}</dt><dd>${esc(card.product.unit || '—')}</dd>
         <dt>${esc(t('stc-info-method'))}</dt><dd>${esc(t('stc-method-wa'))}</dd>`;
     const formula = document.getElementById('stc-det-formula');
     if (formula)
@@ -254,174 +255,18 @@ async function loadExcluded(): Promise<void> {
     }
 }
 
-// ── 期初库存弹窗 ────────────────────────────────────────────────────
-// 行身份用归组钥匙 key(p:<id> / n:<清洗名>):名字轨行没有 product_id,发 pid 等于把期初
-// 挂到不存在的商品上 —— 后端 OpeningIn 本来就吃「product_id 或 name」双轨。
-function openingRowHtml(p: StcProduct): string {
-    return `<tr data-op-key="${esc(p.key)}">
-        <td>${esc(p.name)}</td>
-        <td class="num"><input type="number" min="0" step="0.001" class="stc-in" data-op-qty value="${p.opening_qty == null ? '' : esc(fmtQty(p.opening_qty))}"></td>
-        <td class="num"><input type="number" min="0" step="0.01" class="stc-in" data-op-cost placeholder="0.00"></td>
-        <td><input type="date" class="stc-in" data-op-date value="${esc(dateFrom)}"></td>
-    </tr>`;
-}
-
-function openOpeningsModal(): void {
-    const mask = document.getElementById('stc-op-mask');
-    if (!mask) return;
-    const rows = products.map(openingRowHtml).join('');
-    mask.innerHTML = `<div class="modal modal-md stc">
-        <div class="modal-header"><div class="modal-title">${esc(t('stc-op-title'))}</div><button type="button" class="modal-close" id="stc-op-close">&times;</button></div>
-        <div class="modal-body">
-            <p class="stc-hint">${esc(t('stc-op-hint'))}</p>
-            ${
-                products.length
-                    ? `<div class="stc-scroll"><table id="stc-op-tbl"><thead><tr>
-                        <th>${esc(t('stc-col-product'))}</th><th class="num">${esc(t('stc-col-qty'))}</th>
-                        <th class="num">${esc(t('stc-op-col-cost'))}</th><th>${esc(t('stc-op-col-date'))}</th>
-                    </tr></thead><tbody>${rows}</tbody></table></div>`
-                    : `<div class="stc-state">${esc(t('stc-op-empty'))}</div>`
-            }
-            <div class="stc-merr" id="stc-op-err"></div>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary btn-sm" id="stc-op-cancel">${esc(t('btn-cancel'))}</button>
-            <button type="button" class="btn btn-primary btn-sm" id="stc-op-save">${esc(t('btn-save'))}</button>
-        </div>
-    </div>`;
-    mask.style.display = 'flex';
-    const close = () => {
-        mask.style.display = 'none';
-    };
-    document.getElementById('stc-op-close')!.onclick = close;
-    document.getElementById('stc-op-cancel')!.onclick = close;
-    mask.onclick = (e) => {
-        if (e.target === mask) close();
-    };
-    const save = document.getElementById('stc-op-save') as HTMLButtonElement;
-    save.onclick = () => void saveOpenings(save, close);
-}
-
-async function saveOpenings(btn: HTMLButtonElement, close: () => void): Promise<void> {
-    const wsId = activeWsId();
-    if (wsId == null) return;
-    const rows: StcOpeningRow[] = [];
-    document.querySelectorAll<HTMLElement>('#stc-op-tbl [data-op-key]').forEach((tr) => {
-        const qty = (tr.querySelector('[data-op-qty]') as HTMLInputElement)?.value.trim();
-        if (!qty) return; // 空 = 这个商品不填期初,跳过(不是 0)
-        const cost = (tr.querySelector('[data-op-cost]') as HTMLInputElement)?.value.trim() || '0';
-        const date = (tr.querySelector('[data-op-date]') as HTMLInputElement)?.value || dateFrom;
-        const key = tr.dataset.opKey || '';
-        const who = key.startsWith('p:') ? { product_id: key.slice(2) } : { name: key.slice(2) };
-        rows.push({ ...who, qty, unit_cost: cost, as_of_date: date });
-    });
-    const err = document.getElementById('stc-op-err');
-    if (!rows.length) {
-        if (err) err.textContent = t('stc-op-empty');
-        return;
-    }
-    btn.disabled = true;
-    try {
-        await stcPostOpenings(wsId, rows);
-        showToast(t('stc-op-save-ok'), 'success');
-        close();
-        loadSummary();
-    } catch (_) {
-        if (err) err.textContent = t('stc-op-save-fail');
-        btn.disabled = false;
-    }
-}
-
-// ── 归并弹窗 ────────────────────────────────────────────────────────
-// 勾选默认只勾入口那一行:其余名字是不是同一件货只有会计知道,默认全勾在真机上把
-// 冰块和美妆并成了一件货 —— 勾选必须是明确动作。目标下拉用 key 当 value(名字轨的
-// product_id 恒空,v1 拿它当 value 是这功能从没成功过的断口之一);已建档商品也进
-// 目标列表,把散名并进真商品档。
-function openMergeModal(selfKey: string): void {
-    const mask = document.getElementById('stc-mg-mask');
-    const self = products.find((p) => p.key === selfKey);
-    if (!mask || !self) return;
-    const others = products.filter((p) => !p.matched && p.key !== selfKey);
-    const checks = [self, ...others]
-        .map(
-            (p) =>
-                `<label class="stc-mg-row"><input type="checkbox"${p.key === selfKey ? ' checked' : ''} data-mg-cb value="${esc(p.key)}"> ${esc(p.name)}</label>`
-        )
-        .join('');
-    const options = [self, ...products.filter((p) => p.matched), ...others]
-        .map((p) => `<option value="${esc(p.key)}">${esc(p.name)}</option>`)
-        .join('');
-    mask.innerHTML = `<div class="modal modal-md stc">
-        <div class="modal-header"><div class="modal-title">${esc(t('stc-mg-title'))}</div><button type="button" class="modal-close" id="stc-mg-close">&times;</button></div>
-        <div class="modal-body">
-            <p class="stc-hint">${esc(t('stc-mg-hint'))}</p>
-            <p><b>${esc(t('stc-mg-found'))}</b></p>
-            ${checks}
-            <p style="margin-top:12px"><b>${esc(t('stc-mg-target'))}</b></p>
-            <select id="stc-mg-target">${options}</select>
-            <div class="stc-merr" id="stc-mg-err"></div>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary btn-sm" id="stc-mg-cancel">${esc(t('btn-cancel'))}</button>
-            <button type="button" class="btn btn-primary btn-sm" id="stc-mg-confirm">${esc(t('stc-mg-confirm'))}</button>
-        </div>
-    </div>`;
-    mask.style.display = 'flex';
-    const close = () => {
-        mask.style.display = 'none';
-    };
-    document.getElementById('stc-mg-close')!.onclick = close;
-    document.getElementById('stc-mg-cancel')!.onclick = close;
-    mask.onclick = (e) => {
-        if (e.target === mask) close();
-    };
-    const confirm = document.getElementById('stc-mg-confirm') as HTMLButtonElement;
-    confirm.onclick = () => void saveMerge(confirm, close);
-}
-
-// key → 后端吃的裸清洗名(去掉归组钥匙的 n: 前缀 · 与 services/stockcard/grouping.py 同约定)。
-function mergeNameOf(key: string): string {
-    return key.replace(/^n:/, '');
-}
-
-async function saveMerge(btn: HTMLButtonElement, close: () => void): Promise<void> {
-    const wsId = activeWsId();
-    if (wsId == null) return;
-    const nameKeys = Array.from(
-        document.querySelectorAll<HTMLInputElement>('[data-mg-cb]:checked')
-    ).map((cb) => mergeNameOf(cb.value));
-    const targetKey = (document.getElementById('stc-mg-target') as HTMLSelectElement)?.value;
-    const target = products.find((p) => p.key === targetKey);
-    const err = document.getElementById('stc-mg-err');
-    // 名字轨目标自己的名字必须入组,否则并完留一个同名空卡。
-    if (target && !target.matched && !nameKeys.includes(mergeNameOf(targetKey))) {
-        nameKeys.push(mergeNameOf(targetKey));
-    }
-    if (!target || !nameKeys.length) {
-        if (err) err.textContent = t('stc-mg-none');
-        return;
-    }
-    const payload = target.matched
-        ? { name_keys: nameKeys, target_product_id: target.product_id }
-        : { name_keys: nameKeys, new_product_name: target.name, unit: target.unit || undefined };
-    btn.disabled = true;
-    try {
-        await stcPostMerge(wsId, payload);
-        showToast(t('stc-mg-ok'), 'success');
-        close();
-        loadSummary();
-    } catch (_) {
-        if (err) err.textContent = t('stc-mg-fail');
-        btn.disabled = false;
-    }
-}
-
 // ── 事件绑定(一次性)─────────────────────────────────────────────
 function bindShell(): void {
     document.getElementById('stc-tab-report')!.onclick = () => switchTab('report');
     document.getElementById('stc-tab-excluded')!.onclick = () => switchTab('excluded');
     document.getElementById('stc-back')!.onclick = () => backToList();
-    document.getElementById('stc-btn-opening')!.onclick = () => openOpeningsModal();
+    document.getElementById('stc-btn-opening')!.onclick = () =>
+        openOpeningsModal({
+            products,
+            wsId: activeWsId()!,
+            onSaved: loadSummary,
+            defaultDate: dateFrom,
+        });
     const q = document.getElementById('stc-q') as HTMLInputElement;
     q.oninput = () => {
         keyword = q.value;

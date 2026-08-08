@@ -62,14 +62,14 @@ export function stcListRow(p: StcProduct): string {
     const neg = p.negative;
     return `<tr class="stc-row${neg ? ' neg' : ''}" data-stc-key="${escapeHtml(p.key)}">
         <td>${escapeHtml(p.name)}</td>
-        <td>${escapeHtml(p.unit)}</td>
+        <td class="c">${escapeHtml(p.unit)}</td>
         <td class="num">${p.opening_qty == null ? '—' : fmtQty(p.opening_qty)}</td>
         <td class="num stc-c-in">${fmtQty(p.in_qty)}</td>
         <td class="num stc-c-out">${fmtQty(p.out_qty)}</td>
         <td class="num stc-c-bal">${fmtQty(p.bal_qty)}</td>
         <td class="num stc-c-bal">${fmtAmt(p.bal_unit_cost)}</td>
         <td class="num stc-c-bal">${fmtAmt(p.bal_value)}</td>
-        <td>${statusChips(p)}</td>
+        <td class="c">${statusChips(p)}</td>
     </tr>`;
 }
 
@@ -122,16 +122,16 @@ export function stcDetailRow(r: StcCardRow): string {
     const isOut = r.kind === 'out';
     const chip = stcChip(MOVE_CHIP_CLS[r.kind], t(MOVE_CHIP_KEY[r.kind]));
     return `<tr${neg ? ' class="neg"' : ''}>
-        <td>${escapeHtml(r.date)}</td>
-        <td>${escapeHtml(r.doc_no || '—')}</td>
-        <td>${chip}</td>
+        <td class="c">${escapeHtml(r.date)}</td>
+        <td class="c">${escapeHtml(r.doc_no || '—')}</td>
+        <td class="c">${chip}</td>
         <td>${escapeHtml(r.desc || '—')}</td>
-        <td class="num stc-c-in">${isIn ? fmtQty(r.qty) : '-'}</td>
-        <td class="num stc-c-in">${isIn ? fmtAmt(r.unit_price) : '-'}</td>
-        <td class="num stc-c-in">${isIn ? fmtAmt(r.amount) : '-'}</td>
-        <td class="num stc-c-out">${isOut ? fmtQty(r.qty) : '-'}</td>
-        <td class="num stc-c-out">${isOut ? fmtAmt(r.unit_price) : '-'}</td>
-        <td class="num stc-c-out">${isOut ? fmtAmt(r.amount) : '-'}</td>
+        <td class="num stc-c-in">${isIn ? fmtQty(r.qty) : '—'}</td>
+        <td class="num stc-c-in">${isIn ? fmtAmt(r.unit_price) : '—'}</td>
+        <td class="num stc-c-in">${isIn ? fmtAmt(r.amount) : '—'}</td>
+        <td class="num stc-c-out">${isOut ? fmtQty(r.qty) : '—'}</td>
+        <td class="num stc-c-out">${isOut ? fmtAmt(r.unit_price) : '—'}</td>
+        <td class="num stc-c-out">${isOut ? fmtAmt(r.amount) : '—'}</td>
         <td class="num stc-c-bal">${fmtQty(r.bal_qty)}</td>
         <td class="num stc-c-bal">${fmtAmt(r.bal_unit_cost)}</td>
         <td class="num stc-c-bal">${fmtAmt(r.bal_value)}</td>
@@ -196,11 +196,11 @@ export function stcExcludedHead(): string {
 
 export function stcExcludedRow(x: StcExcludedRow): string {
     return `<tr>
-        <td>${escapeHtml(x.date)}</td>
-        <td>${escapeHtml(x.doc_no || '—')}</td>
+        <td class="c">${escapeHtml(x.date)}</td>
+        <td class="c">${escapeHtml(x.doc_no || '—')}</td>
         <td>${escapeHtml(x.desc || '—')}</td>
         <td class="num">${fmtAmt(x.amount)}</td>
-        <td>${stcChip('um', t(STC_REASON_KEY[x.reason] || 'stc-reason-no-qty-price'))}</td>
+        <td class="c">${stcChip('um', t(STC_REASON_KEY[x.reason] || 'stc-reason-no-qty-price'))}</td>
     </tr>`;
 }
 

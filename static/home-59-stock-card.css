@@ -91,12 +91,11 @@
 .stc-rules b {
     color: var(--accent-deep);
 }
-.stc-rules ol {
-    margin: 4px 0 0 20px;
+.stc-rules .stc-rules-list {
+    margin: 4px 0 0;
     display: flex;
     flex-wrap: wrap;
     gap: 4px 28px;
-    list-style-position: outside;
 }
 
 .stc-tabs {
@@ -147,18 +146,24 @@
 .stc td {
     border: 1px solid var(--line);
     padding: 7px 9px;
-    text-align: left;
+    text-align: left; /* 长文本格靠左:名称/描述 */
     white-space: nowrap;
+}
+.stc th {
+    text-align: center; /* 表头一律居中(DESIGN_SYSTEM §21) */
 }
 .stc td.num,
 .stc th.num {
-    text-align: right;
+    text-align: center; /* 短内容格居中:数字/金额 */
+}
+.stc td.c {
+    text-align: center; /* 短内容非数字格居中:单位/状态/日期/单据号/类型(DESIGN_SYSTEM §21) */
 }
 .stc thead .stc-grp th {
     font-size: 12.5px;
 }
-/* 表头对齐随内容:单列表头文字左/数字右(继承基础规则),只有跨多列的色带组头居中。
-   数字列 .num 右对齐由 .stc th.num 承接,别再写整行居中压过它(具体度陷阱前科)。 */
+/* 表头一律居中(2026-08-08 Zihao 拍板 · DESIGN_SYSTEM §21 · 推翻 08-07「数字右对齐」):
+   跨列色带组头与单列子表头同口径,整行 th 已由基础规则兜底居中,这里只锁色带组头。 */
 .stc thead th[colspan] {
     text-align: center;
 }
@@ -179,6 +184,17 @@
     background: var(--stc-bal);
     border-color: var(--stc-bal);
 }
+/* 色带表头细分隔线(2026-08-08):深底上段内子列间用半透明白(段色描边在深底上看不见,
+   子列会糊成一团);段与段的分界比段内重一档(白色不透明度更高)。 */
+.stc thead th.stc-g-in:has(+ th.stc-g-in),
+.stc thead th.stc-g-out:has(+ th.stc-g-out),
+.stc thead th.stc-g-bal:has(+ th.stc-g-bal) {
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+.stc thead th.stc-g-in:has(+ th.stc-g-out),
+.stc thead th.stc-g-out:has(+ th.stc-g-bal) {
+    border-right: 1px solid rgba(255, 255, 255, 0.55);
+}
 .stc tbody td.stc-c-in {
     background: var(--stc-in-weak);
 }
@@ -187,6 +203,21 @@
 }
 .stc tbody td.stc-c-bal {
     background: var(--stc-bal-weak);
+}
+/* 色带段内/段界分隔(2026-08-08):段内子列间 1px var(--line) 细分隔线;入/出/结存段
+   与普通列及段与段之间,在基础网格上加重一档(2px 同线令牌,不另起炉灶)。 */
+.stc tbody td.stc-c-in + td.stc-c-in,
+.stc tbody td.stc-c-out + td.stc-c-out,
+.stc tbody td.stc-c-bal + td.stc-c-bal {
+    border-left: 1px solid var(--line);
+}
+.stc tbody tr > td:not(.stc-c-in) + td.stc-c-in,
+.stc tbody td.stc-c-in + td.stc-c-out,
+.stc tbody td.stc-c-out + td.stc-c-bal {
+    border-left: 2px solid var(--line);
+}
+.stc tbody td.stc-c-bal + td:not(.stc-c-bal) {
+    border-right: 2px solid var(--line);
 }
 .stc tbody tr.stc-row {
     cursor: pointer;
@@ -198,9 +229,6 @@
 .stc tbody tr.neg td {
     background: var(--bad-weak);
     color: var(--bad);
-}
-.stc tbody tr.neg td.stc-c-in {
-    background: var(--bad-weak);
 }
 .stc tfoot td {
     background: var(--stc-bal-weak);
@@ -349,6 +377,7 @@
 #stc-op-mask td.num .stc-in,
 #stc-op-mask input[type='number'] {
     text-align: right;
+    min-width: 96px; /* 完整容下 -9999.999,不让窄列挤掉数字尾巴 */
 }
 .stc-merr {
     color: var(--bad);

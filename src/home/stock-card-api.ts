@@ -71,6 +71,15 @@ export interface StcOpeningRow {
     unit_cost: string;
     as_of_date: string;
 }
+// 与 routes/stock_card_routes.py 的 _public_opening 同形(GET /openings 每行)。
+export interface StcOpeningSaved {
+    id: string;
+    product_id: string | null;
+    name_key: string | null;
+    qty: string;
+    unit_cost: string;
+    as_of_date: string;
+}
 // 与 routes/stock_card_routes.py 的 MergeIn 同形(契约测试锁字段面,别单侧改)。
 export interface StcMergePayload {
     name_keys: string[];
@@ -163,6 +172,12 @@ export async function stcGetExcluded(
     const q = stcRangeParams(wsId, dateFrom, dateTo);
     const body = await stcFetch('/api/stockcard/excluded?' + q.toString());
     return (body.rows as StcExcludedRow[]) || [];
+}
+
+// 已存用户期初(GET 与 POST 同一路径,靠方法区分;期初弹窗开起时预填用)。
+export async function stcGetOpenings(wsId: number): Promise<StcOpeningSaved[]> {
+    const body = await stcFetch(`/api/stockcard/openings?workspace_client_id=${wsId}`);
+    return (body.rows as StcOpeningSaved[]) || [];
 }
 
 // 两条写路径的 workspace_client_id 走 URL query —— 路由签名是 Query(...),塞 body 会被

@@ -63,9 +63,44 @@ const CHECKS = [
     { key: '原生弹窗(禁)', re: /(?<![.\w])(alert|confirm|prompt)\s*\(/g },
     { key: '超高z-index', re: /z-index:\s*9{3,}/gi },
     { key: 'i18n原始键残留', re: /-ago-suffix|time-hour|time-day/gi },
+    // 表格对齐硬标准(DESIGN_SYSTEM §21 · 2026-08-08 拍板):表头一律居中、短内容格居中、
+    // 长文本格靠左,禁止对 th/td 声明 text-align: right。这条是整块 CSS 规则的扫描(选择器
+    // 含 th/td 词边界 + 声明块里有 text-align:right),不是逐行正则 —— 见 cssRule:true 分支。
+    {
+        key: 'table-align-right',
+        re: null,
+        cssRule: true,
+        hint: 'DESIGN_SYSTEM §21 表格对齐规范:表头居中、短内容格居中、长文本格靠左,禁止 th/td 右对齐',
+    },
 ];
 // 裸 hex 单列(量大,单独统计;TOKEN_SOURCE 跳过)
 const HEX = /#[0-9a-fA-F]{6}\b/g;
+
+// 整块 CSS 规则(选择器 + 声明块)匹配;块内不含 { } 足以覆盖本仓写法,注释里的右对齐
+// 不会进块,天然不误伤。选择器含 th/td 词边界(\b 让 .width/:nth-child 这类带子串的漏不掉
+// 也没法误伤)且声明块里有 text-align:\s*right 才算命中。
+const CSS_RULE_RE = /([^{}]+)\{([^}]*)\}/g;
+const SEL_TH_TD = /\bth\b|\btd\b/;
+const DECL_ALIGN_RIGHT = /text-align:\s*right\b/gi;
+
+function cssRightAlignHits(txt) {
+    const hits = [];
+    CSS_RULE_RE.lastIndex = 0;
+    let m;
+    while ((m = CSS_RULE_RE.exec(txt))) {
+        const sel = m[1].replace(/\/\*[\s\S]*?\*\//g, ''); // 先剥注释:块首注释会混进选择器段,否则 th/td 误伤
+        const block = m[2];
+        if (!SEL_TH_TD.test(sel)) continue;
+        const decls = block.match(DECL_ALIGN_RIGHT);
+        if (!decls) continue;
+        const lineNo = txt.slice(0, m.index).split('\n').length;
+        hits.push({
+            count: decls.length,
+            sample: `${lineNo}: ${sel.trim().slice(0, 70)} { text-align: right }`,
+        });
+    }
+    return hits;
+}
 
 function walk(dir, out) {
     let ents;
@@ -110,14 +145,24 @@ for (const f of files) {
     for (const c of CHECKS) {
         let cnt = 0;
         const samples = [];
-        lines.forEach((ln, i) => {
-            if (c.skipLineRe && c.skipLineRe.test(ln)) return;
-            const m = ln.match(c.re);
-            if (m) {
-                cnt += m.length;
-                if (samples.length < 2) samples.push(i + 1 + ': ' + ln.trim().slice(0, 90));
+        if (c.cssRule) {
+            // table-align-right:按整条 CSS 规则扫(选择器 + 声明块),只对 .css 文件生效。
+            if (/\.css$/i.test(f)) {
+                for (const h of cssRightAlignHits(txt)) {
+                    cnt += h.count;
+                    if (samples.length < 2) samples.push(h.sample);
+                }
             }
-        });
+        } else {
+            lines.forEach((ln, i) => {
+                if (c.skipLineRe && c.skipLineRe.test(ln)) return;
+                const m = ln.match(c.re);
+                if (m) {
+                    cnt += m.length;
+                    if (samples.length < 2) samples.push(i + 1 + ': ' + ln.trim().slice(0, 90));
+                }
+            });
+        }
         if (cnt) results[c.key].push({ file: f, count: cnt, samples });
     }
     if (!isTokenSrc) {
@@ -131,6 +176,7 @@ for (const c of CHECKS) {
     const rows = results[c.key].sort((a, b) => b.count - a.count);
     const total = rows.reduce((s, r) => s + r.count, 0);
     report += `\n## ${c.key} — 命中 ${total}(${rows.length} 文件)\n`;
+    if (c.hint) report += `> ${c.hint}\n`;
     for (const r of rows) {
         report += `  ${String(r.count).padStart(4)}  ${r.file}\n`;
         for (const s of r.samples) report += `        └ ${s}\n`;

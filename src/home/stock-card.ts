@@ -68,7 +68,6 @@ function shellHtml(): string {
         <div class="stc-head">
             <div class="stc-head-t">
                 <div class="t">${esc(t('stc-title'))}</div>
-                <div class="sub">${esc(t('stc-subtitle'))}</div>
             </div>
         </div>
         <div class="stc-toolbar">

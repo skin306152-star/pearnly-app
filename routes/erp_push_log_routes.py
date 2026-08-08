@@ -20,6 +20,7 @@ from services.erp import erp_push as _erp
 from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
+from core import workspace_context as wc
 
 logger = logging.getLogger("mr-pilot")
 
@@ -276,6 +277,7 @@ async def erp_logs(
             exclude_push_type if exclude_push_type in ("id_card", "invoice") else None
         ),
         tenant_id=_tid(user),
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
 
 
@@ -292,10 +294,14 @@ async def erp_log_detail(log_id: str, request: Request):
 
 @router.get("/api/erp/stats/today")
 async def erp_stats_today(request: Request):
-    """今日推送统计"""
+    """今日推送统计 · 同日志列表按当前套账隔离(active_workspace_for_request 解析)。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
-    return db.get_push_stats_today(user["id"])
+    return db.get_push_stats_today(
+        user["id"],
+        tenant_id=_tid(user),
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+    )
 
 
 @router.post("/api/erp/logs/{log_id}/retry")

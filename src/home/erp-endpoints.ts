@@ -57,7 +57,10 @@ async function loadErpTodayStats() {
     host.innerHTML = '';
     try {
         const resp = await fetch('/api/erp/stats/today', {
-            headers: { Authorization: 'Bearer ' + token },
+            headers: Object.assign(
+                { Authorization: 'Bearer ' + token },
+                typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+            ),
         });
         if (!resp.ok) return;
         const data = await resp.json();

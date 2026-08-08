@@ -109,7 +109,10 @@ async function loadErpLogs(silent?: boolean) {
         // DMS 订车推送已搬独立入口 /dms · 后端剔除该业务行(不再前端 .filter)让 total 诚实。
         params.set('exclude_push_type', 'id_card');
         const resp = await fetch(`/api/erp/logs?${params}`, {
-            headers: { Authorization: 'Bearer ' + token },
+            headers: Object.assign(
+                { Authorization: 'Bearer ' + token },
+                typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+            ),
         });
         if (!resp.ok) {
             listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-error'))}</div>`;

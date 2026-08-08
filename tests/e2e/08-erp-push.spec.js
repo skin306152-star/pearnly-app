@@ -8,6 +8,7 @@ const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
 const { enterApp, openRoute } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
+/* global window */ // page.evaluate 回调在浏览器上下文执行
 
 test.describe('ERP 推送入口', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
@@ -42,6 +43,40 @@ test.describe('ERP 推送入口', () => {
         // 关抽屉 · 不做任何推送配置改动
         await page.locator('#int-drawer-close').click();
         await expect(page.locator('#int-drawer'), 'ERP 配置抽屉关闭').not.toHaveClass(/open/);
+
+        assertNoConsoleErrors(expect, guard);
+    });
+
+    test('推送日志列表请求带当前套账头 X-Workspace-Client-Id', async ({ page }) => {
+        const guard = attachConsoleGuard(page);
+        await enterApp(page);
+        await openRoute(page, 'integrations');
+
+        // 拦截 /api/erp/logs(仅列表 · 不含 /logs/{id} 明细)抓请求头。
+        // loadErpLogs 的 fetch 已 merge window._wsHeader() → 头必须等于当前套账 id。
+        const logReqs = [];
+        page.on('request', (req) => {
+            if (new URL(req.url()).pathname === '/api/erp/logs') {
+                logReqs.push(req.headers()['x-workspace-client-id'] || null);
+            }
+        });
+
+        await page.locator('[data-int-top-tab="logs"]').click();
+        await expect(page.locator('#erp-logs-section'), '推送日志区可见').toBeVisible();
+        await expect.poll(() => logReqs.length, '应发出 /api/erp/logs 请求').toBeGreaterThan(0);
+
+        // 桩 = 应用当前选中的套账(workspace-gate / 切换器)· 断言请求头与之一致。
+        const activeWs = await page.evaluate(() =>
+            typeof window.getActiveWorkspaceClientId === 'function'
+                ? window.getActiveWorkspaceClientId()
+                : null
+        );
+        if (activeWs != null) {
+            expect(logReqs[0], '请求头必须带当前套账 id').toBe(String(activeWs));
+        } else {
+            // 个人模式(无套账)→ _wsHeader 返 {} · 不带头
+            expect(logReqs[0], '无套账时不应带 X-Workspace-Client-Id').toBeNull();
+        }
 
         assertNoConsoleErrors(expect, guard);
     });

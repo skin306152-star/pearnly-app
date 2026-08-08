@@ -11,7 +11,6 @@
     function render(ctx: any) {
         var _t = ctx.t;
         var _esc = ctx.esc;
-        var S = ctx.S || {};
         var t = function (k: string) {
             return _esc(_t(k));
         };

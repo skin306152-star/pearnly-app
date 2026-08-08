@@ -66,8 +66,8 @@
             connected: false,
             account: cfg && cfg.account_set ? String(cfg.account_set) : null, // 账套唯一键 = PATH(小助手上报)
             accountName: cfg && cfg.account_company ? String(cfg.account_company) : null, // 显示用真公司名
-            push: !(ep && ep.auto_push === false), // 默认开启(照搬文案「默认开启」)
-            // 档位只剩 手动/全托管;历史 'standard' 连接显示为全托管(队列行为等价·见 autonomy.py 档位注)。
+            // 档位只剩 手动/全托管(推送开关由 pushMode 派生,不另存布尔);
+            // 历史 'standard' 连接显示为全托管(队列行为等价·见 autonomy.py 档位注)。
             pushMode: ep && ep.auto_push === false ? 'manual' : 'full',
             token: '', // 本会话刚生成的明文(只此一次·可显隐复制)
             // 长效密钥模型:配过的连接 config 带 agent_token_tail → 重开只显掩码,不诱导重置。
@@ -189,7 +189,7 @@
               ? 'exp-prog-text-2'
               : !S.account
                 ? 'exp-prog-text-3'
-                : S.push
+                : S.pushMode !== 'manual'
                   ? 'exp-prog-text-push-on'
                   : 'exp-prog-text-push-off';
         _txt('exp-progress-text', _t(ptKey));
@@ -395,9 +395,9 @@
         await fetch('/api/erp/endpoints/' + encodeURIComponent(id), {
             method: 'PATCH',
             headers: _auth(),
-            body: JSON.stringify({ auto_push: S.push }),
+            body: JSON.stringify({ auto_push: S.pushMode !== 'manual' }),
         });
-        if (S.push) {
+        if (S.pushMode !== 'manual') {
             await fetch('/api/erp/endpoints/' + encodeURIComponent(id) + '/express-autonomy', {
                 method: 'PATCH',
                 headers: _auth(),
@@ -445,7 +445,6 @@
         var tg = ev.target as HTMLElement;
         if (tg && (tg as HTMLInputElement).name === 'exp-pushmode' && S) {
             S.pushMode = (tg as HTMLInputElement).value;
-            S.push = S.pushMode !== 'manual';
             updateUI();
             // 端点已建 → 即时落库(toast 才诚实);未建 → 随「完成」一并存。
             if (S.id) {

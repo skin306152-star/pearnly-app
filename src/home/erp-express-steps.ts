@@ -54,9 +54,9 @@
             '<div class="exp-sec-copy"><div>' +
             t('exp-install-hint') +
             '</div><div class="exp-action-row">' +
-            '<button class="exp-primary" id="exp-download">' +
+            '<button class="btn exp-primary" id="exp-download">' +
             t('exp-download-agent') +
-            '</button><button class="exp-secondary" id="exp-skip-download">' +
+            '</button><button class="btn exp-secondary" id="exp-skip-download">' +
             t('exp-skip-download') +
             '</button><span class="exp-help-text" id="exp-download-hint">' +
             t('exp-download-hint-1') +
@@ -76,10 +76,10 @@
             t('exp-code-note') +
             '</div></div>' +
             '<button class="exp-iconbtn exp-eye" id="exp-eye" type="button" style="display:none"></button>' +
-            '<button class="exp-secondary" id="exp-copy">' +
+            '<button class="btn exp-secondary" id="exp-copy">' +
             t('exp-copy') +
             '</button></div>' +
-            '<div class="exp-action-row"><button class="exp-primary" id="exp-generate">' +
+            '<div class="exp-action-row"><button class="btn exp-primary" id="exp-generate">' +
             t('exp-gen-token') +
             '</button><div id="exp-agent-notice"></div></div></div></section>';
 
@@ -158,9 +158,9 @@
             render(ctx) +
             '<footer class="exp-footer"><div class="exp-footer-note" id="exp-footer-note"></div>' +
             '<div class="exp-footer-actions">' +
-            '<button class="exp-secondary" id="exp-cancel">' +
+            '<button class="btn exp-secondary" id="exp-cancel">' +
             _esc(_t('exp-cancel')) +
-            '</button><button class="exp-primary" id="exp-done" disabled>' +
+            '</button><button class="btn exp-primary" id="exp-done" disabled>' +
             _esc(_t('exp-done')) +
             '</button></div></footer></section>'
         );
@@ -190,7 +190,7 @@
             if (note) note.textContent = t('exp-key-once');
             if (gen) {
                 gen.textContent = t('exp-key-reset');
-                gen.className = 'exp-secondary exp-danger';
+                gen.className = 'btn exp-secondary exp-danger';
             }
         } else if (S.hasKey) {
             if (cb) cb.style.display = 'grid';
@@ -200,13 +200,13 @@
             if (note) note.textContent = t('exp-key-set-once');
             if (gen) {
                 gen.textContent = t('exp-key-reset');
-                gen.className = 'exp-secondary exp-danger';
+                gen.className = 'btn exp-secondary exp-danger';
             }
         } else {
             if (cb) cb.style.display = 'none';
             if (gen) {
                 gen.textContent = t('exp-gen-token');
-                gen.className = 'exp-primary';
+                gen.className = 'btn exp-primary';
             }
         }
     }

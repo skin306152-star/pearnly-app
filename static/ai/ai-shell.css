@@ -22,10 +22,8 @@
 body.side-collapsed .side {
   width: 64px;
 }
+/* 收起态只留展开/收起图标居中(Zihao 2026-08-08:P 字标一并藏掉,展开再见) */
 body.side-collapsed .brand {
-  justify-content: center;
-}
-body.side-collapsed .brand .word {
   display: none;
 }
 body.side-collapsed .brand-row {

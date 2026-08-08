@@ -87,11 +87,14 @@ body.stw-chat-mode #v-steward.on {
 .stw-side.collapsed .stw-side-label,
 .stw-side.collapsed .stw-side-sec,
 .stw-side.collapsed .stw-sess-list,
-.stw-side.collapsed .stw-side-foot {
+.stw-side.collapsed .stw-side-foot,
+/* 收起态只留展开/收起图标(Zihao 2026-08-08:「+」新对话藏掉,展开再见) */
+.stw-side.collapsed .stw-new-chat {
   display: none;
 }
 .stw-side.collapsed .stw-side-hd {
   flex-direction: column;
+  align-items: center;
   padding: 14px 8px 8px;
 }
 .stw-side.collapsed .stw-new-chat {

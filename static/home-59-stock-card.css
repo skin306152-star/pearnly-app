@@ -195,6 +195,13 @@
 .stc thead th.stc-g-out:has(+ th.stc-g-bal) {
     border-right: 1px solid rgba(255, 255, 255, 0.55);
 }
+/* 色带组头(入库/出库/结存)与子表头行之间的横向分隔(Zihao 2026-08-08 红线标注处)·
+   列表表的入/出组头无 colspan,按 .stc-grp 行内的色带类选,两张表同吃 */
+.stc thead .stc-grp th.stc-g-in,
+.stc thead .stc-grp th.stc-g-out,
+.stc thead .stc-grp th.stc-g-bal {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+}
 .stc tbody td.stc-c-in {
     background: var(--stc-in-weak);
 }

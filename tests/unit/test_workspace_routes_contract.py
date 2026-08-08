@@ -38,6 +38,8 @@ class WorkspaceRouteContractTests(unittest.TestCase):
         # 用户引导闭环(2026-06-11)· 公司资料页读单个 + 建企业主体税号带出
         self.assertIn(("GET", "/api/workspace/clients/{workspace_client_id}"), rs)
         self.assertIn(("GET", "/api/workspace/tax-lookup"), rs)
+        # 复核屏「套账不符 → 一键归入」(2026-08-08)· 批量重绑 ocr_history 账套归属
+        self.assertIn(("POST", "/api/workspace/rebind-history"), rs)
 
     def test_delete_is_soft_archive_only(self):
         # P3:DELETE 仅允许出现在单个账套主体的归档路由上(软删 is_active=False)·

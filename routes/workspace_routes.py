@@ -25,8 +25,9 @@ from core import db
 from core.auth import get_current_user_from_request
 from core.feature_flags import pearnly_ai_m1_enabled_for
 from core.route_helpers import _tid, _log_op
+from services.audit import store as audit_store
 from services.authz.deps import actor_has_perm, get_authz, require_perm
-from services.workspace import thai_name_gate
+from services.workspace import seller_routing, thai_name_gate
 
 router = APIRouter()
 
@@ -68,6 +69,13 @@ class WorkspaceClientUpdate(BaseModel):
     doc_prefix: Optional[str] = Field(
         None, max_length=20, description="单据前缀(空串=清空回落租户级)"
     )
+
+
+class RebindHistoryIn(BaseModel):
+    history_ids: list[str] = Field(
+        ..., min_length=1, max_length=200, description="要重绑账套归属的 ocr_history id"
+    )
+    workspace_client_id: int = Field(..., description="目标账套主体 id")
 
 
 @router.get("/api/workspace/clients")
@@ -215,6 +223,48 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
         details={"subject_type": req.subject_type or "company"},
     )
     return {"ok": True, "id": wid}
+
+
+@router.post("/api/workspace/rebind-history")
+async def rebind_history(req: RebindHistoryIn, request: Request):
+    """把一批 ocr_history 的账套归属重绑到指定账套(复核屏「套账不符 → 一键归入」)。
+
+    销项票卖方税号与当前套账不符时(真机实锤:美妆店票落进冰块公司账套),前端先建
+    目标套账,再整体归入。目标套账必须属于本租户且未归档,否则 404
+    workspace.not_found。逐条复用 seller_routing.update_history_workspace_client_id
+    (内部已做 tenant 隔离 + 归属过滤),不属于本用户/租户的那条返回 False → 进
+    skipped 不抛错(四态诚实,不吞失败)。update 本身幂等,重复调用同参结果一致。
+    """
+    user = require_perm(request, "settings.workspace.manage")
+    tenant_id = _tid(user)
+    client = db.get_workspace_client(req.workspace_client_id, str(user["id"]), tenant_id=tenant_id)
+    if not client or not client.get("is_active"):
+        raise HTTPException(404, detail="workspace.not_found")
+    rebound = 0
+    skipped: list[str] = []
+    for hid in req.history_ids:
+        ok = seller_routing.update_history_workspace_client_id(
+            hid, req.workspace_client_id, str(user["id"]), tenant_id=tenant_id
+        )
+        if ok:
+            rebound += 1
+        else:
+            skipped.append(hid)
+    audit_store.insert_operation_log(
+        tenant_id,
+        str(user["id"]),
+        user.get("username"),
+        bool(user.get("is_super_admin")),
+        "workspace.rebind_history",
+        target_type="workspace_client",
+        target_id=str(req.workspace_client_id),
+        details={
+            "history_count": len(req.history_ids),
+            "rebound": rebound,
+            "skipped": len(skipped),
+        },
+    )
+    return {"ok": True, "rebound": rebound, "skipped": skipped}
 
 
 @router.put("/api/workspace/clients/{workspace_client_id}/endpoint")

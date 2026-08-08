@@ -1,19 +1,25 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-08 收尾 · CI 返工根因 P1-P4 已闭环)
+## 当前状态卡(2026-08-08 晚收工 · Stock Card 写路径修通 + 表格新标准 + ABB/套账全链 + 推送日志隔离)
 
-- **P1**: `scripts/impact.py` 已接入 pre-push;测试-only unit 变更跑子集,生产 Python 回退全量;103 个 Playwright spec 已进影响面台账。
-- **P2**: hook 开头清理 `__pycache__/*.pyc`,导出 `PYTHONDONTWRITEBYTECODE=1`;Windows Git Bash 探测修复,全量 unit 不再假红。
-- **P3**: simplify 分档、复验分档、非紧急推送列车规则已写入现有 skills。
-- **P4**: 闸体系审计报告已落 `docs/refactor/CI_GATE_AUDIT_2026-08-08.md`,未删除无证据闸。
-- **验证**:本地 1120 模块/6 分片全绿;最新 CI `31221873757` 全绿;线上 `/api/version` 返回 `12060022`。
-- **提交**:`f16daf98`、`799c5deb`、`2f0bb840` 已推 `master`;未 push commit:无。
-- **当前 task**:本窗口已收工,不再追加代码。
-- **剩余风险**:工作树仍有其他窗口 Stock Card 改动,本窗口未读取其语义、未修改、未清理。
-- **下一步**:下一窗口接 Stock Card 施工/验收;本窗口不再动作。
-- **等 Zihao**:无;如继续开发,先确认 Stock Card 窗口的文件 ownership。
+- **已上线(本窗 10 push · CI 全绿 · 线上 /api/version=12060029)**:
+  ① Stock Card 期初/归并写路径修通(上线以来首次可用;三层契约断裂,补路由契约闸 test_stockcard_routes_contract 与 TS 互锁)
+  ② 表格对齐全站新标准(DESIGN_SYSTEM §21:表头居中/短内容居中/长文本靠左/占位「—」·ui_design_lint 新类别 table-align-right 棘轮)
+  ③ 复核屏 ABB 散客票状态机(dms-intake-review-fields.ts:散客免检买方税号+对手方税号展示位+เงินสด 徽章)
+  ④ 套账不符横幅+一键建套账归入(dms-intake-workspace-guard.ts + POST /api/workspace/rebind-history)· Zihao 真机已用它建 Sister Makeup 并归入,期初 11×50→结存 ฿550 全对
+  ⑤ 推送日志+今日统计按套账隔离(X-Workspace-Client-Id 三层接线;push_log_queries 拆 push_stats_today.py 过 500 闸,facade 顶部 re-import 保持)
+  ⑥ 杂项:悬停单格不亮根治(删冗余 tr.neg td.stc-c-in)/删原图位置切换与重复收起/按钮压标准 31px(.btn min-height 具体度)/ai 收起态只留居中图标/「单位成本」四语去歧义/组头横线/删(增)(减)
+- **提交**:HEAD=19ff324e=origin/master,工作树干净,未 push:无
+- **流程**:施工分层已兑现(6 张 DeepSeek worker 单零返工·铁律#6 已焊进 session_banner)
+- **剩余风险/欠账**:① steward 测试顺序泄漏(分片偶发红;runner 失败现已落模块序 %TEMP%/unit_shard_N_mods.txt,待按序二分)② _intake_invoice_verify.cjs 多代旧断言未迁完且不在 e2e 台账(pv-* 一层已迁,identity 选项层仍断)③ e2e_ledger stale_ack 三条 08-15 到期(扫码面)④ SM 两张已转换错账票留 ws92(Zihao 拍板不动)
+- **下一步(下窗)**:steward 泄漏二分+治根;_intake_invoice_verify 迁移并纳台账;有新 UI 需求照 §21 表格标准
+- **等 Zihao**:无
 
 ---
+
+## 历史 · 2026-08-08 白天窗 · CI 返工根因 P1-P4 闭环
+
+- impact.py 接入 pre-push(测试-only 跑子集)· hook 清 __pycache__ 防假红 · simplify/复验分档入 skills · 闸审计落 docs/refactor/CI_GATE_AUDIT_2026-08-08.md;当时线上 12060022。
 
 ## 历史 · 2026-08-08 Stock Card 全战役
 

@@ -97,7 +97,9 @@ def run_worker(mod_names: list[str]) -> int:
     return 0 if ok else 1
 
 
-def _summarize_failure(idx: int, total: int, code: int, out: str) -> None:
+def _summarize_failure(
+    idx: int, total: int, code: int, out: str, mods: list[str] | None = None
+) -> None:
     print(f"── shard {idx}/{total} 红(exit {code})──")
     # 测试自身刷的 mock 异常日志会淹掉真失败:只打 FAIL/ERROR/统计行,全文落盘。
     for ln in out.splitlines():
@@ -106,6 +108,12 @@ def _summarize_failure(idx: int, total: int, code: int, out: str) -> None:
     dump = Path(tempfile.gettempdir()) / f"unit_shard_{idx}_fail.log"
     dump.write_text(out, encoding="utf-8")
     print(f"  全文: {dump}")
+    if mods:
+        # 顺序依赖型红(mock 泄漏/模块污染)只能按当片真实次序复现 —— 组成随时长缓存漂移,
+        # 不落盘就没法事后二分找泄漏源(2026-08-08 三连红实锤)。
+        mdump = Path(tempfile.gettempdir()) / f"unit_shard_{idx}_mods.txt"
+        mdump.write_text("\n".join(mods), encoding="utf-8")
+        print(f"  模块序: {mdump}")
 
 
 def _is_load_failure(returncode: int, out: str) -> bool:
@@ -209,10 +217,10 @@ def main() -> int:
                         )
                     continue
                 failed = True
-                _summarize_failure(i + 1, len(procs), retry.returncode, retry.stdout)
+                _summarize_failure(i + 1, len(procs), retry.returncode, retry.stdout, shards[i])
                 continue
             failed = True
-            _summarize_failure(i + 1, len(procs), p.returncode, out)
+            _summarize_failure(i + 1, len(procs), p.returncode, out, shards[i])
         elif not args.quiet:
             n_mods = len(shards[i])
             print(f"shard {i + 1}/{len(procs)}: {n_mods} modules OK")

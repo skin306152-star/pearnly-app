@@ -212,7 +212,7 @@
 /* 按钮(复用主程序 .btn · 仅补主色/小号变体作用域) */
 .dmsx .btn.primary{background:var(--dx-brand);border-color:var(--dx-brand);color:#fff}
 .dmsx .btn.primary:hover{background:var(--dx-brand-strong)}
-.dmsx .btn.small{height:31px;padding:0 10px;border-radius:8px;font-size:11px}
+.dmsx .btn.small{height:31px;min-height:31px;padding:0 10px;border-radius:8px;font-size:11px}
 .dmsx .btn.danger{color:var(--dx-red)}
 .dmsx .dx-badge{border-radius:999px;padding:5px 8px;font-size:9px;font-weight:850;white-space:nowrap}
 .dmsx .dx-badge.green{background:var(--dx-green-soft);color:var(--dx-green)}
@@ -234,10 +234,6 @@
 .dmsx .dx-rv-bar-t b{font-size:12px}
 .dmsx .dx-rv-bar-t span{display:block;font-size:10px;color:var(--ink2);margin-top:3px}
 .dmsx .dx-rv-bar-a{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.dmsx .dx-imgside-l{font-size:10px;color:var(--ink2)}
-.dmsx .dx-imgside{display:flex;border:1px solid var(--dx-line);border-radius:999px;padding:2px;background:var(--card)}
-.dmsx .dx-imgside-btn{border:0;background:transparent;color:var(--ink2);font-size:10px;font-weight:800;padding:4px 11px;border-radius:999px;cursor:pointer}
-.dmsx .dx-imgside-btn.active{background:var(--dx-brand);color:#fff}
 .dmsx .dx-acc{display:grid;gap:8px}
 .dmsx .dx-acc-item{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:clip}
 .dmsx .dx-acc-item.open{border-color:var(--dx-brand);box-shadow:var(--dx-shadow)}
@@ -252,12 +248,9 @@
 .dmsx .dx-acc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:11px;flex-wrap:wrap}
 .dmsx .dx-acc-top b{font-size:12px}
 .dmsx .dx-acc-tip{display:block;font-size:10px;color:var(--ink2);margin-top:3px}
-.dmsx .dx-acc-top-a{display:flex;gap:10px;flex-wrap:wrap}
 /* 核对屏的空间分配:原件要看清,字段只是几个短输入框 —— 把主要宽度给查看器。
    此前 1.25:1 是字段占大头,原件挤成邮票,会计得靠放大镜逐格对。 */
 .dmsx .dx-rgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:13px;align-items:start}
-.dmsx .dx-rgrid.image-left .dx-fields{order:2}
-.dmsx .dx-rgrid.image-left .dx-imgcard{order:1}
 .dmsx .dx-fields{min-width:0}
 .dmsx .dx-extra{margin-top:9px}
 .dmsx .dx-item-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
@@ -338,8 +331,7 @@
 @media(max-width:980px){
   .dmsx .dx-two,.dmsx .dx-task-grid,.dmsx .dx-dgrid,.dmsx .dx-fgrid,.dmsx .dx-sgrid,.dmsx .dx-ogrid{grid-template-columns:1fr}
   .dmsx .dx-scan,.dmsx .dx-review-grid{grid-template-columns:1fr 1fr}
-  .dmsx .dx-rgrid,.dmsx .dx-rgrid.image-left{grid-template-columns:1fr}
-  .dmsx .dx-rgrid.image-left .dx-fields,.dmsx .dx-rgrid.image-left .dx-imgcard{order:0}
+  .dmsx .dx-rgrid{grid-template-columns:1fr}
   .dmsx .dx-imgcard{position:static}
   .dmsx .dx-imgcard .pv-viewer{height:380px}
   .dmsx .dx-stepper{grid-template-columns:repeat(2,1fr)}

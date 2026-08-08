@@ -152,16 +152,12 @@ export function renderReview() {
 }
 
 function barHtml(): string {
-    const sideBtn = (side: 'right' | 'left', lk: string) =>
-        `<button class="dx-imgside-btn${IV.imgSide === side ? ' active' : ''}" data-iv-side="${side}">${esc(t(lk))}</button>`;
     return (
         '<div class="dx-rv-bar"><div class="dx-rv-bar-t">' +
         `<b>${esc(t('dxi-rev-files-h'))}</b><span>${esc(t('dxi-rev-files-tip'))}</span></div>` +
         '<div class="dx-rv-bar-a">' +
         `<button class="btn small" id="dx-inv-collapse-all">${esc(t('dxi-rev-collapse-all'))}</button>` +
         `<button class="btn small primary" id="dx-inv-confirm-all">${esc(t('dxi-rev-confirm-all'))}</button>` +
-        `<span class="dx-imgside-l">${esc(t('dxi-rev-imgside'))}</span>` +
-        `<div class="dx-imgside">${sideBtn('right', 'dxi-rev-side-right')}${sideBtn('left', 'dxi-rev-side-left')}</div>` +
         '</div></div>'
     );
 }
@@ -196,14 +192,11 @@ function accItemHtml(r: IvResult, i: number): string {
 
 function accPanelHtml(r: IvResult, i: number): string {
     const groups = r.invoices.map((inv, ii) => invoiceGroupHtml(i, ii, inv)).join('');
-    const gridCls = IV.imgSide === 'left' ? ' image-left' : '';
     return (
         '<div class="dx-acc-panel"><div class="dx-acc-top"><div>' +
         `<b>${esc(r.filename)} · ${esc(t('dxi-rev-h'))}</b>` +
-        `<span class="dx-acc-tip">${esc(t('dxi-rev-panel-tip'))}</span></div>` +
-        '<div class="dx-acc-top-a">' +
-        `<button class="dx-toggle dx-collapse-one">${esc(t('dxi-rev-collapse'))}</button></div></div>` +
-        `<div class="dx-rgrid${gridCls}"><div class="dx-fields">${groups}${fieldsFootHtml()}</div>` +
+        `<span class="dx-acc-tip">${esc(t('dxi-rev-panel-tip'))}</span></div></div>` +
+        `<div class="dx-rgrid"><div class="dx-fields">${groups}${fieldsFootHtml()}</div>` +
         imageCardHtml(r) +
         '</div></div>'
     );
@@ -360,21 +353,9 @@ export function onReviewClick(tg: HTMLElement): boolean {
         renderReview();
         return true;
     }
-    if (tg.closest('.dx-collapse-one') || tg.closest('#dx-inv-collapse-all')) {
+    if (tg.closest('#dx-inv-collapse-all')) {
         IV.openIdx = -1;
         renderReview();
-        return true;
-    }
-    const side = tg.closest('[data-iv-side]') as HTMLElement | null;
-    if (side) {
-        IV.imgSide = side.dataset.ivSide as 'right' | 'left';
-        const panel = openPanel();
-        panel?.querySelector('.dx-rgrid')?.classList.toggle('image-left', IV.imgSide === 'left');
-        document
-            .querySelectorAll('.dx-imgside-btn')
-            .forEach((b) =>
-                b.classList.toggle('active', (b as HTMLElement).dataset.ivSide === IV.imgSide)
-            );
         return true;
     }
     if (tg.closest('.dx-save-one')) {

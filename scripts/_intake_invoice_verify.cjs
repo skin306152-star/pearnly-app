@@ -297,11 +297,11 @@ async function run() {
     await chk('★needs_review 漏票 banner', vis(page, '.dx-recheck-banner'));
     await chk('第3张空税号标黄(warn)', vis(page, '.dx-rv.warn'));
     // ★ 原图查看器:图片卡 + 原图加载(page.png stub)+ 缩放
-    await chk('★原图查看器可见', vis(page, '.dx-acc-item.open .dx-viewport'));
+    await chk('★原图查看器可见', vis(page, '.dx-acc-item.open .pv-viewer'));
     await page
         .waitForFunction(
             () => {
-                const i = document.querySelector('.dx-acc-item.open .dx-rimg');
+                const i = document.querySelector('.dx-acc-item.open .pv-img');
                 return i && i.src && i.src.startsWith('blob:');
             },
             { timeout: 8000 }
@@ -311,23 +311,23 @@ async function run() {
         '★原图重试后加载成功(404→重试→blob · 非永久不可用)',
         page.evaluate(() => {
             const c = document.querySelector('.dx-acc-item.open .dx-imgcard');
-            const i = document.querySelector('.dx-acc-item.open .dx-rimg');
+            const i = document.querySelector('.dx-acc-item.open .pv-img');
             return !!i && i.src.startsWith('blob:') && !c.classList.contains('noimg');
         })
     );
-    await page.click('.dx-acc-item.open .dx-zoom-in');
+    await page.click('.dx-acc-item.open [data-z="in"]');
     await chk(
         '★放大按钮改变缩放标签',
         page
-            .locator('.dx-acc-item.open .dx-zoom')
+            .locator('.dx-acc-item.open .pv-zoom')
             .innerText()
             .then((s) => s !== '100%')
     );
-    await page.click('.dx-acc-item.open .dx-reset');
+    await page.click('.dx-acc-item.open [data-z="reset"]');
     await chk(
         '★重置回 100%',
         page
-            .locator('.dx-acc-item.open .dx-zoom')
+            .locator('.dx-acc-item.open .pv-zoom')
             .innerText()
             .then((s) => s === '100%')
     );
@@ -342,9 +342,6 @@ async function run() {
     );
     await chk('★展开后明细行表出现', vis(page, '.dx-acc-item.open .dx-item-tbl'));
     await page.screenshot({ path: path.join(OUT, 'inv-1review-expanded.png') });
-    // ★ 原图左右切换
-    await page.click('.dx-imgside-btn[data-iv-side="left"]');
-    await chk('★原图切到左侧(image-left)', vis(page, '.dx-acc-item.open .dx-rgrid.image-left'));
     // ★ 确认并继续 → 视觉 ✓
     await page.click('.dx-acc-item.open .dx-confirm-one');
     await chk(

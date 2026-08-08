@@ -187,7 +187,7 @@ export function guardBannerHtml(): string {
                   )
               )}</button>`
             : `<button class="btn small primary" data-wsg-create>${esc(
-                  t('wsg-create-btn').replace('{name}', g.name || g.tax)
+                  t('wsg-create-btn')
               )}</button>`
         : '';
     const notes: string[] = [];

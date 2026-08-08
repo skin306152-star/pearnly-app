@@ -55,7 +55,6 @@ export const IV = {
     sel: 0, // 复核中选中的文件下标
     showAll: false,
     openIdx: -1 as number, // 复核手风琴当前展开的文件下标(-1 全收起)
-    imgSide: 'right' as 'right' | 'left', // 原图位置(右/左)
     confirmed: new Set<number>(), // 已确认文件(纯前端视觉态 · 不写后端)
     output: { excel: false, erp: false }, // 默认两个都不选(空选)→ 第4步按钮=「完成」(仅落识别记录)
     tpl: 'input_vat',

@@ -215,10 +215,20 @@ test.describe('复核屏「套账不符」非阻断横幅', () => {
         const disp = await banner.evaluate((el) => getComputedStyle(el).display);
         expect(disp).not.toBe('none');
         await expect(banner).toContainText('0105567178203');
-        await expect(page.locator('[data-wsg-create]')).toHaveText(
-            '建套账「美妆店 Makeup Shop」并归入'
-        );
+        await expect(page.locator('[data-wsg-create]')).toHaveText('建套账并归入');
         await expect(page.locator('[data-wsg-switch]')).toHaveCount(0);
+        // 按钮标准化(2026-08-08):确认全部/套账横幅按钮与「全部收起」同高(标准小按钮 31px)
+        const hCollapse = await page
+            .locator('#dx-inv-collapse-all')
+            .evaluate((el) => getComputedStyle(el).height);
+        const hConfirm = await page
+            .locator('#dx-inv-confirm-all')
+            .evaluate((el) => getComputedStyle(el).height);
+        const hCreate = await page
+            .locator('[data-wsg-create]')
+            .evaluate((el) => getComputedStyle(el).height);
+        expect(hConfirm).toBe(hCollapse);
+        expect(hCreate).toBe(hCollapse);
         await page.screenshot({
             path: path.join(OUT, '01-form2-create-banner.png'),
             fullPage: true,

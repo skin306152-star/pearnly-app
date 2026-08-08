@@ -1019,6 +1019,19 @@
       ],
       "only_e2e": ["确认全部真调转换桥、转换跳过出琥珀色 chip、识别记录页范围条已整块删除"]
     },
+    "31-intake-workspace-guard.spec.js": {
+      "covers": [
+        "src/home/**",
+        "static/home-*.css",
+        "home.html",
+        "login.html",
+        "static/i18n-data.js",
+        "tests/e2e/_helpers/**"
+      ],
+      "only_e2e": [
+        "套账不符横幅四态:建套账并归入/切已有套账并归入的真实请求载荷、坏校验位税号不出横幅、错配文件被确认全部拦下"
+      ]
+    },
     "_a1_discount_inferred_verify.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
       "only_e2e": ["系统补的折扣行在审核队列说人话、严重度红、无按建议处理的安全默认"]

@@ -296,6 +296,13 @@
 .dmsx .dx-inv-grp.active{border-left-color:var(--dx-brand);background:var(--bg)}
 .dmsx .dx-inv-fmtwarn{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:8px;font-size:9px;font-weight:700;color:#92400e;background:var(--amber-weak);border:1px solid var(--amber-line)}
 .dmsx .dx-recheck-banner{border:1px solid var(--dx-amber-line);background:var(--dx-amber-soft);color:var(--dx-amber);border-radius:11px;padding:10px 12px;font-size:11px;font-weight:700;margin-bottom:11px}
+/* 复核屏「套账不符」非阻断横幅(票主税号 ≠ 当前套账)→ 黄底警告 + 一键归入/保持 */
+.dmsx .dx-wsguard{border:1px solid var(--warn);background:var(--warn-weak);color:var(--ink);border-radius:11px;padding:11px 13px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.dmsx .dx-wsguard-t{font-size:11px;font-weight:800;line-height:1.5;min-width:0}
+.dmsx .dx-wsguard-a{display:flex;gap:8px;flex-wrap:wrap}
+.dmsx .dx-wsguard-notes{width:100%;font-size:10px;color:var(--ink2);line-height:1.5}
+.dmsx .dx-wsguard .btn{white-space:nowrap}
+@media(max-width:700px){.dmsx .dx-wsguard{flex-direction:column;align-items:stretch}.dmsx .dx-wsguard-a{justify-content:flex-end}}
 .dmsx .dx-rv{background:var(--bg);border-radius:10px;padding:9px}
 .dmsx .dx-rv.warn{background:var(--dx-amber-soft);border:1px solid var(--dx-amber-line)}
 .dmsx .dx-rv label{display:block;font-size:9px;color:var(--ink2);margin-bottom:5px}

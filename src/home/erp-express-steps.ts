@@ -8,12 +8,6 @@
 (function () {
     'use strict';
 
-    // 线性图标(stroke · currentColor · 非 emoji)。
-    var IC_GEAR =
-        '<svg class="exp-chev-ic" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.1"/><path d="M8 1.6v1.6M8 12.8v1.6M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M1.6 8h1.6M12.8 8h1.6M3.1 12.9l1.1-1.1M11.8 4.2l1.1-1.1"/></svg>';
-    var IC_CHEV =
-        '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l4-4 4 4"/></svg>';
-
     function render(ctx: any) {
         var _t = ctx.t;
         var _esc = ctx.esc;
@@ -116,124 +110,8 @@
         var toggle =
             '<div class="exp-pushmode-group">' +
             _mc('manual', 'exp-pushmode-manual', 'exp-pushmode-manual-d') +
-            _mc('standard', 'exp-pushmode-standard', 'exp-pushmode-standard-d') +
             _mc('full', 'exp-pushmode-full', 'exp-pushmode-full-d') +
             '</div>';
-
-        // 高级设置(录入方式:直录 + 查看说明 / 模拟录入占位)· 照搬源初始展开
-        var help =
-            '<div class="exp-choice-help-panel" id="exp-direct-help" aria-hidden="true">' +
-            '<p><b>' +
-            t('exp-how-what-h') +
-            '</b><br>' +
-            t('exp-how-what') +
-            '</p><p><b>' +
-            t('exp-how-work-h') +
-            '</b><br>· ' +
-            t('exp-how-work-1') +
-            '<br>· ' +
-            t('exp-how-work-2') +
-            '<br>· ' +
-            t('exp-how-work-3') +
-            '</p><p><b>' +
-            t('exp-how-note-h') +
-            '</b><br>· ' +
-            t('exp-how-note-1') +
-            '<br>· ' +
-            t('exp-how-note-2') +
-            '<br>· ' +
-            t('exp-how-note-3') +
-            '<br>· ' +
-            t('exp-how-note-4') +
-            '</p></div>';
-        var advanced =
-            '<section class="exp-info-panel" id="exp-advanced">' +
-            '<button class="exp-fold-head" type="button" data-fold="exp-advanced">' +
-            '<span class="exp-fold-title">' +
-            IC_GEAR +
-            ' ' +
-            t('exp-adv-title') +
-            '</span><span class="exp-chev">' +
-            IC_CHEV +
-            '</span></button>' +
-            '<div class="exp-fold-body"><div class="exp-answer-box"><p><b>' +
-            t('exp-method-label') +
-            '</b></p><div class="exp-settings-grid">' +
-            '<div class="exp-choice active direct-choice" id="exp-direct-choice"><div class="exp-choice-main">' +
-            '<div><b>' +
-            t('exp-method-direct') +
-            '</b><span>' +
-            t('exp-method-direct-desc') +
-            '</span></div>' +
-            '<button class="exp-choice-help-btn" type="button" id="exp-direct-help-btn">' +
-            t('exp-direct-help-show') +
-            '</button></div>' +
-            help +
-            '</div>' +
-            '<div class="exp-choice disabled"><b>' +
-            t('exp-method-sim') +
-            ' ' +
-            t('exp-erp-soon') +
-            '</b><span>' +
-            t('exp-method-sim-desc') +
-            '</span></div>' +
-            '</div></div></div></section>';
-
-        // 科目映射(销项 收入/应收/销项税 + 采购 采购/应付/进项税)。
-        // 有小助手上报的科目表 → 下拉按名字选;没有 → 文本兜底手填科目码。
-        var accts = S.accounts && S.accounts.length ? S.accounts : [];
-        var ROW = 'style="display:flex;align-items:center;gap:10px;margin:7px 0"';
-        var LBL = 'style="min-width:128px;font-size:13px;color:var(--ink2)"';
-        // 只读镜像:科目在小助手里选(和账套一样),这里只显示当前配置。code→name 由上报科目表查。
-        function _nameForCode(code: string) {
-            for (var i = 0; i < accts.length; i++) {
-                if (String((accts[i] || {}).code) === String(code)) return accts[i].name || '';
-            }
-            return '';
-        }
-        function accField(key: string, labelK: string) {
-            var cur = (S.acc && S.acc[key]) || '';
-            var nm = _nameForCode(cur);
-            var val = cur ? (nm ? _esc(nm) + ' (' + _esc(cur) + ')' : _esc(cur)) : '—';
-            return (
-                '<div ' +
-                ROW +
-                '><span ' +
-                LBL +
-                '>' +
-                t(labelK) +
-                '</span><b style="flex:1;font-size:13px">' +
-                val +
-                '</b></div>'
-            );
-        }
-        var accmap =
-            '<section class="exp-sec" id="exp-step-accmap"><div class="exp-sec-head">' +
-            '<h3 class="exp-sec-title">' +
-            t('exp-accmap-title') +
-            '</h3></div><div class="exp-sec-copy">' +
-            '<div class="exp-help-text">' +
-            t('exp-accmap-mirror-hint') +
-            '</div>' +
-            // 小助手未连/未上报科目表 → 科目无法解析,显式提示(别让用户以为配好了)。
-            (accts.length
-                ? ''
-                : '<div class="exp-help-text"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M8 1.8L1.5 13.5h13L8 1.8z"/><path d="M8 6.3v3.4M8 11.6h.01"/></svg>' +
-                  t('exp-accmap-offline-hint') +
-                  '</div>') +
-            '<div style="margin-top:10px"><b style="font-size:13px">' +
-            t('exp-accmap-sales') +
-            '</b>' +
-            accField('revenue_acc', 'exp-acc-revenue') +
-            accField('ar_acc', 'exp-acc-ar') +
-            accField('vat_output_acc', 'exp-acc-vat-out') +
-            '</div><div style="margin-top:10px"><b style="font-size:13px">' +
-            t('exp-accmap-purchase') +
-            '</b>' +
-            accField('fallback_acc', 'exp-acc-purchase') +
-            accField('ap_acc', 'exp-acc-ap') +
-            accField('vat_input_acc', 'exp-acc-vat-in') +
-            '</div></div></section>';
 
         return (
             '<div class="exp-modal-body">' +
@@ -242,9 +120,7 @@
             step1 +
             step2 +
             step3 +
-            accmap +
             toggle +
-            advanced +
             '</main></div>'
         );
     }

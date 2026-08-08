@@ -1,5 +1,5 @@
 // src/home/erp-express-wizard.js · Express 接通向导弹窗(照搬 pearnly_express_modal_redesign_v2)
-// 双栏:左 3 步流程轨+进度卡 / 右 step1-3+自动推送+高级折叠。body 一次渲染·updateUI 定点更新。
+// 双栏:左 3 步流程轨+进度卡 / 右 step1-3+自动推送。body 一次渲染·updateUI 定点更新。
 // 接口:生成密钥 POST /agent-token · 连上=心跳轮询 agent_last_seen_at · 账套=heartbeat 上报 · 完成=PATCH endpoint。由连接卡 ExpressWizard.open(ep) 拉起。
 /* global escapeHtml */
 (function () {
@@ -67,22 +67,8 @@
             account: cfg && cfg.account_set ? String(cfg.account_set) : null, // 账套唯一键 = PATH(小助手上报)
             accountName: cfg && cfg.account_company ? String(cfg.account_company) : null, // 显示用真公司名
             push: !(ep && ep.auto_push === false), // 默认开启(照搬文案「默认开启」)
-            pushMode:
-                ep && ep.auto_push === false
-                    ? 'manual'
-                    : (cfg && cfg.autonomy) === 'auto'
-                      ? 'full'
-                      : 'standard',
-            // 科目映射:小助手上报的科目表(下拉数据源)+ 已存的 6 个科目码(预选)。
-            accounts: Array.isArray(cfg && cfg.reported_accounts) ? cfg.reported_accounts : [],
-            acc: {
-                revenue_acc: (cfg && cfg.revenue_acc) || '',
-                ar_acc: (cfg && cfg.ar_acc) || '',
-                vat_output_acc: (cfg && cfg.vat_output_acc) || '',
-                fallback_acc: (cfg && cfg.fallback_acc) || '',
-                ap_acc: (cfg && cfg.ap_acc) || '',
-                vat_input_acc: (cfg && cfg.vat_input_acc) || '',
-            },
+            // 档位只剩 手动/全托管;历史 'standard' 连接显示为全托管(队列行为等价·见 autonomy.py 档位注)。
+            pushMode: ep && ep.auto_push === false ? 'manual' : 'full',
             token: '', // 本会话刚生成的明文(只此一次·可显隐复制)
             // 长效密钥模型:配过的连接 config 带 agent_token_tail → 重开只显掩码,不诱导重置。
             hasKey: !!(cfg && cfg.agent_token_tail),
@@ -415,7 +401,7 @@
             await fetch('/api/erp/endpoints/' + encodeURIComponent(id) + '/express-autonomy', {
                 method: 'PATCH',
                 headers: _auth(),
-                body: JSON.stringify({ autonomy: S.pushMode === 'full' ? 'auto' : 'standard' }),
+                body: JSON.stringify({ autonomy: 'auto' }),
             });
         }
     }
@@ -453,25 +439,6 @@
         }
         var link = tg.closest('.exp-step-link') as HTMLElement;
         if (link) return _scrollToStep(link.getAttribute('data-target') || 'exp-step1');
-        var fold = tg.closest('[data-fold]') as HTMLElement;
-        if (fold) {
-            var panel = $(fold.getAttribute('data-fold') || '');
-            if (panel) panel.classList.toggle('collapsed');
-            return;
-        }
-        if (tg.closest('#exp-direct-help-btn')) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            var hp = $('exp-direct-help');
-            var btn = $('exp-direct-help-btn');
-            if (hp && btn) {
-                var show = !hp.classList.contains('show');
-                hp.classList.toggle('show', show);
-                hp.setAttribute('aria-hidden', show ? 'false' : 'true');
-                btn.textContent = _t(show ? 'exp-direct-help-hide' : 'exp-direct-help-show');
-            }
-            return;
-        }
     });
 
     document.addEventListener('change', function (ev) {

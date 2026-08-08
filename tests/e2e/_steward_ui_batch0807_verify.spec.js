@@ -185,9 +185,10 @@ test('③ 会话历史面板 toggle 真收合(量宽度,与②互相独立)', as
         .poll(async () => (await page.locator('#stwSide').boundingBox()).width, { timeout: 2000 })
         .toBeLessThan(80); // 折叠态 56px
     const after = await page.locator('#stwSide').boundingBox();
-    // 历史列表整块藏起来,新对话按钮与 toggle 本身还在(不是把出路一起藏了)。
+    // 收起态只留展开/收起图标(Zihao 2026-08-08 拍板,推翻 08-07「新对话按钮还在」):
+    // 历史列表与「+」新对话一起藏,唯一出路 = 居中的 toggle,展开后按钮回来。
     expect(await page.locator('#stwSessList').isVisible()).toBe(false);
-    expect(await page.locator('[data-action="stw-new-session"]').isVisible()).toBe(true);
+    expect(await page.locator('[data-action="stw-new-session"]').isVisible()).toBe(false);
     expect(await page.locator('[data-action="stw-side-toggle"]').isVisible()).toBe(true);
     await page.screenshot({
         path: path.join(ART, '03-session-side-collapsed.png'),

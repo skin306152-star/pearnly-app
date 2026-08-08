@@ -1,21 +1,28 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-08 晚收工 · Stock Card 写路径修通 + 表格新标准 + ABB/套账全链 + 推送日志隔离)
+## 当前状态卡(2026-08-08 晚 · 工单→Express 批量推送整条搁置)
 
-- **已上线(本窗 10 push · CI 全绿 · 线上 /api/version=12060029)**:
-  ① Stock Card 期初/归并写路径修通(上线以来首次可用;三层契约断裂,补路由契约闸 test_stockcard_routes_contract 与 TS 互锁)
-  ② 表格对齐全站新标准(DESIGN_SYSTEM §21:表头居中/短内容居中/长文本靠左/占位「—」·ui_design_lint 新类别 table-align-right 棘轮)
-  ③ 复核屏 ABB 散客票状态机(dms-intake-review-fields.ts:散客免检买方税号+对手方税号展示位+เงินสด 徽章)
-  ④ 套账不符横幅+一键建套账归入(dms-intake-workspace-guard.ts + POST /api/workspace/rebind-history)· Zihao 真机已用它建 Sister Makeup 并归入,期初 11×50→结存 ฿550 全对
-  ⑤ 推送日志+今日统计按套账隔离(X-Workspace-Client-Id 三层接线;push_log_queries 拆 push_stats_today.py 过 500 闸,facade 顶部 re-import 保持)
-  ⑥ 杂项:悬停单格不亮根治(删冗余 tr.neg td.stc-c-in)/删原图位置切换与重复收起/按钮压标准 31px(.btn min-height 具体度)/ai 收起态只留居中图标/「单位成本」四语去歧义/组头横线/删(增)(减)
-- **提交**:HEAD=19ff324e=origin/master,工作树干净,未 push:无
-- **流程**:施工分层已兑现(6 张 DeepSeek worker 单零返工·铁律#6 已焊进 session_banner)
-- **剩余风险/欠账**:① steward 测试顺序泄漏(分片偶发红;runner 失败现已落模块序 %TEMP%/unit_shard_N_mods.txt,待按序二分)② _intake_invoice_verify.cjs 多代旧断言未迁完且不在 e2e 台账(pv-* 一层已迁,identity 选项层仍断)③ e2e_ledger stale_ack 三条 08-15 到期(扫码面)④ SM 两张已转换错账票留 ws92(Zihao 拍板不动)
-- **下一步(下窗)**:steward 泄漏二分+治根;_intake_invoice_verify 迁移并纳台账;有新 UI 需求照 §21 表格标准
-- **等 Zihao**:无
+- **🛑 搁置拍板(2026-08-08 晚)**:Zihao 原话「这套逻辑还是没有达到我的预期,先搁置吧,未来再说」——整条工单批量推送停,差距未说明。**重启前必须先问清预期,别从方案侧猜**(当日 kimi 稿、主控 v3/v4 稿三版均未获认可;v4 稿留存桌面\AI工单推送设计稿\)。
+- **搁置前已完成的勘察(结论仍有效·存记忆 workorder-erp-push-reuse-map)**:三路摸清老站推送链/回导/多页拆分全部可复用;通道判断=推荐小助手队列不走桥;老站无手工拆并页,只有自动拆+逐张复核。
+- **草稿已清(2026-08-08 晚 Zihao 拍板「清掉腾干净」)**:上一窗 71 个未提交草稿(①工单 PDF 全页 OCR+0100 schema ②Bridge 0.6 安全协议+0099 ③工单批量推送后端+配套测试)已全部恢复到 HEAD/删除,工作树干净;删除前快照(patch+tgz)留本会话 scratchpad 短期兜底,重做时以记忆勘察结论为准,不必复活旧稿。
+- **代码状态**:HEAD=`cae8d27a`=`origin/master`;本窗唯一仓库改动=本状态卡(docs commit)。
+- **Companion**:`...\.claude\worktrees\steward-closeout`@`419022f` 未提交现场仍在(桥侧改动,另一仓,本窗未动);主仓 master 落后 origin 6 且有 `.claude/`,禁止直接拉/覆盖;去留等 Zihao。
+- **数据状态**:ws92/ws113 均未删除/归档;桌面语料未改;D 盘 ERP 未写;D 盘两候选账套身份结论冲突,重启时只读辨认后再定。
+- **下一步**:无——整条已搁置(见顶部🛑),等 Zihao 重启并说清预期后再动;期间别开新设计稿、别复活旧草稿。
+- **等 Zihao**:重启信号 + 「预期长什么样」;Companion worktree 现场去留。
 
 ---
+
+## 历史 · 2026-08-08 /ai 工单到 Express 探索作废交接
+
+- **为何停**:/ai 原链只到 intake/sort/classify/reconcile/compute/package/review/archive；老站单票 Express 写链没有接到工单。首版 UI 交换稿未获 Zihao 认可，按指示作废并停工。
+- **语料盘点**:SM=2569-05，真正输入为 `A_客户给的原料` 104 JPG；B/C 与 `_workorder_out` 是答案/旧产物，不能重传。冰厂=2569-06，67 JPG + 8 PDF，共 97 个 PDF 物理页；草稿代码已由「每份只取第一页」改为全页 OCR/自动分组，但没有拿真实 97 页验收，也没有可视化拆页/合页复核。
+- **批推送口径**:采购/销售方向应由票据分类+本账套税号锚定，服务/库存应逐票可见并可纠正；危险批动作只允许执行“已就绪”行。授权摘要冻结工单、workspace、endpoint、account_set、history 顺序、payload hash、票数与金额，执行前及逐票重读，漂移即停。
+- **成功口径**:写入请求、Bridge ACK、Express 真存在是三层状态；只有 Express listing/报表反查命中才可 success。当前 verifier 缺失，代码故意落 manual/uncertain，禁止把 ACK 包装成成功。
+- **Bridge 定位**:云桥代码在 Companion 仓 `bridge/`，本窗改动位于独立 worktree `steward-closeout`；它不同于仍指向失效 `P:\69EXP\TEST` 的旧已安装小助手配置。本窗未 build、未发布、未安装 0.6，也未启动桥/Express。
+- **数据与目标**:ws92 冰厂含受保护的错账 SM 发票，不能盲删；ws113 Sister Makeup 也未动。D 盘两个候选写目标结论冲突，且均为实验/镜像目录；下一窗必须核对 book_id、公司、税号、基线/工作副本身份，禁止凭目录名选目标。
+- **验证实录**:主控独立读高敏 diff 并完成等价 `/simplify` 深审；聚焦回归 228/228，Companion 587/587(18 skip)。本地隔离 PG smoke 20 项中 8 error：旧测试桥夹具缺 0.6 version/capabilities/instance，被新写协议闸拒绝，尚未判清仅夹具漂移还是兼容问题。pre-push 因无待推 commit 自动跳过，不能算全闸；主仓未跟踪 import 闸与 Companion Black(14 文件)也为红。
+- **保留现场**:所有实现均为未提交工作树，便于下一窗逐块复审、拆留或整批撤销；未 commit/push/部署，生产和 ERP 无影响。
 
 ## 历史 · 2026-08-08 白天窗 · CI 返工根因 P1-P4 闭环
 

@@ -21,6 +21,20 @@
     "test_no_two_entries_watch_the_same_screenshots 硬拦;认不到任何图也照红(通配写偏一个",
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
+  "stale_ack": {
+    "_inv_guards_verify.cjs": {
+      "until": "2026-08-15",
+      "why": "2026-08-08 i18n-data.js 只新增 stockcard 归并键(stc-mg-*),未触碰扫码/库存任何文案;键完整性由 check_i18n/check_i18n_refs 闸兜住。下次动扫码面时重跑本脚本清欠。"
+    },
+    "_inv_typed_feedback_verify.cjs": {
+      "until": "2026-08-15",
+      "why": "同上:仅 stc-mg-* 新键触发 i18n-data.js covers,慢枪/批号交互面未动。"
+    },
+    "_sx_barcode_copy_accept.cjs": {
+      "until": "2026-08-15",
+      "why": "同上:仅 stc-mg-* 新键触发 i18n-data.js covers,POS 条码复制面未动。"
+    }
+  },
   "scripts": {
     "_pos_vat_summary_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_vat_summary",

@@ -24,30 +24,40 @@ const REV_REST: Array<[string, string]> = [
     ['vat', 'drawer-lbl-vat'],
 ];
 
-// 对手方在哪一侧看方向:销项是买方,进项是卖方。此前写死 seller_*,销项票(回导来的、
-// 或税号判成 sales 的)于是"名称/税号空 + 需确认",看着像识别失败,其实数据在 buyer_*。
-function partyKeys(f: Dict): { name: string; tax: string; other: string } {
+// 对手方在哪一侧看方向:销项是买方,进项是卖方。此前写死 seller_*,销项票于是"名称/税号空 +
+// 需确认",看着像识别失败,其实数据在 buyer_*。标签随方向写清买卖双方(字段键 → exc-fld-*)。
+function partyKeys(f: Dict): { name: string; tax: string; other: string; otherTax: string } {
     return String(f.direction || '') === 'sales'
-        ? { name: 'buyer_name', tax: 'buyer_tax', other: 'seller_name' }
-        : { name: 'seller_name', tax: 'seller_tax', other: 'buyer_name' };
+        ? { name: 'buyer_name', tax: 'buyer_tax', other: 'seller_name', otherTax: 'seller_tax' }
+        : { name: 'seller_name', tax: 'seller_tax', other: 'buyer_name', otherTax: 'buyer_tax' };
+}
+function partyLabel(k: string): string {
+    return 'exc-fld-' + (k.endsWith('_tax') ? k.slice(0, -4) + '-tax' : k.slice(0, -5));
 }
 function revCore(f: Dict): Array<[string, string]> {
     const p = partyKeys(f);
-    return [[p.name, 'drawer-lbl-name'], [p.tax, 'drawer-lbl-tax'], ...REV_REST];
+    return [[p.name, partyLabel(p.name)], [p.tax, partyLabel(p.tax)], ...REV_REST];
 }
 function revMore(f: Dict): Array<[string, string]> {
+    const p = partyKeys(f);
     return [
         ['total_amount', 'drawer-lbl-total'],
-        [partyKeys(f).other, 'drawer-lbl-name'],
+        [p.other, partyLabel(p.other)],
+        [p.otherTax, partyLabel(p.otherTax)],
         ['wht_amount', 'drawer-lbl-wht-amount'],
     ];
 }
-
+// 散客票(销项 ABB 简化税票 / 收据)票面本无买方身份:买方税号空是常态,不当必填标「需确认」;
+// 完整税票 / 方向不明不享受此豁免,仍照旧要求当前方向税号。
+const ANON_BUYER_DOCS = new Set(['simplified_tax_invoice', 'receipt']);
+function isAnonBuyerDoc(f: Dict): boolean {
+    return f.direction === 'sales' && ANON_BUYER_DOCS.has(String(f.document_type || ''));
+}
 function warnFields(f: Dict): Set<string> {
     const s = new Set<string>();
-    ['invoice_number', partyKeys(f).tax, 'total_amount'].forEach((k) => {
-        if (!String(f[k] || '').trim()) s.add(k);
-    });
+    const req = ['invoice_number', 'total_amount'];
+    if (!isAnonBuyerDoc(f)) req.push(partyKeys(f).tax);
+    for (const k of req) if (!String(f[k] || '').trim()) s.add(k);
     return s;
 }
 function fileWarns(r: IvResult): number {
@@ -241,7 +251,11 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
         inv.total > 1
             ? esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))
             : '';
-    const headInner = label + fmtChip + convertChipHtml(inv.history_id);
+    const walkin =
+        isAnonBuyerDoc(inv.fields) && !inv.fields.buyer_name && !inv.fields.buyer_tax
+            ? `<span class="dx-badge blue">${esc(t('rev-walkin-badge'))}</span>`
+            : '';
+    const headInner = label + fmtChip + walkin + convertChipHtml(inv.history_id);
     const head = headInner ? `<div class="dx-inv-head">${headInner}</div>` : '';
     const cell = ([k, lk]: [string, string]) => {
         const warn = warns.has(k) ? ' warn' : '';

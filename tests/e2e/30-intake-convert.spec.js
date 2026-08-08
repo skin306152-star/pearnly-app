@@ -11,7 +11,7 @@
 //   ② 结果预览默认展开全部字段(2026-08-07 拍板删了「展开全部字段」按钮,不用点)
 //   ③ 识别记录页顶部「仅票据」范围条已整块删除(page-history.ts + hist-scope CSS + i18n)
 // ============================================================
-/* global window, document */
+/* global window, document, getComputedStyle */
 
 const path = require('path');
 const fs = require('fs');
@@ -64,6 +64,81 @@ const CONVERT_OK = {
     skipped: [],
 };
 
+// 销项 ABB 简化税票(Sister Makeup 散客):票面无买方身份,seller_* 全对、buyer_* 留空。
+// 修复前 warnFields 无条件要当前方向税号 → 空买方税号被标「需确认」,用户误以为识别失败。
+const RECOG_WALKIN = {
+    ok: true,
+    filename: 'abb-receipt.pdf',
+    page_count: 1,
+    history_id: 'h1',
+    history_ids: ['h1'],
+    invoice_count: 1,
+    confidence: 'high',
+    needs_review: false,
+    missed_invoice_warnings: [],
+    duplicate_warnings: [],
+    pages: [{ fields: {} }],
+    invoices: [
+        {
+            history_id: 'h1',
+            source_index: 1,
+            source_total: 1,
+            page_indices: [1],
+            fields: {
+                direction: 'sales',
+                document_type: 'simplified_tax_invoice',
+                seller_name: 'Sister Makeup',
+                seller_tax: '0105567178203',
+                invoice_number: 'ABB-0001',
+                date: '2026-08-08',
+                subtotal: '100',
+                vat: '7',
+                total_amount: '107',
+                buyer_name: '',
+                buyer_tax: '',
+                items: [{ name: 'Lipstick', qty: '1', price: '107' }],
+            },
+        },
+    ],
+};
+
+// 完整税票:散客豁免不该放松到它头上,买方税号缺失仍须标 warn。
+const RECOG_FULL_TAX = {
+    ok: true,
+    filename: 'full-tax-invoice.pdf',
+    page_count: 1,
+    history_id: 'h1',
+    history_ids: ['h1'],
+    invoice_count: 1,
+    confidence: 'high',
+    needs_review: false,
+    missed_invoice_warnings: [],
+    duplicate_warnings: [],
+    pages: [{ fields: {} }],
+    invoices: [
+        {
+            history_id: 'h1',
+            source_index: 1,
+            source_total: 1,
+            page_indices: [1],
+            fields: {
+                direction: 'sales',
+                document_type: 'tax_invoice',
+                seller_name: 'Sister Makeup',
+                seller_tax: '0105567178203',
+                invoice_number: 'TX-0002',
+                date: '2026-08-08',
+                subtotal: '100',
+                vat: '7',
+                total_amount: '107',
+                buyer_name: 'Walk-in Customer',
+                buyer_tax: '',
+                items: [{ name: 'Product', qty: '1', price: '107' }],
+            },
+        },
+    ],
+};
+
 const CONVERT_SKIPPED = {
     converted: [],
     skipped: [{ history_id: 'h1', reason: 'no_direction' }],
@@ -77,7 +152,7 @@ test.afterAll(() => localServer.stop(server));
 
 let convertCalls = [];
 
-async function stub(page, convertResult) {
+async function stub(page, convertResult, recogn) {
     convertCalls = [];
     await page.route('**/api/**', async (route) => {
         const req = route.request();
@@ -86,7 +161,7 @@ async function stub(page, convertResult) {
             return route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify(RECOG),
+                body: JSON.stringify(recogn || RECOG),
             });
         }
         if (u.includes('/api/ocr/convert-documents')) {
@@ -112,12 +187,12 @@ async function stub(page, convertResult) {
     });
 }
 
-async function boot(page, convertResult) {
+async function boot(page, convertResult, recogn) {
     await page.addInitScript(() => {
         localStorage.setItem('mrpilot_token', 'e2e-intake-convert-token');
         localStorage.setItem('mrpilot_lang', 'zh');
     });
-    await stub(page, convertResult);
+    await stub(page, convertResult, recogn);
     await page.goto(`${BASE}/home.html`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.routeTo === 'function', { timeout: 20000 });
     await page.evaluate(() => {
@@ -217,6 +292,69 @@ test.describe('OCR 确认 → 正式单据转换桥(前端接线 + UI 拍板)', 
         await expect(page.locator('#page-history .hist-scope-tag')).toHaveCount(0);
         await page.screenshot({
             path: path.join(OUT, '04-history-banner-removed.png'),
+            fullPage: true,
+        });
+    });
+
+    test('散客票(ABB/收据):空买方不再「需确认」+ 对手方税号展示 + 现金客户徽章', async ({
+        page,
+    }) => {
+        await boot(page, CONVERT_OK, RECOG_WALKIN);
+        await page.setInputFiles('#dx-inv-file', {
+            name: 'invoice.pdf',
+            mimeType: 'application/pdf',
+            buffer: Buffer.from('x'),
+        });
+        await page.waitForSelector('#dx-inv-start');
+        await page.click('#dx-inv-start');
+        await page.waitForSelector('#dx-s-inv-review.active', { timeout: 8000 });
+
+        // ① 无 warn 高亮格(ABB 散客票不把空买方标「需确认」)
+        await expect(page.locator('.dx-acc-item.open .dx-rv.warn')).toHaveCount(0);
+
+        // ④ 文件行状态不含「需确认」,应为已通过检查
+        const pill = page.locator('.dx-acc-row .dx-pill');
+        await expect(pill).toBeVisible();
+        expect(await pill.textContent()).not.toContain('需确认');
+        await expect(pill).toContainText('已通过检查');
+
+        // ② 头部散客徽章可见(getComputedStyle 确认 display 非 none)
+        const badge = page.locator('.dx-inv-head .dx-badge.blue');
+        await expect(badge).toHaveCount(1);
+        const badgeDisplay = await badge.evaluate((el) => getComputedStyle(el).display);
+        expect(badgeDisplay).not.toBe('none');
+
+        // ③ 展开区能见到对手方(卖方)税号真实值 + 卖方税号标签
+        const sellerTax = page.locator('.dx-acc-item.open input[data-iv-field$="seller_tax"]');
+        await expect(sellerTax).toHaveValue('0105567178203');
+        await expect(
+            page.locator('.dx-acc-item.open label', { hasText: '卖方税号' })
+        ).toBeVisible();
+        await page.screenshot({
+            path: path.join(OUT, '05-walkin-anon-buyer-badge.png'),
+            fullPage: true,
+        });
+    });
+
+    test('完整税票:买方税号缺失仍标 warn(散客豁免不放松)', async ({ page }) => {
+        await boot(page, CONVERT_OK, RECOG_FULL_TAX);
+        await page.setInputFiles('#dx-inv-file', {
+            name: 'invoice.pdf',
+            mimeType: 'application/pdf',
+            buffer: Buffer.from('x'),
+        });
+        await page.click('#dx-inv-start');
+        await page.waitForSelector('#dx-s-inv-review.active', { timeout: 8000 });
+
+        // 完整税票(document_type='tax_invoice')不在散客豁免内 → 买方税号格带 .warn
+        await expect(page.locator('.dx-acc-item.open .dx-rv.warn')).toHaveCount(1);
+        await expect(
+            page.locator('.dx-rv.warn:has(input[data-iv-field$="buyer_tax"])')
+        ).toHaveCount(1);
+        // 非散客票也不该出现现金客户徽章
+        await expect(page.locator('.dx-inv-head .dx-badge.blue')).toHaveCount(0);
+        await page.screenshot({
+            path: path.join(OUT, '06-full-tax-buyer-tax-still-warn.png'),
             fullPage: true,
         });
     });

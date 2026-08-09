@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from services.erp.mrerp_dms_models import (
@@ -43,6 +44,64 @@ def _bump_docno(docno: str) -> str:
     if not tail:
         return docno + "1"
     return head + str(int(tail) + 1).zfill(len(tail))
+
+
+# 订金支付渠道闭集 —— 未知渠道必须报错,不许静默丢。
+_PAYMENT_CHANNELS = ("cash", "transfer", "cheque", "cashier_cheque", "card", "other")
+
+# 每渠道在 DMS 订车单表单上的金额字段(真机勘察字段名)。
+_PAYMENT_MONEY_FIELD = {
+    "cash": "txtmoneycash",
+    "transfer": "txtmoneytfmon",
+    "cheque": "txtmoneycheque",
+    "cashier_cheque": "txtmoneycashiercq",
+    "card": "txtmoneycddbc",
+    "other": "txtmoneyother",
+}
+
+# 每渠道的文本 extra 槽位 → 表单字段;transfer 的 src/dst 为空或 "-" 时不写。
+_PAYMENT_TEXT_FIELD = {
+    "transfer": {"src": "txtaccountnumtffrom", "dst": "txtaccountnumtfmon"},
+    "cheque": {"ref": "txtchequeno"},
+    "cashier_cheque": {"ref": "txtcashiercqno"},
+    "card": {"ref": "txttypenamecddbc"},
+    "other": {"detail": "txtdetailother"},
+}
+
+
+def _payment_form_fields(payments: tuple) -> Dict[str, str]:
+    """聚合订金支付渠道 → DMS 表单字段(纯函数,可单测)。
+
+    同渠道多条:金额 Decimal 相加、文本 extra 用 " / " 连接。
+    空 payments 返回空 dict —— 调用方保留表单默认 txtearnestmoney="0.00"。
+    """
+    totals: Dict[str, Decimal] = {}
+    texts: Dict[str, Dict[str, List[str]]] = {}
+    for pay in payments:
+        channel = pay.get("channel")
+        if channel not in _PAYMENT_CHANNELS:
+            raise ValueError(f"unknown payment channel: {channel!r}")
+        amount = str(pay.get("amount") or "0").replace(",", "")
+        totals[channel] = totals.get(channel, Decimal("0")) + Decimal(amount)
+        extra = pay.get("extra") or {}
+        for slot, value in extra.items():
+            if slot in ("src", "dst", "ref", "detail") and value and value != "-":
+                texts.setdefault(channel, {}).setdefault(slot, []).append(str(value))
+
+    fields: Dict[str, str] = {}
+    grand_total = Decimal("0")
+    for channel in _PAYMENT_CHANNELS:  # 固定顺序,输出确定可断言
+        if channel not in totals:
+            continue
+        grand_total += totals[channel]
+        fields[_PAYMENT_MONEY_FIELD[channel]] = f"{totals[channel]:.2f}"
+        for slot, form_field in _PAYMENT_TEXT_FIELD.get(channel, {}).items():
+            values = texts.get(channel, {}).get(slot)
+            if values:
+                fields[form_field] = " / ".join(values)
+    if fields:
+        fields["txtearnestmoney"] = f"{grand_total:.2f}"
+    return fields
 
 
 class DMSClientOpsMixin:
@@ -103,9 +162,11 @@ class DMSClientOpsMixin:
                 "txtearnestmoney": "0.00",
                 "regisbehalfval": booking.regis_behalf.id,
                 "txtregisbehalf": booking.regis_behalf.name,
-                "txtregisname": card.full_name,
+                "txtregisname": booking.regis_name or card.full_name,
             }
         )
+        # 有订金渠道时覆盖上面的 0.00 默认与新增渠道字段;空 payments 则保持现状。
+        data.update(_payment_form_fields(booking.payments))
         self._apply_address_to_booking_form(data, card.address)
 
     def create_booking_via_form(

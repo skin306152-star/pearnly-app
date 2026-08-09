@@ -97,6 +97,11 @@ class DMSBookingPayload:
     branch: DMSMasterRef
     team: DMSMasterRef
     regis_behalf: DMSMasterRef
+    # 登记人姓名;空 = 沿用身份证姓名,保既有调用方行为不变
+    regis_name: str = ""
+    # 订金支付渠道明细,元素 {"channel", "amount", "extra"};由
+    # mrerp_dms_client_ops._payment_form_fields 聚合进表单,空 = 现状(订金 0.00)
+    payments: tuple = ()
 
 
 @dataclass(frozen=True)

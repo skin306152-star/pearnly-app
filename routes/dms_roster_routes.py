@@ -34,6 +34,7 @@ _ERR_STATUS = {
     "dms_roster.create_failed": 500,
     "dms_roster.endpoint_failed": 500,
     "dms_roster.bind_code_failed": 500,
+    "dms_roster.delete_failed": 500,
 }
 
 
@@ -99,6 +100,12 @@ async def set_operator_status(user_id: str, request: Request):
 async def issue_operator_bind_code(user_id: str, request: Request):
     owner = _require_owner(request)
     return _unwrap(roster.issue_bind_code(owner, user_id))
+
+
+@router.delete("/api/dms/operators/{user_id}")
+async def delete_operator(user_id: str, request: Request):
+    owner = _require_owner(request)
+    return _unwrap(roster.delete_operator(owner, user_id))
 
 
 @router.get("/api/dms/records")

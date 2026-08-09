@@ -117,6 +117,33 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+/* 08-08 表格对齐标准:表头居中于列;短内容(角色/LINE 状态/状态)居中,
+ * 长文本(操作员列·显示名+用户名)保持靠左。具体度足够,不被通用 th 规则压掉。 */
+.dms-op-row.head .dms-op-c {
+  text-align: center;
+}
+.dms-op-c.role,
+.dms-op-c.line,
+.dms-op-c.status {
+  text-align: center;
+}
+/* 删除按钮(danger 红):描边红 + hover 实心红,复用 --err 令牌(明/暗两态)。 */
+.dms-op-btn-danger {
+  color: var(--err);
+  border-color: var(--err);
+  background: transparent;
+}
+.dms-op-btn-danger:hover {
+  background: var(--err);
+  border-color: var(--err);
+  color: #fff;
+}
+.dms-op-del-body {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink2);
+}
 
 /* 弹层(绑定码大字 / 换密码)· 遮罩 + 卡片,复用 dms-line 大字码样式 */
 .dms-op-modal-host,

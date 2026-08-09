@@ -104,6 +104,45 @@ def delete_operator_records(*, tenant_id: str, user_id: str) -> None:
         )
 
 
+def delete_operator_profile(*, tenant_id: str, user_id: str) -> bool:
+    """删除操作员的档案行(删除流程已先清外围,此步只动档案)。"""
+    from core import db
+
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "DELETE FROM dms_operator_profiles WHERE tenant_id = %s AND user_id = %s",
+                (str(tenant_id), str(user_id)),
+            )
+            return cur.rowcount > 0
+
+    try:
+        return bool(_with_heal(_run))
+    except Exception as e:
+        logger.error(f"[dms_roster] delete_operator_profile failed: {e}")
+        return False
+
+
+def disable_operator_user(*, tenant_id: str, user_id: str) -> bool:
+    """删除操作员后置该 member 用户停用(is_active=false · 行保留:erp_push_logs 等外键+审计)。"""
+    from core import db
+
+    def _run():
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE users SET is_active = FALSE "
+                "WHERE id = %s AND tenant_id = %s AND role = 'member'",
+                (str(user_id), str(tenant_id)),
+            )
+            return cur.rowcount > 0
+
+    try:
+        return bool(_with_heal(_run))
+    except Exception as e:
+        logger.error(f"[dms_roster] disable_operator_user failed: {e}")
+        return False
+
+
 def get_profile(tenant_id: str, user_id: str) -> Optional[dict]:
     """取本租户内某档案行(路由校验 {user_id} 属本租户且有档案 · 防跨租户/防对 owner 自身操作)。"""
     from core import db

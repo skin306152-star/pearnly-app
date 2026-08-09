@@ -139,6 +139,11 @@
             esc(t('dms-op-act-pw')) +
             '</button>' +
             toggle +
+            '<button type="button" class="btn small dms-op-btn-danger" data-op-act="del" data-op-id="' +
+            esc(item.user_id) +
+            '">' +
+            esc(t('dms-op-act-delete')) +
+            '</button>' +
             '</div>'
         );
     }
@@ -236,8 +241,8 @@
             '</button></div></div></div>'
         );
     }
-    // 换 DMS 密码模态(体系内 · 非原生弹窗)。
-    function pwModal(name) {
+    // 换 DMS 账号模态(体系内 · 非原生弹窗):用户名/密码各改各 · 留空=不改。
+    function accModal(name) {
         return (
             '<div class="dms-op-modal" role="dialog" aria-modal="true"><div class="dms-op-modal-card">' +
             '<div class="dms-op-modal-h">' +
@@ -245,6 +250,10 @@
             '</div><div class="dms-op-modal-who">' +
             esc(name) +
             '</div><label class="dms-op-field"><span>' +
+            esc(t('dms-op-acc-user')) +
+            '</span><input type="text" id="dms-op-acc-user-input" class="dms-bill-input" autocomplete="username" placeholder="' +
+            esc(t('dms-op-acc-user-ph')) +
+            '"></label><label class="dms-op-field"><span>' +
             esc(t('dms-op-pw-new')) +
             '</span><input type="password" id="dms-op-pw-input" class="dms-bill-input" autocomplete="new-password" placeholder="' +
             esc(t('dms-op-pw-ph')) +
@@ -256,6 +265,23 @@
             '</button></div></div></div>'
         );
     }
+    // 删除操作员确认模态:标题 + 一句后果说明 + 取消/红键确认(全站 modal 范式)。
+    function deleteModal(name) {
+        return (
+            '<div class="dms-op-modal" role="dialog" aria-modal="true"><div class="dms-op-modal-card">' +
+            '<div class="dms-op-modal-h">' +
+            esc(t('dms-op-del-title')) +
+            '</div><div class="dms-op-modal-who">' +
+            esc(name) +
+            '</div><p class="dms-op-del-body" id="dms-op-del-body">' +
+            esc(t('dms-op-del-confirm')) +
+            '</p><div class="dms-op-modal-actions"><button type="button" class="btn" id="dms-op-del-cancel">' +
+            esc(t('dms-op-modal-cancel')) +
+            '</button><button type="button" class="btn dms-op-btn-danger" id="dms-op-del-confirm">' +
+            esc(t('dms-op-act-delete')) +
+            '</button></div></div></div>'
+        );
+    }
 
     root.DXROSTERHTML = {
         page: page,
@@ -264,6 +290,7 @@
         listCard: listCard,
         listEmpty: listEmpty,
         codeOverlay: codeOverlay,
-        pwModal: pwModal,
+        accModal: accModal,
+        deleteModal: deleteModal,
     };
 })(typeof self !== 'undefined' ? self : this);

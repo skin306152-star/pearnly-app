@@ -140,6 +140,9 @@
                     '/api/dms/operators/' + encodeURIComponent(userId) + '/bind-code'
                 );
             },
+            deleteOperator: function (userId) {
+                return call('DELETE', '/api/dms/operators/' + encodeURIComponent(userId));
+            },
             // 记录页 owner 视角:全租户 mrerp_dms 推送 + 操作员归属列(C6)。
             tenantRecords: function (limit) {
                 return call('GET', '/api/dms/records?limit=' + (limit || 100));

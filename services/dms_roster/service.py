@@ -193,6 +193,39 @@ def update_operator(
     return {"ok": True}
 
 
+def delete_operator(owner_user: dict, user_id: str) -> dict:
+    """删除操作员:解绑 LINE + 作废绑定码 + 禁 endpoint + 删档案 + 置用户停用(member 行保留)。
+
+    次序「先外围后档案」:LINE 解绑/作废码 → endpoint 软禁(不裸 DELETE:erp_push_logs 等外键
+    行 + 审计)——ep 不存在则跳过 → 删 dms_operator_profiles 行 → users.is_active=false(行保留)。
+    任一步失败如实返错不装成功(解绑失败即中止,绝不留「显示已删除、LINE 还能推单」的假删除)。"""
+    ctx = _require_profile(owner_user, user_id)
+    if not ctx:
+        return {"error": "dms_roster.not_found"}
+    tenant_id, _prof = ctx
+    uid = str(user_id)
+
+    from services.line_dms import store as line_dms_store
+
+    if not line_dms_store.unbind_by_user(uid):
+        return {"error": "dms_roster.delete_failed"}
+    if not line_dms_store.void_bind_codes_for_user(uid):
+        return {"error": "dms_roster.delete_failed"}
+
+    from core import db
+
+    ep = _dms_endpoint(user_id, enabled_only=False)
+    if ep and not db.update_erp_endpoint(uid, str(ep["id"]), enabled=False):
+        return {"error": "dms_roster.endpoint_update_failed"}
+
+    if not store.delete_operator_profile(tenant_id=tenant_id, user_id=uid):
+        return {"error": "dms_roster.delete_failed"}
+    if not store.disable_operator_user(tenant_id=tenant_id, user_id=uid):
+        return {"error": "dms_roster.delete_failed"}
+    logger.info(f"[dms_roster] delete operator user_id={uid} tenant_id={tenant_id}")
+    return {"ok": True}
+
+
 def set_status(owner_user: dict, user_id: str, status: str) -> dict:
     """停用=endpoint 禁 + 解绑 LINE + 作废未用绑定码;启用=endpoint 启(LINE 需重新发码绑)。
 

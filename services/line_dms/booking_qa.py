@@ -263,11 +263,9 @@ async def _on_pay_amount(tenant_id, line_user_id, qa, text, reply_token) -> None
     pending["amount"] = f"{amount:.2f}"
     shape = CHANNEL_EXTRA_SHAPE.get(pending.get("channel", ""))
     if shape == "src_dst":
-        qa["step"] = "pay_src"
-        next_step = "pay_src"
+        qa["step"] = next_step = "pay_src"
     elif shape in ("ref", "detail"):
-        qa["step"] = "pay_ref"
-        next_step = "pay_ref"
+        qa["step"] = next_step = "pay_ref"
     else:  # cash:金额即渠道完结
         complete_channel(qa)
         next_step = "pay_more"

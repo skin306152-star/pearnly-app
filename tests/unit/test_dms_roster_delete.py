@@ -55,7 +55,9 @@ class DeleteOperatorServiceTest(unittest.TestCase):
             mock.patch.object(service.store, "get_profile", return_value=dict(_PROF)),
             mock.patch("core.db.list_erp_endpoints", return_value=[dict(_EP)]),
             mock.patch("services.line_dms.store.unbind_by_user", return_value=True) as unbind,
-            mock.patch("services.line_dms.store.void_bind_codes_for_user", return_value=True) as void,
+            mock.patch(
+                "services.line_dms.store.void_bind_codes_for_user", return_value=True
+            ) as void,
             mock.patch("core.db.update_erp_endpoint", return_value=True) as up,
             mock.patch.object(service.store, "delete_operator_profile", return_value=True) as dp,
             mock.patch.object(service.store, "disable_operator_user", return_value=True) as du,

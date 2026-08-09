@@ -1,0 +1,498 @@
+# -*- coding: utf-8 -*-
+"""DMS LINE 订车逐问状态机(DL-7 · batch 1/3):聊天内 8 步逐问替代选车面板。
+
+会话态 "booking_qa"(TTL 见 store._STATE_TTL_MINUTES),payload["qa"] 存进度:
+step / endpoint_id / customer / files / answers / payments / pending_channel /
+audit。职责链:slip 凭证 → place → car_search → paint → date → term → regis →
+regis_name → pay_channel(可循环多渠道)→ preview(置 booking_review + 轮换 nonce,
+既有 booking_flow 的确认/取消直接接得上)。纯新增模块,接线在 batch 2。
+
+全局命令(เริ่มใหม่/เมนู)不由本模块吃:handle_* 先 commands.classify,命中即返 False
+让上层路由接管——防御性兜底,避免菜单词被当成本步的输入吞掉。金额一律 Decimal;
+每次用户输入(打字原文或按钮值)按序记 audit,供后续追单与对账。
+"""
+
+from __future__ import annotations
+
+import logging
+import secrets
+from datetime import date
+from typing import Any, Dict, List, Optional
+
+from services.erp import dms_id_ocr as _id_ocr
+from services.erp.mrerp_dms_client_base import to_be_date
+from services.line_binding import line_client
+from services.line_dms import commands, masters_cache, qa_cards, store
+from services.line_dms._out import _CHANNEL, _thr
+from services.line_dms.qa_util import (
+    car_label,
+    car_label_of,
+    complete_channel,
+    find_row,
+    norm,
+    norm_row,
+    parse_amount,
+    row_name,
+)
+
+logger = logging.getLogger(__name__)
+
+_STATE = "booking_qa"
+
+_CASH_WORD = "เงินสด"
+_SKIP_WORD = "-"
+_MAX_CAR_HITS = 10  # 车型命中超过 → 提示打得更具体
+_MAX_REGIS_NAME = 120
+
+
+# ── 入口 ───────────────────────────────────────────────────────────────────
+async def start(
+    tenant_id,
+    line_user_id,
+    endpoint_id,
+    customer_id,
+    customer_name,
+    id_card_mid,
+    reply_token=None,
+) -> None:
+    """客户档落定后开一局逐问:初始化 qa(step=slip)→ 发第 1 问。
+
+    身份证/OCR/客户档由既有 collecting 流程负责,本函数只从「档已落定」接手:
+    id_card_mid 只进 files 供预览附件行展示,不在此再识别。
+    """
+    qa = {
+        "step": "slip",
+        "endpoint_id": str(endpoint_id or ""),
+        "customer": {"id": str(customer_id or ""), "name": customer_name or ""},
+        "files": {"id_card_mid": id_card_mid or None, "slip_mid": None},
+        "answers": {},
+        "payments": [],
+        "pending_channel": {},
+        "audit": [],
+    }
+    await _thr(store.set_session, tenant_id, line_user_id, _STATE, {"qa": qa})
+    await send_step(tenant_id, line_user_id, qa, "slip", reply_token)
+
+
+# ── 每步发问(内部 · slip_after 复用) ─────────────────────────────────────
+async def send_step(tenant_id, line_user_id, qa, step, reply_token=None) -> None:
+    """按步发问。reply_token 有则 reply,无则 push(逐问可被 postback / 收料两种上下文调)。"""
+    if step in ("place", "paint", "term", "regis"):  # 这几个步发问前要取主档
+        msg = await _async_question(tenant_id, line_user_id, qa, step)
+    else:
+        msg = _question(step, qa)
+    _send(line_user_id, msg, reply_token)
+
+
+def _question(step, qa) -> Optional[Dict[str, Any]]:
+    """不依赖主档的步 → 纯 qa_cards 出消息。"""
+    channel = (qa.get("pending_channel") or {}).get("channel", "")
+    return {
+        "slip": qa_cards.ask_slip(),
+        "car_search": qa_cards.ask_car(),
+        "date": qa_cards.ask_date(date.today()),
+        "regis_name": qa_cards.ask_regis_name(),
+        "pay_channel": qa_cards.ask_pay_channel(),
+        "pay_amount": qa_cards.ask_amount(qa_cards.PAY_LABELS.get(channel, "")),
+        "pay_src": qa_cards.ask_pay_src(),
+        "pay_dst": qa_cards.ask_pay_dst(),
+        "pay_ref": qa_cards.ask_pay_ref(channel),
+        "pay_more": qa_cards.ask_more(),
+        "slip_after": qa_cards.need_slip(),
+    }.get(step)
+
+
+async def _async_question(tenant_id, line_user_id, qa, step) -> Optional[Dict[str, Any]]:
+    """依赖主档的步:取主档后出消息。"""
+    if step == "place":
+        return qa_cards.ask_place(await _masters(line_user_id, qa, "place_books"))
+    if step == "term":
+        return qa_cards.ask_term(await _masters(line_user_id, qa, "term_sales"))
+    if step == "regis":
+        return qa_cards.ask_regis(await _masters(line_user_id, qa, "regis_behalfs"))
+    if step == "paint":
+        return qa_cards.ask_paint(car_label_of(qa), await _paints(line_user_id, qa))
+    return None
+
+
+# ── webhook 入口 ───────────────────────────────────────────────────────────
+async def handle_text(tenant_id, line_user_id, text, reply_token) -> bool:
+    """state==booking_qa 时消费文本;全局命令与其它态一律返 False 让上层接管。"""
+    if commands.classify(text):
+        return False
+    qa = await _qa(tenant_id, line_user_id)
+    if qa is None:
+        return False
+    step = qa.get("step") or ""
+    await _audit(tenant_id, line_user_id, qa, step, text)
+    handler = _TEXT_HANDLERS.get(step, _reask)
+    await handler(tenant_id, line_user_id, qa, text, reply_token)
+    return True
+
+
+async def handle_image(tenant_id, line_user_id, message_id, reply_token) -> bool:
+    """slip / slip_after 步收凭证图;其它步与其它态返 False(图片不是它们要的输入)。"""
+    qa = await _qa(tenant_id, line_user_id)
+    if qa is None:
+        return False
+    step = qa.get("step") or ""
+    if step not in ("slip", "slip_after"):
+        return False
+    await _audit(tenant_id, line_user_id, qa, step, f"image:{message_id}")
+    qa["files"]["slip_mid"] = message_id
+    if step == "slip":
+        qa["step"] = "place"
+        await _persist(tenant_id, line_user_id, qa)
+        await send_step(tenant_id, line_user_id, qa, "place", reply_token)
+    else:
+        await _persist(tenant_id, line_user_id, qa)
+        await _to_preview(tenant_id, line_user_id, qa, reply_token)
+    return True
+
+
+_POSTBACK_ACTIONS = {
+    "place": "place",
+    "car_search": "car",
+    "paint": "paint",
+    "date": "date",
+    "term": "term",
+    "regis": "regis",
+    "regis_name": "regisname",
+    "pay_channel": "pay",
+    "pay_more": "more",
+}
+
+
+async def handle_postback(tenant_id, line_user_id, data, params, reply_token) -> bool:
+    """处理所有 "qa:" 前缀 postback;datetimepicker 的 params 携带所选日期。"""
+    qa = await _qa(tenant_id, line_user_id)
+    if qa is None or not (data or "").startswith("qa:"):
+        return False
+    parts = (data or "").split(":")
+    action = parts[1] if len(parts) > 1 else ""
+    value = ":".join(parts[2:])
+    step = qa.get("step") or ""
+    await _audit(tenant_id, line_user_id, qa, step, data)
+    # 旧卡残留 / 串步按钮:吃下不推进状态,原步重问(避免翻历史卡误跳步)。
+    if action != _POSTBACK_ACTIONS.get(step):
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return True
+    if action in _MASTER_PICKS:  # place / term / regis 同一通用单选
+        key, ans, nxt = _MASTER_PICKS[action]
+        await _pick_master(tenant_id, line_user_id, qa, key, ans, value, nxt, reply_token)
+    elif action == "car":
+        await _pick_car(tenant_id, line_user_id, qa, value, reply_token)
+    elif action == "paint":
+        await _pick_paint(tenant_id, line_user_id, qa, value, reply_token)
+    elif action == "date":
+        await _pick_date(tenant_id, line_user_id, qa, params, reply_token)
+    elif action == "regisname":
+        await _pick_regis_name(tenant_id, line_user_id, qa, reply_token)
+    elif action == "pay":
+        await _pick_channel(tenant_id, line_user_id, qa, value, reply_token)
+    elif action == "more":
+        await _pick_more(tenant_id, line_user_id, qa, value, reply_token)
+    return True
+
+
+_MASTER_PICKS = {
+    "place": ("place_books", "place", "car_search"),
+    "term": ("term_sales", "term", "regis"),
+    "regis": ("regis_behalfs", "regis", "regis_name"),
+}
+
+
+# ── 文本步 ─────────────────────────────────────────────────────────────────
+async def _on_slip(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    if text.strip() == _CASH_WORD:
+        qa["step"] = "place"  # 现金声明 → 无凭证图,slip_mid 保持空
+        await _persist(tenant_id, line_user_id, qa)
+        await send_step(tenant_id, line_user_id, qa, "place", reply_token)
+        return
+    _send(line_user_id, qa_cards.slip_only_image(), reply_token)
+
+
+async def _on_car_search(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    rows = await _masters(line_user_id, qa, "cars")
+    needle = norm(text)
+    hits = [r for r in rows if needle and needle in norm_row(r)]
+    if not hits:
+        _send(line_user_id, qa_cards.car_none(), reply_token)
+    elif len(hits) > _MAX_CAR_HITS:
+        _send(line_user_id, qa_cards.car_many(len(hits)), reply_token)
+    else:
+        _send(line_user_id, qa_cards.car_results(hits, len(hits)), reply_token)
+
+
+async def _on_paint(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    paints = await _paints(line_user_id, qa)
+    needle = norm(text)
+    hits = [r for r in paints if needle and needle in norm_row(r)]
+    if len(hits) == 1:
+        await _commit_paint(tenant_id, line_user_id, qa, hits[0], reply_token)
+    else:
+        # 0 命中(重列全部)/ 多命中(列命中项)都回颜色按钮,不推进状态。
+        _send(line_user_id, qa_cards.ask_paint(car_label_of(qa), hits or paints), reply_token)
+
+
+async def _on_date(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    # 交车日只认 datetimepicker;打字无法解析 → 重发选择器(不推进状态)。
+    await send_step(tenant_id, line_user_id, qa, "date", reply_token)
+
+
+async def _on_regis_name(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    name = text.strip()
+    if not name or len(name) > _MAX_REGIS_NAME:
+        await send_step(tenant_id, line_user_id, qa, "regis_name", reply_token)
+        return
+    qa["answers"]["regis_name"] = name
+    qa["step"] = "pay_channel"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "pay_channel", reply_token)
+
+
+async def _on_pay_amount(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    amount = parse_amount(text)
+    if amount is None:
+        _send(line_user_id, qa_cards.bad_amount(), reply_token)
+        return
+    pending = qa["pending_channel"]
+    pending["amount"] = f"{amount:.2f}"
+    channel = pending.get("channel", "")
+    if channel == "transfer":
+        qa["step"] = "pay_src"
+        next_step = "pay_src"
+    elif channel in ("cheque", "cashier_cheque", "card", "other"):
+        qa["step"] = "pay_ref"
+        next_step = "pay_ref"
+    else:  # cash:金额即渠道完结
+        complete_channel(qa)
+        next_step = "pay_more"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, next_step, reply_token)
+
+
+async def _on_pay_src(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    extra = qa["pending_channel"].setdefault("extra", {})
+    extra["src"] = "" if text.strip() == _SKIP_WORD else text.strip()
+    qa["step"] = "pay_dst"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "pay_dst", reply_token)
+
+
+async def _on_pay_dst(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    extra = qa["pending_channel"].setdefault("extra", {})
+    extra["dst"] = "" if text.strip() == _SKIP_WORD else text.strip()
+    complete_channel(qa)
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
+
+
+async def _on_pay_ref(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    pending = qa["pending_channel"]
+    extra = pending.setdefault("extra", {})
+    if pending.get("channel") == "other":
+        extra["detail"] = text.strip()
+    else:
+        extra["ref"] = text.strip()
+    complete_channel(qa)
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
+
+
+async def _on_slip_after(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    # 用户已声明有转账渠道:打 เงินสด 也不放行,必须先送凭证图才能看总结。
+    _send(line_user_id, qa_cards.need_slip(), reply_token)
+
+
+async def _reask(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    """按钮步收到打字 / 串步按钮 → 原步重问,不推进状态(audit 已在入口记过)。"""
+    await send_step(tenant_id, line_user_id, qa, qa.get("step") or "", reply_token)
+
+
+_TEXT_HANDLERS = {
+    "slip": _on_slip,
+    "place": _reask,
+    "car_search": _on_car_search,
+    "paint": _on_paint,
+    "date": _on_date,
+    "term": _reask,
+    "regis": _reask,
+    "regis_name": _on_regis_name,
+    "pay_channel": _reask,
+    "pay_amount": _on_pay_amount,
+    "pay_src": _on_pay_src,
+    "pay_dst": _on_pay_dst,
+    "pay_ref": _on_pay_ref,
+    "pay_more": _reask,
+    "slip_after": _on_slip_after,
+}
+
+
+# ── postback 步 ────────────────────────────────────────────────────────────
+async def _pick_master(
+    tenant_id,
+    line_user_id,
+    qa,
+    masters_key,
+    answer_key,
+    value,
+    next_step,
+    reply_token,
+) -> None:
+    """通用主档单选:id → 存 answers.<key>={"id","name"} → 进下一步。"""
+    row = find_row(await _masters(line_user_id, qa, masters_key), value)
+    if row is None:
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
+    qa["answers"][answer_key] = {"id": str(row[0]), "name": row_name(row)}
+    qa["step"] = next_step
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, next_step, reply_token)
+
+
+async def _pick_car(tenant_id, line_user_id, qa, value, reply_token) -> None:
+    row = find_row(await _masters(line_user_id, qa, "cars"), value)
+    if row is None:
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
+    qa["answers"]["car"] = {"id": str(row[0]), "label": car_label(row)}
+    qa["step"] = "paint"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "paint", reply_token)
+
+
+async def _pick_paint(tenant_id, line_user_id, qa, value, reply_token) -> None:
+    row = find_row(await _paints(line_user_id, qa), value)
+    if row is None:
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
+    await _commit_paint(tenant_id, line_user_id, qa, row, reply_token)
+
+
+async def _commit_paint(tenant_id, line_user_id, qa, row, reply_token) -> None:
+    qa["answers"]["paint"] = {"id": str(row[0]), "name": row_name(row)}
+    qa["step"] = "date"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "date", reply_token)
+
+
+async def _pick_date(tenant_id, line_user_id, qa, params, reply_token) -> None:
+    picked = (params or {}).get("date") or ""
+    try:
+        delivery = date.fromisoformat(picked)
+    except ValueError:
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
+    qa["answers"]["delivery_date_be"] = to_be_date(delivery)  # 公历 ISO → 佛历 dd/mm/yyyy
+    qa["step"] = "term"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "term", reply_token)
+
+
+async def _pick_regis_name(tenant_id, line_user_id, qa, reply_token) -> None:
+    qa["answers"]["regis_name"] = str((qa.get("customer") or {}).get("name") or "")
+    qa["step"] = "pay_channel"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "pay_channel", reply_token)
+
+
+async def _pick_channel(tenant_id, line_user_id, qa, value, reply_token) -> None:
+    if value not in qa_cards.PAY_LABELS:
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
+    qa["pending_channel"] = {"channel": value}
+    qa["step"] = "pay_amount"
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "pay_amount", reply_token)
+
+
+async def _pick_more(tenant_id, line_user_id, qa, value, reply_token) -> None:
+    if value == "add":
+        qa["step"] = "pay_channel"  # 回渠道选择,同渠道可重复选(金额各记一条)
+        await _persist(tenant_id, line_user_id, qa)
+        await send_step(tenant_id, line_user_id, qa, "pay_channel", reply_token)
+        return
+    if value != "done":
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
+    has_transfer = "transfer" in {p.get("channel") for p in qa.get("payments") or []}
+    if has_transfer and not (qa.get("files") or {}).get("slip_mid"):
+        qa["step"] = "slip_after"  # 声明过转账却没凭证 → 先补要,不能放行看总结
+        await _persist(tenant_id, line_user_id, qa)
+        await send_step(tenant_id, line_user_id, qa, "slip_after", reply_token)
+        return
+    await _to_preview(tenant_id, line_user_id, qa, reply_token)
+
+
+async def _to_preview(tenant_id, line_user_id, qa, reply_token) -> None:
+    """逐问收官:置 booking_review(完整 qa + 轮换 nonce)→ 发预览卡。
+
+    轮换 nonce 照 dms_pick_routes.submit 的写法:旧按钮的 postback 从此 mismatch,
+    确认/取消仍由既有 booking_flow 处理(consume_nonce 守卫)。
+    """
+    sess = await _thr(store.get_session, tenant_id, line_user_id)
+    payload = (sess or {}).get("payload") or {}
+    nonce = secrets.token_hex(8)
+    await _thr(
+        store.set_session,
+        tenant_id,
+        line_user_id,
+        "booking_review",
+        {**payload, "qa": qa, "nonce": nonce},
+    )
+    _send(line_user_id, qa_cards.preview_card(qa, nonce), reply_token)
+
+
+# ── 会话 / 主档 / 出口小工具 ───────────────────────────────────────────────
+async def _qa(tenant_id, line_user_id) -> Optional[Dict[str, Any]]:
+    """读当前 qa;非 booking_qa 态 / 缺 step(会话损坏)→ None(交上层)。"""
+    sess = await _thr(store.get_session, tenant_id, line_user_id)
+    if not sess or sess.get("state") != _STATE:
+        return None
+    qa = (sess.get("payload") or {}).get("qa") or {}
+    return qa if qa.get("step") else None
+
+
+async def _audit(tenant_id, line_user_id, qa, step, value) -> None:
+    qa.setdefault("audit", []).append({"step": step, "input": value})
+    await _persist(tenant_id, line_user_id, qa)
+
+
+async def _persist(tenant_id, line_user_id, qa) -> None:
+    await _thr(store.set_session, tenant_id, line_user_id, _STATE, {"qa": qa})
+
+
+def _send(line_user_id, msg, reply_token=None) -> None:
+    """出口:quickReply / Flex 卡结构必须走 reply_messages|push_messages(带消息 dict)。"""
+    if msg is None:
+        return
+    if reply_token:
+        line_client.reply_messages(reply_token, [msg], channel=_CHANNEL)
+    else:
+        line_client.push_messages(line_user_id, [msg], channel=_CHANNEL)
+
+
+async def _resolve_ep(line_user_id, qa) -> Optional[Dict[str, Any]]:
+    """按绑定 user 解析 DMS 端点。会话里只存 endpoint_id 不存 config,主档取数前现解。"""
+    binding = await _thr(store.get_binding_by_line_user, line_user_id)
+    uid = (binding or {}).get("user_id") or ""
+    if not uid:
+        return None
+    return await _thr(_id_ocr.resolve_dms_endpoint, uid, qa.get("endpoint_id"))
+
+
+async def _masters(line_user_id, qa, key) -> List[list]:
+    ep = await _resolve_ep(line_user_id, qa)
+    if not ep:
+        return []
+    masters = await _thr(masters_cache.get_masters, ep)
+    return masters.get(key) or []
+
+
+async def _paints(line_user_id, qa) -> List[list]:
+    ep = await _resolve_ep(line_user_id, qa)
+    car_id = str((qa.get("answers") or {}).get("car", {}).get("id") or "")
+    if not ep or not car_id:
+        return []
+    return (await _thr(masters_cache.get_paints, ep, car_id)) or []

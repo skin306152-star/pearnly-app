@@ -326,7 +326,7 @@ DEFAULT_TTL_MINUTES = 30
 # 会话寿命是状态的属性,不是调用点的参数。待选车/待确认订车这两个态里客户档已经落定,
 # 会话是重签选车链接的唯一凭据 —— 它先于 15 分钟的面板 token 断掉,重发入口就等于不存在,
 # 用户只剩重拍身份证一条路(真扣一次 OCR 费)。写在表里,免得哪个写会话的调用点漏传。
-_STATE_TTL_MINUTES = {"picking": 120, "booking_review": 120}
+_STATE_TTL_MINUTES = {"picking": 120, "booking_review": 120, "booking_qa": 120}
 
 
 def state_ttl_minutes(state: str) -> int:

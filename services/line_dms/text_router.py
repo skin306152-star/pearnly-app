@@ -13,7 +13,16 @@ from __future__ import annotations
 from typing import Optional
 
 from services.line_binding import line_client
-from services.line_dms import cards, commands, edit_flow, menu_cards, menu_flow, pick_resume, store
+from services.line_dms import (
+    booking_qa,
+    cards,
+    commands,
+    edit_flow,
+    menu_cards,
+    menu_flow,
+    qa_cards,
+    store,
+)
 from services.line_dms._out import _CHANNEL, _reply, _thr
 
 
@@ -30,8 +39,7 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
     state = (sess or {}).get("state")
 
     if cmd in (commands.CMD_MENU, commands.CMD_GREETING):
-        if pick_resume.reply_if_pending(reply_token, sess, with_menu=True):
-            return
+        # 菜单命令覆盖任何进行中会话(含逐问):会话被覆写 = 放弃,与 เริ่มใหม่ 同语义。
         if state == "editing":
             # 编辑被菜单打断:就地结束编辑(半截新值作废、已收料留着),不把 editing 带进菜单。
             sess = {"payload": edit_flow.exit_editing(sess)}
@@ -44,9 +52,13 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
         await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
         return
 
-    # 待选车态(picking/booking_review):档已落定,文本一律不进下面任何会覆写会话的路
-    # ——一次覆写就废掉手上那条选车链接,而重来要重拍身份证、真扣一次 OCR 费。
-    if pick_resume.reply_if_pending(reply_token, sess):
+    # 逐问/确认态先于一切文本路(尤其「含数字→手机号」):金额/单字被吃成号码就废一次会话。
+    # booking_review 态文本只提醒点确认/丢弃,不覆写会话(确认/取消是 postback 专属)。
+    if state == "booking_qa":
+        if await booking_qa.handle_text(binding["tenant_id"], line_user_id, text, reply_token):
+            return
+    if state == "booking_review":
+        _reply(reply_token, qa_cards.TXT_CONFIRM_ABOVE)
         return
 
     # menu 态的单字 1/2 = 点对应菜单项;其余数字文本(手机号)不被吃成菜单。
@@ -71,7 +83,11 @@ async def _capture_phone(
     from services.line_dms import flow  # 延迟导入避免 flow ↔ text_router 环依赖
 
     payload = await flow._merge_session(
-        binding, line_user_id, {"phone": text}, keep=("id_card", "endpoint_id", "mode"), sess=sess
+        binding,
+        line_user_id,
+        {"phone": text},
+        keep=("id_card", "id_card_mid", "endpoint_id", "mode"),
+        sess=sess,
     )
     if not payload.get("id_card"):
         _reply(reply_token, cards.TXT_ASK_CARD)
@@ -86,8 +102,8 @@ async def _capture_phone(
 def _nudge(sess: dict) -> str:
     """按当前收料进度给下一步提示(无会话由调用方弹菜单卡引路,不进这里)。
 
-    只管「还缺材料」的态:picking/booking_review 已由上面的 pick_resume 分支接管,
-    落不到这里——已建档的用户再听见「请发身份证和手机号」就是要人重付一次 OCR。
+    只管「还缺材料」的态:booking_qa/booking_review 已由上面的分支接管,落不到这里——
+    已建档的用户再听见「请发身份证和手机号」就是要人重付一次 OCR。
     """
     if sess.get("state") == "reviewing":
         return cards.TXT_PICK_ABOVE

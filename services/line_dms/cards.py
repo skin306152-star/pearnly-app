@@ -98,11 +98,9 @@ ACT_MENU_CUSTOMER = "menu_customer"
 ACT_MENU_BOOKING = "menu_booking"
 ACT_CONTINUE_BOOKING = "continue_booking"
 ACT_RETAKE = "retake"
-# 订车阶段(DL-4a):选车面板落定后的预览确认(booking_flow 侧 dispatch)。
+# 订车阶段(DL-4a):预览确认 / 取消(booking_flow 侧 dispatch · 逐问预览卡在 qa_cards)。
 ACT_CONFIRM_BOOKING = "confirm_booking"
 ACT_CANCEL_BOOKING = "cancel_booking"
-# 选车链接过期/失效后的重发(P1-12 · pick_resume 侧 dispatch,带 cid 对齐防串档)。
-ACT_REISSUE_PICK = "reissue_pick"
 # 改写审批流(波4):销售提审(带 nonce)→ 选审批人 → 管理员批/拒 → 销售可改派。
 ACT_SUBMIT_APPROVAL = "approval_submit"
 ACT_APPROVAL_TARGET = "approval_target"
@@ -111,25 +109,10 @@ ACT_APPROVAL_REJECT = "approval_reject"
 ACT_APPROVAL_RETARGET = "approval_retarget"
 
 # 订车阶段文案与按钮(DL-4a)
-BTN_PICK_CAR = "เลือกรถ (จองรถ)"
 BTN_CONFIRM_BOOKING = "ยืนยันจอง"
 BTN_CANCEL_BOOKING = "ยกเลิก"
-TXT_PICK_INTRO = "บันทึกข้อมูลลูกค้าเรียบร้อย ต้องการเปิดใบจองรถให้ลูกค้าท่านนี้หรือไม่ กดปุ่มด้านล่างเพื่อเลือกรถ"
-TXT_BOOKING_CANCELLED = "ยกเลิกการจองแล้ว"
+TXT_BOOKING_CANCELLED = "ทิ้งรายการแล้ว ไม่มีข้อมูลถูกบันทึก · พิมพ์ เมนู เพื่อเริ่มใหม่"
 TXT_BOOKING_FAIL = "สร้างใบจองไม่สำเร็จ กรุณาลองใหม่"
-
-# 选车链接重发(P1-12):链接 15 分钟就过期,客户档却早已落定 —— 重发只需重签 token,
-# 说清「不必再拍身份证」是钱的问题:重拍一次就真扣一次 OCR 费。
-BTN_REISSUE_PICK = "ขอลิงก์เลือกรถใหม่"
-TXT_PICK_PENDING_TITLE = "รายการจองยังไม่เสร็จ"
-TXT_PICK_PENDING = (
-    "บันทึกข้อมูลลูกค้าเรียบร้อยแล้ว เหลือเพียงขั้นตอนเลือกรถ "
-    "กดปุ่มด้านล่างเพื่อรับลิงก์เลือกรถใหม่ ไม่ต้องถ่ายบัตรประชาชนซ้ำ"
-)
-TXT_PICK_UNAVAILABLE = "เปิดลิงก์เลือกรถไม่สำเร็จ พิมพ์ เมนู เพื่อทำรายการใหม่อีกครั้ง"
-# 从待选车态进菜单 = 用户主动放弃那张未完成的订车单(会话被覆写,选车链接随即失效)。
-# 不拦他,但不说一声就是静默丢单。
-TXT_PICK_ABANDONED = "ยกเลิกรายการจองที่ค้างอยู่แล้ว"
 
 FIELD_LABELS_TH: Dict[str, str] = {
     "prefix_id": "คำนำหน้า",
@@ -369,62 +352,6 @@ def receipt_text(customer_id: str, name: str, mode: str) -> str:
 
 
 # ── 订车阶段(DL-4a) ────────────────────────────────────────────────────
-def pick_button_message(pick_url: str) -> Dict[str, Any]:
-    """客户档落定后推的选车入口:URI 按钮跳车辆选择面板(带签名 token)。"""
-    return {
-        "type": "flex",
-        "altText": BTN_PICK_CAR,
-        "contents": {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "sm",
-                "contents": [{"type": "text", "text": TXT_PICK_INTRO, "size": "sm", "wrap": True}],
-            },
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "button",
-                        "style": "primary",
-                        "height": "sm",
-                        "action": {"type": "uri", "label": BTN_PICK_CAR, "uri": pick_url},
-                    }
-                ],
-            },
-        },
-    }
-
-
-def pick_resume_card(customer_id: str) -> Dict[str, Any]:
-    """待选车态收到文本时的重发卡:说清「档已存,只差选车」+ 一键重签链接。
-
-    cid 进 postback 供对齐会话客户号(翻聊天记录点旧卡串不到别人的档)。"""
-    rows = [{"type": "text", "text": TXT_PICK_PENDING, "size": "sm", "wrap": True}]
-    footer = [_btn(BTN_REISSUE_PICK, _data(ACT_REISSUE_PICK, cid=customer_id), "primary")]
-    return _bubble(TXT_PICK_PENDING_TITLE, rows, footer, BTN_REISSUE_PICK)
-
-
-def booking_review_card(preview: Dict[str, str], nonce: str) -> Dict[str, Any]:
-    """选车提交后的订车预览:客户五要素 + 车型/颜色/价格/顾问/交车日 + [ยืนยันจอง][ยกเลิก]。"""
-    rows = [
-        _kv_row("ลูกค้า", preview.get("customer_name", "")),
-        _kv_row("เลขบัตร", preview.get("people_id", "")),
-        _kv_row("รุ่นรถ", preview.get("car", "")),
-        _kv_row("สี", preview.get("paint", "")),
-        _kv_row("ราคา", preview.get("price", "")),
-        _kv_row("ที่ปรึกษา", preview.get("advisor", "")),
-        _kv_row("วันที่ส่งมอบ", preview.get("delivery_date_be", "")),
-    ]
-    footer = [
-        _btn(BTN_CONFIRM_BOOKING, _data(ACT_CONFIRM_BOOKING, nonce=nonce), "primary"),
-        _btn(BTN_CANCEL_BOOKING, _data(ACT_CANCEL_BOOKING), "secondary"),
-    ]
-    return _bubble("ยืนยันการจองรถ", rows, footer, "ยืนยันการจองรถ")
-
-
 def booking_receipt_text(booking_no: str, car: str, delivery_date_be: str) -> str:
     """订车成功回执:BK 单号 + 车型 + 交车日。"""
     return (

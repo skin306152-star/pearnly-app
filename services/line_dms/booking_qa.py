@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
-"""DMS LINE 订车逐问状态机(DL-7 · batch 1/3):聊天内 8 步逐问替代选车面板。
+"""DMS LINE 订车逐问状态机(DL-7):聊天内 8 步逐问替代选车面板。
 
-会话态 "booking_qa"(TTL 见 store._STATE_TTL_MINUTES),payload["qa"] 存进度:
-step / endpoint_id / customer / files / answers / payments / pending_channel /
-audit。职责链:slip 凭证 → place → car_search → paint → date → term → regis →
-regis_name → pay_channel(可循环多渠道)→ preview(置 booking_review + 轮换 nonce,
-既有 booking_flow 的确认/取消直接接得上)。纯新增模块,接线在 batch 2。
+会话态 "booking_qa"(TTL 见 store._STATE_TTL_MINUTES),payload["qa"] 存进度:step /
+endpoint_id / customer / draft / user_id / files / answers / payments / pending_channel /
+audit。职责链:slip 凭证 → place → car_search → paint → date → term → regis → regis_name →
+pay_channel(可循环多渠道)→ preview(置 booking_review + 轮换 nonce,既有 booking_flow
+的确认/取消直接接得上)。
 
-全局命令(เริ่มใหม่/เมนู)不由本模块吃:handle_* 先 commands.classify,命中即返 False
-让上层路由接管——防御性兜底,避免菜单词被当成本步的输入吞掉。金额一律 Decimal;
-每次用户输入(打字原文或按钮值)按序记 audit,供后续追单与对账。
+全局命令(เริ่มใหม่/เมนู)不由本模块吃:handle_* 先 commands.classify,命中即返 False,交上层路由接管。金额一律 Decimal;每次用户输入按序记 audit 供追单对账。
 """
 
 from __future__ import annotations
@@ -54,16 +52,20 @@ async def start(
     customer_name,
     id_card_mid,
     reply_token=None,
+    draft=None,
+    user_id="",
 ) -> None:
     """客户档落定后开一局逐问:初始化 qa(step=slip)→ 发第 1 问。
 
     身份证/OCR/客户档由既有 collecting 流程负责,本函数只从「档已落定」接手:
-    id_card_mid 只进 files 供预览附件行展示,不在此再识别。
+    id_card_mid 只进 files;draft 与 user_id 原样进 qa,建单执行器从 payload["qa"] 读取。
     """
     qa = {
         "step": "slip",
         "endpoint_id": str(endpoint_id or ""),
         "customer": {"id": str(customer_id or ""), "name": customer_name or ""},
+        "draft": dict(draft or {}),
+        "user_id": str(user_id or ""),
         "files": {"id_card_mid": id_card_mid or None, "slip_mid": None},
         "answers": {},
         "payments": [],
@@ -428,7 +430,7 @@ async def _pick_more(tenant_id, line_user_id, qa, value, reply_token) -> None:
 async def _to_preview(tenant_id, line_user_id, qa, reply_token) -> None:
     """逐问收官:置 booking_review(完整 qa + 轮换 nonce)→ 发预览卡。
 
-    轮换 nonce 照 dms_pick_routes.submit 的写法:旧按钮的 postback 从此 mismatch,
+    轮换 nonce 照预览卡约定:旧按钮的 postback 从此 mismatch,
     确认/取消仍由既有 booking_flow 处理(consume_nonce 守卫)。
     """
     sess = await _thr(store.get_session, tenant_id, line_user_id)
@@ -464,7 +466,7 @@ async def _persist(tenant_id, line_user_id, qa) -> None:
 
 
 def _send(line_user_id, msg, reply_token=None) -> None:
-    """出口:quickReply / Flex 卡结构必须走 reply_messages|push_messages(带消息 dict)。"""
+    """出口:quickReply/Flex 结构必须走 reply_messages|push_messages(带消息 dict)。"""
     if msg is None:
         return
     if reply_token:

@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.line_binding import line_client
-from services.line_dms import booking_flow, cards, menu_cards, pick_resume, store
+from services.line_dms import booking_qa, cards, menu_cards, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 MENU_ACTIONS = frozenset(
@@ -33,8 +33,9 @@ MENU_ACTIONS = frozenset(
 # flow 出卡分流与本文件落档分流都引用它,别再散写裸字符串比较。
 MODE_CUSTOMER = "customer"
 _MENU_CHOICES = {"1": cards.ACT_MENU_CUSTOMER, "2": cards.ACT_MENU_BOOKING}
-# 弹菜单/切模式时保留的已收料:重复进菜单不丢已拍的卡/已输的号。
-_KEEP_KEYS = ("id_card", "phone", "endpoint_id", "mode")
+# 弹菜单/切模式时保留的已收料:重复进菜单不丢已拍的卡/已输的号;id_card_mid 是
+# 订车逐问的身份证附件源,同样保留(客户档落定后 booking_qa.start 要挂附件)。
+_KEEP_KEYS = ("id_card", "id_card_mid", "phone", "endpoint_id", "mode")
 
 
 # ── text:弹菜单 / menu 态下的单字 1|2 ───────────────────────────────────────
@@ -96,13 +97,13 @@ async def _choose(
 ) -> None:
     """选中菜单项:给会话打 mode 回 collecting;齐料直接查重,缺料按缺项提示补料。
 
-    从待选车态点进来 = 放弃那张未完成的订车单(会话被覆写,手上那条选车链接随即失效)。
-    这是用户的选择,不拦;但必须说一声——不说就是静默丢单。
+    有进行中逐问/待确认订车也照常进菜单(会话被覆写 = 放弃,与 เริ่มใหม่ 同语义,不拦)。
     """
-    abandoned = pick_resume.is_pending(sess)
     mode = MODE_CUSTOMER if action == cards.ACT_MENU_CUSTOMER else "booking"
     old = (sess or {}).get("payload") or {}
-    payload = {k: old.get(k) for k in ("id_card", "phone", "endpoint_id") if old.get(k)}
+    payload = {
+        k: old.get(k) for k in ("id_card", "id_card_mid", "phone", "endpoint_id") if old.get(k)
+    }
     payload["mode"] = mode
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "collecting", payload)
 
@@ -110,8 +111,6 @@ async def _choose(
     if id_card and phone:
         from services.line_dms import flow  # 延迟导入避免 flow ↔ menu_flow 环依赖
 
-        if abandoned:
-            _reply(reply_token, cards.TXT_PICK_ABANDONED)
         flow._spawn(
             flow._run_dedup(binding, line_user_id, None, id_card, phone, payload.get("endpoint_id"))
         )
@@ -122,25 +121,27 @@ async def _choose(
         tail = cards.TXT_ASK_CARD
     else:
         tail = cards.TXT_MENU_SEND_CARD
-    _reply(reply_token, f"{cards.TXT_PICK_ABANDONED}\n{tail}" if abandoned else tail)
+    _reply(reply_token, tail)
 
 
 async def _continue_booking(
     binding: dict, line_user_id: str, reply_token: str, pb: dict, sess: Optional[dict]
 ) -> None:
-    """continue 卡的 [ทำใบจองต่อ]:postback cid 须对齐会话客户号(防串到别的档)→ 走选车。"""
+    """continue 卡的 [ทำใบจองต่อ]:postback cid 须对齐会话客户号(防串到别的档)→ 开逐问。"""
     payload = (sess or {}).get("payload") or {}
     cid = pb.get("cid") or ""
     if not cid or cid != str(payload.get("customer_id") or ""):
         _reply(reply_token, cards.TXT_EXPIRED)
         return
-    await booking_flow.offer_pick(
-        binding,
+    await booking_qa.start(
+        binding["tenant_id"],
         line_user_id,
         endpoint_id=str(payload.get("endpoint_id") or ""),
         customer_id=cid,
+        customer_name=str(payload.get("name") or ""),
         draft=payload.get("draft") or {},
-        name=str(payload.get("name") or ""),
+        user_id=str(binding.get("user_id") or ""),
+        id_card_mid=payload.get("id_card_mid") or None,
     )
 
 
@@ -174,19 +175,24 @@ async def after_customer_saved(
     mode: str = "",
     same_data: bool = False,
 ) -> None:
-    """客户档落定后:booking/缺省 → 照旧 offer_pick;customer → 收尾不提订车。
+    """客户档落定后:booking/缺省 → 开订车逐问;customer → 收尾不提订车。
 
     菜单1=只建档(泰方拍板 2026-07-19):不再推「ทำใบจองต่อ?」续订卡;其 postback
     处理保留,聊天历史里已发出的旧卡仍能点。same_data=True 表示本次零写入
     (数据已存/选择保留),文案不谎称「已保存」。"""
     if mode != MODE_CUSTOMER:
-        await booking_flow.offer_pick(
-            binding,
+        sess = await _thr(store.get_session, binding["tenant_id"], line_user_id)
+        payload = (sess or {}).get("payload") or {}
+        await booking_qa.start(
+            binding["tenant_id"],
             line_user_id,
             endpoint_id=endpoint_id,
             customer_id=customer_id,
+            # 零写入路径(同资料点保持)不传 name → 回退建档 draft 里的姓名(照旧选车入口语义)。
+            customer_name=name or (draft or {}).get("name", ""),
             draft=draft,
-            name=name,
+            user_id=str(binding.get("user_id") or ""),
+            id_card_mid=payload.get("id_card_mid") or None,
         )
         return
 

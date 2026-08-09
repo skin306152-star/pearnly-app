@@ -1,4 +1,4 @@
-// DMS 文案诚实闸 · 只守 28-dms-intake-write-honesty 覆盖不到的两件事:四语标题、选车面板过期屏。
+// DMS 文案诚实闸 · 只守 28-dms-intake-write-honesty 覆盖不到的事:四语标题。
 // (连接向导/连接卡/推送记录的文案断言在 28 里,那边是精确文案比对,别在这儿再放一份弱的。)
 // 打的是 build 后的 static/dist,即真实上线形态。
 // 起法:npx playwright test tests/e2e/27-dms-copy-honesty.spec.js
@@ -87,26 +87,4 @@ test('C-2 · 录入页标题四语同义(zh 不再说「订车」——网页只
     expect(seen.th).not.toContain('ใบจอง');
     expect(seen.en.toLowerCase()).not.toContain('booking');
     expect(seen.ja).not.toContain('予約');
-});
-
-test('P1-12 · 选车面板过期屏四语给出可执行指路(且说明不必重拍身份证)', async ({ page }) => {
-    await page.route('**/api/dms/pick/**', (route) =>
-        route.fulfill({
-            status: 401,
-            contentType: 'application/json',
-            body: JSON.stringify({ detail: 'dms_pick.expired' }),
-        })
-    );
-    const seen = {};
-    for (const lang of ['th', 'zh', 'en', 'ja']) {
-        await setLang(page, lang);
-        await page.goto(`${BASE}/static/dist/dms-pick.html?t=expired`);
-        await page.waitForSelector('.state.err');
-        seen[lang] = await page.locator('.state.err').innerText();
-        await page.screenshot({ path: path.join(OUT, `web-pick-expired-${lang}.png`) });
-    }
-    // 泰语是真实用户读的那版:得说清回 LINE 打什么词,以及不必重拍身份证(重拍要再扣一次 OCR 费)。
-    expect(seen.th).toMatch(/เมนู/);
-    expect(seen.th).toMatch(/ไม่ต้อง.*บัตร|บัตรประชาชนซ้ำ/);
-    expect(seen.zh).toMatch(/不必|无需/);
 });

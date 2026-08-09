@@ -95,7 +95,7 @@ class FakeStore:
 
 
 class _Env:
-    """一处装齐 mock;offer_pick 用 spy(不动会话)以便区分「自动订车」与「continue 卡」。"""
+    """一处装齐 mock;booking_qa.start 用 spy(不动会话)以便区分「自动订车」与「continue 卡」。"""
 
     def __init__(self, *, ocr=None, lookup=None, push_result=None):
         self.store = FakeStore()
@@ -118,7 +118,7 @@ class _Env:
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
         p(flow, "_spawn", side_effect=self.spawned.append)
-        self.offer = p(flow.booking_flow, "offer_pick", new_callable=mock.AsyncMock)
+        self.qa_start = p(menu_flow.booking_qa, "start", new_callable=mock.AsyncMock)
         self.reply = p(flow.line_client, "reply_text")
         self.reply_msgs = p(flow.line_client, "reply_messages")
         self.push_text = p(flow.line_client, "push_text")
@@ -194,6 +194,17 @@ class MenuTriggerTests(unittest.IsolatedAsyncioTestCase):
             card = env.reply_msgs.call_args.args[1][0]
             self.assertEqual(card["altText"], cards.TXT_MENU_TITLE)
 
+    async def test_a1_menu_overrides_active_booking_qa(self):
+        """A1 守门:逐问进行中收 เมนู → 照常弹菜单(会话被覆写=放弃,与 เริ่มใหม่ 同语义,不再拦)。"""
+        with _Env() as env:
+            env.store.set_session(
+                "T1", "L1", "booking_qa", {"qa": {"step": "slip", "endpoint_id": "E1"}}
+            )
+            await flow.handle_text(_BINDING, _LUID, "rt", "เมนู")
+            self.assertEqual(env.session()["state"], "menu")
+            card = env.reply_msgs.call_args.args[1][0]
+            self.assertEqual(card["altText"], cards.TXT_MENU_TITLE)
+
 
 class MenuChoiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_a2_menu_button_customer_sets_mode(self):
@@ -260,20 +271,20 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
         return env.session()["payload"]["nonce"]
 
     async def test_a3_customer_save_pushes_done_no_booking(self):
-        """A3(2026-07-19 拍板):customer 模式建档成功 → 完成话术,不提订车不推选车。"""
+        """A3(2026-07-19 拍板):customer 模式建档成功 → 完成话术,不提订车不开逐问。"""
         with _Env(lookup=_lookup("none")) as env:
             nonce = await self._seed_reviewing(env, mode="customer")
             self.assertEqual(env.session()["payload"]["mode"], "customer")
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
             await env.drain()
             self.assertFalse(env.continue_card_pushed())
-            self.assertFalse(env.offer.called)
+            self.assertFalse(env.qa_start.called)
             self.assertIsNone(env.session())  # 收尾清会话
             texts = [c.args[1] for c in env.push_text.call_args_list]
             self.assertIn(cards.TXT_DONE_SAVED, texts)
 
-    async def test_a3_continue_triggers_offer_pick(self):
-        """A3:continue 卡点「ทำใบจองต่อ」(cid 对齐)→ offer_pick。"""
+    async def test_a3_continue_triggers_booking_qa(self):
+        """A3:continue 卡点「ทำใบจองต่อ」(cid 对齐)→ 开订车逐问。"""
         with _Env() as env:
             env.store.set_session(
                 "T1",
@@ -285,16 +296,18 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
                     "draft": {"name": "x"},
                     "name": "x",
                     "mode": "customer",
+                    "id_card_mid": "mid-card",
                 },
             )
             await flow.handle_postback(
                 _BINDING, _LUID, "rt", _pb(cards.ACT_CONTINUE_BOOKING, cid="C99")
             )
-            self.assertTrue(env.offer.called)
-            self.assertEqual(env.offer.call_args.kwargs["customer_id"], "C99")
+            self.assertTrue(env.qa_start.called)
+            self.assertEqual(env.qa_start.call_args.kwargs["customer_id"], "C99")
+            self.assertEqual(env.qa_start.call_args.kwargs["id_card_mid"], "mid-card")
 
     async def test_a3_continue_cid_mismatch_expired(self):
-        """A3:continue 的 cid 与会话客户号不符 → 过期话术,不 offer_pick。"""
+        """A3:continue 的 cid 与会话客户号不符 → 过期话术,不开逐问。"""
         with _Env() as env:
             env.store.set_session(
                 "T1", "L1", "menu_after_save", {"customer_id": "C99", "mode": "customer"}
@@ -303,32 +316,34 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
                 _BINDING, _LUID, "rt", _pb(cards.ACT_CONTINUE_BOOKING, cid="WRONG")
             )
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
-            self.assertFalse(env.offer.called)
+            self.assertFalse(env.qa_start.called)
 
-    async def test_a4_no_mode_auto_offers_pick_no_continue_card(self):
-        """A4 守门:mode 缺省(不经菜单直拍)→ offer_pick 照旧,不出 continue 卡。"""
+    async def test_a4_no_mode_auto_starts_booking_qa_no_continue_card(self):
+        """A4 守门:mode 缺省(不经菜单直拍)→ 写档后自动开逐问,不出 continue 卡。"""
         with _Env(lookup=_lookup("none")) as env:
             nonce = await self._seed_reviewing(env)  # 无 mode
             self.assertEqual(env.session()["payload"]["mode"], "")
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_CREATE, nonce))
             await env.drain()
-            self.assertTrue(env.offer.called)
-            self.assertEqual(env.offer.call_args.kwargs["customer_id"], "C99")
+            self.assertTrue(env.qa_start.called)
+            self.assertEqual(env.qa_start.call_args.kwargs["customer_id"], "C99")
             self.assertFalse(env.continue_card_pushed())
 
-    async def test_a4_exact_same_no_mode_previews_then_keep_offers_pick(self):
-        """A4(2026-07-19 拍板):缺省模式 exact 零差异 → 也先出预览卡;点保持才 offer_pick。"""
+    async def test_a4_exact_same_no_mode_previews_then_keep_starts_booking_qa(self):
+        """A4(2026-07-19 拍板):缺省模式 exact 零差异 → 也先出预览卡;点保持才开逐问。"""
         with _Env(lookup=_lookup("exact", customer_id="C7")) as env:
             env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE})
             await flow.process_image(_BINDING, _LUID, "mid1")
             await env.drain()
-            self.assertFalse(env.offer.called)
+            self.assertFalse(env.qa_start.called)
             self.assertEqual(env.session()["state"], "reviewing")
             nonce = env.session()["payload"]["nonce"]
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP, nonce))
             await env.drain()
-            self.assertTrue(env.offer.called)
-            self.assertEqual(env.offer.call_args.kwargs["customer_id"], "C7")
+            self.assertTrue(env.qa_start.called)
+            self.assertEqual(env.qa_start.call_args.kwargs["customer_id"], "C7")
+            # 零写入路径不传 name → 回退建档 draft 姓名(照旧选车入口语义)
+            self.assertEqual(env.qa_start.call_args.kwargs["customer_name"], "สมชาย ใจดี")
             self.assertFalse(env.continue_card_pushed())
 
     async def test_exact_same_customer_mode_shows_preview_card(self):
@@ -338,7 +353,7 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             await flow.process_image(_BINDING, _LUID, "mid1")
             await env.drain()
             self.assertFalse(env.continue_card_pushed())
-            self.assertFalse(env.offer.called)
+            self.assertFalse(env.qa_start.called)
             sess = env.session()
             self.assertEqual(sess["state"], "reviewing")
             self.assertEqual(sess["payload"]["customer_id"], "C7")
@@ -346,7 +361,7 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(card["altText"], cards.same_customer_card({}, "x")["altText"])
 
     async def test_exact_same_preview_keep_finishes_without_booking(self):
-        """同资料预览卡点「ใช้ข้อมูลเดิม」→ same 完成话术 + 清会话,不订车。"""
+        """同资料预览卡点「ใช้ข้อมูลเดิม」→ same 完成话术 + 清会话,不开逐问。"""
         with _Env(lookup=_lookup("exact", customer_id="C7")) as env:
             env.store.set_session("T1", "L1", "collecting", {"phone": _PHONE, "mode": "customer"})
             await flow.process_image(_BINDING, _LUID, "mid1")
@@ -355,7 +370,7 @@ class ModeGateTests(unittest.IsolatedAsyncioTestCase):
             await flow.handle_postback(_BINDING, _LUID, "rt", _pb(cards.ACT_KEEP, nonce))
             await env.drain()
             self.assertIsNone(env.session())
-            self.assertFalse(env.offer.called)
+            self.assertFalse(env.qa_start.called)
             texts = [c.args[1] for c in env.push_text.call_args_list]
             self.assertIn(cards.TXT_DONE_SAME, texts)
 

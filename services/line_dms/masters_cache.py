@@ -144,7 +144,7 @@ def read_fresh_masters(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """只读缓存主档(<12h),绝不触发登录冷抓。miss / 过期 → None。
 
     submit 校验用:能被提交的选项必来自 data/paints 端点已暖的缓存,请求内再冷抓 = 多余的
-    二次登录 → 宁可 None 让面板重开(dms_pick.bad_selection)。"""
+    二次登录 → 宁可 None 让调用方重开选车流程。"""
     cached = _read(str(endpoint.get("id") or ""))
     if cached and cached["age_seconds"] < CACHE_TTL_SECONDS:
         return cached["masters"]

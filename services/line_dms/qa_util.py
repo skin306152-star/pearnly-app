@@ -59,7 +59,7 @@ def row_name(row) -> str:
 
 
 def car_label(row) -> str:
-    """车型行标签:代码 + 名称(与 dms_pick_routes._row_label 同形)。"""
+    """车型行标签:代码 + 名称(与 qa_cards._car_label 同形)。"""
     code = str(row[1]) if len(row) > 1 else ""
     name = str(row[2]) if len(row) > 2 else ""
     return (code + " " + name).strip()

@@ -40,7 +40,6 @@ PUBLIC_ROUTES = {
     ("GET", "/dms"),
     ("GET", "/dms/{rest:path}"),
     ("GET", "/earn"),
-    ("GET", "/dms-pick"),  # 选车面板壳 · 页内 JS 携 ?t= 调 API,token/nonce 在 API 侧 enforce
     ("GET", "/cashier-sw.js"),  # PWA Service Worker 脚本(公开静态 · 同 /pos-sw.js)
     ("GET", "/invite/{token}"),
     ("GET", "/reset"),
@@ -93,12 +92,6 @@ PUBLIC_ROUTES = {
     ("GET", "/api/sales/documents/shared/{token}/pdf"),
     # 本月凭证打包下载(C-1)· token=时效签名(tenant+ws+period+落盘 rel+exp)即凭证 · verify_token 验签
     ("GET", "/api/purchase/proof-pdf/{token}"),
-    # DMS 选车面板三端点(DL-4a)· 无登录会话:LINE 侧签发的一次性 token 即凭证 —— 每个先过
-    # _verify(scope='dms_pick' + 未过期 → dms_line 闸 → 会话 picking 态 + nonce 吻合),
-    # 提交后换 nonce 使旧 token 失效;坏/过期 token 401,闸关 404(不泄漏功能存在)
-    ("GET", "/api/dms/pick/data"),
-    ("GET", "/api/dms/pick/paints"),
-    ("POST", "/api/dms/pick/submit"),
     # 泰语图卡出图 · LINE imagemap/图片按 baseUrl/{size} 取图 · ver 破缓存 · 仅固定卡(白名单)· 非敏感
     ("GET", "/api/line/card/{ver}/{card}/{size}"),
     # Express 本地 Agent 出站拉取 · Bearer agent token 即凭证(_auth_agent 验 sha256 · 只取本连接队列)·

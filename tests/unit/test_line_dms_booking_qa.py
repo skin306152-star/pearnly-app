@@ -12,7 +12,7 @@ import unittest
 from datetime import date
 from unittest import mock
 
-os.environ.setdefault("JWT_SECRET", "test-secret-key-for-dms-pick-32bytes-long")
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-line-dms-qa-32bytes-long")
 
 from services.line_dms import booking_qa as qa  # noqa: E402
 from services.line_dms import qa_cards  # noqa: E402

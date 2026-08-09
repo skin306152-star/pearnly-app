@@ -1,23 +1,28 @@
 # -*- coding: utf-8 -*-
-"""DMS 订车阶段(DL-4a)· offer_pick 选车入口 + 预览确认建单 + nonce 防双建。
+"""DMS 订车阶段(DL-4a/DL-7)· 逐问完成态 → 确认建单 + 附件挂载 + nonce 防双建。
 
-覆盖:offer_pick 置 picking + 推 URI 按钮;D4(面板所选 advisor/paint 传进建单 +
-push 台账 trigger='line_dms' + 回执含 BK 号 · 失败原样回);D5(nonce 双击第二次拒)。
+覆盖:qa 完成态 payload → 确认 postback → create_booking_via_form 收到含
+payments/regis_name/delivery 的 booking、defaults 含 place/term/regis id;附件按
+qa.files 下载并同会话挂载(attach 结果进 result 与台账 response_body);建单成功但
+附件失败 → 回执如实追加「แนบไฟล์ไม่ครบ」;台账 request_body.qa 摘要;nonce 双击第二次拒。
 """
 
 import contextlib
 import dataclasses
+import json
 import os
 import unittest
 from unittest import mock
 
-os.environ.setdefault("JWT_SECRET", "test-secret-key-for-dms-pick-32bytes-long")
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-line-dms-qa-32bytes-long")
 
 from services.line_dms import booking_flow as bf  # noqa: E402
-from services.line_dms import cards  # noqa: E402
+from services.line_dms import cards, qa_cards  # noqa: E402
 
 _BINDING = {"tenant_id": "T1", "user_id": "U1"}
 _LUID = "L1"
+
+_JPEG = b"\xff\xd8jpeg-bytes"
 
 
 class FakeStore:
@@ -41,10 +46,12 @@ class FakeStore:
 @dataclasses.dataclass(frozen=True)
 class _FakeBooking:
     delivery_date_be: str = "old"
+    regis_name: str = ""
+    payments: tuple = ()
 
 
 class _FakeClient:
-    """记录建单入参(defaults/booking),供断言面板所选透传。"""
+    """记录建单/附件入参,供断言逐问选择与附件透传。"""
 
     def __init__(self, rec):
         self.rec = rec
@@ -56,18 +63,53 @@ class _FakeClient:
 
     def create_booking_via_form(self, *, customer_id, booking, card):
         self.rec["customer_id"] = customer_id
-        self.rec["delivery"] = booking.delivery_date_be
+        self.rec["booking"] = booking
         return ("BID1", "BK123")
+
+    def attach_booking_files(self, *, booking_id, files):
+        self.rec["attach_booking_id"] = booking_id
+        self.rec["attach_files"] = list(files)
+        return {"ok": True, "attached": len(files), "failed": []}
 
     def fetch_masters(self):
         return {}
 
 
+def _qa_payload(**over):
+    qa = {
+        "step": "pay_more",
+        "endpoint_id": "E1",
+        "customer": {"id": "C1", "name": "สมชาย ใจดี"},
+        "draft": {"people_id": "1234567890121", "name": "สมชาย"},
+        "user_id": "U1",
+        "files": {"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
+        "answers": {
+            "place": {"id": "pl1", "name": "สาขาบางนา"},
+            "car": {"id": "c1", "label": "DMX D-Max"},
+            "paint": {"id": "p1", "name": "ขาว"},
+            "delivery_date_be": "01/01/2570",
+            "term": {"id": "t1", "name": "เงินสด"},
+            "regis": {"id": "r1", "name": "บริษัท"},
+            "regis_name": "บริษัท สมชาย จำกัด",
+        },
+        "payments": [{"channel": "transfer", "amount": "5000.00", "extra": {"src": "SCB"}}],
+        "pending_channel": {},
+        "audit": [{"step": "slip", "input": "image:mid-slip"}],
+    }
+    qa.update(over)
+    return qa
+
+
+def _review(nonce="N1", **over):
+    return {"nonce": nonce, "qa": _qa_payload(**over)}
+
+
 class _Env:
-    def __init__(self, *, book_result=None):
+    def __init__(self, *, book_result=None, download=_JPEG):
         self.store = FakeStore()
         self.spawned = []
         self._book_result = book_result
+        self._download = download
         self.es = contextlib.ExitStack()
 
     def __enter__(self):
@@ -81,6 +123,7 @@ class _Env:
         self.push_text = p(bf.line_client, "push_text")
         self.push_msgs = p(bf.line_client, "push_messages")
         p(bf.line_client, "start_loading")
+        self.download = p(bf.line_client, "download_message_content", return_value=self._download)
         p(bf._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
         self.insert_log = p(bf.db, "insert_push_log", return_value="LOG1")
         if self._book_result is not None:
@@ -99,70 +142,42 @@ class _Env:
         return self.store.get_session("T1", "L1")
 
 
-def _review(nonce="N1"):
-    return {
-        "nonce": nonce,
-        "endpoint_id": "E1",
-        "customer_id": "C1",
-        "user_id": "U1",
-        "draft": {"people_id": "1234567890121", "name": "สมชาย"},
-        "name": "สมชาย ใจดี",
-        "car_id": "c9",
-        "paint_id": "p9",
-        "advisor_id": "a9",
-        "delivery_date_be": "01/01/2570",
-        "car": "CODE9 Car Nine",
-    }
-
-
 class BookingTests(unittest.IsolatedAsyncioTestCase):
-    async def test_offer_pick_sets_picking_and_pushes_button(self):
-        with _Env() as env:
-            await bf.offer_pick(
-                _BINDING,
-                _LUID,
-                endpoint_id="E1",
-                customer_id="C1",
-                draft={"people_id": "123", "name": "x"},
-                name="x",
-            )
-            sess = env.session()
-            self.assertEqual(sess["state"], "picking")
-            self.assertTrue(sess["payload"]["nonce"])
-            self.assertEqual(sess["payload"]["user_id"], "U1")
-            card = env.push_msgs.call_args.args[1][0]
-            uri = card["contents"]["footer"]["contents"][0]["action"]["uri"]
-            self.assertIn("/dms-pick?t=", uri)
-            # 会话须活过 15 分钟的面板 token:它是重发链接的唯一凭据(P1-12)。
-            self.assertGreater(sess["ttl_minutes"], 15)
-
-    async def test_offer_pick_no_customer_clears_and_says_so(self):
-        """缺客户号 → 清会话,但要留一句交代,不静默(状态诚实)。"""
-        with _Env() as env:
-            await bf.offer_pick(_BINDING, _LUID, endpoint_id="E1", customer_id="", draft={})
-            self.assertIsNone(env.session())
-            env.push_msgs.assert_not_called()
-            self.assertEqual(env.push_text.call_args.args[1], cards.TXT_PICK_UNAVAILABLE)
-
     async def test_d4_confirm_creates_booking_and_logs(self):
-        result = {"ok": True, "booking_id": "BID1", "booking_no": "BK9"}
+        result = {
+            "ok": True,
+            "booking_id": "BID1",
+            "booking_no": "BK9",
+            "attach_ok": True,
+            "attached": 2,
+            "attach_failed": [],
+        }
         with _Env(book_result=result) as env:
             env.store.set_session("T1", "L1", "booking_review", _review())
             await bf.handle_postback(
                 _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
             )
             await env.drain()
-        # 回执含 BK 号
+        # 回执含 BK 号 + 车型(label 来自 qa.answers.car)
         self.assertIn("BK9", env.push_text.call_args.args[1])
-        # push 台账 trigger='line_dms'
+        self.assertIn("DMX D-Max", env.push_text.call_args.args[1])
+        # push 台账 trigger='line_dms' + request_body.qa 摘要
         request_body = env.insert_log.call_args.args[8]
         self.assertEqual(request_body["trigger"], "line_dms")
         self.assertEqual(request_body["mode"], "booking")
+        qa = request_body["qa"]
+        self.assertEqual(qa["place_id"], "pl1")
+        self.assertEqual(qa["term_id"], "t1")
+        self.assertEqual(qa["regis_id"], "r1")
+        self.assertEqual(qa["regis_name"], "บริษัท สมชาย จำกัด")
+        self.assertEqual(qa["payments"], [{"channel": "transfer", "amount": "5000.00"}])
+        self.assertEqual(qa["earnest_total"], "5000.00")
+        self.assertTrue(qa["slip_attached"])
         self.assertEqual(env.insert_log.call_args.args[3], "BK9")  # invoice_no ← BK 号
         self.assertIsNone(env.session())  # 成功后清
 
-    async def test_d4_book_in_session_passes_panel_selection(self):
-        """面板所选 advisor/car/paint 覆盖端点默认、交车日用面板值。"""
+    async def test_d4_book_in_session_passes_qa_selection_and_attaches(self):
+        """逐问选择覆盖端点默认、交车日/登记人/支付渠道进 booking,附件同会话挂载。"""
         rec = {}
 
         def fake_run(ep, do):
@@ -172,14 +187,101 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
         ):
-            res = bf._book_in_session({"id": "E1", "config": {}}, _review())
+            res = bf._book_in_session(
+                {"id": "E1", "config": {}},
+                _review(),
+                attach_files=[
+                    {
+                        "display_name": "สำเนาบัตรประชาชน",
+                        "filename": "idcard.jpg",
+                        "content_type": "image/jpeg",
+                        "content": _JPEG,
+                    },
+                    {
+                        "display_name": "ใบโอนเงินจอง",
+                        "filename": "slip.jpg",
+                        "content_type": "image/jpeg",
+                        "content": _JPEG,
+                    },
+                ],
+                attach_failed=[{"display_name": "y", "error": "down"}],
+            )
         self.assertTrue(res["ok"])
         self.assertEqual(res["booking_no"], "BK123")
-        self.assertEqual(rec["defaults"].advisor_id, "a9")
-        self.assertEqual(rec["defaults"].car_id, "c9")
-        self.assertEqual(rec["defaults"].paint_id, "p9")
+        self.assertFalse(res["attach_ok"])  # 下载失败件仍在 → 附件不谎报全挂
+        self.assertEqual(res["attached"], 2)
+        self.assertEqual([f["display_name"] for f in res["attach_failed"]], ["y"])
+        d = rec["defaults"]
+        self.assertEqual(d.advisor_id, "")  # payload 无值 → 端点默认路
+        self.assertEqual(d.car_id, "c1")
+        self.assertEqual(d.paint_id, "p1")
+        self.assertEqual(d.place_book_id, "pl1")
+        self.assertEqual(d.term_sale_id, "t1")
+        self.assertEqual(d.regis_behalf_id, "r1")
         self.assertEqual(rec["customer_id"], "C1")
-        self.assertEqual(rec["delivery"], "01/01/2570")  # 面板交车日覆盖
+        b = rec["booking"]
+        self.assertEqual(b.delivery_date_be, "01/01/2570")  # 逐问交车日覆盖
+        self.assertEqual(b.regis_name, "บริษัท สมชาย จำกัด")
+        self.assertEqual(
+            b.payments, ({"channel": "transfer", "amount": "5000.00", "extra": {"src": "SCB"}},)
+        )
+        self.assertEqual(rec["attach_booking_id"], "BID1")
+        self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg", "slip.jpg"])
+        self.assertEqual(rec["attach_files"][0]["content_type"], "image/jpeg")
+
+    async def test_d4_attach_failure_appends_attach_note(self):
+        """建单成功但附件没挂全 → 回执如实追加 TXT_ATTACH_FAIL,不谎报附件成功。"""
+        result = {
+            "ok": True,
+            "booking_id": "BID1",
+            "booking_no": "BK9",
+            "attach_ok": False,
+            "attached": 0,
+            "attach_failed": [
+                {"display_name": "ใบโอนเงินจอง", "error": "line content download failed"}
+            ],
+        }
+        with _Env(book_result=result) as env:
+            env.store.set_session("T1", "L1", "booking_review", _review())
+            await bf.handle_postback(
+                _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
+            )
+            await env.drain()
+        said = env.push_text.call_args.args[1]
+        self.assertIn("BK9", said)
+        self.assertTrue(said.endswith(qa_cards.TXT_ATTACH_FAIL))
+        # 台账 response_body 带附件结果(json 串)
+        response_body = json.loads(env.insert_log.call_args.args[9])
+        self.assertFalse(response_body["attach_ok"])
+        self.assertEqual(len(response_body["attach_failed"]), 1)
+
+    async def test_d4_download_failure_blocks_only_that_attach(self):
+        """LINE 内容下载不到(slip 过期)→ 按 attach_failed 记,不阻断建单。"""
+        rec = {}
+
+        def fake_run(ep, do):
+            return do(_FakeClient(rec), object())
+
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+        ):
+            qa = _qa_payload()
+            files = qa["files"]
+            # slip 下载失败 → 只有 id_card 进挂载
+            res = bf._book_in_session(
+                {"id": "E1", "config": {}},
+                _review(),
+                attach_files=[
+                    {"display_name": "สำเนาบัตรประชาชน", "filename": "idcard.jpg", "content": _JPEG}
+                ],
+                attach_failed=[
+                    {"display_name": "ใบโอนเงินจอง", "error": "line content download failed"}
+                ],
+            )
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["attach_ok"])
+        self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg"])
 
     async def test_d4_failure_returns_friendly_th(self):
         result = {
@@ -196,7 +298,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(env.push_text.call_args.args[1], "สร้างใบจองรถไม่สำเร็จ")
 
     async def test_d5_double_click_single_booking(self):
-        with _Env(book_result={"ok": True, "booking_no": "BK9"}) as env:
+        with _Env(book_result={"ok": True, "booking_no": "BK9", "attach_ok": True}) as env:
             env.store.set_session("T1", "L1", "booking_review", _review())
             await bf.handle_postback(
                 _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}

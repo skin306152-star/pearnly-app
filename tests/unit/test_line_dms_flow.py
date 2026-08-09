@@ -10,7 +10,7 @@ import contextlib
 import unittest
 from unittest import mock
 
-from services.line_dms import cards, flow, ocr_review, text_router
+from services.line_dms import cards, flow, ocr_review, qa_cards, text_router
 
 # 网页确认页 fields 键形状(static/dms/dms-intake-core.js)· LINE 侧必须同形。
 SPA_CREATE_FIELD_KEYS = {"prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone"}
@@ -132,12 +132,12 @@ class _Env:
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
         p(flow, "_spawn", side_effect=self.spawned.append)
 
-        # 客户档落定后 flow 委托 booking_flow.offer_pick(DL-4a 选车入口);此处存 DL-3 客户
-        # 写档语义,offer_pick 桩成「消费 reviewing 会话」——订车阶段本身在 test_line_dms_booking。
-        async def _offer(binding, luid, **kw):
-            self.store.clear_session(str(binding["tenant_id"]), luid)
+        # 客户档落定后 flow 委托 menu_flow.after_customer_saved → booking_qa.start(DL-7 逐问);
+        # 此处存 DL-3 客户写档语义,start 桩成「消费 reviewing 会话」——订车执行在 test_line_dms_booking。
+        async def _qa_start(tenant_id, luid, **kw):
+            self.store.clear_session(str(tenant_id), luid)
 
-        self.offer = p(flow.booking_flow, "offer_pick", side_effect=_offer)
+        self.qa_start = p(flow.menu_flow.booking_qa, "start", side_effect=_qa_start)
         self.reply = p(flow.line_client, "reply_text")
         self.reply_msgs = p(flow.line_client, "reply_messages")
         self.push_text = p(flow.line_client, "push_text")
@@ -147,9 +147,11 @@ class _Env:
         p(flow.db, "find_user_by_id", return_value={"id": "U1", "tenant_id": "T1"})
         self.insert_log = p(flow.db, "insert_push_log", return_value="LOG1")
         if self._ocr_error is not None:
-            p(flow._id_ocr, "recognize_id_card", side_effect=self._ocr_error)
+            self.recognize = p(flow._id_ocr, "recognize_id_card", side_effect=self._ocr_error)
         else:
-            p(flow._id_ocr, "recognize_id_card", return_value=(self._ep, self._ocr, 10))
+            self.recognize = p(
+                flow._id_ocr, "recognize_id_card", return_value=(self._ep, self._ocr, 10)
+            )
         p(flow._id_ocr, "resolve_dms_endpoint", return_value=self._ep)
         p(flow._id_ocr, "recent_dms_customer_ids_by_tail", return_value=[])
         self.lookup = p(flow._dms_intake, "recognize_lookup_mrerp_dms", return_value=self._lookup)
@@ -236,7 +238,7 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_c2b_booking_mode_exact_shows_booking_card_even_with_diffs(self):
         """订车工作流(2026-07-19 泰方拍板):缺省/菜单2 认出已有客户,有差异也不弹更新,
-        出 [ทำใบจองต่อ][แก้ไข] 确认卡;点继续 → offer_pick,零写入。"""
+        出 [ทำใบจองต่อ][แก้ไข] 确认卡;点继续 → 开逐问,零写入。"""
         diffs = [{"field": "house_no", "old": "88", "new": "99"}]
         with _Env(
             ocr=_ocr_ok(), lookup=_lookup("exact", field_diffs=diffs, customer_id="C7"), admin=True
@@ -605,6 +607,64 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             await env.drain()
             self.assertEqual(env.reply.call_args.args[1], cards.TXT_EXPIRED)
             self.assertEqual(env.session()["state"], "reviewing")  # 会话原封不动
+
+    # ── DL-7 逐问接线:图片分发 / 身份证附件 id 存活 ─────────────────────────
+    async def test_g1_image_during_booking_qa_consumed_no_ocr(self):
+        """booking_qa 态收图 → 归逐问消费(slip 凭证步),绝不掉进 OCR 路(无关图走 OCR 真扣费)。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            env.store.set_session(
+                "T1",
+                "L1",
+                "booking_qa",
+                {"qa": {"step": "slip", "files": {"id_card_mid": "mid-card", "slip_mid": None}}},
+            )
+            flow.handle_image(_BINDING, _LUID, "mid-slip")
+            await env.drain()
+            env.recognize.assert_not_called()  # 不落 OCR
+            self.assertEqual(env.session()["state"], "booking_qa")  # 会话没被 OCR 冲毁
+            pushed = env.push_msgs.call_args.args[1][0]
+            self.assertEqual(pushed["text"], qa_cards.TXT_ASK_PLACE)  # 逐问推进到 place 步
+
+    async def test_g1b_image_on_non_slip_qa_step_pushes_hint_no_ocr(self):
+        """booking_qa 非凭证步收图 → 只回 TXT_NO_IMAGE_NEEDED,不推进状态、不进 OCR。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            env.store.set_session(
+                "T1", "L1", "booking_qa", {"qa": {"step": "place", "endpoint_id": "E1"}}
+            )
+            flow.handle_image(_BINDING, _LUID, "mid-x")
+            await env.drain()
+            self.assertEqual(env.push_text.call_args.args[1], qa_cards.TXT_NO_IMAGE_NEEDED)
+            self.assertEqual(env.session()["state"], "booking_qa")
+            self.assertEqual(env.session()["payload"]["qa"]["step"], "place")
+
+    async def test_g1c_image_during_booking_review_hints_confirm(self):
+        """booking_review 态收图 → 只提醒点确认/丢弃,不进 OCR。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            env.store.set_session("T1", "L1", "booking_review", {"qa": {"step": "pay_more"}})
+            flow.handle_image(_BINDING, _LUID, "mid-x")
+            await env.drain()
+            self.assertEqual(env.push_text.call_args.args[1], qa_cards.TXT_CONFIRM_ABOVE)
+            self.assertEqual(env.session()["state"], "booking_review")
+
+    async def test_g2_ocr_stores_id_card_mid_surviving_dedup(self):
+        """OCR 路把 message_id 存成 id_card_mid,重跑查重后的 reviewing 会话仍存活(逐问要挂附件)。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            await self._seed_reviewing(env)  # process_image("mid1") → _run_dedup 重建 payload
+            payload = env.session()["payload"]
+            self.assertEqual(payload["id_card_mid"], "mid1")
+
+    async def test_g2b_phone_capture_keeps_id_card_mid(self):
+        """号码透传的 keep 清单含 id_card_mid:补号不丢身份证附件 id。"""
+        with _Env(ocr=_ocr_ok(), lookup=_lookup("none")) as env:
+            env.store.set_session(
+                "T1",
+                "L1",
+                "collecting",
+                {"id_card": dict(_RAW_ID), "id_card_mid": "mid1", "endpoint_id": "E1"},
+            )
+            await flow.handle_text(_BINDING, _LUID, "rt", _PHONE)
+            await env.drain()
+            self.assertEqual(env.session()["payload"]["id_card_mid"], "mid1")
 
 
 def _all_button_labels(card):

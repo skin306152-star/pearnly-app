@@ -27,12 +27,13 @@ from services.line_dms import (
     _out,
     approval_flow,
     booking_flow,
+    booking_qa,
     cards,
     draft,
     edit_flow,
     menu_flow,
     ocr_review,
-    pick_resume,
+    qa_cards,
     store,
     text_router,
 )
@@ -64,9 +65,30 @@ _spawn = _out.make_spawn("line_dms.flow")
 
 # ── webhook 入口(thin · spawn 后台) ────────────────────────────────────────
 def handle_image(binding: dict, line_user_id: str, message_id: str) -> None:
-    """绑定用户发图片(collecting):后台下载 + 身份证 OCR。"""
+    """绑定用户发图片:逐问/确认态消费凭证图;其余照旧走身份证 OCR(后台)。"""
     if message_id:
-        _spawn(process_image(binding, line_user_id, message_id))
+        _spawn(_dispatch_image(binding, line_user_id, message_id))
+
+
+async def _dispatch_image(binding: dict, line_user_id: str, message_id: str) -> None:
+    """图片事件分发:逐问/确认态先于 OCR。
+
+    中途一张无关图片走 OCR 会真扣一次费并把 QA 会话冲毁——booking_qa 态一律进
+    booking_qa.handle_image 消费,非凭证步返回 False 也只回一句提示,绝不掉进 OCR 路。
+    """
+    sess = await _thr(store.get_session, binding["tenant_id"], line_user_id)
+    state = (sess or {}).get("state")
+    if state == "booking_qa":
+        consumed = await booking_qa.handle_image(
+            binding["tenant_id"], line_user_id, message_id, None
+        )
+        if not consumed:
+            _push(line_user_id, qa_cards.TXT_NO_IMAGE_NEEDED)
+        return
+    if state == "booking_review":
+        _push(line_user_id, qa_cards.TXT_CONFIRM_ABOVE)
+        return
+    await process_image(binding, line_user_id, message_id)
 
 
 async def handle_text(binding: dict, line_user_id: str, reply_token: str, text: str) -> None:
@@ -79,7 +101,14 @@ async def handle_postback(
 ) -> None:
     """确认按钮(postback):核对 nonce → 清 nonce(防双写)→ 分支执行。"""
     tenant = binding["tenant_id"]
-    pb = {k: v[0] for k, v in parse_qs(postback.get("data") or "").items()}
+    data = postback.get("data") or ""
+    # 逐问按钮(data="qa:<action>[:<value>]")直接归 booking_qa;datetimepicker 的
+    # 所选日期在 postback.params,一并带过去。
+    if data.startswith("qa:"):
+        params = postback.get("params") or {}
+        await booking_qa.handle_postback(tenant, line_user_id, data, params, reply_token)
+        return
+    pb = {k: v[0] for k, v in parse_qs(data).items()}
     action = pb.get("action")
 
     # 订车阶段(DL-4a)的预览确认/取消归 booking_flow(客户档写档动作留本文件)。
@@ -100,11 +129,6 @@ async def handle_postback(
         await menu_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
 
-    # 选车链接重发(P1-12):零 OCR、零写档,cid 对齐守卫在 pick_resume 内。
-    if action == cards.ACT_REISSUE_PICK:
-        await pick_resume.handle_postback(binding, line_user_id, reply_token, pb, sess)
-        return
-
     if action in approval_flow.APPROVAL_ACTIONS:  # 波4:nonce/状态守卫都在 approval_flow 内
         await approval_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
         return
@@ -115,13 +139,13 @@ async def handle_postback(
         return
 
     if action == cards.ACT_KEEP:
-        # 零写入不等于零后果:它会签发一条新的选车链接。nonce 只校验不消费(照 _retake),
-        # 否则翻聊天记录点任意一张旧卡都能白拿链接。
+        # 零写入不等于零后果:它会接着开订车逐问。nonce 只校验不消费(照 _retake),
+        # 否则翻聊天记录点任意一张旧卡都能白开一轮会话。
         if not store.verify_nonce(sess, pb.get("nonce")):
             _reply(reply_token, cards.TXT_EXPIRED)
             return
         _reply(reply_token, cards.TXT_KEEP)
-        # 保留旧数据 = 零写入;customer 模式下问是否继续订车,booking/缺省照旧串联。
+        # 保留旧数据 = 零写入;customer 模式收尾,booking/缺省照旧串联逐问。
         await menu_flow.after_customer_saved(
             binding,
             line_user_id,
@@ -188,7 +212,7 @@ async def process_image(binding: dict, line_user_id: str, message_id: str) -> No
     payload = await _merge_session(
         binding,
         line_user_id,
-        {"id_card": id_card, "endpoint_id": str(ep.get("id") or "")},
+        {"id_card": id_card, "endpoint_id": str(ep.get("id") or ""), "id_card_mid": message_id},
         keep=("phone", "mode"),
     )
     if payload.get("phone"):
@@ -211,9 +235,11 @@ async def _run_dedup(
     tenant, user_id = binding["tenant_id"], binding["user_id"]
     await _thr(line_client.start_loading, line_user_id, 30, channel=_CHANNEL)
     # 菜单层(波2)的 mode 决定写档后是否自动串联订车;缺省=老直拍行为不变。会话是权威源
-    # (采集路径都先写会话再进这里),避免多签名穿参。
+    # (采集路径都先写会话再进这里),避免多签名穿参。id_card_mid 同样从会话回读:它是
+    # 订车逐问的身份证附件源,必须活到客户档落定(见 _run_dedup base)。
     _sess = await _thr(store.get_session, tenant, line_user_id)
     mode = str(((_sess or {}).get("payload") or {}).get("mode") or "")
+    id_card_mid = ((_sess or {}).get("payload") or {}).get("id_card_mid")
     if ep is None:
         ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
     if not ep:
@@ -254,6 +280,8 @@ async def _run_dedup(
         "id_card": id_card,
         "phone": phone,
         "mode": mode,  # 写档后分叉(菜单层波2)靠它;编辑重跑经会话回读得以保留。
+        # 身份证消息 id:订车逐问(booking_qa.start)用它挂「สำเนาบัตรประชาชน」附件。
+        "id_card_mid": id_card_mid,
     }
 
     if scenario == "none":
@@ -263,7 +291,7 @@ async def _run_dedup(
         payload = {**base, "scenario": "exact_diff", "customer_id": res["match"]["customer_id"]}
         if mode != menu_flow.MODE_CUSTOMER:
             # 订车工作流(泰方拍板:与档案维护是 DMS 两个功能,证件只为认人):
-            # 认出即确认卡直奔选车,不弹差异不问更新;档案维护走菜单1。
+            # 认出即确认卡直奔订车逐问,不弹差异不问更新;档案维护走菜单1。
             card = cards.booking_customer_card(summary, nonce)
         elif not field_diffs:
             # 同资料:预览卡(保持/修改)——收到证+电话一律先确认(泰方拍板)。

@@ -40,7 +40,6 @@ from routes.companion_installer_routes import router as companion_installer_rout
 from routes.console_invite_routes import router as console_invite_router
 from routes.console_roles_routes import router as console_roles_router
 from routes.console_team_routes import router as console_team_router
-from routes.dms_pick_routes import router as dms_pick_router
 from routes.dms_roster_routes import router as dms_roster_router
 from routes.dms_routes import router as dms_router
 from routes.email_ingest_routes import router as email_ingest_router
@@ -196,7 +195,6 @@ ROUTERS = (
     companion_installer_router,  # 小助手安装包下载
     dms_router,  # MR.ERP DMS · 身份证→订车单
     dms_roster_router,  # DMS 操作员花名册(owner-only)
-    dms_pick_router,  # DMS 车辆选择面板(token 闸 · 无登录)
     line_dms_webhook_router,  # DMS 独立 LINE OA webhook
     admin_users_router,
     history_router,  # OCR 历史(含 assign_client)

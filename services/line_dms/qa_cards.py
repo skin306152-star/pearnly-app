@@ -63,6 +63,11 @@ TXT_PREVIEW_TITLE = "สรุปใบจอง — ตรวจสอบก่
 BTN_CONFIRM = "ยืนยัน"
 BTN_DISCARD = "ทิ้ง"
 TXT_SLIP_ONLY_IMAGE = "ขั้นนี้ต้องการรูปสลิปครับ ส่งเป็นรูปภาพ หรือพิมพ์ เงินสด ถ้าไม่มีการโอน"
+# 逐问/确认态收到的非本步文本或图片,不覆写会话、不推 OCR——只说继续点卡(接线层用)。
+TXT_CONFIRM_ABOVE = "กด ยืนยัน หรือ ทิ้ง ที่สรุปด้านบนครับ"
+TXT_NO_IMAGE_NEEDED = "ขั้นตอนนี้ไม่ต้องการรูปภาพครับ ทำตามคำถามด้านบนได้เลย"
+# 建单成功但附件没挂全时的诚实追加行(不谎报附件成功)。
+TXT_ATTACH_FAIL = "แนบไฟล์ไม่ครบ กรุณาแนบเพิ่มในระบบ DMS"
 
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。
 LBL_CUSTOMER = "ลูกค้า"
@@ -104,7 +109,7 @@ def _name(row: list) -> str:
 
 
 def _car_label(row: list) -> str:
-    """车型行标签:代码 + 名称(与 dms_pick_routes._row_label 同形)。"""
+    """车型行标签:代码 + 名称(与 qa_util.car_label 同形)。"""
     code = str(row[1]) if len(row) > 1 else ""
     name = str(row[2]) if len(row) > 2 else ""
     return (code + " " + name).strip()

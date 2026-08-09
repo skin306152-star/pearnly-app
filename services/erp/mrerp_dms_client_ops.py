@@ -232,6 +232,74 @@ class DMSClientOpsMixin:
         except Exception:
             return ""
 
+    def attach_booking_files(self, *, booking_id: str, files: list) -> dict:
+        """给已存在订车单挂附件 —— 逐文件独立一轮 edit.php POST,失败不中断。
+
+        DMS 上传契约(_dms_probe/fupload_probe/CONTRACT.md):上传 = POST
+        drfcbc/edit.php 提交【完整编辑表单】的 FormData,不是独立小接口;只发
+        新文件字段会把订车单既有字段冲空。所以先加载编辑表单解析全部现值,再
+        逐件追加 fulnew[]/fulnewname[];全部跑完回读校验(HTTP 200 不算数)。
+
+        files 元素:{"display_name", "filename", "content_type", "content"}。
+        返回 {"ok", "attached", "failed": [{"display_name", "error"}]}。
+        """
+        if not files:
+            return {"ok": True, "attached": 0, "failed": []}
+
+        # 编辑表单加载参数名以真机抓包为准(probe 用 {status:"e", id:..})。
+        form_html = self._post_text("drfcbc/form.php", {"status": "e", "id": str(booking_id)})
+        base = self._parse_form_defaults(form_html)
+        if base.get("stsel") != "e" or base.get("idsel") != str(booking_id):
+            raise DMSClientError(
+                f"booking attach form mismatch: stsel={base.get('stsel')!r} "
+                f"idsel={base.get('idsel')!r} vs booking_id={booking_id!r}",
+                "ERR_DMS_IMPORT",
+            )
+        docno_before = base.get("txtdocno")
+
+        attached = 0
+        failed: List[Dict[str, str]] = []
+        uploaded: List[str] = []  # POST 判绿的件,留待回读校验
+        for item in files:
+            display = str(item.get("display_name") or "")[:150]
+            data = dict(base)
+            data["fulnewname[]"] = display
+            resp = self.transport.post(
+                self._url("drfcbc/edit.php"),
+                data=data,
+                files={"fulnew[]": (item["filename"], item["content"], item["content_type"])},
+                timeout_ms=120000,
+            )
+            body = (resp.text or "").strip()
+            if resp.status_code == 200 and not body.startswith("err::"):
+                uploaded.append(display)
+            else:
+                failed.append(
+                    {
+                        "display_name": display,
+                        "error": f"edit.php http={resp.status_code} {body[:200]}",
+                    }
+                )
+
+        # 回读校验:HTTP 200 不算数,附件必须真渲染在表单上且没冲坏单据。
+        if uploaded:
+            verify = self._parse_form_defaults(
+                self._post_text("drfcbc/form.php", {"status": "e", "id": str(booking_id)})
+            )
+            current_names = {v for k, v in verify.items() if k.startswith("fulcurrname")}
+            docno_ok = verify.get("txtdocno") == docno_before
+            for display in uploaded:
+                if not docno_ok:
+                    failed.append({"display_name": display, "error": "readback docno changed"})
+                elif display not in current_names:
+                    failed.append(
+                        {"display_name": display, "error": "readback missing display name"}
+                    )
+                else:
+                    attached += 1
+
+        return {"ok": not failed, "attached": attached, "failed": failed}
+
     def fetch_masters(self) -> Dict[str, List[List[Any]]]:
         """Pull the dropdown lists the connect wizard needs. Best-effort:
         a missing/empty list comes back as []."""

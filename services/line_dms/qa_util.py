@@ -14,6 +14,17 @@ from typing import Any, Dict, List, Optional
 MAX_AMOUNT = Decimal("99999999")
 THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
 
+# 支付渠道补充信息的形态(单一事实源:booking_qa 步进 / qa_cards 文案共用):
+# src_dst=转账问来源+到账两步;ref=单条补充文本;detail=自由描述;None=金额即完结。
+CHANNEL_EXTRA_SHAPE = {
+    "cash": None,
+    "transfer": "src_dst",
+    "cheque": "ref",
+    "cashier_cheque": "ref",
+    "card": "ref",
+    "other": "detail",
+}
+
 
 def parse_amount(text: Optional[str]) -> Optional[Decimal]:
     """泰文数字→阿拉伯、去逗号/空白后 Decimal;非法/超界/超 2 位小数 → None。"""

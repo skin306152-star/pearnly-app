@@ -23,6 +23,7 @@ from services.line_binding import line_client
 from services.line_dms import commands, masters_cache, qa_cards, store
 from services.line_dms._out import _CHANNEL, _thr
 from services.line_dms.qa_util import (
+    CHANNEL_EXTRA_SHAPE,
     car_label,
     car_label_of,
     complete_channel,
@@ -118,11 +119,11 @@ async def _async_question(tenant_id, line_user_id, qa, step) -> Optional[Dict[st
 
 
 # ── webhook 入口 ───────────────────────────────────────────────────────────
-async def handle_text(tenant_id, line_user_id, text, reply_token) -> bool:
+async def handle_text(tenant_id, line_user_id, text, reply_token, sess=None) -> bool:
     """state==booking_qa 时消费文本;全局命令与其它态一律返 False 让上层接管。"""
     if commands.classify(text):
         return False
-    qa = await _qa(tenant_id, line_user_id)
+    qa = await _qa(tenant_id, line_user_id, sess)
     if qa is None:
         return False
     step = qa.get("step") or ""
@@ -132,9 +133,9 @@ async def handle_text(tenant_id, line_user_id, text, reply_token) -> bool:
     return True
 
 
-async def handle_image(tenant_id, line_user_id, message_id, reply_token) -> bool:
+async def handle_image(tenant_id, line_user_id, message_id, reply_token, sess=None) -> bool:
     """slip / slip_after 步收凭证图;其它步与其它态返 False(图片不是它们要的输入)。"""
-    qa = await _qa(tenant_id, line_user_id)
+    qa = await _qa(tenant_id, line_user_id, sess)
     if qa is None:
         return False
     step = qa.get("step") or ""
@@ -260,11 +261,11 @@ async def _on_pay_amount(tenant_id, line_user_id, qa, text, reply_token) -> None
         return
     pending = qa["pending_channel"]
     pending["amount"] = f"{amount:.2f}"
-    channel = pending.get("channel", "")
-    if channel == "transfer":
+    shape = CHANNEL_EXTRA_SHAPE.get(pending.get("channel", ""))
+    if shape == "src_dst":
         qa["step"] = "pay_src"
         next_step = "pay_src"
-    elif channel in ("cheque", "cashier_cheque", "card", "other"):
+    elif shape in ("ref", "detail"):
         qa["step"] = "pay_ref"
         next_step = "pay_ref"
     else:  # cash:金额即渠道完结
@@ -293,10 +294,8 @@ async def _on_pay_dst(tenant_id, line_user_id, qa, text, reply_token) -> None:
 async def _on_pay_ref(tenant_id, line_user_id, qa, text, reply_token) -> None:
     pending = qa["pending_channel"]
     extra = pending.setdefault("extra", {})
-    if pending.get("channel") == "other":
-        extra["detail"] = text.strip()
-    else:
-        extra["ref"] = text.strip()
+    slot = "detail" if CHANNEL_EXTRA_SHAPE.get(pending.get("channel")) == "detail" else "ref"
+    extra[slot] = text.strip()
     complete_channel(qa)
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
@@ -447,9 +446,11 @@ async def _to_preview(tenant_id, line_user_id, qa, reply_token) -> None:
 
 
 # ── 会话 / 主档 / 出口小工具 ───────────────────────────────────────────────
-async def _qa(tenant_id, line_user_id) -> Optional[Dict[str, Any]]:
-    """读当前 qa;非 booking_qa 态 / 缺 step(会话损坏)→ None(交上层)。"""
-    sess = await _thr(store.get_session, tenant_id, line_user_id)
+async def _qa(tenant_id, line_user_id, sess=None) -> Optional[Dict[str, Any]]:
+    """读当前 qa;非 booking_qa 态 / 缺 step(会话损坏)→ None(交上层)。
+    调用方已读过会话就透传 sess 免二读(text_router「入口只读一次」原则)。"""
+    if sess is None:
+        sess = await _thr(store.get_session, tenant_id, line_user_id)
     if not sess or sess.get("state") != _STATE:
         return None
     qa = (sess.get("payload") or {}).get("qa") or {}

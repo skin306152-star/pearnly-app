@@ -80,7 +80,7 @@ async def _dispatch_image(binding: dict, line_user_id: str, message_id: str) -> 
     state = (sess or {}).get("state")
     if state == "booking_qa":
         consumed = await booking_qa.handle_image(
-            binding["tenant_id"], line_user_id, message_id, None
+            binding["tenant_id"], line_user_id, message_id, None, sess=sess
         )
         if not consumed:
             _push(line_user_id, qa_cards.TXT_NO_IMAGE_NEEDED)

@@ -20,7 +20,11 @@ from services.line_dms.cards import (
     _btn,
     _data,
     _kv_row,
+    _qr_item,
 )
+from services.line_dms.qa_util import CHANNEL_EXTRA_SHAPE
+from services.line_dms.qa_util import car_label as _car_label
+from services.line_dms.qa_util import row_name as _name
 
 # ── 文案(业主逐条确认 · 逐字不改) ─────────────────────────────────────────
 TXT_ASK_SLIP = (
@@ -85,34 +89,12 @@ _MAX_BTN = 20  # quick reply 按钮标签截断(display 宽度)
 _MAX_PAINT_BTNS = 12  # 颜色超过则只列前 12 个,余下可打字匹配
 
 
-def _qr_item(label: str, data: str) -> Dict[str, Any]:
-    """quick reply postback 项(照 cards.edit_menu_message 既有范式)。"""
-    return {
-        "type": "action",
-        "action": {"type": "postback", "label": label, "data": data, "displayText": label},
-    }
-
-
 def _msg(text: str, items: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """文本消息 + 可选 quickReply;无按钮时不出空 items(LINE 会拒)。"""
     msg: Dict[str, Any] = {"type": "text", "text": text}
     if items:
         msg["quickReply"] = {"items": items}
     return msg
-
-
-def _name(row: list) -> str:
-    """主档行 [id, code, name, ...] 的名称;缺名回退代码/ID。"""
-    if len(row) > 2 and row[2]:
-        return str(row[2])
-    return str(row[1]) if len(row) > 1 else str(row[0])
-
-
-def _car_label(row: list) -> str:
-    """车型行标签:代码 + 名称(与 qa_util.car_label 同形)。"""
-    code = str(row[1]) if len(row) > 1 else ""
-    name = str(row[2]) if len(row) > 2 else ""
-    return (code + " " + name).strip()
 
 
 def _pick_rows(rows: List[list], action: str, label_fn) -> List[Dict[str, Any]]:
@@ -227,11 +209,10 @@ def ask_pay_dst() -> Dict[str, Any]:
 
 
 def ask_pay_ref(channel: str) -> Dict[str, Any]:
-    """渠道补充信息按渠道换文案(cheque/cashier_cheque→ref,card→ref,other→detail)。"""
-    if channel in ("cheque", "cashier_cheque"):
-        return _msg(TXT_ASK_CHEQUE_REF)
-    if channel == "card":
-        return _msg(TXT_ASK_CARD_REF)
+    """渠道补充信息文案:分类查 CHANNEL_EXTRA_SHAPE 单表,不再各处硬编码渠道子集。"""
+    shape = CHANNEL_EXTRA_SHAPE.get(channel)
+    if shape == "ref":
+        return _msg(TXT_ASK_CARD_REF if channel == "card" else TXT_ASK_CHEQUE_REF)
     return _msg(TXT_ASK_OTHER_REF)
 
 

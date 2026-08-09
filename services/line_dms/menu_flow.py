@@ -101,9 +101,8 @@ async def _choose(
     """
     mode = MODE_CUSTOMER if action == cards.ACT_MENU_CUSTOMER else "booking"
     old = (sess or {}).get("payload") or {}
-    payload = {
-        k: old.get(k) for k in ("id_card", "id_card_mid", "phone", "endpoint_id") if old.get(k)
-    }
+    # 保留清单派生自 _KEEP_KEYS(mode 由本函数按所选菜单重写,不从旧会话带)。
+    payload = {k: old.get(k) for k in _KEEP_KEYS if k != "mode" and old.get(k)}
     payload["mode"] = mode
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "collecting", payload)
 

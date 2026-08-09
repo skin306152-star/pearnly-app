@@ -55,7 +55,9 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
     # 逐问/确认态先于一切文本路(尤其「含数字→手机号」):金额/单字被吃成号码就废一次会话。
     # booking_review 态文本只提醒点确认/丢弃,不覆写会话(确认/取消是 postback 专属)。
     if state == "booking_qa":
-        if await booking_qa.handle_text(binding["tenant_id"], line_user_id, text, reply_token):
+        if await booking_qa.handle_text(
+            binding["tenant_id"], line_user_id, text, reply_token, sess=sess
+        ):
             return
     if state == "booking_review":
         _reply(reply_token, qa_cards.TXT_CONFIRM_ABOVE)

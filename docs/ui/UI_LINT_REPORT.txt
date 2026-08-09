@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 572 个源文件全扫
+# UI 设计合规扫描报告 · 571 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -152,7 +152,7 @@
      1  static\home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 155(85 文件)
+## 小固定max-width(查是否@media) — 命中 153(84 文件)
      8  src\home\sales-detail.ts
         └ 116: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 161: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -237,9 +237,6 @@
      2  static\dms\dms-intake.css
         └ 995: max-width: min(720px, 100%);
         └ 1514: max-width: min(400px, 100%);
-     2  static\dms\pick.html
-        └ 62: max-width: min(460px, 100%);
-        └ 240: max-width: min(320px, 100%);
      2  static\home-01-base.css
         └ 387: max-width: 240px;
         └ 393: .brand-workspace { font-size: 14px; max-width: 140px; }
@@ -313,7 +310,7 @@
      1  static\dms\dms-intake-confirm.js
         └ 298: '<div class="modal dmsx" style="max-width:480px"><div class="modal-head"><b>' +
      1  static\dms\dms-roster.css
-        └ 136: width: min(420px, 100%);
+        └ 166: width: min(420px, 100%);
      1  static\dms\dms-shell.css
         └ 126: max-width: min(480px, 100%);
      1  static\dms\dms-util.js
@@ -480,7 +477,7 @@
      1  static\home-46-acct-bankmj.css
         └ 99: .mjx .mj th.r,.mjx .mj td.r { text-align: right }
      1  static\home-59-stock-card.css
-        └ 376: #stc-op-mask td.num .stc-in,
+        └ 383: #stc-op-mask td.num .stc-in,
 #stc-op-mask input[type='number'] { text-align: right }
 
 ## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 863(59 文件)

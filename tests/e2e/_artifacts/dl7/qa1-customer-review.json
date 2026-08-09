@@ -1,0 +1,171 @@
+{
+  "kind": "push_messages",
+  "channel": "dms",
+  "to": "Udl5e2e000000000000000000000001",
+  "messages": [
+    {
+      "type": "flex",
+      "altText": "พบข้อมูลลูกค้าในระบบ",
+      "contents": {
+        "type": "bubble",
+        "body": {
+          "type": "box",
+          "layout": "vertical",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "text",
+              "text": "พบข้อมูลลูกค้าในระบบ",
+              "weight": "bold",
+              "size": "md",
+              "wrap": true
+            },
+            {
+              "type": "separator",
+              "margin": "sm"
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "เลขบัตร",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "1101700998118",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "ชื่อ",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "ดีแอลห้า ทดสอบพเนิร์ลลี่",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "วันเกิด",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "15/05/2530",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "ที่อยู่",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "199/8 หมู่ 5 ซ.ทดสอบดีแอล ถ.เจริญนคร ต.คลองต้นไทร อ.คลองสาน จ.กรุงเทพมหานคร 10600",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "เบอร์โทร",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "0811111111",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            }
+          ]
+        },
+        "footer": {
+          "type": "box",
+          "layout": "vertical",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "button",
+              "style": "primary",
+              "height": "sm",
+              "action": {
+                "type": "postback",
+                "label": "ทำใบจองต่อ",
+                "data": "action=keep&nonce=3cb8ebc57aa7a8ef",
+                "displayText": "ทำใบจองต่อ"
+              }
+            },
+            {
+              "type": "button",
+              "style": "secondary",
+              "height": "sm",
+              "action": {
+                "type": "postback",
+                "label": "แก้ไข",
+                "data": "action=edit&nonce=3cb8ebc57aa7a8ef",
+                "displayText": "แก้ไข"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

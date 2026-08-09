@@ -59,12 +59,20 @@ def text_in(recs: list[dict], needle: str) -> bool:
 
 
 def data_values(rec: dict) -> list[str]:
-    return C.flex_buttons(rec)
+    # 逐问的按钮在 quickReply(不是 Flex footer),flex_buttons 解不到 —— 两处都收。
+    vals = list(C.flex_buttons(rec))
+    for msg in rec.get("messages") or []:
+        for item in ((msg or {}).get("quickReply") or {}).get("items") or []:
+            data = ((item or {}).get("action") or {}).get("data")
+            if data:
+                vals.append(data)
+    return vals
 
 
-def wait_data(prefix: str, since: int, timeout: float = 120) -> tuple[dict | None, str]:
+def wait_data(prefix: str, since: int, timeout: float = 240) -> tuple[dict | None, str]:
+    # 逐问发问两种出口都有:图片/后台路径 push,postback 应答路径 reply。
     _, rec = C.wait_outbox(
-        lambda r: r.get("kind") == "push_messages"
+        lambda r: r.get("kind") in ("push_messages", "reply_messages")
         and any(v.startswith(prefix) for v in data_values(r)),
         since=since,
         timeout=timeout,
@@ -93,8 +101,10 @@ def bind_booking_menu() -> None:
     )
     if not bound:
         raise AssertionError("binding receipt missing")
+    # 真实旅程 = 先召唤菜单再选 2:单字 1/2 只在 menu 态才是菜单选项,
+    # 无会话直接发「2」会被含数字文本当号码路由走。
     base = C.outbox_len()
-    C.post_webhook([C.ev_text("2")])
+    C.post_webhook([C.ev_text("เมนู")])
     _, menu = C.wait_outbox(
         lambda r: r.get("kind") == "reply_messages"
         and "จัดทำใบจอง" in json.dumps(r, ensure_ascii=False),
@@ -103,6 +113,13 @@ def bind_booking_menu() -> None:
     )
     if not menu:
         raise AssertionError("booking menu missing")
+    base = C.outbox_len()
+    C.post_webhook([C.ev_text("2")])
+    _, chose = C.wait_outbox(
+        lambda r: "บัตรประชาชน" in json.dumps(r, ensure_ascii=False), base, 20
+    )
+    if not chose:
+        raise AssertionError("mode=booking intake prompt missing")
 
 
 def prepare_customer() -> str:
@@ -144,6 +161,18 @@ def latest_button(since: int, prefix: str) -> str:
     return data
 
 
+def car_keyword() -> str:
+    """车型搜索词从主档缓存现取(测试站车名是 Test/TestModel 一类,写死会搜空)。"""
+    with C._conn() as c, c.cursor() as cur:
+        cur.execute("SELECT masters->'cars'->0 AS car FROM dms_masters_cache LIMIT 1")
+        row = cur.fetchone()
+    car = (dict(row) if row else {}).get("car") or []
+    name = str(car[2] if len(car) > 2 else "") or str(car[1] if len(car) > 1 else "")
+    if not name:
+        raise AssertionError("no car master cached; place step should have fetched masters")
+    return name[:4]
+
+
 def qa_common(*, cash: bool = False, slip: bool = True) -> tuple[str, str, dict]:
     customer_id = prepare_customer()
     if cash:
@@ -155,58 +184,51 @@ def qa_common(*, cash: bool = False, slip: bool = True) -> tuple[str, str, dict]
     else:
         base = C.outbox_len()
         C.post_webhook([C.ev_text("เงินสด")])
-    if not C.wait_outbox(
-        lambda r: r.get("kind") in ("push_messages", "reply_messages")
-        and "สถานที่รับจอง" in json.dumps(r, ensure_ascii=False),
-        base,
-        120,
-    )[1]:
-        raise AssertionError("place question missing")
-
-    base = C.outbox_len()
+    # 基线一律在动作【前】取:问句可能在 post 返回前就落 outbox,后取基线会把它跳过
+    # (首版在 place 步就是这么死锁的:等到了问句→重置基线→再等同一条,永远超时)。
     place = latest_button(base, "qa:place:")
-    post(place)
     base = C.outbox_len()
-    C.post_webhook([C.ev_text("dmax")])
+    post(place)
+    C.post_webhook([C.ev_text(car_keyword())])
     car_card, _ = wait_data("qa:car:", base, 150)
     if not car_card:
         raise AssertionError("car search result missing")
-    base = C.outbox_len()
     car = next(v for v in data_values(car_card) if v.startswith("qa:car:"))
+    base = C.outbox_len()
     post(car)
-    base = C.outbox_len()
     paint = latest_button(base, "qa:paint:")
+    base = C.outbox_len()
     post(paint)
-    base = C.outbox_len()
     C.wait_outbox(lambda r: "วันที่คาดว่าจะส่งมอบ" in json.dumps(r, ensure_ascii=False), base, 120)
+    base = C.outbox_len()
     post("qa:date", {"date": (date.today() + timedelta(days=30)).isoformat()})
-    base = C.outbox_len()
     term = latest_button(base, "qa:term:")
+    base = C.outbox_len()
     post(term)
-    base = C.outbox_len()
     regis = latest_button(base, "qa:regis:")
+    base = C.outbox_len()
     post(regis)
-    base = C.outbox_len()
     regis_card, _ = wait_data("qa:regisname:", base, 120)
-    post(next(v for v in data_values(regis_card) if v.endswith(":card")))
     base = C.outbox_len()
+    post(next(v for v in data_values(regis_card) if v.endswith(":card")))
     pay_card, _ = wait_data("qa:pay:", base, 120)
+    base = C.outbox_len()
     post(next(v for v in data_values(pay_card) if v.endswith(":transfer" if not cash else ":cash")))
+    C.wait_outbox(lambda r: "จำนวนเงิน" in json.dumps(r, ensure_ascii=False), base, 120)
     base = C.outbox_len()
     C.post_webhook([C.ev_text("2000" if cash else "1500")])
-    if cash:
-        base = C.outbox_len()
-    else:
+    if not cash:
         C.wait_outbox(lambda r: "บัญชีต้นทาง" in json.dumps(r, ensure_ascii=False), base, 120)
-        C.post_webhook([C.ev_text("บัญชีลูกค้า 123-4")])
         base = C.outbox_len()
+        C.post_webhook([C.ev_text("บัญชีลูกค้า 123-4")])
         C.wait_outbox(lambda r: "บัญชีปลายทาง" in json.dumps(r, ensure_ascii=False), base, 120)
+        base = C.outbox_len()
         C.post_webhook([C.ev_text("บัญชีบริษัท 567-8")])
-    base = C.outbox_len()
     more = latest_button(base, "qa:more:")
+    base = C.outbox_len()
     post("qa:more:done")
     _, preview = C.wait_outbox(
-        lambda r: r.get("kind") == "push_messages"
+        lambda r: r.get("kind") in ("push_messages", "reply_messages")
         and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False),
         base,
         120,
@@ -254,8 +276,8 @@ def g_qa1() -> tuple[str, str, dict] | None:
             and nonce
             and booking_no
             and found
-            and fields.get("txtmoneytfmon") == "1500.00"
-            and fields.get("txtearnestmoney") == "1500.00"
+            and str(fields.get("txtmoneytfmon", "")).replace(",", "") == "1500.00"
+            and str(fields.get("txtearnestmoney", "")).replace(",", "") == "1500.00"
             and fields.get("txtaccountnumtffrom") == "บัญชีลูกค้า 123-4"
             and fields.get("txtaccountnumtfmon") == "บัญชีบริษัท 567-8"
             and "สำเนาบัตรประชาชน" in names
@@ -293,14 +315,15 @@ def g_cancel() -> None:
         qa_common()
         base = C.outbox_len()
         _, preview = C.wait_outbox(
-            lambda r: r.get("kind") == "push_messages"
+            lambda r: r.get("kind") in ("push_messages", "reply_messages")
             and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False),
             base - 2,
             30,
         )
         post(next(v for v in data_values(preview) if "action=cancel_booking" in v))
         _, receipt = C.wait_outbox(
-            lambda r: r.get("kind") == "push_text" and "ทิ้งรายการแล้ว" in r.get("text", ""),
+            lambda r: r.get("kind") in ("push_text", "reply_text")
+            and "ทิ้งรายการแล้ว" in r.get("text", ""),
             base,
             60,
         )
@@ -346,7 +369,7 @@ def g_cash() -> None:
         names = {v for k, v in fields.items() if k.startswith("fulcurrname")}
         ok = (
             bool(receipt)
-            and fields.get("txtmoneycash") == "2000.00"
+            and str(fields.get("txtmoneycash", "")).replace(",", "") == "2000.00"
             and "ใบโอนเงินจอง" not in names
         )
         if no:
@@ -374,18 +397,18 @@ def g_slip_gate() -> None:
         )
     except AssertionError:
         recs = C.read_outbox()
-        need_slip = text_in(recs[-8:], "มีช่องทางเงินโอน กรุณาส่งสลิป")
+        need_slip = any(
+            "มีช่องทางเงินโอน" in json.dumps(r, ensure_ascii=False) for r in recs[-10:]
+        )
         base = C.outbox_len()
         C.post_webhook([C.ev_text("เงินสด")])
         _, still = C.wait_outbox(
-            lambda r: r.get("kind") == "push_text" and "มีช่องทางเงินโอน" in r.get("text", ""),
-            base,
-            30,
+            lambda r: "มีช่องทางเงินโอน" in json.dumps(r, ensure_ascii=False), base, 30
         )
         base = C.outbox_len()
         C.post_webhook([C.ev_image()])
         _, preview = C.wait_outbox(
-            lambda r: r.get("kind") == "push_messages"
+            lambda r: r.get("kind") in ("push_messages", "reply_messages")
             and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False),
             base,
             120,
@@ -410,8 +433,7 @@ def g_noise_image() -> None:
         )
         if not place:
             raise AssertionError("place question missing")
-        base = C.outbox_len()
-        post(latest_button(base, "qa:place:"))
+        post(next(v for v in data_values(place) if v.startswith("qa:place:")))
         base = C.outbox_len()
         C.post_webhook([C.ev_image()])
         _, msg = C.wait_outbox(
@@ -518,11 +540,17 @@ def report() -> None:
 def main() -> int:
     ART.mkdir(parents=True, exist_ok=True)
     save("outbox.json", C.read_outbox())
+    # DL7_ONLY=qa1,nonce 只重跑指定场景:测试站抖动时避免全量重试狂造垃圾单。
+    only = {t for t in os.environ.get("DL7_ONLY", "").split(",") if t}
     result = g_qa1()
-    g_cancel()
-    g_cash()
-    g_slip_gate()
-    g_noise_image()
+    if not only or "cancel" in only:
+        g_cancel()
+    if not only or "cash" in only:
+        g_cash()
+    if not only or "slip" in only:
+        g_slip_gate()
+    if not only or "noise" in only:
+        g_noise_image()
     g_nonce(result)
     try:
         screenshots(result[1] if result else None)

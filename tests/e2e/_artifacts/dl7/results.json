@@ -1,0 +1,19 @@
+[
+  {
+    "g": "G-QA1",
+    "name": "transfer full chain",
+    "status": "PASS",
+    "notes": "booking=BK000002608000003 search_id=36 preview_labels=True nonce=True attachments=['สำเนาบัตรประชาชน', 'ใบโอนเงินจอง'] payment_fields=1,500.00/1,500.00",
+    "evidence": [
+      "qa1-receipt.json",
+      "qa1-dms-readback.json"
+    ]
+  },
+  {
+    "g": "G-QA6",
+    "name": "nonce replay",
+    "status": "PASS",
+    "notes": "expired=True booking_lookup_stable=True",
+    "evidence": []
+  }
+]

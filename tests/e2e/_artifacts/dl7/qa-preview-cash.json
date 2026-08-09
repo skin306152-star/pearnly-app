@@ -1,0 +1,285 @@
+{
+  "kind": "reply_messages",
+  "channel": "dms",
+  "reply_token": "rt_1786276349724",
+  "messages": [
+    {
+      "type": "flex",
+      "altText": "สรุปใบจอง — ตรวจสอบก่อนยืนยัน",
+      "contents": {
+        "type": "bubble",
+        "body": {
+          "type": "box",
+          "layout": "vertical",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "text",
+              "text": "สรุปใบจอง — ตรวจสอบก่อนยืนยัน",
+              "weight": "bold",
+              "size": "md",
+              "wrap": true
+            },
+            {
+              "type": "separator",
+              "margin": "sm"
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "ลูกค้า",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "ดีแอลห้า ทดสอบพเนิร์ลลี่",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "สถานที่รับจอง",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "นอกสถานที่",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "รุ่น/สี",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "Test TestModel · แดง",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "วันส่งมอบ",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "08/09/2569",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "เงื่อนไขการขาย",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "จัดไฟแนนซ์",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "จดทะเบียนในนาม",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "นิติบุคคล · ดีแอลห้า ทดสอบพเนิร์ลลี่",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "เงินสด",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "2000.00",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "ยอดเงินจองรวม",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "2,000.00",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "separator",
+              "margin": "sm"
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "สำเนาบัตรประชาชน",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "แนบแล้ว",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "ใบโอนเงินจอง",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "—",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            }
+          ]
+        },
+        "footer": {
+          "type": "box",
+          "layout": "vertical",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "button",
+              "style": "primary",
+              "height": "sm",
+              "action": {
+                "type": "postback",
+                "label": "ยืนยัน",
+                "data": "action=confirm_booking&nonce=292c22c48462da21",
+                "displayText": "ยืนยัน"
+              }
+            },
+            {
+              "type": "button",
+              "style": "secondary",
+              "height": "sm",
+              "action": {
+                "type": "postback",
+                "label": "ทิ้ง",
+                "data": "action=cancel_booking",
+                "displayText": "ทิ้ง"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

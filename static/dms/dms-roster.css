@@ -117,10 +117,13 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-/* 08-08 表格对齐标准:表头居中于列;短内容(角色/LINE 状态/状态)居中,
- * 长文本(操作员列·显示名+用户名)保持靠左。具体度足够,不被通用 th 规则压掉。 */
+/* 08-08 表格对齐标准(08-09 补口径):短内容列表头居中;长文本列(操作员)
+ * 「居中靠左」= 表头随内容一起靠左,宽列居中表头会飘在内容右侧半空。 */
 .dms-op-row.head .dms-op-c {
   text-align: center;
+}
+.dms-op-row.head .dms-op-c.name {
+  text-align: left;
 }
 .dms-op-c.role,
 .dms-op-c.line,

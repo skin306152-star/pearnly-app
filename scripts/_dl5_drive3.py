@@ -115,9 +115,7 @@ def bind_booking_menu() -> None:
         raise AssertionError("booking menu missing")
     base = C.outbox_len()
     C.post_webhook([C.ev_text("2")])
-    _, chose = C.wait_outbox(
-        lambda r: "บัตรประชาชน" in json.dumps(r, ensure_ascii=False), base, 20
-    )
+    _, chose = C.wait_outbox(lambda r: "บัตรประชาชน" in json.dumps(r, ensure_ascii=False), base, 20)
     if not chose:
         raise AssertionError("mode=booking intake prompt missing")
 
@@ -397,9 +395,7 @@ def g_slip_gate() -> None:
         )
     except AssertionError:
         recs = C.read_outbox()
-        need_slip = any(
-            "มีช่องทางเงินโอน" in json.dumps(r, ensure_ascii=False) for r in recs[-10:]
-        )
+        need_slip = any("มีช่องทางเงินโอน" in json.dumps(r, ensure_ascii=False) for r in recs[-10:])
         base = C.outbox_len()
         C.post_webhook([C.ev_text("เงินสด")])
         _, still = C.wait_outbox(

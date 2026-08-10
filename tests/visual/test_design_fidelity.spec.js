@@ -791,6 +791,15 @@ async function styleOf(page, sel, props) {
         `自检:毒样本 .${SELFPROBE} 被逮住且只逮它(got ${JSON.stringify(probeRes.orphans)})`
     );
 
+    // 首屏预热:pre-push 电池跑完 CPU 正热时,首次 /home 解析 bundle 可超 20s(第一个
+    // mapping 稳定假红,单跑全绿)。预热让循环内的 20s 就绪判定量产物,不量冷启动。
+    await page
+        .goto('http://localhost:' + PORT + '/home', { waitUntil: 'domcontentloaded' })
+        .catch(() => {});
+    await page
+        .waitForFunction(() => typeof window.routeTo === 'function', { timeout: 60000 })
+        .catch(() => {});
+
     for (const m of MAPPINGS) {
         console.log('\n[' + m.name + ']');
         // 1) 设计稿基线

@@ -79,7 +79,9 @@ class NewDmsCodeTests(unittest.TestCase):
 
 class TechFallbackTests(unittest.TestCase):
     def test_connection_error_prefix(self):
-        hit = plf.friendly_any("connection error: HTTPConnectionPool(host='erp.example', port=80): Max retries exceeded")
+        hit = plf.friendly_any(
+            "connection error: HTTPConnectionPool(host='erp.example', port=80): Max retries exceeded"
+        )
         self.assertIsNotNone(hit, "connection error 未命中技术态兜底")
         self.assertIn("网络", hit["zh"])
 

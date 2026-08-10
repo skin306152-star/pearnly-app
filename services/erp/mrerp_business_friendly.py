@@ -38,6 +38,7 @@ FailedRow.reasons list.
 
 from __future__ import annotations
 
+import re
 from typing import Dict, List, Optional
 
 SUPPORTED_LANGS = ("th", "en", "zh", "zh_TW")
@@ -247,6 +248,12 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "意外错误 · 请联系客服",
         "zh_TW": "意外錯誤 · 請聯絡客服",
     },
+    "ERR_DB_IMPORT": {
+        "th": "ระบบอ่านข้อมูลภายในไม่สำเร็จ เป็นปัญหาของระบบ กรุณาติดต่อฝ่ายสนับสนุน",
+        "en": "The system failed to read internal data. This is a system issue — please contact support.",
+        "zh": "系统内部读取数据失败 · 系统问题,请联系支持",
+        "zh_TW": "系統內部讀取資料失敗 · 系統問題,請聯絡支援",
+    },
     # Product-sync buckets (Task 2 · Zihao 2026-05-18 拍板)
     "ERR_NO_SEED_PRODUCT": {
         "th": "ต้องเลือกสินค้าต้นแบบในวิซาร์ดเชื่อม ERP ก่อนสร้างสินค้าใหม่อัตโนมัติ",
@@ -291,6 +298,18 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "en": "Sales price inherited from the seed product — please " "review in MR.ERP",
         "zh": "销售价继承自种子商品 · 请到 MR.ERP 核对",
         "zh_TW": "銷售價繼承自種子商品 · 請到 MR.ERP 核對",
+    },
+    "ERR_NO_SUPPLIER": {
+        "th": "ใบซื้อนี้ยังระบุผู้ขายไม่ได้ กรุณาตรวจสอบชื่อผู้ขายบนใบกำกับ หรือสร้างข้อมูลผู้ขายก่อนแล้วส่งใหม่",
+        "en": "Could not resolve the supplier for this purchase invoice. Check the supplier name on the invoice or create the supplier first, then push again.",
+        "zh": "这张采购票找不到对应的供应商 · 请核对票面供应商名称,或先建好供应商档案再重推",
+        "zh_TW": "這張採購票找不到對應的供應商 · 請核對票面供應商名稱,或先建好供應商檔案再重推",
+    },
+    "ERR_UNKNOWN_UPLOAD_OUTCOME": {
+        "th": "ยืนยันผลการนำเข้าชุดนี้ไม่ได้ (ระบบไม่ได้รับผลรายบรรทัด) กรุณาตรวจใน MR.ERP ว่านำเข้าแล้วหรือยัง ก่อนตัดสินใจส่งซ้ำ",
+        "en": "The outcome of this batch could not be confirmed (no per-row result was returned). Check in MR.ERP whether it was imported before pushing again.",
+        "zh": "本批上传结果无法确认(未取到逐行回执)· 请先到 MR.ERP 核对是否已导入,再决定是否重推",
+        "zh_TW": "本批上傳結果無法確認(未取到逐行回執)· 請先到 MR.ERP 核對是否已導入,再決定是否重推",
     },
 }
 
@@ -459,9 +478,16 @@ APP_UI_LANGS = ("zh", "th", "en", "ja")
 
 
 def _match_catalog(reason: str) -> Optional[Dict[str, str]]:
-    """命中则返回 catalog 原始 dict(th/en/zh/zh_TW),否则 None。"""
+    """命中则返回 catalog 原始 dict(th/en/zh/zh_TW),否则 None。
+
+    精确匹配 miss 后,再用正则从 reason 开头抠 ERR_ 码 token
+    (生产的 error_msg 常带后缀,如 "ERR_AUTH: login failed" —— 整串精确匹配永远 miss),
+    抠到且在 _ERR_CATALOG 里 → 直接返回该条;仍 miss 才走泰文子串层。"""
     if reason in _ERR_CATALOG:
         return _ERR_CATALOG[reason]
+    m = re.match(r"^(ERR_[A-Z0-9_]+)", reason)
+    if m and m.group(1) in _ERR_CATALOG:
+        return _ERR_CATALOG[m.group(1)]
     low = reason.strip().lower()
     for pattern, translations in _THAI_REASON_CATALOG:
         if pattern.lower() in low:

@@ -39,8 +39,12 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     // 会计确认「还是推」的那一次被小助手领走后没回执:租约到期,队列不会自动再推(再推就是
     // 账上多一张,那份载荷关掉了写侧幂等)。系统分不出写没写,只能请她去 Express 看一眼。
     confirmed_push_unacked: 'erp-reason-confirmed-unacked',
+    // 连接设了「全部人工确认」:票被留人工核对,文案提醒确认后重推。
+    autonomy_hold: 'erp-reason-autonomy-hold',
     low_confidence: 'erp-reason-low-confidence',
     enqueue_error: 'erp-reason-enqueue-error',
+    // 本地小助手版本过旧,数据格式对不上:自更新会兜底,提示等几分钟重推。
+    payload_version_outdated: 'erp-reason-payload-outdated',
     amounts_not_consistent: 'erp-reason-amounts',
     bad_or_missing_date: 'erp-reason-bad-date',
     entry_not_balanced: 'erp-reason-unbalanced',

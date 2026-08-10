@@ -73,6 +73,8 @@ const REASON_CHAPTER: Record<string, ChapterRef> = inSection('stuck', {
     CDX_REINDEX_FAILED: 'exc-write-rollback',
     ACCOUNT_BUSY_LOCKED: 'exc-waiting-lock',
     PRIOR_DOC_STILL_IN_ERP: 'exc-prior-doc',
+    // 写入后回读行数不符=Express 里已有同号明细,指去「清掉重复单据」章。
+    READBACK_VERIFY_FAILED: 'exc-duplicate-lines',
 });
 // 不收 enqueue_error / payload_version_outdated:前者是系统异常(会计做不了任何事,该找我们),
 // 后者是小助手版本落后(自更新解决)。给它们挂教程只会把人引去一篇帮不上忙的文章。

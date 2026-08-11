@@ -224,6 +224,7 @@ class MaterialsGateTests(_BillingTestCase):
 
         合并 = 让会计为我们的故障去充一笔本来就够的钱,充完照样跑不动。
         """
+
         def _boom(user_id, tenant_id):
             raise RuntimeError("db down")
 

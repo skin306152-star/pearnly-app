@@ -272,9 +272,7 @@ class BillingQuoteTests(unittest.TestCase):
     def _quote(self, status):
         from services.ocr import entrypoints
 
-        with mock.patch.object(
-            entrypoints.db, "get_billing_status_combined", return_value=status
-        ):
+        with mock.patch.object(entrypoints.db, "get_billing_status_combined", return_value=status):
             # 图片扩展名:page_count=1 直达计费检查,不碰 PDF 解析
             return entrypoints.billing_quote(dict(_USER), b"fake", "a.jpg")
 
@@ -286,7 +284,12 @@ class BillingQuoteTests(unittest.TestCase):
     def test_real_insufficient_keeps_its_own_code(self):
         from services.ocr import entrypoints
 
-        broke = {"allowed": False, "is_exempt": False, "balance_thb": 0.0, "pages_used_this_month": 0}
+        broke = {
+            "allowed": False,
+            "is_exempt": False,
+            "balance_thb": 0.0,
+            "pages_used_this_month": 0,
+        }
         with mock.patch.object(entrypoints.db, "estimate_pdf_cost_thb", return_value=1.5):
             out = self._quote(broke)
         self.assertEqual(out["error_code"], "insufficient_balance")
@@ -298,9 +301,7 @@ class DmsIdOcrGateTests(unittest.TestCase):
     def _gate(self, status):
         from services.erp import dms_id_ocr
 
-        with mock.patch.object(
-            dms_id_ocr.db, "get_billing_status_combined", return_value=status
-        ):
+        with mock.patch.object(dms_id_ocr.db, "get_billing_status_combined", return_value=status):
             return dms_id_ocr._billing_gate(dict(_USER))
 
     def test_lookup_error_raises_503_not_402(self):
@@ -314,7 +315,12 @@ class DmsIdOcrGateTests(unittest.TestCase):
     def test_real_insufficient_keeps_402(self):
         from services.erp import dms_id_ocr
 
-        broke = {"allowed": False, "is_exempt": False, "balance_thb": 0.0, "pages_used_this_month": 0}
+        broke = {
+            "allowed": False,
+            "is_exempt": False,
+            "balance_thb": 0.0,
+            "pages_used_this_month": 0,
+        }
         with mock.patch.object(dms_id_ocr.db, "estimate_pdf_cost_thb", return_value=1.5):
             with self.assertRaises(dms_id_ocr.DmsOcrError) as ctx:
                 self._gate(broke)

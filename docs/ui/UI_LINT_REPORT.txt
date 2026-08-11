@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 571 个源文件全扫
+# UI 设计合规扫描报告 · 575 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -95,8 +95,8 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 352: 'tn-status-overdraft': '⚠ 透支',
-        └ 394: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 425: 'tn-status-overdraft': '⚠ 透支',
+        └ 467: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
@@ -439,8 +439,8 @@
         └ 1220: 'time-min-ago-suffix': ' 分钟前',
         └ 1221: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 476: 'time-hours-ago': '{n} 小时前',
-        └ 477: 'time-days-ago': '{n} 天前',
+        └ 549: 'time-hours-ago': '{n} 小时前',
+        └ 550: 'time-days-ago': '{n} 天前',
 
 ## table-align-right — 命中 21(13 文件)
 > DESIGN_SYSTEM §21 表格对齐规范:表头居中、短内容格居中、长文本格靠左,禁止 th/td 右对齐

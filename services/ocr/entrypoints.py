@@ -153,6 +153,7 @@ def run_pipeline_for_file(
     plan_code: Optional[str] = None,
     is_exempt: bool = False,
     user_type: Optional[str] = None,
+    account: Optional[str] = None,
 ):
     """通用发票管线 facade → controller(始终走 handlers/invoice.py,返回 PipelineResult)。
 
@@ -174,6 +175,7 @@ def run_pipeline_for_file(
             plan_code=plan_code,
             is_exempt=is_exempt,
             user_type=user_type,
+            account=account,
             options={"max_pages": max_pages, "document_type": document_type},
         )
     ).data

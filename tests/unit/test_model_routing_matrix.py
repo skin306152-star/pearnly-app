@@ -126,6 +126,25 @@ class RoutingMatrixContractTests(unittest.TestCase):
         self.assertEqual(routes["ocr.selfhost.flash"].model, "google/gemma-4-27b")
         self.assertIn("ocr.selfhost.flash", diff)
 
+    def test_qwen_lanes_split_read_and_escalate_arms(self):
+        # 千问档不是单模型档:读取档与升级档必须解析成两个模型,映成同一个就是账单错
+        from services.ai_gateway.providers import qwen
+
+        with scrubbed_env():
+            routes = rm.resolve_routes()
+        for tier in ("flash", "flash_lite"):
+            self.assertEqual(routes[f"ocr.qwen.{tier}"], rm.Route(qwen.DEFAULT_FLASH, "", "qwen"))
+        for tier in ("fallback", "escalate"):
+            self.assertEqual(
+                routes[f"ocr.qwen.{tier}"], rm.Route(qwen.DEFAULT_ESCALATE, "", "qwen")
+            )
+
+    def test_qwen_model_env_moves_only_its_own_arm(self):
+        with scrubbed_env(QWEN_MODEL_ESCALATE="qwen9-test"):
+            diff = rm.diff_from_defaults(rm.resolve_routes())
+        self.assertEqual(set(diff), {"ocr.qwen.fallback", "ocr.qwen.escalate"})
+        self.assertEqual(diff["ocr.qwen.escalate"][1].model, "qwen9-test")
+
     def test_resolve_does_not_leak_override_context(self):
         from services.ocr import gemini_models
 

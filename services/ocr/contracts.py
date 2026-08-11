@@ -34,6 +34,9 @@ class OcrRequest:
     plan_code: Optional[str] = None
     is_exempt: bool = False
     user_type: Optional[str] = None
+    # 当前用户登录邮箱:引擎档按账号灰度时的钥匙(engine_policy.overrides_by_account)。
+    # 拿不到就留空 → 按全局档走;机器发起的批处理入口本就没有"当前用户"。
+    account: Optional[str] = None
     options: Dict[str, Any] = field(default_factory=dict)
 
 

@@ -70,7 +70,7 @@ class PolicyRouteTests(unittest.TestCase):
         body = r.json()
         self.assertEqual(body["policy"]["mode"], "economy")  # 现役档(2026-07-22 起)
         self.assertIn("invoice", body["options"]["tasks"])
-        self.assertEqual(body["options"]["plan_modes"], ["direct35", "economy", "selfhost"])
+        self.assertEqual(body["options"]["plan_modes"], ["direct35", "economy", "selfhost", "qwen"])
 
     def test_selfhost_mode_accepted(self):
         # 自部署档可作全局模式落库(校验走 MODES 派生,后端无需特判)
@@ -125,6 +125,50 @@ class PolicyRouteTests(unittest.TestCase):
         self.assertEqual(args[1]["overrides_by_task"], {"id_card": "direct35"})
         self.assertTrue(args[2])
         m_log.assert_called_once()
+
+    def test_account_override_saved_lowercased(self):
+        with (
+            mock.patch.object(mod.store, "set_setting") as m_set,
+            mock.patch.object(mod, "_log_op"),
+            mock.patch.object(mod.store, "get_setting", return_value=None),
+        ):
+            r = self.client.post(
+                "/api/admin/ocr-engine",
+                json={
+                    "mode": "economy",
+                    "overrides_by_account": {"Zihao@Example.com": "qwen", "x@y.com": ""},
+                },
+            )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            m_set.call_args[0][1]["overrides_by_account"], {"zihao@example.com": "qwen"}
+        )
+
+    def test_account_override_kept_when_body_omits_it(self):
+        # 旧版前端不发这个键:保存一次策略页不许把按人开的灰度悄悄关掉
+        stored = {"mode": "economy", "overrides_by_account": {"zihao@example.com": "qwen"}}
+        with (
+            mock.patch.object(mod.store, "set_setting") as m_set,
+            mock.patch.object(mod, "_log_op"),
+            mock.patch.object(mod.store, "get_setting", return_value={"value": stored}),
+        ):
+            r = self.client.post("/api/admin/ocr-engine", json={"mode": "economy"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            m_set.call_args[0][1]["overrides_by_account"], {"zihao@example.com": "qwen"}
+        )
+
+    def test_bad_account_key_and_mode_400(self):
+        r = self.client.post(
+            "/api/admin/ocr-engine",
+            json={"mode": "economy", "overrides_by_account": {"not-an-email": "qwen"}},
+        )
+        self.assertEqual(r.status_code, 400)
+        r = self.client.post(
+            "/api/admin/ocr-engine",
+            json={"mode": "economy", "overrides_by_account": {"a@b.com": "gpt99"}},
+        )
+        self.assertEqual(r.status_code, 400)
 
     def test_metrics_route_ok(self):
         with mock.patch.object(

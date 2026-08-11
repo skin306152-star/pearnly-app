@@ -114,6 +114,22 @@ def _fire_selfhost() -> None:
         print(f"{'ocr.selfhost.flash':<26} FAIL(raise)  {type(e).__name__}: {str(e)[:100]}")
 
 
+def _fire_qwen(tier: str) -> None:
+    """千问档一发(读取臂/升级臂各自打自己的模型;QWEN_OCR_* 未配 → FAIL(auth))。"""
+    from services.ai_gateway import backends
+
+    t0 = time.time()
+    try:
+        out = backends.get_provider("qwen").text_to_json(
+            'ตอบ JSON เท่านั้น: {"pong": true}', tier=tier, timeout_s=25, max_retries=0
+        )
+        ms = int((time.time() - t0) * 1000)
+        status = "OK" if out.ok else f"FAIL({out.error_kind})"
+        print(f"{'ocr.qwen.' + tier:<26} {status:<12} model={out.model or '?':<26} {ms}ms")
+    except Exception as e:  # noqa: BLE001 — 冒烟工具:任何炸法都落成一行可读结果
+        print(f"{'ocr.qwen.' + tier:<26} FAIL(raise)  {type(e).__name__}: {str(e)[:100]}")
+
+
 def fire_all() -> None:
     print()
     print("真打冒烟(每车道一发,走业务同源水管):")
@@ -122,6 +138,9 @@ def fire_all() -> None:
     _fire_one("ocr.direct35.flash", "flash", None)
     _fire_one("ocr.economy.flash_lite", "flash_lite", "economy")
     _fire_selfhost()
+    # 千问两臂分模型 —— 只打一发看不出升级臂通不通
+    _fire_qwen("flash")
+    _fire_qwen("escalate")
     _fire_embedding()
 
 

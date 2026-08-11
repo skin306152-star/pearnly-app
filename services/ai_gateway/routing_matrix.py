@@ -22,6 +22,7 @@ from collections import OrderedDict
 from typing import Dict, NamedTuple, Tuple
 
 from services.ai_gateway.providers.openai import taxops_intent_model, taxops_verdict_model
+from services.ai_gateway.providers import qwen as qwen_provider
 from services.ai_gateway.providers.selfhost import _model as _selfhost_model
 from services.ai_gateway.providers.vertex import _embed_model, _location, _location_for_model
 from services.ocr import engine_policy, gemini_models
@@ -45,6 +46,9 @@ ROUTE_ENV_VARS: Tuple[str, ...] = (
     "OCR_ENGINE_MODE",
     "OCR_LLM_BACKEND",
     "SELFHOST_OCR_MODEL",
+    "QWEN_MODEL_FLASH",
+    "QWEN_MODEL_ESCALATE",
+    "QWEN_MODEL_VLOCR",
     "VERTEX_LOCATION",
     "VERTEX_LOCATION_25",
     "VERTEX_EMBED_MODEL",
@@ -53,6 +57,10 @@ ROUTE_ENV_VARS: Tuple[str, ...] = (
 # 自部署档在总表里的占位:具体 VLM 由运维 env SELFHOST_OCR_MODEL 定(Gemma4/Qwen 随切),
 # env 全空时显式记作未配置,不是 Gemini 名——冒烟脚本在 prod 会显真名并标"≠默认"。
 _SELFHOST_UNSET = "(unset)"
+
+# 千问档的默认模型名(env 未覆写时的代码事实)——从 provider 取,别在本表复制一份字面量。
+_QWEN_FLASH = qwen_provider.DEFAULT_FLASH
+_QWEN_ESCALATE = qwen_provider.DEFAULT_ESCALATE
 
 _OCR_TIERS: Tuple[str, ...] = ("flash", "flash_lite", "fallback", "escalate")
 
@@ -85,6 +93,12 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "ocr.selfhost.flash_lite": Route(_SELFHOST_UNSET, "", "selfhost"),
     "ocr.selfhost.fallback": Route(_SELFHOST_UNSET, "", "selfhost"),
     "ocr.selfhost.escalate": Route(_SELFHOST_UNSET, "", "selfhost"),
+    # 千问档:后端整体切 qwen,读取档(flash/flash_lite)与升级档(fallback/escalate)分模型,
+    # 名字由 QWEN_MODEL_* 覆写(默认写在 providers/qwen)。云端点无 Vertex 区域概念。
+    "ocr.qwen.flash": Route(_QWEN_FLASH, "", "qwen"),
+    "ocr.qwen.flash_lite": Route(_QWEN_FLASH, "", "qwen"),
+    "ocr.qwen.fallback": Route(_QWEN_ESCALATE, "", "qwen"),
+    "ocr.qwen.escalate": Route(_QWEN_ESCALATE, "", "qwen"),
 }
 
 DEFAULT_BACKEND = "aistudio"
@@ -109,6 +123,11 @@ def resolve_routes() -> "OrderedDict[str, Route]":
             model = _selfhost_model() or _SELFHOST_UNSET
             for tier in _OCR_TIERS:
                 routes[f"ocr.{mode}.{tier}"] = Route(model, "", "selfhost")
+            continue
+        # 千问档:档位由 provider 解析(读取臂/升级臂两个模型),无区域。
+        if engine_policy.MODE_BACKENDS.get(mode) == "qwen":
+            for tier in _OCR_TIERS:
+                routes[f"ocr.{mode}.{tier}"] = Route(qwen_provider.model_for_tier(tier), "", "qwen")
             continue
         token = gemini_models.set_model_override(engine_policy.MODE_MODEL_MAPS[mode])
         try:

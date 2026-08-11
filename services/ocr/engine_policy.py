@@ -56,13 +56,21 @@ MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     # 自部署档:不动 Gemini 档位(空覆写),改把整条 LLM 后端切到 selfhost provider
     # (OpenAI 兼容端点·env SELFHOST_OCR_*)。选中即全管线(直读/Vision 回落)打自托管机。
     "selfhost": {},
+    # 千问全家桶档(2026-08-11 建档 · 后台叫「C·Qwen」):同样不动 Gemini 档位,改切后端到
+    # qwen provider,档位由 providers/qwen.model_for_tier 解析(flash 读取臂 / max 升级臂)。
+    # 发票页另走 qwen_direct 的两臂编排(flash 直读 + vl-ocr 转写 → 代码触发器 → max 重读),
+    # 51 张金标实测 49 中;先按账号灰度对比,别一上来全局切。
+    "qwen": {},
 }
 CONCRETE_MODES = tuple(MODE_MODEL_MAPS)
 MODES = (*CONCRETE_MODES, "auto")
 
+# 直读链按档分叉时点名它(qwen 档的发票页走 qwen_direct 编排),档名字面只在本模块出现。
+MODE_QWEN = "qwen"
+
 # mode → LLM 后端覆盖(未列 = 跟全局 OCR_LLM_BACKEND)。engine_context 进入时按档钉后端,
 # 经 backends.override_backend 下发,get_provider/transport 消费——档位与后端单点同源。
-MODE_BACKENDS: Dict[str, str] = {"selfhost": "selfhost"}
+MODE_BACKENDS: Dict[str, str] = {"selfhost": "selfhost", "qwen": "qwen"}
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "mode": "economy",
@@ -78,6 +86,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # 银行对账单钉 direct35(直通档=吃 env 默认):不跟全局走,全局切 economy 也不影响
     # 银行逐行读取(轻量档读长表整页读崩,见 MODE_MODEL_MAPS 上方实测数)。
     "overrides_by_task": {"bank_statement": "direct35"},
+    # 账号(登录邮箱小写)→ mode 覆写:新引擎按人灰度用它,不必为一个人建表也不必全局切。
+    # 优先级低于任务覆写——银行长表的档位口径不因"给某人开新引擎"被顺手掀翻。
+    "overrides_by_account": {},
 }
 
 # 当前请求生效的 mode(成本台账/日志读它;不在 engine_context 内 = 空串)
@@ -101,18 +112,33 @@ def load_config() -> Dict[str, Any]:
     return cfg
 
 
+def _account_mode(cfg: Dict[str, Any], account: Optional[str]) -> Optional[str]:
+    """账号覆写查表(邮箱大小写不敏感:登录邮箱各处大小写不一,配置里只写小写)。"""
+    key = (account or "").strip().lower()
+    if not key:
+        return None
+    return (cfg.get("overrides_by_account") or {}).get(key)
+
+
 def resolve_mode(
     task: str,
     plan_code: Optional[str] = None,
     is_exempt: bool = False,
     config: Optional[Dict[str, Any]] = None,
+    account: Optional[str] = None,
 ) -> str:
-    """task + 租户套餐 → 生效 mode。env OCR_ENGINE_MODE > task 覆写 > 全局 > 套餐表。"""
+    """task + 账号 + 租户套餐 → 生效 mode。
+    env OCR_ENGINE_MODE > task 覆写 > 账号覆写 > 全局 > 套餐表。"""
     env_mode = os.environ.get("OCR_ENGINE_MODE", "").strip()
     if env_mode in MODE_MODEL_MAPS:
         return env_mode
     cfg = config if config is not None else load_config()
-    mode = (cfg.get("overrides_by_task") or {}).get(task) or cfg.get("mode") or _FAILSAFE_MODE
+    mode = (
+        (cfg.get("overrides_by_task") or {}).get(task)
+        or _account_mode(cfg, account)
+        or cfg.get("mode")
+        or _FAILSAFE_MODE
+    )
     if mode == "auto":
         plan_key = "exempt" if is_exempt else (plan_code or "none")
         mode = (cfg.get("defaults_by_plan") or {}).get(plan_key) or _FAILSAFE_MODE
@@ -126,16 +152,22 @@ def active_mode() -> str:
 
 
 @contextmanager
-def engine_context(task: str, plan_code: Optional[str] = None, is_exempt: bool = False):
+def engine_context(
+    task: str,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+    account: Optional[str] = None,
+):
     """请求级策略生效域:进入时按 mode 下发模型覆写,退出时还原。yield 生效 mode。
 
     已在生效域内(如 recognize/core 带套餐包过、日后又迁进 controller)则原样透传,
-    不许内层无套餐的 resolve 覆盖外层带套餐的结果。"""
+    不许内层无套餐的 resolve 覆盖外层带套餐的结果。account = 当前用户登录邮箱
+    (拿不到就不传,按全局档走)。"""
     active = _ACTIVE_MODE.get()
     if active:
         yield active
         return
-    mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt)
+    mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt, account=account)
     token = gemini_models.set_model_override(MODE_MODEL_MAPS.get(mode))
     backend = MODE_BACKENDS.get(mode)
     backend_token = backends.set_backend_override(backend) if backend else None

@@ -218,8 +218,12 @@ def run_recognition_core(
         from services.ocr.feedback.context import ocr_request_context
 
         _plan_code = (_billing.get("subscription") or {}).get("plan_code")
+        _account = user.get("email")
         _engine_mode = resolve_mode(
-            "invoice", plan_code=_plan_code, is_exempt=bool(_billing.get("is_exempt"))
+            "invoice",
+            plan_code=_plan_code,
+            is_exempt=bool(_billing.get("is_exempt")),
+            account=_account,
         )
         with ocr_request_context(str(user["id"]), _tid(user)):
             _pipe_res = _run_ocr_controller(
@@ -229,6 +233,7 @@ def run_recognition_core(
                 max_pages=max_pages,
                 plan_code=_plan_code,
                 is_exempt=bool(_billing.get("is_exempt")),
+                account=_account,
             )
         # 台账观测参数:实际用的模型(混模型时逗号并列)/是否触发升级臂
         _ocr_models = sorted(

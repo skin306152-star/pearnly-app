@@ -51,9 +51,32 @@ async def get_ocr_engine_policy(request: Request):
     }
 
 
+def _clean_overrides_by_account(raw, current: dict) -> dict:
+    """账号灰度名单校验(邮箱统一小写)。键缺席 = 保持库里现状 —— 旧版前端不发这个键,
+    不保持的话每次在这页点一次保存,都会把按人开的新引擎悄悄关掉。"""
+    if raw is None:
+        return dict(current or {})
+    if not isinstance(raw, dict):
+        raise HTTPException(400, detail="ocr_engine.bad_overrides_by_account")
+    out = {}
+    for k, v in raw.items():
+        email = (k or "").strip().lower()
+        mode = (v or "").strip()
+        if not email:
+            continue
+        if "@" not in email:
+            raise HTTPException(400, detail=f"ocr_engine.bad_account:{k}")
+        if not mode:
+            continue  # 空 = 跟全局,不落库
+        if mode not in MODES:
+            raise HTTPException(400, detail=f"ocr_engine.bad_account_mode:{email}")
+        out[email] = mode
+    return out
+
+
 @router.post("/api/admin/ocr-engine")
 async def set_ocr_engine_policy(request: Request):
-    """body: {mode, defaults_by_plan, overrides_by_task}。整体校验后落库 + 审计。"""
+    """body: {mode, defaults_by_plan, overrides_by_task, overrides_by_account}。校验后落库 + 审计。"""
     user = _require_super_admin(request)
     body = await request.json()
 
@@ -89,6 +112,9 @@ async def set_ocr_engine_policy(request: Request):
         "mode": mode,
         "defaults_by_plan": defaults_by_plan,
         "overrides_by_task": overrides_by_task,
+        "overrides_by_account": _clean_overrides_by_account(
+            body.get("overrides_by_account"), load_config().get("overrides_by_account")
+        ),
     }
     store.set_setting(SETTING_KEY, value, True, by=str(user["id"]))
     _log_op(

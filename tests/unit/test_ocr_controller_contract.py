@@ -71,10 +71,16 @@ class ControllerTest(unittest.TestCase):
             ctx.return_value.__exit__.return_value = False
             imp.return_value.handle.return_value = "ok"
             res = controller.run(
-                _req("invoice", plan_code="L", is_exempt=True, user_type="enterprise")
+                _req(
+                    "invoice",
+                    plan_code="L",
+                    is_exempt=True,
+                    user_type="enterprise",
+                    account="a@b.com",
+                )
             )
         self.assertEqual(res.data, "ok")
-        ctx.assert_called_once_with("invoice", plan_code="L", is_exempt=True)
+        ctx.assert_called_once_with("invoice", plan_code="L", is_exempt=True, account="a@b.com")
 
     def test_policy_task_drives_engine_context_not_handler(self):
         # 银行窄读:handler 仍按 req.task=invoice 路由,引擎档按 policy_task=bank_statement 生效。
@@ -88,7 +94,7 @@ class ControllerTest(unittest.TestCase):
             imp.return_value.handle.return_value = "ok"
             res = controller.run(_req("invoice", policy_task="bank_statement"))
         self.assertEqual(res.data, "ok")
-        ctx.assert_called_once_with("bank_statement", plan_code=None, is_exempt=False)
+        ctx.assert_called_once_with("bank_statement", plan_code=None, is_exempt=False, account=None)
         imp.assert_called_once_with("services.ocr.handlers.invoice")
 
     def test_unknown_policy_task_raises_valueerror(self):

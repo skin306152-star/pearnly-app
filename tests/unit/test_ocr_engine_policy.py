@@ -63,6 +63,37 @@ class ResolveModeTests(unittest.TestCase):
             self.assertEqual(ep.resolve_mode("invoice", plan_code="L", config=cfg), "selfhost")
             self.assertEqual(ep.resolve_mode("invoice", is_exempt=True, config=cfg), "selfhost")
 
+    def test_account_override_beats_global(self):
+        # 按人灰度新引擎:名单里的账号切档,别人照旧
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="a@b.com"), "qwen")
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="c@d.com"), "economy")
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
+
+    def test_account_override_is_case_insensitive(self):
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account=" A@B.com "), "qwen")
+
+    def test_task_override_beats_account(self):
+        # 银行长表的档位口径不因"给某人开新引擎"被顺手掀翻
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
+            self.assertEqual(
+                ep.resolve_mode("bank_statement", config=cfg, account="a@b.com"), "direct35"
+            )
+
+    def test_env_beats_account_override(self):
+        with mock.patch.dict("os.environ", {**_ENV_CLEAR, "OCR_ENGINE_MODE": "economy"}):
+            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="a@b.com"), "economy")
+
+    def test_bad_account_mode_falls_back(self):
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "gpt99"}}
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="a@b.com"), "economy")
+
     def test_invalid_mode_falls_back(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             cfg = {**ep.DEFAULT_CONFIG, "mode": "gpt99"}
@@ -133,6 +164,19 @@ class EngineContextTests(unittest.TestCase):
                     # 档钉后端 selfhost(直读/Vision shim 调 get_provider 才吃得到)
                     self.assertEqual(backends.override_backend(), "selfhost")
                     # 不动 Gemini 档位(空覆写)
+                    self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
+            self.assertIsNone(backends.override_backend())
+            self.assertEqual(ep.active_mode(), "")
+
+    def test_qwen_pins_backend_and_leaves_gemini_tiers_alone(self):
+        from services.ai_gateway import backends
+
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
+            with mock.patch.object(ep, "load_config", return_value=cfg):
+                with ep.engine_context("invoice", account="a@b.com") as mode:
+                    self.assertEqual(mode, "qwen")
+                    self.assertEqual(backends.override_backend(), "qwen")
                     self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
             self.assertIsNone(backends.override_backend())
             self.assertEqual(ep.active_mode(), "")
@@ -212,6 +256,28 @@ class CostByRecordedModelTests(unittest.TestCase):
                 [_page(["ID"], l2i=1_000_000, l2o=1_000_000, l2_model="google/gemma-4-27b")]
             )
         self.assertEqual(thb, 0.0)
+
+    def test_qwen_arms_priced_apart(self):
+        # 读取臂与升级臂差 60x/46x:两臂共用一个价就把 qwen 档的账算飞了
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            thb = c._compute_total_cost(
+                [
+                    _page(
+                        ["ID", "ID_ESC"],
+                        l2i=1_000_000,
+                        l2o=1_000_000,
+                        l3i=1_000_000,
+                        l3o=1_000_000,
+                        l2_model="qwen3.7-flash",
+                        l3_model="qwen3.8-max",
+                    )
+                ]
+            )
+        self.assertAlmostEqual(thb, (0.03 + 0.13 + 2.00 + 6.00) * 35.0, places=4)
+
+    def test_qwen_transcription_model_priced(self):
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            self.assertEqual(c.price_per_m_usd("qwen-vl-ocr-2025-11-20"), (0.072, 0.164))
 
     def test_missing_recorded_model_falls_back_to_env_tier(self):
         # 旧结果/直调层函数没记模型 → 按当前档位计(默认 3.5)

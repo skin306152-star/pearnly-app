@@ -32,6 +32,11 @@ MODEL_PRICES_PER_M_USD = {
     # OpenAI(taxops.verdict 工单大脑影子车道)· 2025-08 发布时官方公开价。
     # 2026-07-14 OpenRouter 实价核实($1/$6·三臂摸底考同日钉死)。
     "openai/gpt-5.6-luna": (1.00, 6.00),
+    # 千问全家桶(阿里云百炼国际站 2026-08 价表)。读取臂与升级臂差 60x/46x —— qwen 档的
+    # 成本全看触发器命中率,别按"平均一张多少钱"估。三个前缀互不包含,与 gemini/openai 也不撞。
+    "qwen3.7-flash": (0.03, 0.13),
+    "qwen3.8-max": (2.00, 6.00),
+    "qwen-vl-ocr": (0.072, 0.164),
 }
 
 # 旧常量名保留(pipeline re-export 契约):按历史档位口径取值的别名。

@@ -9,8 +9,9 @@ source_tier 判定(C1 数据源分级):进项单 source 来自 OCR 入口(photo/
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
 from decimal import Decimal
+
+from services.sales.dates import bangkok_today
 
 _OCR_SOURCES = ("photo", "line", "email")
 
@@ -37,7 +38,9 @@ def load(
 
 
 def _today():
-    return datetime.now(timezone.utc).date()
+    """voucher_date 兜底日必须取曼谷日历日:服务器跑 UTC,曼谷 00:00–07:00 期间 UTC 还停在
+    昨天,月初那几小时会把整张凭证的 period(voucher_date 的 %Y-%m)落进上一个会计期间。"""
+    return bangkok_today()
 
 
 def _purchase(cur, *, tenant_id, workspace_client_id, doc_id):

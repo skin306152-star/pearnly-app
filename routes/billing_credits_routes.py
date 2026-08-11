@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.auth import get_current_user_from_request
 from services.authz.deps import is_owner_role
+from services.sales.dates import bangkok_now, bangkok_today
 
 logger = logging.getLogger("mr-pilot")
 
@@ -26,8 +27,6 @@ router = APIRouter()
 @router.get("/api/me/credits")
 async def get_my_credits(request: Request, response: Response):
     """查询账户余额和用量（区分老板/员工视角）"""
-    import datetime as _dt
-
     # 2026-05-24 · 余额是实时数据 · 禁止浏览器缓存
     # (此前缺这头 → 充值审核通过后前端轮询/刷新仍读到旧余额 0 · 用户以为没到账)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
@@ -43,9 +42,8 @@ async def get_my_credits(request: Request, response: Response):
         return {"has_tenant": False, "is_owner": is_owner}
 
     tid = str(tenant_id)
-    # Task 6A · Asia/Bangkok 时区(UTC+7)· 与 deduct_company_credits 锚点一致
-    _bkk = _dt.timezone(_dt.timedelta(hours=7))
-    year_month = _dt.datetime.now(_bkk).strftime("%Y-%m")
+    # Task 6A · 用量月按曼谷本地月切,与 deduct_company_credits 锚点一致(时区常量单一出口)
+    year_month = bangkok_now().strftime("%Y-%m")
 
     if is_owner:
         balance_thb = 0.0
@@ -333,7 +331,9 @@ async def credits_usage_report(
     if not is_owner:
         user_id = str(user["id"])  # 员工只能导出自己
 
-    today = _dt.date.today()
+    # 默认区间「本月至今」按曼谷日历日:服务器跑 UTC,曼谷 00:00–07:00 期间月初会退回上个月,
+    # 老板导出的用量明细跟账单月对不上。
+    today = bangkok_today()
     try:
         if start_date:
             sd = _dt.date.fromisoformat(start_date)

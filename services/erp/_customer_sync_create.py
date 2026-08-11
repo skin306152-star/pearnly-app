@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
 from typing import List
 
 from playwright.sync_api import (
@@ -27,6 +26,7 @@ from services.erp._customer_sync_const import (
     DEFAULT_CUSTOMER_CODE_PREFIX,
     CUSTOMER_NAME_MAX,
 )
+from services.sales.dates import bangkok_today
 
 logger = logging.getLogger(__name__)
 
@@ -399,7 +399,9 @@ class CustomerCreateMixin:
         """
         import random
 
-        today = date.today()
+        # 月份码按曼谷日历月:服务器跑 UTC,曼谷 00:00–07:00 期间 UTC 还在上个月 → 1 号凌晨建的
+        # 客户会拿到上月前缀,和会计在 ERP 里按月份码找客户的习惯对不上。
+        today = bangkok_today()
         prefix = f"{DEFAULT_CUSTOMER_CODE_PREFIX}{today.year % 100:02d}{today.month:02d}"
         # 2026-05-26 修:按月份码前缀**过滤分页拉全**(只该月那批·量小)→ 真实 max+1 ·
         # 起点准了基本一次命中。此前用 _fetch_listing(首页 30 条)起点偏小 + 搜索校验偶发

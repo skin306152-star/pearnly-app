@@ -17,6 +17,7 @@ from core.pos_api import assert_module_enabled, ok, require_workspace_access
 from services.authz import field_mask
 from services.authz.deps import require_perm_pos_tid
 from services.inventory import reports as report_svc
+from services.sales.dates import bangkok_today
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory-report"])
 
@@ -39,7 +40,9 @@ async def api_inventory_report(
     near_expiry_days: int = Query(30, ge=1, le=365),
 ):
     """进销存 + 周转 + 近效期看板。默认期间=本月 1 号至今天(请求可覆盖 from/to)。"""
-    today = date.today()
+    # 默认窗口按曼谷日历日:服务器跑 UTC,曼谷 00:00–07:00 期间 UTC 还是昨天/上个月,
+    # 1 号凌晨看板会缺当天进出、且「本月 1 号」退回上个月 1 号。
+    today = bangkok_today()
     d_to = _parse_date(date_to, today)
     d_from = _parse_date(date_from, today.replace(day=1))
     tid, _uid = require_perm_pos_tid(request, "inv.report.view")

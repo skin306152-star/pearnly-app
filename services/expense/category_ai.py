@@ -366,9 +366,11 @@ def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str],
     options = _options(categories)
     if not options:
         return None
-    from datetime import date as _date
+    from services.sales.dates import bangkok_today
 
-    today = _date.today().isoformat()
+    # 喂 LLM 的基准日必须是用户所在的曼谷日历日:服务器跑 UTC,曼谷 00:00–07:00 期间还停在昨天,
+    # 「昨天买的」会被解析成前天。
+    today = bangkok_today().isoformat()
     nums = {n.replace(",", "") for n in re.findall(r"\d[\d,]*(?:\.\d+)?", text or "")}
     listing = _listing(options)
     try:

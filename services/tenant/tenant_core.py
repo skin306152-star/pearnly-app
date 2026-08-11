@@ -186,11 +186,12 @@ def get_tenant_monthly_usage(tenant_id: str) -> Dict[str, Any]:
             quota = int(row["monthly_quota"] or 0)
             used = int(row["used_this_month"] or 0)
 
-            # 跨月显示层检查
+            # 跨月显示层检查。今天按曼谷日历日取:服务器跑 UTC,曼谷 00:00–07:00 期间 UTC 还在
+            # 上个月 → 1 号凌晨判不出跨月,配额不清零,用户看到的剩余量是上个月的残值。
             reset_at = row.get("quota_reset_at")
-            from datetime import date
+            from services.sales.dates import bangkok_today
 
-            today = date.today()
+            today = bangkok_today()
             if reset_at and hasattr(reset_at, "year"):
                 if reset_at.year != today.year or reset_at.month != today.month:
                     used = 0
@@ -212,6 +213,9 @@ def increment_tenant_monthly_usage(tenant_id: str, n: int = 1) -> int:
     """
     租户级配额累加 · 跨月自动重置
     返回最新 used_this_month · 失败返回 -1
+
+    跨月判定按曼谷日历月截断(库跑 UTC):否则曼谷 1 号 00:00-06:59 写侧还认上月,
+    与读侧 get_tenant_monthly_usage 的曼谷口径打架。
     """
     if not tenant_id:
         return -1
@@ -222,11 +226,11 @@ def increment_tenant_monthly_usage(tenant_id: str, n: int = 1) -> int:
                 UPDATE tenants SET
                     used_this_month = CASE
                         WHEN quota_reset_at IS NULL
-                          OR quota_reset_at < DATE_TRUNC('month', NOW())::date
+                          OR quota_reset_at < DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Bangkok')::date
                         THEN %s
                         ELSE COALESCE(used_this_month, 0) + %s
                     END,
-                    quota_reset_at = DATE_TRUNC('month', NOW())::date,
+                    quota_reset_at = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Bangkok')::date,
                     last_active_at = NOW(),
                     updated_at = NOW()
                 WHERE id = %s

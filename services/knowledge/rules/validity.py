@@ -19,6 +19,7 @@ from services.knowledge.rules.context import (
     Invoice,
     RuleContext,
 )
+from services.sales.dates import bangkok_today
 
 _THAI_HQ = "สำนักงานใหญ่"
 _BUDDHIST_OFFSET = 543
@@ -117,7 +118,9 @@ def r_date_01_legal(invoice: Invoice, ctx: RuleContext) -> list[Finding]:
                 evidence={"invoice_date": invoice.invoice_date, "normalized": None},
             )
         ]
-    today = ctx.today or date.today()
+    # "Today" is the Bangkok calendar day: the server runs UTC, so between 00:00 and 07:00
+    # local an invoice dated today would be flagged as future-dated.
+    today = ctx.today or bangkok_today()
     if parsed > today:
         return [
             Finding(
@@ -157,7 +160,9 @@ def r_date_02_accounting_period(invoice: Invoice, ctx: RuleContext) -> list[Find
     parsed = parse_invoice_date(invoice.invoice_date)
     if parsed is None:
         return []  # R-DATE-01 already reports an unparseable date
-    today = ctx.today or date.today()
+    # Bangkok calendar day again: current_month/prev_month windows are derived from it, and a
+    # UTC day still stuck in the previous month shifts the whole window by one month.
+    today = ctx.today or bangkok_today()
     start, end = _accounting_window(rule.rule_body.get("mode", "fixed"), today, rule.rule_body)
     if (start and parsed < start) or (end and parsed >= end):
         return [

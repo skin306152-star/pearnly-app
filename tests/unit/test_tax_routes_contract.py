@@ -5,8 +5,9 @@
 import inspect
 import json
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from unittest import mock
 
 import routes.tax_routes as mod
 from core.pos_api import PosError
@@ -178,6 +179,35 @@ class ExportDispatchTests(unittest.TestCase):
     def test_unknown_fmt_raises_not_falls_through(self):
         with self.assertRaises(PosError):
             self._dispatch("csv")
+
+
+class DefaultPeriodClockTests(unittest.TestCase):
+    """默认申报期按曼谷日历月:服务器跑 UTC,曼谷 00:00–07:00 期间 UTC 还在上个月,
+    每月 1 号那几小时默认期会整体退一期(申报截止 15 号,正是会计在赶的时段)。"""
+
+    @staticmethod
+    def _frozen(utc_instant):
+        class _FrozenDatetime:
+            @staticmethod
+            def now(tz=None):
+                return utc_instant.astimezone(tz)
+
+        return _FrozenDatetime
+
+    def _prev_period_at(self, utc_instant):
+        with mock.patch("services.sales.dates.datetime", self._frozen(utc_instant)):
+            return mod._prev_period()
+
+    def test_month_rollover_uses_bangkok_day(self):
+        # UTC 6-30 17:30 = 曼谷 7-01 00:30 → 该报的是 6 月;按 UTC 会退成 5 月。
+        instant = datetime(2026, 6, 30, 17, 30, tzinfo=timezone.utc)
+        self.assertEqual(instant.date().month, 6)  # 自证这一刻两边确实不同月
+        self.assertEqual(self._prev_period_at(instant), "2026-06")
+
+    def test_year_rollover_uses_bangkok_day(self):
+        # UTC 12-31 17:30 = 曼谷次年 1-01 00:30 → 该报的是 12 月;按 UTC 会退成 11 月。
+        instant = datetime(2025, 12, 31, 17, 30, tzinfo=timezone.utc)
+        self.assertEqual(self._prev_period_at(instant), "2025-12")
 
 
 if __name__ == "__main__":

@@ -17,11 +17,11 @@ v114 · PDF 留底存储模块
 import os
 import uuid
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
 from core import file_crypto
+from services.sales.dates import bangkok_now
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,9 @@ def save_bytes(user_id: str, content: bytes, suffix: str = ".bin") -> Tuple[Opti
         return None, 0
     try:
         user_short = str(user_id).replace("-", "")[:8]
-        ym = datetime.now().strftime("%Y-%m")
+        # 月份桶按曼谷本地月:服务器跑 UTC,曼谷 00:00–07:00 上传的票在月初会落进上个月的目录,
+        # 按月归档/清理时对不上账期。
+        ym = bangkok_now().strftime("%Y-%m")
         safe = suffix if (suffix.startswith(".") and 2 <= len(suffix) <= 6) else ".bin"
         rel = f"{user_short}/{ym}/{uuid.uuid4().hex}{safe}"
         abs_path = Path(PDF_STORAGE_BASE) / rel

@@ -7,10 +7,10 @@
 
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal
 
 from core import db
+from services.sales.dates import bangkok_today
 
 
 def do_record_multi(
@@ -26,7 +26,9 @@ def do_record_multi(
 
     created_by = str(bound_user["id"]) if bound_user.get("id") else None
     api_key = line_l2.resolve_api_key(bound_user)
-    today = date.today().isoformat()
+    # 记账日兜底取曼谷日历日:服务器跑 UTC,用户深夜(曼谷 00:00–07:00)发的账会记成昨天,
+    # 月初那几笔还会落进上个月的账期。
+    today = bangkok_today().isoformat()
     with db.get_cursor_rls(tid, commit=True) as cur:
         tree = cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws)
         # 优先 LLM 智能拆(口语「ฉันซื้อน้ำดื่ม 10 บาท ทุเรียน 300」→ 干净项目名+额+分类+日期+卖家·

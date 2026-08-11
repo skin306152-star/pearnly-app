@@ -17,6 +17,8 @@ import re
 from datetime import date
 from typing import Optional
 
+from services.sales.dates import bangkok_today
+
 BUDDHIST_ERA_OFFSET = 543
 
 # 佛历年下界。2400 BE = 1857 AD,早于任何现行票据;公历年份不可能落进这个区间,
@@ -51,7 +53,9 @@ def two_digit_year_to_gregorian(yy: int, anchor_year: Optional[int] = None) -> i
     仓库里此前有四套互斥判据(一律佛历 / yy<70 当公历 / yy>=43 才当佛历 / 取最近),
     同一个 `69` 能解出 2026 或 2069 —— 后者还能通过 2000..2099 的窗校验落库。
     """
-    anchor = anchor_year or date.today().year
+    # 锚点年按曼谷日历日取:服务器跑 UTC,12 月 31 日的曼谷 00:00–07:00 那边还是去年,
+    # 跨年那几小时两位年会往回消歧一年。
+    anchor = anchor_year or bangkok_today().year
     return min((2000 + yy, 1957 + yy), key=lambda y: abs(anchor - y))
 
 

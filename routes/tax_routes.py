@@ -11,7 +11,6 @@ e-Tax 直报未接通(RD 开放度未确认)→ file(etax) 诚实返 tax.efiling
 from __future__ import annotations
 
 import json
-from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request, Response
@@ -21,6 +20,7 @@ from core import db
 from core.pos_api import PosError, assert_module_enabled, ok
 from core.workspace_context import default_workspace_id, read_workspace_id
 from services.authz.deps import check_request_scope, require_perm_pos
+from services.sales.dates import bangkok_today
 from services.tax import aggregate, efiling, filings
 from services.tax import anomalies as tax_anomalies
 from services.tax import settings as tax_settings
@@ -86,8 +86,12 @@ def _uid(user: dict) -> Optional[str]:
 
 
 def _prev_period() -> str:
-    """报税中心默认期 = 上个月(本月要报的是上期的税)。"""
-    today = date.today()
+    """报税中心默认期 = 上个月(本月要报的是上期的税)。
+
+    今天按曼谷日历日取:服务器跑 UTC,曼谷 00:00–07:00 期间 UTC 还在上个月,每月 1 号那几小时
+    默认期会倒退成上上期(申报期只到 15 号,正是会计赶申报的时段)。
+    """
+    today = bangkok_today()
     year, month = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
     return f"{year:04d}-{month:02d}"
 

@@ -34,6 +34,7 @@ from services.knowledge.schema import (
     ClientRule,
 )
 from services.knowledge.access import AccessibleIds, workspace_filter
+from services.sales.dates import bangkok_today
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,9 @@ def validate_rule(rule_type: str, subject_type: str, subject_key, body: dict) ->
 def load_client_rules(
     cur, *, tenant_id: str, workspace_client_id: Optional[int], on_date: Optional[date] = None
 ) -> ClientRuleSet:
-    on_date = on_date or date.today()
+    # Effective-dating follows the Bangkok calendar day: the server runs UTC, so between
+    # 00:00 and 07:00 local a rule that starts today would still be filtered out.
+    on_date = on_date or bangkok_today()
     cur.execute(
         f"SELECT {_CR_COLS} FROM client_rules "
         "WHERE tenant_id = %s AND is_active "

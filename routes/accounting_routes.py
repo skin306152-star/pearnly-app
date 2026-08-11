@@ -22,6 +22,7 @@ from services.accounting import settings as acct_settings
 from services.accounting import store as acct_store
 from services.accounting import templates as jv_templates
 from services.accounting import vouchers as jv
+from services.sales.dates import bangkok_today
 
 router = APIRouter(prefix="/api/accounting", tags=["accounting"])
 
@@ -102,7 +103,9 @@ async def api_list_vouchers(
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        cur_period = period or date.today().strftime("%Y-%m")
+        # 默认账期跟曼谷日历月:UTC 日在曼谷 00:00–07:00 还停在上个月,月初打开凭证列表
+        # 会看到上期的汇总数。
+        cur_period = period or bangkok_today().strftime("%Y-%m")
         items = jv.list_vouchers(
             cur,
             tenant_id=tid,

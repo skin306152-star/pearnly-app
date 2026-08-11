@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
 from decimal import Decimal
 from typing import Optional
 
@@ -21,6 +20,7 @@ from services.accounting import coa_preset, review, rules, sources
 from services.accounting import settings as acct_settings
 from services.accounting import store as acct_store
 from services.accounting import vouchers as jv
+from services.sales.dates import bangkok_today
 
 logger = logging.getLogger("mr-pilot")
 
@@ -249,7 +249,9 @@ def reverse_voucher(
     if not lines:
         return voucher
 
-    today = date.today()
+    # 「当前开放期间」按曼谷日历日算:服务器跑 UTC,曼谷 00:00–07:00 期间 UTC 还在上个月,
+    # 红冲会落进已结/已申报期(要么被 no_open_period 误拦,要么污染已报历史)。
+    today = bangkok_today()
     period = today.strftime("%Y-%m")
     settings = acct_settings.get_settings(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id

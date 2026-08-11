@@ -30,6 +30,7 @@ class RoutesContractTests(unittest.TestCase):
             ("GET", "/api/admin/ocr-engine"),
             ("POST", "/api/admin/ocr-engine"),
             ("GET", "/api/admin/ocr-engine/metrics"),
+            ("GET", "/api/admin/ocr-engine/costs"),
         }
         self.assertEqual(got, expected)
 
@@ -177,6 +178,31 @@ class PolicyRouteTests(unittest.TestCase):
             r = self.client.get("/api/admin/ocr-engine/metrics?days=7")
         self.assertEqual(r.status_code, 200)
         m_metrics.assert_called_once_with(days=7)
+
+    def test_costs_route_returns_attribution_envelope(self):
+        payload = {
+            "days": 7,
+            "rows": [{"entry_point": "bank_recon", "cost_per_page": 2.2}],
+            "unattributed": {"calls": 3, "cost_thb": 0.5},
+            "generated_at": "2026-08-11T00:00:00+00:00",
+        }
+        with mock.patch.object(mod, "get_cost_by_entry_point", return_value=payload) as m_costs:
+            r = self.client.get("/api/admin/ocr-engine/costs?days=30")
+        self.assertEqual(r.status_code, 200)
+        m_costs.assert_called_once_with(days=30)
+        self.assertEqual(r.json(), payload)
+
+    def test_costs_route_days_bounds_enforced(self):
+        for bad in ("0", "91"):
+            r = self.client.get(f"/api/admin/ocr-engine/costs?days={bad}")
+            self.assertEqual(r.status_code, 422, f"days={bad} 应被拒")
+
+    def test_costs_route_requires_super_admin(self):
+        with mock.patch.object(
+            route_helpers, "get_current_user_from_request", return_value={"is_super_admin": False}
+        ):
+            r = self.client.get("/api/admin/ocr-engine/costs")
+        self.assertEqual(r.status_code, 403)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,16 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-11 晚 · 体检未修队列一次收官 · d8c876a5..380a2f34 共 14 commit 上线)
+## 当前状态卡(2026-08-12 凌晨 · 订车单销售提成归属修复 · commit 8208dfa2)
+
+- **✅ 全链一天闭环**:Korn 答复提成机制(认建单登录账号→自动写顾问栏)→ 两路勘察推翻旧判断(LINE 建单本来就各用各的 DMS 账号,断的是顾问栏恒填名册首行)→ 测试站 probe 实证(**填谁存谁/空则拒收/顾问名册 code 列=登录名**)→ 施工+simplify 四路收口 → 七场景 E2E 全绿(dl7 报告入库,新 G-QA7=无归属开局即拦零写入)。机制:开局按操作员 DMS 登录名匹配名册(唯一命中),端点 booking_defaults.advisor_id 可钉死,认不出发泰语拦截(走 push 防 reply 过期);建单层 `_advisor_ref_strict` 严格校验(ERR_DMS_ADVISOR_REQUIRED/UNMATCHED 双目录四语+parity 闸);继承剥离 advisor_*(G-QA7 实锤老板钉死会顺继承流满全店);预览卡/回执/台账三处带顾问名。全档+雷区见记忆 `dms-booking-advisor-attribution-shipped`。
+- **🔄 push 状态**:commit `8208dfa2` 已提交**未推**——本地压着隔壁窗口 8 笔 qwen/成本归因 commit(不捎带别窗半飞行批次),Monitor 看守 origin,它们落远端后本窗立即 push+盯 CI。若接窗时仍未推:`git log origin/master..master` 自查,只剩本窗 commit 即可推。
+- **✅ 前窗挂账已清**:CI run 31503683137(体检批)conclusion=success。
+- **🛑 新雷/待办**:①真车行顾问名册 code 是否=登录名未核(UltraViewer 会顺验;不匹配也有钉死出路+拦截指路)②向导保存整包覆写 endpoint config,会吞手工钉的 advisor_* 和 id_card_auto_push(存量雷,中期=update 改按键 merge 或 pin 搬花名册 UI)③deploy-release skill 的「4 语 release_notes 缺一不部署」已过时(版本横幅已下线,/api/version 不再返回 release_notes),本窗已修正 skill。
+- (沿袭等人项照旧:ขั้นที่1 三问、OCR 计费口径、v1.1.61-64 真机回执、批量推送重启信号)
+
+---
+
+## 历史 · 2026-08-11 晚状态卡(体检未修队列一次收官 · d8c876a5..380a2f34 共 14 commit 上线)
 
 - **✅ 体检队列 8 项全修并 push**(6 路 Opus 代理施工+主控逐行验收,详单见记忆 healthcheck-fix-batch-2026-08-11):①authz 闸改 AST(注释/死分支/写库后的门现形,660 路由零误伤)②UTC 会计期间 14 处收编曼谷(含 tenant_core 写侧 SQL,真库验过表达式)③LINE 双 webhook claim/ack 状态机(failed 留证据+回执请用户重发,不机器重放)④计费闸 fail-closed(根因+9 调用点,lookup_error 503 与 insufficient_balance 402 分码)⑤订阅扣费 26 条测试(变异验证)⑥导出 3 端点去 N+1+100 上限(批量查询与单条版共用归属 WHERE)⑦3 个高敏 spec 带凭据进 CI(secrets=pearnly_e2e_1·每 spec 独立进程防互踢)⑧生产 .env 第 4 行冗余 EMAIL_ENCRYPTION_KEY 已删(备份 .env.bak-emailkey-20260811)。
 - **✅ b39a1378 前端防重闸点击级验收补完并上线**:pearnly_e2e_1(自查生产库确认 sales/expense 开)+本地反代真浏览器——采购双击→1 请求、销项向导双击开出→建草稿 1 次开出 1 次、withBusy abort 注入后按钮复活,截图在会话 _uitest/shots。**顺手揪出 b39a1378 漏建 dist/home.html(?v 未同步,老缓存用户永远拿不到修复),已重建上线**;线上已验 /home 引 main.js?v=12070113。

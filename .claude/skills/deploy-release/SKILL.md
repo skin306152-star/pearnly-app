@@ -1,6 +1,6 @@
 ---
 name: deploy-release
-description: 部署 = git push origin master(webhook 自动上线约 20 秒),以及每次部署必写的 4 语 release_notes 规则与文案示例、上线是否真生效的验证法。要部署、要发版、要写用户看的更新说明时用。
+description: 部署 = git push origin master(webhook 自动上线约 20 秒)与上线是否真生效的验证法。要部署、要发版时用。
 ---
 
 # 部署 & 发版
@@ -23,26 +23,12 @@ curl https://pearnly.com/api/version
 - 后端改动看 `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ 你 push 的时间
 - **push 了但线上没变**:多半是 git-deploy 的 fetch 撞 GitHub 超时,静默留在旧 commit → ssh 上去重跑 `git-deploy.sh`
 
-## 3. release_notes:每次部署必写 4 语,缺一不部署
+## 3. release_notes:已退役(2026-08-12 核实)
 
-写在 `app.py` 的 `/api/version` 返回里,`zh` / `th` / `en` / `ja` 四个字段。前端 `static/version-banner.js` 30 秒轮询,检测到版本变化弹更新提示。
-
-规则:
-
-- **完全覆盖**,不 prepend 老版本说明。要留历史写进 `release_notes_archived_<vXXX>`(不进公开返回)
-- 每条 1-3 句,通知体:先一句陈述事实(『系统已优化…』『已修复…』),后 1-2 句具体影响
-- 标准官方语言。禁口语化/卖萌(🚨 / 客户反馈 / 我们修了 / 紧急)、禁 commit message 风格(根因 / 修法 / hash)
-- 禁技术词:OCR / API / Gemini / batch / SDK / endpoint / lifecycle 一个都不许出现
-- 大白话,让会计师看懂"我能用上啥"
-
-示例:
-
-```
-zh: "系统已优化『收入对账』Excel 上传的日期识别。此前因日期格式兼容性不足导致部分账册显示『0 行』· 已修复 · 即日生效。"
-th: "ระบบได้ปรับปรุงการอ่านวันที่ในไฟล์ Excel ของ『กระทบยอดรายได้』· ปัญหาที่บางไฟล์แสดง『0 แถว』ได้รับการแก้ไขแล้ว · มีผลทันที"
-```
-
-写完自检四条:① 只剩本次内容(grep 不到旧版本号)② 4 语齐 ③ 官方语言 ④ 无技术词。
+版本横幅(version-banner)已下线,`/api/version` 不再返回 release_notes(见
+`routes/meta_aliases_routes.py` 的 `get_frontend_version` docstring)——部署**不需要**再写
+4 语更新说明。用户可见的行为变化照旧走 i18n 四语文案 + 产品内教程/提示位。
+若横幅日后复活,历史规则(完全覆盖/官方语言/禁技术词/4 语齐)冻结在 git 历史本节旧版。
 
 ## 4. commit message
 

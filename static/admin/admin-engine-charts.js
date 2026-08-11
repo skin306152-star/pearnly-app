@@ -20,32 +20,35 @@
     const MAX_SLICES = 5;
     // 占比低于这条线的切片不外挂标签,靠图例 + 明细表认人 —— 细扇区的引线比数字还占地方。
     const LABEL_MIN_PCT = 6;
+    // 拖动停手后才重排:合并连发的 resize,又短到松手时图已经跟上,人察觉不到延迟。
+    const RESIZE_DEBOUNCE_MS = 150;
 
     let _loader = null;
     const _charts = [];
 
-    function _ink(name, fallback) {
-        try {
-            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-            return v || fallback;
-        } catch (_) {
-            return fallback;
-        }
+    function _ink(styles, name, fallback) {
+        const v = styles ? styles.getPropertyValue(name).trim() : '';
+        return v || fallback;
     }
 
     // 令牌读不到时回落到"能看见"的中性色:图宁可丑,不许因为一个变量没解析出来就画成隐形。
+    // getComputedStyle 取一次复用:它每调一次都强制一次样式解析,一张图要读十来个令牌。
     function _theme() {
+        let styles = null;
+        try {
+            styles = getComputedStyle(document.documentElement);
+        } catch (_) {}
         return {
-            ink: _ink('--ink', 'rgb(35,25,66)'),
-            ink2: _ink('--ink2', 'rgb(91,88,117)'),
-            ink3: _ink('--ink3', 'rgb(143,138,168)'),
-            line: _ink('--line', 'rgb(236,232,246)'),
-            card: _ink('--card', 'rgb(255,255,255)'),
-            over: _ink('--viz-over', 'rgb(208,59,59)'),
-            under: _ink('--viz-under', 'rgb(12,163,12)'),
-            other: _ink('--viz-other', 'rgb(173,181,189)'),
-            series: SERIES_SLOTS.map(function (slot, i) {
-                return _ink(slot, 'rgb(42,120,214)') || SERIES_SLOTS[i];
+            ink: _ink(styles, '--ink', 'rgb(35,25,66)'),
+            ink2: _ink(styles, '--ink2', 'rgb(91,88,117)'),
+            ink3: _ink(styles, '--ink3', 'rgb(143,138,168)'),
+            line: _ink(styles, '--line', 'rgb(236,232,246)'),
+            card: _ink(styles, '--card', 'rgb(255,255,255)'),
+            over: _ink(styles, '--viz-over', 'rgb(208,59,59)'),
+            under: _ink(styles, '--viz-under', 'rgb(12,163,12)'),
+            other: _ink(styles, '--viz-other', 'rgb(173,181,189)'),
+            series: SERIES_SLOTS.map(function (slot) {
+                return _ink(styles, slot, 'rgb(42,120,214)');
             }),
         };
     }
@@ -256,7 +259,12 @@
         });
     }
 
-    window.addEventListener('resize', resizeAll);
+    // 拖窗口一次能打出上百个 resize 事件,每个都让两张图重排一次 —— 停手后再重排一次就够。
+    let _resizeTimer = null;
+    window.addEventListener('resize', function () {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(resizeAll, RESIZE_DEBOUNCE_MS);
+    });
 
     window.AdminEngineCharts = {
         ensure: ensure,

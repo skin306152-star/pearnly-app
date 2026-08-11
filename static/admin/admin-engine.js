@@ -18,6 +18,11 @@
         { mode: 'qwen', code: 'C' },
         { mode: 'selfhost', code: 'D' },
     ];
+    // 接口读不到时的档位兜底 —— 从卡片表派生,加档只改 TIERS 一处,不会出现「新档在卡片上
+    // 有、在下拉里没了」的半截状态。
+    const MODE_FALLBACK = TIERS.map(function (t) {
+        return t.mode;
+    });
     const METRIC_KEYS = ['cost', 'quality', 'speed'];
     const PLANS = ['none', 'S', 'M', 'L', 'exempt'];
     const TASKS = ['invoice', 'id_card', 'bank_statement', 'gl_ledger', 'vat_report'];
@@ -82,6 +87,11 @@
         return html + '</select>';
     }
 
+    /** 能力未齐的档(后端 PARTIAL_MODES):只能按账号灰度,全局/套餐位后端会 400 挡回。 */
+    function _isPartial(mode) {
+        return ((options && options.partial_modes) || []).indexOf(mode) !== -1;
+    }
+
     function _tierCard(tier) {
         const on = policy.mode === tier.mode;
         const metrics = METRIC_KEYS.map(function (k) {
@@ -116,7 +126,15 @@
             metrics +
             '</span><span class="eng-tier-note">' +
             D.esc(_t('adm-eng-tier-' + tier.mode + '-note')) +
-            '</span></label>'
+            '</span>' +
+            (_isPartial(tier.mode)
+                ? '<span class="eng-tier-partial" data-eng-partial="' +
+                  tier.mode +
+                  '">' +
+                  D.esc(_t('adm-eng-partial-note')) +
+                  '</span>'
+                : '') +
+            '</label>'
         );
     }
 
@@ -159,7 +177,7 @@
             host.innerHTML = _stateBox('empty', _t('adm-eng-acct-empty'), '');
             return;
         }
-        const modes = (options && options.modes) || ['direct35', 'economy', 'qwen', 'selfhost'];
+        const modes = (options && options.modes) || MODE_FALLBACK;
         host.innerHTML = accounts
             .map(function (a, i) {
                 return (
@@ -184,7 +202,7 @@
     function _renderPolicy() {
         const host = document.getElementById('adm-eng-policy-body');
         if (!host) return;
-        const planModes = (options && options.plan_modes) || ['direct35', 'economy'];
+        const planModes = (options && options.plan_modes) || MODE_FALLBACK;
         const taskModes = (options && options.modes) || planModes.concat(['auto']);
         host.innerHTML =
             '<div class="eng-tier-grid" id="adm-eng-tiers">' +
@@ -268,8 +286,19 @@
             _renderPolicy();
             D.toast(_t('adm-eng-saved-toast'), 'success');
         } catch (e) {
-            D.toast(_t('adm-eng-save-fail'), 'error');
+            D.toast(_saveErrorText(e), 'error');
         }
+    }
+
+    /** 后端挡回来的理由要看得见:只报「保存失败」的话,超管不知道是哪一格被拒、为什么。
+     *  认识的错误码走译文,不认识的把原码接在后面(比藏起来强)。 */
+    function _saveErrorText(e) {
+        const detail = (e && e.detail) || '';
+        if (!detail) return _t('adm-eng-save-fail');
+        const code = detail.split(':')[0];
+        const key = 'adm-eng-err-' + code.split('.').pop();
+        const text = D.t(key);
+        return text === key ? _t('adm-eng-save-fail') + ' · ' + detail : text;
     }
 
     function _accountsFrom(p) {
@@ -342,11 +371,9 @@
                 });
             }
             const row = e.target.closest('.eng-acct-row');
-            if (!row) return;
-            const idx = Number(row.dataset.engAcct);
-            if (e.target.classList.contains('eng-acct-email')) accounts[idx].email = e.target.value;
-            else if (e.target.classList.contains('eng-acct-mode'))
-                accounts[idx].mode = e.target.value;
+            // 邮箱不在这儿收:input 监听已逐键写回,change 再写一遍是同一个值。
+            if (row && e.target.classList.contains('eng-acct-mode'))
+                accounts[Number(row.dataset.engAcct)].mode = e.target.value;
         });
         root.addEventListener('input', function (e) {
             const row = e.target.closest('.eng-acct-row');
@@ -358,8 +385,9 @@
     async function render(deps) {
         D = deps;
         _bind();
-        await _loadPolicy();
+        // 成本区先发车再等策略:两块数据互不依赖,先 await 策略等于让成本区白等一次往返。
         if (window.AdminEngineCost) window.AdminEngineCost.render(deps);
+        await _loadPolicy();
     }
 
     window.AdminEngine = { render: render };

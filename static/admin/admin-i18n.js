@@ -247,6 +247,7 @@
             'adm-eng-tier-selfhost-speed': '—',
             'adm-eng-tier-selfhost-note':
                 '数据不出门。还没跑过金标,三项都没有实测值,别拿别的档的数字替它。',
+            'adm-eng-partial-note': '当前仅支持按账号灰度 · 补齐单据分类后开放全局',
             'adm-eng-tier-auto-name': '自动 · 按套餐表选档',
             'adm-eng-tier-auto-note': '选它以后,每个租户按下面的套餐默认档走',
             'adm-eng-opt-direct35': 'A · 直通',
@@ -279,6 +280,8 @@
             'adm-eng-save': '保存',
             'adm-eng-saved-toast': '策略已保存 · 30 秒内全员生效',
             'adm-eng-save-fail': '保存失败 · 线上配置没动',
+            'adm-eng-err-partial_mode_account_only':
+                '该档还不能当全局档或套餐默认档(缺单据分类)· 只能在下面按账号灰度',
             'adm-eng-load-fail': '档位配置读取失败',
             'adm-eng-loading': '读取中…',
             'adm-eng-retry': '重试',
@@ -878,6 +881,8 @@
             'adm-eng-tier-selfhost-speed': '—',
             'adm-eng-tier-selfhost-note':
                 'ข้อมูลไม่ออกนอกบ้าน · ยังไม่ได้วัดมาตรฐานทอง ทั้งสามค่าจึงยังไม่มี อย่าเอาตัวเลขของระดับอื่นมาแทน',
+            'adm-eng-partial-note':
+                'ตอนนี้ใช้ได้เฉพาะทยอยเปิดตามบัญชี · เปิดทั้งระบบเมื่อจำแนกประเภทเอกสารครบ',
             'adm-eng-tier-auto-name': 'อัตโนมัติ · เลือกตามตารางแพ็กเกจ',
             'adm-eng-tier-auto-note': 'เลือกแล้ว แต่ละผู้เช่าจะใช้ค่าเริ่มต้นตามแพ็กเกจด้านล่าง',
             'adm-eng-opt-direct35': 'A · ผ่านตรง',
@@ -910,6 +915,8 @@
             'adm-eng-save': 'บันทึก',
             'adm-eng-saved-toast': 'บันทึกนโยบายแล้ว · มีผลทั้งระบบใน 30 วินาที',
             'adm-eng-save-fail': 'บันทึกไม่สำเร็จ · ค่าบนระบบยังไม่เปลี่ยน',
+            'adm-eng-err-partial_mode_account_only':
+                'ระดับนี้ยังตั้งเป็นโหมดหลักหรือค่าเริ่มต้นของแพ็กเกจไม่ได้ (ยังไม่มีการจำแนกประเภทเอกสาร) · ใช้ได้เฉพาะทยอยเปิดตามบัญชีด้านล่าง',
             'adm-eng-load-fail': 'อ่านการตั้งค่าระดับไม่สำเร็จ',
             'adm-eng-loading': 'กำลังอ่าน…',
             'adm-eng-retry': 'ลองใหม่',

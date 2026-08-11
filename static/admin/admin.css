@@ -1071,6 +1071,16 @@ body.admin-layout-body .lang-switching-overlay {
   line-height: 1.5;
   color: var(--ink-3);
 }
+/* 能力未齐的档:提示得比 note 更显眼,否则超管点全局被 400 挡住才第一次知道有限制 */
+.eng-tier-partial {
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--amber-300);
+  background: var(--amber-50);
+  color: var(--amber-800);
+}
 .eng-tier-auto {
   flex-direction: row;
   align-items: center;

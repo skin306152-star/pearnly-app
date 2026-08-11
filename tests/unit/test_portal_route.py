@@ -14,6 +14,7 @@ import asyncio
 import re
 import unittest
 from pathlib import Path
+from xml.etree import ElementTree
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -22,6 +23,7 @@ from routes import pages_routes
 from routes.pages_routes import router
 
 PORTAL = Path("static/landing/portal.dc.html")
+MASCOT = Path("static/landing/pearnly-mascot.svg")
 
 
 class PortalRouteTest(unittest.TestCase):
@@ -81,6 +83,16 @@ class PortalRouteTest(unittest.TestCase):
         # 四卡零注册入口:自助注册走登录页自带流程,门户不放注册按钮/链接
         self.assertNotIn("/register", self.html)
         self.assertNotIn("/signup", self.html)
+
+    def test_intro_uses_vector_pearl_mascot_without_embedded_bitmap(self):
+        self.assertIn("/static/landing/pearnly-mascot.svg?v=1", self.html)
+        root = ElementTree.parse(MASCOT).getroot()
+        tags = [node.tag.rsplit("}", 1)[-1] for node in root.iter()]
+        self.assertNotIn("image", tags)
+        self.assertGreaterEqual(tags.count("path"), 20)
+        svg = MASCOT.read_text(encoding="utf-8")
+        for signature in ("#F6AE5F", "#367F54", "#25AEE4", "pearl-wave", "pearl-blink"):
+            self.assertIn(signature, svg)
 
 
 if __name__ == "__main__":

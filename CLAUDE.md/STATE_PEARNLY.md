@@ -1,6 +1,18 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-12 凌晨 · 订车单销售提成归属修复 · commit 8208dfa2)
+## 当前状态卡(2026-08-12 早 · C·Qwen 引擎档上生产 + 逐入口成本归因 · tip 91d4ed5d)
+
+- **✅ C·Qwen 引擎档全链上线**(四批 Opus 代理施工+主控验收,23 笔提交,CI 绿,生产健康):qwen3.7-flash 直读 + qwen-vl-ocr 转写落地校验 + 代码触发器(勾稽/现金找零/税号 mod-11)+ qwen3.8-max 夹心兜底。金标 51 格 98% 追平 3.5 直读档、普票 0.077 铢(现役 economy 的 0.9 倍价、质量 +8pt)、银行页 1.15 铢(现役 2.2 的一半)。**灰度=overrides_by_account 只对 skin306152@gmail.com**,账号压过任务钉档(上线冒烟实锤修的优先级),principal_context 让银行/GL/VAT/身份证入口同吃灰度;LINE/独立 worker 无登录态吃不到(记档)。升级臂已接 escalation_budget 跑批闸。
+- **✅ 逐入口成本归因 + 引擎页重做**:ai_usage 加 entry_point/doc_type/pages(页数一次性消费槽防摊薄),GET /api/admin/ocr-engine/costs 实时聚合;/admin/engine 推倒重做=档位卡(带模型名/实测参数)+ ECharts 柱图钉 ฿1.50 定价参考线 + 环图 + 明细表,旧 KPI 五卡删除。历史流量落「未归因」是设计如此。**发现定价亏损点:银行页现役成本 2.2 铢 > 售价 1.5**(C 档砍半,紧凑输出可再进 0.5)。
+- **🛡️ C 档全局键上保险**:PARTIAL_MODES——qwen 不产 document_type(贷记单方向复核+ABB 分类的判据),超管写全局/套餐档 400 拒绝,仅准按账号灰度。**解锁钥匙=qwen 编排补 document_type+金标复测**(欠账首位)。
+- **🔑 千问 key**:国际站新 key(1043117·充了余额)本地 `_gemini_key.local/qwen_intl.env` + 生产 .env 已切,只认 ws-专属域名;CN key 已废。归因索引已换 (created_at,entry_point) 并在生产落地。
+- **📝 欠账账本 21 条**(simplify 四角审查,全文 `docs/ocr/HANDOVER-2026-08-12-qwen-c-tier.md`):按新铁律#2 次日首批派 DeepSeek worker,15 条直派/4 条主控先定方案/2 条高敏亲做(document_type 是头号)。
+- **🛑 等 Zihao**:今早真传一张票验 C 档生产第一单(仪表盘会长出 web_upload×qwen 的柱子);国际站余额已充可跑。
+- **⚠️ 共享树血泪三连**(已写记忆):commit 会吞隔壁已暂存文件(永远 `git commit -- <指名路径>`)、dist 一致性闸会被隔壁未提交前端源堵死、同机双窗测试进程互杀致假红。
+
+---
+
+## 历史 · 2026-08-12 凌晨状态卡(订车单销售提成归属修复 · commit 8208dfa2)
 
 - **✅ 全链一天闭环**:Korn 答复提成机制(认建单登录账号→自动写顾问栏)→ 两路勘察推翻旧判断(LINE 建单本来就各用各的 DMS 账号,断的是顾问栏恒填名册首行)→ 测试站 probe 实证(**填谁存谁/空则拒收/顾问名册 code 列=登录名**)→ 施工+simplify 四路收口 → 七场景 E2E 全绿(dl7 报告入库,新 G-QA7=无归属开局即拦零写入)。机制:开局按操作员 DMS 登录名匹配名册(唯一命中),端点 booking_defaults.advisor_id 可钉死,认不出发泰语拦截(走 push 防 reply 过期);建单层 `_advisor_ref_strict` 严格校验(ERR_DMS_ADVISOR_REQUIRED/UNMATCHED 双目录四语+parity 闸);继承剥离 advisor_*(G-QA7 实锤老板钉死会顺继承流满全店);预览卡/回执/台账三处带顾问名。全档+雷区见记忆 `dms-booking-advisor-attribution-shipped`。
 - **✅ 已上线+CI 绿**:两窗 18 笔连推(tip `46c10ad2`,qwen 窗口推送连带本批),生产机已验(deployed commit=46c10ad2 · mrpilot 18:46:52 UTC 重启);CI run 31524471573 attempt1 被基建抖动搅黄(lint-size 的 checkout 全量 fetch 卡 5 分钟被 runner 掐,闸本体没跑,其余 9 闸全绿),attempt2 重跑 **success**。

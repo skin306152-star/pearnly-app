@@ -76,12 +76,17 @@ class ResolveModeTests(unittest.TestCase):
             cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
             self.assertEqual(ep.resolve_mode("invoice", config=cfg, account=" A@B.com "), "qwen")
 
-    def test_task_override_beats_account(self):
-        # 银行长表的档位口径不因"给某人开新引擎"被顺手掀翻
+    def test_account_override_beats_task(self):
+        # 灰度语义 = 名单账号整机试新引擎(所有入口所有单据)。生产后台常年把各任务
+        # 钉了档,账号若排在任务之下,灰度在真机上一次都轮不到(2026-08-12 上线冒烟实锤)。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
             self.assertEqual(
-                ep.resolve_mode("bank_statement", config=cfg, account="a@b.com"), "direct35"
+                ep.resolve_mode("bank_statement", config=cfg, account="a@b.com"), "qwen"
+            )
+            # 名单外账号照旧吃任务钉档,银行口径不被牵连
+            self.assertEqual(
+                ep.resolve_mode("bank_statement", config=cfg, account="x@y.com"), "direct35"
             )
 
     def test_env_beats_account_override(self):

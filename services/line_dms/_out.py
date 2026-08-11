@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""DMS LINE 对话流(flow / booking_flow)共享的后台调度 + LINE 出口工具。
+"""DMS LINE 对话流(flow / booking_flow / booking_qa)共享的后台调度 + LINE 出口工具。
 
-两个对话流文件的 _spawn/_reply/_push 逐字节相同(全走 dms channel)→ 收敛到此,
-后台任务日志 tag 参数化(各文件传自己的标识)。纯工具:无会话态、无业务分支。
+各对话流的 _spawn/_reply/_push 逐字节相同(全走 dms channel)→ 收敛到此,后台任务
+日志 tag 参数化(各文件传自己的标识)。纯文本走 _reply/_push,结构化消息(quickReply /
+Flex)一律走 _send —— 它按有没有 reply_token 自己分流,调用方不再各写一份 push_messages。
+纯工具:无会话态、无业务分支。
 """
 
 from __future__ import annotations
@@ -43,3 +45,16 @@ def _reply(reply_token: str, text: str) -> None:
 
 def _push(line_user_id: str, text: str) -> None:
     line_client.push_text(line_user_id, text, channel=_CHANNEL)
+
+
+def _send(line_user_id: str, msg, reply_token: str = "") -> None:
+    """结构化消息出口(quickReply / Flex 必须走 reply_messages|push_messages)。
+
+    有 reply_token 就 reply,没有就 push —— 逐问既可能应答 postback,也可能由后台任务发起。
+    """
+    if msg is None:
+        return
+    if reply_token:
+        line_client.reply_messages(reply_token, [msg], channel=_CHANNEL)
+    else:
+        line_client.push_messages(line_user_id, [msg], channel=_CHANNEL)

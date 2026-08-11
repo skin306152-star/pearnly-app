@@ -20,6 +20,36 @@ os.environ.setdefault(
 from scripts import _dl5_common as C  # noqa: E402
 
 
+def _upsert_user(user_id: str, username: str, role: str) -> None:
+    import psycopg2
+
+    with psycopg2.connect(C.DB_URL) as conn, conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO users
+                 (id, username, password_hash, tenant_id, role, plan)
+               VALUES (%s, %s, %s, %s, %s, 'free')
+               ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id""",
+            (user_id, username, "x", C.TENANT_ID, role),
+        )
+        conn.commit()
+
+
+def _recreate_endpoint(user_id: str, name: str, cfg: dict) -> str:
+    """该用户的 mrerp_dms 端点重建一份:先删干净,resolve 才不会挑到上一轮的残留。"""
+    from core import db  # import via core.db to avoid the push_store circular import
+    import psycopg2
+
+    with psycopg2.connect(C.DB_URL) as conn, conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM erp_endpoints WHERE user_id=%s AND adapter='mrerp_dms'", (user_id,)
+        )
+        conn.commit()
+    eid = db.create_erp_endpoint(user_id, name, "mrerp_dms", cfg, is_default=True)
+    if not eid:
+        raise RuntimeError(f"create_erp_endpoint failed for {name}")
+    return eid
+
+
 def _seed_tenant_user() -> None:
     import psycopg2
 
@@ -32,36 +62,25 @@ def _seed_tenant_user() -> None:
                ON CONFLICT (id) DO NOTHING""",
             (C.TENANT_ID, "DL5 E2E Tenant"),
         )
-        cur.execute(
-            """INSERT INTO users
-                 (id, username, password_hash, tenant_id, role, plan)
-               VALUES (%s, %s, %s, %s, 'owner', 'free')
-               ON CONFLICT (id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id""",
-            (C.USER_ID, "dl5_e2e", "x", C.TENANT_ID),
-        )
         conn.commit()
+    _upsert_user(C.USER_ID, "dl5_e2e", "owner")
 
 
 def _seed_endpoint() -> str:
-    from core import db  # import via core.db to avoid the push_store circular import
-    import psycopg2
-
-    # Drop any prior DL5 mrerp_dms endpoints so resolve picks a clean one.
-    with psycopg2.connect(C.DB_URL) as conn, conn.cursor() as cur:
-        cur.execute(
-            "DELETE FROM erp_endpoints WHERE user_id=%s AND adapter='mrerp_dms'", (C.USER_ID,)
-        )
-        conn.commit()
     cfg = dict(C.DMS_CFG)
     if os.environ.get("DL5_SINGLE_CRED") == "1":
         # dmstest is itself admin on the test site → route writes through the
         # user session (single-cred). Isolates the admin-writer defect.
         cfg.pop("admin_username", None)
         cfg.pop("admin_password", None)
-    eid = db.create_erp_endpoint(C.USER_ID, C.ENDPOINT_NAME, "mrerp_dms", cfg, is_default=True)
-    if not eid:
-        raise RuntimeError("create_erp_endpoint failed")
-    return eid
+    return _recreate_endpoint(C.USER_ID, C.ENDPOINT_NAME, cfg)
+
+
+def seed_operator_without_advisor() -> str:
+    """第二操作员:同租户同凭据,但端点不钉顾问 → 逐问开局必被拦。G-QA7 专用,按需调。"""
+    _upsert_user(C.USER_ID_NO_ADVISOR, "dl5_e2e_no_advisor", "member")
+    cfg = {k: v for k, v in C.DMS_CFG.items() if k != "booking_defaults"}
+    return _recreate_endpoint(C.USER_ID_NO_ADVISOR, C.ENDPOINT_NAME_NO_ADVISOR, cfg)
 
 
 def _enable_flags() -> None:

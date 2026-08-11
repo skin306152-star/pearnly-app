@@ -47,6 +47,19 @@ _DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
         "th": "สร้างใบจองแล้วแต่บันทึกรายละเอียดเพิ่มเติมไม่สำเร็จ กรุณาตรวจสอบใบจองในระบบ DMS",
         "ja": "予約は作成されましたが詳細の更新に失敗しました。DMS 管理画面でご確認ください。",
     },
+    # 销售顾问 = DMS 提成归属,建单前必须定死(2026-08-11)。这两码只可能出在订车路径。
+    "ERR_DMS_ADVISOR_REQUIRED": {
+        "zh": "这张订车单没有销售顾问 · 系统不会替你猜提成算给谁 · 请让管理员为该 DMS 账号配置销售顾问,然后重新开单",
+        "en": "This booking has no sales advisor, and the system will not guess who the commission belongs to. Ask your admin to configure the advisor for this DMS account, then create the booking again.",
+        "th": "ใบจองนี้ไม่มีที่ปรึกษาการขาย ระบบจะไม่เดาว่าค่าคอมมิชชั่นเป็นของใคร กรุณาให้ผู้ดูแลกำหนดที่ปรึกษาให้บัญชี DMS นี้ แล้วเปิดใบจองใหม่อีกครั้ง",
+        "ja": "この予約には販売アドバイザーが設定されておらず、システムが歩合の帰属を推測することはありません。管理者に該当 DMS アカウントのアドバイザー設定を依頼し、予約を作成し直してください。",
+    },
+    "ERR_DMS_ADVISOR_UNMATCHED": {
+        "zh": "这个销售顾问不在 DMS 的顾问名册里 · 请让管理员在 DMS 顾问名册补上这个账号,或联系 Pearnly 为该账号指定归属,然后重新开单",
+        "en": "This sales advisor is not in the DMS advisor list. Ask your admin to add this account to the DMS advisor list, or contact Pearnly to assign one, then create the booking again.",
+        "th": "ที่ปรึกษาการขายรายนี้ไม่อยู่ในรายชื่อที่ปรึกษาของ DMS กรุณาให้ผู้ดูแลเพิ่มบัญชีนี้ในรายชื่อที่ปรึกษาการขายของ DMS หรือติดต่อทีม Pearnly เพื่อกำหนดให้ แล้วเปิดใบจองใหม่",
+        "ja": "この販売アドバイザーは DMS のアドバイザー名簿にありません。管理者に当該アカウントの追加を依頼するか、Pearnly に割り当てを依頼したうえで、予約を作成し直してください。",
+    },
     "ERR_DMS_TEMPLATE": {
         "zh": "获取 DMS 订车单模板失败 · 请稍后重试",
         "en": "Failed to fetch the DMS booking template. Please retry shortly.",

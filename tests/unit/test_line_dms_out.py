@@ -25,6 +25,31 @@ class ReplyPushTests(unittest.TestCase):
         push.assert_called_once_with("L1", "hi", channel="dms")
 
 
+class SendMessageTests(unittest.TestCase):
+    """结构化消息(quickReply/Flex)出口:有 token 走 reply,没有走 push,None 不发。"""
+
+    def test_send_replies_with_token(self):
+        msg = {"type": "text", "text": "hi"}
+        with mock.patch.object(_out.line_client, "reply_messages") as reply:
+            _out._send("L1", msg, "rt")
+        reply.assert_called_once_with("rt", [msg], channel="dms")
+
+    def test_send_pushes_without_token(self):
+        msg = {"type": "text", "text": "hi"}
+        with mock.patch.object(_out.line_client, "push_messages") as push:
+            _out._send("L1", msg)
+        push.assert_called_once_with("L1", [msg], channel="dms")
+
+    def test_send_ignores_none(self):
+        with (
+            mock.patch.object(_out.line_client, "reply_messages") as reply,
+            mock.patch.object(_out.line_client, "push_messages") as push,
+        ):
+            _out._send("L1", None, "rt")
+        reply.assert_not_called()
+        push.assert_not_called()
+
+
 class SpawnTests(unittest.IsolatedAsyncioTestCase):
     async def test_spawn_runs_coro_on_running_loop(self):
         ran = []

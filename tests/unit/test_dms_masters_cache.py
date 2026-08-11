@@ -69,6 +69,12 @@ class MastersCacheTests(unittest.TestCase):
         mc.get_masters(_EP)
         self.assertEqual(self.masters_calls, 2)
 
+    def test_force_refresh_bypasses_fresh_cache(self):
+        """顾问认不出时要按现场名册重判 → force_refresh 必须真的重抓,不吃 12h 缓存。"""
+        mc.get_masters(_EP)
+        mc.get_masters(_EP, force_refresh=True)
+        self.assertEqual(self.masters_calls, 2)
+
     def test_login_fail_serves_stale(self):
         mc.get_masters(_EP)
         self.mem.rows["E1"]["age"] = 13 * 3600

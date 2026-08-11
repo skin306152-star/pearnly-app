@@ -28,6 +28,16 @@ USER_ID = "d5000000-0000-4000-8000-000000000002"
 LINE_USER_ID = "Udl5e2e000000000000000000000001"
 ENDPOINT_NAME = "DL5 DMS test site"
 
+# 顾问归属:dmstest 不在测试站的顾问名册里,所以主操作员端点上钉死一位顾问
+# (sale02 = id 335,真机 probe 实证),让逐问走「钉死」这条路。
+ADVISOR_PIN_ID = "335"
+ADVISOR_PIN_NAME = "sale02"
+
+# 第二操作员(同租户、同 DMS 凭据、端点【不】钉顾问)—— 专供开局拦截场景。
+USER_ID_NO_ADVISOR = "d5000000-0000-4000-8000-000000000003"
+LINE_USER_ID_NO_ADVISOR = "Udl5e2e000000000000000000000002"
+ENDPOINT_NAME_NO_ADVISOR = "DL5 DMS test site (no advisor)"
+
 SECRET = "e2e-test-secret"  # self-sign / self-verify (env LINE_DMS_CHANNEL_SECRET)
 PORT = 8300
 BASE = f"http://127.0.0.1:{PORT}"
@@ -40,6 +50,7 @@ DMS_CFG = {
     "admin_password": "dmstest",
     "system_url": "https://www.mrerp4sme.com/dms/index.php",
     "id_card_auto_push": True,
+    "booking_defaults": {"advisor_id": ADVISOR_PIN_ID, "advisor_name": ADVISOR_PIN_NAME},
 }
 
 # ── people ids ──────────────────────────────────────────────────────────────
@@ -133,29 +144,29 @@ def post_webhook(events: list, *, signature: str | None = None, secret: str | No
         return e.code, e.read().decode("utf-8", "replace")
 
 
-def ev_text(text: str) -> dict:
+def ev_text(text: str, luid: str = LINE_USER_ID) -> dict:
     return {
         "type": "message",
         "replyToken": "rt_" + str(int(time.time() * 1000)),
-        "source": {"type": "user", "userId": LINE_USER_ID},
+        "source": {"type": "user", "userId": luid},
         "message": {"type": "text", "id": "m" + str(int(time.time() * 1000)), "text": text},
     }
 
 
-def ev_image() -> dict:
+def ev_image(luid: str = LINE_USER_ID) -> dict:
     return {
         "type": "message",
         "replyToken": "rt_" + str(int(time.time() * 1000)),
-        "source": {"type": "user", "userId": LINE_USER_ID},
+        "source": {"type": "user", "userId": luid},
         "message": {"type": "image", "id": "img" + str(int(time.time() * 1000))},
     }
 
 
-def ev_postback(data: str) -> dict:
+def ev_postback(data: str, luid: str = LINE_USER_ID) -> dict:
     return {
         "type": "postback",
         "replyToken": "rt_" + str(int(time.time() * 1000)),
-        "source": {"type": "user", "userId": LINE_USER_ID},
+        "source": {"type": "user", "userId": luid},
         "postback": {"data": data},
     }
 
@@ -246,11 +257,11 @@ def db_push_logs(user_id: str = USER_ID) -> list:
         return [dict(r) for r in cur.fetchall()]
 
 
-def db_session() -> dict | None:
+def db_session(luid: str = LINE_USER_ID) -> dict | None:
     with _conn() as c, c.cursor() as cur:
         cur.execute(
             "SELECT state, payload FROM dms_line_sessions WHERE line_user_id=%s",
-            (LINE_USER_ID,),
+            (luid,),
         )
         r = cur.fetchone()
         return dict(r) if r else None

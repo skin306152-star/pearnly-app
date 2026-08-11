@@ -14,10 +14,12 @@ from unittest import mock
 
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-line-dms-qa-32bytes-long")
 
+from services.line_binding import line_client  # noqa: E402
 from services.line_dms import booking_qa as qa  # noqa: E402
 from services.line_dms import qa_cards  # noqa: E402
 
 _TID, _LUID = "T1", "L1"
+_ADVISOR = {"id": "335", "name": "sale02"}
 
 _CARS = [
     ["c1", "DMX", "D-Max"],
@@ -57,11 +59,13 @@ class FakeStore:
 
 
 class Env:
-    def __init__(self, cars=_CARS, paints=_PAINTS):
+    def __init__(self, cars=_CARS, paints=_PAINTS, advisor=_ADVISOR, dms_username="sale02"):
         self.store = FakeStore()
         self.cars = cars
         self.paints = paints
         self.paints_calls = []
+        self.advisor = advisor
+        self.dms_username = dms_username
         self.es = contextlib.ExitStack()
 
     def __enter__(self):
@@ -69,6 +73,7 @@ class Env:
         p = lambda *a, **k: es.enter_context(mock.patch.object(*a, **k))  # noqa: E731
         p(qa.store, "get_session", side_effect=self.store.get_session)
         p(qa.store, "set_session", side_effect=self.store.set_session)
+        p(qa.store, "clear_session", side_effect=self.store.clear_session)
         p(qa.store, "get_binding_by_line_user", side_effect=self.store.get_binding_by_line_user)
         p(qa._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
         p(
@@ -87,8 +92,13 @@ class Env:
             return self.paints
 
         p(qa.masters_cache, "get_paints", side_effect=_paints)
-        self.reply = p(qa.line_client, "reply_messages")
-        self.push = p(qa.line_client, "push_messages")
+        p(
+            qa.advisor_match,
+            "resolve_operator_advisor",
+            return_value=(self.advisor, self.dms_username),
+        )
+        self.reply = p(line_client, "reply_messages")
+        self.push = p(line_client, "push_messages")
         return self
 
     def __exit__(self, *a):
@@ -107,6 +117,7 @@ def _qa(step="slip", **over):
         "step": step,
         "endpoint_id": "E1",
         "customer": {"id": "C1", "name": "สมชาย ใจดี"},
+        "advisor": dict(_ADVISOR),
         "files": {"id_card_mid": "mid-card", "slip_mid": None},
         "answers": {},
         "payments": [],
@@ -129,6 +140,10 @@ def _replied_items(env):
     return env.reply.call_args.args[1][0]["quickReply"]["items"]
 
 
+def _pushed_text(env):
+    return env.push.call_args.args[1][0]["text"]
+
+
 class BookingQaTests(unittest.IsolatedAsyncioTestCase):
     async def test_start_initializes_payload_and_asks_slip(self):
         with Env() as env:
@@ -142,6 +157,34 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(p["files"]["id_card_mid"], "mid-card")
             self.assertIsNone(p["files"]["slip_mid"])
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_SLIP)
+            # 提成归属开局定死在 qa.advisor,建单执行器只认这一处
+            self.assertEqual(p["advisor"], _ADVISOR)
+            self.assertEqual(set(sess["payload"]), {"qa"})
+
+    async def test_start_blocked_when_advisor_unmatched(self):
+        """认不出顾问 → 发拦截话术且不开局(答完 8 问才拦 = 白占销售时间)。"""
+        with Env(advisor=None, dms_username="dmstest") as env:
+            env.store.set_session(_TID, _LUID, "reviewing", {"nonce": "n"})  # 上一阶段的复述卡
+            await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
+            self.assertIsNone(env.session())  # 连旧会话一起清,别让下一句话撞旧卡
+            # 拦截话术走 push:顾问解析可能含一次慢登录,reply_token 早过期了
+            env.reply.assert_not_called()
+            said = _pushed_text(env)
+            self.assertIn("dmstest", said)
+            self.assertIn("ที่ปรึกษาการขาย", said)
+
+    async def test_start_blocked_message_degrades_without_username(self):
+        with Env(advisor=None, dms_username="") as env:
+            await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
+            self.assertIsNone(env.session())
+            self.assertEqual(_pushed_text(env), qa_cards.TXT_ADVISOR_BLOCK_NO_USER)
+
+    async def test_start_without_endpoint_does_not_open_session(self):
+        with Env() as env:
+            with mock.patch.object(qa._id_ocr, "resolve_dms_endpoint", return_value=None):
+                await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
+            self.assertIsNone(env.session())
+            self.assertEqual(_pushed_text(env), qa_cards.TXT_NO_ENDPOINT)
 
     # ── slip ──────────────────────────────────────────────────────────────
     async def test_slip_image_advances_to_place(self):
@@ -413,6 +456,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                 if row.get("type") == "box"
             )
             self.assertIn("ลูกค้า=สมชาย ใจดี", flat)
+            self.assertIn("ที่ปรึกษาการขาย=sale02", flat)  # 提成归属确认前可见
             self.assertIn("สถานที่รับจอง=สาขาบางนา", flat)
             self.assertIn("รุ่น/สี=DMX D-Max · ขาว", flat)
             self.assertIn("วันส่งมอบ=20/08/2569", flat)

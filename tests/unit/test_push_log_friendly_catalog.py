@@ -8,7 +8,8 @@ ERR_NO_SUPPLIER / ERR_UNKNOWN_UPLOAD_OUTCOME + _match_catalog 支持 "ERR_xxx: �
 push_log_friendly 补 5 个 DMS 键 + Express 桥接层 _COMPANION_BRIDGE_FRIENDLY + 纯技术态
 兜底 _tech_fallback_friendly。本测锁 friendly_any 六层链各层的命中与互不误伤:
 ① ERR_ 码带后缀(正则抠 token) ② 桥接层整串/小写码 ③ DMS 新键 ④ 技术态兜底
-⑤ 未知串不误伤(返 None) ⑥ 长码 ERR_DMS_IMPORT_REPORT 不被 ERR_DMS_IMPORT 抢占。
+⑤ 未知串不误伤(返 None) ⑥ 长码 ERR_DMS_IMPORT_REPORT 不被 ERR_DMS_IMPORT 抢占
+⑦ LINE 信道的 DMS 码必须在台账目录也有(两份目录漂移 = 推送记录里露裸 error_code)。
 """
 
 from __future__ import annotations
@@ -62,6 +63,17 @@ class NewDmsCodeTests(unittest.TestCase):
         hit = plf.friendly_any("ERR_DMS_CUSTOMER_SAVE")
         self.assertEqual(hit, plf._DMS_PUSH_FRIENDLY["ERR_DMS_CUSTOMER_SAVE"])
 
+    def test_advisor_codes_hit_with_and_without_suffix(self):
+        # 顾问归属码(2026-08-11)带原始报错后缀出现在 error_msg 里,子串层必须照样命中。
+        for code in ("ERR_DMS_ADVISOR_REQUIRED", "ERR_DMS_ADVISOR_UNMATCHED"):
+            for msg in (code, f"{code}: booking advisor id '999' not in DMS advisor master"):
+                hit = plf.friendly_any(msg)
+                self.assertEqual(hit, plf._DMS_PUSH_FRIENDLY[code], msg)
+            for lang in LANGS:
+                self.assertTrue(
+                    str(plf._DMS_PUSH_FRIENDLY[code][lang]).strip(), f"{code}.{lang} 空"
+                )
+
     def test_new_dms_keys_all_hit_and_4_langs(self):
         for code in (
             "ERR_DMS_ADMIN_AUTH",
@@ -75,6 +87,17 @@ class NewDmsCodeTests(unittest.TestCase):
             self.assertEqual(d, plf._DMS_PUSH_FRIENDLY[code])
             for lang in LANGS:
                 self.assertTrue(str(d[lang]).strip(), f"{code}.{lang} 空")
+
+
+class DmsCatalogParityTests(unittest.TestCase):
+    def test_line_dms_codes_all_exist_in_push_log_catalog(self):
+        # LINE 信道自带一份 DMS 码文案(erp_dms_push._DMS_FRIENDLY),同一批单子也会进
+        # 台账;台账目录缺哪个码,用户在推送记录里就只看得到裸英文 error_code。
+        from services.erp import erp_dms_push
+
+        line_codes = {k for k in erp_dms_push._DMS_FRIENDLY if k.startswith("ERR_DMS_")}
+        missing = sorted(line_codes - set(plf._DMS_PUSH_FRIENDLY))
+        self.assertEqual(missing, [], f"push_log_friendly._DMS_PUSH_FRIENDLY 缺码:{missing}")
 
 
 class TechFallbackTests(unittest.TestCase):

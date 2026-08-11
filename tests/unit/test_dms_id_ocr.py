@@ -140,6 +140,28 @@ class TestInheritTenantDefaults(unittest.TestCase):
             self.assertIs(s._inherit_tenant_defaults("m-1", ep), ep)
         fu.assert_not_called()
 
+    def test_inherited_defaults_never_carry_owner_advisor(self):
+        # 顾问=个人提成归属:老板钉给自己的 advisor_* 顺着继承流进销售端点,
+        # 就是「全店的单算到老板头上」(2026-08-11 G-QA7 实锤),必须剥离。
+        owner_cfg = {
+            "admin_username_enc": "enc-au",
+            "booking_defaults": {
+                "booking_prefix": "ZX",
+                "advisor_id": "42",
+                "advisor_code": "boss",
+                "advisor_name": "เถ้าแก่",
+            },
+        }
+        ep = {"id": "e1", "config": {"username_enc": "u"}}
+        with (
+            patch.object(s.db, "find_user_by_id", return_value=dict(self._MEMBER)),
+            patch.object(s, "_tenant_owner_endpoint_cfg", return_value=owner_cfg),
+        ):
+            out = s._inherit_tenant_defaults("m-1", ep)
+        self.assertEqual(out["config"]["booking_defaults"], {"booking_prefix": "ZX"})
+        # 老板自己的配置不能被剥离动作污染(他本人建单仍靠这份钉死)。
+        self.assertEqual(owner_cfg["booking_defaults"]["advisor_id"], "42")
+
     def test_owner_without_dms_endpoint_leaves_ep_unchanged(self):
         ep = {"id": "e1", "config": {"username_enc": "u"}}
         with (

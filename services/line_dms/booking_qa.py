@@ -19,9 +19,8 @@ from typing import Any, Dict, List, Optional
 
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.mrerp_dms_client_base import to_be_date
-from services.line_binding import line_client
-from services.line_dms import commands, masters_cache, qa_cards, store
-from services.line_dms._out import _CHANNEL, _thr
+from services.line_dms import advisor_match, commands, masters_cache, qa_cards, store
+from services.line_dms._out import _send, _thr
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
     car_label,
@@ -56,15 +55,30 @@ async def start(
     draft=None,
     user_id="",
 ) -> None:
-    """客户档落定后开一局逐问:初始化 qa(step=slip)→ 发第 1 问。
+    """客户档落定后开一局逐问:定提成归属 → 初始化 qa(step=slip)→ 发第 1 问。
 
     身份证/OCR/客户档由既有 collecting 流程负责,本函数只从「档已落定」接手:
     id_card_mid 只进 files;draft 与 user_id 原样进 qa,建单执行器从 payload["qa"] 读取。
+    顾问(提成归属)在开局就定死:认不出账号的单最终必被 DMS 拒收,答完 8 问再拦等于
+    白占销售 5 分钟。
     """
+    ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
+    advisor, dms_username = (None, "")
+    if ep:
+        advisor, dms_username = await _thr(advisor_match.resolve_operator_advisor, ep)
+    if advisor is None:
+        # 开不了单就别留着上一阶段的复述卡会话,否则用户下一句话撞在旧卡上(客户档已落定,不受影响)。
+        await _thr(store.clear_session, tenant_id, line_user_id)
+        msg = qa_cards.no_endpoint() if not ep else qa_cards.advisor_block_msg(dms_username)
+        # 一律 push:顾问解析可能含一次 DMS 慢登录,到这里 reply_token 大概率已过期,
+        # reply 失败 = 拦截理由静默丢失,销售只会看到「没反应」。
+        _send(line_user_id, msg)
+        return
     qa = {
         "step": "slip",
         "endpoint_id": str(endpoint_id or ""),
         "customer": {"id": str(customer_id or ""), "name": customer_name or ""},
+        "advisor": advisor,
         "draft": dict(draft or {}),
         "user_id": str(user_id or ""),
         "files": {"id_card_mid": id_card_mid or None, "slip_mid": None},
@@ -73,7 +87,7 @@ async def start(
         "pending_channel": {},
         "audit": [],
     }
-    await _thr(store.set_session, tenant_id, line_user_id, _STATE, {"qa": qa})
+    await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, "slip", reply_token)
 
 
@@ -464,36 +478,10 @@ async def _persist(tenant_id, line_user_id, qa) -> None:
     await _thr(store.set_session, tenant_id, line_user_id, _STATE, {"qa": qa})
 
 
-def _send(line_user_id, msg, reply_token=None) -> None:
-    """出口:quickReply/Flex 结构必须走 reply_messages|push_messages(带消息 dict)。"""
-    if msg is None:
-        return
-    if reply_token:
-        line_client.reply_messages(reply_token, [msg], channel=_CHANNEL)
-    else:
-        line_client.push_messages(line_user_id, [msg], channel=_CHANNEL)
-
-
-async def _resolve_ep(line_user_id, qa) -> Optional[Dict[str, Any]]:
-    """按绑定 user 解析 DMS 端点。会话里只存 endpoint_id 不存 config,主档取数前现解。"""
-    binding = await _thr(store.get_binding_by_line_user, line_user_id)
-    uid = (binding or {}).get("user_id") or ""
-    if not uid:
-        return None
-    return await _thr(_id_ocr.resolve_dms_endpoint, uid, qa.get("endpoint_id"))
-
-
 async def _masters(line_user_id, qa, key) -> List[list]:
-    ep = await _resolve_ep(line_user_id, qa)
-    if not ep:
-        return []
-    masters = await _thr(masters_cache.get_masters, ep)
-    return masters.get(key) or []
+    return await masters_cache.qa_masters(line_user_id, qa.get("endpoint_id"), key)
 
 
 async def _paints(line_user_id, qa) -> List[list]:
-    ep = await _resolve_ep(line_user_id, qa)
     car_id = str((qa.get("answers") or {}).get("car", {}).get("id") or "")
-    if not ep or not car_id:
-        return []
-    return (await _thr(masters_cache.get_paints, ep, car_id)) or []
+    return await masters_cache.qa_paints(line_user_id, qa.get("endpoint_id"), car_id)

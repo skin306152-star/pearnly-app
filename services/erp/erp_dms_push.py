@@ -107,6 +107,20 @@ _DMS_FRIENDLY = {
         "zh_TW": "回填訂車單資料失敗 · 請稍後重試",
         "ja": "予約情報の入力に失敗しました · 再試行してください",
     },
+    "ERR_DMS_ADVISOR_REQUIRED": {
+        "zh": "这张订车单还没定销售顾问 · 请联系管理员为该 DMS 账号配置销售顾问后重开单",
+        "en": "This booking has no sales advisor assigned — ask your admin to set the advisor for this DMS account, then start the booking again",
+        "th": "ใบจองนี้ยังไม่ได้กำหนดที่ปรึกษาการขาย กรุณาให้ผู้ดูแลกำหนดที่ปรึกษาให้บัญชี DMS นี้ แล้วเปิดใบจองใหม่",
+        "zh_TW": "這張訂車單還沒定銷售顧問 · 請聯絡管理員為該 DMS 帳號設定銷售顧問後重開單",
+        "ja": "この予約には販売アドバイザーが設定されていません · 管理者に該当 DMS アカウントのアドバイザー設定を依頼してから、予約を作成し直してください",
+    },
+    "ERR_DMS_ADVISOR_UNMATCHED": {
+        "zh": "在 DMS 销售顾问名册里找不到该顾问 · 请让管理员在 DMS 顾问名册补上这个账号,或联系 Pearnly 配置归属",
+        "en": "The advisor is not in the DMS advisor list — ask your admin to add this account to the DMS advisor list, or contact Pearnly to configure it",
+        "th": "ไม่พบที่ปรึกษาการขายรายนี้ในรายชื่อที่ปรึกษาของ DMS กรุณาให้ผู้ดูแลเพิ่มบัญชีนี้ในรายชื่อที่ปรึกษาการขาย หรือติดต่อทีม Pearnly เพื่อกำหนดให้",
+        "zh_TW": "在 DMS 銷售顧問名冊裡找不到該顧問 · 請讓管理員在 DMS 顧問名冊補上這個帳號,或聯絡 Pearnly 設定歸屬",
+        "ja": "このアドバイザーは DMS のアドバイザー名簿に存在しません · 管理者に当該アカウントの追加を依頼するか、Pearnly にご連絡ください",
+    },
     "ERR_DMS_TEMPLATE": {
         "zh": "下载订车单模板失败 · 请稍后重试",
         "en": "Failed to download the booking template — please retry",
@@ -148,18 +162,27 @@ def _dms_resolve_admin_creds(cfg: Dict[str, Any]):
     return _dms_resolve_creds(cfg, "admin_")
 
 
-def _dms_admin_kwargs(cfg: Dict[str, Any]) -> Dict[str, str]:
-    """把 admin 凭据组解析成传给适配器的明文 kwargs。没配 admin → {}(单凭据路径
-    逐字节不变)。加密态就地解密(ValueError/ImportError 交由外层 build 兜成
-    ERR_CRED_DECRYPT/ERR_KMS_MISSING)。"""
-    plain_user, plain_pass, enc_user, enc_pass = _dms_resolve_admin_creds(cfg)
+def _dms_plain_creds(cfg: Dict[str, Any], prefix: str = "") -> Tuple[str, str]:
+    """凭据组 → 明文 (user, pass);没配全 → ("", "")。
+
+    有明文用明文,否则解密密文对。解密异常原样上抛:调用方自己决定是兜成
+    ERR_CRED_DECRYPT/ERR_KMS_MISSING 还是降级放行,这一层不替它做主。
+    """
+    plain_user, plain_pass, enc_user, enc_pass = _dms_resolve_creds(cfg, prefix)
     if plain_user and plain_pass:
-        return {"admin_username": plain_user, "admin_password": plain_pass}
+        return plain_user, plain_pass
     if enc_user and enc_pass:
         from core.kms_helper import decrypt_str
 
-        return {"admin_username": decrypt_str(enc_user), "admin_password": decrypt_str(enc_pass)}
-    return {}
+        return decrypt_str(enc_user) or "", decrypt_str(enc_pass) or ""
+    return "", ""
+
+
+def _dms_admin_kwargs(cfg: Dict[str, Any]) -> Dict[str, str]:
+    """把 admin 凭据组解析成传给适配器的明文 kwargs。没配 admin → {}(单凭据路径
+    逐字节不变)。解密异常交由外层 build 兜成 ERR_CRED_DECRYPT/ERR_KMS_MISSING。"""
+    user, password = _dms_plain_creds(cfg, "admin_")
+    return {"admin_username": user, "admin_password": password} if user and password else {}
 
 
 def _build_mrerp_dms_adapter(cfg: Dict[str, Any]):

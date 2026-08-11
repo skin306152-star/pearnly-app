@@ -3,10 +3,49 @@
     "g": "G-QA1",
     "name": "transfer full chain",
     "status": "PASS",
-    "notes": "booking=BK000002608000003 search_id=36 preview_labels=True nonce=True attachments=['สำเนาบัตรประชาชน', 'ใบโอนเงินจอง'] payment_fields=1,500.00/1,500.00",
+    "notes": "booking=BK000002608000013 search_id=47 preview_labels=True nonce=True advisor=335/sale02 attachments=['สำเนาบัตรประชาชน', 'ใบโอนเงินจอง'] payment_fields=1,500.00/1,500.00",
     "evidence": [
       "qa1-receipt.json",
       "qa1-dms-readback.json"
+    ]
+  },
+  {
+    "g": "G-QA2",
+    "name": "discard preview without DMS write",
+    "status": "PASS",
+    "notes": "receipt=True logs_before=13 logs_after=13",
+    "evidence": []
+  },
+  {
+    "g": "G-QA3",
+    "name": "cash path",
+    "status": "PASS",
+    "notes": "booking=BK000002608000014 txtmoneycash=2,000.00 attachments=['สำเนาบัตรประชาชน']",
+    "evidence": [
+      "qa3-dms-readback.json"
+    ]
+  },
+  {
+    "g": "G-QA4",
+    "name": "transfer requires slip",
+    "status": "PASS",
+    "notes": "need_slip=True cash_rejected=True preview_after_image=True",
+    "evidence": []
+  },
+  {
+    "g": "G-QA5",
+    "name": "mid-flow image is rejected without OCR",
+    "status": "PASS",
+    "notes": "customer=107 reply=True ocr_delta=0",
+    "evidence": []
+  },
+  {
+    "g": "G-QA7",
+    "name": "unmatched advisor blocks at start",
+    "status": "PASS",
+    "notes": "blocked=True slip_asked=False session_state=— push_logs=0->0",
+    "evidence": [
+      "qa7-advisor-block.json"
     ]
   },
   {

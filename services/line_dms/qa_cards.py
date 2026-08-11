@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from services.line_dms.cards import (
     ACT_CANCEL_BOOKING,
     ACT_CONFIRM_BOOKING,
+    TXT_NO_ENDPOINT,
     _bubble,
     _btn,
     _data,
@@ -72,9 +73,21 @@ TXT_CONFIRM_ABOVE = "กด ยืนยัน หรือ ทิ้ง ที�
 TXT_NO_IMAGE_NEEDED = "ขั้นตอนนี้ไม่ต้องการรูปภาพครับ ทำตามคำถามด้านบนได้เลย"
 # 建单成功但附件没挂全时的诚实追加行(不谎报附件成功)。
 TXT_ATTACH_FAIL = "แนบไฟล์ไม่ครบ กรุณาแนบเพิ่มในระบบ DMS"
+# 开局闸:DMS 账号对不上顾问名册就开不了单(提成没人认)。告诉销售哪个账号出错、谁能修。
+TXT_ADVISOR_BLOCK = (
+    "ยังเปิดใบจองไม่ได้ครับ บัญชี DMS «{username}» ไม่ตรงกับรายชื่อที่ปรึกษาการขายในระบบ DMS\n"
+    "กรุณาให้แอดมินหรือเถ้าแก่เพิ่มรหัสผู้ใช้นี้ในรายชื่อที่ปรึกษาการขายของ DMS "
+    "หรือให้ทีม Pearnly กำหนดที่ปรึกษาให้บัญชีนี้ แล้วลองใหม่อีกครั้ง"
+)
+TXT_ADVISOR_BLOCK_NO_USER = (
+    "ยังเปิดใบจองไม่ได้ครับ ไม่พบบัญชี DMS ของผู้ใช้นี้\n"
+    "กรุณาให้แอดมินหรือเถ้าแก่ตรวจสอบการเชื่อมต่อ DMS ของบัญชีนี้ "
+    "หรือให้ทีม Pearnly กำหนดที่ปรึกษาให้บัญชีนี้ แล้วลองใหม่อีกครั้ง"
+)
 
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。
 LBL_CUSTOMER = "ลูกค้า"
+LBL_ADVISOR = "ที่ปรึกษาการขาย"
 LBL_PLACE = "สถานที่รับจอง"
 LBL_CAR = "รุ่น/สี"
 LBL_DELIVERY = "วันส่งมอบ"
@@ -112,6 +125,20 @@ def _plus_years(d: date, years: int) -> date:
         return d.replace(year=d.year + years)
     except ValueError:
         return d + timedelta(days=365 * years)
+
+
+# ── 开局闸 ───────────────────────────────────────────────────────────────
+def no_endpoint() -> Dict[str, Any]:
+    """端点没配/被停用 → 沿用全站同一句无端点话术。"""
+    return _msg(TXT_NO_ENDPOINT)
+
+
+def advisor_block_msg(username: str) -> Dict[str, Any]:
+    """顾问认不出 → 说清哪个账号、谁能修、修完重试;连账号都解不出时退通用版。"""
+    username = (username or "").strip()
+    if not username:
+        return _msg(TXT_ADVISOR_BLOCK_NO_USER)
+    return _msg(TXT_ADVISOR_BLOCK.format(username=username))
 
 
 # ── 各步发问 ─────────────────────────────────────────────────────────────
@@ -258,8 +285,11 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     answers = qa.get("answers") or {}
     files = qa.get("files") or {}
     payments = qa.get("payments") or []
+    advisor = str((qa.get("advisor") or {}).get("name") or "")
     rows: List[Dict[str, Any]] = [
         _kv_row(LBL_CUSTOMER, str((qa.get("customer") or {}).get("name") or "")),
+        # 顾问 = 提成归属,确认前让销售自己看一眼落在谁头上;没匹配上时开局就拦了,不会到这。
+        *([_kv_row(LBL_ADVISOR, advisor)] if advisor else []),
         _kv_row(LBL_PLACE, str((answers.get("place") or {}).get("name") or "")),
         _kv_row(LBL_CAR, _car_paint_line(answers)),
         _kv_row(LBL_DELIVERY, str(answers.get("delivery_date_be") or "")),

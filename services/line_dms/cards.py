@@ -352,9 +352,15 @@ def receipt_text(customer_id: str, name: str, mode: str) -> str:
 
 
 # ── 订车阶段(DL-4a) ────────────────────────────────────────────────────
-def booking_receipt_text(booking_no: str, car: str, delivery_date_be: str) -> str:
-    """订车成功回执:BK 单号 + 车型 + 交车日。"""
-    return (
+def booking_receipt_text(
+    booking_no: str, car: str, delivery_date_be: str, advisor_name: str
+) -> str:
+    """订车成功回执:BK 单号 + 车型 + 交车日 + 销售顾问。
+
+    顾问行 = 提成归属的当场回执,销售不用登 DMS 就能核对(名字缺则不出这行,不留空槽)。
+    """
+    text = (
         f"เปิดใบจองสำเร็จ\nเลขที่ใบจอง: {booking_no or '—'}\n"
         f"รุ่นรถ: {car or '—'}\nวันที่ส่งมอบ: {delivery_date_be or '—'}"
     )
+    return f"{text}\nที่ปรึกษา: {advisor_name}" if advisor_name else text

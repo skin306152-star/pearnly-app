@@ -52,6 +52,13 @@ class TestDmsFriendlyI18n(unittest.TestCase):
             self.assertTrue(str(d[lang]).strip(), f"ERR_DMS_ADMIN_AUTH.{lang} empty")
         self.assertNotEqual(d["ja"], d["en"])  # 真日文,非英文兜底
 
+    def test_advisor_codes_reach_the_line_failure_channel(self):
+        # LINE 建单失败只念 _dms_friendly(code)["th"](booking_flow),漏一条码就裸露 ERR_*。
+        for code in ("ERR_DMS_ADVISOR_REQUIRED", "ERR_DMS_ADVISOR_UNMATCHED"):
+            d = erp_push._dms_friendly(code)
+            self.assertNotEqual(d, erp_push._DMS_FRIENDLY["ERR_UNEXPECTED"], f"{code} 未收录")
+            self.assertTrue(d["th"].strip(), f"{code}.th 空")
+
     def test_unknown_code_falls_back_to_unexpected_with_ja(self):
         d = erp_push._dms_friendly("ERR_SOMETHING_NOT_DEFINED")
         self.assertEqual(d, erp_push._DMS_FRIENDLY["ERR_UNEXPECTED"])

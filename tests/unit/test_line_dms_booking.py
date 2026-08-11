@@ -80,6 +80,7 @@ def _qa_payload(**over):
         "step": "pay_more",
         "endpoint_id": "E1",
         "customer": {"id": "C1", "name": "สมชาย ใจดี"},
+        "advisor": {"id": "335", "name": "sale02"},
         "draft": {"people_id": "1234567890121", "name": "สมชาย"},
         "user_id": "U1",
         "files": {"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
@@ -101,6 +102,7 @@ def _qa_payload(**over):
 
 
 def _review(nonce="N1", **over):
+    """booking_review 会话:顶层只有 nonce,业务数据一律在 qa(顾问归属在 qa.advisor)。"""
     return {"nonce": nonce, "qa": _qa_payload(**over)}
 
 
@@ -158,13 +160,17 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
             )
             await env.drain()
-        # 回执含 BK 号 + 车型(label 来自 qa.answers.car)
+        # 回执含 BK 号 + 车型(label 来自 qa.answers.car)+ 顾问(提成归属当场可核对)
         self.assertIn("BK9", env.push_text.call_args.args[1])
         self.assertIn("DMX D-Max", env.push_text.call_args.args[1])
+        self.assertIn("ที่ปรึกษา: sale02", env.push_text.call_args.args[1])
         # push 台账 trigger='line_dms' + request_body.qa 摘要
         request_body = env.insert_log.call_args.args[8]
         self.assertEqual(request_body["trigger"], "line_dms")
         self.assertEqual(request_body["mode"], "booking")
+        self.assertEqual(request_body["advisor_id"], "335")
+        # 台账留归属名,对账不用回查主档;与 advisor_id 同层,别拆两处
+        self.assertEqual(request_body["advisor_name"], "sale02")
         qa = request_body["qa"]
         self.assertEqual(qa["place_id"], "pl1")
         self.assertEqual(qa["term_id"], "t1")
@@ -212,7 +218,9 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res["attached"], 2)
         self.assertEqual([f["display_name"] for f in res["attach_failed"]], ["y"])
         d = rec["defaults"]
-        self.assertEqual(d.advisor_id, "")  # payload 无值 → 端点默认路
+        # 顾问归属:开局匹配好的 id/name 一路传到建单层(建单层按 id 严格解析)
+        self.assertEqual(d.advisor_id, "335")
+        self.assertEqual(d.advisor_name, "sale02")
         self.assertEqual(d.car_id, "c1")
         self.assertEqual(d.paint_id, "p1")
         self.assertEqual(d.place_book_id, "pl1")

@@ -76,6 +76,7 @@ async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> N
             result.get("booking_no", ""),
             str((answers.get("car") or {}).get("label") or ""),
             str(answers.get("delivery_date_be") or ""),
+            str((qa.get("advisor") or {}).get("name") or ""),
         )
         # 建单成功但附件没挂全 → 如实补一句,绝不谎报附件成功(四态诚实)。
         if not result.get("attach_ok"):
@@ -131,19 +132,24 @@ def _book_in_session(
 ) -> Dict[str, Any]:
     """一个 DMS 会话内:解析订车载荷 → 建单 → 挂附件 → 顺手全量刷主档缓存(零额外登录)。
 
-    逐问选的 place/term/regis/car/paint id 覆盖端点默认;advisor 逐问不选 → 维持旧来源
-    (payload 无值 → 端点默认);交车日用逐问值覆盖(端点默认只给推算基线)。附件在同一
-    会话挂载:create 成功后、主档刷新前调 cl.attach_booking_files。返回 {ok, booking_no,
-    booking_id, attach_ok, attached, attach_failed} 或 _run_logged_in 的 _err dict(ok=False)。
+    逐问选的 place/term/regis/car/paint id 覆盖端点默认;advisor 在逐问开局就按操作员的
+    DMS 账号匹配好(或端点上钉死)存进 qa["advisor"] —— 建单层(_advisor_ref_strict)按该
+    id 严格校验,匹配不上宁可报错也不落到别人头上;交车日用逐问值覆盖(端点默认只给推算基线)。
+    附件在同一会话挂载:create 成功后、主档刷新前调 cl.attach_booking_files。返回 {ok,
+    booking_no, booking_id, attach_ok, attached, attach_failed} 或 _run_logged_in 的
+    _err dict(ok=False)。
     """
     from services.erp.erp_dms_intake import _run_logged_in
     from services.erp.mrerp_dms_models import BookingDefaults
 
     qa = payload.get("qa") or {}
     answers = qa.get("answers") or {}
+    adv = qa.get("advisor") or {}
     defaults = dataclasses.replace(
         BookingDefaults.from_config(ep.get("config") or {}),
-        advisor_id=str(payload.get("advisor_id") or ""),
+        advisor_id=str(adv.get("id") or ""),
+        # 主档列表抖动时建单层按名字降级落顾问,故名字也要一路带到 defaults。
+        advisor_name=str(adv.get("name") or ""),
         car_id=str((answers.get("car") or {}).get("id") or ""),
         paint_id=str((answers.get("paint") or {}).get("id") or ""),
         place_book_id=str((answers.get("place") or {}).get("id") or ""),
@@ -221,6 +227,7 @@ def _log_booking(user_id: str, ep: dict, payload: dict, result: dict) -> None:
     ok = bool(result.get("ok"))
     qa = payload.get("qa") or {}
     answers = qa.get("answers") or {}
+    adv = qa.get("advisor") or {}
     payments = qa.get("payments") or []
     request_body = {
         "adapter": "mrerp_dms",
@@ -229,7 +236,9 @@ def _log_booking(user_id: str, ep: dict, payload: dict, result: dict) -> None:
         "customer_id": str((qa.get("customer") or {}).get("id") or ""),
         "car_id": str((answers.get("car") or {}).get("id") or ""),
         "paint_id": str((answers.get("paint") or {}).get("id") or ""),
-        "advisor_id": str(payload.get("advisor_id") or ""),
+        "advisor_id": str(adv.get("id") or ""),
+        # 归属名与 id 同层:对账翻台账时不用回查主档,也不用跨层拼。
+        "advisor_name": str(adv.get("name") or ""),
         "qa": {
             "place_id": str((answers.get("place") or {}).get("id") or ""),
             "term_id": str((answers.get("term") or {}).get("id") or ""),

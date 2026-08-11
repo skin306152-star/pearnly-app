@@ -29,6 +29,9 @@ _DRFCBC_MENULV = "2"
 # 撞重复时往后顺号重试,跳过所有已占用号。
 _BOOKING_DOCNO_MAX_TRIES = 25
 
+# 顾问名册一次取满(真机 probe:服务端尊重 bshsdamt,200 行覆盖单店全部销售)。
+_ADVISOR_PAGE_SIZE = "200"
+
 
 def _is_duplicate_docno_error(body: str) -> bool:
     """DMS 单号重复报错(err::"เลขที่ใบจอง" ซ้ำ)· ซ้ำ=泰语「重复」。"""
@@ -305,7 +308,8 @@ class DMSClientOpsMixin:
         a missing/empty list comes back as []."""
         out: Dict[str, List[List[Any]]] = {}
         for key, elem, extra in (
-            ("advisors", "txtusers", {}),
+            # 顾问名册要全量:操作员账号按 code 列匹配,被默认 10 行分页截断就永远匹配不上。
+            ("advisors", "txtusers", {"bshsdamt": _ADVISOR_PAGE_SIZE}),
             ("cars", "txtcar", {}),
             ("place_books", "txtplacebook", {}),
             ("term_sales", "txttermsale", {}),
@@ -326,9 +330,7 @@ class DMSClientOpsMixin:
         today = today or date.today()
         delivery = today + timedelta(days=defaults.delivery_days)
 
-        advisor = self._ref_from_default(
-            "txtusers", defaults.advisor_id, defaults.advisor_code, defaults.advisor_name
-        )
+        advisor = self._advisor_ref_strict(defaults)
         car = self._ref_from_default("txtcar", defaults.car_id, defaults.car_code, "")
         paint = self._ref_from_default(
             "txtcarpaint", defaults.paint_id, defaults.paint_code, "", idcar=car.id
@@ -383,29 +385,63 @@ class DMSClientOpsMixin:
         )
         return self._first_data_val(body)
 
+    def _advisor_ref_strict(self, defaults: BookingDefaults) -> DMSMasterRef:
+        """顾问栏(ที่ปรึกษาการขาย)= 销售提成归属,只认调用方钉死的 id,绝不回落名册首行。
+
+        逐问开局已按操作员的 DMS 账号匹配好归属(services/line_dms/advisor_match.py),
+        到这里必有 id;落错人只有月底对账才看得出来,所以宁可当场报错也不猜。
+        """
+        if not defaults.advisor_id:
+            raise DMSClientError(
+                "booking advisor not pinned for operator", "ERR_DMS_ADVISOR_REQUIRED"
+            )
+        rows = self._bshsd("txtusers", bshsdamt=_ADVISOR_PAGE_SIZE)
+        row = self._row_by_id(rows, defaults.advisor_id)
+        if row is not None:
+            return self._ref_from_row(row)
+        if not rows and defaults.advisor_name:
+            # 名册整份空:可能是接口抖/200 里塞了不可解析的 body,也可能名册真的一个人都没有
+            # —— 这两种在这一层分不出来。有名字才敢放行(id 是从本租户名册匹配出来的),
+            # 按钉死标量提交,DMS 侧仍按 id 认人。
+            return DMSMasterRef(
+                id=defaults.advisor_id, code=defaults.advisor_code, name=defaults.advisor_name
+            )
+        raise DMSClientError(
+            f"booking advisor id {defaults.advisor_id!r} not in DMS advisor master",
+            "ERR_DMS_ADVISOR_UNMATCHED",
+        )
+
     def _ref_from_default(
         self, elemname: str, pinned_id: str, pinned_code: str, pinned_name: str, **extra
     ) -> DMSMasterRef:
         """Resolve a master ref: if the user pinned an id, fetch that exact
         row; else take the first available row from live master data."""
         rows = self._bshsd(elemname, **extra)
-        chosen = None
-        if pinned_id:
-            for row in rows:
-                if str(row[0]) == str(pinned_id):
-                    chosen = row
-                    break
+        chosen = self._row_by_id(rows, pinned_id) if pinned_id else None
         if chosen is None and rows:
             chosen = rows[0]
         if chosen is None:
             # No live rows and no pin — fall back to the pinned scalars so the
             # caller still gets a usable (if unverified) ref.
             return DMSMasterRef(id=pinned_id, code=pinned_code, name=pinned_name)
+        return self._ref_from_row(chosen)
+
+    @staticmethod
+    def _row_by_id(rows: List[List[Any]], rid: str) -> Optional[list]:
+        """bshsd 主档行按 id 命中(首列即 id),取首个;没有 → None。"""
+        for row in rows:
+            if str(row[0]) == str(rid):
+                return row
+        return None
+
+    @staticmethod
+    def _ref_from_row(row: list) -> DMSMasterRef:
+        """bshsd 行 [id, code, name, ...] → DMSMasterRef(尾列进 extra 供表单原样回显)。"""
         return DMSMasterRef(
-            id=str(chosen[0]),
-            code=str(chosen[1]) if len(chosen) > 1 else str(chosen[0]),
-            name=str(chosen[2]) if len(chosen) > 2 else (str(chosen[1]) if len(chosen) > 1 else ""),
-            extra=tuple(chosen[3:]),
+            id=str(row[0]),
+            code=str(row[1]) if len(row) > 1 else str(row[0]),
+            name=str(row[2]) if len(row) > 2 else (str(row[1]) if len(row) > 1 else ""),
+            extra=tuple(row[3:]),
         )
 
     def _bshsd(self, elemname: str, **extra) -> List[List[Any]]:

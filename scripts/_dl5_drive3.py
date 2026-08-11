@@ -82,20 +82,20 @@ def wait_data(prefix: str, since: int, timeout: float = 240) -> tuple[dict | Non
     return rec, next(v for v in data_values(rec) if v.startswith(prefix))
 
 
-def post(data: str, params: dict | None = None) -> None:
-    event = C.ev_postback(data)
+def post(data: str, params: dict | None = None, luid: str = C.LINE_USER_ID) -> None:
+    event = C.ev_postback(data, luid)
     if params:
         event["postback"]["params"] = params
     C.post_webhook([event])
 
 
-def bind_booking_menu() -> None:
+def bind_booking_menu(luid: str = C.LINE_USER_ID, user_id: str = C.USER_ID) -> None:
     from services.line_dms import store
 
-    reset_conversation()
-    code = store.generate_bind_code(C.TENANT_ID, C.USER_ID)["code"]
+    reset_conversation(luid)
+    code = store.generate_bind_code(C.TENANT_ID, user_id)["code"]
     base = C.outbox_len()
-    C.post_webhook([C.ev_text(code)])
+    C.post_webhook([C.ev_text(code, luid)])
     _, bound = C.wait_outbox(
         lambda r: r.get("kind") == "reply_text" and "เชื่อมต่อสำเร็จ" in r.get("text", ""), base, 20
     )
@@ -104,7 +104,7 @@ def bind_booking_menu() -> None:
     # 真实旅程 = 先召唤菜单再选 2:单字 1/2 只在 menu 态才是菜单选项,
     # 无会话直接发「2」会被含数字文本当号码路由走。
     base = C.outbox_len()
-    C.post_webhook([C.ev_text("เมนู")])
+    C.post_webhook([C.ev_text("เมนู", luid)])
     _, menu = C.wait_outbox(
         lambda r: r.get("kind") == "reply_messages"
         and "จัดทำใบจอง" in json.dumps(r, ensure_ascii=False),
@@ -114,32 +114,41 @@ def bind_booking_menu() -> None:
     if not menu:
         raise AssertionError("booking menu missing")
     base = C.outbox_len()
-    C.post_webhook([C.ev_text("2")])
+    C.post_webhook([C.ev_text("2", luid)])
     _, chose = C.wait_outbox(lambda r: "บัตรประชาชน" in json.dumps(r, ensure_ascii=False), base, 20)
     if not chose:
         raise AssertionError("mode=booking intake prompt missing")
 
 
-def prepare_customer() -> str:
-    bind_booking_menu()
+def customer_saved(luid: str = C.LINE_USER_ID, user_id: str = C.USER_ID, tag: str = "qa1") -> int:
+    """走到「客户档落定」为止(拍证 → 报号 → 复述卡 → 沿用旧档)。返回落定动作前的 outbox 基线。"""
+    bind_booking_menu(luid, user_id)
     C.set_ocr(C.id_card_g1())
     base = C.outbox_len()
-    C.post_webhook([C.ev_image()])
+    C.post_webhook([C.ev_image(luid)])
     if not C.wait_outbox(
         lambda r: r.get("kind") == "push_text" and "เบอร์โทร" in r.get("text", ""), base, 90
     )[1]:
         raise AssertionError("phone question missing")
     base = C.outbox_len()
-    C.post_webhook([C.ev_text(C.PHONE)])
-    card, data = wait_data("action=", base, 150)
+    C.post_webhook([C.ev_text(C.PHONE, luid)])
+    card, _ = wait_data("action=", base, 150)
     if not card:
         raise AssertionError("customer review card missing")
-    save("qa1-customer-review.json", card)
-    keep = next((v for v in data_values(card) if v.startswith("action=keep")), "")
-    if not keep:
-        raise AssertionError("ACT_KEEP missing for existing customer")
+    save(f"{tag}-customer-review.json", card)
+    # 老客户出 [ใช้ข้อมูลเดิม],首次跑(DMS 里还没这张身份证)出 [บันทึกลูกค้าใหม่]。
+    settle = next(
+        (v for v in data_values(card) if v.startswith(("action=keep", "action=create"))), ""
+    )
+    if not settle:
+        raise AssertionError("neither ACT_KEEP nor ACT_CREATE on the review card")
     base = C.outbox_len()
-    post(keep)
+    post(settle, luid=luid)
+    return base
+
+
+def prepare_customer() -> str:
+    base = customer_saved()
     _, prompt = C.wait_outbox(
         lambda r: r.get("kind") in ("push_text", "push_messages")
         and "สลิป" in json.dumps(r, ensure_ascii=False),
@@ -243,7 +252,15 @@ def g_qa1() -> tuple[str, str, dict] | None:
         cid, _, preview = qa_common()
         body = json.dumps(preview, ensure_ascii=False)
         labels = all(
-            x in body for x in ("สรุปใบจอง", "ยอดเงินจองรวม", "สำเนาบัตรประชาชน", "ใบโอนเงินจอง")
+            x in body
+            for x in (
+                "สรุปใบจอง",
+                "ยอดเงินจองรวม",
+                "สำเนาบัตรประชาชน",
+                "ใบโอนเงินจอง",
+                "ที่ปรึกษาการขาย",
+                C.ADVISOR_PIN_NAME,  # 提成归属确认前就摆在预览卡上
+            )
         )
         confirm = next(v for v in data_values(preview) if "action=confirm_booking" in v)
         LAST_CONFIRM = confirm
@@ -269,11 +286,18 @@ def g_qa1() -> tuple[str, str, dict] | None:
         save("qa1-dms-readback.json", readback)
         fields = readback.get("fields", {})
         names = {v for k, v in fields.items() if k.startswith("fulcurrname")}
+        # 顾问栏 = 提成归属:DMS 里存的必须是本操作员的顾问,不是名册首行。
+        advisor_ok = (
+            str(fields.get("usersval", "")) == C.ADVISOR_PIN_ID
+            and str(fields.get("txtusers", "")) == C.ADVISOR_PIN_NAME
+        )
         ok = (
             labels
             and nonce
             and booking_no
             and found
+            and advisor_ok
+            and "ที่ปรึกษา" in receipt["text"]
             and str(fields.get("txtmoneytfmon", "")).replace(",", "") == "1500.00"
             and str(fields.get("txtearnestmoney", "")).replace(",", "") == "1500.00"
             and fields.get("txtaccountnumtffrom") == "บัญชีลูกค้า 123-4"
@@ -287,7 +311,7 @@ def g_qa1() -> tuple[str, str, dict] | None:
             "G-QA1",
             "transfer full chain",
             bool(ok),
-            f"booking={booking_no} search_id={found} preview_labels={labels} nonce={bool(nonce)} attachments={sorted(names)} payment_fields={fields.get('txtmoneytfmon')}/{fields.get('txtearnestmoney')}",
+            f"booking={booking_no} search_id={found} preview_labels={labels} nonce={bool(nonce)} advisor={fields.get('usersval')}/{fields.get('txtusers')} attachments={sorted(names)} payment_fields={fields.get('txtmoneytfmon')}/{fields.get('txtearnestmoney')}",
             ["qa1-receipt.json", "qa1-dms-readback.json"],
         )
         return booking_no, str(found), readback
@@ -459,6 +483,52 @@ def g_noise_image() -> None:
         )
 
 
+def g_blocked() -> None:
+    """开局闸:端点没钉顾问 + DMS 账号(dmstest)不在顾问名册 → 客户档落定后当场拦。
+
+    拦的是「开局」不是「确认」:不发第 1 问、不建 booking_qa 会话、DMS 零写入。
+    """
+    from scripts._dl5_seed import seed_operator_without_advisor
+
+    luid = C.LINE_USER_ID_NO_ADVISOR
+    try:
+        seed_operator_without_advisor()
+        logs_before = len(C.db_push_logs(C.USER_ID_NO_ADVISOR))
+        base = customer_saved(luid, C.USER_ID_NO_ADVISOR, tag="qa7")
+        _, blocked = C.wait_outbox(
+            lambda r: r.get("kind") in ("push_messages", "reply_messages")
+            and "dmstest" in json.dumps(r, ensure_ascii=False),
+            base,
+            120,
+        )
+        after = records_since(base)
+        slip_asked = any("สลิป" in json.dumps(r, ensure_ascii=False) for r in after)
+        state = (C.db_session(luid) or {}).get("state") or ""
+        logs_after = len(C.db_push_logs(C.USER_ID_NO_ADVISOR))
+        ok = (
+            bool(blocked) and not slip_asked and state != "booking_qa" and logs_after == logs_before
+        )
+        if blocked:
+            save("qa7-advisor-block.json", blocked)
+        record(
+            "G-QA7",
+            "unmatched advisor blocks at start",
+            ok,
+            f"blocked={bool(blocked)} slip_asked={slip_asked} session_state={state or '—'} "
+            f"push_logs={logs_before}->{logs_after}",
+            ["qa7-advisor-block.json"] if blocked else [],
+        )
+    except Exception as exc:
+        record(
+            "G-QA7",
+            "unmatched advisor blocks at start",
+            False,
+            f"blocked: {type(exc).__name__}: {exc}",
+        )
+    finally:
+        reset_conversation(luid)
+
+
 def g_nonce(result: tuple[str, str, dict] | None) -> None:
     if not result:
         record("G-QA6", "nonce replay", False, "G-QA1 did not produce a booking")
@@ -547,6 +617,8 @@ def main() -> int:
         g_slip_gate()
     if not only or "noise" in only:
         g_noise_image()
+    if not only or "blocked" in only:
+        g_blocked()
     g_nonce(result)
     try:
         screenshots(result[1] if result else None)

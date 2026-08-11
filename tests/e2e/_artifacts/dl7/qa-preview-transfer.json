@@ -1,7 +1,7 @@
 {
   "kind": "reply_messages",
   "channel": "dms",
-  "reply_token": "rt_1786276611228",
+  "reply_token": "rt_1786469699392",
   "messages": [
     {
       "type": "flex",
@@ -39,6 +39,28 @@
                 {
                   "type": "text",
                   "text": "ดีแอลห้า ทดสอบพเนิร์ลลี่",
+                  "size": "sm",
+                  "color": "#111111",
+                  "flex": 5,
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "baseline",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "ที่ปรึกษาการขาย",
+                  "size": "sm",
+                  "color": "#8a8a8a",
+                  "flex": 2
+                },
+                {
+                  "type": "text",
+                  "text": "sale02",
                   "size": "sm",
                   "color": "#111111",
                   "flex": 5,
@@ -104,7 +126,7 @@
                 },
                 {
                   "type": "text",
-                  "text": "08/09/2569",
+                  "text": "11/09/2569",
                   "size": "sm",
                   "color": "#111111",
                   "flex": 5,
@@ -262,7 +284,7 @@
               "action": {
                 "type": "postback",
                 "label": "ยืนยัน",
-                "data": "action=confirm_booking&nonce=db8c259d9a5ad9ac",
+                "data": "action=confirm_booking&nonce=d5c8d0d850da2f02",
                 "displayText": "ยืนยัน"
               }
             },

@@ -104,6 +104,11 @@ class DMSBookingPayload:
     payments: tuple = ()
 
 
+# booking_defaults 里属于「个人」的键:顾问 = 销售提成归属,是个人身份不是租户策略,
+# 绝不随租户默认值继承下去(否则全店的单都算到老板头上)。
+PERSONAL_BOOKING_DEFAULT_KEYS = ("advisor_id", "advisor_code", "advisor_name")
+
+
 @dataclass(frozen=True)
 class BookingDefaults:
     """Per-endpoint booking defaults (from endpoint.config.booking_defaults).

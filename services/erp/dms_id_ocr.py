@@ -118,7 +118,13 @@ def _inherit_tenant_defaults(user_id: str, ep: Dict[str, Any]) -> Optional[Dict[
     销售的 DMS 账号无改档权限是常态(2026-07-19 泰方拍板:销售改档不走审批),客户档
     写路径靠借老板管理员凭据组落地——密文原样带过去(KMS 同钥),操作员永远接触不到
     明文;订车默认值(单号前缀)同理跟随老板配置。老板没配 → 原样返回,差异卡如实
-    不出更新按钮。老板自己的 endpoint 在这里恒原样返回。"""
+    不出更新按钮。老板自己的 endpoint 在这里恒原样返回。
+
+    例外:booking_defaults 里的个人键(PERSONAL_BOOKING_DEFAULT_KEYS = 顾问三键)绝不
+    继承——老板钉给自己的归属顺着继承流下去=全店的单都算到老板头上(2026-08-11 E2E
+    G-QA7 实锤后加此闸)。"""
+    from services.erp.mrerp_dms_models import PERSONAL_BOOKING_DEFAULT_KEYS
+
     cfg = ep.get("config") or {}
     has_admin = _cfg_has_admin(cfg)
     if has_admin and cfg.get("booking_defaults"):
@@ -135,7 +141,10 @@ def _inherit_tenant_defaults(user_id: str, ep: Dict[str, Any]) -> Optional[Dict[
             if owner_cfg.get(key):
                 merged[key] = owner_cfg[key]
     if not merged.get("booking_defaults") and owner_cfg.get("booking_defaults"):
-        merged["booking_defaults"] = owner_cfg["booking_defaults"]
+        inherited = dict(owner_cfg["booking_defaults"])
+        for key in PERSONAL_BOOKING_DEFAULT_KEYS:
+            inherited.pop(key, None)
+        merged["booking_defaults"] = inherited
     out = dict(ep)
     out["config"] = merged
     return out

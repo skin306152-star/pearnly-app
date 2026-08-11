@@ -61,12 +61,12 @@ def http_get(path):
         return e.code, e.read().decode("utf-8", "replace")
 
 
-def reset_conversation():
+def reset_conversation(luid: str = C.LINE_USER_ID):
     """Fresh conversation: drop binding + session (push_logs kept, filtered by mode)."""
     from services.line_dms import store
 
-    store.unbind_by_line_user(C.LINE_USER_ID)
-    store.clear_session(C.TENANT_ID, C.LINE_USER_ID)
+    store.unbind_by_line_user(luid)
+    store.clear_session(C.TENANT_ID, luid)
 
 
 def clear_session():

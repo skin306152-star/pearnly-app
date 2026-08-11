@@ -322,7 +322,7 @@ async def _run_dedup(
         card = cards.candidates_card(cands, nonce)
 
     await _thr(store.set_session, tenant, line_user_id, "reviewing", payload)
-    _push_card(line_user_id, card)
+    _out._send(line_user_id, card)
 
 
 # ── reviewing → 执行写档 ────────────────────────────────────────────────────
@@ -465,8 +465,3 @@ def _ocr_error_text(e: _id_ocr.DmsOcrError) -> str:
     if e.code in ("ocr.id_card_unreadable", "ocr.empty_file", "ocr.file_too_large"):
         return cards.TXT_BLURRY
     return cards.TXT_SYSTEM_ERROR
-
-
-# ── LINE 出口(全走 dms channel · _reply/_push 见 _out) ──────────────────────
-def _push_card(line_user_id: str, card: dict) -> None:
-    line_client.push_messages(line_user_id, [card], channel=_CHANNEL)

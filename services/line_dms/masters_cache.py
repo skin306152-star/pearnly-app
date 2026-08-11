@@ -5,6 +5,8 @@
 paints 依赖 car,惰性按 car_id 存进同一 jsonb 的 paints_by_car 键。写库走 owner 连接
 (endpoint_id 非租户键,不施 RLS);登录抓取复用 erp_dms_intake 的会话范式(_run_logged_in,
 失败即回退,绝不抛)。表首用 ensure 自愈(prod 无 alembic 钩子,照 line_dms/store 范式)。
+逐问状态机的取数入口(qa_endpoint / qa_masters / qa_paints)也在本文件:它们只是「按 LINE
+用户解端点 → 读缓存」的异步薄壳,和缓存同源同一处改。
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any, Dict, List, Optional
+
+from services.line_dms._out import _thr
 
 logger = logging.getLogger(__name__)
 
@@ -120,14 +124,16 @@ def _fetch_paints_via_login(endpoint: Dict[str, Any], car_id: str) -> Optional[L
 
 
 # ── 对外:主档 / 颜色 ────────────────────────────────────────────────────
-def get_masters(endpoint: Dict[str, Any]) -> Dict[str, Any]:
+def get_masters(endpoint: Dict[str, Any], *, force_refresh: bool = False) -> Dict[str, Any]:
     """主档:缓存 <12h 直接回;过期/缺失 → 登录抓全量 + 落缓存。
 
     登录失败时回退陈旧缓存(状态诚实优先于报错),都没有则空 dict。全量刷新保留已惰性
-    缓存的 paints_by_car(避免每次刷主档就丢颜色缓存)。"""
+    缓存的 paints_by_car(避免每次刷主档就丢颜色缓存)。
+    force_refresh 给「刚在 DMS 改了主档、马上要按新数据判」的调用方(如顾问匹配失败重判),
+    否则那句「改完再试一次」在 12 小时内都是假的。"""
     eid = str(endpoint.get("id") or "")
     cached = _read(eid)
-    if cached and cached["age_seconds"] < CACHE_TTL_SECONDS:
+    if not force_refresh and cached and cached["age_seconds"] < CACHE_TTL_SECONDS:
         return cached["masters"]
     fresh = _fetch_masters_via_login(endpoint)
     if fresh is None:
@@ -171,6 +177,38 @@ def get_paints(
     pbc[car_id] = paints
     _write(eid, {**masters, "paints_by_car": pbc})
     return paints
+
+
+# ── LINE 逐问的取数入口(会话只存 endpoint_id,取数前现解端点) ──────────────
+async def qa_endpoint(line_user_id: str, endpoint_id: Any) -> Optional[Dict[str, Any]]:
+    """按 LINE 绑定的 user 解 DMS 端点。未绑定 / 端点被停用 → None。"""
+    from services.erp import dms_id_ocr
+    from services.line_dms import store
+
+    binding = await _thr(store.get_binding_by_line_user, line_user_id)
+    uid = (binding or {}).get("user_id") or ""
+    if not uid:
+        return None
+    return await _thr(dms_id_ocr.resolve_dms_endpoint, uid, endpoint_id)
+
+
+async def qa_masters(line_user_id: str, endpoint_id: Any, key: str) -> List[list]:
+    """某类主档(cars/place_books/…)。端点解不出就给空表 —— 发问层据此重问,不炸会话。"""
+    ep = await qa_endpoint(line_user_id, endpoint_id)
+    if not ep:
+        return []
+    masters = await _thr(get_masters, ep)
+    return masters.get(key) or []
+
+
+async def qa_paints(line_user_id: str, endpoint_id: Any, car_id: str) -> List[list]:
+    """某车型的颜色主档(逐问选完车才有 car_id)。"""
+    if not car_id:
+        return []
+    ep = await qa_endpoint(line_user_id, endpoint_id)
+    if not ep:
+        return []
+    return (await _thr(get_paints, ep, car_id)) or []
 
 
 def refresh_from_client(endpoint: Dict[str, Any], client: Any) -> None:

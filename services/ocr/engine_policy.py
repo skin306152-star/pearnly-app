@@ -21,7 +21,7 @@ from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
 from services.ai_gateway import backends
-from services.ocr import gemini_models
+from services.ocr import gemini_models, principal_context
 
 logger = logging.getLogger(__name__)
 
@@ -132,13 +132,17 @@ def resolve_mode(
 
     账号压过任务:灰度语义是「名单上的账号整机试新引擎(所有入口所有单据)」;
     生产后台常年把各任务钉了档,账号若排在任务之下,灰度在真机上永远轮不到
-    (2026-08-12 上线冒烟实锤,不是理论)。"""
+    (2026-08-12 上线冒烟实锤,不是理论)。
+
+    account 缺省时回落请求级 principal(鉴权层设,见 principal_context):银行/GL-VAT/
+    VAT 报表/身份证几条链的 OcrRequest 建在 facade 深处传不上 account,不回落的话
+    「所有入口生效」就只剩发票一条路。显式传参永远优先。"""
     env_mode = os.environ.get("OCR_ENGINE_MODE", "").strip()
     if env_mode in MODE_MODEL_MAPS:
         return env_mode
     cfg = config if config is not None else load_config()
     mode = (
-        _account_mode(cfg, account)
+        _account_mode(cfg, account or principal_context.current_email())
         or (cfg.get("overrides_by_task") or {}).get(task)
         or cfg.get("mode")
         or _FAILSAFE_MODE

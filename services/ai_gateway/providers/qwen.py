@@ -14,7 +14,7 @@ env:
 
 两处与别家 provider 有意不同:
   · 每个 chat 请求显式 enable_thinking=false:千问默认开思考链,抽字段用不上,不关既慢又贵。
-    vl-ocr 是纯转写模型,按 2026-08-11 实测编排不带这个参数。
+    转写路按 2026-08-11 实测编排不带这个参数(调用方按车道传,不从模型名反猜)。
   · 不发 response_format=json_object:DashScope 视觉模型对它不稳,JSON 由 prompt 约束,
     解析统一走 layer2_gemini._parse_json(与 selfhost 同一支解析,行为不劈叉)。
 """
@@ -69,20 +69,24 @@ def model_for_tier(tier: str) -> str:
     return os.environ.get("QWEN_MODEL_FLASH", "").strip() or DEFAULT_FLASH
 
 
-def _sends_thinking_toggle(model: str) -> bool:
-    """vl-ocr 纯转写模型按实测编排不带 enable_thinking;chat 档必须显式关掉思考链。"""
-    return not model.startswith("qwen-vl")
-
-
-def _payload(model: str, content, *, temperature: float, max_tokens: int) -> dict:
+def _payload(
+    model: str,
+    content,
+    *,
+    temperature: float,
+    max_tokens: int,
+    enable_thinking: Optional[bool],
+) -> dict:
+    """enable_thinking=None 则整个参数不发。带不带由调用方按车道定(chat 关思考链、转写路
+    按实测编排不带),不从模型名反猜 —— env 换个模型名,猜法就默默失灵。"""
     body = {
         "model": model,
         "messages": [{"role": "user", "content": content}],
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-    if _sends_thinking_toggle(model):
-        body["enable_thinking"] = False
+    if enable_thinking is not None:
+        body["enable_thinking"] = enable_thinking
     return body
 
 
@@ -124,7 +128,13 @@ def _parse_object(text: str) -> dict:
 def _chat_json(prompt, images, *, temperature, max_tokens, timeout_s, max_retries, tier):
     model_name = model_for_tier(tier)
     content = image_content_parts(prompt, images) if images else prompt
-    payload = _payload(model_name, content, temperature=temperature, max_tokens=max_tokens)
+    payload = _payload(
+        model_name,
+        content,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        enable_thinking=False,
+    )
     last_raw = ""
     for _ in range(max_retries + 1):
         text, kind, toks = _chat_text(payload, timeout_s)
@@ -143,7 +153,7 @@ def _chat_json(prompt, images, *, temperature, max_tokens, timeout_s, max_retrie
             except Exception:  # noqa: BLE001 — 解析不了就再读一次,读不出交上层救援
                 pass
     # 解析失败带回原文(上层可把散文当线索);raw 绝不进日志(_observe 只记 error_kind/token)
-    return ProviderOutcome(ok=False, error_kind="parse", model=model_for_tier(tier), raw=last_raw)
+    return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)
 
 
 def text_to_action(prompt, *, tools, **kw) -> ProviderOutcome:
@@ -213,6 +223,7 @@ def multimodal_to_text(
         image_content_parts(prompt, images),
         temperature=temperature,
         max_tokens=max_tokens,
+        enable_thinking=None,  # 转写路按 2026-08-11 实测编排不带这个参数
     )
     text, kind, toks = _chat_text(payload, timeout_s)
     if kind:
@@ -235,7 +246,9 @@ def text_to_text(
 ) -> ProviderOutcome:
     model_name = model_for_tier(tier)
     content = f"{system}\n\n{prompt}" if system else prompt
-    payload = _payload(model_name, content, temperature=temperature, max_tokens=4096)
+    payload = _payload(
+        model_name, content, temperature=temperature, max_tokens=4096, enable_thinking=False
+    )
     text, kind, toks = _chat_text(payload, timeout_s)
     if kind:
         return ProviderOutcome(ok=False, error_kind=kind, model=model_name)

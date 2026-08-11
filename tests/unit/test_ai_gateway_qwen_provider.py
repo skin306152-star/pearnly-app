@@ -88,6 +88,19 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(payload["model"], qwen.DEFAULT_VLOCR)
         self.assertEqual(out.data, "บริษัท ตัวอย่าง")
 
+    def test_thinking_toggle_follows_the_lane_not_the_model_name(self):
+        """带不带 enable_thinking 由车道定 —— 从模型名反猜的话,env 换个名字就默默失灵。"""
+        env = {**_ENV, "QWEN_MODEL_VLOCR": "ocr-renamed-2027", "QWEN_MODEL_FLASH": "qwen-vl-flash"}
+        post = _Post((_body("บริษัท ตัวอย่าง"), None))
+        with mock.patch.dict("os.environ", env), mock.patch.object(qwen, "post_json", post):
+            qwen.multimodal_to_text("transcribe", [(b"img", "image/png")])
+        self.assertNotIn("enable_thinking", post.calls[0]["payload"])
+
+        post = _Post((_body('{"total_amount": "70.00"}'), None))
+        with mock.patch.dict("os.environ", env), mock.patch.object(qwen, "post_json", post):
+            qwen.multimodal_to_json("p", [(b"img", "image/png")], tier="flash")
+        self.assertIs(post.calls[0]["payload"]["enable_thinking"], False)
+
     def test_image_travels_as_data_uri_part(self):
         post = _Post()
         with mock.patch.dict("os.environ", _ENV), mock.patch.object(qwen, "post_json", post):

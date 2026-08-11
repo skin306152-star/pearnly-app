@@ -16,6 +16,10 @@ Vision 路(page_runner)整建制保留,承担两件事:
   软闸(标注)= 单号缺失(实测 B 单号反而比 Vision 路更准,回落救不了,不回落)。
 
 秒级回退:env OCR_IMAGE_DIRECT=0 → 全量走原 Vision 链,零迁移。
+
+qwen 档(2026-08-11)在这条主路上分叉一次:发票/auto 页改走 qwen_direct 的两臂编排
+(flash 直读 + vl-ocr 转写 → 代码触发器 → max 重读),银行/总账长表仍走本模块的原提示词,
+只是档位换成 qwen 的升级臂。编排内任何异常都收敛成 DirectReadFallback,回落路径不变。
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from typing import List, Optional
 
 from pydantic import ValidationError
 
+from . import engine_policy
 from .cost import _compute_total_cost
 from .gl_balance_chain import repair_gl_document
 from .layer2_prompts import _SYSTEM_PROMPT
@@ -125,6 +130,19 @@ def _sniff_mime(image_bytes: bytes) -> str:
     if image_bytes[:3] == b"GIF":
         return "image/gif"
     return "image/png"  # PDF 渲染页就是 PNG;未知类型按 PNG 送,模型端自会报错
+
+
+def _qwen_active() -> bool:
+    """本请求生效档是不是 qwen(读策略层公开口径,不自己解析 env/配置)。"""
+    return engine_policy.active_mode() == engine_policy.MODE_QWEN
+
+
+def _tier_for(document_type: BusinessDocumentType) -> str:
+    """长表在 qwen 档吃升级臂:qwen 的读取臂是轻档,而轻档读长表会整页读崩
+    (实测断点数见 engine_policy 文件头)。其余档位维持原样的 flash_lite。"""
+    if document_type in _TABLE_DOC_TYPES and _qwen_active():
+        return "escalate"
+    return "flash_lite"
 
 
 def _call_model(
@@ -238,6 +256,20 @@ def _second_read(image_bytes: bytes, first: ThaiInvoice, api_key: Optional[str],
     return o2, inv2
 
 
+def _read_page_qwen(image_bytes: bytes, page_number: int, api_key: Optional[str]):
+    """qwen 档的发票页读数(两臂编排在 qwen_direct)。任何炸法都收敛成回落,不让上传看 500。"""
+    from . import qwen_direct
+
+    try:
+        return qwen_direct.read_invoice_page(
+            image_bytes, _sniff_mime(image_bytes), page_number, api_key
+        )
+    except DirectReadFallback:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise DirectReadFallback(f"page {page_number}: qwen raise: {type(e).__name__}: {e}") from e
+
+
 def read_page(
     image_bytes: bytes,
     page_number: int,
@@ -246,26 +278,36 @@ def read_page(
 ) -> PipelinePageResult:
     """单页直读 → PipelinePageResult(layer_chain=["ID"])。不可信即抛 DirectReadFallback。"""
     t0 = time.time()
-    try:
-        outcome = _call_model(image_bytes, document_type, api_key)
-    except Exception as e:  # noqa: BLE001 — 直读任何炸法都回落 Vision 路,不让用户看 500
-        raise DirectReadFallback(f"provider raise: {type(e).__name__}: {e}") from e
-    if not outcome.ok or not isinstance(outcome.data, dict):
-        raise DirectReadFallback(f"page {page_number}: {outcome.error_kind or 'empty output'}")
+    qwen_arm = None
+    if _qwen_active() and document_type in ("auto", "invoice"):
+        qwen_arm = _read_page_qwen(image_bytes, page_number, api_key)
+        data = qwen_arm.data
+        l2_model, (l2_in, l2_out) = qwen_arm.read_model, qwen_arm.read_tokens
+    else:
+        try:
+            outcome = _call_model(
+                image_bytes, document_type, api_key, tier=_tier_for(document_type)
+            )
+        except Exception as e:  # noqa: BLE001 — 直读任何炸法都回落 Vision 路,不让用户看 500
+            raise DirectReadFallback(f"provider raise: {type(e).__name__}: {e}") from e
+        if not outcome.ok or not isinstance(outcome.data, dict):
+            raise DirectReadFallback(f"page {page_number}: {outcome.error_kind or 'empty output'}")
+        data = outcome.data
+        l2_model, l2_in, l2_out = outcome.model, outcome.input_tokens, outcome.output_tokens
 
     invoice = ThaiInvoice(is_not_invoice=True)
     document = None
     warnings: List[str] = []
     if document_type in ("auto", "invoice"):
         try:
-            invoice = ThaiInvoice(**outcome.data)
+            invoice = ThaiInvoice(**data)
         except ValidationError as e:
             raise DirectReadFallback(f"page {page_number}: invoice schema: {e}") from e
         warnings.extend(_invoice_hard_gates(invoice, page_number))
         warnings.extend(_invoice_soft_flags(invoice))
     else:
         try:
-            document = _DOC_SCHEMAS[document_type](**outcome.data)
+            document = _DOC_SCHEMAS[document_type](**data)
         except ValidationError as e:
             raise DirectReadFallback(f"page {page_number}: {document_type} schema: {e}") from e
         if document_type == "general_ledger":
@@ -299,7 +341,15 @@ def read_page(
     chain = ["ID"]
     l3_in = l3_out = 0
     l3_model = ""
-    if (
+    triggers: List[str] = []
+    if qwen_arm is not None:
+        # qwen 档自带第二臂(触发器命中才升级),不再叠双读:两者治的是同一件事,叠了只是多花钱。
+        triggers = list(qwen_arm.triggers)
+        if qwen_arm.escalate_model:
+            chain = ["ID", "ID_ESC"]
+            l3_model = qwen_arm.escalate_model
+            l3_in, l3_out = qwen_arm.escalate_tokens
+    elif (
         document_type in ("auto", "invoice")
         and not invoice.is_not_invoice
         and double_read_enabled()
@@ -325,11 +375,11 @@ def read_page(
         document_type=document_type,
         document=document,
         layer_chain=chain,
-        trigger_reasons=[],
+        trigger_reasons=triggers,
         layer1_avg_confidence=0.0,
-        layer2_input_tokens=outcome.input_tokens,
-        layer2_output_tokens=outcome.output_tokens,
-        layer2_model=outcome.model,
+        layer2_input_tokens=l2_in,
+        layer2_output_tokens=l2_out,
+        layer2_model=l2_model,
         layer3_input_tokens=l3_in,
         layer3_output_tokens=l3_out,
         layer3_model=l3_model if (l3_in or l3_out) else "",

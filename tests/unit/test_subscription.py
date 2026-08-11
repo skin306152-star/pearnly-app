@@ -47,6 +47,32 @@ def _all_sql(cur):
     return "\n".join(s for s, _ in cur.executed)
 
 
+def _params_of(cur, sql_fragment):
+    """取第一条含 sql_fragment 的 execute 的参数元组(验写入落值)。"""
+    for sql, params in cur.executed:
+        if sql_fragment in sql:
+            return params
+    raise AssertionError(f"no execute matched: {sql_fragment}")
+
+
+def _sub_row(**over):
+    """tenant_subscriptions 行 · 默认 M 套餐已过期(in_cycle=False)。"""
+    row = {
+        "plan_code": "M",
+        "status": "active",
+        "quota": 200,
+        "over_rate": Decimal("1.25"),
+        "monthly_fee": Decimal("250"),
+        "pages_used_this_cycle": 30,
+        "auto_renew": True,
+        "cycle_start": None,
+        "cycle_end": None,
+        "in_cycle": False,
+    }
+    row.update(over)
+    return row
+
+
 class PricingPlansLockTests(unittest.TestCase):
     """套餐目录 = Zihao 2026-06-28 拍板值 · 改价必须先改本测试。"""
 
@@ -269,6 +295,119 @@ class GetActiveSubscriptionTests(unittest.TestCase):
         from services.billing import subscription
 
         self.assertIsNone(subscription.get_active_subscription(None))
+
+    def test_cancelled_but_in_cycle_still_active(self):
+        """取消 = 到期不再续 · 当前周期额度照用(不能一取消就掉回按量)。"""
+        from services.billing import subscription
+
+        cur = _FakeCursor(rows=[_sub_row(status="cancelled", auto_renew=False, in_cycle=True)])
+        with mock.patch.object(subscription.db, "get_cursor_rls", _ctxmgr(cur)):
+            sub = subscription.get_active_subscription("t1")
+        self.assertEqual(sub["status"], "cancelled")
+        self.assertEqual(sub["remaining"], 170)
+        self.assertNotIn("DELETE", _all_sql(cur))
+
+
+class RenewOrExpireTests(unittest.TestCase):
+    """周期已过后的惰性续订/失效 —— 付费用户扣月费的唯一入口。
+
+    分支矩阵:并发已续 / cancelled / 关自动续订 / 余额不足 / 余额够。
+    前四条都不许动 tenant_credits;最后一条必须扣费 + 重置周期。
+    """
+
+    def _renew(self, rows):
+        from services.billing import subscription
+
+        cur = _FakeCursor(rows=rows)
+        with mock.patch.object(subscription.db, "get_cursor_rls", _ctxmgr(cur)):
+            return subscription._renew_or_expire("t1"), cur
+
+    def _assert_expired_without_charging(self, out, cur):
+        self.assertIsNone(out)
+        sql = _all_sql(cur)
+        self.assertIn("DELETE FROM tenant_subscriptions", sql)
+        self.assertNotIn("UPDATE tenant_credits", sql)
+        self.assertNotIn("INSERT INTO credit_transactions", sql)
+
+    def test_no_row_returns_none(self):
+        out, cur = self._renew([])
+        self.assertIsNone(out)
+        self.assertNotIn("DELETE", _all_sql(cur))
+
+    def test_concurrently_renewed_returns_row_without_writes(self):
+        out, cur = self._renew([_sub_row(in_cycle=True)])
+        self.assertEqual(out["plan_code"], "M")
+        self.assertEqual(out["remaining"], 170)
+        sql = _all_sql(cur)
+        self.assertNotIn("DELETE", sql)
+        self.assertNotIn("UPDATE tenant_credits", sql)
+        self.assertNotIn("UPDATE tenant_subscriptions", sql)
+
+    def test_cancelled_expires_and_falls_back(self):
+        out, cur = self._renew([_sub_row(status="cancelled")])
+        self._assert_expired_without_charging(out, cur)
+
+    def test_auto_renew_off_expires_and_falls_back(self):
+        out, cur = self._renew([_sub_row(auto_renew=False)])
+        self._assert_expired_without_charging(out, cur)
+
+    def test_insufficient_balance_expires_and_falls_back(self):
+        # 余额 100 · M 月费 250 → 不够续 → 删行回落按量
+        out, cur = self._renew([_sub_row(), {"balance_thb": "100.00"}])
+        self._assert_expired_without_charging(out, cur)
+
+    def test_missing_credits_row_counts_as_zero_balance(self):
+        # tenant_credits 无行 → 视作 0 元 → 失效(不建行 · 不扣负)
+        out, cur = self._renew([_sub_row()])
+        self._assert_expired_without_charging(out, cur)
+
+    def test_sufficient_balance_renews_and_resets_cycle(self):
+        renewed = _sub_row(pages_used_this_cycle=0, in_cycle=True)
+        out, cur = self._renew([_sub_row(), {"balance_thb": "600.00"}, renewed])
+        self.assertEqual(out["plan_code"], "M")
+        self.assertEqual(out["pages_used_this_cycle"], 0)
+        self.assertEqual(out["remaining"], 200)
+        sql = _all_sql(cur)
+        self.assertNotIn("DELETE", sql)
+        self.assertIn("UPDATE tenant_credits SET balance_thb", sql)
+        self.assertIn("pages_used_this_cycle = 0", sql)
+        self.assertIn("make_interval(days =>", sql)
+        # 600 - 250 = 350 · 余额与流水 balance_after 必须同值
+        self.assertEqual(Decimal(_params_of(cur, "UPDATE tenant_credits")[0]), Decimal("350"))
+        txn = _params_of(cur, "INSERT INTO credit_transactions")
+        self.assertEqual(Decimal(txn[1]), Decimal("-250"))
+        self.assertEqual(Decimal(txn[2]), Decimal("350"))
+        self.assertIn("Package M", txn[3])
+
+    def test_renewal_uses_configured_cycle_days(self):
+        from services.billing.pricing import SUBSCRIPTION_CYCLE_DAYS
+
+        renewed = _sub_row(pages_used_this_cycle=0, in_cycle=True)
+        _, cur = self._renew([_sub_row(), {"balance_thb": "600.00"}, renewed])
+        self.assertEqual(_params_of(cur, "UPDATE tenant_subscriptions")[0], SUBSCRIPTION_CYCLE_DAYS)
+
+    def test_db_error_returns_none(self):
+        from services.billing import subscription
+
+        @contextmanager
+        def _boom(*a, **k):
+            raise RuntimeError("db down")
+            yield  # pragma: no cover
+
+        with mock.patch.object(subscription.db, "get_cursor_rls", _boom):
+            self.assertIsNone(subscription._renew_or_expire("t1"))
+
+    def test_expired_row_routes_from_get_active_subscription(self):
+        """接线验证:热路径读到过期行 → 真的进 _renew_or_expire 而不是直接返 None。"""
+        from services.billing import subscription
+
+        renewed = _sub_row(pages_used_this_cycle=0, in_cycle=True)
+        cur = _FakeCursor(rows=[_sub_row(), _sub_row(), {"balance_thb": "600.00"}, renewed])
+        with mock.patch.object(subscription.db, "get_cursor_rls", _ctxmgr(cur)):
+            sub = subscription.get_active_subscription("t1")
+        self.assertEqual(sub["remaining"], 200)
+        self.assertIn("FOR UPDATE", _all_sql(cur))
+        self.assertIn("UPDATE tenant_credits SET balance_thb", _all_sql(cur))
 
 
 class CatalogAndReExportTests(unittest.TestCase):

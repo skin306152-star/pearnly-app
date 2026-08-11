@@ -80,6 +80,9 @@ _ENTRY_ASSETS = {
         "/static/dist/admin.css",
         "/static/admin/admin.js",
         "/static/admin/admin-i18n.js",
+        "/static/admin/admin-engine.js",
+        "/static/admin/admin-engine-cost.js",
+        "/static/admin/admin-engine-charts.js",
         "/static/pearnly-ui.css",
     ),
     "static/console/console.html": (

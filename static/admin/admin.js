@@ -3038,30 +3038,7 @@
         _renderAllowlist(d.allowlist);
     }
 
-    // ============ OCR 引擎策略页 ============
-    const _ENG_PLANS = ['none', 'S', 'M', 'L', 'exempt'];
-    const _ENG_TASKS = ['invoice', 'id_card', 'bank_statement', 'gl_ledger', 'vat_report'];
-
-    function _engSelect(id, options, withEmpty, current) {
-        let html = '<select class="adm-eng-select" id="' + id + '">';
-        if (withEmpty)
-            html += '<option value="">' + _esc(_t('adm-eng-follow-global')) + '</option>';
-        const opts = options.slice();
-        // 防呆:后端存的档位本页不认识(新加的档 / 前端没同步)也必须出现在列表里,
-        // 否则 select 渲染成空白,一按保存就被当"跟全局"静默抹掉——银行钉档真这样丢过。
-        if (current && opts.indexOf(current) === -1) opts.push(current);
-        opts.forEach(function (o) {
-            const label = _t('adm-eng-opt-' + o);
-            html +=
-                '<option value="' +
-                o +
-                '">' +
-                _esc(label === 'adm-eng-opt-' + o ? o : label) +
-                '</option>';
-        });
-        return html + '</select>';
-    }
-
+    // 通用 KPI 卡片(OCR 引擎页建的,现由 POS / Agent 页共用 —— 别按名字猜归属)
     function _engKpi(label, value, sub) {
         return (
             '<div class="cost-kpi-card"><div class="cost-kpi-label">' +
@@ -3074,179 +3051,18 @@
         );
     }
 
-    function _renderEngineMetrics(m) {
-        const kpis = document.getElementById('adm-eng-kpis');
-        if (!kpis) return;
-        const w = m.window || {};
-        const today = m.today || {};
-        const perPage = w.pages ? w.cost_thb / w.pages : 0;
-        kpis.innerHTML =
-            _engKpi(
-                _t('adm-eng-kpi-today'),
-                '฿ ' + _fmt(today.cost_thb || 0, 2),
-                (today.requests || 0) + ' req · ' + (today.pages || 0) + ' p'
-            ) +
-            _engKpi(
-                _t('adm-eng-kpi-perpage'),
-                '฿ ' + _fmt(perPage, 3),
-                _t('adm-eng-kpi-window') + ' ฿ ' + _fmt(w.cost_thb || 0, 2)
-            ) +
-            _engKpi(_t('adm-eng-kpi-latency'), _fmt((w.avg_ms || 0) / 1000, 1) + 's', '') +
-            _engKpi(
-                _t('adm-eng-kpi-l3'),
-                _fmt((w.l3_rate || 0) * 100, 1) + '%',
-                _t('adm-eng-kpi-fail') + ' ' + _fmt((w.fail_rate || 0) * 100, 1) + '%'
-            ) +
-            _engKpi(
-                _t('adm-eng-kpi-shadow'),
-                _fmt(((m.shadow || {}).rate || 0) * 100, 1) + '%',
-                _t('adm-eng-shadow-ran') +
-                    ' ' +
-                    ((m.shadow || {}).total || 0) +
-                    ' · ' +
-                    _t('adm-eng-shadow-mism') +
-                    ' ' +
-                    ((m.shadow || {}).mismatches || 0)
-            );
-        const box = document.getElementById('adm-eng-by-model');
-        if (!box) return;
-        const rows = (m.by_model || [])
-            .map(function (r) {
-                return (
-                    '<tr><td>' +
-                    _esc(r.name) +
-                    '</td><td>' +
-                    r.requests +
-                    '</td><td>' +
-                    r.pages +
-                    '</td><td>฿ ' +
-                    _fmt(r.cost_thb, 2) +
-                    '</td><td>' +
-                    _fmt((r.avg_ms || 0) / 1000, 1) +
-                    's</td></tr>'
-                );
-            })
-            .join('');
-        box.innerHTML = rows
-            ? '<div class="cost-table-wrap"><table class="cost-table"><thead><tr><th>' +
-              [
-                  _t('adm-eng-col-model'),
-                  _t('adm-eng-col-reqs'),
-                  _t('adm-eng-col-pages'),
-                  _t('adm-eng-col-cost'),
-                  _t('adm-eng-col-latency'),
-              ].join('</th><th>') +
-              '</th></tr></thead><tbody>' +
-              rows +
-              '</tbody></table></div>'
-            : '<div class="cost-section-hint">' + _esc(_t('adm-eng-no-data')) + '</div>';
-    }
-
-    function _renderEngineForm(policy, options) {
-        const planModes = (options && options.plan_modes) || ['direct35', 'economy', 'selfhost'];
-        const taskModes = (options && options.modes) || planModes.concat(['auto']);
-        const mode = policy.mode || 'economy';
-        document.querySelectorAll('input[name="adm-eng-mode"]').forEach(function (r) {
-            r.checked = r.value === mode;
-        });
-        const plans = document.getElementById('adm-eng-plans');
-        if (plans) {
-            plans.innerHTML = _ENG_PLANS
-                .map(function (p) {
-                    return (
-                        '<label class="adm-eng-row"><span class="adm-set-row-label">' +
-                        _esc(_t('adm-eng-plan-' + p)) +
-                        '</span>' +
-                        _engSelect(
-                            'adm-eng-plan-' + p,
-                            planModes,
-                            false,
-                            (policy.defaults_by_plan || {})[p]
-                        ) +
-                        '</label>'
-                    );
-                })
-                .join('');
-            _ENG_PLANS.forEach(function (p) {
-                const sel = document.getElementById('adm-eng-plan-' + p);
-                if (sel) sel.value = (policy.defaults_by_plan || {})[p] || mode;
-            });
-        }
-        const tasks = document.getElementById('adm-eng-tasks');
-        if (tasks) {
-            tasks.innerHTML = _ENG_TASKS
-                .map(function (tk) {
-                    return (
-                        '<label class="adm-eng-row"><span class="adm-set-row-label">' +
-                        _esc(_t('adm-eng-task-' + tk)) +
-                        '</span>' +
-                        _engSelect(
-                            'adm-eng-task-' + tk,
-                            taskModes,
-                            true,
-                            (policy.overrides_by_task || {})[tk]
-                        ) +
-                        '</label>'
-                    );
-                })
-                .join('');
-            _ENG_TASKS.forEach(function (tk) {
-                const sel = document.getElementById('adm-eng-task-' + tk);
-                if (sel) sel.value = (policy.overrides_by_task || {})[tk] || '';
-            });
-        }
-    }
-
+    // ============ OCR 引擎页(档位能力 + 逐入口成本)============
+    // 页面本体在 admin-engine.js(档位卡 / 账号灰度)与 admin-engine-cost.js(成本仪表盘),
+    // 这里只把共用的 fetch/i18n/toast 递过去:那两个模块不自己抓全局,换鉴权只改这一处。
     async function _renderEnginePage() {
-        const saveBtn = document.getElementById('adm-eng-save');
-        if (!saveBtn) return;
-        if (!saveBtn.__bound) {
-            saveBtn.__bound = true;
-            saveBtn.addEventListener('click', async function () {
-                const mode =
-                    document.querySelector('input[name="adm-eng-mode"]:checked')?.value ||
-                    'economy';
-                const defaults_by_plan = {};
-                _ENG_PLANS.forEach(function (p) {
-                    defaults_by_plan[p] =
-                        document.getElementById('adm-eng-plan-' + p)?.value || mode;
-                });
-                const overrides_by_task = {};
-                _ENG_TASKS.forEach(function (tk) {
-                    const v = document.getElementById('adm-eng-task-' + tk)?.value || '';
-                    if (v) overrides_by_task[tk] = v;
-                });
-                try {
-                    await _adminFetch('/api/admin/ocr-engine', {
-                        method: 'POST',
-                        body: {
-                            mode: mode,
-                            defaults_by_plan: defaults_by_plan,
-                            overrides_by_task: overrides_by_task,
-                        },
-                    });
-                    _toast(_t('adm-eng-saved-toast'), 'success');
-                    _renderEnginePage();
-                } catch (e) {
-                    _toast(_t('adm-load-fail'), 'error');
-                }
-            });
-        }
-        try {
-            const [d, m] = await Promise.all([
-                _adminFetch('/api/admin/ocr-engine'),
-                _adminFetch('/api/admin/ocr-engine/metrics?days=7'),
-            ]);
-            _renderEngineForm(d.policy || {}, d.options || {});
-            const savedEl = document.getElementById('adm-eng-saved');
-            if (savedEl)
-                savedEl.textContent = d.updated_at
-                    ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
-                    : '';
-            _renderEngineMetrics(m || {});
-        } catch (e) {
-            _toast(_t('adm-load-fail'), 'error');
-        }
+        if (!window.AdminEngine) return;
+        await window.AdminEngine.render({
+            fetch: _adminFetch,
+            t: _t,
+            esc: _esc,
+            fmt: _fmt,
+            toast: _toast,
+        });
     }
 
     // ============ POS 开通页(PS-3 买断授权 · 开通/吊销/转移)============

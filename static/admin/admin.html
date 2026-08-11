@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
 
     <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
-    <link rel="stylesheet" href="/static/dist/admin.css?v=12046402" />
+    <link rel="stylesheet" href="/static/dist/admin.css?v=12081201" />
 
     <script>
       // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
@@ -994,73 +994,53 @@
               </svg>
             </div>
             <div class="page-head-text">
-              <h1 class="page-title" data-i18n="adm-eng-title">OCR 引擎策略</h1>
+              <h1 class="page-title" data-i18n="adm-eng-title">OCR 档位与成本</h1>
               <div class="page-subtitle" data-i18n="adm-eng-sub">
-                模式/套餐/任务级档位 · 配置故障自动回落 A · 高精度(全 3.5)· 改动留审计
+                四个档位的实测能力 · 每个入口的真实每页成本 · 定价前先看这页
               </div>
             </div>
           </div>
 
           <div class="cost-section" style="margin-top: 24px">
             <div class="cost-section-head">
-              <h3 data-i18n="adm-eng-metrics-title">运行指标(近 7 天)</h3>
-              <span class="cost-section-hint" data-i18n="adm-eng-metrics-hint"
-                >成本按每次识别实际用的模型单价落账 · 混跑 2.5/3.5 不算串</span
+              <h3 data-i18n="adm-eng-tier-title">引擎档位</h3>
+              <span class="cost-section-hint" data-i18n="adm-eng-tier-hint"
+                >选中即全局生效 · 银行对账单不跟全局(在下方任务覆写里单独钉档)</span
               >
             </div>
-            <div class="cost-kpi-grid" id="adm-eng-kpis"></div>
-            <div id="adm-eng-by-model"></div>
+            <div id="adm-eng-policy-body"></div>
           </div>
 
           <div class="cost-section">
             <div class="cost-section-head">
-              <h3 data-i18n="adm-eng-mode-title">全局模式</h3>
-              <span class="cost-section-hint" data-i18n="adm-eng-mode-hint"
-                >B · 现役 = L2 读取用 gemini-3.1-flash-lite,难票 L3 自动升 gemini-3.5-flash
-                (~฿0.11/页)‖ A · 直通 = 不覆写任何档位、全跟 OCR_*_MODEL 环境变量走(运维现场
-                救火用;它不是「更准的档」)‖ 自动 = 按下方套餐表选档 ‖ 银行对账单不跟全局:另在
-                任务覆写里钉 A · 直通(实测余额链断点 3.5=2 / 3.6=7 / 3.1-lite=40)</span
+              <h3 data-i18n="adm-eng-acct-title">按账号灰度</h3>
+              <span class="cost-section-hint" data-i18n="adm-eng-acct-hint"
+                >仅列出的账号走指定档位,其余跟全局</span
               >
             </div>
-            <div class="adm-set-rollout">
-              <label class="adm-set-radio">
-                <input type="radio" name="adm-eng-mode" value="direct35" />
-                <span data-i18n="adm-eng-mode-direct35">A · 直通(不覆写 · 跟 env 模型走)</span>
-              </label>
-              <label class="adm-set-radio">
-                <input type="radio" name="adm-eng-mode" value="economy" />
-                <span data-i18n="adm-eng-mode-economy"
-                  >B · 现役(L2 用 gemini-3.1-flash-lite · 难票 L3 升 gemini-3.5-flash)</span
-                >
-              </label>
-              <label class="adm-set-radio">
-                <input type="radio" name="adm-eng-mode" value="selfhost" />
-                <span data-i18n="adm-eng-mode-selfhost"
-                  >自部署(自托管模型 · 走 SELFHOST 端点 · 数据不出门)</span
-                >
-              </label>
-              <label class="adm-set-radio">
-                <input type="radio" name="adm-eng-mode" value="auto" />
-                <span data-i18n="adm-eng-mode-auto">自动(按下方套餐表)</span>
-              </label>
+            <div id="adm-eng-accounts"></div>
+            <div class="eng-acct-actions">
+              <button class="btn btn-sm" id="adm-eng-acct-add" data-i18n="adm-eng-acct-add">
+                添加账号
+              </button>
             </div>
-
-            <div class="cost-section-head" style="margin-top: 16px">
-              <h3 data-i18n="adm-eng-plan-title">套餐默认档(auto 模式生效)</h3>
-            </div>
-            <div id="adm-eng-plans"></div>
-
-            <div class="cost-section-head" style="margin-top: 16px">
-              <h3 data-i18n="adm-eng-task-title">任务级覆写(优先于全局)</h3>
-            </div>
-            <div id="adm-eng-tasks"></div>
-
             <div class="adm-set-actions">
               <button class="btn btn-primary btn-sm" id="adm-eng-save" data-i18n="adm-eng-save">
                 保存
               </button>
               <span class="adm-set-saved" id="adm-eng-saved"></span>
             </div>
+          </div>
+
+          <div class="cost-section">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-eng-cost-title">每页成本 · 按入口</h3>
+              <span class="cost-section-hint" data-i18n="adm-eng-cost-hint"
+                >对照当前售价 ฿1.50/页 · 超线的柱子是红的 · 页数未知的行只进明细表</span
+              >
+            </div>
+            <div class="eng-days" id="adm-eng-days"></div>
+            <div id="adm-eng-cost-body"></div>
           </div>
         </section>
 
@@ -1413,8 +1393,13 @@
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/admin/admin-i18n.js?v=11922005"></script>
+    <script src="/static/admin/admin-i18n.js?v=12081202"></script>
 
-    <script src="/static/admin/admin.js?v=11922004" defer></script>
+    <!-- OCR 引擎页三件套 · defer 保序,先于 admin.js 完成注册(admin.js 只做调用方) -->
+    <script src="/static/admin/admin-engine-charts.js?v=12081203" defer></script>
+    <script src="/static/admin/admin-engine-cost.js?v=12081204" defer></script>
+    <script src="/static/admin/admin-engine.js?v=12081205" defer></script>
+
+    <script src="/static/admin/admin.js?v=12081206" defer></script>
   </body>
 </html>

@@ -977,6 +977,223 @@ body.admin-layout-body .lang-switching-overlay {
   font-size: 13px;
 }
 
+/* ---- OCR 档位能力卡 + 成本仪表盘(eng-*)· 配色令牌见 admin-viz.css ---- */
+.eng-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+.eng-tier {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+}
+.eng-tier:hover {
+  border-color: var(--accent);
+}
+.eng-tier.is-on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-weak);
+}
+.eng-tier > input[type='radio'] {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  accent-color: var(--accent);
+}
+.eng-tier-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 22px;
+}
+.eng-tier-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.eng-tier-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.eng-tier-live {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+.eng-tier-models {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--ink2);
+  word-break: break-word;
+}
+.eng-tier-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line2);
+}
+.eng-tier-metric {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+.eng-tier-metric-k {
+  color: var(--ink-3);
+}
+.eng-tier-metric-v {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.eng-tier-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.eng-tier-auto {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-right: 44px;
+}
+.eng-tier-auto .eng-tier-note {
+  margin-left: auto;
+}
+.eng-tier-foot {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.eng-sub-head {
+  margin-top: 22px;
+}
+
+.eng-acct-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.eng-acct-email {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+}
+.eng-acct-actions {
+  margin-top: 12px;
+}
+
+/* 四态:加载 / 空 / 错误(带重试)· 有数据时本容器整个被内容替换 */
+.eng-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 28px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--ink-3);
+  font-size: 13px;
+  text-align: center;
+}
+.eng-state-loading {
+  border-style: solid;
+}
+.eng-state-error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.eng-days {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+/* 分段控件与重试都得看得出「可以点」· .btn 默认是透明幽灵态,单摆着像一行文字 */
+.eng-day {
+  border-color: var(--line);
+  color: var(--ink2);
+}
+.eng-day.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.eng-state .btn {
+  border-color: currentColor;
+}
+.eng-charts {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 16px;
+}
+.eng-chart {
+  margin: 0;
+  min-width: 0;
+}
+.eng-chart figcaption {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.eng-chart-canvas {
+  width: 100%;
+  height: 320px;
+}
+.eng-chart-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+@media (max-width: 900px) {
+  .eng-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 明细表 · DESIGN_SYSTEM §21:表头居中 · 短内容居中 · 长文本靠左 · 空值一律 — */
+.eng-table th,
+.eng-table td {
+  text-align: center;
+}
+.eng-table .eng-cell-text {
+  text-align: left;
+  white-space: normal;
+  min-width: 180px;
+}
+.eng-table .eng-row-muted td {
+  color: var(--ink-3);
+}
+
 /* ---- Z1-b · Pearnly AI 邀请管理页(adm-ai-*) ---- */
 .adm-ai-flag-line {
   font-size: 13px;

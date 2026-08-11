@@ -148,7 +148,7 @@
               "action": {
                 "type": "postback",
                 "label": "ทำใบจองต่อ",
-                "data": "action=keep&nonce=952be357c5c58210",
+                "data": "action=keep&nonce=5881afc0f8cdfae8",
                 "displayText": "ทำใบจองต่อ"
               }
             },
@@ -159,7 +159,7 @@
               "action": {
                 "type": "postback",
                 "label": "แก้ไข",
-                "data": "action=edit&nonce=952be357c5c58210",
+                "data": "action=edit&nonce=5881afc0f8cdfae8",
                 "displayText": "แก้ไข"
               }
             }

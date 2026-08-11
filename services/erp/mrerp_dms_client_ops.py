@@ -7,10 +7,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, timedelta
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from services.erp import dms_employees
 from services.erp.mrerp_dms_models import (
     BookingDefaults,
     DMSBookingPayload,
@@ -18,6 +19,9 @@ from services.erp.mrerp_dms_models import (
     ThaiIdCardPayload,
 )
 from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
+from services.erp.mrerp_dms_payments import payment_form_fields
+
+logger = logging.getLogger(__name__)
 
 # DMS 订车单(drfcbc)菜单 id/层级 —— autonum 自动编号的键(MR.ERP DMS 标准实例)。
 # 走原生表单建单时带上,让 new.php 推进对应 BK 流水计数器。
@@ -29,8 +33,8 @@ _DRFCBC_MENULV = "2"
 # 撞重复时往后顺号重试,跳过所有已占用号。
 _BOOKING_DOCNO_MAX_TRIES = 25
 
-# 顾问名册一次取满(真机 probe:服务端尊重 bshsdamt,200 行覆盖单店全部销售)。
-_ADVISOR_PAGE_SIZE = "200"
+# 顾问名册翻页页大小(真机 probe:服务端尊重 bshsdamt,200 行一页覆盖单店全部销售)。
+_ADVISOR_PAGE_SIZE = 200
 
 
 def _is_duplicate_docno_error(body: str) -> bool:
@@ -49,62 +53,37 @@ def _bump_docno(docno: str) -> str:
     return head + str(int(tail) + 1).zfill(len(tail))
 
 
-# 订金支付渠道闭集 —— 未知渠道必须报错,不许静默丢。
-_PAYMENT_CHANNELS = ("cash", "transfer", "cheque", "cashier_cheque", "card", "other")
-
-# 每渠道在 DMS 订车单表单上的金额字段(真机勘察字段名)。
-_PAYMENT_MONEY_FIELD = {
-    "cash": "txtmoneycash",
-    "transfer": "txtmoneytfmon",
-    "cheque": "txtmoneycheque",
-    "cashier_cheque": "txtmoneycashiercq",
-    "card": "txtmoneycddbc",
-    "other": "txtmoneyother",
-}
-
-# 每渠道的文本 extra 槽位 → 表单字段;transfer 的 src/dst 为空或 "-" 时不写。
-_PAYMENT_TEXT_FIELD = {
-    "transfer": {"src": "txtaccountnumtffrom", "dst": "txtaccountnumtfmon"},
-    "cheque": {"ref": "txtchequeno"},
-    "cashier_cheque": {"ref": "txtcashiercqno"},
-    "card": {"ref": "txttypenamecddbc"},
-    "other": {"detail": "txtdetailother"},
-}
+def row_by_id(rows: Optional[List[list]], rid: str) -> Optional[list]:
+    """bshsd 主档行按 id 命中(首列即 id),取首个;没有 → None。"""
+    for row in rows or []:
+        if row and str(row[0]) == str(rid):
+            return row
+    return None
 
 
-def _payment_form_fields(payments: tuple) -> Dict[str, str]:
-    """聚合订金支付渠道 → DMS 表单字段(纯函数,可单测)。
+def _memo(client: Any) -> Dict[tuple, Any]:
+    """会话级取数备忘。client 实例活在一次 DMS 登录会话里(_run_logged_in),期间主档不变;
+    惰性挂在实例上,mixin 因此不依赖 DMSClient.__init__。"""
+    return client.__dict__.setdefault("_bshsd_memo", {})
 
-    同渠道多条:金额 Decimal 相加、文本 extra 用 " / " 连接。
-    空 payments 返回空 dict —— 调用方保留表单默认 txtearnestmoney="0.00"。
+
+def _parse_bshsd_rows(elemname: str, text: str) -> Optional[List[List[Any]]]:
+    """bshsd 响应 → 行表。空 body / 合法空数组 → [];非空但不可解析 → None。
+
+    「取数失败」与「名册真的一个人都没有」必须分得开:前者可以降级重试,后者只能诚实报错。
     """
-    totals: Dict[str, Decimal] = {}
-    texts: Dict[str, Dict[str, List[str]]] = {}
-    for pay in payments:
-        channel = pay.get("channel")
-        if channel not in _PAYMENT_CHANNELS:
-            raise ValueError(f"unknown payment channel: {channel!r}")
-        amount = str(pay.get("amount") or "0").replace(",", "")
-        totals[channel] = totals.get(channel, Decimal("0")) + Decimal(amount)
-        extra = pay.get("extra") or {}
-        for slot, value in extra.items():
-            if slot in ("src", "dst", "ref", "detail") and value and value != "-":
-                texts.setdefault(channel, {}).setdefault(slot, []).append(str(value))
-
-    fields: Dict[str, str] = {}
-    grand_total = Decimal("0")
-    for channel in _PAYMENT_CHANNELS:  # 固定顺序,输出确定可断言
-        if channel not in totals:
-            continue
-        grand_total += totals[channel]
-        fields[_PAYMENT_MONEY_FIELD[channel]] = f"{totals[channel]:.2f}"
-        for slot, form_field in _PAYMENT_TEXT_FIELD.get(channel, {}).items():
-            values = texts.get(channel, {}).get(slot)
-            if values:
-                fields[form_field] = " / ".join(values)
-    if fields:
-        fields["txtearnestmoney"] = f"{grand_total:.2f}"
-    return fields
+    if not text.strip():
+        return []
+    try:
+        rows = json.loads(text)
+    except (ValueError, json.JSONDecodeError):
+        rows = None
+    if not isinstance(rows, list):
+        logger.warning(
+            "[dms] bshsd %s: body is not a JSON array; treated as fetch failure", elemname
+        )
+        return None
+    return rows
 
 
 class DMSClientOpsMixin:
@@ -169,7 +148,7 @@ class DMSClientOpsMixin:
             }
         )
         # 有订金渠道时覆盖上面的 0.00 默认与新增渠道字段;空 payments 则保持现状。
-        data.update(_payment_form_fields(booking.payments))
+        data.update(payment_form_fields(booking.payments))
         self._apply_address_to_booking_form(data, card.address)
 
     def create_booking_via_form(
@@ -305,21 +284,27 @@ class DMSClientOpsMixin:
 
     def fetch_masters(self) -> Dict[str, List[List[Any]]]:
         """Pull the dropdown lists the connect wizard needs. Best-effort:
-        a missing/empty list comes back as []."""
+        a missing/unreadable list comes back as []."""
         out: Dict[str, List[List[Any]]] = {}
-        for key, elem, extra in (
-            # 顾问名册要全量:操作员账号按 code 列匹配,被默认 10 行分页截断就永远匹配不上。
-            ("advisors", "txtusers", {"bshsdamt": _ADVISOR_PAGE_SIZE}),
-            ("cars", "txtcar", {}),
-            ("place_books", "txtplacebook", {}),
-            ("term_sales", "txttermsale", {}),
-            ("branches", "txtbranch_book", {}),
-            ("regis_behalfs", "txtregisbehalf", {}),
+        for key, elem in (
+            ("cars", "txtcar"),
+            ("place_books", "txtplacebook"),
+            ("term_sales", "txttermsale"),
+            ("branches", "txtbranch_book"),
+            ("regis_behalfs", "txtregisbehalf"),
         ):
             try:
-                out[key] = self._bshsd(elem, **extra)
+                out[key] = self._bshsd(elem) or []
             except Exception:
                 out[key] = []
+        try:
+            # 顾问名册单独翻页取全:操作员账号按 code 列匹配,被分页截断就永远匹配不上。
+            out["advisors"] = self._advisor_rows() or []
+        except Exception:
+            out["advisors"] = []
+        # 员工表带登录名,是顾问归属的精确层(顾问下拉的 code 列只是员工编号)。
+        # 销售账号未必有员工页权限 → 取不到就落 [],调用方回落启发式匹配。
+        out["employees"] = dms_employees.fetch_employees(self) or []
         return out
 
     def resolve_booking_payload(
@@ -385,24 +370,28 @@ class DMSClientOpsMixin:
         )
         return self._first_data_val(body)
 
+    def _advisor_rows(self) -> Optional[List[List[Any]]]:
+        """顾问名册(翻页取全)· 建单严格解析与 fetch_masters 共用同一次取数。"""
+        return self._bshsd_all("txtusers", page_size=_ADVISOR_PAGE_SIZE)
+
     def _advisor_ref_strict(self, defaults: BookingDefaults) -> DMSMasterRef:
         """顾问栏(ที่ปรึกษาการขาย)= 销售提成归属,只认调用方钉死的 id,绝不回落名册首行。
 
-        逐问开局已按操作员的 DMS 账号匹配好归属(services/line_dms/advisor_match.py),
-        到这里必有 id;落错人只有月底对账才看得出来,所以宁可当场报错也不猜。
+        逐问开局已按操作员的 DMS 账号匹配好归属(services/erp/dms_advisor.py),到这里必有
+        id;落错人只有月底对账才看得出来,所以宁可当场报错也不猜。
         """
         if not defaults.advisor_id:
             raise DMSClientError(
                 "booking advisor not pinned for operator", "ERR_DMS_ADVISOR_REQUIRED"
             )
-        rows = self._bshsd("txtusers", bshsdamt=_ADVISOR_PAGE_SIZE)
-        row = self._row_by_id(rows, defaults.advisor_id)
+        rows = self._advisor_rows()
+        row = row_by_id(rows, defaults.advisor_id)
         if row is not None:
             return self._ref_from_row(row)
-        if not rows and defaults.advisor_name:
-            # 名册整份空:可能是接口抖/200 里塞了不可解析的 body,也可能名册真的一个人都没有
-            # —— 这两种在这一层分不出来。有名字才敢放行(id 是从本租户名册匹配出来的),
-            # 按钉死标量提交,DMS 侧仍按 id 认人。
+        if rows is None and defaults.advisor_name:
+            # 名册取数失败(接口抖 / 200 里塞了不可解析的 body):有名字才敢放行,按钉死标量
+            # 提交,DMS 侧仍按 id 认人。名册真空(rows == [])不走这条 —— 那种单 DMS 必拒,
+            # 降级只会把「建不了单」拖到更晚才暴露。
             return DMSMasterRef(
                 id=defaults.advisor_id, code=defaults.advisor_code, name=defaults.advisor_name
             )
@@ -416,8 +405,8 @@ class DMSClientOpsMixin:
     ) -> DMSMasterRef:
         """Resolve a master ref: if the user pinned an id, fetch that exact
         row; else take the first available row from live master data."""
-        rows = self._bshsd(elemname, **extra)
-        chosen = self._row_by_id(rows, pinned_id) if pinned_id else None
+        rows = self._bshsd(elemname, **extra) or []
+        chosen = row_by_id(rows, pinned_id) if pinned_id else None
         if chosen is None and rows:
             chosen = rows[0]
         if chosen is None:
@@ -425,14 +414,6 @@ class DMSClientOpsMixin:
             # caller still gets a usable (if unverified) ref.
             return DMSMasterRef(id=pinned_id, code=pinned_code, name=pinned_name)
         return self._ref_from_row(chosen)
-
-    @staticmethod
-    def _row_by_id(rows: List[List[Any]], rid: str) -> Optional[list]:
-        """bshsd 主档行按 id 命中(首列即 id),取首个;没有 → None。"""
-        for row in rows:
-            if str(row[0]) == str(rid):
-                return row
-        return None
 
     @staticmethod
     def _ref_from_row(row: list) -> DMSMasterRef:
@@ -444,11 +425,46 @@ class DMSClientOpsMixin:
             extra=tuple(row[3:]),
         )
 
-    def _bshsd(self, elemname: str, **extra) -> List[List[Any]]:
-        data = {"bshsdamt": "10", "bshsdcurrpage": "1", "elemname": elemname, "sdt": ""}
-        data.update({k: str(v) for k, v in extra.items()})
-        text = self._post_text("drfcbc/component/bshsd.php", data)
-        try:
-            return json.loads(text) if text.strip() else []
-        except (ValueError, json.JSONDecodeError):
-            return []
+    def _bshsd(self, elemname: str, **extra) -> Optional[List[List[Any]]]:
+        """DMS 主档单页取数(取数失败 → None,见 _parse_bshsd_rows)。
+
+        同一会话内同参只打一次:一次建单要解六七个主档、还会在成功后就地刷缓存,
+        而主档在这一次登录期间不会变。失败不进备忘,允许下次重试。
+        """
+        key = (elemname, tuple(sorted(extra.items())))
+        memo = _memo(self)
+        if key not in memo:
+            data = {"bshsdamt": "10", "bshsdcurrpage": "1", "elemname": elemname, "sdt": ""}
+            data.update({k: str(v) for k, v in extra.items()})
+            rows = _parse_bshsd_rows(elemname, self._post_text("drfcbc/component/bshsd.php", data))
+            if rows is None:
+                return None
+            memo[key] = rows
+        return memo[key]
+
+    def _bshsd_all(
+        self, elemname: str, *, page_size: int = 200, max_pages: int = 20, **extra
+    ) -> Optional[List[List[Any]]]:
+        """翻页拉全某主档:不满一页即最后一页。任一页取数失败 → 整体 None。
+
+        半份名册比取不到更危险 ——「这个人不在名册」的判断会变成瞎话。撞 max_pages 说明
+        主档比预期大一个量级,截断必须点名留痕(静默截断 = 又一个分页黑洞)。
+        """
+        key = (elemname, tuple(sorted(extra.items())), "all")
+        memo = _memo(self)
+        if key in memo:
+            return memo[key]
+        rows: List[List[Any]] = []
+        for page in range(1, max_pages + 1):
+            got = self._bshsd(elemname, bshsdamt=page_size, bshsdcurrpage=page, **extra)
+            if got is None:
+                return None
+            rows.extend(got)
+            if len(got) < page_size:
+                break
+        else:
+            logger.warning(
+                "[dms] master %s truncated at %d pages / %d rows", elemname, max_pages, len(rows)
+            )
+        memo[key] = rows
+        return rows

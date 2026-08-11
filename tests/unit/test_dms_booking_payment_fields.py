@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 """DMS 订车单建单载荷:订金支付渠道聚合 + 登记人姓名。
 
-_payment_form_fields 纯函数直接测; _apply_booking_form_fields 走假客户端
+payment_form_fields 纯函数直接测; _apply_booking_form_fields 走假客户端
 验证字段落进表单 dict(regis_name 覆盖/回落、空渠道保持现状逐字节一致)。
 """
 
 import unittest
 
-from services.erp.mrerp_dms_client_ops import (
-    DMSClientOpsMixin,
-    _payment_form_fields,
-)
+from services.erp.mrerp_dms_client_ops import DMSClientOpsMixin
+from services.erp.mrerp_dms_payments import payment_form_fields
 from services.erp.mrerp_dms_models import (
     DMSBookingPayload,
     DMSMasterRef,
@@ -73,15 +71,15 @@ class _FormClient(DMSClientOpsMixin):
 
 class TestPaymentFormFields(unittest.TestCase):
     def test_empty_payments_returns_empty(self):
-        self.assertEqual(_payment_form_fields(()), {})
+        self.assertEqual(payment_form_fields(()), {})
 
     def test_single_cash_channel(self):
-        fields = _payment_form_fields(({"channel": "cash", "amount": "5000", "extra": {}},))
+        fields = payment_form_fields(({"channel": "cash", "amount": "5000", "extra": {}},))
         self.assertEqual(fields["txtmoneycash"], "5000.00")
         self.assertEqual(fields["txtearnestmoney"], "5000.00")
 
     def test_transfer_src_dst_verbatim(self):
-        fields = _payment_form_fields(
+        fields = payment_form_fields(
             (
                 {
                     "channel": "transfer",
@@ -96,7 +94,7 @@ class TestPaymentFormFields(unittest.TestCase):
         self.assertEqual(fields["txtearnestmoney"], "2000.50")
 
     def test_transfer_dash_src_skipped(self):
-        fields = _payment_form_fields(
+        fields = payment_form_fields(
             (
                 {
                     "channel": "transfer",
@@ -110,7 +108,7 @@ class TestPaymentFormFields(unittest.TestCase):
         self.assertEqual(fields["txtmoneytfmon"], "1000.00")
 
     def test_same_channel_sums_decimals(self):
-        fields = _payment_form_fields(
+        fields = payment_form_fields(
             (
                 {"channel": "cash", "amount": "1000.50", "extra": {}},
                 {"channel": "cash", "amount": "2000", "extra": {}},
@@ -120,7 +118,7 @@ class TestPaymentFormFields(unittest.TestCase):
         self.assertEqual(fields["txtearnestmoney"], "3000.50")
 
     def test_multi_entry_text_joined(self):
-        fields = _payment_form_fields(
+        fields = payment_form_fields(
             (
                 {
                     "channel": "transfer",
@@ -147,7 +145,7 @@ class TestPaymentFormFields(unittest.TestCase):
             {"channel": "card", "amount": "500", "extra": {"ref": "CARD1"}},
             {"channel": "other", "amount": "600", "extra": {"detail": "cash on delivery"}},
         )
-        fields = _payment_form_fields(pays)
+        fields = payment_form_fields(pays)
         self.assertEqual(fields["txtmoneycash"], "100.00")
         self.assertEqual(fields["txtmoneytfmon"], "200.00")
         self.assertEqual(fields["txtaccountnumtffrom"], "S")
@@ -164,10 +162,10 @@ class TestPaymentFormFields(unittest.TestCase):
 
     def test_unknown_channel_raises(self):
         with self.assertRaises(ValueError):
-            _payment_form_fields(({"channel": "bitcoin", "amount": "1", "extra": {}},))
+            payment_form_fields(({"channel": "bitcoin", "amount": "1", "extra": {}},))
 
     def test_comma_amount_normalized(self):
-        fields = _payment_form_fields(({"channel": "cash", "amount": "1,000.50", "extra": {}},))
+        fields = payment_form_fields(({"channel": "cash", "amount": "1,000.50", "extra": {}},))
         self.assertEqual(fields["txtmoneycash"], "1000.50")
         self.assertEqual(fields["txtearnestmoney"], "1000.50")
 

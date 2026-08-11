@@ -1,7 +1,7 @@
 {
   "kind": "reply_messages",
   "channel": "dms",
-  "reply_token": "rt_1786469699392",
+  "reply_token": "rt_1786485611680",
   "messages": [
     {
       "type": "flex",
@@ -284,7 +284,7 @@
               "action": {
                 "type": "postback",
                 "label": "ยืนยัน",
-                "data": "action=confirm_booking&nonce=d5c8d0d850da2f02",
+                "data": "action=confirm_booking&nonce=a2d44ab18d32499f",
                 "displayText": "ยืนยัน"
               }
             },

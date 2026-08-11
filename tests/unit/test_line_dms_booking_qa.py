@@ -14,6 +14,7 @@ from unittest import mock
 
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-line-dms-qa-32bytes-long")
 
+from services.erp import erp_dms_push  # noqa: E402
 from services.line_binding import line_client  # noqa: E402
 from services.line_dms import booking_qa as qa  # noqa: E402
 from services.line_dms import qa_cards  # noqa: E402
@@ -93,7 +94,7 @@ class Env:
 
         p(qa.masters_cache, "get_paints", side_effect=_paints)
         p(
-            qa.advisor_match,
+            qa.dms_advisor,
             "resolve_operator_advisor",
             return_value=(self.advisor, self.dms_username),
         )
@@ -178,6 +179,12 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
             self.assertIsNone(env.session())
             self.assertEqual(_pushed_text(env), qa_cards.TXT_ADVISOR_BLOCK_NO_USER)
+
+    async def test_block_copy_stays_in_sync_with_error_catalog(self):
+        """补救指引单源:改了错误码目录的泰语原文,LINE 拦截话术必须跟着变(防两处漂)。"""
+        catalog = erp_dms_push._DMS_FRIENDLY["ERR_DMS_ADVISOR_UNMATCHED"]["th"]
+        self.assertIn(catalog, qa_cards.TXT_ADVISOR_BLOCK)
+        self.assertIn(catalog, qa_cards.TXT_ADVISOR_BLOCK_NO_USER)
 
     async def test_start_without_endpoint_does_not_open_session(self):
         with Env() as env:

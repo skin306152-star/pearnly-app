@@ -3,9 +3,11 @@
 
 2026-08-11:顾问栏此前恒填名册首行(_ref_from_default 的首行兜底),而 payload 从没人写
 advisor_id → 全公司的单都算到同一个人头上。改成只认调用方钉死的 id,认不出就报错;
-名册整份取不到(接口抖)时才按钉死标量降级,不因一次抖动拦生意。
+只有名册取数失败(_bshsd 回 None)才按钉死标量降级,不因一次抖动拦生意 —— 名册真空
+(回 [])一律拦,那种单 DMS 必拒,降级只会把失败拖到更晚。
 """
 
+import json
 import unittest
 
 from services.erp.mrerp_dms_client_base import DMSClientError
@@ -18,16 +20,34 @@ _ADVISORS = [
 ]
 
 
-class _FakeClient(DMSClientOpsMixin):
-    """只桩 _bshsd:主档取数是本测唯一外部依赖,顺带记录调用参数。"""
+_EMPLOYEE_LISTING = (
+    'dt::<div data-val="297"><div><div><p>SALE01</p><p>sale01</p></div>'
+    "<div><p>สมชาย</p></div></div></div>"
+)
 
-    def __init__(self, rows_by_elem):
+
+class _FakeClient(DMSClientOpsMixin):
+    """桩 _bshsd(主档)+ _post_text(员工表):本测仅有的两个外部依赖,顺带记录调用参数。
+
+    rows_by_elem 的值为 None 表示「取数失败」,与「名册真空([])」分开。
+    """
+
+    def __init__(self, rows_by_elem, employees_body=_EMPLOYEE_LISTING):
         self.rows_by_elem = rows_by_elem
+        self.employees_body = employees_body
         self.calls = []
+        self.posts = []
 
     def _bshsd(self, elemname, **extra):
         self.calls.append((elemname, extra))
-        return list(self.rows_by_elem.get(elemname) or [])
+        rows = self.rows_by_elem.get(elemname)
+        if rows is None and elemname in self.rows_by_elem:
+            return None
+        return list(rows or [])
+
+    def _post_text(self, path, data):
+        self.posts.append(path)
+        return self.employees_body
 
 
 def _defaults(**over) -> BookingDefaults:
@@ -44,10 +64,10 @@ class AdvisorStrictTests(unittest.TestCase):
         self.assertEqual((ref.id, ref.code, ref.name), ("297", "sale01", "สมชาย"))
         self.assertEqual(ref.extra, ("0811111111",))  # txtuserstel 从这里取
 
-    def test_master_is_fetched_unpaged(self):
+    def test_master_is_fetched_paged_from_page_one(self):
         cl = _FakeClient({"txtusers": _ADVISORS})
         cl._advisor_ref_strict(_defaults())
-        self.assertEqual(cl.calls, [("txtusers", {"bshsdamt": "200"})])
+        self.assertEqual(cl.calls, [("txtusers", {"bshsdamt": 200, "bshsdcurrpage": 1})])
 
     def test_missing_pin_raises_required(self):
         cl = _FakeClient({"txtusers": _ADVISORS})
@@ -62,17 +82,26 @@ class AdvisorStrictTests(unittest.TestCase):
             cl._advisor_ref_strict(_defaults(advisor_id="999", advisor_name="ผีน้อย"))
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_ADVISOR_UNMATCHED")
 
-    def test_empty_master_falls_back_to_pinned_scalars(self):
-        cl = _FakeClient({"txtusers": []})
+    def test_fetch_failure_falls_back_to_pinned_scalars(self):
+        cl = _FakeClient({"txtusers": None})
         ref = cl._advisor_ref_strict(
             _defaults(advisor_id="335", advisor_code="sale02", advisor_name="sale02")
         )
         self.assertEqual((ref.id, ref.code, ref.name, ref.extra), ("335", "sale02", "sale02", ()))
 
-    def test_empty_master_without_name_raises_unmatched(self):
-        cl = _FakeClient({"txtusers": []})
+    def test_fetch_failure_without_name_raises_unmatched(self):
+        cl = _FakeClient({"txtusers": None})
         with self.assertRaises(DMSClientError) as ctx:
             cl._advisor_ref_strict(_defaults(advisor_id="335"))
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_ADVISOR_UNMATCHED")
+
+    def test_empty_master_raises_even_with_pinned_name(self):
+        # 名册真空 ≠ 取数失败:真空时 DMS 必拒这张单,降级放行只会把失败拖到更晚。
+        cl = _FakeClient({"txtusers": []})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl._advisor_ref_strict(
+                _defaults(advisor_id="335", advisor_code="sale02", advisor_name="sale02")
+            )
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_ADVISOR_UNMATCHED")
 
 
@@ -97,12 +126,109 @@ class ResolveBookingPayloadTests(unittest.TestCase):
 
 
 class FetchMastersTests(unittest.TestCase):
-    def test_advisors_pulled_unpaged_others_default(self):
+    def test_advisors_pulled_paged_others_default(self):
         cl = _FakeClient({"txtusers": _ADVISORS})
         cl.fetch_masters()
         extras = dict(cl.calls)
-        self.assertEqual(extras["txtusers"], {"bshsdamt": "200"})
+        self.assertEqual(extras["txtusers"], {"bshsdamt": 200, "bshsdcurrpage": 1})
         self.assertEqual(extras["txtcar"], {})
+
+    def test_employees_pulled_for_the_exact_advisor_layer(self):
+        # 顾问下拉的 code 列是员工编号,登录名只有员工表有 → 主档必须带上 employees。
+        out = _FakeClient({"txtusers": _ADVISORS}).fetch_masters()
+        self.assertEqual(
+            out["employees"], [{"id": "297", "code": "SALE01", "login": "sale01", "name": "สมชาย"}]
+        )
+
+    def test_fetch_failure_degrades_to_empty_list(self):
+        cl = _FakeClient({"txtusers": None, "txtcar": None}, employees_body="<html>login</html>")
+        with self.assertLogs("services.erp.dms_employees", "WARNING"):
+            out = cl.fetch_masters()
+        self.assertEqual(out["advisors"], [])
+        self.assertEqual(out["cars"], [])
+        # 员工表拿不到不该拖垮整份主档:落 [],顾问匹配自己退化到启发层。
+        self.assertEqual(out["employees"], [])
+
+
+class BshsdPagingTests(unittest.TestCase):
+    """_bshsd_all:翻页取全 + 失败传播 + 截断留痕(顾问名册靠它才拿得到第 11 个人)。"""
+
+    class _Paged(DMSClientOpsMixin):
+        def __init__(self, pages):
+            self.pages = pages  # 第 n 页(1-based)的行;取不到 → 空页
+            self.calls = []
+
+        def _bshsd(self, elemname, **extra):
+            self.calls.append((elemname, extra))
+            page = int(extra.get("bshsdcurrpage") or 1)
+            rows = self.pages[page - 1] if page <= len(self.pages) else []
+            return None if rows is None else list(rows)
+
+    def test_collects_every_full_page(self):
+        pages = [[[str(i)] for i in range(3)], [["9"]]]
+        cl = self._Paged(pages)
+        rows = cl._bshsd_all("txtusers", page_size=3)
+        self.assertEqual([r[0] for r in rows], ["0", "1", "2", "9"])
+        self.assertEqual([c[1]["bshsdcurrpage"] for c in cl.calls], [1, 2])
+
+    def test_exact_multiple_stops_on_empty_page(self):
+        cl = self._Paged([[["0"], ["1"]], []])
+        self.assertEqual(len(cl._bshsd_all("txtusers", page_size=2)), 2)
+        self.assertEqual(len(cl.calls), 2)
+
+    def test_any_failed_page_fails_the_whole_fetch(self):
+        # 半份名册比取不到更危险:「不在名册」的判断会变成瞎话。
+        cl = self._Paged([[["0"], ["1"]], None])
+        self.assertIsNone(cl._bshsd_all("txtusers", page_size=2))
+
+    def test_truncation_is_logged_not_silent(self):
+        cl = self._Paged([[["a"], ["b"]]] * 4)
+        with self.assertLogs("services.erp.mrerp_dms_client_ops", "WARNING") as logs:
+            rows = cl._bshsd_all("txtusers", page_size=2, max_pages=3)
+        self.assertEqual(len(rows), 6)
+        self.assertIn("truncated", logs.output[0])
+
+
+class SessionMemoTests(unittest.TestCase):
+    """一次建单会话内同参主档只打一次(resolve + fetch_masters + 成功后刷缓存全共用)。"""
+
+    class _Counting(DMSClientOpsMixin):
+        def __init__(self, rows_by_elem, body_by_elem=None):
+            self.rows_by_elem = rows_by_elem
+            self.body_by_elem = body_by_elem or {}
+            self.posts = []
+
+        def _post_text(self, path, data):
+            if "elemname" not in data:  # 员工表(users/…/showdata.php),不走 bshsd 备忘
+                return _EMPLOYEE_LISTING
+            self.posts.append((data["elemname"], data.get("bshsdcurrpage")))
+            elem = data["elemname"]
+            if elem in self.body_by_elem:
+                return self.body_by_elem[elem]
+            return json.dumps(self.rows_by_elem.get(elem) or [])
+
+    def test_same_params_hit_the_wire_once(self):
+        cl = self._Counting({"txtusers": _ADVISORS, "txtcar": [["c1", "DMX", "D-Max"]]})
+        cl.resolve_booking_payload(_defaults(advisor_id="335"), _CARD)
+        cl.fetch_masters()
+        cl.fetch_masters()
+        self.assertEqual(cl.posts.count(("txtusers", "1")), 1)
+        self.assertEqual(cl.posts.count(("txtcar", "1")), 1)
+
+    def test_failed_fetch_is_not_memoized(self):
+        # 失败进备忘 = 一次抖动毒死整场会话;允许下次重试。
+        cl = self._Counting({}, body_by_elem={"txtusers": "<html>session expired</html>"})
+        with self.assertLogs("services.erp.mrerp_dms_client_ops", "WARNING"):
+            self.assertIsNone(cl._bshsd("txtusers"))
+        with self.assertLogs("services.erp.mrerp_dms_client_ops", "WARNING"):
+            self.assertIsNone(cl._bshsd("txtusers"))
+        self.assertEqual(len(cl.posts), 2)
+
+    def test_empty_master_is_memoized(self):
+        cl = self._Counting({"txtusers": []})
+        self.assertEqual(cl._bshsd("txtusers"), [])
+        self.assertEqual(cl._bshsd("txtusers"), [])
+        self.assertEqual(len(cl.posts), 1)
 
 
 if __name__ == "__main__":

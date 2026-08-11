@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DMS 车辆选择面板主档缓存(DL-4a)· TTL / 惰性 paints / 登录失败陈旧回退。
+"""DMS 主档缓存(DL-4a · services/erp/dms_masters_cache.py)· TTL / 惰性 paints / 登录失败陈旧回退。
 
 内存背板替 _read/_write,计数 _fetch_*_via_login 断言 DMS 登录次数(D1)。
 """
@@ -8,7 +8,7 @@ import contextlib
 import unittest
 from unittest import mock
 
-from services.line_dms import masters_cache as mc
+from services.erp import dms_masters_cache as mc
 
 _EP = {"id": "E1", "config": {}}
 _MASTERS = {"cars": [["c1", "CODE1", "Car One"]], "advisors": [["a1", "A1", "Adv"]]}
@@ -91,6 +91,15 @@ class MastersCacheTests(unittest.TestCase):
         mc.get_paints(_EP, "c2")  # 异 car → 抓
         self.assertEqual(self.paint_calls["c2"], 1)
 
+    def test_paint_fetch_failure_yields_empty_and_is_not_cached(self):
+        """_bshsd 取数失败现在回 None(不再假装空表)—— 这条 None 路不许炸,也不许被当成
+        「这个车型没有颜色」缓存下来。"""
+        mc.get_masters(_EP)
+        with mock.patch.object(mc, "_fetch_paints_via_login", return_value=None):
+            self.assertEqual(mc.get_paints(_EP, "c1"), [])
+        self.assertNotIn("paints_by_car", self.mem.rows["E1"]["masters"])
+        self.assertEqual(mc.get_paints(_EP, "c1"), _PAINTS)  # 恢复后照常取到
+
     def test_full_refresh_preserves_paints(self):
         mc.get_masters(_EP)
         mc.get_paints(_EP, "c1")
@@ -98,6 +107,17 @@ class MastersCacheTests(unittest.TestCase):
         mc.get_masters(_EP)  # 全量刷主档
         mc.get_paints(_EP, "c1")  # paints_by_car 应仍在 → 不再抓
         self.assertEqual(self.paint_calls["c1"], 1)
+
+
+class PaintFetchLayerTests(unittest.TestCase):
+    """登录抓取层(不打桩本体):_bshsd 取数失败与登录失败在这里都必须落成 None。"""
+
+    def test_none_and_error_dict_both_become_none(self):
+        from services.erp import erp_dms_intake
+
+        for outcome in (None, {"ok": False, "error_code": "ERR_DMS_AUTH"}):
+            with mock.patch.object(erp_dms_intake, "_run_logged_in", return_value=outcome):
+                self.assertIsNone(mc._fetch_paints_via_login(_EP, "c1"))
 
 
 if __name__ == "__main__":

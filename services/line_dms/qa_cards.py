@@ -13,6 +13,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from services.erp.erp_dms_push import _DMS_FRIENDLY
 from services.line_dms.cards import (
     ACT_CANCEL_BOOKING,
     ACT_CONFIRM_BOOKING,
@@ -74,15 +75,19 @@ TXT_NO_IMAGE_NEEDED = "ขั้นตอนนี้ไม่ต้องกา
 # 建单成功但附件没挂全时的诚实追加行(不谎报附件成功)。
 TXT_ATTACH_FAIL = "แนบไฟล์ไม่ครบ กรุณาแนบเพิ่มในระบบ DMS"
 # 开局闸:DMS 账号对不上顾问名册就开不了单(提成没人认)。告诉销售哪个账号出错、谁能修。
+# 补救指引与错误码目录同一份泰语原文 —— 同一件事在 LINE 与主 UI 上说法漂了,用户会以为
+# 是两个毛病。会话语气(ครับ / 账号名)只加在前缀,不改目录原文。
+_TH_ADVISOR_UNMATCHED = _DMS_FRIENDLY["ERR_DMS_ADVISOR_UNMATCHED"]["th"]
+_TH_RETRY = " แล้วลองใหม่อีกครั้ง"
 TXT_ADVISOR_BLOCK = (
-    "ยังเปิดใบจองไม่ได้ครับ บัญชี DMS «{username}» ไม่ตรงกับรายชื่อที่ปรึกษาการขายในระบบ DMS\n"
-    "กรุณาให้แอดมินหรือเถ้าแก่เพิ่มรหัสผู้ใช้นี้ในรายชื่อที่ปรึกษาการขายของ DMS "
-    "หรือให้ทีม Pearnly กำหนดที่ปรึกษาให้บัญชีนี้ แล้วลองใหม่อีกครั้ง"
+    "ยังเปิดใบจองไม่ได้ครับ · บัญชี DMS ที่ใช้อยู่คือ «{username}»\n"
+    + _TH_ADVISOR_UNMATCHED
+    + _TH_RETRY
 )
 TXT_ADVISOR_BLOCK_NO_USER = (
-    "ยังเปิดใบจองไม่ได้ครับ ไม่พบบัญชี DMS ของผู้ใช้นี้\n"
-    "กรุณาให้แอดมินหรือเถ้าแก่ตรวจสอบการเชื่อมต่อ DMS ของบัญชีนี้ "
-    "หรือให้ทีม Pearnly กำหนดที่ปรึกษาให้บัญชีนี้ แล้วลองใหม่อีกครั้ง"
+    "ยังเปิดใบจองไม่ได้ครับ · ระบบยังอ่านบัญชี DMS ของผู้ใช้นี้ไม่ได้\n"
+    + _TH_ADVISOR_UNMATCHED
+    + _TH_RETRY
 )
 
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。

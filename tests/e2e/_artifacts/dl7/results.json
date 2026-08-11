@@ -3,7 +3,7 @@
     "g": "G-QA1",
     "name": "transfer full chain",
     "status": "PASS",
-    "notes": "booking=BK000002608000013 search_id=47 preview_labels=True nonce=True advisor=335/sale02 attachments=['สำเนาบัตรประชาชน', 'ใบโอนเงินจอง'] payment_fields=1,500.00/1,500.00",
+    "notes": "booking=BK000002608000015 search_id=49 preview_labels=True nonce=True advisor=335/sale02 attachments=['สำเนาบัตรประชาชน', 'ใบโอนเงินจอง'] payment_fields=1,500.00/1,500.00",
     "evidence": [
       "qa1-receipt.json",
       "qa1-dms-readback.json"
@@ -13,14 +13,14 @@
     "g": "G-QA2",
     "name": "discard preview without DMS write",
     "status": "PASS",
-    "notes": "receipt=True logs_before=13 logs_after=13",
+    "notes": "receipt=True logs_before=15 logs_after=15",
     "evidence": []
   },
   {
     "g": "G-QA3",
     "name": "cash path",
     "status": "PASS",
-    "notes": "booking=BK000002608000014 txtmoneycash=2,000.00 attachments=['สำเนาบัตรประชาชน']",
+    "notes": "booking=BK000002608000016 txtmoneycash=2,000.00 attachments=['สำเนาบัตรประชาชน']",
     "evidence": [
       "qa3-dms-readback.json"
     ]

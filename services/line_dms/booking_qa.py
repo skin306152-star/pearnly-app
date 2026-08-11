@@ -17,9 +17,10 @@ import secrets
 from datetime import date
 from typing import Any, Dict, List, Optional
 
+from services.erp import dms_advisor
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.mrerp_dms_client_base import to_be_date
-from services.line_dms import advisor_match, commands, masters_cache, qa_cards, store
+from services.line_dms import commands, masters_cache, qa_cards, store
 from services.line_dms._out import _send, _thr
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
@@ -65,7 +66,7 @@ async def start(
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
     advisor, dms_username = (None, "")
     if ep:
-        advisor, dms_username = await _thr(advisor_match.resolve_operator_advisor, ep)
+        advisor, dms_username = await _thr(dms_advisor.resolve_operator_advisor, ep)
     if advisor is None:
         # 开不了单就别留着上一阶段的复述卡会话,否则用户下一句话撞在旧卡上(客户档已落定,不受影响)。
         await _thr(store.clear_session, tenant_id, line_user_id)

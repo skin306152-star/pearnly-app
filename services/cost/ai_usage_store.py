@@ -18,11 +18,23 @@ prompt/LINE 原文/api key —— log_call 传进来的 result 本来就不含�
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 _ensured = False
+
+# 成本归因列 + 面板索引。ADD COLUMN IF NOT EXISTS / CREATE INDEX IF NOT EXISTS 天然幂等,
+# 库里已有(别的进程先建过)照跑不报错。
+_ATTRIBUTION_MIGRATIONS = (
+    "ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS entry_point TEXT",
+    "ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS doc_type TEXT",
+    "ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS pages INTEGER",
+    # 逐入口成本面板是 (entry_point, doc_type) 分组 + 时间窗过滤,现有索引都以 tenant/task
+    # 打头吃不上;单列 created_at 索引也不存在,故按面板的过滤序建。
+    "CREATE INDEX IF NOT EXISTS idx_ai_usage_entry ON ai_usage(entry_point, created_at DESC)",
+)
 
 
 def ensure_ai_usage_table() -> None:
@@ -66,6 +78,10 @@ def ensure_ai_usage_table() -> None:
         cur.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_usage_task ON ai_usage(task, created_at DESC)"
         )
+        # 归因三列(2026-08-11 后加 · 建表后 ALTER,同 services/auth/schema.py 范式)。
+        # 全可空:旧行没有归因,报表按 NULL 归「未归因」,不回填假值。
+        for stmt in _ATTRIBUTION_MIGRATIONS:
+            cur.execute(stmt)
         apply_tenant_rls(cur, "ai_usage")
         logger.info("✅ ai_usage 表已就绪")
 
@@ -93,6 +109,9 @@ def log_ai_usage(
     output_tokens: int,
     cost_thb: float,
     trace_id: Optional[str],
+    entry_point: Optional[str] = None,
+    doc_type: Optional[str] = None,
+    pages: Optional[int] = None,
 ) -> None:
     """写一行 AI 网关调用成本(同步 · 全量吞异常)。
 
@@ -112,8 +131,9 @@ def log_ai_usage(
                 """
                 INSERT INTO ai_usage
                 (tenant_id, user_id, task, provider, model, status, error_kind,
-                 latency_ms, input_tokens, output_tokens, cost_thb, trace_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 latency_ms, input_tokens, output_tokens, cost_thb, trace_id,
+                 entry_point, doc_type, pages)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     str(tenant_id) if tenant_id else None,
@@ -128,6 +148,9 @@ def log_ai_usage(
                     int(output_tokens or 0),
                     round(float(cost_thb or 0), 6),
                     trace_id,
+                    entry_point or None,
+                    doc_type or None,
+                    int(pages) if pages else None,
                 ),
             )
     except Exception as e:
@@ -167,6 +190,73 @@ def get_usage_by_task(days: int = 30) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"get_usage_by_task failed: {e}")
         return []
+
+
+# 逐入口成本聚合:一条查询出全部分组,NULL 入口的行在 Python 侧归「未归因」——
+# 分两条查会让两半的时间窗错开一个执行间隔,合计对不上。
+_COST_BY_ENTRY_SQL = """
+    SELECT entry_point,
+           doc_type,
+           COUNT(*) AS calls,
+           COALESCE(SUM(pages), 0) AS pages,
+           COALESCE(SUM(cost_thb), 0) AS cost_thb,
+           COALESCE(SUM(cost_thb), 0) / NULLIF(SUM(pages), 0) AS cost_per_page,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY latency_ms)
+               FILTER (WHERE status = 'ok' AND latency_ms IS NOT NULL) AS p50_latency_ms,
+           COALESCE(
+               ARRAY_AGG(DISTINCT model) FILTER (WHERE COALESCE(model, '') <> ''),
+               ARRAY[]::text[]
+           ) AS models
+    FROM ai_usage
+    WHERE created_at >= NOW() - make_interval(days => %s)
+    GROUP BY entry_point, doc_type
+    ORDER BY SUM(cost_thb) DESC
+"""
+
+
+def get_cost_by_entry_point(days: int = 7) -> Dict[str, Any]:
+    """逐入口 × 单据类型的成本聚合(近 N 天)。超管 OCR 引擎面板用。
+
+    每页成本是这张表的重点:定价按 1.5 铢/页走,银行对账单实际更贵,混合均值会把差价藏住。
+    页数未知的分组 cost_per_page 返回 None(不是 0)—— 「不知道几页」和「每页 0 铢」是两回事。
+    """
+    out: Dict[str, Any] = {
+        "days": int(days),
+        "rows": [],
+        "unattributed": {"calls": 0, "cost_thb": 0.0},
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        from core import db
+
+        with db.get_cursor() as cur:
+            cur.execute(_COST_BY_ENTRY_SQL, (int(days),))
+            rows = cur.fetchall()
+    except Exception as e:
+        logger.error("get_cost_by_entry_point failed: %s", e)
+        return out
+
+    for r in rows:
+        if not r["entry_point"]:  # 归因列上线前的历史行 + 漏打点的调用点
+            out["unattributed"]["calls"] += int(r["calls"])
+            out["unattributed"]["cost_thb"] += float(r["cost_thb"])
+            continue
+        p50 = r["p50_latency_ms"]
+        cpp = r["cost_per_page"]
+        out["rows"].append(
+            {
+                "entry_point": r["entry_point"],
+                "doc_type": r["doc_type"] or None,
+                "calls": int(r["calls"]),
+                "pages": int(r["pages"]),
+                "cost_thb": round(float(r["cost_thb"]), 6),
+                "cost_per_page": round(float(cpp), 6) if cpp is not None else None,
+                "p50_latency_ms": int(p50) if p50 is not None else None,
+                "models": list(r["models"] or []),
+            }
+        )
+    out["unattributed"]["cost_thb"] = round(out["unattributed"]["cost_thb"], 6)
+    return out
 
 
 def get_usage_daily_trend(days: int = 30) -> List[Dict[str, Any]]:

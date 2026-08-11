@@ -74,6 +74,15 @@ class EnsureAiUsageTableTests(unittest.TestCase):
         self.assertIn("CREATE POLICY tenant_isolation ON ai_usage", sql)
         self.assertEqual(cur.cm_kwargs[0].get("commit"), True)
 
+    def test_attribution_columns_added_idempotently(self):
+        cur = FakeCursor()
+        with patch_cursor(cur):
+            store.ensure_ai_usage_table()
+        sql = cur.all_sql()
+        for col, typ in (("entry_point", "TEXT"), ("doc_type", "TEXT"), ("pages", "INTEGER")):
+            self.assertIn(f"ADD COLUMN IF NOT EXISTS {col} {typ}", sql)
+        self.assertIn("CREATE INDEX IF NOT EXISTS idx_ai_usage_entry", sql)
+
 
 class LogAiUsageTests(unittest.TestCase):
     def setUp(self):
@@ -125,6 +134,28 @@ class LogAiUsageTests(unittest.TestCase):
         with patch_cursor_raises():
             self._call()  # 不抛即通过
 
+    def test_attribution_written_when_supplied(self):
+        cur = FakeCursor()
+        with patch_cursor(cur):
+            self._call(entry_point="bank_recon", doc_type="bank_statement", pages=18)
+        self.assertIn("entry_point, doc_type, pages", cur.last_sql)
+        p = cur.last_params
+        self.assertEqual(p[12:], ("bank_recon", "bank_statement", 18))
+
+    def test_attribution_defaults_to_null(self):
+        # 没归因的调用点照旧能落账(旧行为不变),报表侧归「未归因」
+        cur = FakeCursor()
+        with patch_cursor(cur):
+            self._call()
+        self.assertEqual(cur.last_params[12:], (None, None, None))
+
+    def test_zero_pages_stored_as_null(self):
+        # 0 页 = 页数未知,落 NULL;落 0 会污染 cost_per_page 的分母
+        cur = FakeCursor()
+        with patch_cursor(cur):
+            self._call(entry_point="line", pages=0)
+        self.assertIsNone(cur.last_params[14])
+
 
 class AggregationTests(unittest.TestCase):
     def test_get_usage_by_task_maps_rows(self):
@@ -170,6 +201,86 @@ class AggregationTests(unittest.TestCase):
     def test_get_usage_daily_trend_exception_returns_empty(self):
         with patch_cursor_raises():
             self.assertEqual(store.get_usage_daily_trend(), [])
+
+
+def _entry_row(**overrides):
+    row = {
+        "entry_point": "bank_recon",
+        "doc_type": "bank_statement",
+        "calls": 4,
+        "pages": 18,
+        "cost_thb": "39.6",
+        "cost_per_page": "2.2",
+        "p50_latency_ms": 1800.0,
+        "models": ["gemini-3.5-flash"],
+    }
+    row.update(overrides)
+    return row
+
+
+class CostByEntryPointTests(unittest.TestCase):
+    def test_sql_aggregates_in_one_query(self):
+        cur = FakeCursor(fetchall=[])
+        with patch_cursor(cur):
+            store.get_cost_by_entry_point(days=7)
+        self.assertEqual(len(cur.calls), 1, "聚合必须一条查询完成(禁 N+1)")
+        sql = cur.last_sql
+        self.assertIn("GROUP BY entry_point, doc_type", sql)
+        self.assertIn("NULLIF(SUM(pages), 0)", sql)  # 无页数 → NULL 不除零
+        self.assertIn("PERCENTILE_CONT(0.5)", sql)
+        self.assertIn("ARRAY_AGG(DISTINCT model)", sql)
+        self.assertIn("make_interval(days => %s)", sql)
+        self.assertEqual(cur.last_params, (7,))
+
+    def test_maps_row_shape(self):
+        cur = FakeCursor(fetchall=[_entry_row()])
+        with patch_cursor(cur):
+            out = store.get_cost_by_entry_point(days=7)
+        self.assertEqual(
+            out["rows"],
+            [
+                {
+                    "entry_point": "bank_recon",
+                    "doc_type": "bank_statement",
+                    "calls": 4,
+                    "pages": 18,
+                    "cost_thb": 39.6,
+                    "cost_per_page": 2.2,  # 老板要看见的那 2.2,不再被混合均值藏住
+                    "p50_latency_ms": 1800,
+                    "models": ["gemini-3.5-flash"],
+                }
+            ],
+        )
+        self.assertEqual(out["days"], 7)
+        self.assertTrue(out["generated_at"])
+
+    def test_null_entry_point_rows_go_to_unattributed(self):
+        cur = FakeCursor(
+            fetchall=[
+                _entry_row(),
+                _entry_row(entry_point=None, doc_type=None, calls=9, cost_thb="1.5"),
+                _entry_row(entry_point=None, doc_type=None, calls=1, cost_thb="0.25"),
+            ]
+        )
+        with patch_cursor(cur):
+            out = store.get_cost_by_entry_point()
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["unattributed"], {"calls": 10, "cost_thb": 1.75})
+
+    def test_missing_pages_and_latency_stay_none(self):
+        # 「不知道几页」不是「每页 0 铢」—— 报表不许把未知渲染成 0
+        cur = FakeCursor(fetchall=[_entry_row(pages=0, cost_per_page=None, p50_latency_ms=None)])
+        with patch_cursor(cur):
+            out = store.get_cost_by_entry_point()
+        self.assertIsNone(out["rows"][0]["cost_per_page"])
+        self.assertIsNone(out["rows"][0]["p50_latency_ms"])
+        self.assertEqual(out["rows"][0]["pages"], 0)
+
+    def test_exception_returns_empty_envelope(self):
+        with patch_cursor_raises():
+            out = store.get_cost_by_entry_point()
+        self.assertEqual(out["rows"], [])
+        self.assertEqual(out["unattributed"], {"calls": 0, "cost_thb": 0.0})
 
 
 if __name__ == "__main__":

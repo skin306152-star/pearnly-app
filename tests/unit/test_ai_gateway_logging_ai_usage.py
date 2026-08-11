@@ -10,6 +10,7 @@ from unittest import mock
 
 from services.ai_gateway import logging as ai_log
 from services.ai_gateway import tasks as T
+from services.cost.usage_context import usage_context
 
 
 def _result(**overrides):
@@ -60,6 +61,28 @@ class RecordUsageWiringTests(unittest.TestCase):
     def test_import_failure_does_not_break_log_call(self):
         with mock.patch.dict("sys.modules", {"services.cost.ai_usage_store": None}):
             ai_log.log_call(_result())  # 模块导入失败也不抛
+
+
+class AttributionWiringTests(unittest.TestCase):
+    """归因上下文(入口/单据/页数)在落账点被读进 ai_usage —— 断了这根线,
+    面板就只剩「未归因」一行,逐入口成本重新变成瞎子。"""
+
+    def test_usage_context_flows_into_ai_usage(self):
+        with mock.patch("services.cost.ai_usage_store.log_ai_usage") as m:
+            with usage_context("bank_recon", doc_type="bank_statement", pages=18):
+                ai_log.log_call(_result())
+        kw = m.call_args.kwargs
+        self.assertEqual(kw["entry_point"], "bank_recon")
+        self.assertEqual(kw["doc_type"], "bank_statement")
+        self.assertEqual(kw["pages"], 18)
+
+    def test_no_context_passes_none(self):
+        with mock.patch("services.cost.ai_usage_store.log_ai_usage") as m:
+            ai_log.log_call(_result())
+        kw = m.call_args.kwargs
+        self.assertIsNone(kw["entry_point"])
+        self.assertIsNone(kw["doc_type"])
+        self.assertIsNone(kw["pages"])
 
 
 if __name__ == "__main__":

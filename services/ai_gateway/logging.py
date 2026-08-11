@@ -43,10 +43,15 @@ def log_call(result, *, text=None, tenant_id=None, user_id=None, trace_id=None) 
 
 def _record_usage(result, *, tenant_id, user_id, trace_id) -> None:
     """转发到 ai_usage 落库(懒 import 防循环)。store 层已全量吞异常,这里再兜一层——
-    成本记账绝不能是打断 AI 调用主路径的理由(如 ai_usage_store 导入失败)。"""
+    成本记账绝不能是打断 AI 调用主路径的理由(如 ai_usage_store 导入失败)。
+
+    归因(入口/单据/页数)在这里读而不在 transport 读:log_call 有两个上游(transport 4 形态
+    + router.run_task),读在汇合点才两条路都盖到。"""
     try:
         from services.cost.ai_usage_store import log_ai_usage
+        from services.cost.usage_context import current as usage_current
 
+        usage = usage_current() or {}
         log_ai_usage(
             tenant_id=tenant_id,
             user_id=user_id,
@@ -60,6 +65,9 @@ def _record_usage(result, *, tenant_id, user_id, trace_id) -> None:
             output_tokens=result.output_tokens,
             cost_thb=result.cost_thb,
             trace_id=trace_id,
+            entry_point=usage.get("entry_point"),
+            doc_type=usage.get("doc_type"),
+            pages=usage.get("pages"),
         )
     except Exception as e:
         logger.warning("ai_usage record skipped: %s", e)

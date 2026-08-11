@@ -156,18 +156,20 @@ def parse_gl(
     """Facade → controller(task=gl_ledger, flavor=gl_vat)."""
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
+    from services.cost.usage_context import usage_context
 
-    return controller.run(
-        OcrRequest(
-            task="gl_ledger",
-            file_bytes=file_bytes,
-            filename=filename,
-            plan_code=plan_code,
-            is_exempt=is_exempt,
-            user_type=user_type,
-            options={"flavor": "gl_vat", "revenue_prefix": revenue_prefix},
-        )
-    ).data
+    with usage_context("vat_recon", doc_type="gl_vat"):
+        return controller.run(
+            OcrRequest(
+                task="gl_ledger",
+                file_bytes=file_bytes,
+                filename=filename,
+                plan_code=plan_code,
+                is_exempt=is_exempt,
+                user_type=user_type,
+                options={"flavor": "gl_vat", "revenue_prefix": revenue_prefix},
+            )
+        ).data
 
 
 def _parse_gl_impl(file_bytes: bytes, filename: str, revenue_prefix: str = "4") -> Dict[str, Any]:

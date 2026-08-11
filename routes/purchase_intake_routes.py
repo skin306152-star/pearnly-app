@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from core import db
 from core.pos_api import PosError, ok
 from routes.purchase_common import auth_member, gate, resolve_ws, uid as _uid
+from services.cost.usage_context import usage_context
 from services.ocr import entrypoints as ocr
 from services.purchase import categories as cat_svc
 from services.purchase import docs as docs_svc
@@ -42,14 +43,15 @@ def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, 
     if not quote.get("allowed"):
         raise PosError("purchase.unexpected", 402, detail=quote.get("error_code") or "ocr_blocked")
     try:
-        pipe_res = ocr.run_pipeline_for_file(
-            file_bytes,
-            filename,
-            api_key=api_key,
-            max_pages=50,
-            account=user_fresh.get("email"),
-            **ocr.policy_context_from_billing(quote),
-        )
+        with usage_context("purchase_intake", doc_type="invoice", pages=quote.get("page_count")):
+            pipe_res = ocr.run_pipeline_for_file(
+                file_bytes,
+                filename,
+                api_key=api_key,
+                max_pages=50,
+                account=user_fresh.get("email"),
+                **ocr.policy_context_from_billing(quote),
+            )
     except Exception as e:
         raise PosError("purchase.unexpected", 422, detail="ocr_failed") from e
     pages = getattr(pipe_res, "pages", None) or []

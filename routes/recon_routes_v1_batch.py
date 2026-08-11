@@ -14,6 +14,7 @@ from services.authz.deps import require_perm
 from services.vat.vat_report_parser import parse_vat_report
 from routes.recon_routes_shared import _user_key
 from routes.recon_routes_progress import _progress_init, _progress_update
+from services.cost.usage_context import usage_context
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +191,10 @@ async def batch_process(
 
             def _run_with_ctx():
                 # 反馈闭环 ② · 上下文须在 executor 线程内设(contextvar 不跨线程传)
-                with ocr_request_context(str(user["id"]), _ctx_tid):
+                with (
+                    ocr_request_context(str(user["id"]), _ctx_tid),
+                    usage_context("vat_recon", doc_type="invoice"),
+                ):
                     return _run_ocr_controller(
                         content_b,
                         fname,

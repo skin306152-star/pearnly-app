@@ -21,6 +21,7 @@ from core import db
 from core.pos_api import PosError, ok
 from routes.accounting_common import auth_member, gate, resolve_ws, uid
 from services.accounting import bank_candidates, bank_match, bank_recon
+from services.cost.usage_context import usage_context
 
 router = APIRouter(prefix="/api/accounting/bank", tags=["accounting-bank"])
 logger = logging.getLogger(__name__)
@@ -92,18 +93,20 @@ async def _parse_statement(
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
 
-    return await asyncio.to_thread(
-        lambda: controller.run(
-            OcrRequest(
-                task="bank_statement",
-                file_bytes=raw,
-                filename=filename,
-                tenant_id=tenant_id,
-                **(ocr_policy_ctx or {}),
-                options={"shape": "legacy_parsed_statement"},
-            )
-        ).data
-    )
+    # asyncio.to_thread 自带 copy_context,归因跟得进工作线程
+    with usage_context("bank_recon", doc_type="bank_statement"):
+        return await asyncio.to_thread(
+            lambda: controller.run(
+                OcrRequest(
+                    task="bank_statement",
+                    file_bytes=raw,
+                    filename=filename,
+                    tenant_id=tenant_id,
+                    **(ocr_policy_ctx or {}),
+                    options={"shape": "legacy_parsed_statement"},
+                )
+            ).data
+        )
 
 
 @router.post("/import")

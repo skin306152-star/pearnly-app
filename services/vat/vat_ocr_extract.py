@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """单张发票 OCR 抽取(8 字段)+ 7 项硬校验 + 并行调度 · vat_excel_export 拆分。"""
 
+import contextvars
 import os
 import re
 import logging
@@ -268,8 +269,16 @@ def extract_invoices_parallel(
         return []
     results: List[Optional[Dict]] = [None] * len(invoice_files)
     pool = ThreadPoolExecutor(max_workers=min(max_workers, len(invoice_files)))
+    # 提交时捕获上下文:成本归因(usage_context)是 contextvars,子线程起始为空,
+    # 裸 submit 会让这批发票的钱落成「未归因」(同 ocr/page_runner 写法)。
     fut_to_idx = {
-        pool.submit(extract_invoice_fields, f["bytes"], f["filename"], api_key=api_key): i
+        pool.submit(
+            contextvars.copy_context().run,
+            extract_invoice_fields,
+            f["bytes"],
+            f["filename"],
+            api_key=api_key,
+        ): i
         for i, f in enumerate(invoice_files)
     }
     for fut, idx in fut_to_idx.items():

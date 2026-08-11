@@ -23,6 +23,7 @@ from core import workspace_context as wc
 from core.db import increment_user_monthly_usage
 from core.route_helpers import _plan_permissions, _tid
 from services.billing import account_status
+from services.cost.usage_context import usage_context
 from services.ocr.entrypoints import (
     content_hash as _ocr_content_hash,
     get_cached_history as _ocr_get_cached,
@@ -225,7 +226,11 @@ def run_recognition_core(
             is_exempt=bool(_billing.get("is_exempt")),
             account=_account,
         )
-        with ocr_request_context(str(user["id"]), _tid(user)):
+        with (
+            ocr_request_context(str(user["id"]), _tid(user)),
+            # 成本归因:网页上传是混料入口(document_type 不指定 → 管线自检),故 doc_type=auto
+            usage_context("web_upload", doc_type="auto", pages=page_count),
+        ):
             _pipe_res = _run_ocr_controller(
                 content,
                 file.filename or "upload",

@@ -34,6 +34,7 @@ from services.erp import erp_dms_intake as _dms_intake
 from services.line_dms import store as line_dms_store
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
+from services.cost.usage_context import usage_context
 
 logger = logging.getLogger("mr-pilot")
 
@@ -96,14 +97,15 @@ async def _ocr_id_card(
     响应体与抽出前逐字节一致(DmsOcrError.detail 原样转)。"""
     content = await file.read()
     try:
-        return await asyncio.to_thread(
-            _id_ocr.recognize_id_card,
-            user,
-            content,
-            file.filename,
-            file.content_type or "",
-            endpoint_id,
-        )
+        with usage_context("dms", doc_type="thai_id_card", pages=1):
+            return await asyncio.to_thread(
+                _id_ocr.recognize_id_card,
+                user,
+                content,
+                file.filename,
+                file.content_type or "",
+                endpoint_id,
+            )
     except _id_ocr.DmsOcrError as e:
         raise HTTPException(e.http_status, detail=e.detail)
 

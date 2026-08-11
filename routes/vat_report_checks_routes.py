@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from services.vat.vat_excel_helpers import _require_user, _user_key
 from services.vat.vat_report_checks import run_report_checks, to_jsonable
 from services.vat.vat_report_parser import parse_vat_report
+from services.cost.usage_context import usage_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/vat_report_checks", tags=["vat-report-checks"])
@@ -27,7 +28,8 @@ async def run_report_checks_endpoint(request: Request, report: UploadFile = File
     file_bytes = await report.read(_MAX_REPORT_BYTES + 1)
     if len(file_bytes) > _MAX_REPORT_BYTES:
         raise HTTPException(413, "报告文件过大 · 单文件不超过 20MB")
-    parsed = parse_vat_report(file_bytes, report.filename or "report.pdf", api_key=api_key)
+    with usage_context("web_upload", doc_type="vat_report"):
+        parsed = parse_vat_report(file_bytes, report.filename or "report.pdf", api_key=api_key)
     if not parsed.get("ok"):
         raise HTTPException(422, parsed.get("error") or "报告解析失败")
 

@@ -24,6 +24,7 @@ from services.recon.bank_recon_types import StatementRow
 from services.workorder import storage
 from services.workorder.engine import StepContext
 from services.workorder.steps import checkpoint, stmt_totals
+from services.cost.usage_context import reset_usage_context, set_usage_context
 
 _STEP = "reconcile"
 _EVT_BANK_PARSED = "item_bank_parsed"
@@ -292,6 +293,7 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
     token = attribution.set_attribution(
         _BANK_OCR_TASK, tenant_id=str(ctx.tenant_id), trace_id=str(ctx.work_order_id)
     )
+    usage_token = set_usage_context("workorder", doc_type="bank_statement")
     try:
         data = storage.read_bytes(file_ref)  # 落盘密文解回明文再解析(双轨读)
         parsed = _parse_bank_statement_impl(data, Path(file_ref).name, tenant_id=ctx.tenant_id)
@@ -304,6 +306,7 @@ def _default_parse_bank_file(ctx: StepContext, item: dict) -> list:
         # GC-D-2 · 断链换眼重读留痕随行上抛,检查点并进 item_bank_parsed 事件供审计回放。
         return rows, list(parsed.get("escalations") or [])
     finally:
+        reset_usage_context(usage_token)
         attribution.reset_attribution(token)
 
 

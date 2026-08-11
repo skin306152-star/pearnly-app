@@ -14,6 +14,7 @@ import threading
 from core import db
 from core import workspace_context as wc
 from core.db import insert_ocr_history
+from services.cost.usage_context import usage_context
 from services.exceptions.exception_checks import _async_run_exception_checks
 from services.ocr import line_image_route
 from services.ocr.line_multi_page import select_bookable_pages
@@ -194,7 +195,10 @@ async def _handle_line_image_ocr(
 
             _ctx_tid = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
             # 反馈闭环 ② · 设请求级上下文(L2 few-shot 按租户取例;flag 关时无副作用)
-            with ocr_request_context(str(user_fresh["id"]), _ctx_tid):
+            with (
+                ocr_request_context(str(user_fresh["id"]), _ctx_tid),
+                usage_context("line", doc_type="auto", pages=quote.get("page_count")),
+            ):
                 _pipe_res = _ocr_run_pipeline_file(
                     file_bytes,
                     filename,

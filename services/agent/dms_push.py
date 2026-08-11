@@ -14,6 +14,7 @@ import logging
 
 from core import db
 from services.erp import dms_id_ocr
+from services.cost.usage_context import usage_context
 
 logger = logging.getLogger("mr-pilot")
 
@@ -109,7 +110,8 @@ def handle_id_card(user, tid, line_user_id, lang, file_bytes, filename, quote_to
     存检查点 + 复述。恒返 True=本图已处理(含所有失败分支的人话回执)。
     同步重活——调用方 asyncio.to_thread。"""
     try:
-        ep, ocr, _ = dms_id_ocr.recognize_id_card(user, file_bytes, filename)
+        with usage_context("dms", doc_type="thai_id_card", pages=1):
+            ep, ocr, _ = dms_id_ocr.recognize_id_card(user, file_bytes, filename)
     except dms_id_ocr.DmsOcrError as e:
         if e.code == "dms.no_endpoint":
             msg = _t(_NO_ENDPOINT, lang)

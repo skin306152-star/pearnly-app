@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """多发票批量 OCR(一次 Gemini 调用抽多张 · 减少 5x API)· vat_excel_export 拆分。"""
 
+import contextvars
 import os
 import logging
 from typing import List, Dict, Any, Optional, Tuple
@@ -213,7 +214,10 @@ def extract_invoices_batched_parallel(
     # P0-2:每批加硬超时(批含 batch_size 张 + 可能的单张 fallback)· 挂起的批不阻塞整体 · job 能完成
     _batch_timeout = _VEX_OCR_PER_FILE_TIMEOUT * (batch_size + 1)
     pool = ThreadPoolExecutor(max_workers=max_workers)
-    fut_to_batch = {pool.submit(_run_batch, s, c): (s, c) for (s, c) in batches}
+    # 提交时捕获上下文:成本归因走 contextvars,裸 submit 的子线程读不到(同 page_runner 写法)。
+    fut_to_batch = {
+        pool.submit(contextvars.copy_context().run, _run_batch, s, c): (s, c) for (s, c) in batches
+    }
     for fut, (s, c) in fut_to_batch.items():
         try:
             fut.result(timeout=_batch_timeout)

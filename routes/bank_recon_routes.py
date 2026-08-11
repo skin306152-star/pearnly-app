@@ -32,6 +32,7 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
+from services.cost.usage_context import usage_context
 
 logger = logging.getLogger("mr-pilot")
 
@@ -84,18 +85,19 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[bank_recon.ocr_policy] billing lookup skipped: {e}")
 
-        parsed = await asyncio.to_thread(
-            lambda: controller.run(
-                OcrRequest(
-                    task="bank_statement",
-                    file_bytes=pdf_bytes,
-                    filename=filename,
-                    tenant_id=_tid(user),
-                    **_ocr_policy_ctx,
-                    options={"shape": "legacy_parsed_statement"},
-                )
-            ).data
-        )
+        with usage_context("bank_recon", doc_type="bank_statement"):
+            parsed = await asyncio.to_thread(
+                lambda: controller.run(
+                    OcrRequest(
+                        task="bank_statement",
+                        file_bytes=pdf_bytes,
+                        filename=filename,
+                        tenant_id=_tid(user),
+                        **_ocr_policy_ctx,
+                        options={"shape": "legacy_parsed_statement"},
+                    )
+                ).data
+            )
     except Exception as e:
         logger.exception("[bank_recon] 解析异常")
         raise HTTPException(500, detail=f"bank_recon.parse_exception:{str(e)[:100]}")

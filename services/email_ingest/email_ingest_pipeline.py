@@ -16,6 +16,7 @@ from services.ocr.entrypoints import (
     policy_context_from_billing,
     run_pipeline_for_file,
 )
+from services.cost.usage_context import usage_context
 from services.email_ingest.email_ingest_crypto import is_available
 from services.email_ingest.email_ingest_imap import (
     MAX_EMAILS_PER_RUN,
@@ -87,7 +88,10 @@ def _ingest_one_attachment(
 
         _ctx_tid = str(user.get("tenant_id")) if user.get("tenant_id") else None
         # 反馈闭环 ② · 设请求级上下文(L2 few-shot 按租户取例;flag 关时无副作用)
-        with ocr_request_context(user_id, _ctx_tid):
+        with (
+            ocr_request_context(user_id, _ctx_tid),
+            usage_context("email", doc_type="auto", pages=quote.get("page_count")),
+        ):
             _pipe_res = run_pipeline_for_file(
                 content,
                 filename,

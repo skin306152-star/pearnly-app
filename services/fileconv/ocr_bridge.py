@@ -38,6 +38,7 @@ from services.fileconv.model import (
 )
 from services.fileconv.ledger import LEDGER_COLUMNS, to_table_rows
 from services.ocr.direct_read import _sniff_mime
+from services.cost.usage_context import reset_usage_context, set_usage_context
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,7 @@ def _default_provider_call(
     # 与 direct_read 同口径兜 env:aistudio provider 只认显式 key(vertex 走 SA 忽略此参)。
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     token = attribution.set_attribution(TASK_FILECONV_OCR, tenant_id=tenant_id)
+    usage_token = set_usage_context("fileconv")
     try:
         return transport.multimodal_to_json(
             prompt,
@@ -128,6 +130,7 @@ def _default_provider_call(
             tenant_id=tenant_id,
         )
     finally:
+        reset_usage_context(usage_token)
         attribution.reset_attribution(token)
 
 

@@ -26,6 +26,7 @@ from services.workorder.steps import ocr_snapshots, purchase_dedup, statement_re
 from services.workorder.steps import sort as sort_step
 from services.workorder.steps import summary_read
 from services.workspace import client_alias_store
+from services.cost.usage_context import reset_usage_context, set_usage_context
 
 # 工单 OCR 成本归因 task(落 ai_usage,与主站散单 OCR 台账分得开,见 C-1 §5)。
 _OCR_TASK = "workorder_classify"
@@ -233,12 +234,14 @@ def _ocr_safe(item: dict, tenant_id: str, governor=None, budget=None):
     token = attribution.set_attribution(
         _OCR_TASK, tenant_id=str(tenant_id), trace_id=str(item.get("id") or "")
     )
+    usage_token = set_usage_context("workorder", doc_type="invoice")
     btoken = escalation_budget.set_budget(budget) if budget is not None else None
     try:
         return ocr_quota.fetch_with_retry(lambda: _ocr_image(item["file_ref"]), governor=governor)
     finally:
         if btoken is not None:
             escalation_budget.reset_budget(btoken)
+        reset_usage_context(usage_token)
         attribution.reset_attribution(token)
 
 

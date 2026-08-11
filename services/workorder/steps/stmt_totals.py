@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from services.ai_gateway import attribution
+from services.cost.usage_context import reset_usage_context, set_usage_context
 from services.workorder import storage
 from services.workorder.engine import StepContext
 
@@ -116,6 +117,7 @@ def emit_from_banks(ctx: StepContext, banks: list[dict]) -> Optional[dict]:
     token = attribution.set_attribution(
         _STMT_OCR_TASK, tenant_id=str(ctx.tenant_id), trace_id=str(ctx.work_order_id)
     )
+    usage_token = set_usage_context("workorder", doc_type="bank_statement")
     try:
         for item in banks:
             fields = _narrow_read(item.get("file_ref") or "")
@@ -129,6 +131,7 @@ def emit_from_banks(ctx: StepContext, banks: list[dict]) -> Optional[dict]:
         _log.warning("stmt_totals narrow read failed wo=%s: %r", ctx.work_order_id, exc)
         return None
     finally:
+        reset_usage_context(usage_token)
         attribution.reset_attribution(token)
 
 

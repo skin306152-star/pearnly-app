@@ -21,6 +21,7 @@ from typing import Any
 from services.agent.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
+from services.cost.usage_context import usage_context
 from services.steward.tool_scope import (  # 入口仍在 tools_file:调用方按 tools_file.ERR_* 认错误码
     ERR_MANY_ATTACHMENTS,  # noqa: F401
     ERR_NO_ATTACHMENT,  # noqa: F401
@@ -116,7 +117,8 @@ def vat_report_check(ctx: ToolContext, args: dict) -> ToolResult:
         or (ctx.user or {}).get("custom_gemini_api_key")
         or ""
     ).strip() or None
-    parsed = parse_vat_report(row["content"], name, api_key=api_key)
+    with usage_context("steward", doc_type="vat_report"):
+        parsed = parse_vat_report(row["content"], name, api_key=api_key)
     rows = parsed.get("rows") or []
     if not parsed.get("ok") or not rows:
         return ToolResult(

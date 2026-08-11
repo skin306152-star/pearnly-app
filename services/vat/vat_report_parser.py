@@ -130,18 +130,21 @@ def parse_vat_report(
     """销项 VAT 报表解析(任意格式)。Facade → controller(task=vat_report)。"""
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
+    from services.cost.usage_context import usage_context
 
-    return controller.run(
-        OcrRequest(
-            task="vat_report",
-            file_bytes=file_bytes,
-            filename=filename,
-            api_key=api_key,
-            plan_code=plan_code,
-            is_exempt=is_exempt,
-            user_type=user_type,
-        )
-    ).data
+    # 入口按调用方兜底(网页查/管家工具会在外层设各自入口,外层优先)
+    with usage_context("vat_recon", doc_type="vat_report"):
+        return controller.run(
+            OcrRequest(
+                task="vat_report",
+                file_bytes=file_bytes,
+                filename=filename,
+                api_key=api_key,
+                plan_code=plan_code,
+                is_exempt=is_exempt,
+                user_type=user_type,
+            )
+        ).data
 
 
 def _parse_vat_report_impl(

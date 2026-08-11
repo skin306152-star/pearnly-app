@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from services.cost.usage_context import usage_context
+
 
 def parse_bank_statement_pdf(
     file_bytes: bytes,
@@ -20,18 +22,21 @@ def parse_bank_statement_pdf(
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
 
-    return controller.run(
-        OcrRequest(
-            task="bank_statement",
-            file_bytes=file_bytes,
-            filename=filename,
-            api_key=api_key,
-            tenant_id=tenant_id,
-            plan_code=plan_code,
-            is_exempt=is_exempt,
-            user_type=user_type,
-        )
-    ).data
+    # 归因在 facade 而非各路由:两个调用点(网页 run + 异步 job)都是银行对账,
+    # 且 doc_type 只有这一层分得清。上层若已设入口(如工单),外层入口优先,这里只补单据类型。
+    with usage_context("bank_recon", doc_type="bank_statement"):
+        return controller.run(
+            OcrRequest(
+                task="bank_statement",
+                file_bytes=file_bytes,
+                filename=filename,
+                api_key=api_key,
+                tenant_id=tenant_id,
+                plan_code=plan_code,
+                is_exempt=is_exempt,
+                user_type=user_type,
+            )
+        ).data
 
 
 def parse_gl(
@@ -49,16 +54,17 @@ def parse_gl(
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
 
-    return controller.run(
-        OcrRequest(
-            task="gl_ledger",
-            file_bytes=file_bytes,
-            filename=filename,
-            api_key=api_key,
-            tenant_id=tenant_id,
-            plan_code=plan_code,
-            is_exempt=is_exempt,
-            user_type=user_type,
-            options={"account_code": account_code},
-        )
-    ).data
+    with usage_context("bank_recon", doc_type="gl_ledger"):
+        return controller.run(
+            OcrRequest(
+                task="gl_ledger",
+                file_bytes=file_bytes,
+                filename=filename,
+                api_key=api_key,
+                tenant_id=tenant_id,
+                plan_code=plan_code,
+                is_exempt=is_exempt,
+                user_type=user_type,
+                options={"account_code": account_code},
+            )
+        ).data

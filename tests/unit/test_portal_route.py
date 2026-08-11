@@ -82,6 +82,18 @@ class PortalRouteTest(unittest.TestCase):
         self.assertNotIn("/register", self.html)
         self.assertNotIn("/signup", self.html)
 
+    def test_brand_intro_uses_accessible_svg_cat_and_reduced_motion(self):
+        self.assertIn('id="pn-intro-cat"', self.html)
+        self.assertIn('role="img" aria-label="Pearnly cat logo"', self.html)
+        self.assertIn("[data-eye]", self.html)
+        reduced_motion = re.search(
+            r"@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{(.*?)\n\s*\}",
+            self.html,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(reduced_motion)
+        self.assertIn("#pn-intro", reduced_motion.group(1))
+
 
 if __name__ == "__main__":
     unittest.main()

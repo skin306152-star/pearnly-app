@@ -38,6 +38,11 @@
   @keyframes pnScan { 0% { top: 10%; } 50% { top: 86%; } 100% { top: 10%; } }
   @keyframes pnAnnErr { 0%, 100% { box-shadow: 0 0 0 0 rgba(178,58,36,.30); } 50% { box-shadow: 0 0 0 9px rgba(178,58,36,0); } }
   @keyframes pnAnnWarn { 0%, 100% { box-shadow: 0 0 0 0 rgba(176,122,30,.30); } 50% { box-shadow: 0 0 0 9px rgba(176,122,30,0); } }
+  #pn-intro-logo { width: min(430px, 76vw); display: grid; justify-items: center; gap: 12px; }
+  #pn-intro-cat { width: min(150px, 32vw); height: auto; overflow: visible; }
+  #pn-intro-word { display: flex; align-items: center; gap: 18px; color: #1B1E14; font-size: clamp(64px, 9vw, 108px); font-weight: 700; letter-spacing: -0.055em; line-height: .9; }
+  #pn-intro-word::before { content: ''; width: .28em; height: .28em; border-radius: 50%; background: #4E7D25; flex: 0 0 auto; }
+  #pn-intro-cat [data-eye] { transform-box: fill-box; transform-origin: center; }
   @media (max-width: 800px) {
     [data-pstage] { height: auto !important; padding: 8px 0 12px !important; display: flex !important; flex-direction: column; gap: 18px; align-items: center; }
     [data-pcard] { position: static !important; width: 100% !important; max-width: 400px !important; transform: none !important; }
@@ -67,7 +72,21 @@
 
   <!-- ================= BRAND INTRO OVERLAY (v2 logo animation) ================= -->
   <div id="pn-intro" style="position: fixed; inset: 0; z-index: 200; background: #FAF9F5; display: flex; align-items: center; justify-content: center;">
-    <div id="pn-intro-gl" style="position: absolute; inset: 0;"></div>
+    <div id="pn-intro-logo" role="img" aria-label="Pearnly cat logo">
+      <svg id="pn-intro-cat" viewBox="0 0 180 142" aria-hidden="true">
+        <path data-ear="left" d="M34 53 38 17 70 41" fill="#FAF9F5" stroke="#1B1E14" stroke-width="7" stroke-linejoin="round"/>
+        <path data-ear="right" d="m110 41 32-24 4 36" fill="#FAF9F5" stroke="#1B1E14" stroke-width="7" stroke-linejoin="round"/>
+        <path d="M31 65c0-22 26-35 59-35s59 13 59 35v20c0 31-23 50-59 50S31 116 31 85Z" fill="#FAF9F5" stroke="#1B1E14" stroke-width="7"/>
+        <path d="m44 40-3-14 17 12Z" fill="#7FB84E"/>
+        <path d="m136 40 3-14-17 12Z" fill="#7FB84E"/>
+        <path data-eye="left" d="M56 76q9-9 18 0" fill="none" stroke="#1B1E14" stroke-width="7" stroke-linecap="round"/>
+        <path data-eye="right" d="M106 76q9-9 18 0" fill="none" stroke="#1B1E14" stroke-width="7" stroke-linecap="round"/>
+        <path d="M82 91c0-6 4-10 8-10s8 4 8 10c0 7-8 12-8 12s-8-5-8-12Z" fill="#4E7D25"/>
+        <path d="M90 103v6m0 0q-9 11-18 2m18-2q9 11 18 2" fill="none" stroke="#1B1E14" stroke-width="5" stroke-linecap="round"/>
+        <path d="M52 94 18 88m35 17-35 5m110-16 34-6m-35 17 35 5" fill="none" stroke="#1B1E14" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <div id="pn-intro-word">pearnly</div>
+    </div>
   </div>
 
   <!-- ================= NAV ================= -->
@@ -845,39 +864,11 @@ class Component extends DCLogic {
     this._sections();
   }
 
-  // ---------- v2 brand intro: cloth logo type-on at viewport center ----------
-  _logoTexture() {
-    const c = document.createElement('canvas');
-    c.width = 1400; c.height = 340;
-    const x = c.getContext('2d');
-    // dot + wordmark (same as nav brand). The plane maps this canvas onto a
-    // viewport-centered mesh, so the dot+word block must sit centered in the
-    // canvas — measure the word and center the whole block, else the wordmark
-    // renders left-and-low of screen center.
-    const dotR = 46, gap = 40, midY = c.height / 2;
-    const word = 'pearnly';
-    x.font = '700 190px Anuphan';
-    const textW = x.measureText(word).width;
-    const blockW = dotR * 2 + gap + textW;
-    const startX = (c.width - blockW) / 2;
-    x.beginPath();
-    x.arc(startX + dotR, midY, dotR, 0, Math.PI * 2);
-    x.fillStyle = '#4E7D25';
-    x.fill();
-    x.fillStyle = '#1B1E14';
-    x.textBaseline = 'middle';
-    x.textAlign = 'left';
-    x.fillText(word, startX + dotR * 2 + gap, midY);
-    const tex = new THREE.CanvasTexture(c);
-    tex.anisotropy = 4;
-    return tex;
-  }
-
   _brandIntro(onDone) {
     const ov = document.getElementById('pn-intro');
-    const host = document.getElementById('pn-intro-gl');
-    let gl = true;
-    try { gl = !!document.createElement('canvas').getContext('webgl'); } catch (e) { gl = false; }
+    const logo = document.getElementById('pn-intro-logo');
+    const cat = document.getElementById('pn-intro-cat');
+    const word = document.getElementById('pn-intro-word');
     const finish = () => {
       if (this._introFinished) return;
       this._introFinished = true;
@@ -886,64 +877,19 @@ class Component extends DCLogic {
       }
       onDone();
     };
-    if (!ov || !host || !gl) { if (ov) ov.remove(); this._introFinished = true; onDone(); return; }
-    ov.addEventListener('click', finish); // click to skip
-    setTimeout(finish, 4200); // safety
+    if (!ov || !logo || !cat || !word) { if (ov) ov.remove(); this._introFinished = true; onDone(); return; }
+    ov.addEventListener('click', finish);
+    setTimeout(finish, 4200);
 
-    const W = host.clientWidth, H = host.clientHeight;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(W, H);
-    host.appendChild(renderer.domElement);
-    this._renderers.push(renderer);
-    const scene = new THREE.Scene();
-    const cam = new THREE.PerspectiveCamera(40, W / H, 0.1, 50);
-    cam.position.z = 8;
-    const halfH = Math.tan(cam.fov * Math.PI / 360) * cam.position.z;
-    const halfW = halfH * cam.aspect;
-
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      side: THREE.DoubleSide,
-      uniforms: { uMap: { value: this._logoTexture() }, uTime: { value: 0 }, uProgress: { value: 0 }, uOpacity: { value: 0 } },
-      vertexShader:
-        'uniform float uTime; uniform float uProgress; varying vec2 vUv; varying float vSh;\n' +
-        'void main(){ vUv = uv; vec3 p = position;\n' +
-        '  float un = 1.0 - uProgress;\n' +
-        '  float fl = (sin(uv.y*6.28318 + uTime*1.6) + sin(uv.x*4.0 - uTime*1.1)) * 0.5;\n' +
-        '  p.z += fl * 0.05 * (0.2 + 0.8*un) * 0.85;\n' +
-        '  p.z += sin(uv.y*9.0) * un * un * 0.47;\n' +
-        '  p.x += sin(uv.y*5.0) * un * 0.15;\n' +
-        '  p.y += cos(uv.x*3.0) * un * 0.1;\n' +
-        '  vSh = fl * (0.2 + 0.8*un);\n' +
-        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
-      fragmentShader:
-        'uniform sampler2D uMap; uniform float uOpacity; uniform float uProgress; varying vec2 vUv; varying float vSh;\n' +
-        'void main(){ vec4 c = texture2D(uMap, vUv);\n' +
-        '  float sweep = smoothstep(vUv.x - 0.08, vUv.x, uProgress * 1.1);\n' +
-        '  c.rgb *= (1.0 - vSh * 0.28);\n' +
-        '  gl_FragColor = vec4(c.rgb, c.a * uOpacity * sweep); }',
-    });
-    const lw = Math.min(4.6, halfW * 2 * 0.8);
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 340 / 1400, 72, 20), mat);
-    scene.add(mesh);
-
-    const clock = new THREE.Clock();
-    let live = true;
-    const loop = () => {
-      if (!live || this._dead) return;
-      mat.uniforms.uTime.value = clock.getElapsedTime();
-      renderer.render(scene, cam);
-      requestAnimationFrame(loop);
-    };
-    loop();
-
+    const leftEar = cat.querySelector('[data-ear="left"]');
+    const eyes = cat.querySelectorAll('[data-eye]');
     const tl = gsap.timeline();
-    tl.to(mat.uniforms.uOpacity, { value: 1, duration: 0.35 }, 0.1);
-    tl.to(mat.uniforms.uProgress, { value: 1, duration: 1.55, ease: 'power3.inOut' }, 0.1);
-    tl.to(mesh.position, { y: 0.8, duration: 0.7, ease: 'power2.in' }, 2.15);
-    tl.to(mat.uniforms.uOpacity, { value: 0, duration: 0.5 }, 2.2);
-    tl.call(() => { live = false; finish(); }, [], 2.5);
+    tl.from(cat, { autoAlpha: 0, y: 34, scale: 0.72, rotation: -5, duration: 0.7, ease: 'back.out(1.8)' }, 0.08);
+    tl.from(word, { autoAlpha: 0, y: 18, scale: 0.88, duration: 0.62, ease: 'back.out(1.7)' }, 0.3);
+    tl.to(leftEar, { rotation: -8, transformOrigin: '70% 80%', duration: 0.12, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 1.12);
+    tl.to(eyes, { scaleY: 0.12, duration: 0.1, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 1.28);
+    tl.to(logo, { y: -42, autoAlpha: 0, duration: 0.52, ease: 'power2.in' }, 2.1);
+    tl.call(finish, [], 2.58);
   }
 
   // ---------- v2 perspective grid floor behind the hero ----------

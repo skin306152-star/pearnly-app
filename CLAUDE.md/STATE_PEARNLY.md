@@ -1,6 +1,16 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡(2026-08-09 深夜下班 · ขั้นที่ 1 全链上线+真机人类门 PASS + 花名册三修)
+## 当前状态卡(2026-08-11 晚 · 体检未修队列一次收官 · d8c876a5..380a2f34 共 14 commit 上线)
+
+- **✅ 体检队列 8 项全修并 push**(6 路 Opus 代理施工+主控逐行验收,详单见记忆 healthcheck-fix-batch-2026-08-11):①authz 闸改 AST(注释/死分支/写库后的门现形,660 路由零误伤)②UTC 会计期间 14 处收编曼谷(含 tenant_core 写侧 SQL,真库验过表达式)③LINE 双 webhook claim/ack 状态机(failed 留证据+回执请用户重发,不机器重放)④计费闸 fail-closed(根因+9 调用点,lookup_error 503 与 insufficient_balance 402 分码)⑤订阅扣费 26 条测试(变异验证)⑥导出 3 端点去 N+1+100 上限(批量查询与单条版共用归属 WHERE)⑦3 个高敏 spec 带凭据进 CI(secrets=pearnly_e2e_1·每 spec 独立进程防互踢)⑧生产 .env 第 4 行冗余 EMAIL_ENCRYPTION_KEY 已删(备份 .env.bak-emailkey-20260811)。
+- **✅ b39a1378 前端防重闸点击级验收补完并上线**:pearnly_e2e_1(自查生产库确认 sales/expense 开)+本地反代真浏览器——采购双击→1 请求、销项向导双击开出→建草稿 1 次开出 1 次、withBusy abort 注入后按钮复活,截图在会话 _uitest/shots。**顺手揪出 b39a1378 漏建 dist/home.html(?v 未同步,老缓存用户永远拿不到修复),已重建上线**;线上已验 /home 引 main.js?v=12070113。
+- **✅ 部署已验**:api/version 200、新 ai-i18n-blocked 四语键在线。**CI run 31503683137 收笔时 in_progress**(本地 pre-push 全套绿)——接窗第一件事查它 conclusion。
+- **📝 清单外欠账**(代理挖出,只报未修,见记忆 healthcheck-fix-batch):UTC 同病 9 类(最重=pos/refund.py 连号桶)、订阅钱路 6 条可疑(订阅读取异常按量重复计费最伤)、计费 fail-open 残余 2 处(recon_intake/dms_id_ocr 尾部 except)、桩契约闸仍 3/212。
+- **🛑 沿袭在等 Zihao/爸爸**:ขั้นที่1 三问+真机、OCR 计费口径(DMS 登录失败也扣)、v1.1.61-63 真机回执、批量推送重启信号。
+
+---
+
+## 历史 · 2026-08-09 深夜下班状态卡(ขั้นที่ 1 全链上线+真机人类门 PASS + 花名册三修)
 
 - **✅ ขั้นที่ 1 收官**(edcb7e95→def1b20e 共 16 commit 全上线·CI 每笔绿):LINE 菜单 2 = 聊天逐问 8 步(证照+凭证/地点/车型颜色/日历/分期现金/法人自然人/登记人/支付 6 渠道循环)→ 预览 → ยืนยัน 建单+按指定名挂附件 / ทิ้ง 零写入;picker 退役(/dms-pick 404)。**Zihao 真机人类门 PASS:BK000002608000004**(现金路,DMS 网页亲眼回读,状态 แบบร่าง 等经理批=DMS 原有后续流程)。E2E 六场景全绿(dl7/ 有报告截图)。已发爸爸的泰语说明+三问=本会话记录;框架图 artifact `f22444cb`。
 - **✅ 真机撞出的三件已修**:①操作员 DMS 用户名 7/18 存了占位符「123」导致登录死循环——服务器解密实锤+当场改 dmstest(旧密文已备份在会话记录);②花名册 UX 三修上线(换 DMS 账号弹窗可改用户名/操作员可删除[解绑+禁端点+删档案+users 停用不删行]/操作列对齐);③长文本列表头随内容靠左(08-08 表格标准补口径,已写回记忆 table-align-standard-center)。

@@ -43,9 +43,11 @@ class WithinCapTests(unittest.TestCase):
         with mock.patch("core.db.get_cursor", return_value=_Cur(row={"n": Q.DAILY_CAP + 5})):
             self.assertFalse(Q.within_cap("U1", "T1"))
 
-    def test_exception_returns_true(self):
+    def test_exception_returns_false_fail_closed(self):
+        # 成本闸:查不出今天回了几条就不再自费多回一句(配额表一挂 = 上限形同虚设)。
+        # 代价只是退回固定模板,记账主路径不受影响。
         with mock.patch("core.db.get_cursor", return_value=_Cur(raise_on_exec=True)):
-            self.assertTrue(Q.within_cap("U1", "T1"))
+            self.assertFalse(Q.within_cap("U1", "T1"))
 
     def test_no_user_true(self):
         self.assertTrue(Q.within_cap("", "T1"))

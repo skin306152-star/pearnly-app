@@ -93,10 +93,16 @@ class TestPostback(unittest.TestCase):
     def _ref(self):
         return json.dumps({"kind": "agent_kb", "q": "VAT คืออะไร"})
 
-    def _run(self, action, consume, *, balance=100.0, exempt=False, runner=None):
+    def _run(self, action, consume, *, balance=100.0, exempt=False, runner=None, billing=None):
         says = []
         ran = []
         runner = runner or (lambda fn: ran.append(fn))
+        # billing 给 Exception 类 → 模拟查库抛错;给 dict → 直接当查询结果(装 lookup_error 用)。
+        gate = (
+            {"side_effect": billing}
+            if isinstance(billing, Exception)
+            else {"return_value": billing or {"is_exempt": exempt, "balance_thb": balance}}
+        )
         with (
             patch("core.db.get_cursor_rls", _fake_cursor),
             patch("services.line_binding.line_action_nonce.consume", return_value=consume),
@@ -105,10 +111,7 @@ class TestPostback(unittest.TestCase):
                 lambda rt, body, **k: says.append(body),
             ),
             patch("services.line_binding.line_client.t_line", lambda lang, key, **k: f"[{key}]"),
-            patch(
-                "core.db.get_billing_status_combined",
-                return_value={"is_exempt": exempt, "balance_thb": balance},
-            ),
+            patch("core.db.get_billing_status_combined", **gate),
         ):
             knowledge_confirm.handle_postback(_BOUND, "rt", action, "TOK1", "th", runner=runner)
         return says, ran
@@ -142,6 +145,29 @@ class TestPostback(unittest.TestCase):
         )
         self.assertEqual(ran, [])
         self.assertIn(says[0], knowledge_confirm._NO_BALANCE.values())
+
+    def test_lookup_error_refuses_and_never_spends(self):
+        """余额查不出来 → 不检索、不扣费(钱闸 fail-closed),回既有的「没收费,稍后再试」。"""
+        from services.billing import account_status
+
+        says, ran = self._run(
+            line_postback.ACTION_AGENT_KB_CONFIRM,
+            {"status": "ok", "action_ref": self._ref()},
+            billing={"is_exempt": False, "error_code": account_status.LOOKUP_ERROR},
+        )
+        self.assertEqual(ran, [])
+        self.assertIn(says[0], knowledge_confirm._FAIL.values())
+        # 系统故障绝不说成「余额不足」——那是让用户白充一笔钱。
+        self.assertNotIn(says[0], knowledge_confirm._NO_BALANCE.values())
+
+    def test_lookup_exception_refuses_instead_of_passing_through(self):
+        says, ran = self._run(
+            line_postback.ACTION_AGENT_KB_CONFIRM,
+            {"status": "ok", "action_ref": self._ref()},
+            billing=RuntimeError("db down"),
+        )
+        self.assertEqual(ran, [])
+        self.assertIn(says[0], knowledge_confirm._FAIL.values())
 
     def test_exempt_low_balance_still_runs(self):
         says, ran = self._run(

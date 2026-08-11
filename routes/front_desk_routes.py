@@ -112,7 +112,7 @@ async def create_contract(
             billing_user = ocr_balance.resolve_billing_user(cur, tenant_id, workspace_client_id)
         denial = ocr_balance.batch_denial(billing_user, tenant_id, len(files))
         if denial:
-            raise HTTPException(402, detail=denial)
+            raise HTTPException(ocr_balance.denial_status(denial), detail=denial)
 
     # 段一:读入 + 封顶(不落盘)。给了客户 id 则先验归属(不给未授权请求写盘的机会)。
     staged: list[tuple[str, bytes, str]] = []  # (original_name, content, sha256)

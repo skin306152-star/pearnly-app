@@ -28,9 +28,18 @@ logger = logging.getLogger(__name__)
 
 _BKK_TZ = _tz(_td(hours=7))
 
+# 「我们查不出来」的码。与 insufficient_balance(「用户没钱」)必须两条码两条出路:前者 503
+# 稍后再试、后者 402 去充值。把系统故障报成用户没钱 = 让会计去充一笔本来就够的钱。
+LOOKUP_ERROR = "lookup_error"
+
 # 白名单 LRU cache(进程内 · 5 分钟 TTL · 减少 DB 压力)
 _EXEMPT_CACHE: dict = {}
 _EXEMPT_CACHE_TTL = 300
+
+
+def lookup_failed(status) -> bool:
+    """这次是「查不出来」而不是「余额不足」。调用方据此分派 503 / 402,别把两件事合成一句话。"""
+    return (status or {}).get("error_code") == LOOKUP_ERROR
 
 
 def _bkk_year_month() -> str:
@@ -70,6 +79,10 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
     """v0.21 · 一次 SELECT 拿 is_exempt + balance + pages_used_this_month
     取代 v0.20 的 3 次独立查询 · DB roundtrip 从 3 → 1。
     返: {allowed, is_exempt, balance_thb, pages_used_this_month, error_code}
+
+    error_code 两种拒绝必须分得清,调用方据此走不同出路:
+      insufficient_balance = 用户没钱(去充值 · 402)
+      lookup_error         = 我们查不出来(稍后再试 · 503)· 不许报成用户没钱
     """
     # 白名单走 cache(不查 DB · 0 RTT)
     if is_user_billing_exempt(user_id):
@@ -116,7 +129,8 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
             )
 
         # 有有效订阅:套餐内有剩余额度即放行(额度免费 · 不看余额);额度耗尽才要余额>0 扣超额。
-        # 单独 try:订阅查询失败按"无套餐"处理(走下方余额闸),不让它扩大外层异常→fail-open 放行的面。
+        # 单独 try:订阅查询失败按"无套餐"处理(走下方余额闸)。余额这一手已经查到了,不该让
+        # 订阅这一手的故障冒到外层被判成 lookup_error —— 那会把「余额够、能跑」的人也拒掉。
         try:
             sub = db.get_active_subscription(tenant_id)
         except Exception as _se:
@@ -151,10 +165,15 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
             "error_code": None,
         }
     except Exception as e:
-        logger.warning(f"get_billing_status_combined error tenant={tenant_id}: {e}")
-        # 失败时不阻塞 OCR(降级到允许 · 但 log 警报)
+        # 钱闸 fail-closed:这里是全站计费的单一事实源,DB 抖一下就放行 = 全站免费,且损失
+        # 不可逆也不可发现(服务已交付、钱收不回、事后无从追认谁白嫖了)。拒绝的代价只是用户
+        # 重试一次,可逆。故「查不到计费状态」一律不放行。
+        # 与 services/pos/entitlements.pos_provision_allowed 的 fail-open 有意相反——那条闸
+        # 「绝不误伤任何在闸开启前就存在的租户」,拒绝会把 POS 从既有客户手里锁没,不可逆的是
+        # 拒绝那一侧;此处不可逆的是放行那一侧,所以方向相反。
+        logger.error(f"get_billing_status_combined error tenant={tenant_id}: {e}", exc_info=True)
         return {
-            "allowed": True,
+            "allowed": False,
             "is_exempt": False,
             "balance_thb": 0.0,
             "pages_used_this_month": 0,

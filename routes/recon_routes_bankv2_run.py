@@ -11,6 +11,7 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
+from services.billing import account_status
 from routes.recon_routes_shared import _user_key, _pdf_billing_units
 from routes.recon_routes_bankv2_helpers import (
     _BANK_V2_OK,
@@ -68,12 +69,15 @@ async def bank_v2_run(
         raise HTTPException(422, _brv2_err("no_gl_files", lang))
 
     # v118.35.0.21 · Credits 前置检查(1 次 SELECT · 异步扣费)
-    _billing_bv2 = {"is_exempt": True, "pages_used_this_month": 0}
+    # 查不出计费状态就不放行(钱闸 fail-closed · 见 services/billing/account_status)。
+    _billing_bv2 = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
     try:
         from core import db as _db_credit
 
         _tid_bv2 = user.get("tenant_id")
         _billing_bv2 = _db_credit.get_billing_status_combined(str(user.get("id")), _tid_bv2)
+        if account_status.lookup_failed(_billing_bv2):
+            raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
         if not _billing_bv2.get("allowed") and not _billing_bv2.get("is_exempt"):
             _est_cost = float(
                 _db_credit.estimate_pdf_cost_thb(
@@ -92,9 +96,8 @@ async def bank_v2_run(
     except HTTPException:
         raise
     except Exception as _be:
-        import logging as _lg_pre
-
-        _lg_pre.getLogger("recon").warning(f"[bank_v2.credits] pre-check skip: {_be}")
+        logger.error(f"[bank_v2.credits] pre-check failed: {_be}", exc_info=True)
+        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from _be
 
     # v118.33.12.1 · use _user_key (gemini_api_key OR custom_gemini_api_key)
     # to match the rest of the system; fall back to env GEMINI_API_KEY.

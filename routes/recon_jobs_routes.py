@@ -28,6 +28,7 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
+from services.billing import account_status
 from services.ocr.entrypoints import policy_context_from_billing
 from services.recon_jobs import store, worker
 
@@ -63,10 +64,17 @@ async def _stage_uploads(job_id: str, files: List[UploadFile], role: str, defaul
 
 
 def _credits_precheck(user_id: str, tenant_id, est_pages: int):
-    """复刻原 run 接口的 credits 前置检查 · 返回 billing dict(含 is_exempt)· 不够余额则抛 402。"""
-    billing = {"is_exempt": True, "pages_used_this_month": 0}
+    """复刻原 run 接口的 credits 前置检查 · 返回 billing dict(含 is_exempt)。
+
+    不够余额 → 402;查不出计费状态 → 503(钱闸 fail-closed,理由见 services/billing/
+    account_status.get_billing_status_combined)。两个码绝不合并:一个叫用户去充值,
+    一个叫用户稍后再试。
+    """
+    billing = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
     try:
         billing = db.get_billing_status_combined(str(user_id), tenant_id)
+        if account_status.lookup_failed(billing):
+            raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
         if not billing.get("allowed") and not billing.get("is_exempt"):
             est_cost = float(
                 db.estimate_pdf_cost_thb(billing.get("pages_used_this_month", 0), est_pages)
@@ -83,7 +91,8 @@ def _credits_precheck(user_id: str, tenant_id, est_pages: int):
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"[recon-submit.credits] pre-check skip: {e}")
+        logger.error(f"[recon-submit.credits] pre-check failed: {e}", exc_info=True)
+        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from e
     return billing
 
 

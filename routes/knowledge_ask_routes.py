@@ -8,6 +8,7 @@ can be reviewed against its citations.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -15,11 +16,14 @@ from pydantic import BaseModel
 
 from core import db
 from services.authz.deps import require_perm
+from services.billing import account_status
 from services.billing.charge import SATANG_PER_THB
 from services.knowledge import contract
 from routes.knowledge_common import authorize_write, resolve_caller
 from services.knowledge import ask, dal, embedding, generation, search
 from services.knowledge.schema import KnowledgeAnswer
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge-ask"])
 
@@ -56,9 +60,16 @@ def ask_question(request: Request, body: AskRequest) -> dict[str, Any]:
     if not question:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty question")
 
-    # 余额前置检查:不足则在花 Gemini 钱之前拦下(豁免账号放行)。
+    # 余额前置检查:不足则在花 Gemini 钱之前拦下(豁免账号放行)。查不出余额同样不放行——
+    # 钱闸 fail-closed(见 services/billing/account_status),但 503 与 402 分开:一个是我们
+    # 的故障(稍后再试),一个是用户没钱(去充值)。
     try:
         _bill = db.get_billing_status_combined(identity.user_id, identity.tenant_id)
+        if account_status.lookup_failed(_bill):
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"code": account_status.LOOKUP_ERROR},
+            )
         if not _bill.get("is_exempt") and float(_bill.get("balance_thb", 0)) < (
             _RAG_ANSWER_SATANG / SATANG_PER_THB
         ):
@@ -72,8 +83,11 @@ def ask_question(request: Request, body: AskRequest) -> dict[str, Any]:
             )
     except HTTPException:
         raise
-    except Exception:
-        pass  # 计费查询异常容忍 · 不阻断问答
+    except Exception as exc:
+        logger.error("[kb.ask] billing pre-check failed", exc_info=True)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, detail={"code": account_status.LOOKUP_ERROR}
+        ) from exc
 
     scope = accessible
     if body.workspace_client_id is not None:

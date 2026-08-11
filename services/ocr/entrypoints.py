@@ -15,6 +15,7 @@ import hashlib
 from typing import Any, Dict, Optional
 
 from core import db
+from services.billing import account_status
 from services.ocr.pipeline import IMAGE_EXTENSIONS, PDF_EXTENSIONS, TABLE_EXTENSIONS
 
 SUPPORTED_OCR_EXTENSIONS = PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS
@@ -85,6 +86,18 @@ def billing_quote(
 
     tenant_id = str(user.get("tenant_id")) if user.get("tenant_id") else None
     billing = db.get_billing_status_combined(str(user["id"]), tenant_id)
+    # 查询失败 ≠ 没钱:fail-closed 之后 lookup_error 也走 not allowed,若不先分流
+    # 会被下面误报成 insufficient_balance,把我们的故障指成用户余额问题。
+    if account_status.lookup_failed(billing):
+        return {
+            "allowed": False,
+            "error_code": account_status.LOOKUP_ERROR,
+            "kind": kind,
+            "units": units,
+            "page_count": page_count,
+            "ext": ext,
+            "is_exempt": False,
+        }
     is_exempt = bool(billing.get("is_exempt"))
     if not billing.get("allowed") and not is_exempt:
         if kind == "pdf":

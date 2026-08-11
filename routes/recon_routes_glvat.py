@@ -14,6 +14,7 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
+from services.billing import account_status
 from services.vat.vat_report_parser import parse_vat_report
 from routes.recon_routes_shared import _user_key, _pdf_billing_units
 from services.recon.gl_vat_reconciler import (
@@ -113,12 +114,15 @@ async def gl_vat_run(
 
     # M3-3 修(2026-05-25):收入对账旧同步路径补 credits 前置检查 + 按量扣费 · 闭掉免费入口
     #   (与 bank /run、async /submit 一致 · 余额不足直接 402 · 不让付费 OCR 先跑)。
-    _billing_glv = {"is_exempt": True, "pages_used_this_month": 0}
+    # 查不出计费状态就不放行(钱闸 fail-closed · 见 services/billing/account_status)。
+    _billing_glv = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
     try:
         from core import db as _db_credit_glv
 
         _tid_glv = user.get("tenant_id")
         _billing_glv = _db_credit_glv.get_billing_status_combined(str(user.get("id")), _tid_glv)
+        if account_status.lookup_failed(_billing_glv):
+            raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
         if not _billing_glv.get("allowed") and not _billing_glv.get("is_exempt"):
             _est_cost = float(
                 _db_credit_glv.estimate_pdf_cost_thb(
@@ -137,7 +141,8 @@ async def gl_vat_run(
     except HTTPException:
         raise
     except Exception as _be:
-        logger.warning(f"[gl-vat.credits] pre-check skip: {_be}")
+        logger.error(f"[gl-vat.credits] pre-check failed: {_be}", exc_info=True)
+        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from _be
 
     # 读所有字节
     gl_data: List[tuple] = []

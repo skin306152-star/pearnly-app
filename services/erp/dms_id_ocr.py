@@ -200,6 +200,12 @@ def _billing_gate(user: Dict[str, Any]) -> Dict[str, Any]:
     再扣成负。异常容错降级(不阻塞,与热路径一致)。"""
     try:
         _bill = db.get_billing_status_combined(str(user["id"]), _tid(user))
+        # 查询失败 ≠ 没钱:fail-closed 后 lookup_error 也走 not allowed,先分流成 503,
+        # 否则下面把我们的故障报成 402 insufficient_balance 叫用户去充值。
+        from services.billing import account_status
+
+        if account_status.lookup_failed(_bill):
+            raise DmsOcrError("lookup_error", 503, {"code": account_status.LOOKUP_ERROR})
         if not _bill.get("allowed") and not _bill.get("is_exempt"):
             raise DmsOcrError(
                 "insufficient_balance",

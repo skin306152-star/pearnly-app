@@ -22,6 +22,7 @@ from core import db
 from core import workspace_context as wc
 from core.db import increment_user_monthly_usage
 from core.route_helpers import _plan_permissions, _tid
+from services.billing import account_status
 from services.ocr.entrypoints import (
     content_hash as _ocr_content_hash,
     get_cached_history as _ocr_get_cached,
@@ -167,16 +168,19 @@ def run_recognition_core(
         )
         return {"response": resp, "raw_pages": [], "history_ids": []}
 
-    # Credits 余额前置检查(1 次 SELECT)。
+    # Credits 余额前置检查(1 次 SELECT)。查不出状态就不放行:钱闸 fail-closed 的理由见
+    # services/billing/account_status.get_billing_status_combined。
     _billing = {
-        "allowed": True,
-        "is_exempt": True,
+        "allowed": False,
+        "is_exempt": False,
         "balance_thb": 0.0,
         "pages_used_this_month": 0,
         "error_code": None,
     }
     try:
         _billing = db.get_billing_status_combined(str(user.get("id")), _tid(user))
+        if account_status.lookup_failed(_billing):
+            raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
         if not _billing.get("allowed") and not _billing.get("is_exempt"):
             if _ext in PDF_EXTENSIONS or _ext in IMAGE_EXTENSIONS:
                 _est_cost = float(
@@ -197,7 +201,8 @@ def run_recognition_core(
     except HTTPException:
         raise
     except Exception as _be:
-        logger.warning(f"[credits] billing pre-check skip(error tolerated): {_be}")
+        logger.error(f"[credits] billing pre-check failed: {_be}", exc_info=True)
+        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from _be
 
     # v105 · Gemini 主 + Google Vision 备
     own_key = (user.get("gemini_api_key") or user.get("custom_gemini_api_key") or "").strip()

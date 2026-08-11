@@ -337,7 +337,7 @@ async def add_materials(
         )
     denial = ocr_balance.batch_denial(billing_user, tenant_id, len(files))
     if denial:
-        raise HTTPException(402, detail=denial)
+        raise HTTPException(ocr_balance.denial_status(denial), detail=denial)
 
     # 段一:整批读入 + 预处理(不落盘)。封顶读法:最多读上限+1 字节,超限即 413。段内抛错=盘上零残留。
     pairs = []

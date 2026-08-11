@@ -19,6 +19,7 @@ from core import file_crypto
 from core import workspace_context as wc
 from core.auth import get_current_user_from_request
 from core.route_helpers import content_disposition as _content_disposition
+from services.billing import account_status
 from services.vat.vat_excel_export import (
     extract_invoices_parallel,
     extract_invoices_batched_parallel,  # v118.32.5 · 批量OCR 性能优化 B
@@ -101,9 +102,12 @@ async def build_excel_endpoint(
         lang = "th"
 
     # v118.35.0.21 · Credits 前置检查(1 次 SELECT · 异步扣费)
-    _billing_vex = {"is_exempt": True, "pages_used_this_month": 0}
+    # 查不出计费状态就不放行(钱闸 fail-closed · 见 services/billing/account_status)。
+    _billing_vex = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
     try:
         _billing_vex = db.get_billing_status_combined(str(user_id), tenant_id)
+        if account_status.lookup_failed(_billing_vex):
+            raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
         if not _billing_vex.get("allowed") and not _billing_vex.get("is_exempt"):
             _est_pages = len(invoices) + len(reports)
             _est_cost = float(
@@ -121,7 +125,8 @@ async def build_excel_endpoint(
     except HTTPException:
         raise
     except Exception as _be:
-        logger.warning(f"[vex.credits] pre-check skip: {_be}")
+        logger.error(f"[vex.credits] pre-check failed: {_be}", exc_info=True)
+        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from _be
 
     api_key = _user_key(user)
     t0 = time.time()

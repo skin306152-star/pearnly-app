@@ -203,12 +203,42 @@ class MaterialsGateTests(_BillingTestCase):
         self.assertIsNone(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 3))
         self.assertEqual(st.calls, 0)  # 闸关连查都不查,现状逐字节不变
 
-    def test_lookup_error_fails_open(self):
+    def test_lookup_exception_fails_closed(self):
+        """查库炸了拒收:放行 = DB 抖一下全站免费,不可逆也发现不了。"""
+
         def _boom(user_id, tenant_id):
             raise RuntimeError("db down")
 
         self._swap(_billing_status=_boom)
-        self.assertIsNone(ocr_balance.batch_denial(_OWNER_USER, _TENANT, 2))
+        denial = ocr_balance.batch_denial(_OWNER_USER, _TENANT, 2)
+        self.assertEqual(denial, {"code": ocr_balance.LOOKUP_FAILED_REASON})
+
+    def test_lookup_error_status_fails_closed(self):
+        """闸本身返 lookup_error(没抛异常)也拒收 —— 两条失败路同一个出口。"""
+        self._statuses([_ok(allowed=False, error_code=ocr_balance.LOOKUP_FAILED_REASON)])
+        denial = ocr_balance.batch_denial(_OWNER_USER, _TENANT, 2)
+        self.assertEqual(denial["code"], ocr_balance.LOOKUP_FAILED_REASON)
+
+    def test_lookup_failure_is_not_reported_as_no_money(self):
+        """查询故障 ≠ 用户没钱:码不同、HTTP 状态不同、缺口不编。
+
+        合并 = 让会计为我们的故障去充一笔本来就够的钱,充完照样跑不动。
+        """
+        def _boom(user_id, tenant_id):
+            raise RuntimeError("db down")
+
+        self._swap(_billing_status=_boom)
+        denial = ocr_balance.batch_denial(_OWNER_USER, _TENANT, 2)
+        self.assertNotEqual(denial["code"], ocr_balance.STUCK_REASON)
+        self.assertNotIn("shortfall", denial)  # 没查到余额就别编缺口
+        self.assertEqual(ocr_balance.denial_status(denial), 503)
+        self.assertEqual(ocr_balance.denial_status({"code": ocr_balance.STUCK_REASON}), 402)
+
+    def test_lookup_failed_reason_matches_billing_source_of_truth(self):
+        """防漂:此处的码是 account_status.LOOKUP_ERROR 的同值副本(避模块级循环导入)。"""
+        from services.billing import account_status
+
+        self.assertEqual(ocr_balance.LOOKUP_FAILED_REASON, account_status.LOOKUP_ERROR)
 
     def test_denial_estimate_comes_from_decimal_pricing(self):
         # 钱只由 Decimal 定价算;float 只出现在 JSON 出线的那一刻(与老站 402 体同形)。

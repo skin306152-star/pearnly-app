@@ -16,6 +16,7 @@ import threading
 
 from core import db
 from services.agent import agent_i18n
+from services.billing import account_status
 
 logger = logging.getLogger(__name__)
 
@@ -163,13 +164,21 @@ def handle_postback(bound_user, reply_token, action, token, lang, *, runner=None
         _say(agent_i18n.render("agent.confirm.cancelled", lang))
         return
     uid = str(bound_user.get("id") or "")
-    try:  # 余额前置:不足在花模型钱之前拦(豁免账号放行);查询异常容忍不阻断
+    try:  # 余额前置:不足在花模型钱之前拦(豁免账号放行)
         bill = db.get_billing_status_combined(uid, tid)
-        if not bill.get("is_exempt") and float(bill.get("balance_thb", 0)) < 0.5:
-            _say(_t(_NO_BALANCE, lang))
-            return
-    except Exception:
-        pass
+    except Exception:  # noqa: BLE001 - 归一成 lookup_error,与查得到但查失败走同一个判点
+        logger.exception("[agent kb] 余额查询异常")
+        bill = {"error_code": account_status.LOOKUP_ERROR}
+    if account_status.lookup_failed(bill):
+        # 钱闸 fail-closed:查不出余额就不开工(理由见 services/billing/account_status)。
+        # 复用 _FAIL 那句「这次没收费,稍后再试」—— 对用户与检索失败是同一件事(没扣钱、
+        # 重来即可),不为此另造一句文案;绝不说成「余额不足」,那是让他白充钱。
+        logger.warning("[agent kb] 余额查不出 · 拒绝执行 tenant=%s", tid)
+        _say(_t(_FAIL, lang))
+        return
+    if not bill.get("is_exempt") and float(bill.get("balance_thb", 0)) < 0.5:
+        _say(_t(_NO_BALANCE, lang))
+        return
     _say(_t(_ACK, lang))
     run = runner or (lambda fn: threading.Thread(target=fn, daemon=True).start())
     run(lambda: _execute_and_notify(bound_user, tid, ref["q"], lang, luid))

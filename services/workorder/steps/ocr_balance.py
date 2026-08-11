@@ -9,7 +9,7 @@
 
 口径与老站(/home 识别中心)一字不差,本模块只管「工单侧怎么接线」:
   闸 = db.get_billing_status_combined(services/billing/account_status.py 单一事实源,含豁免
-       直通与查库异常 fail-open——查库炸了不挡用户,老站什么样这里什么样);
+       直通与查库异常 fail-closed——查不出计费状态就不放行,老站什么样这里什么样);
   扣 = db.charge_ocr(services/billing/charge.py 单原子事务 + SELECT FOR UPDATE + 三表齐写)。
 定价、扣费、豁免判据一行都不重写。
 
@@ -52,6 +52,13 @@ logger = logging.getLogger(__name__)
 # stuck 原因码 = 全站计费闸统一码(services/billing/account_status.py 单一事实源),前端
 # static/ai/ai-fail-render.js 认的也是这个词,不另造工单专属码。
 STUCK_REASON = "insufficient_balance"
+
+# 「余额查不出来」的码,与 STUCK_REASON 永远分开:前者出路是充值,后者出路是稍后再试。合并
+# 一次 = 拿我们自己的故障骗会计去充一笔本来就够的钱(与模块 docstring 里 ocr_cost_cap 和
+# insufficient_balance 不许合并是同一条理由)。
+# 值 = services/billing/account_status.LOOKUP_ERROR,同值另写在此避开模块级循环导入;
+# tests/unit/test_workorder_billing.py 锁两者一致防漂。
+LOOKUP_FAILED_REASON = "lookup_error"
 
 # 一件计一页、也只烧一页(见模块 docstring 的计费单位);kind 用老站的 "pdf" 档(页价)。
 PAGES_PER_ITEM = 1
@@ -107,8 +114,9 @@ def batch_denial(billing_user_id, tenant_id, file_count: int) -> Optional[dict]:
     /ai 两条入料路径(工单补料 / 总台建合同)共用这一条闸,行为不许分叉。billing_user_id 由
     resolve_billing_user 给,不许直接拿登录用户——那是另一个人。
 
-    闸关 / 无料 / 豁免 / 查库异常一律放行:计费问题绝不把「传料」这个动作本身弄挂,余额真见底
-    还有 classify 逐件复查兜底。预估按一件一页(整批 file_count 页)。
+    闸关 / 无料 / 豁免放行;查库异常改为拒收(钱闸 fail-closed,理由见 services/billing/
+    account_status.get_billing_status_combined)——查不出余额就收料,等于 DB 抖一下全站免费。
+    预估按一件一页(整批 file_count 页)。
 
     shortfall(还差多少)是给失败卡回答「充多少够」的:余额够却仍被拒(非余额原因)时为 null,
     前端据此少说那一句——报一个算错的缺口比不报更糟。
@@ -118,6 +126,8 @@ def batch_denial(billing_user_id, tenant_id, file_count: int) -> Optional[dict]:
     try:
         user_id = str(billing_user_id) if billing_user_id else None
         status = _billing_status(user_id, str(tenant_id) if tenant_id else None) or {}
+        if status.get("error_code") == LOOKUP_FAILED_REASON:
+            return _lookup_failed_denial()
         if status.get("allowed") or status.get("is_exempt"):
             return None
         used = int(status.get("pages_used_this_month") or 0)
@@ -131,9 +141,25 @@ def batch_denial(billing_user_id, tenant_id, file_count: int) -> Optional[dict]:
             "pages_used_this_month": used,
             "shortfall": float(short) if short else None,
         }
-    except Exception as exc:  # noqa: BLE001 - 预检失败按放行(fail-open,与老站闸同口径)
-        logger.warning("工单补料余额预检跳过(放行): %s", exc)
-        return None
+    except Exception as exc:  # noqa: BLE001 - 预检失败按拒收(fail-closed,与老站闸同口径)
+        logger.error("工单补料余额预检失败(拒收): %s", exc, exc_info=True)
+        return _lookup_failed_denial()
+
+
+def _lookup_failed_denial() -> dict:
+    """查不出余额的拒收体。不带 balance/shortfall:那些数字我们这次根本没拿到,编一个出来
+    比不说更糟(与 shortfall 算不出就退回裸码是同一条规矩)。"""
+    return {"code": LOOKUP_FAILED_REASON}
+
+
+def denial_status(denial: Optional[dict]) -> int:
+    """拒收体 → HTTP 状态码。402 = 你没钱(去充值);503 = 我们查不出来(稍后再试)。
+
+    两个码在前端是两屏:static/ai/ai-fail-render.js 的 failureView 对 402 给「去充值」按钮,
+    对 5xx 给既有的 fail_server「服务器出错了,稍等再试」。把查询故障也发成 402 = 把用户推去
+    充一笔本来就够的钱,充完照样跑不动。
+    """
+    return 503 if (denial or {}).get("code") == LOOKUP_FAILED_REASON else 402
 
 
 def from_ctx(ctx, owner: Optional[dict], images: list, reused: dict) -> Optional["Wallet"]:
@@ -177,9 +203,13 @@ class Wallet:
                 _billing_status(str(self._user_id) if self._user_id else None, self._tenant_id)
                 or {}
             )
-        except Exception as exc:  # noqa: BLE001 - 查库炸了不挡用户(继承老站 fail-open)
-            logger.warning("工单余额回查失败(放行不挡跑批): %s", exc)
-            self._status = {"allowed": True, "is_exempt": False, "error_code": "lookup_error"}
+        except Exception as exc:  # noqa: BLE001 - 查库炸了停批(继承老站 fail-closed)
+            logger.error("工单余额回查失败(停批): %s", exc, exc_info=True)
+            self._status = {
+                "allowed": False,
+                "is_exempt": False,
+                "error_code": LOOKUP_FAILED_REASON,
+            }
         return self._status
 
     def status(self) -> dict:
@@ -188,7 +218,7 @@ class Wallet:
         return self._status
 
     def exhausted(self) -> bool:
-        """钱花完了没(豁免恒 False;查库异常 fail-open 恒 False,不把跑批堵死)。"""
+        """还能不能接着烧钱(豁免恒 False;查库异常恒 True —— 余额未知不许继续投料)。"""
         st = self.status()
         return not (st.get("allowed") or st.get("is_exempt"))
 
@@ -200,9 +230,14 @@ class Wallet:
         (services/billing/pricing,Decimal 全程,不用 float 算钱)。
 
         算不出就退回裸码(前端对无参数码有不带金额的降级句):少说一句,好过报一个错数字。
+
+        余额压根没查出来时给 LOOKUP_FAILED_REASON:此时「还差多少」无从谈起,报 STUCK_REASON
+        等于告诉会计他没钱——他可能钱多得很,是我们查不动。
         """
         try:
             st = self.status()
+            if st.get("error_code") == LOOKUP_FAILED_REASON:
+                return LOOKUP_FAILED_REASON
             pages = max(0, int(items_left or 0)) * PAGES_PER_ITEM
             if pages <= 0:
                 return STUCK_REASON

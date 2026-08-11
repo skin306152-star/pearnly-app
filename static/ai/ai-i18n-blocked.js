@@ -13,6 +13,9 @@ Object.assign(window.__AI_I18N_ZH__, {
     blocked_insufficient_balance: 'OCR 余额不足',
     blocked_ocr_cost_cap_exceeded: '这一单的识别成本到了我们这边的预算上限（不是你的余额）',
     blocked_ocr_quota_deferred: '有 {n} 张票撞上识别配额上限',
+    // 与 blocked_insufficient_balance 说的必须是两件事:那句是「你没钱」,这句是「我们没查着」。
+    // 后端 ocr_balance.LOOKUP_FAILED_REASON 产出,余额未知时绝不推用户去充值。
+    blocked_lookup_error: '我们这边查不到你的余额，剩下的票先停住了（不是余额不足）',
     wo_blocked_ran: '这一单已经识别完 {done} 件，共 {total} 件。',
     wo_blocked_credit_why: '余额不够了，剩下 {left} 件停在这里没跑。',
     wo_blocked_credit_rest: '余额不够了，剩下的票停在这里没跑。',
@@ -31,6 +34,7 @@ Object.assign(window.__AI_I18N_TH__, {
     blocked_insufficient_balance: 'เครดิต OCR ไม่พอ',
     blocked_ocr_cost_cap_exceeded: 'ต้นทุนการอ่านของใบงานนี้ชนเพดานงบฝั่งเรา (ไม่ใช่เครดิตของคุณ)',
     blocked_ocr_quota_deferred: 'มีบิล {n} ใบชนโควตาการอ่าน',
+    blocked_lookup_error: 'ฝั่งเราตรวจสอบยอดคงเหลือของคุณไม่ได้ บิลที่เหลือจึงหยุดไว้ก่อน (ไม่ใช่เครดิตไม่พอ)',
     wo_blocked_ran: 'ใบงานนี้อ่านไปแล้ว {done} ใบ จากทั้งหมด {total} ใบ',
     wo_blocked_credit_why: 'เครดิตไม่พอ อีก {left} ใบจึงหยุดค้างอยู่',
     wo_blocked_credit_rest: 'เครดิตไม่พอ บิลที่เหลือจึงหยุดค้างอยู่',
@@ -50,6 +54,8 @@ Object.assign(window.__AI_I18N_EN__, {
     blocked_ocr_cost_cap_exceeded:
         'this order hit our own recognition budget cap (not your balance)',
     blocked_ocr_quota_deferred: '{n} document(s) hit the recognition quota',
+    blocked_lookup_error:
+        'we could not read your balance on our side, so the rest is paused (not a credit shortage)',
     wo_blocked_ran: 'This order finished reading {done} of {total} documents.',
     wo_blocked_credit_why: 'Credits ran out — the remaining {left} document(s) stopped here.',
     wo_blocked_credit_rest: 'Credits ran out — the remaining documents stopped here.',
@@ -70,6 +76,7 @@ Object.assign(window.__AI_I18N_JA__, {
     blocked_ocr_cost_cap_exceeded:
         'この案件の読取コストが当社側の予算上限に達しました（残高の問題ではありません）',
     blocked_ocr_quota_deferred: '{n} 件が読取クォータに達しました',
+    blocked_lookup_error: '当社側で残高を確認できず、残りは一時停止しています（残高不足ではありません）',
     wo_blocked_ran: 'この案件は {total} 件中 {done} 件の読取が完了しています。',
     wo_blocked_credit_why: '残高が不足し、残り {left} 件がここで止まっています。',
     wo_blocked_credit_rest: '残高が不足し、残りの書類がここで止まっています。',

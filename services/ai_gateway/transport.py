@@ -58,7 +58,9 @@ def _run(
         (backend or backends.override_backend() or backends.active_backend()).strip().lower()
     )
     prov = backends.get_provider(effective)
-    fn = getattr(prov, method)
+    fn = getattr(prov, method, None)
+    if fn is None:  # 形态是逐家实现的(如整页转写只有 qwen 有)→ 缺就报不支持,不抛给热路径
+        return ProviderOutcome(ok=False, error_kind="unsupported", model=effective)
     start = time.time()
     outcome = fn(*args, **kwargs)
     latency_ms = int((time.time() - start) * 1000)
@@ -178,6 +180,39 @@ def multimodal_to_json(
             max_tokens=max_tokens,
             timeout_s=timeout_s,
             max_retries=max_retries,
+        ),
+        task=task,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        trace_id=trace_id,
+    )
+
+
+def multimodal_to_text(
+    prompt: str,
+    images: List[Tuple[bytes, str]],
+    *,
+    tier: str = "flash",
+    api_key: Optional[str] = None,
+    temperature: float = 0.0,
+    max_tokens: int = 4096,
+    timeout_s: int = 90,
+    task: str = "ocr.image_text",
+    tenant_id=None,
+    user_id=None,
+    trace_id=None,
+) -> ProviderOutcome:
+    """整页转写:图 → 纯文本(不解析 JSON)。只有实现了该形态的后端能接(现为 qwen),
+    其余后端返回 error_kind=unsupported,由调用方决定回落。"""
+    return _run(
+        "multimodal_to_text",
+        (prompt, images),
+        dict(
+            tier=tier,
+            api_key=api_key,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout_s=timeout_s,
         ),
         task=task,
         tenant_id=tenant_id,

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """LLM 后端选择(单一开关)。
 
-OCR_LLM_BACKEND = aistudio(默认) | vertex | selfhost
+OCR_LLM_BACKEND = aistudio(默认) | vertex | selfhost | qwen
   - aistudio:google-generativeai + API key(现状·行为零变化)
   - vertex  :google-genai + Vertex AI(服务账号 · 企业配额/数据驻留)
   - selfhost:OpenAI 兼容端点(自托管 Qwen2.5-VL 等)
+  - qwen    :阿里云百炼 OpenAI 兼容端点(Qwen 全家桶 · 按档分模型)
 
 唯一一处读环境变量决定后端;全产品 OCR/VAT/银行/知识的 LLM 调用都经此取 provider。
 默认 aistudio → 老代码路径原样执行,不引入任何行为变化。
@@ -16,7 +17,7 @@ import os
 from contextvars import ContextVar, Token
 from typing import Optional
 
-_VALID = ("aistudio", "vertex", "selfhost", "anthropic", "openai")
+_VALID = ("aistudio", "vertex", "selfhost", "anthropic", "openai", "qwen")
 
 # 请求级后端覆盖:某处需为本请求固定某家 provider 时用(通用能力)。
 # 现无生产调用方——economy 曾用它钉 aistudio(Vertex 无 2.5),已改由 vertex provider
@@ -80,6 +81,10 @@ def get_provider(name: Optional[str] = None):
         from services.ai_gateway.providers import openai
 
         return openai
+    if backend == "qwen":
+        from services.ai_gateway.providers import qwen
+
+        return qwen
     from services.ai_gateway.providers import aistudio
 
     return aistudio

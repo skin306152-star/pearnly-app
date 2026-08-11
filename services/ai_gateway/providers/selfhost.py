@@ -15,7 +15,11 @@ from __future__ import annotations
 import os
 from typing import List, Optional, Tuple
 
-from services.ai_gateway.providers.http_common import error_kind_for_status, image_content_parts
+from services.ai_gateway.providers.http_common import (
+    chat_text_and_usage,
+    image_content_parts,
+    post_json,
+)
 from services.ai_gateway.tasks import ProviderOutcome
 
 NAME = "selfhost"
@@ -43,39 +47,17 @@ def _embed_model() -> str:
 
 def _post(path: str, payload: dict, timeout_s: int):
     """POST → (json, error_kind)。网络/HTTP 错收敛为 error_kind。"""
-    import httpx
-
     base = _base()
     if not base:
         return None, "auth"  # 未配置端点 → 当作不可用(auth 类·上层走 fallback)
-    try:
-        resp = httpx.post(f"{base}{path}", headers=_headers(), json=payload, timeout=timeout_s)
-    except httpx.TimeoutException:
-        return None, "timeout"
-    except httpx.HTTPError:
-        return None, "provider"
-    if resp.status_code >= 400:
-        return None, error_kind_for_status(resp.status_code)
-    try:
-        return resp.json(), None
-    except Exception:  # noqa: BLE001
-        return None, "parse"
+    return post_json(f"{base}{path}", _headers(), payload, timeout_s)
 
 
 def _chat_text(payload, timeout_s):
     body, kind = _post("/chat/completions", payload, timeout_s)
     if kind:
         return None, kind, (0, 0)
-    try:
-        text = body["choices"][0]["message"]["content"] or ""
-        usage = body.get("usage") or {}
-        toks = (
-            int(usage.get("prompt_tokens", 0) or 0),
-            int(usage.get("completion_tokens", 0) or 0),
-        )
-        return text.strip(), None, toks
-    except Exception:  # noqa: BLE001
-        return None, "parse", (0, 0)
+    return chat_text_and_usage(body)
 
 
 def _chat_json(prompt, images, *, temperature, response_mime, max_tokens, timeout_s, max_retries):

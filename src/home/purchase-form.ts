@@ -425,7 +425,15 @@ function payload(status: 'draft' | 'posted'): unknown {
     return base;
 }
 
+// 新单的 st.id 要等 POST 回来才有,慢网下连点会各自建一张采购单(各带一次入库/应付)。
+// 存草稿与过账都汇到这个漏斗,闸加在这里两个入口一起盖住。
+let submitting = false;
+
 async function submit(status: 'draft' | 'posted'): Promise<void> {
+    if (submitting) return;
+    submitting = true;
+    const foot = document.querySelectorAll<HTMLButtonElement>('#pur-save-draft2, #pur-post2');
+    foot.forEach((b) => (b.disabled = true));
     try {
         const body = payload(status);
         const path = st!.id ? `/api/purchase/docs/${st!.id}` : '/api/purchase/docs';
@@ -438,6 +446,9 @@ async function submit(status: 'draft' | 'posted'): Promise<void> {
         window.routeTo?.('purchase');
     } catch (e) {
         showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    } finally {
+        submitting = false;
+        foot.forEach((b) => (b.disabled = false));
     }
 }
 

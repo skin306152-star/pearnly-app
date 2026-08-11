@@ -92,6 +92,9 @@ export async function withBusy(btn: HTMLElement | null, fn: () => Promise<void>)
     } finally {
         btn.removeAttribute('aria-busy');
         btn.classList.remove('busy');
+        // disabled 必须同 aria-busy 一起摘:失败分支只弹 toast 不重渲染(acct-bank.ts
+        // harvest/confirm 就是),漏了这行按钮永久变灰,用户看得到错误却点不了重试。
+        (btn as HTMLButtonElement).disabled = false;
     }
 }
 

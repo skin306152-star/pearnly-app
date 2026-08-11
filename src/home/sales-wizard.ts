@@ -377,7 +377,13 @@ function goStep(step: number) {
     }
 }
 
+// 开出期间关门:draftId 要等第一次 saveDraft 回来才写回 st,慢网下连点「开出」会各自
+// POST 建一张草稿再各自开出 —— 同一笔销售落两张带法定连号的税票,销项 VAT 重复申报,
+// 且票已冻结撤不回。服务端幂等是后账,先把最常见的双击路堵上。
+let issuing = false;
+
 async function doIssue() {
+    if (issuing) return;
     // 先确保有商品行(否则跳回第3步)。
     if (!st.lines.some((l) => (l.desc || '').trim())) {
         goStep(2);
@@ -390,21 +396,29 @@ async function doIssue() {
         const detail = blockers.map((b) => wt(b.descKey)).join(' · ');
         return showToast(wt('blockers') + ' ' + detail, 'error');
     }
-    const r = await issueDraft(st);
-    if (r.ok && r.id) {
-        showSuccess(r.id);
-        window.dispatchEvent(new CustomEvent('pearnly:sales-changed'));
-        return;
-    }
-    // 服务端兜底拦截(买方/税号/分店/收款):跳到对应步骤 + 友好说明,不暴露原始错误码。
-    const code = (r.error || '').replace(/^sales\./, '');
-    const hit = SERVER_ERR[code];
-    if (hit) {
-        goStep(hit.step);
-        showToast(wt('blockers') + ' ' + wt(hit.descKey), 'error');
-    } else {
-        // 未在 SERVER_ERR 表里的码:用全局本地化文案,实在没有才回退向导兜底(不露原始码)。
-        showToast(salesErrText(r.error) || wt('issueFail'), 'error');
+    issuing = true;
+    const btn = document.getElementById('sw-next') as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    try {
+        const r = await issueDraft(st);
+        if (r.ok && r.id) {
+            showSuccess(r.id);
+            window.dispatchEvent(new CustomEvent('pearnly:sales-changed'));
+            return;
+        }
+        // 服务端兜底拦截(买方/税号/分店/收款):跳到对应步骤 + 友好说明,不暴露原始错误码。
+        const code = (r.error || '').replace(/^sales\./, '');
+        const hit = SERVER_ERR[code];
+        if (hit) {
+            goStep(hit.step);
+            showToast(wt('blockers') + ' ' + wt(hit.descKey), 'error');
+        } else {
+            // 未在 SERVER_ERR 表里的码:用全局本地化文案,实在没有才回退向导兜底(不露原始码)。
+            showToast(salesErrText(r.error) || wt('issueFail'), 'error');
+        }
+    } finally {
+        issuing = false;
+        if (btn) btn.disabled = false;
     }
 }
 function showSuccess(docId: string) {

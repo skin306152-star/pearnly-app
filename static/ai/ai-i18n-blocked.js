@@ -34,7 +34,8 @@ Object.assign(window.__AI_I18N_TH__, {
     blocked_insufficient_balance: 'เครดิต OCR ไม่พอ',
     blocked_ocr_cost_cap_exceeded: 'ต้นทุนการอ่านของใบงานนี้ชนเพดานงบฝั่งเรา (ไม่ใช่เครดิตของคุณ)',
     blocked_ocr_quota_deferred: 'มีบิล {n} ใบชนโควตาการอ่าน',
-    blocked_lookup_error: 'ฝั่งเราตรวจสอบยอดคงเหลือของคุณไม่ได้ บิลที่เหลือจึงหยุดไว้ก่อน (ไม่ใช่เครดิตไม่พอ)',
+    blocked_lookup_error:
+        'ฝั่งเราตรวจสอบยอดคงเหลือของคุณไม่ได้ บิลที่เหลือจึงหยุดไว้ก่อน (ไม่ใช่เครดิตไม่พอ)',
     wo_blocked_ran: 'ใบงานนี้อ่านไปแล้ว {done} ใบ จากทั้งหมด {total} ใบ',
     wo_blocked_credit_why: 'เครดิตไม่พอ อีก {left} ใบจึงหยุดค้างอยู่',
     wo_blocked_credit_rest: 'เครดิตไม่พอ บิลที่เหลือจึงหยุดค้างอยู่',
@@ -76,7 +77,8 @@ Object.assign(window.__AI_I18N_JA__, {
     blocked_ocr_cost_cap_exceeded:
         'この案件の読取コストが当社側の予算上限に達しました（残高の問題ではありません）',
     blocked_ocr_quota_deferred: '{n} 件が読取クォータに達しました',
-    blocked_lookup_error: '当社側で残高を確認できず、残りは一時停止しています（残高不足ではありません）',
+    blocked_lookup_error:
+        '当社側で残高を確認できず、残りは一時停止しています（残高不足ではありません）',
     wo_blocked_ran: 'この案件は {total} 件中 {done} 件の読取が完了しています。',
     wo_blocked_credit_why: '残高が不足し、残り {left} 件がここで止まっています。',
     wo_blocked_credit_rest: '残高が不足し、残りの書類がここで止まっています。',

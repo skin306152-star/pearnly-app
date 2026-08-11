@@ -88,6 +88,44 @@ class PolicyRouteTests(unittest.TestCase):
         r = self.client.post("/api/admin/ocr-engine", json={"mode": "gpt99"})
         self.assertEqual(r.status_code, 400)
 
+    def test_partial_mode_rejected_as_global(self):
+        # qwen 不产 document_type,整机切过去会让贷记单方向复核静默失效 → 只准按账号灰度
+        with mock.patch.object(mod.store, "set_setting") as m_set:
+            r = self.client.post("/api/admin/ocr-engine", json={"mode": "qwen"})
+        self.assertEqual(r.status_code, 400)
+        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
+        m_set.assert_not_called()  # 挡住 = 一个字节都没落库
+
+    def test_partial_mode_rejected_as_plan_default(self):
+        with mock.patch.object(mod.store, "set_setting") as m_set:
+            r = self.client.post(
+                "/api/admin/ocr-engine",
+                json={"mode": "auto", "defaults_by_plan": {"L": "qwen"}},
+            )
+        self.assertEqual(r.status_code, 400)
+        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
+        m_set.assert_not_called()
+
+    def test_partial_mode_allowed_as_account_gray_release(self):
+        with (
+            mock.patch.object(mod.store, "set_setting") as m_set,
+            mock.patch.object(mod, "_log_op"),
+            mock.patch.object(mod.store, "get_setting", return_value=None),
+        ):
+            r = self.client.post(
+                "/api/admin/ocr-engine",
+                json={"mode": "economy", "overrides_by_account": {"Gray@Pearnly.com": "qwen"}},
+            )
+        self.assertEqual(r.status_code, 200)
+        saved = m_set.call_args[0][1]
+        self.assertEqual(saved["overrides_by_account"], {"gray@pearnly.com": "qwen"})
+
+    def test_partial_modes_exposed_to_frontend(self):
+        # 卡片上的「只能按账号灰度」提示照这个清单画,写死在前端就会跟后端漂
+        with mock.patch.object(mod.store, "get_setting", return_value=None):
+            r = self.client.get("/api/admin/ocr-engine")
+        self.assertEqual(r.json()["options"]["partial_modes"], ["qwen"])
+
     def test_bad_plan_mode_400(self):
         r = self.client.post(
             "/api/admin/ocr-engine",

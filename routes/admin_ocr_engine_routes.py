@@ -26,6 +26,7 @@ from services.ocr.engine_policy import (
     CONCRETE_MODES,
     DEFAULT_CONFIG,
     MODES,
+    PARTIAL_MODES,
     SETTING_KEY,
     load_config,
 )
@@ -36,6 +37,16 @@ logger = logging.getLogger("mr-pilot")
 router = APIRouter()
 
 # defaults_by_plan 只许落到具体档(auto 进套餐表会循环,resolve 侧也会兜回 direct35)
+
+# 能力未齐的档(engine_policy.PARTIAL_MODES)只准按账号灰度:全局档与套餐默认档是「整机切
+# 过去」,而这些档还缺 document_type,切了会让贷记单方向复核静默失效。账号覆写不受限 ——
+# 灰度本来就是拿少数账号对比读数,风险有边界。
+_PARTIAL_MODE_ERROR = "ocr_engine.partial_mode_account_only"
+
+
+def _reject_partial_mode(mode: str) -> None:
+    if mode in PARTIAL_MODES:
+        raise HTTPException(400, detail=f"{_PARTIAL_MODE_ERROR}:{mode}")
 
 
 @router.get("/api/admin/ocr-engine")
@@ -48,6 +59,7 @@ async def get_ocr_engine_policy(request: Request):
         "options": {
             "modes": list(MODES),
             "plan_modes": list(CONCRETE_MODES),
+            "partial_modes": sorted(PARTIAL_MODES),
             "tasks": list(OCR_TASKS),
         },
     }
@@ -85,6 +97,7 @@ async def set_ocr_engine_policy(request: Request):
     mode = (body.get("mode") or "").strip()
     if mode not in MODES:
         raise HTTPException(400, detail="ocr_engine.bad_mode")
+    _reject_partial_mode(mode)
 
     plans = body.get("defaults_by_plan") or {}
     if not isinstance(plans, dict):
@@ -94,6 +107,7 @@ async def set_ocr_engine_policy(request: Request):
         v = (plans.get(k) or defaults_by_plan[k]).strip()
         if v not in CONCRETE_MODES:
             raise HTTPException(400, detail=f"ocr_engine.bad_plan_mode:{k}")
+        _reject_partial_mode(v)
         defaults_by_plan[k] = v
 
     tasks = body.get("overrides_by_task") or {}

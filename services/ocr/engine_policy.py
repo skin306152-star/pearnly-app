@@ -68,6 +68,14 @@ MODES = (*CONCRETE_MODES, "auto")
 # 直读链按档分叉时点名它(qwen 档的发票页走 qwen_direct 编排),档名字面只在本模块出现。
 MODE_QWEN = "qwen"
 
+# 能力未齐的档:只准按账号灰度,不许当全局档或套餐默认档(超管写侧 400 挡,见
+# routes/admin_ocr_engine_routes)。
+# qwen 的两臂编排只产钱面字段,不产 document_type —— 而贷记单方向复核(sanity.credit_note
+# 硬闸)与 ABB 分类都拿 document_type 当判据,整机切过去 = 这两条静默失效,退货冲销会当
+# 正常进账过掉。解锁条件:qwen_direct 编排补齐 document_type(两臂 prompt + to_invoice_fields
+# 都出这个字段)后把它从本集合移除,别只改文案。
+PARTIAL_MODES = frozenset({MODE_QWEN})
+
 # mode → LLM 后端覆盖(未列 = 跟全局 OCR_LLM_BACKEND)。engine_context 进入时按档钉后端,
 # 经 backends.override_backend 下发,get_provider/transport 消费——档位与后端单点同源。
 MODE_BACKENDS: Dict[str, str] = {"selfhost": "selfhost", "qwen": "qwen"}

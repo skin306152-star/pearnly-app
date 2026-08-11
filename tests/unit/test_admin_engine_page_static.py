@@ -72,9 +72,7 @@ class TierCardTests(unittest.TestCase):
         zh = _lang_block("zh")
         for mode in TIERS:
             for facet in ("name", "models", "cost", "quality", "speed", "note"):
-                self.assertIn(
-                    f"'adm-eng-tier-{mode}-{facet}':", zh, f"{mode} 缺 {facet} 文案"
-                )
+                self.assertIn(f"'adm-eng-tier-{mode}-{facet}':", zh, f"{mode} 缺 {facet} 文案")
 
     def test_selfhost_metrics_are_honest_dashes(self):
         # 自部署没跑过金标 —— 成本/质量/速度三项必须是占位符,不许借别档数字。
@@ -119,7 +117,7 @@ class CostPanelTests(unittest.TestCase):
     def test_four_states_all_present(self):
         for kind in ("loading", "empty", "error"):
             self.assertIn(f"_stateBox('{kind}'", COST_JS, f"成本区缺 {kind} 态")
-        self.assertIn("data-eng-retry=\"costs\"", COST_JS)
+        self.assertIn('data-eng-retry="costs"', COST_JS)
 
     def test_day_range_switch(self):
         self.assertIn("const DAY_OPTIONS = [7, 30, 90];", COST_JS)

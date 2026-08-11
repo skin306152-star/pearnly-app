@@ -55,11 +55,13 @@ class DedupTests(unittest.TestCase):
             b'{"webhookEventId":"E9","type":"follow","source":{"userId":"L1"},"replyToken":"rt2"}'
             b"]}"
         )
+        dd = w.line_webhook_runner.line_webhook_dedup
         with mock.patch.dict(os.environ, {"LINE_DMS_CHANNEL_SECRET": "dms-sec"}, clear=False):
             with (
                 mock.patch.object(
-                    w.line_webhook_dedup, "seen_before", side_effect=[False, True]
-                ) as seen,
+                    dd, "claim", side_effect=[dd.CLAIM_FRESH, dd.CLAIM_SKIP]
+                ) as claim,
+                mock.patch.object(dd, "mark_done") as done,
                 mock.patch.object(w, "_handle_dms_event") as handle,
             ):
                 resp = _client().post(
@@ -68,8 +70,39 @@ class DedupTests(unittest.TestCase):
                     headers={"x-line-signature": _sign(body, "dms-sec")},
                 )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(seen.call_count, 2)
+        self.assertEqual(claim.call_count, 2)
         handle.assert_called_once()  # 第二投(重投)被 dedup 跳过,handler 不二次执行
+        done.assert_called_once_with("E9")  # 处理成功才钉 done
+
+    def test_handler_failure_is_not_marked_done_and_asks_user_to_resend(self):
+        """S1 反面:handler 抛异常 → 不钉 done、落 failed 留证据、回执请用户重发、仍回 200。
+
+        失败事件不会被机器重放(可能已部分建单),唯一安全的重投是用户重发(新 event_id)。
+        """
+        body = (
+            b'{"events":[{"webhookEventId":"E7","type":"message","source":{"userId":"L1"},'
+            b'"replyToken":"rt","message":{"type":"text","text":"hi"}}]}'
+        )
+        dd = w.line_webhook_runner.line_webhook_dedup
+        with mock.patch.dict(os.environ, {"LINE_DMS_CHANNEL_SECRET": "dms-sec"}, clear=False):
+            with (
+                mock.patch.object(dd, "claim", return_value=dd.CLAIM_FRESH),
+                mock.patch.object(dd, "mark_done") as done,
+                mock.patch.object(dd, "mark_failed") as failed,
+                mock.patch.object(w, "_handle_dms_event", side_effect=RuntimeError("boom")),
+                mock.patch.object(w.line_webhook_runner, "notify_failed") as notify,
+            ):
+                resp = _client().post(
+                    "/api/line/dms/webhook",
+                    content=body,
+                    headers={"x-line-signature": _sign(body, "dms-sec")},
+                )
+        self.assertEqual(resp.status_code, 200)  # 恒 200:回非 200 只会让 LINE 判 webhook 挂掉
+        done.assert_not_called()
+        self.assertEqual(failed.call_args.args[0], "E7")
+        self.assertIn("boom", failed.call_args.args[1])  # last_error 留证据
+        self.assertEqual(notify.call_args.kwargs["text"], w._MSG_FAILED)
+        self.assertEqual(notify.call_args.kwargs["channel"], w._CHANNEL)
 
 
 class GateClosedSilentTests(unittest.TestCase):

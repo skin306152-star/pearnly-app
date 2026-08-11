@@ -16,7 +16,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from core.feature_flags import dms_line_enabled_for
-from services.line_binding import line_client, line_webhook_dedup
+from services.line_binding import line_client, line_webhook_runner
 from services.line_dms import cards, flow, menu_cards, store
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,8 @@ _MSG_UNBOUND = "ยกเลิกการเชื่อมต่อเรี�
 _MSG_GUIDE = (
     "พิมพ์รหัสเชื่อมต่อ 6 หลักเพื่อเริ่มใช้งาน " "หรือพิมพ์ ยกเลิกการเชื่อมต่อ เพื่อออกจากระบบ"
 )
+# 处理失败的回执:失败事件不自动重放,只能请用户重发(重发 = 新 event_id,不会重复建单)。
+_MSG_FAILED = "ข้อความล่าสุดประมวลผลไม่สำเร็จค่ะ กรุณาส่งใหม่อีกครั้งนะคะ"
 
 
 def _reply(reply_token: str, text: str) -> None:
@@ -184,18 +186,17 @@ async def line_dms_webhook(request: Request):
         logger.error(f"[line_dms_webhook] JSON 解析失败: {e}")
         raise HTTPException(status_code=400, detail="line_dms.bad_json")
 
+    # DMS 事件驱动 OCR/建单(烧钱且不可逆)→ 重跑比丢一条伤害大,故沿用 at-most-once:
+    # 幂等占坑 + 成败收尾 + 失败回执统一在 runner,失败不自动重放而是请用户重发。
     for ev in payload.get("events") or []:
-        try:
-            # LINE at-least-once 重投:按 webhookEventId 原子判重,重投整个事件跳过。
-            # DMS 事件驱动 OCR/建单(烧钱且不可逆)→ 重跑比丢一条伤害大,at-most-once 更稳。
-            if line_webhook_dedup.seen_before(ev.get("webhookEventId")):
-                logger.info(
-                    "[line_dms_webhook] duplicate event skipped id=%s",
-                    str(ev.get("webhookEventId"))[:24],
-                )
-                continue
-            await _handle_dms_event(ev)
-        except Exception as e:
-            logger.error(f"[line_dms_webhook] 事件处理异常: {e}")
+        await line_webhook_runner.run_event(
+            ev,
+            _handle_dms_event,
+            source="line_dms_webhook",
+            channel=_CHANNEL,
+            failed_text=_MSG_FAILED,
+        )
 
+    # 恒 200:LINE 平台重投是控制台开关(不归我们控),回非 200 只会让 LINE 判定 webhook
+    # 挂掉并降级投递,救不回这一条 —— 补救靠 runner 的「请重发」回执。
     return {"ok": True}

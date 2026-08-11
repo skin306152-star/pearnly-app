@@ -73,6 +73,7 @@ LINE_I18N = {
             "拍摄时请尽量完整、清晰,看清金额和日期,识别会更准。"
         ),
         "line_processing_receipt": "已收到文件,我正在读取金额、日期、卖方、VAT 和明细,稍后给你核对。",
+        "line_event_failed": "刚才那条我没能处理成功,请重新发送一次。",
         "line_ocr_failed_recovery": (
             "这张单据我还没有读完整。\n"
             "你可以重新发送一张完整、清晰、无遮挡的照片,尤其要看清金额和日期。\n\n"
@@ -166,6 +167,7 @@ LINE_I18N = {
         "line_processing_receipt": (
             "Document received. I'm reading the amount, date, vendor, VAT, and line items for your review."
         ),
+        "line_event_failed": "I couldn't process your last message. Please send it again.",
         "line_ocr_failed_recovery": (
             "I couldn't read this document completely.\n"
             "Please try another photo with the full document visible, good lighting, no blur, "
@@ -262,6 +264,7 @@ LINE_I18N = {
             "ถ่ายให้เห็นเต็มใบ ชัดเจน เห็นยอดเงินและวันที่ จะอ่านได้แม่นยำขึ้นค่ะ"
         ),
         "line_processing_receipt": "ได้รับเอกสารแล้วค่ะ กำลังอ่านยอด วันที่ ผู้ขาย VAT และรายการย่อยให้คุณตรวจสอบ",
+        "line_event_failed": "ข้อความล่าสุดประมวลผลไม่สำเร็จค่ะ กรุณาส่งใหม่อีกครั้งนะคะ",
         "line_ocr_failed_recovery": (
             "ฉันยังอ่านข้อมูลจากเอกสารนี้ได้ไม่ครบค่ะ\n"
             "กรุณาลองส่งรูปที่เห็นทั้งใบ แสงชัด ไม่เบลอ และไม่มีเงาบังยอดเงินหรือวันที่\n\n"
@@ -355,6 +358,7 @@ LINE_I18N = {
             "書類全体が写り、金額と日付が見えるよう鮮明に撮ると、より正確に読み取れます。"
         ),
         "line_processing_receipt": "書類を受け取りました。金額、日付、取引先、VAT、明細を読み取っています。",
+        "line_event_failed": "直前のメッセージを処理できませんでした。もう一度お送りください。",
         "line_ocr_failed_recovery": (
             "この書類を完全には読み取れませんでした。\n"
             "全体が写り、明るく、ぼやけや影で金額や日付が隠れていない写真をもう一度送ってください。\n\n"

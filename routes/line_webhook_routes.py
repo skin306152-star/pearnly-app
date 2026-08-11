@@ -480,21 +480,13 @@ async def line_webhook(request: Request):
         logger.error(f"[line_webhook] JSON 解析失败: {e}")
         return {"status": "bad_json"}
 
-    from services.line_binding import line_webhook_dedup
+    from services.line_binding import line_webhook_runner
 
-    events = payload.get("events") or []
-    for ev in events:
-        try:
-            # LINE redelivery 会原样重投:按 webhookEventId 原子判重,重投整个跳过
-            # (at-most-once:文本直录无消息级幂等,双记账比丢一条伤害大)。
-            if line_webhook_dedup.seen_before(ev.get("webhookEventId")):
-                logger.info(
-                    "[line_webhook] duplicate event skipped id=%s",
-                    str(ev.get("webhookEventId"))[:24],
-                )
-                continue
-            await _handle_line_event(ev)
-        except Exception as e:
-            logger.error(f"[line_webhook] 事件处理异常: {e}")
+    # 幂等占坑 + 成败收尾 + 失败回执统一在 runner(at-most-once:文本直录无消息级幂等,
+    # 双记账比丢一条伤害大;失败不自动重放,改回执请用户重发)。
+    for ev in payload.get("events") or []:
+        await line_webhook_runner.run_event(ev, _handle_line_event, source="line_webhook")
 
+    # 恒 200:LINE 平台重投是控制台开关(不归我们控),回非 200 只会让 LINE 判定 webhook
+    # 挂掉并降级投递,救不回这一条 —— 补救靠 runner 的「请重发」回执。
     return {"status": "ok"}

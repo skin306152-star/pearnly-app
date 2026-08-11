@@ -146,6 +146,9 @@ TENANT_A = "11111111-1111-1111-1111-111111111111"
 TENANT_B = "22222222-2222-2222-2222-222222222222"
 USER_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 USER_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+# 批量详情查询会在 Python 侧校验 uuid 格式 · 这两个必须是真 uuid 才进得了 SQL
+REC_1 = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+REC_2 = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 
 
 def _all_sql(cursor: _Cursor) -> str:
@@ -210,6 +213,42 @@ class OcrHistoryIsolationTests(unittest.TestCase):
         sql = _all_sql(cur)
         self.assertIn("user_id = %s", sql)
         self.assertIn(USER_A, [str(p) for p in _all_params(cur)])
+
+    # 批量详情(批量导出端点的 N+1 解药)· 隔离条件必须与单条版逐字同源,漏一条 = 跨租户读数
+    def test_get_ocr_history_details_bulk_tenant_mode(self):
+        cur = _Cursor()
+        with _patch_cursor(cur):
+            db.get_ocr_history_details_bulk(USER_A, [REC_1, REC_2], tenant_id=TENANT_A)
+        sql = _all_sql(cur)
+        self.assertIn("id = ANY(%s::uuid[])", sql)
+        self.assertIn("tenant_id = %s", sql)
+        self.assertIn(TENANT_A, [str(p) for p in _all_params(cur)])
+
+    def test_get_ocr_history_details_bulk_user_mode(self):
+        cur = _Cursor()
+        with _patch_cursor(cur):
+            db.get_ocr_history_details_bulk(USER_A, [REC_1], tenant_id=None)
+        sql = _all_sql(cur)
+        self.assertIn("user_id = %s", sql)
+        self.assertIn(USER_A, [str(p) for p in _all_params(cur)])
+        self.assertNotIn("tenant_id = %s", sql)
+
+    def test_get_ocr_history_details_bulk_rejects_invalid_uuid_before_sql(self):
+        """非法 id 在 Python 侧滤掉 · 一个坏值进 ANY(uuid[]) 会让整批 SQL 抛,
+        而单条版是坏的那条返 None、其余照常出数 —— 滤掉才等价。"""
+        cur = _Cursor()
+        with _patch_cursor(cur):
+            out = db.get_ocr_history_details_bulk(USER_A, ["not-a-uuid", "", None])
+        self.assertEqual(out, {})
+        self.assertEqual(cur.executed, [], "非法 id 不许进 SQL")
+
+    def test_get_ocr_history_details_bulk_mixed_valid_and_invalid(self):
+        """混着传:合法的照查 · 非法的只是查不到,不能拖垮整批。"""
+        cur = _Cursor()
+        with _patch_cursor(cur):
+            db.get_ocr_history_details_bulk(USER_A, [REC_1, "junk"], tenant_id=TENANT_A)
+        ids_param = next(p for p in _all_params(cur) if isinstance(p, list))
+        self.assertEqual(ids_param, [REC_1], "只有合法 uuid 进 SQL 数组")
 
     def test_delete_ocr_history_always_scoped_tenant(self):
         cur = _Cursor(rowcount=1)

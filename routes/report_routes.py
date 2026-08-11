@@ -36,6 +36,9 @@ logger = logging.getLogger("mrpilot.reports")
 
 router = APIRouter(prefix="/api/reports", tags=["reports-v109"])
 
+# 一次导出的单据上限 · 无上限时选中几千张会一次性把整批 pages 读进内存再生成 xlsx
+MAX_BATCH_SIZE = 100
+
 
 # ============================================================
 # Pydantic 模型(v1 兼容)
@@ -239,6 +242,8 @@ def batch_export_history(req: HistoryBatchExportRequest, request: Request):
 
         if not req.history_ids:
             raise HTTPException(status_code=400, detail="未选择任何记录")
+        if len(req.history_ids) > MAX_BATCH_SIZE:
+            raise HTTPException(status_code=400, detail="reports.batch_too_many")
         if req.template not in REPORT_TEMPLATES:
             raise HTTPException(status_code=400, detail=f"未知模板: {req.template}")
         if req.lang not in ("zh", "th", "en", "ja"):
@@ -247,15 +252,13 @@ def batch_export_history(req: HistoryBatchExportRequest, request: Request):
         # lazy import db
         from core import db as _db
 
-        # 用 get_ocr_history_detail 单条拉 · 保证只查到自己的记录(内置 user_id 校验)
+        # 一次取回 · 不传 tenant_id:与逐条版同口径,只查得到自己的记录(内置 user_id 校验)
+        details = _db.get_ocr_history_details_bulk(user_id, req.history_ids)
         rows = []
         for hid in req.history_ids:
-            try:
-                r = _db.get_ocr_history_detail(user_id, str(hid))
-                if r:
-                    rows.append(r)
-            except Exception as one_e:
-                logger.warning(f"batch_export skip {hid}: {one_e}")
+            r = details.get(str(hid))
+            if r:
+                rows.append(r)
 
         if not rows:
             raise HTTPException(status_code=404, detail="选中的记录不存在或无权限")

@@ -9,6 +9,7 @@ services.ocr_history.store 命名空间(db.xxx() / store.xxx() 调用点不变)�
 """
 
 import logging
+import uuid as _uuid
 from typing import Optional, Dict, Any, List
 
 from core import db
@@ -187,6 +188,56 @@ def list_ocr_history(
         return {"items": [], "total": 0, "status_counts": ls.EMPTY_COUNTS}
 
 
+# 详情列 / 归属边界 / 行映射 · 单条版与批量版共用:分开写迟早漂,
+# 漏搬一个归属条件 = 跨租户读数,漏搬一列 = 批量导出比单条少字段。
+_DETAIL_COLUMNS = """id, filename, page_count, confidence, elapsed_ms,
+                       pages, invoice_no, invoice_date, seller_name, total_amount,
+                       archive_name, category_tag,
+                       fields_edited_at, edit_count, created_at, updated_at,
+                       client_id, workspace_client_id,
+                       seller_name_official, seller_name_verified, posting_kind"""
+
+
+def _owner_clause(user_id: str, tenant_id: Optional[str]) -> tuple[str, list]:
+    """v118.14 · tenant_id 给了 → 同 tenant 任意成员可查 · 否则只能查自己的。"""
+    if tenant_id:
+        return "user_id IN (SELECT id FROM users WHERE tenant_id = %s)", [tenant_id]
+    return "user_id = %s", [user_id]
+
+
+def _detail_row(r) -> dict:
+    """详情行 → API dict。"""
+    return {
+        "id": str(r["id"]),
+        "filename": r["filename"],
+        "page_count": r["page_count"],
+        "confidence": r["confidence"],
+        "elapsed_ms": r["elapsed_ms"],
+        "pages": r["pages"],
+        "invoice_no": r["invoice_no"],
+        "invoice_date": r["invoice_date"].isoformat() if r["invoice_date"] else None,
+        "seller_name": r["seller_name"],
+        "total_amount": float(r["total_amount"]) if r["total_amount"] is not None else None,
+        "archive_name": r["archive_name"],
+        "category_tag": r["category_tag"],
+        "edited": r["fields_edited_at"] is not None,
+        "edit_count": r["edit_count"],
+        "created_at": r["created_at"].isoformat(),
+        "updated_at": r["updated_at"].isoformat(),
+        # v107 · 客户归属
+        "client_id": int(r["client_id"]) if r.get("client_id") else None,
+        # P1d · 卖方账套归属(智能分拣路由读它定目标 endpoint)
+        "workspace_client_id": (
+            int(r["workspace_client_id"]) if r.get("workspace_client_id") else None
+        ),
+        # ③ 官方名核验 · 税局 RD 官方抬头 + 已核验标(并存·前端可展示·记账/推送优先用)
+        "seller_name_official": r.get("seller_name_official"),
+        "seller_name_verified": bool(r.get("seller_name_verified")),
+        # 上传时声明的过账去向 · 推送四条腿共用(express_push.posting_kind 解析)
+        "posting_kind": r.get("posting_kind"),
+    }
+
+
 def get_ocr_history_detail(
     user_id: str,
     record_id: str,
@@ -198,22 +249,12 @@ def get_ocr_history_detail(
     PO-4 · workspace_client_id 给了 → 限本套账(+ NULL 未归属行)· 见 list_ocr_history 说明
     """
     ws_sql, ws_params = _workspace_clause(workspace_client_id)
-    if tenant_id:
-        owner_sql, owner_params = "user_id IN (SELECT id FROM users WHERE tenant_id = %s)", [
-            tenant_id
-        ]
-    else:
-        owner_sql, owner_params = "user_id = %s", [user_id]
+    owner_sql, owner_params = _owner_clause(user_id, tenant_id)
     try:
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 f"""
-                SELECT id, filename, page_count, confidence, elapsed_ms,
-                       pages, invoice_no, invoice_date, seller_name, total_amount,
-                       archive_name, category_tag,
-                       fields_edited_at, edit_count, created_at, updated_at,
-                       client_id, workspace_client_id,
-                       seller_name_official, seller_name_verified, posting_kind
+                SELECT {_DETAIL_COLUMNS}
                 FROM ocr_history
                 WHERE id = %s AND {owner_sql}{ws_sql}
                 LIMIT 1
@@ -221,40 +262,62 @@ def get_ocr_history_detail(
                 (record_id, *owner_params, *ws_params),
             )
             r = cur.fetchone()
-            if not r:
-                return None
-            return {
-                "id": str(r["id"]),
-                "filename": r["filename"],
-                "page_count": r["page_count"],
-                "confidence": r["confidence"],
-                "elapsed_ms": r["elapsed_ms"],
-                "pages": r["pages"],
-                "invoice_no": r["invoice_no"],
-                "invoice_date": r["invoice_date"].isoformat() if r["invoice_date"] else None,
-                "seller_name": r["seller_name"],
-                "total_amount": float(r["total_amount"]) if r["total_amount"] is not None else None,
-                "archive_name": r["archive_name"],
-                "category_tag": r["category_tag"],
-                "edited": r["fields_edited_at"] is not None,
-                "edit_count": r["edit_count"],
-                "created_at": r["created_at"].isoformat(),
-                "updated_at": r["updated_at"].isoformat(),
-                # v107 · 客户归属
-                "client_id": int(r["client_id"]) if r.get("client_id") else None,
-                # P1d · 卖方账套归属(智能分拣路由读它定目标 endpoint)
-                "workspace_client_id": (
-                    int(r["workspace_client_id"]) if r.get("workspace_client_id") else None
-                ),
-                # ③ 官方名核验 · 税局 RD 官方抬头 + 已核验标(并存·前端可展示·记账/推送优先用)
-                "seller_name_official": r.get("seller_name_official"),
-                "seller_name_verified": bool(r.get("seller_name_verified")),
-                # 上传时声明的过账去向 · 推送四条腿共用(express_push.posting_kind 解析)
-                "posting_kind": r.get("posting_kind"),
-            }
+            return _detail_row(r) if r else None
     except Exception as e:
         logger.error(f"查询历史详情失败 (id={record_id}): {e}")
         return None
+
+
+def get_ocr_history_details_bulk(
+    user_id: str,
+    history_ids: List[str],
+    tenant_id: Optional[str] = None,
+    workspace_client_id: Optional[int] = None,
+) -> Dict[str, dict]:
+    """批量取详情 · 返回 {传入的 history_id: detail}(批量导出端点的 N+1 解药)。
+
+    权限边界与 get_ocr_history_detail 同源(_owner_clause + _workspace_clause + 同一 RLS 游标)。
+    查不到 / 不属于本人的 id 不进返回 —— 与单条版返 None 等价,调用方按传入顺序取即可。
+    非法 uuid 先在 Python 侧滤掉:一个坏值进 ANY(uuid[]) 会让整批 SQL 抛,而单条版是坏的
+    那条返 None、其余照常出数 —— 滤掉才等价。
+    """
+    # canonical uuid → 调用方传进来的原始写法(大小写等变体都要能原样取回)
+    raws_by_id: Dict[str, List[str]] = {}
+    for h in history_ids or []:
+        raw = "" if h is None else str(h)
+        try:
+            canonical = str(_uuid.UUID(raw.strip()))
+        except (ValueError, AttributeError, TypeError):
+            continue
+        raws = raws_by_id.setdefault(canonical, [])
+        if raw not in raws:
+            raws.append(raw)
+    if not raws_by_id:
+        return {}
+
+    ws_sql, ws_params = _workspace_clause(workspace_client_id)
+    owner_sql, owner_params = _owner_clause(user_id, tenant_id)
+    try:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
+            cur.execute(
+                f"""
+                SELECT {_DETAIL_COLUMNS}
+                FROM ocr_history
+                WHERE id = ANY(%s::uuid[]) AND {owner_sql}{ws_sql}
+                """,
+                (list(raws_by_id), *owner_params, *ws_params),
+            )
+            rows = cur.fetchall() or []
+    except Exception as e:
+        logger.error(f"批量查询历史详情失败 (n={len(raws_by_id)}): {e}")
+        return {}
+
+    out: Dict[str, dict] = {}
+    for r in rows:
+        detail = _detail_row(r)
+        for raw in raws_by_id.get(str(r["id"]), []):
+            out[raw] = detail
+    return out
 
 
 def get_history_pdf_info(

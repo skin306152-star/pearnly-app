@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# 一次导出的单据上限 · 无上限时选中几千张会把整批 pages 读进内存再生成 xlsx
+MAX_BATCH_SIZE = 100
+
 
 class QuotaResponse(BaseModel):
     plan: str
@@ -252,6 +255,8 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
     user = get_current_user_from_request(request)
     if not req.history_ids:
         raise HTTPException(400, detail="export.empty_records")
+    if len(req.history_ids) > MAX_BATCH_SIZE:
+        raise HTTPException(400, detail="export.batch_too_many")
     template_name = (req.template or "sales_detail_th").strip()
     if template_name != "sales_detail_th":
         raise HTTPException(400, detail="export.template_not_supported_yet")
@@ -260,13 +265,14 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
     tenant_id = user.get("tenant_id")
     tenant_id = str(tenant_id) if tenant_id else None
 
+    details = db.get_ocr_history_details_bulk(user_id, req.history_ids, tenant_id)
     records = []
     hid_by_record: List[str] = []  # 与 records 同序 · 每条对应的 history_id(回查动作用)
     for hid in req.history_ids:
+        h = details.get(str(hid))
+        if not h:
+            continue
         try:
-            h = db.get_ocr_history_detail(user_id, str(hid), tenant_id)
-            if not h:
-                continue
             mf = _merge_pages_to_fields(h.get("pages") or [])
             # 用冗余字段回填(ocr_history 表里专门存了这些 · 比 pages 更稳)
             if h.get("invoice_no") and not mf.get("invoice_number"):
@@ -286,7 +292,7 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
             )
             hid_by_record.append(str(hid))
         except Exception as e:
-            logger.warning(f"export-by-history-ids · history {hid} 拉取失败: {e}")
+            logger.warning(f"export-by-history-ids · history {hid} 组装失败: {e}")
             continue
 
     if not records:

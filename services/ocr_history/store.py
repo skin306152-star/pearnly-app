@@ -15,6 +15,7 @@ db.py / dal_reexports 经此暴露同一对象,db.xxx() / store.xxx() / from db 
 from services.ocr_history.queries import (  # noqa: F401
     list_ocr_history,
     get_ocr_history_detail,
+    get_ocr_history_details_bulk,
     get_history_pdf_info,
     check_duplicate_invoice,
 )

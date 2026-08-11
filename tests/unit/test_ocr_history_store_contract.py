@@ -25,6 +25,7 @@ class OcrHistoryReexportContract(unittest.TestCase):
             "delete_ocr_history_with_pdf_paths",
             # 写入/去重半边(REFACTOR-B2 第二刀)
             "insert_ocr_history",
+            "get_ocr_history_details_bulk",
             "get_history_pdf_info",
             "find_ocr_by_hash",
             "check_duplicate_invoice",
@@ -121,6 +122,88 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
         self.assertEqual(
             out["status_counts"], {"all": 1, "confirmed": 1, "failed": 0, "pending": 0}
         )
+
+
+REC_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+
+def _detail_row(rec_id=REC_ID):
+    import datetime as _dt
+
+    now = _dt.datetime(2026, 8, 11, 9, 0, 0)
+    return {
+        "id": rec_id,
+        "filename": "a.pdf",
+        "page_count": 1,
+        "confidence": "high",
+        "elapsed_ms": 10,
+        "pages": [{"fields": {"invoice_number": "INV-1"}}],
+        "invoice_no": "INV-1",
+        "invoice_date": _dt.date(2026, 8, 1),
+        "seller_name": "S",
+        "total_amount": 107,
+        "archive_name": None,
+        "category_tag": None,
+        "fields_edited_at": None,
+        "edit_count": 0,
+        "created_at": now,
+        "updated_at": now,
+        "client_id": None,
+        "workspace_client_id": None,
+        "seller_name_official": None,
+        "seller_name_verified": False,
+        "posting_kind": None,
+    }
+
+
+def _cursor_returning(rows):
+    cur = mock.MagicMock()
+    cur.fetchall.return_value = rows
+    cur.fetchone.return_value = rows[0] if rows else None
+    ctx = mock.MagicMock()
+    ctx.__enter__.return_value = cur
+    ctx.__exit__.return_value = False
+    return mock.patch("core.db.get_cursor_rls", return_value=ctx)
+
+
+class OcrHistoryDetailsBulkContract(unittest.TestCase):
+    """批量详情 · 批量导出端点的 N+1 解药 · 语义必须与逐条版等价。"""
+
+    def test_bulk_row_maps_identically_to_single(self):
+        """同一行喂两个函数必须出同一份 dict —— 两处各写一遍映射迟早漂。"""
+        row = _detail_row()
+        with _cursor_returning([row]):
+            bulk = store.get_ocr_history_details_bulk("u1", [REC_ID])
+        with _cursor_returning([row]):
+            single = store.get_ocr_history_detail("u1", REC_ID)
+        self.assertEqual(bulk[REC_ID], single)
+
+    def test_keys_use_caller_id_form_and_dedupe(self):
+        """键 = 调用方传进来的写法(大写变体也要取得回)· 重复 id 只占一个键。"""
+        upper = REC_ID.upper()
+        with _cursor_returning([_detail_row()]):
+            out = store.get_ocr_history_details_bulk("u1", [upper, upper])
+        self.assertIn(upper, out)
+        self.assertEqual(len(out), 1)
+
+    def test_missing_id_absent_from_result(self):
+        """查不到的 id 不进返回 —— 等价于单条版返 None。"""
+        with _cursor_returning([]):
+            out = store.get_ocr_history_details_bulk("u1", [REC_ID])
+        self.assertEqual(out, {})
+
+    def test_all_invalid_ids_return_empty_without_db(self):
+        with (
+            mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")),
+            mock.patch("core.db.get_cursor_rls", side_effect=AssertionError("must not hit DB")),
+        ):
+            self.assertEqual(store.get_ocr_history_details_bulk("u1", ["junk", "", None]), {})
+            self.assertEqual(store.get_ocr_history_details_bulk("u1", []), {})
+
+    def test_db_failure_degrades_to_empty(self):
+        """整批查询抛了就当全查不到 · 与逐条版每条都抛的终局一致(调用方回 404)。"""
+        with mock.patch("core.db.get_cursor_rls", side_effect=RuntimeError("db down")):
+            self.assertEqual(store.get_ocr_history_details_bulk("u1", [REC_ID]), {})
 
 
 if __name__ == "__main__":

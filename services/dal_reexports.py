@@ -304,6 +304,7 @@ _REEXPORTS = {
         "list_ocr_history",
         "docs_overview",
         "get_ocr_history_detail",
+        "get_ocr_history_details_bulk",
         "update_ocr_history_pages",
         "commit_staged_ocr_history",
         "delete_ocr_history",

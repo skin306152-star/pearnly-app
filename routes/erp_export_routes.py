@@ -30,6 +30,9 @@ router = APIRouter()
 
 _XLSX_CT = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+# 一次导出的单据上限 · 无上限时 N 张票 = N 次单条详情查询,选中几千张能把库拖垮
+MAX_BATCH_SIZE = 100
+
 
 class MrerpXlsxBatchRequest(BaseModel):
     history_ids: List[str] = Field(..., min_items=1)
@@ -41,15 +44,19 @@ async def download_mrerp_xlsx_batch(req: MrerpXlsxBatchRequest, request: Request
     user = get_current_user_from_request(request)
     _check_push_access(user)
 
+    if len(req.history_ids) > MAX_BATCH_SIZE:
+        raise HTTPException(400, detail="erp.batch_too_many")
+
     tenant_id = _tid(user)
     mappings = load_mrerp_mappings(tenant_id)
 
     # 逐张 preflight(与机器人同一道校验)· 合格的进文件,不合格的跳过并记首个错误码。
     # 全不合格 → 422 回首个错误码(缺客户映射 / 发票号超长 / 缺客户等)让用户知道要补什么。
+    details = db.get_ocr_history_details_bulk(user["id"], req.history_ids, tenant_id=tenant_id)
     valid = []
     first_err = None
     for hid in req.history_ids:
-        history = db.get_ocr_history_detail(user["id"], hid, tenant_id=tenant_id)
+        history = details.get(str(hid))
         if not history:
             continue
         flat = flatten_history_for_mrerp(history)

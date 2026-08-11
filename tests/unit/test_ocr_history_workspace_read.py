@@ -99,6 +99,27 @@ class WorkspaceReadFilterTests(unittest.TestCase):
         self.assertIn("workspace_client_id = %s", cur.all_sql)
         self.assertIn(9, cur.all_params)
 
+    def test_details_bulk_with_workspace_adds_filter(self):
+        # 批量版与单条版共用 _workspace_clause · 套账边界不许因为改批量而失守
+        cur = _run(
+            queries.get_ocr_history_details_bulk,
+            user_id="u1",
+            history_ids=["cccccccc-cccc-cccc-cccc-cccccccccccc"],
+            tenant_id="t1",
+            workspace_client_id=9,
+        )
+        self.assertIn("workspace_client_id = %s", cur.all_sql)
+        self.assertIn(9, cur.all_params)
+
+    def test_details_bulk_without_workspace_no_filter(self):
+        cur = _run(
+            queries.get_ocr_history_details_bulk,
+            user_id="u1",
+            history_ids=["cccccccc-cccc-cccc-cccc-cccccccccccc"],
+            tenant_id="t1",
+        )
+        self.assertNotIn("workspace_client_id = %s", cur.all_sql)
+
     def test_pdf_info_with_workspace_adds_filter(self):
         cur = _run(
             queries.get_history_pdf_info,

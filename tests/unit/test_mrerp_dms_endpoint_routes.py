@@ -146,5 +146,131 @@ class MrerpDmsEndpointCreateTests(unittest.TestCase):
         self.assertEqual(captured["config"]["password_enc"], "ENC:already2")
 
 
+@unittest.skipUnless(_HAS_FASTAPI and _HAS_KMS, "needs fastapi + kms_helper importable")
+class MrerpDmsEndpointPatchPreserveTests(unittest.TestCase):
+    """PATCH 整包替换 config 的防丢层(2026-08-12)。
+
+    向导表单从不携带钉死顾问(booking_defaults.advisor_* = 提成归属出路)、
+    id_card_auto_push 与凭据密文——整包替换会把它们静默抹掉(G-QA7 战役实锤
+    归属漂移的代价)。钉死:缺席=保留,显式携带(含空串)=按来值;非 DMS
+    adapter 不受此层影响。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+
+        os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
+        import app  # noqa
+        from routes import erp_endpoints_routes  # noqa
+
+        cls.app_module = app
+        cls.routes = erp_endpoints_routes
+
+    def _run_patch(self, body, existing):
+        from unittest.mock import AsyncMock
+
+        from services.erp import ssrf_guard
+
+        captured = {}
+
+        def _fake_update(user_id, endpoint_id, **fields):
+            captured.update(fields)
+            return True
+
+        app = self.app_module
+        with (
+            patch.object(
+                self.routes,
+                "get_current_user_from_request",
+                return_value={"id": "u-1", "plan": "pro"},
+            ),
+            patch.object(self.routes, "_check_push_access", return_value=None),
+            patch.object(app.db, "get_erp_endpoint", return_value=dict(existing)),
+            patch.object(app.db, "update_erp_endpoint", side_effect=_fake_update),
+            patch.object(ssrf_guard, "assert_public_config_url", new=AsyncMock()),
+            patch("core.kms_helper.encrypt_str", side_effect=lambda v: "ENC:" + v),
+            patch("core.kms_helper.is_encrypted", side_effect=lambda v: str(v).startswith("ENC:")),
+        ):
+            with self._client() as client:
+                r = client.patch("/api/erp/endpoints/ep-1", json=body)
+        return r, captured
+
+    def _client(self):
+        from fastapi.testclient import TestClient
+
+        return TestClient(self.app_module.app)
+
+    _EXISTING_DMS = {
+        "id": "ep-1",
+        "adapter": "mrerp_dms",
+        "enabled": True,
+        "config": {
+            "system_url": "https://www.mrerp4sme.com/dms/index.php",
+            "username_enc": "ENC:old-u",
+            "password_enc": "ENC:old-p",
+            "admin_username_enc": "ENC:old-au",
+            "admin_password_enc": "ENC:old-ap",
+            "id_card_auto_push": True,
+            "booking_defaults": {
+                "booking_prefix": "ZX",
+                "advisor_id": "42",
+                "advisor_name": "เถ้าแก่",
+            },
+        },
+    }
+
+    def test_wizard_shape_patch_keeps_pin_flags_and_creds(self):
+        # 向导保存的真实形状:只有 system_url + 新账密 + booking_prefix。
+        body = {
+            "config": {
+                "system_url": "https://www.mrerp4sme.com/dms/index.php",
+                "username_enc": "new-u",
+                "password_enc": "new-p",
+                "booking_defaults": {"booking_prefix": "PN"},
+            }
+        }
+        r, captured = self._run_patch(body, self._EXISTING_DMS)
+        self.assertEqual(r.status_code, 200, r.text)
+        cfg = captured["config"]
+        self.assertEqual(
+            cfg["booking_defaults"],
+            {"booking_prefix": "PN", "advisor_id": "42", "advisor_name": "เถ้าแก่"},
+        )
+        self.assertTrue(cfg["id_card_auto_push"])
+        self.assertEqual(cfg["admin_username_enc"], "ENC:old-au")
+        self.assertEqual(cfg["admin_password_enc"], "ENC:old-ap")
+        self.assertEqual(cfg["username_enc"], "ENC:new-u")  # 新明文照旧走加密
+
+    def test_explicit_values_still_win_including_clear(self):
+        body = {
+            "config": {
+                "system_url": "https://www.mrerp4sme.com/dms/index.php",
+                "id_card_auto_push": False,
+                "booking_defaults": {"booking_prefix": "PN", "advisor_id": ""},
+            }
+        }
+        r, captured = self._run_patch(body, self._EXISTING_DMS)
+        self.assertEqual(r.status_code, 200, r.text)
+        cfg = captured["config"]
+        self.assertEqual(cfg["booking_defaults"]["advisor_id"], "")  # 显式清空生效
+        self.assertFalse(cfg["id_card_auto_push"])
+        self.assertEqual(cfg["username_enc"], "ENC:old-u")  # 未携带仍保留
+
+    def test_non_dms_adapter_keeps_wholesale_replace(self):
+        existing = {
+            "id": "ep-1",
+            "adapter": "mrerp",
+            "enabled": True,
+            "config": {"token": "T", "custom_flag": 1},
+        }
+        body = {"config": {"token": "***"}}
+        r, captured = self._run_patch(body, existing)
+        self.assertEqual(r.status_code, 200, r.text)
+        cfg = captured["config"]
+        self.assertEqual(cfg["token"], "T")  # *** 占位保留是既有行为
+        self.assertNotIn("custom_flag", cfg)  # 非 DMS 不做缺席保留,整包替换语义不变
+
+
 if __name__ == "__main__":
     unittest.main()

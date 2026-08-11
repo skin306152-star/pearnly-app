@@ -5,7 +5,7 @@
 - **✅ 全链一天闭环**:Korn 答复提成机制(认建单登录账号→自动写顾问栏)→ 两路勘察推翻旧判断(LINE 建单本来就各用各的 DMS 账号,断的是顾问栏恒填名册首行)→ 测试站 probe 实证(**填谁存谁/空则拒收/顾问名册 code 列=登录名**)→ 施工+simplify 四路收口 → 七场景 E2E 全绿(dl7 报告入库,新 G-QA7=无归属开局即拦零写入)。机制:开局按操作员 DMS 登录名匹配名册(唯一命中),端点 booking_defaults.advisor_id 可钉死,认不出发泰语拦截(走 push 防 reply 过期);建单层 `_advisor_ref_strict` 严格校验(ERR_DMS_ADVISOR_REQUIRED/UNMATCHED 双目录四语+parity 闸);继承剥离 advisor_*(G-QA7 实锤老板钉死会顺继承流满全店);预览卡/回执/台账三处带顾问名。全档+雷区见记忆 `dms-booking-advisor-attribution-shipped`。
 - **✅ 已上线+CI 绿**:两窗 18 笔连推(tip `46c10ad2`,qwen 窗口推送连带本批),生产机已验(deployed commit=46c10ad2 · mrpilot 18:46:52 UTC 重启);CI run 31524471573 attempt1 被基建抖动搅黄(lint-size 的 checkout 全量 fetch 卡 5 分钟被 runner 掐,闸本体没跑,其余 9 闸全绿),attempt2 重跑 **success**。
 - **✅ 前窗挂账已清**:CI run 31503683137(体检批)conclusion=success。
-- **🛑 新雷/待办**:①真车行顾问名册 code 是否=登录名未核(UltraViewer 会顺验;不匹配也有钉死出路+拦截指路)②向导保存整包覆写 endpoint config,会吞手工钉的 advisor_* 和 id_card_auto_push(存量雷,中期=update 改按键 merge 或 pin 搬花名册 UI)③deploy-release skill 的「4 语 release_notes 缺一不部署」已过时(版本横幅已下线,/api/version 不再返回 release_notes),本窗已修正 skill。
+- **🛑 待办**:①真车行顾问名册 code 是否=登录名未核——生产缓存查过(dms_masters_cache 只有测试站名册,真车行没暖过缓存),全量核对需真凭据登录,留 UltraViewer 会或他们开用后自动暖(不匹配也有钉死出路+拦截指路)。②~~向导整包覆写吞钉死~~已当场修:PATCH 加 DMS 防丢层(缺席=保留 advisor_*/id_card_auto_push/凭据密文,显式含空串=按来值,非 DMS 语义不变),3 断言真跑绿。③deploy-release skill 的 release_notes 段已按现状退役(横幅已下线)。
 - (沿袭等人项照旧:ขั้นที่1 三问、OCR 计费口径、v1.1.61-64 真机回执、批量推送重启信号)
 
 ---

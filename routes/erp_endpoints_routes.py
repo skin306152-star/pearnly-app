@@ -243,6 +243,28 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
         new_cfg.pop("_username_enc_set", None)
         new_cfg.pop("_password_enc_set", None)
 
+        # DMS 整包替换防丢层(2026-08-12):向导表单从不携带的运行配置不因这次保存
+        # 而静默蒸发——缺席=保留旧值,显式携带(含空串)=按来值。booking_defaults 按键
+        # 合并同理:向导只发 booking_prefix,手工钉的顾问归属(advisor_*,提成落谁的
+        # 唯一出路)被整包吞掉 = 全店归属静默漂移,身份证自动推开关同坑。
+        if target_adapter == "mrerp_dms" and existing_ep:
+            old_cfg = existing_ep.get("config") or {}
+            for fld in (
+                "id_card_auto_push",
+                "username_enc",
+                "password_enc",
+                "admin_username_enc",
+                "admin_password_enc",
+            ):
+                if fld not in new_cfg and fld in old_cfg:
+                    new_cfg[fld] = old_cfg[fld]
+            old_bd = old_cfg.get("booking_defaults") or {}
+            if old_bd:
+                new_cfg["booking_defaults"] = {
+                    **old_bd,
+                    **dict(new_cfg.get("booking_defaults") or {}),
+                }
+
         # P0「开箱即用」(Zihao 2026-05-26 拍板) · client_ids 已退役(见 POST
         # 路由注释)· PATCH 不再拦"清空 client_ids" · 编辑连接不会再被卡。
 

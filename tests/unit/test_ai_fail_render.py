@@ -521,14 +521,17 @@ class TopupBranchWiringTests(unittest.TestCase):
     tests/unit/test_workorder_billing.py。"""
 
     def test_materials_endpoint_really_raises_402_insufficient_balance(self):
+        # 2026-08-11 起状态码经 denial_status 分派:真没钱 402(去充值),查不出余额 503
+        # (稍后再试)——两码分开的契约在 test_workorder_billing.py,这里只钉「接线还在」。
         root = Path(AI_DIR).parents[1]
         text = (root / "routes" / "workorder_routes.py").read_text(encoding="utf-8")
         self.assertIn("ocr_balance.batch_denial", text)
-        self.assertIn("HTTPException(402, detail=denial)", text)
+        self.assertIn("HTTPException(ocr_balance.denial_status(denial), detail=denial)", text)
         gate = (root / "services" / "workorder" / "steps" / "ocr_balance.py").read_text(
             encoding="utf-8"
         )
         self.assertIn('STUCK_REASON = "insufficient_balance"', gate)
+        self.assertIn('LOOKUP_FAILED_REASON = "lookup_error"', gate)
 
     def test_fail_render_points_at_the_real_402_source(self):
         text = (AI_DIR / "ai-fail-render.js").read_text(encoding="utf-8")

@@ -323,8 +323,8 @@ async def add_materials(
     解密,不留存)。整批先读+校验齐全再落盘,任一件不合规=整批拒且盘上零孤儿。
 
     余额闸(拦在花钱之前)排在读文件之前:识别按老站同一份定价从同一个钱包扣,余额不够整批拒
-    并返 402 + detail.code=insufficient_balance(前端失败卡据此出「去充值」)。闸关/豁免/查库
-    异常一律放行,见 services/workorder/steps/ocr_balance。"""
+    并返 402 + detail.code=insufficient_balance(前端失败卡据此出「去充值」)。闸关/豁免放行;
+    查库异常拒收 503 + lookup_error(fail-closed,与 402 分码),见 services/workorder/steps/ocr_balance。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")

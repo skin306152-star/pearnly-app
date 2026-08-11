@@ -61,6 +61,41 @@ class NestingTests(unittest.TestCase):
             self.assertEqual(uc.current()["doc_type"], "auto")
 
 
+class TakePagesTests(unittest.TestCase):
+    """页数只许被落账取走一次 —— 一份 N 页票会落多行 ai_usage,行行记 N 会让 SUM(pages)
+    按调用次数翻倍,每页成本被稀释成假的便宜(正是这次要拆穿的混合均值)。"""
+
+    def test_first_take_wins_rest_get_none(self):
+        with uc.usage_context("web_upload", pages=10):
+            self.assertEqual(uc.take_pages(), 10)
+            self.assertIsNone(uc.take_pages())
+            self.assertIsNone(uc.take_pages())
+
+    def test_current_still_reports_pages_after_take(self):
+        # 只读视图不受影响:take 是落账专用的一次性口
+        with uc.usage_context("web_upload", pages=10):
+            uc.take_pages()
+            self.assertIsNone(uc.current()["pages"])
+
+    def test_take_without_context_is_none(self):
+        self.assertIsNone(uc.take_pages())
+
+    def test_concurrent_takes_hand_out_pages_exactly_once(self):
+        # 页级并发共享同一个 slot(copy_context 复制映射不复制对象):不加锁会记两遍
+        with uc.usage_context("web_upload", pages=9):
+            with ThreadPoolExecutor(max_workers=8) as ex:
+                futs = [ex.submit(contextvars.copy_context().run, uc.take_pages) for _ in range(8)]
+                got = [f.result() for f in futs]
+        self.assertEqual([g for g in got if g is not None], [9])
+
+    def test_nested_context_does_not_double_count_pages(self):
+        # 内层再设一次不许另开 slot,否则同一份票的页数被记两遍
+        with uc.usage_context("web_upload", pages=6):
+            with uc.usage_context("web_upload", doc_type="invoice"):
+                self.assertEqual(uc.take_pages(), 6)
+            self.assertIsNone(uc.take_pages())
+
+
 class PagesNormalizationTests(unittest.TestCase):
     def test_zero_and_negative_and_garbage_become_none(self):
         for bad in (0, -3, None, "", "abc", object()):

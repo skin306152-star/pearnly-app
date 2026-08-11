@@ -76,6 +76,18 @@ class AttributionWiringTests(unittest.TestCase):
         self.assertEqual(kw["doc_type"], "bank_statement")
         self.assertEqual(kw["pages"], 18)
 
+    def test_pages_recorded_once_per_request(self):
+        # 一份 18 页对账单会落多行(逐页/逐层各一次调用):页数只记第一行,
+        # 否则 SUM(pages) 变 18×行数,每页成本被稀释成假的便宜
+        with mock.patch("services.cost.ai_usage_store.log_ai_usage") as m:
+            with usage_context("bank_recon", doc_type="bank_statement", pages=18):
+                for _ in range(5):
+                    ai_log.log_call(_result())
+        pages = [c.kwargs["pages"] for c in m.call_args_list]
+        self.assertEqual(pages, [18, None, None, None, None])
+        # 入口/单据是每行都带的,分组不能漏
+        self.assertTrue(all(c.kwargs["entry_point"] == "bank_recon" for c in m.call_args_list))
+
     def test_no_context_passes_none(self):
         with mock.patch("services.cost.ai_usage_store.log_ai_usage") as m:
             ai_log.log_call(_result())

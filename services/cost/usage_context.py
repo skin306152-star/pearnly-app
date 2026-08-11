@@ -20,6 +20,7 @@ fan-out 的并发点必须照抄这个写法,否则子线程落的账 entry_poin
 from __future__ import annotations
 
 import logging
+import threading
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from typing import Any, Dict, Optional, Tuple
@@ -37,10 +38,37 @@ ENTRY_POINTS: Tuple[str, ...] = (
     "email",  # 邮件收料
     "purchase_intake",  # 采购进料
     "bank_recon",  # 银行对账
+    "vat_recon",  # 收入/VAT 对账(GL-VAT、销项汇总、发票批量核对)
     "dms",  # 车行 DMS
 )
 
 _USAGE: ContextVar[Optional[Dict[str, Any]]] = ContextVar("ai_usage_context", default=None)
+
+
+class _PageSlot:
+    """一次请求的页数,只许被落账取走一次。
+
+    一份 N 页票会产生多行 ai_usage(逐页一次调用,难页再升一次高精档)。若每行都记 N,
+    SUM(pages) 就按调用次数翻倍,每页成本被稀释成假的便宜 —— 正是这次要拆穿的那种混合均值。
+    故页数记在其中一行,其余行留 NULL:SUM(pages) 等于真实文档页数,分母是对的。
+
+    取值要加锁:页级并发经 copy_context 共享同一个 slot 对象,裸 check-then-clear 会让
+    两个线程都取到,页数记两遍。"""
+
+    __slots__ = ("_pages", "_lock")
+
+    def __init__(self, pages: Optional[int]):
+        self._pages = pages
+        self._lock = threading.Lock()
+
+    @property
+    def pages(self) -> Optional[int]:
+        return self._pages
+
+    def take(self) -> Optional[int]:
+        with self._lock:
+            pages, self._pages = self._pages, None
+            return pages
 
 
 def _clean_pages(pages: Any) -> Optional[int]:
@@ -71,13 +99,18 @@ def set_usage_context(
 ) -> Token:
     """设归因,返回 token(调用方 finally 里 reset_usage_context)。
 
-    已在归因域内则做补齐式合并:入口保持外层的,doc_type/pages 用本次传入的非空值补上。"""
+    已在归因域内则做补齐式合并:入口保持外层的,doc_type/pages 用本次传入的非空值补上
+    (外层已有页数则保留外层的 slot,不另开 —— 否则同一份票的页数会被记两遍)。"""
     outer = _USAGE.get() or {}
     doc = (doc_type or "").strip() or None
+    slot = outer.get("_page_slot")
+    clean_pages = _clean_pages(pages)
+    if slot is None or slot.pages is None:
+        slot = _PageSlot(clean_pages) if clean_pages else slot
     merged = {
         "entry_point": outer.get("entry_point") or _clean_entry(entry_point),
         "doc_type": doc or outer.get("doc_type"),
-        "pages": _clean_pages(pages) or outer.get("pages"),
+        "_page_slot": slot,
     }
     return _USAGE.set(merged)
 
@@ -87,7 +120,24 @@ def reset_usage_context(token: Token) -> None:
 
 
 def current() -> Optional[Dict[str, Any]]:
-    return _USAGE.get()
+    """当前归因(只读视图)。pages 是本次请求的文档页数,读几次都在;
+    真正落账取值走 take_pages(),那条是一次性的。"""
+    ctx = _USAGE.get()
+    if ctx is None:
+        return None
+    slot = ctx.get("_page_slot")
+    return {
+        "entry_point": ctx.get("entry_point"),
+        "doc_type": ctx.get("doc_type"),
+        "pages": slot.pages if slot is not None else None,
+    }
+
+
+def take_pages() -> Optional[int]:
+    """取走本请求的页数(只有第一次拿得到)。落账点专用,见 _PageSlot 的 why。"""
+    ctx = _USAGE.get() or {}
+    slot = ctx.get("_page_slot")
+    return slot.take() if slot is not None else None
 
 
 @contextmanager

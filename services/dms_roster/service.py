@@ -15,7 +15,7 @@ import logging
 import secrets
 from typing import Optional
 
-from services.dms_roster import store
+from services.dms_roster import advisors, store
 
 logger = logging.getLogger("mr-pilot")
 
@@ -51,6 +51,38 @@ def _clean(value: Optional[str]) -> str:
     return str(value or "").strip()
 
 
+def _resolve_pin(owner_user: dict, advisor_id: str):
+    """请求里的顾问 id → (顾问 {id,name}, 错误码);名字服务端解,不信客户端传的。
+
+    名册取老板端点(操作员端点的主档缓存可能从没暖过),故老板未连 DMS 时连钉都钉不了。
+    """
+    owner_ep = _dms_endpoint(owner_user["id"], enabled_only=True)
+    if not owner_ep:
+        return None, "dms_roster.no_endpoint"
+    options = advisors.list_options(owner_ep)
+    if options is None:
+        return None, "dms_roster.advisors_unavailable"
+    hit = advisors.pick(options, advisor_id)
+    if hit is None:
+        return None, "dms_roster.invalid_advisor"
+    return hit, None
+
+
+def list_advisors(owner_user: dict) -> dict:
+    """顾问下拉选项。四态靠 ok/code 分:未连 DMS / 取数失败 / 空名册 / 正常。
+
+    不走 {"error": ...} → 4xx 那条路:下拉的失败不是操作失败,前端要按 code 分别指路,
+    统一 4xx 只会被吞成一句「加载失败」。
+    """
+    owner_ep = _dms_endpoint(owner_user["id"], enabled_only=True)
+    if not owner_ep:
+        return {"ok": False, "code": "no_endpoint", "advisors": []}
+    options = advisors.list_options(owner_ep)
+    if options is None:
+        return {"ok": False, "code": "fetch_failed", "advisors": []}
+    return {"ok": True, "advisors": options}
+
+
 def list_operators(owner_user: dict) -> dict:
     """列表:档案 + 用户名 + LINE 绑定态 + endpoint 配置态(四态诚实由前端按字段渲染)。"""
     tenant_id = _tenant(owner_user)
@@ -73,6 +105,9 @@ def list_operators(owner_user: dict) -> dict:
                     bound_at.isoformat() if hasattr(bound_at, "isoformat") else bound_at
                 ),
                 "endpoint_ready": r.get("ep_enabled") is True,
+                # 提成归属:空 = 没钉死 = 走自动匹配。id 给编辑弹窗回显当前选中项。
+                "advisor_id": r.get("advisor_id") or "",
+                "advisor_name": r.get("advisor_name") or "",
             }
         )
     return {"ok": True, "items": items}
@@ -85,9 +120,12 @@ def create_operator(
     dms_username: str,
     dms_password: str,
     dms_role: str,
+    dms_advisor_id: Optional[str] = None,
 ) -> dict:
     """建操作员:①老板须已有自己的 mrerp_dms 连接(取模板)②建 member 用户 + 档案(同事务)
-    ③给该用户建 mrerp_dms endpoint(凭据加密 · 不写 admin_ 键)。③失败补偿清理 ②,不留半成品。"""
+    ③给该用户建 mrerp_dms endpoint(凭据加密 · 不写 admin_ 键)。③失败补偿清理 ②,不留半成品。
+
+    dms_advisor_id 可选:给了就在 endpoint 上钉死提成归属(空/缺省 = 走自动匹配)。"""
     tenant_id = _tenant(owner_user)
     if not tenant_id:
         return {"error": "dms_roster.no_tenant"}
@@ -104,6 +142,12 @@ def create_operator(
         return {"error": "dms_roster.no_endpoint"}
     tcfg = template.get("config") or {}
 
+    pinned = None
+    if _clean(dms_advisor_id):
+        pinned, err = _resolve_pin(owner_user, dms_advisor_id)
+        if err:  # 归属解不出就别建号:半个操作员比没有更难收拾
+            return {"error": err}
+
     username = "dmsop-" + secrets.token_hex(4)
     op_password = secrets.token_urlsafe(18)  # 随机 · 不回显不外传(操作员只走 LINE)
     try:
@@ -119,11 +163,14 @@ def create_operator(
         logger.error(f"[dms_roster] create user/profile failed: {e}")
         return {"error": "dms_roster.create_failed"}
 
-    config = {
-        "system_url": tcfg.get("system_url"),
-        "username_enc": _encrypt(dms_username),
-        "password_enc": _encrypt(dms_password),
-    }
+    config = advisors.merge_into_config(
+        {
+            "system_url": tcfg.get("system_url"),
+            "username_enc": _encrypt(dms_username),
+            "password_enc": _encrypt(dms_password),
+        },
+        pinned,
+    )
     from core import db
 
     ep_id = db.create_erp_endpoint(
@@ -154,8 +201,12 @@ def update_operator(
     dms_role: Optional[str] = None,
     dms_username: Optional[str] = None,
     dms_password: Optional[str] = None,
+    dms_advisor_id: Optional[str] = None,
 ) -> dict:
-    """改显示名/角色(档案)+ 换 DMS 账密(重加密该操作员 endpoint 凭据)。空字段不动。"""
+    """改显示名/角色(档案)+ 换 DMS 账密 + 钉/清提成归属(同一次 endpoint 写)。空字段不动。
+
+    dms_advisor_id:缺省=不动归属,空串=清除钉死回自动匹配,其余按 id 服务端解析。
+    校验全部前置:归属 id 非法时档案也不该已经被改了一半。"""
     ctx = _require_profile(owner_user, user_id)
     if not ctx:
         return {"error": "dms_roster.not_found"}
@@ -170,12 +221,18 @@ def update_operator(
     if display_name is not None and not name:
         return {"error": "dms_roster.required_fields"}
 
+    pinned = None
+    if _clean(dms_advisor_id):
+        pinned, err = _resolve_pin(owner_user, dms_advisor_id)
+        if err:
+            return {"error": err}
+
     if name is not None or role is not None:
         store.update_profile(tenant_id, user_id, display_name=name, dms_role=role)
 
     new_user = _clean(dms_username) if dms_username is not None else None
     new_pass = dms_password if dms_password is not None else None
-    if new_user or new_pass:
+    if new_user or new_pass or dms_advisor_id is not None:
         ep = _dms_endpoint(user_id, enabled_only=False)
         if not ep:
             return {"error": "dms_roster.endpoint_missing"}
@@ -184,6 +241,8 @@ def update_operator(
             cfg["username_enc"] = _encrypt(new_user)
         if new_pass:
             cfg["password_enc"] = _encrypt(new_pass)
+        if dms_advisor_id is not None:
+            cfg = advisors.merge_into_config(cfg, pinned)
         from core import db
 
         # update_erp_endpoint 吞异常返 False——不核对就回 ok 会让老板看到「已换密码」的假成功,

@@ -64,7 +64,7 @@
 }
 .dms-op-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.4fr 1fr 2.2fr;
+  grid-template-columns: 1.5fr 1fr 1.2fr 1.1fr 0.9fr 2.6fr;
   align-items: center;
   gap: 10px;
   padding: 12px 8px;
@@ -126,9 +126,30 @@
   text-align: left;
 }
 .dms-op-c.role,
+.dms-op-c.advisor,
 .dms-op-c.line,
 .dms-op-c.status {
   text-align: center;
+}
+/* 提成归属:钉死的顾问名正常墨色,没钉的「自动」次级灰(一眼看出哪几行是例外)。 */
+.dms-op-adv-pinned {
+  font-size: 13px;
+  color: var(--ink);
+}
+.dms-op-adv-auto {
+  font-size: 13px;
+  color: var(--ink2);
+}
+/* 顾问下拉的状态行(空名册提示 / 取数失败 + 重试),四态里的「非正常」那两态 */
+.dms-op-adv-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.dms-op-adv-hint:empty {
+  display: none;
 }
 /* 删除按钮(danger 红):描边红 + hover 实心红,复用 --err 令牌(明/暗两态)。 */
 .dms-op-btn-danger {

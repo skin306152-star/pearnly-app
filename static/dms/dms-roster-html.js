@@ -51,6 +51,7 @@
             field('dms-op-user', t('dms-op-f-user'), 'text', t('dms-op-f-user-ph')) +
             field('dms-op-pass', t('dms-op-f-pass'), 'password', t('dms-op-f-pass-ph')) +
             roleRadio() +
+            advisorField('dms-op-advisor', '', t('dms-op-adv-auto')) +
             '</div><div class="dms-op-err" id="dms-op-form-err" style="display:none"></div>' +
             '<div class="dms-op-form-actions"><button type="button" class="btn primary" id="dms-op-create">' +
             esc(t('dms-op-add-btn')) +
@@ -95,6 +96,55 @@
         );
     }
 
+    // 提成归属下拉:选项异步来自 DMS 顾问主档,这里只出骨架 + 当前值,四态由逻辑层
+    // (paintAdvisorField)填 —— 加载中/取数失败时锁住并原样显示当前归属,不冒充「自动」。
+    function advisorField(id, selectedId, currentLabel) {
+        return (
+            '<div class="dms-op-field" data-adv-field data-adv-selected="' +
+            esc(selectedId) +
+            '" data-adv-label="' +
+            esc(currentLabel) +
+            '"><span>' +
+            esc(t('dms-op-f-advisor')) +
+            '</span><select class="dms-bill-select" id="' +
+            id +
+            '" disabled>' +
+            frozenOption(t('dms-op-adv-loading')) +
+            '</select><div class="dms-op-adv-hint" data-adv-hint></div></div>'
+        );
+    }
+    function frozenOption(label) {
+        return '<option value="">' + esc(label) + '</option>';
+    }
+    function advisorOptions(items, selectedId) {
+        var html = '<option value="">' + esc(t('dms-op-adv-auto')) + '</option>';
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            html +=
+                '<option value="' +
+                esc(it.id) +
+                '"' +
+                (String(it.id) === String(selectedId) ? ' selected' : '') +
+                '>' +
+                esc(it.code ? it.name + ' · ' + it.code : it.name) +
+                '</option>';
+        }
+        return html;
+    }
+    function advisorHint(msg, withRetry) {
+        if (!msg) return '';
+        return (
+            '<span>' +
+            esc(msg) +
+            '</span>' +
+            (withRetry
+                ? '<button type="button" class="btn small" data-adv-retry>' +
+                  esc(t('dms-op-retry')) +
+                  '</button>'
+                : '')
+        );
+    }
+
     function roleBadge(role) {
         var cls = role === 'admin' ? 'admin' : 'sales';
         var key = role === 'admin' ? 'dms-op-role-admin' : 'dms-op-role-sales';
@@ -111,6 +161,13 @@
         if (status === 'inactive')
             return '<span class="dms-badge fail">' + esc(t('dms-op-st-inactive')) + '</span>';
         return '<span class="dms-badge ok">' + esc(t('dms-op-st-active')) + '</span>';
+    }
+
+    // 归属列:钉死了显示顾问名,没钉显示「自动」(灰),空着会让人以为这单没人拿提成。
+    function advisorCell(item) {
+        if (item.advisor_name)
+            return '<span class="dms-op-adv-pinned">' + esc(item.advisor_name) + '</span>';
+        return '<span class="dms-op-adv-auto">' + esc(t('dms-op-adv-auto-short')) + '</span>';
     }
 
     function rowActions(item) {
@@ -136,7 +193,7 @@
             '<button type="button" class="btn small" data-op-act="pw" data-op-id="' +
             esc(item.user_id) +
             '">' +
-            esc(t('dms-op-act-pw')) +
+            esc(t('dms-op-act-edit')) +
             '</button>' +
             toggle +
             '<button type="button" class="btn small dms-op-btn-danger" data-op-act="del" data-op-id="' +
@@ -158,6 +215,8 @@
             '</span></div>' +
             '<div class="dms-op-c role">' +
             roleBadge(item.dms_role) +
+            '</div><div class="dms-op-c advisor">' +
+            advisorCell(item) +
             '</div><div class="dms-op-c line">' +
             lineBadge(item) +
             '</div><div class="dms-op-c status">' +
@@ -173,6 +232,8 @@
             esc(t('dms-op-col-name')) +
             '</div><div class="dms-op-c role">' +
             esc(t('dms-op-col-role')) +
+            '</div><div class="dms-op-c advisor">' +
+            esc(t('dms-op-col-advisor')) +
             '</div><div class="dms-op-c line">' +
             esc(t('dms-op-col-line')) +
             '</div><div class="dms-op-c status">' +
@@ -241,15 +302,22 @@
             '</button></div></div></div>'
         );
     }
-    // 换 DMS 账号模态(体系内 · 非原生弹窗):用户名/密码各改各 · 留空=不改。
-    function accModal(name) {
+    // 编辑操作员模态(体系内 · 非原生弹窗):DMS 用户名/密码各改各 · 留空=不改;
+    // 提成归属下拉不动就不带进 PATCH(见逻辑层 advisorPayload)。
+    function accModal(item) {
         return (
             '<div class="dms-op-modal" role="dialog" aria-modal="true"><div class="dms-op-modal-card">' +
             '<div class="dms-op-modal-h">' +
-            esc(t('dms-op-pw-title')) +
+            esc(t('dms-op-edit-title')) +
             '</div><div class="dms-op-modal-who">' +
-            esc(name) +
-            '</div><label class="dms-op-field"><span>' +
+            esc(item.display_name) +
+            '</div>' +
+            advisorField(
+                'dms-op-acc-advisor',
+                item.advisor_id || '',
+                item.advisor_name || t('dms-op-adv-auto')
+            ) +
+            '<label class="dms-op-field"><span>' +
             esc(t('dms-op-acc-user')) +
             '</span><input type="text" id="dms-op-acc-user-input" class="dms-bill-input" autocomplete="username" placeholder="' +
             esc(t('dms-op-acc-user-ph')) +
@@ -292,5 +360,8 @@
         codeOverlay: codeOverlay,
         accModal: accModal,
         deleteModal: deleteModal,
+        advisorOptions: advisorOptions,
+        advisorHint: advisorHint,
+        frozenOption: frozenOption,
     };
 })(typeof self !== 'undefined' ? self : this);

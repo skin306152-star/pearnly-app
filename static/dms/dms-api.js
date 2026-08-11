@@ -122,6 +122,10 @@
             createOperator: function (payload) {
                 return call('POST', '/api/dms/operators', payload);
             },
+            // 提成归属下拉的选项(DMS 顾问主档)· 失败也是 200 + ok:false + code,见路由注释。
+            listAdvisors: function () {
+                return call('GET', '/api/dms/roster/advisors');
+            },
             updateOperator: function (userId, payload) {
                 return call('PATCH', '/api/dms/operators/' + encodeURIComponent(userId), payload);
             },

@@ -84,6 +84,32 @@ class RosterGuardTest(unittest.TestCase):
                 _run(rr.set_operator_status("foreign", _FakeReq({"status": "inactive"})))
         self.assertEqual(ctx.exception.status_code, 404)
 
+    def test_advisors_requires_owner(self):
+        member = {"id": "op-1", "tenant_id": "t1", "role": "member", "entry": "dms"}
+        with mock.patch.object(rr, "_dms_authorize", return_value=member):
+            with self.assertRaises(rr.HTTPException) as ctx:
+                _run(rr.list_roster_advisors(object()))
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_advisors_pass_through_without_endpoint(self):
+        # 下拉的失败不走 4xx:前端要按 code 分别指路,统一 4xx 会被吞成一句「加载失败」。
+        payload = {"ok": False, "code": "no_endpoint", "advisors": []}
+        with (
+            mock.patch.object(rr, "_dms_authorize", return_value=OWNER),
+            mock.patch.object(rr.roster, "list_advisors", return_value=payload),
+        ):
+            res = _run(rr.list_roster_advisors(object()))
+        self.assertEqual(res, payload)
+
+    def test_advisors_ok_list(self):
+        payload = {"ok": True, "advisors": [{"id": "9", "code": "S09", "name": "阿明"}]}
+        with (
+            mock.patch.object(rr, "_dms_authorize", return_value=OWNER),
+            mock.patch.object(rr.roster, "list_advisors", return_value=payload),
+        ):
+            res = _run(rr.list_roster_advisors(object()))
+        self.assertEqual(res["advisors"][0]["id"], "9")
+
     def test_create_passes_body_through(self):
         captured = {}
 
@@ -100,11 +126,40 @@ class RosterGuardTest(unittest.TestCase):
                 "dms_username": "u",
                 "dms_password": "p",
                 "dms_role": "sales",
+                "dms_advisor_id": "9",
             }
             res = _run(rr.create_operator(_FakeReq(body)))
         self.assertTrue(res["ok"])
         self.assertEqual(captured["dms_role"], "sales")
         self.assertEqual(captured["display_name"], "สมชาย")
+        self.assertEqual(captured["dms_advisor_id"], "9")
+
+    def test_update_advisor_field_reaches_service(self):
+        captured = {}
+
+        def _cap(owner, user_id, **kw):
+            captured.update(kw)
+            return {"ok": True}
+
+        with (
+            mock.patch.object(rr, "_dms_authorize", return_value=OWNER),
+            mock.patch.object(rr.roster, "update_operator", side_effect=_cap),
+        ):
+            _run(rr.update_operator("op-1", _FakeReq({"dms_advisor_id": ""})))
+        # 空串必须原样穿到 service(那是「清除钉死」,不是「没传」)。
+        self.assertEqual(captured["dms_advisor_id"], "")
+        self.assertIsNone(captured["dms_username"])
+
+    def test_invalid_advisor_maps_to_400(self):
+        with (
+            mock.patch.object(rr, "_dms_authorize", return_value=OWNER),
+            mock.patch.object(
+                rr.roster, "update_operator", return_value={"error": "dms_roster.invalid_advisor"}
+            ),
+        ):
+            with self.assertRaises(rr.HTTPException) as ctx:
+                _run(rr.update_operator("op-1", _FakeReq({"dms_advisor_id": "404"})))
+        self.assertEqual(ctx.exception.status_code, 400)
 
 
 if __name__ == "__main__":

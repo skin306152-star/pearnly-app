@@ -27,6 +27,8 @@ _ERR_STATUS = {
     "dms_roster.invalid_role": 400,
     "dms_roster.invalid_status": 400,
     "dms_roster.no_endpoint": 400,
+    "dms_roster.invalid_advisor": 400,
+    "dms_roster.advisors_unavailable": 502,
     "dms_roster.not_found": 404,
     "dms_roster.inactive": 400,
     "dms_roster.endpoint_missing": 400,
@@ -58,6 +60,17 @@ async def list_operators(request: Request):
     return _unwrap(roster.list_operators(owner))
 
 
+@router.get("/api/dms/roster/advisors")
+async def list_roster_advisors(request: Request):
+    """提成归属下拉的选项(老板端点的 DMS 顾问主档)。
+
+    失败不走 _unwrap 的 4xx:下拉要按 code 分别指路(没连 DMS / 取数失败 / 名册空),
+    统一 4xx 会被前端吞成一句「加载失败」。
+    """
+    owner = _require_owner(request)
+    return roster.list_advisors(owner)
+
+
 @router.post("/api/dms/operators")
 async def create_operator(request: Request):
     owner = _require_owner(request)
@@ -69,6 +82,7 @@ async def create_operator(request: Request):
             dms_username=body.get("dms_username"),
             dms_password=body.get("dms_password"),
             dms_role=body.get("dms_role"),
+            dms_advisor_id=body.get("dms_advisor_id"),
         )
     )
 
@@ -85,6 +99,7 @@ async def update_operator(user_id: str, request: Request):
             dms_role=body.get("dms_role"),
             dms_username=body.get("dms_username"),
             dms_password=body.get("dms_password"),
+            dms_advisor_id=body.get("dms_advisor_id"),
         )
     )
 

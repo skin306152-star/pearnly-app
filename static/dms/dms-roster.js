@@ -1,7 +1,8 @@
 /* Pearnly DMS · 操作员花名册视图 · 逻辑层(挂 window.DXROSTER · 模板在 dms-roster-html.js)。
  * owner-only(nav 由 boot 按 is_owner 藏);非 owner 直调后端 403(此视图正常触达不到)。
- * 职责:拉 /api/dms/operators 四态渲染;新增操作员 / 发绑定码(大字码+倒计时)/ 换 DMS 账号
- * (用户名/密码各改各 · 体系内模态)/ 删除操作员(红键确认)/ 停用·启用(pearnlyConfirm)。事件委托一次性挂 host,重渲不掉。 */
+ * 职责:拉 /api/dms/operators 四态渲染;新增操作员 / 发绑定码(大字码+倒计时)/ 编辑操作员
+ * (DMS 用户名·密码各改各 + 提成归属钉死 · 体系内模态)/ 删除操作员(红键确认)/ 停用·启用
+ * (pearnlyConfirm)。事件委托一次性挂 host,重渲不掉。 */
 (function (root) {
     'use strict';
     function H() {
@@ -24,10 +25,21 @@
     function createErrKey(code) {
         if (code === 'dms_roster.no_endpoint') return 'dms-op-err-no-endpoint';
         if (code === 'dms_roster.required_fields') return 'dms-op-err-required';
+        if (code === 'dms_roster.invalid_advisor') return 'dms-op-adv-invalid';
+        if (code === 'dms_roster.advisors_unavailable') return 'dms-op-adv-err';
         return 'dms-op-err-generic';
     }
 
-    var S = { host: null, busy: false, items: [], modal: null, timer: null, expiresAt: null };
+    var S = {
+        host: null,
+        busy: false,
+        items: [],
+        modal: null,
+        timer: null,
+        expiresAt: null,
+        // 顾问名单四态:loading / ok / err(code 分「没连 DMS」与「取数失败」)。
+        adv: { state: 'loading', items: [], code: '' },
+    };
 
     function clearTimer() {
         if (S.timer) {
@@ -70,6 +82,77 @@
         S.host.innerHTML = H().page(
             H().formCard() + (S.items.length ? H().listCard(S.items) : H().listEmpty())
         );
+        loadAdvisors(false);
+    }
+
+    // ── 提成归属下拉(建号表单 + 编辑弹窗共用一份名单)──
+    function loadAdvisors(force) {
+        if (!force && S.adv.state === 'ok') return void paintAdvisors();
+        S.adv = { state: 'loading', items: [], code: '' };
+        paintAdvisors();
+        api()
+            .listAdvisors()
+            .then(function (d) {
+                S.adv =
+                    d && d.ok
+                        ? { state: 'ok', items: d.advisors || [], code: '' }
+                        : { state: 'err', items: [], code: (d && d.code) || 'fetch_failed' };
+                paintAdvisors();
+            })
+            .catch(function (err) {
+                S.adv = { state: 'err', items: [], code: (err && err.code) || 'fetch_failed' };
+                paintAdvisors();
+            });
+    }
+    function paintAdvisors() {
+        var boxes = document.querySelectorAll('[data-adv-field]');
+        for (var i = 0; i < boxes.length; i++) paintAdvisorField(boxes[i]);
+    }
+    function paintAdvisorField(box) {
+        var sel = box.querySelector('select');
+        var hint = box.querySelector('[data-adv-hint]');
+        if (!sel || !hint) return;
+        if (S.adv.state !== 'ok') {
+            // 名单不可信时锁住下拉,原样显示当前归属(加载中显示进度)——绝不冒充「自动」。
+            var frozen =
+                S.adv.state === 'loading'
+                    ? t('dms-op-adv-loading')
+                    : box.getAttribute('data-adv-label') || '';
+            sel.innerHTML = H().frozenOption(frozen);
+            sel.disabled = true;
+            hint.innerHTML =
+                S.adv.state === 'err'
+                    ? H().advisorHint(
+                          t(
+                              S.adv.code === 'no_endpoint'
+                                  ? 'dms-op-err-no-endpoint'
+                                  : 'dms-op-adv-err'
+                          ),
+                          true
+                      )
+                    : '';
+            var retry = hint.querySelector('[data-adv-retry]');
+            if (retry)
+                retry.addEventListener('click', function () {
+                    loadAdvisors(true);
+                });
+            return;
+        }
+        sel.innerHTML = H().advisorOptions(
+            S.adv.items,
+            sel.value || box.getAttribute('data-adv-selected') || ''
+        );
+        sel.disabled = false;
+        hint.innerHTML = S.adv.items.length ? '' : H().advisorHint(t('dms-op-adv-empty'), false);
+    }
+    // 只有名单可信(ok)且真被改过才带进请求:取数失败时下拉里只剩一个占位项,照发等于
+    // 把老板钉好的归属静默清成自动 —— 提成算给谁不能这么漂。返回 null = 本次不带该字段。
+    function advisorPayload(selectId) {
+        var sel = byId(selectId);
+        if (!sel || S.adv.state !== 'ok') return null;
+        var box = sel.closest('[data-adv-field]');
+        var was = (box && box.getAttribute('data-adv-selected')) || '';
+        return sel.value === was ? null : sel.value;
     }
 
     // ── 新增操作员 ──
@@ -88,13 +171,16 @@
         S.busy = true;
         var btn = byId('dms-op-create');
         if (btn) btn.disabled = true;
+        var payload = {
+            display_name: name.trim(),
+            dms_username: user.trim(),
+            dms_password: pass,
+            dms_role: role,
+        };
+        var advisor = advisorPayload('dms-op-advisor');
+        if (advisor) payload.dms_advisor_id = advisor; // 空 = 自动匹配 = 不必钉
         api()
-            .createOperator({
-                display_name: name.trim(),
-                dms_username: user.trim(),
-                dms_password: pass,
-                dms_role: role,
-            })
+            .createOperator(payload)
             .then(function () {
                 S.busy = false;
                 toast(t('dms-op-add-ok'), 'success');
@@ -206,11 +292,12 @@
         el.textContent = t('dms-op-code-expires') + ' ' + label;
     }
 
-    // ── 换 DMS 账号(用户名/密码各改各 · 至少填一项)──
+    // ── 编辑操作员(DMS 用户名/密码各改各 · 提成归属下拉 · 都没动则拦下)──
     function openAcc(userId) {
         var op = opById(userId);
         if (!op) return;
-        openModal(H().accModal(op.display_name));
+        openModal(H().accModal(op));
+        loadAdvisors(false);
         var cancel = byId('dms-op-pw-cancel');
         if (cancel) cancel.addEventListener('click', closeModal);
         var save = byId('dms-op-pw-save');
@@ -225,21 +312,26 @@
         var errEl = byId('dms-op-pw-err');
         var user = ((userEl && userEl.value) || '').trim();
         var pw = (pwEl && pwEl.value) || '';
-        if (!user && !pw) return void showErr(errEl, t('dms-op-pw-required'));
         var payload = {};
         if (user) payload.dms_username = user; // 留空字段不进 PATCH body → 后端不动该配置
         if (pw) payload.dms_password = pw;
+        var advisor = advisorPayload('dms-op-acc-advisor');
+        if (advisor !== null) payload.dms_advisor_id = advisor; // 空串 = 清除钉死回自动匹配
+        if (!Object.keys(payload).length) {
+            return void showErr(errEl, t('dms-op-edit-nochange'));
+        }
         var save = byId('dms-op-pw-save');
         if (save) save.disabled = true;
         api()
             .updateOperator(userId, payload)
             .then(function () {
-                toast(t('dms-op-pw-ok'), 'success');
+                toast(t('dms-op-edit-saved'), 'success');
                 closeModal();
+                load(); // 归属列要跟着变
             })
-            .catch(function () {
+            .catch(function (err) {
                 if (save) save.disabled = false;
-                showErr(errEl, t('dms-op-err-generic'));
+                showErr(errEl, t(createErrKey(err && err.code)));
             });
     }
 

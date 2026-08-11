@@ -165,7 +165,7 @@ def get_profile(tenant_id: str, user_id: str) -> Optional[dict]:
 
 
 def list_profiles(tenant_id: str) -> List[dict]:
-    """列本租户全部操作员档案 + 用户名 + LINE 绑定态 + endpoint 配置态(一次 JOIN,无 N+1)。"""
+    """列本租户全部操作员档案 + 用户名 + LINE 绑定态 + endpoint 配置态 + 提成归属(一次 JOIN,无 N+1)。"""
     from core import db
 
     def _run():
@@ -175,12 +175,16 @@ def list_profiles(tenant_id: str) -> List[dict]:
                 SELECT p.user_id, p.display_name, p.dms_role, p.status, p.created_at,
                        u.username,
                        b.display_name AS line_name, b.bound_at, b.line_user_id,
-                       e.enabled AS ep_enabled
+                       e.enabled AS ep_enabled, e.advisor_id, e.advisor_name
                 FROM dms_operator_profiles p
                 JOIN users u ON u.id = p.user_id
                 LEFT JOIN line_dms_bindings b ON b.user_id = p.user_id
                 LEFT JOIN LATERAL (
-                    SELECT enabled FROM erp_endpoints
+                    -- 钉死的提成归属就住在这条 endpoint 的 config 里,顺手带出来免得列表再查一轮
+                    SELECT enabled,
+                           config -> 'booking_defaults' ->> 'advisor_id'   AS advisor_id,
+                           config -> 'booking_defaults' ->> 'advisor_name' AS advisor_name
+                    FROM erp_endpoints
                     WHERE user_id = p.user_id AND LOWER(adapter) = 'mrerp_dms'
                     ORDER BY is_default DESC, created_at LIMIT 1
                 ) e ON TRUE

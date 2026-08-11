@@ -117,6 +117,7 @@ const ADMIN_CSS = [
     'home-36-topup.css',
     'home-37-html-inline.css',
     'home-38-buttons.css',
+    'admin/admin-viz.css',
     'admin/admin.css',
     'home-45-kit.css',
 ];

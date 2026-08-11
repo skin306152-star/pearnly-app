@@ -415,13 +415,16 @@ async function waitAdvisorReady(page, id) {
     await page2.waitForSelector('[data-adv-retry]', { state: 'visible', timeout: 15000 });
     if (!(await page2.locator('#dms-op-advisor').isDisabled()))
         throw new Error('名单取不回来时下拉必须锁住(照发等于把归属清成自动)');
-    const hintText = await page2.locator('[data-adv-hint]').first().innerText();
+    // 建号表单那一份归属字段(编辑弹窗里还有一份同构的)——按字段容器锚定,不按位置取,
+    // 否则选择器打偏时点到的是另一份、断言照样"成立"。
+    const createField = page2.locator('[data-adv-field]:has(#dms-op-advisor)');
+    const hintText = await createField.locator('[data-adv-hint]').innerText();
     if (!hintText.includes('顾问名单读取失败')) throw new Error(`错态提示文案不对: ${hintText}`);
     await shot(page2, '12-advisor-fetch-failed-locked.png');
     ok('取数失败:下拉锁住 + 错态提示 + 重试按钮在场');
 
     advisorsReply = { ok: true, advisors: ADVISORS };
-    await page2.locator('[data-adv-retry]').first().click();
+    await createField.locator('[data-adv-retry]').click();
     await waitAdvisorReady(page2, 'dms-op-advisor');
     if ((await page2.locator('#dms-op-advisor option').count()) !== ADVISORS.length + 1)
         throw new Error('重试成功后下拉应填回完整名单');

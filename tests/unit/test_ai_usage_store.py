@@ -81,7 +81,26 @@ class EnsureAiUsageTableTests(unittest.TestCase):
         sql = cur.all_sql()
         for col, typ in (("entry_point", "TEXT"), ("doc_type", "TEXT"), ("pages", "INTEGER")):
             self.assertIn(f"ADD COLUMN IF NOT EXISTS {col} {typ}", sql)
-        self.assertIn("CREATE INDEX IF NOT EXISTS idx_ai_usage_entry", sql)
+
+    def test_entry_index_leads_with_created_at(self):
+        """前导列必须是 created_at:面板先按时间窗过滤,入口打头时范围条件落不到索引上。"""
+        cur = FakeCursor()
+        with patch_cursor(cur):
+            store.ensure_ai_usage_table()
+        sql = cur.all_sql()
+        self.assertIn(
+            "CREATE INDEX IF NOT EXISTS idx_ai_usage_created_entry "
+            "ON ai_usage(created_at DESC, entry_point)",
+            sql,
+        )
+        # 建反的旧索引拆掉(幂等),不留着白占写入开销
+        self.assertIn("DROP INDEX IF EXISTS idx_ai_usage_entry", sql)
+        self.assertNotIn("ON ai_usage(entry_point, created_at DESC)", sql)
+
+    def test_panel_query_filters_by_the_indexed_leading_column(self):
+        """索引前导列与面板 SQL 的过滤列同源 —— 两边漂了,索引就又白建。"""
+        self.assertIn("WHERE created_at >= NOW()", store._COST_BY_ENTRY_SQL)
+        self.assertIn("GROUP BY entry_point, doc_type", store._COST_BY_ENTRY_SQL)
 
 
 class LogAiUsageTests(unittest.TestCase):

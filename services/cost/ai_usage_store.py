@@ -31,9 +31,13 @@ _ATTRIBUTION_MIGRATIONS = (
     "ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS entry_point TEXT",
     "ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS doc_type TEXT",
     "ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS pages INTEGER",
-    # 逐入口成本面板是 (entry_point, doc_type) 分组 + 时间窗过滤,现有索引都以 tenant/task
-    # 打头吃不上;单列 created_at 索引也不存在,故按面板的过滤序建。
-    "CREATE INDEX IF NOT EXISTS idx_ai_usage_entry ON ai_usage(entry_point, created_at DESC)",
+    # 逐入口成本面板先按时间窗过滤、再按 (entry_point, doc_type) 分组,现有索引都以
+    # tenant/task 打头吃不上。前导列必须是 created_at:入口打头时范围条件落不到索引上,
+    # 整表还是全扫(2026-08-12 建反了一次,前导列反了等于没建)。
+    "CREATE INDEX IF NOT EXISTS idx_ai_usage_created_entry "
+    "ON ai_usage(created_at DESC, entry_point)",
+    # 建反的旧索引直接拆掉:留着只白占写入开销,面板一条查询也用不上它。
+    "DROP INDEX IF EXISTS idx_ai_usage_entry",
 )
 
 

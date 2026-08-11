@@ -29,14 +29,18 @@ def upgrade() -> None:
     op.execute("ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS entry_point TEXT")
     op.execute("ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS doc_type TEXT")
     op.execute("ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS pages INTEGER")
-    # 面板查询 = 入口分组 + 时间窗过滤;现有索引都以 tenant/task 打头,吃不上。
+    # 面板查询 = 时间窗过滤 + 入口分组;现有索引都以 tenant/task 打头,吃不上。
+    # 前导列是 created_at:入口打头时时间范围落不到索引上,整表照样全扫。
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ai_usage_entry ON ai_usage(entry_point, created_at DESC)"
+        "CREATE INDEX IF NOT EXISTS idx_ai_usage_created_entry "
+        "ON ai_usage(created_at DESC, entry_point)"
     )
+    # 首版把前导列建反了(idx_ai_usage_entry),留着只白占写入开销。
+    op.execute("DROP INDEX IF EXISTS idx_ai_usage_entry")
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX IF EXISTS idx_ai_usage_entry")
+    op.execute("DROP INDEX IF EXISTS idx_ai_usage_created_entry")
     op.execute("ALTER TABLE ai_usage DROP COLUMN IF EXISTS pages")
     op.execute("ALTER TABLE ai_usage DROP COLUMN IF EXISTS doc_type")
     op.execute("ALTER TABLE ai_usage DROP COLUMN IF EXISTS entry_point")

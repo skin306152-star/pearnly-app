@@ -130,8 +130,15 @@ def upgrade_to_full_tax_invoice(
     save_buyer: bool = False,
 ) -> dict:
     """小票 → 全式税票。单事务(调用方 commit):校验 → 建草稿 → 取连号开出冻结 → 回填标记。"""
+    # for_update:先锁住小票行再判 full_invoice_id,否则两次并发升级(双击/重试)都读到
+    # NULL,各自取一个合法连号开出两张全式税票 —— 同一笔销售两个票号,销项 VAT 重复申报,
+    # 且票已冻结撤不回。同 void_sale/refund 的锁法。
     sale = sales_store.get_sale(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        sale_id=sale_id,
+        for_update=True,
     )
     if not sale or sale["sale_type"] != "sale" or sale["status"] != "completed":
         raise PosError("pos.product_not_found", 404)

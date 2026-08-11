@@ -128,6 +128,46 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(ctx.exception.http_status, 404)
 
 
+class ForUpdateLockTests(unittest.TestCase):
+    """并发双击防重复升级(修复):get_sale 必须带 for_update=True 锁住小票行,否则两次并发
+    升级都读到 NULL full_invoice_id,各自开出一张全式票(同一笔销售两个法定连号)。"""
+
+    def test_get_sale_called_with_for_update_true(self):
+        # full_invoice_id=None → 过guard 继续往下走(证明不是靠短路侥幸带过 kwargs);
+        # 真 cur 无预置行 → _sale_lines_as_doc_lines 读到空表,函数在此止步(line_invalid),
+        # 但 get_sale 的调用已经发生且已被观察。
+        sale = {"id": "s", "sale_type": "sale", "status": "completed", "full_invoice_id": None}
+        with patch.object(upgrade.sales_store, "get_sale", return_value=sale) as get_sale:
+            with self.assertRaises(PosError) as ctx:
+                upgrade.upgrade_to_full_tax_invoice(
+                    _Cur(), tenant_id="t", workspace_client_id=9, sale_id="s", buyer={}
+                )
+        get_sale.assert_called_once()
+        self.assertIs(get_sale.call_args.kwargs["for_update"], True)
+        self.assertEqual(get_sale.call_args.kwargs["tenant_id"], "t")
+        self.assertEqual(get_sale.call_args.kwargs["workspace_client_id"], 9)
+        self.assertEqual(get_sale.call_args.kwargs["sale_id"], "s")
+        self.assertEqual(ctx.exception.code, "pos.line_invalid")
+
+    def test_second_concurrent_call_finds_already_locked_and_upgraded(self):
+        # 模拟双击的第二次调用:锁住行后读到 full_invoice_id 已被第一次调用填上 → 409,
+        # 不会各自取号各开一张全式票。
+        sale = {
+            "id": "s",
+            "sale_type": "sale",
+            "status": "completed",
+            "full_invoice_id": "doc-from-first-click",
+        }
+        with patch.object(upgrade.sales_store, "get_sale", return_value=sale) as get_sale:
+            with self.assertRaises(PosError) as ctx:
+                upgrade.upgrade_to_full_tax_invoice(
+                    _Cur(), tenant_id="t", workspace_client_id=9, sale_id="s", buyer={}
+                )
+        self.assertIs(get_sale.call_args.kwargs["for_update"], True)
+        self.assertEqual(ctx.exception.code, "pos.already_upgraded")
+        self.assertEqual(ctx.exception.http_status, 409)
+
+
 class SaveBuyerClientTests(unittest.TestCase):
     """买方档存回客户管理:已有档复用不覆盖 · 税号校验位不合法/无操作人不建档。"""
 

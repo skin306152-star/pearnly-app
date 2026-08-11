@@ -317,13 +317,16 @@ async def _handle_line_image_ocr(
             except Exception as _ce:
                 logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
             # 多张票各自发一张卡(只第一张引用用户原图,避免 N 条都带引用)。
+            # 懒 import 同文件头解循环 import 的口径(line_binding 不一定在仓库里)。
+            from services.line_binding import line_booker
+
             for _i, _one in enumerate(ingests):
-                _push_result_card(
+                line_booker.push_result_card(
                     line_user_id,
                     lang,
                     _one,
-                    quote_token if _i == 0 else None,
-                    _ws_client_id,
+                    quote_token=quote_token if _i == 0 else None,
+                    ws_client_id=_ws_client_id,
                     tenant_id=tid_str,
                 )
             # 跨轮锚点:锚定这张单,让下一句「把刚才那张推进ERP」命中它(闸关 no-op)。
@@ -465,6 +468,12 @@ async def _handle_line_image_ocr(
         # 6. 推送识别结果:删老式字段 dump(Zihao 指明清掉)· 改干净一行(已识别 + 引导网页)。
         # 到这里票已识别(认不出的在上方 all_pages_not_invoice 已拦);未开记账模块/入账分流失败
         # 的兜底统一走此 —— 已写识别记录,网页可查,不再回显整段原始字段。
+        # hid=None = 第 5 步写库失败:网页历史里没有这张票,再说"识别完成·去网页看"就是假成功
+        # (红线:rows=0 绝不显示成功)。该路径未走扣费,如实告知并让用户重发。
+        if not hid:
+            _notify(line_client.t_ocr(lang, "save_failed"))
+            logger.warning(f"[line_ocr] history 未落库 · 已告知重发 · user={user_fresh['id']}")
+            return False
         _notify(
             line_client.t_ocr(lang, "success_head") + " · " + line_client.t_ocr(lang, "view_on_web")
         )
@@ -477,24 +486,3 @@ async def _handle_line_image_ocr(
         except Exception as _pe:
             logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
         return False
-
-
-def _push_result_card(
-    line_user_id: str,
-    lang: str,
-    ingest: dict,
-    quote_token: str = None,
-    ws_client_id="",
-    tenant_id=None,
-) -> None:
-    """识别结果数据卡 push(共用发卡口 line_booker.push_result_card · 发完绑消息 id 供引用改/删)。"""
-    from services.line_binding import line_booker
-
-    line_booker.push_result_card(
-        line_user_id,
-        lang,
-        ingest,
-        quote_token=quote_token,
-        ws_client_id=ws_client_id,
-        tenant_id=tenant_id,
-    )

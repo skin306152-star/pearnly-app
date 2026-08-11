@@ -11,6 +11,7 @@ from unittest import mock
 from services.ai_gateway.tasks import ProviderOutcome
 from services.ocr import direct_read as dr
 from services.ocr import engine_policy as ep
+from services.ocr import escalation_budget
 from services.ocr import qwen_direct as qd
 
 # 真实泰国税号(公开注册信息):校验位合法,改一位就该被 mod-11 抓住。
@@ -34,23 +35,25 @@ _TRANSCRIPT = (
     "ใบกำกับภาษี INV-20260811 เลขประจำตัวผู้เสียภาษี 0105535134278 "
     "ผู้ซื้อ 0105546015062 วันที่ 11/06/2569 รวม 65.42 ภาษี 4.58 สุทธิ 70.00"
 )
+# 落地校验吃的是 pack 过的转写(编排里整页只 pack 一次,两处比对复用同一个串)。
+_PACKED = qd.pack_text(_TRANSCRIPT)
 
 
 class TriggerTests(unittest.TestCase):
     def test_clean_read_needs_no_escalation(self):
-        self.assertEqual(qd.evaluate_triggers(_FIELDS_CLEAN, _TRANSCRIPT), [])
+        self.assertEqual(qd.evaluate_triggers(_FIELDS_CLEAN, _PACKED), [])
 
     def test_subtotal_plus_vat_must_equal_total(self):
         fields = {**_FIELDS_CLEAN, "total_amount": "71.00", "cash": None, "change": None}
-        self.assertIn("math_sv", qd.evaluate_triggers(fields, _TRANSCRIPT))
+        self.assertIn("math_sv", qd.evaluate_triggers(fields, _PACKED))
 
     def test_cash_minus_change_must_equal_total(self):
         fields = {**_FIELDS_CLEAN, "change": "25.00"}
-        self.assertIn("math_cash", qd.evaluate_triggers(fields, _TRANSCRIPT))
+        self.assertIn("math_cash", qd.evaluate_triggers(fields, _PACKED))
 
     def test_missing_total_triggers(self):
         fields = {**_FIELDS_CLEAN, "total_amount": None}
-        self.assertIn("no_total", qd.evaluate_triggers(fields, _TRANSCRIPT))
+        self.assertIn("no_total", qd.evaluate_triggers(fields, _PACKED))
 
     def test_real_tax_ids_pass_mod11(self):
         for tax in (_TAX_OK, _TAX_OK_2):
@@ -65,17 +68,17 @@ class TriggerTests(unittest.TestCase):
 
     def test_missing_tax_id_is_not_a_checksum_failure(self):
         fields = {**_FIELDS_CLEAN, "seller_tax": None, "buyer_tax": "null"}
-        triggers = qd.evaluate_triggers(fields, _TRANSCRIPT)
+        triggers = qd.evaluate_triggers(fields, _PACKED)
         self.assertNotIn("badsum_seller_tax", triggers)
         self.assertNotIn("badsum_buyer_tax", triggers)
 
     def test_grounding_ignores_spaces_and_hyphens(self):
         fields = {**_FIELDS_CLEAN, "seller_tax": "0-1055-35134-27-8"}
-        self.assertEqual(qd.evaluate_triggers(fields, _TRANSCRIPT), [])
+        self.assertEqual(qd.evaluate_triggers(fields, _PACKED), [])
 
     def test_field_absent_from_transcript_triggers(self):
         fields = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999"}
-        self.assertIn("unground_invoice_number", qd.evaluate_triggers(fields, _TRANSCRIPT))
+        self.assertIn("unground_invoice_number", qd.evaluate_triggers(fields, _PACKED))
 
     def test_transcript_unavailable_skips_grounding(self):
         fields = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999"}
@@ -112,27 +115,31 @@ def _json_outcome(data, model="qwen3.7-flash"):
     return ProviderOutcome(ok=True, data=data, model=model, input_tokens=10, output_tokens=5)
 
 
+def _run_page(read_outcome, escalate_outcome=None, transcript=_TRANSCRIPT):
+    """跑一页编排,返回 (结果, 打过的档位序列)。档位序列是"有没有花贵模型"的唯一硬证据。"""
+    calls = []
+
+    def _json(prompt, images, **kw):
+        calls.append(kw.get("tier"))
+        if kw.get("tier") == "flash":
+            return read_outcome
+        return escalate_outcome or ProviderOutcome(ok=False, error_kind="parse")
+
+    def _text(prompt, images, **kw):
+        if transcript is None:
+            return ProviderOutcome(ok=False, error_kind="timeout")
+        return ProviderOutcome(ok=True, data=transcript, model="qwen-vl-ocr")
+
+    with (
+        mock.patch("services.ai_gateway.transport.multimodal_to_json", side_effect=_json),
+        mock.patch("services.ai_gateway.transport.multimodal_to_text", side_effect=_text),
+    ):
+        return qd.read_invoice_page(b"png", "image/png", 1, None), calls
+
+
 class OrchestrationTests(unittest.TestCase):
     def _run(self, read_outcome, escalate_outcome=None, transcript=_TRANSCRIPT):
-        calls = []
-
-        def _json(prompt, images, **kw):
-            calls.append(kw.get("tier"))
-            if kw.get("tier") == "flash":
-                return read_outcome
-            return escalate_outcome or ProviderOutcome(ok=False, error_kind="parse")
-
-        def _text(prompt, images, **kw):
-            if transcript is None:
-                return ProviderOutcome(ok=False, error_kind="timeout")
-            return ProviderOutcome(ok=True, data=transcript, model="qwen-vl-ocr")
-
-        with (
-            mock.patch("services.ai_gateway.transport.multimodal_to_json", side_effect=_json),
-            mock.patch("services.ai_gateway.transport.multimodal_to_text", side_effect=_text),
-        ):
-            result = qd.read_invoice_page(b"png", "image/png", 1, None)
-        return result, calls
+        return _run_page(read_outcome, escalate_outcome, transcript)
 
     def test_clean_page_stops_at_read_arm(self):
         result, calls = self._run(_json_outcome(dict(_FIELDS_CLEAN)))
@@ -165,6 +172,47 @@ class OrchestrationTests(unittest.TestCase):
     def test_read_arm_failure_falls_back_to_vision(self):
         with self.assertRaises(dr.DirectReadFallback):
             self._run(ProviderOutcome(ok=False, error_kind="timeout"))
+
+
+class EscalationBudgetTests(unittest.TestCase):
+    """跑批级回落配额:升级臂是读取臂约 60 倍单价,跑批必须封顶,且封顶不许把触发理由吞掉。"""
+
+    def _run_with_budget(self, limit):
+        broken = {**_FIELDS_CLEAN, "total_amount": "700.00", "cash": None, "change": None}
+        fixed = {**_FIELDS_CLEAN, "cash": None, "change": None}
+        token = escalation_budget.set_budget(escalation_budget.new_budget(limit))
+        try:
+            return _run_page(
+                _json_outcome(dict(broken)), _json_outcome(dict(fixed), model="qwen3.8-max")
+            )
+        finally:
+            escalation_budget.reset_budget(token)
+
+    def test_exhausted_budget_skips_the_expensive_arm(self):
+        result, calls = self._run_with_budget(0)
+        self.assertEqual(calls, ["flash"])  # 贵模型一次没打
+        self.assertEqual(result.escalate_model, "")
+        self.assertEqual(result.escalate_tokens, (0, 0))
+        self.assertEqual(result.data["total_amount"], "700.00")  # 保留读取臂读数,不丢页
+
+    def test_exhausted_budget_still_records_triggers(self):
+        # 不升级 ≠ 当作读对了:触发理由照常带回 trigger_reasons,该页仍走人审
+        result, _ = self._run_with_budget(0)
+        self.assertIn("math_sv", result.triggers)
+
+    def test_budget_available_escalates_and_consumes_one(self):
+        result, calls = self._run_with_budget(1)
+        self.assertEqual(calls, ["flash", "escalate"])
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
+
+    def test_no_budget_set_means_unlimited(self):
+        # 单张 OCR / 主站散单没有跑批配额,行为必须与配额上线前逐字节一致
+        broken = {**_FIELDS_CLEAN, "total_amount": "700.00", "cash": None, "change": None}
+        result, calls = _run_page(
+            _json_outcome(broken), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+        )
+        self.assertEqual(calls, ["flash", "escalate"])
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
 
 
 class DirectReadWiringTests(unittest.TestCase):

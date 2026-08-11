@@ -6,12 +6,13 @@
   ② qwen-vl-ocr 把整页转写成文本(只当落地校验的对照物,不进字段);
   ③ 代码触发器:勾稽 subtotal+vat=total · 现金找零 cash−change=total · 泰税号 mod-11 ·
      字段落地(单号/税号/日期的字符要能在转写里找到);
-  ④ 任一触发 → qwen3.8-max 按 MAX_V3 夹着转写重读;id 类字段若 max 的读数不落地而 flash 的
-     落地,保留 flash 值(实测 max 偶尔"顺"出一个更漂亮但票面没有的单号)。
+  ④ 任一触发 且 跑批级回落配额放行 → qwen3.8-max 按 MAX_V3 夹着转写重读;id 类字段若 max 的
+     读数不落地而 flash 的落地,保留 flash 值(实测 max 偶尔"顺"出一个更漂亮但票面没有的单号)。
 
 判"要不要花贵模型"的是代码不是模型 —— 模型只负责认字,算术与校验位归确定性代码
 (见 [[agent-boundary-read-vs-calc]])。升级臂单价约读取臂的 60 倍,触发器每多误报一次就
-多花一次钱,所以每条触发器都要能用票面自证。
+多花一次钱,所以每条触发器都要能用票面自证;跑批还另受 escalation_budget 的 per-run 封顶
+约束(与 Vision 路同一个闸),配额用尽时该页保留读取臂读数、触发理由照常落痕交人审。
 
 ⚠️ 边界(如实记,不夸大):本编排只产钱面字段 + 现金/找零/折扣,不产 document_type、明细行、
 买卖方名址 —— 落到 ThaiInvoice 上 document_type 恒是默认值 tax_invoice。所以 qwen 档当前只
@@ -27,6 +28,7 @@ from datetime import date
 from typing import Dict, List, Optional, Tuple
 
 from core.thai_date import gregorian_from_printed, to_gregorian_year, two_digit_year_to_gregorian
+from services.ocr import escalation_budget
 from services.ocr.direct_read import DirectReadFallback
 from services.ocr.money import normalize_money, valid_thai_tax_id
 from services.ocr.qwen_prompts import (
@@ -56,6 +58,9 @@ _TRANSCRIBE_MAX_TOKENS = 4096
 
 _PACK_RE = re.compile(r"[\s\-]")
 _DIGITS_RE = re.compile(r"\d+")
+
+# 读取臂提示词:模板固定,每页拼一次纯属浪费。
+_READ_PROMPT = f"{FLASH_V25}\n\n{READ_USER_SUFFIX}"
 
 # 票面月份名 → 月。日期在千问档由模型原样抄下来,换算一律走确定性代码(不信 LLM 算术)。
 _MONTH_NAMES: Dict[str, int] = {
@@ -108,6 +113,10 @@ _MONTH_NAMES: Dict[str, int] = {
     "dec": 12,
 }
 
+# 按名字长度倒序定死匹配序:短名多是长名的子串(jan ⊂ january),最具体的先命中,
+# 结果也不随 dict 顺序漂。表是常量,每张票现排一次纯属浪费。
+_MONTH_NAMES_LONGEST_FIRST = tuple(sorted(_MONTH_NAMES.items(), key=lambda kv: -len(kv[0])))
+
 
 @dataclass(frozen=True)
 class QwenPageRead:
@@ -129,19 +138,25 @@ def read_invoice_page(
 ) -> QwenPageRead:
     """单页发票直读。读取臂失败 → DirectReadFallback(调用方整件回落 Vision 路)。"""
     images = [(image_bytes, mime)]
-    read = _read_fields(f"{FLASH_V25}\n\n{READ_USER_SUFFIX}", images, "flash", api_key)
+    read = _read_fields(_READ_PROMPT, images, "flash", api_key)
     if not read.ok or not isinstance(read.data, dict):
         raise DirectReadFallback(f"page {page_number}: qwen read {read.error_kind or 'empty'}")
 
     fields = dict(read.data)
     transcript = _transcribe(images, api_key)
-    triggers = evaluate_triggers(fields, transcript)
+    packed = pack_text(transcript)
+    triggers = evaluate_triggers(fields, packed)
     escalate_model, escalate_tokens = "", (0, 0)
     if triggers:
-        escalated = _escalate(images, transcript, api_key)
-        if escalated is not None:
-            merged, escalate_model, escalate_tokens = escalated
-            fields = _keep_grounded_ids(merged, fields, transcript)
+        # 跑批级回落配额(与 Vision 路 page_runner 同一个闸):用尽 → 不升级、不报错,
+        # triggers 照常带回 trigger_reasons,该页走既有诚实路径交人审。
+        if escalation_budget.try_escalate():
+            escalated = _escalate(images, transcript, api_key)
+            if escalated is not None:
+                merged, escalate_model, escalate_tokens = escalated
+                fields = _keep_grounded_ids(merged, fields, packed)
+        else:
+            logger.info("qwen_direct: 升级配额用尽,保留读取臂读数(%s)", ",".join(triggers))
     return QwenPageRead(
         data=to_invoice_fields(fields),
         triggers=triggers,
@@ -201,8 +216,16 @@ def _escalate(images, transcript: Optional[str], api_key: Optional[str]):
     return dict(outcome.data), outcome.model, (outcome.input_tokens, outcome.output_tokens)
 
 
-def evaluate_triggers(fields: Dict, transcript: Optional[str]) -> List[str]:
-    """纯代码触发器:返回"该花贵模型重读"的理由列表(空 = 读取臂读数自证通过)。"""
+def pack_text(text: Optional[str]) -> Optional[str]:
+    """比对形态:去空格与连字符(票面折行/分组符不该影响字符是否落地)。None 透传 = 转写不可用。"""
+    return None if text is None else _PACK_RE.sub("", text)
+
+
+def evaluate_triggers(fields: Dict, packed_transcript: Optional[str]) -> List[str]:
+    """纯代码触发器:返回"该花贵模型重读"的理由列表(空 = 读取臂读数自证通过)。
+
+    转写取 pack_text 的产物:一页要比对四个字段 + 升级臂合流还要再比一轮,整页现 pack 多次
+    是白烧 CPU。"""
     out: List[str] = []
     sub = normalize_money(fields.get("subtotal"))
     vat = normalize_money(fields.get("vat"))
@@ -219,10 +242,9 @@ def evaluate_triggers(fields: Dict, transcript: Optional[str]) -> List[str]:
     for key in _TAX_FIELDS:
         if _present(fields.get(key)) and not valid_thai_tax_id(fields.get(key)):
             out.append(f"badsum_{key}")
-    if transcript is not None:
-        packed = _PACK_RE.sub("", transcript)
+    if packed_transcript is not None:
         for key in _GROUND_FIELDS:
-            if not _grounded(fields.get(key), packed):
+            if not _grounded(fields.get(key), packed_transcript):
                 out.append(f"unground_{key}")
     return out
 
@@ -240,17 +262,16 @@ def _grounded(value, packed_transcript: str) -> bool:
     return len(packed) >= _GROUND_MIN_CHARS and packed in packed_transcript
 
 
-def _keep_grounded_ids(merged: Dict, read: Dict, transcript: Optional[str]) -> Dict:
+def _keep_grounded_ids(merged: Dict, read: Dict, packed_transcript: Optional[str]) -> Dict:
     """升级臂的 id 字段不落地、读取臂的落地 → 保留读取臂的值(实测 max 会"顺"出漂亮单号)。"""
-    if transcript is None:
+    if packed_transcript is None:
         return merged
-    packed = _PACK_RE.sub("", transcript)
     out = dict(merged)
     for key in _ID_FIELDS:
         if (
-            not _grounded(merged.get(key), packed)
+            not _grounded(merged.get(key), packed_transcript)
             and _present(read.get(key))
-            and _grounded(read.get(key), packed)
+            and _grounded(read.get(key), packed_transcript)
         ):
             out[key] = read.get(key)
     return out
@@ -292,14 +313,7 @@ def printed_date_to_iso(printed: str) -> Optional[str]:
 
 def _month_name_date_to_iso(printed: str) -> Optional[str]:
     packed = _PACK_RE.sub("", printed).replace(".", "").lower()
-    month = next(
-        (
-            m
-            for name, m in sorted(_MONTH_NAMES.items(), key=lambda kv: -len(kv[0]))
-            if name in packed
-        ),
-        None,
-    )
+    month = next((m for name, m in _MONTH_NAMES_LONGEST_FIRST if name in packed), None)
     if month is None:
         return None
     numbers = _DIGITS_RE.findall(printed)

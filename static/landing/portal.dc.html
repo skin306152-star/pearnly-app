@@ -38,8 +38,6 @@
   @keyframes pnScan { 0% { top: 10%; } 50% { top: 86%; } 100% { top: 10%; } }
   @keyframes pnAnnErr { 0%, 100% { box-shadow: 0 0 0 0 rgba(178,58,36,.30); } 50% { box-shadow: 0 0 0 9px rgba(178,58,36,0); } }
   @keyframes pnAnnWarn { 0%, 100% { box-shadow: 0 0 0 0 rgba(176,122,30,.30); } 50% { box-shadow: 0 0 0 9px rgba(176,122,30,0); } }
-  #pn-intro-mascot { position: absolute; left: 50%; top: 50%; width: min(172px, 34vw); transform: translate(-50%, -154%); z-index: 2; pointer-events: none; }
-  #pn-intro-cat { display: block; width: 100%; height: auto; }
   @media (max-width: 800px) {
     [data-pstage] { height: auto !important; padding: 8px 0 12px !important; display: flex !important; flex-direction: column; gap: 18px; align-items: center; }
     [data-pcard] { position: static !important; width: 100% !important; max-width: 400px !important; transform: none !important; }
@@ -70,9 +68,6 @@
   <!-- ================= BRAND INTRO OVERLAY (v2 logo animation) ================= -->
   <div id="pn-intro" style="position: fixed; inset: 0; z-index: 200; background: #FAF9F5; display: flex; align-items: center; justify-content: center;">
     <div id="pn-intro-gl" style="position: absolute; inset: 0;"></div>
-    <div id="pn-intro-mascot" aria-hidden="true">
-      <img id="pn-intro-cat" src="/static/landing/pearnly-mascot.svg?v=1" alt="" />
-    </div>
   </div>
 
   <!-- ================= NAV ================= -->
@@ -881,7 +876,6 @@ class Component extends DCLogic {
   _brandIntro(onDone) {
     const ov = document.getElementById('pn-intro');
     const host = document.getElementById('pn-intro-gl');
-    const mascot = document.getElementById('pn-intro-cat');
     let gl = true;
     try { gl = !!document.createElement('canvas').getContext('webgl'); } catch (e) { gl = false; }
     const finish = () => {
@@ -945,10 +939,6 @@ class Component extends DCLogic {
     loop();
 
     const tl = gsap.timeline();
-    if (mascot) {
-      tl.from(mascot, { autoAlpha: 0, y: 28, scale: 0.68, rotation: -4, duration: 0.72, ease: 'back.out(1.8)' }, 0.08);
-      tl.to(mascot, { y: -34, autoAlpha: 0, duration: 0.5, ease: 'power2.in' }, 2.16);
-    }
     tl.to(mat.uniforms.uOpacity, { value: 1, duration: 0.35 }, 0.1);
     tl.to(mat.uniforms.uProgress, { value: 1, duration: 1.55, ease: 'power3.inOut' }, 0.1);
     tl.to(mesh.position, { y: 0.8, duration: 0.7, ease: 'power2.in' }, 2.15);

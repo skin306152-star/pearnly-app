@@ -95,7 +95,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # 银行逐行读取(轻量档读长表整页读崩,见 MODE_MODEL_MAPS 上方实测数)。
     "overrides_by_task": {"bank_statement": "direct35"},
     # 账号(登录邮箱小写)→ mode 覆写:新引擎按人灰度用它,不必为一个人建表也不必全局切。
-    # 优先级低于任务覆写——银行长表的档位口径不因"给某人开新引擎"被顺手掀翻。
+    # 优先级高于任务覆写(见 resolve_mode docstring 的实锤理由);名单外账号不受影响。
     "overrides_by_account": {},
 }
 

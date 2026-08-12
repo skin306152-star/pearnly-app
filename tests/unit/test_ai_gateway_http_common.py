@@ -110,7 +110,9 @@ class BearerHeadersTests(unittest.TestCase):
     def test_no_key_omits_authorization(self):
         for key in (None, ""):
             with self.subTest(key=key):
-                self.assertEqual(http_common.bearer_headers(key), {"Content-Type": "application/json"})
+                self.assertEqual(
+                    http_common.bearer_headers(key), {"Content-Type": "application/json"}
+                )
 
 
 if __name__ == "__main__":

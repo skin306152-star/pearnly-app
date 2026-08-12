@@ -79,7 +79,9 @@ _READ_PROMPT = f"{FLASH_V25}\n\n{READ_USER_SUFFIX}"
 
 # 票面月份名 → 月。日期在千问档由模型原样抄下来,换算一律走确定性代码(不信 LLM 算术)。
 # 全称 + 泰无点缩写 + 英全称 + 英缩写:正典在 core/thai_date,这里只选形(泰无点式)。
-_MONTH_NAMES: Dict[str, int] = thai_date.printed_month_map(th_abbr="plain", en_full=True, en_abbr=True)
+_MONTH_NAMES: Dict[str, int] = thai_date.printed_month_map(
+    th_abbr="plain", en_full=True, en_abbr=True
+)
 
 # 按名字长度倒序定死匹配序:短名多是长名的子串(jan ⊂ january),最具体的先命中,
 # 结果也不随 dict 顺序漂。表是常量,每张票现排一次纯属浪费。

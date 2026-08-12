@@ -270,4 +270,3 @@ def get_cost_daily_by_engine(days: int = 30) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"get_cost_daily_by_engine failed: {e}")
         return []
-

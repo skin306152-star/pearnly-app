@@ -85,8 +85,13 @@ def chat_json_outcome(do_call, parse, model_name, max_retries):
         if text:
             last_raw = text
             try:
-                return ProviderOutcome(ok=True, data=parse(text), model=model_name,
-                                       input_tokens=toks[0], output_tokens=toks[1])
+                return ProviderOutcome(
+                    ok=True,
+                    data=parse(text),
+                    model=model_name,
+                    input_tokens=toks[0],
+                    output_tokens=toks[1],
+                )
             except Exception:  # noqa: BLE001 — 坏 JSON → 重试;用尽落 parse
                 pass
     return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)

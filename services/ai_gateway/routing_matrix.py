@@ -19,11 +19,11 @@ aistudio 无区域概念,但仍解析出来——切后端那天这列就是事�
 from __future__ import annotations
 
 from collections import OrderedDict
+from importlib import import_module
 from typing import Dict, NamedTuple, Tuple
 
 from services.ai_gateway.providers.openai import taxops_intent_model, taxops_verdict_model
 from services.ai_gateway.providers import qwen as qwen_provider
-from services.ai_gateway.providers.selfhost import _model as _selfhost_model
 from services.ai_gateway.providers.vertex import _embed_model, _location, _location_for_model
 from services.ocr import engine_policy, gemini_models
 
@@ -118,16 +118,17 @@ def resolve_routes() -> "OrderedDict[str, Route]":
     routes["taxops.intent"] = Route(taxops_intent_model(), "", "openai")
     routes["knowledge.embedding"] = Route(_embed_model(), _location())
     for mode in engine_policy.CONCRETE_MODES:
-        # 后端覆盖档(selfhost):不走 Gemini 档位解析,四档同映射到自托管 VLM,无区域。
-        if engine_policy.MODE_BACKENDS.get(mode) == "selfhost":
-            model = _selfhost_model() or _SELFHOST_UNSET
+        backend = engine_policy.MODE_BACKENDS.get(mode)
+        if backend:
+            # 后端覆盖档(selfhost/qwen):不走 Gemini 档位解析,档位→模型由该 provider 的
+            # model_for_tier 公约解析,无 Vertex 区域。selfhost 四档同映射到同一个 VLM
+            # (运维 env 定);qwen 读取臂(flash/flash_lite)与升级臂(fallback/escalate)分模型。
+            # 语义归 provider 自己守,矩阵不复制第二份。
+            provider = import_module(f"services.ai_gateway.providers.{backend}")
             for tier in _OCR_TIERS:
-                routes[f"ocr.{mode}.{tier}"] = Route(model, "", "selfhost")
-            continue
-        # 千问档:档位由 provider 解析(读取臂/升级臂两个模型),无区域。
-        if engine_policy.MODE_BACKENDS.get(mode) == "qwen":
-            for tier in _OCR_TIERS:
-                routes[f"ocr.{mode}.{tier}"] = Route(qwen_provider.model_for_tier(tier), "", "qwen")
+                routes[f"ocr.{mode}.{tier}"] = Route(
+                    provider.model_for_tier(tier) or _SELFHOST_UNSET, "", backend
+                )
             continue
         token = gemini_models.set_model_override(engine_policy.MODE_MODEL_MAPS[mode])
         try:

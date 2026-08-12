@@ -39,6 +39,12 @@ def _model() -> str:
     return os.environ.get("SELFHOST_OCR_MODEL", "").strip()
 
 
+def model_for_tier(tier: str) -> str:
+    """路由总表公约:后端覆盖档的 provider 公开档位→模型解析。自托管四档同一 VLM,
+    env 未配返空串(矩阵侧显 "(unset)")。"""
+    return _model()
+
+
 def _embed_model() -> str:
     return os.environ.get("SELFHOST_EMBED_MODEL", "").strip() or _model()
 

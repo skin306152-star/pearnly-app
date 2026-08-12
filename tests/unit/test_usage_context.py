@@ -96,6 +96,34 @@ class TakePagesTests(unittest.TestCase):
             self.assertIsNone(uc.take_pages())
 
 
+class RestorePagesTests(unittest.TestCase):
+    """写入成功才算消费:落账失败要能把页数还回槽里,DB 抖一下不丢分母;
+    但槽已被别的行占走时放弃 —— 宁可少记,不可记两遍。"""
+
+    def test_restore_after_failed_write_lets_next_row_carry_pages(self):
+        with uc.usage_context("bank_recon", pages=18):
+            taken = uc.take_pages()
+            uc.restore_pages(taken)
+            self.assertEqual(uc.take_pages(), 18)
+
+    def test_double_restore_never_doubles(self):
+        with uc.usage_context("bank_recon", pages=18):
+            taken = uc.take_pages()
+            uc.restore_pages(taken)
+            uc.restore_pages(taken)
+            self.assertEqual(uc.take_pages(), 18)
+            self.assertIsNone(uc.take_pages())
+
+    def test_restore_without_context_is_noop(self):
+        uc.restore_pages(7)  # 不抛即通过
+        self.assertIsNone(uc.take_pages())
+
+    def test_restore_none_is_noop(self):
+        with uc.usage_context("bank_recon", pages=18):
+            uc.restore_pages(None)
+            self.assertEqual(uc.take_pages(), 18)
+
+
 class PagesNormalizationTests(unittest.TestCase):
     def test_zero_and_negative_and_garbage_become_none(self):
         for bad in (0, -3, None, "", "abc", object()):

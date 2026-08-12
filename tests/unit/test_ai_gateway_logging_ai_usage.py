@@ -96,6 +96,16 @@ class AttributionWiringTests(unittest.TestCase):
         self.assertIsNone(kw["doc_type"])
         self.assertIsNone(kw["pages"])
 
+    def test_failed_write_restores_pages_for_next_row(self):
+        # 第一行落账失败(store 返 False)→ 页数还回槽 → 第二行把分母补上
+        with mock.patch(
+            "services.cost.ai_usage_store.log_ai_usage", side_effect=[False, True]
+        ) as m:
+            with usage_context("bank_recon", doc_type="bank_statement", pages=18):
+                ai_log.log_call(_result())
+                ai_log.log_call(_result())
+        self.assertEqual([c.kwargs["pages"] for c in m.call_args_list], [18, 18])
+
 
 if __name__ == "__main__":
     unittest.main()

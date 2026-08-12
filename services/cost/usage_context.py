@@ -70,6 +70,12 @@ class _PageSlot:
             pages, self._pages = self._pages, None
             return pages
 
+    def restore(self, pages: Optional[int]) -> None:
+        """写账失败时把取走的页数还回来(槽已被别的行占走则放弃,绝不重复计数)。"""
+        with self._lock:
+            if self._pages is None:
+                self._pages = pages
+
 
 def _clean_pages(pages: Any) -> Optional[int]:
     """页数归一:非正数/非数字一律当未知(NULL),不落 0 —— 0 会把 cost_per_page 的分母污染成
@@ -139,6 +145,17 @@ def take_pages() -> Optional[int]:
     ctx = _USAGE.get() or {}
     slot = ctx.get("_page_slot")
     return slot.take() if slot is not None else None
+
+
+def restore_pages(pages: Optional[int]) -> None:
+    """落账失败时归还页数,让本请求后续行有机会把分母补上(写入成功才算消费)。
+    上下文已退出或槽已被占则静默放弃 —— 宁可少记分母,不可记两遍。"""
+    if not pages:
+        return
+    ctx = _USAGE.get() or {}
+    slot = ctx.get("_page_slot")
+    if slot is not None:
+        slot.restore(pages)
 
 
 @contextmanager

@@ -116,11 +116,13 @@ def log_ai_usage(
     entry_point: Optional[str] = None,
     doc_type: Optional[str] = None,
     pages: Optional[int] = None,
-) -> None:
-    """写一行 AI 网关调用成本(同步 · 全量吞异常)。
+) -> bool:
+    """写一行 AI 网关调用成本(同步 · 全量吞异常)。返回是否真的落了账。
 
     调用方 = ai_gateway.logging.log_call,是每次网关调用的收尾;这里任何失败(建表/连接/
     约束)都只 log warning,绝不抛出打断已经跑完的 AI 调用 —— 记账不能连坐主路径。
+    返回 False 时调用方要把一次性消费槽的页数还回去(usage_context.restore_pages),
+    否则 DB 抖一下这份票的页数分母就永久丢失。
     """
     try:
         _ensure_once()
@@ -157,8 +159,10 @@ def log_ai_usage(
                     int(pages) if pages else None,
                 ),
             )
+        return True
     except Exception as e:
         logger.warning("log_ai_usage failed (dropped, not fatal): %s", e)
+        return False
 
 
 def get_usage_by_task(days: int = 30) -> List[Dict[str, Any]]:

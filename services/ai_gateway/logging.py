@@ -50,13 +50,14 @@ def _record_usage(result, *, tenant_id, user_id, trace_id) -> None:
     try:
         from services.cost.ai_usage_store import log_ai_usage
         from services.cost.usage_context import current as usage_current
-        from services.cost.usage_context import take_pages
+        from services.cost.usage_context import restore_pages, take_pages
 
         usage = usage_current() or {}
         # 页数只记在本请求的第一行:一份 N 页票会落多行(逐页/逐层各一次调用),
         # 行行都记 N 的话 SUM(pages) 按调用次数翻倍,每页成本被稀释成假的便宜。
+        # take 在写库前、写库失败还回(restore):写入成功才算消费,DB 抖动不丢分母。
         pages = take_pages()
-        log_ai_usage(
+        written = log_ai_usage(
             tenant_id=tenant_id,
             user_id=user_id,
             task=result.task,
@@ -73,5 +74,7 @@ def _record_usage(result, *, tenant_id, user_id, trace_id) -> None:
             doc_type=usage.get("doc_type"),
             pages=pages,
         )
+        if not written:
+            restore_pages(pages)
     except Exception as e:
         logger.warning("ai_usage record skipped: %s", e)

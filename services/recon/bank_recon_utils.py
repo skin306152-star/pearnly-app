@@ -12,6 +12,8 @@ import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
+from core import thai_date
+
 AMOUNT_TOL = 0.02  # baht tolerance for amount matching
 MIN_PLUMBER_ROWS = 3  # fallback to Gemini if pdfplumber yields < this
 # Layer-2 date tolerance for reconcile + invoice-candidate matching. Single
@@ -86,45 +88,8 @@ def _disk_cache_put(key: str, value: Dict[str, Any]) -> None:
         pass
 
 
-# Thai month names (full + abbreviated)
-_TH_MONTHS = {
-    "มกราคม": 1,
-    "กุมภาพันธ์": 2,
-    "มีนาคม": 3,
-    "เมษายน": 4,
-    "พฤษภาคม": 5,
-    "มิถุนายน": 6,
-    "กรกฎาคม": 7,
-    "สิงหาคม": 8,
-    "กันยายน": 9,
-    "ตุลาคม": 10,
-    "พฤศจิกายน": 11,
-    "ธันวาคม": 12,
-    "ม.ค.": 1,
-    "ก.พ.": 2,
-    "มี.ค.": 3,
-    "เม.ย.": 4,
-    "พ.ค.": 5,
-    "มิ.ย.": 6,
-    "ก.ค.": 7,
-    "ส.ค.": 8,
-    "ก.ย.": 9,
-    "ต.ค.": 10,
-    "พ.ย.": 11,
-    "ธ.ค.": 12,
-    "jan": 1,
-    "feb": 2,
-    "mar": 3,
-    "apr": 4,
-    "may": 5,
-    "jun": 6,
-    "jul": 7,
-    "aug": 8,
-    "sep": 9,
-    "oct": 10,
-    "nov": 11,
-    "dec": 12,
-}
+# Thai month names (full + abbreviated):正典在 core/thai_date,这里取泰带尾点缩写式 + 英 3 字缩写。
+_TH_MONTHS = thai_date.printed_month_map(th_abbr="dotted_trailing", en_abbr=True)
 
 # Bank detection keywords
 _BANK_SIGNATURES = {

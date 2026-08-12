@@ -142,3 +142,31 @@ def gregorian_period(period: object) -> Optional[str]:
     if not 1 <= month <= 12:
         return None
     return f"{to_gregorian_year(int(year_s)):04d}-{month:02d}"
+
+
+# 月份名正典(唯一一份):泰缩写带点式为正,无点/带尾点两式由它派生。
+MONTHS_TH_FULL = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+                  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+MONTHS_TH_ABBR_DOTTED = ["ม.ค", "ก.พ", "มี.ค", "เม.ย", "พ.ค", "มิ.ย",
+                         "ก.ค", "ส.ค", "ก.ย", "ต.ค", "พ.ย", "ธ.ค"]
+MONTHS_EN_FULL = ["january", "february", "march", "april", "may", "june",
+                  "july", "august", "september", "october", "november", "december"]
+MONTHS_EN_ABBR3 = ["jan", "feb", "mar", "apr", "may", "jun",
+                   "jul", "aug", "sep", "oct", "nov", "dec"]
+
+
+def printed_month_map(*, th_abbr=None, en_full=False, en_abbr=False):
+    """票面月份名→月号查表。th_abbr: None/"plain"(มค)/"dotted"(ม.ค)/"dotted_trailing"(ม.ค.)。
+    插入序 = 全称先于缩写:两处消费点按序做子串扫描,全称必须先命中。"""
+    mapping = {name: i + 1 for i, name in enumerate(MONTHS_TH_FULL)}
+    if th_abbr == "plain":
+        mapping.update({name.replace(".", ""): i + 1 for i, name in enumerate(MONTHS_TH_ABBR_DOTTED)})
+    elif th_abbr == "dotted":
+        mapping.update({name: i + 1 for i, name in enumerate(MONTHS_TH_ABBR_DOTTED)})
+    elif th_abbr == "dotted_trailing":
+        mapping.update({name + ".": i + 1 for i, name in enumerate(MONTHS_TH_ABBR_DOTTED)})
+    if en_full:
+        mapping.update({name: i + 1 for i, name in enumerate(MONTHS_EN_FULL)})
+    if en_abbr:
+        mapping.update({name: i + 1 for i, name in enumerate(MONTHS_EN_ABBR3)})
+    return mapping

@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Dict, List, Optional, Tuple
 
+from core import thai_date
 from core.thai_date import gregorian_from_printed, to_gregorian_year, two_digit_year_to_gregorian
 from services.ocr import escalation_budget
 from services.ocr.direct_read import DirectReadFallback
@@ -63,55 +64,8 @@ _DIGITS_RE = re.compile(r"\d+")
 _READ_PROMPT = f"{FLASH_V25}\n\n{READ_USER_SUFFIX}"
 
 # 票面月份名 → 月。日期在千问档由模型原样抄下来,换算一律走确定性代码(不信 LLM 算术)。
-_MONTH_NAMES: Dict[str, int] = {
-    "มกราคม": 1,
-    "มค": 1,
-    "กุมภาพันธ์": 2,
-    "กพ": 2,
-    "มีนาคม": 3,
-    "มีค": 3,
-    "เมษายน": 4,
-    "เมย": 4,
-    "พฤษภาคม": 5,
-    "พค": 5,
-    "มิถุนายน": 6,
-    "มิย": 6,
-    "กรกฎาคม": 7,
-    "กค": 7,
-    "สิงหาคม": 8,
-    "สค": 8,
-    "กันยายน": 9,
-    "กย": 9,
-    "ตุลาคม": 10,
-    "ตค": 10,
-    "พฤศจิกายน": 11,
-    "พย": 11,
-    "ธันวาคม": 12,
-    "ธค": 12,
-    "january": 1,
-    "jan": 1,
-    "february": 2,
-    "feb": 2,
-    "march": 3,
-    "mar": 3,
-    "april": 4,
-    "apr": 4,
-    "may": 5,
-    "june": 6,
-    "jun": 6,
-    "july": 7,
-    "jul": 7,
-    "august": 8,
-    "aug": 8,
-    "september": 9,
-    "sep": 9,
-    "october": 10,
-    "oct": 10,
-    "november": 11,
-    "nov": 11,
-    "december": 12,
-    "dec": 12,
-}
+# 全称 + 泰无点缩写 + 英全称 + 英缩写:正典在 core/thai_date,这里只选形(泰无点式)。
+_MONTH_NAMES: Dict[str, int] = thai_date.printed_month_map(th_abbr="plain", en_full=True, en_abbr=True)
 
 # 按名字长度倒序定死匹配序:短名多是长名的子串(jan ⊂ january),最具体的先命中,
 # 结果也不随 dict 顺序漂。表是常量,每张票现排一次纯属浪费。

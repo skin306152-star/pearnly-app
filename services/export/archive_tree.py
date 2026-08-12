@@ -18,6 +18,8 @@ from __future__ import annotations
 import re
 from datetime import date
 
+from core import thai_date
+
 ROOT = "Pearnly"
 
 _FALLBACK_SUBJECT = {"zh": "主体", "en": "entity", "th": "กิจการ", "ja": "主体"}
@@ -41,34 +43,8 @@ _MONTHS = {
         "十一月",
         "十二月",
     ],
-    "en": [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ],
-    "th": [
-        "มกราคม",
-        "กุมภาพันธ์",
-        "มีนาคม",
-        "เมษายน",
-        "พฤษภาคม",
-        "มิถุนายน",
-        "กรกฎาคม",
-        "สิงหาคม",
-        "กันยายน",
-        "ตุลาคม",
-        "พฤศจิกายน",
-        "ธันวาคม",
-    ],
+    "en": [m.capitalize() for m in thai_date.MONTHS_EN_FULL],
+    "th": thai_date.MONTHS_TH_FULL,
     "ja": ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
 }
 

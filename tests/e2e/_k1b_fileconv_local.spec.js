@@ -237,6 +237,26 @@ test.describe('K1b · 财务文件转换视图(本地 stub 真浏览器)', () =>
         });
     });
 
+    test('错误态:402 余额不足显示当前余额(非 err_generic 通用文案)', async ({ page }) => {
+        // fileconv 余额闸(commit d97a28db):402 + detail.code=insufficient_balance + balance。
+        // 此前词典无对应键 → 落 err_generic;现在走 err_insufficient_balance 带余额。
+        await bootFileconv(page, {
+            convertBody: { detail: { code: 'insufficient_balance', balance: 5.0, estimated_cost: 1.5 } },
+            convertStatus: 402,
+        });
+        await pickPdfAndRun(page);
+        const err = page.locator('.intake-err');
+        await expect(err).toBeVisible();
+        const txt = await err.innerText();
+        expect(txt).toContain('余额不足');
+        expect(txt).toMatch(/฿\s*5\.00/);
+        expect(txt).not.toContain('err_generic');
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, '06b-error-402-insufficient.png'),
+            fullPage: true,
+        });
+    });
+
     test('下载:点按钮真发 ?format=xlsx 并触发浏览器下载', async ({ page }) => {
         await bootFileconv(page, {});
         await pickPdfAndRun(page);

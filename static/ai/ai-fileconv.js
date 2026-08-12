@@ -45,6 +45,7 @@
             running: S.running,
             downloadKind: S.downloadKind,
             errKey: S.errKey,
+            errVars: S.errVars,
             result: S.result,
         });
     }

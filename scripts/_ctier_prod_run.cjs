@@ -6,7 +6,7 @@
  * 只上传+等结果+读屏+截图,零破坏;禁 ERP 推送/删除/设置/订阅/充值/改配置。
  *
  * 跑法:
- *   $env:PEARNY_E2E_USER='...'; $env:PEARNY_E2E_PASS='...'
+ *   $env:PEARNLY_E2E_USER='...'; $env:PEARNLY_E2E_PASS='...'
  *   node scripts/_ctier_prod_run.cjs
  *
  * 凭据只走环境变量,绝不打印/写盘/进 git。脚本内禁止出现任何凭据字面量。
@@ -21,10 +21,10 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const BASE = 'https://pearnly.com';
-const USER = process.env.PEARNY_E2E_USER;
-const PASS = process.env.PEARNY_E2E_PASS;
+const USER = process.env.PEARNLY_E2E_USER;
+const PASS = process.env.PEARNLY_E2E_PASS;
 if (!USER || !PASS) {
-    console.error('缺少 PEARNY_E2E_USER / PEARNY_E2E_PASS 环境变量');
+    console.error('缺少 PEARNLY_E2E_USER / PEARNLY_E2E_PASS 环境变量');
     process.exit(1);
 }
 

@@ -8,7 +8,6 @@ services/ocr/engine_policy(fail-safe direct35,这里写坏值也停不了 OCR)�
 覆盖:
   GET  /api/admin/ocr-engine          · 读当前策略(含默认值合并)+ 可选项
   POST /api/admin/ocr-engine          · 写策略(校验 + 审计)
-  GET  /api/admin/ocr-engine/metrics  · 成本/每张成本/延迟/模型占比/L3 触发率/失败率
   GET  /api/admin/ocr-engine/costs    · 逐入口 × 单据的成本/每页成本/p50 延迟
 """
 
@@ -20,7 +19,6 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from core.route_helpers import _log_op, _require_super_admin
 from services.cost.ai_usage_store import get_cost_by_entry_point
-from services.cost.store import get_ocr_engine_metrics
 from services.ocr.contracts import OCR_TASKS
 from services.ocr.engine_policy import (
     CONCRETE_MODES,
@@ -144,17 +142,10 @@ async def set_ocr_engine_policy(request: Request):
     return {"ok": True, "policy": load_config()}
 
 
-@router.get("/api/admin/ocr-engine/metrics")
-async def ocr_engine_metrics(request: Request, days: int = Query(7, ge=1, le=90)):
-    _require_super_admin(request)
-    return get_ocr_engine_metrics(days=days)
-
-
 @router.get("/api/admin/ocr-engine/costs")
 async def ocr_engine_costs(request: Request, days: int = Query(7, ge=1, le=90)):
     """逐入口 × 单据类型的成本与每页成本(ai_usage 归因列)。
 
-    与 /metrics 口径不同、不可相加:/metrics 读 ocr_cost_log(逐 OCR 请求),这里读 ai_usage
-    (逐网关调用,一份多页票会有多行)。这条回答的是「哪个入口贵」,不是「跑了多少张」。"""
+    读 ai_usage(逐网关调用,一份多页票会有多行)。这条回答的是「哪个入口贵」,不是「跑了多少张」。"""
     _require_super_admin(request)
     return get_cost_by_entry_point(days=days)

@@ -24,6 +24,7 @@ from services.background_loops import email_ingest_loop, erp_retry_loop
 from services.startup_lock import startup_ddl_lock
 from services.deploy_script import GIT_DEPLOY_SH
 from services.users.columns import ensure_user_profile_columns
+from services.cost.ai_usage_store import ensure_ai_usage_table
 
 logger = logging.getLogger("mr-pilot")
 
@@ -82,6 +83,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_vat_recon_tasks_table, "vat_recon_tasks 建表"),
         (db.ensure_bank_recon_v2_table, "bank_recon_v2 建表"),
         (db.ensure_platform_settings, "platform_settings 钥匙闸建表"),
+        (ensure_ai_usage_table, "ai_usage 建表+归因列"),
     ]
     for ensure_fn, label in boot_ensures:
         try:

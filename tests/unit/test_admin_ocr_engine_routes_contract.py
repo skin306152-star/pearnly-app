@@ -29,7 +29,6 @@ class RoutesContractTests(unittest.TestCase):
         expected = {
             ("GET", "/api/admin/ocr-engine"),
             ("POST", "/api/admin/ocr-engine"),
-            ("GET", "/api/admin/ocr-engine/metrics"),
             ("GET", "/api/admin/ocr-engine/costs"),
         }
         self.assertEqual(got, expected)
@@ -208,14 +207,6 @@ class PolicyRouteTests(unittest.TestCase):
             json={"mode": "economy", "overrides_by_account": {"a@b.com": "gpt99"}},
         )
         self.assertEqual(r.status_code, 400)
-
-    def test_metrics_route_ok(self):
-        with mock.patch.object(
-            mod, "get_ocr_engine_metrics", return_value={"days": 7}
-        ) as m_metrics:
-            r = self.client.get("/api/admin/ocr-engine/metrics?days=7")
-        self.assertEqual(r.status_code, 200)
-        m_metrics.assert_called_once_with(days=7)
 
     def test_costs_route_returns_attribution_envelope(self):
         payload = {

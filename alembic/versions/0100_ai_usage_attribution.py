@@ -15,6 +15,7 @@ Create Date: 2026-08-11
 
 Dual-run:prod 无自动迁移钩子,真正建列靠首次写入时的幂等自愈
 (services/cost/ai_usage_store.ensure_ai_usage_table 跑同一批 DDL),本版仅留档。
+DDL 从 services/cost/ai_usage_store._ATTRIBUTION_MIGRATIONS 单源导入,本文件不再手抄。
 """
 
 from alembic import op
@@ -26,17 +27,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS entry_point TEXT")
-    op.execute("ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS doc_type TEXT")
-    op.execute("ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS pages INTEGER")
-    # 面板查询 = 时间窗过滤 + 入口分组;现有索引都以 tenant/task 打头,吃不上。
-    # 前导列是 created_at:入口打头时时间范围落不到索引上,整表照样全扫。
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ai_usage_created_entry "
-        "ON ai_usage(created_at DESC, entry_point)"
-    )
-    # 首版把前导列建反了(idx_ai_usage_entry),留着只白占写入开销。
-    op.execute("DROP INDEX IF EXISTS idx_ai_usage_entry")
+    # DDL 单源在 ai_usage_store._ATTRIBUTION_MIGRATIONS:prod 建列与留档迁移跑同一批,
+    # 两处手抄必然漂移(建索引前导列已踩过一次),这里逐条执行同一个列表。
+    from services.cost.ai_usage_store import _ATTRIBUTION_MIGRATIONS
+
+    for stmt in _ATTRIBUTION_MIGRATIONS:
+        op.execute(stmt)
 
 
 def downgrade() -> None:

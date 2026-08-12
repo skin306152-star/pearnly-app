@@ -117,7 +117,9 @@ def _default_provider_call(
     # 与 direct_read 同口径兜 env:aistudio provider 只认显式 key(vertex 走 SA 忽略此参)。
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     token = attribution.set_attribution(TASK_FILECONV_OCR, tenant_id=tenant_id)
-    usage_token = set_usage_context("fileconv")
+    # pages=1:本桥一次调用恰好一页图,逐调用记 1 页,SUM(pages) 即 fileconv 的真实页数
+    # (此前不记,引擎成本页 cost_per_page 对 fileconv 恒显「—」)。
+    usage_token = set_usage_context("fileconv", pages=1)
     try:
         return transport.multimodal_to_json(
             prompt,

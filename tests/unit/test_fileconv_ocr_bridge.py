@@ -275,6 +275,25 @@ class AttributionTests(unittest.TestCase):
         self.assertEqual(seen["kwargs"]["tier"], "flash_lite")
         self.assertIsNone(attribution.current())  # finally 里必 reset,不泄漏到后续调用
 
+    def test_default_call_records_one_page_per_call(self):
+        # 本桥一次调用恰好一页图:逐调用记 pages=1,SUM(pages) 才是 fileconv 的真实页数
+        # (不记的话引擎成本页 cost_per_page 对 fileconv 恒显「—」)。
+        from services.cost import usage_context as uc
+
+        seen = {}
+
+        def fake_transport(prompt, images, **kwargs):
+            seen["usage"] = uc.current()
+            return _Outcome(True, {})
+
+        with mock.patch("services.ai_gateway.transport.multimodal_to_json", fake_transport):
+            ocr_bridge._default_provider_call(
+                "p", b"\x89PNG\r\n\x1a\nxx", tenant_id=None, api_key=None, max_tokens=64
+            )
+        self.assertEqual(seen["usage"]["entry_point"], "fileconv")
+        self.assertEqual(seen["usage"]["pages"], 1)
+        self.assertIsNone(uc.current())  # finally 里必 reset
+
 
 class ConvertPdfSeamTests(unittest.TestCase):
     def test_no_text_layer_pdf_routes_to_ocr_bridge(self):

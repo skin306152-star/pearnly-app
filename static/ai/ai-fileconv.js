@@ -34,6 +34,7 @@
             running: false,
             downloadKind: null, // null | 'xlsx' | 'pdf'——哪个下载在跑,两键各自独立禁用
             errKey: null,
+            errVars: null, // 余额不足卡的 {balance} 填充(有才填,渲染 at(errKey, errVars))
             result: null,
         };
     }
@@ -60,11 +61,13 @@
         if (!check.ok) {
             S.file = null;
             S.errKey = check.errKey;
+            S.errVars = null;
             render();
             return;
         }
         S.file = file;
         S.errKey = null;
+        S.errVars = null;
         S.result = null;
         render();
     }
@@ -73,7 +76,30 @@
         S.file = null;
         S.result = null;
         S.errKey = null;
+        S.errVars = null;
         render();
+    }
+
+    // 计费闸 402(detail.code=insufficient_balance + balance)→ err_insufficient_balance 键,
+    // 文案带当前余额(AI.format.money 自带 ฿ + 窄空格)。其余码走 mapApiErrorKey 通用映射。
+    function applyErr(S_, err) {
+        var key = AI.api.mapApiErrorKey(err && err.code);
+        S_.errKey = at(key) !== key ? key : 'err_generic';
+        S_.errVars = null;
+        if (
+            err &&
+            err.code === 'insufficient_balance' &&
+            err.detail &&
+            err.detail.balance != null
+        ) {
+            S_.errKey = 'err_insufficient_balance';
+            S_.errVars = {
+                balance:
+                    window.AI && window.AI.format && window.AI.format.money
+                        ? window.AI.format.money(err.detail.balance)
+                        : String(err.detail.balance),
+            };
+        }
     }
 
     function run() {
@@ -81,6 +107,7 @@
         var session = S; // 快照——回调落地时若已切走(离开视图再回来重挂)一律不认。
         S.running = true;
         S.errKey = null;
+        S.errVars = null;
         render();
         S.api
             .convertFile(S.file)
@@ -93,8 +120,7 @@
             .catch(function (err) {
                 if (S !== session) return;
                 S.running = false;
-                var key = AI.api.mapApiErrorKey(err && err.code);
-                S.errKey = at(key) !== key ? key : 'err_generic';
+                applyErr(S, err);
                 render();
             });
     }
@@ -116,8 +142,7 @@
             })
             .catch(function (err) {
                 if (S !== session) return;
-                var key = AI.api.mapApiErrorKey(err && err.code);
-                S.errKey = at(key) !== key ? key : 'err_generic';
+                applyErr(S, err);
             })
             .then(function () {
                 if (S !== session) return;
@@ -130,6 +155,7 @@
         S.file = null;
         S.result = null;
         S.errKey = null;
+        S.errVars = null;
         render();
     }
 

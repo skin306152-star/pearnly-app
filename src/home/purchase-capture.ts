@@ -3,7 +3,14 @@
 // 文件 → 统一智能入口 /api/purchase/intake 分流:draft→复核屏,否则落待归类。
 // 识别阶段(可能 9~61s)有持久进度态:票据预览 + 转圈 + 文案 + 返回 · 失败可重试(不再 toast 一闪而过)。
 /* global t, escapeHtml, showToast */
-import { papi, activeWsId, purchaseErrMsg, injectPurBase, injectStyle } from './purchase-common.js';
+import {
+    papi,
+    activeWsId,
+    purchaseErrMsg,
+    PurchaseError,
+    injectPurBase,
+    injectStyle,
+} from './purchase-common.js';
 
 const PAGE_CSS = `
 .pur.cap .ph{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
@@ -103,6 +110,26 @@ function renderError(f: File, msg: string): void {
     if (rs) rs.onclick = () => renderShell();
 }
 
+// 余额不足(402):不复用「识别失败·重试」——用户得先充值。文案与发票页同口径
+// (err.insufficient_balance · 带当前余额),「充值」按钮直开充值弹窗(_openTopupModal)。
+function renderInsufficientBalance(balance: number): void {
+    const s = sec();
+    if (!s) return;
+    s.innerHTML = `<div class="pur cap"><div class="wrap">${headHtml()}
+        <div class="panel"><div class="recog err">
+            <div class="preview">${IC_DOC_LG}</div>
+            <div class="rtitle">${escapeHtml(t('pur-cap-recog-fail'))}</div>
+            <div class="rhint">${escapeHtml(t('err.insufficient_balance', { balance: String(balance) }))}</div>
+            <div class="acts"><button class="btn" id="cap-reselect">${escapeHtml(t('pur-cap-reselect'))}</button><button class="btn primary" id="cap-topup">${escapeHtml(t('topup-cta'))}</button></div>
+        </div></div>
+    </div></div>`;
+    bindBack();
+    const rs = document.getElementById('cap-reselect');
+    if (rs) rs.onclick = () => renderShell();
+    const tp = document.getElementById('cap-topup');
+    if (tp) tp.onclick = () => window._openTopupModal?.();
+}
+
 // 文件 → 统一智能入口分流(F12):draft→复核屏录入;sales/recon→提示后回采集屏;否则落待归类。
 async function intakeFile(f: File): Promise<void> {
     renderRecognizing(f);
@@ -136,6 +163,22 @@ async function intakeFile(f: File): Promise<void> {
         // 待归类已下线:/intake 必返 booked(已过账)或 draft(草稿)· 走到这说明意外空返,回壳防卡死。
         renderShell();
     } catch (e) {
+        // 余额不足走专用卡(带当前余额 + 充值按钮),不进通用「识别失败·重试」。
+        // 后端 402 信封:error.code=purchase.insufficient_balance + error.detail.balance。
+        const pe = e instanceof PurchaseError ? e : null;
+        const d =
+            pe && pe.detail && typeof pe.detail === 'object'
+                ? (pe.detail as { code?: string; balance?: number })
+                : null;
+        if (
+            pe &&
+            pe.code === 'purchase.insufficient_balance' &&
+            d &&
+            typeof d.balance === 'number'
+        ) {
+            renderInsufficientBalance(d.balance);
+            return;
+        }
         renderError(f, purchaseErrMsg(e, 'purchase.unexpected'));
     }
 }

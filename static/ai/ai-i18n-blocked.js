@@ -26,8 +26,10 @@ Object.assign(window.__AI_I18N_ZH__, {
         '这一单的识别成本到了我们这边的预算上限，不是你的余额问题，剩下的先停住了。',
     wo_blocked_cap_how: '点下面的「重试」再跑一次；还停在这里就找我们放预算，你不用充值。',
     wo_blocked_also: '另外还有：{list}。',
-    // 指到侧栏真有的那一项:充值在「设置」页里,「计费」不是一个能点开的地方。
-    err_insufficient_balance: 'OCR 余额不足 · 到「设置」充值后再传',
+    // 通用计费闸 402(detail.code=insufficient_balance)· 全站统一口径:带当前余额。
+    // {balance} 由调用方喂 AI.format.money 结果(自带 ฿ + 窄空格);拿不到余额的调用方
+    // 走 fail_credits 系列(fail-render),不走这个键。
+    err_insufficient_balance: '余额不足 · 当前 {balance} · 请充值',
 });
 
 Object.assign(window.__AI_I18N_TH__, {
@@ -47,7 +49,7 @@ Object.assign(window.__AI_I18N_TH__, {
     wo_blocked_cap_how:
         'กด「ลองใหม่」ด้านล่างอีกครั้ง ถ้ายังหยุดอยู่ให้ติดต่อเรา เราจะเพิ่มงบให้ คุณไม่ต้องเติมเงิน',
     wo_blocked_also: 'นอกจากนี้ยังมี: {list}',
-    err_insufficient_balance: 'เครดิต OCR ไม่พอ · ไปเติมเงินที่「ตั้งค่า」ก่อนแล้วค่อยอัปโหลด',
+    err_insufficient_balance: 'ยอดเงินไม่พอ · ปัจจุบัน {balance} · กรุณาเติมเงิน',
 });
 
 Object.assign(window.__AI_I18N_EN__, {
@@ -68,8 +70,7 @@ Object.assign(window.__AI_I18N_EN__, {
     wo_blocked_cap_how:
         'Hit Retry below to run it again; if it still stops, contact us to raise the budget — no top-up needed on your side.',
     wo_blocked_also: 'Also: {list}.',
-    err_insufficient_balance:
-        'OCR credits ran out · top up under Settings · Billing, then upload again',
+    err_insufficient_balance: 'Insufficient balance · current {balance} · please top up',
 });
 
 Object.assign(window.__AI_I18N_JA__, {
@@ -90,6 +91,5 @@ Object.assign(window.__AI_I18N_JA__, {
     wo_blocked_cap_how:
         '下の「再試行」をもう一度押してください。それでも止まる場合はご連絡ください。当社側で予算を上げます（チャージは不要です）。',
     wo_blocked_also: 'このほか：{list}。',
-    err_insufficient_balance:
-        'OCR残高が不足しています · 「設定 · 請求」でチャージしてから再度アップロードしてください',
+    err_insufficient_balance: '残高不足 · 現在 {balance} · チャージしてください',
 });

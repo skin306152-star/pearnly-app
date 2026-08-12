@@ -41,7 +41,22 @@ def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, 
         raise PosError("purchase.unexpected", 402, detail="no_api_key")
     quote = ocr.billing_quote(user_fresh, file_bytes, filename, max_pages=50)
     if not quote.get("allowed"):
-        raise PosError("purchase.unexpected", 402, detail=quote.get("error_code") or "ocr_blocked")
+        error_code = quote.get("error_code") or "ocr_blocked"
+        if error_code == "insufficient_balance":
+            # 对齐全站计费闸口径(services/billing/account_status.py 单一事实源):402 +
+            # detail.code=insufficient_balance + 余额/估价数据 → 前端出「余额不足·去充值」
+            # 专用卡(带当前余额)。此前包进 purchase.unexpected 会显示通用「出错·重试」。
+            raise PosError(
+                "purchase.insufficient_balance",
+                402,
+                detail={
+                    "code": "insufficient_balance",
+                    "balance": quote.get("balance", 0.0),
+                    "estimated_cost": quote.get("estimated_cost", 0.0),
+                    "pages_used_this_month": quote.get("pages_used_this_month", 0),
+                },
+            )
+        raise PosError("purchase.unexpected", 402, detail=error_code)
     try:
         with usage_context("purchase_intake", doc_type="invoice", pages=quote.get("page_count")):
             pipe_res = ocr.run_pipeline_for_file(

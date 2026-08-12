@@ -11,6 +11,7 @@ from unittest import mock
 
 from services.purchase import intake as ik
 from services.purchase import totals as totals_svc
+from services.ocr import entrypoints as ocr
 
 MY = "1234567890123"
 
@@ -480,6 +481,61 @@ class ApplyCategoriesTests(unittest.TestCase):
         f = {"seller_name": "Unknown XYZ", "items": [{"name": "zzz", "qty": "1", "price": "10"}]}
         ln = ik.build_draft_from_invoice(f, kind="expense", categories=self.TREE)["lines"][0]
         self.assertIsNone(ln["category_id"])
+
+
+class OcrBillingGateTests(unittest.TestCase):
+    """_run_ocr 的 402 余额不足分支(2026-08-12 生产实测:detail=insufficient_balance 曾被
+    包进 purchase.unexpected → 前端只显示通用「出错·重试」)。余额不足必须给专用码 +
+    余额数据,前端才能出「去充值」卡。
+    """
+
+    def _user(self):
+        return {"id": "u1", "email": "a@b.c", "gemini_api_key": "test-key"}
+
+    def _quote(self, error_code, **extra):
+        q = {"allowed": False, "error_code": error_code, "kind": "pdf", "units": 1, "page_count": 1}
+        q.update(extra)
+        return q
+
+    def _run_ocr(self, quote):
+        import routes.purchase_intake_routes as ir
+
+        with (
+            mock.patch.object(ocr, "is_supported_ocr_file", return_value=True),
+            mock.patch.object(ocr, "billing_quote", return_value=quote),
+        ):
+            return ir._run_ocr(self._user(), b"x", "a.pdf")
+
+    def test_insufficient_balance_uses_special_code_and_balance(self):
+        # 余额不足 → 专用错误码 + 402 + detail 对象(code/balance/估价/本月页数)。
+        # detail.code=insufficient_balance 对齐全站计费闸口径(发票页/工单补料/总台同款)。
+        from core.pos_api import PosError
+
+        with self.assertRaises(PosError) as cm:
+            self._run_ocr(
+                self._quote(
+                    "insufficient_balance",
+                    balance=5.0,
+                    estimated_cost=1.5,
+                    pages_used_this_month=3,
+                )
+            )
+        self.assertEqual(cm.exception.code, "purchase.insufficient_balance")
+        self.assertEqual(cm.exception.http_status, 402)
+        d = cm.exception.detail
+        self.assertEqual(d["code"], "insufficient_balance")
+        self.assertEqual(d["balance"], 5.0)
+        self.assertEqual(d["estimated_cost"], 1.5)
+        self.assertEqual(d["pages_used_this_month"], 3)
+
+    def test_other_denials_stay_unexpected(self):
+        # 非余额不足的拒收(如 OCR 通道关闭)保持通用 purchase.unexpected 语义不变。
+        from core.pos_api import PosError
+
+        with self.assertRaises(PosError) as cm:
+            self._run_ocr(self._quote("ocr_blocked"))
+        self.assertEqual(cm.exception.code, "purchase.unexpected")
+        self.assertEqual(cm.exception.detail, "ocr_blocked")
 
 
 if __name__ == "__main__":

@@ -129,18 +129,21 @@ export interface DocDetail {
 }
 
 // 契约错误:携带 02/05 字典里的 code(purchase.dup_invoice 等),调用方映射 4 语,绝不裸露 code。
+// detail = 后端信封 error.detail(可为对象)——余额不足等业务分支要读它里面的 balance 等字段。
 export class PurchaseError extends Error {
     code: string;
-    constructor(code: string) {
+    detail?: unknown;
+    constructor(code: string, detail?: unknown) {
         super(code);
         this.code = code;
+        this.detail = detail;
     }
 }
 
 interface Envelope {
     ok?: boolean;
     data?: unknown;
-    error?: { code?: string };
+    error?: { code?: string; detail?: unknown };
 }
 
 export function authHeaders(): Record<string, string> {
@@ -158,7 +161,10 @@ export function authHeaders(): Record<string, string> {
 
 function unwrap(body: Envelope): unknown {
     if (body && body.ok === true) return body.data;
-    throw new PurchaseError((body && body.error && body.error.code) || 'purchase.unexpected');
+    throw new PurchaseError(
+        (body && body.error && body.error.code) || 'purchase.unexpected',
+        body && body.error && body.error.detail
+    );
 }
 
 // papi:打真接口 /api/purchase/*。后端已上线(S1-S5)→ 一律走真:成功取 data,失败抛 code。

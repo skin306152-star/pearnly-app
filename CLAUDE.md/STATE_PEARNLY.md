@@ -1,6 +1,16 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · C·Qwen 欠账清账(2026-08-12 午 · 22 条账本全落地 · 全局键已解锁 · 两批已上线 CI 绿)
+## 当前状态卡 · C 档生产全入口实测+四修(2026-08-12 下午 · a064c5f7..f0cc8f4b 已上线)
+
+- **🛑 实测揪出并已修的大雷**:①**ai_usage 成本台账 8-07 起 RLS 断流 5 天**(RLS_ROLE 上线后系统级行被静默吞,引擎成本页全靠旧数据撑着)→ 改显式 bypass 游标(d655213b),修后成本三层逐格对齐(官方单价×token=DB=Earn 后台);8-07~8-12 明细永久丢失。②**qwen 档下 vat_report 批解析全灭**(qwen API 毫秒级 400×15)→ 能力盲区注册表 MODE_UNSUPPORTED_TASKS,任何路径选中 qwen 的 vat_report 自动回落现役(2258bed7);**qwen 真适配 vat 车道=欠账**。③**Excel 字符计费无预扣闸**(฿186 一笔把 93 块余额打穿到 -92.98)→ 预检估价含字符折算,submit/同步 run/job 开跑前三层闸(6652a108)。④**fileconv 三不沾**(不吃灰度/不计费/无闸·负余额烧我方 ฿5.08)→ 余额闸+按页计费(d97a28db),生产实弹复验 200→402。⑤采购页 402 专用文案+充值直达,/ai 同步(4b4bd22d)。
+- **✅ C 档生产实锤**:发票 qwen 双臂 ฿0.25/页真跑通(账号灰度压任务钉档拿真数据验证)、读不准整页回落 Vision 如设计(฿1.11);全零税号占位规则已加(白回落省掉)。质量口径仍以 25 张金标为准(98% 追平最贵档);今日 3 页难票样本 23-93s/页不推翻 4-5s 中位。
+- **✅ 测法资产**:runner=scripts/_ctier_prod_run.cjs(8 入口真浏览器·--only 子集·逐入口证据);163 账号临时灰度已撤(现役=仅 skin306152);/ai 邀请留着(revoke 可收);163 余额 -92.98 待拍板冲正。
+- **🛑 C 档全局切换前置**:qwen 适配 vat 批解析(先 root-cause 400=请求形状,payload_hash 空串);银行长表产线路径没在灰度下真跑过(实测那次被 402 拦);fileconv 永远走 Gemini(设计)。
+- **📝 细账全档**:记忆 ctier-prod-alltest-and-aiusage-rls-outage。
+
+---
+
+## 历史 · 2026-08-12 午状态卡(C·Qwen 欠账清账 · 22 条账本全落地 · 全局键已解锁)
 
 - **✅ A1 头号钥匙落地**(fc5bd02c):qwen 两臂提示词+to_invoice_fields 补 document_type(非法值落 schema 默认·升级臂漏出保读取臂判型);金标 25 张复测**两轮 vat/total 零漂**、修对基线 7 处错(会员号当单号×2/假税号×2/算出 subtotal×2/漏读 ID×1),唯一真退步(pur05 会员卡号当单号)加"会员/积分卡号非单号"排除后复测归位;ABB 专项(Tops/7-11/Amazon/Punthai)全判 simplified、贷记单合成加考 2/2 → **qwen 移出 PARTIAL_MODES,后台可写 qwen 全局/套餐/任务档(真切全局待 Zihao 拍板)**;任务级覆写补同款挡板(B6)。金标资产已抢救归档 `桌面 pearnly-local-ocr-stack/qwen-eval-2026-08-11-rescued/`(基线锁 baseline-v3-locked.json·runner 在会话 scratchpad gold_rerun.py)。
 - **✅ 入口普查(Zihao 问的"好多入口没接")**:登录态入口(网页发票/银行/GL/VAT/身份证)全部吃账号灰度;真吃不到的只有 LINE webhook+独立 worker(无登录态回落全局档)= 设计内,全局切 qwen 后自然覆盖;bank_recon_pipeline 里"GL 绕过 engine_context"的记债注释已过时(gl_ledger 现走 controller)。

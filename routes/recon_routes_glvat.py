@@ -16,7 +16,7 @@ from core.route_helpers import _tid
 from services.authz.deps import require_perm
 from services.billing import account_status
 from services.vat.vat_report_parser import parse_vat_report
-from routes.recon_routes_shared import _user_key, _pdf_billing_units
+from routes.recon_routes_shared import _user_key, _pdf_billing_units, estimate_upload_units
 from services.recon.gl_vat_reconciler import (
     parse_gl,
     reconcile_gl_vat,
@@ -115,6 +115,7 @@ async def gl_vat_run(
     # M3-3 修(2026-05-25):收入对账旧同步路径补 credits 前置检查 + 按量扣费 · 闭掉免费入口
     #   (与 bank /run、async /submit 一致 · 余额不足直接 402 · 不让付费 OCR 先跑)。
     # 查不出计费状态就不放行(钱闸 fail-closed · 见 services/billing/account_status)。
+    # 估价含 Excel/CSV 字符折算(estimate_recon_cost_thb),与事后扣费同口径。
     _billing_glv = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
     try:
         from core import db as _db_credit_glv
@@ -123,21 +124,25 @@ async def gl_vat_run(
         _billing_glv = _db_credit_glv.get_billing_status_combined(str(user.get("id")), _tid_glv)
         if account_status.lookup_failed(_billing_glv):
             raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
-        if not _billing_glv.get("allowed") and not _billing_glv.get("is_exempt"):
-            _est_cost = float(
-                _db_credit_glv.estimate_pdf_cost_thb(
-                    _billing_glv.get("pages_used_this_month", 0), len(gl_list) + len(vat_list)
+        if not _billing_glv.get("is_exempt"):
+            _pdf_units, _excel_chars = await estimate_upload_units(gl_list + vat_list)
+            if not account_status.can_cover_estimate(_billing_glv, _pdf_units, _excel_chars):
+                _est_cost = float(
+                    _db_credit_glv.estimate_recon_cost_thb(
+                        _billing_glv.get("pages_used_this_month", 0),
+                        _pdf_units,
+                        _excel_chars,
+                    )
                 )
-            )
-            raise HTTPException(
-                402,
-                detail={
-                    "code": "insufficient_balance",
-                    "balance": _billing_glv.get("balance_thb", 0.0),
-                    "estimated_cost": _est_cost,
-                    "pages_used_this_month": _billing_glv.get("pages_used_this_month", 0),
-                },
-            )
+                raise HTTPException(
+                    402,
+                    detail={
+                        "code": "insufficient_balance",
+                        "balance": _billing_glv.get("balance_thb", 0.0),
+                        "estimated_cost": _est_cost,
+                        "pages_used_this_month": _billing_glv.get("pages_used_this_month", 0),
+                    },
+                )
     except HTTPException:
         raise
     except Exception as _be:

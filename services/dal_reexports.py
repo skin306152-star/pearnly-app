@@ -339,6 +339,7 @@ _REEXPORTS = {
     "services.billing.pricing": [
         "estimate_pdf_cost_thb",
         "estimate_excel_cost_thb",
+        "estimate_recon_cost_thb",
         "PDF_TIER1_LIMIT_V21",
         "PDF_TIER1_PRICE_V21",
         "PDF_TIER2_PRICE_V21",

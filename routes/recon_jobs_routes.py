@@ -31,6 +31,7 @@ from services.authz.deps import require_perm
 from services.billing import account_status
 from services.ocr.entrypoints import policy_context_from_billing
 from services.recon_jobs import store, worker
+from routes.recon_routes_shared import estimate_upload_units
 
 logger = logging.getLogger("recon_jobs.routes")
 router = APIRouter(tags=["recon-jobs"])
@@ -63,9 +64,12 @@ async def _stage_uploads(job_id: str, files: List[UploadFile], role: str, defaul
     return refs
 
 
-def _credits_precheck(user_id: str, tenant_id, est_pages: int):
+async def _credits_precheck(user_id: str, tenant_id, uploads) -> dict:
     """复刻原 run 接口的 credits 前置检查 · 返回 billing dict(含 is_exempt)。
 
+    估价 = PDF 页数 + Excel/CSV 字符折算(见 services/billing/pricing.estimate_recon_cost_thb):
+    大 Excel 的「字符→张」折算必须计入预检,否则余额够跑 PDF 却被一笔字符折算打穿透支
+    (生产实锤 2026-08-12:93 块余额被 ฿186 的字符折算扣成 -92.98)。
     不够余额 → 402;查不出计费状态 → 503(钱闸 fail-closed,理由见 services/billing/
     account_status.get_billing_status_combined)。两个码绝不合并:一个叫用户去充值,
     一个叫用户稍后再试。
@@ -75,19 +79,23 @@ def _credits_precheck(user_id: str, tenant_id, est_pages: int):
         billing = db.get_billing_status_combined(str(user_id), tenant_id)
         if account_status.lookup_failed(billing):
             raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
-        if not billing.get("allowed") and not billing.get("is_exempt"):
-            est_cost = float(
-                db.estimate_pdf_cost_thb(billing.get("pages_used_this_month", 0), est_pages)
-            )
-            raise HTTPException(
-                402,
-                detail={
-                    "code": "insufficient_balance",
-                    "balance": billing.get("balance_thb", 0.0),
-                    "estimated_cost": est_cost,
-                    "pages_used_this_month": billing.get("pages_used_this_month", 0),
-                },
-            )
+        if not billing.get("is_exempt"):
+            pdf_units, excel_chars = await estimate_upload_units(uploads)
+            if not account_status.can_cover_estimate(billing, pdf_units, excel_chars):
+                est_cost = float(
+                    db.estimate_recon_cost_thb(
+                        billing.get("pages_used_this_month", 0), pdf_units, excel_chars
+                    )
+                )
+                raise HTTPException(
+                    402,
+                    detail={
+                        "code": "insufficient_balance",
+                        "balance": billing.get("balance_thb", 0.0),
+                        "estimated_cost": est_cost,
+                        "pages_used_this_month": billing.get("pages_used_this_month", 0),
+                    },
+                )
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
@@ -199,7 +207,7 @@ async def bank_v2_submit(
         raise HTTPException(422, "请上传银行账单与 GL 文件")
 
     tenant_id = user.get("tenant_id")
-    billing = _credits_precheck(user["id"], tenant_id, len(stmt_files) + len(gl_files))
+    billing = await _credits_precheck(user["id"], tenant_id, stmt_files + gl_files)
     _ocr_policy_ctx = policy_context_from_billing(billing)
 
     job_id = str(uuid.uuid4())
@@ -274,7 +282,7 @@ async def gl_vat_submit(
     tenant_id = user.get("tenant_id")
     # M3-3 修(2026-05-25):收入对账与银行对账一致 · submit 前置 credits 检查(余额不足直接 402 ·
     #   不让付费 OCR/Gemini 先跑再失败)· is_exempt 透传给 worker 决定是否扣费。
-    billing = _credits_precheck(user["id"], tenant_id, len(gl_list) + len(vat_list))
+    billing = await _credits_precheck(user["id"], tenant_id, gl_list + vat_list)
     _ocr_policy_ctx = policy_context_from_billing(billing)
     job_id = str(uuid.uuid4())
     try:
@@ -325,7 +333,7 @@ async def vat_excel_submit(
         raise HTTPException(400, "至少上传 1 张发票 + 1 份 VAT 报告")
 
     tenant_id = user.get("tenant_id")
-    billing = _credits_precheck(user["id"], tenant_id, len(invoices) + len(reports))
+    billing = await _credits_precheck(user["id"], tenant_id, invoices + reports)
     _ocr_policy_ctx = policy_context_from_billing(billing)
 
     job_id = str(uuid.uuid4())

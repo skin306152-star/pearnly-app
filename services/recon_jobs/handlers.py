@@ -52,6 +52,21 @@ def run_glvat(
     total = len(gl_data) + len(vat_data)
     progress_cb({"stage": "parse", "stage_done": 0, "stage_total": total})
 
+    # 跑前再查一次余额闸(提交时过 ≠ 现在够:余额可能被别的请求扣走)。不足就把 job 置
+    # failed 带 insufficient_balance · 别让付费解析跑一半扣不了钱。估价含 Excel/CSV 字符
+    # 折算(与 submit 预检同一口径 · 见 account_status.can_cover_estimate)。
+    if not is_exempt:
+        from services.billing import account_status as _acct_now
+        from routes.recon_routes import estimate_recon_units as _est_units
+
+        _billing_now = db.get_billing_status_combined(user_id, tenant_id)
+        if _acct_now.lookup_failed(_billing_now):
+            logger.warning(f"[glvat] billing lookup failed at run time · user={user_id}")
+            return ("__failed__", {"error_code": _acct_now.LOOKUP_ERROR})
+        if not _acct_now.can_cover_estimate(_billing_now, *_est_units(gl_data + vat_data)):
+            logger.warning(f"[glvat] insufficient_balance at run time · user={user_id}")
+            return ("__failed__", {"error_code": "insufficient_balance"})
+
     # 1. 并行解析 GL + 合并 rows
     gl_results = _parallel(
         lambda bf: parse_gl(

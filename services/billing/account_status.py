@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import time as _time
 from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+from decimal import Decimal as _Dec
 
 from core import db
 
@@ -40,6 +41,31 @@ _EXEMPT_CACHE_TTL = 300
 def lookup_failed(status) -> bool:
     """这次是「查不出来」而不是「余额不足」。调用方据此分派 503 / 402,别把两件事合成一句话。"""
     return (status or {}).get("error_code") == LOOKUP_ERROR
+
+
+def can_cover_estimate(status: dict, pdf_units: int, excel_chars: int = 0) -> bool:
+    """余额/套餐额度是否盖得住这批的预检估价(纯判断 · 无 DB 调用)。
+
+    估价 = PDF 阶梯价 + Excel 字符折算成张 × 基准张价(见 pricing.estimate_recon_cost_thb,
+    与事后实扣同口径)。套餐额度能整个吃下 → 免费放行(不看余额);有套餐但额度不足 → 超额
+    部分按套餐 over_rate 估;无套餐 → 余额必须 ≥ 整批估价。豁免由调用方先判,这里只回答
+    「钱够不够」。余额不足却放行 = 大 Excel 打穿余额透支(生产实锤 2026-08-12)。
+    """
+    if status.get("is_exempt"):
+        return True
+    if not status.get("allowed"):
+        return False  # 余额≤0 且无套餐额度 → 一律不够(既有判据保留)
+    used = int(status.get("pages_used_this_month") or 0)
+    est_cost = float(db.estimate_recon_cost_thb(used, int(pdf_units or 0), int(excel_chars or 0)))
+    sub = status.get("subscription")
+    quota_pages = int(pdf_units or 0) + db.doc_quota_pages(int(excel_chars or 0))
+    if sub is not None and int(sub.get("remaining", 0)) >= quota_pages:
+        return True  # 套餐额度全覆盖 → 免费
+    payable = est_cost
+    if sub is not None:
+        billable = max(0, quota_pages - int(sub.get("remaining", 0)))
+        payable = float(_Dec(str(billable)) * _Dec(str(sub.get("over_rate", 1.5))))
+    return float(status.get("balance_thb", 0.0)) >= payable
 
 
 def _bkk_year_month() -> str:

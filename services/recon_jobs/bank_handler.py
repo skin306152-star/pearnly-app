@@ -64,6 +64,22 @@ def run_bank_recon(
     total = len(stmt_data) + len(gl_data)
     progress_cb({"stage": "parse", "stage_done": 0, "stage_total": total})
 
+    # 跑前再查一次余额闸(提交时过 ≠ 现在够:余额可能被别的请求扣走)。不足就把 job 置
+    # failed 带 insufficient_balance · 别让付费解析跑一半扣不了钱。估价含 Excel/CSV 字符
+    # 折算(与 submit 预检同一口径 · 见 account_status.can_cover_estimate)。
+    # S8 确认重对账不重扣费 → 同 charge 条件一样跳过闸。
+    if not is_exempt and not confirmed_rows:
+        from services.billing import account_status as _acct_now
+        from routes.recon_routes import estimate_recon_units as _est_units
+
+        _billing_now = db.get_billing_status_combined(user_id, tenant_id)
+        if _acct_now.lookup_failed(_billing_now):
+            logger.warning(f"[bank] billing lookup failed at run time · user={user_id}")
+            return ("__failed__", {"error_code": _acct_now.LOOKUP_ERROR})
+        if not _acct_now.can_cover_estimate(_billing_now, *_est_units(stmt_data + gl_data)):
+            logger.warning(f"[bank] insufficient_balance at run time · user={user_id}")
+            return ("__failed__", {"error_code": "insufficient_balance"})
+
     # 1. 解析(并行)· ADR-006 模板学习层作用域 = 租户优先,无租户退回 user_id
     #    (必须与 submit 预检 / save-mapping 用同一作用域,否则确认过的映射 worker 找不到)
     _scope = tenant_id or user_id

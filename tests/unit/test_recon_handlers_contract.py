@@ -208,11 +208,20 @@ class RunGlvatTests(unittest.TestCase):
 
     def test_glvat_charges_ocr_when_not_exempt(self):
         # M3-3(2026-05-25):非豁免 + 图片 VAT 报告(PNG)→ 必须按 OCR 页扣费(此前完全不扣)。
+        # 非豁免跑前过闸:开跑前余额回查必须 mock(否则真库 lookup_error → job failed)。
         self._patch_parse(
             {"ok": True, "rows": [{"a": 1}], "row_count": 1},
             {"ok": True, "rows": [{"b": 2}], "row_count": 1},
         )
         detail = [SimpleNamespace(gl_amount=10.0, diff=0.0)]
+        billing_ok = {
+            "allowed": True,
+            "is_exempt": False,
+            "balance_thb": 100.0,
+            "pages_used_this_month": 0,
+            "subscription": None,
+            "error_code": None,
+        }
         with (
             mock.patch("routes.recon_routes.reconcile_gl_vat", return_value=(detail, object())),
             mock.patch("routes.recon_routes.detail_to_json", return_value=[]),
@@ -221,6 +230,7 @@ class RunGlvatTests(unittest.TestCase):
             mock.patch("services.ocr.pdf_utils.count_pdf_pages", return_value=1),
             mock.patch("core.db.create_gl_vat_task", return_value=606),
             mock.patch("core.db.charge_ocr_async") as charge,
+            mock.patch("core.db.get_billing_status_combined", return_value=billing_ok),
         ):
             with tempfile.TemporaryDirectory() as d:
                 refs = [_stage(d, "gl", "g.xlsx"), _stage(d, "vat", "v.png")]

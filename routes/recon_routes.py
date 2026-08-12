@@ -29,6 +29,8 @@ from routes.recon_routes_shared import (  # noqa: F401  re-export + facade-inter
     _user_key,
     _pdf_billing_units,
     _ROWS_PER_PAGE_BILLING,
+    estimate_recon_units,
+    estimate_upload_units,
 )
 
 # 进度子系统 · moved to recon_routes_progress.py

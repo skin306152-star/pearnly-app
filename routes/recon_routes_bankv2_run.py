@@ -12,7 +12,7 @@ from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
 from services.billing import account_status
-from routes.recon_routes_shared import _user_key, _pdf_billing_units
+from routes.recon_routes_shared import _user_key, _pdf_billing_units, estimate_upload_units
 from routes.recon_routes_bankv2_helpers import (
     _BANK_V2_OK,
     parse_bank_statement_pdf,
@@ -70,6 +70,8 @@ async def bank_v2_run(
 
     # v118.35.0.21 · Credits 前置检查(1 次 SELECT · 异步扣费)
     # 查不出计费状态就不放行(钱闸 fail-closed · 见 services/billing/account_status)。
+    # 估价含 Excel/CSV 字符折算(estimate_recon_cost_thb):大 Excel 的字符费用必须预检拦住,
+    # 否则余额够跑 PDF 却被一笔字符折算打穿透支(生产实锤 2026-08-12)。
     _billing_bv2 = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
     try:
         from core import db as _db_credit
@@ -78,21 +80,25 @@ async def bank_v2_run(
         _billing_bv2 = _db_credit.get_billing_status_combined(str(user.get("id")), _tid_bv2)
         if account_status.lookup_failed(_billing_bv2):
             raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
-        if not _billing_bv2.get("allowed") and not _billing_bv2.get("is_exempt"):
-            _est_cost = float(
-                _db_credit.estimate_pdf_cost_thb(
-                    _billing_bv2.get("pages_used_this_month", 0), len(stmt_files) + len(gl_files)
+        if not _billing_bv2.get("is_exempt"):
+            _pdf_units, _excel_chars = await estimate_upload_units(stmt_files + gl_files)
+            if not account_status.can_cover_estimate(_billing_bv2, _pdf_units, _excel_chars):
+                _est_cost = float(
+                    _db_credit.estimate_recon_cost_thb(
+                        _billing_bv2.get("pages_used_this_month", 0),
+                        _pdf_units,
+                        _excel_chars,
+                    )
                 )
-            )
-            raise HTTPException(
-                402,
-                detail={
-                    "code": "insufficient_balance",
-                    "balance": _billing_bv2.get("balance_thb", 0.0),
-                    "estimated_cost": _est_cost,
-                    "pages_used_this_month": _billing_bv2.get("pages_used_this_month", 0),
-                },
-            )
+                raise HTTPException(
+                    402,
+                    detail={
+                        "code": "insufficient_balance",
+                        "balance": _billing_bv2.get("balance_thb", 0.0),
+                        "estimated_cost": _est_cost,
+                        "pages_used_this_month": _billing_bv2.get("pages_used_this_month", 0),
+                    },
+                )
     except HTTPException:
         raise
     except Exception as _be:

@@ -63,9 +63,10 @@ class ReconSubmitPrecheckTests(unittest.TestCase):
             fake_db.get_billing_status_combined.side_effect = exc
         else:
             fake_db.get_billing_status_combined.return_value = status
-        fake_db.estimate_pdf_cost_thb.return_value = 4.5
+        fake_db.estimate_recon_cost_thb.return_value = 4.5
+        fake_db.doc_quota_pages.return_value = 0
         with mock.patch.object(rjr, "db", fake_db):
-            return rjr._credits_precheck("u1", "t1", 3)
+            return asyncio.run(rjr._credits_precheck("u1", "t1", []))
 
     def test_lookup_error_status_returns_503(self):
         with self.assertRaises(HTTPException) as ctx:
@@ -85,7 +86,14 @@ class ReconSubmitPrecheckTests(unittest.TestCase):
         self.assertEqual(ctx.exception.detail["code"], "insufficient_balance")
 
     def test_allowed_passes_the_status_through(self):
-        ok = {"allowed": True, "is_exempt": False, "error_code": None}
+        ok = {
+            "allowed": True,
+            "is_exempt": False,
+            "balance_thb": 100.0,
+            "pages_used_this_month": 0,
+            "subscription": None,
+            "error_code": None,
+        }
         self.assertEqual(self._precheck(status=ok), ok)
 
 

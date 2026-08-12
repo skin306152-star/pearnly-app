@@ -68,3 +68,17 @@ def doc_quota_pages(char_count: int) -> int:
     if cost <= 0:
         return 0
     return _math_v21.ceil(cost / DOC_QUOTA_REF_PRICE)
+
+
+def estimate_recon_cost_thb(
+    pages_used_this_month: int, pdf_units: int, excel_chars: int = 0
+) -> _DecV21:
+    """一批文件的预检总估价 = PDF 阶梯价 + Excel 字符折算成张 × 基准张价。
+
+    Excel/CSV 字符文件按 doc_quota_pages 折算成额度张数、每张按 DOC_QUOTA_REF_PRICE
+    计(与按量一档页价对齐)。估值口径 = 解析前文本量,与事后实扣的解析后字符数可能
+    有小偏差;预检从宽,不加安全系数。
+    """
+    pdf_cost = estimate_pdf_cost_thb(pages_used_this_month, pdf_units)
+    excel_cost = _DecV21(doc_quota_pages(excel_chars)) * DOC_QUOTA_REF_PRICE
+    return (pdf_cost + excel_cost).quantize(_DecV21("0.01"), rounding=_RH_V21)

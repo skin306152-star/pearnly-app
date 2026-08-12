@@ -22,10 +22,11 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from core.route_helpers import authorize_pearnly_ai, content_disposition, lang_or_default
+from services.billing import account_status
 from services.fileconv import pdf_out
 from services.fileconv.convert import convert_image, convert_pdf
 from services.fileconv.excel_in import convert_excel
-from services.fileconv.model import ConvertResult, Issue
+from services.fileconv.model import ConvertResult, Issue, STATUS_OK
 from services.fileconv.xlsx_out import build_xlsx
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,77 @@ _PDF_MEDIA_TYPE = "application/pdf"
 # 图片扩展白名单:扫描件走 OCR(K1c);Excel/CSV 走 K2;带文字层 PDF(默认)走纯函数路。
 _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 _EXCEL_EXTS = (".xlsx", ".xlsm", ".xls", ".csv")
+
+
+def _ext(filename: str) -> str:
+    return ("." + (filename or "").lower().rsplit(".", 1)[-1]) if "." in (filename or "") else ""
+
+
+def _gate_units(data: bytes, filename: str):
+    """预检估价单位:(pdf_units, excel_chars)。
+
+    PDF 按物理页数(count_pdf_pages 便宜读数 · 读不出按 1)· 图片按 1 页 · Excel/CSV 按
+    字符折算。估值口径 = 转换前文本量,与转换后的实际页数可能有小偏差;预检从宽。
+    """
+    from core import db as _db_chg
+    from services.ocr.pdf_utils import count_pdf_pages as _count_pages
+
+    ext = _ext(filename)
+    if ext in _EXCEL_EXTS:
+        return 0, int(_db_chg._excel_char_count_estimate(data, filename) or 0)
+    if ext in _IMAGE_EXTS:
+        return 1, 0
+    return max(1, int(_count_pages(data) or 0)), 0
+
+
+def _fileconv_billing_gate(user: dict, tenant_id: str, data: bytes, filename: str) -> dict:
+    """余额闸(拦在模型花钱之前):余额 ≤ 0 或不足以覆盖预估 → 402 同对账形状。
+
+    查不出计费状态 → 503(fail-closed,与全站计费闸同一判据,见 account_status)。
+    返回 billing dict(含 is_exempt)供转换后扣费判断复用。
+    """
+    from core import db as _db_gate
+
+    billing = _db_gate.get_billing_status_combined(str(user.get("id")), tenant_id)
+    if account_status.lookup_failed(billing):
+        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
+    if billing.get("is_exempt"):
+        return billing
+    pdf_units, excel_chars = _gate_units(data, filename)
+    if not account_status.can_cover_estimate(billing, pdf_units, excel_chars):
+        est_cost = float(
+            _db_gate.estimate_recon_cost_thb(
+                billing.get("pages_used_this_month", 0), pdf_units, excel_chars
+            )
+        )
+        raise HTTPException(
+            402,
+            detail={
+                "code": "insufficient_balance",
+                "balance": billing.get("balance_thb", 0.0),
+                "estimated_cost": est_cost,
+                "pages_used_this_month": billing.get("pages_used_this_month", 0),
+            },
+        )
+    return billing
+
+
+def _conversion_charge_units(result: ConvertResult, data: bytes, filename: str):
+    """转换成功后的扣费单位 (kind, units, description)。
+
+    与对账处同参数形状:PDF/图片按页(kind="pdf" · 页数从转换结果 stats.pages 取,OCR 路
+    真实页数 · 文字层路退回物理页数)· Excel/CSV 按字符(kind="excel")。
+    """
+    from core import db as _db_chg
+    from services.ocr.pdf_utils import count_pdf_pages as _count_pages
+
+    if _ext(filename) in _EXCEL_EXTS:
+        units = int(_db_chg._excel_char_count_estimate(data, filename) or 0)
+        return "excel", units, f"文件转换 Excel · {units} 字符"
+    pages = int((result.stats or {}).get("pages") or 0)
+    if pages <= 0:
+        pages = max(1, int(_count_pages(data) or 0))
+    return "pdf", pages, f"文件转换 PDF · {pages} 页"
 
 
 def _run_conversion(data: bytes, filename: str, tenant_id: str) -> ConvertResult:
@@ -85,7 +157,7 @@ async def convert_endpoint(
 ):
     """上传单份 PDF/图片/Excel → 转换 + 守恒校验。`?format=xlsx` 回 xlsx 附件,
     `?format=pdf` 回 K2 规范排版 PDF 附件(泰文文件名走 RFC 5987)。"""
-    _, tenant_id = authorize_pearnly_ai(request, _PERM, not_found="fileconv.not_found")
+    user, tenant_id = authorize_pearnly_ai(request, _PERM, not_found="fileconv.not_found")
 
     data = await file.read()
     if len(data) > _MAX_BYTES:
@@ -93,7 +165,33 @@ async def convert_endpoint(
     if not data:
         raise HTTPException(400, detail="fileconv.empty_file")
 
+    # 余额闸(拦在模型花钱之前):负余额 / 不够付预估 → 402 同对账形状(前端失败卡据此出
+    # 「去充值」)· 查不出计费状态 → 503(fail-closed)。此前 fileconv 全程无闸:负余额账号
+    # 照跑、烧我方 Gemini、用户 0 扣费(生产实锤 2026-08-12)。
+    billing = _fileconv_billing_gate(user, tenant_id, data, file.filename)
+
     result = _run_conversion(data, file.filename, tenant_id)
+
+    # 转换成功后按同口径计费(豁免不扣 · fire-and-forget 与对账一致):PDF/图片按页 ·
+    # Excel/CSV 按字符。拒绝件(OCR 读不出等)不收钱,同「失败不收钱」全站口径。
+    if not billing.get("is_exempt") and result.status == STATUS_OK:
+        import asyncio
+
+        from core import db as _db_chg
+
+        _kind, _units, _desc = _conversion_charge_units(result, data, file.filename)
+        if _units > 0:
+            asyncio.create_task(
+                asyncio.to_thread(
+                    _db_chg.charge_ocr_async,
+                    str(user.get("id")),
+                    tenant_id,
+                    _kind,
+                    _units,
+                    None,
+                    _desc,
+                )
+            )
 
     if fmt == "xlsx":
         xlsx_bytes = build_xlsx(result)

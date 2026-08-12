@@ -10,6 +10,7 @@ JSON 摘要(doc_type/status/conserved/stats/issue_count + issues 截断);⑥?for
 
 from __future__ import annotations
 
+import asyncio
 import io
 import unittest
 from unittest import mock
@@ -23,6 +24,7 @@ from routes.fileconv_routes import router as fileconv_router
 from services.fileconv.model import (
     ConvertResult,
     Issue,
+    GENERIC_TABLE,
     GL_LEDGER,
     STATUS_NO_TEXT_LAYER,
     STATUS_OK,
@@ -64,13 +66,25 @@ class RouteContractTests(unittest.TestCase):
 
 class GatedRouteCase(unittest.IsolatedAsyncioTestCase):
     """M1 闸 + 权限桩(照 test_client_pool_routes_contract 先例,patch route_helpers
-    模块级名——authorize_pearnly_ai 引用的是它们)。"""
+    模块级名——authorize_pearnly_ai 引用的是它们)。余额闸 + 扣费一并打桩:非豁免预检
+    走 get_billing_status_combined(否则真库 lookup_error → 503 假红)。"""
+
+    _BILLING_OK = {
+        "allowed": True,
+        "is_exempt": False,
+        "balance_thb": 999.0,
+        "pages_used_this_month": 0,
+        "subscription": None,
+        "error_code": None,
+    }
 
     def _wire(self, m1=True):
         patches = (
             mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
             mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=m1),
             mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch("core.db.get_billing_status_combined", return_value=self._BILLING_OK),
+            mock.patch("core.db.charge_ocr_async", return_value=None),
         )
         for p in patches:
             self.enterContext(p)
@@ -260,6 +274,129 @@ class ExcelDispatchTests(GatedRouteCase):
             m_excel.reset_mock()
             await fcr.convert_endpoint(mock.Mock(), file=_upload(name=name), fmt=None)
             m_excel.assert_called_once()
+
+
+class BillingGateTests(GatedRouteCase):
+    """修3(2026-08-12)· fileconv 余额闸 + 转换后扣费:此前负余额账号照跑、烧我方
+    Gemini、用户 0 扣费。现在:负余额/不够付预估 → 402 同对账形状且转换不跑;
+    正余额转换成功 → 按同口径扣费一笔(pdf 按页 / excel 按字符)。"""
+
+    @staticmethod
+    async def _wait_charge(m_charge, expect: bool):
+        """fire-and-forget 扣费任务落地(线程池)后等断言:轮询最多 0.5s。"""
+        for _ in range(50):
+            await asyncio.sleep(0.01)
+            if bool(m_charge.call_count) == expect:
+                return
+
+    def _broke(self):
+        return {
+            "allowed": False,
+            "is_exempt": False,
+            "balance_thb": -92.98,
+            "pages_used_this_month": 271,
+            "subscription": None,
+            "error_code": None,
+        }
+
+    async def test_negative_balance_402_and_conversion_not_run(self):
+        self._wire()
+        self.enterContext(
+            mock.patch("core.db.get_billing_status_combined", return_value=self._broke())
+        )
+        m_conv = self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        with self.assertRaises(HTTPException) as ctx:
+            await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt=None)
+        self.assertEqual(ctx.exception.status_code, 402)
+        self.assertEqual(ctx.exception.detail["code"], "insufficient_balance")
+        m_conv.assert_not_called()  # 转换(烧模型)一次都没跑
+
+    async def test_low_positive_balance_but_insufficient_402(self):
+        """余额>0 但不够付大文件预估 → 同样 402(与对账修2同口径,防打穿)。"""
+        self._wire()
+        self.enterContext(
+            mock.patch(
+                "core.db.get_billing_status_combined",
+                return_value={
+                    "allowed": True,
+                    "is_exempt": False,
+                    "balance_thb": 3.0,
+                    "pages_used_this_month": 0,
+                    "subscription": None,
+                    "error_code": None,
+                },
+            )
+        )
+        self.enterContext(mock.patch("services.ocr.pdf_utils.count_pdf_pages", return_value=4))
+        m_conv = self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        with self.assertRaises(HTTPException) as ctx:
+            # 4 页 PDF 预估 ฿6.00 > 余额 ฿3.00
+            await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt=None)
+        self.assertEqual(ctx.exception.status_code, 402)
+        m_conv.assert_not_called()
+
+    async def test_ok_conversion_charges_pdf_pages_once(self):
+        self._wire()
+        result = ConvertResult(
+            doc_type=GENERIC_TABLE,
+            status=STATUS_OK,
+            source_name="in.pdf",
+            stats={"pages": 2},
+        )
+        m_conv = self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=result))
+        m_charge = self.enterContext(mock.patch("core.db.charge_ocr_async"))
+        out = await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt=None)
+        self.assertEqual(out["status"], STATUS_OK)
+        m_conv.assert_called_once()
+        await self._wait_charge(m_charge, expect=True)
+        m_charge.assert_called_once()
+        args = m_charge.call_args.args
+        self.assertEqual(args[2], "pdf")
+        self.assertEqual(args[3], 2)  # 页数取自转换结果 stats.pages
+        self.assertIn("文件转换 PDF · 2 页", args[5])
+
+    async def test_excel_conversion_charges_char_basis(self):
+        self._wire()
+        m_excel = self.enterContext(
+            mock.patch.object(fcr, "convert_excel", return_value=_ok_result())
+        )
+        m_charge = self.enterContext(mock.patch("core.db.charge_ocr_async"))
+        await fcr.convert_endpoint(
+            mock.Mock(), file=_upload(name="gl.csv", data=b"a" * 5000), fmt=None
+        )
+        m_excel.assert_called_once()
+        await self._wait_charge(m_charge, expect=True)
+        m_charge.assert_called_once()
+        args = m_charge.call_args.args
+        self.assertEqual(args[2], "excel")
+        self.assertEqual(args[3], 5000)  # CSV 字符数 = 字节数
+        self.assertIn("文件转换 Excel · 5000 字符", args[5])
+
+    async def test_exempt_no_charge(self):
+        self._wire()
+        self.enterContext(
+            mock.patch(
+                "core.db.get_billing_status_combined",
+                return_value={"allowed": True, "is_exempt": True, "error_code": None},
+            )
+        )
+        m_charge = self.enterContext(mock.patch("core.db.charge_ocr_async"))
+        await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt=None)
+        await self._wait_charge(m_charge, expect=False)
+        m_charge.assert_not_called()
+
+    async def test_rejected_conversion_no_charge(self):
+        """拒绝件(OCR 读不出 / 无文字层)不收钱,同「失败不收钱」全站口径。"""
+        self._wire()
+        rejected = ConvertResult(
+            doc_type="", status=STATUS_NO_TEXT_LAYER, source_name="scan.pdf", stats={}
+        )
+        self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=rejected))
+        m_charge = self.enterContext(mock.patch("core.db.charge_ocr_async"))
+        out = await fcr.convert_endpoint(mock.Mock(), file=_upload(name="scan.pdf"), fmt=None)
+        self.assertEqual(out["status"], STATUS_NO_TEXT_LAYER)
+        await self._wait_charge(m_charge, expect=False)
+        m_charge.assert_not_called()
 
 
 class PdfFormatTests(GatedRouteCase):

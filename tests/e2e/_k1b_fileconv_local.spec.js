@@ -241,7 +241,9 @@ test.describe('K1b · 财务文件转换视图(本地 stub 真浏览器)', () =>
         // fileconv 余额闸(commit d97a28db):402 + detail.code=insufficient_balance + balance。
         // 此前词典无对应键 → 落 err_generic;现在走 err_insufficient_balance 带余额。
         await bootFileconv(page, {
-            convertBody: { detail: { code: 'insufficient_balance', balance: 5.0, estimated_cost: 1.5 } },
+            convertBody: {
+                detail: { code: 'insufficient_balance', balance: 5.0, estimated_cost: 1.5 },
+            },
             convertStatus: 402,
         });
         await pickPdfAndRun(page);

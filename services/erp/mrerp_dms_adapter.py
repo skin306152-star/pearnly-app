@@ -235,7 +235,9 @@ class MrerpDmsAdapter:
 
     def _client(self) -> DMSClient:
         # 读操作走用户会话;客户档写操作在配了 admin 时懒切到 admin 会话。工厂(而非
-        # 现成 transport)保证纯读路径永不起 admin 浏览器。
+        # 现成 transport)保证 admin 浏览器只在真用得着时才起。
+        # 2026-08-12 起「纯读永不起 admin」不再成立:员工表读取(顾问归属精确匹配)在
+        # 销售账号没权限时会借 admin 重试一次 —— 归属落错人的代价大过一次登录开销。
         admin = self._admin_writer_transport if self.has_admin_creds else None
         return DMSClient(self._transport(), self.base_url, admin_transport=admin)
 

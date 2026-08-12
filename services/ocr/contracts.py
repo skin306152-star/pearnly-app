@@ -45,3 +45,8 @@ class OcrResult:
     task: str
     data: Any
     elapsed_ms: int
+
+
+class DirectReadFallback(Exception):
+    """直读不可信 → 上层整件回落 Vision 路。放 contracts:direct_read 与各档读取器都要
+    抛/接它,放任何一头都会出 import 环。"""

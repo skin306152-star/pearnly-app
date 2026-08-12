@@ -29,9 +29,14 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from importlib import import_module
 from typing import List, Optional
 
 from pydantic import ValidationError
+
+from services.ocr.contracts import (
+    DirectReadFallback,
+)  # noqa: F401 — 既有调用方(pipeline/qwen_direct/测试)从本模块 import,兼容再导出
 
 from . import engine_policy
 from .cost import _compute_total_cost
@@ -94,10 +99,6 @@ Schema:
 Use one entry per printed row. Put a balance-forward value in opening_balance, not entries, and the final visible running balance in closing_balance. Amounts may only come from printed Deposit, Withdrawal, or Balance columns; never treat reference, account, or description digits as money. Dates ending in two-digit year 26 mean 2026. For four-digit Buddhist years subtract 543. Preserve the exact printed date in transaction_date_raw. Remove commas and currency symbols. Keep each description under 80 characters. Skip headers and totals."""
 
 
-class DirectReadFallback(Exception):
-    """直读不可信/失败 → 调用方整件回落 Vision 路。"""
-
-
 def enabled() -> bool:
     return os.environ.get("OCR_IMAGE_DIRECT", "1").strip().lower() not in (
         "0",
@@ -132,16 +133,12 @@ def _sniff_mime(image_bytes: bytes) -> str:
     return "image/png"  # PDF 渲染页就是 PNG;未知类型按 PNG 送,模型端自会报错
 
 
-def _qwen_active() -> bool:
-    """本请求生效档是不是 qwen(读策略层公开口径,不自己解析 env/配置)。"""
-    return engine_policy.active_mode() == engine_policy.MODE_QWEN
-
-
 def _tier_for(document_type: BusinessDocumentType) -> str:
-    """长表在 qwen 档吃升级臂:qwen 的读取臂是轻档,而轻档读长表会整页读崩
-    (实测断点数见 engine_policy 文件头)。其余档位维持原样的 flash_lite。"""
-    if document_type in _TABLE_DOC_TYPES and _qwen_active():
-        return "escalate"
+    """长表档位由 engine_policy.MODE_TABLE_TIER 声明,未登记的档维持 flash_lite。
+    qwen 登记 escalate:qwen 的读取臂是轻档,而轻档读长表会整页读崩
+    (实测断点数见 engine_policy 文件头)。"""
+    if document_type in _TABLE_DOC_TYPES:
+        return engine_policy.MODE_TABLE_TIER.get(engine_policy.active_mode(), "flash_lite")
     return "flash_lite"
 
 
@@ -256,12 +253,11 @@ def _second_read(image_bytes: bytes, first: ThaiInvoice, api_key: Optional[str],
     return o2, inv2
 
 
-def _read_page_qwen(image_bytes: bytes, page_number: int, api_key: Optional[str]):
-    """qwen 档的发票页读数(两臂编排在 qwen_direct)。任何炸法都收敛成回落,不让上传看 500。"""
-    from . import qwen_direct
-
+def _read_page_via(image_bytes: bytes, page_number: int, api_key: Optional[str], reader: str):
+    """发票页读数交给注册表声明的读取器模块(qwen_direct 两臂编排,路径见
+    engine_policy.MODE_INVOICE_PAGE_READER)。任何炸法都收敛成回落,不让上传看 500。"""
     try:
-        return qwen_direct.read_invoice_page(
+        return import_module(reader).read_invoice_page(
             image_bytes, _sniff_mime(image_bytes), page_number, api_key
         )
     except DirectReadFallback:
@@ -279,8 +275,9 @@ def read_page(
     """单页直读 → PipelinePageResult(layer_chain=["ID"])。不可信即抛 DirectReadFallback。"""
     t0 = time.time()
     qwen_arm = None
-    if _qwen_active() and document_type in ("auto", "invoice"):
-        qwen_arm = _read_page_qwen(image_bytes, page_number, api_key)
+    reader = engine_policy.MODE_INVOICE_PAGE_READER.get(engine_policy.active_mode())
+    if reader and document_type in ("auto", "invoice"):
+        qwen_arm = _read_page_via(image_bytes, page_number, api_key, reader)
         data = qwen_arm.data
         l2_model, (l2_in, l2_out) = qwen_arm.read_model, qwen_arm.read_tokens
     else:

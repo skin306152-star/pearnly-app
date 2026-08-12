@@ -294,7 +294,7 @@ class DirectReadWiringTests(unittest.TestCase):
 
     def test_long_table_stays_on_the_escalate_arm(self):
         # 轻档读长表会整页读崩 —— qwen 档的银行/总账页必须落升级臂
-        with mock.patch.object(dr, "_qwen_active", return_value=True):
+        with mock.patch.object(ep, "active_mode", return_value="qwen"):
             self.assertEqual(dr._tier_for("bank_statement"), "escalate")
             self.assertEqual(dr._tier_for("general_ledger"), "escalate")
             self.assertEqual(dr._tier_for("invoice"), "flash_lite")

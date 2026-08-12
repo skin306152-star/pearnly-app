@@ -68,6 +68,13 @@ MODES = (*CONCRETE_MODES, "auto")
 # 直读链按档分叉时点名它(qwen 档的发票页走 qwen_direct 编排),档名字面只在本模块出现。
 MODE_QWEN = "qwen"
 
+# 档位能力注册表:direct_read 查表分流,不特判档名。加新档只登记这里,别去 direct_read 写 if。
+# invoice 页读取器:值 = 模块路径,约定该模块暴露 read_invoice_page(image_bytes, mime, page_number, api_key)。
+MODE_INVOICE_PAGE_READER: Dict[str, str] = {MODE_QWEN: "services.ocr.qwen_direct"}
+# 长表(bank_statement/general_ledger)读取臂档位:未登记的档维持 flash_lite。
+# qwen 登记 escalate:qwen 读取臂是轻档,轻档读长表整页读崩(实测断点数见本文件头)。
+MODE_TABLE_TIER: Dict[str, str] = {MODE_QWEN: "escalate"}
+
 # 能力未齐的档:只准按账号灰度,不许当全局档或套餐默认档(超管写侧 400 挡,见
 # routes/admin_ocr_engine_routes)。机制保留,当前为空。
 # qwen 于 2026-08-12 移出:两臂编排已补 document_type(贷记单硬闸/ABB 分类的判据),

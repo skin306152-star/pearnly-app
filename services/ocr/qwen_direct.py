@@ -30,7 +30,7 @@ from typing import Dict, List, Optional, Tuple
 from core import thai_date
 from core.thai_date import gregorian_from_printed, to_gregorian_year, two_digit_year_to_gregorian
 from services.ocr import escalation_budget
-from services.ocr.direct_read import DirectReadFallback
+from services.ocr.contracts import DirectReadFallback
 from services.ocr.money import normalize_money, valid_thai_tax_id
 from services.ocr.qwen_prompts import (
     ESCALATE_TRANSCRIPT_LIMIT,

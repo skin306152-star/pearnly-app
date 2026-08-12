@@ -75,6 +75,12 @@ MODE_INVOICE_PAGE_READER: Dict[str, str] = {MODE_QWEN: "services.ocr.qwen_direct
 # qwen 登记 escalate:qwen 读取臂是轻档,轻档读长表整页读崩(实测断点数见本文件头)。
 MODE_TABLE_TIER: Dict[str, str] = {MODE_QWEN: "escalate"}
 
+# 档位能力盲区:该档做不了的 task,解析一律回落 fail-safe 档,不管档是怎么选上的
+# (账号灰度/任务钉档/全局切换同判)——把功能切坏比多花点钱严重得多。
+# qwen·vat_report:2026-08-12 生产实锤,VAT 报表批解析打 qwen API 全部 400(15/15 批,
+# 毫秒级拒收),车道没适配就不接;适配完成删本行。
+MODE_UNSUPPORTED_TASKS: Dict[str, frozenset] = {MODE_QWEN: frozenset({"vat_report"})}
+
 # 能力未齐的档:只准按账号灰度,不许当全局档或套餐默认档(超管写侧 400 挡,见
 # routes/admin_ocr_engine_routes)。机制保留,当前为空。
 # qwen 于 2026-08-12 移出:两臂编排已补 document_type(贷记单硬闸/ABB 分类的判据),
@@ -166,6 +172,8 @@ def resolve_mode(
         plan_key = "exempt" if is_exempt else (plan_code or "none")
         mode = (cfg.get("defaults_by_plan") or {}).get(plan_key) or _FAILSAFE_MODE
     if mode not in MODE_MODEL_MAPS:
+        mode = _FAILSAFE_MODE
+    if task in MODE_UNSUPPORTED_TASKS.get(mode, ()):
         mode = _FAILSAFE_MODE
     return mode
 

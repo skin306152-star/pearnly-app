@@ -112,7 +112,7 @@ def read_invoice_page(
     if not read.ok or not isinstance(read.data, dict):
         raise DirectReadFallback(f"page {page_number}: qwen read {read.error_kind or 'empty'}")
 
-    fields = dict(read.data)
+    fields = _scrub_placeholder_taxes(dict(read.data))
     transcript = _transcribe(images, api_key)
     packed = pack_text(transcript)
     triggers = evaluate_triggers(fields, packed)
@@ -124,6 +124,7 @@ def read_invoice_page(
             escalated = _escalate(images, transcript, api_key)
             if escalated is not None:
                 merged, escalate_model, escalate_tokens = escalated
+                _scrub_placeholder_taxes(merged)
                 # 升级臂漏出/吐非法单据类型 → 保留读取臂的判型,别让重读把分类清空。
                 if _doc_type(merged.get("document_type")) is None:
                     merged["document_type"] = fields.get("document_type")
@@ -187,6 +188,17 @@ def _escalate(images, transcript: Optional[str], api_key: Optional[str]):
         logger.info("qwen_direct: 升级臂无果(%s),保留读取臂读数", outcome.error_kind or "empty")
         return None
     return dict(outcome.data), outcome.model, (outcome.input_tokens, outcome.output_tokens)
+
+
+def _scrub_placeholder_taxes(fields: Dict) -> Dict:
+    """票面全零税号(0000000000000)是「散客/无税号」占位,不是读错——按缺失处理。
+    不刷洗的话 mod-11 触发器白升一次贵模型,升完 sanity 硬闸还是整页回落 Vision
+    (2026-08-12 生产实测:一页因此多花 ฿1.11 走了回落)。"""
+    for key in _TAX_FIELDS:
+        digits = re.sub(r"\D", "", str(fields.get(key) or ""))
+        if digits and set(digits) == {"0"}:
+            fields[key] = None
+    return fields
 
 
 def pack_text(text: Optional[str]) -> Optional[str]:

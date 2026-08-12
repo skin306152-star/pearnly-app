@@ -71,6 +71,21 @@ class ResolveModeTests(unittest.TestCase):
             self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="c@d.com"), "economy")
             self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
 
+    def test_unsupported_task_falls_back_regardless_of_how_mode_was_chosen(self):
+        # 能力盲区回落:qwen 不接 vat_report(2026-08-12 生产 15/15 批 400 实锤),
+        # 账号灰度/全局切换/任务钉档选上都一样回 fail-safe——功能不能被档位切坏。
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            by_account = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
+            self.assertEqual(
+                ep.resolve_mode("vat_report", config=by_account, account="a@b.com"), "economy"
+            )
+            self.assertEqual(
+                ep.resolve_mode("invoice", config=by_account, account="a@b.com"), "qwen"
+            )
+            by_global = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+            self.assertEqual(ep.resolve_mode("vat_report", config=by_global), "economy")
+            self.assertEqual(ep.resolve_mode("invoice", config=by_global), "qwen")
+
     def test_account_override_is_case_insensitive(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}

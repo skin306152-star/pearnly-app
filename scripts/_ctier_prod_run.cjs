@@ -123,7 +123,16 @@ async function runEntry(name, files, fn) {
     e.console_errors = [...guard.pageErrors, ...guard.consoleErrors];
     current = null;
     report.push(e);
+    saveReport(); // 逐入口落盘:中途崩了证据也在(首跑在 AI 壳登录处崩,内存报表全丢的教训)
     return e;
+}
+
+function saveReport() {
+    try {
+        fs.writeFileSync(path.join(ART, 'report.json'), JSON.stringify(report, null, 2), 'utf-8');
+    } catch {
+        /* 证据落盘失败不拖垮跑测 */
+    }
 }
 
 async function shot(name, sel) {
@@ -464,7 +473,10 @@ async function entryFileconv(p, e) {
         { timeout: ENTRY_TIMEOUT }
     );
     const chooser = p.waitForEvent('filechooser', { timeout: 10_000 });
-    await p.locator('#fcDrop [data-action="fc-pick"], #fcDrop [data-action="fc-goto-upload"]').first().click();
+    // 两种入口态各自唯一(data-action 锚定),按存在性分支,不并联选择器按位置点
+    const fcPick = p.locator('#fcDrop [data-action="fc-pick"]');
+    const fcGoto = p.locator('#fcDrop [data-action="fc-goto-upload"]');
+    await ((await fcPick.count()) ? fcPick : fcGoto).click();
     const fc = await chooser;
     await fc.setFiles(P.bigcPdf);
     await p
@@ -561,28 +573,55 @@ async function entrySteward(p, e) {
         r.fulfill({ status: 204, body: '' })
     );
 
-    console.log('\n[login] 主应用(' + BASE + ')');
-    await loginMain(page);
-    await dismissWorkspaceGate(page);
-    console.log('[login] 主应用已进 /home');
+    // --only=main / --only=ai:子集重跑(首跑主应用段已过、AI 壳被邀请门拦的续跑场景)
+    const only = (process.argv.find((a) => a.startsWith('--only=')) || '').split('=')[1] || 'all';
 
-    await runEntry('1_web_upload发票识别', [P.img2530, P.img2600], (p, e) => entryWebUpload(p, e));
-    await runEntry('2_purchase_intake采购进料', [P.img2620], (p, e) => entryPurchase(p, e));
-    // 3/4 同页同提交:共享一次 bank 对账流程,逐入口独立留证
-    const e3 = mkEntry('3_bank_recon银行对账单', [P.img2496]);
-    const e4 = mkEntry('4_bank_recon_GL', [P.glXlsx]);
-    await entryBankRecon(page, e3, e4);
-    report.push(e3, e4);
+    if (only === 'all' || only === 'main') {
+        console.log('\n[login] 主应用(' + BASE + ')');
+        await loginMain(page);
+        await dismissWorkspaceGate(page);
+        console.log('[login] 主应用已进 /home');
 
-    await runEntry('5_vat_recon_GL-VAT对账', [P.glXlsx, P.vatCsv], (p, e) => entryVatRecon(p, e));
+        await runEntry('1_web_upload发票识别', [P.img2530, P.img2600], (p, e) => entryWebUpload(p, e));
+        await runEntry('2_purchase_intake采购进料', [P.img2620], (p, e) => entryPurchase(p, e));
+        // 3/4 同页同提交:共享一次 bank 对账流程,逐入口独立留证
+        const e3 = mkEntry('3_bank_recon银行对账单', [P.img2496]);
+        const e4 = mkEntry('4_bank_recon_GL', [P.glXlsx]);
+        await entryBankRecon(page, e3, e4);
+        report.push(e3, e4);
+        saveReport();
 
-    console.log('\n[login] AI 壳(/ai)');
-    await loginAi(page);
-    console.log('[login] AI 壳已进工作台');
+        await runEntry('5_vat_recon_GL-VAT对账', [P.glXlsx, P.vatCsv], (p, e) => entryVatRecon(p, e));
+    }
 
-    await runEntry('6_vat_report检查页', [P.invoicePdf], (p, e) => entryVatcheck(p, e));
-    await runEntry('7_fileconv文件转换', [P.bigcPdf], (p, e) => entryFileconv(p, e));
-    await runEntry('8_steward管家上传', [P.invoicePdf], (p, e) => entrySteward(p, e));
+    if (only === 'all' || only === 'ai') {
+        console.log('\n[login] AI 壳(/ai)');
+        let aiReady = true;
+        try {
+            await loginAi(page);
+            console.log('[login] AI 壳已进工作台');
+        } catch (err) {
+            aiReady = false;
+            console.log('[login] AI 壳进不去(邀请制门拦/登录失败): ' + String(err.message).slice(0, 200));
+        }
+        if (aiReady) {
+            await runEntry('6_vat_report检查页', [P.invoicePdf], (p, e) => entryVatcheck(p, e));
+            await runEntry('7_fileconv文件转换', [P.bigcPdf], (p, e) => entryFileconv(p, e));
+            await runEntry('8_steward管家上传', [P.invoicePdf], (p, e) => entrySteward(p, e));
+        } else {
+            for (const [n, f] of [
+                ['6_vat_report检查页', [P.invoicePdf]],
+                ['7_fileconv文件转换', [P.bigcPdf]],
+                ['8_steward管家上传', [P.invoicePdf]],
+            ]) {
+                const e = mkEntry(n, f);
+                e.status = 'SKIPPED';
+                e.ui_state = 'AI 壳登录未通过(邀请门)';
+                report.push(e);
+            }
+            saveReport();
+        }
+    }
 
     await browser.close();
 

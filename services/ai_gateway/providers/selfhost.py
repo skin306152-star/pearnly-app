@@ -16,6 +16,8 @@ import os
 from typing import List, Optional, Tuple
 
 from services.ai_gateway.providers.http_common import (
+    bearer_headers,
+    chat_json_outcome,
     chat_text_and_usage,
     image_content_parts,
     post_json,
@@ -30,11 +32,7 @@ def _base() -> str:
 
 
 def _headers() -> dict:
-    h = {"Content-Type": "application/json"}
-    key = os.environ.get("SELFHOST_OCR_KEY")
-    if key:
-        h["Authorization"] = f"Bearer {key}"
-    return h
+    return bearer_headers(os.environ.get("SELFHOST_OCR_KEY"))
 
 
 def _model() -> str:
@@ -73,27 +71,9 @@ def _chat_json(prompt, images, *, temperature, response_mime, max_tokens, timeou
     }
     if response_mime:
         payload["response_format"] = {"type": "json_object"}
-    last_raw = ""
-    for attempt in range(max_retries + 1):
-        text, kind, toks = _chat_text(payload, timeout_s)
-        if kind:
-            return ProviderOutcome(ok=False, error_kind=kind, model=model_name)
-        if text:
-            last_raw = text
-            try:
-                return ProviderOutcome(
-                    ok=True,
-                    data=_parse_json(text),
-                    model=model_name,
-                    input_tokens=toks[0],
-                    output_tokens=toks[1],
-                )
-            except Exception:  # noqa: BLE001
-                pass
-        if attempt < max_retries:
-            continue
-    # 解析失败带回原文(Agent 可把散文当回复救援)· raw 绝不进日志(_observe 只记 error_kind/token)
-    return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)
+    return chat_json_outcome(
+        lambda: _chat_text(payload, timeout_s), _parse_json, model_name, max_retries
+    )
 
 
 def text_to_action(prompt, *, tools, **kw) -> ProviderOutcome:

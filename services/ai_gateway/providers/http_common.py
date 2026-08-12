@@ -61,3 +61,32 @@ def image_content_parts(prompt: str, images: List[Tuple[bytes, str]]) -> list:
         b64 = base64.b64encode(data).decode("ascii")
         parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
     return parts
+
+
+def bearer_headers(key):
+    """Content-Type + 可选 Bearer。key 空 = 无鉴权(vLLM 场景)。"""
+    h = {"Content-Type": "application/json"}
+    if key:
+        h["Authorization"] = f"Bearer {key}"
+    return h
+
+
+def chat_json_outcome(do_call, parse, model_name, max_retries):
+    """三 provider 同构的重试→ProviderOutcome 循环:传输错立即带 kind 返回;
+    解析失败重读;用尽落 parse 并带回原文(raw 绝不进日志,_observe 只记 error_kind/token)。
+    do_call() -> (text, kind, (in_tokens, out_tokens));parse(text) -> data。"""
+    from services.ai_gateway.tasks import ProviderOutcome
+
+    last_raw = ""
+    for _ in range(max_retries + 1):
+        text, kind, toks = do_call()
+        if kind:
+            return ProviderOutcome(ok=False, error_kind=kind, model=model_name)
+        if text:
+            last_raw = text
+            try:
+                return ProviderOutcome(ok=True, data=parse(text), model=model_name,
+                                       input_tokens=toks[0], output_tokens=toks[1])
+            except Exception:  # noqa: BLE001 — 坏 JSON → 重试;用尽落 parse
+                pass
+    return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)

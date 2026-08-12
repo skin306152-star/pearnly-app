@@ -27,6 +27,8 @@ import re
 from typing import List, Optional, Tuple
 
 from services.ai_gateway.providers.http_common import (
+    bearer_headers,
+    chat_json_outcome,
     chat_text_and_usage,
     image_content_parts,
     post_json,
@@ -49,11 +51,7 @@ def _base() -> str:
 
 
 def _headers() -> dict:
-    h = {"Content-Type": "application/json"}
-    key = os.environ.get("QWEN_OCR_KEY")
-    if key:
-        h["Authorization"] = f"Bearer {key}"
-    return h
+    return bearer_headers(os.environ.get("QWEN_OCR_KEY"))
 
 
 def model_for_tier(tier: str) -> str:
@@ -135,25 +133,9 @@ def _chat_json(prompt, images, *, temperature, max_tokens, timeout_s, max_retrie
         max_tokens=max_tokens,
         enable_thinking=False,
     )
-    last_raw = ""
-    for _ in range(max_retries + 1):
-        text, kind, toks = _chat_text(payload, timeout_s)
-        if kind:
-            return ProviderOutcome(ok=False, error_kind=kind, model=model_name)
-        if text:
-            last_raw = text
-            try:
-                return ProviderOutcome(
-                    ok=True,
-                    data=_parse_object(text),
-                    model=model_name,
-                    input_tokens=toks[0],
-                    output_tokens=toks[1],
-                )
-            except Exception:  # noqa: BLE001 — 解析不了就再读一次,读不出交上层救援
-                pass
-    # 解析失败带回原文(上层可把散文当线索);raw 绝不进日志(_observe 只记 error_kind/token)
-    return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)
+    return chat_json_outcome(
+        lambda: _chat_text(payload, timeout_s), _parse_object, model_name, max_retries
+    )
 
 
 def text_to_action(prompt, *, tools, **kw) -> ProviderOutcome:

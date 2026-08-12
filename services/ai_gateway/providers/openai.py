@@ -19,7 +19,12 @@ from __future__ import annotations
 import os
 from typing import List, Optional, Tuple
 
-from services.ai_gateway.providers.http_common import error_kind_for_status, image_content_parts
+from services.ai_gateway.providers.http_common import (
+    bearer_headers,
+    chat_json_outcome,
+    error_kind_for_status,
+    image_content_parts,
+)
 from services.ai_gateway.tasks import ProviderOutcome
 
 NAME = "openai"
@@ -116,7 +121,7 @@ def _chat(payload: dict, model: str, timeout_s: int):
     key = _key()
     if not key:
         return None, "auth", (0, 0)
-    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    headers = bearer_headers(key)
     for _ in range(3):  # 首发 + 至多两类参数被拒各重发一次
         try:
             resp = httpx.post(
@@ -165,25 +170,9 @@ def _chat_json(
         max_tokens=max_tokens,
         json_mode=bool(response_mime),
     )
-    last_raw = ""
-    for _ in range(max_retries + 1):
-        text, kind, toks = _chat(payload, model, timeout_s)
-        if kind:
-            return ProviderOutcome(ok=False, error_kind=kind, model=model)
-        if text:
-            last_raw = text
-            try:
-                return ProviderOutcome(
-                    ok=True,
-                    data=_parse_json(text),
-                    model=model,
-                    input_tokens=toks[0],
-                    output_tokens=toks[1],
-                )
-            except Exception:  # noqa: BLE001 — 坏 JSON → 重试;用尽落 parse
-                pass
-    # 解析失败带回原文(上层可把散文当回复救援)· raw 绝不进日志(_observe 只记 error_kind/token)
-    return ProviderOutcome(ok=False, error_kind="parse", model=model, raw=last_raw)
+    return chat_json_outcome(
+        lambda: _chat(payload, model, timeout_s), _parse_json, model, max_retries
+    )
 
 
 def text_to_action(prompt, *, tools, **kw) -> ProviderOutcome:
@@ -279,7 +268,7 @@ def embed(
     key = _key()
     if not model or not key:
         return ProviderOutcome(ok=False, error_kind="auth", model=NAME)
-    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    headers = bearer_headers(key)
     try:
         resp = httpx.post(
             f"{_base()}/embeddings",

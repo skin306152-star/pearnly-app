@@ -87,19 +87,41 @@ class PolicyRouteTests(unittest.TestCase):
         r = self.client.post("/api/admin/ocr-engine", json={"mode": "gpt99"})
         self.assertEqual(r.status_code, 400)
 
+    # PARTIAL_MODES 机制测试:2026-08-12 qwen 补齐 document_type 后集合清空,机制保留给
+    # 未来的能力未齐档 —— 用 patch 造一个 partial 档(选真实档名 selfhost,先过 MODES 校验)
+    # 钉死三个口(全局/套餐/任务)都挡、账号灰度放行。
     def test_partial_mode_rejected_as_global(self):
-        # qwen 不产 document_type,整机切过去会让贷记单方向复核静默失效 → 只准按账号灰度
-        with mock.patch.object(mod.store, "set_setting") as m_set:
-            r = self.client.post("/api/admin/ocr-engine", json={"mode": "qwen"})
+        with (
+            mock.patch.object(mod, "PARTIAL_MODES", frozenset({"selfhost"})),
+            mock.patch.object(mod.store, "set_setting") as m_set,
+        ):
+            r = self.client.post("/api/admin/ocr-engine", json={"mode": "selfhost"})
         self.assertEqual(r.status_code, 400)
         self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
         m_set.assert_not_called()  # 挡住 = 一个字节都没落库
 
     def test_partial_mode_rejected_as_plan_default(self):
-        with mock.patch.object(mod.store, "set_setting") as m_set:
+        with (
+            mock.patch.object(mod, "PARTIAL_MODES", frozenset({"selfhost"})),
+            mock.patch.object(mod.store, "set_setting") as m_set,
+        ):
             r = self.client.post(
                 "/api/admin/ocr-engine",
-                json={"mode": "auto", "defaults_by_plan": {"L": "qwen"}},
+                json={"mode": "auto", "defaults_by_plan": {"L": "selfhost"}},
+            )
+        self.assertEqual(r.status_code, 400)
+        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
+        m_set.assert_not_called()
+
+    def test_partial_mode_rejected_as_task_override(self):
+        # 任务级覆写=该 task 全量切档,与全局同风险面(欠账 B6 补上的第三个口)
+        with (
+            mock.patch.object(mod, "PARTIAL_MODES", frozenset({"selfhost"})),
+            mock.patch.object(mod.store, "set_setting") as m_set,
+        ):
+            r = self.client.post(
+                "/api/admin/ocr-engine",
+                json={"mode": "economy", "overrides_by_task": {"invoice": "selfhost"}},
             )
         self.assertEqual(r.status_code, 400)
         self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
@@ -107,23 +129,35 @@ class PolicyRouteTests(unittest.TestCase):
 
     def test_partial_mode_allowed_as_account_gray_release(self):
         with (
+            mock.patch.object(mod, "PARTIAL_MODES", frozenset({"selfhost"})),
             mock.patch.object(mod.store, "set_setting") as m_set,
             mock.patch.object(mod, "_log_op"),
             mock.patch.object(mod.store, "get_setting", return_value=None),
         ):
             r = self.client.post(
                 "/api/admin/ocr-engine",
-                json={"mode": "economy", "overrides_by_account": {"Gray@Pearnly.com": "qwen"}},
+                json={"mode": "economy", "overrides_by_account": {"Gray@Pearnly.com": "selfhost"}},
             )
         self.assertEqual(r.status_code, 200)
         saved = m_set.call_args[0][1]
-        self.assertEqual(saved["overrides_by_account"], {"gray@pearnly.com": "qwen"})
+        self.assertEqual(saved["overrides_by_account"], {"gray@pearnly.com": "selfhost"})
+
+    def test_qwen_unlocked_as_global_mode(self):
+        # 解锁实锤:document_type 补齐 + 金标复测过门后,qwen 可当全局档(全局切由 Zihao 拍板)
+        with (
+            mock.patch.object(mod.store, "set_setting") as m_set,
+            mock.patch.object(mod, "_log_op"),
+            mock.patch.object(mod.store, "get_setting", return_value=None),
+        ):
+            r = self.client.post("/api/admin/ocr-engine", json={"mode": "qwen"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(m_set.call_args[0][1]["mode"], "qwen")
 
     def test_partial_modes_exposed_to_frontend(self):
-        # 卡片上的「只能按账号灰度」提示照这个清单画,写死在前端就会跟后端漂
+        # 卡片上的「只能按账号灰度」提示照这个清单画,写死在前端就会跟后端漂;当前为空
         with mock.patch.object(mod.store, "get_setting", return_value=None):
             r = self.client.get("/api/admin/ocr-engine")
-        self.assertEqual(r.json()["options"]["partial_modes"], ["qwen"])
+        self.assertEqual(r.json()["options"]["partial_modes"], [])
 
     def test_bad_plan_mode_400(self):
         r = self.client.post(

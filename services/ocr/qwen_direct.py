@@ -14,9 +14,9 @@
 多花一次钱,所以每条触发器都要能用票面自证;跑批还另受 escalation_budget 的 per-run 封顶
 约束(与 Vision 路同一个闸),配额用尽时该页保留读取臂读数、触发理由照常落痕交人审。
 
-⚠️ 边界(如实记,不夸大):本编排只产钱面字段 + 现金/找零/折扣,不产 document_type、明细行、
-买卖方名址 —— 落到 ThaiInvoice 上 document_type 恒是默认值 tax_invoice。所以 qwen 档当前只
-适合"按账号对比读数",别拿它当 ABB/贷记单的分类依据。
+⚠️ 边界(如实记,不夸大):本编排产钱面字段 + 现金/找零/折扣 + document_type(2026-08-12 补,
+两臂都出、非法值落 schema 默认)——贷记单硬闸与 ABB 分类的判据自此有值。仍不产明细行与
+买卖方名址:行和勾稽(sanity 规则 6)之类吃明细的软闸对 qwen 页天然不生效,Vision 路照旧兜底。
 """
 
 from __future__ import annotations
@@ -59,6 +59,20 @@ _TRANSCRIBE_MAX_TOKENS = 4096
 
 _PACK_RE = re.compile(r"[\s\-]")
 _DIGITS_RE = re.compile(r"\d+")
+
+# ThaiInvoice.document_type 的合法值(schemas_invoice 的 Literal 同步)。非法/缺失不进字段,
+# 落 schema 默认 tax_invoice——分类失败不许拖垮读数主业。
+_DOC_TYPES = frozenset(
+    {
+        "tax_invoice",
+        "simplified_tax_invoice",
+        "receipt",
+        "credit_note",
+        "payment_evidence",
+        "order_evidence",
+        "other",
+    }
+)
 
 # 读取臂提示词:模板固定,每页拼一次纯属浪费。
 _READ_PROMPT = f"{FLASH_V25}\n\n{READ_USER_SUFFIX}"
@@ -108,6 +122,9 @@ def read_invoice_page(
             escalated = _escalate(images, transcript, api_key)
             if escalated is not None:
                 merged, escalate_model, escalate_tokens = escalated
+                # 升级臂漏出/吐非法单据类型 → 保留读取臂的判型,别让重读把分类清空。
+                if _doc_type(merged.get("document_type")) is None:
+                    merged["document_type"] = fields.get("document_type")
                 fields = _keep_grounded_ids(merged, fields, packed)
         else:
             logger.info("qwen_direct: 升级配额用尽,保留读取臂读数(%s)", ",".join(triggers))
@@ -234,7 +251,7 @@ def _keep_grounded_ids(merged: Dict, read: Dict, packed_transcript: Optional[str
 def to_invoice_fields(fields: Dict) -> Dict[str, object]:
     """编排产出 → ThaiInvoice 构造参数(键名对齐 schema,值原样交给 schema 的 coercion)。"""
     printed_date = str(fields.get("date") or "").strip()
-    return {
+    out: Dict[str, object] = {
         "invoice_number": _clean(fields.get("invoice_number")),
         "date": printed_date_to_iso(printed_date),
         "date_raw": printed_date,
@@ -248,6 +265,16 @@ def to_invoice_fields(fields: Dict) -> Dict[str, object]:
         "change_amount": _clean(fields.get("change")),
         "currency": _clean(fields.get("currency")),
     }
+    doc_type = _doc_type(fields.get("document_type"))
+    if doc_type is not None:
+        out["document_type"] = doc_type
+    return out
+
+
+def _doc_type(value) -> Optional[str]:
+    """模型输出的单据类型:合法枚举原样收,其余(缺失/幻觉值)返 None 交 schema 默认。"""
+    kind = str(value or "").strip().lower()
+    return kind if kind in _DOC_TYPES else None
 
 
 def _clean(value):

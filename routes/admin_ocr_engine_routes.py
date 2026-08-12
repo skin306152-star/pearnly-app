@@ -120,6 +120,9 @@ async def set_ocr_engine_policy(request: Request):
             continue  # 空 = 跟全局,不落库
         if v not in MODES:
             raise HTTPException(400, detail=f"ocr_engine.bad_task_mode:{k}")
+        # 任务级覆写=该 task 全量切档(如 invoice 一钉全站发票都走),与全局同风险面,
+        # 同样只准按账号灰度;此前只挡了全局与套餐两处,这是补上的第三个口。
+        _reject_partial_mode(v)
         overrides_by_task[k] = v
 
     value = {

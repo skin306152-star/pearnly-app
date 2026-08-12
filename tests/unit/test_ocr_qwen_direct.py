@@ -111,6 +111,30 @@ class PrintedDateTests(unittest.TestCase):
         self.assertIsNone(out["currency"])
 
 
+class DocumentTypeTests(unittest.TestCase):
+    """document_type 是贷记单硬闸与 ABB 分类的判据(PARTIAL_MODES 解锁条件):
+    合法值必须透传,幻觉值必须落 schema 默认,升级臂不许把读取臂的判型清空。"""
+
+    def test_valid_document_type_passes_through(self):
+        out = qd.to_invoice_fields({**_FIELDS_CLEAN, "document_type": "credit_note"})
+        self.assertEqual(out["document_type"], "credit_note")
+
+    def test_case_and_whitespace_normalized(self):
+        out = qd.to_invoice_fields({**_FIELDS_CLEAN, "document_type": " Simplified_Tax_Invoice "})
+        self.assertEqual(out["document_type"], "simplified_tax_invoice")
+
+    def test_missing_or_invented_type_falls_to_schema_default(self):
+        for bad in (None, "", "null", "ใบกำกับภาษี", "invoice"):
+            out = qd.to_invoice_fields({**_FIELDS_CLEAN, "document_type": bad})
+            self.assertNotIn("document_type", out)
+
+    def test_both_arm_prompts_ask_for_document_type(self):
+        from services.ocr import qwen_prompts
+
+        self.assertIn("document_type", qwen_prompts.FLASH_V25)
+        self.assertIn("document_type", qwen_prompts.MAX_V3)
+
+
 def _json_outcome(data, model="qwen3.7-flash"):
     return ProviderOutcome(ok=True, data=data, model=model, input_tokens=10, output_tokens=5)
 
@@ -172,6 +196,18 @@ class OrchestrationTests(unittest.TestCase):
     def test_read_arm_failure_falls_back_to_vision(self):
         with self.assertRaises(dr.DirectReadFallback):
             self._run(ProviderOutcome(ok=False, error_kind="timeout"))
+
+    def test_escalate_without_document_type_keeps_read_arm_classification(self):
+        broken = {**_FIELDS_CLEAN, "total_amount": "700.00", "document_type": "credit_note"}
+        fixed = {**_FIELDS_CLEAN}  # 升级臂修好钱数但没出 document_type
+        result, _ = self._run(_json_outcome(broken), _json_outcome(fixed, model="qwen3.8-max"))
+        self.assertEqual(result.data["document_type"], "credit_note")
+
+    def test_escalate_with_valid_document_type_wins(self):
+        broken = {**_FIELDS_CLEAN, "total_amount": "700.00", "document_type": "receipt"}
+        fixed = {**_FIELDS_CLEAN, "document_type": "simplified_tax_invoice"}
+        result, _ = self._run(_json_outcome(broken), _json_outcome(fixed, model="qwen3.8-max"))
+        self.assertEqual(result.data["document_type"], "simplified_tax_invoice")
 
 
 class EscalationBudgetTests(unittest.TestCase):

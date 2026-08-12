@@ -69,12 +69,12 @@ MODES = (*CONCRETE_MODES, "auto")
 MODE_QWEN = "qwen"
 
 # 能力未齐的档:只准按账号灰度,不许当全局档或套餐默认档(超管写侧 400 挡,见
-# routes/admin_ocr_engine_routes)。
-# qwen 的两臂编排只产钱面字段,不产 document_type —— 而贷记单方向复核(sanity.credit_note
-# 硬闸)与 ABB 分类都拿 document_type 当判据,整机切过去 = 这两条静默失效,退货冲销会当
-# 正常进账过掉。解锁条件:qwen_direct 编排补齐 document_type(两臂 prompt + to_invoice_fields
-# 都出这个字段)后把它从本集合移除,别只改文案。
-PARTIAL_MODES = frozenset({MODE_QWEN})
+# routes/admin_ocr_engine_routes)。机制保留,当前为空。
+# qwen 于 2026-08-12 移出:两臂编排已补 document_type(贷记单硬闸/ABB 分类的判据),
+# 金标 25 张复测 vat/total 两列零漂 + ABB 专项全对 + 贷记单合成加考 2/2。
+# 仍如实记:qwen 页不产明细行与买卖方名址,吃明细的软闸(sanity 行和勾稽)对它不生效,
+# 异常页照旧整页回落 Vision 路——全局切档由 Zihao 在后台拍板,这里只负责不再拦。
+PARTIAL_MODES: frozenset = frozenset()
 
 # mode → LLM 后端覆盖(未列 = 跟全局 OCR_LLM_BACKEND)。engine_context 进入时按档钉后端,
 # 经 backends.override_backend 下发,get_provider/transport 消费——档位与后端单点同源。

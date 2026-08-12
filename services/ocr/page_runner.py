@@ -9,13 +9,13 @@ pipeline.py re-import 回原命名空间 → run_on_* 调用方 + Step2/Step3 �
 
 from __future__ import annotations
 
-import contextvars
 import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
 
+from core.concurrency import submit_ctx
 from . import escalation_budget, gemini_models, image_first, totals_rescue
 from .confidence import check_field_in_l1_text, find_field_min_word_conf
 from .gl_balance_chain import repair_gl_document
@@ -92,12 +92,11 @@ def _process_pages(
     if pattern_memory is None and n_pages > 1 and OCR_PDF_PAGE_WORKERS > 1:
         workers = min(OCR_PDF_PAGE_WORKERS, n_pages)
         by_page: Dict[int, PipelinePageResult] = {}
-        # 反馈闭环 ② · 把当前上下文(OCR 请求级 user/tenant)复制进 worker 线程,
-        # 否则多页 PDF 的页工作线程读不到 contextvar → few-shot 注入漏掉多页场景。
-        # 每个任务一份独立副本(Context 不可并发重入,不能跨 worker 复用同一个)。
+        # 反馈闭环 ② · 页工作线程经 submit_ctx 继承 OCR 请求级 user/tenant 上下文,
+        # 否则多页 PDF 的 few-shot 注入漏掉多页场景。每任务一份独立副本(Context 不可并发重入)。
         with ThreadPoolExecutor(max_workers=workers) as ex:
             futs = {
-                ex.submit(contextvars.copy_context().run, _run_page, i, ib): i
+                submit_ctx(ex, _run_page, i, ib): i
                 for i, ib in enumerate(page_image_bytes_list, start=1)
             }
             for fut in as_completed(futs):

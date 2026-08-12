@@ -24,7 +24,6 @@ qwen 档(2026-08-11)在这条主路上分叉一次:发票/auto 页改走 qwen_di
 
 from __future__ import annotations
 
-import contextvars
 import logging
 import os
 import time
@@ -34,6 +33,7 @@ from typing import List, Optional
 
 from pydantic import ValidationError
 
+from core.concurrency import submit_ctx
 from services.ocr.contracts import (
     DirectReadFallback,
 )  # noqa: F401 — 既有调用方(pipeline/qwen_direct/测试)从本模块 import,兼容再导出
@@ -445,7 +445,7 @@ def run_file(
         ex = ThreadPoolExecutor(max_workers=min(DIRECT_PAGE_WORKERS, n_pages))
         try:
             futs = {
-                ex.submit(contextvars.copy_context().run, _run_page, i, ib): i
+                submit_ctx(ex, _run_page, i, ib): i
                 for i, ib in enumerate(page_image_bytes_list, start=1)
             }
             for fut in as_completed(futs):

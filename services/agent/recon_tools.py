@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 
+from core.concurrency import submit_ctx
 from services.agent import copy_map
 from services.agent.contracts import AgentContext, ToolResult
 
@@ -44,9 +45,9 @@ def overview(ctx: AgentContext) -> ToolResult:
     from concurrent.futures import ThreadPoolExecutor
 
     with ThreadPoolExecutor(max_workers=3) as pool:
-        f_bank = pool.submit(_bank_recent, ctx, limit=3)
-        f_income = pool.submit(_income_recent, ctx, limit=3)
-        f_tax = pool.submit(_tax_recent, ctx, limit=3)
+        f_bank = submit_ctx(pool, _bank_recent, ctx, limit=3)
+        f_income = submit_ctx(pool, _income_recent, ctx, limit=3)
+        f_tax = submit_ctx(pool, _tax_recent, ctx, limit=3)
         bank, income, tax = f_bank.result(), f_income.result(), f_tax.result()
     latest = next((k[0] for k in (bank, income, tax) if k), None)
     receipt = copy_map.recon_receipt(latest) if latest else ""

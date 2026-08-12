@@ -7,6 +7,7 @@ import re
 import logging
 from typing import List, Dict, Any, Optional
 
+from core.concurrency import submit_ctx
 from services.recon.field_comparator import normalize_tax_id, normalize_branch
 
 from services.vat.vat_parser_common import _to_float, PARSER_VERSION
@@ -106,7 +107,7 @@ def parse_with_gemini_paged(file_bytes: bytes, api_key: Optional[str] = None) ->
         return parse_with_gemini(b, "application/pdf", api_key=api_key)
 
     with ThreadPoolExecutor(max_workers=min(_BATCH_WORKERS, len(batches))) as ex:
-        futures = [ex.submit(_one, b) for b in batches]
+        futures = [submit_ctx(ex, _one, b) for b in batches]
         for i, fut in enumerate(futures):
             try:
                 r = fut.result()
@@ -215,7 +216,7 @@ def parse_with_gemini_image_smart(file_bytes: bytes, ext: str, api_key: Optional
             return parse_with_gemini(b, "image/jpeg", api_key=api_key)
 
         with ThreadPoolExecutor(max_workers=2) as ex:
-            futures = [ex.submit(_one, b) for b in bufs]
+            futures = [submit_ctx(ex, _one, b) for b in bufs]
             for i, fut in enumerate(futures):
                 try:
                     r = fut.result()

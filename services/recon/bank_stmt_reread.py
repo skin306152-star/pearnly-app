@@ -18,11 +18,11 @@ EDC/K SHOP ฿28,363 两代同位置被吞),而运维用「单页直读」重读
 
 from __future__ import annotations
 
-import contextvars
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 
+from core.concurrency import submit_ctx
 from services.recon.bank_recon_pipeline import statement_rows_from_entries
 from services.recon.bank_recon_types import StatementRow
 from services.recon.bank_stmt_balance import finalize_rows
@@ -99,17 +99,10 @@ def maybe_reread_chain_breaks(
 
     alt_rows: list[StatementRow] = []
     with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, page_count)) as pool:
-        # 提交时捕获当前上下文:成本归因(services/cost/usage_context)是 contextvars,
-        # 裸 submit 的子线程起始上下文为空,重读这几页的钱会落成「未归因」(同 page_runner 写法)。
+        # 成本归因(services/cost/usage_context)是 contextvars:submit_ctx 提交时快照,
+        # 重读这几页的钱不会落成「未归因」(同 page_runner 写法)。
         futures = [
-            pool.submit(
-                contextvars.copy_context().run,
-                _reread_one_page,
-                file_bytes,
-                page_number,
-                filename,
-                api_key,
-            )
+            submit_ctx(pool, _reread_one_page, file_bytes, page_number, filename, api_key)
             for page_number in range(1, page_count + 1)
         ]
         try:

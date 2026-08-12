@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-import contextvars
 import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, List, Tuple
+
+from core.concurrency import submit_ctx
 
 ProgressCb = Callable[[dict], None]
 
@@ -87,7 +88,7 @@ def _parallel(fn: Callable, items: List, max_workers: int = 4) -> List:
     if len(items) == 1:
         return [fn(items[0])]
     with ThreadPoolExecutor(max_workers=min(max_workers, len(items))) as ex:
-        # 提交时逐件捕获上下文(不能在 worker 里 copy,那时已是空上下文):对账重活底下就是 OCR,
-        # 成本归因走 contextvars,裸 map 会让整批的钱落成「未归因」。
-        futures = [ex.submit(contextvars.copy_context().run, fn, it) for it in items]
+        # 对账重活底下就是 OCR,成本归因走 contextvars:submit_ctx 逐件快照提交时刻的
+        # 上下文(不能在 worker 里 copy,那时已是空上下文),整批的钱不会落成「未归因」。
+        futures = [submit_ctx(ex, fn, it) for it in items]
         return [f.result() for f in futures]

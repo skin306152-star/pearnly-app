@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 from core import feature_flags
+from core.concurrency import submit_ctx
 from services.ai_gateway import attribution
 from services.ocr import escalation_budget
 from services.workorder import decisions, kinds
@@ -261,12 +262,14 @@ def _ocr_in_order(images: list[dict], tenant_id: str, *, governor=None, budget=N
     rest = iter(images)
     try:
         for it in islice(rest, n * 2):
-            window.append((it, pool.submit(_ocr_safe, it, tenant_id, governor, budget)))
+            window.append((it, submit_ctx(pool, _ocr_safe, it, tenant_id, governor, budget)))
         while window:
             item, fut = window.popleft()
             follow = next(rest, None)
             if follow is not None:
-                window.append((follow, pool.submit(_ocr_safe, follow, tenant_id, governor, budget)))
+                window.append(
+                    (follow, submit_ctx(pool, _ocr_safe, follow, tenant_id, governor, budget))
+                )
             yield item, fut.result()
     finally:
         pool.shutdown(wait=False, cancel_futures=True)

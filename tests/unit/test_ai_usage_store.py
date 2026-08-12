@@ -135,6 +135,9 @@ class LogAiUsageTests(unittest.TestCase):
             self._call()
         self.assertIn("INSERT INTO ai_usage", cur.last_sql)
         self.assertEqual(cur.cm_kwargs[0].get("commit"), True)
+        # 系统级台账必须 bypass RLS:RLS_ROLE 强制切角色后,无租户行(网关调用/job worker)
+        # 过不了 WITH CHECK,2026-08-07 起整本台账静默断流 5 天的根子就在这。
+        self.assertEqual(cur.cm_kwargs[0].get("bypass"), True)
         p = cur.last_params
         self.assertEqual(p[0], "tenant-1")
         self.assertEqual(p[1], "user-1")

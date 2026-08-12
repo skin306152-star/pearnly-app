@@ -128,10 +128,16 @@ def log_ai_usage(
         _ensure_once()
         from core import db
 
+        # bypass=True:本表是系统级成本台账,大量行天然无租户(网关调用不带 tenant、job worker
+        # 全部),RLS_ROLE 强制切角色后这些行过不了 WITH CHECK —— 2026-08-07 生产启用
+        # RLS_ROLE=pearnly_app 起,整本台账静默断流 5 天(每笔都在 log_ai_usage failed 里,
+        # 没人看见)。ensure 的 docstring 早预告了这一天:系统级写入走显式 bypass 游标。
+        # tenant_id 列值照存,数据面归因不受影响;本表无用户面读路径,仅超管仪表盘消费。
         with db.get_cursor_rls(
             tenant_id=str(tenant_id) if tenant_id else None,
             user_id=str(user_id) if user_id else None,
             commit=True,
+            bypass=True,
         ) as cur:
             cur.execute(
                 """

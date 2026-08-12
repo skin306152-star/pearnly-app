@@ -18,6 +18,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from core.route_helpers import _log_op, _require_super_admin
+from services.billing.pricing import PDF_TIER1_PRICE_V21
 from services.cost.ai_usage_store import get_cost_by_entry_point
 from services.ocr.contracts import OCR_TASKS
 from services.ocr.engine_policy import (
@@ -149,6 +150,10 @@ async def set_ocr_engine_policy(request: Request):
 async def ocr_engine_costs(request: Request, days: int = Query(7, ge=1, le=90)):
     """逐入口 × 单据类型的成本与每页成本(ai_usage 归因列)。
 
-    读 ai_usage(逐网关调用,一份多页票会有多行)。这条回答的是「哪个入口贵」,不是「跑了多少张」。"""
+    读 ai_usage(逐网关调用,一份多页票会有多行)。这条回答的是「哪个入口贵」,不是「跑了多少张」。
+    售价参考线一并下发(前端不再硬编 1.5):定价单源在 pricing.PDF_TIER1_PRICE_V21,
+    改价只动一处,柱图参考线与明细提示自动跟上。"""
     _require_super_admin(request)
-    return get_cost_by_entry_point(days=days)
+    costs = get_cost_by_entry_point(days=days)
+    costs["price_thb_per_page"] = float(PDF_TIER1_PRICE_V21)
+    return costs

@@ -66,6 +66,14 @@
         );
     }
 
+    // 三件套单一 owner:成本区(admin-engine-cost.js)与这里各有一份逐字拷贝,收拢到本文件,
+    // cost 侧只做薄委托。依赖的 D 是 admin.js 注入的同一份 deps,谁先调用都拿得到同一批函数。
+    window.AdminEngineShared = {
+        t: _t,
+        label: _label,
+        stateBox: _stateBox,
+    };
+
     function _modeSelect(cls, modes, withEmpty, current) {
         let html = '<select class="adm-eng-select ' + cls + '">';
         if (withEmpty)
@@ -199,12 +207,11 @@
             .join('');
     }
 
-    function _renderPolicy() {
-        const host = document.getElementById('adm-eng-policy-body');
-        if (!host) return;
+    /** 档位/套餐/任务三块的可读区 HTML(不含账号灰度)。dirty 时只刷这段,保住未保存的输入。 */
+    function _policyBodyHtml() {
         const planModes = (options && options.plan_modes) || MODE_FALLBACK;
         const taskModes = (options && options.modes) || planModes.concat(['auto']);
-        host.innerHTML =
+        return (
             '<div class="eng-tier-grid" id="adm-eng-tiers">' +
             TIERS.map(_tierCard).join('') +
             '</div>' +
@@ -219,13 +226,17 @@
             D.esc(_t('adm-eng-task-title')) +
             '</h3><span class="cost-section-hint">' +
             D.esc(_t('adm-eng-task-hint')) +
-            '</span></div><div id="adm-eng-tasks"></div>';
+            '</span></div><div id="adm-eng-tasks"></div>'
+        );
+    }
+
+    function _renderPolicyRows() {
         _rowSelects(
             document.getElementById('adm-eng-plans'),
             PLANS,
             'adm-eng-plan-',
             'eng-plan-sel',
-            planModes,
+            (options && options.plan_modes) || MODE_FALLBACK,
             false,
             function (p) {
                 return (policy.defaults_by_plan || {})[p] || policy.mode;
@@ -236,13 +247,29 @@
             TASKS,
             'adm-eng-task-',
             'eng-task-sel',
-            taskModes,
+            (options && options.modes) || MODE_FALLBACK.concat(['auto']),
             true,
             function (k) {
                 return (policy.overrides_by_task || {})[k] || '';
             }
         );
+    }
+
+    /** 全量重画(档位 + 套餐 + 任务 + 账号灰度)。 */
+    function _renderPolicy() {
+        const host = document.getElementById('adm-eng-policy-body');
+        if (!host) return;
+        host.innerHTML = _policyBodyHtml();
+        _renderPolicyRows();
         _renderAccounts();
+    }
+
+    /** 只刷档位/套餐/任务,账号灰度容器原样保留(未保存编辑不能被服务器快照冲掉)。 */
+    function _renderPolicyBody() {
+        const host = document.getElementById('adm-eng-policy-body');
+        if (!host) return;
+        host.innerHTML = _policyBodyHtml();
+        _renderPolicyRows();
     }
 
     function _collect() {
@@ -316,24 +343,53 @@
         });
     }
 
+    /** 账号灰度编辑态与服务器态是否不一致(有未保存改动)。语言切换/整页重渲染会重拉策略,
+     *  不一致时必须保住输入区,不能拿服务器快照把没保存的邮箱/档位冲掉。 */
+    function _accountsDirty(p) {
+        const saved = _accountsFrom(p);
+        if (accounts.length !== saved.length) return true;
+        for (let i = 0; i < accounts.length; i++) {
+            const a = accounts[i];
+            const s = saved[i];
+            if (!s) return true;
+            if ((a.email || '').trim().toLowerCase() !== s.email || a.mode !== s.mode) return true;
+        }
+        return false;
+    }
+
     async function _loadPolicy() {
         const host = document.getElementById('adm-eng-policy-body');
         if (!host) return;
+        // 有未保存编辑时,账号灰度容器在请求期间也原样保留(loading 一盖,输入框就没了)。
+        const keepAccounts = _accountsDirty(policy);
         policy = null;
-        _setBothStates('loading', _t('adm-eng-loading'), '');
+        if (keepAccounts) {
+            host.innerHTML = _stateBox('loading', _t('adm-eng-loading'), '');
+        } else {
+            _setBothStates('loading', _t('adm-eng-loading'), '');
+        }
         try {
             const d = await D.fetch('/api/admin/ocr-engine');
             policy = d.policy || {};
             options = d.options || {};
-            accounts = _accountsFrom(policy);
-            _renderPolicy();
+            if (keepAccounts && _accountsDirty(policy)) {
+                // 编辑还没落库:账号输入区不动,只刷档位/套餐/任务(语言切换就是走这条)。
+                _renderPolicyBody();
+            } else {
+                accounts = _accountsFrom(policy);
+                _renderPolicy();
+            }
             const saved = document.getElementById('adm-eng-saved');
             if (saved)
                 saved.textContent = d.updated_at
                     ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
                     : '';
         } catch (e) {
-            _setBothStates('error', _t('adm-eng-load-fail'), 'policy');
+            if (keepAccounts && _accountsDirty(policy)) {
+                host.innerHTML = _stateBox('error', _t('adm-eng-load-fail'), 'policy');
+            } else {
+                _setBothStates('error', _t('adm-eng-load-fail'), 'policy');
+            }
         }
     }
 

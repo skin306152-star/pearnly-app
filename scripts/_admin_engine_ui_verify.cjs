@@ -143,57 +143,42 @@ async function verifyTierSwitch(page) {
 
 /**
  * 能力未齐的档只准按账号灰度:卡片上要有醒目提示,选成全局要被后端挡回且理由看得见。
- * qwen 不产 document_type,当全局档会让贷记单方向复核静默失效 —— 这是钱路,只能真点一遍。
+ * 2026-08-12 qwen 补齐 document_type + 金标复测过门后 PARTIAL_MODES 清空、qwen 解锁为全局档 ——
+ * 本段据此改写:不再有 partial 提示,选 qwen 存全局应 200 成功(旧假设已过时)。
  */
 async function verifyPartialMode(page) {
-    console.log('\n[2b] C 档只准按账号灰度');
-    const note = page.locator('.eng-tier[data-eng-tier="qwen"] [data-eng-partial="qwen"]');
-    chk('C 卡提示可见', await note.isVisible());
-    const noteStyle = await note.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return { bg: s.backgroundColor, color: s.color, border: s.borderTopColor };
-    });
+    console.log('\n[2b] C 档已解锁为全局档');
+    const noteCount = await page.locator('[data-eng-partial]').count();
     chk(
-        '提示是真样式不是裸文字',
-        noteStyle.bg !== 'rgba(0, 0, 0, 0)' && noteStyle.border !== noteStyle.bg,
-        JSON.stringify(noteStyle)
+        '无 partial 提示(2026-08-12 qwen 解锁后 PARTIAL_MODES 清空)',
+        noteCount === 0,
+        `count=${noteCount}`
     );
-    for (const mode of ['direct35', 'economy', 'selfhost']) {
-        chk(
-            `${mode} 卡不带该提示`,
-            (await page
-                .locator(`.eng-tier[data-eng-tier="${mode}"] [data-eng-partial]`)
-                .count()) === 0
-        );
-    }
-    await shot(page, '02b-partial-note', '.eng-tier[data-eng-tier="qwen"]');
+    await shot(page, '02b-partial-none', '.eng-tier-grid');
 
-    // 真点成全局 → 存 → 后端 400,且理由印在 toast 上
+    // qwen 作全局档保存 → 后端放行 200(解锁前此处是 400 挡回)
     await page.locator('.eng-tier[data-eng-tier="qwen"]').click();
     const posted = page.waitForResponse(
         (r) => r.url().includes('/api/admin/ocr-engine') && r.request().method() === 'POST'
     );
     await page.click('#adm-eng-save');
     const resp = await posted;
-    chk('全局设成 C 档被挡回 400', resp.status() === 400, `status=${resp.status()}`);
-    chk(
-        '错误码是 partial_mode_account_only',
-        String((await resp.json()).detail).startsWith('ocr_engine.partial_mode_account_only'),
-        JSON.stringify(await resp.json())
-    );
-    const toast = page.locator('#admin-toast-host > div').last();
-    await toast.waitFor({ timeout: 5000 });
-    const toastText = await toast.innerText();
-    chk('toast 说清为什么被挡', /只能|按账号|บัญชี/.test(toastText), toastText);
-    const toastBg = await toast.evaluate((el) => getComputedStyle(el).backgroundColor);
-    chk('toast 是错误色', toastBg === 'rgb(220, 38, 38)', toastBg);
-    await shot(page, '02c-partial-blocked');
+    chk('全局设成 C 档保存成功', resp.status() === 200, `status=${resp.status()}`);
 
-    // 重载确认没落库:被挡回 = 线上配置一个字节没动
+    // 存回现役档,别把本地库留在别的档上
+    await page.locator('.eng-tier[data-eng-tier="economy"]').click();
+    const posted2 = page.waitForResponse(
+        (r) => r.url().includes('/api/admin/ocr-engine') && r.request().method() === 'POST'
+    );
+    await page.click('#adm-eng-save');
+    const resp2 = await posted2;
+    chk('切回经济档保存成功', resp2.status() === 200, `status=${resp2.status()}`);
+
+    // 重载确认线上档位回到现役
     await page.reload();
     await page.waitForSelector('.eng-tier');
     const live = await page.locator('.eng-tier.is-on').getAttribute('data-eng-tier');
-    chk('挡回后线上档位没变', live !== 'qwen', `live=${live}`);
+    chk('重载后线上档位是经济档', live === 'economy', `live=${live}`);
 }
 
 async function verifyAccounts(page) {

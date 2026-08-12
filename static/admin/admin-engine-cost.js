@@ -11,8 +11,9 @@
 (function () {
     'use strict';
 
-    // 老板当前对外售价(฿/页)。参考线用它,不是从后端算的 —— 它是定价决策的输入,不是观测值。
-    const PRICE_THB = 1.5;
+    // 售价参考线(฿/页)走后端单源(costs 响应的 price_thb_per_page,源头 pricing.PDF_TIER1_PRICE_V21)。
+    // 缺字段时回落 1.5 照常画参考线 —— 定价是这张图的灵魂,接口少给一个字段不该让整块仪表盘白屏。
+    const PRICE_FALLBACK = 1.5;
     const DAY_OPTIONS = [7, 30, 90];
     // 柱子超过这个数,横轴标签就挤成一团。按每页成本降序取前 N,并在图下说明截断了多少。
     const MAX_BARS = 12;
@@ -21,16 +22,17 @@
     let days = 7;
     let bound = false;
     let unattributed = null;
+    let priceThb = PRICE_FALLBACK;
+    let cache = null; // 最近一次取数的响应;语言切换只重画不重查时用它
 
+    // 三件套与策略区共用,定义在 admin-engine.js(window.AdminEngineShared),这里只做薄委托,
+    // 别再造一份实现 —— 改一处生效两处。D 两模块共用 admin.js 注入的同一份 deps。
     function _t(k) {
-        return D.t(k);
+        return window.AdminEngineShared.t(k);
     }
 
-    /** 缺翻译回落原值:入口/单据枚举随后端加,前端漏配也要照实显示。 */
     function _label(prefix, value) {
-        if (!value) return '—';
-        const text = D.t(prefix + value);
-        return text === prefix + value ? value : text;
+        return window.AdminEngineShared.label(prefix, value);
     }
 
     function _baht(n) {
@@ -49,21 +51,7 @@
     }
 
     function _stateBox(kind, message, retry) {
-        return (
-            '<div class="eng-state eng-state-' +
-            kind +
-            '" data-eng-state="' +
-            kind +
-            '"><span class="eng-state-msg">' +
-            D.esc(message) +
-            '</span>' +
-            (retry
-                ? '<button type="button" class="btn btn-sm" data-eng-retry="costs">' +
-                  D.esc(_t('adm-eng-retry')) +
-                  '</button>'
-                : '') +
-            '</div>'
-        );
+        return window.AdminEngineShared.stateBox(kind, message, retry);
     }
 
     function _rowLabel(r) {
@@ -207,10 +195,10 @@
                             cost_per_page: r.cost_per_page,
                         };
                     }),
-                    PRICE_THB,
+                    priceThb,
                     {
                         axisName: _t('adm-eng-axis-perpage'),
-                        priceLabel: _t('adm-eng-price-line') + ' ' + _baht(PRICE_THB),
+                        priceLabel: _t('adm-eng-price-line') + ' ' + _baht(priceThb),
                     }
                 );
                 window.AdminEngineCharts.renderDonut(pieHost, _donutSlices(rows, unattributed), {
@@ -263,6 +251,14 @@
         _drawCharts(rows);
     }
 
+    /** 售价提示行:文案里的 {price} 在运行时注入(走后端单源,不写死)。语言切换重画也走这条。 */
+    function _renderHint() {
+        const el = document.getElementById('adm-eng-cost-hint');
+        if (!el) return;
+        // 模板自带 ฿ 前缀(zh/th 原文都是「฿1.50/页」),这里只填数字。
+        el.textContent = _t('adm-eng-cost-hint').replace('{price}', D.fmt(priceThb, 2));
+    }
+
     async function load() {
         const host = document.getElementById('adm-eng-cost-body');
         if (!host) return;
@@ -270,10 +266,19 @@
         host.innerHTML = _stateBox('loading', _t('adm-eng-loading'), '');
         try {
             const d = await D.fetch('/api/admin/ocr-engine/costs?days=' + days);
-            _renderData(d || {});
+            cache = d || {};
+            if (cache.price_thb_per_page != null) priceThb = cache.price_thb_per_page;
+            _renderData(cache);
         } catch (e) {
             host.innerHTML = _stateBox('error', _t('adm-eng-cost-fail'), 'costs');
         }
+        _renderHint();
+    }
+
+    /** 语言切换钩子:拿上次拉到的数据重画,不再打接口(查询参数没变,重查只会白跑一趟)。 */
+    function rerender() {
+        if (cache) _renderData(cache);
+        _renderHint();
     }
 
     function _renderDays() {
@@ -316,7 +321,9 @@
         D = deps;
         _bind();
         _renderDays();
-        load();
+        // 有缓存 = 语言切换重渲染,只重画不重查;没缓存才是第一次进页面,取数 + 画。
+        if (cache) rerender();
+        else load();
     }
 
     window.AdminEngineCost = { render: render };

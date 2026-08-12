@@ -248,12 +248,15 @@ class PolicyRouteTests(unittest.TestCase):
             "rows": [{"entry_point": "bank_recon", "cost_per_page": 2.2}],
             "unattributed": {"calls": 3, "cost_thb": 0.5},
             "generated_at": "2026-08-11T00:00:00+00:00",
+            # 售价参考线由后端单源下发(pricing.PDF_TIER1_PRICE_V21),前端不再硬编
+            "price_thb_per_page": 1.5,
         }
         with mock.patch.object(mod, "get_cost_by_entry_point", return_value=payload) as m_costs:
             r = self.client.get("/api/admin/ocr-engine/costs?days=30")
         self.assertEqual(r.status_code, 200)
         m_costs.assert_called_once_with(days=30)
         self.assertEqual(r.json(), payload)
+        self.assertEqual(r.json()["price_thb_per_page"], 1.5)
 
     def test_costs_route_days_bounds_enforced(self):
         for bad in ("0", "91"):

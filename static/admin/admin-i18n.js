@@ -287,7 +287,7 @@
             'adm-eng-retry': '重试',
             'adm-eng-cost-title': '每页成本 · 按入口',
             'adm-eng-cost-hint':
-                '对照当前售价 ฿1.50/页 · 超线的柱子是红的 · 页数未知的行只进明细表',
+                '对照当前售价 ฿{price}/页 · 超线的柱子是红的 · 页数未知的行只进明细表',
             'adm-eng-cost-empty': '这段时间没有带归因的 OCR 调用',
             'adm-eng-cost-fail': '成本数据读取失败',
             'adm-eng-chart-fail': '图表组件没加载出来',
@@ -328,8 +328,6 @@
             'adm-eng-doc-gl_ledger': 'GL 总账',
             'adm-eng-doc-gl_vat': 'GL-VAT',
             'adm-eng-doc-vat_report': 'VAT 报表',
-            'adm-eng-doc-voucher': '记账凭证',
-            'adm-eng-doc-generated_table': '生成表格',
             'adm-eng-doc-auto': '自动判别',
             'adm-set-allowlist-title': '灰度名单',
             'adm-set-allowlist-hint': '按邮箱或用户 ID 加入 · 仅在「仅名单内用户」策略下生效',
@@ -922,7 +920,7 @@
             'adm-eng-retry': 'ลองใหม่',
             'adm-eng-cost-title': 'ต้นทุนต่อหน้า · ตามช่องทาง',
             'adm-eng-cost-hint':
-                'เทียบราคาขายปัจจุบัน ฿1.50/หน้า · แท่งที่เกินเส้นเป็นสีแดง · แถวที่ไม่รู้จำนวนหน้าอยู่เฉพาะในตาราง',
+                'เทียบราคาขายปัจจุบัน ฿{price}/หน้า · แท่งที่เกินเส้นเป็นสีแดง · แถวที่ไม่รู้จำนวนหน้าอยู่เฉพาะในตาราง',
             'adm-eng-cost-empty': 'ช่วงเวลานี้ไม่มีการเรียก OCR ที่มีข้อมูลช่องทาง',
             'adm-eng-cost-fail': 'อ่านข้อมูลต้นทุนไม่สำเร็จ',
             'adm-eng-chart-fail': 'โหลดคอมโพเนนต์กราฟไม่สำเร็จ',
@@ -964,8 +962,6 @@
             'adm-eng-doc-gl_ledger': 'บัญชีแยกประเภท GL',
             'adm-eng-doc-gl_vat': 'GL-VAT',
             'adm-eng-doc-vat_report': 'รายงาน VAT',
-            'adm-eng-doc-voucher': 'ใบสำคัญบัญชี',
-            'adm-eng-doc-generated_table': 'ตารางที่ระบบสร้าง',
             'adm-eng-doc-auto': 'ตรวจอัตโนมัติ',
             'adm-set-allowlist-title': 'รายชื่อทยอยเปิด',
             'adm-set-allowlist-hint':

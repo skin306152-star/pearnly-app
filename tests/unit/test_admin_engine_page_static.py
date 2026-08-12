@@ -102,8 +102,12 @@ class SaveContractTests(unittest.TestCase):
 
 
 class CostPanelTests(unittest.TestCase):
-    def test_price_reference_line_is_the_selling_price(self):
-        self.assertRegex(COST_JS, r"const PRICE_THB = 1\.5;")
+    def test_price_reference_line_comes_from_backend(self):
+        # 售价参考线走后端单源(costs 响应 price_thb_per_page,源头 pricing.PDF_TIER1_PRICE_V21);
+        # 前端只留缺字段时回落 1.5 的兜底,不再硬编「当前定价」。
+        self.assertRegex(COST_JS, r"const PRICE_FALLBACK = 1\.5;")
+        self.assertIn("cache.price_thb_per_page", COST_JS)
+        self.assertIn("priceThb", COST_JS)
 
     def test_unknown_pages_never_become_zero_cost(self):
         # cost_per_page 为 null 的行:表里写 —,柱图里不画。写成 0 等于说它免费。
@@ -117,7 +121,9 @@ class CostPanelTests(unittest.TestCase):
     def test_four_states_all_present(self):
         for kind in ("loading", "empty", "error"):
             self.assertIn(f"_stateBox('{kind}'", COST_JS, f"成本区缺 {kind} 态")
-        self.assertIn('data-eng-retry="costs"', COST_JS)
+        # 重试按钮渲染在共享 _stateBox(admin-engine.js 单一 owner),cost 侧以 'costs' 为 retry 值
+        self.assertRegex(COST_JS, r"_stateBox\('error', _t\('adm-eng-cost-fail'\), 'costs'\)")
+        self.assertIn('data-eng-retry="', ENGINE_JS)
 
     def test_day_range_switch(self):
         self.assertIn("const DAY_OPTIONS = [7, 30, 90];", COST_JS)

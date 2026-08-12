@@ -1,11 +1,9 @@
 # UI 设计合规扫描报告 · 575 个源文件全扫
 
 
-## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
+## 旧色/旧蓝(应改令牌) — 命中 2(2 文件)
      1  static\admin\admin.css
         └ 521: color: #2563eb;
-     1  static\admin\admin.js
-        └ 322: google_vision: { label: 'Google Vision', color: '#2563EB' },
      1  static\pos\pos-data.js
         └ 349: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
@@ -95,14 +93,14 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 428: 'tn-status-overdraft': '⚠ 透支',
-        └ 470: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 426: 'tn-status-overdraft': '⚠ 透支',
+        └ 468: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
      5  static\admin\admin.js
-        └ 1849: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
-        └ 1916: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
+        └ 1896: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
+        └ 1963: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
         └ 364: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
@@ -160,8 +158,8 @@
         └ 168: max-width: 520px;
         └ 173: max-width: 420px;
      5  static\admin\admin.js
-        └ 1664: '<div class="cpw-forgot-modal" style="max-width:420px">' +
-        └ 1730: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1711: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1777: '<div class="cpw-forgot-modal" style="max-width:420px">' +
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
@@ -439,8 +437,8 @@
         └ 1220: 'time-min-ago-suffix': ' 分钟前',
         └ 1221: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 552: 'time-hours-ago': '{n} 小时前',
-        └ 553: 'time-days-ago': '{n} 天前',
+        └ 550: 'time-hours-ago': '{n} 小时前',
+        └ 551: 'time-days-ago': '{n} 天前',
 
 ## table-align-right — 命中 21(13 文件)
 > DESIGN_SYSTEM §21 表格对齐规范:表头居中、短内容格居中、长文本格靠左,禁止 th/td 右对齐
@@ -480,11 +478,11 @@
         └ 383: #stc-op-mask td.num .stc-in,
 #stc-op-mask input[type='number'] { text-align: right }
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 863(59 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 855(59 文件)
    157  static\home-18-admin-users.css
     78  static\pos\pos.css
-    68  static\admin\admin.js
     63  static\erp-mrerp-connect.css
+    60  static\admin\admin.js
     51  static\pos\pos-restaurant.css
     40  static\admin\admin.css
     39  static\landing\landing-auth.css

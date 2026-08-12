@@ -11,23 +11,12 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
+const { chk, summary } = require('./_verify_shared.cjs');
 
 const BASE = process.env.BASE || 'http://127.0.0.1:7861';
 const USER = process.env.ADMIN_USER || 'eng_e2e_admin';
 const PW = process.env.ADMIN_PW || 'EngE2E!local-2026';
 const SHOTS = path.join('tests', 'e2e', '_artifacts', 'admin-engine');
-
-let pass = 0;
-let fail = 0;
-function chk(name, ok, extra) {
-    if (ok) {
-        pass++;
-        console.log(`  PASS  ${name}${extra ? ' · ' + extra : ''}`);
-    } else {
-        fail++;
-        console.log(`  FAIL  ${name}${extra ? ' · ' + extra : ''}`);
-    }
-}
 
 // 截图前先把目标滚进视口:图表挂在页面第三屏,不滚就截到一张看不见图的「证据」。
 async function shot(page, name, sel) {
@@ -79,7 +68,7 @@ function cssVarRgb(page, name) {
 async function verifyTiers(page) {
     console.log('\n[1] 档位卡片区');
     const cards = page.locator('.eng-tier[data-eng-tier]:not(.eng-tier-auto)');
-    chk('四张档位卡渲染', (await cards.count()) === 4, `count=${await cards.count()}`);
+    chk('四张档位卡渲染 · ' + `count=${await cards.count()}`, (await cards.count()) === 4);
     for (const mode of ['direct35', 'economy', 'qwen', 'selfhost']) {
         chk(
             `卡片 ${mode} 可见`,
@@ -98,15 +87,15 @@ async function verifyTiers(page) {
         .locator('.eng-tier:not(.is-on)')
         .first()
         .evaluate((el) => getComputedStyle(el).borderTopColor);
-    chk('现役卡边框与未选中不同色', on.border !== off, `${on.border} vs ${off}`);
-    chk('现役卡有外圈', on.shadow !== 'none', on.shadow);
+    chk('现役卡边框与未选中不同色 · ' + `${on.border} vs ${off}`, on.border !== off);
+    chk('现役卡有外圈 · ' + on.shadow, on.shadow !== 'none');
     chk('现役徽章可见', await page.locator('.eng-tier.is-on .eng-tier-live').isVisible());
 
     // 模型链等宽字体
     const ff = await page
         .locator('.eng-tier[data-eng-tier="qwen"] .eng-tier-models')
         .evaluate((el) => getComputedStyle(el).fontFamily);
-    chk('模型链等宽字体', /mono/i.test(ff), ff);
+    chk('模型链等宽字体 · ' + ff, /mono/i.test(ff));
 
     // 自部署没实测过 → 三项必须是占位符,不许借别档数字
     const selfhost = await page
@@ -120,7 +109,7 @@ async function verifyTiers(page) {
 
     // qwen 卡的实测数字真的印在页面上
     const qwenTxt = await page.locator('.eng-tier[data-eng-tier="qwen"]').innerText();
-    chk('qwen 每页成本可见', qwenTxt.includes('0.077'), qwenTxt.split('\n').join(' | '));
+    chk('qwen 每页成本可见 · ' + qwenTxt.split('\n').join(' | '), qwenTxt.includes('0.077'));
     chk('qwen 质量分可见', qwenTxt.includes('98%'));
     chk('金标脚注可见', await page.locator('.eng-tier-foot').isVisible());
     await shot(page, '01-tiers');
@@ -135,7 +124,7 @@ async function verifyTierSwitch(page) {
     const cls = await qwen.evaluate((el) => el.classList.contains('is-on'));
     chk('高亮跟着走', cls);
     const others = await page.locator('.eng-tier.is-on').count();
-    chk('高亮唯一', others === 1, `count=${others}`);
+    chk('高亮唯一 · ' + `count=${others}`, others === 1);
     await shot(page, '02-tier-switch-qwen');
     // 验收完切回现役档,别把本地库留在别的档上
     await page.locator('.eng-tier[data-eng-tier="economy"]').click();
@@ -163,7 +152,7 @@ async function verifyPartialMode(page) {
     );
     await page.click('#adm-eng-save');
     const resp = await posted;
-    chk('全局设成 C 档保存成功', resp.status() === 200, `status=${resp.status()}`);
+    chk('全局设成 C 档保存成功 · ' + `status=${resp.status()}`, resp.status() === 200);
 
     // 存回现役档,别把本地库留在别的档上
     await page.locator('.eng-tier[data-eng-tier="economy"]').click();
@@ -172,13 +161,13 @@ async function verifyPartialMode(page) {
     );
     await page.click('#adm-eng-save');
     const resp2 = await posted2;
-    chk('切回经济档保存成功', resp2.status() === 200, `status=${resp2.status()}`);
+    chk('切回经济档保存成功 · ' + `status=${resp2.status()}`, resp2.status() === 200);
 
     // 重载确认线上档位回到现役
     await page.reload();
     await page.waitForSelector('.eng-tier');
     const live = await page.locator('.eng-tier.is-on').getAttribute('data-eng-tier');
-    chk('重载后线上档位是经济档', live === 'economy', `live=${live}`);
+    chk('重载后线上档位是经济档 · ' + `live=${live}`, live === 'economy');
 }
 
 async function verifyAccounts(page) {
@@ -207,7 +196,7 @@ async function verifyAccounts(page) {
     );
     await page.click('#adm-eng-save');
     const resp = await saved;
-    chk('保存返回 200', resp.status() === 200, `status=${resp.status()}`);
+    chk('保存返回 200 · ' + `status=${resp.status()}`, resp.status() === 200);
     const body = JSON.parse(resp.request().postData() || '{}');
     chk(
         '回传完整 overrides_by_account',
@@ -247,13 +236,13 @@ async function verifyCostCharts(page) {
     console.log('\n[4] 成本仪表盘 · 柱图 + 参考线');
     await page.waitForSelector('#adm-eng-chart-bar canvas', { timeout: 15000 });
     const box = await page.locator('#adm-eng-chart-bar').boundingBox();
-    chk('柱图有实际尺寸', box && box.width > 200 && box.height > 200, JSON.stringify(box));
+    chk('柱图有实际尺寸 · ' + JSON.stringify(box), box && box.width > 200 && box.height > 200);
 
     const opt = await chartOption(page, '#adm-eng-chart-bar');
     chk('echarts 实例存在', !!opt);
     const series = opt.series[0];
     const line = series.markLine.data[0];
-    chk('参考线钉在 1.5 铢', Number(line.yAxis) === 1.5, `yAxis=${line.yAxis}`);
+    chk('参考线钉在 1.5 铢 · ' + `yAxis=${line.yAxis}`, Number(line.yAxis) === 1.5);
     chk(
         '参考线标了「当前定价」',
         String(series.markLine.label.formatter).includes('1.50'),
@@ -272,7 +261,7 @@ async function verifyCostCharts(page) {
         `over=${over} under=${under} bad=${JSON.stringify(wrong.map((w) => [w.value, w.itemStyle.color]))}`
     );
     const overCount = series.data.filter((d) => d.value > 1.5).length;
-    chk('样例里确有超线入口', overCount > 0, `overCount=${overCount}`);
+    chk('样例里确有超线入口 · ' + `overCount=${overCount}`, overCount > 0);
 
     const donut = await chartOption(page, '#adm-eng-chart-pie');
     chk('环形图渲染', !!donut && donut.series[0].type === 'pie');
@@ -303,19 +292,19 @@ async function verifyTable(page) {
         .locator('.eng-table th')
         .first()
         .evaluate((el) => getComputedStyle(el).textAlign);
-    chk('表头居中', th === 'center', th);
+    chk('表头居中 · ' + th, th === 'center');
     const numTd = await page
         .locator('.eng-table tbody tr:first-child td:nth-child(5)')
         .evaluate((el) => getComputedStyle(el).textAlign);
-    chk('每页成本列居中', numTd === 'center', numTd);
+    chk('每页成本列居中 · ' + numTd, numTd === 'center');
     const textTd = await page
         .locator('.eng-table .eng-cell-text')
         .first()
         .evaluate((el) => getComputedStyle(el).textAlign);
-    chk('模型列(长文本)靠左', textTd === 'left', textTd);
+    chk('模型列(长文本)靠左 · ' + textTd, textTd === 'left');
 
     const rows = await page.locator('.eng-table tbody tr').count();
-    chk('明细表有行', rows > 0, `rows=${rows}`);
+    chk('明细表有行 · ' + `rows=${rows}`, rows > 0);
     const bodyText = await page.locator('.eng-table tbody').innerText();
     chk('页数未知写占位符 —', bodyText.includes('—'));
     chk('未归因行在表里', /未归因|ไม่ระบุ/.test(bodyText));
@@ -327,7 +316,7 @@ async function verifyTable(page) {
         .locator('.eng-table tbody tr:first-child td')
         .first()
         .evaluate((el) => getComputedStyle(el).color);
-    chk('未归因行灰显', muted !== normal, `${muted} vs ${normal}`);
+    chk('未归因行灰显 · ' + `${muted} vs ${normal}`, muted !== normal);
     await shot(page, '08-cost-table', '.eng-table');
 }
 
@@ -342,7 +331,7 @@ async function verifyDaySwitch(page) {
     const bgOff = await page
         .locator('[data-eng-days="7"]')
         .evaluate((el) => getComputedStyle(el).backgroundColor);
-    chk('选中档底色变化', bg !== bgOff, `${bg} vs ${bgOff}`);
+    chk('选中档底色变化 · ' + `${bg} vs ${bgOff}`, bg !== bgOff);
     await page.waitForSelector('#adm-eng-chart-bar canvas');
     await shot(page, '09-days-30', '#adm-eng-days');
     await page.click('[data-eng-days="7"]');
@@ -390,7 +379,7 @@ async function verifyStates(page) {
     chk('错误态可见', await err.isVisible());
     const errColor = await err.evaluate((el) => getComputedStyle(el).color);
     const danger = await cssVarRgb(page, '--danger');
-    chk('错误态用告警色', errColor === danger, `${errColor} vs ${danger}`);
+    chk('错误态用告警色 · ' + `${errColor} vs ${danger}`, errColor === danger);
     chk('错误态给重试按钮', await page.locator('[data-eng-retry="costs"]').isVisible());
     await shot(page, '12-state-error', '#adm-eng-cost-body');
 
@@ -428,7 +417,7 @@ async function verifyFullPage(page) {
     await page.click('button[data-admin-lang="th"]');
     await page.waitForSelector('#adm-eng-chart-bar canvas', { timeout: 20000 });
     const title = await page.locator('#page-admin-engine .page-title').innerText();
-    chk('标题切泰语', /[฀-๿]/.test(title), title);
+    chk('标题切泰语 · ' + title, /[฀-๿]/.test(title));
     const tier = await page.locator('.eng-tier[data-eng-tier="economy"]').innerText();
     chk('档位卡切泰语', /[฀-๿]/.test(tier));
     await page.screenshot({ path: path.join(SHOTS, '16-thai.png'), fullPage: true });
@@ -441,8 +430,7 @@ async function verifyFullPage(page) {
     const browser = await chromium.launch();
     const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
     page.on('pageerror', (e) => {
-        fail++;
-        console.log('  FAIL  页面 JS 报错 · ' + e.message);
+        chk('页面 JS 报错 · ' + e.message, false);
     });
     await page.addInitScript((t) => localStorage.setItem('mrpilot_token', t), token);
     await page.goto(`${BASE}/admin/engine`, { waitUntil: 'domcontentloaded' });
@@ -459,8 +447,7 @@ async function verifyFullPage(page) {
     await verifyFullPage(page);
 
     await browser.close();
-    console.log(`\n通过 ${pass} · 失败 ${fail}`);
-    process.exit(fail ? 1 : 0);
+    process.exit(summary());
 })().catch((e) => {
     console.error(e);
     process.exit(1);

@@ -318,12 +318,14 @@
     // ============ 引擎归一 + 配色(成本构成 / 趋势图共用 · 2026-05-25)============
     // ocr_cost_log.engine 原始值:pipeline_v1 / pipeline_v1_table / gemini-vex / cache / text_path 等
     // 归一到 4 桶 + 其他 · 文字色块不全黑(满足"图例小色块")
+    // 配色 = admin-viz.css 的分类色板令牌(定序不轮回 · 色觉分离度已校验 · admin-engine-charts.js 同源)。
+    // 内联 style 直接写 var() 即可,ECharts 侧画图时解析成具体色值。
     const _ENGINE_META = {
-        google_vision: { label: 'Google Vision', color: '#2563EB' },
-        pipeline_v1: { label: 'Pipeline V1', color: '#0891B2' },
-        gemini: { label: 'Gemini', color: '#16A34A' },
-        'gemini-vex': { label: 'Gemini VEX', color: '#7C3AED' },
-        other: { label: '其他', color: '#9CA3AF' },
+        google_vision: { label: 'Google Vision', color: 'var(--viz-1)' },
+        pipeline_v1: { label: 'Pipeline V1', color: 'var(--viz-2)' },
+        gemini: { label: 'Gemini', color: 'var(--viz-3)' },
+        'gemini-vex': { label: 'Gemini VEX', color: 'var(--viz-4)' },
+        other: { label: '其他', color: 'var(--viz-other)' },
     };
     const _ENGINE_ORDER = ['google_vision', 'pipeline_v1', 'gemini', 'gemini-vex', 'other'];
     function _canonEngine(e) {
@@ -581,14 +583,72 @@
         tbody.innerHTML = rows + pager;
     }
 
-    // ============ 30 天成本趋势(堆叠柱 + 总花费折线 · 2026-05-25 重做)============
-    // 纯 UI/前端聚合:不改任何扣费逻辑。数据 = /api/admin/cost/daily_trend?days=30 → {days,by_engine}
+    // ============ 30 天成本趋势(ECharts · 2026-08-12 收编)============
+    // 纯 UI/前端聚合:不改任何扣费逻辑。数据 = /api/admin/cost/daily_trend?days=30 → {days,by_engine}。
+    // 原手写 SVG 折线/堆叠柱收编 ECharts,交互(分段切换 / 图例开关 / hover 明细)原样保留;
+    // 颜色全部取 admin-viz.css 令牌,JS 不写死色值(admin-engine-charts.js 同源)。
     const _ctState = { metric: 'cost', hidden: {}, days: [], byEngine: [], bound: false };
     const _CT_METRIC = {
         cost: { f: 'cost_thb', money: true },
         count: { f: 'invoices', money: false },
         pages: { f: 'pages', money: false },
     };
+
+    let _ctChart = null;
+    let _ctEchartsPromise = null;
+    let _ctResizeTimer = null;
+
+    // 按需注入的脚本 URL 共用 admin.js 自己的 ?v:CDN 按 URL 缓存,指纹不同步 = 永远发旧文件
+    // (scan-loader.js / admin-engine-charts.js 同招)。
+    function _adminAssetVersion() {
+        const self = document.querySelector('script[src*="/static/admin/admin.js"]');
+        const m = self && self.src.match(/[?&]v=([^&]+)/);
+        return m ? m[1] : '';
+    }
+
+    // admin-viz.css 令牌 → 实际色值:内联 style 直接写 var() 即可,ECharts 的 option 只认具体
+    // 颜色,这里在画图时解析;令牌读不到就回落 cssVar 原文,不许画成隐形。
+    function _vizColor(cssVar) {
+        const m = String(cssVar || '').match(/^var\((--[\w-]+)\)$/);
+        if (!m) return cssVar;
+        try {
+            const v = getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim();
+            return v || cssVar;
+        } catch (e) {
+            return cssVar;
+        }
+    }
+
+    // echarts 只在这张图出现时才拉(static/vendor/echarts · 664KB),失败清掉记录允许重试。
+    function _ensureECharts() {
+        if (window.echarts) return Promise.resolve(window.echarts);
+        if (_ctEchartsPromise) return _ctEchartsPromise;
+        _ctEchartsPromise = new Promise(function (resolve, reject) {
+            const s = document.createElement('script');
+            s.src =
+                '/static/vendor/echarts/echarts.common.min.js' +
+                (_adminAssetVersion() ? '?v=' + _adminAssetVersion() : '');
+            s.async = true;
+            s.onload = function () {
+                if (window.echarts) resolve(window.echarts);
+                else reject(new Error('echarts loaded but missing'));
+            };
+            s.onerror = function () {
+                _ctEchartsPromise = null;
+                reject(new Error('echarts load failed'));
+            };
+            document.head.appendChild(s);
+        });
+        return _ctEchartsPromise;
+    }
+
+    function _ctDisposeChart() {
+        if (!_ctChart) return;
+        try {
+            _ctChart.dispose();
+        } catch (e) {}
+        _ctChart = null;
+    }
 
     function _ctBindControls() {
         if (_ctState.bound) return;
@@ -619,223 +679,7 @@
         _drawCostTrend();
     }
 
-    function _drawCostTrend() {
-        const wrap = document.getElementById('cost-trend-chart');
-        if (!wrap) return;
-        const days = _ctState.days || [];
-        const metric = _ctState.metric || 'cost';
-        const mf = (_CT_METRIC[metric] || _CT_METRIC.cost).f;
-        const money = (_CT_METRIC[metric] || _CT_METRIC.cost).money;
-        // 空状态
-        if (!days.length) {
-            wrap.innerHTML =
-                '<div class="ct-empty">' +
-                '<div class="ct-empty-title">' +
-                _esc(_t('cost-trend-empty-title')) +
-                '</div>' +
-                '<div class="ct-empty-desc">' +
-                _esc(_t('cost-trend-empty-desc')) +
-                '</div>' +
-                '<button class="btn btn-ghost btn-sm" id="ct-empty-refresh">' +
-                _esc(_t('cost-refresh')) +
-                '</button>' +
-                '</div>';
-            const rb = document.getElementById('ct-empty-refresh');
-            if (rb) rb.addEventListener('click', _renderCostTrend);
-            return;
-        }
-        // 1. 按天聚合引擎(归一桶)
-        const engByDay = {};
-        (_ctState.byEngine || []).forEach((r) => {
-            const k = _canonEngine(r.engine);
-            (engByDay[r.day] = engByDay[r.day] || {})[k] = (engByDay[r.day][k] || 0) + (r[mf] || 0);
-        });
-        // 2. 出现过的引擎(按固定顺序 · 排除被图例隐藏的)
-        const present = _ENGINE_ORDER.filter((k) =>
-            days.some((d) => (engByDay[d.day] || {})[k] > 0)
-        );
-        const visible = present.filter((k) => !_ctState.hidden[k]);
-        // 3. 每天总值(用 days 的口径 · 折线走真总值) + 可见堆叠值
-        const dayTotal = days.map((d) => d[mf] || 0);
-        const maxTotal = Math.max(1, ...dayTotal);
-        // nice 上界
-        const niceMax = _ctNiceMax(maxTotal);
-        const avg =
-            dayTotal.filter((v) => v > 0).reduce((a, b) => a + b, 0) /
-            (dayTotal.filter((v) => v > 0).length || 1);
-        // 4. 几何
-        const W = 800,
-            H = 240,
-            padL = money ? 50 : 42,
-            padR = 12,
-            padT = 12,
-            padB = 26;
-        const plotW = W - padL - padR,
-            plotH = H - padT - padB,
-            baseY = padT + plotH;
-        const n = days.length;
-        const colW = plotW / n;
-        const bw = Math.max(3, Math.min(22, colW * 0.62));
-        const yOf = (v) => baseY - (v / niceMax) * plotH;
-        const fmtTick = (v) => (money ? '฿' + _ctShort(v) : _ctShort(v));
-        // 5. Y 轴刻度 + 网格
-        let svg = '';
-        const ticks = 4;
-        for (let t = 0; t <= ticks; t++) {
-            const val = (niceMax / ticks) * t;
-            const y = yOf(val);
-            svg +=
-                '<line x1="' +
-                padL +
-                '" y1="' +
-                y +
-                '" x2="' +
-                (W - padR) +
-                '" y2="' +
-                y +
-                '" stroke="#eee" stroke-width="1"/>';
-            svg +=
-                '<text x="' +
-                (padL - 6) +
-                '" y="' +
-                (y + 3) +
-                '" text-anchor="end" font-size="9" fill="#9ca3af">' +
-                fmtTick(val) +
-                '</text>';
-        }
-        // 6. 堆叠柱 + X 轴标签 + 异常点 + hover 热区
-        const linePts = [];
-        for (let i = 0; i < n; i++) {
-            const cx = padL + colW * i + colW / 2;
-            const eng = engByDay[days[i].day] || {};
-            let acc = 0;
-            visible.forEach((k) => {
-                const v = eng[k] || 0;
-                if (v <= 0) return;
-                const h = (v / niceMax) * plotH;
-                const y = baseY - acc - h;
-                svg +=
-                    '<rect x="' +
-                    (cx - bw / 2) +
-                    '" y="' +
-                    y +
-                    '" width="' +
-                    bw +
-                    '" height="' +
-                    Math.max(0.5, h) +
-                    '" fill="' +
-                    _ENGINE_META[k].color +
-                    '" rx="1"/>';
-                acc += h;
-            });
-            linePts.push(cx + ',' + yOf(dayTotal[i]));
-            // 异常峰值:> 日均 2 倍
-            if (dayTotal[i] > avg * 2 && dayTotal[i] > 0) {
-                svg +=
-                    '<circle cx="' +
-                    cx +
-                    '" cy="' +
-                    (yOf(dayTotal[i]) - 6) +
-                    '" r="2.6" fill="#DC2626"/>';
-            }
-            // X 标签:每 5 天 + 末日
-            if (i % 5 === 0 || i === n - 1) {
-                svg +=
-                    '<text x="' +
-                    cx +
-                    '" y="' +
-                    (baseY + 14) +
-                    '" text-anchor="middle" font-size="9" fill="#9ca3af">' +
-                    _esc(String(days[i].day).slice(5)) +
-                    '</text>';
-            }
-        }
-        // 7. 总花费折线 + 端点
-        svg +=
-            '<polyline points="' +
-            linePts.join(' ') +
-            '" fill="none" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/>';
-        // 8. hover 热区(透明 · 全高 · 带 data-i)
-        for (let i = 0; i < n; i++) {
-            const x = padL + colW * i;
-            svg +=
-                '<rect class="ct-hit" data-i="' +
-                i +
-                '" x="' +
-                x +
-                '" y="' +
-                padT +
-                '" width="' +
-                colW +
-                '" height="' +
-                plotH +
-                '" fill="transparent"/>';
-        }
-        // 9. 图例(可点切)
-        const legend = present
-            .map((k) => {
-                const off = _ctState.hidden[k] ? ' ct-legend-off' : '';
-                return (
-                    '<button class="ct-legend-item' +
-                    off +
-                    '" data-eng="' +
-                    k +
-                    '"><span class="ct-legend-dot" style="background:' +
-                    _ENGINE_META[k].color +
-                    '"></span>' +
-                    _esc(_ENGINE_META[k].label) +
-                    '</button>'
-                );
-            })
-            .join('');
-        wrap.innerHTML =
-            '<div class="ct-legend">' +
-            legend +
-            '</div>' +
-            '<div class="ct-plot">' +
-            '<svg viewBox="0 0 ' +
-            W +
-            ' ' +
-            H +
-            '" preserveAspectRatio="none" class="ct-svg">' +
-            svg +
-            '</svg>' +
-            '<div class="ct-tooltip" id="ct-tooltip" style="display:none"></div>' +
-            '</div>';
-        // 图例点击切换
-        wrap.querySelectorAll('.ct-legend-item').forEach((b) => {
-            b.addEventListener('click', () => {
-                const k = b.dataset.eng;
-                _ctState.hidden[k] = !_ctState.hidden[k];
-                _drawCostTrend();
-            });
-        });
-        // hover tooltip
-        const plot = wrap.querySelector('.ct-plot');
-        const tip = wrap.querySelector('#ct-tooltip');
-        if (plot && tip) {
-            plot.addEventListener('mousemove', (ev) => {
-                const tgt = ev.target;
-                if (!tgt || !tgt.classList || !tgt.classList.contains('ct-hit')) {
-                    tip.style.display = 'none';
-                    return;
-                }
-                const i = parseInt(tgt.dataset.i, 10);
-                tip.innerHTML = _ctTooltip(i, money);
-                tip.style.display = 'block';
-                const pr = plot.getBoundingClientRect();
-                let lx = ev.clientX - pr.left + 12;
-                if (lx > pr.width - 150) lx = ev.clientX - pr.left - 150;
-                tip.style.left = Math.max(0, lx) + 'px';
-                tip.style.top = Math.max(0, ev.clientY - pr.top + 8) + 'px';
-            });
-            plot.addEventListener('mouseleave', () => {
-                tip.style.display = 'none';
-            });
-        }
-    }
-
-    function _ctTooltip(i, money) {
+    function _ctTooltipHtml(i, money) {
         const d = _ctState.days[i];
         if (!d) return '';
         const mf = (_CT_METRIC[_ctState.metric] || _CT_METRIC.cost).f;
@@ -846,7 +690,6 @@
             eng[k] = (eng[k] || 0) + (r[mf] || 0);
         });
         const val = (v) => (money ? '฿' + _fmt(v || 0, 2) : String(v || 0));
-        const cntLbl = _curLang === 'th' ? '次' : '次';
         let h =
             '<div class="ct-tt-day">' +
             _esc(d.day) +
@@ -883,18 +726,222 @@
         return h;
     }
 
-    function _ctNiceMax(v) {
-        if (v <= 0) return 1;
-        const pow = Math.pow(10, Math.floor(Math.log10(v)));
-        const n = v / pow;
-        const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
-        return step * pow;
+    function _ctEngineByLabel(label) {
+        for (let i = 0; i < _ENGINE_ORDER.length; i++) {
+            const k = _ENGINE_ORDER[i];
+            if (_ENGINE_META[k].label === label) return k;
+        }
+        return null;
     }
+
     function _ctShort(v) {
         if (v >= 1000) return (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
         if (v === Math.floor(v)) return String(v);
         return v.toFixed(v < 10 ? 1 : 0);
     }
+
+    function _ctOption(present, engByDay, days, mf, money, dayTotal, avg, t) {
+        const labels = present.map((k) => _ENGINE_META[k].label);
+        const selected = {};
+        labels.forEach((lb, i) => {
+            selected[lb] = !_ctState.hidden[present[i]];
+        });
+        return {
+            animation: false,
+            grid: { left: 8, right: 16, top: 20, bottom: 4, containLabel: true },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                backgroundColor: t.card,
+                borderColor: t.line,
+                textStyle: { color: t.ink, fontSize: 12 },
+                extraCssText:
+                    'padding:8px 10px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.12);',
+                formatter: function (params) {
+                    return _ctTooltipHtml(params[0].dataIndex, money);
+                },
+            },
+            legend: {
+                bottom: 0,
+                itemWidth: 10,
+                itemHeight: 10,
+                itemGap: 10,
+                textStyle: { color: t.ink2, fontSize: 11 },
+                data: labels,
+                selected: selected,
+            },
+            xAxis: {
+                type: 'category',
+                data: days.map((d) => d.day),
+                axisLine: { lineStyle: { color: t.line } },
+                axisTick: { show: false },
+                axisLabel: {
+                    color: t.ink3,
+                    fontSize: 11,
+                    interval: function (index) {
+                        return index % 5 === 0 || index === days.length - 1;
+                    },
+                    formatter: function (v) {
+                        return String(v).slice(5);
+                    },
+                },
+            },
+            yAxis: {
+                type: 'value',
+                axisLabel: {
+                    color: t.ink3,
+                    fontSize: 11,
+                    formatter: function (v) {
+                        return (money ? '฿' : '') + _ctShort(v);
+                    },
+                },
+                splitLine: { lineStyle: { color: t.line } },
+            },
+            series: present
+                .map(function (k) {
+                    return {
+                        name: _ENGINE_META[k].label,
+                        type: 'bar',
+                        stack: 'total',
+                        barMaxWidth: 22,
+                        itemStyle: { color: _vizColor(_ENGINE_META[k].color) },
+                        data: days.map((d) => engByDay[d.day][k] || 0),
+                    };
+                })
+                .concat([
+                    // 总花费折线不进图例(不可关 · 与收编前行为一致);异常峰值(> 日均 2 倍)点红标
+                    {
+                        name: 'total',
+                        type: 'line',
+                        symbol: 'none',
+                        lineStyle: { color: t.ink, width: 1.4 },
+                        itemStyle: { color: t.ink },
+                        data: dayTotal,
+                        markPoint: {
+                            symbol: 'circle',
+                            symbolSize: 5,
+                            label: { show: false },
+                            itemStyle: { color: t.danger },
+                            data: dayTotal
+                                .map((v, i) =>
+                                    v > avg * 2 && v > 0 ? { coord: [days[i].day, v] } : null
+                                )
+                                .filter((x) => x),
+                        },
+                    },
+                ]),
+        };
+    }
+
+    function _drawCostTrend() {
+        const wrap = document.getElementById('cost-trend-chart');
+        if (!wrap) return;
+        const days = _ctState.days || [];
+        const metric = _ctState.metric || 'cost';
+        const mf = (_CT_METRIC[metric] || _CT_METRIC.cost).f;
+        const money = (_CT_METRIC[metric] || _CT_METRIC.cost).money;
+        // 空状态(与收编前一致 · 刷新按钮重走取数)
+        if (!days.length) {
+            _ctDisposeChart();
+            wrap.innerHTML =
+                '<div class="ct-empty">' +
+                '<div class="ct-empty-title">' +
+                _esc(_t('cost-trend-empty-title')) +
+                '</div>' +
+                '<div class="ct-empty-desc">' +
+                _esc(_t('cost-trend-empty-desc')) +
+                '</div>' +
+                '<button class="btn btn-ghost btn-sm" id="ct-empty-refresh">' +
+                _esc(_t('cost-refresh')) +
+                '</button>' +
+                '</div>';
+            const rb = document.getElementById('ct-empty-refresh');
+            if (rb) rb.addEventListener('click', _renderCostTrend);
+            return;
+        }
+        // 按天聚合引擎(归一桶)+ 每天总值:口径与收编前完全一致
+        const engByDay = {};
+        (_ctState.byEngine || []).forEach((r) => {
+            const k = _canonEngine(r.engine);
+            (engByDay[r.day] = engByDay[r.day] || {})[k] = (engByDay[r.day][k] || 0) + (r[mf] || 0);
+        });
+        const present = _ENGINE_ORDER.filter((k) =>
+            days.some((d) => (engByDay[d.day] || {})[k] > 0)
+        );
+        const dayTotal = days.map((d) => d[mf] || 0);
+        const avg =
+            dayTotal.filter((v) => v > 0).reduce((a, b) => a + b, 0) /
+            (dayTotal.filter((v) => v > 0).length || 1);
+        _ensureECharts()
+            .then(function () {
+                const t = _themeForTrend();
+                if (!_ctChart) {
+                    // 容器本身没有高度(旧图靠 .ct-svg 撑),ECharts 需要一个有尺寸的宿主
+                    wrap.style.height = '240px';
+                    _ctChart = window.echarts.init(wrap, null, { renderer: 'canvas' });
+                    // 图例点击只改隐藏状态,重画交给 _drawCostTrend(状态单一源在 _ctState)
+                    _ctChart.on('legendselectchanged', function (params) {
+                        const k = _ctEngineByLabel(params.name);
+                        if (!k) return;
+                        _ctState.hidden[k] = !params.selected[params.name];
+                        _drawCostTrend();
+                    });
+                }
+                _ctChart.setOption(
+                    _ctOption(present, engByDay, days, mf, money, dayTotal, avg, t),
+                    true
+                );
+                // 切页签回来时容器刚恢复可见,尺寸可能还是旧的 —— 每次重画主动量一次
+                _ctChart.resize();
+            })
+            .catch(function () {
+                // echarts 拉取失败:复用空态容器 + 刷新按钮(重试会重拉 echarts)
+                _ctDisposeChart();
+                wrap.innerHTML =
+                    '<div class="ct-empty">' +
+                    '<div class="ct-empty-title">' +
+                    _esc(_t('cost-trend-empty-title')) +
+                    '</div>' +
+                    '<div class="ct-empty-desc">' +
+                    _esc(_t('cost-trend-empty-desc')) +
+                    '</div>' +
+                    '<button class="btn btn-ghost btn-sm" id="ct-empty-refresh">' +
+                    _esc(_t('cost-refresh')) +
+                    '</button>' +
+                    '</div>';
+                const rb = document.getElementById('ct-empty-refresh');
+                if (rb) rb.addEventListener('click', _renderCostTrend);
+            });
+    }
+
+    // 主题令牌 → 具体色值(取一次复用:getComputedStyle 每调一次都强制一次样式解析)。
+    // 读不到时回落中性色,图宁可丑不许隐形 —— admin-engine-charts.js 的 _theme 同套路。
+    function _themeForTrend() {
+        let styles = null;
+        try {
+            styles = getComputedStyle(document.documentElement);
+        } catch (e) {}
+        const v = (name, fb) => {
+            const val = styles ? styles.getPropertyValue(name).trim() : '';
+            return val || fb;
+        };
+        return {
+            ink: v('--ink', 'rgb(35,25,66)'),
+            ink2: v('--ink2', 'rgb(91,88,117)'),
+            ink3: v('--ink3', 'rgb(143,138,168)'),
+            line: v('--line', 'rgb(236,232,246)'),
+            card: v('--card', 'rgb(255,255,255)'),
+            danger: v('--danger', 'rgb(220,38,38)'),
+        };
+    }
+
+    // 窗口尺寸变化时图跟着重排(等松手:合并连发的 resize)
+    window.addEventListener('resize', function () {
+        clearTimeout(_ctResizeTimer);
+        _ctResizeTimer = setTimeout(function () {
+            if (_ctChart) _ctChart.resize();
+        }, 150);
+    });
 
     // v118.35.0.25 · 系统监控渲染(每 30 秒自动刷新)
     async function _renderMonitoring() {
@@ -3052,9 +3099,58 @@
     }
 
     // ============ OCR 引擎页(档位能力 + 逐入口成本)============
-    // 页面本体在 admin-engine.js(档位卡 / 账号灰度)与 admin-engine-cost.js(成本仪表盘),
-    // 这里只把共用的 fetch/i18n/toast 递过去:那两个模块不自己抓全局,换鉴权只改这一处。
+    // 三支引擎模块(约 36KB)只在进引擎页签时才动态注入:七个管理页签只有这一页用它们,
+    // 挂 admin.html 上让另外六页白背这份体积。注入 URL 的 ?v 从本文件自己的 ?v 抠
+    // (CDN 按 URL 缓存 · 指纹不同步 = 永远发旧文件)。页面本体在 admin-engine.js(档位卡 /
+    // 账号灰度)与 admin-engine-cost.js(成本仪表盘),这里只把共用的 fetch/i18n/toast 递过去:
+    // 那两个模块不自己抓全局,换鉴权只改这一处。
+    const _ENGINE_SCRIPTS = [
+        '/static/admin/admin-engine-charts.js',
+        '/static/admin/admin-engine-cost.js',
+        '/static/admin/admin-engine.js',
+    ];
+
+    function _injectEngineScript(src) {
+        return new Promise(function (resolve, reject) {
+            const s = document.createElement('script');
+            s.src = src + (_adminAssetVersion() ? '?v=' + _adminAssetVersion() : '');
+            s.async = true;
+            s.onload = resolve;
+            s.onerror = function () {
+                s.remove();
+                reject(new Error('engine script load failed: ' + src));
+            };
+            document.head.appendChild(s);
+        });
+    }
+
+    let _engineScriptsReady = null;
+    function _ensureEngineScripts() {
+        if (window.AdminEngine) return Promise.resolve();
+        if (_engineScriptsReady) return _engineScriptsReady;
+        _engineScriptsReady = Promise.all(_ENGINE_SCRIPTS.map(_injectEngineScript)).catch(
+            function (e) {
+                _engineScriptsReady = null; // 失败清掉记录,再进页签真能重试
+                throw e;
+            }
+        );
+        return _engineScriptsReady;
+    }
+
     async function _renderEnginePage() {
+        try {
+            await _ensureEngineScripts();
+        } catch (e) {
+            // 注入失败也要给可见的错误态,不许白屏
+            const body = document.getElementById('adm-eng-policy-body');
+            if (body)
+                body.innerHTML =
+                    '<div class="eng-state eng-state-error" data-eng-state="error">' +
+                    '<span class="eng-state-msg">' +
+                    _esc(_t('adm-eng-load-fail')) +
+                    '</span></div>';
+            return;
+        }
         if (!window.AdminEngine) return;
         await window.AdminEngine.render({
             fetch: _adminFetch,

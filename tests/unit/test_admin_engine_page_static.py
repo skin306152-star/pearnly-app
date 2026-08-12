@@ -6,7 +6,8 @@
   ② 保存必须回传完整的 overrides_by_account —— 后端「缺键 = 保留现值」,少发这个键
      就删不掉灰度账号(routes/admin_ocr_engine_routes._clean_overrides_by_account);
   ③ 售价参考线钉 ฿1.5/页,成本表把每页成本单独摊开 —— 混合均值藏差价正是本页要拆穿的。
-另钉 adm-* 两语(zh+th)键齐,和三个新模块都挂在 admin.html 上且带 ?v 指纹。
+另钉 adm-* 两语(zh+th)键齐,和三个新模块的按需注入接线(2026-08-12 起不再挂 admin.html,
+admin.js 进引擎页签才动态注入,URL 的 ?v 运行时从 admin.js 自己的 ?v 抠)。
 """
 
 import re
@@ -38,20 +39,19 @@ def _eng_keys(lang: str) -> set:
 
 
 class EnginePageWiringTests(unittest.TestCase):
-    def test_modules_loaded_with_cache_fingerprint(self):
+    def test_modules_injected_lazily_from_admin_js(self):
+        # 2026-08-12 收编:三支引擎模块(约 36KB)改按需注入 —— 不再写死在 admin.html,
+        # 引用收进 admin.js 的 _ENGINE_SCRIPTS 清单,URL 的 ?v 运行时从 admin.js 自己的 ?v 抠
+        # (七个管理页签只有引擎页用它们,挂 HTML 上让另外六页白背体积)。
         for name in MODULES:
-            m = re.search(rf'src="/static/admin/{re.escape(name)}\?v=(\d+)"', HTML)
-            self.assertIsNotNone(m, f"{name} 没挂在 admin.html 上(或漏了 ?v 指纹)")
-
-    def test_modules_load_before_admin_js(self):
-        # admin.js 只是调用方:三个模块必须先注册好 window.AdminEngine*,顺序靠 defer 保序。
-        for name in MODULES:
-            self.assertLess(
-                HTML.index(name), HTML.index("admin.js?v="), f"{name} 必须排在 admin.js 前面"
+            self.assertNotIn(
+                f'src="/static/admin/{name}?v=', HTML, f"{name} 不该再静态挂在 admin.html 上"
             )
+            self.assertIn(name, ADMIN_JS, f"{name} 不在 admin.js 的注入清单里")
 
     def test_admin_js_only_delegates(self):
         self.assertIn("window.AdminEngine.render(", ADMIN_JS)
+        self.assertIn("_ensureEngineScripts()", ADMIN_JS)
         # 旧 KPI 五卡与「模型请求页数成本」表整区已删,壳里不许再留挂载点。
         for dead in ("adm-eng-kpis", "adm-eng-by-model", "adm-eng-mode-hint"):
             self.assertNotIn(dead, HTML, f"admin.html 仍留着已删区的 {dead}")

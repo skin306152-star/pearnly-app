@@ -80,9 +80,6 @@ _ENTRY_ASSETS = {
         "/static/dist/admin.css",
         "/static/admin/admin.js",
         "/static/admin/admin-i18n.js",
-        "/static/admin/admin-engine.js",
-        "/static/admin/admin-engine-cost.js",
-        "/static/admin/admin-engine-charts.js",
         "/static/pearnly-ui.css",
     ),
     "static/console/console.html": (
@@ -199,6 +196,27 @@ CACHE_BUST_DIRS = (
         for html, ref in (
             ("static/pos/pos.html", "/static/dist/pos.js"),
             ("home.html", "/static/dist/pre.js"),
+        )
+    ),
+    # 超管后台引擎页三支模块(admin-engine*.js)改按需注入后不再写在 admin.html 里:
+    # admin.js 进引擎页签才现拼 <script> 拉取,URL 的 ?v 抠自页面里 admin.js 的 ?v ——
+    # 所以「改了 admin-engine*.js 要去 bump admin.html 里 admin.js 的 ?v」不是笔误,
+    # 两者共用一个指纹,不 bump 就是超管永远拿旧的引擎页代码。
+    # echarts 同理:admin.js / admin-engine-charts.js 里按需拉 static/vendor/echarts,
+    # 加载时同样抠 admin.js 的 ?v(升级换文件名那天闸才看得见)。
+    *(
+        CacheBustDir(
+            prefix=prefix,
+            html="static/admin/admin.html",
+            ref="/static/admin/admin.js",
+            why="引擎页懒加载产物的 ?v 在注入时从页面里 admin.js 的 ?v 抠"
+            "(admin.js 动态注入 · scan-loader.js 同招)",
+        )
+        for prefix in (
+            "static/admin/admin-engine.js",
+            "static/admin/admin-engine-cost.js",
+            "static/admin/admin-engine-charts.js",
+            "static/vendor/echarts/",
         )
     ),
 )

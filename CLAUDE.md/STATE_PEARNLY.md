@@ -1,6 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · DMS 线(2026-08-12 凌晨 · 订车单提成归属全链闭环 · CI 31544490946 success · prod 已验)
+## 当前状态卡 · C·Qwen 欠账清账(2026-08-12 午 · 22 条账本全落地 · 全局键已解锁 · 两批已上线 CI 绿)
+
+- **✅ A1 头号钥匙落地**(fc5bd02c):qwen 两臂提示词+to_invoice_fields 补 document_type(非法值落 schema 默认·升级臂漏出保读取臂判型);金标 25 张复测**两轮 vat/total 零漂**、修对基线 7 处错(会员号当单号×2/假税号×2/算出 subtotal×2/漏读 ID×1),唯一真退步(pur05 会员卡号当单号)加"会员/积分卡号非单号"排除后复测归位;ABB 专项(Tops/7-11/Amazon/Punthai)全判 simplified、贷记单合成加考 2/2 → **qwen 移出 PARTIAL_MODES,后台可写 qwen 全局/套餐/任务档(真切全局待 Zihao 拍板)**;任务级覆写补同款挡板(B6)。金标资产已抢救归档 `桌面 pearnly-local-ocr-stack/qwen-eval-2026-08-11-rescued/`(基线锁 baseline-v3-locked.json·runner 在会话 scratchpad gold_rerun.py)。
+- **✅ 入口普查(Zihao 问的"好多入口没接")**:登录态入口(网页发票/银行/GL/VAT/身份证)全部吃账号灰度;真吃不到的只有 LINE webhook+独立 worker(无登录态回落全局档)= 设计内,全局切 qwen 后自然覆盖;bank_recon_pipeline 里"GL 绕过 engine_context"的记债注释已过时(gl_ledger 现走 controller)。
+- **✅ 欠账 22 条全清**:A2 页数槽"写入成功才算消费"(d6345dc9)· B3 档位能力注册表+DirectReadFallback 收 contracts(7cce4d5c)· B4 model_for_tier 公约(7e340f17)· B5 submit_ctx 收 11 处(比账本多 5 处裸 submit=未归因元凶之一)+机械闸(61db2f97)· C7 月份表四合一(7e564ee8)· C8/9 provider 收 http_common(8957461d)· C13/14/15 死 metrics 端点删/0100 DDL 单源/ai_usage 进启动自检(dd720d72)· C22 fileconv 每调用记 1 页(45682889)· FE-1 引擎页五件=助手收拢/语言切换只重画/售价走后端 price_thb_per_page 单源/死键清理/灰度未保存编辑保护(e31c7e16·主控真浏览器 57 断言复验+截图入库 42aba5fe)。FE-2(ECharts 收编 admin.js 旧 SVG 趋势图/三 JS 按需注入/懒加载进 cachebust/验收脚本共享化)收笔中。
+- **✅ 已上线**:两批 push(`a1ca6b9b..dc9ab2ef`、`dc9ab2ef..b5c8e1f9`),第二批 CI success;第一批唯一红=lint-size(CI 只看 HEAD~1,black 收尾商未带豁免,教训进记忆 diff-gate-green-needs-right-base);生产 home/login/dms/api 全 200。
+- **🛑 新血泪**:CI lint-size 只 diff 最后一笔 commit → **每次 push 收尾 commit 必须自净或自带 RATCHET-EXEMPT**(空 commit 收尾最稳);Windows 下 pkill 杀不净 uvicorn,要 netstat 找 PID taskkill。
+- **🛑 等 Zihao**:①真传一张票验 C 档生产第一单(沿袭)②全局切 qwen 的拍板(后台开关已解锁,建议先看几天灰度成本再切)。
+
+---
+
+## 历史 · 2026-08-12 凌晨状态卡 · DMS 线(订车单提成归属全链闭环 · CI 31544490946 success · prod 已验)
 
 - **✅ 归属主链上线**(8208dfa2/302c87e5):顾问栏不再恒填名册首行——逐问开局按操作员的 DMS 账号定归属,认不出当场泰语拦截(说清哪个账号、谁能修),建单层严格校验(两个新错误码进 LINE/台账双目录四语+parity 闸),预览卡/回执/台账三处显示顾问名;继承层剥离 advisor_*(否则老板钉死会顺继承流满全店,G-QA7 实锤);端点 PATCH 加防丢层(向导保存不再吞钉死顾问/身份证自动推开关/凭据密文)。
 - **✅ 深改六件 + 匹配器 v2**(1cf4dc7c/f447485a/ae5798f6/91d4ed5d):**真机探针推翻关键假设——顾问下拉 code 列是员工编号不是登录名**,故新增员工表精确层(登录名→员工 id→回验顾问资格;员工在表但无资格=直接拦不猜;取不到员工表才回落启发匹配,配 admin 会话重试)。另五件:名册翻页取全(截断报警)、取数失败与真空可分辨、缓存核与顾问逻辑归位 services/erp、同会话主档备忘(建单省 6 趟往返)、拦截话术复用错误码目录单源。**花名册加「销售提成归属」下拉**(留空=自动/选中=钉死·名服务端解·名单没到不发字段防静默清钉·列表带归属列)。

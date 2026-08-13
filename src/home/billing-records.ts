@@ -394,7 +394,7 @@ function mapUsage(r: Record<string, unknown>): RecRow {
         badge = _t('rec-b-monthly', '月费');
         badgeCls = 'neutral';
     } else if (isQuota) {
-        // 额度是月费买的,抵扣不等于免费:badge 直写抵了几张,别让 ฿0 冒充免费。
+        // 额度是月费买的,抵扣不等于免费:badge 直写抵了几张,别让零元扣费冒充免费。
         badge = _t('rec-b-quota', '额度抵扣 {n} 张').replace('{n}', String(pages));
         badgeCls = 'free';
     } else if (cost === 0) {

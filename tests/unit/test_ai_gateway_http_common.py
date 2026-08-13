@@ -5,8 +5,10 @@
 就红。anthropic 有意不入列(529→timeout 是它的专属差异),此处不设断言。
 """
 
+import base64
 import json
 import unittest
+from unittest import mock
 
 from services.ai_gateway.providers import http_common, openai, qwen, selfhost
 
@@ -28,12 +30,53 @@ class ErrorKindForStatusTests(unittest.TestCase):
                 self.assertEqual(http_common.error_kind_for_status(status), kind)
 
 
+def _make_pdf(pages: int) -> bytes:
+    import fitz
+
+    doc = fitz.open()
+    for i in range(pages):
+        doc.new_page(width=200, height=100).insert_text((10, 50), f"page {i + 1}")
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
 class ImageContentPartsTests(unittest.TestCase):
     def test_prompt_first_then_data_uri_per_image(self):
         parts = http_common.image_content_parts("read it", [(b"\x89PNG", "image/png")])
         self.assertEqual(parts[0], {"type": "text", "text": "read it"})
         self.assertEqual(len(parts), 2)
         self.assertTrue(parts[1]["image_url"]["url"].startswith("data:image/png;base64,"))
+
+    def test_pdf_part_expands_to_one_png_per_page(self):
+        # OpenAI 兼容 image_url 不吃 PDF(DashScope 400「The image format is illegal」,
+        # 2026-08-12 生产 vat_report 15/15 批全灭)——PDF 必须在组请求这层逐页转图。
+        parts = http_common.image_content_parts("read it", [(_make_pdf(2), "application/pdf")])
+        self.assertEqual(len(parts), 3)  # text + 2 页
+        for part in parts[1:]:
+            url = part["image_url"]["url"]
+            self.assertTrue(url.startswith("data:image/png;base64,"))
+            raw = base64.b64decode(url.split(",", 1)[1])
+            self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n")
+
+    def test_pdf_pages_capped_per_request(self):
+        with mock.patch.object(http_common, "_PDF_MAX_PAGES", 1):
+            parts = http_common.image_content_parts("p", [(_make_pdf(3), "application/pdf")])
+        self.assertEqual(len(parts), 2)  # text + 只留第 1 页
+
+    def test_unreadable_pdf_falls_through_unchanged(self):
+        # 渲染不了 → 按原 mime 发出:服务端照旧拒收,错误路径与修前一致,不新造失败形态
+        parts = http_common.image_content_parts("p", [(b"not a pdf", "application/pdf")])
+        self.assertEqual(len(parts), 2)
+        self.assertTrue(parts[1]["image_url"]["url"].startswith("data:application/pdf;base64,"))
+
+    def test_mixed_image_and_pdf_keep_order(self):
+        parts = http_common.image_content_parts(
+            "p", [(b"\xff\xd8jpg", "image/jpeg"), (_make_pdf(1), "application/pdf")]
+        )
+        self.assertEqual(len(parts), 3)
+        self.assertTrue(parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,"))
+        self.assertTrue(parts[2]["image_url"]["url"].startswith("data:image/png;base64,"))
 
 
 class SingleSourceTests(unittest.TestCase):

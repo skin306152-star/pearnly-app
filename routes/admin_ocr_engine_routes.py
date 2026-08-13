@@ -38,8 +38,9 @@ router = APIRouter()
 # defaults_by_plan 只许落到具体档(auto 进套餐表会循环,resolve 侧也会兜回 direct35)
 
 # 能力未齐的档(engine_policy.PARTIAL_MODES)只准按账号灰度:全局档与套餐默认档是「整机切
-# 过去」,而这些档还缺 document_type,切了会让贷记单方向复核静默失效。账号覆写不受限 ——
-# 灰度本来就是拿少数账号对比读数,风险有边界。
+# 过去」,能力缺口会随档全租户生效。集合当前为空(qwen 2026-08-12 补齐 document_type 后移出),
+# 闸常驻当绊线:新档几乎都是能力先残后齐,写侧不拦,残档一进全局/套餐默认就是全租户事故。
+# 账号覆写不受限——灰度本来就是拿少数账号对比读数,风险有边界。
 _PARTIAL_MODE_ERROR = "ocr_engine.partial_mode_account_only"
 
 

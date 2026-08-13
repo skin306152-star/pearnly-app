@@ -25,7 +25,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import date
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, get_args
 
 from core import thai_date
 from core.thai_date import gregorian_from_printed, to_gregorian_year, two_digit_year_to_gregorian
@@ -41,6 +41,7 @@ from services.ocr.qwen_prompts import (
     READ_USER_SUFFIX,
     VLOCR_PROMPT,
 )
+from services.ocr.schemas_invoice import ThaiInvoice
 
 logger = logging.getLogger(__name__)
 
@@ -60,19 +61,9 @@ _TRANSCRIBE_MAX_TOKENS = 4096
 _PACK_RE = re.compile(r"[\s\-]")
 _DIGITS_RE = re.compile(r"\d+")
 
-# ThaiInvoice.document_type 的合法值(schemas_invoice 的 Literal 同步)。非法/缺失不进字段,
-# 落 schema 默认 tax_invoice——分类失败不许拖垮读数主业。
-_DOC_TYPES = frozenset(
-    {
-        "tax_invoice",
-        "simplified_tax_invoice",
-        "receipt",
-        "credit_note",
-        "payment_evidence",
-        "order_evidence",
-        "other",
-    }
-)
+# ThaiInvoice.document_type 的合法值直接取自 schema 的 Literal(单一事实源,加枚举只改
+# schema 一处)。非法/缺失不进字段,落 schema 默认 tax_invoice——分类失败不许拖垮读数主业。
+_DOC_TYPES = frozenset(get_args(ThaiInvoice.model_fields["document_type"].annotation))
 
 # 读取臂提示词:模板固定,每页拼一次纯属浪费。
 _READ_PROMPT = f"{FLASH_V25}\n\n{READ_USER_SUFFIX}"
@@ -112,7 +103,8 @@ def read_invoice_page(
     if not read.ok or not isinstance(read.data, dict):
         raise DirectReadFallback(f"page {page_number}: qwen read {read.error_kind or 'empty'}")
 
-    fields = _scrub_placeholder_taxes(dict(read.data))
+    fields = dict(read.data)
+    _scrub_placeholder_taxes(fields)
     transcript = _transcribe(images, api_key)
     packed = pack_text(transcript)
     triggers = evaluate_triggers(fields, packed)
@@ -190,15 +182,14 @@ def _escalate(images, transcript: Optional[str], api_key: Optional[str]):
     return dict(outcome.data), outcome.model, (outcome.input_tokens, outcome.output_tokens)
 
 
-def _scrub_placeholder_taxes(fields: Dict) -> Dict:
-    """票面全零税号(0000000000000)是「散客/无税号」占位,不是读错——按缺失处理。
+def _scrub_placeholder_taxes(fields: Dict) -> None:
+    """票面全零税号(0000000000000)是「散客/无税号」占位,不是读错——原地改为缺失。
     不刷洗的话 mod-11 触发器白升一次贵模型,升完 sanity 硬闸还是整页回落 Vision
     (2026-08-12 生产实测:一页因此多花 ฿1.11 走了回落)。"""
     for key in _TAX_FIELDS:
         digits = re.sub(r"\D", "", str(fields.get(key) or ""))
         if digits and set(digits) == {"0"}:
             fields[key] = None
-    return fields
 
 
 def pack_text(text: Optional[str]) -> Optional[str]:

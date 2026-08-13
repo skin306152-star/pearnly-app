@@ -8,7 +8,10 @@ anthropic 有意不入列:它把 529(overloaded)也归 timeout,是 Anthropic 专
 from __future__ import annotations
 
 import base64
+import logging
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def error_kind_for_status(status: int) -> str:
@@ -55,9 +58,62 @@ def chat_text_and_usage(
         return None, "parse", (0, 0)
 
 
+# OpenAI 兼容 chat 的 image_url 只认图片:data:application/pdf 服务端秒拒
+# (DashScope 2026-08-13 实测 400 invalid_parameter_error「The image format is illegal」,
+# 生产 vat_report 批解析 15/15 批全灭即此)。Gemini 系原生吃 PDF 但不经本模块,
+# 所以 PDF→逐页图片的适配归这里:请求形状在哪层组,能力边界就在哪层兜。
+_PDF_RENDER_DPI = 200  # 与 OCR 管线渲染同值(pipeline.DEFAULT_DPI),直读金标按它测的
+_PDF_MAX_PAGES = 10  # 单请求页数封顶:现有调用方都逐页拆批,只防未来整本 PDF 直塞
+
+
+def _pdf_page_images(data: bytes) -> Optional[List[bytes]]:
+    """PDF → 逐页 PNG。打不开/依赖缺失返回 None,调用方按原 mime 发出——服务端照旧拒收,
+    错误路径不变,传输层不新造失败形态。"""
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        return None
+    try:
+        doc = fitz.open(stream=data, filetype="pdf")
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        if doc.page_count == 0:
+            return None
+        if doc.page_count > _PDF_MAX_PAGES:
+            logger.warning(
+                "image parts: PDF %d 页超单请求上限,只取前 %d 页",
+                doc.page_count,
+                _PDF_MAX_PAGES,
+            )
+        matrix = fitz.Matrix(_PDF_RENDER_DPI / 72.0, _PDF_RENDER_DPI / 72.0)
+        return [
+            doc.load_page(i).get_pixmap(matrix=matrix, alpha=False).tobytes("png")
+            for i in range(min(doc.page_count, _PDF_MAX_PAGES))
+        ]
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        doc.close()
+
+
 def image_content_parts(prompt: str, images: List[Tuple[bytes, str]]) -> list:
     parts: list = [{"type": "text", "text": prompt}]
     for data, mime in images:
+        if (mime or "").strip().lower() == "application/pdf":
+            pages = _pdf_page_images(data)
+            if pages is None:
+                logger.warning("image parts: PDF 渲染失败,按原 mime 发出(服务端将拒收)")
+            else:
+                for page in pages:
+                    b64 = base64.b64encode(page).decode("ascii")
+                    parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{b64}"},
+                        }
+                    )
+                continue
         b64 = base64.b64encode(data).decode("ascii")
         parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
     return parts

@@ -76,10 +76,11 @@ MODE_INVOICE_PAGE_READER: Dict[str, str] = {MODE_QWEN: "services.ocr.qwen_direct
 MODE_TABLE_TIER: Dict[str, str] = {MODE_QWEN: "escalate"}
 
 # 档位能力盲区:该档做不了的 task,解析一律回落 fail-safe 档,不管档是怎么选上的
-# (账号灰度/任务钉档/全局切换同判)——把功能切坏比多花点钱严重得多。
-# qwen·vat_report:2026-08-12 生产实锤,VAT 报表批解析打 qwen API 全部 400(15/15 批,
-# 毫秒级拒收),车道没适配就不接;适配完成删本行。
-MODE_UNSUPPORTED_TASKS: Dict[str, frozenset] = {MODE_QWEN: frozenset({"vat_report"})}
+# (账号灰度/任务钉档/全局切换同判)——把功能切坏比多花点钱严重得多。机制常驻当绊线。
+# qwen·vat_report(2026-08-12 生产 15/15 批 400)已于 2026-08-13 移出:根因是 OpenAI
+# 兼容 image_url 塞了 data:application/pdf,修在 providers/http_common(PDF 逐页转图),
+# 真报表样张端到端复验通过。
+MODE_UNSUPPORTED_TASKS: Dict[str, frozenset] = {}
 
 # 能力未齐的档:只准按账号灰度,不许当全局档或套餐默认档(超管写侧 400 挡,见
 # routes/admin_ocr_engine_routes)。机制保留,当前为空。

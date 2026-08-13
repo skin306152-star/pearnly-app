@@ -73,11 +73,10 @@ class TriggerTests(unittest.TestCase):
         self.assertNotIn("badsum_buyer_tax", triggers)
 
     def test_all_zero_tax_is_placeholder_not_misread(self):
-        # 票面印全零税号=散客占位:刷洗成缺失,不触发 mod-11 升级更不许整页回落
+        # 票面印全零税号=散客占位:原地刷洗成缺失,不触发 mod-11 升级更不许整页回落
         # (2026-08-12 生产实测一页因此白花 ฿1.11 走 Vision 回落)
-        fields = qd._scrub_placeholder_taxes(
-            {**_FIELDS_CLEAN, "buyer_tax": "0000000000000", "seller_tax": "0-0000-00000-00-0"}
-        )
+        fields = {**_FIELDS_CLEAN, "buyer_tax": "0000000000000", "seller_tax": "0-0000-00000-00-0"}
+        qd._scrub_placeholder_taxes(fields)
         self.assertIsNone(fields["buyer_tax"])
         self.assertIsNone(fields["seller_tax"])
         self.assertNotIn("badsum_buyer_tax", qd.evaluate_triggers(fields, None))

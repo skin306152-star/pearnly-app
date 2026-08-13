@@ -259,7 +259,8 @@ async function entryPurchase(p, e) {
         doc_id: body.doc_id || '',
         dedupe_hit: !!body.dedupe_hit,
     };
-    await p.waitForTimeout(2500); // 给复核屏/详情渲染留窗口
+    // 复核屏/详情渲染 = intake 响应回来后的后续渲染;等网络静默替代盲等固定时长
+    await p.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
     e.ui_state = await uiText('#page-purchase-capture, .pur.cap');
     await finalizeShot(e, '2-purchase-intake', '#page-purchase-capture');
 }
@@ -317,7 +318,19 @@ async function entryBankRecon(p, e3, e4) {
             .first()
             .waitFor({ state: 'visible', timeout: 90_000 })
             .catch(() => {});
-        await p.waitForTimeout(3000);
+        // 终态区可见后再等其真正填出内容(结果/失败文本 >20 字),替代盲等固定时长
+        await p
+            .waitForFunction(
+                () => {
+                    const r = document.getElementById('rcx-results');
+                    const f = document.getElementById('rcx-fail');
+                    const txt = (el) => (el && el.offsetParent !== null ? (el.innerText || '').trim() : '');
+                    return txt(r).length > 20 || txt(f).length > 5;
+                },
+                null,
+                { timeout: 8_000 }
+            )
+            .catch(() => {});
         const res = await uiText('#rcx-results', 500);
         const fail = await uiText('#rcx-fail', 300);
         const proc = await uiText('#rcx-processing', 200);
@@ -396,7 +409,19 @@ async function entryVatRecon(p, e) {
         .first()
         .waitFor({ state: 'visible', timeout: 90_000 })
         .catch(() => {});
-    await p.waitForTimeout(3000);
+    // 终态区可见后再等其真正填出内容,替代盲等固定时长
+    await p
+        .waitForFunction(
+            () => {
+                const r = document.getElementById('rcx-results');
+                const f = document.getElementById('rcx-fail');
+                const txt = (el) => (el && el.offsetParent !== null ? (el.innerText || '').trim() : '');
+                return txt(r).length > 20 || txt(f).length > 5;
+            },
+            null,
+            { timeout: 8_000 }
+        )
+        .catch(() => {});
     const res = await uiText('#rcx-results', 500);
     const fail = await uiText('#rcx-fail', 300);
     e.ui_state = '对账结果: ' + (res || fail || '(未见终态区)');
@@ -463,7 +488,12 @@ async function entryVatcheck(p, e) {
         detail: body.detail || '',
         issues: body.issues ? (Array.isArray(body.issues) ? body.issues.length : body.issues) : '',
     };
-    await p.waitForTimeout(3000);
+    // 响应回来后等结果/错误块渲染(vc-done-bar/banner/clean/family 任一),替代盲等
+    await p
+        .locator('#vcBody .vc-done-bar, #vcBody .vc-banner, #vcBody .vc-clean, #vcBody .vc-family, #vcBody .err')
+        .first()
+        .waitFor({ state: 'visible', timeout: 12_000 })
+        .catch(() => {});
     e.ui_state = await uiText('#vcBody');
     await finalizeShot(e, '6-vatcheck', '#vcBody');
 }
@@ -502,7 +532,12 @@ async function entryFileconv(p, e) {
         issue_count: body.issue_count ?? '',
         detail: body.detail || '',
     };
-    await p.waitForTimeout(3000);
+    // 响应回来后等转换结果渲染(结果表 / 重置按钮 / 错误块任一),替代盲等
+    await p
+        .locator('#fcBody table, #fcBody [data-action="fc-reset"], #fcBody .err')
+        .first()
+        .waitFor({ state: 'visible', timeout: 12_000 })
+        .catch(() => {});
     e.ui_state = await uiText('#fcBody');
     await finalizeShot(e, '7-fileconv', '#fcBody');
 }
@@ -537,7 +572,12 @@ async function entrySteward(p, e) {
         attachments: body.attachments ? body.attachments.length : '',
         detail: body.detail || '',
     };
-    await p.waitForTimeout(2000);
+    // 附件响应回来后等附件卡渲染进列表,替代盲等
+    await p
+        .locator('#v-steward .stw-att-list .stw-att-chip')
+        .first()
+        .waitFor({ state: 'visible', timeout: 10_000 })
+        .catch(() => {});
     e.ui_state = await uiText('#v-steward .stw-messages, #v-steward', 500);
     await finalizeShot(e, '8-steward', '#v-steward');
 }

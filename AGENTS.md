@@ -4,7 +4,7 @@
 > (2026-07-25:CLAUDE.md 由 1470 行瘦身成轻量版 + 8 个 skill,旧全文冻结在 `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md`,逐段对照表见 `docs/context-engineering/2026-07-25-claude-md-simplify.md`。)
 > 最后更新:2026-07-25(CLAUDE.md 瘦身成轻量版 + 8 个 skill · authz 覆盖闸修准并进 CI · 本页删掉 2026-05/06 的历史流水)
 >
-> **🔴 常驻铁律(Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **每次 Zihao 说"收尾"(今天到这/换窗口/下班/总结)→ 主动先跑 `/simplify` 再出收尾报告**。③ **(2026-07-01)任何任务自己做→自己检→自己验证闭环**:凡"视觉/UI 验收"的改动必须真浏览器 E2E + 截图为证(grep 类名/断言 MODAL=true 不算数,见 §3 红线#4);任何 push 后必须自己盯 CI 到绿、红了自己修,不甩给 Zihao/别的窗口。**验证绑批次边界·不攒到最后(2026-07-11·vertical slicing)**:每切完一个可独立验证的批次就地验——命中任一=大批次当场验(高敏路径 登录/OCR/计费/推送/POS 收款/多租户/RLS/迁移 · 用户可见 UI · 新 flag/路由/迁移 · ≥~200 行或一个独立功能单元);小批次(纯格式化/docs/测试-only/无运行时面重构/<~50 行机械改)并到批次末或交付前一起兜。④ **(2026-07-11)动手写码前先做 discovery**:每个功能/派单前先写「场景+对标」——JTBD 真实场景 / RICE·Kano 判实用性(警惕 feature creep)/ 便利性(减摩擦·手机优先·危险操作确认·四态诚实)/ 照抄成熟产品 design pattern(Loyverse·Square…·Jakob's Law),别从代码结构倒推(见 [[design-from-real-scenarios-ref-market-leaders]])。
+> **🔴 常驻铁律(Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **(2026-08-12 改口径)Zihao 说"收尾"→ 轻收口:四角审查外派 DeepSeek worker、发现只记账进交接账本(次日首批修)、push 前 10 秒机械自检,然后 STATE→交接→清树;simplify 只在批次收口边界跑,收尾只兜当天没扫过的尾巴**(细则=`.claude/skills/wrapup`)。③ **(2026-07-01)任何任务自己做→自己检→自己验证闭环**:凡"视觉/UI 验收"的改动必须真浏览器 E2E + 截图为证(grep 类名/断言 MODAL=true 不算数,见 §3 红线#4);任何 push 后必须自己盯 CI 到绿、红了自己修,不甩给 Zihao/别的窗口。**验证绑批次边界·不攒到最后(2026-07-11·vertical slicing)**:每切完一个可独立验证的批次就地验——命中任一=大批次当场验(高敏路径 登录/OCR/计费/推送/POS 收款/多租户/RLS/迁移 · 用户可见 UI · 新 flag/路由/迁移 · ≥~200 行或一个独立功能单元);小批次(纯格式化/docs/测试-only/无运行时面重构/<~50 行机械改)并到批次末或交付前一起兜。④ **(2026-07-11)动手写码前先做 discovery**:每个功能/派单前先写「场景+对标」——JTBD 真实场景 / RICE·Kano 判实用性(警惕 feature creep)/ 便利性(减摩擦·手机优先·危险操作确认·四态诚实)/ 照抄成熟产品 design pattern(Loyverse·Square…·Jakob's Law),别从代码结构倒推(见 [[design-from-real-scenarios-ref-market-leaders]])。
 > **📐 通用工程标准(大厂级约束基线)**:见全局 `~/.claude/CLAUDE.md` 挂载的《通用工程标准(任意项目通用)》(正本在 `~/.claude/`·所有项目通用)。本项目铁律 = 它的超集 + Pearnly 特例;冲突以本项目为准。
 > **🔒 防屎山闸已切硬门(2026-06-03)**:size+ratchet 进 pre-push 硬拦 + CI `lint-size` fail 模式 + master 禁强推/删除(不要求 PR·保 push 即部署)· 见 [[gates-hardened-post-refactor]]。新增文件触发 ratchet 净增 → commit 写 `RATCHET-EXEMPT: <file> +<N> · <理由>`。**注:`lint-ui`(UI 一致性)已 FAIL 模式(2026-06-05 切硬门·反弹即拦)· 唯 `lint-routes`(新路由契约)仍 warning · 存量 B 类视觉清理 + Wave3 staging 仍 Zihao-gated → 整顿"核心"收官但非全部完结。**
 
@@ -84,7 +84,7 @@ sh scripts/git-hooks/pre-push     # Git Bash
 
 ## 7. 交接 / 长跑上下文(治漂移第二招)
 
-- **收尾铁律(Zihao 说"收尾/今天到这/换窗口/下班/总结"时)**:**① 先主动跑 `/simplify`**(扫本窗口改动做简化/复用/效率收口·别等点)→ ② **重写**(不是无脑追加)STATE 顶部「状态卡」:当前 task / 最后 commit / 未 push commit / 剩余风险 / 下一步 / 在等 Zihao 啥。
+- **收尾铁律(2026-08-12 新口径·Zihao 说"收尾/今天到这/换窗口/下班/总结"时)**:轻收口 —— ① 四角审查(复用/简化/效率/层级)全派 `opencode run --agent worker`(DeepSeek),主控只汇总裁决;② 发现只记账进交接账本,次日首批派 worker 修(当场只准 ≤几行零风险微修;例外=不修不能 push/会污染生产);③ push 前 10 秒机械自检(前端源→dist 同提交/大净增→RATCHET-EXEMPT/动文案→check_i18n --strict);④ **重写**(不是无脑追加)STATE 顶部「状态卡」→ 交接报告 → 清树。simplify 的正确时机=批次收口边界,收尾只兜当天没扫过的尾巴。细则=`.claude/skills/wrapup`。
 - 历史明细往「分割线以下」追加。状态卡保持 ≤30 行,永远最新。
 - 长跑 loop:每轮跑脚本看真数字 + 抽代码前 re-grep 真实行号(别信文档行号)+ 每轮写状态卡 → 压缩后重读 = 一页 + 脚本,永不漂。
 

@@ -130,10 +130,14 @@ def parse_vat_report(
     """销项 VAT 报表解析(任意格式)。Facade → controller(task=vat_report)。"""
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
+    from services.ocr.pdf_utils import doc_page_count
     from services.cost.usage_context import usage_context
 
-    # 入口按调用方兜底(网页查/管家工具会在外层设各自入口,外层优先)
-    with usage_context("vat_recon", doc_type="vat_report"):
+    # 入口按调用方兜底(网页查/管家工具会在外层设各自入口,外层优先);
+    # pages 在此补齐(PDF/图片物理页数),recon 行的每页成本靠它当分母。
+    with usage_context(
+        "vat_recon", doc_type="vat_report", pages=doc_page_count(file_bytes, filename)
+    ):
         return controller.run(
             OcrRequest(
                 task="vat_report",

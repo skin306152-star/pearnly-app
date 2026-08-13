@@ -1100,27 +1100,6 @@ body.admin-layout-body .lang-switching-overlay {
   margin-top: 22px;
 }
 
-.eng-acct-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-.eng-acct-email {
-  flex: 1 1 240px;
-  min-width: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--ink);
-  font-size: 13px;
-}
-.eng-acct-actions {
-  margin-top: 12px;
-}
-
 /* 四态:加载 / 空 / 错误(带重试)· 有数据时本容器整个被内容替换 */
 .eng-state {
   display: flex;

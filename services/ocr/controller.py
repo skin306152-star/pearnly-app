@@ -30,8 +30,6 @@ def run(req: OcrRequest) -> OcrResult:
     t0 = time.monotonic()
     # Controller 只消费调用方传入的套餐上下文,不在这里查 DB;没有上下文时按 none 档回落。
     # 引擎档按 policy_task 生效(银行窄读复用发票 handler 却按银行档解析);handler 仍按 req.task 路由。
-    with engine_context(
-        policy_task, plan_code=req.plan_code, is_exempt=req.is_exempt, account=req.account
-    ):
+    with engine_context(policy_task, plan_code=req.plan_code, is_exempt=req.is_exempt):
         data = handler.handle(req)
     return OcrResult(task=req.task, data=data, elapsed_ms=int((time.monotonic() - t0) * 1000))

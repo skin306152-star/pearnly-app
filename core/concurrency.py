@@ -2,8 +2,8 @@
 """线程池提交的上下文快照助手。
 
 请求级状态全在 contextvars(成本归因 usage_context / 引擎档 engine_policy /
-principal_context):裸 executor.submit 起的子线程读不到,落账进「未归因」、
-账号灰度断线。收单点后新增并发点没有第二种写法可选。
+网关归因 attribution):裸 executor.submit 起的子线程读不到,落账进「未归因」。
+收单点后新增并发点没有第二种写法可选。
 """
 
 from __future__ import annotations

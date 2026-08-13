@@ -38,11 +38,16 @@ router = APIRouter()
 
 # defaults_by_plan 只许落到具体档(auto 进套餐表会循环,resolve 侧也会兜回 direct35)
 
-# 能力未齐的档(engine_policy.PARTIAL_MODES)只准按账号灰度:全局档与套餐默认档是「整机切
-# 过去」,能力缺口会随档全租户生效。集合当前为空(qwen 2026-08-12 补齐 document_type 后移出),
-# 闸常驻当绊线:新档几乎都是能力先残后齐,写侧不拦,残档一进全局/套餐默认就是全租户事故。
-# 账号覆写不受限——灰度本来就是拿少数账号对比读数,风险有边界。
-_PARTIAL_MODE_ERROR = "ocr_engine.partial_mode_account_only"
+# 能力未齐的档(engine_policy.PARTIAL_MODES)不准启用为任何档位(全局/套餐默认/任务覆写):
+# 三个口都是「成批切过去」,能力缺口会随档全租户生效。集合当前为空(qwen 2026-08-12 补齐
+# document_type 后移出),闸常驻当绊线:新档几乎都是能力先残后齐,写侧不拦,残档一上线就是
+# 全租户事故。语义演变:建档时是「只准账号灰度」,2026-08-13 账号灰度机制退役后收紧为全面禁用。
+_PARTIAL_MODE_ERROR = "ocr_engine.partial_mode_disabled"
+
+# 账号灰度(overrides_by_account)2026-08-13 退役:写侧明确拒收,不静默丢弃——
+# 旧脚本/旧前端还在发这个键时,400 比「保存成功但没生效」诚实。
+_RETIRED_ACCOUNT_KEY = "overrides_by_account"
+_RETIRED_ACCOUNT_ERROR = "ocr_engine.overrides_by_account_retired"
 
 
 def _reject_partial_mode(mode: str) -> None:
@@ -66,34 +71,16 @@ async def get_ocr_engine_policy(request: Request):
     }
 
 
-def _clean_overrides_by_account(raw, current: dict) -> dict:
-    """账号灰度名单校验(邮箱统一小写)。键缺席 = 保持库里现状 —— 旧版前端不发这个键,
-    不保持的话每次在这页点一次保存,都会把按人开的新引擎悄悄关掉。"""
-    if raw is None:
-        return dict(current or {})
-    if not isinstance(raw, dict):
-        raise HTTPException(400, detail="ocr_engine.bad_overrides_by_account")
-    out = {}
-    for k, v in raw.items():
-        email = (k or "").strip().lower()
-        mode = (v or "").strip()
-        if not email:
-            continue
-        if "@" not in email:
-            raise HTTPException(400, detail=f"ocr_engine.bad_account:{k}")
-        if not mode:
-            continue  # 空 = 跟全局,不落库
-        if mode not in MODES:
-            raise HTTPException(400, detail=f"ocr_engine.bad_account_mode:{email}")
-        out[email] = mode
-    return out
-
-
 @router.post("/api/admin/ocr-engine")
 async def set_ocr_engine_policy(request: Request):
-    """body: {mode, defaults_by_plan, overrides_by_task, overrides_by_account}。校验后落库 + 审计。"""
+    """body: {mode, defaults_by_plan, overrides_by_task}。校验后落库 + 审计。
+
+    落库 value 只含认识的键:存量配置里的退役键(账号灰度名单)在下一次保存时被自然剥离,
+    不需要迁移脚本去改生产 DB。"""
     user = _require_super_admin(request)
     body = await request.json()
+    if _RETIRED_ACCOUNT_KEY in body:
+        raise HTTPException(400, detail=_RETIRED_ACCOUNT_ERROR)
 
     mode = (body.get("mode") or "").strip()
     if mode not in MODES:
@@ -132,9 +119,6 @@ async def set_ocr_engine_policy(request: Request):
         "mode": mode,
         "defaults_by_plan": defaults_by_plan,
         "overrides_by_task": overrides_by_task,
-        "overrides_by_account": _clean_overrides_by_account(
-            body.get("overrides_by_account"), load_config().get("overrides_by_account")
-        ),
     }
     store.set_setting(SETTING_KEY, value, True, by=str(user["id"]))
     _log_op(

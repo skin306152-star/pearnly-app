@@ -50,6 +50,23 @@ def count_pdf_pages(pdf_bytes: bytes) -> int:
         return 0
 
 
+def doc_page_count(file_bytes: bytes, filename: str) -> Optional[int]:
+    """成本归因用的文档页数:PDF 按物理页数(损坏件按 1 页,钱已经花了),图片恒 1,
+    表格/文本格式返回 None —— 那些按字符计费,「页」的概念不成立,落 NULL 归「页数未知」。
+
+    对账三车道(银行/GL-VAT/销项)的 facade 用它填 usage_context.pages:没有这一步,
+    ai_usage 的 recon 行 pages 全空,成本面板的每页成本对这几个入口永远算不出来。"""
+    ext = "." + (filename or "").lower().rsplit(".", 1)[-1] if "." in (filename or "") else ""
+    # 后缀集合单源在 pipeline(懒 import 防环:pipeline 体量大且依赖多)。
+    from services.ocr.pipeline import IMAGE_EXTENSIONS, PDF_EXTENSIONS
+
+    if ext in PDF_EXTENSIONS:
+        return max(1, count_pdf_pages(file_bytes))
+    if ext in IMAGE_EXTENSIONS:
+        return 1
+    return None
+
+
 def render_page_png(path: str, page: int = 1, dpi: int = 144) -> Optional[Tuple[bytes, int]]:
     """Rasterize one page of a stored PDF to PNG bytes for inline viewing.
 

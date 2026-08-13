@@ -89,7 +89,7 @@ class PolicyRouteTests(unittest.TestCase):
 
     # PARTIAL_MODES 机制测试:2026-08-12 qwen 补齐 document_type 后集合清空,机制保留给
     # 未来的能力未齐档 —— 用 patch 造一个 partial 档(选真实档名 selfhost,先过 MODES 校验)
-    # 钉死三个口(全局/套餐/任务)都挡、账号灰度放行。
+    # 钉死三个口(全局/套餐/任务)都挡。账号灰度 2026-08-13 退役后没有第四个口。
     def test_partial_mode_rejected_as_global(self):
         with (
             mock.patch.object(mod, "PARTIAL_MODES", frozenset({"selfhost"})),
@@ -97,7 +97,7 @@ class PolicyRouteTests(unittest.TestCase):
         ):
             r = self.client.post("/api/admin/ocr-engine", json={"mode": "selfhost"})
         self.assertEqual(r.status_code, 400)
-        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
+        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_disabled"))
         m_set.assert_not_called()  # 挡住 = 一个字节都没落库
 
     def test_partial_mode_rejected_as_plan_default(self):
@@ -110,7 +110,7 @@ class PolicyRouteTests(unittest.TestCase):
                 json={"mode": "auto", "defaults_by_plan": {"L": "selfhost"}},
             )
         self.assertEqual(r.status_code, 400)
-        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
+        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_disabled"))
         m_set.assert_not_called()
 
     def test_partial_mode_rejected_as_task_override(self):
@@ -124,23 +124,8 @@ class PolicyRouteTests(unittest.TestCase):
                 json={"mode": "economy", "overrides_by_task": {"invoice": "selfhost"}},
             )
         self.assertEqual(r.status_code, 400)
-        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_account_only"))
+        self.assertTrue(r.json()["detail"].startswith("ocr_engine.partial_mode_disabled"))
         m_set.assert_not_called()
-
-    def test_partial_mode_allowed_as_account_gray_release(self):
-        with (
-            mock.patch.object(mod, "PARTIAL_MODES", frozenset({"selfhost"})),
-            mock.patch.object(mod.store, "set_setting") as m_set,
-            mock.patch.object(mod, "_log_op"),
-            mock.patch.object(mod.store, "get_setting", return_value=None),
-        ):
-            r = self.client.post(
-                "/api/admin/ocr-engine",
-                json={"mode": "economy", "overrides_by_account": {"Gray@Pearnly.com": "selfhost"}},
-            )
-        self.assertEqual(r.status_code, 200)
-        saved = m_set.call_args[0][1]
-        self.assertEqual(saved["overrides_by_account"], {"gray@pearnly.com": "selfhost"})
 
     def test_qwen_unlocked_as_global_mode(self):
         # 解锁实锤:document_type 补齐 + 金标复测过门后,qwen 可当全局档(全局切由 Zihao 拍板)
@@ -198,27 +183,26 @@ class PolicyRouteTests(unittest.TestCase):
         self.assertTrue(args[2])
         m_log.assert_called_once()
 
-    def test_account_override_saved_lowercased(self):
-        with (
-            mock.patch.object(mod.store, "set_setting") as m_set,
-            mock.patch.object(mod, "_log_op"),
-            mock.patch.object(mod.store, "get_setting", return_value=None),
-        ):
+    # ── 账号灰度 2026-08-13 退役:写侧拒收 + 存量键自然清洗 ────────────────
+    def test_overrides_by_account_rejected_400(self):
+        # 旧脚本/旧前端还发这个键 → 400 明确文案,不静默丢弃(丢弃=「保存成功但没生效」)
+        with mock.patch.object(mod.store, "set_setting") as m_set:
             r = self.client.post(
                 "/api/admin/ocr-engine",
-                json={
-                    "mode": "economy",
-                    "overrides_by_account": {"Zihao@Example.com": "qwen", "x@y.com": ""},
-                },
+                json={"mode": "economy", "overrides_by_account": {"a@b.com": "qwen"}},
             )
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(
-            m_set.call_args[0][1]["overrides_by_account"], {"zihao@example.com": "qwen"}
-        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()["detail"], "ocr_engine.overrides_by_account_retired")
+        m_set.assert_not_called()
 
-    def test_account_override_kept_when_body_omits_it(self):
-        # 旧版前端不发这个键:保存一次策略页不许把按人开的灰度悄悄关掉
-        stored = {"mode": "economy", "overrides_by_account": {"zihao@example.com": "qwen"}}
+    def test_legacy_stored_account_key_not_served_and_stripped_on_save(self):
+        # 生产 DB 现存 skin306152 覆写行的清洗路径:GET 不再下发(load 忽略),
+        # 下一次正常保存落库的 value 不含该键 —— 存量配置被自然清洗,无迁移脚本。
+        stored = {"mode": "economy", "overrides_by_account": {"skin306152@gmail.com": "qwen"}}
+        with mock.patch.object(mod.store, "get_setting", return_value={"value": stored}):
+            r = self.client.get("/api/admin/ocr-engine")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("overrides_by_account", r.json()["policy"])
         with (
             mock.patch.object(mod.store, "set_setting") as m_set,
             mock.patch.object(mod, "_log_op"),
@@ -226,21 +210,7 @@ class PolicyRouteTests(unittest.TestCase):
         ):
             r = self.client.post("/api/admin/ocr-engine", json={"mode": "economy"})
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(
-            m_set.call_args[0][1]["overrides_by_account"], {"zihao@example.com": "qwen"}
-        )
-
-    def test_bad_account_key_and_mode_400(self):
-        r = self.client.post(
-            "/api/admin/ocr-engine",
-            json={"mode": "economy", "overrides_by_account": {"not-an-email": "qwen"}},
-        )
-        self.assertEqual(r.status_code, 400)
-        r = self.client.post(
-            "/api/admin/ocr-engine",
-            json={"mode": "economy", "overrides_by_account": {"a@b.com": "gpt99"}},
-        )
-        self.assertEqual(r.status_code, 400)
+        self.assertNotIn("overrides_by_account", m_set.call_args[0][1])
 
     def test_costs_route_returns_attribution_envelope(self):
         payload = {

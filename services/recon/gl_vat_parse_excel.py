@@ -156,9 +156,10 @@ def parse_gl(
     """Facade → controller(task=gl_ledger, flavor=gl_vat)."""
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
+    from services.ocr.pdf_utils import doc_page_count
     from services.cost.usage_context import usage_context
 
-    with usage_context("vat_recon", doc_type="gl_vat"):
+    with usage_context("vat_recon", doc_type="gl_vat", pages=doc_page_count(file_bytes, filename)):
         return controller.run(
             OcrRequest(
                 task="gl_ledger",

@@ -201,7 +201,6 @@ async def batch_process(
                         api_key=api_key,
                         max_pages=10,
                         document_type="invoice",
-                        account=user.get("email"),
                         **_ocr_policy_ctx,
                     )
 

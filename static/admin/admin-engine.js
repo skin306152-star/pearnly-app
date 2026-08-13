@@ -6,8 +6,6 @@
  * 没测过的档就写「—」,不许拿别的档的数字凑一个好看的平均。
  *
  * 依赖由 admin.js 注入(共用同一份 token/i18n/toast),本文件不碰全局状态。
- * 语言切换时 admin.js 会整页重渲染,故账号灰度的未保存编辑存在模块状态里、
- * 从状态重画,不从 DOM 反读 —— 否则切一次语言,刚填的邮箱就没了。
  */
 (function () {
     'use strict';
@@ -30,7 +28,6 @@
     let D = null; // {fetch, t, esc, fmt, toast}
     let policy = null;
     let options = null;
-    let accounts = []; // [{email, mode}] · 编辑中的灰度名单(含未保存改动)
     let bound = false;
 
     function _t(k) {
@@ -95,7 +92,7 @@
         return html + '</select>';
     }
 
-    /** 能力未齐的档(后端 PARTIAL_MODES):只能按账号灰度,全局/套餐位后端会 400 挡回。 */
+    /** 能力未齐的档(后端 PARTIAL_MODES):暂不可启用为任何档位,写侧后端会 400 挡回。 */
     function _isPartial(mode) {
         return ((options && options.partial_modes) || []).indexOf(mode) !== -1;
     }
@@ -178,39 +175,8 @@
         });
     }
 
-    function _renderAccounts() {
-        const host = document.getElementById('adm-eng-accounts');
-        if (!host) return;
-        if (!accounts.length) {
-            host.innerHTML = _stateBox('empty', _t('adm-eng-acct-empty'), '');
-            return;
-        }
-        const modes = (options && options.modes) || MODE_FALLBACK;
-        host.innerHTML = accounts
-            .map(function (a, i) {
-                return (
-                    '<div class="eng-acct-row" data-eng-acct="' +
-                    i +
-                    '"><input class="eng-acct-email" type="email" autocomplete="off" value="' +
-                    D.esc(a.email) +
-                    '" placeholder="' +
-                    D.esc(_t('adm-eng-acct-ph')) +
-                    '" />' +
-                    _modeSelect('eng-acct-mode', modes, false, a.mode) +
-                    '<button type="button" class="btn btn-ghost btn-sm eng-acct-del" data-eng-acct-del="' +
-                    i +
-                    '">' +
-                    D.esc(_t('adm-eng-acct-del')) +
-                    '</button></div>'
-                );
-            })
-            .join('');
-    }
-
-    /** 档位/套餐/任务三块的可读区 HTML(不含账号灰度)。dirty 时只刷这段,保住未保存的输入。 */
+    /** 档位/套餐/任务三块的可读区 HTML。 */
     function _policyBodyHtml() {
-        const planModes = (options && options.plan_modes) || MODE_FALLBACK;
-        const taskModes = (options && options.modes) || planModes.concat(['auto']);
         return (
             '<div class="eng-tier-grid" id="adm-eng-tiers">' +
             TIERS.map(_tierCard).join('') +
@@ -255,17 +221,7 @@
         );
     }
 
-    /** 全量重画(档位 + 套餐 + 任务 + 账号灰度)。 */
     function _renderPolicy() {
-        const host = document.getElementById('adm-eng-policy-body');
-        if (!host) return;
-        host.innerHTML = _policyBodyHtml();
-        _renderPolicyRows();
-        _renderAccounts();
-    }
-
-    /** 只刷档位/套餐/任务,账号灰度容器原样保留(未保存编辑不能被服务器快照冲掉)。 */
-    function _renderPolicyBody() {
         const host = document.getElementById('adm-eng-policy-body');
         if (!host) return;
         host.innerHTML = _policyBodyHtml();
@@ -278,8 +234,6 @@
             mode: (mode && mode.value) || policy.mode,
             defaults_by_plan: {},
             overrides_by_task: {},
-            // 后端「缺键 = 保留现值」,所以删除一行必须靠回传完整对象来表达。
-            overrides_by_account: {},
         };
         document.querySelectorAll('#adm-eng-plans select').forEach(function (sel) {
             body.defaults_by_plan[sel.dataset.engKey] = sel.value || body.mode;
@@ -287,29 +241,15 @@
         document.querySelectorAll('#adm-eng-tasks select').forEach(function (sel) {
             if (sel.value) body.overrides_by_task[sel.dataset.engKey] = sel.value;
         });
-        for (let i = 0; i < accounts.length; i++) {
-            const email = (accounts[i].email || '').trim().toLowerCase();
-            if (!email) continue;
-            if (email.indexOf('@') === -1) return { error: email };
-            body.overrides_by_account[email] = accounts[i].mode;
-        }
-        return { body: body };
+        return body;
     }
 
     async function _save() {
         if (!policy) return; // 策略没读出来就保存 = 拿一份空白覆盖线上配置
-        const collected = _collect();
-        if (collected.error) {
-            D.toast(_t('adm-eng-acct-bad') + ' ' + collected.error, 'error');
-            return;
-        }
+        const body = _collect();
         try {
-            const r = await D.fetch('/api/admin/ocr-engine', {
-                method: 'POST',
-                body: collected.body,
-            });
-            policy = r.policy || collected.body;
-            accounts = _accountsFrom(policy);
+            const r = await D.fetch('/api/admin/ocr-engine', { method: 'POST', body: body });
+            policy = r.policy || body;
             _renderPolicy();
             D.toast(_t('adm-eng-saved-toast'), 'success');
         } catch (e) {
@@ -328,69 +268,23 @@
         return text === key ? _t('adm-eng-save-fail') + ' · ' + detail : text;
     }
 
-    function _accountsFrom(p) {
-        const raw = (p && p.overrides_by_account) || {};
-        return Object.keys(raw).map(function (email) {
-            return { email: email, mode: raw[email] };
-        });
-    }
-
-    /** 档位区与账号灰度区读的是同一个接口,状态必须同进同退,不许一半是数据一半是旧壳。 */
-    function _setBothStates(kind, message, retry) {
-        ['adm-eng-policy-body', 'adm-eng-accounts'].forEach(function (id, i) {
-            const el = document.getElementById(id);
-            if (el) el.innerHTML = _stateBox(kind, message, i === 0 ? retry : '');
-        });
-    }
-
-    /** 账号灰度编辑态与服务器态是否不一致(有未保存改动)。语言切换/整页重渲染会重拉策略,
-     *  不一致时必须保住输入区,不能拿服务器快照把没保存的邮箱/档位冲掉。 */
-    function _accountsDirty(p) {
-        const saved = _accountsFrom(p);
-        if (accounts.length !== saved.length) return true;
-        for (let i = 0; i < accounts.length; i++) {
-            const a = accounts[i];
-            const s = saved[i];
-            if (!s) return true;
-            if ((a.email || '').trim().toLowerCase() !== s.email || a.mode !== s.mode) return true;
-        }
-        return false;
-    }
-
     async function _loadPolicy() {
         const host = document.getElementById('adm-eng-policy-body');
         if (!host) return;
-        // 有未保存编辑时,账号灰度容器在请求期间也原样保留(loading 一盖,输入框就没了)。
-        const keepAccounts = _accountsDirty(policy);
         policy = null;
-        if (keepAccounts) {
-            host.innerHTML = _stateBox('loading', _t('adm-eng-loading'), '');
-        } else {
-            _setBothStates('loading', _t('adm-eng-loading'), '');
-        }
+        host.innerHTML = _stateBox('loading', _t('adm-eng-loading'), '');
         try {
             const d = await D.fetch('/api/admin/ocr-engine');
             policy = d.policy || {};
             options = d.options || {};
-            if (keepAccounts && _accountsDirty(policy)) {
-                // 编辑还没落库:账号输入区不动,只刷档位/套餐/任务(语言切换就是走这条)。
-                _renderPolicyBody();
-            } else {
-                accounts = _accountsFrom(policy);
-                _renderPolicy();
-            }
+            _renderPolicy();
             const saved = document.getElementById('adm-eng-saved');
             if (saved)
                 saved.textContent = d.updated_at
                     ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
                     : '';
-        } catch (e) {
-            // fetch 失败时 policy 已在上方置 null,没有服务器态可比,判据只剩「本地还有没有行」。
-            if (keepAccounts && accounts.length > 0) {
-                host.innerHTML = _stateBox('error', _t('adm-eng-load-fail'), 'policy');
-            } else {
-                _setBothStates('error', _t('adm-eng-load-fail'), 'policy');
-            }
+        } catch {
+            host.innerHTML = _stateBox('error', _t('adm-eng-load-fail'), 'policy');
         }
     }
 
@@ -405,19 +299,6 @@
                 _loadPolicy();
                 return;
             }
-            const del = e.target.closest('[data-eng-acct-del]');
-            if (del) {
-                accounts.splice(Number(del.dataset.engAcctDel), 1);
-                _renderAccounts();
-                return;
-            }
-            if (e.target.closest('#adm-eng-acct-add')) {
-                accounts.push({ email: '', mode: policy ? policy.mode : 'economy' });
-                _renderAccounts();
-                const rows = document.querySelectorAll('.eng-acct-row .eng-acct-email');
-                if (rows.length) rows[rows.length - 1].focus();
-                return;
-            }
             if (e.target.closest('#adm-eng-save')) _save();
         });
         root.addEventListener('change', function (e) {
@@ -427,15 +308,6 @@
                     el.classList.toggle('is-on', el === tier);
                 });
             }
-            const row = e.target.closest('.eng-acct-row');
-            // 邮箱不在这儿收:input 监听已逐键写回,change 再写一遍是同一个值。
-            if (row && e.target.classList.contains('eng-acct-mode'))
-                accounts[Number(row.dataset.engAcct)].mode = e.target.value;
-        });
-        root.addEventListener('input', function (e) {
-            const row = e.target.closest('.eng-acct-row');
-            if (row && e.target.classList.contains('eng-acct-email'))
-                accounts[Number(row.dataset.engAcct)].email = e.target.value;
         });
     }
 

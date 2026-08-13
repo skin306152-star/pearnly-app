@@ -19,7 +19,12 @@ def payload_hash(text) -> str:
 
 
 def log_call(result, *, text=None, tenant_id=None, user_id=None, trace_id=None) -> None:
-    """记一次调用的工程元信息(无原文/prompt/key/raw response)+ 落库 ai_usage。"""
+    """记一次调用的工程元信息(无原文/prompt/key/raw response)+ 落库 ai_usage。
+
+    tenant/user 兜底顺序:显式实参(含 transport 已合并的 attribution)> 鉴权层绑定的
+    请求上下文(observability.log_context)。HTTP 内联车道(如 VAT 报表三查)不逐层
+    传 owner,行日志早就带租户而成本行落 NULL —— 差的就是这一步回读(2026-08-13 实锤)。"""
+    tenant_id, user_id = _fill_owner_from_request_context(tenant_id, user_id)
     logger.info(
         "ai_call task=%s schema=%s provider=%s model=%s status=%s error_kind=%s latency_ms=%s "
         "in_tok=%s out_tok=%s cost_thb=%.6f payload_hash=%s tenant=%s user=%s trace=%s",
@@ -39,6 +44,20 @@ def log_call(result, *, text=None, tenant_id=None, user_id=None, trace_id=None) 
         trace_id or "-",
     )
     _record_usage(result, tenant_id=tenant_id, user_id=user_id, trace_id=trace_id)
+
+
+def _fill_owner_from_request_context(tenant_id, user_id):
+    """tenant/user 缺位时回读鉴权层绑定的请求上下文(core.auth → log_context.bind)。
+    显式值永远优先(批处理可能代他人跑);读不到/没绑定 = 原样返回,绝不抛。"""
+    if tenant_id and user_id:
+        return tenant_id, user_id
+    try:
+        from services.observability import log_context
+
+        ctx = log_context.current()
+        return tenant_id or ctx.get("tenant_id"), user_id or ctx.get("user_id")
+    except Exception:  # noqa: BLE001 · 归因兜底绝不打断 AI 调用收尾
+        return tenant_id, user_id
 
 
 def _record_usage(result, *, tenant_id, user_id, trace_id) -> None:

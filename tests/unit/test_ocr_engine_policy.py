@@ -63,14 +63,6 @@ class ResolveModeTests(unittest.TestCase):
             self.assertEqual(ep.resolve_mode("invoice", plan_code="L", config=cfg), "selfhost")
             self.assertEqual(ep.resolve_mode("invoice", is_exempt=True, config=cfg), "selfhost")
 
-    def test_account_override_beats_global(self):
-        # 按人灰度新引擎:名单里的账号切档,别人照旧
-        with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="a@b.com"), "qwen")
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="c@d.com"), "economy")
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
-
     def test_unsupported_task_falls_back_regardless_of_how_mode_was_chosen(self):
         # 能力盲区注册表是常驻绊线:登记的 (mode, task) 不管档怎么选上都回 fail-safe——
         # 功能不能被档位切坏。注册表当前为空,这里灌一条假登记验机制本身。
@@ -78,51 +70,34 @@ class ResolveModeTests(unittest.TestCase):
             with mock.patch.object(
                 ep, "MODE_UNSUPPORTED_TASKS", {"qwen": frozenset({"vat_report"})}
             ):
-                by_account = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
-                self.assertEqual(
-                    ep.resolve_mode("vat_report", config=by_account, account="a@b.com"), "economy"
-                )
-                self.assertEqual(
-                    ep.resolve_mode("invoice", config=by_account, account="a@b.com"), "qwen"
-                )
                 by_global = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
                 self.assertEqual(ep.resolve_mode("vat_report", config=by_global), "economy")
                 self.assertEqual(ep.resolve_mode("invoice", config=by_global), "qwen")
+                by_task = {**ep.DEFAULT_CONFIG, "overrides_by_task": {"vat_report": "qwen"}}
+                self.assertEqual(ep.resolve_mode("vat_report", config=by_task), "economy")
 
     def test_vat_report_back_on_qwen_after_pdf_part_fix(self):
         # 2026-08-13 根因修复(http_common:PDF 逐页转图再进 image_url)后,
         # vat_report 车道重新接 qwen,不再被盲区注册表劫回现役档。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
-            self.assertEqual(ep.resolve_mode("vat_report", config=cfg, account="a@b.com"), "qwen")
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+            self.assertEqual(ep.resolve_mode("vat_report", config=cfg), "qwen")
 
-    def test_account_override_is_case_insensitive(self):
+    def test_retired_account_key_ignored_on_load(self):
+        # 账号灰度 2026-08-13 退役:存量配置里的 overrides_by_account 不炸、不生效,
+        # 合并结果里没有这个键(写侧下次保存自然剥离,不跑迁移脚本)。
+        legacy = {
+            "mode": "economy",
+            "overrides_by_task": {"bank_statement": "direct35"},
+            "overrides_by_account": {"skin306152@gmail.com": "qwen"},
+        }
+        with mock.patch(
+            "services.platform_settings.store.get_setting", return_value={"value": legacy}
+        ):
+            cfg = ep.load_config()
+        self.assertNotIn("overrides_by_account", cfg)
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account=" A@B.com "), "qwen")
-
-    def test_account_override_beats_task(self):
-        # 灰度语义 = 名单账号整机试新引擎(所有入口所有单据)。生产后台常年把各任务
-        # 钉了档,账号若排在任务之下,灰度在真机上一次都轮不到(2026-08-12 上线冒烟实锤)。
-        with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
-            self.assertEqual(
-                ep.resolve_mode("bank_statement", config=cfg, account="a@b.com"), "qwen"
-            )
-            # 名单外账号照旧吃任务钉档,银行口径不被牵连
-            self.assertEqual(
-                ep.resolve_mode("bank_statement", config=cfg, account="x@y.com"), "direct35"
-            )
-
-    def test_env_beats_account_override(self):
-        with mock.patch.dict("os.environ", {**_ENV_CLEAR, "OCR_ENGINE_MODE": "economy"}):
-            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="a@b.com"), "economy")
-
-    def test_bad_account_mode_falls_back(self):
-        with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "gpt99"}}
-            self.assertEqual(ep.resolve_mode("invoice", config=cfg, account="a@b.com"), "economy")
+            self.assertEqual(ep.resolve_mode("invoice", config=cfg), "economy")
 
     def test_invalid_mode_falls_back(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):
@@ -202,9 +177,9 @@ class EngineContextTests(unittest.TestCase):
         from services.ai_gateway import backends
 
         with mock.patch.dict("os.environ", _ENV_CLEAR):
-            cfg = {**ep.DEFAULT_CONFIG, "overrides_by_account": {"a@b.com": "qwen"}}
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
             with mock.patch.object(ep, "load_config", return_value=cfg):
-                with ep.engine_context("invoice", account="a@b.com") as mode:
+                with ep.engine_context("invoice") as mode:
                     self.assertEqual(mode, "qwen")
                     self.assertEqual(backends.override_backend(), "qwen")
                     self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")

@@ -22,13 +22,17 @@ _ATTR: ContextVar[Optional[dict]] = ContextVar("ai_attribution", default=None)
 
 
 def set_attribution(
-    task: str,
+    task: Optional[str],
     *,
     tenant_id: Optional[str] = None,
     user_id: Optional[str] = None,
     trace_id: Optional[str] = None,
 ) -> Token:
-    """设归因(task 必填 + 可选 tenant/user/trace)。返回 token,调用方 finally 里 reset。"""
+    """设归因。返回 token,调用方 finally 里 reset。
+
+    task=None = 只补 tenant/user/trace、不改写调用点的内部 task 标签 —— 后台 worker
+    (recon jobs)要把成本记到任务 owner 名下,但 ocr.image_json 这类工程标签得保留,
+    否则「按 task 聚合」的面板全被压成一个业务名。"""
     return _ATTR.set(
         {"task": task, "tenant_id": tenant_id, "user_id": user_id, "trace_id": trace_id}
     )

@@ -204,7 +204,6 @@ async def _handle_line_image_ocr(
                     filename,
                     api_key=api_key,
                     max_pages=50,
-                    account=user_fresh.get("email"),
                 )
             result = pipeline_result_to_legacy_dict(_pipe_res)
             _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)

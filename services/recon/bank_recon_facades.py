@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from services.cost.usage_context import usage_context
+from services.ocr.pdf_utils import doc_page_count
 
 
 def parse_bank_statement_pdf(
@@ -23,8 +24,11 @@ def parse_bank_statement_pdf(
     from services.ocr.contracts import OcrRequest
 
     # 归因在 facade 而非各路由:两个调用点(网页 run + 异步 job)都是银行对账,
-    # 且 doc_type 只有这一层分得清。上层若已设入口(如工单),外层入口优先,这里只补单据类型。
-    with usage_context("bank_recon", doc_type="bank_statement"):
+    # 且 doc_type 只有这一层分得清。上层若已设入口(如工单),外层入口优先,这里只补单据类型;
+    # pages 同理在此补齐(PDF/图片的物理页数),否则 recon 行每页成本永远算不出。
+    with usage_context(
+        "bank_recon", doc_type="bank_statement", pages=doc_page_count(file_bytes, filename)
+    ):
         return controller.run(
             OcrRequest(
                 task="bank_statement",
@@ -54,7 +58,9 @@ def parse_gl(
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
 
-    with usage_context("bank_recon", doc_type="gl_ledger"):
+    with usage_context(
+        "bank_recon", doc_type="gl_ledger", pages=doc_page_count(file_bytes, filename)
+    ):
         return controller.run(
             OcrRequest(
                 task="gl_ledger",

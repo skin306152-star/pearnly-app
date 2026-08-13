@@ -93,8 +93,8 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 427: 'tn-status-overdraft': '⚠ 透支',
-        └ 469: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 419: 'tn-status-overdraft': '⚠ 透支',
+        └ 461: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
@@ -437,8 +437,8 @@
         └ 1221: 'time-min-ago-suffix': ' 分钟前',
         └ 1222: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 551: 'time-hours-ago': '{n} 小时前',
-        └ 552: 'time-days-ago': '{n} 天前',
+        └ 543: 'time-hours-ago': '{n} 小时前',
+        └ 544: 'time-days-ago': '{n} 天前',
 
 ## table-align-right — 命中 21(13 文件)
 > DESIGN_SYSTEM §21 表格对齐规范:表头居中、短内容格居中、长文本格靠左,禁止 th/td 右对齐

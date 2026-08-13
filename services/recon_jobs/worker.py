@@ -70,6 +70,30 @@ def _cleanup_stage(job_id: str) -> None:
         logger.warning(f"[recon-worker] cleanup stage {job_id} failed: {e}")
 
 
+def _run_handler_attributed(handler: Callable, params: Dict, job: Dict, progress_cb) -> object:
+    """带任务 owner 上下文跑 handler:worker 线程没有 HTTP 请求上下文,ai_usage 落账
+    的 tenant/user 全空(2026-08-13 生产实锤:recon 行 tenant_id/user_id=NULL,成本
+    面板算不出每租户/每页成本)。submit 时 owner 已存进 job params,这里设进网关归因
+    contextvar,handler 内的 _parallel(submit_ctx 快照)子线程一并继承。
+    task=None:只补 owner,不改写 ocr.* 内部 task 标签。归因失败不拦任务本体。"""
+    try:
+        from services.ai_gateway import attribution
+
+        token = attribution.set_attribution(
+            None,
+            tenant_id=str(params["tenant_id"]) if params.get("tenant_id") else None,
+            user_id=str(params["user_id"]) if params.get("user_id") else None,
+            trace_id=str(job.get("id")) if job.get("id") else None,
+        )
+    except Exception as e:  # noqa: BLE001 · 记账上下文绝不拦对账主路径
+        logger.warning(f"[recon-worker] attribution skip: {e}")
+        return handler(params, job.get("input_ref") or [], progress_cb)
+    try:
+        return handler(params, job.get("input_ref") or [], progress_cb)
+    finally:
+        attribution.reset_attribution(token)
+
+
 def _run_one(job: Dict) -> None:
     """在线程里跑单个任务(同步)· 写结果/失败 · 清暂存文件。"""
     job_id = job.get("id")
@@ -100,7 +124,7 @@ def _run_one(job: Dict) -> None:
             if params.get(key) is None and job.get(row_key) is not None:
                 params[key] = job.get(row_key)
 
-        result = handler(params, job.get("input_ref") or [], progress_cb)
+        result = _run_handler_attributed(handler, params, job, progress_cb)
         # S8 · handler 返回 ("__needs_review__", payload) → 暂停等用户核对 OCR 行
         _sentinel = result[0] if isinstance(result, (tuple, list)) and len(result) == 2 else None
         if _sentinel == "__needs_review__":

@@ -21,12 +21,17 @@ from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
 from services.ai_gateway import backends
-from services.ocr import gemini_models, principal_context
+from services.ocr import gemini_models
 
 logger = logging.getLogger(__name__)
 
 SETTING_KEY = "ocr_engine_policy"
 _FAILSAFE_MODE = "economy"
+
+# 已退役的配置键(账号灰度 2026-08-13 退役,Zihao 拍板):存量配置里出现只忽略 + 告警一次,
+# 超管保存时自然剥离(写侧只落认识的键),不跑一次性迁移脚本去改生产 DB。
+_RETIRED_KEYS = ("overrides_by_account",)
+_retired_warned = False
 
 # mode → tier 覆写表。加新模式只补这里 + cost 价表,CONCRETE_MODES/MODES 由本表派生。
 #
@@ -59,7 +64,7 @@ MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     # 千问全家桶档(2026-08-11 建档 · 后台叫「C·Qwen」):同样不动 Gemini 档位,改切后端到
     # qwen provider,档位由 providers/qwen.model_for_tier 解析(flash 读取臂 / max 升级臂)。
     # 发票页另走 qwen_direct 的两臂编排(flash 直读 + vl-ocr 转写 → 代码触发器 → max 重读),
-    # 51 张金标实测 49 中;先按账号灰度对比,别一上来全局切。
+    # 51 张金标实测 49 中;切换粒度 = 全局档 / 任务覆写 / 套餐档(后台超管页)。
     "qwen": {},
 }
 CONCRETE_MODES = tuple(MODE_MODEL_MAPS)
@@ -76,14 +81,16 @@ MODE_INVOICE_PAGE_READER: Dict[str, str] = {MODE_QWEN: "services.ocr.qwen_direct
 MODE_TABLE_TIER: Dict[str, str] = {MODE_QWEN: "escalate"}
 
 # 档位能力盲区:该档做不了的 task,解析一律回落 fail-safe 档,不管档是怎么选上的
-# (账号灰度/任务钉档/全局切换同判)——把功能切坏比多花点钱严重得多。机制常驻当绊线。
+# (任务钉档/全局切换/套餐档同判)——把功能切坏比多花点钱严重得多。机制常驻当绊线。
 # qwen·vat_report(2026-08-12 生产 15/15 批 400)已于 2026-08-13 移出:根因是 OpenAI
 # 兼容 image_url 塞了 data:application/pdf,修在 providers/http_common(PDF 逐页转图),
 # 真报表样张端到端复验通过。
 MODE_UNSUPPORTED_TASKS: Dict[str, frozenset] = {}
 
-# 能力未齐的档:只准按账号灰度,不许当全局档或套餐默认档(超管写侧 400 挡,见
-# routes/admin_ocr_engine_routes)。机制保留,当前为空。
+# 能力未齐的档:不准启用为任何档位(全局/套餐默认/任务覆写,超管写侧 400 挡,见
+# routes/admin_ocr_engine_routes)。机制保留当绊线,当前为空。
+# 语义演变:建档时(2026-08-11)是「只准按账号灰度」;2026-08-13 账号灰度机制整体退役,
+# 残档失去唯一的受控放量口,收紧为全面禁用——新档必须先补齐能力再上线。
 # qwen 于 2026-08-12 移出:两臂编排已补 document_type(贷记单硬闸/ABB 分类的判据),
 # 金标 25 张复测 vat/total 两列零漂 + ABB 专项全对 + 贷记单合成加考 2/2。
 # 仍如实记:qwen 页不产明细行与买卖方名址,吃明细的软闸(sanity 行和勾稽)对它不生效,
@@ -108,17 +115,28 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # 银行对账单钉 direct35(直通档=吃 env 默认):不跟全局走,全局切 economy 也不影响
     # 银行逐行读取(轻量档读长表整页读崩,见 MODE_MODEL_MAPS 上方实测数)。
     "overrides_by_task": {"bank_statement": "direct35"},
-    # 账号(登录邮箱小写)→ mode 覆写:新引擎按人灰度用它,不必为一个人建表也不必全局切。
-    # 优先级高于任务覆写(见 resolve_mode docstring 的实锤理由);名单外账号不受影响。
-    "overrides_by_account": {},
 }
 
 # 当前请求生效的 mode(成本台账/日志读它;不在 engine_context 内 = 空串)
 _ACTIVE_MODE: ContextVar[str] = ContextVar("ocr_engine_mode", default="")
 
 
+def _warn_retired_keys(value: Dict[str, Any]) -> None:
+    """存量配置里的退役键:忽略即无害,但告警一次留痕(静默吞会让人以为灰度还在生效)。"""
+    global _retired_warned
+    if _retired_warned:
+        return
+    found = [k for k in _RETIRED_KEYS if value.get(k)]
+    if found:
+        _retired_warned = True
+        logger.warning(
+            "engine_policy: 配置含已退役键 %s(账号灰度已退役,忽略;下次保存自动剥离)", found
+        )
+
+
 def load_config() -> Dict[str, Any]:
-    """后台配置(缺省/故障回落 DEFAULT_CONFIG)。浅合并顶层键,别信部分写入的形状。"""
+    """后台配置(缺省/故障回落 DEFAULT_CONFIG)。浅合并顶层键,别信部分写入的形状;
+    退役键(如 overrides_by_account)不进合并结果,存量配置带着也只告警不生效。"""
     cfg = dict(DEFAULT_CONFIG)
     try:
         from services.platform_settings import store
@@ -126,6 +144,7 @@ def load_config() -> Dict[str, Any]:
         row = store.get_setting(SETTING_KEY)
         value = (row or {}).get("value")
         if isinstance(value, dict):
+            _warn_retired_keys(value)
             for k in DEFAULT_CONFIG:
                 if k in value and isinstance(value[k], type(DEFAULT_CONFIG[k])):
                     cfg[k] = value[k]
@@ -134,41 +153,22 @@ def load_config() -> Dict[str, Any]:
     return cfg
 
 
-def _account_mode(cfg: Dict[str, Any], account: Optional[str]) -> Optional[str]:
-    """账号覆写查表(邮箱大小写不敏感:登录邮箱各处大小写不一,配置里只写小写)。"""
-    key = (account or "").strip().lower()
-    if not key:
-        return None
-    return (cfg.get("overrides_by_account") or {}).get(key)
-
-
 def resolve_mode(
     task: str,
     plan_code: Optional[str] = None,
     is_exempt: bool = False,
     config: Optional[Dict[str, Any]] = None,
-    account: Optional[str] = None,
 ) -> str:
-    """task + 账号 + 租户套餐 → 生效 mode。
-    env OCR_ENGINE_MODE > 账号覆写 > task 覆写 > 全局 > 套餐表。
+    """task + 租户套餐 → 生效 mode。
+    env OCR_ENGINE_MODE > task 覆写 > 全局 > 套餐表(全局=auto 时)。
 
-    账号压过任务:灰度语义是「名单上的账号整机试新引擎(所有入口所有单据)」;
-    生产后台常年把各任务钉了档,账号若排在任务之下,灰度在真机上永远轮不到
-    (2026-08-12 上线冒烟实锤,不是理论)。
-
-    account 缺省时回落请求级 principal(鉴权层设,见 principal_context):银行/GL-VAT/
-    VAT 报表/身份证几条链的 OcrRequest 建在 facade 深处传不上 account,不回落的话
-    「所有入口生效」就只剩发票一条路。显式传参永远优先。"""
+    2026-08-13 起档位与「当前是谁」无关(账号灰度机制退役):同一 task 全租户同档,
+    差异只来自任务覆写与套餐档。"""
     env_mode = os.environ.get("OCR_ENGINE_MODE", "").strip()
     if env_mode in MODE_MODEL_MAPS:
         return env_mode
     cfg = config if config is not None else load_config()
-    mode = (
-        _account_mode(cfg, account or principal_context.current_email())
-        or (cfg.get("overrides_by_task") or {}).get(task)
-        or cfg.get("mode")
-        or _FAILSAFE_MODE
-    )
+    mode = (cfg.get("overrides_by_task") or {}).get(task) or cfg.get("mode") or _FAILSAFE_MODE
     if mode == "auto":
         plan_key = "exempt" if is_exempt else (plan_code or "none")
         mode = (cfg.get("defaults_by_plan") or {}).get(plan_key) or _FAILSAFE_MODE
@@ -188,18 +188,16 @@ def engine_context(
     task: str,
     plan_code: Optional[str] = None,
     is_exempt: bool = False,
-    account: Optional[str] = None,
 ):
     """请求级策略生效域:进入时按 mode 下发模型覆写,退出时还原。yield 生效 mode。
 
     已在生效域内(如 recognize/core 带套餐包过、日后又迁进 controller)则原样透传,
-    不许内层无套餐的 resolve 覆盖外层带套餐的结果。account = 当前用户登录邮箱
-    (拿不到就不传,按全局档走)。"""
+    不许内层无套餐的 resolve 覆盖外层带套餐的结果。"""
     active = _ACTIVE_MODE.get()
     if active:
         yield active
         return
-    mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt, account=account)
+    mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt)
     token = gemini_models.set_model_override(MODE_MODEL_MAPS.get(mode))
     backend = MODE_BACKENDS.get(mode)
     backend_token = backends.set_backend_override(backend) if backend else None

@@ -3,8 +3,8 @@
 
 这页给老板定价用,三件事一旦悄悄坏掉就会得出错的价:
   ① 四个档位的参数必须逐档独立(自部署没实测过就得是「—」,不许拿别档数字顶上);
-  ② 保存必须回传完整的 overrides_by_account —— 后端「缺键 = 保留现值」,少发这个键
-     就删不掉灰度账号(routes/admin_ocr_engine_routes._clean_overrides_by_account);
+  ② 账号灰度 2026-08-13 整体退役 —— 编辑区/保存键 overrides_by_account 必须删干净,
+     后端见键即 400,前端残留半截就是「保存永远失败」;
   ③ 售价参考线钉 ฿1.5/页,成本表把每页成本单独摊开 —— 混合均值藏差价正是本页要拆穿的。
 另钉 adm-* 两语(zh+th)键齐,和三个新模块的按需注入接线(2026-08-12 起不再挂 admin.html,
 admin.js 进引擎页签才动态注入,URL 的 ?v 运行时从 admin.js 自己的 ?v 抠)。
@@ -58,12 +58,7 @@ class EnginePageWiringTests(unittest.TestCase):
             self.assertNotIn(dead, ADMIN_JS, f"admin.js 仍在渲染已删区的 {dead}")
 
     def test_page_hosts_exist(self):
-        for host in (
-            "adm-eng-policy-body",
-            "adm-eng-accounts",
-            "adm-eng-days",
-            "adm-eng-cost-body",
-        ):
+        for host in ("adm-eng-policy-body", "adm-eng-days", "adm-eng-cost-body"):
             self.assertIn(f'id="{host}"', HTML, f"缺 {host} 挂载点")
 
 
@@ -88,10 +83,14 @@ class TierCardTests(unittest.TestCase):
 
 
 class SaveContractTests(unittest.TestCase):
-    def test_save_always_sends_full_account_overrides(self):
-        # 后端缺键 = 保留现值,所以删一行只能靠回传完整对象来表达。
-        self.assertIn("overrides_by_account: {}", ENGINE_JS)
-        self.assertRegex(ENGINE_JS, r"body\.overrides_by_account\[email\] = accounts\[i\]\.mode")
+    def test_account_gray_release_fully_removed(self):
+        # 账号灰度已退役:后端见 overrides_by_account 键即 400,前端残留半截
+        # (编辑区没了但保存还发键)= 这页的保存从此永远失败。
+        for surface, name in ((HTML, "admin.html"), (ENGINE_JS, "admin-engine.js")):
+            self.assertNotIn("overrides_by_account", surface, f"{name} 残留灰度键")
+            self.assertNotIn("adm-eng-acct", surface, f"{name} 残留灰度 UI")
+            self.assertNotIn("eng-acct-", surface, f"{name} 残留灰度 UI 类名")
+        self.assertNotIn("adm-eng-acct", I18N, "admin-i18n.js 残留灰度文案键")
 
     def test_save_blocked_before_policy_loaded(self):
         self.assertIn("if (!policy) return;", ENGINE_JS)

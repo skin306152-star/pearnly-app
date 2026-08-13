@@ -2,7 +2,9 @@
 """services/ai_gateway/logging.py::log_call → ai_usage 落库接线契约。
 
 锁定:① tenant/task/cost 等参数原样传给 log_ai_usage;② store 层抛异常不影响
-log_call 正常返回(记账绝不能打断 AI 调用主路径);③ ai_usage_store 导入失败时同样不抛。
+log_call 正常返回(记账绝不能打断 AI 调用主路径);③ ai_usage_store 导入失败时同样不抛;
+④ tenant/user 缺位时回读鉴权层绑定的请求上下文(log_context)—— 内联车道的成本行
+从此带 owner,显式实参永远优先。
 """
 
 import unittest
@@ -11,6 +13,7 @@ from unittest import mock
 from services.ai_gateway import logging as ai_log
 from services.ai_gateway import tasks as T
 from services.cost.usage_context import usage_context
+from services.observability import log_context
 
 
 def _result(**overrides):
@@ -105,6 +108,40 @@ class AttributionWiringTests(unittest.TestCase):
                 ai_log.log_call(_result())
                 ai_log.log_call(_result())
         self.assertEqual([c.kwargs["pages"] for c in m.call_args_list], [18, 18])
+
+
+class RequestContextOwnerFallbackTests(unittest.TestCase):
+    """tenant/user 缺位回读 log_context(鉴权层 core.auth 绑定):VAT 报表三查这类内联
+    车道不逐层传 owner,行日志早带租户而成本行落 NULL —— 这根线断了成本面板就分不出租户。"""
+
+    def test_owner_filled_from_bound_request_context(self):
+        tokens = log_context.bind(user_id="U9", tenant_id="T9")
+        try:
+            with mock.patch("services.cost.ai_usage_store.log_ai_usage") as m:
+                ai_log.log_call(_result())
+        finally:
+            log_context.reset(tokens)
+        kw = m.call_args.kwargs
+        self.assertEqual(kw["tenant_id"], "T9")
+        self.assertEqual(kw["user_id"], "U9")
+
+    def test_explicit_owner_wins_over_request_context(self):
+        # 批处理可能代他人跑:调用方点名了 owner,不许被「当前登录的是谁」改写
+        tokens = log_context.bind(user_id="U9", tenant_id="T9")
+        try:
+            with mock.patch("services.cost.ai_usage_store.log_ai_usage") as m:
+                ai_log.log_call(_result(), tenant_id="T1", user_id="U1")
+        finally:
+            log_context.reset(tokens)
+        kw = m.call_args.kwargs
+        self.assertEqual(kw["tenant_id"], "T1")
+        self.assertEqual(kw["user_id"], "U1")
+
+    def test_unbound_context_stays_none(self):
+        with mock.patch("services.cost.ai_usage_store.log_ai_usage") as m:
+            ai_log.log_call(_result())
+        self.assertIsNone(m.call_args.kwargs["tenant_id"])
+        self.assertIsNone(m.call_args.kwargs["user_id"])
 
 
 if __name__ == "__main__":

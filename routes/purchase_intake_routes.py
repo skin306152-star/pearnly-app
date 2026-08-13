@@ -64,7 +64,6 @@ def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, 
                 filename,
                 api_key=api_key,
                 max_pages=50,
-                account=user_fresh.get("email"),
                 **ocr.policy_context_from_billing(quote),
             )
     except Exception as e:

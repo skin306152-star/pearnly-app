@@ -342,16 +342,6 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001 · 观测绝不阻断鉴权
         pass
 
-    # OCR 引擎档按账号灰度的兜底钥匙:银行/GL-VAT/VAT 报表/身份证几条链的 OcrRequest 建在
-    # facade 深处,拿不到「当前是谁」,不在这儿设一次,灰度就只对发票主路生效。
-    # 不 reset:每个请求跑在自己的 task 上下文里(同 log_context 的作用域),不会串到别的请求。
-    try:
-        from services.ocr import principal_context
-
-        principal_context.set_principal(user.get("email"))
-    except Exception:  # noqa: BLE001 · 灰度兜底绝不阻断鉴权
-        pass
-
     return user
 
 

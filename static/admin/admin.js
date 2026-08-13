@@ -3120,7 +3120,7 @@
     // 三支引擎模块(约 36KB)只在进引擎页签时才动态注入:七个管理页签只有这一页用它们,
     // 挂 admin.html 上让另外六页白背这份体积。注入 URL 的 ?v 从本文件自己的 ?v 抠
     // (CDN 按 URL 缓存 · 指纹不同步 = 永远发旧文件)。页面本体在 admin-engine.js(档位卡 /
-    // 账号灰度)与 admin-engine-cost.js(成本仪表盘),这里只把共用的 fetch/i18n/toast 递过去:
+    // 套餐与任务覆写)与 admin-engine-cost.js(成本仪表盘),这里只把共用的 fetch/i18n/toast 递过去:
     // 那两个模块不自己抓全局,换鉴权只改这一处。
     const _ENGINE_SCRIPTS = [
         '/static/admin/admin-engine-charts.js',

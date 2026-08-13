@@ -97,7 +97,6 @@ def _ingest_one_attachment(
                 filename,
                 api_key=api_key,
                 max_pages=50,
-                account=user.get("email"),
                 **policy_context_from_billing(quote),
             )
         result = pipeline_result_to_legacy_dict(_pipe_res)

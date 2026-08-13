@@ -3,8 +3,8 @@
 """机械闸:services/ 里的线程池提交一律走 core.concurrency.submit_ctx。
 
 出身(2026-08-12 B5):请求级状态全在 contextvars(成本归因 usage_context / 引擎档
-engine_policy / principal_context)。裸 `pool.submit(fn)` 起的子线程上下文为空——
-落账进「未归因」、账号灰度断线。历史散落 6 处手抄 `contextvars.copy_context().run`
+engine_policy / 网关归因 attribution)。裸 `pool.submit(fn)` 起的子线程上下文为空——
+落账进「未归因」。历史散落 6 处手抄 `contextvars.copy_context().run`
 样板 + 5 处裸 submit,已收拢进 submit_ctx 单点;此后新增并发点没有第二种写法。
 
 判据(只认能静态证明的,宁可漏报不许误报):

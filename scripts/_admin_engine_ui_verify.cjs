@@ -131,7 +131,7 @@ async function verifyTierSwitch(page) {
 }
 
 /**
- * 能力未齐的档只准按账号灰度:卡片上要有醒目提示,选成全局要被后端挡回且理由看得见。
+ * 能力未齐的档不可启用(PARTIAL_MODES 绊线):卡片上要有醒目提示,写侧后端 400 挡回。
  * 2026-08-12 qwen 补齐 document_type + 金标复测过门后 PARTIAL_MODES 清空、qwen 解锁为全局档 ——
  * 本段据此改写:不再有 partial 提示,选 qwen 存全局应 200 成功(旧假设已过时)。
  */
@@ -170,27 +170,14 @@ async function verifyPartialMode(page) {
     chk('重载后线上档位是经济档 · ' + `live=${live}`, live === 'economy');
 }
 
-async function verifyAccounts(page) {
-    console.log('\n[3] 按账号灰度');
-    const empty = page.locator('#adm-eng-accounts [data-eng-state="empty"]');
-    const hadEmpty = await empty.count();
-    if (hadEmpty) chk('空态可见', await empty.isVisible());
-    await shot(page, '03-accounts-empty', '#adm-eng-accounts');
-
-    await page.click('#adm-eng-acct-add');
-    chk('增行', (await page.locator('.eng-acct-row').count()) === 1);
-    const input = page.locator('.eng-acct-row .eng-acct-email').first();
-    await input.click();
-    await page.keyboard.type('skin306152@gmail.com');
-    chk('邮箱输入生效', (await input.inputValue()) === 'skin306152@gmail.com');
-    await page.selectOption('.eng-acct-row .eng-acct-mode', 'qwen');
-    chk(
-        '档位可选 qwen',
-        (await page.locator('.eng-acct-row .eng-acct-mode').inputValue()) === 'qwen'
-    );
-    await shot(page, '04-accounts-row-added', '#adm-eng-accounts');
-
-    // 存盘 → 重载 → 还在,才叫真落库(后端缺键=保留现值,少发就删不掉)
+/**
+ * 账号灰度机制 2026-08-13 整体退役(Zihao 拍板):页面不再有编辑区,保存请求不再携带
+ * overrides_by_account(后端见键即 400)。这里验「真的删干净」而不是「碰巧没渲染」。
+ */
+async function verifyAccountsRetired(page) {
+    console.log('\n[3] 账号灰度已退役');
+    chk('灰度编辑区不存在', (await page.locator('#adm-eng-accounts').count()) === 0);
+    chk('添加账号按钮不存在', (await page.locator('#adm-eng-acct-add').count()) === 0);
     const saved = page.waitForResponse(
         (r) => r.url().includes('/api/admin/ocr-engine') && r.request().method() === 'POST'
     );
@@ -199,37 +186,11 @@ async function verifyAccounts(page) {
     chk('保存返回 200 · ' + `status=${resp.status()}`, resp.status() === 200);
     const body = JSON.parse(resp.request().postData() || '{}');
     chk(
-        '回传完整 overrides_by_account',
-        body.overrides_by_account && body.overrides_by_account['skin306152@gmail.com'] === 'qwen',
-        JSON.stringify(body.overrides_by_account)
+        '保存请求不含 overrides_by_account',
+        !('overrides_by_account' in body),
+        JSON.stringify(Object.keys(body))
     );
-    await page.reload();
-    await page.waitForSelector('.eng-acct-row .eng-acct-email');
-    chk(
-        '重载后灰度账号还在',
-        (await page.locator('.eng-acct-row .eng-acct-email').first().inputValue()) ===
-            'skin306152@gmail.com'
-    );
-    await shot(page, '05-accounts-persisted', '#adm-eng-accounts');
-
-    // 删行 → 再存 → 真的没了(这条正是「缺键=保留现值」最容易漏掉的一半)
-    await page.click('.eng-acct-del');
-    chk('删行', (await page.locator('.eng-acct-row').count()) === 0);
-    const saved2 = page.waitForResponse(
-        (r) => r.url().includes('/api/admin/ocr-engine') && r.request().method() === 'POST'
-    );
-    await page.click('#adm-eng-save');
-    const resp2 = await saved2;
-    const body2 = JSON.parse(resp2.request().postData() || '{}');
-    chk(
-        '删除后回传空对象',
-        body2.overrides_by_account && Object.keys(body2.overrides_by_account).length === 0,
-        JSON.stringify(body2.overrides_by_account)
-    );
-    await page.reload();
-    await page.waitForSelector('#adm-eng-accounts [data-eng-state="empty"]');
-    chk('重载后确认删除', (await page.locator('.eng-acct-row').count()) === 0);
-    await shot(page, '06-accounts-removed', '#adm-eng-accounts');
+    await shot(page, '03-accounts-retired');
 }
 
 async function verifyCostCharts(page) {
@@ -399,10 +360,6 @@ async function verifyStates(page) {
     const perr = page.locator('#adm-eng-policy-body [data-eng-state="error"]');
     await perr.waitFor();
     chk('策略区错误态可见', await perr.isVisible());
-    chk(
-        '策略区错误时灰度区不留旧壳',
-        await page.locator('#adm-eng-accounts [data-eng-state="error"]').isVisible()
-    );
     await shot(page, '14-state-policy-error');
     await page.unroute('**/api/admin/ocr-engine');
 }
@@ -442,7 +399,7 @@ async function verifyFullPage(page) {
     await verifyCostCharts(page);
     await verifyTable(page);
     await verifyDaySwitch(page);
-    await verifyAccounts(page);
+    await verifyAccountsRetired(page);
     await verifyStates(page);
     await verifyFullPage(page);
 

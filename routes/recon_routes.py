@@ -24,12 +24,9 @@ from services.vat.vat_ai_analyzer import analyze_diff
 # P1.2-M2 · 发票侧字段级用户校正(铁律 #21 独立 service)
 from services.recon.field_override import record_field_override, ALLOWED_FIELDS as _OVERRIDE_FIELDS
 
-# 跨组共享 helper · moved to recon_routes_shared.py
+# 跨组共享 helper · moved to recon_routes_shared.py(计费单位判据下沉 services/billing/pricing)
 from routes.recon_routes_shared import (  # noqa: F401  re-export + facade-internal
     _user_key,
-    _pdf_billing_units,
-    _ROWS_PER_PAGE_BILLING,
-    estimate_recon_units,
     estimate_upload_units,
 )
 
@@ -472,10 +469,9 @@ router.include_router(glvat_router)
 # ════════════════════════════════════════════════════════════════════
 from routes.recon_routes_bankv2 import bankv2_router  # noqa: E402
 
-# re-export bank-v2 surface · recon_jobs/handlers.py 运行时 `from recon_routes import ...`
-# 拉这批名字(原 bank_v2_run 解析段同名函数)+ 测试 patch recon_routes.X / 直接调 handler。
-# verbatim 搬出后必须保契约,否则 worker import 崩 + monkeypatch 失效。
-from routes.recon_routes_bankv2_helpers import (  # noqa: F401,E402  re-export (handlers/tests)
+# re-export bank-v2 surface(路由组内部使用;worker 已改为直连 services.recon.bank_recon_v2,
+# 警告/锚点 helper 下沉 services/recon/bank_recon_warnings)。
+from routes.recon_routes_bankv2_helpers import (  # noqa: F401,E402  re-export
     parse_bank_statement_pdf,
     parse_gl_v2,
     merge_statements,
@@ -483,10 +479,6 @@ from routes.recon_routes_bankv2_helpers import (  # noqa: F401,E402  re-export (
     bank_reconcile,
     rows_to_json,
     bank_summary_to_json,
-    _apply_anchor_overrides,
-    _detect_recon_mismatch,
-    _brv2_warn,
-    _completeness_details,
 )
 from routes.recon_routes_bankv2_run import bank_v2_run  # noqa: F401,E402  re-export
 from routes.recon_routes_bankv2 import (  # noqa: F401,E402  re-export (tests 直接调 handler)

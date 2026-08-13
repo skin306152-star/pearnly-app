@@ -74,8 +74,20 @@ def _stage(d, role, name="f.pdf", data=b"x"):
 
 
 class RunBankReconTests(unittest.TestCase):
+    # handler 运行时直连 services 层(不再经 routes.recon_routes 再导出)· patch 打在真源上。
+    _TARGETS = {
+        "parse_bank_statement_pdf": "services.recon.bank_recon_v2.parse_bank_statement_pdf",
+        "parse_gl_v2": "services.recon.bank_recon_v2.parse_gl",
+        "merge_statements": "services.recon.bank_recon_v2.merge_statements",
+        "merge_gl_files": "services.recon.bank_recon_v2.merge_gl_files",
+        "bank_reconcile": "services.recon.bank_recon_v2.reconcile",
+        "rows_to_json": "services.recon.bank_recon_v2.rows_to_json",
+        "bank_summary_to_json": "services.recon.bank_recon_v2.summary_to_json",
+        "_detect_recon_mismatch": "services.recon.bank_recon_warnings.detect_recon_mismatch",
+    }
+
     def _patch(self, **over):
-        """patch recon_routes 名字 + db · 返回 (patchers, db_mock)。"""
+        """patch 解析/对账真源 + db · 返回 patch 对象 dict。"""
         summary = SimpleNamespace(
             matched_count=3,
             gl_debit_only_count=1,
@@ -95,7 +107,7 @@ class RunBankReconTests(unittest.TestCase):
             _detect_recon_mismatch=mock.Mock(return_value=[]),
         )
         defaults.update(over)
-        ps = [mock.patch(f"routes.recon_routes.{k}", v) for k, v in defaults.items()]
+        ps = [mock.patch(self._TARGETS[k], v) for k, v in defaults.items()]
         for p in ps:
             p.start()
             self.addCleanup(p.stop)
@@ -159,8 +171,11 @@ class RunBankReconTests(unittest.TestCase):
 
 class RunGlvatTests(unittest.TestCase):
     def _patch_parse(self, gl_ret, vat_ret):
-        for name, ret in (("parse_gl", gl_ret), ("parse_vat_report", vat_ret)):
-            p = mock.patch(f"routes.recon_routes.{name}", return_value=ret)
+        for target, ret in (
+            ("services.recon.gl_vat_reconciler.parse_gl", gl_ret),
+            ("services.vat.vat_report_parser.parse_vat_report", vat_ret),
+        ):
+            p = mock.patch(target, return_value=ret)
             p.start()
             self.addCleanup(p.stop)
 
@@ -174,9 +189,12 @@ class RunGlvatTests(unittest.TestCase):
             SimpleNamespace(gl_amount=None, diff=0),
         ]
         with (
-            mock.patch("routes.recon_routes.reconcile_gl_vat", return_value=(detail, object())),
-            mock.patch("routes.recon_routes.detail_to_json", return_value=[]),
-            mock.patch("routes.recon_routes.summary_to_json", return_value={}),
+            mock.patch(
+                "services.recon.gl_vat_reconciler.reconcile_gl_vat",
+                return_value=(detail, object()),
+            ),
+            mock.patch("services.recon.gl_vat_reconciler.detail_to_json", return_value=[]),
+            mock.patch("services.recon.gl_vat_reconciler.summary_to_json", return_value={}),
             mock.patch("core.db.create_gl_vat_task", return_value=555),
         ):
             with tempfile.TemporaryDirectory() as d:
@@ -223,10 +241,13 @@ class RunGlvatTests(unittest.TestCase):
             "error_code": None,
         }
         with (
-            mock.patch("routes.recon_routes.reconcile_gl_vat", return_value=(detail, object())),
-            mock.patch("routes.recon_routes.detail_to_json", return_value=[]),
-            mock.patch("routes.recon_routes.summary_to_json", return_value={}),
-            mock.patch("routes.recon_routes._pdf_billing_units", return_value=1),
+            mock.patch(
+                "services.recon.gl_vat_reconciler.reconcile_gl_vat",
+                return_value=(detail, object()),
+            ),
+            mock.patch("services.recon.gl_vat_reconciler.detail_to_json", return_value=[]),
+            mock.patch("services.recon.gl_vat_reconciler.summary_to_json", return_value={}),
+            mock.patch("services.billing.pricing.pdf_billing_units", return_value=1),
             mock.patch("services.ocr.pdf_utils.count_pdf_pages", return_value=1),
             mock.patch("core.db.create_gl_vat_task", return_value=606),
             mock.patch("core.db.charge_ocr_async") as charge,
@@ -252,9 +273,12 @@ class RunGlvatTests(unittest.TestCase):
         )
         detail = [SimpleNamespace(gl_amount=10.0, diff=0.0)]
         with (
-            mock.patch("routes.recon_routes.reconcile_gl_vat", return_value=(detail, object())),
-            mock.patch("routes.recon_routes.detail_to_json", return_value=[]),
-            mock.patch("routes.recon_routes.summary_to_json", return_value={}),
+            mock.patch(
+                "services.recon.gl_vat_reconciler.reconcile_gl_vat",
+                return_value=(detail, object()),
+            ),
+            mock.patch("services.recon.gl_vat_reconciler.detail_to_json", return_value=[]),
+            mock.patch("services.recon.gl_vat_reconciler.summary_to_json", return_value={}),
             mock.patch("core.db.create_gl_vat_task", return_value=607),
             mock.patch("core.db.charge_ocr_async") as charge,
         ):

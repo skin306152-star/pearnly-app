@@ -28,10 +28,10 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
-from services.billing import account_status
+from services.billing import account_status, pricing
 from services.ocr.entrypoints import policy_context_from_billing
 from services.recon_jobs import store, worker
-from routes.recon_routes_shared import estimate_upload_units
+from routes.recon_routes_shared import require_coverage_or_raise
 
 logger = logging.getLogger("recon_jobs.routes")
 router = APIRouter(tags=["recon-jobs"])
@@ -64,44 +64,45 @@ async def _stage_uploads(job_id: str, files: List[UploadFile], role: str, defaul
     return refs
 
 
-async def _credits_precheck(user_id: str, tenant_id, uploads) -> dict:
-    """复刻原 run 接口的 credits 前置检查 · 返回 billing dict(含 is_exempt)。
+def _staged_units(input_ref) -> tuple:
+    """已落盘文件的预检估价 (pdf_units, excel_chars) · 逐个读盘,不整批载入内存。"""
+    pdf_units = 0
+    excel_chars = 0
+    for ref in input_ref or []:
+        with open(ref["path"], "rb") as f:
+            data = f.read()
+        p, c = pricing.estimate_recon_units([(data, ref.get("filename") or "")])
+        pdf_units += p
+        excel_chars += c
+    return pdf_units, excel_chars
 
-    估价 = PDF 页数 + Excel/CSV 字符折算(见 services/billing/pricing.estimate_recon_cost_thb):
-    大 Excel 的「字符→张」折算必须计入预检,否则余额够跑 PDF 却被一笔字符折算打穿透支
-    (生产实锤 2026-08-12:93 块余额被 ฿186 的字符折算扣成 -92.98)。
+
+def _credits_precheck(user_id, tenant_id, input_ref) -> tuple:
+    """credits 前置检查(staged 文件版)· 返回 (billing, units)。
+
+    units = [pdf_units, excel_chars] 快照,随 params 入 job:worker 跑前闸直接复用
+    (单位不随排队时间变,快照合法;等待期会变的只有余额,worker 只回查余额)。
+    豁免不估价,units=None。估价 = PDF 物理页数 + Excel/CSV 字符折算(见
+    services/billing/pricing):大 Excel 的「字符→张」折算必须计入预检,否则余额够跑
+    PDF 却被一笔字符折算打穿透支(生产实锤 2026-08-12:93 块余额被扣成 -92.98)。
     不够余额 → 402;查不出计费状态 → 503(钱闸 fail-closed,理由见 services/billing/
     account_status.get_billing_status_combined)。两个码绝不合并:一个叫用户去充值,
     一个叫用户稍后再试。
     """
-    billing = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
     try:
         billing = db.get_billing_status_combined(str(user_id), tenant_id)
         if account_status.lookup_failed(billing):
             raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
-        if not billing.get("is_exempt"):
-            pdf_units, excel_chars = await estimate_upload_units(uploads)
-            if not account_status.can_cover_estimate(billing, pdf_units, excel_chars):
-                est_cost = float(
-                    db.estimate_recon_cost_thb(
-                        billing.get("pages_used_this_month", 0), pdf_units, excel_chars
-                    )
-                )
-                raise HTTPException(
-                    402,
-                    detail={
-                        "code": "insufficient_balance",
-                        "balance": billing.get("balance_thb", 0.0),
-                        "estimated_cost": est_cost,
-                        "pages_used_this_month": billing.get("pages_used_this_month", 0),
-                    },
-                )
+        if billing.get("is_exempt"):
+            return billing, None
+        pdf_units, excel_chars = _staged_units(input_ref)
+        require_coverage_or_raise(billing, pdf_units, excel_chars)
+        return billing, [pdf_units, excel_chars]
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
         logger.error(f"[recon-submit.credits] pre-check failed: {e}", exc_info=True)
         raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from e
-    return billing
 
 
 def _cleanup_on_fail(job_id: str):
@@ -135,15 +136,12 @@ def _preflight_stmt_mapping(input_ref, scope_id, api_key=""):
     except Exception:  # noqa: BLE001
         return None
 
-    def _ext(fn):
-        return ("." + fn.lower().rsplit(".", 1)[-1]) if "." in (fn or "") else ""
-
     # 1) 账单(stmt)· Excel + CSV/TSV
     for ref in input_ref or []:
         if ref.get("role") != "stmt":
             continue
         fn = ref.get("filename") or ""
-        if _ext(fn) not in _EXCEL_EXTS:
+        if pricing.file_ext(fn) not in _EXCEL_EXTS:
             continue
         try:
             with open(ref["path"], "rb") as f:
@@ -166,7 +164,7 @@ def _preflight_stmt_mapping(input_ref, scope_id, api_key=""):
         if ref.get("role") != "gl":
             continue
         fn = ref.get("filename") or ""
-        if _ext(fn) not in _GL_EXTS:
+        if pricing.file_ext(fn) not in _GL_EXTS:
             continue
         try:
             with open(ref["path"], "rb") as f:
@@ -207,13 +205,14 @@ async def bank_v2_submit(
         raise HTTPException(422, "请上传银行账单与 GL 文件")
 
     tenant_id = user.get("tenant_id")
-    billing = await _credits_precheck(user["id"], tenant_id, stmt_files + gl_files)
-    _ocr_policy_ctx = policy_context_from_billing(billing)
-
     job_id = str(uuid.uuid4())
     try:
+        # 先落盘再估价:同一份上传只 read 一次流(旧顺序预检读一遍、落盘再读一遍,
+        # >1MB 走磁盘重读)· 402/503 由下方 except HTTPException 清理暂存。
         input_ref = await _stage_uploads(job_id, stmt_files, "stmt", "statement.pdf")
         input_ref += await _stage_uploads(job_id, gl_files, "gl", "gl.xlsx")
+        billing, billing_units = _credits_precheck(user["id"], tenant_id, input_ref)
+        _ocr_policy_ctx = policy_context_from_billing(billing)
         # ADR-006 · 同步预检:新模板 Excel 账单先确认列对应(不建任务)· S7 本地拿不准时
         # 在此同步阶段调一次 Gemini(allow_ai)· 异步 worker 不烧钱。
         _scope = str(tenant_id or user["id"])
@@ -229,6 +228,7 @@ async def bank_v2_submit(
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
             "plan_code": _ocr_policy_ctx.get("plan_code"),
+            "billing_units": billing_units,  # 预检快照 · worker 跑前闸复用(豁免为 None)
             "lang": lang,
             "gl_account": gl_account,
             "stmt_opening_override": stmt_opening_override,
@@ -282,12 +282,12 @@ async def gl_vat_submit(
     tenant_id = user.get("tenant_id")
     # M3-3 修(2026-05-25):收入对账与银行对账一致 · submit 前置 credits 检查(余额不足直接 402 ·
     #   不让付费 OCR/Gemini 先跑再失败)· is_exempt 透传给 worker 决定是否扣费。
-    billing = await _credits_precheck(user["id"], tenant_id, gl_list + vat_list)
-    _ocr_policy_ctx = policy_context_from_billing(billing)
     job_id = str(uuid.uuid4())
     try:
         input_ref = await _stage_uploads(job_id, gl_list, "gl", "gl.pdf")
         input_ref += await _stage_uploads(job_id, vat_list, "vat", "vat.pdf")
+        billing, billing_units = _credits_precheck(user["id"], tenant_id, input_ref)
+        _ocr_policy_ctx = policy_context_from_billing(billing)
         _ws = wc.active_workspace_for_request(request, _tid(user))
         params = {
             "user_id": str(user["id"]),
@@ -296,6 +296,7 @@ async def gl_vat_submit(
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
             "plan_code": _ocr_policy_ctx.get("plan_code"),
+            "billing_units": billing_units,  # 预检快照 · worker 跑前闸复用(豁免为 None)
             "revenue_prefix": revenue_prefix or "4",
             "lang": lang,
         }
@@ -333,13 +334,13 @@ async def vat_excel_submit(
         raise HTTPException(400, "至少上传 1 张发票 + 1 份 VAT 报告")
 
     tenant_id = user.get("tenant_id")
-    billing = await _credits_precheck(user["id"], tenant_id, invoices + reports)
-    _ocr_policy_ctx = policy_context_from_billing(billing)
-
     job_id = str(uuid.uuid4())
     try:
         input_ref = await _stage_uploads(job_id, invoices, "invoice", "invoice.pdf")
         input_ref += await _stage_uploads(job_id, reports, "report", "report.pdf")
+        # salesvat 按成功识别件数事后计费(worker 无跑前闸)· units 快照用不上
+        billing, _ = _credits_precheck(user["id"], tenant_id, input_ref)
+        _ocr_policy_ctx = policy_context_from_billing(billing)
         _ws = wc.active_workspace_for_request(request, _tid(user))
         params = {
             "user_id": str(user["id"]),

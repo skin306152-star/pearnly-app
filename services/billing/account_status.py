@@ -24,6 +24,7 @@ from datetime import datetime as _dt, timedelta as _td, timezone as _tz
 from decimal import Decimal as _Dec
 
 from core import db
+from services.billing import pricing
 
 logger = logging.getLogger(__name__)
 
@@ -43,29 +44,31 @@ def lookup_failed(status) -> bool:
     return (status or {}).get("error_code") == LOOKUP_ERROR
 
 
-def can_cover_estimate(status: dict, pdf_units: int, excel_chars: int = 0) -> bool:
-    """余额/套餐额度是否盖得住这批的预检估价(纯判断 · 无 DB 调用)。
+def can_cover_estimate(status: dict, pdf_units: int, excel_chars: int = 0) -> tuple:
+    """余额/套餐额度盖不盖得住这批预检估价 → (covers, est_cost)(纯判断 · 无 DB 调用)。
 
-    估价 = PDF 阶梯价 + Excel 字符折算成张 × 基准张价(见 pricing.estimate_recon_cost_thb,
-    与事后实扣同口径)。套餐额度能整个吃下 → 免费放行(不看余额);有套餐但额度不足 → 超额
-    部分按套餐 over_rate 估;无套餐 → 余额必须 ≥ 整批估价。豁免由调用方先判,这里只回答
-    「钱够不够」。余额不足却放行 = 大 Excel 打穿余额透支(生产实锤 2026-08-12)。
+    est_cost(Decimal)一并返回:402 信封要展示同一口径的估价,调用方拿完判断再自己
+    算一遍必漂。估价 = PDF 阶梯价 + Excel 字符折算成张 × 基准张价(见
+    pricing.estimate_recon_cost_thb,与事后实扣同口径)。套餐额度能整个吃下 → 免费放行
+    (不看余额);有套餐但额度不足 → 超额部分按套餐 over_rate 估;无套餐 → 余额必须 ≥
+    整批估价。豁免由调用方先判,这里只回答「钱够不够」。余额不足却放行 = 大 Excel
+    打穿余额透支(生产实锤 2026-08-12)。
     """
-    if status.get("is_exempt"):
-        return True
-    if not status.get("allowed"):
-        return False  # 余额≤0 且无套餐额度 → 一律不够(既有判据保留)
     used = int(status.get("pages_used_this_month") or 0)
-    est_cost = float(db.estimate_recon_cost_thb(used, int(pdf_units or 0), int(excel_chars or 0)))
+    est_cost = pricing.estimate_recon_cost_thb(used, int(pdf_units or 0), int(excel_chars or 0))
+    if status.get("is_exempt"):
+        return True, est_cost
+    if not status.get("allowed"):
+        return False, est_cost  # 余额≤0 且无套餐额度 → 一律不够(既有判据保留)
     sub = status.get("subscription")
-    quota_pages = int(pdf_units or 0) + db.doc_quota_pages(int(excel_chars or 0))
+    quota_pages = int(pdf_units or 0) + pricing.doc_quota_pages(int(excel_chars or 0))
     if sub is not None and int(sub.get("remaining", 0)) >= quota_pages:
-        return True  # 套餐额度全覆盖 → 免费
-    payable = est_cost
+        return True, est_cost  # 套餐额度全覆盖 → 免费
+    payable = float(est_cost)
     if sub is not None:
         billable = max(0, quota_pages - int(sub.get("remaining", 0)))
         payable = float(_Dec(str(billable)) * _Dec(str(sub.get("over_rate", 1.5))))
-    return float(status.get("balance_thb", 0.0)) >= payable
+    return float(status.get("balance_thb", 0.0)) >= payable, est_cost
 
 
 def _bkk_year_month() -> str:

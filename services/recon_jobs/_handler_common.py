@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
-"""对账重活 · 共享辅助(暂存文件读取 / 并行映射 / 整侧失败分流信号)· ADR-005。"""
+"""对账重活 · 共享辅助(暂存文件读取 / 并行映射 / 跑前余额闸 / 事后扣费 / 失败分流)· ADR-005。"""
 
 from __future__ import annotations
 
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from core.concurrency import submit_ctx
+
+logger = logging.getLogger("recon_jobs.handlers")
 
 ProgressCb = Callable[[dict], None]
 
@@ -39,6 +42,62 @@ def _resolve_api_key(params: dict) -> str:
         or os.environ.get("GEMINI_API_KEY", "")
         or os.environ.get("GOOGLE_API_KEY", "")
     ).strip()
+
+
+def _runtime_balance_gate(
+    tag: str, params: dict, files: List[Tuple[bytes, str]]
+) -> Optional[Tuple[str, dict]]:
+    """跑前二次余额闸(提交时过 ≠ 现在够:余额可能被别的请求扣走)· 放行返 None。
+
+    units 优先用 submit 预检快照 params["billing_units"](单位不随排队时间变,只有余额
+    会变,免得整簿 Excel 在 worker 里再逐格读一遍);改动上线瞬间队列里的旧 job 无快照
+    → 回落现算。不足返 __failed__ 信号 · 别让付费解析跑一半扣不了钱。
+    """
+    from core import db
+    from services.billing import account_status
+    from services.billing.pricing import estimate_recon_units
+
+    user_id = str(params.get("user_id"))
+    billing = db.get_billing_status_combined(user_id, params.get("tenant_id"))
+    if account_status.lookup_failed(billing):
+        logger.warning(f"[{tag}] billing lookup failed at run time · user={user_id}")
+        return ("__failed__", {"error_code": account_status.LOOKUP_ERROR})
+    units = params.get("billing_units")
+    if units:
+        pdf_units, excel_chars = int(units[0]), int(units[1])
+    else:
+        pdf_units, excel_chars = estimate_recon_units(files)
+    covers, _ = account_status.can_cover_estimate(billing, pdf_units, excel_chars)
+    if not covers:
+        logger.warning(f"[{tag}] insufficient_balance at run time · user={user_id}")
+        return ("__failed__", {"error_code": "insufficient_balance"})
+    return None
+
+
+def _charge_parsed(tag: str, desc_label: str, user_id, tenant_id, pairs) -> None:
+    """成功解析件的事后扣费(worker 线程内同步调)· 失败只记 log 不打断任务。
+
+    分类/单位判据单源在 pricing.billed_units_for_parses(失败件/0 行件不收钱)。"""
+    from core import db
+    from services.billing.pricing import billed_units_for_parses
+
+    try:
+        pdf_units, excel_chars = billed_units_for_parses(pairs)
+        if pdf_units > 0:
+            db.charge_ocr_async(
+                user_id, tenant_id, "pdf", pdf_units, None, f"{desc_label} PDF · {pdf_units} 页"
+            )
+        if excel_chars > 0:
+            db.charge_ocr_async(
+                user_id,
+                tenant_id,
+                "excel",
+                excel_chars,
+                None,
+                f"{desc_label} Excel · {excel_chars} 字符",
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"💳 {tag} async charge skip: {e}")
 
 
 def _side_fail_signal(stmt_results, stmt_data, gl_results, gl_data, failed_id):

@@ -12,6 +12,8 @@ from ._handler_common import (
     _side_fail_signal,
     _parallel,
     _resolve_api_key,
+    _runtime_balance_gate,
+    _charge_parsed,
     ProgressCb,
 )
 
@@ -26,19 +28,20 @@ def run_bank_recon(
 ) -> Tuple[str, Any]:
     progress_cb = progress_cb or _noop
     from core import db
-    from routes.recon_routes import (
+    from services.recon.bank_recon_v2 import (
         parse_bank_statement_pdf,
-        parse_gl_v2,
+        parse_gl as parse_gl_v2,
         merge_statements,
         merge_gl_files,
-        bank_reconcile,
+        reconcile as bank_reconcile,
         rows_to_json,
-        bank_summary_to_json,
-        _apply_anchor_overrides,
-        _detect_recon_mismatch,
-        _brv2_warn,
-        _completeness_details,
-        _pdf_billing_units,
+        summary_to_json as bank_summary_to_json,
+    )
+    from services.recon.bank_recon_warnings import (
+        apply_anchor_overrides,
+        brv2_warn,
+        completeness_details,
+        detect_recon_mismatch,
     )
 
     lang = params.get("lang") or "th"
@@ -64,21 +67,12 @@ def run_bank_recon(
     total = len(stmt_data) + len(gl_data)
     progress_cb({"stage": "parse", "stage_done": 0, "stage_total": total})
 
-    # 跑前再查一次余额闸(提交时过 ≠ 现在够:余额可能被别的请求扣走)。不足就把 job 置
-    # failed 带 insufficient_balance · 别让付费解析跑一半扣不了钱。估价含 Excel/CSV 字符
-    # 折算(与 submit 预检同一口径 · 见 account_status.can_cover_estimate)。
+    # 跑前二次余额闸(units 用 submit 快照 · 旧 job 回落现算 · 见 _runtime_balance_gate)。
     # S8 确认重对账不重扣费 → 同 charge 条件一样跳过闸。
     if not is_exempt and not confirmed_rows:
-        from services.billing import account_status as _acct_now
-        from routes.recon_routes import estimate_recon_units as _est_units
-
-        _billing_now = db.get_billing_status_combined(user_id, tenant_id)
-        if _acct_now.lookup_failed(_billing_now):
-            logger.warning(f"[bank] billing lookup failed at run time · user={user_id}")
-            return ("__failed__", {"error_code": _acct_now.LOOKUP_ERROR})
-        if not _acct_now.can_cover_estimate(_billing_now, *_est_units(stmt_data + gl_data)):
-            logger.warning(f"[bank] insufficient_balance at run time · user={user_id}")
-            return ("__failed__", {"error_code": "insufficient_balance"})
+        gate_fail = _runtime_balance_gate("bank", params, stmt_data + gl_data)
+        if gate_fail:
+            return gate_fail
 
     # 1. 解析(并行)· ADR-006 模板学习层作用域 = 租户优先,无租户退回 user_id
     #    (必须与 submit 预检 / save-mapping 用同一作用域,否则确认过的映射 worker 找不到)
@@ -123,41 +117,16 @@ def run_bank_recon(
     )
     progress_cb({"stage": "parse", "stage_done": total, "stage_total": total})
 
-    # 异步扣费 · 按扩展名分 pdf/excel(原路由 create_task · 此处工人线程内同步调用)
+    # 事后扣费(工人线程内同步调)· 分类/单位判据单源在 pricing.billed_units_for_parses
     # S8 · 确认重对账不重扣费(首次 OCR 已扣)
     if not is_exempt and not confirmed_rows:
-        try:
-            from services.ocr.pdf_utils import count_pdf_pages as _count_pages
-
-            _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
-            _pdf_units = 0
-            _excel_units = 0
-            for r, (b, fn) in list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data)):
-                if not r.get("ok"):
-                    continue
-                row_count = len(r.get("rows") or [])
-                if row_count == 0:
-                    continue
-                ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
-                if ext in _excel_exts:
-                    _excel_units += db._excel_char_count_estimate(b, fn)
-                else:
-                    _pdf_units += _pdf_billing_units(_count_pages(b) or 1, row_count)
-            if _pdf_units > 0:
-                db.charge_ocr_async(
-                    user_id, tenant_id, "pdf", _pdf_units, None, f"银行对账 PDF · {_pdf_units} 页"
-                )
-            if _excel_units > 0:
-                db.charge_ocr_async(
-                    user_id,
-                    tenant_id,
-                    "excel",
-                    _excel_units,
-                    None,
-                    f"银行对账 Excel · {_excel_units} 字符",
-                )
-        except Exception as _ce:  # noqa: BLE001
-            logger.warning(f"💳 bank async charge skip: {_ce}")
+        _charge_parsed(
+            "bank",
+            "银行对账",
+            user_id,
+            tenant_id,
+            list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data)),
+        )
 
     # ADR-006 S8 · 核对闸:PDF/图片账单 OCR 低信心或完整性不过 → 暂停等用户逐行核对纠错
     #   (干净 OCR / Excel / 确认重跑 → 不触发 · 照旧对账)· 守铁律「低信心主动喊停·不静默出错」
@@ -256,7 +225,7 @@ def run_bank_recon(
         stmt_closing,
         _anchor_ocr_snapshot,
         _anchor_used,
-    ) = _apply_anchor_overrides(
+    ) = apply_anchor_overrides(
         stmt_opening,
         gl_opening,
         gl_closing,
@@ -292,23 +261,21 @@ def run_bank_recon(
     )
 
     # 警告:输入不匹配 + 多账户 + 完整性(原路由 v118.35.0.54/61/63)
-    brv2_warnings = _detect_recon_mismatch(stmt_rows, gl_rows, summary.matched_count, lang)
+    brv2_warnings = detect_recon_mismatch(stmt_rows, gl_rows, summary.matched_count, lang)
     _stmt_accts: list = []
     for _r in stmt_results:
         if _r.get("ok") and _r.get("multi_account"):
             _stmt_accts.extend(_r.get("account_codes") or [])
     if len(_stmt_accts) > 1:
         _seen = list(dict.fromkeys(_stmt_accts))
-        brv2_warnings.append(
-            _brv2_warn("multi_account", lang, n=len(_seen), codes="、".join(_seen))
-        )
+        brv2_warnings.append(brv2_warn("multi_account", lang, n=len(_seen), codes="、".join(_seen)))
     _comp_details = []
     for _r in stmt_results:
         comp = _r.get("completeness") if _r.get("ok") else None
         if comp and not comp.get("ok"):
-            _comp_details.extend(_completeness_details(comp["issues"], lang))
+            _comp_details.extend(completeness_details(comp["issues"], lang))
     if _comp_details:
-        brv2_warnings.append(_brv2_warn("completeness", lang, detail="；".join(_comp_details[:4])))
+        brv2_warnings.append(brv2_warn("completeness", lang, detail="；".join(_comp_details[:4])))
 
     # 5. 序列化
     detail_j = rows_to_json(recon_rows)

@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from core import db
-from routes import recon_routes as RR
+import services.recon.bank_recon_v2 as BRV2
 import services.recon_jobs.handlers as H
 import services.recon_jobs.bank_handler as BH
 from services.recon.bank_recon_v2 import StatementRow
@@ -50,8 +50,8 @@ class S8ReviewGateTests(unittest.TestCase):
     def test_low_conf_pdf_triggers_needs_review(self):
         with (
             patch.object(BH, "_read_inputs", side_effect=_read_inputs_fake("scan.pdf")),
-            patch.object(RR, "parse_bank_statement_pdf", return_value=_low_conf_pdf_result()),
-            patch.object(RR, "parse_gl_v2", return_value={"ok": True, "rows": []}),
+            patch.object(BRV2, "parse_bank_statement_pdf", return_value=_low_conf_pdf_result()),
+            patch.object(BRV2, "parse_gl", return_value={"ok": True, "rows": []}),
         ):
             result = H.run_bank_recon(
                 {"is_exempt": True, "user_id": "u1", "tenant_id": None},
@@ -69,10 +69,10 @@ class S8ReviewGateTests(unittest.TestCase):
         # Excel 账单即使低信心也不归 S8 核对(走 S1–S7 列映射)→ 闸不触发 → 不返回哨兵
         with (
             patch.object(BH, "_read_inputs", side_effect=_read_inputs_fake("book.xlsx")),
-            patch.object(RR, "parse_bank_statement_pdf", return_value=_low_conf_pdf_result()),
-            patch.object(RR, "parse_gl_v2", return_value={"ok": True, "rows": []}),
-            patch.object(RR, "merge_statements", return_value=([], 0.0, 0.0, "generic")),
-            patch.object(RR, "merge_gl_files", return_value=([], [], 0.0, 0.0)),
+            patch.object(BRV2, "parse_bank_statement_pdf", return_value=_low_conf_pdf_result()),
+            patch.object(BRV2, "parse_gl", return_value={"ok": True, "rows": []}),
+            patch.object(BRV2, "merge_statements", return_value=([], 0.0, 0.0, "generic")),
+            patch.object(BRV2, "merge_gl_files", return_value=([], [], 0.0, 0.0)),
         ):
             # merge 返回空 → handler 走 _save_failed_task(需 db)· 我们只验证『没在闸处返回哨兵』
             with patch.object(db, "create_bank_recon_v2_task", return_value="failtask"):
@@ -98,9 +98,9 @@ class S8ReviewGateTests(unittest.TestCase):
         ]
         with (
             patch.object(BH, "_read_inputs", side_effect=_read_inputs_fake("scan.pdf")),
-            patch.object(RR, "parse_gl_v2", return_value={"ok": True, "rows": []}),
-            patch.object(RR, "merge_statements", return_value=([], 0.0, 0.0, "generic")),
-            patch.object(RR, "merge_gl_files", return_value=([], [], 0.0, 0.0)),
+            patch.object(BRV2, "parse_gl", return_value={"ok": True, "rows": []}),
+            patch.object(BRV2, "merge_statements", return_value=([], 0.0, 0.0, "generic")),
+            patch.object(BRV2, "merge_gl_files", return_value=([], [], 0.0, 0.0)),
             patch.object(db, "create_bank_recon_v2_task", return_value="failtask"),
         ):
             result = H.run_bank_recon(

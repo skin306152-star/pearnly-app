@@ -11,7 +11,15 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Optional, Tuple
 
-from ._handler_common import _read_inputs, _noop, _parallel, _resolve_api_key, ProgressCb
+from ._handler_common import (
+    _read_inputs,
+    _noop,
+    _parallel,
+    _resolve_api_key,
+    _runtime_balance_gate,
+    _charge_parsed,
+    ProgressCb,
+)
 from .bank_handler import run_bank_recon
 from services.export.archive import run_export
 
@@ -26,14 +34,13 @@ def run_glvat(
 ) -> Tuple[str, Any]:
     progress_cb = progress_cb or _noop
     from core import db
-    from routes.recon_routes import (
+    from services.recon.gl_vat_reconciler import (
         parse_gl,
-        parse_vat_report,
         reconcile_gl_vat,
         detail_to_json,
         summary_to_json,
-        _pdf_billing_units,
     )
+    from services.vat.vat_report_parser import parse_vat_report
 
     revenue_prefix = params.get("revenue_prefix") or "4"
     api_key = _resolve_api_key(params)
@@ -52,20 +59,11 @@ def run_glvat(
     total = len(gl_data) + len(vat_data)
     progress_cb({"stage": "parse", "stage_done": 0, "stage_total": total})
 
-    # 跑前再查一次余额闸(提交时过 ≠ 现在够:余额可能被别的请求扣走)。不足就把 job 置
-    # failed 带 insufficient_balance · 别让付费解析跑一半扣不了钱。估价含 Excel/CSV 字符
-    # 折算(与 submit 预检同一口径 · 见 account_status.can_cover_estimate)。
+    # 跑前二次余额闸(units 用 submit 快照 · 旧 job 回落现算 · 见 _runtime_balance_gate)。
     if not is_exempt:
-        from services.billing import account_status as _acct_now
-        from routes.recon_routes import estimate_recon_units as _est_units
-
-        _billing_now = db.get_billing_status_combined(user_id, tenant_id)
-        if _acct_now.lookup_failed(_billing_now):
-            logger.warning(f"[glvat] billing lookup failed at run time · user={user_id}")
-            return ("__failed__", {"error_code": _acct_now.LOOKUP_ERROR})
-        if not _acct_now.can_cover_estimate(_billing_now, *_est_units(gl_data + vat_data)):
-            logger.warning(f"[glvat] insufficient_balance at run time · user={user_id}")
-            return ("__failed__", {"error_code": "insufficient_balance"})
+        gate_fail = _runtime_balance_gate("glvat", params, gl_data + vat_data)
+        if gate_fail:
+            return gate_fail
 
     # 1. 并行解析 GL + 合并 rows
     gl_results = _parallel(
@@ -112,41 +110,16 @@ def run_glvat(
     vat_row_count = sum(r.get("row_count") or 0 for r in vat_results)
 
     # M3-3 修(2026-05-25 收入对账成本回归):此前 GL-VAT 完全不扣费 → 图片/PDF VAT 报告用了
-    #   Gemini/OCR 却免费(成本泄漏)。改为与 run_bank/run_salesvat 一致的统一按量计费:
-    #   图片/PDF 按 OCR 页 · Excel/CSV 本地解析按字符估算 · 各格式各费率 · 豁免账号不扣。
+    #   Gemini/OCR 却免费(成本泄漏)。与 run_bank/run_salesvat 一致的统一按量计费 ·
+    #   分类/单位判据单源在 pricing.billed_units_for_parses · 豁免账号不扣。
     if not is_exempt:
-        try:
-            from services.ocr.pdf_utils import count_pdf_pages as _count_pages
-
-            _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
-            _pdf_units = 0
-            _excel_units = 0
-            for r, (b, fn) in list(zip(gl_results, gl_data)) + list(zip(vat_results, vat_data)):
-                if not r.get("ok"):
-                    continue
-                row_count = len(r.get("rows") or [])
-                if row_count == 0:
-                    continue
-                ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
-                if ext in _excel_exts:
-                    _excel_units += db._excel_char_count_estimate(b, fn)
-                else:
-                    _pdf_units += _pdf_billing_units(_count_pages(b) or 1, row_count)
-            if _pdf_units > 0:
-                db.charge_ocr_async(
-                    user_id, tenant_id, "pdf", _pdf_units, None, f"收入对账 PDF · {_pdf_units} 页"
-                )
-            if _excel_units > 0:
-                db.charge_ocr_async(
-                    user_id,
-                    tenant_id,
-                    "excel",
-                    _excel_units,
-                    None,
-                    f"收入对账 Excel · {_excel_units} 字符",
-                )
-        except Exception as _ce:  # noqa: BLE001
-            logger.warning(f"💳 glvat async charge skip: {_ce}")
+        _charge_parsed(
+            "glvat",
+            "收入对账",
+            user_id,
+            tenant_id,
+            list(zip(gl_results, gl_data)) + list(zip(vat_results, vat_data)),
+        )
 
     # 3. 对账
     progress_cb({"stage": "reconcile", "stage_done": 0, "stage_total": 1})

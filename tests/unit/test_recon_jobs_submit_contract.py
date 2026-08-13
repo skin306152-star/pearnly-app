@@ -164,7 +164,7 @@ class SubmitFlowTests(unittest.TestCase):
 
         with (
             mock.patch.object(rjr.store, "enqueue", side_effect=fake_enqueue),
-            mock.patch.object(rjr, "_credits_precheck", return_value={"is_exempt": True}),
+            mock.patch.object(rjr, "_credits_precheck", return_value=({"is_exempt": True}, None)),
         ):
             out = asyncio.run(
                 rjr.bank_v2_submit(
@@ -185,6 +185,8 @@ class SubmitFlowTests(unittest.TestCase):
         for ref in captured["input_ref"]:
             self.assertTrue(os.path.isfile(ref["path"]))
         self.assertEqual(captured["params"]["gl_account"], "1010")
+        # 预检 units 快照随 params 入 job(豁免为 None · worker 跑前闸据此判断回落现算)
+        self.assertIn("billing_units", captured["params"])
 
     def test_credits_insufficient_returns_402(self):
         def boom(*a, **k):

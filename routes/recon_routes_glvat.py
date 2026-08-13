@@ -14,9 +14,8 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
-from services.billing import account_status
 from services.vat.vat_report_parser import parse_vat_report
-from routes.recon_routes_shared import _user_key, _pdf_billing_units, estimate_upload_units
+from routes.recon_routes_shared import _user_key, precheck_upload_billing, schedule_parse_charges
 from services.recon.gl_vat_reconciler import (
     parse_gl,
     reconcile_gl_vat,
@@ -114,40 +113,10 @@ async def gl_vat_run(
 
     # M3-3 修(2026-05-25):收入对账旧同步路径补 credits 前置检查 + 按量扣费 · 闭掉免费入口
     #   (与 bank /run、async /submit 一致 · 余额不足直接 402 · 不让付费 OCR 先跑)。
-    # 查不出计费状态就不放行(钱闸 fail-closed · 见 services/billing/account_status)。
-    # 估价含 Excel/CSV 字符折算(estimate_recon_cost_thb),与事后扣费同口径。
-    _billing_glv = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
-    try:
-        from core import db as _db_credit_glv
-
-        _tid_glv = user.get("tenant_id")
-        _billing_glv = _db_credit_glv.get_billing_status_combined(str(user.get("id")), _tid_glv)
-        if account_status.lookup_failed(_billing_glv):
-            raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
-        if not _billing_glv.get("is_exempt"):
-            _pdf_units, _excel_chars = await estimate_upload_units(gl_list + vat_list)
-            if not account_status.can_cover_estimate(_billing_glv, _pdf_units, _excel_chars):
-                _est_cost = float(
-                    _db_credit_glv.estimate_recon_cost_thb(
-                        _billing_glv.get("pages_used_this_month", 0),
-                        _pdf_units,
-                        _excel_chars,
-                    )
-                )
-                raise HTTPException(
-                    402,
-                    detail={
-                        "code": "insufficient_balance",
-                        "balance": _billing_glv.get("balance_thb", 0.0),
-                        "estimated_cost": _est_cost,
-                        "pages_used_this_month": _billing_glv.get("pages_used_this_month", 0),
-                    },
-                )
-    except HTTPException:
-        raise
-    except Exception as _be:
-        logger.error(f"[gl-vat.credits] pre-check failed: {_be}", exc_info=True)
-        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from _be
+    # 闸骨架收口进 recon_routes_shared:查不出计费状态 503 fail-closed · 盖不住预估 402。
+    _billing_glv = await precheck_upload_billing(
+        user.get("id"), user.get("tenant_id"), gl_list + vat_list, log_tag="gl-vat.credits"
+    )
 
     # 读所有字节
     gl_data: List[tuple] = []
@@ -223,54 +192,15 @@ async def gl_vat_run(
         "row_count": sum(r.get("row_count") or 0 for r in vat_results),
     }
 
-    # M3-3 · 按量扣费(图片/PDF 按 OCR 页 · Excel/CSV 按字符估算 · 各格式各费率)· 豁免账号不扣
+    # M3-3 · 按量扣费(图片/PDF 按 OCR 页 · Excel/CSV 按字符估算)· 豁免账号不扣 ·
+    # 分类/单位判据单源在 pricing.billed_units_for_parses(失败件/0 行件不收钱)
     if not _billing_glv.get("is_exempt"):
-        try:
-            from core import db as _db_chg_glv
-            from services.ocr.pdf_utils import count_pdf_pages as _count_pages_glv
-
-            _tid_chg_glv = user.get("tenant_id")
-            _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
-            _pdf_units = 0
-            _excel_units = 0
-            for r, (b, fn) in list(zip(gl_results, gl_data)) + list(zip(vat_results, vat_data)):
-                if not r.get("ok"):
-                    continue
-                if len(r.get("rows") or []) == 0:
-                    continue
-                ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
-                if ext in _excel_exts:
-                    _excel_units += _db_chg_glv._excel_char_count_estimate(b, fn)
-                else:
-                    _pdf_units += _pdf_billing_units(
-                        _count_pages_glv(b) or 1, len(r.get("rows") or [])
-                    )
-            if _pdf_units > 0:
-                asyncio.create_task(
-                    asyncio.to_thread(
-                        _db_chg_glv.charge_ocr_async,
-                        str(user.get("id")),
-                        _tid_chg_glv,
-                        "pdf",
-                        _pdf_units,
-                        None,
-                        f"收入对账 PDF · {_pdf_units} 页",
-                    )
-                )
-            if _excel_units > 0:
-                asyncio.create_task(
-                    asyncio.to_thread(
-                        _db_chg_glv.charge_ocr_async,
-                        str(user.get("id")),
-                        _tid_chg_glv,
-                        "excel",
-                        _excel_units,
-                        None,
-                        f"收入对账 Excel · {_excel_units} 字符",
-                    )
-                )
-        except Exception as _ce:  # noqa: BLE001
-            logger.warning(f"💳 gl-vat sync charge skip: {_ce}")
+        schedule_parse_charges(
+            user.get("id"),
+            user.get("tenant_id"),
+            list(zip(gl_results, gl_data)) + list(zip(vat_results, vat_data)),
+            "收入对账",
+        )
 
     # 3. 对账
     detail, summary = reconcile_gl_vat(gl_result["rows"], vat_result["rows"])

@@ -53,7 +53,9 @@ def _assert_lookup_503(case, ctx):
 
 
 class ReconSubmitPrecheckTests(unittest.TestCase):
-    """routes/recon_jobs_routes._credits_precheck(对账异步 submit · 三个 submit 共用)。"""
+    """routes/recon_jobs_routes._credits_precheck(对账异步 submit · 三个 submit 共用)。
+
+    staged 文件版:返回 (billing, units 快照);staged=[] 时估价为 (0, 0),不碰盘。"""
 
     def _precheck(self, *, status=None, exc=None):
         from routes import recon_jobs_routes as rjr
@@ -63,10 +65,8 @@ class ReconSubmitPrecheckTests(unittest.TestCase):
             fake_db.get_billing_status_combined.side_effect = exc
         else:
             fake_db.get_billing_status_combined.return_value = status
-        fake_db.estimate_recon_cost_thb.return_value = 4.5
-        fake_db.doc_quota_pages.return_value = 0
         with mock.patch.object(rjr, "db", fake_db):
-            return asyncio.run(rjr._credits_precheck("u1", "t1", []))
+            return rjr._credits_precheck("u1", "t1", [])
 
     def test_lookup_error_status_returns_503(self):
         with self.assertRaises(HTTPException) as ctx:
@@ -94,7 +94,9 @@ class ReconSubmitPrecheckTests(unittest.TestCase):
             "subscription": None,
             "error_code": None,
         }
-        self.assertEqual(self._precheck(status=ok), ok)
+        billing, units = self._precheck(status=ok)
+        self.assertEqual(billing, ok)
+        self.assertEqual(units, [0, 0])
 
 
 class BankV2RunTests(unittest.TestCase):

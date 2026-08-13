@@ -11,8 +11,13 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
-from services.billing import account_status
-from routes.recon_routes_shared import _user_key, _pdf_billing_units, estimate_upload_units
+from services.recon.bank_recon_warnings import (
+    apply_anchor_overrides,
+    brv2_warn,
+    completeness_details,
+    detect_recon_mismatch,
+)
+from routes.recon_routes_shared import _user_key, precheck_upload_billing, schedule_parse_charges
 from routes.recon_routes_bankv2_helpers import (
     _BANK_V2_OK,
     parse_bank_statement_pdf,
@@ -22,11 +27,7 @@ from routes.recon_routes_bankv2_helpers import (
     bank_reconcile,
     bank_summary_to_json,
     rows_to_json,
-    _apply_anchor_overrides,
     _brv2_err,
-    _brv2_warn,
-    _completeness_details,
-    _detect_recon_mismatch,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,42 +69,11 @@ async def bank_v2_run(
     if not gl_files:
         raise HTTPException(422, _brv2_err("no_gl_files", lang))
 
-    # v118.35.0.21 · Credits 前置检查(1 次 SELECT · 异步扣费)
-    # 查不出计费状态就不放行(钱闸 fail-closed · 见 services/billing/account_status)。
-    # 估价含 Excel/CSV 字符折算(estimate_recon_cost_thb):大 Excel 的字符费用必须预检拦住,
-    # 否则余额够跑 PDF 却被一笔字符折算打穿透支(生产实锤 2026-08-12)。
-    _billing_bv2 = {"allowed": False, "is_exempt": False, "pages_used_this_month": 0}
-    try:
-        from core import db as _db_credit
-
-        _tid_bv2 = user.get("tenant_id")
-        _billing_bv2 = _db_credit.get_billing_status_combined(str(user.get("id")), _tid_bv2)
-        if account_status.lookup_failed(_billing_bv2):
-            raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR})
-        if not _billing_bv2.get("is_exempt"):
-            _pdf_units, _excel_chars = await estimate_upload_units(stmt_files + gl_files)
-            if not account_status.can_cover_estimate(_billing_bv2, _pdf_units, _excel_chars):
-                _est_cost = float(
-                    _db_credit.estimate_recon_cost_thb(
-                        _billing_bv2.get("pages_used_this_month", 0),
-                        _pdf_units,
-                        _excel_chars,
-                    )
-                )
-                raise HTTPException(
-                    402,
-                    detail={
-                        "code": "insufficient_balance",
-                        "balance": _billing_bv2.get("balance_thb", 0.0),
-                        "estimated_cost": _est_cost,
-                        "pages_used_this_month": _billing_bv2.get("pages_used_this_month", 0),
-                    },
-                )
-    except HTTPException:
-        raise
-    except Exception as _be:
-        logger.error(f"[bank_v2.credits] pre-check failed: {_be}", exc_info=True)
-        raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from _be
+    # v118.35.0.21 · Credits 前置检查(闸骨架收口进 recon_routes_shared):查不出计费状态
+    # 503 fail-closed · 估价含多页 PDF 物理页数 + Excel/CSV 字符折算 · 盖不住 402。
+    _billing_bv2 = await precheck_upload_billing(
+        user.get("id"), user.get("tenant_id"), stmt_files + gl_files, log_tag="bank_v2.credits"
+    )
 
     # v118.33.12.1 · use _user_key (gemini_api_key OR custom_gemini_api_key)
     # to match the rest of the system; fall back to env GEMINI_API_KEY.
@@ -152,56 +122,15 @@ async def bank_v2_run(
     stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])
     gl_results = await asyncio.gather(*[_parse_gl(b, fn) for b, fn in gl_data])
 
-    # v118.35.0.21 · 异步扣费 · 按文件扩展名分 pdf/excel 两种 kind
+    # v118.35.0.21 · 异步扣费 · 分类/单位判据单源在 pricing.billed_units_for_parses
+    # (PDF/图片按『页』计费 v118.35.0.58 · Excel 档按字符 · 失败件/0 行件不收钱)
     if not _billing_bv2.get("is_exempt"):
-        try:
-            from core import db as _db_chg
-            from services.ocr.pdf_utils import count_pdf_pages as _count_pages_chg
-
-            _tid_chg = user.get("tenant_id")
-            _excel_exts = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv", ".txt", ".docx", ".doc"}
-            # v118.35.0.58 · BUG 修复:PDF/图片改按『页』计费(对齐 ฿1.5/页规则)· 此前误按交易行数收 · 超收 10-34 倍
-            _pdf_units = 0
-            _excel_units = 0
-            for r, (b, fn) in list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data)):
-                if not r.get("ok"):
-                    continue
-                row_count = len(r.get("rows") or [])
-                if row_count == 0:
-                    continue
-                ext = "." + (fn or "").lower().rsplit(".", 1)[-1] if "." in (fn or "") else ""
-                if ext in _excel_exts:
-                    _excel_units += _db_chg._excel_char_count_estimate(b, fn)
-                else:
-                    _pdf_units += _pdf_billing_units(_count_pages_chg(b) or 1, row_count)
-            if _pdf_units > 0:
-                asyncio.create_task(
-                    asyncio.to_thread(
-                        _db_chg.charge_ocr_async,
-                        str(user.get("id")),
-                        _tid_chg,
-                        "pdf",
-                        _pdf_units,
-                        None,
-                        f"银行对账 PDF · {_pdf_units} 页",
-                    )
-                )
-            if _excel_units > 0:
-                asyncio.create_task(
-                    asyncio.to_thread(
-                        _db_chg.charge_ocr_async,
-                        str(user.get("id")),
-                        _tid_chg,
-                        "excel",
-                        _excel_units,
-                        None,
-                        f"银行对账 Excel · {_excel_units} 字符",
-                    )
-                )
-        except Exception as _ce:
-            import logging as _lg_ce
-
-            _lg_ce.getLogger("recon").warning(f"💳 bank_v2 async charge skip: {_ce}")
+        schedule_parse_charges(
+            user.get("id"),
+            user.get("tenant_id"),
+            list(zip(stmt_results, stmt_data)) + list(zip(gl_results, gl_data)),
+            "银行对账",
+        )
 
     # v118.35.0.19 · per-file parse diagnostics 带 error_code 字段 · 前端用它做 i18n 翻译
     parse_info = {
@@ -292,7 +221,7 @@ async def bank_v2_run(
     # P0.1 BUG-B-T1 v118.35.0.37 · 抽成 _apply_anchor_overrides 纯函数 · 总是 snapshot OCR 给前端预填用
     # BUG-FIX-T3 v118.35.0.44 · 加第 4 个 anchor stmt_closing
     stmt_opening, gl_opening, gl_closing, stmt_closing, _anchor_ocr_snapshot, _anchor_used = (
-        _apply_anchor_overrides(
+        apply_anchor_overrides(
             stmt_opening,
             gl_opening,
             gl_closing,
@@ -341,7 +270,7 @@ async def bank_v2_run(
     )
 
     # v118.35.0.54 · 输入不匹配检测(期间/科目/规模对不上)· 主动警告 · 不让用户看不懂差额
-    brv2_warnings = _detect_recon_mismatch(stmt_rows, gl_rows, summary.matched_count, lang)
+    brv2_warnings = detect_recon_mismatch(stmt_rows, gl_rows, summary.matched_count, lang)
 
     # v118.35.0.61 · 多账户文件检测(一个文件塞多个账户 · 每 sheet 一个)· 已分账户独立校验
     # · 主动提示『需 GL 对应单一账户』· 避免用户拿多账户文件对单账户 GL 还以为系统坏了。
@@ -351,18 +280,16 @@ async def bank_v2_run(
             _stmt_accts.extend(_r.get("account_codes") or [])
     if len(_stmt_accts) > 1:
         _seen = list(dict.fromkeys(_stmt_accts))  # 去重保序
-        brv2_warnings.append(
-            _brv2_warn("multi_account", lang, n=len(_seen), codes="、".join(_seen))
-        )
+        brv2_warnings.append(brv2_warn("multi_account", lang, n=len(_seen), codes="、".join(_seen)))
 
     # v118.35.0.63 · 完整性交叉校验:提取行 vs 账单印刷合计/笔数/期末对不上 → 主动提示漏行
     _comp_details = []
     for _r in stmt_results:
         comp = _r.get("completeness") if _r.get("ok") else None
         if comp and not comp.get("ok"):
-            _comp_details.extend(_completeness_details(comp["issues"], lang))
+            _comp_details.extend(completeness_details(comp["issues"], lang))
     if _comp_details:
-        brv2_warnings.append(_brv2_warn("completeness", lang, detail="；".join(_comp_details[:4])))
+        brv2_warnings.append(brv2_warn("completeness", lang, detail="；".join(_comp_details[:4])))
 
     # 5. Serialize
     detail_j = rows_to_json(recon_rows)

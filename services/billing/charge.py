@@ -5,15 +5,14 @@ services/billing/charge.py · OCR 扣费(REFACTOR-B2)
 铁律 #26 高敏:钱写入路径 — `tenant_credits.balance_thb` UPDATE + `credit_transactions`
 INSERT + `monthly_page_usage` UPSERT。spec 11(充值审核闭环)+ spec 16(OCR 真扣费)兜底。
 
-3 函数 + 1 私有常量(_Dec):
+主要函数:
 - charge_ocr(user_id, tenant_id, kind, units, history_id?, description?)
     OCR 完成后扣费 · 单原子事务 SELECT FOR UPDATE · 豁免账号 ok=True charged=0 ·
     pdf 走分档定价 + 累加 monthly_page_usage / excel 走字符定价(纯计算)。
-- _excel_char_count_estimate(file_bytes, filename)
-    估算 Excel/CSV/Word 文件字符数(扣费 units)· xlsx via openpyxl / csv via decode /
-    docx via python-docx · 异常降级粗估。
 - charge_ocr_async(...)
     fire-and-forget 包装 · asyncio.to_thread 路径 · 失败仅 log。
+字符估算(_excel_char_count_estimate)本体归 pricing(定价/估算单一事实源),此处只留
+旧私名别名 —— 它已是事实公共 API(db 门面 re-export + 多处测试 patch 锚点)。
 
 范式(ADR-007):import db + 运行时 `db.get_cursor()` + db.is_user_billing_exempt /
 db._bkk_year_month / db.estimate_pdf_cost_thb / db.estimate_excel_cost_thb(均已 re-export
@@ -24,6 +23,11 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal as _Dec
+
+# 旧私名保留别名(见模块 docstring)· pricing 是叶子模块,不参与本文件尾部的 db 循环。
+from services.billing.pricing import (  # noqa: F401  兼容 re-export
+    excel_char_count_estimate as _excel_char_count_estimate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -290,46 +294,6 @@ def charge_ocr(
     except Exception as e:
         logger.error(f"[charge_ocr] FAIL tenant={tenant_id} kind={kind} units={units}: {e}")
         return {"ok": False, "error": str(e)[:200]}
-
-
-def _excel_char_count_estimate(file_bytes: bytes, filename: str) -> int:
-    """估算 Excel/CSV/Word 文件的总字符数 · 用于扣费"""
-    if not file_bytes:
-        return 0
-    fn = (filename or "").lower()
-    try:
-        if fn.endswith(".xlsx") or fn.endswith(".xlsm") or fn.endswith(".xls"):
-            try:
-                import openpyxl
-                import io
-
-                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
-                total = 0
-                for ws in wb.worksheets:
-                    for row in ws.iter_rows(values_only=True):
-                        for c in row:
-                            if c is not None:
-                                total += len(str(c))
-                return total
-            except Exception:
-                return max(0, len(file_bytes) // 4)  # 粗估降级
-        elif fn.endswith(".csv") or fn.endswith(".tsv") or fn.endswith(".txt"):
-            try:
-                return len(file_bytes.decode("utf-8", errors="ignore"))
-            except Exception:
-                return 0
-        elif fn.endswith(".docx") or fn.endswith(".doc"):
-            try:
-                import docx
-                import io
-
-                doc = docx.Document(io.BytesIO(file_bytes))
-                return sum(len(p.text) for p in doc.paragraphs)
-            except Exception:
-                return max(0, len(file_bytes) // 2)
-    except Exception as e:
-        logger.warning(f"_excel_char_count_estimate error fn={fn}: {e}")
-    return 0
 
 
 def charge_ocr_async(

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-v118.35.0.54 · 守门测试 · 银行对账输入不匹配警告(_detect_recon_mismatch)
+v118.35.0.54 · 守门测试 · 银行对账输入不匹配警告(bank_recon_warnings.detect_recon_mismatch)
 
 真实案例(skin 实测):上传 KBank 1月对账单(277行)+ 12月挂账科目 GL(1行)·
 系统闷头算出 -455,613 差额让用户看不懂。应主动警告"期间/规模不匹配"。
@@ -15,7 +15,7 @@ import unittest
 from datetime import date
 
 from services.recon.bank_recon_v2 import StatementRow, GlRow
-from routes.recon_routes import _detect_recon_mismatch
+from services.recon.bank_recon_warnings import detect_recon_mismatch as _detect_recon_mismatch
 
 
 def _s(d):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-P0.1 BUG-B-T1 v118.35.0.37 · 守门测试 · recon_routes._apply_anchor_overrides
+P0.1 BUG-B-T1 v118.35.0.37 · 守门测试 · bank_recon_warnings.apply_anchor_overrides
 
 锁定 3 个契约:
   1. OCR snapshot 总是返回(无论是否有 override) → 前端 localStorage 预填用
@@ -10,7 +10,7 @@ P0.1 BUG-B-T1 v118.35.0.37 · 守门测试 · recon_routes._apply_anchor_overrid
 
 import unittest
 
-from routes.recon_routes import _apply_anchor_overrides
+from services.recon.bank_recon_warnings import apply_anchor_overrides as _apply_anchor_overrides
 
 
 class ApplyAnchorOverridesContractTests(unittest.TestCase):

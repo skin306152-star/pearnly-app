@@ -385,7 +385,8 @@
                     ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
                     : '';
         } catch (e) {
-            if (keepAccounts && _accountsDirty(policy)) {
+            // fetch 失败时 policy 已在上方置 null,没有服务器态可比,判据只剩「本地还有没有行」。
+            if (keepAccounts && accounts.length > 0) {
                 host.innerHTML = _stateBox('error', _t('adm-eng-load-fail'), 'policy');
             } else {
                 _setBothStates('error', _t('adm-eng-load-fail'), 'policy');

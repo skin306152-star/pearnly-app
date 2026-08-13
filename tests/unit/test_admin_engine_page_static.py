@@ -138,9 +138,13 @@ class ChartLayerTests(unittest.TestCase):
 
     def test_colors_come_from_tokens(self):
         # 图表配色是 admin-viz.css 的令牌,JS 里不写死 hex(裸 hex 会顶穿 ui_design_lint 棘轮)。
+        # 令牌读取单源在宿主 admin.js 的 _vizTheme(暴露为 AdminHost.vizTheme),图表层只委托
+        # —— 别再回到两份 _theme 各抄一套回落色的年代。
         self.assertNotRegex(CHARTS_JS, r"#[0-9a-fA-F]{6}\b")
-        self.assertIn("--viz-over", CHARTS_JS)
-        self.assertIn("--viz-under", CHARTS_JS)
+        self.assertIn("window.AdminHost.vizTheme()", CHARTS_JS)
+        self.assertIn("window.AdminHost.loadScript(", CHARTS_JS)
+        for token in ("--viz-over", "--viz-under", "--viz-other"):
+            self.assertIn(token, ADMIN_JS, f"宿主 _vizTheme 缺 {token} 令牌")
 
     def test_lib_load_failure_surfaces(self):
         self.assertIn("adm-eng-chart-fail", COST_JS)

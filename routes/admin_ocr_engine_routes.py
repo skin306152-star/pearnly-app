@@ -17,6 +17,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from core import db
 from core.route_helpers import _log_op, _require_super_admin
 from services.billing.pricing import PDF_TIER1_PRICE_V21
 from services.cost.ai_usage_store import get_cost_by_entry_point
@@ -147,14 +148,40 @@ async def set_ocr_engine_policy(request: Request):
     return {"ok": True, "policy": load_config()}
 
 
+def _quota_pages_deducted(days: int) -> int:
+    """近 N 天走订阅套餐额度抵扣的总页数(credit_transactions 里 usage 且金额为 0 的行 ——
+    只有套餐内抵扣这么落账,见 services/billing/charge.py::_charge_with_subscription)。
+
+    成本页拿它标注「额度抵扣 N 页」:这些页扣费 ฿0 但不免费(营收在订阅月费里),
+    不标出来 0 就冒充免费。查询失败回 0 —— 标注缺席不该让整块仪表盘白屏。"""
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT COALESCE(SUM(pages), 0) AS pages
+                FROM credit_transactions
+                WHERE type = 'usage' AND amount_thb = 0 AND pages > 0
+                  AND created_at >= NOW() - make_interval(days => %s)
+                """,
+                (int(days),),
+            )
+            row = cur.fetchone()
+            return int(row["pages"]) if row else 0
+    except Exception as e:
+        logger.warning("quota_pages_deducted failed: %s", e)
+        return 0
+
+
 @router.get("/api/admin/ocr-engine/costs")
 async def ocr_engine_costs(request: Request, days: int = Query(7, ge=1, le=90)):
     """逐入口 × 单据类型的成本与每页成本(ai_usage 归因列)。
 
     读 ai_usage(逐网关调用,一份多页票会有多行)。这条回答的是「哪个入口贵」,不是「跑了多少张」。
     售价参考线一并下发(前端不再硬编 1.5):定价单源在 pricing.PDF_TIER1_PRICE_V21,
-    改价只动一处,柱图参考线与明细提示自动跟上。"""
+    改价只动一处,柱图参考线与明细提示自动跟上。额度抵扣页数走 credit_transactions
+    (ai_usage 只有成本没有扣费,分不出「套餐内 ฿0」)。"""
     _require_super_admin(request)
     costs = get_cost_by_entry_point(days=days)
     costs["price_thb_per_page"] = float(PDF_TIER1_PRICE_V21)
+    costs["quota_pages_deducted"] = _quota_pages_deducted(days)
     return costs

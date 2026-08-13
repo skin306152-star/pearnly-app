@@ -595,15 +595,40 @@
     };
 
     let _ctChart = null;
-    let _ctEchartsPromise = null;
     let _ctResizeTimer = null;
 
     // 按需注入的脚本 URL 共用 admin.js 自己的 ?v:CDN 按 URL 缓存,指纹不同步 = 永远发旧文件
-    // (scan-loader.js / admin-engine-charts.js 同招)。
+    // (scan-loader.js 同招)。
     function _adminAssetVersion() {
         const self = document.querySelector('script[src*="/static/admin/admin.js"]');
         const m = self && self.src.match(/[?&]v=([^&]+)/);
         return m ? m[1] : '';
+    }
+
+    // 按需脚本注入单源(echarts / 引擎页三件套 · admin-engine-charts.js 经 AdminHost 复用):
+    // 已有全局立即短路 · 同一 src 并发只注入一次 · 失败清记录允许重试(成功的不重跑 ——
+    // 重复执行模块 IIFE 会重复注册监听)。globalName 传了就以 window[globalName] 判成败。
+    const _scriptPromises = {};
+    function _loadScript(src, globalName) {
+        if (globalName && window[globalName]) return Promise.resolve(window[globalName]);
+        if (_scriptPromises[src]) return _scriptPromises[src];
+        _scriptPromises[src] = new Promise(function (resolve, reject) {
+            const s = document.createElement('script');
+            s.src = src + (_adminAssetVersion() ? '?v=' + _adminAssetVersion() : '');
+            s.async = true;
+            s.onload = function () {
+                if (!globalName) return resolve();
+                if (window[globalName]) resolve(window[globalName]);
+                else reject(new Error(globalName + ' loaded but missing'));
+            };
+            s.onerror = function () {
+                delete _scriptPromises[src];
+                s.remove();
+                reject(new Error('script load failed: ' + src));
+            };
+            document.head.appendChild(s);
+        });
+        return _scriptPromises[src];
     }
 
     // admin-viz.css 令牌 → 实际色值:内联 style 直接写 var() 即可,ECharts 的 option 只认具体
@@ -619,27 +644,9 @@
         }
     }
 
-    // echarts 只在这张图出现时才拉(static/vendor/echarts · 664KB),失败清掉记录允许重试。
+    // echarts 只在有图的页面才拉(static/vendor/echarts · 664KB),不挂 admin.html 白背体积。
     function _ensureECharts() {
-        if (window.echarts) return Promise.resolve(window.echarts);
-        if (_ctEchartsPromise) return _ctEchartsPromise;
-        _ctEchartsPromise = new Promise(function (resolve, reject) {
-            const s = document.createElement('script');
-            s.src =
-                '/static/vendor/echarts/echarts.common.min.js' +
-                (_adminAssetVersion() ? '?v=' + _adminAssetVersion() : '');
-            s.async = true;
-            s.onload = function () {
-                if (window.echarts) resolve(window.echarts);
-                else reject(new Error('echarts loaded but missing'));
-            };
-            s.onerror = function () {
-                _ctEchartsPromise = null;
-                reject(new Error('echarts load failed'));
-            };
-            document.head.appendChild(s);
-        });
-        return _ctEchartsPromise;
+        return _loadScript('/static/vendor/echarts/echarts.common.min.js', 'echarts');
     }
 
     function _ctDisposeChart() {
@@ -874,7 +881,7 @@
             (dayTotal.filter((v) => v > 0).length || 1);
         _ensureECharts()
             .then(function () {
-                const t = _themeForTrend();
+                const t = _vizTheme();
                 if (!_ctChart) {
                     // 容器本身没有高度(旧图靠 .ct-svg 撑),ECharts 需要一个有尺寸的宿主
                     wrap.style.height = '240px';
@@ -915,8 +922,10 @@
     }
 
     // 主题令牌 → 具体色值(取一次复用:getComputedStyle 每调一次都强制一次样式解析)。
-    // 读不到时回落中性色,图宁可丑不许隐形 —— admin-engine-charts.js 的 _theme 同套路。
-    function _themeForTrend() {
+    // 读不到时回落中性色,图宁可丑不许隐形。趋势图与引擎页图表(admin-engine-charts.js
+    // 经 AdminHost 复用)共用这一份 —— 状态色/分类色板定义见 admin-viz.css。
+    const _VIZ_SERIES_SLOTS = ['--viz-1', '--viz-2', '--viz-3', '--viz-4', '--viz-5', '--viz-6'];
+    function _vizTheme() {
         let styles = null;
         try {
             styles = getComputedStyle(document.documentElement);
@@ -932,8 +941,17 @@
             line: v('--line', 'rgb(236,232,246)'),
             card: v('--card', 'rgb(255,255,255)'),
             danger: v('--danger', 'rgb(220,38,38)'),
+            over: v('--viz-over', 'rgb(208,59,59)'),
+            under: v('--viz-under', 'rgb(12,163,12)'),
+            other: v('--viz-other', 'rgb(173,181,189)'),
+            series: _VIZ_SERIES_SLOTS.map(function (slot) {
+                return v(slot, 'rgb(42,120,214)');
+            }),
         };
     }
+
+    // 动态注入的图表模块跑在 admin.js 之后,经这个口复用宿主的注入器与主题(单源,别再抄)。
+    window.AdminHost = { loadScript: _loadScript, vizTheme: _vizTheme };
 
     // 窗口尺寸变化时图跟着重排(等松手:合并连发的 resize)
     window.addEventListener('resize', function () {
@@ -3110,31 +3128,14 @@
         '/static/admin/admin-engine.js',
     ];
 
-    function _injectEngineScript(src) {
-        return new Promise(function (resolve, reject) {
-            const s = document.createElement('script');
-            s.src = src + (_adminAssetVersion() ? '?v=' + _adminAssetVersion() : '');
-            s.async = true;
-            s.onload = resolve;
-            s.onerror = function () {
-                s.remove();
-                reject(new Error('engine script load failed: ' + src));
-            };
-            document.head.appendChild(s);
-        });
-    }
-
-    let _engineScriptsReady = null;
     function _ensureEngineScripts() {
         if (window.AdminEngine) return Promise.resolve();
-        if (_engineScriptsReady) return _engineScriptsReady;
-        _engineScriptsReady = Promise.all(_ENGINE_SCRIPTS.map(_injectEngineScript)).catch(
-            function (e) {
-                _engineScriptsReady = null; // 失败清掉记录,再进页签真能重试
-                throw e;
-            }
+        // 注入/去重/失败重试都在 _loadScript(按 src 记账:重试只补拉失败的那支)。
+        return Promise.all(
+            _ENGINE_SCRIPTS.map(function (src) {
+                return _loadScript(src);
+            })
         );
-        return _engineScriptsReady;
     }
 
     async function _renderEnginePage() {

@@ -385,11 +385,18 @@ async function downloadReceipt(id: string, btn: HTMLButtonElement) {
 function mapUsage(r: Record<string, unknown>): RecRow {
     const isSub = r.type === 'subscription';
     const cost = Number(r.cost_thb || 0);
+    const pages = Number(r.pages || 0);
+    // 扣费 0 但记了页数 = 订阅套餐额度抵扣(services/billing charge 只有这种 usage 行是 0 元)
+    const isQuota = !isSub && cost === 0 && pages > 0;
     let badge: string;
     let badgeCls: string;
     if (isSub) {
         badge = _t('rec-b-monthly', '月费');
         badgeCls = 'neutral';
+    } else if (isQuota) {
+        // 额度是月费买的,抵扣不等于免费:badge 直写抵了几张,别让 ฿0 冒充免费。
+        badge = _t('rec-b-quota', '额度抵扣 {n} 张').replace('{n}', String(pages));
+        badgeCls = 'free';
     } else if (cost === 0) {
         badge = _t('rec-b-free', '套餐内免费');
         badgeCls = 'free';
@@ -400,9 +407,10 @@ function mapUsage(r: Record<string, unknown>): RecRow {
     const title = isSub
         ? String(r.description || _t('rec-t-sub', '订阅 / 续订'))
         : String(r.filename || r.description || _t('rec-t-scan', '扫描扣费'));
+    // 额度抵扣行的张数已在 badge 里,meta 不再重复一遍同一个数
     const meta =
         _fmtDate(r.date as string) +
-        (!isSub && r.pages ? ' · ' + r.pages + ' ' + _t('sub-sheet', '张') : '');
+        (!isSub && !isQuota && pages ? ' · ' + pages + ' ' + _t('sub-sheet', '张') : '');
     return { title, meta, badge, badgeCls, amount: cost === 0 ? '' : _money(Math.abs(cost)) };
 }
 

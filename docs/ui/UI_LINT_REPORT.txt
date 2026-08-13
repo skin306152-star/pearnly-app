@@ -84,8 +84,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 201(28 文件)
     96  static\i18n-data.js
-        └ 1413: 'billing-accuracy-good': '✅ 准',
-        └ 1414: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1414: 'billing-accuracy-good': '✅ 准',
+        └ 1415: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -93,14 +93,14 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 426: 'tn-status-overdraft': '⚠ 透支',
-        └ 468: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 427: 'tn-status-overdraft': '⚠ 透支',
+        └ 469: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
      5  static\admin\admin.js
-        └ 1896: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
-        └ 1963: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
+        └ 1914: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
+        └ 1981: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
         └ 364: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
@@ -158,8 +158,8 @@
         └ 168: max-width: 520px;
         └ 173: max-width: 420px;
      5  static\admin\admin.js
-        └ 1711: '<div class="cpw-forgot-modal" style="max-width:420px">' +
-        └ 1777: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1729: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1795: '<div class="cpw-forgot-modal" style="max-width:420px">' +
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
@@ -434,11 +434,11 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1220: 'time-min-ago-suffix': ' 分钟前',
-        └ 1221: 'time-hour-ago-suffix': ' 小时前',
+        └ 1221: 'time-min-ago-suffix': ' 分钟前',
+        └ 1222: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 550: 'time-hours-ago': '{n} 小时前',
-        └ 551: 'time-days-ago': '{n} 天前',
+        └ 551: 'time-hours-ago': '{n} 小时前',
+        └ 552: 'time-days-ago': '{n} 天前',
 
 ## table-align-right — 命中 21(13 文件)
 > DESIGN_SYSTEM §21 表格对齐规范:表头居中、短内容格居中、长文本格靠左,禁止 th/td 右对齐

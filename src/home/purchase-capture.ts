@@ -92,42 +92,49 @@ function renderRecognizing(f: File): void {
     bindBack();
 }
 
-function renderError(f: File, msg: string): void {
+// 失败态外壳(识别失败/余额不足共用):标题固定「识别失败」,提示与主操作按场景注入,
+// 「重新选择」恒在。主按钮 id 保持各自原值(cap-retry / cap-topup),E2E 与样式都认它。
+function renderErrCard(o: {
+    hint: string;
+    primaryId: string;
+    primaryLabel: string;
+    onPrimary: () => void;
+}): void {
     const s = sec();
     if (!s) return;
     s.innerHTML = `<div class="pur cap"><div class="wrap">${headHtml()}
         <div class="panel"><div class="recog err">
             <div class="preview">${IC_DOC_LG}</div>
             <div class="rtitle">${escapeHtml(t('pur-cap-recog-fail'))}</div>
-            <div class="rhint">${escapeHtml(msg)}</div>
-            <div class="acts"><button class="btn" id="cap-reselect">${escapeHtml(t('pur-cap-reselect'))}</button><button class="btn primary" id="cap-retry">${escapeHtml(t('pur-cap-retry'))}</button></div>
+            <div class="rhint">${escapeHtml(o.hint)}</div>
+            <div class="acts"><button class="btn" id="cap-reselect">${escapeHtml(t('pur-cap-reselect'))}</button><button class="btn primary" id="${o.primaryId}">${escapeHtml(o.primaryLabel)}</button></div>
         </div></div>
     </div></div>`;
     bindBack();
-    const re = document.getElementById('cap-retry');
-    if (re) re.onclick = () => intakeFile(f);
     const rs = document.getElementById('cap-reselect');
     if (rs) rs.onclick = () => renderShell();
+    const pb = document.getElementById(o.primaryId);
+    if (pb) pb.onclick = o.onPrimary;
+}
+
+function renderError(f: File, msg: string): void {
+    renderErrCard({
+        hint: msg,
+        primaryId: 'cap-retry',
+        primaryLabel: t('pur-cap-retry'),
+        onPrimary: () => intakeFile(f),
+    });
 }
 
 // 余额不足(402):不复用「识别失败·重试」——用户得先充值。文案与发票页同口径
 // (err.insufficient_balance · 带当前余额),「充值」按钮直开充值弹窗(_openTopupModal)。
 function renderInsufficientBalance(balance: number): void {
-    const s = sec();
-    if (!s) return;
-    s.innerHTML = `<div class="pur cap"><div class="wrap">${headHtml()}
-        <div class="panel"><div class="recog err">
-            <div class="preview">${IC_DOC_LG}</div>
-            <div class="rtitle">${escapeHtml(t('pur-cap-recog-fail'))}</div>
-            <div class="rhint">${escapeHtml(t('err.insufficient_balance', { balance: String(balance) }))}</div>
-            <div class="acts"><button class="btn" id="cap-reselect">${escapeHtml(t('pur-cap-reselect'))}</button><button class="btn primary" id="cap-topup">${escapeHtml(t('topup-cta'))}</button></div>
-        </div></div>
-    </div></div>`;
-    bindBack();
-    const rs = document.getElementById('cap-reselect');
-    if (rs) rs.onclick = () => renderShell();
-    const tp = document.getElementById('cap-topup');
-    if (tp) tp.onclick = () => window._openTopupModal?.();
+    renderErrCard({
+        hint: t('err.insufficient_balance', { balance: String(balance) }),
+        primaryId: 'cap-topup',
+        primaryLabel: t('topup-cta'),
+        onPrimary: () => window._openTopupModal?.(),
+    });
 }
 
 // 文件 → 统一智能入口分流(F12):draft→复核屏录入;sales/recon→提示后回采集屏;否则落待归类。

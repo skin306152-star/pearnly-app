@@ -251,12 +251,23 @@ class PolicyRouteTests(unittest.TestCase):
             # 售价参考线由后端单源下发(pricing.PDF_TIER1_PRICE_V21),前端不再硬编
             "price_thb_per_page": 1.5,
         }
-        with mock.patch.object(mod, "get_cost_by_entry_point", return_value=payload) as m_costs:
+        with (
+            mock.patch.object(mod, "get_cost_by_entry_point", return_value=payload) as m_costs,
+            # 额度抵扣页数走 credit_transactions(独立于 ai_usage 聚合),窗口必须同一个 days
+            mock.patch.object(mod, "_quota_pages_deducted", return_value=12) as m_quota,
+        ):
             r = self.client.get("/api/admin/ocr-engine/costs?days=30")
         self.assertEqual(r.status_code, 200)
         m_costs.assert_called_once_with(days=30)
+        m_quota.assert_called_once_with(30)
         self.assertEqual(r.json(), payload)
         self.assertEqual(r.json()["price_thb_per_page"], 1.5)
+        self.assertEqual(r.json()["quota_pages_deducted"], 12)
+
+    def test_quota_pages_deducted_fail_open_zero(self):
+        # 标注是附加信息:查库失败回 0,不许连坐整个成本响应
+        with mock.patch.object(mod.db, "get_cursor", side_effect=RuntimeError("db down")):
+            self.assertEqual(mod._quota_pages_deducted(7), 0)
 
     def test_costs_route_days_bounds_enforced(self):
         for bad in ("0", "91"):

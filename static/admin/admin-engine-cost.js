@@ -22,6 +22,7 @@
     let days = 7;
     let bound = false;
     let unattributed = null;
+    let quotaPages = 0; // 窗口内订阅套餐额度抵扣的页数(quota_pages_deducted · 见 _quotaNote)
     let priceThb = PRICE_FALLBACK;
     let cache = null; // 最近一次取数的响应;语言切换只重画不重查时用它
 
@@ -224,11 +225,23 @@
             : '';
     }
 
+    /** 额度抵扣标注:这些页对用户扣费 ฿0(订阅套餐内),但成本照烧 —— 不标出来,
+     *  0 扣费在报表里就冒充免费。数据源是 credit_transactions,窗口与本区同一个 days。 */
+    function _quotaNote() {
+        if (!quotaPages) return '';
+        return (
+            '<div class="eng-chart-note" id="adm-eng-quota-note">' +
+            D.esc(_t('adm-eng-note-quota').replace('{n}', D.fmt(quotaPages, 0))) +
+            '</div>'
+        );
+    }
+
     function _renderData(d) {
         const host = document.getElementById('adm-eng-cost-body');
         const rows = d.rows || [];
         const un = d.unattributed || { calls: 0, cost_thb: 0 };
         unattributed = un;
+        quotaPages = Number(d.quota_pages_deducted) || 0;
         if (!rows.length && !un.calls) {
             window.AdminEngineCharts.disposeAll();
             host.innerHTML = _stateBox('empty', _t('adm-eng-cost-empty'), '');
@@ -244,6 +257,7 @@
             '</figcaption><div class="eng-chart-canvas" id="adm-eng-chart-pie"></div></figure>' +
             '</div>' +
             _noteFor(rows) +
+            _quotaNote() +
             _table(rows, un) +
             (un.calls
                 ? '<div class="eng-chart-note">' + D.esc(_t('adm-eng-unattributed-hint')) + '</div>'

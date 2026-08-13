@@ -13,9 +13,6 @@
 
     const ECHARTS_SRC = '/static/vendor/echarts/echarts.common.min.js';
 
-    // 颜色全部取自 admin-viz.css 的令牌(状态色 --viz-over/-under 是「超没超售价」的二值判断,
-    // --viz-1..6 是分类色板定序)。第 7 个入口起并入「其他」,不现造新色。
-    const SERIES_SLOTS = ['--viz-1', '--viz-2', '--viz-3', '--viz-4', '--viz-5', '--viz-6'];
     // 环形图只画到第 5 名(余下并成「其他」):副图只有主图三分之一宽,再多切片标签就叠成一团。
     const MAX_SLICES = 5;
     // 占比低于这条线的切片不外挂标签,靠图例 + 明细表认人 —— 细扇区的引线比数字还占地方。
@@ -23,54 +20,17 @@
     // 拖动停手后才重排:合并连发的 resize,又短到松手时图已经跟上,人察觉不到延迟。
     const RESIZE_DEBOUNCE_MS = 150;
 
-    let _loader = null;
     const _charts = [];
 
-    function _ink(styles, name, fallback) {
-        const v = styles ? styles.getPropertyValue(name).trim() : '';
-        return v || fallback;
-    }
-
-    // 令牌读不到时回落到"能看见"的中性色:图宁可丑,不许因为一个变量没解析出来就画成隐形。
-    // getComputedStyle 取一次复用:它每调一次都强制一次样式解析,一张图要读十来个令牌。
+    // 注入器与主题令牌都走宿主单源(admin.js 的 AdminHost):本模块由 admin.js 动态注入,
+    // 宿主必在。颜色取自 admin-viz.css(状态色 --viz-over/-under 是「超没超售价」的二值判断,
+    // --viz-1..6 是分类色板定序;第 7 个入口起并入「其他」,不现造新色)。
     function _theme() {
-        let styles = null;
-        try {
-            styles = getComputedStyle(document.documentElement);
-        } catch (_) {}
-        return {
-            ink: _ink(styles, '--ink', 'rgb(35,25,66)'),
-            ink2: _ink(styles, '--ink2', 'rgb(91,88,117)'),
-            ink3: _ink(styles, '--ink3', 'rgb(143,138,168)'),
-            line: _ink(styles, '--line', 'rgb(236,232,246)'),
-            card: _ink(styles, '--card', 'rgb(255,255,255)'),
-            over: _ink(styles, '--viz-over', 'rgb(208,59,59)'),
-            under: _ink(styles, '--viz-under', 'rgb(12,163,12)'),
-            other: _ink(styles, '--viz-other', 'rgb(173,181,189)'),
-            series: SERIES_SLOTS.map(function (slot) {
-                return _ink(styles, slot, 'rgb(42,120,214)');
-            }),
-        };
+        return window.AdminHost.vizTheme();
     }
 
     function ensure() {
-        if (window.echarts) return Promise.resolve(window.echarts);
-        if (_loader) return _loader;
-        _loader = new Promise(function (resolve, reject) {
-            const s = document.createElement('script');
-            s.src = ECHARTS_SRC;
-            s.async = true;
-            s.onload = function () {
-                if (window.echarts) resolve(window.echarts);
-                else reject(new Error('echarts loaded but missing'));
-            };
-            s.onerror = function () {
-                _loader = null; // 允许重试按钮再拉一次
-                reject(new Error('echarts load failed'));
-            };
-            document.head.appendChild(s);
-        });
-        return _loader;
+        return window.AdminHost.loadScript(ECHARTS_SRC, 'echarts');
     }
 
     function _mount(el, option) {

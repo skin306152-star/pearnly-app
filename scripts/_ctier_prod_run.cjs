@@ -349,10 +349,19 @@ async function entryBankRecon(p, e3, e4) {
 
 // ── 入口 5:vat_recon(GL-VAT · income tab · 左 GL + 右 VAT → 开始对账) ──
 async function entryVatRecon(p, e) {
-    // 切 tab 前清空 bank 留下的两卡(避免 hasStaged 确认弹窗卡点击)
-    await p.locator('[data-rcx-remove="left"]').click().catch(() => {});
-    await p.locator('[data-rcx-remove="right"]').click().catch(() => {});
+    // bank 流程若留有已上传文件(如仍在 processing / 已失败),切 tab 会弹「切换将清空」
+    // 确认框——按真实用户路径点「确定」。旧做法(先点两个 remove ✕)在 processing/fail
+    // 视图下按钮不可见,白等 2×30s 后确认框又没人点 → entry5 曾 75s TIMEOUT。
     await p.locator('[data-rcx-tab="income"]').click();
+    const switchConfirm = p.locator('#confirm-modal');
+    if (
+        await switchConfirm
+            .waitFor({ state: 'visible', timeout: 2_000 })
+            .then(() => true)
+            .catch(() => false)
+    ) {
+        await p.locator('#confirm-modal-ok').click();
+    }
     await p.waitForSelector('#rcx-card-left', { state: 'visible', timeout: 15_000 });
 
     await p.locator('input[data-rcx-input="left"]').setInputFiles(P.glXlsx);

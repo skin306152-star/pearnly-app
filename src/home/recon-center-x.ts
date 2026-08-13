@@ -60,8 +60,12 @@ function view(v: RxView) {
     saveStep('recon-center', v === 'results' ? RESULTS_STEP : 1, RX.tab);
 }
 
-// 清本次对账的临时数据(切换类型/清空/返回共用)
+// 清本次对账的临时数据(切换类型/清空共用)。
+// runSeq+1 使在途 run 的所有权票据失效:旧 job 的后台续段不再改视图,
+// running 立即归位——否则切走后开始按钮被旧 job 卡死(2026-08-13 生产实锤)。
 function resetRxData() {
+    RX.runSeq += 1;
+    RX.running = false;
     RX.left = null;
     RX.right = null;
     RX.result = null;
@@ -173,6 +177,9 @@ function setProcessingSub(text: string) {
 async function start() {
     if (RX.running || !RX.left || !RX.right) return;
     const cfg = rxCfg();
+    // 所有权票据:每个 await 之后核对,票据失效(用户已切类型/清空)即整段放弃,
+    // 视图与 running 归新上下文所有。
+    const run = RX.runSeq;
     RX.running = true;
     updateReady();
     view('processing');
@@ -197,6 +204,7 @@ async function start() {
         } catch {
             sub = null;
         }
+        if (RX.runSeq !== run) return;
         // 提交即需『确认字段对应』(普通表格)→ 复用现有面板,确认保存后重跑
         if (sub && sub.needs_mapping) {
             RX.running = false;
@@ -220,16 +228,20 @@ async function start() {
 
         RX.jobId = sub.job_id;
         const job: any = await window._reconPollJob(sub.job_id, token, {
+            shouldAbort: () => RX.runSeq !== run,
             onProgress: (p: unknown) => setProcessingSub(window._reconProgressText(p as any, lang)),
         });
-        await afterPoll(job, token, lang);
+        if (RX.runSeq !== run) return;
+        await afterPoll(job, token, lang, run);
     } catch (e) {
+        if (RX.runSeq !== run) return;
         RX.running = false;
         fail((e as Error).message || tt('rcx-err-network', '网络错误'));
     }
 }
 
-async function afterPoll(job: any, token: string, lang: string) {
+async function afterPoll(job: any, token: string, lang: string, run: number) {
+    if (RX.runSeq !== run) return;
     // 后台解析认不出列 → 弹『确认字段对应』(防御纵深)
     if (job && job.status === 'needs_mapping' && job.mapping) {
         RX.running = false;
@@ -249,13 +261,16 @@ async function afterPoll(job: any, token: string, lang: string) {
                 lang,
                 jobId: RX.jobId,
                 onConfirmed: async (newJobId: string) => {
+                    if (RX.runSeq !== run) return;
                     RX.running = true;
                     view('processing');
                     const j2: any = await window._reconPollJob(newJobId, token, {
+                        shouldAbort: () => RX.runSeq !== run,
                         onProgress: (p: unknown) =>
                             setProcessingSub(window._reconProgressText(p as any, lang)),
                     });
-                    await afterPoll(j2, token, lang);
+                    if (RX.runSeq !== run) return;
+                    await afterPoll(j2, token, lang, run);
                 },
             });
         } else {
@@ -271,6 +286,7 @@ async function afterPoll(job: any, token: string, lang: string) {
     // done → 取结果 + 适配 + 渲染
     const resultId = job.result_id || RX.jobId;
     const res = await fetchResult(rxCfg().kind, resultId);
+    if (RX.runSeq !== run) return;
     RX.running = false;
     if (!res) {
         fail(tt('rcx-err-result', '结果读取失败，请重试'));

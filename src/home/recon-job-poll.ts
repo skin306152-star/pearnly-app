@@ -2,6 +2,7 @@
 // REFACTOR-C1 (2026-05-27) · 对账异步任务前端轮询工具 recon-job-poll 从 home.js 抽出为 ES module
 //
 // 来源:home.js L6765-6830 · verbatim 0 改逻辑(仅 prettier 重排)。
+// 2026-08-13 · 增加 opts.shouldAbort(调用方判弃在途轮询 · 对账中心切类型即中止旧 job 轮询)。
 // 暴露 window._reconPollJob / window._reconProgressText(被 bank-recon-v2 经 window. 运行期调用)。
 // 加载顺序:home.js(sync)暴露公共全局 → 本 module(Vite bundle · defer)后跑 · bare 调全局不 import。
 // ============================================================
@@ -58,6 +59,7 @@
         return label;
     };
     // 轮询任务到 done/failed · 返回最终 job(或 {status:'timeout'})。onProgress(progress, job) 每轮回调。
+    // opts.shouldAbort:调用方判弃钩子(如用户切走对账类型)· 为真即停轮询,省掉最长 20 分钟的死轮询。
     window._reconPollJob = async function (jobId, token, opts) {
         opts = opts || {};
         const intervalMs = opts.intervalMs || 1500;
@@ -65,6 +67,8 @@
         const start = Date.now();
         let softFails = 0;
         for (;;) {
+            if (opts.shouldAbort && opts.shouldAbort())
+                return { ok: false, status: 'aborted', error_code: 'aborted' };
             let job = null;
             try {
                 const r = await fetch('/api/recon/jobs/' + encodeURIComponent(jobId), {

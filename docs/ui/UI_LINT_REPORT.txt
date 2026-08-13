@@ -136,7 +136,7 @@
      1  src\home\purchase-list.ts
         └ 116: // 已入账的付款片可一键切换 paid↔unpaid(PO-5),点击不触发行跳转(bindRows 里 stopPropagation)。
      1  src\home\recon-job-poll.ts
-        └ 14: * ⚠️ 暂塞 home.js(全局 window 工具 · 三个 recon IIFE 共用)· 迁出 deadline = REFACTOR-C1
+        └ 15: * ⚠️ 暂塞 home.js(全局 window 工具 · 三个 recon IIFE 共用)· 迁出 deadline = REFACTOR-C1
      1  src\home\sales-wizard-io.ts
         └ 39: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
      1  static\admin\admin.html

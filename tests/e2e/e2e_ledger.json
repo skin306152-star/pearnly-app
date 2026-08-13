@@ -1032,6 +1032,12 @@
         "套账不符横幅四态:建套账并归入/切已有套账并归入的真实请求载荷、坏校验位税号不出横幅、错配文件被确认全部拦下"
       ]
     },
+    "32-recon-tab-switch-during-run.spec.js": {
+      "covers": ["src/home/recon-center-x*.ts", "src/home/recon-job-poll.ts", "home.html"],
+      "only_e2e": [
+        "对账进行中切类型的三道硬门:确认弹窗后工作区秒级可见、RX.running 不卡死开始按钮、旧 job 收尾不劫持新 tab 视图(runSeq 票据是跨 await 的时序行为,单测桩不出真实事件循环)"
+      ]
+    },
     "_a1_discount_inferred_verify.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
       "only_e2e": ["系统补的折扣行在审核队列说人话、严重度红、无按建议处理的安全默认"]

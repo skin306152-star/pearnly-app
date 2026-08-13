@@ -181,6 +181,7 @@ interface Window {
             intervalMs?: number;
             maxMs?: number;
             onProgress?: (progress: unknown, job: unknown) => void;
+            shouldAbort?: () => boolean;
         }
     ) => Promise<unknown>;
     // 缺口④ · 网页 OCR 异步任务轮询(/api/ocr/jobs/{id})· done 时 job.result 同形 recognize 响应

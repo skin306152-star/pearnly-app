@@ -34,6 +34,9 @@ export interface RxState {
     left: RxFile | null;
     right: RxFile | null;
     running: boolean;
+    // 运行所有权票据:切换类型/清空时 +1。在途 submit/poll 的续段凭它判弃,
+    // 防止旧 job 把 running 卡死或把失败/结果视图砸到新 tab 上。
+    runSeq: number;
     jobId: string | null;
     result: RxResult | null;
     filter: 'all' | 'matched' | 'difference' | 'unmatched';
@@ -46,6 +49,7 @@ export const RX: RxState = {
     left: null,
     right: null,
     running: false,
+    runSeq: 0,
     jobId: null,
     result: null,
     filter: 'all',

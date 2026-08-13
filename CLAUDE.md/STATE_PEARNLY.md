@@ -1,6 +1,15 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · C 档生产全入口实测+四修(2026-08-12 下午 · a064c5f7..f0cc8f4b 已上线)
+## 当前状态卡 · 08-12 欠账清仓批收官(2026-08-13 · 993129c9..a22db5a1 · CI 31662919966 success · prod 99656ceb 已验)
+
+- **✅ 昨账本除拍板/外部项全清(Fable 代理施工·主控逐单验收)**:①**A1 vat_report 400 根治**(399dc7b1):真因=PDF 原字节当图片塞 image_url、DashScope 只认图片(日志空串 hash 是 transport 恒传 None 的烟雾弹),修在 http_common 组请求层 PDF→逐页 PNG 三 provider 共用,真 API 51 页零失败,已移出能力盲区,**生产复验 qwen3.7-flash ok**;②**B4 对账切 tab 卡死**(af693769):75s=runner 盲等+确认弹窗,真 bug 是切走后 RX.running 死锁+旧 job 劫持视图,修法=runSeq 所有权票据+轮询 shouldAbort,新回归 spec 6.1s;③**计费收口**(a50d2d06 净减 48 行):判据下沉 services/billing/pricing 单源(原 5 份手抄)、402 信封单构造点+契约测试、fileconv 3 遍解析归 1、**B3 多页 PDF 预检按物理页数(打穿余额口子关死)**、worker 闸吃 units 快照旧 job 兼容;④**C5 额度抵扣标注**(1dbffa78):成本页注文+用户明细四语 badge「额度抵扣 N 张」,治 0 冒充免费;⑤runner 盲等改条件等待(a22db5a1)+wrapup skill 同步铁律#2(993129c9)。
+- **🛑 A2 实弹拿到定论=新高敏洞(次日首批头号)**:银行产线灰度实测端到端 done,但 **set_principal 只在 HTTP 层设、contextvar 不进 worker 线程 → 账号灰度到不了异步对账 worker**,灰度号对账照走 Gemini 满价(ai_usage 实锤 1.67 铢 gemini-3.5-flash);gl-vat 同构同病、旧同步 /run 的 run_in_executor 同丢。**08-12「银行/GL/VAT 入口全吃灰度」的普查结论对异步对账车道不成立**。修法与全账本:`docs/ocr/HANDOVER-2026-08-13-cleanout-batch.md`。C 档切全局前置更新=堵此洞+复验。
+- **✅ 验证链**:第一推被钱显示闸拦(注释 ฿ 紧贴数字,一行微修)→六笔 CI success→prod 99656ceb 健康 18s→home/login/dms 200→35 分钟巡检无异常;vat 生产两笔 qwen 共 ฿0.009。
+- **🛑 等 Zihao**:(沿袭)163 冲正 / /ai 邀请去留 / C 档全局切 / 真票首单 / runner 进 CI;(新)/ai 名单与 qwen 灰度不重合,要真 UI 验 /ai 侧 qwen 得让一个号两边都在。
+
+---
+
+## 历史 · 2026-08-12 下午状态卡(C 档生产全入口实测+四修 · a064c5f7..f0cc8f4b 已上线)
 
 - **🛑 实测揪出并已修的大雷**:①**ai_usage 成本台账 8-07 起 RLS 断流 5 天**(RLS_ROLE 上线后系统级行被静默吞,引擎成本页全靠旧数据撑着)→ 改显式 bypass 游标(d655213b),修后成本三层逐格对齐(官方单价×token=DB=Earn 后台);8-07~8-12 明细永久丢失。②**qwen 档下 vat_report 批解析全灭**(qwen API 毫秒级 400×15)→ 能力盲区注册表 MODE_UNSUPPORTED_TASKS,任何路径选中 qwen 的 vat_report 自动回落现役(2258bed7);**qwen 真适配 vat 车道=欠账**。③**Excel 字符计费无预扣闸**(฿186 一笔把 93 块余额打穿到 -92.98)→ 预检估价含字符折算,submit/同步 run/job 开跑前三层闸(6652a108)。④**fileconv 三不沾**(不吃灰度/不计费/无闸·负余额烧我方 ฿5.08)→ 余额闸+按页计费(d97a28db),生产实弹复验 200→402。⑤采购页 402 专用文案+充值直达,/ai 同步(4b4bd22d)。
 - **✅ C 档生产实锤**:发票 qwen 双臂 ฿0.25/页真跑通(账号灰度压任务钉档拿真数据验证)、读不准整页回落 Vision 如设计(฿1.11);全零税号占位规则已加(白回落省掉)。质量口径仍以 25 张金标为准(98% 追平最贵档);今日 3 页难票样本 23-93s/页不推翻 4-5s 中位。

@@ -179,6 +179,24 @@ class SummaryTests(GatedRouteCase):
 
 
 class ImageDispatchTests(GatedRouteCase):
+    async def test_image_ocr_receives_plan_policy_context(self):
+        self._wire()
+        billing = {
+            **self._BILLING_OK,
+            "subscription": {"plan_code": "M"},
+        }
+        self.enterContext(mock.patch("core.db.get_billing_status_combined", return_value=billing))
+        m_img = self.enterContext(
+            mock.patch.object(fcr, "convert_image", return_value=_ok_result())
+        )
+
+        await fcr.convert_endpoint(
+            mock.Mock(), file=_upload(name="scan.jpg", data=b"jpeg"), fmt=None
+        )
+
+        self.assertEqual(m_img.call_args.kwargs.get("plan_code"), "M")
+        self.assertFalse(m_img.call_args.kwargs.get("is_exempt"))
+
     async def test_image_upload_routes_to_ocr_converter_with_tenant(self):
         """K1c:图片扩展 → convert_image(OCR 桥)且带租户归因;PDF 路不受牵连。"""
         self._wire()

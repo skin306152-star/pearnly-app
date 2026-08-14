@@ -20,6 +20,7 @@ from core import workspace_context as wc
 from core.auth import get_current_user_from_request
 from core.route_helpers import content_disposition as _content_disposition
 from services.billing import account_status
+from services.ocr.entrypoints import policy_context_from_billing
 from services.vat.vat_excel_export import (
     extract_invoices_parallel,
     extract_invoices_batched_parallel,  # v118.32.5 · 批量OCR 性能优化 B
@@ -129,6 +130,7 @@ async def build_excel_endpoint(
         raise HTTPException(503, detail={"code": account_status.LOOKUP_ERROR}) from _be
 
     api_key = _user_key(user)
+    ocr_policy_ctx = policy_context_from_billing(_billing_vex)
     t0 = time.time()
 
     # 报告先合并
@@ -138,7 +140,9 @@ async def build_excel_endpoint(
         report_files.append({"filename": f.filename or "report.pdf", "bytes": b})
 
     loop = asyncio.get_event_loop()
-    rep_result = await loop.run_in_executor(None, merge_vat_reports, report_files, api_key)
+    rep_result = await loop.run_in_executor(
+        None, lambda: merge_vat_reports(report_files, api_key, **ocr_policy_ctx)
+    )
     if not rep_result.get("ok"):
         raise HTTPException(422, rep_result.get("error", "报告解析失败"))
 
@@ -168,12 +172,17 @@ async def build_excel_endpoint(
             parsed_invoices += await loop.run_in_executor(
                 None,
                 lambda: extract_invoices_batched_parallel(
-                    ocr_files, api_key=api_key, batch_size=5, max_workers=4
+                    ocr_files,
+                    api_key=api_key,
+                    batch_size=5,
+                    max_workers=4,
+                    **ocr_policy_ctx,
                 ),
             )
         else:
             parsed_invoices += await loop.run_in_executor(
-                None, extract_invoices_parallel, ocr_files, api_key, 10
+                None,
+                lambda: extract_invoices_parallel(ocr_files, api_key, 10, **ocr_policy_ctx),
             )
     if struct_inv:
         parsed_invoices += await loop.run_in_executor(

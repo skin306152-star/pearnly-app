@@ -21,6 +21,8 @@ OCR_TASKS: Tuple[str, ...] = (
     "gl_ledger",
     "vat_report",
     "vat_report_csv",
+    "salesvat",
+    "fileconv_ocr",
 )
 
 

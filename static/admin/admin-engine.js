@@ -23,7 +23,16 @@
     });
     const METRIC_KEYS = ['cost', 'quality', 'speed'];
     const PLANS = ['none', 'S', 'M', 'L', 'exempt'];
-    const TASKS = ['invoice', 'id_card', 'bank_statement', 'gl_ledger', 'vat_report'];
+    const TASKS = [
+        'invoice',
+        'id_card',
+        'bank_statement',
+        'gl_ledger',
+        'vat_report',
+        'vat_report_csv',
+        'salesvat',
+        'fileconv_ocr',
+    ];
 
     let D = null; // {fetch, t, esc, fmt, toast}
     let policy = null;
@@ -210,7 +219,7 @@
         );
         _rowSelects(
             document.getElementById('adm-eng-tasks'),
-            TASKS,
+            (options && options.tasks) || TASKS,
             'adm-eng-task-',
             'eng-task-sel',
             (options && options.modes) || MODE_FALLBACK.concat(['auto']),

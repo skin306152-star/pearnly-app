@@ -81,6 +81,12 @@ class TierCardTests(unittest.TestCase):
         self.assertIn("{ mode: 'qwen', code: 'C' }", ENGINE_JS)
         self.assertIn("'adm-eng-opt-qwen':", _lang_block("zh"))
 
+    def test_all_backend_policy_tasks_are_selectable(self):
+        for task in ("vat_report_csv", "salesvat", "fileconv_ocr"):
+            self.assertIn(f"'{task}'", ENGINE_JS)
+            self.assertIn(f"'adm-eng-task-{task}':", _lang_block("zh"))
+            self.assertIn(f"'adm-eng-task-{task}':", _lang_block("th"))
+
 
 class SaveContractTests(unittest.TestCase):
     def test_account_gray_release_fully_removed(self):

@@ -301,11 +301,13 @@ class RunSalesvatTests(unittest.TestCase):
         }
         summary = {"n_total": 1, "n_ok": 1, "n_diff": 0, "diff_amount_total": 0.0}
         with (
-            mock.patch("services.vat.vat_excel_export.merge_vat_reports", return_value=rep),
+            mock.patch(
+                "services.vat.vat_excel_export.merge_vat_reports", return_value=rep
+            ) as merge_mock,
             mock.patch(
                 "services.vat.vat_excel_export.extract_invoices_parallel",
                 return_value=[{"ok": True}],
-            ),
+            ) as invoice_mock,
             mock.patch(
                 "services.vat.vat_excel_export.build_excel", return_value=(b"XLSX", summary)
             ),
@@ -317,9 +319,19 @@ class RunSalesvatTests(unittest.TestCase):
         ):
             with tempfile.TemporaryDirectory() as d:
                 refs = [_stage(d, "invoice", "i.pdf"), _stage(d, "report", "r.pdf")]
-                params = {"user_id": "u1", "tenant_id": "t1", "lang": "th", "is_exempt": True}
+                params = {
+                    "user_id": "u1",
+                    "tenant_id": "t1",
+                    "lang": "th",
+                    "plan_code": "M",
+                    "is_exempt": True,
+                }
                 table, rid = handlers.run_salesvat(params, refs, None)
         self.assertEqual((table, rid), ("vat_recon_tasks", "abc-uuid"))
+        self.assertEqual(merge_mock.call_args.kwargs["plan_code"], "M")
+        self.assertTrue(merge_mock.call_args.kwargs["is_exempt"])
+        self.assertEqual(invoice_mock.call_args.kwargs["plan_code"], "M")
+        self.assertTrue(invoice_mock.call_args.kwargs["is_exempt"])
 
 
 if __name__ == "__main__":

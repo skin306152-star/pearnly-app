@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>OCR engine task harness</title>
+    <style>
+      body { font-family: sans-serif; margin: 24px; }
+      .adm-eng-row { display: flex; justify-content: space-between; margin: 8px; }
+      .eng-tier-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      .eng-tier { border: 1px solid #ddd; padding: 8px; }
+      .eng-tier-auto, .eng-tier-foot, .eng-sub-head { margin-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <main id="page-admin-engine">
+      <div id="adm-eng-policy-body"></div>
+      <span id="adm-eng-saved"></span>
+      <button id="adm-eng-save" type="button">保存</button>
+    </main>
+    <script src="/static/admin/admin-engine.js?v=14081730"></script>
+    <script>
+      const labels = {
+        'adm-eng-task-vat_report_csv': 'VAT CSV',
+        'adm-eng-task-salesvat': '销项 VAT 勾稽',
+        'adm-eng-task-fileconv_ocr': '文件转换 OCR',
+      };
+      AdminEngine.render({
+        fetch: async () => ({
+          policy: { mode: 'qwen', defaults_by_plan: {}, overrides_by_task: {} },
+          options: {
+            modes: ['direct35', 'economy', 'qwen', 'selfhost', 'auto'],
+            plan_modes: ['direct35', 'economy', 'qwen', 'selfhost'],
+            partial_modes: [],
+            tasks: [
+              'invoice', 'id_card', 'bank_statement', 'gl_ledger', 'vat_report',
+              'vat_report_csv', 'salesvat', 'fileconv_ocr'
+            ],
+          },
+        }),
+        t: (key) => labels[key] || key,
+        esc: (value) => String(value),
+        fmt: (value) => String(value),
+        toast: () => {},
+      });
+    </script>
+  </body>
+</html>

@@ -168,9 +168,9 @@ def extract_invoice_fields(
         #   映射成 VEX 8 字段 · 此前直接报"不支持的格式"(配合前端 UI 宣传支持但静默丢弃)。
         return _extract_invoice_via_pipeline(file_bytes, filename, api_key=api_key)
 
+    # BYO Gemini key 只对 Gemini provider 有意义；qwen/selfhost/vertex 各自从 provider
+    # 配置取凭据。不要在业务层用 Gemini key 把其他后端提前挡死。
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not key:
-        return {"ok": False, "filename": filename, "error": "Gemini key 未配置"}
 
     from services.ai_gateway import transport
 
@@ -260,7 +260,22 @@ _VEX_OCR_PER_FILE_TIMEOUT = int(os.environ.get("VEX_OCR_PER_FILE_TIMEOUT_SEC", "
 
 
 def extract_invoices_parallel(
-    invoice_files: List[Dict[str, Any]], api_key: Optional[str] = None, max_workers: int = 10
+    invoice_files: List[Dict[str, Any]],
+    api_key: Optional[str] = None,
+    max_workers: int = 10,
+    *,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+) -> List[Dict[str, Any]]:
+    """进入 salesvat 策略域后再开线程；submit_ctx 会把 provider 覆盖带进每张发票。"""
+    from services.ocr.engine_policy import engine_context
+
+    with engine_context("salesvat", plan_code=plan_code, is_exempt=is_exempt):
+        return _extract_invoices_parallel_active(invoice_files, api_key, max_workers)
+
+
+def _extract_invoices_parallel_active(
+    invoice_files: List[Dict[str, Any]], api_key: Optional[str], max_workers: int
 ) -> List[Dict[str, Any]]:
     """v118.32.4.9.5 · 并行 10 路 OCR · 防止 1000 张串行跑死
     invoice_files: [{filename, bytes}]

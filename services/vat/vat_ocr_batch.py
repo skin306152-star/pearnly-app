@@ -99,12 +99,8 @@ def extract_invoice_fields_batch(
             ]
         images.append((f["bytes"], mime))
 
+    # provider 自己校验自己的凭据；业务层不能用 Gemini key 拦住 qwen/selfhost/vertex。
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not key:
-        return [
-            {"ok": False, "filename": f.get("filename"), "error": "Gemini key 未配置"}
-            for f in invoice_files
-        ]
 
     from services.ai_gateway import transport
     from services.ocr.gemini_models import flash, tier_for_model, try_with_fallback
@@ -180,6 +176,29 @@ def extract_invoices_batched_parallel(
     batch_size: int = 5,
     max_workers: int = 4,
     auto_fallback_single: bool = True,
+    *,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+) -> List[Dict[str, Any]]:
+    """进入 salesvat 策略域后再开批线程，保证整批使用同一 Earn 后台档位。"""
+    from services.ocr.engine_policy import engine_context
+
+    with engine_context("salesvat", plan_code=plan_code, is_exempt=is_exempt):
+        return _extract_invoices_batched_parallel_active(
+            invoice_files,
+            api_key,
+            batch_size,
+            max_workers,
+            auto_fallback_single,
+        )
+
+
+def _extract_invoices_batched_parallel_active(
+    invoice_files: List[Dict[str, Any]],
+    api_key: Optional[str],
+    batch_size: int,
+    max_workers: int,
+    auto_fallback_single: bool,
 ) -> List[Dict[str, Any]]:
     """v118.32.5 · 批量 + 并行：
     - 每批 batch_size 张走一次 Gemini

@@ -350,8 +350,6 @@ def parse_with_gemini(
     file_bytes: bytes, mime_type: str, api_key: Optional[str] = None
 ) -> Dict[str, Any]:
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not key:
-        return {"ok": False, "error": "Gemini API key 未配置", "rows": []}
 
     from services.ai_gateway import transport
     from services.ocr.gemini_models import flash, tier_for_model, try_with_fallback

@@ -360,11 +360,32 @@ def convert_images(
     tenant_id: Optional[str] = None,
     api_key: Optional[str] = None,
     provider_call: Optional[ProviderCall] = None,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+) -> ConvertResult:
+    """Run image OCR under the Earn-selected fileconv engine."""
+    if provider_call is not None:
+        return _convert_images_active(images, source_name, tenant_id, api_key, provider_call)
+
+    from services.ocr.engine_policy import engine_context
+
+    with engine_context(TASK_FILECONV_OCR, plan_code=plan_code, is_exempt=is_exempt):
+        return _convert_images_active(
+            images, source_name, tenant_id, api_key, _default_provider_call
+        )
+
+
+def _convert_images_active(
+    images: List[bytes],
+    source_name: str,
+    tenant_id: Optional[str],
+    api_key: Optional[str],
+    provider_call: ProviderCall,
 ) -> ConvertResult:
     """一批页图(单图=一页)→ ConvertResult。分类 → 逐页直吐 → 适配 → 守恒校验。"""
     if not images:
         return _reject(STATUS_OCR_UNAVAILABLE, source_name, "无可识别页面")
-    call = provider_call or _default_provider_call
+    call = provider_call
 
     ocr_doc_type = _classify(images[0], call, tenant_id, api_key)
     if ocr_doc_type not in _LEDGER_DOC_TYPES:
@@ -439,6 +460,8 @@ def convert_image(
     tenant_id: Optional[str] = None,
     api_key: Optional[str] = None,
     provider_call: Optional[ProviderCall] = None,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
 ) -> ConvertResult:
     """单张图片(jpg/png/webp)→ ConvertResult。"""
     return convert_images(
@@ -447,6 +470,8 @@ def convert_image(
         tenant_id=tenant_id,
         api_key=api_key,
         provider_call=provider_call,
+        plan_code=plan_code,
+        is_exempt=is_exempt,
     )
 
 
@@ -457,6 +482,8 @@ def convert_scanned_pdf(
     tenant_id: Optional[str] = None,
     api_key: Optional[str] = None,
     provider_call: Optional[ProviderCall] = None,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
 ) -> ConvertResult:
     """无文字层 PDF(扫描件)→ 逐页栅格化 → OCR → ConvertResult。栅格化失败诚实拒绝。"""
     pages = _rasterize_pdf(pdf_bytes)
@@ -468,4 +495,6 @@ def convert_scanned_pdf(
         tenant_id=tenant_id,
         api_key=api_key,
         provider_call=provider_call,
+        plan_code=plan_code,
+        is_exempt=is_exempt,
     )

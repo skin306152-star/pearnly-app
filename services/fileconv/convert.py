@@ -74,7 +74,12 @@ def convert_pages(pages: List[str], source_name: str, grid=None) -> ConvertResul
 
 
 def convert_pdf(
-    pdf_bytes: bytes, source_name: str = "", *, tenant_id: Optional[str] = None
+    pdf_bytes: bytes,
+    source_name: str = "",
+    *,
+    tenant_id: Optional[str] = None,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
 ) -> ConvertResult:
     """入口:财务 PDF → ConvertResult。带文字层走纯函数路;无文字层(扫描件)转 OCR 桥。
 
@@ -85,7 +90,13 @@ def convert_pdf(
     if not has_text_layer(pages):
         from services.fileconv import ocr_bridge  # 懒加载:文字层路不牵连 OCR/pydantic 依赖
 
-        return ocr_bridge.convert_scanned_pdf(pdf_bytes, source_name, tenant_id=tenant_id)
+        return ocr_bridge.convert_scanned_pdf(
+            pdf_bytes,
+            source_name,
+            tenant_id=tenant_id,
+            plan_code=plan_code,
+            is_exempt=is_exempt,
+        )
     layout = extract_pages(pdf_bytes, layout=True)
     return convert_pages(
         pages, source_name, grid=pdf_grid.extract_grid(pdf_bytes, pages_text=layout)
@@ -93,9 +104,20 @@ def convert_pdf(
 
 
 def convert_image(
-    image_bytes: bytes, source_name: str = "", *, tenant_id: Optional[str] = None
+    image_bytes: bytes,
+    source_name: str = "",
+    *,
+    tenant_id: Optional[str] = None,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
 ) -> ConvertResult:
     """入口:财务文件图片(jpg/png/webp)→ OCR 桥 → ConvertResult。"""
     from services.fileconv import ocr_bridge
 
-    return ocr_bridge.convert_image(image_bytes, source_name, tenant_id=tenant_id)
+    return ocr_bridge.convert_image(
+        image_bytes,
+        source_name,
+        tenant_id=tenant_id,
+        plan_code=plan_code,
+        is_exempt=is_exempt,
+    )

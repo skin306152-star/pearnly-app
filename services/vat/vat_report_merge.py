@@ -23,6 +23,19 @@ def merge_vat_reports(
     is_exempt: bool = False,
     user_type: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """在 salesvat 策略域内解析整批报告；硬超时线程由 submit_ctx 继承该上下文。"""
+    from services.ocr.engine_policy import engine_context
+
+    with engine_context("salesvat", plan_code=plan_code, is_exempt=is_exempt):
+        return _merge_vat_reports_active(report_files, api_key, user_type=user_type)
+
+
+def _merge_vat_reports_active(
+    report_files: List[Dict[str, Any]],
+    api_key: Optional[str],
+    *,
+    user_type: Optional[str],
+) -> Dict[str, Any]:
     """多份 VAT 报告 PDF 串行解析 · 拼接 rows · 校验同卖方同期间
     report_files: [{filename, bytes}]
     返回:{ok, rows, seller_name, seller_tax_id, period_year, period_month,
@@ -36,10 +49,6 @@ def merge_vat_reports(
     _rep_in_tok = 0
     _rep_out_tok = 0
     policy_kwargs: Dict[str, Any] = {}
-    if plan_code:
-        policy_kwargs["plan_code"] = plan_code
-    if is_exempt:
-        policy_kwargs["is_exempt"] = True
     if user_type:
         policy_kwargs["user_type"] = user_type
     for f in report_files:

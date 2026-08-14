@@ -211,10 +211,14 @@ def run_salesvat(
         progress_cb({"stage": "parse", "stage_done": 0, "stage_total": len(ocr_files)})
         if len(ocr_files) >= 10:
             parsed_invoices += extract_invoices_batched_parallel(
-                ocr_files, api_key=api_key, batch_size=5, max_workers=4
+                ocr_files,
+                api_key=api_key,
+                batch_size=5,
+                max_workers=4,
+                **ocr_policy_ctx,
             )
         else:
-            parsed_invoices += extract_invoices_parallel(ocr_files, api_key, 10)
+            parsed_invoices += extract_invoices_parallel(ocr_files, api_key, 10, **ocr_policy_ctx)
     if struct_inv:
         parsed_invoices += parse_structured_invoices(struct_inv, api_key=api_key)
     ok_invoices = [r for r in parsed_invoices if r.get("ok")]

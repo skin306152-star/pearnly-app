@@ -31,6 +31,9 @@ POLICIES: Dict[str, TaskPolicy] = {
     # vat_report_csv 无独立 handler(路由恒走 vat_report),只占策略档位:引擎档按它生效,
     # 盲区登记(engine_policy.MODE_UNSUPPORTED_TASKS)按它判定。csv/表格支路无零成本路径。
     "vat_report_csv": TaskPolicy("vat_report_csv", "flash_lite", None),
+    # 两条业务旁路同样受 Earn OCR 策略控制；它们直接消费 gateway，不走 controller handler。
+    "salesvat": TaskPolicy("salesvat", "flash", "pdf_text/excel"),
+    "fileconv_ocr": TaskPolicy("fileconv_ocr", "flash_lite", "pdf_text/excel"),
 }
 
 

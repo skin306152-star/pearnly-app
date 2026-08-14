@@ -28,6 +28,7 @@ from services.fileconv.convert import convert_image, convert_pdf
 from services.fileconv.excel_in import convert_excel
 from services.fileconv.model import ConvertResult, Issue, STATUS_OK
 from services.fileconv.xlsx_out import build_xlsx
+from services.ocr.entrypoints import policy_context_from_billing
 from routes.recon_routes_shared import require_coverage_or_raise
 
 logger = logging.getLogger(__name__)
@@ -79,15 +80,34 @@ def _conversion_charge_units(result: ConvertResult, gate_units, filename: str):
     return "pdf", pages, f"文件转换 PDF · {pages} 页"
 
 
-def _run_conversion(data: bytes, filename: str, tenant_id: str) -> ConvertResult:
+def _run_conversion(
+    data: bytes,
+    filename: str,
+    tenant_id: str,
+    *,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+) -> ConvertResult:
     """按文件类型分流:图片 → OCR 桥;Excel/CSV → K2;PDF(默认)→ 文字层引擎
     (无文字层内部再转 OCR)。"""
     name = (filename or "").lower()
     if name.endswith(_IMAGE_EXTS):
-        return convert_image(data, source_name=filename or "upload.png", tenant_id=tenant_id)
+        return convert_image(
+            data,
+            source_name=filename or "upload.png",
+            tenant_id=tenant_id,
+            plan_code=plan_code,
+            is_exempt=is_exempt,
+        )
     if name.endswith(_EXCEL_EXTS):
         return convert_excel(data, source_name=filename or "upload.xlsx")
-    return convert_pdf(data, source_name=filename or "upload.pdf", tenant_id=tenant_id)
+    return convert_pdf(
+        data,
+        source_name=filename or "upload.pdf",
+        tenant_id=tenant_id,
+        plan_code=plan_code,
+        is_exempt=is_exempt,
+    )
 
 
 def _issue_out(issue: Issue) -> dict:
@@ -136,7 +156,12 @@ async def convert_endpoint(
     # 照跑、烧我方 Gemini、用户 0 扣费(生产实锤 2026-08-12)。
     billing, gate_units = _fileconv_billing_gate(user, tenant_id, data, file.filename)
 
-    result = _run_conversion(data, file.filename, tenant_id)
+    result = _run_conversion(
+        data,
+        file.filename,
+        tenant_id,
+        **policy_context_from_billing(billing),
+    )
 
     # 转换成功后按同口径计费(豁免不扣 · fire-and-forget 与对账一致):PDF/图片按页 ·
     # Excel/CSV 按字符。拒绝件(OCR 读不出等)不收钱,同「失败不收钱」全站口径。

@@ -77,15 +77,22 @@ MODE_QWEN = "qwen"
 # invoice 页读取器:值 = 模块路径,约定该模块暴露 read_invoice_page(image_bytes, mime, page_number, api_key)。
 MODE_INVOICE_PAGE_READER: Dict[str, str] = {MODE_QWEN: "services.ocr.qwen_direct"}
 # 长表(bank_statement/general_ledger)读取臂档位:未登记的档维持 flash_lite。
-# qwen 登记 escalate:qwen 读取臂是轻档,轻档读长表整页读崩(实测断点数见本文件头)。
-MODE_TABLE_TIER: Dict[str, str] = {MODE_QWEN: "escalate"}
+# qwen 登记 flash:长表 flash 先读(单页 ฿0.024 vs max ฿1.15,2026-08-13 bench);
+# 没有自动升 max 的回落——flash 读崩靠调用方整件回落 Vision 路(fail-safe)。
+MODE_TABLE_TIER: Dict[str, str] = {MODE_QWEN: "flash"}
 
 # 档位能力盲区:该档做不了的 task,解析一律回落 fail-safe 档,不管档是怎么选上的
 # (任务钉档/全局切换/套餐档同判)——把功能切坏比多花点钱严重得多。机制常驻当绊线。
 # qwen·vat_report(2026-08-12 生产 15/15 批 400)已于 2026-08-13 移出:根因是 OpenAI
 # 兼容 image_url 塞了 data:application/pdf,修在 providers/http_common(PDF 逐页转图),
 # 真报表样张端到端复验通过。
-MODE_UNSUPPORTED_TASKS: Dict[str, frozenset] = {}
+# qwen·vat_report_csv(2026-08-13 bench 2/2):VAT csv 支路(policy_task=vat_report_csv ·
+# 非 PDF/Excel/图片格式走 run_on_table_bytes,由 L2 生成大 entries 数组)30K 窗口截断 +
+# qwen 生成耗时长,稳定 60s 超时挂死无回落 → 整支回 fail-safe 档(economy,与 B 档行为持平)。
+# PDF 支路(vat_report)qwen 实弹 84/84 是赢线,只钉 csv 支路,不整 task 登记。
+MODE_UNSUPPORTED_TASKS: Dict[str, frozenset] = {
+    "qwen": frozenset({"vat_report_csv"}),
+}
 
 # 能力未齐的档:不准启用为任何档位(全局/套餐默认/任务覆写,超管写侧 400 挡,见
 # routes/admin_ocr_engine_routes)。机制保留当绊线,当前为空。
@@ -166,6 +173,10 @@ def resolve_mode(
     差异只来自任务覆写与套餐档。"""
     env_mode = os.environ.get("OCR_ENGINE_MODE", "").strip()
     if env_mode in MODE_MODEL_MAPS:
+        # env 快速开关同样过盲区判定:早退不许绕过绊线(2026-08-13 复验抓现行:
+        # env=qwen 时 vat_report_csv 支路不回落,60s 超时挂死)。
+        if task in MODE_UNSUPPORTED_TASKS.get(env_mode, ()):
+            return _FAILSAFE_MODE
         return env_mode
     cfg = config if config is not None else load_config()
     mode = (cfg.get("overrides_by_task") or {}).get(task) or cfg.get("mode") or _FAILSAFE_MODE

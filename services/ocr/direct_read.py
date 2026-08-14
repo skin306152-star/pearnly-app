@@ -39,6 +39,7 @@ from services.ocr.contracts import (
 )  # noqa: F401 — 既有调用方(pipeline/qwen_direct/测试)从本模块 import,兼容再导出
 
 from . import engine_policy
+from .bank_chain_gate import bank_chain_gate_enabled, reread_bank_page
 from .cost import _compute_total_cost
 from .gl_balance_chain import repair_gl_document
 from .layer2_prompts import _SYSTEM_PROMPT
@@ -69,8 +70,14 @@ _TABLE_DOC_TYPES = ("bank_statement", "general_ledger")
 # 串行时 8 页要 82s,用户等不起;Vision 路正是靠并发把 8 页压到 14s。
 DIRECT_PAGE_WORKERS = int(os.environ.get("OCR_IMAGE_DIRECT_WORKERS", "4"))
 
-_TIMEOUT_S = 60
+# 长表页读取耗时高(单页几百行 JSON),60s 对慢档太紧:
+# bank/gl 放宽到 180s;env OCR_DIRECT_TIMEOUT_SECONDS 全量覆写。
+_DEFAULT_TIMEOUT_S = 60
+_TIMEOUT_BY_TASK = {"bank_statement": 180, "general_ledger": 180}
 _MAX_RETRIES = 1
+
+# 余额链闸崩页重读用的升档 tier(闸与校验在 bank_chain_gate.py,这里只留档位接线)
+_BANK_ESCALATE_TIER = "escalate"
 
 _IMAGE_INPUT_NOTE = (
     "\n\nINPUT CHANGE: the input is the document IMAGE attached to this request, "
@@ -78,7 +85,7 @@ _IMAGE_INPUT_NOTE = (
     "and fill the exact same JSON schema. Same rules apply."
 )
 
-_BANK_STATEMENT_IMAGE_PROMPT = """Read EVERY visible transaction row from this Thai bank-statement IMAGE. Return one compact JSON object only; never summarize, sample, merge, or omit rows.
+_BANK_STATEMENT_IMAGE_PROMPT = """Read EVERY visible transaction row from this Thai bank-statement IMAGE. Assign each amount to deposit or withdrawal by its PRINTED column header, never by column position. Return one compact JSON object only; never summarize, sample, merge, or omit rows.
 
 Schema:
 {
@@ -96,7 +103,7 @@ Schema:
   }]
 }
 
-Use one entry per printed row. Put a balance-forward value in opening_balance, not entries, and the final visible running balance in closing_balance. Amounts may only come from printed Deposit, Withdrawal, or Balance columns; never treat reference, account, or description digits as money. Dates ending in two-digit year 26 mean 2026. For four-digit Buddhist years subtract 543. Preserve the exact printed date in transaction_date_raw. Remove commas and currency symbols. Keep each description under 80 characters. Skip headers and totals."""
+Use one entry per printed row. Put a balance-forward value in opening_balance, not entries, and the final visible running balance in closing_balance. Amounts may only come from printed Deposit, Withdrawal, or Balance columns; never treat reference, account, or description digits as money. Dates ending in two-digit year 26 mean 2026. For four-digit Buddhist years subtract 543. Preserve the exact printed date in transaction_date_raw. Remove commas and currency symbols. Keep each description under 80 characters. Skip headers and totals. Map columns by printed header: deposit-side headers are เงินเข้า / ฝาก / Deposit / Credit, withdrawal-side headers are เงินออก / ถอน / Withdrawal / Debit; never decide by column position. Check every row's balance chain: previous balance + deposit - withdrawal must equal the printed balance (first row starts from opening_balance); on mismatch, re-read that row's amounts and column attribution, and split any printed row that merges two transactions into separate entries so every row's chain matches."""
 
 
 def enabled() -> bool:
@@ -133,10 +140,18 @@ def _sniff_mime(image_bytes: bytes) -> str:
     return "image/png"  # PDF 渲染页就是 PNG;未知类型按 PNG 送,模型端自会报错
 
 
+def _timeout_s_for(document_type: BusinessDocumentType) -> int:
+    """任务级超时(env OCR_DIRECT_TIMEOUT_SECONDS 设了全用它,调用时读 os.environ 供测试 patch)。"""
+    override = os.environ.get("OCR_DIRECT_TIMEOUT_SECONDS")
+    if override:
+        return int(override)
+    return _TIMEOUT_BY_TASK.get(document_type, _DEFAULT_TIMEOUT_S)
+
+
 def _tier_for(document_type: BusinessDocumentType) -> str:
     """长表档位由 engine_policy.MODE_TABLE_TIER 声明,未登记的档维持 flash_lite。
-    qwen 登记 escalate:qwen 的读取臂是轻档,而轻档读长表会整页读崩
-    (实测断点数见 engine_policy 文件头)。"""
+    qwen 登记 flash:长表 flash 先读(单页 ฿0.024 vs max ฿1.15,2026-08-13 bench);
+    没有自动升 max 的回落——flash 读崩靠调用方整件回落 Vision 路(fail-safe)。"""
     if document_type in _TABLE_DOC_TYPES:
         return engine_policy.MODE_TABLE_TIER.get(engine_policy.active_mode(), "flash_lite")
     return "flash_lite"
@@ -172,7 +187,7 @@ def _call_model(
         [(image_bytes, _sniff_mime(image_bytes))],
         tier=tier,
         api_key=key,
-        timeout_s=_TIMEOUT_S,
+        timeout_s=_timeout_s_for(document_type),
         max_retries=_MAX_RETRIES,
         task="ocr.image_direct",
         **request_options,
@@ -294,6 +309,7 @@ def read_page(
 
     invoice = ThaiInvoice(is_not_invoice=True)
     document = None
+    bank_escalated = None
     warnings: List[str] = []
     if document_type in ("auto", "invoice"):
         try:
@@ -307,6 +323,19 @@ def read_page(
             document = _DOC_SCHEMAS[document_type](**data)
         except ValidationError as e:
             raise DirectReadFallback(f"page {page_number}: {document_type} schema: {e}") from e
+        if document_type == "bank_statement" and bank_chain_gate_enabled():
+            # 闸只挂 bank:银行单余额链是确定性不变量(GL 另有 repair_gl_document 修链,
+            # 发票走钱面勾稽闸),其他类型零影响。env OCR_BANK_CHAIN_GATE=0 一键回滚。
+            document, bank_escalated, bank_audit_warnings = reread_bank_page(
+                document,
+                image_bytes,
+                page_number,
+                api_key,
+                lambda ib, ak: _call_model(ib, "bank_statement", ak, tier=_BANK_ESCALATE_TIER),
+                _DOC_SCHEMAS["bank_statement"],
+            )
+            # P0:max 重读链校验残断/链推定覆写行进 validation_warnings,对账面显形
+            warnings.extend(bank_audit_warnings)
         if document_type == "general_ledger":
             # 台账#10 · 与 Vision 路(page_runner)同一套余额链修复,两链不劈叉
             warnings.extend(repair_gl_document(document))
@@ -346,6 +375,11 @@ def read_page(
             chain = ["ID", "ID_ESC"]
             l3_model = qwen_arm.escalate_model
             l3_in, l3_out = qwen_arm.escalate_tokens
+    elif bank_escalated is not None:
+        # 闸崩 → max 重读:chain 打 ID_ESC,token/模型取升级读数(成本进 ai_usage 可查)
+        chain = ["ID", "ID_ESC"]
+        l3_model = bank_escalated.model
+        l3_in, l3_out = bank_escalated.input_tokens, bank_escalated.output_tokens
     elif (
         document_type in ("auto", "invoice")
         and not invoice.is_not_invoice

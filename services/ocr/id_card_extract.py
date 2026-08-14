@@ -51,6 +51,9 @@ _ID_CARD_PROMPT = (
     '  "date_of_birth_be": "date of birth as dd/mm/yyyy in BUDDHIST ERA (พ.ศ.). '
     "If the card shows a Thai month name, convert to numeric month. If the year is "
     'Gregorian (ค.ศ.), add 543 to make it Buddhist era.",\n'
+    "Thai month abbreviations: ม.ค.=01 ก.พ.=02 มี.ค.=03 เม.ย.=04 พ.ค.=05 "
+    "มิ.ย.=06 ก.ค.=07 ส.ค.=08 ก.ย.=09 ต.ค.=10 พ.ย.=11 ธ.ค.=12. Note: "
+    "เม.ย. is month 04 (April), NOT 05. Convert strictly using this table.\n"
     '  "issue_date_be": "date of issue (วันออกบัตร / Date of Issue) as dd/mm/yyyy in '
     'Buddhist era, same era/format rules as date_of_birth_be. Empty if not printed.",\n'
     '  "expiry_date_be": "expiry date (วันบัตรหมดอายุ / Date of Expiry) as dd/mm/yyyy in '

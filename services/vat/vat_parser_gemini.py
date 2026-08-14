@@ -52,9 +52,69 @@ Return ONLY:
 
 # v118.32.4.9.6 · 大 PDF 拆页 + 并行处理(防 Gemini 504)
 # 真实国税局 33 行 PDF 单批 2 页 + 45s timeout 仍然 504 · 改单页一批 + 60s + 单次重试
-# 单页一批保证 Gemini 处理负担最小 · 总并发 4 路 · 总耗时基本持平
+# 单页一批保证 Gemini 处理负担最小 · 总耗时基本持平
 _BATCH_PAGES = 1
-_BATCH_WORKERS = 8
+# F10(2026-08-13) · vat 车道 wall 26.3s→22.6s:16 个单页批次 8 并发要跑两波次,
+# 提到 16 单波次一次跑完。env OCR_VAT_BATCH_WORKERS 可覆盖(回滚口)。
+_BATCH_WORKERS = int(os.environ.get("OCR_VAT_BATCH_WORKERS", "16"))
+
+# F7(2026-08-13) · 模型把一行拆成两半(同发票号相邻、金额相加恰还原真值)→ 确定性代码合并
+# 修法不靠模型:paged 各批 / 单批都会在返回前合并一次;规则只对相邻同号行生效,
+# 对无拆行输入是零操作(逐行原样通过)——B/C 档共用此解析器,零操作是硬约束。
+_MERGE_AMOUNT_FIELDS = ("report_amount_pre_vat", "report_vat_amount", "report_amount")
+
+
+def _merge_split_rows(rows: List[Dict]) -> List[Dict]:
+    """相邻行发票号相同 → 金额字段求和,其余字段取第一行。"""
+    if len(rows) < 2:
+        return rows
+    merged = []
+    cur = dict(rows[0])
+    for r in rows[1:]:
+        inv = cur.get("report_invoice_no") or ""
+        if inv and inv == (r.get("report_invoice_no") or ""):
+            for f in _MERGE_AMOUNT_FIELDS:
+                cur[f] = round((cur.get(f) or 0) + (r.get(f) or 0), 2)
+        else:
+            merged.append(cur)
+            cur = dict(r)
+    merged.append(cur)
+    return merged
+
+
+# F9(2026-08-13) · 模型把打印的"合计"列误读成税前(实锤 doc10:合计 250000 → subtotal,
+# vat 16355.14 / total 266355.14;模型自洽 pre+vat=total 所以自查抓不到,但 250000×7%≠16355.14)。
+# 销项报告 vat=7%×税前是确定性不变量,修复以 vat 列为锚重算税前/合计。
+# 已知局限:若 vat 列本身读错,会把对的税前改错——bench 实证该模式未出现,故以 vat 为锚。
+# env OCR_VAT_REPAIR(默认开)可关。对通过校验的行零操作(B/C 档共用解析器,零操作是硬约束)。
+_VAT_RATE = 0.07
+_VAT_REPAIR_TOL = 0.01
+
+
+def _repair_vat_consistency(rows: List[Dict]) -> List[Dict]:
+    """vat 与税前不满足 7% 恒等时以 vat 为锚重算税前/合计并打标记 · 通过校验的行原样通过。"""
+    if os.environ.get("OCR_VAT_REPAIR", "1") not in ("1", "true", "True"):
+        return rows
+    out = []
+    for r in rows:
+        vat = r.get("report_vat_amount")
+        pre = r.get("report_amount_pre_vat")
+        # vat<=0 或税前缺失/非数字的行没有可修复的锚,原样通过
+        if not isinstance(vat, (int, float)) or vat <= 0:
+            out.append(r)
+            continue
+        if not isinstance(pre, (int, float)):
+            out.append(r)
+            continue
+        if abs(pre * _VAT_RATE - vat) <= _VAT_REPAIR_TOL:
+            out.append(r)
+            continue
+        r = dict(r)
+        r["report_amount_pre_vat"] = round(vat / _VAT_RATE, 2)
+        r["report_amount"] = round(vat / _VAT_RATE + vat, 2)
+        r["vat_repaired"] = True
+        out.append(r)
+    return out
 
 
 def parse_with_gemini_paged(file_bytes: bytes, api_key: Optional[str] = None) -> Dict[str, Any]:
@@ -133,6 +193,12 @@ def parse_with_gemini_paged(file_bytes: bytes, api_key: Optional[str] = None) ->
             "error": f"全部 {len(batches)} 批 OCR 均失败 · {'; '.join(failed_msgs[:3])}",
         }
 
+    # F7 · 逐批行汇合后再合并一次(拆行若跨页,批内合并兜不住)· 无拆行时零操作
+    rows_all = _merge_split_rows(rows_all)
+
+    # F9 · 7% 校验后处理(vat 列锚定)· 与 F7 同位置,通过校验的行零操作
+    rows_all = _repair_vat_consistency(rows_all)
+
     # 重编 row_no(每批从 1 开始 · 合并后重新连续编号)
     for i, r in enumerate(rows_all, 1):
         r["row_no"] = i
@@ -142,6 +208,10 @@ def parse_with_gemini_paged(file_bytes: bytes, api_key: Optional[str] = None) ->
         warnings.append(f"{len(failed_msgs)}/{len(batches)} 批失败 · 部分数据可能缺失")
         for m in failed_msgs[:3]:
             logger.warning(f"[vat_paged] {m}")
+    if any(r.get("vat_repaired") for r in rows_all):
+        warnings.append(
+            f"{sum(1 for r in rows_all if r.get('vat_repaired'))} 行 vat 与税前不符 7% 校验 · 已按 vat 修复税前/合计"
+        )
 
     return {
         "ok": True,
@@ -369,11 +439,22 @@ def parse_with_gemini(
                 continue
             rows.append(parsed)
 
+        # F7 · 模型拆行合并(单批内相邻同号)· 无拆行时零操作
+        rows = _merge_split_rows(rows)
+
+        # F9 · 7% 校验后处理(vat 列锚定)· 与 F7 同位置,通过校验的行零操作
+        rows = _repair_vat_consistency(rows)
+        warnings = []
+        if any(r.get("vat_repaired") for r in rows):
+            warnings.append(
+                f"{sum(1 for r in rows if r.get('vat_repaired'))} 行 vat 与税前不符 7% 校验 · 已按 vat 修复税前/合计"
+            )
+
         return {
             "ok": True,
             "rows": rows,
             "meta": data.get("meta", {}) or {},
-            "warnings": [],
+            "warnings": warnings,
             "parser_version": PARSER_VERSION,
             "row_count": len(rows),
             "method": "gemini_ocr",

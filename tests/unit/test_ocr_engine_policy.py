@@ -65,7 +65,7 @@ class ResolveModeTests(unittest.TestCase):
 
     def test_unsupported_task_falls_back_regardless_of_how_mode_was_chosen(self):
         # 能力盲区注册表是常驻绊线:登记的 (mode, task) 不管档怎么选上都回 fail-safe——
-        # 功能不能被档位切坏。注册表当前为空,这里灌一条假登记验机制本身。
+        # 功能不能被档位切坏。这里 patch 一条假登记验机制本身(真实登记见 qwen·vat_report_csv)。
         with mock.patch.dict("os.environ", _ENV_CLEAR):
             with mock.patch.object(
                 ep, "MODE_UNSUPPORTED_TASKS", {"qwen": frozenset({"vat_report"})}
@@ -75,6 +75,36 @@ class ResolveModeTests(unittest.TestCase):
                 self.assertEqual(ep.resolve_mode("invoice", config=by_global), "qwen")
                 by_task = {**ep.DEFAULT_CONFIG, "overrides_by_task": {"vat_report": "qwen"}}
                 self.assertEqual(ep.resolve_mode("vat_report", config=by_task), "economy")
+
+    def test_vat_report_csv_blind_spot_falls_back_on_qwen(self):
+        # qwen 档的 VAT csv 支路(policy_task=vat_report_csv)是能力盲区(30K 截断 + 长
+        # entries 生成超时,2026-08-13 bench 2/2):全局切 qwen 与任务钉 qwen 同判,一律回 fail-safe。
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            by_global = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+            self.assertEqual(ep.resolve_mode("vat_report_csv", config=by_global), "economy")
+            by_task = {**ep.DEFAULT_CONFIG, "overrides_by_task": {"vat_report_csv": "qwen"}}
+            self.assertEqual(ep.resolve_mode("vat_report_csv", config=by_task), "economy")
+
+    def test_blind_spot_beats_env_quick_switch(self):
+        # env OCR_ENGINE_MODE 早退不许绕过盲区绊线(2026-08-13 复验抓现行:env=qwen
+        # 时 vat_report_csv 不回落,60s 超时挂死)——盲区判定对 env/config 两条选档路同判。
+        with mock.patch.dict("os.environ", {**_ENV_CLEAR, "OCR_ENGINE_MODE": "qwen"}):
+            self.assertEqual(ep.resolve_mode("vat_report_csv"), "economy")
+            self.assertEqual(ep.resolve_mode("vat_report"), "qwen")
+            self.assertEqual(ep.resolve_mode("invoice"), "qwen")
+
+    def test_vat_report_pdf_branch_keeps_qwen(self):
+        # 盲区只钉 csv 支路:PDF/图片/Excel 支路(task=vat_report)qwen 实弹 84/84 是赢线,照走 qwen。
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "qwen"}
+            self.assertEqual(ep.resolve_mode("vat_report", config=cfg), "qwen")
+
+    def test_vat_report_csv_unaffected_on_other_modes(self):
+        # 盲区是 qwen 档专属:其余档(economy/direct35/selfhost)解析 csv 支路不受影响。
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            for m in ("economy", "direct35", "selfhost"):
+                cfg = {**ep.DEFAULT_CONFIG, "mode": m}
+                self.assertEqual(ep.resolve_mode("vat_report_csv", config=cfg), m)
 
     def test_vat_report_back_on_qwen_after_pdf_part_fix(self):
         # 2026-08-13 根因修复(http_common:PDF 逐页转图再进 image_url)后,

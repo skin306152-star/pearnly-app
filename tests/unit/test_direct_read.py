@@ -111,6 +111,17 @@ class RouteDirectTests(unittest.TestCase):
         observed.assert_called_once()
         self.assertEqual(observed.call_args[0][0], "ocr.image_direct")
 
+    def test_long_table_gets_wider_timeout_than_default(self):
+        # 长表单页几百行 JSON,max 回落臂实测 ~90s 读时,60s 一刀切会误杀
+        self.assertEqual(dr._timeout_s_for("bank_statement"), 180)
+        self.assertEqual(dr._timeout_s_for("general_ledger"), 180)
+        self.assertEqual(dr._timeout_s_for("invoice"), 60)
+
+    def test_timeout_env_override_wins(self):
+        with mock.patch.dict("os.environ", {"OCR_DIRECT_TIMEOUT_SECONDS": "300"}):
+            self.assertEqual(dr._timeout_s_for("bank_statement"), 300)
+            self.assertEqual(dr._timeout_s_for("invoice"), 300)
+
 
 class ReadPageTests(unittest.TestCase):
     def test_clean_invoice_yields_confirm_band(self):
@@ -192,6 +203,160 @@ class ReadPageTests(unittest.TestCase):
             pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
         self.assertIsNotNone(pr.document)
         self.assertEqual(pr.layer_chain, ["ID"])  # 非发票不双读(下游对账有自己的勾稽)
+
+
+class BankChainGateWiringTests(unittest.TestCase):
+    """bank 页余额链闸接线(F17 行级修复):互换行翻正放行零升档 / 不可解行升 max 一次 /
+    升级失败原 fail-safe / 非 bank 不过闸 / 开关回滚。"""
+
+    _GOOD_BANK = {
+        "document_type": "bank_statement",
+        "bank_name": "KBANK",
+        "opening_balance": "1000.00",
+        "entries": [
+            {
+                "transaction_date": "2026-01-02",
+                "description": "dep",
+                "deposit": "500.00",
+                "withdrawal": "",
+                "balance": "1500.00",
+            },
+            {
+                "transaction_date": "2026-01-03",
+                "description": "wd",
+                "deposit": "",
+                "withdrawal": "200.00",
+                "balance": "1300.00",
+            },
+        ],
+    }
+
+    # 印刷行是存款(余额 1000→1500),flash 误读成取款 → 正向 1000-500=500 ≠ 1500,
+    # 翻转向 1000+500-0=1500 唯一命中 → 行级修复翻正,不升档(F17 治的 ~36% 互换行)
+    _BROKEN_BANK = {
+        "document_type": "bank_statement",
+        "bank_name": "KBANK",
+        "opening_balance": "1000.00",
+        "entries": [
+            {
+                "transaction_date": "2026-01-02",
+                "description": "dep misread",
+                "deposit": "",
+                "withdrawal": "500.00",
+                "balance": "1500.00",
+            }
+        ],
+    }
+
+    # 真断链:正常向 1200、翻转向 1800 都 ≠ 印刷 1600,且双侧非零不落链推定覆写(列归属
+    # 读乱无基准)→ 数学无解,只能升 max 重读
+    _UNSOLVABLE_BANK = {
+        "document_type": "bank_statement",
+        "bank_name": "KBANK",
+        "opening_balance": "1000.00",
+        "entries": [
+            {
+                "transaction_date": "2026-01-02",
+                "description": "amount misread",
+                "deposit": "500.00",
+                "withdrawal": "300.00",
+                "balance": "1600.00",
+            }
+        ],
+    }
+
+    def _ok(self, data, model="m", in_tok=9, out_tok=3):
+        return ProviderOutcome(
+            ok=True, data=data, model=model, input_tokens=in_tok, output_tokens=out_tok
+        )
+
+    def test_clean_bank_page_passes_without_escalation(self):
+        fp = _FakeProvider(self._ok(self._GOOD_BANK))
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
+        self.assertEqual(len(fp.calls), 1)
+        self.assertEqual(fp.calls[0]["tier"], "flash_lite")  # 读取臂,没升档
+        self.assertEqual(pr.layer_chain, ["ID"])
+
+    def test_swapped_bank_page_repaired_without_escalation(self):
+        # 存取互换行被确定性翻正:1 次 flash 读取、不升档、字段已翻正且带修复标记
+        fp = _FakeProvider(self._ok(self._BROKEN_BANK))
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
+        self.assertEqual(len(fp.calls), 1)
+        self.assertEqual(pr.layer_chain, ["ID"])
+        entry = pr.document.entries[0]
+        self.assertEqual(entry.deposit, "500.00")
+        self.assertEqual(entry.withdrawal, "")
+        self.assertTrue(entry.chain_repaired)
+
+    def test_unsolvable_chain_page_escalates_once_to_max_tier(self):
+        fp = _FakeProvider(
+            [
+                self._ok(self._UNSOLVABLE_BANK, model="flash"),
+                self._ok(self._GOOD_BANK, model="max", in_tok=20, out_tok=5),
+            ]
+        )
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
+        self.assertEqual(len(fp.calls), 2)
+        self.assertEqual(fp.calls[1]["tier"], "escalate")  # 升 max 档(路由矩阵 → qwen3.8-max)
+        self.assertEqual(pr.layer_chain, ["ID", "ID_ESC"])
+        self.assertEqual(pr.layer3_model, "max")
+        self.assertEqual(pr.layer3_input_tokens, 20)
+
+    def test_escalate_read_not_gated_again(self):
+        # 重读结果不再过闸(防死循环):二读仍断链也照单全收,chain 已标 ID_ESC
+        fp = _FakeProvider(
+            [
+                self._ok(self._UNSOLVABLE_BANK, model="flash"),
+                self._ok(self._UNSOLVABLE_BANK, model="max"),
+            ]
+        )
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
+        self.assertEqual(len(fp.calls), 2)
+        self.assertEqual(pr.layer_chain, ["ID", "ID_ESC"])
+
+    def test_escalate_failure_uses_existing_fail_safe(self):
+        seq = [
+            self._ok(self._UNSOLVABLE_BANK, model="flash"),
+            ProviderOutcome(ok=False, error_kind="parse"),
+        ]
+        with _patch_provider(seq):
+            with self.assertRaises(dr.DirectReadFallback):
+                dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
+
+    def test_non_bank_table_doc_never_gated(self):
+        # GL 同有余额字段,但闸只挂 bank(GLEntry 无 deposit 属性,若误闸会 AttributeError)
+        gl = {
+            "document_type": "general_ledger",
+            "opening_balance": "1000.00",
+            "entries": [
+                {
+                    "debit": "500.00",
+                    "credit": "",
+                    "amount": "500.00",
+                    "direction": "deposit",
+                    "balance": "1500.00",
+                }
+            ],
+        }
+        fp = _FakeProvider(self._ok(gl))
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="general_ledger")
+        self.assertEqual(len(fp.calls), 1)
+        self.assertEqual(pr.layer_chain, ["ID"])
+
+    def test_kill_switch_disables_gate(self):
+        # 关闸 = 不修不闸不升:互换行照单全收(列保持原样、无修复标记),不开升级重读
+        fp = _FakeProvider(self._ok(self._BROKEN_BANK))
+        with mock.patch.dict("os.environ", {"OCR_BANK_CHAIN_GATE": "0"}):
+            with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+                pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
+        self.assertEqual(len(fp.calls), 1)
+        self.assertEqual(pr.layer_chain, ["ID"])
+        self.assertFalse(pr.document.entries[0].chain_repaired)
 
 
 @mock.patch.dict("os.environ", {"OCR_DOUBLE_READ": "1"})  # 双读默认关·本类显式启用测机制本身

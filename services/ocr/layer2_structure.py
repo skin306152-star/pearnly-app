@@ -93,7 +93,9 @@ from .gemini_models import flash_lite as _flashlite_model
 
 DEFAULT_MODEL = _flashlite_model()
 DEFAULT_MAX_RETRIES = 1
-DEFAULT_TIMEOUT_SECONDS = 60
+# 60s 一刀切太死:长表/大批量生成侧耗时高(2026-08-13 bench qwen csv 支路 2/2 撞超时),
+# 运维现场 OCR_L2_TIMEOUT_SECONDS 可单独调,默认仍 60。
+DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OCR_L2_TIMEOUT_SECONDS") or "60")
 # v118.35.0.11 · 8192 → 16384 · raw_row_data 字段从 BankStatementEntry schema
 # 物理删除后 · 单 entry token 砍掉一半 · 但极大流水 Excel(80-100 行交易) +
 # 长描述字段 还是有可能撞 8192 · 16384 给足空间.

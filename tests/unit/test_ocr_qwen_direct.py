@@ -38,6 +38,10 @@ _TRANSCRIPT = (
 # 落地校验吃的是 pack 过的转写(编排里整页只 pack 一次,两处比对复用同一个串)。
 _PACKED = qd.pack_text(_TRANSCRIPT)
 
+# 现金票形态:收银机简式票无 subtotal/vat 结构,cash−change=total 自洽 ——
+# F19 病灶:旧谓词 _money_consistent 因 sub/vat 缺失判 False,现金票 68% 仍打转写臂。
+_CASH_RECEIPT = {**_FIELDS_CLEAN, "subtotal": None, "vat": None}
+
 
 class TriggerTests(unittest.TestCase):
     def test_clean_read_needs_no_escalation(self):
@@ -108,6 +112,13 @@ class PrintedDateTests(unittest.TestCase):
     def test_english_month_name(self):
         self.assertEqual(qd.printed_date_to_iso("11 Jun 2026"), "2026-06-11")
 
+    def test_read_prompt_carries_thai_month_abbreviation_table(self):
+        # F18 防回退:泰文缩写月份表必须留在读取臂提示词(พ.ค.=5月 误读成 ม.ค.=1月 病灶);
+        # 口径与 id_card_extract 同表,且带 "เม.ย.=04 不是 05" 的显式注记
+        self.assertIn("ม.ค.=01", qd._READ_PROMPT)
+        self.assertIn("พ.ค.=05", qd._READ_PROMPT)
+        self.assertIn("เม.ย. is month 04 (April), NOT 05", qd._READ_PROMPT)
+
     def test_unreadable_date_stays_none(self):
         self.assertIsNone(qd.printed_date_to_iso("ไม่ทราบ"))
         self.assertIsNone(qd.printed_date_to_iso(""))
@@ -149,7 +160,8 @@ def _json_outcome(data, model="qwen3.7-flash"):
 
 
 def _run_page(read_outcome, escalate_outcome=None, transcript=_TRANSCRIPT):
-    """跑一页编排,返回 (结果, 打过的档位序列)。档位序列是"有没有花贵模型"的唯一硬证据。"""
+    """跑一页编排,返回 (结果, 打过的档位序列)。档位序列是"有没有花贵模型"的唯一硬证据;
+    转写臂也进序列("transcribe" 标记)——惰性转写(F14)后,转写是否被跳过必须看得见。"""
     calls = []
 
     def _json(prompt, images, **kw):
@@ -159,6 +171,7 @@ def _run_page(read_outcome, escalate_outcome=None, transcript=_TRANSCRIPT):
         return escalate_outcome or ProviderOutcome(ok=False, error_kind="parse")
 
     def _text(prompt, images, **kw):
+        calls.append("transcribe")
         if transcript is None:
             return ProviderOutcome(ok=False, error_kind="timeout")
         return ProviderOutcome(ok=True, data=transcript, model="qwen-vl-ocr")
@@ -186,7 +199,7 @@ class OrchestrationTests(unittest.TestCase):
         fixed = {**_FIELDS_CLEAN, "cash": None, "change": None}
         result, calls = self._run(_json_outcome(broken), _json_outcome(fixed, model="qwen3.8-max"))
         self.assertIn("math_sv", result.triggers)
-        self.assertEqual(calls, ["flash", "escalate"])
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
         self.assertEqual(result.escalate_model, "qwen3.8-max")
         self.assertEqual(result.data["total_amount"], "70.00")
 
@@ -219,6 +232,151 @@ class OrchestrationTests(unittest.TestCase):
         self.assertEqual(result.data["document_type"], "simplified_tax_invoice")
 
 
+class MoneyGateTests(unittest.TestCase):
+    """金额闸(F13):钱面自洽时纯文本差异(unground_*)不升级 —— 升级臂贵且慢,金额一致
+    说明入账数没问题,单号/日期差一个字不影响记账;金额不一致或读不出才是真冲突。
+
+    判据=subtotal/vat/total 三件 Decimal 解析成功且 subtotal+vat≈total(容差 0.01)。
+    """
+
+    def test_text_diff_with_consistent_money_does_not_escalate(self):
+        # 金额自洽(65.42+4.58=70.00)+ 单号文本差异 → 不升级,保留读取臂读数
+        unground = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999"}
+        result, calls = self._run(_json_outcome(unground))
+        self.assertEqual(calls, ["flash"])  # 升级臂一次没打
+        self.assertEqual(result.escalate_model, "")
+        self.assertEqual(result.triggers, [])  # 文本差异被金额闸滤掉,不再交人审
+        self.assertEqual(result.data["total_amount"], "70.00")
+
+    def test_money_mismatch_still_escalates(self):
+        # total 差 0.10(超出 0.05 勾稽容差)→ math_sv 触发 → 转写照打,unground_* 也升;
+        # 金额不自洽 → 闸不滤 → 升级臂裁决。0.02 档的差在勾稽容差内,不再值得 max 仲裁
+        # (是否打转写由惰性转写谓词管,见 LazyTranscribeTests)。
+        broken = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999", "total_amount": "70.10"}
+        result, calls = self._run(
+            _json_outcome(broken), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+        )
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
+
+    def test_money_parse_failure_escalates_conservatively(self):
+        # 金额缺失 → no_total 是 det 触发器 → 转写照打并升级(宁多花一次,不放过可能读错的金额)
+        broken = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999", "total_amount": None}
+        result, calls = self._run(
+            _json_outcome(broken), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+        )
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
+
+    def test_switch_off_restores_old_behavior(self):
+        # OCR_ESCALATE_MONEY_GATE=0 → 金额一致也照旧升级(回滚开关);此时惰性转写的
+        # 跳过条件不成立(gate 关着,unground_* 不会被滤掉),转写照打 —— 两个开关各自诚实。
+        unground = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999"}
+        with mock.patch.dict("os.environ", {"OCR_ESCALATE_MONEY_GATE": "0"}):
+            result, calls = self._run(
+                _json_outcome(unground), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+            )
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
+        self.assertIn("unground_invoice_number", result.triggers)
+
+    def test_gate_only_filters_text_diff_keeps_money_math_trigger(self):
+        # math_sv 是真钱面冲突,金额闸不许拦它
+        broken = {**_FIELDS_CLEAN, "total_amount": "71.00", "cash": None, "change": None}
+        triggers = qd.evaluate_triggers(broken, _PACKED)
+        self.assertIn("math_sv", triggers)
+        self.assertIn("math_sv", qd._apply_money_gate(broken, triggers))
+
+    def _run(self, read_outcome, escalate_outcome=None):
+        return _run_page(read_outcome, escalate_outcome)
+
+
+class LazyTranscribeTests(unittest.TestCase):
+    """惰性转写(F14,F19 谓词泛化):转写臂唯一消费方是 unground_* 落地校验 —— 跳过判据 =
+    fields-only 确定性触发器(math_*/badsum_*/no_total)评估为空:det 空 = 转写产出必被
+    丢弃(纯文本差异要么被金额闸滤掉、要么钱面勾稽已自洽到无升级必要,现金票即此类)。
+    det 非空(金额对不上/读不出)→ 照打转写:金额不自洽时闸不滤 unground_*,升级证据
+    要靠它增补,且升级臂要夹转写重读,保守不走捷径。
+    跳过条件还挂 _money_gate_enabled():gate 关着时 unground_* 照旧升级,转写必须有。"""
+
+    def test_fields_only_triggers_empty_skips_transcribe_arm(self):
+        # det 空(金额自洽 + 税号合法)→ 转写臂零调用,unground_* 无从产生,不升级
+        unground = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999"}
+        result, calls = self._run(_json_outcome(unground))
+        self.assertEqual(calls, ["flash"])  # 无 "transcribe" 标记 = 转写臂一次没打
+        self.assertEqual(result.triggers, [])
+        self.assertEqual(result.escalate_model, "")
+        self.assertEqual(result.data["total_amount"], "70.00")
+
+    def test_cash_receipt_skips_transcribe_arm(self):
+        # F19 病灶:现金票 subtotal/vat 空 → 旧谓词 _money_consistent 判 False,68% 仍打转写;
+        # 泛化后 cash−change=total 自洽 + 税号合法 → det 空 → 零转写
+        result, calls = self._run(_json_outcome(dict(_CASH_RECEIPT)))
+        self.assertEqual(calls, ["flash"])
+        self.assertEqual(result.triggers, [])
+        self.assertEqual(result.escalate_model, "")
+
+    def test_badsum_deterministic_trigger_transcribes(self):
+        # badsum_* 是 det 触发器(只看字段的 mod-11):非空 → 照打转写,升级证据不留死角
+        bad_tax = {**_FIELDS_CLEAN, "seller_tax": _TAX_BAD}
+        result, calls = self._run(
+            _json_outcome(bad_tax), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+        )
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
+        self.assertIn("badsum_seller_tax", result.triggers)
+
+    def test_math_mismatch_transcribes_and_escalates(self):
+        # total 差 0.10(超出 0.05 勾稽容差)→ math_sv 触发 → 照打转写并升级
+        broken = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999", "total_amount": "70.10"}
+        result, calls = self._run(
+            _json_outcome(broken), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+        )
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
+        self.assertIn("unground_invoice_number", result.triggers)
+
+    def test_cash_receipt_math_break_still_transcribes(self):
+        # 现金票找零对不上 → math_cash 是 det 触发器 → 照打转写(现金票跳过只限自洽票)
+        broken = {**_CASH_RECEIPT, "change": "25.00"}
+        result, calls = self._run(
+            _json_outcome(broken), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+        )
+        self.assertIn("transcribe", calls)
+        self.assertIn("math_cash", result.triggers)
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
+
+    def test_no_total_still_transcribes(self):
+        # 金额缺失 → no_total 是 det 触发器 → 照打转写并升级
+        broken = {**_FIELDS_CLEAN, "total_amount": None}
+        result, calls = self._run(
+            _json_outcome(broken), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
+        )
+        self.assertIn("transcribe", calls)
+        self.assertEqual(result.escalate_model, "qwen3.8-max")
+
+    def test_unparseable_subtotal_with_clean_math_skips(self):
+        # subtotal 不可解但其余字段全自洽 → det 空 → 零转写(解析失败的保守升级只挂在
+        # det 触发器上:no_total / 超容差勾稽才值得 max 档仲裁)
+        unparseable = {**_FIELDS_CLEAN, "subtotal": "not-a-number"}
+        result, calls = self._run(_json_outcome(unparseable))
+        self.assertEqual(calls, ["flash"])
+        self.assertEqual(result.escalate_model, "")
+        self.assertEqual(result.triggers, [])
+
+    def test_lazy_switch_off_restores_always_transcribe(self):
+        # OCR_LAZY_TRANSCRIBE=0 → det 空也照打转写(串行,不恢复 F3 并行);
+        # 闸还开着,文本差异仍被滤掉 → 不升级,但转写臂确实打了
+        unground = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999"}
+        with mock.patch.dict("os.environ", {"OCR_LAZY_TRANSCRIBE": "0"}):
+            result, calls = self._run(_json_outcome(unground))
+        self.assertEqual(calls, ["flash", "transcribe"])
+        self.assertEqual(result.escalate_model, "")
+        self.assertEqual(result.triggers, [])
+
+    def _run(self, read_outcome, escalate_outcome=None):
+        return _run_page(read_outcome, escalate_outcome)
+
+
 class EscalationBudgetTests(unittest.TestCase):
     """跑批级回落配额:升级臂是读取臂约 60 倍单价,跑批必须封顶,且封顶不许把触发理由吞掉。"""
 
@@ -235,7 +393,7 @@ class EscalationBudgetTests(unittest.TestCase):
 
     def test_exhausted_budget_skips_the_expensive_arm(self):
         result, calls = self._run_with_budget(0)
-        self.assertEqual(calls, ["flash"])  # 贵模型一次没打
+        self.assertEqual(calls, ["flash", "transcribe"])  # 贵模型一次没打,转写臂不受配额管
         self.assertEqual(result.escalate_model, "")
         self.assertEqual(result.escalate_tokens, (0, 0))
         self.assertEqual(result.data["total_amount"], "700.00")  # 保留读取臂读数,不丢页
@@ -247,7 +405,7 @@ class EscalationBudgetTests(unittest.TestCase):
 
     def test_budget_available_escalates_and_consumes_one(self):
         result, calls = self._run_with_budget(1)
-        self.assertEqual(calls, ["flash", "escalate"])
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
         self.assertEqual(result.escalate_model, "qwen3.8-max")
 
     def test_no_budget_set_means_unlimited(self):
@@ -256,7 +414,7 @@ class EscalationBudgetTests(unittest.TestCase):
         result, calls = _run_page(
             _json_outcome(broken), _json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
         )
-        self.assertEqual(calls, ["flash", "escalate"])
+        self.assertEqual(calls, ["flash", "transcribe", "escalate"])
         self.assertEqual(result.escalate_model, "qwen3.8-max")
 
 
@@ -292,7 +450,9 @@ class DirectReadWiringTests(unittest.TestCase):
         self.assertEqual(page.layer2_model, "qwen3.7-flash")
 
     def test_escalated_page_records_second_arm_in_l3_slots(self):
-        broken = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999"}
+        # 金额闸生效后,纯文本差异不再升级 → 本测试必须同时带钱面冲突才能走到升级臂;
+        # 0.10 差超出勾稽容差 → math_sv 触发 → 转写照打,unground_* 一并进升级判断
+        broken = {**_FIELDS_CLEAN, "invoice_number": "INV-99999999", "total_amount": "70.10"}
         page = self._read_page(
             broken, escalate=_json_outcome(dict(_FIELDS_CLEAN), model="qwen3.8-max")
         )
@@ -301,11 +461,11 @@ class DirectReadWiringTests(unittest.TestCase):
         self.assertEqual(page.layer3_model, "qwen3.8-max")
         self.assertTrue(page.layer3_input_tokens or page.layer3_output_tokens)
 
-    def test_long_table_stays_on_the_escalate_arm(self):
-        # 轻档读长表会整页读崩 —— qwen 档的银行/总账页必须落升级臂
+    def test_long_table_uses_flash_arm_with_max_as_escalate_fallback(self):
+        # 2026-08-13 档位调整:qwen 长表 flash 先读,max 留升级兜底(单页成本 ฿1.15→฿0.024)
         with mock.patch.object(ep, "active_mode", return_value="qwen"):
-            self.assertEqual(dr._tier_for("bank_statement"), "escalate")
-            self.assertEqual(dr._tier_for("general_ledger"), "escalate")
+            self.assertEqual(dr._tier_for("bank_statement"), "flash")
+            self.assertEqual(dr._tier_for("general_ledger"), "flash")
             self.assertEqual(dr._tier_for("invoice"), "flash_lite")
         self.assertEqual(dr._tier_for("bank_statement"), "flash_lite")
 

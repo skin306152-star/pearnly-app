@@ -11,6 +11,8 @@ vat_report_parser.py(Excel/PDF 解析 VAT 报表)此前 0 专属测试。
 
 import io
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 import openpyxl
 
@@ -135,6 +137,28 @@ class ParseExcelTests(unittest.TestCase):
     def test_bad_bytes(self):
         out = vp.parse_excel(b"not an xlsx")
         self.assertFalse(out["ok"])
+
+
+class ParseVatReportPolicyTaskTests(unittest.TestCase):
+    """csv 支路以独立 policy_task 生效引擎档(qwen 档盲区只钉这一支);PDF 支路不动。"""
+
+    def test_csv_branch_sets_policy_task(self):
+        with mock.patch(
+            "services.ocr.controller.run", return_value=SimpleNamespace(data={"ok": True})
+        ) as m:
+            out = vp.parse_vat_report(b"c", "r.csv", api_key="k")
+        self.assertTrue(out["ok"])
+        req = m.call_args[0][0]
+        self.assertEqual(req.task, "vat_report")  # handler 恒 vat_report
+        self.assertEqual(req.policy_task, "vat_report_csv")
+
+    def test_pdf_branch_keeps_policy_task_default(self):
+        with mock.patch(
+            "services.ocr.controller.run", return_value=SimpleNamespace(data={"ok": True})
+        ) as m:
+            vp.parse_vat_report(b"p", "r.pdf", api_key="k")
+        req = m.call_args[0][0]
+        self.assertEqual(req.policy_task, None)  # 跟 task=vat_report
 
 
 if __name__ == "__main__":

@@ -12,7 +12,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
-OCR_TASKS: Tuple[str, ...] = ("invoice", "id_card", "bank_statement", "gl_ledger", "vat_report")
+# vat_report_csv = VAT csv 支路的策略档 task(handler 仍走 vat_report,只换引擎档生效域,
+# 见 vat_report_parser.parse_vat_report);qwen 档在此支路是能力盲区,engine_policy 按它登记)。
+OCR_TASKS: Tuple[str, ...] = (
+    "invoice",
+    "id_card",
+    "bank_statement",
+    "gl_ledger",
+    "vat_report",
+    "vat_report_csv",
+)
 
 
 @dataclass(frozen=True)

@@ -60,6 +60,16 @@ class Layer2PromptsContractTest(unittest.TestCase):
         self.assertIn("Bank Statement", p._BANK_STATEMENT_SYSTEM_PROMPT)
         self.assertIn("truncated mid-string", p._RETRY_TRIM_HINT)
 
+    def test_gl_prompt_omits_derived_row_fields(self) -> None:
+        # F8 · 裁 GL 行级派生冗余字段减输出 tokens:amount / direction /
+        # transaction_date_raw 均无下游消费方(或可确定性派生),不再要求模型输出。
+        # F16 · 再裁 raw_row_data:无生产读方(gl_balance_chain 只写不打标依赖模型)。
+        # 防回退:这三个 JSON 键不得重新出现在 GL prompt 里。
+        self.assertNotIn('"amount":', p._GL_SYSTEM_PROMPT)
+        self.assertNotIn('"direction":', p._GL_SYSTEM_PROMPT)
+        self.assertNotIn("transaction_date_raw", p._GL_SYSTEM_PROMPT)
+        self.assertNotIn("raw_row_data", p._GL_SYSTEM_PROMPT)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

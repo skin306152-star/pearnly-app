@@ -37,19 +37,15 @@ Output ONE JSON object (no markdown fences, no prose, just JSON):
   "entries": [
     {
       "transaction_date": "YYYY-MM-DD or empty",
-      "transaction_date_raw": "date text as printed",
       "voucher_no": "voucher / journal / document number (e.g. JV681130.1, QP10280137) or empty",
       "account_code": "account code (e.g. 1112-07) or empty",
       "description": "row description text (Thai or English) — may contain digits like '6091' which are NOT amounts",
       "debit": "number-as-string from the Debit / เดบิต column, no commas, empty if no debit",
       "credit": "number-as-string from the Credit / เครดิต column, no commas, empty if no credit",
-      "amount": "debit if debit>0 else credit (derived number-as-string)",
-      "direction": "deposit | withdrawal | empty",
       "balance": "running balance from the Balance / ยอดคงเหลือ column, or empty",
       "debit_ref":   {"value": "number", "source_text": "as printed", "source_column": "Debit"   } or null,
       "credit_ref":  {"value": "number", "source_text": "as printed", "source_column": "Credit"  } or null,
-      "balance_ref": {"value": "number", "source_text": "as printed", "source_column": "Balance" } or null,
-      "raw_row_data": {"column header": "cell text"}
+      "balance_ref": {"value": "number", "source_text": "as printed", "source_column": "Balance" } or null
     }
   ]
 }
@@ -66,41 +62,29 @@ guess or omit source_column when the value is non-empty.
 CRITICAL RULES — VIOLATIONS ARE BUGS:
 
 1. AMOUNT SOURCING (most important):
-   - debit / credit / balance / amount fields MAY ONLY contain values from the
+   - debit / credit / balance fields MAY ONLY contain values from the
      Debit / Credit / Balance columns of the GL.
    - The following columns are NEVER amounts: Description / รายการ / คำอธิบาย,
      Account Code / รหัสบัญชี, Voucher No. / เลขที่เอกสาร, Journal No., Reference.
    - Example: if you see "6091" in the Description column, '6091' goes in
-     `description`. It MUST NOT appear in `debit`, `credit`, `amount`, or `balance`.
+     `description`. It MUST NOT appear in `debit`, `credit`, or `balance`.
    - Example: 'JV681130.1' is a voucher_no, never an amount.
    - Example: '1112-07' is an account_code, never an amount.
 
-2. DIRECTION DERIVATION:
-   - debit > 0  →  direction = "deposit"     (bank account goes UP / เงินฝาก)
-   - credit > 0 →  direction = "withdrawal"  (bank account goes DOWN / ถอนเงิน)
-   - both 0 / both blank → direction = "" (skip — likely a header or summary row)
-   - MERGED "Debit/Credit" column (one column, direction not printed): put the
-     value in `debit` — do NOT guess direction from the description wording.
-     Downstream recomputes direction deterministically from the balance chain.
+2. MERGED "Debit/Credit" column (one column, direction not printed): put the
+   value in `debit` — do NOT guess direction from the description wording.
+   Downstream recomputes direction deterministically from the balance chain.
 
-3. AMOUNT DERIVATION:
-   - amount = debit if debit > 0 else credit
-   - Never sum debit + credit into amount. They are mutually exclusive in a row.
+3. DATES: convert Buddhist year (>=2400) to Gregorian by subtracting 543.
 
-4. DATES: convert Buddhist year (>=2400) to Gregorian by subtracting 543.
-   ALWAYS preserve original text in transaction_date_raw.
-
-5. NUMBERS: no commas, no currency symbols, no parentheses. "12,450.00" → "12450.00".
+4. NUMBERS: no commas, no currency symbols, no parentheses. "12,450.00" → "12450.00".
    Negative numbers stay negative ("-500.00").
 
-6. SKIP rows that are pure subtotals / openings / closings / page headers
+5. SKIP rows that are pure subtotals / openings / closings / page headers
    (e.g. "ยอดยกมา", "ยอดยกไป", "Balance forward", "Subtotal"). They go into
    opening_balance / closing_balance, NOT entries. Footer "Total Debit" /
    "Total Credit" (รวมเดบิต / รวมเครดิต) amounts go into the document-level
    total_debit / total_credit fields, NOT entries.
-
-7. raw_row_data is for audit: dump the original column→cell mapping as you
-   read it. If you cannot identify columns, leave it as an empty object {}.
 
 If the text is clearly NOT a General Ledger (e.g. a tax invoice was uploaded
 into the GL slot by mistake), return:

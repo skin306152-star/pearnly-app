@@ -1,13 +1,21 @@
 # -*- coding: utf-8 -*-
 """qwen 档的单页直读编排(2026-08-11 实测 v3 产品化 · 51 张金标 49 中)。
 
-一页 = 两个便宜模型 + 一段纯代码判断:
+一页 = 读取臂 + 惰性转写臂 + 一段纯代码判断:
   ① qwen3.7-flash 按 FLASH_V25 读钱面字段;
-  ② qwen-vl-ocr 把整页转写成文本(只当落地校验的对照物,不进字段);
+  ② qwen-vl-ocr 把整页转写成文本(只当落地校验的对照物,不进字段)—— 惰性转写(F14,
+     F19 谓词泛化):fields-only 确定性触发器评估为空时跳过(见 ⑤),有触发器才打;
   ③ 代码触发器:勾稽 subtotal+vat=total · 现金找零 cash−change=total · 泰税号 mod-11 ·
      字段落地(单号/税号/日期的字符要能在转写里找到);
-  ④ 任一触发 且 跑批级回落配额放行 → qwen3.8-max 按 MAX_V3 夹着转写重读;id 类字段若 max 的
-     读数不落地而 flash 的落地,保留 flash 值(实测 max 偶尔"顺"出一个更漂亮但票面没有的单号)。
+   ④ 任一触发 且 跑批级回落配额放行 → qwen3.8-max 按 MAX_V3 夹着转写重读;id 类字段若 max 的
+      读数不落地而 flash 的落地,保留 flash 值(实测 max 偶尔"顺"出一个更漂亮但票面没有的单号);
+   ⑤ 金额闸(F13)+ 惰性转写(F14,F19):钱面自洽时纯文本差异(unground_*)不升级 ——
+     升级臂约读取臂 60 倍单价,金额一致说明入账数没问题,单号/日期在转写里对不上不影响
+     记账。惰性转写以此为据泛化:跳过判据 = fields-only 确定性触发器(math_*/badsum_*/
+     no_total)评估为空,不写死"sub/vat/total 三件齐全" —— 现金票(subtotal/vat 空、
+     cash−change=total 自洽)同样无升级必要。转写臂唯一消费方是 unground_*:det 空 =
+     转写产出必被丢弃,白等一次模型调用+延迟;det 非空(金额对不上/读不出)才值得 max
+     档仲裁,此时转写照打。自洽票延迟从并行两臂 ~5.2s 压成只等读取臂 ~4.4s。
 
 判"要不要花贵模型"的是代码不是模型 —— 模型只负责认字,算术与校验位归确定性代码
 (见 [[agent-boundary-read-vs-calc]])。升级臂单价约读取臂的 60 倍,触发器每多误报一次就
@@ -22,9 +30,11 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple, get_args
 
 from core import thai_date
@@ -60,13 +70,28 @@ _TRANSCRIBE_MAX_TOKENS = 4096
 
 _PACK_RE = re.compile(r"[\s\-]")
 _DIGITS_RE = re.compile(r"\d+")
+# 金额清洗口径与 money.normalize_money 同一份(去货币符号/千分位,留 数字/点/负号)。
+_MONEY_CLEAN_RE = re.compile(r"[^\d.\-]")
+# 金额闸容差:票面分位四舍五入吸得掉,0.02 的差吸不掉(比数学触发器 _MATH_TOL 更严,
+# 差 0.02 的票要么是读错要么是四舍五入,保守起见照旧升级)。见 _money_consistent。
+_MONEY_GATE_TOL = Decimal("0.01")
+_MONEY_FIELDS = ("subtotal", "vat", "total_amount")
 
 # ThaiInvoice.document_type 的合法值直接取自 schema 的 Literal(单一事实源,加枚举只改
 # schema 一处)。非法/缺失不进字段,落 schema 默认 tax_invoice——分类失败不许拖垮读数主业。
 _DOC_TYPES = frozenset(get_args(ThaiInvoice.model_fields["document_type"].annotation))
 
-# 读取臂提示词:模板固定,每页拼一次纯属浪费。
-_READ_PROMPT = f"{FLASH_V25}\n\n{READ_USER_SUFFIX}"
+# 读取臂提示词:模板固定,每页拼一次纯属浪费。月份表防泰文缩写月份读串
+# (พ.ค.=5月 误读成 ม.ค.=1月 是 F5 修过的 id 车道病灶,发票臂补同表防御,口径见
+# id_card_extract;换算仍走下方确定性代码,模型只需照抄)。日期规则在 FLASH_V25 末尾,表紧邻其后。
+_READ_PROMPT = (
+    f"{FLASH_V25}\n\n"
+    "Thai month abbreviations: ม.ค.=01 ก.พ.=02 มี.ค.=03 เม.ย.=04 พ.ค.=05 "
+    "มิ.ย.=06 ก.ค.=07 ส.ค.=08 ก.ย.=09 ต.ค.=10 พ.ย.=11 ธ.ค.=12. "
+    "Note: เม.ย. is month 04 (April), NOT 05. Copy the printed date verbatim "
+    "including Thai month abbreviations; never substitute one abbreviation for another.\n\n"
+    f"{READ_USER_SUFFIX}"
+)
 
 # 票面月份名 → 月。日期在千问档由模型原样抄下来,换算一律走确定性代码(不信 LLM 算术)。
 # 全称 + 泰无点缩写 + 英全称 + 英缩写:正典在 core/thai_date,这里只选形(泰无点式)。
@@ -105,9 +130,27 @@ def read_invoice_page(
 
     fields = dict(read.data)
     _scrub_placeholder_taxes(fields)
-    transcript = _transcribe(images, api_key)
+    # 惰性转写(F14,F19 谓词泛化):跳过判据 = fields-only 确定性触发器评估为空。
+    # 转写臂唯一消费方是 unground_* 落地校验;math_*/badsum_*/no_total 只看字段,
+    # 先拿 packed=None 跑 evaluate_triggers 即可定胜负 —— 空 = 转写产出必无消费方
+    # (纯文本差异要么被金额闸滤掉、要么钱面勾稽已自洽到无升级必要,现金票即属此类),
+    # 白等一次模型调用+延迟;非空 = 照打转写:金额不自洽时闸不滤 unground_*,升级证据
+    # 要靠它增补,且升级臂要夹转写重读,保守起见不走捷径。
+    # F3 曾用并行把两臂压成较慢那臂,当时读取与转写总是都要,并行是对的;惰性化后
+    # 无触发票只等读取臂(~4.4s),有触发票本来就要两臂+可能升级,串行不增关键路径,
+    # 条件变了,并行池随之退役,退回串行。关 OCR_LAZY_TRANSCRIBE 也只是串行照打,不恢复并行。
+    det_triggers = evaluate_triggers(fields, None)
+    if _lazy_transcribe_enabled() and _money_gate_enabled() and not det_triggers:
+        transcript = None
+        logger.info("qwen_direct: 无 fields-only 触发器,跳过转写臂(unground_* 无消费方)")
+    else:
+        transcript = _transcribe(images, api_key)
+
     packed = pack_text(transcript)
     triggers = evaluate_triggers(fields, packed)
+    # 金额闸在触发评估之后、升级决策之前:钱面自洽时把纯文本差异(unground_*)滤掉,
+    # 剩下的触发器才进升级判断。见 _apply_money_gate 的 why。
+    triggers = _apply_money_gate(fields, triggers)
     escalate_model, escalate_tokens = "", (0, 0)
     if triggers:
         # 跑批级回落配额(与 Vision 路 page_runner 同一个闸):用尽 → 不升级、不报错,
@@ -190,6 +233,74 @@ def _scrub_placeholder_taxes(fields: Dict) -> None:
         digits = re.sub(r"\D", "", str(fields.get(key) or ""))
         if digits and set(digits) == {"0"}:
             fields[key] = None
+
+
+def _money_decimal(value) -> Optional[Decimal]:
+    """票面金额 → Decimal;空/不可解 → None。清洗口径与 money.normalize_money 一致,
+    只换类型:金额闸用 Decimal 精确比较(0.01 容差下 float 的二进制误差会误判)。"""
+    if value is None:
+        return None
+    s = _MONEY_CLEAN_RE.sub("", str(value).replace(",", "").strip())
+    if not s or s in ("-", ".", "-."):
+        return None
+    try:
+        return Decimal(s)
+    except InvalidOperation:
+        return None
+
+
+def _money_consistent(fields: Dict) -> bool:
+    """金额闸判据:subtotal/vat/total 三件全部按 Decimal 解析成功且 subtotal+vat≈total(容差 0.01)。
+
+    金标实测 28% 升级是文本差异触发(单号/日期在转写里对不上)、金额其实自洽 —— 升级臂
+    单价约读取臂 60 倍,金额一致说明入账数没问题,单号差一个字不影响记账;只有金额对不上
+    (可能真读错钱)或读不出(保守)才值得花 max 档仲裁重读一遍。
+    """
+    values = [_money_decimal(fields.get(key)) for key in _MONEY_FIELDS]
+    if None in values:
+        return False
+    sub, vat, total = values
+    return abs(sub + vat - total) <= _MONEY_GATE_TOL
+
+
+def _money_gate_enabled() -> bool:
+    """OCR_ESCALATE_MONEY_GATE 开关(默认开):金额一致时文本差异不升级。
+    关掉 = 回滚到"任何触发器都升级"的旧行为。"""
+    return os.environ.get("OCR_ESCALATE_MONEY_GATE", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _lazy_transcribe_enabled() -> bool:
+    """OCR_LAZY_TRANSCRIBE 开关(默认开):fields-only 确定性触发器评估为空 且 金额闸开着时
+    跳过转写臂。关掉 = 回到"总是打转写再评估"的旧行为(串行,不恢复 F3 并行)。
+    跳过条件挂 _money_gate_enabled():闸关着时 unground_* 不被滤掉,转写产出还有消费方,
+    照打 —— 两个开关各自诚实,gate=0 的回滚语义(任何触发器都升级)不因惰性静默失效。"""
+    return os.environ.get("OCR_LAZY_TRANSCRIBE", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _apply_money_gate(fields: Dict, triggers: List[str]) -> List[str]:
+    """金额闸:钱面自洽时,文本差异触发器(unground_*)不升级;金额/税号/缺失类触发器原样保留。
+
+    只拦文本差异 —— 数学勾稽失败(math_*)、税号 mod-11 不过(badsum_*)、金额缺失(no_total)
+    仍是真冲突,照旧升级。返回空列表 = 本轮升级全部被拦下,页按读取臂读数走。"""
+    if not _money_gate_enabled() or not _money_consistent(fields):
+        return triggers
+    kept = [t for t in triggers if not t.startswith("unground_")]
+    if kept != triggers:
+        logger.info(
+            "qwen_direct: 金额自洽,文本差异不升级(%s)",
+            ",".join(sorted(set(triggers) - set(kept))),
+        )
+    return kept
 
 
 def pack_text(text: Optional[str]) -> Optional[str]:

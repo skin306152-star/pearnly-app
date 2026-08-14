@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+import os
 from typing import List
 
 DEFAULT_DPI = 200
 DEFAULT_MAX_PAGES = 50
 DEFAULT_LANGUAGE_HINTS: List[str] = ["th", "en"]
-DEFAULT_TIMEOUT_SECONDS = 60
+# 60s 一刀切太死:长表/大批量生成侧耗时高(2026-08-13 bench qwen csv 支路 2/2 撞超时),
+# 运维现场 OCR_L1_TIMEOUT_SECONDS 可单独调,默认仍 60。
+DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OCR_L1_TIMEOUT_SECONDS") or "60")
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".tiff", ".tif", ".bmp", ".gif"}
 PDF_EXTENSIONS = {".pdf"}

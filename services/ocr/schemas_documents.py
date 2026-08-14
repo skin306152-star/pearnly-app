@@ -161,6 +161,20 @@ class BankStatementEntry(BaseModel):
     amount: str = Field(default="", description="derived: deposit if deposit>0 else withdrawal")
     direction: Literal["deposit", "withdrawal", ""] = Field(default="")
     balance: str = Field(default="", description="running balance")
+    chain_repaired: bool = Field(
+        default=False,
+        description="F17 余额链闸自动翻正存取列归属的审计标记(数学可证才置位)",
+    )
+    chain_amount_imputed: bool = Field(
+        default=False,
+        description="F20 余额链闸按印刷余额链推定单侧发生额并覆写的审计标记"
+        "(两向方程都断且恰一侧非空才置位)",
+    )
+    review_required: bool = Field(
+        default=False,
+        description="P0 复核标记:该行金额是链推定(余额反推)覆写,无第二份图像证据,"
+        "下游入账/导出按待复核处理,不作最终入账数字;F17 翻正是数学可证不置位",
+    )
 
     deposit_ref: Optional[FieldRef] = Field(default=None)
     withdrawal_ref: Optional[FieldRef] = Field(default=None)

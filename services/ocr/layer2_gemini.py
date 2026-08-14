@@ -206,7 +206,9 @@ def _call_l2_via_gateway(
             }
         last_kind = out.error_kind or "parse"
         if last_kind in ("auth", "quota", "timeout"):
-            raise _l2_error_for_kind(last_kind, model_name)
+            # 错误串用 provider 实际发的模型(out.model):qwen 档下传入名是 Gemini 档位名,
+            # 照报「gemini-3.5-flash 超时」而实际调的是 qwen 读取臂,排障会被带偏。
+            raise _l2_error_for_kind(last_kind, out.model or model_name)
         # parse/empty:落入下一轮重试(预算用尽则退出循环抛下方 ValueError)
     raise ValueError(
         f"layer2: gateway returned no valid JSON after {max_retries + 1} attempts ({last_kind})"

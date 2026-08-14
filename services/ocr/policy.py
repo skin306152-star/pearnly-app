@@ -28,6 +28,9 @@ POLICIES: Dict[str, TaskPolicy] = {
     "bank_statement": TaskPolicy("bank_statement", "flash_lite", "excel/pdfplumber/coords"),
     "gl_ledger": TaskPolicy("gl_ledger", "flash", "excel/pdfplumber/mrerp_table"),
     "vat_report": TaskPolicy("vat_report", "flash", "excel/pdf_text/regex"),
+    # vat_report_csv 无独立 handler(路由恒走 vat_report),只占策略档位:引擎档按它生效,
+    # 盲区登记(engine_policy.MODE_UNSUPPORTED_TASKS)按它判定。csv/表格支路无零成本路径。
+    "vat_report_csv": TaskPolicy("vat_report_csv", "flash_lite", None),
 }
 
 

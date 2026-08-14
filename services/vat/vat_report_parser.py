@@ -35,6 +35,11 @@ from services.vat.vat_parser_common import _hit, _map_columns, _build_row  # noq
 
 logger = logging.getLogger(__name__)
 
+# 走 services/ocr/pipeline 的格式分支(其余格式统一入口)。引擎档按 policy_task=vat_report_csv
+# 生效(handler 恒 vat_report):qwen 档在此支路是能力盲区(engine_policy.MODE_UNSUPPORTED_TASKS),
+# PDF/Excel/图片支路不受影响。常量单源,parse_vat_report 与 _parse_vat_report_impl 共用防漂移。
+_PIPELINE_EXTS = ("csv", "tsv", "docx", "doc", "txt", "tiff", "tif", "bmp", "gif", "xlsm")
+
 
 # ======================================================================
 # 统一入口 · 按后缀分发 + 自动 fallback
@@ -133,6 +138,10 @@ def parse_vat_report(
     from services.ocr.pdf_utils import doc_page_count
     from services.cost.usage_context import usage_context
 
+    ext = (filename or "").lower().rsplit(".", 1)[-1]
+    # csv 支路以独立 policy_task 生效引擎档:qwen 档盲区只钉这一支,PDF 支路(84/84 赢线)不动
+    policy_task = "vat_report_csv" if ext in _PIPELINE_EXTS else None
+
     # 入口按调用方兜底(网页查/管家工具会在外层设各自入口,外层优先);
     # pages 在此补齐(PDF/图片物理页数),recon 行的每页成本靠它当分母。
     with usage_context(
@@ -144,6 +153,7 @@ def parse_vat_report(
                 file_bytes=file_bytes,
                 filename=filename,
                 api_key=api_key,
+                policy_task=policy_task,
                 plan_code=plan_code,
                 is_exempt=is_exempt,
                 user_type=user_type,
@@ -195,7 +205,17 @@ def _parse_vat_report_impl(
         if result is None:
             mime = "image/jpeg" if ext == "jpg" else f"image/{ext}"
             result = parse_with_gemini(file_bytes, mime, api_key=api_key)
-    elif ext in ("csv", "tsv", "docx", "doc", "txt", "tiff", "tif", "bmp", "gif", "xlsm"):
+    elif ext in ("csv", "tsv"):
+        # F23(2026-08-13)csv/tsv 先试确定性直读:CSV 是结构化文本,列名映射命中就
+        # 代码直读(779 行真表被 layer2 30K 窗口截到 20 行 · B 档召回 0.64% · qwen
+        # 60s 超时 —— 让 LLM 读表是设计错误)。映射不命中返回 None → 走原 pipeline
+        # 兜底,行为不变。policy_task=vat_report_csv 仍生效,兜底路照旧走引擎档。
+        from services.vat.vat_parser_csv import parse_csv_direct
+
+        result = parse_csv_direct(file_bytes, filename)
+        if result is None:
+            result = _parse_vat_via_pipeline(file_bytes, filename, api_key=api_key)
+    elif ext in _PIPELINE_EXTS:
         # 2026-05-21 v118.35.0.2 · 新增格式走统一 pipeline · document_type=vat_report
         result = _parse_vat_via_pipeline(file_bytes, filename, api_key=api_key)
     else:

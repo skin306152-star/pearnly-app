@@ -1,6 +1,12 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-12 欠账清仓批收官(2026-08-13 · 993129c9..a22db5a1 · CI 31662919966 success · prod 99656ceb 已验)
+## 当前状态卡 · 08-14 C 档 KBANK 终判+适配器封存( bench 全在 scratchpad·生产零污染·开关零触碰)
+
+- **🛑 C 档 bank 车道终判(Zihao 裁)**:max 路数=90s/页·฿1.15/页·完整度 18/18 赢 B 5/18;但人读实锤 max 单读 2484 逐字 66%(行 10/11/17-28/44 错)·自洽静默错链闸挡不住→「全对」给不了。确定性适配器(KBANK-photo-v1 链求解)六判据实测不切档(干净页逐字 84-91%/零静默/但 0 页全 auto·p50 本机 168s·772 人金标未建全),**Zihao 拍板封存不续投**。三选项仍挂:①接受延迟+漏率 ②bank 暂不切 ③等代际;GL 账页速度轴(25.5 vs 13.5s)同挂。
+- **🛑 (新欠账)M2 salesvat + fileconv ocr_bridge 硬编码 Gemini 不合设计**:Zihao 08-14 重申=产品所有 OCR 入口必须跟随 Earn 后台切换;此两路边界外硬编码=欠账,退役为独立项目。配套语料缺口:ภ.พ.30 扫描件/泰国身份证照片待补。
+- **✅ 沿袭已上线**:P0+修复批 1e0d80d1(CI 绿)·max 重读过链只打标不升档·链推金额待复核。
+
+## 历史 · 08-12 欠账清仓批收官(2026-08-13 · 993129c9..a22db5a1 · CI 31662919966 success · prod 99656ceb 已验)
 
 - **✅ 昨账本除拍板/外部项全清(Fable 代理施工·主控逐单验收)**:①**A1 vat_report 400 根治**(399dc7b1):真因=PDF 原字节当图片塞 image_url、DashScope 只认图片(日志空串 hash 是 transport 恒传 None 的烟雾弹),修在 http_common 组请求层 PDF→逐页 PNG 三 provider 共用,真 API 51 页零失败,已移出能力盲区,**生产复验 qwen3.7-flash ok**;②**B4 对账切 tab 卡死**(af693769):75s=runner 盲等+确认弹窗,真 bug 是切走后 RX.running 死锁+旧 job 劫持视图,修法=runSeq 所有权票据+轮询 shouldAbort,新回归 spec 6.1s;③**计费收口**(a50d2d06 净减 48 行):判据下沉 services/billing/pricing 单源(原 5 份手抄)、402 信封单构造点+契约测试、fileconv 3 遍解析归 1、**B3 多页 PDF 预检按物理页数(打穿余额口子关死)**、worker 闸吃 units 快照旧 job 兼容;④**C5 额度抵扣标注**(1dbffa78):成本页注文+用户明细四语 badge「额度抵扣 N 张」,治 0 冒充免费;⑤runner 盲等改条件等待(a22db5a1)+wrapup skill 同步铁律#2(993129c9)。
 - **🛑 A2 实弹拿到定论=新高敏洞(次日首批头号)**:银行产线灰度实测端到端 done,但 **set_principal 只在 HTTP 层设、contextvar 不进 worker 线程 → 账号灰度到不了异步对账 worker**,灰度号对账照走 Gemini 满价(ai_usage 实锤 1.67 铢 gemini-3.5-flash);gl-vat 同构同病、旧同步 /run 的 run_in_executor 同丢。**08-12「银行/GL/VAT 入口全吃灰度」的普查结论对异步对账车道不成立**。修法与全账本:`docs/ocr/HANDOVER-2026-08-13-cleanout-batch.md`。C 档切全局前置更新=堵此洞+复验。

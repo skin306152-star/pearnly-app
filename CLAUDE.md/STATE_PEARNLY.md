@@ -1,9 +1,10 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-14 C 档 KBANK 终判+适配器封存( bench 全在 scratchpad·生产零污染·开关零触碰)
+## 当前状态卡 · 08-14 OCR 旁路已收口跟随 Earn 档位(bank 依然封存)
 
 - **🛑 C 档 bank 车道终判(Zihao 裁)**:max 路数=90s/页·฿1.15/页·完整度 18/18 赢 B 5/18;但人读实锤 max 单读 2484 逐字 66%(行 10/11/17-28/44 错)·自洽静默错链闸挡不住→「全对」给不了。确定性适配器(KBANK-photo-v1 链求解)六判据实测不切档(干净页逐字 84-91%/零静默/但 0 页全 auto·p50 本机 168s·772 人金标未建全),**Zihao 拍板封存不续投**。三选项仍挂:①接受延迟+漏率 ②bank 暂不切 ③等代际;GL 账页速度轴(25.5 vs 13.5s)同挂。
-- **🛑 (新欠账)M2 salesvat + fileconv ocr_bridge 硬编码 Gemini 不合设计**:Zihao 08-14 重申=产品所有 OCR 入口必须跟随 Earn 后台切换;此两路边界外硬编码=欠账,退役为独立项目。配套语料缺口:ภ.พ.30 扫描件/泰国身份证照片待补。
+- **✅ salesvat + fileconv OCR 旁路已收口**(`9a55875`):两路登记进 `OCR_TASKS/POLICIES`,同步路由+异步 job+线程池全程透传 `plan_code/is_exempt`,qwen 上下文在 salesvat 单票/批量及 fileconv 分类→抽取均实测生效;Gemini key 不再在业务层误拦 qwen/selfhost。Earn 管理页改从后端 `options.tasks` 渲染,8 任务全可单独覆写,中泰文已补。
+- **✅ 验证**:OCR/route/admin 回归 122+68 组合全绿;format/lint(0 error)/typecheck/UI/theme/bundle/pre-push 全绿;真浏览器见 8 任务与 3 新任务下拉,证据 `tests/e2e/_artifacts/ocr-engine-sidecar/admin-engine-tasks.png`。配套语料缺口仍是外部项:ภ.พ.30 扫描件/泰国身份证照片待补。
 - **✅ 沿袭已上线**:P0+修复批 1e0d80d1(CI 绿)·max 重读过链只打标不升档·链推金额待复核。
 
 ## 历史 · 08-12 欠账清仓批收官(2026-08-13 · 993129c9..a22db5a1 · CI 31662919966 success · prod 99656ceb 已验)

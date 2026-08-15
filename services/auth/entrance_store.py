@@ -14,14 +14,15 @@ from __future__ import annotations
 import logging
 from typing import Optional, Set
 
-from services.auth.entrance import AI, ALL_ENTRANCES, DMS, MAIN, POS
+from services.auth.entrance import AI, ALL_ENTRANCES, DAILY, DMS, MAIN, POS
 
-# 入口常量单一事实源在 entrance.py；此处 re-export 供发放侧(entrance_store.MAIN/POS/AI/DMS)沿用。
+# 入口常量单一事实源在 entrance.py；此处 re-export 供发放侧(entrance_store.MAIN/POS/AI/DMS/DAILY)沿用。
 __all__ = [
     "MAIN",
     "POS",
     "AI",
     "DMS",
+    "DAILY",
     "grant_entrance",
     "grant_entrance_safe",
     "list_entrances",

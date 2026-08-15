@@ -427,7 +427,12 @@ const BUNDLES = [
     // 先加载(同 console-i18n 范式),不并入 bundle。
     {
         out: 'static/dist/daily.js',
-        files: ['daily/daily-core.js', 'daily/daily-gate.js', 'daily/daily.js'],
+        files: [
+            'daily/daily-core.js',
+            'daily/daily-gate.js',
+            'daily/daily-actions.js',
+            'daily/daily.js',
+        ],
     },
 ];
 

@@ -40,7 +40,7 @@ def _lang_blocks(src: str) -> dict:
     blocks = {}
     starts = {}
     for lang in LANGS:
-        m = re.search(r"\n  " + lang + r": \{", src)
+        m = re.search(r"\n\s+" + lang + r": \{", src)
         assert m, f"daily-i18n.js 缺语言块: {lang}"
         starts[lang] = m.start()
     ordered = sorted(LANGS, key=lambda x: starts[x])
@@ -87,10 +87,10 @@ class DailyI18nTest(unittest.TestCase):
         for key in re.findall(r"data-i18n(?:-placeholder)?=\"([\w.]+)\"", html):
             self.assertIn(key, known, f"daily.html 引用未知键: {key}")
 
-        js = _read("daily.js")
-        for key in re.findall(r"\bt\('([\w.]+)'", js):
+        js = _read("daily.js") + _read("daily-actions.js")
+        for key in re.findall(r"(?:\bt|\bcore\.t)\('([\w.]+)'", js):
             self.assertIn(key, known, f"daily.js 引用未知键: {key}")
-        for key in re.findall(r"\bt\('([\w.]+)'", js):
+        for key in re.findall(r"(?:\bt|\bcore\.t)\('([\w.]+)'", js):
             if key.startswith(_VARIADIC_PREFIXES):
                 self.assertTrue(
                     any(key.startswith(p) for p in _VARIADIC_PREFIXES),

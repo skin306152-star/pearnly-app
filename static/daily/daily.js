@@ -1,9 +1,9 @@
 /*
- * static/daily/daily.js · Daily 周记账主壳(数据操作 + 应用渲染 + 事件 + init)
+ * static/daily/daily.js · Daily 周记账主壳(应用渲染 + 事件 + init)
  *
  * 分层:纯逻辑/状态/API 在 daily-core.js(DailyCore · UMD 导出供 node 单测),
- * 门禁/登录卡/故障态在 daily-gate.js(DailyGate),本文件只剩业务壳:
- *   - 数据:月列表加载 / 新建 / 删除 / 全量导出 / JSON 导入(逐条 POST 合并)
+ * 门禁/登录卡/故障态在 daily-gate.js(DailyGate),数据操作在 daily-actions.js,
+ * 本文件只保留渲染和交互编排:
  *   - 渲染:appHtml 全量重渲 + data-i18n 绑定
  *   - 事件:appRoot 单一 click 委托(data-* 空属性按 `!= null` 判,防空串假阴性)
  */
@@ -12,8 +12,6 @@
 
     var state = root.DailyCore.state;
     var t = root.DailyCore.t;
-    var api = root.DailyCore.api;
-    var clearToken = root.DailyCore.clearToken;
     var weekBounds = root.DailyCore.weekBounds;
     var sumBy = root.DailyCore.sumBy;
     var inMonth = root.DailyCore.inMonth;
@@ -25,157 +23,12 @@
     var applyStaticI18n = root.DailyGate.applyStaticI18n;
     var renderGate = root.DailyGate.renderGate;
 
-    // ==================== 数据 ====================
-
-    function loadMonth() {
-        state.loading = true;
-        rerender();
-        api('/api/daily/entries?month=' + encodeURIComponent(state.monthId)).then(function (res) {
-            if (res.status === 200) {
-                state.entries = (res.body && res.body.entries) || [];
-            } else if (res.status === 401) {
-                clearToken();
-                state.gate = 'login';
-                renderGate();
-                return;
-            } else {
-                state.entries = [];
-                showToast('daily.err.load_failed');
-            }
-            state.loading = false;
-            rerender();
-        });
-    }
-
-    function saveEntry(entry) {
-        if (state.saving) return;
-        state.saving = true;
-        api('/api/daily/entries', { method: 'POST', json: entry }).then(function (res) {
-            state.saving = false;
-            if (res.status === 200 && res.body) {
-                state.entries.push(res.body);
-                state.entries.sort(function (a, b) {
-                    return (
-                        String(b.entry_date).localeCompare(String(a.entry_date)) ||
-                        String(b.created_at).localeCompare(String(a.created_at))
-                    );
-                });
-                state.showEntryForm = false;
-                showToast('daily.toast.saved');
-            } else if (res.status === 401) {
-                clearToken();
-                state.gate = 'login';
-                renderGate();
-                return;
-            } else {
-                showToast('daily.err.save_failed');
-            }
-            rerender();
-        });
-    }
-
-    function deleteEntry(id) {
-        if (!root.confirm(t('daily.confirm.delete'))) return;
-        api('/api/daily/entries/' + encodeURIComponent(id), { method: 'DELETE' }).then(
-            function (res) {
-                if (res.status === 200) {
-                    state.entries = state.entries.filter(function (e) {
-                        return e.id !== id;
-                    });
-                    showToast('daily.toast.deleted');
-                } else if (res.status === 401) {
-                    clearToken();
-                    state.gate = 'login';
-                    renderGate();
-                    return;
-                } else {
-                    showToast('daily.err.delete_failed');
-                }
-                rerender();
-            }
-        );
-    }
-
-    function exportData() {
-        api('/api/daily/export').then(function (res) {
-            if (res.status !== 200) {
-                showToast('daily.err.load_failed');
-                rerender();
-                return;
-            }
-            var payload = {
-                version: 1,
-                exportedAt: new Date().toISOString(),
-                entries: (res.body && res.body.entries) || [],
-            };
-            var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-            var link = root.document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'daily-finance-' + new Date().toISOString().slice(0, 10) + '.json';
-            link.click();
-            URL.revokeObjectURL(link.href);
-            showToast('daily.toast.exported');
-            rerender();
-        });
-    }
-
-    function importFile(file) {
-        var reader = new FileReader();
-        reader.onload = function () {
-            var parsed = null;
-            try {
-                parsed = JSON.parse(String(reader.result));
-            } catch (e) {
-                /* fallthrough */
-            }
-            var incoming =
-                parsed && Array.isArray(parsed)
-                    ? parsed
-                    : parsed && Array.isArray(parsed.entries)
-                      ? parsed.entries
-                      : null;
-            if (!incoming || !incoming.length) {
-                showToast('daily.err.import_invalid');
-                rerender();
-                return;
-            }
-            var valid = incoming.every(function (e) {
-                return (
-                    e &&
-                    typeof e.id === 'string' &&
-                    typeof e.date === 'string' &&
-                    (e.type === 'income' || e.type === 'expense') &&
-                    typeof e.title === 'string' &&
-                    Number.isFinite(Number(e.amount))
-                );
-            });
-            if (!valid) {
-                showToast('daily.err.import_invalid');
-                rerender();
-                return;
-            }
-            if (!root.confirm(t('daily.confirm.import', { n: incoming.length }))) return;
-            var queue = incoming.slice();
-            var done = 0;
-            var next = function () {
-                if (!queue.length) {
-                    showToast('daily.toast.imported', { n: done });
-                    loadMonth();
-                    return;
-                }
-                var e = queue.shift();
-                api('/api/daily/entries', {
-                    method: 'POST',
-                    json: { date: e.date, kind: e.type, title: e.title, amount: Number(e.amount) },
-                }).then(function (res) {
-                    if (res.status === 200) done += 1;
-                    next();
-                });
-            };
-            next();
-        };
-        reader.readAsText(file);
-    }
+    var actions = root.DailyActions.create({ rerender: rerender, showToast: showToast });
+    var loadMonth = actions.loadMonth;
+    var saveEntry = actions.saveEntry;
+    var deleteEntry = actions.deleteEntry;
+    var exportData = actions.exportData;
+    var importFile = actions.importFile;
 
     function showToast(key, vars) {
         state.toast = { key: key, vars: vars };

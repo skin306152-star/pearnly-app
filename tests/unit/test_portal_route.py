@@ -37,6 +37,26 @@ class PortalRouteTest(unittest.TestCase):
         self.assertEqual(asyncio.run(pages_routes.root()).path, "static/dist/portal.html")
         self.assertEqual(asyncio.run(pages_routes.login_page()).path, "static/dist/login.html")
 
+    def test_login_routes_liff_booking_draft_to_editor(self):
+        response = self.client.get(
+            "/login",
+            params={"liff.state": "?draft=nonce with spaces"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers["location"],
+            "/login/dms-booking?draft=nonce%20with%20spaces",
+        )
+
+    def test_login_ignores_unrelated_liff_state(self):
+        response = self.client.get(
+            "/login",
+            params={"liff.state": "?screen=home"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 200)
+
     def test_root_no_cache(self):
         resp = self.client.get("/", follow_redirects=False)
         self.assertEqual(resp.status_code, 200)

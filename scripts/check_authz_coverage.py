@@ -79,6 +79,7 @@ PUBLIC_ROUTES = {
     ("GET", "/api/line/liff/config"),  # 仅返回公开 LIFF ID(非密)· 前端 liff.init 用
     ("GET", "/liff/purchase/{doc_id}"),  # LIFF 页入口·跳 /home 复核屏(前端 LIFF 鉴权)
     ("GET", "/liff/dms-booking"),  # DMS LIFF 页面壳;业务数据仍需 JWT + 一次性 nonce
+    ("GET", "/login/dms-booking"),  # 同一 LIFF 页面壳;保持在已登记的 /login 路径下
     ("GET", "/api/line/dms-booking/config"),  # 公开返回非秘密 DMS LIFF ID
     ("POST", "/api/line/dms-booking/auth"),  # DMS LIFF id_token 经 LINE 验签即凭证
     ("POST", "/internal/deploy"),

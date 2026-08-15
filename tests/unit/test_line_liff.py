@@ -110,6 +110,11 @@ class LiffEntryRedirectTests(unittest.TestCase):
         self.assertTrue(Path(res.path).as_posix().endswith("static/dist/dms-booking-edit.html"))
         self.assertIn("no-store", res.headers["cache-control"])
 
+    def test_dms_booking_editor_has_registered_liff_path_alias(self):
+        paths = {route.path for route in dms_edit.router.routes}
+        self.assertIn("/liff/dms-booking", paths)
+        self.assertIn("/login/dms-booking", paths)
+
 
 class DmsBookingAsyncTripwireTests(unittest.TestCase):
     def test_draft_loader_runs_off_event_loop(self):

@@ -26,6 +26,7 @@ class DmsBookingSaveIn(BaseModel):
     form: Dict[str, Any] = Field(default_factory=dict)
 
 
+@router.get("/login/dms-booking")
 @router.get("/liff/dms-booking")
 async def liff_dms_booking_entry():
     """Public shell; draft data still requires a DMS JWT and one-time nonce."""

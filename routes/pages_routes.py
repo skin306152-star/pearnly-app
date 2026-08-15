@@ -26,9 +26,11 @@ REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后�
 
 import asyncio
 import os
+from typing import Annotated
+from urllib.parse import parse_qs, quote
 
-from fastapi import APIRouter
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi import APIRouter, Query
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
 
 router = APIRouter()
 
@@ -115,7 +117,16 @@ async def root():
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page():
+async def login_page(
+    liff_state: Annotated[str, Query(alias="liff.state")] = "",
+):
+    state = str(liff_state or "").lstrip("?")
+    draft = (parse_qs(state).get("draft") or [""])[0].strip()
+    if draft:
+        return RedirectResponse(
+            url=f"/login/dms-booking?draft={quote(draft, safe='')}",
+            status_code=302,
+        )
     return FileResponse("static/dist/login.html", headers=_NO_CACHE)
 
 

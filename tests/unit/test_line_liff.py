@@ -8,6 +8,7 @@ webview = 用户验收(需真 channel)。
 import asyncio
 import os
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from routes import line_liff_routes as liff
@@ -106,7 +107,7 @@ class LiffEntryRedirectTests(unittest.TestCase):
 
     def test_dms_booking_entry_serves_built_shell_without_cache(self):
         res = asyncio.run(dms_edit.liff_dms_booking_entry())
-        self.assertTrue(str(res.path).endswith("static\\dist\\dms-booking-edit.html"))
+        self.assertTrue(Path(res.path).as_posix().endswith("static/dist/dms-booking-edit.html"))
         self.assertIn("no-store", res.headers["cache-control"])
 
 

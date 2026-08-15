@@ -158,8 +158,13 @@ class DailyCrudFlowTests(unittest.TestCase):
             def __exit__(self, *a):
                 return False
 
-        with p1, p2, p3, mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()) as gc, \
-                mock.patch.object(daily.store, "insert_entry", return_value=row) as insert:
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()) as gc,
+            mock.patch.object(daily.store, "insert_entry", return_value=row) as insert,
+        ):
             result = asyncio.run(daily.daily_entry_create(body, object()))
             self.assertEqual(result, row)
             self.assertEqual(gc.call_args.kwargs["tenant_id"], "t1")
@@ -182,8 +187,13 @@ class DailyCrudFlowTests(unittest.TestCase):
             def __exit__(self, *a):
                 return False
 
-        with p1, p2, p3, mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()), \
-                mock.patch.object(daily.store, "insert_entry", return_value=None):
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()),
+            mock.patch.object(daily.store, "insert_entry", return_value=None),
+        ):
             with self.assertRaises(daily.HTTPException) as ctx:
                 asyncio.run(daily.daily_entry_create(body, object()))
         self.assertEqual(ctx.exception.status_code, 422)
@@ -199,8 +209,13 @@ class DailyCrudFlowTests(unittest.TestCase):
             def __exit__(self, *a):
                 return False
 
-        with p1, p2, p3, mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()) as gc, \
-                mock.patch.object(daily.store, "delete_entry", return_value=True) as delete:
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()) as gc,
+            mock.patch.object(daily.store, "delete_entry", return_value=True) as delete,
+        ):
             result = asyncio.run(daily.daily_entry_delete("e1", object()))
             self.assertEqual(result, {"ok": True})
             self.assertEqual(gc.call_args.kwargs["tenant_id"], "t1")
@@ -217,8 +232,13 @@ class DailyCrudFlowTests(unittest.TestCase):
             def __exit__(self, *a):
                 return False
 
-        with p1, p2, p3, mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()), \
-                mock.patch.object(daily.store, "delete_entry", return_value=False):
+        with (
+            p1,
+            p2,
+            p3,
+            mock.patch.object(daily.db, "get_cursor_rls", return_value=_Ctx()),
+            mock.patch.object(daily.store, "delete_entry", return_value=False),
+        ):
             with self.assertRaises(daily.HTTPException) as ctx:
                 asyncio.run(daily.daily_entry_delete("e1", object()))
         self.assertEqual(ctx.exception.status_code, 404)

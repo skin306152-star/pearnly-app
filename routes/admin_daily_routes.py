@@ -173,7 +173,10 @@ async def daily_overview(request: Request):
         }
         for r in rows
     ]
-    return {"flag": {"enabled": bool(flag and flag.get("enabled")), "rollout": rollout or "allowlist"}, "allowlist": allowlist}
+    return {
+        "flag": {"enabled": bool(flag and flag.get("enabled")), "rollout": rollout or "allowlist"},
+        "allowlist": allowlist,
+    }
 
 
 @router.post("/api/admin/daily/invite")
@@ -193,7 +196,10 @@ async def daily_invite(request: Request, body: InviteBody):
         subject_id = _subject_id(existing)
         platform_settings_store.add_to_allowlist(DAILY_KEY, subject_id)
         grant_entrance_safe(
-            DAILY, existing.get("tenant_id"), str(admin.get("id")) if admin else None, context="daily"
+            DAILY,
+            existing.get("tenant_id"),
+            str(admin.get("id")) if admin else None,
+            context="daily",
         )
         _log_op(
             request,

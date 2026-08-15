@@ -188,9 +188,7 @@ class OverviewTests(unittest.TestCase):
                 "get_setting",
                 return_value={"enabled": True, "value": {"rollout": "all"}, "updated_at": None},
             ),
-            mock.patch.object(
-                admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
-            ),
+            mock.patch.object(admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)),
         ):
             r = self.client.get("/api/admin/daily/overview")
         self.assertEqual(r.status_code, 200)
@@ -270,9 +268,7 @@ class InviteCreateAccountTests(unittest.TestCase):
 
     def test_invite_unknown_email_creates_account_and_reveals_password_once(self):
         with (
-            mock.patch.object(
-                admin_daily_routes.db, "find_user_by_username", return_value=None
-            ),
+            mock.patch.object(admin_daily_routes.db, "find_user_by_username", return_value=None),
             mock.patch.object(
                 admin_daily_routes,
                 "create_owner_user",
@@ -310,9 +306,7 @@ class InviteCreateAccountTests(unittest.TestCase):
 
     def test_invite_unknown_plain_username_creates_account(self):
         with (
-            mock.patch.object(
-                admin_daily_routes.db, "find_user_by_username", return_value=None
-            ),
+            mock.patch.object(admin_daily_routes.db, "find_user_by_username", return_value=None),
             mock.patch.object(
                 admin_daily_routes,
                 "create_owner_user",
@@ -338,9 +332,7 @@ class InviteCreateAccountTests(unittest.TestCase):
 
     def test_invite_username_exists_race_returns_409(self):
         with (
-            mock.patch.object(
-                admin_daily_routes.db, "find_user_by_username", return_value=None
-            ),
+            mock.patch.object(admin_daily_routes.db, "find_user_by_username", return_value=None),
             mock.patch.object(
                 admin_daily_routes,
                 "create_owner_user",
@@ -353,9 +345,7 @@ class InviteCreateAccountTests(unittest.TestCase):
         self.assertEqual(r.status_code, 409)
 
     def test_invite_username_with_whitespace_422(self):
-        r = self.client.post(
-            "/api/admin/daily/invite", json={"username_or_email": "has space"}
-        )
+        r = self.client.post("/api/admin/daily/invite", json={"username_or_email": "has space"})
         self.assertEqual(r.status_code, 422)
         self.assertEqual(r.json()["detail"], "admin.daily_username_invalid")
 
@@ -412,9 +402,7 @@ class ResetPasswordTests(unittest.TestCase):
         with mock.patch.object(
             admin_daily_routes.platform_settings_store, "is_allowlisted", return_value=False
         ):
-            r = self.client.post(
-                "/api/admin/daily/reset-password", json={"subject_id": "tenant-9"}
-            )
+            r = self.client.post("/api/admin/daily/reset-password", json={"subject_id": "tenant-9"})
         self.assertEqual(r.status_code, 404)
         self.assertEqual(r.json()["detail"], "admin.daily_not_invited")
 
@@ -426,9 +414,7 @@ class ResetPasswordTests(unittest.TestCase):
                 "is_allowlisted",
                 return_value=True,
             ),
-            mock.patch.object(
-                admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
-            ),
+            mock.patch.object(admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)),
             mock.patch.object(
                 admin_daily_routes.db,
                 "find_user_by_id",
@@ -439,9 +425,7 @@ class ResetPasswordTests(unittest.TestCase):
             ) as m_reset,
             mock.patch.object(admin_daily_routes, "_log_op") as m_log,
         ):
-            r = self.client.post(
-                "/api/admin/daily/reset-password", json={"subject_id": "tenant-9"}
-            )
+            r = self.client.post("/api/admin/daily/reset-password", json={"subject_id": "tenant-9"})
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertEqual(body["username"], "boss")
@@ -458,9 +442,7 @@ class ResetPasswordTests(unittest.TestCase):
                 "is_allowlisted",
                 return_value=True,
             ),
-            mock.patch.object(
-                admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
-            ),
+            mock.patch.object(admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)),
             mock.patch.object(
                 admin_daily_routes.db,
                 "find_user_by_id",
@@ -483,14 +465,10 @@ class ResetPasswordTests(unittest.TestCase):
                 "is_allowlisted",
                 return_value=True,
             ),
-            mock.patch.object(
-                admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
-            ),
+            mock.patch.object(admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)),
             mock.patch.object(admin_daily_routes.db, "find_user_by_id", return_value=None),
         ):
-            r = self.client.post(
-                "/api/admin/daily/reset-password", json={"subject_id": "ghost-id"}
-            )
+            r = self.client.post("/api/admin/daily/reset-password", json={"subject_id": "ghost-id"})
         self.assertEqual(r.status_code, 404)
         self.assertEqual(r.json()["detail"], "admin.daily_subject_unknown")
 
@@ -502,9 +480,7 @@ class ResetPasswordTests(unittest.TestCase):
                 "is_allowlisted",
                 return_value=True,
             ),
-            mock.patch.object(
-                admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
-            ),
+            mock.patch.object(admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)),
             mock.patch.object(
                 admin_daily_routes.db,
                 "find_user_by_id",

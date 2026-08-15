@@ -25,8 +25,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        """
+    op.execute("""
         CREATE TABLE IF NOT EXISTS daily_entries (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id uuid NOT NULL,
@@ -37,8 +36,7 @@ def upgrade() -> None:
             created_at timestamptz NOT NULL DEFAULT now(),
             updated_at timestamptz NOT NULL DEFAULT now()
         )
-        """
-    )
+        """)
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_daily_entries_tenant_date "
         "ON daily_entries (tenant_id, entry_date)"

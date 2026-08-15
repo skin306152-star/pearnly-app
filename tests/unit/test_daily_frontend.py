@@ -117,8 +117,12 @@ class DailyPureFunctionsTest(unittest.TestCase):
             "  feb: d.weekBounds(2027, 2, 5)"
             "}))"
         )
-        self.assertEqual(out["w1"], {"startDay": 1, "endDay": 7, "min": "2026-09-01", "max": "2026-09-07"})
-        self.assertEqual(out["w5"], {"startDay": 29, "endDay": 30, "min": "2026-09-29", "max": "2026-09-30"})
+        self.assertEqual(
+            out["w1"], {"startDay": 1, "endDay": 7, "min": "2026-09-01", "max": "2026-09-07"}
+        )
+        self.assertEqual(
+            out["w5"], {"startDay": 29, "endDay": 30, "min": "2026-09-29", "max": "2026-09-30"}
+        )
         self.assertEqual(out["feb"]["endDay"], 28, "2027-02 非闰年 · 第5周止于 28")
 
     def test_month_options_cover_last_13_months_ending_current(self):

@@ -11,6 +11,7 @@ import unittest
 from unittest import mock
 
 from routes import line_liff_routes as liff
+from routes import line_dms_booking_edit_routes as dms_edit
 from core.pos_api import PosError
 
 
@@ -73,6 +74,27 @@ class LiffAuthRouteTests(unittest.TestCase):
             res = asyncio.run(liff.api_liff_auth(liff.LiffAuthIn(id_token="ok")))
         self.assertEqual(res["data"]["token"], "JWT-XYZ")
 
+    def test_dms_bound_user_gets_dms_scoped_token(self):
+        binding = {"line_user_id": "L1", "user_id": "u1", "tenant_id": "t1"}
+        user = {
+            "id": "u1",
+            "username": "sale02",
+            "plan": "free",
+            "tenant_id": "t1",
+            "role": "member",
+            "is_active": True,
+        }
+        with (
+            mock.patch.object(dms_edit, "_verify_id_token", return_value={"sub": "L1"}) as verify,
+            mock.patch("services.line_dms.store.get_binding_by_line_user", return_value=binding),
+            mock.patch.object(dms_edit.db, "find_user_by_id", return_value=user),
+            mock.patch.object(dms_edit, "create_access_token", return_value="DMS-JWT") as issue,
+        ):
+            res = asyncio.run(dms_edit.dms_booking_liff_auth(liff.LiffAuthIn(id_token="ok")))
+        verify.assert_called_once_with("ok", "LINE_DMS_LIFF_ID")
+        self.assertEqual(res["data"]["token"], "DMS-JWT")
+        self.assertEqual(issue.call_args.kwargs["entry"], "dms")
+
 
 class LiffEntryRedirectTests(unittest.TestCase):
     """LIFF 深链入口跳 /home 带参(PO-4):doc → 复核屏该单(待归类已下线)。"""
@@ -81,6 +103,28 @@ class LiffEntryRedirectTests(unittest.TestCase):
         res = asyncio.run(liff.liff_purchase_entry("D1", None))
         self.assertEqual(res.status_code, 302)
         self.assertEqual(res.headers["location"], "/home?liff=purchase&doc=D1")
+
+    def test_dms_booking_entry_serves_built_shell_without_cache(self):
+        res = asyncio.run(dms_edit.liff_dms_booking_entry())
+        self.assertTrue(str(res.path).endswith("static\\dist\\dms-booking-edit.html"))
+        self.assertIn("no-store", res.headers["cache-control"])
+
+
+class DmsBookingAsyncTripwireTests(unittest.TestCase):
+    def test_draft_loader_runs_off_event_loop(self):
+        def blocking_load(user, nonce):
+            with self.assertRaises(RuntimeError):
+                asyncio.get_running_loop()
+            return {"form": {}, "masters": {}}
+
+        with (
+            mock.patch.object(
+                dms_edit, "_authorize", new=mock.AsyncMock(return_value={"id": "U1"})
+            ),
+            mock.patch("services.line_dms.booking_edit.load", side_effect=blocking_load),
+        ):
+            response = asyncio.run(dms_edit.dms_booking_draft(mock.Mock(), "N1"))
+        self.assertTrue(response["ok"])
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from decimal import Decimal
+import os
 from typing import Any, Dict, List, Optional
 
 from services.erp.erp_dms_push import _DMS_FRIENDLY
@@ -71,6 +72,7 @@ BTN_MORE_ADD = "เพิ่มช่องทาง"
 TXT_NEED_SLIP = "มีช่องทางเงินโอน กรุณาส่งสลิปโอนเงินก่อนดูสรุปครับ"
 TXT_PREVIEW_TITLE = "สรุปใบจอง — ตรวจสอบก่อนยืนยัน"
 BTN_CONFIRM = "ยืนยัน"
+BTN_EDIT = "แก้ไข"
 BTN_DISCARD = "ทิ้ง"
 TXT_SLIP_ONLY_IMAGE = "ขั้นนี้ต้องการรูปสลิปครับ ส่งเป็นรูปภาพ หรือพิมพ์ เงินสด ถ้าไม่มีการโอน"
 # 逐问/确认态收到的非本步文本或图片,不覆写会话、不推 OCR——只说继续点卡(接线层用)。
@@ -96,6 +98,9 @@ TXT_ADVISOR_BLOCK_NO_USER = (
 
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。
 LBL_CUSTOMER = "ลูกค้า"
+LBL_ADDRESS = "ที่อยู่"
+LBL_POSTCODE = "รหัสไปรษณีย์"
+LBL_PHONE = "เบอร์โทรลูกค้า"
 LBL_ADVISOR = "ที่ปรึกษาการขาย"
 LBL_PLACE = "สถานที่รับจอง"
 LBL_CAR = "รุ่น/สี"
@@ -287,6 +292,38 @@ def _regis_line(answers: Dict[str, Any]) -> str:
     return regis or name or "—"
 
 
+def _edit_url(nonce: str) -> str:
+    liff_id = os.getenv("LINE_DMS_LIFF_ID", "").strip() or os.getenv("LINE_LIFF_ID", "").strip()
+    if liff_id:
+        return f"https://liff.line.me/{liff_id}?draft={nonce}"
+    base = (os.getenv("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
+    return f"{base}/liff/dms-booking?draft={nonce}"
+
+
+def _uri_btn(label: str, uri: str) -> Dict[str, Any]:
+    return {
+        "type": "button",
+        "style": "secondary",
+        "height": "sm",
+        "action": {"type": "uri", "label": label, "uri": uri},
+    }
+
+
+def _address_line(draft: Dict[str, Any]) -> str:
+    parts = [
+        draft.get("house_no"),
+        draft.get("building"),
+        draft.get("village"),
+        draft.get("moo"),
+        draft.get("soi"),
+        draft.get("road"),
+        draft.get("subdistrict_name"),
+        draft.get("district_name"),
+        draft.get("province_name"),
+    ]
+    return " ".join(str(part).strip() for part in parts if str(part or "").strip()) or "—"
+
+
 def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     """逐问结束的汇总卡:全部答案 + 各渠道金额 + 合计 + 附件两行 + 确认/丢弃。
 
@@ -297,8 +334,12 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     files = qa.get("files") or {}
     payments = qa.get("payments") or []
     advisor = str((qa.get("advisor") or {}).get("name") or "")
+    draft = qa.get("draft") or {}
     rows: List[Dict[str, Any]] = [
         _kv_row(LBL_CUSTOMER, str((qa.get("customer") or {}).get("name") or "")),
+        _kv_row(LBL_ADDRESS, _address_line(draft)),
+        _kv_row(LBL_POSTCODE, str(draft.get("zipcode") or draft.get("zipcode_name") or "")),
+        _kv_row(LBL_PHONE, str(draft.get("phone") or "")),
         # 顾问 = 提成归属,确认前让销售自己看一眼落在谁头上;没匹配上时开局就拦了,不会到这。
         *([_kv_row(LBL_ADVISOR, advisor)] if advisor else []),
         _kv_row(LBL_PLACE, str((answers.get("place") or {}).get("name") or "")),
@@ -320,6 +361,7 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     rows.append(_kv_row(LBL_ATTACH_SLIP, VAL_ATTACHED if files.get("slip_mid") else "—"))
     footer = [
         _btn(BTN_CONFIRM, _data(ACT_CONFIRM_BOOKING, nonce=nonce), "primary"),
+        _uri_btn(BTN_EDIT, _edit_url(nonce)),
         _btn(BTN_DISCARD, _data(ACT_CANCEL_BOOKING), "secondary"),
     ]
     return _bubble(TXT_PREVIEW_TITLE, rows, footer, TXT_PREVIEW_TITLE)

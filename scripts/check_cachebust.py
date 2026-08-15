@@ -95,6 +95,14 @@ _ENTRY_ASSETS = {
         "/static/dms/dms-i18n.js",
         *(f"/static/dms/dms-i18n-{lang}.js" for lang in ("zh", "th", "en", "ja")),
     ),
+    "static/dms-booking-edit/dms-booking-edit.html": (
+        "/static/pearnly-ui.css",
+        "/static/dms-booking-edit/dms-booking-edit.css",
+        "/static/dms-booking-edit/dms-booking-i18n.js",
+        "/static/dms-booking-edit/dms-booking-api.js",
+        "/static/dms-booking-edit/dms-booking-language.js",
+        "/static/dms-booking-edit/dms-booking-edit.js",
+    ),
     # POS 是在卖钱的产品,它这 5 个带指纹的产物此前一个都没被守(2026-07-25 覆盖率测试照出来)。
     "static/pos/pos.html": (
         "/static/dist/pos.js",

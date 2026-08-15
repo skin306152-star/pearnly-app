@@ -14,6 +14,8 @@
 | `/admin/*` Earn 后台 | `static/dist/admin.html` | `static/admin/admin.html/.js/admin-i18n.js` | **改 admin.js/i18n 必 bump admin.html 里 `?v`**(CDN 按旧键回旧文件·缓存闸盲区)+ build 出 dist/admin.html |
 | `/ai` `/console` `/invite` `/reset` `/terms` `/privacy` | 各自 `static/dist/*.html` | `static/ai/ai.html` / `static/console/*.html` / 根 `reset.html` / `static/terms\|privacy.html` | 全部源→产物映射的唯一权威=`scripts/build-html-minify.mjs` 的 TARGETS |
 
+| `/liff/dms-booking` LINE 订车编辑 | `static/dist/dms-booking-edit.html` | `static/dms-booking-edit/*` | 改 JS/CSS 必须 bump 源 HTML 的 `?v` + build；数据 API 需 DMS JWT + `booking_review` nonce |
+
 **三条硬规**
 
 1. 新对外页面必进 `scripts/build-html-minify.mjs` 的 TARGETS + 外壳闸测试(`test_page_shell_minified`·响应 ≤3 行)+ 路由契约表(`test_pages_routes_contract`)。

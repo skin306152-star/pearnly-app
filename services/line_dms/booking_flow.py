@@ -164,6 +164,10 @@ def _book_in_session(
         from services.erp.mrerp_dms_booking_customer import card_from_customer
         from services.erp.mrerp_dms_company_banks import validate_company_bank_payments
 
+        if qa.get("customer_dirty"):
+            draft = dict(qa.get("draft") or {})
+            draft["name"] = str((qa.get("customer") or {}).get("name") or "")
+            cl.save_customer(fields=draft, mode="overwrite", customer_id=customer_id)
         master_card = card_from_customer(
             cl,
             customer_id=customer_id,
@@ -210,9 +214,17 @@ def _card_payload(payload: dict):
     address = ThaiAddress(
         house_no=str(d.get("house_no") or ""),
         province_id=str(d.get("province_id") or ""),
+        province_name=str(d.get("province_name") or ""),
         district_id=str(d.get("district_id") or ""),
+        district_name=str(d.get("district_name") or ""),
         subdistrict_id=str(d.get("subdistrict_id") or ""),
+        subdistrict_name=str(d.get("subdistrict_name") or ""),
         zipcode_id=str(d.get("zipcode_id") or ""),
+        zipcode=str(d.get("zipcode") or d.get("zipcode_name") or ""),
+        building=str(d.get("building") or ""),
+        floor=str(d.get("floor") or ""),
+        room=str(d.get("room") or ""),
+        village=str(d.get("village") or ""),
         moo=str(d.get("moo") or ""),
         soi=str(d.get("soi") or ""),
         road=str(d.get("road") or ""),

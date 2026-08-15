@@ -29,13 +29,15 @@ router = APIRouter(tags=["line-liff"])
 _VERIFY_ENDPOINT = "https://api.line.me/oauth2/v2.1/verify"
 
 
-def _verify_id_token(id_token: str) -> Optional[dict]:
+def _verify_id_token(id_token: str, liff_env: str = "LINE_LIFF_ID") -> Optional[dict]:
     """LINE 验 LIFF id_token。返回 claims 或 None。
 
     audience = LIFF 所属 LINE Login 频道 = LINE_LIFF_ID 前缀(与网页登录频道 LINE_LOGIN_CHANNEL_ID
     分开·别用错频道否则 aud 不匹配验签必败)。无 LIFF_ID 才回退网页登录频道。
     """
-    liff_id = os.getenv("LINE_LIFF_ID", "").strip()
+    liff_id = os.getenv(liff_env, "").strip()
+    if not liff_id and liff_env == "LINE_DMS_LIFF_ID":
+        liff_id = os.getenv("LINE_LIFF_ID", "").strip()
     channel_id = (
         liff_id.split("-")[0] if liff_id else os.getenv("LINE_LOGIN_CHANNEL_ID", "").strip()
     )

@@ -440,3 +440,37 @@ def consume_nonce(tenant_id, line_user_id: str, expect_state: str, nonce: str) -
         return None
     set_session(tenant_id, line_user_id, expect_state, {**payload, "nonce": None})
     return payload
+
+
+def replace_review_payload(
+    tenant_id, line_user_id: str, expected_nonce: str, payload: dict
+) -> bool:
+    """Replace one booking review draft and rotate its nonce in one guarded write."""
+    from core import db
+
+    if not expected_nonce or not payload.get("nonce"):
+        return False
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
+            cur.execute(
+                "UPDATE dms_line_sessions SET payload = %s::jsonb, "
+                "expires_at = now() + make_interval(mins => %s) "
+                "WHERE tenant_id = %s AND line_user_id = %s "
+                "AND state = 'booking_review' AND expires_at > now() "
+                "AND payload->>'nonce' = %s",
+                (
+                    json.dumps(payload, ensure_ascii=False),
+                    state_ttl_minutes("booking_review"),
+                    str(tenant_id),
+                    str(line_user_id),
+                    expected_nonce,
+                ),
+            )
+            return cur.rowcount == 1
+
+    try:
+        return bool(_with_heal(_run))
+    except Exception:
+        logger.warning("[line_dms] replace review failed", exc_info=True)
+        return False

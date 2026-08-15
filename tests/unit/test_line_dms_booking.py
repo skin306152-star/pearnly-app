@@ -61,6 +61,10 @@ class _FakeClient:
         self.rec["card"] = card
         return _FakeBooking()
 
+    def save_customer(self, **kwargs):
+        self.rec["customer_save"] = kwargs
+        return kwargs.get("customer_id"), False
+
     def create_booking_via_form(self, *, customer_id, booking, card):
         self.rec["customer_id"] = customer_id
         self.rec["booking"] = booking
@@ -151,6 +155,36 @@ class _Env:
 
 
 class BookingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_browser_customer_edits_are_written_before_booking(self):
+        rec = {}
+
+        def fake_run(ep, do):
+            return do(_FakeClient(rec), object())
+
+        qa = _qa_payload(
+            customer_dirty=True,
+            customer={"id": "C1", "name": "แก้แล้ว"},
+            draft={"people_id": "1101700998118", "phone": "0899999999"},
+        )
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload({"qa": qa}),
+            ),
+            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB"]],
+            ),
+        ):
+            result = bf._book_in_session({"id": "E1", "config": {}}, {"qa": qa})
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(rec["customer_save"]["fields"]["name"], "แก้แล้ว")
+        self.assertEqual(rec["customer_save"]["fields"]["phone"], "0899999999")
+        self.assertEqual(rec["customer_save"]["mode"], "overwrite")
+
     async def test_d4_confirm_creates_booking_and_logs(self):
         result = {
             "ok": True,

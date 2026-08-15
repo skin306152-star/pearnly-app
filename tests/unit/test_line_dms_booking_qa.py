@@ -512,8 +512,10 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(actions[0]["label"], qa_cards.BTN_CONFIRM)
             self.assertIn("action=confirm_booking", actions[0]["data"])
             self.assertIn("nonce=", actions[0]["data"])
-            self.assertEqual(actions[1]["label"], qa_cards.BTN_DISCARD)
-            self.assertIn("action=cancel_booking", actions[1]["data"])
+            self.assertEqual(actions[1]["label"], qa_cards.BTN_EDIT)
+            self.assertIn("/dms-booking", actions[1]["uri"])
+            self.assertEqual(actions[2]["label"], qa_cards.BTN_DISCARD)
+            self.assertIn("action=cancel_booking", actions[2]["data"])
 
     def test_preview_shows_selected_company_bank_for_transfer(self):
         card = qa_cards.preview_card(

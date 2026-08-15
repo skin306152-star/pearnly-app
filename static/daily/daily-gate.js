@@ -67,7 +67,7 @@
         });
     }
 
-    function submitLogin(username, password) {
+    function submitLogin(username, password, remember) {
         var u = String(username == null ? '' : username).trim();
         var p = String(password == null ? '' : password);
         if (!u || !p) {
@@ -76,7 +76,9 @@
         }
         api('/api/login', {
             method: 'POST',
-            json: { username: u, password: p, entry: 'daily' },
+            // remember_me=true → token 30 天;不勾 → 12 小时会话级(登录卡默认勾选
+            // 「记住登录」= 打开即自动登录,符合手机个人应用减摩擦)。
+            json: { username: u, password: p, entry: 'daily', remember_me: !!remember },
         }).then(function (res) {
             if (res.status === 200 && res.body && res.body.token) {
                 saveToken(res.body.token);
@@ -104,7 +106,7 @@
             if (form) {
                 form.addEventListener('submit', function (ev) {
                     ev.preventDefault();
-                    submitLogin(form.username.value, form.password.value);
+                    submitLogin(form.username.value, form.password.value, form.remember.checked);
                 });
             }
         }
@@ -136,6 +138,8 @@
                 '<form class="gate-form">' +
                 '<input name="username" autocomplete="username" data-i18n-placeholder="daily.gate.username">' +
                 '<input name="password" type="password" autocomplete="current-password" data-i18n-placeholder="daily.gate.password">' +
+                '<label class="gate-remember"><input type="checkbox" name="remember" checked>' +
+                '<span data-i18n="daily.gate.remember"></span></label>' +
                 '<p class="gate-error" id="gateError"></p>' +
                 '<button type="submit" data-i18n="daily.gate.login"></button>' +
                 '</form></div>'

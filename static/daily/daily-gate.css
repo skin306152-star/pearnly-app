@@ -98,6 +98,23 @@
   color: var(--daily-terra);
 }
 
+.gate-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--daily-ink-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.gate-remember input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--daily-emerald);
+  cursor: pointer;
+}
+
 .gate-logout {
   margin-top: 12px;
   border: 0;

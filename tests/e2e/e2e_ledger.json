@@ -1043,9 +1043,7 @@
         "static/dms-booking-edit/dms-booking-edit.html",
         "static/dms-booking-edit/dms-booking-edit.css"
       ],
-      "only_e2e": [
-        "390px 手机视口下付款删除按钮、金额输入框与附件勾选框的真实浏览器布局和对齐"
-      ]
+      "only_e2e": ["390px 手机视口下付款删除按钮、金额输入框与附件勾选框的真实浏览器布局和对齐"]
     },
     "_a1_discount_inferred_verify.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],

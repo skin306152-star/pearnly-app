@@ -1,0 +1,23 @@
+{
+  "scenario": "existing customer selected by citizen ID before booking",
+  "result": "PASS",
+  "booking_no": "BK000002608000022",
+  "booking_id": "56",
+  "customer_id": "107",
+  "address": {
+    "house_no": "921064/W4",
+    "province_id": "1",
+    "province_name": "กรุงเทพมหานคร",
+    "district_id": "18",
+    "district_name": "คลองสาน",
+    "subdistrict_id": "72",
+    "subdistrict_name": "คลองต้นไทร",
+    "zipcode_id": "197",
+    "zipcode": "10600"
+  },
+  "checks": {
+    "transfer_booking_full_chain": "PASS",
+    "nonce_replay_did_not_duplicate_booking": "PASS",
+    "address_ids_and_visible_names_read_back_from_dms": "PASS"
+  }
+}

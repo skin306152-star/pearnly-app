@@ -191,6 +191,13 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: (
+                    rec.__setitem__("customer_lookup", (customer_id, people_id))
+                    or bf._card_payload(_review())
+                ),
+            ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
         ):
             res = bf._book_in_session(
@@ -227,6 +234,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(d.term_sale_id, "t1")
         self.assertEqual(d.regis_behalf_id, "r1")
         self.assertEqual(rec["customer_id"], "C1")
+        self.assertEqual(rec["customer_lookup"], ("C1", "1234567890121"))
         b = rec["booking"]
         self.assertEqual(b.delivery_date_be, "01/01/2570")  # 逐问交车日覆盖
         self.assertEqual(b.regis_name, "บริษัท สมชาย จำกัด")
@@ -272,6 +280,10 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
+            ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
         ):
             qa = _qa_payload()

@@ -260,6 +260,8 @@ class DMSClientIntakeMixin:
     # ── 内部 ────────────────────────────────────────────────────────
     def _extract_customer_fields(self, data: Dict[str, str], form_html: str = "") -> Dict[str, str]:
         out = {fk: data.get(dms, "") for fk, dms in _IDENTITY_MAP.items()}
+        if form_html:
+            out["prefix_name"] = self._geo_label(form_html, "selprefix", out["prefix_id"])
         # 三套地址各自抽出(户籍 ""·联系 _ct·寄送 _sd),供全字段表单分区显示。
         for sfx in _ADDR_SUFFIXES:
             for fk, dms in _ADDR_MAP.items():

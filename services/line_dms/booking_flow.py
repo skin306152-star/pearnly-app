@@ -161,7 +161,14 @@ def _book_in_session(
     customer_id = str((qa.get("customer") or {}).get("id") or "")
 
     def _do(cl, adapter):
-        booking = cl.resolve_booking_payload(defaults, card)
+        from services.erp.mrerp_dms_booking_customer import card_from_customer
+
+        master_card = card_from_customer(
+            cl,
+            customer_id=customer_id,
+            people_id=card.people_id,
+        )
+        booking = cl.resolve_booking_payload(defaults, master_card)
         if delivery_be:
             booking = dataclasses.replace(
                 booking,
@@ -170,7 +177,7 @@ def _book_in_session(
                 payments=tuple(qa.get("payments") or []),
             )
         booking_id, booking_no = cl.create_booking_via_form(
-            customer_id=customer_id, booking=booking, card=card
+            customer_id=customer_id, booking=booking, card=master_card
         )
         attached = 0
         failed = list(attach_failed or [])

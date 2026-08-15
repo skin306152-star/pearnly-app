@@ -114,6 +114,7 @@ class LiffEntryRedirectTests(unittest.TestCase):
         paths = {route.path for route in dms_edit.router.routes}
         self.assertIn("/liff/dms-booking", paths)
         self.assertIn("/login/dms-booking", paths)
+        self.assertIn("/home/dms-booking", paths)
 
 
 class DmsBookingAsyncTripwireTests(unittest.TestCase):

@@ -46,12 +46,32 @@ class PortalRouteTest(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.headers["location"],
-            "/login/dms-booking?draft=nonce%20with%20spaces",
+            "/home/dms-booking?draft=nonce%20with%20spaces",
+        )
+
+    def test_home_routes_liff_booking_draft_to_editor(self):
+        response = self.client.get(
+            "/home",
+            params={"liff.state": "?draft=real-line-nonce"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers["location"],
+            "/home/dms-booking?draft=real-line-nonce",
         )
 
     def test_login_ignores_unrelated_liff_state(self):
         response = self.client.get(
             "/login",
+            params={"liff.state": "?screen=home"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_home_ignores_unrelated_liff_state(self):
+        response = self.client.get(
+            "/home",
             params={"liff.state": "?screen=home"},
             follow_redirects=False,
         )

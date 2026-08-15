@@ -120,18 +120,30 @@ async def root():
 async def login_page(
     liff_state: Annotated[str, Query(alias="liff.state")] = "",
 ):
+    redirect = _dms_booking_redirect(liff_state)
+    if redirect:
+        return redirect
+    return FileResponse("static/dist/login.html", headers=_NO_CACHE)
+
+
+def _dms_booking_redirect(liff_state: str) -> RedirectResponse | None:
     state = str(liff_state or "").lstrip("?")
     draft = (parse_qs(state).get("draft") or [""])[0].strip()
     if draft:
         return RedirectResponse(
-            url=f"/login/dms-booking?draft={quote(draft, safe='')}",
+            url=f"/home/dms-booking?draft={quote(draft, safe='')}",
             status_code=302,
         )
-    return FileResponse("static/dist/login.html", headers=_NO_CACHE)
+    return None
 
 
 @router.get("/home", response_class=HTMLResponse)
-async def home():
+async def home(
+    liff_state: Annotated[str, Query(alias="liff.state")] = "",
+):
+    redirect = _dms_booking_redirect(liff_state)
+    if redirect:
+        return redirect
     # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版
     return FileResponse("static/dist/home.html", headers=_NO_CACHE)
 

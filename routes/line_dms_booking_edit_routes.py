@@ -26,6 +26,7 @@ class DmsBookingSaveIn(BaseModel):
     form: Dict[str, Any] = Field(default_factory=dict)
 
 
+@router.get("/home/dms-booking")
 @router.get("/login/dms-booking")
 @router.get("/liff/dms-booking")
 async def liff_dms_booking_entry():

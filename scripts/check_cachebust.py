@@ -103,6 +103,12 @@ _ENTRY_ASSETS = {
         "/static/dms-booking-edit/dms-booking-language.js",
         "/static/dms-booking-edit/dms-booking-edit.js",
     ),
+    "static/daily/daily.html": (
+        "/static/daily/daily.webmanifest",
+        "/static/dist/daily.css",
+        "/static/daily/daily-i18n.js",
+        "/static/dist/daily.js",
+    ),
     # POS 是在卖钱的产品,它这 5 个带指纹的产物此前一个都没被守(2026-07-25 覆盖率测试照出来)。
     "static/pos/pos.html": (
         "/static/dist/pos.js",

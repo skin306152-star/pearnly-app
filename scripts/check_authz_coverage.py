@@ -39,6 +39,9 @@ PUBLIC_ROUTES = {
     ("GET", "/cashier/{rest:path}"),
     ("GET", "/dms"),
     ("GET", "/dms/{rest:path}"),
+    ("GET", "/daily"),
+    ("GET", "/daily/{rest:path}"),
+    ("GET", "/daily-sw.js"),  # Daily PWA shell; invitation and tenant checks live in its APIs
     ("GET", "/earn"),
     ("GET", "/cashier-sw.js"),  # PWA Service Worker 脚本(公开静态 · 同 /pos-sw.js)
     ("GET", "/invite/{token}"),

@@ -18,6 +18,10 @@ _REEXPORTS = {
     "services.sales.schema": [
         "ensure_sales_rls",
     ],
+    "services.daily.schema": [
+        "ensure_daily_tables",
+        "ensure_daily_rls",
+    ],
     "services.knowledge.rules_dal": [
         "ensure_client_rules_rls",
     ],

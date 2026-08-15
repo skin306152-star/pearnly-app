@@ -32,6 +32,7 @@ _ENROLLS = (
     "ensure_knowledge_rls",
     "ensure_settings_misc_rls",
     "ensure_erp_credentials_rls",
+    "ensure_daily_rls",
 )
 
 

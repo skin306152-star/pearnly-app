@@ -84,6 +84,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_bank_recon_v2_table, "bank_recon_v2 建表"),
         (db.ensure_platform_settings, "platform_settings 钥匙闸建表"),
         (ensure_ai_usage_table, "ai_usage 建表+归因列"),
+        (db.ensure_daily_tables, "daily_entries 建表"),
     ]
     for ensure_fn, label in boot_ensures:
         try:

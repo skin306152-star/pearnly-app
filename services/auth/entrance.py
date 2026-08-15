@@ -9,6 +9,7 @@
   - pos  : 开通了 pos 模块(Earn 发放)
   - ai   : 在 pearnly_ai_m1 白名单(Earn 邀请)
   - dms  : 在 dms_portal 白名单(Earn 邀请 · MR.ERP 身份证订车单入口)
+  - daily: 在 daily_finance 白名单(Earn 邀请 · 个人周记账应用)
 
 超管任意门放行(平台运营);回退闸 entrance_gate 关时一律不拦(上线前/回退=现状,任何门都通);
 推导异常一律 fail-open —— 登录可用性优先,绝不因基建抖动把人锁在门外(与 auth.py 改密比对同款容错)。
@@ -27,7 +28,8 @@ MAIN = "main"
 POS = "pos"
 AI = "ai"
 DMS = "dms"
-ALL_ENTRANCES = (MAIN, POS, AI, DMS)
+DAILY = "daily"
+ALL_ENTRANCES = (MAIN, POS, AI, DMS, DAILY)
 
 # 权限码前缀 → 允许的登录入口【集合】(Phase3 API 作用域闸的判据 · 按前缀判、不按 URL 判:
 # tax_profile_routes 是 AI 接口却寄生 /api/workspace 路径)。一码可跨多门——业务功能被多个壳
@@ -115,12 +117,18 @@ def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
         if store.is_enabled(cur, tenant_id=tenant_id, module_key="pos"):
             ents.add(POS)
 
-    from core.feature_flags import dms_portal_enabled_for, pearnly_ai_m1_enabled_for
+    from core.feature_flags import (
+        daily_enabled_for,
+        dms_portal_enabled_for,
+        pearnly_ai_m1_enabled_for,
+    )
 
     if pearnly_ai_m1_enabled_for(tenant_id, user_id):
         ents.add(AI)
     if dms_portal_enabled_for(tenant_id, user_id):
         ents.add(DMS)
+    if daily_enabled_for(tenant_id, user_id):
+        ents.add(DAILY)
     return ents
 
 

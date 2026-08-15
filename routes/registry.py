@@ -42,6 +42,7 @@ from routes.console_roles_routes import router as console_roles_router
 from routes.console_team_routes import router as console_team_router
 from routes.dms_roster_routes import router as dms_roster_router
 from routes.dms_routes import router as dms_router
+from routes.daily_routes import router as daily_router
 from routes.email_ingest_routes import router as email_ingest_router
 from routes.erp_agent import router as erp_agent_router
 from routes.erp_bridge_routes import router as erp_bridge_router
@@ -195,6 +196,7 @@ ROUTERS = (
     companion_installer_router,  # 小助手安装包下载
     dms_router,  # MR.ERP DMS · 身份证→订车单
     dms_roster_router,  # DMS 操作员花名册(owner-only)
+    daily_router,  # Daily 周记账(daily_finance 闸 · 每用户独立租户隔离)
     line_dms_webhook_router,  # DMS 独立 LINE OA webhook
     admin_users_router,
     history_router,  # OCR 历史(含 assign_client)

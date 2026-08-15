@@ -82,6 +82,13 @@ DMS_PORTAL_KEY = "dms_portal"
 # 绑定 + 收发。判定域=账套主体归属(有 tenant_id 走 tenant · 个人套账退回 user_id),与
 # dms_portal 同口径。消费在 routes/line_dms_webhook_routes(webhook)与 routes/dms_routes(DMS 闸)。
 DMS_LINE_KEY = "dms_line"
+# Daily 周记账入口邀请闸(个人收入/支出记录应用 · pearnly.com/daily · 照 dms_portal
+# 邀请制范式):默认关 fail-closed。关 = /daily 登录准入不含该门、/api/daily/* 四端点 404;
+# 开 = 被邀请租户(每受邀用户经 create_owner_user 建号得独立租户)从 /daily 门登录 +
+# 数据端点放行。判定域=账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回
+# user_id · 与 pearnly_ai_m1 同口径)。消费在 services/auth/entrance._derive_entrances
+# (登录准入)与 routes/daily_routes._authorize(API 守卫)。
+DAILY_KEY = "daily_finance"
 # POS 退货/作废店长授权闸(PS-1 · 防内盗):默认关。关 → 退货/作废路由逐字节走历史
 # (任何持效 POS 令牌的收银员都能退,现网 metta 行为不变);开 → 操作者须持 pos.refund.approve,
 # 收银员无此码 → 必须店长 PIN 覆盖(校验店长确有该码)才放行,并把授权人写进审计。
@@ -289,6 +296,16 @@ def dms_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> 
     按账套主体归属判定(有 tenant_id 用 tenant · 个人套账退回 user_id),与 pearnly_ai_m1 同口径。
     """
     return _enabled(DMS_PORTAL_KEY, tenant_id or user_id, "dms_portal_enabled_for")
+
+
+def daily_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
+    """Daily 周记账入口邀请闸。关 = /api/daily/* 四端点 404、/daily 登录准入不含该门。
+
+    判定域=账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回 user_id),与
+    pearnly_ai_m1 同口径。消费在 services/auth/entrance._derive_entrances(登录准入)
+    与 routes/daily_routes._authorize(API 守卫)。
+    """
+    return _enabled(DAILY_KEY, tenant_id or user_id, "daily_enabled_for")
 
 
 def dms_line_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:

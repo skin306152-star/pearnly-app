@@ -14,6 +14,7 @@ from services.erp.mrerp_dms_client_ops import (
     _bump_docno,
     _is_duplicate_docno_error,
 )
+from services.erp.mrerp_dms_docno import listing_docnos
 
 _DUP_BODY = 'err::"เลขที่ใบจอง" ซ้ำ'
 
@@ -42,14 +43,19 @@ class _FakeTransport:
 class _FakeClient(DMSClientOpsMixin):
     """只保留单号重试路径所需的依赖,其余桩掉。"""
 
-    def __init__(self, transport, start_docno):
+    def __init__(self, transport, start_docno, listing_docnos=()):
         self.transport = transport
         self._start = start_docno
+        self.listing_docnos = tuple(listing_docnos)
+        self.listing_requests = []
 
     def _url(self, p):
         return "http://dms.test/" + p
 
     def _post_text(self, path, data=None):
+        if path.endswith("showdata.php"):
+            self.listing_requests.append(dict(data or {}))
+            return "".join(f"<p>{value}</p>" for value in self.listing_docnos)
         return "<form></form>"
 
     def _parse_form_defaults(self, html):
@@ -93,7 +99,22 @@ class TestDuplicateDetect(unittest.TestCase):
         self.assertFalse(_is_duplicate_docno_error('err::"something else" failed'))
 
 
+class TestListingDocnos(unittest.TestCase):
+    def test_only_accepts_same_prefix_and_digit_width(self):
+        body = "<p>BK2608000001</p><p>BK2608000025</p><p>PN2608000099</p><p>BK260800123</p>"
+        self.assertEqual(listing_docnos(body, "BK2608", 6), {"BK2608000001", "BK2608000025"})
+
+
 class TestBookingDocnoRetry(unittest.TestCase):
+    def test_starts_after_latest_docno_from_listing(self):
+        used = [f"BK2608{str(i).zfill(6)}" for i in range(1, 26)]
+        tr = _FakeTransport(used)
+        cl = _FakeClient(tr, "BK2608000001", listing_docnos=used)
+        bid, bno = cl.create_booking_via_form(customer_id="100", booking=_Booking(), card=object())
+        self.assertEqual((bid, bno), ("BID-BK2608000026", "BK2608000026"))
+        self.assertEqual(tr.posts, ["BK2608000026"])
+        self.assertEqual(cl.listing_requests[0]["sd"], "BK2608")
+
     def test_skips_used_numbers(self):
         used = ["BK2606000001", "BK2606000002", "BK2606000003"]
         tr = _FakeTransport(used)

@@ -11,7 +11,7 @@ import logging
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
-from services.erp import dms_employees
+from services.erp import dms_employees, mrerp_dms_docno
 from services.erp.mrerp_dms_models import (
     BookingDefaults,
     DMSBookingPayload,
@@ -31,7 +31,7 @@ _DRFCBC_MENULV = "2"
 # DMS autonum 计数器是按分店分段的,跟全局唯一约束会失步:它回的「下一个号」
 # 可能已被其它分店/历史单占用,提交即 err::"เลขที่ใบจอง" ซ้ำ(单号重复)。
 # 撞重复时往后顺号重试,跳过所有已占用号。
-_BOOKING_DOCNO_MAX_TRIES = 25
+_BOOKING_DOCNO_MAX_TRIES = mrerp_dms_docno.BOOKING_DOCNO_MAX_TRIES
 
 # 顾问名册翻页页大小(真机 probe:服务端尊重 bshsdamt,200 行一页覆盖单店全部销售)。
 _ADVISOR_PAGE_SIZE = 200
@@ -39,18 +39,12 @@ _ADVISOR_PAGE_SIZE = 200
 
 def _is_duplicate_docno_error(body: str) -> bool:
     """DMS 单号重复报错(err::"เลขที่ใบจอง" ซ้ำ)· ซ้ำ=泰语「重复」。"""
-    return body.startswith("err::") and "ซ้ำ" in body
+    return mrerp_dms_docno.is_duplicate_docno_error(body)
 
 
 def _bump_docno(docno: str) -> str:
     """末尾连续数字段 +1 并保持位宽:BK2606000001 → BK2606000002。无数字尾则补 1。"""
-    i = len(docno)
-    while i > 0 and docno[i - 1].isdigit():
-        i -= 1
-    head, tail = docno[:i], docno[i:]
-    if not tail:
-        return docno + "1"
-    return head + str(int(tail) + 1).zfill(len(tail))
+    return mrerp_dms_docno.bump_docno(docno)
 
 
 def row_by_id(rows: Optional[List[list]], rid: str) -> Optional[list]:
@@ -168,6 +162,8 @@ class DMSClientOpsMixin:
         self._apply_booking_form_fields(base, customer_id=customer_id, booking=booking, card=card)
 
         docno = self._next_booking_docno(booking.branch.id) or booking.booking_no
+        digits = getattr(self, "_booking_docno_digits", 6)
+        docno = mrerp_dms_docno.next_unoccupied_docno(docno, digits, self._post_text)
         last_body = ""
         for _ in range(_BOOKING_DOCNO_MAX_TRIES):
             data = dict(base)
@@ -198,6 +194,10 @@ class DMSClientOpsMixin:
             )
             if not cfg or cfg[0] is None or str(cfg[1]) != "1":
                 return ""
+            digits = int(cfg[3])
+            if digits <= 0:
+                return ""
+            self._booking_docno_digits = digits
             det = json.loads(
                 self._post_text(
                     "component/php/autonumdetail.php",

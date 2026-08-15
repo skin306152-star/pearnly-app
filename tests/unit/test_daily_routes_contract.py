@@ -45,10 +45,19 @@ class DailyRoutesContractTests(unittest.TestCase):
             {
                 ("GET", "/api/daily/session"),
                 ("GET", "/api/daily/entries"),
+                ("GET", "/api/daily/export"),
                 ("POST", "/api/daily/entries"),
                 ("DELETE", "/api/daily/entries/{entry_id}"),
             },
         )
+
+    def test_token_entry_whitelist_includes_daily(self):
+        """登录签发 token 的入口白名单必须含 daily —— 漏了会被 _normalize_entry
+        静默降级成 main,入口作用域闸 403 全端拒绝(E2E 踩过 · core/auth.py VALID_ENTRIES)。"""
+        from core import auth as auth_mod
+
+        self.assertIn("daily", auth_mod.VALID_ENTRIES)
+        self.assertEqual(auth_mod._normalize_entry("daily"), "daily")
 
 
 class DailyEntranceGuardTest(unittest.TestCase):

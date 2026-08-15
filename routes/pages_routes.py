@@ -233,6 +233,29 @@ async def dms_layout_page(rest: str):
     return FileResponse("static/dist/dms.html", headers=_NO_CACHE)
 
 
+# Pearnly Daily SPA(收支周记 · 邀请制独立入口)· 照 /dms 先例:友好路由指向打包壳,
+# 鉴权/闸判定在前端 daily.js boot() 跑(无 token/失效 → 内嵌登录卡 entry=daily;
+# daily_finance 闸 404 → 未受邀提示;5xx/断网 → 可重试故障态)。
+# 后端 /api/daily/* 按 token.entry='daily' 隔离(超管除外),闸 daily_finance 默认关。
+@router.get("/daily", response_class=HTMLResponse)
+async def daily_page():
+    return FileResponse("static/dist/daily.html", headers=_NO_CACHE)
+
+
+@router.get("/daily/{rest:path}", response_class=HTMLResponse)
+async def daily_layout_page(rest: str):
+    return FileResponse("static/dist/daily.html", headers=_NO_CACHE)
+
+
+@router.get("/daily-sw.js")
+async def daily_service_worker():
+    # Daily 离线外壳 SW:从根路径出 → 可注册 scope=/daily(断网重开壳)。缓存名前缀
+    # pearnly-daily-v 自持一族,与 pos/cashier 互不删除(照 cashier-sw 教训)。
+    return FileResponse(
+        "static/daily/daily-sw.js", media_type="application/javascript", headers=_NO_CACHE
+    )
+
+
 # POS 老板后台专属登录页(PS-5 · 主域路径 /pos · pos.pearnly.com 子域方案已废弃)。
 # 只有账号+密码(账号=用户名或邮箱),无 Google/LINE/注册。页头 guard:本机存过收银台绑定凭据(pos_store_token)→
 # 即跳 /cashier;否则渲染老板登录页。收银台 SPA 迁至 /cashier(见上)。不碰根路由 `/`(脸 0 门户在改)。

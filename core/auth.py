@@ -28,7 +28,7 @@ POS_STORE_TOKEN_TTL_DAYS = 365  # 设备店铺令牌(绑定一次长期用 · do
 # 登录入口(会话级)· token 烙 entry claim,壳与准入都认它,取代 per-browser localStorage 猜测。
 # main=会计站(自由注册即得) · pos=收银老板后台 · ai=Pearnly AI · dms=MR.ERP 订车单入口。
 # 未知值一律收敛回 main。新增门必进本白名单,否则登录 token 被 _normalize_entry 静默降级成 main。
-VALID_ENTRIES = ("main", "pos", "ai", "dms")
+VALID_ENTRIES = ("main", "pos", "ai", "dms", "daily")
 
 
 def _normalize_entry(entry: str) -> str:

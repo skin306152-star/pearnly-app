@@ -265,6 +265,9 @@ const DMS_CSS = [
     'dms/dms-roster.css',
 ];
 
+// Pearnly Daily SPA(独立设计语言:暖象牙/深墨绿/翠绿/陶土红/金 · 壳/门禁/弹窗三文件)。
+const DAILY_CSS = ['daily/daily.css', 'daily/daily-gate.css', 'daily/daily-form.css'];
+
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },
     { list: ADMIN_CSS, out: 'static/dist/admin.css' },
@@ -273,6 +276,7 @@ const BUNDLES = [
     { list: POS_CSS, out: 'static/dist/pos.css' },
     { list: AI_CSS, out: 'static/dist/ai.css' },
     { list: DMS_CSS, out: 'static/dist/dms.css' },
+    { list: DAILY_CSS, out: 'static/dist/daily.css' },
 ];
 
 async function buildOne(list, out) {

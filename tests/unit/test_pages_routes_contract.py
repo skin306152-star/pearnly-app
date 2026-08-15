@@ -49,6 +49,10 @@ EXPECTED = {
     # 批2 新增:Pearnly DMS SPA 友好路由(照 /ai 先例 · 出 static/dist/dms.html)
     ("GET", "/dms"),
     ("GET", "/dms/{rest:path}"),
+    # Daily 周记账 SPA 友好路由(照 /dms 先例 · 出 static/dist/daily.html)+ 离线外壳 SW
+    ("GET", "/daily"),
+    ("GET", "/daily/{rest:path}"),
+    ("GET", "/daily-sw.js"),
     ("GET", "/reset"),
     ("GET", "/terms"),
     ("GET", "/privacy"),
@@ -101,6 +105,12 @@ class PagesRoutesContractTests(unittest.TestCase):
         dms = "static/dist/dms.html"
         self.assertEqual(asyncio.run(pages_routes.dms_page()).path, dms)
         self.assertEqual(asyncio.run(pages_routes.dms_layout_page("records")).path, dms)
+        daily = "static/dist/daily.html"
+        self.assertEqual(asyncio.run(pages_routes.daily_page()).path, daily)
+        self.assertEqual(asyncio.run(pages_routes.daily_layout_page("anything")).path, daily)
+        self.assertEqual(
+            asyncio.run(pages_routes.daily_service_worker()).path, "static/daily/daily-sw.js"
+        )
 
     def test_ai_uses_shared_brand_favicons(self):
         expected = (

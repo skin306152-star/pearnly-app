@@ -28,6 +28,20 @@ def list_entries(cur, tenant_id: str, month: str) -> list[dict]:
     return [dict(r) for r in cur.fetchall()]
 
 
+def list_all_entries(cur, tenant_id: str) -> list[dict]:
+    """全量记录(JSON 备份导出用 · 与列表同款租户隔离)。"""
+    cur.execute(
+        """
+        SELECT id::text, entry_date, kind, title, amount, created_at
+        FROM daily_entries
+        WHERE tenant_id = %s::uuid
+        ORDER BY entry_date, created_at
+        """,
+        (str(tenant_id),),
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
 def insert_entry(
     cur,
     tenant_id: str,

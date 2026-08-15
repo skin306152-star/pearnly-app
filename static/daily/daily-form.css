@@ -1,0 +1,155 @@
+/* static/daily/daily-form.css · Daily 记账弹窗 + toast(与 daily.css 同令牌) */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 53, 44, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+}
+
+.entry-form {
+  background: var(--daily-surface);
+  border-radius: 18px 18px 0 0;
+  width: 100%;
+  max-width: 520px;
+  padding: 18px 20px 30px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-heading p {
+  margin: 0 0 2px;
+  font-size: 12px;
+  color: var(--daily-gold);
+}
+
+.form-heading h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.form-close {
+  border: 0;
+  background: none;
+  font-size: 22px;
+  color: var(--daily-ink-soft);
+  cursor: pointer;
+}
+
+.entry-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.entry-form label span,
+.entry-form legend {
+  font-size: 13px;
+  color: var(--daily-ink-soft);
+}
+
+.entry-form input,
+.entry-form select {
+  border: 1px solid var(--daily-line);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-size: 15px;
+  outline: none;
+  box-sizing: border-box;
+  background: var(--daily-surface);
+  color: var(--daily-ink);
+}
+
+.entry-form input:focus {
+  border-color: var(--daily-emerald);
+}
+
+.entry-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.type-picker {
+  display: flex;
+  gap: 10px;
+}
+
+.type-btn {
+  flex: 1;
+  border: 1px solid var(--daily-line);
+  border-radius: 10px;
+  background: var(--daily-surface);
+  color: var(--daily-ink-soft);
+  padding: 10px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.type-btn.selected.income {
+  background: var(--daily-emerald);
+  border-color: var(--daily-emerald);
+  color: #fff;
+}
+
+.type-btn.selected.expense {
+  background: var(--daily-terra);
+  border-color: var(--daily-terra);
+  color: #fff;
+}
+
+.amount-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--daily-line);
+  border-radius: 10px;
+  padding: 0 12px;
+}
+
+.amount-field b {
+  color: var(--daily-ink-soft);
+}
+
+.amount-field input {
+  border: 0;
+  flex: 1;
+  padding-left: 0;
+}
+
+.save-button {
+  border: 0;
+  border-radius: 12px;
+  background: var(--daily-deep);
+  color: #fff;
+  padding: 13px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--daily-deep);
+  color: #fff;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 14px;
+  box-shadow: var(--daily-shadow);
+  z-index: 70;
+  max-width: 90vw;
+  text-align: center;
+}

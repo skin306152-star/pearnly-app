@@ -99,6 +99,16 @@ async def daily_entries(request: Request, month: str):
     return {"entries": rows}
 
 
+@router.get("/api/daily/export")
+async def daily_export(request: Request):
+    """全量导出(JSON 备份 · 前端导出按钮用)。与列表同款租户隔离。"""
+    user = _authorize(request)
+    tid = _tid(user)
+    with db.get_cursor_rls(tenant_id=tid, commit=False) as cur:
+        rows = store.list_all_entries(cur, tid)
+    return {"entries": rows}
+
+
 @router.post("/api/daily/entries")
 async def daily_entry_create(body: EntryCreate, request: Request):
     user = _authorize(request)

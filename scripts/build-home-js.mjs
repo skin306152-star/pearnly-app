@@ -421,6 +421,14 @@ const BUNDLES = [
             'dms/dms-boot.js',
         ],
     },
+    // Pearnly Daily SPA(收支周记 · 独立入口壳):纯逻辑/状态 core 在前(daily-core.js 定义
+    // window.DailyCore · UMD 导出纯函数供 node 单测),门禁层 daily-gate.js 次之,UI 主壳
+    // daily.js 最后加载(读 DailyCore/DailyGate)。i18n 数据(daily-i18n.js)是独立 <script>
+    // 先加载(同 console-i18n 范式),不并入 bundle。
+    {
+        out: 'static/dist/daily.js',
+        files: ['daily/daily-core.js', 'daily/daily-gate.js', 'daily/daily.js'],
+    },
 ];
 
 for (const b of BUNDLES) {

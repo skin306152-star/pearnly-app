@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes.pages_routes import router
+from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
 
 # 全部返回 HTML 外壳的对外路由(/admin 是 301 → 用落地的 /admin/cost)。
 SHELL_ROUTES = [
@@ -26,9 +27,11 @@ SHELL_ROUTES = [
     "/console",
     "/invite/x",
     "/ai",
+    "/daily",
     "/reset",
     "/terms",
     "/privacy",
+    "/liff/dms-booking",
 ]
 
 MAX_LINES = 3  # minified 外壳 · 留 3 行余量(实测均为 1 行)
@@ -39,6 +42,7 @@ class PageShellMinifiedTest(unittest.TestCase):
     def setUpClass(cls):
         app = FastAPI()
         app.include_router(router)
+        app.include_router(line_dms_booking_edit_router)
         cls.client = TestClient(app)
 
     def test_public_routes_serve_minified_shell(self):

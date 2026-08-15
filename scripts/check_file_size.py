@@ -93,6 +93,11 @@ MONITORED_GLOBS = [
     "static/pos/**/*.css",
     "static/pos/**/*.html",
     "static/scan/**/*.js",
+    # Daily 周记账 SPA(2026-08-15 新增):plain-script,不进 Vite,与 /ai /pos 同款
+    # 必须纳入闸(新建时即入,不给「存量巨石豁免」留累积空间)。
+    "static/daily/**/*.js",
+    "static/daily/**/*.css",
+    "static/daily/**/*.html",
 ]
 
 # 路径模式豁免(纯数据 / 自动生成 · 不算业务代码)

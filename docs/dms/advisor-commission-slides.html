@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="th" data-lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearnly DMS · Flow การลงชื่อที่ปรึกษา & ค่าคอมมิชชั่น</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6fb; --card:#ffffff; --ink:#171a2b; --mut:#68718a;
+  --brand:#7c4dff; --brand-deep:#6b3ff2; --blue:#2f6bff; --pink:#f25c6e;
+  --line:#e3e8f4; --soft:#eef1ff; --soft-pink:#fdecef; --good:#0f9d6e; --soft-good:#e7f7f0;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{
+  font-family:"Inter","Noto Sans Thai","Leelawadee UI",system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:var(--bg); color:var(--ink); overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+html[data-lang="th"] .zh{display:none}
+html[data-lang="zh"] .th{display:none}
+
+.deck{position:relative; height:100dvh; display:flex; align-items:center; justify-content:center}
+.slide{
+  display:none; width:min(1060px,94vw); height:min(640px,92dvh);
+  background:var(--card); border:1px solid var(--line); border-radius:22px;
+  box-shadow:0 24px 60px -30px rgba(23,26,43,.18);
+  padding:clamp(24px,4.5vh,48px) clamp(24px,4.5vw,56px);
+  flex-direction:column; overflow:auto; position:relative;
+}
+.slide.on{display:flex; animation:pop .35s cubic-bezier(.2,.7,.2,1)}
+@keyframes pop{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
+
+.kicker{
+  display:inline-flex; align-items:center; gap:8px; align-self:flex-start;
+  font-size:12px; font-weight:700; letter-spacing:.08em; color:var(--brand-deep);
+  background:var(--soft); border:1px solid #e2d9ff; border-radius:999px; padding:6px 14px;
+}
+.kicker .dot{width:7px; height:7px; border-radius:50%; background:var(--brand)}
+h1{font-size:clamp(28px,4.6vh,44px); font-weight:800; letter-spacing:-.02em; line-height:1.15; margin:18px 0 10px}
+h2{font-size:clamp(22px,3.6vh,32px); font-weight:800; letter-spacing:-.015em; line-height:1.2; margin:14px 0 6px}
+.sub{color:var(--mut); font-size:clamp(14px,2.2vh,17px); line-height:1.65; font-weight:500}
+.cols{display:flex; gap:clamp(18px,3vw,40px); align-items:flex-start; margin-top:clamp(10px,2.5vh,24px); flex:1; min-height:0}
+.col{flex:1; min-width:0; display:flex; flex-direction:column; gap:12px}
+
+.bullets{list-style:none; display:flex; flex-direction:column; gap:12px; margin-top:clamp(8px,2vh,18px)}
+.bullets li{display:flex; gap:12px; align-items:flex-start; font-size:clamp(14px,2.3vh,17px); line-height:1.6; font-weight:500}
+.bullets .n{
+  flex:0 0 26px; height:26px; border-radius:9px; background:var(--soft); color:var(--brand-deep);
+  font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; margin-top:1px;
+}
+.bullets li b{font-weight:700}
+.note{
+  margin-top:auto; background:#f7f9ff; border:1px solid var(--line); border-radius:14px;
+  padding:12px 16px; font-size:clamp(12px,2vh,14.5px); color:var(--mut); line-height:1.6;
+}
+.note b{color:var(--ink)}
+
+.chat{
+  background:#f0f2f8; border:1px solid var(--line); border-radius:18px;
+  padding:16px 14px; display:flex; flex-direction:column; gap:10px; min-width:0;
+}
+.chat .cap{font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--mut); text-transform:uppercase}
+.bub{max-width:88%; border-radius:14px; padding:10px 14px; font-size:clamp(12.5px,2vh,14.5px); line-height:1.55; font-weight:500}
+.bub.bot{background:#fff; border:1px solid #e6e9f2; align-self:flex-start; border-top-left-radius:4px}
+.bub.user{background:var(--brand); color:#fff; align-self:flex-end; border-bottom-right-radius:4px}
+.bub.user.blue{background:var(--blue)}
+
+.flexcard{background:#fff; border:1px solid #e6e9f2; border-radius:16px; padding:14px 16px; align-self:stretch; max-width:100%}
+.flexcard .t{font-weight:800; font-size:14px; margin-bottom:8px}
+.flexcard .row{display:flex; gap:10px; padding:6px 0; border-top:1px solid #f0f2f8; font-size:13px}
+.flexcard .row:first-of-type{border-top:0}
+.flexcard .k{flex:0 0 150px; color:var(--mut); font-weight:600}
+.flexcard .v{font-weight:600}
+.flexcard .v .ok{color:var(--good); font-weight:800}
+.flexcard .foot{display:flex; gap:8px; margin-top:10px}
+.flexcard .foot span{flex:1; text-align:center; border-radius:10px; padding:8px 0; font-size:13px; font-weight:800}
+.flexcard .foot .p{background:var(--brand); color:#fff}
+.flexcard .foot .s{background:#fff; border:1px solid #dfe4f0; color:var(--mut)}
+.tag{display:inline-block; background:var(--soft); color:var(--brand-deep); border:1px solid #e2d9ff; border-radius:8px; padding:2px 9px; font-size:12px; font-weight:800}
+.tag.pin{background:var(--soft-pink); color:var(--pink); border-color:#f9d9de}
+
+/* horizontal mini flow (slide ขั้นที่ 2) */
+.flowrow{display:flex; align-items:stretch; gap:0; margin-top:clamp(14px,3vh,26px)}
+.fnode{
+  flex:1; min-width:0; background:#fff; border:1.5px solid #d9d2ff; border-radius:16px;
+  padding:14px 14px; display:flex; flex-direction:column; gap:6px; align-items:flex-start;
+}
+.fnode .fn{width:26px; height:26px; border-radius:9px; background:var(--soft); color:var(--brand-deep); font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center}
+.fnode .ft{font-size:clamp(13px,2.1vh,15.5px); font-weight:700; line-height:1.45}
+.fnode .fd{font-size:clamp(11.5px,1.8vh,13px); color:var(--mut); font-weight:500; line-height:1.5}
+.fnode.last{border-color:#bfe6d6; background:var(--soft-good)}
+.farr{flex:0 0 34px; display:flex; align-items:center; justify-content:center; color:#a9b3cf; font-size:20px; font-weight:800}
+
+/* SVG flowchart */
+.fc-wrap{flex:1; min-height:0; display:flex; align-items:center; justify-content:center; margin-top:8px}
+.fc-wrap svg{width:100%; height:100%; max-height:100%}
+.fc-wrap text{font-family:inherit}
+
+.bar{
+  position:fixed; left:0; right:0; bottom:0; height:44px; display:flex; align-items:center;
+  justify-content:space-between; padding:0 18px; font-size:12.5px; color:var(--mut); font-weight:600;
+}
+.bar .mid{position:absolute; left:50%; transform:translateX(-50%); display:flex; gap:8px}
+.bar button{
+  border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:999px;
+  padding:5px 14px; font:inherit; font-weight:700; cursor:pointer;
+}
+.bar button:hover{border-color:var(--brand); color:var(--brand-deep)}
+.bar .lang button.act{background:var(--ink); color:#fff; border-color:var(--ink)}
+.progress{position:fixed; top:0; left:0; height:3px; background:linear-gradient(90deg,var(--brand),var(--blue)); width:0; transition:width .3s}
+
+.cover{align-items:flex-start; justify-content:center; gap:6px;
+  background:
+    radial-gradient(700px 340px at 85% -10%, #ece5ff 0%, transparent 60%),
+    radial-gradient(560px 300px at -10% 110%, #e5edff 0%, transparent 60%),
+    var(--card);
+}
+.logo{display:flex; align-items:center; gap:10px; font-weight:800; font-size:18px; letter-spacing:-.01em}
+.logo svg{width:26px; height:26px}
+.foot-meta{margin-top:26px; display:flex; gap:10px; flex-wrap:wrap}
+.foot-meta span{border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-size:12px; font-weight:700; color:var(--mut)}
+
+@page{size:1060px 640px; margin:0}
+@media print{
+  html,body{overflow:visible; background:#fff; height:auto}
+  .bar,.progress{display:none}
+  .deck{display:block; height:auto}
+  .slide{
+    display:flex !important; animation:none; width:1060px; height:640px;
+    border-radius:0; border:0; box-shadow:none; margin:0; overflow:hidden;
+    padding:40px 52px; page-break-after:always; break-after:page;
+  }
+  .slide:last-child{page-break-after:auto; break-after:auto}
+}
+</style>
+</head>
+<body>
+<div class="progress" id="prog"></div>
+<div class="deck" id="deck">
+
+<!-- 1 · cover -->
+<section class="slide cover on">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1" stroke="#7c4dff" stroke-width="2.6" stroke-linecap="round"/></svg>
+    Pearnly DMS
+  </div>
+  <div class="kicker" style="margin-top:18px"><span class="dot"></span>
+    <span class="th">คู่มือการใช้งาน · ค่าคอมมิชชั่น</span><span class="zh">操作教程手册 · 提成归属</span>
+  </div>
+  <h1><span class="th">Flow การลงชื่อที่ปรึกษาในใบจอง</span><span class="zh">订车单顾问署名流程</span></h1>
+  <p class="sub">
+    <span class="th">ทำใบจองผ่าน LINE · ระบบลงชื่อพนักงานขายผู้ทำรายการในช่อง «ที่ปรึกษา» ให้อัตโนมัติ เพื่อให้ค่าคอมมิชชั่นลงถูกคนเสมอ</span>
+    <span class="zh">通过 LINE 建订车单 · 系统自动把实际操作的销售署名到«顾问»栏，提成永远落到对的人</span>
+  </p>
+  <div class="foot-meta">
+    <span>pearnly.com/dms</span>
+    <span class="th">ภาษาไทย / 中文</span><span class="zh">泰语 / 中文</span>
+    <span>2026-08</span>
+  </div>
+</section>
+
+<!-- 2 · principle -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">หลักการ</span><span class="zh">系统原则</span></div>
+  <h2><span class="th">ค่าคอมนับจากใคร — หลักการของระบบ</span><span class="zh">提成认谁 — 系统原则</span></h2>
+  <ul class="bullets">
+    <li><span class="n">1</span><span><span class="th">DMS คิดค่าคอมมิชชั่นจาก <b>บัญชีผู้ใช้ที่ล็อกอินสร้างใบจอง</b> และลงชื่อคนนั้นในช่อง «ที่ปรึกษา»</span><span class="zh">DMS 按<b>登录建单的用户账号</b>计提成，并把此人署名到«顾问»栏</span></span></li>
+    <li><span class="n">2</span><span><span class="th">ช่อง «ที่ปรึกษา» ถูก<b>ล็อกหลังเปิดใบจอง</b> — เปลี่ยนเป็นคนอื่นภายหลังไม่ได้</span><span class="zh">«顾问»栏<b>建单后即锁定</b>，事后不能改成别人</span></span></li>
+    <li><span class="n">3</span><span><span class="th">Pearnly จึงตรวจสอบและลงชื่อผู้ขายให้ถูกต้อง <b>ก่อนเปิดใบจอง</b> ทุกครั้ง</span><span class="zh">因此 Pearnly 在<b>建单之前</b>就把销售身份核对并署名正确</span></span></li>
+    <li><span class="n">4</span><span><span class="th">ผลลัพธ์: พนักงานขายผู้ทำรายการ = ที่ปรึกษาในใบจอง = ผู้รับค่าคอม — <b>คนเดียวกันเสมอ</b></span><span class="zh">结果：操作的销售 = 单上的顾问 = 拿提成的人 — <b>永远同一人</b></span></span></li>
+  </ul>
+  <div class="note"><span class="th"><b>คำเดียวกันสองชื่อ:</b> «พนักงานขาย» กับ «ที่ปรึกษา (ที่ปรึกษาการขาย)» คือตำแหน่งเดียวกัน — ใบจองใช้คำว่า ที่ปรึกษา</span><span class="zh"><b>同一职位两个叫法：</b>「销售」与「顾问（销售顾问）」是同一岗位 — 订车单上叫«顾问»</span></div>
+</section>
+
+<!-- 3 · step 1 setup -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">ขั้นที่ 1 · ตั้งค่าครั้งเดียว</span><span class="zh">第 1 步 · 一次性设置</span></div>
+  <h2><span class="th">เพิ่มพนักงานขายในระบบ Pearnly</span><span class="zh">在 Pearnly 里添加销售</span></h2>
+  <div class="cols">
+    <ul class="bullets" style="margin-top:0">
+      <li><span class="n">1</span><span><span class="th">กรอกชื่อที่แสดง + บัญชี DMS <b>ของพนักงานคนนั้นเอง</b> (หนึ่งคน หนึ่งบัญชี)</span><span class="zh">填显示名 + <b>该销售本人的</b> DMS 账号（一人一号）</span></span></li>
+      <li><span class="n">2</span><span><span class="th">เลือกบทบาท <b>พนักงานขาย</b></span><span class="zh">角色选<b>销售</b></span></span></li>
+      <li><span class="n">3</span><span><span class="th">ช่องค่าคอมมิชชั่น ปล่อยเป็นค่าเริ่มต้น <b>จับคู่อัตโนมัติตามบัญชี DMS</b></span><span class="zh">提成归属保持默认<b>「自动匹配（按 DMS 账号）」</b></span></span></li>
+      <li><span class="n">4</span><span><span class="th">ส่ง <b>รหัสผูก LINE</b> ให้พนักงานผูกแชทของตัวเอง</span><span class="zh">发<b> LINE 绑定码</b>给销售绑定自己的聊天</span></span></li>
+    </ul>
+    <div class="col">
+      <div class="flexcard">
+        <div class="t"><span class="th">เพิ่มพนักงานขาย · Pearnly DMS</span><span class="zh">新增销售 · Pearnly DMS</span></div>
+        <div class="row"><span class="k"><span class="th">ชื่อที่แสดง</span><span class="zh">显示名</span></span><span class="v">สมชาย <span class="th">(พนักงานขาย)</span><span class="zh">(销售)</span></span></div>
+        <div class="row"><span class="k"><span class="th">บัญชี DMS</span><span class="zh">DMS 账号</span></span><span class="v">somchai01</span></div>
+        <div class="row"><span class="k"><span class="th">บทบาท</span><span class="zh">角色</span></span><span class="v"><span class="tag"><span class="th">พนักงานขาย</span><span class="zh">销售</span></span></span></div>
+        <div class="row"><span class="k"><span class="th">ค่าคอมมิชชั่น</span><span class="zh">提成归属</span></span><span class="v"><span class="th">อัตโนมัติ (ตามบัญชี DMS)</span><span class="zh">自动（按 DMS 账号）</span></span></div>
+        <div class="row"><span class="k">LINE</span><span class="v"><span class="ok">✓</span> <span class="th">ผูกแล้ว · Somchai</span><span class="zh">已绑定 · Somchai</span></span></div>
+        <div class="foot"><span class="p"><span class="th">ส่งรหัสผูก LINE</span><span class="zh">发绑定码</span></span><span class="s"><span class="th">บันทึก</span><span class="zh">保存</span></span></div>
+      </div>
+      <div class="note" style="margin-top:0"><span class="th"><b>หัวใจของระบบ:</b> หนึ่งคน หนึ่งบัญชี — ไม่ใช้บัญชีร่วมกัน (ยกเว้นกรณีพิเศษในขั้นที่ 3)</span><span class="zh"><b>核心：</b>一人一号，不共用账号（第 3 步的特殊情况除外）</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 · step 2 auto -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">ขั้นที่ 2 · โหมดอัตโนมัติ (เส้นทางหลัก)</span><span class="zh">第 2 步 · 自动模式（主路）</span></div>
+  <h2><span class="th">ใครทำใบจอง ระบบลงชื่อคนนั้น</span><span class="zh">谁建单，系统就署谁</span></h2>
+  <div class="flowrow">
+    <div class="fnode">
+      <span class="fn">1</span>
+      <span class="ft"><span class="th">พนักงานขายทำใบจองผ่าน LINE ของตัวเอง</span><span class="zh">销售在自己的 LINE 里建订车单</span></span>
+      <span class="fd"><span class="th">ตอบคำถาม 8 ข้อตามปกติ</span><span class="zh">照常回答 8 个问题</span></span>
+    </div>
+    <div class="farr">→</div>
+    <div class="fnode">
+      <span class="fn">2</span>
+      <span class="ft"><span class="th">ระบบเข้าสู่ DMS ด้วยบัญชีของเขาเอง</span><span class="zh">系统用他本人的 DMS 账号登录</span></span>
+      <span class="fd"><span class="th">ตามที่ตั้งค่าไว้ในขั้นที่ 1</span><span class="zh">按第 1 步的设置</span></span>
+    </div>
+    <div class="farr">→</div>
+    <div class="fnode">
+      <span class="fn">3</span>
+      <span class="ft"><span class="th">ตรวจชื่อกับฐานข้อมูลพนักงานใน DMS</span><span class="zh">与 DMS 员工数据库核对身份</span></span>
+      <span class="fd"><span class="th">ต้องตรงหนึ่งเดียวเท่านั้นจึงผ่าน</span><span class="zh">必须唯一命中才放行</span></span>
+    </div>
+    <div class="farr">→</div>
+    <div class="fnode last">
+      <span class="fn">✓</span>
+      <span class="ft"><span class="th">ช่อง «ที่ปรึกษา» = ตัวเขาเอง → เปิดใบจอง</span><span class="zh">«顾问»栏 = 他本人 → 建单成功</span></span>
+      <span class="fd"><span class="th">ค่าคอมลงถูกคน</span><span class="zh">提成落对人</span></span>
+    </div>
+  </div>
+  <div class="note"><span class="th"><b>ไม่ต้องเลือก ไม่ต้องพิมพ์ชื่อใคร</b> — ระบบทำให้เองทุกใบ พนักงานแค่ทำใบจองตามปกติ</span><span class="zh"><b>不用选人、不用打任何名字</b> — 每一单系统自动完成，销售只管正常建单</span></div>
+</section>
+
+<!-- 5 · step 3 pin -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">ขั้นที่ 3 · โหมดปักหมุด (กรณีพิเศษ)</span><span class="zh">第 3 步 · 钉死模式（特殊情况）</span></div>
+  <h2><span class="th">กำหนดที่ปรึกษาตายตัวให้บางบัญชี</span><span class="zh">给某些账号固定指定顾问</span></h2>
+  <div class="cols">
+    <ul class="bullets" style="margin-top:0">
+      <li><span class="n">1</span><span><span class="th">ในหน้าตั้งค่า เปลี่ยนช่องค่าคอมมิชชั่นจาก «อัตโนมัติ» เป็น<b>เลือกชื่อที่ปรึกษา</b>จากรายการ</span><span class="zh">在设置页把提成归属从「自动」改成<b>从名单里选定一位顾问</b></span></span></li>
+      <li><span class="n">2</span><span><span class="th">ทุกใบจองของบัญชีนี้จะลงชื่อที่ปรึกษาคนที่เลือกไว้ <b>เสมอ</b></span><span class="zh">此账号建的每一单都<b>固定</b>署名所选顾问</span></span></li>
+      <li><span class="n">3</span><span><span class="th">เหมาะกับ: ผู้ช่วย/ธุรการทำใบจองแทนที่ปรึกษา · บัญชีที่จับคู่อัตโนมัติไม่ได้</span><span class="zh">适用：助理/文员替顾问建单 · 自动匹配认不出的账号</span></span></li>
+    </ul>
+    <div class="col">
+      <div class="flexcard">
+        <div class="t"><span class="th">ค่าคอมมิชชั่นของบัญชีนี้</span><span class="zh">此账号的提成归属</span></div>
+        <div class="row"><span class="k"><span class="th">โหมด</span><span class="zh">模式</span></span><span class="v"><span class="tag pin"><span class="th">ปักหมุด</span><span class="zh">钉死</span></span></span></div>
+        <div class="row"><span class="k"><span class="th">ที่ปรึกษา</span><span class="zh">顾问</span></span><span class="v">สมชาย ใจดี</span></div>
+        <div class="row"><span class="k"><span class="th">ผลลัพธ์</span><span class="zh">效果</span></span><span class="v"><span class="th">ทุกใบจอง → ลงชื่อ สมชาย เสมอ</span><span class="zh">每一单 → 固定署名 สมชาย</span></span></div>
+      </div>
+      <div class="note" style="margin-top:0"><span class="th">ร้านที่พนักงานขายมีบัญชี DMS ครบทุกคน <b>ไม่จำเป็นต้องใช้โหมดนี้เลย</b> — โหมดอัตโนมัติดูแลให้หมดแล้ว</span><span class="zh">销售人人有自己 DMS 账号的店<b>完全用不到此模式</b> — 自动模式已全覆盖</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · step 4 block -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">ขั้นที่ 4 · ระบบไม่เดา</span><span class="zh">第 4 步 · 系统不猜</span></div>
+  <h2><span class="th">จับคู่ไม่ได้ = หยุดก่อนเปิดใบจอง</span><span class="zh">认不出人 = 建单前先停下</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <span class="cap">LINE · Pearnly DMS</span>
+      <div class="bub user blue"><span class="th">จัดทำใบจอง</span><span class="zh">จัดทำใบจอง（建订车单）</span></div>
+      <div class="bub bot"><span class="th">ยังไม่สามารถระบุที่ปรึกษาของบัญชีนี้ได้ จึงยังไม่เปิดใบจอง<br><br>กรุณาติดต่อผู้ดูแลระบบเพื่อตั้งค่าพนักงานขาย แล้วทำรายการใหม่อีกครั้ง</span><span class="zh">无法确定此账号对应的顾问，因此暂不建单<br><br>请联系系统管理员完成销售设置后重新操作</span></div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">1</span><span><span class="th">ระบบ<b>ยังไม่เปิดใบจอง</b> และไม่มีข้อมูลถูกบันทึกแม้แต่รายการเดียว</span><span class="zh">系统<b>不建单</b>，一个字都不写入</span></span></li>
+        <li><span class="n">2</span><span><span class="th">ผู้ดูแลเพิ่มพนักงาน (ขั้นที่ 1) หรือปักหมุดที่ปรึกษา (ขั้นที่ 3)</span><span class="zh">管理员按第 1 步补设置，或按第 3 步钉死顾问</span></span></li>
+        <li><span class="n">3</span><span><span class="th">ตั้งค่าเสร็จ พนักงานทำรายการใหม่ได้ทันที</span><span class="zh">设置完成后销售立即可重新操作</span></span></li>
+      </ul>
+      <div class="note" style="margin-top:0"><span class="th"><b>เหตุผล:</b> ช่อง «ที่ปรึกษา» แก้ภายหลังไม่ได้ การหยุดถามจึงปลอดภัยกว่าการเดา — ค่าคอมจึง<b>ไม่มีทางลงผิดคน</b></span><span class="zh"><b>原因：</b>«顾问»栏事后改不了，停下来问比瞎猜安全 — 提成<b>不可能记错人</b></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · full flowchart -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">ภาพรวม</span><span class="zh">总览</span></div>
+  <h2><span class="th">แผนภาพการลงชื่อที่ปรึกษา — ทุกเส้นทาง</span><span class="zh">顾问署名流程图 — 全部路径</span></h2>
+  <div class="fc-wrap">
+  <svg viewBox="0 0 960 470" role="img" aria-label="flowchart">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#a9b3cf"/>
+      </marker>
+    </defs>
+    <!-- links -->
+    <g stroke="#a9b3cf" stroke-width="2" fill="none" marker-end="url(#ah)">
+      <path d="M480 58 V92"/>
+      <path d="M330 130 H160 V330"/>
+      <path d="M480 168 V212"/>
+      <path d="M480 288 V330"/>
+      <path d="M630 250 H800 V330"/>
+    </g>
+    <!-- branch labels -->
+    <g font-size="13" font-weight="800">
+      <rect x="215" y="116" rx="9" width="52" height="26" fill="#e7f7f0" stroke="#bfe6d6"/>
+      <text x="241" y="134" text-anchor="middle" fill="#0f9d6e" class="th">ใช่</text>
+      <text x="241" y="134" text-anchor="middle" fill="#0f9d6e" class="zh">是</text>
+      <rect x="452" y="178" rx="9" width="56" height="26" fill="#eef1ff" stroke="#e2d9ff"/>
+      <text x="480" y="196" text-anchor="middle" fill="#6b3ff2" class="th">ไม่มี</text>
+      <text x="480" y="196" text-anchor="middle" fill="#6b3ff2" class="zh">没有</text>
+      <rect x="454" y="296" rx="9" width="52" height="26" fill="#e7f7f0" stroke="#bfe6d6"/>
+      <text x="480" y="314" text-anchor="middle" fill="#0f9d6e" class="th">ได้</text>
+      <text x="480" y="314" text-anchor="middle" fill="#0f9d6e" class="zh">能</text>
+      <rect x="676" y="236" rx="9" width="64" height="26" fill="#fdecef" stroke="#f9d9de"/>
+      <text x="708" y="254" text-anchor="middle" fill="#f25c6e" class="th">ไม่ได้</text>
+      <text x="708" y="254" text-anchor="middle" fill="#f25c6e" class="zh">不能</text>
+    </g>
+    <!-- start -->
+    <rect x="320" y="10" rx="14" width="320" height="48" fill="#eef1ff" stroke="#d9d2ff" stroke-width="1.5"/>
+    <text x="480" y="40" text-anchor="middle" font-size="16" font-weight="800" fill="#171a2b" class="th">พนักงานขายทำใบจองผ่าน LINE</text>
+    <text x="480" y="40" text-anchor="middle" font-size="16" font-weight="800" fill="#171a2b" class="zh">销售通过 LINE 建订车单</text>
+    <!-- decision 1 -->
+    <rect x="330" y="94" rx="18" width="300" height="74" fill="#fff" stroke="#7c4dff" stroke-width="1.8"/>
+    <text x="480" y="124" text-anchor="middle" font-size="15.5" font-weight="800" fill="#171a2b" class="th">บัญชีนี้ปักหมุดที่ปรึกษาไว้หรือไม่?</text>
+    <text x="480" y="124" text-anchor="middle" font-size="15.5" font-weight="800" fill="#171a2b" class="zh">此账号是否钉死了顾问？</text>
+    <text x="480" y="148" text-anchor="middle" font-size="12.5" font-weight="600" fill="#68718a" class="th">(ตั้งค่าไว้ในขั้นที่ 3)</text>
+    <text x="480" y="148" text-anchor="middle" font-size="12.5" font-weight="600" fill="#68718a" class="zh">（第 3 步的设置）</text>
+    <!-- decision 2 -->
+    <rect x="330" y="214" rx="18" width="300" height="74" fill="#fff" stroke="#7c4dff" stroke-width="1.8"/>
+    <text x="480" y="244" text-anchor="middle" font-size="15.5" font-weight="800" fill="#171a2b" class="th">จับคู่บัญชี DMS กับฐานข้อมูล</text>
+    <text x="480" y="266" text-anchor="middle" font-size="15.5" font-weight="800" fill="#171a2b" class="th">พนักงานได้หรือไม่? (ตรงหนึ่งเดียว)</text>
+    <text x="480" y="244" text-anchor="middle" font-size="15.5" font-weight="800" fill="#171a2b" class="zh">DMS 账号能否与员工库</text>
+    <text x="480" y="266" text-anchor="middle" font-size="15.5" font-weight="800" fill="#171a2b" class="zh">唯一匹配？</text>
+    <!-- outcome A pinned -->
+    <rect x="40" y="332" rx="16" width="240" height="96" fill="#e7f7f0" stroke="#bfe6d6" stroke-width="1.5"/>
+    <text x="160" y="368" text-anchor="middle" font-size="15" font-weight="800" fill="#0b7a55" class="th">ลงชื่อที่ปรึกษาที่ปักหมุดไว้</text>
+    <text x="160" y="368" text-anchor="middle" font-size="15" font-weight="800" fill="#0b7a55" class="zh">署名钉死的那位顾问</text>
+    <text x="160" y="394" text-anchor="middle" font-size="14" font-weight="700" fill="#0f9d6e" class="th">เปิดใบจอง ✓</text>
+    <text x="160" y="394" text-anchor="middle" font-size="14" font-weight="700" fill="#0f9d6e" class="zh">建单成功 ✓</text>
+    <!-- outcome B auto -->
+    <rect x="360" y="332" rx="16" width="240" height="96" fill="#e7f7f0" stroke="#bfe6d6" stroke-width="1.5"/>
+    <text x="480" y="368" text-anchor="middle" font-size="15" font-weight="800" fill="#0b7a55" class="th">ที่ปรึกษา = เจ้าของบัญชี</text>
+    <text x="480" y="368" text-anchor="middle" font-size="15" font-weight="800" fill="#0b7a55" class="zh">顾问 = 账号本人</text>
+    <text x="480" y="394" text-anchor="middle" font-size="14" font-weight="700" fill="#0f9d6e" class="th">เปิดใบจอง ✓</text>
+    <text x="480" y="394" text-anchor="middle" font-size="14" font-weight="700" fill="#0f9d6e" class="zh">建单成功 ✓</text>
+    <!-- outcome C stop -->
+    <rect x="680" y="332" rx="16" width="240" height="96" fill="#fdecef" stroke="#f9d9de" stroke-width="1.5"/>
+    <text x="800" y="362" text-anchor="middle" font-size="15" font-weight="800" fill="#c93f52" class="th">หยุด — แจ้งติดต่อผู้ดูแล</text>
+    <text x="800" y="362" text-anchor="middle" font-size="15" font-weight="800" fill="#c93f52" class="zh">停 — 提示联系管理员</text>
+    <text x="800" y="388" text-anchor="middle" font-size="13.5" font-weight="700" fill="#f25c6e" class="th">ไม่เปิดใบจอง · ไม่มีการบันทึก ✕</text>
+    <text x="800" y="388" text-anchor="middle" font-size="13.5" font-weight="700" fill="#f25c6e" class="zh">不建单 · 零写入 ✕</text>
+    <!-- bottom line -->
+    <text x="480" y="458" text-anchor="middle" font-size="14" font-weight="700" fill="#68718a" class="th">ทุกเส้นทางจบแบบเดียว: ค่าคอมลงถูกคน หรือ ไม่เปิดใบจองเลย — ไม่มีทางลงผิดคน</text>
+    <text x="480" y="458" text-anchor="middle" font-size="14" font-weight="700" fill="#68718a" class="zh">所有路径只有一种结局：提成落对人，或干脆不建单 — 不存在记错人</text>
+  </svg>
+  </div>
+</section>
+
+<!-- 8 · closing -->
+<section class="slide cover">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1" stroke="#7c4dff" stroke-width="2.6" stroke-linecap="round"/></svg>
+    Pearnly DMS
+  </div>
+  <h1 style="margin-top:24px"><span class="th">ตั้งค่าครั้งเดียว ถูกต้องทุกใบ</span><span class="zh">设置一次，单单正确</span></h1>
+  <p class="sub">
+    <span class="th">เพิ่มพนักงาน + บัญชี DMS ของตัวเอง → ทำใบจองผ่าน LINE → ระบบลงชื่อผู้ขายให้อัตโนมัติ → ค่าคอมมิชชั่นลงถูกคนเสมอ</span>
+    <span class="zh">添加销售 + 本人 DMS 账号 → LINE 建单 → 系统自动署名 → 提成永远落对人</span>
+  </p>
+  <div class="foot-meta">
+    <span><span class="th">มีปัญหาติดต่อผู้ดูแลระบบของบริษัท</span><span class="zh">有问题请联系公司系统管理员</span></span>
+    <span>pearnly.com/dms</span>
+  </div>
+</section>
+
+</div>
+
+<div class="bar">
+  <span id="cnt">1 / 8</span>
+  <div class="mid">
+    <button id="prev" aria-label="prev">←</button>
+    <button id="next" aria-label="next">→</button>
+  </div>
+  <span class="lang">
+    <button id="lth" class="act">TH</button><button id="lzh">中文</button>
+  </span>
+</div>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide')),i=0;
+  var cnt=document.getElementById('cnt'),prog=document.getElementById('prog');
+  function go(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('on',k===i)});
+    cnt.textContent=(i+1)+' / '+slides.length;
+    prog.style.width=((i+1)/slides.length*100)+'%';
+    location.hash='#'+(i+1);
+  }
+  document.getElementById('prev').onclick=function(){go(i-1)};
+  document.getElementById('next').onclick=function(){go(i+1)};
+  addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown')go(i+1);
+    else if(e.key==='ArrowLeft'||e.key==='PageUp')go(i-1);
+    else if(e.key==='Home')go(0);
+    else if(e.key==='End')go(slides.length-1);
+  });
+  var tx=0;
+  addEventListener('touchstart',function(e){tx=e.touches[0].clientX});
+  addEventListener('touchend',function(e){
+    var dx=e.changedTouches[0].clientX-tx;
+    if(dx<-40)go(i+1);else if(dx>40)go(i-1);
+  });
+  function lang(l){
+    document.documentElement.setAttribute('data-lang',l);
+    document.getElementById('lth').classList.toggle('act',l==='th');
+    document.getElementById('lzh').classList.toggle('act',l==='zh');
+  }
+  document.getElementById('lth').onclick=function(){lang('th')};
+  document.getElementById('lzh').onclick=function(){lang('zh')};
+  var h=parseInt((location.hash||'').slice(1),10);
+  go(isNaN(h)?0:h-1);
+})();
+</script>
+</body>
+</html>

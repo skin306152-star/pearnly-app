@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="th" data-lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearnly DMS · Flow LINE จัดทำใบจอง · คู่มือ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6fb; --card:#ffffff; --ink:#171a2b; --mut:#68718a;
+  --brand:#7c4dff; --brand-deep:#6b3ff2; --blue:#2f6bff; --pink:#f25c6e;
+  --line:#e3e8f4; --soft:#eef1ff; --soft-pink:#fdecef; --good:#0f9d6e;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{
+  font-family:"Inter","Noto Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:var(--bg); color:var(--ink); overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+html[data-lang="th"] .zh{display:none}
+html[data-lang="zh"] .th{display:none}
+
+.deck{position:relative; height:100dvh; display:flex; align-items:center; justify-content:center}
+.slide{
+  display:none; width:min(1060px,94vw); height:min(640px,92dvh);
+  background:var(--card); border:1px solid var(--line); border-radius:22px;
+  box-shadow:0 24px 60px -30px rgba(23,26,43,.18);
+  padding:clamp(24px,4.5vh,48px) clamp(24px,4.5vw,56px);
+  flex-direction:column; overflow:auto; position:relative;
+}
+.slide.on{display:flex; animation:pop .35s cubic-bezier(.2,.7,.2,1)}
+@keyframes pop{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
+
+.kicker{
+  display:inline-flex; align-items:center; gap:8px; align-self:flex-start;
+  font-size:12px; font-weight:700; letter-spacing:.08em; color:var(--brand-deep);
+  background:var(--soft); border:1px solid #e2d9ff; border-radius:999px; padding:6px 14px;
+}
+.kicker .dot{width:7px; height:7px; border-radius:50%; background:var(--brand)}
+h1{font-size:clamp(28px,4.6vh,44px); font-weight:800; letter-spacing:-.02em; line-height:1.15; margin:18px 0 10px}
+h2{font-size:clamp(22px,3.6vh,32px); font-weight:800; letter-spacing:-.015em; line-height:1.2; margin:14px 0 6px}
+.sub{color:var(--mut); font-size:clamp(14px,2.2vh,17px); line-height:1.65; font-weight:500}
+.cols{display:flex; gap:clamp(18px,3vw,40px); align-items:flex-start; margin-top:clamp(10px,2.5vh,24px); flex:1; min-height:0}
+.col{flex:1; min-width:0; display:flex; flex-direction:column; gap:12px}
+
+.bullets{list-style:none; display:flex; flex-direction:column; gap:12px; margin-top:clamp(8px,2vh,18px)}
+.bullets li{display:flex; gap:12px; align-items:flex-start; font-size:clamp(14px,2.3vh,17px); line-height:1.6; font-weight:500}
+.bullets .n{
+  flex:0 0 26px; height:26px; border-radius:9px; background:var(--soft); color:var(--brand-deep);
+  font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; margin-top:1px;
+}
+.bullets li b{font-weight:700}
+.note{
+  margin-top:auto; background:#f7f9ff; border:1px solid var(--line); border-radius:14px;
+  padding:12px 16px; font-size:clamp(12px,2vh,14.5px); color:var(--mut); line-height:1.6;
+}
+.note b{color:var(--ink)}
+
+/* LINE chat mockup */
+.chat{
+  background:#f0f2f8; border:1px solid var(--line); border-radius:18px;
+  padding:16px 14px; display:flex; flex-direction:column; gap:10px; min-width:0;
+}
+.chat .cap{font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--mut); text-transform:uppercase}
+.bub{max-width:88%; border-radius:14px; padding:10px 14px; font-size:clamp(12.5px,2vh,14.5px); line-height:1.55; font-weight:500}
+.bub.bot{background:#fff; border:1px solid #e6e9f2; align-self:flex-start; border-top-left-radius:4px}
+.bub.user{background:var(--brand); color:#fff; align-self:flex-end; border-bottom-right-radius:4px}
+.bub.user.blue{background:var(--blue)}
+.qr{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.qr span{
+  background:#fff; border:1px solid #dfe4f0; color:var(--blue); border-radius:999px;
+  padding:5px 12px; font-size:12px; font-weight:700;
+}
+.qr span.primary{background:var(--brand); border-color:var(--brand); color:#fff}
+.qr span.ghost{color:var(--mut)}
+.step-chip{
+  align-self:flex-start; background:var(--soft-pink); color:var(--pink); border:1px solid #f9d9de;
+  border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:800;
+}
+.step-chip.blue{background:var(--soft); color:var(--blue); border-color:#dfe7ff}
+
+/* flex card mockup */
+.flexcard{background:#fff; border:1px solid #e6e9f2; border-radius:16px; padding:14px 16px; align-self:stretch; max-width:100%}
+.flexcard .t{font-weight:800; font-size:14px; margin-bottom:8px}
+.flexcard .row{display:flex; gap:10px; padding:5px 0; border-top:1px solid #f0f2f8; font-size:13px}
+.flexcard .row:first-of-type{border-top:0}
+.flexcard .k{flex:0 0 96px; color:var(--mut); font-weight:600}
+.flexcard .v{font-weight:600}
+.flexcard .foot{display:flex; gap:8px; margin-top:10px}
+.flexcard .foot span{flex:1; text-align:center; border-radius:10px; padding:8px 0; font-size:13px; font-weight:800}
+.flexcard .foot .p{background:var(--brand); color:#fff}
+.flexcard .foot .s{background:#fff; border:1px solid #dfe4f0; color:var(--mut)}
+
+.menu-item{display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #dfe7ff; border-radius:14px; padding:12px 14px}
+.menu-item.pink{border-color:#f9d9de}
+.menu-item .num{font-size:22px; font-weight:800; color:var(--blue)}
+.menu-item.pink .num{color:var(--pink)}
+.menu-item .ic{width:40px; height:40px; border-radius:50%; background:var(--soft); display:flex; align-items:center; justify-content:center}
+.menu-item.pink .ic{background:var(--soft-pink)}
+.menu-item .ic svg{width:20px; height:20px}
+.menu-item .tt{font-size:14px; font-weight:800}
+.menu-item .dd{font-size:11.5px; color:var(--mut); font-weight:500; margin-top:2px}
+.menu-item .ar{margin-left:auto; color:var(--blue); font-weight:800}
+.menu-item.pink .ar{color:var(--pink)}
+
+.bar{
+  position:fixed; left:0; right:0; bottom:0; height:44px; display:flex; align-items:center;
+  justify-content:space-between; padding:0 18px; font-size:12.5px; color:var(--mut); font-weight:600;
+}
+.bar .mid{position:absolute; left:50%; transform:translateX(-50%); display:flex; gap:8px}
+.bar button{
+  border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:999px;
+  padding:5px 14px; font:inherit; font-weight:700; cursor:pointer;
+}
+.bar button:hover{border-color:var(--brand); color:var(--brand-deep)}
+.bar .lang button.act{background:var(--ink); color:#fff; border-color:var(--ink)}
+.progress{position:fixed; top:0; left:0; height:3px; background:linear-gradient(90deg,var(--brand),var(--blue)); width:0; transition:width .3s}
+
+.cover{align-items:flex-start; justify-content:center; gap:6px;
+  background:
+    radial-gradient(700px 340px at 85% -10%, #ece5ff 0%, transparent 60%),
+    radial-gradient(560px 300px at -10% 110%, #e5edff 0%, transparent 60%),
+    var(--card);
+}
+.logo{display:flex; align-items:center; gap:10px; font-weight:800; font-size:18px; letter-spacing:-.01em}
+.logo svg{width:26px; height:26px}
+.foot-meta{margin-top:26px; display:flex; gap:10px; flex-wrap:wrap}
+.foot-meta span{border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-size:12px; font-weight:700; color:var(--mut)}
+kbd{background:var(--soft); border:1px solid #d9d2ff; border-radius:6px; padding:1px 7px; font-family:inherit; font-size:.85em; font-weight:800; color:var(--brand-deep)}
+</style>
+</head>
+<body>
+<div class="progress" id="prog"></div>
+<div class="deck" id="deck">
+
+<!-- 1 · cover -->
+<section class="slide cover on">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1" stroke="#7c4dff" stroke-width="2.6" stroke-linecap="round"/></svg>
+    Pearnly DMS
+  </div>
+  <div class="kicker" style="margin-top:18px"><span class="dot"></span>
+    <span class="th">คู่มือการใช้งาน · ฉบับสุดท้าย</span><span class="zh">操作教程手册 · 最终版</span>
+  </div>
+  <h1><span class="th">Flow LINE จัดทำใบจอง</span><span class="zh">LINE 订车单流程</span></h1>
+  <p class="sub">
+    <span class="th">สร้างใบจองรถยนต์ผ่านแชท LINE · ระบบถามทีละข้อ กดปุ่มหรือพิมพ์ตอบ ไม่ต้องกรอกฟอร์มยาว ๆ ในเว็บ</span>
+    <span class="zh">在 LINE 聊天里完成汽车订车单 · 系统逐条提问，点按钮或打字回答，无需在网页填长表单</span>
+  </p>
+  <div class="foot-meta">
+    <span>pearnly.com/dms</span>
+    <span class="th">ภาษาไทย / 中文</span><span class="zh">泰语 / 中文</span>
+    <span>2026-08</span>
+  </div>
+</section>
+
+<!-- 2 · overview -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">ภาพรวม</span><span class="zh">概览</span></div>
+  <h2><span class="th">ทำใบจองเสร็จในแชทเดียว</span><span class="zh">一个聊天窗口完成订车单</span></h2>
+  <ul class="bullets">
+    <li><span class="n">1</span><span><span class="th"><b>ถามทีละข้อ</b> — ระบบส่งคำถามทีละขั้นตอน ตอบเป็นปุ่มกดหรือพิมพ์</span><span class="zh"><b>逐条提问</b> — 系统一次只问一步，可点按钮或打字回答</span></span></li>
+    <li><span class="n">2</span><span><span class="th"><b>สรุปก่อนเสมอ</b> — จบครบ 8 ข้อจะเห็นการ์ดสรุป ต้องกด ยืนยัน จึงบันทึก</span><span class="zh"><b>先总结后保存</b> — 8 步完成后显示汇总卡，按「确认」才写入</span></span></li>
+    <li><span class="n">3</span><span><span class="th"><b>ทิ้งได้ตลอด</b> — กด ทิ้ง = ไม่มีการบันทึกอะไรเลยในระบบ</span><span class="zh"><b>可随时放弃</b> — 按「ทิ้ง(丢弃)」= 系统零写入</span></span></li>
+    <li><span class="n">4</span><span><span class="th"><b>ซื่อตรง</b> — อ่านบัตรไม่ชัดหรือข้อมูลผิด ระบบบอกตรง ๆ ไม่เดาให้</span><span class="zh"><b>诚实反馈</b> — 证件不清或信息有误时系统如实提示，不猜测</span></span></li>
+  </ul>
+  <div class="note"><span class="th"><b>ต้องมี:</b> บัญชีผู้ใช้ใน Pearnly ที่เชื่อมต่อ DMS แล้ว + ผูก LINE กับระบบแล้ว (ดูหน้าถัดไป)</span><span class="zh"><b>前提：</b>已在 Pearnly 连接 DMS 的账号 + 已绑定 LINE（见下页）</span></div>
+</section>
+
+<!-- 3 · bind -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">เริ่มต้นใช้งาน</span><span class="zh">首次使用</span></div>
+  <h2><span class="th">เชื่อมต่อ LINE กับบัญชี DMS</span><span class="zh">把 LINE 绑定到 DMS 账号</span></h2>
+  <div class="cols">
+    <ul class="bullets" style="margin-top:0">
+      <li><span class="n">1</span><span><span class="th">เพิ่มเพื่อน LINE OA ของ Pearnly DMS</span><span class="zh">添加 Pearnly DMS 的 LINE OA 为好友</span></span></li>
+      <li><span class="n">2</span><span><span class="th">ขอรหัสเชื่อมต่อ 6 หลักจากระบบ Pearnly (หน้า DMS)</span><span class="zh">在 Pearnly 系统（DMS 页）获取 6 位连接码</span></span></li>
+      <li><span class="n">3</span><span><span class="th">พิมพ์รหัส 6 หลักส่งในแชท → ใช้งานได้เลย</span><span class="zh">在聊天中发送 6 位码 → 即刻可用</span></span></li>
+    </ul>
+    <div class="chat">
+      <span class="cap">LINE · Pearnly DMS</span>
+      <div class="bub bot"><span class="th">ยินดีต้อนรับสู่ Pearnly DMS<br><br>พิมพ์รหัสเชื่อมต่อ 6 หลักที่ได้จากระบบ เพื่อเริ่มใช้งานผ่าน LINE</span><span class="zh">欢迎使用 Pearnly DMS<br><br>请输入从系统获取的 6 位连接码</span></div>
+      <div class="bub user blue">5 9 3 2 1 4</div>
+      <div class="bub bot"><span class="th">เชื่อมต่อสำเร็จแล้ว ตอนนี้ใช้งาน Pearnly DMS ผ่าน LINE ได้เลย</span><span class="zh">连接成功，现在可以通过 LINE 使用 Pearnly DMS</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 · menu -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">เมนูหลัก</span><span class="zh">主菜单</span></div>
+  <h2><span class="th">เลือกเมนูในแชท</span><span class="zh">在聊天中选择菜单</span></h2>
+  <div class="cols">
+    <div class="col">
+      <div class="menu-item">
+        <span class="num">1</span>
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#2f6bff" stroke-width="2"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5" stroke="#2f6bff" stroke-width="2" stroke-linecap="round"/></svg></span>
+        <span><span class="tt">จัดทำข้อมูลลูกค้า</span><span class="dd"><span class="th">บันทึกลูกค้าใหม่จากบัตรประชาชน หรืออัปเดตข้อมูลเดิม</span><span class="zh">用身份证登记新客户或更新旧资料</span></span></span>
+        <span class="ar">›</span>
+      </div>
+      <div class="menu-item pink">
+        <span class="num">2</span>
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 16l2-5h12l2 5" stroke="#f25c6e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16h16v3H4z" stroke="#f25c6e" stroke-width="2" stroke-linejoin="round"/><circle cx="7.5" cy="17.5" r=".5" fill="#f25c6e"/><circle cx="16.5" cy="17.5" r=".5" fill="#f25c6e"/></svg></span>
+        <span><span class="tt">จัดทำใบจอง</span><span class="dd"><span class="th">สร้างใบจองรถยนต์ เลือกรุ่น สี และบันทึกการจอง</span><span class="zh">创建汽车订车单：选车型、颜色并记录订金</span></span></span>
+        <span class="ar">›</span>
+      </div>
+      <div class="note" style="margin-top:0"><span class="th">พิมพ์ <b>เมนู</b> หรือ <b>สวัสดี</b> เพื่อเรียกเมนูนี้ได้ตลอดเวลา</span><span class="zh">随时输入 <b>เมนู（菜单）</b>或 <b>สวัสดี（你好）</b>可重新叫出菜单</span></div>
+    </div>
+    <div class="col">
+      <p class="sub"><span class="th">เมนู 2 = ทำใบจอง · เริ่มจากถ่ายรูปบัตรประชาชนของลูกค้าส่งเข้าแชท ระบบจะค้นหา/สร้างลูกค้าให้อัตโนมัติ</span><span class="zh">菜单 2 = 订车 · 先拍客户身份证发进聊天，系统自动查找/建立客户</span></p>
+      <div class="chat" style="margin-top:4px">
+        <div class="bub user blue"><span class="th">[รูปบัตรประชาชน]</span><span class="zh">[身份证照片]</span></div>
+        <div class="flexcard">
+          <div class="t"><span class="th">พบข้อมูลลูกค้าในระบบ</span><span class="zh">系统中找到该客户</span></div>
+          <div class="row"><span class="k"><span class="th">เลขบัตร</span><span class="zh">证号</span></span><span class="v">1·xxxx·xxxxx·xx·4</span></div>
+          <div class="row"><span class="k"><span class="th">ชื่อ</span><span class="zh">姓名</span></span><span class="v">สมชาย ใจดี</span></div>
+          <div class="row"><span class="k"><span class="th">เบอร์โทร</span><span class="zh">电话</span></span><span class="v">08x-xxx-xxxx</span></div>
+          <div class="foot"><span class="p"><span class="th">ทำใบจองต่อ</span><span class="zh">继续订车</span></span><span class="s"><span class="th">แก้ไข</span><span class="zh">修改</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · start booking -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">จัดทำใบจอง</span><span class="zh">订车流程</span></div>
+  <h2><span class="th">กด ทำใบจองต่อ → เริ่มคำถาม 8 ข้อ</span><span class="zh">按「继续订车」→ 开始 8 个问题</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <span class="cap"><span class="th">ข้อ 1/8 · สลิปโอนเงินจอง</span><span class="zh">第 1/8 步 · 订金转账凭条</span></span>
+      <div class="bub bot"><span class="th">ส่งสลิปโอนเงินจอง (ใบโอนเงิน) ได้เลยครับ · ถ้าลูกค้าจ่ายเงินสด พิมพ์ เงินสด เพื่อข้ามขั้นนี้</span><span class="zh">请发送订金转账凭条 · 若客户付现金，输入 เงินสด（现金）跳过此步</span></div>
+      <div class="bub user blue"><span class="th">เงินสด</span><span class="zh">เงินสด（现金）</span></div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">A</span><span><span class="th">ลูกค้าโอนแล้ว → ส่งรูปสลิปเข้าแชท</span><span class="zh">已转账 → 发送凭条图片</span></span></li>
+        <li><span class="n">B</span><span><span class="th">ลูกค้าจ่ายเงินสด → พิมพ์ว่า <b>เงินสด</b> เพื่อข้าม</span><span class="zh">付现金 → 输入 <b>เงินสด</b> 跳过</span></span></li>
+      </ul>
+      <div class="note" style="margin-top:0"><span class="th">สลิปที่ส่งจะถูกระบบเก็บไว้ เพื่อแนบเข้ากับใบจองอัตโนมัติตอนยืนยัน</span><span class="zh">发送的凭条会由系统保存，确认时自动附到订车单</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · place + car -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">จัดทำใบจอง</span><span class="zh">订车流程</span></div>
+  <h2><span class="th">สถานที่รับจอง · รุ่นรถ · สี</span><span class="zh">接单门店 · 车型 · 颜色</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <div class="bub bot"><span class="th">ข้อ 2/8 · สถานที่รับจอง — กดเลือกด้านล่าง</span><span class="zh">第 2/8 步 · 接单门店 — 点选下方按钮</span>
+        <div class="qr"><span>สำนักงานใหญ่</span><span>สาขา 2</span></div>
+      </div>
+      <div class="bub bot"><span class="th">ข้อ 3/8 · รุ่นรถ — พิมพ์ชื่อรุ่นสั้น ๆ เพื่อค้นหา เช่น dmax</span><span class="zh">第 3/8 步 · 车型 — 输入型号关键词搜索，如 dmax</span></div>
+      <div class="bub user blue">dmax</div>
+      <div class="bub bot"><span class="th">เลือกรุ่นรถ (พบ 3 รายการ)</span><span class="zh">选择车型（找到 3 条）</span>
+        <div class="qr"><span>D-MAX 1.9 DDi S</span><span>D-MAX V-Cross</span><span>D-MAX EV</span></div>
+      </div>
+      <div class="bub bot"><span class="th">เลือกสีของ D-MAX 1.9 DDi S</span><span class="zh">选择 D-MAX 1.9 DDi S 的颜色</span>
+        <div class="qr"><span>ขาว</span><span>ดำ</span><span>เงิน</span><span>แดง</span></div>
+      </div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">2</span><span><span class="th">สถานที่รับจอง — กดปุ่มเลือกจากรายการ</span><span class="zh">接单门店 — 按钮选择</span></span></li>
+        <li><span class="n">3</span><span><span class="th">รุ่นรถ — พิมพ์ค้นก่อน แล้วกดเลือกจากผลที่พบ (พบเยอะเกินไป พิมพ์เจาะจงขึ้น)</span><span class="zh">车型 — 先打字搜索再点选；结果太多时输入更精确的词</span></span></li>
+        <li><span class="n">+</span><span><span class="th">สี — กดปุ่มเลือก · สีเยอะพิมพ์ชื่อสีค้นหาได้</span><span class="zh">颜色 — 按钮选择；颜色多时可打字搜索</span></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · date/term/regis -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">จัดทำใบจอง</span><span class="zh">订车流程</span></div>
+  <h2><span class="th">วันส่งมอบ · เงื่อนไข · จดทะเบียนในนาม</span><span class="zh">交车日 · 销售条件 · 登记名义</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <div class="bub bot"><span class="th">ข้อ 4/8 · วันที่คาดว่าจะส่งมอบรถ — กดปุ่มเพื่อเลือกวันที่</span><span class="zh">第 4/8 步 · 预计交车日 — 按按钮打开日历选择</span>
+        <div class="qr"><span><span class="th">เลือกวันที่</span><span class="zh">选择日期</span></span></div>
+      </div>
+      <div class="bub bot"><span class="th">ข้อ 5/8 · เงื่อนไขการขาย — กดเลือกด้านล่าง</span><span class="zh">第 5/8 步 · 销售条件 — 点选</span>
+        <div class="qr"><span>เงินสด</span><span>เช่าซื้อ</span></div>
+      </div>
+      <div class="bub bot"><span class="th">ข้อ 6/8 · จดทะเบียนในนาม — กดเลือกด้านล่าง</span><span class="zh">第 6/8 步 · 登记名义 — 点选</span>
+        <div class="qr"><span><span class="th">บุคคลธรรมดา</span><span class="zh">个人</span></span><span><span class="th">นิติบุคคล</span><span class="zh">法人</span></span></div>
+      </div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">4</span><span><span class="th">วันส่งมอบ เลือกจากปฏิทินของ LINE (เลือกวันนี้ถึง +2 ปี)</span><span class="zh">交车日用 LINE 日历选择（今天至 +2 年）</span></span></li>
+        <li><span class="n">5</span><span><span class="th">เงื่อนไขการขาย เช่น เงินสด / เช่าซื้อ ตามข้อมูลจริงของดีล</span><span class="zh">销售条件，如现金 / 分期，按实际选择</span></span></li>
+        <li><span class="n">6</span><span><span class="th">จดทะเบียนในนามบุคคลธรรมดาหรือนิติบุคคล</span><span class="zh">登记为个人或公司名义</span></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · regis name -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">จัดทำใบจอง</span><span class="zh">订车流程</span></div>
+  <h2><span class="th">ชื่อผู้จดทะเบียน</span><span class="zh">登记人姓名</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <span class="cap"><span class="th">ข้อ 7/8</span><span class="zh">第 7/8 步</span></span>
+      <div class="bub bot"><span class="th">ข้อ 7/8 · ชื่อผู้จดทะเบียน — กดปุ่มใช้ชื่อตามบัตร หรือพิมพ์ชื่ออื่น</span><span class="zh">第 7/8 步 · 登记人姓名 — 按按钮使用证件姓名，或输入其他姓名</span>
+        <div class="qr"><span class="primary"><span class="th">ใช้ชื่อตามบัตร</span><span class="zh">使用证件姓名</span></span></div>
+      </div>
+      <div class="bub user blue"><span class="th">ใช้ชื่อตามบัตร</span><span class="zh">ใช้ชื่อตามบัตร（使用证件姓名）</span></div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">A</span><span><span class="th">ส่วนใหญ่กด <b>ใช้ชื่อตามบัตร</b> — ระบบเอาชื่อลูกค้าจากบัตรให้อัตโนมัติ</span><span class="zh">多数情况按「使用证件姓名」— 自动带入客户姓名</span></span></li>
+        <li><span class="n">B</span><span><span class="th">ถ้าจดในนามคนอื่น/บริษัท พิมพ์ชื่อนั้นแทนได้</span><span class="zh">若以他人/公司名义登记，可直接输入该名称</span></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9 · payment -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">จัดทำใบจอง</span><span class="zh">订车流程</span></div>
+  <h2><span class="th">ช่องทางชำระเงินจอง (หลายช่องทางได้)</span><span class="zh">订金支付方式（可多种组合）</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <span class="cap"><span class="th">ข้อ 8/8</span><span class="zh">第 8/8 步</span></span>
+      <div class="bub bot"><span class="th">ข้อ 8/8 · ช่องทางชำระเงินจอง — เลือกช่องทาง</span><span class="zh">第 8/8 步 · 订金支付方式 — 选择</span>
+        <div class="qr"><span>เงินสด</span><span>เงินโอน</span><span>เช็ค</span><span>แคชเชียร์เช็ค</span><span>บัตรเครดิต/เดบิต</span><span>อื่นๆ</span></div>
+      </div>
+      <div class="bub bot"><span class="th">ยอดเงิน (เงินโอน) — พิมพ์จำนวนเงิน เช่น 5000</span><span class="zh">金额（转账）— 输入数字，如 5000</span></div>
+      <div class="bub user blue">5,000</div>
+      <div class="bub bot"><span class="th">บัญชีปลายทาง (บัญชีบริษัท) — พิมพ์ หรือพิมพ์ - เพื่อข้าม</span><span class="zh">收款账户（公司账户）— 输入或输 - 跳过</span></div>
+      <div class="bub bot"><span class="th">มีช่องทางอื่นอีกไหม</span><span class="zh">还有其他支付方式吗</span>
+        <div class="qr"><span class="primary"><span class="th">ครบแล้ว</span><span class="zh">齐了</span></span><span><span class="th">เพิ่มช่องทาง</span><span class="zh">增加方式</span></span></div>
+      </div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">+</span><span><span class="th"><b>เพิ่มช่องทาง</b> = กลับไปเลือกช่องทางซ้ำได้ เช่น โอน 5,000 + บัตร 2,000</span><span class="zh"><b>增加方式</b> = 可叠加多种，如转账 5,000 + 刷卡 2,000</span></span></li>
+        <li><span class="n">!</span><span><span class="th">เลือก <b>เงินโอน</b> แล้วต้องส่งรูปสลิปก่อนดูสรุป มิฉะนั้นระบบจะทวงสลิป</span><span class="zh">选了<b>转账</b>就必须发凭条图片才能看汇总，否则系统会催</span></span></li>
+        <li><span class="n">✓</span><span><span class="th">กด <b>ครบแล้ว</b> → ไปการ์ดสรุป</span><span class="zh">按<b>ครบแล้ว（齐了）</b>→ 进入汇总卡</span></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · preview -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">สรุป & ยืนยัน</span><span class="zh">汇总与确认</span></div>
+  <h2><span class="th">ตรวจสอบสรุปก่อนยืนยันทุกครั้ง</span><span class="zh">确认前务必核对汇总</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <div class="flexcard">
+        <div class="t"><span class="th">สรุปใบจอง — ตรวจสอบก่อนยืนยัน</span><span class="zh">订车单汇总 — 确认前请核对</span></div>
+        <div class="row"><span class="k"><span class="th">ลูกค้า</span><span class="zh">客户</span></span><span class="v">สมชาย ใจดี</span></div>
+        <div class="row"><span class="k"><span class="th">สถานที่รับจอง</span><span class="zh">门店</span></span><span class="v">สำนักงานใหญ่</span></div>
+        <div class="row"><span class="k"><span class="th">รุ่น/สี</span><span class="zh">车型/颜色</span></span><span class="v">D-MAX 1.9 DDi S · ขาว</span></div>
+        <div class="row"><span class="k"><span class="th">วันส่งมอบ</span><span class="zh">交车日</span></span><span class="v">15/01/2570</span></div>
+        <div class="row"><span class="k"><span class="th">เงินโอน</span><span class="zh">转账</span></span><span class="v">5,000.00</span></div>
+        <div class="row"><span class="k"><span class="th">ยอดรวม</span><span class="zh">合计</span></span><span class="v">5,000.00</span></div>
+        <div class="row"><span class="k"><span class="th">แนบไฟล์</span><span class="zh">附件</span></span><span class="v"><span class="th">สำเนาบัตร ✓ · ใบโอนเงิน ✓</span><span class="zh">身份证 ✓ · 转账凭条 ✓</span></span></div>
+        <div class="foot"><span class="p"><span class="th">ยืนยัน</span><span class="zh">确认</span></span><span class="s"><span class="th">ทิ้ง</span><span class="zh">丢弃</span></span></div>
+      </div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">✓</span><span><span class="th"><b>ยืนยัน</b> → เปิดใบจองในระบบทันที ได้รับเลขที่ใบจอง (BK…) ในแชท</span><span class="zh"><b>ยืนยัน（确认）</b>→ 立即建单，聊天里收到订车单号（BK…）</span></span></li>
+        <li><span class="n">✕</span><span><span class="th"><b>ทิ้ง</b> → ยกเลิกรายการ ไม่มีข้อมูลถูกบันทึกเลย</span><span class="zh"><b>ทิ้ง（丢弃）</b>→ 放弃，零写入</span></span></li>
+        <li><span class="n">i</span><span><span class="th">รูปบัตร + สลิปที่ส่งไว้ ถูกแนบเข้าใบจองอัตโนมัติ</span><span class="zh">之前发的证件与凭条会自动附到订车单</span></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 11 · receipt -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">หลังยืนยัน</span><span class="zh">确认之后</span></div>
+  <h2><span class="th">ได้เลขที่ใบจอง → ต่อด้วยขั้นตอน DMS ปกติ</span><span class="zh">拿到单号 → 接 DMS 原有流程</span></h2>
+  <div class="cols">
+    <div class="chat">
+      <div class="bub bot"><span class="th">เปิดใบจองสำเร็จ<br>เลขที่ใบจอง: BK000002608000004<br>รุ่นรถ: D-MAX 1.9 DDi S · ขาว<br>วันที่ส่งมอบ: 15/01/2570</span><span class="zh">订车单创建成功<br>单号: BK000002608000004<br>车型: D-MAX 1.9 DDi S · 白<br>交车日: 15/01/2570</span></div>
+    </div>
+    <div class="col">
+      <ul class="bullets" style="margin-top:0">
+        <li><span class="n">1</span><span><span class="th">ใบจองเข้า DMS เป็นสถานะ <b>แบบร่าง</b> — รอผู้จัดการอนุมัติในเว็บ DMS ตามขั้นตอนเดิมของบริษัท</span><span class="zh">订车单以<b>草稿</b>状态进入 DMS — 由经理在 DMS 网页按公司原有流程审批</span></span></li>
+        <li><span class="n">2</span><span><span class="th">ตรวจใบจองอีกครั้งได้ที่เว็บ DMS → ค้นหาตามเลขที่ใบจอง</span><span class="zh">可在 DMS 网页按单号复查</span></span></li>
+        <li><span class="n">3</span><span><span class="th">ทำใบต่อไป: พิมพ์ <b>เมนู</b> แล้วเลือกข้อ 2 อีกครั้ง</span><span class="zh">下一单：输入 <b>เมนู</b> 再选第 2 项</span></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 12 · commands -->
+<section class="slide">
+  <div class="kicker"><span class="dot"></span><span class="th">คำสั่งลัด</span><span class="zh">常用命令</span></div>
+  <h2><span class="th">พิมพ์ในแชทได้ตลอดเวลา</span><span class="zh">聊天中随时可输入</span></h2>
+  <ul class="bullets">
+    <li><span class="n">1</span><span><b>เมนู</b> — <span class="th">เรียกเมนูหลัก (พิมพ์ผิดนิดหน่อยเช่น เมน ก็ใช้ได้)</span><span class="zh">叫出主菜单（打错一点如 เมน 也可以）</span></span></li>
+    <li><span class="n">2</span><span><b>เริ่มใหม่</b> — <span class="th">ยกเลิกสิ่งที่ทำค้างไว้ เริ่มรายการใหม่ตั้งแต่ต้น</span><span class="zh">放弃当前进度，从头开始</span></span></li>
+    <li><span class="n">3</span><span><b>ยกเลิกการเชื่อมต่อ</b> — <span class="th">ถอด LINE นี้ออกจากบัญชี DMS (เช่น เปลี่ยนคนใช้)</span><span class="zh">解除该 LINE 与 DMS 账号的绑定（如换人使用）</span></span></li>
+  </ul>
+  <div class="note"><span class="th"><b>เคล็ดลับ:</b> ระหว่างตอบคำถาม ถ้าเผลอพิมพ์อย่างอื่น ระบบจะไม่บันทึกมั่ว แต่จะถามข้อเดิมซ้ำ — ตอบตามปุ่ม/รูปแบบที่ถามได้เลย</span><span class="zh"><b>提示：</b>问答过程中输入了无关内容，系统不会乱记，只会重问当前步骤 — 按提示回答即可</span></div>
+</section>
+
+<!-- 13 · closing -->
+<section class="slide cover">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1" stroke="#7c4dff" stroke-width="2.6" stroke-linecap="round"/></svg>
+    Pearnly DMS
+  </div>
+  <h1 style="margin-top:24px"><span class="th">พร้อมใช้งานแล้ว</span><span class="zh">即刻可用</span></h1>
+  <p class="sub">
+    <span class="th">เพิ่มเพื่อน LINE OA → ผูกบัญชีด้วยรหัส 6 หลัก → ถ่ายบัตรลูกค้า → ตอบ 8 ข้อ → ยืนยัน = เปิดใบจองเสร็จในแชทเดียว</span>
+    <span class="zh">加好友 → 6 位码绑定 → 拍客户证件 → 回答 8 步 → 确认 = 一个聊天窗口完成订车单</span>
+  </p>
+  <div class="foot-meta">
+    <span><span class="th">มีปัญหาติดต่อผู้ดูแลระบบของบริษัท</span><span class="zh">有问题请联系公司系统管理员</span></span>
+    <span>pearnly.com/dms</span>
+  </div>
+</section>
+
+</div>
+
+<div class="bar">
+  <span id="cnt">1 / 13</span>
+  <div class="mid">
+    <button id="prev" aria-label="prev">←</button>
+    <button id="next" aria-label="next">→</button>
+  </div>
+  <span class="lang">
+    <button id="lth" class="act">TH</button><button id="lzh">中文</button>
+  </span>
+</div>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide')),i=0;
+  var cnt=document.getElementById('cnt'),prog=document.getElementById('prog');
+  function go(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('on',k===i)});
+    cnt.textContent=(i+1)+' / '+slides.length;
+    prog.style.width=((i+1)/slides.length*100)+'%';
+    location.hash='#'+(i+1);
+  }
+  document.getElementById('prev').onclick=function(){go(i-1)};
+  document.getElementById('next').onclick=function(){go(i+1)};
+  addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown')go(i+1);
+    else if(e.key==='ArrowLeft'||e.key==='PageUp')go(i-1);
+    else if(e.key==='Home')go(0);
+    else if(e.key==='End')go(slides.length-1);
+  });
+  var tx=0;
+  addEventListener('touchstart',function(e){tx=e.touches[0].clientX});
+  addEventListener('touchend',function(e){
+    var dx=e.changedTouches[0].clientX-tx;
+    if(dx<-40)go(i+1);else if(dx>40)go(i-1);
+  });
+  function lang(l){
+    document.documentElement.setAttribute('data-lang',l);
+    document.getElementById('lth').classList.toggle('act',l==='th');
+    document.getElementById('lzh').classList.toggle('act',l==='zh');
+  }
+  document.getElementById('lth').onclick=function(){lang('th')};
+  document.getElementById('lzh').onclick=function(){lang('zh')};
+  var h=parseInt((location.hash||'').slice(1),10);
+  go(isNaN(h)?0:h-1);
+})();
+</script>
+</body>
+</html>

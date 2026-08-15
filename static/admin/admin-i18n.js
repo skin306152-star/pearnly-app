@@ -154,12 +154,12 @@
             'adm-daily-title': 'Daily 邀请管理',
             'adm-daily-sub':
                 '发放个人收支周记入口 · 已有账号直接加名单 · 新客户建号并生成一次性密码',
-            'adm-daily-flag-title': '闸状态',
-            'adm-daily-flag-hint': '只读展示 · 总闸/灰度策略切换请去「全局设置」',
+            'adm-daily-flag-title': '开通方式',
+            'adm-daily-flag-hint': '邀请即用 · 名单内账号可直接登录 /daily,无需其他开关',
             'adm-daily-flag-on': '已启用',
             'adm-daily-flag-off': '已关闭',
             'adm-daily-flag-rollout-all': '全部用户',
-            'adm-daily-flag-rollout-allowlist': '仅名单内(灰度)',
+            'adm-daily-flag-rollout-allowlist': '仅被邀请账号',
             'adm-daily-invite-title': '邀请',
             'adm-daily-invite-hint':
                 '填已有账号直接加名单;不存在的用户名自动建号(任意字符,不强制邮箱)',
@@ -809,13 +809,13 @@
             'adm-daily-title': 'จัดการคำเชิญ Daily',
             'adm-daily-sub':
                 'เปิดสิทธิ์บันทึกรายรับรายจ่ายส่วนตัว · บัญชีที่มีอยู่เพิ่มเข้ารายชื่อได้ทันที · ลูกค้าใหม่สร้างบัญชีพร้อมรหัสผ่านใช้ครั้งเดียว',
-            'adm-daily-flag-title': 'สถานะสวิตช์',
+            'adm-daily-flag-title': 'วิธีเปิดใช้งาน',
             'adm-daily-flag-hint':
-                'แสดงอย่างเดียว · สลับสวิตช์หลัก/นโยบายทยอยเปิดที่หน้า "ตั้งค่าทั่วไป"',
+                'เชิญแล้วใช้ได้ทันที · บัญชีในรายชื่อเข้าสู่ระบบ /daily ได้โดยไม่ต้องเปิดสวิตช์อื่น',
             'adm-daily-flag-on': 'เปิดใช้งาน',
             'adm-daily-flag-off': 'ปิดอยู่',
             'adm-daily-flag-rollout-all': 'ผู้ใช้ทั้งหมด',
-            'adm-daily-flag-rollout-allowlist': 'เฉพาะในรายชื่อ (ทยอยเปิด)',
+            'adm-daily-flag-rollout-allowlist': 'เฉพาะบัญชีที่ได้รับเชิญ',
             'adm-daily-invite-title': 'เชิญ',
             'adm-daily-invite-hint':
                 'กรอกบัญชีที่มีอยู่เพื่อเพิ่มเข้ารายชื่อ · ชื่อผู้ใช้ที่ยังไม่มีจะถูกสร้างอัตโนมัติ (ไม่บังคับอีเมล)',

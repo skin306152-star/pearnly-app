@@ -153,9 +153,19 @@ input[readonly] {
 .file-row:first-of-type {
   border-top: 0;
 }
+.file-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-align: right;
+}
 .switch {
+  flex: 0 0 auto;
   width: 22px;
   height: 22px;
+  min-height: 22px;
+  margin: 0;
+  padding: 0;
   accent-color: var(--good);
 }
 .sticky-actions {
@@ -237,18 +247,23 @@ input[readonly] {
     grid-column: auto;
   }
   .payment {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) 44px;
   }
   .payment .extra {
     grid-column: 1 / -1;
   }
   .payment .remove {
-    position: absolute;
-    right: 0;
-    top: 8px;
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
   }
   .payment .channel {
-    padding-right: 50px;
+    grid-column: 1;
+    grid-row: 1;
+    padding-right: 0;
+  }
+  .payment > .field:not(.channel):not(.extra) {
     grid-column: 1 / -1;
   }
 }

@@ -159,6 +159,7 @@
         if (p === '/admin/pos' || p === '/admin/pos/') return 'pos';
         if (p === '/admin/pearnly-ai' || p === '/admin/pearnly-ai/') return 'pearnly-ai';
         if (p === '/admin/dms' || p === '/admin/dms/') return 'dms';
+        if (p === '/admin/daily' || p === '/admin/daily/') return 'daily';
         return 'cost';
     }
 
@@ -174,6 +175,7 @@
             pos: 'page-admin-pos',
             'pearnly-ai': 'page-admin-pearnly-ai',
             dms: 'page-admin-dms',
+            daily: 'page-admin-daily',
         };
         Object.keys(pages).forEach(function (r) {
             const el = document.getElementById(pages[r]);
@@ -194,6 +196,7 @@
         if (route === 'pos') _renderPosPage();
         if (route === 'pearnly-ai') _renderPearlyAiPage();
         if (route === 'dms') _renderDmsPage();
+        if (route === 'daily') _renderDailyPage();
     }
 
     function _bindSidebar() {
@@ -3962,6 +3965,198 @@
     function _dmsErrorKey(err) {
         const detail = (err && err.detail) || '';
         return _DMS_ERROR_KEYS[detail] || 'adm-load-fail';
+    }
+
+    // ============ Daily 收支周记入口邀请管理页(照 DMS 邀请页范式) ============
+    function _dailyFlagText(flag) {
+        flag = flag || {};
+        const on = flag.enabled ? _t('adm-daily-flag-on') : _t('adm-daily-flag-off');
+        const rollout =
+            flag.rollout === 'all'
+                ? _t('adm-daily-flag-rollout-all')
+                : _t('adm-daily-flag-rollout-allowlist');
+        return on + ' · ' + rollout;
+    }
+
+    function _renderDailyList(rows) {
+        const host = document.getElementById('adm-daily-list');
+        if (!host) return;
+        if (!rows || !rows.length) {
+            host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-daily-list-empty')) + '</div>';
+            return;
+        }
+        host.innerHTML = rows
+            .map(function (r) {
+                const who =
+                    r.subject_type === 'unknown'
+                        ? _t('adm-daily-list-unknown')
+                        : _esc(r.username || r.email || r.subject_id);
+                const meta = [
+                    r.company_name,
+                    r.joined_at ? new Date(r.joined_at).toLocaleString() : '',
+                ]
+                    .filter(Boolean)
+                    .map(_esc)
+                    .join(' · ');
+                return (
+                    '<div class="adm-ai-list-row">' +
+                    '<span class="adm-ai-list-who"><span class="adm-ai-list-name">' +
+                    who +
+                    '</span><span class="adm-ai-list-meta">' +
+                    meta +
+                    '</span></span>' +
+                    '<span class="adm-ai-list-actions">' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-daily-reset="' +
+                    _esc(r.subject_id) +
+                    '" data-adm-daily-reset-who="' +
+                    _esc(r.username || r.email || r.subject_id) +
+                    '">' +
+                    _esc(_t('adm-daily-reset-btn')) +
+                    '</button>' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-daily-revoke="' +
+                    _esc(r.subject_id) +
+                    '">' +
+                    _esc(_t('adm-daily-revoke-btn')) +
+                    '</button>' +
+                    '</span>' +
+                    '</div>'
+                );
+            })
+            .join('');
+        host.querySelectorAll('[data-adm-daily-revoke]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const ok = await _admConfirm(_t('adm-daily-revoke-confirm'), {
+                    title: _t('adm-daily-revoke-btn'),
+                    okText: _t('adm-daily-revoke-btn'),
+                    danger: true,
+                });
+                if (!ok) return;
+                try {
+                    await _adminFetch('/api/admin/daily/revoke', {
+                        method: 'POST',
+                        body: { subject_id: btn.dataset.admDailyRevoke },
+                    });
+                    _renderDailyPage();
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+        });
+        host.querySelectorAll('[data-adm-daily-reset]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const who = btn.dataset.admDailyResetWho || btn.dataset.admDailyReset;
+                const pwd = await _admPrompt(_t('adm-daily-reset-confirm').replace('{n}', who), {
+                    placeholder: _t('adm-daily-invite-pwd-ph'),
+                    okText: _t('adm-daily-reset-btn'),
+                });
+                if (pwd === null) return;
+                const trimmed = pwd.trim();
+                try {
+                    const r = await _adminFetch('/api/admin/daily/reset-password', {
+                        method: 'POST',
+                        body: trimmed
+                            ? { subject_id: btn.dataset.admDailyReset, password: trimmed }
+                            : { subject_id: btn.dataset.admDailyReset },
+                    });
+                    _toast(_t('adm-daily-reset-ok'), 'success');
+                    _showDailyPassword(r.initial_password, r.username);
+                } catch (e) {
+                    _toast(_t(_dailyErrorKey(e)), 'error');
+                }
+            });
+        });
+    }
+
+    function _showDailyPassword(pwd, username) {
+        const box = document.getElementById('adm-daily-pwd-box');
+        const input = document.getElementById('adm-daily-pwd-value');
+        if (!box || !input) return;
+        input.value = pwd;
+        const forLine = document.getElementById('adm-daily-pwd-for');
+        if (forLine)
+            forLine.textContent = username
+                ? _t('adm-daily-pwd-for-label').replace('{n}', username)
+                : '';
+        box.hidden = false;
+    }
+
+    // 错误按 err.detail(后端 HTTPException detail)精确分流 · invite/reset 两组 detail 不相交,共用一张表。
+    const _DAILY_ERROR_KEYS = {
+        'admin.daily_not_invited': 'adm-daily-reset-not-invited',
+        'admin.daily_subject_unknown': 'adm-daily-reset-subject-unknown',
+        'admin.username_exists': 'adm-daily-invite-username-exists',
+    };
+
+    function _dailyErrorKey(err) {
+        const detail = (err && err.detail) || '';
+        return _DAILY_ERROR_KEYS[detail] || 'adm-load-fail';
+    }
+
+    async function _renderDailyPage() {
+        const btn = document.getElementById('adm-daily-invite-btn');
+        const input = document.getElementById('adm-daily-invite-input');
+        const pwInput = document.getElementById('adm-daily-invite-password');
+        if (!btn || !input) return;
+        if (!btn.__bound) {
+            btn.__bound = true;
+            const go = async function () {
+                const raw = (input.value || '').trim();
+                if (!raw) return;
+                const pwd = (pwInput && pwInput.value.trim()) || '';
+                try {
+                    const r = await _adminFetch('/api/admin/daily/invite', {
+                        method: 'POST',
+                        body: pwd
+                            ? { username_or_email: raw, password: pwd }
+                            : { username_or_email: raw },
+                    });
+                    input.value = '';
+                    if (pwInput) pwInput.value = '';
+                    if (r.created_account) {
+                        _toast(_t('adm-daily-invite-created-ok'), 'success');
+                        _showDailyPassword(r.initial_password, r.username);
+                    } else {
+                        _toast(_t('adm-daily-invite-existing-ok'), 'success');
+                    }
+                    _renderDailyPage();
+                } catch (e) {
+                    _toast(_t(_dailyErrorKey(e)), 'error');
+                }
+            };
+            btn.addEventListener('click', go);
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') go();
+            });
+            document
+                .getElementById('adm-daily-pwd-copy')
+                ?.addEventListener('click', async function () {
+                    const val = document.getElementById('adm-daily-pwd-value');
+                    if (!val || !val.value) return;
+                    val.select();
+                    try {
+                        await navigator.clipboard.writeText(val.value);
+                    } catch (_) {}
+                    _toast(_t('adm-daily-pwd-copied'), 'success');
+                });
+            document.getElementById('adm-daily-pwd-close')?.addEventListener('click', function () {
+                const box = document.getElementById('adm-daily-pwd-box');
+                const val = document.getElementById('adm-daily-pwd-value');
+                const forLine = document.getElementById('adm-daily-pwd-for');
+                if (box) box.hidden = true;
+                if (val) val.value = '';
+                if (forLine) forLine.textContent = '';
+            });
+        }
+        let d;
+        try {
+            d = await _adminFetch('/api/admin/daily/overview');
+        } catch (e) {
+            _toast(_t('adm-load-fail'), 'error');
+            return;
+        }
+        const flagLine = document.getElementById('adm-daily-flag-line');
+        if (flagLine) flagLine.textContent = _dailyFlagText(d.flag);
+        _renderDailyList(d.allowlist);
     }
 
     async function _renderDmsPage() {

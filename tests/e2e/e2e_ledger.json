@@ -1038,6 +1038,15 @@
         "对账进行中切类型的三道硬门:确认弹窗后工作区秒级可见、RX.running 不卡死开始按钮、旧 job 收尾不劫持新 tab 视图(runSeq 票据是跨 await 的时序行为,单测桩不出真实事件循环)"
       ]
     },
+    "33-dms-booking-edit-mobile.spec.js": {
+      "covers": [
+        "static/dms-booking-edit/dms-booking-edit.html",
+        "static/dms-booking-edit/dms-booking-edit.css"
+      ],
+      "only_e2e": [
+        "390px 手机视口下付款删除按钮、金额输入框与附件勾选框的真实浏览器布局和对齐"
+      ]
+    },
     "_a1_discount_inferred_verify.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
       "only_e2e": ["系统补的折扣行在审核队列说人话、严重度红、无按建议处理的安全默认"]

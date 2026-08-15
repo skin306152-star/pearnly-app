@@ -87,6 +87,7 @@ sh scripts/git-hooks/pre-push     # Git Bash
 - **收尾铁律(2026-08-12 新口径·Zihao 说"收尾/今天到这/换窗口/下班/总结"时)**:轻收口 —— ① 四角审查(复用/简化/效率/层级)全派 `opencode run --agent worker`(DeepSeek),主控只汇总裁决;② 发现只记账进交接账本,次日首批派 worker 修(当场只准 ≤几行零风险微修;例外=不修不能 push/会污染生产);③ push 前 10 秒机械自检(前端源→dist 同提交/大净增→RATCHET-EXEMPT/动文案→check_i18n --strict);④ **重写**(不是无脑追加)STATE 顶部「状态卡」→ 交接报告 → 清树。simplify 的正确时机=批次收口边界,收尾只兜当天没扫过的尾巴。细则=`.claude/skills/wrapup`。
 - 历史明细往「分割线以下」追加。状态卡保持 ≤30 行,永远最新。
 - 长跑 loop:每轮跑脚本看真数字 + 抽代码前 re-grep 真实行号(别信文档行号)+ 每轮写状态卡 → 压缩后重读 = 一页 + 脚本,永不漂。
+- **上下文精度铁律(2026-08-13·额度黑洞根治)**:真相落盘(目标/决策/约定 当场写 任务板/状态卡/交接账本,不留在对话)· worker 交摘要+全文落盘 · 压缩//clear 后必先重读状态卡+任务板再干活。**机械强制,不靠自觉**:SessionStart 横幅 + PostCompact 钩子自动注入(`scripts/session_banner.sh` + `scripts/state_reread.sh`)。精度靠磁盘,不靠大上下文。
 
 ## 8. 文档地图(别全读 · 按需取)
 

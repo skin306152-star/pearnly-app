@@ -228,9 +228,11 @@ def qa_common(*, cash: bool = False, slip: bool = True) -> tuple[str, str, dict]
         C.wait_outbox(lambda r: "บัญชีต้นทาง" in json.dumps(r, ensure_ascii=False), base, 120)
         base = C.outbox_len()
         C.post_webhook([C.ev_text("บัญชีลูกค้า 123-4")])
-        C.wait_outbox(lambda r: "บัญชีปลายทาง" in json.dumps(r, ensure_ascii=False), base, 120)
+        bank_card, _ = wait_data("qa:bank:", base, 120)
+        if not bank_card:
+            raise AssertionError("company bank choices missing")
         base = C.outbox_len()
-        C.post_webhook([C.ev_text("บัญชีบริษัท 567-8")])
+        post(next(v for v in data_values(bank_card) if v.startswith("qa:bank:")))
     more = latest_button(base, "qa:more:")
     base = C.outbox_len()
     post("qa:more:done")

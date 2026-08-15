@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from services.erp import dms_advisor
 from services.erp import dms_id_ocr as _id_ocr
+from services.erp.mrerp_dms_company_banks import company_bank_label
 from services.erp.mrerp_dms_client_base import to_be_date
 from services.line_dms import commands, masters_cache, qa_cards, store
 from services.line_dms._out import _send, _thr
@@ -95,7 +96,7 @@ async def start(
 # ── 每步发问(内部 · slip_after 复用) ─────────────────────────────────────
 async def send_step(tenant_id, line_user_id, qa, step, reply_token=None) -> None:
     """按步发问。reply_token 有则 reply,无则 push(逐问可被 postback / 收料两种上下文调)。"""
-    if step in ("place", "paint", "term", "regis"):  # 这几个步发问前要取主档
+    if step in ("place", "paint", "term", "regis", "pay_dst"):  # 这些步发问前要取主档
         msg = await _async_question(tenant_id, line_user_id, qa, step)
     else:
         msg = _question(step, qa)
@@ -113,7 +114,6 @@ def _question(step, qa) -> Optional[Dict[str, Any]]:
         "pay_channel": qa_cards.ask_pay_channel(),
         "pay_amount": qa_cards.ask_amount(qa_cards.PAY_LABELS.get(channel, "")),
         "pay_src": qa_cards.ask_pay_src(),
-        "pay_dst": qa_cards.ask_pay_dst(),
         "pay_ref": qa_cards.ask_pay_ref(channel),
         "pay_more": qa_cards.ask_more(),
         "slip_after": qa_cards.need_slip(),
@@ -130,6 +130,8 @@ async def _async_question(tenant_id, line_user_id, qa, step) -> Optional[Dict[st
         return qa_cards.ask_regis(await _masters(line_user_id, qa, "regis_behalfs"))
     if step == "paint":
         return qa_cards.ask_paint(car_label_of(qa), await _paints(line_user_id, qa))
+    if step == "pay_dst":
+        return qa_cards.ask_pay_dst(await _masters(line_user_id, qa, "company_banks"))
     return None
 
 
@@ -177,6 +179,7 @@ _POSTBACK_ACTIONS = {
     "regis": "regis",
     "regis_name": "regisname",
     "pay_channel": "pay",
+    "pay_dst": "bank",
     "pay_more": "more",
 }
 
@@ -208,6 +211,8 @@ async def handle_postback(tenant_id, line_user_id, data, params, reply_token) ->
         await _pick_regis_name(tenant_id, line_user_id, qa, reply_token)
     elif action == "pay":
         await _pick_channel(tenant_id, line_user_id, qa, value, reply_token)
+    elif action == "bank":
+        await _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token)
     elif action == "more":
         await _pick_more(tenant_id, line_user_id, qa, value, reply_token)
     return True
@@ -296,14 +301,6 @@ async def _on_pay_src(tenant_id, line_user_id, qa, text, reply_token) -> None:
     await send_step(tenant_id, line_user_id, qa, "pay_dst", reply_token)
 
 
-async def _on_pay_dst(tenant_id, line_user_id, qa, text, reply_token) -> None:
-    extra = qa["pending_channel"].setdefault("extra", {})
-    extra["dst"] = "" if text.strip() == _SKIP_WORD else text.strip()
-    complete_channel(qa)
-    await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
-
-
 async def _on_pay_ref(tenant_id, line_user_id, qa, text, reply_token) -> None:
     pending = qa["pending_channel"]
     extra = pending.setdefault("extra", {})
@@ -336,7 +333,7 @@ _TEXT_HANDLERS = {
     "pay_channel": _reask,
     "pay_amount": _on_pay_amount,
     "pay_src": _on_pay_src,
-    "pay_dst": _on_pay_dst,
+    "pay_dst": _reask,
     "pay_ref": _on_pay_ref,
     "pay_more": _reask,
     "slip_after": _on_slip_after,
@@ -363,6 +360,19 @@ async def _pick_master(
     qa["step"] = next_step
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, next_step, reply_token)
+
+
+async def _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token) -> None:
+    row = find_row(await _masters(line_user_id, qa, "company_banks"), value)
+    if row is None:
+        await _reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
+    extra = qa["pending_channel"].setdefault("extra", {})
+    extra["dst_id"] = str(row[0])
+    extra["dst"] = company_bank_label(row)
+    complete_channel(qa)
+    await _persist(tenant_id, line_user_id, qa)
+    await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
 
 
 async def _pick_car(tenant_id, line_user_id, qa, value, reply_token) -> None:

@@ -11,7 +11,11 @@ from unittest import mock
 from services.erp import dms_masters_cache as mc
 
 _EP = {"id": "E1", "config": {}}
-_MASTERS = {"cars": [["c1", "CODE1", "Car One"]], "advisors": [["a1", "A1", "Adv"]]}
+_MASTERS = {
+    "cars": [["c1", "CODE1", "Car One"]],
+    "advisors": [["a1", "A1", "Adv"]],
+    "company_banks": [["1", "SCB", "SCB"]],
+}
 _PAINTS = [["p1", "PC1", "Red"]]
 
 
@@ -69,6 +73,12 @@ class MastersCacheTests(unittest.TestCase):
         mc.get_masters(_EP)
         self.assertEqual(self.masters_calls, 2)
 
+    def test_legacy_cache_without_company_banks_is_refreshed(self):
+        self.mem.write("E1", {"cars": _MASTERS["cars"]})
+        out = mc.get_masters(_EP)
+        self.assertEqual(out["company_banks"], _MASTERS["company_banks"])
+        self.assertEqual(self.masters_calls, 1)
+
     def test_force_refresh_bypasses_fresh_cache(self):
         """顾问认不出时要按现场名册重判 → force_refresh 必须真的重抓,不吃 12h 缓存。"""
         mc.get_masters(_EP)
@@ -118,6 +128,25 @@ class PaintFetchLayerTests(unittest.TestCase):
         for outcome in (None, {"ok": False, "error_code": "ERR_DMS_AUTH"}):
             with mock.patch.object(erp_dms_intake, "_run_logged_in", return_value=outcome):
                 self.assertIsNone(mc._fetch_paints_via_login(_EP, "c1"))
+
+    def test_full_master_fetch_includes_company_banks(self):
+        from services.erp import erp_dms_intake
+
+        client = mock.Mock()
+        client.fetch_masters.return_value = {"cars": []}
+
+        def run(endpoint, fn):
+            return fn(client, object())
+
+        with (
+            mock.patch.object(erp_dms_intake, "_run_logged_in", side_effect=run),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB"]],
+            ),
+        ):
+            out = mc._fetch_masters_via_login(_EP)
+        self.assertEqual(out["company_banks"], [["1", "SCB", "SCB"]])
 
 
 if __name__ == "__main__":

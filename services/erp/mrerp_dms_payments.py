@@ -23,7 +23,7 @@ _PAYMENT_MONEY_FIELD = {
     "other": "txtmoneyother",
 }
 
-# 每渠道的文本 extra 槽位 → 表单字段;transfer 的 src/dst 为空或 "-" 时不写。
+# 每渠道的文本 extra 槽位 → 表单字段；transfer 的来源可空，目的地由公司银行主档给值。
 _PAYMENT_TEXT_FIELD = {
     "transfer": {"src": "txtaccountnumtffrom", "dst": "txtaccountnumtfmon"},
     "cheque": {"ref": "txtchequeno"},

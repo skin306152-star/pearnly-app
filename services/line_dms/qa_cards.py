@@ -24,6 +24,7 @@ from services.line_dms.cards import (
     _kv_row,
     _qr_item,
 )
+from services.erp.mrerp_dms_company_banks import company_bank_label
 from services.line_dms.qa_util import CHANNEL_EXTRA_SHAPE
 from services.line_dms.qa_util import car_label as _car_label
 from services.line_dms.qa_util import row_name as _name
@@ -57,7 +58,10 @@ PAY_LABELS = {
 TXT_ASK_AMOUNT = "ยอดเงิน ({channel}) — พิมพ์จำนวนเงิน เช่น 5000"
 TXT_BAD_AMOUNT = "จำนวนเงินไม่ถูกต้อง พิมพ์เป็นตัวเลข เช่น 5000 หรือ 5,000.50"
 TXT_ASK_PAY_SRC = "บัญชีต้นทาง (ธนาคาร + เลขบัญชี) — พิมพ์ หรือพิมพ์ - เพื่อข้าม"
-TXT_ASK_PAY_DST = "บัญชีปลายทาง (บัญชีบริษัท) — พิมพ์ หรือพิมพ์ - เพื่อข้าม"
+TXT_ASK_PAY_DST = "บัญชีปลายทาง (บัญชีบริษัท) — กดเลือกจากธนาคารของบริษัทด้านล่าง"
+TXT_NO_COMPANY_BANK = (
+    "ยังไม่มีข้อมูลธนาคารของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
+)
 TXT_ASK_CHEQUE_REF = "เลขที่เช็ค + ธนาคาร — พิมพ์"
 TXT_ASK_CARD_REF = "ธนาคาร/ประเภทบัตร — พิมพ์"
 TXT_ASK_OTHER_REF = "รายละเอียดช่องทาง — พิมพ์"
@@ -236,8 +240,10 @@ def ask_pay_src() -> Dict[str, Any]:
     return _msg(TXT_ASK_PAY_SRC)
 
 
-def ask_pay_dst() -> Dict[str, Any]:
-    return _msg(TXT_ASK_PAY_DST)
+def ask_pay_dst(company_banks: List[list]) -> Dict[str, Any]:
+    if not company_banks:
+        return _msg(TXT_NO_COMPANY_BANK)
+    return _msg(TXT_ASK_PAY_DST, _pick_rows(company_banks, "bank", company_bank_label))
 
 
 def ask_pay_ref(channel: str) -> Dict[str, Any]:
@@ -303,7 +309,11 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     ]
     for p in payments:
         label = PAY_LABELS.get(p.get("channel") or "", p.get("channel") or "")
-        rows.append(_kv_row(label, str(p.get("amount") or "")))
+        value = str(p.get("amount") or "")
+        if p.get("channel") == "transfer":
+            bank = str((p.get("extra") or {}).get("dst") or "")
+            value = " · ".join(part for part in (value, bank) if part)
+        rows.append(_kv_row(label, value))
     rows.append(_kv_row(LBL_TOTAL, f"{deposit_total(payments):,.2f}"))
     rows.append({"type": "separator", "margin": "sm"})
     rows.append(_kv_row(LBL_ATTACH_CARD, VAL_ATTACHED if files.get("id_card_mid") else "—"))

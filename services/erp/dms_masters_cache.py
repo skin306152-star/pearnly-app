@@ -106,7 +106,12 @@ def _fetch_masters_via_login(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any
     """登录 DMS 抓全量主档;登录/抓取失败(_run_logged_in 回 _err dict)→ None。"""
     from services.erp.erp_dms_intake import _run_logged_in
 
-    res = _run_logged_in(endpoint, lambda cl, ad: cl.fetch_masters())
+    def _fetch(client, adapter):
+        from services.erp.mrerp_dms_company_banks import fetch_company_banks
+
+        return {**client.fetch_masters(), "company_banks": fetch_company_banks(adapter)}
+
+    res = _run_logged_in(endpoint, _fetch)
     if isinstance(res, dict) and res.get("ok") is False:
         return None
     return res
@@ -132,7 +137,8 @@ def get_masters(endpoint: Dict[str, Any], *, force_refresh: bool = False) -> Dic
     否则那句「改完再试一次」在 12 小时内都是假的。"""
     eid = str(endpoint.get("id") or "")
     cached = _read(eid)
-    if not force_refresh and cached and cached["age_seconds"] < CACHE_TTL_SECONDS:
+    cache_has_banks = cached and "company_banks" in cached["masters"]
+    if not force_refresh and cache_has_banks and cached["age_seconds"] < CACHE_TTL_SECONDS:
         return cached["masters"]
     fresh = _fetch_masters_via_login(endpoint)
     if fresh is None:
@@ -188,7 +194,10 @@ def refresh_from_client(endpoint: Dict[str, Any], client: Any) -> None:
     eid = str(endpoint.get("id") or "")
     cached = _read(eid)
     if cached:
-        pbc = (cached["masters"] or {}).get("paints_by_car")
+        old = cached["masters"] or {}
+        pbc = old.get("paints_by_car")
         if pbc:
             masters = {**masters, "paints_by_car": pbc}
+        if "company_banks" in old:
+            masters = {**masters, "company_banks": old["company_banks"]}
     _write(eid, masters)

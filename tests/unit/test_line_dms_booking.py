@@ -93,7 +93,13 @@ def _qa_payload(**over):
             "regis": {"id": "r1", "name": "บริษัท"},
             "regis_name": "บริษัท สมชาย จำกัด",
         },
-        "payments": [{"channel": "transfer", "amount": "5000.00", "extra": {"src": "SCB"}}],
+        "payments": [
+            {
+                "channel": "transfer",
+                "amount": "5000.00",
+                "extra": {"src": "SCB", "dst_id": "1", "dst": "old"},
+            }
+        ],
         "pending_channel": {},
         "audit": [{"step": "slip", "input": "image:mid-slip"}],
     }
@@ -199,6 +205,10 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB"]],
+            ),
         ):
             res = bf._book_in_session(
                 {"id": "E1", "config": {}},
@@ -239,7 +249,14 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(b.delivery_date_be, "01/01/2570")  # 逐问交车日覆盖
         self.assertEqual(b.regis_name, "บริษัท สมชาย จำกัด")
         self.assertEqual(
-            b.payments, ({"channel": "transfer", "amount": "5000.00", "extra": {"src": "SCB"}},)
+            b.payments,
+            (
+                {
+                    "channel": "transfer",
+                    "amount": "5000.00",
+                    "extra": {"src": "SCB", "dst_id": "1", "dst": "SCB"},
+                },
+            ),
         )
         self.assertEqual(rec["attach_booking_id"], "BID1")
         self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg", "slip.jpg"])
@@ -285,6 +302,10 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
             ),
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB"]],
+            ),
         ):
             qa = _qa_payload()
             files = qa["files"]

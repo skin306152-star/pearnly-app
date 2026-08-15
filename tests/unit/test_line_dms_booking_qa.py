@@ -31,6 +31,7 @@ _PAINTS = [["p1", "", "ขาว"], ["p2", "", "ดำ"], ["p3", "", "เทา"
 _PLACES = [["pl1", "", "สาขาบางนา"], ["pl2", "", "สาขารามอินทรา"]]
 _TERMS = [["t1", "", "เงินสด"], ["t2", "", "ผ่อน"]]
 _REGIS = [["r1", "", "บริษัท"], ["r2", "", "บุคคลธรรมดา"]]
+_COMPANY_BANKS = [["1", "SCB", "SCB"]]
 
 
 class FakeStore:
@@ -60,13 +61,21 @@ class FakeStore:
 
 
 class Env:
-    def __init__(self, cars=_CARS, paints=_PAINTS, advisor=_ADVISOR, dms_username="sale02"):
+    def __init__(
+        self,
+        cars=_CARS,
+        paints=_PAINTS,
+        advisor=_ADVISOR,
+        dms_username="sale02",
+        company_banks=_COMPANY_BANKS,
+    ):
         self.store = FakeStore()
         self.cars = cars
         self.paints = paints
         self.paints_calls = []
         self.advisor = advisor
         self.dms_username = dms_username
+        self.company_banks = company_banks
         self.es = contextlib.ExitStack()
 
     def __enter__(self):
@@ -85,6 +94,7 @@ class Env:
                 "place_books": _PLACES,
                 "term_sales": _TERMS,
                 "regis_behalfs": _REGIS,
+                "company_banks": self.company_banks,
             },
         )
 
@@ -382,11 +392,15 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PAY_SRC)
             await qa.handle_text(_TID, _LUID, "-", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
-            await qa.handle_text(_TID, _LUID, "-", "rt")
+            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PAY_DST)
+            self.assertEqual(_replied_items(env)[0]["action"]["data"], "qa:bank:1")
+            await qa.handle_text(_TID, _LUID, "SCB", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_dst")
+            await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
             p = env.qa_payload()
             self.assertEqual(p["step"], "pay_more")
             self.assertEqual(p["payments"][0]["channel"], "transfer")
-            self.assertEqual(p["payments"][0]["extra"], {"src": "", "dst": ""})
+            self.assertEqual(p["payments"][0]["extra"], {"src": "", "dst_id": "1", "dst": "SCB"})
             # done → 有转账渠道但没凭证 → 补要
             await qa.handle_postback(_TID, _LUID, "qa:more:done", {}, "rt")
             self.assertEqual(env.qa_payload()["step"], "slip_after")
@@ -401,6 +415,26 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sess["state"], "booking_review")
             self.assertEqual(sess["payload"]["qa"]["files"]["slip_mid"], "mid-slip2")
             self.assertTrue(sess["payload"]["nonce"])
+
+    async def test_transfer_blocks_when_company_bank_master_is_empty(self):
+        with Env(company_banks=[]) as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_dst",
+                    pending_channel={
+                        "channel": "transfer",
+                        "amount": "1500.00",
+                        "extra": {"src": "บัญชีลูกค้า 123-4"},
+                    },
+                ),
+            )
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "pay_dst", "rt")
+            self.assertEqual(_replied_text(env), qa_cards.TXT_NO_COMPANY_BANK)
+            self.assertNotIn("quickReply", env.reply.call_args.args[1][0])
+            await qa.handle_text(_TID, _LUID, "SCB", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_dst")
+            self.assertEqual(env.qa_payload()["payments"], [])
 
     # ── 支付:cheque 补充信息 ──────────────────────────────────────────────
     async def test_cheque_ref(self):
@@ -480,6 +514,27 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("nonce=", actions[0]["data"])
             self.assertEqual(actions[1]["label"], qa_cards.BTN_DISCARD)
             self.assertIn("action=cancel_booking", actions[1]["data"])
+
+    def test_preview_shows_selected_company_bank_for_transfer(self):
+        card = qa_cards.preview_card(
+            _qa(
+                payments=[
+                    {
+                        "channel": "transfer",
+                        "amount": "1500.00",
+                        "extra": {"dst_id": "1", "dst": "SCB"},
+                    }
+                ]
+            ),
+            "nonce",
+        )
+        body = card["contents"]["body"]["contents"]
+        flat = " | ".join(
+            f"{row['contents'][0]['text']}={row['contents'][1]['text']}"
+            for row in body
+            if row.get("type") == "box"
+        )
+        self.assertIn("เงินโอน=1500.00 · SCB", flat)
 
     # ── audit / 全局命令 / 态守卫 ─────────────────────────────────────────
     async def test_audit_records_all_inputs_in_order(self):

@@ -162,6 +162,7 @@ def _book_in_session(
 
     def _do(cl, adapter):
         from services.erp.mrerp_dms_booking_customer import card_from_customer
+        from services.erp.mrerp_dms_company_banks import validate_company_bank_payments
 
         master_card = card_from_customer(
             cl,
@@ -170,11 +171,12 @@ def _book_in_session(
         )
         booking = cl.resolve_booking_payload(defaults, master_card)
         if delivery_be:
+            payments = validate_company_bank_payments(adapter, qa.get("payments") or [])
             booking = dataclasses.replace(
                 booking,
                 delivery_date_be=delivery_be,
                 regis_name=str(answers.get("regis_name") or ""),
-                payments=tuple(qa.get("payments") or []),
+                payments=tuple(payments),
             )
         booking_id, booking_no = cl.create_booking_via_form(
             customer_id=customer_id, booking=booking, card=master_card

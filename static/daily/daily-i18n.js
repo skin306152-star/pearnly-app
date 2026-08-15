@@ -10,6 +10,8 @@ window.DAILY_I18N = {
         'daily.gate.remember': 'จำการเข้าสู่ระบบ',
         'daily.gate.err_required': 'กรอกชื่อผู้ใช้และรหัสผ่าน',
         'daily.gate.err_network': 'เชื่อมต่อไม่ได้ ลองอีกครั้ง',
+        'daily.gate.loading': 'กำลังโหลด…',
+        'daily.gate.loading_body': 'กำลังตรวจสอบบัญชี กรุณารอสักครู่',
         'daily.gate.err_generic': 'เข้าสู่ระบบไม่สำเร็จ ลองอีกครั้ง',
         'daily.gate.invited_title': 'ยังไม่ได้เปิดใช้งาน',
         'daily.gate.invited_body':
@@ -72,6 +74,8 @@ window.DAILY_I18N = {
         'daily.gate.remember': 'Remember me',
         'daily.gate.err_required': 'Enter username and password',
         'daily.gate.err_network': 'Cannot connect. Try again',
+        'daily.gate.loading': 'Loading…',
+        'daily.gate.loading_body': 'Checking your account…',
         'daily.gate.err_generic': 'Sign in failed. Try again',
         'daily.gate.invited_title': 'Not activated yet',
         'daily.gate.invited_body':
@@ -134,6 +138,8 @@ window.DAILY_I18N = {
         'daily.gate.remember': '记住登录',
         'daily.gate.err_required': '请输入用户名和密码',
         'daily.gate.err_network': '无法连接,请重试',
+        'daily.gate.loading': '加载中…',
+        'daily.gate.loading_body': '正在验证账号…',
         'daily.gate.err_generic': '登录失败,请重试',
         'daily.gate.invited_title': '尚未开通',
         'daily.gate.invited_body': '此账号尚未受邀使用「收支周记」,请联系管理员',
@@ -195,6 +201,8 @@ window.DAILY_I18N = {
         'daily.gate.remember': 'ログイン状態を保持',
         'daily.gate.err_required': 'ユーザー名とパスワードを入力してください',
         'daily.gate.err_network': '接続できません。もう一度お試しください',
+        'daily.gate.loading': 'ロード中…',
+        'daily.gate.loading_body': 'アカウントを確認中…',
         'daily.gate.err_generic': 'ログインに失敗しました。もう一度お試しください',
         'daily.gate.invited_title': 'まだ利用できません',
         'daily.gate.invited_body':

@@ -149,6 +149,10 @@
             invited: ['daily.gate.invited_title', 'daily.gate.invited_body', false],
             unavailable: ['daily.gate.unavailable_title', 'daily.gate.unavailable_body', true],
             offline: ['daily.gate.offline_title', 'daily.gate.offline_body', true],
+            // loading 是 boot 探针期间的初始态:渲染中性加载卡,绝不落到
+            // 「登录失败+重试」的错误兜底(2026-08-15 真机事故:loading 渲染成
+            // 错误卡,点重试→又渲染 loading→看着像卡死)。
+            loading: ['daily.gate.loading', 'daily.gate.loading_body', false],
         }[state.gate] || ['daily.gate.err_generic', 'daily.gate.err_generic', true];
         return (
             langbar +

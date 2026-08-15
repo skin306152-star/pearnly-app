@@ -60,6 +60,39 @@ class DailyRoutesContractTests(unittest.TestCase):
         self.assertEqual(auth_mod._normalize_entry("daily"), "daily")
 
 
+class DailyEnabledForTests(unittest.TestCase):
+    """名单制直判(2026-08-15 Zihao 拍板:邀请即用,不走总闸灰度)。"""
+
+    def test_allowlisted_subject_is_enabled_without_global_switch(self):
+        # 总闸行不存在(生产没开过 daily_finance 设置)→ 名单成员也必须放行。
+        from core.feature_flags import daily_enabled_for
+
+        with (
+            mock.patch("services.platform_settings.store.is_allowlisted", return_value=True) as m,
+            mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False),
+        ):
+            self.assertTrue(daily_enabled_for("tenant-9", "user-1"))
+        self.assertEqual(m.call_args.args, ("daily_finance", "tenant-9"))
+
+    def test_not_allowlisted_is_closed(self):
+        from core.feature_flags import daily_enabled_for
+
+        with mock.patch("services.platform_settings.store.is_allowlisted", return_value=False):
+            self.assertFalse(daily_enabled_for("tenant-9", "user-1"))
+
+    def test_falls_back_to_user_id_when_no_tenant(self):
+        from core.feature_flags import daily_enabled_for
+
+        with mock.patch("services.platform_settings.store.is_allowlisted", return_value=True) as m:
+            self.assertTrue(daily_enabled_for(None, "user-orphan"))
+        self.assertEqual(m.call_args.args, ("daily_finance", "user-orphan"))
+
+    def test_no_subject_is_closed(self):
+        from core.feature_flags import daily_enabled_for
+
+        self.assertFalse(daily_enabled_for(None, None))
+
+
 class DailyEntranceGuardTest(unittest.TestCase):
     def test_gate_closed_returns_404(self):
         user = _user()

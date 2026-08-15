@@ -150,20 +150,16 @@ class OverviewTests(unittest.TestCase):
         self.addCleanup(self._su.stop)
 
     def test_overview_shape_empty(self):
-        with (
-            mock.patch.object(
-                admin_daily_routes.platform_settings_store, "get_setting", return_value=None
-            ),
-            mock.patch.object(
-                admin_daily_routes.db,
-                "get_cursor",
-                lambda *a, **k: _cursor_cm(_SeqCursor([[]])),
-            ),
+        # 名单制直判:flag 恒为启用态,不读 platform_settings(2026-08-15 拍板不走灰度)
+        with mock.patch.object(
+            admin_daily_routes.db,
+            "get_cursor",
+            lambda *a, **k: _cursor_cm(_SeqCursor([[]])),
         ):
             r = self.client.get("/api/admin/daily/overview")
         self.assertEqual(r.status_code, 200)
         body = r.json()
-        self.assertFalse(body["flag"]["enabled"])
+        self.assertTrue(body["flag"]["enabled"])
         self.assertEqual(body["flag"]["rollout"], "allowlist")
         self.assertEqual(body["allowlist"], [])
 
@@ -182,19 +178,14 @@ class OverviewTests(unittest.TestCase):
                 [],  # user fallback (unused, tenant already matched)
             ]
         )
-        with (
-            mock.patch.object(
-                admin_daily_routes.platform_settings_store,
-                "get_setting",
-                return_value={"enabled": True, "value": {"rollout": "all"}, "updated_at": None},
-            ),
-            mock.patch.object(admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)),
+        with mock.patch.object(
+            admin_daily_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
         ):
             r = self.client.get("/api/admin/daily/overview")
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertTrue(body["flag"]["enabled"])
-        self.assertEqual(body["flag"]["rollout"], "all")
+        self.assertEqual(body["flag"]["rollout"], "allowlist")
         self.assertEqual(len(body["allowlist"]), 1)
         row = body["allowlist"][0]
         self.assertEqual(row["subject_id"], "tenant-1")

@@ -82,12 +82,11 @@ DMS_PORTAL_KEY = "dms_portal"
 # 绑定 + 收发。判定域=账套主体归属(有 tenant_id 走 tenant · 个人套账退回 user_id),与
 # dms_portal 同口径。消费在 routes/line_dms_webhook_routes(webhook)与 routes/dms_routes(DMS 闸)。
 DMS_LINE_KEY = "dms_line"
-# Daily 周记账入口邀请闸(个人收入/支出记录应用 · pearnly.com/daily · 照 dms_portal
-# 邀请制范式):默认关 fail-closed。关 = /daily 登录准入不含该门、/api/daily/* 四端点 404;
-# 开 = 被邀请租户(每受邀用户经 create_owner_user 建号得独立租户)从 /daily 门登录 +
-# 数据端点放行。判定域=账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回
-# user_id · 与 pearnly_ai_m1 同口径)。消费在 services/auth/entrance._derive_entrances
-# (登录准入)与 routes/daily_routes._authorize(API 守卫)。
+# Daily 周记账入口邀请闸(个人收入/支出记录应用 · pearnly.com/daily):名单成员即开,
+# 不走总闸灰度(2026-08-15 Zihao 拍板:邀请即用,不搞「总闸+名单」两段式——邀请/收回
+# 是名单唯一写入口,超管后台独占,名单本身可信)。判定域=账套主体归属(有 tenant_id 走
+# tenant 共享闸 · 个人套账退回 user_id · 与 pearnly_ai_m1 同口径)。消费在
+# services/auth/entrance._derive_entrances(登录准入)与 routes/daily_routes._authorize(API 守卫)。
 DAILY_KEY = "daily_finance"
 # POS 退货/作废店长授权闸(PS-1 · 防内盗):默认关。关 → 退货/作废路由逐字节走历史
 # (任何持效 POS 令牌的收银员都能退,现网 metta 行为不变);开 → 操作者须持 pos.refund.approve,
@@ -299,13 +298,23 @@ def dms_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> 
 
 
 def daily_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
-    """Daily 周记账入口邀请闸。关 = /api/daily/* 四端点 404、/daily 登录准入不含该门。
+    """Daily 周记账入口判定:名单成员即开(邀请制直判 · 不走总闸灰度)。
 
-    判定域=账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回 user_id),与
-    pearnly_ai_m1 同口径。消费在 services/auth/entrance._derive_entrances(登录准入)
-    与 routes/daily_routes._authorize(API 守卫)。
+    与 pearnly_ai_m1 的「总闸+名单两段式」不同:Daily 邀请即用(Zihao 2026-08-15 拍板),
+    名单本身由超管后台独占写入,无需再开全局开关。判定域=账套主体归属(有 tenant_id 走
+    tenant · 个人套账退回 user_id)。消费在 services/auth/entrance._derive_entrances(登录
+    准入)与 routes/daily_routes._authorize(API 守卫)。
     """
-    return _enabled(DAILY_KEY, tenant_id or user_id, "daily_enabled_for")
+    subject = tenant_id or user_id
+    if not subject:
+        return False
+    try:
+        from services.platform_settings import store
+
+        return store.is_allowlisted(DAILY_KEY, subject)
+    except Exception as e:
+        logger.warning(f"daily_enabled_for fail-closed: {e}")
+        return False
 
 
 def dms_line_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:

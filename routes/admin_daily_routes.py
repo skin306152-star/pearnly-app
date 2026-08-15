@@ -147,11 +147,11 @@ def _resolve_target_user(subject_id: str) -> dict | None:
 
 @router.get("/api/admin/daily/overview")
 async def daily_overview(request: Request):
-    """闸状态(enabled/rollout)+ 邀请名单(每项配人类可读的用户/租户信息)。"""
+    """邀请名单(每项配人类可读的用户/租户信息)。
+
+    Daily 是名单制直判(邀请即用 · 不走总闸灰度,Zihao 2026-08-15 拍板),
+    不存在「总闸开没开」状态 —— flag 固定返回启用态,前端只展示名单。"""
     _require_super_admin(request)
-    flag = platform_settings_store.get_setting(DAILY_KEY)
-    value = (flag or {}).get("value") or {}
-    rollout = value.get("rollout") if isinstance(value, dict) else None
 
     with db.get_cursor() as cur:
         cur.execute(
@@ -174,7 +174,7 @@ async def daily_overview(request: Request):
         for r in rows
     ]
     return {
-        "flag": {"enabled": bool(flag and flag.get("enabled")), "rollout": rollout or "allowlist"},
+        "flag": {"enabled": True, "rollout": "allowlist"},
         "allowlist": allowlist,
     }
 

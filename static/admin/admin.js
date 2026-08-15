@@ -3982,7 +3982,8 @@
         const host = document.getElementById('adm-daily-list');
         if (!host) return;
         if (!rows || !rows.length) {
-            host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-daily-list-empty')) + '</div>';
+            host.innerHTML =
+                '<div class="adm-empty">' + _esc(_t('adm-daily-list-empty')) + '</div>';
             return;
         }
         host.innerHTML = rows

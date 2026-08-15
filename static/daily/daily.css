@@ -25,7 +25,9 @@ body {
 body.daily-body {
   background: var(--daily-bg);
   color: var(--daily-ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans Thai', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans Thai',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

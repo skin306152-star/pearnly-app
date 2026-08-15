@@ -1,13 +1,13 @@
 {
-  "name": "รายรับ–รายจ่าย · Pearnly Daily",
-  "short_name": "รายรับ–รายจ่าย",
-  "description": "บันทึกรายรับรายจ่ายรายสัปดาห์อย่างง่าย",
-  "lang": "th",
-  "start_url": "/daily",
-  "scope": "/daily",
-  "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#f7f3ea",
-  "theme_color": "#1b3a2b",
-  "icons": [{ "src": "/static/brand/favicon-32.png", "sizes": "32x32", "type": "image/png" }]
+    "name": "รายรับ–รายจ่าย · Pearnly Daily",
+    "short_name": "รายรับ–รายจ่าย",
+    "description": "บันทึกรายรับรายจ่ายรายสัปดาห์อย่างง่าย",
+    "lang": "th",
+    "start_url": "/daily",
+    "scope": "/daily",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#f7f3ea",
+    "theme_color": "#1b3a2b",
+    "icons": [{ "src": "/static/brand/favicon-32.png", "sizes": "32x32", "type": "image/png" }]
 }

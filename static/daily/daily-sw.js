@@ -12,59 +12,61 @@ const CACHE = PREFIX + V;
 const CORE = ['/daily'];
 
 function isDailyAsset(pathname) {
-  return (
-    pathname === '/daily' ||
-    pathname.startsWith('/daily/') ||
-    pathname === '/daily-sw.js' ||
-    pathname.startsWith('/static/daily/') ||
-    pathname.startsWith('/static/brand/') ||
-    pathname === '/static/dist/daily.js' ||
-    pathname === '/static/dist/daily.css'
-  );
+    return (
+        pathname === '/daily' ||
+        pathname.startsWith('/daily/') ||
+        pathname === '/daily-sw.js' ||
+        pathname.startsWith('/static/daily/') ||
+        pathname.startsWith('/static/brand/') ||
+        pathname === '/static/dist/daily.js' ||
+        pathname === '/static/dist/daily.css'
+    );
 }
 
 // 外壳没落地就不许上位(同 cashier-sw 教训:activate 删旧缓存时新缓存必须已就绪,
 // 否则部署重启窗口断网打开 /daily 是浏览器网络错误页)。
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches
-      .open(CACHE)
-      .then((c) => c.addAll(CORE))
-      .then(() => self.skipWaiting())
-  );
+    e.waitUntil(
+        caches
+            .open(CACHE)
+            .then((c) => c.addAll(CORE))
+            .then(() => self.skipWaiting())
+    );
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches
-      .open(CACHE)
-      .then((c) => c.match('/daily'))
-      .then((hit) => {
-        if (!hit) return;
-        return caches
-          .keys()
-          .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-          .then(() => self.clients.claim());
-      })
-  );
+    e.waitUntil(
+        caches
+            .open(CACHE)
+            .then((c) => c.match('/daily'))
+            .then((hit) => {
+                if (!hit) return;
+                return caches
+                    .keys()
+                    .then((keys) =>
+                        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+                    )
+                    .then(() => self.clients.claim());
+            })
+    );
 });
 
 self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return;
-  if (!isDailyAsset(url.pathname)) return;
+    const url = new URL(e.request.url);
+    if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+    if (url.pathname.startsWith('/api/')) return;
+    if (!isDailyAsset(url.pathname)) return;
 
-  e.respondWith(
-    caches.match(e.request).then((hit) => {
-      if (hit) return hit;
-      return fetch(e.request).then((resp) => {
-        if (resp.ok && isDailyAsset(url.pathname)) {
-          const copy = resp.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
-        }
-        return resp;
-      });
-    })
-  );
+    e.respondWith(
+        caches.match(e.request).then((hit) => {
+            if (hit) return hit;
+            return fetch(e.request).then((resp) => {
+                if (resp.ok && isDailyAsset(url.pathname)) {
+                    const copy = resp.clone();
+                    caches.open(CACHE).then((c) => c.put(e.request, copy));
+                }
+                return resp;
+            });
+        })
+    );
 });

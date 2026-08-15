@@ -37,8 +37,7 @@
   border-radius: var(--daily-radius);
   box-shadow: var(--daily-shadow);
   padding: 28px 24px;
-  width: 100%;
-  max-width: 340px;
+  inline-size: min(100%, 21.25rem);
   box-sizing: border-box;
   text-align: center;
 }

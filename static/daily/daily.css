@@ -4,14 +4,14 @@
    门禁样式在 daily-gate.css · 记账弹窗 + toast 在 daily-form.css。 */
 :root {
   --daily-bg: #f7f3ea;
-  --daily-surface: #ffffff;
+  --daily-surface: var(--card);
   --daily-ink: #21352c;
   --daily-ink-soft: #5c6f66;
   --daily-deep: #1b3a2b;
   --daily-emerald: #2e8b63;
   --daily-terra: #c05c3e;
   --daily-gold: #b08d3f;
-  --daily-line: #e6dfd0;
+  --daily-line: var(--line);
   --daily-radius: 14px;
   --daily-shadow: 0 10px 30px rgba(33, 53, 44, 0.08);
 }
@@ -34,7 +34,7 @@ body.daily-body {
 /* 应用壳 */
 
 .app-shell {
-  max-width: 520px;
+  inline-size: min(100%, 32.5rem);
   margin: 0 auto;
   padding: 20px 16px 40px;
   box-sizing: border-box;

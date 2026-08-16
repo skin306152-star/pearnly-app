@@ -4085,6 +4085,7 @@
     const _DAILY_ERROR_KEYS = {
         'admin.daily_not_invited': 'adm-daily-reset-not-invited',
         'admin.daily_subject_unknown': 'adm-daily-reset-subject-unknown',
+        'admin.daily_super_admin_conflict': 'adm-daily-invite-super-admin-conflict',
         'admin.username_exists': 'adm-daily-invite-username-exists',
     };
 

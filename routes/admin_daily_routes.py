@@ -193,6 +193,13 @@ async def daily_invite(request: Request, body: InviteBody):
 
     existing = db.find_user_by_username(identity["lookup_key"])
     if existing:
+        # 平台超管不参与 Daily 邀请:超管账号(is_super_admin)无添加/删除入口,
+        # 用户名查找大小写不敏感(lower 匹配),小写 earn 会命中超管 Earn —— 把它
+        # 当普通已有账号加名单 / 重置密码会污染超管凭证(2026-08-16 事故:earn
+        # 邀请把超管密码重置成 earn)。命中超管一律拒绝,请换用户名。
+        if existing.get("is_super_admin"):
+            raise HTTPException(409, detail="admin.daily_super_admin_conflict")
+
         subject_id = _subject_id(existing)
         platform_settings_store.add_to_allowlist(DAILY_KEY, subject_id)
         grant_entrance_safe(

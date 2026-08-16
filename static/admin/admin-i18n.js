@@ -169,6 +169,8 @@
             'adm-daily-invite-existing-ok': '已加入名单',
             'adm-daily-invite-created-ok': '已建号并加入名单 · 初始密码见下方',
             'adm-daily-invite-reset-ok': '已加入名单 · 密码已按填写重置 · 见下方',
+            'adm-daily-invite-super-admin-conflict':
+                '该用户名是平台超管账号,不能用作 Daily 账号 · 请换一个用户名',
             'adm-daily-invite-username-exists': '该用户名/邮箱已被占用',
             'adm-daily-pwd-warn': '初始密码仅显示一次 · 请立即复制转告客户 · 关闭后无法再查看',
             'adm-daily-pwd-for-label': '账号:{n}',
@@ -828,6 +830,8 @@
                 'สร้างบัญชีและเพิ่มเข้ารายชื่อแล้ว · รหัสผ่านเริ่มต้นด้านล่าง',
             'adm-daily-invite-reset-ok':
                 'เพิ่มเข้ารายชื่อแล้ว · ตั้งรหัสผ่านตามที่กรอกแล้ว · ดูด้านล่าง',
+            'adm-daily-invite-super-admin-conflict':
+                'ชื่อผู้ใช้นี้เป็นบัญชีผู้ดูแลระบบแพลตฟอร์ม ไม่สามารถใช้เป็นบัญชี Daily ได้ · กรุณาใช้ชื่อผู้ใช้อื่น',
             'adm-daily-invite-username-exists': 'ชื่อผู้ใช้/อีเมลนี้ถูกใช้แล้ว',
             'adm-daily-pwd-warn':
                 'รหัสผ่านเริ่มต้นแสดงเพียงครั้งเดียว · กรุณาคัดลอกแจ้งลูกค้าทันที · ปิดแล้วดูซ้ำไม่ได้',

@@ -292,6 +292,39 @@ class InviteExistingUserTests(unittest.TestCase):
         self.assertIsNone(body["initial_password"])
         m_reset.assert_not_called()
 
+    def test_invite_super_admin_conflict_rejected(self):
+        """平台超管不参与 Daily 邀请:小写 earn 命中超管 Earn(lower 匹配)必须
+        拒绝,不进名单、不重置密码(2026-08-16 事故:earn 邀请把超管密码重置成 earn)。"""
+        super_user = {
+            "id": "super-1",
+            "tenant_id": "tenant-super",
+            "username": "Earn",
+            "is_super_admin": True,
+        }
+        with (
+            mock.patch.object(
+                admin_daily_routes.db, "find_user_by_username", return_value=super_user
+            ),
+            mock.patch.object(
+                admin_daily_routes.platform_settings_store, "add_to_allowlist"
+            ) as m_add,
+            mock.patch.object(admin_daily_routes, "grant_entrance_safe") as m_grant,
+            mock.patch.object(
+                admin_daily_routes.db, "reset_user_password", return_value=True
+            ) as m_reset,
+            mock.patch.object(admin_daily_routes, "_log_op") as m_log,
+        ):
+            r = self.client.post(
+                "/api/admin/daily/invite",
+                json={"username_or_email": "earn", "password": "earn"},
+            )
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.json()["detail"], "admin.daily_super_admin_conflict")
+        m_add.assert_not_called()
+        m_grant.assert_not_called()
+        m_reset.assert_not_called()
+        m_log.assert_not_called()
+
 
 class InviteCreateAccountTests(unittest.TestCase):
     def setUp(self):

@@ -40,6 +40,7 @@ eq(formatDate('2026-06-06'), '2569-06-06', 'buddhist YYYY-MM-DD');
 eq(formatDate('2026-06-06', { style: 'DD/MM/YYYY' }), '06/06/2569', 'buddhist DD/MM/YYYY');
 eq(formatDate('2026-06-06', { style: 'YYYY/MM/DD' }), '2569/06/06', 'buddhist YYYY/MM/DD');
 eq(formatDateTime('2026-06-06T09:05:00'), '2569-06-06 09:05', 'buddhist date time');
+eq(formatDateTime('2026-06-06T09:05:00', { style: 'DD/MM/YYYY' }), '06/06/2569 09:05', 'styled buddhist date time');
 setCalendar('gregorian');
 eq(getCalendar(), 'buddhist', 'calendar is fixed buddhist');
 eq(formatDate('2026-06-06'), '2569-06-06', 'gregorian setting ignored');

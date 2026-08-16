@@ -111,8 +111,20 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
 
         try:
             with adapter:
-                adapter.login()
-                out = fn(adapter._client(), adapter)
+                try:
+                    adapter.login()
+                except (MrerpDmsAuthError, MrerpDmsTechnicalError) as e:
+                    if adapter.concurrent_login_detected:
+                        return _err("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    raise
+                try:
+                    out = fn(adapter._client(), adapter)
+                except DMSClientError as e:
+                    if adapter.concurrent_login_detected:
+                        return _err("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    raise
+                if adapter.concurrent_login_detected:
+                    return _err("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
                 _cookies_put(endpoint, adapter.session_cookies(), adapter.base_url)
                 return out
         except MrerpDmsAdminAuthError as e:

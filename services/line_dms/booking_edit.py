@@ -106,10 +106,9 @@ def _form(qa: dict) -> dict:
 def load(user: dict, nonce: str) -> dict:
     _, payload, endpoint = _review(user, nonce)
     qa = payload.get("qa") or {}
-    masters = get_masters(endpoint)
-    prefix_rows = _run_logged_in(endpoint, lambda client, adapter: client.list_prefixes())
-    if isinstance(prefix_rows, dict):
-        prefix_rows = []
+    # 编辑页展示的是用户即将确认的主档,不能让 12 小时前的银行/车型快照继续占位。
+    masters = get_masters(endpoint, force_refresh=True)
+    prefix_rows = masters.get("prefixes") or []
     car_id = str(((qa.get("answers") or {}).get("car") or {}).get("id") or "")
     return {
         "form": _form(qa),

@@ -72,6 +72,13 @@ _DMS_FRIENDLY = {
         "zh_TW": "連線 DMS 逾時或網路異常 · 請稍後重試",
         "ja": "DMS への接続がタイムアウトまたはネットワーク異常です · しばらくしてから再試行してください",
     },
+    "ERR_DMS_CONCURRENT_LOGIN": {
+        "zh": "DMS 账号正在其他地方使用 · 请退出其他登录后重试",
+        "en": "This DMS account is being used elsewhere — sign out there and retry",
+        "th": "บัญชี DMS นี้กำลังถูกใช้งานที่อื่น · กรุณาออกจากระบบที่อื่นแล้วลองใหม่",
+        "zh_TW": "DMS 帳號正在其他地方使用 · 請退出其他登入後重試",
+        "ja": "この DMS アカウントは別の場所で使用中です · 他の場所からログアウトして再試行してください",
+    },
     "ERR_DMS_ADMIN_AUTH": {
         "zh": "DMS 管理员凭据登录失败 · 请检查管理员用户名和密码",
         "en": "DMS admin credential login failed — check the admin username and password",
@@ -256,8 +263,19 @@ def test_mrerp_dms_endpoint(config: Dict[str, Any]) -> Dict[str, Any]:
 
         try:
             with adapter:
-                adapter.login()
-                return adapter.test_connection()
+                try:
+                    adapter.login()
+                    if adapter.concurrent_login_detected:
+                        return _fail("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    return adapter.test_connection()
+                except MrerpDmsAuthError:
+                    if adapter.concurrent_login_detected:
+                        return _fail("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    raise
+                except MrerpDmsTechnicalError:
+                    if adapter.concurrent_login_detected:
+                        return _fail("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    raise
         except MrerpDmsAuthError as e:
             return _fail("ERR_DMS_AUTH", f"{type(e).__name__}: {e}")
         except MrerpDmsTechnicalError as e:

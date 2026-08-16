@@ -45,6 +45,13 @@ from services.erp.mrerp_dms_client import DMSClient
 
 logger = logging.getLogger(__name__)
 
+_CONCURRENT_LOGIN_MARKER = "มีผู้เข้าใช้งานในระบบซ้ำ"
+
+
+def is_concurrent_login_dialog(message: str) -> bool:
+    """识别 DMS 的单账号重复登录提示。"""
+    return _CONCURRENT_LOGIN_MARKER in str(message or "")
+
 
 class MrerpDmsAuthError(RuntimeError):
     """DMS login bounced — bad credentials / not approved. NOT retryable."""
@@ -274,6 +281,18 @@ class MrerpDmsAdapter:
             return self._page.context.cookies()
         except Exception:
             return []
+
+    @property
+    def concurrent_login_detected(self) -> bool:
+        """当前浏览器会话是否收到 DMS 的重复登录弹窗。"""
+        return bool(
+            self._session and any(is_concurrent_login_dialog(d) for d in self._session.dialogs)
+        )
+
+    @property
+    def last_dialog(self) -> str:
+        """最近一条 DMS 浏览器弹窗，用于错误分类而不暴露凭据。"""
+        return self._session.last_dialog if self._session is not None else ""
 
     # ----- login ------------------------------------------------------
 

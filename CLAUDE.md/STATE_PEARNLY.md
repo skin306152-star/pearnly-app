@@ -1,11 +1,13 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-14 OCR 旁路已收口跟随 Earn 档位(bank 依然封存)
+## 当前状态卡 · 08-16 Daily 邀请三连修收官(earn 冲突根治 · CI 31924383472 success · prod 已上线)
 
-- **🛑 C 档 bank 车道终判(Zihao 裁)**:max 路数=90s/页·฿1.15/页·完整度 18/18 赢 B 5/18;但人读实锤 max 单读 2484 逐字 66%(行 10/11/17-28/44 错)·自洽静默错链闸挡不住→「全对」给不了。确定性适配器(KBANK-photo-v1 链求解)六判据实测不切档(干净页逐字 84-91%/零静默/但 0 页全 auto·p50 本机 168s·772 人金标未建全),**Zihao 拍板封存不续投**。三选项仍挂:①接受延迟+漏率 ②bank 暂不切 ③等代际;GL 账页速度轴(25.5 vs 13.5s)同挂。
-- **✅ salesvat + fileconv OCR 旁路已收口**(`9a55875`):两路登记进 `OCR_TASKS/POLICIES`,同步路由+异步 job+线程池全程透传 `plan_code/is_exempt`,qwen 上下文在 salesvat 单票/批量及 fileconv 分类→抽取均实测生效;Gemini key 不再在业务层误拦 qwen/selfhost。Earn 管理页改从后端 `options.tasks` 渲染,8 任务全可单独覆写,中泰文已补。
-- **✅ 验证**:OCR/route/admin 回归 122+68 组合全绿;format/lint(0 error)/typecheck/UI/theme/bundle/pre-push 全绿;真浏览器见 8 任务与 3 新任务下拉,证据 `tests/e2e/_artifacts/ocr-engine-sidecar/admin-engine-tasks.png`。配套语料缺口仍是外部项:ภ.พ.30 扫描件/泰国身份证照片待补。
-- **✅ 沿袭已上线**:P0+修复批 1e0d80d1(CI 绿)·max 重读过链只打标不升档·链推金额待复核。
+- **✅ Daily 邀请与平台超管冲突根治**(`8c7f9587`):用户名查找大小写不敏感(lower 匹配),小写 earn 永远命中超管 Earn(is_super_admin)。命中超管一律 409 拒绝(`admin.daily_super_admin_conflict`),不进名单、不重置密码、不记日志,前端 toast 提示换用户名(zh/th 新键)。**已误加入名单的超管 Earn 条目 → 用户需在 Daily 邀请页点「收回」清理**。
+- **✅ earn/earn 登录失败已修**(`c62a7062`):根因=邀请已有账号时密码被静默丢弃;改已有账号+传密码→按填重置并回显;⚠️ 此轮对超管生效的逻辑已由 8c7f9587 封死(超管拒绝)。
+- **✅ daily 门禁壳残留已修**(`c62a7062`):boot 进 app 后 gateRoot 的 loading/登录卡从不清理(图1 loading 卡常驻/图2 登录卡盖记一笔弹窗)→ boot 200 分支+rerender 兜底统一清 gateRoot(clearGate)。fetch-stub 真浏览器 E2E 验证:登录/刷新/弹窗三场景 gateRoot 均清空,vision 截图确认无叠层。
+- **✅ admin Daily 邀请页文案去灰度**(`1baac13d`+`c62a7062`):闸状态/灰度字样 → 开通方式 · 邀请即用 · 仅被邀请账号;邀请名单。?v= admin 14081732→34 · daily 3→4,dist 重建同提交。
+- **✅ 验证链**:三轮 push CI 全绿(31924383472/31922833901/31894798773);contract test 26(超管冲突+重置回显+原密码保持);pre-push 闸全过(含 black/ratchet/欠条延期至 08-22 与本次无关);prod admin-i18n?v=14081734 已验新文案,dist/daily.js?v=4 clearGate 已上线。
+- **⚠️ 遗留**:① 名单里超管 Earn 条目待用户手动「收回」;② 用户想要的 Daily 测试账号需换名(earn 被超管占用),建议 earn-daily;③ e2e_ledger 三条扫码面欠条延期至 08-22(扫码面未动,与本次无关)。
 
 ## 历史 · 08-12 欠账清仓批收官(2026-08-13 · 993129c9..a22db5a1 · CI 31662919966 success · prod 99656ceb 已验)
 

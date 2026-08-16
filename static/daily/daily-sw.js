@@ -6,7 +6,7 @@
  *  - 其余同源 GET(外壳/静态):cache-first + 联网回填;离线导航回落已缓存的 /daily。
  * 缓存名带版本号,改外壳 bump 即可让旧缓存失效(对齐 ?v= 缓存破)。
  */
-const V = '2';
+const V = '3';
 const PREFIX = 'pearnly-daily-v';
 const CACHE = PREFIX + V;
 const CORE = ['/daily'];

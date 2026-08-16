@@ -168,6 +168,7 @@
             'adm-daily-invite-btn': '邀请',
             'adm-daily-invite-existing-ok': '已加入名单',
             'adm-daily-invite-created-ok': '已建号并加入名单 · 初始密码见下方',
+            'adm-daily-invite-reset-ok': '已加入名单 · 密码已按填写重置 · 见下方',
             'adm-daily-invite-username-exists': '该用户名/邮箱已被占用',
             'adm-daily-pwd-warn': '初始密码仅显示一次 · 请立即复制转告客户 · 关闭后无法再查看',
             'adm-daily-pwd-for-label': '账号:{n}',
@@ -175,7 +176,7 @@
             'adm-daily-pwd-copied': '已复制',
             'adm-daily-pwd-close': '我已保存,关闭',
             'adm-daily-list-title': '名单',
-            'adm-daily-list-hint': '灰度名单 · 收回不删账号',
+            'adm-daily-list-hint': '邀请名单 · 收回不删账号',
             'adm-daily-list-empty': '名单为空',
             'adm-daily-list-unknown': '(已失联 · 账号或租户已删)',
             'adm-daily-revoke-btn': '收回',
@@ -825,6 +826,8 @@
             'adm-daily-invite-existing-ok': 'เพิ่มเข้ารายชื่อแล้ว',
             'adm-daily-invite-created-ok':
                 'สร้างบัญชีและเพิ่มเข้ารายชื่อแล้ว · รหัสผ่านเริ่มต้นด้านล่าง',
+            'adm-daily-invite-reset-ok':
+                'เพิ่มเข้ารายชื่อแล้ว · ตั้งรหัสผ่านตามที่กรอกแล้ว · ดูด้านล่าง',
             'adm-daily-invite-username-exists': 'ชื่อผู้ใช้/อีเมลนี้ถูกใช้แล้ว',
             'adm-daily-pwd-warn':
                 'รหัสผ่านเริ่มต้นแสดงเพียงครั้งเดียว · กรุณาคัดลอกแจ้งลูกค้าทันที · ปิดแล้วดูซ้ำไม่ได้',
@@ -833,7 +836,7 @@
             'adm-daily-pwd-copied': 'คัดลอกแล้ว',
             'adm-daily-pwd-close': 'บันทึกแล้ว ปิดหน้าต่าง',
             'adm-daily-list-title': 'รายชื่อ',
-            'adm-daily-list-hint': 'รายชื่อทยอยเปิด · การนำออกไม่ลบบัญชี',
+            'adm-daily-list-hint': 'รายชื่อผู้ได้รับเชิญ · การนำออกไม่ลบบัญชี',
             'adm-daily-list-empty': 'ยังไม่มีรายชื่อ',
             'adm-daily-list-unknown': '(ขาดการเชื่อมโยง · บัญชีหรือกิจการถูกลบแล้ว)',
             'adm-daily-revoke-btn': 'นำออก',

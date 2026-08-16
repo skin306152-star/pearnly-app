@@ -4116,6 +4116,10 @@
                     if (r.created_account) {
                         _toast(_t('adm-daily-invite-created-ok'), 'success');
                         _showDailyPassword(r.initial_password, r.username);
+                    } else if (r.initial_password) {
+                        // 已有账号 + 超管填了密码 → 已按填的重置(邀请即用)
+                        _toast(_t('adm-daily-invite-reset-ok'), 'success');
+                        _showDailyPassword(r.initial_password, r.username);
                     } else {
                         _toast(_t('adm-daily-invite-existing-ok'), 'success');
                     }

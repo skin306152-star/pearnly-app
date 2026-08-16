@@ -247,6 +247,51 @@ class InviteExistingUserTests(unittest.TestCase):
         m_add.assert_called_once_with("daily_finance", "user-orphan")
         self.assertEqual(m_log.call_args.kwargs.get("target_type"), "user")
 
+    def test_invite_existing_user_with_password_resets_and_reveals(self):
+        """已有账号 + 超管传了密码 → 按填的重置并在响应回显(2026-08-15 事故:
+        earn 命中已有超管,密码被静默丢弃,earn/earn 永远登不进)。"""
+        existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
+        with (
+            mock.patch.object(
+                admin_daily_routes.db, "find_user_by_username", return_value=existing
+            ),
+            mock.patch.object(admin_daily_routes.platform_settings_store, "add_to_allowlist"),
+            mock.patch.object(admin_daily_routes, "grant_entrance_safe"),
+            mock.patch.object(
+                admin_daily_routes.db, "reset_user_password", return_value=True
+            ) as m_reset,
+            mock.patch.object(admin_daily_routes, "_log_op"),
+        ):
+            r = self.client.post(
+                "/api/admin/daily/invite",
+                json={"username_or_email": "member1", "password": "Member2026x"},
+            )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertFalse(body["created_account"])
+        self.assertEqual(body["initial_password"], "Member2026x")
+        m_reset.assert_called_once_with("user-1", "Member2026x")
+
+    def test_invite_existing_user_no_password_keeps_original(self):
+        """已有账号 + 没传密码 → 不动密码,响应不回显 initial_password。"""
+        existing = {"id": "user-1", "tenant_id": "tenant-9", "username": "member1"}
+        with (
+            mock.patch.object(
+                admin_daily_routes.db, "find_user_by_username", return_value=existing
+            ),
+            mock.patch.object(admin_daily_routes.platform_settings_store, "add_to_allowlist"),
+            mock.patch.object(admin_daily_routes, "grant_entrance_safe"),
+            mock.patch.object(
+                admin_daily_routes.db, "reset_user_password", return_value=True
+            ) as m_reset,
+            mock.patch.object(admin_daily_routes, "_log_op"),
+        ):
+            r = self.client.post("/api/admin/daily/invite", json={"username_or_email": "member1"})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIsNone(body["initial_password"])
+        m_reset.assert_not_called()
+
 
 class InviteCreateAccountTests(unittest.TestCase):
     def setUp(self):

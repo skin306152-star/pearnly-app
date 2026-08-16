@@ -201,6 +201,14 @@ async def daily_invite(request: Request, body: InviteBody):
             str(admin.get("id")) if admin else None,
             context="daily",
         )
+        # 已有账号 + 超管传了密码 → 按填的密码重置(邀请即用:填什么密码就按什么
+        # 登录,2026-08-15 事故:earn 命中已有超管,密码被静默丢弃,earn/earn
+        # 永远登不进)。没传密码则保持原密码,不回显。
+        reset_pwd = None
+        if body.password:
+            if not db.reset_user_password(existing["id"], body.password):
+                raise HTTPException(500, detail="admin.daily_reset_failed")
+            reset_pwd = body.password
         _log_op(
             request,
             admin,
@@ -214,6 +222,7 @@ async def daily_invite(request: Request, body: InviteBody):
             "created_account": False,
             "subject_id": subject_id,
             "username": existing.get("username"),
+            "initial_password": reset_pwd,
         }
 
     temp_password = _resolve_password(body.password)

@@ -48,6 +48,8 @@
             rootEl.innerHTML = '';
             return;
         }
+        // 进 app 态的渲染统一兜底清门禁壳(防止任何路径残留 loading/登录卡叠在应用上)。
+        root.DailyGate.clearGate();
         rootEl.innerHTML = appHtml();
         bindAppEvents();
         applyStaticI18n();

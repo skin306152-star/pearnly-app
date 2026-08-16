@@ -49,6 +49,7 @@
         api('/api/daily/session').then(function (res) {
             if (res.status === 200) {
                 state.gate = 'app';
+                clearGate();
                 root.DailyApp.loadMonth();
             } else if (res.status === 401) {
                 clearToken();
@@ -92,6 +93,14 @@
     function gateError(key) {
         var el = root.document.getElementById('gateError');
         if (el) el.textContent = t(key);
+    }
+
+    function clearGate() {
+        // 进 app 后门禁壳必须清空:boot 探针期间渲染的 loading/登录卡留在
+        // gateRoot 不清,会整块叠在应用上方(2026-08-15 真机事故:loading 卡
+        // 常驻 + 登录卡盖在「记一笔」弹窗上)。
+        var host = root.document.getElementById('gateRoot');
+        if (host) host.innerHTML = '';
     }
 
     function renderGate() {
@@ -197,5 +206,6 @@
         setLang: setLang,
         renderGate: renderGate,
         applyStaticI18n: applyStaticI18n,
+        clearGate: clearGate,
     };
 })(typeof window !== 'undefined' ? window : globalThis);

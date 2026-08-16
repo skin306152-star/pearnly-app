@@ -302,6 +302,10 @@ class DMSClientOpsMixin:
             out["advisors"] = self._advisor_rows() or []
         except Exception:
             out["advisors"] = []
+        try:
+            out["prefixes"] = self.list_prefixes() or []
+        except Exception:
+            out["prefixes"] = []
         # 员工表带登录名,是顾问归属的精确层(顾问下拉的 code 列只是员工编号)。
         # 销售账号未必有员工页权限 → 取不到就落 [],调用方回落启发式匹配。
         out["employees"] = dms_employees.fetch_employees(self) or []

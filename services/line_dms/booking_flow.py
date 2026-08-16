@@ -14,17 +14,21 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import secrets
 from typing import Any, Dict, List, Optional, Tuple
 
 from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.line_binding import line_client
 from services.line_dms import _out, cards, masters_cache, qa_cards, store
-from services.line_dms._out import _CHANNEL, _push, _reply, _thr
+from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
 
 logger = logging.getLogger(__name__)
 
-BOOKING_ACTIONS = frozenset({cards.ACT_CONFIRM_BOOKING, cards.ACT_CANCEL_BOOKING})
+BOOKING_ACTIONS = frozenset(
+    {cards.ACT_CONFIRM_BOOKING, cards.ACT_CANCEL_BOOKING, cards.ACT_RETRY_BOOKING}
+)
+_RETRY_TTL_MINUTES = 30
 
 # 后台调度 + LINE 出口(_CHANNEL/_thr/_reply/_push 见 _out)· tag 供后台任务日志定位。
 _spawn = _out.make_spawn("line_dms.booking")
@@ -45,6 +49,16 @@ async def handle_postback(
     if action == cards.ACT_CANCEL_BOOKING:
         await _thr(store.clear_session, tenant, line_user_id)
         _reply(reply_token, cards.TXT_BOOKING_CANCELLED)
+        return
+
+    if action == cards.ACT_RETRY_BOOKING:
+        payload = await _thr(
+            store.consume_nonce, tenant, line_user_id, "booking_review", pb.get("nonce")
+        )
+        if payload is None:
+            _reply(reply_token, cards.TXT_EXPIRED)
+            return
+        _spawn(_execute_booking(binding, line_user_id, payload))
         return
 
     # 确认守卫(booking_review 态 + nonce 吻合)原子清 nonce 并回 payload;不符/过期 → 过期
@@ -85,7 +99,49 @@ async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> N
         await _thr(store.clear_session, tenant, line_user_id)
     else:
         fr = result.get("error_friendly") or {}
+        if _retryable_result(result):
+            retry_nonce = secrets.token_hex(8)
+            armed = await _thr(
+                _arm_retry,
+                tenant,
+                line_user_id,
+                payload,
+                retry_nonce,
+            )
+            if armed:
+                _send(
+                    line_user_id,
+                    qa_cards.booking_retry_card(
+                        fr.get("th") or cards.TXT_BOOKING_FAIL,
+                        retry_nonce,
+                    ),
+                )
+                return
         _push(line_user_id, fr.get("th") or cards.TXT_BOOKING_FAIL)
+
+
+def _retryable_result(result: Dict[str, Any]) -> bool:
+    """只对明确发生在建单前的 DMS 阻塞开放重试,不重放未知写入结果。"""
+    if result.get("booking_id"):
+        return False
+    if result.get("error_code") == "ERR_DMS_CONCURRENT_LOGIN":
+        return True
+    raw = str(result.get("raw_error") or "")
+    response = result.get("response_body") or {}
+    raw += " " + str(response.get("raw_error") or "")
+    return "company bank master did not become ready" in raw
+
+
+def _arm_retry(tenant: str, line_user_id: str, payload: dict, nonce: str) -> bool:
+    """把失败后的完整订车草稿重新挂回 booking_review,只保留 30 分钟。"""
+    store.set_session(
+        tenant,
+        line_user_id,
+        "booking_review",
+        {**payload, "nonce": nonce},
+        ttl_minutes=_RETRY_TTL_MINUTES,
+    )
+    return store.verify_nonce(store.get_session(tenant, line_user_id), nonce, "booking_review")
 
 
 async def _download_attach_files(qa: dict) -> Tuple[List[dict], List[dict]]:

@@ -372,6 +372,61 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             await env.drain()
         self.assertEqual(env.push_text.call_args.args[1], "สร้างใบจองรถไม่สำเร็จ")
 
+    async def test_concurrent_login_failure_keeps_draft_and_sends_retry_card(self):
+        result = {
+            "ok": False,
+            "error_code": "ERR_DMS_CONCURRENT_LOGIN",
+            "error_friendly": {"th": "บัญชี DMS นี้กำลังถูกใช้งานที่อื่น"},
+            "booking_id": "",
+        }
+        with _Env(book_result=result) as env:
+            env.store.set_session("T1", "L1", "booking_review", _review())
+            await bf.handle_postback(
+                _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
+            )
+            await env.drain()
+
+        card = env.push_msgs.call_args.args[1][0]
+        self.assertEqual(card["type"], "flex")
+        self.assertEqual(env.session()["state"], "booking_review")
+        self.assertEqual(env.session()["ttl_minutes"], 30)
+        self.assertNotEqual(env.session()["payload"]["nonce"], "N1")
+
+    async def test_retry_postback_resumes_draft_and_finishes_booking(self):
+        failure = {
+            "ok": False,
+            "error_code": "ERR_DMS_CONCURRENT_LOGIN",
+            "error_friendly": {"th": "บัญชี DMS นี้กำลังถูกใช้งานที่อื่น"},
+            "booking_id": "",
+        }
+        success = {
+            "ok": True,
+            "booking_id": "BID2",
+            "booking_no": "BK2",
+            "attach_ok": True,
+        }
+        with (
+            _Env() as env,
+            mock.patch.object(bf, "_book_in_session", side_effect=[failure, success]),
+        ):
+            env.store.set_session("T1", "L1", "booking_review", _review())
+            await bf.handle_postback(
+                _BINDING, _LUID, "rt", cards.ACT_CONFIRM_BOOKING, {"nonce": "N1"}
+            )
+            await env.drain()
+            retry_nonce = env.session()["payload"]["nonce"]
+            await bf.handle_postback(
+                _BINDING,
+                _LUID,
+                "rt-retry",
+                cards.ACT_RETRY_BOOKING,
+                {"nonce": retry_nonce},
+            )
+            await env.drain()
+
+        self.assertIsNone(env.session())
+        self.assertIn("BK2", env.push_text.call_args.args[1])
+
     async def test_d5_double_click_single_booking(self):
         with _Env(book_result={"ok": True, "booking_no": "BK9", "attach_ok": True}) as env:
             env.store.set_session("T1", "L1", "booking_review", _review())

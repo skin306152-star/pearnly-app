@@ -101,6 +101,7 @@ ACT_RETAKE = "retake"
 # 订车阶段(DL-4a):预览确认 / 取消(booking_flow 侧 dispatch · 逐问预览卡在 qa_cards)。
 ACT_CONFIRM_BOOKING = "confirm_booking"
 ACT_CANCEL_BOOKING = "cancel_booking"
+ACT_RETRY_BOOKING = "retry_booking"
 # 改写审批流(波4):销售提审(带 nonce)→ 选审批人 → 管理员批/拒 → 销售可改派。
 ACT_SUBMIT_APPROVAL = "approval_submit"
 ACT_APPROVAL_TARGET = "approval_target"
@@ -111,6 +112,7 @@ ACT_APPROVAL_RETARGET = "approval_retarget"
 # 订车阶段文案与按钮(DL-4a)
 BTN_CONFIRM_BOOKING = "ยืนยันจอง"
 BTN_CANCEL_BOOKING = "ยกเลิก"
+BTN_RETRY_BOOKING = "ลองสร้างใบจองอีกครั้ง"
 TXT_BOOKING_CANCELLED = "ทิ้งรายการแล้ว ไม่มีข้อมูลถูกบันทึก · พิมพ์ เมนู เพื่อเริ่มใหม่"
 TXT_BOOKING_FAIL = "สร้างใบจองไม่สำเร็จ กรุณาลองใหม่"
 

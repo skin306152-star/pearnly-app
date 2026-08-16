@@ -128,10 +128,11 @@ class ResolveBookingPayloadTests(unittest.TestCase):
 class FetchMastersTests(unittest.TestCase):
     def test_advisors_pulled_paged_others_default(self):
         cl = _FakeClient({"txtusers": _ADVISORS})
-        cl.fetch_masters()
+        out = cl.fetch_masters()
         extras = dict(cl.calls)
         self.assertEqual(extras["txtusers"], {"bshsdamt": 200, "bshsdcurrpage": 1})
         self.assertEqual(extras["txtcar"], {})
+        self.assertIn("prefixes", out)
 
     def test_employees_pulled_for_the_exact_advisor_layer(self):
         # 顾问下拉的 code 列是员工编号,登录名只有员工表有 → 主档必须带上 employees。

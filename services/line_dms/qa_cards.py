@@ -18,6 +18,8 @@ from services.erp.erp_dms_push import _DMS_FRIENDLY
 from services.line_dms.cards import (
     ACT_CANCEL_BOOKING,
     ACT_CONFIRM_BOOKING,
+    ACT_RETRY_BOOKING,
+    BTN_RETRY_BOOKING,
     TXT_NO_ENDPOINT,
     _bubble,
     _btn,
@@ -365,3 +367,27 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
         _btn(BTN_DISCARD, _data(ACT_CANCEL_BOOKING), "secondary"),
     ]
     return _bubble(TXT_PREVIEW_TITLE, rows, footer, TXT_PREVIEW_TITLE)
+
+
+def booking_retry_card(message: str, nonce: str) -> Dict[str, Any]:
+    """建单在外部 DMS 写入前失败时,保留草稿并发一次性重试按钮。"""
+    rows = [
+        {"type": "text", "text": message or "สร้างใบจองไม่สำเร็จ", "wrap": True},
+        {
+            "type": "text",
+            "text": "กรุณาออกจากระบบ DMS ที่อื่น แล้วกดลองใหม่ภายใน 30 นาที",
+            "size": "sm",
+            "color": "#8a8a8a",
+            "wrap": True,
+        },
+    ]
+    footer = [
+        _btn(BTN_RETRY_BOOKING, _data(ACT_RETRY_BOOKING, nonce=nonce), "primary"),
+        _btn(BTN_DISCARD, _data(ACT_CANCEL_BOOKING), "secondary"),
+    ]
+    return _bubble(
+        "สร้างใบจองไม่สำเร็จ",
+        rows,
+        footer,
+        "สร้างใบจองไม่สำเร็จ · ลองใหม่",
+    )

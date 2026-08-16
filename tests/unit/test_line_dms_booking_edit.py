@@ -144,6 +144,22 @@ class BookingEditTests(TestCase):
         self.assertEqual(send.call_args.args[0], "L1")
         self.assertIn(next_nonce, str(send.call_args.args[1]))
 
+    def test_load_forces_fresh_masters_and_uses_same_session_prefixes(self):
+        masters = {**MASTERS, "prefixes": [["17", "Mr"]]}
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, self.payload, {"id": "E1"}),
+            ),
+            mock.patch.object(booking_edit, "get_masters", return_value=masters) as fetch,
+            mock.patch.object(booking_edit, "get_paints", return_value=[]),
+        ):
+            out = booking_edit.load(self.user, "N1")
+
+        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
+        self.assertEqual(out["masters"]["prefixes"], [{"id": "17", "label": "Mr"}])
+
     def test_invalid_master_does_not_replace_review(self):
         broken = form()
         broken["answers"]["car_id"] = "NOT-A-CAR"

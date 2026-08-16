@@ -49,7 +49,7 @@
             tz.value = localStorage.getItem(LS_TZ) || DEFAULTS.tz;
             dt.value = localStorage.getItem(LS_DATE) || DEFAULTS.date;
             nm.value = localStorage.getItem(LS_NUMBER) || DEFAULTS.number;
-            if (cal) cal.value = localStorage.getItem(LS_CALENDAR) || DEFAULTS.calendar;
+            if (cal) cal.value = DEFAULTS.calendar;
         } catch (e) {
             tz.value = DEFAULTS.tz;
             dt.value = DEFAULTS.date;
@@ -79,9 +79,7 @@
             const nm =
                 ((document.getElementById('general-number') || {}) as { value?: string }).value ||
                 DEFAULTS.number;
-            const cal =
-                ((document.getElementById('general-calendar') || {}) as { value?: string }).value ||
-                DEFAULTS.calendar;
+            const cal = DEFAULTS.calendar;
             try {
                 localStorage.setItem(LS_TZ, tz);
                 localStorage.setItem(LS_DATE, dt);

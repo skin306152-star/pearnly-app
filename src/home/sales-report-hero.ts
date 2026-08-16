@@ -3,6 +3,7 @@
 // 日期器改动通过 ctx.onChange 回给主模块(状态与取数都在主模块,这里只管画和收事件)。
 /* global t, escapeHtml */
 import { posErrMsg } from './inventory-common.js';
+import { formatDate } from './format-date.js';
 import {
     CHEV_L,
     CHEV_R,
@@ -99,7 +100,7 @@ function lastSaleText(iso: string): string {
     if (mins < 60) return hhmm + ' · ' + t('rep-min-ago').replace('{n}', String(mins));
     if (mins < 1440)
         return hhmm + ' · ' + t('rep-hour-ago').replace('{n}', String(Math.round(mins / 60)));
-    return ymd(d) + ' ' + hhmm;
+    return formatDate(d) + ' ' + hhmm;
 }
 
 function badgesHtml(k: Kpi, live: Live): string {

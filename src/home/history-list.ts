@@ -248,12 +248,7 @@ function renderHistoryList() {
     } else {
         tbody!.innerHTML = items
             .map((r: HistoryRow) => {
-                const dt = new Date(r.created_at);
-                const mm = String(dt.getMonth() + 1).padStart(2, '0');
-                const dd = String(dt.getDate()).padStart(2, '0');
-                const hh = String(dt.getHours()).padStart(2, '0');
-                const mi = String(dt.getMinutes()).padStart(2, '0');
-                const dateStr = `${mm}-${dd} ${hh}:${mi}`;
+                const dateStr = window.formatDateTime(r.created_at);
 
                 const origName = escapeHtml(r.filename || '');
                 const shortOrig = origName.length > 46 ? origName.substring(0, 46) + '…' : origName;

@@ -29,6 +29,19 @@
         if (!n || n === 0) return '฿ 0';
         return '฿ ' + _fmt(n, 4);
     }
+    function _adminDate(input, withTime) {
+        if (!input) return '';
+        const raw = String(input);
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        const d = match
+            ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+            : new Date(raw);
+        if (isNaN(d.getTime())) return raw;
+        const pad = (n) => String(n).padStart(2, '0');
+        const date = `${d.getFullYear() + 543}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        return withTime ? `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}` : date;
+    }
+    window._adminDate = _adminDate;
     function _setText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
@@ -1310,7 +1323,7 @@
                         _esc(u.email || u.username) +
                         '</div>' +
                         '<div class="adm-cell-mute">' +
-                        (u.created_at ? new Date(u.created_at).toLocaleDateString() : '—') +
+                        (u.created_at ? _adminDate(u.created_at) : '—') +
                         adminBadge +
                         '</div>' +
                         '</div>' +
@@ -1901,7 +1914,7 @@
         const fmt = (s) => {
             if (!s) return '—';
             try {
-                return new Date(s).toLocaleString();
+                return _adminDate(s, true);
             } catch (e) {
                 return s;
             }
@@ -2426,7 +2439,7 @@
     }
 
     function _topupCard(t) {
-        const when = t.created_at ? new Date(t.created_at).toLocaleString() : '';
+        const when = t.created_at ? _adminDate(t.created_at, true) : '';
         const who = _esc(t.tenant_name || t.username || t.email || '#' + t.id);
         const sub = _esc([t.username, t.email].filter(Boolean).join(' · '));
         const amt = _fmt(t.amount_thb || 0, 2);
@@ -2700,7 +2713,7 @@
                             ? _t('team-status-disabled')
                             : _t('team-status-active');
                     const lastLogin = e.last_login_at
-                        ? new Date(e.last_login_at).toLocaleDateString()
+                        ? _adminDate(e.last_login_at)
                         : _t('team-never-login');
                     return (
                         '<div class="adm-emp-row">' +
@@ -2793,7 +2806,7 @@
                     let t = '';
                     if (l.created_at) {
                         try {
-                            t = new Date(l.created_at).toLocaleString();
+                            t = _adminDate(l.created_at, true);
                         } catch (e) {
                             t = l.created_at;
                         }
@@ -3101,7 +3114,7 @@
         const savedEl = document.getElementById('adm-set-saved');
         if (savedEl)
             savedEl.textContent = ag.updated_at
-                ? _t('adm-set-saved-at') + ' ' + new Date(ag.updated_at).toLocaleString()
+                ? _t('adm-set-saved-at') + ' ' + _adminDate(ag.updated_at, true)
                 : '';
         _renderAllowlist(d.allowlist);
     }
@@ -3551,7 +3564,7 @@
         const meta = [
             it.username || '—',
             _posBizLabel(it.business_type),
-            it.purchased_at ? new Date(it.purchased_at).toLocaleDateString() : '',
+            it.purchased_at ? _adminDate(it.purchased_at) : '',
             '฿' + _fmt(it.amount_paid_thb || 0, 0),
         ]
             .filter(Boolean)
@@ -3670,10 +3683,7 @@
                     r.subject_type === 'unknown'
                         ? _t('adm-ai-list-unknown')
                         : _esc(r.username || r.email || r.subject_id);
-                const meta = [
-                    r.company_name,
-                    r.joined_at ? new Date(r.joined_at).toLocaleString() : '',
-                ]
+                const meta = [r.company_name, r.joined_at ? _adminDate(r.joined_at, true) : '']
                     .filter(Boolean)
                     .map(_esc)
                     .join(' · ');
@@ -3866,10 +3876,7 @@
                     r.subject_type === 'unknown'
                         ? _t('adm-dms-list-unknown')
                         : _esc(r.username || r.email || r.subject_id);
-                const meta = [
-                    r.company_name,
-                    r.joined_at ? new Date(r.joined_at).toLocaleString() : '',
-                ]
+                const meta = [r.company_name, r.joined_at ? _adminDate(r.joined_at, true) : '']
                     .filter(Boolean)
                     .map(_esc)
                     .join(' · ');
@@ -3992,10 +3999,7 @@
                     r.subject_type === 'unknown'
                         ? _t('adm-daily-list-unknown')
                         : _esc(r.username || r.email || r.subject_id);
-                const meta = [
-                    r.company_name,
-                    r.joined_at ? new Date(r.joined_at).toLocaleString() : '',
-                ]
+                const meta = [r.company_name, r.joined_at ? _adminDate(r.joined_at, true) : '']
                     .filter(Boolean)
                     .map(_esc)
                     .join(' · ');

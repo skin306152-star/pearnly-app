@@ -18,6 +18,7 @@ import {
     showTestResult,
     testFromModal,
 } from './email-ingest-form.js'; // REFACTOR-WB-modularize · 绑定 modal/表单拆出
+import { formatDateTime } from './format-date.js';
 (function () {
     async function load() {
         const emptyEl = document.getElementById('email-empty');
@@ -140,10 +141,7 @@ import {
 
     function formatTime(iso: string | number | null | undefined) {
         if (!iso) return '';
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return '';
-        const pad = (n: number) => String(n).padStart(2, '0');
-        return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return formatDateTime(iso);
     }
 
     function humanizeEmailError(raw: unknown) {

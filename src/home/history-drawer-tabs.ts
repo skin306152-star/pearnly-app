@@ -6,6 +6,7 @@
 /* global escapeHtml, token, t, showToast */
 import { imageViewerHtml, remountImageViewer } from './image-viewer.js';
 import { BAHT } from './money.js';
+import { formatDateTime } from './format-date.js';
 
 type HistDetail = {
     id?: string;
@@ -35,10 +36,7 @@ function _deriveStatus(body: HTMLElement, conf: string | undefined): string {
 
 function _fmtTime(iso?: string): string {
     if (!iso) return '';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return escapeHtml(iso);
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    return formatDateTime(iso) || escapeHtml(iso);
 }
 
 function _filePanel(detail: HistDetail): string {

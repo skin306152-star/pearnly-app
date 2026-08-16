@@ -55,6 +55,10 @@
                 clearToken();
                 state.gate = 'login';
                 renderGate();
+            } else if (res.status === 404) {
+                clearToken();
+                state.gate = 'login';
+                renderGate();
             } else if (res.status >= 500 || res.status === 408 || res.status === 429) {
                 state.gate = 'unavailable';
                 renderGate();
@@ -87,6 +91,14 @@
             } else {
                 gateError(res.status == null ? 'daily.gate.err_network' : 'daily.gate.err_generic');
             }
+        });
+    }
+
+    function logout() {
+        api('/api/logout', { method: 'POST' }).then(function () {
+            clearToken();
+            state.gate = 'login';
+            renderGate();
         });
     }
 
@@ -207,5 +219,6 @@
         renderGate: renderGate,
         applyStaticI18n: applyStaticI18n,
         clearGate: clearGate,
+        logout: logout,
     };
 })(typeof window !== 'undefined' ? window : globalThis);

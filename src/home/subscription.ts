@@ -8,6 +8,7 @@
 // ============================================================
 
 import { BAHT } from './money.js';
+import { formatDate } from './format-date.js';
 
 interface SubPlan {
     code: string;
@@ -62,14 +63,7 @@ function _toast(msg: string, type?: string) {
 }
 function _fmtDate(iso: string | null): string {
     if (!iso) return '';
-    try {
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return '';
-        const p = (n: number) => String(n).padStart(2, '0');
-        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
-    } catch (_) {
-        return '';
-    }
+    return formatDate(iso);
 }
 
 async function loadSubscription() {

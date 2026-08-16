@@ -5,6 +5,16 @@
         var core = root.DailyCore;
         var state = core.state;
 
+        function sendToLogin() {
+            core.clearToken();
+            state.gate = 'login';
+            root.DailyGate.renderGate();
+        }
+
+        function isAccessDenied(res) {
+            return res.status === 401 || res.status === 404;
+        }
+
         function loadMonth() {
             state.loading = true;
             callbacks.rerender();
@@ -12,10 +22,8 @@
                 function (res) {
                     if (res.status === 200) {
                         state.entries = (res.body && res.body.entries) || [];
-                    } else if (res.status === 401) {
-                        core.clearToken();
-                        state.gate = 'login';
-                        root.DailyGate.renderGate();
+                    } else if (isAccessDenied(res)) {
+                        sendToLogin();
                         return;
                     } else {
                         state.entries = [];
@@ -42,10 +50,8 @@
                     });
                     state.showEntryForm = false;
                     callbacks.showToast('daily.toast.saved');
-                } else if (res.status === 401) {
-                    core.clearToken();
-                    state.gate = 'login';
-                    root.DailyGate.renderGate();
+                } else if (isAccessDenied(res)) {
+                    sendToLogin();
                     return;
                 } else {
                     callbacks.showToast('daily.err.save_failed');
@@ -63,10 +69,8 @@
                             return entry.id !== id;
                         });
                         callbacks.showToast('daily.toast.deleted');
-                    } else if (res.status === 401) {
-                        core.clearToken();
-                        state.gate = 'login';
-                        root.DailyGate.renderGate();
+                    } else if (isAccessDenied(res)) {
+                        sendToLogin();
                         return;
                     } else {
                         callbacks.showToast('daily.err.delete_failed');
@@ -78,6 +82,10 @@
 
         function exportData() {
             core.api('/api/daily/export').then(function (res) {
+                if (isAccessDenied(res)) {
+                    sendToLogin();
+                    return;
+                }
                 if (res.status !== 200) {
                     callbacks.showToast('daily.err.load_failed');
                     callbacks.rerender();
@@ -154,6 +162,11 @@
                             amount: Number(entry.amount),
                         },
                     }).then(function (res) {
+                        if (isAccessDenied(res)) {
+                            sendToLogin();
+                            queue.length = 0;
+                            return;
+                        }
                         if (res.status === 200) done += 1;
                         next();
                     });

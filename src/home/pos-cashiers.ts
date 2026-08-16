@@ -5,6 +5,7 @@
 // 仅 pos 开通后由 module-nav 显隐(owner)。删除仅限从未开过班的收银员(后端 pos.cashier_in_use 守门)。
 /* global t, token, escapeHtml, showToast */
 import { activeWsId, posErrMsg } from './inventory-common.js';
+import { formatDateTime } from './format-date.js';
 
 interface Caps {
     discount_limit_pct: number;
@@ -83,10 +84,7 @@ function colorFor(c: Cashier, i: number): string {
 
 function fmtWhen(iso: string | null): string {
     if (!iso) return '';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '';
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    return formatDateTime(iso);
 }
 
 function metaHtml(c: Cashier): string {

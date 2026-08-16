@@ -20,11 +20,7 @@
 
     function _fmtTime(iso: string) {
         if (!iso) return '';
-        try {
-            return new Date(iso).toLocaleString();
-        } catch (e) {
-            return iso;
-        }
+        return window.formatDateTime(iso) || iso;
     }
 
     function _renderEmpty(msg: string) {

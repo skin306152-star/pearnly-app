@@ -1,10 +1,10 @@
 // ============================================================
 // 共享日期格式化 · 全站唯一出口(显示/表格/CSV/PDF 全走它)
 // ------------------------------------------------------------
-// 内部永远存公历 ISO(DB 不存佛历)· 此处只按用户偏好渲染:
-//   历法 pearnly_calendar:'buddhist'(默认 พ.ศ. = 公历年 +543)| 'gregorian'
+// 内部永远存公历 ISO(DB 不存佛历)· 用户可见日期统一按佛历渲染(公历年 +543)。
 //   样式 pearnly_general_date_format:YYYY-MM-DD / DD/MM/YYYY / …(设置→通用)
-// window.formatDate / getCalendar / setCalendar 供非模块代码裸调。
+// formatDate 纯日期 · formatDateTime = formatDate + 本地 HH:mm(带时间显示用)。
+// window.formatDate / formatDateTime / getCalendar / setCalendar 供非模块代码裸调。
 // ============================================================
 /* eslint-disable no-undef */
 
@@ -14,16 +14,12 @@ const FMT_KEY = 'pearnly_general_date_format';
 type Calendar = 'buddhist' | 'gregorian';
 
 export function getCalendar(): Calendar {
-    try {
-        return localStorage.getItem(CAL_KEY) === 'gregorian' ? 'gregorian' : 'buddhist';
-    } catch (_) {
-        return 'buddhist';
-    }
+    return 'buddhist';
 }
 
-export function setCalendar(v: string): void {
+export function setCalendar(_v: string): void {
     try {
-        localStorage.setItem(CAL_KEY, v === 'gregorian' ? 'gregorian' : 'buddhist');
+        localStorage.setItem(CAL_KEY, 'buddhist');
     } catch (_) {
         /* silent · 私模/配额 */
     }
@@ -63,7 +59,7 @@ export function formatDate(input: unknown, opts?: { style?: string; calendar?: C
     const d = toDate(input);
     if (!d) return '';
     const style = (opts && opts.style) || getStyle();
-    const cal = (opts && opts.calendar) || getCalendar();
+    const cal: Calendar = 'buddhist';
     const year = cal === 'buddhist' ? d.getFullYear() + 543 : d.getFullYear();
     const yyyy = String(year);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -83,14 +79,26 @@ export function formatDate(input: unknown, opts?: { style?: string; calendar?: C
     }
 }
 
+export function formatDateTime(
+    input: unknown,
+    opts?: { style?: string; calendar?: Calendar }
+): string {
+    const d = toDate(input);
+    if (!d) return '';
+    const p2 = (n: number) => String(n).padStart(2, '0');
+    return formatDate(d, opts) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+}
+
 declare global {
     interface Window {
         formatDate: typeof formatDate;
+        formatDateTime: typeof formatDateTime;
         getCalendar: typeof getCalendar;
         setCalendar: typeof setCalendar;
     }
 }
 
 window.formatDate = formatDate;
+window.formatDateTime = formatDateTime;
 window.getCalendar = getCalendar;
 window.setCalendar = setCalendar;

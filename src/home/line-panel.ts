@@ -77,7 +77,7 @@
 
         const sinceEl = $('linebot-bound-since');
         if (sinceEl && data.bound_at) {
-            sinceEl.textContent = new Date(data.bound_at).toLocaleString();
+            sinceEl.textContent = window.formatDateTime(data.bound_at);
         }
     }
 

@@ -17,6 +17,10 @@
         return year + '-' + String(month).padStart(2, '0');
     }
 
+    function buddhistYear(year) {
+        return Number(year) + 543;
+    }
+
     function monthOptions(now) {
         var out = [];
         for (var i = 12; i >= 0; i--) {
@@ -84,8 +88,25 @@
     function entryDateLabel(lang, value) {
         var parts = String(value).split('-').map(Number);
         if (parts.length !== 3 || parts.some(isNaN)) return value;
-        return new Intl.DateTimeFormat(localeOf(lang), { day: 'numeric', month: 'short' }).format(
-            new Date(parts[0], parts[1] - 1, parts[2])
+        var date = new Date(parts[0], parts[1] - 1, parts[2]);
+        return (
+            new Intl.DateTimeFormat(localeOf(lang), { day: 'numeric', month: 'short' }).format(
+                date
+            ) +
+            ' ' +
+            buddhistYear(parts[0])
+        );
+    }
+
+    function buddhistDateLabel(value) {
+        var parts = String(value).split('-').map(Number);
+        if (parts.length !== 3 || parts.some(isNaN)) return value;
+        return (
+            buddhistYear(parts[0]) +
+            '/' +
+            String(parts[1]).padStart(2, '0') +
+            '/' +
+            String(parts[2]).padStart(2, '0')
         );
     }
 
@@ -205,6 +226,8 @@
         persistLang: persistLang,
         LANGS: LANGS,
         monthId: monthId,
+        buddhistYear: buddhistYear,
+        buddhistDateLabel: buddhistDateLabel,
         monthOptions: monthOptions,
         weekBounds: weekBounds,
         sumBy: sumBy,
@@ -227,6 +250,8 @@
             monthName: monthName,
             moneyFormat: moneyFormat,
             entryDateLabel: entryDateLabel,
+            buddhistYear: buddhistYear,
+            buddhistDateLabel: buddhistDateLabel,
             escapeHtml: escapeHtml,
             monthId: monthId,
         };

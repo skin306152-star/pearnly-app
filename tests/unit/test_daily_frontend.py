@@ -112,6 +112,15 @@ class DailyI18nTest(unittest.TestCase):
         self.assertRegex(source_css, r"#gateRoot:empty\s*\{\s*display:\s*none")
         self.assertIn("#gateRoot:empty{display:none}", bundle_css)
 
+    def test_daily_uses_buddhist_display_and_single_click_binding(self):
+        js = _read("daily.js")
+        self.assertIn("_dailyClickBound", js)
+        out = _run_node(
+            "const d = require('./static/daily/daily-core.js');"
+            "console.log(JSON.stringify({year:d.buddhistYear(2026),date:d.buddhistDateLabel('2026-08-01')}))"
+        )
+        self.assertEqual(out, {"year": 2569, "date": "2569/08/01"})
+
 
 class DailyPureFunctionsTest(unittest.TestCase):
     def test_week_bounds_match_pwa_semantics(self):

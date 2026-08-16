@@ -17,6 +17,8 @@
     var inMonth = root.DailyCore.inMonth;
     var inRange = root.DailyCore.inRange;
     var monthName = root.DailyCore.monthName;
+    var buddhistYear = root.DailyCore.buddhistYear;
+    var buddhistDateLabel = root.DailyCore.buddhistDateLabel;
     var moneyFormat = root.DailyCore.moneyFormat;
     var entryDateLabel = root.DailyCore.entryDateLabel;
     var escapeHtml = root.DailyCore.escapeHtml;
@@ -82,7 +84,8 @@
 
         var monthOptionsHtml = state.months
             .map(function (opt) {
-                var name = monthName(state.lang, opt.year, opt.month) + ' ' + opt.year;
+                var name =
+                    monthName(state.lang, opt.year, opt.month) + ' ' + buddhistYear(opt.year);
                 return (
                     '<option value="' +
                     opt.id +
@@ -151,7 +154,9 @@
                 .join('');
         }
 
-        var monthNameFull = escapeHtml(monthName(state.lang, m.year, m.month));
+        var monthNameFull = escapeHtml(
+            monthName(state.lang, m.year, m.month) + ' ' + buddhistYear(m.year)
+        );
 
         return (
             '<main class="app-shell">' +
@@ -162,22 +167,31 @@
             escapeHtml(t('daily.title')) +
             '</h1></div>' +
             '<div class="header-actions">' +
-            '<button type="button" class="tool-button" data-tools>⋯</button>' +
+            '<button type="button" class="tool-button" data-tools aria-expanded="' +
+            (state.showDataTools ? 'true' : 'false') +
+            '" aria-label="' +
+            escapeHtml(t('daily.data.menu')) +
+            '" title="' +
+            escapeHtml(t('daily.data.menu')) +
+            '">⋯</button>' +
             '<button type="button" class="icon-button" data-add>+</button>' +
             '</div>' +
             '</header>' +
             (state.showDataTools
-                ? '<section class="surface data-tools">' +
+                ? '<section class="surface data-tools" role="menu">' +
                   '<div><strong>' +
                   escapeHtml(t('daily.data.title')) +
                   '</strong><small>' +
                   escapeHtml(t('daily.data.note')) +
                   '</small></div>' +
-                  '<button type="button" data-export>' +
+                  '<button type="button" data-export role="menuitem">' +
                   escapeHtml(t('daily.data.export')) +
                   '</button>' +
-                  '<button type="button" data-import>' +
+                  '<button type="button" data-import role="menuitem">' +
                   escapeHtml(t('daily.data.import')) +
+                  '</button>' +
+                  '<button type="button" data-logout role="menuitem" class="data-logout">' +
+                  escapeHtml(t('daily.data.logout')) +
                   '</button>' +
                   '<input type="file" id="importFile" accept="application/json,.json" hidden>' +
                   '</section>'
@@ -305,13 +319,21 @@
             '<label><span>' +
             escapeHtml(t('daily.form.date')) +
             '</span>' +
-            '<input type="date" name="date" value="' +
+            '<div class="date-field"><input type="text" class="date-display" value="' +
+            escapeHtml(buddhistDateLabel(bounds.min)) +
+            '" readonly aria-label="' +
+            escapeHtml(t('daily.form.date')) +
+            '"><input type="date" name="date" value="' +
             bounds.min +
             '" min="' +
             bounds.min +
             '" max="' +
             bounds.max +
-            '"></label>' +
+            '" aria-label="' +
+            escapeHtml(t('daily.form.date')) +
+            '"><span class="date-calendar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span></div><small class="buddhist-date-note" data-date-preview>' +
+            escapeHtml(t('daily.form.calendar_note', { date: buddhistDateLabel(bounds.min) })) +
+            '</small></label>' +
             '<fieldset><legend>' +
             escapeHtml(t('daily.form.type')) +
             '</legend><div class="type-picker">' +
@@ -335,41 +357,46 @@
 
     function bindAppEvents() {
         var rootEl = root.document.getElementById('appRoot');
-        rootEl.addEventListener('click', function (ev) {
-            var el = ev.target;
-            while (el && el !== rootEl && !el.dataset) el = el.parentNode;
-            if (!el || el === rootEl) return;
-            if (el.dataset.add != null) {
-                state.showEntryForm = true;
-                rerender();
-            } else if (el.dataset.tools != null) {
-                state.showDataTools = !state.showDataTools;
-                rerender();
-            } else if (el.dataset.export != null) {
-                exportData();
-            } else if (el.dataset.import != null) {
-                var input = root.document.getElementById('importFile');
-                if (input) input.click();
-            } else if (el.dataset.week) {
-                state.week = Number(el.dataset.week);
-                rerender();
-            } else if (el.dataset.delete) {
-                deleteEntry(el.dataset.delete);
-            } else if (el.dataset.kind) {
-                var form = rootEl.querySelector('form.entry-form');
-                if (form) form.dataset.kind = el.dataset.kind;
-                var btns = rootEl.querySelectorAll('.type-btn');
-                for (var i = 0; i < btns.length; i++) {
-                    btns[i].className =
-                        btns[i].getAttribute('data-kind') === el.dataset.kind
-                            ? 'type-btn selected ' + el.dataset.kind
-                            : 'type-btn';
+        if (!rootEl._dailyClickBound) {
+            rootEl._dailyClickBound = true;
+            rootEl.addEventListener('click', function (ev) {
+                var el = ev.target;
+                while (el && el !== rootEl && !el.dataset) el = el.parentNode;
+                if (!el || el === rootEl) return;
+                if (el.dataset.add != null) {
+                    state.showEntryForm = true;
+                    rerender();
+                } else if (el.dataset.tools != null) {
+                    state.showDataTools = !state.showDataTools;
+                    rerender();
+                } else if (el.dataset.export != null) {
+                    exportData();
+                } else if (el.dataset.import != null) {
+                    var input = root.document.getElementById('importFile');
+                    if (input) input.click();
+                } else if (el.dataset.logout != null) {
+                    root.DailyGate.logout();
+                } else if (el.dataset.week) {
+                    state.week = Number(el.dataset.week);
+                    rerender();
+                } else if (el.dataset.delete) {
+                    deleteEntry(el.dataset.delete);
+                } else if (el.dataset.kind) {
+                    var form = rootEl.querySelector('form.entry-form');
+                    if (form) form.dataset.kind = el.dataset.kind;
+                    var btns = rootEl.querySelectorAll('.type-btn');
+                    for (var i = 0; i < btns.length; i++) {
+                        btns[i].className =
+                            btns[i].getAttribute('data-kind') === el.dataset.kind
+                                ? 'type-btn selected ' + el.dataset.kind
+                                : 'type-btn';
+                    }
+                } else if (el.dataset.close != null) {
+                    state.showEntryForm = false;
+                    rerender();
                 }
-            } else if (el.dataset.close != null) {
-                state.showEntryForm = false;
-                rerender();
-            }
-        });
+            });
+        }
         var monthSel = rootEl.querySelector('[data-month]');
         if (monthSel) {
             monthSel.addEventListener('change', function () {
@@ -388,6 +415,17 @@
         }
         var form = rootEl.querySelector('form.entry-form');
         if (form) {
+            var dateInput = form.querySelector('input[name="date"]');
+            var dateDisplay = form.querySelector('.date-display');
+            var datePreview = form.querySelector('[data-date-preview]');
+            if (dateInput && dateDisplay && datePreview) {
+                dateInput.addEventListener('change', function () {
+                    dateDisplay.value = buddhistDateLabel(dateInput.value);
+                    datePreview.textContent = t('daily.form.calendar_note', {
+                        date: buddhistDateLabel(dateInput.value),
+                    });
+                });
+            }
             form.addEventListener('submit', function (ev) {
                 ev.preventDefault();
                 var fd = new root.FormData(form);
@@ -413,11 +451,7 @@
                 var el = ev.target;
                 if (!el || !el.dataset) return;
                 if (el.dataset.lang) root.DailyGate.setLang(el.dataset.lang);
-                if (el.dataset.logout != null) {
-                    root.DailyCore.clearToken();
-                    state.gate = 'login';
-                    renderGate();
-                }
+                if (el.dataset.logout != null) root.DailyGate.logout();
                 if (el.dataset.retry != null) root.DailyGate.boot();
             });
         }

@@ -62,16 +62,7 @@
 
     function _fmtTime(iso: string) {
         if (!iso) return '-';
-        try {
-            const d = new Date(iso);
-            const m = (d.getMonth() + 1).toString().padStart(2, '0');
-            const day = d.getDate().toString().padStart(2, '0');
-            const h = d.getHours().toString().padStart(2, '0');
-            const min = d.getMinutes().toString().padStart(2, '0');
-            return `${m}-${day} ${h}:${min}`;
-        } catch (e) {
-            return iso;
-        }
+        return window.formatDateTime(iso) || iso;
     }
 
     function _renderRules(rules: any[]) {

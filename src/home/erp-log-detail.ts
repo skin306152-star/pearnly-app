@@ -104,7 +104,7 @@ async function showLogDetail(logId: any) {
             (ep ? ep.name : log.endpoint_id ? t('erp-log-endpoint-deleted') : '-');
         const adapter = (log.endpoint_adapter || (ep && ep.adapter) || '').toLowerCase();
 
-        const time = new Date(log.created_at).toLocaleString();
+        const time = window.formatDateTime(log.created_at);
         const triggerText =
             log.trigger === 'auto'
                 ? t('log-tag-auto')

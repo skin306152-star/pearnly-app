@@ -19,6 +19,43 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+
+.buddhist-date-note {
+  color: var(--daily-gold);
+  font-size: 12px;
+}
+
+.date-field {
+  position: relative;
+}
+
+.date-display {
+  inline-size: 100%;
+}
+
+.date-field input[type='date'] {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.date-calendar-icon {
+  position: absolute;
+  inset-inline-end: 12px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  color: var(--daily-ink);
+  pointer-events: none;
+}
+
+.date-calendar-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .form-heading {

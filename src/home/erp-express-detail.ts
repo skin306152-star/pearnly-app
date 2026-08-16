@@ -183,7 +183,7 @@
 
     function _timeline(log: any, docnum: string): string {
         var st = log.status || 'pending';
-        var time = log.created_at ? new Date(log.created_at).toLocaleString() : '';
+        var time = log.created_at ? window.formatDateTime(log.created_at) : '';
         var rows = [_tl('ok', '✓', _t('expd-tl-recognized'), time)];
         rows.push(_tl('ok', '✓', _t('expd-tl-queued'), _t('expd-tl-queued-sub')));
         if (st === 'success') rows.push(_tl('ok', '✓', _t('expd-tl-pushed'), docnum || ''));

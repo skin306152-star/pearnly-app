@@ -444,11 +444,16 @@ class RevokeTests(unittest.TestCase):
             mock.patch.object(
                 admin_daily_routes.platform_settings_store, "remove_from_allowlist"
             ) as m_remove,
+            mock.patch.object(
+                admin_daily_routes.db, "get_cursor", lambda **_: _cursor_cm(_SeqCursor())
+            ),
+            mock.patch.object(admin_daily_routes, "revoke_entrance") as m_revoke,
             mock.patch.object(admin_daily_routes, "_log_op") as m_log,
         ):
             r = self.client.post("/api/admin/daily/revoke", json={"subject_id": "tenant-1"})
         self.assertEqual(r.status_code, 200)
         m_remove.assert_called_once_with("daily_finance", "tenant-1")
+        m_revoke.assert_called_once_with(mock.ANY, "tenant-1", "daily")
         self.assertEqual(m_log.call_args.kwargs.get("action"), "daily.revoke")
 
     def test_revoke_missing_subject_400(self):

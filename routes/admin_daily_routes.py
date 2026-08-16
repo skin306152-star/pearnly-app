@@ -29,7 +29,7 @@ from core import db
 from core.feature_flags import DAILY_KEY
 from core.route_helpers import _check_password_strength, _log_op, _require_super_admin
 from services.auth.account_provision import resolve_account_identifier
-from services.auth.entrance_store import DAILY, grant_entrance_safe
+from services.auth.entrance_store import DAILY, grant_entrance_safe, revoke_entrance
 from services.platform_settings import store as platform_settings_store
 from services.tenant.owner_users import create_owner_user
 
@@ -284,6 +284,11 @@ async def daily_revoke(request: Request, body: RevokeBody):
 
     info = _enrich_subjects([subject_id]).get(subject_id, {})
     platform_settings_store.remove_from_allowlist(DAILY_KEY, subject_id)
+    try:
+        with db.get_cursor(commit=True) as cur:
+            revoke_entrance(cur, subject_id, DAILY)
+    except Exception as e:  # noqa: BLE001 · 过渡期入口表缺失不阻断名单收回
+        logger.warning("[daily] revoke_entrance skip · subject=%s: %s", subject_id, e)
     _log_op(
         request,
         admin,

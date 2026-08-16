@@ -355,11 +355,11 @@
                         <div class="form-row form-row-inline">
                             <label data-i18n="set-general-date">日期格式</label>
                             <select id="general-date" class="form-input">
-                                <option value="YYYY-MM-DD">2026-05-09</option>
-                                <option value="DD/MM/YYYY">09/05/2026</option>
-                                <option value="MM/DD/YYYY">05/09/2026</option>
-                                <option value="DD-MM-YYYY">09-05-2026</option>
-                                <option value="YYYY/MM/DD">2026/05/09</option>
+                                <option value="YYYY-MM-DD">2569-05-09</option>
+                                <option value="DD/MM/YYYY">09/05/2569</option>
+                                <option value="MM/DD/YYYY">05/09/2569</option>
+                                <option value="DD-MM-YYYY">09-05-2569</option>
+                                <option value="YYYY/MM/DD">2569/05/09</option>
                             </select>
                             <div class="form-hint" data-i18n="set-general-date-hint">显示在历史 / 异常 / 对账 / 导出 CSV</div>
                         </div>
@@ -367,7 +367,6 @@
                             <label data-i18n="set-general-calendar">历法</label>
                             <select id="general-calendar" class="form-input">
                                 <option value="buddhist">พ.ศ. · 佛历</option>
-                                <option value="gregorian">ค.ศ. · 公历</option>
                             </select>
                             <div class="form-hint" data-i18n="set-general-calendar-hint">显示 / 表格 / 导出统一用此历法 · 数据始终存公历</div>
                         </div>

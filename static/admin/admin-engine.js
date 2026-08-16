@@ -290,7 +290,7 @@
             const saved = document.getElementById('adm-eng-saved');
             if (saved)
                 saved.textContent = d.updated_at
-                    ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
+                    ? _t('adm-set-saved-at') + ' ' + window._adminDate(d.updated_at, true)
                     : '';
         } catch {
             host.innerHTML = _stateBox('error', _t('adm-eng-load-fail'), 'policy');

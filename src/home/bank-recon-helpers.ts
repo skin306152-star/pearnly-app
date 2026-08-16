@@ -2,6 +2,7 @@
 // REFACTOR-WB (2026-06-02) · 银行对账 M10 · 纯工具:进度/错误/格式化/评分徽章 · 从 bank-recon.js 抽出
 // verbatim 0 改逻辑。
 // ============================================================
+import { formatDate as formatBuddhistDate } from './format-date.js';
 
 function _scoreBadge(score: unknown) {
     const n = Number(score || 0);
@@ -62,7 +63,7 @@ function fmtAmt(v: unknown) {
 function formatDate(s: unknown) {
     if (!s) return '-';
     const str = String(s);
-    return str.length >= 10 ? str.slice(0, 10) : str;
+    return formatBuddhistDate(str) || (str.length >= 10 ? str.slice(0, 10) : str);
 }
 
 function formatPeriod(a: unknown, b: unknown) {

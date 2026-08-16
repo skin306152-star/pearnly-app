@@ -5,6 +5,7 @@
 
 // v118.20.5 · 简易 i18n 占位替换({n} 等)
 import { BAHT } from './money.js';
+import { formatDate, formatDateTime } from './format-date.js';
 
 function _tn(key: string, vars?: Record<string, unknown>) {
     let s = t(key) || key;
@@ -53,7 +54,7 @@ function _fmtMoney(n: unknown) {
 
 function _shortDate(iso?: string | null) {
     if (!iso) return '—';
-    return iso.slice(0, 10);
+    return formatDate(iso) || iso.slice(0, 10);
 }
 
 function _v(s: unknown) {
@@ -144,13 +145,7 @@ const EXC_RULE_GROUPS: { labelKey: string; codes: string[] }[] = [
 // ============================================================
 function _shortDateTime(iso?: string | null) {
     if (!iso) return '—';
-    try {
-        const d = new Date(iso);
-        const pad = (n: number) => String(n).padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    } catch (_) {
-        return iso.slice(0, 16).replace('T', ' ');
-    }
+    return formatDateTime(iso) || iso.slice(0, 16).replace('T', ' ');
 }
 
 export {

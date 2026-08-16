@@ -106,6 +106,12 @@ class DailyI18nTest(unittest.TestCase):
             "th 块应含泰文字符(值贴错语言块 = 用户看到错语言)",
         )
 
+    def test_empty_gate_root_collapses_in_source_and_bundle(self):
+        source_css = _read("daily-gate.css")
+        bundle_css = (PROJECT_ROOT / "static" / "dist" / "daily.css").read_text(encoding="utf-8")
+        self.assertRegex(source_css, r"#gateRoot:empty\s*\{\s*display:\s*none")
+        self.assertIn("#gateRoot:empty{display:none}", bundle_css)
+
 
 class DailyPureFunctionsTest(unittest.TestCase):
     def test_week_bounds_match_pwa_semantics(self):

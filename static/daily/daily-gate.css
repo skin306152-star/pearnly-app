@@ -10,6 +10,10 @@
   box-sizing: border-box;
 }
 
+#gateRoot:empty {
+  display: none;
+}
+
 .langbar {
   display: flex;
   gap: 8px;

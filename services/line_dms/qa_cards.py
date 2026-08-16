@@ -377,7 +377,6 @@ def booking_retry_card(message: str, nonce: str) -> Dict[str, Any]:
             "type": "text",
             "text": "กรุณาออกจากระบบ DMS ที่อื่น แล้วกดลองใหม่ภายใน 30 นาที",
             "size": "sm",
-            "color": "#8a8a8a",
             "wrap": True,
         },
     ]

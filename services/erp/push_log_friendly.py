@@ -84,6 +84,12 @@ _DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
         "th": "การเชื่อมต่อ DMS หมดเวลาหรือเครือข่ายขัดข้อง กรุณาลองใหม่ภายหลัง",
         "ja": "DMS への接続がタイムアウトまたはネットワーク異常です。しばらくしてから再試行してください。",
     },
+    "ERR_DMS_CONCURRENT_LOGIN": {
+        "zh": "DMS 账号正在其他地方使用 · 请退出其他登录后重试",
+        "en": "This DMS account is being used elsewhere. Sign out there and retry.",
+        "th": "บัญชี DMS นี้กำลังถูกใช้งานที่อื่น กรุณาออกจากระบบที่อื่นแล้วลองใหม่",
+        "ja": "この DMS アカウントは別の場所で使用中です。他の場所からログアウトして再試行してください。",
+    },
     "ERR_DMS_UNEXPECTED": {
         "zh": "推送 DMS 时发生未知错误 · 请稍后重试或联系客服",
         "en": "An unexpected error occurred while pushing to DMS. Please retry or contact support.",

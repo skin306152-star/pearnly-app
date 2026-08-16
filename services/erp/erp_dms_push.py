@@ -265,16 +265,25 @@ def test_mrerp_dms_endpoint(config: Dict[str, Any]) -> Dict[str, Any]:
             with adapter:
                 try:
                     adapter.login()
-                    if adapter.concurrent_login_detected:
-                        return _fail("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    if getattr(adapter, "concurrent_login_detected", False):
+                        return _fail(
+                            "ERR_DMS_CONCURRENT_LOGIN",
+                            getattr(adapter, "last_dialog", ""),
+                        )
                     return adapter.test_connection()
                 except MrerpDmsAuthError:
-                    if adapter.concurrent_login_detected:
-                        return _fail("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    if getattr(adapter, "concurrent_login_detected", False):
+                        return _fail(
+                            "ERR_DMS_CONCURRENT_LOGIN",
+                            getattr(adapter, "last_dialog", ""),
+                        )
                     raise
                 except MrerpDmsTechnicalError:
-                    if adapter.concurrent_login_detected:
-                        return _fail("ERR_DMS_CONCURRENT_LOGIN", adapter.last_dialog)
+                    if getattr(adapter, "concurrent_login_detected", False):
+                        return _fail(
+                            "ERR_DMS_CONCURRENT_LOGIN",
+                            getattr(adapter, "last_dialog", ""),
+                        )
                     raise
         except MrerpDmsAuthError as e:
             return _fail("ERR_DMS_AUTH", f"{type(e).__name__}: {e}")

@@ -22,6 +22,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from services.erp.mrerp_dms_adapter import MrerpDmsAdapter  # noqa: E402
 from services.erp.mrerp_dms_client import DMSClient  # noqa: E402
 from services.erp.mrerp_dms_models import ThaiAddress, ThaiIdCardPayload  # noqa: E402
 
@@ -137,6 +138,23 @@ class GeoResolveTests(unittest.TestCase):
         self.assertEqual(r.district_id, "800")  # first option
         self.assertEqual(r.subdistrict_id, "9000")
         self.assertEqual(r.zipcode_id, "106")
+
+
+class LogoutCleanupTests(unittest.TestCase):
+    def test_logout_uses_dms_server_logout_endpoint(self):
+        class Page:
+            def __init__(self):
+                self.calls = []
+
+            def goto(self, url, **kwargs):
+                self.calls.append((url, kwargs))
+
+        page = Page()
+        adapter = object.__new__(MrerpDmsAdapter)
+        adapter.base_url = "https://www.mrerp4sme.com/dms/"
+        adapter._logout_page(page)
+        self.assertEqual(page.calls[0][0], "https://www.mrerp4sme.com/dms/login/logout.php")
+        self.assertEqual(page.calls[0][1]["timeout"], 5000)
 
 
 if __name__ == "__main__":

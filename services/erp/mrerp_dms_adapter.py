@@ -38,7 +38,7 @@ import logging
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from services.erp._browser import BrowserSession
 from services.erp.mrerp_dms_client import DMSClient
@@ -218,6 +218,8 @@ class MrerpDmsAdapter:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
+        if self._admin_page is not None:
+            self._logout_page(self._admin_page)
         if self._admin_ctx is not None:
             try:
                 self._admin_ctx.close()
@@ -227,9 +229,21 @@ class MrerpDmsAdapter:
         self._admin_page = None
         self._admin_logged_in = False
         if self._session is not None:
+            self._logout_page(self._session.page)
             self._session.__exit__(exc_type, exc, tb)
         self._session = None
         self._logged_in = False
+
+    def _logout_page(self, page: Any) -> None:
+        """显式结束 DMS 服务端会话,避免关闭浏览器后仍占用单账号登录槽。"""
+        try:
+            page.goto(
+                urljoin(self.base_url, "login/logout.php"),
+                wait_until="domcontentloaded",
+                timeout=5000,
+            )
+        except Exception:
+            logger.debug("DMS logout cleanup failed", exc_info=True)
 
     @property
     def _page(self):

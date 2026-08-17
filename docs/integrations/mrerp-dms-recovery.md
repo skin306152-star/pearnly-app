@@ -14,6 +14,10 @@ rows, while the cached snapshot still contained one bank row. The editor now
 forces one master refresh when a pending booking is opened and obtains customer
 prefixes in that same authenticated DMS session.
 
+Closing Chromium is not enough to release the DMS server-side login slot. The
+adapter calls the verified `/dms/login/logout.php` endpoint for both the user
+and optional admin context before closing each browser context.
+
 ## Recovery Contract
 
 - Duplicate-login and pre-create company-bank readiness failures preserve the

@@ -469,6 +469,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
 
     # ── 预览卡 ────────────────────────────────────────────────────────────
     async def test_preview_card_full_fields(self):
+        # 无 summary 的 legacy qa → 回退从 draft 拼五要素(邮编并入地址行)。
         qa_dict = _qa(
             "pay_more",
             draft={
@@ -502,10 +503,11 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                 for row in body
                 if row.get("type") == "box"
             )
-            self.assertIn("ลูกค้า=สมชาย ใจดี", flat)
-            self.assertIn("เลขบัตรประชาชน=1234567890121", flat)
+            # 客户资料区 = cards._summary_rows 同一套标签(เลขบัตร/ชื่อ/วันเกิด/ที่อยู่/เบอร์โทร)
+            self.assertIn("ชื่อ=สมชาย ใจดี", flat)
+            self.assertIn("เลขบัตร=1234567890121", flat)
             self.assertIn("วันเกิด=01/01/2530", flat)
-            self.assertIn("รหัสไปรษณีย์=10110", flat)
+            self.assertIn("ที่อยู่=99 10110", flat)  # 邮编并入地址行,不再单列
             self.assertIn("ที่ปรึกษาการขาย=sale02", flat)  # 提成归属确认前可见
             self.assertIn("สถานที่รับจอง=สาขาบางนา", flat)
             self.assertIn("รุ่น/สี=DMX D-Max · ขาว", flat)
@@ -525,6 +527,41 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("/dms-booking", actions[1]["uri"])
             self.assertEqual(actions[2]["label"], qa_cards.BTN_DISCARD)
             self.assertIn("action=cancel_booking", actions[2]["data"])
+
+    async def test_preview_card_uses_summary_rows(self):
+        """预览卡客户资料区复用客户确认卡的 summary:同一套标签/顺序/完整地址。"""
+        qa_dict = _qa(
+            "pay_more",
+            summary={
+                "people_id": "1234567890121",
+                "name": "สมชาย ใจดี",
+                "birthday_be": "01/01/2530",
+                "address": "99 หมู่ 2 ต.คลองเตย อ.คลองเตย จ.กรุงเทพมหานคร 10230",
+                "phone": "0812345678",
+            },
+            answers={
+                "place": {"id": "pl1", "name": "สาขาบางนา"},
+                "car": {"id": "c1", "label": "DMX D-Max"},
+                "paint": {"id": "p1", "name": "ขาว"},
+                "delivery_date_be": "20/08/2569",
+                "term": {"id": "t1", "name": "เงินสด"},
+                "regis": {"id": "r1", "name": "บริษัท"},
+                "regis_name": "สมชาย ใจดี",
+            },
+            payments=[{"channel": "cash", "amount": "5000.00"}],
+        )
+        card = qa_cards.preview_card(qa_dict, "nonce")
+        body = card["contents"]["body"]["contents"]
+        flat = " | ".join(
+            f"{row['contents'][0]['text']}={row['contents'][1]['text']}"
+            for row in body
+            if row.get("type") == "box"
+        )
+        self.assertIn("เลขบัตร=1234567890121", flat)
+        self.assertIn("ชื่อ=สมชาย ใจดี", flat)
+        self.assertIn("วันเกิด=01/01/2530", flat)
+        self.assertIn("ที่อยู่=99 หมู่ 2 ต.คลองเตย อ.คลองเตย จ.กรุงเทพมหานคร 10230", flat)
+        self.assertIn("เบอร์โทร=0812345678", flat)
 
     def test_preview_shows_selected_company_bank_for_transfer(self):
         card = qa_cards.preview_card(

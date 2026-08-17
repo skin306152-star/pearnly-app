@@ -134,8 +134,11 @@ test('master-data save errors are actionable on mobile and desktop', async ({ pa
         { width: 1280, height: 900 },
     ]) {
         await page.setViewportSize(viewport);
-        await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=error-${viewport.width}`);
+        await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=error-${viewport.width}`, {
+            waitUntil: 'domcontentloaded',
+        });
         await page.waitForSelector('#editor:not([hidden])');
+        await page.waitForSelector('#save:not([disabled])');
         await page.locator('#save').click();
         const error = page.locator('#form-error');
         await expect(error).toBeVisible();

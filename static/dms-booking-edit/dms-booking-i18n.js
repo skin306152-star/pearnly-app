@@ -261,4 +261,10 @@
         'dms_booking.geo_unavailable': 'geoUnavailable',
         'dms_booking.preview_send_failed': 'previewSendFailed',
     };
+    window.DMS_BOOKING_GEO = [
+        'province_id',
+        'district_id',
+        'subdistrict_id',
+        'zipcode_id',
+    ];
 })();

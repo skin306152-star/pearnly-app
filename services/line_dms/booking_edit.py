@@ -260,6 +260,7 @@ def save(user: dict, nonce: str, submitted: dict) -> str:
         raise BookingEditError("dms_booking.invalid_delivery") from exc
     qa["draft"] = {**(qa.get("draft") or {}), **customer}
     qa["customer"] = {**(qa.get("customer") or {}), "name": customer["name"]}
+    qa["summary"] = qa_cards._fallback_summary(qa)
     qa["customer_dirty"] = True
     qa["answers"] = {
         "place": _pick(masters, "place", raw_answers.get("place_id")),

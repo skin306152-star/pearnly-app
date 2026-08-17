@@ -139,6 +139,7 @@ async def _continue_booking(
         customer_id=cid,
         customer_name=str(payload.get("name") or ""),
         draft=payload.get("draft") or {},
+        summary=payload.get("summary"),
         user_id=str(binding.get("user_id") or ""),
         id_card_mid=payload.get("id_card_mid") or None,
     )
@@ -173,12 +174,14 @@ async def after_customer_saved(
     name: str = "",
     mode: str = "",
     same_data: bool = False,
+    summary: Optional[dict] = None,
 ) -> None:
     """客户档落定后:booking/缺省 → 开订车逐问;customer → 收尾不提订车。
 
     菜单1=只建档(泰方拍板 2026-07-19):不再推「ทำใบจองต่อ?」续订卡;其 postback
     处理保留,聊天历史里已发出的旧卡仍能点。same_data=True 表示本次零写入
-    (数据已存/选择保留),文案不谎称「已保存」。"""
+    (数据已存/选择保留),文案不谎称「已保存」。summary 透传给逐问开局,预览卡
+    与客户确认卡共用同一份五要素。"""
     if mode != MODE_CUSTOMER:
         sess = await _thr(store.get_session, binding["tenant_id"], line_user_id)
         payload = (sess or {}).get("payload") or {}
@@ -190,6 +193,7 @@ async def after_customer_saved(
             # 零写入路径(同资料点保持)不传 name → 回退建档 draft 里的姓名(照旧选车入口语义)。
             customer_name=name or (draft or {}).get("name", ""),
             draft=draft,
+            summary=summary,
             user_id=str(binding.get("user_id") or ""),
             id_card_mid=payload.get("id_card_mid") or None,
         )

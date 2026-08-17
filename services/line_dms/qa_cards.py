@@ -26,6 +26,7 @@ from services.line_dms.cards import (
     _data,
     _kv_row,
     _qr_item,
+    _summary_rows,
 )
 from services.erp.mrerp_dms_company_banks import company_bank_label
 from services.line_dms.qa_util import CHANNEL_EXTRA_SHAPE
@@ -98,13 +99,8 @@ TXT_ADVISOR_BLOCK_NO_USER = (
     + _TH_RETRY
 )
 
-# 预览卡行标签(与确认后建单要回显的字段一一对应)。
-LBL_PEOPLE_ID = "เลขบัตรประชาชน"
-LBL_CUSTOMER = "ลูกค้า"
-LBL_BIRTHDAY = "วันเกิด"
-LBL_ADDRESS = "ที่อยู่"
-LBL_POSTCODE = "รหัสไปรษณีย์"
-LBL_PHONE = "เบอร์โทรลูกค้า"
+# 预览卡行标签(与确认后建单要回显的字段一一对应)。客户资料区不在此列:
+# 复用 cards._summary_rows 的同一套标签,不另维护一份(防两处漂)。
 LBL_ADVISOR = "ที่ปรึกษาการขาย"
 LBL_PLACE = "สถานที่รับจอง"
 LBL_CAR = "รุ่น/สี"
@@ -328,9 +324,32 @@ def _address_line(draft: Dict[str, Any]) -> str:
     return " ".join(str(part).strip() for part in parts if str(part or "").strip()) or "—"
 
 
+def _fallback_summary(qa: Dict[str, Any]) -> Dict[str, str]:
+    """legacy 会话没有 summary 时的可读回退:从 draft + customer 拼五要素。
+
+    地址沿用 _address_line 的拼接,邮编追加到地址末尾(不单列一行,与 summary
+    的地址格式对齐);字段取值优先级照旧预览卡(people_id/name 先 draft 后 customer)。
+    """
+    draft = qa.get("draft") or {}
+    customer = qa.get("customer") or {}
+    address = _address_line(draft)
+    postcode = str(draft.get("zipcode") or draft.get("zipcode_name") or "")
+    if postcode:
+        address = f"{address} {postcode}".strip()
+    return {
+        "people_id": str(draft.get("people_id") or customer.get("people_id") or ""),
+        "name": str(customer.get("name") or draft.get("name") or ""),
+        "birthday_be": str(draft.get("birthday_be") or ""),
+        "address": address,
+        "phone": str(draft.get("phone") or ""),
+    }
+
+
 def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     """逐问结束的汇总卡:全部答案 + 各渠道金额 + 合计 + 附件两行 + 确认/丢弃。
 
+    客户资料区复用 cards._summary_rows(与客户确认卡同一份 summary,标签/顺序/地址
+    格式完全一致);legacy 会话没有 summary 时从 draft+customer 拼可读回退。
     按钮复用 ACT_CONFIRM_BOOKING / ACT_CANCEL_BOOKING 与 _data 编码,既有 booking_flow
     的确认/取消(parse_qs + consume_nonce)无需任何改动即可接住。
     """
@@ -338,15 +357,9 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     files = qa.get("files") or {}
     payments = qa.get("payments") or []
     advisor = str((qa.get("advisor") or {}).get("name") or "")
-    draft = qa.get("draft") or {}
-    customer = qa.get("customer") or {}
+    summary = qa.get("summary") or _fallback_summary(qa)
     rows: List[Dict[str, Any]] = [
-        _kv_row(LBL_PEOPLE_ID, str(draft.get("people_id") or customer.get("people_id") or "")),
-        _kv_row(LBL_CUSTOMER, str(customer.get("name") or draft.get("name") or "")),
-        _kv_row(LBL_BIRTHDAY, str(draft.get("birthday_be") or "")),
-        _kv_row(LBL_ADDRESS, _address_line(draft)),
-        _kv_row(LBL_POSTCODE, str(draft.get("zipcode") or draft.get("zipcode_name") or "")),
-        _kv_row(LBL_PHONE, str(draft.get("phone") or "")),
+        *_summary_rows(summary),
         # 顾问 = 提成归属,确认前让销售自己看一眼落在谁头上;没匹配上时开局就拦了,不会到这。
         *([_kv_row(LBL_ADVISOR, advisor)] if advisor else []),
         _kv_row(LBL_PLACE, str((answers.get("place") or {}).get("name") or "")),

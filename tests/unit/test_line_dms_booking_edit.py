@@ -139,6 +139,8 @@ class BookingEditTests(TestCase):
         self.assertEqual(qa["answers"]["car"]["label"], "DMAX X-Series")
         self.assertEqual(qa["payments"][0]["amount"], "12000.00")
         self.assertEqual(qa["payments"][0]["extra"]["dst"], "SCB 123")
+        self.assertIn("District", qa["summary"]["address"])
+        self.assertIn("10230", qa["summary"]["address"])
         self.assertTrue(qa["customer_dirty"])
         self.assertEqual(qa["files"]["slip_mid"], "MID2")
         self.assertEqual(send.call_args.args[0], "L1")
@@ -210,3 +212,22 @@ class BookingEditTests(TestCase):
         self.assertIn("0811111111", raw)
         self.assertIn("10230", raw)
         self.assertIn("https://liff.line.me/DMS-LIFF?draft=N-EDIT", raw)
+
+    def test_preview_legacy_qa_without_summary_falls_back_to_draft_address(self):
+        """legacy qa 无 summary:预览卡从 draft 拼地址(府/区/街道/邮编),不丢可读性。"""
+        qa = {
+            **QA,
+            "draft": {
+                **QA["draft"],
+                "province_name": "Bangkok",
+                "district_name": "District",
+                "subdistrict_name": "Subdistrict",
+                "zipcode": "10230",
+            },
+        }
+        card = qa_cards.preview_card(qa, "N-LEGACY")
+        raw = str(card)
+        self.assertIn("Subdistrict", raw)
+        self.assertIn("District", raw)
+        self.assertIn("Bangkok", raw)
+        self.assertIn("10230", raw)

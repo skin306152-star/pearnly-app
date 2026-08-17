@@ -284,7 +284,7 @@
             ) +
             '<p id="form-error" class="error" role="alert"></p><div class="sticky-actions"><button id="cancel" class="pu-btn secondary" type="button">' +
             t('cancel') +
-            '</button><button id="save" class="pu-btn primary" type="submit">' +
+            '</button><button id="save" class="pu-btn primary" type="submit" disabled>' +
             t('save') +
             '</button></div>';
         document.getElementById('loading').hidden = true;
@@ -335,6 +335,7 @@
                 c.subdistrict_id
             );
             setOptions('zipcode_id', await geo('zipcodes', c.subdistrict_id), c.zipcode_id);
+            document.getElementById('save').disabled = false;
         } catch (e) {
             showFormError();
         }
@@ -367,9 +368,7 @@
             showFormError();
         }
     }
-    function val(id) {
-        return document.getElementById(id).value.trim();
-    }
+    var val = (id, fallback) => document.getElementById(id).value.trim() || fallback || '';
     function selectedLabel(id) {
         var el = document.getElementById(id);
         return el.selectedOptions[0] ? el.selectedOptions[0].textContent : '';
@@ -409,7 +408,7 @@
             ],
             customer = {};
         names.forEach(function (n) {
-            customer[n] = val(n);
+            customer[n] = val(n, window.DMS_BOOKING_GEO.includes(n) ? model.form.customer[n] : '');
         });
         customer.province_name = selectedLabel('province_id');
         customer.district_name = selectedLabel('district_id');

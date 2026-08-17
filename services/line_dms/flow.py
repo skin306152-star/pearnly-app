@@ -154,6 +154,7 @@ async def handle_postback(
             draft=payload.get("draft") or {},
             mode=str(payload.get("mode") or ""),
             same_data=True,
+            summary=payload.get("summary"),
         )
         return
 
@@ -431,6 +432,7 @@ async def _execute(
             draft=payload.get("draft") or {},
             name=name,
             mode=str(payload.get("mode") or ""),
+            summary=payload.get("summary"),
         )
     elif result.get("error_code") == "ERR_DMS_ADMIN_AUTH":
         _push(line_user_id, cards.TXT_ADMIN_AUTH_FAIL)  # 不谎称已自动通知

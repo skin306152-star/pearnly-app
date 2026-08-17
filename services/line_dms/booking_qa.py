@@ -56,9 +56,9 @@ async def start(
     reply_token=None,
     draft=None,
     user_id="",
+    summary=None,
 ) -> None:
     """客户档落定后开一局逐问:定提成归属 → 初始化 qa(step=slip)→ 发第 1 问。
-
     身份证/OCR/客户档由既有 collecting 流程负责,本函数只从「档已落定」接手:
     id_card_mid 只进 files;draft 与 user_id 原样进 qa,建单执行器从 payload["qa"] 读取。
     顾问(提成归属)在开局就定死:认不出账号的单最终必被 DMS 拒收,答完 8 问再拦等于
@@ -82,6 +82,7 @@ async def start(
         "customer": {"id": str(customer_id or ""), "name": customer_name or ""},
         "advisor": advisor,
         "draft": dict(draft or {}),
+        "summary": dict(summary or {}),
         "user_id": str(user_id or ""),
         "files": {"id_card_mid": id_card_mid or None, "slip_mid": None},
         "answers": {},

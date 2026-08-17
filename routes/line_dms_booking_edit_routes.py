@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict
@@ -16,6 +17,8 @@ from core import db
 from core.auth import create_access_token
 from core.pos_api import PosError, ok
 from routes.line_liff_routes import LiffAuthIn, _verify_id_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["line-dms-booking-edit"])
 _ROOT = Path(__file__).resolve().parent.parent
@@ -77,6 +80,7 @@ def _booking_error(exc):
     from services.line_dms.booking_edit import BookingEditError
 
     if isinstance(exc, BookingEditError):
+        logger.warning("dms booking edit failed: code=%s status=%s", exc.code, exc.status)
         raise PosError(exc.code, exc.status, detail=exc.code) from exc
     raise exc
 

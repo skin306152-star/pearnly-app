@@ -10,7 +10,7 @@ import contextlib
 import unittest
 from unittest import mock
 
-from services.line_dms import cards, flow, ocr_review, qa_cards, text_router
+from services.line_dms import cards, draft, flow, ocr_review, qa_cards, text_router
 
 # 网页确认页 fields 键形状(static/dms/dms-intake-core.js)· LINE 侧必须同形。
 SPA_CREATE_FIELD_KEYS = {"prefix_id", "name", "people_id", "tax_id", "birthday_be", "phone"}
@@ -699,6 +699,29 @@ def _card_has_text(card, text):
 
     walk(card)
     return found[0]
+
+
+class DraftZipcodeTests(unittest.TestCase):
+    """build_draft 把 zipcode_id 映成主档 label(预览卡读 draft.zipcode 显示)。"""
+
+    def test_zipcode_label_resolved_from_geo_master(self):
+        # id(ZC1) 与 label(10110) 不同才证明走了 geo.zipcodes 解析,不是透传 id。
+        geo = {
+            "provinces": [["1", "กรุงเทพมหานคร"]],
+            "districts": [["101", "คลองเตย"]],
+            "subdistricts": [["1001", "คลองเตย"]],
+            "zipcodes": [["ZC1", "10110"]],
+            "selected": {
+                "province_id": "1",
+                "district_id": "101",
+                "subdistrict_id": "1001",
+                "zipcode_id": "ZC1",
+            },
+            "text": {"house_no": "99", "moo": "4", "soi": "", "road": "สุขุมวิท"},
+        }
+        out = draft.build_draft(_RAW_ID, geo, _PREFIXES, _PHONE)
+        self.assertEqual(out["zipcode_id"], "ZC1")
+        self.assertEqual(out["zipcode"], "10110")
 
 
 if __name__ == "__main__":

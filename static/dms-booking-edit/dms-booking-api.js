@@ -16,6 +16,7 @@
         if (!response.ok || !body || !body.ok) {
             var error = new Error((body && body.error && body.error.detail) || 'failed');
             error.status = response.status;
+            error.code = body && body.error && body.error.code;
             throw error;
         }
         return body.data;

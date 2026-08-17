@@ -17,6 +17,7 @@
     var form = document.getElementById('editor');
     var result = document.getElementById('result');
     var nonce = query('draft');
+    var ERROR_KEYS = window.DMS_BOOKING_ERROR_KEYS;
 
     function query(name) {
         var sp = new URLSearchParams(location.search);
@@ -454,11 +455,9 @@
             setTimeout(close, 900);
         } catch (e) {
             btn.disabled = false;
-            document.getElementById('form-error').textContent =
-                e.status === 409 ? t('expired') : t('failed');
-            document
-                .getElementById('form-error')
-                .scrollIntoView({ behavior: 'smooth', block: 'center' });
+            var el = document.getElementById('form-error');
+            el.textContent = t(e.status === 409 ? 'expired' : ERROR_KEYS[e.code] || 'failed');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
     function close() {

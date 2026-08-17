@@ -93,3 +93,59 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
 
     await page.screenshot({ path: path.join(OUT, 'mobile-controls.png'), fullPage: true });
 });
+
+test('master-data save errors are actionable on mobile and desktop', async ({ page }) => {
+    const message = '可选项目已更新，请使用 LINE 中的最新预览卡后重试。';
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', (route) => {
+        if (route.request().method() === 'POST') {
+            return route.fulfill({
+                status: 400,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    ok: false,
+                    error: { code: 'dms_booking.invalid_master', detail: 'dms_booking.invalid_master' },
+                }),
+            });
+        }
+        const url = route.request().url();
+        const data = url.includes('/draft') ? DRAFT : [];
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    for (const viewport of [
+        { width: 390, height: 844 },
+        { width: 1280, height: 900 },
+    ]) {
+        await page.setViewportSize(viewport);
+        await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=error-${viewport.width}`);
+        await page.waitForSelector('#editor:not([hidden])');
+        await page.locator('#save').click();
+        const error = page.locator('#form-error');
+        await expect(error).toBeVisible();
+        await expect(error).toHaveText(message);
+        const state = await error.evaluate((element) => {
+            const style = getComputedStyle(element);
+            return { visible: element.getBoundingClientRect().height > 0, color: style.color };
+        });
+        expect(state.visible).toBe(true);
+        expect(state.color).toBeTruthy();
+        await page.screenshot({
+            path: path.join(OUT, `master-error-${viewport.width}.png`),
+            fullPage: true,
+        });
+    }
+});

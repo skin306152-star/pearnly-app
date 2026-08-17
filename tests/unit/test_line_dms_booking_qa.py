@@ -471,6 +471,12 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
     async def test_preview_card_full_fields(self):
         qa_dict = _qa(
             "pay_more",
+            draft={
+                "people_id": "1234567890121",
+                "birthday_be": "01/01/2530",
+                "house_no": "99",
+                "zipcode": "10110",
+            },
             answers={
                 "place": {"id": "pl1", "name": "สาขาบางนา"},
                 "car": {"id": "c1", "label": "DMX D-Max"},
@@ -497,6 +503,9 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                 if row.get("type") == "box"
             )
             self.assertIn("ลูกค้า=สมชาย ใจดี", flat)
+            self.assertIn("เลขบัตรประชาชน=1234567890121", flat)
+            self.assertIn("วันเกิด=01/01/2530", flat)
+            self.assertIn("รหัสไปรษณีย์=10110", flat)
             self.assertIn("ที่ปรึกษาการขาย=sale02", flat)  # 提成归属确认前可见
             self.assertIn("สถานที่รับจอง=สาขาบางนา", flat)
             self.assertIn("รุ่น/สี=DMX D-Max · ขาว", flat)

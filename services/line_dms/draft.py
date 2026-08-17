@@ -49,6 +49,8 @@ def build_draft(id_card: dict, geo: dict, prefixes: List[list], phone: str) -> D
         "district_id": sel.get("district_id") or "",
         "subdistrict_id": sel.get("subdistrict_id") or "",
         "zipcode_id": sel.get("zipcode_id") or "",
+        # 预览卡读 draft.zipcode 显示;zipcode_id 是主档 ID,label 单独解析。
+        "zipcode": geo_name(geo, "zipcode_id", sel.get("zipcode_id") or ""),
     }
 
 

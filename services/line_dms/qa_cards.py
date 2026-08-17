@@ -99,7 +99,9 @@ TXT_ADVISOR_BLOCK_NO_USER = (
 )
 
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。
+LBL_PEOPLE_ID = "เลขบัตรประชาชน"
 LBL_CUSTOMER = "ลูกค้า"
+LBL_BIRTHDAY = "วันเกิด"
 LBL_ADDRESS = "ที่อยู่"
 LBL_POSTCODE = "รหัสไปรษณีย์"
 LBL_PHONE = "เบอร์โทรลูกค้า"
@@ -337,8 +339,11 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     payments = qa.get("payments") or []
     advisor = str((qa.get("advisor") or {}).get("name") or "")
     draft = qa.get("draft") or {}
+    customer = qa.get("customer") or {}
     rows: List[Dict[str, Any]] = [
-        _kv_row(LBL_CUSTOMER, str((qa.get("customer") or {}).get("name") or "")),
+        _kv_row(LBL_PEOPLE_ID, str(draft.get("people_id") or customer.get("people_id") or "")),
+        _kv_row(LBL_CUSTOMER, str(customer.get("name") or draft.get("name") or "")),
+        _kv_row(LBL_BIRTHDAY, str(draft.get("birthday_be") or "")),
         _kv_row(LBL_ADDRESS, _address_line(draft)),
         _kv_row(LBL_POSTCODE, str(draft.get("zipcode") or draft.get("zipcode_name") or "")),
         _kv_row(LBL_PHONE, str(draft.get("phone") or "")),

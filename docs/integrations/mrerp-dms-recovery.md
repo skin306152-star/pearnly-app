@@ -29,6 +29,12 @@ and optional admin context before closing each browser context.
 - Successful retry clears the booking session and returns the normal booking
   receipt.
 
+## Booking Preview Contract
+
+The first booking preview repeats the ID-card number, name, birthday, address,
+postcode, and phone. The postcode is displayed from the resolved DMS geo master;
+the stored `zipcode_id` remains the value used for DMS writes.
+
 ## Verification
 
 The LINE simulation covers confirm → duplicate-login failure → retry postback →

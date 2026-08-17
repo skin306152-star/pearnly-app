@@ -508,6 +508,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("เลขบัตร=1234567890121", flat)
             self.assertIn("วันเกิด=01/01/2530", flat)
             self.assertIn("ที่อยู่=99 10110", flat)  # 邮编并入地址行,不再单列
+            self.assertIn("รหัสไปรษณีย์=10110", flat)
             self.assertIn("ที่ปรึกษาการขาย=sale02", flat)  # 提成归属确认前可见
             self.assertIn("สถานที่รับจอง=สาขาบางนา", flat)
             self.assertIn("รุ่น/สี=DMX D-Max · ขาว", flat)
@@ -537,6 +538,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                 "name": "สมชาย ใจดี",
                 "birthday_be": "01/01/2530",
                 "address": "99 หมู่ 2 ต.คลองเตย อ.คลองเตย จ.กรุงเทพมหานคร 10230",
+                "zipcode": "10230",
                 "phone": "0812345678",
             },
             answers={
@@ -561,6 +563,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ชื่อ=สมชาย ใจดี", flat)
         self.assertIn("วันเกิด=01/01/2530", flat)
         self.assertIn("ที่อยู่=99 หมู่ 2 ต.คลองเตย อ.คลองเตย จ.กรุงเทพมหานคร 10230", flat)
+        self.assertIn("รหัสไปรษณีย์=10230", flat)
         self.assertIn("เบอร์โทร=0812345678", flat)
 
     def test_preview_shows_selected_company_bank_for_transfer(self):

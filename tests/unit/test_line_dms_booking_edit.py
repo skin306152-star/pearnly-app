@@ -231,3 +231,4 @@ class BookingEditTests(TestCase):
         self.assertIn("District", raw)
         self.assertIn("Bangkok", raw)
         self.assertIn("10230", raw)
+        self.assertIn("รหัสไปรษณีย์", raw)

@@ -42,6 +42,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from services.erp._browser import BrowserSession
 from services.erp.mrerp_dms_client import DMSClient
+from services.erp.session_lock import mrerp_session_lock
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,7 @@ class MrerpDmsAdapter:
         self.slow_mo_ms = max(0, int(slow_mo_ms))
         self._session: Optional[BrowserSession] = None
         self._logged_in = False
+        self._lock_cm = None
         # admin 会话不再自开浏览器:复用用户会话的同一 Browser,只多开一个隔离 context。
         self._admin_ctx: Any = None
         self._admin_page: Any = None
@@ -206,16 +208,22 @@ class MrerpDmsAdapter:
     # ----- lifecycle --------------------------------------------------
 
     def __enter__(self) -> "MrerpDmsAdapter":
-        secrets = [self._password]
-        if len(self._username) >= 3:
-            secrets.append(self._username)
-        self._session = BrowserSession(
-            headless=self.headless,
-            screenshot_dir=self.screenshot_dir,
-            redact_strings=secrets,
-            slow_mo_ms=self.slow_mo_ms,
-        ).__enter__()
-        return self
+        self._lock_cm = mrerp_session_lock(f"{self.login_url}|{self._username}")
+        try:
+            self._lock_cm.__enter__()
+            secrets = [self._password]
+            if len(self._username) >= 3:
+                secrets.append(self._username)
+            self._session = BrowserSession(
+                headless=self.headless,
+                screenshot_dir=self.screenshot_dir,
+                redact_strings=secrets,
+                slow_mo_ms=self.slow_mo_ms,
+            ).__enter__()
+            return self
+        except Exception as exc:
+            self._release_lock(type(exc), exc, exc.__traceback__)
+            raise
 
     def __exit__(self, exc_type, exc, tb) -> None:
         if self._admin_page is not None:
@@ -233,6 +241,15 @@ class MrerpDmsAdapter:
             self._session.__exit__(exc_type, exc, tb)
         self._session = None
         self._logged_in = False
+        self._release_lock(exc_type, exc, tb)
+
+    def _release_lock(self, exc_type=None, exc=None, tb=None) -> None:
+        if self._lock_cm is None:
+            return
+        try:
+            self._lock_cm.__exit__(exc_type, exc, tb)
+        finally:
+            self._lock_cm = None
 
     def _logout_page(self, page: Any) -> None:
         """显式结束 DMS 服务端会话,避免关闭浏览器后仍占用单账号登录槽。"""

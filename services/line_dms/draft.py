@@ -88,6 +88,7 @@ def build_summary(draft: Dict[str, str], geo: dict) -> Dict[str, str]:
         "name": draft.get("name", ""),
         "birthday_be": draft.get("birthday_be", ""),
         "address": " ".join(bits),
+        "zipcode": zc,
         "phone": draft.get("phone", ""),
     }
 

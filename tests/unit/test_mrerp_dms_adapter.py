@@ -18,6 +18,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -155,6 +156,41 @@ class LogoutCleanupTests(unittest.TestCase):
         adapter._logout_page(page)
         self.assertEqual(page.calls[0][0], "https://www.mrerp4sme.com/dms/login/logout.php")
         self.assertEqual(page.calls[0][1]["timeout"], 5000)
+
+    def test_dms_browser_session_holds_account_lock_until_logout(self):
+        events = []
+
+        class Lock:
+            def __enter__(self):
+                events.append("lock-enter")
+
+            def __exit__(self, *args):
+                events.append("lock-exit")
+
+        class Session:
+            page = object()
+
+            def __enter__(self):
+                events.append("browser-enter")
+                return self
+
+            def __exit__(self, *args):
+                events.append("browser-exit")
+
+        adapter = MrerpDmsAdapter(
+            system_url="https://www.mrerp4sme.com/dms/index.php",
+            username="dmstest",
+            password="secret",
+        )
+        with (
+            mock.patch("services.erp.mrerp_dms_adapter.mrerp_session_lock", return_value=Lock()),
+            mock.patch("services.erp.mrerp_dms_adapter.BrowserSession", return_value=Session()),
+            mock.patch.object(adapter, "_logout_page"),
+        ):
+            adapter.__enter__()
+            adapter.__exit__(None, None, None)
+
+        self.assertEqual(events, ["lock-enter", "browser-enter", "browser-exit", "lock-exit"])
 
 
 if __name__ == "__main__":

@@ -102,6 +102,7 @@ TXT_ADVISOR_BLOCK_NO_USER = (
 # 预览卡行标签(与确认后建单要回显的字段一一对应)。客户资料区不在此列:
 # 复用 cards._summary_rows 的同一套标签,不另维护一份(防两处漂)。
 LBL_ADVISOR = "ที่ปรึกษาการขาย"
+LBL_POSTCODE = "รหัสไปรษณีย์"
 LBL_PLACE = "สถานที่รับจอง"
 LBL_CAR = "รุ่น/สี"
 LBL_DELIVERY = "วันส่งมอบ"
@@ -341,6 +342,7 @@ def _fallback_summary(qa: Dict[str, Any]) -> Dict[str, str]:
         "name": str(customer.get("name") or draft.get("name") or ""),
         "birthday_be": str(draft.get("birthday_be") or ""),
         "address": address,
+        "zipcode": postcode,
         "phone": str(draft.get("phone") or ""),
     }
 
@@ -358,8 +360,10 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     payments = qa.get("payments") or []
     advisor = str((qa.get("advisor") or {}).get("name") or "")
     summary = qa.get("summary") or _fallback_summary(qa)
+    customer_rows = _summary_rows(summary)
+    customer_rows.insert(4, _kv_row(LBL_POSTCODE, str(summary.get("zipcode") or "")))
     rows: List[Dict[str, Any]] = [
-        *_summary_rows(summary),
+        *customer_rows,
         # 顾问 = 提成归属,确认前让销售自己看一眼落在谁头上;没匹配上时开局就拦了,不会到这。
         *([_kv_row(LBL_ADVISOR, advisor)] if advisor else []),
         _kv_row(LBL_PLACE, str((answers.get("place") or {}).get("name") or "")),

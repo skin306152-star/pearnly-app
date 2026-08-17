@@ -141,7 +141,7 @@ test('master-data save errors are actionable on mobile and desktop', async ({ pa
         await expect(error).toBeVisible();
         await expect(error).toHaveText(message);
         const state = await error.evaluate((element) => {
-            const style = getComputedStyle(element);
+            const style = element.ownerDocument.defaultView.getComputedStyle(element);
             return { visible: element.getBoundingClientRect().height > 0, color: style.color };
         });
         expect(state.visible).toBe(true);

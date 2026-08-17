@@ -113,7 +113,10 @@ test('master-data save errors are actionable on mobile and desktop', async ({ pa
                 contentType: 'application/json',
                 body: JSON.stringify({
                     ok: false,
-                    error: { code: 'dms_booking.invalid_master', detail: 'dms_booking.invalid_master' },
+                    error: {
+                        code: 'dms_booking.invalid_master',
+                        detail: 'dms_booking.invalid_master',
+                    },
                 }),
             });
         }

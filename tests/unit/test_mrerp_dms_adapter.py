@@ -192,6 +192,21 @@ class LogoutCleanupTests(unittest.TestCase):
 
         self.assertEqual(events, ["lock-enter", "browser-enter", "browser-exit", "lock-exit"])
 
+    def test_same_admin_credentials_reuse_user_session(self):
+        adapter = MrerpDmsAdapter(
+            system_url="https://www.mrerp4sme.com/dms/index.php",
+            username="dmstest",
+            password="secret",
+            admin_username="dmstest",
+            admin_password="secret",
+        )
+        with mock.patch.object(adapter, "_transport", return_value=object()):
+            client = adapter._client()
+
+        self.assertTrue(adapter.has_admin_creds)
+        self.assertFalse(adapter.has_distinct_admin_creds)
+        self.assertIsNone(client._admin_transport)
+
 
 if __name__ == "__main__":
     unittest.main()

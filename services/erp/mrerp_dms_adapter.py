@@ -169,6 +169,12 @@ class MrerpDmsAdapter:
     def has_admin_creds(self) -> bool:
         return bool(self._admin_username and self._admin_password)
 
+    @property
+    def has_distinct_admin_creds(self) -> bool:
+        return self.has_admin_creds and (
+            self._admin_username != self._username or self._admin_password != self._password
+        )
+
     @staticmethod
     def _normalize_urls(system_url: str):
         """Return (login_url, base_url). Accepts either the full index.php URL
@@ -276,7 +282,7 @@ class MrerpDmsAdapter:
         # 现成 transport)保证 admin 浏览器只在真用得着时才起。
         # 2026-08-12 起「纯读永不起 admin」不再成立:员工表读取(顾问归属精确匹配)在
         # 销售账号没权限时会借 admin 重试一次 —— 归属落错人的代价大过一次登录开销。
-        admin = self._admin_writer_transport if self.has_admin_creds else None
+        admin = self._admin_writer_transport if self.has_distinct_admin_creds else None
         return DMSClient(self._transport(), self.base_url, admin_transport=admin)
 
     def _admin_writer_transport(self) -> PlaywrightTransport:

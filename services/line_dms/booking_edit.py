@@ -126,7 +126,8 @@ def load(user: dict, nonce: str) -> dict:
 
 def paints(user: dict, nonce: str, car_id: str) -> list[dict]:
     _, _, endpoint = _review(user, nonce)
-    masters = get_masters(endpoint)
+    # 颜色选项同 load:映射当前 DMS 主档,不拿 12h 快照(旧色会错配已下架车型)。
+    masters = get_masters(endpoint, force_refresh=True)
     if find_row(masters.get("cars"), car_id) is None:
         raise BookingEditError("dms_booking.invalid_master")
     return _options(get_paints(endpoint, car_id, masters))
@@ -244,7 +245,8 @@ def _payments(rows: list, masters: dict) -> list[dict]:
 def save(user: dict, nonce: str, submitted: dict) -> str:
     binding, payload, endpoint = _review(user, nonce)
     qa = dict(payload.get("qa") or {})
-    masters = get_masters(endpoint)
+    # 保存校验按当前 DMS 主档判(称谓/地点/车型/条件/登记/银行都可能被 12h 快照带偏)。
+    masters = get_masters(endpoint, force_refresh=True)
     customer = _customer(dict(submitted.get("customer") or {}))
     customer.update(_customer_master_labels(endpoint, customer))
     raw_answers = dict(submitted.get("answers") or {})

@@ -284,7 +284,8 @@ class DMSClientOpsMixin:
 
     def fetch_masters(self) -> Dict[str, List[List[Any]]]:
         """Pull the dropdown lists the connect wizard needs. Best-effort:
-        a missing/unreadable list comes back as []."""
+        a missing/unreadable list comes back as []. 普通主档与顾问名册一样翻页取全 ——
+        只取第一页会让第 2 页起的选项在 LINE 逐问里静默消失。"""
         out: Dict[str, List[List[Any]]] = {}
         for key, elem in (
             ("cars", "txtcar"),
@@ -294,7 +295,7 @@ class DMSClientOpsMixin:
             ("regis_behalfs", "txtregisbehalf"),
         ):
             try:
-                out[key] = self._bshsd(elem) or []
+                out[key] = self._bshsd_all(elem) or []
             except Exception:
                 out[key] = []
         try:
@@ -408,8 +409,12 @@ class DMSClientOpsMixin:
         self, elemname: str, pinned_id: str, pinned_code: str, pinned_name: str, **extra
     ) -> DMSMasterRef:
         """Resolve a master ref: if the user pinned an id, fetch that exact
-        row; else take the first available row from live master data."""
-        rows = self._bshsd(elemname, **extra) or []
+        row from the full (paged) live master; else take the first available row.
+
+        只在第 1 页里找 pinned id,id 在第 2 页会被误判成「不存在」然后悄悄回落首行,
+        建单就填错车/店。故最终解析与 fetch_masters 一样走 _bshsd_all 全量翻页。
+        """
+        rows = self._bshsd_all(elemname, **extra) or []
         chosen = row_by_id(rows, pinned_id) if pinned_id else None
         if chosen is None and rows:
             chosen = rows[0]

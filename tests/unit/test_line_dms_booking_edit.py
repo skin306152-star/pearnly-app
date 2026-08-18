@@ -162,6 +162,36 @@ class BookingEditTests(TestCase):
         fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
         self.assertEqual(out["masters"]["prefixes"], [{"id": "17", "label": "Mr"}])
 
+    def test_paints_forces_fresh_masters(self):
+        """颜色下拉同 load:按当前 DMS 主档映射,不吃 12h 快照。"""
+        with (
+            mock.patch.object(
+                booking_edit,
+                "_review",
+                return_value=(self.binding, self.payload, {"id": "E1"}),
+            ),
+            mock.patch.object(booking_edit, "get_masters", return_value=MASTERS) as fetch,
+            mock.patch.object(booking_edit, "get_paints", return_value=[["PA1", "RED", "Red"]]),
+        ):
+            out = booking_edit.paints(self.user, "N1", "C1")
+        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
+        self.assertEqual(out, [{"id": "PA1", "label": "Red"}])
+
+    def test_save_reads_fresh_masters(self):
+        """save 校验/映射按当前 DMS 主档(称谓/地点/车型/条件/登记/银行),不吃 12h 快照。"""
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            fetch = es.enter_context(
+                mock.patch.object(booking_edit, "get_masters", return_value=MASTERS)
+            )
+            es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
+            )
+            es.enter_context(mock.patch.object(booking_edit, "_send"))
+            booking_edit.save(self.user, "N1", form())
+        fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
+
     def test_invalid_master_does_not_replace_review(self):
         broken = form()
         broken["answers"]["car_id"] = "NOT-A-CAR"

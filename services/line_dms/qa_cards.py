@@ -41,7 +41,6 @@ TXT_ASK_PLACE = "ข้อ 2/8 · สถานที่รับจอง — �
 TXT_ASK_CAR = "ข้อ 3/8 · รุ่นรถ — พิมพ์ชื่อรุ่นสั้น ๆ เพื่อค้นหา เช่น dmax"
 TXT_CAR_PICK = "เลือกรุ่นรถ (พบ {n} รายการ)"
 TXT_CAR_NONE = "ไม่พบรุ่นที่ตรง ลองพิมพ์ใหม่อีกครั้ง"
-TXT_CAR_MANY = "พบ {n} รายการ พิมพ์ให้เจาะจงขึ้นอีกนิดครับ"
 TXT_ASK_PAINT = "เลือกสีของ {car}"
 TXT_PAINT_MANY = "มีสีมากกว่านี้ พิมพ์ชื่อสีเพื่อค้นหาได้"
 TXT_ASK_DATE = "ข้อ 4/8 · วันที่คาดว่าจะส่งมอบรถ — กดปุ่มเพื่อเลือกวันที่"
@@ -114,7 +113,14 @@ LBL_ATTACH_SLIP = "ใบโอนเงินจอง"
 VAL_ATTACHED = "แนบแล้ว"
 
 _MAX_BTN = 20  # quick reply 按钮标签截断(display 宽度)
-_MAX_PAINT_BTNS = 12  # 颜色超过则只列前 12 个,余下可打字匹配
+
+# LINE quick reply 硬上限 13 项;主档每页 11 项,余 2 格给上一页/下一页导航。
+# 翻页 postback 走内部 token "__page:<n>"(带本步 action);DMS 主档 id 是纯数字,永不冲突。
+QR_LIMIT = 13
+QR_PAGE_SIZE = 11
+PAGE_TOKEN = "__page:"
+BTN_PAGE_PREV = "ก่อนหน้า"
+BTN_PAGE_NEXT = "ถัดไป"
 
 
 def _msg(text: str, items: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
@@ -125,13 +131,26 @@ def _msg(text: str, items: Optional[List[Dict[str, Any]]] = None) -> Dict[str, A
     return msg
 
 
-def _pick_rows(rows: List[list], action: str, label_fn) -> List[Dict[str, Any]]:
-    """主档按钮列表:data="qa:<action>:<id>",label 截 20 字符。"""
-    return [
+def _pick_rows(rows: List[list], action: str, label_fn, page: int = 0) -> List[Dict[str, Any]]:
+    """主档按钮第 page 页(0 基):data="qa:<action>:<id>",label 截 20 字符。
+
+    超过 QR_PAGE_SIZE 项自动分页,首尾补上一页/下一页导航,总项恒 ≤ QR_LIMIT(LINE 硬限)。
+    页号越界(主档缩水)夹到最后一页,导航按实际展示页计算 —— 不落死循环、不静默丢选项。
+    """
+    rows = [r for r in (rows or []) if r and r[0] is not None]
+    n = len(rows)
+    last_page = (n - 1) // QR_PAGE_SIZE if n else 0
+    page = max(0, min(int(page or 0), last_page))
+    start = page * QR_PAGE_SIZE
+    items = [
         _qr_item(label_fn(r)[:_MAX_BTN], f"qa:{action}:{r[0]}")
-        for r in rows or []
-        if r and r[0] is not None
+        for r in rows[start : start + QR_PAGE_SIZE]
     ]
+    if start > 0:
+        items.insert(0, _qr_item(BTN_PAGE_PREV, f"qa:{action}:{PAGE_TOKEN}{page - 1}"))
+    if start + QR_PAGE_SIZE < n:
+        items.append(_qr_item(BTN_PAGE_NEXT, f"qa:{action}:{PAGE_TOKEN}{page + 1}"))
+    return items
 
 
 def _plus_years(d: date, years: int) -> date:
@@ -167,9 +186,9 @@ def slip_only_image() -> Dict[str, Any]:
     return _msg(TXT_SLIP_ONLY_IMAGE)
 
 
-def ask_place(place_books: List[list]) -> Dict[str, Any]:
-    """第 2 问:สถานที่รับจอง 按钮(place_books 主档)。"""
-    return _msg(TXT_ASK_PLACE, _pick_rows(place_books, "place", _name))
+def ask_place(place_books: List[list], page: int = 0) -> Dict[str, Any]:
+    """第 2 问:สถานที่รับจอง 按钮(place_books 主档,分页全量可达)。"""
+    return _msg(TXT_ASK_PLACE, _pick_rows(place_books, "place", _name, page))
 
 
 def ask_car() -> Dict[str, Any]:
@@ -177,25 +196,21 @@ def ask_car() -> Dict[str, Any]:
     return _msg(TXT_ASK_CAR)
 
 
-def car_results(rows: List[list], n: int) -> Dict[str, Any]:
-    """车型命中 1-10 条:按钮列出(data="qa:car:<id>")。"""
-    return _msg(TXT_CAR_PICK.format(n=n), _pick_rows(rows, "car", _car_label))
+def car_results(rows: List[list], n: int, page: int = 0) -> Dict[str, Any]:
+    """车型搜索结果按钮(分页):全部命中逐页可选,一次消息恒 ≤13 项。"""
+    return _msg(TXT_CAR_PICK.format(n=n), _pick_rows(rows, "car", _car_label, page))
 
 
 def car_none() -> Dict[str, Any]:
     return _msg(TXT_CAR_NONE)
 
 
-def car_many(n: int) -> Dict[str, Any]:
-    return _msg(TXT_CAR_MANY.format(n=n))
-
-
-def ask_paint(car_label: str, paints: List[list]) -> Dict[str, Any]:
-    """第 4 问(顺序表里的 paint):选颜色。>12 色只列前 12 个 + 打字提示。"""
+def ask_paint(car_label: str, paints: List[list], page: int = 0) -> Dict[str, Any]:
+    """第 4 问(顺序表里的 paint):选颜色(分页全量;多页时附打字搜索提示)。"""
     text = TXT_ASK_PAINT.format(car=car_label)
-    if len(paints or []) > _MAX_PAINT_BTNS:
+    if len(paints or []) > QR_PAGE_SIZE:
         text = f"{text}\n{TXT_PAINT_MANY}"
-    return _msg(text, _pick_rows(paints[:_MAX_PAINT_BTNS], "paint", _name))
+    return _msg(text, _pick_rows(paints, "paint", _name, page))
 
 
 def ask_date(today: date) -> Dict[str, Any]:
@@ -212,14 +227,14 @@ def ask_date(today: date) -> Dict[str, Any]:
     return _msg(TXT_ASK_DATE, [{"type": "action", "action": action}])
 
 
-def ask_term(term_sales: List[list]) -> Dict[str, Any]:
-    """第 6 问:เงื่อนไขการขาย 按钮(term_sales 主档)。"""
-    return _msg(TXT_ASK_TERM, _pick_rows(term_sales, "term", _name))
+def ask_term(term_sales: List[list], page: int = 0) -> Dict[str, Any]:
+    """第 6 问:เงื่อนไขการขาย 按钮(term_sales 主档,分页全量可达)。"""
+    return _msg(TXT_ASK_TERM, _pick_rows(term_sales, "term", _name, page))
 
 
-def ask_regis(regis_behalfs: List[list]) -> Dict[str, Any]:
-    """第 7 问:จดทะเบียนในนาม 按钮(regis_behalfs 主档)。"""
-    return _msg(TXT_ASK_REGIS, _pick_rows(regis_behalfs, "regis", _name))
+def ask_regis(regis_behalfs: List[list], page: int = 0) -> Dict[str, Any]:
+    """第 7 问:จดทะเบียนในนาม 按钮(regis_behalfs 主档,分页全量可达)。"""
+    return _msg(TXT_ASK_REGIS, _pick_rows(regis_behalfs, "regis", _name, page))
 
 
 def ask_regis_name() -> Dict[str, Any]:
@@ -246,10 +261,10 @@ def ask_pay_src() -> Dict[str, Any]:
     return _msg(TXT_ASK_PAY_SRC)
 
 
-def ask_pay_dst(company_banks: List[list]) -> Dict[str, Any]:
+def ask_pay_dst(company_banks: List[list], page: int = 0) -> Dict[str, Any]:
     if not company_banks:
         return _msg(TXT_NO_COMPANY_BANK)
-    return _msg(TXT_ASK_PAY_DST, _pick_rows(company_banks, "bank", company_bank_label))
+    return _msg(TXT_ASK_PAY_DST, _pick_rows(company_banks, "bank", company_bank_label, page))
 
 
 def ask_pay_ref(channel: str) -> Dict[str, Any]:

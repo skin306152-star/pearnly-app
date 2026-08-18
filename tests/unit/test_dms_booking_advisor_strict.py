@@ -50,6 +50,29 @@ class _FakeClient(DMSClientOpsMixin):
         return self.employees_body
 
 
+class _PagedMasters(DMSClientOpsMixin):
+    """按 bshsdcurrpage 返回对应页的假客户端(验收普通主档翻页取全与跨页 pinned id)。"""
+
+    def __init__(self, pages_by_elem, employees_body=_EMPLOYEE_LISTING):
+        self.pages_by_elem = pages_by_elem
+        self.employees_body = employees_body
+        self.calls = []
+
+    def _bshsd(self, elemname, **extra):
+        self.calls.append((elemname, extra))
+        pages = self.pages_by_elem.get(elemname)
+        if pages is None:
+            return None
+        page = int(extra.get("bshsdcurrpage") or 1) - 1
+        if page >= len(pages):
+            return []
+        rows = pages[page]
+        return None if rows is None else list(rows)
+
+    def _post_text(self, path, data):
+        return self.employees_body
+
+
 def _defaults(**over) -> BookingDefaults:
     return BookingDefaults(**{"advisor_id": "335", **over})
 
@@ -118,6 +141,16 @@ class ResolveBookingPayloadTests(unittest.TestCase):
         booking = cl.resolve_booking_payload(_defaults(), _CARD)
         self.assertEqual(booking.place_book.id, "pl1")
 
+    def test_pinned_id_on_second_page_resolves(self):
+        """pinned id 在第 2 页:全量翻页后仍能命中,不许回落第 1 页首行。"""
+        page1 = [[f"pl{i}", "", f"สาขา {i}"] for i in range(200)]
+        cl = _PagedMasters({"txtplacebook": [page1, [["pl200", "", "สาขา 200"]]]})
+        ref = cl._ref_from_default("txtplacebook", "pl200", "", "")
+        self.assertEqual((ref.id, ref.name), ("pl200", "สาขา 200"))
+        self.assertEqual(
+            [c[1]["bshsdcurrpage"] for c in cl.calls if c[0] == "txtplacebook"], [1, 2]
+        )
+
     def test_unpinned_advisor_blocks_the_whole_booking(self):
         cl = _FakeClient({"txtusers": _ADVISORS})
         with self.assertRaises(DMSClientError) as ctx:
@@ -131,8 +164,19 @@ class FetchMastersTests(unittest.TestCase):
         out = cl.fetch_masters()
         extras = dict(cl.calls)
         self.assertEqual(extras["txtusers"], {"bshsdamt": 200, "bshsdcurrpage": 1})
-        self.assertEqual(extras["txtcar"], {})
+        # 普通主档与顾问名册一样翻页取全:第一页参数一致,第 2 页不满即止。
+        self.assertEqual(extras["txtcar"], {"bshsdamt": 200, "bshsdcurrpage": 1})
         self.assertIn("prefixes", out)
+
+    def test_fetch_masters_pulls_full_pages(self):
+        """普通主档翻页取全:第 1 页满页继续拉第 2 页,选项一条不丢。"""
+        page1 = [[f"c{i}", f"V{i}", f"Vios {i}"] for i in range(200)]
+        cl = _PagedMasters({"txtcar": [page1, [["c200", "V200", "Vios 200"]]]})
+        out = cl.fetch_masters()
+        self.assertEqual(len(out["cars"]), 201)
+        self.assertEqual(out["cars"][-1][0], "c200")
+        pages = [c[1]["bshsdcurrpage"] for c in cl.calls if c[0] == "txtcar"]
+        self.assertEqual(pages, [1, 2])
 
     def test_employees_pulled_for_the_exact_advisor_layer(self):
         # 顾问下拉的 code 列是员工编号,登录名只有员工表有 → 主档必须带上 employees。

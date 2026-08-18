@@ -68,14 +68,22 @@ class Env:
         advisor=_ADVISOR,
         dms_username="sale02",
         company_banks=_COMPANY_BANKS,
+        places=_PLACES,
+        terms=_TERMS,
+        regis=_REGIS,
     ):
         self.store = FakeStore()
         self.cars = cars
         self.paints = paints
         self.paints_calls = []
+        self.paint_masters_calls = []
+        self.masters_calls = []
         self.advisor = advisor
         self.dms_username = dms_username
         self.company_banks = company_banks
+        self.places = places
+        self.terms = terms
+        self.regis = regis
         self.es = contextlib.ExitStack()
 
     def __enter__(self):
@@ -86,20 +94,11 @@ class Env:
         p(qa.store, "clear_session", side_effect=self.store.clear_session)
         p(qa.store, "get_binding_by_line_user", side_effect=self.store.get_binding_by_line_user)
         p(qa._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
-        p(
-            qa.masters_cache,
-            "get_masters",
-            return_value={
-                "cars": self.cars,
-                "place_books": _PLACES,
-                "term_sales": _TERMS,
-                "regis_behalfs": _REGIS,
-                "company_banks": self.company_banks,
-            },
-        )
+        p(qa.masters_cache, "get_masters", side_effect=self._get_masters)
 
-        def _paints(ep, cid, *a):
+        def _paints(ep, cid, masters=None):
             self.paints_calls.append(cid)
+            self.paint_masters_calls.append(masters)
             return self.paints
 
         p(qa.masters_cache, "get_paints", side_effect=_paints)
@@ -111,6 +110,16 @@ class Env:
         self.reply = p(line_client, "reply_messages")
         self.push = p(line_client, "push_messages")
         return self
+
+    def _get_masters(self, ep, **kw):
+        self.masters_calls.append((ep, kw))
+        return {
+            "cars": self.cars,
+            "place_books": self.places,
+            "term_sales": self.terms,
+            "regis_behalfs": self.regis,
+            "company_banks": self.company_banks,
+        }
 
     def __exit__(self, *a):
         self.es.close()
@@ -257,12 +266,29 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(items[0]["action"]["data"], "qa:car:c1")
             self.assertEqual(env.qa_payload()["step"], "car_search")  # 等按钮,不推进
 
-    async def test_car_search_many_prompts_specific(self):
-        cars = [[f"c{i}", f"C{i}", f"Toyota Vios {i}"] for i in range(12)]
+    async def test_car_search_many_paginates(self):
+        """命中 >10 不再拒给按钮:搜索结果分页逐页可选,翻页不丢搜索、token 不进 answers。"""
+        cars = [[f"c{i}", f"V{i}", f"Toyota Vios {i}"] for i in range(14)]
         with Env(cars=cars) as env:
             _seed(env, _qa("car_search"))
             await qa.handle_text(_TID, _LUID, "vios", "rt")
-            self.assertEqual(_replied_text(env), qa_cards.TXT_CAR_MANY.format(n=12))
+            msg = env.reply.call_args.args[1][0]
+            self.assertEqual(msg["text"], qa_cards.TXT_CAR_PICK.format(n=14))
+            items = msg["quickReply"]["items"]
+            self.assertLessEqual(len(items), 13)
+            self.assertEqual(items[-1]["action"]["data"], "qa:car:__page:1")
+            # 翻页取会话里的命中集:步不推进,最后一条可达
+            self.assertTrue(await qa.handle_postback(_TID, _LUID, "qa:car:__page:1", {}, "rt"))
+            self.assertEqual(env.qa_payload()["step"], "car_search")
+            items = _replied_items(env)
+            self.assertLessEqual(len(items), 13)
+            self.assertEqual(items[-1]["action"]["data"], "qa:car:c13")
+            # 选中真实行:命中集清理,answers 落真实 id
+            await qa.handle_postback(_TID, _LUID, "qa:car:c13", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["answers"]["car"]["id"], "c13")
+            self.assertEqual(p["step"], "paint")
+            self.assertNotIn("car_search", p)
 
     async def test_car_button_selects(self):
         with Env() as env:
@@ -301,6 +327,123 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.handle_text(_TID, _LUID, "ม่วง", "rt")
             self.assertEqual(env.qa_payload()["step"], "paint")
             self.assertIn(qa_cards.TXT_ASK_PAINT.format(car="DMX D-Max"), _replied_text(env))
+
+    # ── 主档分页(quick reply 13 项硬限) ───────────────────────────────────
+    async def test_masters_and_paints_always_force_refresh(self):
+        """LINE 逐问实时取 DMS:每步发问 force_refresh=True,颜色带同一份新鲜 masters。"""
+        with Env() as env:
+            _seed(env, _qa("place"))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
+            self.assertTrue(env.masters_calls)
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+
+            _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertIsNotNone(env.paint_masters_calls[-1])  # 颜色带 masters,不吃 12h 缓存
+
+    async def test_place_pagination_reaches_last_row(self):
+        places = [[f"pl{i}", "", f"สาขา {i}"] for i in range(14)]
+        with Env(places=places) as env:
+            _seed(env, _qa("place"))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
+            items = _replied_items(env)
+            self.assertLessEqual(len(items), 13)
+            self.assertEqual(items[-1]["action"]["data"], "qa:place:__page:1")
+            # 翻页不推进 step;第 2 页带回到上一页,最后一条可达
+            self.assertTrue(await qa.handle_postback(_TID, _LUID, "qa:place:__page:1", {}, "rt"))
+            self.assertEqual(env.qa_payload()["step"], "place")
+            items = _replied_items(env)
+            self.assertLessEqual(len(items), 13)
+            self.assertEqual(items[0]["action"]["data"], "qa:place:__page:0")
+            self.assertEqual(items[-1]["action"]["data"], "qa:place:pl13")
+            # 选中最后一条 → 真实 id 落 answers,页码清理
+            await qa.handle_postback(_TID, _LUID, "qa:place:pl13", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["answers"]["place"], {"id": "pl13", "name": "สาขา 13"})
+            self.assertEqual(p["step"], "car_search")
+            self.assertEqual(p.get("pages", {}), {})
+
+    async def test_paint_pagination_reaches_last_color(self):
+        paints = [[f"p{i}", "", f"สี {i}"] for i in range(14)]
+        with Env(paints=paints) as env:
+            _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
+            items = _replied_items(env)
+            self.assertLessEqual(len(items), 13)
+            self.assertEqual(items[-1]["action"]["data"], "qa:paint:__page:1")
+            await qa.handle_postback(_TID, _LUID, "qa:paint:__page:1", {}, "rt")
+            self.assertEqual(env.qa_payload()["step"], "paint")
+            items = _replied_items(env)
+            self.assertEqual(items[-1]["action"]["data"], "qa:paint:p13")
+            await qa.handle_postback(_TID, _LUID, "qa:paint:p13", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["answers"]["paint"], {"id": "p13", "name": "สี 13"})
+            self.assertEqual(p["step"], "date")
+
+    async def test_term_and_regis_pagination(self):
+        terms = [[f"t{i}", "", f"เงื่อนไข {i}"] for i in range(14)]
+        regis = [[f"r{i}", "", f"นาม {i}"] for i in range(14)]
+        with Env(terms=terms, regis=regis) as env:
+            _seed(env, _qa("term"))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "term", "rt")
+            self.assertLessEqual(len(_replied_items(env)), 13)
+            await qa.handle_postback(_TID, _LUID, "qa:term:__page:1", {}, "rt")
+            items = _replied_items(env)
+            self.assertEqual(items[-1]["action"]["data"], "qa:term:t13")
+            await qa.handle_postback(_TID, _LUID, "qa:term:t13", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["answers"]["term"]["id"], "t13")
+            self.assertEqual(p["step"], "regis")
+
+            _seed(env, _qa("regis"))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "regis", "rt")
+            self.assertLessEqual(len(_replied_items(env)), 13)
+            await qa.handle_postback(_TID, _LUID, "qa:regis:__page:1", {}, "rt")
+            items = _replied_items(env)
+            self.assertEqual(items[-1]["action"]["data"], "qa:regis:r13")
+            await qa.handle_postback(_TID, _LUID, "qa:regis:r13", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["answers"]["regis"]["id"], "r13")
+            self.assertEqual(p["step"], "regis_name")
+
+    async def test_company_bank_pagination(self):
+        banks = [[str(i), f"B{i}", f"Bank {i}"] for i in range(14)]
+        with Env(company_banks=banks) as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_dst",
+                    pending_channel={
+                        "channel": "transfer",
+                        "amount": "1000.00",
+                        "extra": {"src": "-"},
+                    },
+                ),
+            )
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "pay_dst", "rt")
+            items = _replied_items(env)
+            self.assertLessEqual(len(items), 13)
+            self.assertEqual(items[-1]["action"]["data"], "qa:bank:__page:1")
+            await qa.handle_postback(_TID, _LUID, "qa:bank:__page:1", {}, "rt")
+            items = _replied_items(env)
+            self.assertEqual(items[-1]["action"]["data"], "qa:bank:13")
+            await qa.handle_postback(_TID, _LUID, "qa:bank:13", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "pay_more")
+            self.assertEqual(p["payments"][0]["extra"]["dst_id"], "13")
+
+    async def test_page_token_never_written_as_row_id(self):
+        """导航 token 只翻页:步不推进,不进 answers(旧/非法/串步仍由 _reask 兜底)。"""
+        with Env() as env:
+            _seed(env, _qa("place"))
+            self.assertTrue(await qa.handle_postback(_TID, _LUID, "qa:place:__page:1", {}, "rt"))
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "place")
+            self.assertNotIn("place", p["answers"])
+            # 越界/垃圾页码 → 重问不炸
+            self.assertTrue(await qa.handle_postback(_TID, _LUID, "qa:place:__page:99", {}, "rt"))
+            self.assertEqual(env.qa_payload()["step"], "place")
 
     def test_ask_date_picker_bounds(self):
         msg = qa_cards.ask_date(date(2026, 8, 9))

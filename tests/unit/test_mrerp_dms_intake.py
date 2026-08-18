@@ -10,6 +10,7 @@ from unittest import mock
 
 from services.erp.mrerp_dms_client import DMSClient
 from services.erp.mrerp_dms_client_base import DMSClientError
+from services.erp import erp_dms_intake
 
 
 class _Resp:
@@ -124,6 +125,18 @@ class IntakeContractTests(unittest.TestCase):
         self.assertEqual(self.c.list_geo("provinces"), [["65", "กระบี่"]])
         self.assertEqual(self.c.list_geo("districts", "65"), [["804", "คลองท่อม"]])
         self.assertEqual(self.c.list_geo("zipcodes", "6472"), [["6477", "81120"]])
+
+    def test_geo_cascade_uses_live_session_not_cookie_cache(self):
+        """geo 级联直接走 _run_logged_in(真实 Playwright 会话)· 不存在已注销 cookie 复用路径。"""
+        endpoint = {"id": "E1", "config": {}}
+        with mock.patch.object(
+            erp_dms_intake,
+            "_run_logged_in",
+            return_value={"ok": True, "options": [["65", "กระบี่"]]},
+        ) as run:
+            out = erp_dms_intake.geo_mrerp_dms(endpoint, level="provinces")
+        run.assert_called_once_with(endpoint, mock.ANY)
+        self.assertEqual(out["options"], [["65", "กระบี่"]])
 
     def test_lookup_found(self):
         self.t._edit_name = "Somchai Jaidee"

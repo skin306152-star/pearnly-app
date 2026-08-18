@@ -39,6 +39,39 @@ const DRAFT = {
     },
 };
 
+const GEO_DRAFT = {
+    ...DRAFT,
+    form: {
+        ...DRAFT.form,
+        customer: {
+            ...DRAFT.form.customer,
+            province_id: '1',
+            district_id: '18',
+            subdistrict_id: '72',
+            zipcode_id: '197',
+        },
+    },
+};
+
+const GEO = {
+    provinces: [
+        { id: '1', label: 'กรุงเทพมหานคร' },
+        { id: '65', label: 'กระบี่' },
+    ],
+    districts: {
+        1: [{ id: '18', label: 'คลองสาน' }],
+        65: [{ id: '804', label: 'คลองท่อม' }],
+    },
+    subdistricts: {
+        18: [{ id: '72', label: 'คลองต้นไทร' }],
+        804: [{ id: '6472', label: 'คลองท่อมเหนือ' }],
+    },
+    zipcodes: {
+        72: [{ id: '197', label: '10600' }],
+        6472: [{ id: '6477', label: '81120' }],
+    },
+};
+
 test('mobile payment and attachment controls stay aligned', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => {
@@ -151,6 +184,58 @@ test('master-data save errors are actionable on mobile and desktop', async ({ pa
         expect(state.color).toBeTruthy();
         await page.screenshot({
             path: path.join(OUT, `master-error-${viewport.width}.png`),
+            fullPage: true,
+        });
+    }
+});
+
+test('geo master selects stay populated through the cascade', async ({ page }) => {
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', (route) => {
+        const url = new URL(route.request().url());
+        let data = [];
+        if (url.pathname.endsWith('/draft')) data = GEO_DRAFT;
+        if (url.pathname.endsWith('/geo')) {
+            const level = url.searchParams.get('level');
+            const parent = url.searchParams.get('parent_id') || '';
+            data = level === 'provinces' ? GEO.provinces : GEO[level]?.[parent] || [];
+        }
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    for (const viewport of [
+        { width: 390, height: 844 },
+        { width: 1280, height: 900 },
+    ]) {
+        await page.setViewportSize(viewport);
+        await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=geo-${viewport.width}`);
+        await page.waitForSelector('#editor:not([hidden])');
+        await page.waitForSelector('#save:not([disabled])');
+        await page.locator('#province_id').selectOption('65');
+        await expect(page.locator('#district_id')).toHaveValue('804');
+        await page.locator('#district_id').selectOption('804');
+        await expect(page.locator('#subdistrict_id')).toHaveValue('6472');
+        await page.locator('#subdistrict_id').selectOption('6472');
+        await expect(page.locator('#zipcode_id')).toHaveValue('6477');
+        await expect(page.locator('#province_id option')).not.toHaveCount(0);
+        await expect(page.locator('#district_id option')).not.toHaveCount(0);
+        await expect(page.locator('#subdistrict_id option')).not.toHaveCount(0);
+        await expect(page.locator('#zipcode_id option')).not.toHaveCount(0);
+        await page.screenshot({
+            path: path.join(OUT, `geo-selects-${viewport.width}.png`),
             fullPage: true,
         });
     }

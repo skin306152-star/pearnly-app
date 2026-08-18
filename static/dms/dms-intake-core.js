@@ -110,14 +110,15 @@
         var addr = (S.ocr || {}).address || {};
         var sel = S.geo.selected || {};
         var txt = S.geo.text || {};
-        // 称谓:精确匹配 DMS 称谓主档,匹配不到留空(不回落第一项,否则称谓写错且永远显差异)。
+        // 称谓:身份证 OCR 命中 DMS 主档优先;不命中时使用 DMS 第一项,不自造值。
         var hit = S.prefixes.find(function (p) {
             return p[1] === ic.prefix_name;
         });
-        S.prefixUnmappable = !!ic.prefix_name && !hit;
+        var chosenPrefix = hit || S.prefixes[0] || null;
+        S.prefixUnmappable = !!ic.prefix_name && !hit && !chosenPrefix;
         S.newVals = {
-            prefix_id: hit ? hit[0] : '',
-            prefix_name: ic.prefix_name || '',
+            prefix_id: chosenPrefix ? chosenPrefix[0] : '',
+            prefix_name: chosenPrefix ? chosenPrefix[1] : ic.prefix_name || '',
             name: ic.name || '',
             people_id: ic.people_id || '',
             tax_id: ic.people_id || '',

@@ -4,13 +4,14 @@
 dms_routes 的三个新端点调这里:
 - recognize_lookup_mrerp_dms:登录一次 → 查 DMS 客户 + 解析 OCR 地址为级联 ids +
   府/县/区/邮编选项 + 称谓 → 一次性喂面板。
-- geo_mrerp_dms:面板改地址时的级联代理。优先用缓存 cookie + httpx(只读·快),
-  失效再 Playwright 重登录并刷新缓存。
+- geo_mrerp_dms:面板改地址时的级联代理。直接走 _run_logged_in 的真实 Playwright
+  会话——adapter 退出时会显式访问 logout 页注销浏览器会话,复用它的 cookie 只会拿到
+  已注销会话(HTTP 200 空壳正文或静默空级联),故不复用。
 - push_idcard_fields_mrerp_dms:用面板编辑后的字段建/改客户(save_customer)。
   只写客户库(ลูกค้า · cus/new.php·cus/edit.php),不建订车单。
 
-会话 cookie 缓存(进程级·短 TTL):登录成本高,级联只读复用 cookie 避免每次重登录。
-写操作(建/改客户)仍走 Playwright(铁律#7);cookie 只用于只读级联。
+读级联与写操作统一走 Playwright 登录会话(_run_logged_in),会话随 adapter 上下文退出
+注销,不落 cookie 缓存(铁律#7)。
 """
 
 from __future__ import annotations
@@ -28,60 +29,6 @@ from services.erp.erp_dms_push import (
 
 logger = logging.getLogger(__name__)
 
-_SESSION_TTL_S = 600
-_session_cache: Dict[str, Dict[str, Any]] = {}
-
-
-def _cache_key(endpoint: Dict[str, Any]) -> str:
-    return str(endpoint.get("id") or endpoint.get("config", {}).get("system_url") or "dms")
-
-
-def _cookies_put(endpoint: Dict[str, Any], cookies: List[dict], base_url: str) -> None:
-    if cookies:
-        _session_cache[_cache_key(endpoint)] = {
-            "cookies": cookies,
-            "base": base_url,
-            "exp": time.time() + _SESSION_TTL_S,
-        }
-
-
-def _cookies_get(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    ent = _session_cache.get(_cache_key(endpoint))
-    if ent and ent["exp"] > time.time():
-        return ent
-    return None
-
-
-class _CookieTransport:
-    """httpx transport(带登录 cookie)· 鸭子类型同 PlaywrightTransport · 仅用于只读级联。
-    若响应像登录页(会话过期)→ 抛错让调用方回退 Playwright 重登录。"""
-
-    def __init__(self, base_url: str, cookies: List[dict]):
-        import httpx
-
-        jar = {c.get("name"): c.get("value") for c in (cookies or []) if c.get("name")}
-        self._c = httpx.Client(cookies=jar, timeout=20.0, follow_redirects=True)
-
-    def _wrap(self, r):
-        from services.erp.mrerp_dms_adapter import _Resp
-
-        body = r.content or b""
-        text = body.decode("utf-8", "replace")
-        if "txtpasswords" in text or "checklogin.php" in text:
-            raise _StaleSession()
-        return _Resp(r.status_code, text, body)
-
-    def get(self, url: str, timeout_ms: Optional[int] = None):
-        return self._wrap(self._c.get(url))
-
-    def post(self, url: str, data=None, files=None, timeout_ms: Optional[int] = None):
-        form = {k: str(v) for k, v in (data or {}).items()}
-        return self._wrap(self._c.post(url, data=form))
-
-
-class _StaleSession(Exception):
-    pass
-
 
 def _err(code: str, raw: str = "") -> Dict[str, Any]:
     return {
@@ -95,8 +42,8 @@ def _err(code: str, raw: str = "") -> Dict[str, Any]:
 
 
 def _run_logged_in(endpoint: Dict[str, Any], fn):
-    """Build adapter → login → fn(client, adapter) → cache cookies. Maps DMS
-    errors to friendly dicts. NEVER raises."""
+    """Build adapter → login → fn(client, adapter). Maps DMS errors to friendly
+    dicts. NEVER raises. 会话随 adapter 退出即注销,不缓存 cookie 复用。"""
     cfg = endpoint.get("config") or {}
     adapter, build_err = _build_mrerp_dms_adapter(cfg)
     if build_err:
@@ -134,7 +81,6 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
                         "ERR_DMS_CONCURRENT_LOGIN",
                         getattr(adapter, "last_dialog", ""),
                     )
-                _cookies_put(endpoint, adapter.session_cookies(), adapter.base_url)
                 return out
         except MrerpDmsAdminAuthError as e:
             # admin 凭据组登录失败(≠ 用户会话)— 子类必须先于基类捕获。
@@ -322,18 +268,7 @@ def customer_fields_mrerp_dms(endpoint: Dict[str, Any], *, customer_id: str) -> 
 
 
 def geo_mrerp_dms(endpoint: Dict[str, Any], *, level: str, parent_id: str = "") -> Dict[str, Any]:
-    """地址级联选项。优先缓存 cookie + httpx(快);失效回退 Playwright。"""
-    cached = _cookies_get(endpoint)
-    if cached:
-        try:
-            from services.erp.mrerp_dms_client import DMSClient
-
-            cl = DMSClient(_CookieTransport(cached["base"], cached["cookies"]), cached["base"])
-            return {"ok": True, "options": cl.list_geo(level, parent_id)}
-        except _StaleSession:
-            _session_cache.pop(_cache_key(endpoint), None)
-        except Exception as e:
-            logger.warning(f"[dms] geo httpx fallback: {type(e).__name__}: {e}")
+    """地址级联选项。直接走 _run_logged_in 的真实 Playwright 会话(不复用已注销 cookie)。"""
 
     def _do(cl, adapter):
         return {"ok": True, "options": cl.list_geo(level, parent_id)}

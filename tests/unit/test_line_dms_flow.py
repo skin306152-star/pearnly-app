@@ -69,6 +69,24 @@ _GEO = {
 _PREFIXES = [["17", "นาย"]]
 
 
+class DraftPrefixTests(unittest.TestCase):
+    def test_ocr_prefix_wins_when_dms_has_the_same_option(self):
+        out = draft.build_draft(
+            {"prefix_name": "นางสาว", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
+        )
+        self.assertEqual(out["prefix_id"], "18")
+
+    def test_unmapped_ocr_prefix_falls_back_to_first_dms_option(self):
+        out = draft.build_draft(
+            {"prefix_name": "เด็กหญิง", "address": {}}, {}, [["17", "นาย"], ["18", "นางสาว"]], ""
+        )
+        self.assertEqual(out["prefix_id"], "17")
+
+    def test_empty_dms_prefix_master_stays_empty(self):
+        out = draft.build_draft({"prefix_name": "นาย", "address": {}}, {}, [], "")
+        self.assertEqual(out["prefix_id"], "")
+
+
 def _ep(admin=False):
     cfg = {"admin_username": "a", "admin_password": "b"} if admin else {}
     return {"id": "E1", "config": cfg}

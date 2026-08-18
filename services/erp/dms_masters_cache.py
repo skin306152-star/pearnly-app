@@ -118,10 +118,10 @@ def _fetch_masters_via_login(endpoint: Dict[str, Any]) -> Optional[Dict[str, Any
 
 
 def _fetch_paints_via_login(endpoint: Dict[str, Any], car_id: str) -> Optional[List[list]]:
-    """登录 DMS 抓某车型的颜色;失败 → None(登录失败回 _err dict,取数失败 _bshsd 自己回 None)。"""
+    """登录 DMS 抓某车型的颜色(翻页取全 —— 只取第一页会漏掉第 2 页起的颜色);失败 → None。"""
     from services.erp.erp_dms_intake import _run_logged_in
 
-    res = _run_logged_in(endpoint, lambda cl, ad: cl._bshsd("txtcarpaint", idcar=car_id))
+    res = _run_logged_in(endpoint, lambda cl, ad: cl._bshsd_all("txtcarpaint", idcar=car_id))
     if isinstance(res, dict):
         return None
     return res
@@ -131,10 +131,12 @@ def _fetch_paints_via_login(endpoint: Dict[str, Any], car_id: str) -> Optional[L
 def get_masters(endpoint: Dict[str, Any], *, force_refresh: bool = False) -> Dict[str, Any]:
     """主档:缓存 <12h 直接回;过期/缺失 → 登录抓全量 + 落缓存。
 
-    登录失败时回退陈旧缓存(状态诚实优先于报错),都没有则空 dict。全量刷新保留已惰性
-    缓存的 paints_by_car(避免每次刷主档就丢颜色缓存)。
-    force_refresh 给「刚在 DMS 改了主档、马上要按新数据判」的调用方(如顾问匹配失败重判),
-    否则那句「改完再试一次」在 12 小时内都是假的。"""
+    普通读取登录失败时回退陈旧缓存(状态诚实优先于报错),都没有则空 dict；强制刷新失败
+    则直接返回空 dict，避免把旧主档冒充实时数据。普通刷新保留已惰性缓存的
+    paints_by_car，强制刷新则按 DMS 现状清掉旧颜色缓存。
+    force_refresh 给「刚在 DMS 改了主档、马上要按新数据判」的调用方(如顾问匹配失败重判)——
+    必须真抓:成功时按 DMS 现状落库(旧 paints_by_car 不合并回去,否则 DMS 新增/删除的
+    颜色被旧色遮住),失败时返回空 dict(fail closed,不拿旧主档冒充刷新过)。"""
     eid = str(endpoint.get("id") or "")
     cached = _read(eid)
     cache_has_banks = cached and "company_banks" in cached["masters"]
@@ -142,8 +144,11 @@ def get_masters(endpoint: Dict[str, Any], *, force_refresh: bool = False) -> Dic
         return cached["masters"]
     fresh = _fetch_masters_via_login(endpoint)
     if fresh is None:
+        if force_refresh:
+            return {}
         return cached["masters"] if cached else {}
-    if cached:
+    if not force_refresh and cached:
+        # 普通过期刷新才保留惰性颜色缓存;force_refresh 按 DMS 现状重判,旧色不合并。
         pbc = (cached["masters"] or {}).get("paints_by_car")
         if pbc:
             fresh = {**fresh, "paints_by_car": pbc}

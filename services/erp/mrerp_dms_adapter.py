@@ -313,7 +313,7 @@ class MrerpDmsAdapter:
         self._admin_logged_in = True
 
     def session_cookies(self) -> list:
-        """登录态 cookie · 供交互层缓存做只读级联提速(避免每次 dropdown 重登录)。"""
+        """Return a snapshot for diagnostics; cookies must not outlive this adapter."""
         try:
             return self._page.context.cookies()
         except Exception:

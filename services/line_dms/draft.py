@@ -24,16 +24,18 @@ _GEO_LISTS = {
 
 
 def build_draft(id_card: dict, geo: dict, prefixes: List[list], phone: str) -> Dict[str, str]:
-    """OCR 身份证 + 解析后的地址级联 → 写库字段值。称谓按主档精确匹配,匹配不到留空。"""
+    """OCR 身份证 + 地址级联 → 写库字段值。称谓 OCR 优先,不命中时回退主档首项。"""
     addr = id_card.get("address") or {}
     sel = geo.get("selected") or {}
     txt = geo.get("text") or {}
-    prefix_id = ""
     pn = id_card.get("prefix_name") or ""
-    for opt in prefixes or []:
-        if opt and opt[1] == pn:
-            prefix_id = opt[0]
-            break
+    prefix = next(
+        (opt for opt in prefixes or [] if opt and len(opt) > 1 and opt[1] == pn),
+        None,
+    )
+    if prefix is None:
+        prefix = next((opt for opt in prefixes or [] if opt and opt[0] is not None), None)
+    prefix_id = str(prefix[0]) if prefix else ""
     return {
         "prefix_id": prefix_id,
         "name": id_card.get("name") or "",

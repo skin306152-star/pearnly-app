@@ -39,6 +39,18 @@ const DRAFT = {
     },
 };
 
+const PREFIX_DRAFT = {
+    ...DRAFT,
+    masters: {
+        ...DRAFT.masters,
+        prefixes: [
+            { id: '17', label: 'นาย' },
+            { id: '18', label: 'น.ส.' },
+            { id: '19', label: 'คุณ' },
+        ],
+    },
+};
+
 const GEO_DRAFT = {
     ...DRAFT,
     form: {
@@ -125,6 +137,53 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
     expect(Math.abs(switches[0].x - switches[1].x)).toBeLessThanOrEqual(1);
 
     await page.screenshot({ path: path.join(OUT, 'mobile-controls.png'), fullPage: true });
+});
+
+test('booking editor exposes every live DMS title option', async ({ page }) => {
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', (route) => {
+        const data = route.request().url().includes('/draft') ? PREFIX_DRAFT : [];
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    for (const viewport of [
+        { width: 390, height: 844 },
+        { width: 1280, height: 900 },
+    ]) {
+        await page.setViewportSize(viewport);
+        await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=prefix-${viewport.width}`);
+        await page.waitForSelector('#editor:not([hidden])');
+        await expect(page.locator('#prefix_id option')).toHaveCount(
+            PREFIX_DRAFT.masters.prefixes.length
+        );
+        await expect(page.locator('#prefix_id option[value="18"]')).toHaveText('น.ส.');
+        await expect(page.locator('#prefix_id option[value="19"]')).toHaveText('คุณ');
+        await page.locator('#prefix_id').selectOption('19');
+        await expect(page.locator('#prefix_id')).toHaveValue('19');
+        const state = await page.locator('#prefix_id').evaluate((element) => {
+            const style = element.ownerDocument.defaultView.getComputedStyle(element);
+            return { visible: element.getBoundingClientRect().height > 0, display: style.display };
+        });
+        expect(state.visible).toBe(true);
+        expect(state.display).not.toBe('none');
+        await page.screenshot({
+            path: path.join(OUT, `prefix-options-${viewport.width}.png`),
+            fullPage: true,
+        });
+    }
 });
 
 test('master-data save errors are actionable on mobile and desktop', async ({ page }) => {

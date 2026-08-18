@@ -46,6 +46,13 @@ _NEW_FORM = """
 </form>
 """
 
+# 订车快速建客表(drfcbc):称谓下拉名 selprefix_fs,含客户表没有的 18/น.ส.、19/คุณ。
+_BOOKING_FORM = """
+<form id="frm">
+  <select name="selprefix_fs"><option value="">--</option><option value="17">นาย</option><option value="18">น.ส.</option><option value="19">คุณ</option></select>
+</form>
+"""
+
 
 def _edit_form(name="Old Name", tel="0811111111", house_no=""):
     return (
@@ -74,6 +81,8 @@ class FakeTransport:
             if (data or {}).get("status") == "e":
                 return _Resp(_edit_form(name=self._edit_name, house_no=self._edit_house_no))
             return _Resp(_NEW_FORM)
+        if url.endswith("drfcbc/form.php"):
+            return _Resp(_BOOKING_FORM)
         if url.endswith("cus/new.php"):
             self._created = True
             return _Resp("")
@@ -115,16 +124,67 @@ class _DupCodeTransport(FakeTransport):
         return super().post(url, data=data, files=files, timeout_ms=timeout_ms)
 
 
+class _BookingFailTransport(FakeTransport):
+    """订车表新单 form 返回 500 → list_prefixes 应只保留客户表来源。"""
+
+    def post(self, url, data=None, files=None, timeout_ms=None):
+        if url.endswith("drfcbc/form.php"):
+            return _Resp("", status=500)
+        return super().post(url, data=data, files=files, timeout_ms=timeout_ms)
+
+
+class _CustomerFailTransport(FakeTransport):
+    """客户表新单 form 返回 500 → list_prefixes 应只保留订车表来源。"""
+
+    def post(self, url, data=None, files=None, timeout_ms=None):
+        if url.endswith("cus/form.php") and (data or {}).get("status") == "n":
+            return _Resp("", status=500)
+        return super().post(url, data=data, files=files, timeout_ms=timeout_ms)
+
+
+class _NoPrefixTransport(FakeTransport):
+    """两来源表单都不含称谓下拉 → 空列表。"""
+
+    def post(self, url, data=None, files=None, timeout_ms=None):
+        if url.endswith("cus/form.php") and (data or {}).get("status") == "n":
+            return _Resp("<form></form>")
+        if url.endswith("drfcbc/form.php"):
+            return _Resp("<form></form>")
+        return super().post(url, data=data, files=files, timeout_ms=timeout_ms)
+
+
 class IntakeContractTests(unittest.TestCase):
     def setUp(self):
         self.t = FakeTransport()
         self.c = DMSClient(self.t, "https://x/dms/")
 
     def test_list_prefixes_and_geo(self):
-        self.assertEqual(self.c.list_prefixes(), [["17", "นาย"]])
+        self.assertEqual(self.c.list_prefixes(), [["17", "นาย"], ["18", "น.ส."], ["19", "คุณ"]])
         self.assertEqual(self.c.list_geo("provinces"), [["65", "กระบี่"]])
         self.assertEqual(self.c.list_geo("districts", "65"), [["804", "คลองท่อม"]])
         self.assertEqual(self.c.list_geo("zipcodes", "6472"), [["6477", "81120"]])
+
+    def test_list_prefixes_dedup_by_id_keeps_first_order(self):
+        """客户表只有 17,订车表 17/18/19 → 合并后 17/18/19 且 17 只出现一次。"""
+        self.assertEqual(self.c.list_prefixes(), [["17", "นาย"], ["18", "น.ส."], ["19", "คุณ"]])
+
+    def test_list_prefixes_booking_failure_keeps_customer_source(self):
+        """订车表 HTTP 失败(500)→ 客户表选项原样保留,不抛错。"""
+        t = _BookingFailTransport()
+        c = DMSClient(t, "https://x/dms/")
+        self.assertEqual(c.list_prefixes(), [["17", "นาย"]])
+
+    def test_list_prefixes_customer_failure_keeps_booking_source(self):
+        """客户表 HTTP 失败(500)→ 订车表选项原样保留,不抛错。"""
+        t = _CustomerFailTransport()
+        c = DMSClient(t, "https://x/dms/")
+        self.assertEqual(c.list_prefixes(), [["17", "นาย"], ["18", "น.ส."], ["19", "คุณ"]])
+
+    def test_list_prefixes_both_sources_empty_returns_empty(self):
+        """两来源都没有称谓选项 → 空列表(不报错)。"""
+        t = _NoPrefixTransport()
+        c = DMSClient(t, "https://x/dms/")
+        self.assertEqual(c.list_prefixes(), [])
 
     def test_geo_cascade_uses_live_session_not_cookie_cache(self):
         """geo 级联直接走 _run_logged_in(真实 Playwright 会话)· 不存在已注销 cookie 复用路径。"""

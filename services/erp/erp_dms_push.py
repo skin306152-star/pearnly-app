@@ -135,6 +135,20 @@ _DMS_FRIENDLY = {
         "zh_TW": "下載訂車單範本失敗 · 請稍後重試",
         "ja": "予約テンプレートのダウンロードに失敗しました · 再試行してください",
     },
+    "ERR_DMS_MASTER_UNAVAILABLE": {
+        "zh": "DMS 主档暂时无法读取 · 请稍后重试",
+        "en": "DMS master data is temporarily unavailable — please retry",
+        "th": "อ่านข้อมูลหลักของ DMS ไม่ได้ชั่วคราว — กรุณาลองใหม่อีกครั้ง",
+        "zh_TW": "DMS 主檔暫時無法讀取 · 請稍後重試",
+        "ja": "DMS のマスターデータを一時的に読み取れません · しばらくしてから再試行してください",
+    },
+    "ERR_DMS_MASTER_UNMATCHED": {
+        "zh": "所选项目在 DMS 主档里已变更或不存在 · 请返回重新选择后重试",
+        "en": "The selected item is no longer in the DMS master data — go back, re-select it, and retry",
+        "th": "รายการที่เลือกไม่อยู่ในข้อมูลหลักของ DMS แล้ว กรุณากลับไปเลือกใหม่ แล้วลองอีกครั้ง",
+        "zh_TW": "所選項目在 DMS 主檔裡已變更或不存在 · 請返回重新選擇後重試",
+        "ja": "選択した項目は DMS のマスターデータに存在しなくなりました · 戻って選択し直してから再試行してください",
+    },
 }
 
 

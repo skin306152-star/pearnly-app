@@ -92,6 +92,12 @@ _FORM = """
 </form>
 """
 
+_BOOKING_PREFIX_FORM = """
+<form>
+  <select name="selprefix_fs"><option value="17">นาย</option><option value="18">น.ส.</option></select>
+</form>
+"""
+
 
 class _LookupFakeTransport:
     """命中已有客户:search 返回 id、cus/form.php 返回上面的表单、地址级联回同值
@@ -109,6 +115,8 @@ class _LookupFakeTransport:
             return _Resp('<a data-val="95">row</a>' if self._found else "")
         if url.endswith("cus/form.php"):
             return _Resp(_FORM.replace("__NAME__", self._dms_name))
+        if url.endswith("drfcbc/form.php"):
+            return _Resp(_BOOKING_PREFIX_FORM)
         if url.endswith("listdistricts.php"):
             return _Resp('<option value="804">คลองท่อม</option>')
         if url.endswith("listsubdistricts.php"):
@@ -165,6 +173,7 @@ class RecognizeLookupDiffWiringTests(unittest.TestCase):
         self.assertIn("name", diffs)
         self.assertEqual(diffs["name"]["old"], "Old DMS Name")
         self.assertEqual(diffs["name"]["new"], "New OCR Name")
+        self.assertEqual(out["prefixes"], [["17", "นาย"], ["18", "น.ส."]])
 
     def test_operator_phone_joins_diff(self):
         """手输电话进对比:DMS 现值空 + 手输新号 → phone diff(A2 · 2026-07-19 缺口回归)。"""

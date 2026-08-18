@@ -60,6 +60,18 @@ _DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
         "th": "ที่ปรึกษาการขายรายนี้ไม่อยู่ในรายชื่อที่ปรึกษาของ DMS กรุณาให้ผู้ดูแลเพิ่มบัญชีนี้ในรายชื่อที่ปรึกษาการขายของ DMS หรือติดต่อทีม Pearnly เพื่อกำหนดให้ แล้วเปิดใบจองใหม่",
         "ja": "この販売アドバイザーは DMS のアドバイザー名簿にありません。管理者に当該アカウントの追加を依頼するか、Pearnly に割り当てを依頼したうえで、予約を作成し直してください。",
     },
+    "ERR_DMS_MASTER_UNAVAILABLE": {
+        "zh": "DMS 主档暂时无法读取 · 已暂停建单 · 请稍后重试",
+        "en": "DMS master data is temporarily unavailable; booking was paused. Please retry shortly.",
+        "th": "อ่านข้อมูลหลักของ DMS ไม่ได้ชั่วคราว จึงหยุดสร้างใบจอง กรุณาลองใหม่ภายหลัง",
+        "ja": "DMS のマスターデータを一時的に読み取れず、予約作成を停止しました。しばらくしてから再試行してください。",
+    },
+    "ERR_DMS_MASTER_UNMATCHED": {
+        "zh": "所选项目在 DMS 主档里已变更或不存在 · 已暂停建单 · 请返回重新选择后再提交",
+        "en": "The selected item is no longer in the DMS master data; booking was paused. Go back and re-select it, then submit again.",
+        "th": "รายการที่เลือกไม่อยู่ในข้อมูลหลักของ DMS แล้ว จึงหยุดสร้างใบจอง กรุณากลับไปเลือกใหม่ แล้วจึงส่งอีกครั้ง",
+        "ja": "選択した項目が DMS のマスターデータに存在しなくなったため、予約作成を停止しました。戻って選択し直してから再度送信してください。",
+    },
     "ERR_DMS_TEMPLATE": {
         "zh": "获取 DMS 订车单模板失败 · 请稍后重试",
         "en": "Failed to fetch the DMS booking template. Please retry shortly.",

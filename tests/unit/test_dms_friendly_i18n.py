@@ -59,6 +59,16 @@ class TestDmsFriendlyI18n(unittest.TestCase):
             self.assertNotEqual(d, erp_push._DMS_FRIENDLY["ERR_UNEXPECTED"], f"{code} 未收录")
             self.assertTrue(d["th"].strip(), f"{code}.th 空")
 
+    def test_master_strict_codes_cover_five_langs_ja_real(self):
+        # 主档严格同步两码(2026-08-18):主 UI 五语齐全、ja 是真日文不是英文兜底。
+        for code in ("ERR_DMS_MASTER_UNAVAILABLE", "ERR_DMS_MASTER_UNMATCHED"):
+            d = erp_push._DMS_FRIENDLY[code]
+            for lang in ("zh", "en", "th", "zh_TW", "ja"):
+                self.assertIn(lang, d, f"{code} missing {lang}")
+                self.assertTrue(str(d[lang]).strip(), f"{code}.{lang} empty")
+            self.assertNotEqual(d["ja"], d["en"], f"{code} ja still equals en (English fallback)")
+            self.assertNotEqual(d, erp_push._DMS_FRIENDLY["ERR_UNEXPECTED"], f"{code} 未收录")
+
     def test_unknown_code_falls_back_to_unexpected_with_ja(self):
         d = erp_push._dms_friendly("ERR_SOMETHING_NOT_DEFINED")
         self.assertEqual(d, erp_push._DMS_FRIENDLY["ERR_UNEXPECTED"])

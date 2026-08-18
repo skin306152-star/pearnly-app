@@ -99,8 +99,9 @@ class CompanyBankTests(unittest.TestCase):
         with mock.patch(
             "services.erp.mrerp_dms_company_banks.fetch_company_banks", return_value=[]
         ):
-            with self.assertRaises(DMSClientError):
+            with self.assertRaises(DMSClientError) as ctx:
                 validate_company_bank_payments(object(), [payment])
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
 
 
 if __name__ == "__main__":

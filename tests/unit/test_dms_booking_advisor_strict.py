@@ -128,6 +128,35 @@ class AdvisorStrictTests(unittest.TestCase):
         self.assertEqual(ctx.exception.error_code, "ERR_DMS_ADVISOR_UNMATCHED")
 
 
+class RefFromDefaultStrictTests(unittest.TestCase):
+    """普通主档 pinned id 一旦存在就走严格解析:主档读不到/找不到都不许回落首行或标量。
+
+    _ref_from_default 的历史行为是「找不到 pinned 就悄悄取 rows[0]」——主档在第 2 页/被删
+    时整单填错且当场无感。现在 pinned 只认 live rows 命中,失败按码上抛(见 2026-08-18 派单)。
+    """
+
+    def test_pinned_id_absent_raises_unmatched_not_first_row(self):
+        # rows 有内容但找不到 pinned:绝不能回落 rows[0](会拿第一辆车顶替客户选的车)。
+        cl = _FakeClient({"txtcar": [["c1", "DMX", "D-Max"], ["c2", "MX5", "MX-5"]]})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl._ref_from_default("txtcar", "zz9", "", "")
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
+
+    def test_fetch_failure_with_pin_raises_unavailable(self):
+        # 取数失败(rows None)≠ 真空:主档可能只是暂时读不到,重试有机会,但不许提交旧值。
+        cl = _FakeClient({"txtcar": None})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl._ref_from_default("txtcar", "c1", "", "")
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
+
+    def test_empty_master_with_pin_raises_unmatched(self):
+        # 主档真空(rows [])是 DMS 的真实状态而非抖动:重试拿到的还是空,必须重选。
+        cl = _FakeClient({"txtcar": []})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl._ref_from_default("txtcar", "c1", "", "")
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNMATCHED")
+
+
 class ResolveBookingPayloadTests(unittest.TestCase):
     def test_booking_payload_carries_matched_advisor(self):
         cl = _FakeClient({"txtusers": _ADVISORS, "txtcar": [["c1", "DMX", "D-Max"]]})
@@ -140,6 +169,25 @@ class ResolveBookingPayloadTests(unittest.TestCase):
         cl = _FakeClient({"txtusers": _ADVISORS, "txtplacebook": [["pl1", "", "สาขาบางนา"]]})
         booking = cl.resolve_booking_payload(_defaults(), _CARD)
         self.assertEqual(booking.place_book.id, "pl1")
+
+    def test_pinned_car_resolves_from_live_rows(self):
+        # 普通主档 pinned id 有 live rows 时必须按该行解析(不落首行、不落标量)。
+        cl = _FakeClient(
+            {"txtusers": _ADVISORS, "txtcar": [["c1", "DMX", "D-Max"], ["c2", "MX5", "MX-5"]]}
+        )
+        booking = cl.resolve_booking_payload(
+            _defaults(advisor_id="335", car_id="c2", car_code="MX5"), _CARD
+        )
+        self.assertEqual(
+            (booking.car.id, booking.car.code, booking.car.name), ("c2", "MX5", "MX-5")
+        )
+
+    def test_resolve_raises_when_pinned_master_unavailable(self):
+        # 全链路:主档取数失败时不再静默提交空/旧标量,而是按 UNAVAILABLE 上抛。
+        cl = _FakeClient({"txtusers": _ADVISORS, "txtcar": None})
+        with self.assertRaises(DMSClientError) as ctx:
+            cl.resolve_booking_payload(_defaults(advisor_id="335", car_id="c1"), _CARD)
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_MASTER_UNAVAILABLE")
 
     def test_pinned_id_on_second_page_resolves(self):
         """pinned id 在第 2 页:全量翻页后仍能命中,不许回落第 1 页首行。"""

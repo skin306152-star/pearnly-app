@@ -81,6 +81,8 @@ class NewDmsCodeTests(unittest.TestCase):
             "ERR_DMS_ORDER_FAILED",
             "ERR_PLAYWRIGHT_MISSING",
             "ERR_KMS_MISSING",
+            "ERR_DMS_MASTER_UNAVAILABLE",
+            "ERR_DMS_MASTER_UNMATCHED",
         ):
             d = plf.friendly_any(code)
             self.assertIsNotNone(d, f"{code} 未命中")

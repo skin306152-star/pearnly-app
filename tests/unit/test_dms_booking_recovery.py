@@ -6,7 +6,9 @@
   1. is_concurrent_login_dialog —— DMS 单账号重复登录的泰文弹窗识别。
   2. _retryable_result —— 什么失败结果可以安全重放:并发登录必可重试;
      银行主档未就绪仅在还没建出 booking_id 时可重试(已有 booking_id 重放
-     会双建单);普通技术错误不可重试。
+     会双建单);DMS 主档暂时读不到(ERR_DMS_MASTER_UNAVAILABLE)同样只在
+     未建单时可重试;主档已变更(ERR_DMS_MASTER_UNMATCHED)不自动重试;
+     普通技术错误不可重试。
   3. booking_retry_card —— 失败后发给销售的重试卡:重试 postback 带 nonce、
      30 分钟提示、取消按钮。
   4. BOOKING_ACTIONS —— booking_flow 只认 confirm/cancel/retry 三个动作的
@@ -136,6 +138,45 @@ class RetryableResultTests(unittest.TestCase):
                     "ok": False,
                     "error_code": "ERR_DMS_TECHNICAL",
                     "raw_error": "timeout waiting for selector",
+                }
+            )
+        )
+
+    def test_master_unavailable_without_booking_id_retryable(self):
+        # 主档暂时读不到:等主档恢复后重试有机会,尚未建单,可安全重放。
+        self.assertTrue(
+            bf._retryable_result(
+                {
+                    "ok": False,
+                    "error_code": "ERR_DMS_MASTER_UNAVAILABLE",
+                    "raw_error": "DMS master txtcar unavailable while resolving pinned id 'c2'",
+                }
+            )
+        )
+
+    def test_master_unavailable_with_booking_id_not_retryable(self):
+        # 主档读不到但 booking_id 已产出 → 重放会双建单,绝不重试。
+        self.assertFalse(
+            bf._retryable_result({"error_code": "ERR_DMS_MASTER_UNAVAILABLE", "booking_id": "BID1"})
+        )
+
+    def test_master_unmatched_never_retryable(self):
+        # 主档已变更:重试只会拿到同一份主档,必须让操作员重新选择,不自动重放。
+        self.assertFalse(
+            bf._retryable_result(
+                {
+                    "ok": False,
+                    "error_code": "ERR_DMS_MASTER_UNMATCHED",
+                    "raw_error": "pinned id 'c2' not in DMS master txtcar",
+                }
+            )
+        )
+        self.assertFalse(
+            bf._retryable_result(
+                {
+                    "error_code": "ERR_DMS_MASTER_UNMATCHED",
+                    "booking_id": "BID1",
+                    "raw_error": "selected company bank is no longer available",
                 }
             )
         )

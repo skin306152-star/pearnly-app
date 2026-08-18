@@ -175,6 +175,7 @@ def recognize_lookup_mrerp_dms(
             time.sleep(1.5)
             look = cl.lookup_customer(people_id)
         form_html = cl._post_text("cus/form.php", {"status": "n"})
+        prefixes = cl.list_prefixes()
         a = ocr_address or {}
         addr = ThaiAddress(
             house_no=str(a.get("house_no") or ""),
@@ -243,7 +244,7 @@ def recognize_lookup_mrerp_dms(
             "field_diffs": field_diffs,
             "candidates": candidates,
             "geo": geo,
-            "prefixes": cl._select_options(form_html, "selprefix"),
+            "prefixes": prefixes,
         }
 
     return _run_logged_in(endpoint, _do)
@@ -261,7 +262,7 @@ def customer_fields_mrerp_dms(endpoint: Dict[str, Any], *, customer_id: str) -> 
             "customer_id": customer_id,
             "current_fields": cl._extract_customer_fields(data, page),
             "provinces": cl._select_options(page, "selprovinces"),
-            "prefixes": cl._select_options(page, "selprefix"),
+            "prefixes": cl.list_prefixes(),
         }
 
     return _run_logged_in(endpoint, _do)

@@ -413,11 +413,27 @@ class DMSClientOpsMixin:
 
         只在第 1 页里找 pinned id,id 在第 2 页会被误判成「不存在」然后悄悄回落首行,
         建单就填错车/店。故最终解析与 fetch_masters 一样走 _bshsd_all 全量翻页。
+
+        pinned id 一旦存在就不许回落首行或钉死标量:主档读不到/已变更时提交旧值,
+        月底对账才会暴露填错。取数失败(rows None)→ ERR_DMS_MASTER_UNAVAILABLE
+        (可重试);主档真空或找不到 pinned → ERR_DMS_MASTER_UNMATCHED(重试无意义,
+        必须让操作员重新选择)。
         """
-        rows = self._bshsd_all(elemname, **extra) or []
-        chosen = row_by_id(rows, pinned_id) if pinned_id else None
-        if chosen is None and rows:
-            chosen = rows[0]
+        rows = self._bshsd_all(elemname, **extra)
+        if pinned_id:
+            if rows is None:
+                raise DMSClientError(
+                    f"DMS master {elemname} unavailable while resolving pinned id {pinned_id!r}",
+                    "ERR_DMS_MASTER_UNAVAILABLE",
+                )
+            chosen = row_by_id(rows, pinned_id)
+            if chosen is None:
+                raise DMSClientError(
+                    f"pinned id {pinned_id!r} not in DMS master {elemname}",
+                    "ERR_DMS_MASTER_UNMATCHED",
+                )
+            return self._ref_from_row(chosen)
+        chosen = rows[0] if rows else None
         if chosen is None:
             # No live rows and no pin — fall back to the pinned scalars so the
             # caller still gets a usable (if unverified) ref.

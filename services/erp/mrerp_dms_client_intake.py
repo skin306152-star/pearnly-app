@@ -19,12 +19,15 @@
 from __future__ import annotations
 
 import html
+import logging
 import re
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
 from services.erp.mrerp_dms_client_base import DMSClientError
+
+logger = logging.getLogger(__name__)
 
 # 前端友好键 → DMS 客户表单字段名(非地址部分)
 _IDENTITY_MAP = {
@@ -140,8 +143,28 @@ class DMSClientIntakeMixin:
         return out
 
     def list_prefixes(self) -> List[List[str]]:
-        html = self._post_text("cus/form.php", {"status": "n"})
-        return self._select_options(html, "selprefix")
+        """称谓主档双来源合并:客户新表(cus)+ 订车快速建客表(drfcbc)。
+        按首列 DMS ID 去重、保留首次出现顺序(客户表在前);单个来源取数失败不拖累另一个。"""
+        merged: List[List[str]] = []
+        seen: Set[str] = set()
+        for path, select_name in (
+            ("cus/form.php", "selprefix"),
+            ("drfcbc/form.php", "selprefix_fs"),
+        ):
+            for row in self._prefix_options(path, select_name):
+                if row[0] not in seen:
+                    seen.add(row[0])
+                    merged.append(row)
+        return merged
+
+    def _prefix_options(self, path: str, select_name: str) -> List[List[str]]:
+        """拉单个称谓来源的选项;HTTP/解析失败视为该来源无选项(降级,不中断合并)。"""
+        try:
+            html = self._post_text(path, {"status": "n"})
+            return self._select_options(html, select_name)
+        except Exception:
+            logger.debug("[dms] prefix options unavailable from %s", path, exc_info=True)
+            return []
 
     def list_geo(self, level: str, parent_id: str = "") -> List[List[str]]:
         """四级联动选项:provinces 无 parent;其余按上一级 id 取。返回 [[id,label],...]。"""

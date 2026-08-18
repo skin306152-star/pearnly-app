@@ -247,6 +247,17 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(p["answers"]["place"], {"id": "pl1", "name": "สาขาบางนา"})
             self.assertEqual(p["step"], "car_search")
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_CAR)
+            self.assertTrue(env.masters_calls)
+            self.assertTrue(all(call[1].get("force_refresh") for call in env.masters_calls))
+
+    async def test_stale_master_button_reasks_with_current_dms_options(self):
+        with Env(places=[_PLACES[1]]) as env:
+            _seed(env, _qa("place"))
+            self.assertTrue(await qa.handle_postback(_TID, _LUID, "qa:place:pl1", {}, "rt"))
+
+            self.assertEqual(env.qa_payload()["step"], "place")
+            items = _replied_items(env)
+            self.assertEqual([item["action"]["data"] for item in items], ["qa:place:pl2"])
 
     # ── car_search 三分支 ─────────────────────────────────────────────────
     async def test_car_search_none(self):

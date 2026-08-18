@@ -121,10 +121,16 @@ async def _execute_booking(binding: dict, line_user_id: str, payload: dict) -> N
 
 
 def _retryable_result(result: Dict[str, Any]) -> bool:
-    """只对明确发生在建单前的 DMS 阻塞开放重试,不重放未知写入结果。"""
+    """只对明确发生在建单前的 DMS 阻塞开放重试,不重放未知写入结果。
+
+    主档暂时读不到(ERR_DMS_MASTER_UNAVAILABLE)可等主档恢复后重试;主档已变更
+    (ERR_DMS_MASTER_UNMATCHED)重试只会拿到同一份主档,必须让操作员重新选择。
+    """
     if result.get("booking_id"):
         return False
-    if result.get("error_code") == "ERR_DMS_CONCURRENT_LOGIN":
+    if result.get("error_code") == "ERR_DMS_MASTER_UNMATCHED":
+        return False
+    if result.get("error_code") in ("ERR_DMS_CONCURRENT_LOGIN", "ERR_DMS_MASTER_UNAVAILABLE"):
         return True
     raw = str(result.get("raw_error") or "")
     response = result.get("response_body") or {}

@@ -92,7 +92,11 @@ def validate_company_bank_payments(adapter: Any, payments: Iterable[dict]) -> Li
             extra = dict(current.get("extra") or {})
             row = by_id.get(str(extra.get("dst_id") or ""))
             if row is None:
-                raise DMSClientError("selected company bank is no longer available")
+                # 已选公司银行不在当前 live 主档:主档已变更,不许拿会话旧值提交。
+                raise DMSClientError(
+                    "selected company bank is no longer available",
+                    "ERR_DMS_MASTER_UNMATCHED",
+                )
             extra["dst"] = company_bank_label(row)
             current["extra"] = extra
         validated.append(current)

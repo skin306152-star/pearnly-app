@@ -17,6 +17,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-key-for-line-dms-qa-32bytes-lon
 from services.erp import erp_dms_push  # noqa: E402
 from services.line_binding import line_client  # noqa: E402
 from services.line_dms import booking_qa as qa  # noqa: E402
+from services.line_dms import masters_cache  # noqa: E402
 from services.line_dms import qa_cards  # noqa: E402
 
 _TID, _LUID = "T1", "L1"
@@ -94,14 +95,14 @@ class Env:
         p(qa.store, "clear_session", side_effect=self.store.clear_session)
         p(qa.store, "get_binding_by_line_user", side_effect=self.store.get_binding_by_line_user)
         p(qa._id_ocr, "resolve_dms_endpoint", return_value={"id": "E1", "config": {}})
-        p(qa.masters_cache, "get_masters", side_effect=self._get_masters)
+        p(masters_cache, "get_masters", side_effect=self._get_masters)
 
         def _paints(ep, cid, masters=None):
             self.paints_calls.append(cid)
             self.paint_masters_calls.append(masters)
             return self.paints
 
-        p(qa.masters_cache, "get_paints", side_effect=_paints)
+        p(masters_cache, "get_paints", side_effect=_paints)
         p(
             qa.dms_advisor,
             "resolve_operator_advisor",
@@ -340,8 +341,8 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(qa_cards.TXT_ASK_PAINT.format(car="DMX D-Max"), _replied_text(env))
 
     # ── 主档分页(quick reply 13 项硬限) ───────────────────────────────────
-    async def test_masters_and_paints_always_force_refresh(self):
-        """LINE 逐问实时取 DMS:每步发问 force_refresh=True,颜色带同一份新鲜 masters。"""
+    async def test_masters_and_paints_first_read_force(self):
+        """主档/颜色首次读取(live 会话刚开、masters_synced 未落)→ force_refresh=True。"""
         with Env() as env:
             _seed(env, _qa("place"))
             await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
@@ -352,6 +353,43 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
             self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
             self.assertIsNotNone(env.paint_masters_calls[-1])  # 颜色带 masters,不吃 12h 缓存
+
+    async def test_first_master_read_forces_then_session_reuses_cache(self):
+        """本轮首个主档 force_refresh 登录一次,masters_synced 落会话,后续读复用缓存。"""
+        with Env() as env:
+            _seed(env, _qa("place"))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertTrue(env.qa_payload().get("masters_synced"))
+
+            # 同一 booking_qa 会话再取主档 → 不再强制登录
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "term", "rt")
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": False})
+            self.assertTrue(env.qa_payload().get("masters_synced"))
+
+    async def test_empty_master_not_marked_and_next_read_retries_force(self):
+        """首次取数为空(端点可达但表空)→ 不落 masters_synced,下一次仍强制 live。"""
+        with Env(places=[]) as env:
+            _seed(env, _qa("place"))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertNotIn("masters_synced", env.qa_payload())
+
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "place", "rt")
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+
+    async def test_paints_force_once_then_reuse_cache(self):
+        """颜色路径:首次 live 拉取 force_refresh=True 并落标记,后续同会话复用缓存。"""
+        with Env() as env:
+            _seed(env, _qa("paint", answers={"car": {"id": "c1", "label": "DMX D-Max"}}))
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": True})
+            self.assertIsNotNone(env.paint_masters_calls[-1])
+            self.assertTrue(env.qa_payload().get("masters_synced"))
+
+            await qa.send_step(_TID, _LUID, env.qa_payload(), "paint", "rt")
+            self.assertEqual(env.masters_calls[-1][1], {"force_refresh": False})
+            self.assertIsNotNone(env.paint_masters_calls[-1])
 
     async def test_place_pagination_reaches_last_row(self):
         places = [[f"pl{i}", "", f"สาขา {i}"] for i in range(14)]

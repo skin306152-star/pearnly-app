@@ -11,7 +11,12 @@
 import unittest
 from unittest import mock
 
-from services.erp.session_lock import _account_lock_key, mrerp_session_lock
+from services.erp.session_lock import (
+    _account_lock_key,
+    dms_booking_scope_key,
+    mrerp_booking_lock,
+    mrerp_session_lock,
+)
 
 
 class AccountLockKeyTests(unittest.TestCase):
@@ -46,6 +51,60 @@ class GracefulDegradeTests(unittest.TestCase):
                 self.assertFalse(got)
         # 连接必须被归还
         fake_pool.putconn.assert_called_once_with(fake_conn)
+
+
+class DmsBookingScopeKeyTests(unittest.TestCase):
+    """账套级锁 key:同账套不同账号同 key、不同账套不同 key、URL 归一化、不泄漏密码。"""
+
+    def _ep(self, **over):
+        cfg = {
+            "system_url": "https://dms.example.com/dms/",
+            "comidyear": 6,
+            "seldb": 1,
+            **over,
+        }
+        return {"id": "E1", "config": cfg}
+
+    def test_same_account_set_ignores_username(self):
+        a = dms_booking_scope_key(self._ep())
+        b = dms_booking_scope_key(self._ep(username_enc="user-a", password_enc="pw-a"))
+        self.assertEqual(a, b)  # 同账套不同销售账号 → 同一把共享锁
+
+    def test_account_set_hints_do_not_fake_split_dms_scope(self):
+        base = dms_booking_scope_key(self._ep())
+        self.assertEqual(base, dms_booking_scope_key(self._ep(comidyear=15)))
+        self.assertEqual(base, dms_booking_scope_key(self._ep(seldb=2)))
+
+    def test_index_php_and_base_url_normalize_same(self):
+        base = dms_booking_scope_key(self._ep(system_url="https://dms.example.com/dms/"))
+        full = dms_booking_scope_key(self._ep(system_url="https://dms.example.com/dms/index.php"))
+        self.assertEqual(base, full)
+
+    def test_defaults_apply_when_missing(self):
+        k = dms_booking_scope_key({"config": {"system_url": "https://dms.example.com/dms"}})
+        self.assertEqual(k, "https://dms.example.com/dms")
+
+    def test_missing_url_uses_dms_default(self):
+        missing = dms_booking_scope_key({"config": {}})
+        explicit = dms_booking_scope_key(
+            {"config": {"system_url": "https://www.mrerp4sme.com/dms/index.php"}}
+        )
+        self.assertEqual(missing, "https://www.mrerp4sme.com/dms")
+        self.assertEqual(missing, explicit)
+
+    def test_key_does_not_leak_password(self):
+        k = dms_booking_scope_key(self._ep(password_enc="sup3r-secret-pw"))
+        self.assertNotIn("sup3r-secret-pw", k)
+
+
+class DmsBookingLockTests(unittest.TestCase):
+    def test_no_db_yields_false_not_raise(self):
+        """get_pool 抛(没 DATABASE_URL)→ 账套锁降级放行 · 不阻断建单。"""
+        with mock.patch("core.db.get_pool", side_effect=RuntimeError("no DATABASE_URL")):
+            with mrerp_booking_lock(
+                {"config": {"system_url": "https://dms.example.com/dms/"}}, timeout_sec=1
+            ) as got:
+                self.assertFalse(got)
 
 
 class AdapterWiringTests(unittest.TestCase):

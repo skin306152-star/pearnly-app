@@ -33,30 +33,36 @@ async def qa_endpoint(line_user_id: str, endpoint_id: Any) -> Optional[Dict[str,
     return await _thr(dms_id_ocr.resolve_dms_endpoint, uid, endpoint_id)
 
 
-async def qa_masters(line_user_id: str, endpoint_id: Any, key: str) -> List[list]:
+async def qa_masters(
+    line_user_id: str, endpoint_id: Any, key: str, *, force_refresh: bool = False
+) -> List[list]:
     """某类主档(cars/place_books/…)。端点解不出就给空表 —— 发问层据此重问,不炸会话。
 
-    LINE 逐问每次实时拉当前 DMS:force_refresh 跳过 12h 缓存快照,当天改的主档当天可见。
+    force_refresh 只在本轮订车第一次进主档时开(当天改的主档当天可见);
+    同轮后续按钮复用 12h 缓存快照,不再每步登录一遍 DMS。
     """
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(get_masters, ep, force_refresh=True)
+    masters = await _thr(get_masters, ep, force_refresh=force_refresh)
     return masters.get(key) or []
 
 
-async def qa_paints(line_user_id: str, endpoint_id: Any, car_id: str) -> List[list]:
-    """某车型的颜色主档(逐问选完车才有 car_id)。同 qa_masters:实时取,不吃 12h 缓存。
+async def qa_paints(
+    line_user_id: str, endpoint_id: Any, car_id: str, *, force_refresh: bool = False
+) -> List[list]:
+    """某车型的颜色主档(逐问选完车才有 car_id)。force_refresh 语义同 qa_masters。
 
-    先把同一份新抓的 masters 传给 get_paints —— 若回空 dict(强制刷新 fail closed)说明
-    DMS 不可达,颜色一起诚实为空,不拿旧色冒充,也不把空 masters 写坏缓存。
+    先把同一份 masters 传给 get_paints(force 时按 DMS 现状抓,fail closed;否则读普通缓存
+    主档 + get_paints 懒加载颜色)。masters 为空(登录失败/空库)颜色一起诚实为空,
+    不拿旧色冒充,也不把空 masters 写坏缓存。
     """
     if not car_id:
         return []
     ep = await qa_endpoint(line_user_id, endpoint_id)
     if not ep:
         return []
-    masters = await _thr(get_masters, ep, force_refresh=True)
+    masters = await _thr(get_masters, ep, force_refresh=force_refresh)
     if not masters:
         return []
     return (await _thr(get_paints, ep, car_id, masters)) or []

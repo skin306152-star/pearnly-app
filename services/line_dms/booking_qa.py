@@ -3,7 +3,8 @@
 
 会话态 "booking_qa"(TTL 见 store._STATE_TTL_MINUTES),payload["qa"] 存进度:step /
 endpoint_id / customer / draft / user_id / files / answers / payments / pending_channel /
-audit / pages(各主档翻页页码)/ car_search(车型搜索命中集 + 页码)。职责链:slip 凭证 →
+audit / pages(各主档翻页页码)/ car_search(车型搜索命中集 + 页码)/ masters_synced
+(本轮主档已 live 拉取成功,后续复用 12h 缓存)。职责链:slip 凭证 →
 place → car_search → paint → date → term → regis → regis_name →
 pay_channel(可循环多渠道)→ preview(置 booking_review + 轮换 nonce,既有 booking_flow
 的确认/取消直接接得上)。
@@ -19,13 +20,13 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from services.erp import dms_advisor
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.mrerp_dms_company_banks import company_bank_label
 from services.erp.mrerp_dms_client_base import to_be_date
-from services.line_dms import booking_qa_pages, commands, masters_cache, qa_cards, store
+from services.line_dms import booking_qa_pages, booking_qa_sync, commands, qa_cards, store
 from services.line_dms._out import _send, _thr
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
@@ -101,7 +102,14 @@ async def start(
 async def send_step(tenant_id, line_user_id, qa, step, reply_token=None) -> None:
     """按步发问。reply_token 有则 reply,无则 push(逐问可被 postback / 收料两种上下文调)。"""
     if step in ("place", "paint", "term", "regis", "pay_dst"):  # 这些步发问前要取主档
-        msg = await booking_qa_pages.question(line_user_id, qa, step, _masters, _paints)
+        # 闭包绑定 tenant_id,让 booking_qa_sync 首次 live 拉取后能把 masters_synced 落会话
+        msg = await booking_qa_pages.question(
+            line_user_id,
+            qa,
+            step,
+            lambda luid, q, key: booking_qa_sync.masters(tenant_id, luid, q, key, persist=_persist),
+            lambda luid, q: booking_qa_sync.paints(tenant_id, luid, q, persist=_persist),
+        )
     else:
         msg = booking_qa_pages.static_question(step, qa)
     _send(line_user_id, msg, reply_token)
@@ -223,7 +231,7 @@ async def _on_slip(tenant_id, line_user_id, qa, text, reply_token) -> None:
 
 
 async def _on_car_search(tenant_id, line_user_id, qa, text, reply_token) -> None:
-    rows = await _masters(line_user_id, qa, "cars")
+    rows = await booking_qa_sync.masters(tenant_id, line_user_id, qa, "cars", persist=_persist)
     needle = norm(text)
     hits = [r for r in rows if needle and needle in norm_row(r)]
     if not hits:
@@ -236,7 +244,7 @@ async def _on_car_search(tenant_id, line_user_id, qa, text, reply_token) -> None
 
 
 async def _on_paint(tenant_id, line_user_id, qa, text, reply_token) -> None:
-    paints = await _paints(line_user_id, qa)
+    paints = await booking_qa_sync.paints(tenant_id, line_user_id, qa, persist=_persist)
     needle = norm(text)
     hits = [r for r in paints if needle and needle in norm_row(r)]
     if len(hits) == 1:
@@ -341,7 +349,8 @@ async def _pick_master(
     reply_token,
 ) -> None:
     """通用主档单选:id → 存 answers.<key>={"id","name"} → 进下一步(清该主档页码)。"""
-    row = find_row(await _masters(line_user_id, qa, masters_key), value)
+    rows = await booking_qa_sync.masters(tenant_id, line_user_id, qa, masters_key, persist=_persist)
+    row = find_row(rows, value)
     if row is None:
         await _reask(tenant_id, line_user_id, qa, "", reply_token)
         return
@@ -353,7 +362,10 @@ async def _pick_master(
 
 
 async def _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token) -> None:
-    row = find_row(await _masters(line_user_id, qa, "company_banks"), value)
+    rows = await booking_qa_sync.masters(
+        tenant_id, line_user_id, qa, "company_banks", persist=_persist
+    )
+    row = find_row(rows, value)
     if row is None:
         await _reask(tenant_id, line_user_id, qa, "", reply_token)
         return
@@ -367,7 +379,8 @@ async def _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token) ->
 
 
 async def _pick_car(tenant_id, line_user_id, qa, value, reply_token) -> None:
-    row = find_row(await _masters(line_user_id, qa, "cars"), value)
+    rows = await booking_qa_sync.masters(tenant_id, line_user_id, qa, "cars", persist=_persist)
+    row = find_row(rows, value)
     if row is None:
         await _reask(tenant_id, line_user_id, qa, "", reply_token)
         return
@@ -379,7 +392,8 @@ async def _pick_car(tenant_id, line_user_id, qa, value, reply_token) -> None:
 
 
 async def _pick_paint(tenant_id, line_user_id, qa, value, reply_token) -> None:
-    row = find_row(await _paints(line_user_id, qa), value)
+    rows = await booking_qa_sync.paints(tenant_id, line_user_id, qa, persist=_persist)
+    row = find_row(rows, value)
     if row is None:
         await _reask(tenant_id, line_user_id, qa, "", reply_token)
         return
@@ -480,12 +494,3 @@ async def _audit(tenant_id, line_user_id, qa, step, value) -> None:
 
 async def _persist(tenant_id, line_user_id, qa) -> None:
     await _thr(store.set_session, tenant_id, line_user_id, _STATE, {"qa": qa})
-
-
-async def _masters(line_user_id, qa, key) -> List[list]:
-    return await masters_cache.qa_masters(line_user_id, qa.get("endpoint_id"), key)
-
-
-async def _paints(line_user_id, qa) -> List[list]:
-    car_id = str((qa.get("answers") or {}).get("car", {}).get("id") or "")
-    return await masters_cache.qa_paints(line_user_id, qa.get("endpoint_id"), car_id)

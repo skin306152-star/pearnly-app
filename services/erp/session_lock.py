@@ -130,3 +130,36 @@ def mrerp_session_lock(account_key: str, timeout_sec: float = 180.0, poll_sec: f
                 db.get_pool().putconn(conn)
             except Exception:
                 pass
+
+
+def dms_booking_scope_key(endpoint) -> str:
+    """DMS 建单共享锁键:按规范化服务地址收敛,不带账号凭据。
+
+    URL 规范化:去尾斜杠、剥掉 /index.php —— full index.php URL 与 /dms/ base URL
+    归一成同一键。当前 DMS 登录适配器不读取 comidyear/seldb,无法从 endpoint
+    配置可靠推导账套 id;按服务地址保守串行,避免同一服务上的共享账套漏锁。
+    """
+    cfg = endpoint.get("config") or {}
+    url = (
+        str(cfg.get("system_url") or "https://www.mrerp4sme.com/dms/index.php").strip().rstrip("/")
+    )
+    if url.lower().endswith("/index.php"):
+        url = url[: -len("/index.php")]
+    return url
+
+
+@contextmanager
+def mrerp_booking_lock(endpoint, timeout_sec: float = 180.0, poll_sec: float = 1.0):
+    """对同一 DMS 账套(非同一账号)串行化「取号→提交」临界区。
+
+    同账套多个销售账号并发建单,autonum 取号可能撞到同一单号 → DMS 唯一约束 + 重复号
+    重试是最后安全网,但跨账号互斥能直接避免无谓重试。锁按整个账套(不加 branch_id):
+    不同分店的 autonum 仍可能撞全局单号。锁基础设施失败 → 降级放行(语义同
+    mrerp_session_lock)。
+    """
+    with mrerp_session_lock(
+        f"booking|{dms_booking_scope_key(endpoint)}",
+        timeout_sec=timeout_sec,
+        poll_sec=poll_sec,
+    ) as got:
+        yield got

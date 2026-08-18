@@ -358,6 +358,60 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(res["attach_ok"])
         self.assertEqual([f["filename"] for f in rec["attach_files"]], ["idcard.jpg"])
 
+    async def test_d4_create_booking_runs_inside_shared_account_lock(self):
+        """create_booking_via_form 在账套级 mrerp_booking_lock 内执行;附件在锁释放后挂载。"""
+        rec = {}
+        lock_events: list = []
+
+        @contextlib.contextmanager
+        def fake_lock(ep, timeout_sec=180.0, poll_sec=1.0):
+            rec["lock_ep_id"] = ep.get("id")
+            lock_events.append("enter")
+            yield True
+            lock_events.append("exit")
+
+        class _ProbeClient(_FakeClient):
+            def create_booking_via_form(self, *, customer_id, booking, card):
+                rec["create_in_lock"] = lock_events == ["enter"]
+                return super().create_booking_via_form(
+                    customer_id=customer_id, booking=booking, card=card
+                )
+
+            def attach_booking_files(self, *, booking_id, files):
+                rec["attach_lock_state"] = list(lock_events)
+                return super().attach_booking_files(booking_id=booking_id, files=files)
+
+        def fake_run(ep, do):
+            return do(_ProbeClient(rec), object())
+
+        ep = {"id": "E1", "config": {"system_url": "https://dms.example.com/dms/index.php"}}
+        with (
+            mock.patch("services.erp.erp_dms_intake._run_logged_in", side_effect=fake_run),
+            mock.patch(
+                "services.erp.mrerp_dms_booking_customer.card_from_customer",
+                side_effect=lambda client, customer_id, people_id: bf._card_payload(_review()),
+            ),
+            mock.patch.object(bf.masters_cache, "refresh_from_client"),
+            mock.patch(
+                "services.erp.mrerp_dms_company_banks.fetch_company_banks",
+                return_value=[["1", "SCB", "SCB"]],
+            ),
+            mock.patch.object(bf, "mrerp_booking_lock", fake_lock),
+        ):
+            res = bf._book_in_session(
+                ep,
+                _review(),
+                attach_files=[
+                    {"display_name": "สำเนาบัตรประชาชน", "filename": "idcard.jpg", "content": _JPEG}
+                ],
+            )
+
+        self.assertTrue(res["ok"])
+        self.assertEqual(rec["lock_ep_id"], "E1")  # 锁按 endpoint 取键
+        self.assertTrue(rec["create_in_lock"])  # 建单在锁上下文内执行
+        # 附件挂载在锁退出后(慢步骤不进共享锁 · 锁只护取号→提交)
+        self.assertEqual(rec["attach_lock_state"], ["enter", "exit"])
+
     async def test_d4_failure_returns_friendly_th(self):
         result = {
             "ok": False,

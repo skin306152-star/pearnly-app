@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core import db
 from services.erp import dms_id_ocr as _id_ocr
+from services.erp.session_lock import mrerp_booking_lock
 from services.line_binding import line_client
 from services.line_dms import _out, cards, masters_cache, qa_cards, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
@@ -244,9 +245,12 @@ def _book_in_session(
                 regis_name=str(answers.get("regis_name") or ""),
                 payments=tuple(payments),
             )
-        booking_id, booking_no = cl.create_booking_via_form(
-            customer_id=customer_id, booking=booking, card=master_card
-        )
+        # 账套级互斥只护「取号→提交」:同账套不同销售账号并发时别撞单号。
+        # 客户写入/附件挂载/主档刷新等慢步骤不进共享锁。
+        with mrerp_booking_lock(ep):
+            booking_id, booking_no = cl.create_booking_via_form(
+                customer_id=customer_id, booking=booking, card=master_card
+            )
         attached = 0
         failed = list(attach_failed or [])
         if attach_files:

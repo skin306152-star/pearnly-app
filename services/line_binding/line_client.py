@@ -231,13 +231,13 @@ def start_loading(
         return False
 
 
-def create_rich_menu(payload: Dict[str, Any]) -> Optional[str]:
+def create_rich_menu(payload: Dict[str, Any], channel: str = "default") -> Optional[str]:
     """建 Rich Menu(返 richMenuId · 整合用 · 需再 setDefault + 上传背景图)。失败 None。
 
     payload 由 line_intake.rich_menu_payload 出。真生效还要传背景图 + setDefaultRichMenu,
     属用户验收范围(需真 channel)。
     """
-    token = _get_channel_token()
+    token = _get_channel_token(channel)
     if not token:
         return None
     req = urllib.request.Request(

@@ -84,6 +84,43 @@ const GEO = {
     },
 };
 
+test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
+    let authBody;
+    const payload = Buffer.from(
+        JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+    ).toString('base64url');
+    const token = `e2e.${payload}.sig`;
+
+    await page.route('https://static.line-scdn.net/**', (route) =>
+        route.fulfill({
+            contentType: 'application/javascript',
+            body: `window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>false};`,
+        })
+    );
+    await page.route('**/api/line/dms-booking/config', (route) =>
+        route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { liff_id: 'DMS-LIFF' } }),
+        })
+    );
+    await page.route('**/api/line/dms-booking/auth', async (route) => {
+        authBody = route.request().postDataJSON();
+        await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { token } }),
+        });
+    });
+    await page.route('**/dms', (route) =>
+        route.fulfill({ contentType: 'text/html', body: '<h1 id="dms-portal">DMS portal</h1>' })
+    );
+
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?portal=dms`);
+    await expect(page).toHaveURL(`${BASE}/dms`);
+    await expect(page.locator('#dms-portal')).toBeVisible();
+    expect(authBody).toEqual({ id_token: 'LINE-ID-TOKEN' });
+    expect(await page.evaluate(() => localStorage.getItem('mrpilot_token'))).toBe(token);
+});
+
 test('mobile payment and attachment controls stay aligned', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => {

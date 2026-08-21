@@ -5276,6 +5276,8 @@ window.I18N = {
         'stc-reason-service': '服务票',
         'stc-reason-no-qty-price': '无数量/单价',
         'stc-reason-total-only': '汇总票,无商品明细',
+        'stc-report-summary-title': '库存卡报表-汇总',
+        'stc-report-detail-title': '库存卡报表-明细',
     },
     en: {
         'dxpp-loading': "Checking catalog…",
@@ -10526,6 +10528,8 @@ window.I18N = {
         'stc-reason-service': 'Service invoice',
         'stc-reason-no-qty-price': 'Missing qty / unit price',
         'stc-reason-total-only': 'Summary invoice, no line items',
+        'stc-report-summary-title': 'Stock Card Report - Summary',
+        'stc-report-detail-title': 'Stock Card Report - Detail',
     },
     th: {
         'dxpp-loading': "กำลังตรวจรายการสินค้า…",
@@ -15769,6 +15773,8 @@ window.I18N = {
         'stc-reason-service': 'บิลค่าบริการ',
         'stc-reason-no-qty-price': 'ไม่มีจำนวน/ราคาต่อหน่วย',
         'stc-reason-total-only': 'บิลยอดรวม ไม่มีรายการสินค้า',
+        'stc-report-summary-title': 'รายงานสต๊อกการ์ด-สรุป',
+        'stc-report-detail-title': 'รายงานสต๊อกการ์ด-ละเอียด',
     },
     ja: {
         'dxpp-loading': "品目を確認中…",
@@ -21008,6 +21014,8 @@ window.I18N = {
         'stc-reason-service': '役務(サービス)請求書',
         'stc-reason-no-qty-price': '数量・単価なし',
         'stc-reason-total-only': '合計のみ、明細なし',
+        'stc-report-summary-title': '在庫カードレポート-サマリー',
+        'stc-report-detail-title': '在庫カードレポート-明細',
     },
 };
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""DMS LINE 菜单卡(波2):入口菜单行卡。
+"""DMS LINE 菜单卡：三个入口行卡。
 
-布局照泰方认可的 ChatGPT mockup:标题区 + 两张整行可点的行卡(编号圆徽+图标+标题
+布局照泰方认可的 ChatGPT mockup:标题区 + 三张整行可点的行卡(编号圆徽+图标+标题
 两行说明+箭头)。从 cards.py 拆出保 500 行硬门;文案/动作名仍以 cards 为单一来源。
 """
 
@@ -14,14 +14,17 @@ from services.line_dms.cards import (
     ACT_MENU_CUSTOMER,
     TXT_MENU_D1,
     TXT_MENU_D2,
+    TXT_MENU_D3,
     TXT_MENU_ITEM1,
     TXT_MENU_ITEM2,
+    TXT_MENU_ITEM3,
     TXT_MENU_HINT,
     TXT_MENU_PICK,
     TXT_MENU_PICK_SUB,
     TXT_MENU_TITLE,
     _data,
 )
+from services.line_dms.rich_menu import portal_liff_url
 
 # ── 菜单层(波2) ──────────────────────────────────────────────────────────
 # 图标托管在自家 static(LINE Flex 的图片必须是公网 https URL);?v 随图变更 bump。
@@ -42,15 +45,21 @@ def _menu_icon_disc(icon: str, soft: str, size: str, img: str) -> Dict[str, Any]
     }
 
 
-# 行卡配色主题(accent 编号/箭头 · soft 图标圆底 · border 卡边):建档蓝 / 订车粉。
+# 行卡配色主题(accent 编号/箭头 · soft 图标圆底 · border 卡边)。
 THEME_BLUE = {"accent": "#2f6bff", "soft": "#eaf0ff", "border": "#dfe7ff"}
 THEME_PINK = {"accent": "#f25c6e", "soft": "#fdecef", "border": "#f9d9de"}
+THEME_PURPLE = {"accent": "#7656d6", "soft": "#f0ebff", "border": "#e5dcff"}
 
 
 def _menu_item(
-    num: str, icon: str, theme: Dict[str, str], title: str, desc: str, action: str
+    num: str,
+    icon: str,
+    theme: Dict[str, str],
+    title: str,
+    desc: str,
+    action: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """整行可点的菜单项(postback 无 nonce):编号圆徽 + 图标 + 标题两行说明 + 箭头。"""
+    """整行可点的菜单项：编号圆徽、图标、标题说明和箭头。"""
     accent = theme["accent"]
     return {
         "type": "box",
@@ -62,7 +71,7 @@ def _menu_item(
         "borderWidth": "1px",
         "paddingAll": "14px",
         "alignItems": "center",
-        "action": {"type": "postback", "data": action},
+        "action": action,
         "contents": [
             _menu_icon_disc(icon, theme["soft"], "46px", "26px"),
             {
@@ -150,10 +159,28 @@ def menu_card() -> Dict[str, Any]:
             head,
             {"type": "separator", "margin": "lg", "color": "#eeeef4"},
             _menu_item(
-                "1", "menu-1", THEME_BLUE, TXT_MENU_ITEM1, TXT_MENU_D1, _data(ACT_MENU_CUSTOMER)
+                "1",
+                "menu-1",
+                THEME_BLUE,
+                TXT_MENU_ITEM1,
+                TXT_MENU_D1,
+                {"type": "postback", "data": _data(ACT_MENU_CUSTOMER)},
             ),
             _menu_item(
-                "2", "menu-2", THEME_PINK, TXT_MENU_ITEM2, TXT_MENU_D2, _data(ACT_MENU_BOOKING)
+                "2",
+                "menu-2",
+                THEME_PINK,
+                TXT_MENU_ITEM2,
+                TXT_MENU_D2,
+                {"type": "postback", "data": _data(ACT_MENU_BOOKING)},
+            ),
+            _menu_item(
+                "3",
+                "menu-3",
+                THEME_PURPLE,
+                TXT_MENU_ITEM3,
+                TXT_MENU_D3,
+                {"type": "uri", "label": TXT_MENU_ITEM3, "uri": portal_liff_url()},
             ),
             {
                 "type": "text",

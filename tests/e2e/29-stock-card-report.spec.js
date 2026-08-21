@@ -257,6 +257,7 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await page.evaluate(() => window.routeTo('stock-card'));
 
         // ── ① 列表态:四行落地(含负库存 + 两条未归并名字轨)──
+        await expect(page.locator('#stc-view-list .stc-head .t')).toHaveText('库存卡报表-汇总');
         await expect(page.locator('.stc-row')).toHaveCount(4);
         const negRow = page.locator('.stc-row.neg');
         await expect(negRow).toHaveCount(1);
@@ -345,6 +346,7 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await page.locator('.stc-row[data-stc-key="p:WPC-001"]').click();
         await expect(page.locator('#stc-view-detail')).toBeVisible();
         await expect(page.locator('#stc-view-list')).toBeHidden();
+        await expect(page.locator('#stc-view-detail .stc-head .t')).toHaveText('库存卡报表-明细');
         await expect(page.locator('#stc-tbl-detail tbody tr')).toHaveCount(3);
         // 结存段内子列分隔线回归锁(2026-08-08):数量/单价/金额三子列之间至少 1px 细分隔线,
         // 不随色带底色糊成一片。
@@ -406,13 +408,25 @@ test.describe('事务所端 · 商品收发存报表', () => {
             colIn: window.I18N.th['stc-col-in'],
             tabExcluded: window.I18N.th['stc-tab-excluded'],
         }));
-        await expect(page.locator('.stc-head .t')).toHaveText(thExpect.title);
+        await expect(page.locator('.stc > .stc-head .t')).toHaveText(thExpect.title);
         await expect(page.locator('.stc thead th.stc-g-in').first()).toContainText(thExpect.colIn);
         await expect(page.locator('#stc-tab-excluded')).toContainText(thExpect.tabExcluded);
         // 回归锁:shellHtml() 整壳重渲模板里角标是写死的占位「0」,真跑一次复现过切语言后
         // 徽章从 3 被顶回 0(数据仍在,只是没在切语言这条路上重新贴回去)。
         await expect(page.locator('#stc-excluded-cnt'), '切语言后角标计数不丢').toHaveText('3');
         await page.screenshot({ path: path.join(OUT, '05-thai.png'), fullPage: true });
+        await page.locator('.stc-row[data-stc-key="p:WPC-001"]').click();
+        await expect(page.locator('#stc-view-detail .stc-head .t')).toHaveText(
+            'รายงานสต๊อกการ์ด-ละเอียด'
+        );
+        await expect(page.locator('#stc-tbl-detail thead')).toContainText('เลขที่เอกสาร');
+        await expect(page.locator('#stc-tbl-detail thead')).toContainText('รับเข้า');
+        await expect(page.locator('#stc-tbl-detail thead')).toContainText('จ่ายออก');
+        await expect(page.locator('#stc-tbl-detail thead')).toContainText('คงเหลือ');
+        await page.setViewportSize({ width: 1800, height: 1000 });
+        await page.screenshot({ path: path.join(OUT, '08-thai-detail.png'), fullPage: true });
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.locator('#stc-back').click();
         await page.evaluate(() => window.applyLang('zh'));
 
         // ── ⑥ 归并弹窗:默认只勾入口行 + 名字轨目标代建的出站契约 ──

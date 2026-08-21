@@ -181,6 +181,15 @@
             });
     }
     async function load() {
+        if (query('portal') === 'dms') {
+            try {
+                if (!gateway.hasDmsToken()) await gateway.authenticate();
+            } catch (e) {
+                return showError('failed');
+            }
+            location.replace('/dms');
+            return;
+        }
         if (!nonce) return showError('expired');
         try {
             if (!gateway.hasDmsToken()) await gateway.authenticate();

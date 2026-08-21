@@ -93,11 +93,13 @@ function shellHtml(): string {
             <div class="stc-tab" id="stc-tab-excluded">${esc(t('stc-tab-excluded'))}<span class="stc-cnt" id="stc-excluded-cnt">0</span></div>
         </div>
         <div class="stc-card" id="stc-view-list">
+            <div class="stc-head"><div class="t">${esc(t('stc-report-summary-title'))}</div></div>
             <div class="stc-scroll"><table id="stc-tbl-list"></table></div>
             <p class="stc-hint">${esc(t('stc-list-hint'))}</p>
         </div>
         <div class="stc-card" id="stc-view-detail" style="display:none">
             <button type="button" class="stc-link" id="stc-back">← ${esc(t('stc-back'))}</button>
+            <div class="stc-head"><div class="t">${esc(t('stc-report-detail-title'))}</div></div>
             <div class="stc-det-top">
                 <dl class="stc-info" id="stc-det-info"></dl>
                 <div class="stc-formula" id="stc-det-formula"></div>

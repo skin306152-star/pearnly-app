@@ -40,7 +40,9 @@ def _area(col: int, action: dict) -> dict:
 
 def portal_liff_url() -> str:
     """返回公开 LIFF 入口；没有 LIFF 配置时退回普通 DMS 登录。"""
-    liff_id = (os.environ.get("LINE_DMS_LIFF_ID") or "").strip()
+    liff_id = (os.environ.get("LINE_DMS_LIFF_ID") or "").strip() or (
+        os.environ.get("LINE_LIFF_ID") or ""
+    ).strip()
     if liff_id:
         query = urllib.parse.urlencode({"portal": "dms"})
         return f"https://liff.line.me/{liff_id}?{query}"

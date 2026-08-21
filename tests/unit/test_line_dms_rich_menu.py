@@ -16,6 +16,33 @@ class DmsRichMenuTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(rich_menu.portal_liff_url(), "https://pearnly.com/dms")
 
+    def test_portal_liff_url_prefers_dms_id_over_shared(self):
+        with patch.dict(
+            os.environ,
+            {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_LIFF_ID": "SHARED-LIFF"},
+            clear=True,
+        ):
+            self.assertEqual(
+                rich_menu.portal_liff_url(),
+                "https://liff.line.me/DMS-LIFF?portal=dms",
+            )
+
+    def test_portal_liff_url_falls_back_to_shared_liff_id(self):
+        with patch.dict(os.environ, {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True):
+            self.assertEqual(
+                rich_menu.portal_liff_url(),
+                "https://liff.line.me/SHARED-LIFF?portal=dms",
+            )
+        with patch.dict(
+            os.environ,
+            {"LINE_DMS_LIFF_ID": "  ", "LINE_LIFF_ID": "SHARED-LIFF"},
+            clear=True,
+        ):
+            self.assertEqual(
+                rich_menu.portal_liff_url(),
+                "https://liff.line.me/SHARED-LIFF?portal=dms",
+            )
+
     def test_payload_has_three_top_row_actions(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):
             payload = rich_menu.build_payload()

@@ -128,7 +128,13 @@ async def login_page(
 
 def _dms_booking_redirect(liff_state: str) -> RedirectResponse | None:
     state = str(liff_state or "").lstrip("?")
-    draft = (parse_qs(state).get("draft") or [""])[0].strip()
+    params = parse_qs(state)
+    if (params.get("portal") or [""])[0].strip() == "dms":
+        return RedirectResponse(
+            url="/home/dms-booking?portal=dms",
+            status_code=302,
+        )
+    draft = (params.get("draft") or [""])[0].strip()
     if draft:
         return RedirectResponse(
             url=f"/home/dms-booking?draft={quote(draft, safe='')}",

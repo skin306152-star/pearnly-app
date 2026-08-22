@@ -131,9 +131,24 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
             </style></head><main id="dms-portal"><div class="spin"></div><h1>กำลังเข้าสู่ระบบ DMS</h1><p>กรุณารอสักครู่</p></main></html>`,
         })
     );
+    await page.route(/\/home\?liff\.state=/, (route) =>
+        route.fulfill({
+            status: 302,
+            headers: {
+                location: `${BASE}/static/dist/dms-booking-edit.html?portal=dms`,
+            },
+        })
+    );
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?portal=dms`);
+    await page.setContent(`<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
+        body{margin:0;background:#171717;color:#fff;font-family:system-ui,sans-serif}.chat{min-height:100vh;padding:28px 14px 210px;box-sizing:border-box}.bubble{margin:20px 0 0 auto;max-width:78%;padding:12px 16px;border-radius:18px;background:#6ee787;color:#102416}.menu{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);background:#f8f4ff;color:#30295f}.cell{height:94px;display:grid;place-items:center;text-align:center;border:1px solid #ddd5ff;color:inherit;text-decoration:none;font-weight:700}.placeholder{color:#aaa}
+    </style></head><body><main class="chat"><div class="bubble">เลือกเมนูที่ต้องการได้เลยครับ</div></main><nav class="menu" aria-label="เมนู DMS">
+        <a class="cell" href="#customer">สร้างลูกค้า</a><a class="cell" href="#booking">สร้างการจองรถ</a><a id="dms-menu" class="cell" href="${BASE}/home?liff.state=%3Fportal%3Ddms">เข้าสู่ DMS</a>
+        <span class="cell placeholder">—</span><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
+    </nav></body></html>`);
+    await page.screenshot({ path: path.join(OUT, 'line-rich-menu-before-click-390.png') });
+    await page.locator('#dms-menu').click();
     await expect(page).toHaveURL(`${BASE}/line/dms-portal?ticket=opaque-ticket`);
     await expect(page.locator('#dms-portal')).toBeVisible();
     expect(authBody).toEqual({ id_token: 'LINE-ID-TOKEN' });

@@ -61,6 +61,24 @@ class PortalRouteTest(unittest.TestCase):
             "/home/dms-booking?draft=real-line-nonce",
         )
 
+    def test_home_routes_liff_dms_portal_to_editor(self):
+        response = self.client.get(
+            "/home",
+            params={"liff.state": "?portal=dms"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
+
+    def test_login_routes_liff_dms_portal_to_editor(self):
+        response = self.client.get(
+            "/login",
+            params={"liff.state": "?portal=dms"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
+
     def test_login_ignores_unrelated_liff_state(self):
         response = self.client.get(
             "/login",

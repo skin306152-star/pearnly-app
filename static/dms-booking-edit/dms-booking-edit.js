@@ -184,10 +184,15 @@
         if (query('portal') === 'dms') {
             try {
                 if (!gateway.hasDmsToken()) await gateway.authenticate();
+                var portal = await gateway.api('/api/line/dms-portal/ticket', {
+                    method: 'POST',
+                    body: '{}',
+                });
+                if (!portal || !portal.url) throw new Error('portal_unavailable');
+                location.replace(portal.url);
             } catch (e) {
                 return showError('failed');
             }
-            location.replace('/dms');
             return;
         }
         if (!nonce) return showError('expired');

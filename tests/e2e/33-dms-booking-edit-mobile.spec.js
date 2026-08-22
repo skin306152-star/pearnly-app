@@ -86,6 +86,7 @@ const GEO = {
 
 test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     let authBody;
+    let ticketRequested = false;
     const payload = Buffer.from(
         JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
     ).toString('base64url');
@@ -110,15 +111,36 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
             body: JSON.stringify({ ok: true, data: { token } }),
         });
     });
-    await page.route('**/dms', (route) =>
-        route.fulfill({ contentType: 'text/html', body: '<h1 id="dms-portal">DMS portal</h1>' })
+    await page.route('**/api/line/dms-portal/ticket', async (route) => {
+        ticketRequested = true;
+        expect(route.request().method()).toBe('POST');
+        await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({
+                ok: true,
+                data: { url: '/line/dms-portal?ticket=opaque-ticket' },
+            }),
+        });
+    });
+    await page.route('**/line/dms-portal?ticket=opaque-ticket', (route) =>
+        route.fulfill({
+            contentType: 'text/html',
+            body: `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
+                body{display:grid;min-height:100vh;margin:0;place-items:center;background:#f7f5ff;color:#30295f;font-family:system-ui,sans-serif}
+                main{text-align:center}.spin{width:34px;height:34px;margin:0 auto 18px;border:4px solid #ddd5ff;border-top-color:#7357eb;border-radius:50%}
+            </style></head><main id="dms-portal"><div class="spin"></div><h1>กำลังเข้าสู่ระบบ DMS</h1><p>กรุณารอสักครู่</p></main></html>`,
+        })
     );
 
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${BASE}/static/dist/dms-booking-edit.html?portal=dms`);
-    await expect(page).toHaveURL(`${BASE}/dms`);
+    await expect(page).toHaveURL(`${BASE}/line/dms-portal?ticket=opaque-ticket`);
     await expect(page.locator('#dms-portal')).toBeVisible();
     expect(authBody).toEqual({ id_token: 'LINE-ID-TOKEN' });
+    expect(ticketRequested).toBe(true);
     expect(await page.evaluate(() => localStorage.getItem('mrpilot_token'))).toBe(token);
+    expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
+    await page.screenshot({ path: path.join(OUT, 'portal-auto-login-390.png'), fullPage: true });
 });
 
 test('mobile payment and attachment controls stay aligned', async ({ page }) => {

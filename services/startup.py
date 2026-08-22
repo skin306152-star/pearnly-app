@@ -162,6 +162,7 @@ def _boot_schema_ddl() -> None:
         ("services.expense.line_voice_quota", "闲聊配额"),
         ("services.line_binding.line_webhook_dedup", "webhook去重"),
         ("services.agent.turn_log", "Agent审计"),
+        ("services.line_dms.login_tickets", "DMS登录票据"),  # alembic 0102 留档
     ):
         try:
             __import__(_mod, fromlist=["ensure_table"]).ensure_table()

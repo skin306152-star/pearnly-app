@@ -105,30 +105,23 @@ class TtlCapTests(unittest.TestCase):
         """ttl_seconds=3600 → 到期时间被夹到 60s 上限。"""
         cur = FakeTicketCursor()
         with _patch(cur):
-            before = datetime.now(timezone.utc)
             out = lt.issue_login_ticket("t1", "u1", ttl_seconds=3600)
-            after = datetime.now(timezone.utc)
         exp = datetime.fromisoformat(out["expires_at"])
-        self.assertLessEqual((exp - after).total_seconds(), lt.MAX_TICKET_TTL_SECONDS)
-        self.assertGreater((exp - before).total_seconds(), 0)
+        self.assertEqual((exp - cur.now).total_seconds(), lt.MAX_TICKET_TTL_SECONDS)
 
     def test_short_ttl_honored(self):
         cur = FakeTicketCursor()
         with _patch(cur):
-            before = datetime.now(timezone.utc)
             out = lt.issue_login_ticket("t1", "u1", ttl_seconds=5)
-        delta = (datetime.fromisoformat(out["expires_at"]) - before).total_seconds()
-        self.assertGreaterEqual(delta, 5)
-        self.assertLess(delta, 7)
+        delta = (datetime.fromisoformat(out["expires_at"]) - cur.now).total_seconds()
+        self.assertEqual(delta, 5)
 
     def test_default_ttl_is_max(self):
         cur = FakeTicketCursor()
         with _patch(cur):
-            before = datetime.now(timezone.utc)
             out = lt.issue_login_ticket("t1", "u1")
-        delta = (datetime.fromisoformat(out["expires_at"]) - before).total_seconds()
-        self.assertGreaterEqual(delta, lt.MAX_TICKET_TTL_SECONDS)
-        self.assertLess(delta, lt.MAX_TICKET_TTL_SECONDS + 2)
+        delta = (datetime.fromisoformat(out["expires_at"]) - cur.now).total_seconds()
+        self.assertEqual(delta, lt.MAX_TICKET_TTL_SECONDS)
 
 
 class _RecordingCursor:

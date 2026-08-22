@@ -42,7 +42,7 @@ def security_headers(nonce: str) -> Dict[str, str]:
     csp = (
         "default-src 'none'; "
         f"script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
-        f"form-action {MRERP_ORIGIN}; frame-src {MRERP_ORIGIN}; "
+        f"form-action {MRERP_ORIGIN}; "
         "base-uri 'none'; object-src 'none'; frame-ancestors 'self'"
     )
     return {
@@ -56,19 +56,19 @@ def security_headers(nonce: str) -> Dict[str, str]:
 
 
 def render_login_relay(username: str, password: str) -> Tuple[str, str]:
-    """Return an uncached relay page; credentials exist only in the transient form."""
+    """Return an uncached top-level login handoff for MR.ERP."""
     nonce = secrets.token_urlsafe(18)
     safe_user = html.escape(username, quote=True)
     safe_password = html.escape(password, quote=True)
     page = f"""<!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><title>DMS</title>
-<style nonce="{nonce}">html,body{{height:100%;margin:0}}body{{display:grid;place-items:center;font-family:system-ui,sans-serif;background:#f7f5ff;color:#30295f}}main{{text-align:center;padding:28px}}.spin{{width:34px;height:34px;margin:0 auto 18px;border:4px solid #ddd5ff;border-top-color:#7357eb;border-radius:50%;animation:r .8s linear infinite}}@keyframes r{{to{{transform:rotate(360deg)}}}}</style></head>
-<body><main><div class="spin"></div><h1>กำลังเข้าสู่ระบบ DMS</h1><p>กรุณารอสักครู่</p></main>
-<iframe id="mrerp-login-frame" name="mrerp-login-frame" hidden></iframe>
-<form id="mrerp-login" method="post" action="{MRERP_LOGIN_URL}" target="mrerp-login-frame" autocomplete="off">
+<style nonce="{nonce}">html,body{{height:100%;margin:0}}body{{display:grid;place-items:center;font-family:system-ui,sans-serif;background:#f7f5ff;color:#30295f}}main{{width:min(420px,calc(100% - 40px));text-align:center;padding:32px 24px;border-radius:24px;background:#fff;box-shadow:0 18px 48px rgba(48,41,95,.12)}}h1{{margin:0 0 12px;font-size:30px}}p{{margin:0 0 24px;line-height:1.6;color:#615b80}}button{{width:100%;min-height:52px;border:0;border-radius:14px;background:#7357eb;color:#fff;font:700 18px system-ui,sans-serif}}button:disabled{{opacity:.65}}#status{{min-height:26px;margin:18px 0 0;color:#615b80}}</style></head>
+<body><main id="dms-portal"><h1>เข้าสู่ระบบ DMS</h1><p>กดปุ่มด้านล่างเพื่อเปิดระบบ DMS ในเบราว์เซอร์</p><button id="open-dms" type="button">เข้าสู่ระบบ DMS</button><p id="status" role="status" aria-live="polite"></p></main>
+<form id="mrerp-login" method="post" action="{MRERP_LOGIN_URL}" autocomplete="off" hidden>
 <input type="hidden" name="txtusers" value="{safe_user}" autocomplete="off">
 <input type="hidden" name="txtpasswords" value="{safe_password}" autocomplete="off">
+<input type="hidden" name="btnsubmit" value="Submit">
 </form>
-<script nonce="{nonce}">(function(){{'use strict';var form=document.getElementById('mrerp-login');var frame=document.getElementById('mrerp-login-frame');var sent=false;var openHome=function(){{location.replace('{MRERP_HOME_URL}');}};frame.addEventListener('load',function(){{if(sent)openHome();}});sent=true;form.submit();setTimeout(function(){{form.querySelectorAll('input').forEach(function(input){{input.value='';}});form.remove();}},0);setTimeout(openHome,5000);}})();</script></body></html>"""
+<script nonce="{nonce}">(function(){{'use strict';var button=document.getElementById('open-dms');var status=document.getElementById('status');var form=document.getElementById('mrerp-login');var windowName='pearnly-mrerp-dms';var reset=function(message){{button.disabled=false;status.textContent=message;}};button.addEventListener('click',function(){{button.disabled=true;status.textContent='กำลังเปิดระบบ DMS กรุณารอสักครู่';var portal=window.open('{MRERP_ROOT_URL}',windowName);if(!portal){{reset('ไม่สามารถเปิดเบราว์เซอร์ได้ กรุณาอนุญาตหน้าต่างใหม่แล้วลองอีกครั้ง');return;}}setTimeout(function(){{try{{form.target=windowName;form.submit();form.querySelectorAll('input').forEach(function(input){{input.value='';}});form.remove();}}catch(error){{reset('ไม่สามารถเข้าสู่ระบบ DMS ได้ กรุณาลองอีกครั้ง');return;}}setTimeout(function(){{try{{portal.location='{MRERP_HOME_URL}';status.textContent='เปิดระบบ DMS แล้ว';}}catch(error){{reset('ไม่สามารถเปิดหน้าหลัก DMS ได้ กรุณาลองอีกครั้ง');}}}},4000);}},1800);}});}})();</script></body></html>"""
     return page, nonce

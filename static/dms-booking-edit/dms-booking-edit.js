@@ -18,6 +18,8 @@
     var result = document.getElementById('result');
     var nonce = query('draft');
     var ERROR_KEYS = window.DMS_BOOKING_ERROR_KEYS;
+    var portalMode = query('portal') === 'dms';
+    if (portalMode) locale = 'th';
 
     function query(name) {
         var sp = new URLSearchParams(location.search);
@@ -181,7 +183,7 @@
             });
     }
     async function load() {
-        if (query('portal') === 'dms') {
+        if (portalMode) {
             try {
                 if (!gateway.hasDmsToken()) await gateway.authenticate();
                 var portal = await gateway.api('/api/line/dms-portal/ticket', {
@@ -189,7 +191,17 @@
                     body: '{}',
                 });
                 if (!portal || !portal.url) throw new Error('portal_unavailable');
-                location.replace(portal.url);
+                var portalUrl = new URL(portal.url, location.origin).toString();
+                if (
+                    window.liff &&
+                    window.liff.isInClient &&
+                    window.liff.isInClient() &&
+                    window.liff.openWindow
+                ) {
+                    window.liff.openWindow({ url: portalUrl, external: true });
+                } else {
+                    location.replace(portalUrl);
+                }
             } catch (e) {
                 return showError('failed');
             }
@@ -500,6 +512,7 @@
         }
     }
     var language = document.getElementById('language');
+    if (portalMode) language.hidden = true;
     language.value = locale;
     language.onchange = function () {
         locale = this.value;

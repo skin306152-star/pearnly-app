@@ -40,19 +40,31 @@ class MrerpPortalHtmlTests(unittest.TestCase):
 
     def test_posts_expected_fields_to_mrerp(self):
         self.assertIn(f'action="{mrerp_portal.MRERP_LOGIN_URL}"', self.page)
-        self.assertIn('target="mrerp-login-frame"', self.page)
         self.assertIn('name="txtusers"', self.page)
         self.assertIn('name="txtpasswords"', self.page)
+        self.assertIn('name="btnsubmit" value="Submit"', self.page)
+        self.assertNotIn("<iframe", self.page)
 
     def test_credentials_are_attribute_escaped(self):
         self.assertNotIn(self.password, self.page)
         self.assertIn("p&amp;ss&#x27;&quot;&gt;&lt;script&gt;", self.page)
         self.assertNotIn("<script>alert(1)</script>", self.page)
 
-    def test_form_is_cleared_and_removed_before_navigation(self):
+    def test_user_click_opens_top_level_mrerp_before_login_and_navigation(self):
+        self.assertIn("button.addEventListener('click'", self.page)
+        self.assertIn(f"window.open('{mrerp_portal.MRERP_ROOT_URL}',windowName)", self.page)
+        self.assertIn("form.target=windowName", self.page)
+        self.assertIn("form.submit()", self.page)
         self.assertIn("input.value=''", self.page)
         self.assertIn("form.remove()", self.page)
-        self.assertIn(f"location.replace('{mrerp_portal.MRERP_HOME_URL}')", self.page)
+        self.assertIn(f"portal.location='{mrerp_portal.MRERP_HOME_URL}'", self.page)
+
+    def test_visible_relay_copy_is_thai(self):
+        self.assertIn('<html lang="th">', self.page)
+        self.assertIn("เข้าสู่ระบบ DMS", self.page)
+        self.assertIn("กดปุ่มด้านล่างเพื่อเปิดระบบ DMS ในเบราว์เซอร์", self.page)
+        self.assertNotIn("Confirm", self.page)
+        self.assertNotIn("确认", self.page)
 
     def test_password_never_appears_in_a_url_or_storage_call(self):
         for url in (
@@ -78,7 +90,7 @@ class MrerpPortalHtmlTests(unittest.TestCase):
         csp = headers["Content-Security-Policy"]
         self.assertIn(f"script-src 'nonce-{self.nonce}'", csp)
         self.assertIn(f"form-action {mrerp_portal.MRERP_ORIGIN}", csp)
-        self.assertIn(f"frame-src {mrerp_portal.MRERP_ORIGIN}", csp)
+        self.assertNotIn("frame-src", csp)
 
 
 if __name__ == "__main__":

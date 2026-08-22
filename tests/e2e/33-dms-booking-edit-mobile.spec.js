@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { test, expect } = require('@playwright/test');
 const localServer = require('./_local_static_server');
 
@@ -87,6 +88,13 @@ const GEO = {
 test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     let authBody;
     let ticketRequested = false;
+    await page.addInitScript(() => {
+        try {
+            localStorage.setItem('pearnly_lang', 'zh');
+        } catch {
+            // The initial synthetic chat document has an opaque origin.
+        }
+    });
     const payload = Buffer.from(
         JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
     ).toString('base64url');
@@ -95,7 +103,7 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     await page.route('https://static.line-scdn.net/**', (route) =>
         route.fulfill({
             contentType: 'application/javascript',
-            body: `window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>false};`,
+            body: `window.__dmsExternalOpen=null;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsExternalOpen=params;}};`,
         })
     );
     await page.route('**/api/line/dms-booking/config', (route) =>
@@ -122,15 +130,6 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
             }),
         });
     });
-    await page.route('**/line/dms-portal?ticket=opaque-ticket', (route) =>
-        route.fulfill({
-            contentType: 'text/html',
-            body: `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
-                body{display:grid;min-height:100vh;margin:0;place-items:center;background:#f7f5ff;color:#30295f;font-family:system-ui,sans-serif}
-                main{text-align:center}.spin{width:34px;height:34px;margin:0 auto 18px;border:4px solid #ddd5ff;border-top-color:#7357eb;border-radius:50%}
-            </style></head><main id="dms-portal"><div class="spin"></div><h1>กำลังเข้าสู่ระบบ DMS</h1><p>กรุณารอสักครู่</p></main></html>`,
-        })
-    );
     await page.route(/\/home\?liff\.state=/, (route) =>
         route.fulfill({
             status: 302,
@@ -149,13 +148,82 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     </nav></body></html>`);
     await page.screenshot({ path: path.join(OUT, 'line-rich-menu-before-click-390.png') });
     await page.locator('#dms-menu').click();
-    await expect(page).toHaveURL(`${BASE}/line/dms-portal?ticket=opaque-ticket`);
-    await expect(page.locator('#dms-portal')).toBeVisible();
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__dmsExternalOpen))
+        .toEqual({
+            url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
+            external: true,
+        });
+    await expect(page).toHaveURL(`${BASE}/static/dist/dms-booking-edit.html?portal=dms`);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'th');
+    await expect(page.locator('#language')).toBeHidden();
+    await expect(page.locator('#loading [data-t="loading"]')).toHaveText('กำลังโหลดข้อมูล…');
     expect(authBody).toEqual({ id_token: 'LINE-ID-TOKEN' });
     expect(ticketRequested).toBe(true);
     expect(await page.evaluate(() => localStorage.getItem('mrpilot_token'))).toBe(token);
     expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
-    await page.screenshot({ path: path.join(OUT, 'portal-auto-login-390.png'), fullPage: true });
+    await page.screenshot({
+        path: path.join(OUT, 'portal-external-handoff-390.png'),
+        fullPage: true,
+    });
+});
+
+test('external relay logs in through a top-level MRERP window', async ({ page, context }) => {
+    const relayHtml = execFileSync(
+        'python',
+        [
+            '-c',
+            'from services.line_dms.mrerp_portal import render_login_relay; print(render_login_relay("staff", "secret")[0])',
+        ],
+        {
+            cwd: path.join(__dirname, '..', '..'),
+            encoding: 'utf8',
+            env: { ...process.env, PYTHONUTF8: '1' },
+        }
+    );
+    const requests = [];
+    await context.route(/https:\/\/www\.mrerp4sme\.com\/dms(?:\/.*)?$/, async (route) => {
+        const request = route.request();
+        requests.push({ url: request.url(), method: request.method(), body: request.postData() });
+        if (request.url().includes('checklogin.php')) {
+            return route.fulfill({ contentType: 'text/plain', body: 'lct::2::1' });
+        }
+        if (request.url().includes('home/home.php')) {
+            return route.fulfill({
+                contentType: 'text/html; charset=utf-8',
+                body: '<main id="mrerp-home">เข้าสู่ระบบ DMS สำเร็จ</main>',
+            });
+        }
+        return route.fulfill({
+            contentType: 'text/html; charset=utf-8',
+            body: '<main id="mrerp-root">ระบบ DMS</main>',
+        });
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setContent(relayHtml);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'th');
+    await expect(page.locator('#open-dms')).toHaveText('เข้าสู่ระบบ DMS');
+    await expect(page.locator('iframe')).toHaveCount(0);
+    await page.screenshot({ path: path.join(OUT, 'portal-thai-confirm-390.png'), fullPage: true });
+
+    const popupPromise = page.waitForEvent('popup');
+    await page.locator('#open-dms').click();
+    const popup = await popupPromise;
+    await expect(popup.locator('#mrerp-home')).toBeVisible({ timeout: 10_000 });
+    expect(requests.map((request) => request.url)).toEqual([
+        'https://www.mrerp4sme.com/dms',
+        'https://www.mrerp4sme.com/dms/login/checklogin.php',
+        'https://www.mrerp4sme.com/dms/home/home.php',
+    ]);
+    expect(requests[1].method).toBe('POST');
+    const loginForm = new URLSearchParams(requests[1].body);
+    expect(loginForm.get('txtusers')).toBe('staff');
+    expect(loginForm.get('txtpasswords')).toBe('secret');
+    expect(loginForm.get('btnsubmit')).toBe('Submit');
+    expect(relayHtml).not.toContain('localStorage');
+    expect(relayHtml).not.toContain('sessionStorage');
+    await popup.screenshot({ path: path.join(OUT, 'portal-mrerp-home-390.png'), fullPage: true });
 });
 
 test('mobile payment and attachment controls stay aligned', async ({ page }) => {

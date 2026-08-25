@@ -1,7 +1,7 @@
 name: CI
 
 # 阶段 3-4 + REFACTOR-A1.2 · CI 自动化保险 · 防"v0.20 db pool 5 重演"
-# 每次 push / PR 跑 9 个 job(2026-08-26 拆 split + 精确部署 job):
+# 每次 push / PR 跑 12 个 job(2026-08-26 拆 split + 精确部署 job):
 #   lint        : black + ruff + bandit + pip-audit + prettier + eslint + npm audit(格式/真bug/安全/CVE)
 #   lint-size   : 防屎山闸(REFACTOR-WC-P1)· 文件 ≤500 行 + 行数棘轮只降不升(铁律 #27)· FAIL 模式(2026-06-03 整顿收官切硬门)
 #   lint-ui     : UI 一致性棘轮(REFACTOR-WC 审计#2)· 违规不许反弹超基线 · FAIL 模式(2026-06-05 拍板切硬门 · 存量 B 类视觉清理仍 Zihao-gated)
@@ -150,10 +150,11 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Checkout (full history · 棘轮需要 HEAD~1)
+      - name: Checkout (PR 全历史 / push 最近 2 commit)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 全历史 · 否则 HEAD~1 在 shallow clone 里不存在
+          # PR 闸需 origin/<base> 看完整分支 diff;push 只比较 HEAD~1,拉全历史浪费且曾 5 分钟超时。
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -268,17 +269,17 @@ jobs:
   #   #5  db.py/services/** 不许新增 def ensure_*  (运行期建表反模式 · schema 只走 alembic)
   #   #17 app.py 不许新增 @app.<verb> 路由         (路由必落 *_routes.py · 防巨石回潮)
   # 只看本次 diff 的【新增行】· 命中即 fail · commit 加 NEW-DEBT-EXEMPT 透明豁免。
-  # 与 lint-size 不同:此闸 fail 模式(当前 HEAD 干净 · 不会误红存量)· 需全历史拿 HEAD~1。
+  # 与 lint-size 不同:此闸 fail 模式(当前 HEAD 干净 · 不会误红存量)· push 只需最近 2 commit。
   lint-debt:
     name: lint-debt (REFACTOR-WC · new-debt diff gate · FAIL mode)
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - name: Checkout (full history · diff 需要 HEAD~1)
+      - name: Checkout (PR 全历史 / push 最近 2 commit)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 全历史 · 否则 HEAD~1 / origin/master 在 shallow clone 里不存在
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -307,10 +308,10 @@ jobs:
     continue-on-error: true
 
     steps:
-      - name: Checkout (full history · diff 需要 HEAD~1)
+      - name: Checkout (PR 全历史 / push 最近 2 commit)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 全历史 · 否则 HEAD~1 / origin/master 在 shallow clone 里不存在
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '2' }}
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -457,10 +458,10 @@ jobs:
       # 单测里有一条拿本仓真 git 历史跑的用例(test_line_ratchet_gate.RealRepoStillJudges)——
       # 默认 depth=1 的 checkout 上 HEAD~1 压根不存在,棘轮只能报「判不了」。那不是闸坏了,
       # 是这次 checkout 没有可比的基线;基线该由环境给,不该靠把闸改回 fail-open 来绕。
-      - name: Checkout (full history · 棘轮的真仓用例需要 HEAD~1)
+      - name: Checkout (最近 2 commit · 棘轮真仓用例需要 HEAD~1)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 全历史 · 否则 HEAD~1 在 shallow clone 里不存在
+          fetch-depth: 2
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5

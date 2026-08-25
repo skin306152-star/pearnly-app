@@ -82,6 +82,8 @@ git push origin master
 
 > e2e 604s > 旧 484s 是**诚实代价**:本地 spec(`ps5_cashier_route` 等)spawn `python -m uvicorn app:app`,拆 job 后必须自己装应用依赖;这 ~120s 换来了「unit 与 e2e 永不互相阻塞」。CI 结构性契约由 `tests/unit/test_ci_workflow_contract.py` 锁住。
 
+> 2026-08-26 首次文档同步 run 暴露 checkout 浪费:`lint-debt` 为拿 `HEAD~1` 拉完整约 243MB 历史,撞 5 分钟 timeout 被取消,deploy 因 required job 不完整而正确跳过。现已改为 push 只取最近 2 commit、PR 保留全历史,并由 workflow contract 防回归。
+
 ### 部署前必做（铁律 #24 · 血泪根因）
 
 ```bash

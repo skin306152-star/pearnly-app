@@ -18,6 +18,8 @@ git config core.hooksPath scripts/git-hooks
 2. **路径是相对的,按「谁在 push」各自解析** —— githooks(5):钩子跑之前 git 会 `cd` 到该 worktree 的根。所以 A worktree push 跑的是 `A/scripts/git-hooks/pre-push`,B 跑 B 的。老分支跑老版本的闸;分支里没这个文件 = 那次 push 静悄悄没有闸。
 3. **代价**:改动只含文档/纯文本约 40 秒;含前端(要跑 eslint + vite build)实测约 3 分钟起。`.py` 由 `impact.py` 分流:只改 `tests/unit/` 测试文件跑点名模块,生产 Python 仍跑分片全量。钩子开头清理 `__pycache__/*.pyc` 并导出 `PYTHONDONTWRITEBYTECODE=1`,防陈腐字节码污染本次验证。**「改了什么」按 merge-base 算**,所以分支自己没动 `.py` 就不跑 unit 那趟 —— 停摆分支不会再因为 master 往前跑而白跑。生产 Python 保留全量是因为 1038 个测试模块里 213 个靠扫文件/起子进程验,没有可靠 import 边,反向裁剪会漏测。`git push --dry-run` 也会触发本钩子(但不会真推),可拿来空跑验证。
 
+CI 的 diff 闸在 push 事件只 checkout 最近 2 个 commit(足够判断 `HEAD~1`);PR 才拉全历史取得 `origin/<base>`。禁止为“保险”把 push 改回全历史:仓库约 243MB,曾让 5 分钟 `lint-debt` 在 checkout 阶段直接超时取消。
+
 ## 31 道闸 · 查什么 · 怎么提前自查 · 豁免法
 
 | 闸 | 触发条件 | 查什么 | 提前自查命令 | 豁免/注意 |

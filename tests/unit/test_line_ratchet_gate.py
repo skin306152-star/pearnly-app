@@ -169,7 +169,7 @@ class RealRepoStillJudges(unittest.TestCase):
 
     判得动的前提是有基线可比,而「拿不到 base ref」跟「git 坏了」是两回事:actions/checkout
     默认 depth=1,HEAD~1 在 runner 上压根不存在。所以前提单独断一条 —— 浅克隆时红在那一句、
-    指名道姓说是 checkout 的事(CI 侧对应 unit job 的 fetch-depth: 0),不至于让人读成「闸把
+    指名道姓说是 checkout 的事(CI 侧对应 unit job 的 fetch-depth: 2),不至于让人读成「闸把
     自己判死了」进而回头改回 fail-open。
     """
 
@@ -177,7 +177,7 @@ class RealRepoStillJudges(unittest.TestCase):
         try:
             ratchet.git("rev-parse", "--verify", "HEAD~1")
         except (RuntimeError, FileNotFoundError) as exc:
-            self.fail(f"当前 checkout 取不到 HEAD~1(浅克隆?CI 的 unit job 需 fetch-depth: 0):{exc}")
+            self.fail(f"当前 checkout 取不到 HEAD~1(浅克隆?CI 的 unit job 需 fetch-depth: 2):{exc}")
 
     def test_gate_reaches_a_verdict_on_this_repo(self) -> None:
         buf = io.StringIO()

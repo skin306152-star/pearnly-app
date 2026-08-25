@@ -7,6 +7,7 @@
     不含 WARN 闸(lint-routes / lint-model)
   · deploy 调 /internal/deploy/manual 必须带 sha=${{ github.sha }} + secrets.DEPLOY_TOKEN
   · concurrency 必须 cancel-in-progress(同 ref 新 push 取消旧 run → 旧 deploy job 不触发)
+  · push diff 闸只拉最近 2 commit;PR 保留全历史拿 origin/base,避免 243MB 全历史 fetch 超时
   · Playwright retries 不允许在这轮迁移里被调低(迁移纪律:不动 E2E 稳定性参数)
 
 本契约故意用纯文本断言(不依赖 PyYAML):CI unit job 不装 pyyaml,测试若 import yaml
@@ -127,6 +128,12 @@ class CiWorkflowContractTests(unittest.TestCase):
     def test_concurrency_cancels_older_master_runs(self):
         self.assertIn("cancel-in-progress: true", self.text)
         self.assertIn("${{ github.workflow }}-${{ github.ref }}", self.text)
+
+    def test_push_diff_jobs_do_not_fetch_full_history(self):
+        conditional_depth = "github.event_name == 'pull_request' && '0' || '2'"
+        for name in ("lint-size", "lint-debt", "lint-routes"):
+            self.assertIn(conditional_depth, self.jobs[name], f"{name} push 应只拉 2 个 commit")
+        self.assertIn("fetch-depth: 2", self.jobs["unit"])
 
     def test_playwright_retries_not_reduced(self):
         # 迁移纪律:不动 E2E 稳定性参数 —— CI retries 必须是 2(迁移前原值)

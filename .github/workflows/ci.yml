@@ -541,7 +541,11 @@ jobs:
   # E2E job(2026-08-26 从原单体 test job 拆出 · 与 unit 并行)
   #   视觉照搬闸(重 build + chromium)+ Playwright smoke + 高敏 smoke(真账号)。
   #   specs 里 `python -m http.server`(stdlib 静态服)需要 `python` 命令 —— ubuntu 默认只有
-  #   python3,setup-python 补上它;不装任何 pip 依赖(纯 stdlib 够用)。
+  #   python3,setup-python 补上它。
+  #   本地规格(ps5_cashier_route 等)spawn `python -m uvicorn app:app` 起真 FastAPI app ——
+  #   app 全量导入依赖 requirements.lock.txt 的应用依赖,所以必须装锁文件(与 unit 同款
+  #   setup-python pip cache)。2026-08-25 拆 job 时只装了 python 没装依赖 → e2e 全红
+  #   ("server not up"),这条就是那道 implicit dependency 的显式化。
   #   注意:高敏 spec 必须独立进程顺序跑(连跑共用登录会话会互踢)· 凭据缺失 hasCreds() 自动 skip。
   e2e:
     name: e2e (visual fidelity + playwright smoke + 高敏 smoke)
@@ -555,10 +559,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.11 (specs 起 stdlib http.server 静态服用)
+      - name: Setup Python 3.11 (specs 起 stdlib http.server / uvicorn app:app 用)
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock.txt
+
+      - name: Install dependencies (锁文件 · 本地 spec 的 uvicorn app:app 全量导入需要)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
 
       - name: Setup Node 20
         uses: actions/setup-node@v4

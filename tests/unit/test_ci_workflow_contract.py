@@ -94,6 +94,15 @@ class CiWorkflowContractTests(unittest.TestCase):
         self.assertIn("26-entrance-token-isolation.spec.js", self.jobs["e2e"])
         self.assertIn("PEARNLY_E2E_USER", self.jobs["e2e"])
 
+    def test_e2e_job_installs_app_python_deps(self):
+        # 2026-08-25 拆 job 踩的坑:e2e 只装 python 没装应用依赖,ps5_cashier_route 等本地
+        # spec 起 `python -m uvicorn app:app` 全量导入直接 "server not up" 全红。本地 spec
+        # spawn 真 FastAPI app 是 e2e 的显式依赖 —— 拆/改 job 时不许再丢锁文件安装。
+        e2e = self.jobs["e2e"]
+        self.assertIn("pip install -r requirements.lock.txt", e2e)
+        self.assertIn("cache: pip", e2e)
+        self.assertIn("cache-dependency-path: requirements.lock.txt", e2e)
+
     def test_deploy_job_exists_and_master_only(self):
         self.assertIn("deploy", self.jobs)
         deploy = self.jobs["deploy"]

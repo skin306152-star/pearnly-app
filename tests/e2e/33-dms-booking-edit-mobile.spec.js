@@ -85,9 +85,10 @@ const GEO = {
     },
 };
 
-test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
+test('LINE portal opens MRERP DMS in-app without leaving LINE', async ({ page }) => {
     let authBody;
     let ticketRequested = false;
+    let ticketRequestCount = 0;
     await page.addInitScript(() => {
         try {
             localStorage.setItem('pearnly_lang', 'zh');
@@ -103,7 +104,7 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     await page.route('https://static.line-scdn.net/**', (route) =>
         route.fulfill({
             contentType: 'application/javascript',
-            body: `window.__dmsExternalOpen=null;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsExternalOpen=params;}};`,
+            body: `window.__dmsInAppOpen=null;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsInAppOpen=params;}};`,
         })
     );
     await page.route('**/api/line/dms-booking/config', (route) =>
@@ -121,6 +122,7 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     });
     await page.route('**/api/line/dms-portal/ticket', async (route) => {
         ticketRequested = true;
+        ticketRequestCount += 1;
         expect(route.request().method()).toBe('POST');
         await route.fulfill({
             contentType: 'application/json',
@@ -149,10 +151,10 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     await page.screenshot({ path: path.join(OUT, 'line-rich-menu-before-click-390.png') });
     await page.locator('#dms-menu').click();
     await expect
-        .poll(() => page.evaluate(() => globalThis.__dmsExternalOpen))
+        .poll(() => page.evaluate(() => globalThis.__dmsInAppOpen))
         .toEqual({
             url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
-            external: true,
+            external: false,
         });
     await expect(page).toHaveURL(`${BASE}/static/dist/dms-booking-edit.html?portal=dms`);
     await expect(page.locator('html')).toHaveAttribute('lang', 'th');
@@ -160,10 +162,11 @@ test('LINE portal authenticates and opens the DMS portal', async ({ page }) => {
     await expect(page.locator('#loading [data-t="loading"]')).toHaveText('กำลังโหลดข้อมูล…');
     expect(authBody).toEqual({ id_token: 'LINE-ID-TOKEN' });
     expect(ticketRequested).toBe(true);
+    expect(ticketRequestCount).toBe(1);
     expect(await page.evaluate(() => localStorage.getItem('mrpilot_token'))).toBe(token);
     expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
     await page.screenshot({
-        path: path.join(OUT, 'portal-external-handoff-390.png'),
+        path: path.join(OUT, 'portal-line-in-app-handoff-390.png'),
         fullPage: true,
     });
 });
@@ -206,6 +209,10 @@ test('external relay logs in through a top-level MRERP window', async ({ page, c
     await expect(page.locator('#open-dms')).toHaveText('เข้าสู่ระบบ DMS');
     await expect(page.locator('iframe')).toHaveCount(0);
     await page.screenshot({ path: path.join(OUT, 'portal-thai-confirm-390.png'), fullPage: true });
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({ path: path.join(OUT, 'portal-thai-confirm-1280.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
 
     const popupPromise = page.waitForEvent('popup');
     await page.locator('#open-dms').click();

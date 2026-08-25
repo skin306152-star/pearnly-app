@@ -198,7 +198,7 @@
                     window.liff.isInClient() &&
                     window.liff.openWindow
                 ) {
-                    window.liff.openWindow({ url: portalUrl, external: true });
+                    window.liff.openWindow({ url: portalUrl, external: false });
                 } else {
                     location.replace(portalUrl);
                 }

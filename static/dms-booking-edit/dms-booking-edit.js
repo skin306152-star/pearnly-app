@@ -198,9 +198,8 @@
                     window.liff.isInClient() &&
                     window.liff.openWindow
                 ) {
-                    var os = typeof window.liff.getOS === 'function' ? window.liff.getOS() : '';
-                    var useExternal = os === 'ios' || (os !== 'android' && os !== 'web');
-                    window.liff.openWindow({ url: portalUrl, external: useExternal });
+                    window.liff.openWindow({ url: portalUrl, external: true });
+                    if (window.liff.closeWindow) window.liff.closeWindow();
                 } else {
                     location.replace(portalUrl);
                 }

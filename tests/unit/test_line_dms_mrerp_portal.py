@@ -50,14 +50,37 @@ class MrerpPortalHtmlTests(unittest.TestCase):
         self.assertIn("p&amp;ss&#x27;&quot;&gt;&lt;script&gt;", self.page)
         self.assertNotIn("<script>alert(1)</script>", self.page)
 
-    def test_user_click_opens_top_level_mrerp_before_login_and_navigation(self):
+    def test_user_click_opens_about_blank_popup_then_submits_and_navigates(self):
         self.assertIn("button.addEventListener('click'", self.page)
-        self.assertIn(f"window.open('{mrerp_portal.MRERP_ROOT_URL}',windowName)", self.page)
+        self.assertIn("window.open('about:blank',windowName)", self.page)
         self.assertIn("form.target=windowName", self.page)
         self.assertIn("form.submit()", self.page)
         self.assertIn("input.value=''", self.page)
         self.assertIn("form.remove()", self.page)
         self.assertIn(f"portal.location='{mrerp_portal.MRERP_HOME_URL}'", self.page)
+
+    def test_dns_prefetch_and_preconnect_hints_present(self):
+        self.assertIn(
+            f'<link rel="dns-prefetch" href="{mrerp_portal.MRERP_ORIGIN}">', self.page
+        )
+        self.assertIn(
+            f'<link rel="preconnect" href="{mrerp_portal.MRERP_ORIGIN}" crossorigin>',
+            self.page,
+        )
+
+    def test_no_legacy_delay_timers(self):
+        self.assertNotIn("1800", self.page)
+        self.assertNotIn("4000", self.page)
+
+    def test_home_navigation_waits_for_login_post_to_land(self):
+        # The relay must not use a blind short timer that could cancel a slow
+        # in-flight checklogin POST; it polls the popup and navigates home only
+        # once the popup leaves the same-origin about:blank (login landed).
+        self.assertIn("setInterval(function()", self.page)
+        self.assertIn("portal.location.href", self.page)
+        self.assertIn("setTimeout(goHome,400)", self.page)
+        self.assertNotIn("},800);", self.page)
+        self.assertNotIn("addEventListener('load'", self.page)
 
     def test_visible_relay_copy_is_thai(self):
         self.assertIn('<html lang="th">', self.page)

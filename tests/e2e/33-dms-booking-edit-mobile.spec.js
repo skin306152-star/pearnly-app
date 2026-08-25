@@ -85,9 +85,8 @@ const GEO = {
     },
 };
 
-function liffMockScript(osValue) {
-    var getOS = osValue === undefined ? '' : `,getOS:()=>${JSON.stringify(osValue)}`;
-    return `window.__dmsPortalOpen=null;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsPortalOpen=params;}${getOS}};`;
+function liffMockScript() {
+    return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
 }
 
 const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
@@ -97,7 +96,7 @@ const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="ut
     <span class="cell placeholder">—</span><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
 </nav></body></html>`;
 
-async function setupPortalTest(page, osValue) {
+async function setupPortalTest(page) {
     let authBody;
     let ticketRequested = false;
     let ticketRequestCount = 0;
@@ -114,7 +113,7 @@ async function setupPortalTest(page, osValue) {
     const token = `e2e.${payload}.sig`;
 
     await page.route('https://static.line-scdn.net/**', (route) =>
-        route.fulfill({ contentType: 'application/javascript', body: liffMockScript(osValue) })
+        route.fulfill({ contentType: 'application/javascript', body: liffMockScript() })
     );
     await page.route('**/api/line/dms-booking/config', (route) =>
         route.fulfill({
@@ -155,51 +154,36 @@ async function setupPortalTest(page, osValue) {
     };
 }
 
-test('Android LINE opens MRERP DMS in-app (external:false)', async ({ page }) => {
-    const h = await setupPortalTest(page, 'android');
+test('LINE always opens MRERP DMS in external browser and closes launcher', async ({ page }) => {
+    const h = await setupPortalTest(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.setContent(PORTAL_CHAT_HTML);
-    await page.screenshot({ path: path.join(OUT, 'portal-android-before-click-390.png') });
+    await page.screenshot({ path: path.join(OUT, 'portal-before-click-390.png') });
     await page.locator('#dms-menu').click();
     await expect
         .poll(() => page.evaluate(() => globalThis.__dmsPortalOpen))
         .toEqual({
             url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
-            external: false,
+            external: true,
         });
-    await expect(page).toHaveURL(`${BASE}/static/dist/dms-booking-edit.html?portal=dms`);
-    await expect(page.locator('html')).toHaveAttribute('lang', 'th');
-    await expect(page.locator('#language')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(true);
     expect(h.ticketRequested()).toBe(true);
     expect(h.ticketRequestCount()).toBe(1);
     expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
     await page.screenshot({
-        path: path.join(OUT, 'portal-android-in-app-390.png'),
+        path: path.join(OUT, 'portal-external-close-390.png'),
         fullPage: true,
     });
 });
 
-test('iOS LINE opens MRERP DMS in external browser (external:true)', async ({ page }) => {
-    const h = await setupPortalTest(page, 'ios');
+test('second menu click issues a fresh ticket after closeWindow', async ({ page }) => {
+    const h = await setupPortalTest(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.setContent(PORTAL_CHAT_HTML);
-    await page.screenshot({ path: path.join(OUT, 'portal-ios-before-click-390.png') });
     await page.locator('#dms-menu').click();
-    await expect
-        .poll(() => page.evaluate(() => globalThis.__dmsPortalOpen))
-        .toEqual({
-            url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
-            external: true,
-        });
-    expect(h.ticketRequested()).toBe(true);
-    expect(h.ticketRequestCount()).toBe(1);
-    expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
-    await page.screenshot({ path: path.join(OUT, 'portal-ios-external-390.png'), fullPage: true });
-});
-
-test('unknown OS falls back to external browser for safety', async ({ page }) => {
-    const h = await setupPortalTest(page, undefined);
-    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalOpen)).toBeTruthy();
+    // Simulate closeWindow returning the user to the LINE chat, then click the
+    // menu again to prove a fresh ticket is issued rather than a stale reuse.
     await page.setContent(PORTAL_CHAT_HTML);
     await page.locator('#dms-menu').click();
     await expect
@@ -208,7 +192,8 @@ test('unknown OS falls back to external browser for safety', async ({ page }) =>
             url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
             external: true,
         });
-    expect(h.ticketRequested()).toBe(true);
+    await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(true);
+    expect(h.ticketRequestCount()).toBe(2);
 });
 
 test('external relay logs in through a top-level MRERP window', async ({ page, context }) => {
@@ -248,6 +233,14 @@ test('external relay logs in through a top-level MRERP window', async ({ page, c
     await expect(page.locator('html')).toHaveAttribute('lang', 'th');
     await expect(page.locator('#open-dms')).toHaveText('เข้าสู่ระบบ DMS');
     await expect(page.locator('iframe')).toHaveCount(0);
+    await expect(page.locator('link[rel="dns-prefetch"]')).toHaveAttribute(
+        'href',
+        'https://www.mrerp4sme.com'
+    );
+    await expect(page.locator('link[rel="preconnect"]')).toHaveAttribute(
+        'href',
+        'https://www.mrerp4sme.com'
+    );
     await page.screenshot({ path: path.join(OUT, 'portal-thai-confirm-390.png'), fullPage: true });
 
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -259,17 +252,18 @@ test('external relay logs in through a top-level MRERP window', async ({ page, c
     const popup = await popupPromise;
     await expect(popup.locator('#mrerp-home')).toBeVisible({ timeout: 10_000 });
     expect(requests.map((request) => request.url)).toEqual([
-        'https://www.mrerp4sme.com/dms',
         'https://www.mrerp4sme.com/dms/login/checklogin.php',
         'https://www.mrerp4sme.com/dms/home/home.php',
     ]);
-    expect(requests[1].method).toBe('POST');
-    const loginForm = new URLSearchParams(requests[1].body);
+    expect(requests[0].method).toBe('POST');
+    const loginForm = new URLSearchParams(requests[0].body);
     expect(loginForm.get('txtusers')).toBe('staff');
     expect(loginForm.get('txtpasswords')).toBe('secret');
     expect(loginForm.get('btnsubmit')).toBe('Submit');
     expect(relayHtml).not.toContain('localStorage');
     expect(relayHtml).not.toContain('sessionStorage');
+    expect(relayHtml).not.toContain('1800');
+    expect(relayHtml).not.toContain('4000');
     await popup.screenshot({ path: path.join(OUT, 'portal-mrerp-home-390.png'), fullPage: true });
 });
 

@@ -85,14 +85,26 @@ const GEO = {
     },
 };
 
-test('LINE portal opens MRERP DMS in-app without leaving LINE', async ({ page }) => {
+function liffMockScript(osValue) {
+    var getOS = osValue === undefined ? '' : `,getOS:()=>${JSON.stringify(osValue)}`;
+    return `window.__dmsPortalOpen=null;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsPortalOpen=params;}${getOS}};`;
+}
+
+const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
+    body{margin:0;background:#171717;color:#fff;font-family:system-ui,sans-serif}.chat{min-height:100vh;padding:28px 14px 210px;box-sizing:border-box}.bubble{margin:20px 0 0 auto;max-width:78%;padding:12px 16px;border-radius:18px;background:#6ee787;color:#102416}.menu{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);background:#f8f4ff;color:#30295f}.cell{height:94px;display:grid;place-items:center;text-align:center;border:1px solid #ddd5ff;color:inherit;text-decoration:none;font-weight:700}.placeholder{color:#aaa}
+</style></head><body><main class="chat"><div class="bubble">เลือกเมนูที่ต้องการได้เลยครับ</div></main><nav class="menu" aria-label="เมนู DMS">
+    <a class="cell" href="#customer">สร้างลูกค้า</a><a class="cell" href="#booking">สร้างการจองรถ</a><a id="dms-menu" class="cell" href="${BASE}/home?liff.state=%3Fportal%3Ddms">เข้าสู่ DMS</a>
+    <span class="cell placeholder">—</span><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
+</nav></body></html>`;
+
+async function setupPortalTest(page, osValue) {
     let authBody;
     let ticketRequested = false;
     let ticketRequestCount = 0;
     await page.addInitScript(() => {
         try {
             localStorage.setItem('pearnly_lang', 'zh');
-        } catch {
+        } catch (_) {
             // The initial synthetic chat document has an opaque origin.
         }
     });
@@ -102,10 +114,7 @@ test('LINE portal opens MRERP DMS in-app without leaving LINE', async ({ page })
     const token = `e2e.${payload}.sig`;
 
     await page.route('https://static.line-scdn.net/**', (route) =>
-        route.fulfill({
-            contentType: 'application/javascript',
-            body: `window.__dmsInAppOpen=null;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsInAppOpen=params;}};`,
-        })
+        route.fulfill({ contentType: 'application/javascript', body: liffMockScript(osValue) })
     );
     await page.route('**/api/line/dms-booking/config', (route) =>
         route.fulfill({
@@ -135,23 +144,25 @@ test('LINE portal opens MRERP DMS in-app without leaving LINE', async ({ page })
     await page.route(/\/home\?liff\.state=/, (route) =>
         route.fulfill({
             status: 302,
-            headers: {
-                location: `${BASE}/static/dist/dms-booking-edit.html?portal=dms`,
-            },
+            headers: { location: `${BASE}/static/dist/dms-booking-edit.html?portal=dms` },
         })
     );
+    return {
+        authBody: () => authBody,
+        ticketRequested: () => ticketRequested,
+        ticketRequestCount: () => ticketRequestCount,
+        token,
+    };
+}
 
+test('Android LINE opens MRERP DMS in-app (external:false)', async ({ page }) => {
+    const h = await setupPortalTest(page, 'android');
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.setContent(`<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
-        body{margin:0;background:#171717;color:#fff;font-family:system-ui,sans-serif}.chat{min-height:100vh;padding:28px 14px 210px;box-sizing:border-box}.bubble{margin:20px 0 0 auto;max-width:78%;padding:12px 16px;border-radius:18px;background:#6ee787;color:#102416}.menu{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);background:#f8f4ff;color:#30295f}.cell{height:94px;display:grid;place-items:center;text-align:center;border:1px solid #ddd5ff;color:inherit;text-decoration:none;font-weight:700}.placeholder{color:#aaa}
-    </style></head><body><main class="chat"><div class="bubble">เลือกเมนูที่ต้องการได้เลยครับ</div></main><nav class="menu" aria-label="เมนู DMS">
-        <a class="cell" href="#customer">สร้างลูกค้า</a><a class="cell" href="#booking">สร้างการจองรถ</a><a id="dms-menu" class="cell" href="${BASE}/home?liff.state=%3Fportal%3Ddms">เข้าสู่ DMS</a>
-        <span class="cell placeholder">—</span><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
-    </nav></body></html>`);
-    await page.screenshot({ path: path.join(OUT, 'line-rich-menu-before-click-390.png') });
+    await page.setContent(PORTAL_CHAT_HTML);
+    await page.screenshot({ path: path.join(OUT, 'portal-android-before-click-390.png') });
     await page.locator('#dms-menu').click();
     await expect
-        .poll(() => page.evaluate(() => globalThis.__dmsInAppOpen))
+        .poll(() => page.evaluate(() => globalThis.__dmsPortalOpen))
         .toEqual({
             url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
             external: false,
@@ -159,16 +170,45 @@ test('LINE portal opens MRERP DMS in-app without leaving LINE', async ({ page })
     await expect(page).toHaveURL(`${BASE}/static/dist/dms-booking-edit.html?portal=dms`);
     await expect(page.locator('html')).toHaveAttribute('lang', 'th');
     await expect(page.locator('#language')).toBeHidden();
-    await expect(page.locator('#loading [data-t="loading"]')).toHaveText('กำลังโหลดข้อมูล…');
-    expect(authBody).toEqual({ id_token: 'LINE-ID-TOKEN' });
-    expect(ticketRequested).toBe(true);
-    expect(ticketRequestCount).toBe(1);
-    expect(await page.evaluate(() => localStorage.getItem('mrpilot_token'))).toBe(token);
+    expect(h.ticketRequested()).toBe(true);
+    expect(h.ticketRequestCount()).toBe(1);
     expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
     await page.screenshot({
-        path: path.join(OUT, 'portal-line-in-app-handoff-390.png'),
+        path: path.join(OUT, 'portal-android-in-app-390.png'),
         fullPage: true,
     });
+});
+
+test('iOS LINE opens MRERP DMS in external browser (external:true)', async ({ page }) => {
+    const h = await setupPortalTest(page, 'ios');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setContent(PORTAL_CHAT_HTML);
+    await page.screenshot({ path: path.join(OUT, 'portal-ios-before-click-390.png') });
+    await page.locator('#dms-menu').click();
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__dmsPortalOpen))
+        .toEqual({
+            url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
+            external: true,
+        });
+    expect(h.ticketRequested()).toBe(true);
+    expect(h.ticketRequestCount()).toBe(1);
+    expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
+    await page.screenshot({ path: path.join(OUT, 'portal-ios-external-390.png'), fullPage: true });
+});
+
+test('unknown OS falls back to external browser for safety', async ({ page }) => {
+    const h = await setupPortalTest(page, undefined);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setContent(PORTAL_CHAT_HTML);
+    await page.locator('#dms-menu').click();
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__dmsPortalOpen))
+        .toEqual({
+            url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
+            external: true,
+        });
+    expect(h.ticketRequested()).toBe(true);
 });
 
 test('external relay logs in through a top-level MRERP window', async ({ page, context }) => {

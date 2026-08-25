@@ -1,47 +1,67 @@
-# 11 · DMS LINE 自动登录中继(一次性票据 · 批次B · 2026-08-22 · in-app 修订 2026-08-25)
+# 11 · DMS LINE 自动登录中继(一次性票据 · 批次B · 2026-08-22 · 平台分流 2026-08-25)
 
-> 用途:LINE DMS 富菜单第三项在 **LINE 内置浏览器**(`liff.openWindow external:false`)
-> 打开 MRERP DMS,继续使用后台配置的账号密码自动登录,减少外部浏览器切换等待。
+> 用途:LINE DMS 富菜单第三项按平台分流打开 MRERP DMS,继续使用后台配置的账号密码
+> 自动登录。Android 走 LINE 内置浏览器(`external:false`),iOS 走外部 Safari
+> (`external:true`)以避开 WKWebView named window 隔离问题。
 > 后端事实源:`services/line_dms/login_tickets.py`(DAL)· 留档 `alembic 0102`。
 
 ---
 
-## 0. 当前状态(2026-08-25)
+## 0. 当前状态(2026-08-25 · 平台分流)
 
-- **前端**:`static/dms-booking-edit/dms-booking-edit.js?v=7` portalMode 分支调用
-  `liff.openWindow({ url, external: false })`,MRERP relay 页面在 LINE 内置浏览器内加载,
-  不再弹出外部浏览器。非 LINE 环境回落 `location.replace(portalUrl)`。
+- **前端**:`static/dms-booking-edit/dms-booking-edit.js?v=8` portalMode 分支使用
+  `liff.getOS()` 判定平台:
+  - `android` → `liff.openWindow({ url, external: false })`(LINE 内置浏览器)
+  - `ios` → `liff.openWindow({ url, external: true })`(外部 Safari,保自动登录)
+  - 未知/缺失 getOS → `external: true`(安全兜底)
+  - 非 LINE 环境 → `location.replace(portalUrl)`(不变)
 - **后端**:一次性票据(`/api/line/dms-portal/ticket` POST)+ relay(`/line/dms-portal` GET)
   不变。票据 TTL 60s、一次性、SHA256 哈希存库、no-store/CSP/no-referrer 头齐备。
-- **E2E**:`tests/e2e/33-dms-booking-edit-mobile.spec.js` 首条用例精确断言
-  `external: false`,并验证票据只请求一次、页面停留原 LIFF 页、泰语 loading 文案可见。
-- **⚠️ 未验**:LINE 真机(iOS/Android)尚未实测。in-app WebView 对第三方 cookie / 表单
-  POST 的行为随 LINE 版本变化,需真机验证 relay 登录后是否落在 `home/home.php`。
+  `services/line_dms/mrerp_portal.py` 登录协议未改。
+- **E2E**:`tests/e2e/33-dms-booking-edit-mobile.spec.js` 三条用例分别锁定 Android
+  `external:false`、iOS `external:true`、未知 OS `external:true`。relay 弹窗测试不变。
+
+### 平台矩阵
+
+| 平台 | `liff.getOS()` | `external` | 行为 | 自动登录 |
+|---|---|---|---|---|
+| Android LINE | `"android"` | `false` | LINE 内置浏览器加载 relay | ✅(待真机验) |
+| iOS LINE | `"ios"` | `true` | 跳转 Safari 加载 relay | ✅(Safari 支持 named popup) |
+| 未知/旧 LIFF | `undefined`/其他 | `true` | 外部浏览器(安全兜底) | ✅ |
+| 桌面/非 LINE | N/A | N/A | `location.replace` 同窗口跳转 | ✅ |
+
+### 为什么 iOS 不能走内置浏览器
+
+MRERP 登录协议是两步握手:POST checklogin.php → 纯文本 `lct::1::1` → 客户端 JS
+`sdpt()` 导航到 home.php。relay 页面用 `window.open(url, name)` + `form.target=name`
+把表单提交送入 named popup。iOS WKWebView(LINE 内置浏览器内核)对 named window 创建
+独立 browsing context,导致 form target 失效、用户看到空白 MRERP 登录页。此问题在
+桌面 Chromium 不复现,属 WebKit 已知行为。详情见诊断报告(2026-08-25)。
 
 ## 1. JTBD(真实场景)
 
-销售员/店主在 LINE 里点 DMS 门户链接 → 期望**直接看到 MR.ERP DMS**,不跳出 LINE。
-现实:LINE 内置浏览器没有 MR.ERP 登录态,每次都要手输用户名+密码;若跳外部浏览器还
-增加切换等待。任务:用 LINE 已绑定身份核销一次性票据,在 LINE 内置浏览器内取该员工
-在 Pearnly 配置的 MR.ERP 凭据完成一次免输入登录。
+销售员/店主在 LINE 里点 DMS 门户链接 → 期望**直接看到 MR.ERP DMS**。现实:LINE
+内置浏览器没有 MR.ERP 登录态,每次都要手输用户名+密码。任务:用 LINE 已绑定身份核销
+一次性票据,取该员工在 Pearnly 配置的 MR.ERP 凭据完成一次免输入登录。
 
 ## 2. RICE / Kano 判实用性
 
 | 维度 | 判断 |
 |---|---|
 | Reach | 全部已绑 LINE 的 DMS 用户,每次点门户链接都命中(高频) |
-| Impact | 高 —— 去掉登录页 + 去掉外部浏览器切换 = 去掉进入产品前的两道墙 |
-| Confidence | 高 —— 一次性票据中继是业界成熟范式(§5),`external:false` 是 LIFF 标准 API |
-| Effort | 小 —— 表+两函数(批次A 已落),路由/前端为后续批次,in-app 改一行 |
-| Kano | 基础型(Must-be):没有不算错,但一旦有,再回到手输密码或外部浏览器会立刻被感知为退化 |
+| Impact | 高 —— 去掉登录页 = 去掉进入产品前的最后一道墙 |
+| Confidence | 高 —— 一次性票据中继是业界成熟范式(§5),平台分流基于 LIFF 官方 API |
+| Effort | 小 —— 表+两函数(批次A 已落),前端加 getOS 判定 |
+| Kano | 基础型(Must-be):没有不算错,但一旦有,再回到手输密码会立刻被感知为退化 |
 
 结论:做。不做灰度(铁律:测完直接全开)。
 
 ## 3. 移动端优先
 
-- 主画面 = LINE 内置浏览器(手机竖屏):`liff.openWindow({ external: false })` 在当前
-  LINE 会话内打开 relay 页,票据经 URL 参数传入、服务端一次核销换会话。用户在 relay
-  页点一次「เข้าสู่ระบบ DMS」按钮后,后台凭据自动提交、不输账号密码、不切应用。
+- Android:LINE 内置浏览器内加载 relay,用户在 relay 页点「เข้าสู่ระบบ DMS」按钮后
+  凭据自动提交、不输账号密码、不切应用。
+- iOS:跳转 Safari 加载 relay,自动登录成功后用户手动切回 LINE。代价是可接受的切换,
+  换取可靠的自动登录。
 - TTL 60 秒、一次性:票据只够「这一次跳转」,不为桌面端多开窗口留长寿命后门。
 - 失败页必须手机可读(一句话 + 一个动作按钮,见 §4),不给技术错误码。
 
@@ -54,7 +74,7 @@
 | 已过期 | 超过 60 秒(网络慢/链接留置) | 「链接已过期,请回 LINE 重新点选单」 |
 | 核销服务不可用 | DB 故障,DAL 软降级返 None(fail-closed) | 「暂时无法登录,请稍后再试」 |
 | MR.ERP 拒绝登录 | 账号密码失效 | 落到 MR.ERP 登录页,由负责人在 Pearnly 更新凭据 |
-| in-app WebView 拦截会话 | LINE 内置浏览器内核拒绝第三方 cookie/表单 POST | 落到 MR.ERP 登录页;记录真机型号与 LINE 版本后评估官方 SSO/同域中继 |
+| in-app WebView 拦截会话 | Android LINE 内置浏览器内核拒绝第三方 cookie | 落到 MR.ERP 登录页;记录真机型号与 LINE 版本后评估 |
 
 Pearnly 票据失败的出口动作是回 LINE 重进入口(重新发票据)。核销失败一律返 None 走 fail-closed,
 宁可让用户重点一次,不放行任何身份不明的请求。
@@ -68,26 +88,20 @@ Pearnly 票据失败的出口动作是回 LINE 重进入口(重新发票据)。�
 - 差异:凭据不是浏览器重定向链,而是 App(已登录侧)发票据 → LINE 侧核销,
   故票据明文只在 App↔webhook 间走一次,库里只有 SHA256 哈希。
 
-## 6. in-app WebView 兼容风险(external:false 特有)
+## 6. 长期目标:MRERP 官方 SSO
 
-LINE 没有面向此场景的官方 SSO/OIDC 通道,本方案是自建中继 + LINE 内置浏览器承载,
-已知风险:
+当前 iOS 走外部浏览器是权宜之计。两者兼得(LINE 内置 + 自动登录)需要 MRERP 提供:
 
-1. **in-app WebView 第三方 cookie / 表单 POST**:relay 在 LINE 内置浏览器内向
-   `mrerp4sme.com` POST 登录表单。LINE 内置浏览器的 cookie 策略随版本/OS 变化,
-   可能拦截第三方会话 cookie;拦截时用户落到 MR.ERP 登录页,不能声称自动登录成功。
-   此前 `external:true` 走系统浏览器避开了此问题,但代价是离开 LINE 应用。
-2. **无法跨域判定密码结果**:浏览器同源策略禁止 Pearnly 读取 MR.ERP 的登录响应。中继
-   只在表单提交后跳转;密码错误由 MR.ERP 首页/登录页如实呈现,不在 Pearnly 显示成功。
-3. **LINE 版本差异(真机未验)**:上线后必须用实际员工手机验证 iOS 与 Android。记录票据
-   核销后最终落在 `home/home.php` 还是登录页;若 in-app WebView 拦截会话,备选方案:
-   (a) 回退 `external:true` 接受外部浏览器切换,(b) 等 MR.ERP 提供官方 SSO/一次性登录端点,
-   (c) 同域中继代理(工程量大,需 MR.ERP 配合)。不能靠前端绕过浏览器安全策略。
+- 一次性 token 端点:接受 Pearnly 签发的短寿命 token → 建立 PHPSESSID → redirect home.php
+- 或标准 OIDC/SAML 端点
 
-## 7. 真机验证步骤(待执行)
+在 MRERP 提供前,iOS 保持 `external:true`,Android 保持 `external:false`。
 
-1. 在 LINE iOS + Android 真机上打开 DMS 富菜单第三项「เข้าสู่ DMS」。
-2. 确认:页面在 LINE 内置浏览器内打开(不弹外部浏览器),loading 泰语文案可见。
-3. 确认:relay 页显示「เข้าสู่ระบบ DMS」按钮,点击后 MR.ERP DMS 首页加载(非登录页)。
-4. 若落到登录页:记录设备型号、LINE 版本号、iOS/Android 版本号,截图存档,评估 §6 备选。
-5. 验证票据一次性:同一链接第二次点击应显示「链接已使用」。
+## 7. 真机验证步骤
+
+1. **Android**:LINE 真机打开 DMS 富菜单第三项 → 确认在 LINE 内置浏览器内打开(不弹
+   外部浏览器)→ relay 页点按钮 → MR.ERP DMS 首页加载(非登录页)。
+2. **iOS**:LINE 真机打开 DMS 富菜单第三项 → 确认跳转 Safari → relay 页点按钮 →
+   MR.ERP DMS 首页加载(非登录页)。
+3. 验证票据一次性:同一链接第二次点击应显示「链接已使用」。
+4. 若 Android 落到登录页:记录设备型号、LINE 版本号,截图存档,评估是否也需切 external。

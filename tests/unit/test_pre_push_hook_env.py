@@ -99,6 +99,21 @@ _NATIVE_IS_UTF8 = is_utf8(native_encoding())
 
 
 class HookEnvContract(unittest.TestCase):
+    def test_hook_prefers_repo_virtualenv_before_any_gate(self):
+        text = hook_text()
+        for path in (
+            "$ROOT/venv/bin",
+            "$ROOT/.venv/bin",
+            "$ROOT/venv/Scripts",
+            "$ROOT/.venv/Scripts",
+        ):
+            self.assertIn(path, text)
+        self.assertLess(
+            text.index('PATH="$tool_dir:$PATH"'),
+            text.index("python scripts/check_test_git_writes.py"),
+            "项目虚拟环境必须在第一道 Python 闸之前进入 PATH",
+        )
+
     def test_hook_turns_on_utf8_mode(self):
         self.assertEqual(
             hook_exports().get("PYTHONUTF8"),

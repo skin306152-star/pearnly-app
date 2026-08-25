@@ -12,6 +12,8 @@ git config core.hooksPath scripts/git-hooks
 
 装没装上:`git config --get core.hooksPath` 有输出 = 装上了(没输出/退出码 1 = 没装,闸一道都不跑)。卸:`git config --unset core.hooksPath`。
 
+钩子会自动优先使用仓库 `venv/.venv` 里的 Python、ruff、black,兼容 macOS/Linux 的 `bin/` 与 Windows Git Bash 的 `Scripts/`;新 Mac 不需要额外创建 `python` 系统别名。虚拟环境不存在时才使用 PATH 里的工具。
+
 三件事先知道,别装完才发现:
 
 1. **它写进 `.git/config`,不是写进某个 worktree** —— 共享同一个 `.git` 的所有 worktree(`git worktree list` 列出来的每一个)从此每次 push 都走这道闸。逐 worktree 单独开关做不到,除非先开 `extensions.worktreeConfig` 再用 `git config --worktree`。

@@ -26,6 +26,16 @@
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT" || exit 1
 
+# 新 Mac 默认只有 python3,而 ruff/black 等开发工具装在项目虚拟环境里。钩子不依赖调用者
+# 先手动 activate:自动优先使用仓库 venv/.venv,并兼容 Unix bin 与 Windows Git Bash Scripts。
+for tool_dir in "$ROOT/venv/bin" "$ROOT/.venv/bin" "$ROOT/venv/Scripts" "$ROOT/.venv/Scripts"; do
+  if [ -x "$tool_dir/python" ] || [ -x "$tool_dir/python.exe" ]; then
+    PATH="$tool_dir:$PATH"
+    export PATH
+    break
+  fi
+done
+
 # Windows 默认控制台是 cp874(泰语页):闸脚本打印中文会 UnicodeEncodeError → 退出码 1 →
 # 明明通过的闸报假红,失败清单也印不出来(2026-07-25 复现:check_ai_smell 通过却 exit 1)。
 #
@@ -82,8 +92,8 @@ TS_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '\.ts$' || true)"
 E2E_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(tests/e2e/.*\.spec\.js|tests/e2e/e2e_ledger\.json|scripts/_.*\.cjs|tests/unit/test_e2e_ledger_gate\.py)$' || true)"
 # 视觉照搬闸触发面(docs/pos/12)· 2026-07-31 从 pos|inventory|purchase 三个前缀放宽到整个
 # src/home/ 与 dist:闸的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条
-# route,旧写法对其中十几条本地完全不设防 —— dashboard 那条选择器烂了三周没人报警。push 即
-# 秒上线、CI 是事后报警器,本地拦住才是真拦。代价:任何前端 push 多 21 秒。
+# route,旧写法对其中十几条本地完全不设防 —— dashboard 那条选择器烂了三周没人报警。
+# 现有 CI 是部署前硬门,本地仍保留快速反馈,避免占用远端 E2E 后才发现。代价:前端 push 多 21 秒。
 DESIGN_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(static/pos/|src/home/|static/dist/|tests/visual/design/)' || true)"
 
 fail() {

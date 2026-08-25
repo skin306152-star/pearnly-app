@@ -6,7 +6,7 @@
 - **✅ 全量测试闸不再假卡死**:`c635a5bf` 修复分片子进程 PIPE 串行读取死锁;13,043 条单测约 28s 完成,保留完整覆盖而不做无意义删测。
 - **✅ 部署流程改版**:`7f7bf12a..429f1da6` 将 unit/e2e 并行,全部 required jobs 绿后 deploy job 才带精确 SHA 上线;服务器有 TARGET_SHA 守卫、flock 与失败回滚。旧 push webhook `625195648` 已停用但保留紧急回退。
 - **✅ 最后验证生产基线**:`4e9cb164` 曾核对 local/origin/prod 三端一致;CI `32891950686` success,`mrpilot` active,健康检查 18s 通过,无 rollback marker;全链路约 10m14s(旧链路 13m42s)。当前 SHA 必须按 Runbook 实时查,静态卡不冒充实时状态。
-- **✅ 流程文档与 CI checkout**:AGENTS/STATE/ONBOARDING/GATES/ENGINEERING_STANDARD/部署与排障 skills 及活跃交接文档已同步新口径;push diff 闸只取最近 2 commit,避免约 243MB 全历史 fetch 撞 5 分钟 timeout;PR 保留全历史。
+- **✅ 流程文档与工具环境**:活文档已同步新部署口径;push diff 闸只取最近 2 commit,避免约 243MB 全历史 fetch 撞 5 分钟 timeout;PR 保留全历史。pre-push 自动优先仓库 venv/.venv,新 Mac 无需创建系统 `python` 别名或重复安装 ruff。
 - **⚠️ 已知边界**:私有免费 GitHub 仓库无法启用 branch protection;目前由本地 pre-push、CI required jobs、精确 SHA deploy 三层兜底。代理不用时须立即回收 opencode 进程树,避免本地模型常驻内存。
 
 ---

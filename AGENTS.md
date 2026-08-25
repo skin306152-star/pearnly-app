@@ -14,7 +14,7 @@
 
 ```
 1. git branch --show-current        # 不是 master 立刻 git checkout master(铁律 #14)
-2. python scripts/refactor_progress.py   # ← 看【实时】数字。永不信任何文档里手写的行数!
+2. python3 scripts/refactor_progress.py  # ← macOS 默认只有 python3;看【实时】数字!
 3. 读 CLAUDE.md/STATE_PEARNLY.md 顶部「状态卡」(分割线以上 · ≤30 行 · 当前 task/最后 commit/未 push)
 4. 读本文件 §2(今天敲定的认知)+ §8(文档地图)+ docs/agent/TASK_MODES.md(识别 Zihao 要哪种活)
 5. git log --oneline -10 + git status   # 有没有本地未 push 的 commit

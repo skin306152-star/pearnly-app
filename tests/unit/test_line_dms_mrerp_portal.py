@@ -76,9 +76,14 @@ class MrerpPortalHtmlTests(unittest.TestCase):
         # once the popup leaves the same-origin about:blank (login landed).
         self.assertIn("setInterval(function()", self.page)
         self.assertIn("portal.location.href", self.page)
-        self.assertIn("setTimeout(goHome,400)", self.page)
+        self.assertNotIn("setTimeout(goHome", self.page)
         self.assertNotIn("},800);", self.page)
         self.assertNotIn("addEventListener('load'", self.page)
+
+    def test_poll_interval_is_100ms_and_timeout_is_12s(self):
+        self.assertIn("},100);", self.page)
+        self.assertIn("tries>120", self.page)
+        self.assertNotIn("document.write", self.page)
 
     def test_visible_relay_copy_is_thai(self):
         self.assertIn('<html lang="th">', self.page)

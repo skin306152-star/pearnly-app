@@ -264,6 +264,8 @@ test('external relay logs in through a top-level MRERP window', async ({ page, c
     expect(relayHtml).not.toContain('sessionStorage');
     expect(relayHtml).not.toContain('1800');
     expect(relayHtml).not.toContain('4000');
+    expect(relayHtml).not.toContain('document.write');
+    expect(relayHtml).not.toContain('setTimeout(goHome');
     await popup.screenshot({ path: path.join(OUT, 'portal-mrerp-home-390.png'), fullPage: true });
 });
 

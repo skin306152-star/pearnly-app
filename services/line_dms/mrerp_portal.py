@@ -61,10 +61,10 @@ def render_login_relay(username: str, password: str) -> Tuple[str, str]:
     Optimised flow (replaces the legacy 1800 ms + 4000 ms relay):
     1. User clicks → open a named ``about:blank`` popup (instant, no network).
     2. Immediately submit the login form targeting that popup.
-    3. Poll the popup: while it stays on same-origin ``about:blank`` the login
+    3. Poll the popup every 100 ms: while it stays on same-origin the login
        POST is still in flight; once it lands on the cross-origin checklogin
-       page (session cookie set) send it to the home page. A slow network thus
-       never cancels the in-flight login.
+       page (session cookie set) navigate directly to home with no extra
+       delay. A slow network thus never cancels the in-flight login.
     DNS-prefetch / preconnect hints warm the connection while the user reads
     the confirmation screen.
     """
@@ -83,5 +83,5 @@ def render_login_relay(username: str, password: str) -> Tuple[str, str]:
 <input type="hidden" name="txtpasswords" value="{safe_password}" autocomplete="off">
 <input type="hidden" name="btnsubmit" value="Submit">
 </form>
-<script nonce="{nonce}">(function(){{'use strict';var button=document.getElementById('open-dms');var status=document.getElementById('status');var form=document.getElementById('mrerp-login');var windowName='pearnly-mrerp-dms';var reset=function(message){{button.disabled=false;status.textContent=message;}};button.addEventListener('click',function(){{button.disabled=true;status.textContent='กำลังเปิดระบบ DMS กรุณารอสักครู่';var portal=window.open('about:blank',windowName);if(!portal){{reset('ไม่สามารถเปิดเบราว์เซอร์ได้ กรุณาอนุญาตหน้าต่างใหม่แล้วลองอีกครั้ง');return;}}try{{form.target=windowName;form.submit();form.querySelectorAll('input').forEach(function(input){{input.value='';}});form.remove();}}catch(error){{reset('ไม่สามารถเข้าสู่ระบบ DMS ได้ กรุณาลองอีกครั้ง');return;}}var settled=false;var goHome=function(){{if(settled)return;settled=true;clearInterval(timer);try{{portal.location='{MRERP_HOME_URL}';status.textContent='เปิดระบบ DMS แล้ว';}}catch(error){{reset('ไม่สามารถเปิดหน้าหลัก DMS ได้ กรุณาลองอีกครั้ง');}}}};var tries=0;var timer=setInterval(function(){{if(settled)return;var landed=false;try{{portal.location.href;}}catch(error){{landed=true;}}if(landed){{setTimeout(goHome,400);}}else if(++tries>30){{goHome();}}}},400);}});}})();</script></body></html>"""
+<script nonce="{nonce}">(function(){{'use strict';var button=document.getElementById('open-dms');var status=document.getElementById('status');var form=document.getElementById('mrerp-login');var windowName='pearnly-mrerp-dms';var reset=function(message){{button.disabled=false;status.textContent=message;}};button.addEventListener('click',function(){{button.disabled=true;status.textContent='กำลังเปิดระบบ DMS กรุณารอสักครู่';var portal=window.open('about:blank',windowName);if(!portal){{reset('ไม่สามารถเปิดเบราว์เซอร์ได้ กรุณาอนุญาตหน้าต่างใหม่แล้วลองอีกครั้ง');return;}}try{{form.target=windowName;form.submit();form.querySelectorAll('input').forEach(function(input){{input.value='';}});form.remove();}}catch(error){{reset('ไม่สามารถเข้าสู่ระบบ DMS ได้ กรุณาลองอีกครั้ง');return;}}var settled=false;var goHome=function(){{if(settled)return;settled=true;clearInterval(timer);try{{portal.location='{MRERP_HOME_URL}';status.textContent='เปิดระบบ DMS แล้ว';}}catch(error){{reset('ไม่สามารถเปิดหน้าหลัก DMS ได้ กรุณาลองอีกครั้ง');}}}};var tries=0;var timer=setInterval(function(){{if(settled)return;var landed=false;try{{portal.location.href;}}catch(error){{landed=true;}}if(landed){{goHome();}}else if(++tries>120){{goHome();}}}},100);}});}})();</script></body></html>"""
     return page, nonce

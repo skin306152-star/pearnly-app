@@ -60,9 +60,7 @@ class MrerpPortalHtmlTests(unittest.TestCase):
         self.assertIn(f"portal.location='{mrerp_portal.MRERP_HOME_URL}'", self.page)
 
     def test_dns_prefetch_and_preconnect_hints_present(self):
-        self.assertIn(
-            f'<link rel="dns-prefetch" href="{mrerp_portal.MRERP_ORIGIN}">', self.page
-        )
+        self.assertIn(f'<link rel="dns-prefetch" href="{mrerp_portal.MRERP_ORIGIN}">', self.page)
         self.assertIn(
             f'<link rel="preconnect" href="{mrerp_portal.MRERP_ORIGIN}" crossorigin>',
             self.page,

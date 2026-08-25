@@ -29,6 +29,7 @@ from __future__ import annotations
 import hmac
 import logging
 import os
+import re
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -56,6 +57,45 @@ def _require_internal_token(request: Request) -> None:
     token = request.headers.get("X-Internal-Token", "")
     if not secret or not hmac.compare_digest(token, secret):
         raise HTTPException(status_code=403, detail="Invalid token")
+
+
+_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+
+
+def _validate_target_sha(sha: str | None) -> str | None:
+    """校验可选的部署目标 SHA:必须恰为 40 位 hex · 非法值直接 422。
+
+    返回小写规范化值(hex 大小写等价 · 统一比较口径)· None 表示未指定。
+    """
+    if sha is None:
+        return None
+    if not _SHA_RE.fullmatch(sha):
+        raise HTTPException(status_code=422, detail="sha must be a 40-hex commit SHA")
+    return sha.lower()
+
+
+def _launch_deploy(sleep_s: int, target_sha: str | None = None) -> None:
+    """独立 cgroup(systemd-run)启动 git-deploy.sh · restart 杀不到它 · 回滚生效。
+
+    与旧版同构:systemd-run 不可用则退回 bash 直跑。target_sha 非 None 时经
+    bash -c 的位置参数($1)传给脚本 —— 值走 argv 不经字符串拼接,注入面为零;
+    git-deploy.sh 收到 $1 作为 TARGET_SHA(不传 = 部署当前 master 的旧语义)。
+    """
+    import subprocess as _subprocess
+
+    cmd = (
+        f"sleep {sleep_s} && ( systemd-run --quiet --collect -- " "bash /opt/mrpilot/git-deploy.sh"
+    )
+    if target_sha:
+        cmd += ' "$1"'
+    cmd += " >> /var/log/mrpilot-deploy.log 2>&1 || bash /opt/mrpilot/git-deploy.sh"
+    if target_sha:
+        cmd += ' "$1"'
+    cmd += " >> /var/log/mrpilot-deploy.log 2>&1 )"
+    argv = ["bash", "-c", cmd]
+    if target_sha:
+        argv += ["_", target_sha]
+    _subprocess.Popen(argv, close_fds=True, start_new_session=True)
 
 
 # ── 超管诊断接口 (v118.35.0.28 · 体检 P0-02 2026-05-21) ───────────────────
@@ -109,7 +149,6 @@ async def github_deploy_webhook(request: Request):
     """
     import hmac as _hmac
     import hashlib as _hashlib
-    import subprocess as _subprocess
     import os as _os
 
     body = await request.body()
@@ -131,43 +170,27 @@ async def github_deploy_webhook(request: Request):
     # 第 6/7 步健康检查+回滚【永远跑不到】→ 坏码崩了无人自愈 → 502 等人救(血泪)。
     # systemd-run 把脚本放进独立 transient unit(自己的 cgroup)· restart 杀不到它 →
     # 回滚安全网才真生效。systemd-run 不可用则退回旧法(至少能部署)。
-    _subprocess.Popen(
-        [
-            "bash",
-            "-c",
-            "sleep 3 && ( systemd-run --quiet --collect -- "
-            "bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 "
-            "|| bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 )",
-        ],
-        close_fds=True,
-        start_new_session=True,
-    )
+    _launch_deploy(3)
     return {"ok": True, "status": "deploy scheduled in 3 s"}
 
 
 @router.get("/internal/deploy/manual")
-async def manual_deploy_trigger(request: Request):
+async def manual_deploy_trigger(request: Request, sha: str | None = None):
     """
-    备用手动部署触发器（webhook 失败时使用）。
-    调用：curl -H "X-Internal-Token: <GITHUB_WEBHOOK_SECRET>" https://pearnly.com/internal/deploy/manual
+    备用手动部署触发器（webhook 失败 / CI 精确部署时使用）。
+    调用：curl -H "X-Internal-Token: <GITHUB_WEBHOOK_SECRET>" "https://pearnly.com/internal/deploy/manual?sha=<40-hex>"
     无需 SSH，header 带 token 触发（不走 URL query，避免落进访问日志）。
+
+    sha(可选 · 40-hex commit SHA):传给 git-deploy.sh 作 TARGET_SHA —— 服务器只部署
+    这个精确 commit;若 fetch 后 master 已领先(该 push 已被更新的取代)则跳过。不传 =
+    部署当前 master(旧语义 · 保留给人工救援)。
     """
     _require_internal_token(request)
-    import subprocess as _subprocess
+    target_sha = _validate_target_sha(sha)
 
-    logger.info("[git-deploy] manual trigger")
+    logger.info("[git-deploy] manual trigger%s", f" · target={target_sha}" if target_sha else "")
     # systemd-run 独立 cgroup 启动(同 webhook · 见上方注释)· 不被 restart 杀 · 回滚生效
-    _subprocess.Popen(
-        [
-            "bash",
-            "-c",
-            "sleep 1 && ( systemd-run --quiet --collect -- "
-            "bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 "
-            "|| bash /opt/mrpilot/git-deploy.sh >> /var/log/mrpilot-deploy.log 2>&1 )",
-        ],
-        close_fds=True,
-        start_new_session=True,
-    )
+    _launch_deploy(1, target_sha=target_sha)
     return {"ok": True, "status": "manual deploy scheduled", "log": "/var/log/mrpilot-deploy.log"}
 
 

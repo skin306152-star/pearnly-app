@@ -1,15 +1,20 @@
 name: CI
 
 # 阶段 3-4 + REFACTOR-A1.2 · CI 自动化保险 · 防"v0.20 db pool 5 重演"
-# 每次 push / PR 跑 6 个 job(2026-05-30 WC 审计补齐机械闸后的真实清单):
+# 每次 push / PR 跑 9 个 job(2026-08-26 拆 split + 精确部署 job):
 #   lint        : black + ruff + bandit + pip-audit + prettier + eslint + npm audit(格式/真bug/安全/CVE)
 #   lint-size   : 防屎山闸(REFACTOR-WC-P1)· 文件 ≤500 行 + 行数棘轮只降不升(铁律 #27)· FAIL 模式(2026-06-03 整顿收官切硬门)
 #   lint-ui     : UI 一致性棘轮(REFACTOR-WC 审计#2)· 违规不许反弹超基线 · FAIL 模式(2026-06-05 拍板切硬门 · 存量 B 类视觉清理仍 Zihao-gated)
 #   lint-debt   : 新债 diff 闸(REFACTOR-WC 审计#3)· 禁新增 ensure_*/巨石路由(铁律 #5/#17)· FAIL 模式
 #   lint-routes : 新路由契约软闸(REFACTOR-WC 审计#4)· 新 *_routes.py 必带契约测试 · WARNING 模式(continue-on-error · 唯一仍软的闸)
 #   lint-guide  : 使用教程内容闸 · 配图两套齐 / 中泰双语齐 / 一章一屏 · FAIL 模式
-#   test        : 5 关 = import 静态检查 / home.js i18n 4 语完整 / unit+coverage(--fail-under=40)
-#                 / Vite build 跑通 / Playwright E2E smoke(pearnly.com 公开页 · 4 语切换 · 0 console error)
+#   lint-agent  : Agent 能力登记完整性 · FAIL 模式
+#   lint-model  : 换大脑不写死 · WARNING 模式(continue-on-error)
+#   pg-smoke    : 真 Postgres 冒烟(台账精度/串行/RLS)· FAIL 模式
+#   unit        : import + i18n + authz + unit+coverage(--fail-under=40)+ Vite build + dist 一致 · FAIL
+#   e2e         : 视觉照搬闸 + Playwright E2E smoke(pearnly.com 公开页)+ 高敏 smoke(真账号)· FAIL
+#   deploy      : 仅 push refs/heads/master · 上面全部 FAIL 闸绿后,带 pin SHA 调
+#                 /internal/deploy/manual(DEPLOY_TOKEN)· 服务器只部署该精确 commit。
 # integ contract tests 全部 stub;e2e 分两档:smoke 只 GET 公开页(零 secret),
 # 高敏 smoke(计费安全/RLS/入口隔离)用 secrets 里的专用测试账号真跑 —— 2026-08-11 起,
 # 此前「仓库里有 E2E」≠ CI 有断言(凭据缺失全 skip)。
@@ -20,7 +25,9 @@ on:
   pull_request:
     branches: [master]
 
-# 同一 ref 上有新 push 时取消旧 run · 省 CI 配额
+# 同一 ref 上有新 push 时取消旧 run · 省 CI 配额 · 对 master 还有一层含义:
+# 旧 run 的 deploy job 会被取消 → 不会拿旧 SHA 触发部署;最新 run 的 deploy job 才触发
+# 本次精确部署。服务器侧另有 TARGET_SHA 守卫,即使取消了也到不了服务器,双保险。
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -433,8 +440,12 @@ jobs:
           sys.exit(0 if result.wasSuccessful() else 1)
           PY
 
-  test:
-    name: import + i18n + unit + vite-build + e2e
+  # 单元/构建/静态检查 job(2026-08-26 从原单体 test job 拆出 · 与 e2e 并行)
+  #   保留原 test job 的:import 静态检查 / i18n 完整 / authz 覆盖 / 条码枪声明 /
+  #   unit+coverage(--fail-under=40) / Vite build + dist 一致性 / 资产打包清单。
+  #   慢重的 Playwright E2E(原 ~484s)拆到 e2e job —— 两 job 互不阻塞。
+  unit:
+    name: unit (import + i18n + authz + unit + coverage + vite-build)
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -527,6 +538,40 @@ jobs:
       - name: 前端打包闸②③ (源页只引 bundle · 资产全在打包清单 · 防 view-source 退化)
         run: python scripts/check_asset_bundling.py
 
+  # E2E job(2026-08-26 从原单体 test job 拆出 · 与 unit 并行)
+  #   视觉照搬闸(重 build + chromium)+ Playwright smoke + 高敏 smoke(真账号)。
+  #   specs 里 `python -m http.server`(stdlib 静态服)需要 `python` 命令 —— ubuntu 默认只有
+  #   python3,setup-python 补上它;不装任何 pip 依赖(纯 stdlib 够用)。
+  #   注意:高敏 spec 必须独立进程顺序跑(连跑共用登录会话会互踢)· 凭据缺失 hasCreds() 自动 skip。
+  e2e:
+    name: e2e (visual fidelity + playwright smoke + 高敏 smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11 (specs 起 stdlib http.server 静态服用)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node deps (npm ci · 严格按 lockfile)
+        run: npm ci
+
+      - name: Vite build (视觉照搬闸渲染本地 dist 真 bundle)
+        run: npm run build
+
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -578,3 +623,31 @@ jobs:
             test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # 精确部署 job(2026-08-26) · 只跑 push 到 refs/heads/master。
+  #   需要全部 FAIL 模式闸 + unit/e2e/pg-smoke 全绿才触发;WARN 模式闸(lint-routes /
+  #   lint-model · continue-on-error)不进 needs —— 它们的失败本就不影响成功结论。
+  #   带本次 push 的 40-hex SHA 调 /internal/deploy/manual(DEPLOY_TOKEN = 服务器
+  #   GITHUB_WEBHOOK_SECRET 原值)—— 服务器 flock 串行化、只部署该精确 commit、
+  #   被更新的 push 取代时跳过(见 services/deploy_script.py)。
+  deploy:
+    name: deploy (master push · pinned-SHA manual deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - lint
+      - lint-size
+      - lint-ui
+      - lint-guide
+      - lint-debt
+      - lint-agent
+      - pg-smoke
+      - unit
+      - e2e
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: Trigger pinned-SHA manual deploy
+        run: |
+          curl -fsS --max-time 30 \
+            -H "X-Internal-Token: ${{ secrets.DEPLOY_TOKEN }}" \
+            "https://pearnly.com/internal/deploy/manual?sha=${{ github.sha }}"

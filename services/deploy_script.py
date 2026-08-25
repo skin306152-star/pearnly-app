@@ -8,10 +8,11 @@ app 启动时把这段脚本写到磁盘供 webhook 调用。它是运维脚本�
 # v118.33.7 · 健壮版 git-deploy.sh(带回滚 + 健康检查 + 日志)· app 启动时写入磁盘
 GIT_DEPLOY_SH = r"""#!/bin/bash
 # ============================================================
-# git-deploy.sh  v118.33.10.1
+# git-deploy.sh  v118.33.10.2
 # 由 app.py 启动时自动写入 · 请勿手动修改（重启会覆盖）
-# 流程：fetch → reset hard → cp static → restart → health check
+# 流程：flock → fetch → reset hard → cp static → restart → health check
 # 失败时回滚到上一个 GitHub commit（不会回滚到本地旧 commit）
+# v118.33.10.2: 可选 TARGET_SHA 精确部署($1)· flock 串行化 · 被更新 push 取代则跳过
 # ============================================================
 LOG=/var/log/mrpilot-deploy.log
 REPO=/opt/mrpilot
@@ -24,6 +25,21 @@ echo "======================================" >> "$LOG"
 echo "$(date '+%Y-%m-%d %H:%M:%S') git-deploy start" >> "$LOG"
 
 cd "$REPO" || { echo "cd failed" >> "$LOG"; exit 1; }
+
+# v118.33.10.2 · 可选精确目标(CI deploy job 传本次 push 的 40-hex SHA)
+# 不传 = 部署当前 master(旧语义 · 手动救援保留)
+TARGET_SHA="${1:-}"
+
+# flock 串行化部署:同一时刻只有一个 git-deploy 在跑。LOCK_WAIT 必须 ≥ 一次完整部署
+# 最坏耗时 —— 队列里较新的请求若因锁忙过早退出,那笔新 SHA 就「静默丢了」。最坏 ≈
+# 各 pip/playwright timeout(60+120+180+240)+ 健康检查(180)≈ 810s → 拉到 900s 兜底。
+LOCK=/var/lock/mrpilot-deploy.lock
+LOCK_WAIT=900
+exec 9>"$LOCK"
+if ! flock -w "$LOCK_WAIT" 9; then
+    echo "lock busy after ${LOCK_WAIT}s — not deploying (a newer push will trigger again)" >> "$LOG"
+    exit 1
+fi
 
 # 1. 记录 GitHub 上一个已知的好版本作为回滚目标
 #    用远端追踪分支（不是本地 HEAD），避免回滚到比 GitHub 更老的本地 commit
@@ -41,6 +57,14 @@ echo "new HEAD:  $NEW_HEAD" >> "$LOG"
 
 if [ "$PREV_HEAD" = "$NEW_HEAD" ]; then
     echo "already up to date — skipping restart" >> "$LOG"
+    exit 0
+fi
+
+# v118.33.10.2 · 精确目标守卫:请求指定 SHA 时,若 fetch 后 master 已领先(更新的 push
+# 已到),本次请求已被取代 —— 绝不把未审查的更新 SHA 当目标 reset --hard 部署(静默部署
+# 一个没被要求、没被验过的 commit)。更新那笔有自己的 webhook / CI deploy 触发,让它自己上。
+if [ -n "$TARGET_SHA" ] && [ "$NEW_HEAD" != "$TARGET_SHA" ]; then
+    echo "SUPERSEDED: requested $TARGET_SHA but master now at $NEW_HEAD — skip (newer push deploys itself)" >> "$LOG"
     exit 0
 fi
 

@@ -14,6 +14,9 @@ export default [
         // 巨石 + 构建产物 + 第三方 + 临时目录 —— 不 lint
         ignores: [
             'node_modules/**',
+            // 本地 Python venv(gitignored)· 内含 Playwright/coverage/urllib3 vendored JS ·
+            // 非项目源码 · 同 node_modules 策略豁免。
+            'venv/**',
             'static/dist/**',
             // 脸0 品牌门户自托管的第三方运行时(React/THREE/GSAP/support.js dc-runtime)·
             // 生成式 bundle + 第三方源码 · 非本项目交付前端源码 · 不 lint(同 static/dist 策略)。

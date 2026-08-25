@@ -41,7 +41,7 @@ FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主�
 - 破坏 git 历史:`push --force` 到 master / `reset --hard` / 删 tag / 删 branch。
 - `push --no-verify` 绕闸:永远不许。
 - 删表 / 删字段 / `DROP`。
-- **其余一切改动**:自己写 → 自己验 → 自己 `git push origin master`(push 即上线),不分高敏低敏、不等任何人在场;改坏了自己 `git revert`,不把红的留在 master。
+- **其余一切改动**:自己写 → 自己验 → 自己 `git push origin master`(进入 CI 全闸;全绿后精确 SHA 上线),不分高敏低敏、不等任何人在场;改坏了自己 `git revert`,不把红的留在 master。
 
 ## 4. 做法在 skills 里(按需装载,不用背)
 

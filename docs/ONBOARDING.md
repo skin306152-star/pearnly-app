@@ -144,6 +144,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 - `git push origin master`(显式 master · 不是当前 branch)
 - 不许 `--force` / `--no-verify`(红线 · 必问 Zihao)
 - Push 后:`gh run watch <id> --exit-status --repo skin306152-star/pearnly-app` 独立查 CI 真绿(不只信本地)
+- CI 全闸绿后 `deploy` job 才按该次精确 SHA 上线;旧 push webhook 已停用,不是秒级部署
 - 红即 `git revert HEAD` + 单独 push,**绝不留红**
 
 ---
@@ -260,11 +261,11 @@ A: 先看是不是环境问题(Python 3.10 vs 3.11 · npm ci · pip install -r r
 |---|---|
 | 域名 | https://pearnly.com |
 | Repo | https://github.com/skin306152-star/pearnly-app(私库) |
-| 服务器 | root@45.76.53.194(Vultr Tokyo · 免密 SSH) |
+| 服务器 | `pearnly-prod` → root@66.42.49.213(Vultr Singapore · SSH key) |
 | 数据库 | Supabase PostgreSQL · AWS ap-southeast-1 |
 | 邮件 | hello@pearnly.com(Gmail SMTP) |
 | LINE Bot | @pearnly(Channel ID 2010309291) |
-| 部署 | git push origin master → webhook 自动部署 · ~15s 后 `/api/version` 可验 |
+| 部署 | git push origin master → CI 全闸绿 → deploy job 精确 SHA 部署(约 10 分钟)· 旧 webhook 已停用 |
 | 1 真实付费用户 | mrerp@outlook.co.th(MR.ERP · 维护时绝不动其余额) |
 
 ---

@@ -39,7 +39,7 @@
 - 边界:只动 `src/home/*.ts`+对应 CSS、`static/dist`(build 产物)、`static/i18n-data.js`、`home.html`(只 bump ?v=)、`tests/visual`。**绝不碰 routes/ services/**(后端已做完)。
 - 改 src/home 必:`npm run build` + `git add static/dist` + **bump `home.html` 的 `?v=`**(★最大坑:不 bump→同版本化 URL CDN 服旧码用户看不到;当前 11850841,下次 +N)。
 - 单文件 <500(prettier 会展开密集单行→易超,超了拆文件/抽 types)。新文件需 commit 写 `RATCHET-EXEMPT: <file> +<N> · 理由`。i18n 4 语(zh/en/th/ja)同增,插值 `{name}`。
-- push:`git push origin HEAD:master`(worktree 内·pre-push 全闸兜底·绿才放行→webhook 部署新加坡)。被拒=master 推进了→`git fetch + git rebase origin/master`(dist 冲突→`npm run build` 后 `git add static/dist` 续 rebase)再推。
+- push:`git push origin HEAD:master`(worktree 内·pre-push 先拦,远端 CI 全闸绿后 deploy job 精确 SHA 部署新加坡)。被拒=master 推进了→`git fetch + git rebase origin/master`(dist 冲突→`npm run build` 后 `git add static/dist` 续 rebase)再推。
 
 ## 四、自验 / 自推 / 自 E2E 套路(本地反代×真后端)
 - 真浏览器验(grep 类名不算):Playwright + 本地 http 反代(serve worktree·`/api`·`/internal` 反代 `https://pearnly.com`)+ 真账号 UI 登录(凭据**只从 env** `PEARNLY_E2E_USER/PASS` 填表单·不入码)→ 选套账门 `.wsg-card[data-wsg-pick]` → routeTo/openX → isVisible+getComputedStyle+截图。模板见本窗口历史(_selfcheck/_prodsmoke 已删·按 docs 描述重写到 tests/visual/_*.cjs·跑完删·临时 .cjs 别留[eslint 会红])。

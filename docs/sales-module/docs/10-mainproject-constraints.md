@@ -51,7 +51,7 @@
 | ALTER/DDL | `with db.get_cursor(commit=True)` 否则回滚 | #2 |
 | 删后端字段 | 同步改 Pydantic `response_model` · 先 Optional 一版再删 | #15 |
 | 状态字段 | 单一 source of truth · 多处 UI 同读一个后端字段 · 前端只读 `body.ok` | #12 |
-| 部署 | push master → webhook 自动部署 · 部署前看磁盘 `df -h /` · 后清 `/tmp/pip-*` | #24 |
+| 部署 | push master → CI 全闸绿 → deploy job 精确 SHA 部署 · 生产脚本检查磁盘并清 `/tmp/pip-*` | #24 |
 | 改前端源 | 必 `npm run build` + `git add static/dist` + bump `home.html ?v=` | #27 ENG |
 
 ## 四、产品/UI 约束
@@ -78,7 +78,7 @@
 - 开工前 `git branch --show-current` 确认在 **master**(铁律 #14)。
 - commit:**Conventional Commits + `Co-Authored-By: Claude Opus 4.8`**(整顿期才加 `· REFACTOR-<id>`;
   本模块是新功能 · 整顿收官后做 · 用普通 Conventional Commits + 模块 task id)。
-- 每次部署写 **4 语 release_notes**(标准官方语言 · 无技术词 · 完全覆盖不 prepend)(铁律 #6)。
+- `release_notes` 横幅已退役;用户可见变化仍须走产品内四语文案与提示位。
 - 验收:真浏览器 isVisible+getComputedStyle+截图(grep 类名不算)· 跑对应验收剧本。
 
 ## 六、与既有 PRD 的边界(防重造/防冲突)

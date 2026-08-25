@@ -23,7 +23,7 @@ B1 只到「卡 + 载荷契约」;B2 是**真正把期初写进 Express + 把两
 
 ## 3. 改了什么
 
-### Pearnly 侧(主站 · webhook 部署)
+### Pearnly 侧(主站 · CI 精确 SHA 部署)
 - `services/erp/express_push/preflight.py`:mapper 从 flat 构造 payload 时不读 `merged_fields`,
   期初被丢弃(**断点根因**)。在 `pf.payload` 就绪后显式透传 `merged_fields.opening_stock` 进 payload。
 - `static/i18n-data.js`(四语)+ `home.html` ?v bump:补期初卡加**诚实边界**提示 ——「仅用于客户
@@ -60,7 +60,7 @@ Express 里开一眼期初卡确认无碍**。
 
 ## 6. 发版清单(等拍板 · 两件一起上)
 
-1. **Pearnly**:提交上述 Pearnly 改动 → push master → 盯 CI 到绿(webhook 自动部署)。
+1. **Pearnly**:提交上述 Pearnly 改动 → push master → 盯 CI 全闸与 deploy job 到绿 → 核对生产精确 SHA。
 2. **小助手**:把 scratchpad 草稿改动落到真仓库 `skin306152-star/pearnly-companion` →
    bump `src/companion/version.py` VERSION → `packaging/release.ps1`(打包 + scp prod 66.42.49.213 +
    写 latest.json)→ **验在用小助手真更新到最新版**。

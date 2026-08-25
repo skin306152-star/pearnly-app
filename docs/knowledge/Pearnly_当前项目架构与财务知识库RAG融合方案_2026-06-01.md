@@ -623,7 +623,7 @@ RAG 必须从第一天实现：
 - systemd：`mrpilot`
 - uvicorn：2 workers
 - DB：Supabase Postgres Pooler
-- 部署：push master → GitHub webhook → `git-deploy.sh` pull/cp/restart
+- 部署：push master → GitHub CI 全闸 → deploy job 携精确 SHA → `git-deploy.sh` 校验目标、串行化、重启并健康检查；旧 push webhook 已停用
 - 健康验证：`/api/version`、`/api/ready`
 
 RAG V1 增量需要：

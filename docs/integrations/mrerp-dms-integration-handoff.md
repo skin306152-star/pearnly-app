@@ -470,9 +470,9 @@ DMS 成功后 `response_body` 至少返回:
 
 当前部署机制:
 
-- `git push origin master` 触发 GitHub webhook。
-- webhook 路由在 `admin_diagnostics_routes.py:86-132`。
-- 手动部署入口在 `admin_diagnostics_routes.py:135-158`。
+- `git push origin master` 触发 GitHub CI;全闸绿后 `deploy` job 携精确 SHA 调手动部署入口。
+- 旧 GitHub push webhook 已停用,保留为紧急回退口子。
+- webhook 与手动部署路由在 `routes/admin_diagnostics_routes.py`。
 - 部署日志入口在 `admin_diagnostics_routes.py:161-176`。
 - 部署状态/回滚 marker 在 `admin_diagnostics_routes.py:179-190`。
 - 旧 tar 部署脚本会备份 `/opt/mrpilot` 到 `/opt/mrpilot_backup`:`deploy.sh:31-46`。
@@ -483,6 +483,8 @@ DMS 成功后 `response_body` 至少返回:
 - 不要直接在生产打开给所有用户。先做 feature flag 或仅 owner/测试账号可见。
 - endpoint adapter 白名单变更必须 Alembic + `services/erp/push_schema.py` ensure 双跑。
 - 部署后验证:
+  - GitHub CI 全闸与 deploy job 全绿
+  - `ssh pearnly-prod "git -C /opt/mrpilot rev-parse HEAD"` 等于本次 commit
   - `curl https://pearnly.com/api/version`
   - `curl https://pearnly.com/internal/deploy/status`
   - 登录测试账号,确认 ERP 卡片出现/隐藏逻辑正确

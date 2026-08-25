@@ -1,6 +1,6 @@
 # 机械闸自查手册(每个窗口开工先读 · 左移=别等 push 才第一次见闸)
 
-> 出身:push 即自动部署,CI 事后才红=太晚 → 全部质量检查做成 pre-push 本地硬拦(scripts/git-hooks/pre-push,只认退出码)。
+> 出身(历史):旧链路 push 即 webhook 部署、CI 事后才红,所以质量检查前移为 pre-push 本地硬拦。2026-08-26 起 push 先跑 CI 全闸,全绿后 deploy job 才按精确 SHA 上线;本地闸继续保留,用于更早、更快地拦错。
 > **本页的用法:① 开工第 0 步把"全套自查"跑一遍拿基线(知道哪些红是别窗口/存量的) ② 干活中途随时跑单道 ③ 收尾跑全套,绿了才 push。**
 > 一键全套(等价 pre-push,不用真推):`sh scripts/git-hooks/pre-push`(在 Git Bash)或逐条跑下表命令。
 

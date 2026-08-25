@@ -59,7 +59,7 @@
 ---
 
 ## 3. 流程标准 🟡
-- 分支:在 master 干 / 从 master 开 feature(铁律#14)· 部署 = push master 触发 webhook。
+- 分支:在 master 干 / 从 master 开 feature(铁律#14)· 部署 = push master 触发 CI,全闸绿后 deploy job 精确 SHA 上线。
 - Commit:Conventional Commits + `· REFACTOR-<id>`(整顿期)+ Co-Authored-By Opus 4.8(🔒 铁律#20)。
 - **Definition of Ready**(开干前):需求清楚 / 影响面已评估 / 高敏走流程(铁律#16)。
 - **Definition of Done**(本文件全部 ✅ 才算真完成):代码过 §1 · 测试过 §5 · CI 过 §6 · 验收过 §8 · 文档更新 §9。
@@ -86,7 +86,7 @@
 
 ## 6. CI/CD 标准 🟡🔒
 - CI:lint + 安全扫描(bandit/pip-audit/npm audit ✅)+ 全量测试 + build + 覆盖率棘轮 + lint-size,全绿才能合(🔒)。
-- 部署:push → webhook → git-deploy.sh pull+restart · 验证 `/api/version` 200 + 看新进程时间戳(铁律#25)。
+- 部署:push → CI 全闸 → deploy job → git-deploy.sh 精确 SHA+flock+restart · 验证生产 HEAD、`/api/version` 与新进程时间戳(铁律#25)。
 - 健康检查:`/health` + `/ready` 能真实失败(⚪ B4 · 硬门槛#7)。
 - 回滚:CI 红/E2E 红 → `git revert` + 单独 push · 绝不留红在 master(🔒 铁律#26)。
 - 依赖:锁定(✅ requirements.lock + package-lock)+ Dependabot 周更(✅)。

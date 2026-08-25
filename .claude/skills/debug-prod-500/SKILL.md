@@ -35,10 +35,11 @@ ssh root@66.42.49.213 "tail -50 /var/log/nginx/error.log /var/log/nginx/error.lo
 `/api/version` 返 200 ≠ 新码生效。
 
 ```bash
-ssh root@66.42.49.213 "systemctl show mrpilot -p ActiveEnterTimestamp"   # 要 ≥ 你 push 的时间
+ssh pearnly-prod "git -C /opt/mrpilot rev-parse HEAD"                    # 要 == 你 push 的 commit
+ssh pearnly-prod "systemctl show mrpilot -p ActiveEnterTimestamp"        # 要 ≥ deploy job 的时间
 ```
 
-**push 了但线上没变**:git-deploy 的 fetch 撞 GitHub 超时会静默留旧 commit → ssh 重跑 `git-deploy.sh`。
+**push 了但线上没变**:先确认 CI 全闸与 `deploy` job 是否绿。job 绿后仍是旧 SHA,再查 `/var/log/mrpilot-deploy.log`;fetch 撞 GitHub 超时会留旧 commit → ssh 带目标 SHA 重跑 `git-deploy.sh <40-hex>`。
 
 ## 4. 权限边界
 

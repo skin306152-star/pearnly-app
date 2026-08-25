@@ -1,6 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-16 Daily 邀请三连修收官(earn 冲突根治 · CI 31924383472 success · prod 已上线)
+## 当前状态卡 · 08-26 DMS 跳转与 CI 精确部署链收官
+
+- **✅ DMS 外部浏览器体验**:`aef51903..27e73ad2` 统一 iOS/Android 外部浏览器登录,relay 轮询降到 100ms;中转原始页实测中位约 46ms、最大 75ms,慢响应仍能进入 DMS 首页。
+- **✅ 全量测试闸不再假卡死**:`c635a5bf` 修复分片子进程 PIPE 串行读取死锁;13,043 条单测约 28s 完成,保留完整覆盖而不做无意义删测。
+- **✅ 部署流程改版**:`7f7bf12a..429f1da6` 将 unit/e2e 并行,全部 required jobs 绿后 deploy job 才带精确 SHA 上线;服务器有 TARGET_SHA 守卫、flock 与失败回滚。旧 push webhook `625195648` 已停用但保留紧急回退。
+- **✅ 当前生产**:`4e9cb164` == local == origin/master == `/opt/mrpilot` HEAD;CI `32891950686` success,`mrpilot` active,健康检查 18s 通过,无 rollback marker;全链路约 10m14s(旧链路 13m42s)。
+- **✅ 流程文档**:AGENTS/STATE/ONBOARDING/GATES/ENGINEERING_STANDARD/部署与排障 skills 及活跃交接文档已同步新口径;历史架构文档已标明过时入口。
+- **⚠️ 已知边界**:私有免费 GitHub 仓库无法启用 branch protection;目前由本地 pre-push、CI required jobs、精确 SHA deploy 三层兜底。代理不用时须立即回收 opencode 进程树,避免本地模型常驻内存。
+
+---
+
+## 历史 · 08-16 Daily 邀请三连修收官(earn 冲突根治 · CI 31924383472 success · prod 已上线)
 
 - **✅ Daily 邀请与平台超管冲突根治**(`8c7f9587`):用户名查找大小写不敏感(lower 匹配),小写 earn 永远命中超管 Earn(is_super_admin)。命中超管一律 409 拒绝(`admin.daily_super_admin_conflict`),不进名单、不重置密码、不记日志,前端 toast 提示换用户名(zh/th 新键)。**已误加入名单的超管 Earn 条目 → 用户需在 Daily 邀请页点「收回」清理**。
 - **✅ earn/earn 登录失败已修**(`c62a7062`):根因=邀请已有账号时密码被静默丢弃;改已有账号+传密码→按填重置并回显;⚠️ 此轮对超管生效的逻辑已由 8c7f9587 封死(超管拒绝)。

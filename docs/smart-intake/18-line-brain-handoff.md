@@ -19,9 +19,9 @@
   四文件净减;归类/总额/数量 prod 复验不变。**未做(下个窗口·风险较高故缓)**:卡片发射器统一
   (`_reply_card` 收 items/detail override)、`_to_purchase_data` 泛化收 line 列表、category_ai
   `_listing`/`_decode_choice`/prompt 常量抽取——字段形态单/多不同,需带真 booking E2E 再动。
-- **坑**:**webhook 偶尔不自动 deploy**(连续两次快推时第二次没触发)→ push 后必查 prod HEAD
-  (`ssh root@66.42.49.213 'cd /opt/mrpilot && git rev-parse --short HEAD'`),没跟上就手跑
-  `bash git-deploy.sh`(幂等·有健康检查回滚)。
+- **部署口径已更新(2026-08-26)**:旧 webhook 已停用。push 后先等 CI 全闸与 deploy job,再查
+  prod HEAD(`ssh pearnly-prod 'git -C /opt/mrpilot rev-parse --short HEAD'`);没跟上先查部署日志,
+  必要时带目标 SHA 重跑 `bash /opt/mrpilot/git-deploy.sh <40-hex>`。
 
 ## 0. 本轮已上线(prod 全部真票/真 LLM 验证过,别重做)
 - **LIFF 编辑深链**:点卡片「复核/编辑」直达该单可编辑页(治 `liff.state` 包裹坑)。

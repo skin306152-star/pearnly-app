@@ -11,6 +11,8 @@
   连续切段让「谁跑在谁前面」与原全量最接近,跨段进程隔离只会更干净。
 - 切分只看耗时不动内容:首跑按文件字节近似,跑完把每模块实测耗时写进
   %TEMP%/pearnly_unit_times.json,之后按真耗时均衡切段。
+- 并发排空(2026-08-26):每片一个线程独占 communicate(),父进程不顺序逐片等 ——
+  顺序等会让写满 64KB 管道的 worker 堵在 write() 上干等(实测 pre-push 卡 13 分钟)。
 
 不用 pytest-xdist:本仓测试只用 unittest(no-pytest 约定)。
 子进程继承本进程环境(pre-push 已剥 GIT_* 并设 PYTHONUTF8)。
@@ -24,6 +26,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -145,6 +148,17 @@ def _collect_times(out: str, all_times: dict[str, float]) -> None:
                 pass
 
 
+def _drain_worker(idx: int, proc: subprocess.Popen, results: dict[int, tuple[int, str]]) -> None:
+    """并发排空单片子进程:独占读空它的 stdout 合并管道,结果按片号落盘。
+
+    所有 worker 的输出从生到死都由各自线程读,任何一片写满 64KB 管道都不会堵在
+    write() 上等父进程读完别的片 —— 顺序逐片 communicate() 的旧实现实测把
+    pre-push 卡了 13 分钟。
+    """
+    out, _ = proc.communicate()
+    results[idx] = (proc.returncode, out)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="tests/unit 分片并行 runner(保字母序连续切段)")
     ap.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 4))
@@ -194,11 +208,20 @@ def main() -> int:
     ]
     failed = False
     all_times: dict[str, float] = load_times()
+    results: dict[int, tuple[int, str]] = {}
+    drainers = [
+        threading.Thread(target=_drain_worker, args=(i, p, results), daemon=True)
+        for i, p in enumerate(procs)
+    ]
+    for d in drainers:
+        d.start()
+    for d in drainers:
+        d.join()
     for i, p in enumerate(procs):
-        out, _ = p.communicate()
+        code, out = results[i]
         _collect_times(out, all_times)
-        if p.returncode != 0:
-            if _is_load_failure(p.returncode, out):
+        if code != 0:
+            if _is_load_failure(code, out):
                 # 负载/初始化型红:单进程串行复跑一次(不抢资源),绿了就放过——真负载是偶发,
                 # 复现不了的红不该当确定性失败判掉整片。
                 retry = subprocess.run(
@@ -220,7 +243,7 @@ def main() -> int:
                 _summarize_failure(i + 1, len(procs), retry.returncode, retry.stdout, shards[i])
                 continue
             failed = True
-            _summarize_failure(i + 1, len(procs), p.returncode, out, shards[i])
+            _summarize_failure(i + 1, len(procs), code, out, shards[i])
         elif not args.quiet:
             n_mods = len(shards[i])
             print(f"shard {i + 1}/{len(procs)}: {n_mods} modules OK")

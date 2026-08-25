@@ -5,8 +5,11 @@
 打乱顺序会踩存量测试的顺序耦合(2026-08-02 乱序分桶实测炸出 auth_password 两红)。
 """
 
+import tempfile
+import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from scripts.run_unit_sharded import (
     UNIT_DIR,
@@ -103,3 +106,65 @@ class TimesCollectTests(unittest.TestCase):
         all_times = {"keep": 1.0}
         _collect_times("SHARD_TIMES_JSON:{not json}\n", all_times)
         self.assertEqual(all_times, {"keep": 1.0})
+
+
+class ConcurrentDrainTests(unittest.TestCase):
+    """管道并发排空回归(2026-08-26)。
+
+    旧实现逐片顺序 communicate():先序片慢/卡住时,后续片一写满 64KB stdout 管道就
+    堵在 write() 上干等父进程 —— 实测 pre-push 卡 13 分钟(PID 采样停在 write() · CPU 0)。
+    新实现每片一个线程并发 communicate(),单根管道从生到死都有线程在读,永不堵。
+
+    用假 Popen 把死锁场景钉死:第 0 片慢(communicate 阻塞到测试放行)、第 1 片在它
+    阻塞期间就必须已被排空(真实现里 = 写满管道也不堵)。旧实现此刻还顺序等第 0 片,
+    第 1 片根本轮不到 communicate() —— 断言 2 秒超时,测试红。确定性、毫秒级、不依赖
+    真实管道容量。
+    """
+
+    def test_later_worker_drained_while_earlier_blocks(self):
+        import scripts.run_unit_sharded as runner
+
+        first = threading.Event()
+        release = threading.Event()
+        created: list = []
+        rc: list[int] = []
+
+        class _FakeWorker:
+            def __init__(self, cmd, **kwargs):
+                self._idx = len(created)
+                self.returncode = 0
+                self.communicated = threading.Event()
+                created.append(self)
+
+            def communicate(self):
+                self.communicated.set()
+                if self._idx == 0:
+                    first.set()
+                    release.wait(timeout=10)
+                return "", ""
+
+        with (
+            tempfile.TemporaryDirectory() as td,
+            mock.patch.object(runner, "TIMES_CACHE", Path(td) / "times.json"),
+            mock.patch.object(runner.subprocess, "run", return_value=mock.Mock(returncode=0)),
+            mock.patch.object(runner.subprocess, "Popen", _FakeWorker),
+            mock.patch("sys.argv", ["run_unit_sharded.py", "--workers", "2", "--quiet"]),
+        ):
+
+            def _run():
+                rc.append(runner.main())
+
+            t = threading.Thread(target=_run)
+            t.start()
+            try:
+                self.assertTrue(first.wait(timeout=10), "第 0 片没进入阻塞态")
+                self.assertEqual(len(created), 2, "应精确产出 2 片")
+                self.assertTrue(
+                    created[1].communicated.wait(timeout=2),
+                    "第 1 片没在早片阻塞期间被排空(顺序 communicate 死锁复现)",
+                )
+            finally:
+                release.set()
+            t.join(timeout=10)
+            self.assertFalse(t.is_alive(), "runner 未在放行后收敛")
+        self.assertEqual(rc, [0], "全绿场景下 runner 必须返回 0")

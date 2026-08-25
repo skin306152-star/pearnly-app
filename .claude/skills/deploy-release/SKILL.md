@@ -1,27 +1,34 @@
 ---
 name: deploy-release
-description: 部署 = git push origin master(webhook 自动上线约 20 秒)与上线是否真生效的验证法。要部署、要发版时用。
+description: 部署 = git push origin master → CI 全闸绿 → deploy job 精确部署(≈10 min · 非秒级)与上线是否真生效的验证法。要部署、要发版时用。
 ---
 
 # 部署 & 发版
 
-## 1. 部署就是 push
+## 1. 部署就是 push(2026-08-26 起 CI 精确部署 · webhook 已停用)
 
 ```bash
-git push origin master        # → GitHub webhook → /internal/deploy → git-deploy.sh(pull + cp + restart,约 20s)
+git push origin master        # → CI(unit ∥ e2e + 全闸)全绿 → deploy job 带精确 SHA 调
+                              #   /internal/deploy/manual(DEPLOY_TOKEN)→ git-deploy.sh(TARGET_SHA+flock)
 curl https://pearnly.com/api/version
 ```
 
 - 分支永远显式写 `master`(不是当前分支,不是 main)
-- 服务器:`root@66.42.49.213`(Vultr 新加坡)· `/opt/mrpilot/` · systemd `mrpilot`
+- 服务器:`root@66.42.49.213`(Vultr 新加坡)· `/opt/mrpilot/` · systemd `mrpilot` · SSH 别名 `pearnly-prod`
 - 前端改动必须 dist 同提交 + `?v=` 已 bump(见 `frontend-change` skill)
-- **新增的 `static/` 根文件 webhook 不会部署** —— 走打包产物或确认 git-deploy.sh 覆盖到
+- **上线要等 CI 全绿 + deploy job(≈10 min · 非秒级)**。旧 GitHub webhook `625195648` 已停用(`active=false`);CI 红时 deploy 不会触发(needs 全闸)——紧急部署/复启 webhook 的 gh 命令见 `docs/RUNBOOK.md` §3。
+- **新增的 `static/` 根文件 deploy 不保证覆盖** —— 走打包产物或确认 git-deploy.sh 覆盖到
 
 ## 2. 验证真的上线了(别只看 200)
 
-- `/api/version` 的 `cache_bust` 变了才算新码
-- 后端改动看 `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ 你 push 的时间
-- **push 了但线上没变**:多半是 git-deploy 的 fetch 撞 GitHub 超时,静默留在旧 commit → ssh 上去重跑 `git-deploy.sh`
+- **判据:生产 HEAD == 你 push 的 commit**
+  ```bash
+  ssh pearnly-prod "git -C /opt/mrpilot rev-parse HEAD"      # == 你 push 的 40-hex
+  ssh pearnly-prod "systemctl show mrpilot -p ActiveEnterTimestamp"   # ≥ 那次部署时间
+  ```
+- `deploy` job 绿 ≠ 服务器已部署完成 → 再看 `/var/log/mrpilot-deploy.log`(SSH `tail -20` · 看 `new HEAD:` 与 `health check OK`)
+- **push 了但 CI deploy 后线上没变**:多半是 git-deploy 的 fetch 撞 GitHub 超时,静默留在旧 commit → ssh 上去重跑 `bash /opt/mrpilot/git-deploy.sh`
+- 部署失败自动回滚:服务器只读 `/internal/deploy/status` 看 `rolled_back` marker
 
 ## 3. release_notes:已退役(2026-08-12 核实)
 

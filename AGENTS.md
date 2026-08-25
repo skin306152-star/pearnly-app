@@ -71,7 +71,7 @@ sh scripts/git-hooks/pre-push     # Git Bash
 
 - 服务器 `root@66.42.49.213`(Vultr **新加坡** · 2026-06-11 迁同区 · DB RTT 1ms · 只 SSH key 登录) · `/opt/mrpilot/` · systemd `mrpilot` · uvicorn `--workers 2`。⚠️ 老文档里的东京 `45.76.53.194` 是 2026-06 的回滚兜底,**别再往那台推**。
 - DB:Supabase Postgres(Pooler)· **生产不跑 `alembic upgrade`** → schema 靠启动 `ensure_*` 应用 · alembic/versions 仅留档。
-- 部署:`git push origin master` → GitHub webhook → `git-deploy.sh` pull+cp+restart(~20s)· 验证 `curl https://pearnly.com/api/version`(200)。
+- 部署:**`git push origin master` → CI 全闸绿 → deploy job 带精确 SHA 调 `/internal/deploy/manual`(DEPLOY_TOKEN)→ git-deploy.sh 只部署该 commit(≈10 min · 非秒级)**。旧 GitHub webhook `625195648` 已停用(2026-08-26 · 复启用 §3 的 gh API 命令)· 服务器 TARGET_SHA 守卫 + flock 串行化双保险。验证 = 生产 `git -C /opt/mrpilot rev-parse HEAD` == 你推的 commit + `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ 部署时间。SSH 别名 `pearnly-prod`。详见 `docs/RUNBOOK.md`。
 - gh CLI:直接 `gh`(已在 PATH · WinGet 装的;旧的 `C:\Program Files\GitHub CLI\gh.exe` 路径已失效)· 例 `gh run list --repo skin306152-star/pearnly-app --branch master`。
 
 ## 5-bis. 入口/路由地图

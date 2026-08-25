@@ -95,15 +95,16 @@ pearnly_project/                    # FastAPI 后端 + Vite/TypeScript 前端
 
 ## 5. 部署流程概览(指向 RUNBOOK)
 
-Pearnly 用 **git webhook 自动部署 · 每次 push 即上线 · 没有 staging**:
+Pearnly 用 **CI 精确部署(2026-08-26 起 · webhook 已停用)**:push 后 CI 全闸绿,`deploy` job 才带本次 commit 的精确 SHA 调服务器手动部署端点 → `git-deploy.sh` 只部署那一个 commit:
 
 ```
-git push origin master  →  GitHub webhook  →  服务器 git pull + cp static/ + 重启 mrpilot  →  ~15s 后 prod 生效
+git push origin master  →  CI(unit ∥ e2e + 全闸绿)  →  deploy job
+                         →  /internal/deploy/manual?sha=<commit>  →  git-deploy.sh(TARGET_SHA+flock)  →  restart → 健康检查
 ```
 
-- 服务器:`root@45.76.53.194`(Vultr Tokyo · Ubuntu 24.04 · `/opt/mrpilot/`)· 进程 systemd unit `mrpilot`
+- 服务器:`root@66.42.49.213`(Vultr **Singapore** · Ubuntu 24.04 · `/opt/mrpilot/`)· SSH 别名 `pearnly-prod` · 进程 systemd unit `mrpilot`
 - 本地 remote 名 `origin`,分支名 `master`(历史原因)
-- 验证上线:`curl https://pearnly.com/api/version` 看 `cache_bust` 翻新
+- 验证上线:**生产 `git -C /opt/mrpilot rev-parse HEAD` == 你 push 的 commit**(CI 跑完 ≈10 min · 不是秒级)
 - **回滚用 `git revert`(新增反向 commit)· 绝不 `--force` / `reset --hard` 到 master**
 
 > 📖 **部署 / 回滚 / CI 查看 / 健康检查 / 紧急排查(磁盘满血泪根因)完整操作手册 → [`docs/RUNBOOK.md`](docs/RUNBOOK.md)。出事先翻那里。**

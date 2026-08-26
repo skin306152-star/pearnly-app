@@ -104,7 +104,8 @@
 
     function _bind() {
         const btn = document.getElementById('btn-save-general') as
-            (HTMLButtonElement & { _pearnlyGenBound?: boolean }) | null;
+            | (HTMLButtonElement & { _pearnlyGenBound?: boolean })
+            | null;
         if (!btn) {
             setTimeout(_bind, 200);
             return;

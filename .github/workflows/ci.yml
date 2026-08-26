@@ -78,8 +78,8 @@ jobs:
       - name: Install Node deps (npm ci)
         run: npm ci
 
-      - name: prettier --check (前端格式 · 巨石豁免)
-        run: npm run format:check
+      - name: prettier --check (全仓 · 基于 HEAD 已提交字节 · 与 pre-push 同脚本)
+        run: node scripts/check_prettier_committed.mjs
 
       - name: eslint (前端模块 lint)
         run: npm run lint

@@ -53,7 +53,7 @@ async function preminifyDcScript(html) {
     const re = /(<script\b[^>]*\btype="text\/x-dc"[^>]*>)([\s\S]*?)(<\/script>)/gi;
     const parts = [];
     let last = 0;
-    for (let m; (m = re.exec(html));) {
+    for (let m; (m = re.exec(html)); ) {
         const { code } = await transform(m[2], { loader: 'js', minify: true });
         // esbuild 已压掉结构性换行;残留换行只在反引号模板串里(门户全是 GLSL 着色器串,
         // 无 # 预处理指令 / // 注释,语句以 ; 分隔)→ 换行折成空格语义等价,外壳收成一行。

@@ -21,7 +21,8 @@ function _renderClientBadge() {
 
     if (cid != null) {
         const c = (window._clientsCache || []).find((x) => Number(x.id) === Number(cid)) as
-            { color?: unknown; short_name?: unknown; name?: unknown } | undefined;
+            | { color?: unknown; short_name?: unknown; name?: unknown }
+            | undefined;
         badge.classList.remove('is-empty');
         if (dot) dot.style.background = ((c && c.color) || '#111111') as string;
         if (name) name.textContent = ((c && (c.short_name || c.name)) || '#' + cid) as string;

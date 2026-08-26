@@ -199,9 +199,7 @@ function renderFilter() {
             loadActive();
         };
     const inp = document.getElementById('rec-date-input') as
-        | HTMLInputElement
-        | HTMLSelectElement
-        | null;
+        HTMLInputElement | HTMLSelectElement | null;
     if (inp)
         inp.onchange = () => {
             const v = inp.value;

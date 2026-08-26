@@ -44,8 +44,7 @@ function ingestOcrSuccess(f: IvFile, d: Dict) {
     if (d.auto_pushed) recState.autoPushed++;
     // 归属透明:税号路由把票归到别的套账时计数,批次结束一次性明示(治"扫完找不到")
     const attr = d.workspace_attribution as
-        | { assignments?: { workspace_id?: number | null }[] }
-        | undefined;
+        { assignments?: { workspace_id?: number | null }[] } | undefined;
     const activeWs = w.getActiveWorkspaceClientId ? w.getActiveWorkspaceClientId() : null;
     if (attr && activeWs != null) {
         for (const a of attr.assignments || []) {

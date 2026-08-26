@@ -1,13 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-26 DMS 跳转与 CI 精确部署链收官
+## 当前状态卡 · 08-27 ERP / Cowork 入口拆分已上线
 
-- **✅ DMS 外部浏览器体验**:`aef51903..27e73ad2` 统一 iOS/Android 外部浏览器登录,relay 轮询降到 100ms;中转原始页实测中位约 46ms、最大 75ms,慢响应仍能进入 DMS 首页。
-- **✅ 全量测试闸不再假卡死**:`c635a5bf` 修复分片子进程 PIPE 串行读取死锁;13,043 条单测约 28s 完成,保留完整覆盖而不做无意义删测。
-- **✅ 部署流程改版**:`7f7bf12a..429f1da6` 将 unit/e2e 并行,全部 required jobs 绿后 deploy job 才带精确 SHA 上线;服务器有 TARGET_SHA 守卫、flock 与失败回滚。旧 push webhook `625195648` 已停用但保留紧急回退。
-- **✅ 最后验证生产基线**:`4e9cb164` 曾核对 local/origin/prod 三端一致;CI `32891950686` success,`mrpilot` active,健康检查 18s 通过,无 rollback marker;全链路约 10m14s(旧链路 13m42s)。当前 SHA 必须按 Runbook 实时查,静态卡不冒充实时状态。
-- **✅ 流程文档与工具环境**:活文档已同步新部署口径;push diff 闸只取最近 2 commit,避免约 243MB 全历史 fetch 撞 5 分钟 timeout;PR 保留全历史。pre-push 自动优先仓库 venv/.venv,新 Mac 无需创建系统 `python` 别名或重复安装 ruff。
-- **⚠️ 已知边界**:私有免费 GitHub 仓库无法启用 branch protection;目前由本地 pre-push、CI required jobs、精确 SHA deploy 三层兜底。代理不用时须立即回收 opencode 进程树,避免本地模型常驻内存。
+- **✅ 不是重写,是同一套业务搬家**:`48cf6fe3..ceb0ca8f` 复用现有 SPA/后端能力,仅按入口身份隔离菜单与登录壳;内部 `/home` 继续兼容,对外 canonical 为 `/cowork`、`/erp`。
+- **✅ Cowork 事务所入口**:`/login` 302 到 `/cowork`;沿用原登录界面。菜单只留首页、Pearnly Cowork、主数据、使用教程,并保留左下账号与右上账套/头像。
+- **✅ ERP 客户入口**:`/erp` 使用与 AI/DMS/POS 同类的独立邀请制登录壳。菜单只留首页、商品、采购系统、销售系统、主数据,不显示使用教程;原 ERP 前后端业务逻辑不改。
+- **✅ Earn 邀请闭环**:新增 ERP 邀请、撤回、一次性密码与 tenant-first 入口授权;复用现有账号、租户、账套与权限体系,未另建业务实现。
+- **✅ 全局搜索已删除**:右上 CmdK/搜索入口及对应前后端能力均移除;账套切换器内部的账套筛选不属于全局搜索,继续保留。
+- **✅ 测试与视觉验收**:新入口专项 60/60、Earn 邀请 43/43;10+5 张截图已人工检查。旧静态 `/home.html` E2E 已显式使用内部 `firm` 入口,本轮 27/27 通过。
+- **✅ 本地/CI 闸统一**:`ae0a4edc..d4ec497f` 让 pre-push 与 CI 共用 `scripts/check_prettier_committed.mjs`,锁定 package-lock 的 Prettier 版本并按 HEAD 字节校验;旧 E2E canonical 跳转红项已根治。
+- **✅ 上线证据**:CI `33011345925` success,精确 SHA `d4ec497f92db743dfed28c4e2b7b937fd5031c77` 已部署;生产 HEAD 同 SHA,`mrpilot` active,重启时间 `2026-08-26 20:49:00 UTC`;`/cowork`、`/erp` 200。
+- **✅ 部署流程已植根**:`7bf6a3c0` 把活文档统一为 master push → required CI 全绿 → deploy job 携 `github.sha` → `TARGET_SHA`/flock → 生产 HEAD+重启时间验收;旧东京机与无 SHA 手工路径不再是可执行默认流程。
+- **⚠️ 本地代理策略**:Qwen3.8 Max 本轮关键施工多次误判,只派低风险/只读任务;关键施工优先 DeepSeek,主控独立验收。任务结束立即回收独立 opencode 进程树,共享 service 不杀。
 
 ---
 

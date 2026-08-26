@@ -51,12 +51,12 @@
 **铁律:先复现 + 查日志,不先改代码(铁律 #25)。**
 
 步骤:
-1. **磁盘**:`ssh root@45.76.53.194 "df -h /"`(>85% 是头号嫌疑·铁律 #24:满盘→Nginx 500→前端 `Unexpected token '<'`)。
+1. **磁盘**:`ssh pearnly-prod "df -h /"`(>85% 是头号嫌疑·铁律 #24:满盘→Nginx 500→前端 `Unexpected token '<'`)。
 2. **抓真栈**:`journalctl -u mrpilot --since '...' | grep -iE 'ERR_|Traceback|<关键词>'`。不猜根因。
 3. **分类**(见 `ERROR_CODES_AND_STATES.md`):用户数据错 / 业务拒绝 / 技术错 / 环境错。
 4. **复现**:能本地用真 adapter + sandbox(test01)复现就复现(铁律 #25 "用测试证根因")。
 5. 定位后**修一类不修一处**(铁律 #1:grep 同类 pattern 一次修全)。
-6. 修后**在重启后的新进程**上复测(`systemctl show mrpilot -p ActiveEnterTimestamp` ≥ push 时间)。
+6. 修后**验证生产 HEAD == 你 push 的精确 SHA**:`ssh pearnly-prod "git -C /opt/mrpilot rev-parse HEAD"` + `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ 部署时间。
 7. 真 bug 必补守门测试。
 
 实战要点:500≠504(不是超时);uvicorn 日志查不到该 POST = 卡在 Nginx 没到应用;`--workers 2` 下进程内锁无效(要 pg advisory / DB lease)。

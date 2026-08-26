@@ -41,7 +41,7 @@ curl -s "https://pearnly.com/api/erp/logs/<LOG_ID>" -H "Authorization: Bearer $T
 
 **判匹配 vs 自动建**:看 prod 日志 —— 有 `auto-created customer` 行=自动建;无客户创建行且无 `ERR_NO_CUSTOMER_MAPPING`=匹配已有。
 ```bash
-ssh root@45.76.53.194 "journalctl -u mrpilot --since '<push时间前1min>' | grep -iE 'mrerp-lock|customer|auto.?creat|bill|importpc|<INVOICE_NO>'"
+ssh pearnly-prod "journalctl -u mrpilot --since '<push时间前1min>' | grep -iE 'mrerp-lock|customer|auto.?creat|bill|importpc|<INVOICE_NO>'"
 ```
 
 **收尾**:测试 endpoint 用完恢复 `enabled=false`;**别让测试账号长期开自动推送**(红线)。
@@ -106,12 +106,14 @@ npx eslint src/home/<file>.js                            # 若动 src/**
 
 ---
 
-## 部署后冒烟(任何 push 后)
+## 部署后冒烟(任何 push 后 · 判据 = 生产 HEAD == 你 push 的精确 SHA)
 
 ```bash
-ssh root@45.76.53.194 "systemctl show mrpilot -p ActiveEnterTimestamp"   # ≥ push 时间(新进程)
+# 核心判据:生产 HEAD 必须等于你 push 的 40-hex SHA(不是只看 200)
+ssh pearnly-prod "git -C /opt/mrpilot rev-parse HEAD"                    # == 你 push 的 commit
+ssh pearnly-prod "systemctl show mrpilot -p ActiveEnterTimestamp"        # ≥ 部署时间(新进程)
 curl -s -o /dev/null -w '%{http_code}\n' https://pearnly.com/api/version  # 200
-ssh root@45.76.53.194 "journalctl -u mrpilot --since '2 min ago' | grep -ciE 'Application startup complete'"  # =2(两 worker)
-ssh root@45.76.53.194 "journalctl -u mrpilot --since '2 min ago' | grep -iE 'ImportError|Traceback'"          # 应为空
+ssh pearnly-prod "journalctl -u mrpilot --since '2 min ago' | grep -ciE 'Application startup complete'"  # =2(两 worker)
+ssh pearnly-prod "journalctl -u mrpilot --since '2 min ago' | grep -iE 'ImportError|Traceback'"          # 应为空
 ```
 搬出的路由抽查返 401/422(非 404/500)= 零丢路由。

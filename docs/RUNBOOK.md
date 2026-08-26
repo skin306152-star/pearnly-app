@@ -27,7 +27,7 @@
 | 进程 | systemd unit `mrpilot`(uvicorn `app:app`) |
 | 数据库 | Supabase PostgreSQL(Pooler) |
 | 部署机制 | push → GitHub CI(`unit` + `e2e` 并行 + 全部 FAIL 闸绿)→ **`deploy` job**(仅 master push)带 `sha=${{ github.sha }}` + `secrets.DEPLOY_TOKEN` 调 `GET /internal/deploy/manual` → `/opt/mrpilot/git-deploy.sh`(`TARGET_SHA` 精确守卫 + `flock` 串行化) |
-| GitHub webhook | **已停用**(`625195648` · `active=false` · 2026-08-26)· 不再是部署入口 · 复启命令见 §3 |
+| GitHub webhook | **永久停用**(`625195648` · `active=false` · 2026-08-26)· 历史遗留机制 · 不再是部署入口 · 不提供复启命令 |
 | 私库 | `github.com/skin306152-star/pearnly-app`(本地 remote 名 `origin` · 分支 `master` · 服务器 remote 名 `pearnly`) |
 | 密钥 | 生产 `/opt/mrpilot/.env`;部署令牌 repo secret `DEPLOY_TOKEN`(= 服务器 `GITHUB_WEBHOOK_SECRET` 原值) |
 | 前端版本探针 | `GET /api/version` → `cache_bust` 数字 |
@@ -70,7 +70,7 @@ git push origin master
 关键性质:
 - **服务器只部署「CI 验过的那一个 commit」**(`TARGET_SHA = ${{ github.sha }}`);fetch 后发现 master 已被更新的 push 取代 → 记 `SUPERSEDED` 并跳过,不静默部署未审查 commit。
 - **flock 串行化**:同一时刻只有一个 `git-deploy.sh` 在跑,排队的更新 push 等锁不丢。
-- 回滚 / 手动救援仍可调 `GET /internal/deploy/manual?sha=<40-hex>`(不带 sha = 部署当前 master 的旧语义)。
+- 紧急手动救援可调 `GET /internal/deploy/manual?sha=<40-hex>`(**必须带 SHA · 不带 SHA 已禁止**)。需 Zihao 明确授权。
 - `curl /internal/deploy/log` 看最近部署日志;`/internal/deploy/status` 只读回滚 marker。
 
 ### 拆分实测（2026-08-26 · 迁移前后量到的墙钟）
@@ -119,18 +119,23 @@ git push origin master
 
 ### 紧急时:等不及 CI / CI 红着也要部署
 
-CI 全红时 `deploy` job 不会触发(它 needs 全部 FAIL 闸)。急用下面任一条:
+> 🔴 **以下操作必须 Zihao 明确授权后才可执行。** 未经授权不得手动触发部署。
+
+CI 全红时 `deploy` job 不会触发(它 needs 全部 FAIL 闸)。**优先重跑同一 CI run 的 deploy job**:
 
 ```bash
-# 手动端点(带 40-hex SHA · 服务器只部署这个 commit · DEPLOY_TOKEN 在 gh secret)
-curl -H "X-Internal-Token: $DEPLOY_TOKEN" \
-     "https://pearnly.com/internal/deploy/manual?sha=<40-hex>"
-# 或临时复启 webhook(复启后 push 即秒级部署 · 用完全部复停)
-gh api -X PATCH repos/skin306152-star/pearnly-app/hooks/625195648 -F active=true
-# 停用(不要 delete)
-gh api -X PATCH repos/skin306152-star/pearnly-app/hooks/625195648 -F active=false
-gh api repos/skin306152-star/pearnly-app/hooks --jq '.[] | {id, active}'   # 查状态
+gh run rerun <RUN_ID> --repo skin306152-star/pearnly-app
 ```
+
+若重跑仍失败且 Zihao 已明确授权,可用手动端点(**必须带显式 40-hex SHA · 绝不允许不带 SHA**):
+
+```bash
+# 手动端点(Zihao 授权后 · 必须带精确 40-hex SHA · DEPLOY_TOKEN 在 gh secret)
+curl -H "X-Internal-Token: $DEPLOY_TOKEN" \
+     "https://pearnly.com/internal/deploy/manual?sha=<40-hex-SHA>"
+```
+
+> ⚠️ **旧 GitHub webhook `625195648` 已于 2026-08-26 永久停用。** 它是历史遗留机制,不再是部署入口。不提供复启命令——若极端情况确需复启,必须由 Zihao 亲自决策并手动操作。
 
 服务器侧部署失败有 byte-for-byte 保住的健康检查回滚(`.deploy_rollback` marker · `GET /internal/deploy/status` 读)。
 
@@ -193,7 +198,7 @@ ssh pearnly-prod "systemctl restart mrpilot"
 
 ### 后端改动「上了但没生效」
 
-部署走 deploy job(≈10 min)不是秒级 → `/api/version`=200 ≠ 新码跑起来。判据:生产 `git rev-parse HEAD` == 你推的 commit,且 `ActiveEnterTimestamp ≥ 部署时间`(铁律 #25)。`/internal/deploy/log` 看部署日志;fetch 撞 GitHub 超时会让 git-deploy 静默留在旧 commit → ssh 上去重跑 `bash /opt/mrpilot/git-deploy.sh`。
+部署走 deploy job(≈10 min)不是秒级 → `/api/version`=200 ≠ 新码跑起来。判据:生产 `git rev-parse HEAD` == 你推的精确 SHA,且 `ActiveEnterTimestamp ≥ 部署时间`(铁律 #25)。`/internal/deploy/log` 看部署日志;fetch 撞 GitHub 超时会让 git-deploy 静默留在旧 commit → 优先 `gh run rerun <RUN_ID>` 重跑 deploy job;反复失败再 SSH 带精确 SHA 重跑:`bash /opt/mrpilot/git-deploy.sh <40-hex-SHA>`(**禁止不带 SHA**)。
 
 ### 删后端字段后 `/api/me` 等 500（铁律 #15）
 

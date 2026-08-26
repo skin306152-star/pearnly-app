@@ -16,7 +16,7 @@ curl https://pearnly.com/api/version
 - 分支永远显式写 `master`(不是当前分支,不是 main)
 - 服务器:`root@66.42.49.213`(Vultr 新加坡)· `/opt/mrpilot/` · systemd `mrpilot` · SSH 别名 `pearnly-prod`
 - 前端改动必须 dist 同提交 + `?v=` 已 bump(见 `frontend-change` skill)
-- **上线要等 CI 全绿 + deploy job(≈10 min · 非秒级)**。旧 GitHub webhook `625195648` 已停用(`active=false`);CI 红时 deploy 不会触发(needs 全闸)——紧急部署/复启 webhook 的 gh 命令见 `docs/RUNBOOK.md` §3。
+- **上线要等 CI 全绿 + deploy job(≈10 min · 非秒级)**。旧 GitHub webhook `625195648` 已于 2026-08-26 永久停用(`active=false`)· **不再是部署入口**。网络/部署失败优先重跑同一 CI run(`gh run rerun <RUN_ID>`);极端紧急情况见 `docs/RUNBOOK.md` §3(需 Zihao 明确授权)。
 - **新增的 `static/` 根文件 deploy 不保证覆盖** —— 走打包产物或确认 git-deploy.sh 覆盖到
 
 ## 2. 验证真的上线了(别只看 200)
@@ -27,7 +27,7 @@ curl https://pearnly.com/api/version
   ssh pearnly-prod "systemctl show mrpilot -p ActiveEnterTimestamp"   # ≥ 那次部署时间
   ```
 - `deploy` job 绿 ≠ 服务器已部署完成 → 再看 `/var/log/mrpilot-deploy.log`(SSH `tail -20` · 看 `new HEAD:` 与 `health check OK`)
-- **push 了但 CI deploy 后线上没变**:多半是 git-deploy 的 fetch 撞 GitHub 超时,静默留在旧 commit → ssh 上去重跑 `bash /opt/mrpilot/git-deploy.sh`
+- **push 了但 CI deploy 后线上没变**:优先重跑同一 CI run 的 deploy job(`gh run rerun <RUN_ID>`);若反复失败再 SSH 上去带精确 SHA 重跑:`bash /opt/mrpilot/git-deploy.sh <40-hex-SHA>`(**禁止不带 SHA 调用此脚本**)
 - 部署失败自动回滚:服务器只读 `/internal/deploy/status` 看 `rolled_back` marker
 
 ## 3. release_notes:已退役(2026-08-12 核实)

@@ -22,6 +22,7 @@ from routes.admin_agent_routes import router as admin_agent_router
 from routes.admin_cost_routes import router as admin_cost_router
 from routes.admin_diagnostics_routes import router as admin_diagnostics_router
 from routes.admin_dms_routes import router as admin_dms_router
+from routes.admin_erp_routes import router as admin_erp_router
 from routes.admin_logs_routes import router as admin_logs_router
 from routes.admin_migration_routes import router as admin_migration_router
 from routes.admin_ocr_engine_routes import router as admin_ocr_engine_router
@@ -217,6 +218,7 @@ ROUTERS = (
     admin_pearnly_ai_router,
     admin_daily_router,  # Daily 邀请管理(超管)
     admin_dms_router,
+    admin_erp_router,  # ERP 入口邀请管理(超管)
     exceptions_router,
     billing_router,
     admin_diagnostics_router,  # 含 internal/deploy*

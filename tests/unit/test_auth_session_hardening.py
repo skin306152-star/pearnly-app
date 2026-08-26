@@ -59,7 +59,7 @@ class AuthSessionHardeningTests(unittest.TestCase):
             self.assertNotIn(key, payload)
 
     def test_access_token_carries_entry_claim(self) -> None:
-        """token 烙会话入口 entry(main/pos/ai/dms)· 缺省 main · 未知值收敛回 main。"""
+        """token 烙会话入口 entry(main/pos/ai/dms/cowork/erp)· 缺省 main · 未知值收敛回 main。"""
         from core import auth
 
         cur = _Cursor()
@@ -71,6 +71,10 @@ class AuthSessionHardeningTests(unittest.TestCase):
             pos = auth.decode_access_token(auth.create_access_token("u1", "a", "free", entry="pos"))
             ai = auth.decode_access_token(auth.create_access_token("u1", "a", "free", entry="ai"))
             dms = auth.decode_access_token(auth.create_access_token("u1", "a", "free", entry="dms"))
+            cowork = auth.decode_access_token(
+                auth.create_access_token("u1", "a", "free", entry="cowork")
+            )
+            erp = auth.decode_access_token(auth.create_access_token("u1", "a", "free", entry="erp"))
             junk = auth.decode_access_token(
                 auth.create_access_token("u1", "a", "free", entry="firm-picker")
             )
@@ -79,6 +83,8 @@ class AuthSessionHardeningTests(unittest.TestCase):
         self.assertEqual(pos["entry"], "pos")
         self.assertEqual(ai["entry"], "ai")
         self.assertEqual(dms["entry"], "dms")
+        self.assertEqual(cowork["entry"], "cowork")
+        self.assertEqual(erp["entry"], "erp")
         self.assertEqual(junk["entry"], "main")
 
     def test_logout_revokes_current_active_jti(self) -> None:

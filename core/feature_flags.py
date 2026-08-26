@@ -76,6 +76,12 @@ PEARNLY_AI_M1_KEY = "pearnly_ai_m1"
 # 个人套账退回 user_id · 与 pearnly_ai_m1 同口径)。消费在 services/auth/entrance._derive_entrances
 # (登录准入)与 routes/dms_routes._authorize(API 守卫)。
 DMS_PORTAL_KEY = "dms_portal"
+# ERP 入口邀请闸(ERP 门户 · 照 dms_portal 邀请制范式):默认关 fail-closed。关 = erp 门不授权
+# (登录准入推导不含 erp)、erp 作用域前缀不放行;开 = 被邀请租户从 erp 门登录得该入口 +
+# sales/purchase/inv/intake/stockcard/kb/ar 前缀放行。判定域=账套主体归属(有 tenant_id 走 tenant
+# 共享闸,个人套账退回 user_id · 与 dms_portal 同口径)。消费在 services/auth/entrance._derive_entrances
+# (登录准入)与 services/auth/entrance._ENTRANCE_BY_PREFIX(API 作用域)。
+ERP_PORTAL_KEY = "erp_portal"
 # DMS LINE 通道邀请闸(独立 LINE OA · 经销商销售员绑定/会话):默认关 fail-closed。
 # 关 = /api/line/dms/webhook 收到事件一律 200 静默零回复、DMS 侧 /api/dms/line/* 绑定端点
 # 判定域内不放行(现状零变化,老会计站 OA 逐字节不受影响);开 = 被邀请租户可从 DMS LINE OA
@@ -295,6 +301,14 @@ def dms_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> 
     按账套主体归属判定(有 tenant_id 用 tenant · 个人套账退回 user_id),与 pearnly_ai_m1 同口径。
     """
     return _enabled(DMS_PORTAL_KEY, tenant_id or user_id, "dms_portal_enabled_for")
+
+
+def erp_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
+    """ERP 入口邀请闸。关 = erp 门不授权(登录准入推导不含 erp,现状零变化)。
+
+    按账套主体归属判定(有 tenant_id 用 tenant · 个人套账退回 user_id),与 dms_portal 同口径。
+    """
+    return _enabled(ERP_PORTAL_KEY, tenant_id or user_id, "erp_portal_enabled_for")
 
 
 def daily_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:

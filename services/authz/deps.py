@@ -64,8 +64,9 @@ def _cached_authz(request: Optional[Request], user: dict, cur=None) -> Authz:
 def _entrance_scope_deny(user: dict, code: str) -> str:
     """入口作用域闸(Phase3 · 各是各的):token.entry 不在码允许的入口集 → 拒。
 
-    码可跨多门共用(entrance_of_code 返集合:sales/purchase/inv/intake={main,pos}、
-    tax={main,ai}…)。中性横切码(返 None)短路放行,否则 /api/me 系列 bootstrap 全崩;
+    码可跨多门共用(entrance_of_code 返集合:sales/purchase/inv/intake={main,pos,cowork,erp}、
+    tax={main,ai,cowork},acct/recon={main,cowork},stockcard/kb/ar={main,cowork,erp},
+    pos={pos}…)。中性横切码(返 None)短路放行,否则 /api/me 系列 bootstrap 全崩;
     entrance_api_scope 关(默认)= 不拦,现状零变化。返回 deny_reason("" = 放行)。
     """
     from services.auth.entrance import entrance_of_code

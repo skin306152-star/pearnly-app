@@ -26,9 +26,10 @@ POS_TOKEN_TTL_HOURS = 12  # POS 收银员 token 有效期(离线缓存窗口 · 
 POS_STORE_TOKEN_TTL_DAYS = 365  # 设备店铺令牌(绑定一次长期用 · docs/pos/04 §1b)
 
 # 登录入口(会话级)· token 烙 entry claim,壳与准入都认它,取代 per-browser localStorage 猜测。
-# main=会计站(自由注册即得) · pos=收银老板后台 · ai=Pearnly AI · dms=MR.ERP 订车单入口。
+# main=会计站(自由注册即得) · pos=收银老板后台 · ai=Pearnly AI · dms=MR.ERP 订车单入口 ·
+# daily=个人周记账应用 · cowork=协同工作台(非 pos_only 随 main 同源) · erp=ERP 入口(erp_portal 邀请)。
 # 未知值一律收敛回 main。新增门必进本白名单,否则登录 token 被 _normalize_entry 静默降级成 main。
-VALID_ENTRIES = ("main", "pos", "ai", "dms", "daily")
+VALID_ENTRIES = ("main", "pos", "ai", "dms", "daily", "cowork", "erp")
 
 
 def _normalize_entry(entry: str) -> str:
@@ -89,7 +90,7 @@ def create_access_token(
 
     身份、租户、角色、套餐每次从 DB 取最新值,不再塞进浏览器可解码的 token 里。
     remember_me=True → 默认 7 天;否则默认 12 小时。两者均可用 env 覆盖。
-    entry=会话入口(main/pos/ai)· 决定登录后落哪个壳、Phase3 起还锁 API 作用域;
+    entry=会话入口(main/pos/ai/cowork/erp)· 决定登录后落哪个壳、Phase3 起还锁 API 作用域;
     默认 main 使孤儿签发点(OAuth/LINE/LIFF/注册自动登录)天然归会计站。
     """
     # v118.32.5.5.10 · 1 账号 1 设备:每次签发新 jti · 注册为 active_jti · 旧 jti 自动失效

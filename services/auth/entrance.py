@@ -1,18 +1,21 @@
 # -*- coding: utf-8 -*-
 """登录入口(会话级)准入 —— 「各是各的」的授权判据单一事实源。
 
-一套账号被授权从哪些门登录(main / pos / ai / dms)。登录时校验「这个门是否在授权集」,
+一套账号被授权从哪些门登录(main / pos / ai / dms / daily / cowork / erp)。登录时校验「这个门是否在授权集」,
 不在即当作账号密码错误拒登(不泄漏账号存在、无「去别处登录」指向文案)。
 
 授权来源(Phase1 从现有数据推导 · Phase2 将换成读 tenant_entrances 表,只改本模块):
-  - main : 业态非 pos_only(会计站自由注册的账号天然是 main;pos_only 是 Earn 直建的纯收银租户)
-  - pos  : 开通了 pos 模块(Earn 发放)
-  - ai   : 在 pearnly_ai_m1 白名单(Earn 邀请)
-  - dms  : 在 dms_portal 白名单(Earn 邀请 · MR.ERP 身份证订车单入口)
-  - daily: 在 daily_finance 白名单(Earn 邀请 · 个人周记账应用)
+  - main  : 业态非 pos_only(会计站自由注册的账号天然是 main;pos_only 是 Earn 直建的纯收银租户)
+  - pos   : 开通了 pos 模块(Earn 发放)
+  - ai    : 在 pearnly_ai_m1 白名单(Earn 邀请)
+  - dms   : 在 dms_portal 白名单(Earn 邀请 · MR.ERP 身份证订车单入口)
+  - daily : 在 daily_finance 白名单(Earn 邀请 · 个人周记账应用)
+  - cowork: 业态非 pos_only(随 main 同源 · 协同工作台)
+  - erp   : 在 erp_portal 白名单(Earn 邀请 · ERP 入口)
 
 超管任意门放行(平台运营);回退闸 entrance_gate 关时一律不拦(上线前/回退=现状,任何门都通);
-推导异常一律 fail-open —— 登录可用性优先,绝不因基建抖动把人锁在门外(与 auth.py 改密比对同款容错)。
+推导异常默认 fail-open(登录可用性优先,绝不因基建抖动把人锁在门外,与 auth.py 改密比对同款容错)
+—— 仅 erp 门 fail-closed:ERP 为对外敏感入口,宁可拦。
 """
 
 from __future__ import annotations
@@ -29,36 +32,36 @@ POS = "pos"
 AI = "ai"
 DMS = "dms"
 DAILY = "daily"
-ALL_ENTRANCES = (MAIN, POS, AI, DMS, DAILY)
+COWORK = "cowork"
+ERP = "erp"
+ALL_ENTRANCES = (MAIN, POS, AI, DMS, DAILY, COWORK, ERP)
 
-# 权限码前缀 → 允许的登录入口【集合】(Phase3 API 作用域闸的判据 · 按前缀判、不按 URL 判:
-# tax_profile_routes 是 AI 接口却寄生 /api/workspace 路径)。一码可跨多门——业务功能被多个壳
-# 共用,不能一码归一门(2026-07-16 查证坐实):
-#   - sales/inv/intake = {main, pos}:POS 商户也做销售开票 / 盘点 / 收料。
-#   - purchase = {main, pos, ai}:采购/供应商数据跨会计/POS/AI 三方共用(AI 工作台客户画像
-#     供应商档案 ai-profile.js → /api/purchase/supplier-profiles GET/PUT/DELETE 也调 purchase.* 码,
-#     AI 处理进项发票天然要读写供应商档案)。
-#   - tax = {main, ai}:会计主壳报税中心(src/home/tax-*.ts → /api/tax/filings·settings)与
-#     AI SPA 工单(static/ai/ai-api*.js → /api/workorder,四权分立映射 tax.filing.*)都调 tax.* 码。
-#   - acct/recon/kb/ar = {main}:做账/对账/知识库/应收是会计主壳专属,POS/AI 壳无这些菜单
-#     (AI 工单内部对账走 tax.filing.* 码,不走 recon.*)。
-#   - stockcard = {main}:商品收发存报表是事务所端按客户账套出的会计报表,与 acct/recon
-#     同款会计主壳专属,POS/AI/DMS 会话不该调得到 /api/stockcard/*。
+# 权限码前缀 → 允许的登录入口【集合】(Phase3 API 作用域闸判据,按前缀判而非 URL)。
+# 一码可跨多门(业务功能被多个壳共用),故以集合建模;未知/横切中性前缀返 None,由 _check
+# 短路放行,否则 /api/me 系列 bootstrap 全崩:
 #   - pos = {pos}:收银专属。
-# 未列前缀(team/billing/ownership/settings/audit/field 等横切中性码)与未知前缀 → None(中性,
-# 不归任何入口,_check 里短路放行,否则登录 bootstrap 的 /api/me 系列全崩)。
+#   - tax = {main, ai, cowork}:会计主壳报税中心与 AI SPA 工单都调 tax.*;cowork 随 main;ERP 不碰。
+#   - acct/recon = {main, cowork}:做账/对账主壳专属(AI 工单内部对账走 tax.filing.*);ERP 不碰。
+#   - stockcard/kb/ar = {main, cowork, erp}:应收/知识库/商品收发存按客户账套出的主壳能力;ERP 获此三前缀。
+#   - sales/inv/intake = {main, pos, cowork, erp}:POS 商户也做销售开票 / 盘点 / 收料。
+#   - purchase = {main, pos, ai, cowork, erp}:采购/供应商数据跨会计/POS/AI(AI 客户画像也调 purchase.*)。
+#   - cowork 与 main 等价:凡原来含 main 的集合都并入 cowork(协同工作台继承会计主壳能力)。
+#   - ERP 门仅获 sales/purchase/inv/intake/stockcard/kb/ar 七前缀(erp_portal 邀请业务作用域),
+#     不碰 pos/tax/acct/recon;ai/dms/daily 是各自独立门,不在 ERP 派生范围。
 _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
     "pos": frozenset({POS}),
-    "tax": frozenset({MAIN, AI}),
-    "acct": frozenset({MAIN}),
-    "recon": frozenset({MAIN}),
-    "stockcard": frozenset({MAIN}),
-    "kb": frozenset({MAIN}),
-    "ar": frozenset({MAIN}),
-    "sales": frozenset({MAIN, POS}),
-    "purchase": frozenset({MAIN, POS, AI}),  # AI 客户画像供应商档案(ai-profile.js)也调 purchase.*
-    "inv": frozenset({MAIN, POS}),
-    "intake": frozenset({MAIN, POS}),
+    "tax": frozenset({MAIN, AI, COWORK}),
+    "acct": frozenset({MAIN, COWORK}),
+    "recon": frozenset({MAIN, COWORK}),
+    "stockcard": frozenset({MAIN, COWORK, ERP}),
+    "kb": frozenset({MAIN, COWORK, ERP}),
+    "ar": frozenset({MAIN, COWORK, ERP}),
+    "sales": frozenset({MAIN, POS, COWORK, ERP}),
+    "purchase": frozenset(
+        {MAIN, POS, AI, COWORK, ERP}
+    ),  # AI 客户画像供应商档案(ai-profile.js)也调 purchase.*
+    "inv": frozenset({MAIN, POS, COWORK, ERP}),
+    "intake": frozenset({MAIN, POS, COWORK, ERP}),
 }
 
 
@@ -71,7 +74,7 @@ _NEUTRAL_PREFIXES: frozenset[str] = frozenset(
 
 
 def entrance_of_code(code: str) -> Optional[frozenset[str]]:
-    """该权限码允许哪些登录入口(main/pos/ai 的集合);横切中性码/未知前缀返 None(不归任何入口)。"""
+    """该权限码允许哪些登录入口(授权入口集合);横切中性码/未知前缀返 None(不归任何入口)。"""
     return _ENTRANCE_BY_PREFIX.get(code.split(".", 1)[0])
 
 
@@ -84,7 +87,7 @@ def authorized_entrances(tenant_id: Optional[str], user_id: Optional[str]) -> Se
     回填后,表侧有行才切表(发放侧注册/开 POS/邀请 AI 也已顺带写表,新数据自然落表)。
     """
     if not tenant_id:
-        return {MAIN}  # 无租户兜底(已建号账号理论上必有 tenant)
+        return {MAIN, COWORK}  # 无租户兜底:与推导口径严格等价(main+cowork)
 
     table_ents = _entrances_from_table(tenant_id)
     if table_ents:
@@ -106,7 +109,8 @@ def _entrances_from_table(tenant_id: str) -> Set[str]:
 
 
 def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
-    """Phase1 推导版:business_type 非 pos_only=main / pos 模块开=pos / m1 名单=ai / dms_portal 名单=dms。"""
+    """Phase1 推导版:business_type 非 pos_only=main+cowork / pos 模块开=pos / m1 名单=ai /
+    dms_portal 名单=dms / daily_finance 名单=daily / erp_portal 名单=erp。"""
     ents: Set[str] = set()
     from core import db
     from services.modules import store
@@ -114,12 +118,14 @@ def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
     with db.get_cursor() as cur:
         if store.get_business_type(cur, tenant_id=tenant_id) != "pos_only":
             ents.add(MAIN)
+            ents.add(COWORK)  # 协同工作台随 main 同源:非 pos_only 天然拥有
         if store.is_enabled(cur, tenant_id=tenant_id, module_key="pos"):
             ents.add(POS)
 
     from core.feature_flags import (
         daily_enabled_for,
         dms_portal_enabled_for,
+        erp_portal_enabled_for,
         pearnly_ai_m1_enabled_for,
     )
 
@@ -129,6 +135,8 @@ def _derive_entrances(tenant_id: str, user_id: Optional[str]) -> Set[str]:
         ents.add(DMS)
     if daily_enabled_for(tenant_id, user_id):
         ents.add(DAILY)
+    if erp_portal_enabled_for(tenant_id, user_id):
+        ents.add(ERP)
     return ents
 
 
@@ -189,6 +197,10 @@ def login_entrance_allowed(entry: Optional[str], user: dict) -> bool:
             )
             return False
         return True
-    except Exception as e:  # noqa: BLE001 · 登录可用性优先,推导异常不锁人
-        logger.warning("[entrance] gate check error · fail-open: %s", e)
-        return True
+    except (
+        Exception
+    ) as e:  # noqa: BLE001 · 推导异常默认 fail-open(登录可用性优先),仅 erp 门 fail-closed
+        logger.warning(
+            "[entrance] gate check error · fail-open (erp fail-closed) entry=%s: %s", entry, e
+        )
+        return entry != ERP

@@ -117,8 +117,8 @@ class DualTrackTests(unittest.TestCase):
             # 表不存在(prod 过渡期)绝不抛错锁登录 → 回落推导
             self.assertEqual(entrance.authorized_entrances("t1", "u1"), {"main"})
 
-    def test_no_tenant_still_main(self):
-        self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main"})
+    def test_no_tenant_still_main_and_cowork(self):
+        self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main", "cowork"})
 
 
 class GrantEntranceSafeTests(unittest.TestCase):

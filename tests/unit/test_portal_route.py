@@ -3,7 +3,8 @@
 
 锁三条机械事实,防回归:
   1. 根路径 `/` 出品牌门户 static/landing/portal.dc.html(不是登录页)· 带 no-cache;
-     `/login` 仍出原登录页 static/dist/login.html(登录主路径没被门户顶掉)。
+     `/login` 已退居服务端 302 别名(2026-08-26 · 默认 → /cowork canonical 主壳,登录页由
+     /cowork /erp 直接呈现),不再直接出登录页外壳。
   2. 门户资产零外链:HTML 里的 <link stylesheet> / <script src> 全指向本地 /static/landing/vendor/。
      唯二允许的外部字符串是 window.__resources 里 React/ReactDOM 的 unpkg 键(support.js 读它
      重定向到本地副本 · 不真落 CDN)与页脚 LINE OA 联系链接(用户点击跳转 · 非资源加载)。
@@ -32,10 +33,14 @@ class PortalRouteTest(unittest.TestCase):
         cls.client = TestClient(app)
         cls.html = PORTAL.read_text(encoding="utf-8")
 
-    def test_root_serves_portal_login_serves_login(self):
+    def test_root_serves_portal_login_is_alias(self):
         # / 出门户 minified 产物(源逐字可读在 static/landing/portal.dc.html · build 压成 dist/portal.html)
         self.assertEqual(asyncio.run(pages_routes.root()).path, "static/dist/portal.html")
-        self.assertEqual(asyncio.run(pages_routes.login_page()).path, "static/dist/login.html")
+        # /login 已退居 302 别名(2026-08-26):登录页由 /cowork canonical 主壳直接呈现,
+        # 不再直接出登录页外壳。
+        resp = self.client.get("/login", follow_redirects=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.headers["location"], "/cowork")
 
     def test_login_routes_liff_booking_draft_to_editor(self):
         response = self.client.get(
@@ -80,12 +85,14 @@ class PortalRouteTest(unittest.TestCase):
         self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
 
     def test_login_ignores_unrelated_liff_state(self):
+        # 未触发 DMS 订车 liff 特殊 → /login 一律 302 到 canonical 主壳(默认 /cowork)。
         response = self.client.get(
             "/login",
             params={"liff.state": "?screen=home"},
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "/cowork")
 
     def test_home_ignores_unrelated_liff_state(self):
         response = self.client.get(

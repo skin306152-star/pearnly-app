@@ -34,18 +34,6 @@ const TOPBAR_HTML = `
             <div id="workspace-switcher-root"></div>
         </div>
 
-        <!-- NAV-IA Phase 1 · 顶栏搜索框(2026-05-15 拍板 · 点击/⌘K 弹命令面板) -->
-        <div class="topbar-search" id="topbar-search" role="button" tabindex="0"
-             aria-label="Open command palette"
-             title="搜索 · 快速跳转 (Cmd+K / Ctrl+K)">
-            <svg class="topbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="9" cy="9" r="6"/>
-                <line x1="14" y1="14" x2="17" y2="17"/>
-            </svg>
-            <span class="topbar-search-text" data-i18n="topbar-search-ph">搜索发票 · 客户 · 跳转...</span>
-            <span class="topbar-search-kbd"><span class="topbar-search-kbd-mac">⌘K</span><span class="topbar-search-kbd-win">Ctrl K</span></span>
-        </div>
 
         <!-- NAV-IA Phase 1 · 头像下拉菜单(2026-05-15 拍板 · 收纳账户/设置/管理员入口) -->
         <div class="avatar-wrap" id="avatar-wrap">

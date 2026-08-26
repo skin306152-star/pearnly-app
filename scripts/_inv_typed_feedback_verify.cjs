@@ -77,6 +77,8 @@ async function openInModal(browser, origin, viewport) {
     await page.addInitScript(() => {
         localStorage.setItem('mrpilot_token', 'typed-verify');
         localStorage.setItem('mrpilot_lang', 'zh'); // 期望值仍现场从 I18N 取,这里只定屏上语言
+        localStorage.setItem('pearnly_entry', 'pos');
+        localStorage.setItem('pearnly_active_workspace_client_id', '1');
     });
     const hits = [];
     await page.route('**/api/**', async (route) => {
@@ -106,6 +108,24 @@ async function openInModal(browser, origin, viewport) {
         }
         if (url.pathname === '/api/me') {
             await route.fulfill({ json: { email: 'typed@e2e', role: 'owner', plan: 'pro' } });
+            return;
+        }
+        if (url.pathname === '/api/me/modules') {
+            await route.fulfill({
+                json: {
+                    data: {
+                        modules: { pos: { enabled: true }, inventory: { enabled: true } },
+                        business_type: 'pos_only',
+                        entry: 'pos',
+                    },
+                },
+            });
+            return;
+        }
+        if (url.pathname === '/api/workspace/clients') {
+            await route.fulfill({
+                json: { clients: [{ id: 1, name: 'Demo Co Ltd', tax_id: '0105567178203' }] },
+            });
             return;
         }
         await route.fulfill({ json: { ok: true, data: {} } });

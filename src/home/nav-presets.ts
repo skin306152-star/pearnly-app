@@ -3,7 +3,7 @@
 // 与后端模块开关(GET /api/me/modules)在这两类业态里【解耦】——pos_only 后端只开 pos+inventory,
 // 但清单要它出「采购系统/销售系统」;firm 后端默认开 accounting,清单却要收起「做账/商品系统」。
 // 以拍板清单为唯一事实源,不再按模块开关逐项算。其余商户业态仍走 module-nav 的动态门控。
-// 隐藏≠删:display 控制,DOM 保留,切业态即复现。方向恒为"多显不误杀"(清单只增显不封路由)。
+// DOM 仍复用同一业务壳；cowork/erp 的深链边界由 route-table allowlist 单独守住。
 
 export function show(el: HTMLElement | null, on: boolean): void {
     if (el) el.style.display = on ? '' : 'none';
@@ -40,13 +40,14 @@ export const NAV_NODES: Record<string, string> = {
     perm: '#nav-group-perm', // 权限管理系统(收银员/切收银台/操作记录)
     clients: '.nav-item[data-route="clients"]',
     company: '.nav-item[data-route="company"]',
+    master: '[data-collapsible="master"]', // 主数据(客户 / 公司资料 / 集成 · 2026-08-26 入 SSOT)
     // exceptions 不在此:2026-07-26 下线,由 app-shell-sidebar-html 内联 display:none 恒隐
     // (留在这里会被 applyNavPreset 的 show(el,true) 打开)。
     integrations: '#nav-integrations',
     guide: '[data-collapsible="guide"]', // 使用教程(父栏 → 主题)· 只对会计版有意义
 };
 
-// 会计版(firm / 未选业态老租户):首页 + Cowork + 采购 + 客户/公司/(知识) + 销售 + 集成。
+// 会计版(firm / 未选业态老租户):首页 + Cowork + 采购 + 商品 + 客户/公司/(知识) + 销售 + 集成。
 export const FIRM_PRESET: NavPreset = {
     show: [
         'dashboard',
@@ -55,6 +56,7 @@ export const FIRM_PRESET: NavPreset = {
         'purchases',
         'clients',
         'company',
+        'master',
         'sales',
         'integrations',
         'guide',
@@ -65,9 +67,25 @@ export const FIRM_PRESET: NavPreset = {
 
 // POS 版(pos_only 拆卖收银壳):收银 + 权限 + 客户 + 公司 + 商品 + 采购 + 发票(clients 放 company 前,同会计版)。
 export const POS_PRESET: NavPreset = {
-    show: ['cashier', 'perm', 'clients', 'company', 'products', 'purchases', 'sales'],
+    show: ['cashier', 'perm', 'clients', 'company', 'products', 'purchases', 'sales', 'master'],
     home: 'inventory',
     avatarHide: POS_AVATAR_HIDE,
+};
+
+// Cowork 版(entry=cowork · 2026-08-26 拍板 · 协同工作台 canonical):仅 首页 + Pearnly Cowork +
+// 主数据 + 使用教程。底部账号 / 右上账套切换 / 头像保留(avatarHide 沿用会计版收缩)。
+export const COWORK_PRESET: NavPreset = {
+    show: ['dashboard', 'cowork', 'master', 'clients', 'company', 'guide'],
+    home: 'dashboard',
+    avatarHide: FIRM_AVATAR_HIDE,
+};
+
+// ERP 版(entry=erp · 2026-08-26 拍板 · erp_portal 邀请制对外敏感入口):仅 首页 + 商品(firmGoods,
+// 不改业务逻辑)+ 采购系统 + 销售系统 + 主数据;无使用教程。fallback home 落 dashboard。
+export const ERP_PRESET: NavPreset = {
+    show: ['dashboard', 'firmGoods', 'purchases', 'sales', 'master', 'clients', 'company'],
+    home: 'dashboard',
+    avatarHide: FIRM_AVATAR_HIDE,
 };
 
 // 自身或任一祖先 display:none 即视为不可见(折叠组用 max-height 收起不算隐:菜单项仍在)。
@@ -96,7 +114,9 @@ function redirectOffHidden(home: string): void {
 // 子项另有外部门控(角色/开通)的折叠组:整组显隐由清单处理、子项 display 交 applyPosRoles,
 // applyNavPreset 不复位其 [data-module] 子项(否则强显 owner-only 项)。新增此类组往这里加,
 // 别再往下面的判定堆 key !== '…' 字面量链。
-const CHILD_GATED_GROUPS = new Set(['cashier', 'perm']);
+// 2026-08-26 · master(主数据)入 SSOT:其子项有 pos-sheets(data-module=pos)/knowledge(kbProbe)
+// 外部门控,不复位,防强显 owner-only 项。
+const CHILD_GATED_GROUPS = new Set(['cashier', 'perm', 'master']);
 
 // 按清单显隐顶层节点。显示的折叠组顺带复位子项 display(切业态往返时清残留),
 // 唯 CHILD_GATED_GROUPS 内的组子项另有门控(见上),此处不碰。

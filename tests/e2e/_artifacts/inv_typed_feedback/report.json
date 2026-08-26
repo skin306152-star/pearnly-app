@@ -45,24 +45,24 @@
     "geo": {
       "product": 108,
       "qty": 72,
-      "batch": 124,
-      "expiry": 129,
+      "batch": 112,
+      "expiry": 139,
       "rowWidth": 322,
       "bodyWidth": 358,
       "spill": 0
     },
     "lot": {
       "value": "LOT-B240301",
-      "scrollW": 122,
-      "clientW": 122
+      "scrollW": 110,
+      "clientW": 110
     }
   },
   "rowOnDesktop": {
     "ok": true,
     "geo": {
       "product": 358,
-      "batch": 268,
-      "expiry": 268,
+      "batch": 266,
+      "expiry": 266,
       "dateFits": true,
       "rows": 2
     }

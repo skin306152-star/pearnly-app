@@ -173,6 +173,7 @@
         if (p === '/admin/pearnly-ai' || p === '/admin/pearnly-ai/') return 'pearnly-ai';
         if (p === '/admin/dms' || p === '/admin/dms/') return 'dms';
         if (p === '/admin/daily' || p === '/admin/daily/') return 'daily';
+        if (p === '/admin/erp' || p === '/admin/erp/') return 'erp';
         return 'cost';
     }
 
@@ -189,6 +190,7 @@
             'pearnly-ai': 'page-admin-pearnly-ai',
             dms: 'page-admin-dms',
             daily: 'page-admin-daily',
+            erp: 'page-admin-erp',
         };
         Object.keys(pages).forEach(function (r) {
             const el = document.getElementById(pages[r]);
@@ -210,6 +212,7 @@
         if (route === 'pearnly-ai') _renderPearlyAiPage();
         if (route === 'dms') _renderDmsPage();
         if (route === 'daily') _renderDailyPage();
+        if (route === 'erp') _renderErpPage();
     }
 
     function _bindSidebar() {
@@ -4234,6 +4237,165 @@
         const flagLine = document.getElementById('adm-dms-flag-line');
         if (flagLine) flagLine.textContent = _dmsFlagText(d.flag);
         _renderDmsList(d.allowlist);
+    }
+
+    // ============ ERP 入口邀请管理页(照 DMS 邀请页范式 · 仅列表/邀请/撤销,不加重置密码) ============
+    function _erpFlagText(flag) {
+        flag = flag || {};
+        const on = flag.enabled ? _t('adm-erp-flag-on') : _t('adm-erp-flag-off');
+        const rollout =
+            flag.rollout === 'all'
+                ? _t('adm-erp-flag-rollout-all')
+                : _t('adm-erp-flag-rollout-allowlist');
+        return on + ' · ' + rollout;
+    }
+
+    function _renderErpList(rows) {
+        const host = document.getElementById('adm-erp-list');
+        if (!host) return;
+        if (!rows || !rows.length) {
+            host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-erp-list-empty')) + '</div>';
+            return;
+        }
+        host.innerHTML = rows
+            .map(function (r) {
+                const who =
+                    r.subject_type === 'unknown'
+                        ? _t('adm-erp-list-unknown')
+                        : _esc(r.username || r.email || r.subject_id);
+                const meta = [r.company_name, r.joined_at ? _adminDate(r.joined_at, true) : '']
+                    .filter(Boolean)
+                    .map(_esc)
+                    .join(' · ');
+                return (
+                    '<div class="adm-ai-list-row">' +
+                    '<span class="adm-ai-list-who"><span class="adm-ai-list-name">' +
+                    who +
+                    '</span><span class="adm-ai-list-meta">' +
+                    meta +
+                    '</span></span>' +
+                    '<span class="adm-ai-list-actions">' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-erp-revoke="' +
+                    _esc(r.subject_id) +
+                    '">' +
+                    _esc(_t('adm-erp-revoke-btn')) +
+                    '</button>' +
+                    '</span>' +
+                    '</div>'
+                );
+            })
+            .join('');
+        host.querySelectorAll('[data-adm-erp-revoke]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const ok = await _admConfirm(_t('adm-erp-revoke-confirm'), {
+                    title: _t('adm-erp-revoke-btn'),
+                    okText: _t('adm-erp-revoke-btn'),
+                    danger: true,
+                });
+                if (!ok) return;
+                try {
+                    await _adminFetch('/api/admin/erp/revoke', {
+                        method: 'POST',
+                        body: { subject_id: btn.dataset.admErpRevoke },
+                    });
+                    _renderErpPage();
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+        });
+    }
+
+    function _showErpPassword(pwd, username) {
+        const box = document.getElementById('adm-erp-pwd-box');
+        const input = document.getElementById('adm-erp-pwd-value');
+        if (!box || !input) return;
+        input.value = pwd;
+        const forLine = document.getElementById('adm-erp-pwd-for');
+        if (forLine)
+            forLine.textContent = username
+                ? _t('adm-erp-pwd-for-label').replace('{n}', username)
+                : '';
+        box.hidden = false;
+    }
+
+    // 错误按 err.detail(后端 HTTPException detail)精确分流 · invite 组 detail(见 admin_erp_routes)。
+    const _ERP_ERROR_KEYS = {
+        'admin.erp_missing_identity': 'adm-erp-invite-missing-identity',
+        'admin.erp_create_failed': 'adm-erp-invite-create-failed',
+        'admin.username_exists': 'adm-erp-invite-username-exists',
+    };
+
+    function _erpErrorKey(err) {
+        const detail = (err && err.detail) || '';
+        return _ERP_ERROR_KEYS[detail] || 'adm-load-fail';
+    }
+
+    async function _renderErpPage() {
+        const btn = document.getElementById('adm-erp-invite-btn');
+        const input = document.getElementById('adm-erp-invite-input');
+        const pwInput = document.getElementById('adm-erp-invite-password');
+        if (!btn || !input) return;
+        if (!btn.__bound) {
+            btn.__bound = true;
+            const go = async function () {
+                const raw = (input.value || '').trim();
+                if (!raw) return;
+                const pwd = (pwInput && pwInput.value.trim()) || '';
+                try {
+                    const r = await _adminFetch('/api/admin/erp/invite', {
+                        method: 'POST',
+                        body: pwd
+                            ? { username_or_email: raw, password: pwd }
+                            : { username_or_email: raw },
+                    });
+                    input.value = '';
+                    if (pwInput) pwInput.value = '';
+                    if (r.created_account) {
+                        _toast(_t('adm-erp-invite-created-ok'), 'success');
+                        _showErpPassword(r.initial_password, r.username);
+                    } else {
+                        _toast(_t('adm-erp-invite-existing-ok'), 'success');
+                    }
+                    _renderErpPage();
+                } catch (e) {
+                    _toast(_t(_erpErrorKey(e)), 'error');
+                }
+            };
+            btn.addEventListener('click', go);
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') go();
+            });
+            document
+                .getElementById('adm-erp-pwd-copy')
+                ?.addEventListener('click', async function () {
+                    const val = document.getElementById('adm-erp-pwd-value');
+                    if (!val || !val.value) return;
+                    val.select();
+                    try {
+                        await navigator.clipboard.writeText(val.value);
+                    } catch (_) {}
+                    _toast(_t('adm-erp-pwd-copied'), 'success');
+                });
+            document.getElementById('adm-erp-pwd-close')?.addEventListener('click', function () {
+                const box = document.getElementById('adm-erp-pwd-box');
+                const val = document.getElementById('adm-erp-pwd-value');
+                const forLine = document.getElementById('adm-erp-pwd-for');
+                if (box) box.hidden = true;
+                if (val) val.value = '';
+                if (forLine) forLine.textContent = '';
+            });
+        }
+        let d;
+        try {
+            d = await _adminFetch('/api/admin/erp/overview');
+        } catch (e) {
+            _toast(_t('adm-load-fail'), 'error');
+            return;
+        }
+        const flagLine = document.getElementById('adm-erp-flag-line');
+        if (flagLine) flagLine.textContent = _erpFlagText(d.flag);
+        _renderErpList(d.allowlist);
     }
 
     // ============ Agent 助手观测页 ============

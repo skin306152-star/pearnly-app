@@ -174,23 +174,6 @@ const SHOTS = [
         after: (page) => page.evaluate(() => document.getElementById('orgsw-pop')?.remove()),
     },
     {
-        id: 'overview-04-cmdk',
-        scene: 'wb',
-        sel: '.cmdk',
-        prep: async (page) => {
-            await page.evaluate(() => window.openCmdk());
-            await page.waitForTimeout(400);
-            // 四行语言项在「操作」段、列表最底下 —— 滚到底才四行齐全(这张图要的就是那四行,
-            // 顶上「跳转」标题被裁掉一线是可以接受的代价)。
-            await page.evaluate(() => {
-                const b = document.getElementById('cmdk-body');
-                if (b) b.scrollTop = b.scrollHeight;
-            });
-            await page.waitForTimeout(300);
-        },
-        after: (page) => page.evaluate(() => window.closeCmdk()),
-    },
-    {
         id: 'daily-11-summarytask',
         scene: 'wb',
         sel: '.dx-wrap',

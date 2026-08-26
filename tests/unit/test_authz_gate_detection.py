@@ -180,5 +180,25 @@ class GateDetectionTests(unittest.TestCase):
         self.assertIsNone(self._gate(handler_gated_helper_after_delete))
 
 
+class PublicRouteWhitelistTests(unittest.TestCase):
+    """锁住 cowork / erp 页面壳在公开白名单,且不存在通配 /erp/{rest:path}。"""
+
+    def test_cowork_shell_in_public_whitelist(self):
+        from scripts.check_authz_coverage import PUBLIC_ROUTES
+
+        self.assertIn(("GET", "/cowork"), PUBLIC_ROUTES)
+
+    def test_erp_shell_in_public_whitelist(self):
+        from scripts.check_authz_coverage import PUBLIC_ROUTES
+
+        self.assertIn(("GET", "/erp"), PUBLIC_ROUTES)
+
+    def test_no_erp_wildcard_route_in_whitelist(self):
+        """/erp/{rest:path} 不在白名单 —— 避免扩大公开面。"""
+        from scripts.check_authz_coverage import PUBLIC_ROUTES
+
+        self.assertNotIn(("GET", "/erp/{rest:path}"), PUBLIC_ROUTES)
+
+
 if __name__ == "__main__":
     unittest.main()

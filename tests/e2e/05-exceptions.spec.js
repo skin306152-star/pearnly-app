@@ -38,15 +38,8 @@ test.describe('异常栏已下线', () => {
         });
         await expect(page.locator('#page-exceptions'), '异常页不该激活').not.toHaveClass(/active/);
 
-        // ────── ③ 命令面板(真按键 Ctrl+K)里没有异常栏项
-        await page.keyboard.press('Control+k');
-        await expect(page.locator('#cmdk-mask'), '命令面板打开').toBeVisible();
-        await expect(
-            page.locator('#cmdk-mask [data-cmdk-route="exceptions"]'),
-            '命令面板不该还有异常栏'
-        ).toHaveCount(0);
-        await page.keyboard.press('Escape');
-
+        // ────── ③ 命令面板(⌘K)已于 2026-08-26 整体下线(需求批 B4),异常栏项无从残留——
+        //        此处不再验命令面板,保留深链回落 + 侧栏恒隐两条防线。
         assertNoConsoleErrors(expect, guard);
     });
 

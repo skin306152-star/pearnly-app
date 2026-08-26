@@ -408,7 +408,7 @@ export const SIDEBAR_HTML = `
     </div>
 
     <!-- 异常栏 · 2026-07-26 下线(Zihao:实际使用毫无用处)。DOM 留着不删,恒隐;
-         路由/命令面板/红点轮询/后端规则同批掐断,恢复见 route-table.ts 的下线注释。 -->
+         路由/红点轮询/后端规则同批掐断,恢复见 route-table.ts 的下线注释。 -->
     <div class="nav-item nav-sub-item" data-route="exceptions" style="display:none;">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9.1 3.4L2.3 15a1.5 1.5 0 001.3 2.3h12.8A1.5 1.5 0 0017.7 15L10.9 3.4a1.5 1.5 0 00-1.8 0z"/>

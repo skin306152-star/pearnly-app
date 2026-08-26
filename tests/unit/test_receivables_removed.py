@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # 曾承载过 receivables 占位的前端骨架文件(全部不得再出现 receivables 路由字样)
 SHELL_FILES = [
     "src/home/app-shell-sidebar-html.ts",
-    "src/home/cmdk-mask-html.ts",
+    # 2026-08-26 · 命令面板整体下线,cmdk-mask-html.ts 已删除,不再纳入骨架清单
     "src/home/page-placeholders.ts",
     "src/home/route-table.ts",
     "src/home/sidebar-nav-group.ts",

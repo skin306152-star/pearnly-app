@@ -52,9 +52,17 @@ class FrontendEntryCutTests(unittest.TestCase):
         self.assertFalse("exceptions: '.nav-item" in text, "exceptions 又回到 NAV_NODES 了")
         self.assertFalse("'exceptions'," in text, "exceptions 又回到某个 preset 白名单了")
 
-    def test_cmdk_has_no_exceptions_item(self):
-        text = _read("src/home/cmdk-mask-html.ts")
-        self.assertFalse('data-cmdk-route="exceptions"' in text, "命令面板里的异常栏项又回来了")
+    def test_cmdk_module_removed(self):
+        # 2026-08-26 · 顶栏搜索框 / Cmd+K 命令面板整体下线(需求批 B4):cmdk 模板模块已删、
+        # main.js 不再 import、home.html 无 #cmdk-mask 空壳。命令面板里的异常栏项无从残留。
+        self.assertFalse(
+            (PROJECT_ROOT / "src/home/cmdk-mask-html.ts").exists(),
+            "cmdk 模板模块应已删除",
+        )
+        text = _read("src/main.js")
+        self.assertFalse("cmdk-mask-html" in text, "main.js 不再 import cmdk 模板")
+        home = _read("home.html")
+        self.assertFalse("cmdk-mask" in home, "home.html 不应再有精命令面板空壳")
 
     def test_no_stray_route_jumps(self):
         # 推送日志详情里那个 routeTo('exceptions') 分支(本就无按钮触发)已删。

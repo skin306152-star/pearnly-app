@@ -1,0 +1,397 @@
+<!doctype html>
+<!-- ui-lint: standalone -->
+<!-- ERP 邀请制登录门：只负责账号密码登录，业务继续复用现有 home SPA。 -->
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ERP · Pearnly</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
+    <style>
+      :root {
+        --bg: rgb(250, 250, 248);
+        --panel: rgb(255, 255, 255);
+        --ink: rgb(26, 26, 26);
+        --ink-3: rgb(107, 114, 128);
+        --line: rgb(229, 231, 235);
+        --accent: #7c4dff;
+        --accent-press: #6b3ff2;
+        --danger: rgb(220, 38, 38);
+        --ok: rgb(5, 150, 105);
+        --inverse: rgb(255, 255, 255);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+          'PingFang SC', 'Microsoft YaHei', sans-serif;
+        padding: 24px;
+      }
+      .brand {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 6px;
+        color: var(--ink);
+        text-decoration: none;
+      }
+      .tag {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-bottom: 20px;
+        letter-spacing: 0.3px;
+      }
+      .card {
+        width: 100%;
+        max-width: 400px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 28px 26px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 6px;
+      }
+      .sub {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin: 0 0 20px;
+        line-height: 1.5;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        margin: 14px 0 6px;
+      }
+      .field {
+        position: relative;
+      }
+      input {
+        width: 100%;
+        height: 42px;
+        padding: 0 40px 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 14px;
+        outline: none;
+        background: var(--panel);
+        color: var(--ink);
+      }
+      input:focus {
+        border-color: var(--accent);
+      }
+      .eye {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--ink-3);
+        padding: 6px;
+        line-height: 0;
+      }
+      .eye svg {
+        display: block;
+      }
+      button.submit {
+        width: 100%;
+        height: 44px;
+        margin-top: 22px;
+        background: var(--accent);
+        color: var(--inverse);
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.submit:hover {
+        background: var(--accent-press);
+      }
+      button.submit:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .msg {
+        font-size: 13px;
+        margin-top: 14px;
+        min-height: 18px;
+        line-height: 1.5;
+      }
+      .msg.error {
+        color: var(--danger);
+      }
+      .msg.success {
+        color: var(--ok);
+      }
+      .langbar {
+        margin-top: 18px;
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+      }
+      .langbar button {
+        background: none;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 12px;
+        color: var(--ink-3);
+        cursor: pointer;
+      }
+      .langbar button.active {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="brand">Pearnly</div>
+    <div class="tag" id="p-tag"></div>
+    <div class="card">
+      <h1 id="p-title"></h1>
+      <p class="sub" id="p-sub"></p>
+      <form id="p-form">
+        <label id="p-label-email" for="p-email"></label>
+        <div class="field">
+          <input
+            id="p-email"
+            type="text"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+          />
+        </div>
+        <label id="p-label-pw" for="p-pw"></label>
+        <div class="field">
+          <input id="p-pw" type="password" autocomplete="current-password" />
+          <button class="eye" type="button" data-target="p-pw" aria-label="show/hide">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
+        <button class="submit" id="p-submit" type="submit"></button>
+        <div class="msg" id="p-msg"></div>
+      </form>
+      <div class="langbar" id="p-langbar">
+        <button data-lang="zh">中文</button><button data-lang="th">ไทย</button
+        ><button data-lang="en">EN</button><button data-lang="ja">日本</button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        'use strict';
+        var I18N = {
+          zh: {
+            tag: 'ERP 门户登录',
+            title: '登录',
+            sub: '用你的账号和密码登录 ERP 门户。',
+            email: '账号',
+            pw: '密码',
+            submit: '登录',
+            submitting: '登录中…',
+            empty: '请输入账号和密码',
+            wrong: '账号或密码不正确',
+            locked: '尝试次数过多 · 请 30 分钟后再试',
+            neterr: '网络异常 · 请稍后重试',
+          },
+          th: {
+            tag: 'เข้าสู่ระบบ ERP',
+            title: 'เข้าสู่ระบบ',
+            sub: 'เข้าสู่ระบบ ERP ด้วยบัญชีและรหัสผ่านของคุณ',
+            email: 'บัญชี',
+            pw: 'รหัสผ่าน',
+            submit: 'เข้าสู่ระบบ',
+            submitting: 'กำลังเข้าสู่ระบบ…',
+            empty: 'กรุณากรอกบัญชีและรหัสผ่าน',
+            wrong: 'บัญชีหรือรหัสผ่านไม่ถูกต้อง',
+            locked: 'พยายามหลายครั้งเกินไป · ลองใหม่ใน 30 นาที',
+            neterr: 'เครือข่ายมีปัญหา · ลองใหม่อีกครั้ง',
+          },
+          en: {
+            tag: 'ERP Portal Login',
+            title: 'Sign in',
+            sub: 'Sign in to the ERP portal with your account and password.',
+            email: 'Account',
+            pw: 'Password',
+            submit: 'Sign in',
+            submitting: 'Signing in…',
+            empty: 'Please enter account and password',
+            wrong: 'Incorrect account or password',
+            locked: 'Too many attempts · try again in 30 minutes',
+            neterr: 'Network error · please try again',
+          },
+          ja: {
+            tag: 'ERP ポータルログイン',
+            title: 'ログイン',
+            sub: 'アカウントとパスワードで ERP ポータルにログイン。',
+            email: 'アカウント',
+            pw: 'パスワード',
+            submit: 'ログイン',
+            submitting: 'ログイン中…',
+            empty: 'アカウントとパスワードを入力してください',
+            wrong: 'アカウントまたはパスワードが正しくありません',
+            locked: '試行回数が多すぎます · 30 分後に再試行',
+            neterr: 'ネットワークエラー · もう一度お試しください',
+          },
+        };
+        function pick() {
+          var s = '';
+          try {
+            s = localStorage.getItem('mrpilot_lang') || '';
+          } catch (e) {}
+          var n = (navigator.language || '').slice(0, 2);
+          var c = s || n;
+          return I18N[c] ? c : 'zh';
+        }
+        var lang = pick(),
+          dict = I18N[lang] || I18N.zh;
+        function $(id) {
+          return document.getElementById(id);
+        }
+        function applyLang() {
+          document.documentElement.lang = lang;
+          $('p-tag').textContent = dict.tag;
+          $('p-title').textContent = dict.title;
+          $('p-sub').textContent = dict.sub;
+          $('p-label-email').textContent = dict.email;
+          $('p-label-pw').textContent = dict.pw;
+          $('p-submit').textContent = dict.submit;
+          document.querySelectorAll('#p-langbar button').forEach(function (b) {
+            b.classList.toggle('active', b.dataset.lang === lang);
+          });
+        }
+        function setMsg(t, k) {
+          var e = $('p-msg');
+          e.textContent = t || '';
+          e.className = 'msg' + (k ? ' ' + k : '');
+        }
+
+        function tokenEntryFromJwt() {
+          var tok = (localStorage.getItem('mrpilot_token') || '').split('.');
+          if (!tok[1]) return '';
+          try {
+            var p = JSON.parse(atob(tok[1].replace(/-/g, '+').replace(/_/g, '/')));
+            var e = p && p.entry ? p.entry : '';
+            return typeof e === 'string' ? e : '';
+          } catch (e2) {
+            return '';
+          }
+        }
+        function canonicalFor(entry) {
+          if (entry === 'erp') return 'erp';
+          if (entry === 'pos' || entry === 'dms' || entry === 'ai' || entry === 'daily')
+            return entry;
+          return 'cowork';
+        }
+        var hasToken = false;
+        try {
+          hasToken = !!localStorage.getItem('mrpilot_token');
+        } catch (e3) {
+          hasToken = false;
+        }
+        if (hasToken) {
+          var entry = tokenEntryFromJwt() || '';
+          if (!entry) {
+            try {
+              entry = localStorage.getItem('pearnly_entry') || '';
+            } catch (e4) {}
+          }
+          var canon = canonicalFor(entry);
+          try {
+            localStorage.setItem('pearnly_entry', canon);
+          } catch (e5) {}
+          window.location.replace(
+            canon === 'cowork' || canon === 'erp' ? '/home?canonical=' + canon : '/' + canon
+          );
+          return;
+        }
+        async function submit(e) {
+          e.preventDefault();
+          var acct = ($('p-email').value || '').trim(),
+            pw = $('p-pw').value;
+          if (!acct || !pw) return setMsg(dict.empty, 'error');
+          var b = $('p-submit');
+          b.disabled = true;
+          b.textContent = dict.submitting;
+          setMsg('', '');
+          try {
+            var r = await fetch('/api/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: acct, password: pw, remember: true, entry: 'erp' }),
+            });
+            var data = await r.json().catch(function () {
+              return {};
+            });
+            if (r.ok && data.access_token) {
+              try {
+                localStorage.setItem('mrpilot_token', data.access_token);
+                localStorage.setItem('mrpilot_lang', lang);
+                localStorage.setItem('pearnly_entry', 'erp');
+              } catch (e6) {}
+              window.location.href = data.is_super_admin ? '/admin/cost' : '/home?canonical=erp';
+              return;
+            }
+            setMsg(data.detail === 'account_locked' ? dict.locked : dict.wrong, 'error');
+          } catch (err) {
+            setMsg(dict.neterr, 'error');
+          } finally {
+            b.disabled = false;
+            b.textContent = dict.submit;
+          }
+        }
+        function bind() {
+          document.querySelectorAll('.eye').forEach(function (eye) {
+            eye.addEventListener('click', function () {
+              var i = $(eye.dataset.target);
+              if (i) i.type = i.type === 'password' ? 'text' : 'password';
+            });
+          });
+          $('p-form').addEventListener('submit', submit);
+          $('p-langbar').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-lang]');
+            if (!b) return;
+            lang = b.dataset.lang;
+            dict = I18N[lang] || I18N.zh;
+            try {
+              localStorage.setItem('mrpilot_lang', lang);
+            } catch (e7) {}
+            applyLang();
+            setMsg('', '');
+          });
+        }
+        applyLang();
+        bind();
+      })();
+    </script>
+  </body>
+</html>

@@ -16,10 +16,14 @@ from routes.pages_routes import router
 from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
 
 # 全部返回 HTML 外壳的对外路由(/admin 是 301 → 用落地的 /admin/cost)。
+# 2026-08-26 · /login 已退居服务端 302 别名(落 /cowork),不再吐外壳,故不在此清单;
+# /cowork 完全复用主站登录 UI(serve static/dist/login.html)· /erp 独立 ERP 专属登录门
+# (serve static/dist/erp.html)· 两者都是 minified 外壳,同样受本闸约束。
 SHELL_ROUTES = [
     "/",
-    "/login",
     "/home",
+    "/cowork",
+    "/erp",
     "/admin/cost",
     "/pos",
     "/earn",

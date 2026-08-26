@@ -77,8 +77,22 @@ class AuthorizedEntrancesTests(unittest.TestCase):
         )
 
     def test_no_tenant_gets_main_and_cowork(self) -> None:
-        # 无租户兜底与推导口径严格等价(非 pos_only 天然 main+cowork)
-        self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main", "cowork"})
+        # 无租户兜底与推导口径严格等价(非 pos_only 天然 main+cowork);
+        # 无 user-level 邀请标记时绝不引入 erp(不放松未邀请 ERP)。
+        with mock.patch("core.feature_flags.erp_portal_enabled_for", return_value=False):
+            self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main", "cowork"})
+
+    def test_no_tenant_with_user_level_erp_marker_gets_erp(self) -> None:
+        # 无 tenant(个人套账)但有 user-level erp_portal 邀请标记 → 必须能穿 ERP 门。
+        with mock.patch("core.feature_flags.erp_portal_enabled_for", return_value=True):
+            self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main", "cowork", "erp"})
+
+    def test_no_tenant_without_erp_marker_is_still_denied(self) -> None:
+        # 未邀请(user-level 无标记)→ 授权集不含 erp,ERP 门不放行(不因无租户而放宽)。
+        with mock.patch("core.feature_flags.erp_portal_enabled_for", return_value=False):
+            ents = entrance.authorized_entrances(None, "u1")
+        self.assertEqual(ents, {"main", "cowork"})
+        self.assertNotIn("erp", ents)
 
 
 class LoginEntranceAllowedTests(unittest.TestCase):
@@ -114,6 +128,17 @@ class LoginEntranceAllowedTests(unittest.TestCase):
     def test_gate_off_allows_unentitled(self) -> None:
         with mock.patch("core.feature_flags.entrance_gate_enabled_for", return_value=False):
             self.assertTrue(entrance.login_entrance_allowed("pos", {"tenant_id": "t1", "id": "u1"}))
+
+    def test_gate_off_does_not_bypass_erp_invitation(self) -> None:
+        with (
+            mock.patch("core.feature_flags.entrance_gate_enabled_for", return_value=False),
+            mock.patch(
+                "services.auth.entrance.authorized_entrances", return_value={"main", "cowork"}
+            ),
+        ):
+            self.assertFalse(
+                entrance.login_entrance_allowed("erp", {"tenant_id": "t1", "id": "u1"})
+            )
 
     def test_gate_on_denies_unentitled(self) -> None:
         with (
@@ -154,6 +179,21 @@ class LoginEntranceAllowedTests(unittest.TestCase):
 
     def test_real_erp_allowed_when_invited(self) -> None:
         self.assertTrue(self._real_login("erp", erp_on=True))
+
+    def test_personal_user_level_erp_gate(self) -> None:
+        # 无 tenant(个人套账)用户:user-level erp_portal 邀请 → ERP 门放行;未邀请 → 拒。
+        with (
+            mock.patch("core.feature_flags.entrance_gate_enabled_for", return_value=True),
+            mock.patch("core.feature_flags.erp_portal_enabled_for", return_value=True),
+        ):
+            self.assertTrue(entrance.login_entrance_allowed("erp", {"id": "u1", "tenant_id": None}))
+        with (
+            mock.patch("core.feature_flags.entrance_gate_enabled_for", return_value=True),
+            mock.patch("core.feature_flags.erp_portal_enabled_for", return_value=False),
+        ):
+            self.assertFalse(
+                entrance.login_entrance_allowed("erp", {"id": "u1", "tenant_id": None})
+            )
 
     def test_real_cowork_allowed_for_firm(self) -> None:
         # 非 pos_only 天然 main+cowork → cowork 门放行

@@ -29,6 +29,11 @@ EXPECTED = {
     ("GET", "/"),
     ("GET", "/login"),
     ("GET", "/home"),
+    # 2026-08-26 · /cowork canonical 主壳(完全复用主站登录 UI · serve static/dist/login.html);
+    # /erp 独立 ERP 专属登录门(serve static/dist/erp.html · erp_portal 邀请制)。两者路由走
+    # hash,pathname 恒为 /cowork 或 /erp,故无 {rest:path} 子路径)
+    ("GET", "/cowork"),
+    ("GET", "/erp"),
     ("GET", "/admin"),
     ("GET", "/admin/{rest:path}"),
     ("GET", "/pos-sw.js"),
@@ -131,6 +136,36 @@ class PagesRoutesContractTests(unittest.TestCase):
 
         self.assertIs(pages_routes.v1_health.__globals__["health"], pages_routes.health)
         self.assertIs(pages_routes.v1_contact.__globals__["contact"], pages_routes.contact)
+
+    def test_cowork_erp_serve_distinct_shells_and_login_redirects(self):
+        """2026-08-26 主控拍板:/cowork 完全复用主站老登录 UI(login.html + landing.js);
+        /erp 是独立 ERP 专属登录门(static/dist/erp.html · erp_portal 邀请制),不复用 login.html;
+        /login 服务端 302 到 canonical 主壳(默认 /cowork),不再跳 /login?entry=。"""
+        import asyncio
+
+        from routes import pages_routes
+
+        login = "static/dist/login.html"
+        self.assertEqual(asyncio.run(pages_routes.cowork_page()).path, login)
+        self.assertEqual(asyncio.run(pages_routes.erp_page()).path, "static/dist/erp.html")
+
+        # /login 默认重定向 /cowork;安全 next 同源内部路径才放行,开放重定向一律回落 /cowork。
+        self.assertEqual(pages_routes._safe_internal_next(""), None)
+        self.assertEqual(pages_routes._safe_internal_next("/erp#/dashboard"), "/erp#/dashboard")
+        self.assertIsNone(pages_routes._safe_internal_next("//evil.example/x"))
+        self.assertIsNone(pages_routes._safe_internal_next("/\\evil.example/x"))
+        self.assertIsNone(pages_routes._safe_internal_next("/%2f%2fevil.example/x"))
+        self.assertIsNone(pages_routes._safe_internal_next("/%5c%5cevil.example/x"))
+        self.assertIsNone(pages_routes._safe_internal_next("https://evil.example/x"))
+        self.assertIsNone(pages_routes._safe_internal_next("relative/path"))
+
+        resp = asyncio.run(pages_routes.login_page())
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.headers["location"], "/cowork")
+        # 保留安全 next,否则默认 /cowork。
+        resp_next = asyncio.run(pages_routes.login_page(next="/erp#/dashboard"))
+        self.assertEqual(resp_next.status_code, 302)
+        self.assertEqual(resp_next.headers["location"], "/erp#/dashboard")
 
 
 if __name__ == "__main__":

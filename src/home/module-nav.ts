@@ -7,7 +7,14 @@
 // knowledge 例外:由 knowledge-center.ts kbProbe 独占门控,两路都不碰(抢同一元素会回归)。
 /* global apiGet */
 
-import { show, applyNavPreset, FIRM_PRESET, POS_PRESET } from './nav-presets.js';
+import {
+    show,
+    applyNavPreset,
+    FIRM_PRESET,
+    POS_PRESET,
+    COWORK_PRESET,
+    ERP_PRESET,
+} from './nav-presets.js';
 
 interface ModuleFlag {
     enabled?: boolean;
@@ -69,7 +76,7 @@ function applyPosRoles(
 }
 
 // 顶栏头像菜单按业态白名单收缩(清单路径设,商户路径清空)。落到全局供 applyRoleVisibility 复用:
-// 它在 i18n 切换 / cmdk 打开时会重跑,读同一份 _avatarShellHide 才不会把锁死项又显回来。
+// 它在 i18n 切换时会重跑,读同一份 _avatarShellHide 才不会把锁死项又显回来。
 function lockAvatarShell(hideIds: string[]): void {
     window._avatarShellHide = hideIds;
     if (typeof window.applyRoleVisibility === 'function') window.applyRoleVisibility();
@@ -128,7 +135,12 @@ function resolvePreset(
             : !businessType || businessType === 'firm'
               ? FIRM_PRESET
               : null;
-    if ((window._entry || '') === 'pos') return posEnabled ? POS_PRESET : original; // 没开 pos 模块则忽略 entry
+    const entry = window._entry || '';
+    if (entry === 'pos') return posEnabled ? POS_PRESET : original; // 没开 pos 模块则忽略 entry
+    // cowo/erp 入口(2026-08-26 拍板):入口决定性大于业态回落。cowork 主壳 / ERP 敏感门各按
+    // 拍板清单出菜单,不随 business_type 的 firm 回落(否则 ERP 会看到 full firm 菜单)。
+    if (entry === 'cowork') return COWORK_PRESET;
+    if (entry === 'erp') return ERP_PRESET;
     return original;
 }
 
@@ -150,6 +162,17 @@ function apply(
             /* silent · localStorage 私模/配额 */
         }
     }
+    // 层2 校正(权威 data.entry · 2026-08-26):主壳 canonical 与可见 pathname 不符 → 归一 URL,
+    // 兜的是 landing.js 层1 管不到的场景(手输 /home?canonical= 或 token.entry 服务端已变)。
+    // 仅 cowork/main/erp 三个主壳入口参与;pos/dms/ai/daily 各自独立壳,不走本桁。
+    const shellEntry = window._entry || '';
+    if (shellEntry === 'erp' || shellEntry === 'cowork' || shellEntry === 'main') {
+        const want = shellEntry === 'erp' ? '/erp' : '/cowork';
+        if (location.pathname !== want) {
+            window.location.replace(want + location.search + location.hash);
+            return;
+        }
+    }
     const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
     const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
     const on = (k: string) => !!(modules[k] && modules[k].enabled);
@@ -157,8 +180,10 @@ function apply(
     const preset = resolvePreset(businessType, on('pos'));
 
     // 客户知识入口由 knowledge-center 的 kbProbe 按"有没有知识库"独立显隐(异步),module-nav 不抢。
-    // 唯 pos_only 收银壳要它彻底消失(不在白名单)→ 置旗让 kbProbe 的 reveal 不再显(竞态双保险)。
-    window._navShellHidesKnowledge = businessType === 'pos_only';
+    // 唯 pos_only 收银壳 + cowork/erp 两个 lock 壳要它彻底消失(不在白名单)→ 置旗让 kbProbe 的
+    // reveal 不再显(竞态双保险)。
+    window._navShellHidesKnowledge =
+        businessType === 'pos_only' || window._entry === 'cowork' || window._entry === 'erp';
 
     if (preset) {
         applyNavPreset(preset);

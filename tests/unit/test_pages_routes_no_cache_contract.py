@@ -14,7 +14,19 @@ from fastapi.testclient import TestClient
 from routes.pages_routes import router, _NO_CACHE
 
 # 返回静态 HTML 外壳、且文件在仓库内存在的页面入口(reset.html 不入仓,单独豁免)
-SHELL_ROUTES = ["/", "/login", "/home", "/console", "/invite/x", "/terms", "/privacy"]
+# 2026-08-26 · /cowork 完全复用主站登录 UI(serve static/dist/login.html)· /erp 独立 ERP
+# 专属登录门(serve static/dist/erp.html)· 两者都须 no-cache 防缓存旧壳。/login 已退居
+# 302 别名(见 test_login_redirects_to_cowork),不再列入静态外壳清单。
+SHELL_ROUTES = [
+    "/",
+    "/home",
+    "/cowork",
+    "/erp",
+    "/console",
+    "/invite/x",
+    "/terms",
+    "/privacy",
+]
 
 
 class NoCacheContractTest(unittest.TestCase):
@@ -49,6 +61,12 @@ class NoCacheContractTest(unittest.TestCase):
         resp = self.client.get("/pos", follow_redirects=False)
         self.assertEqual(resp.status_code, 200)
         self.assertIn("no-cache", resp.headers.get("cache-control", ""))
+
+    def test_login_redirects_to_cowork(self):
+        # /login 服务端 302 → /cowork(canonical 主壳),不再直接出登录页外壳。
+        resp = self.client.get("/login", follow_redirects=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.headers.get("location"), "/cowork")
 
 
 if __name__ == "__main__":

@@ -111,7 +111,7 @@ test('full surface audit', async ({ page }) => {
     // L1 安全打开:渲染型全局函数(无副作用)
     const openers = [
         ['L1-settings-设置弹窗', 'openSettingsModal'],
-        ['L1-cmdk-命令面板', 'openCmdk'],
+        // 2026-08-26 · 命令面板(openCmdk)已整体下线 · 该项从 UI 审计清单移除
         ['L1-rules-归档规则', 'openRulesSettings'],
         ['L1-camera-tips-拍照贴士', 'showCameraTips'],
         ['L1-help-帮助', 'openHelpModal'],

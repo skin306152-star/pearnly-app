@@ -21,20 +21,7 @@
     "test_no_two_entries_watch_the_same_screenshots 硬拦;认不到任何图也照红(通配写偏一个",
     "字符就什么都不匹配,而那种失效从外面看跟『跑过了』一模一样)。"
   ],
-  "stale_ack": {
-    "_inv_guards_verify.cjs": {
-      "until": "2026-08-22",
-      "why": "2026-08-08 i18n-data.js 只新增 stockcard 归并键(stc-mg-*),未触碰扫码/库存任何文案;键完整性由 check_i18n/check_i18n_refs 闸兜住。下次动扫码面时重跑本脚本清欠。"
-    },
-    "_inv_typed_feedback_verify.cjs": {
-      "until": "2026-08-22",
-      "why": "同上:仅 stc-mg-* 新键触发 i18n-data.js covers,慢枪/批号交互面未动。"
-    },
-    "_sx_barcode_copy_accept.cjs": {
-      "until": "2026-08-22",
-      "why": "同上:仅 stc-mg-* 新键触发 i18n-data.js covers,POS 条码复制面未动。"
-    }
-  },
+  "stale_ack": {},
   "scripts": {
     "_pos_vat_summary_verify.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_vat_summary",
@@ -621,6 +608,45 @@
         "确认后弹出「当期义务已重算」toast(真 DOM 节点+.on 过渡类):toast 的存在与文案是渲染期事实",
         "SBT CTA 按钮点击真调用 AI.steward.openWith(带预填句):模块间调用链路,node 单测里没有 AI.steward",
         "完整度百分比与进度条宽度随确认动作实时变化:getComputedStyle/文本节点只有真渲染给得出"
+      ]
+    },
+    "_erp_cowork_split_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/erp-cowork-split",
+      "covers": [
+        "routes/pages_routes.py",
+        "home.html",
+        "login.html",
+        "static/erp/erp.html",
+        "static/landing/landing.js",
+        "src/home/app-shell-html.ts",
+        "src/home/app-shell-sidebar-html.ts",
+        "src/home/core-boot.ts",
+        "src/home/module-nav.ts",
+        "src/home/nav-presets.ts",
+        "src/home/route-table.ts",
+        "src/home/topbar-avatar.ts",
+        "static/home-31-navia-topbar.css",
+        "static/i18n-data.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "/login 真实 302 → /cowork(fetch redirect:manual 才拿得到 location 头,单测里路由是桩)、浏览器 URL canonical 落到 /cowork 而非 /login:整条链是真 HTTP + 真 history.pushState",
+        "桌面与手机(390×844)两套登录门各自真渲染(cowork=旧 auth-shell/#form-login,erp=独立 #p-form/#p-email):isVisible + getComputedStyle 双证,且输入框用 keyboard.type 验焦点与键入值",
+        "cowork 顶级菜单严格 = 首页/Pearnly Cowork/主数据/使用教程、erp 严格 = 首页/商品/采购系统/销售系统/主数据:DOM 顺序 + isVisible + display!==none 逐条量,非白名单项必须 display:none;手机抽屉打开后同结构复验",
+        "全局 topbar 无搜索输入、按 Cmd/Ctrl+K 不弹任何命令面板/遮罩/不改 URL(overlaySig 前后一致);但账套切换器(orgsw-pop)内部搜索框真获焦、收下键盘输入、按词过滤主体列表 —— 两条路在同一跑里互证",
+        "跨壳深链 allowlist:stock-card 在 cowork 被拦回 dashboard、在 erp 放行到 page-stock-card;history 在 cowork 放行、在 erp 被拦回 dashboard —— 同一路由两壳行为相反,只有真 _entryGuardRoute + COWORK/ERP_ALLOWED_ROUTES 走得出"
+      ]
+    },
+    "_erp_admin_invite_verify.cjs": {
+      "artifacts": "tests/e2e/_artifacts/erp-admin-invite",
+      "covers": ["static/admin/admin.html", "static/admin/admin.js", "static/admin/admin-i18n.js"],
+      "fixtures": [],
+      "only_e2e": [
+        "中文/泰文至少切换显示(document.documentElement.lang 真变、页面标题与侧栏标签各自从真 window.ADMIN_I18N 取词逐字对):单测里没有页面语言这回事,词典注入也造不出 admin.js 的真切换链路",
+        "桌面与手机(390×844)布局各自真渲染(#page-admin-erp.active + 邀请按钮 isVisible + display!==none):getComputedStyle + getBoundingClientRect 双证,手机视口下元素不被挤出或截断",
+        "撤销必须过确认弹窗(#adm-confirm-modal display!==none):取消不发 revoke 请求(net.revoke.length===0)、确认才 POST subject_id 且成功后 overview 重拉 +1 并剔除该行 —— 弹窗淡入动画后的截图肉眼可见,单测里 confirm 是直接调的",
+        "创建新账号一次性密码框(#adm-erp-pwd-box hidden=false + display=block)真展示后端发放值、复制按钮把密码写入剪贴板(navigator.clipboard.writeText 桩记录)、归属账号行从真词典合成;关闭后 hidden=true 且值清空 —— 整条链是真 DOM 状态机",
+        "已有账号邀请 POST payload 精确仅含 username_or_email(无 password 字段)、成功后 overview 重拉 +1 且名单新增该账号行、toast 文案从真词典取:请求载荷与刷新时序只有真 page.route 桩 + 真 waitForFunction 验得出"
       ]
     }
   },

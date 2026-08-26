@@ -198,15 +198,28 @@ document.addEventListener('click', () => {
 setupDropdown('lang-dropdown', (item: any) => applyLang(item.dataset.lang));
 
 // 路由表抽 route-table.ts(纯数据 · 控本文件行数):加新页改那边,这里只消费。
-import { VALID_ROUTES, ROUTE_LOADERS, POS_ENTRY_ROUTES, MAIN_ENTRY_ROUTES } from './route-table.js';
+import {
+    VALID_ROUTES,
+    ROUTE_LOADERS,
+    POS_ENTRY_ROUTES,
+    MAIN_ENTRY_ROUTES,
+    COWORK_ALLOWED_ROUTES,
+    ERP_ALLOWED_ROUTES,
+} from './route-table.js';
 
 // Phase3 入口守卫(各是各的 · 纯 UX;后端 _check 是真边界):跨壳深链回落当前入口首页。
-// 仅在 window._entry 明确为 'pos'/'main' 时生效(旧会话为空 → 不拦,向后兼容);两壳共用 /
-// 无法判定归属的路由不在两集 → 放行。
+// 入口优先取服务器同步的 window._entry；冷启动首轮用 canonical pathname 兜住 cowork/erp。
+// 旧会话且非 canonical 路径仍不拦，保持向后兼容。
 function _entryGuardRoute(route: string): string {
-    const entry = window._entry;
+    // 冷启动首轮 routeTo 早于 /api/me/modules；先按 canonical pathname 守住深链，
+    // 鉴权返回后 module-nav 再用 token 的 data.entry 覆盖 window._entry。
+    const entry =
+        window._entry ||
+        (location.pathname === '/erp' ? 'erp' : location.pathname === '/cowork' ? 'cowork' : '');
     if (entry === 'pos' && MAIN_ENTRY_ROUTES.has(route)) return 'inventory';
     if (entry === 'main' && POS_ENTRY_ROUTES.has(route)) return 'dashboard';
+    if (entry === 'cowork' && !COWORK_ALLOWED_ROUTES.has(route)) return 'dashboard';
+    if (entry === 'erp' && !ERP_ALLOWED_ROUTES.has(route)) return 'dashboard';
     return route;
 }
 
@@ -327,8 +340,8 @@ async function loadAll() {
         // ============================================================
         // v118.28.2 · 超管 /admin URL 独立(对齐 Stripe / Xero / QuickBooks)
         // 规则:
-        //   - 普通用户 → 只能进 /home · 偷偷输 /admin 自动弹回
-        //   - 超管 → 永远只看 /admin · 误进 /home 自动跳走
+        //   - 普通用户 → 只能进 /cowork · 偷偷输 /admin 自动弹回(2026-08-26 /home 退居内部入口)
+        //   - 超管 → 永远只看 /admin · 误进 /cowork 自动跳走
         // v118.44.0 · _isAdminPath 加 startsWith('/admin/')· 新 /admin/cost · /admin/users 也算 admin path
         // ============================================================
         try {
@@ -336,7 +349,7 @@ async function loadAll() {
                 location.pathname === '/admin' || location.pathname.startsWith('/admin/');
             const _isSuper = !!u.is_super_admin;
             if (_isAdminPath && !_isSuper) {
-                window.location.replace('/home');
+                window.location.replace('/cowork');
                 return;
             }
             if (!_isAdminPath && _isSuper) {

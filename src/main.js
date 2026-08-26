@@ -141,7 +141,6 @@ import './home/tax-center.js'; // 屏1 报税中心(window.loadTaxCenter · 北�
 import './home/tax-pp30.js'; // 屏2 PP30 复核(window.loadTaxPp30 · 销−进可追溯 + 体检 + 提交/导出)
 import './home/tax-pnd.js'; // 屏3 PND 复核(window.loadTaxPnd · PND53/PND3 tab + 逐笔 + 扣缴凭证态 + 缺税号拦)
 import './home/tax-settings.js'; // 屏4 报税设置(window.loadTaxSettings · VAT登记/总分公司/提醒/0税额也报)
-import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-subtab-settings.js'; // REFACTOR-C1 · 对账子tab+设置弹窗
 import './home/erp-onboard.js'; // REFACTOR-C1 · ERP 对接新用户引导 modal

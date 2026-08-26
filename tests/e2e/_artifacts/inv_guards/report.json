@@ -10,7 +10,7 @@
     "note": {
       "found": true,
       "w": 300,
-      "h": 54,
+      "h": 55,
       "display": "flex",
       "visibility": "visible",
       "opacity": "1",
@@ -47,14 +47,14 @@
     "first": true,
     "appeared": 1,
     "vanished": 0,
-    "samples": 142,
+    "samples": 146,
     "rearms": 2,
     "qty": "3",
     "rows": 2,
     "note": {
       "found": true,
       "w": 300,
-      "h": 54,
+      "h": 55,
       "display": "flex",
       "visibility": "visible",
       "opacity": "1",
@@ -109,7 +109,7 @@
     "err": {
       "found": true,
       "w": 322,
-      "h": 32,
+      "h": 34,
       "display": "block",
       "visibility": "visible",
       "opacity": "1",
@@ -147,7 +147,7 @@
     "msg": {
       "found": true,
       "w": 300,
-      "h": 16,
+      "h": 17,
       "display": "flex",
       "visibility": "visible",
       "opacity": "1",
@@ -161,7 +161,7 @@
     "err": {
       "found": true,
       "w": 322,
-      "h": 32,
+      "h": 34,
       "display": "block",
       "visibility": "visible",
       "opacity": "1",

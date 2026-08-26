@@ -53,7 +53,7 @@ async function preminifyDcScript(html) {
     const re = /(<script\b[^>]*\btype="text\/x-dc"[^>]*>)([\s\S]*?)(<\/script>)/gi;
     const parts = [];
     let last = 0;
-    for (let m; (m = re.exec(html)); ) {
+    for (let m; (m = re.exec(html));) {
         const { code } = await transform(m[2], { loader: 'js', minify: true });
         // esbuild 已压掉结构性换行;残留换行只在反引号模板串里(门户全是 GLSL 着色器串,
         // 无 # 预处理指令 / // 注释,语句以 ; 分隔)→ 换行折成空格语义等价,外壳收成一行。
@@ -79,6 +79,9 @@ const TARGETS = [
     { src: 'static/pos/pos.html', out: 'static/dist/pos.html' },
     // POS 老板后台登录页(路由 /pos)· 原内联 routes/pos_login_page.py 常量 → 挪成可读源 + dist 产物。
     { src: 'static/pos/pos-login.html', out: 'static/dist/pos-login.html' },
+    // ERP 专属登录门(路由 /erp · erp_portal 邀请制对外敏感入口)· 照 /pos 独立门范式:
+    // 可读源 + dist 产物(FileResponse 服务)。不复制主站 login.html、不建 ERP 业务前端。
+    { src: 'static/erp/erp.html', out: 'static/dist/erp.html' },
     // Pearnly AI SPA(M1-W1):壳成品化(7 逻辑 JS 已合 dist/ai.js · 4 CSS 已合 dist/ai.css)。
     { src: 'static/ai/ai.html', out: 'static/dist/ai.html' },
     // Pearnly DMS SPA(身份证 → DMS 客户 · 邀请制独立入口):逻辑 JS 合 dist/dms.js · CSS 合 dist/dms.css。

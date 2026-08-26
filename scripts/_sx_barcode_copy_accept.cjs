@@ -30,7 +30,12 @@ let lookupMode = 'free';
 function serve() {
     const server = http.createServer((req, res) => {
         const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
-        const fp = path.join(ROOT, rel === 'home' ? 'home.html' : rel);
+        // cowork / erp / home(以及原 home.html / 空路径)都落到 home.html —— 路由名随 app 走,
+        // 但静态地基只认这一个真文件。
+        const page = ['cowork', 'erp', 'home', 'home.html'].includes(rel)
+            ? 'home.html'
+            : rel || 'home.html';
+        const fp = path.join(ROOT, page);
         const ok = fp.startsWith(ROOT) && fs.existsSync(fp) && !fs.statSync(fp).isDirectory();
         res.writeHead(ok ? 200 : 404, {
             'content-type': ok ? MIME[path.extname(fp)] || 'text/html' : 'text/html',
@@ -52,6 +57,8 @@ async function boot(browser, origin) {
     await page.addInitScript(() => {
         localStorage.setItem('mrpilot_token', 'tok');
         localStorage.setItem('mrpilot_lang', 'th'); // 真语言键(旧脚本写的 'lang' 根本不生效)
+        localStorage.setItem('pearnly_entry', 'pos');
+        localStorage.setItem('pearnly_active_workspace_client_id', '1');
     });
     await page.route('**/api/**', (route) => {
         const u = route.request().url();
@@ -65,6 +72,20 @@ async function boot(browser, origin) {
         }
         if (u.includes('/api/sales/products')) return route.fulfill(json({ products: [] }));
         if (u.includes('/api/me/plan')) return route.fulfill(json({ plan: 'lifetime' }));
+        if (u.includes('/api/me/modules'))
+            return route.fulfill(
+                json({
+                    data: {
+                        modules: { pos: { enabled: true }, inventory: { enabled: true } },
+                        business_type: 'pos_only',
+                        entry: 'pos',
+                    },
+                })
+            );
+        if (u.includes('/api/workspace/clients'))
+            return route.fulfill(
+                json({ clients: [{ id: 1, name: 'Demo Co Ltd', tax_id: '0105567178203' }] })
+            );
         return route.fulfill(json({ ok: true, items: [] }));
     });
     await page.goto(origin + '/home', { waitUntil: 'domcontentloaded' });

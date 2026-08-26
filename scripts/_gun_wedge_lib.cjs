@@ -29,7 +29,12 @@ const HUMAN_DELAY = 260; // 人手打字:每个字符都超过 150ms → 一串�
 function serve() {
     const server = http.createServer((req, res) => {
         const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
-        const fp = path.join(ROOT, rel || 'home.html');
+        // cowork / erp / home(以及原 home.html / 空路径)都落到 home.html —— 路由名随 app 走,
+        // 但静态地基只认这一个真文件。
+        const page = ['cowork', 'erp', 'home', 'home.html'].includes(rel)
+            ? 'home.html'
+            : rel || 'home.html';
+        const fp = path.join(ROOT, page);
         const ok = fp.startsWith(ROOT) && fs.existsSync(fp) && !fs.statSync(fp).isDirectory();
         res.writeHead(ok ? 200 : 404, {
             'content-type': ok ? MIME[path.extname(fp)] || 'application/octet-stream' : 'text/html',

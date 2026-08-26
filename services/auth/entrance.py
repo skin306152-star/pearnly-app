@@ -10,10 +10,10 @@
   - ai    : 在 pearnly_ai_m1 白名单(Earn 邀请)
   - dms   : 在 dms_portal 白名单(Earn 邀请 · MR.ERP 身份证订车单入口)
   - daily : 在 daily_finance 白名单(Earn 邀请 · 个人周记账应用)
-  - cowork: 业态非 pos_only(随 main 同源 · 协同工作台)
+  - cowork: 业态非 pos_only(随 main 同源 · 与 main 互为旧入口别名)
   - erp   : 在 erp_portal 白名单(Earn 邀请 · ERP 入口)
 
-超管任意门放行(平台运营);回退闸 entrance_gate 关时一律不拦(上线前/回退=现状,任何门都通);
+超管任意门放行(平台运营);回退闸 entrance_gate 关时旧入口不拦,ERP 仍强制邀请制;
 推导异常默认 fail-open(登录可用性优先,绝不因基建抖动把人锁在门外,与 auth.py 改密比对同款容错)
 —— 仅 erp 门 fail-closed:ERP 为对外敏感入口,宁可拦。
 """
@@ -87,12 +87,33 @@ def authorized_entrances(tenant_id: Optional[str], user_id: Optional[str]) -> Se
     回填后,表侧有行才切表(发放侧注册/开 POS/邀请 AI 也已顺带写表,新数据自然落表)。
     """
     if not tenant_id:
-        return {MAIN, COWORK}  # 无租户兜底:与推导口径严格等价(main+cowork)
+        return _entrances_for_personal(user_id)
 
     table_ents = _entrances_from_table(tenant_id)
     if table_ents:
         return table_ents
     return _derive_entrances(tenant_id, user_id)
+
+
+def _entrances_for_personal(user_id: Optional[str]) -> Set[str]:
+    """个人套账保留主入口，并接受 user-level ERP 邀请标记。"""
+    ents: Set[str] = {MAIN, COWORK}
+    if user_id:
+        from core.feature_flags import erp_portal_enabled_for
+
+        if erp_portal_enabled_for(None, user_id):
+            ents.add(ERP)
+    return ents
+
+
+def _expand_legacy_aliases(ents: Set[str]) -> Set[str]:
+    """显式授权表可能只存了 main/cowork 旧入口中的一个。"""
+    ents = set(ents)
+    if MAIN in ents:
+        ents.add(COWORK)
+    if COWORK in ents:
+        ents.add(MAIN)
+    return ents
 
 
 def _entrances_from_table(tenant_id: str) -> Set[str]:
@@ -102,7 +123,7 @@ def _entrances_from_table(tenant_id: str) -> Set[str]:
         from services.auth import entrance_store
 
         with db.get_cursor() as cur:
-            return entrance_store.list_entrances(cur, tenant_id)
+            return _expand_legacy_aliases(entrance_store.list_entrances(cur, tenant_id))
     except Exception as e:  # noqa: BLE001 · 表未建(prod 过渡期)/基建抖动 → 静默回落推导
         logger.debug("[entrance] table read miss · fall back to derivation: %s", e)
         return set()
@@ -183,8 +204,8 @@ def login_entrance_allowed(entry: Optional[str], user: dict) -> bool:
     try:
         from core.feature_flags import entrance_gate_enabled_for
 
-        if not entrance_gate_enabled_for(tenant_id):
-            return True  # 闸关 = 不拦(现状:任何门都通)
+        if not entrance_gate_enabled_for(tenant_id) and entry != ERP:
+            return True  # 回退只放开旧入口；ERP 对外敏感门始终邀请制。
 
         user_id = str(user["id"]) if user.get("id") else None
         ents = authorized_entrances(tenant_id, user_id)

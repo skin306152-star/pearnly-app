@@ -7,8 +7,10 @@ REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后�
 包含:
   页面服务(FileResponse · 全公开 · 无鉴权 · 一律读 dist minified 外壳,源逐字可读):
     /                   → static/dist/portal.html(品牌门户 · 源 static/landing/portal.dc.html)
-    /login              → static/dist/login.html(原登录页)
-    /home               → static/dist/home.html
+    /login              → 302 → /cowork(登录门别名退居 canonical 主壳 · 见 login_page)· DMS liff 优先
+    /home               → static/dist/home.html(兼容/内部加载入口 · canonical 由 preboot 归一)
+    /cowork             → static/dist/login.html(cowork canonical 主壳 · 完全复用老登录 UI · 2026-08-26)
+    /erp                → static/dist/erp.html(erp 专属登录门 · erp_portal 邀请制 · 源 static/erp/erp.html · 2026-08-26)
     /admin              → 301 redirect → /admin/cost
     /admin/{rest:path}  → static/dist/admin.html(SPA · 源 static/admin/admin.html)
     /pos                → static/dist/pos-login.html(POS 老板登录 · 源 static/pos/pos-login.html)
@@ -27,7 +29,7 @@ REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后�
 import asyncio
 import os
 from typing import Annotated
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs, quote, unquote
 
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
@@ -119,11 +121,30 @@ async def root():
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(
     liff_state: Annotated[str, Query(alias="liff.state")] = "",
+    next: Annotated[str, Query()] = "",
 ):
     redirect = _dms_booking_redirect(liff_state)
     if redirect:
         return redirect
-    return FileResponse("static/dist/login.html", headers=_NO_CACHE)
+    # 旧入口退居别名；next 只接受同源绝对路径。
+    target = _safe_internal_next(next) or "/cowork"
+    return RedirectResponse(url=target, status_code=302)
+
+
+def _safe_internal_next(next_url: str) -> str | None:
+    """安全 next:仅同源内部绝对路径(以单个 / 开头、无协议/双斜杠)才放行,否则 None。"""
+    if not next_url or not next_url.strip():
+        return None
+    next_url = next_url.strip()
+    decoded = unquote(next_url)
+    if (
+        decoded.startswith("//")
+        or "\\" in decoded
+        or "://" in decoded
+        or not decoded.startswith("/")
+    ):
+        return None
+    return next_url
 
 
 def _dms_booking_redirect(liff_state: str) -> RedirectResponse | None:
@@ -152,6 +173,18 @@ async def home(
         return redirect
     # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版
     return FileResponse("static/dist/home.html", headers=_NO_CACHE)
+
+
+# Cowork 复用旧登录页；登录后由共享 home SPA 承接。
+@router.get("/cowork", response_class=HTMLResponse)
+async def cowork_page():
+    return FileResponse("static/dist/login.html", headers=_NO_CACHE)
+
+
+# ERP 使用独立邀请制登录页，登录后仍复用共享 home SPA。
+@router.get("/erp", response_class=HTMLResponse)
+async def erp_page():
+    return FileResponse("static/dist/erp.html", headers=_NO_CACHE)
 
 
 # v118.44.0.1 · NAV-IA Phase 8 hotfix · 老 /admin 永久重定向到 /admin/cost

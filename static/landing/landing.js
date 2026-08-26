@@ -47,6 +47,63 @@
 
     const FP = generateFingerprint();
 
+    function tokenEntryFromJwt() {
+        const tok = (localStorage.getItem('mrpilot_token') || '').split('.');
+        if (!tok[1]) return '';
+        try {
+            const payload = JSON.parse(atob(tok[1].replace(/-/g, '+').replace(/_/g, '/')));
+            const e = payload && payload.entry ? payload.entry : '';
+            return typeof e === 'string' ? e : '';
+        } catch (_e) {
+            return '';
+        }
+    }
+
+    function safeLocalEntry() {
+        try {
+            return localStorage.getItem('pearnly_entry') || '';
+        } catch (_e) {
+            return '';
+        }
+    }
+
+    function canonicalFor(entry) {
+        if (entry === 'erp') return 'erp';
+        if (entry === 'pos' || entry === 'dms' || entry === 'ai' || entry === 'daily') return entry;
+        return 'cowork';
+    }
+
+    // /erp 有独立登录页；通用登录页只承接 /cowork。
+    const _pathEntry = location.pathname === '/erp' ? 'erp' : 'cowork';
+
+    // 已登录用户回到 token 对应的 canonical 入口。
+    let _hasToken = false;
+    try {
+        _hasToken = !!localStorage.getItem('mrpilot_token');
+    } catch (_e) {
+        _hasToken = false;
+    }
+    const _tokEntry = tokenEntryFromJwt() || safeLocalEntry();
+    if (_hasToken) {
+        const _canon = _tokEntry ? canonicalFor(_tokEntry) : 'cowork';
+        try {
+            localStorage.setItem('pearnly_entry', _canon);
+        } catch (_e) {}
+        window.location.replace(
+            _canon === 'cowork' || _canon === 'erp' ? '/home?canonical=' + _canon : '/' + _canon
+        );
+        return;
+    }
+    const _entry = _pathEntry;
+    try {
+        localStorage.setItem('pearnly_entry', _entry);
+    } catch (_e) {}
+
+    function canonicalAfterLogin(entry, isSuperAdmin) {
+        if (isSuperAdmin) return '/admin/cost';
+        return '/home?canonical=' + (entry === 'erp' ? 'erp' : 'cowork');
+    }
+
     root.innerHTML = `
     <div class="auth-stage">
     <main class="auth-shell" aria-label="Pearnly authentication">
@@ -252,7 +309,7 @@
             const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, remember, entry: 'main' }),
+                body: JSON.stringify({ username, password, remember, entry: _entry }),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.access_token) {
@@ -265,10 +322,10 @@
             }
             localStorage.setItem('mrpilot_token', data.access_token);
             localStorage.setItem('mrpilot_lang', currentLang());
-            localStorage.setItem('pearnly_entry', 'main');
+            localStorage.setItem('pearnly_entry', _entry);
             setMessage(T('loginSuccess'), 'success');
             window.setTimeout(() => {
-                window.location.href = data.is_super_admin ? '/admin/cost' : '/home';
+                window.location.href = canonicalAfterLogin(_entry, data.is_super_admin);
             }, 400);
         } catch (_err) {
             setMessage(T('netError'), 'error');
@@ -385,9 +442,10 @@
             }
             localStorage.setItem('mrpilot_token', data.token);
             localStorage.setItem('mrpilot_lang', currentLang());
+            localStorage.setItem('pearnly_entry', 'cowork');
             setMessage(T('signupSuccess'), 'success');
             window.setTimeout(() => {
-                window.location.href = '/home';
+                window.location.href = '/home?canonical=cowork';
             }, 600);
         } catch (_err) {
             setMessage(T('netError'), 'error');

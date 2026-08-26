@@ -95,6 +95,34 @@ export const MAIN_ENTRY_ROUTES = new Set<string>([
     'stock-card',
 ]);
 
+// Canonical portals use allowlists so future routes cannot leak into the wrong shell by default.
+export const COWORK_ALLOWED_ROUTES = new Set<string>([
+    'dashboard',
+    'dms-intake',
+    'history',
+    'push-logs',
+    'reconcile',
+    'clients',
+    'company',
+    'guide',
+]);
+
+export const ERP_ALLOWED_ROUTES = new Set<string>([
+    'dashboard',
+    'stock-card',
+    'purchase',
+    'purchase-suppliers',
+    'purchase-settings',
+    'purchase-form',
+    'purchase-detail',
+    'purchase-export',
+    'purchase-capture',
+    'sales-invoices',
+    'sales-account',
+    'clients',
+    'company',
+]);
+
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
 export const ROUTE_LOADERS: Record<string, string> = {
     settings: 'renderSettings',

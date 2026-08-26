@@ -96,6 +96,28 @@ class DualTrackTests(unittest.TestCase):
             self.assertEqual(entrance.authorized_entrances("t1", "u1"), {"pos", "ai"})
             derive.assert_not_called()
 
+    def test_table_main_implies_cowork_alias(self):
+        # main 与 cowork 互为旧入口别名:表侧只写 main,cowork 读侧补全(协同工作台照常放行)。
+        with (
+            mock.patch("core.db.get_cursor", _cursor_ctx()),
+            mock.patch("services.auth.entrance_store.list_entrances", return_value={"main"}),
+            mock.patch("services.auth.entrance._derive_entrances") as derive,
+        ):
+            self.assertEqual(entrance.authorized_entrances("t1", "u1"), {"main", "cowork"})
+            derive.assert_not_called()
+
+    def test_table_cowork_implies_main_alias(self):
+        # 反向别名:表侧只写 cowork(含 erp),main 读侧补全,且不丢其它入口。
+        with (
+            mock.patch("core.db.get_cursor", _cursor_ctx()),
+            mock.patch(
+                "services.auth.entrance_store.list_entrances", return_value={"cowork", "erp"}
+            ),
+            mock.patch("services.auth.entrance._derive_entrances") as derive,
+        ):
+            self.assertEqual(entrance.authorized_entrances("t1", "u1"), {"main", "cowork", "erp"})
+            derive.assert_not_called()
+
     def test_empty_table_falls_back_to_derivation(self):
         with (
             mock.patch("core.db.get_cursor", _cursor_ctx()),
@@ -118,7 +140,9 @@ class DualTrackTests(unittest.TestCase):
             self.assertEqual(entrance.authorized_entrances("t1", "u1"), {"main"})
 
     def test_no_tenant_still_main_and_cowork(self):
-        self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main", "cowork"})
+        # 无租户兜底 main+cowork;无 user-level erp 标记不引入 erp。
+        with mock.patch("core.feature_flags.erp_portal_enabled_for", return_value=False):
+            self.assertEqual(entrance.authorized_entrances(None, "u1"), {"main", "cowork"})
 
 
 class GrantEntranceSafeTests(unittest.TestCase):

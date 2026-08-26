@@ -91,6 +91,8 @@ async function openInModal(browser, origin) {
     await page.addInitScript(() => {
         localStorage.setItem('mrpilot_token', 'inv-guards');
         localStorage.setItem('mrpilot_lang', 'zh');
+        localStorage.setItem('pearnly_entry', 'pos');
+        localStorage.setItem('pearnly_active_workspace_client_id', '1');
     });
     await page.route('**/api/**', async (route) => {
         const url = new URL(route.request().url());
@@ -119,6 +121,20 @@ async function openInModal(browser, origin) {
             });
         if (url.pathname === '/api/me')
             return route.fulfill({ json: { email: 'guards@e2e', role: 'owner', plan: 'pro' } });
+        if (url.pathname === '/api/me/modules')
+            return route.fulfill({
+                json: {
+                    data: {
+                        modules: { pos: { enabled: true }, inventory: { enabled: true } },
+                        business_type: 'pos_only',
+                        entry: 'pos',
+                    },
+                },
+            });
+        if (url.pathname === '/api/workspace/clients')
+            return route.fulfill({
+                json: { clients: [{ id: 1, name: 'Demo Co Ltd', tax_id: '0105567178203' }] },
+            });
         return route.fulfill({ json: { ok: true, data: {}, items: [] } });
     });
     await page.goto(`${origin}/home.html`);

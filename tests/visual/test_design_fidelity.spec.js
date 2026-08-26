@@ -766,6 +766,10 @@ async function styleOf(page, sel, props) {
         localStorage.setItem('mrpilot_token', 'designgate.fake.token');
         localStorage.setItem('mrpilot_lang', 'zh');
         localStorage.setItem('pearnly_work_mode', 'personal');
+        // Neutral sentinel so /home does not canonicalize into cowork and trip _entryGuardRoute
+        // on non-cowork routes. This gate stubs all APIs and measures CSS in isolation; entry
+        // permission is covered separately by _erp_cowork_split_verify.cjs.
+        localStorage.setItem('pearnly_entry', 'designgate');
     });
 
     // 0) 自检:往第一份基准里塞一个生产绝不会有的 class,基准过期检测必须只报它这一条。

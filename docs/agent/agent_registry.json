@@ -16,6 +16,7 @@
   "admin_pearnly_ai_routes": "D",
   "admin_dms_routes": "D",
   "admin_daily_routes": "D",
+  "admin_erp_routes": "D",
   "admin_pos_entitlement_routes": "D",
   "admin_users_query_routes": "D",
   "admin_users_mutation_routes": "D",

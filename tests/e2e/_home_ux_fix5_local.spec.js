@@ -81,6 +81,8 @@ async function boot(page, { lang = 'zh', api = {} } = {}) {
         (a) => {
             localStorage.setItem('mrpilot_token', 'ux5-stub-token');
             localStorage.setItem('mrpilot_lang', a.lang);
+            // Keep static home.html tests on the internal full shell.
+            localStorage.setItem('pearnly_entry', 'firm');
         },
         { lang }
     );

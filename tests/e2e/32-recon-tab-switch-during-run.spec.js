@@ -58,6 +58,8 @@ test('对账进行中切 income tab:确认后秒级可用·旧 job 不劫持视�
     await page.addInitScript(() => {
         localStorage.setItem('mrpilot_token', 'e2e-recon-tab-token');
         localStorage.setItem('mrpilot_lang', 'zh');
+        // Keep static home.html tests on the internal full shell.
+        localStorage.setItem('pearnly_entry', 'firm');
     });
     await page.route('**/api/**', (route) => {
         const p = new URL(route.request().url()).pathname;

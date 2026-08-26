@@ -191,6 +191,8 @@ async function boot(page, convertResult, recogn) {
     await page.addInitScript(() => {
         localStorage.setItem('mrpilot_token', 'e2e-intake-convert-token');
         localStorage.setItem('mrpilot_lang', 'zh');
+        // Keep static home.html tests on the internal full shell.
+        localStorage.setItem('pearnly_entry', 'firm');
     });
     await stub(page, convertResult, recogn);
     await page.goto(`${BASE}/home.html`, { waitUntil: 'domcontentloaded' });

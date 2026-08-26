@@ -301,6 +301,8 @@ async function bootHome(page, vp) {
     await page.addInitScript(() => {
         localStorage.setItem('mrpilot_token', 'tier3-stub-token');
         localStorage.setItem('mrpilot_lang', 'zh');
+        // Keep static home.html tests on the internal full shell.
+        localStorage.setItem('pearnly_entry', 'firm');
     });
     await page.route('**/api/**', (r) => {
         const p = new URL(r.request().url()).pathname;

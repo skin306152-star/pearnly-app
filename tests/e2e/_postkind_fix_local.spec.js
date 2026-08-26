@@ -55,6 +55,8 @@ async function boot(page, { lang = 'zh', viewport = DESKTOP } = {}) {
     await page.addInitScript((l) => {
         localStorage.setItem('mrpilot_token', 'pk-stub');
         localStorage.setItem('mrpilot_lang', l);
+        // Keep static home.html tests on the internal full shell.
+        localStorage.setItem('pearnly_entry', 'firm');
     }, lang);
     await page.route('**/api/**', (route) => {
         const req = route.request();

@@ -240,6 +240,8 @@ test.describe('事务所端 · 商品收发存报表', () => {
             // 默认语言是 th(state.ts 无偏好回落)· 本测试前半段断言写死中文,
             // 固定起始语言避免和「⑤ 泰语切换」那段的语言状态互相干扰。
             localStorage.setItem('mrpilot_lang', 'zh');
+            // Keep /home stock-card tests on the internal full shell.
+            localStorage.setItem('pearnly_entry', 'firm');
         });
         const captures = {};
         await stubApi(page, captures);
@@ -462,6 +464,8 @@ test.describe('事务所端 · 商品收发存报表', () => {
         await blockCfInsights(page);
         await page.addInitScript(() => {
             localStorage.setItem('mrpilot_token', 'e2e-stock-card-token-mobile');
+            // Keep /home stock-card tests on the internal full shell.
+            localStorage.setItem('pearnly_entry', 'firm');
         });
         await stubApi(page);
         await page.goto('/home#/stock-card');

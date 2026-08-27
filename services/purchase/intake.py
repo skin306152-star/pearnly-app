@@ -213,9 +213,11 @@ def build_draft_from_invoice(fields: dict, *, kind: str, categories: list | None
         # qty×price 盖过印刷值。一致(差 < 0.05)或无 subtotal 才保留 qty/price 明细。
         if sub > 0 and abs(qty * price - sub) > Decimal("0.05"):
             qty, price = Decimal("1"), sub
+        posting_kind = str(it.get("posting_kind") or "").strip().lower()
+        item_type = "service" if posting_kind == "service" else "goods"
         lines.append(
             {
-                "item_type": "goods",
+                "item_type": item_type,
                 "description": (it.get("name") or "").strip(),
                 "qty": str(qty),
                 "unit_price": str(price),
@@ -227,7 +229,15 @@ def build_draft_from_invoice(fields: dict, *, kind: str, categories: list | None
     if not lines:
         # 无明细:用税前小计或总额倒推单行,让用户在屏10 补全。
         lines = [_single_line(fields, base, vat_rate)]
-    elif base > 0 and not _lines_match_receipt(fields, lines, base):
+    elif (
+        base > 0
+        and not _lines_match_receipt(fields, lines, base)
+        and not all(
+            str(item.get("posting_kind") or "").strip().lower() in ("stock", "service")
+            for item in fields.get("items") or []
+            if isinstance(item, dict)
+        )
+    ):
         # 行明细之和既不合票面税前小计、也不合票面总额 → OCR 明细乱读(多品项串行/qty 误读·如 7-11
         # 读成 845 ≠ 票面 110)→ 收敛成单行兜底(=票面值),别让错明细之和冒充总额。
         lines = [_single_line(fields, base, vat_rate)]

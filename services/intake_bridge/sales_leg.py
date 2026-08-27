@@ -52,7 +52,11 @@ def _build_lines(fields: dict) -> list:
             price = (sub / qty) if qty else sub
         if price <= 0:
             continue
-        lines.append({"description": name, "qty": qty, "unit_price": price, "vat_applicable": True})
+        line = {"description": name, "qty": qty, "unit_price": price, "vat_applicable": True}
+        posting_kind = str(it.get("posting_kind") or "").strip().lower()
+        if posting_kind in ("stock", "service"):
+            line["item_type"] = "service" if posting_kind == "service" else "goods"
+        lines.append(line)
     return lines
 
 

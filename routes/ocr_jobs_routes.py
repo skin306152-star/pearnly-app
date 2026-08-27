@@ -70,6 +70,8 @@ async def ocr_submit(
         "workspace_client_id": ws_client_id,
         "posting_kind": posting_kind,
         "direction": direction,
+        # entry 只取服务端已签发的会话上下文，不接受上传字段覆盖。
+        "entry": user.get("entry"),
     }
     rid = store.enqueue(
         user_id=str(user["id"]),

@@ -10,6 +10,7 @@
 import { authHeaders } from './dms-intake-core.js';
 import { IV, w } from './dms-intake-invoice.js';
 import type { Dict, IvFile, IvInvoice, IvResult } from './dms-intake-invoice.js';
+import { isErpEntry } from './erp-intake.js';
 
 // 在飞请求控制器集合(停止时一次性 abort · startRecognize/stopRecognize 共用)
 export const ctrls = new Set<AbortController>();
@@ -182,9 +183,19 @@ function ingestResult(d: Dict): IvResult {
                   total: 1,
               },
           ];
+    if (isErpEntry()) {
+        invoices.forEach((invoice) => {
+            const items = invoice.fields.items;
+            if (Array.isArray(items) && items.length) return;
+            invoice.fields.items = [
+                { name: '', qty: '', price: '', subtotal: '', posting_kind: '' },
+            ];
+        });
+    }
     return {
         filename: (d.filename as string) || '',
         invoices,
+        pages,
         history_ids: (d.history_ids as string[]) || (d.history_id ? [d.history_id as string] : []),
         invoice_count: (d.invoice_count as number) || invoices.length,
         needs_review:

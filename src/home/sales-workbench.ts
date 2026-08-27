@@ -4,6 +4,7 @@
 /* global t, escapeHtml, apiGet, showToast, routeTo */
 import { type SalesDoc, docTypeLabel, fmtMoney, fmtDate } from './sales-common.js';
 import { BAHT } from './money.js';
+import { isErpEntry, setErpIntakeDirection } from './erp-intake.js';
 
 const ICON_INV =
     '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>';
@@ -117,6 +118,7 @@ function pageShell(): string {
                 <div class="h1" data-i18n="sx-wb-title">${escapeHtml(t('sx-wb-title'))}</div>
             </div>
             <div class="sx-actions">
+                ${isErpEntry() ? `<button class="btn btn-ghost" id="sx-upload-btn">${escapeHtml(t('dxi-up-pick'))}</button>` : ''}
                 <button class="btn btn-ghost" id="sx-settings-btn">${ICON_GEAR}<span>${escapeHtml(t('sx-settings'))}</span></button>
                 <button class="btn btn-primary" id="sx-new-btn">${ICON_PLUS}<span>${escapeHtml(t('sx-new'))}</span></button>
             </div>
@@ -196,6 +198,8 @@ async function refreshView() {
 }
 
 function bindShell() {
+    const uploadBtn = document.getElementById('sx-upload-btn');
+    if (uploadBtn) uploadBtn.onclick = () => setErpIntakeDirection('sales');
     const newBtn = document.getElementById('sx-new-btn');
     if (newBtn) newBtn.onclick = () => window.openSalesWizard?.();
     const setBtn = document.getElementById('sx-settings-btn');

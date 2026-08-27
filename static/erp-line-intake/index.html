@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Pearnly ERP</title>
+    <link rel="stylesheet" href="/static/pearnly-ui.css?v=5" />
+    <link rel="stylesheet" href="/static/erp-line-intake/erp-line-intake.css?v=3" />
+  </head>
+  <body>
+    <header>
+      <strong><span class="mark">P</span> Pearnly ERP</strong
+      ><select id="lang" aria-label="Language">
+        <option value="th">ไทย</option>
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+        <option value="ja">日本語</option>
+      </select>
+    </header>
+    <main id="app" aria-live="polite">
+      <section id="state" class="state">กำลังโหลด…</section>
+      <form id="editor" hidden novalidate></form>
+    </main>
+    <div id="discard-dialog" class="discard-dialog" hidden aria-hidden="true">
+      <div class="discard-dialog__backdrop" data-dialog-cancel></div>
+      <section
+        class="discard-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="discard-dialog-title"
+      >
+        <h2 id="discard-dialog-title"></h2>
+        <div class="discard-dialog__actions">
+          <button type="button" class="btn" data-dialog-cancel></button>
+          <button type="button" class="btn danger" data-dialog-confirm></button>
+        </div>
+      </section>
+    </div>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="/static/erp-line-intake/discard-dialog.js?v=1"></script>
+    <script src="/static/erp-line-intake/preview.js?v=1"></script>
+    <script src="/static/erp-line-intake/erp-line-intake.js?v=3"></script>
+  </body>
+</html>

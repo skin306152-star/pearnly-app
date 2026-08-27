@@ -80,9 +80,13 @@ PUBLIC_ROUTES = {
     # webhook(签名校验在实现内:LINE signature / GitHub secret)
     ("POST", "/api/line/webhook"),
     ("POST", "/api/line/dms/webhook"),  # DMS channel · line_client.verify_signature 验签即凭证
+    ("POST", "/api/line/erp/webhook"),  # ERP 独立 channel · ERP secret 验 LINE signature
     ("POST", "/api/line/liff/auth"),  # LIFF id_token 即凭证(LINE verify 验签)
+    ("POST", "/api/line/erp/liff/auth"),  # ERP LIFF id_token + binding + draft session 即凭证
     ("GET", "/api/line/liff/config"),  # 仅返回公开 LIFF ID(非密)· 前端 liff.init 用
+    ("GET", "/api/line/erp/liff/config"),  # 仅返回 ERP OA 的公开 LIFF ID
     ("GET", "/liff/purchase/{doc_id}"),  # LIFF 页入口·跳 /home 复核屏(前端 LIFF 鉴权)
+    ("GET", "/liff/erp/{draft_id}"),  # ERP LIFF 静态编辑壳;草稿数据仍需专用短期凭证
     ("GET", "/liff/dms-booking"),  # DMS LIFF 页面壳;业务数据仍需 JWT + 一次性 nonce
     ("GET", "/login/dms-booking"),  # 同一 LIFF 页面壳;保持在已登记的 /login 路径下
     ("GET", "/home/dms-booking"),  # 同一 LIFF 页面壳;生产 LIFF 的实际登记路径

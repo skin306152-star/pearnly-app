@@ -30,7 +30,9 @@ class SubmitPayloadContract(unittest.TestCase):
     def setUp(self):
         self._patches = [
             mock.patch.object(
-                r, "get_current_user_from_request", return_value={"id": "u1", "tenant_id": "t1"}
+                r,
+                "get_current_user_from_request",
+                return_value={"id": "u1", "tenant_id": "t1", "entry": "erp"},
             ),
             mock.patch.object(r.worker, "stage_dir_for", return_value="/tmp/ocr-stage-test"),
             mock.patch("os.makedirs"),
@@ -58,6 +60,9 @@ class SubmitPayloadContract(unittest.TestCase):
         # 前端没声明 → 键在但值 None(= 未声明),handler 直取即可,不是缺键。
         self.assertEqual(self._submit({"posting_kind": "stock"})["posting_kind"], "stock")
         self.assertIsNone(self._submit()["posting_kind"])
+
+    def test_entry_comes_from_authenticated_user(self):
+        self.assertEqual(self._submit()["entry"], "erp")
 
 
 class GetJobContract(unittest.IsolatedAsyncioTestCase):

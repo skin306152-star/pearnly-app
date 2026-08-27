@@ -28,6 +28,7 @@ import {
 } from './dms-intake-batch.js';
 import { onBatchReviewClick, rerenderBatchReview } from './dms-intake-batch-review.js';
 import { onBatchSubmitClick } from './dms-intake-batch-submit.js';
+import { isErpEntry } from './erp-intake.js';
 
 // ── 导航 / 重置 ──────────────────────────────────────────────
 function resetFlow() {
@@ -44,6 +45,7 @@ function resetFlow() {
 
 // 任务切换:重渲整壳(任务选择器高亮 + 标题/步骤条按任务)· 委托监听挂在 section 上,innerHTML 重写不丢
 function selectTask(task: 'invoice' | 'summary_batch') {
+    if (isErpEntry()) return;
     if (S.task === task) return;
     S.task = task;
     const el = sec();
@@ -118,6 +120,7 @@ function resumeFlow(): boolean {
 window.loadDmsIntake = function () {
     const el = sec();
     if (!el) return;
+    if (isErpEntry()) S.task = 'invoice';
     el.innerHTML = dxShell(t, S.task);
     renderDxErpCards(S.task);
     bind();

@@ -22,6 +22,8 @@ import {
     initGuard,
     ensureGuardData,
 } from './dms-intake-workspace-guard.js';
+import { isErpEntry } from './erp-intake.js';
+import { confirmIndices, convertChipHtml, pagesForInvoice } from './dms-intake-review-convert.js';
 
 // 套账不符横幅需要重渲复核屏(归入/保持后横幅状态变化)→ 把 renderReview 交给 guard 模块。
 initGuard(renderReview);
@@ -32,102 +34,6 @@ function fileWarns(r: IvResult): number {
 // 「可通过项」= 不需复核且无低置信空字段(确认全部只动这些)
 function passable(r: IvResult): boolean {
     return !r.needs_review && fileWarns(r) === 0;
-}
-
-// ── 确认 → 正式单据(转换桥)──────────────────────────────────
-// 「确认」此前只是纯前端视觉态,后端只翻 ocr_history.staged,不落 purchase_docs/
-// sales_documents —— 商品收发存报表读的正是这两张表,于是"确认完"≠"过账完",报表恒空。
-// 这里把确认接上真实建账(POST /api/ocr/convert-documents),按 history_id 记住转换结果,
-// 就地渲染 chip:四态诚实,跳过原因不吞。
-interface ConvertResult {
-    status: 'converted' | 'skipped';
-    reason?: string;
-}
-const convertStatus = new Map<string, ConvertResult>();
-
-function activeWorkspaceId(): number | null {
-    const w = window as unknown as { getActiveWorkspaceClientId?: () => number | null };
-    return typeof w.getActiveWorkspaceClientId === 'function'
-        ? w.getActiveWorkspaceClientId()
-        : null;
-}
-
-export async function convertHistoryIds(ids: string[]): Promise<void> {
-    const pending = Array.from(new Set(ids.filter((id) => id && !convertStatus.has(id))));
-    if (!pending.length) return;
-    const ws = activeWorkspaceId();
-    if (!ws) {
-        pending.forEach((id) =>
-            convertStatus.set(id, { status: 'skipped', reason: 'no_workspace' })
-        );
-        return;
-    }
-    try {
-        const r = await fetch('/api/ocr/convert-documents', {
-            method: 'POST',
-            headers: authHeaders(true),
-            body: JSON.stringify({ history_ids: pending, workspace_client_id: ws }),
-        });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(String(r.status));
-        (d.converted || []).forEach((c: { history_id: string }) =>
-            convertStatus.set(c.history_id, { status: 'converted' })
-        );
-        (d.skipped || []).forEach((s: { history_id: string; reason: string }) =>
-            convertStatus.set(s.history_id, { status: 'skipped', reason: s.reason })
-        );
-    } catch {
-        pending.forEach((id) => convertStatus.set(id, { status: 'skipped', reason: 'error' }));
-    }
-}
-
-// 已确认文件的全部下标(供 invoice-submit 进第4步前兜底补转换 · confirmIndices 的入参)。
-export function confirmedIndices(): number[] {
-    const idxs: number[] = [];
-    IV.results.forEach((_r, i) => {
-        if (IV.confirmed.has(i)) idxs.push(i);
-    });
-    return idxs;
-}
-
-// 单一入口:把 idxs 标记为已确认 + 收集其 history_ids + 提交转换桥(convertHistoryIds
-// 内部按 history_id 去重,已转换过的不重复调用)。此前「单张确认」「确认全部」「步骤4 兜底」
-// 三处各写一遍"IV.confirmed.add + 收集 ids + convertHistoryIds",口径一旦漂移就是某条路
-// 确认了却没转换。不在这里重渲——三个调用点各自的后续动作不同(单张要挪到下一条待办、
-// confirm-all 全部展开重排、enterSubmit 兜底则接着进第4步),交回调用方处理。
-export async function confirmIndices(idxs: number[]): Promise<void> {
-    const ids: string[] = [];
-    idxs.forEach((i) => {
-        const r = IV.results[i];
-        if (!r) return;
-        IV.confirmed.add(i);
-        ids.push(...r.history_ids);
-    });
-    if (ids.length) await convertHistoryIds(ids);
-}
-
-// convert_histories 的跳过原因 → i18n 键(导出供 dms-intake-batch-submit.ts 复用,不
-// 另造一份文案 · duplicate/already_converted 不进这张表,走下面 convertChipHtml 的专属分支)。
-export const CONVERT_REASON_KEY: Record<string, string> = {
-    no_items: 'dxi-conv-r-no-items',
-    no_direction: 'dxi-conv-r-no-direction',
-    no_workspace: 'dxi-conv-r-no-workspace',
-    no_doc_no: 'dxi-conv-r-no-doc-no',
-    no_date: 'dxi-conv-r-no-date',
-    not_found: 'dxi-conv-r-error',
-};
-
-function convertChipHtml(historyId: string | null): string {
-    if (!historyId) return '';
-    const st = convertStatus.get(historyId);
-    if (!st) return '';
-    if (st.status === 'converted')
-        return `<span class="dx-badge green">${esc(t('dxi-conv-done'))}</span>`;
-    if (st.reason === 'duplicate' || st.reason === 'already_converted')
-        return `<span class="dx-badge blue">${esc(t('dxi-conv-dup'))}</span>`;
-    const reasonKey = CONVERT_REASON_KEY[st.reason || ''] || 'dxi-conv-r-error';
-    const phrase = t(reasonKey);
-    return `<span class="dx-badge amber">${esc(t('dxi-conv-skip').replace('{reason}', phrase))}</span>`;
 }
 
 // 原图查看器复用识别记录/异常同款共享件(image-viewer.ts · 按物理页翻 + 缩放/旋转/全屏)·
@@ -272,12 +178,16 @@ function itemsTableHtml(fi: number, ii: number, inv: IvInvoice): string {
                     ` data-iv-item="${fi}:${ii}:${ti}:${k}" value="${esc(v)}"></td>`
                 );
             }).join('');
-            return `<tr>${tds}</tr>`;
+            const postingKind = String(it.posting_kind || '');
+            const typeCell = isErpEntry()
+                ? `<td><select class="dx-item-type" data-iv-item="${fi}:${ii}:${ti}:posting_kind"><option value="">${esc(t('dxi-item-type-pick'))}</option><option value="stock"${postingKind === 'stock' ? ' selected' : ''}>${esc(t('dxi-posting-stock-t'))}</option><option value="service"${postingKind === 'service' ? ' selected' : ''}>${esc(t('dxi-posting-service-t'))}</option></select></td>`
+                : '';
+            return `<tr>${tds}${typeCell}</tr>`;
         })
         .join('');
-    const ths = ITEM_COLS.map(
-        ([, lk], ci) => `<th${ci ? ' class="r"' : ''}>${esc(t(lk))}</th>`
-    ).join('');
+    const ths =
+        ITEM_COLS.map(([, lk], ci) => `<th${ci ? ' class="r"' : ''}>${esc(t(lk))}</th>`).join('') +
+        (isErpEntry() ? `<th>${esc(t('dxi-item-type'))}</th>` : '');
     return `<table class="dx-item-tbl"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -286,7 +196,11 @@ function fieldsFootHtml(): string {
         `<div class="dx-fields-foot"><div class="dx-note">${esc(t('dxi-rev-hint'))}</div>` +
         '<div class="dx-fields-foot-a">' +
         `<button class="btn small dx-save-one">${esc(t('dxi-rev-save'))}</button>` +
-        `<button class="btn small primary dx-confirm-one">${esc(t('dxi-rev-next'))}</button></div></div>`
+        `<button class="btn small primary dx-confirm-one">${esc(t('dxi-rev-next'))}</button>` +
+        (isErpEntry()
+            ? `<button class="btn small danger" data-dx-action="discard">${esc(t('dxi-discard'))}</button>`
+            : '') +
+        '</div></div>'
     );
 }
 
@@ -330,7 +244,7 @@ async function saveOpenFileEdits(btn: HTMLElement | null): Promise<void> {
                     fetch(`/api/history/${encodeURIComponent(iv.history_id as string)}`, {
                         method: 'PUT',
                         headers: authHeaders(true),
-                        body: JSON.stringify({ pages: [{ fields: iv.fields }] }),
+                        body: JSON.stringify({ pages: pagesForInvoice(r, iv) }),
                     }).then((resp) => {
                         if (!resp.ok) throw new Error(String(resp.status));
                     })
@@ -365,12 +279,16 @@ export function onReviewClick(tg: HTMLElement): boolean {
     if (tg.closest('.dx-confirm-one')) {
         if (IV.openIdx >= 0) {
             const idx = IV.openIdx;
-            const done = confirmIndices([idx]);
-            IV.openIdx = nextUnconfirmed(idx);
-            renderReview();
-            showToast(t('dxi-rev-confirmed-toast'), 'success');
-            void done.then(renderReview);
+            if (isErpEntry() && missingPostingKind(IV.results[idx])) {
+                showToast(t('dxi-item-type-required'), 'error');
+                return true;
+            }
+            void confirmAndRender([idx], idx);
         }
+        return true;
+    }
+    if (tg.closest('[data-dx-action="discard"]')) {
+        void discardOpenFile();
         return true;
     }
     if (tg.closest('#dx-inv-confirm-all')) {
@@ -378,16 +296,78 @@ export function onReviewClick(tg: HTMLElement): boolean {
         // 就多污染一张报表。单文件「确认并继续」不拦(用户逐张看过了,是显式决定)。
         const blocked = blockedIdxs();
         const idxs = IV.results.reduce<number[]>((acc, r, i) => {
-            if (passable(r) && !blocked.has(i)) acc.push(i);
+            if (passable(r) && !blocked.has(i) && (!isErpEntry() || !missingPostingKind(r)))
+                acc.push(i);
             return acc;
         }, []);
-        const done = confirmIndices(idxs);
-        renderReview();
-        showToast(t('dxi-rev-confirmed-all'), 'success');
-        void done.then(renderReview);
+        if (
+            isErpEntry() &&
+            idxs.length < IV.results.filter((r, i) => passable(r) && !blocked.has(i)).length
+        ) {
+            showToast(t('dxi-item-type-required'), 'error');
+            return true;
+        }
+        void confirmAndRender(idxs, -1);
         return true;
     }
     return false;
+}
+
+async function confirmAndRender(idxs: number[], current: number): Promise<void> {
+    const ok = await confirmIndices(idxs);
+    if (!ok && isErpEntry()) {
+        renderReview();
+        showToast(t('dxi-rev-save-fail'), 'error');
+        return;
+    }
+    if (current >= 0) IV.openIdx = nextUnconfirmed(current);
+    renderReview();
+    showToast(t(current >= 0 ? 'dxi-rev-confirmed-toast' : 'dxi-rev-confirmed-all'), 'success');
+}
+
+async function discardOpenFile(): Promise<void> {
+    const r = IV.results[IV.openIdx];
+    if (!r) return;
+    const ids = r.history_ids.filter(Boolean);
+    const ok = window.pearnlyConfirm
+        ? await window.pearnlyConfirm(t('dxi-discard-confirm'))
+        : window.confirm(t('dxi-discard-confirm'));
+    if (!ok) return;
+    try {
+        const response = await fetch('/api/erp/intake/discard', {
+            method: 'POST',
+            headers: authHeaders(true),
+            body: JSON.stringify({ history_ids: ids }),
+        });
+        if (!response.ok) throw new Error('discard_failed');
+        const removed = IV.openIdx;
+        IV.results.splice(removed, 1);
+        IV.confirmed = new Set(
+            Array.from(IV.confirmed)
+                .filter((index) => index !== removed)
+                .map((index) => (index > removed ? index - 1 : index))
+        );
+        IV.openIdx = Math.min(removed, IV.results.length - 1);
+        renderReview();
+    } catch {
+        showToast(t('dxi-discard-fail'), 'error');
+    }
+}
+
+function missingPostingKind(r: IvResult): boolean {
+    return r.invoices.some((invoice) => {
+        const items = invoice.fields.items;
+        return (
+            !Array.isArray(items) ||
+            !items.length ||
+            items.some(
+                (item) =>
+                    !String(item.name || '').trim() ||
+                    !String(item.qty || '').trim() ||
+                    !['stock', 'service'].includes(String(item.posting_kind || ''))
+            )
+        );
+    });
 }
 
 function nextUnconfirmed(from: number): number {

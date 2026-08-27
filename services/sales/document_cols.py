@@ -20,6 +20,6 @@ _DOC_COLS = (
     "created_at, updated_at"
 )
 _LINE_COLS = (
-    "id, document_id, line_no, product_id, description, qty, unit_price, "
+    "id, document_id, line_no, item_type, product_id, description, qty, unit_price, "
     "discount, discount_pct, vat_applicable, line_total"
 )

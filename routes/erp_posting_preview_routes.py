@@ -42,7 +42,14 @@ def _history_doc(history_id: str, history: Dict[str, Any]) -> Dict[str, Any]:
     flat = flatten_history_for_mrerp(history or {})
     fields = flat.get("fields") if isinstance(flat.get("fields"), dict) else {}
     items = (fields or {}).get("items") or []
-    names = [{"name": str(it.get("name") or "")} for it in items if isinstance(it, dict)]
+    names = [
+        {
+            "name": str(it.get("name") or ""),
+            "posting_kind": str(it.get("posting_kind") or "").strip().lower() or None,
+        }
+        for it in items
+        if isinstance(it, dict)
+    ]
     return {"history_id": history_id, "items": names}
 
 

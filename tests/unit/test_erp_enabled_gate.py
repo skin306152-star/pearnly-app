@@ -54,6 +54,33 @@ class EnabledGateTests(unittest.TestCase):
         get_ep.assert_called_once()
         dedup.assert_not_called()
 
+    def test_erp_entry_cannot_push_unconfirmed_history(self):
+        user = {"id": "u-test", "tenant_id": "t1", "entry": "erp", "plan": "pro"}
+        with (
+            patch.object(erp_push_log_routes, "get_current_user_from_request", return_value=user),
+            patch.object(erp_push_log_routes, "_check_push_access", return_value=None),
+            patch.object(erp_push_log_routes, "_tid", return_value="t1"),
+            patch.object(
+                erp_push_log_routes.db,
+                "get_ocr_history_detail",
+                return_value={"invoice_no": "INV-1", "total_amount": "1"},
+            ),
+            patch.object(
+                erp_push_log_routes.convert_svc,
+                "history_is_converted",
+                return_value=False,
+            ),
+            patch.object(erp_push_log_routes.db, "get_erp_endpoint") as get_endpoint,
+            patch.object(erp_push_log_routes._erp, "push_to_endpoint") as push,
+        ):
+            response = self._client().post(
+                "/api/erp/push", json={"history_id": "h-1", "endpoint_id": "ep-x"}
+            )
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json().get("detail"), "erp.history_not_converted")
+        get_endpoint.assert_not_called()
+        push.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

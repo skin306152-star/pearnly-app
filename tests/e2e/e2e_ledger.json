@@ -1120,6 +1120,34 @@
         "登出只清当前入口槽,另一入口槽 token + workspace 不受影响;X-Workspace-Client-Id 按入口槽分流"
       ]
     },
+    "35-erp-line-intake.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/erp-line-intake/*.png",
+      "covers": ["static/erp-line-intake/**"],
+      "fixtures": [],
+      "only_e2e": [
+        "ERP LINE LIFF 在桌面与手机真实视口渲染全字段、多明细、原票预览、保存/确认/丢弃四态；Authorization bearer 预览请求和触控布局必须由浏览器验证。"
+      ]
+    },
+    "36-erp-web-entry-contract.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/erp-web-entry/*.png",
+      "covers": [
+        "src/home/dms-intake-html.ts",
+        "src/home/dms-intake-invoice.ts",
+        "src/home/dms-intake-review.ts",
+        "src/home/dms-intake.ts",
+        "src/home/purchase-list.ts",
+        "src/home/sales-workbench.ts",
+        "src/home/erp-intake.ts",
+        "src/home/nav-presets.ts",
+        "src/home/route-table.ts",
+        "home.html",
+        "static/i18n-data.js"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "ERP 采购/销售按钮在真实主壳中进入共享 OCR 工作台并锁定方向；确认前保存失败时不创建正式单据且复核卡仍可见；非 ERP 仍保留汇总表任务和原采购入口。"
+      ]
+    },
     "_a1_discount_inferred_verify.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
       "only_e2e": ["系统补的折扣行在审核队列说人话、严重度红、无按建议处理的安全默认"]

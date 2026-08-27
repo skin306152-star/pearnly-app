@@ -259,7 +259,7 @@ def extract_line_items(
     base: Decimal,
     *,
     total: Optional[Decimal] = None,
-    item_mode: str = ITEM_MODE_NONSTOCK,
+    item_mode: Any = ITEM_MODE_NONSTOCK,
 ) -> Dict[str, Any]:
     """OCR 行项目 → 规整明细 + 对账闸。确定性纯函数,绝不为"好看"采信不自洽的明细。
 
@@ -274,7 +274,7 @@ def extract_line_items(
 
     items: List[Dict[str, str]] = []
     incomplete = False
-    for it in raw:
+    for idx, it in enumerate(raw):
         if not isinstance(it, dict):
             incomplete = True
             continue
@@ -292,6 +292,7 @@ def extract_line_items(
             qty = Decimal("1")
         if price is None:
             price = _q(amount / qty) if qty else amount
+        mode = item_mode(idx, it) if callable(item_mode) else item_mode
         items.append(
             {
                 "name": name[:50],
@@ -299,7 +300,7 @@ def extract_line_items(
                 "unit": str(it.get("unit") or it.get("uom") or "").strip()[:10],
                 "unit_price": _s(price),
                 "amount": _s(amount),
-                "item_mode": item_mode,
+                "item_mode": mode,
             }
         )
 

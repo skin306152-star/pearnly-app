@@ -64,11 +64,16 @@ def pick_lang_from_line_event(ev: dict) -> str:
 _CHANNEL_ENV = {
     "default": ("LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"),
     "dms": ("LINE_DMS_CHANNEL_SECRET", "LINE_DMS_CHANNEL_ACCESS_TOKEN"),
+    "erp": ("LINE_ERP_CHANNEL_SECRET", "LINE_ERP_CHANNEL_ACCESS_TOKEN"),
 }
 
 
 def _channel_env_names(channel: str) -> tuple[str, str]:
-    return _CHANNEL_ENV.get(channel) or _CHANNEL_ENV["default"]
+    names = _CHANNEL_ENV.get(channel)
+    if names:
+        return names
+    logger.warning("未知 LINE channel profile: %s", channel)
+    return "", ""
 
 
 def _get_channel_secret(channel: str = "default") -> str:

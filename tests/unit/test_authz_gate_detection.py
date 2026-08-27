@@ -74,6 +74,11 @@ def handler_gate_three_hops():
     return {"ok": True}
 
 
+def handler_erp_draft_gate():
+    _draft_token(None, "draft")  # noqa: F821
+    return {"ok": True}
+
+
 def handler_gate_commented_out():
     # require_perm(None, "x.y")
     return {"ok": True}
@@ -138,6 +143,9 @@ class GateDetectionTests(unittest.TestCase):
         gate = self._gate(handler_gate_two_hops)
         self.assertIsNotNone(gate)
         self.assertTrue(gate.startswith("pearnly_ai_gate"), gate)
+
+    def test_erp_draft_custom_gate_detected(self):
+        self.assertEqual(self._gate(handler_erp_draft_gate), "erp_draft_gate")
 
     def test_truly_ungated_handler_still_flagged(self):
         """闸不许变橡皮章:调了个无关 helper 不等于有门。"""

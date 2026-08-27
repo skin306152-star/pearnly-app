@@ -30,6 +30,7 @@ from services.erp.express_push.posting_kind import (
     POSTING_KIND_SERVICE,
     POSTING_KIND_STOCK,
     VALID_POSTING_KINDS,
+    item_posting_kinds,
 )
 from services.erp.express_push.common import (
     ExpressMapResult,
@@ -203,6 +204,9 @@ def build_express_sales_payload(
     if _q(dr) != _q(cr):
         return fail("entry_not_balanced")
 
+    line_kinds = item_posting_kinds(fields.get("items"))
+    if line_kinds is not None and len(line_kinds) != len(fields.get("items") or []):
+        return fail("posting_kind_needed", line_item_names(fields))
     # 记账画像:永续客户库存路未开时,销售会结转 COGS/扣库存,绝不静默按周期制落 → 交会计。
     # 指纹未上报→unknown→非库存(=今天默认,行为不变)。
     profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
@@ -210,7 +214,11 @@ def build_express_sales_payload(
     # 选「库存」= 明确卖真实库存(V2-b 真扣库存正是永续客户该走的账);选「服务」= 明确是服务/
     # 非库存(收入式入账,永续账套里的真服务本就不动库存)。自动 escalate 只兜「没显式选」的情形
     # (系统拿不准,不硬落)。放行库存侧安全:小助手匹配不到真库存品仍兜底 escalate(ERR_STOCK_NOT_FOUND)。
-    if posting_kind not in VALID_POSTING_KINDS and profile.blocks_auto_posting():
+    if (
+        posting_kind not in VALID_POSTING_KINDS
+        and line_kinds is None
+        and profile.blocks_auto_posting()
+    ):
         # 带上票面商品行:补选卡靠它让会计看见这张票卖的是什么再判库存/服务(同科目组卡口径)。
         return fail(profile.escalate_reason(), line_item_names(fields))
 
@@ -218,7 +226,19 @@ def build_express_sales_payload(
     acc_group_auto = False
     # 每批开关优先于画像:显式「库存」→ stock_sale(小助手扣真实库存 + 结转成本);显式「服务」→
     # 非库存服务档 + 收入式(不碰库存·不被永续画像推成 stock);缺省 → 沿用画像(=今天默认,行为不变)。
-    if posting_kind == POSTING_KIND_STOCK:
+    line_modes = (
+        [
+            ITEM_MODE_STOCK_SALE if kind == POSTING_KIND_STOCK else ITEM_MODE_NONSTOCK
+            for kind in line_kinds
+        ]
+        if line_kinds is not None
+        else None
+    )
+    has_stock_mode = (ITEM_MODE_STOCK_SALE in line_modes) if line_modes is not None else False
+    effective_has_stock = (
+        has_stock_mode if line_modes is not None else posting_kind == POSTING_KIND_STOCK
+    )
+    if effective_has_stock:
         # 零库存主档 = 小助手没有可克隆的 STMAS 模板行,只能靠 ISACC 存货科目组从零建档。
         # 拦的是「定不下来用哪个组」,不是「账里缺这个品」:品不在账里/库存为零负都照落
         # (建档 + 卖成负,没成本基础就不结转 COGS)—— 选了库存就一定能落,不留死胡同。
@@ -228,14 +248,21 @@ def build_express_sales_payload(
                 # 带上票面商品行:闸在载荷构造之前退出,不带出来卡就没东西可列(只剩一句话)。
                 return fail(choice.fail_reason, line_item_names(fields))
             stock_acccod, acc_group_auto = choice.acccod, choice.auto
-        line_item_mode = ITEM_MODE_STOCK_SALE
+        line_item_mode = (
+            line_modes[0] if line_modes is not None and line_modes else ITEM_MODE_STOCK_SALE
+        )
     elif posting_kind == POSTING_KIND_SERVICE:
         line_item_mode = ITEM_MODE_NONSTOCK
     else:
         line_item_mode = item_mode_for(profile.posting_mode)
     # V1 安全明细:OCR 行项目过对账闸(行合计≈税前额才采信)。挂收入科目作直接科目行,
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
-    detail = extract_line_items(fields, base, total=total, item_mode=line_item_mode)
+    detail = extract_line_items(
+        fields,
+        base,
+        total=total,
+        item_mode=(lambda idx, _it: line_modes[idx]) if line_modes is not None else line_item_mode,
+    )
 
     # 现销 HS / 赊销 IV:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
     # 票种语义(F3)> 银行佐证(F6)> 无信号默认赊销。销项 v1 不接供应商过账档案(档案锚是
@@ -278,7 +305,7 @@ def build_express_sales_payload(
             "filename": history.get("filename"),
         },
     }
-    if line_item_mode == ITEM_MODE_STOCK_SALE and stock_acccod:
+    if (effective_has_stock or line_item_mode == ITEM_MODE_STOCK_SALE) and stock_acccod:
         # 小助手建新库存主档时拿它填 STMAS.ACCCOD(→ISACC→存货资产 + 销货成本)。
         # 账里已有该品就用不上;定不下来就不发,别给老小助手塞没约定的空键。
         payload["stock_acccod"] = stock_acccod

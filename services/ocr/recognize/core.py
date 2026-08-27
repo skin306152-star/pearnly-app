@@ -109,6 +109,8 @@ def run_recognition_core(
     declared_dir, direction = direction, _normalize_direction(direction)
     if declared_dir and direction is None:
         logger.warning("[direction] 认不出的方向声明 %r · 按未声明处理", declared_dir)
+    if staged and user.get("entry") == "erp" and direction is None:
+        raise HTTPException(400, detail="erp.direction_required")
     plan = user.get("plan", "free")
 
     # PO-4 · 缺套账时回落本租户默认套账(上传记录绝不漏归属写 NULL)。
@@ -155,7 +157,10 @@ def run_recognition_core(
 
     # 4.5. 文件指纹缓存(必须先于余额闸:命中不产生新成本,余额 0 也复用)。
     file_hash = _ocr_content_hash(content)
-    cached = _ocr_get_cached(user, file_hash, workspace_client_id=ws_client_id)
+    if staged and user.get("entry") == "erp":
+        cached = None
+    else:
+        cached = _ocr_get_cached(user, file_hash, workspace_client_id=ws_client_id)
     if cached:
         resp = strip_internal_fields(
             serve_cache_hit(
@@ -385,7 +390,11 @@ def run_recognition_core(
     primary_archive_name = _persist["primary_archive_name"]
     primary_category_tag = _persist["primary_category_tag"]
 
-    auto_pushed = dispatch_auto_push(history_ids=history_ids, plan=plan, user=user)
+    auto_pushed = (
+        False
+        if staged and user.get("entry") == "erp"
+        else dispatch_auto_push(history_ids=history_ids, plan=plan, user=user)
+    )
 
     # 成本日志(pipeline-v1 自带完整成本 · 100% 埋点)。
     try:

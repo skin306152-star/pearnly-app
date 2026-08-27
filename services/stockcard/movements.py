@@ -62,7 +62,7 @@ _PURCHASE_SQL = (
 
 _SALES_SQL = (
     "SELECT d.doc_type, d.doc_number, d.issue_date, d.created_at AS doc_created_at, d.grand_total, "
-    "l.id AS line_id, l.line_no, l.product_id, l.description, l.qty, l.line_total "
+    "l.id AS line_id, l.line_no, l.item_type, l.product_id, l.description, l.qty, l.line_total "
     "FROM sales_documents d "
     "LEFT JOIN sales_document_lines l ON l.document_id = d.id AND l.tenant_id = d.tenant_id "
     "WHERE d.tenant_id = %s AND d.seller_workspace_client_id = %s AND d.status = 'issued' "
@@ -126,6 +126,9 @@ def _classify_sale(row: dict, out: MovementSet) -> None:
 
     if row["line_id"] is None:
         exclude(REASON_TOTAL_ONLY, "", row["grand_total"])
+        return
+    if row.get("item_type", "goods") != "goods":
+        exclude(REASON_SERVICE, row["description"], row["line_total"])
         return
     qty = row["qty"]
     if qty is None or Decimal(qty) <= 0:

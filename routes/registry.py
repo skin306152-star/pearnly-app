@@ -48,6 +48,7 @@ from routes.daily_routes import router as daily_router
 from routes.email_ingest_routes import router as email_ingest_router
 from routes.erp_agent import router as erp_agent_router
 from routes.erp_bridge_routes import router as erp_bridge_router
+from routes.erp_intake_routes import router as erp_intake_router
 from routes.erp_mappings_routes import router as erp_mappings_router
 from routes.erp_routes import router as erp_router
 from routes.exceptions_routes import router as exceptions_router
@@ -66,6 +67,7 @@ from routes.line_dms_webhook_routes import router as line_dms_webhook_router
 from routes.line_liff_routes import router as line_liff_router
 from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
 from routes.line_dms_portal_routes import router as line_dms_portal_router
+from routes.line_erp_routes import router as line_erp_router
 from routes.line_webhook_routes import router as line_webhook_router
 from routes.login_routes import router as login_router
 from routes.me_routes import router as me_router
@@ -197,6 +199,7 @@ ROUTERS = (
     me_router,
     line_binding_router,
     erp_router,  # ERP 推送
+    erp_intake_router,  # ERP 商户 staged OCR 草稿丢弃
     erp_agent_router,  # Express Push · 本地 Agent 出站拉取 + token
     erp_bridge_router,  # ERP 桥 · 内网出站 + 管理端
     companion_installer_router,  # 小助手安装包下载
@@ -204,6 +207,7 @@ ROUTERS = (
     dms_roster_router,  # DMS 操作员花名册(owner-only)
     daily_router,  # Daily 周记账(daily_finance 闸 · 每用户独立租户隔离)
     line_dms_webhook_router,  # DMS 独立 LINE OA webhook
+    line_erp_router,  # ERP 独立 LINE OA + LIFF 复核
     admin_users_router,
     history_router,  # OCR 历史(含 assign_client)
     bank_recon_router,

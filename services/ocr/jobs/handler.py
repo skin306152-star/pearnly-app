@@ -64,6 +64,11 @@ def handle_web_ocr(
     if not user:
         return ("__failed__", {"error_code": "user_not_found"})
 
+    # worker 重新查用户后补回入队时的会话入口；旧任务没有该键时保留数据库值。
+    entry = params.get("entry")
+    if entry in {"main", "pos", "ai", "dms", "daily", "cowork", "erp"}:
+        user["entry"] = entry
+
     path = _staged_path(params, input_ref)
     if not path or not os.path.isfile(path):
         return ("__failed__", {"error_code": "staged_file_missing"})
@@ -91,6 +96,7 @@ def handle_web_ocr(
             ws_client_id=ws_client_id,
             posting_kind=posting_kind,
             direction=direction,
+            staged=True,
         )
     except HTTPException as he:
         # 校验/非票/余额不足:终态失败,前端按明确原因展示(绝不冒充完成)。

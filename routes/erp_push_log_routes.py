@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from services.erp import erp_push as _erp
+from services.intake_bridge import convert as convert_svc
 from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
@@ -47,6 +48,12 @@ async def erp_push(req: ErpPushRequest, request: Request):
     history = db.get_ocr_history_detail(user["id"], req.history_id, tenant_id=_tid(user))
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
+    # ERP 产品只允许推送用户已经确认并生成正式采购/销售单的历史。Cowork 的既有推送
+    # 工作流保持原样；这里按会话入口收窄，避免直接调用 API 绕过 ERP 复核确认。
+    if user.get("entry") == "erp" and not convert_svc.history_is_converted(
+        tenant_id=_tid(user), history_id=req.history_id
+    ):
+        raise HTTPException(409, detail="erp.history_not_converted")
 
     # 2) 选 endpoint
     if req.endpoint_id:

@@ -38,6 +38,7 @@ GATE_NAMES = [
     ("auth_member", ("auth_member", "auth_owner")),
     ("pos_auth", ("pos_auth",)),
     ("login_only", ("get_current_user_from_request",)),
+    ("erp_draft_gate", ("_draft_token",)),
     # core.route_helpers.authorize_pearnly_ai:登录 + M1 闸(关→404 fail-closed)+ require_perm
     ("pearnly_ai_gate", ("authorize_pearnly_ai",)),
     # routes/steward_common.authorize_steward:上面那道 + pearnly_ai_steward 双闸(S1 起

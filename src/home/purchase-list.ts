@@ -29,6 +29,7 @@ import {
     monthLabel,
 } from './purchase-list-filters.js';
 import { MORE_SVG } from './more-menu.js';
+import { isErpEntry, setErpIntakeDirection } from './erp-intake.js';
 
 const ICON_SEARCH =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
@@ -345,7 +346,12 @@ function bindChrome(): void {
                 : showToast(t('nav-soon'), 'info');
     // 主操作:记一笔采购 → 采集屏(草稿 s-capture · 桌面上传/手工 · 手机拍照/相册/文件/手工)。
     const recordBtn = document.getElementById('pur-record-btn');
-    if (recordBtn) recordBtn.onclick = () => window.routeTo?.('purchase-capture');
+    if (recordBtn) {
+        recordBtn.onclick = () => {
+            if (isErpEntry()) setErpIntakeDirection('purchase');
+            else window.routeTo?.('purchase-capture');
+        };
+    }
     const lineBtn = document.getElementById('pur-line-btn');
     if (lineBtn) lineBtn.onclick = () => window.openPurchaseLine?.();
     const bulkDel = document.getElementById('pur-bulk-del');

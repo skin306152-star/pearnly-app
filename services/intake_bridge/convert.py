@@ -20,6 +20,46 @@ _MAX_HISTORY_IDS = 500
 _SAVEPOINT = "intake_bridge_convert"
 
 
+def erp_declaration_error(fields: dict) -> Optional[str]:
+    """Validate the ERP-only user decisions before a draft can become a formal document."""
+    if str(fields.get("direction") or "").strip().lower() not in ("purchase", "sales"):
+        return "no_direction"
+    items = fields.get("items")
+    if not isinstance(items, list) or not items:
+        return "no_items"
+    for item in items:
+        if not isinstance(item, dict) or not str(item.get("name") or "").strip():
+            return "item_name_required"
+        if not str(item.get("qty") or "").strip():
+            return "item_qty_required"
+        if str(item.get("posting_kind") or "").strip().lower() not in ("stock", "service"):
+            return "posting_kind_required"
+    return None
+
+
+def validate_erp_histories(cur, *, tenant_id: str, history_ids: list) -> dict[str, str]:
+    """Return invalid ERP history ids and reasons; missing ids fail closed as ``not_found``."""
+    ids = list(dict.fromkeys(str(value) for value in history_ids if value))
+    if not ids:
+        return {}
+    cur.execute(
+        "SELECT id, pages FROM ocr_history WHERE tenant_id = %s::uuid " "AND id = ANY(%s::uuid[])",
+        (tenant_id, ids),
+    )
+    found = {}
+    for row in cur.fetchall() or []:
+        pages = row.get("pages") or []
+        fields = _primary_fields(pages) or {}
+        found[str(row["id"])] = erp_declaration_error(fields)
+    invalid = {}
+    for history_id in ids:
+        if history_id not in found:
+            invalid[history_id] = "not_found"
+        elif found[history_id]:
+            invalid[history_id] = found[history_id]
+    return invalid
+
+
 def convert_histories(cur, *, tenant_id: str, user_id: str, history_ids: list) -> dict:
     """逐张转换。返回 {converted:[{history_id,doc_type,doc_id,doc_no}], skipped:[{history_id,reason}]}。"""
     converted: list = []
@@ -124,6 +164,14 @@ def _already_converted(cur, *, tenant_id: str, history_id: str) -> bool:
         (tenant_id, history_id, tenant_id, history_id),
     )
     return cur.fetchone() is not None
+
+
+def history_is_converted(*, tenant_id: str, history_id: str) -> bool:
+    """Whether an OCR history already owns a formal purchase or sales document."""
+    from core import db
+
+    with db.get_cursor_rls(tenant_id) as cur:
+        return _already_converted(cur, tenant_id=tenant_id, history_id=history_id)
 
 
 def _primary_fields(pages: list) -> Optional[dict]:

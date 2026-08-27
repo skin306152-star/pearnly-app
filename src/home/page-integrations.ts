@@ -1,3 +1,5 @@
+import { authHeaders } from './dms-intake-core.js';
+
 // ============================================================
 // REFACTOR-WB-C3 (2026-05-29) · page-integrations 静态骨架从 home.html 抽出 · 运行期模板注入(R6 机制)
 //
@@ -11,6 +13,96 @@
     'use strict';
     const sec = document.getElementById('page-integrations');
     if (!sec || sec.dataset.wbInjected === '1') return;
+    if (window._entry === 'erp' || localStorage.getItem('pearnly_entry') === 'erp') {
+        const lang = (localStorage.getItem('mrpilot_lang') || 'th').slice(0, 2);
+        const tr = (th: string, en: string, zh: string, ja: string) =>
+            ({ th, en, zh, ja })[lang] || th;
+        sec.innerHTML = `
+            <div class="page-head-clean"><div class="page-head-text">
+                <div class="page-head-title">ERP</div><div class="page-head-sub">LINE ERP · ${window.t?.('nav-push-logs') || 'Push logs'}</div>
+            </div></div>
+            <div class="card"><div class="integrations-section-title">LINE ERP</div>
+                <div id="erp-line-status" class="integration-row"><div class="int-info">
+                    <div class="int-name">LINE ERP</div><div class="int-desc">${tr('สถานะการเชื่อมต่อ / สาขาปัจจุบัน', 'Connection status / current branch', '连接状态 / 当前分店', '接続状態 / 現在の支店')}</div>
+                </div><div class="int-actions"><button class="int-btn-configure" id="erp-line-code">${tr('สร้างรหัสผูกบัญชี', 'Generate binding code', '生成绑定码', '連携コードを生成')}</button><button class="int-btn-configure" id="erp-line-unbind">${tr('ยกเลิกการผูก', 'Unbind', '解绑', '連携解除')}</button></div></div>
+                <div id="erp-line-code-output" class="hint"></div>
+            </div>
+            <div class="card"><div class="integrations-section-title">${tr('ERP อื่น', 'Third-party ERP', '第三方 ERP', '外部 ERP')}</div>
+                <div class="integration-row"><div class="int-info"><div class="int-name">MR.ERP / Express</div><div class="int-desc">${tr('การเชื่อมต่อและประวัติการส่ง', 'Connection and push history', '连接与推送记录', '接続と送信履歴')}</div></div>
+                <div class="int-actions"><button class="int-btn-configure" id="erp-express-connect">${tr('เชื่อมต่อ', 'Configure connection', '配置连接', '接続を設定')}</button><button class="int-btn-configure" data-route="push-logs">${window.t?.('nav-push-logs') || 'Push logs'}</button></div></div>
+            </div>`;
+        sec.dataset.wbInjected = '1';
+        const status = sec.querySelector('#erp-line-status .int-desc');
+        const output = sec.querySelector('#erp-line-code-output');
+        const statusText = (key: string) =>
+            tr(
+                key === 'bound' ? 'เชื่อมต่อแล้ว' : 'ยังไม่เชื่อมต่อ',
+                key === 'bound' ? 'Bound' : 'Not bound',
+                key === 'bound' ? '已绑定' : '未绑定',
+                key === 'bound' ? '連携済み' : '未連携'
+            );
+        const headers = (json = false) => authHeaders(json) as HeadersInit;
+        const refresh = () =>
+            fetch('/api/line/erp/binding', { headers: headers() })
+                .then((r) => r.json())
+                .then((x) => {
+                    const d = x.data || x;
+                    if (status)
+                        status.textContent = `${d.bound ? statusText('bound') : statusText('unbound')} · ${d.display_name || '-'} · ${d.workspace_client_id || '-'} · ${d.bound_at || '-'}`;
+                    const unbind = sec.querySelector(
+                        '#erp-line-unbind'
+                    ) as HTMLButtonElement | null;
+                    if (unbind) unbind.disabled = !d.bound;
+                })
+                .catch(() => {
+                    if (status) status.textContent = statusText('failed');
+                });
+        sec.querySelector('#erp-line-code')?.addEventListener('click', () =>
+            fetch('/api/line/erp/binding-code', {
+                method: 'POST',
+                headers: {
+                    ...headers(true),
+                    'X-Workspace-Client-Id': String(window.getActiveWorkspaceClientId?.() || ''),
+                },
+                body: '{}',
+            })
+                .then((r) => r.json())
+                .then((x) => {
+                    const d = x.data || x;
+                    if (output)
+                        output.textContent = `${d.code || statusText('failed')} · ${d.expires_at || ''}`;
+                })
+                .catch(() => {
+                    if (output) output.textContent = statusText('failed');
+                })
+        );
+        sec.querySelector('#erp-line-unbind')?.addEventListener('click', () => {
+            if (
+                !window.confirm(
+                    tr(
+                        'ยืนยันการยกเลิกการผูก?',
+                        'Unbind LINE ERP?',
+                        '确认解绑 LINE ERP？',
+                        'LINE ERP の連携を解除しますか？'
+                    )
+                )
+            )
+                return;
+            void fetch('/api/line/erp/binding', { method: 'DELETE', headers: headers() }).then(
+                refresh
+            );
+        });
+        sec.querySelector('#erp-express-connect')?.addEventListener('click', () => {
+            const express = (window as Window & { ExpressWizard?: { open?: () => void } })
+                .ExpressWizard;
+            express?.open?.();
+        });
+        sec.querySelector('[data-route="push-logs"]')?.addEventListener('click', () =>
+            window.routeTo?.('push-logs')
+        );
+        void refresh();
+        return;
+    }
     sec.innerHTML = `
         <div class="page-head-clean">
             <div class="page-head-icon">

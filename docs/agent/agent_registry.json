@@ -55,6 +55,7 @@
   "email_ingest_routes": "B",
   "erp_agent": "D",
   "erp_bridge_routes": "D",
+  "erp_intake_routes": "D",
   "erp_endpoints_routes": "C",
   "erp_export_routes": {
     "bucket": "A",
@@ -72,6 +73,7 @@
   },
   "erp_mappings_routes": "C",
   "erp_push_log_routes": "B",
+  "line_erp_routes": "D",
   "erp_posting_preview_routes": "B",
   "exceptions_routes": "B",
   "front_desk_routes": "C",

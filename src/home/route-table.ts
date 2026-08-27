@@ -109,6 +109,7 @@ export const COWORK_ALLOWED_ROUTES = new Set<string>([
 
 export const ERP_ALLOWED_ROUTES = new Set<string>([
     'dashboard',
+    'dms-intake',
     'stock-card',
     'purchase',
     'purchase-suppliers',
@@ -121,6 +122,8 @@ export const ERP_ALLOWED_ROUTES = new Set<string>([
     'sales-account',
     'clients',
     'company',
+    'integrations',
+    'push-logs',
 ]);
 
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。

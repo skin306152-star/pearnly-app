@@ -44,6 +44,7 @@ from services.erp.express_push.posting_kind import (
     POSTING_KIND_SERVICE,
     POSTING_KIND_STOCK,
     VALID_POSTING_KINDS,
+    item_posting_kinds,
 )
 from services.erp.express_push.common import (
     ExpressMapResult,
@@ -201,6 +202,9 @@ def build_express_payload(
     if not ap_acc:
         return fail("no_ap_account")
 
+    line_kinds = item_posting_kinds(fields.get("items"))
+    if line_kinds is not None and len(line_kinds) != len(fields.get("items") or []):
+        return fail("posting_kind_needed", line_item_names(fields))
     # 货/费判据(单一事实源 · 与 MR.ERP routing.choose_doc_type 同判据,防两车道判据漂移)。
     is_expense, item_src = item_verdict(fields)
     # 记账画像:这家客户的商品行该怎么落(非库存/直接科目/库存/交人)。指纹未上报→unknown→
@@ -209,19 +213,25 @@ def build_express_payload(
     profile = profile_from_config(config, stock_enabled=stock_lane_enabled(config))
     # 本批显式声明优先于画像:声明「库存」→ 真入库(永续客户本该走的路),声明「服务」→ 不碰
     # 库存。自动 escalate 只兜「没人声明」的票 —— 系统拿不准就不硬落(镜像 sales_mapper 口径)。
-    declared = posting_kind in VALID_POSTING_KINDS
+    declared = posting_kind in VALID_POSTING_KINDS or line_kinds is not None
     if not is_expense and not declared and profile.blocks_auto_posting():
         # 带上票面商品行:补选卡靠它让会计看见这张票卖的是什么再判库存/服务(同科目组卡口径)。
         return fail(profile.escalate_reason(), line_item_names(fields))
 
-    item_mode = _goods_item_mode(posting_kind, profile)
+    line_modes = (
+        [_goods_item_mode(kind, profile) for kind in line_kinds] if line_kinds is not None else None
+    )
+    item_mode = line_modes[0] if line_modes else _goods_item_mode(posting_kind, profile)
+    has_stock_mode = (
+        (ITEM_MODE_STOCK in line_modes) if line_modes is not None else item_mode == ITEM_MODE_STOCK
+    )
     stock_acccod = str(config.get("stock_acccod") or "").strip()
     acc_group_auto = False
     # 采购建第一个库存品同样要一个存货科目组:零主档账套里小助手没有可克隆的 STMAS 模板行,
     # 只能靠 ISACC 从零建 STKTYP=0。此前这道闸只装在销项、采购一律放行,可放行的票到了小助手
     # 那儿照样建不出档 —— 只是把失败推迟到会计看不懂的地方。改成与销项同一个解析器后,合格组
     # 唯一的账套自动通过(零打扰),真拦下的只剩「Express 里压根没有存货科目组」,那必须人去建。
-    if not is_expense and item_mode == ITEM_MODE_STOCK and account_set_has_no_stock_master(config):
+    if not is_expense and has_stock_mode and account_set_has_no_stock_master(config):
         choice = resolve_stock_acc_group(config)
         if choice.fail_reason:
             # 带上票面商品行:闸在载荷构造之前退出,不带出来补救卡就只剩一句话没有可填的行。
@@ -272,7 +282,12 @@ def build_express_payload(
     if is_expense:
         detail = _expense_detail(total)
     else:
-        detail = extract_line_items(fields, base, total=total, item_mode=item_mode)
+        detail = extract_line_items(
+            fields,
+            base,
+            total=total,
+            item_mode=(lambda idx, _it: line_modes[idx]) if line_modes is not None else item_mode,
+        )
 
     # 现购 HP / 赊购 RR:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
     # 票种语义(F3)> 供应商过账档案(F4)> 银行佐证(F6)> config 默认(B2B 缺省 RR)。

@@ -28,6 +28,17 @@ _RLS_TABLES = (
 )
 
 
+def ensure_sales_line_item_type() -> None:
+    """Keep the additive sales line classification available on databases without Alembic."""
+    from core import db
+
+    with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            "ALTER TABLE sales_document_lines ADD COLUMN IF NOT EXISTS "
+            "item_type text NOT NULL DEFAULT 'goods'"
+        )
+
+
 def ensure_sales_rls() -> None:
     """给 sales 域孤儿表上 tenant policy(幂等 · 独立事务防牵连别的 ensure)。
 

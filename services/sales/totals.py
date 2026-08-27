@@ -89,6 +89,7 @@ def compute_totals(
         norm_lines.append(
             {
                 "line_no": i,
+                "item_type": ln.get("item_type") or "goods",
                 "product_id": ln.get("product_id"),
                 "description": (ln.get("description") or "").strip(),
                 "qty": qty,

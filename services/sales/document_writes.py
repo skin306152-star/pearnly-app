@@ -36,12 +36,15 @@ def replace_lines(cur, tenant_id: str, doc_id, lines: list) -> None:
         "DELETE FROM sales_document_lines WHERE tenant_id=%s AND document_id=%s",
         (tenant_id, doc_id),
     )
+    has_item_type = any("item_type" in ln for ln in lines)
     for ln in lines:
-        cur.execute(
-            "INSERT INTO sales_document_lines (tenant_id, document_id, line_no, product_id, "
-            "description, qty, unit_price, discount, discount_pct, vat_applicable, line_total) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-            (
+        if has_item_type:
+            sql = (
+                "INSERT INTO sales_document_lines (tenant_id, document_id, line_no, product_id, "
+                "description, qty, unit_price, discount, discount_pct, vat_applicable, line_total, item_type) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            )
+            params = (
                 tenant_id,
                 doc_id,
                 ln["line_no"],
@@ -53,5 +56,25 @@ def replace_lines(cur, tenant_id: str, doc_id, lines: list) -> None:
                 ln["discount_pct"],
                 ln["vat_applicable"],
                 ln["line_total"],
-            ),
-        )
+                ln.get("item_type") or "goods",
+            )
+        else:
+            sql = (
+                "INSERT INTO sales_document_lines (tenant_id, document_id, line_no, product_id, "
+                "description, qty, unit_price, discount, discount_pct, vat_applicable, line_total) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            )
+            params = (
+                tenant_id,
+                doc_id,
+                ln["line_no"],
+                ln["product_id"],
+                ln["description"],
+                ln["qty"],
+                ln["unit_price"],
+                ln["discount"],
+                ln["discount_pct"],
+                ln["vat_applicable"],
+                ln["line_total"],
+            )
+        cur.execute(sql, params)

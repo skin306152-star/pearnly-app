@@ -9,8 +9,15 @@ import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, Endpoint } from './dms-intake-invoice.js';
 import { pushHistory } from './dms-intake-erp-push.js';
+import { renderReview } from './dms-intake-review.js';
 import { postingPreviewContainer, refreshPostingPreview } from './dms-intake-posting-preview.js';
-import { confirmIndices, confirmedIndices } from './dms-intake-review.js';
+import {
+    confirmIndices,
+    confirmedIndices,
+    convertedHistoryIds,
+    pagesForInvoice,
+} from './dms-intake-review-convert.js';
+import { isErpEntry } from './erp-intake.js';
 
 // ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
@@ -169,24 +176,44 @@ export async function doFinish() {
     renderSubmit();
     // 终态:① 先把复核面改过的字段(已实时写入 IV.results)全部写进各自记录 →
     // ② 再 commit 草稿→正式落识别记录。顺序不能反,否则落库的是识别时原值(治"改了不同步")。
-    await persistAllEdits();
-    await commitStaged();
+    const saved = await persistAllEdits();
+    if (isErpEntry() && !saved) {
+        IV.busy = false;
+        renderReview();
+        return;
+    }
+    const committed = await commitStaged();
+    if (isErpEntry() && !committed) {
+        showToast(t('dxi-rev-save-fail'), 'error');
+        IV.busy = false;
+        renderReview();
+        return;
+    }
     let excelOk = false;
     let erpOk = 0;
     let erpFail = 0;
+    let erpPending = 0;
     if (IV.output.excel) excelOk = await doExport();
-    if (IV.output.erp) {
-        for (const id of allHistoryIds()) {
-            (await pushOne(id)) ? erpOk++ : erpFail++;
+    if (IV.output.erp && (!isErpEntry() || (saved && committed))) {
+        const ids = allHistoryIds();
+        const pushIds = isErpEntry() ? convertedHistoryIds(ids) : ids;
+        erpFail += ids.length - pushIds.length;
+        for (const id of pushIds) {
+            const outcome = await pushOne(id);
+            if (outcome === 'success') erpOk++;
+            else if (outcome === 'pending') erpPending++;
+            else erpFail++;
         }
+    } else if (IV.output.erp) {
+        erpFail = allHistoryIds().length;
     }
     IV.busy = false;
-    renderResult(excelOk, erpOk, erpFail);
+    renderResult(excelOk, erpOk, erpFail, erpPending);
 }
 // 第4步落库前:把所有发票当前字段(复核面改后·已实时写入 IV.results)写进各自记录。
 // 不依赖用户是否点过「保存修改」→ 用户看到什么改值,就一定落进识别记录(治"改了不同步")。
-async function persistAllEdits(): Promise<void> {
-    const puts: Promise<unknown>[] = [];
+async function persistAllEdits(): Promise<boolean> {
+    const puts: Promise<Response>[] = [];
     IV.results.forEach((r) => {
         r.invoices.forEach((inv) => {
             if (!inv.history_id) return;
@@ -194,26 +221,39 @@ async function persistAllEdits(): Promise<void> {
                 fetch(`/api/history/${encodeURIComponent(inv.history_id)}`, {
                     method: 'PUT',
                     headers: authHeaders(true),
-                    body: JSON.stringify({ pages: [{ fields: inv.fields }] }),
-                }).catch(() => {})
+                    body: JSON.stringify({ pages: pagesForInvoice(r, inv) }),
+                })
             );
         });
     });
-    await Promise.all(puts);
+    try {
+        const responses = await Promise.all(puts);
+        if (responses.some((r) => !r.ok)) {
+            showToast(t('dxi-rev-save-fail'), 'error');
+            return false;
+        }
+        return true;
+    } catch {
+        showToast(t('dxi-rev-save-fail'), 'error');
+        return false;
+    }
 }
 
-// 把本次草稿记录落进识别记录(staged→正式)。失败不阻断导出/推送(记录仍可经 id 引用)。
-async function commitStaged(): Promise<void> {
+// 把本次草稿记录落进识别记录(staged→正式)。ERP 推送要求这一步返回成功。
+async function commitStaged(): Promise<boolean> {
     const ids = allHistoryIds();
-    if (!ids.length) return;
+    if (!ids.length) return true;
     try {
-        await fetch('/api/ocr/commit', {
+        const r = await fetch('/api/ocr/commit', {
             method: 'POST',
             headers: authHeaders(true),
             body: JSON.stringify({ ids }),
         });
+        if (!r.ok) return false;
+        const d = (await r.json().catch(() => ({}))) as { committed?: unknown };
+        return !isErpEntry() || typeof d.committed === 'number';
     } catch {
-        /* 落库失败:容后(列表可能暂不显示)· 不阻断本次导出/推送 */
+        return false;
     }
 }
 function allHistoryIds(): string[] {
@@ -278,7 +318,7 @@ async function doExport(): Promise<boolean> {
         return false;
     }
 }
-async function pushOne(historyId: string): Promise<boolean> {
+async function pushOne(historyId: string): Promise<import('./dms-intake-erp-push.js').PushOutcome> {
     return pushHistory(historyId, IV.target, IV.postingKind);
 }
 function downloadBlob(blob: Blob, name: string) {
@@ -295,7 +335,7 @@ function stamp() {
     return String(new Date().getTime());
 }
 
-function renderResult(excelOk: boolean, erpOk: number, erpFail: number) {
+function renderResult(excelOk: boolean, erpOk: number, erpFail: number, erpPending = 0) {
     IV.view = 'success';
     const el = $('dx-s-success');
     if (!el) return;
@@ -312,8 +352,10 @@ function renderResult(excelOk: boolean, erpOk: number, erpFail: number) {
         ? sitem(
               'dxi-res-erp',
               t('dxi-res-erp-ok').replace('{name}', targetName()) +
-                  (erpFail ? ` · ✗${erpFail}` : ` · ✓${erpOk}`),
-              erpFail === 0
+                  ` · ✓${erpOk}` +
+                  (erpPending ? ` · ${t('erp-status-pending')} ${erpPending}` : '') +
+                  (erpFail ? ` · ✗${erpFail}` : ''),
+              erpFail === 0 && erpPending === 0
           )
         : sitem('dxi-res-erp', t('dxi-res-none'), null);
     el.innerHTML =

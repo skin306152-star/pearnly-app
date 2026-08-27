@@ -3,6 +3,7 @@
 // 作用域 .dmsx · 控制器在 dms-intake.ts。标签为 i18n 键 · 渲染时 t() · 跟随语言切换。
 // ============================================================
 /* global escapeHtml */
+import { isErpEntry } from './erp-intake.js';
 
 function dxEsc(s: unknown): string {
     return typeof escapeHtml === 'function'
@@ -28,6 +29,7 @@ export const STEP_KEYS: Record<string, Array<[string, string]>> = {
 
 // 任务选择器卡(发票 / 汇总表批量)· data-task 切换由控制器接管
 function taskPickerHtml(t: (k: string) => string, task: string): string {
+    if (isErpEntry()) return '';
     const opt = (key: string, titleK: string, descK: string, icon: string) =>
         `<div class="dx-opt${task === key ? ' active' : ''}" data-task="${key}">` +
         `<div class="dx-opt-ic">${icon}</div>` +

@@ -71,6 +71,19 @@ class BuildDraftTests(unittest.TestCase):
         self.assertEqual(len(d["lines"]), 1)
         self.assertEqual(d["lines"][0]["vat_rate"], 7)
 
+    def test_explicit_line_posting_kind_maps_to_item_type(self):
+        f = {
+            "seller_name": "ACME",
+            "invoice_number": "INV-MIX",
+            "subtotal": "150",
+            "items": [
+                {"name": "货品", "qty": "1", "price": "100", "posting_kind": "stock"},
+                {"name": "服务", "qty": "1", "price": "50", "posting_kind": "service"},
+            ],
+        }
+        d = ik.build_draft_from_invoice(f, kind="purchase_invoice")
+        self.assertEqual([ln["item_type"] for ln in d["lines"]], ["goods", "service"])
+
     def test_expense_kind_forces_no_vat(self):
         # 费用类(含截图证据)即便 OCR 读到 vat 也不带可抵进项 VAT(进项票才抵)。
         f = {"vat": "70", "items": [{"name": "x", "qty": "1", "price": "100"}]}

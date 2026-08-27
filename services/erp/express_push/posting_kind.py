@@ -20,6 +20,29 @@ POSTING_KIND_STOCK = "stock"
 VALID_POSTING_KINDS = (POSTING_KIND_SERVICE, POSTING_KIND_STOCK)
 
 
+def item_posting_kinds(items: Any) -> Optional[list]:
+    """Return per-line declarations when the payload uses the ERP line contract.
+
+    A line-level declaration is opt-in for legacy Cowork/DMS callers. Once any
+    line declares ``posting_kind``, every non-empty line must declare a valid
+    value; a missing/invalid line returns ``None`` so the caller can leave the
+    document for human review instead of guessing.
+    """
+    rows = items if isinstance(items, list) else []
+    declared = any(isinstance(row, dict) and "posting_kind" in row for row in rows)
+    if not declared:
+        return None
+    out = []
+    for row in rows:
+        if not isinstance(row, dict):
+            return []
+        kind = normalize(row.get("posting_kind"))
+        if kind is None:
+            return []
+        out.append(kind)
+    return out
+
+
 def normalize(value: Any) -> Optional[str]:
     """认不出的值一律 None —— 不猜。
 

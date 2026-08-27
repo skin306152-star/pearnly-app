@@ -1,10 +1,4 @@
-// ============================================================
-// 录入工作台 · 发票/收据任务 · 上传 + 识别(复用 /api/ocr/recognize 全套语义,不重写后端)
-//   多发票拆分:一个 PDF 可能 N 张发票 → 后端 invoice_grouper 已拆,响应给 invoices[];
-//   本流按 invoices[] 逐张展示/导出(不再 mergeFields 压成一张)。
-//   去重(name+size)/6 路并发/client_id 归属/needs_review·重复·自动推送 透出。
-//   复核/导出/结果在 dms-intake-invoice-submit.ts(控行数)。
-// ============================================================
+// 录入工作台发票/收据任务：上传、识别和多发票拆分；复核与提交分模块实现。
 /* global t, showToast */
 import { S, esc, $ } from './dms-intake-core.js';
 import { saveStep } from './step-resume.js';
@@ -14,6 +8,7 @@ import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
 import { recognizeOne, ctrls, recState } from './dms-intake-invoice-recognize.js';
 import { fetchErpEndpoints } from './dms-intake-erp-push.js';
 import { focusDxErpCards } from './dms-intake-erp-cards.js';
+import { erpIntakeDirection, isErpEntry } from './erp-intake.js';
 
 export type Dict = Record<string, unknown>;
 export interface IvFile {
@@ -36,6 +31,7 @@ export interface IvInvoice {
 export interface IvResult {
     filename: string;
     invoices: IvInvoice[];
+    pages: unknown[]; // 后端原始 pages，保存字段时保留多页结构
     history_ids: string[];
     invoice_count: number;
     needs_review: boolean; // 后端 missed_invoice_warnings 非空 = 可能漏票需人工核对
@@ -61,11 +57,9 @@ export const IV = {
     endpoints: [] as Endpoint[],
     target: '' as string,
     // 本批过账去向(录入向导 step① 每批开关 · 仅 Express 有此拆分)。
-    // 初值空 = 没声明,不预选:预选值会被当成「用户对本批的显式决定」落库,进而绕过
-    // sales_mapper 的「永续客户 + 库存路未开 → 交会计」escalate,把该交人的票静默按服务记。
+    // 初值空 = 没声明；预选会被当作用户决定并绕过 mapper 的人工复核闸。
     postingKind: '' as '' | 'stock' | 'service',
-    // 本批进项/销项。同样不预选 —— 预选等于替用户声明了方向,而方向判反是把一张进项票
-    // 记成收入(或反之),比没声明严重得多。空 = 交税号锚点自动判(今天的行为)。
+    // 本批进项/销项也不预选；空值由既有税号锚点处理，ERP 入口另行锁定。
     direction: '' as '' | 'purchase' | 'sales',
     busy: false,
     aborted: false, // 用户点「停止」· worker 据此停拉队列
@@ -102,7 +96,7 @@ export function resetInvoice() {
     IV.output = { excel: false, erp: false };
     IV.target = '';
     IV.postingKind = '';
-    IV.direction = '';
+    IV.direction = isErpEntry() ? erpIntakeDirection() : '';
     IV.busy = false;
     IV.view = 'upload';
 }
@@ -223,14 +217,15 @@ function choiceHtml(attr: string, on: boolean, tk: string, dk: string): string {
 // 「本批是进项还是销项」· 用户选了就按他选的做,不再拿税号去猜(税号读错=方向判反)。
 // 不选 = 沿用税号锚点自动判定,行为与今天一致。
 function directionHtml(): string {
+    const locked = isErpEntry() ? erpIntakeDirection() : '';
     const opt = (k: 'purchase' | 'sales', tk: string, dk: string) =>
         choiceHtml(`data-iv-dir="${k}"`, IV.direction === k, tk, dk);
     return (
         `<div class="dx-side-box"><b>${esc(t('dxi-dir-h'))}</b>` +
         `<p>${esc(t('dxi-dir-hint'))}</p>` +
         '<div class="dx-choices">' +
-        opt('purchase', 'dxi-dir-purchase-t', 'dxi-dir-purchase-d') +
-        opt('sales', 'dxi-dir-sales-t', 'dxi-dir-sales-d') +
+        (locked !== 'sales' ? opt('purchase', 'dxi-dir-purchase-t', 'dxi-dir-purchase-d') : '') +
+        (locked !== 'purchase' ? opt('sales', 'dxi-dir-sales-t', 'dxi-dir-sales-d') : '') +
         '</div></div>'
     );
 }
@@ -251,6 +246,7 @@ function hasEnabledExpressTarget(): boolean {
     );
 }
 function postingKindHtml(): string {
+    if (isErpEntry()) return ''; // ERP 在复核页逐行选择，支持同票库存+服务混合。
     if (!hasEnabledExpressTarget()) return ''; // 非 Express 目标:隐藏(MR.ERP 不区分库存/服务)
     const opt = (k: 'service' | 'stock', tk: string, dk: string) =>
         choiceHtml(`data-iv-posting="${k}"`, IV.postingKind === k, tk, dk);
@@ -296,6 +292,11 @@ async function addFiles(list: FileList | null | undefined) {
 
 // ── 步骤 2:识别(机制在 dms-intake-invoice-recognize.ts · recognizeOne / ctrls / recState)──
 async function startRecognize() {
+    const lockedDirection = isErpEntry() ? erpIntakeDirection() : '';
+    if (isErpEntry() && (!lockedDirection || IV.direction !== lockedDirection)) {
+        showToast(t('dxi-dir-hint'), 'error');
+        return;
+    }
     const waiting = IV.files.filter((f) => f.status === 'waiting');
     if (!waiting.length || IV.busy) return;
     IV.busy = true;
@@ -415,9 +416,10 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     }
     const dir = tg.closest('[data-iv-dir]') as HTMLElement | null;
     if (dir) {
-        // 再点一次取消 —— 选错了要能退回「不声明」,否则用户只能刷新页面重来。
         const v = dir.dataset.ivDir as 'purchase' | 'sales';
-        IV.direction = IV.direction === v ? '' : v;
+        const locked = isErpEntry() ? erpIntakeDirection() : '';
+        // ERP 的采购/销售入口就是用户决定，工作台只能展示该决定，不能再点空后回退猜测。
+        IV.direction = locked || (IV.direction === v ? '' : v);
         renderInvoiceUpload();
         return true;
     }

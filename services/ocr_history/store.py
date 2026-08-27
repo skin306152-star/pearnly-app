@@ -34,6 +34,9 @@ from services.ocr_history.mutations import (  # noqa: F401
     update_ocr_history_pdf_storage,
     update_history_official_name,
 )
+from services.ocr_history.staged import (  # noqa: F401
+    discard_staged_ocr_history_with_pdf_paths,
+)
 from services.ocr_history.posting_kind_store import (  # noqa: F401
     update_history_posting_kind,
 )

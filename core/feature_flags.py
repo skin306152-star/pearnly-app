@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """应用层 feature flag · 对话 Agent 总闸的消费侧(WP2 钥匙闸)。
 
-WP5 入口在调 Agent 前先问 agent_enabled_for(user_id):False → 绕过整个 Agent 层、
-用户无感回到现状。默认关(表无记录 / 查询异常 → False);开 / 灰度由超管在平台后台
-「全局设置」控制(钥匙闸是安全阀,fail-closed)。设置读写见 services/platform_settings。
+WP5 调 Agent 前先问 agent_enabled_for(user_id)：False 就回到现状。默认关；开 / 灰度由超管后台
+「全局设置」控制(钥匙闸 fail-closed)。设置读写见 services/platform_settings。
 """
 
 from __future__ import annotations
@@ -329,6 +328,10 @@ def dms_line_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bo
     按账套主体归属判定(有 tenant_id 用 tenant · 个人套账退回 user_id),与 dms_portal 同口径。
     """
     return _enabled(DMS_LINE_KEY, tenant_id or user_id, "dms_line_enabled_for")
+
+
+def erp_line_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
+    return _allowlisted(ERP_PORTAL_KEY, tenant_id or user_id, "erp_line_enabled_for")
 
 
 def pos_refund_approval_enabled_for(tenant_id: Optional[str]) -> bool:

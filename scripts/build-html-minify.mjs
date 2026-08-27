@@ -92,6 +92,7 @@ const TARGETS = [
         src: 'static/dms-booking-edit/dms-booking-edit.html',
         out: 'static/dist/dms-booking-edit.html',
     },
+    { src: 'static/erp-line-intake/index.html', out: 'static/dist/erp-line-intake.html' },
     // Earn 平台超管后台(路由 /admin/*)· SPA 外壳收口(admin JS/CSS 仍独立 · 超管页防抄需求低)。
     { src: 'static/admin/admin.html', out: 'static/dist/admin.html' },
     // Earn 超管登录页(路由 /earn)· 原内联 routes/earn_login_page.py 常量 → 挪成可读源 + dist 产物。

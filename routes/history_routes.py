@@ -153,9 +153,32 @@ async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
         wc.assert_workspace_in_tenant(
             cur, tenant_id=tenant_id, workspace_client_id=req.workspace_client_id
         )
+        if user.get("entry") == "erp":
+            invalid = convert_svc.validate_erp_histories(
+                cur, tenant_id=tenant_id, history_ids=req.history_ids
+            )
+            if invalid:
+                raise HTTPException(
+                    409,
+                    detail={"code": "erp.declaration_required", "histories": invalid},
+                )
         result = convert_svc.convert_histories(
             cur, tenant_id=tenant_id, user_id=str(user["id"]), history_ids=req.history_ids
         )
+        if user.get("entry") == "erp":
+            resolved_ids = {str(row.get("history_id")) for row in result.get("converted") or []}
+            resolved_ids.update(
+                str(row.get("history_id"))
+                for row in result.get("skipped") or []
+                if row.get("reason") == "already_converted"
+            )
+            if resolved_ids:
+                cur.execute(
+                    "UPDATE ocr_history SET staged = FALSE, updated_at = NOW() "
+                    "WHERE id = ANY(%s::uuid[]) AND tenant_id = %s::uuid "
+                    "AND user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)",
+                    (list(resolved_ids), tenant_id, tenant_id),
+                )
     return result
 
 

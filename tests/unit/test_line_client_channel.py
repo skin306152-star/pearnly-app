@@ -65,8 +65,8 @@ class ChannelSecretProfileTests(unittest.TestCase):
         ):
             self.assertEqual(line_client._get_channel_token(), "legacy-tok")
             self.assertEqual(line_client._get_channel_token("dms"), "dms-tok")
-            # 未知 channel 回落 default(不炸)。
-            self.assertEqual(line_client._get_channel_token("nope"), "legacy-tok")
+            # 未知 channel fail-closed，不能借用旧 OA 凭据。
+            self.assertEqual(line_client._get_channel_token("nope"), "")
 
 
 if __name__ == "__main__":

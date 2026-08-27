@@ -377,6 +377,24 @@ class ExpressSalesStockToggleTests(unittest.TestCase):
         for it in r.payload["items"]:
             self.assertEqual(it["item_mode"], "non_stock_item")
 
+    def test_line_service_declarations_override_legacy_stock_kind(self):
+        history = _sales_history(
+            fields={
+                "subtotal": "100.00",
+                "vat": "7.00",
+                "items": [
+                    {"name": "服务 A", "qty": "1", "subtotal": "50.00", "posting_kind": "service"},
+                    {"name": "服务 B", "qty": "1", "subtotal": "50.00", "posting_kind": "service"},
+                ],
+            },
+            total_amount="107.00",
+        )
+        config = {**_CONFIG, "stock_acccod": "12-01-01-00"}
+        r = build_express_sales_payload(history, config=config, posting_kind="stock")
+        self.assertTrue(r.ok, r.reason)
+        self.assertNotIn("stock_acccod", r.payload)
+        self.assertTrue(all(it["item_mode"] == "non_stock_item" for it in r.payload["items"]))
+
     def test_explicit_kind_bypasses_perpetual_escalation(self):
         # 用户显式选「库存/服务」优先于自动画像 → 都绕过「永续→交会计」自动 escalate:
         # 「库存」发 stock_sale(V2-b 真扣库存)·「服务」发 non_stock_item(收入式服务档)。

@@ -34,6 +34,10 @@ def _docs(*names):
     return [{"history_id": "h", "items": [{"name": n} for n in names]}]
 
 
+def _declared_docs(*rows):
+    return [{"history_id": "h", "items": [dict(row) for row in rows]}]
+
+
 class PreviewGateTests(unittest.TestCase):
     def test_ok_new_item_none_client(self):
         r = compute_posting_preview(_docs("สินค้าใหม่ไม่มีในระบบ"), _cfg(_NONE_FP))
@@ -65,6 +69,17 @@ class PreviewGateTests(unittest.TestCase):
     def test_escalate_perpetual_without_stock_lane(self):
         r = compute_posting_preview(_docs("x"), _cfg(_PERPETUAL_FP))
         self.assertEqual(r["gate"], "escalate")
+
+    def test_complete_line_declarations_override_profile_guess(self):
+        r = compute_posting_preview(
+            _declared_docs(
+                {"name": "สินค้า", "posting_kind": "stock"},
+                {"name": "บริการ", "posting_kind": "service"},
+            ),
+            _cfg(_PERPETUAL_FP),
+        )
+        self.assertNotEqual(r["gate"], "escalate")
+        self.assertEqual([row["posting_kind"] for row in r["items"]], ["stock", "service"])
 
     def test_confirmed_override_suppresses_confirm(self):
         cfg = _cfg(_NONE_FP, profile={"posting_mode": "non_stock", "inventory_usage": "none"})

@@ -1,15 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-27 ERP 全商品收发存长表上线 · 本批暂停
+## 当前状态卡 · 08-28 ERP 单据录入至库存/第三方 ERP 闭环
 
-- **✅ 产品关系终版**:`/cowork` 事务所自由注册;`/erp` 个体老板只接受 Earn 邀请;两套产品租户、单据、余额与状态独立,不建立商户-事务所关系。
-- **✅ Stock Card 上线**:按商品连续排列参考图原样 13 列,所有商品逐笔流水同页默认显示;旧汇总→单品详情、未入账、归并、规则、搜索与状态交互已删除;仅保留已拍板的期初库存。施工正本=`docs/erp/STOCK-CARD-ALL-PRODUCTS.md`。
-- **✅ 算法口径**:各商品按 key 独立滚存移动加权平均;保留期初截至日、负库存和未知成本诚实态;禁止跨商品混算。网页单源 `/api/stockcard/report`,内部 Steward 的 `report.summary/card` 不动。
-- **✅ 验收证据**:Stock Card 单测 70/70;本地 Playwright 4/4(桌面/手机/泰语/期初/空态/错态);CI `33091878210` 全绿(含 unit、真 PG、全量 E2E)。
-- **✅ E2E 机制修正**:台账只归责 `merge-base(origin/master,HEAD)..HEAD` 待推差异,共享词典/HTML 精确命中;库存卡 spec 自起静态服验当前提交成品并保持真实 `/erp` pathname,不再拿部署前线上旧版断言新页面。
-- **✅ 生产**:`d801cda26bb6dfdd68677c17e08d9c64561c73b7` 已部署;`api/health=ok`、`/erp=200`、`home.css?v=12070111`、线上 bundle 含 `loadStockCard`。首次 502 是 worker 启动约 19 秒的重启窗口,就绪后复验通过。
-- **📌 录入口径**:网页与 ERP 专用 LINE 均为上传→OCR 预览→全字段编辑→明确确认或丢弃;LINE 不猜采购/销售和库存/服务,混合单据逐行选择。
-- **⚠️ 边界**:`/ai`、`/pos`、`/dms` 与现有采购 LINE 未改;工作区 8 个既有 DMS/E2E dirty 文件未暂存、未覆盖。当前无本批未推代码,下一步等 Zihao 再开工。
+- **✅ 产品边界**:`/cowork` 与 `/erp` 独立;ERP 商户数据不投递 Cowork;`/ai`、`/pos`、`/dms` 和旧采购 LINE 不复用 ERP 凭据、绑定或会话。
+- **✅ Stock Card**:按参考图 13 列、所有商品逐笔同页;各商品独立移动加权平均;仅保留期初库存,服务行不进库存。
+- **✅ ERP 网页**:采购/销售入口锁定用户选择→OCR 原票预览→全字段/逐行库存或服务编辑→保存→确认生成正式单据或丢弃;空明细不猜数量金额,保存失败不转换。
+- **✅ ERP LINE**:独立 OA/webhook/LIFF/绑定表/会话;菜单先选采购或销售;图片和 PDF 多页预览;编辑、确认、丢弃均按用户/租户/草稿授权,webhookEventId 幂等。
+- **✅ 正式数据**:确认后采购落 `purchase_docs posted`,销售落 `sales_documents issued`;`ocr_history_id` 幂等关联;Stock Card 只读正式库存行。
+- **✅ 第三方 ERP**:MR.ERP/Express 复用既有推送底座;逐行 posting_kind 进入 mapper/预览;ERP 未正式转换 history 服务端 409;`erp_push_logs` 仍是状态唯一源。
+- **✅ 本地证据**:相关单测 1145 passed/7 skipped;Playwright 13 passed(Stock Card、网页、LINE、非 ERP 回归);typecheck/build/Black/Ruff/Alembic 单头/文件尺寸闸通过;截图在 `tests/e2e/_artifacts/erp-*`。
+- **📚 正本**:`docs/erp/ERP-DOCUMENT-CLOSED-LOOP.md`;真机清单=`docs/erp/ERP-REAL-DEVICE-ACCEPTANCE.md`。
+- **⏳ 外部验收**:ERP LINE iOS/Android 真实 OA 与 Express 公司局域网 Windows Agent/TEST 账套回查待 Zihao 起床后执行;完成前不宣称真机写入成功。
+- **⚠️ 工作树边界**:既有 DMS 源码、34 号隔离 spec、favicon 单测及其 build 产物不属于本批,不得暂存或覆盖。
 
 ---
 

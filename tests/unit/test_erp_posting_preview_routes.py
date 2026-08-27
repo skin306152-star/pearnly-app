@@ -107,6 +107,31 @@ class PostingPreviewRouteTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(r.json()["items"], [])
 
+    def test_route_preserves_line_posting_kind(self):
+        endpoint = {
+            "id": "ep-1",
+            "adapter": "express",
+            "config": {
+                "catalog_fingerprint": {
+                    "stock_master_count": 4,
+                    "stcrd_lines": 10,
+                    "stcrd_lines_moving_stock": 9,
+                }
+            },
+        }
+        history = {
+            "id": "h-1",
+            "pages": [{"fields": {"items": [{"name": "A", "posting_kind": "service"}]}}],
+        }
+        r = self._run_preview(
+            {"history_ids": ["h-1"], "endpoint_id": "ep-1"},
+            endpoint=endpoint,
+            history=history,
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["items"][0]["posting_kind"], "service")
+        self.assertNotEqual(r.json()["gate"], "escalate")
+
 
 @unittest.skipUnless(
     __import__("importlib").util.find_spec("fastapi") is not None,

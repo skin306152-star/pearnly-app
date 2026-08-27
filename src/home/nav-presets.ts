@@ -83,7 +83,16 @@ export const COWORK_PRESET: NavPreset = {
 // ERP 版(entry=erp · 2026-08-26 拍板 · erp_portal 邀请制对外敏感入口):仅 首页 + 商品(firmGoods,
 // 不改业务逻辑)+ 采购系统 + 销售系统 + 主数据;无使用教程。fallback home 落 dashboard。
 export const ERP_PRESET: NavPreset = {
-    show: ['dashboard', 'firmGoods', 'purchases', 'sales', 'master', 'clients', 'company'],
+    show: [
+        'dashboard',
+        'firmGoods',
+        'purchases',
+        'sales',
+        'master',
+        'clients',
+        'company',
+        'integrations',
+    ],
     home: 'dashboard',
     avatarHide: FIRM_AVATAR_HIDE,
 };

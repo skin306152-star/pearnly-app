@@ -41,13 +41,25 @@ def compute_posting_preview(
                 continue
             v = resolve_product_indexed(name, index, products)
             status = v.get("status")
-            row: Dict[str, Any] = {"name": name, "status": status}
+            declared_kind = str((it or {}).get("posting_kind") or "").strip().lower()
+            row_target_kind = (
+                "stock"
+                if declared_kind == "stock"
+                else "non_stock" if declared_kind == "service" else target_kind
+            )
+            row: Dict[str, Any] = {
+                "name": name,
+                "status": status,
+                "posting_kind": declared_kind or None,
+            }
             if status == "reuse":
                 row["code"] = v.get("code")
                 row["kind"] = v.get("kind")
                 # 跨类:命中的是库存目录,但本客户按非库存落 → 复用库存码(挂客户库存)vs 另建非库存,
                 # 是有会计后果的选择,交人裁一次(默认另建 · firm-safe)。
-                row["cross_kind"] = bool(v.get("kind") == "stock" and target_kind == "non_stock")
+                row["cross_kind"] = bool(
+                    v.get("kind") == "stock" and row_target_kind == "non_stock"
+                )
                 reuse += 1
             elif status == "confirm":
                 row["guess"] = v.get("guess")
@@ -58,9 +70,12 @@ def compute_posting_preview(
             items_out.append(row)
 
     # gate 优先级:escalate(不可自动落)> confirm_profile(画像未定)> decide_items(有例外)> ok。
-    if profile.blocks_auto_posting():
+    declarations_complete = bool(items_out) and all(
+        row.get("posting_kind") in ("stock", "service") for row in items_out
+    )
+    if profile.blocks_auto_posting() and not declarations_complete:
         gate = "escalate"
-    elif profile.needs_confirm:
+    elif profile.needs_confirm and not declarations_complete:
         gate = "confirm_profile"
     elif confirm or any(r.get("cross_kind") for r in items_out):
         gate = "decide_items"

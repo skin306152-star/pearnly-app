@@ -23,6 +23,7 @@ def _params(**kw):
         "client_id": None,
         "workspace_client_id": None,
         "posting_kind": None,
+        "direction": None,
     }
     base.update(kw)
     return base
@@ -99,6 +100,41 @@ class HandleWebOcrTests(unittest.TestCase):
             h.handle_web_ocr(legacy, [], lambda p: None)
         kinds = [c.kwargs.get("posting_kind") for c in core.call_args_list]
         self.assertEqual(kinds, ["stock", None])
+
+    def test_erp_async_without_direction_fails(self):
+        with self._patch_core(
+            side_effect=HTTPException(400, detail="erp.direction_required")
+        ) as core:
+            out = h.handle_web_ocr(_params(entry="erp"), [], lambda p: None)
+        self.assertEqual(out, ("__failed__", {"error_code": "erp.direction_required"}))
+        self.assertEqual(core.call_args.args[0]["entry"], "erp")
+        self.assertTrue(core.call_args.kwargs["staged"])
+
+    def test_erp_async_with_direction_does_not_auto_push(self):
+        with self._patch_core(
+            return_value={
+                "response": {"auto_pushed": False},
+                "raw_pages": [],
+                "history_ids": [],
+            }
+        ) as core:
+            out = h.handle_web_ocr(_params(entry="erp", direction="purchase"), [], lambda p: None)
+        self.assertFalse(out["result"]["auto_pushed"])
+        self.assertEqual(core.call_args.kwargs["direction"], "purchase")
+        self.assertTrue(core.call_args.kwargs["staged"])
+
+    def test_non_erp_entry_keeps_existing_behavior(self):
+        with self._patch_core(
+            return_value={
+                "response": {"auto_pushed": True},
+                "raw_pages": [],
+                "history_ids": [],
+            }
+        ) as core:
+            out = h.handle_web_ocr(_params(entry="cowork"), [], lambda p: None)
+        self.assertTrue(out["result"]["auto_pushed"])
+        self.assertEqual(core.call_args.args[0]["entry"], "cowork")
+        self.assertTrue(core.call_args.kwargs["staged"])
 
     def test_progress_emitted_before_core(self):
         seen = []

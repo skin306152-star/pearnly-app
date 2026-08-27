@@ -163,6 +163,7 @@ def _boot_schema_ddl() -> None:
         ("services.line_binding.line_webhook_dedup", "webhook去重"),
         ("services.agent.turn_log", "Agent审计"),
         ("services.line_dms.login_tickets", "DMS登录票据"),  # alembic 0102 留档
+        ("services.line_erp.store", "ERP LINE绑定与会话"),  # alembic 0106 留档
     ):
         try:
             __import__(_mod, fromlist=["ensure_table"]).ensure_table()
@@ -185,6 +186,13 @@ def _boot_schema_ddl() -> None:
         ensure_stock_card_schema()
     except Exception as e:
         logger.warning(f"启动 商品收发存 schema 失败(等 alembic 0097): {e}")
+
+    try:
+        from services.sales.schema import ensure_sales_line_item_type
+
+        ensure_sales_line_item_type()
+    except Exception as e:
+        logger.warning(f"启动 sales 明细类型 schema 失败(等 alembic 0107): {e}")
 
     # OCR 确认→正式单据转换桥 schema 双跑 · 与 alembic 0098 同源幂等 DDL。
     try:

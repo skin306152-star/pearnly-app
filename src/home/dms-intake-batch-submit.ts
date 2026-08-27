@@ -13,7 +13,7 @@ import {
     type ErpEndpoint,
 } from './dms-intake-erp-push.js';
 import { focusDxErpCards } from './dms-intake-erp-cards.js';
-import { CONVERT_REASON_KEY } from './dms-intake-review.js';
+import { CONVERT_REASON_KEY } from './dms-intake-review-convert.js';
 
 function t(k: string): string {
     const w = window as unknown as { t?: (k: string) => string };
@@ -85,7 +85,7 @@ let _data: CommitData | null = null;
 let _endpoints: ErpEndpoint[] = [];
 let _target = '';
 let _pushing = false;
-let _pushed: { ok: number; fail: number } | null = null;
+let _pushed: { ok: number; pending: number; fail: number } | null = null;
 
 const STATUS_BADGE: Record<string, string> = {
     created: 'green',
@@ -137,10 +137,13 @@ function pushPanelHtml(): string {
     );
 }
 
-function pushResultHtml(p: { ok: number; fail: number }): string {
+function pushResultHtml(p: { ok: number; pending: number; fail: number }): string {
     return (
         '<div class="dxb-stats">' +
         `<div class="dxb-stat green"><b>${p.ok}</b><span>${esc(t('dxb-push-ok'))}</span></div>` +
+        (p.pending
+            ? `<div class="dxb-stat"><b>${p.pending}</b><span>${esc(t('erp-status-pending'))}</span></div>`
+            : '') +
         (p.fail
             ? `<div class="dxb-stat red"><b>${p.fail}</b><span>${esc(t('dxb-push-fail'))}</span></div>`
             : '') +
@@ -217,16 +220,20 @@ async function doPush(): Promise<void> {
     _pushing = true;
     render();
     let ok = 0;
+    let pending = 0;
     let fail = 0;
     for (const id of ids) {
-        (await pushHistory(id, _target)) ? ok++ : fail++;
+        const outcome = await pushHistory(id, _target);
+        if (outcome === 'success') ok++;
+        else if (outcome === 'pending') pending++;
+        else fail++;
     }
     _pushing = false;
-    _pushed = { ok, fail };
+    _pushed = { ok, pending, fail };
     render();
     showToast(
-        fail === 0 ? t('dxb-push-ok-toast') : t('dxb-push-partial-toast'),
-        fail === 0 ? 'success' : 'warn'
+        fail === 0 && pending === 0 ? t('dxb-push-ok-toast') : t('dxb-push-partial-toast'),
+        fail === 0 && pending === 0 ? 'success' : 'warn'
     );
 }
 

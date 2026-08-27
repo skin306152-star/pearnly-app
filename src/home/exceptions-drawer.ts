@@ -24,7 +24,7 @@ async function _loadDrawerPdf(hid: string, expectId: unknown) {
     try {
         const resp = await fetch('/api/history/' + encodeURIComponent(hid) + '/pdf', {
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         // 抽屉已切到下一条 · 丢弃这次结果
@@ -93,7 +93,7 @@ async function loadHistoryDetail(hid: string) {
     try {
         const resp = await fetch('/api/history/' + encodeURIComponent(hid), {
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) throw new Error('http ' + resp.status);
@@ -152,7 +152,7 @@ async function actionSaveFields() {
             {
                 method: 'PUT',
                 headers: {
-                    Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                    Authorization: 'Bearer ' + (window.session.getToken() || ''),
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ pages }),
@@ -182,7 +182,7 @@ async function actionResolve() {
         const resp = await fetch('/api/exceptions/' + _drawer.openExcId + '/resolve', {
             method: 'POST',
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) throw new Error('http ' + resp.status);
@@ -207,7 +207,7 @@ async function actionIgnore() {
         const resp = await fetch('/api/exceptions/' + _drawer.openExcId + '/ignore', {
             method: 'POST',
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) throw new Error('http ' + resp.status);

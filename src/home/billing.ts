@@ -25,7 +25,7 @@ function _bt(k: string): string {
     return (typeof window.t === 'function' ? window.t(k) : null) || k;
 }
 function _tok() {
-    return localStorage.getItem('mrpilot_token') || '';
+    return window.session.getToken() || '';
 }
 function _g(id: string): HTMLElement | null {
     return document.getElementById(id);

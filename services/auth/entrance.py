@@ -194,6 +194,34 @@ def require_entrance_api(
     return user
 
 
+# ERP 专属能力面(/api/erp/*)拒绝的其它入口。这些壳的会话不得凭「已登录」就调 ERP 能力,
+# 只有 main / cowork / erp 门与超管可进,以及个别被其它入口正当复用的窄 allowlist 例外(见
+# require_erp_portal 的 also_allowed)。未知/缺失 entry 按现有 main 兼容放行(签发层已收敛)。
+_NON_ERP_ENTRANCES: frozenset[str] = frozenset({POS, AI, DMS, DAILY})
+
+
+def require_erp_portal(user: dict, *, also_allowed: Optional[Set[str]] = None) -> dict:
+    """ERP 专属 /api/erp/* 入口闸(fail-closed · 单一可复用 helper)。
+
+    ERP 路由大多只做 plan 推送闸(_check_push_access),没走 require_perm 的码级入口作用域闸
+    (authz.deps 按码前缀判),而 settings.org.* 是中性码、入口闸管不到 → pos/ai/dms/daily
+    会话凭登录状态就能调 ERP 能力面。本 helper 显式堵住这条 seam:
+      - 超管任意门放行(平台运营);
+      - entry 缺失/未知 → 按现有 main 兼容放行;
+      - entry ∈ {pos, ai, dms, daily} 且不在 also_allowed → 403 authz.entrance_scope;
+      - 其余(main/cowork/erp/…)→ 放行。
+    also_allowed 必须是逐端点确证的窄白名单(如 DMS 正当复用 /api/erp/endpoints · push ·
+    posting-preview · mrerp-xlsx-batch),禁止一刀切 URL 中间件。返回 user 便于原地透传。
+    """
+    if user.get("is_super_admin"):
+        return user
+    entry = user.get("entry") or MAIN
+    allowed = frozenset(also_allowed or ())
+    if entry in _NON_ERP_ENTRANCES and entry not in allowed:
+        raise HTTPException(403, detail="authz.entrance_scope")
+    return user
+
+
 def login_entrance_allowed(entry: Optional[str], user: dict) -> bool:
     """登录时校验入口准入。返回 False = 该门未授权(调用方按账号密码错误拒)。"""
     entry = entry or MAIN

@@ -168,7 +168,7 @@ async function loadHistoryPage() {
             ),
         });
         if (resp.status === 401) {
-            localStorage.removeItem('mrpilot_token');
+            window.session.clearToken();
             const _bd = await resp.json().catch(() => ({}));
             const _dc =
                 typeof _bd.detail === 'string' ? _bd.detail : (_bd.detail && _bd.detail.code) || '';

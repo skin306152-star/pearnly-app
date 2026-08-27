@@ -28,6 +28,8 @@
 // (服务器端 run_rls_isolation_tests 已用真 DB 里现存的两个 tenant 跑 A↔B 隔离)。
 //
 // 凭据:
+// ============================================================
+/* global window */
 //   PEARNLY_E2E_USER / PEARNLY_E2E_PASS — 测试账号(非超管)
 //   PEARNLY_ADMIN_USER / PEARNLY_ADMIN_PASS — Earn 超管
 //
@@ -65,7 +67,7 @@ test.describe('RLS 行级隔离 + 垂直权限(铁律 #26 + RLS infra)', () => {
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
         await doUiLogin(page);
-        const tokenUser = await page.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const tokenUser = await page.evaluate(() => window.session.getToken());
         expect((tokenUser || '').length, '测试账号登录后应有 token').toBeGreaterThan(0);
 
         const apiUser = await pwRequest.newContext({

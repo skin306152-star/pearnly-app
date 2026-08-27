@@ -20,7 +20,7 @@ let rsScope = 'global';
 const RS_API = '/api/knowledge/rules';
 
 function rsToken(): string {
-    return localStorage.getItem('mrpilot_token') || '';
+    return window.session.getToken() || '';
 }
 
 async function rsApi(method: string, path: string, body?: unknown): Promise<Response> {

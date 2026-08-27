@@ -239,7 +239,7 @@ async function doCreate(): Promise<void> {
 async function doLogout(): Promise<void> {
     if (typeof window.revokeSessionToken === 'function') await window.revokeSessionToken();
     try {
-        localStorage.removeItem('mrpilot_token');
+        window.session.clearToken();
         localStorage.removeItem('mrpilot_user');
         sessionStorage.removeItem(_GATE_SESSION_KEY); // 清会话过门标志 → 重新登录强制选套账
     } catch (_) {

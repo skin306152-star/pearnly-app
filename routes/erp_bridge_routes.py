@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from services.auth.entrance import require_erp_portal
 from services.authz.deps import require_perm
 from services.erp.bridge import bridge_enabled, poll_hold_seconds
 from services.erp.bridge import store
@@ -182,6 +183,7 @@ async def erp_bridge_mint(req: MintRequest, request: Request):
     """铸所级密钥 · 明文只返一次(库里只存 sha256)· 全所会计继承同一把。"""
     _require_enabled()
     user = require_perm(request, "settings.org.edit")
+    require_erp_portal(user)
     tenant_id = _tenant_of(user)
     res = await asyncio.to_thread(store.mint_bridge, tenant_id, req.name, req.role)
     logger.info(
@@ -195,6 +197,7 @@ async def erp_bridge_list(request: Request):
     """列本租户的桥与在线状态(永不返密钥)。"""
     _require_enabled()
     user = require_perm(request, "settings.org.view")
+    require_erp_portal(user)
     from services.erp.bridge import client as bridge_client
 
     status = await asyncio.to_thread(bridge_client.bridge_status, _tenant_of(user))

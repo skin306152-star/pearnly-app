@@ -281,7 +281,7 @@ export function openImportModal(onDone: () => void): void {
         fd.append('file', file);
         try {
             const headers: Record<string, string> = {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             };
             try {
                 const ws = window._wsHeader && window._wsHeader();

@@ -113,6 +113,22 @@ declare function revokeSessionToken(): Promise<void>;
 /** Bearer token held globally by home.js core. */
 // eslint-disable-next-line no-var
 declare var token: string;
+
+/** Entry-scoped session slot types (src/home/session.ts · single source of truth). */
+type SessionEntry = 'cowork' | 'erp' | 'main' | 'pos' | 'dms' | 'ai' | 'daily' | '';
+interface SessionBridge {
+    entry: () => SessionEntry;
+    tokenKey: () => string;
+    workspaceKey: () => string;
+    decodeJwtEntry: (token: string) => SessionEntry;
+    migrateLegacyToken: () => boolean;
+    getToken: () => string;
+    hasToken: () => boolean;
+    setToken: (value: string) => void;
+    clearToken: () => void;
+    getWorkspaceClientId: () => number | null;
+    setWorkspaceClientId: (id: number | null) => void;
+}
 /** One entry in the OCR upload queue. Known fields are typed; the index
  *  signature covers per-flow extras (errorKey, canRetry, progress, …). */
 interface SelectedFile {
@@ -138,6 +154,8 @@ declare var _contact: {
 // Window bridges exposed by migrated src/home modules. Extended per C5 batch as
 // modules move to TypeScript; consumers still on .js read these off window.
 interface Window {
+    // entry-scoped session slot bridge (src/home/session.ts)
+    session: SessionBridge;
     // i18n switch bus (home.js core); optional — callers guard with typeof check.
     subscribeI18n?: (key: string, rerender: () => void) => void;
     // gl-vat-recon bridges

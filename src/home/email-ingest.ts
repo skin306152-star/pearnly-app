@@ -31,7 +31,7 @@ import { formatDateTime } from './format-date.js';
                 headers: { Authorization: 'Bearer ' + token },
             });
             if (resp.status === 401) {
-                localStorage.removeItem('mrpilot_token');
+                window.session.clearToken();
                 const _bd = await resp.json().catch(() => ({}));
                 const _dc =
                     typeof _bd.detail === 'string'

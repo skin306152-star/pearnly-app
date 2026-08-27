@@ -84,7 +84,7 @@ test.describe('订阅与计费(首页)', () => {
     test('GET /api/me/subscription 返回 S/M/L 目录', async ({ page }) => {
         await doUiLogin(page); // 只需 token · 套餐目录不依赖已选公司(避免 sidebar flaky)
         const data = await page.evaluate(async () => {
-            const t = localStorage.getItem('mrpilot_token');
+            const t = window.session.getToken();
             const r = await fetch('/api/me/subscription', {
                 headers: { Authorization: 'Bearer ' + t },
                 cache: 'no-store',
@@ -104,7 +104,7 @@ test.describe('订阅与计费(首页)', () => {
     test('订阅 L(余额不足)→ 服务端守卫 402 → 弹充值(不真扣钱)', async ({ page }) => {
         await gotoDashboard(page);
         const balance = await page.evaluate(async () => {
-            const t = localStorage.getItem('mrpilot_token');
+            const t = window.session.getToken();
             const r = await fetch('/api/me/subscription', {
                 headers: { Authorization: 'Bearer ' + t },
                 cache: 'no-store',

@@ -6,6 +6,7 @@
 //
 // 后续阶段 C 持续从 home.js 抽模块 → 都进 src/home/ → 在这里 import
 
+import './home/session.js'; // 入口级会话隔离 · 单一事实源(migrate + 同步 window.token + 挂 window.session)——【必第 0 个】早于一切消费 window.token/window.session 的 sibling
 import './home/state.js'; // REFACTOR-C1-home-batch9g2 · 应用引导/全局状态(错误拦截IIFE + i18n总线 + window.* 状态 init)· 【必第 1 个】早于所有 sibling · 取代已删的 home.js
 import './home/core.js'; // REFACTOR-C1-home-batch9f · 真核心叶子层(t/escapeHtml/svgIcon/鉴权API🔴/_showSessionRevokedModal🔴/getMax*)· 【必第 1 个】保证 sibling 模块 eval 期 window.t/apiGet 等已就绪
 import './home/login-url.js'; // 登录口单一事实源(window.loginUrl · pos_only→/pos 其余→/login)· 早挂,被下方所有退出/踢session点裸调

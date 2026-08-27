@@ -7,7 +7,7 @@
 /* global escapeHtml */
 /* eslint-disable no-useless-assignment -- verbatim exceptions.js · 非 bug */
 
-const _tok = () => localStorage.getItem('mrpilot_token') || '';
+const _tok = () => window.session.getToken() || '';
 
 // 失败原因人话化:优先后端 4 语 friendly → Express 码人话 → 去掉 ERR_ 码的原始串。
 function _excFriendly(it: ExcItem): string {

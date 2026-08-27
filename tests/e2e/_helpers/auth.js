@@ -65,10 +65,16 @@ async function doUiLogin(page) {
 
     // 普通账号登录成功 → 跳 /home(超管会跳 /admin/cost · 那种账号不该用于本套测试)
     await page.waitForURL('**/home**', { timeout: 20_000 });
-    // 等 token 真正落地 localStorage(storageState 才抓得到)
-    await page.waitForFunction(() => !!localStorage.getItem('mrpilot_token'), null, {
-        timeout: 10_000,
-    });
+    // 等 token 真正落地 localStorage(storageState 才抓得到)。2026-08-27 入口级会话隔离:
+    // /cowork 登录写 cowork 槽 mrpilot_token_cowork(legacy mrpilot_token 仅超管镜像),
+    // 故两者任一存在即视为已登录。
+    await page.waitForFunction(
+        () =>
+            !!localStorage.getItem('mrpilot_token') ||
+            !!localStorage.getItem('mrpilot_token_cowork'),
+        null,
+        { timeout: 10_000 }
+    );
 }
 
 // 确保 storageState 文件存在且新鲜 · 不存在或过期则起一个独立 context 走 UI 登录并保存

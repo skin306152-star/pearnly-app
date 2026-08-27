@@ -143,7 +143,7 @@ document.addEventListener('click', async (e) => {
         const resp = await fetch('/api/exception-whitelist/' + wlId, {
             method: 'DELETE',
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) throw new Error('http ' + resp.status);

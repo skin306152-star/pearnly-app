@@ -20,6 +20,7 @@ from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
+from services.auth.entrance import require_erp_portal
 from services.erp import mrerp_xlsx_generator
 from services.erp.erp_payload import flatten_history_for_mrerp
 from services.erp.erp_push import load_mrerp_mappings
@@ -42,6 +43,7 @@ class MrerpXlsxBatchRequest(BaseModel):
 async def download_mrerp_xlsx_batch(req: MrerpXlsxBatchRequest, request: Request):
     """把多张已识别发票打成一个 MR.ERP 批量导入 Excel 下载(用户自行上传 MR.ERP）。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     if len(req.history_ids) > MAX_BATCH_SIZE:

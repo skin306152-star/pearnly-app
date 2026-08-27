@@ -216,7 +216,7 @@
                     ).finally(function () {
                         try {
                             // 入口提示(pearnly_entry)登出即清:壳的权威是 token.entry,不留旧门痕迹。
-                            localStorage.removeItem('mrpilot_token');
+                            window.session.clearToken();
                             localStorage.removeItem('mrpilot_user');
                             localStorage.removeItem('pearnly_entry');
                         } catch (_) {

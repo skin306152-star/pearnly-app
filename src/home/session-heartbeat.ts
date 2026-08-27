@@ -14,7 +14,7 @@
     let _hbRunning = false;
     async function _sessionCheck() {
         if (_hbRunning) return;
-        const tk = localStorage.getItem('mrpilot_token');
+        const tk = window.session.getToken();
         if (!tk) return;
         _hbRunning = true;
         try {
@@ -29,7 +29,7 @@
                 if (typeof detail === 'string') code = detail;
                 else if (detail && typeof detail === 'object') code = detail.code || '';
                 console.warn('[heartbeat] session revoked', code);
-                localStorage.removeItem('mrpilot_token');
+                window.session.clearToken();
                 if (_hbTimer) {
                     clearInterval(_hbTimer);
                     _hbTimer = null;
@@ -70,7 +70,7 @@
         _hbTimer = setInterval(_sessionCheck, 15000); // 15 秒
     }
     // 启动
-    if (localStorage.getItem('mrpilot_token')) {
+    if (window.session.getToken()) {
         _startHeartbeat();
     }
     // 切回 tab 立即 check(关键 · 用户离开后回来第 1 秒就被踢)

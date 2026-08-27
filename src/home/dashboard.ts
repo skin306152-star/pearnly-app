@@ -37,7 +37,7 @@ async function loadCreditsCard() {
         balCard.style.display = on ? '' : 'none';
     };
     try {
-        const auth = { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
+        const auth = { Authorization: 'Bearer ' + (window.session.getToken() || '') };
         const resp = await fetch('/api/me/credits', { headers: auth, cache: 'no-store' });
         if (!resp.ok) {
             showBalance(false);

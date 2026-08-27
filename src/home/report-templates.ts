@@ -99,7 +99,7 @@
             return (_tplCache as Record<string, any>)[cacheKey];
         let result;
         try {
-            const tok = localStorage.getItem('mrpilot_token');
+            const tok = window.session.getToken();
             const r = await fetch(`/api/reports/templates?lang=${encodeURIComponent(lang)}`, {
                 headers: { Authorization: 'Bearer ' + tok },
             });
@@ -294,7 +294,7 @@
         dlBtn.innerHTML = `<span>${escapeHtmlSafe(t('report-modal-loading'))}</span>`;
 
         try {
-            const tok = localStorage.getItem('mrpilot_token');
+            const tok = window.session.getToken();
             let resp, defaultName;
 
             if (ctx.mode === 'client') {

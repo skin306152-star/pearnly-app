@@ -56,7 +56,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                        Authorization: 'Bearer ' + (window.session.getToken() || ''),
                     },
                     body: JSON.stringify({ email: v }),
                 });
@@ -72,7 +72,7 @@
                 }
                 const data = await resp.json();
                 if (data.token) {
-                    localStorage.setItem('mrpilot_token', data.token);
+                    window.session.setToken(data.token);
                 }
                 // 弹完 toast 后刷新页面 · 让 _userInfo 重拉
                 if (typeof showToast === 'function') {
@@ -122,7 +122,7 @@
     }
 
     async function _check() {
-        const tk = localStorage.getItem('mrpilot_token');
+        const tk = window.session.getToken();
         if (!tk) return;
         try {
             const resp = await fetch('/api/me/needs_email', {

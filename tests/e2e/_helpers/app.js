@@ -2,7 +2,7 @@
 // ============================================================
 // 复用 storageState 进 /home 后,走真实点击切路由(home.js: .nav-item[data-route] → routeTo)。
 // ============================================================
-/* global document, getComputedStyle */
+/* global document, getComputedStyle, window */
 
 const { expect } = require('@playwright/test');
 const { blockCfInsights } = require('./console-guard');
@@ -38,7 +38,9 @@ async function dismissWorkspaceGate(page) {
         .catch(() => {});
 }
 
-// 进主应用 · storageState 已注入 mrpilot_token → home.js 不该把我们踢回着陆页
+// 进主应用 · storageState 已注入登录态 → home 不该把我们踢回着陆页。
+// /home 是主壳兼容内部入口:worker 用 legacy mrpilot_token 注入的 spec 直接吃 legacy 槽;
+// 真登录(cowork 槽)则由 home.html preboot 自愈重定向到 /home?canonical=cowork 承接。
 async function enterApp(page) {
     await blockCfInsights(page);
     await page.goto('/home');
@@ -58,10 +60,11 @@ async function openRoute(page, route) {
     await expect(page.locator(`#page-${route}`), `路由 ${route} 页面激活`).toHaveClass(/active/);
 }
 
-// 用登录 token 拉 /api/me/modules(业态 + 各模块启用状态)· pos_only 门控 spec 共用
+// 用登录 token 拉 /api/me/modules(业态 + 各模块启用状态)· pos_only 门控 spec 共用。
+// 2026-08-27 入口级会话隔离:token 经 window.session.getToken() 读当前入口槽(cowork/erp/legacy)。
 async function getModules(page) {
     return page.evaluate(async () => {
-        const tok = localStorage.getItem('mrpilot_token');
+        const tok = window.session.getToken();
         const r = await fetch('/api/me/modules', { headers: { Authorization: 'Bearer ' + tok } });
         return r.json();
     });
@@ -96,10 +99,11 @@ const AVATAR = {
     logout: '#avatar-menu-logout',
 };
 
-// owner 专属 PUT /api/me/onboarding 切业态(pos_only / firm)· afterEach 幂等复原用
+// owner 专属 PUT /api/me/onboarding 切业态(pos_only / firm)· afterEach 幂等复原用。
+// 2026-08-27 入口级会话隔离:token 经 window.session.getToken() 读当前入口槽。
 async function setBusinessType(page, businessType) {
     return page.evaluate(async (bt) => {
-        const tok = localStorage.getItem('mrpilot_token');
+        const tok = window.session.getToken();
         const r = await fetch('/api/me/onboarding', {
             method: 'PUT',
             headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },

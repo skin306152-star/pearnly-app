@@ -14,7 +14,7 @@ const KB_BASE = '/api/knowledge';
 export const KB_CAT = '/static/brand/kb-cat.png?v=2';
 
 function kbToken(): string {
-    return localStorage.getItem('mrpilot_token') || '';
+    return window.session.getToken() || '';
 }
 
 /** i18n 取词:命中 window.t 用译文,否则回退默认文案。知识库各模块共用。 */

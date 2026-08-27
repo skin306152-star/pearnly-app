@@ -23,6 +23,7 @@
 // 真烧 Gemini token(铁律 #26.D 计费可自由测 · pennies),Zihao 已授权。
 // 端点超时:Gemini 实时 OCR 一张 PDF 平均 10-25s · 这条 spec 用 90s 单测超时。
 // ============================================================
+/* global window */
 
 const fs = require('fs');
 const path = require('path');
@@ -60,7 +61,7 @@ test.describe('OCR 识别 + 扣费台账闭环(铁律 #26 高敏)', () => {
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
         await doUiLogin(page);
-        const token = await page.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const token = await page.evaluate(() => window.session.getToken());
         expect((token || '').length, '登录后应有 token').toBeGreaterThan(0);
 
         // ────── 2) 用 APIRequestContext 携带 Bearer · 拿 credits 基线

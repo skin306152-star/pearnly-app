@@ -90,7 +90,7 @@
         showMsg('', '');
 
         try {
-            const tok = localStorage.getItem('mrpilot_token');
+            const tok = window.session.getToken();
             const r = await fetch('/api/me/change_password', {
                 method: 'POST',
                 headers: {

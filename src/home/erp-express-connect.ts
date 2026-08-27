@@ -30,7 +30,7 @@
         }
     }
     function _tk() {
-        return localStorage.getItem('mrpilot_token');
+        return window.session.getToken();
     }
 
     function _isOnline(ep: any) {

@@ -116,7 +116,7 @@ async function liffEntry(
             mask(tx(liffErrKey(body), 'เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้ง'));
             return;
         }
-        localStorage.setItem('mrpilot_token', body.data.token);
+        window.session.setToken(body.data.token);
         if (doc) sessionStorage.setItem(LIFF_DOC_KEY, doc);
         if (view) sessionStorage.setItem(LIFF_VIEW_KEY, view);
         if (ws) sessionStorage.setItem(LIFF_WS_KEY, ws);

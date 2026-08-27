@@ -17,6 +17,7 @@
 // 安全:DELETE 只在「当前已绑定」时调,避免改测试账号状态。本 spec 跑完不留副作用
 // (生成 code 写 line_binding_codes,10min 自动过期;反查只读;DELETE 已绑→不动 = no-op)。
 // ============================================================
+/* global window */
 
 const { test, expect } = require('@playwright/test');
 const { request: pwRequest } = require('@playwright/test');
@@ -32,7 +33,7 @@ test.describe('LINE 账号绑定(端点)', () => {
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
         await doUiLogin(page);
-        const token = await page.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const token = await page.evaluate(() => window.session.getToken());
         expect((token || '').length, '登录后应有 token').toBeGreaterThan(0);
 
         const apiCtx = await pwRequest.newContext({

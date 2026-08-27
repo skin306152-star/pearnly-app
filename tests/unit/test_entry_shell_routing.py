@@ -47,16 +47,16 @@ class LandingEntryRoutingTests(unittest.TestCase):
         self.assertIn("location.pathname === '/erp' ? 'erp' : 'cowork'", text)
 
     def test_existing_token_redirects_to_internal_canonical(self):
-        # 已有 token → jump 内部 /home?canonical=,不再渲染登录页。
+        # 已有 token → jump 内部 /home?canonical=,不再渲染登录页(读入口槽 + legacy 迁移收养)。
         text = _read("static/landing/landing.js")
-        self.assertIn("localStorage.getItem('mrpilot_token')", text)
-        self.assertIn("canonicalFor", text)
-        self.assertIn("'/home?canonical=' + _canon", text)
+        self.assertIn("readSlotToken", text)
+        self.assertIn("legacyMigratable", text)
+        self.assertIn("'/home?canonical=' + _pathEntry", text)
 
     def test_canonical_for_maps_erp_else_cowork(self):
         text = _read("static/landing/landing.js")
-        self.assertIn("canonicalFor(entry)", text)
-        self.assertIn("entry === 'erp'", text)
+        self.assertIn("canonicalAfterLogin(entry, isSuperAdmin)", text)
+        self.assertIn("entry === 'erp' ? 'erp' : 'cowork'", text)
 
     def test_canoniical_after_login_defaults_cowork(self):
         # 登录成功落 /home?canonical=cowork(erp 落 /home?canonical=erp;超管 /admin/cost)。
@@ -67,7 +67,7 @@ class LandingEntryRoutingTests(unittest.TestCase):
 
     def test_signup_lands_on_cowork_canonical(self):
         text = _read("static/landing/landing.js")
-        self.assertIn("'/home?canonical=cowork'", text)
+        self.assertIn("'/home?canonical=' + _entry", text)
 
     def test_login_writes_entry_from_pathname(self):
         text = _read("static/landing/landing.js")
@@ -98,50 +98,53 @@ class HomePrebootCanonicalTests(unittest.TestCase):
 
     def test_preboot_sets_pearnly_entry(self):
         text = _read("home.html")
-        self.assertIn("localStorage.setItem('pearnly_entry',_canon)", text)
+        self.assertIn("localStorage.setItem('pearnly_entry',_slot)", text)
 
     def test_preboot_gate_never_uses_login_entry_query(self):
-        # 门(零 token)落 canonical 主壳,绝不露 /login?entry=。
+        # 门(零 token)落 canonical 主壳,绝不露 /login?entry=。槽由 pathname/canonical 决定。
         text = _read("home.html")
         self.assertNotIn("'/login?entry", text)
-        self.assertIn("location.replace(_pe==='pos'?'/pos'", text)
-        self.assertIn("(_pe==='cowork'||_pe==='erp')?'/'+_pe", text)
+        self.assertIn("location.replace(_slot==='pos'?'/pos'", text)
+        self.assertIn("_slot==='erp'?'/erp':'/cowork'", text)
 
     def test_preboot_defaults_to_cowork(self):
         text = _read("home.html")
-        self.assertIn("(_pe==='cowork'||_pe==='main'||!_pe)?'cowork'", text)
+        self.assertIn("_slot==='erp'?'/erp':'/cowork'", text)
 
 
 class LoginUrlEntryPriorityTests(unittest.TestCase):
     def test_entry_checked_before_business_type_fallback(self):
+        # 2026-08-27 入口级会话隔离:入口优先 session.entry()(pathname/canonical),再回落 window._entry,
+        # 业态标签只作最后兜底。
         text = _read("src/home/login-url.ts")
-        entry_pos_idx = text.find("window._entry === 'pos'")
+        entry_pos_idx = text.find("entry === 'pos'")
         fallback_idx = text.find("_businessType === 'pos_only'")
-        self.assertGreater(entry_pos_idx, -1, "loginUrl 没读 window._entry==='pos'")
+        self.assertGreater(entry_pos_idx, -1, "loginUrl 没读 entry==='pos'")
         self.assertGreater(fallback_idx, -1, "loginUrl 丢了业态回落判据")
         self.assertLess(entry_pos_idx, fallback_idx, "entry 判据必须先于业态回落判据")
 
     def test_cold_boot_seeds_entry_from_localstorage(self):
         text = _read("src/home/login-url.ts")
-        self.assertIn("localStorage.getItem('pearnly_entry')", text)
+        self.assertIn("window.session.entry()", text)
+        self.assertIn("window._entry", text)
 
     def test_dms_entry_routes_to_dms(self):
         text = _read("src/home/login-url.ts")
-        dms_idx = text.find("window._entry === 'dms'")
+        dms_idx = text.find("entry === 'dms'")
         fallback_idx = text.find("_businessType === 'pos_only'")
-        self.assertGreater(dms_idx, -1, "loginUrl 没读 window._entry==='dms'")
+        self.assertGreater(dms_idx, -1, "loginUrl 没读 entry==='dms'")
         self.assertLess(dms_idx, fallback_idx, "dms 判据必须先于业态回落判据")
 
     def test_cowork_main_return_cowork_not_login(self):
         # 2026-08-26 主控:退出/401 回 /cowork|/erp,绝不露 /login?entry=。
         text = _read("src/home/login-url.ts")
         self.assertNotIn("return '/login?entry", text)
-        self.assertIn("window._entry === 'cowork') return '/cowork'", text)
-        self.assertIn("window._entry === 'main') return '/cowork'", text)
+        self.assertIn("entry === 'cowork') return '/cowork'", text)
+        self.assertIn("entry === 'main') return '/cowork'", text)
 
     def test_erp_entry_returns_erp(self):
         text = _read("src/home/login-url.ts")
-        self.assertIn("window._entry === 'erp') return '/erp'", text)
+        self.assertIn("entry === 'erp') return '/erp'", text)
 
 
 class LoginEntryPointsWriteEntryMarkTests(unittest.TestCase):
@@ -313,12 +316,12 @@ class CoworkErpPageRoutesTests(unittest.TestCase):
         self.assertIn("pearnly_entry', 'erp'", text)
 
     def test_erp_gate_corrects_shell_by_token_entry(self):
-        # 层1 串壳校正:非 erp 入口 token(如 cowork/main 手输 /erp)跳回 canonical 主壳,
-        # erp token 才进 /home?canonical=erp。
+        # 层1 串壳校正:仅 erp 槽(mrpilot_token_erp)或 legacy entry=erp 才进 /home?canonical=erp;
+        # pos/main/cowork token 一律留住登录页(不跳走)。
         text = _read("static/erp/erp.html")
-        self.assertIn("canonicalFor", text)
-        self.assertIn("'/home?canonical=' + canon", text)
-        self.assertIn("localStorage.getItem('mrpilot_token')", text)
+        self.assertIn("legacyEntryFromJwt", text)
+        self.assertIn("'/home?canonical=erp'", text)
+        self.assertIn("localStorage.getItem('mrpilot_token_erp')", text)
 
     def test_login_route_redirects_to_cowork(self):
         text = _read("routes/pages_routes.py")

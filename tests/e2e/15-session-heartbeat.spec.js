@@ -17,6 +17,7 @@
 //
 // env-gated:无 PEARNLY_E2E_USER/PEARNLY_E2E_PASS(CI)优雅跳过 · CI 保绿(铁律 #2 / #26)。
 // ============================================================
+/* global window */
 
 const fs = require('fs');
 const path = require('path');
@@ -52,7 +53,7 @@ test.describe('Session 互踢(铁律 #3)', () => {
         // 401 session_revoked + token 失效 toast / 跳登录页等 console.error,这正是
         // 铁律 #3 的预期行为,不算回归。只在 B(新主)上守 console error。
         await doUiLogin(pageA);
-        const tokenA = await pageA.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const tokenA = await pageA.evaluate(() => window.session.getToken());
         expect((tokenA || '').length, 'tokenA 应在 localStorage').toBeGreaterThan(0);
 
         const meA1 = await callMe(pageA, tokenA);
@@ -65,7 +66,7 @@ test.describe('Session 互踢(铁律 #3)', () => {
         const pageB = await ctxB.newPage();
         const guardB = attachConsoleGuard(pageB);
         await doUiLogin(pageB);
-        const tokenB = await pageB.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const tokenB = await pageB.evaluate(() => window.session.getToken());
         expect((tokenB || '').length, 'tokenB 应在 localStorage').toBeGreaterThan(0);
         expect(tokenB, 'tokenB 应与 tokenA 不同(新 jti)').not.toBe(tokenA);
 

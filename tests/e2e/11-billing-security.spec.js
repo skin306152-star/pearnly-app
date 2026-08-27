@@ -9,6 +9,7 @@
 // ============================================================
 
 // page.evaluate 回调在浏览器上下文执行(fetch/localStorage 为浏览器内建全局)
+/* global window */
 const { test, expect } = require('@playwright/test');
 const { hasCreds, doUiLogin } = require('./_helpers/auth');
 
@@ -53,7 +54,7 @@ test.describe('计费安全 / 防渗透(prod)', () => {
 
     test('伪造套餐码 → 400(不可凭空造套餐)', async ({ page }) => {
         await doUiLogin(page);
-        const token = await page.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const token = await page.evaluate(() => window.session.getToken());
         const res = await callApi(page, {
             method: 'POST',
             path: '/api/subscription/subscribe',
@@ -65,7 +66,7 @@ test.describe('计费安全 / 防渗透(prod)', () => {
 
     test('伪造廉价金额无效 · 服务端按目录真价判(余额不足仍 402)', async ({ page }) => {
         await doUiLogin(page);
-        const token = await page.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const token = await page.evaluate(() => window.session.getToken());
         const sub = await callApi(page, { method: 'GET', path: '/api/me/subscription', token });
         expect(sub.status).toBe(200);
         const balance = sub.body.balance_thb;

@@ -18,6 +18,7 @@ from services.erp import erp_push as _erp
 from core.auth import get_current_user_from_request
 from core.route_helpers import _plan_permissions, _record_500
 from routes.erp_routes_access import _check_push_access
+from services.auth.entrance import DMS, require_erp_portal
 from services.erp.express_push.agent_reporting import fit_stock_acc_groups
 
 logger = logging.getLogger("mr-pilot")
@@ -65,6 +66,7 @@ def _strip_endpoint_for_response(ep: Dict[str, Any]) -> Dict[str, Any]:
 @router.get("/api/erp/endpoints")
 async def erp_endpoints_list(request: Request):
     user = get_current_user_from_request(request)
+    require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台复用端点清单 → 窄 allowlist
     _check_push_access(user)
     items = db.list_erp_endpoints(user["id"])
     return {"items": [_strip_endpoint_for_response(it) for it in items]}
@@ -78,6 +80,7 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
     回头 test-connection 解密就 InvalidToken。现在路由识别 mrerp ·
     走 kms_helper.encrypt_str 转 ciphertext 再落地。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台连接向导建端点 → 窄 allowlist
     _check_push_access(user)
     p = _plan_permissions(user.get("plan", "free"))
 
@@ -215,6 +218,9 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
     ciphertext;明文就 encrypt_str 转一次再 update。已是 ciphertext
     (gAAAAA*)的不动 · 防止 double-encrypt。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(
+        user, also_allowed=(DMS,)
+    )  # DMS 录入工作台复用端点启用/停用卡 → 窄 allowlist
     _check_push_access(user)
     # 如果 config 里 token 是 "***" 占位符,说明用户没改 token,要保留旧值
     fields = {k: v for k, v in req.dict(exclude_unset=True).items() if v is not None}
@@ -328,6 +334,7 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
 @router.delete("/api/erp/endpoints/{endpoint_id}")
 async def erp_endpoints_delete(endpoint_id: str, request: Request):
     user = get_current_user_from_request(request)
+    require_erp_portal(user, also_allowed=(DMS,))
     _check_push_access(user)
     ok = db.delete_erp_endpoint(user["id"], endpoint_id)
     if not ok:
@@ -352,6 +359,7 @@ async def erp_endpoints_update_seed(endpoint_id: str, req: ErpSeedUpdate, reques
     (含真实密文)· 仅覆盖 seed_* 两键 · 原样写回 · username_enc/password_enc 不变。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     ep = db.get_erp_endpoint(user["id"], endpoint_id)
     if not ep:
@@ -405,6 +413,7 @@ async def erp_endpoints_express_accounts(
     reported_accounts/已加密凭据,避开整体替换 config 的破坏)。空串 = 清空(回落无映射)。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     ep = db.get_erp_endpoint(user["id"], endpoint_id)
     if not ep:
@@ -436,6 +445,7 @@ async def erp_endpoints_express_autonomy(endpoint_id: str, req: ExpressAutonomy,
     不碰 account_set/科目/凭据。全人工=高置信也转人工复核 / 标准=高置信自动·低置信问 /
     全托管=尽量自动。默认 standard(见 services/erp/express_push/autonomy)。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     level = str(req.autonomy or "").strip().lower()
     if level not in _AUTONOMY_LEVELS:
@@ -469,6 +479,7 @@ async def erp_endpoints_express_stock_acc_group(
     过半把 ACCNUM01 挂在费用科目上),云端不猜。同 /seed 套路读 DB 原始 config 只覆盖这一键。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     ep = db.get_erp_endpoint(user["id"], endpoint_id)
     if not ep:

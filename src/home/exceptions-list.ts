@@ -25,7 +25,7 @@ async function refreshExcBadge() {
             (cid ? '&client_id=' + encodeURIComponent(cid) : '');
         const resp = await fetch(url, {
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) return;
@@ -228,7 +228,7 @@ async function loadExceptionsStats() {
         const url = '/api/exceptions/stats?' + params.toString();
         const resp = await fetch(url, {
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) throw new Error('http ' + resp.status);
@@ -286,7 +286,7 @@ async function loadExceptionsList(opts?: any) {
         if (navigator.onLine === false) throw new Error('offline');
         const resp = await fetch('/api/exceptions/list?' + params.toString(), {
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) throw new Error('http ' + resp.status);
@@ -356,7 +356,7 @@ async function actionBatchResolve() {
         const resp = await fetch('/api/exceptions/batch', {
             method: 'POST',
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ ids, action: 'resolve' }),
@@ -392,7 +392,7 @@ async function actionBatchIgnore() {
         const resp = await fetch('/api/exceptions/batch', {
             method: 'POST',
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ ids, action: 'ignore' }),

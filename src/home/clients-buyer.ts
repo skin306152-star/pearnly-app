@@ -369,7 +369,7 @@ async function exportClient(clientId: string) {
     }
     // fallback · 老路径(理论不到这里)
     try {
-        const tok = localStorage.getItem('mrpilot_token');
+        const tok = window.session.getToken();
         const r = await fetch(`/api/clients/${clientId}/export?month=all`, {
             headers: { Authorization: 'Bearer ' + tok },
         });

@@ -1,16 +1,14 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-27 ERP / Cowork 入口拆分已上线
+## 当前状态卡 · 08-27 Cowork/ERP 会话与租户入口隔离待提交
 
-- **✅ 不是重写,是同一套业务搬家**:`48cf6fe3..ceb0ca8f` 复用现有 SPA/后端能力,仅按入口身份隔离菜单与登录壳;内部 `/home` 继续兼容,对外 canonical 为 `/cowork`、`/erp`。
-- **✅ Cowork 事务所入口**:`/login` 302 到 `/cowork`;沿用原登录界面。菜单只留首页、Pearnly Cowork、主数据、使用教程,并保留左下账号与右上账套/头像。
-- **✅ ERP 客户入口**:`/erp` 使用与 AI/DMS/POS 同类的独立邀请制登录壳。菜单只留首页、商品、采购系统、销售系统、主数据,不显示使用教程;原 ERP 前后端业务逻辑不改。
-- **✅ Earn 邀请闭环**:新增 ERP 邀请、撤回、一次性密码与 tenant-first 入口授权;复用现有账号、租户、账套与权限体系,未另建业务实现。
-- **✅ 全局搜索已删除**:右上 CmdK/搜索入口及对应前后端能力均移除;账套切换器内部的账套筛选不属于全局搜索,继续保留。
-- **✅ 测试与视觉验收**:新入口专项 60/60、Earn 邀请 43/43;10+5 张截图已人工检查。旧静态 `/home.html` E2E 已显式使用内部 `firm` 入口,相关 27/27 通过;遗漏的库存卡两条同类入口夹具由 `eb8606d9` 补齐,生产域名 2/2 通过。
-- **✅ 本地/CI 闸统一**:`ae0a4edc..eb8606d9` 让 pre-push 与 CI 共用 `scripts/check_prettier_committed.mjs`,锁定 package-lock 的 Prettier 版本并按 HEAD 字节校验;旧 E2E canonical 跳转红项已根治。
-- **✅ 上线证据**:CI `33014225499` success,精确 SHA `eb8606d98b6afcb83d1d07b66b1127b25edee046` 已部署;生产 HEAD 同 SHA,`mrpilot` active,重启时间 `2026-08-26 21:21:31 UTC`;`/login` 302→`/cowork`,`/cowork`、`/erp` 200。
-- **✅ 部署流程已植根**:`7bf6a3c0` 把活文档统一为 master push → required CI 全绿 → deploy job 携 `github.sha` → `TARGET_SHA`/flock → 生产 HEAD+重启时间验收;旧东京机与无 SHA 手工路径不再是可执行默认流程。
+- **🟡 未提交/未推送**:本窗口改动仍在 working tree,下一步 = 本窗口 commit master + push + 盯精确 SHA CI + 验生产 HEAD。不要声称已上线。
+- **✅ 不同入口独立 token/workspace 槽**:Cowork/ERP/DMS/admin 各自维护独立 session slot,跨入口不共享 token;同账号仍受 `active_jti` 单会话限制,**不承诺同账号双开**。
+- **✅ 后端 fail-closed 隔离**:所有真实用户 `/api/erp` 能力走 `require_erp_portal`(非 ERP 入口 403);DMS 仅 endpoints CRUD/test/logs 窄 allowlist,其余一律拒。契约测试锁定。
+- **✅ admin 邀请时间解析**:保留完整时分,按曼谷时区(UTC+7)落库与回显,不再截断到日。
+- **✅ favicon 分入口**:DMS/console/invite/ERP 各自独立 favicon,浏览器标签可区分。
+- **✅ 验证**:96 Python 单元测试、4 Playwright session isolation、cowork/erp 壳 60/60、admin invite 43/43、ledger 24/24、tsc 绿;契约测试已锁入口隔离与 DMS allowlist。
+- **✅ 活交接文档已根治**:施工窗口自测→commit→push master→盯本 SHA CI→验生产 HEAD 为唯一可执行默认流程;旧"口头交接/无 SHA 部署"路径作废。
 - **⚠️ 本地代理策略**:Qwen3.8 Max 本轮关键施工多次误判,只派低风险/只读任务;关键施工优先 DeepSeek,主控独立验收。任务结束立即回收独立 opencode 进程树,共享 service 不杀。
 
 ---

@@ -31,7 +31,7 @@
 
     async function refreshStatus() {
         try {
-            const token = localStorage.getItem('mrpilot_token');
+            const token = window.session.getToken();
             const resp = await fetch('/api/line/binding', {
                 headers: { Authorization: 'Bearer ' + token },
             });
@@ -98,7 +98,7 @@
 
     async function fetchNewCode() {
         try {
-            const token = localStorage.getItem('mrpilot_token');
+            const token = window.session.getToken();
             const resp = await fetch('/api/line/binding-code', {
                 method: 'POST',
                 headers: { Authorization: 'Bearer ' + token },
@@ -183,7 +183,7 @@
         // 每 4 秒轮询一次绑定状态
         _pollTimer = setInterval(async () => {
             try {
-                const token = localStorage.getItem('mrpilot_token');
+                const token = window.session.getToken();
                 const resp = await fetch('/api/line/binding', {
                     headers: { Authorization: 'Bearer ' + token },
                 });
@@ -230,7 +230,7 @@
         const ok = await showConfirm(t('linebot-unbind-confirm'), { danger: true });
         if (!ok) return;
         try {
-            const token = localStorage.getItem('mrpilot_token');
+            const token = window.session.getToken();
             const resp = await fetch('/api/line/binding', {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token },
@@ -249,7 +249,7 @@
     // 一键「用 LINE 连接」(已登录用户补绑·如 Google 登录)→ 取授权 URL → 跳转。
     async function connectLine() {
         try {
-            const token = localStorage.getItem('mrpilot_token');
+            const token = window.session.getToken();
             const resp = await fetch('/api/me/connect-line/start', {
                 headers: { Authorization: 'Bearer ' + token },
             });

@@ -22,6 +22,7 @@ from core import db
 from services.erp import erp_push as _erp
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
+from services.auth.entrance import DMS, require_erp_portal
 from services.erp._master_data_cache import TTLCache as _EndpointTestCache
 
 logger = logging.getLogger("mr-pilot")
@@ -44,6 +45,7 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     plaintext `{username, password}`(以前只接受 `{username_enc,
     password_enc}` 容易碰到的 ImportError 上浮成 500)。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台连接向导测试连接 → 窄 allowlist
     _check_push_access(user)
     if req.adapter not in _erp.ADAPTER_REGISTRY:
         raise HTTPException(400, detail="erp.unknown_adapter")
@@ -154,19 +156,9 @@ async def erp_endpoint_test_connection(
     request: Request,
     refresh: bool = False,
 ):
-    """Per-endpoint health check. Loads the stored endpoint (with its
-    Fernet-encrypted credentials), runs adapter-specific verification
-    (MR.ERP: login + select_company + scrape companies dropdown), and
-    returns a structured result the wizard / cards UI can render.
-
-    Caches by (user_id, endpoint_id) for 60s. Pass `?refresh=1` to
-    bypass the cache (used by the explicit "重新测试" button).
-
-    Returns 200 with `{ok: bool, ...}` either way — the UI uses `ok`
-    to decide the pill colour. Auth / not-found responses still HTTP
-    error normally so the UI can show a generic toast.
-    """
+    """端点级健康检查 · 缓存 60s · ?refresh=1 绕过。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user, also_allowed=(DMS,))
     _check_push_access(user)
     ep = db.get_erp_endpoint(user["id"], endpoint_id)
     if not ep:
@@ -335,6 +327,7 @@ async def erp_endpoint_customers(
     Only available for `adapter='mrerp'` endpoints.
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     ep = db.get_erp_endpoint(user["id"], endpoint_id)
     if not ep:
@@ -395,6 +388,7 @@ async def erp_endpoint_products(
     product listing for an endpoint so the wizard's Step-3 seed-product
     dropdown can show real options. Mirrors the customers route + cache."""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     ep = db.get_erp_endpoint(user["id"], endpoint_id)
     if not ep:
@@ -458,6 +452,7 @@ async def erp_wizard_products(req: ErpWizardProductsRequest, request: Request):
     `{ok: false, ...}` 让向导降级(用户可手填 / 跳过)。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     cfg = dict(req.config or {})
     cfg.pop("_token_set", None)

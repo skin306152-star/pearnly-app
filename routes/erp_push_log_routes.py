@@ -20,6 +20,7 @@ from services.erp import erp_push as _erp
 from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
+from services.auth.entrance import DMS, require_erp_portal
 from core import workspace_context as wc
 
 logger = logging.getLogger("mr-pilot")
@@ -39,6 +40,7 @@ class ErpPushRequest(BaseModel):
 async def erp_push(req: ErpPushRequest, request: Request):
     """手动触发推送一条历史记录到指定 endpoint"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     # 1) 拿历史记录
@@ -173,6 +175,7 @@ async def erp_log_debug_xlsx(log_id: str, request: Request):
     """v27.8.1.5 · 推送失败时下载 Pearnly 这次生成的 xlsx · 用户拖给 ERP 服务方诊断
     只有同 tenant 用户能下 · 没存 _debug_xlsx_b64 → 404"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     tid = _tid(user)
     try:
         with db.get_cursor() as cur:
@@ -226,6 +229,7 @@ async def erp_log_debug_xlsx(log_id: str, request: Request):
 async def erp_history_push_status(history_id: str, request: Request):
     """P0-2 · 查询某张发票是否已成功推送到 ERP"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     result = db.list_push_logs(
         user["id"], history_id=history_id, status_filter="success", limit=1, tenant_id=_tid(user)
@@ -261,6 +265,9 @@ async def erp_logs(
       让 total 诚实(前端不再 .filter 造成「共 N 条」虚高)。/dms 记录页走 adapter=mrerp_dms
       仍能看到 id_card 行,故不能全局硬剔——只在调用方显式传参时排除。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(
+        user, also_allowed=(DMS,)
+    )  # /dms 记录页(entry='dms')读本租户推送日志 → 窄 allowlist
     _check_push_access(user)
     return db.list_push_logs(
         user["id"],
@@ -285,6 +292,7 @@ async def erp_logs(
 async def erp_log_detail(log_id: str, request: Request):
     """单条日志完整详情 · 含请求体/响应体"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     detail = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
     if not detail:
@@ -296,6 +304,7 @@ async def erp_log_detail(log_id: str, request: Request):
 async def erp_stats_today(request: Request):
     """今日推送统计 · 同日志列表按当前套账隔离(active_workspace_for_request 解析)。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     return db.get_push_stats_today(
         user["id"],
@@ -308,6 +317,7 @@ async def erp_stats_today(request: Request):
 async def erp_retry_push(log_id: str, request: Request):
     """一键重试失败的推送"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
     if not log:
@@ -370,6 +380,7 @@ class ErpBatchRetryRequest(BaseModel):
 async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
     """批量重推:对每个 log_id 跑一次手动重试逻辑 · 返回成功/失败计数"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     if not req.log_ids:
@@ -464,6 +475,7 @@ async def erp_batch_delete(req: ErpBatchDeleteRequest, request: Request):
     确认操作不可撤销 · 弹窗确认在 JS 侧 · 这里只管严格 user_id-scoped delete.
     返回 {total, deleted, skipped} · skipped = 不在该用户 scope 内的."""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     if not req.log_ids:

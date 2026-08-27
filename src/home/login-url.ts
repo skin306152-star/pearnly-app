@@ -7,17 +7,19 @@
 // 会话过期 401 直跳时 _entry 尚空 → 此处自读入口记号。
 // 2026-08-26 定版(主控拍板):/cowork /erp 未登录直接呈现同一套登录 UI(浏览器地址就是 /cowork|/erp,
 // 不再露 /login?entry=)。故 cowork/main 一律落 /cowork,erp 落 /erp,其它独立门回各自登录页。
+// 2026-08-27 入口级会话隔离:冷启动优先 pathname/canonical(session.entry),不能被另一标签共享的
+// pearnly_entry 误导(同名多标签不同入口时,谁先写 pearnly_entry 谁说了算 — 已否决)。
 // 改此分支必须同步 home.html 头部 preboot 门 + static/landing/landing.js(两处都是物理拷贝,
 // preboot 早于 main.js 调不到这里)。
 export function loginUrl(): string {
-    if (!window._entry) window._entry = localStorage.getItem('pearnly_entry') || '';
-    if (window._entry === 'pos') return '/pos';
-    if (window._entry === 'dms') return '/dms';
-    if (window._entry === 'ai') return '/ai';
-    if (window._entry === 'daily') return '/daily';
-    if (window._entry === 'erp') return '/erp';
-    if (window._entry === 'cowork') return '/cowork';
-    if (window._entry === 'main') return '/cowork'; // 默认主壳(普通默认用户 canonical=/cowork)
+    const entry = window.session.entry() || window._entry || '';
+    if (entry === 'pos') return '/pos';
+    if (entry === 'dms') return '/dms';
+    if (entry === 'ai') return '/ai';
+    if (entry === 'daily') return '/daily';
+    if (entry === 'erp') return '/erp';
+    if (entry === 'cowork') return '/cowork';
+    if (entry === 'main') return '/cowork'; // 默认主壳(普通默认用户 canonical=/cowork)
     return window._businessType === 'pos_only' ? '/pos' : '/cowork';
 }
 

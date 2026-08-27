@@ -221,7 +221,7 @@ function _wsHeader(): Record<string, string> {
 }
 
 async function revokeSessionToken() {
-    const tk = localStorage.getItem('mrpilot_token') || token || '';
+    const tk = window.session.getToken() || token || '';
     if (!tk) return;
     try {
         await fetch('/api/logout', {
@@ -252,7 +252,7 @@ async function apiGet(url: string) {
             resp.status === 401 || (typeof code === 'string' && code.indexOf('auth.') >= 0);
         if (isAuthFail) {
             console.warn('[auth-fail-redirect]', url, resp.status, detail); // 诊断 · 用户截屏给我看
-            localStorage.removeItem('mrpilot_token');
+            window.session.clearToken();
             if (code === 'auth.session_revoked') {
                 _showSessionRevokedModal();
             } else {
@@ -297,7 +297,7 @@ async function apiPost(url: string, data: unknown) {
             resp.status === 401 || (typeof code === 'string' && code.indexOf('auth.') >= 0);
         if (isAuthFail) {
             console.warn('[auth-fail-redirect]', url, resp.status, detail);
-            localStorage.removeItem('mrpilot_token');
+            window.session.clearToken();
             if (code === 'auth.session_revoked') {
                 _showSessionRevokedModal();
             } else {
@@ -341,7 +341,7 @@ async function apiPut(url: string, data: unknown) {
                 resp.status === 401 || (typeof code === 'string' && code.indexOf('auth.') >= 0);
             if (isAuthFail) {
                 console.warn('[auth-fail-redirect]', url, resp.status, detail);
-                localStorage.removeItem('mrpilot_token');
+                window.session.clearToken();
                 if (code === 'auth.session_revoked') {
                     _showSessionRevokedModal();
                 } else {

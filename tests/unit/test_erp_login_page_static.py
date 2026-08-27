@@ -91,11 +91,12 @@ class ErpLoginPageContentTests(unittest.TestCase):
         self.assertIn("pearnly_entry', 'erp'", ERP_LOGIN_HTML)
 
     def test_shell_correction_by_token_entry(self):
-        # 层1 串壳校正:boot 读 mrpilot_token 的 JWT entry/local 提示,非 erp 入口 token 立即
-        # 跳回自己的 canonical 主壳,erp token 才进 /home?canonical=erp。
-        self.assertIn("localStorage.getItem('mrpilot_token')", ERP_LOGIN_HTML)
-        self.assertIn("canonicalFor", ERP_LOGIN_HTML)
-        self.assertIn("'/home?canonical=' + canon", ERP_LOGIN_HTML)
+        # 层1 串壳校正:先看 erp 槽(mrpilot_token_erp);无则读 legacy mrpilot_token 的 JWT entry,
+        # 仅当 entry==='erp' 才收养进 /home?canonical=erp;pos/main/cowork token(无 erp 槽)一律
+        # 留住登录页(不跳走)。2026-08-27 改为入口级 token 槽 + legacy 迁移判据。
+        self.assertIn("localStorage.getItem('mrpilot_token_erp')", ERP_LOGIN_HTML)
+        self.assertIn("legacyEntryFromJwt", ERP_LOGIN_HTML)
+        self.assertIn("'/home?canonical=erp'", ERP_LOGIN_HTML)
 
     def test_no_erp_business_api_or_dom(self):
         # 本页只是登录门:不新增 ERP 业务 API、不复制 home 业务 DOM(无 home SPA 的 page-* 壳)。

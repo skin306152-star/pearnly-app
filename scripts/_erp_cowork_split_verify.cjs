@@ -82,10 +82,10 @@ async function boot(browser, { entry, hash, viewport }) {
     const ctx = await browser.newContext({ viewport });
     const page = await ctx.newPage();
     await page.addInitScript((e) => {
-        localStorage.setItem('mrpilot_token', 'tok');
+        localStorage.setItem('mrpilot_token_' + e, 'tok');
         localStorage.setItem('mrpilot_lang', 'zh');
         localStorage.setItem('pearnly_entry', e);
-        localStorage.setItem('pearnly_active_workspace_client_id', '1');
+        localStorage.setItem('pearnly_active_workspace_client_id_' + e, '1');
     }, entry);
     await page.route('**/api/**', routeStub(entry));
     const pageerrs = [];

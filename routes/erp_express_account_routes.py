@@ -18,6 +18,7 @@ from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
+from services.auth.entrance import require_erp_portal
 from services.erp import erp_push as _erp
 from services.erp.express_push import chart_codes
 from services.erp.express_push.posting_kind import normalize as normalize_posting_kind
@@ -94,6 +95,7 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
     端点 config 默认(复用 /express-accounts 同口径),后续同类票直接解析。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     log, endpoint = _express_repair_target(user, log_id)
@@ -148,6 +150,7 @@ async def erp_express_bind_subject(
     preflight 重跑、税号锚点判出方向。重推走 push_to_endpoint 更新原行(同待补科目卡)。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     log, endpoint = _express_repair_target(user, log_id)
@@ -208,6 +211,7 @@ async def erp_express_stock_opening(
     STMAS 开账余额 + GL 借存货,由小助手侧 set_opening_stock 落地。走库存模式重推(posting_kind=stock)。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     log, endpoint = _express_repair_target(user, log_id)
@@ -248,6 +252,7 @@ async def erp_express_posting_kind(
     库存并结转 COGS,Express 里不可逆)。
     """
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     kind = normalize_posting_kind(req.posting_kind)

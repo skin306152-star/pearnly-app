@@ -32,14 +32,27 @@
     function _adminDate(input, withTime) {
         if (!input) return '';
         const raw = String(input);
-        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        const d = match
-            ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-            : new Date(raw);
-        if (isNaN(d.getTime())) return raw;
         const pad = (n) => String(n).padStart(2, '0');
-        const date = `${d.getFullYear() + 543}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        return withTime ? `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}` : date;
+        const dateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        const hasOffset = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+        let d;
+        if (dateMatch) {
+            d = new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]));
+        } else {
+            d = new Date(raw);
+        }
+        if (isNaN(d.getTime())) return raw;
+        // 仅整串 YYYY-MM-DD 才按浏览器本地日期处理(无时间语义,诚实显示当天 00:00)。
+        // 完整 ISO 时间戳(created_at 等 timestamptz 存 UTC)解析真实时刻,按 Asia/Bangkok(+7、无 DST)
+        // 呈现,不再被日期前缀正则截成 00:00;无时区标记的字符串按浏览器本地呈现,不再叠 7 小时。
+        const bkk = !dateMatch && hasOffset ? new Date(d.getTime() + 7 * 60 * 60 * 1000) : null;
+        const y = bkk ? bkk.getUTCFullYear() : d.getFullYear();
+        const mo = bkk ? bkk.getUTCMonth() + 1 : d.getMonth() + 1;
+        const da = bkk ? bkk.getUTCDate() : d.getDate();
+        const h = bkk ? bkk.getUTCHours() : d.getHours();
+        const mi = bkk ? bkk.getUTCMinutes() : d.getMinutes();
+        const date = `${y + 543}-${pad(mo)}-${pad(da)}`;
+        return withTime ? `${date} ${pad(h)}:${pad(mi)}` : date;
     }
     window._adminDate = _adminDate;
     function _setText(id, text) {

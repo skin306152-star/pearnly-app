@@ -13,6 +13,7 @@
 // env-gated:无凭据(CI)优雅跳过 · 保持 CI 绿(铁律 #2)。
 // 账号要求:普通非超管账号(超管会被 home.js 弹到 /admin/cost)。
 // ============================================================
+/* global window */
 
 const fs = require('fs');
 const path = require('path');
@@ -33,9 +34,9 @@ test.describe('登录地基', () => {
         expect(page.url(), '登录后应进 /home(普通账号)').toContain('/home');
         expect(page.url(), '不应是超管 admin 页(测试账号须为普通账号)').not.toContain('/admin');
 
-        // ────── 2) token 真落地 localStorage
-        const token = await page.evaluate(() => localStorage.getItem('mrpilot_token'));
-        expect((token || '').length, 'mrpilot_token 应存在').toBeGreaterThan(0);
+        // ────── 2) token 真落地 localStorage(2026-08-27 入口级会话隔离:读当前入口槽)
+        const token = await page.evaluate(() => window.session.getToken());
+        expect((token || '').length, '当前入口 token 应存在').toBeGreaterThan(0);
 
         // ────── 3) 过套账硬门(26e95a7d 起每次登录强制选 · 选第一个套账进场)
         await dismissWorkspaceGate(page);

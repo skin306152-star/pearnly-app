@@ -26,7 +26,7 @@ function applyLang(lang?: any) {
     //   - 之前问题:用户测试 4 语连点 → 4 次 fetch 排队 · 最后到的等 16 秒
     //   - 现在:200ms 内多次切语言 · 只发最新一次 · 旧请求 abort
     try {
-        const token = localStorage.getItem('mrpilot_token');
+        const token = window.session.getToken();
         if (token) {
             // 取消上一次未完成的请求
             if (window.__langSyncCtrl) {

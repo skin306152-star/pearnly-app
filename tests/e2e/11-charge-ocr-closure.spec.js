@@ -24,6 +24,7 @@
 //   spec skip + annotate。
 // ============================================================
 
+/* global window */
 const { test, expect } = require('@playwright/test');
 const { request: pwRequest } = require('@playwright/test');
 const { hasCreds, doUiLogin } = require('./_helpers/auth');
@@ -55,7 +56,7 @@ test.describe('充值申请 → Earn 审核 → 台账闭环(铁律 #26 高敏)'
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
         await doUiLogin(page);
-        const tokenUser = await page.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const tokenUser = await page.evaluate(() => window.session.getToken());
         expect((tokenUser || '').length, '测试账号登录后应有 token').toBeGreaterThan(0);
 
         const apiUser = await pwRequest.newContext({

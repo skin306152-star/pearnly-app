@@ -133,7 +133,7 @@ export function rxLang(): string {
 }
 
 export function rxToken(): string {
-    return localStorage.getItem('mrpilot_token') || '';
+    return window.session.getToken() || '';
 }
 
 // 文案:走全局 window.t(i18n),缺失给中文兜底(开发期),正式 key 在 i18n-data.js 四语齐。

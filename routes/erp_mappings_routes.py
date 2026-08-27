@@ -39,6 +39,7 @@ from pydantic import BaseModel
 
 from core import db
 from core.auth import get_current_user_from_request
+from services.auth.entrance import require_erp_portal
 from services.authz.deps import require_perm
 
 router = APIRouter()
@@ -56,6 +57,7 @@ def _tid(user: dict) -> Optional[str]:
 @router.get("/api/erp/mappings/clients")
 async def erp_map_list_clients(request: Request):
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     tid = _tid(user)
     if not tid:
         return {"items": []}
@@ -67,6 +69,7 @@ async def erp_map_list_clients(request: Request):
 @router.post("/api/erp/mappings/clients")
 async def erp_map_upsert_client(request: Request):
     owner = require_perm(request, "settings.org.edit")
+    require_erp_portal(owner)
     body = await request.json()
     cid = body.get("client_id")
     erp_type = body.get("erp_type")
@@ -85,6 +88,7 @@ async def erp_map_upsert_client(request: Request):
 @router.delete("/api/erp/mappings/clients/{mapping_id}")
 async def erp_map_delete_client(mapping_id: str, request: Request):
     owner = require_perm(request, "settings.org.edit")
+    require_erp_portal(owner)
     ok = db.delete_erp_client_mapping(str(owner["tenant_id"]), mapping_id)
     if not ok:
         raise HTTPException(404, detail="erp_map.not_found")
@@ -95,6 +99,7 @@ async def erp_map_delete_client(mapping_id: str, request: Request):
 @router.get("/api/erp/mappings/accounts")
 async def erp_map_list_accounts(request: Request):
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     tid = _tid(user)
     if not tid:
         return {"items": []}
@@ -105,6 +110,7 @@ async def erp_map_list_accounts(request: Request):
 @router.post("/api/erp/mappings/accounts")
 async def erp_map_upsert_account(request: Request):
     owner = require_perm(request, "settings.org.edit")
+    require_erp_portal(owner)
     body = await request.json()
     erp_type = body.get("erp_type")
     cat = body.get("pearnly_category")
@@ -124,6 +130,7 @@ async def erp_map_upsert_account(request: Request):
 @router.delete("/api/erp/mappings/accounts/{mapping_id}")
 async def erp_map_delete_account(mapping_id: str, request: Request):
     owner = require_perm(request, "settings.org.edit")
+    require_erp_portal(owner)
     ok = db.delete_erp_account_mapping(str(owner["tenant_id"]), mapping_id)
     if not ok:
         raise HTTPException(404, detail="erp_map.not_found")
@@ -134,6 +141,7 @@ async def erp_map_delete_account(mapping_id: str, request: Request):
 @router.get("/api/erp/mappings/taxes")
 async def erp_map_list_taxes(request: Request):
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     tid = _tid(user)
     if not tid:
         return {"items": []}
@@ -144,6 +152,7 @@ async def erp_map_list_taxes(request: Request):
 @router.post("/api/erp/mappings/taxes")
 async def erp_map_upsert_tax(request: Request):
     owner = require_perm(request, "settings.org.edit")
+    require_erp_portal(owner)
     body = await request.json()
     erp_type = body.get("erp_type")
     kind = body.get("pearnly_tax_kind")
@@ -162,6 +171,7 @@ async def erp_map_upsert_tax(request: Request):
 @router.delete("/api/erp/mappings/taxes/{mapping_id}")
 async def erp_map_delete_tax(mapping_id: str, request: Request):
     owner = require_perm(request, "settings.org.edit")
+    require_erp_portal(owner)
     ok = db.delete_erp_tax_mapping(str(owner["tenant_id"]), mapping_id)
     if not ok:
         raise HTTPException(404, detail="erp_map.not_found")
@@ -183,6 +193,7 @@ class ErpProductMappingReq(BaseModel):
 async def list_mappings_products(request: Request, erp_type: str = ""):
     """列商品映射 · 可选 erp_type 过滤 · 默认列全部"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     tid = _tid(user)
     if not tid:
         raise HTTPException(400, detail="no_tenant")
@@ -211,6 +222,7 @@ async def list_mappings_products(request: Request, erp_type: str = ""):
 async def upsert_mapping_product(req: ErpProductMappingReq, request: Request):
     """加/改商品映射"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     tid = _tid(user)
     if not tid:
         raise HTTPException(400, detail="no_tenant")
@@ -234,6 +246,7 @@ async def upsert_mapping_product(req: ErpProductMappingReq, request: Request):
 @router.delete("/api/erp/mappings/products/{mapping_id}")
 async def delete_mapping_product(mapping_id: str, request: Request):
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     tid = _tid(user)
     if not tid:
         raise HTTPException(400, detail="no_tenant")

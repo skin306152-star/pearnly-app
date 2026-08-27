@@ -209,8 +209,7 @@ import { ONBOARDING_HTML } from './welcome-wizard-html.js'; // REFACTOR-WB-C3 ·
             const resp = await fetch('/api/me/profile', {
                 method: 'PUT',
                 headers: {
-                    Authorization:
-                        'Bearer ' + (window.token || localStorage.getItem('mrpilot_token')),
+                    Authorization: 'Bearer ' + (window.token || window.session.getToken()),
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),

@@ -59,39 +59,48 @@
         }
     }
 
-    function safeLocalEntry() {
+    // /erp 有独立登录页；通用登录页只承接 /cowork。
+    const _pathEntry = location.pathname === '/erp' ? 'erp' : 'cowork';
+    // 入口级会话槽:cowork 用独立 token 槽,与 legacy main/pos 的 mrpilot_token 隔离,互不覆盖。
+    const _slotKey = _pathEntry === 'erp' ? 'mrpilot_token_erp' : 'mrpilot_token_cowork';
+
+    function readSlotToken() {
         try {
-            return localStorage.getItem('pearnly_entry') || '';
+            return localStorage.getItem(_slotKey) || '';
         } catch (_e) {
             return '';
         }
     }
 
-    function canonicalFor(entry) {
-        if (entry === 'erp') return 'erp';
-        if (entry === 'pos' || entry === 'dms' || entry === 'ai' || entry === 'daily') return entry;
-        return 'cowork';
+    function legacyTokenValue() {
+        try {
+            return localStorage.getItem('mrpilot_token') || '';
+        } catch (_e) {
+            return '';
+        }
     }
 
-    // /erp 有独立登录页；通用登录页只承接 /cowork。
-    const _pathEntry = location.pathname === '/erp' ? 'erp' : 'cowork';
+    // 安全迁移判据:仅 JWT entry 精确匹配才认 legacy token(cowork 接 main/cowork · erp 只接 erp)。
+    function legacyMigratable(entry) {
+        const e = tokenEntryFromJwt(); // 读 legacy mrpilot_token 的 JWT entry
+        if (!legacyTokenValue()) return false;
+        if (entry === 'cowork') return e === 'cowork' || e === 'main';
+        if (entry === 'erp') return e === 'erp';
+        return false;
+    }
 
-    // 已登录用户回到 token 对应的 canonical 入口。
+    // 已登录用户回到 token 对应的 canonical 入口(读当前入口槽 + 允许 legacy 迁移)。
     let _hasToken = false;
     try {
-        _hasToken = !!localStorage.getItem('mrpilot_token');
+        _hasToken = !!readSlotToken() || legacyMigratable(_pathEntry);
     } catch (_e) {
         _hasToken = false;
     }
-    const _tokEntry = tokenEntryFromJwt() || safeLocalEntry();
     if (_hasToken) {
-        const _canon = _tokEntry ? canonicalFor(_tokEntry) : 'cowork';
         try {
-            localStorage.setItem('pearnly_entry', _canon);
+            localStorage.setItem('pearnly_entry', _pathEntry);
         } catch (_e) {}
-        window.location.replace(
-            _canon === 'cowork' || _canon === 'erp' ? '/home?canonical=' + _canon : '/' + _canon
-        );
+        window.location.replace('/home?canonical=' + _pathEntry);
         return;
     }
     const _entry = _pathEntry;
@@ -320,7 +329,9 @@
                 setBusy(button, false);
                 return;
             }
-            localStorage.setItem('mrpilot_token', data.access_token);
+            localStorage.setItem(_slotKey, data.access_token);
+            // 超管:镜像 legacy token —— admin SPA(/admin/cost)只读 legacy mrpilot_token,不走本槽。
+            if (data.is_super_admin) localStorage.setItem('mrpilot_token', data.access_token);
             localStorage.setItem('mrpilot_lang', currentLang());
             localStorage.setItem('pearnly_entry', _entry);
             setMessage(T('loginSuccess'), 'success');
@@ -440,12 +451,12 @@
                 setBusy(button, false);
                 return;
             }
-            localStorage.setItem('mrpilot_token', data.token);
+            localStorage.setItem(_slotKey, data.token);
             localStorage.setItem('mrpilot_lang', currentLang());
-            localStorage.setItem('pearnly_entry', 'cowork');
+            localStorage.setItem('pearnly_entry', _entry);
             setMessage(T('signupSuccess'), 'success');
             window.setTimeout(() => {
-                window.location.href = '/home?canonical=cowork';
+                window.location.href = '/home?canonical=' + _entry;
             }, 600);
         } catch (_err) {
             setMessage(T('netError'), 'error');

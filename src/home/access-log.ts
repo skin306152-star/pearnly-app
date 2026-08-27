@@ -89,7 +89,7 @@
     }
 
     async function _load(page: number) {
-        const tk = localStorage.getItem('mrpilot_token');
+        const tk = window.session.getToken();
         if (!tk) return;
         _state.page = page || 1;
         _renderEmpty(t('set-access-log-loading'));
@@ -119,7 +119,7 @@
     }
 
     async function _csvExport() {
-        const tk = localStorage.getItem('mrpilot_token');
+        const tk = window.session.getToken();
         if (!tk) return;
         try {
             const url = '/api/me/access_log.csv?q=' + encodeURIComponent(_state.q || '');

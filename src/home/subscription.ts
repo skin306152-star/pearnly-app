@@ -42,7 +42,7 @@ function _t(k: string, fb?: string): string {
     }
 }
 function _auth() {
-    return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
+    return { Authorization: 'Bearer ' + (window.session.getToken() || '') };
 }
 function _money(n: number): string {
     return BAHT + Number(n || 0).toFixed(2);

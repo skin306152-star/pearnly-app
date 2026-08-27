@@ -63,7 +63,7 @@ export function htmlVal(v: string | number | null | undefined): string {
 
 function authHeaders(): Record<string, string> {
     const h: Record<string, string> = {
-        Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+        Authorization: 'Bearer ' + (window.session.getToken() || ''),
     };
     try {
         const ws = window._wsHeader && window._wsHeader();

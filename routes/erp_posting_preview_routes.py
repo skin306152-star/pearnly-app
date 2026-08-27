@@ -22,6 +22,7 @@ from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
+from services.auth.entrance import require_erp_portal
 from services.erp.erp_payload import flatten_history_for_mrerp
 from services.erp.express_push import stock_lane_enabled
 from services.erp.express_push.agent_reporting import _merge_config
@@ -54,6 +55,7 @@ class PostingPreviewRequest(BaseModel):
 async def erp_posting_preview(req: PostingPreviewRequest, request: Request):
     """算一批单据的推送前预览(gate + 逐行 + 画像)· 不落库 · 仅 express 端点有预览。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     endpoint = db.get_erp_endpoint(user["id"], req.endpoint_id)
@@ -85,6 +87,7 @@ class PostingProfileRequest(BaseModel):
 async def erp_posting_profile(req: PostingProfileRequest, request: Request):
     """存会计确认后的记账模式 → config.posting_profile(锁 · compile-once,之后不再问)。"""
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
 
     if req.posting_mode not in VALID_MODES:

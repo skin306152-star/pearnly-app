@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
+from services.auth.entrance import require_erp_portal
 from services.erp.express_push import account_set_allowed, express_push_enabled
 from services.erp.express_push import agent_store
 
@@ -56,6 +57,7 @@ async def erp_agent_token(endpoint_id: str, request: Request):
     """
     _require_enabled()
     user = get_current_user_from_request(request)
+    require_erp_portal(user)
     _check_push_access(user)
     reset = False
     try:

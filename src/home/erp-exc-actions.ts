@@ -51,7 +51,7 @@ const _ERP_ACCT_SLOT_LABEL: Record<string, string> = {
 };
 
 function _erpExcTok(): string {
-    return localStorage.getItem('mrpilot_token') || '';
+    return window.session.getToken() || '';
 }
 
 // 该端点上报的账套科目表(GLACC)· 供待补科目卡下拉(显示 代码 · 名字)。

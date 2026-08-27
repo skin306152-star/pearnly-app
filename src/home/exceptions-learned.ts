@@ -18,7 +18,7 @@ async function loadLearnedRules() {
     try {
         const resp = await fetch('/api/exception-whitelist', {
             headers: {
-                Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || ''),
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
             },
         });
         if (!resp.ok) throw new Error('http ' + resp.status);

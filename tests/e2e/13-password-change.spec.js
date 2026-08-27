@@ -20,6 +20,7 @@
 // 边界:这条 spec 会真实改密 3 次(orig→temp→orig + 二次验证登录)· 命中 SMTP/速率闸时
 // 容许失败(env-gated skip 已挡 CI · 本地由 Zihao 用 Earn 重置 / 等冷却重跑)。
 // ============================================================
+/* global window */
 
 const { test, expect } = require('@playwright/test');
 const { hasCreds, doUiLogin } = require('./_helpers/auth');
@@ -88,7 +89,7 @@ test.describe('改密 / 老 token 失效(铁律 v118.28.9)', () => {
         const ctxA = await browser.newContext();
         const pageA = await ctxA.newPage();
         await doUiLogin(pageA);
-        const tokenA = await pageA.evaluate(() => localStorage.getItem('mrpilot_token'));
+        const tokenA = await pageA.evaluate(() => window.session.getToken());
         expect((tokenA || '').length, 'tokenA 应在 localStorage').toBeGreaterThan(0);
         const me1 = await callMe(pageA, tokenA);
         expect(me1.status, `tokenA 初始应 200 (got ${me1.status} · ${me1.snippet})`).toBe(200);
@@ -115,7 +116,7 @@ test.describe('改密 / 老 token 失效(铁律 v118.28.9)', () => {
             await withTempPass(temp, async () => {
                 await doUiLogin(pageB);
             });
-            const tokenB = await pageB.evaluate(() => localStorage.getItem('mrpilot_token'));
+            const tokenB = await pageB.evaluate(() => window.session.getToken());
             expect((tokenB || '').length, 'tokenB 应在 localStorage').toBeGreaterThan(0);
             const meB = await callMe(pageB, tokenB);
             expect(meB.status, `tokenB 应 200 (got ${meB.status} · ${meB.snippet})`).toBe(200);
@@ -132,7 +133,7 @@ test.describe('改密 / 老 token 失效(铁律 v118.28.9)', () => {
             const ctxC = await browser.newContext();
             const pageC = await ctxC.newPage();
             await doUiLogin(pageC); // 用 env 原密码
-            const tokenC = await pageC.evaluate(() => localStorage.getItem('mrpilot_token'));
+            const tokenC = await pageC.evaluate(() => window.session.getToken());
             expect((tokenC || '').length, '原密码仍能登录').toBeGreaterThan(0);
 
             assertNoConsoleErrors(expect, guardB);
@@ -142,7 +143,6 @@ test.describe('改密 / 老 token 失效(铁律 v118.28.9)', () => {
         } finally {
             if (passwordChanged) {
                 // 兜底:中途挂掉 · 账号当前是 temp · 把它扯回 orig 才能保 env 凭据
-                // eslint-disable-next-line no-console -- 测试失败兜底诊断
                 console.warn(`[spec-13 finally] 改密未完成回滚 · 尝试用 temp(${temp})扯回 orig`);
                 try {
                     const ctxR = await browser.newContext();
@@ -150,13 +150,12 @@ test.describe('改密 / 老 token 失效(铁律 v118.28.9)', () => {
                     await withTempPass(temp, async () => {
                         await doUiLogin(pageR);
                     });
-                    const tokR = await pageR.evaluate(() => localStorage.getItem('mrpilot_token'));
+                    const tokR = await pageR.evaluate(() => window.session.getToken());
                     if (tokR) {
                         await changePassword(pageR, tokR, temp, orig);
                     }
                     await ctxR.close();
                 } catch (e) {
-                    // eslint-disable-next-line no-console -- 终极兜底
                     console.error(
                         `[spec-13 finally] 兜底失败 · 账号可能仍是 temp_pass · ` +
                             `temp=${temp} · 用 Earn 后台重置该测试账号密码 · 错误:${e.message}`

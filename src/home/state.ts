@@ -265,4 +265,5 @@ window._historySelected = new Set();
 window._erpEndpoints = [];
 
 // token 读取(无 token 的硬拦截由 home.html <head> 内联鉴权闸更早处理 · 这里只暴露给模块用)
-window.token = localStorage.getItem('mrpilot_token') as string;
+// 入口级隔离:真实值由 src/home/session.ts(session.js · 最早 import)按当前入口槽解析并同步 window.token。
+window.token = window.session.getToken();

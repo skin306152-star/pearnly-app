@@ -15,8 +15,6 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
 (function () {
     'use strict';
 
-    const LS_ID = 'pearnly_active_workspace_client_id';
-
     function _t(key: string, fallback: string) {
         if (typeof window.t === 'function') {
             const s = window.t(key);
@@ -59,8 +57,14 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
     }
 
     // ---------- 状态 ----------
+    // active workspace key 按入口分槽(cowork/erp 各自 key),避免同一 Chrome 里 /cowork 与 /erp
+    // 两个标签页互相改对方的 X-Workspace-Client-Id。槽名由 src/home/session.ts 决定。
+    function wsKey(): string {
+        return window.session.workspaceKey();
+    }
+
     function getActiveWorkspaceClientId() {
-        const v = localStorage.getItem(LS_ID);
+        const v = localStorage.getItem(wsKey());
         if (!v || v === 'null' || v === '0' || v === '') return null;
         const n = parseInt(v, 10);
         return isNaN(n) ? null : n;
@@ -78,8 +82,9 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
 
     function setActiveWorkspaceClientId(id: number | null) {
         const old = getActiveWorkspaceClientId();
-        if (id == null || id === 0) localStorage.removeItem(LS_ID);
-        else localStorage.setItem(LS_ID, String(id));
+        const k = wsKey();
+        if (id == null || id === 0) localStorage.removeItem(k);
+        else localStorage.setItem(k, String(id));
         if (String(old) !== String(id)) _emit(id);
     }
 

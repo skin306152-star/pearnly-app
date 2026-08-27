@@ -1071,6 +1071,21 @@
       ],
       "only_e2e": ["390px 手机视口下付款删除按钮、金额输入框与附件勾选框的真实浏览器布局和对齐"]
     },
+    "34-cowork-erp-session-isolation.spec.js": {
+      "covers": [
+        "src/home/session.ts",
+        "src/home/**",
+        "home.html",
+        "static/erp/erp.html",
+        "static/landing/landing.js",
+        "tests/e2e/_helpers/**",
+        "static/dist/main.js"
+      ],
+      "only_e2e": [
+        "同一 Chrome 里 /cowork 与 /erp 用不同账号按各自入口 token/workspace 槽并存、互不覆盖;POS token 打 /erp 不被收养",
+        "登出只清当前入口槽,另一入口槽 token + workspace 不受影响;X-Workspace-Client-Id 按入口槽分流"
+      ]
+    },
     "_a1_discount_inferred_verify.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
       "only_e2e": ["系统补的折扣行在审核队列说人话、严重度红、无按建议处理的安全默认"]

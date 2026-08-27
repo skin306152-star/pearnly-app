@@ -4,7 +4,7 @@
 
 // ---------- 工具 ----------
 function authH() {
-    return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
+    return { Authorization: 'Bearer ' + (window.session.getToken() || '') };
 }
 // 结构化错误(422 detail={code,message:四语字典},见 thai_name_gate.error_payload)附到
 // 抛出的 Error 上,不再靠 String(detail) 把整个对象拍扁成 "[object Object]"——调用方

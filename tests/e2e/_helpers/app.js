@@ -2,10 +2,11 @@
 // ============================================================
 // 复用 storageState 进 /home 后,走真实点击切路由(home.js: .nav-item[data-route] → routeTo)。
 // ============================================================
-/* global document, getComputedStyle, window */
+/* global document, getComputedStyle */
 
 const { expect } = require('@playwright/test');
 const { blockCfInsights } = require('./console-guard');
+const { getToken } = require('./auth');
 
 // 登录后「账套软弹」(workspace-switcher.js 的 #ws-modal · 2026-05-27 上线)是全屏 overlay,
 // 会拦截一切点击。它在 /api/me 回来后自动弹,时机略晚于侧栏渲染。进应用后探测并用 ✕ 关掉
@@ -61,13 +62,13 @@ async function openRoute(page, route) {
 }
 
 // 用登录 token 拉 /api/me/modules(业态 + 各模块启用状态)· pos_only 门控 spec 共用。
-// 2026-08-27 入口级会话隔离:token 经 window.session.getToken() 读当前入口槽(cowork/erp/legacy)。
+// token 读取复用 auth.js getToken(page) · 单一事实源。
 async function getModules(page) {
-    return page.evaluate(async () => {
-        const tok = window.session.getToken();
-        const r = await fetch('/api/me/modules', { headers: { Authorization: 'Bearer ' + tok } });
+    const tok = await getToken(page);
+    return page.evaluate(async (token) => {
+        const r = await fetch('/api/me/modules', { headers: { Authorization: 'Bearer ' + token } });
         return r.json();
-    });
+    }, tok);
 }
 
 // 业态导航门控 spec(24 pos_only / 25 firm)共用的选择器表 + 切业态 + 展开折叠组。
@@ -100,17 +101,20 @@ const AVATAR = {
 };
 
 // owner 专属 PUT /api/me/onboarding 切业态(pos_only / firm)· afterEach 幂等复原用。
-// 2026-08-27 入口级会话隔离:token 经 window.session.getToken() 读当前入口槽。
+// token 读取复用 auth.js getToken(page) · 单一事实源。
 async function setBusinessType(page, businessType) {
-    return page.evaluate(async (bt) => {
-        const tok = window.session.getToken();
-        const r = await fetch('/api/me/onboarding', {
-            method: 'PUT',
-            headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ business_type: bt }),
-        });
-        return r.json();
-    }, businessType);
+    const tok = await getToken(page);
+    return page.evaluate(
+        async ({ token, bt }) => {
+            const r = await fetch('/api/me/onboarding', {
+                method: 'PUT',
+                headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ business_type: bt }),
+            });
+            return r.json();
+        },
+        { token: tok, bt: businessType }
+    );
 }
 
 // 折叠组默认展开(max-height),但持久化可能收起 → 收起态子项高度 0、Playwright 判不可见。

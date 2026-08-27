@@ -1,3 +1,4 @@
+/* global window */
 // Pearnly E2E · 登录地基 helper · 整顿期 REFACTOR-D1
 // ============================================================
 // 职责:
@@ -66,12 +67,13 @@ async function doUiLogin(page) {
     // 普通账号登录成功 → 跳 /home(超管会跳 /admin/cost · 那种账号不该用于本套测试)
     await page.waitForURL('**/home**', { timeout: 20_000 });
     // 等 token 真正落地 localStorage(storageState 才抓得到)。2026-08-27 入口级会话隔离:
-    // /cowork 登录写 cowork 槽 mrpilot_token_cowork(legacy mrpilot_token 仅超管镜像),
-    // 故两者任一存在即视为已登录。
+    // /cowork → mrpilot_token_cowork · /erp → mrpilot_token_erp · 其他 → mrpilot_token,
+    // 任一槽有值即视为已登录。
     await page.waitForFunction(
         () =>
             !!localStorage.getItem('mrpilot_token') ||
-            !!localStorage.getItem('mrpilot_token_cowork'),
+            !!localStorage.getItem('mrpilot_token_cowork') ||
+            !!localStorage.getItem('mrpilot_token_erp'),
         null,
         { timeout: 10_000 }
     );
@@ -106,4 +108,26 @@ async function ensureStorageState(browser) {
     return STORAGE_STATE;
 }
 
-module.exports = { STORAGE_STATE, hasCreds, doUiLogin, ensureStorageState };
+// 兼容新旧生产的 token 读取(2026-08-27 · CI 高敏 E2E 部署前对旧生产跑):
+//   新生产:window.session.getToken() 内部按 pathname 选槽(cowork/erp/legacy)
+//   旧生产:无 window.session → 按 pathname 精确选槽 fallback:
+//     /erp    → mrpilot_token_erp
+//     /cowork → mrpilot_token_cowork
+//     其他    → mrpilot_token(legacy main/pos/dms/ai/daily)
+//   绝不跨产品拿错 token(如 /erp 页面拿到 cowork token)。
+async function getToken(page) {
+    return page.evaluate(() => {
+        if (
+            typeof window.session !== 'undefined' &&
+            typeof window.session.getToken === 'function'
+        ) {
+            return window.session.getToken();
+        }
+        const p = window.location.pathname;
+        if (p === '/erp') return localStorage.getItem('mrpilot_token_erp') || '';
+        if (p === '/cowork') return localStorage.getItem('mrpilot_token_cowork') || '';
+        return localStorage.getItem('mrpilot_token') || '';
+    });
+}
+
+module.exports = { STORAGE_STATE, hasCreds, doUiLogin, ensureStorageState, getToken };

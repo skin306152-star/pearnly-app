@@ -29,7 +29,6 @@
 //
 // 凭据:
 // ============================================================
-/* global window */
 //   PEARNLY_E2E_USER / PEARNLY_E2E_PASS — 测试账号(非超管)
 //   PEARNLY_ADMIN_USER / PEARNLY_ADMIN_PASS — Earn 超管
 //
@@ -38,7 +37,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { request: pwRequest } = require('@playwright/test');
-const { hasCreds, doUiLogin } = require('./_helpers/auth');
+const { hasCreds, doUiLogin, getToken } = require('./_helpers/auth');
 
 const BASE_URL = process.env.PEARNLY_E2E_BASE_URL || 'https://pearnly.com';
 
@@ -67,7 +66,7 @@ test.describe('RLS 行级隔离 + 垂直权限(铁律 #26 + RLS infra)', () => {
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
         await doUiLogin(page);
-        const tokenUser = await page.evaluate(() => window.session.getToken());
+        const tokenUser = await getToken(page);
         expect((tokenUser || '').length, '测试账号登录后应有 token').toBeGreaterThan(0);
 
         const apiUser = await pwRequest.newContext({

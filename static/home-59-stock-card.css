@@ -1,21 +1,16 @@
-/* 事务所端 · 商品收发存报表(Stock Card · 2026-08-07)· 作用域 .stc 防污染主程序。
-   三段式表头配色照搬桌面原型 stock-card-prototype-v1.html(拍板稿):入=绿/出=粉/结存=紫。
+/* ERP 门户 · 商品收发存报表(Stock Card · 2026-08-07 · 2026-08-27 改写为按商品连续排列的
+   13 列长表)· 作用域 .stc 防污染主程序。
+   三段式表头配色按业务参考图锁定:入=绿/出=粉/结存=紫。
    --stc-in/--stc-out/--stc-bal = 表头色块(白字压得住,两套主题都不必翻面,同 home-43 的
-   .posrep .hero 白字压渐变同一道理);--stc-*-weak = 单元格底色,走带暗夜重定义的 -weak 令牌
-   (good-weak 有暗夜对;pink 系无暗夜对 → 暗夜借 red-weak 这个已适配的深色曲面,语义仍是
-   "警示色系的浅色曲面",不是拿错色)。全部取现成令牌,无新 hex。 */
+   .posrep .hero 白字压渐变同一道理);--stc-bal-weak 只用于参考图的合计行。全部取现成
+   令牌,无新 hex。 */
 .stc {
     color: var(--ink);
     font-size: 13px;
     --stc-in: var(--green-700);
     --stc-out: var(--pink-800);
     --stc-bal: var(--violet-800);
-    --stc-in-weak: var(--green-weak);
-    --stc-out-weak: var(--pink-100);
     --stc-bal-weak: var(--accent-weak);
-}
-:root.dark .stc {
-    --stc-out-weak: var(--red-weak);
 }
 .stc .tnum,
 .stc .num {
@@ -47,16 +42,6 @@
 .stc-toolbar .stc-grow {
     flex: 1;
 }
-.stc-search input {
-    height: 34px;
-    min-width: 220px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 0 12px;
-    font: inherit;
-    background: var(--card);
-    color: var(--ink);
-}
 .stc-daterange {
     display: flex;
     align-items: center;
@@ -80,72 +65,27 @@
     color: var(--ink);
 }
 
-.stc-rules {
-    background: var(--stc-bal-weak);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
-    font-size: 12.5px;
-}
-.stc-rules b {
-    color: var(--accent-deep);
-}
-.stc-rules .stc-rules-list {
-    margin: 4px 0 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 28px;
-}
-
-.stc-tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: -1px;
-}
-.stc-tab {
-    background: var(--line2);
-    border: 1px solid var(--line);
-    border-bottom: 0;
-    border-radius: 10px 10px 0 0;
-    padding: 9px 18px;
-    cursor: pointer;
-    font-weight: 600;
-    color: var(--ink2);
-}
-.stc-tab.on {
-    background: var(--card);
-    color: var(--accent-deep);
-}
-.stc-cnt {
-    background: var(--stc-out);
-    color: #fff;
-    border-radius: 10px;
-    padding: 0 7px;
-    font-size: 11px;
-    margin-left: 6px;
-}
-
 .stc-card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 0 12px 12px 12px;
+    border-radius: 12px;
     padding: 16px;
     box-shadow: var(--shadow-sm);
 }
-/* 手机端窄屏:表格容器自身横滚,页面本体不横向溢出(响应式硬规)。 */
+/* 手机端窄屏:每个商品表格容器自身横滚,页面本体不横向溢出(响应式硬规)。 */
 .stc-scroll {
     overflow-x: auto;
 }
 .stc table {
     border-collapse: collapse;
     width: 100%;
-    font-size: 13px;
+    table-layout: fixed;
+    font-size: 12px;
 }
 .stc th,
 .stc td {
     border: 1px solid var(--line);
-    padding: 7px 9px;
+    padding: 7px 3px;
     text-align: left; /* 长文本格靠左:名称/描述 */
     white-space: nowrap;
 }
@@ -157,7 +97,7 @@
     text-align: center; /* 短内容格居中:数字/金额 */
 }
 .stc td.c {
-    text-align: center; /* 短内容非数字格居中:单位/状态/日期/单据号/类型(DESIGN_SYSTEM §21) */
+    text-align: center; /* 短内容非数字格居中:单位/日期/单据号/类型(DESIGN_SYSTEM §21) */
 }
 .stc thead .stc-grp th {
     font-size: 12.5px;
@@ -196,20 +136,11 @@
     border-right: 1px solid rgba(255, 255, 255, 0.55);
 }
 /* 色带组头(入库/出库/结存)与子表头行之间的横向分隔(Zihao 2026-08-08 红线标注处)·
-   列表表的入/出组头无 colspan,按 .stc-grp 行内的色带类选,两张表同吃 */
+   13 列长表的入/出/结存都是 colspan=3 的组头,按 .stc-grp 行内的色带类选 */
 .stc thead .stc-grp th.stc-g-in,
 .stc thead .stc-grp th.stc-g-out,
 .stc thead .stc-grp th.stc-g-bal {
     border-bottom: 1px solid rgba(255, 255, 255, 0.55);
-}
-.stc tbody td.stc-c-in {
-    background: var(--stc-in-weak);
-}
-.stc tbody td.stc-c-out {
-    background: var(--stc-out-weak);
-}
-.stc tbody td.stc-c-bal {
-    background: var(--stc-bal-weak);
 }
 /* 色带段内/段界分隔(2026-08-08):段内子列间 1px var(--line) 细分隔线;入/出/结存段
    与普通列及段与段之间,在基础网格上加重一档(2px 同线令牌,不另起炉灶)。 */
@@ -226,63 +157,67 @@
 .stc tbody td.stc-c-bal + td:not(.stc-c-bal) {
     border-right: 2px solid var(--line);
 }
-.stc tbody tr.stc-row {
-    cursor: pointer;
-}
-.stc tbody tr.stc-row:hover td {
-    background: var(--line2);
-}
-/* 负库存整行标红照实显示(不遮不弱化):产品/口径拍板行为,提示采购票可能没送齐。 */
-.stc tbody tr.neg td {
-    background: var(--bad-weak);
-    color: var(--bad);
-}
 .stc tfoot td {
     background: var(--stc-bal-weak);
     font-weight: 700;
 }
-.stc tfoot td.stc-t-in {
-    background: var(--stc-in-weak);
-}
-.stc tfoot td.stc-t-out {
-    background: var(--stc-out-weak);
-}
-.stc .stc-neg-txt {
-    color: var(--bad);
-    font-weight: 700;
-}
-
-.stc-chip {
-    display: inline-block;
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 11.5px;
+.stc-type {
     font-weight: 600;
 }
-.stc-chip-ok {
-    background: var(--good-weak);
-    color: var(--good);
-}
-.stc-chip-neg {
-    background: var(--bad-weak);
-    color: var(--bad);
-    border: 1px solid var(--bad);
-}
-.stc-chip-um {
-    background: var(--warn-weak);
-    color: var(--warn);
-}
-.stc-chip-in {
-    background: var(--stc-in-weak);
+.stc-type-in {
     color: var(--stc-in);
 }
-.stc-chip-out {
-    background: var(--stc-out-weak);
+.stc-type-out {
     color: var(--stc-out);
 }
-.stc-chip-open {
-    background: var(--stc-bal-weak);
+.stc-type-open {
     color: var(--accent-deep);
+}
+
+/* ── 商品块:标题(名称/编码/单位) + 独立横滚的 13 列表格 ── */
+.stc-group {
+    margin-bottom: 20px;
+}
+.stc-group:last-child {
+    margin-bottom: 0;
+}
+.stc-group table {
+    min-width: 930px;
+}
+.stc-group col.stc-w-date {
+    width: 8.5%;
+}
+.stc-group col.stc-w-doc {
+    width: 10%;
+}
+.stc-group col.stc-w-type {
+    width: 5.5%;
+}
+.stc-group col.stc-w-desc {
+    width: 14%;
+}
+.stc-group col.stc-w-num {
+    width: 6.89%;
+}
+.stc-group-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    padding: 4px 2px 8px;
+    font-size: 13px;
+}
+.stc-group-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+}
+.stc-group-code {
+    color: var(--ink3);
+    font-weight: 600;
+}
+.stc-group-unit {
+    color: var(--ink3);
 }
 
 .stc-hint {
@@ -300,47 +235,6 @@
     padding: 0;
 }
 .stc-link:hover {
-    color: var(--accent-deep);
-}
-
-/* ── 单品卡详情:信息条 + 计价公式说明 ── */
-.stc-det-top {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-    margin: 10px 0 14px;
-    flex-wrap: wrap;
-}
-.stc-info {
-    background: var(--stc-bal-weak);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 12px 16px;
-    min-width: 230px;
-}
-.stc-info dt {
-    font-size: 11px;
-    color: var(--ink3);
-    margin-top: 6px;
-}
-.stc-info dt:first-child {
-    margin-top: 0;
-}
-.stc-info dd {
-    font-weight: 700;
-    color: var(--ink);
-}
-.stc-formula {
-    background: var(--card);
-    border: 1px dashed var(--line);
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 12.5px;
-    flex: 1;
-    min-width: 260px;
-    color: var(--ink2);
-}
-.stc-formula b {
     color: var(--accent-deep);
 }
 
@@ -370,7 +264,7 @@
     }
 }
 
-/* ── 期初库存 / 归并弹窗(共用全局 .modal-mask/.modal 外壳,这里只补内容排版)── */
+/* ── 期初库存弹窗(共用全局 .modal-mask/.modal 外壳,这里只补内容排版)── */
 .stc .stc-in {
     width: 100%;
     height: 32px;
@@ -392,41 +286,13 @@
     margin-top: 8px;
     min-height: 1em;
 }
-.stc-mg-row {
-    display: block;
-    padding: 4px 0;
-    font-size: 13px;
-}
-#stc-mg-mask select {
-    width: 100%;
-    min-width: 260px;
-    height: 34px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 0 8px;
-    font: inherit;
-    background: var(--card);
-    color: var(--ink);
-}
 
 @media (max-width: 800px) {
     .stc-toolbar {
         flex-direction: column;
         align-items: stretch;
     }
-    .stc-search input {
-        min-width: 0;
-        width: 100%;
-    }
     .stc-daterange {
         justify-content: space-between;
-    }
-    .stc-det-top {
-        flex-direction: column;
-    }
-    .stc-info,
-    .stc-formula {
-        min-width: 0;
-        width: 100%;
     }
 }

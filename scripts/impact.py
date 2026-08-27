@@ -64,6 +64,30 @@ def changed_paths(base: str, head: str) -> list[str]:
     return sorted({_path(item) for item in raw.split("\0") if item})
 
 
+def revision_text(revision: str, path: str) -> str | None:
+    """Read one tracked text file from a revision; missing paths are reported as None."""
+    try:
+        return _run_git("show", f"{revision}:{_path(path)}")
+    except subprocess.CalledProcessError:
+        return None
+
+
+def changed_text(base: str, head: str, path: str) -> str | None:
+    """Return zero-context added/removed lines for one tracked text file."""
+    try:
+        return _run_git(
+            "diff",
+            "--unified=0",
+            "--no-ext-diff",
+            base,
+            head,
+            "--",
+            _path(path),
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+
 def load_ledger() -> dict[str, Any]:
     with LEDGER_PATH.open(encoding="utf-8") as handle:
         return json.load(handle)

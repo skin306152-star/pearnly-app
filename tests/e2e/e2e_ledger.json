@@ -4,13 +4,15 @@
     "有没有 ended。这些东西 node 里全是桩,单测跑绿说明不了它们还活着。而这些验收脚本又都要",
     "浏览器 + 假摄像头素材,进不了 CI 的 unit job —— 于是它们事实上靠人记得跑,记不得就没人",
     "拦。这份台账把『哪些行为只有 E2E 能保』写成数据,闸(tests/unit/test_e2e_ledger_gate.py)",
-    "按它做两件事:① 新写的扫码验收脚本必须登记 ② 改了 covers 里的源码却没重跑对应脚本,",
-    "本机 push 前就红(判据是产物截图的时间戳 vs 源码时间戳;CI 上全是检出时间,故只在本机判)。",
-    "登记项不是文档,是判据:covers 写错 = 闸看错文件,only_e2e 写空 = 闸自检当场红。"
+    "按它做两件事:① 新写的扫码验收脚本必须登记 ② 本次待 push diff 真命中 covers 却没重跑对应脚本,",
+    "本机 push 前才红;已推送历史源码的 mtime 不跨窗口重复追债。共享四语词典按 i18n_keys 精确归责,",
+    "无关词条不连坐。登记项不是文档,是判据:covers/i18n_keys 写错 = 闸看错责任面,only_e2e 写空 = 闸自检当场红。"
   ],
   "_fields": {
     "artifacts": "跑完落截图的目录,或 目录/前缀*.png(几个脚本共用一个目录时必须写通配)",
-    "covers": "这份 E2E 是谁的最后一道防线 · 这些文件改了就该重跑它",
+    "covers": "这份 E2E 是谁的最后一道防线 · 仅本次待 push diff 命中这些文件时才追验收",
+    "i18n_keys": "covers 含 static/i18n-data.js 时必填 · 只列脚本真断言的词条 key",
+    "cover_tokens": "covers 含共享宿主文件时可填 · 只有本次 diff 增删行命中这些契约 token 才追验收",
     "only_e2e": "只有它能保的行为 · 每条都要说清『为什么单测保不了』",
     "fixtures": "跑之前要先造的素材(没有就填 []）"
   },
@@ -103,6 +105,7 @@
         "static/home-41-inventory.css",
         "static/i18n-data.js"
       ],
+      "i18n_keys": ["inv-scan-typed", "inv-scan-added"],
       "fixtures": [],
       "only_e2e": [
         "「这一发我按人在打字处理了」那句话在屏上真看得见:单测断得了变量里有这句话,断不了它有面积、没被 display/visibility 藏起来 —— 要 getComputedStyle + getBoundingClientRect",
@@ -256,6 +259,13 @@
     "_sx_barcode_copy_accept.cjs": {
       "artifacts": "tests/e2e/_artifacts/pos_barcode_scan/sx-copy",
       "covers": ["src/home/sales-products-scan.ts", "static/i18n-data.js"],
+      "i18n_keys": [
+        "sx-p-bc-hint",
+        "sx-p-bc-scan",
+        "sx-p-bc-free",
+        "sx-p-bc-dup",
+        "sx-p-bc-dup-open"
+      ],
       "fixtures": ["python scripts/_scan_ean_y4m.py .scan_fixture.y4m"],
       "only_e2e": [
         "泰文界面上画的到底是不是泰文:期望值现场从真 window.I18N.th 取,屏上逐字对 —— 单测里没有页面语言这回事"
@@ -520,6 +530,13 @@
         "static/scan/scan-wedge.js",
         "static/i18n-data.js"
       ],
+      "i18n_keys": [
+        "inv-scan-dup",
+        "bscan.err.busy",
+        "inv-scan-retry",
+        "inv-err-bad-qty",
+        "inv-err-bad-cost"
+      ],
       "fixtures": [
         "python scripts/_scan_ean_blink_y4m.py .blink12.y4m 8850999320014 1.2",
         "python scripts/_scan_ean_blink_y4m.py .blink20.y4m 8850999320014 2.0",
@@ -627,6 +644,23 @@
         "src/home/topbar-avatar.ts",
         "static/home-31-navia-topbar.css",
         "static/i18n-data.js"
+      ],
+      "cover_tokens": {
+        "home.html": [
+          "canonical=(cowork|erp)",
+          "id=\"workspace-gate-root\"",
+          "id=\"topbar\"",
+          "id=\"sidebar\""
+        ]
+      },
+      "i18n_keys": [
+        "nav-dashboard",
+        "nav-group-firm",
+        "nav-group-master",
+        "nav-guide",
+        "nav-group-firm-goods",
+        "nav-group-expense",
+        "nav-group-sales"
       ],
       "fixtures": [],
       "only_e2e": [

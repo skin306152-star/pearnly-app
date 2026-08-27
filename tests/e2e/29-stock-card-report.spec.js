@@ -1,14 +1,16 @@
-// Pearnly E2E · 29 事务所端商品收发存报表(Stock Card · 路由 stock-card)
+// Pearnly E2E · 29 ERP 门户商品收发存报表(Stock Card · 路由 stock-card)
 // ============================================================
-// 后端 /api/stockcard/* 与前端并行施工,真库暂无可用测试账号(24/25 一类真登录 spec
-// 需要的 hasCreds() 测试号覆盖不到这条新路由)。照 26-purchase-product-wiring.spec.js
-// 的桩路数:token 塞 localStorage → page.route 拦 /api/** 桩真实契约信封 → 绕开
-// workspace-gate 直接调 window.loadStockCard。验的是「前端拿到这份契约数据后渲染
-// 对不对」,不是后端本身(后端另有测试)。
+// 2026-08-27 口径:网页主视图 = 一次 GET /api/stockcard/report,按商品连续排列的参考图
+// 原样 13 列表格(期初行 + 期间逐笔 + 该组合计),不设「汇总→单品详情」两段式、未入账
+// tab、归并/规则/搜索/状态。唯一报表附加能力 = 期初库存录入。
+// 沿用桩路数:token 塞 localStorage → page.route 拦 /api/** 桩真实契约信封 → 绕开
+// workspace-gate 直接调 window.loadStockCard。验的是前端拿到这份契约数据后渲染对不对。
+// 显式断言旧交互不存在:#stc-view-list / #stc-view-detail / #stc-back / 可点击
+// .stc-row[data-stc-key] 全部为 0,且旧路由 /summary /card /excluded /merge 从不出站。
 //
-// 断言口径按 verification skill 第 3 节:三段式表头色 / 负库存行红色都现场拿
-// getComputedStyle 与一个套同一 CSS 变量的探针元素比对(比"真实值"本身,不比手抄
-// hex)——闸值哪天调了颜色,断言跟着走,不会因为改了色号就假红或漏判。
+// 颜色断言口径按 verification skill 第 3 节:三段式表头色现场拿
+// getComputedStyle 与一个套同一 CSS 变量的探针元素比对(比"同一个令牌解析出的真实颜色"
+// 是否真的落到了目标元素上,不比手抄 hex)。
 // ============================================================
 /* global window, document, getComputedStyle */
 
@@ -23,175 +25,171 @@ const {
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'stock-card');
 
 // key 忠实于真后端形状(services/stockcard/grouping.py):商品档轨 p:<id> · 名字轨 n:<清洗名>
-// 且名字轨 product_id 为 null —— 旧夹具给名字轨编了个假 product_id,恰好把「归并弹窗拿
-// product_id 当 value 而它恒空」的真断裂藏住了(标识符必须来自真实产物,前科见记忆)。
-const PRODUCTS = [
+// 且名字轨 product_id 为 null(在商品标题里以「—」呈现,不是假 pid)。
+const GROUPS = [
     {
-        key: 'p:WPC-001',
-        product_id: 'WPC-001',
-        name: 'WPC 仿木条 2 寸',
-        unit: '条',
-        opening_qty: null,
-        in_qty: '150',
-        out_qty: '60',
-        bal_qty: '90',
-        bal_unit_cost: '254.17',
-        bal_value: '22875.30',
-        negative: false,
-        matched: true,
+        product: { key: 'p:WPC-001', product_id: 'WPC-001', name: 'WPC 仿木条 2 寸', unit: '条' },
+        rows: [
+            {
+                date: '2024-06-01',
+                doc_no: '',
+                kind: 'open',
+                desc: '',
+                qty: '10',
+                unit_price: null,
+                amount: null,
+                bal_qty: '10',
+                bal_unit_cost: '250.00',
+                bal_value: '2500.00',
+            },
+            {
+                date: '2024-06-02',
+                doc_no: 'PO-6706001',
+                kind: 'in',
+                desc: '向供应商采购入库',
+                qty: '100',
+                unit_price: '250.00',
+                amount: '25000.00',
+                bal_qty: '110',
+                bal_unit_cost: '250.00',
+                bal_value: '27500.00',
+            },
+            {
+                date: '2024-06-03',
+                doc_no: 'SO-6706001',
+                kind: 'out',
+                desc: '销售给客户 A',
+                qty: '30',
+                unit_price: '250.00',
+                amount: '7500.00',
+                bal_qty: '80',
+                bal_unit_cost: '250.00',
+                bal_value: '20000.00',
+            },
+        ],
+        totals: {
+            in_qty: '100',
+            in_amount: '25000.00',
+            out_qty: '30',
+            out_amount: '7500.00',
+            bal_qty: '80',
+            bal_unit_cost: '250.00',
+            bal_value: '20000.00',
+        },
     },
     {
-        key: 'p:WTR-600',
-        product_id: 'WTR-600',
-        name: '山牌饮用水 600ml',
-        unit: '箱',
-        // -30 = 模拟「计算结转」的负期初:它不是用户手填的期初,期初弹窗预填不得带上它
-        // (2026-08-08 口径 · 预填只认 GET /openings 的已存用户期初)。
-        opening_qty: '-30',
-        in_qty: '100',
-        out_qty: '130',
-        bal_qty: '-30',
-        bal_unit_cost: '60.00',
-        bal_value: '-1800.00',
-        negative: true,
-        matched: true,
+        product: { key: 'p:WTR-600', product_id: 'WTR-600', name: '山牌饮用水 600ml', unit: '箱' },
+        rows: [
+            {
+                date: '2024-06-01',
+                doc_no: '',
+                kind: 'open',
+                desc: '',
+                qty: '0',
+                unit_price: null,
+                amount: null,
+                bal_qty: '0',
+                bal_unit_cost: null,
+                bal_value: null,
+            },
+            {
+                date: '2024-06-05',
+                doc_no: 'SO-6706105',
+                kind: 'out',
+                desc: '销售给客户 B',
+                qty: '30',
+                unit_price: null,
+                amount: null,
+                bal_qty: '-30',
+                bal_unit_cost: null,
+                bal_value: null,
+            },
+        ],
+        totals: {
+            in_qty: '0',
+            in_amount: null,
+            out_qty: '30',
+            out_amount: null,
+            bal_qty: '-30',
+            bal_unit_cost: null,
+            bal_value: null,
+        },
     },
     {
-        key: 'n:กระดาษ a4',
-        product_id: null,
-        name: 'กระดาษ A4',
-        unit: 'รีม',
-        opening_qty: null,
-        in_qty: '10',
-        out_qty: '4',
-        bal_qty: '6',
-        bal_unit_cost: '95.00',
-        bal_value: '570.00',
-        negative: false,
-        matched: false,
-    },
-    {
-        key: 'n:กระดาษ เอ4',
-        product_id: null,
-        name: 'กระดาษ เอ4',
-        unit: 'รีม',
-        opening_qty: null,
-        in_qty: '2',
-        out_qty: '0',
-        bal_qty: '2',
-        bal_unit_cost: '95.00',
-        bal_value: '190.00',
-        negative: false,
-        matched: false,
+        product: { key: 'n:กระดาษ a4', product_id: null, name: 'กระดาษ A4', unit: 'รีม' },
+        rows: [
+            {
+                date: '2024-06-01',
+                doc_no: '',
+                kind: 'open',
+                desc: '',
+                qty: '0',
+                unit_price: null,
+                amount: null,
+                bal_qty: '0',
+                bal_unit_cost: null,
+                bal_value: null,
+            },
+            {
+                date: '2024-06-04',
+                doc_no: 'PO-6706104',
+                kind: 'in',
+                desc: '向供应商采购入库',
+                qty: '10',
+                unit_price: '95.00',
+                amount: '950.00',
+                bal_qty: '10',
+                bal_unit_cost: '95.00',
+                bal_value: '950.00',
+            },
+        ],
+        totals: {
+            in_qty: '10',
+            in_amount: '950.00',
+            out_qty: '0',
+            out_amount: '0',
+            bal_qty: '10',
+            bal_unit_cost: '95.00',
+            bal_value: '950.00',
+        },
     },
 ];
 
-const EXCLUDED = [
-    {
-        date: '2024-06-04',
-        doc_no: 'INV-1102',
-        desc: '货物运费',
-        amount: '800.00',
-        reason: 'service',
-        side: 'purchase',
-    },
-    {
-        date: '2024-06-06',
-        doc_no: 'CS-208',
-        desc: '现金票(只有总额)',
-        amount: '1500.00',
-        reason: 'total_only',
-        side: 'sales',
-    },
-    {
-        date: '2024-06-09',
-        doc_no: 'INV-1150',
-        desc: '办公耗材',
-        amount: '640.00',
-        reason: 'no_qty_price',
-        side: 'purchase',
-    },
+const LEGACY_ROUTES = [
+    '/api/stockcard/summary',
+    '/api/stockcard/card',
+    '/api/stockcard/excluded',
+    '/api/stockcard/merge',
 ];
 
-const CARD_ROWS = [
-    {
-        date: '2024-06-01',
-        doc_no: 'PO-6706001',
-        kind: 'in',
-        desc: '向供应商采购入库',
-        qty: '100',
-        unit_price: '250.00',
-        amount: '25000.00',
-        bal_qty: '100',
-        bal_unit_cost: '250.00',
-        bal_value: '25000.00',
-    },
-    {
-        date: '2024-06-03',
-        doc_no: 'SO-6706001',
-        kind: 'out',
-        desc: '销售给客户 A',
-        qty: '30',
-        unit_price: null,
-        amount: null,
-        bal_qty: '70',
-        bal_unit_cost: '250.00',
-        bal_value: '17500.00',
-    },
-    {
-        date: '2024-06-05',
-        doc_no: 'PO-6706002',
-        kind: 'in',
-        desc: '向供应商采购入库',
-        qty: '50',
-        unit_price: '260.00',
-        amount: '13000.00',
-        bal_qty: '120',
-        bal_unit_cost: '254.17',
-        bal_value: '30500.00',
-    },
-];
-
-// captures:写路径真实出站请求(URL + 载荷)落在这,供契约断言 —— 桩只回信封,不吞形状。
-async function stubApi(page, captures = {}) {
+// captures:写路径真实出站请求(URL + 载荷)落在这,供契约断言;visited 记录所有出站 /api
+// 路径,末尾断言旧路由从未被调用。overrides.report = 'empty'/'error' 驱动四态测试。
+async function stubApi(page, captures = {}, overrides = {}) {
+    const visited = [];
     await page.route('**/api/**', async (route) => {
         const url = new URL(route.request().url());
         const p = url.pathname;
+        visited.push(p);
         if (p === '/api/stockcard/status') {
             return route.fulfill({ json: { ok: true, enabled: true } });
         }
-        if (p === '/api/stockcard/summary') {
-            return route.fulfill({
-                json: { ok: true, products: PRODUCTS, excluded_count: EXCLUDED.length },
-            });
+        if (p === '/api/stockcard/report') {
+            if (overrides.report === 'empty') {
+                return route.fulfill({ json: { ok: true, groups: [] } });
+            }
+            if (overrides.report === 'error') {
+                return route.fulfill({
+                    json: { ok: false, error: { code: 'stc.unexpected' } },
+                });
+            }
+            return route.fulfill({ json: { ok: true, groups: overrides.groups || GROUPS } });
         }
-        if (p === '/api/stockcard/excluded') {
-            return route.fulfill({ json: { ok: true, rows: EXCLUDED } });
-        }
-        if (p === '/api/stockcard/card') {
-            const key = url.searchParams.get('key');
-            const prod = PRODUCTS.find((x) => x.key === key) || PRODUCTS[0];
-            return route.fulfill({
-                json: {
-                    ok: true,
-                    product: {
-                        product_id: prod.product_id,
-                        name: prod.name,
-                        unit: prod.unit,
-                        matched: prod.matched,
-                    },
-                    rows: CARD_ROWS,
-                    totals: {},
-                },
-            });
-        }
-        // 期初 GET(POST 同一路径,靠方法分流):显式空桩 —— 弹窗预填回归锁用(见下),
-        // 别拦到下面的 POST 分支(captures 记录出站请求那条逻辑必须保留)。
+        // 期初 GET(POST 同一路径,靠方法分流):显式空桩 —— 弹窗预填回归锁用。
         if (p === '/api/stockcard/openings' && route.request().method() === 'GET') {
             return route.fulfill({ json: { ok: true, rows: [] } });
         }
-        if (p === '/api/stockcard/openings' || p === '/api/stockcard/merge') {
-            captures[p.split('/').pop()] = {
+        if (p === '/api/stockcard/openings') {
+            captures.openings = {
                 search: url.search,
                 body: route.request().postDataJSON(),
             };
@@ -200,14 +198,9 @@ async function stubApi(page, captures = {}) {
         // 其余 /api/**(套账/权限探针等)不是本 spec 的验证对象,给中性成功信封放行。
         return route.fulfill({ json: { ok: true, data: {} } });
     });
+    return visited;
 }
 
-// 三段式表头色 / 负库存行红照实生效:现场建一个只套同一 CSS 变量的探针元素,
-// 拿它的 computed 值当基准比对目标元素的 computed 值——比的是"同一个令牌解析出的
-// 真实颜色是否真的落到了目标元素上",不是手抄一份 hex 出来猜。
-// 套账硬门(workspace-gate.ts)按 /api/me/modules 的 needs_onboarding / 0 套账异步判定,
-// 桩回包给不出真套账列表时门会在 boot 完成后重新盖屏——不是移一次 DOM 就完事,得连它据以
-// 判断"要不要盖"的函数一起短路,否则 boot 的异步链路随时把门重新盖回来(见首次真跑复现)。
 async function neutralizeWorkspaceGate(page) {
     await page.evaluate(() => {
         window.getActiveWorkspaceClientId = () => 1;
@@ -231,167 +224,140 @@ async function resolvedVar(page, cssVar) {
     }, cssVar);
 }
 
-test.describe('事务所端 · 商品收发存报表', () => {
-    test('列表/单品卡/未入账/期初弹窗/泰语切换 —— 真浏览器桩数据验收', async ({ page }) => {
+async function openReport(page, captures = {}, overrides = {}) {
+    await blockCfInsights(page);
+    await page.addInitScript(() => {
+        localStorage.setItem('mrpilot_token_erp', 'e2e-stock-card-token');
+        // 默认语言是 th(state.ts 无偏好回落)· 本测试前半段断言写死中文,固定起始语言。
+        localStorage.setItem('mrpilot_lang', 'zh');
+        localStorage.setItem('pearnly_entry', 'erp');
+    });
+    const visited = await stubApi(page, captures, overrides);
+    // /erp 登录后由同一 home SPA 承接；canonical 让本地 E2E 直接进入该 ERP 壳，
+    // preboot 会把可见 pathname 收敛为 /erp，不借 Cowork 壳验 ERP 页面。
+    await page.goto('/home?canonical=erp#/stock-card');
+    await page.waitForFunction(() => window.location.pathname === '/erp');
+    await page.waitForFunction(() => typeof window.loadStockCard === 'function');
+    await neutralizeWorkspaceGate(page);
+    await page.evaluate(() => window.routeTo('stock-card'));
+    return visited;
+}
+
+test.describe('ERP 门户 · 商品收发存报表(2026-08-27 长表面)', () => {
+    test('桌面 · 连续多商品表 + 旧交互不存在 + 期初弹窗 + 泰语切换', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
         const guard = attachConsoleGuard(page);
-        await blockCfInsights(page);
-        await page.addInitScript(() => {
-            localStorage.setItem('mrpilot_token', 'e2e-stock-card-token');
-            // 默认语言是 th(state.ts 无偏好回落)· 本测试前半段断言写死中文,
-            // 固定起始语言避免和「⑤ 泰语切换」那段的语言状态互相干扰。
-            localStorage.setItem('mrpilot_lang', 'zh');
-            // Keep /home stock-card tests on the internal full shell.
-            localStorage.setItem('pearnly_entry', 'firm');
-        });
         const captures = {};
-        await stubApi(page, captures);
+        const visited = await openReport(page, captures);
 
-        // 带 #/stock-card 深链进场:core-boot bootstrap 读 location.hash 决定 initialRoute
-        // (core-boot.ts:415),让 SPA 自己的路由器从第一帧起就认定当前路由是 stock-card——
-        // 不然直接调 window.loadStockCard() 只是手填了 DOM,routeTo 内部的 currentRoute 仍是
-        // 默认 dms-intake,boot 收尾的 reloadCurrentRoute 一来就把页面切回默认路由盖掉。
-        await page.goto('/home#/stock-card'); // 走服务端路由(no-cache)· 直连 /static/dist/home.html 会吃 CF 30 天 immutable 缓存的旧壳(CI 美国节点已实锤)
-        await page.waitForFunction(() => typeof window.loadStockCard === 'function');
-        // 绕开套账硬门(本 spec 验的是 stock-card 页面本身,不是套账选择流程)· 首帧自动路由
-        // 触发的那次 loadStockCard 早于本行,用的还是未接管的 getActiveWorkspaceClientId
-        // (真实值 null → 页面落"请选账套"态),接管后重调一次拿到真桩数据。
-        await neutralizeWorkspaceGate(page);
-        await page.evaluate(() => window.routeTo('stock-card'));
-
-        // ── ① 列表态:四行落地(含负库存 + 两条未归并名字轨)──
-        await expect(page.locator('#stc-view-list .stc-head .t')).toHaveText('库存卡报表-汇总');
-        await expect(page.locator('.stc-row')).toHaveCount(4);
-        const negRow = page.locator('.stc-row.neg');
-        await expect(negRow).toHaveCount(1);
-        await expect(negRow).toContainText('山牌饮用水');
-        await expect(page.locator('.stc-chip-um')).toHaveCount(2);
-        await expect(page.locator('.stc-chip-um').first()).toContainText('未归并');
-        await expect(page.locator('#stc-excluded-cnt')).toHaveText('3');
-
-        // 三段式表头 + 负库存行:真拿 computed 值与同令牌探针比对(不是看 class 在不在)。
-        const inBg = await page
-            .locator('.stc thead th.stc-g-in')
+        // ── ① 主视图:三段式表头 + 三个商品表连续排列 ──
+        await expect(page.locator('#stc-report .stc-group')).toHaveCount(3);
+        const desktopScroll = await page
+            .locator('#stc-report .stc-scroll')
             .first()
-            .evaluate((el) => getComputedStyle(el).backgroundColor);
-        const outBg = await page
-            .locator('.stc thead th.stc-g-out')
-            .first()
-            .evaluate((el) => getComputedStyle(el).backgroundColor);
-        const balBg = await page
-            .locator('.stc thead th.stc-g-bal')
-            .first()
-            .evaluate((el) => getComputedStyle(el).backgroundColor);
-        const [expIn, expOut, expBal] = await Promise.all([
-            resolvedVar(page, '--green-700'),
-            resolvedVar(page, '--pink-800'),
-            resolvedVar(page, '--violet-800'),
-        ]);
-        expect(inBg, '入库表头色 = --green-700 真实解析值').toBe(expIn);
-        expect(outBg, '出库表头色 = --pink-800 真实解析值').toBe(expOut);
-        expect(balBg, '结存表头色 = --violet-800 真实解析值').toBe(expBal);
-        expect(new Set([inBg, outBg, balBg]).size, '三段表头三种不同颜色').toBe(3);
-
-        // 表头对齐新标准(2026-08-08 Zihao 拍板表格对齐新标准 · DESIGN_SYSTEM §21,
-        // 推翻 08-07「单列文字左/数字右」口径):表头一律居中、短内容格(数字)居中、
-        // 长文本格(商品名)靠左 —— 全部量 computed 值,不看 class。
-        const align = (loc) => loc.evaluate((el) => getComputedStyle(el).textAlign);
-        expect(await align(page.locator('.stc thead .stc-grp th').first()), '商品表头居中').toBe(
-            'center'
+            .evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }));
+        // border-collapse 会把最右描边计入约 2px scrollWidth；内容列必须全部在首屏。
+        expect(desktopScroll.scroll, '1280 桌面必须一眼看全 13 列').toBeLessThanOrEqual(
+            desktopScroll.client + 2
         );
-        expect(
-            await align(page.locator('.stc thead .stc-grp th.num').first()),
-            '期初数字表头居中'
-        ).toBe('center');
-        expect(
-            await align(page.locator('.stc thead th[colspan]').first()),
-            '跨列色带组头居中'
-        ).toBe('center');
-        expect(await align(page.locator('.stc-row td').first()), '商品名格靠左').toBe('left');
-        expect(await align(page.locator('.stc-row td.num').first()), '数字格居中').toBe('center');
-        expect(await align(page.locator('.stc-row td.c').first()), '单位格居中').toBe('center');
+        // 商品标题只显示名称 / 编码 / 单位。
+        const g1 = page.locator('#stc-report .stc-group').first();
+        await expect(g1.locator('.stc-group-name')).toHaveText('WPC 仿木条 2 寸');
+        await expect(g1.locator('.stc-group-code')).toHaveText('WPC-001');
+        await expect(g1.locator('.stc-group-unit')).toHaveText('条');
+        // 名字轨没有商品编码时不造一个「—」标签,只显示票面商品名与单位。
+        const g3 = page.locator('#stc-report .stc-group').nth(2);
+        await expect(g3.locator('.stc-group-name')).toHaveText('กระดาษ A4');
+        await expect(g3.locator('.stc-group-code')).toHaveCount(0);
+        await expect(g3.locator('.stc-group-unit')).toHaveText('รีม');
 
-        const negCellBg = await negRow
-            .locator('td')
-            .first()
-            .evaluate((el) => getComputedStyle(el).backgroundColor);
-        const expBad = await resolvedVar(page, '--bad-weak');
-        expect(negCellBg, '负库存整行底色 = --bad-weak 真实解析值').toBe(expBad);
-        const okRowBg = await page
-            .locator('.stc-row:not(.neg)')
-            .first()
-            .locator('td')
-            .first()
-            .evaluate((el) => getComputedStyle(el).backgroundColor);
-        expect(negCellBg, '负库存行底色应不同于正常行').not.toBe(okRowBg);
-
-        await page.screenshot({ path: path.join(OUT, '01-list.png'), fullPage: true });
-
-        // 悬停回归锁(2026-08-08):负库存行悬停整行统一亮 —— 钉死「悬停时唯独入库格
-        // 不跟着亮」的复发面(旧规则 tr.neg td.stc-c-in 与悬停规则同为 (0,3,3) 且写在
-        // 其后,单压入库格;已整条删除,非悬停仍整行统一红底)。
-        const negInCell = negRow.locator('td.stc-c-in');
-        const negInBgBefore = await negInCell.evaluate(
-            (el) => getComputedStyle(el).backgroundColor
+        // 每个商品表都是参考图原样 13 列表头(日期/单据号/类型/摘要 + 入/出/结存各三列)。
+        const tbl = g1.locator('table');
+        await expect(tbl.locator('thead .stc-grp th').nth(0)).toHaveText('日期');
+        await expect(tbl.locator('thead .stc-grp th').nth(1)).toHaveText('单据号');
+        await expect(tbl.locator('thead .stc-grp th').nth(2)).toHaveText('类型');
+        await expect(tbl.locator('thead .stc-grp th').nth(3)).toHaveText('摘要');
+        await expect(tbl.locator('thead th.stc-g-in[colspan="3"]').first()).toHaveText('入库');
+        await expect(tbl.locator('thead th.stc-g-out[colspan="3"]').first()).toHaveText('出库');
+        await expect(tbl.locator('thead th.stc-g-bal[colspan="3"]').first()).toHaveText('结存');
+        // 日期严格按参考图日/月/佛历年,类型是普通彩色文字而不是额外胶囊组件。
+        await expect(tbl.locator('tbody tr').first().locator('td').first()).toHaveText(
+            '01/06/2567'
         );
-        await negRow.hover();
-        const negInBgHover = await negInCell.evaluate((el) => getComputedStyle(el).backgroundColor);
-        const negFirstBgHover = await negRow
-            .locator('td')
-            .first()
-            .evaluate((el) => getComputedStyle(el).backgroundColor);
-        expect(negInBgHover, '悬停时入库格与同行普通格同底色(整行统一亮)').toBe(negFirstBgHover);
-        expect(negInBgHover, '悬停时入库格底色确实变了(不再被单压)').not.toBe(negInBgBefore);
-        await page.screenshot({ path: path.join(OUT, '07-hover-row.png'), fullPage: false });
-        await page.mouse.move(0, 0);
+        await expect(tbl.locator('tbody tr').first().locator('td').nth(2)).toContainText('期初');
+        await expect(tbl.locator('.stc-chip')).toHaveCount(0);
+        await expect(tbl.locator('tbody tr').nth(0)).toContainText('250.00');
+        await expect(tbl.locator('tbody tr')).toHaveCount(3); // 期初 + 2 笔流水
+        await expect(tbl.locator('tbody tr').nth(2)).toContainText('7,500.00');
+        expect(await tbl.innerText(), '参考图金额格不额外添加泰铢符号').not.toContain('฿');
+        // 末尾该商品合计。
+        await expect(tbl.locator('tfoot tr')).toHaveCount(1);
+        await expect(tbl.locator('tfoot tr').first()).toContainText('合计');
+        // 第二商品(负库存)两行:期初 + 一笔出库。负数照实显示,不发明状态列或红底。
+        const g2 = page.locator('#stc-report .stc-group').nth(1);
+        await expect(g2.locator('tbody tr')).toHaveCount(2);
+        await expect(g2.locator('tbody tr').nth(1)).toContainText('-30');
+        await expect(page.locator('#stc-report .stc-group tbody tr.neg')).toHaveCount(0);
 
-        // ── ② 单品卡详情:点行进流水 ──
-        await page.locator('.stc-row[data-stc-key="p:WPC-001"]').click();
-        await expect(page.locator('#stc-view-detail')).toBeVisible();
-        await expect(page.locator('#stc-view-list')).toBeHidden();
-        await expect(page.locator('#stc-view-detail .stc-head .t')).toHaveText('库存卡报表-明细');
-        await expect(page.locator('#stc-tbl-detail tbody tr')).toHaveCount(3);
-        // 结存段内子列分隔线回归锁(2026-08-08):数量/单价/金额三子列之间至少 1px 细分隔线,
-        // 不随色带底色糊成一片。
-        const balMid = page.locator('#stc-tbl-detail tbody tr td.stc-c-bal').nth(1);
-        const balMidBorder = await balMid.evaluate((el) => getComputedStyle(el).borderLeftWidth);
+        // 三段式表头色:真拿 computed 值与同令牌探针比对。
+        const expIn = await resolvedVar(page, '--green-700');
+        const expOut = await resolvedVar(page, '--pink-800');
+        const expBal = await resolvedVar(page, '--violet-800');
+        const grpHead = page.locator('#stc-report .stc-group').first().locator('thead');
         expect(
-            parseFloat(balMidBorder),
-            '结存段中间子列(单价)左分隔线 ≥ 1px'
-        ).toBeGreaterThanOrEqual(1);
-        await expect(page.locator('#stc-det-info')).toContainText('WPC-001');
-        await page.screenshot({ path: path.join(OUT, '02-detail.png'), fullPage: true });
+            await grpHead
+                .locator('th.stc-g-in')
+                .first()
+                .evaluate((el) => getComputedStyle(el).backgroundColor),
+            '入库表头色'
+        ).toBe(expIn);
+        expect(
+            await grpHead
+                .locator('th.stc-g-out')
+                .first()
+                .evaluate((el) => getComputedStyle(el).backgroundColor),
+            '出库表头色'
+        ).toBe(expOut);
+        expect(
+            await grpHead
+                .locator('th.stc-g-bal')
+                .first()
+                .evaluate((el) => getComputedStyle(el).backgroundColor),
+            '结存表头色'
+        ).toBe(expBal);
+        // ── ② 旧「汇总→单品详情」交互不存在 ──
+        await expect(page.locator('#stc-view-list')).toHaveCount(0);
+        await expect(page.locator('#stc-view-detail')).toHaveCount(0);
+        await expect(page.locator('#stc-back')).toHaveCount(0);
+        await expect(page.locator('.stc-row[data-stc-key]')).toHaveCount(0);
+        await expect(page.locator('[data-stc-merge]')).toHaveCount(0);
+        await expect(page.locator('#stc-mg-mask')).toHaveCount(0);
+        await expect(page.locator('#stc-tab-excluded')).toHaveCount(0);
+        // 旧路由从不出站。
+        expect(
+            visited.some((p) => LEGACY_ROUTES.includes(p)),
+            `旧路由出站: ${visited.filter((p) => LEGACY_ROUTES.includes(p)).join(', ')}`
+        ).toBe(false);
 
-        await page.locator('#stc-back').click();
-        await expect(page.locator('#stc-view-list')).toBeVisible();
+        // ── ③ 不再有「未入账 / 归并 / 状态 / 点击商品查看明细 / 返回商品列表」文案 ──
+        const stcText = await page.locator('#page-stock-card').innerText();
+        for (const bad of ['未入账', '归并', '状态', '点击商品', '返回商品列表']) {
+            expect(stcText, `不应出现旧文案「${bad}」`).not.toContain(bad);
+        }
 
-        // ── ③ 未入账清单 tab(懒加载 + 三枚举 reason)──
-        await page.locator('#stc-tab-excluded').click();
-        await expect(page.locator('#stc-view-excluded')).toBeVisible();
-        await expect(page.locator('#stc-tbl-excluded tbody tr')).toHaveCount(3);
-        await expect(page.locator('#stc-tbl-excluded')).toContainText('服务票');
-        await expect(page.locator('#stc-tbl-excluded')).toContainText('汇总票');
-        await expect(page.locator('#stc-tbl-excluded')).toContainText('无数量/单价');
-        await page.screenshot({ path: path.join(OUT, '03-excluded.png'), fullPage: true });
-        await page.locator('#stc-tab-report').click();
+        await page.screenshot({ path: path.join(OUT, '01-desktop-report.png'), fullPage: true });
 
-        // ── ④ 期初库存弹窗(按当前商品列表铺行 · 行身份双轨)──
+        // ── ④ 期初库存弹窗(唯一报表附加能力):按当前商品列表铺行 · 保存走真实出站契约 ──
         await page.locator('#stc-btn-opening').click();
         await expect(page.locator('#stc-op-mask')).toBeVisible();
-        await expect(page.locator('#stc-op-tbl tr[data-op-key]')).toHaveCount(4);
-        // 回归锁(2026-08-08):期初预填只认 GET /openings 的已存用户期初(空桩 → 全空),
-        // 不预填 product.opening_qty —— 那是计算结转(-30),不是用户手填的期初。
+        await expect(page.locator('#stc-op-tbl tr[data-op-key]')).toHaveCount(3);
+        // 回归锁:期初预填只认 GET /openings 的已存用户期初(空桩 → 全空),不预填计算结转。
         await expect(
             page.locator('tr[data-op-key="p:WTR-600"] [data-op-qty]'),
-            '计算结转的 opening_qty 不进期初弹窗预填'
+            '计算结转的开头不预填'
         ).toHaveValue('');
-        // .modal 有 200ms 进场动画(home-05-overlays.css modalIn:透明度+缩放一起变)·
-        // 截图撞在动画中途会拍到一帧半透明/未缩放到位的过渡态,看着像背景"漏"上来,
-        // 实测等动画放完再截就是干净的一张,不是页面坏了。
         await page.waitForTimeout(300);
         await page.screenshot({ path: path.join(OUT, '04-opening-modal.png'), fullPage: false });
-        // 填一条商品档轨 + 一条名字轨,保存后断言出站契约:workspace_client_id 走 query,
-        // 行身份按轨发 product_id / name —— 名字轨发假 pid、workspace 塞 body 是
-        // 2026-08-08 修掉的真断裂(上线以来这条写路径从没成功过)。
         await page.fill('tr[data-op-key="p:WPC-001"] [data-op-qty]', '5');
         await page.fill('tr[data-op-key="n:กระดาษ a4"] [data-op-qty]', '7');
         await page.locator('#stc-op-save').click();
@@ -403,92 +369,94 @@ test.describe('事务所端 · 商品收发存报表', () => {
             expect.objectContaining({ name: 'กระดาษ a4', qty: '7' }),
         ]);
 
-        // ── ⑤ 泰语切换:期望值现场从页面里的 window.I18N.th 真词典取,不自带副本 ──
+        // ── ⑤ 泰语切换:主表 / 商品标题 / 期初按钮全刷新 ──
         await page.evaluate(() => window.applyLang('th'));
         const thExpect = await page.evaluate(() => ({
             title: window.I18N.th['stc-title'],
             colIn: window.I18N.th['stc-col-in'],
-            tabExcluded: window.I18N.th['stc-tab-excluded'],
+            colBal: window.I18N.th['stc-col-bal'],
+            btnOpening: window.I18N.th['stc-btn-opening'],
         }));
         await expect(page.locator('.stc > .stc-head .t')).toHaveText(thExpect.title);
-        await expect(page.locator('.stc thead th.stc-g-in').first()).toContainText(thExpect.colIn);
-        await expect(page.locator('#stc-tab-excluded')).toContainText(thExpect.tabExcluded);
-        // 回归锁:shellHtml() 整壳重渲模板里角标是写死的占位「0」,真跑一次复现过切语言后
-        // 徽章从 3 被顶回 0(数据仍在,只是没在切语言这条路上重新贴回去)。
-        await expect(page.locator('#stc-excluded-cnt'), '切语言后角标计数不丢').toHaveText('3');
-        await page.screenshot({ path: path.join(OUT, '05-thai.png'), fullPage: true });
-        await page.locator('.stc-row[data-stc-key="p:WPC-001"]').click();
-        await expect(page.locator('#stc-view-detail .stc-head .t')).toHaveText(
-            'รายงานสต๊อกการ์ด-ละเอียด'
+        await expect(page.locator('#stc-report .stc-group').first().locator('thead')).toContainText(
+            thExpect.colIn
         );
-        await expect(page.locator('#stc-tbl-detail thead')).toContainText('เลขที่เอกสาร');
-        await expect(page.locator('#stc-tbl-detail thead')).toContainText('รับเข้า');
-        await expect(page.locator('#stc-tbl-detail thead')).toContainText('จ่ายออก');
-        await expect(page.locator('#stc-tbl-detail thead')).toContainText('คงเหลือ');
-        await page.setViewportSize({ width: 1800, height: 1000 });
-        await page.screenshot({ path: path.join(OUT, '08-thai-detail.png'), fullPage: true });
-        await page.setViewportSize({ width: 1280, height: 800 });
-        await page.locator('#stc-back').click();
-        await page.evaluate(() => window.applyLang('zh'));
-
-        // ── ⑥ 归并弹窗:默认只勾入口行 + 名字轨目标代建的出站契约 ──
-        await page.locator('[data-stc-merge]').first().click();
-        await expect(page.locator('#stc-mg-mask')).toBeVisible();
-        const mgCbs = page.locator('[data-mg-cb]');
-        await expect(mgCbs).toHaveCount(2);
-        await expect(mgCbs.nth(0), '入口行自己默认勾上').toBeChecked();
-        await expect(mgCbs.nth(1), '其他名字默认不勾——是不是同一件货由会计定').not.toBeChecked();
-        // 目标下拉 value 用归组钥匙 key(名字轨 product_id 恒空,拿它当 value 从没成功过);
-        // 顺序 = 入口行 → 已建档商品 → 其余名字轨。
-        const optVals = await page
-            .locator('#stc-mg-target option')
-            .evaluateAll((os) => os.map((o) => o.value));
-        expect(optVals).toEqual(['n:กระดาษ a4', 'p:WPC-001', 'p:WTR-600', 'n:กระดาษ เอ4']);
-        await mgCbs.nth(1).check();
-        await page.waitForTimeout(300);
-        await page.screenshot({ path: path.join(OUT, '06-merge-modal.png'), fullPage: false });
-        await page.locator('#stc-mg-confirm').click();
-        await expect(page.locator('#stc-mg-mask')).toBeHidden();
-        expect(captures.merge.search).toContain('workspace_client_id=1');
-        expect(captures.merge.body).toEqual({
-            name_keys: ['กระดาษ a4', 'กระดาษ เอ4'],
-            new_product_name: 'กระดาษ A4',
-            unit: 'รีม',
-        });
+        await expect(page.locator('#stc-report .stc-group').first().locator('thead')).toContainText(
+            thExpect.colBal
+        );
+        await expect(page.locator('#stc-btn-opening')).toContainText(thExpect.btnOpening);
+        // 商品标题(名称/编码/单位)不因切语言丢内容。
+        await expect(page.locator('#stc-report .stc-group-name').first()).toHaveText(
+            'WPC 仿木条 2 寸'
+        );
+        await page.screenshot({ path: path.join(OUT, '05-thai.png'), fullPage: true });
 
         assertNoConsoleErrors(expect, guard);
     });
 
-    test('手机视口(390×844)· 工具栏竖排 + 表格容器独立横滚', async ({ page }) => {
+    test('手机视口(390×844)· 页面本体不横向溢出 · 各商品表容器可横滚', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
-        await blockCfInsights(page);
-        await page.addInitScript(() => {
-            localStorage.setItem('mrpilot_token', 'e2e-stock-card-token-mobile');
-            // Keep /home stock-card tests on the internal full shell.
-            localStorage.setItem('pearnly_entry', 'firm');
-        });
-        await stubApi(page);
-        await page.goto('/home#/stock-card');
-        await page.waitForFunction(() => typeof window.loadStockCard === 'function');
-        await neutralizeWorkspaceGate(page);
-        await page.evaluate(() => window.routeTo('stock-card'));
-        await expect(page.locator('.stc-row')).toHaveCount(4);
+        const visited = await openReport(page);
+        await expect(page.locator('#stc-report .stc-group')).toHaveCount(3);
 
-        // 页面本体不得横向溢出(响应式硬规)· 表格容器自己横滚。
+        // 页面本体不得横向溢出(响应式硬规)· 每个商品表格容器自己横滚。
         const bodyOverflow = await page.evaluate(
             () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
         );
         expect(bodyOverflow, '页面本体不横向溢出').toBe(true);
-        const scrollOverflowX = await page
-            .locator('.stc-scroll')
+        const scrollCount = await page.locator('#stc-report .stc-scroll').count();
+        expect(scrollCount).toBe(3);
+        const overs = await page
+            .locator('#stc-report .stc-scroll')
+            .evaluateAll((els) => els.map((el) => getComputedStyle(el).overflowX));
+        expect(
+            overs.every((v) => v === 'auto'),
+            '每个商品表容器 overflowX=auto'
+        ).toBe(true);
+        const mobileScroll = await page
+            .locator('#stc-report .stc-scroll')
             .first()
-            .evaluate((el) => getComputedStyle(el).overflowX);
-        expect(scrollOverflowX).toBe('auto');
-        const toolbarDir = await page
-            .locator('.stc-toolbar')
-            .evaluate((el) => getComputedStyle(el).flexDirection);
-        expect(toolbarDir, '≤800px 工具栏竖排').toBe('column');
-
+            .evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }));
+        expect(mobileScroll.scroll, '390 手机必须只在商品表内部横滚').toBeGreaterThan(
+            mobileScroll.client
+        );
+        // 商品标题仍清楚可辨(名称/编码/单位可见)。
+        await expect(page.locator('#stc-report .stc-group-name').first()).toBeVisible();
+        await expect(page.locator('#stc-report .stc-group-code').first()).toBeVisible();
         await page.screenshot({ path: path.join(OUT, '06-mobile.png'), fullPage: true });
+        // 旧交互在手机同样不存在。
+        await expect(page.locator('#stc-view-list')).toHaveCount(0);
+        expect(visited.some((p) => LEGACY_ROUTES.includes(p))).toBe(false);
+    });
+
+    test('四态 · 空态诚实且旧交互不存在', async ({ page }) => {
+        const guard = attachConsoleGuard(page);
+
+        // 空态:groups 为空 → 诚实说「没有」,不是报错。
+        await openReport(page, {}, { report: 'empty' });
+        await expect(page.locator('#stc-report .stc-state')).toBeVisible();
+        await expect(page.locator('#stc-report .stc-state')).toContainText('没有已过账的商品单据');
+        await expect(page.locator('#stc-report .stc-group')).toHaveCount(0);
+
+        await expect(page.locator('#stc-view-list')).toHaveCount(0);
+        await expect(page.locator('#stc-view-detail')).toHaveCount(0);
+        assertNoConsoleErrors(expect, guard);
+    });
+
+    test('四态 · 错误态给重试出路且旧交互不存在', async ({ page }) => {
+        const guard = attachConsoleGuard(page);
+
+        // 失败信封 → 说这是加载失败 + 给重试出路；不额外制造浏览器网络噪音。
+        await openReport(page, {}, { report: 'error' });
+        await expect(page.locator('#stc-report [data-state="error"]')).toBeVisible();
+        await expect(page.locator('#stc-report [data-stc-report-retry]')).toBeVisible();
+        await expect(page.locator('#stc-report')).toContainText('加载失败');
+
+        // 旧交互在错误态同样不存在。
+        await expect(page.locator('#stc-view-list')).toHaveCount(0);
+        await expect(page.locator('#stc-view-detail')).toHaveCount(0);
+        await expect(page.locator('#stc-back')).toHaveCount(0);
+
+        assertNoConsoleErrors(expect, guard);
     });
 });

@@ -13,10 +13,12 @@
      写了新的扫码验收脚本却没进台账 = 红。台账里每条都必须说清「只有它能保的是什么、
      为什么单测保不了」;covers 指到不存在的文件 = 红(闸看错文件比不看更糟)。
 
-  ② 新旧对得上(只在本机判)
-     covers 里的源码比该脚本最近一次跑出来的截图【新】= 这些行为在当前版本上没验过 = 红。
-     判据是产物截图的 mtime;CI 上全是检出时间,故 CI 上自动跳过这一半 —— 它守的是
-     「你改了扫码的源码、没重跑那个 E2E 就想 push」,那正是本地 pre-push 的位置。
+  ② 本次 push 的新旧对得上(只在本机判)
+     先取 merge-base(origin/master, HEAD)..HEAD 的待推送文件,再与 covers 求交集;只有
+     这次真改到的责任源码比最近一次截图新,才判为没验过。历史 mtime 不得跨窗口重复追债;
+     共享 `static/i18n-data.js` 按条目声明的 `i18n_keys` 精确归责,无关词条不连坐。
+     共享 HTML 宿主按 `cover_tokens` 检查 diff 增删行,不把一个页面里的所有业务捆在一起。
+     产物新旧仍用截图 mtime;CI 上全是检出时间,故 CI 自动跳过这一半。
 
 ②唯一合法的过法是在台账 `stale_ack` 里写一条带 `until` 的欠条:写清为什么、写死到哪天,
 过了那天照红,最长 14 天。那不是逃生门,是把债写在谁都看得见的地方 —— 跟仓里
@@ -30,13 +32,19 @@ import os
 import re
 import tempfile
 import unittest
+from collections import Counter
 from datetime import date
+from fnmatch import fnmatchcase
 from pathlib import Path
+from subprocess import CalledProcessError
+
+from scripts import impact
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 LEDGER = PROJECT_ROOT / "tests" / "e2e" / "e2e_ledger.json"
 E2E_DIR = PROJECT_ROOT / "tests" / "e2e"
+I18N_SOURCE = "static/i18n-data.js"
 
 # 「这份脚本要开浏览器吗」:直接 require playwright,或走这两个公共库(它们 require)。
 _BROWSER = re.compile(r"@playwright/test|_verify_shared\.cjs|_gun_wedge_lib\.cjs")
@@ -49,6 +57,7 @@ _THROWAWAY = re.compile(r"^_probe_|_tmp\.cjs$")
 # 台账没跑过时先别把别的窗口拦在门外:①永远硬,②在没有任何产物时只提示。
 # 有产物之后它就是硬的 —— 那才是「跑过一次就不许再退回去」。
 _FRESHNESS_ENV_OFF = ("CI", "GITHUB_ACTIONS")
+_I18N_KEY_LINE = re.compile(r"^\s*(['\"])([^'\"]+)\1\s*:\s*(.*)$")
 
 
 def load_ledger() -> dict:
@@ -76,6 +85,76 @@ def newest_mtime(paths: list[Path]) -> float:
     return max((p.stat().st_mtime for p in paths if p.exists()), default=0.0)
 
 
+def _normalized_path(value: str | Path) -> str:
+    text = str(value).replace("\\", "/")
+    return text if Path(text).is_absolute() else text.removeprefix("./")
+
+
+def outgoing_base() -> str | None:
+    """与 pre-push 同口径:只看本分支正要推出去的提交。"""
+    explicit = os.environ.get("PEARNLY_PREPUSH_BASE")
+    if explicit:
+        return explicit
+    try:
+        return impact.default_base()
+    except (CalledProcessError, FileNotFoundError):
+        return None
+
+
+def outgoing_changed_paths(base: str | None = None) -> set[str] | None:
+    """None = Git 状态不可用,调用方必须 fail-safe 退回全量判定。"""
+    start = base or outgoing_base()
+    if not start:
+        return None
+    try:
+        return set(impact.changed_paths(start, "HEAD"))
+    except (CalledProcessError, FileNotFoundError):
+        return None
+
+
+def i18n_key_values(text: str) -> dict[str, tuple[str, ...]]:
+    """四语词典的同名 key 收成一组值;仓库格式是每个 key/value 独占一行。"""
+    values: dict[str, list[str]] = {}
+    for line in text.splitlines():
+        match = _I18N_KEY_LINE.match(line)
+        if match:
+            values.setdefault(match.group(2), []).append(match.group(3).strip())
+    return {key: tuple(items) for key, items in values.items()}
+
+
+def outgoing_changed_i18n_keys(base: str | None = None) -> set[str] | None:
+    """None = 无法解析,必须保守地当成所有登记 key 均可能受影响。"""
+    start = base or outgoing_base()
+    if not start:
+        return None
+    before = impact.revision_text(start, I18N_SOURCE)
+    after = impact.revision_text("HEAD", I18N_SOURCE)
+    if after is None:
+        return None
+    old_values = i18n_key_values(before or "")
+    new_values = i18n_key_values(after)
+    return {
+        key
+        for key in old_values.keys() | new_values.keys()
+        if old_values.get(key) != new_values.get(key)
+    }
+
+
+def outgoing_changed_source_text(path: str, base: str | None = None) -> str | None:
+    """只取待 push diff 里的增删行;共享宿主文件用它判定是否命中契约区域。"""
+    start = base or outgoing_base()
+    if not start:
+        return None
+    return impact.changed_text(start, "HEAD", path)
+
+
+def i18n_key_counts() -> Counter[str]:
+    text = (PROJECT_ROOT / I18N_SOURCE).read_text(encoding="utf-8")
+    return Counter(
+        match.group(2) for line in text.splitlines() if (match := _I18N_KEY_LINE.match(line))
+    )
+
+
 def shots_of(spec: dict) -> list[Path]:
     """这个条目自己的那批截图。
 
@@ -93,28 +172,88 @@ def shots_of(spec: dict) -> list[Path]:
     return sorted(base.glob(rel))
 
 
-def stale_entries(ledger: dict) -> list[str]:
-    """covers 比产物新 = 这些行为在当前版本上没验过。没有任何产物的条目单独归类。"""
+def _matches_cover(path: str, cover: str) -> bool:
+    normalized = _normalized_path(cover)
+    return fnmatchcase(path, normalized) or fnmatchcase(path, normalized.removeprefix("**/"))
+
+
+def _changed_sources(
+    name: str,
+    spec: dict,
+    changed_paths: set[str] | None,
+    changed_i18n_keys: set[str] | None,
+    changed_source_texts: dict[str, str | None] | None,
+) -> list[Path]:
+    if changed_paths is None:
+        return [PROJECT_ROOT / cover for cover in spec["covers"]] + [SCRIPTS_DIR / name]
+
+    normalized_changes = {_normalized_path(path) for path in changed_paths}
+    script_path = f"scripts/{name}"
+    sources: list[Path] = []
+    if script_path in normalized_changes:
+        sources.append(SCRIPTS_DIR / name)
+
+    owned_i18n = set(spec.get("i18n_keys") or [])
+    cover_tokens = spec.get("cover_tokens") or {}
+    for changed in normalized_changes:
+        for cover in spec["covers"]:
+            if not _matches_cover(changed, cover):
+                continue
+            if _normalized_path(cover) == I18N_SOURCE and owned_i18n:
+                if changed_i18n_keys is not None and owned_i18n.isdisjoint(changed_i18n_keys):
+                    continue
+            tokens = cover_tokens.get(_normalized_path(cover)) or []
+            if tokens and changed_source_texts is not None:
+                changed_text = changed_source_texts.get(changed)
+                if changed_text is not None and not any(token in changed_text for token in tokens):
+                    continue
+            source = Path(changed) if Path(changed).is_absolute() else PROJECT_ROOT / changed
+            sources.append(source)
+            break
+    return sources
+
+
+def stale_entries(
+    ledger: dict,
+    changed_paths: set[str] | None = None,
+    changed_i18n_keys: set[str] | None = None,
+    changed_source_texts: dict[str, str | None] | None = None,
+) -> list[str]:
+    """本次 push 命中的 covers 比产物新 = 相关行为没在待推版本上验过。"""
     out = []
     for name, spec in ledger["scripts"].items():
         pics = shots_of(spec)
         if not pics:
             continue  # 从没跑过 —— 由 never_run() 单独报,别混进「过期」里
-        sources = [PROJECT_ROOT / c for c in spec["covers"]] + [SCRIPTS_DIR / name]
+        sources = _changed_sources(
+            name,
+            spec,
+            changed_paths,
+            changed_i18n_keys,
+            changed_source_texts,
+        )
+        if not sources:
+            continue
         src_at = newest_mtime(sources)
         if src_at > newest_mtime(pics):
-            out.append(f"{name}(产物 {spec['artifacts']} 比 covers 里的源码旧)")
+            out.append(f"{name}(产物 {spec['artifacts']} 比本次 push 命中的 covers 旧)")
     return out
 
 
-def unacked_stale(ledger: dict, today: str) -> list[str]:
+def unacked_stale(
+    ledger: dict,
+    today: str,
+    changed_paths: set[str] | None = None,
+    changed_i18n_keys: set[str] | None = None,
+    changed_source_texts: dict[str, str | None] | None = None,
+) -> list[str]:
     """过期且没有【还在有效期内】的欠条 —— 这些才拦人。
 
     欠条不是逃生门,是把债写下来:写清为什么、写死到哪天。过了那天照红。
     """
     acks = ledger.get("stale_ack", {})
     out = []
-    for line in stale_entries(ledger):
+    for line in stale_entries(ledger, changed_paths, changed_i18n_keys, changed_source_texts):
         name = line.split("(")[0]
         ack = acks.get(name)
         if ack and str(ack.get("until", "")) >= today:
@@ -191,6 +330,38 @@ class LedgerIsComplete(unittest.TestCase):
                 bad.append(f"{name}: artifacts 不在 tests/e2e/_artifacts/ 下({art})")
         self.assertEqual(bad, [], "台账写错了 —— 闸会去盯错文件,报绿也没意义")
 
+    def test_shared_i18n_declares_exact_owned_keys(self):
+        """两万行共享词典不是一个业务责任单元,必须按 key 拆开。"""
+        counts = i18n_key_counts()
+        bad = []
+        for name, spec in self.ledger["scripts"].items():
+            if I18N_SOURCE not in spec["covers"]:
+                continue
+            keys = spec.get("i18n_keys") or []
+            if not keys:
+                bad.append(f"{name}: covers 含 {I18N_SOURCE} 却没声明 i18n_keys")
+                continue
+            for key in keys:
+                if counts[key] != 4:
+                    bad.append(f"{name}: {key} 在四语词典出现 {counts[key]} 次(应为 4)")
+        self.assertEqual(bad, [], "词典责任声明失效 —— 无关词条会连坐,或真词条会漏验")
+
+    def test_shared_source_tokens_point_to_real_owned_contracts(self):
+        """共享宿主文件只能按它真承担的契约区域触发。"""
+        bad = []
+        for name, spec in self.ledger["scripts"].items():
+            for rel, tokens in (spec.get("cover_tokens") or {}).items():
+                if rel not in spec["covers"]:
+                    bad.append(f"{name}: cover_tokens 的 {rel} 不在 covers 里")
+                    continue
+                source = (PROJECT_ROOT / rel).read_text(encoding="utf-8")
+                if not tokens:
+                    bad.append(f"{name}: {rel} 的 cover_tokens 是空的")
+                for token in tokens:
+                    if token not in source:
+                        bad.append(f"{name}: {rel} 里找不到契约 token {token!r}")
+        self.assertEqual(bad, [], "共享文件的精确责任声明已漂移")
+
     def test_no_two_entries_watch_the_same_screenshots(self):
         """本闸最容易失效的一种写法:几条都指着同一个目录。
 
@@ -256,18 +427,46 @@ class PlaywrightLedgerIsComplete(unittest.TestCase):
     "CI 上文件 mtime 全是检出时间 · 新旧判据在这里没有意义",
 )
 class E2EIsNotStale(unittest.TestCase):
-    """②新旧对得上 —— 本机 push 前的那一道。"""
+    """②本次待 push 的责任源码与验收产物对得上。"""
 
     @classmethod
     def setUpClass(cls):
         cls.ledger = load_ledger()
+        cls.base = outgoing_base()
+        cls.changed_paths = outgoing_changed_paths(cls.base)
+        cls.changed_i18n_keys = (
+            outgoing_changed_i18n_keys(cls.base)
+            if cls.changed_paths is None or I18N_SOURCE in cls.changed_paths
+            else set()
+        )
+        tokenized_paths = {
+            rel
+            for spec in cls.ledger["scripts"].values()
+            for rel in (spec.get("cover_tokens") or {})
+        }
+        cls.changed_source_texts = (
+            {
+                rel: outgoing_changed_source_text(rel, cls.base)
+                for rel in tokenized_paths & cls.changed_paths
+            }
+            if cls.changed_paths is not None
+            else None
+        )
 
     def test_no_covered_source_is_newer_than_its_e2e_artifacts(self):
-        stale = unacked_stale(self.ledger, date.today().isoformat())
+        stale = unacked_stale(
+            self.ledger,
+            date.today().isoformat(),
+            self.changed_paths,
+            self.changed_i18n_keys,
+            self.changed_source_texts,
+        )
         self.assertEqual(
             stale,
             [],
-            "以下 E2E 保着的行为在【当前版本】上没验过:covers 里的源码比它上次跑出来的截图新。"
+            "以下 E2E 保着的行为在【本次待 push 版本】上没验过:"
+            f"只检查 {self.base or 'fail-safe 全量'}..HEAD 命中的 covers;"
+            "相关源码比它上次跑出来的截图新。"
             "这些行为单测保不了(见台账 only_e2e),所以「单测全绿」不等于验过 —— "
             "重跑对应脚本(fixtures 见台账),或在 stale_ack 里写一条带 until 的欠条。\n  "
             + "\n  ".join(stale),
@@ -339,6 +538,79 @@ class GateHasTeeth(unittest.TestCase):
     def test_fresh_artifacts_are_not_reported_stale(self):
         """反面:产物比源码新时不许误报 —— 误报一次这道闸就会被人 skip 掉。"""
         self.assertEqual(stale_entries(self._fixture(False)), [])
+
+    def test_old_staleness_outside_the_outgoing_diff_does_not_reopen(self):
+        """历史源码再新,本次 push 没碰它就不许每个窗口重复追债。"""
+        led = self._fixture(True)
+        self.assertEqual(
+            stale_entries(led, changed_paths={"docs/unrelated.md"}),
+            [],
+            "闸仍在扫描本次 push 以外的历史 mtime",
+        )
+
+    def test_unrelated_i18n_key_does_not_expire_a_browser_contract(self):
+        """共享大词典按精确键归责,不能改 Stock Card 文案却逼扫码 E2E 重跑。"""
+        led = self._fixture(True)
+        spec = led["scripts"]["fake.cjs"]
+        spec["covers"] = ["static/i18n-data.js"]
+        spec["i18n_keys"] = ["inv-scan-typed"]
+        self.assertEqual(
+            stale_entries(
+                led,
+                changed_paths={"static/i18n-data.js"},
+                changed_i18n_keys={"stc-title"},
+            ),
+            [],
+            "共享词典里无关 key 仍被当成这条 E2E 的行为变更",
+        )
+
+    def test_owned_i18n_key_still_requires_a_fresh_browser_run(self):
+        """反向锁门:真改了这条 E2E 断言的词条,仍必须重跑。"""
+        led = self._fixture(True)
+        spec = led["scripts"]["fake.cjs"]
+        spec["covers"] = ["static/i18n-data.js"]
+        spec["i18n_keys"] = ["inv-scan-typed"]
+        self.assertTrue(
+            stale_entries(
+                led,
+                changed_paths={"static/i18n-data.js"},
+                changed_i18n_keys={"inv-scan-typed"},
+            ),
+            "精确归责把真正相关的词条改动也放过去了",
+        )
+
+    def test_unrelated_region_in_a_shared_html_host_does_not_expire_the_contract(self):
+        """共享 home.html 按契约 token 归责,Stock Card DOM 不连坐门壳 E2E。"""
+        led = self._fixture(True)
+        spec = led["scripts"]["fake.cjs"]
+        spec["covers"] = ["home.html"]
+        spec["cover_tokens"] = {"home.html": ["canonical=(cowork|erp)"]}
+        self.assertEqual(
+            stale_entries(
+                led,
+                changed_paths={"home.html"},
+                changed_source_texts={"home.html": "-<div id='stock-old'>\n+<div id='stock-new'>"},
+            ),
+            [],
+            "共享 HTML 的无关区域仍连坐了门壳 E2E",
+        )
+
+    def test_owned_region_in_a_shared_html_host_still_requires_e2e(self):
+        """真改 canonical 入口契约仍必须重跑门壳 E2E。"""
+        led = self._fixture(True)
+        spec = led["scripts"]["fake.cjs"]
+        spec["covers"] = ["home.html"]
+        spec["cover_tokens"] = {"home.html": ["canonical=(cowork|erp)"]}
+        self.assertTrue(
+            stale_entries(
+                led,
+                changed_paths={"home.html"},
+                changed_source_texts={
+                    "home.html": "-canonical=(cowork|erp)\n+canonical=(cowork|erp|pos)"
+                },
+            ),
+            "共享 HTML 精确归责把真的入口契约改动也放过了",
+        )
 
     def test_an_expired_ack_stops_suppressing(self):
         """欠条过期就不再挡:不然「写一条永久欠条」= 把闸关掉。"""

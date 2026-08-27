@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-"""商品收发存报表(Stock Card)API · 事务所端按客户账套出进销存流水。
+"""商品收发存报表(Stock Card)API · ERP 门户按当前独立账套出进销存流水。
 
 复用 accounting_common 的鉴权/套账解析/模块门控(与 acct.books 同一套四段式:auth_member
 → get_cursor_rls → gate(accounting 模块) → resolve_ws),权限码另立 stockcard.* 两档
-(report.view 读;opening.manage 写期初/归并 · 见 services/authz/registry.py)。
+(report.view 读;opening.manage 写期初 · 见 services/authz/registry.py)。网页只暴露一个
+只读主视图 GET /report + 期初读/写 /openings;旧「汇总→单品详情」流程的 /summary、/card、
+/excluded、/merge 路由已按 2026-08-27 口径删除,服务层 summary()/card() 仅供 Steward 内部
+调用。
 不设灰度闸(Zihao 2026-08-07 拍板:做完测完直接全开,accounting 模块闸 + 权限码就是
 全部控制面);status 探针保留,回答的是「本租户 accounting 模块开没开」,供前端挂菜单三态。
 
@@ -22,7 +25,6 @@ from pydantic import BaseModel, Field
 from core import db
 from core.pos_api import PosError
 from routes.accounting_common import auth_member, gate, resolve_ws
-from services.stockcard import merge as merge_svc
 from services.stockcard import opening as opening_svc
 from services.stockcard import report as report_svc
 
@@ -51,19 +53,6 @@ class OpeningsIn(BaseModel):
     rows: list[OpeningIn] = Field(..., min_length=1, max_length=500)
 
 
-class MergeIn(BaseModel):
-    """目标二选一:target_product_id(已建档)或 new_product_name(名字轨当目标 → 代客建档)。
-    与 src/home/stock-card-api.ts 的 StcMergePayload 同形 —— 2026-08-08 实锤前后端各写一套
-    字段名(name_key/product_id vs name_keys/target_product_id),上线即 422,契约测试锁住。"""
-
-    name_keys: list[str] = Field(..., min_length=1, max_length=200, description="要归并的清洗品名")
-    target_product_id: Optional[str] = Field(None, description="并入已存在于本账套的商品")
-    new_product_name: Optional[str] = Field(
-        None, max_length=200, description="目标没建档时按此名代建最小商品档"
-    )
-    unit: Optional[str] = Field(None, max_length=50, description="代建商品档带上的计量单位")
-
-
 def _public_opening(row: dict) -> dict:
     return {
         "id": row["id"],
@@ -88,64 +77,28 @@ async def api_status(request: Request):
     return {"ok": True, "enabled": module_on}
 
 
-@router.get("/summary")
-async def api_summary(
+@router.get("/report")
+async def api_report(
     request: Request,
     workspace_client_id: int = Query(...),
     date_from: str = Query(...),
     date_to: str = Query(...),
 ):
+    """网页主视图唯一端点:一次请求返回按商品连续排列的完整 13 列表格(groups)。
+
+    2026-08-27 拍板:删除旧「汇总→单品详情」流程的 /summary、/card、/excluded 路由;旧的
+    report.summary()/card() 仍保留给 Steward 内部汇报,但不再驱动网页。参考图没有未入账/
+    状态/归并/规则/搜索,全部不做 —— 只额外保留已拍板的期初库存录入(/openings)。"""
     _, tid = auth_member(request, _C_VIEW)
     d_from = _parse_date(date_from, field="date_from")
     d_to = _parse_date(date_to, field="date_to")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        payload = report_svc.summary(
+        rows = report_svc.groups(
             cur, tenant_id=tid, workspace_client_id=ws, date_from=d_from, date_to=d_to
         )
-    return {"ok": True, **payload}
-
-
-@router.get("/card")
-async def api_card(
-    request: Request,
-    workspace_client_id: int = Query(...),
-    key: str = Query(...),
-    date_from: str = Query(...),
-    date_to: str = Query(...),
-):
-    _, tid = auth_member(request, _C_VIEW)
-    d_from = _parse_date(date_from, field="date_from")
-    d_to = _parse_date(date_to, field="date_to")
-    with db.get_cursor_rls(tid, commit=False) as cur:
-        gate(cur, tid)
-        ws = resolve_ws(cur, request, tid, workspace_client_id)
-        payload = report_svc.card(
-            cur, tenant_id=tid, workspace_client_id=ws, key=key, date_from=d_from, date_to=d_to
-        )
-    if payload is None:
-        raise PosError("stockcard.not_found", 404)
-    return {"ok": True, **payload}
-
-
-@router.get("/excluded")
-async def api_excluded(
-    request: Request,
-    workspace_client_id: int = Query(...),
-    date_from: str = Query(...),
-    date_to: str = Query(...),
-):
-    _, tid = auth_member(request, _C_VIEW)
-    d_from = _parse_date(date_from, field="date_from")
-    d_to = _parse_date(date_to, field="date_to")
-    with db.get_cursor_rls(tid, commit=False) as cur:
-        gate(cur, tid)
-        ws = resolve_ws(cur, request, tid, workspace_client_id)
-        rows = report_svc.excluded(
-            cur, tenant_id=tid, workspace_client_id=ws, date_from=d_from, date_to=d_to
-        )
-    return {"ok": True, "rows": rows}
+    return {"ok": True, "groups": rows}
 
 
 @router.get("/openings")
@@ -174,24 +127,3 @@ async def api_upsert_openings(
             created_by=user.get("id"),
         )
     return {"ok": True, "rows": [_public_opening(r) for r in rows]}
-
-
-@router.post("/merge")
-async def api_merge(req: MergeIn, request: Request, workspace_client_id: int = Query(...)):
-    user, tid = auth_member(request, _C_MANAGE)
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        gate(cur, tid)
-        ws = resolve_ws(cur, request, tid, workspace_client_id)
-        result = merge_svc.merge_into_product(
-            cur,
-            tenant_id=tid,
-            workspace_client_id=ws,
-            name_keys=req.name_keys,
-            target_product_id=req.target_product_id,
-            new_product_name=req.new_product_name,
-            unit=req.unit,
-            actor=user,
-        )
-    if result is None:
-        raise PosError("stockcard.merge_target_missing", 422)
-    return {"ok": True, **result}

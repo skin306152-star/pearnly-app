@@ -10,6 +10,7 @@ from unittest import mock
 
 os.environ.setdefault("JWT_SECRET", "test-secret-key-of-sufficient-length")
 
+from core import feature_flags  # noqa: E402
 from services.auth import entrance  # noqa: E402
 
 
@@ -19,6 +20,30 @@ def _cursor_ctx():
         yield object()
 
     return _gc
+
+
+class ErpInvitePolicyTests(unittest.TestCase):
+    def test_allowlist_grant_does_not_depend_on_global_switch(self) -> None:
+        with (
+            mock.patch(
+                "services.platform_settings.store.is_allowlisted", return_value=True
+            ) as is_allowed,
+            mock.patch(
+                "services.platform_settings.store.get_setting",
+                side_effect=AssertionError("ERP invite policy must not read the global switch"),
+            ),
+        ):
+            self.assertTrue(feature_flags.erp_portal_enabled_for("tenant-1", "user-1"))
+        is_allowed.assert_called_once_with("erp_portal", "tenant-1")
+
+    def test_uninvited_and_lookup_failure_fail_closed(self) -> None:
+        with mock.patch("services.platform_settings.store.is_allowlisted", return_value=False):
+            self.assertFalse(feature_flags.erp_portal_enabled_for("tenant-1", "user-1"))
+        with mock.patch(
+            "services.platform_settings.store.is_allowlisted", side_effect=RuntimeError("db down")
+        ):
+            self.assertFalse(feature_flags.erp_portal_enabled_for("tenant-1", "user-1"))
+        self.assertFalse(feature_flags.erp_portal_enabled_for(None, None))
 
 
 class AuthorizedEntrancesTests(unittest.TestCase):

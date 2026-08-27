@@ -76,8 +76,8 @@ PEARNLY_AI_M1_KEY = "pearnly_ai_m1"
 # 个人套账退回 user_id · 与 pearnly_ai_m1 同口径)。消费在 services/auth/entrance._derive_entrances
 # (登录准入)与 routes/dms_routes._authorize(API 守卫)。
 DMS_PORTAL_KEY = "dms_portal"
-# ERP 入口邀请闸(照 dms_portal 范式):默认关 fail-closed。关 = erp 门不授权、作用域前缀不放行;
-# 开 = 被邀请租户从 erp 门登录得该入口 + 前缀放行。判定域=账套主体归属(tenant_id 用 tenant · 个人套账退回 user_id)。
+# ERP 入口邀请闸:名单成员即开,不叠加总闸;邀请/收回是超管后台唯一写入口。
+# 判定域=账套主体归属(tenant_id 用 tenant · 个人套账退回 user_id),与 Daily 一致。
 ERP_PORTAL_KEY = "erp_portal"
 # DMS LINE 通道邀请闸(独立 LINE OA · 经销商销售员绑定/会话):默认关 fail-closed。
 # 关 = /api/line/dms/webhook 收到事件一律 200 静默零回复、DMS 侧 /api/dms/line/* 绑定端点
@@ -193,6 +193,19 @@ def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
         return False
 
 
+def _allowlisted(key: str, subject_id: Optional[str], label: str) -> bool:
+    """邀请制直判:名单是授权事实,读取异常 fail-closed。"""
+    if not subject_id:
+        return False
+    try:
+        from services.platform_settings import store
+
+        return store.is_allowlisted(key, subject_id)
+    except Exception as e:
+        logger.warning(f"{label} fail-closed: {e}")
+        return False
+
+
 def agent_enabled_for(user_id: Optional[str]) -> bool:
     """对话 Agent 总闸。"""
     return _enabled(AGENT_ENABLED_KEY, user_id, "agent_enabled_for")
@@ -301,28 +314,13 @@ def dms_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> 
 
 
 def erp_portal_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
-    """ERP 入口邀请闸。关 = erp 门不授权(登录准入推导不含 erp,现状零变化)。按账套主体归属判定。"""
-    return _enabled(ERP_PORTAL_KEY, tenant_id or user_id, "erp_portal_enabled_for")
+    """ERP 邀请制直判:名单是授权事实,不叠加 platform_settings.enabled 总闸。"""
+    return _allowlisted(ERP_PORTAL_KEY, tenant_id or user_id, "erp_portal_enabled_for")
 
 
 def daily_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
-    """Daily 周记账入口判定:名单成员即开(邀请制直判 · 不走总闸灰度)。
-
-    与 pearnly_ai_m1 的「总闸+名单两段式」不同:Daily 邀请即用(Zihao 2026-08-15 拍板),
-    名单本身由超管后台独占写入,无需再开全局开关。判定域=账套主体归属(有 tenant_id 走
-    tenant · 个人套账退回 user_id)。消费在 services/auth/entrance._derive_entrances(登录
-    准入)与 routes/daily_routes._authorize(API 守卫)。
-    """
-    subject = tenant_id or user_id
-    if not subject:
-        return False
-    try:
-        from services.platform_settings import store
-
-        return store.is_allowlisted(DAILY_KEY, subject)
-    except Exception as e:
-        logger.warning(f"daily_enabled_for fail-closed: {e}")
-        return False
+    """Daily 邀请制直判:名单成员即开,判定域为 tenant_id 或个人 user_id。"""
+    return _allowlisted(DAILY_KEY, tenant_id or user_id, "daily_enabled_for")
 
 
 def dms_line_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:

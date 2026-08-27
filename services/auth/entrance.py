@@ -11,7 +11,7 @@
   - dms   : 在 dms_portal 白名单(Earn 邀请 · MR.ERP 身份证订车单入口)
   - daily : 在 daily_finance 白名单(Earn 邀请 · 个人周记账应用)
   - cowork: 业态非 pos_only(随 main 同源 · 与 main 互为旧入口别名)
-  - erp   : 在 erp_portal 白名单(Earn 邀请 · ERP 入口)
+  - erp   : 在 erp_portal 邀请名单(名单即授权 · ERP 入口)
 
 超管任意门放行(平台运营);回退闸 entrance_gate 关时旧入口不拦,ERP 仍强制邀请制;
 推导异常默认 fail-open(登录可用性优先,绝不因基建抖动把人锁在门外,与 auth.py 改密比对同款容错)

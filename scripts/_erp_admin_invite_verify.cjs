@@ -354,11 +354,11 @@ async function run(browser) {
         head.pwPh
     );
 
-    // overview:闸状态(flag)用真词典合成期望值;名单 tenant-first 信息渲染。
+    // overview:邀请名单是唯一准入,不受旧总闸字段影响;名单 tenant-first 信息渲染。
     const flagZh = await dictGet(page, 'zh', 'adm-erp-flag-on');
     const rollZh = await dictGet(page, 'zh', 'adm-erp-flag-rollout-allowlist');
     const flagText = await page.locator('#adm-erp-flag-line').textContent();
-    chk('总闸状态行 = 已启用 · 仅名单内(灰度)', flagText === flagZh + ' · ' + rollZh, flagText);
+    chk('开通方式 = 邀请即生效 · 仅邀请名单内', flagText === flagZh + ' · ' + rollZh, flagText);
 
     const rows0 = await listRows(page);
     chk('overview 名单初始 3 行', rows0.length === 3, '实际 ' + rows0.length);

@@ -4253,14 +4253,8 @@
     }
 
     // ============ ERP 入口邀请管理页(照 DMS 邀请页范式 · 仅列表/邀请/撤销,不加重置密码) ============
-    function _erpFlagText(flag) {
-        flag = flag || {};
-        const on = flag.enabled ? _t('adm-erp-flag-on') : _t('adm-erp-flag-off');
-        const rollout =
-            flag.rollout === 'all'
-                ? _t('adm-erp-flag-rollout-all')
-                : _t('adm-erp-flag-rollout-allowlist');
-        return on + ' · ' + rollout;
+    function _erpFlagText() {
+        return _t('adm-erp-flag-on') + ' · ' + _t('adm-erp-flag-rollout-allowlist');
     }
 
     function _renderErpList(rows) {
@@ -4407,7 +4401,7 @@
             return;
         }
         const flagLine = document.getElementById('adm-erp-flag-line');
-        if (flagLine) flagLine.textContent = _erpFlagText(d.flag);
+        if (flagLine) flagLine.textContent = _erpFlagText();
         _renderErpList(d.allowlist);
     }
 

@@ -86,32 +86,28 @@ class DmsPortalEnabledForTests(unittest.TestCase):
 
 
 class ErpPortalEnabledForTests(unittest.TestCase):
-    """ERP 入口邀请闸:tenant-first,默认关(erp 门不授权,与 dms_portal 同口径)。"""
+    """ERP 邀请名单直判:tenant-first,不叠加 platform_settings.enabled 总闸。"""
 
     def test_key_constant(self):
         self.assertEqual(feature_flags.ERP_PORTAL_KEY, "erp_portal")
 
     def test_tenant_id_takes_priority_over_user_id(self):
-        with mock.patch(
-            "services.platform_settings.store.is_enabled_for_user", return_value=True
-        ) as m:
+        with mock.patch("services.platform_settings.store.is_allowlisted", return_value=True) as m:
             self.assertTrue(feature_flags.erp_portal_enabled_for("t1", "u1"))
             m.assert_called_once_with(feature_flags.ERP_PORTAL_KEY, "t1")
 
     def test_falls_back_to_user_id_when_no_tenant(self):
-        with mock.patch(
-            "services.platform_settings.store.is_enabled_for_user", return_value=True
-        ) as m:
+        with mock.patch("services.platform_settings.store.is_allowlisted", return_value=True) as m:
             self.assertTrue(feature_flags.erp_portal_enabled_for(None, "u1"))
             m.assert_called_once_with(feature_flags.ERP_PORTAL_KEY, "u1")
 
     def test_defaults_closed_no_setting_row(self):
-        with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
+        with mock.patch("services.platform_settings.store.is_allowlisted", return_value=False):
             self.assertFalse(feature_flags.erp_portal_enabled_for("t1", "u1"))
 
     def test_store_raises_fails_closed(self):
         with mock.patch(
-            "services.platform_settings.store.is_enabled_for_user",
+            "services.platform_settings.store.is_allowlisted",
             side_effect=RuntimeError("boom"),
         ):
             self.assertFalse(feature_flags.erp_portal_enabled_for("t1", "u1"))

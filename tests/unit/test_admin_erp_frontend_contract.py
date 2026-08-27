@@ -50,6 +50,12 @@ class AdminErpFrontendContractTests(unittest.TestCase):
         self.assertGreaterEqual(text.count("'adm-erp-invite-btn'"), 2)
         self.assertGreaterEqual(text.count("'adm-erp-revoke-btn'"), 2)
 
+    def test_erp_invite_copy_is_immediate_and_existing_password_is_preserved(self):
+        text = _read("static/admin/admin-i18n.js")
+        self.assertIn("'adm-erp-flag-on': '邀请即生效'", text)
+        self.assertIn("'adm-erp-invite-existing-ok': 'ERP 已开通 · 请使用原账号密码登录'", text)
+        self.assertIn("'adm-erp-invite-pwd-ph': '新账号密码(已有账号不会改密)'", text)
+
 
 if __name__ == "__main__":
     unittest.main()

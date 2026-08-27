@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS tenant_modules (
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (tenant_id, module_key)
 );
+ALTER TABLE tenants DROP CONSTRAINT IF EXISTS ck_tenants_tenant_type_v2_allowed;
+ALTER TABLE tenants ALTER COLUMN tenant_type_v2 SET DEFAULT 'firm';
 """
 
 

@@ -1,16 +1,15 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-27 ERP 全商品收发存长表本地闭环 · 待 CI 上线
+## 当前状态卡 · 08-27 ERP 全商品收发存长表上线 · 本批暂停
 
 - **✅ 产品关系终版**:`/cowork` 事务所自由注册;`/erp` 个体老板只接受 Earn 邀请;两套产品租户、单据、余额与状态独立,不建立商户-事务所关系。
-- **✅ 线上基线**:当前 master/origin/生产均为 `6726c552`;ERP/Cowork 错误投递链已清除,现有 DMS 用户改动未纳入本批。
-- **✅ 当前批次**:Stock Card 已从“商品汇总→点单品详情”改成“按商品连续排列的参考图原样 13 列表格、所有逐笔流水同页默认显示”;施工正本=`docs/erp/STOCK-CARD-ALL-PRODUCTS.md`。
-- **📌 计算红线**:各商品按 key 独立滚存移动加权平均;保留期初截至日、负库存和未知成本诚实态;禁止跨商品混算。
-- **📌 严格边界**:参考图没有未入账/状态/归并/规则/搜索,全部不做;只额外保留已拍板的期初库存。网页一次请求 `/api/stockcard/report`;删除旧 `/summary`、`/card`、`/excluded`、`/merge` 路由和点击详情交互;内部 Steward 的 `report.summary/card` 保留。
+- **✅ Stock Card 上线**:按商品连续排列参考图原样 13 列,所有商品逐笔流水同页默认显示;旧汇总→单品详情、未入账、归并、规则、搜索与状态交互已删除;仅保留已拍板的期初库存。施工正本=`docs/erp/STOCK-CARD-ALL-PRODUCTS.md`。
+- **✅ 算法口径**:各商品按 key 独立滚存移动加权平均;保留期初截至日、负库存和未知成本诚实态;禁止跨商品混算。网页单源 `/api/stockcard/report`,内部 Steward 的 `report.summary/card` 不动。
+- **✅ 验收证据**:Stock Card 单测 70/70;本地 Playwright 4/4(桌面/手机/泰语/期初/空态/错态);CI `33091878210` 全绿(含 unit、真 PG、全量 E2E)。
+- **✅ E2E 机制修正**:台账只归责 `merge-base(origin/master,HEAD)..HEAD` 待推差异,共享词典/HTML 精确命中;库存卡 spec 自起静态服验当前提交成品并保持真实 `/erp` pathname,不再拿部署前线上旧版断言新页面。
+- **✅ 生产**:`d801cda26bb6dfdd68677c17e08d9c64561c73b7` 已部署;`api/health=ok`、`/erp=200`、`home.css?v=12070111`、线上 bundle 含 `loadStockCard`。首次 502 是 worker 启动约 19 秒的重启窗口,就绪后复验通过。
 - **📌 录入口径**:网页与 ERP 专用 LINE 均为上传→OCR 预览→全字段编辑→明确确认或丢弃;LINE 不猜采购/销售和库存/服务,混合单据逐行选择。
-- **✅ 本地验收**:Stock Card 单测 70/70、TypeScript、四语词典、source→dist build 全绿;Playwright 4/4,真 `/erp` canonical 壳完成桌面 1280×900、手机 390×844、泰语、期初弹窗、空态/错态截图验收。数据库集成用例因本机无 `DATABASE_URL` 按标记跳过 17 项。
-- **⏳ 交付**:待范围提交→全套 pre-push 机械闸→push master→CI 全绿→精确 SHA 部署与生产 `/erp` 验证;完成后本批暂停。
-- **⚠️ 边界**:`/ai`、`/pos`、`/dms` 与现有采购 LINE 不改;工作区 8 个既有 DMS/E2E dirty 文件绝不暂存。
+- **⚠️ 边界**:`/ai`、`/pos`、`/dms` 与现有采购 LINE 未改;工作区 8 个既有 DMS/E2E dirty 文件未暂存、未覆盖。当前无本批未推代码,下一步等 Zihao 再开工。
 
 ---
 

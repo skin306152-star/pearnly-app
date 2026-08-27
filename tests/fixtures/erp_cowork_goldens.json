@@ -1,0 +1,454 @@
+{
+  "schema_version": 1,
+  "canonical_doc": "docs/erp/ERP-COWORK-CLOSED-LOOP.md",
+  "tenant_type_v2_values": ["s_micro", "m_business", "f_firm"],
+  "product_scope": "erp",
+  "engagement_statuses": ["pending_merchant", "pending_firm", "active", "suspended", "ended"],
+  "submission_statuses": ["pending", "delivered", "failed", "superseded"],
+  "failure_codes": [
+    "ERR_FIRM_REQUIRED",
+    "ERR_FIRM_INACTIVE",
+    "ERR_PRIMARY_ENGAGEMENT_EXISTS",
+    "ERR_ENGAGEMENT_NOT_ACTIVE",
+    "ERR_ENGAGEMENT_WORKSPACE_MISMATCH",
+    "ERR_ENGAGEMENT_FORBIDDEN",
+    "ERR_PRODUCT_SCOPE_REQUIRED",
+    "ERR_LOCATION_REQUIRED",
+    "ERR_INSUFFICIENT_CREDITS",
+    "ERR_SUBMISSION_DELIVERY"
+  ],
+  "scenarios": [
+    {
+      "id": "cowork-free-registration-success",
+      "surface": "/cowork",
+      "given": "访客自由注册会计事务所,提供事务所基础资料。",
+      "action": "提交 /cowork 注册。",
+      "expected": "创建独立 firm 租户与 accounting_firm_profile,生成唯一 firm_code,tenant_type_v2=f_firm。",
+      "invariant_ids": ["INV-001", "INV-002"]
+    },
+    {
+      "id": "cowork-firm-code-unique",
+      "surface": "/cowork",
+      "given": "第二次注册时存在已占用 firm_code。",
+      "action": "尝试复用相同 firm_code 注册。",
+      "expected": "拒绝冲突,重新生成唯一 firm_code,不返回部分创建。",
+      "invariant_ids": ["INV-002"]
+    },
+    {
+      "id": "erp-invite-requires-active-firm",
+      "surface": "/erp",
+      "given": "运营在 /earn 发起商户邀请,但所选 Cowork firm 非 active。",
+      "action": "选择非 active firm 提交邀请。",
+      "expected": "邀请被拒绝,不创建关系,审计记录 ERR_FIRM_INACTIVE。",
+      "invariant_ids": ["INV-003"]
+    },
+    {
+      "id": "erp-invite-requires-firm-selection",
+      "surface": "/erp",
+      "given": "运营填写商户账号,但没有选择 Cowork 事务所。",
+      "action": "提交 ERP 邀请。",
+      "expected": "返回 ERR_FIRM_REQUIRED,不创建 tenant、入口授权或 engagement。",
+      "invariant_ids": ["INV-003", "INV-019"]
+    },
+    {
+      "id": "erp-invite-reuse-existing-merchant",
+      "surface": "/erp",
+      "given": "被邀请商户已有 merchant 账号与租户。",
+      "action": "对一个已有 merchant 发出邀请。",
+      "expected": "复用已有 merchant 账号/tenant,绝不重建,仅建立关系并更新入口授权集。",
+      "invariant_ids": ["INV-003"]
+    },
+    {
+      "id": "erp-invite-reject-inactive-firm",
+      "surface": "/erp",
+      "given": "被邀请方路径上存在 inactive Cowork firm。",
+      "action": "发起邀请。",
+      "expected": "一律拒绝;邀请必须绑定 active firm,错误码为 ERR_FIRM_INACTIVE。",
+      "invariant_ids": ["INV-003"]
+    },
+    {
+      "id": "erp-invite-new-merchant-defers-workspace",
+      "surface": "/erp",
+      "given": "被邀请账号尚不存在,且商户尚未填写公司名称与税号。",
+      "action": "Earn 创建邀请。",
+      "expected": "只创建 merchant tenant + owner、ERP 入口权限和 pending_merchant 关系;不猜测或提前创建正式 workspace。",
+      "invariant_ids": ["INV-003", "INV-007"]
+    },
+    {
+      "id": "existing-primary-firm-requires-transfer",
+      "surface": "/erp",
+      "given": "商户已存在一条未 ended 的主要事务所关系。",
+      "action": "Earn 再次邀请并选择另一事务所。",
+      "expected": "返回 ERR_PRIMARY_ENGAGEMENT_EXISTS,不覆盖旧关系,必须进入显式转所流程。",
+      "invariant_ids": ["INV-003", "INV-006", "INV-010"]
+    },
+    {
+      "id": "earn-metadata-only",
+      "surface": "/earn",
+      "given": "控制面请求展示某关系详情。",
+      "action": "返回关系元数据。",
+      "expected": "仅含关系标识、名称、税号、状态、计数、错误码、审计元数据;不含发票图像、行项、金额、库存、分录。",
+      "invariant_ids": ["INV-004"]
+    },
+    {
+      "id": "earn-reject-invoice-sensitive-fields",
+      "surface": "/earn",
+      "given": "调用方尝试向控制面写入发票行项/金额/库存。",
+      "action": "写入票据敏感字段。",
+      "expected": "拒绝写入;控制面禁止存储/中转/展示此类数据。",
+      "invariant_ids": ["INV-004", "INV-016"]
+    },
+    {
+      "id": "firm-merchant-authz-boundary",
+      "surface": "/erp",
+      "given": "试图把 merchant 的 owner 写进 firm 成员表。",
+      "action": "跨租户插入成员归属。",
+      "expected": "拒绝;firm 与 merchant 是独立授权边界,从不插入 merchant owner 到 firm membership。",
+      "invariant_ids": ["INV-005"]
+    },
+    {
+      "id": "one-firm-many-merchants",
+      "surface": "/erp",
+      "given": "一个 active Cowork firm 拥有服务多个商户的能力。",
+      "action": "同一 firm 建立多条 merchant 关系。",
+      "expected": "允许多个 merchant 关系;一个 firm 可服务多个商户。",
+      "invariant_ids": ["INV-005"]
+    },
+    {
+      "id": "one-merchant-one-primary-firm",
+      "surface": "/erp",
+      "given": "商户已存在一个 open/active 主 firm 关系。",
+      "action": "再试图建立第二个主 firm 关系。",
+      "expected": "返回 ERR_PRIMARY_ENGAGEMENT_EXISTS;v1 一个 merchant 至多一条未 ended 的主要 firm 关系。",
+      "invariant_ids": ["INV-006"]
+    },
+    {
+      "id": "workspace-legal-entity-boundary",
+      "surface": "/erp",
+      "given": "同一 merchant 有多个法人实体。",
+      "action": "为每个法人建立 workspace。",
+      "expected": "每个法人对应独立 workspace 行,是硬运营隔离边界,不混层。",
+      "invariant_ids": ["INV-007"]
+    },
+    {
+      "id": "branch-hq-00000",
+      "surface": "/erp",
+      "given": "merchant workspace 创建。",
+      "action": "初始化地址。",
+      "expected": "HQ business_location=00000,归入 merchant workspace,不做成独立 workspace。",
+      "invariant_ids": ["INV-008"]
+    },
+    {
+      "id": "branch-00001",
+      "surface": "/erp",
+      "given": "merchant 同法人新增门店。",
+      "action": "添加分店 business_location。",
+      "expected": "分店编号为 00001 起,仍是同一 workspace 内 location。",
+      "invariant_ids": ["INV-008"]
+    },
+    {
+      "id": "branch-distinct-taxid-separate-workspace",
+      "surface": "/erp",
+      "given": "新门店持独立法人/税号。",
+      "action": "按其税号建地址。",
+      "expected": "要求独立 workspace,business_location 不承载不同法人/税号。",
+      "invariant_ids": ["INV-007", "INV-008"]
+    },
+    {
+      "id": "engagement-pending-merchant",
+      "surface": "/erp",
+      "given": "邀请已发出,等待商户接受。",
+      "action": "查询关系状态。",
+      "expected": "状态=pending_merchant。",
+      "invariant_ids": ["INV-009"]
+    },
+    {
+      "id": "engagement-pending-firm",
+      "surface": "/erp",
+      "given": "商户已接受,firm 尚未确认。",
+      "action": "查询关系状态。",
+      "expected": "状态=pending_firm。",
+      "invariant_ids": ["INV-009"]
+    },
+    {
+      "id": "engagement-active-status",
+      "surface": "/erp",
+      "given": "firm 确认关系。",
+      "action": "推进状态。",
+      "expected": "仅当双方确认、firm 仍 active 且 firm/merchant workspace 均精确确定时状态=active,可交付。",
+      "invariant_ids": ["INV-009"]
+    },
+    {
+      "id": "engagement-active-requires-both-workspaces",
+      "surface": "/erp",
+      "given": "双方已点击确认,但任一 workspace 尚未建立或选择。",
+      "action": "尝试推进 active。",
+      "expected": "保持 pending_firm,不得激活或投递;禁止按名称猜套账。",
+      "invariant_ids": ["INV-007", "INV-009"]
+    },
+    {
+      "id": "cowork-explicit-workspace-selection",
+      "surface": "/cowork",
+      "given": "事务所收到待接入 ERP 客户。",
+      "action": "事务所核对名称和税号后创建或选择客户套账。",
+      "expected": "显式写入 firm_workspace_client_id 并记录 firm_accepted_at;不串入其他客户套账。",
+      "invariant_ids": ["INV-007", "INV-009"]
+    },
+    {
+      "id": "engagement-suspended",
+      "surface": "/erp",
+      "given": "active 关系中一方暂停合作。",
+      "action": "挂起关系。",
+      "expected": "状态=suspended,可再回 active,审计记录。",
+      "invariant_ids": ["INV-009"]
+    },
+    {
+      "id": "engagement-ended-stops-delivery-keeps-history",
+      "surface": "/erp",
+      "given": "关系终止。",
+      "action": "结束关系。",
+      "expected": "状态=ended;停止未来交付,历史与审计永不删除。",
+      "invariant_ids": ["INV-009"]
+    },
+    {
+      "id": "suspended-engagement-blocks-future-delivery",
+      "surface": "background-bridge",
+      "given": "商户继续经营,但 engagement 已 suspended。",
+      "action": "商户确认新单并由 worker 尝试投递。",
+      "expected": "商户正式单据和库存仍可形成,submission 保持 pending;worker 返回 ERR_ENGAGEMENT_NOT_ACTIVE,恢复前不得送往事务所。",
+      "invariant_ids": ["INV-009", "INV-011", "INV-012", "INV-019"]
+    },
+    {
+      "id": "ended-engagement-does-not-create-old-firm-submission",
+      "surface": "background-bridge",
+      "given": "ERP 入口仍有效,但旧 engagement 已 ended。",
+      "action": "商户确认一张新的采购或销售单据。",
+      "expected": "商户正式单据和库存正常形成;不为旧事务所创建新 submission,旧 pending submission 标 superseded,历史不删除。",
+      "invariant_ids": ["INV-009", "INV-010", "INV-011", "INV-012"]
+    },
+    {
+      "id": "engagement-transfer-effective-date",
+      "surface": "/erp",
+      "given": "商户从 firm A 转到 firm B。",
+      "action": "按生效日执行 cutover。",
+      "expected": "生效日 cutover;merchant tenant/workspace/inventory 保持稳定,不做删除重建。",
+      "invariant_ids": ["INV-009", "INV-010"]
+    },
+    {
+      "id": "confirmed-document-atomic-create",
+      "surface": "background-bridge",
+      "given": "商户在 active engagement 下确认一份 ERP 文档。",
+      "action": "确认提交。",
+      "expected": "同一事务原子创建商户正式单据 + 库存 + client_submission 快照;任一步失败整体回滚。",
+      "invariant_ids": ["INV-011"]
+    },
+    {
+      "id": "confirmed-document-duplicate",
+      "surface": "background-bridge",
+      "given": "同一文档重复确认,唯一键已存在。",
+      "action": "再次提交同一唯一键。",
+      "expected": "幂等回读原提交结果,不产生第二条;唯一键=engagement_id+source_document_type+source_document_id+source_revision。",
+      "invariant_ids": ["INV-011", "INV-018"]
+    },
+    {
+      "id": "submission-delivery-direct-to-cowork-workspace",
+      "surface": "background-bridge",
+      "given": "确认后的 client_submission 待交付。",
+      "action": "背景桥投递。",
+      "expected": "直达精确 Cowork workspace,不经过 /earn。",
+      "invariant_ids": ["INV-012"]
+    },
+    {
+      "id": "wrong-firm-cannot-read-submission",
+      "surface": "/cowork",
+      "given": "事务所 B 请求读取投递给事务所 A 客户套账的快照或副本。",
+      "action": "使用事务所 B 的 tenant/workspace 权限读取。",
+      "expected": "返回 ERR_ENGAGEMENT_FORBIDDEN,不返回原图、快照、金额或任何业务字段。",
+      "invariant_ids": ["INV-005", "INV-012", "INV-019"]
+    },
+    {
+      "id": "client-submissions-status-sole-delivery-status",
+      "surface": "background-bridge",
+      "given": "ERP 到 Cowork 的交付状态变化。",
+      "action": "更新交付状态。",
+      "expected": "client_submissions.status 是唯一承载该链状态;不影响 erp_push_logs。",
+      "invariant_ids": ["INV-012"]
+    },
+    {
+      "id": "submission-workspace-mismatch-refused",
+      "surface": "background-bridge",
+      "given": "快照 target workspace 不属于 engagement 的 firm tenant。",
+      "action": "worker 在投递前回验归属。",
+      "expected": "返回 ERR_ENGAGEMENT_WORKSPACE_MISMATCH,状态不得变 delivered,不写错误事务所。",
+      "invariant_ids": ["INV-007", "INV-012", "INV-019"]
+    },
+    {
+      "id": "submission-technical-failure-retries-honestly",
+      "surface": "background-bridge",
+      "given": "active 关系的 Cowork 投递遇到可重试技术错误。",
+      "action": "worker 记录失败并安排退避重试。",
+      "expected": "记录 ERR_SUBMISSION_DELIVERY、attempts 与 next_attempt_at;显示失败或重试中,不得显示 delivered/成功。",
+      "invariant_ids": ["INV-012", "INV-019"]
+    },
+    {
+      "id": "erp-push-logs-sole-push-state",
+      "surface": "background-bridge",
+      "given": "Cowork 向第三方 ERP 推送状态写入。",
+      "action": "写入推送状态。",
+      "expected": "erp_push_logs 是唯一推送状态源;与 client_submissions.status 各是各的。",
+      "invariant_ids": ["INV-012"]
+    },
+    {
+      "id": "ocr-preview-editable",
+      "surface": "/erp",
+      "given": "OCR 识别出一份待确认文档。",
+      "action": "编辑预览字段。",
+      "expected": "预览可编辑;编辑不影响商户库存。",
+      "invariant_ids": ["INV-013"]
+    },
+    {
+      "id": "ocr-discard-zero-business-effect",
+      "surface": "/erp",
+      "given": "预览中的文档被放弃。",
+      "action": "discard。",
+      "expected": "零业务效果,不产生单据/库存/交付记录。",
+      "invariant_ids": ["INV-013"]
+    },
+    {
+      "id": "ocr-confirmed-immutable-revision",
+      "surface": "/erp",
+      "given": "已确认快照需更正。",
+      "action": "更正。",
+      "expected": "确认快照不可变;走冲销/新修订,不覆盖原快照。",
+      "invariant_ids": ["INV-013"]
+    },
+    {
+      "id": "cowork-edits-review-copy-not-merchant-stock",
+      "surface": "/cowork",
+      "given": "firm 复核 Cowork 副本。",
+      "action": "编辑复核副本。",
+      "expected": "只改自身复核副本,绝不静默改商户库存。",
+      "invariant_ids": ["INV-013"]
+    },
+    {
+      "id": "merchant-first-ocr-charged-once",
+      "surface": "/erp",
+      "given": "merchant 发起首次 OCR。",
+      "action": "首次 OCR。",
+      "expected": "对 merchant 计费一次,落 merchant 钱包。",
+      "invariant_ids": ["INV-014"]
+    },
+    {
+      "id": "insufficient-credits-blocks-before-ocr",
+      "surface": "/erp",
+      "given": "merchant 钱包余额不足。",
+      "action": "从 Web 或 ERP LINE 发起 OCR。",
+      "expected": "返回 ERR_INSUFFICIENT_CREDITS,OCR 不启动,不形成负余额、草稿或提交。",
+      "invariant_ids": ["INV-014", "INV-019"]
+    },
+    {
+      "id": "snapshot-delivery-no-re-ocr-no-charge",
+      "surface": "background-bridge",
+      "given": "确认快照进入交付。",
+      "action": "投递快照。",
+      "expected": "不重做 OCR,不再计费;与首次 OCR 计费分离。",
+      "invariant_ids": ["INV-014"]
+    },
+    {
+      "id": "firm-re-ocr-charges-firm",
+      "surface": "/cowork",
+      "given": "firm 发起 re-OCR。",
+      "action": "re-OCR。",
+      "expected": "对 firm 计费,落 firm 钱包。",
+      "invariant_ids": ["INV-014"]
+    },
+    {
+      "id": "independent-wallets-no-sponsorship",
+      "surface": "/erp",
+      "given": "ERP 与 Cowork 钱包结算。",
+      "action": "核对钱包归属。",
+      "expected": "各自独立钱包;v1 无赞助/共享钱包,费用不互转。",
+      "invariant_ids": ["INV-014"]
+    },
+    {
+      "id": "erp-line-separate-channel-webhook-binding-session",
+      "surface": "LINE",
+      "given": "ERP 需要 LINE 通道。",
+      "action": "建立 LINE 入口。",
+      "expected": "独立 channel/webhook/binding/session 与产品域状态,不复用其它 LINE 通道。",
+      "invariant_ids": ["INV-015"]
+    },
+    {
+      "id": "erp-line-binds-merchant-tenant-workspace-location",
+      "surface": "LINE",
+      "given": "ERP LINE 会话绑定。",
+      "action": "绑定会话。",
+      "expected": "绑定 merchant 租户 + workspace + 当前 business_location。",
+      "invariant_ids": ["INV-015"]
+    },
+    {
+      "id": "erp-line-location-required",
+      "surface": "LINE",
+      "given": "ERP LINE 已绑定 merchant tenant/workspace,但没有当前 location。",
+      "action": "上传采购或销售单据。",
+      "expected": "返回 ERR_LOCATION_REQUIRED,不启动 OCR,不猜总部或其他分店。",
+      "invariant_ids": ["INV-008", "INV-015", "INV-019"]
+    },
+    {
+      "id": "erp-line-no-reuse-dms-procurement-tables",
+      "surface": "LINE",
+      "given": "ERP LINE 需要识别能力。",
+      "action": "接入 OCR。",
+      "expected": "通过窄接口复用 OCR 提取;绝不复用 DMS 或既有采购 LINE 业务表/会话。",
+      "invariant_ids": ["INV-015"]
+    },
+    {
+      "id": "product-scope-erp-required",
+      "surface": "/erp",
+      "given": "请求进入 ERP 域。",
+      "action": "请求携带标识。",
+      "expected": "入口与共享表键均要求显式 product_scope=erp,否则返回 ERR_PRODUCT_SCOPE_REQUIRED。",
+      "invariant_ids": ["INV-016", "INV-019"]
+    },
+    {
+      "id": "ai-zero-change-sentinel",
+      "surface": "/ai",
+      "given": "ERP 域发生读写。",
+      "action": "校验 /ai 数据。",
+      "expected": "ERP 改动零影响 /ai 数据、余额、LINE 绑定/会话、旗标、路由行为。",
+      "invariant_ids": ["INV-016", "INV-017"]
+    },
+    {
+      "id": "pos-zero-change-sentinel",
+      "surface": "/pos",
+      "given": "ERP 域发生读写。",
+      "action": "校验 /pos 数据。",
+      "expected": "ERP 改动零影响 /pos 数据、余额、LINE 绑定/会话、旗标、路由行为。",
+      "invariant_ids": ["INV-016", "INV-017"]
+    },
+    {
+      "id": "dms-zero-change-sentinel",
+      "surface": "/dms",
+      "given": "ERP 域发生读写。",
+      "action": "校验 /dms 数据。",
+      "expected": "ERP 改动零影响 /dms 数据、余额、LINE 绑定/会话、旗标、路由行为。",
+      "invariant_ids": ["INV-016", "INV-017"]
+    },
+    {
+      "id": "stockcard-deletion-gated-on-golden-and-exclusivity",
+      "surface": "/erp",
+      "given": "评估删除旧 Stock Card 逻辑。",
+      "action": "删除评估。",
+      "expected": "仅在 ERP 库存 golden 全绿且独占证据成立后删除;被 /ai /pos /dms 共用代码保留。",
+      "invariant_ids": ["INV-017"]
+    },
+    {
+      "id": "failure-states-never-display-success",
+      "surface": "all-products",
+      "given": "关系待确认、未建账、暂停,或请求结果含 failed/ERR_*。",
+      "action": "渲染状态与下一步操作。",
+      "expected": "不得显示完成或成功;技术投递失败显示重试中或失败,业务拒绝显示可处理原因。",
+      "invariant_ids": ["INV-019"]
+    }
+  ]
+}

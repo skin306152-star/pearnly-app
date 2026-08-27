@@ -80,6 +80,7 @@ tests/fixtures/*
 # 补选过账去向失败卡的 E2E 日志行:由 scripts/gen_postkind_fixture.py 跑真 mapper + 真分类器
 # 生成,不入库 CI 里那条 spec 读不到文件(内容的真实性由 test_postkind_escalate_wire 重算比对)
 !tests/fixtures/postkind_escalated_log.json
+!tests/fixtures/erp_cowork_goldens.json
 tests/pipeline-results.json
 tests/pipeline-results-before-fix.json
 tests/pipeline-benchmark-*.json

@@ -78,16 +78,3 @@ def list_active_profiles(
         (str(tenant_id),),
     )
     return [dict(r) for r in cur.fetchall()]
-
-
-def list_active_profiles_for_admin(cur) -> list[dict]:
-    """Earn 跨租户选择器只读元数据；调用方必须先完成超管鉴权并显式 bypass RLS。"""
-    cur.execute(f"""
-        SELECT {_PROFILE_COLUMNS}, t.name AS tenant_name
-        FROM accounting_firm_profiles p
-        JOIN tenants t ON t.id = p.tenant_id
-        WHERE p.status = 'active' AND t.status = 'active'
-          AND t.tenant_type_v2 = 'f_firm'
-        ORDER BY p.display_name, p.firm_code
-        """)
-    return [dict(r) for r in cur.fetchall()]

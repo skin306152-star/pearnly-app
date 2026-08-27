@@ -154,66 +154,6 @@ class ConvertOrchestrationTests(unittest.TestCase):
         self.assertIn("ROLLBACK TO SAVEPOINT intake_bridge_convert", cur.queries)
         self.assertEqual(out["skipped"][0]["reason"], "already_converted")
 
-    def test_erp_confirmation_enqueues_snapshot_in_same_savepoint(self):
-        history = _history_row()
-        history.update(
-            {
-                "filename": "merchant-invoice.pdf",
-                "source": "line_erp",
-                "pdf_storage_path": "merchant/private/invoice.pdf",
-            }
-        )
-        cur = _FakeCursor([history, None, {"tax_id": _CP_TAX}])
-        with (
-            mock.patch.object(purchase_leg, "book_from_history", return_value=("doc-1", "PO-1")),
-            mock.patch.object(convert_svc.submission_enqueue, "enqueue_confirmed_document") as put,
-        ):
-            out = convert_svc.convert_histories(
-                cur,
-                tenant_id="t1",
-                user_id="u1",
-                history_ids=["h1"],
-                enqueue_client_submissions=True,
-            )
-
-        self.assertEqual(out["skipped"], [])
-        kwargs = put.call_args.kwargs
-        self.assertEqual(kwargs["merchant_workspace_client_id"], 9)
-        self.assertEqual(kwargs["source_document_type"], "purchase")
-        self.assertEqual(kwargs["source_document_id"], "doc-1")
-        self.assertEqual(kwargs["original_file_ref"], "ocr_history:h1")
-        self.assertEqual(kwargs["snapshot"]["fields"]["invoice_number"], "INV-1001")
-        self.assertEqual(kwargs["snapshot"]["pages"], history["pages"])
-        enqueue_at = next(
-            index
-            for index, query in enumerate(cur.queries)
-            if query.startswith("UPDATE purchase_docs SET ocr_history_id")
-        )
-        release_at = cur.queries.index("RELEASE SAVEPOINT intake_bridge_convert")
-        self.assertLess(enqueue_at, release_at)
-
-    def test_submission_failure_rolls_back_formal_document_savepoint(self):
-        cur = _FakeCursor([_history_row(), None, {"tax_id": _CP_TAX}])
-        with (
-            mock.patch.object(purchase_leg, "book_from_history", return_value=("doc-1", "PO-1")),
-            mock.patch.object(
-                convert_svc.submission_enqueue,
-                "enqueue_confirmed_document",
-                side_effect=RuntimeError("outbox unavailable"),
-            ),
-        ):
-            out = convert_svc.convert_histories(
-                cur,
-                tenant_id="t1",
-                user_id="u1",
-                history_ids=["h1"],
-                enqueue_client_submissions=True,
-            )
-
-        self.assertEqual(out["converted"], [])
-        self.assertEqual(out["skipped"][0]["reason"], "error:outbox unavailable")
-        self.assertIn("ROLLBACK TO SAVEPOINT intake_bridge_convert", cur.queries)
-
 
 class SalesLegTests(unittest.TestCase):
     """sales_leg.issue_from_history 自身口径:无票号 / 无行项 / 撞重复。"""

@@ -215,14 +215,13 @@ class WriteHookWiringTests(unittest.TestCase):
         for fn in (entitlements.grant, entitlements.transfer):
             self.assertIn("grant_entrance_safe(POS", inspect.getsource(fn), fn.__name__)
 
-    def test_signup_wires_main_and_erp_by_creation_context(self):
+    def test_signup_wires_main(self):
         import inspect
 
         from services.auth import signup_core
 
         src = inspect.getsource(signup_core._ensure_tenant_for_new_user)
-        self.assertIn("primary_entrance = ERP if is_erp_invite else MAIN", src)
-        self.assertIn("grant_entrance_safe(primary_entrance", src)
+        self.assertIn("grant_entrance_safe(MAIN", src)
 
     def test_ai_invite_wires_ai(self):
         import inspect

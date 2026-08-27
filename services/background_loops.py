@@ -203,10 +203,6 @@ async def run_recovery_tick():
         await run_steward_attachment_tick()
     except Exception as e:
         logger.warning(f"[steward_attachments] tick failed: {e}")
-    try:
-        await run_client_submission_tick()
-    except Exception as e:
-        logger.warning(f"[client_submissions] tick failed: {e}")
     from services.workorder import reaper
 
     # run_tick 自吞异常(挂点安全在 reaper 内部保证),与 erp_retry_loop 开场的调用点一致裸调。
@@ -237,14 +233,6 @@ async def run_steward_attachment_tick():
     from services.steward import attachments
 
     await _asyncio.to_thread(attachments.sweep_expired)
-
-
-async def run_client_submission_tick():
-    import asyncio as _asyncio
-
-    from services.client_submission import worker
-
-    await _asyncio.to_thread(worker.run_tick, 20)
 
 
 async def run_stage_janitor_tick():

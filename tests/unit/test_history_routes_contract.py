@@ -10,10 +10,7 @@ REFACTOR-B1 守门测试 · OCR 历史 10 路由从 app.py 抽到 history_routes
   5. model 字段契约(HistoryUpdateRequest / HistoryBatchDeleteRequest)
 """
 
-import asyncio
-import contextlib
 import unittest
-from unittest import mock
 
 from services.exceptions import exception_checks
 from core import route_helpers
@@ -88,45 +85,6 @@ class HistoryRoutesContractTests(unittest.TestCase):
         self.assertEqual(
             set(OcrConvertRequest.model_fields.keys()), {"history_ids", "workspace_client_id"}
         )
-
-    def test_erp_confirmation_enables_client_submission_but_main_does_not(self):
-        @contextlib.contextmanager
-        def cursor_context():
-            yield object()
-
-        req = OcrConvertRequest(history_ids=["h1"], workspace_client_id=9)
-        for entry, flag, expected in (("erp", True, True), ("main", None, False)):
-            with (
-                self.subTest(entry=entry),
-                mock.patch.object(
-                    history_routes,
-                    "get_current_user_from_request",
-                    return_value={"id": "u1", "tenant_id": "t1", "entry": entry},
-                ),
-                mock.patch.object(history_routes, "_check_history_access"),
-                mock.patch.object(history_routes, "_tid", return_value="t1"),
-                mock.patch.object(
-                    history_routes.db, "get_cursor_rls", return_value=cursor_context()
-                ),
-                mock.patch.object(history_routes.wc, "assert_workspace_in_tenant"),
-                mock.patch.object(
-                    history_routes.engagement_flags,
-                    "enabled_for",
-                    return_value=bool(flag),
-                ) as enabled,
-                mock.patch.object(
-                    history_routes.convert_svc,
-                    "convert_histories",
-                    return_value={"converted": [], "skipped": []},
-                ) as convert,
-            ):
-                asyncio.run(history_routes.ocr_convert_documents(req, mock.Mock()))
-
-            self.assertEqual(convert.call_args.kwargs["enqueue_client_submissions"], expected)
-            if entry == "erp":
-                enabled.assert_called_once_with("t1")
-            else:
-                enabled.assert_not_called()
 
 
 if __name__ == "__main__":

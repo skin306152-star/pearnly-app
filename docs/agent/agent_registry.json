@@ -2,7 +2,6 @@
   "_doc": "Pearnly Agent 能力登记表 · 每个 routes/*.py 一个桶。A=进只读 B=进要确认 C=不进App专属 D=不进系统安全。A 档必须带 agent 字段:tool:<manifest工具名,逗号分隔> 或 exempt:<原因slug>(exempt 建议配 why)。新增路由未登记或 A 档缺 agent → 审计闸红。详见 AGENT-CAPABILITY-INVENTORY.md 与 M3-M4-CLOSED-LOOP-DESIGN.md §2。",
   "accounting_routes": "B",
   "accounting_bank_routes": "B",
-  "accounting_engagement_routes": "C",
   "accounting_books_routes": {
     "bucket": "A",
     "agent": "exempt:app-report",

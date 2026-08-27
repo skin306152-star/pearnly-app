@@ -60,30 +60,6 @@ def apply_tenant_rls(cur, *tables, force: bool = False) -> None:
     _apply(cur, "tenant", tables, force=force)
 
 
-def apply_participant_tenant_rls(
-    cur,
-    *tables,
-    left_column: str,
-    right_column: str,
-    force: bool = False,
-) -> None:
-    """跨租户关系表仅向两侧参与租户开放。"""
-    allowed_columns = {"firm_tenant_id", "merchant_tenant_id"}
-    if left_column not in allowed_columns or right_column not in allowed_columns:
-        raise ValueError("unsupported participant tenant column")
-    current = "current_setting('app.current_tenant_id', true)"
-    predicate = (
-        f"({left_column}::text = {current} OR {right_column}::text = {current})" f" OR {_BYPASS}"
-    )
-    body = f"USING ({predicate}) WITH CHECK ({predicate})"
-    for table in tables:
-        cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-        if force:
-            cur.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
-        cur.execute(f"DROP POLICY IF EXISTS participant_tenant_isolation ON {table}")
-        cur.execute(f"CREATE POLICY participant_tenant_isolation ON {table} FOR ALL {body}")
-
-
 def apply_tenant_workspace_rls(cur, *tables, force: bool = False) -> None:
     """tenant + 账套(workspace_client_id)强隔离(幂等)。表须含两列。"""
     _apply(cur, "tenant_ws", tables, force=force)

@@ -214,22 +214,6 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 firm schema 失败(等 alembic 0103): {e}")
 
-    # 事务所与 ERP 商户的唯一跨租户关系锚；功能闸默认关闭。
-    try:
-        from services.accounting_engagement.schema import ensure_accounting_engagement_schema
-
-        ensure_accounting_engagement_schema()
-    except Exception as e:
-        logger.warning(f"启动 accounting_engagement schema 失败(等 alembic 0104): {e}")
-
-    # ERP 已确认单据直达 Cowork 的 outbox；状态独立于 erp_push_logs。
-    try:
-        from services.client_submission.schema import ensure_client_submission_schema
-
-        ensure_client_submission_schema()
-    except Exception as e:
-        logger.warning(f"启动 client_submission schema 失败(等 alembic 0105): {e}")
-
     # ⚠️ RLS 自愈守卫必须是本函数最后一步:上面所有 ensure_*/apply_* 已建好 policy → 真隔离表此时
     # 有 policy 不被误关。新增任何 ensure_*_rls 务必加在它【之前】。关掉「RLS 已开但零 policy」的
     # 孤儿表,杜绝 deny-all 把 get_cursor_rls 查询静默拖空。复盘 b8-rls-no-policy-orphans-INCIDENT.md。

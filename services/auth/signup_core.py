@@ -309,7 +309,6 @@ def _ensure_tenant_for_new_user(
     """
     entry_norm = _normalize_signup_entry(entry)
     is_firm = entry_norm == _SIGNUP_FIRM_ENTRY
-    is_erp_invite = entry_norm == "erp"
     try:
         # tenant.name 优先级:company > full_name > username > user_<8>
         tenant_name = (company_name or "").strip()
@@ -392,13 +391,14 @@ def _ensure_tenant_for_new_user(
         except Exception as _e_mb:
             logger.warning(f"[authz] signup create_membership skip: {_e_mb}")
 
-        # ERP 邀请创建的商户只拿 ERP 门；自由注册仍拿 main，事务所再加 cowork。
-        from services.auth.entrance import COWORK, ERP, MAIN
-        from services.auth.entrance_store import grant_entrance_safe
+        # 授权入口集显式表(Phase2):自由注册账号天然是 main 入口 → 顺带写 tenant_entrances
+        # (共用 grant_entrance_safe:失败只 log 不阻塞注册,读侧表缺行回落推导零影响)。
+        from services.auth.entrance_store import MAIN, grant_entrance_safe
 
-        primary_entrance = ERP if is_erp_invite else MAIN
-        grant_entrance_safe(primary_entrance, str(new_tenant_id), cur=cur, context="signup")
+        grant_entrance_safe(MAIN, str(new_tenant_id), cur=cur, context="signup")
         if is_firm:
+            from services.auth.entrance import COWORK
+
             grant_entrance_safe(COWORK, str(new_tenant_id), cur=cur, context="signup")
         logger.info(
             "[ensure-tenant] tenant=%s user=%s plan=%s quota=%s firm=%s",
@@ -410,7 +410,7 @@ def _ensure_tenant_for_new_user(
         )
         return str(new_tenant_id)
     except Exception as e:
-        if is_firm or is_erp_invite:
+        if is_firm:
             raise
         logger.warning(f"[v118.26.2.5 ensure-tenant] fail user={user_id} plan={plan}: {e}")
         return None

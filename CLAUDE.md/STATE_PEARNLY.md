@@ -1,18 +1,16 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-27 ERP↔Cowork 后端闭环待上线 · UI 待拍板
+## 当前状态卡 · 08-27 ERP 独立产品边界清理中 · Stock Card V2 下一批
 
-- **✅ 产品关系定稿并落后端**:`/cowork` 事务所自由注册并自动建 firm+独立 tenant/workspace;`/erp` 商户只接受 Earn 邀请;Earn 邀请时必须选事务所,只保留关系元数据。
-- **✅ 双方精确绑定**:邀请先建 pending merchant;事务所与商户双确认 exact workspace 后生效;事务所 1:N 商户,商户 v1 最多一个 open primary firm,分店继续用 `business_location`。
-- **✅ 单据同步底座**:ERP 已确认采购/销售经 `client_submissions` 不可变 outbox 投递到指定 Cowork workspace;具备 revision 幂等、失败重试、稳定错误码与删除后审计保留。
-- **✅ 当前生产接线点**:仅服务端确认的 ERP `POST /api/ocr/convert-documents` 且 `erp_cowork_engagements` 开启时,正式单据与 outbox 在同一 SAVEPOINT;Cowork 以 `acct.entry.view` 收件,ERP 以 `stockcard.report.view` 查源状态。
-- **✅ 边界守住**:`/ai`、`/pos`、`/dms`、现有采购 LINE 与非 ERP 单据均不触发;Earn 不接收图片、行项目、金额、库存或会计分录;`erp_push_logs` 仍是 Cowork→第三方 ERP 唯一推送状态源。
-- **✅ 数据与权限**:双方 tenant/workspace/wallet 独立;关系与 submission RLS fail-closed;成员 workspace scope 生效;泰国佛历/公历日期归一化;原件只存不透明引用,不泄露路径。
-- **✅ 本地验收**:pre-push 全绿(1190 unittest 模块/6 片、构建、视觉、权限、体积/棘轮);Postgres smoke 39 项;Auth/注册定向 50 项;Alembic 单一 head `0105_client_submissions`。
-- **⏳ 发布状态**:首推 CI `33070716415` 的真库闸发现共享测试表漏补列,已用全新 PostgreSQL 16 容器按 CI 顺序修复并 39/39 通过;待再推→本 SHA CI 全绿→精确 SHA 部署→生产 HEAD/重启时间验收后才称上线。
-- **🟡 明确未做**:ERP 专用 LINE、LINE/网页 OCR 预览编辑确认、固定库存卡新算法、Cowork 收件箱/快捷审核、受控原件下载中继;现有 ERP 采购拍票尚未改走新确认接线点。
-- **▶ 下一步**:先与 Zihao 逐屏确认 Earn 关系选择、LINE 预览、库存卡、Cowork 收件箱与快捷审核交互;拍板后按竖切批次施工并做真浏览器 E2E,不先写可见 UI。
-- **⚠️ 代理策略**:Qwen 仅派低风险/只读任务;关键施工主控或 DeepSeek,主控独立验收;任务专属 opencode 结束即回收,共享 service 不杀。
+- **✅ 产品关系纠正**:`/cowork` 事务所自由注册;`/erp` 个体老板只接受 Earn 邀请;两套产品租户、单据、余额与状态独立,不建立商户-事务所关系。
+- **✅ 错误链已从工作区删除**:关系路由/服务、`client_submissions` outbox/worker、OCR 确认投递钩子、Earn 选事务所入口、专属测试/金标/旧规格已移除;待本批全闸、commit、push、CI 与生产验收。
+- **✅ 保留能力**:Cowork firm 身份与自由注册、ERP 邀请/撤销、独立门户会话、通用 OCR→采购/销售正式单据、`erp_push_logs` 第三方 ERP 推送状态源、Stock Card 期初库存均保留。
+- **✅ 历史迁移边界**:`0104/0105` 仅保留为已部署 Alembic 链记录;运行时不导入、不建表、不读写。未执行生产 `DROP`,物理清库须另列目标和备份后确认。
+- **✅ 定向验收**:独立边界/ERP 邀请/Cowork 注册/通用转换/路由/DMS 登录共 134 tests 通过;系统 Python 缺依赖的首轮不计结果,项目 `venv/bin/python` 复跑为准。
+- **📌 商品终版口径**:只做单商品逐笔库存卡,不做商品汇总表;固定入库/出库/结存列;保留期初库存;采购/销售/调整形成流水。
+- **📌 录入终版口径**:网页与 ERP 专用 LINE 均为上传→OCR 预览→全字段编辑→明确确认或丢弃;LINE 不猜采购/销售和库存/服务,混合单据逐行选择。
+- **▶ 下一步**:先完成独立边界批发布;再重写 Stock Card 后端契约/算法,前端施工前给 Zihao 确认具体桌面+手机交互稿;之后做网页 OCR、严格 Express 推送、ERP 专用 LINE。
+- **⚠️ 边界**:`/ai`、`/pos`、`/dms` 与现有采购 LINE 不改;工作区现有 DMS/UI 改动不纳入本批。
 
 ---
 

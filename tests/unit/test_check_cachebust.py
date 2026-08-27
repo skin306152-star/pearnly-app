@@ -230,5 +230,15 @@ class PairCoverageTests(unittest.TestCase):
         self.assertEqual(missing, [], "\n".join(missing))
 
 
+class PrePushWiringTests(unittest.TestCase):
+    def test_local_hook_runs_the_same_cachebust_gate_as_ci(self):
+        hook = (_ROOT / "scripts/git-hooks/pre-push").read_text(encoding="utf-8")
+        self.assertIn(
+            'python scripts/check_cachebust.py --base "$BASE" --head HEAD --quiet',
+            hook,
+            "CI 会拦的缓存指纹漏 bump,本地 pre-push 也必须用同一 diff 范围先拦",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

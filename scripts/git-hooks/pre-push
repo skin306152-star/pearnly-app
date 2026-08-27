@@ -239,6 +239,12 @@ if [ -n "$FE_CHANGED" ]; then
   echo "  · check_asset_bundling(源页只引 bundle · 新资产须进打包清单)"
   python scripts/check_asset_bundling.py || fail "前端打包闸(见上方:源页明文引用=view-source 退化 / 资产漏进打包清单=样式丢)"
 
+  # CI lint-size 的同一道闸:产物字节变了,入口 HTML 的 ?v= 必须跟着变。
+  # 本地先拦,避免 pre-push 全绿后还要等 CI 才知道浏览器会吃旧 bundle。
+  echo "  · check_cachebust(产物变更必须 bump 入口 ?v= · 与 CI 同口径)"
+  python scripts/check_cachebust.py --base "$BASE" --head HEAD --quiet \
+    || fail "缓存指纹漏 bump(见上方产物与对应入口 HTML · 修改 ?v= 后重新提交)"
+
   # UI 设计 lint 棘轮闸(2026-06-10 · punch list 收官后挂)· 各类违规命中数只许降不许升
   # 存量(POS/admin 独立 SPA · i18n 文字强调等)在 scripts/ui_lint_baseline.json;
   # 命中下降后跑 node scripts/ui_design_lint.mjs --update-baseline 收紧。

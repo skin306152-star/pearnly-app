@@ -1,16 +1,18 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-27 Cowork/ERP 会话与租户入口隔离已上线
+## 当前状态卡 · 08-27 ERP 邀请准入 + Cowork/ERP 会话隔离已上线
 
-- **✅ 已上线**:生产 HEAD=`7177ab209cee2a7be91b968dc9bcd21eb397a65b`;CI run `33046780752` 全闸 success,deploy job success;mrpilot 于 2026-08-27 06:52:00 UTC 重启并 active。
-- **✅ 入口会话隔离**:Cowork/ERP 各自维护独立 token+workspace 槽;AI/POS/DMS/Daily 沿用既有 legacy 槽并保持原兼容。不同账号可同时开 Cowork/ERP;同一账号仍受 `active_jti` 单会话限制,**不承诺同账号双开**。
-- **✅ 后端 fail-closed 隔离**:所有真实用户 `/api/erp` 能力走 `require_erp_portal`(非 ERP 入口 403);DMS 仅 endpoints CRUD/test/logs 窄 allowlist,其余一律拒。租户仍由签名 user/tenant/workspace + RLS 约束。
-- **✅ admin 邀请时间解析**:保留完整时分,按曼谷时区(UTC+7)回显,不再截断到日。
-- **✅ favicon 分入口**:DMS/console/invite/ERP 均补 Pearnly favicon;生产 `/cowork`、`/erp`、`/dms` 已验 200 且不跳 `/earn`。
-- **✅ 验证**:96 Python 单元测试、5 Playwright session isolation、cowork/erp 壳 60/60、admin invite 43/43、ledger 24/24、tsc 绿;CI 真账号计费/RLS/入口隔离高敏 E2E 绿。
-- **✅ 流程根治**:`HANDOVER_TO_NEXT_WINDOW.md` 唯一活交接固定施工窗口自测→commit→push master→盯本 SHA CI→验生产 HEAD;旧口头交接归档,契约测试锁流程。
-- **🔐 凭据事项**:真实账号 Playwright 已自动关闭 trace,阻止密码输入进入新 CI 产物;08-27 旧失败 run 的测试凭据须轮换,不得复述或写入仓库。
-- **⚠️ 代理策略**:Qwen 仅派低风险/只读任务;关键施工主控或 DeepSeek,主控独立验收。任务结束立即回收独立 opencode 进程树,共享 service 不杀。
+- **✅ ERP 邀请准入根治**:生产功能 SHA=`c7f89be4edb2a68cfdd26f66ade136f58ac8d7ef`;CI run `33048552800` 全闸 success;mrpilot 于 2026-08-27 07:19:43 UTC 重启并 active。
+- **✅ 根因与口径**:登录密码实际匹配,旧 `platform_settings.enabled` 总闸却在名单之后再次拒绝 ERP。现改为市场常见的单一邀请策略:名单即授权、收回即停用,不再存在隐藏二段开关。
+- **✅ 生产实证**:`skin` 已有用户命中名单,`erp_policy=True` 且授权入口集含 `erp`;无需重邀或改密,已有账号始终沿用原密码,密码框只给新建账号设初始密码。
+- **✅ 后台诚实文案**:状态显示「邀请即生效 · 仅邀请名单内」;邀请成功提示已有账号用原密码;时间保留时分并按曼谷时区(UTC+7)回显。
+- **✅ 入口会话隔离**:Cowork/ERP 各自维护独立 token+workspace 槽;AI/POS/DMS/Daily 沿用 legacy 槽。不同账号可同时开 Cowork/ERP;同一账号仍受 `active_jti` 单会话限制,不承诺同账号双开。
+- **✅ 后端 fail-closed 隔离**:真实用户 `/api/erp` 走 `require_erp_portal`(非 ERP 入口 403);DMS 只放 endpoints CRUD/test/logs 窄集合;租户由签名 user/tenant/workspace + RLS 约束。
+- **✅ favicon/路由**:DMS/console/invite/ERP 已补 Pearnly favicon;生产 `/cowork`、`/erp`、`/dms` 均 200 且不跳 `/earn`。
+- **✅ 验证**:pre-push 1175 模块;目标 Python 125 项;admin invite Playwright 43/43 + 桌面/移动截图;CI 真 PG、全量单测、计费/RLS/入口隔离高敏 E2E 全绿。
+- **✅ 流程固化**:`HANDOVER_TO_NEXT_WINDOW.md` 唯一活交接固定自测→commit→push master→盯本 SHA CI→验生产 HEAD;旧口头交接归档,契约测试锁流程。
+- **🔐 凭据事项**:真实账号 Playwright 有凭据时自动关闭 trace;08-27 旧失败 run 曾含测试凭据,须轮换,不得复述或写入仓库。
+- **⚠️ 代理策略**:Qwen 仅派低风险/只读任务;关键施工主控或 DeepSeek,主控独立验收;任务专属 opencode 结束即回收,共享 service 不杀。
 
 ---
 

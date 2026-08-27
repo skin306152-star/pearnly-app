@@ -404,6 +404,18 @@ def _get_plan(user_id: str) -> str:
         return "credits"
 
 
+_SIGNUP_FIRM_ENTRY = "cowork"
+_SIGNUP_ENTRANCES = frozenset({"main", "cowork", "erp"})
+
+
+def _normalize_signup_entry(entry) -> Optional[str]:
+    """归一化共享注册入口；未知值沿用 main 行为。"""
+    if not entry:
+        return None
+    e = str(entry).strip().lower()
+    return e if e in _SIGNUP_ENTRANCES else None
+
+
 # ============================================================
 # v118.26.2.5 · 新用户注册自动建 tenant
 # 解决 v27.7 fix_orphan 留下的根因:signup 不建 tenant · 导致 tenant_id=NULL ·
@@ -411,12 +423,21 @@ def _get_plan(user_id: str) -> str:
 # 3 个注册路径(email signup / Google OAuth / LINE OAuth)统一调此函数。
 # ============================================================
 def _ensure_tenant_for_new_user(
-    cur, user_id, plan: str, company_name: str = None, full_name: str = None, username: str = None
+    cur,
+    user_id,
+    plan: str,
+    company_name: str = None,
+    full_name: str = None,
+    username: str = None,
+    entry: Optional[str] = None,
 ) -> Optional[str]:
-    """新用户注册同事务建 tenant + 回填 user.tenant_id
+    """新用户注册同事务建 tenant + 回填 user.tenant_id。
+
     cur: 已开 commit=True 模式的 cursor(跟 user INSERT 同事务)
-    返回 new_tenant_id · 失败返 None(不抛 · 不阻塞注册 · 该用户后续走 no_tenant 拒)
+    普通入口保留失败返 None 的历史兼容；Cowork 的事务所身份创建失败则抛出并整笔回滚。
     """
+    entry_norm = _normalize_signup_entry(entry)
+    is_firm = entry_norm == _SIGNUP_FIRM_ENTRY
     try:
         # tenant.name 优先级:company > full_name > username > user_<8>
         tenant_name = (company_name or "").strip()
@@ -432,17 +453,28 @@ def _ensure_tenant_for_new_user(
         features = PLAN_CONFIG.get(plan) or PLAN_CONFIG.get("credits") or {}
         monthly_quota = int(features.get("ocr_per_period") or 100)
 
-        # 建 tenant(同事务)
-        cur.execute(
-            """
-            INSERT INTO tenants (
-                name, owner_user_id, tenant_type, monthly_quota,
-                used_this_month, status, member_count
-            ) VALUES (%s, %s, 'shared_api', %s, 0, 'active', 1)
-            RETURNING id
-        """,
-            (tenant_name, str(user_id), monthly_quota),
-        )
+        if is_firm:
+            cur.execute(
+                """
+                INSERT INTO tenants (
+                    name, owner_user_id, tenant_type, monthly_quota,
+                    used_this_month, status, member_count, tenant_type_v2
+                ) VALUES (%s, %s, 'shared_api', %s, 0, 'active', 1, 'f_firm')
+                RETURNING id
+                """,
+                (tenant_name, str(user_id), monthly_quota),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO tenants (
+                    name, owner_user_id, tenant_type, monthly_quota,
+                    used_this_month, status, member_count
+                ) VALUES (%s, %s, 'shared_api', %s, 0, 'active', 1)
+                RETURNING id
+                """,
+                (tenant_name, str(user_id), monthly_quota),
+            )
         row = cur.fetchone()
         if row:
             new_tenant_id = row["id"] if isinstance(row, dict) else row[0]
@@ -457,15 +489,25 @@ def _ensure_tenant_for_new_user(
             (str(new_tenant_id), str(user_id)),
         )
 
-        # 平台业态套餐 · 新注册打「待选业态」标记 → 首进自动弹业态选择器(仅新租户)。
-        # 这是所有注册路径(邮箱 / Google / LINE)创建租户的唯一汇合点 → 一处覆盖全部。
-        # 失败不阻塞注册(标记缺失只是不弹,不致命)。
-        try:
-            from services.modules import store as _modules_store
+        if is_firm:
+            from services.firm import store as _firm_store
+            from services.modules import presets as _module_presets
 
-            _modules_store.set_needs_onboarding(cur, tenant_id=str(new_tenant_id), value=True)
-        except Exception as _e_onb:
-            logger.warning(f"[platform-onboarding] set_needs_onboarding skip: {_e_onb}")
+            profile = _firm_store.create_profile(
+                cur, tenant_id=str(new_tenant_id), display_name=tenant_name
+            )
+            if profile is None:
+                raise RuntimeError("create firm profile returned None")
+            _module_presets.apply_preset(cur, tenant_id=str(new_tenant_id), business_type="firm")
+
+        if not is_firm:
+            # 普通新租户继续走现有业态 onboarding。
+            try:
+                from services.modules import store as _modules_store
+
+                _modules_store.set_needs_onboarding(cur, tenant_id=str(new_tenant_id), value=True)
+            except Exception as _e_onb:
+                logger.warning(f"[platform-onboarding] set_needs_onboarding skip: {_e_onb}")
 
         # 权限整顿批1 · 新 owner 同事务写 membership(memberships=成员唯一真相 ·
         # docs/permissions/01)。失败不阻塞注册(resolver 有 users.role 存量兜底)。
@@ -483,11 +525,22 @@ def _ensure_tenant_for_new_user(
         from services.auth.entrance_store import MAIN, grant_entrance_safe
 
         grant_entrance_safe(MAIN, str(new_tenant_id), cur=cur, context="signup")
+        if is_firm:
+            from services.auth.entrance import COWORK
+
+            grant_entrance_safe(COWORK, str(new_tenant_id), cur=cur, context="signup")
         logger.info(
-            f"[v118.26.2.5 ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. plan={plan} quota={monthly_quota}"
+            "[ensure-tenant] tenant=%s user=%s plan=%s quota=%s firm=%s",
+            str(new_tenant_id)[:8],
+            str(user_id)[:8],
+            plan,
+            monthly_quota,
+            is_firm,
         )
         return str(new_tenant_id)
     except Exception as e:
+        if is_firm:
+            raise
         logger.warning(f"[v118.26.2.5 ensure-tenant] fail user={user_id} plan={plan}: {e}")
         return None
 

@@ -39,7 +39,12 @@ def _signup_helpers():
 # 仅供 app.py 的 /api/auth/google/callback 在用户首次用 Google 登录且未注册时调用
 # ============================================================
 def create_user_via_google_oauth(
-    email: str, full_name: str, google_sub: str, ip: str = None, ua: str = None
+    email: str,
+    full_name: str,
+    google_sub: str,
+    ip: Optional[str] = None,
+    ua: Optional[str] = None,
+    entry: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     from core import db as _db
 
@@ -138,6 +143,7 @@ def create_user_via_google_oauth(
                 company_name=company,
                 full_name=full_name_safe,
                 username=email_raw,
+                entry=entry,
             )
 
             # 订阅日志
@@ -192,6 +198,7 @@ def create_user_via_line_oauth(
     picture: str = None,
     ip: str = None,
     ua: str = None,
+    entry: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     from core import db as _db
 
@@ -296,6 +303,7 @@ def create_user_via_line_oauth(
                 company_name=company,
                 full_name=full_name_safe,
                 username=username_use,
+                entry=entry,
             )
 
             try:

@@ -49,12 +49,17 @@ class LineLoginAutoBindTests(unittest.TestCase):
         app = FastAPI()
         app.include_router(oauth_line_routes.router)
         self.client = TestClient(app)
+        self.token = mock.Mock(return_value="jwt")
         self._patches = [
             mock.patch.object(oauth_line_routes, "_verify_oauth_state", lambda s: True),
+            mock.patch.object(oauth_line_routes, "_oauth_state_entry", lambda s: "cowork"),
+            mock.patch.object(oauth_line_routes, "_login_entrance_allowed", return_value=True),
             mock.patch.object(oauth_line_routes, "_LINE_LOGIN_CHANNEL_ID", "cid"),
             mock.patch.object(oauth_line_routes, "_LINE_LOGIN_CHANNEL_SECRET", "sec"),
-            mock.patch.object(oauth_line_routes, "create_access_token", lambda **k: "jwt"),
-            mock.patch.object(oauth_line_routes, "_login_redirect_path", lambda u: "/home"),
+            mock.patch.object(oauth_line_routes, "create_access_token", self.token),
+            mock.patch.object(
+                oauth_line_routes, "_login_redirect_path", lambda u, entry=None: "/home"
+            ),
             mock.patch("httpx.AsyncClient", _FakeAsyncClient),
             mock.patch.object(
                 oauth_line_routes.db, "find_user_by_line_uid", lambda uid: dict(_USER)
@@ -70,13 +75,18 @@ class LineLoginAutoBindTests(unittest.TestCase):
 
     def test_login_auto_binds_bot_with_sub(self):
         bind = mock.Mock(return_value=True)
-        with mock.patch.object(oauth_line_routes.db, "create_or_update_line_binding", bind):
+        with (
+            mock.patch.object(oauth_line_routes.db, "create_or_update_line_binding", bind),
+            mock.patch("services.auth.oauth_create.create_user_via_line_oauth") as create_account,
+        ):
             r = self.client.get("/api/auth/line/callback?code=c&state=s", follow_redirects=False)
         self.assertEqual(r.status_code, 200)
         bind.assert_called_once()
         kw = bind.call_args.kwargs
         self.assertEqual(kw["user_id"], "u1")
         self.assertEqual(kw["line_user_id"], "Uabc123")  # 用登录 sub 当 Bot userId
+        create_account.assert_not_called()
+        self.assertEqual(self.token.call_args.kwargs["entry"], "cowork")
 
     def test_bind_failure_does_not_block_login(self):
         bind = mock.Mock(side_effect=RuntimeError("db down"))

@@ -296,10 +296,10 @@
         }
         const sso = event.target.closest('[data-sso]');
         if (sso && sso.dataset.sso === 'google') {
-            window.location.href = '/api/auth/google/start';
+            window.location.href = '/api/auth/google/start?entry=' + encodeURIComponent(_entry);
         }
         if (sso && sso.dataset.sso === 'line') {
-            window.location.href = '/api/auth/line/start';
+            window.location.href = '/api/auth/line/start?entry=' + encodeURIComponent(_entry);
         }
     });
 
@@ -435,6 +435,7 @@
                     line_id: null,
                     signup_source: null,
                     invite_code: null,
+                    entry: _entry,
                     newsletter_opt_in: document.getElementById('su-newsletter').checked,
                     fingerprint: FP,
                 }),

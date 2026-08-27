@@ -24,8 +24,11 @@ from fastapi.responses import RedirectResponse as _RedirectResp
 
 from core import db
 from core.auth import create_access_token
+from services.auth.entrance import login_entrance_allowed as _login_entrance_allowed
 from services.auth.oauth_state import gen_oauth_state as _gen_oauth_state
 from services.auth.oauth_state import login_redirect_path as _login_redirect_path
+from services.auth.oauth_state import oauth_entry_context as _oauth_entry_context
+from services.auth.oauth_state import oauth_state_entry as _oauth_state_entry
 from services.auth.oauth_state import oauth_state_secret as _oauth_state_secret  # noqa: F401
 from services.auth.oauth_state import verify_oauth_state as _verify_oauth_state
 
@@ -60,9 +63,13 @@ def _is_line_inapp(ua: str) -> bool:
     return "Line/" in (ua or "")
 
 
-# 突围页内容在 import 时即完全确定(base + 固定入口)→ 预构建一次,冷登录路径不重复渲染。
-_BREAKOUT_URL = json.dumps(f"{_PEARNLY_BASE}/api/auth/google/start?ext=1&openExternalBrowser=1")
-_BREAKOUT_HTML = f"""<!doctype html>
+def _external_browser_breakout(entry: str = "") -> HTMLResponse:
+    params = {"ext": 1, "openExternalBrowser": 1}
+    safe_entry = _oauth_entry_context(entry)
+    if safe_entry:
+        params["entry"] = safe_entry
+    target = json.dumps(f"{_PEARNLY_BASE}/api/auth/google/start?{_urlencode(params)}")
+    html = f"""<!doctype html>
 <html lang="th"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pearnly</title></head>
@@ -70,24 +77,22 @@ _BREAKOUT_HTML = f"""<!doctype html>
 <div>
 <p>กำลังเปิดเบราว์เซอร์เพื่อเข้าสู่ระบบด้วย Google…</p>
 <p style="opacity:.7;font-size:14px">Opening your browser to sign in with Google…</p>
-<p style="margin-top:20px"><a href={_BREAKOUT_URL} style="color:#7aa2ff">แตะที่นี่ถ้าไม่เปิดอัตโนมัติ / Tap here</a></p>
+<p style="margin-top:20px"><a href={target} style="color:#7aa2ff">แตะที่นี่ถ้าไม่เปิดอัตโนมัติ / Tap here</a></p>
 </div>
-<script>location.replace({_BREAKOUT_URL});</script>
+<script>location.replace({target});</script>
 </body></html>"""
-
-
-def _external_browser_breakout() -> HTMLResponse:
-    return HTMLResponse(_BREAKOUT_HTML)
+    return HTMLResponse(html)
 
 
 @router.get("/api/auth/google/start")
-async def google_oauth_start(request: Request, ext: int = 0):
+async def google_oauth_start(request: Request, ext: int = 0, entry: str = ""):
     if not _GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=503, detail="oauth_not_configured")
+    entry_context = _oauth_entry_context(entry)
     # LINE 内置浏览器里直接跳 Google 会 403(disallowed_useragent)→ 先弹到系统浏览器再登录。
     if not ext and _is_line_inapp(request.headers.get("user-agent", "")):
-        return _external_browser_breakout()
-    state = _gen_oauth_state()
+        return _external_browser_breakout(entry_context)
+    state = _gen_oauth_state(entry_context or None)
     params = {
         "client_id": _GOOGLE_CLIENT_ID,
         "redirect_uri": _GOOGLE_REDIRECT_URI,
@@ -107,6 +112,7 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
         return _RedirectResp(f"/login?oauth_error={error}", status_code=302)
     if not _verify_oauth_state(state):
         return _RedirectResp("/login?oauth_error=invalid_state", status_code=302)
+    _entry_ctx = _oauth_state_entry(state)
     if not code:
         return _RedirectResp("/login?oauth_error=no_code", status_code=302)
     if not _GOOGLE_CLIENT_ID or not _GOOGLE_CLIENT_SECRET:
@@ -171,12 +177,17 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
                     google_sub=sub,
                     ip=None,  # callback 这里取不到 client IP · 留空
                     ua=None,
+                    entry=_entry_ctx,
                 )
             except Exception as e:
                 logger.error(f"[OAuth] google one-click signup failed: {e}")
                 user = None
             if not user:
                 return _RedirectResp("/login?oauth_error=signup_failed", status_code=302)
+
+    if not _login_entrance_allowed(_entry_ctx or "main", user):
+        error_path = "/cowork" if _entry_ctx == "cowork" else "/login"
+        return _RedirectResp(f"{error_path}?oauth_error=invalid_credentials", status_code=302)
 
     # 颁 JWT(跟普通 login 走同一函数)
     db.update_last_login(str(user["id"]))
@@ -195,13 +206,14 @@ async def google_oauth_callback(code: str = "", state: str = "", error: str = ""
         role=user.get("role") or "owner",
         is_super_admin=bool(user.get("is_super_admin")),
         remember_me=True,
+        entry=_entry_ctx or "main",
     )
 
     # 中间页 set localStorage 再跳 /home 或 /admin(callback 是 GET 不能直接 set)
     # v118.28.2 · 超管 → /admin · 普通用户 → /home
     # POS PO-B1 · role=cashier → /pos(收银员只进收银前台)
     safe_token = json.dumps(token)
-    _redirect_path = _login_redirect_path(user)
+    _redirect_path = _login_redirect_path(user, entry=_entry_ctx)
     return HTMLResponse(f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">

@@ -61,6 +61,7 @@ from services.auth.signup_core import (  # noqa: F401
     _require_super_admin,
     _get_plan,
     _ensure_tenant_for_new_user,
+    _normalize_signup_entry,
     get_plan_features,
 )
 
@@ -81,6 +82,7 @@ class SignupRequest(BaseModel):
     line_id: Optional[str] = None
     signup_source: Optional[str] = None
     invite_code: Optional[str] = None
+    entry: Optional[str] = None
     newsletter_opt_in: bool = True
     fingerprint: Optional[str] = None
 
@@ -129,6 +131,10 @@ def signup(req: SignupRequest, request: Request):
         country = (req.country or "TH").upper()
         if country not in ("TH", "CN", "JP", "EN", "US"):
             country = "TH"
+
+        signup_entry = _normalize_signup_entry(req.entry) or "main"
+        if signup_entry == "erp":
+            raise HTTPException(status_code=403, detail="erp_invite_only")
 
         # v118.9 · company_name / full_name 改为选填(注册门槛降到最低 · 用户进入产品后在设置页可补全)
         # 空时用 email 前缀兜底 · 防 NULL · 防 fallback 显示完整 email
@@ -305,6 +311,7 @@ def signup(req: SignupRequest, request: Request):
                 company_name=company,
                 full_name=full_name_safe,
                 username=username,
+                entry=signup_entry,
             )
 
             # 订阅日志(同一事务 · 不能 try/except)
@@ -350,6 +357,7 @@ def signup(req: SignupRequest, request: Request):
             role="owner",
             is_super_admin=False,
             remember_me=False,
+            entry=signup_entry,
         )
         return {
             "ok": True,

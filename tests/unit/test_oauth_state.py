@@ -16,6 +16,7 @@ os.environ.setdefault("JWT_SECRET", "test-oauth-state-secret-1234567890")
 
 from routes.oauth_routes import (
     _gen_oauth_state,
+    _oauth_state_entry,
     _verify_oauth_state,
     _oauth_state_secret,
     _is_line_inapp,
@@ -43,6 +44,22 @@ class OAuthStateTests(unittest.TestCase):
     def test_tampered_sig_rejected(self):
         s = _gen_oauth_state()
         self.assertFalse(_verify_oauth_state(s[:-4] + "dead"))
+
+    def test_cowork_context_is_signed_and_tamper_proof(self):
+        state = _gen_oauth_state("cowork")
+        self.assertEqual(state.count("."), 3)
+        self.assertTrue(_verify_oauth_state(state))
+        self.assertEqual(_oauth_state_entry(state), "cowork")
+        nonce, ts, _entry, sig = state.split(".")
+        tampered = ".".join((nonce, ts, "main", sig))
+        self.assertFalse(_verify_oauth_state(tampered))
+        self.assertIsNone(_oauth_state_entry(tampered))
+
+    def test_erp_cannot_be_carried_by_shared_oauth_state(self):
+        state = _gen_oauth_state("erp")
+        self.assertEqual(state.count("."), 2)
+        self.assertTrue(_verify_oauth_state(state))
+        self.assertIsNone(_oauth_state_entry(state))
 
     def test_garbage_and_empty_rejected(self):
         self.assertFalse(_verify_oauth_state("garbage"))
@@ -81,6 +98,12 @@ class LineInAppBreakoutTests(unittest.TestCase):
         self.assertIn("ext=1", body)
         self.assertIn("/api/auth/google/start", body)
         self.assertIn("location.replace", body)
+
+    def test_breakout_preserves_cowork_but_never_erp(self):
+        cowork = _external_browser_breakout("cowork").body.decode("utf-8")
+        erp = _external_browser_breakout("erp").body.decode("utf-8")
+        self.assertIn("entry=cowork", cowork)
+        self.assertNotIn("entry=erp", erp)
 
 
 if __name__ == "__main__":

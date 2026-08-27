@@ -26,9 +26,12 @@ from fastapi.responses import RedirectResponse as _RedirectResp
 
 from core import db
 from core.auth import create_access_token, get_current_user_from_request
+from services.auth.entrance import login_entrance_allowed as _login_entrance_allowed
 from services.auth.oauth_state import _OAUTH_STATE_TTL
 from services.auth.oauth_state import gen_oauth_state as _gen_oauth_state
 from services.auth.oauth_state import login_redirect_path as _login_redirect_path
+from services.auth.oauth_state import oauth_entry_context as _oauth_entry_context
+from services.auth.oauth_state import oauth_state_entry as _oauth_state_entry
 from services.auth.oauth_state import oauth_state_secret as _oauth_state_secret
 from services.auth.oauth_state import verify_oauth_state as _verify_oauth_state
 
@@ -94,10 +97,10 @@ async def connect_line_start(request: Request):
 
 
 @router.get("/api/auth/line/start")
-async def line_oauth_start():
+async def line_oauth_start(entry: str = ""):
     if not _LINE_LOGIN_CHANNEL_ID:
         raise HTTPException(status_code=503, detail="line_oauth_not_configured")
-    state = _gen_oauth_state()
+    state = _gen_oauth_state(_oauth_entry_context(entry) or None)
     params = {
         "response_type": "code",
         "client_id": _LINE_LOGIN_CHANNEL_ID,
@@ -184,6 +187,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
         return await _handle_connect_line(_connect_uid, code)
     if not _verify_oauth_state(state):
         return _RedirectResp("/login?oauth_error=invalid_state", status_code=302)
+    _entry_ctx = _oauth_state_entry(state)
     if not code:
         return _RedirectResp("/login?oauth_error=no_code", status_code=302)
     if not _LINE_LOGIN_CHANNEL_ID or not _LINE_LOGIN_CHANNEL_SECRET:
@@ -262,12 +266,17 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                     picture=line_picture or None,
                     ip=None,
                     ua=None,
+                    entry=_entry_ctx,
                 )
             except Exception as e:
                 logger.error(f"[LINE OAuth] one-click signup failed: {e}")
                 user = None
             if not user:
                 return _RedirectResp("/login?oauth_error=line_signup_failed", status_code=302)
+
+    if not _login_entrance_allowed(_entry_ctx or "main", user):
+        error_path = "/cowork" if _entry_ctx == "cowork" else "/login"
+        return _RedirectResp(f"{error_path}?oauth_error=invalid_credentials", status_code=302)
 
     # 登录即自动绑定 Bot:登录频道(2010411313)与 Messaging Bot 同一 Provider「Pearnly」→
     # 登录拿到的 sub == Bot 看到的 userId → 直接写 line_bindings,免手输 6 位码。
@@ -306,11 +315,12 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
         role=user.get("role") or "owner",
         is_super_admin=bool(user.get("is_super_admin")),
         remember_me=True,
+        entry=_entry_ctx or "main",
     )
 
     safe_token = json.dumps(token)
     # v118.28.2 · 超管 → /admin · 普通用户 → /home · POS PO-B1 · cashier → /pos
-    _redirect_path = _login_redirect_path(user)
+    _redirect_path = _login_redirect_path(user, entry=_entry_ctx)
     return HTMLResponse(f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Pearnly · Signing in...</title></head>
 <body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">

@@ -16,13 +16,22 @@
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');
+const localServer = require('./_local_static_server');
 const {
     attachConsoleGuard,
     assertNoConsoleErrors,
     blockCfInsights,
 } = require('./_helpers/console-guard');
 
+const PORT = 8977;
+const BASE = `http://127.0.0.1:${PORT}`;
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'stock-card');
+
+let server;
+test.beforeAll(async () => {
+    server = await localServer.start(PORT, '/static/dist/home.html');
+});
+test.afterAll(() => localServer.stop(server));
 
 // key 忠实于真后端形状(services/stockcard/grouping.py):商品档轨 p:<id> · 名字轨 n:<清洗名>
 // 且名字轨 product_id 为 null(在商品标题里以「—」呈现,不是假 pid)。
@@ -233,9 +242,15 @@ async function openReport(page, captures = {}, overrides = {}) {
         localStorage.setItem('pearnly_entry', 'erp');
     });
     const visited = await stubApi(page, captures, overrides);
-    // /erp 登录后由同一 home SPA 承接；canonical 让本地 E2E 直接进入该 ERP 壳，
-    // preboot 会把可见 pathname 收敛为 /erp，不借 Cowork 壳验 ERP 页面。
-    await page.goto('/home?canonical=erp#/stock-card');
+    // 本地静态服没有生产 /erp 路由；将它映射到本次提交的 home 成品，既保留真实
+    // ERP pathname/会话槽，又避免 CI 在部署前拿线上旧版本断言新页面。
+    await page.route(`${BASE}/erp`, (route) =>
+        route.fulfill({
+            path: path.join(localServer.ROOT, 'static', 'dist', 'home.html'),
+            contentType: 'text/html',
+        })
+    );
+    await page.goto(`${BASE}/erp#/stock-card`);
     await page.waitForFunction(() => window.location.pathname === '/erp');
     await page.waitForFunction(() => typeof window.loadStockCard === 'function');
     await neutralizeWorkspaceGate(page);

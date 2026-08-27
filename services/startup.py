@@ -205,6 +205,15 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 外流 schema/handler 失败: {e}")
 
+    # 会计事务所身份 schema 双跑 · 与 alembic 0103 同源幂等 DDL/回填。
+    # tenant_type_v2 三值化 + accounting_firm_profiles 建表 + f_firm 回填 + tenant RLS。
+    try:
+        from services.firm.schema import ensure_firm_schema
+
+        ensure_firm_schema()
+    except Exception as e:
+        logger.warning(f"启动 firm schema 失败(等 alembic 0103): {e}")
+
     # ⚠️ RLS 自愈守卫必须是本函数最后一步:上面所有 ensure_*/apply_* 已建好 policy → 真隔离表此时
     # 有 policy 不被误关。新增任何 ensure_*_rls 务必加在它【之前】。关掉「RLS 已开但零 policy」的
     # 孤儿表,杜绝 deny-all 把 get_cursor_rls 查询静默拖空。复盘 b8-rls-no-policy-orphans-INCIDENT.md。

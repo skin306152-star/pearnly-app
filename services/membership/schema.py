@@ -7,7 +7,7 @@ services/membership/schema.py · 多租户 P0 memberships/roles/client_assignmen
 - roles 表(RBAC 预留 · 3 系统角色 owner/manager/staff)
 - memberships 表(用户挂事务所 · UNIQUE(user_id) · 1 人 1 事务所)
 - client_assignments 表(老板分客户给员工 · 限员工可见客户)
-- tenants.tenant_type_v2 列(firm/sme/freelancer 业务类型 · 不覆盖老 tenant_type)
+- tenants.tenant_type_v2 列(s_micro/m_business/f_firm 经营层 · NULL=待分类)
 
 注意:本文件只负责 schema 初始化 · 不动 RLS 基础设施代码内部(_is_rls_enabled /
 get_cursor_rls / get_clients_rls_status / run_rls_isolation_tests · 硬线 #1)。
@@ -85,12 +85,12 @@ def ensure_membership_tables():
 
             apply_user_rls(cur, "client_assignments")
 
-            # ── 4. tenants 加 tenant_type 列(区分事务所/SME/freelancer)
+            # ── 4. tenants 加经营层列(NULL=待分类,不猜新租户类型)
             cur.execute("""
-                ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_type_v2 TEXT DEFAULT 'firm';
+                ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_type_v2 TEXT;
             """)
             # 注意:tenants 表已经有老的 tenant_type(shared_api/byo_api/admin · 计费类型)
-            # 不能覆盖 · 用新列 tenant_type_v2 区分(firm/sme/freelancer · 业务类型)
+            # 不能覆盖 · tenant_type_v2 的分类与回填由 services.firm.schema 统一负责。
 
             # ── 5. clients 表 · tenant_id 列已存在(v107 ensure_clients_table 已建)· 不重复 ALTER
 

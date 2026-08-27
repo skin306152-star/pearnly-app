@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS display_name text;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_user_id uuid;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS monthly_quota integer NOT NULL DEFAULT 0;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS used_this_month integer NOT NULL DEFAULT 0;

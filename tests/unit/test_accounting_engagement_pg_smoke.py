@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS display_name text;
 CREATE TABLE IF NOT EXISTS tenant_modules (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid NOT NULL,

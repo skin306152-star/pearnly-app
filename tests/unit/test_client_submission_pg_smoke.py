@@ -22,6 +22,7 @@ BASE_DDL = """
 CREATE TABLE IF NOT EXISTS tenants (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
+    display_name text,
     tenant_type text NOT NULL DEFAULT 'shared_api',
     status text NOT NULL DEFAULT 'active',
     tenant_type_v2 text,
@@ -29,6 +30,8 @@ CREATE TABLE IF NOT EXISTS tenants (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS display_name text;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS owner_user_id uuid;
 CREATE TABLE IF NOT EXISTS users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     username text NOT NULL,

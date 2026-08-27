@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS ocr_history (
     last_push_status TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS last_pushed_at TIMESTAMPTZ;
+ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS last_push_status TEXT;
 CREATE TABLE IF NOT EXISTS erp_push_logs (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

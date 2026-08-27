@@ -17,6 +17,7 @@ import os
 
 from routes.accounting_bank_routes import router as accounting_bank_router
 from routes.accounting_books_routes import router as accounting_books_router
+from routes.accounting_engagement_routes import router as accounting_engagement_router
 from routes.accounting_routes import router as accounting_router
 from routes.admin_agent_routes import router as admin_agent_router
 from routes.admin_cost_routes import router as admin_cost_router
@@ -166,6 +167,7 @@ ROUTERS = (
     accounting_router,
     accounting_books_router,
     accounting_bank_router,
+    accounting_engagement_router,
     stock_card_router,  # 商品收发存报表(Stock Card · 移动加权平均 · accounting 模块闸)
     tax_router,
     sales_router,

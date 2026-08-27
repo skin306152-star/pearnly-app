@@ -18,6 +18,7 @@ def invite(
     merchant_tenant_id: str,
     admin_user_id: str,
 ) -> dict:
+    access.require_active_firm(cur, tenant_id=firm_tenant_id)
     existing = store.get_open_for_merchant(cur, merchant_tenant_id=merchant_tenant_id)
     if existing:
         if str(existing["firm_tenant_id"]) == str(firm_tenant_id):

@@ -51,6 +51,7 @@ class RoutesContractTests(unittest.TestCase):
             got,
             {
                 ("GET", "/api/admin/erp/overview"),
+                ("GET", "/api/admin/erp/firms"),
                 ("POST", "/api/admin/erp/invite"),
                 ("POST", "/api/admin/erp/revoke"),
             },
@@ -61,6 +62,7 @@ class RoutesContractTests(unittest.TestCase):
 
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
         self.assertIn("/api/admin/erp/overview", paths)
+        self.assertIn("/api/admin/erp/firms", paths)
         self.assertIn("/api/admin/erp/invite", paths)
         self.assertIn("/api/admin/erp/revoke", paths)
 
@@ -98,6 +100,11 @@ class GuardEnforcedTests(unittest.TestCase):
     def test_invite_non_super_403(self):
         with self._as_non_super():
             r = self.client.post("/api/admin/erp/invite", json={"username_or_email": "x@y.com"})
+        self.assertEqual(r.status_code, 403)
+
+    def test_firms_non_super_403(self):
+        with self._as_non_super():
+            r = self.client.get("/api/admin/erp/firms")
         self.assertEqual(r.status_code, 403)
 
     def test_revoke_non_super_403(self):

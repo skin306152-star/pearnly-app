@@ -29,9 +29,18 @@ from pydantic import BaseModel, Field
 from core import db
 from core.feature_flags import ERP_PORTAL_KEY
 from core.route_helpers import _check_password_strength, _log_op, _require_super_admin
+from services.accounting_engagement import flags as engagement_flags
+from services.accounting_engagement import invitations as engagement_invitations
+from services.accounting_engagement.errors import (
+    FIRM_INACTIVE,
+    NOT_ACTIVE,
+    PRIMARY_EXISTS,
+    EngagementError,
+)
 from services.auth.account_provision import resolve_account_identifier
 from services.auth.entrance import ERP
 from services.auth.entrance_store import grant_entrance_safe, revoke_entrance
+from services.firm import store as firm_store
 from services.platform_settings import store as platform_settings_store
 from services.tenant.owner_users import create_owner_user
 
@@ -48,6 +57,8 @@ class InviteBody(BaseModel):
     username_or_email: str = Field(..., min_length=1, max_length=200)
     # 留空 = 系统随机生成;传了原样用(超管口不设强度闸)。
     password: str | None = Field(None, min_length=1, max_length=200)
+    # 新闭环灰度参数；现有 Earn UI 尚未传入时继续走原邀请，不改变线上行为。
+    firm_tenant_id: str | None = Field(None, min_length=1, max_length=64)
 
 
 class RevokeBody(BaseModel):
@@ -123,6 +134,34 @@ def _enrich_subjects(subject_ids: list[str]) -> dict[str, dict]:
     return out
 
 
+def _engagement_http_error(error: EngagementError) -> HTTPException:
+    status_by_code = {
+        FIRM_INACTIVE: 422,
+        NOT_ACTIVE: 422,
+        PRIMARY_EXISTS: 409,
+    }
+    return HTTPException(status_by_code.get(error.code, 400), detail=error.code)
+
+
+@router.get("/api/admin/erp/firms")
+async def erp_active_firms(request: Request):
+    """Earn 可选事务所元数据；不返回客户、单据、金额或库存。"""
+    _require_super_admin(request)
+    with db.get_cursor_rls(bypass=True) as cur:
+        rows = firm_store.list_active_profiles_for_admin(cur)
+    return {
+        "firms": [
+            {
+                "tenant_id": row["tenant_id"],
+                "firm_code": row["firm_code"],
+                "display_name": row["display_name"],
+                "tax_id": row.get("tax_id"),
+            }
+            for row in rows
+        ]
+    }
+
+
 @router.get("/api/admin/erp/overview")
 async def erp_overview(request: Request):
     """闸状态(enabled/rollout)+ 邀请名单(每项配人类可读的用户/租户信息 + invited 状态)。"""
@@ -175,6 +214,51 @@ async def erp_invite(request: Request, body: InviteBody):
         if code == "account_missing":
             raise HTTPException(400, detail="admin.erp_missing_identity") from e
         raise HTTPException(422, detail=f"admin.erp_{code}") from e
+
+    if body.firm_tenant_id:
+        if not engagement_flags.enabled_for(body.firm_tenant_id):
+            raise HTTPException(404, detail="not_found")
+        try:
+            with db.get_cursor_rls(bypass=True, commit=True) as cur:
+                invited = engagement_invitations.invite_merchant(
+                    cur,
+                    identity=identity,
+                    firm_tenant_id=body.firm_tenant_id,
+                    admin_user_id=str(admin["id"]),
+                    password=body.password,
+                )
+        except EngagementError as error:
+            raise _engagement_http_error(error) from error
+
+        engagement = invited["engagement"]
+        _log_op(
+            request,
+            admin,
+            action="erp.engagement_invite",
+            target_type="tenant",
+            target_id=invited["merchant_tenant_id"],
+            target_name=invited.get("username"),
+            details={
+                "engagement_id": engagement["id"],
+                "firm_tenant_id": engagement["firm_tenant_id"],
+                "status": engagement["status"],
+            },
+        )
+        response = {
+            "ok": True,
+            "created_account": invited["created_account"],
+            "subject_id": invited["merchant_tenant_id"],
+            "username": invited.get("username"),
+            "engagement": {
+                "id": engagement["id"],
+                "firm_tenant_id": engagement["firm_tenant_id"],
+                "merchant_tenant_id": engagement["merchant_tenant_id"],
+                "status": engagement["status"],
+            },
+        }
+        if invited.get("initial_password") is not None:
+            response["initial_password"] = invited["initial_password"]
+        return response
 
     existing = db.find_user_by_username(identity["lookup_key"])
     if existing:

@@ -6,6 +6,7 @@ const { defineConfig, devices } = require('@playwright/test');
 
 const BASE_URL = process.env.PEARNLY_E2E_BASE_URL || 'https://pearnly.com';
 const IS_CI = !!process.env.CI;
+const HAS_REAL_CREDS = !!(process.env.PEARNLY_E2E_USER && process.env.PEARNLY_E2E_PASS);
 
 module.exports = defineConfig({
     testDir: './tests/e2e',
@@ -21,7 +22,8 @@ module.exports = defineConfig({
         headless: true,
         viewport: { width: 1280, height: 800 },
         ignoreHTTPSErrors: true,
-        trace: 'on-first-retry',
+        // Playwright trace 会记录 fill 动作的输入值。真账号运行时关闭 trace,避免凭据进入 CI 产物。
+        trace: HAS_REAL_CREDS ? 'off' : 'on-first-retry',
         video: 'off',
         screenshot: 'only-on-failure',
         actionTimeout: 10_000,

@@ -110,11 +110,12 @@ async function ensureStorageState(browser) {
 
 // 兼容新旧生产的 token 读取(2026-08-27 · CI 高敏 E2E 部署前对旧生产跑):
 //   新生产:window.session.getToken() 内部按 pathname 选槽(cowork/erp/legacy)
-//   旧生产:无 window.session → 按 pathname 精确选槽 fallback:
-//     /erp    → mrpilot_token_erp
-//     /cowork → mrpilot_token_cowork
+//   旧生产:无 window.session → 入口槽优先,再回退旧版唯一 legacy 槽:
+//     /erp    → mrpilot_token_erp || mrpilot_token
+//     /cowork → mrpilot_token_cowork || mrpilot_token
 //     其他    → mrpilot_token(legacy main/pos/dms/ai/daily)
-//   绝不跨产品拿错 token(如 /erp 页面拿到 cowork token)。
+//   旧版没有入口分槽,因此只有在 session API 尚未部署时才允许 legacy 回退;新生产始终由
+//   session.getToken() 严格分槽,绝不跨产品拿错 token(如 /erp 页面拿到 cowork token)。
 async function getToken(page) {
     return page.evaluate(() => {
         if (
@@ -124,8 +125,20 @@ async function getToken(page) {
             return window.session.getToken();
         }
         const p = window.location.pathname;
-        if (p === '/erp') return localStorage.getItem('mrpilot_token_erp') || '';
-        if (p === '/cowork') return localStorage.getItem('mrpilot_token_cowork') || '';
+        if (p === '/erp') {
+            return (
+                localStorage.getItem('mrpilot_token_erp') ||
+                localStorage.getItem('mrpilot_token') ||
+                ''
+            );
+        }
+        if (p === '/cowork') {
+            return (
+                localStorage.getItem('mrpilot_token_cowork') ||
+                localStorage.getItem('mrpilot_token') ||
+                ''
+            );
+        }
         return localStorage.getItem('mrpilot_token') || '';
     });
 }

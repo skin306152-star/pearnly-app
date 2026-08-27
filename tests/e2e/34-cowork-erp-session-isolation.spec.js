@@ -11,11 +11,14 @@
 //      也各自分槽(互不覆盖)。
 //   B. 登出(cowork 槽 clear)只清 cowork 槽,erp 槽 token 仍在,reload 后 erp 仍用原 token。
 //   C. legacy POS token(entry=pos)打 /erp 不被收养:仍停在 erp 登录页,不跳 /home?canonical=erp。
+//   D. 部署前 CI 面对尚无 window.session 的旧生产时,cowork/erp 可读取旧版唯一 legacy token;
+//      新入口槽一旦存在则优先读取入口槽。
 
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 const localServer = require('./_local_static_server');
+const { getToken } = require('./_helpers/auth');
 
 const PORT = 8998;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -23,6 +26,7 @@ const ARTIFACT_DIR = path.join(__dirname, '_artifacts', 'cowork_erp_session');
 
 const COW_TOKEN = 'cow-token-AAA';
 const ERP_TOKEN = 'erp-token-BBB';
+const LEGACY_TOKEN = 'legacy-token-ZZZ';
 const COW_WS = '101';
 const ERP_WS = '202';
 
@@ -43,6 +47,55 @@ test.beforeAll(async () => {
     server = await localServer.start(PORT, '/home.html');
 });
 test.afterAll(() => localServer.stop(server));
+
+test('旧生产无 session API 时回退 legacy token,入口槽仍有优先级', async ({ context }) => {
+    await context.route(`${BASE}/legacy-token-check`, (route) =>
+        route.fulfill({
+            contentType: 'text/html',
+            body: '<!doctype html><html><body><main id="result"></main></body></html>',
+        })
+    );
+    const page = await context.newPage();
+    await page.goto(`${BASE}/legacy-token-check`);
+
+    await page.evaluate((legacyToken) => {
+        delete window.session;
+        localStorage.clear();
+        localStorage.setItem('mrpilot_token', legacyToken);
+        window.history.replaceState(null, '', '/cowork');
+    }, LEGACY_TOKEN);
+    expect(await getToken(page), '旧生产 /cowork 应读取唯一 legacy token').toBe(LEGACY_TOKEN);
+
+    await page.evaluate((coworkToken) => {
+        localStorage.setItem('mrpilot_token_cowork', coworkToken);
+    }, COW_TOKEN);
+    expect(await getToken(page), '/cowork 入口槽应优先于 legacy token').toBe(COW_TOKEN);
+
+    await page.evaluate(() => {
+        localStorage.removeItem('mrpilot_token_cowork');
+        window.history.replaceState(null, '', '/erp');
+    });
+    expect(await getToken(page), '旧生产 /erp 应读取唯一 legacy token').toBe(LEGACY_TOKEN);
+
+    await page.evaluate((erpToken) => {
+        localStorage.setItem('mrpilot_token_erp', erpToken);
+    }, ERP_TOKEN);
+    expect(await getToken(page), '/erp 入口槽应优先于 legacy token').toBe(ERP_TOKEN);
+
+    await page.evaluate(() => {
+        window.document.body.innerHTML = `
+            <main style="font: 18px system-ui; padding: 40px; color: #24143d">
+                <h1>Legacy session compatibility</h1>
+                <p>cowork fallback: PASS</p>
+                <p>erp fallback: PASS</p>
+                <p>scoped slot precedence: PASS</p>
+            </main>`;
+    });
+    await page.screenshot({
+        path: path.join(ARTIFACT_DIR, '03-legacy-token-fallback.png'),
+        fullPage: true,
+    });
+});
 
 async function stubShellRoutes(context, { erpShell = 'shell/erp.html' } = {}) {
     // 主壳 app 在 /cowork|/erp 下由同源 home.html 承接(生产经 pages_routes 出 app 壳;

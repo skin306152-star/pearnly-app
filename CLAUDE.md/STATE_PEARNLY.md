@@ -1,15 +1,16 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-27 Cowork/ERP 会话与租户入口隔离待提交
+## 当前状态卡 · 08-27 Cowork/ERP 会话与租户入口隔离已上线
 
-- **🟡 未提交/未推送**:本窗口改动仍在 working tree,下一步 = 本窗口 commit master + push + 盯精确 SHA CI + 验生产 HEAD。不要声称已上线。
-- **✅ 不同入口独立 token/workspace 槽**:Cowork/ERP/DMS/admin 各自维护独立 session slot,跨入口不共享 token;同账号仍受 `active_jti` 单会话限制,**不承诺同账号双开**。
-- **✅ 后端 fail-closed 隔离**:所有真实用户 `/api/erp` 能力走 `require_erp_portal`(非 ERP 入口 403);DMS 仅 endpoints CRUD/test/logs 窄 allowlist,其余一律拒。契约测试锁定。
-- **✅ admin 邀请时间解析**:保留完整时分,按曼谷时区(UTC+7)落库与回显,不再截断到日。
-- **✅ favicon 分入口**:DMS/console/invite/ERP 各自独立 favicon,浏览器标签可区分。
-- **✅ 验证**:96 Python 单元测试、4 Playwright session isolation、cowork/erp 壳 60/60、admin invite 43/43、ledger 24/24、tsc 绿;契约测试已锁入口隔离与 DMS allowlist。
-- **✅ 活交接文档已根治**:施工窗口自测→commit→push master→盯本 SHA CI→验生产 HEAD 为唯一可执行默认流程;旧"口头交接/无 SHA 部署"路径作废。
-- **⚠️ 本地代理策略**:Qwen3.8 Max 本轮关键施工多次误判,只派低风险/只读任务;关键施工优先 DeepSeek,主控独立验收。任务结束立即回收独立 opencode 进程树,共享 service 不杀。
+- **✅ 已上线**:生产 HEAD=`7177ab209cee2a7be91b968dc9bcd21eb397a65b`;CI run `33046780752` 全闸 success,deploy job success;mrpilot 于 2026-08-27 06:52:00 UTC 重启并 active。
+- **✅ 入口会话隔离**:Cowork/ERP 各自维护独立 token+workspace 槽;AI/POS/DMS/Daily 沿用既有 legacy 槽并保持原兼容。不同账号可同时开 Cowork/ERP;同一账号仍受 `active_jti` 单会话限制,**不承诺同账号双开**。
+- **✅ 后端 fail-closed 隔离**:所有真实用户 `/api/erp` 能力走 `require_erp_portal`(非 ERP 入口 403);DMS 仅 endpoints CRUD/test/logs 窄 allowlist,其余一律拒。租户仍由签名 user/tenant/workspace + RLS 约束。
+- **✅ admin 邀请时间解析**:保留完整时分,按曼谷时区(UTC+7)回显,不再截断到日。
+- **✅ favicon 分入口**:DMS/console/invite/ERP 均补 Pearnly favicon;生产 `/cowork`、`/erp`、`/dms` 已验 200 且不跳 `/earn`。
+- **✅ 验证**:96 Python 单元测试、5 Playwright session isolation、cowork/erp 壳 60/60、admin invite 43/43、ledger 24/24、tsc 绿;CI 真账号计费/RLS/入口隔离高敏 E2E 绿。
+- **✅ 流程根治**:`HANDOVER_TO_NEXT_WINDOW.md` 唯一活交接固定施工窗口自测→commit→push master→盯本 SHA CI→验生产 HEAD;旧口头交接归档,契约测试锁流程。
+- **🔐 凭据事项**:真实账号 Playwright 已自动关闭 trace,阻止密码输入进入新 CI 产物;08-27 旧失败 run 的测试凭据须轮换,不得复述或写入仓库。
+- **⚠️ 代理策略**:Qwen 仅派低风险/只读任务;关键施工主控或 DeepSeek,主控独立验收。任务结束立即回收独立 opencode 进程树,共享 service 不杀。
 
 ---
 

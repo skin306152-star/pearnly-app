@@ -16,7 +16,7 @@
 | /erp | 商户 | Earn 邀请制 | 独立 merchant 租户 + ERP 入口授权 + pending 关系 |
 | /earn | 平台控制面 | 平台运营 | 仅展示关系元数据、状态、计数、错误码、审计元数据 |
 
-- `/cowork` 自由注册。注册即创建一个独立 firm 租户与 accounting_firm_profile,并为该 profile 生成唯一 firm_code。`tenant_type_v2` 的可信分类值为 `s_micro`、`m_business`、`f_firm`,禁止发明 `merchant` 作为 `tenant_type_v2` 的值。
+- `/cowork` 自由注册。注册即创建一个独立 firm 租户与 accounting_firm_profile,并为该 profile 生成唯一 firm_code。`tenant_type_v2` 的可信非空分类值为 `s_micro`、`m_business`、`f_firm`,禁止发明 `merchant` 作为 `tenant_type_v2` 的值。`NULL` 不是第四种经营层,只表示尚未取得可靠分类；存量迁移不得把未选业态的租户猜成事务所。
 - `/erp` 为邀请制。Earn 的邀请动作必须从 active 状态的 Cowork firm 中选取。已有 merchant 账号/租户一律复用,绝不静默重建。
 - `/earn` 是控制面。可存储与展示关系标识、名称、税号、状态、计数、错误码与审计元数据;禁止存储、中转或展示发票图像、行项、金额、库存、会计分录。
 
@@ -197,7 +197,7 @@ OCR 预览(可编辑) ──确认──▶ 已确认快照(不可变) ──原
 ## 12. 迁移与上线顺序
 
 1. PO-0:只落本规格与契约测试,零运行时改动。
-2. PO-1:修正租户经营层分类；Cowork 注册新增 accounting_firm_profile 与 firm_code。迁移先 dry-run 计数，再 apply 与回读核对。
+2. PO-1:修正租户经营层分类；非空默认值改为 `NULL`,仅按已有真实业态映射（firm→f_firm；retail/pharmacy/restaurant→s_micro；service/b2b→m_business）,无可靠信号保持 `NULL`；Cowork 新注册显式写 f_firm 并新增 accounting_firm_profile 与 firm_code。迁移先 dry-run 计数，再 apply 与回读核对。
 3. PO-2:新增 accounting_engagement schema/store/lifecycle/access，feature flag 默认关闭，只上线只读关系总览。
 4. PO-3:接 Earn 邀请、商户确认与 Cowork 建账，两段确认后才激活。
 5. PO-4:新增 business_locations，总部回填 00000；只处理 ERP 范围数据。
@@ -236,7 +236,7 @@ OCR 预览(可编辑) ──确认──▶ 已确认快照(不可变) ──原
 
 | 标识 | 不变式 |
 |---|---|
-| INV-001 | tenant_type_v2 分类值恰为 s_micro / m_business / f_firm;禁止发明 merchant 作为其值 |
+| INV-001 | tenant_type_v2 的非空分类值恰为 s_micro / m_business / f_firm;NULL 只表示待分类;无可靠信号不得猜测;禁止发明 merchant 作为其值 |
 | INV-002 | /cowork 自由注册建独立 firm 租户 + accounting_firm_profile + 唯一 firm_code |
 | INV-003 | /erp 邀请制;邀请须选 active Cowork firm;已有 merchant 账号/租户一律复用,绝不静默重建或重置密码;workspace 必须按真实公司资料显式建立 |
 | INV-004 | /earn 为控制面;只存/展关系元数据与审计元数据;禁止发票图像、行项、金额、库存、分录 |

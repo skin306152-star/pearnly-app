@@ -2,6 +2,7 @@
   "schema_version": 1,
   "canonical_doc": "docs/erp/ERP-COWORK-CLOSED-LOOP.md",
   "tenant_type_v2_values": ["s_micro", "m_business", "f_firm"],
+  "tenant_type_v2_allows_unclassified_null": true,
   "product_scope": "erp",
   "engagement_statuses": ["pending_merchant", "pending_firm", "active", "suspended", "ended"],
   "submission_statuses": ["pending", "delivered", "failed", "superseded"],
@@ -33,6 +34,14 @@
       "action": "尝试复用相同 firm_code 注册。",
       "expected": "拒绝冲突,重新生成唯一 firm_code,不返回部分创建。",
       "invariant_ids": ["INV-002"]
+    },
+    {
+      "id": "tenant-layer-unclassified-remains-null",
+      "surface": "/cowork",
+      "given": "存量租户没有真实业态或其他可靠经营层信号。",
+      "action": "执行 tenant_type_v2 dry-run 与回填。",
+      "expected": "tenant_type_v2 保持 NULL 待分类,不因旧默认 firm 猜成 f_firm;NULL 不是第四种经营层。",
+      "invariant_ids": ["INV-001"]
     },
     {
       "id": "erp-invite-requires-active-firm",

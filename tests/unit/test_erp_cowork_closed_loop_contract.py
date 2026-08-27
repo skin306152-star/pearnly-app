@@ -220,6 +220,10 @@ class EnumeratedContractSets(unittest.TestCase):
     def test_tenant_types_exact_set(self):
         self.assertEqual(set(self.goldens["tenant_type_v2_values"]), EXPECTED_TENANT_TYPES)
 
+    def test_unclassified_tenant_layer_is_nullable_not_a_fourth_type(self):
+        self.assertIs(self.goldens["tenant_type_v2_allows_unclassified_null"], True)
+        self.assertNotIn(None, self.goldens["tenant_type_v2_values"])
+
     def test_failure_codes_exact_set(self):
         self.assertEqual(set(self.goldens["failure_codes"]), EXPECTED_FAILURE_CODES)
 

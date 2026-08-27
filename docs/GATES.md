@@ -22,7 +22,7 @@ git config core.hooksPath scripts/git-hooks
 
 CI 的 diff 闸在 push 事件只 checkout 最近 2 个 commit(足够判断 `HEAD~1`);PR 才拉全历史取得 `origin/<base>`。禁止为“保险”把 push 改回全历史:仓库约 243MB,曾让 5 分钟 `lint-debt` 在 checkout 阶段直接超时取消。
 
-## 31 道闸 · 查什么 · 怎么提前自查 · 豁免法
+## 32 道闸 · 查什么 · 怎么提前自查 · 豁免法
 
 | 闸 | 触发条件 | 查什么 | 提前自查命令 | 豁免/注意 |
 |---|---|---|---|---|
@@ -34,7 +34,7 @@ CI 的 diff 闸在 push 事件只 checkout 最近 2 个 commit(足够判断 `HEA
 | check_i18n | 改 .py | 4 语翻译完整(**横向**比:有 zh 没 th) | `python scripts/check_i18n.py --strict --quiet` | 加键必四语齐;**四语一起缺它看不见**(没有参照物)→ 那一半归下一行 |
 | check_i18n_refs | 改 .py | **纵向**查:`t()` / `POS.t()` / `data-i18n` 用到的键必须在 `static/i18n-data.js` / `static/pos/pos-i18n.js` 里存在(落空 = 屏上印裸键名) | `python scripts/check_i18n_refs.py` | 2026-07-31 建;`sx-p-bc-dup-unit` / `posui.bscan.fails_n` 四语一起缺、check_i18n 同时报 0 missing,就是这么上屏的;拼接键 `t('pre_' + x)` 不查(判据故意做窄,误报一次闸就废);反证 `tests/unit/test_i18n_refs_gate.py` |
 | unit 影响面(`scripts/impact.py`) | 改 `.py` | 测试-only 变更跑点名模块,生产 Python 回退全量分片 | `python scripts/impact.py --base <base> --head HEAD --run-unit` | 生产 Python 不裁剪;子进程清掉 GIT_* 防临时 git 仓写回宿主;CI 仍全量兜底 |
-| E2E 台账闸(跑在全量 unittest 里) | 改扫码这一片的源码,或新写扫码验收脚本 | ① 新写的扫码 E2E 必须在 `tests/e2e/e2e_ledger.json` 里登记「只有它能保什么」② 改了 `covers` 里的源码却没重跑那个 E2E → 本机红(判据=产物截图 mtime;CI 上 mtime 全是检出时间,故 CI 自动跳过②) | `python -m unittest tests.unit.test_e2e_ledger_gate` | 真反证长在 `scripts/_*.cjs` 里而它们不在任何跑单上,这道闸补的就是那个洞;②的唯一过法是在台账 `stale_ack` 写一条带 `until` 的欠条(说清为什么、最长 14 天、过期照红) |
+| E2E 台账闸(跑在全量 unittest 里) | 改扫码这一片的源码,或新写扫码验收脚本 | ① 新写的扫码 E2E 必须在 `tests/e2e/e2e_ledger.json` 里登记「只有它能保什么」② 只检查 `merge-base(origin/master, HEAD)..HEAD` 本次待推源码;命中责任 `covers` 且验收产物比它旧才红,历史提交不跨窗口追债;共享词典按 `i18n_keys` 精确归责,共享 HTML 按 `cover_tokens` 只看契约区域;CI 检出时间不可作为验收先后证据,自动跳过时效判定 | `python -m unittest tests.unit.test_e2e_ledger_gate` | Git/diff 不可用时 fail-safe 退回全量判定;时效红的唯一过法是在台账 `stale_ack` 写带 `until` 的欠条(说清为什么、最长 14 天、过期照红) |
 | 验收脚本两道(跑在全量 unittest 里) | 改 `scripts/_*.cjs` | ① 点击必须唯一定位(`.first()/.nth()` + `.click()` 关掉了 Playwright 严格模式 → 打偏也不抛)② 期望值必须现场从页面真词典取,脚本一个字都不注入 | `python -m unittest tests.unit.test_verify_script_selector_gate tests.unit.test_verify_script_i18n_injection_gate` | ① 真要按位置点:同行/上一行写 `// SELECTOR-INDEX-OK: <点的是哪一个>`(理由不许空)② 整份搬真词典进合成页放行(要 require 真词典源);「断言必须只有走目标路径才会变」机械化不了,见 `.claude/skills/verification` 验收脚本规范第 1 条 |
 | check_new_debt | 改 .py | 禁新增 ensure_*/app.py 巨石路由 | `python scripts/check_new_debt.py` | 真要新 ensure:commit 写 `NEW-DEBT-EXEMPT: <理由>` |
 | prettier 全仓 | 任何改动(无条件) | 全仓格式合规(按 **HEAD 已提交字节**校验,与工作树/CRLF 无关)+ prettier 版本锁/配置文件漂移 fail-closed | `node scripts/check_prettier_committed.mjs`(本地与 CI 同脚本、同口径;版本从 HEAD:package-lock.json 读,运行中 prettier.version 必须严格匹配;.prettierrc.json/.prettierignore 工作树字节必须 == HEAD blob,不一致即 exit 1) | home.html/home.js 在 .prettierignore;**禁 prettier --write 它们**;CI 干净 checkout 自然通过配置漂移闸 |
@@ -44,6 +44,7 @@ CI 的 diff 闸在 push 事件只 checkout 最近 2 个 commit(足够判断 `HEA
 | check_home_i18n_refs | 改 /home 前端 | `t()`/`_t()`/`kbT()`/`data-i18n` 引的键必须在 `static/i18n-data.js` 的 window.I18N 里有定义(落空 = 要么把 key 原样印上屏,要么整个元素跳过、模板里写死的中文永不翻译) | `python scripts/check_home_i18n_refs.py` | **check_i18n 只对拍四语之间齐不齐,从不问键有没有人引、引对没有**;只查"引用得到定义",不查四语齐;拼接键 `t('pre-' + x)` 与常量键表 `t(TBL[x])` 不查(闸顶注写明);存量落空记 `scripts/home_i18n_refs_baseline.txt`,只许降不许升,修好跑 `--update-baseline`;反证 `tests/unit/test_home_i18n_refs_gate.py` |
 | tsc | 改 .ts | 类型错 | `npm run typecheck` | **已进 CI lint job(2026-07-30 · 硬闸)**;eslint 的 flat config 不收 src/**/*.ts,tsc 是 TS 源唯一的机械闸,别指望 eslint 兜 |
 | build+dist 一致 | 改前端 | 改源没重打包=prod 跑旧 bundle | `npm run build` 后 `git add static/dist` + bump `?v=` | main.js/map 的 drift 不算 |
+| check_cachebust | 改前端产物 | `static/dist` 或入口依赖的运行时产物变更时,对应源 HTML 的 `?v=` 必须同批 bump;防部署新文件但用户继续命中旧缓存 | `python scripts/check_cachebust.py --base "$(git merge-base origin/master HEAD)" --head HEAD` | pre-push 与 CI 必须同参数同口径;不准为了过闸伪改无关资产版本 |
 | check_asset_bundling | 改前端 | 源页明文引资源(view-source 退化)· 覆盖 home/login/admin/console/pos | `python scripts/check_asset_bundling.py` | 新资产进打包清单(pos/console 新 JS 逻辑必进 bundle·仅 *-i18n 数据/pos-sw 可独立) |
 | ui_design_lint 棘轮 | 改前端 | 裸 hex/emoji 图标/自曝文案等,命中数**只许降** | `node scripts/ui_design_lint.mjs --gate` | **注释里的 hex 也计数**;存量降了跑 `--update-baseline` 收紧;写色一律 var() |
 | check_file_size | 任何改动 | 任何监控文件 >500 行(监控面 = 根 `*.py` / `routes` `core` `services` 下的 `.py` / `src/home/**` / **`static/pos/**`(2026-07-31 收)/ `static/scan/**/*.js`(同期)/ `static/ai/**/*.js`(2026-08-01 收)**) | `python scripts/check_file_size.py --quiet` | 先拆,无豁免;**三片 plain-script SPA 此前整片在闸外** —— /pos 与 /ai 都不走 vite 打包,`src/home/**` 照不到,闸报 PASS 是没看见不是判合格(/pos 收进来抓到 4 个、/ai 抓到 7 个,`pos.html` 1429、`ai-review.js` 770 行居首),存量按下一行的基线记账 |

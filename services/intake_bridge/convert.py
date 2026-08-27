@@ -13,6 +13,7 @@ from typing import Optional
 from services.erp.express_push import direction as direction_mod
 from services.intake_bridge import purchase_leg, sales_leg
 from services.intake_bridge.errors import SkipConversion
+from services.client_submission import enqueue as submission_enqueue
 
 logger = logging.getLogger("mr-pilot")
 
@@ -20,7 +21,14 @@ _MAX_HISTORY_IDS = 500
 _SAVEPOINT = "intake_bridge_convert"
 
 
-def convert_histories(cur, *, tenant_id: str, user_id: str, history_ids: list) -> dict:
+def convert_histories(
+    cur,
+    *,
+    tenant_id: str,
+    user_id: str,
+    history_ids: list,
+    enqueue_client_submissions: bool = False,
+) -> dict:
     """逐张转换。返回 {converted:[{history_id,doc_type,doc_id,doc_no}], skipped:[{history_id,reason}]}。"""
     converted: list = []
     skipped: list = []
@@ -37,7 +45,12 @@ def convert_histories(cur, *, tenant_id: str, user_id: str, history_ids: list) -
             continue
         try:
             result = _convert_one(
-                cur, tenant_id=tenant_id, user_id=user_id, history_id=hid, tax_id_cache=tax_id_cache
+                cur,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                history_id=hid,
+                tax_id_cache=tax_id_cache,
+                enqueue_client_submission=enqueue_client_submissions,
             )
             cur.execute(f"RELEASE SAVEPOINT {_SAVEPOINT}")
             converted.append({"history_id": hid, **result})
@@ -55,7 +68,15 @@ def convert_histories(cur, *, tenant_id: str, user_id: str, history_ids: list) -
     return {"converted": converted, "skipped": skipped}
 
 
-def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_cache: dict) -> dict:
+def _convert_one(
+    cur,
+    *,
+    tenant_id: str,
+    user_id: str,
+    history_id: str,
+    tax_id_cache: dict,
+    enqueue_client_submission: bool,
+) -> dict:
     history = _load_history(cur, tenant_id=tenant_id, history_id=history_id)
     if history is None:
         raise SkipConversion("not_found")
@@ -91,6 +112,17 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
         _stamp_ocr_history_id(
             cur, table="purchase_docs", tenant_id=tenant_id, doc_id=doc_id, history_id=history_id
         )
+        _enqueue_client_submission(
+            cur,
+            enabled=enqueue_client_submission,
+            tenant_id=tenant_id,
+            history_id=history_id,
+            history=history,
+            fields=fields,
+            document_type="purchase",
+            document_id=doc_id,
+            document_no=doc_no,
+        )
         return {"doc_type": "purchase", "doc_id": str(doc_id), "doc_no": doc_no}
 
     doc_id, doc_no = sales_leg.issue_from_history(
@@ -103,16 +135,66 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
     _stamp_ocr_history_id(
         cur, table="sales_documents", tenant_id=tenant_id, doc_id=doc_id, history_id=history_id
     )
+    _enqueue_client_submission(
+        cur,
+        enabled=enqueue_client_submission,
+        tenant_id=tenant_id,
+        history_id=history_id,
+        history=history,
+        fields=fields,
+        document_type="sales",
+        document_id=doc_id,
+        document_no=doc_no,
+    )
     return {"doc_type": "sales", "doc_id": str(doc_id), "doc_no": doc_no}
 
 
 def _load_history(cur, *, tenant_id: str, history_id: str) -> Optional[dict]:
     cur.execute(
-        "SELECT pages, workspace_client_id FROM ocr_history "
+        "SELECT pages, workspace_client_id, filename, source, pdf_storage_path FROM ocr_history "
         "WHERE id = %s::uuid AND tenant_id = %s::uuid",
         (history_id, tenant_id),
     )
     return cur.fetchone()
+
+
+def _enqueue_client_submission(
+    cur,
+    *,
+    enabled: bool,
+    tenant_id: str,
+    history_id: str,
+    history: dict,
+    fields: dict,
+    document_type: str,
+    document_id,
+    document_no,
+) -> None:
+    if not enabled:
+        return
+    snapshot = {
+        "schema_version": 1,
+        "filename": history.get("filename"),
+        "source": history.get("source"),
+        "ocr_history_id": str(history_id),
+        "document_type": document_type,
+        "document_id": str(document_id),
+        "document_no": document_no,
+        "fields": fields,
+        "pages": history.get("pages") or [],
+    }
+    submission_enqueue.enqueue_confirmed_document(
+        cur,
+        merchant_tenant_id=tenant_id,
+        merchant_workspace_client_id=int(history["workspace_client_id"]),
+        source_document_type=document_type,
+        source_document_id=str(document_id),
+        source_revision=1,
+        snapshot=snapshot,
+        original_file_ref=(
+            f"ocr_history:{history_id}" if history.get("pdf_storage_path") else None
+        ),
+    )
 
 
 def _already_converted(cur, *, tenant_id: str, history_id: str) -> bool:

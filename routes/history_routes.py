@@ -45,6 +45,8 @@ from routes.history_assign_routes import router as _assign_router
 from core.route_helpers import _check_history_access, _tid, content_disposition
 from services.exceptions.exception_checks import _async_run_exception_checks, _parse_money
 from services.intake_bridge import convert as convert_svc
+from services.accounting_engagement import flags as engagement_flags
+from services.auth.entrance import ERP
 from services.ocr_history.posting_manual import (
     _ITEM_TYPE_VALUES,
     _PAYMENT_VALUES,
@@ -154,7 +156,13 @@ async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
             cur, tenant_id=tenant_id, workspace_client_id=req.workspace_client_id
         )
         result = convert_svc.convert_histories(
-            cur, tenant_id=tenant_id, user_id=str(user["id"]), history_ids=req.history_ids
+            cur,
+            tenant_id=tenant_id,
+            user_id=str(user["id"]),
+            history_ids=req.history_ids,
+            enqueue_client_submissions=(
+                user.get("entry") == ERP and engagement_flags.enabled_for(tenant_id)
+            ),
         )
     return result
 

@@ -2,6 +2,15 @@
 
 > 批次标识：**PO-0**。本文只锁定业务契约、数据边界与验收金标，不实现运行时行为、路由、schema、界面、迁移、LINE、OCR、计费、库存或部署。后续施工前必须同时阅读 `docs/workspace-isolation/00-overview.md`、`services/auth/entrance.py`、`docs/company-blueprint/01-产品分层与客户经营.md`。
 
+## 0.1 施工状态（2026-08-27）
+
+本页的 PO-0 契约已经进入分批实现，但不能把后端地基误称为完整产品：
+
+- 已完成：Cowork 自由注册建 firm 租户、Earn 邀请绑定 active firm、双方 workspace 确认、`accounting_engagements` 关系锚、ERP 确认单据同事务创建 `client_submissions`、后台直达精确 Cowork workspace、参与方只读回执与员工账套范围过滤。
+- 已接入的确认缝仅为 `ERP 会话 → /api/ocr/convert-documents → intake_bridge`。灰度关闭、非 ERP 会话或无有效关系时不会创建提交，也不会影响商户自身建单。
+- 尚未完成：门店模型、新采购/销售 OCR 预览 UI、现有 ERP 采购拍票改道、销售图片上传、ERP 专用 LINE、固定库存表替换、Cowork 收件箱/快捷复核、原件受控下载、OCR 计费接线与生产放量。
+- 所有可见 UI 开工前先确认交互；旧 Stock Card 与现有采购 LINE 在新闭环验收前保持不动。
+
 ## 1. 范围与非范围
 
 **做(本次仅写规格)**:明确 /cowork、/erp、/earn 三个入口的产品分层,定义 firm 租户与 merchant 租户的关系隔离、workspace_client 硬边界、accounting_engagement 跨租户关系锚、确认交付原子性、计费归属、门店/地址规则、产品防火墙、幂等与唯一键、迁移与上线顺序、显式失败态、审计要求、不变式与验收矩阵。

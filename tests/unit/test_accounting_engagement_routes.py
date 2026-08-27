@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import contextlib
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import accounting_engagement_routes as routes
+
+SUBMISSION_ID = "11111111-1111-1111-1111-111111111111"
 
 
 @contextlib.contextmanager
@@ -53,8 +56,12 @@ class AccountingEngagementRouteTests(unittest.TestCase):
             {
                 ("GET", "/api/erp/accounting-engagements"),
                 ("POST", "/api/erp/accounting-engagements/{engagement_id}/accept"),
+                ("GET", "/api/erp/client-submissions"),
+                ("GET", "/api/erp/client-submissions/{submission_id}"),
                 ("GET", "/api/cowork/accounting-engagements"),
                 ("POST", "/api/cowork/accounting-engagements/{engagement_id}/accept"),
+                ("GET", "/api/cowork/client-submissions"),
+                ("GET", "/api/cowork/client-submissions/{submission_id}"),
             },
         )
 
@@ -167,6 +174,101 @@ class AccountingEngagementRouteTests(unittest.TestCase):
             firm_tenant_id="firm-1",
             workspace_client_id=8,
         )
+
+    def test_cowork_submission_detail_returns_snapshot_without_storage_path(self):
+        cur = object()
+        submitted = {
+            "id": SUBMISSION_ID,
+            "engagement_id": "eng-1",
+            "source_tenant_id": "merchant-1",
+            "source_workspace_client_id": 7,
+            "source_document_type": "purchase",
+            "source_document_id": "doc-1",
+            "source_revision": 1,
+            "target_tenant_id": "firm-1",
+            "target_workspace_client_id": 8,
+            "status": "delivered",
+            "cowork_history_id": "history-1",
+            "attempts": 0,
+            "last_error": None,
+            "snapshot_json": {"fields": {"items": [{"name": "Paper"}]}},
+            "original_file_ref": "ocr_history:history-1",
+        }
+        with (
+            mock.patch.object(
+                routes,
+                "require_perm",
+                return_value={"id": "u2", "tenant_id": "firm-1", "entry": "cowork"},
+            ),
+            mock.patch.object(routes.flags, "enabled_for", return_value=True),
+            mock.patch.object(
+                routes,
+                "get_authz",
+                return_value=SimpleNamespace(scope_mode="assigned", workspace_ids={8}),
+            ),
+            mock.patch.object(routes.db, "get_cursor_rls", return_value=cursor_cm(cur)),
+            mock.patch.object(
+                routes.submission_store,
+                "get_for_tenant",
+                return_value=submitted,
+            ) as get_submission,
+        ):
+            response = self.client.get(f"/api/cowork/client-submissions/{SUBMISSION_ID}")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()["submission"]
+        self.assertEqual(body["snapshot"]["fields"]["items"][0]["name"], "Paper")
+        self.assertTrue(body["original_file_available"])
+        self.assertNotIn("original_file_ref", body)
+        get_submission.assert_called_once_with(
+            cur,
+            tenant_id="firm-1",
+            submission_id=SUBMISSION_ID,
+            participant_side="target",
+            workspace_client_ids=[8],
+        )
+
+    def test_cowork_submission_list_uses_accounting_read_permission_and_scope(self):
+        cur = object()
+        with (
+            mock.patch.object(
+                routes,
+                "require_perm",
+                return_value={"id": "u2", "tenant_id": "firm-1", "entry": "cowork"},
+            ) as require,
+            mock.patch.object(routes.flags, "enabled_for", return_value=True),
+            mock.patch.object(
+                routes,
+                "get_authz",
+                return_value=SimpleNamespace(scope_mode="assigned", workspace_ids={8, 9}),
+            ),
+            mock.patch.object(routes.db, "get_cursor_rls", return_value=cursor_cm(cur)),
+            mock.patch.object(
+                routes.submission_store, "list_for_tenant", return_value=[]
+            ) as listing,
+        ):
+            response = self.client.get("/api/cowork/client-submissions")
+
+        self.assertEqual(response.status_code, 200)
+        require.assert_called_once_with(mock.ANY, "acct.entry.view")
+        listing.assert_called_once_with(
+            cur,
+            tenant_id="firm-1",
+            participant_side="target",
+            workspace_client_ids=[8, 9],
+        )
+
+    def test_submission_detail_rejects_invalid_uuid_before_database(self):
+        with mock.patch.object(routes.db, "get_cursor_rls") as get_cursor:
+            response = self.client.get("/api/cowork/client-submissions/not-a-uuid")
+        self.assertEqual(response.status_code, 422)
+        get_cursor.assert_not_called()
+
+    def test_submission_summary_never_exposes_internal_error_text(self):
+        summary = routes._submission_summary(
+            {"id": SUBMISSION_ID, "last_error": "connection failed at /opt/private/db.sock"}
+        )
+        self.assertEqual(summary["last_error"], "ERR_SUBMISSION_DELIVERY")
 
 
 if __name__ == "__main__":

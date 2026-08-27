@@ -9,7 +9,7 @@
 - **✅ 边界守住**:`/ai`、`/pos`、`/dms`、现有采购 LINE 与非 ERP 单据均不触发;Earn 不接收图片、行项目、金额、库存或会计分录;`erp_push_logs` 仍是 Cowork→第三方 ERP 唯一推送状态源。
 - **✅ 数据与权限**:双方 tenant/workspace/wallet 独立;关系与 submission RLS fail-closed;成员 workspace scope 生效;泰国佛历/公历日期归一化;原件只存不透明引用,不泄露路径。
 - **✅ 本地验收**:pre-push 全绿(1190 unittest 模块/6 片、构建、视觉、权限、体积/棘轮);Postgres smoke 39 项;Auth/注册定向 50 项;Alembic 单一 head `0105_client_submissions`。
-- **⏳ 发布状态**:本地 HEAD=`be16b157`;待 push→本 SHA CI 全绿→精确 SHA 部署→生产 HEAD/重启时间验收后才称上线。
+- **⏳ 发布状态**:首推 CI `33070716415` 的真库闸发现共享测试表漏补列,已用全新 PostgreSQL 16 容器按 CI 顺序修复并 39/39 通过;待再推→本 SHA CI 全绿→精确 SHA 部署→生产 HEAD/重启时间验收后才称上线。
 - **🟡 明确未做**:ERP 专用 LINE、LINE/网页 OCR 预览编辑确认、固定库存卡新算法、Cowork 收件箱/快捷审核、受控原件下载中继;现有 ERP 采购拍票尚未改走新确认接线点。
 - **▶ 下一步**:先与 Zihao 逐屏确认 Earn 关系选择、LINE 预览、库存卡、Cowork 收件箱与快捷审核交互;拍板后按竖切批次施工并做真浏览器 E2E,不先写可见 UI。
 - **⚠️ 代理策略**:Qwen 仅派低风险/只读任务;关键施工主控或 DeepSeek,主控独立验收;任务专属 opencode 结束即回收,共享 service 不杀。

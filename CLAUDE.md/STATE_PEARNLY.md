@@ -1,17 +1,17 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-27 ERP 邀请准入 + Cowork/ERP 会话隔离已上线
+## 当前状态卡 · 08-27 ERP↔Cowork 后端闭环待上线 · UI 待拍板
 
-- **✅ ERP 邀请准入根治**:生产功能 SHA=`c7f89be4edb2a68cfdd26f66ade136f58ac8d7ef`;CI run `33048552800` 全闸 success;mrpilot 于 2026-08-27 07:19:43 UTC 重启并 active。
-- **✅ 根因与口径**:登录密码实际匹配,旧 `platform_settings.enabled` 总闸却在名单之后再次拒绝 ERP。现改为市场常见的单一邀请策略:名单即授权、收回即停用,不再存在隐藏二段开关。
-- **✅ 生产实证**:`skin` 已有用户命中名单,`erp_policy=True` 且授权入口集含 `erp`;无需重邀或改密,已有账号始终沿用原密码,密码框只给新建账号设初始密码。
-- **✅ 后台诚实文案**:状态显示「邀请即生效 · 仅邀请名单内」;邀请成功提示已有账号用原密码;时间保留时分并按曼谷时区(UTC+7)回显。
-- **✅ 入口会话隔离**:Cowork/ERP 各自维护独立 token+workspace 槽;AI/POS/DMS/Daily 沿用 legacy 槽。不同账号可同时开 Cowork/ERP;同一账号仍受 `active_jti` 单会话限制,不承诺同账号双开。
-- **✅ 后端 fail-closed 隔离**:真实用户 `/api/erp` 走 `require_erp_portal`(非 ERP 入口 403);DMS 只放 endpoints CRUD/test/logs 窄集合;租户由签名 user/tenant/workspace + RLS 约束。
-- **✅ favicon/路由**:DMS/console/invite/ERP 已补 Pearnly favicon;生产 `/cowork`、`/erp`、`/dms` 均 200 且不跳 `/earn`。
-- **✅ 验证**:pre-push 1175 模块;目标 Python 125 项;admin invite Playwright 43/43 + 桌面/移动截图;CI 真 PG、全量单测、计费/RLS/入口隔离高敏 E2E 全绿。
-- **✅ 流程固化**:`HANDOVER_TO_NEXT_WINDOW.md` 唯一活交接固定自测→commit→push master→盯本 SHA CI→验生产 HEAD;旧口头交接归档,契约测试锁流程。
-- **🔐 凭据事项**:真实账号 Playwright 有凭据时自动关闭 trace;08-27 旧失败 run 曾含测试凭据,须轮换,不得复述或写入仓库。
+- **✅ 产品关系定稿并落后端**:`/cowork` 事务所自由注册并自动建 firm+独立 tenant/workspace;`/erp` 商户只接受 Earn 邀请;Earn 邀请时必须选事务所,只保留关系元数据。
+- **✅ 双方精确绑定**:邀请先建 pending merchant;事务所与商户双确认 exact workspace 后生效;事务所 1:N 商户,商户 v1 最多一个 open primary firm,分店继续用 `business_location`。
+- **✅ 单据同步底座**:ERP 已确认采购/销售经 `client_submissions` 不可变 outbox 投递到指定 Cowork workspace;具备 revision 幂等、失败重试、稳定错误码与删除后审计保留。
+- **✅ 当前生产接线点**:仅服务端确认的 ERP `POST /api/ocr/convert-documents` 且 `erp_cowork_engagements` 开启时,正式单据与 outbox 在同一 SAVEPOINT;Cowork 以 `acct.entry.view` 收件,ERP 以 `stockcard.report.view` 查源状态。
+- **✅ 边界守住**:`/ai`、`/pos`、`/dms`、现有采购 LINE 与非 ERP 单据均不触发;Earn 不接收图片、行项目、金额、库存或会计分录;`erp_push_logs` 仍是 Cowork→第三方 ERP 唯一推送状态源。
+- **✅ 数据与权限**:双方 tenant/workspace/wallet 独立;关系与 submission RLS fail-closed;成员 workspace scope 生效;泰国佛历/公历日期归一化;原件只存不透明引用,不泄露路径。
+- **✅ 本地验收**:pre-push 全绿(1190 unittest 模块/6 片、构建、视觉、权限、体积/棘轮);Postgres smoke 39 项;Auth/注册定向 50 项;Alembic 单一 head `0105_client_submissions`。
+- **⏳ 发布状态**:本地 HEAD=`be16b157`;待 push→本 SHA CI 全绿→精确 SHA 部署→生产 HEAD/重启时间验收后才称上线。
+- **🟡 明确未做**:ERP 专用 LINE、LINE/网页 OCR 预览编辑确认、固定库存卡新算法、Cowork 收件箱/快捷审核、受控原件下载中继;现有 ERP 采购拍票尚未改走新确认接线点。
+- **▶ 下一步**:先与 Zihao 逐屏确认 Earn 关系选择、LINE 预览、库存卡、Cowork 收件箱与快捷审核交互;拍板后按竖切批次施工并做真浏览器 E2E,不先写可见 UI。
 - **⚠️ 代理策略**:Qwen 仅派低风险/只读任务;关键施工主控或 DeepSeek,主控独立验收;任务专属 opencode 结束即回收,共享 service 不杀。
 
 ---

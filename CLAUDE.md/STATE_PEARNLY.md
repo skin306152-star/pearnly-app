@@ -1,26 +1,27 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-28 ERP 销售记录与 LINE 收口
+## 当前状态卡 · 08-28 DMS LINE 自助同步凭据收官
 
-- **✅ 产品边界**:`/cowork` 与 `/erp` 独立;ERP 商户数据不投递 Cowork;`/ai`、`/pos`、`/dms` 和旧采购 LINE 不复用 ERP 凭据、绑定或会话。
-- **✅ ERP 销售导航**:ERP 的「发票系统」改为「销售系统」,子菜单为「销售发票 / 销售记录 / 开票资料」;销售发票页只保留开票,原顶部「选择文件」已移除。
-- **✅ 销售记录入口**:新增 `sales-records` 页面,按采购记录模式展示正式 `/api/sales/documents` 数据;「记一笔销售」进入共用 OCR 单据录入并锁定销售方向。
-- **✅ 集成页收口**:ERP 集成页已删除第三方 ERP 连接卡及入口,保留 ERP LINE 绑定;单据录入后的 MR.ERP/Express 推送能力仍留在业务流程内。
-- **✅ POS 隔离**:POS 仍显示「发票系统 / 销售发票 / 开票资料」,不展示、不允许深链进入 ERP `sales-records`;ERP 即使商户类型为 `pos_only` 也按 ERP 入口文案和权限渲染。
-- **✅ Stock Card**:按参考图 13 列、所有商品逐笔同页;各商品独立移动加权平均;仅保留期初库存,服务行不进库存。
-- **✅ ERP 网页**:采购/销售入口锁定用户选择→OCR 原票预览→全字段/逐行库存或服务编辑→保存→确认生成正式单据或丢弃;空明细不猜数量金额,保存失败不转换。
-- **✅ ERP LINE**:独立 OA `@063eadty`、Messaging API、webhook、LINE Login/LIFF 和生产凭据已配置并由官方 Verify 通过;网页复用 DMS 成熟绑定卡(二维码/Basic ID/6 位码/自动轮询/解绑),不复用 DMS 账号或会话。
-- **✅ LINE 对话前端**:Flex 菜单由用户明确选择采购/销售;上传后显示处理中→票号/日期/往来方/金额/明细预览→确认/编辑/丢弃;LIFF 编辑器支持原票多页和全字段修改,并发重复事件只计费/识别一次。
-- **✅ 正式数据**:确认后采购落 `purchase_docs posted`,销售落 `sales_documents issued`;`ocr_history_id` 幂等关联;Stock Card 只读正式库存行。
-- **✅ 第三方 ERP**:MR.ERP/Express 复用既有推送底座;逐行 posting_kind 进入 mapper/预览;ERP 未正式转换 history 服务端 409;`erp_push_logs` 仍是状态唯一源。
-- **✅ 最新上线**:`e8c9be11` 已在 `master` 与 `origin/master`;销售/采购记录页去掉三点菜单,直接保留「导出/归档 + 记一笔」;销售记录排在销售发票上方;期初库存弹窗扩大并改善长商品名展示。
-- **✅ 本批验收**:销售/导航/集成定向 Playwright 10 passed,ERP/Cowork 入口分流 60 passed,相关单测 55 passed,完整 pre-push 全绿;CI `33141461207` 全绿并完成 deploy;生产服务 active、ERP/POS/health 均 200。
-- **📚 正本**:`docs/erp/ERP-DOCUMENT-CLOSED-LOOP.md`;真机清单=`docs/erp/ERP-REAL-DEVICE-ACCEPTANCE.md`。
-- **⏳ 外部验收**:ERP LINE iOS/Android 真实 OA 与 Express 公司局域网 Windows Agent/TEST 账套回查待执行;完成前不宣称真机写入成功。
-- **⚠️ 下一步首项**:ERP LINE 绑定码生产请求当前返回 403 `workspace.forbidden`;页面显示未选账套但仍发送旧的无权限账套 ID,导致绑定码、Bot ID、二维码均为空。尚未修复,下次先清理前端账套状态并补精确错误提示/回归测试。
-- **⚠️ 工作树边界**:既有 DMS 源码、34 号隔离 spec、favicon 单测及其 build 产物不属于本批,不得暂存或覆盖。
+- **✅ 当前 task**:DMS 销售人员可从 LINE 菜单 4 打开账号密码编辑器,手动同步其在 MR.ERP/DMS 已修改的新用户名和密码。
+- **✅ 真实入口**:菜单 4 使用同一 DMS LIFF 的 `credentials=dms`;生产 `/home?liff.state=?credentials=dms` 现 302 到 `/home/dms-booking?credentials=dms`,不再落 Pearnly Login。
+- **✅ 编辑器**:LINE 内展示 DMS 用户名、密码、确认密码和保存按钮;密码不回显,两次密码不一致不提交。
+- **✅ 同步闭环**:保存只更新当前 active member 自己的 `mrerp_dms` endpoint 加密凭据;下一次菜单 3 登录从同一 endpoint 读取更新后的账号密码。
+- **✅ 安全边界**:不允许改他人、管理员或其他 endpoint;API 不返回密码,更新保留 endpoint 其余配置。
+- **✅ 验收**:定向单测 25 passed;真实 uvicorn 路由 Playwright 8 passed;ERP/Cowork 分流 60 passed;完整 pre-push 1189 模块分片及全部机械闸全绿。
+- **✅ 最新上线**:`d12143f3` 已在 `master`、`origin/master` 和生产 `/opt/mrpilot`;CI `33177361906` 全绿并完成 pinned-SHA deploy;生产 health/editor 200。
+- **✅ 生产证据**:精确 LIFF 回调实测 302 到编辑器;Chrome 生产检查最终 URL 为编辑器路由,标题 `Pearnly DMS`,不再是登录页。
+- **⏳ 外部验收**:真实 iOS/Android LINE 客户端仍需点菜单 4 看编辑器;不使用用户真实密码做自动化生产写入,完成前不宣称真实账号已改写。
+- **⚠️ 使用口径**:系统不会侦测 MR.ERP 密码变化;销售人员先在 MR.ERP 修改,再在 LINE 菜单 4 填入同一组新凭据完成同步。
+- **⚠️ 下一步首项**:沿袭 ERP LINE 绑定码 403 `workspace.forbidden` 待办;修复前先清理前端过期账套状态并补精确错误提示/回归测试。
+- **🧹 工作树**:本批源码、验证证据和状态卡均已提交;无未 push commit、无本批临时服务/测试进程。
 
 ---
+
+## 历史 · 08-28 DMS LINE 自助凭据同步收官(`a1875461..d12143f3` · CI 33177361906 success · prod 已验)
+
+- **✅ 产品闭环**:DMS Rich Menu 新增菜单 4;销售人员在 MR.ERP 改账号密码后,可在 LINE 内编辑并加密更新自己的 Pearnly DMS endpoint;菜单 3 下一次登录读取同一份新凭据。
+- **✅ 跳转事故已修**:初版 E2E mock 了 LIFF 回调,漏出生产 `/home?liff.state=?credentials=dms` 落登录页;现改真实 uvicorn 路由并补 `/home`、`/login` 契约测试,生产实测 302 到编辑器。
+- **✅ 验收边界**:编辑器视觉/保存行为、保存→下一次登录连续性、完整 CI/deploy 均绿;未自动写入真实销售账号,真实 iOS/Android LINE 点击仍由用户验收。
 
 ## 历史 · 08-16 Daily 邀请三连修收官(earn 冲突根治 · CI 31924383472 success · prod 已上线)
 

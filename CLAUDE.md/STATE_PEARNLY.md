@@ -9,7 +9,7 @@
 - **✅ LINE 对话前端**:Flex 菜单由用户明确选择采购/销售;上传后显示处理中→票号/日期/往来方/金额/明细预览→确认/编辑/丢弃;LIFF 编辑器支持原票多页和全字段修改,并发重复事件只计费/识别一次。
 - **✅ 正式数据**:确认后采购落 `purchase_docs posted`,销售落 `sales_documents issued`;`ocr_history_id` 幂等关联;Stock Card 只读正式库存行。
 - **✅ 第三方 ERP**:MR.ERP/Express 复用既有推送底座;逐行 posting_kind 进入 mapper/预览;ERP 未正式转换 history 服务端 409;`erp_push_logs` 仍是状态唯一源。
-- **✅ 本地证据**:ERP LINE 单测 15 passed;Playwright 13 passed(编辑器 + 桌面/移动绑定卡);typecheck/build/Black/Ruff/Prettier/diff-check 通过;截图在 `tests/e2e/_artifacts/erp-*`。完整 pre-push/CI/精确 SHA 部署在本批提交后执行。
+- **✅ 验证上线**:ERP LINE 单测 15 passed、定向 Playwright 13 passed;完整 pre-push 1188 模块全绿;CI `33138874325` 全绿(生产 E2E 441 passed + 高敏 smoke);生产精确 SHA `14e0983a`,服务 active;LIFF Endpoint 已切 `?v=4` 并读回新编辑器资源。
 - **📚 正本**:`docs/erp/ERP-DOCUMENT-CLOSED-LOOP.md`;真机清单=`docs/erp/ERP-REAL-DEVICE-ACCEPTANCE.md`。
 - **⏳ 外部验收**:ERP LINE iOS/Android 真实 OA 与 Express 公司局域网 Windows Agent/TEST 账套回查待 Zihao 起床后执行;完成前不宣称真机写入成功。
 - **⚠️ 工作树边界**:既有 DMS 源码、34 号隔离 spec、favicon 单测及其 build 产物不属于本批,不得暂存或覆盖。

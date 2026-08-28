@@ -51,7 +51,13 @@ test.beforeAll(async () => {
 test.afterAll(() => localServer.stop(server));
 
 async function boot(page, entry, state = {}) {
-    Object.assign(state, { recognizes: [], historyPuts: 0, commits: 0, converts: 0 });
+    Object.assign(state, {
+        recognizes: [],
+        historyPuts: 0,
+        commits: 0,
+        converts: 0,
+        lineCodeCalls: 0,
+    });
     await page.addInitScript((portal) => {
         localStorage.clear();
         sessionStorage.clear();
@@ -64,6 +70,13 @@ async function boot(page, entry, state = {}) {
     }, entry);
     await page.route(/\/erp(?:\?.*)?$/, (route) =>
         route.fulfill({ status: 200, contentType: 'text/html', body: HOME_HTML })
+    );
+    await page.route('https://api.qrserver.com/**', (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'image/svg+xml',
+            body: '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140"><rect width="140" height="140" fill="white"/><path d="M8 8h48v48H8zm76 0h48v48H84zM8 84h48v48H8zm76 0h16v16H84zm24 0h24v48h-24zM76 108h24v24H76z" fill="black"/></svg>',
+        })
     );
     await page.route('**/api/**', async (route) => {
         const req = route.request();
@@ -107,6 +120,28 @@ async function boot(page, entry, state = {}) {
             body = { data: { modules: {}, business_type: 'firm', entry } };
         } else if (pathname === '/api/erp/endpoints') {
             body = { items: [] };
+        } else if (pathname === '/api/line/erp/binding') {
+            body = {
+                ok: true,
+                data: state.lineBound
+                    ? {
+                          bound: true,
+                          display_name: 'Zihao LINE',
+                          bound_at: '2026-08-28T03:00:00Z',
+                      }
+                    : { bound: false },
+            };
+        } else if (pathname === '/api/line/erp/binding-code') {
+            state.lineCodeCalls += 1;
+            body = {
+                ok: true,
+                data: {
+                    code: '482913',
+                    expires_at: new Date(Date.now() + 600_000).toISOString(),
+                    bot_basic_id: '@063eadty',
+                    bot_friend_url: 'https://line.me/R/ti/p/@063eadty',
+                },
+            };
         }
         return route.fulfill({
             status,
@@ -298,4 +333,58 @@ test('ERP purchase entry remains touch-sized on mobile', async ({ browser }) => 
         animations: 'disabled',
     });
     await page.close();
+});
+
+test('ERP integration reuses the established LINE binding card with its own bot', async ({
+    page,
+}) => {
+    const state = {};
+    await boot(page, 'erp', state);
+    await page.evaluate(() => window.routeTo('integrations'));
+    await expect(page.locator('#erp-linebot-unbound')).toBeVisible();
+    await expect(page.locator('#erp-linebot-code')).toHaveText('482913');
+    await expect(page.locator('#erp-linebot-bot-id')).toHaveText('@063eadty');
+    await expect(page.locator('#erp-linebot-open-line')).toHaveAttribute(
+        'href',
+        'https://line.me/R/ti/p/@063eadty'
+    );
+    await expect(page.locator('#erp-linebot-qr img')).toHaveAttribute(
+        'src',
+        /data=https%3A%2F%2Fline\.me%2FR%2Fti%2Fp%2F%40063eadty/
+    );
+    expect(state.lineCodeCalls).toBeGreaterThanOrEqual(1);
+    await revealShell(page);
+    await page.screenshot({
+        path: path.join(OUT, 'line-binding-desktop.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+});
+
+test('ERP LINE binding card has a truthful bound state and touch-sized mobile actions', async ({
+    browser,
+}) => {
+    const unboundPage = await browser.newPage({ ...devices['iPhone 13'] });
+    await boot(unboundPage, 'erp');
+    await unboundPage.evaluate(() => window.routeTo('integrations'));
+    await expect(unboundPage.locator('#erp-linebot-code-refresh')).toBeVisible();
+    const tapHeight = await unboundPage
+        .locator('#erp-linebot-code-refresh')
+        .evaluate((node) => node.getBoundingClientRect().height);
+    expect(tapHeight).toBeGreaterThanOrEqual(44);
+    await revealShell(unboundPage);
+    await unboundPage.screenshot({
+        path: path.join(OUT, 'line-binding-mobile.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+    await unboundPage.close();
+
+    const boundPage = await browser.newPage();
+    await boot(boundPage, 'erp', { lineBound: true });
+    await boundPage.evaluate(() => window.routeTo('integrations'));
+    await expect(boundPage.locator('#erp-linebot-bound')).toBeVisible();
+    await expect(boundPage.locator('#erp-linebot-bound-name')).toHaveText('Zihao LINE');
+    await expect(boundPage.locator('#erp-linebot-unbound')).toBeHidden();
+    await boundPage.close();
 });

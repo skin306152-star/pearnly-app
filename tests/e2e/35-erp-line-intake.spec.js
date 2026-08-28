@@ -67,7 +67,10 @@ function records() {
     ];
 }
 
-async function open(page, { putStatus = 200, draftRecords = records() } = {}) {
+async function open(
+    page,
+    { putStatus = 200, draftRecords = records(), draftQuery = '?draft=d1' } = {}
+) {
     authBodies.length = 0;
     previewHeaders.length = 0;
     requestLog.length = 0;
@@ -135,7 +138,7 @@ async function open(page, { putStatus = 200, draftRecords = records() } = {}) {
             }),
         });
     });
-    await page.goto(`${BASE}/static/erp-line-intake/index.html?draft=d1`);
+    await page.goto(`${BASE}/static/erp-line-intake/index.html${draftQuery}`);
     await expect(page.locator('#editor')).toBeVisible();
 }
 
@@ -197,6 +200,11 @@ test('desktop supports language switching and discard action', async ({ browser 
             .map((entry) => `${entry.method} ${entry.path}`)
     ).toEqual(['POST /api/line/erp/draft/d1/discard']);
     await page.screenshot({ path: path.join(OUT, 'desktop-discarded.png'), fullPage: true });
+});
+
+test('LIFF callback state keeps the ERP draft id', async ({ page }) => {
+    await open(page, { draftQuery: `?liff.state=${encodeURIComponent('?draft=d1')}` });
+    await expect(page.locator('[data-field="0:seller_name"]')).toHaveValue('Supplier');
 });
 
 test('failed draft save never calls confirm', async ({ page }) => {

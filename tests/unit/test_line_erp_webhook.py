@@ -28,6 +28,76 @@ class _Context:
 
 
 class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
+    async def test_media_event_queues_ocr_instead_of_waiting_for_reply(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        with (
+            mock.patch.object(webhook.store, "get_binding", return_value=binding),
+            mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook, "_queue_document") as queue,
+        ):
+            await webhook.handle_event(
+                {
+                    "type": "message",
+                    "source": {"userId": "line-u1"},
+                    "replyToken": "reply",
+                    "message": {"type": "image", "id": "m1"},
+                }
+            )
+        queue.assert_called_once_with({"type": "image", "id": "m1"}, binding, "line-u1", "reply")
+
+    async def test_queue_atomically_claims_one_billable_ocr_run(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+
+        def close_task(coro):
+            coro.close()
+
+        with (
+            mock.patch.object(
+                webhook.store, "claim_processing", return_value={"mode": "purchase"}
+            ) as claim,
+            mock.patch.object(webhook, "_spawn", side_effect=close_task) as spawn,
+        ):
+            await webhook._queue_document(
+                {"type": "image", "id": "m1"}, binding, "line-u1", "reply"
+            )
+        claim.assert_called_once_with("t1", "line-u1", "m1")
+        spawn.assert_called_once()
+
+    async def test_queue_rejects_duplicate_while_ocr_is_processing(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        with (
+            mock.patch.object(webhook.store, "claim_processing", return_value=None),
+            mock.patch.object(
+                webhook.store,
+                "get_session",
+                return_value={"state": "ocr_processing", "payload": {"mode": "purchase"}},
+            ),
+            mock.patch.object(webhook, "_notify") as notify,
+            mock.patch.object(webhook, "_spawn") as spawn,
+        ):
+            await webhook._queue_document(
+                {"type": "image", "id": "m2"}, binding, "line-u1", "reply"
+            )
+        spawn.assert_not_called()
+        notify.assert_called_once()
+        self.assertIn("กำลังอ่านเอกสาร", notify.call_args.args[2])
+
+    async def test_processing_session_does_not_switch_document_mode(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        with (
+            mock.patch.object(
+                webhook.store,
+                "get_session",
+                return_value={"state": "ocr_processing", "payload": {"mode": "purchase"}},
+            ),
+            mock.patch.object(webhook.store, "set_session") as set_session,
+            mock.patch.object(webhook.line_client, "reply_text") as reply_text,
+        ):
+            await webhook._handle_text({"text": "2"}, binding, "line-u1", "reply")
+        set_session.assert_not_called()
+        reply_text.assert_called_once()
+        self.assertIn("กำลังอ่านเอกสาร", reply_text.call_args.args[1])
+
     async def test_document_backfills_preview_before_opening_draft(self):
         binding = {"tenant_id": "t1", "user_id": "u1", "workspace_client_id": 7}
         with (
@@ -87,11 +157,13 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook, "run_recognition_core") as recognize,
+            mock.patch.object(webhook.store, "clear_session") as clear_session,
         ):
             await webhook._handle_document(
                 {"id": "m1", "type": "image"}, binding, "line-u1", "reply"
             )
         recognize.assert_not_called()
+        clear_session.assert_called_once_with("t1", "line-u1")
 
     async def test_incomplete_confirm_keeps_session_and_rolls_back_batch(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}

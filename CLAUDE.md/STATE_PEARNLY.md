@@ -5,10 +5,11 @@
 - **✅ 产品边界**:`/cowork` 与 `/erp` 独立;ERP 商户数据不投递 Cowork;`/ai`、`/pos`、`/dms` 和旧采购 LINE 不复用 ERP 凭据、绑定或会话。
 - **✅ Stock Card**:按参考图 13 列、所有商品逐笔同页;各商品独立移动加权平均;仅保留期初库存,服务行不进库存。
 - **✅ ERP 网页**:采购/销售入口锁定用户选择→OCR 原票预览→全字段/逐行库存或服务编辑→保存→确认生成正式单据或丢弃;空明细不猜数量金额,保存失败不转换。
-- **✅ ERP LINE**:独立 OA/webhook/LIFF/绑定表/会话;菜单先选采购或销售;图片和 PDF 多页预览;编辑、确认、丢弃均按用户/租户/草稿授权,webhookEventId 幂等。
+- **✅ ERP LINE**:独立 OA `@063eadty`、Messaging API、webhook、LINE Login/LIFF 和生产凭据已配置并由官方 Verify 通过;网页复用 DMS 成熟绑定卡(二维码/Basic ID/6 位码/自动轮询/解绑),不复用 DMS 账号或会话。
+- **✅ LINE 对话前端**:Flex 菜单由用户明确选择采购/销售;上传后显示处理中→票号/日期/往来方/金额/明细预览→确认/编辑/丢弃;LIFF 编辑器支持原票多页和全字段修改,并发重复事件只计费/识别一次。
 - **✅ 正式数据**:确认后采购落 `purchase_docs posted`,销售落 `sales_documents issued`;`ocr_history_id` 幂等关联;Stock Card 只读正式库存行。
 - **✅ 第三方 ERP**:MR.ERP/Express 复用既有推送底座;逐行 posting_kind 进入 mapper/预览;ERP 未正式转换 history 服务端 409;`erp_push_logs` 仍是状态唯一源。
-- **✅ 本地证据**:相关单测 1145 passed/7 skipped;Playwright 13 passed(Stock Card、网页、LINE、非 ERP 回归);typecheck/build/Black/Ruff/Alembic 单头/文件尺寸闸通过;截图在 `tests/e2e/_artifacts/erp-*`。
+- **✅ 本地证据**:ERP LINE 单测 15 passed;Playwright 13 passed(编辑器 + 桌面/移动绑定卡);typecheck/build/Black/Ruff/Prettier/diff-check 通过;截图在 `tests/e2e/_artifacts/erp-*`。完整 pre-push/CI/精确 SHA 部署在本批提交后执行。
 - **📚 正本**:`docs/erp/ERP-DOCUMENT-CLOSED-LOOP.md`;真机清单=`docs/erp/ERP-REAL-DEVICE-ACCEPTANCE.md`。
 - **⏳ 外部验收**:ERP LINE iOS/Android 真实 OA 与 Express 公司局域网 Windows Agent/TEST 账套回查待 Zihao 起床后执行;完成前不宣称真机写入成功。
 - **⚠️ 工作树边界**:既有 DMS 源码、34 号隔离 spec、favicon 单测及其 build 产物不属于本批,不得暂存或覆盖。

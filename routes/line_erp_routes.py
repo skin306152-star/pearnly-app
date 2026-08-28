@@ -119,6 +119,16 @@ async def erp_binding_code(request: Request):
         ):
             raise HTTPException(403, detail="workspace.forbidden")
     data = store.new_code(user["tenant_id"], user["id"], workspace_client_id)
+    basic_id = os.getenv("LINE_ERP_BOT_BASIC_ID", "").strip()
+    friend_url = os.getenv("LINE_ERP_BOT_FRIEND_URL", "").strip()
+    if basic_id and not friend_url:
+        friend_url = f"https://line.me/R/ti/p/{basic_id}"
+    data.update(
+        {
+            "bot_basic_id": basic_id or None,
+            "bot_friend_url": friend_url or None,
+        }
+    )
     return {"ok": True, "data": data}
 
 

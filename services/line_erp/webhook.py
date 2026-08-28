@@ -14,9 +14,12 @@ from core.feature_flags import erp_line_enabled_for
 from services.intake_bridge import convert as convert_svc
 from services.line_binding import line_client
 from services.line_erp import cards, flow, intake, store
+from services.line_erp.out import make_spawn
 from services.ocr.recognize.core import run_recognition_core
 
 CHANNEL = "erp"
+_spawn = make_spawn("line_erp.webhook")
+_MENU_WORDS = frozenset({"menu", "เมนู"})
 
 
 class BatchIncomplete(Exception):
@@ -51,19 +54,21 @@ def draft_records(user_id: str, tenant_id: str, draft_id: str, ids: list[str]) -
     return records
 
 
-def _preview_values(result: dict) -> tuple[str, str, str]:
+def _preview_values(result: dict) -> tuple[str, str, str, str, str]:
     pages = result.get("raw_pages") or []
     page = pages[0] if pages and isinstance(pages[0], dict) else {}
     fields = page.get("fields") or {}
     amount = fields.get("total_amount") or fields.get("grand_total") or ""
     vendor = fields.get("seller_name") or fields.get("buyer_name") or fields.get("vendor") or ""
+    document_no = fields.get("invoice_number") or fields.get("invoice_no") or ""
+    document_date = fields.get("date") or fields.get("invoice_date") or ""
     items = fields.get("items") or []
     detail = " · ".join(
         str(item.get("name") or item.get("description") or "")
         for item in items[:3]
         if isinstance(item, dict)
     )
-    return str(amount), str(vendor), detail
+    return str(amount), str(vendor), detail, str(document_no), str(document_date)
 
 
 async def handle_event(ev: dict) -> None:
@@ -98,7 +103,7 @@ async def handle_event(ev: dict) -> None:
     if message.get("type") == "text":
         await _handle_text(message, binding, line_user_id, reply_token)
     elif message.get("type") in ("image", "file"):
-        await _handle_document(message, binding, line_user_id, reply_token)
+        await _queue_document(message, binding, line_user_id, reply_token)
 
 
 async def _bind_if_possible(ev: dict, line_user_id: str, reply_token: str | None) -> None:
@@ -130,6 +135,21 @@ async def _handle_postback(
     if action.startswith("mode:"):
         mode = action.split(":", 1)[1]
         if mode in flow.MODES:
+            session = store.get_session(binding["tenant_id"], line_user_id) or {}
+            if session.get("state") == "ocr_processing":
+                _notify(
+                    line_user_id,
+                    reply_token,
+                    "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่",
+                )
+                return
+            if session.get("state") in ("draft", "editing"):
+                _notify(
+                    line_user_id,
+                    reply_token,
+                    "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนเริ่มรายการใหม่",
+                )
+                return
             store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
             if reply_token:
                 line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
@@ -141,7 +161,27 @@ async def _handle_postback(
 async def _handle_text(
     message: dict, binding: dict, line_user_id: str, reply_token: str | None
 ) -> None:
+    session = store.get_session(binding["tenant_id"], line_user_id) or {}
+    if session.get("state") == "ocr_processing":
+        if reply_token:
+            line_client.reply_text(
+                reply_token, "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่", channel=CHANNEL
+            )
+        return
     text = (message.get("text") or "").strip()
+    if session.get("state") in ("draft", "editing"):
+        if reply_token:
+            line_client.reply_text(
+                reply_token,
+                "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนเริ่มรายการใหม่",
+                channel=CHANNEL,
+            )
+        return
+    if text.lower() in _MENU_WORDS:
+        store.set_session(binding["tenant_id"], line_user_id, "menu", {})
+        if reply_token:
+            line_client.reply_messages(reply_token, [cards.menu_card()], channel=CHANNEL)
+        return
     if text not in ("1", "2"):
         return
     mode = "purchase" if text == "1" else "sales"
@@ -150,10 +190,68 @@ async def _handle_text(
         line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
 
 
-async def _handle_document(
+def _notify(line_user_id: str, reply_token: str | None, text: str) -> None:
+    if reply_token:
+        line_client.reply_text(reply_token, text, channel=CHANNEL)
+    else:
+        line_client.push_text(line_user_id, text, channel=CHANNEL)
+
+
+def _restore_receiving(binding: dict, line_user_id: str, mode: str) -> None:
+    store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
+
+
+async def _queue_document(
     message: dict, binding: dict, line_user_id: str, reply_token: str | None
 ) -> None:
+    """Reserve one OCR run, then let the webhook return before recognition starts."""
+    claimed = await asyncio.to_thread(
+        store.claim_processing,
+        binding["tenant_id"],
+        line_user_id,
+        message.get("id"),
+    )
+    if claimed:
+        _spawn(_process_document(message, binding, line_user_id))
+        return
+    session = await asyncio.to_thread(store.get_session, binding["tenant_id"], line_user_id) or {}
+    if session.get("state") == "ocr_processing":
+        text = "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่"
+    elif session.get("state") in ("draft", "editing"):
+        text = "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนส่งเอกสารใหม่"
+    else:
+        text = "กรุณาเลือก 1 ซื้อ หรือ 2 ขาย ก่อนส่งเอกสาร"
+    _notify(line_user_id, reply_token, text)
+
+
+async def _process_document(message: dict, binding: dict, line_user_id: str) -> None:
+    session = await asyncio.to_thread(store.get_session, binding["tenant_id"], line_user_id) or {}
+    mode = (session.get("payload") or {}).get("mode") or ""
+    try:
+        await asyncio.to_thread(line_client.start_loading, line_user_id, 30, channel=CHANNEL)
+        await _handle_document(message, binding, line_user_id, None, queued=True)
+    except Exception:
+        if mode in flow.MODES:
+            _restore_receiving(binding, line_user_id, mode)
+        _notify(line_user_id, None, "ดำเนินการไม่สำเร็จ กรุณาส่งเอกสารใหม่")
+        raise
+
+
+async def _handle_document(
+    message: dict,
+    binding: dict,
+    line_user_id: str,
+    reply_token: str | None,
+    *,
+    queued: bool = False,
+) -> None:
     session = store.get_session(binding["tenant_id"], line_user_id) or {}
+    if session.get("state") == "ocr_processing" and not queued:
+        if reply_token:
+            line_client.reply_text(
+                reply_token, "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่", channel=CHANNEL
+            )
+        return
     mode = (session.get("payload") or {}).get("mode") or ""
     if mode not in flow.MODES:
         if reply_token:
@@ -162,13 +260,17 @@ async def _handle_document(
             )
         return
     message_id = message.get("id")
-    content = line_client.download_message_content(message_id, channel=CHANNEL)
+    content = await asyncio.to_thread(
+        line_client.download_message_content, message_id, channel=CHANNEL
+    )
     if not content:
-        if reply_token:
-            line_client.reply_text(reply_token, "อ่านไฟล์ไม่สำเร็จ กรุณาส่งใหม่", channel=CHANNEL)
+        _restore_receiving(binding, line_user_id, mode)
+        _notify(line_user_id, reply_token, "อ่านไฟล์ไม่สำเร็จ กรุณาส่งใหม่")
         return
     user = db.find_user_by_id(binding["user_id"])
     if not user:
+        store.clear_session(binding["tenant_id"], line_user_id)
+        _notify(line_user_id, reply_token, "ไม่พบผู้ใช้ ERP กรุณาติดต่อผู้ดูแล")
         return
     user = dict(user)
     if (
@@ -176,7 +278,18 @@ async def _handle_document(
         or str(user.get("tenant_id")) != str(binding.get("tenant_id"))
         or not erp_line_enabled_for(binding.get("tenant_id"), binding.get("user_id"))
     ):
+        store.clear_session(binding["tenant_id"], line_user_id)
+        _notify(line_user_id, reply_token, "ไม่สามารถใช้งาน ERP ได้ในขณะนี้")
         return
+    if not queued:
+        store.set_session(
+            binding["tenant_id"],
+            line_user_id,
+            "ocr_processing",
+            {"mode": mode, "message_id": str(message_id or "")},
+            ttl_minutes=15,
+        )
+        await asyncio.to_thread(line_client.start_loading, line_user_id, 30, channel=CHANNEL)
     user["entry"] = "erp"
     try:
         result = await asyncio.to_thread(
@@ -190,18 +303,13 @@ async def _handle_document(
             posting_kind=None,
         )
     except Exception:
-        if reply_token:
-            line_client.reply_text(
-                reply_token, "อ่านเอกสารไม่สำเร็จหรือเครดิตไม่พอ กรุณาลองใหม่", channel=CHANNEL
-            )
+        _restore_receiving(binding, line_user_id, mode)
+        _notify(line_user_id, reply_token, "อ่านเอกสารไม่สำเร็จหรือเครดิตไม่พอ กรุณาลองใหม่")
         return
     history_ids = [str(value) for value in result.get("history_ids") or [] if value]
     if not history_ids:
-        store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
-        if reply_token:
-            line_client.reply_text(
-                reply_token, "ไม่พบเอกสารที่อ่านได้ กรุณาส่งไฟล์ใหม่", channel=CHANNEL
-            )
+        _restore_receiving(binding, line_user_id, mode)
+        _notify(line_user_id, reply_token, "ไม่พบเอกสารที่อ่านได้ กรุณาส่งไฟล์ใหม่")
         return
     await asyncio.to_thread(
         intake.generate_and_save_pdf,
@@ -218,13 +326,14 @@ async def _handle_document(
         "draft",
         {"mode": mode, "history_ids": history_ids, "nonce": nonce},
     )
+    amount, vendor, detail, document_no, document_date = _preview_values(result)
+    preview = cards.preview_card(
+        history_ids[0], mode, amount, vendor, detail, document_no, document_date
+    )
     if reply_token:
-        amount, vendor, detail = _preview_values(result)
-        line_client.reply_messages(
-            reply_token,
-            [cards.preview_card(history_ids[0], mode, amount, vendor, detail)],
-            channel=CHANNEL,
-        )
+        line_client.reply_messages(reply_token, [preview], channel=CHANNEL)
+    else:
+        line_client.push_messages(line_user_id, [preview], channel=CHANNEL)
 
 
 async def act_draft(

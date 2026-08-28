@@ -140,6 +140,26 @@ def get_session(tenant_id, line_user_id):
     return dict(row) if row else None
 
 
+def claim_processing(tenant_id, line_user_id, message_id, ttl_minutes=15):
+    """Atomically reserve a receiving session before one billable OCR run."""
+    from core import db
+
+    expires = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+    with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            """UPDATE erp_line_sessions SET
+            state='ocr_processing',
+            payload=jsonb_build_object('mode', payload->>'mode', 'message_id', %s),
+            expires_at=%s
+            WHERE tenant_id=%s AND line_user_id=%s AND state='receiving'
+              AND expires_at>now() AND payload->>'mode' IN ('purchase','sales')
+            RETURNING payload->>'mode' AS mode""",
+            (str(message_id or ""), expires, tenant_id, line_user_id),
+        )
+        row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def clear_session(tenant_id, line_user_id):
     from core import db
 

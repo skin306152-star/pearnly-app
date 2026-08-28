@@ -108,6 +108,7 @@ _ENTRY_ASSETS = {
         "/static/erp-line-intake/erp-line-intake.css",
         "/static/erp-line-intake/discard-dialog.js",
         "/static/erp-line-intake/preview.js",
+        "/static/erp-line-intake/field-renderer.js",
         "/static/erp-line-intake/erp-line-intake.js",
     ),
     "static/daily/daily.html": (

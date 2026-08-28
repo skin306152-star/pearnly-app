@@ -139,15 +139,25 @@
         description: { th: 'รายละเอียด', en: 'Description', zh: '说明', ja: '摘要' },
     };
     var CANCEL = { th: 'ยกเลิก', en: 'Cancel', zh: '取消', ja: 'キャンセル' };
+    function draftFromLocation() {
+        var match = location.pathname.match(/\/liff\/erp\/([^/?#]+)/);
+        if (match && match[1]) return match[1];
+        var query = new URLSearchParams(location.search);
+        var direct = query.get('draft');
+        if (direct) return direct;
+        var state = query.get('liff.state');
+        if (state) {
+            state = state.charAt(0) === '?' ? state.slice(1) : state;
+            return new URLSearchParams(state).get('draft') || '';
+        }
+        return '';
+    }
     var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2),
         state = document.getElementById('state'),
         form = document.getElementById('editor'),
         model,
         busy = false,
-        draft =
-            (location.pathname.match(/\/liff\/erp\/([^/?#]+)/) || [])[1] ||
-            new URLSearchParams(location.search).get('draft') ||
-            '';
+        draft = draftFromLocation();
     function t(k) {
         return (L[lang] || L.th)[k] || L.en[k] || k;
     }
@@ -166,20 +176,24 @@
         var x = dat(model);
         return Array.isArray(x.records) ? x.records : Array.isArray(x.invoices) ? x.invoices : [x];
     }
+    function moveAlias(target, canonical, alias) {
+        if (!target[canonical] && target[alias]) target[canonical] = target[alias];
+        if (alias !== canonical) delete target[alias];
+    }
     function fieldsOf(record) {
         var f = record.fields || (record.pages && record.pages[0] && record.pages[0].fields) || {};
-        if (!f.invoice_number && f.invoice_no) f.invoice_number = f.invoice_no;
-        if (!f.date && f.invoice_date) f.date = f.invoice_date;
+        moveAlias(f, 'invoice_number', 'invoice_no');
+        moveAlias(f, 'date', 'invoice_date');
         if (!Array.isArray(f.items) || !f.items.length) {
             // 空白编辑行只提供人工补录入口，不从票头金额猜数量、单价或行金额。
             f.items = [{ name: '', qty: '', price: '', subtotal: '', posting_kind: '' }];
         }
         if (Array.isArray(f.items)) {
             f.items.forEach(function (item) {
-                if (!item.name && item.description) item.name = item.description;
-                if (!item.qty && item.quantity) item.qty = item.quantity;
-                if (!item.price && item.unit_price) item.price = item.unit_price;
-                if (!item.subtotal && item.amount) item.subtotal = item.amount;
+                moveAlias(item, 'name', 'description');
+                moveAlias(item, 'qty', 'quantity');
+                moveAlias(item, 'price', 'unit_price');
+                moveAlias(item, 'subtotal', 'amount');
             });
         }
         return f;
@@ -227,21 +241,7 @@
         return '<section class="section"><h2>' + esc(h) + '</h2>' + b + '</section>';
     }
     function fld(k, v, req, ri) {
-        var lk = k.indexOf('item.') === 0 ? k.split('.').pop() : k;
-        return (
-            '<div class="field"><label>' +
-            esc(label(lk)) +
-            (req ? ' *' : '') +
-            '</label><input data-field="' +
-            ri +
-            ':' +
-            esc(k) +
-            '" value="' +
-            esc(v == null ? '' : v) +
-            '"' +
-            (req ? ' required' : '') +
-            '></div>'
-        );
+        return window.erpLineFieldRenderer.render(k, v, req, ri, label, esc);
     }
     function prev(r) {
         var fallback = r.preview_url || r.original_url || r.source_url || r.pdf_url || '',
@@ -279,7 +279,7 @@
                     var f = fieldsOf(r),
                         it = Array.isArray(f.items) ? f.items : [],
                         keys = Object.keys(f).filter(function (k) {
-                            return k !== 'items' && typeof f[k] !== 'object';
+                            return k !== 'items';
                         });
                     return (
                         '<article data-record="' +
@@ -377,8 +377,17 @@
             f = fieldsOf(r),
             k = p.slice(1).join(':'),
             m = k.match(/^item\.(\d+)\.(.+)$/);
-        if (m) (f.items || [])[+m[1]][m[2]] = e.target.value;
-        else f[k] = e.target.value;
+        var value = e.target.value;
+        if (e.target.tagName === 'TEXTAREA') {
+            try {
+                value = JSON.parse(value);
+            } catch (_) {
+                // Invalid JSON keeps the last valid value until the user completes the object.
+                return;
+            }
+        }
+        if (m) (f.items || [])[+m[1]][m[2]] = value;
+        else f[k] = value;
     }
     function kind(e) {
         var p = e.target.dataset.kind.split(':'),

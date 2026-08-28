@@ -22,6 +22,13 @@
 | `LINE_ERP_CHANNEL_SECRET` | ERP OA webhook 签名校验 | 只接受正确签名，错误签名拒绝 |
 | `LINE_ERP_CHANNEL_ACCESS_TOKEN` | ERP OA 回复/推送 | 不与会计 OA、DMS OA token 混用 |
 | `LINE_ERP_LIFF_ID` | ERP LIFF 编辑入口 | 只打开 ERP 入口并保留租户/草稿授权边界 |
+| `LINE_ERP_BOT_BASIC_ID` | ERP OA 公开 Basic ID | 网页绑定卡只显示 ERP OA |
+| `LINE_ERP_BOT_FRIEND_URL` | ERP OA 加好友链接和二维码 | 不引用会计 OA 或 DMS OA |
+
+2026-08-28 已完成官方侧基础配置：独立 LINE Login channel 已发布，LIFF endpoint 指向
+`/static/dist/erp-line-intake.html`，Messaging API webhook 已启用并由 LINE 控制台验证返回
+Success；Chat、Greeting message、Auto-response messages 保持关闭。此处仅表示通道连通，不能
+替代 iOS/Android 的实际菜单、上传、预览、编辑、确认和丢弃验收。
 
 确认路由为 `/api/line/erp/webhook`，绑定和会话使用独立的
 `line_erp_bindings`、`line_erp_binding_codes`、`erp_line_sessions`。不得把旧 OA webhook

@@ -1138,6 +1138,7 @@
         "src/home/purchase-list.ts",
         "src/home/sales-workbench.ts",
         "src/home/erp-intake.ts",
+        "src/home/page-integrations.ts",
         "src/home/nav-presets.ts",
         "src/home/route-table.ts",
         "home.html",
@@ -1145,7 +1146,8 @@
       ],
       "fixtures": [],
       "only_e2e": [
-        "ERP 采购/销售按钮在真实主壳中进入共享 OCR 工作台并锁定方向；确认前保存失败时不创建正式单据且复核卡仍可见；非 ERP 仍保留汇总表任务和原采购入口。"
+        "ERP 采购/销售按钮在真实主壳中进入共享 OCR 工作台并锁定方向；确认前保存失败时不创建正式单据且复核卡仍可见；非 ERP 仍保留汇总表任务和原采购入口。",
+        "ERP 集成页复用成熟 LINE 绑定卡，显示 ERP 专用 QR、Basic ID、6 位码、自动轮询、已绑定和移动端触控状态。"
       ]
     },
     "_a1_discount_inferred_verify.spec.js": {

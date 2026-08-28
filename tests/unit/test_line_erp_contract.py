@@ -46,6 +46,30 @@ class ErpChannelTests(unittest.TestCase):
                 line_client.verify_signature(body, _sig(body, "old"), channel="unknown")
             )
 
+    @mock.patch.object(
+        routes.store,
+        "new_code",
+        return_value={"code": "482913", "expires_at": "2099-08-28T10:00:00+00:00"},
+    )
+    @mock.patch.object(
+        routes,
+        "_require_erp_account",
+        return_value={"id": "u1", "tenant_id": "t1"},
+    )
+    def test_erp_binding_code_returns_erp_bot_identity(self, _account, _new_code):
+        app = FastAPI()
+        app.include_router(routes.router)
+        with mock.patch.dict(
+            os.environ,
+            {"LINE_ERP_BOT_BASIC_ID": "@erp-test", "LINE_ERP_BOT_FRIEND_URL": ""},
+            clear=False,
+        ):
+            response = TestClient(app).post("/api/line/erp/binding-code", json={})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["bot_basic_id"], "@erp-test")
+        self.assertEqual(data["bot_friend_url"], "https://line.me/R/ti/p/@erp-test")
+
 
 class ErpFlowTests(unittest.TestCase):
     def test_mode_must_be_selected_before_media(self):

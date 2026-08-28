@@ -133,7 +133,6 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
             cur, table="purchase_docs", tenant_id=tenant_id, doc_id=doc_id, history_id=history_id
         )
         return {"doc_type": "purchase", "doc_id": str(doc_id), "doc_no": doc_no}
-
     doc_id, doc_no = sales_leg.issue_from_history(
         cur,
         tenant_id=tenant_id,

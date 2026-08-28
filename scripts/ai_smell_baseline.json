@@ -43,9 +43,6 @@
   "static/dms/dms-billing-html.js": {
     "emoji": 1
   },
-  "static/erp-mrerp-connect.js": {
-    "console": 1
-  },
   "static/i18n-data.js": {
     "emoji": 4
   },

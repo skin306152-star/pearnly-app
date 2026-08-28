@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DMS LINE 菜单卡：三个入口行卡。
+"""DMS LINE 菜单卡：四个入口行卡。
 
 布局照泰方认可的 ChatGPT mockup:标题区 + 三张整行可点的行卡(编号圆徽+图标+标题
 两行说明+箭头)。从 cards.py 拆出保 500 行硬门;文案/动作名仍以 cards 为单一来源。
@@ -15,16 +15,18 @@ from services.line_dms.cards import (
     TXT_MENU_D1,
     TXT_MENU_D2,
     TXT_MENU_D3,
+    TXT_MENU_D4,
     TXT_MENU_ITEM1,
     TXT_MENU_ITEM2,
     TXT_MENU_ITEM3,
+    TXT_MENU_ITEM4,
     TXT_MENU_HINT,
     TXT_MENU_PICK,
     TXT_MENU_PICK_SUB,
     TXT_MENU_TITLE,
     _data,
 )
-from services.line_dms.rich_menu import portal_liff_url
+from services.line_dms.rich_menu import credentials_liff_url, portal_liff_url
 
 # ── 菜单层(波2) ──────────────────────────────────────────────────────────
 # 图标托管在自家 static(LINE Flex 的图片必须是公网 https URL);?v 随图变更 bump。
@@ -49,6 +51,7 @@ def _menu_icon_disc(icon: str, soft: str, size: str, img: str) -> Dict[str, Any]
 THEME_BLUE = {"accent": "#2f6bff", "soft": "#eaf0ff", "border": "#dfe7ff"}
 THEME_PINK = {"accent": "#f25c6e", "soft": "#fdecef", "border": "#f9d9de"}
 THEME_PURPLE = {"accent": "#7656d6", "soft": "#f0ebff", "border": "#e5dcff"}
+THEME_GREEN = {"accent": "#198c6a", "soft": "#e8f7f1", "border": "#d3eee4"}
 
 
 def _menu_item(
@@ -119,7 +122,7 @@ def _menu_item(
 
 
 def menu_card() -> Dict[str, Any]:
-    """入口菜单(照泰方认可的 mockup):标题区 + 两张整行可点的行卡。点旧卡安全。"""
+    """入口菜单(照泰方认可的 mockup):标题区 + 四张整行可点的行卡。"""
     head = {
         "type": "box",
         "layout": "horizontal",
@@ -181,6 +184,14 @@ def menu_card() -> Dict[str, Any]:
                 TXT_MENU_ITEM3,
                 TXT_MENU_D3,
                 {"type": "uri", "label": TXT_MENU_ITEM3, "uri": portal_liff_url()},
+            ),
+            _menu_item(
+                "4",
+                "menu-4",
+                THEME_GREEN,
+                TXT_MENU_ITEM4,
+                TXT_MENU_D4,
+                {"type": "uri", "label": TXT_MENU_ITEM4, "uri": credentials_liff_url()},
             ),
             {
                 "type": "text",

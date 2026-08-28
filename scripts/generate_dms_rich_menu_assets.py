@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 ICON_PATH = ROOT / "static" / "dms" / "line-icons" / "menu-3.png"
+CREDENTIAL_ICON_PATH = ROOT / "static" / "dms" / "line-icons" / "menu-4.png"
 MENU_PATH = ROOT / "static" / "brand" / "line-richmenu-dms-v1-2500x1686.png"
 FONT_CANDIDATES = (
     ROOT / "services" / "export" / "fonts" / "Sarabun-Bold.ttf",
@@ -13,6 +14,7 @@ FONT_CANDIDATES = (
 )
 
 PURPLE = (118, 86, 214)
+GREEN = (25, 140, 106)
 BLUE = (47, 107, 255)
 PINK = (242, 92, 110)
 INK = (55, 48, 75)
@@ -202,11 +204,11 @@ def draw_lock(draw, center_x, center_y, size, color, width):
     )
 
 
-def build_icon():
+def build_icon(path, glyph, color):
     image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
-    draw_dashboard(ImageDraw.Draw(image), 48, 48, 88, PURPLE, 6)
-    ICON_PATH.parent.mkdir(parents=True, exist_ok=True)
-    image.save(ICON_PATH, "PNG", optimize=True)
+    glyph(ImageDraw.Draw(image), 48, 48, 88, color, 6)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path, "PNG", optimize=True)
     return image
 
 
@@ -219,27 +221,50 @@ def build_menu():
             draw.ellipse((x - 4, y - 4, x + 4, y + 4), fill=dot_color)
 
     active_cells = (
-        (BLUE, "จัดทำข้อมูลลูกค้า", "เพิ่มและแก้ไขข้อมูลลูกค้า", draw_customer),
-        (PINK, "จัดทำใบจองรถยนต์", "สร้างและติดตามใบจอง", draw_car),
-        (PURPLE, "เข้าสู่ระบบ DMS", "เข้าใช้งานระบบหลังบ้าน", draw_dashboard),
+        (0, 0, BLUE, "จัดทำข้อมูลลูกค้า", "เพิ่มและแก้ไขข้อมูลลูกค้า", draw_customer, 68),
+        (1, 0, PINK, "จัดทำใบจองรถยนต์", "สร้างและติดตามใบจอง", draw_car, 68),
+        (2, 0, PURPLE, "เข้าสู่ระบบ DMS", "เข้าใช้งานระบบหลังบ้าน", draw_dashboard, 68),
+        (
+            0,
+            1,
+            GREEN,
+            "เปลี่ยนบัญชีและรหัสผ่าน",
+            "อัปเดตข้อมูลเข้าสู่ระบบ DMS",
+            draw_lock,
+            56,
+        ),
     )
-    for index, (color, title, subtitle, glyph) in enumerate(active_cells):
-        left, right = COLUMN_EDGES[index], COLUMN_EDGES[index + 1]
+    for col, row, color, title, subtitle, glyph, title_size in active_cells:
+        left, right = COLUMN_EDGES[col], COLUMN_EDGES[col + 1]
+        top = row * ROW_EDGE
+        bottom = (row + 1) * ROW_EDGE
         center_x = (left + right) / 2
         rounded_card(
             draw,
-            (left + 44, 44, right - 44, ROW_EDGE - 44),
+            (left + 44, top + 44, right - 44, bottom - 44),
             48,
             fill=WHITE,
             outline=blend(WHITE, color, 0.22),
             width=4,
         )
-        rounded_card(draw, (center_x - 120, 190, center_x + 120, 430), 64, fill=color)
-        glyph(draw, center_x, 310, 150, WHITE, 12)
-        centered_text(draw, title, load_font(68), color, center_x, 538)
-        centered_text(draw, subtitle, load_font(42), blend(INK, BACKGROUND, 0.35), center_x, 640)
+        rounded_card(
+            draw,
+            (center_x - 120, top + 190, center_x + 120, top + 430),
+            64,
+            fill=color,
+        )
+        glyph(draw, center_x, top + 310, 150, WHITE, 12)
+        centered_text(draw, title, load_font(title_size), color, center_x, top + 538)
+        centered_text(
+            draw,
+            subtitle,
+            load_font(40),
+            blend(INK, BACKGROUND, 0.35),
+            center_x,
+            top + 640,
+        )
 
-    for index in range(3):
+    for index in range(1, 3):
         left, right = COLUMN_EDGES[index], COLUMN_EDGES[index + 1]
         center_x = (left + right) / 2
         rounded_card(
@@ -263,7 +288,12 @@ def build_menu():
 
 
 def main():
-    for path, image in ((ICON_PATH, build_icon()), (MENU_PATH, build_menu())):
+    assets = (
+        (ICON_PATH, build_icon(ICON_PATH, draw_dashboard, PURPLE)),
+        (CREDENTIAL_ICON_PATH, build_icon(CREDENTIAL_ICON_PATH, draw_lock, GREEN)),
+        (MENU_PATH, build_menu()),
+    )
+    for path, image in assets:
         print(f"{path} {image.width}x{image.height} {image.mode}")
 
 

@@ -93,7 +93,7 @@ const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="ut
     body{margin:0;background:#171717;color:#fff;font-family:system-ui,sans-serif}.chat{min-height:100vh;padding:28px 14px 210px;box-sizing:border-box}.bubble{margin:20px 0 0 auto;max-width:78%;padding:12px 16px;border-radius:18px;background:#6ee787;color:#102416}.menu{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);background:#f8f4ff;color:#30295f}.cell{height:94px;display:grid;place-items:center;text-align:center;border:1px solid #ddd5ff;color:inherit;text-decoration:none;font-weight:700}.placeholder{color:#aaa}
 </style></head><body><main class="chat"><div class="bubble">เลือกเมนูที่ต้องการได้เลยครับ</div></main><nav class="menu" aria-label="เมนู DMS">
     <a class="cell" href="#customer">สร้างลูกค้า</a><a class="cell" href="#booking">สร้างการจองรถ</a><a id="dms-menu" class="cell" href="${BASE}/home?liff.state=%3Fportal%3Ddms">เข้าสู่ DMS</a>
-    <span class="cell placeholder">—</span><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
+    <a id="credentials-menu" class="cell" href="${BASE}/home?liff.state=%3Fcredentials%3Ddms">เปลี่ยนบัญชีและรหัสผ่าน</a><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
 </nav></body></html>`;
 
 async function setupPortalTest(page) {
@@ -194,6 +194,96 @@ test('second menu click issues a fresh ticket after closeWindow', async ({ page 
         });
     await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(true);
     expect(h.ticketRequestCount()).toBe(2);
+});
+
+test('menu 4 opens the operator credential editor and saves only the entered pair', async ({
+    page,
+}) => {
+    let updateBody;
+    let updateCount = 0;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'th');
+    });
+    await page.route('**/api/line/dms-credentials', async (route) => {
+        if (route.request().method() === 'GET') {
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { username: 'sale02' } }),
+            });
+        }
+        updateCount += 1;
+        updateBody = route.request().postDataJSON();
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { updated: true } }),
+        });
+    });
+    await page.route(/\/home\?liff\.state=.*credentials/, (route) =>
+        route.fulfill({
+            status: 302,
+            headers: {
+                location: `${BASE}/static/dist/dms-booking-edit.html?credentials=dms`,
+            },
+        })
+    );
+
+    await page.setContent(PORTAL_CHAT_HTML);
+    await page.locator('#credentials-menu').click();
+    await expect(page.locator('#credentials-username')).toBeVisible();
+    await expect(page.locator('#credentials-username')).toHaveValue('sale02');
+    await expect(page.locator('#credentials-password')).toHaveValue('');
+    await expect(page.locator('body')).not.toContainText('secret');
+
+    await page.locator('#credentials-password').click();
+    await page.keyboard.type('updated-pass');
+    expect(await page.evaluate(() => globalThis.document.activeElement.id)).toBe(
+        'credentials-password'
+    );
+    await page.locator('#credentials-confirm').click();
+    await page.keyboard.type('wrong-pass');
+    await page.locator('#credentials-save').click();
+    await expect(page.locator('#credentials-error')).toContainText('ไม่ตรงกัน');
+    expect(updateCount).toBe(0);
+
+    await page.locator('#credentials-confirm').fill('');
+    await page.locator('#credentials-confirm').click();
+    await page.keyboard.type('updated-pass');
+    await page.screenshot({
+        path: path.join(OUT, 'credentials-editor-390.png'),
+        fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({
+        path: path.join(OUT, 'credentials-editor-1280.png'),
+        fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    for (const language of ['en', 'zh', 'ja', 'th']) {
+        await page.locator('#language').selectOption(language);
+        await expect(page.locator('.credentials-editor h1')).not.toBeEmpty();
+        expect(
+            await page.evaluate(
+                () => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth
+            )
+        ).toBe(true);
+    }
+    await page.locator('#credentials-save').click();
+    await expect(page.locator('#credentials-done')).toBeVisible();
+    expect(updateCount).toBe(1);
+    expect(updateBody).toEqual({ username: 'sale02', password: 'updated-pass' });
+    await page.screenshot({
+        path: path.join(OUT, 'credentials-saved-390.png'),
+        fullPage: true,
+    });
 });
 
 test('external relay logs in through a top-level MRERP window', async ({ page, context }) => {

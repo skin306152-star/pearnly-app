@@ -27,6 +27,13 @@ class DmsRichMenuTests(unittest.TestCase):
                 "https://liff.line.me/DMS-LIFF?portal=dms",
             )
 
+    def test_credentials_liff_url(self):
+        with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
+            self.assertEqual(
+                rich_menu.credentials_liff_url(),
+                "https://liff.line.me/DMS-LIFF?credentials=dms",
+            )
+
     def test_portal_liff_url_falls_back_to_shared_liff_id(self):
         with patch.dict(os.environ, {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True):
             self.assertEqual(
@@ -43,22 +50,32 @@ class DmsRichMenuTests(unittest.TestCase):
                 "https://liff.line.me/SHARED-LIFF?portal=dms",
             )
 
-    def test_payload_has_three_top_row_actions(self):
+    def test_payload_has_three_top_row_actions_and_credentials_below(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):
             payload = rich_menu.build_payload()
         self.assertEqual(payload["size"], {"width": 2500, "height": 1686})
         self.assertLessEqual(len(payload["chatBarText"]), 14)
-        self.assertEqual(len(payload["areas"]), 3)
+        self.assertEqual(len(payload["areas"]), 4)
         self.assertEqual(
-            [(a["bounds"]["x"], a["bounds"]["width"]) for a in payload["areas"]],
+            [(a["bounds"]["x"], a["bounds"]["width"]) for a in payload["areas"][:3]],
             [(0, 833), (833, 833), (1666, 834)],
         )
         self.assertTrue(
-            all(a["bounds"]["y"] == 0 and a["bounds"]["height"] == 843 for a in payload["areas"])
+            all(
+                a["bounds"]["y"] == 0 and a["bounds"]["height"] == 843 for a in payload["areas"][:3]
+            )
         )
         self.assertEqual(
             [a["action"]["type"] for a in payload["areas"]],
-            ["postback", "postback", "uri"],
+            ["postback", "postback", "uri", "uri"],
+        )
+        self.assertEqual(
+            payload["areas"][3]["bounds"],
+            {"x": 0, "y": 843, "width": 833, "height": 843},
+        )
+        self.assertEqual(
+            payload["areas"][3]["action"]["uri"],
+            "https://liff.line.me/DMS-LIFF?credentials=dms",
         )
 
     def _image_path(self):

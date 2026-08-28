@@ -66,6 +66,7 @@ from routes.line_card_image_routes import router as line_card_image_router
 from routes.line_dms_webhook_routes import router as line_dms_webhook_router
 from routes.line_liff_routes import router as line_liff_router
 from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
+from routes.line_dms_credentials_routes import router as line_dms_credentials_router
 from routes.line_dms_portal_routes import router as line_dms_portal_router
 from routes.line_erp_routes import router as line_erp_router
 from routes.line_webhook_routes import router as line_webhook_router
@@ -163,6 +164,7 @@ ROUTERS = (
     google_oauth_router,  # 集成中心 Google Drive/Sheets 授权
     line_liff_router,
     line_dms_booking_edit_router,
+    line_dms_credentials_router,
     line_dms_portal_router,
     purchase_config_router,
     supplier_posting_router,  # 供应商过账档案 CRUD(零 UI)

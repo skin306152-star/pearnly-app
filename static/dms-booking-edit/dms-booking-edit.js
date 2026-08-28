@@ -19,6 +19,7 @@
     var nonce = query('draft');
     var ERROR_KEYS = window.DMS_BOOKING_ERROR_KEYS;
     var portalMode = query('portal') === 'dms';
+    var credentialsMode = query('credentials') === 'dms';
     if (portalMode) locale = 'th';
 
     function query(name) {
@@ -183,6 +184,9 @@
             });
     }
     async function load() {
+        if (credentialsMode) {
+            return window.DmsCredentials.mount({ gateway: gateway, locale: locale, close: close });
+        }
         if (portalMode) {
             try {
                 if (!gateway.hasDmsToken()) await gateway.authenticate();
@@ -502,6 +506,10 @@
     }
     function applyLanguage() {
         document.documentElement.lang = locale;
+        if (credentialsMode) {
+            window.DmsCredentials.setLocale(locale);
+            return;
+        }
         document.querySelectorAll('[data-t]').forEach(function (el) {
             el.textContent = t(el.dataset.t);
         });

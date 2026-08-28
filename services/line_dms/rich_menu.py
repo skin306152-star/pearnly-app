@@ -26,11 +26,11 @@ _ROW_H = 843
 _COL_X = (0, _W // 3, 2 * _W // 3, _W)
 
 
-def _area(col: int, action: dict) -> dict:
+def _area(col: int, action: dict, *, row: int = 0) -> dict:
     return {
         "bounds": {
             "x": _COL_X[col],
-            "y": 0,
+            "y": row * _ROW_H,
             "width": _COL_X[col + 1] - _COL_X[col],
             "height": _ROW_H,
         },
@@ -45,6 +45,17 @@ def portal_liff_url() -> str:
     ).strip()
     if liff_id:
         query = urllib.parse.urlencode({"portal": "dms"})
+        return f"https://liff.line.me/{liff_id}?{query}"
+    return "https://pearnly.com/dms"
+
+
+def credentials_liff_url() -> str:
+    """Open the self-service credential editor in the same DMS LIFF app."""
+    liff_id = (os.environ.get("LINE_DMS_LIFF_ID") or "").strip() or (
+        os.environ.get("LINE_LIFF_ID") or ""
+    ).strip()
+    if liff_id:
+        query = urllib.parse.urlencode({"credentials": "dms"})
         return f"https://liff.line.me/{liff_id}?{query}"
     return "https://pearnly.com/dms"
 
@@ -75,6 +86,15 @@ def build_payload() -> dict:
             _area(
                 2,
                 {"type": "uri", "label": "เข้าสู่ DMS", "uri": portal_liff_url()},
+            ),
+            _area(
+                0,
+                {
+                    "type": "uri",
+                    "label": "เปลี่ยนรหัสผ่าน",
+                    "uri": credentials_liff_url(),
+                },
+                row=1,
             ),
         ],
     }

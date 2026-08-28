@@ -19,6 +19,10 @@ from core.auth import get_current_user_from_request
 from core.route_helpers import _plan_permissions, _record_500
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import DMS, require_erp_portal
+from services.erp.endpoint_config import (
+    normalize_mrerp_dms_config as _normalize_mrerp_dms_credentials,
+)
+from services.erp.endpoint_config import strip_endpoint_for_response as _strip_endpoint_for_response
 from services.erp.express_push.agent_reporting import fit_stock_acc_groups
 
 logger = logging.getLogger("mr-pilot")
@@ -40,27 +44,6 @@ class ErpEndpointUpdate(BaseModel):
     is_default: Optional[bool] = None
     auto_push: Optional[bool] = None
     enabled: Optional[bool] = None
-
-
-def _strip_endpoint_for_response(ep: Dict[str, Any]) -> Dict[str, Any]:
-    """返回前端时,把 token / 加密凭据 字段隐藏,避免泄漏"""
-    out = dict(ep)
-    cfg = dict(out.get("config") or {})
-    # Agent 密钥哈希永不出库到前端(掩码尾段 agent_token_tail / 生成时间保留供 UI 显示)。
-    cfg.pop("agent_token_hash", None)
-    if "token" in cfg and cfg["token"]:
-        t = str(cfg["token"])
-        cfg["token"] = (t[:4] + "***" + t[-4:]) if len(t) > 10 else "***"
-        cfg["_token_set"] = True
-    # P1-B / C-1 · MR.ERP endpoints store Fernet-encrypted creds. The
-    # UI must never see them — replace with sentinel flags so the
-    # wizard knows credentials are present without exposing the values.
-    for sensitive in ("username_enc", "password_enc"):
-        if sensitive in cfg and cfg[sensitive]:
-            cfg[sensitive] = "***"
-            cfg[f"_{sensitive}_set"] = True
-    out["config"] = cfg
-    return out
 
 
 @router.get("/api/erp/endpoints")
@@ -120,6 +103,8 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
             raise HTTPException(400, detail=f"erp.blocked_url:{_sse}")
         if req.adapter == "mrerp" and not isinstance(config.get("client_ids"), list):
             config["client_ids"] = []
+        if req.adapter == "mrerp_dms":
+            config = _normalize_mrerp_dms_credentials(config)
 
         # v118.34.13 · 加密凭据再落地 · wizard 发的是 plaintext。
         # 即使字段名叫 _enc · 不加密就 None-op 解密会炸。
@@ -248,11 +233,13 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
         new_cfg.pop("_token_set", None)
         new_cfg.pop("_username_enc_set", None)
         new_cfg.pop("_password_enc_set", None)
+        new_cfg.pop("_admin_username_enc_set", None)
+        new_cfg.pop("_admin_password_enc_set", None)
 
         # DMS 整包替换防丢层(2026-08-12):向导表单从不携带的运行配置不因这次保存
-        # 而静默蒸发——缺席=保留旧值,显式携带(含空串)=按来值。booking_defaults 按键
-        # 合并同理:向导只发 booking_prefix,手工钉的顾问归属(advisor_*,提成落谁的
-        # 唯一出路)被整包吞掉 = 全店归属静默漂移,身份证自动推开关同坑。
+        # 而静默蒸发——缺席=保留旧值,显式携带(含空串)=按来值。booking_defaults 也
+        # 按键合并,否则手工钉的顾问归属(advisor_*,提成落谁的唯一出路)会被整包吞掉,
+        # 导致全店归属静默漂移;旧 booking_prefix 会在归一层删除,建单只认 ERP 自动编号。
         if target_adapter == "mrerp_dms" and existing_ep:
             old_cfg = existing_ep.get("config") or {}
             for fld in (
@@ -270,6 +257,7 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
                     **old_bd,
                     **dict(new_cfg.get("booking_defaults") or {}),
                 }
+            new_cfg = _normalize_mrerp_dms_credentials(new_cfg)
 
         # P0「开箱即用」(Zihao 2026-05-26 拍板) · client_ids 已退役(见 POST
         # 路由注释)· PATCH 不再拦"清空 client_ids" · 编辑连接不会再被卡。

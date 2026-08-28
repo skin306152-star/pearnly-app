@@ -269,8 +269,7 @@ DMS 成功后 `response_body` 至少返回:
       "advisor": "",
       "car_model": "",
       "color": "",
-      "branch": "",
-      "booking_prefix": "PN"
+      "branch": ""
     }
   },
   "is_default": false,

@@ -77,7 +77,6 @@ class _Branch:
 
 class _Booking:
     branch = _Branch()
-    booking_no = "BK2606000001"
 
 
 class TestBumpDocno(unittest.TestCase):
@@ -130,6 +129,14 @@ class TestBookingDocnoRetry(unittest.TestCase):
         bid, bno = cl.create_booking_via_form(customer_id="100", booking=_Booking(), card=object())
         self.assertEqual(bno, "BK2606000001")
         self.assertEqual(tr.posts, ["BK2606000001"])
+
+    def test_autonum_unavailable_does_not_fabricate_a_number(self):
+        tr = _FakeTransport([])
+        cl = _FakeClient(tr, "")
+        with self.assertRaises(DMSClientError) as ctx:
+            cl.create_booking_via_form(customer_id="100", booking=_Booking(), card=object())
+        self.assertEqual(ctx.exception.error_code, "ERR_DMS_IMPORT")
+        self.assertEqual(tr.posts, [])
 
     def test_all_taken_raises_import_error(self):
         used = ["BK2606" + str(i).zfill(6) for i in range(1, 60)]

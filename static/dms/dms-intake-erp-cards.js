@@ -17,9 +17,13 @@
     function isEnabled(ep) {
         return !!ep && ep.enabled !== false;
     }
-    // 已配管理员账密(DL-4b · 只用于客户档改写);值恒为密文,只判是否存在。
-    function hasAdmin(ep) {
-        return !!(ep.config || {}).admin_username_enc;
+    // 老板只维护一组有修改权限的凭据;响应值是掩码,这里只判断成对存在。
+    function hasCredential(ep) {
+        var cfg = ep.config || {};
+        return !!(
+            (cfg.admin_username_enc && cfg.admin_password_enc) ||
+            (cfg.username_enc && cfg.password_enc)
+        );
     }
 
     function cardHtml() {
@@ -46,10 +50,11 @@
         if (st) {
             if (!ep) st.textContent = T('dx-erp-not-connected');
             else if (!enabled) st.textContent = T('dx-erp-disabled');
-            // 只报连接/停用与管理员凭据:这条路 100% 手动(4 步向导 + 确认弹窗),没有自动推送态。
+            // 只报连接/停用与有权限凭据:这条路 100% 手动(4 步向导 + 确认弹窗),没有自动推送态。
             else
                 st.textContent =
-                    T('dx-erp-connected') + (hasAdmin(ep) ? ' · ' + T('dms-card-admin-badge') : '');
+                    T('dx-erp-connected') +
+                    (hasCredential(ep) ? ' · ' + T('dms-card-admin-badge') : '');
         }
         if (!acts) return;
         if (!ep) {

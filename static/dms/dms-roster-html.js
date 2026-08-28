@@ -261,7 +261,7 @@
     }
 
     // 绑定码大字弹层(照 dms-line 样式:大字码 + 倒计时);逻辑层填 code/countdown 并驱动过期。
-    // DMS 独立 OA(与 dms-line.js 的 FRIEND_URL 同源);QR 走 api.qrserver.com
+    // DMS 独立 OA;QR 走 api.qrserver.com。
     // (CSP img-src 已放行·主站 LINE 绑定卡同款渠道),扫出来即加好友页。
     var FRIEND_URL = 'https://line.me/R/ti/p/@264tuqln';
     var LINE_ID = '@264tuqln';

@@ -43,7 +43,6 @@ def _ref(uid, code="C", name="N"):
 
 def _booking(**kw):
     base = dict(
-        booking_no="BK2608000001",
         doc_date_be="01/08/2569",
         delivery_date_be="16/08/2569",
         advisor=_ref("a1"),

@@ -86,7 +86,6 @@ class DMSMasterRef:
 class DMSBookingPayload:
     """Everything the booking draft (drfcbc) needs beyond the ID card."""
 
-    booking_no: str
     doc_date_be: str
     delivery_date_be: str
     advisor: DMSMasterRef
@@ -129,7 +128,6 @@ class BookingDefaults:
     branch_id: str = ""
     team_id: str = ""
     regis_behalf_id: str = ""
-    booking_prefix: str = "PN"
     delivery_days: int = 15
 
     @classmethod
@@ -152,6 +150,5 @@ class BookingDefaults:
             branch_id=str(d.get("branch_id") or "").strip(),
             team_id=str(d.get("team_id") or "").strip(),
             regis_behalf_id=str(d.get("regis_behalf_id") or "").strip(),
-            booking_prefix=str(d.get("booking_prefix") or "PN").strip() or "PN",
             delivery_days=days,
         )

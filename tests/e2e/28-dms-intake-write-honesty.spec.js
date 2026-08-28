@@ -12,7 +12,9 @@ const localServer = require('./_local_static_server');
 const PORT = 8976;
 const BASE = `http://127.0.0.1:${PORT}`;
 const ART = path.join(__dirname, '_artifacts', 'dms_p1_closure');
+const SINGLE_CRED_ART = path.join(__dirname, '_artifacts', 'dms_single_credential');
 fs.mkdirSync(ART, { recursive: true });
+fs.mkdirSync(SINGLE_CRED_ART, { recursive: true });
 
 const ENDPOINTS = {
     items: [
@@ -21,7 +23,13 @@ const ENDPOINTS = {
             name: 'MR.ERP DMS',
             adapter: 'mrerp_dms',
             enabled: true,
-            config: { system_url: 'https://dms.example.com', admin_username_enc: 'x' },
+            config: {
+                system_url: 'https://dms.example.com',
+                username_enc: '***',
+                password_enc: '***',
+                admin_username_enc: '***',
+                admin_password_enc: '***',
+            },
         },
     ],
 };
@@ -115,6 +123,10 @@ function recognizeBody(scenario) {
 
 let server;
 const pushed = [];
+const endpointWrites = [];
+const connectionTests = [];
+const savedConnectionTests = [];
+const lineBindingRequests = [];
 test.beforeAll(async () => {
     server = await localServer.start(PORT, '/static/dist/dms.html');
 });
@@ -134,6 +146,25 @@ async function boot(page, scenario) {
                 body: JSON.stringify(o),
             });
         if (url.includes('/api/dms/session')) return json({ ok: true, is_owner: true });
+        if (url.includes('/api/dms/line-binding')) {
+            lineBindingRequests.push(url);
+            return json({ bound: false });
+        }
+        if (url.includes('/api/erp/test-connection')) {
+            connectionTests.push(JSON.parse(route.request().postData() || '{}'));
+            return json({ ok: true });
+        }
+        if (url.includes('/api/erp/endpoints/ep-1/test-connection')) {
+            savedConnectionTests.push(url);
+            return json({ ok: true });
+        }
+        if (
+            url.includes('/api/erp/endpoints/ep-1') &&
+            route.request().method().toUpperCase() === 'PATCH'
+        ) {
+            endpointWrites.push(JSON.parse(route.request().postData() || '{}'));
+            return json(ENDPOINTS.items[0]);
+        }
         if (url.includes('/api/erp/endpoints')) return json(ENDPOINTS);
         if (url.includes('/api/dms/id-card/recognize')) return json(recognizeBody(scenario));
         if (url.includes('/api/dms/id-card/push')) {
@@ -234,7 +265,7 @@ test('C-6 · 清空的地址字段不进 payload(空白不清除 DMS 原资料)'
 
     // 真实按键清空「巷」,不用 fill() 绕过键盘
     await page.click('#dx-f-soi');
-    await page.keyboard.press('Control+A');
+    await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.press('Delete');
     await expect(page.locator('#dx-f-soi')).toHaveValue('');
     await page.screenshot({ path: path.join(ART, 'c6-cleared-soi.png'), fullPage: true });
@@ -269,7 +300,7 @@ test('C-3/C-1/C-4 · 连接卡不再谎报自动推送 · 向导文案只承诺�
     const status = page.locator('#dx-erp-cards .dx-erp-status');
     expect(await status.isVisible()).toBe(true);
     const statusText = (await status.textContent()).trim();
-    expect(statusText).toBe('已连接 · 管理员 ✓');
+    expect(statusText).toBe('已连接 · 有权限账号 ✓');
     expect(statusText).not.toContain('推送');
     await page.screenshot({ path: path.join(ART, 'c3-card-status.png'), fullPage: true });
 
@@ -278,10 +309,102 @@ test('C-3/C-1/C-4 · 连接卡不再谎报自动推送 · 向导文案只承诺�
     await expect(page.locator('#dms-wizard-overlay .dms-wizard')).toContainText(
         '识别身份证 → 查重 → 建立或更新 DMS 客户档(订车单在 LINE 渠道开)'
     );
-    await expect(page.locator('#dms-wizard-overlay .dms-wizard')).toContainText(
-        '用于 LINE 渠道开的订车单号;网页录入不建订车单'
-    );
+    await expect(page.locator('#dms-w-prefix')).toHaveCount(0);
     await page.screenshot({ path: path.join(ART, 'c1-c4-wizard.png') });
+});
+
+test('DMS 只维护一组有权限凭据,录入页不再显示 LINE 连接卡', async ({ page }) => {
+    endpointWrites.length = 0;
+    connectionTests.length = 0;
+    lineBindingRequests.length = 0;
+    await boot(page, 'exact');
+
+    await expect(page.locator('#dx-line-card')).toHaveCount(0);
+    await expect(page.getByText('连接 LINE', { exact: true })).toHaveCount(0);
+    expect(lineBindingRequests).toEqual([]);
+
+    await page.click('#dx-erp-cards [data-erp-config]');
+    const wizard = page.locator('#dms-wizard-overlay .dms-wizard');
+    await expect(wizard).toBeVisible();
+    await expect(wizard).toContainText('有修改权限的账号');
+    await expect(wizard).toContainText('销售人员需要改写时也由此账号执行');
+    await expect(page.locator('#dms-w-user')).toHaveCount(0);
+    await expect(page.locator('#dms-w-pass')).toHaveCount(0);
+    await expect(page.locator('#dms-w-prefix')).toHaveCount(0);
+    await expect(page.locator('#dms-w-admin-user')).toBeVisible();
+    await expect(page.locator('#dms-w-admin-pass')).toBeVisible();
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({ path: path.join(SINGLE_CRED_ART, 'desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: path.join(SINGLE_CRED_ART, 'mobile.png'), fullPage: true });
+
+    await page.click('#dms-w-admin-user');
+    await page.keyboard.type('edit-user');
+    expect(
+        await page
+            .locator('#dms-w-admin-user')
+            .evaluate((element) => element.ownerDocument.activeElement === element)
+    ).toBe(true);
+    await page.click('#dms-w-admin-pass');
+    await page.keyboard.type('edit-password');
+    await page.click('#dms-w-save');
+    await expect.poll(() => endpointWrites.length).toBe(1);
+
+    expect(connectionTests).toEqual([
+        {
+            adapter: 'mrerp_dms',
+            config: {
+                system_url: 'https://dms.example.com',
+                username: 'edit-user',
+                password: 'edit-password',
+            },
+        },
+    ]);
+    expect(endpointWrites[0].config).toMatchObject({
+        username_enc: 'edit-user',
+        password_enc: 'edit-password',
+        admin_username_enc: 'edit-user',
+        admin_password_enc: 'edit-password',
+    });
+    expect(endpointWrites[0].config).not.toHaveProperty('booking_defaults');
+});
+
+test('唯一有权限账号说明四语一致', async ({ page }) => {
+    const expected = {
+        zh: ['有修改权限的账号', '销售人员需要改写时也由此账号执行'],
+        th: ['บัญชีที่มีสิทธิ์แก้ไข', 'เมื่อพนักงานขายต้องแก้ไข ระบบจะใช้บัญชีนี้เช่นกัน'],
+        en: [
+            'Account with edit permission',
+            'Sales staff use this account when an edit is needed.',
+        ],
+        ja: ['編集権限のあるアカウント', '販売担当者が編集する場合もこのアカウントを使用します。'],
+    };
+    await boot(page, 'exact');
+    for (const lang of Object.keys(expected)) {
+        await page.click(`[data-dms-lang="${lang}"]`);
+        await page.click('#dx-erp-cards [data-erp-config]');
+        const wizard = page.locator('#dms-wizard-overlay .dms-wizard');
+        await expect(wizard).toContainText(expected[lang][0]);
+        await expect(wizard).toContainText(expected[lang][1]);
+        await expect(wizard.locator('input')).toHaveCount(2);
+        await page.keyboard.press('Escape');
+        await expect(wizard).toHaveCount(0);
+    }
+});
+
+test('已配置凭据留空保存时由服务端测试旧密文,前端不回传秘密', async ({ page }) => {
+    endpointWrites.length = 0;
+    connectionTests.length = 0;
+    savedConnectionTests.length = 0;
+    await boot(page, 'exact');
+    await page.click('#dx-erp-cards [data-erp-config]');
+    await page.click('#dms-w-save');
+    await expect.poll(() => endpointWrites.length).toBe(1);
+
+    expect(savedConnectionTests).toHaveLength(1);
+    expect(connectionTests).toEqual([]);
+    expect(endpointWrites[0].config).toEqual({ system_url: 'https://dms.example.com' });
 });
 
 test('C-8 · 推送记录页认出 LINE 订车行,不再显示「—」', async ({ page }) => {
@@ -332,8 +455,7 @@ test('四语 · 泰文(真实用户语言)新文案落地', async ({ page }) => 
     await expect(wiz).toContainText(
         'อ่านบัตรประชาชน → ตรวจสอบซ้ำ → สร้างหรืออัปเดตข้อมูลลูกค้าใน DMS (ใบจองเปิดผ่าน LINE)'
     );
-    await expect(wiz).toContainText(
-        'ใช้กับเลขที่ใบจองที่เปิดผ่าน LINE เท่านั้น การบันทึกบนเว็บไม่สร้างใบจอง'
-    );
+    await expect(wiz).toContainText('บัญชีที่มีสิทธิ์แก้ไข');
+    await expect(page.locator('#dms-w-prefix')).toHaveCount(0);
     await page.screenshot({ path: path.join(ART, 'th-wizard.png') });
 });

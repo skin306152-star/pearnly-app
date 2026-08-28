@@ -100,7 +100,7 @@ class TestInheritTenantDefaults(unittest.TestCase):
     _OWNER_CFG = {
         "admin_username_enc": "enc-au",
         "admin_password_enc": "enc-ap",
-        "booking_defaults": {"booking_prefix": "ZX"},
+        "booking_defaults": {"delivery_days": 20},
     }
     _MEMBER = {"id": "m-1", "role": "member", "tenant_id": "t-1"}
 
@@ -113,7 +113,7 @@ class TestInheritTenantDefaults(unittest.TestCase):
             out = s._inherit_tenant_defaults("m-1", ep)
         self.assertEqual(out["config"]["admin_username_enc"], "enc-au")
         self.assertEqual(out["config"]["admin_password_enc"], "enc-ap")
-        self.assertEqual(out["config"]["booking_defaults"], {"booking_prefix": "ZX"})
+        self.assertEqual(out["config"]["booking_defaults"], {"delivery_days": 20})
         self.assertEqual(out["config"]["username_enc"], "u")  # 自己的主凭据原样
         self.assertNotIn("admin_username_enc", ep["config"])  # 不污染入参
 
@@ -126,7 +126,7 @@ class TestInheritTenantDefaults(unittest.TestCase):
         ):
             out = s._inherit_tenant_defaults("m-1", ep)
         self.assertEqual(out["config"]["admin_username_enc"], "own-u")
-        self.assertEqual(out["config"]["booking_defaults"], {"booking_prefix": "ZX"})
+        self.assertEqual(out["config"]["booking_defaults"], {"delivery_days": 20})
 
     def test_owner_endpoint_passthrough_untouched(self):
         ep = {"id": "e1", "config": {"username_enc": "u"}}
@@ -146,7 +146,7 @@ class TestInheritTenantDefaults(unittest.TestCase):
         owner_cfg = {
             "admin_username_enc": "enc-au",
             "booking_defaults": {
-                "booking_prefix": "ZX",
+                "delivery_days": 20,
                 "advisor_id": "42",
                 "advisor_code": "boss",
                 "advisor_name": "เถ้าแก่",
@@ -158,7 +158,7 @@ class TestInheritTenantDefaults(unittest.TestCase):
             patch.object(s, "_tenant_owner_endpoint_cfg", return_value=owner_cfg),
         ):
             out = s._inherit_tenant_defaults("m-1", ep)
-        self.assertEqual(out["config"]["booking_defaults"], {"booking_prefix": "ZX"})
+        self.assertEqual(out["config"]["booking_defaults"], {"delivery_days": 20})
         # 老板自己的配置不能被剥离动作污染(他本人建单仍靠这份钉死)。
         self.assertEqual(owner_cfg["booking_defaults"]["advisor_id"], "42")
 

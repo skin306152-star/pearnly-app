@@ -16,7 +16,7 @@ const EP = {
     id: 'E1',
     adapter: 'mrerp_dms',
     enabled: true,
-    config: { admin_username_enc: 'x', booking_defaults: { booking_prefix: 'PN' } },
+    config: { admin_username_enc: 'x', admin_password_enc: 'x' },
 };
 
 let server;

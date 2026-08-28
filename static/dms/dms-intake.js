@@ -422,7 +422,6 @@
         if (!el) return;
         el.innerHTML = root.DXHTML.dxShell(t);
         root.DXERP.renderCards();
-        root.DXLINE.mount('#dx-line-card');
         bind();
         if (!S.ocr) S.step = 1;
         renderCurrentStep();

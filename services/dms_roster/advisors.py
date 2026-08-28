@@ -63,7 +63,7 @@ def pick(options: Optional[List[Dict[str, str]]], advisor_id: str) -> Optional[D
 def merge_into_config(config: Dict[str, Any], advisor: Optional[Dict[str, str]]) -> Dict[str, Any]:
     """把钉死并进端点 config(advisor=None → 清除,回到自动匹配)。
 
-    booking_defaults 按键改写、不整包替换:同一个 dict 里还住着向导写的 booking_prefix 等键,
+    booking_defaults 按键改写、不整包替换:同一个 dict 里还住着 delivery_days 等租户配置,
     整包覆盖会把它们静默吞掉(erp_endpoints PATCH 防丢层同坑)。
     """
     cfg = dict(config or {})

@@ -161,7 +161,9 @@ class DMSClientOpsMixin:
         base["menulv"] = _DRFCBC_MENULV
         self._apply_booking_form_fields(base, customer_id=customer_id, booking=booking, card=card)
 
-        docno = self._next_booking_docno(booking.branch.id) or booking.booking_no
+        docno = self._next_booking_docno(booking.branch.id)
+        if not docno:
+            raise DMSClientError("booking auto number unavailable", "ERR_DMS_IMPORT")
         digits = getattr(self, "_booking_docno_digits", 6)
         docno = mrerp_dms_docno.next_unoccupied_docno(docno, digits, self._post_text)
         last_body = ""
@@ -184,7 +186,7 @@ class DMSClientOpsMixin:
         raise DMSClientError(f"booking create failed: {last_body[:300]!r}", "ERR_DMS_IMPORT")
 
     def _next_booking_docno(self, branch_id: str) -> str:
-        """取 DMS 订车单下一个自动编号(BK+期间+流水)。autonum 关/异常 → '' 让调用方兜底。"""
+        """取 DMS 订车单下一个自动编号(BK+期间+流水)。autonum 关/异常时返回空。"""
         try:
             cfg = json.loads(
                 self._post_text(
@@ -333,9 +335,7 @@ class DMSClientOpsMixin:
         )
         regis = self._ref_from_default("txtregisbehalf", defaults.regis_behalf_id, "", "")
 
-        booking_no = f"{defaults.booking_prefix}{card.people_id[-6:]}{today.strftime('%m%d')}"
         return DMSBookingPayload(
-            booking_no=booking_no,
             doc_date_be=to_be_date(today),
             delivery_date_be=to_be_date(delivery),
             advisor=advisor,

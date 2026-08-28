@@ -140,7 +140,6 @@
             '<div class="dx-state" id="dx-s-success"></div>' +
             '</div>' +
             '<div id="dx-erp-cards" class="dx-erp-cards-zone"></div>' +
-            '<div id="dx-line-card" class="dx-erp-cards-zone"></div>' +
             '</div></div>' +
             '<div class="modal-overlay" id="dx-modal-mask" style="display:none;"></div>'
         );

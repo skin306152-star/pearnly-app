@@ -30,7 +30,7 @@ _OP_EP = {
     "enabled": True,
     "config": {
         "system_url": "https://dms.example.com",
-        "booking_defaults": {"booking_prefix": "BK", "advisor_id": "7", "advisor_name": "旧名字"},
+        "booking_defaults": {"delivery_days": 20, "advisor_id": "7", "advisor_name": "旧名字"},
     },
 }
 # DMS 顾问下拉行形 [id, code, name, tel]
@@ -166,13 +166,13 @@ class UpdatePinTest(unittest.TestCase):
         defaults = up.call_args.kwargs["config"]["booking_defaults"]
         self.assertEqual(defaults["advisor_id"], "9")
         self.assertEqual(defaults["advisor_name"], "阿明")  # 名字重解,不留库里的旧名字
-        self.assertEqual(defaults["booking_prefix"], "BK")  # 同 dict 的别的键不许被吞
+        self.assertEqual(defaults["delivery_days"], 20)  # 同 dict 的别的键不许被吞
 
     def test_empty_string_clears_pin_and_keeps_other_defaults(self):
         res, up = self._update(dms_advisor_id="")
         self.assertTrue(res.get("ok"))
         defaults = up.call_args.kwargs["config"]["booking_defaults"]
-        self.assertEqual(defaults, {"booking_prefix": "BK"})
+        self.assertEqual(defaults, {"delivery_days": 20})
 
     def test_absent_field_leaves_pin_untouched(self):
         res, up = self._update(dms_password="newpw")
@@ -205,9 +205,9 @@ class MergeIntoConfigTest(unittest.TestCase):
         self.assertNotIn("booking_defaults", cfg)
 
     def test_does_not_mutate_caller_config(self):
-        src = {"booking_defaults": {"booking_prefix": "BK"}}
+        src = {"booking_defaults": {"delivery_days": 20}}
         advisors.merge_into_config(src, {"id": "9", "name": "阿明"})
-        self.assertEqual(src["booking_defaults"], {"booking_prefix": "BK"})
+        self.assertEqual(src["booking_defaults"], {"delivery_days": 20})
 
 
 class ListShowsAttributionTest(unittest.TestCase):

@@ -1,12 +1,9 @@
 /* Pearnly DMS · MR.ERP DMS 连接向导 + 设置页连接卡。
- * 移植自主站 src/home/erp-mrerp-dms-connect.ts:DMS 地址写死隐藏(只此一个实例),
- * 向导露 账号/密码/订车单号前缀 + 可选的管理员账密(DL-4b · 只用于客户档改写)。保存
- * adapter=mrerp_dms · auto_push=false(后端再兜底 false,防发票自动推送误投)。网页这条路
- * 全程手动:识别 → 查重 → 人工确认 → 推送,没有自动推送开关。凭据明文塞 username_enc/
- * password_enc/admin_username_enc/admin_password_enc,路由 kms 加密后落地(前端不加密不留
- * 明文;后端已把这两键纳入 ENCRYPTED_CRED_ADAPTERS 加密清单,见 routes/erp_endpoints_routes.py)。
- * 管理员账密留空且此前已配过 → 沿用已存密文(PATCH 整体替换 config,空槽会丢旧值,故须显式带回)。
- * 挂 window.DXCONNECT + window._mrerpDmsOpenWizard。 */
+ * DMS 地址写死隐藏(只此一个实例),向导只维护一组有修改权限的账号密码。
+ * 这组凭据同时用于连接、查重、建档和改写;销售人员仍用自己的账号匹配提成归属,需要改写
+ * 客户档时由服务端继承老板的这组凭据。保存 adapter=mrerp_dms · auto_push=false,凭据明文
+ * 只在本次请求内存在,路由经 KMS 加密后落地。挂 window.DXCONNECT +
+ * window._mrerpDmsOpenWizard。 */
 (function (root) {
     'use strict';
     var DEFAULT_URL = 'https://www.mrerp4sme.com/dms/index.php';
@@ -46,9 +43,12 @@
             });
     }
 
-    // 已配管理员账密(config.admin_username_enc 存在即算,值恒为密文/占位,不判真伪)。
-    function hasAdmin(ep) {
-        return !!(ep && ep.config && ep.config.admin_username_enc);
+    function hasCredential(ep) {
+        var cfg = (ep && ep.config) || {};
+        return !!(
+            (cfg.admin_username_enc && cfg.admin_password_enc) ||
+            (cfg.username_enc && cfg.password_enc)
+        );
     }
 
     // ── 设置页连接卡(复用向导上下文卡的 .dx-erp-* 视觉,不自创卡片体系) ──
@@ -63,7 +63,7 @@
               ? t('dms-card-connected')
               : t('dms-card-disabled-pill');
         var adminBadge =
-            configured && hasAdmin(_ep)
+            configured && hasCredential(_ep)
                 ? '<span class="dx-badge blue" style="margin-left:6px">' +
                   esc(t('dms-card-admin-badge')) +
                   '</span>'
@@ -126,9 +126,8 @@
             '" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--card);color:var(--ink);"></label>'
         );
     }
-    // 管理员账密区块:可选,留空=不改;已配过时提示占位符(不回显明文)。
-    function adminFieldsHtml() {
-        var configured = hasAdmin(_ep);
+    function credentialFieldsHtml() {
+        var configured = hasCredential(_ep);
         var ph = configured ? t('dms-wizard-admin-configured') : '';
         return (
             '<div style="margin:6px 0 14px;padding-top:14px;border-top:1px solid var(--line);">' +
@@ -142,22 +141,8 @@
             '</div>'
         );
     }
-    // 订车单号前缀只服务 LINE 渠道建单(网页这条路不建订车单)· 标明作用域,免得看成网页会用。
-    function prefixNoteHtml() {
-        return (
-            '<div style="font-size:11px;color:var(--ink2);margin:-6px 0 14px;line-height:1.5;">' +
-            esc(t('dms-wizard-prefix-note')) +
-            '</div>'
-        );
-    }
     function openWizard() {
         closeWizard();
-        var prefix =
-            (_ep &&
-                _ep.config &&
-                _ep.config.booking_defaults &&
-                _ep.config.booking_defaults.booking_prefix) ||
-            'PN';
         var ov = document.createElement('div');
         ov.id = 'dms-wizard-overlay';
         ov.style.cssText =
@@ -169,11 +154,7 @@
             '</div><div style="font-size:13px;color:var(--ink2);margin-bottom:18px;">' +
             esc(t('dms-card-desc')) +
             '</div>' +
-            field('dms-wizard-username', 'dms-w-user', 'text', '', '') +
-            field('dms-wizard-password', 'dms-w-pass', 'password', '', '') +
-            field('dms-wizard-prefix', 'dms-w-prefix', 'text', prefix, 'PN') +
-            prefixNoteHtml() +
-            adminFieldsHtml() +
+            credentialFieldsHtml() +
             '<div id="dms-w-err" style="display:none;color:#b3261e;font-size:13px;margin:4px 0 12px;"></div>' +
             '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;"><button type="button" class="btn" id="dms-w-cancel">' +
             esc(t('dms-wizard-cancel')) +
@@ -185,32 +166,37 @@
         ov.addEventListener('click', function (e) {
             if (e.target === ov) closeWizard();
         });
-        var userEl = document.getElementById('dms-w-user');
+        var userEl = document.getElementById('dms-w-admin-user');
         if (userEl) userEl.focus();
     }
 
     function saveWizard() {
         // DMS 地址写死(界面隐藏)· 编辑态沿用已存 system_url,新建用 DEFAULT_URL。
         var url = ((_ep && _ep.config && _ep.config.system_url) || DEFAULT_URL).trim();
-        var user = (val('dms-w-user') || '').trim();
-        var pass = val('dms-w-pass') || '';
-        var prefix = val('dms-w-prefix') || 'PN';
-        if (!url || !user || !pass) return wizErr(t('dms-wizard-required'));
+        var user = (val('dms-w-admin-user') || '').trim();
+        var pass = val('dms-w-admin-pass') || '';
+        var enteredPair = !!(user && pass);
+        if (!url || (!enteredPair && (!hasCredential(_ep) || user || pass))) {
+            return wizErr(t('dms-wizard-required'));
+        }
         var saveBtn = document.getElementById('dms-w-save');
         if (saveBtn) {
             saveBtn.disabled = true;
             saveBtn.textContent = t('dms-wizard-saving');
         }
         wizErr('');
-        // 1) 测试连接(明文凭据 · 仅内存)。
-        fetch('/api/erp/test-connection', {
-            method: 'POST',
-            headers: authHeaders(true),
-            body: JSON.stringify({
+        // 新凭据走明文内存测试;编辑时两项都留空则测试服务端已保存的密文,不回传秘密。
+        var testPath = enteredPair
+            ? '/api/erp/test-connection'
+            : '/api/erp/endpoints/' + encodeURIComponent(_ep.id) + '/test-connection?refresh=1';
+        var testOptions = { method: 'POST', headers: authHeaders(enteredPair) };
+        if (enteredPair) {
+            testOptions.body = JSON.stringify({
                 adapter: 'mrerp_dms',
                 config: { system_url: url, username: user, password: pass },
-            }),
-        })
+            });
+        }
+        fetch(testPath, testOptions)
             .then(function (tr) {
                 return tr
                     .json()
@@ -231,14 +217,14 @@
                     resetSaveBtn(saveBtn);
                     return wizErr(fr);
                 }
-                // 2) 保存端点(路由加密 username_enc/password_enc 明文)。
-                var cfg = {
-                    system_url: url,
-                    username_enc: user,
-                    password_enc: pass,
-                    booking_defaults: { booking_prefix: prefix.trim() || 'PN' },
-                };
-                applyAdminFields(cfg);
+                // 2) 保存端点。新输入同时写入主凭据和管理员凭据;后端也会再次归一兜底。
+                var cfg = { system_url: url };
+                if (enteredPair) {
+                    cfg.username_enc = user;
+                    cfg.password_enc = pass;
+                    cfg.admin_username_enc = user;
+                    cfg.admin_password_enc = pass;
+                }
                 var method = _ep && _ep.id ? 'PATCH' : 'POST';
                 var path =
                     _ep && _ep.id
@@ -297,18 +283,6 @@
     function val(id) {
         var el = document.getElementById(id);
         return el ? el.value : '';
-    }
-
-    // 管理员账密留空且此前已配 → 沿用旧密文(PATCH 整体替换 config,不带回会丢);
-    // 填了新值 → 明文塞进 cfg,路由 kms 加密落地;两者皆无 → 不写这两键(未配过)。
-    function applyAdminFields(cfg) {
-        var newUser = (val('dms-w-admin-user') || '').trim();
-        var newPass = val('dms-w-admin-pass') || '';
-        var oldCfg = (_ep && _ep.config) || {};
-        if (newUser) cfg.admin_username_enc = newUser;
-        else if (oldCfg.admin_username_enc) cfg.admin_username_enc = oldCfg.admin_username_enc;
-        if (newPass) cfg.admin_password_enc = newPass;
-        else if (oldCfg.admin_password_enc) cfg.admin_password_enc = oldCfg.admin_password_enc;
     }
 
     function testSaved() {

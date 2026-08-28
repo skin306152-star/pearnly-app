@@ -116,15 +116,22 @@ class MrerpDmsEndpointCreateTests(unittest.TestCase):
         self.assertEqual(cfg["username_enc"], "ENC:dmsuser")
         self.assertEqual(cfg["password_enc"], "ENC:dmspass")
         self.assertNotIn("dmsuser", cfg["password_enc"])
+        # The owner-facing endpoint has one privileged pair, mirrored into both adapter groups.
+        self.assertEqual(cfg["admin_username_enc"], "ENC:dmsuser")
+        self.assertEqual(cfg["admin_password_enc"], "ENC:dmspass")
         # 2. auto_push forced False for mrerp_dms (anti-misroute)
         self.assertFalse(captured["auto_push"])
         # 3. id_card_auto_push preserved
         self.assertTrue(cfg["id_card_auto_push"])
+        # Legacy prefixes are ignored; booking creation follows the ERP autonumber sequence.
+        self.assertNotIn("booking_defaults", cfg)
         # 4. response strips plaintext creds
         body_out = r.json()
         out_cfg = body_out.get("config", {})
         self.assertEqual(out_cfg.get("username_enc"), "***")
         self.assertEqual(out_cfg.get("password_enc"), "***")
+        self.assertEqual(out_cfg.get("admin_username_enc"), "***")
+        self.assertEqual(out_cfg.get("admin_password_enc"), "***")
 
     def test_already_encrypted_creds_not_double_encrypted(self):
         body = {
@@ -221,13 +228,14 @@ class MrerpDmsEndpointPatchPreserveTests(unittest.TestCase):
     }
 
     def test_wizard_shape_patch_keeps_pin_flags_and_creds(self):
-        # 向导保存的真实形状:只有 system_url + 新账密 + booking_prefix。
+        # 向导保存的真实形状:唯一有权限账密同步写进主/管理员两组,不再发送单号前缀。
         body = {
             "config": {
                 "system_url": "https://www.mrerp4sme.com/dms/index.php",
                 "username_enc": "new-u",
                 "password_enc": "new-p",
-                "booking_defaults": {"booking_prefix": "PN"},
+                "admin_username_enc": "new-u",
+                "admin_password_enc": "new-p",
             }
         }
         r, captured = self._run_patch(body, self._EXISTING_DMS)
@@ -235,27 +243,33 @@ class MrerpDmsEndpointPatchPreserveTests(unittest.TestCase):
         cfg = captured["config"]
         self.assertEqual(
             cfg["booking_defaults"],
-            {"booking_prefix": "PN", "advisor_id": "42", "advisor_name": "เถ้าแก่"},
+            {"advisor_id": "42", "advisor_name": "เถ้าแก่"},
         )
         self.assertTrue(cfg["id_card_auto_push"])
-        self.assertEqual(cfg["admin_username_enc"], "ENC:old-au")
-        self.assertEqual(cfg["admin_password_enc"], "ENC:old-ap")
-        self.assertEqual(cfg["username_enc"], "ENC:new-u")  # 新明文照旧走加密
+        self.assertEqual(cfg["admin_username_enc"], "ENC:new-u")
+        self.assertEqual(cfg["admin_password_enc"], "ENC:new-p")
+        self.assertEqual(cfg["username_enc"], "ENC:new-u")
+        self.assertEqual(cfg["password_enc"], "ENC:new-p")
 
     def test_explicit_values_still_win_including_clear(self):
         body = {
             "config": {
                 "system_url": "https://www.mrerp4sme.com/dms/index.php",
                 "id_card_auto_push": False,
-                "booking_defaults": {"booking_prefix": "PN", "advisor_id": ""},
+                "booking_defaults": {"advisor_id": ""},
             }
         }
         r, captured = self._run_patch(body, self._EXISTING_DMS)
         self.assertEqual(r.status_code, 200, r.text)
         cfg = captured["config"]
         self.assertEqual(cfg["booking_defaults"]["advisor_id"], "")  # 显式清空生效
+        self.assertNotIn("booking_prefix", cfg["booking_defaults"])
         self.assertFalse(cfg["id_card_auto_push"])
-        self.assertEqual(cfg["username_enc"], "ENC:old-u")  # 未携带仍保留
+        # 旧双账号配置在下一次保存时收敛为管理员这组,不再继续保留两套。
+        self.assertEqual(cfg["username_enc"], "ENC:old-au")
+        self.assertEqual(cfg["password_enc"], "ENC:old-ap")
+        self.assertEqual(cfg["admin_username_enc"], "ENC:old-au")
+        self.assertEqual(cfg["admin_password_enc"], "ENC:old-ap")
 
     def test_non_dms_adapter_keeps_wholesale_replace(self):
         existing = {

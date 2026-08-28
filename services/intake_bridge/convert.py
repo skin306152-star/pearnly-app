@@ -127,6 +127,7 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
             workspace_client_id=int(workspace_client_id),
             created_by=user_id,
             fields=fields,
+            source=str(history.get("source") or ""),
         )
         _stamp_ocr_history_id(
             cur, table="purchase_docs", tenant_id=tenant_id, doc_id=doc_id, history_id=history_id
@@ -148,7 +149,7 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
 
 def _load_history(cur, *, tenant_id: str, history_id: str) -> Optional[dict]:
     cur.execute(
-        "SELECT pages, workspace_client_id FROM ocr_history "
+        "SELECT pages, workspace_client_id, source FROM ocr_history "
         "WHERE id = %s::uuid AND tenant_id = %s::uuid",
         (history_id, tenant_id),
     )

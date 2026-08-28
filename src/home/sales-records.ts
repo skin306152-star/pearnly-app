@@ -217,7 +217,7 @@ async function push(doc: SalesDoc, button: HTMLButtonElement): Promise<void> {
 
 function bindRows(): void {
     document.querySelectorAll<HTMLElement>('[data-sr-doc]').forEach((row) => {
-        row.onclick = () => window.openSalesDetail?.(row.dataset.srDoc!);
+        row.onclick = () => window.openSalesRecordDetail?.(row.dataset.srDoc!);
     });
     document.querySelectorAll<HTMLButtonElement>('[data-sr-push]').forEach((button) => {
         button.onclick = (event) => {

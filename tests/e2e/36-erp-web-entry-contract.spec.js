@@ -52,6 +52,7 @@ const SALES_RECORDS = [
         doc_number: 'S-2026-018',
         issue_date: '2026-08-18',
         status: 'issued',
+        subtotal: '1000.00',
         grand_total: '1070.00',
         vat_amount: '70.00',
         buyer: { name: 'Customer A' },
@@ -70,6 +71,7 @@ const SALES_RECORDS = [
         doc_number: 'R-2026-044',
         issue_date: '2026-08-12',
         status: 'issued',
+        subtotal: '500.00',
         grand_total: '535.00',
         vat_amount: '35.00',
         buyer: { name: 'Walk-in Customer' },
@@ -87,6 +89,7 @@ test.beforeAll(async () => {
 test.afterAll(() => localServer.stop(server));
 
 async function boot(page, entry, state = {}) {
+    if (!state.salesDocuments) state.salesDocuments = JSON.parse(JSON.stringify(SALES_RECORDS));
     Object.assign(state, {
         recognizes: [],
         historyPuts: 0,
@@ -143,6 +146,25 @@ async function boot(page, entry, state = {}) {
             body = { categories: [] };
         } else if (pathname === '/api/sales/documents') {
             body = { documents: state.salesDocuments || SALES_RECORDS };
+        } else if (pathname.startsWith('/api/sales/documents/')) {
+            const id = pathname.split('/').pop();
+            body = {
+                document: (state.salesDocuments || SALES_RECORDS).find((doc) => doc.id === id),
+            };
+        } else if (/^\/api\/history\/[^/]+\/page\/1\.png$/.test(pathname)) {
+            return route.fulfill({
+                status: 200,
+                contentType: 'image/jpeg',
+                body: fs.readFileSync(
+                    path.join(
+                        __dirname,
+                        '..',
+                        'fixtures',
+                        'messy_intake_pack',
+                        'normal_receipt.jpg'
+                    )
+                ),
+            });
         } else if (pathname === '/api/workspace/clients') {
             body = { clients: [{ id: 1, name: 'ERP Branch' }] };
         } else if (pathname === '/api/me') {
@@ -165,6 +187,8 @@ async function boot(page, entry, state = {}) {
             body = { items: state.erpEndpoints || [] };
         } else if (pathname === '/api/erp/push') {
             state.erpPushes += 1;
+            const pending = state.salesDocuments.find((doc) => doc.push_status !== 'success');
+            if (pending) pending.push_status = 'success';
             body = { ok: true };
         } else if (pathname === '/api/line/erp/binding') {
             body = {
@@ -329,9 +353,31 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     await expect(erpPage.locator('[data-sr-push="sale-line-1"]')).toHaveText('推送 ERP');
     await erpPage.locator('[data-sr-push="sale-line-1"]').click();
     await expect.poll(() => erpState.erpPushes).toBe(1);
+    await erpPage.locator('[data-sr-doc="sale-line-1"]').click();
+    await expect(erpPage.locator('#page-sales-record-detail')).toHaveClass(/active/);
+    await expect(erpPage.locator('.srd .ph .t')).toContainText('销售单据详情');
+    await expect(erpPage.locator('#srd-original-img img')).toBeVisible();
+    await erpPage.waitForFunction(
+        () => document.querySelector('#srd-original-img img')?.naturalWidth > 0
+    );
+    await expect(erpPage.locator('.srd')).toContainText('Customer A');
+    await expect(erpPage.locator('.srd')).toContainText('Coffee beans');
+    await expect(erpPage.locator('.srd')).toContainText('商品');
+    await expect(erpPage.locator('.srd')).toContainText('服务');
+    for (const invoiceAction of [
+        '下载PDF',
+        '打印',
+        '发送给买家',
+        '付款二维码',
+        '复制再开',
+        '红冲',
+        '补开',
+    ]) {
+        await expect(erpPage.getByText(invoiceAction, { exact: true })).toHaveCount(0);
+    }
     await revealShell(erpPage);
     await erpPage.screenshot({
-        path: path.join(OUT, 'sales-records-desktop.png'),
+        path: path.join(OUT, 'sales-record-detail.png'),
         fullPage: true,
         animations: 'disabled',
     });
@@ -355,6 +401,11 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
         '销售发票'
     );
     await expect(posPage.locator('#nav-sales-records')).toBeHidden();
+    await posPage.evaluate(() => window.routeTo('sales-invoices'));
+    await expect(posPage.locator('#sx-wb-body [data-doc]')).toHaveCount(4);
+    await posPage.locator('#sx-wb-body [data-doc]').first().click();
+    await expect(posPage.locator('#sales-detail-mask')).toBeVisible();
+    await expect(posPage.getByText('下载PDF', { exact: true })).toBeVisible();
     await posPage.close();
 });
 

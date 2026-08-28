@@ -40,6 +40,7 @@ def _history_row(fields=None, workspace_client_id=9):
     return {
         "pages": [{"fields": fields if fields is not None else copy.deepcopy(_FIELDS)}],
         "workspace_client_id": workspace_client_id,
+        "source": "erp_web",
         "posting_kind": None,
     }
 
@@ -91,6 +92,7 @@ class ConvertOrchestrationTests(unittest.TestCase):
             [{"history_id": "h1", "doc_type": "purchase", "doc_id": "doc-1", "doc_no": "PO-1"}],
         )
         p_book.assert_called_once()
+        self.assertEqual(p_book.call_args.kwargs["source"], "erp_web")
         s_issue.assert_not_called()
 
     def test_sales_direction_when_own_tax_matches_seller(self):
@@ -254,6 +256,36 @@ class PurchaseLegTests(unittest.TestCase):
                     created_by="u1",
                     fields=dict(_FIELDS),
                 )
+
+    def test_erp_web_source_is_preserved_as_upload(self):
+        captured = {}
+
+        def create_doc(_cur, **kwargs):
+            captured.update(kwargs["data"])
+            return {"doc": {"id": "D1"}}
+
+        with (
+            mock.patch.object(
+                purchase_leg.settings_svc,
+                "get_settings",
+                return_value={"auto_stock_in": False},
+            ),
+            mock.patch.object(purchase_leg.docs_svc, "create_doc", side_effect=create_doc),
+            mock.patch.object(
+                purchase_leg.posting_svc,
+                "post_doc",
+                return_value={"doc": {"doc_no": "P1"}},
+            ),
+        ):
+            purchase_leg.book_from_history(
+                mock.Mock(),
+                tenant_id="t1",
+                workspace_client_id=9,
+                created_by="u1",
+                fields=dict(_FIELDS),
+                source="erp_web",
+            )
+        self.assertEqual(captured["source"], "upload")
 
     def test_manual_expense_beats_judge_direction_purchase_signal(self):
         # 票面证据齐全(完整税票+VAT+买方身份)judge_direction 会判 purchase_invoice,

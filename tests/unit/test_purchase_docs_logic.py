@@ -10,6 +10,7 @@ import unittest
 from core.pos_api import PosError
 from services.purchase import correct as correct_svc
 from services.purchase import docs as docs_svc
+from services.purchase import ocr_original
 from services.purchase import posting as posting_svc
 
 
@@ -192,6 +193,40 @@ class LineValidationTests(unittest.TestCase):
     def test_good_line_passes(self):
         ok = [{"line_no": 1, "description": "ของ", "product_id": None, "qty": 2}]
         docs_svc._validate_lines(ok)  # 不抛 = 通过
+
+
+class OcrOriginalFallbackTests(unittest.TestCase):
+    class Cursor:
+        def __init__(self, rows):
+            self.rows = list(rows)
+            self.sql = []
+
+        def execute(self, sql, params=None):
+            self.sql.append((sql, params))
+
+        def fetchone(self):
+            return self.rows.pop(0) if self.rows else None
+
+    def test_bill_image_falls_back_to_linked_ocr_original(self):
+        cur = self.Cursor([None, {"url": "ocr/original.pdf"}])
+        ref = docs_svc.get_bill_image_ref(
+            cur,
+            tenant_id="t1",
+            workspace_client_id=9,
+            doc_id="D1",
+        )
+        self.assertEqual(ref, "ocr/original.pdf")
+        self.assertIn("JOIN ocr_history", cur.sql[1][0])
+        self.assertIn("d.workspace_client_id = %s", cur.sql[1][0])
+
+    def test_ocr_source_maps_to_purchase_surface(self):
+        doc = {"source": "manual"}
+        ocr_original.apply_meta(
+            doc,
+            {"source": "line_erp", "pdf_storage_path": "ocr/original.pdf"},
+        )
+        self.assertEqual(doc["source"], "line")
+        self.assertTrue(doc["ocr_original_available"])
 
 
 class PostAutoPayTests(unittest.TestCase):

@@ -20,7 +20,9 @@ from services.purchase import posting as posting_svc
 from services.purchase import settings as settings_svc
 
 
-def book_from_history(cur, *, tenant_id, workspace_client_id, created_by, fields: dict) -> tuple:
+def book_from_history(
+    cur, *, tenant_id, workspace_client_id, created_by, fields: dict, source: str = ""
+) -> tuple:
     """建进项单据(draft)并立即过账(posted)。返回 (doc_id, doc_no)。
 
     doc_kind(purchase_invoice/expense)判定改走 item_verdict.item_verdict —— 仓库货/费判据
@@ -31,6 +33,7 @@ def book_from_history(cur, *, tenant_id, workspace_client_id, created_by, fields
     is_expense, _src = item_verdict_svc.item_verdict(fields)
     kind = "expense" if is_expense else "purchase_invoice"
     draft = intake_svc.build_draft_from_invoice(fields, kind=kind)
+    draft["source"] = {"line_erp": "line", "erp_web": "upload"}.get(source, "manual")
     settings = settings_svc.get_settings(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )

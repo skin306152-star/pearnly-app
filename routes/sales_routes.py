@@ -168,10 +168,12 @@ async def api_create_document(req: DocumentIn, request: Request):
 
 @router.get("/{doc_id}")
 async def api_get_document(doc_id: str, request: Request):
-    tid, _ = require_perm_tid(request, "sales.doc.view")
+    tid, uid = require_perm_tid(request, "sales.doc.view")
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
         doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id, workspace_client_id=ws)
+        if doc:
+            record_enrichment.enrich(cur, [doc], tenant_id=str(tid), user_id=str(uid))
     if not doc:
         _fail("not_found")
     return {"document": _doc_out(doc)}

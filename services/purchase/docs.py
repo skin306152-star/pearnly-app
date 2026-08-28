@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """进项单据 DAL · 建/列(含 KPI)/详/改草稿/删(商户采购 · docs/purchasing/01-02 §1)。
-
 进项票/采购单/费用同表(doc_kind)。建单:totals 反算合计(权威)→ 解析/自动建供应商 →
 dedupe 防重复抵扣 → 写头+行。posted 不可改(409)。删仅 draft。post/pay/void 见 posting.py。
 隔离=每句 WHERE tenant_id + workspace_client_id;钱字段 Decimal;值全 %s 参数化。调用方管事务。
@@ -14,6 +13,7 @@ from typing import Optional
 from core.pos_api import PosError
 from services.purchase import field_clean
 from services.purchase import item_name
+from services.purchase import ocr_original
 from services.purchase import suppliers as sup_svc
 from services.purchase import totals as totals_svc
 
@@ -22,7 +22,7 @@ _DOC_COLS = (
     "currency, fx_rate, subtotal, discount_total, vat_amount, wht_amount, rounding, "
     "grand_total, net_payable, category_id, requester, requester_user_id, "
     "approval_status, payment_status, payment_method, paid_amount, due_date, source, "
-    "dedupe_key, status, amount_override, created_by, created_at, updated_at"
+    "dedupe_key, status, amount_override, created_by, created_at, updated_at, ocr_history_id"
 )
 _LINE_COLS = (
     "id, line_no, item_type, product_id, description, qty, unit, unit_price, discount, "
@@ -256,8 +256,6 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
     # P1F:抽 supplier 并清洗税号/卖家(嵌套 + doc 扁平字段都清·详情页/编辑表单/卡片共用同一套 cleaned·
     # 异常值「13」/日期片段/纯金额 → None·前端显「—」/留空待补·原值仍在 suppliers 表)。
     supplier = field_clean.serialize_supplier(doc)
-    # 税务一致性(P1F):识别到有效税号 → 该单即税票,has_vat 不得为 false(治「填了税号却显
-    # ไม่มีใบกำกับภาษี」的矛盾)。仅置标记·不动 vat_amount/grand_total(金额在独立列·算法不变)。
     if supplier and supplier.get("tax_id"):
         doc["has_vat"] = True
     cur.execute(
@@ -266,7 +264,6 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
         (tenant_id, doc_id),
     )
     lines = cur.fetchall()
-    # P2C:明细名展示清洗(POS 噪声/乱码 → 清洗名;不可读 → '' + name_unclear)。raw 仍留库供调试。
     item_name.clean_doc_lines(lines)
     cur.execute(
         "SELECT id, kind, url, generated, created_at FROM purchase_attachments "
@@ -274,13 +271,7 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
         (tenant_id, doc_id),
     )
     attachments = cur.fetchall()
-    # bill 票图:DB 存的是落盘 ref(内部)· 对外只给鉴权 serving 端点(带 idx,喂 1/N 相册),
-    # 不暴露存储路径。idx 按 bill 子集 created_at ASC,与 get_bill_image_ref 同序。
-    bill_idx = 0
-    for a in attachments:
-        if a.get("kind") == "bill":
-            a["url"] = f"/api/purchase/docs/{doc_id}/bill-image?idx={bill_idx}"
-            bill_idx += 1
+    ocr_original.enrich_detail(cur, tenant_id=tenant_id, doc=doc, attachments=attachments)
     return {"doc": doc, "lines": lines, "attachments": attachments, "supplier": supplier}
 
 
@@ -299,7 +290,15 @@ def get_bill_image_ref(cur, *, tenant_id, workspace_client_id, doc_id, idx=0) ->
         (tenant_id, workspace_client_id, doc_id, offset),
     )
     row = cur.fetchone()
-    return row["url"] if row else None
+    if row:
+        return row["url"]
+    return ocr_original.fallback_ref(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        doc_id=doc_id,
+        idx=offset,
+    )
 
 
 def list_docs(
@@ -314,8 +313,7 @@ def list_docs(
     date_from=None,
     date_to=None,
 ) -> dict:
-    """列单据 + 本月 KPI。date_from/to 按 doc_date 闭区间;每行带 attachment_count
-    (bill 张数·喂「+N」徽章);q 后端 ILIKE 搜供应商名/票号。"""
+    """列单据 + 本月 KPI;每行含原票张数，支持日期与供应商/票号筛选。"""
     sql = (
         f"SELECT d.{', d.'.join(_DOC_COLS.split(', '))}, s.name AS supplier_name, "
         "(SELECT COUNT(*) FROM purchase_attachments pa "
@@ -348,6 +346,7 @@ def list_docs(
     sql += " ORDER BY d.created_at DESC LIMIT 500"
     cur.execute(sql, tuple(params))
     docs = cur.fetchall()
+    ocr_original.enrich_list(cur, tenant_id=tenant_id, docs=docs)
     return {"docs": docs, "summary": _summary(cur, tenant_id, workspace_client_id)}
 
 

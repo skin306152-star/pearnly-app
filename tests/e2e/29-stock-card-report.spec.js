@@ -371,8 +371,15 @@ test.describe('ERP 门户 · 商品收发存报表(2026-08-27 长表面)', () =>
             page.locator('tr[data-op-key="p:WTR-600"] [data-op-qty]'),
             '计算结转的开头不预填'
         ).toHaveValue('');
+        const modalWidth = await page
+            .locator('#stc-op-mask .modal.stc')
+            .evaluate((node) => node.getBoundingClientRect().width);
+        expect(modalWidth).toBeGreaterThanOrEqual(900);
         await page.waitForTimeout(300);
-        await page.screenshot({ path: path.join(OUT, '04-opening-modal.png'), fullPage: false });
+        await page.screenshot({
+            path: path.join(OUT, '05-opening-modal-wide.png'),
+            fullPage: false,
+        });
         await page.fill('tr[data-op-key="p:WPC-001"] [data-op-qty]', '5');
         await page.fill('tr[data-op-key="n:กระดาษ a4"] [data-op-qty]', '7');
         await page.locator('#stc-op-save').click();

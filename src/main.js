@@ -96,6 +96,7 @@ import './home/sales-common.js'; // 销项 PO-10 · 共享叶子(类型/格式�
 import './home/sales-detail.js'; // 销项 PO-10 · 发票详情弹窗(window.openSalesDetail · #sales-detail-mask)
 import './home/sales-workbench.js'; // 销项 PO-10 · 发票工作台(window.loadSalesWorkbench · 接 GET /api/sales/documents)
 import './home/sales-records.js'; // ERP 销售记录 · 网页/LINE 销售单据 + 商品服务/收款/ERP 推送
+import './home/sales-record-detail.js'; // ERP 销售记录详情 · 原票/识别字段/品项/收款/ERP 推送(与开票详情分离)
 import './home/sales-products.js'; // 销项 PO-10 · 商品管理(主数据 · window.loadSalesProducts · CRUD+import)
 import './home/expense-data.js'; // 费用数据(费用科目主数据 · 从采购设置搬入「商品」枢纽 · window.loadExpenseData)
 import './home/sales-account.js'; // 销项 PO-10 · 账套·开票资料(window.loadSalesAccount · 卖方+品牌+模板 · PUT sellers)

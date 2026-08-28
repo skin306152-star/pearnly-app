@@ -297,6 +297,8 @@ interface Window {
     loadKnowledgePage?: () => void;
     loadSalesWorkbench?: () => void;
     loadSalesRecords?: () => void;
+    loadSalesRecordDetail?: () => void;
+    openSalesRecordDetail?: (docId: string) => void;
     loadSalesProducts?: () => void;
     loadExpenseData?: () => void;
     loadSalesAccount?: () => void;

@@ -1,15 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-28 ERP 单据录入至库存/第三方 ERP 闭环
+## 当前状态卡 · 08-28 ERP 销售系统与销售记录拆分收官
 
 - **✅ 产品边界**:`/cowork` 与 `/erp` 独立;ERP 商户数据不投递 Cowork;`/ai`、`/pos`、`/dms` 和旧采购 LINE 不复用 ERP 凭据、绑定或会话。
+- **✅ ERP 销售导航**:ERP 的「发票系统」改为「销售系统」,子菜单为「销售发票 / 销售记录 / 开票资料」;销售发票页只保留开票,原顶部「选择文件」已移除。
+- **✅ 销售记录入口**:新增 `sales-records` 页面,按采购记录模式展示正式 `/api/sales/documents` 数据;「记一笔销售」进入共用 OCR 单据录入并锁定销售方向。
+- **✅ 集成页收口**:ERP 集成页已删除第三方 ERP 连接卡及入口,保留 ERP LINE 绑定;单据录入后的 MR.ERP/Express 推送能力仍留在业务流程内。
+- **✅ POS 隔离**:POS 仍显示「发票系统 / 销售发票 / 开票资料」,不展示、不允许深链进入 ERP `sales-records`;ERP 即使商户类型为 `pos_only` 也按 ERP 入口文案和权限渲染。
 - **✅ Stock Card**:按参考图 13 列、所有商品逐笔同页;各商品独立移动加权平均;仅保留期初库存,服务行不进库存。
 - **✅ ERP 网页**:采购/销售入口锁定用户选择→OCR 原票预览→全字段/逐行库存或服务编辑→保存→确认生成正式单据或丢弃;空明细不猜数量金额,保存失败不转换。
 - **✅ ERP LINE**:独立 OA `@063eadty`、Messaging API、webhook、LINE Login/LIFF 和生产凭据已配置并由官方 Verify 通过;网页复用 DMS 成熟绑定卡(二维码/Basic ID/6 位码/自动轮询/解绑),不复用 DMS 账号或会话。
 - **✅ LINE 对话前端**:Flex 菜单由用户明确选择采购/销售;上传后显示处理中→票号/日期/往来方/金额/明细预览→确认/编辑/丢弃;LIFF 编辑器支持原票多页和全字段修改,并发重复事件只计费/识别一次。
 - **✅ 正式数据**:确认后采购落 `purchase_docs posted`,销售落 `sales_documents issued`;`ocr_history_id` 幂等关联;Stock Card 只读正式库存行。
 - **✅ 第三方 ERP**:MR.ERP/Express 复用既有推送底座;逐行 posting_kind 进入 mapper/预览;ERP 未正式转换 history 服务端 409;`erp_push_logs` 仍是状态唯一源。
-- **✅ 验证上线**:ERP LINE 单测 15 passed、定向 Playwright 13 passed;完整 pre-push 1188 模块全绿;CI `33138874325` 全绿(生产 E2E 441 passed + 高敏 smoke);生产精确 SHA `14e0983a`,服务 active;LIFF Endpoint 已切 `?v=4` 并读回新编辑器资源。
+- **✅ 本批验收**:销售/导航/集成定向 Playwright 10 passed,ERP/Cowork 入口分流 60 passed,相关单测 55 passed,完整 pre-push 全绿;CI `33141461207` 全绿并完成 deploy;功能 SHA `fdddaaee`,生产服务 active、ERP/POS/health 均 200,线上版本化 HTML/JS/CSS/四语词典已命中新入口。
 - **📚 正本**:`docs/erp/ERP-DOCUMENT-CLOSED-LOOP.md`;真机清单=`docs/erp/ERP-REAL-DEVICE-ACCEPTANCE.md`。
 - **⏳ 外部验收**:ERP LINE iOS/Android 真实 OA 与 Express 公司局域网 Windows Agent/TEST 账套回查待 Zihao 起床后执行;完成前不宣称真机写入成功。
 - **⚠️ 工作树边界**:既有 DMS 源码、34 号隔离 spec、favicon 单测及其 build 产物不属于本批,不得暂存或覆盖。

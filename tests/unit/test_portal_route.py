@@ -84,6 +84,30 @@ class PortalRouteTest(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
 
+    def test_home_routes_liff_dms_credentials_to_editor(self):
+        response = self.client.get(
+            "/home",
+            params={"liff.state": "?credentials=dms"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers["location"],
+            "/home/dms-booking?credentials=dms",
+        )
+
+    def test_login_routes_liff_dms_credentials_to_editor(self):
+        response = self.client.get(
+            "/login",
+            params={"liff.state": "?credentials=dms"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers["location"],
+            "/home/dms-booking?credentials=dms",
+        )
+
     def test_login_ignores_unrelated_liff_state(self):
         # 未触发 DMS 订车 liff 特殊 → /login 一律 302 到 canonical 主壳(默认 /cowork)。
         response = self.client.get(

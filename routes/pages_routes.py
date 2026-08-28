@@ -150,6 +150,11 @@ def _safe_internal_next(next_url: str) -> str | None:
 def _dms_booking_redirect(liff_state: str) -> RedirectResponse | None:
     state = str(liff_state or "").lstrip("?")
     params = parse_qs(state)
+    if (params.get("credentials") or [""])[0].strip() == "dms":
+        return RedirectResponse(
+            url="/home/dms-booking?credentials=dms",
+            status_code=302,
+        )
     if (params.get("portal") or [""])[0].strip() == "dms":
         return RedirectResponse(
             url="/home/dms-booking?portal=dms",

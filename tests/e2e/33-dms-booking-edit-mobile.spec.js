@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
+const http = require('http');
 const { test, expect } = require('@playwright/test');
-const localServer = require('./_local_static_server');
 
 const PORT = 8994;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -10,10 +10,46 @@ const OUT = path.join(__dirname, '_artifacts', 'dms-booking-edit');
 fs.mkdirSync(OUT, { recursive: true });
 
 let server;
+function waitUp(url, tries = 80) {
+    return new Promise((resolve, reject) => {
+        const hit = (remaining) => {
+            http.get(url, (response) => {
+                response.resume();
+                if (response.statusCode && response.statusCode < 500) return resolve();
+                if (remaining <= 0) return reject(new Error('server 5xx'));
+                setTimeout(() => hit(remaining - 1), 250);
+            }).on('error', () => {
+                if (remaining <= 0) return reject(new Error('server not up'));
+                setTimeout(() => hit(remaining - 1), 250);
+            });
+        };
+        hit(tries);
+    });
+}
 test.beforeAll(async () => {
-    server = await localServer.start(PORT, '/static/dist/dms-booking-edit.html');
+    server = spawn(
+        'python',
+        [
+            '-m',
+            'uvicorn',
+            'app:app',
+            '--host',
+            '127.0.0.1',
+            '--port',
+            String(PORT),
+            '--no-access-log',
+        ],
+        {
+            cwd: path.join(__dirname, '..', '..'),
+            stdio: 'ignore',
+            env: { ...process.env, PYTHONUTF8: '1' },
+        }
+    );
+    await waitUp(`${BASE}/api/health`);
 });
-test.afterAll(() => localServer.stop(server));
+test.afterAll(() => {
+    if (server) server.kill();
+});
 
 const DRAFT = {
     form: {
@@ -140,12 +176,6 @@ async function setupPortalTest(page) {
             }),
         });
     });
-    await page.route(/\/home\?liff\.state=/, (route) =>
-        route.fulfill({
-            status: 302,
-            headers: { location: `${BASE}/static/dist/dms-booking-edit.html?portal=dms` },
-        })
-    );
     return {
         authBody: () => authBody,
         ticketRequested: () => ticketRequested,
@@ -226,17 +256,9 @@ test('menu 4 opens the operator credential editor and saves only the entered pai
             body: JSON.stringify({ ok: true, data: { updated: true } }),
         });
     });
-    await page.route(/\/home\?liff\.state=.*credentials/, (route) =>
-        route.fulfill({
-            status: 302,
-            headers: {
-                location: `${BASE}/static/dist/dms-booking-edit.html?credentials=dms`,
-            },
-        })
-    );
-
     await page.setContent(PORTAL_CHAT_HTML);
     await page.locator('#credentials-menu').click();
+    await expect(page).toHaveURL(/\/home\/dms-booking\?credentials=dms$/);
     await expect(page.locator('#credentials-username')).toBeVisible();
     await expect(page.locator('#credentials-username')).toHaveValue('sale02');
     await expect(page.locator('#credentials-password')).toHaveValue('');

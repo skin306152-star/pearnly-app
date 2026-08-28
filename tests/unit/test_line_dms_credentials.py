@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+import copy
 import sys
 import unittest
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from unittest import mock
 from core.pos_api import PosError
 from routes import line_dms_credentials_routes as routes
 from services.dms_roster import self_credentials
+from services.line_dms import mrerp_portal
 
 OPERATOR = {"id": "user-1", "tenant_id": "tenant-1", "role": "member"}
 PROFILE = {"user_id": "user-1", "tenant_id": "tenant-1", "status": "active"}
@@ -136,6 +138,48 @@ class CredentialRouteTests(unittest.TestCase):
 
         paths = {route.path for route in app.app.routes if hasattr(route, "path")}
         self.assertIn("/api/line/dms-credentials", paths)
+
+    def test_editor_update_is_used_by_the_next_dms_portal_login(self):
+        endpoint = copy.deepcopy(ENDPOINT)
+
+        def persist(_user_id, _endpoint_id, *, config):
+            endpoint["config"] = copy.deepcopy(config)
+            return True
+
+        def decrypt(value):
+            return value.removeprefix("enc:")
+
+        fake_kms = SimpleNamespace(
+            encrypt_str=lambda value: f"enc:{value}",
+            decrypt_str=decrypt,
+        )
+        with (
+            mock.patch.dict(sys.modules, {"core.kms_helper": fake_kms}),
+            mock.patch.object(routes, "_authorize", new=mock.AsyncMock(return_value=OPERATOR)),
+            mock.patch.object(self_credentials.store, "get_profile", return_value=PROFILE),
+            mock.patch("core.db.list_erp_endpoints", return_value=[endpoint]),
+            mock.patch("core.db.update_erp_endpoint", side_effect=persist),
+            mock.patch(
+                "services.erp.dms_id_ocr.resolve_dms_endpoint",
+                return_value=endpoint,
+            ),
+        ):
+            response = asyncio.run(
+                routes.update_dms_credentials(
+                    object(),
+                    routes.DmsCredentialsIn(
+                        username="changed-in-dms",
+                        password="changed-password",
+                    ),
+                )
+            )
+            credentials = mrerp_portal.load_credentials(OPERATOR["id"])
+            relay, _nonce = mrerp_portal.render_login_relay(*credentials)
+
+        self.assertTrue(response["ok"])
+        self.assertEqual(credentials, ("changed-in-dms", "changed-password"))
+        self.assertIn('name="txtusers" value="changed-in-dms"', relay)
+        self.assertIn('name="txtpasswords" value="changed-password"', relay)
 
 
 if __name__ == "__main__":

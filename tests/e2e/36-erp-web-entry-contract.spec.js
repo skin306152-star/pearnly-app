@@ -117,7 +117,13 @@ async function boot(page, entry, state = {}) {
                 ocr_async_web: false,
             };
         } else if (pathname === '/api/me/modules') {
-            body = { data: { modules: {}, business_type: 'firm', entry } };
+            body = {
+                data: {
+                    modules: state.modules || {},
+                    business_type: state.businessType || 'firm',
+                    entry,
+                },
+            };
         } else if (pathname === '/api/erp/endpoints') {
             body = { items: [] };
         } else if (pathname === '/api/line/erp/binding') {
@@ -178,7 +184,7 @@ async function revealShell(page) {
     await page.waitForTimeout(150);
 }
 
-test('ERP purchase and sales buttons open the shared intake with an explicit direction', async ({
+test('ERP purchase and sales record buttons open the shared intake with an explicit direction', async ({
     page,
 }) => {
     await boot(page, 'erp');
@@ -202,18 +208,101 @@ test('ERP purchase and sales buttons open the shared intake with an explicit dir
     await expect(page.locator('[data-task="summary_batch"]')).toHaveCount(0);
 
     await page.evaluate(() => window.routeTo('sales-invoices'));
-    await page.waitForSelector('#sx-upload-btn');
-    await page.click('#sx-upload-btn');
+    await page.waitForSelector('#sx-new-btn');
+    await expect(page.locator('#sx-upload-btn')).toHaveCount(0);
+    await expect(page.locator('#sx-record-btn')).toHaveCount(0);
+
+    await page.evaluate(() => window.routeTo('sales-records'));
+    await page.waitForSelector('#sx-record-btn');
+    await expect(page.locator('#sx-new-btn')).toHaveCount(0);
+    await page.click('#sx-record-btn');
     await page.waitForSelector('#dx-inv-drop');
     await revealShell(page);
     await page.screenshot({
-        path: path.join(OUT, 'sales-entry.png'),
+        path: path.join(OUT, 'sales-record-entry.png'),
         fullPage: true,
         animations: 'disabled',
     });
     expect(await page.evaluate(() => sessionStorage.getItem('pearnly_erp_intake_direction'))).toBe(
         'sales'
     );
+});
+
+test('ERP gets sales-system labels and records while POS keeps its invoicing menu', async ({
+    browser,
+}) => {
+    const erpPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await boot(erpPage, 'erp', { businessType: 'pos_only' });
+    await erpPage.waitForFunction(
+        () => document.querySelector('#nav-sales-records')?.getBoundingClientRect().height > 0
+    );
+    await expect(
+        erpPage.locator('[data-collapsible="sales"] > .nav-group-toggle > .nav-label')
+    ).toHaveText('销售系统');
+    await expect(erpPage.locator('.nav-item[data-route="sales-invoices"] .nav-label')).toHaveText(
+        '销售发票'
+    );
+    await expect(erpPage.locator('#nav-sales-records .nav-label')).toHaveText('销售记录');
+    await expect(erpPage.locator('.nav-item[data-route="sales-account"] .nav-label')).toHaveText(
+        '开票资料'
+    );
+    const erpLabels = await erpPage.evaluate(() => {
+        const selectors = {
+            'nav-group-sales': '[data-collapsible="sales"] > .nav-group-toggle > .nav-label',
+            'nav-sales-workbench-erp': '.nav-item[data-route="sales-invoices"] .nav-label',
+            'nav-sales-records': '#nav-sales-records .nav-label',
+            'nav-sales-account-erp': '.nav-item[data-route="sales-account"] .nav-label',
+        };
+        const values = {};
+        for (const lang of ['zh', 'en', 'th', 'ja']) {
+            window.applyLang(lang);
+            values[lang] = Object.fromEntries(
+                Object.entries(selectors).map(([key, selector]) => [
+                    key,
+                    {
+                        actual: document.querySelector(selector)?.textContent,
+                        expected: window.I18N[lang][key],
+                    },
+                ])
+            );
+        }
+        window.applyLang('zh');
+        return values;
+    });
+    for (const lang of ['zh', 'en', 'th', 'ja']) {
+        for (const value of Object.values(erpLabels[lang])) {
+            expect(value.actual).toBe(value.expected);
+        }
+    }
+    await erpPage.evaluate(() => window.routeTo('sales-records'));
+    await expect(erpPage.locator('#sx-record-btn')).toBeVisible();
+    await revealShell(erpPage);
+    await erpPage.screenshot({
+        path: path.join(OUT, 'sales-records-desktop.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+    await erpPage.close();
+
+    const posPage = await browser.newPage();
+    await boot(posPage, 'pos', {
+        businessType: 'pos_only',
+        modules: { pos: { enabled: true }, inventory: { enabled: true } },
+    });
+    await posPage.waitForFunction(
+        () =>
+            document
+                .querySelector('[data-collapsible="sales"] > .nav-group-toggle > .nav-label')
+                ?.getAttribute('data-i18n') === 'nav-group-sales-pos'
+    );
+    await expect(
+        posPage.locator('[data-collapsible="sales"] > .nav-group-toggle > .nav-label')
+    ).toHaveText('发票系统');
+    await expect(posPage.locator('.nav-item[data-route="sales-invoices"] .nav-label')).toHaveText(
+        '销售发票'
+    );
+    await expect(posPage.locator('#nav-sales-records')).toBeHidden();
+    await posPage.close();
 });
 
 test('ERP finish save failure stays in review without commit or result success', async ({
@@ -335,12 +424,36 @@ test('ERP purchase entry remains touch-sized on mobile', async ({ browser }) => 
     await page.close();
 });
 
+test('ERP sales records remains touch-sized on mobile', async ({ browser }) => {
+    const page = await browser.newPage({ ...devices['iPhone 13'] });
+    await boot(page, 'erp', { businessType: 'pos_only' });
+    await page.evaluate(() => window.routeTo('sales-records'));
+    await expect(page.locator('#sx-record-btn')).toBeVisible();
+    const tapHeight = await page
+        .locator('#sx-record-btn')
+        .evaluate((node) => node.getBoundingClientRect().height);
+    expect(tapHeight).toBeGreaterThanOrEqual(44);
+    const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+    await revealShell(page);
+    await page.screenshot({
+        path: path.join(OUT, 'sales-records-mobile.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+    await page.close();
+});
+
 test('ERP integration reuses the established LINE binding card with its own bot', async ({
     page,
 }) => {
     const state = {};
     await boot(page, 'erp', state);
     await page.evaluate(() => window.routeTo('integrations'));
+    await expect(page.locator('#erp-express-connect')).toHaveCount(0);
+    await expect(page.getByText('第三方 ERP')).toHaveCount(0);
     await expect(page.locator('#erp-linebot-unbound')).toBeVisible();
     await expect(page.locator('#erp-linebot-code')).toHaveText('482913');
     await expect(page.locator('#erp-linebot-bot-id')).toHaveText('@063eadty');

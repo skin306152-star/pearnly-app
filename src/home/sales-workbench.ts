@@ -4,7 +4,7 @@
 /* global t, escapeHtml, apiGet, showToast, routeTo */
 import { type SalesDoc, docTypeLabel, fmtMoney, fmtDate } from './sales-common.js';
 import { BAHT } from './money.js';
-import { isErpEntry, setErpIntakeDirection } from './erp-intake.js';
+import { setErpIntakeDirection } from './erp-intake.js';
 
 const ICON_INV =
     '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>';
@@ -17,12 +17,14 @@ const ICON_CHEV =
 
 const PAY_STATES = ['paid', 'unpaid', 'partial'];
 type Filter = 'all' | 'draft' | 'issued' | 'void';
+type PageMode = 'invoices' | 'records';
 
 let allDocs: SalesDoc[] = []; // 汇总卡数据源(全量·不随筛选变)
 let docs: SalesDoc[] = []; // 表格当前视图(服务端 status/q 筛选结果)
 let filter: Filter = 'all';
 let keyword = '';
 let searchTimer: number | undefined;
+let pageMode: PageMode = 'invoices';
 
 function payState(d: SalesDoc): string {
     const s = (d.payment && d.payment.status) || '';
@@ -77,7 +79,7 @@ function rowsHtml(): string {
 // 放进单元格就按表格滚动宽度居中 → 「暂无发票」被推到视口外(手机 390 实测半张卡在屏外)。
 function emptyHtml(show: boolean): string {
     return `<div class="sx-state" id="sx-wb-empty"${show ? '' : ' hidden'}>${ICON_INV}<div>${escapeHtml(
-        t('sx-empty')
+        t(pageMode === 'records' ? 'sx-records-empty' : 'sx-empty')
     )}</div></div>`;
 }
 
@@ -91,8 +93,8 @@ function listInnerHtml(): string {
         .join('');
     const empty = !docs.length;
     return `<div class="sx-cards">
-        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-month'))}</div><div class="sx-v">${s.count} <small>${escapeHtml(t('sx-unit-docs'))}</small></div></div>
-        <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-amount'))}</div><div class="sx-v">${BAHT}${fmtMoney(s.amount)}</div></div>
+        <div class="sx-stat"><div class="sx-l">${escapeHtml(t(pageMode === 'records' ? 'sx-records-card-month' : 'sx-card-month'))}</div><div class="sx-v">${s.count} <small>${escapeHtml(t('sx-unit-docs'))}</small></div></div>
+        <div class="sx-stat"><div class="sx-l">${escapeHtml(t(pageMode === 'records' ? 'sx-records-card-amount' : 'sx-card-amount'))}</div><div class="sx-v">${BAHT}${fmtMoney(s.amount)}</div></div>
         <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-draft'))}</div><div class="sx-v">${s.drafts}</div></div>
         <div class="sx-stat"><div class="sx-l">${escapeHtml(t('sx-card-due'))}</div><div class="sx-v warn">${BAHT}${fmtMoney(s.due)}</div></div>
     </div>
@@ -111,17 +113,19 @@ function listInnerHtml(): string {
     </table>${emptyHtml(empty)}</div>`;
 }
 
-function pageShell(): string {
+function pageShell(mode: PageMode): string {
+    const titleKey = mode === 'records' ? 'sx-records-title' : 'sx-wb-title';
+    const actions =
+        mode === 'records'
+            ? `<button class="btn btn-primary" id="sx-record-btn">${ICON_PLUS}<span data-i18n="sx-record-sale">${escapeHtml(t('sx-record-sale'))}</span></button>`
+            : `<button class="btn btn-ghost" id="sx-settings-btn">${ICON_GEAR}<span>${escapeHtml(t('sx-settings'))}</span></button>
+                <button class="btn btn-primary" id="sx-new-btn">${ICON_PLUS}<span>${escapeHtml(t('sx-new'))}</span></button>`;
     return `<div class="wrap sx-page">
         <div class="pagehead">
             <div>
-                <div class="h1" data-i18n="sx-wb-title">${escapeHtml(t('sx-wb-title'))}</div>
+                <div class="h1" data-i18n="${titleKey}">${escapeHtml(t(titleKey))}</div>
             </div>
-            <div class="sx-actions">
-                ${isErpEntry() ? `<button class="btn btn-ghost" id="sx-upload-btn">${escapeHtml(t('dxi-up-pick'))}</button>` : ''}
-                <button class="btn btn-ghost" id="sx-settings-btn">${ICON_GEAR}<span>${escapeHtml(t('sx-settings'))}</span></button>
-                <button class="btn btn-primary" id="sx-new-btn">${ICON_PLUS}<span>${escapeHtml(t('sx-new'))}</span></button>
-            </div>
+            <div class="sx-actions">${actions}</div>
         </div>
         <div id="sx-wb-body"></div>
     </div>`;
@@ -198,8 +202,8 @@ async function refreshView() {
 }
 
 function bindShell() {
-    const uploadBtn = document.getElementById('sx-upload-btn');
-    if (uploadBtn) uploadBtn.onclick = () => setErpIntakeDirection('sales');
+    const recordBtn = document.getElementById('sx-record-btn');
+    if (recordBtn) recordBtn.onclick = () => setErpIntakeDirection('sales');
     const newBtn = document.getElementById('sx-new-btn');
     if (newBtn) newBtn.onclick = () => window.openSalesWizard?.();
     const setBtn = document.getElementById('sx-settings-btn');
@@ -225,22 +229,43 @@ async function load() {
     }
 }
 
-window.loadSalesWorkbench = function () {
-    const sec = document.getElementById('page-sales-invoices');
+function mount(pageId: string, mode: PageMode): void {
+    const sec = document.getElementById(pageId);
     if (!sec) return;
-    if (sec.dataset.sxInit !== '1') {
-        sec.classList.add('ui');
-        sec.innerHTML = pageShell();
-        sec.dataset.sxInit = '1';
-        bindShell();
-    }
+    pageMode = mode;
+    const siblingId = mode === 'records' ? 'page-sales-invoices' : 'page-sales-records';
+    const sibling = document.getElementById(siblingId);
+    if (sibling) sibling.innerHTML = '';
+    sec.classList.add('ui');
+    sec.innerHTML = pageShell(mode);
+    bindShell();
     load();
+}
+
+window.loadSalesWorkbench = function () {
+    mount('page-sales-invoices', 'invoices');
+};
+
+window.loadSalesRecords = function () {
+    mount('page-sales-records', 'records');
 };
 
 // 详情里作废/红冲后回流刷新工作台
 window.addEventListener('pearnly:sales-changed', () => {
-    if (typeof currentRoute !== 'undefined' && currentRoute === 'sales-invoices') load();
+    if (
+        typeof currentRoute !== 'undefined' &&
+        (currentRoute === 'sales-invoices' || currentRoute === 'sales-records')
+    )
+        load();
 });
+
+if (typeof window.subscribeI18n === 'function') {
+    window.subscribeI18n('sales-workbench', () => {
+        if (typeof currentRoute === 'undefined') return;
+        if (currentRoute === 'sales-invoices') window.loadSalesWorkbench?.();
+        if (currentRoute === 'sales-records') window.loadSalesRecords?.();
+    });
+}
 
 // 切账套重载已统一收口到 core-boot 全局 pearnly:workspace-changed → reloadCurrentRoute。
 

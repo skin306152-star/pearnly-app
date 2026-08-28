@@ -37,10 +37,25 @@ const POS_LABEL_KEYS: Record<string, string> = {
     'nav-sales-account': 'nav-sales-account-pos',
 };
 
+const ERP_LABEL_KEYS: Record<string, string> = {
+    'nav-sales-workbench': 'nav-sales-workbench-erp',
+    'nav-sales-account': 'nav-sales-account-erp',
+};
+
 function applyPosLabels(): void {
     // 改指向 -pos 键(applyLang 后续切语言自动出 pos 名);当场用全局 t() 补一次文案免闪。
     Object.keys(POS_LABEL_KEYS).forEach((from) => {
         const to = POS_LABEL_KEYS[from];
+        document.querySelectorAll<HTMLElement>('[data-i18n="' + from + '"]').forEach((el) => {
+            el.dataset.i18n = to;
+            if (typeof window.t === 'function') el.textContent = window.t(to);
+        });
+    });
+}
+
+function applyErpLabels(): void {
+    Object.keys(ERP_LABEL_KEYS).forEach((from) => {
+        const to = ERP_LABEL_KEYS[from];
         document.querySelectorAll<HTMLElement>('[data-i18n="' + from + '"]').forEach((el) => {
             el.dataset.i18n = to;
             if (typeof window.t === 'function') el.textContent = window.t(to);
@@ -89,6 +104,7 @@ function applyMerchantNav(
     emp: boolean,
     on: (k: string) => boolean
 ): void {
+    show(document.getElementById('nav-sales-records'), false);
     // 首页=计费面板,员工看不到钱 → 隐藏 + 停在首页则回落业务首页。
     show(qs('.nav-item[data-route="dashboard"]'), !emp);
     const onDash = (location.hash || '').replace(/^#\//, '') === 'dashboard';
@@ -187,6 +203,7 @@ function apply(
 
     if (preset) {
         applyNavPreset(preset);
+        show(document.getElementById('nav-sales-records'), preset === ERP_PRESET);
         if (businessType === 'pos_only') show(document.getElementById('nav-knowledge'), false);
         // 首页=计费面板,员工不给(隐藏 + 若正停在首页则落业务首页;非员工由清单决定首页显隐)。
         if (emp) {
@@ -201,9 +218,11 @@ function apply(
                 .forEach((el) => show(el, true));
         }
         // 收银业务组的角色/开通门控(组显隐已由清单处理,这里只管组内子项)。
-        if (businessType === 'pos_only') {
+        if (preset === POS_PRESET) {
             applyPosRoles(owner, on('pos'), on('inventory'), businessType, false);
             applyPosLabels(); // 4 个共用节点改名为 pos 变体(抗语言切换)
+        } else if (preset === ERP_PRESET) {
+            applyErpLabels();
         }
         lockAvatarShell(preset.avatarHide);
         return;

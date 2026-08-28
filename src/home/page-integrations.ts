@@ -85,11 +85,7 @@ function erpLineBindingMarkup(tr: ErpTranslator): string {
                 </div>
             </div>
         </div>
-        <div id="erp-linebot-error" class="linebot-error" style="display:none;"></div>
-        <div class="card"><div class="integrations-section-title">${tr('ERP อื่น', 'Third-party ERP', '第三方 ERP', '外部 ERP')}</div>
-            <div class="integration-row"><div class="int-info"><div class="int-name">MR.ERP / Express</div><div class="int-desc">${tr('การเชื่อมต่อและประวัติการส่ง', 'Connection and push history', '连接与推送记录', '接続と送信履歴')}</div></div>
-            <div class="int-actions"><button class="int-btn-configure" id="erp-express-connect">${tr('เชื่อมต่อ', 'Configure connection', '配置连接', '接続を設定')}</button><button class="int-btn-configure" data-route="push-logs">${window.t?.('nav-push-logs') || 'Push logs'}</button></div></div>
-        </div>`;
+        <div id="erp-linebot-error" class="linebot-error" style="display:none;"></div>`;
 }
 
 function initErpLineBinding(sec: HTMLElement, tr: ErpTranslator): void {
@@ -321,14 +317,6 @@ function initErpLineBinding(sec: HTMLElement, tr: ErpTranslator): void {
         sec.innerHTML = erpLineBindingMarkup(tr);
         sec.dataset.wbInjected = '1';
         initErpLineBinding(sec, tr);
-        sec.querySelector('#erp-express-connect')?.addEventListener('click', () => {
-            const express = (window as Window & { ExpressWizard?: { open?: () => void } })
-                .ExpressWizard;
-            express?.open?.();
-        });
-        sec.querySelector('[data-route="push-logs"]')?.addEventListener('click', () =>
-            window.routeTo?.('push-logs')
-        );
         return;
     }
     sec.innerHTML = `

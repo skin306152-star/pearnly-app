@@ -16,6 +16,9 @@ body.sidebar-collapsed .nav-section-label {
 .sx-page {
     padding: 22px;
 }
+#sx-record-btn {
+    min-height: 44px;
+}
 .sx-head {
     display: flex;
     align-items: baseline;

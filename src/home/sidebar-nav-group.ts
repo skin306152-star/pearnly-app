@@ -14,6 +14,7 @@
         history: 'sales',
         reconcile: 'sales',
         'sales-invoices': 'sales',
+        'sales-records': 'sales',
         'sales-account': 'sales',
         'sales-products': 'products',
         'expense-data': 'products',

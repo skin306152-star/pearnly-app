@@ -27,6 +27,7 @@ export const VALID_ROUTES = [
     'purchase-export',
     'purchase-capture',
     'sales-invoices',
+    'sales-records',
     'sales-products',
     'expense-data',
     'stock-card',
@@ -93,6 +94,7 @@ export const MAIN_ENTRY_ROUTES = new Set<string>([
     'api-keys',
     'guide',
     'stock-card',
+    'sales-records',
 ]);
 
 // Canonical portals use allowlists so future routes cannot leak into the wrong shell by default.
@@ -119,6 +121,7 @@ export const ERP_ALLOWED_ROUTES = new Set<string>([
     'purchase-export',
     'purchase-capture',
     'sales-invoices',
+    'sales-records',
     'sales-account',
     'clients',
     'company',
@@ -145,6 +148,7 @@ export const ROUTE_LOADERS: Record<string, string> = {
     'pos-payment': 'loadPosPayment',
     'pos-sheets': 'loadPosSheets',
     'sales-invoices': 'loadSalesWorkbench',
+    'sales-records': 'loadSalesRecords',
     'sales-products': 'loadSalesProducts',
     'expense-data': 'loadExpenseData',
     'stock-card': 'loadStockCard',

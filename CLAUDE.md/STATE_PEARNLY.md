@@ -1,6 +1,6 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-28 ERP 销售系统与销售记录拆分收官
+## 当前状态卡 · 08-28 ERP 销售记录与 LINE 收口
 
 - **✅ 产品边界**:`/cowork` 与 `/erp` 独立;ERP 商户数据不投递 Cowork;`/ai`、`/pos`、`/dms` 和旧采购 LINE 不复用 ERP 凭据、绑定或会话。
 - **✅ ERP 销售导航**:ERP 的「发票系统」改为「销售系统」,子菜单为「销售发票 / 销售记录 / 开票资料」;销售发票页只保留开票,原顶部「选择文件」已移除。
@@ -13,9 +13,11 @@
 - **✅ LINE 对话前端**:Flex 菜单由用户明确选择采购/销售;上传后显示处理中→票号/日期/往来方/金额/明细预览→确认/编辑/丢弃;LIFF 编辑器支持原票多页和全字段修改,并发重复事件只计费/识别一次。
 - **✅ 正式数据**:确认后采购落 `purchase_docs posted`,销售落 `sales_documents issued`;`ocr_history_id` 幂等关联;Stock Card 只读正式库存行。
 - **✅ 第三方 ERP**:MR.ERP/Express 复用既有推送底座;逐行 posting_kind 进入 mapper/预览;ERP 未正式转换 history 服务端 409;`erp_push_logs` 仍是状态唯一源。
-- **✅ 本批验收**:销售/导航/集成定向 Playwright 10 passed,ERP/Cowork 入口分流 60 passed,相关单测 55 passed,完整 pre-push 全绿;CI `33141461207` 全绿并完成 deploy;功能 SHA `fdddaaee`,生产服务 active、ERP/POS/health 均 200,线上版本化 HTML/JS/CSS/四语词典已命中新入口。
+- **✅ 最新上线**:`e8c9be11` 已在 `master` 与 `origin/master`;销售/采购记录页去掉三点菜单,直接保留「导出/归档 + 记一笔」;销售记录排在销售发票上方;期初库存弹窗扩大并改善长商品名展示。
+- **✅ 本批验收**:销售/导航/集成定向 Playwright 10 passed,ERP/Cowork 入口分流 60 passed,相关单测 55 passed,完整 pre-push 全绿;CI `33141461207` 全绿并完成 deploy;生产服务 active、ERP/POS/health 均 200。
 - **📚 正本**:`docs/erp/ERP-DOCUMENT-CLOSED-LOOP.md`;真机清单=`docs/erp/ERP-REAL-DEVICE-ACCEPTANCE.md`。
-- **⏳ 外部验收**:ERP LINE iOS/Android 真实 OA 与 Express 公司局域网 Windows Agent/TEST 账套回查待 Zihao 起床后执行;完成前不宣称真机写入成功。
+- **⏳ 外部验收**:ERP LINE iOS/Android 真实 OA 与 Express 公司局域网 Windows Agent/TEST 账套回查待执行;完成前不宣称真机写入成功。
+- **⚠️ 下一步首项**:ERP LINE 绑定码生产请求当前返回 403 `workspace.forbidden`;页面显示未选账套但仍发送旧的无权限账套 ID,导致绑定码、Bot ID、二维码均为空。尚未修复,下次先清理前端账套状态并补精确错误提示/回归测试。
 - **⚠️ 工作树边界**:既有 DMS 源码、34 号隔离 spec、favicon 单测及其 build 产物不属于本批,不得暂存或覆盖。
 
 ---

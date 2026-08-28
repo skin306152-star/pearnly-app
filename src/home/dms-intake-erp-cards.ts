@@ -220,8 +220,10 @@ export function renderDxErpCards(task: string): void {
     if (!defs.length) {
         stopAgentPolling();
         zone.innerHTML = '';
+        delete zone.dataset.erpTask;
         return;
     }
+    zone.dataset.erpTask = task;
     zone.innerHTML =
         `<div class="dx-erp-h">${esc(T('dx-erp-h'))}</div>` +
         `<div class="dx-erp-row">${defs.map(cardHtml).join('')}</div>`;
@@ -229,3 +231,10 @@ export function renderDxErpCards(task: string): void {
     void loadStatus(zone, defs);
     startAgentPolling(zone, () => void loadStatus(zone, defs, true));
 }
+
+window.addEventListener('pearnly:erp-endpoints-changed', () => {
+    const zone = document.getElementById('dx-erp-cards');
+    if (!zone) return;
+    const defs = TASK_CARDS[zone.dataset.erpTask || ''] || [];
+    if (defs.length) void loadStatus(zone, defs, true);
+});

@@ -10,6 +10,7 @@ import { SALES_RECORDS_CSS } from './sales-records-css.js';
 
 type Segment = 'all' | 'goods' | 'service' | 'unpaid';
 type SelectKey = 'date' | 'doc' | 'source' | 'push';
+type DateBasis = 'doc' | 'upload';
 
 const ICON_SEARCH =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
@@ -22,6 +23,7 @@ let docs: SalesDoc[] = [];
 let segment: Segment = 'all';
 let keyword = '';
 let searchTimer: number | undefined;
+let dateBasis: DateBasis = 'doc';
 const selects: Record<SelectKey, string> = { date: '', doc: '', source: '', push: '' };
 
 function payState(doc: SalesDoc): string {
@@ -83,13 +85,18 @@ function summary(): { total: number; goods: number; service: number; vat: number
 
 function inDateRange(doc: SalesDoc): boolean {
     if (!selects.date) return true;
-    const date = doc.issue_date || '';
+    const date = basisDate(doc);
     const now = new Date();
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (selects.date === 'this') return date.startsWith(month);
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
     return date.startsWith(prevMonth);
+}
+
+function basisDate(doc: SalesDoc): string {
+    const value = dateBasis === 'upload' ? doc.created_at || doc.issue_date : doc.issue_date;
+    return (value || '').slice(0, 10);
 }
 
 function view(): SalesDoc[] {
@@ -130,11 +137,15 @@ function filterHtml(): string {
         <label>${escapeHtml(t('sr-filter-doc'))}<select data-sr-select="doc">${option('', 'sr-filter-all')}${option('tax_invoice', 'sx-dt-tax_invoice')}${option('receipt', 'sx-dt-receipt')}${option('tax_invoice_simple', 'sx-dt-tax_invoice_simple')}</select></label>
         <label>${escapeHtml(t('sr-filter-source'))}<select data-sr-select="source">${option('', 'sr-filter-all')}${option('web', 'sr-source-web')}${option('line', 'sr-source-line')}${option('legacy', 'sr-source-legacy')}</select></label>
         <label>${escapeHtml(t('sr-filter-push'))}<select data-sr-select="push">${option('', 'sr-filter-all')}${option('not_pushed', 'sr-push-not_pushed')}${option('pending', 'sr-push-pending')}${option('success', 'sr-push-success')}${option('failed', 'sr-push-failed')}</select></label>
+        <div class="datebasis" id="sr-datebasis">
+            <span class="o ${dateBasis === 'doc' ? 'on' : ''}" data-sr-basis="doc">${escapeHtml(t('pur-basis-doc'))}</span>
+            <span class="o ${dateBasis === 'upload' ? 'on' : ''}" data-sr-basis="upload">${escapeHtml(t('pur-basis-upload'))}</span>
+        </div>
     </div>`;
 }
 
 function monthKey(doc: SalesDoc): string {
-    return (doc.issue_date || doc.created_at || '0000-00').slice(0, 7);
+    return (basisDate(doc) || '0000-00').slice(0, 7);
 }
 
 function monthLabel(key: string): string {
@@ -162,7 +173,7 @@ function pushButton(doc: SalesDoc): string {
 }
 
 function rowHtml(doc: SalesDoc): string {
-    const date = (doc.issue_date || '—').slice(5, 10).replace('-', '/');
+    const date = (basisDate(doc) || '—').slice(5, 10).replace('-', '/');
     const vat =
         Number(doc.vat_amount || 0) > 0
             ? `<div class="vat">${escapeHtml(t('sr-output-vat'))} ${BAHT}${fmtMoney(doc.vat_amount)}</div>`
@@ -215,6 +226,46 @@ async function push(doc: SalesDoc, button: HTMLButtonElement): Promise<void> {
     await load();
 }
 
+async function exportRecords(button: HTMLButtonElement): Promise<void> {
+    const historyIds = view()
+        .map((doc) => doc.ocr_history_id)
+        .filter((id): id is string => !!id);
+    if (!historyIds.length) {
+        showToast(t('sr-export-empty'), 'info');
+        return;
+    }
+    button.disabled = true;
+    try {
+        const r = await fetch('/api/ocr/export-by-history-ids', {
+            method: 'POST',
+            headers: {
+                Authorization: 'Bearer ' + (window.session.getToken() || ''),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                template: 'sales_detail_th',
+                lang: window._currentLang || localStorage.getItem('mrpilot_lang') || 'th',
+                history_ids: historyIds,
+            }),
+        });
+        if (!r.ok) throw new Error('http_' + r.status);
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Pearnly_Sales_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        showToast(t('sr-export-ok'), 'success');
+    } catch {
+        showToast(t('sr-export-failed'), 'error');
+    } finally {
+        button.disabled = false;
+    }
+}
+
 function bindRows(): void {
     document.querySelectorAll<HTMLElement>('[data-sr-doc]').forEach((row) => {
         row.onclick = () => window.openSalesRecordDetail?.(row.dataset.srDoc!);
@@ -255,6 +306,15 @@ function bindControls(): void {
             renderBody();
         };
     });
+    document.querySelectorAll<HTMLElement>('[data-sr-basis]').forEach((item) => {
+        item.onclick = () => {
+            dateBasis = item.dataset.srBasis as DateBasis;
+            document
+                .querySelectorAll<HTMLElement>('[data-sr-basis]')
+                .forEach((node) => node.classList.toggle('on', node === item));
+            renderBody();
+        };
+    });
     document
         .getElementById('sr-record-btn')
         ?.addEventListener('click', () => setErpIntakeDirection('sales'));
@@ -264,6 +324,9 @@ function bindControls(): void {
     document
         .getElementById('sr-logs-btn')
         ?.addEventListener('click', () => window.routeTo?.('push-logs'));
+    document.getElementById('sr-export-btn')?.addEventListener('click', (event) => {
+        void exportRecords(event.currentTarget as HTMLButtonElement);
+    });
 }
 
 function shell(): string {
@@ -273,7 +336,7 @@ function shell(): string {
     return `<div class="pur pl sr"><div class="wrap">
         <div class="ph"><div><div class="t">${escapeHtml(t('sx-records-title'))}</div><div class="sub">${escapeHtml(t('sr-subtitle'))}</div></div></div>
         <div class="panel"><div class="band"><div class="star"><div class="big tnum">${BAHT}${fmtMoney(stat.total)}<small>${escapeHtml(t('sr-month-sales'))}</small></div><div class="ctx">${cell('sr-goods-sales', stat.goods)}${cell('sr-service-sales', stat.service)}${cell('sr-output-vat', stat.vat, true)}</div></div>
-        <div class="acts"><button class="btn primary" id="sr-record-btn">${ICON_PEN}${escapeHtml(t('sx-record-sale'))}</button><div class="more-wrap"><button class="btn" aria-label="more">${MORE_SVG}</button><div class="more-menu right" hidden><button class="mi" id="sr-line-btn">${escapeHtml(t('sr-line-entry'))}</button><button class="mi" id="sr-logs-btn">${escapeHtml(t('sr-push-logs'))}</button></div></div></div></div>
+        <div class="acts"><button class="btn" id="sr-export-btn">${escapeHtml(t('sr-export-records'))}</button><button class="btn primary" id="sr-record-btn">${ICON_PEN}${escapeHtml(t('sx-record-sale'))}</button><div class="more-wrap"><button class="btn" aria-label="more">${MORE_SVG}</button><div class="more-menu right" hidden><button class="mi" id="sr-line-btn">${escapeHtml(t('sr-line-entry'))}</button><button class="mi" id="sr-logs-btn">${escapeHtml(t('sr-push-logs'))}</button></div></div></div></div>
         <div class="toolbar"><div class="seg">${segmentHtml()}</div><div class="search">${ICON_SEARCH}<input id="sr-search" value="${escapeHtml(keyword)}" placeholder="${escapeHtml(t('sr-search'))}"></div></div>
         ${filterHtml()}<div id="sr-body"><div class="state">${escapeHtml(t('sx-loading'))}</div></div><div class="listfoot" id="sr-count"></div>
         </div></div></div>`;

@@ -41,6 +41,7 @@
             var ec = (window as any).ExpressConnect;
             if (ec && ec.refresh) ec.refresh();
         } catch (e) {}
+        window.dispatchEvent(new CustomEvent('pearnly:erp-endpoints-changed'));
     }
 
     function _close() {

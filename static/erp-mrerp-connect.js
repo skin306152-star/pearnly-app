@@ -659,10 +659,17 @@
 
     function _tk() {
         try {
+            if (window.session && typeof window.session.getToken === 'function') {
+                return window.session.getToken() || '';
+            }
             return localStorage.getItem('mrpilot_token') || '';
         } catch (e) {
             return '';
         }
+    }
+
+    function _notifyEndpointChange() {
+        window.dispatchEvent(new CustomEvent('pearnly:erp-endpoints-changed'));
     }
 
     function _authHeaders() {
@@ -1109,6 +1116,7 @@
                             window._refreshErpEndpointsCache();
                         }
                     } catch (e2) {}
+                    _notifyEndpointChange();
                 } catch (err) {
                     _toast(t('card-toggle-failed'), 'error');
                     btn.disabled = false;
@@ -1187,11 +1195,7 @@
 
     // Public hook for the wizard module (defined further below in
     // the same file — C-3).
-    window._mrerpOpenWizard =
-        window._mrerpOpenWizard ||
-        function () {
-            console.log('[mrerp] wizard not yet attached');
-        };
+    window._mrerpOpenWizard = window._mrerpOpenWizard || function () {};
 
     // ─────────────────────────────────────────────────────────────
     // Auto-bind: render on initial load + whenever the ERP tab
@@ -1690,6 +1694,7 @@
             }
             _toast(t('wiz-saved'), 'success');
             _closeWizard();
+            _notifyEndpointChange();
             setTimeout(_bootstrap, 100);
         } catch (e) {
             _toast(String(e).slice(0, 200), 'error');

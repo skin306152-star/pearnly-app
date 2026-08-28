@@ -97,6 +97,7 @@ async function boot(page, entry, state = {}) {
         converts: 0,
         lineCodeCalls: 0,
         erpPushes: 0,
+        salesExports: [],
     });
     await page.addInitScript((portal) => {
         localStorage.clear();
@@ -146,6 +147,13 @@ async function boot(page, entry, state = {}) {
             body = { categories: [] };
         } else if (pathname === '/api/sales/documents') {
             body = { documents: state.salesDocuments || SALES_RECORDS };
+        } else if (pathname === '/api/ocr/export-by-history-ids') {
+            state.salesExports.push(req.postDataJSON());
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                body: Buffer.from('xlsx'),
+            });
         } else if (pathname.startsWith('/api/sales/documents/')) {
             const id = pathname.split('/').pop();
             body = {
@@ -183,6 +191,18 @@ async function boot(page, entry, state = {}) {
                     entry,
                 },
             };
+        } else if (pathname === '/api/erp/test-connection') {
+            state.mrerpTestAuth = req.headers().authorization || '';
+            body = {
+                ok: true,
+                companies: [{ comidyear: '6', seldb: '1', label: 'TEST2019' }],
+            };
+        } else if (pathname === '/api/erp/endpoints' && req.method() === 'POST') {
+            state.mrerpSaveAuth = req.headers().authorization || '';
+            const input = req.postDataJSON();
+            const saved = { id: 'mrerp-1', enabled: true, ...input };
+            state.erpEndpoints = [...(state.erpEndpoints || []), saved];
+            body = saved;
         } else if (pathname === '/api/erp/endpoints') {
             body = { items: state.erpEndpoints || [] };
         } else if (pathname === '/api/erp/push') {
@@ -292,6 +312,30 @@ test('ERP purchase and sales record buttons open the shared intake with an expli
     );
 });
 
+test('ERP MR.ERP setup uses the isolated ERP session and refreshes its card immediately', async ({
+    page,
+}) => {
+    const state = { erpEndpoints: [] };
+    await boot(page, 'erp', state);
+    await page.evaluate(() => {
+        localStorage.setItem('mrpilot_token', 'wrong-legacy-token');
+        window.routeTo('purchase');
+    });
+    await page.click('#pur-record-btn');
+    await expect(page.locator('[data-erp="mrerp"] [data-erp-status]')).toHaveText('未连接');
+    await page.click('[data-erp="mrerp"] [data-erp-config]');
+    await page.fill('[data-mw-user]', 'sandbox-user');
+    await page.fill('[data-mw-pass]', 'sandbox-password');
+    await page.click('[data-mw-test]');
+    await expect(page.locator('[data-mw-test-status]')).toContainText('1');
+    await page.click('[data-mw-next]');
+    await page.click('[data-mw-next]');
+
+    await expect.poll(() => state.mrerpTestAuth).toBe('Bearer erp-e2e-token');
+    await expect.poll(() => state.mrerpSaveAuth).toBe('Bearer erp-e2e-token');
+    await expect(page.locator('[data-erp="mrerp"] [data-erp-status]')).toContainText('已连接');
+});
+
 test('ERP gets sales-system labels and records while POS keeps its invoicing menu', async ({
     browser,
 }) => {
@@ -346,11 +390,23 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     }
     await erpPage.evaluate(() => window.routeTo('sales-records'));
     await expect(erpPage.locator('#sr-record-btn')).toBeVisible();
+    await expect(erpPage.locator('#sr-export-btn')).toBeVisible();
     await expect(erpPage.locator('.pur.pl.sr')).toBeVisible();
     await expect(erpPage.locator('[data-sr-doc]')).toHaveCount(2);
     await expect(erpPage.locator('#sr-body .src.line')).toHaveText('LINE 上传');
     await expect(erpPage.locator('#sr-body .src.web')).toHaveText('网页上传');
     await expect(erpPage.locator('[data-sr-push="sale-line-1"]')).toHaveText('推送 ERP');
+    await erpPage.locator('[data-sr-basis="upload"]').click();
+    await expect(erpPage.locator('[data-sr-basis="upload"]')).toHaveClass(/on/);
+    await revealShell(erpPage);
+    await erpPage.screenshot({
+        path: path.join(OUT, 'sales-records-desktop.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+    await erpPage.locator('#sr-export-btn').click();
+    await expect.poll(() => erpState.salesExports.length).toBe(1);
+    expect(erpState.salesExports[0].history_ids).toEqual(['history-sales-1', 'history-sales-2']);
     await erpPage.locator('[data-sr-push="sale-line-1"]').click();
     await expect.poll(() => erpState.erpPushes).toBe(1);
     await erpPage.locator('[data-sr-doc="sale-line-1"]').click();

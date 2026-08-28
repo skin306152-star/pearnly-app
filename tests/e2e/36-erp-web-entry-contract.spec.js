@@ -210,6 +210,11 @@ async function boot(page, entry, state = {}) {
             const pending = state.salesDocuments.find((doc) => doc.push_status !== 'success');
             if (pending) pending.push_status = 'success';
             body = { ok: true };
+        } else if (pathname === '/api/integrations/google/status') {
+            body = {
+                ok: true,
+                data: { configured: true, connected: false, email: '', scope: '' },
+            };
         } else if (pathname === '/api/line/erp/binding') {
             body = {
                 ok: true,
@@ -405,8 +410,23 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
         animations: 'disabled',
     });
     await erpPage.locator('#sr-export-btn').click();
+    await expect(erpPage.locator('#page-purchase-export')).toHaveClass(/active/);
+    await expect(erpPage.locator('#page-purchase-export .ph .t')).toHaveText(
+        '销售记录导出 / 归档到 Google'
+    );
+    await expect(erpPage.locator('[data-fmt="drive"]')).toBeVisible();
+    await expect(erpPage.locator('[data-fmt="sheet"]')).toHaveCount(0);
+    await revealShell(erpPage);
+    await erpPage.screenshot({
+        path: path.join(OUT, 'sales-export-archive.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+    await erpPage.locator('[data-fmt="excel"]').click();
     await expect.poll(() => erpState.salesExports.length).toBe(1);
     expect(erpState.salesExports[0].history_ids).toEqual(['history-sales-1', 'history-sales-2']);
+    await erpPage.locator('#pex-back').click();
+    await expect(erpPage.locator('#page-sales-records')).toHaveClass(/active/);
     await erpPage.locator('[data-sr-push="sale-line-1"]').click();
     await expect.poll(() => erpState.erpPushes).toBe(1);
     await erpPage.locator('[data-sr-doc="sale-line-1"]').click();

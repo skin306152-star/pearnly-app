@@ -226,7 +226,7 @@ async function push(doc: SalesDoc, button: HTMLButtonElement): Promise<void> {
     await load();
 }
 
-async function exportRecords(button: HTMLButtonElement): Promise<void> {
+function exportRecords(): void {
     const historyIds = view()
         .map((doc) => doc.ocr_history_id)
         .filter((id): id is string => !!id);
@@ -234,36 +234,7 @@ async function exportRecords(button: HTMLButtonElement): Promise<void> {
         showToast(t('sr-export-empty'), 'info');
         return;
     }
-    button.disabled = true;
-    try {
-        const r = await fetch('/api/ocr/export-by-history-ids', {
-            method: 'POST',
-            headers: {
-                Authorization: 'Bearer ' + (window.session.getToken() || ''),
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                template: 'sales_detail_th',
-                lang: window._currentLang || localStorage.getItem('mrpilot_lang') || 'th',
-                history_ids: historyIds,
-            }),
-        });
-        if (!r.ok) throw new Error('http_' + r.status);
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Pearnly_Sales_${new Date().toISOString().slice(0, 10)}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        showToast(t('sr-export-ok'), 'success');
-    } catch {
-        showToast(t('sr-export-failed'), 'error');
-    } finally {
-        button.disabled = false;
-    }
+    window.openSalesExport?.(historyIds);
 }
 
 function bindRows(): void {
@@ -324,9 +295,7 @@ function bindControls(): void {
     document
         .getElementById('sr-logs-btn')
         ?.addEventListener('click', () => window.routeTo?.('push-logs'));
-    document.getElementById('sr-export-btn')?.addEventListener('click', (event) => {
-        void exportRecords(event.currentTarget as HTMLButtonElement);
-    });
+    document.getElementById('sr-export-btn')?.addEventListener('click', exportRecords);
 }
 
 function shell(): string {
@@ -336,7 +305,7 @@ function shell(): string {
     return `<div class="pur pl sr"><div class="wrap">
         <div class="ph"><div><div class="t">${escapeHtml(t('sx-records-title'))}</div><div class="sub">${escapeHtml(t('sr-subtitle'))}</div></div></div>
         <div class="panel"><div class="band"><div class="star"><div class="big tnum">${BAHT}${fmtMoney(stat.total)}<small>${escapeHtml(t('sr-month-sales'))}</small></div><div class="ctx">${cell('sr-goods-sales', stat.goods)}${cell('sr-service-sales', stat.service)}${cell('sr-output-vat', stat.vat, true)}</div></div>
-        <div class="acts"><button class="btn" id="sr-export-btn">${escapeHtml(t('sr-export-records'))}</button><button class="btn primary" id="sr-record-btn">${ICON_PEN}${escapeHtml(t('sx-record-sale'))}</button><div class="more-wrap"><button class="btn" aria-label="more">${MORE_SVG}</button><div class="more-menu right" hidden><button class="mi" id="sr-line-btn">${escapeHtml(t('sr-line-entry'))}</button><button class="mi" id="sr-logs-btn">${escapeHtml(t('sr-push-logs'))}</button></div></div></div></div>
+        <div class="acts"><button class="btn" id="sr-export-btn">${escapeHtml(t('sr-export-archive'))}</button><button class="btn primary" id="sr-record-btn">${ICON_PEN}${escapeHtml(t('sx-record-sale'))}</button><div class="more-wrap"><button class="btn" aria-label="more">${MORE_SVG}</button><div class="more-menu right" hidden><button class="mi" id="sr-line-btn">${escapeHtml(t('sr-line-entry'))}</button><button class="mi" id="sr-logs-btn">${escapeHtml(t('sr-push-logs'))}</button></div></div></div></div>
         <div class="toolbar"><div class="seg">${segmentHtml()}</div><div class="search">${ICON_SEARCH}<input id="sr-search" value="${escapeHtml(keyword)}" placeholder="${escapeHtml(t('sr-search'))}"></div></div>
         ${filterHtml()}<div id="sr-body"><div class="state">${escapeHtml(t('sx-loading'))}</div></div><div class="listfoot" id="sr-count"></div>
         </div></div></div>`;

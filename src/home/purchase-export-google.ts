@@ -10,6 +10,12 @@ interface GoogleStatus {
     email: string;
 }
 
+function defaultDescription(): string {
+    return sessionStorage.getItem('pearnly_sales_export_ids')
+        ? t('sr-google-desc')
+        : t('int-google-desc');
+}
+
 function render(st: GoogleStatus): void {
     const badge = document.getElementById('pex-gbadge');
     const desc = document.getElementById('pex-gdesc');
@@ -27,7 +33,7 @@ function render(st: GoogleStatus): void {
         badge.textContent = t('int-google-st-on');
         desc.textContent = st.email
             ? t('int-google-connected-as', { email: st.email })
-            : t('int-google-desc');
+            : defaultDescription();
         act.innerHTML = `<button class="ig-btn" id="pex-gdisconnect">${escapeHtml(t('int-google-disconnect'))}</button>`;
         const b = document.getElementById('pex-gdisconnect');
         if (b) b.onclick = gDisconnect;
@@ -35,7 +41,7 @@ function render(st: GoogleStatus): void {
     }
     badge.className = 'int-gst off';
     badge.textContent = t('int-google-st-off');
-    desc.textContent = t('int-google-desc');
+    desc.textContent = defaultDescription();
     act.innerHTML = `<button class="ig-btn pri" id="pex-gconnect">${escapeHtml(t('int-google-connect'))}</button>`;
     const b = document.getElementById('pex-gconnect');
     if (b) b.onclick = gConnect;
@@ -49,9 +55,16 @@ async function gConnect(): Promise<void> {
         return;
     }
     try {
+        const salesMode = sessionStorage.getItem('pearnly_sales_export_ids');
+        const erpShell = window.location.pathname.startsWith('/erp');
+        const returnTo = erpShell
+            ? salesMode
+                ? 'erp-sales-export'
+                : 'erp-purchase-export'
+            : 'purchase-export';
         const res = (await papi(
             'POST',
-            `/api/integrations/google/connect/start?workspace_client_id=${ws}`
+            `/api/integrations/google/connect/start?workspace_client_id=${ws}&return_to=${returnTo}`
         )) as { url?: string };
         if (!res.url) throw new Error('missing_google_connect_url');
         window.location.href = res.url;

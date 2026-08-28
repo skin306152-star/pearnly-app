@@ -8,6 +8,11 @@ import { dateRangeParams } from './purchase-list-filters.js';
 import { loadPexGoogleCard } from './purchase-export-google.js';
 
 type Fmt = 'excel' | 'drive' | 'sheet';
+type ExportSource = 'purchase' | 'sales';
+
+const SALES_MODE_KEY = 'pearnly_sales_export_ids';
+let source: ExportSource = 'purchase';
+let salesHistoryIds: string[] = [];
 
 interface JobProgress {
     status: string;
@@ -92,22 +97,48 @@ function basePayload(): Record<string, unknown> | null {
     return { workspace_client_id: ws, lang: currentLang(), ...dateRangeParams() };
 }
 
+function restoreSource(): void {
+    const stored = sessionStorage.getItem(SALES_MODE_KEY);
+    let restoredIds: string[] = [];
+    if (stored) {
+        try {
+            const ids = JSON.parse(stored);
+            restoredIds = Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+        } catch {
+            sessionStorage.removeItem(SALES_MODE_KEY);
+        }
+    }
+    salesHistoryIds = restoredIds;
+    source = restoredIds.length ? 'sales' : 'purchase';
+}
+
 async function doExcel(): Promise<void> {
     const payload = basePayload();
     if (!payload) return;
     setBusy(true);
     try {
-        const r = await fetch('/api/purchase/export', {
-            method: 'POST',
-            headers: { ...authHeaders(), 'Content-Type': 'application/json' } as HeadersInit,
-            body: JSON.stringify({ ...payload, format: 'excel' }),
-        });
+        const r = await fetch(
+            source === 'sales' ? '/api/ocr/export-by-history-ids' : '/api/purchase/export',
+            {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' } as HeadersInit,
+                body: JSON.stringify(
+                    source === 'sales'
+                        ? {
+                              template: 'sales_detail_th',
+                              lang: currentLang(),
+                              history_ids: salesHistoryIds,
+                          }
+                        : { ...payload, format: 'excel' }
+                ),
+            }
+        );
         if (!r.ok) throw new Error('http');
         const blob = await r.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'purchase_export.xlsx';
+        a.download = source === 'sales' ? 'sales_export.xlsx' : 'purchase_export.xlsx';
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -147,7 +178,8 @@ async function pollJob(jobId: string, fmt: Fmt, tries = 0): Promise<void> {
     }
     let p: JobProgress | null = null;
     try {
-        const r = await fetch(`/api/purchase/export/${encodeURIComponent(jobId)}`, {
+        const prefix = source === 'sales' ? '/api/sales/export' : '/api/purchase/export';
+        const r = await fetch(`${prefix}/${encodeURIComponent(jobId)}`, {
             headers: authHeaders() as HeadersInit,
         });
         const body = await r.json();
@@ -194,10 +226,15 @@ async function doArchive(fmt: Fmt): Promise<void> {
     setBusy(true);
     setRes(escapeHtml(t('pur-export-running', { done: 0, total: '—' })));
     try {
-        const r = await fetch('/api/purchase/export', {
+        const endpoint = source === 'sales' ? '/api/sales/export' : '/api/purchase/export';
+        const r = await fetch(endpoint, {
             method: 'POST',
             headers: { ...authHeaders(), 'Content-Type': 'application/json' } as HeadersInit,
-            body: JSON.stringify({ ...payload, format: fmt }),
+            body: JSON.stringify(
+                source === 'sales'
+                    ? { ...payload, history_ids: salesHistoryIds, format: 'drive' }
+                    : { ...payload, format: fmt }
+            ),
         });
         const body = await r.json().catch(() => null);
         if (
@@ -233,11 +270,16 @@ function colsHtml(): string {
 }
 
 function shell(): string {
+    const salesMode = source === 'sales';
+    const title = salesMode ? t('sr-export-archive-title') : t('pur-export-title');
+    const tree = salesMode ? t('sr-export-tree') : t('pur-export-tree');
+    const googleName = salesMode ? t('sr-google-name') : t('int-google-name');
+    const googleDescription = salesMode ? t('sr-google-desc') : t('int-google-desc');
     return `<div class="pur pex"><div class="wrap">
-        <div class="ph"><span class="back" id="pex-back">‹</span><div class="t">${escapeHtml(t('pur-export-title'))}</div></div>
+        <div class="ph"><span class="back" id="pex-back">‹</span><div class="t">${escapeHtml(title)}</div></div>
         <div class="panel gcard" id="pex-gcard">
-            <div class="gname">${escapeHtml(t('int-google-name'))}<span class="int-gst off" id="pex-gbadge">${escapeHtml(t('int-google-st-off'))}</span></div>
-            <div class="gdesc" id="pex-gdesc">${escapeHtml(t('int-google-desc'))}</div>
+            <div class="gname">${escapeHtml(googleName)}<span class="int-gst off" id="pex-gbadge">${escapeHtml(t('int-google-st-off'))}</span></div>
+            <div class="gdesc" id="pex-gdesc">${escapeHtml(googleDescription)}</div>
             <div class="gact" id="pex-gact"></div>
         </div>
         <div class="panel">
@@ -245,25 +287,30 @@ function shell(): string {
             <div class="acts">
                 <button class="btn primary" data-fmt="excel">${IC_DOWNLOAD}${escapeHtml(t('pur-export-excel'))}</button>
                 <button class="btn" data-fmt="drive">${IC_CLOUD}${escapeHtml(t('pur-export-drive'))}</button>
-                <button class="btn" data-fmt="sheet">${IC_GRID}${escapeHtml(t('pur-export-sheet'))}</button>
+                ${salesMode ? '' : `<button class="btn" data-fmt="sheet">${IC_GRID}${escapeHtml(t('pur-export-sheet'))}</button>`}
             </div>
             <div class="res"></div>
         </div>
         <div class="panel">
             <h4>${escapeHtml(t('pur-export-p2'))}</h4>
-            <div class="tree">${escapeHtml(t('pur-export-tree'))}</div>
+            <div class="tree">${escapeHtml(tree)}</div>
         </div>
-        <div class="panel">
+        ${
+            salesMode
+                ? ''
+                : `<div class="panel">
             <h4>${escapeHtml(t('pur-export-p3'))}</h4>
             <div class="cols">${colsHtml()}</div>
             <div class="infonote">${IC_BOOK}<span>${escapeHtml(t('pur-export-sheet-note'))}</span></div>
-        </div>
+        </div>`
+        }
     </div></div>`;
 }
 
 function bind(): void {
     const back = document.getElementById('pex-back');
-    if (back) back.onclick = () => window.routeTo?.('purchase');
+    if (back)
+        back.onclick = () => window.routeTo?.(source === 'sales' ? 'sales-records' : 'purchase');
     sec()
         ?.querySelectorAll<HTMLElement>('.acts .btn[data-fmt]')
         .forEach((b) => {
@@ -276,10 +323,21 @@ function bind(): void {
 }
 
 window.openPurchaseExport = function () {
+    sessionStorage.removeItem(SALES_MODE_KEY);
+    source = 'purchase';
+    window.routeTo?.('purchase-export');
+};
+
+window.openSalesExport = function (historyIds: string[]) {
+    salesHistoryIds = [...new Set(historyIds.filter(Boolean))];
+    if (!salesHistoryIds.length) return;
+    source = 'sales';
+    sessionStorage.setItem(SALES_MODE_KEY, JSON.stringify(salesHistoryIds));
     window.routeTo?.('purchase-export');
 };
 
 window.loadPurchaseExport = function () {
+    restoreSource();
     injectPurBase();
     injectStyle('pur-export-css', PAGE_CSS);
     const s = sec();

@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 from services.export import archive
+from services.export import sales_archive
 from services.export.archive import flatten_categories
 
 
@@ -58,6 +59,39 @@ class SyncSheetLinkTests(unittest.TestCase):
             },
         )
         self.assertEqual(items[0]["evidence_url"], "https://drive/doc/D1")
+
+
+class SalesArchiveTests(unittest.TestCase):
+    def test_sales_query_requires_tenant_workspace_issued_and_selected_history(self):
+        cur = mock.MagicMock()
+        cur.fetchall.return_value = [{"id": "d1", "ocr_history_id": "h1"}]
+
+        out = sales_archive._sales_docs(
+            cur,
+            tenant_id="t1",
+            workspace_client_id=11,
+            history_ids=["h1"],
+        )
+
+        sql, params = cur.execute.call_args.args
+        self.assertIn("tenant_id = %s", sql)
+        self.assertIn("seller_workspace_client_id = %s", sql)
+        self.assertIn("status = 'issued'", sql)
+        self.assertIn("ocr_history_id = ANY", sql)
+        self.assertEqual(params, ("t1", 11, ["h1"]))
+        self.assertEqual(out[0]["id"], "d1")
+
+    def test_export_dispatches_sales_without_entering_purchase_path(self):
+        with mock.patch.object(
+            sales_archive, "run_sales_export", return_value=("export_archived_docs", 11)
+        ) as run:
+            out = archive.run_export(
+                {"source_type": "sales", "history_ids": ["h1"]},
+                progress_cb=lambda _progress: None,
+            )
+
+        self.assertEqual(out, ("export_archived_docs", 11))
+        run.assert_called_once()
 
 
 if __name__ == "__main__":

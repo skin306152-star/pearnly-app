@@ -162,6 +162,11 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
     凭据按套账取;逐单归档(已成功跳过=幂等);写 Sheet。进度/结果经 recon_jobs store
     回填(drive/sheet 链接进 progress)。无凭据/Google 故障 → 失败可重试,不污染主数据。
     """
+    if params.get("source_type") == "sales":
+        from services.export.sales_archive import run_sales_export
+
+        return run_sales_export(params, progress_cb=progress_cb)
+
     progress_cb = progress_cb or (lambda _p: None)
     tid = params.get("tenant_id")
     ws = params.get("workspace_client_id")

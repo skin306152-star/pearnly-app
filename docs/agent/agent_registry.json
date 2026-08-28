@@ -173,6 +173,7 @@
     "agent": "tool:list_history,history_summary"
   },
   "sales_routes": "B",
+  "sales_export_routes": "B",
   "sales_send_routes": "B",
   "sales_seller_routes": "B",
   "sales_settings_routes": "C",

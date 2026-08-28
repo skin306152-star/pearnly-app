@@ -101,6 +101,7 @@ from routes.recon_jobs_routes import router as recon_jobs_router
 from routes.recon_routes import router as recon_router
 from routes.report_routes import router as reports_router
 from routes.sales_routes import router as sales_router
+from routes.sales_export_routes import router as sales_export_router
 from routes.sales_seller_routes import router as sales_seller_router
 from routes.sales_send_routes import router as sales_send_router
 from routes.sales_settings_routes import router as sales_settings_router
@@ -171,6 +172,7 @@ ROUTERS = (
     stock_card_router,  # 商品收发存报表(Stock Card · 移动加权平均 · accounting 模块闸)
     tax_router,
     sales_router,
+    sales_export_router,
     sales_seller_router,
     sales_settings_router,
     sales_send_router,

@@ -382,6 +382,7 @@ interface Window {
     openPurchaseMatch?: (line: unknown, onDone?: (res: unknown) => void) => void;
     openPurchaseSupplierPicker?: (onPick: (s: unknown) => void) => void;
     openPurchaseExport?: () => void;
+    openSalesExport?: (historyIds: string[]) => void;
     loadPurchaseExport?: () => void;
     loadPurchaseCapture?: () => void;
     __LIFF_BOOTSTRAP__?: number;

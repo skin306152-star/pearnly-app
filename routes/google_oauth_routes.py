@@ -24,6 +24,8 @@ _LAUNCH_PREFIX = "launch:"
 # 回调最终落地页:哪个功能发起连接,授权完就回哪(同一份 OAuth 凭据服务多个集成入口)。
 _RETURN_TARGETS = {
     "purchase-export": "/home#/purchase-export",
+    "erp-purchase-export": "/erp#/purchase-export",
+    "erp-sales-export": "/erp#/purchase-export",
     "pos": "/home#/pos-sheets",
 }
 

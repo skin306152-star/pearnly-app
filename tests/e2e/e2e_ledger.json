@@ -1136,6 +1136,9 @@
         "src/home/dms-intake-review.ts",
         "src/home/dms-intake.ts",
         "src/home/purchase-list.ts",
+        "src/home/sales-common.ts",
+        "src/home/sales-records.ts",
+        "src/home/sales-records-css.ts",
         "src/home/sales-workbench.ts",
         "src/home/erp-intake.ts",
         "src/home/page-integrations.ts",
@@ -1153,6 +1156,7 @@
       "only_e2e": [
         "ERP 采购/销售记录按钮在真实主壳中进入共享 OCR 工作台并锁定方向；销售发票页不再出现上传入口；确认前保存失败时不创建正式单据且复核卡仍可见。",
         "ERP 销售系统显示销售发票、销售记录、开票资料，POS 继续显示原发票系统且不出现销售记录。",
+        "ERP 销售记录在桌面和手机真实视口呈现采购式汇总、来源/商品服务/收款/推送状态，并从单据行调用既有 ERP 推送通道。",
         "ERP 集成页只保留成熟 LINE 绑定卡，显示 ERP 专用 QR、Basic ID、6 位码、自动轮询、已绑定和移动端触控状态。"
       ]
     },

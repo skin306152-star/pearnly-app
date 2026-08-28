@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from routes import line_erp_routes as routes
 from services.line_binding import line_client
-from services.line_erp import cards, flow, store, webhook
+from services.line_erp import cards, flow, preview, store, webhook
 
 
 def _sig(body: bytes, secret: str) -> str:
@@ -82,6 +82,75 @@ class ErpFlowTests(unittest.TestCase):
         self.assertIn("mode%3Apurchase", rendered)
         self.assertIn("mode%3Asales", rendered)
         self.assertNotIn("mode%3Adms", rendered)
+
+    def test_sales_preview_uses_buyer_totals_line_items_and_compact_footer(self):
+        shaped = preview.from_result(
+            {
+                "raw_pages": [
+                    {
+                        "fields": {
+                            "invoice_number": "S-2026-18",
+                            "date": "2026-08-28",
+                            "seller_name": "Own Shop",
+                            "buyer_name": "Customer A",
+                            "buyer_tax": "0105555000111",
+                            "subtotal": "1000",
+                            "vat": "70",
+                            "total_amount": "1070",
+                            "items": [
+                                {
+                                    "name": "Coffee beans",
+                                    "qty": "2",
+                                    "price": "400",
+                                    "subtotal": "800",
+                                    "posting_kind": "stock",
+                                },
+                                {
+                                    "name": "Delivery",
+                                    "qty": "1",
+                                    "price": "200",
+                                    "subtotal": "200",
+                                    "posting_kind": "service",
+                                },
+                            ],
+                        }
+                    }
+                ]
+            },
+            "sales",
+        )
+        self.assertEqual(shaped["party_name"], "Customer A")
+        self.assertEqual(shaped["party_label"], "ผู้ซื้อ")
+        self.assertEqual(shaped["total"], "1,070.00")
+        card = cards.preview_card("h1", "sales", shaped)
+        rendered = json.dumps(card, ensure_ascii=False)
+        self.assertIn("ตรวจสอบเอกสารขาย", rendered)
+        self.assertIn("Customer A", rendered)
+        self.assertIn("Coffee beans", rendered)
+        self.assertIn("2 × ฿400.00 · สินค้า", rendered)
+        self.assertIn("Delivery", rendered)
+        self.assertIn("1 × ฿200.00 · บริการ", rendered)
+        footer = card["contents"]["footer"]["contents"]
+        self.assertEqual(footer[0]["action"]["label"], "ยืนยันบันทึก")
+        self.assertEqual(footer[1]["layout"], "horizontal")
+
+    def test_purchase_preview_uses_seller_not_buyer(self):
+        shaped = preview.from_result(
+            {
+                "raw_pages": [
+                    {
+                        "fields": {
+                            "seller_name": "Supplier A",
+                            "buyer_name": "Own Shop",
+                            "items": [],
+                        }
+                    }
+                ]
+            },
+            "purchase",
+        )
+        self.assertEqual(shaped["party_name"], "Supplier A")
+        self.assertEqual(shaped["party_label"], "ผู้ขาย")
 
     @mock.patch("services.ocr_history.queries.get_ocr_history_detail")
     def test_preview_urls_follow_original_page_numbers(self, detail):

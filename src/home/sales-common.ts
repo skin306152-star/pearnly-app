@@ -4,9 +4,11 @@
 
 export interface SalesLine {
     description?: string;
+    item_type?: 'goods' | 'service';
     qty?: number | string;
     unit_price?: number | string;
     amount?: number | string;
+    line_total?: number | string;
 }
 export interface SalesDoc {
     id: string;
@@ -28,6 +30,11 @@ export interface SalesDoc {
     payment: { status?: string; paid_amount?: number | string; method?: string; date?: string };
     references_document_id: string | null;
     created_at: string | null;
+    ocr_history_id?: string | null;
+    source?: string;
+    posting_kind?: 'stock' | 'service' | null;
+    push_status?: 'not_pushed' | 'pending' | 'success' | 'failed';
+    push_endpoints?: { name?: string; status?: string }[];
     lines: SalesLine[];
 }
 

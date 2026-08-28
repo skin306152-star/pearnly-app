@@ -19,6 +19,7 @@ from services.sales import buyer as buyer_mod
 from services.sales import issue_gates
 from services.sales import numbering
 from services.sales import seller_profile
+from services.sales.document_list_lines import attach as _attach_list_lines
 from services.sales.document_cols import _DOC_COLS, _LINE_COLS
 from services.sales.document_writes import replace_lines as _replace_lines
 from services.sales.document_writes import write_header_totals as _write_header_totals
@@ -253,7 +254,11 @@ def list_documents(
     sql += " ORDER BY created_at DESC LIMIT %s"
     params.append(limit)
     cur.execute(sql, params)
-    return cur.fetchall()
+    rows = [dict(row) for row in cur.fetchall()]
+    if not rows:
+        return rows
+    _attach_list_lines(cur, rows, tenant_id=tenant_id)
+    return rows
 
 
 def _status_of(

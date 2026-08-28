@@ -45,6 +45,42 @@ const RECOGNIZED = {
     ],
 };
 
+const SALES_RECORDS = [
+    {
+        id: 'sale-line-1',
+        doc_type: 'tax_invoice',
+        doc_number: 'S-2026-018',
+        issue_date: '2026-08-18',
+        status: 'issued',
+        grand_total: '1070.00',
+        vat_amount: '70.00',
+        buyer: { name: 'Customer A' },
+        payment: { status: 'unpaid', paid_amount: '0' },
+        ocr_history_id: 'history-sales-1',
+        source: 'line_erp',
+        push_status: 'not_pushed',
+        lines: [
+            { description: 'Coffee beans', item_type: 'goods', qty: '2', unit_price: '400' },
+            { description: 'Delivery', item_type: 'service', qty: '1', unit_price: '200' },
+        ],
+    },
+    {
+        id: 'sale-web-2',
+        doc_type: 'receipt',
+        doc_number: 'R-2026-044',
+        issue_date: '2026-08-12',
+        status: 'issued',
+        grand_total: '535.00',
+        vat_amount: '35.00',
+        buyer: { name: 'Walk-in Customer' },
+        payment: { status: 'paid', paid_amount: '535' },
+        ocr_history_id: 'history-sales-2',
+        source: 'erp_web',
+        push_status: 'success',
+        lines: [{ description: 'Consulting', item_type: 'service', qty: '1', unit_price: '500' }],
+    },
+];
+
 test.beforeAll(async () => {
     server = await localServer.start(PORT, '/home.html');
 });
@@ -57,6 +93,7 @@ async function boot(page, entry, state = {}) {
         commits: 0,
         converts: 0,
         lineCodeCalls: 0,
+        erpPushes: 0,
     });
     await page.addInitScript((portal) => {
         localStorage.clear();
@@ -105,7 +142,7 @@ async function boot(page, entry, state = {}) {
         } else if (pathname === '/api/purchase/categories') {
             body = { categories: [] };
         } else if (pathname === '/api/sales/documents') {
-            body = { documents: [] };
+            body = { documents: state.salesDocuments || SALES_RECORDS };
         } else if (pathname === '/api/workspace/clients') {
             body = { clients: [{ id: 1, name: 'ERP Branch' }] };
         } else if (pathname === '/api/me') {
@@ -125,7 +162,10 @@ async function boot(page, entry, state = {}) {
                 },
             };
         } else if (pathname === '/api/erp/endpoints') {
-            body = { items: [] };
+            body = { items: state.erpEndpoints || [] };
+        } else if (pathname === '/api/erp/push') {
+            state.erpPushes += 1;
+            body = { ok: true };
         } else if (pathname === '/api/line/erp/binding') {
             body = {
                 ok: true,
@@ -213,9 +253,9 @@ test('ERP purchase and sales record buttons open the shared intake with an expli
     await expect(page.locator('#sx-record-btn')).toHaveCount(0);
 
     await page.evaluate(() => window.routeTo('sales-records'));
-    await page.waitForSelector('#sx-record-btn');
+    await page.waitForSelector('#sr-record-btn');
     await expect(page.locator('#sx-new-btn')).toHaveCount(0);
-    await page.click('#sx-record-btn');
+    await page.click('#sr-record-btn');
     await page.waitForSelector('#dx-inv-drop');
     await revealShell(page);
     await page.screenshot({
@@ -232,7 +272,13 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     browser,
 }) => {
     const erpPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-    await boot(erpPage, 'erp', { businessType: 'pos_only' });
+    const erpState = {
+        businessType: 'pos_only',
+        erpEndpoints: [
+            { id: 'express-1', name: 'Express ERP', adapter: 'express', is_default: true },
+        ],
+    };
+    await boot(erpPage, 'erp', erpState);
     await erpPage.waitForFunction(
         () => document.querySelector('#nav-sales-records')?.getBoundingClientRect().height > 0
     );
@@ -275,7 +321,14 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
         }
     }
     await erpPage.evaluate(() => window.routeTo('sales-records'));
-    await expect(erpPage.locator('#sx-record-btn')).toBeVisible();
+    await expect(erpPage.locator('#sr-record-btn')).toBeVisible();
+    await expect(erpPage.locator('.pur.pl.sr')).toBeVisible();
+    await expect(erpPage.locator('[data-sr-doc]')).toHaveCount(2);
+    await expect(erpPage.locator('#sr-body .src.line')).toHaveText('LINE 上传');
+    await expect(erpPage.locator('#sr-body .src.web')).toHaveText('网页上传');
+    await expect(erpPage.locator('[data-sr-push="sale-line-1"]')).toHaveText('推送 ERP');
+    await erpPage.locator('[data-sr-push="sale-line-1"]').click();
+    await expect.poll(() => erpState.erpPushes).toBe(1);
     await revealShell(erpPage);
     await erpPage.screenshot({
         path: path.join(OUT, 'sales-records-desktop.png'),
@@ -428,9 +481,9 @@ test('ERP sales records remains touch-sized on mobile', async ({ browser }) => {
     const page = await browser.newPage({ ...devices['iPhone 13'] });
     await boot(page, 'erp', { businessType: 'pos_only' });
     await page.evaluate(() => window.routeTo('sales-records'));
-    await expect(page.locator('#sx-record-btn')).toBeVisible();
+    await expect(page.locator('#sr-record-btn')).toBeVisible();
     const tapHeight = await page
-        .locator('#sx-record-btn')
+        .locator('#sr-record-btn')
         .evaluate((node) => node.getBoundingClientRect().height);
     expect(tapHeight).toBeGreaterThanOrEqual(44);
     const overflow = await page.evaluate(
@@ -455,6 +508,10 @@ test('ERP integration reuses the established LINE binding card with its own bot'
     await expect(page.locator('#erp-express-connect')).toHaveCount(0);
     await expect(page.getByText('第三方 ERP')).toHaveCount(0);
     await expect(page.locator('#erp-linebot-unbound')).toBeVisible();
+    await expect(page.locator('#page-integrations .page-head-title')).toHaveText('LINE 集成');
+    await expect(page.locator('#page-integrations .page-head-sub')).toHaveText(
+        '采购与销售单据的专用上传入口'
+    );
     await expect(page.locator('#erp-linebot-code')).toHaveText('482913');
     await expect(page.locator('#erp-linebot-bot-id')).toHaveText('@063eadty');
     await expect(page.locator('#erp-linebot-open-line')).toHaveAttribute(

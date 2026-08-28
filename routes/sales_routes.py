@@ -23,9 +23,11 @@ from services.sales import approval as approval_svc
 from services.sales import credit_note
 from services.sales import dates as sales_dates
 from services.sales import document as doc_svc
+from services.sales.document_output import serialize as _doc_out
 from services.sales import numbering
 from services.sales import promptpay as promptpay_svc
 from services.sales import quotation as quotation_svc
+from services.sales import record_enrichment
 from services.sales import render as sales_render
 from services.sales import seller_profile
 from services.sales import settings as settings_svc
@@ -71,10 +73,6 @@ def _dump(req) -> dict:
     return d
 
 
-def _m(v) -> Optional[str]:
-    return str(v) if v is not None else None
-
-
 def _payment_payload(pay: Optional[dict]) -> Optional[dict]:
     """收款块:把 date 字符串解析成 date(无效 422),其余透传给业务层归一化。"""
     if not pay:
@@ -117,79 +115,6 @@ def _resolve_issue_date(raw: Optional[str]) -> date:
     return on
 
 
-def _line_out(ln: dict) -> dict:
-    return {
-        "line_no": ln.get("line_no"),
-        "product_id": str(ln["product_id"]) if ln.get("product_id") else None,
-        "description": ln.get("description"),
-        "qty": _m(ln.get("qty")),
-        "unit_price": _m(ln.get("unit_price")),
-        "discount": _m(ln.get("discount")),
-        "discount_pct": _m(ln.get("discount_pct")),
-        "vat_applicable": bool(ln.get("vat_applicable")),
-        "line_total": _m(ln.get("line_total")),
-    }
-
-
-def _doc_out(d: dict) -> dict:
-    return {
-        "id": str(d["id"]),
-        "doc_type": d.get("doc_type"),
-        "doc_number": d.get("doc_number"),
-        "client_id": int(d["client_id"]) if d.get("client_id") is not None else None,
-        "seller_workspace_client_id": (
-            int(d["seller_workspace_client_id"])
-            if d.get("seller_workspace_client_id") is not None
-            else None
-        ),
-        "issue_date": d["issue_date"].isoformat() if d.get("issue_date") else None,
-        "status": d.get("status"),
-        "currency": d.get("currency"),
-        "subtotal": _m(d.get("subtotal")),
-        "discount_total": _m(d.get("discount_total")),
-        "header_discount_amount": _m(d.get("header_discount_amount")),
-        "header_discount_pct": _m(d.get("header_discount_pct")),
-        "vat_rate": _m(d.get("vat_rate")),
-        "vat_amount": _m(d.get("vat_amount")),
-        "price_includes_vat": bool(d.get("price_includes_vat")),
-        "copies_layout": d.get("copies_layout") or "separate",
-        "paper_size": d.get("paper_size") or "A4",
-        "doc_language": d.get("doc_language") or "th_en",
-        "wht_rate": _m(d.get("wht_rate")),
-        "wht_amount": _m(d.get("wht_amount")),
-        "grand_total": _m(d.get("grand_total")),
-        "issued_at": d["issued_at"].isoformat() if d.get("issued_at") else None,
-        "pdf_sha256": d.get("pdf_sha256"),
-        "references_document_id": (
-            str(d["references_document_id"]) if d.get("references_document_id") else None
-        ),
-        "reference_reason": d.get("reference_reason"),
-        "due_date": d["due_date"].isoformat() if d.get("due_date") else None,
-        "payment_terms": d.get("payment_terms"),
-        "buyer": {
-            "type": d.get("buyer_type"),
-            "name": d.get("buyer_name"),
-            "address": d.get("buyer_address"),
-            "tax_id": d.get("buyer_tax_id"),
-            "branch_type": d.get("buyer_branch_type"),
-            "branch_no": d.get("buyer_branch_no"),
-        },
-        "payment": {
-            "status": d.get("payment_status"),
-            "paid_amount": _m(d.get("paid_amount")),
-            "method": d.get("payment_method"),
-            "date": d["payment_date"].isoformat() if d.get("payment_date") else None,
-        },
-        "approval": {
-            "approved_by": d.get("approved_by"),
-            "approved_at": d["approved_at"].isoformat() if d.get("approved_at") else None,
-            "rejected_reason": d.get("rejected_reason"),
-        },
-        "created_at": d["created_at"].isoformat() if d.get("created_at") else None,
-        "lines": [_line_out(ln) for ln in d.get("lines", [])],
-    }
-
-
 def _fail(code: str):
     raise HTTPException(_ERR_HTTP.get(code, 400), detail=f"sales.{code}")
 
@@ -201,12 +126,13 @@ async def api_list_documents(
     client_id: Optional[int] = None,
     q: Optional[str] = None,
 ):
-    tid, _ = require_perm_tid(request, "sales.doc.view")
+    tid, uid = require_perm_tid(request, "sales.doc.view")
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
         rows = doc_svc.list_documents(
             cur, tenant_id=tid, status=status, client_id=client_id, q=q, workspace_client_id=ws
         )
+        record_enrichment.enrich(cur, rows, tenant_id=str(tid), user_id=str(uid))
     return {"documents": [_doc_out(r) for r in rows]}
 
 

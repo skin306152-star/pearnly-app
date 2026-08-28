@@ -17,6 +17,7 @@ _DOC_COLS = (
     "due_date, payment_terms, approved_by, approved_at, rejected_reason, "
     "pdf_sha256, pdf_url, "
     "issued_at, created_by, references_document_id, reference_reason, source_receipt_no, "
+    "ocr_history_id, "
     "created_at, updated_at"
 )
 _LINE_COLS = (

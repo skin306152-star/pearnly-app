@@ -29,6 +29,7 @@ from services.ocr.entrypoints import (
     get_cached_history as _ocr_get_cached,
 )
 from services.ocr.recognize.cache import serve_cache_hit
+from services.ocr.recognize.errors import classify_pipeline_error
 from services.ocr.recognize.persist import persist_invoices
 from services.ocr.recognize.autopush import dispatch_auto_push
 from services.ocr.recognize.sanitize import strip_internal_fields
@@ -37,25 +38,6 @@ from services.erp.express_push.direction import normalize as _normalize_directio
 from services.ocr.invoice_no import format_warnings_for_groups
 
 logger = logging.getLogger("mr-pilot")
-
-
-_USER_FAULT_EXC_NAMES = {
-    "Layer1PDFError": "ocr.invalid_file",
-    # 坏字节配图片扩展名(伪装扩展名/截断/非图内容)· Vision 报 code 3,此前直通
-    # 500 吓用户(入口怪文件实弹 2026-07-06)。按异常类型判,不靠 Vision 报文
-    # 措辞字符串匹配(措辞是 Google 侧文本,可能变;类型是我们自己声明的契约)。
-    "Layer1InvalidImageError": "ocr.unreadable_file",
-}
-
-
-def classify_pipeline_error(exc: Exception) -> Optional[str]:
-    """管线异常分诊:用户文件问题 → 400 detail 码;引擎故障 → None(调用方 500)。"""
-    if isinstance(exc, ValueError):
-        return f"ocr.invalid_file: {exc}"
-    detail = _USER_FAULT_EXC_NAMES.get(type(exc).__name__)
-    if detail == "ocr.invalid_file":
-        return f"{detail}: {exc}"
-    return detail
 
 
 def _page_confidence(p: dict) -> int:
@@ -90,6 +72,7 @@ def run_recognition_core(
     staged: bool = False,
     posting_kind: Optional[str] = None,
     direction: Optional[str] = None,
+    source: str = "manual",
 ) -> Dict[str, Any]:
     """识别核心 · 同步(pipeline/persist/push 全同步)· 调用方负责读 content + 留底调度。
 
@@ -381,6 +364,7 @@ def run_recognition_core(
         staged=staged,
         posting_kind=posting_kind,
         direction=direction,
+        source=source,
     )
     invoice_groups = _persist["invoice_groups"]
     invoice_count = _persist["invoice_count"]

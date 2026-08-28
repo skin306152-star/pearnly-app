@@ -5,8 +5,8 @@ type ErpTranslator = (th: string, en: string, zh: string, ja: string) => string;
 function erpLineBindingMarkup(tr: ErpTranslator): string {
     return `
         <div class="page-head-clean"><div class="page-head-text">
-            <div class="page-head-title">ERP</div>
-            <div class="page-head-sub">LINE ERP · ${window.t?.('nav-push-logs') || 'Push logs'}</div>
+            <div class="page-head-title">${tr('การเชื่อมต่อ LINE', 'LINE Integration', 'LINE 集成', 'LINE 連携')}</div>
+            <div class="page-head-sub">${tr('ช่องทางเฉพาะสำหรับอัปโหลดเอกสารซื้อและขาย', 'Dedicated intake for purchase and sales documents', '采购与销售单据的专用上传入口', '仕入・売上書類専用のアップロード入口')}</div>
         </div></div>
         <div class="auto-panel-head">
             <div>

@@ -120,49 +120,204 @@ def menu_card() -> dict:
     }
 
 
-def preview_card(
-    draft_id: str,
-    mode: str,
-    amount: str = "",
-    vendor: str = "",
-    detail: str = "",
-    document_no: str = "",
-    document_date: str = "",
-) -> dict:
-    title = "ตัวอย่างเอกสารซื้อ" if mode == "purchase" else "ตัวอย่างเอกสารขาย"
-    liff_id = os.getenv("LINE_ERP_LIFF_ID", "").strip()
-    edit_uri = (
-        f"https://liff.line.me/{liff_id}?draft={draft_id}"
-        if liff_id
-        else f"https://pearnly.com/liff/erp/{draft_id}"
-    )
-    body = [
-        {"type": "text", "text": title, "weight": "bold", "size": "lg"},
-        {"type": "text", "text": f"เลขที่: {document_no or '-'}", "wrap": True},
-        {"type": "text", "text": f"วันที่: {document_date or '-'}", "wrap": True},
-        {"type": "text", "text": f"ยอดรวม ฿{amount or '-'}", "wrap": True},
-        {"type": "text", "text": f"ผู้ขาย/ลูกค้า: {vendor or '-'}", "wrap": True},
-        {"type": "text", "text": f"รายการ: {detail or '-'}", "wrap": True},
-        {
-            "type": "text",
-            "text": "กรุณาตรวจสอบข้อมูลทั้งหมดก่อนยืนยันหรือทิ้ง",
-            "wrap": True,
-            "size": "sm",
-        },
-        _button("ยืนยัน", "confirm", draft_id),
-        {
-            "type": "button",
-            "style": "secondary",
-            "action": {"type": "uri", "label": "แก้ไข", "uri": edit_uri},
-        },
-        _button("ทิ้ง", "discard", draft_id, "secondary"),
-    ]
+def _kv(label: str, value: str) -> dict:
+    return {
+        "type": "box",
+        "layout": "horizontal",
+        "margin": "sm",
+        "contents": [
+            {"type": "text", "text": label, "size": "xs", "color": "#777777", "flex": 2},
+            {
+                "type": "text",
+                "text": value or "-",
+                "size": "xs",
+                "weight": "bold",
+                "align": "end",
+                "wrap": True,
+                "flex": 4,
+            },
+        ],
+    }
+
+
+def _item_row(item: dict) -> dict:
+    kind = {
+        "stock": "สินค้า",
+        "service": "บริการ",
+    }.get(item.get("kind"), "ยังไม่เลือกประเภท")
+    meta = f"{item.get('qty') or '-'} × ฿{item.get('price') or '-'} · {kind}"
+    return {
+        "type": "box",
+        "layout": "horizontal",
+        "margin": "md",
+        "contents": [
+            {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 4,
+                "contents": [
+                    {"type": "text", "text": item.get("name") or "-", "size": "sm", "wrap": True},
+                    {"type": "text", "text": meta, "size": "xxs", "color": "#888888", "wrap": True},
+                ],
+            },
+            {
+                "type": "text",
+                "text": f"฿{item.get('total') or '-'}",
+                "size": "sm",
+                "weight": "bold",
+                "align": "end",
+                "flex": 2,
+            },
+        ],
+    }
+
+
+def preview_card(draft_id: str, mode: str, data: dict) -> dict:
+    is_purchase = mode == "purchase"
+    title = "ตรวจสอบเอกสารซื้อ" if is_purchase else "ตรวจสอบเอกสารขาย"
+    accent = "#16873E" if is_purchase else "#B11B50"
+    shown_items = (data.get("items") or [])[:4]
+    more = max(0, int(data.get("item_count") or 0) - len(shown_items))
+    party = data.get("party_name") or "-"
+    if data.get("party_tax"):
+        party += f"\nเลขผู้เสียภาษี {data['party_tax']}"
+    if data.get("party_branch"):
+        party += f" · สาขา {data['party_branch']}"
+    if data.get("party_address"):
+        party += f"\n{str(data['party_address'])[:120]}"
+    item_contents = [_item_row(item) for item in shown_items]
+    if not item_contents:
+        item_contents.append(
+            {"type": "text", "text": "ไม่พบรายการสินค้า", "size": "xs", "color": "#999999"}
+        )
+    if more:
+        item_contents.append(
+            {
+                "type": "text",
+                "text": f"และอีก {more} รายการ · เปิดแก้ไขเพื่อดูทั้งหมด",
+                "size": "xxs",
+                "color": accent,
+                "margin": "md",
+                "wrap": True,
+            }
+        )
     return {
         "type": "flex",
         "altText": title,
         "contents": {
             "type": "bubble",
-            "body": {"type": "box", "layout": "vertical", "contents": body},
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "backgroundColor": accent,
+                "paddingAll": "16px",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": title,
+                        "weight": "bold",
+                        "size": "lg",
+                        "color": "#FFFFFF",
+                    },
+                    {
+                        "type": "text",
+                        "text": "ตรวจสอบข้อมูลก่อนบันทึกเข้าระบบ",
+                        "size": "xxs",
+                        "color": "#EAF7EE",
+                        "margin": "xs",
+                    },
+                ],
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "paddingAll": "16px",
+                "contents": [
+                    _kv("เลขที่เอกสาร", data.get("document_no") or "-"),
+                    _kv("วันที่", data.get("document_date") or "-"),
+                    {"type": "separator", "margin": "lg", "color": "#EEEEEE"},
+                    {
+                        "type": "text",
+                        "text": data.get("party_label") or "คู่ค้า",
+                        "size": "xxs",
+                        "color": "#777777",
+                        "margin": "lg",
+                    },
+                    {
+                        "type": "text",
+                        "text": party,
+                        "size": "sm",
+                        "weight": "bold",
+                        "wrap": True,
+                        "margin": "xs",
+                    },
+                    {"type": "separator", "margin": "lg", "color": "#EEEEEE"},
+                    {
+                        "type": "text",
+                        "text": f"รายการ ({data.get('item_count') or 0})",
+                        "size": "xs",
+                        "weight": "bold",
+                        "margin": "lg",
+                    },
+                    *item_contents,
+                    {"type": "separator", "margin": "lg", "color": "#EEEEEE"},
+                    _kv("ก่อนภาษี", f"฿{data.get('subtotal') or '-'}"),
+                    _kv("VAT", f"฿{data.get('vat') or '-'}"),
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "md",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "ยอดรวม",
+                                "weight": "bold",
+                                "size": "sm",
+                                "flex": 2,
+                            },
+                            {
+                                "type": "text",
+                                "text": f"฿{data.get('total') or '-'}",
+                                "weight": "bold",
+                                "size": "lg",
+                                "color": accent,
+                                "align": "end",
+                                "flex": 4,
+                            },
+                        ],
+                    },
+                ],
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "paddingAll": "14px",
+                "contents": [
+                    _button("ยืนยันบันทึก", "confirm", draft_id),
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "style": "secondary",
+                                "height": "sm",
+                                "action": {
+                                    "type": "uri",
+                                    "label": "แก้ไข",
+                                    "uri": edit_uri(draft_id),
+                                },
+                            },
+                            {
+                                **_button("ทิ้งเอกสาร", "discard", draft_id, "link"),
+                                "color": "#C53A3A",
+                            },
+                        ],
+                    },
+                ],
+            },
         },
     }
 

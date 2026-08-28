@@ -4,6 +4,7 @@
 import unittest
 
 from routes.sales_routes import router
+from services.sales.record_enrichment import enrich, push_summary
 
 EXPECTED = {
     ("GET", "/api/sales/documents"),
@@ -25,6 +26,39 @@ EXPECTED = {
 
 
 class SalesRoutesContractTests(unittest.TestCase):
+    def test_sales_record_push_state_is_derived_from_existing_log_states(self):
+        self.assertEqual(push_summary([]), "not_pushed")
+        self.assertEqual(push_summary(["success", "skipped_dup"]), "success")
+        self.assertEqual(push_summary(["pending"]), "pending")
+        self.assertEqual(push_summary(["success", "failed"]), "failed")
+
+    def test_sales_record_lineage_and_push_state_use_existing_sources(self):
+        class Cursor:
+            def __init__(self):
+                self.results = [
+                    [{"id": "h1", "source": "line_erp", "posting_kind": "mixed"}],
+                    [
+                        {
+                            "history_id": "h1",
+                            "status": "success",
+                            "endpoint_name": "Express ERP",
+                        }
+                    ],
+                ]
+
+            def execute(self, _sql, _params=None):
+                pass
+
+            def fetchall(self):
+                return self.results.pop(0)
+
+        rows = [{"ocr_history_id": "h1"}]
+        enrich(Cursor(), rows, tenant_id="t1", user_id="u1")
+        self.assertEqual(rows[0]["source"], "line_erp")
+        self.assertEqual(rows[0]["posting_kind"], "mixed")
+        self.assertEqual(rows[0]["push_status"], "success")
+        self.assertEqual(rows[0]["push_endpoints"], [{"name": "Express ERP", "status": "success"}])
+
     def test_router_registers_expected_routes(self):
         got = set()
         for r in router.routes:

@@ -53,6 +53,7 @@ async def ocr_recognize(
         staged=True,
         posting_kind=posting_kind,
         direction=direction,
+        source="erp_web" if user.get("entry") == "erp" else "manual",
     )
 
     # PDF 留底后台化:响应返回后才生成 searchable PDF + 回填 pdf_storage_path(前端 has_pdf 届时显示)。

@@ -1,4 +1,4 @@
-/* global window */
+/* global window, document, Node */
 
 const path = require('path');
 const fs = require('fs');
@@ -69,7 +69,12 @@ function records() {
 
 async function open(
     page,
-    { putStatus = 200, draftRecords = records(), draftQuery = '?draft=d1' } = {}
+    {
+        putStatus = 200,
+        draftRecords = records(),
+        draftQuery = '?draft=d1',
+        direction = 'purchase',
+    } = {}
 ) {
     authBodies.length = 0;
     previewHeaders.length = 0;
@@ -134,7 +139,7 @@ async function open(
             contentType: 'application/json',
             body: JSON.stringify({
                 ok: true,
-                data: { direction: 'purchase', records: draftRecords },
+                data: { direction, records: draftRecords },
             }),
         });
     });
@@ -185,7 +190,7 @@ test('desktop supports language switching and discard action', async ({ browser 
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     await open(page);
     await page.locator('#lang').selectOption('en');
-    await expect(page.locator('h1')).toContainText('Review ERP document');
+    await expect(page.locator('h1')).toContainText('Review purchase document');
     await page.locator('[data-action="discard"]').click();
     await expect(page.locator('#discard-dialog')).toBeVisible();
     await page.locator('[data-dialog-cancel]').last().click();
@@ -200,6 +205,34 @@ test('desktop supports language switching and discard action', async ({ browser 
             .map((entry) => `${entry.method} ${entry.path}`)
     ).toEqual(['POST /api/line/erp/draft/d1/discard']);
     await page.screenshot({ path: path.join(OUT, 'desktop-discarded.png'), fullPage: true });
+});
+
+test('sales review identifies the buyer first and keeps seller fields editable', async ({
+    browser,
+}) => {
+    const draftRecords = records().slice(0, 1);
+    Object.assign(draftRecords[0].pages[0].fields, {
+        buyer_name: 'Customer A',
+        buyer_tax: '0105559000012',
+        buyer_branch: '00000',
+        buyer_address: 'Bangkok',
+        seller_address: 'Chiang Mai',
+        document_type: 'tax_invoice',
+    });
+    const page = await browser.newPage({ ...devices['iPhone 13'] });
+    await open(page, { direction: 'sales', draftRecords });
+    await page.locator('#lang').selectOption('zh');
+    await expect(page.locator('h1')).toHaveText('复核销售单据');
+    await expect(page.locator('[data-field="0:buyer_name"]')).toHaveValue('Customer A');
+    await expect(page.locator('[data-field="0:seller_name"]')).toHaveValue('Supplier');
+    const buyerComesFirst = await page.evaluate(() => {
+        const buyer = document.querySelector('[data-field="0:buyer_name"]');
+        const seller = document.querySelector('[data-field="0:seller_name"]');
+        return Boolean(buyer.compareDocumentPosition(seller) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(buyerComesFirst).toBe(true);
+    await page.screenshot({ path: path.join(OUT, 'sales-mobile-review.png'), fullPage: true });
+    await page.close();
 });
 
 test('LIFF callback state keeps the ERP draft id', async ({ page }) => {

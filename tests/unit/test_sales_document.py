@@ -398,6 +398,34 @@ class ListDocumentsQueryTests(unittest.TestCase):
         self.assertIn("issued", cur.params)
         self.assertIn("%abc%", cur.params)
 
+    def test_list_attaches_lines_in_one_bulk_query(self):
+        class Cursor:
+            def __init__(self):
+                self.results = [
+                    [{"id": "d1", "doc_number": "S-001"}],
+                    [
+                        {
+                            "document_id": "d1",
+                            "line_no": 1,
+                            "description": "Widget",
+                            "item_type": "goods",
+                        }
+                    ],
+                ]
+                self.sql = []
+
+            def execute(self, sql, params=None):
+                self.sql.append(sql)
+
+            def fetchall(self):
+                return self.results.pop(0)
+
+        cur = Cursor()
+        rows = doc.list_documents(cur, tenant_id="t")
+        self.assertEqual(rows[0]["lines"][0]["description"], "Widget")
+        self.assertEqual(rows[0]["lines"][0]["item_type"], "goods")
+        self.assertIn("document_id = ANY", cur.sql[1])
+
 
 if __name__ == "__main__":
     unittest.main()

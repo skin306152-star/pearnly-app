@@ -3,6 +3,8 @@
     var L = {
         th: {
             title: 'ตรวจสอบเอกสาร ERP',
+            purchaseTitle: 'ตรวจสอบเอกสารซื้อ',
+            salesTitle: 'ตรวจสอบเอกสารขาย',
             loading: 'กำลังโหลดร่างเอกสาร…',
             failed: 'โหลดเอกสารไม่สำเร็จ',
             expired: 'รายการหมดอายุ',
@@ -26,6 +28,8 @@
         },
         en: {
             title: 'Review ERP document',
+            purchaseTitle: 'Review purchase document',
+            salesTitle: 'Review sales document',
             loading: 'Loading draft…',
             failed: 'Could not load document',
             expired: 'Draft expired',
@@ -49,6 +53,8 @@
         },
         zh: {
             title: '复核 ERP 单据',
+            purchaseTitle: '复核采购单据',
+            salesTitle: '复核销售单据',
             loading: '正在加载草稿…',
             failed: '无法加载单据',
             expired: '草稿已过期',
@@ -72,6 +78,8 @@
         },
         ja: {
             title: 'ERP 書類を確認',
+            purchaseTitle: '仕入書類を確認',
+            salesTitle: '売上書類を確認',
             loading: '下書きを読み込み中…',
             failed: '書類を読み込めません',
             expired: '下書きの期限切れ',
@@ -128,6 +136,37 @@
             zh: '买方地址',
             ja: '買い手住所',
         },
+        seller_addr: {
+            th: 'ที่อยู่ผู้ขาย',
+            en: 'Seller address',
+            zh: '卖方地址',
+            ja: '売り手住所',
+        },
+        buyer_addr: {
+            th: 'ที่อยู่ผู้ซื้อ',
+            en: 'Buyer address',
+            zh: '买方地址',
+            ja: '買い手住所',
+        },
+        seller_branch: {
+            th: 'สาขาผู้ขาย',
+            en: 'Seller branch',
+            zh: '卖方分店',
+            ja: '売り手支店',
+        },
+        buyer_branch: {
+            th: 'สาขาผู้ซื้อ',
+            en: 'Buyer branch',
+            zh: '买方分店',
+            ja: '買い手支店',
+        },
+        document_type: {
+            th: 'ประเภทเอกสาร',
+            en: 'Document type',
+            zh: '单据类型',
+            ja: '書類種類',
+        },
+        notes: { th: 'หมายเหตุ', en: 'Notes', zh: '备注', ja: '備考' },
         subtotal: { th: 'ยอดก่อนภาษี', en: 'Subtotal', zh: '小计', ja: '小計' },
         vat: { th: 'ภาษีมูลค่าเพิ่ม', en: 'VAT', zh: 'VAT', ja: 'VAT' },
         total_amount: { th: 'ยอดรวม', en: 'Total', zh: '总额', ja: '合計' },
@@ -268,9 +307,39 @@
     function render() {
         var all = rows(),
             dir = dat(model).direction || '';
+        var commonOrder = ['invoice_number', 'date', 'document_type'],
+            purchaseOrder = [
+                'seller_name',
+                'seller_tax',
+                'seller_branch',
+                'seller_addr',
+                'seller_address',
+                'buyer_name',
+                'buyer_tax',
+                'buyer_branch',
+                'buyer_addr',
+                'buyer_address',
+            ],
+            salesOrder = [
+                'buyer_name',
+                'buyer_tax',
+                'buyer_branch',
+                'buyer_addr',
+                'buyer_address',
+                'seller_name',
+                'seller_tax',
+                'seller_branch',
+                'seller_addr',
+                'seller_address',
+            ],
+            amountOrder = ['subtotal', 'vat', 'total_amount', 'notes'],
+            preferred = commonOrder.concat(
+                dir === 'sales' ? salesOrder : purchaseOrder,
+                amountOrder
+            );
         form.innerHTML =
             '<h1>' +
-            t('title') +
+            t(dir === 'sales' ? 'salesTitle' : dir === 'purchase' ? 'purchaseTitle' : 'title') +
             '</h1><p class="hint">' +
             esc(t(dir)) +
             '</p>' +
@@ -278,9 +347,15 @@
                 .map(function (r, ri) {
                     var f = fieldsOf(r),
                         it = Array.isArray(f.items) ? f.items : [],
-                        keys = Object.keys(f).filter(function (k) {
-                            return k !== 'items';
-                        });
+                        keys = preferred
+                            .filter(function (k) {
+                                return Object.prototype.hasOwnProperty.call(f, k);
+                            })
+                            .concat(
+                                Object.keys(f).filter(function (k) {
+                                    return k !== 'items' && preferred.indexOf(k) < 0;
+                                })
+                            );
                     return (
                         '<article data-record="' +
                         ri +

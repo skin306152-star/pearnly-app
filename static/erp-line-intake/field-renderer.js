@@ -22,7 +22,7 @@
               '>';
         return (
             '<div class="field"><label>' +
-            escapeHtml(key.indexOf('item.') === 0 ? key.split('.').pop() : label(key)) +
+            escapeHtml(label(key.indexOf('item.') === 0 ? key.split('.').pop() : key)) +
             (required ? ' *' : '') +
             '</label>' +
             control +

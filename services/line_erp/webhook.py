@@ -13,7 +13,7 @@ from core import db
 from core.feature_flags import erp_line_enabled_for
 from services.intake_bridge import convert as convert_svc
 from services.line_binding import line_client
-from services.line_erp import cards, flow, intake, store
+from services.line_erp import cards, flow, intake, preview, store
 from services.line_erp.out import make_spawn
 from services.ocr.recognize.core import run_recognition_core
 
@@ -52,23 +52,6 @@ def draft_records(user_id: str, tenant_id: str, draft_id: str, ids: list[str]) -
         detail["preview_url"] = detail["preview_urls"][0]
         records.append(detail)
     return records
-
-
-def _preview_values(result: dict) -> tuple[str, str, str, str, str]:
-    pages = result.get("raw_pages") or []
-    page = pages[0] if pages and isinstance(pages[0], dict) else {}
-    fields = page.get("fields") or {}
-    amount = fields.get("total_amount") or fields.get("grand_total") or ""
-    vendor = fields.get("seller_name") or fields.get("buyer_name") or fields.get("vendor") or ""
-    document_no = fields.get("invoice_number") or fields.get("invoice_no") or ""
-    document_date = fields.get("date") or fields.get("invoice_date") or ""
-    items = fields.get("items") or []
-    detail = " · ".join(
-        str(item.get("name") or item.get("description") or "")
-        for item in items[:3]
-        if isinstance(item, dict)
-    )
-    return str(amount), str(vendor), detail, str(document_no), str(document_date)
 
 
 async def handle_event(ev: dict) -> None:
@@ -301,6 +284,7 @@ async def _handle_document(
             staged=True,
             direction=mode,
             posting_kind=None,
+            source="line_erp",
         )
     except Exception:
         _restore_receiving(binding, line_user_id, mode)
@@ -326,14 +310,11 @@ async def _handle_document(
         "draft",
         {"mode": mode, "history_ids": history_ids, "nonce": nonce},
     )
-    amount, vendor, detail, document_no, document_date = _preview_values(result)
-    preview = cards.preview_card(
-        history_ids[0], mode, amount, vendor, detail, document_no, document_date
-    )
+    preview_card = cards.preview_card(history_ids[0], mode, preview.from_result(result, mode))
     if reply_token:
-        line_client.reply_messages(reply_token, [preview], channel=CHANNEL)
+        line_client.reply_messages(reply_token, [preview_card], channel=CHANNEL)
     else:
-        line_client.push_messages(line_user_id, [preview], channel=CHANNEL)
+        line_client.push_messages(line_user_id, [preview_card], channel=CHANNEL)
 
 
 async def act_draft(

@@ -283,6 +283,13 @@ export const SIDEBAR_HTML = `
         <div class="nav-sub">
             <!-- 2026-06-10 五-bis:识别/对账 = 事务所代账工具 · 已移出到「事务所工具」组(business_type=firm 显)·
                  销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料(pos_only 壳改名见 module-nav applyPosLabels) -->
+            <div class="nav-item nav-sub-item" data-route="sales-records" id="nav-sales-records" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="14" height="14" rx="2"/>
+                    <path d="M6.5 7h7M6.5 10h7M6.5 13h4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-records">销售记录</span>
+            </div>
             <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>
@@ -290,13 +297,6 @@ export const SIDEBAR_HTML = `
                     <path d="M13 2v3h3"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-workbench">发票工作台</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="sales-records" id="nav-sales-records" style="display:none;">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="14" height="14" rx="2"/>
-                    <path d="M6.5 7h7M6.5 10h7M6.5 13h4"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-sales-records">销售记录</span>
             </div>
             <div class="nav-item nav-sub-item" data-route="sales-account" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

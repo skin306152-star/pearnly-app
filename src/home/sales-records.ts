@@ -3,7 +3,6 @@ import { type SalesDoc, fmtMoney } from './sales-common.js';
 import { BAHT } from './money.js';
 import { injectStyle } from './purchase-common.js';
 import { PURCHASE_LIST_CSS } from './purchase-list-css.js';
-import { MORE_SVG } from './more-menu.js';
 import { setErpIntakeDirection } from './erp-intake.js';
 import { fetchErpEndpoints, pickDefaultTarget, pushHistory } from './dms-intake-erp-push.js';
 import { SALES_RECORDS_CSS } from './sales-records-css.js';
@@ -289,12 +288,6 @@ function bindControls(): void {
     document
         .getElementById('sr-record-btn')
         ?.addEventListener('click', () => setErpIntakeDirection('sales'));
-    document
-        .getElementById('sr-line-btn')
-        ?.addEventListener('click', () => window.routeTo?.('integrations'));
-    document
-        .getElementById('sr-logs-btn')
-        ?.addEventListener('click', () => window.routeTo?.('push-logs'));
     document.getElementById('sr-export-btn')?.addEventListener('click', exportRecords);
 }
 
@@ -305,7 +298,7 @@ function shell(): string {
     return `<div class="pur pl sr"><div class="wrap">
         <div class="ph"><div><div class="t">${escapeHtml(t('sx-records-title'))}</div><div class="sub">${escapeHtml(t('sr-subtitle'))}</div></div></div>
         <div class="panel"><div class="band"><div class="star"><div class="big tnum">${BAHT}${fmtMoney(stat.total)}<small>${escapeHtml(t('sr-month-sales'))}</small></div><div class="ctx">${cell('sr-goods-sales', stat.goods)}${cell('sr-service-sales', stat.service)}${cell('sr-output-vat', stat.vat, true)}</div></div>
-        <div class="acts"><button class="btn" id="sr-export-btn">${escapeHtml(t('sr-export-archive'))}</button><button class="btn primary" id="sr-record-btn">${ICON_PEN}${escapeHtml(t('sx-record-sale'))}</button><div class="more-wrap"><button class="btn" aria-label="more">${MORE_SVG}</button><div class="more-menu right" hidden><button class="mi" id="sr-line-btn">${escapeHtml(t('sr-line-entry'))}</button><button class="mi" id="sr-logs-btn">${escapeHtml(t('sr-push-logs'))}</button></div></div></div></div>
+        <div class="acts"><button class="btn" id="sr-export-btn">${escapeHtml(t('sr-export-archive'))}</button><button class="btn primary" id="sr-record-btn">${ICON_PEN}${escapeHtml(t('sx-record-sale'))}</button></div></div>
         <div class="toolbar"><div class="seg">${segmentHtml()}</div><div class="search">${ICON_SEARCH}<input id="sr-search" value="${escapeHtml(keyword)}" placeholder="${escapeHtml(t('sr-search'))}"></div></div>
         ${filterHtml()}<div id="sr-body"><div class="state">${escapeHtml(t('sx-loading'))}</div></div><div class="listfoot" id="sr-count"></div>
         </div></div></div>`;

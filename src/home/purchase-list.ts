@@ -28,7 +28,6 @@ import {
     groupByMonth,
     monthLabel,
 } from './purchase-list-filters.js';
-import { MORE_SVG } from './more-menu.js';
 import { isErpEntry, setErpIntakeDirection } from './erp-intake.js';
 
 const ICON_SEARCH =
@@ -172,14 +171,8 @@ function shell(): string {
             <div class="band">
                 <div class="star" id="pur-star">${starHtml(summary)}</div>
                 <div class="acts">
+                    <button class="btn" id="pur-export-btn">${escapeHtml(t('pur-export-archive'))}</button>
                     <button class="btn primary" id="pur-record-btn">${ICON_PEN}${escapeHtml(t('pur-record-purchase'))}</button>
-                    <div class="more-wrap">
-                        <button class="btn" id="pur-more-btn" aria-label="more">${MORE_SVG}</button>
-                        <div class="more-menu right" id="pur-more-menu" hidden>
-                            <button class="mi" id="pur-export-btn">${escapeHtml(t('pur-export-archive'))}</button>
-                            <button class="mi" id="pur-line-btn">${escapeHtml(t('pur-line-expense'))}</button>
-                        </div>
-                    </div>
                 </div>
             </div>
             <div id="pur-alert-slot">${alertHtml(summary)}</div>
@@ -352,8 +345,6 @@ function bindChrome(): void {
             else window.routeTo?.('purchase-capture');
         };
     }
-    const lineBtn = document.getElementById('pur-line-btn');
-    if (lineBtn) lineBtn.onclick = () => window.openPurchaseLine?.();
     const bulkDel = document.getElementById('pur-bulk-del');
     if (bulkDel) bulkDel.onclick = bulkDelete;
 }

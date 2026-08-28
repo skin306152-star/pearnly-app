@@ -365,6 +365,19 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     await expect(erpPage.locator('.nav-item[data-route="sales-account"] .nav-label')).toHaveText(
         '开票资料'
     );
+    expect(
+        await erpPage.evaluate(() => {
+            const records = document.getElementById('nav-sales-records');
+            const invoices = document.querySelector('[data-route="sales-invoices"]');
+            const documentPositionFollowing = 4;
+            return Boolean(
+                records &&
+                invoices &&
+                records.compareDocumentPosition(invoices) & documentPositionFollowing
+            );
+        }),
+        'ERP 侧栏应先显示销售记录，再显示销售发票'
+    ).toBe(true);
     const erpLabels = await erpPage.evaluate(() => {
         const selectors = {
             'nav-group-sales': '[data-collapsible="sales"] > .nav-group-toggle > .nav-label',
@@ -393,9 +406,32 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
             expect(value.actual).toBe(value.expected);
         }
     }
+    await erpPage.evaluate(() => window.routeTo('purchase'));
+    await expect(erpPage.locator('#pur-export-btn')).toBeVisible();
+    await expect(erpPage.locator('#pur-record-btn')).toBeVisible();
+    await expect(erpPage.locator('#page-purchase .more-wrap')).toHaveCount(0);
+    await expect(erpPage.locator('#pur-line-btn')).toHaveCount(0);
+    expect(
+        await erpPage
+            .locator('#page-purchase .acts > .btn')
+            .evaluateAll((buttons) => buttons.map((button) => button.id))
+    ).toEqual(['pur-export-btn', 'pur-record-btn']);
+    await revealShell(erpPage);
+    await erpPage.screenshot({
+        path: path.join(OUT, 'purchase-records-actions.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
     await erpPage.evaluate(() => window.routeTo('sales-records'));
     await expect(erpPage.locator('#sr-record-btn')).toBeVisible();
     await expect(erpPage.locator('#sr-export-btn')).toBeVisible();
+    await expect(erpPage.locator('#page-sales-records .more-wrap')).toHaveCount(0);
+    await expect(erpPage.locator('#sr-line-btn, #sr-logs-btn')).toHaveCount(0);
+    expect(
+        await erpPage
+            .locator('#page-sales-records .acts > .btn')
+            .evaluateAll((buttons) => buttons.map((button) => button.id))
+    ).toEqual(['sr-export-btn', 'sr-record-btn']);
     await expect(erpPage.locator('.pur.pl.sr')).toBeVisible();
     await expect(erpPage.locator('[data-sr-doc]')).toHaveCount(2);
     await expect(erpPage.locator('#sr-body .src.line')).toHaveText('LINE 上传');

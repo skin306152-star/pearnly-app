@@ -32,7 +32,7 @@ function openingRowHtml(
     const cost = saved && saved.unit_cost ? saved.unit_cost : '';
     const date = saved && saved.as_of_date ? saved.as_of_date : defaultDate;
     return `<tr data-op-key="${esc(p.key)}">
-        <td>${esc(p.name)}</td>
+        <td class="stc-op-name">${esc(p.name)}</td>
         <td class="num"><input type="number" min="0" step="0.001" class="stc-in" data-op-qty value="${esc(qty)}"></td>
         <td class="num"><input type="number" min="0" step="0.01" class="stc-in" data-op-cost placeholder="0.00" value="${esc(cost)}"></td>
         <td><input type="date" class="stc-in" data-op-date value="${esc(date)}"></td>
@@ -65,7 +65,7 @@ export async function openOpeningsModal(ctx: StcModalCtx): Promise<void> {
             <p class="stc-hint">${esc(t('stc-op-hint'))}</p>
             ${
                 ctx.products.length
-                    ? `<div class="stc-scroll"><table id="stc-op-tbl"><thead><tr>
+                    ? `<div class="stc-scroll"><table id="stc-op-tbl"><colgroup><col class="stc-op-col-product"><col class="stc-op-col-qty"><col class="stc-op-col-cost"><col class="stc-op-col-date"></colgroup><thead><tr>
                         <th>${esc(t('stc-col-product'))}</th><th class="num">${esc(t('stc-col-qty'))}</th>
                         <th class="num">${esc(t('stc-op-col-cost'))}</th><th>${esc(t('stc-op-col-date'))}</th>
                     </tr></thead><tbody>${rows}</tbody></table></div>`

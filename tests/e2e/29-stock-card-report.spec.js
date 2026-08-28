@@ -416,6 +416,45 @@ test.describe('ERP 门户 · 商品收发存报表(2026-08-27 长表面)', () =>
         assertNoConsoleErrors(expect, guard);
     });
 
+    test('期初库存弹窗 · 长商品名完整换行且不覆盖输入列', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        const longName =
+            'แป้งฝุ่น สูตร PERFECT TRANSLUCENT LOOSE SE POWDER SPF 27 PA+++ รุ่นพิเศษสำหรับร้านค้า';
+        const longGroups = [
+            {
+                ...GROUPS[0],
+                product: { ...GROUPS[0].product, name: longName },
+            },
+        ];
+        await openReport(page, {}, { groups: longGroups });
+        await page.locator('#stc-btn-opening').click();
+        const nameCell = page.locator('#stc-op-tbl .stc-op-name');
+        await expect(nameCell).toHaveText(longName);
+        const metrics = await nameCell.evaluate((cell) => {
+            const next = cell.nextElementSibling;
+            const box = cell.getBoundingClientRect();
+            const nextBox = next?.getBoundingClientRect();
+            const style = getComputedStyle(cell);
+            return {
+                whiteSpace: style.whiteSpace,
+                overflowWrap: style.overflowWrap,
+                fits: cell.scrollWidth <= cell.clientWidth + 1,
+                noOverlap: !nextBox || box.right <= nextBox.left + 1,
+                height: box.height,
+            };
+        });
+        expect(metrics.whiteSpace).toBe('normal');
+        expect(metrics.overflowWrap).toBe('anywhere');
+        expect(metrics.fits, '长商品名必须完整收在商品格内').toBe(true);
+        expect(metrics.noOverlap, '商品名不得覆盖数量输入列').toBe(true);
+        expect(metrics.height, '长商品名应通过多行展示').toBeGreaterThan(48);
+        await page.screenshot({
+            path: path.join(OUT, '06-opening-long-name.png'),
+            fullPage: false,
+            animations: 'disabled',
+        });
+    });
+
     test('手机视口(390×844)· 页面本体不横向溢出 · 各商品表容器可横滚', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         const visited = await openReport(page);

@@ -1,4 +1,4 @@
-// 商户采购 · 外流页(导出 / 归档到 Google)· 列表「⋯→导出/归档」routeTo 进来 · 照搬草稿⑤。
+// 商户采购 · 外流页(导出 / 归档到 Google)· 列表顶部「导出 / 归档」直达 · 照搬草稿⑤。
 // 三块:导出方式(Excel 免授权 / 归档 Drive / 同步 Sheet) + Drive 归档结构 + Sheet 列(末 4 列绿=Pearnly 独有)。
 // excel → xlsx blob 直下;drive/sheet 未连 Google(412 google_not_connected)→ 跳集成中心高亮卡;
 // 已连 → {job_id} 轮询进度(queued/running/done/failed)· 完成给 Sheet 直达链接 / 归档条数。

@@ -274,7 +274,23 @@
     overflow: auto;
 }
 .modal-mask#stc-op-mask .modal.stc table {
-    min-width: 760px;
+    min-width: 920px;
+}
+#stc-op-tbl .stc-op-col-product {
+    width: 40%;
+}
+#stc-op-tbl .stc-op-col-qty,
+#stc-op-tbl .stc-op-col-cost {
+    width: 17%;
+}
+#stc-op-tbl .stc-op-col-date {
+    width: 26%;
+}
+#stc-op-tbl td.stc-op-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+    padding: 9px 10px;
 }
 .stc .stc-in {
     width: 100%;

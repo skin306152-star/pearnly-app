@@ -113,6 +113,7 @@
   "line_card_image_routes": "D",
   "line_dms_webhook_routes": "D",
   "line_dms_booking_edit_routes": "C",
+  "line_dms_credentials_routes": "C",
   "line_dms_portal_routes": "C",
   "daily_routes": "C",
   "line_liff_routes": "D",

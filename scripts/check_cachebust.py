@@ -98,9 +98,12 @@ _ENTRY_ASSETS = {
     "static/dms-booking-edit/dms-booking-edit.html": (
         "/static/pearnly-ui.css",
         "/static/dms-booking-edit/dms-booking-edit.css",
+        "/static/dms-booking-edit/dms-credentials.css",
         "/static/dms-booking-edit/dms-booking-i18n.js",
+        "/static/dms-booking-edit/dms-credentials-i18n.js",
         "/static/dms-booking-edit/dms-booking-api.js",
         "/static/dms-booking-edit/dms-booking-language.js",
+        "/static/dms-booking-edit/dms-credentials.js",
         "/static/dms-booking-edit/dms-booking-edit.js",
     ),
     "static/erp-line-intake/index.html": (

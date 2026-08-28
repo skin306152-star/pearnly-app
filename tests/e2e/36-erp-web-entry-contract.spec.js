@@ -418,6 +418,44 @@ test('ERP review save failure does not create a formal document', async ({ page 
     });
 });
 
+test('ERP sales cannot finish before confirmation creates the formal document', async ({
+    page,
+}) => {
+    const state = {};
+    await boot(page, 'erp', state);
+    await page.evaluate(() => window.routeTo('sales-records'));
+    await page.click('#sr-record-btn');
+    await page.setInputFiles('#dx-inv-file', {
+        name: 'erp-sales.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('sales'),
+    });
+    await page.click('#dx-inv-start');
+    await page.waitForSelector('#dx-s-inv-review.active');
+    await page.locator('select.dx-item-type').selectOption('service');
+
+    await page.click('#dx-inv-rev-next');
+    await expect(page.locator('#dx-s-inv-review.active')).toBeVisible();
+    await expect(page.locator('#dx-s-inv-submit.active')).toHaveCount(0);
+    expect(state.converts).toBe(0);
+    expect(state.commits).toBe(0);
+    await expect(page.locator('#mp-toast-wrap')).toContainText('请先逐张确认单据');
+    await revealShell(page);
+    await page.screenshot({
+        path: path.join(OUT, 'sales-unconfirmed-blocked.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+
+    await page.click('.dx-confirm-one');
+    await expect.poll(() => state.converts).toBe(1);
+    await page.click('#dx-inv-rev-next');
+    await expect(page.locator('#dx-s-inv-submit.active')).toBeVisible();
+    await page.click('#dx-inv-finish');
+    await expect.poll(() => state.commits).toBe(1);
+    expect(state.recognizes[0]).toContain('sales');
+});
+
 test('ERP web leaves missing OCR item values blank and blocks confirmation', async ({ page }) => {
     const recognized = JSON.parse(JSON.stringify(RECOGNIZED));
     recognized.invoices[0].fields.items = [];

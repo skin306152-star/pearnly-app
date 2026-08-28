@@ -21,15 +21,30 @@ import { isErpEntry } from './erp-intake.js';
 
 // ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
-    // loadEndpoints(拉推送目标列表)与「兜底把已确认但未转换的 history 补转换」互不依赖
-    // 对方结果,顺序 await 两次是白等——并行跑省一轮网络等待。
-    await Promise.all([
-        loadEndpoints(),
-        // 兜底:用户跳过步骤3 的「确认」按钮直接点到这里 → 已确认项里仍有没转换的,这里补一次
-        // (confirmIndices → convertHistoryIds 内部已按 history_id 去重,不会对已转换项重复调用)。
-        confirmIndices(confirmedIndices()),
-    ]);
+    if (!(await ensureErpFormalConfirmation())) return;
+    await loadEndpoints();
     renderSubmit();
+}
+
+async function ensureErpFormalConfirmation(): Promise<boolean> {
+    if (!isErpEntry()) return true;
+    const confirmed = confirmedIndices();
+    if (!IV.results.length || confirmed.length !== IV.results.length) {
+        returnToReviewForConfirmation();
+        return false;
+    }
+    const converted = await confirmIndices(confirmed);
+    const ids = Array.from(new Set(allHistoryIds().filter(Boolean)));
+    if (!converted || convertedHistoryIds(ids).length !== ids.length) {
+        returnToReviewForConfirmation();
+        return false;
+    }
+    return true;
+}
+
+function returnToReviewForConfirmation(): void {
+    renderReview();
+    showToast(t('dxi-erp-confirm-required'), 'error');
 }
 async function loadEndpoints() {
     try {
@@ -169,6 +184,7 @@ function submitFootHtml() {
 
 export async function doFinish() {
     if (IV.busy) return;
+    if (!(await ensureErpFormalConfirmation())) return;
     // 空选合法(= 仅完成入库);只在选了推送但无可用端点时拦。
     const enabled = IV.endpoints.filter((e) => e.enabled !== false);
     if (IV.output.erp && !enabled.length) return showToast(t('dxi-need-erp'), 'warn');

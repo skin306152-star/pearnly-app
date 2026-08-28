@@ -114,6 +114,64 @@ class ErpIntakeContractTests(unittest.TestCase):
 
 
 class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
+    async def test_erp_commit_rejects_history_without_formal_document(self):
+        cur = _Cur()
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        with (
+            mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
+            mock.patch.object(history_routes, "_check_history_access"),
+            mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(history_routes.db, "get_cursor_rls", return_value=_Ctx(cur)),
+            mock.patch.object(
+                history_routes.convert_svc,
+                "unconverted_owned_history_ids",
+                return_value=["h1"],
+            ),
+            mock.patch.object(history_routes, "commit_staged_ocr_history") as commit,
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await history_routes.ocr_commit(
+                    history_routes.OcrCommitRequest(ids=["h1"]), mock.MagicMock()
+                )
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertEqual(ctx.exception.detail["code"], "erp.formal_document_required")
+        commit.assert_not_called()
+
+    async def test_erp_commit_allows_converted_history(self):
+        cur = _Cur()
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        with (
+            mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
+            mock.patch.object(history_routes, "_check_history_access"),
+            mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(history_routes.db, "get_cursor_rls", return_value=_Ctx(cur)),
+            mock.patch.object(
+                history_routes.convert_svc,
+                "unconverted_owned_history_ids",
+                return_value=[],
+            ),
+            mock.patch.object(history_routes, "commit_staged_ocr_history", return_value=1),
+        ):
+            result = await history_routes.ocr_commit(
+                history_routes.OcrCommitRequest(ids=["h1"]), mock.MagicMock()
+            )
+        self.assertEqual(result, {"ok": True, "committed": 1})
+
+    async def test_non_erp_commit_keeps_existing_behavior(self):
+        user = {"id": "u1", "tenant_id": "t1", "entry": "pos"}
+        with (
+            mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
+            mock.patch.object(history_routes, "_check_history_access"),
+            mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(history_routes.db, "get_cursor_rls") as get_cursor,
+            mock.patch.object(history_routes, "commit_staged_ocr_history", return_value=1),
+        ):
+            result = await history_routes.ocr_commit(
+                history_routes.OcrCommitRequest(ids=["h1"]), mock.MagicMock()
+            )
+        self.assertEqual(result, {"ok": True, "committed": 1})
+        get_cursor.assert_not_called()
+
     async def test_successful_conversion_finishes_resolved_staged_histories(self):
         cur = _Cur()
         result = {

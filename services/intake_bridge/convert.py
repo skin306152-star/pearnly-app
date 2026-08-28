@@ -174,6 +174,26 @@ def history_is_converted(*, tenant_id: str, history_id: str) -> bool:
         return _already_converted(cur, tenant_id=tenant_id, history_id=history_id)
 
 
+def unconverted_owned_history_ids(
+    cur, *, tenant_id: str, user_id: str, history_ids: list
+) -> list[str]:
+    """Return owned OCR histories that still have no formal purchase or sales document."""
+    ids = list(dict.fromkeys(str(value) for value in history_ids if value))
+    if not ids:
+        return []
+    cur.execute(
+        "SELECT h.id::text AS id FROM ocr_history h "
+        "WHERE h.tenant_id = %s::uuid AND h.user_id = %s::uuid "
+        "AND h.id = ANY(%s::uuid[]) "
+        "AND NOT EXISTS (SELECT 1 FROM purchase_docs p "
+        "WHERE p.tenant_id = h.tenant_id AND p.ocr_history_id = h.id) "
+        "AND NOT EXISTS (SELECT 1 FROM sales_documents s "
+        "WHERE s.tenant_id = h.tenant_id AND s.ocr_history_id = h.id)",
+        (tenant_id, user_id, ids),
+    )
+    return [str(row["id"]) for row in cur.fetchall() or []]
+
+
 def _primary_fields(pages: list) -> Optional[dict]:
     """一条 history = 一张票(services/ocr/invoice_grouper 已按此粒度拆分),直接取 pages[0]。"""
     if not pages or not isinstance(pages[0], dict):

@@ -154,6 +154,22 @@ class ConvertOrchestrationTests(unittest.TestCase):
         self.assertIn("ROLLBACK TO SAVEPOINT intake_bridge_convert", cur.queries)
         self.assertEqual(out["skipped"][0]["reason"], "already_converted")
 
+    def test_commit_gate_returns_only_owned_histories_without_formal_documents(self):
+        cur = mock.Mock()
+        cur.fetchall.return_value = [{"id": "h2"}]
+        result = convert_svc.unconverted_owned_history_ids(
+            cur,
+            tenant_id="t1",
+            user_id="u1",
+            history_ids=["h1", "h2", "h2"],
+        )
+        self.assertEqual(result, ["h2"])
+        sql, params = cur.execute.call_args.args
+        self.assertIn("purchase_docs", sql)
+        self.assertIn("sales_documents", sql)
+        self.assertIn("h.user_id = %s::uuid", sql)
+        self.assertEqual(params, ("t1", "u1", ["h1", "h2"]))
+
 
 class SalesLegTests(unittest.TestCase):
     """sales_leg.issue_from_history 自身口径:无票号 / 无行项 / 撞重复。"""

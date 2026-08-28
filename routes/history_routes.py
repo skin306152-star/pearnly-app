@@ -128,7 +128,24 @@ async def ocr_commit(req: OcrCommitRequest, request: Request):
     """
     user = get_current_user_from_request(request)
     _check_history_access(user)
-    n = commit_staged_ocr_history(str(user["id"]), list(req.ids), tenant_id=_tid(user))
+    tenant_id = _tid(user)
+    if user.get("entry") == "erp":
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user["id"])) as cur:
+            unconverted = convert_svc.unconverted_owned_history_ids(
+                cur,
+                tenant_id=tenant_id,
+                user_id=str(user["id"]),
+                history_ids=req.ids,
+            )
+        if unconverted:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "erp.formal_document_required",
+                    "history_ids": unconverted,
+                },
+            )
+    n = commit_staged_ocr_history(str(user["id"]), list(req.ids), tenant_id=tenant_id)
     return {"ok": True, "committed": n}
 
 

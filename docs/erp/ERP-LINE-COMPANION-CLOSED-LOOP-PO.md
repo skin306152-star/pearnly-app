@@ -1,13 +1,13 @@
 # ERP / LINE / Companion 全闭环 PO
 
-> 状态：F0 `COMPLETE` · F1 `DISCOVERY` · F2-F7 `PLANNED_LOCKED`
+> 状态：F0 `COMPLETE` · F1 `IMPLEMENTING` · F2-F7 `PLANNED_LOCKED`
 >
 > 本文是本轮产品目标、严格施工顺序、功能边界与解锁门的唯一任务板。`/cowork` 与
 > `/erp` 的产品隔离继续服从 `ERP-PRODUCT-BOUNDARY.md`；单据、Stock Card、LINE 与真机
 > 细则不在本文复制，分别引用 `ERP-DOCUMENT-CLOSED-LOOP.md`、
 > `ERP-REAL-DEVICE-ACCEPTANCE.md` 与 `ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 >
-> 基线日期：2026-08-29。本地核查点为 `master` `b580bae6`；每个功能仍须重新绑定自己的
+> 基线日期：2026-08-29。已发布规划基线为 `master` `e37bfed7`；每个功能仍须重新绑定自己的
 > CI、production SHA、Companion 版本及 ERP 报表回查，不能继承本页的基线当验收。
 
 ## 1. 产品结果
@@ -187,6 +187,10 @@ workspace 的授权员工可共享手动推送能力，同时保留各自操作�
 
 **明确不含**：Companion 代码改动、auto_push、MR.ERP、DMS、LINE、多 Profile、跨 tenant 共享、
 endpoint 自动合并。
+
+**当前实施批次 F1-B1**：只落默认休眠的数据底座——tenant flag、additive workspace/shared
+字段、active shared Express partial unique 及 session-local 显式开启的 SELECT policy；不接路由、
+不回填、不改变旧 user unique/自动清理或任何推送行为。B1 验证完成仍属于 F1，不能解锁 F2。
 
 **代码/数据涉及**：
 
@@ -407,7 +411,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `DISCOVERY` | F0 complete | 核对 schema、冲突数据、四权限码与 `erp_shared_express_endpoint` |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | F1-B1 默认休眠的数据底座;禁止 B2 与共享业务接线 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |
@@ -446,4 +450,4 @@ Companion 私有仓及 Windows 发布环境。缺少时对应功能进入 `BLOCK
   验证时间与保留/关闭原因；不得以 `pending`、口头“再决定放量”结束全计划。
 - 无未处理的数据完整性、安全或重复过账 P0/P1。
 
-当前只允许推进 F1 discovery；F2-F7 禁止施工。
+当前只允许推进 F1-B1；F1 后续批次及 F2-F7 禁止提前施工。

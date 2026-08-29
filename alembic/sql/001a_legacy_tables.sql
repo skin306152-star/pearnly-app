@@ -13,7 +13,8 @@
 -- 三类东西按规则排除,不是漏抄:
 --   - 与表内 CONSTRAINT 同名的索引 —— 唯一约束自带索引,再建一次会撞名;
 --   - 已由后续迁移建的索引(uq_users_username_lower / idx_ocr_history_workspace /
---     ix_erp_push_logs_tenant_wo)—— 一个对象只能有一个迁移当主人;
+--     ix_erp_push_logs_tenant_wo / uq_erp_endpoints_shared_express_workspace)
+--     —— 一个对象只能有一个迁移当主人;
 --   - 外键 —— 快照把 FK 统一列在末尾且跨全部 175 张表,补 FK 的前提是所有表都进了
 --     迁移史,不在本轮范围。
 
@@ -212,6 +213,8 @@ CREATE TABLE IF NOT EXISTS "erp_endpoints" (
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   "tenant_id" uuid,
+  "workspace_client_id" bigint,
+  "shared_scope" boolean DEFAULT false NOT NULL,
   CONSTRAINT "erp_endpoints_adapter_chk" CHECK ((adapter = ANY (ARRAY['webhook'::text, 'xero'::text, 'flowaccount'::text, 'mrerp'::text, 'mrerp_dms'::text, 'express'::text]))),
   CONSTRAINT "erp_endpoints_pkey" PRIMARY KEY (id)
 );
@@ -270,6 +273,7 @@ CREATE TABLE IF NOT EXISTS "erp_push_logs" (
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "trigger" text DEFAULT 'manual'::text NOT NULL,
   "tenant_id" uuid,
+  "workspace_client_id" bigint,
   "retry_count" integer DEFAULT 0 NOT NULL,
   "max_retries" integer DEFAULT 3 NOT NULL,
   "next_retry_at" timestamp with time zone,

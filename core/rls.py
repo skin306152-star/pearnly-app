@@ -43,6 +43,47 @@ _TPL = {
     "user": f"USING ({_USER} OR {_BYPASS}) WITH CHECK ({_USER} OR {_BYPASS})",
 }
 
+# Extra permissive SELECT policies for the dormant F1 Express sharing path. The existing
+# tenant_isolation FOR ALL policy remains the actor/owner path; PostgreSQL ORs permissive
+# policies, so these statements only add visibility after an explicit transaction-local gate.
+ERP_SHARED_EXPRESS_SELECT_DDL = (
+    "ALTER TABLE erp_endpoints ENABLE ROW LEVEL SECURITY",
+    "DROP POLICY IF EXISTS erp_endpoints_shared_express_select ON erp_endpoints",
+    "CREATE POLICY erp_endpoints_shared_express_select ON erp_endpoints FOR SELECT USING ("
+    "current_setting('app.erp_shared_express_endpoint', true) = 'on' "
+    "AND current_setting('app.erp_shared_express_tenant_id', true) "
+    "= current_setting('app.current_tenant_id', true) "
+    "AND current_setting('app.erp_shared_express_workspace_id', true) "
+    "= current_setting('app.current_workspace_id', true) "
+    "AND adapter = 'express' AND enabled = TRUE AND shared_scope = TRUE "
+    "AND tenant_id IS NOT NULL AND workspace_client_id IS NOT NULL "
+    "AND tenant_id::text = current_setting('app.erp_shared_express_tenant_id', true) "
+    "AND workspace_client_id::text "
+    "= current_setting('app.erp_shared_express_workspace_id', true) "
+    "AND tenant_id::text = current_setting('app.current_tenant_id', true) "
+    "AND workspace_client_id::text = current_setting('app.current_workspace_id', true))",
+    "ALTER TABLE erp_push_logs ENABLE ROW LEVEL SECURITY",
+    "DROP POLICY IF EXISTS erp_push_logs_shared_express_select ON erp_push_logs",
+    "CREATE POLICY erp_push_logs_shared_express_select ON erp_push_logs FOR SELECT USING ("
+    "current_setting('app.erp_shared_express_endpoint', true) = 'on' "
+    "AND current_setting('app.erp_shared_express_tenant_id', true) "
+    "= current_setting('app.current_tenant_id', true) "
+    "AND current_setting('app.erp_shared_express_workspace_id', true) "
+    "= current_setting('app.current_workspace_id', true) "
+    "AND tenant_id IS NOT NULL AND workspace_client_id IS NOT NULL "
+    "AND tenant_id::text = current_setting('app.erp_shared_express_tenant_id', true) "
+    "AND workspace_client_id::text "
+    "= current_setting('app.erp_shared_express_workspace_id', true) "
+    "AND tenant_id::text = current_setting('app.current_tenant_id', true) "
+    "AND workspace_client_id::text = current_setting('app.current_workspace_id', true) "
+    "AND EXISTS (SELECT 1 FROM erp_endpoints shared_endpoint "
+    "WHERE shared_endpoint.id = erp_push_logs.endpoint_id "
+    "AND shared_endpoint.adapter = 'express' "
+    "AND shared_endpoint.enabled = TRUE AND shared_endpoint.shared_scope = TRUE "
+    "AND shared_endpoint.tenant_id = erp_push_logs.tenant_id "
+    "AND shared_endpoint.workspace_client_id = erp_push_logs.workspace_client_id))",
+)
+
 
 def _apply(cur, kind: str, tables, name: str = "tenant_isolation", force: bool = False) -> None:
     body = _TPL[kind]

@@ -160,7 +160,7 @@ next_action: PENDING
 schema_version: 1
 feature_id: F1
 attempt: 1
-state: DISCOVERY
+state: IMPLEMENTING
 purpose: >-
   验证单一 tenant、单一 workspace、现有单 Profile Express 小助手能否由 owner 和多员工
   安全共用手动推送；不改 Companion，不含 auto_push、MR.ERP、mrerp_dms、DMS、LINE 或多 Profile。
@@ -430,7 +430,9 @@ open_issues:
   - Confirm MR.ERP and mrerp_dms ownership, credentials, query and RLS behavior remain unchanged.
   - Confirm erp.endpoint.view, erp.endpoint.manage, erp.push.operate and erp.log.view gates.
   - Confirm purchase/sales create+approve and workspace-scope enforcement.
-next_action: Complete F1 discovery; do not modify F2-F7.
+next_action: >-
+  Commit the F1-B1 candidate and wait for CI PostgreSQL smoke before exact deployment;
+  do not start F1-B2 or modify F2-F7.
 ```
 
 ## 7. F2-F7

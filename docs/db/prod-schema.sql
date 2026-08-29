@@ -778,6 +778,8 @@ CREATE TABLE IF NOT EXISTS "erp_endpoints" (
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   "tenant_id" uuid,
+  "workspace_client_id" bigint,
+  "shared_scope" boolean DEFAULT false NOT NULL,
   CONSTRAINT "erp_endpoints_adapter_chk" CHECK ((adapter = ANY (ARRAY['webhook'::text, 'xero'::text, 'flowaccount'::text, 'mrerp'::text, 'mrerp_dms'::text, 'express'::text]))),
   CONSTRAINT "erp_endpoints_pkey" PRIMARY KEY (id)
 );
@@ -785,6 +787,7 @@ CREATE UNIQUE INDEX idx_erp_endpoints_one_default_per_user ON public.erp_endpoin
 CREATE INDEX idx_erp_endpoints_tenant_id ON public.erp_endpoints USING btree (tenant_id);
 CREATE INDEX idx_erp_endpoints_user ON public.erp_endpoints USING btree (user_id, enabled, is_default DESC);
 CREATE UNIQUE INDEX uq_erp_endpoints_user_express ON public.erp_endpoints USING btree (user_id) WHERE (adapter = 'express'::text);
+CREATE UNIQUE INDEX uq_erp_endpoints_shared_express_workspace ON public.erp_endpoints USING btree (tenant_id, workspace_client_id, adapter) WHERE ((enabled = true) AND (shared_scope = true) AND (adapter = 'express'::text) AND (tenant_id IS NOT NULL) AND (workspace_client_id IS NOT NULL));
 
 CREATE TABLE IF NOT EXISTS "erp_oauth_states" (
   "state" text NOT NULL,
@@ -857,6 +860,7 @@ CREATE TABLE IF NOT EXISTS "erp_push_logs" (
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "trigger" text DEFAULT 'manual'::text NOT NULL,
   "tenant_id" uuid,
+  "workspace_client_id" bigint,
   "retry_count" integer DEFAULT 0 NOT NULL,
   "max_retries" integer DEFAULT 3 NOT NULL,
   "next_retry_at" timestamp with time zone,

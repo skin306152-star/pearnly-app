@@ -2,19 +2,19 @@
 
 ## 当前状态卡 · 08-29 ERP / LINE / Companion 全闭环启动
 
-- **▶ 当前 task**:严格单功能推进 ERP 全闭环;F0 规划交付已完成,F1「单组织/单账套/多员工共用现有单 Profile Express 小助手」进入 discovery。
+- **▶ 当前 task**:严格单功能推进 ERP 全闭环;F1 正在实施 Batch 1 数据底座,仅做默认休眠的 additive schema/flag/RLS,不接共享业务路径。
 - **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
 - **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 - **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
 - **✅ F0**:`COMPLETE`;PO、acceptance ledger 与本状态卡已落盘,不作为需真机/用户 OK 的产品功能。
-- **▶ F1 状态**:`DISCOVERY`;endpoint 改 tenant-owned + workspace scope,现有 `user_id` 保留 creator;push log `user_id` 保持 actor。
+- **▶ F1 状态**:`IMPLEMENTING`;B1 增 workspace/shared 字段、tenant flag、active shared Express partial unique 与 session-local SELECT RLS;不回填。
 - **📐 F1 窄边界**:只共享 active Express 手动推送;partial unique 轴=`(tenant_id,workspace_client_id,adapter)`;共享查询/RLS 必须 adapter-gated;MR.ERP/`mrerp_dms` 原样;Companion/auto_push/LINE/多 Profile 不改。
 - **🚩 F1 放量**:`erp_shared_express_endpoint` 默认关,仅测试 tenant;存量多 endpoint 冲突只阻断并报告,不自动合并;最终 rollout 状态须入 ledger。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
 - **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
-- **📍 已核生产基线**:`master`、`origin/master`、生产均为 `b580bae6`;CI `33237575937` success;本轮功能发布仍须重新验精确 SHA。
+- **📍 已核生产基线**:`master`、`origin/master`、生产均为 `e37bfed7`;CI `33245600399` success;本轮功能发布仍须重新验精确 SHA。
 - **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
-- **🧹 工作树**:本轮仅新增/改写规划文档,尚未提交或推送;源码、配置、业务数据与 Companion 均未改。
+- **🧪 B1 交付态**:本地代码与静态/合同单测已通过,待提交后 CI 真 PG smoke 与精确部署验证;B2 仍禁止,且未改路由、业务数据、Companion、agent_store、auto_push、MR.ERP、DMS、LINE 或 F2-F7。
 
 ---
 

@@ -56,7 +56,12 @@ LEGACY_TABLES = frozenset(
 # 归后续迁移所有的索引:baseline 不建,由 005 / 0065 / 0076 各自建。
 # 一个数据库对象只能有一个迁移当主人,两边都建就是两份会漂的事实源。
 INDEXES_OWNED_BY_LATER_MIGRATIONS = frozenset(
-    {"idx_ocr_history_workspace", "uq_users_username_lower", "ix_erp_push_logs_tenant_wo"}
+    {
+        "idx_ocr_history_workspace",
+        "uq_users_username_lower",
+        "ix_erp_push_logs_tenant_wo",
+        "uq_erp_endpoints_shared_express_workspace",
+    }
 )
 
 _TABLE_RE = re.compile(r'^CREATE TABLE IF NOT EXISTS "([a-z0-9_]+)" \($', re.M)

@@ -121,8 +121,8 @@ const GEO = {
     },
 };
 
-function liffMockScript(os) {
-    return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,getOS:()=>${JSON.stringify(os)},openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
+function liffMockScript(os, inClient = true) {
+    return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.__dmsLiffInit=null;window.liff={init:async(params)=>{window.__dmsLiffInit=params;localStorage.setItem('__dmsLiffInit',JSON.stringify(params));},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>${JSON.stringify(inClient)},getOS:()=>${JSON.stringify(os)},openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
 }
 
 const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
@@ -132,7 +132,7 @@ const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="ut
     <a id="credentials-menu" class="cell" href="${BASE}/home?liff.state=%3Fcredentials%3Ddms">เปลี่ยนบัญชีและรหัสผ่าน</a><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
 </nav></body></html>`;
 
-async function setupPortalTest(page, os) {
+async function setupPortalTest(page, os, inClient = true) {
     let authBody;
     let ticketRequested = false;
     let ticketRequestCount = 0;
@@ -149,7 +149,7 @@ async function setupPortalTest(page, os) {
     const token = `e2e.${payload}.sig`;
 
     await page.route('https://static.line-scdn.net/**', (route) =>
-        route.fulfill({ contentType: 'application/javascript', body: liffMockScript(os) })
+        route.fulfill({ contentType: 'application/javascript', body: liffMockScript(os, inClient) })
     );
     await page.route('**/api/line/dms-booking/config', (route) =>
         route.fulfill({
@@ -199,6 +199,12 @@ test('Android opens MRERP DMS externally without cancelling the browser handoff'
             external: true,
         });
     await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(false);
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__dmsLiffInit))
+        .toEqual({
+            liffId: 'DMS-LIFF',
+            withLoginOnExternalBrowser: true,
+        });
     expect(h.ticketRequested()).toBe(true);
     expect(h.ticketRequestCount()).toBe(1);
     expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
@@ -233,6 +239,22 @@ test('iOS keeps the working external handoff and issues a fresh ticket after clo
         path: path.join(OUT, 'portal-external-close-390.png'),
         fullPage: true,
     });
+});
+
+test('desktop LINE browser authenticates and continues in the same external tab', async ({
+    page,
+}) => {
+    const h = await setupPortalTest(page, 'web', false);
+    await page.route('**/home/dms-booking/portal?ticket=opaque-ticket', (route) =>
+        route.fulfill({ contentType: 'text/html', body: '<main id="relay">DMS relay</main>' })
+    );
+    await page.goto(`${BASE}/home/dms-booking?portal=dms&openExternalBrowser=1`);
+    await expect(page.locator('#relay')).toBeVisible();
+    await expect(page).toHaveURL(/\/home\/dms-booking\/portal\?ticket=opaque-ticket$/);
+    expect(h.ticketRequested()).toBe(true);
+    await expect
+        .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('__dmsLiffInit'))))
+        .toEqual({ liffId: 'DMS-LIFF', withLoginOnExternalBrowser: true });
 });
 
 test('menu 4 opens the operator credential editor and saves only the entered pair', async ({

@@ -38,14 +38,14 @@ def _area(col: int, action: dict, *, row: int = 0) -> dict:
     }
 
 
-def portal_liff_url() -> str:
-    """返回公开 LIFF 入口；没有 LIFF 配置时退回普通 DMS 登录。"""
+def portal_external_url() -> str:
+    """Open menu 3 in the system browser before LIFF authentication starts."""
     liff_id = (os.environ.get("LINE_DMS_LIFF_ID") or "").strip() or (
         os.environ.get("LINE_LIFF_ID") or ""
     ).strip()
     if liff_id:
-        query = urllib.parse.urlencode({"portal": "dms"})
-        return f"https://liff.line.me/{liff_id}?{query}"
+        query = urllib.parse.urlencode({"portal": "dms", "openExternalBrowser": "1"})
+        return f"https://pearnly.com/home/dms-booking?{query}"
     return "https://pearnly.com/dms"
 
 
@@ -85,7 +85,7 @@ def build_payload() -> dict:
             ),
             _area(
                 2,
-                {"type": "uri", "label": "เข้าสู่ DMS", "uri": portal_liff_url()},
+                {"type": "uri", "label": "เข้าสู่ DMS", "uri": portal_external_url()},
             ),
             _area(
                 0,

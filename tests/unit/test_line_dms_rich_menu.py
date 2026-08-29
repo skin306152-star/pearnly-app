@@ -7,24 +7,24 @@ from services.line_dms import rich_menu
 
 
 class DmsRichMenuTests(unittest.TestCase):
-    def test_portal_liff_url(self):
+    def test_portal_external_url(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):
             self.assertEqual(
-                rich_menu.portal_liff_url(),
-                "https://liff.line.me/DMS-LIFF?portal=dms",
+                rich_menu.portal_external_url(),
+                "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             )
         with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(rich_menu.portal_liff_url(), "https://pearnly.com/dms")
+            self.assertEqual(rich_menu.portal_external_url(), "https://pearnly.com/dms")
 
-    def test_portal_liff_url_prefers_dms_id_over_shared(self):
+    def test_portal_external_url_accepts_dms_or_shared_liff_config(self):
         with patch.dict(
             os.environ,
             {"LINE_DMS_LIFF_ID": "DMS-LIFF", "LINE_LIFF_ID": "SHARED-LIFF"},
             clear=True,
         ):
             self.assertEqual(
-                rich_menu.portal_liff_url(),
-                "https://liff.line.me/DMS-LIFF?portal=dms",
+                rich_menu.portal_external_url(),
+                "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             )
 
     def test_credentials_liff_url(self):
@@ -34,11 +34,11 @@ class DmsRichMenuTests(unittest.TestCase):
                 "https://liff.line.me/DMS-LIFF?credentials=dms",
             )
 
-    def test_portal_liff_url_falls_back_to_shared_liff_id(self):
+    def test_portal_external_url_falls_back_to_shared_liff_id(self):
         with patch.dict(os.environ, {"LINE_LIFF_ID": "SHARED-LIFF"}, clear=True):
             self.assertEqual(
-                rich_menu.portal_liff_url(),
-                "https://liff.line.me/SHARED-LIFF?portal=dms",
+                rich_menu.portal_external_url(),
+                "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             )
         with patch.dict(
             os.environ,
@@ -46,8 +46,8 @@ class DmsRichMenuTests(unittest.TestCase):
             clear=True,
         ):
             self.assertEqual(
-                rich_menu.portal_liff_url(),
-                "https://liff.line.me/SHARED-LIFF?portal=dms",
+                rich_menu.portal_external_url(),
+                "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             )
 
     def test_payload_has_three_top_row_actions_and_credentials_below(self):
@@ -68,6 +68,10 @@ class DmsRichMenuTests(unittest.TestCase):
         self.assertEqual(
             [a["action"]["type"] for a in payload["areas"]],
             ["postback", "postback", "uri", "uri"],
+        )
+        self.assertEqual(
+            payload["areas"][2]["action"]["uri"],
+            "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
         )
         self.assertEqual(
             payload["areas"][3]["bounds"],

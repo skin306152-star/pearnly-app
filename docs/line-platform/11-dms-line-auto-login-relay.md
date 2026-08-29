@@ -1,15 +1,21 @@
-# 11 · DMS LINE 自动登录中继(一次性票据 · 批次B · 2026-08-22 · 全平台 external 2026-08-25)
+# 11 · DMS LINE 自动登录中继(一次性票据 · 外部浏览器直开 2026-08-29)
 
 > 用途:LINE DMS 富菜单第三项打开 MRERP DMS,继续使用后台配置的账号密码自动登录。
-> **Android 与 iOS 一律 `external:true`**(走系统外部浏览器,避开 LINE 内置 WebView
-> 的 named window 隔离与第三方 cookie 拦截两个坑),并优化了登录中继时延。
+> 菜单 3 使用普通 HTTPS + `openExternalBrowser=1`,由 LINE 原生直接交给系统浏览器,
+> 不再从 LIFF WebView 二次唤起。外部浏览器以 `withLoginOnExternalBrowser:true`
+> 初始化 LIFF;Android、iOS、电脑 LINE 的菜单卡共用同一入口。
 > 后端事实源:`services/line_dms/login_tickets.py`(DAL)· 留档 `alembic 0102`。
 
 ---
 
-## 0. 当前状态(2026-08-25 · 全平台 external + 中继提速)
+## 0. 当前状态(2026-08-29 · LINE 原生外部浏览器入口 + 中继提速)
 
-- **前端**:`static/dms-booking-edit/dms-booking-edit.js?v=11` portalMode 分支统一
+- **菜单入口**:`services/line_dms/rich_menu.py::portal_external_url` 返回普通 Pearnly
+  HTTPS URL + `openExternalBrowser=1`;不能改回 `liff.line.me` URL,LINE 官方明确该参数
+  对 LIFF URL 无效。Flex 菜单卡与 Rich Menu 共用这个函数。
+- **外部浏览器 LIFF 登录**:`dms-booking-api.js?v=3` 使用
+  `withLoginOnExternalBrowser:true`;电脑 LINE/手机系统浏览器可完成 LINE 身份验证后拿票。
+- **历史 LIFF 兼容**:`static/dms-booking-edit/dms-booking-edit.js?v=11` portalMode 分支统一
   `liff.openWindow({ url, external: true })`,但按平台安全清理 LINE 启动页:
   - Android **与** iOS 都走外部浏览器(不再按 `liff.getOS()` 分流)
   - iOS 保持打开外部浏览器后立即 `closeWindow()`
@@ -34,8 +40,9 @@
 
 | 平台 | `external` | 行为 | 自动登录 |
 |---|---|---|---|
-| Android LINE | `true` | 跳外部浏览器;进入后台后清理启动页 | ✅ |
-| iOS LINE | `true` | 跳外部 Safari;立即清理启动页 | ✅ |
+| Android LINE | 原生 URL 参数 | 菜单点击直接进系统浏览器 | ✅ |
+| iOS LINE | 原生 URL 参数 | 菜单点击直接进系统浏览器 | ✅ |
+| 电脑 LINE | 普通 HTTPS | 默认浏览器完成 LIFF 登录后同页进中继 | ✅ |
 | 非 LINE 桌面 | N/A | `location.replace` 同窗口跳转 | ✅ |
 
 ### 为什么全平台都走 external
@@ -118,9 +125,9 @@ Pearnly 票据失败的出口动作是回 LINE 重进入口(重新发票据)。�
 - 一次性 token 端点:接受 Pearnly 签发的短寿命 token → 建立 PHPSESSID → redirect home.php
 - 或标准 OIDC/SAML 端点
 
-在 MRERP 提供前,Android 与 iOS 都保持 `external:true`。中继 URL 必须保留在 LIFF
-endpoint 的下层(`/home/dms-booking/portal`);LINE 官方不保证从 endpoint 跳到更高层或
-范围外路径的行为,该限制会在部分 Android WebView 上表现为拿票成功但完全不启动外部浏览器。
+在 MRERP 提供前,菜单 3 必须保持普通 HTTPS + `openExternalBrowser=1`,不能把该参数加到
+`liff.line.me` URL。历史 LIFF 链接仍使用 `external:true`;中继 URL 保留在 LIFF endpoint
+的下层(`/home/dms-booking/portal`)。
 
 ## 7. 真机验证步骤
 
@@ -128,5 +135,6 @@ endpoint 的下层(`/home/dms-booking/portal`);LINE 官方不保证从 endpoint 
    relay 页点按钮 → MR.ERP DMS 首页加载(非登录页)。
 2. **iOS**:LINE 真机打开 DMS 富菜单第三项 → 确认跳转 Safari → relay 页点按钮 →
    MR.ERP DMS 首页加载(非登录页)。
-3. 验证票据一次性:同一链接第二次点击应显示「链接已使用」。
-4. 若外部浏览器内仍落到登录页:记录设备型号、浏览器版本,截图存档,评估是否凭据已失效。
+3. **电脑 LINE**:菜单卡第三项 → 默认浏览器完成 LINE 登录 → relay 页点按钮 → DMS 首页。
+4. 验证票据一次性:同一链接第二次点击应显示「链接已使用」。
+5. 若外部浏览器内仍落到登录页:记录设备型号、浏览器版本,截图存档,评估是否凭据已失效。

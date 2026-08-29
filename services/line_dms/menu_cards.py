@@ -26,7 +26,7 @@ from services.line_dms.cards import (
     TXT_MENU_TITLE,
     _data,
 )
-from services.line_dms.rich_menu import credentials_liff_url, portal_liff_url
+from services.line_dms.rich_menu import credentials_liff_url, portal_external_url
 
 # ── 菜单层(波2) ──────────────────────────────────────────────────────────
 # 图标托管在自家 static(LINE Flex 的图片必须是公网 https URL);?v 随图变更 bump。
@@ -183,7 +183,7 @@ def menu_card() -> Dict[str, Any]:
                 THEME_PURPLE,
                 TXT_MENU_ITEM3,
                 TXT_MENU_D3,
-                {"type": "uri", "label": TXT_MENU_ITEM3, "uri": portal_liff_url()},
+                {"type": "uri", "label": TXT_MENU_ITEM3, "uri": portal_external_url()},
             ),
             _menu_item(
                 "4",

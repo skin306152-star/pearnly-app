@@ -27,7 +27,7 @@ class DmsMenuCardTests(unittest.TestCase):
             {
                 "type": "uri",
                 "label": cards.TXT_MENU_ITEM3,
-                "uri": "https://liff.line.me/DMS-LIFF?portal=dms",
+                "uri": "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             },
         )
         self.assertEqual(

@@ -5,6 +5,8 @@
 打乱顺序会踩存量测试的顺序耦合(2026-08-02 乱序分桶实测炸出 auth_password 两红)。
 """
 
+import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -18,6 +20,7 @@ from scripts.run_unit_sharded import (
     collect_modules,
     make_shards,
 )
+from tests.unit import _psycopg2_import
 
 
 class CollectMatchesDiscover(unittest.TestCase):
@@ -43,6 +46,74 @@ class ShardsPartitionExactly(unittest.TestCase):
         mods = [("tests.unit.test_a", 10), ("tests.unit.test_b", 20)]
         shards = make_shards(mods, 8, {})
         self.assertEqual([m for s in shards for m in s], ["tests.unit.test_a", "tests.unit.test_b"])
+
+
+class WorkerModuleIsolationTests(unittest.TestCase):
+    def test_legacy_fallback_does_not_poison_later_module(self):
+        root = Path(UNIT_DIR).parents[1]
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(root / "scripts" / "run_unit_sharded.py"),
+                "--worker",
+                "tests.unit.test_push_dedup_contract",
+                "tests.unit.test_sales_product_code",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_fallback_then_real_driver_order_is_isolated(self):
+        root = Path(UNIT_DIR).parents[1]
+        script = """
+import unittest
+
+from tests.unit import _psycopg2_import as guard
+
+real_import_module = guard.importlib.import_module
+
+
+def missing_psycopg2(name, package=None):
+    if name == "psycopg2":
+        raise ModuleNotFoundError("No module named 'psycopg2'", name="psycopg2")
+    return real_import_module(name, package)
+
+
+guard.importlib.import_module = missing_psycopg2
+try:
+    first = unittest.defaultTestLoader.loadTestsFromName(
+        "tests.unit.test_push_dedup_contract"
+    )
+finally:
+    guard.importlib.import_module = real_import_module
+second = unittest.defaultTestLoader.loadTestsFromName(
+    "tests.unit.test_sales_product_code"
+)
+suite = unittest.TestSuite((first, second))
+result = unittest.TextTestRunner(verbosity=0).run(suite)
+raise SystemExit(0 if result.wasSuccessful() else 1)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_fallback_restores_every_module_slot(self):
+        sentinel = object()
+        before = {name: sys.modules.get(name, sentinel) for name in _psycopg2_import._MODULE_NAMES}
+        missing = ModuleNotFoundError("No module named 'psycopg2'", name="psycopg2")
+        with mock.patch.object(_psycopg2_import.importlib, "import_module", side_effect=missing):
+            with _psycopg2_import.psycopg2_import_guard():
+                self.assertTrue(hasattr(sys.modules["psycopg2"], "errors"))
+        after = {name: sys.modules.get(name, sentinel) for name in _psycopg2_import._MODULE_NAMES}
+        self.assertEqual(after, before)
 
 
 class HookUsesImpactPlanner(unittest.TestCase):

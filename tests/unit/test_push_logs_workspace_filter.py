@@ -21,7 +21,6 @@ Express 推送——全链路没带套账维度。本测试锁 SQL 契约,防后
 from __future__ import annotations
 
 import sys
-import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -29,44 +28,10 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# Stub psycopg2 (与其它 push 守门测试同款 · 本地无 DB).
-if "psycopg2" not in sys.modules:
-    fake_pg = types.ModuleType("psycopg2")
-    fake_pg.connect = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stub"))
-    fake_pg.Error = Exception
-    fake_pg.OperationalError = Exception
-    fake_pg.extras = types.ModuleType("psycopg2.extras")
-    fake_pg.extras.RealDictCursor = object
-    fake_pg.extras.DictCursor = object
-    fake_pg.extras.execute_values = lambda *a, **k: None
-    fake_pg.extras.Json = lambda x: x
-    fake_pg.pool = types.ModuleType("psycopg2.pool")
+from tests.unit._psycopg2_import import psycopg2_import_guard  # noqa: E402
 
-    class _StubPool:
-        def __init__(self, *a, **k):
-            pass
-
-        def getconn(self):
-            raise RuntimeError("stub")
-
-        def putconn(self, *a, **k):
-            pass
-
-        def closeall(self):
-            pass
-
-    fake_pg.pool.ThreadedConnectionPool = _StubPool
-    fake_pg.pool.SimpleConnectionPool = _StubPool
-    fake_pg.sql = types.ModuleType("psycopg2.sql")
-    fake_pg.sql.SQL = lambda s: s
-    fake_pg.sql.Identifier = lambda s: s
-    sys.modules["psycopg2"] = fake_pg
-    sys.modules["psycopg2.extras"] = fake_pg.extras
-    sys.modules["psycopg2.pool"] = fake_pg.pool
-    sys.modules["psycopg2.sql"] = fake_pg.sql
-
-
-from core import db  # noqa: E402
+with psycopg2_import_guard():
+    from core import db  # noqa: E402
 
 _WS_CLAUSE = "(h.workspace_client_id = %s OR h.workspace_client_id IS NULL)"
 _WS_JOIN = "LEFT JOIN ocr_history h ON h.id = l.history_id"

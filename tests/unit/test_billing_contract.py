@@ -59,42 +59,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # ────────────────────────────────────────────────────────────────────
 # Stub native deps · 跟 test_tenant_isolation_contract.py 完全一致
 # ────────────────────────────────────────────────────────────────────
-def _ensure_stub_psycopg2():
-    if "psycopg2" in sys.modules:
-        return
-    fake_pg = types.ModuleType("psycopg2")
-    fake_pg.connect = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stub"))
-    fake_pg.Error = Exception
-    fake_pg.OperationalError = Exception
-    fake_pg.extras = types.ModuleType("psycopg2.extras")
-    fake_pg.extras.RealDictCursor = object
-    fake_pg.extras.DictCursor = object
-    fake_pg.extras.execute_values = lambda *a, **k: None
-    fake_pg.extras.Json = lambda x: x
-    fake_pg.pool = types.ModuleType("psycopg2.pool")
-
-    class _StubPool:
-        def __init__(self, *a, **k):
-            pass
-
-        def getconn(self):
-            raise RuntimeError("stub")
-
-        def putconn(self, *a, **k):
-            pass
-
-        def closeall(self):
-            pass
-
-    fake_pg.pool.ThreadedConnectionPool = _StubPool
-    fake_pg.pool.SimpleConnectionPool = _StubPool
-    fake_pg.sql = types.ModuleType("psycopg2.sql")
-    fake_pg.sql.SQL = lambda s: s
-    fake_pg.sql.Identifier = lambda s: s
-    sys.modules["psycopg2"] = fake_pg
-    sys.modules["psycopg2.extras"] = fake_pg.extras
-    sys.modules["psycopg2.pool"] = fake_pg.pool
-    sys.modules["psycopg2.sql"] = fake_pg.sql
+from tests.unit._psycopg2_import import psycopg2_import_guard  # noqa: E402
 
 
 def _ensure_stub_bcrypt():
@@ -107,10 +72,10 @@ def _ensure_stub_bcrypt():
     sys.modules["bcrypt"] = fake
 
 
-_ensure_stub_psycopg2()
 _ensure_stub_bcrypt()
 
-from core import db  # noqa: E402
+with psycopg2_import_guard():
+    from core import db  # noqa: E402
 from tests.unit._cursor_patch import patch_both  # noqa: E402
 
 

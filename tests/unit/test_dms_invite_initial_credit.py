@@ -14,7 +14,6 @@ psycopg2 打桩(charge/account_status 顶/尾 import core.db 会拉起连接池)
 from __future__ import annotations
 
 import sys
-import types
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -23,44 +22,11 @@ from unittest import mock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-if "psycopg2" not in sys.modules:
-    fake_pg = types.ModuleType("psycopg2")
-    fake_pg.connect = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stub"))
-    fake_pg.Error = Exception
-    fake_pg.OperationalError = Exception
-    fake_pg.extras = types.ModuleType("psycopg2.extras")
-    fake_pg.extras.RealDictCursor = object
-    fake_pg.extras.DictCursor = object
-    fake_pg.extras.execute_values = lambda *a, **k: None
-    fake_pg.extras.Json = lambda x: x
-    fake_pg.pool = types.ModuleType("psycopg2.pool")
+from tests.unit._psycopg2_import import psycopg2_import_guard  # noqa: E402
 
-    class _StubPool:
-        def __init__(self, *a, **k):
-            pass
-
-        def getconn(self):
-            raise RuntimeError("stub")
-
-        def putconn(self, *a, **k):
-            pass
-
-        def closeall(self):
-            pass
-
-    fake_pg.pool.ThreadedConnectionPool = _StubPool
-    fake_pg.pool.SimpleConnectionPool = _StubPool
-    fake_pg.sql = types.ModuleType("psycopg2.sql")
-    fake_pg.sql.SQL = lambda s: s
-    fake_pg.sql.Identifier = lambda s: s
-    sys.modules["psycopg2"] = fake_pg
-    sys.modules["psycopg2.extras"] = fake_pg.extras
-    sys.modules["psycopg2.pool"] = fake_pg.pool
-    sys.modules["psycopg2.sql"] = fake_pg.sql
-
-
-from services.billing import account_status  # noqa: E402
-from services.billing import charge  # noqa: E402
+with psycopg2_import_guard():
+    from services.billing import account_status  # noqa: E402
+    from services.billing import charge  # noqa: E402
 
 
 class _RecCursor:

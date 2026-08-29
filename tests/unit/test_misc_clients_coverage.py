@@ -16,7 +16,6 @@
 """
 
 import sys
-import types
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -25,43 +24,11 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-if "psycopg2" not in sys.modules:
-    _pg = types.ModuleType("psycopg2")
-    _pg.connect = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stub"))
-    _pg.Error = Exception
-    _pg.OperationalError = Exception
-    _pg.extras = types.ModuleType("psycopg2.extras")
-    _pg.extras.RealDictCursor = object
-    _pg.extras.DictCursor = object
-    _pg.extras.execute_values = lambda *a, **k: None
-    _pg.extras.Json = lambda x: x
-    _pg.pool = types.ModuleType("psycopg2.pool")
+from tests.unit._psycopg2_import import psycopg2_import_guard  # noqa: E402
 
-    class _StubPool:
-        def __init__(self, *a, **k):
-            pass
-
-        def getconn(self):
-            raise RuntimeError("stub")
-
-        def putconn(self, *a, **k):
-            pass
-
-        def closeall(self):
-            pass
-
-    _pg.pool.ThreadedConnectionPool = _StubPool
-    _pg.pool.SimpleConnectionPool = _StubPool
-    _pg.sql = types.ModuleType("psycopg2.sql")
-    _pg.sql.SQL = lambda s: s
-    _pg.sql.Identifier = lambda s: s
-    sys.modules["psycopg2"] = _pg
-    sys.modules["psycopg2.extras"] = _pg.extras
-    sys.modules["psycopg2.pool"] = _pg.pool
-    sys.modules["psycopg2.sql"] = _pg.sql
-
-from core import db  # noqa: E402
-from services.clients import store  # noqa: E402
+with psycopg2_import_guard():
+    from core import db  # noqa: E402
+    from services.clients import store  # noqa: E402
 
 
 class _FakeCursor:

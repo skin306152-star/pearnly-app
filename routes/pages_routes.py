@@ -29,7 +29,7 @@ REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后�
 import asyncio
 import os
 from typing import Annotated
-from urllib.parse import parse_qs, quote, unquote
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
@@ -148,8 +148,8 @@ def _safe_internal_next(next_url: str) -> str | None:
 
 
 def _dms_booking_redirect(liff_state: str) -> RedirectResponse | None:
-    state = str(liff_state or "").lstrip("?")
-    params = parse_qs(state)
+    parsed = urlsplit(str(liff_state or "").strip())
+    params = parse_qs(parsed.query or parsed.path.lstrip("?"))
     if (params.get("credentials") or [""])[0].strip() == "dms":
         return RedirectResponse(
             url="/home/dms-booking?credentials=dms",

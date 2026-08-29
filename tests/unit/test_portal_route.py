@@ -75,6 +75,17 @@ class PortalRouteTest(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
 
+    def test_home_restores_path_prefixed_liff_login_redirect(self):
+        response = self.client.get(
+            "/home",
+            params={
+                "liff.state": "/dms-booking?portal=dms&openExternalBrowser=1",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
+
     def test_login_routes_liff_dms_portal_to_editor(self):
         response = self.client.get(
             "/login",

@@ -16,7 +16,9 @@
   对 LIFF URL 无效。Flex 菜单卡与 Rich Menu 共用这个函数。
 - **外部浏览器 LIFF 登录**:`dms-booking-api.js?v=4` 在未登录时把当前完整 DMS URL
   作为 `redirectUri`;不能使用 `withLoginOnExternalBrowser:true`,否则 LIFF 会按控制台的
-  `/home` endpoint 回跳并丢失 `portal=dms`,最终误落到普通 `/cowork` 登录页。
+  `/home` endpoint 回跳并丢失 `portal=dms`,最终误落到普通 `/cowork` 登录页。LINE 会把
+  子路径编码成 `/home?liff.state=/dms-booking?...`;`pages_routes._dms_booking_redirect`
+  必须先恢复这类 path-prefixed state,再进入普通 home 壳。
 - **历史 LIFF 兼容**:`static/dms-booking-edit/dms-booking-edit.js?v=11` portalMode 分支统一
   `liff.openWindow({ url, external: true })`,但按平台安全清理 LINE 启动页:
   - Android **与** iOS 都走外部浏览器(不再按 `liff.getOS()` 分流)

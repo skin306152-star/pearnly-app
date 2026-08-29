@@ -19,6 +19,10 @@ class ClassifyTests(unittest.TestCase):
         for text in ("เมนู", "เมน", "เมนB", " เมนู "):
             self.assertEqual(commands.classify(text), commands.CMD_MENU, text)
 
+    def test_english_menu_is_case_and_whitespace_insensitive(self):
+        for text in ("Menu", "menu", "MENU", "  mEnU  "):
+            self.assertEqual(commands.classify(text), commands.CMD_MENU, text)
+
     def test_long_word_starting_with_menu_prefix_is_not_menu(self):
         # 以 เมน 起头的长句是闲聊,不是召唤菜单
         self.assertIsNone(commands.classify("เมนูอาหารกลางวันวันนี้"))

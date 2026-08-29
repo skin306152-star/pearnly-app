@@ -29,6 +29,8 @@ def classify(text: str) -> Optional[str]:
     stripped = (text or "").strip()
     if stripped == RESET_WORD:
         return CMD_RESET
+    if stripped.casefold() == "menu":
+        return CMD_MENU
     if len(stripped) <= _MENU_MAX_LEN and stripped.startswith(_MENU_PREFIX):
         return CMD_MENU
     if stripped.startswith(_GREETING_PREFIX):

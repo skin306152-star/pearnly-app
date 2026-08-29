@@ -205,6 +205,16 @@ class MenuTriggerTests(unittest.IsolatedAsyncioTestCase):
             card = env.reply_msgs.call_args.args[1][0]
             self.assertEqual(card["altText"], cards.TXT_MENU_TITLE)
 
+    async def test_a1_english_menu_overrides_active_session(self):
+        """A1:活跃会话发英文 Menu → 重弹 Flex 菜单,不得落进 _nudge。"""
+        with _Env() as env:
+            env.store.set_session("T1", "L1", "menu", {})
+            await flow.handle_text(_BINDING, _LUID, "rt", "  mEnU  ")
+            env.reply.assert_not_called()
+            card = env.reply_msgs.call_args.args[1][0]
+            self.assertEqual(card["altText"], cards.TXT_MENU_TITLE)
+            self.assertEqual(env.session()["state"], "menu")
+
 
 class MenuChoiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_a2_menu_button_customer_sets_mode(self):

@@ -1,19 +1,20 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-28 DMS LINE 自助同步凭据收官
+## 当前状态卡 · 08-29 ERP / LINE / Companion 全闭环启动
 
-- **✅ 当前 task**:DMS 销售人员可从 LINE 菜单 4 打开账号密码编辑器,手动同步其在 MR.ERP/DMS 已修改的新用户名和密码。
-- **✅ 真实入口**:菜单 4 使用同一 DMS LIFF 的 `credentials=dms`;生产 `/home?liff.state=?credentials=dms` 现 302 到 `/home/dms-booking?credentials=dms`,不再落 Pearnly Login。
-- **✅ 编辑器**:LINE 内展示 DMS 用户名、密码、确认密码和保存按钮;密码不回显,两次密码不一致不提交。
-- **✅ 同步闭环**:保存只更新当前 active member 自己的 `mrerp_dms` endpoint 加密凭据;下一次菜单 3 登录从同一 endpoint 读取更新后的账号密码。
-- **✅ 安全边界**:不允许改他人、管理员或其他 endpoint;API 不返回密码,更新保留 endpoint 其余配置。
-- **✅ 验收**:定向单测 25 passed;真实 uvicorn 路由 Playwright 8 passed;ERP/Cowork 分流 60 passed;完整 pre-push 1189 模块分片及全部机械闸全绿。
-- **✅ 最新上线**:`d12143f3` 已在 `master`、`origin/master` 和生产 `/opt/mrpilot`;CI `33177361906` 全绿并完成 pinned-SHA deploy;生产 health/editor 200。
-- **✅ 生产证据**:精确 LIFF 回调实测 302 到编辑器;Chrome 生产检查最终 URL 为编辑器路由,标题 `Pearnly DMS`,不再是登录页。
-- **⏳ 外部验收**:真实 iOS/Android LINE 客户端仍需点菜单 4 看编辑器;不使用用户真实密码做自动化生产写入,完成前不宣称真实账号已改写。
-- **⚠️ 使用口径**:系统不会侦测 MR.ERP 密码变化;销售人员先在 MR.ERP 修改,再在 LINE 菜单 4 填入同一组新凭据完成同步。
-- **⚠️ 下一步首项**:沿袭 ERP LINE 绑定码 403 `workspace.forbidden` 待办;修复前先清理前端过期账套状态并补精确错误提示/回归测试。
-- **🧹 工作树**:本批源码、验证证据和状态卡均已提交;无未 push commit、无本批临时服务/测试进程。
+- **▶ 当前 task**:严格单功能推进 ERP 全闭环;F0 规划交付已完成,F1「单组织/单账套/多员工共用现有单 Profile Express 小助手」进入 discovery。
+- **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
+- **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
+- **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
+- **✅ F0**:`COMPLETE`;PO、acceptance ledger 与本状态卡已落盘,不作为需真机/用户 OK 的产品功能。
+- **▶ F1 状态**:`DISCOVERY`;endpoint 改 tenant-owned + workspace scope,现有 `user_id` 保留 creator;push log `user_id` 保持 actor。
+- **📐 F1 窄边界**:只共享 active Express 手动推送;partial unique 轴=`(tenant_id,workspace_client_id,adapter)`;共享查询/RLS 必须 adapter-gated;MR.ERP/`mrerp_dms` 原样;Companion/auto_push/LINE/多 Profile 不改。
+- **🚩 F1 放量**:`erp_shared_express_endpoint` 默认关,仅测试 tenant;存量多 endpoint 冲突只阻断并报告,不自动合并;最终 rollout 状态须入 ledger。
+- **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
+- **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
+- **📍 已核生产基线**:`master`、`origin/master`、生产均为 `b580bae6`;CI `33237575937` success;本轮功能发布仍须重新验精确 SHA。
+- **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
+- **🧹 工作树**:本轮仅新增/改写规划文档,尚未提交或推送;源码、配置、业务数据与 Companion 均未改。
 
 ---
 

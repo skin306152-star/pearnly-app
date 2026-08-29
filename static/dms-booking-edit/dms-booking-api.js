@@ -28,9 +28,9 @@
         });
         var liffId = config && config.data && config.data.liff_id;
         if (!liffId || !window.liff) throw new Error('open_in_line');
-        await window.liff.init({ liffId: liffId, withLoginOnExternalBrowser: true });
+        await window.liff.init({ liffId: liffId });
         if (!window.liff.isLoggedIn()) {
-            window.liff.login();
+            window.liff.login({ redirectUri: window.location.href });
             return new Promise(function () {});
         }
         var body = await fetch('/api/line/dms-booking/auth', {

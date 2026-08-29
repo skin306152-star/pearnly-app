@@ -121,8 +121,8 @@ const GEO = {
     },
 };
 
-function liffMockScript(os, inClient = true) {
-    return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.__dmsLiffInit=null;window.liff={init:async(params)=>{window.__dmsLiffInit=params;localStorage.setItem('__dmsLiffInit',JSON.stringify(params));},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>${JSON.stringify(inClient)},getOS:()=>${JSON.stringify(os)},openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
+function liffMockScript(os, inClient = true, loggedIn = true) {
+    return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.__dmsLiffInit=null;window.__dmsLiffLogin=null;window.liff={init:async(params)=>{window.__dmsLiffInit=params;localStorage.setItem('__dmsLiffInit',JSON.stringify(params));},isLoggedIn:()=>${JSON.stringify(loggedIn)},login:(params)=>{window.__dmsLiffLogin=params;localStorage.setItem('__dmsLiffLogin',JSON.stringify(params));},getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>${JSON.stringify(inClient)},getOS:()=>${JSON.stringify(os)},openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
 }
 
 const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
@@ -201,10 +201,7 @@ test('Android opens MRERP DMS externally without cancelling the browser handoff'
     await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(false);
     await expect
         .poll(() => page.evaluate(() => globalThis.__dmsLiffInit))
-        .toEqual({
-            liffId: 'DMS-LIFF',
-            withLoginOnExternalBrowser: true,
-        });
+        .toEqual({ liffId: 'DMS-LIFF' });
     expect(h.ticketRequested()).toBe(true);
     expect(h.ticketRequestCount()).toBe(1);
     expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
@@ -241,7 +238,31 @@ test('iOS keeps the working external handoff and issues a fresh ticket after clo
     });
 });
 
-test('desktop LINE browser authenticates and continues in the same external tab', async ({
+test('desktop LINE browser preserves the DMS URL across the first LINE login', async ({ page }) => {
+    await page.route('https://static.line-scdn.net/**', (route) =>
+        route.fulfill({
+            contentType: 'application/javascript',
+            body: liffMockScript('web', false, false),
+        })
+    );
+    await page.route('**/api/line/dms-booking/config', (route) =>
+        route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { liff_id: 'DMS-LIFF' } }),
+        })
+    );
+    await page.goto(`${BASE}/home/dms-booking?portal=dms&openExternalBrowser=1`);
+    await expect
+        .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('__dmsLiffLogin'))))
+        .toEqual({
+            redirectUri: `${BASE}/home/dms-booking?portal=dms&openExternalBrowser=1`,
+        });
+    await expect
+        .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('__dmsLiffInit'))))
+        .toEqual({ liffId: 'DMS-LIFF' });
+});
+
+test('desktop LINE browser authenticates after redirect and continues in the same tab', async ({
     page,
 }) => {
     const h = await setupPortalTest(page, 'web', false);
@@ -254,7 +275,7 @@ test('desktop LINE browser authenticates and continues in the same external tab'
     expect(h.ticketRequested()).toBe(true);
     await expect
         .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('__dmsLiffInit'))))
-        .toEqual({ liffId: 'DMS-LIFF', withLoginOnExternalBrowser: true });
+        .toEqual({ liffId: 'DMS-LIFF' });
 });
 
 test('menu 4 opens the operator credential editor and saves only the entered pair', async ({

@@ -2,8 +2,9 @@
 
 > 用途:LINE DMS 富菜单第三项打开 MRERP DMS,继续使用后台配置的账号密码自动登录。
 > 菜单 3 使用普通 HTTPS + `openExternalBrowser=1`,由 LINE 原生直接交给系统浏览器,
-> 不再从 LIFF WebView 二次唤起。外部浏览器以 `withLoginOnExternalBrowser:true`
-> 初始化 LIFF;Android、iOS、电脑 LINE 的菜单卡共用同一入口。
+> 不再从 LIFF WebView 二次唤起。外部浏览器初始化 LIFF 后显式调用
+> `liff.login({redirectUri: window.location.href})`,确保首次授权后仍回到 DMS 入口;
+> Android、iOS、电脑 LINE 的菜单卡共用同一入口。
 > 后端事实源:`services/line_dms/login_tickets.py`(DAL)· 留档 `alembic 0102`。
 
 ---
@@ -13,8 +14,9 @@
 - **菜单入口**:`services/line_dms/rich_menu.py::portal_external_url` 返回普通 Pearnly
   HTTPS URL + `openExternalBrowser=1`;不能改回 `liff.line.me` URL,LINE 官方明确该参数
   对 LIFF URL 无效。Flex 菜单卡与 Rich Menu 共用这个函数。
-- **外部浏览器 LIFF 登录**:`dms-booking-api.js?v=3` 使用
-  `withLoginOnExternalBrowser:true`;电脑 LINE/手机系统浏览器可完成 LINE 身份验证后拿票。
+- **外部浏览器 LIFF 登录**:`dms-booking-api.js?v=4` 在未登录时把当前完整 DMS URL
+  作为 `redirectUri`;不能使用 `withLoginOnExternalBrowser:true`,否则 LIFF 会按控制台的
+  `/home` endpoint 回跳并丢失 `portal=dms`,最终误落到普通 `/cowork` 登录页。
 - **历史 LIFF 兼容**:`static/dms-booking-edit/dms-booking-edit.js?v=11` portalMode 分支统一
   `liff.openWindow({ url, external: true })`,但按平台安全清理 LINE 启动页:
   - Android **与** iOS 都走外部浏览器(不再按 `liff.getOS()` 分流)

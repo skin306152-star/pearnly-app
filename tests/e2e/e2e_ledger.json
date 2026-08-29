@@ -1163,6 +1163,24 @@
         "ERP 集成页只保留成熟 LINE 绑定卡，显示 ERP 专用 QR、Basic ID、6 位码、自动轮询、已绑定和移动端触控状态。"
       ]
     },
+    "37-dms-line-cross-platform.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/dms-line-cross-platform/*.png",
+      "covers": [
+        "routes/pages_routes.py",
+        "services/line_dms/menu_cards.py",
+        "services/line_dms/rich_menu.py",
+        "static/dms-booking-edit/dms-booking-api.js",
+        "static/dms-booking-edit/dms-booking-edit.js",
+        "static/dms-booking-edit/dms-credentials.js",
+        "static/dms-booking-edit/dms-booking-edit.html",
+        "static/dist/dms-booking-edit.html"
+      ],
+      "fixtures": [],
+      "only_e2e": [
+        "iOS WebKit、Android Chromium、macOS Chromium、Windows Firefox/Chromium 浏览器模型从 path-prefixed liff.state 主回调原 URL 启动；LIFF init 消费 code/state/liffClientId/liffRedirectUri 后必须零次重登并按 auth→ticket→relay 或 auth→GET credentials 的真浏览器网络顺序完成，且服务端不得先 302 丢掉 OAuth 参数。",
+        "菜单 1/2 的 postback 数据与菜单 3/4 的手机 external URI、桌面 altUri 同真实页面回调闭环一起留截图和逐平台 JSON 证据；这些导航、脚本加载、localStorage token 与浏览器事件顺序不能由 Python 单测证明。"
+      ]
+    },
     "_a1_discount_inferred_verify.spec.js": {
       "covers": ["static/ai/**", "static/dist/ai.*", "tests/e2e/_helpers/**"],
       "only_e2e": ["系统补的折扣行在审核队列说人话、严重度红、无按建议处理的安全默认"]

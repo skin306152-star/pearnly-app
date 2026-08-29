@@ -1,0 +1,56 @@
+{
+  "label": "macOS Chrome-compatible Chromium browser model",
+  "engine": "chromium",
+  "nativeDeviceOrOs": false,
+  "selectedMenuUris": {
+    "menu3": "https://pearnly.com/home/dms-booking?portal=dms",
+    "menu4": "https://pearnly.com/home/dms-booking?credentials=dms"
+  },
+  "menu1Postback": "action=menu_customer",
+  "menu2Postback": "action=menu_booking",
+  "portal": {
+    "requestedCallback": "http://127.0.0.1:53399/home?liff.state=%2Fdms-booking%3Fportal%3Ddms&code=line-code-macos-chromium-portal&state=line-state-macos-chromium-portal&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A53399%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "callbackHttpStatus": 200,
+    "callbackRedirectedFrom": null,
+    "finalUrl": "http://127.0.0.1:53399/home/dms-booking/portal?ticket=opaque-macos-chromium",
+    "liffInitCalls": [
+      {
+        "liffId": "DMS-LIFF"
+      }
+    ],
+    "liffLoginCount": 0,
+    "authBody": {
+      "id_token": "LINE-ID-TOKEN-macos-chromium"
+    },
+    "eventSequence": [
+      "config",
+      "liff.init",
+      "auth",
+      "ticket",
+      "relay"
+    ],
+    "redirectResponses": []
+  },
+  "credentials": {
+    "requestedCallback": "http://127.0.0.1:53399/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-macos-chromium-credentials&state=line-state-macos-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A53399%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "callbackHttpStatus": 200,
+    "callbackRedirectedFrom": null,
+    "finalUrl": "http://127.0.0.1:53399/home?liff.state=%2Fdms-booking%3Fcredentials%3Ddms&code=line-code-macos-chromium-credentials&state=line-state-macos-chromium-credentials&liffClientId=DMS-LIFF&liffRedirectUri=http%3A%2F%2F127.0.0.1%3A53399%2Fhome%3Fliff.state%3D%252Fdms-booking",
+    "liffInitCalls": [
+      {
+        "liffId": "DMS-LIFF"
+      }
+    ],
+    "liffLoginCount": 0,
+    "authBody": {
+      "id_token": "LINE-ID-TOKEN-macos-chromium"
+    },
+    "eventSequence": [
+      "config",
+      "liff.init",
+      "auth",
+      "credentials"
+    ],
+    "redirectResponses": []
+  }
+}

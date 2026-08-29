@@ -28,6 +28,9 @@ class DmsMenuCardTests(unittest.TestCase):
                 "type": "uri",
                 "label": cards.TXT_MENU_ITEM3,
                 "uri": "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
+                "altUri": {
+                    "desktop": "https://pearnly.com/home/dms-booking?portal=dms",
+                },
             },
         )
         self.assertEqual(
@@ -35,7 +38,10 @@ class DmsMenuCardTests(unittest.TestCase):
             {
                 "type": "uri",
                 "label": cards.TXT_MENU_ITEM4,
-                "uri": "https://liff.line.me/DMS-LIFF?credentials=dms",
+                "uri": "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
+                "altUri": {
+                    "desktop": "https://pearnly.com/home/dms-booking?credentials=dms",
+                },
             },
         )
 

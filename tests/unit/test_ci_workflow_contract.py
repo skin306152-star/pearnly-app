@@ -104,6 +104,12 @@ class CiWorkflowContractTests(unittest.TestCase):
         self.assertIn("cache: pip", e2e)
         self.assertIn("cache-dependency-path: requirements.lock.txt", e2e)
 
+    def test_e2e_job_installs_cross_platform_browser_engines(self):
+        e2e = self.jobs["e2e"]
+        self.assertIn("playwright install chromium webkit firefox", e2e)
+        self.assertIn("playwright install-deps chromium webkit firefox", e2e)
+        self.assertIn("playwright-all-browsers-v1-", e2e)
+
     def test_deploy_job_exists_and_master_only(self):
         self.assertIn("deploy", self.jobs)
         deploy = self.jobs["deploy"]

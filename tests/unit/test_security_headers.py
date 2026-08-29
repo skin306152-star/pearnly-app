@@ -63,6 +63,10 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
             "static.line-scdn.net",
             resp.headers["content-security-policy-report-only"],
         )
+        self.assertIn(
+            "liffsdk.line-scdn.net",
+            resp.headers["content-security-policy-report-only"],
+        )
 
     def test_report_uri_present_in_both(self):
         # 违规上报目标:两档都要带 report-uri,否则违规收不到、无法数据驱动升格

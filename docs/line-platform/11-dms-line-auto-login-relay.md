@@ -11,15 +11,16 @@
 
 ## 0. 当前状态(2026-08-29 · LINE 原生外部浏览器入口 + 中继提速)
 
-- **菜单入口**:`services/line_dms/rich_menu.py::portal_external_url` 返回普通 Pearnly
-  HTTPS URL + `openExternalBrowser=1`;不能改回 `liff.line.me` URL,LINE 官方明确该参数
-  对 LIFF URL 无效。Flex 菜单卡与 Rich Menu 共用这个函数。
+- **菜单入口**:菜单 3、4 均返回普通 Pearnly HTTPS URL;手机 URI 带
+  `openExternalBrowser=1`,不能改回 `liff.line.me` URL,LINE 官方明确该参数对 LIFF URL
+  无效。电脑 LINE 不显示 Rich Menu,依赖 Flex 菜单卡的 `altUri.desktop` 直接打开默认浏览器。
 - **外部浏览器 LIFF 登录**:`dms-booking-api.js?v=4` 在未登录时把当前完整 DMS URL
   作为 `redirectUri`;不能使用 `withLoginOnExternalBrowser:true`,否则 LIFF 会按控制台的
-  `/home` endpoint 回跳并丢失 `portal=dms`,最终误落到普通 `/cowork` 登录页。LINE 会把
-  子路径编码成 `/home?liff.state=/dms-booking?...`;`pages_routes._dms_booking_redirect`
-  必须先恢复这类 path-prefixed state,再进入普通 home 壳。
-- **历史 LIFF 兼容**:`static/dms-booking-edit/dms-booking-edit.js?v=11` portalMode 分支统一
+  `/home` endpoint 做 primary redirect。LINE 会把子路径编码成
+  `/home?liff.state=/dms-booking?...`;该请求必须原 URL 200 返回 DMS shell,由
+  `liff.init()` 先消费 `code/state/liff.*` 再完成登录。禁止在 init 前服务端 301/302
+  或删除回调参数,否则 SDK 会持续判断未登录并形成登录循环。
+- **历史 LIFF 兼容**:`static/dms-booking-edit/dms-booking-edit.js?v=12` portalMode 分支统一
   `liff.openWindow({ url, external: true })`,但按平台安全清理 LINE 启动页:
   - Android **与** iOS 都走外部浏览器(不再按 `liff.getOS()` 分流)
   - iOS 保持打开外部浏览器后立即 `closeWindow()`

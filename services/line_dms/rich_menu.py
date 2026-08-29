@@ -38,26 +38,37 @@ def _area(col: int, action: dict, *, row: int = 0) -> dict:
     }
 
 
-def portal_external_url() -> str:
-    """Open menu 3 in the system browser before LIFF authentication starts."""
+def _entry_url(mode: str, *, external: bool) -> str:
     liff_id = (os.environ.get("LINE_DMS_LIFF_ID") or "").strip() or (
         os.environ.get("LINE_LIFF_ID") or ""
     ).strip()
     if liff_id:
-        query = urllib.parse.urlencode({"portal": "dms", "openExternalBrowser": "1"})
+        params = {mode: "dms"}
+        if external:
+            params["openExternalBrowser"] = "1"
+        query = urllib.parse.urlencode(params)
         return f"https://pearnly.com/home/dms-booking?{query}"
     return "https://pearnly.com/dms"
 
 
-def credentials_liff_url() -> str:
-    """Open the self-service credential editor in the same DMS LIFF app."""
-    liff_id = (os.environ.get("LINE_DMS_LIFF_ID") or "").strip() or (
-        os.environ.get("LINE_LIFF_ID") or ""
-    ).strip()
-    if liff_id:
-        query = urllib.parse.urlencode({"credentials": "dms"})
-        return f"https://liff.line.me/{liff_id}?{query}"
-    return "https://pearnly.com/dms"
+def portal_external_url() -> str:
+    """Open menu 3 in the system browser before LIFF authentication starts."""
+    return _entry_url("portal", external=True)
+
+
+def portal_desktop_url() -> str:
+    """Desktop LINE already opens URI actions in the default browser."""
+    return _entry_url("portal", external=False)
+
+
+def credentials_external_url() -> str:
+    """Open menu 4 in the system browser on Android and iOS."""
+    return _entry_url("credentials", external=True)
+
+
+def credentials_desktop_url() -> str:
+    """Open menu 4 directly in the macOS or Windows default browser."""
+    return _entry_url("credentials", external=False)
 
 
 def build_payload() -> dict:
@@ -92,7 +103,7 @@ def build_payload() -> dict:
                 {
                     "type": "uri",
                     "label": "เปลี่ยนรหัสผ่าน",
-                    "uri": credentials_liff_url(),
+                    "uri": credentials_external_url(),
                 },
                 row=1,
             ),

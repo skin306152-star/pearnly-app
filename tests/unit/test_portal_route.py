@@ -42,82 +42,81 @@ class PortalRouteTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp.headers["location"], "/cowork")
 
-    def test_login_routes_liff_booking_draft_to_editor(self):
+    def test_login_serves_liff_booking_draft_shell_without_redirect(self):
         response = self.client.get(
             "/login",
             params={"liff.state": "?draft=nonce with spaces"},
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            response.headers["location"],
-            "/home/dms-booking?draft=nonce%20with%20spaces",
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
 
-    def test_home_routes_liff_booking_draft_to_editor(self):
+    def test_home_serves_liff_booking_draft_shell_without_redirect(self):
         response = self.client.get(
             "/home",
             params={"liff.state": "?draft=real-line-nonce"},
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            response.headers["location"],
-            "/home/dms-booking?draft=real-line-nonce",
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
 
-    def test_home_routes_liff_dms_portal_to_editor(self):
+    def test_home_serves_liff_dms_portal_shell_without_redirect(self):
         response = self.client.get(
             "/home",
             params={"liff.state": "?portal=dms"},
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
 
-    def test_home_restores_path_prefixed_liff_login_redirect(self):
+    def test_home_keeps_path_prefixed_liff_login_callback_intact(self):
         response = self.client.get(
             "/home",
             params={
                 "liff.state": "/dms-booking?portal=dms&openExternalBrowser=1",
+                "code": "line-oauth-code",
+                "state": "line-oauth-state",
+                "liffClientId": "2010411313",
+                "liffRedirectUri": "https://pearnly.com/home?liff.state=%2Fdms-booking",
             },
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
 
-    def test_login_routes_liff_dms_portal_to_editor(self):
+    def test_login_serves_liff_dms_portal_shell_without_redirect(self):
         response = self.client.get(
             "/login",
             params={"liff.state": "?portal=dms"},
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers["location"], "/home/dms-booking?portal=dms")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
 
-    def test_home_routes_liff_dms_credentials_to_editor(self):
+    def test_home_serves_liff_dms_credentials_shell_without_redirect(self):
         response = self.client.get(
             "/home",
             params={"liff.state": "?credentials=dms"},
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            response.headers["location"],
-            "/home/dms-booking?credentials=dms",
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
 
-    def test_login_routes_liff_dms_credentials_to_editor(self):
+    def test_login_serves_liff_dms_credentials_shell_without_redirect(self):
         response = self.client.get(
             "/login",
             params={"liff.state": "?credentials=dms"},
             follow_redirects=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            response.headers["location"],
-            "/home/dms-booking?credentials=dms",
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly DMS", response.text)
 
     def test_login_ignores_unrelated_liff_state(self):
         # 未触发 DMS 订车 liff 特殊 → /login 一律 302 到 canonical 主壳(默认 /cowork)。

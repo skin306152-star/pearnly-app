@@ -26,7 +26,8 @@
         var sp = new URLSearchParams(location.search);
         var state = sp.get('liff.state');
         if (state) {
-            state = state.charAt(0) === '?' ? state.slice(1) : state;
+            var queryStart = state.indexOf('?');
+            state = queryStart >= 0 ? state.slice(queryStart + 1) : state;
             return new URLSearchParams(state).get(name) || '';
         }
         return sp.get(name) || '';

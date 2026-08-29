@@ -589,20 +589,20 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-all-browsers-v1-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install Chromium browser
+      - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium
+        run: npx playwright install chromium webkit firefox
 
-      - name: Install Chromium system deps
-        run: npx playwright install-deps chromium
+      - name: Install Playwright system deps
+        run: npx playwright install-deps chromium webkit firefox
 
       # 视觉照搬闸 + 基准过期检测 · 2026-07-31 起进 CI(此前只挂 pre-push)。
       # 触发面本来只有 static/pos/ · src/home/{pos,inventory,purchase}- · tests/visual/design/,
       # 而它的 MAPPINGS 管着 dashboard/history/clients/sales-report/acct-* 等 20 条 route ——
       # dashboard 那条选择器 6-28 就烂了,直到有人碰巧改 purchase-settings.ts 才撞出来,三周零报警。
-      # 无条件跑(复用上面的 npm run build 与 chromium · 本机实测 21 秒)。
+      # 无条件跑(复用上面的 npm run build 与 Playwright 浏览器 · 本机实测 21 秒)。
       - name: 视觉照搬闸 · 关键令牌全等设计稿 + 基准不过期(FAIL mode)
         run: node tests/visual/test_design_fidelity.spec.js
 

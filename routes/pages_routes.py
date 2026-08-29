@@ -29,7 +29,7 @@ REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后�
 import asyncio
 import os
 from typing import Annotated
-from urllib.parse import parse_qs, quote, unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
@@ -123,9 +123,8 @@ async def login_page(
     liff_state: Annotated[str, Query(alias="liff.state")] = "",
     next: Annotated[str, Query()] = "",
 ):
-    redirect = _dms_booking_redirect(liff_state)
-    if redirect:
-        return redirect
+    if _is_dms_booking_state(liff_state):
+        return _dms_booking_shell()
     # 旧入口退居别名；next 只接受同源绝对路径。
     target = _safe_internal_next(next) or "/cowork"
     return RedirectResponse(url=target, status_code=302)
@@ -147,35 +146,28 @@ def _safe_internal_next(next_url: str) -> str | None:
     return next_url
 
 
-def _dms_booking_redirect(liff_state: str) -> RedirectResponse | None:
+def _is_dms_booking_state(liff_state: str) -> bool:
+    """Select the DMS shell without changing LIFF's primary-redirect URL."""
     parsed = urlsplit(str(liff_state or "").strip())
     params = parse_qs(parsed.query or parsed.path.lstrip("?"))
     if (params.get("credentials") or [""])[0].strip() == "dms":
-        return RedirectResponse(
-            url="/home/dms-booking?credentials=dms",
-            status_code=302,
-        )
+        return True
     if (params.get("portal") or [""])[0].strip() == "dms":
-        return RedirectResponse(
-            url="/home/dms-booking?portal=dms",
-            status_code=302,
-        )
-    draft = (params.get("draft") or [""])[0].strip()
-    if draft:
-        return RedirectResponse(
-            url=f"/home/dms-booking?draft={quote(draft, safe='')}",
-            status_code=302,
-        )
-    return None
+        return True
+    return bool((params.get("draft") or [""])[0].strip())
+
+
+def _dms_booking_shell() -> FileResponse:
+    # LIFF must consume code/state/liff.* on the untouched primary redirect before any URL change.
+    return FileResponse("static/dist/dms-booking-edit.html", headers=_NO_CACHE)
 
 
 @router.get("/home", response_class=HTMLResponse)
 async def home(
     liff_state: Annotated[str, Query(alias="liff.state")] = "",
 ):
-    redirect = _dms_booking_redirect(liff_state)
-    if redirect:
-        return redirect
+    if _is_dms_booking_state(liff_state):
+        return _dms_booking_shell()
     # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版
     return FileResponse("static/dist/home.html", headers=_NO_CACHE)
 

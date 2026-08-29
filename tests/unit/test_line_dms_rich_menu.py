@@ -27,11 +27,15 @@ class DmsRichMenuTests(unittest.TestCase):
                 "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             )
 
-    def test_credentials_liff_url(self):
+    def test_credentials_external_and_desktop_urls(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=True):
             self.assertEqual(
-                rich_menu.credentials_liff_url(),
-                "https://liff.line.me/DMS-LIFF?credentials=dms",
+                rich_menu.credentials_external_url(),
+                "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
+            )
+            self.assertEqual(
+                rich_menu.credentials_desktop_url(),
+                "https://pearnly.com/home/dms-booking?credentials=dms",
             )
 
     def test_portal_external_url_falls_back_to_shared_liff_id(self):
@@ -79,7 +83,7 @@ class DmsRichMenuTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["areas"][3]["action"]["uri"],
-            "https://liff.line.me/DMS-LIFF?credentials=dms",
+            "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
         )
 
     def _image_path(self):

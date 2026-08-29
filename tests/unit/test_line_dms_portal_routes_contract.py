@@ -9,7 +9,7 @@ from routes import line_dms_portal_routes as portal_routes
 
 EXPECTED = {
     ("POST", "/api/line/dms-portal/ticket"),
-    ("GET", "/line/dms-portal"),
+    ("GET", "/home/dms-booking/portal"),
 }
 
 
@@ -33,7 +33,7 @@ class LineDmsPortalRouteContractTests(unittest.TestCase):
     def test_public_relay_is_explicitly_whitelisted(self):
         from scripts.check_authz_coverage import PUBLIC_ROUTES
 
-        self.assertIn(("GET", "/line/dms-portal"), PUBLIC_ROUTES)
+        self.assertIn(("GET", "/home/dms-booking/portal"), PUBLIC_ROUTES)
 
 
 class LineDmsPortalRouteTests(unittest.TestCase):
@@ -44,7 +44,11 @@ class LineDmsPortalRouteTests(unittest.TestCase):
         issue.return_value = {"ticket": "opaque+/", "expires_at": "soon"}
         result = asyncio.run(portal_routes.issue_mrerp_login_ticket(object()))
         issue.assert_called_once_with("tenant-2", "user-1")
-        self.assertEqual(result["data"]["url"], "/line/dms-portal?ticket=opaque%2B%2F")
+        self.assertEqual(
+            result["data"]["url"],
+            "/home/dms-booking/portal?ticket=opaque%2B%2F",
+        )
+        self.assertTrue(result["data"]["url"].startswith("/home/dms-booking/"))
 
     @patch.object(portal_routes, "_authorize", new_callable=AsyncMock)
     def test_issue_rejects_missing_identity(self, authorize):

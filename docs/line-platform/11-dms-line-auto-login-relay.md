@@ -24,7 +24,7 @@
      一旦落到跨域 checklogin 页(登录已落、会话 cookie 已建)才送 home.php
      —— 慢网也**不会**打断在途登录
   4. `<link rel="dns-prefetch">` + `<link rel="preconnect">` 预热 MRERP 连接
-- **票据链路**:一次性票据(`/api/line/dms-portal/ticket` POST)+ relay(`/line/dms-portal`
+- **票据链路**:一次性票据(`/api/line/dms-portal/ticket` POST)+ relay(`/home/dms-booking/portal`
   GET)不变。TTL 60s、一次性、SHA256 哈希存库、no-store/CSP/no-referrer 头齐备。
 - **E2E**:`tests/e2e/33-dms-booking-edit-mobile.spec.js` 锁定:① Android
   `external:true`,外部交接前不关闭、进入后台后才关闭;② iOS 保持立即关闭且重入发
@@ -118,7 +118,9 @@ Pearnly 票据失败的出口动作是回 LINE 重进入口(重新发票据)。�
 - 一次性 token 端点:接受 Pearnly 签发的短寿命 token → 建立 PHPSESSID → redirect home.php
 - 或标准 OIDC/SAML 端点
 
-在 MRERP 提供前,Android 与 iOS 都保持 `external:true`。
+在 MRERP 提供前,Android 与 iOS 都保持 `external:true`。中继 URL 必须保留在 LIFF
+endpoint 的下层(`/home/dms-booking/portal`);LINE 官方不保证从 endpoint 跳到更高层或
+范围外路径的行为,该限制会在部分 Android WebView 上表现为拿票成功但完全不启动外部浏览器。
 
 ## 7. 真机验证步骤
 

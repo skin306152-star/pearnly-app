@@ -172,7 +172,7 @@ async function setupPortalTest(page, os) {
             contentType: 'application/json',
             body: JSON.stringify({
                 ok: true,
-                data: { url: '/line/dms-portal?ticket=opaque-ticket' },
+                data: { url: '/home/dms-booking/portal?ticket=opaque-ticket' },
             }),
         });
     });
@@ -195,7 +195,7 @@ test('Android opens MRERP DMS externally without cancelling the browser handoff'
     await expect
         .poll(() => page.evaluate(() => globalThis.__dmsPortalOpen))
         .toEqual({
-            url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
+            url: `${BASE}/home/dms-booking/portal?ticket=opaque-ticket`,
             external: true,
         });
     await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(false);
@@ -222,7 +222,7 @@ test('iOS keeps the working external handoff and issues a fresh ticket after clo
     await expect
         .poll(() => page.evaluate(() => globalThis.__dmsPortalOpen))
         .toEqual({
-            url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
+            url: `${BASE}/home/dms-booking/portal?ticket=opaque-ticket`,
             external: true,
         });
     await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(true);

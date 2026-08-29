@@ -54,13 +54,13 @@ async def issue_mrerp_login_ticket(request: Request):
     ticket = urllib.parse.quote(issued["ticket"], safe="")
     return ok(
         {
-            "url": f"/line/dms-portal?ticket={ticket}",
+            "url": f"/home/dms-booking/portal?ticket={ticket}",
             "expires_at": issued["expires_at"],
         }
     )
 
 
-@router.get("/line/dms-portal")
+@router.get("/home/dms-booking/portal")
 async def consume_mrerp_login_ticket(ticket: str = ""):
     identity = await asyncio.to_thread(login_tickets.consume_login_ticket, ticket)
     if not identity:

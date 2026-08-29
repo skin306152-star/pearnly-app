@@ -92,7 +92,7 @@ PUBLIC_ROUTES = {
     ("GET", "/home/dms-booking"),  # 同一 LIFF 页面壳;生产 LIFF 的实际登记路径
     ("GET", "/api/line/dms-booking/config"),  # 公开返回非秘密 DMS LIFF ID
     ("POST", "/api/line/dms-booking/auth"),  # DMS LIFF id_token 经 LINE 验签即凭证
-    ("GET", "/line/dms-portal"),  # 60 秒单次 opaque ticket 即凭证;DB 原子核销
+    ("GET", "/home/dms-booking/portal"),  # LIFF endpoint 下层中继;60 秒单次票据原子核销
     ("POST", "/internal/deploy"),
     ("GET", "/internal/deploy/log"),
     ("GET", "/internal/deploy/manual"),

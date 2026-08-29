@@ -1,20 +1,23 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-29 ERP / LINE / Companion 全闭环启动
+## 当前状态卡 · 08-29 F1-B2 后端发布收口
 
-- **▶ 当前 task**:严格单功能推进 ERP 全闭环;F1 正在实施 Batch 1 数据底座,仅做默认休眠的 additive schema/flag/RLS,不接共享业务路径。
+- **▶ 当前 task**:严格单功能推进 ERP 全闭环;F1-B2 后端已完成本地实现,正在做提交前发布收口;不开始 B3/B4/B5。
 - **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
 - **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 - **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
 - **✅ F0**:`COMPLETE`;PO、acceptance ledger 与本状态卡已落盘,不作为需真机/用户 OK 的产品功能。
-- **▶ F1 状态**:`IMPLEMENTING`;B1 增 workspace/shared 字段、tenant flag、active shared Express partial unique 与 session-local SELECT RLS;不回填。
+- **▶ F1 状态**:`IMPLEMENTING`;B1 默认休眠底座已按 `57fb5480` 精确部署;B2 后端候选尚无 commit/CI/production SHA,F1 绝未完成。
+- **✅ B2 后端范围**:ERP 四权限码与 owner/admin/custom 边界;tenant-flagged custom role 邀请/接受/撤销/scope 并发完整性;flag-on `main/cowork/erp` 确认、编辑、正式单据关联与 actor/workspace/direction 原子门。
+- **🛌 B2 安全部署**:`erp_shared_express_endpoint` 默认 false/fail-closed;B2 生产发布保持所有 tenant flag-off,旧 system-role 邀请、history/convert/commit 路径逐字走 legacy 分支;不在本批开测试 tenant。
 - **📐 F1 窄边界**:只共享 active Express 手动推送;partial unique 轴=`(tenant_id,workspace_client_id,adapter)`;共享查询/RLS 必须 adapter-gated;MR.ERP/`mrerp_dms` 原样;Companion/auto_push/LINE/多 Profile 不改。
 - **🚩 F1 放量**:`erp_shared_express_endpoint` 默认关,仅测试 tenant;存量多 endpoint 冲突只阻断并报告,不自动合并;最终 rollout 状态须入 ledger。
+- **⏸ F1 后续批次**:B3=真实 endpoint/push/log 权限与共享路由;B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送,含四语/source/dist/cache-bust/真浏览器;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;三批均未解锁。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
 - **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
-- **📍 已核生产基线**:`master`、`origin/master`、生产均为 `e37bfed7`;CI `33245600399` success;本轮功能发布仍须重新验精确 SHA。
+- **📍 发布基线**:最后已验 F1-B1 production SHA=`57fb5480`;B2 仍是未提交工作树,必须另绑 CI success、精确生产 SHA/启动时间后才可写 deployed。
 - **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
-- **🧪 B1 交付态**:本地代码与静态/合同单测已通过,待提交后 CI 真 PG smoke 与精确部署验证;B2 仍禁止,且未改路由、业务数据、Companion、agent_store、auto_push、MR.ERP、DMS、LINE 或 F2-F7。
+- **🧪 B2 当前证据**:定向 208、全量 unit 13954、真 PostgreSQL smoke 32/零 skip 及 worktree black/ruff/authz/size/destructive 等机械闸全绿;待提交后让 pre-push 真实检查该 commit,未改 UI、Companion、agent_store、auto_push、MR.ERP、DMS、LINE 或 F2-F7。
 
 ---
 

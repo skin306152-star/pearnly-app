@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 from core import db
 from services.authz.registry import ASSIGNABLE_ROLE_KEYS, SCOPABLE_ROLE_KEYS
 from services.authz.resolver import set_membership_role
+from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 
 logger = logging.getLogger("mr-pilot")
 
@@ -104,20 +105,26 @@ def seat_usage(tenant_id: str) -> Dict[str, int]:
     return {"members": members, "pending": pending, "used": members + pending}
 
 
+def _get_member_with_cursor(
+    cur, tenant_id: str, user_id: str, *, for_update: bool = False
+) -> Optional[Dict[str, Any]]:
+    sql = """
+        SELECT m.id AS membership_id, m.scope_mode, r.key AS role_key, u.username
+        FROM memberships m
+        JOIN roles r ON r.id = m.role_id
+        JOIN users u ON u.id = m.user_id
+        WHERE m.tenant_id = %s AND m.user_id = %s AND m.status = 'active'
+    """
+    if for_update:
+        sql += " FOR UPDATE OF m"
+    cur.execute(sql, (str(tenant_id), str(user_id)))
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def get_member(tenant_id: str, user_id: str) -> Optional[Dict[str, Any]]:
     with db.get_cursor() as cur:
-        cur.execute(
-            """
-            SELECT m.id AS membership_id, m.scope_mode, r.key AS role_key, u.username
-            FROM memberships m
-            JOIN roles r ON r.id = m.role_id
-            JOIN users u ON u.id = m.user_id
-            WHERE m.tenant_id = %s AND m.user_id = %s AND m.status = 'active'
-            """,
-            (str(tenant_id), str(user_id)),
-        )
-        row = cur.fetchone()
-    return dict(row) if row else None
+        return _get_member_with_cursor(cur, tenant_id, user_id)
 
 
 def change_role(
@@ -128,12 +135,12 @@ def change_role(
         return {"error": "team.cannot_modify_self"}
     if role_key not in ASSIGNABLE_ROLE_KEYS:
         return {"error": "team.role_not_assignable"}
-    member = get_member(tenant_id, target_user_id)
-    if member is None:
-        return {"error": "team.member_not_found"}
-    if member["role_key"] == "owner":
-        return {"error": "team.target_is_owner"}
     with db.get_cursor(commit=True) as cur:
+        member = _get_member_with_cursor(cur, tenant_id, target_user_id, for_update=True)
+        if member is None:
+            return {"error": "team.member_not_found"}
+        if member["role_key"] == "owner":
+            return {"error": "team.target_is_owner"}
         ok = set_membership_role(
             cur,
             user_id=str(target_user_id),
@@ -169,26 +176,34 @@ def set_scope(
         return {"error": "team.cannot_modify_self"}
     if scope_mode not in ("all", "assigned"):
         return {"error": "team.scope_invalid"}
-    member = get_member(tenant_id, target_user_id)
-    if member is None:
-        return {"error": "team.member_not_found"}
-    if member["role_key"] == "owner":
-        return {"error": "team.target_is_owner"}
-    if scope_mode == "assigned" and member["role_key"] not in SCOPABLE_ROLE_KEYS:
-        return {"error": "team.scope_not_allowed"}
-    mid = str(member["membership_id"])
     with db.get_cursor(commit=True) as cur:
+        member = _get_member_with_cursor(cur, tenant_id, target_user_id, for_update=True)
+        if member is None:
+            return {"error": "team.member_not_found"}
+        if member["role_key"] == "owner":
+            return {"error": "team.target_is_owner"}
+        role_key = str(member["role_key"])
+        if scope_mode == "assigned":
+            custom_scopable = role_key.startswith(
+                "custom:"
+            ) and erp_shared_express_endpoint_enabled_for(str(tenant_id))
+            if role_key not in SCOPABLE_ROLE_KEYS and not custom_scopable:
+                return {"error": "team.scope_not_allowed"}
+        mid = str(member["membership_id"])
         valid_ids: List[int] = []
         if scope_mode == "assigned":
-            wanted = [int(ws) for ws in (workspace_ids or [])]
-            if wanted:
-                cur.execute(
-                    "SELECT id FROM workspace_clients WHERE id = ANY(%s) AND tenant_id = %s",
-                    (wanted, str(tenant_id)),
-                )
-                valid_ids = sorted(int(r["id"]) for r in cur.fetchall())
-            if not valid_ids:
+            wanted = list(dict.fromkeys(int(ws) for ws in (workspace_ids or [])))
+            if not wanted:
                 return {"error": "team.scope_empty"}
+            cur.execute(
+                "SELECT id FROM workspace_clients WHERE tenant_id = %s "
+                "AND id = ANY(%s) AND is_active = TRUE FOR SHARE",
+                (str(tenant_id), wanted),
+            )
+            found = {int(r["id"]) for r in cur.fetchall()}
+            if found != set(wanted):
+                return {"error": "team.scope_invalid"}
+            valid_ids = sorted(found)
         cur.execute(
             "SELECT workspace_client_id FROM member_scopes WHERE tenant_id=%s AND membership_id=%s",
             (str(tenant_id), mid),

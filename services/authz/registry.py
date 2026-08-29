@@ -114,6 +114,13 @@ STOCKCARD_CODES = (
     "stockcard.opening.manage",
 )
 
+ERP_CODES = (
+    "erp.endpoint.view",
+    "erp.endpoint.manage",
+    "erp.push.operate",
+    "erp.log.view",
+)
+
 # 敏感字段可见性(G4 · 字段级遮蔽,非模块动作)。缺码 → 成本/工资列读侧返 null。
 # 不挂任何模块开关(横切),预设角色除收银员外按现状全开;自定义角色可关。
 FIELD_CODES = (
@@ -134,6 +141,7 @@ ALL_CODES: frozenset[str] = frozenset(
     + POS_CODES
     + INTAKE_CODES
     + STOCKCARD_CODES
+    + ERP_CODES
     + FIELD_CODES
 )
 
@@ -152,6 +160,7 @@ _PREFIX_MODULE = {
     "pos": "pos",
     "intake": "expense",
     "stockcard": "accounting",
+    "erp": None,
     "team": None,
     "billing": None,
     "ownership": None,
@@ -247,7 +256,7 @@ _ACCOUNTANT = _CLERK + (
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     # owner 在 roles 表存 {"all": true},此处展开全集供矩阵单测逐格断言
     "owner": ALL_CODES,
-    "admin": ALL_CODES - {"billing.manage", "ownership.transfer"},
+    "admin": ALL_CODES - {"billing.manage", "ownership.transfer", "erp.endpoint.manage"},
     "accountant": frozenset(_ACCOUNTANT),
     "clerk": frozenset(_CLERK),
     "viewer": frozenset(_VIEW_EXPORT),

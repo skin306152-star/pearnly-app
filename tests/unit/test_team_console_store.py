@@ -10,6 +10,51 @@ from unittest import mock
 from services.team import console_store, ownership
 
 
+class _TransactionalCursor:
+    def __init__(self, member=None, workspace_ids=(), existing_scope_ids=()):
+        self.member = member
+        self.workspace_ids = list(workspace_ids)
+        self.existing_scope_ids = list(existing_scope_ids)
+        self.calls = []
+        self.current = None
+        self.rowcount = 1
+
+    def execute(self, sql, params=None):
+        compact = " ".join(sql.split())
+        self.calls.append((compact, params))
+        if "FROM memberships m" in compact:
+            self.current = "member"
+        elif compact.startswith("SELECT id FROM workspace_clients"):
+            self.current = "workspaces"
+        elif compact.startswith("SELECT workspace_client_id FROM member_scopes"):
+            self.current = "scopes"
+        else:
+            self.current = None
+
+    def fetchone(self):
+        return self.member if self.current == "member" else None
+
+    def fetchall(self):
+        if self.current == "workspaces":
+            return [{"id": workspace_id} for workspace_id in self.workspace_ids]
+        if self.current == "scopes":
+            return [
+                {"workspace_client_id": workspace_id} for workspace_id in self.existing_scope_ids
+            ]
+        return []
+
+
+class _CursorContext:
+    def __init__(self, cur):
+        self.cur = cur
+
+    def __enter__(self):
+        return self.cur
+
+    def __exit__(self, *args):
+        return False
+
+
 class ChangeRoleGuardTests(unittest.TestCase):
     def test_cannot_modify_self(self):
         out = console_store.change_role(
@@ -31,14 +76,17 @@ class ChangeRoleGuardTests(unittest.TestCase):
 
     def test_target_owner_blocked(self):
         member = {"membership_id": "m1", "role_key": "owner", "username": "boss"}
-        with mock.patch.object(console_store, "get_member", return_value=member):
+        cur = _TransactionalCursor(member)
+        with mock.patch.object(console_store.db, "get_cursor", return_value=_CursorContext(cur)):
             out = console_store.change_role(
                 tenant_id="t", actor_id="u1", target_user_id="u2", role_key="viewer"
             )
         self.assertEqual(out["error"], "team.target_is_owner")
+        self.assertIn("FOR UPDATE OF m", cur.calls[0][0])
 
     def test_member_not_found(self):
-        with mock.patch.object(console_store, "get_member", return_value=None):
+        cur = _TransactionalCursor(None)
+        with mock.patch.object(console_store.db, "get_cursor", return_value=_CursorContext(cur)):
             out = console_store.change_role(
                 tenant_id="t", actor_id="u1", target_user_id="u2", role_key="viewer"
             )
@@ -54,7 +102,8 @@ class SetScopeGuardTests(unittest.TestCase):
 
     def test_admin_cannot_be_assigned(self):
         member = {"membership_id": "m1", "role_key": "admin", "username": "a"}
-        with mock.patch.object(console_store, "get_member", return_value=member):
+        cur = _TransactionalCursor(member)
+        with mock.patch.object(console_store.db, "get_cursor", return_value=_CursorContext(cur)):
             out = console_store.set_scope(
                 tenant_id="t",
                 actor_id="u1",
@@ -66,7 +115,8 @@ class SetScopeGuardTests(unittest.TestCase):
 
     def test_target_owner_blocked(self):
         member = {"membership_id": "m1", "role_key": "owner", "username": "boss"}
-        with mock.patch.object(console_store, "get_member", return_value=member):
+        cur = _TransactionalCursor(member)
+        with mock.patch.object(console_store.db, "get_cursor", return_value=_CursorContext(cur)):
             out = console_store.set_scope(
                 tenant_id="t",
                 actor_id="u1",
@@ -75,6 +125,71 @@ class SetScopeGuardTests(unittest.TestCase):
                 workspace_ids=[],
             )
         self.assertEqual(out["error"], "team.target_is_owner")
+
+    def test_custom_role_can_use_assigned_scope(self):
+        member = {"membership_id": "m1", "role_key": "custom:buyer", "username": "buyer"}
+        cur = _TransactionalCursor(member, workspace_ids=[11])
+        with (
+            mock.patch.object(console_store.db, "get_cursor", return_value=_CursorContext(cur)),
+            mock.patch.object(
+                console_store, "erp_shared_express_endpoint_enabled_for", return_value=True
+            ),
+        ):
+            out = console_store.set_scope(
+                tenant_id="tenant-a",
+                actor_id="owner-1",
+                target_user_id="user-1",
+                scope_mode="assigned",
+                workspace_ids=[11],
+            )
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["added"], [11])
+        self.assertIn("FOR UPDATE OF m", cur.calls[0][0])
+        workspace_sql = next(sql for sql, _ in cur.calls if "workspace_clients" in sql)
+        self.assertIn("is_active = TRUE", workspace_sql)
+        self.assertIn("FOR SHARE", workspace_sql)
+        self.assertTrue(any(sql.startswith("INSERT INTO member_scopes") for sql, _ in cur.calls))
+
+    def test_flag_off_custom_role_keeps_legacy_scope_rejection(self):
+        member = {"membership_id": "m1", "role_key": "custom:buyer", "username": "buyer"}
+        cur = _TransactionalCursor(member, workspace_ids=[11])
+        with (
+            mock.patch.object(console_store.db, "get_cursor", return_value=_CursorContext(cur)),
+            mock.patch.object(
+                console_store, "erp_shared_express_endpoint_enabled_for", return_value=False
+            ) as flag,
+        ):
+            out = console_store.set_scope(
+                tenant_id="tenant-a",
+                actor_id="owner-1",
+                target_user_id="user-1",
+                scope_mode="assigned",
+                workspace_ids=[11],
+            )
+        self.assertEqual(out, {"error": "team.scope_not_allowed"})
+        flag.assert_called_once_with("tenant-a")
+        self.assertFalse(any("workspace_clients" in sql for sql, _ in cur.calls))
+        self.assertFalse(any(sql.startswith("UPDATE memberships") for sql, _ in cur.calls))
+
+    def test_any_invalid_workspace_rejects_entire_scope_update(self):
+        member = {"membership_id": "m1", "role_key": "custom:buyer", "username": "buyer"}
+        cur = _TransactionalCursor(member, workspace_ids=[11])
+        with (
+            mock.patch.object(console_store.db, "get_cursor", return_value=_CursorContext(cur)),
+            mock.patch.object(
+                console_store, "erp_shared_express_endpoint_enabled_for", return_value=True
+            ),
+        ):
+            out = console_store.set_scope(
+                tenant_id="tenant-a",
+                actor_id="owner-1",
+                target_user_id="user-1",
+                scope_mode="assigned",
+                workspace_ids=[11, 22],
+            )
+        self.assertEqual(out, {"error": "team.scope_invalid"})
+        self.assertFalse(any(sql.startswith("DELETE FROM member_scopes") for sql, _ in cur.calls))
+        self.assertFalse(any(sql.startswith("UPDATE memberships") for sql, _ in cur.calls))
 
 
 class MemberActionGuardTests(unittest.TestCase):

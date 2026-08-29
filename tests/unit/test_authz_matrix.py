@@ -13,6 +13,7 @@ CROSS = set(registry.CROSS_CODES)
 FIELD = set(registry.FIELD_CODES)
 BUSINESS = ALL - CROSS - FIELD
 POS = set(registry.POS_CODES)
+ERP = set(registry.ERP_CODES)
 
 
 def _verb(code):
@@ -26,8 +27,10 @@ def _expected(role, code):
         return role != "cashier"
     if role == "owner":
         return True
+    if code in ERP:
+        return role == "admin" and code != "erp.endpoint.manage"
     if role == "admin":
-        return code not in {"billing.manage", "ownership.transfer"}
+        return code not in {"billing.manage", "ownership.transfer", "erp.endpoint.manage"}
     if role == "cashier":
         return code in {"pos.sale.operate", "pos.shift.operate"}
     if role == "viewer":
@@ -81,9 +84,25 @@ class MatrixInvariantTests(unittest.TestCase):
     def test_owner_short_circuit_covers_all(self):
         self.assertEqual(registry.ROLE_PERMISSIONS["owner"], ALL)
 
-    def test_admin_lacks_exactly_billing_and_ownership(self):
+    def test_admin_lacks_owner_only_permissions(self):
         missing = ALL - registry.ROLE_PERMISSIONS["admin"]
-        self.assertEqual(missing, {"billing.manage", "ownership.transfer"})
+        self.assertEqual(
+            missing,
+            {"billing.manage", "ownership.transfer", "erp.endpoint.manage"},
+        )
+
+    def test_erp_permissions_are_explicit_by_system_role(self):
+        self.assertTrue(ERP <= registry.ROLE_PERMISSIONS["owner"])
+        self.assertEqual(
+            registry.ROLE_PERMISSIONS["admin"] & ERP,
+            {
+                "erp.endpoint.view",
+                "erp.push.operate",
+                "erp.log.view",
+            },
+        )
+        for role in ("accountant", "clerk", "viewer", "cashier"):
+            self.assertFalse(registry.ROLE_PERMISSIONS[role] & ERP, role)
 
     def test_clerk_never_irreversible(self):
         for code in registry.ROLE_PERMISSIONS["clerk"]:

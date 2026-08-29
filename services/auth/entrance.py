@@ -46,8 +46,9 @@ ALL_ENTRANCES = (MAIN, POS, AI, DMS, DAILY, COWORK, ERP)
 #   - sales/inv/intake = {main, pos, cowork, erp}:POS 商户也做销售开票 / 盘点 / 收料。
 #   - purchase = {main, pos, ai, cowork, erp}:采购/供应商数据跨会计/POS/AI(AI 客户画像也调 purchase.*)。
 #   - cowork 与 main 等价:凡原来含 main 的集合都并入 cowork(协同工作台继承会计主壳能力)。
-#   - ERP 门仅获 sales/purchase/inv/intake/stockcard/kb/ar 七前缀(erp_portal 邀请业务作用域),
-#     不碰 pos/tax/acct/recon;ai/dms/daily 是各自独立门,不在 ERP 派生范围。
+#   - ERP 门仅获 sales/purchase/inv/intake/stockcard/kb/ar 与 erp 八前缀(erp_portal 邀请
+#     业务作用域);erp.* 仅 main/cowork/erp 可用,DMS 复用旧路由不因此获得 F1 权限码。
+#     ERP 不碰 pos/tax/acct/recon;ai/dms/daily 是各自独立门,不在 ERP 派生范围。
 _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
     "pos": frozenset({POS}),
     "tax": frozenset({MAIN, AI, COWORK}),
@@ -62,6 +63,7 @@ _ENTRANCE_BY_PREFIX: dict[str, frozenset[str]] = {
     ),  # AI 客户画像供应商档案(ai-profile.js)也调 purchase.*
     "inv": frozenset({MAIN, POS, COWORK, ERP}),
     "intake": frozenset({MAIN, POS, COWORK, ERP}),
+    "erp": frozenset({MAIN, COWORK, ERP}),
 }
 
 

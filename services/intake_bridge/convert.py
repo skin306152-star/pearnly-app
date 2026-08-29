@@ -37,6 +37,18 @@ def erp_declaration_error(fields: dict) -> Optional[str]:
     return None
 
 
+def resolve_history_direction(history: dict, *, own_tax_id: str) -> Optional[str]:
+    """Resolve one stored history with the same canonical rule used by conversion."""
+    fields = _primary_fields(history.get("pages") or [])
+    if fields is None:
+        return None
+    return direction_mod.resolve_direction(
+        {"fields": fields, "workspace_client_id": history.get("workspace_client_id")},
+        history,
+        own_tax_id=own_tax_id,
+    )
+
+
 def validate_erp_histories(cur, *, tenant_id: str, history_ids: list) -> dict[str, str]:
     """Return invalid ERP history ids and reasons; missing ids fail closed as ``not_found``."""
     ids = list(dict.fromkeys(str(value) for value in history_ids if value))
@@ -110,11 +122,7 @@ def _convert_one(cur, *, tenant_id: str, user_id: str, history_id: str, tax_id_c
     own_tax_id = _cached_own_tax_id(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, cache=tax_id_cache
     )
-    direction = direction_mod.resolve_direction(
-        {"fields": fields, "workspace_client_id": workspace_client_id},
-        history,
-        own_tax_id=own_tax_id,
-    )
+    direction = resolve_history_direction(history, own_tax_id=own_tax_id)
     if direction is None:
         raise SkipConversion("no_direction")
     if not workspace_client_id:

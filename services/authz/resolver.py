@@ -15,7 +15,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from services.authz.registry import ALL_CODES, ROLE_PERMISSIONS
+from services.authz.registry import ALL_CODES, ASSIGNABLE_ROLE_KEYS, ROLE_PERMISSIONS
 
 logger = logging.getLogger("mr-pilot")
 
@@ -72,44 +72,50 @@ def legacy_role_key(user: dict) -> str:
     return "accountant"
 
 
-def resolve(user: dict, cur=None) -> Authz:
+def resolve(user: dict, cur=None, *, lock: bool = False) -> Authz:
     """取该用户在其生效租户下的权限快照。cur 可复用调用方游标(省连接)。"""
     tenant_id = user.get("tenant_id")
     if not tenant_id:
         return Authz(role_key="none")
     if cur is not None:
-        return _resolve_with_cursor(cur, user, str(tenant_id))
+        return _resolve_with_cursor(cur, user, str(tenant_id), lock=lock)
     from core import db
 
     with db.get_cursor() as own_cur:
-        return _resolve_with_cursor(own_cur, user, str(tenant_id))
+        return _resolve_with_cursor(own_cur, user, str(tenant_id), lock=lock)
 
 
-def _resolve_with_cursor(cur, user: dict, tenant_id: str) -> Authz:
-    cur.execute(
-        """
-        SELECT m.id, m.scope_mode, r.key AS role_key, r.permissions
+def _resolve_with_cursor(cur, user: dict, tenant_id: str, *, lock: bool = False) -> Authz:
+    sql = """
+        SELECT m.id, m.scope_mode, r.key AS role_key, r.permissions,
+               r.tenant_id AS role_tenant_id, COALESCE(r.is_active, TRUE) AS role_is_active
         FROM memberships m JOIN roles r ON r.id = m.role_id
         WHERE m.user_id = %s AND m.tenant_id = %s AND m.status = 'active'
         LIMIT 1
-        """,
-        (str(user["id"]), tenant_id),
-    )
+    """
+    if lock:
+        sql += " FOR SHARE OF m, r"
+    cur.execute(sql, (str(user["id"]), tenant_id))
     row = cur.fetchone()
     if row is None or not row.get("role_key"):
         key = legacy_role_key(user)
         return Authz(role_key=key, permissions=ROLE_PERMISSIONS.get(key, frozenset()))
 
     role_key = row["role_key"]
-    perms = perms_from_jsonb(row["permissions"])
+    custom_role_valid = not role_key.startswith("custom:") or (
+        str(row.get("role_tenant_id")) == tenant_id and row.get("role_is_active") is True
+    )
+    perms = perms_from_jsonb(row["permissions"]) if custom_role_valid else frozenset()
     scope_mode = row.get("scope_mode") or "all"
     workspace_ids: Optional[frozenset] = None
     if scope_mode == "assigned":
-        cur.execute(
+        scope_sql = (
             "SELECT workspace_client_id FROM member_scopes "
-            "WHERE tenant_id = %s AND membership_id = %s",
-            (tenant_id, str(row["id"])),
+            "WHERE tenant_id = %s AND membership_id = %s"
         )
+        if lock:
+            scope_sql += " FOR SHARE"
+        cur.execute(scope_sql, (tenant_id, str(row["id"])))
         workspace_ids = frozenset(int(r["workspace_client_id"]) for r in cur.fetchall())
     return Authz(
         role_key=role_key,
@@ -133,16 +139,30 @@ def _system_role_id(cur, role_key: str) -> Optional[str]:
     return str(row["id"]) if row else None
 
 
-def _assignable_role_id(cur, tenant_id: str, role_key: str) -> Optional[str]:
-    """分配目标角色 id:custom:<slug> 查本租户 active 自定义行,其余查系统预设行。"""
+def _assignable_role_id(
+    cur,
+    tenant_id: str,
+    role_key: str,
+    *,
+    allow_owner: bool = False,
+    allow_custom: bool = True,
+) -> Optional[str]:
+    """Resolve an explicitly assignable system role or an active tenant custom role."""
     if role_key.startswith("custom:"):
+        if not allow_custom:
+            return None
         cur.execute(
             "SELECT id FROM roles WHERE key = %s AND tenant_id = %s "
-            "AND COALESCE(is_active, TRUE)",
+            "AND COALESCE(is_active, TRUE) FOR SHARE",
             (role_key, str(tenant_id)),
         )
         row = cur.fetchone()
         return str(row["id"]) if row else None
+    allowed = set(ASSIGNABLE_ROLE_KEYS)
+    if allow_owner:
+        allowed.add("owner")
+    if role_key not in allowed:
+        return None
     return _system_role_id(cur, role_key)
 
 
@@ -154,11 +174,22 @@ def create_membership(
     role_key: str,
     granted_by: Optional[str] = None,
     scope_mode: str = "all",
+    allow_custom: bool = False,
+    allow_owner: bool = True,
 ) -> bool:
-    """建号点调(注册建 owner / 邀请入组)。幂等(已有行不动)。用调用方事务。"""
-    role_id = _system_role_id(cur, role_key)
+    """建号点调(注册建 owner / 邀请入组)。幂等(已有行不动)。用调用方事务。
+
+    自定义角色只允许显式调用方开启；无论系统或自定义角色都走同一可分配角色校验。
+    """
+    role_id = _assignable_role_id(
+        cur,
+        str(tenant_id),
+        role_key,
+        allow_owner=allow_owner,
+        allow_custom=allow_custom,
+    )
     if not role_id:
-        logger.warning(f"create_membership: system role {role_key!r} missing (ensure 未跑?)")
+        logger.warning("create_membership: role %r is not assignable", role_key)
         return False
     cur.execute(
         """
@@ -169,6 +200,13 @@ def create_membership(
         """,
         (str(user_id), str(tenant_id), role_id, scope_mode, granted_by),
     )
+    cur.execute(
+        "SELECT 1 FROM memberships WHERE user_id = %s AND tenant_id = %s "
+        "AND role_id = %s AND status = 'active'",
+        (str(user_id), str(tenant_id), role_id),
+    )
+    if cur.fetchone() is None:
+        return False
     cur.execute(
         "UPDATE users SET role = %s WHERE id = %s",
         (_legacy_role_value(role_key), str(user_id)),
@@ -186,7 +224,9 @@ def set_membership_role(
 ) -> bool:
     """改角色(批3 接口/转移流用)。membership 必须已存在且属本租户。
     role_key 可为系统预设或 custom:<slug>(G3 自定义角色 · 后者按本租户解析)。"""
-    role_id = _assignable_role_id(cur, str(tenant_id), role_key)
+    role_id = _assignable_role_id(
+        cur, str(tenant_id), role_key, allow_owner=True, allow_custom=True
+    )
     if not role_id:
         return False
     cur.execute(
@@ -195,6 +235,32 @@ def set_membership_role(
         WHERE user_id = %s AND tenant_id = %s
         """,
         (role_id, granted_by, str(user_id), str(tenant_id)),
+    )
+    if cur.rowcount == 0:
+        return False
+    cur.execute(
+        "UPDATE users SET role = %s WHERE id = %s",
+        (_legacy_role_value(role_key), str(user_id)),
+    )
+    return True
+
+
+def set_membership_role_resolved(
+    cur,
+    *,
+    user_id: str,
+    tenant_id: str,
+    role_id: str,
+    role_key: str,
+    granted_by: Optional[str] = None,
+) -> bool:
+    """Apply a role id already validated and locked by the caller."""
+    cur.execute(
+        """
+        UPDATE memberships SET role_id = %s, granted_by = %s, granted_at = NOW()
+        WHERE user_id = %s AND tenant_id = %s
+        """,
+        (str(role_id), granted_by, str(user_id), str(tenant_id)),
     )
     if cur.rowcount == 0:
         return False

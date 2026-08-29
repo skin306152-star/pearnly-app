@@ -82,7 +82,12 @@ class SeatBoundaryRouteTests(unittest.TestCase):
             mock.patch.object(
                 inv_routes.inv_store,
                 "create_invitation",
-                return_value={"id": "i1", "token": "tk", "expires_at": "2026-06-18T00:00:00+00:00"},
+                return_value={
+                    "id": "i1",
+                    "token": "tk",
+                    "expires_at": "2026-06-18T00:00:00+00:00",
+                    "role_name": "Viewer",
+                },
             ) as created,
             mock.patch.object(inv_routes.inv_store, "send_invite_email", return_value=True),
             mock.patch.object(inv_routes, "_log_op"),

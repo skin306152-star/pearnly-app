@@ -36,6 +36,7 @@ class RegistryShapeTests(unittest.TestCase):
             + registry.POS_CODES
             + registry.INTAKE_CODES
             + registry.STOCKCARD_CODES
+            + registry.ERP_CODES
             + registry.FIELD_CODES
         )
         self.assertEqual(len(groups), len(registry.ALL_CODES))
@@ -59,6 +60,10 @@ class RegistryShapeTests(unittest.TestCase):
     def test_cross_domain_codes_have_no_module_gate(self):
         for code in registry.CROSS_CODES:
             self.assertIsNone(registry.module_of(code), f"横切域 {code} 不该挂模块开关")
+
+    def test_erp_codes_have_no_tenant_module_gate(self):
+        for code in registry.ERP_CODES:
+            self.assertIsNone(registry.module_of(code), code)
 
     def test_business_codes_gated_by_module(self):
         for code in registry.SALES_CODES:

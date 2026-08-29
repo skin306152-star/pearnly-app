@@ -173,6 +173,32 @@ code:
   production_sha: PENDING
   production_verified_at: PENDING
 
+implementation_batches:
+  - batch_id: F1-B1
+    backend_implementation_complete: true
+    release_state: DEPLOYED_EXACT_FLAG_OFF
+    pearnly_commit: 57fb5480a72bbd27a0af8f6549ff03b63d06ca0c
+    scope: DORMANT_ADDITIVE_SCHEMA_FLAG_PARTIAL_INDEX_SELECT_RLS
+    shared_scope_true_existing_rows: 0
+  - batch_id: F1-B2
+    backend_implementation_complete: true
+    release_state: UNCOMMITTED_RELEASE_CLOSURE
+    pearnly_commit: PENDING_CANDIDATE_COMMIT
+    scope: AUTHZ_CUSTOM_INVITATION_CONFIRMATION_AND_MUTABLE_HISTORY_BACKEND
+    production_rollout_contract: ALL_TENANTS_FLAG_OFF
+  - batch_id: F1-B3
+    backend_implementation_complete: false
+    release_state: PLANNED_LOCKED
+    scope: ENDPOINT_PUSH_LOG_PERMISSION_AND_SHARED_EXPRESS_ROUTE_WIRING
+  - batch_id: F1-B4
+    backend_implementation_complete: false
+    release_state: PLANNED_LOCKED
+    scope: CONSOLE_ROLE_INVITE_AND_MAIN_COWORK_FORMAL_THEN_PUSH_UI_I18N_DIST_BROWSER
+  - batch_id: F1-B5
+    backend_implementation_complete: false
+    release_state: PLANNED_LOCKED
+    scope: CONFLICT_INVENTORY_TEST_TENANT_ROLLOUT_DEVICE_AND_EXPRESS_REPORT
+
 companion:
   change: UNCHANGED
   commit: NOT_APPLICABLE_NO_COMPANION_CHANGE
@@ -182,11 +208,14 @@ companion:
 
 feature_flags:
   - name: erp_shared_express_endpoint
-    candidate_rollout_state: TEST_TENANTS_ONLY
+    candidate_rollout_state: OFF_ALL_TENANTS_FOR_B2_DEPLOY
     accepted_rollout_state: PENDING
-    scope: PENDING
-    verified_at: PENDING
-    reason: PENDING
+    scope: ALL_TENANTS_FLAG_OFF_UNTIL_F1_B5
+    verified_at: PENDING_B2_PRODUCTION_READBACK
+    reason: >-
+      B2 only installs fail-closed authorization and confirmation prerequisites. Shared endpoint,
+      push/log route wiring, Console UI and true-device acceptance are not present, so no tenant may
+      enter the shared branch in this release.
 
 test_contexts:
   - context_id: F1-COWORK-OWNER-REGRESSION
@@ -307,24 +336,51 @@ actors:
     - PENDING_COWORK_SALES_EMPLOYEE
     - PENDING_ERP_PURCHASE_EMPLOYEE
     - PENDING_ERP_SALES_EMPLOYEE
-  permission_matrix_result: PENDING
+  permission_matrix_result: PENDING_F1_B3_ROUTE_ENFORCEMENT_AND_F1_B5_DEVICE_PROOF
 
 automatic_verification:
-  commands: []
-  results: []
-  conclusion: PENDING
+  commands:
+    - >-
+      PYTHONUTF8=1 venv/bin/python -m unittest tests.unit.test_authz_matrix
+      tests.unit.test_authz_registry tests.unit.test_authz_resolver
+      tests.unit.test_entrance_scope tests.unit.test_erp_intake_contract
+      tests.unit.test_roles_store tests.unit.test_seat_enforce
+      tests.unit.test_team_console_store tests.unit.test_team_invitations
+      tests.unit.test_console_invite_custom_roles
+      tests.unit.test_erp_commit_confirmation_access
+      tests.unit.test_erp_confirmation_access
+      tests.unit.test_erp_mutable_history_access
+      tests.unit.test_invitation_accept_transaction
+    - >-
+      PEARNLY_PG_SMOKE_URL=postgresql://LOCAL_DISPOSABLE_DB PYTHONUTF8=1
+      venv/bin/python -m unittest discover -s tests/unit -p test_*_pg_smoke.py
+    - PYTHONUTF8=1 venv/bin/python -m unittest discover -s tests/unit -p test_*.py
+    - PATH=venv/bin:$PATH ruff check CHANGED_PYTHON_FILES
+    - PATH=venv/bin:$PATH black --check CHANGED_PYTHON_FILES
+    - >-
+      import-app, check_imports, check_i18n, check_i18n_refs, check_new_debt,
+      check_test_git_writes, check_destructive_db_tests, check_file_size,
+      check_e2e_stub_contracts and check_authz_coverage
+    - PYTHONUTF8=1 sh scripts/git-hooks/pre-push
+  results:
+    - TARGETED_B2_BACKEND_208_TESTS_PASS
+    - POSTGRESQL16_ALL_PG_SMOKE_32_TESTS_PASS_ZERO_SKIP
+    - FULL_UNIT_13954_TESTS_PASS_15_EXPECTED_SKIPS
+    - WORKTREE_RUFF_BLACK_AND_RELEVANT_MECHANICAL_GATES_PASS
+    - PRE_PUSH_EXIT_0_SKIPPED_BECAUSE_B2_CANDIDATE_IS_UNCOMMITTED_RERUN_AFTER_COMMIT
+  conclusion: PENDING_F1_REMAINING_BATCHES_CANDIDATE_CI_DEVICE_AND_USER_ACCEPTANCE
 
 ui_verification:
   applicability: REQUIRED
   not_applicable_reason: NOT_APPLICABLE_UI_REQUIRED
-  source_dist_same_commit: PENDING
-  cachebust_updated: PENDING
+  source_dist_same_commit: PENDING_F1_B4_NOT_IMPLEMENTED
+  cachebust_updated: PENDING_F1_B4_NOT_IMPLEMENTED
   locales:
     - zh
     - th
     - en
     - ja
-  real_browser_result: PENDING
+  real_browser_result: PENDING_F1_B4_NOT_IMPLEMENTED
   evidence_paths: []
 
 device_verification:
@@ -337,7 +393,7 @@ device_verification:
     - An unauthorized employee is denied with zero Express side effect.
     - Repeating a submitted document creates no duplicate Express document.
     - Cowork and ERP tenants are verified separately, not as simultaneous multi-Profile proof.
-  result: PENDING
+  result: PENDING_F1_B5_NOT_READY
 
 erp_report_readbacks:
   - readback_id: F1-RB-COWORK-OWNER
@@ -413,7 +469,14 @@ erp_report_readbacks:
     conclusion: PENDING
     evidence_paths: []
 
-evidence_paths: []
+evidence_paths:
+  - tests/unit/test_console_invite_custom_roles.py
+  - tests/unit/test_invitation_accept_transaction.py
+  - tests/unit/test_team_role_concurrency_pg_smoke.py
+  - tests/unit/test_erp_confirmation_access.py
+  - tests/unit/test_erp_commit_confirmation_access.py
+  - tests/unit/test_erp_mutable_history_access.py
+  - tests/unit/test_erp_mutable_history_pg_smoke.py
 cleanup_result: PENDING
 
 user_decision:
@@ -425,14 +488,15 @@ user_decision:
   accepted_erp_report_evidence_ids: []
 
 open_issues:
-  - Inventory existing tenant Express endpoints and record conflicts without auto-merging.
-  - Confirm active shared Express partial unique axis and adapter-gated query/RLS design.
-  - Confirm MR.ERP and mrerp_dms ownership, credentials, query and RLS behavior remain unchanged.
-  - Confirm erp.endpoint.view, erp.endpoint.manage, erp.push.operate and erp.log.view gates.
-  - Confirm purchase/sales create+approve and workspace-scope enforcement.
+  - B2 has no candidate commit, CI run or exact production readback yet; flag must remain off globally.
+  - B3 must wire erp.endpoint.view, erp.endpoint.manage, erp.push.operate and erp.log.view into the actual endpoint, push and log routes; the B2 registry alone is not route enforcement.
+  - B4 must expose only flag-on tenant custom roles in Console invitation and scope UI, keep erp.endpoint.manage owner-only, escape roleName, close main/cowork save-to-formal-to-push only after conversion succeeds, ship zh/th/en/ja source plus dist and cache-bust, and pass true-browser gates.
+  - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
+  - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
 next_action: >-
-  Commit the F1-B1 candidate and wait for CI PostgreSQL smoke before exact deployment;
-  do not start F1-B2 or modify F2-F7.
+  Finish the B2 full local gates, commit the exact reviewed candidate, require CI including non-skipped
+  PostgreSQL smoke, deploy that exact SHA with the flag off for every tenant, and record production
+  HEAD plus service start readback. Do not start F1-B3/B4/B5 or modify F2-F7 until separately unlocked.
 ```
 
 ## 7. F2-F7

@@ -1,21 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Pearnly · OCR 历史记录 API 路由模块(REFACTOR-B1 · 2026-05-25 抽出 · 步骤 B)
-
-历史列表 / 详情 / 编辑(重对账 hook)/ 删除 / PDF 下载 / 批量删除 + v1 别名 ·
-10 路由。从 app.py 整片搬过来 · 纯搬家 · URL/method/权限/返回结构/错误码 0 改。
-
-前置:OCR 异常检测链已在步骤 A 搬到 exception_checks.py(history PUT 编辑后重跑
-规则用 _async_run_exception_checks / _parse_money · 此处 import)。
-
-依赖:
-  - db.*(get_cursor)+ list_ocr_history / get_ocr_history_detail / update_ocr_history_pages /
-    delete_ocr_history_with_pdf_paths / get_history_pdf_info(从 db import)
-  - pdf_storage(PDF 留底删除 / 取绝对路径)
-  - auth.get_current_user_from_request
-  - route_helpers._tid / _plan_permissions(_check_history_access 用)
-  - exception_checks._async_run_exception_checks / _parse_money(history PUT 重跑规则)
-"""
+"""OCR history list, detail, confirmation, mutation, file, and deletion routes."""
 
 from __future__ import annotations
 
@@ -44,7 +28,8 @@ from core.auth import get_current_user_from_request
 from routes.history_assign_routes import router as _assign_router
 from core.route_helpers import _check_history_access, _tid, content_disposition
 from services.exceptions.exception_checks import _async_run_exception_checks, _parse_money
-from services.intake_bridge import convert as convert_svc
+from services.intake_bridge import convert as convert_svc, erp_confirmation_access
+from services.intake_bridge import mutable_history_access
 from services.ocr_history.posting_manual import (
     _ITEM_TYPE_VALUES,
     _PAYMENT_VALUES,
@@ -122,13 +107,13 @@ class OcrCommitRequest(BaseModel):
 
 @router.post("/api/ocr/commit")
 async def ocr_commit(req: OcrCommitRequest, request: Request):
-    """录入第4步完成(无论仅完成 / 导出 / 推送)→ 把草稿记录落进识别记录(staged→FALSE)。
-
-    幂等:已落库 / 非本人的 id 跳过,只翻仍属本人的草稿。前端任一终态动作都调,确保必落库。
-    """
+    """录入第4步完成:把本人草稿落进识别记录;F1共享确认必须已有匹配正式单据。"""
     user = get_current_user_from_request(request)
     _check_history_access(user)
     tenant_id = _tid(user)
+    guarded = erp_confirmation_access.commit_shared_confirmation(request, user, tenant_id, req.ids)
+    if guarded is not None:
+        return {"ok": True, "committed": guarded}
     if user.get("entry") == "erp":
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user["id"])) as cur:
             unconverted = convert_svc.unconverted_owned_history_ids(
@@ -156,19 +141,19 @@ class OcrConvertRequest(BaseModel):
 
 @router.post("/api/ocr/convert-documents")
 async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
-    """录入工作台「确认」的真正落点:草稿 history → 正式单据(purchase_docs/sales_documents)。
-
-    此前「确认」只经 /api/ocr/commit 翻 staged,不落正式单据 → 商品收发存报表读 posted/issued
-    恒空("识别完≠过账完")。本端点把确认接上真实建账,幂等(services.intake_bridge.convert,
-    重复调用已转换项直接回 already_converted)。workspace_client_id 仅作用域校验(同本文件
-    /api/ocr/commit 的鉴权写法),每张单据真正落哪个账套仍按各自 history.workspace_client_id。
-    """
+    """录入工作台确认:草稿 history 转正式单;flag-on 整批锁定并验权,flag-off 保留旧行为。
+    转换由 intake_bridge.convert 幂等处理。"""
     user = get_current_user_from_request(request)
     _check_history_access(user)
     tenant_id = _tid(user)
-    with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user["id"]), commit=True) as cur:
-        wc.assert_workspace_in_tenant(
-            cur, tenant_id=tenant_id, workspace_client_id=req.workspace_client_id
+    with db.get_cursor_rls(
+        tenant_id=tenant_id,
+        workspace_client_id=req.workspace_client_id,
+        user_id=str(user["id"]),
+        commit=True,
+    ) as cur:
+        confirmation = erp_confirmation_access.guard_confirmation(
+            cur, request, user, tenant_id, req.workspace_client_id, req.history_ids
         )
         if user.get("entry") == "erp":
             invalid = convert_svc.validate_erp_histories(
@@ -190,11 +175,13 @@ async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
                 if row.get("reason") == "already_converted"
             )
             if resolved_ids:
-                cur.execute(
-                    "UPDATE ocr_history SET staged = FALSE, updated_at = NOW() "
-                    "WHERE id = ANY(%s::uuid[]) AND tenant_id = %s::uuid "
-                    "AND user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)",
-                    (list(resolved_ids), tenant_id, tenant_id),
+                erp_confirmation_access.finish_resolved_histories(
+                    cur,
+                    confirmation,
+                    tenant_id,
+                    str(user["id"]),
+                    req.workspace_client_id,
+                    resolved_ids,
                 )
     return result
 
@@ -233,7 +220,10 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
     bad_printed = _derive_dates_from_printed(req.pages)
     if bad_printed:
         raise HTTPException(400, detail="history.date_unreadable")
-    ok = update_ocr_history_pages(str(user["id"]), record_id, req.pages, tenant_id=_tid(user))
+    tenant_id = _tid(user)
+    ok = mutable_history_access.update_history_pages(request, user, tenant_id, record_id, req.pages)
+    if ok is None:
+        ok = update_ocr_history_pages(str(user["id"]), record_id, req.pages, tenant_id=tenant_id)
     if not ok:
         raise HTTPException(404, detail="history.not_found")
     # v118.18 · 推荐分类「学习」· 用户改了 category 就记忆「seller → category」
@@ -320,7 +310,11 @@ async def history_update_posting(record_id: str, req: HistoryPostingRequest, req
         raise HTTPException(422, detail="history.posting_payment_invalid")
     if "item_type" in changed and changed["item_type"] not in _POSTING_ITEM_TYPE_VALUES:
         raise HTTPException(422, detail="history.posting_item_type_invalid")
-    result = update_history_posting_manual(str(user["id"]), record_id, tenant_id, **changed)
+    result = mutable_history_access.update_history_posting(
+        request, user, tenant_id, record_id, changed
+    )
+    if result is None:
+        result = update_history_posting_manual(str(user["id"]), record_id, tenant_id, **changed)
     if not result.ok:
         raise HTTPException(404, detail="history.not_found")
     backflow_supplier_profile(
@@ -339,9 +333,13 @@ async def history_delete(record_id: str, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
     # v114 · 删除时同步清掉留底的 PDF 文件
-    deleted, pdf_paths = delete_ocr_history_with_pdf_paths(
-        str(user["id"]), [record_id], tenant_id=_tid(user)
-    )
+    tenant_id = _tid(user)
+    guarded = mutable_history_access.delete_histories(request, user, tenant_id, [record_id])
+    if guarded is None:
+        guarded = delete_ocr_history_with_pdf_paths(
+            str(user["id"]), [record_id], tenant_id=tenant_id
+        )
+    deleted, pdf_paths = guarded
     if deleted == 0:
         raise HTTPException(404, detail="history.not_found")
     # v114 · 检查这个 PDF 是否还被其他记录引用(多发票拆分场景共享同一 PDF)· 没人引用才真正删
@@ -449,7 +447,11 @@ async def history_batch_delete(req: HistoryBatchDeleteRequest, request: Request)
     _check_history_access(user)
     uid = str(user["id"])
     # v114 · 一次性删除 + 拿到所有要清理的 PDF 路径
-    deleted, pdf_paths = delete_ocr_history_with_pdf_paths(uid, list(req.ids), tenant_id=_tid(user))
+    tenant_id = _tid(user)
+    guarded = mutable_history_access.delete_histories(request, user, tenant_id, list(req.ids))
+    if guarded is None:
+        guarded = delete_ocr_history_with_pdf_paths(uid, list(req.ids), tenant_id=tenant_id)
+    deleted, pdf_paths = guarded
     failed = max(0, len(req.ids) - deleted)
     # v114 · 检查每个 PDF 是否还被其他记录引用 · 没人引用才物理删
     if pdf_paths:

@@ -24,7 +24,6 @@ from pydantic import BaseModel, Field
 from core.route_helpers import _check_password_strength, _log_op
 from services.auth.signup_core import PLAN_CONFIG
 from services.authz.deps import require_perm
-from services.authz.registry import ASSIGNABLE_ROLE_KEYS
 from services.team import console_store
 from services.team import invitations as inv_store
 from services.team import ownership as ownership_store
@@ -32,13 +31,11 @@ from services.team import ownership as ownership_store
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
 
-ROLE_NAMES = {"admin": "Admin", "accountant": "Accountant", "clerk": "Clerk", "viewer": "Viewer"}
-
 
 class InvitationCreate(BaseModel):
     channel: str = Field(..., pattern="^(email|line)$")
     target: str = Field(..., min_length=1, max_length=200)
-    role_key: str = Field(..., min_length=3, max_length=20)
+    role_key: str = Field(..., min_length=3, max_length=64)
     scope_mode: str = Field("all", pattern="^(all|assigned)$")
     workspace_ids: List[int] = []
 
@@ -66,7 +63,8 @@ def _invite_url(request: Request, token: str) -> str:
 @router.post("/api/team/invitations")
 async def create_invitation(req: InvitationCreate, request: Request):
     user = require_perm(request, "team.member.invite")
-    if req.role_key not in ASSIGNABLE_ROLE_KEYS:
+    tenant_id = str(user["tenant_id"])
+    if not inv_store.role_key_allowed_for_invitation(tenant_id, req.role_key):
         raise HTTPException(422, detail="invite.role_not_allowed")
     if req.scope_mode == "assigned" and not req.workspace_ids:
         raise HTTPException(422, detail="team.scope_empty")
@@ -77,16 +75,19 @@ async def create_invitation(req: InvitationCreate, request: Request):
     if console_store.seat_usage(str(user["tenant_id"]))["used"] >= int(plan["seats_max"]):
         raise HTTPException(422, detail="team.seat_limit")
     created = inv_store.create_invitation(
-        tenant_id=str(user["tenant_id"]),
+        tenant_id=tenant_id,
         invited_by=str(user["id"]),
         channel=req.channel,
         target=req.target.strip(),
         role_key=req.role_key,
         scope_mode=req.scope_mode,
         workspace_ids=req.workspace_ids,
+        inviter=user,
     )
     if not created:
         raise HTTPException(422, detail="invite.role_not_allowed")
+    if created.get("error"):
+        raise HTTPException(422, detail=created["error"])
     url = _invite_url(request, created["token"])
     sent = False
     if req.channel == "email":
@@ -94,7 +95,7 @@ async def create_invitation(req: InvitationCreate, request: Request):
             req.target.strip(),
             url,
             user.get("company_name") or "Pearnly",
-            ROLE_NAMES.get(req.role_key, req.role_key),
+            created["role_name"],
         )
     _log_op(
         request,
@@ -111,6 +112,7 @@ async def create_invitation(req: InvitationCreate, request: Request):
         "invite_url": url,
         "email_sent": sent,
         "expires_at": created["expires_at"],
+        "role_name": created["role_name"],
     }
 
 
@@ -140,6 +142,7 @@ async def preview_invitation(token: str):
         "status": inv["status"],
         "tenant_name": inv.get("tenant_name"),
         "role_key": inv["role_key"],
+        "role_name": inv["role_name"],
         "email": inv.get("email"),
     }
 
@@ -167,11 +170,11 @@ async def accept_invitation(token: str, req: InvitationAccept, request: Request)
             target_type="user",
             target_id=result["user_id"],
             target_name=req.username,
-            details={"role_key": result["role_key"]},
+            details={"role_key": result["role_key"], "role_name": result["role_name"]},
         )
     except Exception as e:
         logger.warning(f"member_join audit skip: {e}")
-    return {"ok": True}
+    return {"ok": True, "role_name": result["role_name"]}
 
 
 @router.post("/api/ownership/transfer")

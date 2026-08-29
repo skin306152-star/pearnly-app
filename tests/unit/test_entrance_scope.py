@@ -88,6 +88,12 @@ class EntranceOfCodeTests(unittest.TestCase):
         for code in ("pos.sale.operate", "tax.filing.view", "acct.entry.view", "recon.view"):
             self.assertNotIn("erp", entrance_of_code(code), code)
 
+    def test_erp_permission_prefix_is_main_cowork_erp_only(self):
+        expected = frozenset({"main", "cowork", "erp"})
+        for code in ALL_CODES:
+            if code.startswith("erp."):
+                self.assertEqual(entrance_of_code(code), expected, code)
+
     def test_cross_cutting_codes_are_neutral(self):
         for code in (
             "settings.modules.manage",
@@ -204,6 +210,18 @@ class EntranceScopeDenyTests(unittest.TestCase):
         with _scope(True):
             for code in ("pos.sale.operate", "tax.filing.view", "acct.entry.view", "recon.view"):
                 self.assertEqual(_entrance_deny(_user(entry="erp"), code), "entrance_scope", code)
+
+    def test_gate_on_erp_permissions_excludes_dms_and_other_shells(self):
+        with _scope(True):
+            for code in sorted(code for code in ALL_CODES if code.startswith("erp.")):
+                for entry in ("main", "cowork", "erp"):
+                    self.assertEqual(_entrance_deny(_user(entry=entry), code), "", (entry, code))
+                for entry in ("dms", "pos", "ai", "daily"):
+                    self.assertEqual(
+                        _entrance_deny(_user(entry=entry), code),
+                        "entrance_scope",
+                        (entry, code),
+                    )
 
     def test_missing_entry_treated_as_main(self):
         with _scope(True):

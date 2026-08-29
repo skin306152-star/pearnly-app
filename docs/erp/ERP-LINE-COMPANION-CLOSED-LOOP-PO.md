@@ -7,8 +7,9 @@
 > 细则不在本文复制，分别引用 `ERP-DOCUMENT-CLOSED-LOOP.md`、
 > `ERP-REAL-DEVICE-ACCEPTANCE.md` 与 `ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 >
-> 基线日期：2026-08-29。已发布规划基线为 `master` `e37bfed7`；每个功能仍须重新绑定自己的
-> CI、production SHA、Companion 版本及 ERP 报表回查，不能继承本页的基线当验收。
+> 基线日期：2026-08-29。规划提交为 `e37bfed7`，F1-B1 默认休眠底座已按 `57fb5480`
+> 精确部署；当前 F1-B2 仍是未提交候选。每个功能仍须重新绑定自己的 CI、production SHA、
+> Companion 版本及 ERP 报表回查，不能继承任一批次基线当验收。
 
 ## 1. 产品结果
 
@@ -74,6 +75,10 @@ Express、在一台能访问 Express 的 Windows 电脑安装小助手、邀请�
   缺商品确认建档及库存真机回查已完成。
 - MR.ERP 已有销售现金、赊销及采购导入基础，但采购现金/赊购和 workspace 策略未闭环。
 - `erp_push_logs` 必须继续作为第三方 ERP 推送状态唯一来源。
+- F1-B1 的 additive schema、默认关闭 flag、partial unique 与 dormant SELECT RLS 已部署；
+  `shared_scope=TRUE` 的生产存量为零，因此这不等于共享业务已开放。
+- F1-B2 后端候选已实现 ERP 权限/自定义角色邀请边界，以及 flag-on 确认与 history mutation
+  原子门；候选尚未提交、跑 CI 或部署，真实 endpoint/push/log 共享路由与网页 UI 均未接。
 
 主要证据入口：
 
@@ -188,9 +193,25 @@ workspace 的授权员工可共享手动推送能力，同时保留各自操作�
 **明确不含**：Companion 代码改动、auto_push、MR.ERP、DMS、LINE、多 Profile、跨 tenant 共享、
 endpoint 自动合并。
 
-**当前实施批次 F1-B1**：只落默认休眠的数据底座——tenant flag、additive workspace/shared
-字段、active shared Express partial unique 及 session-local 显式开启的 SELECT policy；不接路由、
-不回填、不改变旧 user unique/自动清理或任何推送行为。B1 验证完成仍属于 F1，不能解锁 F2。
+**F1 内部批次与当前裁决**（这些编号不等于功能 F2-F5，也不改变功能级顺序）：
+
+- F1-B1 已部署：只落默认休眠的数据底座——tenant flag、additive workspace/shared 字段、
+  active shared Express partial unique 及 session-local 显式开启的 SELECT policy；未接共享业务。
+- F1-B2 后端已完成本地候选：新增四个 ERP 权限码及 owner/admin/custom role 边界；只在 tenant
+  flag-on 时允许 active custom role 邀请和 assigned workspace；邀请创建、接受、角色停用/删除、
+  成员 scope/角色变更均 fail-closed 并按统一锁序处理。`main/cowork/erp` 的 flag-on 确认路径按
+  actor、tenant、workspace、采购/销售方向及 create+approve 权限原子预检，mixed batch 整批处理，
+  只有匹配 actor/workspace 的正式单据存在后才能 commit；已转正式单据的 history 禁止再改/删。
+- F1-B2 的发布合同是 **所有 tenant 保持 flag-off**。关闭时 custom role 邀请/scope 继续沿用旧
+  system-role-only 行为，history/convert/commit 继续走 legacy 分支；本批不打开测试 tenant。
+- F1-B3、B4、B5 均未解锁：B3 才把真实 endpoint/push/log 路由接上四权限码与共享 Express
+  选择；B4 才交付 Console 自定义角色/邀请 UI、`erp.endpoint.manage` owner-only 表达、roleName
+  安全渲染，以及 main/cowork 保存→正式提交→仅转换成功后推送的可见闭环，并补四语、
+  source/dist/cache-bust 与真浏览器证据；B5 才做冲突清单、测试 tenant 放量、原 Profile
+  owner+员工采购/销售真机及 Express report 回查。
+
+B1/B2 完成仍只代表 F1 的数据与后端前置，不代表 F1 `CODE_VERIFIED`、`DEPLOYED_EXACT`、
+`READY_FOR_DEVICE` 或 `USER_ACCEPTED`，也绝不能解锁 F2。
 
 **代码/数据涉及**：
 
@@ -411,7 +432,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | F1-B1 默认休眠的数据底座;禁止 B2 与共享业务接线 |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1 已部署;B2 后端发布收口;B3/B4/B5 与真机均未解锁 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |
@@ -450,4 +471,5 @@ Companion 私有仓及 Windows 发布环境。缺少时对应功能进入 `BLOCK
   验证时间与保留/关闭原因；不得以 `pending`、口头“再决定放量”结束全计划。
 - 无未处理的数据完整性、安全或重复过账 P0/P1。
 
-当前只允许推进 F1-B1；F1 后续批次及 F2-F7 禁止提前施工。
+当前只允许收口并发布 F1-B2 后端，且发布时所有 tenant 保持
+`erp_shared_express_endpoint=false`；F1-B3/B4/B5 及 F2-F7 禁止提前施工。

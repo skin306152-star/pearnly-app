@@ -4,8 +4,8 @@
 真相 = roles 表 tenant 级行(key='custom:<slug>' · permissions JSONB 勾选码集);resolver 零改动
 读它即生效。本模块只管自定义行的增删改查与分配,系统预设行(tenant_id IS NULL)一概不碰。
 
-权限码集合法性在写入口收口:registry 外的码丢弃(deny-by-default),两个提权码
-(ownership.transfer / billing.manage · 连 admin 都没有)禁入自定义角色,杜绝越权造角色。
+权限码集合法性在写入口收口:registry 外的码丢弃(deny-by-default),只属于
+owner 的提权码禁入自定义角色,杜绝越权造角色。
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from typing import Any, Dict, List, Optional
 
 from core import db
 from services.authz.registry import ALL_CODES
-from services.authz.resolver import set_membership_role
+from services.authz.resolver import set_membership_role_resolved
 from services.team import console_store
 
 logger = logging.getLogger("mr-pilot")
 
-# 连 admin 都没有的提权码,不许塞进自定义角色(防越权造角色)
-FORBIDDEN_CUSTOM_CODES = frozenset({"ownership.transfer", "billing.manage"})
+# 只属于 owner 的提权码,不许塞进自定义角色(防越权造角色)
+FORBIDDEN_CUSTOM_CODES = frozenset({"ownership.transfer", "billing.manage", "erp.endpoint.manage"})
 
 _MAX_NAME = 40
 
@@ -74,6 +74,27 @@ def _row_to_dict(r: dict) -> Dict[str, Any]:
         "version": int(r.get("version") or 0),
         "member_count": int(r.get("member_count") or 0),
         "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+    }
+
+
+def get_active_custom_role_by_key(cur, tenant_id: str, role_key: str) -> Optional[Dict[str, Any]]:
+    """Resolve one active custom role inside its owning tenant."""
+    if not role_key.startswith("custom:"):
+        return None
+    cur.execute(
+        "SELECT id, key, COALESCE(display_name, name) AS role_name, permissions "
+        "FROM roles WHERE tenant_id = %s AND key = %s AND key LIKE 'custom:%%' "
+        "AND COALESCE(is_active, TRUE) LIMIT 1 FOR SHARE",
+        (str(tenant_id), role_key),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "id": str(row["id"]),
+        "key": row["key"],
+        "role_name": row["role_name"],
+        "permissions": row.get("permissions"),
     }
 
 
@@ -186,32 +207,70 @@ def update_custom_role(
 
     sets.append("version = version + 1")
     params += [str(tenant_id), str(role_id)]
+    version_sql = ""
+    if expected_version is not None:
+        version_sql = " AND version = %s"
+        params.append(int(expected_version))
     with db.get_cursor(commit=True) as cur:
         cur.execute(
             f"UPDATE roles SET {', '.join(sets)} "
-            "WHERE tenant_id = %s AND id = %s AND key LIKE 'custom:%%'",
+            f"WHERE tenant_id = %s AND id = %s AND key LIKE 'custom:%%'{version_sql}",
             tuple(params),
         )
         if cur.rowcount == 0:
-            return {"error": "team.role_not_found"}
+            if expected_version is None:
+                return {"error": "team.role_not_found"}
+            cur.execute(
+                "SELECT 1 FROM roles WHERE tenant_id = %s AND id = %s " "AND key LIKE 'custom:%%'",
+                (str(tenant_id), str(role_id)),
+            )
+            return {
+                "error": ("team.role_version_conflict" if cur.fetchone() else "team.role_not_found")
+            }
     return {"ok": True, "role": get_custom_role(tenant_id, role_id)}
 
 
 def delete_custom_role(*, tenant_id: str, role_id: str) -> Dict[str, Any]:
-    """删自定义角色。仍有 active 成员在用 → 拦(先转移),返回在用人数。"""
-    current = get_custom_role(tenant_id, role_id)
-    if current is None:
-        return {"error": "team.role_not_found"}
-    if current["member_count"] > 0:
-        return {"error": "team.role_in_use", "member_count": current["member_count"]}
+    """删自定义角色;在用成员拦截,未决邀请在同事务撤销。"""
     with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            """
+            SELECT r.key, COALESCE(r.display_name, r.name) AS role_name
+            FROM roles r
+            WHERE r.tenant_id = %s AND r.id = %s AND r.key LIKE 'custom:%%'
+            FOR UPDATE
+            """,
+            (str(tenant_id), str(role_id)),
+        )
+        current = cur.fetchone()
+        if current is None:
+            return {"error": "team.role_not_found"}
+        cur.execute(
+            "SELECT COUNT(*) AS c FROM memberships " "WHERE role_id = %s AND tenant_id = %s",
+            (str(role_id), str(tenant_id)),
+        )
+        count_row = cur.fetchone() or {}
+        member_count = int(count_row.get("c") or 0)
+        if member_count > 0:
+            return {"error": "team.role_in_use", "member_count": member_count}
+        cur.execute(
+            "UPDATE invitations SET revoked_at = NOW() "
+            "WHERE tenant_id = %s AND role_key = %s "
+            "AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > NOW()",
+            (str(tenant_id), current["key"]),
+        )
+        revoked_invitations = int(cur.rowcount or 0)
         cur.execute(
             "DELETE FROM roles WHERE tenant_id = %s AND id = %s AND key LIKE 'custom:%%'",
             (str(tenant_id), str(role_id)),
         )
         if cur.rowcount == 0:
             return {"error": "team.role_not_found"}
-    return {"ok": True, "name": current["name"]}
+    return {
+        "ok": True,
+        "name": current["role_name"],
+        "revoked_invitations": revoked_invitations,
+    }
 
 
 def assign_role(
@@ -231,16 +290,22 @@ def assign_role(
         )
     if str(actor_id) == str(target_user_id):
         return {"error": "team.cannot_modify_self"}
-    member = console_store.get_member(tenant_id, target_user_id)
-    if member is None:
-        return {"error": "team.member_not_found"}
-    if member["role_key"] == "owner":
-        return {"error": "team.target_is_owner"}
     with db.get_cursor(commit=True) as cur:
-        ok = set_membership_role(
+        role = get_active_custom_role_by_key(cur, str(tenant_id), role_key)
+        if role is None:
+            return {"error": "team.role_not_assignable"}
+        member = console_store._get_member_with_cursor(
+            cur, tenant_id, target_user_id, for_update=True
+        )
+        if member is None:
+            return {"error": "team.member_not_found"}
+        if member["role_key"] == "owner":
+            return {"error": "team.target_is_owner"}
+        ok = set_membership_role_resolved(
             cur,
             user_id=str(target_user_id),
             tenant_id=str(tenant_id),
+            role_id=role["id"],
             role_key=role_key,
             granted_by=str(actor_id),
         )

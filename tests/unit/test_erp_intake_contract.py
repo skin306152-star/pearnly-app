@@ -121,6 +121,11 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
             mock.patch.object(history_routes, "_check_history_access"),
             mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(
+                history_routes.erp_confirmation_access,
+                "commit_shared_confirmation",
+                return_value=None,
+            ),
             mock.patch.object(history_routes.db, "get_cursor_rls", return_value=_Ctx(cur)),
             mock.patch.object(
                 history_routes.convert_svc,
@@ -144,6 +149,11 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
             mock.patch.object(history_routes, "_check_history_access"),
             mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(
+                history_routes.erp_confirmation_access,
+                "commit_shared_confirmation",
+                return_value=None,
+            ),
             mock.patch.object(history_routes.db, "get_cursor_rls", return_value=_Ctx(cur)),
             mock.patch.object(
                 history_routes.convert_svc,
@@ -163,6 +173,11 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
             mock.patch.object(history_routes, "_check_history_access"),
             mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(
+                history_routes.erp_confirmation_access,
+                "commit_shared_confirmation",
+                return_value=None,
+            ) as shared_commit,
             mock.patch.object(history_routes.db, "get_cursor_rls") as get_cursor,
             mock.patch.object(history_routes, "commit_staged_ocr_history", return_value=1),
         ):
@@ -170,7 +185,64 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
                 history_routes.OcrCommitRequest(ids=["h1"]), mock.MagicMock()
             )
         self.assertEqual(result, {"ok": True, "committed": 1})
+        shared_commit.assert_called_once()
         get_cursor.assert_not_called()
+
+    async def test_shared_commit_returns_atomic_result_without_legacy_mutation(self):
+        user = {"id": "u1", "tenant_id": "t1", "entry": "cowork"}
+        with (
+            mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
+            mock.patch.object(history_routes, "_check_history_access"),
+            mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(
+                history_routes.erp_confirmation_access,
+                "commit_shared_confirmation",
+                return_value=2,
+            ) as shared_commit,
+            mock.patch.object(history_routes.db, "get_cursor_rls") as legacy_cursor,
+            mock.patch.object(history_routes, "commit_staged_ocr_history") as legacy_commit,
+        ):
+            result = await history_routes.ocr_commit(
+                history_routes.OcrCommitRequest(ids=["h1", "h2"]), mock.MagicMock()
+            )
+        self.assertEqual(result, {"ok": True, "committed": 2})
+        shared_commit.assert_called_once_with(mock.ANY, user, "t1", ["h1", "h2"])
+        legacy_cursor.assert_not_called()
+        legacy_commit.assert_not_called()
+
+    async def test_shared_commit_denials_have_zero_legacy_side_effects(self):
+        cases = (
+            HTTPException(403, detail="authz.forbidden"),
+            HTTPException(404, detail="history.not_found"),
+            HTTPException(
+                409,
+                detail={"code": "erp.formal_document_required", "history_ids": ["h1"]},
+            ),
+        )
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        for failure in cases:
+            with self.subTest(status=failure.status_code):
+                with (
+                    mock.patch.object(
+                        history_routes, "get_current_user_from_request", return_value=user
+                    ),
+                    mock.patch.object(history_routes, "_check_history_access"),
+                    mock.patch.object(history_routes, "_tid", return_value="t1"),
+                    mock.patch.object(
+                        history_routes.erp_confirmation_access,
+                        "commit_shared_confirmation",
+                        side_effect=failure,
+                    ),
+                    mock.patch.object(history_routes.db, "get_cursor_rls") as legacy_cursor,
+                    mock.patch.object(history_routes, "commit_staged_ocr_history") as legacy_commit,
+                ):
+                    with self.assertRaises(HTTPException) as caught:
+                        await history_routes.ocr_commit(
+                            history_routes.OcrCommitRequest(ids=["h1"]), mock.MagicMock()
+                        )
+                self.assertEqual(caught.exception.status_code, failure.status_code)
+                legacy_cursor.assert_not_called()
+                legacy_commit.assert_not_called()
 
     async def test_successful_conversion_finishes_resolved_staged_histories(self):
         cur = _Cur()
@@ -179,12 +251,26 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
             "skipped": [{"history_id": "h2", "reason": "already_converted"}],
         }
         user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        preflight = history_routes.erp_confirmation_access.ConfirmationPreflight(
+            ("purchase", "sales"),
+            (),
+            (("h1", "purchase"), ("h2", "sales")),
+        )
         with (
             mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
             mock.patch.object(history_routes, "_check_history_access"),
             mock.patch.object(history_routes, "_tid", return_value="t1"),
-            mock.patch.object(history_routes.db, "get_cursor_rls", return_value=_Ctx(cur)),
-            mock.patch.object(history_routes.wc, "assert_workspace_in_tenant"),
+            mock.patch.object(
+                history_routes.db, "get_cursor_rls", return_value=_Ctx(cur)
+            ) as get_cursor,
+            mock.patch.object(
+                history_routes.erp_confirmation_access,
+                "guard_confirmation",
+                return_value=preflight,
+            ) as guard,
+            mock.patch.object(
+                history_routes.erp_confirmation_access, "finish_resolved_histories"
+            ) as finish,
             mock.patch.object(
                 history_routes.convert_svc, "validate_erp_histories", return_value={}
             ),
@@ -195,9 +281,35 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
                 mock.MagicMock(),
             )
         self.assertEqual(response, result)
-        updates = [(sql, params) for sql, params in cur.sql if "SET staged = FALSE" in sql]
-        self.assertEqual(len(updates), 1)
-        self.assertEqual(set(updates[0][1][0]), {"h1", "h2"})
+        finish.assert_called_once_with(cur, preflight, "t1", "u1", 1, {"h1", "h2"})
+        guard.assert_called_once_with(cur, mock.ANY, user, "t1", 1, ["h1", "h2"])
+        get_cursor.assert_called_once_with(
+            tenant_id="t1", workspace_client_id=1, user_id="u1", commit=True
+        )
+
+    async def test_confirmation_guard_failure_keeps_batch_zero_write(self):
+        cur = _Cur()
+        user = {"id": "u1", "tenant_id": "t1", "entry": "cowork"}
+        with (
+            mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
+            mock.patch.object(history_routes, "_check_history_access"),
+            mock.patch.object(history_routes, "_tid", return_value="t1"),
+            mock.patch.object(history_routes.db, "get_cursor_rls", return_value=_Ctx(cur)),
+            mock.patch.object(
+                history_routes.erp_confirmation_access,
+                "guard_confirmation",
+                side_effect=HTTPException(404, detail="authz.not_found"),
+            ),
+            mock.patch.object(history_routes.convert_svc, "convert_histories") as convert,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                await history_routes.ocr_convert_documents(
+                    history_routes.OcrConvertRequest(history_ids=["h1"], workspace_client_id=7),
+                    mock.MagicMock(),
+                )
+        self.assertEqual(caught.exception.status_code, 404)
+        self.assertEqual(caught.exception.detail, "authz.not_found")
+        convert.assert_not_called()
 
 
 if __name__ == "__main__":

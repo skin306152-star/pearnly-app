@@ -34,6 +34,20 @@
     function t(key) {
         return (TEXT[locale] && TEXT[locale][key]) || TEXT.en[key] || key;
     }
+    function closeAndroidLauncherAfterHandoff() {
+        if (!window.liff || !window.liff.closeWindow) return;
+        document.addEventListener(
+            'visibilitychange',
+            function () {
+                try {
+                    window.liff.closeWindow();
+                } catch {
+                    // The external browser already owns the flow; launcher cleanup is best effort.
+                }
+            },
+            { once: true }
+        );
+    }
     function esc(v) {
         var d = document.createElement('div');
         d.textContent = v == null ? '' : String(v);
@@ -202,8 +216,10 @@
                     window.liff.isInClient() &&
                     window.liff.openWindow
                 ) {
+                    var os = typeof window.liff.getOS === 'function' ? window.liff.getOS() : '';
+                    if (os === 'android') closeAndroidLauncherAfterHandoff();
                     window.liff.openWindow({ url: portalUrl, external: true });
-                    if (window.liff.closeWindow) window.liff.closeWindow();
+                    if (os === 'ios' && window.liff.closeWindow) window.liff.closeWindow();
                 } else {
                     location.replace(portalUrl);
                 }

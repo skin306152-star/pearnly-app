@@ -9,12 +9,12 @@
 
 ## 0. 当前状态(2026-08-25 · 全平台 external + 中继提速)
 
-- **前端**:`static/dms-booking-edit/dms-booking-edit.js?v=9` portalMode 分支统一
-  `liff.openWindow({ url, external: true })` 后立刻 `liff.closeWindow()`:
+- **前端**:`static/dms-booking-edit/dms-booking-edit.js?v=11` portalMode 分支统一
+  `liff.openWindow({ url, external: true })`,但按平台安全清理 LINE 启动页:
   - Android **与** iOS 都走外部浏览器(不再按 `liff.getOS()` 分流)
-  - `closeWindow()` 关掉 LIFF 启动页,返回 LINE 聊天,再次点菜单会重新发票据
-    (修掉旧「返回后再次进入 generic failed」——旧版靠 getOS 分流 + 不开窗导致
-    重入时票据复用/状态残留)
+  - iOS 保持打开外部浏览器后立即 `closeWindow()`
+  - Android 等 `visibilitychange` 证明系统浏览器已接管后才 `closeWindow()`,避免同一
+    JavaScript tick 里提前关闭 LIFF、取消尚未完成的 Android 外部 Intent
   - 非 LINE 环境 → `location.replace(portalUrl)`(不变)
 - **后端 relay 提速**:`services/line_dms/mrerp_portal.py` 把旧 1800 ms + 4000 ms
   的两段盲等改成:
@@ -26,16 +26,16 @@
   4. `<link rel="dns-prefetch">` + `<link rel="preconnect">` 预热 MRERP 连接
 - **票据链路**:一次性票据(`/api/line/dms-portal/ticket` POST)+ relay(`/line/dms-portal`
   GET)不变。TTL 60s、一次性、SHA256 哈希存库、no-store/CSP/no-referrer 头齐备。
-- **E2E**:`tests/e2e/33-dms-booking-edit-mobile.spec.js` 三条用例锁定:① 统一
-  `external:true` + `closeWindow`;② closeWindow 后再次点菜单发**新票据**(计数 2);
-  ③ relay 弹窗登录(含 preconnect 链接断言、无 1800/4000 盲等)。relay 弹窗测试不变。
+- **E2E**:`tests/e2e/33-dms-booking-edit-mobile.spec.js` 锁定:① Android
+  `external:true`,外部交接前不关闭、进入后台后才关闭;② iOS 保持立即关闭且重入发
+  **新票据**;③ relay 弹窗登录(含 preconnect 链接断言、无 1800/4000 盲等)。
 
 ### 平台矩阵
 
 | 平台 | `external` | 行为 | 自动登录 |
 |---|---|---|---|
-| Android LINE | `true` | 跳外部浏览器加载 relay | ✅ |
-| iOS LINE | `true` | 跳外部 Safari 加载 relay | ✅ |
+| Android LINE | `true` | 跳外部浏览器;进入后台后清理启动页 | ✅ |
+| iOS LINE | `true` | 跳外部 Safari;立即清理启动页 | ✅ |
 | 非 LINE 桌面 | N/A | `location.replace` 同窗口跳转 | ✅ |
 
 ### 为什么全平台都走 external
@@ -80,7 +80,7 @@ browsing context,`form.target=name` 失效,用户看到空白登录页;② Andro
 
 ## 3. 移动端优先
 
-- Android / iOS 统一跳外部浏览器加载 relay,用户在 relay 页点「เข้าสู่ระบบ DMS」按钮后
+- Android / iOS 统一一键跳外部浏览器加载 relay,用户在 relay 页点「เข้าสู่ระบบ DMS」按钮后
   凭据自动提交、不输账号密码。自动登录成功后用户手动切回 LINE,代价是可接受的切换,
   换取两个平台都可靠的自动登录(绕开 WebView named window 隔离与第三方 cookie 拦截)。
 - relay 页 DNS-prefetch / preconnect 预热 MRERP 连接;点按钮后立即开窗、立即提交,

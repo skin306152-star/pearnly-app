@@ -121,8 +121,8 @@ const GEO = {
     },
 };
 
-function liffMockScript() {
-    return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
+function liffMockScript(os) {
+    return `window.__dmsPortalOpen=null;window.__dmsPortalClosed=false;window.liff={init:async()=>{},isLoggedIn:()=>true,getIDToken:()=>"LINE-ID-TOKEN",isInClient:()=>true,getOS:()=>${JSON.stringify(os)},openWindow:(params)=>{window.__dmsPortalOpen=params;},closeWindow:()=>{window.__dmsPortalClosed=true;}};`;
 }
 
 const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
@@ -132,7 +132,7 @@ const PORTAL_CHAT_HTML = `<!doctype html><html lang="th"><head><meta charset="ut
     <a id="credentials-menu" class="cell" href="${BASE}/home?liff.state=%3Fcredentials%3Ddms">เปลี่ยนบัญชีและรหัสผ่าน</a><span class="cell placeholder">—</span><span class="cell placeholder">—</span>
 </nav></body></html>`;
 
-async function setupPortalTest(page) {
+async function setupPortalTest(page, os) {
     let authBody;
     let ticketRequested = false;
     let ticketRequestCount = 0;
@@ -149,7 +149,7 @@ async function setupPortalTest(page) {
     const token = `e2e.${payload}.sig`;
 
     await page.route('https://static.line-scdn.net/**', (route) =>
-        route.fulfill({ contentType: 'application/javascript', body: liffMockScript() })
+        route.fulfill({ contentType: 'application/javascript', body: liffMockScript(os) })
     );
     await page.route('**/api/line/dms-booking/config', (route) =>
         route.fulfill({
@@ -184,8 +184,10 @@ async function setupPortalTest(page) {
     };
 }
 
-test('LINE always opens MRERP DMS in external browser and closes launcher', async ({ page }) => {
-    const h = await setupPortalTest(page);
+test('Android opens MRERP DMS externally without cancelling the browser handoff', async ({
+    page,
+}) => {
+    const h = await setupPortalTest(page, 'android');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.setContent(PORTAL_CHAT_HTML);
     await page.screenshot({ path: path.join(OUT, 'portal-before-click-390.png') });
@@ -196,24 +198,25 @@ test('LINE always opens MRERP DMS in external browser and closes launcher', asyn
             url: `${BASE}/line/dms-portal?ticket=opaque-ticket`,
             external: true,
         });
-    await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(true);
+    await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(false);
     expect(h.ticketRequested()).toBe(true);
     expect(h.ticketRequestCount()).toBe(1);
     expect(await page.evaluate(() => localStorage.getItem('mrerp_password'))).toBeNull();
     await page.screenshot({
-        path: path.join(OUT, 'portal-external-close-390.png'),
+        path: path.join(OUT, 'portal-android-external-open-390.png'),
         fullPage: true,
     });
+    await page.evaluate(() =>
+        globalThis.document.dispatchEvent(new globalThis.Event('visibilitychange'))
+    );
+    await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(true);
 });
 
-test('second menu click issues a fresh ticket after closeWindow', async ({ page }) => {
-    const h = await setupPortalTest(page);
+test('iOS keeps the working external handoff and issues a fresh ticket after close', async ({
+    page,
+}) => {
+    const h = await setupPortalTest(page, 'ios');
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.setContent(PORTAL_CHAT_HTML);
-    await page.locator('#dms-menu').click();
-    await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalOpen)).toBeTruthy();
-    // Simulate closeWindow returning the user to the LINE chat, then click the
-    // menu again to prove a fresh ticket is issued rather than a stale reuse.
     await page.setContent(PORTAL_CHAT_HTML);
     await page.locator('#dms-menu').click();
     await expect
@@ -223,7 +226,13 @@ test('second menu click issues a fresh ticket after closeWindow', async ({ page 
             external: true,
         });
     await expect.poll(() => page.evaluate(() => globalThis.__dmsPortalClosed)).toBe(true);
-    expect(h.ticketRequestCount()).toBe(2);
+    await page.setContent(PORTAL_CHAT_HTML);
+    await page.locator('#dms-menu').click();
+    await expect.poll(() => h.ticketRequestCount()).toBe(2);
+    await page.screenshot({
+        path: path.join(OUT, 'portal-external-close-390.png'),
+        fullPage: true,
+    });
 });
 
 test('menu 4 opens the operator credential editor and saves only the entered pair', async ({

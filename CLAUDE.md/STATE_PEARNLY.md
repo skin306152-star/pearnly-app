@@ -1,8 +1,8 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-30 F1-B3A shared endpoint read
+## 当前状态卡 · 08-30 F1-B3B1 typed binding foundation
 
-- **▶ 当前 task**:严格单功能推进 ERP 全闭环;当前只实施 F1-B3A 共享 Express endpoint 只读可见性、安全 DTO 与服务端在线态;B3B/B3C、B4/B5 均锁定。
+- **▶ 当前 task**:严格单功能推进 ERP 全闭环;当前只实施 F1-B3B1 typed binding schema 与不可逆 Profile key 纯函数;B3B2/B3B3、B3C、B4/B5 均锁定。
 - **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
 - **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 - **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
@@ -12,14 +12,18 @@
 - **🛌 B2 生产证据**:CI `33253769492` 全绿(含真 PG smoke);production HEAD=`be959c05998f185b7bd978975487a1246ec17f39`,service active=`2026-08-29T13:06:04Z`;45/45 tenant 的 `erp_shared_express_endpoint` 有效态均 OFF。
 - **📐 F1 窄边界**:只共享 active Express 手动推送;partial unique 轴=`(tenant_id,workspace_client_id,adapter)`;共享查询/RLS 必须 adapter-gated;MR.ERP/`mrerp_dms` 原样;Companion/auto_push/LINE/多 Profile 不改。
 - **🚩 F1 放量**:`erp_shared_express_endpoint` 默认关,仅测试 tenant;存量多 endpoint 冲突只阻断并报告,不自动合并;最终 rollout 状态须入 ledger。
-- **▶ F1-B3A**:`IMPLEMENTING_UNCOMMITTED`;仅 flag-on `main/cowork/erp` 的 GET endpoint 清单进入 tenant/user/workspace RLS 共享读;员工安全投影不返 config/token/path/device/catalog/科目/creator;在线态以服务器时间 180 秒判定。
-- **⏸ F1-B3B/B3C**:B3B=endpoint manage/binding/token;B3C=manual push/log/Agent lease/ack;两批均 `PLANNED_LOCKED`。真实 Profile mismatch 必须先建立稳定 `bound_account_set`/`live_account_set` 双字段与协议再验;B3A 不改 heartbeat、不冒充已检测。
+- **✅ F1-B3A**:`DEPLOYED_EXACT_FLAG_OFF`;commit/production=`f37f824e`,CI `33292287719` 全绿;45/45 tenant flag OFF;共享 endpoint 只读 DTO/在线态未放量。
+- **▶ F1-B3B1**:`IMPLEMENTING_UNCOMMITTED`;仅 additive 0109/startup ensure/fresh baseline 的 7 个 typed 字段+3 个 CHECK,同名列 type/null/default 漂移 fail-closed,以及 `account_set+Windows account_dir` 规范化后 `v1:sha256` 纯 key;存量除 generation=0 外不回填。
+- **🛑 B3B1 运行时边界**:不接 owner API、token/config、heartbeat、CRUD、RLS、push/log/lease/ack、UI 或 Companion;不调用 generic ERP outbound test;flag-off 生产行为必须为零变化。
+- **⏸ F1-B3B2/B3B3/B3C**:B3B2=owner manage/binding/token;B3B3=live heartbeat/mismatch/legacy isolation;B3C=manual push/log/Agent lease/ack;均 `PLANNED_LOCKED`。
 - **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批均锁定。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
 - **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
-- **📍 发布基线**:`master/origin/master=b2d924a7`;最后已核 F1 生产基线仍为 `be959c05`;B3A 仅未提交工作树候选,不得写 deployed/ready。
+- **📍 发布基线**:`master/origin/master=f37f824e`;production exact=`f37f824e`;仅 B3B1 为未提交工作树候选,不得写 deployed/ready。
+- **⚠️ 独立安全微批待修(HIGH)**:generic ERP webhook/test 的 SSRF guard 校验 `system_url`,真实 sink 读取 `url`,endpoint test 未逐跳复验重定向;B3B Express 状态不得调用该 outbound test;B3B1 未修。
+- **⚠️ 独立可靠性微批待修(MEDIUM)**:legacy retry worker 不校验 endpoint.enabled,disabled endpoint 仍可能重试外推;B3B2 对非终态任务先 409,完整 draining/lease 语义归 B3C;B3B1 未修。
 - **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
-- **🧪 B3A 当前证据**:基线原样加 B3A 两测试文件共 476 passed/16 环境 skip/75 subtests;ruff/black/size 绿;新增真 PostgreSQL RLS smoke 已进 CI glob,本机 Docker 未运行故其中 1 条按环境规则 skip;未改 UI、Companion、agent_store、auto_push、MR.ERP、DMS、LINE 或 F2-F7。
+- **🧪 B3B1 当前证据**:B3B1+B1+B3A+fresh baseline 定向 56 pass/9 环境 skip/31 subtests;其中 B3B1 真 PG 7 条已进 CI skip-as-fail,本机 PostgreSQL 未运行;ruff/black/size/new-debt模拟/destructive-db/AI-smell/Alembic-head/YAML/diff-check 绿,独立复审 PASS;待 commit、CI 真 PG 与精确部署。
 
 ---
 

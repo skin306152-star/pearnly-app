@@ -193,14 +193,29 @@ implementation_batches:
     scope: AUTHZ_CUSTOM_INVITATION_CONFIRMATION_AND_MUTABLE_HISTORY_BACKEND
     production_rollout_contract: ALL_TENANTS_FLAG_OFF
   - batch_id: F1-B3A
+    backend_implementation_complete: true
+    release_state: DEPLOYED_EXACT_FLAG_OFF
+    pearnly_commit: f37f824eaf144602438d2b060575d295361c4a25
+    ci_run_id: 33292287719
+    ci_result: SUCCESS
+    production_sha: f37f824eaf144602438d2b060575d295361c4a25
+    production_verified_at: 2026-08-30T05:36:31Z
+    service_active_enter_timestamp: 2026-08-30T04:30:51Z
+    scope: SHARED_EXPRESS_ENDPOINT_READ_SAFE_DTO_AND_SERVER_CONNECTION_STATE
+    production_rollout_contract: ALL_TENANTS_FLAG_OFF
+  - batch_id: F1-B3B1
     backend_implementation_complete: false
     release_state: IMPLEMENTING_UNCOMMITTED
-    source_baseline: b2d924a7a91a45aa215af312e72cebd05b4d6208
-    scope: SHARED_EXPRESS_ENDPOINT_READ_SAFE_DTO_AND_SERVER_CONNECTION_STATE
-  - batch_id: F1-B3B
+    source_baseline: f37f824eaf144602438d2b060575d295361c4a25
+    scope: TYPED_BINDING_SCHEMA_AND_VERSIONED_IRREVERSIBLE_PROFILE_KEY
+  - batch_id: F1-B3B2
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
-    scope: SHARED_EXPRESS_ENDPOINT_MANAGE_BINDING_TOKEN_AND_STABLE_BOUND_ACCOUNT_SET
+    scope: OWNER_MANAGE_BINDING_TOKEN_AND_DISABLE_DELETE_GUARDS
+  - batch_id: F1-B3B3
+    backend_implementation_complete: false
+    release_state: PLANNED_LOCKED
+    scope: LIVE_HEARTBEAT_PROFILE_MISMATCH_AND_LEGACY_ISOLATION
   - batch_id: F1-B3C
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
@@ -223,17 +238,20 @@ companion:
 
 feature_flags:
   - name: erp_shared_express_endpoint
-    candidate_rollout_state: OFF_ALL_TENANTS_FOR_B2_DEPLOY
+    candidate_rollout_state: OFF_ALL_TENANTS_AFTER_B3A_DEPLOY
     accepted_rollout_state: PENDING
     scope: ALL_TENANTS_FLAG_OFF_UNTIL_F1_B5
     verified_at: 2026-08-29T13:11:47Z
+    latest_release_sha: f37f824eaf144602438d2b060575d295361c4a25
+    latest_release_readback: OFF_45_OF_45_TENANTS
+    latest_release_readback_at: PENDING_EXACT_TIMESTAMP_FROM_B3A_RELEASE_EVIDENCE
     effective_enabled_tenants: 0
     effective_disabled_tenants: 45
     tenant_total: 45
     reason: >-
-      B2 only installs fail-closed authorization and confirmation prerequisites. Shared endpoint,
-      push/log route wiring, Console UI and true-device acceptance are not present, so no tenant may
-      enter the shared branch in this release.
+      B3A only adds fail-closed shared endpoint read behavior behind the existing flag. Owner manage,
+      binding/token writers, push/log route wiring, Console UI and true-device acceptance are not
+      present, so no tenant may enter the shared branch in this release.
 
 test_contexts:
   - context_id: F1-COWORK-OWNER-REGRESSION
@@ -394,6 +412,16 @@ automatic_verification:
     - CI_33253769492_ALL_REQUIRED_JOBS_SUCCESS_INCLUDING_NON_SKIPPED_PG_SMOKE
     - PRODUCTION_HEAD_EXACT_BE959C05998F185B7BD978975487A1246EC17F39
     - PRODUCTION_FLAG_EFFECTIVE_DISABLED_45_OF_45_TENANTS
+    - CI_33292287719_ALL_REQUIRED_JOBS_SUCCESS_INCLUDING_NON_SKIPPED_PG_SMOKE_AND_DEPLOY
+    - PRODUCTION_HEAD_EXACT_F37F824EAF144602438D2B060575D295361C4A25
+    - PRODUCTION_SERVICE_ACTIVE_2026_08_30T04_30_51Z
+    - PRODUCTION_FLAG_REMAINED_EFFECTIVE_DISABLED_45_OF_45_TENANTS_AFTER_B3A
+    - B3B1_TARGETED_SCHEMA_AND_PROFILE_KEY_14_PASS
+    - B3B1_POSTGRESQL_SMOKE_7_TESTS_LOCAL_ENVIRONMENT_SKIP_CI_SKIP_AS_FAIL
+    - B3B1_COLUMN_CATALOG_DRIFT_CONTRACT_AND_NO_REWRITE_PG_POISON_TESTS_ADDED
+    - B3B1_PLUS_B1_B3A_FRESH_BASELINE_TARGETED_56_PASS_9_ENVIRONMENT_SKIPS_31_SUBTESTS
+    - B3B1_RUFF_BLACK_SIZE_NEW_DEBT_SIMULATION_DESTRUCTIVE_DB_AI_SMELL_ALEMBIC_HEAD_YAML_DIFF_CHECK_PASS
+    - B3B1_INDEPENDENT_CATALOG_CONTRACT_REVIEW_PASS_NO_P0_P1_P2
   conclusion: PENDING_F1_REMAINING_BATCHES_CANDIDATE_CI_DEVICE_AND_USER_ACCEPTANCE
 
 ui_verification:
@@ -498,6 +526,8 @@ erp_report_readbacks:
 evidence_paths:
   - tests/unit/test_erp_shared_endpoint_read.py
   - tests/unit/test_erp_shared_endpoint_read_pg_smoke.py
+  - tests/unit/test_erp_shared_binding_foundation.py
+  - tests/unit/test_erp_shared_binding_pg_smoke.py
   - tests/unit/test_console_invite_custom_roles.py
   - tests/unit/test_invitation_accept_transaction.py
   - tests/unit/test_team_role_concurrency_pg_smoke.py
@@ -516,15 +546,18 @@ user_decision:
   accepted_erp_report_evidence_ids: []
 
 open_issues:
-  - B3A is an uncommitted read-only candidate; it still needs stable-snapshot review, non-skipped PostgreSQL CI, full gates, commit, exact deployment readback and flag-off proof.
-  - B3B endpoint manage/binding/token and B3C manual push/log/Agent remain locked; erp.endpoint.manage, erp.push.operate and erp.log.view are not wired by B3A.
-  - Real Profile mismatch is not observable today because heartbeat overwrites the sole config.account_set; B3B/B3C must establish stable bound_account_set/live_account_set writers and protocol before claiming mismatch detection.
+  - B3B1 is an uncommitted schema and pure-key candidate; local targeted/static/mechanical gates and independent review pass, but its seven PostgreSQL tests are local environment skips and still require non-skipped CI before commit release, exact deployment readback and flag-off proof.
+  - B3B2 owner manage/binding/token, B3B3 live heartbeat/mismatch/legacy isolation and B3C manual push/log/Agent remain locked; erp.endpoint.manage, erp.push.operate and erp.log.view are not yet wired to those operations.
+  - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
+  - HIGH separate security microbatch remains unfixed: generic ERP webhook/test SSRF guard validates system_url while the real network sink reads url, and endpoint test does not revalidate every redirect hop. B3B Express state must not call that outbound test.
+  - MEDIUM separate reliability microbatch remains unfixed: legacy retry worker does not check endpoint.enabled, so a disabled endpoint may still retry outward. B3B2 must return 409 for nonterminal tasks; full draining and lease semantics remain B3C.
   - B4 must expose only flag-on tenant custom roles in Console invitation and scope UI, keep erp.endpoint.manage owner-only, escape roleName, close main/cowork save-to-formal-to-push only after conversion succeeds, ship zh/th/en/ja source plus dist and cache-bust, and pass true-browser gates.
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
   - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
 next_action: >-
-  Finish only F1-B3A review and automatic verification on the b2d924a7 baseline while keeping every
-  tenant flag off. Do not start F1-B3B/B3C, F1-B4/B5 or modify F2-F7 until separately unlocked.
+  Finish only F1-B3B1 schema/profile-key review and automatic verification on the f37f824e baseline
+  while keeping every tenant flag off. Do not start F1-B3B2/B3B3/B3C, F1-B4/B5 or modify F2-F7
+  until separately unlocked.
 ```
 
 ## 7. F2-F7

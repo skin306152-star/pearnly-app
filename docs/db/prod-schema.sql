@@ -780,7 +780,17 @@ CREATE TABLE IF NOT EXISTS "erp_endpoints" (
   "tenant_id" uuid,
   "workspace_client_id" bigint,
   "shared_scope" boolean DEFAULT false NOT NULL,
+  "bound_account_set" text,
+  "bound_profile_key" text,
+  "live_account_set" text,
+  "live_profile_key" text,
+  "agent_last_seen_at" timestamp with time zone,
+  "agent_version" text,
+  "binding_generation" bigint DEFAULT 0 NOT NULL,
   CONSTRAINT "erp_endpoints_adapter_chk" CHECK ((adapter = ANY (ARRAY['webhook'::text, 'xero'::text, 'flowaccount'::text, 'mrerp'::text, 'mrerp_dms'::text, 'express'::text]))),
+  CONSTRAINT "erp_endpoints_binding_generation_chk" CHECK ((binding_generation >= 0)),
+  CONSTRAINT "erp_endpoints_bound_profile_pair_chk" CHECK (((bound_account_set IS NULL) = (bound_profile_key IS NULL))),
+  CONSTRAINT "erp_endpoints_live_profile_pair_chk" CHECK (((live_account_set IS NULL) = (live_profile_key IS NULL))),
   CONSTRAINT "erp_endpoints_pkey" PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX idx_erp_endpoints_one_default_per_user ON public.erp_endpoints USING btree (user_id) WHERE (is_default = true);

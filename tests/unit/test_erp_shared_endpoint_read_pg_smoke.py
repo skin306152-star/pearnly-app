@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 import unittest
+from datetime import timedelta
 from unittest import mock
 
 from core.rls import RLS_APP_ROLE, ensure_rls_app_role
@@ -73,7 +74,7 @@ class SharedEndpointReadPgSmokeTests(unittest.TestCase):
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 shared_scope BOOLEAN NOT NULL DEFAULT FALSE, bound_account_set TEXT, bound_profile_key TEXT,
                 live_account_set TEXT, live_profile_key TEXT, agent_last_seen_at TIMESTAMPTZ, agent_version TEXT,
-                binding_generation BIGINT NOT NULL DEFAULT 0
+                binding_generation BIGINT NOT NULL DEFAULT 0, revoked_at TIMESTAMPTZ
             );
             """)
         ensure_rls_app_role(c)
@@ -166,6 +167,36 @@ class SharedEndpointReadPgSmokeTests(unittest.TestCase):
             (actor, TENANT_A, str(workspace)),
         )
 
+    def _project_managed_age(self, age_seconds):
+        self.cur.execute("RESET ROLE")
+        self.cur.execute("SELECT clock_timestamp() AS server_now")
+        server_now = self.cur.fetchone()["server_now"]
+        self.cur.execute(
+            "UPDATE erp_endpoints SET bound_account_set='Main', bound_profile_key='profile-1', "
+            "live_account_set='Main', live_profile_key='profile-1', agent_last_seen_at=%s "
+            "WHERE binding_generation=1",
+            (server_now - timedelta(seconds=age_seconds),),
+        )
+        self.conn.commit()
+
+        self._app_context()
+        with mock.patch.object(
+            shared_express_schema, "erp_shared_express_endpoint_enabled_for", return_value=True
+        ):
+            self.assertTrue(
+                shared_express_schema.enable_shared_express_select(self.cur, TENANT_A, WORKSPACE_A)
+            )
+        rows = shared_express_store.fetch_visible_endpoint_rows(
+            self.cur,
+            actor_id=EMPLOYEE,
+            tenant_id=TENANT_A,
+            workspace_client_id=WORKSPACE_A,
+        )
+        managed = next(row for row in rows if row["name"] == "managed")
+        projected = shared_express_store.safe_endpoint_dto(managed, server_now)
+        self.conn.rollback()
+        return managed, projected
+
     def test_managed_generation_one_is_visible_only_in_current_active_workspace_and_legacy_is_gen0(
         self,
     ):
@@ -197,6 +228,20 @@ class SharedEndpointReadPgSmokeTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "legacy")
         self.conn.rollback()
+
+    def test_managed_timestamptz_round_trip_enforces_freshness_boundaries(self):
+        cases = (
+            (-5, "online"),
+            (-5.000001, "needs_attention"),
+            (-3600, "needs_attention"),
+            (179, "online"),
+            (180, "offline"),
+        )
+        for age_seconds, expected in cases:
+            with self.subTest(age_seconds=age_seconds):
+                managed, projected = self._project_managed_age(age_seconds)
+                self.assertIsNotNone(managed["agent_last_seen_at"].tzinfo)
+                self.assertEqual(projected["connection_state"], expected)
 
 
 if __name__ == "__main__":

@@ -50,7 +50,7 @@ _ERP_ENDPOINT_AUDIT_DETAIL_KEYS = frozenset(
         "reason",
     }
 )
-_ERP_ENDPOINT_AUDIT_DETAIL_ACTIONS = frozenset({"rebind", "enable", "disable", "revoke"})
+_ERP_ENDPOINT_AUDIT_DETAIL_ACTIONS = frozenset({"bind", "rebind", "enable", "disable", "revoke"})
 
 _CANONICAL_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 

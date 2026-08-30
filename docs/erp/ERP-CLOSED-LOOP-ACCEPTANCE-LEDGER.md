@@ -6,7 +6,7 @@
 >
 > 不记录密码、token、绑定码、cookie、私钥、完整 UNC、本机用户名或付费客户数据。
 >
-> 2026-08-30 口径：CI workflow 已停用；历史 CI 结果只作历史证据，不把 flag-off 技术切片记为用户功能完成。每个用户功能必须形成唯一可用 candidate 后直接 production 启用并验收，不做长期灰度；F1 在 B3B3/B3C 完成前不得启用。
+> 2026-08-30 口径：CI workflow 已停用；历史 CI 结果只作历史证据，不把 flag-off 技术切片记为用户功能完成。每个用户功能必须形成唯一可用 candidate 后直接 production 启用并验收，不做微部署或长期灰度；F1 candidate 完整发布前不得启用。
 
 ## 1. Attempt 定义与记账规则
 
@@ -254,11 +254,11 @@ implementation_batches:
     hardening_notes:
       - Deployed exact with all tenant flags off: the busy helper scans all actor logs and treats every non-NULL lease_owner, including expired leases, as busy; this batch is not READY.
       - Independent review: ordinary Express enqueue preflight has no external side effect, but promotion races can drop a queue item or write false history; steward bridge and expired leases may write without a log.
-      - reservation/finalize, drain, managed log/Agent/bridge remain hard B3B3/B3C prerequisites.
+      - B3B3 is now internally verified but unreleased; reservation/finalize, drain, and managed log/Agent/bridge remain hard B3C prerequisites.
       - Archive replay note: the complete Alembic blank-chain replay still fails on pre-existing 002 missing-table and 0108 long-revision/varchar32 archive debt; 0111's tgattr/role defects are fixed here. Do not change 002, 0108, MR.ERP, bridge, or B3C in this batch.
     open_issues:
       - This batch has no token/config UI, heartbeat, Companion, LINE, push/log/lease, or MR.ERP work.
-      - Enrollment intentionally isolates the old Companion token/reporting writers; it is not usable until B3B3 restores the managed live path.
+      - Enrollment intentionally isolates the old Companion token/reporting writers; B3B3 restores the managed live path only in unreleased internal code, so enrollment is not usable until the complete F1 candidate includes B3C and is released.
       - Managed log read/delete/stat/export authorization remains a B3C prerequisite; this batch does not expose managed history to employees.
   - batch_id: F1-B3B2b-2
     state: INTERNAL_CODE_VERIFIED_NOT_RELEASED
@@ -269,16 +269,27 @@ implementation_batches:
     rollout_contract: ALL_TENANTS_FLAG_OFF
     discovery_doc: docs/erp/F1-B3B2B2-OWNER-LIFECYCLE-CAS-DISPATCH.md
     verification: 43 lifecycle unittest (parameter matrix retained via subTest); 83 all-PG tests plus 11 subtests; 0 skips; DeepSeek and independent review found no P0/P1.
-    next_action: B3B3 is unblocked; do not micro-release this slice. Keep all tenant flags off until the complete F1 candidate is merged.
+    next_action: B3B3 is internally verified and B3C is unblocked for discovery; do not micro-release this slice. Keep all tenant flags off until the complete F1 candidate is merged.
   - batch_id: F1-B3B3
-    backend_implementation_complete: false
-    release_state: DISCOVERY_COMPLETE_IMPLEMENTING
+    state: INTERNAL_CODE_VERIFIED_NOT_RELEASED
+    backend_implementation_complete: true
+    release_state: INTERNAL_CODE_VERIFIED_NOT_RELEASED
     scope: LIVE_HEARTBEAT_PROFILE_MISMATCH_AND_LEGACY_ISOLATION
+    readiness: NOT_F1_COMPLETE_NOT_USER_FUNCTION_COMPLETE
+    rollout_contract: ALL_TENANTS_FLAG_OFF
     discovery_doc: docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md
     companion_reference: master HEAD 72a92b8 / version 1.1.64
+    companion_protocol_change: NONE
+    verification: >-
+      Final 112 targeted unittest with full-application ASGI coverage; independent blank-database
+      all-PG discovery found 96 tests with 0 skips; managed heartbeat/creator decoupling,
+      tenant+workspace/RLS/ACL, confirmation CAS+audit, three concurrency groups, gen0 and
+      lease-ack isolation, clock_timestamp(), and event-loop closure verified. DeepSeek's final
+      suspicions were disproved; Sol final review found no P0-P2.
+    next_action: B3C is unblocked for discovery; do not micro-release B3B3. Keep every tenant flag off until the complete F1 candidate is merged.
   - batch_id: F1-B3C
     backend_implementation_complete: false
-    release_state: PLANNED_LOCKED
+    release_state: UNBLOCKED_DISCOVERY_PENDING
     scope: SHARED_EXPRESS_MANUAL_PUSH_LOG_AGENT_CHANNEL_AND_LIVE_ACCOUNT_SET
   - batch_id: F1-B4
     backend_implementation_complete: false
@@ -292,7 +303,8 @@ implementation_batches:
 companion:
   change: UNCHANGED
   commit: NOT_APPLICABLE_NO_COMPANION_CHANGE
-  version: PENDING_TRUE_DEVICE_READBACK
+  reference: master HEAD 72a92b8
+  version: 1.1.64_PROTOCOL_UNCHANGED_PENDING_TRUE_DEVICE_READBACK
   installer_sha256: NOT_APPLICABLE_NO_COMPANION_CHANGE
   auto_update_readback: NOT_APPLICABLE_NO_COMPANION_CHANGE
 
@@ -309,9 +321,9 @@ feature_flags:
     effective_disabled_tenants: 45
     tenant_total: 45
     reason: >-
-      B3B2b-1 adds only owner legacy Express enrollment promotion behind the existing flag. Live
-      heartbeat, managed push/log route wiring, Console UI and true-device acceptance are not present,
-      so no tenant may enter the shared branch in this release.
+      B3B2b-1 is the latest deployed internal prerequisite. B3B2b-2 and B3B3 are internally verified
+      but not released; managed push/log route wiring, Console UI and true-device acceptance are not
+      complete, so no tenant may enter the shared branch.
 
 test_contexts:
   - context_id: F1-COWORK-OWNER-REGRESSION
@@ -608,17 +620,18 @@ user_decision:
 open_issues:
   - B3B2b-1 is an internal prerequisite deployment with all tenant flags off: runtime/enrollment SHA a609748955779e2be4935b5cc08c214d57ee881b, release/gate and production SHA 4c871b78d60d69644ce4b5a2505053bab4a42a4e, historical CI 33309634623 13/13 success, production service 2026-08-30T11:53:43Z, ready 200/true, true PG 63/63 with 0 skips, and helper/trigger/policy/ACL/search_path plus 45 flags and 36 endpoint readbacks verified. This is not a usable F1 candidate and must not be called feature-complete. The docs closure commit records this state only and must not be used as a self-referential feature SHA.
   - B3B2a P2 follow-up: real resolver/console concurrent transfer coverage and canonical membership→role→users→workspace lock-order proof remain open; this batch only proves the managed helper and transfer-shaped lock path reach their barriers without deadlock.
-  - B3B2b-2 is `INTERNAL_CODE_VERIFIED_NOT_RELEASED`: 43 lifecycle unittest (parameter matrix retained via subTest), 83 all-PG tests plus 11 subtests, 0 skips, and no P0/P1 from DeepSeek or independent review. It is not F1 complete or a user-facing feature. B3B3 is now `DISCOVERY_COMPLETE_IMPLEMENTING`; B3C/B4/B5 remain not implemented.
-  - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
+  - B3B2b-2 is `INTERNAL_CODE_VERIFIED_NOT_RELEASED`: 43 lifecycle unittest (parameter matrix retained via subTest), 83 all-PG tests plus 11 subtests, 0 skips. It is not F1 complete or a user-facing feature.
+  - B3B3 is `INTERNAL_CODE_VERIFIED_NOT_RELEASED`: final 112 targeted unittest with full-application ASGI coverage; independent blank-database all-PG discovery 96 tests/0 skips; managed heartbeat/creator decoupling, tenant+workspace/RLS/ACL, confirmation CAS+audit, three concurrency groups, gen0 and lease-ack isolation, clock_timestamp(), and event-loop closure verified. DeepSeek's final suspicions were disproved and Sol final review found no P0-P2. Companion master `72a92b8`/`1.1.64` protocol is unchanged. This is not F1 complete, READY, or a user-facing feature; B3C is `UNBLOCKED_DISCOVERY_PENDING`, while B4/B5 remain locked.
+  - B3B1 by itself creates no writers and cannot observe Profile mismatch; the unreleased B3B2/B3B3 internal code now supplies the bound/live protocol and mismatch counter-evidence, but production still does not contain it.
   - HIGH separate security microbatch remains unfixed: generic ERP webhook/test SSRF guard validates system_url while the real network sink reads url, and endpoint test does not revalidate every redirect hop. B3B Express state must not call that outbound test.
   - MEDIUM separate reliability microbatch remains unfixed: legacy retry worker does not check endpoint.enabled, so a disabled endpoint may still retry outward. B3B2 must return 409 for nonterminal tasks; full draining and lease semantics remain B3C.
   - B4 must expose only flag-on tenant custom roles in Console invitation and scope UI, keep erp.endpoint.manage owner-only, escape roleName, close main/cowork save-to-formal-to-push only after conversion succeeds, ship zh/th/en/ja source plus dist and cache-bust, and pass true-browser gates.
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
-  - Current master/origin/production is exact `82f03810d3fcb51da8f06a244ca34a8b3b410043`; manual CD run `33314653206` succeeded, `/api/ready` is true, service timestamp `13:37:09Z`. This deployment does not contain B3 WIP. CI is disabled. Companion reference is master HEAD `72a92b8`, version `1.1.64`.
+  - Current master/origin baseline is `44c8d1ff`; production exact is `82f03810d3fcb51da8f06a244ca34a8b3b410043` and active. Production does not contain B3B2b-2/B3B3. CI is disabled. Companion reference remains master HEAD `72a92b8`, version `1.1.64`; this state record does not self-reference an uncommitted SHA.
 next_action: >-
-  Proceed with F1-B3B3 while keeping every tenant flag off. B3B2b-2 and subsequent slices are not
-  micro-released; merge the complete F1 candidate, run one manual CD, then perform real-site,
-  real-environment, ERP-report and Zihao device acceptance. B3C/B4/B5 remain not implemented.
+  Proceed with F1-B3C discovery while keeping every tenant flag off. B3B2b-2, B3B3, and subsequent
+  slices are not micro-released; merge the complete F1 candidate, run one manual CD, then perform
+  real-site, real-environment, ERP-report and Zihao device acceptance. B4/B5 remain locked.
 ```
 
 ## 7. F2-F7

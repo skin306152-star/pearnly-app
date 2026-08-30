@@ -13,6 +13,7 @@ lease 返回的载荷 account_set 必须 == endpoint.config.account_set 且 ∈ 
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -45,6 +46,87 @@ def _auth_agent(request: Request) -> Dict[str, Any]:
     if not ep.get("enabled", True):
         raise HTTPException(403, detail="erp.endpoint_disabled")
     return ep
+
+
+def _managed_heartbeat(token: str, body: Dict[str, Any]):
+    """Call the B3B3 managed heartbeat seam without widening legacy Agent auth."""
+    from services.erp.shared_express_live import ManagedLiveError, record_managed_heartbeat
+
+    try:
+        return record_managed_heartbeat(
+            token,
+            account_set=body.get("account_set"),
+            account_dir=body.get("account_dir"),
+            agent_version=body.get("companion_version"),
+            offline=bool(body.get("offline")),
+        )
+    except ManagedLiveError as exc:
+        raise HTTPException(
+            status_code=int(getattr(exc, "status", getattr(exc, "status_code", 500))),
+            detail=str(getattr(exc, "code", "erp.managed_live_error")),
+        ) from exc
+
+
+def _run_agent_heartbeat(token: str, body: Dict[str, Any]):
+    ep = agent_store.authenticate(token)
+    if ep and not ep.get("enabled", True):
+        raise HTTPException(403, detail="erp.endpoint_disabled")
+    if not ep:
+        # Lease and ack still call _auth_agent and remain generation-zero only.
+        return _managed_heartbeat(token, body)
+    # 优雅退出信号:立即标离线(不写 last_seen=now)→ Pearnly 实时显示断开。
+    if body.get("offline"):
+        agent_store.mark_offline(str(ep["id"]))
+        return {"ok": True, "endpoint_id": str(ep["id"]), "connected": False}
+    device = str(body.get("device") or "")
+    agent_store.touch_heartbeat(str(ep["id"]), device=device)
+    cfg = ep.get("config") or {}
+    stored = 0
+    accts_stored = 0
+    selected = None
+    if body.get("account_sets") is not None:
+        stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
+    # 科目表上报(可选)→ 存 config.reported_accounts,供「科目映射」下拉读。
+    if body.get("accounts") is not None:
+        accts_stored = agent_store.store_reported_accounts(str(ep["id"]), body.get("accounts"))
+    # 科目映射(小助手选的 6 个码)→ 存 config,网页只读镜像(小助手为唯一真相源)。
+    if body.get("mapping") is not None:
+        agent_store.store_mapping(str(ep["id"]), body.get("mapping"))
+    # 商品/客户目录 + 记账指纹(小助手读 STMAS/ARMAS/STCRD)→ 存 config,供目录解析器判
+    # 复用、供记账画像推库存模式。整体快照替换,老客户端不带 catalog 键则此分支不触发。
+    cat = body.get("catalog")
+    if isinstance(cat, dict):  # 非 dict(脏客户端传字符串/列表)→ 跳过,不让心跳 500
+        agent_store.store_reported_catalog(
+            str(ep["id"]),
+            cat.get("products") or [],
+            cat.get("customers") or [],
+            cat.get("fingerprint"),
+        )
+        # 存货科目组候选 → 供「零库存账套建第一个库存品」的下拉。搭同一班目录上报。
+        # 带了才写:store 侧是整体快照替换,老客户端不带这个键时若照调会把已存候选擦成空。
+        if cat.get("isacc_candidates") is not None:
+            agent_store.store_reported_stock_acc_groups(str(ep["id"]), cat.get("isacc_candidates"))
+    # 小助手上报客户【所选账套整组】→ 存 config(方法无关·直录/RPA 共用·见可扩展性契约)。
+    # 仅在与已存不同时写,省稳态每拍无谓写库。
+    selected = str(body.get("account_set") or "").strip() or None
+    if selected and agent_store.selected_account_changed(cfg, body):
+        agent_store.store_selected_account(str(ep["id"]), body)
+    # 载荷版本协商:小助手上报自己最高支持的 payload_version → 存 config,喂 preflight
+    # 的版本闸(老客户端跟不上新契约字段就拦推送,而不是塞一份它解析不了的载荷)。
+    if body.get("max_payload_version") is not None:
+        agent_store.store_max_payload_version(str(ep["id"]), body.get("max_payload_version"))
+    # 小助手版本落端点:发版后「在用的真更新了没」得能查,不能只靠上机器看托盘。
+    if cfg.get("companion_version") != body.get("companion_version"):
+        agent_store.store_companion_version(str(ep["id"]), body.get("companion_version"))
+    return {
+        "ok": True,
+        "endpoint_id": str(ep["id"]),
+        "connected": True,
+        "account_set": selected or cfg.get("account_set"),
+        "method": cfg.get("method") or "rpa",
+        "account_sets_received": stored,
+        "accounts_received": accts_stored,
+    }
 
 
 # ── token 生成(网页会话)────────────────────────────────────────────────
@@ -89,67 +171,15 @@ async def erp_agent_heartbeat(request: Request):
     config.reported_accounts,前端经 GET /api/erp/endpoints 读到(账套选择 / 科目映射下拉)。
     """
     _require_enabled()
-    ep = _auth_agent(request)
+    header = request.headers.get("authorization") or ""
+    token = header[7:].strip() if header.lower().startswith("bearer ") else ""
     try:
         body = await request.json()
     except Exception:
         body = {}
-    # 优雅退出信号:立即标离线(不写 last_seen=now)→ Pearnly 实时显示断开。
-    if isinstance(body, dict) and body.get("offline"):
-        agent_store.mark_offline(str(ep["id"]))
-        return {"ok": True, "endpoint_id": str(ep["id"]), "connected": False}
-    device = str(body.get("device") or "") if isinstance(body, dict) else ""
-    agent_store.touch_heartbeat(str(ep["id"]), device=device)
-    cfg = ep.get("config") or {}
-    stored = 0
-    accts_stored = 0
-    selected = None
-    if isinstance(body, dict):
-        if body.get("account_sets") is not None:
-            stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
-        # 科目表上报(可选)→ 存 config.reported_accounts,供「科目映射」下拉读。
-        if body.get("accounts") is not None:
-            accts_stored = agent_store.store_reported_accounts(str(ep["id"]), body.get("accounts"))
-        # 科目映射(小助手选的 6 个码)→ 存 config,网页只读镜像(小助手为唯一真相源)。
-        if body.get("mapping") is not None:
-            agent_store.store_mapping(str(ep["id"]), body.get("mapping"))
-        # 商品/客户目录 + 记账指纹(小助手读 STMAS/ARMAS/STCRD)→ 存 config,供目录解析器判
-        # 复用、供记账画像推库存模式。整体快照替换,老客户端不带 catalog 键则此分支不触发。
-        cat = body.get("catalog")
-        if isinstance(cat, dict):  # 非 dict(脏客户端传字符串/列表)→ 跳过,不让心跳 500
-            agent_store.store_reported_catalog(
-                str(ep["id"]),
-                cat.get("products") or [],
-                cat.get("customers") or [],
-                cat.get("fingerprint"),
-            )
-            # 存货科目组候选 → 供「零库存账套建第一个库存品」的下拉。搭同一班目录上报。
-            # 带了才写:store 侧是整体快照替换,老客户端不带这个键时若照调会把已存候选擦成空。
-            if cat.get("isacc_candidates") is not None:
-                agent_store.store_reported_stock_acc_groups(
-                    str(ep["id"]), cat.get("isacc_candidates")
-                )
-        # 小助手上报客户【所选账套整组】→ 存 config(方法无关·直录/RPA 共用·见可扩展性契约)。
-        # 仅在与已存不同时写,省稳态每拍无谓写库。
-        selected = str(body.get("account_set") or "").strip() or None
-        if selected and agent_store.selected_account_changed(cfg, body):
-            agent_store.store_selected_account(str(ep["id"]), body)
-        # 载荷版本协商:小助手上报自己最高支持的 payload_version → 存 config,喂 preflight
-        # 的版本闸(老客户端跟不上新契约字段就拦推送,而不是塞一份它解析不了的载荷)。
-        if body.get("max_payload_version") is not None:
-            agent_store.store_max_payload_version(str(ep["id"]), body.get("max_payload_version"))
-        # 小助手版本落端点:发版后「在用的真更新了没」得能查,不能只靠上机器看托盘。
-        if cfg.get("companion_version") != body.get("companion_version"):
-            agent_store.store_companion_version(str(ep["id"]), body.get("companion_version"))
-    return {
-        "ok": True,
-        "endpoint_id": str(ep["id"]),
-        "connected": True,
-        "account_set": selected or cfg.get("account_set"),
-        "method": cfg.get("method") or "rpa",
-        "account_sets_received": stored,
-        "accounts_received": accts_stored,
-    }
+    return await asyncio.to_thread(
+        _run_agent_heartbeat, token, body if isinstance(body, dict) else {}
+    )
 
 
 class LeaseRequest(BaseModel):

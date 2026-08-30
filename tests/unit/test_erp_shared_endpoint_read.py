@@ -119,6 +119,102 @@ class SharedContextTests(unittest.TestCase):
 
 
 class SafeProjectionTests(unittest.TestCase):
+    def _managed(self, **overrides):
+        row = _endpoint(
+            binding_generation=1,
+            bound_account_set="TEST",
+            bound_profile_key="profile-1",
+            live_account_set="TEST",
+            live_profile_key="profile-1",
+            agent_last_seen_at=(NOW - timedelta(seconds=10)).isoformat(),
+            agent_version="1.1.64",
+            revoked_at=None,
+        )
+        row.update(overrides)
+        return row
+
+    def test_managed_reader_uses_typed_profile_state(self):
+        cases = (
+            ({"revoked_at": NOW}, "revoked"),
+            ({"enabled": False}, "disabled"),
+            ({"agent_last_seen_at": (NOW - timedelta(seconds=180)).isoformat()}, "offline"),
+            ({"agent_last_seen_at": "bad"}, "needs_attention"),
+            ({"live_profile_key": ""}, "needs_attention"),
+            ({"bound_profile_key": ""}, "unbound"),
+            ({"live_profile_key": "other"}, "mismatch"),
+            ({}, "online"),
+        )
+        for overrides, expected in cases:
+            with self.subTest(expected=expected):
+                item = shared_express_store.safe_endpoint_dto(self._managed(**overrides), NOW)
+                self.assertEqual(item["connection_state"], expected)
+                self.assertEqual(item["account_set"], "TEST")
+                self.assertEqual(item["agent_version"], "1.1.64")
+
+    def test_managed_reader_rejects_clock_values_over_five_seconds_in_the_future(self):
+        cases = (
+            (NOW + timedelta(seconds=5), "online"),
+            (NOW + timedelta(seconds=5, microseconds=1), "needs_attention"),
+            (NOW + timedelta(days=365), "needs_attention"),
+        )
+        for seen, expected in cases:
+            with self.subTest(seen=seen):
+                item = shared_express_store.safe_endpoint_dto(
+                    self._managed(agent_last_seen_at=seen), NOW
+                )
+                self.assertEqual(item["connection_state"], expected)
+
+    def test_managed_reader_normalizes_naive_and_aware_timestamps_to_utc(self):
+        bangkok = timezone(timedelta(hours=7))
+        cases = (
+            ((NOW - timedelta(seconds=10)).replace(tzinfo=None), NOW),
+            ((NOW - timedelta(seconds=10)).astimezone(bangkok), NOW),
+            (NOW - timedelta(seconds=10), NOW.replace(tzinfo=None)),
+        )
+        for seen, server_now in cases:
+            with self.subTest(seen=seen, server_now=server_now):
+                item = shared_express_store.safe_endpoint_dto(
+                    self._managed(agent_last_seen_at=seen), server_now
+                )
+                self.assertEqual(item["connection_state"], "online")
+                self.assertEqual(item["last_seen_at"], (NOW - timedelta(seconds=10)).isoformat())
+
+    def test_managed_reader_status_priority_is_fail_closed(self):
+        cases = (
+            (
+                {
+                    "revoked_at": NOW,
+                    "enabled": False,
+                    "agent_last_seen_at": "bad",
+                    "live_profile_key": "",
+                },
+                "revoked",
+            ),
+            (
+                {
+                    "enabled": False,
+                    "agent_last_seen_at": "bad",
+                    "live_profile_key": "",
+                },
+                "disabled",
+            ),
+            (
+                {
+                    "agent_last_seen_at": NOW - timedelta(seconds=180),
+                    "live_profile_key": "",
+                },
+                "offline",
+            ),
+            ({"live_profile_key": "", "bound_profile_key": ""}, "needs_attention"),
+            ({"bound_profile_key": ""}, "unbound"),
+            ({"live_profile_key": "profile-2"}, "mismatch"),
+            ({}, "online"),
+        )
+        for overrides, expected in cases:
+            with self.subTest(expected=expected):
+                item = shared_express_store.safe_endpoint_dto(self._managed(**overrides), NOW)
+                self.assertEqual(item["connection_state"], expected)
+
     def test_projection_is_a_strict_allowlist(self):
         item = shared_express_store.safe_endpoint_dto(_endpoint(), NOW)
         self.assertEqual(set(item), SAFE_KEYS)

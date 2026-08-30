@@ -49,6 +49,20 @@ BEGIN
     IF OLD.binding_generation = 0 THEN
         RETURN NEW;
     END IF;
+    -- B3B3 profile confirmation has its own exact trigger/policy.  Keep the
+    -- original lifecycle gate closed to it, but let that typed gate advance
+    -- generation atomically after the dedicated trigger has validated every
+    -- column and the bound/live pair.
+    IF current_setting('app.erp_managed_live_confirm', true) = 'on' THEN
+        IF current_setting('app.erp_managed_live_endpoint_id', true) <> OLD.id::text
+           OR current_setting('app.erp_managed_live_tenant_id', true) <> OLD.tenant_id::text
+           OR current_setting('app.erp_managed_live_actor_id', true) <> current_setting('app.current_user_id', true)
+           OR current_setting('app.erp_managed_live_expected_generation', true) <> OLD.binding_generation::text
+        THEN
+            RAISE EXCEPTION 'erp.managed_live_confirm_gate_required';
+        END IF;
+        RETURN NEW;
+    END IF;
     IF current_setting('app.erp_endpoint_lifecycle', true) <> 'on'
        OR current_setting('app.current_tenant_id', true) <> OLD.tenant_id::text
        OR current_setting('app.current_user_id', true) <> current_setting('app.erp_endpoint_lifecycle_actor_id', true)

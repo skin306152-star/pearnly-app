@@ -16,6 +16,7 @@ from services.erp.shared_express_schema import enable_shared_express_select
 logger = logging.getLogger(__name__)
 
 _ONLINE_SECONDS = 180
+_MAX_FUTURE_SKEW_SECONDS = 5
 _VIEW_PERMISSION = "erp.endpoint.view"
 
 
@@ -81,7 +82,9 @@ def fetch_visible_endpoint_rows(
         SELECT id, name, adapter, config, is_default, auto_push, enabled,
                last_used_at, last_status, success_count, failure_count,
                created_at, updated_at, user_id, tenant_id,
-               workspace_client_id, shared_scope
+               workspace_client_id, shared_scope, binding_generation,
+               bound_account_set, bound_profile_key, live_account_set,
+               live_profile_key, agent_last_seen_at, agent_version, revoked_at
         FROM erp_endpoints
         WHERE (
             user_id = %s
@@ -177,6 +180,31 @@ def _config_text(config: dict, key: str, limit: int) -> str:
 
 
 def _connection_state(endpoint: Dict[str, Any], server_now: datetime) -> str:
+    if int(endpoint.get("binding_generation") or 0) > 0:
+        if endpoint.get("revoked_at") is not None:
+            return "revoked"
+        if endpoint.get("enabled") is not True:
+            return "disabled"
+        seen = _parse_time(endpoint.get("agent_last_seen_at"))
+        now = _parse_time(server_now)
+        if seen is None or now is None:
+            return "needs_attention"
+        age_seconds = (now - seen).total_seconds()
+        if age_seconds < -_MAX_FUTURE_SKEW_SECONDS:
+            return "needs_attention"
+        if age_seconds >= _ONLINE_SECONDS:
+            return "offline"
+        live_set = _config_text(endpoint, "live_account_set", 120)
+        live_key = _config_text(endpoint, "live_profile_key", 200)
+        bound_set = _config_text(endpoint, "bound_account_set", 120)
+        bound_key = _config_text(endpoint, "bound_profile_key", 200)
+        if not live_set or not live_key:
+            return "needs_attention"
+        if not bound_set or not bound_key:
+            return "unbound"
+        if live_set != bound_set or live_key != bound_key:
+            return "mismatch"
+        return "online"
     if endpoint.get("enabled") is not True:
         return "disabled"
     if str(endpoint.get("adapter") or "").strip().lower() != "express":
@@ -200,11 +228,24 @@ def _connection_state(endpoint: Dict[str, Any], server_now: datetime) -> str:
 def safe_endpoint_dto(endpoint: Dict[str, Any], server_now: datetime) -> Dict[str, Any]:
     """Project the employee-safe allowlist; raw config never crosses this boundary."""
     config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
-    label = _config_text(config, "account_set_label", 120) or _config_text(
-        config, "account_set", 120
+    managed = int(endpoint.get("binding_generation") or 0) > 0
+    label = (
+        _config_text(endpoint, "bound_account_set", 120)
+        or _config_text(endpoint, "live_account_set", 120)
+        if managed
+        else _config_text(config, "account_set_label", 120)
+        or _config_text(config, "account_set", 120)
     )
-    seen = _parse_time(config.get("agent_last_seen_at"))
-    version = _config_text(config, "companion_version", 40) or None
+    seen = (
+        _parse_time(endpoint.get("agent_last_seen_at"))
+        if managed
+        else _parse_time(config.get("agent_last_seen_at"))
+    )
+    version = (
+        _config_text(endpoint, "agent_version", 40)
+        if managed
+        else _config_text(config, "companion_version", 40) or None
+    )
     return {
         "id": str(endpoint.get("id") or ""),
         "name": str(endpoint.get("name") or "")[:80],

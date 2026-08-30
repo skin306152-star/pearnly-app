@@ -21,6 +21,7 @@ from tests.unit._erp_shared_express_live_pg_harness import (
     WORKSPACE,
     ManagedLivePgHarness,
 )
+from tests.unit._pg_smoke import require_disposable_db
 
 
 class ManagedLiveMatrixPgSmokeTests(ManagedLivePgHarness):
@@ -235,6 +236,7 @@ class ManagedLiveMatrixPgSmokeTests(ManagedLivePgHarness):
                 self.assertIn(denied.exception.code, {"authz.forbidden", "erp.endpoint_not_found"})
 
         old_key = profile_key("old", r"C:\Express\OLD")
+        require_disposable_db(self.cur, self.schema, "smoke_live_matrix_")
         self.cur.execute("TRUNCATE operation_logs")
         self.conn.commit()
         self._insert_endpoint(

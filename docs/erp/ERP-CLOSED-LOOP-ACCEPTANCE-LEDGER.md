@@ -215,11 +215,18 @@ implementation_batches:
     scope: TYPED_BINDING_SCHEMA_AND_VERSIONED_IRREVERSIBLE_PROFILE_KEY
     production_rollout_contract: ALL_TENANTS_FLAG_OFF
   - batch_id: F1-B3B2a
-    backend_implementation_complete: false
-    release_state: IMPLEMENTING
+    backend_implementation_complete: true
+    release_state: DEPLOYED_EXACT_FLAG_OFF
+    feature_sha: fd473abd204f3dae864bcd15928333f388c98679
+    ci_run_id: 33301999658
+    ci_result: SUCCESS
+    production_sha: fd473abd204f3dae864bcd15928333f388c98679
+    production_verified_at: 2026-08-30
     source_baseline: 3ef91fea4cdbcb2fc1b05abc40f0fb188b663203
     scope: MANAGED_OWNERSHIP_RLS_CREATOR_DELETE_PROTECTION_TRANSACTIONAL_AUDIT_FOUNDATION
     audit_wiring_state: FOUNDATION_ONLY_NO_LIFECYCLE_WRITERS
+    rollout_contract: ALL_TENANTS_FLAG_OFF
+    evidence: CI_TRUE_PG_20_PLUS_51_ZERO_SKIPS; PRODUCTION_SCHEMA_READINESS_AND_FLAGS_READBACK; 36_ENDPOINTS_GENERATION_0_PROFILE_NULL_SHARED_SCOPE_0; MISSING_DEDUP_INDEX_SELF_HEAL_COVERED
   - batch_id: F1-B3B2
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
@@ -558,7 +565,7 @@ user_decision:
   accepted_erp_report_evidence_ids: []
 
 open_issues:
-  - B3B2a is an uncommitted managed ownership/RLS, creator-delete protection and transactional audit foundation candidate; local targeted/static gates pass, while its PostgreSQL smoke remains a local environment skip and requires non-skipped CI before release.
+  - B3B2a is deployed at feature SHA fd473abd204f3dae864bcd15928333f388c98679 with CI 33301999658 green; the docs closure commit records this state only and must not be used as a self-referential feature SHA.
   - B3B2a P2 follow-up: real resolver/console concurrent transfer coverage and canonical membership→role→users→workspace lock-order proof remain open; this batch only proves the managed helper and transfer-shaped lock path reach their barriers without deadlock.
   - B3B2b owner manage/binding/token lifecycle, B3B3 live heartbeat/mismatch/legacy isolation and B3C manual push/log/Agent remain locked; B3B2a audit is foundation-only and no lifecycle writer is wired.
   - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
@@ -568,9 +575,10 @@ open_issues:
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
   - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
 next_action: >-
-  Finish only F1-B3B2a managed ownership/RLS, creator-delete protection, readiness and audit foundation
-  verification on the 3ef91fea baseline while keeping every tenant flag off. Do not start F1-B3B2b,
-  B3B3/B3C, F1-B4/B5 or modify F2-F7 until separately unlocked.
+  Proceed to F1-B3B2b owner manage/binding/token lifecycle as the next planned unlocked batch,
+  while keeping every tenant flag off and preserving the B3B2a P2 lock-order follow-up. Do not start
+  B3B3/B3C, F1-B4/B5 or modify F2-F7 until separately unlocked; F1 remains IMPLEMENTING and is not
+  READY_FOR_DEVICE or USER_ACCEPTED.
 ```
 
 ## 7. F2-F7

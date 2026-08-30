@@ -10,9 +10,10 @@
 > 基线日期：2026-08-30。规划提交为 `e37bfed7`，F1-B1 默认休眠底座已按 `57fb5480`
 > 精确部署；F1-B2 后端为 `14b141c2`，连同测试隔离修 `be959c05` 经 CI `33253769492`
 > 全绿并精确部署；F1-B3A 为 `f37f824e`，经 CI `33292287719` 全绿并精确部署，生产
-> 45/45 tenant 的 rollout 有效态仍为 OFF。F1-B3B1 已按 `3ef91fea` 精确部署；当前仅
-> F1-B3B2a managed ownership/RLS、creator 删除保护与 transaction audit foundation 在未提交
-> 工作树实施；B3B2b/B3B3/B3C 锁定。
+> 45/45 tenant 的 rollout 有效态仍为 OFF。F1-B3B1 已按 `3ef91fea` 精确部署；F1-B3B2a
+> runtime feature SHA `fd473abd204f3dae864bcd15928333f388c98679` 经 CI `33301999658` 全绿并
+> 精确部署，生产回读通过；docs closure commit 仅记录状态，不自引用其 SHA。B3B2b 为
+> `NEXT_READY/PLANNED_UNLOCKED`，B3B3/B3C 锁定。
 > 每个功能仍须重新绑定自己的 CI、production SHA、
 > Companion 版本及 ERP 报表回查，不能继承任一批次基线当验收。
 
@@ -91,10 +92,12 @@ Express、在一台能访问 Express 的 Windows 电脑安装小助手、邀请�
   baseline 双跑，以及规范化 `account_set + Windows account_dir` 后不可逆、版本化的 Profile
   key 纯函数已按 `3ef91fea` 部署。它不接 writer、owner API、token、heartbeat 或 route，不能
   宣称已检测 bound/live Profile mismatch。
-- F1-B3B2a 当前实施 managed ownership/RLS、creator 删除分流与不可变 creator DB trigger、
-  tenant cascade/cleanup bypass、transaction-local audit helper 和 startup readiness fail-closed；
-  audit 仅底座，不代表真实 lifecycle audit 已接线。B3B2b/B3B3、B3C、网页 UI、测试 tenant
-  放量与真机仍锁定。
+- F1-B3B2a 已部署 managed ownership/RLS、creator 删除分流与不可变 creator DB trigger、tenant
+  cascade/cleanup bypass、transaction-local audit helper 和 startup readiness fail-closed；CI 真 PG
+  `20+51` tests 为 `0 skip`，并覆盖缺失 dedup 索引自愈；生产 36 endpoints generation=0/profile
+  空/shared_scope=0、45/45 flag OFF。audit 仅底座，不代表真实 lifecycle audit 已接线；真实
+  resolver/console 并发锁序覆盖仍是 P2 欠账。B3B2b owner manage/binding/token lifecycle 下一步，
+  B3B3/B3C、网页 UI、测试 tenant 放量与真机仍锁定。
 
 主要证据入口：
 
@@ -467,7 +470,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1 已部署;B3B2a ownership foundation 实施;B3B2b/B3B3/B3C、B4/B5 与真机锁定 |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1/B3B2a runtime 已部署;B3B2b `NEXT_READY/PLANNED_UNLOCKED`;B3B3/B3C、B4/B5 与真机锁定 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |

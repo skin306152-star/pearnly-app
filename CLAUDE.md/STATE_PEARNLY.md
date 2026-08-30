@@ -2,7 +2,7 @@
 
 ## 当前状态卡 · 08-30 F1-B3B2a managed ownership foundation
 
-- **▶ 当前 task**:严格单功能推进 ERP 全闭环;当前只实施 F1-B3B2a managed ownership/RLS、creator 删除保护与 transaction audit foundation;B3B2b/B3B3、B3C、B4/B5 均锁定。
+- **▶ 当前 task**:严格单功能推进 ERP 全闭环;F1-B3B2a runtime 已精确部署但全租户 flag-off;B3B2b/B3B3、B3C、B4/B5 均锁定。
 - **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
 - **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 - **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
@@ -14,17 +14,17 @@
 - **🚩 F1 放量**:`erp_shared_express_endpoint` 默认关,仅测试 tenant;存量多 endpoint 冲突只阻断并报告,不自动合并;最终 rollout 状态须入 ledger。
 - **✅ F1-B3A**:`DEPLOYED_EXACT_FLAG_OFF`;commit/production=`f37f824e`,CI `33292287719` 全绿;45/45 tenant flag OFF;共享 endpoint 只读 DTO/在线态未放量。
 - **✅ F1-B3B1**:`DEPLOYED_EXACT_FLAG_OFF`;commit/origin/production=`3ef91fea4cdbcb2fc1b05abc40f0fb188b663203`;production service active=`2026-08-30T06:30:52Z`;仅 typed binding schema+不可逆 Profile key,无 writer。
-- **▶ F1-B3B2a**:`IMPLEMENTING_UNCOMMITTED`;0110 managed CHECK/FK/RLS、creator delete 分流、immutable creator trigger、transactional audit helper、startup readiness fail-closed 与真 PG smoke。
+- **✅ F1-B3B2a**:`DEPLOYED_EXACT_FLAG_OFF`;runtime feature SHA=`fd473abd204f3dae864bcd15928333f388c98679`;CI `33301999658` 全绿含 unit/e2e/真 PG smoke/deploy;production exact/readiness/schema 回读通过。
 - **🛑 B3B2a 运行时边界**:不接 HTTP lifecycle、token/config、heartbeat、push/log/lease/ack、UI、Companion、DMS、MR.ERP、auto/bridge 或独立 SSRF/retry 修复;audit 仅底座未接真实 lifecycle writer。
-- **⏸ F1-B3B2b/B3B3/B3C**:B3B2b lifecycle route/store;B3B3 live heartbeat/mismatch/legacy isolation;B3C manual push/log/Agent lease/ack;均 `PLANNED_LOCKED`。
+- **⏸ F1-B3B2b/B3B3/B3C**:B3B2b=`NEXT_READY/PLANNED_UNLOCKED`;B3B3 live heartbeat/mismatch/legacy isolation;B3C manual push/log/Agent lease/ack;后两项均 `PLANNED_LOCKED`。
 - **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批均锁定。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
 - **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
-- **📍 发布基线**:`master/origin/master=3ef91fea`;production exact=`3ef91fea`;仅 B3B2a 为未提交工作树候选,不得写 deployed/ready。
+- **📍 发布基线**:`master/origin/master=fd473abd`;production exact=`fd473abd`;B3B2a runtime feature 已部署;docs closure commit 仅记录状态，不在此自引用。
 - **⚠️ 独立安全微批待修(HIGH)**:generic ERP webhook/test 的 SSRF guard 校验 `system_url`,真实 sink 读取 `url`,endpoint test 未逐跳复验重定向;B3B Express 状态不得调用该 outbound test;B3B1 未修。
 - **⚠️ 独立可靠性微批待修(MEDIUM)**:legacy retry worker 不校验 endpoint.enabled,disabled endpoint 仍可能重试外推;B3B2 对非终态任务先 409,完整 draining/lease 语义归 B3C;B3B1 未修。
 - **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
-- **🧪 B3B2a 当前证据**:定向单测与静态检查通过;真 PG smoke 已按 `test_*_pg_smoke.py` glob 接入,本机 PostgreSQL 未运行;待 CI 真 PG、机械闸、commit 与精确部署。B3B1 的部署证据不继承为本批验收。
+- **🧪 B3B2a 当前证据**:CI 真 PG `20+51` tests、`0 skip`;缺失 dedup 索引可自愈并有回归覆盖;36 endpoints generation=0/profile 空/shared_scope=0,45/45 flag OFF。P2 真实 resolver/console 锁序覆盖仍欠账;F1 仍 `IMPLEMENTING`，未到 READY_FOR_DEVICE/USER_ACCEPTED。
 
 ---
 

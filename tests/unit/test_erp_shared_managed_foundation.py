@@ -28,13 +28,32 @@ class SharedExpressManagedSchemaTests(unittest.TestCase):
             "checkadapter='express'::text",
         )
         self.assertIn("conname = 'endpoint_scope_chk'", contract)
-        self.assertIn("v_definition <> 'checkadapter=''express''::text'", contract)
+        self.assertIn("v_definition NOT IN ('checkadapter=''express''::text')", contract)
         self.assertNotIn("adapter='express'::text' THEN", contract)
         self.assertIn('ADD CONSTRAINT "endpoint_scope_chk"', contract)
         self.assertEqual(
             validate,
             'ALTER TABLE erp_endpoints VALIDATE CONSTRAINT "endpoint_scope_chk"',
         )
+
+    def test_managed_scope_accepts_lifecycle_definition_without_using_it_for_creation(self):
+        contract = next(
+            statement
+            for statement in shared_express_managed_schema.SHARED_EXPRESS_MANAGED_STRUCTURE_DDL
+            if "erp_endpoints_managed_scope_chk does not match" in statement
+        )
+        normalized = _norm(contract)
+
+        self.assertIn(
+            'add constraint "erp_endpoints_managed_scope_chk" check '
+            "(binding_generation = 0 or (tenant_id is not null and workspace_client_id "
+            "is not null and adapter = 'express')) not valid",
+            normalized,
+        )
+        self.assertIn("v_definition not in", normalized)
+        self.assertIn("revoked_atisnotnull", normalized)
+        creation = normalized.split("add constraint", 1)[1].split("not valid", 1)[0]
+        self.assertNotIn("revoked_at", creation)
 
     def test_structure_is_additive_and_fail_closed(self):
         ddl = _norm(" ".join(shared_express_managed_schema.SHARED_EXPRESS_MANAGED_STRUCTURE_DDL))

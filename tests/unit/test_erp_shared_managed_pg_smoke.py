@@ -255,6 +255,32 @@ class SharedExpressManagedPgSmokeTests(unittest.TestCase):
         self.assertEqual(self.cur.rowcount, 0)
         self.conn.rollback()
 
+    def test_0110_ensure_accepts_lifecycle_managed_scope_constraint(self):
+        self.cur.execute("ALTER TABLE erp_endpoints ADD COLUMN revoked_at TIMESTAMPTZ")
+        self.cur.execute(
+            "ALTER TABLE erp_endpoints DROP CONSTRAINT erp_endpoints_managed_scope_chk"
+        )
+        self.cur.execute(
+            "ALTER TABLE erp_endpoints ADD CONSTRAINT erp_endpoints_managed_scope_chk CHECK ("
+            "binding_generation = 0 OR (tenant_id IS NOT NULL AND adapter = 'express' AND "
+            "(workspace_client_id IS NOT NULL OR revoked_at IS NOT NULL)))"
+        )
+
+        for statement in _localized_ddl(self.schema):
+            self.cur.execute(statement)
+
+        self.cur.execute(
+            "SELECT regexp_replace(lower(pg_get_constraintdef(oid)), "
+            "'[[:space:]()]', '', 'g') AS definition "
+            "FROM pg_constraint WHERE conrelid = 'erp_endpoints'::regclass "
+            "AND conname = 'erp_endpoints_managed_scope_chk'"
+        )
+        self.assertEqual(
+            self.cur.fetchone()["definition"],
+            "checkbinding_generation=0ortenant_idisnotnullandadapter='express'::textand"
+            "workspace_client_idisnotnullorrevoked_atisnotnull",
+        )
+
     def test_managed_delete_is_denied_but_legacy_delete_remains_user_scoped(self):
         self._context(CREATOR)
         self.cur.execute("SET LOCAL app.bypass_rls = 'on'")

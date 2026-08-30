@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Database ownership boundary for tenant-managed Express endpoints."""
 
 from __future__ import annotations
@@ -29,7 +28,14 @@ def _sql_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
 
 
-def _check_constraint(name: str, expression: str, normalized_definition: str) -> tuple[str, str]:
+def _check_constraint(
+    name: str,
+    expression: str,
+    normalized: str,
+    *,
+    compatible: tuple[str, ...] = (),
+) -> tuple[str, str]:
+    accepted = ", ".join(_sql_literal(value) for value in (normalized, *compatible))
     contract = f"""
 DO $pearnly$
 DECLARE
@@ -43,7 +49,7 @@ BEGIN
     IF NOT FOUND THEN
         ALTER TABLE erp_endpoints
             ADD CONSTRAINT {_sql_identifier(name)} CHECK ({expression}) NOT VALID;
-    ELSIF v_definition <> {_sql_literal(normalized_definition)} THEN
+    ELSIF v_definition NOT IN ({accepted}) THEN
         RAISE EXCEPTION {_sql_literal(name + ' does not match the F1-B3B2a contract')};
     END IF;
 END
@@ -310,6 +316,10 @@ SHARED_EXPRESS_MANAGED_STRUCTURE_DDL = (
         "AND workspace_client_id IS NOT NULL AND adapter = 'express')",
         "checkbinding_generation=0ortenant_idisnotnullandworkspace_client_idisnotnull"
         "andadapter='express'::text",
+        compatible=(
+            "checkbinding_generation=0ortenant_idisnotnullandadapter='express'::textand"
+            "workspace_client_idisnotnullorrevoked_atisnotnull",
+        ),
     ),
     *_check_constraint(
         "erp_endpoints_shared_generation_chk",
@@ -394,19 +404,16 @@ SHARED_EXPRESS_MANAGED_DDL = SHARED_EXPRESS_MANAGED_STRUCTURE_DDL + SHARED_EXPRE
 
 
 def apply_shared_express_managed_rls(cur) -> None:
-    """Install the endpoint-specific policy set without touching push-log RLS."""
     for statement in SHARED_EXPRESS_MANAGED_RLS_DDL:
         cur.execute(statement)
 
 
 def apply_shared_express_managed_foundation(cur) -> None:
-    """Apply the B3B2a structure and policy contract on one cursor."""
     for statement in SHARED_EXPRESS_MANAGED_DDL:
         cur.execute(statement)
 
 
 def ensure_shared_express_managed_foundation() -> None:
-    """Mirror Alembic 0110 for production startup."""
     global _MANAGED_FOUNDATION_READY
     try:
         with db.get_cursor(commit=True) as cur:

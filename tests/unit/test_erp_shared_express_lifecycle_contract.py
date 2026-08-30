@@ -52,6 +52,7 @@ def _check_flag_off_is_checked_before_endpoint_resolution(path):
     )
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
+        patch.object(route, "require_perm", return_value=user),
         patch.object(route, "require_erp_portal", return_value=user),
         patch.object(route, "erp_shared_express_endpoint_enabled_for", return_value=False),
     ):
@@ -71,6 +72,7 @@ def _check_entry_and_super_admin_are_rejected_after_authentication():
     ):
         with (
             patch.object(route, "get_current_user_from_request", return_value=user),
+            patch.object(route, "require_perm", return_value=user),
             patch.object(route, "require_erp_portal", return_value=user),
             patch.object(route, "erp_shared_express_endpoint_enabled_for", return_value=True),
         ):
@@ -87,6 +89,7 @@ def _check_models_reject_extra_and_invalid_semantic_confirmation():
     user = {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": False}
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
+        patch.object(route, "require_perm", return_value=user),
         patch.object(route, "require_erp_portal", return_value=user),
         patch.object(route, "erp_shared_express_endpoint_enabled_for", return_value=True),
         patch.object(route, "change_shared_express_endpoint") as service,
@@ -102,6 +105,7 @@ def _check_models_reject_extra_and_invalid_semantic_confirmation():
 
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
+        patch.object(route, "require_perm", return_value=user),
         patch.object(route, "require_erp_portal", return_value=user),
         patch.object(route, "erp_shared_express_endpoint_enabled_for", return_value=True),
     ):
@@ -117,6 +121,7 @@ def _check_revoke_requires_explicit_confirmation():
     user = {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": False}
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
+        patch.object(route, "require_perm", return_value=user),
         patch.object(route, "require_erp_portal", return_value=user),
         patch.object(route, "erp_shared_express_endpoint_enabled_for", return_value=True),
         patch.object(route, "change_shared_express_endpoint") as service,
@@ -135,6 +140,7 @@ def _check_reason_control_character_is_rejected():
     user = {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": False}
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
+        patch.object(route, "require_perm", return_value=user),
         patch.object(route, "require_erp_portal", return_value=user),
         patch.object(route, "erp_shared_express_endpoint_enabled_for", return_value=True),
     ):

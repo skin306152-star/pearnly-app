@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.auth import get_current_user_from_request
+from services.authz.deps import require_perm
 from services.auth.entrance import require_erp_portal
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_lifecycle import change_shared_express_endpoint
@@ -57,8 +58,8 @@ def _source_workspace(request: Request) -> int:
     return int(raw.strip())
 
 
-def _guard(request: Request):
-    user = get_current_user_from_request(request)
+def _guard(request: Request, user=None):
+    user = user or get_current_user_from_request(request)
     require_erp_portal(user)
     if user.get("is_super_admin") or user.get("entry") not in {"main", "cowork", "erp"}:
         raise HTTPException(403, detail="authz.entrance_scope")
@@ -67,8 +68,8 @@ def _guard(request: Request):
     return user, _source_workspace(request)
 
 
-def _run(request: Request, endpoint_id: str, action: str, req: _BaseRequest):
-    user, source = _guard(request)
+def _run(request: Request, endpoint_id: str, action: str, req: _BaseRequest, user):
+    user, source = _guard(request, user)
     target = getattr(req, "target_workspace_client_id", None)
     if action == "rebind" and target != req.confirm_target_workspace_client_id:
         raise HTTPException(400, detail="erp.target_workspace_confirmation_mismatch")
@@ -95,25 +96,29 @@ def _run(request: Request, endpoint_id: str, action: str, req: _BaseRequest):
 async def rebind_shared_express_endpoint(
     endpoint_id: str, request: Request, req: RebindRequest = Body(...)
 ):
-    return await asyncio.to_thread(_run, request, endpoint_id, "rebind", req)
+    user = require_perm(request, "erp.endpoint.manage")
+    return await asyncio.to_thread(_run, request, endpoint_id, "rebind", req, user)
 
 
 @router.post("/api/erp/endpoints/{endpoint_id}/shared/enable")
 async def enable_shared_express_endpoint(
     endpoint_id: str, request: Request, req: EnableRequest = Body(...)
 ):
-    return await asyncio.to_thread(_run, request, endpoint_id, "enable", req)
+    user = require_perm(request, "erp.endpoint.manage")
+    return await asyncio.to_thread(_run, request, endpoint_id, "enable", req, user)
 
 
 @router.post("/api/erp/endpoints/{endpoint_id}/shared/disable")
 async def disable_shared_express_endpoint(
     endpoint_id: str, request: Request, req: DisableRequest = Body(...)
 ):
-    return await asyncio.to_thread(_run, request, endpoint_id, "disable", req)
+    user = require_perm(request, "erp.endpoint.manage")
+    return await asyncio.to_thread(_run, request, endpoint_id, "disable", req, user)
 
 
 @router.post("/api/erp/endpoints/{endpoint_id}/shared/revoke")
 async def revoke_shared_express_endpoint(
     endpoint_id: str, request: Request, req: RevokeRequest = Body(...)
 ):
-    return await asyncio.to_thread(_run, request, endpoint_id, "revoke", req)
+    user = require_perm(request, "erp.endpoint.manage")
+    return await asyncio.to_thread(_run, request, endpoint_id, "revoke", req, user)

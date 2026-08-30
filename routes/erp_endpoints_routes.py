@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pearnly · ERP 端点 CRUD 路由(REFACTOR-WA-B1 · 2026-05-29 R18 从 erp_routes 拆出 · 0 逻辑改)
-
-ERP endpoint 增删改查 + 高级设置(seed/generic 模板码)+ mrerp 凭据 Fernet 加密落地。
-erp_routes 顶部 include_router 聚合 · app.py 单一 include 不变。_check_push_access 走 erp_routes_access。
-"""
+"""ERP endpoint listing, CRUD and adapter configuration routes."""
 
 from __future__ import annotations
 
@@ -24,6 +20,7 @@ from services.erp.endpoint_config import (
 )
 from services.erp.endpoint_config import strip_endpoint_for_response as _strip_endpoint_for_response
 from services.erp.express_push.agent_reporting import fit_stock_acc_groups
+from services.erp import shared_express_access
 
 logger = logging.getLogger("mr-pilot")
 
@@ -51,6 +48,8 @@ async def erp_endpoints_list(request: Request):
     user = get_current_user_from_request(request)
     require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台复用端点清单 → 窄 allowlist
     _check_push_access(user)
+    if shared_express_access.is_shared_endpoint_read(user):
+        return {"items": shared_express_access.list_shared_endpoint_items(request, user)}
     items = db.list_erp_endpoints(user["id"])
     return {"items": [_strip_endpoint_for_response(it) for it in items]}
 

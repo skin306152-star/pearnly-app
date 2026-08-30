@@ -1,23 +1,25 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-29 F1-B2 后端发布收口
+## 当前状态卡 · 08-30 F1-B3A shared endpoint read
 
-- **▶ 当前 task**:严格单功能推进 ERP 全闭环;F1-B2 后端已完成本地实现,正在做提交前发布收口;不开始 B3/B4/B5。
+- **▶ 当前 task**:严格单功能推进 ERP 全闭环;当前只实施 F1-B3A 共享 Express endpoint 只读可见性、安全 DTO 与服务端在线态;B3B/B3C、B4/B5 均锁定。
 - **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
 - **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 - **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
 - **✅ F0**:`COMPLETE`;PO、acceptance ledger 与本状态卡已落盘,不作为需真机/用户 OK 的产品功能。
-- **▶ F1 状态**:`IMPLEMENTING`;B1 默认休眠底座已按 `57fb5480` 精确部署;B2 后端候选尚无 commit/CI/production SHA,F1 绝未完成。
+- **▶ F1 状态**:`IMPLEMENTING`;B1=`57fb5480`、B2=`14b141c2`+测试隔离修=`be959c05` 均已精确部署;F1 仍未到 `CODE_VERIFIED/READY_FOR_DEVICE/USER_ACCEPTED`。
 - **✅ B2 后端范围**:ERP 四权限码与 owner/admin/custom 边界;tenant-flagged custom role 邀请/接受/撤销/scope 并发完整性;flag-on `main/cowork/erp` 确认、编辑、正式单据关联与 actor/workspace/direction 原子门。
-- **🛌 B2 安全部署**:`erp_shared_express_endpoint` 默认 false/fail-closed;B2 生产发布保持所有 tenant flag-off,旧 system-role 邀请、history/convert/commit 路径逐字走 legacy 分支;不在本批开测试 tenant。
+- **🛌 B2 生产证据**:CI `33253769492` 全绿(含真 PG smoke);production HEAD=`be959c05998f185b7bd978975487a1246ec17f39`,service active=`2026-08-29T13:06:04Z`;45/45 tenant 的 `erp_shared_express_endpoint` 有效态均 OFF。
 - **📐 F1 窄边界**:只共享 active Express 手动推送;partial unique 轴=`(tenant_id,workspace_client_id,adapter)`;共享查询/RLS 必须 adapter-gated;MR.ERP/`mrerp_dms` 原样;Companion/auto_push/LINE/多 Profile 不改。
 - **🚩 F1 放量**:`erp_shared_express_endpoint` 默认关,仅测试 tenant;存量多 endpoint 冲突只阻断并报告,不自动合并;最终 rollout 状态须入 ledger。
-- **⏸ F1 后续批次**:B3=真实 endpoint/push/log 权限与共享路由;B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送,含四语/source/dist/cache-bust/真浏览器;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;三批均未解锁。
+- **▶ F1-B3A**:`IMPLEMENTING_UNCOMMITTED`;仅 flag-on `main/cowork/erp` 的 GET endpoint 清单进入 tenant/user/workspace RLS 共享读;员工安全投影不返 config/token/path/device/catalog/科目/creator;在线态以服务器时间 180 秒判定。
+- **⏸ F1-B3B/B3C**:B3B=endpoint manage/binding/token;B3C=manual push/log/Agent lease/ack;两批均 `PLANNED_LOCKED`。真实 Profile mismatch 必须先建立稳定 `bound_account_set`/`live_account_set` 双字段与协议再验;B3A 不改 heartbeat、不冒充已检测。
+- **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批均锁定。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
 - **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
-- **📍 发布基线**:最后已验 F1-B1 production SHA=`57fb5480`;B2 仍是未提交工作树,必须另绑 CI success、精确生产 SHA/启动时间后才可写 deployed。
+- **📍 发布基线**:`master/origin/master=b2d924a7`;最后已核 F1 生产基线仍为 `be959c05`;B3A 仅未提交工作树候选,不得写 deployed/ready。
 - **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
-- **🧪 B2 当前证据**:定向 208、全量 unit 13954、真 PostgreSQL smoke 32/零 skip 及 worktree black/ruff/authz/size/destructive 等机械闸全绿;待提交后让 pre-push 真实检查该 commit,未改 UI、Companion、agent_store、auto_push、MR.ERP、DMS、LINE 或 F2-F7。
+- **🧪 B3A 当前证据**:基线原样加 B3A 两测试文件共 476 passed/16 环境 skip/75 subtests;ruff/black/size 绿;新增真 PostgreSQL RLS smoke 已进 CI glob,本机 Docker 未运行故其中 1 条按环境规则 skip;未改 UI、Companion、agent_store、auto_push、MR.ERP、DMS、LINE 或 F2-F7。
 
 ---
 

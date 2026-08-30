@@ -182,14 +182,29 @@ implementation_batches:
     shared_scope_true_existing_rows: 0
   - batch_id: F1-B2
     backend_implementation_complete: true
-    release_state: UNCOMMITTED_RELEASE_CLOSURE
-    pearnly_commit: PENDING_CANDIDATE_COMMIT
+    release_state: DEPLOYED_EXACT_FLAG_OFF
+    pearnly_commit: 14b141c2f2ad6b0749579534d330fdc40cad0ca8
+    release_support_commit: be959c05998f185b7bd978975487a1246ec17f39
+    ci_run_id: 33253769492
+    ci_result: SUCCESS
+    production_sha: be959c05998f185b7bd978975487a1246ec17f39
+    production_verified_at: 2026-08-29T13:11:47Z
+    service_active_enter_timestamp: 2026-08-29T13:06:04Z
     scope: AUTHZ_CUSTOM_INVITATION_CONFIRMATION_AND_MUTABLE_HISTORY_BACKEND
     production_rollout_contract: ALL_TENANTS_FLAG_OFF
-  - batch_id: F1-B3
+  - batch_id: F1-B3A
+    backend_implementation_complete: false
+    release_state: IMPLEMENTING_UNCOMMITTED
+    source_baseline: b2d924a7a91a45aa215af312e72cebd05b4d6208
+    scope: SHARED_EXPRESS_ENDPOINT_READ_SAFE_DTO_AND_SERVER_CONNECTION_STATE
+  - batch_id: F1-B3B
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
-    scope: ENDPOINT_PUSH_LOG_PERMISSION_AND_SHARED_EXPRESS_ROUTE_WIRING
+    scope: SHARED_EXPRESS_ENDPOINT_MANAGE_BINDING_TOKEN_AND_STABLE_BOUND_ACCOUNT_SET
+  - batch_id: F1-B3C
+    backend_implementation_complete: false
+    release_state: PLANNED_LOCKED
+    scope: SHARED_EXPRESS_MANUAL_PUSH_LOG_AGENT_CHANNEL_AND_LIVE_ACCOUNT_SET
   - batch_id: F1-B4
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
@@ -211,7 +226,10 @@ feature_flags:
     candidate_rollout_state: OFF_ALL_TENANTS_FOR_B2_DEPLOY
     accepted_rollout_state: PENDING
     scope: ALL_TENANTS_FLAG_OFF_UNTIL_F1_B5
-    verified_at: PENDING_B2_PRODUCTION_READBACK
+    verified_at: 2026-08-29T13:11:47Z
+    effective_enabled_tenants: 0
+    effective_disabled_tenants: 45
+    tenant_total: 45
     reason: >-
       B2 only installs fail-closed authorization and confirmation prerequisites. Shared endpoint,
       push/log route wiring, Console UI and true-device acceptance are not present, so no tenant may
@@ -341,7 +359,8 @@ actors:
 automatic_verification:
   commands:
     - >-
-      PYTHONUTF8=1 venv/bin/python -m unittest tests.unit.test_authz_matrix
+      PYTHONUTF8=1 venv/bin/python -m unittest tests.unit.test_erp_shared_endpoint_read
+      tests.unit.test_authz_matrix
       tests.unit.test_authz_registry tests.unit.test_authz_resolver
       tests.unit.test_entrance_scope tests.unit.test_erp_intake_contract
       tests.unit.test_roles_store tests.unit.test_seat_enforce
@@ -363,11 +382,18 @@ automatic_verification:
       check_e2e_stub_contracts and check_authz_coverage
     - PYTHONUTF8=1 sh scripts/git-hooks/pre-push
   results:
+    - TARGETED_B3A_NEW_UNIT_16_PASS_12_SUBTESTS_PASS
+    - B3A_PLUS_BASELINE_TARGETED_476_PASS_16_ENVIRONMENT_SKIPS_75_SUBTESTS_PASS
+    - B3A_POSTGRESQL_SMOKE_ADDED_TO_CI_GLOB_LOCAL_DOCKER_UNAVAILABLE_EXPECTED_SKIP
+    - B3A_CHANGED_PYTHON_RUFF_BLACK_AND_FILE_SIZE_PASS
     - TARGETED_B2_BACKEND_208_TESTS_PASS
     - POSTGRESQL16_ALL_PG_SMOKE_32_TESTS_PASS_ZERO_SKIP
     - FULL_UNIT_13954_TESTS_PASS_15_EXPECTED_SKIPS
     - WORKTREE_RUFF_BLACK_AND_RELEVANT_MECHANICAL_GATES_PASS
-    - PRE_PUSH_EXIT_0_SKIPPED_BECAUSE_B2_CANDIDATE_IS_UNCOMMITTED_RERUN_AFTER_COMMIT
+    - PRE_PUSH_EXIT_0_FOR_COMMITTED_B2_AND_TEST_INFRA_CANDIDATE
+    - CI_33253769492_ALL_REQUIRED_JOBS_SUCCESS_INCLUDING_NON_SKIPPED_PG_SMOKE
+    - PRODUCTION_HEAD_EXACT_BE959C05998F185B7BD978975487A1246EC17F39
+    - PRODUCTION_FLAG_EFFECTIVE_DISABLED_45_OF_45_TENANTS
   conclusion: PENDING_F1_REMAINING_BATCHES_CANDIDATE_CI_DEVICE_AND_USER_ACCEPTANCE
 
 ui_verification:
@@ -470,6 +496,8 @@ erp_report_readbacks:
     evidence_paths: []
 
 evidence_paths:
+  - tests/unit/test_erp_shared_endpoint_read.py
+  - tests/unit/test_erp_shared_endpoint_read_pg_smoke.py
   - tests/unit/test_console_invite_custom_roles.py
   - tests/unit/test_invitation_accept_transaction.py
   - tests/unit/test_team_role_concurrency_pg_smoke.py
@@ -488,15 +516,15 @@ user_decision:
   accepted_erp_report_evidence_ids: []
 
 open_issues:
-  - B2 has no candidate commit, CI run or exact production readback yet; flag must remain off globally.
-  - B3 must wire erp.endpoint.view, erp.endpoint.manage, erp.push.operate and erp.log.view into the actual endpoint, push and log routes; the B2 registry alone is not route enforcement.
+  - B3A is an uncommitted read-only candidate; it still needs stable-snapshot review, non-skipped PostgreSQL CI, full gates, commit, exact deployment readback and flag-off proof.
+  - B3B endpoint manage/binding/token and B3C manual push/log/Agent remain locked; erp.endpoint.manage, erp.push.operate and erp.log.view are not wired by B3A.
+  - Real Profile mismatch is not observable today because heartbeat overwrites the sole config.account_set; B3B/B3C must establish stable bound_account_set/live_account_set writers and protocol before claiming mismatch detection.
   - B4 must expose only flag-on tenant custom roles in Console invitation and scope UI, keep erp.endpoint.manage owner-only, escape roleName, close main/cowork save-to-formal-to-push only after conversion succeeds, ship zh/th/en/ja source plus dist and cache-bust, and pass true-browser gates.
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
   - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
 next_action: >-
-  Finish the B2 full local gates, commit the exact reviewed candidate, require CI including non-skipped
-  PostgreSQL smoke, deploy that exact SHA with the flag off for every tenant, and record production
-  HEAD plus service start readback. Do not start F1-B3/B4/B5 or modify F2-F7 until separately unlocked.
+  Finish only F1-B3A review and automatic verification on the b2d924a7 baseline while keeping every
+  tenant flag off. Do not start F1-B3B/B3C, F1-B4/B5 or modify F2-F7 until separately unlocked.
 ```
 
 ## 7. F2-F7

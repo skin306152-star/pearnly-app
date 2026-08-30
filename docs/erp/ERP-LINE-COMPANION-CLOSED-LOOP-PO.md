@@ -8,7 +8,10 @@
 > `ERP-REAL-DEVICE-ACCEPTANCE.md` 与 `ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 >
 > 基线日期：2026-08-29。规划提交为 `e37bfed7`，F1-B1 默认休眠底座已按 `57fb5480`
-> 精确部署；当前 F1-B2 仍是未提交候选。每个功能仍须重新绑定自己的 CI、production SHA、
+> 精确部署；F1-B2 后端为 `14b141c2`，连同测试隔离修 `be959c05` 经 CI `33253769492`
+> 全绿并精确部署，生产 45/45 tenant 的 rollout 有效态仍为 OFF。当前源码发布基线为
+> `b2d924a7`，仅 F1-B3A 共享 endpoint 只读候选在未提交工作树实施；B3B/B3C 锁定。
+> 每个功能仍须重新绑定自己的 CI、production SHA、
 > Companion 版本及 ERP 报表回查，不能继承任一批次基线当验收。
 
 ## 1. 产品结果
@@ -77,8 +80,13 @@ Express、在一台能访问 Express 的 Windows 电脑安装小助手、邀请�
 - `erp_push_logs` 必须继续作为第三方 ERP 推送状态唯一来源。
 - F1-B1 的 additive schema、默认关闭 flag、partial unique 与 dormant SELECT RLS 已部署；
   `shared_scope=TRUE` 的生产存量为零，因此这不等于共享业务已开放。
-- F1-B2 后端候选已实现 ERP 权限/自定义角色邀请边界，以及 flag-on 确认与 history mutation
-  原子门；候选尚未提交、跑 CI 或部署，真实 endpoint/push/log 共享路由与网页 UI 均未接。
+- F1-B2 后端已实现 ERP 权限/自定义角色邀请边界，以及 flag-on 确认与 history mutation
+  原子门；`14b141c2`+`be959c05` 已通过 CI `33253769492` 并精确部署至 production
+  `be959c05998f185b7bd978975487a1246ec17f39`，但 45/45 tenant 的 flag 有效态均为 OFF。
+- F1-B3A 正在实施共享 Express endpoint 只读清单、安全 DTO 与服务端在线态；endpoint
+  manage/binding/token、manual push/log/Agent 属 B3B/B3C，仍锁定且未接。网页 UI、测试 tenant
+  放量与真机也未接。当前 heartbeat 会把 live 选择覆盖到唯一 `config.account_set`，因此 B3A
+  不宣称已检测 bound/live Profile mismatch。
 
 主要证据入口：
 
@@ -197,20 +205,29 @@ endpoint 自动合并。
 
 - F1-B1 已部署：只落默认休眠的数据底座——tenant flag、additive workspace/shared 字段、
   active shared Express partial unique 及 session-local 显式开启的 SELECT policy；未接共享业务。
-- F1-B2 后端已完成本地候选：新增四个 ERP 权限码及 owner/admin/custom role 边界；只在 tenant
+- F1-B2 后端已部署：新增四个 ERP 权限码及 owner/admin/custom role 边界；只在 tenant
   flag-on 时允许 active custom role 邀请和 assigned workspace；邀请创建、接受、角色停用/删除、
   成员 scope/角色变更均 fail-closed 并按统一锁序处理。`main/cowork/erp` 的 flag-on 确认路径按
   actor、tenant、workspace、采购/销售方向及 create+approve 权限原子预检，mixed batch 整批处理，
   只有匹配 actor/workspace 的正式单据存在后才能 commit；已转正式单据的 history 禁止再改/删。
-- F1-B2 的发布合同是 **所有 tenant 保持 flag-off**。关闭时 custom role 邀请/scope 继续沿用旧
-  system-role-only 行为，history/convert/commit 继续走 legacy 分支；本批不打开测试 tenant。
-- F1-B3、B4、B5 均未解锁：B3 才把真实 endpoint/push/log 路由接上四权限码与共享 Express
-  选择；B4 才交付 Console 自定义角色/邀请 UI、`erp.endpoint.manage` owner-only 表达、roleName
+- F1-B2 的发布合同是 **所有 tenant 保持 flag-off**。生产匿名聚合读回为 45/45 tenant OFF；关闭时
+  custom role 邀请/scope 继续沿用旧 system-role-only 行为，history/convert/commit 继续走 legacy
+  分支，本批未打开测试 tenant。
+- F1-B3A 是当前唯一施工批：只在 tenant flag-on 且入口为 `main/cowork/erp` 时，把 GET endpoint
+  清单切到 tenant/user/workspace 绑定的 RLS 共享读，保留 actor 自有 legacy 行并合并当前 active
+  workspace 的 active shared Express；无 manage 权限只返严格 DTO，在线态用服务器时间和 180 秒
+  边界判定；现有可观测异常（如非法 heartbeat 时间、已心跳但缺 account_set）才进入
+  `needs_attention`。flag-off 与其它入口仍走原 user-scoped 清单。B3A 不含任何写接口。
+- F1-B3B(endpoint manage/binding/token)与 B3C(manual push/log/Agent lease/ack)均未解锁；B4/B5
+  也仍未解锁。B3B/B3C 的前置硬门是先建立稳定 `bound_account_set` 与 `live_account_set`
+  双字段/writer/协议，再为真实 mismatch 补反证；不得复用当前被 heartbeat 覆盖的单字段假判。
+  B4 才交付 Console 自定义角色/邀请 UI、
+  `erp.endpoint.manage` owner-only 表达、roleName
   安全渲染，以及 main/cowork 保存→正式提交→仅转换成功后推送的可见闭环，并补四语、
   source/dist/cache-bust 与真浏览器证据；B5 才做冲突清单、测试 tenant 放量、原 Profile
   owner+员工采购/销售真机及 Express report 回查。
 
-B1/B2 完成仍只代表 F1 的数据与后端前置，不代表 F1 `CODE_VERIFIED`、`DEPLOYED_EXACT`、
+B1/B2 已部署仍只代表 F1 的数据与后端前置，不代表 F1 `CODE_VERIFIED`、`DEPLOYED_EXACT`、
 `READY_FOR_DEVICE` 或 `USER_ACCEPTED`，也绝不能解锁 F2。
 
 **代码/数据涉及**：
@@ -432,7 +449,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1 已部署;B2 后端发布收口;B3/B4/B5 与真机均未解锁 |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2 已部署;仅 B3A 只读候选实施;B3B/B3C、B4/B5 与真机锁定 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |
@@ -471,5 +488,5 @@ Companion 私有仓及 Windows 发布环境。缺少时对应功能进入 `BLOCK
   验证时间与保留/关闭原因；不得以 `pending`、口头“再决定放量”结束全计划。
 - 无未处理的数据完整性、安全或重复过账 P0/P1。
 
-当前只允许收口并发布 F1-B2 后端，且发布时所有 tenant 保持
-`erp_shared_express_endpoint=false`；F1-B3/B4/B5 及 F2-F7 禁止提前施工。
+当前只允许推进 F1-B3A 共享 endpoint 只读候选；`erp_shared_express_endpoint` 在 B5 测试 tenant
+放量前继续全租户关闭。F1-B3B/B3C、F1-B4/B5 及 F2-F7 禁止提前施工。

@@ -683,6 +683,7 @@ BEGIN
 END
 $pearnly$;
 
+
 -- F1-B3B2b promotion guard. The policy is installed by 0111 after
 -- workspace_clients, memberships, and roles exist; this row guard is safe in
 -- the legacy baseline and protects direct SQL during the later upgrade.
@@ -916,6 +917,406 @@ BEGIN
     BEFORE DELETE ON public.users
     FOR EACH ROW
     EXECUTE FUNCTION public.preserve_managed_erp_endpoints_on_user_delete();
+  END IF;
+END
+$pearnly$;
+
+-- B3B2b-2 lifecycle baseline archive.
+-- B3B2b-2 lifecycle columns are additive in the legacy baseline.
+ALTER TABLE erp_endpoints ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+ALTER TABLE erp_endpoints ADD COLUMN IF NOT EXISTS revoked_by UUID;
+
+DO $pearnly$
+BEGIN
+  ALTER TABLE erp_endpoints DROP CONSTRAINT IF EXISTS erp_endpoints_managed_scope_chk;
+  ALTER TABLE erp_endpoints ADD CONSTRAINT erp_endpoints_managed_scope_chk CHECK
+    (binding_generation = 0 OR (tenant_id IS NOT NULL AND adapter = 'express'
+      AND (workspace_client_id IS NOT NULL OR revoked_at IS NOT NULL)));
+  ALTER TABLE erp_endpoints DROP CONSTRAINT IF EXISTS erp_endpoints_revoked_pair_chk;
+  ALTER TABLE erp_endpoints ADD CONSTRAINT erp_endpoints_revoked_pair_chk CHECK
+    ((revoked_at IS NULL) = (revoked_by IS NULL));
+  ALTER TABLE erp_endpoints DROP CONSTRAINT IF EXISTS erp_endpoints_revoked_terminal_chk;
+  ALTER TABLE erp_endpoints ADD CONSTRAINT erp_endpoints_revoked_terminal_chk CHECK
+    (revoked_at IS NULL OR (binding_generation > 0 AND tenant_id IS NOT NULL
+      AND adapter = 'express' AND enabled = FALSE AND shared_scope = FALSE
+      AND workspace_client_id IS NULL));
+END
+$pearnly$;
+
+DO $pearnly$
+DECLARE v_unique boolean; v_keys smallint; v_definition text; v_predicate text; v_duplicate boolean;
+BEGIN
+  SELECT EXISTS (
+      SELECT 1
+        FROM operation_logs
+       WHERE target_type = 'erp_endpoint'
+         AND action IN ('erp.endpoint.rebind', 'erp.endpoint.enable', 'erp.endpoint.disable', 'erp.endpoint.revoke')
+         AND details ? 'operation_id'
+       GROUP BY tenant_id, (details ->> 'operation_id')
+      HAVING count(*) > 1
+  ) INTO v_duplicate;
+  IF v_duplicate THEN
+    RAISE EXCEPTION 'duplicate tenant operation_id prevents lifecycle index contract';
+  END IF;
+  SELECT index_meta.indisunique, index_meta.indnkeyatts, pg_get_indexdef(index_meta.indexrelid),
+         pg_get_expr(index_meta.indpred, index_meta.indrelid)
+    INTO v_unique, v_keys, v_definition, v_predicate
+    FROM pg_catalog.pg_index index_meta
+   WHERE index_meta.indexrelid = pg_catalog.to_regclass('uq_operation_logs_erp_endpoint_lifecycle_operation');
+  IF NOT FOUND THEN
+    CREATE UNIQUE INDEX uq_operation_logs_erp_endpoint_lifecycle_operation
+      ON operation_logs (tenant_id, (details ->> 'operation_id'))
+      WHERE target_type = 'erp_endpoint'
+        AND action IN ('erp.endpoint.rebind', 'erp.endpoint.enable', 'erp.endpoint.disable', 'erp.endpoint.revoke')
+        AND details ? 'operation_id';
+  ELSIF v_unique IS DISTINCT FROM TRUE OR v_keys IS DISTINCT FROM 2
+     OR position('tenant_id' IN lower(v_definition)) = 0
+     OR position('details ->> ''operation_id''' IN lower(v_definition)) = 0
+     OR v_predicate IS NULL OR position('target_type' IN lower(v_predicate)) = 0
+     OR position('operation_id' IN lower(v_predicate)) = 0
+     OR position('erp.endpoint.rebind' IN v_predicate) = 0
+     OR position('erp.endpoint.enable' IN v_predicate) = 0
+     OR position('erp.endpoint.disable' IN v_predicate) = 0
+     OR position('erp.endpoint.revoke' IN v_predicate) = 0
+  THEN
+    RAISE EXCEPTION 'uq_operation_logs_erp_endpoint_lifecycle_operation does not match lifecycle contract';
+  END IF;
+END
+$pearnly$;
+
+
+CREATE OR REPLACE FUNCTION public.guard_erp_endpoint_lifecycle_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+DECLARE
+    v_action text := current_setting('app.erp_endpoint_lifecycle_action', true);
+    v_expected text := current_setting('app.erp_endpoint_lifecycle_expected_generation', true);
+    v_source text := current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true);
+    v_target text := current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true);
+    v_scrubbed jsonb;
+BEGIN
+    IF OLD.binding_generation = 0 THEN
+        RETURN NEW;
+    END IF;
+    IF current_setting('app.erp_endpoint_lifecycle', true) <> 'on'
+       OR current_setting('app.current_tenant_id', true) <> OLD.tenant_id::text
+       OR current_setting('app.current_user_id', true) <> current_setting('app.erp_endpoint_lifecycle_actor_id', true)
+       OR current_setting('app.erp_endpoint_lifecycle_endpoint_id', true) <> OLD.id::text
+       OR current_setting('app.erp_endpoint_lifecycle_operation_id', true) !~
+           '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       OR v_expected !~ '^[1-9][0-9]*$'
+       OR v_expected::bigint <> OLD.binding_generation
+       OR v_source IS DISTINCT FROM COALESCE(OLD.workspace_client_id::text, '')
+    THEN
+        RAISE EXCEPTION 'erp.endpoint_lifecycle_gate_required';
+    END IF;
+    IF NEW.id IS DISTINCT FROM OLD.id
+       OR NEW.user_id IS DISTINCT FROM OLD.user_id
+       OR NEW.name IS DISTINCT FROM OLD.name
+       OR NEW.adapter IS DISTINCT FROM OLD.adapter
+       OR NEW.is_default IS DISTINCT FROM OLD.is_default
+       OR NEW.auto_push IS DISTINCT FROM OLD.auto_push
+       OR NEW.last_used_at IS DISTINCT FROM OLD.last_used_at
+       OR NEW.last_status IS DISTINCT FROM OLD.last_status
+       OR NEW.success_count IS DISTINCT FROM OLD.success_count
+       OR NEW.failure_count IS DISTINCT FROM OLD.failure_count
+       OR NEW.created_at IS DISTINCT FROM OLD.created_at
+       OR NEW.bound_account_set IS DISTINCT FROM OLD.bound_account_set
+       OR NEW.bound_profile_key IS DISTINCT FROM OLD.bound_profile_key
+       OR NEW.live_account_set IS DISTINCT FROM OLD.live_account_set
+       OR NEW.live_profile_key IS DISTINCT FROM OLD.live_profile_key
+       OR NEW.agent_last_seen_at IS DISTINCT FROM OLD.agent_last_seen_at
+       OR NEW.agent_version IS DISTINCT FROM OLD.agent_version
+       OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+    THEN
+        RAISE EXCEPTION 'erp endpoint lifecycle may only change lifecycle columns';
+    END IF;
+    IF NEW.binding_generation <> OLD.binding_generation + 1 THEN
+        RAISE EXCEPTION 'erp.endpoint_stale_generation';
+    END IF;
+    IF v_action = 'rebind' THEN
+        IF OLD.revoked_at IS NOT NULL OR OLD.enabled OR NOT OLD.shared_scope
+           OR OLD.workspace_client_id IS NULL
+           OR v_target IS NULL OR v_target = ''
+           OR NEW.workspace_client_id::text IS DISTINCT FROM v_target
+           OR NEW.enabled OR NOT NEW.shared_scope
+           OR NEW.revoked_at IS NOT NULL OR NEW.revoked_by IS NOT NULL
+           OR NEW.config IS DISTINCT FROM OLD.config
+        THEN
+            RAISE EXCEPTION 'erp.endpoint_invalid_rebind';
+        END IF;
+    ELSIF v_action = 'enable' THEN
+        IF OLD.revoked_at IS NOT NULL OR OLD.enabled OR NOT OLD.shared_scope
+           OR NEW.workspace_client_id IS DISTINCT FROM OLD.workspace_client_id
+           OR NOT NEW.enabled OR NOT NEW.shared_scope
+           OR NEW.revoked_at IS DISTINCT FROM OLD.revoked_at
+           OR NEW.revoked_by IS DISTINCT FROM OLD.revoked_by
+           OR NEW.config IS DISTINCT FROM OLD.config
+           OR v_target IS DISTINCT FROM v_source
+        THEN
+            RAISE EXCEPTION 'erp.endpoint_invalid_enable';
+        END IF;
+    ELSIF v_action = 'disable' THEN
+        IF OLD.revoked_at IS NOT NULL OR NOT OLD.enabled OR NOT OLD.shared_scope
+           OR NEW.workspace_client_id IS DISTINCT FROM OLD.workspace_client_id
+           OR NEW.enabled OR NOT NEW.shared_scope
+           OR NEW.revoked_at IS DISTINCT FROM OLD.revoked_at
+           OR NEW.revoked_by IS DISTINCT FROM OLD.revoked_by
+           OR NEW.config IS DISTINCT FROM OLD.config
+           OR v_target IS DISTINCT FROM v_source
+        THEN
+            RAISE EXCEPTION 'erp.endpoint_invalid_disable';
+        END IF;
+    ELSIF v_action = 'revoke' THEN
+        IF OLD.revoked_at IS NOT NULL OR OLD.enabled OR NOT OLD.shared_scope
+           OR NEW.workspace_client_id IS NOT NULL OR NEW.enabled OR NEW.shared_scope
+           OR NEW.revoked_at IS NULL
+           OR NEW.revoked_by::text IS DISTINCT FROM current_setting('app.erp_endpoint_lifecycle_actor_id', true)
+           OR v_target IS DISTINCT FROM ''
+        THEN
+            RAISE EXCEPTION 'erp.endpoint_invalid_revoke';
+        END IF;
+        v_scrubbed := OLD.config - ARRAY[
+            'agent_token', 'agent_token_hash', 'agent_token_tail', 'agent_token_created_at'
+        ]::text[];
+        IF NEW.config IS DISTINCT FROM v_scrubbed THEN
+            RAISE EXCEPTION 'erp.endpoint_revoke_token_scrub_required';
+        END IF;
+    ELSE
+        RAISE EXCEPTION 'erp.endpoint_lifecycle_action_required';
+    END IF;
+    RETURN NEW;
+END
+$pearnly$
+;
+
+REVOKE ALL ON FUNCTION public.guard_erp_endpoint_lifecycle_columns() FROM PUBLIC;
+
+DO $pearnly$
+DECLARE
+    v_enabled "char";
+    v_tgtype smallint;
+    v_tgattr text;
+    v_has_when boolean;
+    v_function oid;
+BEGIN
+    SELECT trigger_meta.tgenabled, trigger_meta.tgtype, trigger_meta.tgattr::text,
+           trigger_meta.tgqual IS NOT NULL, trigger_meta.tgfoid
+      INTO v_enabled, v_tgtype, v_tgattr, v_has_when, v_function
+      FROM pg_catalog.pg_trigger trigger_meta
+     WHERE trigger_meta.tgrelid = 'erp_endpoints'::regclass
+       AND trigger_meta.tgname = 'erp_endpoints_lifecycle_columns_guard'
+       AND NOT trigger_meta.tgisinternal;
+    IF NOT FOUND THEN
+        CREATE TRIGGER erp_endpoints_lifecycle_columns_guard
+        BEFORE UPDATE OF tenant_id, workspace_client_id, binding_generation, enabled,
+            shared_scope, revoked_at, revoked_by, updated_at ON public.erp_endpoints
+        FOR EACH ROW
+        EXECUTE FUNCTION public.guard_erp_endpoint_lifecycle_columns();
+    ELSIF v_enabled IS DISTINCT FROM 'O' OR v_tgtype IS DISTINCT FROM 19
+       OR v_tgattr IS DISTINCT FROM (
+           SELECT string_agg(attribute.attnum::text, ' ' ORDER BY array_position(
+               ARRAY['tenant_id', 'workspace_client_id', 'binding_generation', 'enabled',
+                     'shared_scope', 'revoked_at', 'revoked_by', 'updated_at'], attribute.attname
+           ))
+           FROM pg_catalog.pg_attribute attribute
+           WHERE attribute.attrelid = 'erp_endpoints'::regclass
+             AND attribute.attname = ANY (ARRAY[
+                 'tenant_id', 'workspace_client_id', 'binding_generation', 'enabled',
+                 'shared_scope', 'revoked_at', 'revoked_by', 'updated_at'
+             ])
+             AND attribute.attnum > 0 AND NOT attribute.attisdropped
+       ) OR v_has_when
+       OR v_function IS DISTINCT FROM 'public.guard_erp_endpoint_lifecycle_columns()'::regprocedure
+    THEN
+        RAISE EXCEPTION 'erp_endpoints_lifecycle_columns_guard does not match lifecycle contract';
+    END IF;
+END
+$pearnly$
+;
+
+
+DO $pearnly$
+BEGIN
+  IF to_regclass('public.workspace_clients') IS NOT NULL
+     AND to_regclass('public.memberships') IS NOT NULL
+     AND to_regclass('public.roles') IS NOT NULL
+  THEN
+    EXECUTE $archive$
+
+CREATE OR REPLACE FUNCTION public.erp_managed_endpoint_has_activity(p_endpoint_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $helper$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.erp_endpoints endpoint
+        WHERE endpoint.id = $1
+          AND endpoint.binding_generation > 0
+          AND endpoint.adapter = 'express'
+          AND endpoint.revoked_at IS NULL
+          AND endpoint.tenant_id::text = pg_catalog.current_setting('app.current_tenant_id', true)
+          AND endpoint.workspace_client_id IS NOT NULL
+          AND EXISTS (
+              SELECT 1
+              FROM public.workspace_clients workspace
+              WHERE workspace.id = endpoint.workspace_client_id
+                AND workspace.tenant_id = endpoint.tenant_id
+                AND workspace.is_active = TRUE
+          )
+          AND EXISTS (
+              SELECT 1
+              FROM public.users actor
+              JOIN public.memberships membership ON membership.user_id = actor.id
+              JOIN public.roles role ON role.id = membership.role_id
+              WHERE actor.id::text = pg_catalog.current_setting('app.current_user_id', true)
+                AND actor.tenant_id = endpoint.tenant_id
+                AND actor.is_active = TRUE
+                AND membership.tenant_id = endpoint.tenant_id
+                AND membership.status = 'active'
+                AND role.name = 'owner'
+          )
+          AND EXISTS (
+              SELECT 1
+              FROM public.erp_push_logs push_log
+              WHERE push_log.endpoint_id = endpoint.id
+                AND (
+                    push_log.status IN ('pending', 'retrying')
+                    OR push_log.next_retry_at IS NOT NULL
+                    OR push_log.lease_owner IS NOT NULL
+                    OR push_log.lease_expires_at IS NOT NULL
+                )
+          )
+    )
+$helper$
+
+    $archive$;
+  END IF;
+END
+$pearnly$;
+
+REVOKE ALL ON FUNCTION public.erp_managed_endpoint_has_activity(uuid) FROM PUBLIC;
+DO $pearnly$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'pearnly_app') THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.erp_managed_endpoint_has_activity(uuid) TO pearnly_app';
+  END IF;
+END
+$pearnly$;
+
+-- Workspace-dependent lifecycle RLS is installed by revision 0112 after its
+-- dependency tables exist; this baseline policy keeps legacy replay valid.
+DROP POLICY IF EXISTS erp_endpoints_managed_lifecycle_update ON erp_endpoints;
+CREATE POLICY erp_endpoints_managed_lifecycle_update ON erp_endpoints FOR UPDATE
+USING (current_setting('app.erp_endpoint_lifecycle', true) = 'on'
+  AND current_setting('app.erp_endpoint_lifecycle_tenant_id', true) = current_setting('app.current_tenant_id', true)
+  AND current_setting('app.erp_endpoint_lifecycle_actor_id', true) = current_setting('app.current_user_id', true)
+  AND id::text = current_setting('app.erp_endpoint_lifecycle_endpoint_id', true)
+  AND binding_generation > 0 AND adapter = 'express' AND revoked_at IS NULL)
+WITH CHECK (current_setting('app.erp_endpoint_lifecycle', true) = 'on'
+  AND current_setting('app.erp_endpoint_lifecycle_tenant_id', true) = current_setting('app.current_tenant_id', true)
+  AND current_setting('app.erp_endpoint_lifecycle_actor_id', true) = current_setting('app.current_user_id', true)
+  AND id::text = current_setting('app.erp_endpoint_lifecycle_endpoint_id', true)
+  AND binding_generation > 0 AND adapter = 'express');
+
+-- 0112 installs the exact workspace-aware policies once these later tables exist.
+-- Dollar-quoted dynamic SQL keeps this legacy payload replay-safe.
+DO $pearnly$
+BEGIN
+  IF to_regclass('public.workspace_clients') IS NOT NULL
+     AND to_regclass('public.memberships') IS NOT NULL
+     AND to_regclass('public.roles') IS NOT NULL
+  THEN
+    EXECUTE $policy$
+      DROP POLICY IF EXISTS erp_endpoints_managed_lifecycle_select ON erp_endpoints;
+      CREATE POLICY erp_endpoints_managed_lifecycle_select ON erp_endpoints FOR SELECT
+      USING (
+        current_setting('app.erp_endpoint_lifecycle', true) = 'on'
+        AND current_setting('app.erp_endpoint_lifecycle_tenant_id', true) = current_setting('app.current_tenant_id', true)
+        AND current_setting('app.erp_endpoint_lifecycle_actor_id', true) = current_setting('app.current_user_id', true)
+        AND current_setting('app.erp_endpoint_lifecycle_action', true) IN ('rebind','enable','disable','revoke')
+        AND id::text = current_setting('app.erp_endpoint_lifecycle_endpoint_id', true)
+        AND current_setting('app.erp_endpoint_lifecycle_expected_generation', true) ~ '^[1-9][0-9]*$'
+        AND tenant_id::text = current_setting('app.current_tenant_id', true)
+        AND EXISTS (SELECT 1 FROM users lifecycle_actor
+          JOIN memberships lifecycle_membership ON lifecycle_membership.user_id = lifecycle_actor.id
+          JOIN roles lifecycle_role ON lifecycle_role.id = lifecycle_membership.role_id
+          WHERE lifecycle_actor.id::text = current_setting('app.current_user_id', true)
+            AND lifecycle_actor.tenant_id = erp_endpoints.tenant_id AND lifecycle_actor.is_active
+            AND lifecycle_membership.tenant_id = erp_endpoints.tenant_id
+            AND lifecycle_membership.status = 'active' AND lifecycle_role.name = 'owner')
+        AND (
+          (binding_generation::text = current_setting('app.erp_endpoint_lifecycle_expected_generation', true)
+           AND binding_generation > 0 AND adapter = 'express' AND revoked_at IS NULL
+           AND current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true) = COALESCE(workspace_client_id::text, '')
+           AND EXISTS (SELECT 1 FROM workspace_clients source_workspace
+             WHERE source_workspace.id = erp_endpoints.workspace_client_id
+               AND source_workspace.tenant_id = erp_endpoints.tenant_id AND source_workspace.is_active))
+          OR
+          (binding_generation::text = (current_setting('app.erp_endpoint_lifecycle_expected_generation', true)::bigint + 1)::text
+           AND binding_generation > 0 AND adapter = 'express'
+           AND ((current_setting('app.erp_endpoint_lifecycle_action', true) IN ('enable','disable')
+                 AND current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) = current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true)
+                 AND workspace_client_id::text = current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true)
+                 AND enabled = (current_setting('app.erp_endpoint_lifecycle_action', true) = 'enable')
+                 AND shared_scope = TRUE AND revoked_at IS NULL AND revoked_by IS NULL
+                 AND EXISTS (SELECT 1 FROM workspace_clients source_workspace
+                   WHERE source_workspace.id = erp_endpoints.workspace_client_id
+                     AND source_workspace.tenant_id = erp_endpoints.tenant_id AND source_workspace.is_active))
+             OR (current_setting('app.erp_endpoint_lifecycle_action', true) = 'rebind'
+                 AND current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) <> ''
+                 AND workspace_client_id::text = current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true)
+                 AND enabled = FALSE AND shared_scope = TRUE AND revoked_at IS NULL AND revoked_by IS NULL
+                 AND EXISTS (SELECT 1 FROM workspace_clients target_workspace
+                   WHERE target_workspace.id = erp_endpoints.workspace_client_id
+                     AND target_workspace.tenant_id = erp_endpoints.tenant_id AND target_workspace.is_active))
+             OR (current_setting('app.erp_endpoint_lifecycle_action', true) = 'revoke'
+                 AND current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) = ''
+                 AND workspace_client_id IS NULL AND enabled = FALSE AND shared_scope = FALSE
+                 AND revoked_at IS NOT NULL
+                 AND revoked_by::text = current_setting('app.erp_endpoint_lifecycle_actor_id', true))))
+        )
+      );
+      DROP POLICY IF EXISTS erp_endpoints_managed_lifecycle_update ON erp_endpoints;
+      CREATE POLICY erp_endpoints_managed_lifecycle_update ON erp_endpoints FOR UPDATE
+      USING (
+        current_setting('app.erp_endpoint_lifecycle', true) = 'on'
+        AND current_setting('app.erp_endpoint_lifecycle_tenant_id', true) = current_setting('app.current_tenant_id', true)
+        AND current_setting('app.erp_endpoint_lifecycle_actor_id', true) = current_setting('app.current_user_id', true)
+        AND current_setting('app.erp_endpoint_lifecycle_action', true) IN ('rebind','enable','disable','revoke')
+        AND id::text = current_setting('app.erp_endpoint_lifecycle_endpoint_id', true)
+        AND current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true) = COALESCE(workspace_client_id::text, '')
+        AND current_setting('app.erp_endpoint_lifecycle_expected_generation', true) ~ '^[1-9][0-9]*$'
+        AND binding_generation >= current_setting('app.erp_endpoint_lifecycle_expected_generation', true)::bigint
+        AND binding_generation > 0 AND adapter = 'express' AND revoked_at IS NULL
+        AND tenant_id::text = current_setting('app.current_tenant_id', true)
+        AND EXISTS (SELECT 1 FROM workspace_clients source_workspace
+          WHERE source_workspace.id = erp_endpoints.workspace_client_id
+            AND source_workspace.tenant_id = erp_endpoints.tenant_id AND source_workspace.is_active)
+        AND EXISTS (SELECT 1 FROM users lifecycle_actor
+          JOIN memberships lifecycle_membership ON lifecycle_membership.user_id = lifecycle_actor.id
+          JOIN roles lifecycle_role ON lifecycle_role.id = lifecycle_membership.role_id
+          WHERE lifecycle_actor.id::text = current_setting('app.current_user_id', true)
+            AND lifecycle_actor.tenant_id = erp_endpoints.tenant_id AND lifecycle_actor.is_active
+            AND lifecycle_membership.tenant_id = erp_endpoints.tenant_id
+            AND lifecycle_membership.status = 'active' AND lifecycle_role.name = 'owner')
+      )
+      WITH CHECK (current_setting('app.erp_endpoint_lifecycle', true) = 'on'
+        AND current_setting('app.erp_endpoint_lifecycle_tenant_id', true) = current_setting('app.current_tenant_id', true)
+        AND current_setting('app.erp_endpoint_lifecycle_actor_id', true) = current_setting('app.current_user_id', true)
+        AND id::text = current_setting('app.erp_endpoint_lifecycle_endpoint_id', true)
+        AND binding_generation::text = (current_setting('app.erp_endpoint_lifecycle_expected_generation', true)::bigint + 1)::text
+        AND binding_generation > 0 AND adapter = 'express' AND tenant_id::text = current_setting('app.current_tenant_id', true)
+        AND ((current_setting('app.erp_endpoint_lifecycle_action', true) = 'rebind' AND current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) <> '' AND workspace_client_id::text = current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) AND enabled = FALSE AND shared_scope = TRUE AND revoked_at IS NULL AND revoked_by IS NULL)
+          OR (current_setting('app.erp_endpoint_lifecycle_action', true) = 'enable' AND current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) = current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true) AND workspace_client_id::text = current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true) AND enabled = TRUE AND shared_scope = TRUE AND revoked_at IS NULL AND revoked_by IS NULL)
+          OR (current_setting('app.erp_endpoint_lifecycle_action', true) = 'disable' AND current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) = current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true) AND workspace_client_id::text = current_setting('app.erp_endpoint_lifecycle_source_workspace_id', true) AND enabled = FALSE AND shared_scope = TRUE AND revoked_at IS NULL AND revoked_by IS NULL)
+          OR (current_setting('app.erp_endpoint_lifecycle_action', true) = 'revoke' AND current_setting('app.erp_endpoint_lifecycle_target_workspace_id', true) = '' AND workspace_client_id IS NULL AND enabled = FALSE AND shared_scope = FALSE AND revoked_at IS NOT NULL AND revoked_by::text = current_setting('app.erp_endpoint_lifecycle_actor_id', true))))
+    $policy$;
   END IF;
 END
 $pearnly$;

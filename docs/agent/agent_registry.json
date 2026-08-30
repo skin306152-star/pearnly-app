@@ -74,6 +74,7 @@
   "erp_mappings_routes": "C",
   "erp_push_log_routes": "B",
   "erp_shared_express_enrollment_routes": "C",
+  "erp_shared_express_lifecycle_routes": "C",
   "line_erp_routes": "D",
   "erp_posting_preview_routes": "B",
   "exceptions_routes": "B",

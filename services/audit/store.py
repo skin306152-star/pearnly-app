@@ -9,6 +9,7 @@ db.py 文件尾 re-export 回本命名空间 · 所有 `db.xxx()` 调用点不�
 
 import json as _json
 import logging
+import re
 from typing import Optional, Dict, Any, List
 
 from core import db
@@ -28,6 +29,14 @@ _ERP_ENDPOINT_AUDIT_ACTIONS = frozenset(
 )
 _ERP_ENDPOINT_AUDIT_DETAIL_KEYS = frozenset(
     {
+        "endpoint_id",
+        "action",
+        "operation_id",
+        "expected_generation",
+        "actual_generation",
+        "workspace_before",
+        "workspace_after",
+        "target_workspace_client_id",
         "workspace_client_id",
         "generation_before",
         "generation_after",
@@ -35,10 +44,15 @@ _ERP_ENDPOINT_AUDIT_DETAIL_KEYS = frozenset(
         "enabled_after",
         "shared_scope_before",
         "shared_scope_after",
+        "revoked_before",
+        "revoked_after",
         "profile_changed",
         "reason",
     }
 )
+_ERP_ENDPOINT_AUDIT_DETAIL_ACTIONS = frozenset({"rebind", "enable", "disable", "revoke"})
+
+_CANONICAL_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 def insert_operation_log_tx(
@@ -71,12 +85,35 @@ def insert_operation_log_tx(
         raise ValueError("operation log details contain unsupported keys")
     for key, value in detail_payload.items():
         if key == "reason":
-            if not isinstance(value, str) or len(value) > 200:
+            if (
+                not isinstance(value, str)
+                or len(value) > 200
+                or any(ord(character) < 32 or ord(character) == 127 for character in value)
+            ):
                 raise ValueError("operation log reason must be a short string")
-        elif key == "workspace_client_id":
-            if not isinstance(value, (str, int)) or isinstance(value, bool):
-                raise ValueError("workspace_client_id must be scalar")
-        elif key in {"generation_before", "generation_after"}:
+        elif key == "endpoint_id":
+            if not isinstance(value, str) or not value.strip() or len(value) > 128:
+                raise ValueError("endpoint_id must be a short string")
+        elif key == "action":
+            if not isinstance(value, str) or value not in _ERP_ENDPOINT_AUDIT_DETAIL_ACTIONS:
+                raise ValueError("operation log action must be a lifecycle action")
+        elif key == "operation_id":
+            if not isinstance(value, str) or not _CANONICAL_UUID.fullmatch(value):
+                raise ValueError("operation_id must be a canonical UUID")
+        elif key in {
+            "workspace_before",
+            "workspace_after",
+            "target_workspace_client_id",
+            "workspace_client_id",
+        }:
+            if value is not None and (not isinstance(value, (str, int)) or isinstance(value, bool)):
+                raise ValueError(f"{key} must be scalar")
+        elif key in {
+            "generation_before",
+            "generation_after",
+            "expected_generation",
+            "actual_generation",
+        }:
             if not isinstance(value, int) or isinstance(value, bool):
                 raise ValueError("binding generation must be an integer")
         elif not isinstance(value, bool):

@@ -57,6 +57,7 @@ from routes.erp_export_routes import router as _export_router  # noqa: F401
 from routes.erp_express_account_routes import router as _express_acct_router  # noqa: F401
 from routes.erp_posting_preview_routes import router as _posting_preview_router  # noqa: F401
 from routes.erp_shared_express_enrollment_routes import router as _shared_enrollment_router
+from routes.erp_shared_express_lifecycle_routes import router as _shared_lifecycle_router
 
 router = APIRouter()
 router.include_router(_listing_router)
@@ -66,3 +67,4 @@ router.include_router(_export_router)
 router.include_router(_express_acct_router)
 router.include_router(_posting_preview_router)
 router.include_router(_shared_enrollment_router)
+router.include_router(_shared_lifecycle_router)

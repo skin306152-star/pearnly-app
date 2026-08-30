@@ -335,7 +335,8 @@ class ErpEndpointsSingleUserIsolationTests(unittest.TestCase):
     def test_delete_erp_endpoint_scoped_by_user(self):
         # delete_erp_endpoint 先 UPDATE erp_push_logs 再 DELETE erp_endpoints
         # 两条都必须按 user_id 限定
-        cur = _Cursor(rowcount=1)
+        # The path first locks and confirms the legacy generation row.
+        cur = _Cursor(fetchone_results=[{"id": "ep-1"}], rowcount=1)
         with _patch_cursor(cur):
             db.delete_erp_endpoint(USER_A, "ep-1")
         self.assertGreaterEqual(len(cur.executed), 2)
@@ -698,7 +699,8 @@ class DeleteAlwaysScopedContractTests(unittest.TestCase):
     SCOPE_TOKENS = ("user_id", "tenant_id", "endpoint_id")
 
     def _assert_delete_scoped(self, fn, *args, **kwargs):
-        cur = _Cursor(rowcount=1, fetchall_results=[[]], fetchone_results=[None])
+        fetchone_results = [{"id": "ep-1"}] if fn is db.delete_erp_endpoint else [None]
+        cur = _Cursor(rowcount=1, fetchall_results=[[]], fetchone_results=fetchone_results)
         with _patch_cursor(cur):
             try:
                 fn(*args, **kwargs)

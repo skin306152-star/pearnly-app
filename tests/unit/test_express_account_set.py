@@ -65,7 +65,9 @@ class StoreSelectedAccount(unittest.TestCase):
         self.assertFalse(agent_store.store_selected_account("ep1", {"account_dir": "x"}))  # 缺名
 
     def test_stores_whole_group(self):
-        cur = mock.MagicMock()
+        # B3B2b-1 fences managed endpoints and reports success only when the
+        # legacy UPDATE changed exactly one row.
+        cur = mock.MagicMock(rowcount=1)
         cm = mock.MagicMock()
         cm.__enter__.return_value = cur
         body = {

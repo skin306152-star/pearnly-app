@@ -177,9 +177,7 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
             )
 
         self.assertEqual(lease_response.status_code, 200)
-        self.assertEqual(
-            lease_response.json(), {"ok": True, "lease_seconds": 120, "jobs": []}
-        )
+        self.assertEqual(lease_response.json(), {"ok": True, "lease_seconds": 120, "jobs": []})
         self.assertEqual(ack_response.status_code, 200)
         self.assertEqual(ack_response.json(), {"ok": False, "stale": True})
         self.assertEqual(authenticate.call_args_list, [mock.call(token), mock.call(token)])

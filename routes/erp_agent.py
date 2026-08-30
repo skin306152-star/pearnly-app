@@ -240,9 +240,7 @@ def _run_agent_lease(token: str, agent_id: object, max_n: int) -> Dict[str, Any]
 async def erp_agent_lease(req: LeaseRequest, request: Request):
     """领取 ≤max 条待推送载荷(置租约 120s)· 账套白名单不符的不返回并告警。"""
     _require_enabled()
-    return await asyncio.to_thread(
-        _run_agent_lease, _bearer_token(request), req.agent_id, req.max
-    )
+    return await asyncio.to_thread(_run_agent_lease, _bearer_token(request), req.agent_id, req.max)
 
 
 class AckRequest(BaseModel):

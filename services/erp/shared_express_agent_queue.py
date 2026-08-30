@@ -73,9 +73,7 @@ def _decode_handle(
         return None
     encoded = handle[len(_HANDLE_PREFIX) :]
     try:
-        raw = base64.b64decode(
-            encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True
-        )
+        raw = base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True)
     except (ValueError, TypeError):
         return None
     body_length = 1 + 16 + 8
@@ -292,8 +290,10 @@ def ack_managed(
     from services.erp.express_push import common
 
     owner = _agent_id(agent_id)
-    stage = outcome if outcome in common.ACK_OUTCOMES else (
-        common.STAGE_SUCCESS if success else common.STAGE_FAILED
+    stage = (
+        outcome
+        if outcome in common.ACK_OUTCOMES
+        else (common.STAGE_SUCCESS if success else common.STAGE_FAILED)
     )
     try:
         with db.get_cursor(commit=True) as cur:

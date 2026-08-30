@@ -34,8 +34,7 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
         cls.schema = f"smoke_managed_agent_{uuid.uuid4().hex[:10]}"
         cls.cur.execute(f'CREATE SCHEMA "{cls.schema}"')
         cls.cur.execute(f'SET search_path TO "{cls.schema}", public')
-        cls.cur.execute(
-            """
+        cls.cur.execute("""
             CREATE TABLE tenants (
               id uuid primary key, status text not null
             );
@@ -59,8 +58,7 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
               attempt integer not null default 1, created_at timestamptz not null default now(),
               lease_owner text, lease_expires_at timestamptz
             );
-            """
-        )
+            """)
         cls.conn.commit()
 
     @classmethod
@@ -96,9 +94,7 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
             (
                 OTHER_ENDPOINT,
                 OWNER,
-                json.dumps(
-                    {"agent_token_hash": hashlib.sha256(OTHER_TOKEN.encode()).hexdigest()}
-                ),
+                json.dumps({"agent_token_hash": hashlib.sha256(OTHER_TOKEN.encode()).hexdigest()}),
                 TENANT,
                 OTHER_WORKSPACE,
             ),
@@ -114,9 +110,7 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
             """,
             endpoint_rows,
         )
-        self.cur.execute(
-            "INSERT INTO ocr_history VALUES (%s, 'pending', NULL)", (HISTORY,)
-        )
+        self.cur.execute("INSERT INTO ocr_history VALUES (%s, 'pending', NULL)", (HISTORY,))
         self.cur.execute(
             """
             INSERT INTO erp_push_logs (
@@ -128,9 +122,7 @@ class ManagedAgentQueuePgSmokeTests(unittest.TestCase):
                 OWNER,
                 ENDPOINT,
                 HISTORY,
-                json.dumps(
-                    {"account_set": "DATAT", "meta": {"managed_generation": 2}}
-                ),
+                json.dumps({"account_set": "DATAT", "meta": {"managed_generation": 2}}),
             ),
         )
         self.conn.commit()

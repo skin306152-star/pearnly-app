@@ -54,9 +54,7 @@ class ManagedHandleTests(unittest.TestCase):
         endpoint = {"id": ENDPOINT, "tenant_id": "tenant-a"}
         with (
             mock.patch.object(queue.db, "get_cursor", return_value=cursor_context),
-            mock.patch.object(
-                queue, "_authenticate_managed", return_value=(endpoint, "a" * 64)
-            ),
+            mock.patch.object(queue, "_authenticate_managed", return_value=(endpoint, "a" * 64)),
             mock.patch.object(
                 queue, "erp_shared_express_endpoint_enabled_for", return_value=False
             ) as enabled,
@@ -112,9 +110,7 @@ class AgentRouteEventLoopTests(unittest.TestCase):
                 ),
             ):
                 return await erp_agent.erp_agent_ack(
-                    erp_agent.AckRequest(
-                        log_id="opaque", result="success", agent_id="comp-a"
-                    ),
+                    erp_agent.AckRequest(log_id="opaque", result="success", agent_id="comp-a"),
                     _Request(TOKEN),
                 )
 

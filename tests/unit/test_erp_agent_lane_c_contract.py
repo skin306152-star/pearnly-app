@@ -131,14 +131,10 @@ class AgentLaneCTests(unittest.TestCase):
         touch.assert_not_called()
 
     def test_lease_and_ack_fall_back_to_managed_lane_off_legacy_auth(self):
-        denied = erp_agent.managed_agent_queue.ManagedAgentQueueError(
-            "erp.agent_unauthorized", 401
-        )
+        denied = erp_agent.managed_agent_queue.ManagedAgentQueueError("erp.agent_unauthorized", 401)
         with (
             mock.patch.object(erp_agent, "_require_enabled"),
-            mock.patch.object(
-                erp_agent.agent_store, "authenticate", return_value=None
-            ) as auth,
+            mock.patch.object(erp_agent.agent_store, "authenticate", return_value=None) as auth,
             mock.patch.object(
                 erp_agent.managed_agent_queue, "lease_managed", side_effect=denied
             ) as lease,

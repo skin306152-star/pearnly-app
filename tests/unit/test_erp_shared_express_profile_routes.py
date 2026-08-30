@@ -2,6 +2,7 @@
 """B3B3 owner confirmation route contracts."""
 
 import asyncio
+import inspect
 import json
 import sys
 import types
@@ -38,6 +39,12 @@ class ProfileModelTests(unittest.TestCase):
 
 
 class ProfileRouteTests(unittest.TestCase):
+    def test_confirmation_authz_is_mechanically_visible(self):
+        from scripts.authz_route_inventory import _gate_of
+
+        gate = _gate_of(inspect.getsource(routes.confirm_managed_profile), routes)
+        self.assertEqual(gate, "require_perm")
+
     def test_route_is_classified_as_app_only_agent_capability(self):
         registry = json.loads(
             (ROOT / "docs" / "agent" / "agent_registry.json").read_text(encoding="utf-8")

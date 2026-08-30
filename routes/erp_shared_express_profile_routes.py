@@ -27,8 +27,7 @@ def _source_workspace(request: Request) -> int:
     return int(raw.strip())
 
 
-def _run_confirm(request: Request, endpoint_id: str, req: ConfirmManagedProfileRequest):
-    user = require_perm(request, "erp.endpoint.manage")
+def _run_confirm(request: Request, endpoint_id: str, req: ConfirmManagedProfileRequest, user):
     require_erp_portal(user)
     if user.get("is_super_admin") or user.get("entry") not in {"main", "cowork", "erp"}:
         raise HTTPException(403, detail="authz.entrance_scope")
@@ -61,7 +60,8 @@ def _run_confirm(request: Request, endpoint_id: str, req: ConfirmManagedProfileR
 async def confirm_managed_profile(
     endpoint_id: str, request: Request, req: ConfirmManagedProfileRequest = Body(...)
 ):
-    return await asyncio.to_thread(_run_confirm, request, endpoint_id, req)
+    user = await asyncio.to_thread(lambda: require_perm(request, "erp.endpoint.manage"))
+    return await asyncio.to_thread(_run_confirm, request, endpoint_id, req, user)
 
 
 __all__ = ["ConfirmManagedProfileRequest", "confirm_managed_profile", "router"]

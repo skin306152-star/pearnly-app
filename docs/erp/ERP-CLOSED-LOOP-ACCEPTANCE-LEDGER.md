@@ -5,11 +5,13 @@
 > 修改，真机通用动作继续引用 `ERP-REAL-DEVICE-ACCEPTANCE.md`。
 >
 > 不记录密码、token、绑定码、cookie、私钥、完整 UNC、本机用户名或付费客户数据。
+>
+> 2026-08-30 口径：CI workflow 已停用；历史 CI 结果只作历史证据，不把 flag-off 技术切片记为用户功能完成。每个用户功能必须形成唯一可用 candidate 后直接 production 启用并验收，不做长期灰度；F1 在 B3B3/B3C 完成前不得启用。
 
 ## 1. Attempt 定义与记账规则
 
-1. 一个 attempt 是一组候选 `code.production_sha + companion.version` 的完整验收轮，从自动化、
-   精确部署、真机、ERP report readback 一直走到用户决定。
+1. 一个 attempt 是一组候选 `code.production_sha + companion.version` 的完整验收轮，从本地风险验证、
+   精确部署、生产回读、真实站点/真实环境、真机、ERP report readback 一直走到用户决定。
 2. 同一候选版本补证据、重跑自动化、重做真机步骤或补报表，不增加 attempt；在原块追加时间与
    evidence。候选 production SHA 或 Companion version 任一改变，才创建下一 attempt。
 3. Discovery 的 Attempt 1 可先把候选字段记为 `PENDING`；一旦进入 `DEPLOYED_EXACT`，候选二元组
@@ -47,7 +49,7 @@ READY_FOR_DEVICE / USER_VERIFYING / DEVICE_FAILED / USER_ACCEPTED / BLOCKED / RE
 `PLANNED_LOCKED` 进入 `DISCOVERY`：
 
 1. `state == USER_ACCEPTED`，且依赖的前一 feature 已是有效 accepted attempt。
-2. `code.ci_run_id` 为实际 run，`code.ci_result == SUCCESS`。
+2. 本地风险分层验证达到功能最小基数并通过；自动 CI workflow 已停用时，`code.ci_run_id` 可记录历史 run 或写 `NOT_RUN_CI_DISABLED`，不再作为用户功能完成的必要条件。
 3. `code.production_sha` 是 40 位十六进制 SHA；`code.production_verified_at` 是部署后的生产
    readback 时间，且生产 HEAD 当时等于该 SHA。
 4. `user_decision.accepted_production_sha == code.production_sha`。
@@ -82,6 +84,8 @@ surface、tenant、workspace、endpoint、adapter、Profile、account set、acto
 `erp_report_readbacks: []` 用于一对一或一对多绑定 context 的真出口回查。每个 item 必须有
 readback id、context id、适用性、report 名称/筛选、回查时间、业务字段结果、结论和证据。F2 至少
 两份 Express report；F6 的销售现金、销售赊销、采购现金、采购赊购必须四项分别 `PASS`。
+
+所有外部 ERP 回查只能使用 TEST/sandbox 账套；每张测试单必须使用新的唯一单号，禁止复用单号或接入生产账套。
 
 ## 5. Attempt 模板
 
@@ -176,13 +180,13 @@ code:
 implementation_batches:
   - batch_id: F1-B1
     backend_implementation_complete: true
-    release_state: DEPLOYED_EXACT_FLAG_OFF
+    release_state: INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF
     pearnly_commit: 57fb5480a72bbd27a0af8f6549ff03b63d06ca0c
     scope: DORMANT_ADDITIVE_SCHEMA_FLAG_PARTIAL_INDEX_SELECT_RLS
     shared_scope_true_existing_rows: 0
   - batch_id: F1-B2
     backend_implementation_complete: true
-    release_state: DEPLOYED_EXACT_FLAG_OFF
+    release_state: INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF
     pearnly_commit: 14b141c2f2ad6b0749579534d330fdc40cad0ca8
     release_support_commit: be959c05998f185b7bd978975487a1246ec17f39
     ci_run_id: 33253769492
@@ -194,7 +198,7 @@ implementation_batches:
     production_rollout_contract: ALL_TENANTS_FLAG_OFF
   - batch_id: F1-B3A
     backend_implementation_complete: true
-    release_state: DEPLOYED_EXACT_FLAG_OFF
+    release_state: INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF
     pearnly_commit: f37f824eaf144602438d2b060575d295361c4a25
     ci_run_id: 33292287719
     ci_result: SUCCESS
@@ -205,7 +209,7 @@ implementation_batches:
     production_rollout_contract: ALL_TENANTS_FLAG_OFF
   - batch_id: F1-B3B1
     backend_implementation_complete: true
-    release_state: DEPLOYED_EXACT_FLAG_OFF
+    release_state: INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF
     pearnly_commit: 3ef91fea4cdbcb2fc1b05abc40f0fb188b663203
     ci_run_id: 33296470641
     ci_result: SUCCESS
@@ -216,7 +220,7 @@ implementation_batches:
     production_rollout_contract: ALL_TENANTS_FLAG_OFF
   - batch_id: F1-B3B2a
     backend_implementation_complete: true
-    release_state: DEPLOYED_EXACT_FLAG_OFF
+    release_state: INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF
     feature_sha: fd473abd204f3dae864bcd15928333f388c98679
     ci_run_id: 33301999658
     ci_result: SUCCESS
@@ -229,7 +233,7 @@ implementation_batches:
     evidence: CI_TRUE_PG_20_PLUS_51_ZERO_SKIPS; PRODUCTION_SCHEMA_READINESS_AND_FLAGS_READBACK; 36_ENDPOINTS_GENERATION_0_PROFILE_NULL_SHARED_SCOPE_0; MISSING_DEDUP_INDEX_SELF_HEAL_COVERED
   - batch_id: F1-B3B2b-1
     backend_implementation_complete: true
-    release_state: DEPLOYED_EXACT
+    release_state: INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF
     readiness: CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C
     scope: OWNER_LEGACY_EXPRESS_ENROLL_TO_MANAGED_PROMOTION_ONLY
     ui_verification: NOT_APPLICABLE_NO_UI
@@ -257,16 +261,21 @@ implementation_batches:
       - Enrollment intentionally isolates the old Companion token/reporting writers; it is not usable until B3B3 restores the managed live path.
       - Managed log read/delete/stat/export authorization remains a B3C prerequisite; this batch does not expose managed history to employees.
   - batch_id: F1-B3B2b-2
-    backend_implementation_complete: false
-    release_state: DISCOVERY
+    state: INTERNAL_CODE_VERIFIED_NOT_RELEASED
+    backend_implementation_complete: true
+    release_state: INTERNAL_CODE_VERIFIED_NOT_RELEASED
     scope: OWNER_REBIND_ENABLE_DISABLE_REVOKE_CAS
-    readiness: NOT_STARTED
+    readiness: NOT_F1_COMPLETE_NOT_USER_FUNCTION_COMPLETE
     rollout_contract: ALL_TENANTS_FLAG_OFF
-    next_action: Implement and verify owner rebind, enable/disable and revoke CAS while preserving generation and audit invariants; keep B3B3/B3C/B4/B5 locked.
+    discovery_doc: docs/erp/F1-B3B2B2-OWNER-LIFECYCLE-CAS-DISPATCH.md
+    verification: 49 lifecycle tests; 83 all-PG tests plus 11 subtests; 0 skips; DeepSeek and independent review found no P0/P1.
+    next_action: B3B3 is unblocked; do not micro-release this slice. Keep all tenant flags off until the complete F1 candidate is merged.
   - batch_id: F1-B3B3
     backend_implementation_complete: false
-    release_state: PLANNED_LOCKED
+    release_state: DISCOVERY_COMPLETE_IMPLEMENTING
     scope: LIVE_HEARTBEAT_PROFILE_MISMATCH_AND_LEGACY_ISOLATION
+    discovery_doc: docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md
+    companion_reference: master HEAD 72a92b8 / version 1.1.64
   - batch_id: F1-B3C
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
@@ -597,19 +606,19 @@ user_decision:
   accepted_erp_report_evidence_ids: []
 
 open_issues:
-  - B3B2b-1 is deployed exact: runtime/enrollment SHA a609748955779e2be4935b5cc08c214d57ee881b, release/gate and production SHA 4c871b78d60d69644ce4b5a2505053bab4a42a4e, CI 33309634623 13/13 success, production service 2026-08-30T11:53:43Z, ready 200/true, true PG 63/63 with 0 skips, and helper/trigger/policy/ACL/search_path plus 45 flags and 36 endpoint readbacks verified. The docs closure commit records this state only and must not be used as a self-referential feature SHA.
+  - B3B2b-1 is an internal prerequisite deployment with all tenant flags off: runtime/enrollment SHA a609748955779e2be4935b5cc08c214d57ee881b, release/gate and production SHA 4c871b78d60d69644ce4b5a2505053bab4a42a4e, historical CI 33309634623 13/13 success, production service 2026-08-30T11:53:43Z, ready 200/true, true PG 63/63 with 0 skips, and helper/trigger/policy/ACL/search_path plus 45 flags and 36 endpoint readbacks verified. This is not a usable F1 candidate and must not be called feature-complete. The docs closure commit records this state only and must not be used as a self-referential feature SHA.
   - B3B2a P2 follow-up: real resolver/console concurrent transfer coverage and canonical membership→role→users→workspace lock-order proof remain open; this batch only proves the managed helper and transfer-shaped lock path reach their barriers without deadlock.
-  - B3B2b-2 owner rebind/enable-disable/revoke CAS is the current discovery task. B3B3 live heartbeat/mismatch/legacy isolation, B3C manual push/log/Agent, and B4/B5 remain locked; B3B2a audit is foundation-only until the lifecycle writers are complete.
+  - B3B2b-2 is `INTERNAL_CODE_VERIFIED_NOT_RELEASED`: 49 lifecycle tests, 83 all-PG tests plus 11 subtests, 0 skips, and no P0/P1 from DeepSeek or independent review. It is not F1 complete or a user-facing feature. B3B3 is now `DISCOVERY_COMPLETE_IMPLEMENTING`; B3C/B4/B5 remain not implemented.
   - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
   - HIGH separate security microbatch remains unfixed: generic ERP webhook/test SSRF guard validates system_url while the real network sink reads url, and endpoint test does not revalidate every redirect hop. B3B Express state must not call that outbound test.
   - MEDIUM separate reliability microbatch remains unfixed: legacy retry worker does not check endpoint.enabled, so a disabled endpoint may still retry outward. B3B2 must return 409 for nonterminal tasks; full draining and lease semantics remain B3C.
   - B4 must expose only flag-on tenant custom roles in Console invitation and scope UI, keep erp.endpoint.manage owner-only, escape roleName, close main/cowork save-to-formal-to-push only after conversion succeeds, ship zh/th/en/ja source plus dist and cache-bust, and pass true-browser gates.
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
-  - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
+  - Current master/origin/production is exact `82f03810d3fcb51da8f06a244ca34a8b3b410043`; manual CD run `33314653206` succeeded, `/api/ready` is true, service timestamp `13:37:09Z`. This deployment does not contain B3 WIP. CI is disabled. Companion reference is master HEAD `72a92b8`, version `1.1.64`.
 next_action: >-
-  Proceed with F1-B3B2b-2 owner rebind/enable-disable/revoke CAS while keeping every tenant
-  flag off. Keep B3B3/B3C, F1-B4/B5 and F2-F7 locked until separately unlocked; F1 remains
-  IMPLEMENTING and is not READY_FOR_DEVICE or USER_ACCEPTED.
+  Proceed with F1-B3B3 while keeping every tenant flag off. B3B2b-2 and subsequent slices are not
+  micro-released; merge the complete F1 candidate, run one manual CD, then perform real-site,
+  real-environment, ERP-report and Zihao device acceptance. B3C/B4/B5 remain not implemented.
 ```
 
 ## 7. F2-F7

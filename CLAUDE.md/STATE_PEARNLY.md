@@ -1,8 +1,8 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-30 F1-B3B2b-2 owner endpoint lifecycle CAS discovery
+## 当前状态卡 · 08-30 F1-B3B2b-2 internal code verification / B3B3 implementing
 
-- **▶ 当前 task**:严格单功能推进 ERP 全闭环;当前推进 B3B2b-2 owner rebind/enable-disable/revoke CAS;B3B3、B3C、B4/B5 均锁定。
+- **▶ 当前 task**:严格单功能推进 ERP 全闭环;B3B2b-2 已 `INTERNAL_CODE_VERIFIED_NOT_RELEASED`;当前解锁 B3B3 discovery/implementing；B3C/B4/B5 未实现。
 - **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
 - **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 - **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
@@ -11,17 +11,18 @@
 - **✅ B2 后端范围**:ERP 四权限码与 owner/admin/custom 边界;tenant-flagged custom role 邀请/接受/撤销/scope 并发完整性;flag-on `main/cowork/erp` 确认、编辑、正式单据关联与 actor/workspace/direction 原子门。
 - **🛌 B2 生产证据**:CI `33253769492` 全绿(含真 PG smoke);production HEAD=`be959c05998f185b7bd978975487a1246ec17f39`,service active=`2026-08-29T13:06:04Z`;45/45 tenant 的 `erp_shared_express_endpoint` 有效态均 OFF。
 - **📐 F1 窄边界**:只共享 active Express 手动推送;partial unique 轴=`(tenant_id,workspace_client_id,adapter)`;共享查询/RLS 必须 adapter-gated;MR.ERP/`mrerp_dms` 原样;Companion/auto_push/LINE/多 Profile 不改。
-- **🚩 F1 放量**:`erp_shared_express_endpoint` 默认关,仅测试 tenant;存量多 endpoint 冲突只阻断并报告,不自动合并;最终 rollout 状态须入 ledger。
-- **✅ F1-B3A**:`DEPLOYED_EXACT_FLAG_OFF`;commit/production=`f37f824e`,CI `33292287719` 全绿;45/45 tenant flag OFF;共享 endpoint 只读 DTO/在线态未放量。
-- **✅ F1-B3B1**:`DEPLOYED_EXACT_FLAG_OFF`;commit/origin/production=`3ef91fea4cdbcb2fc1b05abc40f0fb188b663203`;production service active=`2026-08-30T06:30:52Z`;仅 typed binding schema+不可逆 Profile key,无 writer。
-- **✅ F1-B3B2a**:`DEPLOYED_EXACT_FLAG_OFF`;runtime feature SHA=`fd473abd204f3dae864bcd15928333f388c98679`;CI `33301999658` 全绿含 unit/e2e/真 PG smoke/deploy;production exact/readiness/schema 回读通过。
+- **🚩 F1 放量**:`erp_shared_express_endpoint` 在 B3B3/B3C 前保持全租户关闭；形成唯一可用 F1 candidate 后直接 production 启用并真实验收，不做长期灰度；存量多 endpoint 冲突只阻断并报告,不自动合并，最终 rollout 状态须入 ledger。
+- **🧱 F1-B3A**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;commit/production=`f37f824e`,CI `33292287719` 全绿;45/45 tenant flag OFF;共享 endpoint 只读 DTO/在线态未放量；仅为 F1 内部前置，F1 未完成。
+- **🧱 F1-B3B1**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;commit/origin/production=`3ef91fea4cdbcb2fc1b05abc40f0fb188b663203`;production service active=`2026-08-30T06:30:52Z`;仅 typed binding schema+不可逆 Profile key,无 writer；仅为 F1 内部前置，F1 未完成。
+- **🧱 F1-B3B2a**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;runtime feature SHA=`fd473abd204f3dae864bcd15928333f388c98679`;CI `33301999658` 全绿含 unit/e2e/真 PG smoke/deploy;production exact/readiness/schema 回读通过；仅为 F1 内部前置，F1 未完成。
 - **🛑 B3B2a 运行时边界**:不接 HTTP lifecycle、token/config、heartbeat、push/log/lease/ack、UI、Companion、DMS、MR.ERP、auto/bridge 或独立 SSRF/retry 修复;audit 仅底座未接真实 lifecycle writer。
-- **✅ F1-B3B2b-1**:`DEPLOYED_EXACT_FLAG_OFF`;runtime/enrollment=`a609748955779e2be4935b5cc08c214d57ee881b`;release/gate+production=`4c871b78d60d69644ce4b5a2505053bab4a42a4e`;CI `33309634623` 13/13 success;production service=`2026-08-30T11:53:43Z`, `/api/ready`=200/true;PG=63/63,0 skip;45 flags OFF,36 endpoints generation0/shared_scope0。readiness 仍 `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`。
-- **▶ F1-B3B2b-2**:`DISCOVERY`;owner rebind/enable-disable/revoke CAS；所有 tenant flag 保持 OFF；B3B3/B3C 仍 `PLANNED_LOCKED`，不进入 READY/真机。
-- **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批均锁定。
+- **🧱 F1-B3B2b-1**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;runtime/enrollment=`a609748955779e2be4935b5cc08c214d57ee881b`;release/gate+production=`4c871b78d60d69644ce4b5a2505053bab4a42a4e`;CI `33309634623` 13/13 success;production service=`2026-08-30T11:53:43Z`, `/api/ready`=200/true;PG=63/63,0 skip;45 flags OFF,36 endpoints generation0/shared_scope0。仅为 F1 内部前置，readiness 仍 `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`。
+- **🧱 F1-B3B2b-2**:`INTERNAL_CODE_VERIFIED_NOT_RELEASED`;49 lifecycle tests、83 全部 PG tests+11 subtests、0 skip；DeepSeek 与独立审查均无 P0/P1；仅代码验证，绝不称 F1/用户功能完成。
+- **▶ F1-B3B3**:`DISCOVERY_COMPLETE_IMPLEMENTING`;按 `docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md` 继续；Companion master HEAD=`72a92b8`、version=`1.1.64`；B3C/B4/B5 尚未实现。
+- **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批均未实现。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
 - **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
-- **📍 发布基线**:`master/origin/master=4c871b78`;production exact=`4c871b78`;B3B2b-1 runtime 已精确部署;helper/trigger/policy/ACL/search_path 生产回读通过;docs closure commit 仅记录状态，不在此自引用。
+- **📍 发布基线**:`master/origin/master=82f03810d3fcb51da8f06a244ca34a8b3b410043`;production exact=`82f03810d3fcb51da8f06a244ca34a8b3b410043`;Manual CD run=`33314653206` success，ready=true，service=`13:37:09Z`；该部署不含 B3 WIP。CI disabled；B3B2b-2及后续不再微批发布，合并完整 F1 candidate 后一次 manual CD + 真实验收。
 - **⚠️ 独立安全微批待修(HIGH)**:generic ERP webhook/test 的 SSRF guard 校验 `system_url`,真实 sink 读取 `url`,endpoint test 未逐跳复验重定向;B3B Express 状态不得调用该 outbound test;B3B1 未修。
 - **⚠️ 独立可靠性微批待修(MEDIUM)**:legacy retry worker 不校验 endpoint.enabled,disabled endpoint 仍可能重试外推;B3B2 对非终态任务先 409,完整 draining/lease 语义归 B3C;B3B1 未修。
 - **⚠️ B3B2b-1 边界**:普通 Express enqueue 的 preflight 无外部副作用，但 promotion race 可能丢队列/写假 history；steward bridge/过期 lease 可能真写无日志。reservation/finalize、drain、managed log/Agent/bridge 均是 B3C/B3B3 硬前置；本批全 flag OFF 且绝不 READY。

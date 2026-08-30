@@ -1,6 +1,6 @@
 # ERP / LINE / Companion 全闭环 PO
 
-> 状态：F0 `COMPLETE` · F1 `IMPLEMENTING`（当前 B3B2b-2）· F2-F7 `PLANNED_LOCKED`
+> 状态：F0 `COMPLETE` · F1 `IMPLEMENTING`（B3B2b-2 `INTERNAL_CODE_VERIFIED_NOT_RELEASED`，B3B3 `DISCOVERY_COMPLETE_IMPLEMENTING`）· B3C/B4/B5 未实现 · F2-F7 `PLANNED_LOCKED`
 >
 > 本文是本轮产品目标、严格施工顺序、功能边界与解锁门的唯一任务板。`/cowork` 与
 > `/erp` 的产品隔离继续服从 `ERP-PRODUCT-BOUNDARY.md`；单据、Stock Card、LINE 与真机
@@ -17,10 +17,12 @@
 > `4c871b78d60d69644ce4b5a2505053bab4a42a4e`，CI `33309634623` 13/13 success，生产服务时间
 > `2026-08-30T11:53:43Z`、`/api/ready` 200/true、真 PG `63/63`（0 skip），helper/trigger/policy/ACL/search_path
 > 回读通过，45 flags 全 OFF、36 endpoints 全 generation0/shared_scope0。其 readiness 仍为
-> `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`，不得称 READY 或通过真机；当前进入
-> F1-B3B2b-2 owner rebind/enable-disable/revoke CAS discovery，B3B3/B3C/B4/B5 锁定。
-> 每个功能仍须重新绑定自己的 CI、production SHA、
+> `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`，只是内部前置已部署，不得称功能完成、READY 或通过真机；当前进入
+> F1-B3B2b-2 owner rebind/enable-disable/revoke CAS，discovery 已冻结于
+> `docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md`，实现仍保持所有 tenant flag-off。B3B2b-2 已完成内部代码验证（49 lifecycle、83 全部 PG+11 subtests、0 skip；DeepSeek 与独立审查无 P0/P1），状态为 `INTERNAL_CODE_VERIFIED_NOT_RELEASED`，不代表 F1 或用户功能完成；B3B3 已解锁为 `DISCOVERY_COMPLETE_IMPLEMENTING`，Companion master HEAD=`72a92b8`/version=`1.1.64`，B3C/B4/B5 未实现。
+> 每个功能形成唯一可用 candidate 后直接 production 启用并真实验收，不做长期灰度；每个功能仍须重新绑定自己的本地验证、production SHA、
 > Companion 版本及 ERP 报表回查，不能继承任一批次基线当验收。
+> 当前 `master/origin/master/production=82f03810d3fcb51da8f06a244ca34a8b3b410043`；Manual CD `33314653206` success，ready=true、service=`13:37:09Z`，该部署不含 B3 WIP；CI 已 disabled。B3B2b-2 及后续不再微批发布，完整 F1 candidate 合并后一次 manual CD 再做真实验收。
 
 ## 1. 产品结果
 
@@ -92,17 +94,17 @@ Express、在一台能访问 Express 的 Windows 电脑安装小助手、邀请�
   原子门；`14b141c2`+`be959c05` 已通过 CI `33253769492` 并精确部署至 production
   `be959c05998f185b7bd978975487a1246ec17f39`，但 45/45 tenant 的 flag 有效态均为 OFF。
 - F1-B3A 共享 Express endpoint 只读清单、安全 DTO 与服务端在线态已按 `f37f824e`、CI
-  `33292287719` 精确部署；45/45 tenant flag OFF，未放量。
+  `33292287719` 精确部署；45/45 tenant flag OFF，未放量；这是内部前置已部署，不是 F1 完成。
 - F1-B3B1 七个 typed binding/agent 字段、三个数据 CHECK、Alembic + startup ensure + fresh
   baseline 双跑，以及规范化 `account_set + Windows account_dir` 后不可逆、版本化的 Profile
   key 纯函数已按 `3ef91fea` 部署。它不接 writer、owner API、token、heartbeat 或 route，不能
   宣称已检测 bound/live Profile mismatch。
-- F1-B3B2a 已部署 managed ownership/RLS、creator 删除分流与不可变 creator DB trigger、tenant
+- F1-B3B2a 已内部前置部署 managed ownership/RLS、creator 删除分流与不可变 creator DB trigger、tenant
   cascade/cleanup bypass、transaction-local audit helper 和 startup readiness fail-closed；CI 真 PG
   `20+51` tests 为 `0 skip`，并覆盖缺失 dedup 索引自愈；生产 36 endpoints generation=0/profile
   空/shared_scope=0、45/45 flag OFF。audit 仅底座，不代表真实 lifecycle audit 已接线；真实
-  resolver/console 并发锁序覆盖仍是 P2 欠账。B3B2b owner manage/binding/token lifecycle 下一步，
-  B3B3/B3C、网页 UI、测试 tenant 放量与真机仍锁定。
+  resolver/console 并发锁序覆盖仍是 P2 欠账。B3B2b owner manage/binding/token lifecycle 已完成内部代码验证；
+  B3B3 已解锁为 `DISCOVERY_COMPLETE_IMPLEMENTING`，详见 `docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md`；B3C、网页 UI、测试 tenant 放量与真机仍未实现/锁定。
 
 主要证据入口：
 
@@ -152,7 +154,7 @@ F1-F7 使用以下状态：
 - `DISCOVERY`：当前唯一功能正在核对场景、代码、数据和真机前提。
 - `IMPLEMENTING`：当前唯一施工功能。
 - `CODE_VERIFIED`：定向测试、构建与适用机械闸通过。
-- `DEPLOYED_EXACT`：CI 成功且生产 HEAD 等于目标 SHA。
+- `DEPLOYED_EXACT`：候选 production SHA 已精确部署且生产 HEAD 等于目标 SHA；这不是用户功能完成状态。
 - `READY_FOR_DEVICE`：真机账号、设备、版本和测试单准备完成。
 - `USER_VERIFYING`：Zihao 正在真机验证。
 - `DEVICE_FAILED`：候选版本在真机或用户验收中暴露产品失败；保留本轮证据，留在本功能修复。
@@ -175,7 +177,7 @@ F1-F7 使用以下状态：
 
 - 前项 feature 状态为 `USER_ACCEPTED`、`user_decision.result == ACCEPTED`，且有验收时间和
   用户原话。
-- CI run id 有值且结论为 success；生产读回的是 40 位 SHA，并等于用户接受的 production SHA，
+- 本地风险分层验证与适用的真实 PG/API/UI 检查均通过；手动 CD 回读的是 40 位 SHA，并等于用户接受的 production SHA，
   且有部署后的 production readback 时间。
 - 自动化、每个 test context、真机和清理均为 pass；每个 ERP report 都是 pass，或明确
   `NOT_APPLICABLE` 并写原因。
@@ -208,8 +210,8 @@ workspace 的授权员工可共享手动推送能力，同时保留各自操作�
   `erp.endpoint.view + erp.push.operate`，查看推送日志需 `erp.log.view`。
 - 员工确认采购还必须同时具备 `purchase.doc.create`、`purchase.doc.approve`，确认销售还必须
   同时具备 `sales.doc.create`、`sales.doc.approve`；两条路径都必须命中 workspace scope。
-- 租户级 feature flag 精确命名为 `erp_shared_express_endpoint`，默认关闭；只为测试 tenant
-  打开，真机通过、用户 OK 后再决定放量。
+- 租户级 feature flag 精确命名为 `erp_shared_express_endpoint`，在 F1 未形成唯一可用 candidate
+  前默认关闭；完成 B3B3/B3C 后直接在 production 启用并真实验收，不做长期灰度。
 - 存量同 tenant 多 Express endpoint 冲突只生成冲突清单并阻断共享，不自动合并、删除、
   旋转 token 或猜默认 endpoint。
 - schema 走 Alembic + 启动 ensure 双跑，回填后 readback。
@@ -229,12 +231,12 @@ endpoint 自动合并。
 - F1-B2 的发布合同是 **所有 tenant 保持 flag-off**。生产匿名聚合读回为 45/45 tenant OFF；关闭时
   custom role 邀请/scope 继续沿用旧 system-role-only 行为，history/convert/commit 继续走 legacy
   分支，本批未打开测试 tenant。
-- F1-B3A 已部署：只在 tenant flag-on 且入口为 `main/cowork/erp` 时，把 GET endpoint
+- F1-B3A 已内部前置部署：只在 tenant flag-on 且入口为 `main/cowork/erp` 时，把 GET endpoint
   清单切到 tenant/user/workspace 绑定的 RLS 共享读，保留 actor 自有 legacy 行并合并当前 active
   workspace 的 active shared Express；无 manage 权限只返严格 DTO，在线态用服务器时间和 180 秒
   边界判定；现有可观测异常（如非法 heartbeat 时间、已心跳但缺 account_set）才进入
   `needs_attention`。flag-off 与其它入口仍走原 user-scoped 清单。B3A 不含任何写接口。
-- F1-B3B1 已部署：只增加 `bound_account_set`、`bound_profile_key`、
+- F1-B3B1 已内部前置部署：只增加 `bound_account_set`、`bound_profile_key`、
   `live_account_set`、`live_profile_key`、`agent_last_seen_at`、`agent_version` 与
   `binding_generation` 七个 typed 字段，约束 bound/live 各自同空同非空且 generation 非负；
   Alembic archive 与 startup ensure 在 ADD 后都从 catalog 校验同名七列的 type、nullability、
@@ -242,8 +244,8 @@ endpoint 自动合并。
   禁止猜测或回填 Profile。Profile key 只返回 `v1:sha256`，不记录、不返回规范化前后的原始目录。
 - F1-B3B1 明确不含 owner API、token/config、heartbeat、CRUD、RLS、push/log/lease/ack、UI、
   Companion、DMS、MR.ERP、auto_push、bridge 或任何 flag 开启；它不改变运行时共享行为。
-- F1-B3B2a(owner deletion guard/managed ownership/RLS/audit foundation)已部署；B3B2b-1(owner legacy Express enroll promotion)已 `DEPLOYED_EXACT` 但全 flag-off；当前 B3B2b-2 为 owner rebind/enable-disable/revoke CAS discovery；B3B3(live heartbeat/mismatch/legacy isolation)
-  与 B3C(manual push/log/Agent lease/ack)均未解锁；B4/B5 也仍未解锁。后续必须建立稳定
+- F1-B3B2a(owner deletion guard/managed ownership/RLS/audit foundation)已内部前置部署；B3B2b-1(owner legacy Express enroll promotion)已内部前置部署但全 flag-off；B3B2b-2 为 owner rebind/enable-disable/revoke CAS，已完成内部代码验证；B3B3(live heartbeat/mismatch/legacy isolation)
+  已解锁为 `DISCOVERY_COMPLETE_IMPLEMENTING`，B3C(manual push/log/Agent lease/ack)、B4/B5 仍未实现/未解锁。后续必须建立稳定
   bound/live writer 与协议，再为真实 mismatch 补反证；不得复用当前被 heartbeat 覆盖的单字段假判。
   `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`：enroll 后旧 Companion token/reporting 会被 gen0 隔离，故本批不得称 READY。
   B3B2b-1 硬化确认 busy 必须覆盖 endpoint 全部 actor 的 pending/retrying/next_retry/任意 lease（含过期），并以安全定义函数与真实 enroll/bind race 锁住；普通 Express enqueue 的 preflight 无外部副作用，但 promotion race 仍可能丢队列/写假 history，steward bridge/过期 lease 可能真写无日志。reservation/finalize、drain、managed log/Agent/bridge 是 B3C/B3B3 硬前置；本批全 flag OFF，绝不 READY。B3B2b-2 仅处理 owner rebind/enable-disable/revoke CAS，不能提前打开后续批次。
@@ -253,8 +255,10 @@ endpoint 自动合并。
   source/dist/cache-bust 与真浏览器证据；B5 才做冲突清单、测试 tenant 放量、原 Profile
   owner+员工采购/销售真机及 Express report 回查。
 
-B1/B2 已部署仍只代表 F1 的数据与后端前置，不代表 F1 `CODE_VERIFIED`、`DEPLOYED_EXACT`、
+B1/B2/B3A/B3B1/B3B2a/B3B2b-1 已部署仍只代表 F1 的内部数据与后端前置，不代表 F1 `CODE_VERIFIED`、`DEPLOYED_EXACT`、
 `READY_FOR_DEVICE` 或 `USER_ACCEPTED`，也绝不能解锁 F2。
+
+F1 当前缺少 B3B3 与 B3C；此时打开 `erp_shared_express_endpoint` 会断开 live heartbeat、managed push、lease/log/ack 链，因而不得启用测试 tenant，也不得进入真实验收。等形成唯一可用 F1 candidate 后，直接 production 启用并完成真实验收，不做长期灰度。
 
 **代码/数据涉及**：
 
@@ -477,7 +481,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1/B3B2a runtime 已部署；B3B2b-1=`DEPLOYED_EXACT_FLAG_OFF`（a6097489 runtime，4c871b78 production，CI 33309634623，63/63 PG，ready 200/true，45 flags OFF、36 endpoints generation0/shared_scope0）；当前 B3B2b-2 owner rebind/enable-disable/revoke CAS discovery；readiness 仍 `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`；B3B3/B3C、B4/B5 与真机锁定 |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1/B3B2a/B3B2b-1 均为 `INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`；B3B2b-2=`INTERNAL_CODE_VERIFIED_NOT_RELEASED`（49 lifecycle、83 全部 PG+11 subtests、0 skip；DeepSeek/独立审查无 P0/P1），不代表 F1 或用户功能完成；B3B3=`DISCOVERY_COMPLETE_IMPLEMENTING`，引用 `F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md` 与 Companion master `72a92b8`/`1.1.64`；B3C/B4/B5 未实现，flag 全关，真机锁定 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |
@@ -496,7 +500,7 @@ Companion 私有仓及 Windows 发布环境。缺少时对应功能进入 `BLOCK
 - endpoint 所有权迁移串租户：加法迁移、flag 默认关、RLS 真库测试、回填 readback。
 - 存量多 endpoint 冲突：只报告并阻断，绝不自动合并或删数据。
 - 员工权限过宽：独立 ERP 权限、workspace scope、字段遮蔽、后端硬闸和审计。
-- Express 重单/损坏：TEST 账套、唯一单号、写前备份、目录锁、失败回滚、report 回查。
+- Express 重单/损坏：只用 TEST 账套、每张单使用唯一单号、写前备份、目录锁、失败回滚、report 回查；禁止接生产账套或复用单号。
 - Companion 版本漂移：payload version、版本上报、发版链和真机自动更新。
 - LINE 重复事件：webhookEventId、一次性 action token、服务器真实状态重读。
 - MR.ERP 页面/模板变化：真样本 clone、Playwright retry、失败截图和 listing verifier。
@@ -519,10 +523,9 @@ Companion 私有仓及 Windows 发布环境。缺少时对应功能进入 `BLOCK
 - 员工不安装小助手、不接触 ERP 凭据。
 - LINE 主链、Express 关机恢复、商品库存、MR.ERP 四类现/赊和 Stock Card 下载均真机通过。
 - 所有 Companion 改动已发版且在用真机已更新。
-- 每次发布 CI 成功且生产 HEAD 等于记录的目标 SHA。
+- 每个用户功能形成唯一可用 candidate 后直接 production 启用；生产 HEAD 等于记录的目标 SHA，且主控真实站点/真实环境/ERP report 预验收、Zihao 真机 OK 后才算完成。
 - 每个功能引入或使用的 feature flag 都在 accepted attempt 记录最终 rollout 状态、适用范围、
   验证时间与保留/关闭原因；不得以 `pending`、口头“再决定放量”结束全计划。
 - 无未处理的数据完整性、安全或重复过账 P0/P1。
 
-当前只允许推进 F1-B3B2a managed ownership foundation；`erp_shared_express_endpoint`
-在 B5 测试 tenant 放量前继续全租户关闭。F1-B3B2/B3B3/B3C、F1-B4/B5 及 F2-F7 禁止提前施工。
+当前推进 F1-B3B3；`erp_shared_express_endpoint` 在 B3B3/B3C 完成并形成唯一可用 F1 candidate 前继续全租户关闭。B3B2b-2 及后续不再微批发布，合并完整 F1 candidate 后一次 manual CD，再做真实站点/真实环境/ERP report/真机验收；不做长期灰度。

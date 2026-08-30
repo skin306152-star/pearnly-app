@@ -228,17 +228,27 @@ implementation_batches:
     rollout_contract: ALL_TENANTS_FLAG_OFF
     evidence: CI_TRUE_PG_20_PLUS_51_ZERO_SKIPS; PRODUCTION_SCHEMA_READINESS_AND_FLAGS_READBACK; 36_ENDPOINTS_GENERATION_0_PROFILE_NULL_SHARED_SCOPE_0; MISSING_DEDUP_INDEX_SELF_HEAL_COVERED
   - batch_id: F1-B3B2b-1
-    backend_implementation_complete: false
-    release_state: IMPLEMENTING
+    backend_implementation_complete: true
+    release_state: DEPLOYED_EXACT
     readiness: CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C
     scope: OWNER_LEGACY_EXPRESS_ENROLL_TO_MANAGED_PROMOTION_ONLY
     ui_verification: NOT_APPLICABLE_NO_UI
     device_verification: NOT_APPLICABLE_UNTIL_F1_BATCH_READY
     rollout_contract: ALL_TENANTS_FLAG_OFF
-    code: PENDING
-    tests: PENDING
+    pearnly_commit: a609748955779e2be4935b5cc08c214d57ee881b
+    release_support_commit: 4c871b78d60d69644ce4b5a2505053bab4a42a4e
+    ci_run_id: 33309634623
+    ci_result: SUCCESS_13_OF_13
+    production_sha: 4c871b78d60d69644ce4b5a2505053bab4a42a4e
+    production_verified_at: 2026-08-30T11:53:43Z
+    service_active_enter_timestamp: 2026-08-30T11:53:43Z
+    code: a609748955779e2be4935b5cc08c214d57ee881b
+    tests: TRUE_PG_63_PASS_0_SKIP
+    production_readback: READY_HTTP_200_TRUE; FLAGS_45_OFF; ENDPOINTS_36_GENERATION_0_SHARED_SCOPE_0
+    schema_readback: HELPER_TRIGGER_POLICY_ACL_SEARCH_PATH_VERIFIED
+    evidence: CI_13_OF_13_SUCCESS; TRUE_PG_63_OF_63_ZERO_SKIPS; PRODUCTION_READY_200_TRUE; FLAGS_45_OFF; ENDPOINTS_36_GENERATION_0_SHARED_SCOPE_0; HELPER_TRIGGER_POLICY_ACL_SEARCH_PATH_READBACK
     hardening_notes:
-      - Working-tree candidate only: the busy helper scans all actor logs and treats every non-NULL lease_owner, including expired leases, as busy; no tenant flag is enabled and this batch is not READY.
+      - Deployed exact with all tenant flags off: the busy helper scans all actor logs and treats every non-NULL lease_owner, including expired leases, as busy; this batch is not READY.
       - Independent review: ordinary Express enqueue preflight has no external side effect, but promotion races can drop a queue item or write false history; steward bridge and expired leases may write without a log.
       - reservation/finalize, drain, managed log/Agent/bridge remain hard B3B3/B3C prerequisites.
       - Archive replay note: the complete Alembic blank-chain replay still fails on pre-existing 002 missing-table and 0108 long-revision/varchar32 archive debt; 0111's tgattr/role defects are fixed here. Do not change 002, 0108, MR.ERP, bridge, or B3C in this batch.
@@ -246,6 +256,13 @@ implementation_batches:
       - This batch has no token/config UI, heartbeat, Companion, LINE, push/log/lease, or MR.ERP work.
       - Enrollment intentionally isolates the old Companion token/reporting writers; it is not usable until B3B3 restores the managed live path.
       - Managed log read/delete/stat/export authorization remains a B3C prerequisite; this batch does not expose managed history to employees.
+  - batch_id: F1-B3B2b-2
+    backend_implementation_complete: false
+    release_state: DISCOVERY
+    scope: OWNER_REBIND_ENABLE_DISABLE_REVOKE_CAS
+    readiness: NOT_STARTED
+    rollout_contract: ALL_TENANTS_FLAG_OFF
+    next_action: Implement and verify owner rebind, enable/disable and revoke CAS while preserving generation and audit invariants; keep B3B3/B3C/B4/B5 locked.
   - batch_id: F1-B3B3
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
@@ -272,20 +289,20 @@ companion:
 
 feature_flags:
   - name: erp_shared_express_endpoint
-    candidate_rollout_state: OFF_ALL_TENANTS_AFTER_B3A_DEPLOY
+    candidate_rollout_state: OFF_ALL_TENANTS_AFTER_B3B2B1_DEPLOY
     accepted_rollout_state: PENDING
     scope: ALL_TENANTS_FLAG_OFF_UNTIL_F1_B5
-    verified_at: 2026-08-29T13:11:47Z
-    latest_release_sha: f37f824eaf144602438d2b060575d295361c4a25
+    verified_at: 2026-08-30T11:53:43Z
+    latest_release_sha: 4c871b78d60d69644ce4b5a2505053bab4a42a4e
     latest_release_readback: OFF_45_OF_45_TENANTS
-    latest_release_readback_at: PENDING_EXACT_TIMESTAMP_FROM_B3A_RELEASE_EVIDENCE
+    latest_release_readback_at: 2026-08-30T11:53:43Z
     effective_enabled_tenants: 0
     effective_disabled_tenants: 45
     tenant_total: 45
     reason: >-
-      B3A only adds fail-closed shared endpoint read behavior behind the existing flag. Owner manage,
-      binding/token writers, push/log route wiring, Console UI and true-device acceptance are not
-      present, so no tenant may enter the shared branch in this release.
+      B3B2b-1 adds only owner legacy Express enrollment promotion behind the existing flag. Live
+      heartbeat, managed push/log route wiring, Console UI and true-device acceptance are not present,
+      so no tenant may enter the shared branch in this release.
 
 test_contexts:
   - context_id: F1-COWORK-OWNER-REGRESSION
@@ -580,9 +597,9 @@ user_decision:
   accepted_erp_report_evidence_ids: []
 
 open_issues:
-  - B3B2a is deployed at feature SHA fd473abd204f3dae864bcd15928333f388c98679 with CI 33301999658 green; the docs closure commit records this state only and must not be used as a self-referential feature SHA.
+  - B3B2b-1 is deployed exact: runtime/enrollment SHA a609748955779e2be4935b5cc08c214d57ee881b, release/gate and production SHA 4c871b78d60d69644ce4b5a2505053bab4a42a4e, CI 33309634623 13/13 success, production service 2026-08-30T11:53:43Z, ready 200/true, true PG 63/63 with 0 skips, and helper/trigger/policy/ACL/search_path plus 45 flags and 36 endpoint readbacks verified. The docs closure commit records this state only and must not be used as a self-referential feature SHA.
   - B3B2a P2 follow-up: real resolver/console concurrent transfer coverage and canonical membership→role→users→workspace lock-order proof remain open; this batch only proves the managed helper and transfer-shaped lock path reach their barriers without deadlock.
-  - B3B2b owner manage/binding/token lifecycle is being implemented only as this enroll microbatch; B3B3 live heartbeat/mismatch/legacy isolation and B3C manual push/log/Agent remain locked; B3B2a audit is foundation-only until this writer passes review.
+  - B3B2b-2 owner rebind/enable-disable/revoke CAS is the current discovery task. B3B3 live heartbeat/mismatch/legacy isolation, B3C manual push/log/Agent, and B4/B5 remain locked; B3B2a audit is foundation-only until the lifecycle writers are complete.
   - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
   - HIGH separate security microbatch remains unfixed: generic ERP webhook/test SSRF guard validates system_url while the real network sink reads url, and endpoint test does not revalidate every redirect hop. B3B Express state must not call that outbound test.
   - MEDIUM separate reliability microbatch remains unfixed: legacy retry worker does not check endpoint.enabled, so a disabled endpoint may still retry outward. B3B2 must return 409 for nonterminal tasks; full draining and lease semantics remain B3C.
@@ -590,10 +607,9 @@ open_issues:
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
   - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
 next_action: >-
-  Complete the F1-B3B2b-1 release readback first, then proceed to F1-B3B2b-2 owner
-  rebind/enable-disable/revoke CAS, while keeping every tenant flag off. Keep B3B3/B3C,
-  F1-B4/B5 and F2-F7 locked until separately unlocked; F1 remains IMPLEMENTING and is not
-  READY_FOR_DEVICE or USER_ACCEPTED.
+  Proceed with F1-B3B2b-2 owner rebind/enable-disable/revoke CAS while keeping every tenant
+  flag off. Keep B3B3/B3C, F1-B4/B5 and F2-F7 locked until separately unlocked; F1 remains
+  IMPLEMENTING and is not READY_FOR_DEVICE or USER_ACCEPTED.
 ```
 
 ## 7. F2-F7

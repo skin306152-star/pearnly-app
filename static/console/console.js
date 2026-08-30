@@ -85,12 +85,7 @@
         {
             key: 'erp',
             title: 'mod_erp',
-            codes: [
-                'erp.endpoint.view',
-                'erp.endpoint.manage',
-                'erp.push.operate',
-                'erp.log.view',
-            ],
+            codes: ['erp.endpoint.view', 'erp.endpoint.manage', 'erp.push.operate', 'erp.log.view'],
         },
         {
             key: 'acct',

@@ -246,7 +246,8 @@ async function boot(page, entry, state = {}) {
             const response = state.erpPushResponses?.shift() || { ok: true };
             const pending = state.salesDocuments.find((doc) => doc.push_status !== 'success');
             if (pending)
-                pending.push_status = response.status || (response.ok === true ? 'success' : 'failed');
+                pending.push_status =
+                    response.status || (response.ok === true ? 'success' : 'failed');
             body = response;
         } else if (pathname === '/api/integrations/google/status') {
             body = {

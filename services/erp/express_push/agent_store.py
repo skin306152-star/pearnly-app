@@ -51,7 +51,7 @@ def get_express_endpoint(endpoint_id: str) -> Optional[Dict[str, Any]]:
                 """
                 SELECT id, name, adapter, config, enabled, user_id
                 FROM erp_endpoints
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 LIMIT 1
                 """,
                 (endpoint_id,),
@@ -147,7 +147,12 @@ def close_unacked_confirmed(cur, endpoint_id: str) -> int:
     分不出来就得说分不出来,由会计去 Express 看一眼。返回被收尾的行数。
     """
     from services.erp.express_push import common as C
+    from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
     from services.erp.express_push.enqueue import MANUAL_PREFIX
+
+    lock_endpoint_binding(cur, endpoint_id)
+    if not lock_legacy_endpoint(cur, endpoint_id):
+        return 0
 
     cur.execute(
         f"""
@@ -220,6 +225,11 @@ def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, An
         from core import db
 
         with db.get_cursor(commit=True) as cur:
+            from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
+
+            lock_endpoint_binding(cur, endpoint_id)
+            if not lock_legacy_endpoint(cur, endpoint_id):
+                return []
             cur.execute(
                 f"""
                 WITH due AS (
@@ -251,6 +261,11 @@ def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, An
 
 
 def _load_owned_log(cur, endpoint_id: str, log_id: str) -> Optional[Dict[str, Any]]:
+    from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
+
+    lock_endpoint_binding(cur, endpoint_id)
+    if not lock_legacy_endpoint(cur, endpoint_id):
+        return None
     cur.execute(
         """
         SELECT id, status, attempt, lease_owner, response_body, history_id

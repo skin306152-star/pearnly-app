@@ -23,6 +23,7 @@ from services.erp.push_log_queries import (  # noqa: F401,E402
     derive_bind_fix,
     get_push_stats_today,
 )
+from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def list_erp_endpoints(user_id: str, auto_push_only: bool = False) -> List[Dict[
                        last_used_at, last_status, success_count, failure_count,
                        created_at, updated_at, user_id
                 FROM erp_endpoints
-                WHERE user_id = %s
+                WHERE user_id = %s AND binding_generation = 0
             """
             if auto_push_only:
                 sql += " AND auto_push = TRUE AND enabled = TRUE"
@@ -60,7 +61,7 @@ def get_erp_endpoint(user_id: str, endpoint_id: str) -> Optional[Dict[str, Any]]
                        last_used_at, last_status, success_count, failure_count,
                        created_at, updated_at, user_id
                 FROM erp_endpoints
-                WHERE user_id = %s AND id = %s
+                WHERE user_id = %s AND id = %s AND binding_generation = 0
                 LIMIT 1
             """,
                 (user_id, endpoint_id),
@@ -80,7 +81,7 @@ def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
                 """
                 SELECT id, name, adapter, config, is_default, auto_push, enabled, user_id
                 FROM erp_endpoints
-                WHERE user_id = %s AND enabled = true
+                WHERE user_id = %s AND enabled = true AND binding_generation = 0
                 ORDER BY is_default DESC, created_at ASC
                 LIMIT 1
             """,
@@ -103,6 +104,7 @@ def _existing_express_id(cur, user_id: str) -> Optional[str]:
     """该用户已有的 express 端点 id(有则复用 · 保 express 单例)。"""
     cur.execute(
         "SELECT id FROM erp_endpoints WHERE user_id = %s AND adapter = 'express' "
+        "AND binding_generation = 0 "
         "ORDER BY created_at LIMIT 1",
         (user_id,),
     )
@@ -114,7 +116,8 @@ def _disable_other_auto_push(cur, user_id: str, keep_endpoint_id) -> None:
     """自动推送单例(2026-07-01 · 防双推):关掉除 keep 外该用户所有端点的 auto_push。
     与 is_default 单选同思路 · create/update 共用单一实现(单一事实源)。"""
     cur.execute(
-        "UPDATE erp_endpoints SET auto_push = false WHERE user_id = %s AND id <> %s",
+        "UPDATE erp_endpoints SET auto_push = false WHERE user_id = %s AND id <> %s "
+        "AND binding_generation = 0",
         (user_id, str(keep_endpoint_id)),
     )
 
@@ -143,12 +146,15 @@ def create_erp_endpoint(
                     return existing
             if is_default:
                 cur.execute(
-                    "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s", (user_id,)
+                    "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s "
+                    "AND binding_generation = 0",
+                    (user_id,),
                 )
             cur.execute(
                 """
-                INSERT INTO erp_endpoints (user_id, name, adapter, config, is_default, auto_push)
-                VALUES (%s, %s, %s, %s::jsonb, %s, %s)
+                INSERT INTO erp_endpoints (user_id, name, adapter, config, is_default, auto_push,
+                                           binding_generation)
+                VALUES (%s, %s, %s, %s::jsonb, %s, %s, 0)
                 RETURNING id
             """,
                 (user_id, name, adapter, _json.dumps(config), is_default, auto_push),
@@ -201,16 +207,30 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
         return False
     try:
         with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
+            # Confirm and lock the legacy row before touching any secondary defaults.
+            # A managed row must be invisible to this old mutation path, including
+            # its unrelated endpoints' flags.
+            cur.execute(
+                "SELECT id FROM erp_endpoints WHERE user_id = %s AND id = %s "
+                "AND binding_generation = 0 FOR UPDATE",
+                (user_id, endpoint_id),
+            )
+            if not cur.fetchone():
+                return False
             # 如果设为默认,先取消其他默认
             if fields.get("is_default"):
                 cur.execute(
-                    "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s AND id <> %s",
+                    "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s AND id <> %s "
+                    "AND binding_generation = 0",
                     (user_id, endpoint_id),
                 )
             # 自动推送单例(2026-07-01 · 防双推):设自动时先关掉其它端点的 auto_push。
             if fields.get("auto_push"):
                 _disable_other_auto_push(cur, user_id, endpoint_id)
-            sql = f"UPDATE erp_endpoints SET {', '.join(sets)} WHERE user_id = %s AND id = %s"
+            sql = (
+                f"UPDATE erp_endpoints SET {', '.join(sets)} "
+                "WHERE user_id = %s AND id = %s AND binding_generation = 0"
+            )
             vals.extend([user_id, endpoint_id])
             cur.execute(sql, tuple(vals))
             return cur.rowcount > 0
@@ -222,6 +242,15 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
 def delete_erp_endpoint(user_id: str, endpoint_id: str) -> bool:
     try:
         with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
+            # Lock and verify before clearing retry state. Managed endpoints must
+            # leave their historical queue untouched when an old delete arrives.
+            cur.execute(
+                "SELECT id FROM erp_endpoints WHERE user_id = %s AND id = %s "
+                "AND binding_generation = 0 FOR UPDATE",
+                (user_id, endpoint_id),
+            )
+            if not cur.fetchone():
+                return False
             # v118.25.0.2 · 删端点前 · 先把这个端点所有挂起的重试停掉(避免 worker 继续跑)
             cur.execute(
                 """
@@ -232,7 +261,9 @@ def delete_erp_endpoint(user_id: str, endpoint_id: str) -> bool:
                 (user_id, endpoint_id),
             )
             cur.execute(
-                "DELETE FROM erp_endpoints WHERE user_id = %s AND id = %s", (user_id, endpoint_id)
+                "DELETE FROM erp_endpoints WHERE user_id = %s AND id = %s "
+                "AND binding_generation = 0",
+                (user_id, endpoint_id),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -273,6 +304,9 @@ def insert_push_log(
 
     try:
         with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
+            lock_endpoint_binding(cur, endpoint_id)
+            if not lock_legacy_endpoint(cur, endpoint_id, user_id):
+                return None
             cur.execute(
                 """
                 INSERT INTO erp_push_logs (
@@ -385,7 +419,7 @@ def update_endpoint_stats(endpoint_id: str, success: bool):
                     SET success_count = success_count + 1,
                         last_used_at = NOW(),
                         last_status = 'success'
-                    WHERE id = %s
+                    WHERE id = %s AND binding_generation = 0
                 """,
                     (endpoint_id,),
                 )
@@ -396,7 +430,7 @@ def update_endpoint_stats(endpoint_id: str, success: bool):
                     SET failure_count = failure_count + 1,
                         last_used_at = NOW(),
                         last_status = 'failed'
-                    WHERE id = %s
+                    WHERE id = %s AND binding_generation = 0
                 """,
                     (endpoint_id,),
                 )

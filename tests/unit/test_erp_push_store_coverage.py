@@ -264,6 +264,14 @@ class CreateEndpointTests(unittest.TestCase):
 
 
 class UpdateEndpointTests(unittest.TestCase):
+    def test_managed_row_is_rejected_before_secondary_mutation(self):
+        cur = FakeCursor(fetchone_seq=[None], rowcount=1)
+        with patch_cursor(cur):
+            self.assertFalse(
+                store.update_erp_endpoint("u1", "managed", is_default=True, auto_push=True)
+            )
+        self.assertEqual(len(cur.calls), 1)
+
     def test_no_allowed_fields_returns_false_without_db(self):
         # 全是非白名单字段 → 不触 DB · 直接 False
         called = {"hit": False}
@@ -277,7 +285,7 @@ class UpdateEndpointTests(unittest.TestCase):
         self.assertFalse(called["hit"])
 
     def test_config_serialized_as_jsonb(self):
-        cur = FakeCursor(rowcount=1)
+        cur = FakeCursor(fetchone_seq=[{"id": "e1"}], rowcount=1)
         with patch_cursor(cur):
             ok = store.update_erp_endpoint("u1", "e1", config={"a": 1})
         self.assertTrue(ok)
@@ -285,14 +293,14 @@ class UpdateEndpointTests(unittest.TestCase):
         self.assertIn('"a": 1', cur.last_params[0])
 
     def test_is_default_unsets_other_rows(self):
-        cur = FakeCursor(rowcount=1)
+        cur = FakeCursor(fetchone_seq=[{"id": "e1"}], rowcount=1)
         with patch_cursor(cur):
             store.update_erp_endpoint("u1", "e1", is_default=True)
-        self.assertIn("id <> %s", cur.calls[0][0])
+        self.assertIn("id <> %s", cur.calls[1][0])
 
     def test_auto_push_unsets_other_rows_on_update(self):
         # 自动推送单例:改端点为自动 → 关掉其它端点的 auto_push。
-        cur = FakeCursor(rowcount=1)
+        cur = FakeCursor(fetchone_seq=[{"id": "e1"}], rowcount=1)
         with patch_cursor(cur):
             store.update_erp_endpoint("u1", "e1", auto_push=True)
         demote = [c for c in cur.calls if "SET auto_push = false" in c[0]]
@@ -302,13 +310,13 @@ class UpdateEndpointTests(unittest.TestCase):
 
     def test_no_auto_push_unset_when_disabling(self):
         # 关自动(auto_push=False)不触发单例关闭(只有开自动才互斥)。
-        cur = FakeCursor(rowcount=1)
+        cur = FakeCursor(fetchone_seq=[{"id": "e1"}], rowcount=1)
         with patch_cursor(cur):
             store.update_erp_endpoint("u1", "e1", auto_push=False)
         self.assertNotIn("SET auto_push = false WHERE user_id = %s AND id <> %s", cur.all_sql())
 
     def test_rowcount_zero_returns_false(self):
-        cur = FakeCursor(rowcount=0)
+        cur = FakeCursor(fetchone_seq=[{"id": "e1"}], rowcount=0)
         with patch_cursor(cur):
             self.assertFalse(store.update_erp_endpoint("u1", "e1", name="z"))
 
@@ -318,14 +326,20 @@ class UpdateEndpointTests(unittest.TestCase):
 
 
 class DeleteEndpointTests(unittest.TestCase):
+    def test_managed_row_does_not_clear_retry_schedule(self):
+        cur = FakeCursor(fetchone_seq=[None], rowcount=1)
+        with patch_cursor(cur):
+            self.assertFalse(store.delete_erp_endpoint("u1", "managed"))
+        self.assertEqual(len(cur.calls), 1)
+
     def test_stops_retries_then_deletes(self):
-        cur = FakeCursor(rowcount=1)
+        cur = FakeCursor(fetchone_seq=[{"id": "e1"}], rowcount=1)
         with patch_cursor(cur):
             ok = store.delete_erp_endpoint("u1", "e1")
         self.assertTrue(ok)
         # 第一条:停挂起重试(next_retry_at = NULL);第二条:DELETE
-        self.assertIn("next_retry_at = NULL", cur.calls[0][0])
-        self.assertIn("DELETE FROM erp_endpoints", cur.calls[1][0])
+        self.assertIn("next_retry_at = NULL", cur.calls[1][0])
+        self.assertIn("DELETE FROM erp_endpoints", cur.calls[2][0])
 
     def test_rowcount_zero_false(self):
         cur = FakeCursor(rowcount=0)
@@ -468,7 +482,7 @@ class RetrySchedulingTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn("INTERVAL '1 second'", cur.last_sql)
         self.assertIn("status = 'failed'", cur.last_sql)
-        self.assertEqual(cur.last_params, (300, "log-1"))
+        self.assertEqual(cur.last_params, (300, "log-1", None))
 
     def test_schedule_rowcount_zero_false(self):
         cur = FakeCursor(rowcount=0)
@@ -484,7 +498,7 @@ class RetrySchedulingTests(unittest.TestCase):
         with patch_cursor(cur):
             store.clear_retry_schedule("log-1")
         self.assertIn("next_retry_at = NULL", cur.last_sql)
-        self.assertEqual(cur.last_params, ("log-1",))
+        self.assertEqual(cur.last_params, ("log-1", None))
 
     def test_clear_exception_swallowed(self):
         with patch_cursor_raises():
@@ -551,8 +565,8 @@ class UpdateLogStatusAfterRetryTests(unittest.TestCase):
         with patch_cursor(cur):
             store.update_log_status_after_retry("l1", True, 200, "r", None, 10)
         self.assertIn("COALESCE(%s::jsonb, request_body)", cur.last_sql)
-        # rb 参数(倒数第二)应为 None → 保留原值
-        self.assertIsNone(cur.last_params[-2])
+        # rb 参数(倒数第三)应为 None → 保留原值；末尾是 log/endpoint CAS。
+        self.assertIsNone(cur.last_params[-3])
 
     def test_request_body_dict_serialized(self):
         cur = FakeCursor()
@@ -560,7 +574,7 @@ class UpdateLogStatusAfterRetryTests(unittest.TestCase):
             store.update_log_status_after_retry(
                 "l1", True, 200, "r", None, 10, request_body={"x": 1}
             )
-        self.assertIn('"x": 1', cur.last_params[-2])
+        self.assertIn('"x": 1', cur.last_params[-3])
 
     def test_exception_swallowed(self):
         with patch_cursor_raises():
@@ -579,6 +593,21 @@ class DeletePushLogsTests(unittest.TestCase):
         self.assertEqual(n, 2)
         self.assertIn("user_id = %s", cur.last_sql)
         self.assertEqual(cur.last_params, ("u1", ["l1", "l2"]))
+
+    def test_locks_endpoints_before_delete(self):
+        cur = FakeCursor(
+            fetchall=[{"endpoint_id": "e1"}],
+            fetchone_seq=[{"id": "e1"}],
+            rowcount=1,
+        )
+        with patch_cursor(cur):
+            self.assertEqual(store.delete_push_logs("u1", ["l1"]), 1)
+        sql = [statement for statement, _ in cur.calls]
+        self.assertIn("pg_advisory_xact_lock", sql[1])
+        self.assertIn("binding_generation = 0", sql[2])
+        self.assertTrue(sql[-1].lstrip().startswith("DELETE FROM erp_push_logs"))
+        self.assertLess(sql.index(sql[1]), sql.index(sql[-1]))
+        self.assertNotIn("SKIP LOCKED", " ".join(sql))
 
     def test_exception_returns_zero(self):
         with patch_cursor_raises():

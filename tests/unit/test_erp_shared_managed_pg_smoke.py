@@ -11,7 +11,14 @@ from unittest import mock
 from core import rls
 from services.erp import shared_express_managed_schema as managed
 from services.erp import shared_express_schema
-from tests.unit._pg_smoke import connect, connect_or_skip
+from tests.unit._pg_smoke import (
+    assert_public_routines_unchanged,
+    connect,
+    connect_or_skip,
+    schema_function,
+    schema_function_name,
+    snapshot_public_routines,
+)
 
 TENANT_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 TENANT_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -77,10 +84,20 @@ def _create_tables(cur, prefix: str = "") -> None:
     )
 
 
-# fmt: off
 def _localized_ddl(schema: str) -> tuple[str, ...]:
-    return tuple(statement.replace("public.users", f'"{schema}".users').replace("public.erp_endpoints", f'"{schema}".erp_endpoints') for statement in managed.SHARED_EXPRESS_MANAGED_DDL)
-# fmt: on
+    localized = []
+    for statement in managed.SHARED_EXPRESS_MANAGED_DDL:
+        statement = statement.replace("public.users", f'"{schema}".users').replace(
+            "public.erp_endpoints", f'"{schema}".erp_endpoints'
+        )
+        for name in (
+            "preserve_managed_erp_endpoints_on_user_delete",
+            "prevent_managed_erp_endpoint_creator_change",
+            "purge_managed_erp_endpoints_for_users",
+        ):
+            statement = statement.replace(f"public.{name}", f'"{schema}".{name}')
+        localized.append(statement)
+    return tuple(localized)
 
 
 def _run_race_thread(schema: str, errors: list[str], action):
@@ -113,6 +130,7 @@ class SharedExpressManagedPgSmokeTests(unittest.TestCase):
 
         cls.cur = cls.conn.cursor(cursor_factory=RealDictCursor)
         try:
+            cls._public_routines_before = snapshot_public_routines(cls.cur)
             rls.ensure_rls_app_role(cls.cur)
             cls.cur.execute("SET search_path TO pg_temp, public")
             cls.cur.execute("SELECT current_schema() AS schema")
@@ -133,6 +151,7 @@ class SharedExpressManagedPgSmokeTests(unittest.TestCase):
             for statement in _localized_ddl(cls.schema):
                 cls.cur.execute(statement)
             cls.cur.execute("ALTER TABLE erp_endpoints FORCE ROW LEVEL SECURITY")
+            assert_public_routines_unchanged(cls.cur, cls._public_routines_before)
             cls.conn.commit()
             managed._MANAGED_FOUNDATION_READY = True
         except Exception:
@@ -146,10 +165,13 @@ class SharedExpressManagedPgSmokeTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         if cls.conn is not None:
-            managed._MANAGED_FOUNDATION_READY = cls._previous_ready
-            cls.conn.rollback()
-            cls.cur.close()
-            cls.conn.close()
+            try:
+                managed._MANAGED_FOUNDATION_READY = cls._previous_ready
+                cls.conn.rollback()
+                assert_public_routines_unchanged(cls.cur, cls._public_routines_before)
+            finally:
+                cls.cur.close()
+                cls.conn.close()
 
     def setUp(self):
         self.cur.execute(
@@ -327,7 +349,7 @@ class SharedExpressManagedPgSmokeTests(unittest.TestCase):
             (demo_endpoint, demo_user, TENANT_A, WORKSPACE_A),
         )
         self.cur.execute(
-            "SELECT public.purge_managed_erp_endpoints_for_users(%s::uuid[]) AS deleted",
+            f"SELECT {schema_function_name(self.schema, 'purge_managed_erp_endpoints_for_users')}(%s::uuid[]) AS deleted",
             ([demo_user],),
         )
         self.assertEqual(self.cur.fetchone()["deleted"], 1)
@@ -345,22 +367,23 @@ class SharedExpressManagedPgSmokeTests(unittest.TestCase):
         self.cur.execute(
             "SELECT procedure_meta.prosecdef, procedure_meta.proconfig "
             "FROM pg_proc procedure_meta "
-            "WHERE procedure_meta.oid = "
-            "'public.prevent_managed_erp_endpoint_creator_change()'::regprocedure"
+            "WHERE procedure_meta.oid = %s::regprocedure",
+            (schema_function(self.schema, "prevent_managed_erp_endpoint_creator_change"),),
         )
         function_meta = self.cur.fetchone()
         self.assertTrue(function_meta["prosecdef"])
         self.assertEqual(function_meta["proconfig"], ["search_path=pg_catalog"])
         self.cur.execute(
-            "SELECT pg_get_functiondef("
-            "'public.prevent_managed_erp_endpoint_creator_change()'::regprocedure) AS body"
+            "SELECT pg_get_functiondef(%s::regprocedure) AS body",
+            (schema_function(self.schema, "prevent_managed_erp_endpoint_creator_change"),),
         )
         self.assertIn("pg_trigger_depth() = 1", self.cur.fetchone()["body"])
         self.cur.execute(
             "SELECT lower(pg_get_triggerdef(trigger_meta.oid)) AS definition "
             "FROM pg_trigger trigger_meta "
-            "WHERE trigger_meta.tgrelid = 'erp_endpoints'::regclass "
-            "AND trigger_meta.tgname = 'erp_endpoints_managed_creator_immutable'"
+            "WHERE trigger_meta.tgrelid = %s::regclass "
+            "AND trigger_meta.tgname = 'erp_endpoints_managed_creator_immutable'",
+            (f'"{self.schema}".erp_endpoints',),
         )
         definition = self.cur.fetchone()["definition"]
         self.assertIn("before update of user_id", definition)
@@ -371,7 +394,7 @@ class SharedExpressManagedPgSmokeTests(unittest.TestCase):
         self.cur.execute(
             "CREATE TRIGGER erp_endpoints_managed_creator_immutable "
             "BEFORE INSERT ON erp_endpoints FOR EACH ROW "
-            "EXECUTE FUNCTION public.prevent_managed_erp_endpoint_creator_change()"
+            f"EXECUTE FUNCTION {schema_function_name(self.schema, 'prevent_managed_erp_endpoint_creator_change')}()"
         )
         import psycopg2
 

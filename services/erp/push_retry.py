@@ -12,6 +12,22 @@ from typing import Optional, Dict, Any, List  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
+from services.erp.legacy_generation import (
+    lock_endpoint_binding,
+    lock_legacy_endpoint,
+    read_log_endpoint_id,
+)
+
+
+def _lock_log_endpoint(cur, log_id: str) -> tuple[bool, Optional[str]]:
+    endpoint_id = read_log_endpoint_id(cur, log_id)
+    if endpoint_id:
+        lock_endpoint_binding(cur, endpoint_id)
+        if not lock_legacy_endpoint(cur, endpoint_id):
+            return False, endpoint_id
+    return True, endpoint_id
+
+
 # 指数退避序列(秒):60s · 5min · 30min · 共 3 次
 _ERP_RETRY_DELAYS_SEC = [60, 300, 1800]
 ERP_MAX_RETRIES = 3
@@ -139,13 +155,18 @@ def schedule_log_retry(log_id: str, delay_sec: int) -> bool:
     """把一条失败日志加入重试队列 · next_retry_at = NOW + delay"""
     try:
         with db.get_cursor(commit=True) as cur:
+            allowed, endpoint_id = _lock_log_endpoint(cur, log_id)
+            if not allowed:
+                return False
             cur.execute(
                 """
                 UPDATE erp_push_logs
                 SET next_retry_at = NOW() + (%s * INTERVAL '1 second')
-                WHERE id = %s AND status = 'failed'
+                WHERE id = %s
+                  AND status = 'failed'
+                  AND endpoint_id IS NOT DISTINCT FROM %s
             """,
-                (int(delay_sec), log_id),
+                (int(delay_sec), log_id, endpoint_id),
             )
             return cur.rowcount > 0
     except Exception as e:
@@ -157,13 +178,16 @@ def clear_retry_schedule(log_id: str):
     """重试成功 / 达到上限后调用 · 清空 next_retry_at(从队列里摘出来)"""
     try:
         with db.get_cursor(commit=True) as cur:
+            allowed, endpoint_id = _lock_log_endpoint(cur, log_id)
+            if not allowed:
+                return
             cur.execute(
                 """
                 UPDATE erp_push_logs
                 SET next_retry_at = NULL
-                WHERE id = %s
+                WHERE id = %s AND endpoint_id IS NOT DISTINCT FROM %s
             """,
-                (log_id,),
+                (log_id, endpoint_id),
             )
     except Exception as e:
         logger.error(f"clear_retry_schedule failed: {e}")
@@ -179,6 +203,9 @@ def list_logs_due_for_retry(limit: int = 20) -> List[Dict[str, Any]]:
                        l.invoice_no, l.seller_name, l.total_amount,
                        l.retry_count, l.max_retries, l.next_retry_at
                 FROM erp_push_logs l
+                JOIN erp_endpoints endpoint
+                  ON endpoint.id = l.endpoint_id
+                 AND endpoint.binding_generation = 0
                 WHERE l.status = 'failed'
                   AND l.next_retry_at IS NOT NULL
                   AND l.next_retry_at <= NOW()
@@ -199,14 +226,17 @@ def increment_retry_count(log_id: str) -> int:
     """重试一次后自增 retry_count · 返回新值"""
     try:
         with db.get_cursor(commit=True) as cur:
+            allowed, endpoint_id = _lock_log_endpoint(cur, log_id)
+            if not allowed:
+                return 0
             cur.execute(
                 """
                 UPDATE erp_push_logs
                 SET retry_count = retry_count + 1
-                WHERE id = %s
+                WHERE id = %s AND endpoint_id IS NOT DISTINCT FROM %s
                 RETURNING retry_count
             """,
-                (log_id,),
+                (log_id, endpoint_id),
             )
             row = cur.fetchone()
             return int(row["retry_count"]) if row else 0
@@ -242,6 +272,9 @@ def update_log_status_after_retry(
                 else _json.dumps(request_body, ensure_ascii=False)
             )
         with db.get_cursor(commit=True) as cur:
+            allowed, endpoint_id = _lock_log_endpoint(cur, log_id)
+            if not allowed:
+                return
             cur.execute(
                 """
                 UPDATE erp_push_logs
@@ -251,7 +284,7 @@ def update_log_status_after_retry(
                     error_msg = %s,
                     elapsed_ms = %s,
                     request_body = COALESCE(%s::jsonb, request_body)
-                WHERE id = %s
+                WHERE id = %s AND endpoint_id IS NOT DISTINCT FROM %s
             """,
                 (
                     status,
@@ -261,6 +294,7 @@ def update_log_status_after_retry(
                     int(elapsed_ms),
                     rb,
                     log_id,
+                    endpoint_id,
                 ),
             )
     except Exception as e:

@@ -124,6 +124,7 @@ def _cfg(*, masters=0, acccod=None, groups=()):
 class FakeCursor:
     def __init__(self):
         self.executed = []
+        self.rowcount = 1
 
     def execute(self, sql, params=None):
         self.executed.append((sql, params))

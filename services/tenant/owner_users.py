@@ -353,7 +353,8 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                     ),
                     (
                         "erp_endpoints",
-                        "DELETE FROM erp_endpoints WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
+                        "DELETE FROM erp_endpoints WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s) "
+                        "AND binding_generation = 0",
                     ),
                     (
                         "clients",
@@ -438,7 +439,10 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                     ("ocr_history", "DELETE FROM ocr_history WHERE user_id = %s"),
                     ("ocr_cost_log", "DELETE FROM ocr_cost_log WHERE user_id = %s"),
                     ("erp_push_logs", "DELETE FROM erp_push_logs WHERE user_id = %s"),
-                    ("erp_endpoints", "DELETE FROM erp_endpoints WHERE user_id = %s"),
+                    (
+                        "erp_endpoints",
+                        "DELETE FROM erp_endpoints WHERE user_id = %s AND binding_generation = 0",
+                    ),
                     ("clients", "DELETE FROM clients WHERE user_id = %s"),
                     ("archive_settings", "DELETE FROM archive_settings WHERE user_id = %s"),
                     ("rd_daily_usage", "DELETE FROM rd_daily_usage WHERE user_id = %s"),

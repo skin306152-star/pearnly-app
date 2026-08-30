@@ -17,9 +17,10 @@ from services.workspace import store as ws
 
 
 class FakeCursor:
-    def __init__(self, fetchone=None, fetchall=None, rowcount=0):
+    def __init__(self, fetchone=None, fetchall=None, rowcount=0, fetchone_seq=None):
         self.calls = []
         self._fetchone = fetchone
+        self._fetchone_seq = list(fetchone_seq or [])
         self._fetchall = fetchall if fetchall is not None else []
         self.rowcount = rowcount
 
@@ -27,6 +28,8 @@ class FakeCursor:
         self.calls.append((sql, params))
 
     def fetchone(self):
+        if self._fetchone_seq:
+            return self._fetchone_seq.pop(0)
         return self._fetchone
 
     def fetchall(self):
@@ -73,12 +76,22 @@ def patch_cursor_raises(exc=RuntimeError("boom")):
 
 
 class CreateTests(unittest.TestCase):
+    def test_create_rejects_managed_endpoint_without_insert(self):
+        cur = FakeCursor(
+            fetchone={"id": "ep1", "user_id": "u1", "tenant_id": "t1", "binding_generation": 1}
+        )
+        with patch_cursor(cur):
+            self.assertIsNone(ws.create_workspace_client("u1", "t1", "ACME", erp_endpoint_id="ep1"))
+        self.assertNotIn("INSERT INTO workspace_clients", cur.all_sql())
+
     def test_empty_name_returns_none_without_db(self):
         with patch_cursor_raises():
             self.assertIsNone(ws.create_workspace_client("u1", "t1", "   "))
 
     def test_success_trims_and_returns_id(self):
-        cur = FakeCursor(fetchone={"id": 11})
+        cur = FakeCursor(
+            fetchone={"id": 11, "user_id": "u1", "tenant_id": None, "binding_generation": 0}
+        )
         with patch_cursor(cur):
             wid = ws.create_workspace_client(
                 "u1", "t1", "  ACME Co  ", tax_id="  123  ", erp_endpoint_id=" ep1 "
@@ -345,16 +358,49 @@ class EnrichedTests(unittest.TestCase):
 
 
 class BindTests(unittest.TestCase):
+    def test_bind_tenantless_scope_rejects_tenant_endpoint(self):
+        cur = FakeCursor(
+            fetchone_seq=[
+                {"id": 1},
+                {"id": "ep1", "user_id": "u1", "tenant_id": "t1", "binding_generation": 0},
+            ],
+            rowcount=1,
+        )
+        with patch_cursor(cur):
+            self.assertFalse(ws.bind_workspace_endpoint(1, "ep1", "u1", tenant_id=None))
+        self.assertNotIn("UPDATE workspace_clients SET erp_endpoint_id", cur.all_sql())
+
+    def test_bind_rejects_managed_endpoint_after_workspace_lock(self):
+        cur = FakeCursor(
+            fetchone_seq=[
+                {"id": 1},
+                {"id": "ep1", "user_id": "u1", "tenant_id": "t1", "binding_generation": 1},
+            ],
+            rowcount=1,
+        )
+        with patch_cursor(cur):
+            self.assertFalse(ws.bind_workspace_endpoint(1, "ep1", "u1", "t1"))
+        self.assertNotIn("UPDATE workspace_clients SET erp_endpoint_id", cur.all_sql())
+
     def test_bind_tenant_path(self):
-        cur = FakeCursor(rowcount=1)
+        cur = FakeCursor(
+            fetchone_seq=[
+                {"id": 1},
+                {"id": "ep9", "user_id": "u1", "tenant_id": None, "binding_generation": 0},
+            ],
+            rowcount=1,
+        )
         with patch_cursor(cur):
             self.assertTrue(ws.bind_workspace_endpoint(1, "  ep9  ", "u1", "t1"))
         self.assertIn("erp_endpoint_id = %s", cur.last_sql)
         self.assertEqual(cur.last_params[0], "ep9")  # trimmed
         self.assertIn("tenant_id = %s", cur.last_sql)
+        self.assertIn("pg_advisory_xact_lock", cur.calls[0][0])
+        self.assertIn("workspace_clients", cur.calls[1][0])
+        self.assertIn("erp_endpoints", cur.calls[2][0])
 
     def test_unbind_none(self):
-        cur = FakeCursor(rowcount=1)
+        cur = FakeCursor(fetchone={"id": 1}, rowcount=1)
         with patch_cursor(cur):
             ws.bind_workspace_endpoint(1, None, "u1", tenant_id=None)
         self.assertIsNone(cur.last_params[0])

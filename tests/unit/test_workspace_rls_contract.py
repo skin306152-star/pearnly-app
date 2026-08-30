@@ -84,7 +84,14 @@ class WorkspaceStoreContext(_Base):
         self._run(store.list_workspace_clients_enriched, USER, tenant_id=TENANT, fetchall=[])
 
     def test_bind(self):
-        self._run(store.bind_workspace_endpoint, 1, "ep", USER, tenant_id=TENANT)
+        self._run(
+            store.bind_workspace_endpoint,
+            1,
+            "ep",
+            USER,
+            tenant_id=TENANT,
+            fetchone={"id": 1, "user_id": USER, "tenant_id": TENANT, "binding_generation": 0},
+        )
 
 
 class SellerRoutingContext(_Base):

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-REFACTOR-B1 守门测试 · ERP 推送 15 路由从 app.py 抽到 erp_routes.py。
+REFACTOR-B1 守门测试 · ERP 路由聚合契约。
 
 锁定(防搬迁回归):
-  1. router 注册的 15 个路由 path+method 契约不变(防丢路由 / 改 URL)
+  1. router 注册的 path+method 契约(防丢路由 / 改 URL)
   2. app.py 通过 include_router 真挂上了(防漏挂)
   3. _check_push_access 复用 route_helpers._plan_permissions(单一来源)
   4. _record_500 单一来源(erp_routes / route_helpers / app 同一对象 · 共享 500 现场状态)
@@ -63,9 +63,10 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/mrerp-xlsx-batch"),
             ("POST", "/api/erp/posting-preview"),
             ("POST", "/api/erp/posting-profile"),
+            ("POST", "/api/erp/endpoints/{endpoint_id}/shared/enroll"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 29)
+        self.assertEqual(len(router.routes), 30)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""

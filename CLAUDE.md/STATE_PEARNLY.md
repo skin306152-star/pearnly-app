@@ -16,13 +16,14 @@
 - **✅ F1-B3B1**:`DEPLOYED_EXACT_FLAG_OFF`;commit/origin/production=`3ef91fea4cdbcb2fc1b05abc40f0fb188b663203`;production service active=`2026-08-30T06:30:52Z`;仅 typed binding schema+不可逆 Profile key,无 writer。
 - **✅ F1-B3B2a**:`DEPLOYED_EXACT_FLAG_OFF`;runtime feature SHA=`fd473abd204f3dae864bcd15928333f388c98679`;CI `33301999658` 全绿含 unit/e2e/真 PG smoke/deploy;production exact/readiness/schema 回读通过。
 - **🛑 B3B2a 运行时边界**:不接 HTTP lifecycle、token/config、heartbeat、push/log/lease/ack、UI、Companion、DMS、MR.ERP、auto/bridge 或独立 SSRF/retry 修复;audit 仅底座未接真实 lifecycle writer。
-- **⏸ F1-B3B2b/B3B3/B3C**:B3B2b=`NEXT_READY/PLANNED_UNLOCKED`;B3B3 live heartbeat/mismatch/legacy isolation;B3C manual push/log/Agent lease/ack;后两项均 `PLANNED_LOCKED`。
+- **▶ F1-B3B2b**:`IMPLEMENTING/CODE_CANDIDATE`;`CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`;本轮只做 owner Express legacy enroll→managed promotion 硬化，所有 tenant flag 保持 OFF；无 UI、无真机门（N/A）。B3B3/B3C 仍 `PLANNED_LOCKED`，本批绝不 READY。
 - **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批均锁定。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
 - **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
 - **📍 发布基线**:`master/origin/master=fd473abd`;production exact=`fd473abd`;B3B2a runtime feature 已部署;docs closure commit 仅记录状态，不在此自引用。
 - **⚠️ 独立安全微批待修(HIGH)**:generic ERP webhook/test 的 SSRF guard 校验 `system_url`,真实 sink 读取 `url`,endpoint test 未逐跳复验重定向;B3B Express 状态不得调用该 outbound test;B3B1 未修。
 - **⚠️ 独立可靠性微批待修(MEDIUM)**:legacy retry worker 不校验 endpoint.enabled,disabled endpoint 仍可能重试外推;B3B2 对非终态任务先 409,完整 draining/lease 语义归 B3C;B3B1 未修。
+- **⚠️ B3B2b-1 独立审查发现**:普通 Express enqueue 的 preflight 无外部副作用，但 promotion race 可能丢队列/写假 history；steward bridge/过期 lease 可能真写无日志。reservation/finalize、drain、managed log/Agent/bridge 均是 B3C/B3B3 硬前置；本批全 flag OFF 且绝不 READY。
 - **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
 - **🧪 B3B2a 当前证据**:CI 真 PG `20+51` tests、`0 skip`;缺失 dedup 索引可自愈并有回归覆盖;36 endpoints generation=0/profile 空/shared_scope=0,45/45 flag OFF。P2 真实 resolver/console 锁序覆盖仍欠账;F1 仍 `IMPLEMENTING`，未到 READY_FOR_DEVICE/USER_ACCEPTED。
 

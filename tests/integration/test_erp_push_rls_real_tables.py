@@ -45,7 +45,8 @@ _STUBS = (
     "  auto_push BOOLEAN DEFAULT false, enabled BOOLEAN DEFAULT true, last_used_at TIMESTAMPTZ,"
     "  last_status TEXT, success_count INT DEFAULT 0, failure_count INT DEFAULT 0,"
     "  created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(),"
-    "  workspace_client_id BIGINT, shared_scope BOOLEAN NOT NULL DEFAULT false)",
+    "  workspace_client_id BIGINT, shared_scope BOOLEAN NOT NULL DEFAULT false,"
+    "  binding_generation BIGINT NOT NULL DEFAULT 0)",
     "CREATE TABLE erp_push_logs ("
     "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL, tenant_id UUID,"
     "  workspace_client_id BIGINT,"

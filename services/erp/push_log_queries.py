@@ -39,6 +39,7 @@ from services.erp.push_exception_classify import (  # noqa: F401
     derive_prior_doc_fix,
     derive_stock_fix,
 )
+from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,30 @@ def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
         return 0
     try:
         with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
+            # Promotion and legacy deletion share the endpoint lock.  Gather and
+            # lock endpoint ids in a stable order before touching any log row.
             cur.execute(
-                "DELETE FROM erp_push_logs WHERE user_id = %s AND id = ANY(%s::uuid[])",
+                "SELECT DISTINCT endpoint_id FROM erp_push_logs "
+                "WHERE user_id = %s AND id = ANY(%s::uuid[]) "
+                "AND endpoint_id IS NOT NULL ORDER BY endpoint_id",
+                (user_id, list(log_ids)),
+            )
+            endpoint_ids = []
+            for row in cur.fetchall() or []:
+                endpoint_id = row.get("endpoint_id") if hasattr(row, "get") else row[0]
+                if endpoint_id is not None:
+                    endpoint_ids.append(str(endpoint_id))
+            for endpoint_id in endpoint_ids:
+                lock_endpoint_binding(cur, endpoint_id)
+                # A missing endpoint is an orphan log and remains deletable;
+                # existing managed endpoints are deliberately left untouched.
+                lock_legacy_endpoint(cur, endpoint_id)
+            cur.execute(
+                "DELETE FROM erp_push_logs log "
+                "WHERE log.user_id = %s AND log.id = ANY(%s::uuid[]) "
+                "AND (log.endpoint_id IS NULL OR NOT EXISTS "
+                "(SELECT 1 FROM erp_endpoints endpoint "
+                "WHERE endpoint.id = log.endpoint_id AND endpoint.binding_generation > 0))",
                 (user_id, list(log_ids)),
             )
             return cur.rowcount or 0

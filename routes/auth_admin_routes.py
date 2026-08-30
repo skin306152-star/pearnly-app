@@ -123,7 +123,8 @@ def admin_cleanup_demo(request: Request):
                 )
                 deleted["erp_endpoints"] = int(cur.fetchone()["deleted"] or 0)
                 cur.execute(
-                    "DELETE FROM erp_endpoints WHERE user_id = ANY(%s::uuid[])",
+                    "DELETE FROM erp_endpoints WHERE user_id = ANY(%s::uuid[]) "
+                    "AND binding_generation = 0",
                     (ids,),
                 )
                 deleted["erp_endpoints"] += cur.rowcount

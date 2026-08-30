@@ -17,9 +17,12 @@ from services.workspace import store
 
 
 @contextmanager
-def _fake_cursor(fetchone=None, fetchall=None, rowcount=1):
+def _fake_cursor(fetchone=None, fetchall=None, rowcount=1, fetchone_seq=None):
     cur = mock.MagicMock()
-    cur.fetchone.return_value = fetchone
+    if fetchone_seq is not None:
+        cur.fetchone.side_effect = list(fetchone_seq)
+    else:
+        cur.fetchone.return_value = fetchone
     cur.fetchall.return_value = fetchall or []
     cur.rowcount = rowcount
     yield cur
@@ -78,7 +81,16 @@ class CrudSqlTests(unittest.TestCase):
         self.assertIn("tenant_id = %s", captured["sql"])
 
     def test_bind_endpoint_rowcount_true(self):
-        with mock.patch("core.db.get_cursor_rls", return_value=_fake_cursor(rowcount=1)):
+        with mock.patch(
+            "core.db.get_cursor_rls",
+            return_value=_fake_cursor(
+                rowcount=1,
+                fetchone_seq=[
+                    {"id": 1},
+                    {"id": "ep-9", "user_id": "u1", "tenant_id": None, "binding_generation": 0},
+                ],
+            ),
+        ):
             self.assertTrue(store.bind_workspace_endpoint(1, "ep-9", "u1", tenant_id="t1"))
 
     def test_get_endpoint_id_reads_binding(self):

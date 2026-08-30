@@ -13,7 +13,7 @@
 > 45/45 tenant 的 rollout 有效态仍为 OFF。F1-B3B1 已按 `3ef91fea` 精确部署；F1-B3B2a
 > runtime feature SHA `fd473abd204f3dae864bcd15928333f388c98679` 经 CI `33301999658` 全绿并
 > 精确部署，生产回读通过；docs closure commit 仅记录状态，不自引用其 SHA。B3B2b 为
-> `NEXT_READY/PLANNED_UNLOCKED`，B3B3/B3C 锁定。
+> `IMPLEMENTING/CODE_CANDIDATE`，`CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`（本轮只做 owner Express legacy enroll promotion，flag 全 OFF、无 UI/真机 N/A），B3B3/B3C 锁定。
 > 每个功能仍须重新绑定自己的 CI、production SHA、
 > Companion 版本及 ERP 报表回查，不能继承任一批次基线当验收。
 
@@ -237,9 +237,11 @@ endpoint 自动合并。
   禁止猜测或回填 Profile。Profile key 只返回 `v1:sha256`，不记录、不返回规范化前后的原始目录。
 - F1-B3B1 明确不含 owner API、token/config、heartbeat、CRUD、RLS、push/log/lease/ack、UI、
   Companion、DMS、MR.ERP、auto_push、bridge 或任何 flag 开启；它不改变运行时共享行为。
-- F1-B3B2a(owner deletion guard/managed ownership/RLS/audit foundation)当前实施；B3B2b(owner manage/binding/token lifecycle)、B3B3(live heartbeat/mismatch/legacy isolation)
+- F1-B3B2a(owner deletion guard/managed ownership/RLS/audit foundation)已部署；B3B2b 当前 `IMPLEMENTING/CODE_CANDIDATE`，本微批仅 owner legacy Express enroll promotion；B3B3(live heartbeat/mismatch/legacy isolation)
   与 B3C(manual push/log/Agent lease/ack)均未解锁；B4/B5 也仍未解锁。后续必须建立稳定
   bound/live writer 与协议，再为真实 mismatch 补反证；不得复用当前被 heartbeat 覆盖的单字段假判。
+  `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`：enroll 后旧 Companion token/reporting 会被 gen0 隔离，故本批不得称 READY。
+  B3B2b-1 硬化确认 busy 必须覆盖 endpoint 全部 actor 的 pending/retrying/next_retry/任意 lease（含过期），并以安全定义函数与真实 enroll/bind race 锁住；普通 Express enqueue 的 preflight 无外部副作用，但 promotion race 仍可能丢队列/写假 history，steward bridge/过期 lease 可能真写无日志。reservation/finalize、drain、managed log/Agent/bridge 是 B3C/B3B3 硬前置；本批全 flag OFF，绝不 READY。
   B4 才交付 Console 自定义角色/邀请 UI、
   `erp.endpoint.manage` owner-only 表达、roleName
   安全渲染，以及 main/cowork 保存→正式提交→仅转换成功后推送的可见闭环，并补四语、
@@ -470,7 +472,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1/B3B2a runtime 已部署;B3B2b `NEXT_READY/PLANNED_UNLOCKED`;B3B3/B3C、B4/B5 与真机锁定 |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1/B3B2a runtime 已部署;B3B2b `IMPLEMENTING/CODE_CANDIDATE`，`CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`（enroll 微批，flag OFF、UI/真机 N/A）;B3B3/B3C、B4/B5 与真机锁定 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |
@@ -498,6 +500,9 @@ Companion 私有仓及 Windows 发布环境。缺少时对应功能进入 `BLOCK
   test。B3B1 不修此问题，也不宣称已修。
 - 独立可靠性微批待修（MEDIUM）：legacy retry worker 不校验 `endpoint.enabled`，disabled endpoint
   仍可能重试外推；B3B1 不修，B3B2 遇非终态任务先返回 409，完整 draining/lease 语义归 B3C。
+- B3B2b-1 审查补充：普通 Express enqueue 的 preflight 无外部副作用，但 promotion race
+  可能丢队列/写假 history；steward bridge/过期 lease 可能真写无日志。reservation/finalize、
+  drain、managed log/Agent/bridge 均不得在本批实现，留作 B3C/B3B3 硬前置。
 - 上下文漂移：本页只记目标与门，逐 attempt 证据只写 ledger，STATE 只保留当前状态卡。
 
 ## 9. 全计划完成定义

@@ -227,10 +227,25 @@ implementation_batches:
     audit_wiring_state: FOUNDATION_ONLY_NO_LIFECYCLE_WRITERS
     rollout_contract: ALL_TENANTS_FLAG_OFF
     evidence: CI_TRUE_PG_20_PLUS_51_ZERO_SKIPS; PRODUCTION_SCHEMA_READINESS_AND_FLAGS_READBACK; 36_ENDPOINTS_GENERATION_0_PROFILE_NULL_SHARED_SCOPE_0; MISSING_DEDUP_INDEX_SELF_HEAL_COVERED
-  - batch_id: F1-B3B2
+  - batch_id: F1-B3B2b-1
     backend_implementation_complete: false
-    release_state: PLANNED_LOCKED
-    scope: OWNER_MANAGE_BINDING_TOKEN_AND_DISABLE_DELETE_GUARDS
+    release_state: IMPLEMENTING
+    readiness: CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C
+    scope: OWNER_LEGACY_EXPRESS_ENROLL_TO_MANAGED_PROMOTION_ONLY
+    ui_verification: NOT_APPLICABLE_NO_UI
+    device_verification: NOT_APPLICABLE_UNTIL_F1_BATCH_READY
+    rollout_contract: ALL_TENANTS_FLAG_OFF
+    code: PENDING
+    tests: PENDING
+    hardening_notes:
+      - Working-tree candidate only: the busy helper scans all actor logs and treats every non-NULL lease_owner, including expired leases, as busy; no tenant flag is enabled and this batch is not READY.
+      - Independent review: ordinary Express enqueue preflight has no external side effect, but promotion races can drop a queue item or write false history; steward bridge and expired leases may write without a log.
+      - reservation/finalize, drain, managed log/Agent/bridge remain hard B3B3/B3C prerequisites.
+      - Archive replay note: the complete Alembic blank-chain replay still fails on pre-existing 002 missing-table and 0108 long-revision/varchar32 archive debt; 0111's tgattr/role defects are fixed here. Do not change 002, 0108, MR.ERP, bridge, or B3C in this batch.
+    open_issues:
+      - This batch has no token/config UI, heartbeat, Companion, LINE, push/log/lease, or MR.ERP work.
+      - Enrollment intentionally isolates the old Companion token/reporting writers; it is not usable until B3B3 restores the managed live path.
+      - Managed log read/delete/stat/export authorization remains a B3C prerequisite; this batch does not expose managed history to employees.
   - batch_id: F1-B3B3
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
@@ -567,7 +582,7 @@ user_decision:
 open_issues:
   - B3B2a is deployed at feature SHA fd473abd204f3dae864bcd15928333f388c98679 with CI 33301999658 green; the docs closure commit records this state only and must not be used as a self-referential feature SHA.
   - B3B2a P2 follow-up: real resolver/console concurrent transfer coverage and canonical membership→role→users→workspace lock-order proof remain open; this batch only proves the managed helper and transfer-shaped lock path reach their barriers without deadlock.
-  - B3B2b owner manage/binding/token lifecycle, B3B3 live heartbeat/mismatch/legacy isolation and B3C manual push/log/Agent remain locked; B3B2a audit is foundation-only and no lifecycle writer is wired.
+  - B3B2b owner manage/binding/token lifecycle is being implemented only as this enroll microbatch; B3B3 live heartbeat/mismatch/legacy isolation and B3C manual push/log/Agent remain locked; B3B2a audit is foundation-only until this writer passes review.
   - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
   - HIGH separate security microbatch remains unfixed: generic ERP webhook/test SSRF guard validates system_url while the real network sink reads url, and endpoint test does not revalidate every redirect hop. B3B Express state must not call that outbound test.
   - MEDIUM separate reliability microbatch remains unfixed: legacy retry worker does not check endpoint.enabled, so a disabled endpoint may still retry outward. B3B2 must return 409 for nonterminal tasks; full draining and lease semantics remain B3C.
@@ -575,9 +590,9 @@ open_issues:
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
   - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
 next_action: >-
-  Proceed to F1-B3B2b owner manage/binding/token lifecycle as the next planned unlocked batch,
-  while keeping every tenant flag off and preserving the B3B2a P2 lock-order follow-up. Do not start
-  B3B3/B3C, F1-B4/B5 or modify F2-F7 until separately unlocked; F1 remains IMPLEMENTING and is not
+  Complete the F1-B3B2b-1 release readback first, then proceed to F1-B3B2b-2 owner
+  rebind/enable-disable/revoke CAS, while keeping every tenant flag off. Keep B3B3/B3C,
+  F1-B4/B5 and F2-F7 locked until separately unlocked; F1 remains IMPLEMENTING and is not
   READY_FOR_DEVICE or USER_ACCEPTED.
 ```
 

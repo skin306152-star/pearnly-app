@@ -3390,3 +3390,114 @@ BEGIN
 END
 $pearnly$;
 REVOKE ALL ON FUNCTION public.purge_managed_erp_endpoints_for_users(uuid[]) FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION public.erp_endpoint_has_legacy_activity(p_endpoint_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.erp_endpoints endpoint
+    WHERE endpoint.id = $1
+      AND endpoint.binding_generation = 0
+      AND endpoint.adapter = 'express'
+      AND endpoint.user_id::text = pg_catalog.current_setting('app.current_user_id', true)
+      AND (
+        endpoint.tenant_id IS NULL
+        OR endpoint.tenant_id::text = pg_catalog.current_setting('app.current_tenant_id', true)
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM public.erp_push_logs push_log
+        WHERE push_log.endpoint_id = endpoint.id
+          AND (
+            push_log.status IN ('pending', 'retrying')
+            OR push_log.next_retry_at IS NOT NULL
+            OR push_log.lease_owner IS NOT NULL
+          )
+      )
+  );
+$pearnly$;
+REVOKE ALL ON FUNCTION public.erp_endpoint_has_legacy_activity(uuid) FROM PUBLIC;
+DO $pearnly$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'pearnly_app') THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.erp_endpoint_has_legacy_activity(uuid) TO pearnly_app';
+  END IF;
+END
+$pearnly$;
+
+CREATE OR REPLACE FUNCTION public.guard_erp_endpoint_enrollment_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+BEGIN
+  IF OLD.binding_generation = 0 AND NEW.binding_generation = 1 THEN
+    IF NEW.id IS DISTINCT FROM OLD.id
+       OR NEW.user_id IS DISTINCT FROM OLD.user_id
+       OR NEW.name IS DISTINCT FROM OLD.name
+       OR NEW.adapter IS DISTINCT FROM OLD.adapter
+       OR NEW.config IS DISTINCT FROM OLD.config
+       OR NEW.is_default IS DISTINCT FROM OLD.is_default
+       OR NEW.auto_push IS DISTINCT FROM OLD.auto_push
+       OR NEW.enabled IS DISTINCT FROM OLD.enabled
+       OR NEW.last_used_at IS DISTINCT FROM OLD.last_used_at
+       OR NEW.last_status IS DISTINCT FROM OLD.last_status
+       OR NEW.success_count IS DISTINCT FROM OLD.success_count
+       OR NEW.failure_count IS DISTINCT FROM OLD.failure_count
+       OR NEW.created_at IS DISTINCT FROM OLD.created_at
+       OR NEW.bound_account_set IS DISTINCT FROM OLD.bound_account_set
+       OR NEW.bound_profile_key IS DISTINCT FROM OLD.bound_profile_key
+       OR NEW.live_account_set IS DISTINCT FROM OLD.live_account_set
+       OR NEW.live_profile_key IS DISTINCT FROM OLD.live_profile_key
+       OR NEW.agent_last_seen_at IS DISTINCT FROM OLD.agent_last_seen_at
+       OR NEW.agent_version IS DISTINCT FROM OLD.agent_version
+    THEN
+      RAISE EXCEPTION 'ERP endpoint enrollment may only change binding columns';
+    END IF;
+  END IF;
+  RETURN NEW;
+END
+$pearnly$;
+REVOKE ALL ON FUNCTION public.guard_erp_endpoint_enrollment_columns() FROM PUBLIC;
+
+DO $pearnly$
+DECLARE
+  v_enabled "char";
+  v_tgtype SMALLINT;
+  v_tgattr TEXT;
+  v_has_when BOOLEAN;
+  v_function OID;
+BEGIN
+    SELECT tgenabled, tgtype, tgattr::text, tgqual IS NOT NULL, tgfoid
+    INTO v_enabled, v_tgtype, v_tgattr, v_has_when, v_function
+    FROM pg_trigger
+   WHERE tgrelid = 'erp_endpoints'::regclass
+     AND tgname = 'erp_endpoints_enrollment_columns_guard'
+     AND NOT tgisinternal;
+  IF NOT FOUND THEN
+    CREATE TRIGGER erp_endpoints_enrollment_columns_guard
+    BEFORE UPDATE ON public.erp_endpoints
+    FOR EACH ROW
+    EXECUTE FUNCTION public.guard_erp_endpoint_enrollment_columns();
+  ELSIF v_enabled IS DISTINCT FROM 'O'
+     OR v_tgtype IS DISTINCT FROM 19
+     OR v_tgattr IS DISTINCT FROM ''
+     OR v_has_when
+     OR v_function IS DISTINCT FROM 'public.guard_erp_endpoint_enrollment_columns()'::regprocedure
+  THEN
+    RAISE EXCEPTION
+      'erp_endpoints_enrollment_columns_guard does not match the enrollment contract';
+  END IF;
+END
+$pearnly$;
+
+ALTER TABLE erp_endpoints ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS erp_endpoints_shared_express_enroll ON erp_endpoints;
+CREATE POLICY erp_endpoints_shared_express_enroll ON erp_endpoints FOR UPDATE
+USING (binding_generation = 0 AND adapter = 'express' AND user_id::text = current_setting('app.current_user_id', true) AND (tenant_id IS NULL OR tenant_id::text = current_setting('app.current_tenant_id', true)))
+WITH CHECK (binding_generation = 1 AND adapter = 'express' AND shared_scope = TRUE AND user_id::text = current_setting('app.current_user_id', true) AND tenant_id::text = current_setting('app.current_tenant_id', true) AND workspace_client_id::text = current_setting('app.current_workspace_id', true) AND EXISTS (SELECT 1 FROM workspace_clients workspace WHERE workspace.id = erp_endpoints.workspace_client_id AND workspace.tenant_id::text = current_setting('app.current_tenant_id', true) AND workspace.is_active = TRUE) AND EXISTS (SELECT 1 FROM memberships membership JOIN roles role ON role.id = membership.role_id WHERE membership.user_id::text = current_setting('app.current_user_id', true) AND membership.tenant_id::text = current_setting('app.current_tenant_id', true) AND membership.status = 'active' AND role.name = 'owner'));

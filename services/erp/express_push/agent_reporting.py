@@ -58,11 +58,12 @@ def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
                 SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
                         'reported_account_sets', %s::jsonb,
                         'account_sets_seen_at', to_jsonb(NOW()::text))
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 """,
                 (json.dumps(sets, ensure_ascii=False), endpoint_id),
             )
-        return len(sets)
+            changed = cur.rowcount
+        return len(sets) if changed == 1 else 0
     except Exception as e:
         logger.error(f"store_account_sets failed: {e}")
         return 0
@@ -110,11 +111,12 @@ def store_reported_accounts(endpoint_id: str, accounts: Any) -> int:
                 SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
                         'reported_accounts', %s::jsonb,
                         'accounts_seen_at', to_jsonb(NOW()::text))
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 """,
                 (json.dumps(accs, ensure_ascii=False), endpoint_id),
             )
-        return len(accs)
+            changed = cur.rowcount
+        return len(accs) if changed == 1 else 0
     except Exception as e:
         logger.error(f"store_reported_accounts failed: {e}")
         return 0
@@ -195,11 +197,12 @@ def store_reported_stock_acc_groups(endpoint_id: str, candidates: Any) -> int:
                 SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
                         'reported_stock_acc_groups', %s::jsonb,
                         'stock_acc_groups_seen_at', to_jsonb(NOW()::text))
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 """,
                 (json.dumps(groups, ensure_ascii=False), endpoint_id),
             )
-        return len(groups)
+            changed = cur.rowcount
+        return len(groups) if changed == 1 else 0
     except Exception as e:
         logger.error(f"store_reported_stock_acc_groups failed: {e}")
         return 0
@@ -270,7 +273,7 @@ def store_reported_catalog(
                         'catalog_seen_at', to_jsonb(NOW()::text))
                     || CASE WHEN %s::jsonb = '{}'::jsonb THEN '{}'::jsonb
                             ELSE jsonb_build_object('catalog_fingerprint', %s::jsonb) END
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 """,
                 (
                     json.dumps(prods, ensure_ascii=False),
@@ -280,7 +283,8 @@ def store_reported_catalog(
                     endpoint_id,
                 ),
             )
-        return (len(prods), len(custs))
+            changed = cur.rowcount
+        return (len(prods), len(custs)) if changed == 1 else (0, 0)
     except Exception as e:
         logger.error(f"store_reported_catalog failed: {e}")
         return (0, 0)
@@ -302,11 +306,11 @@ def _merge_config(endpoint_id: str, patch: Dict[str, Any]) -> bool:
                 """
                 UPDATE erp_endpoints
                 SET config = COALESCE(config, '{}'::jsonb) || %s::jsonb
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 """,
                 (json.dumps(patch, ensure_ascii=False), endpoint_id),
             )
-        return True
+            return cur.rowcount == 1
     except Exception as e:
         logger.error(f"_merge_config failed: {e}")
         return False
@@ -414,11 +418,12 @@ def bump_stock_master_count(endpoint_id: str, created: int) -> bool:
                         ),
                         true
                     )
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 """,
                 (int(created), endpoint_id),
             )
-        return True
+            changed = cur.rowcount
+        return changed == 1
     except Exception as e:
         logger.error(f"bump_stock_master_count failed: {e}")
         return False
@@ -448,7 +453,7 @@ def mark_offline(endpoint_id: str) -> None:
                 UPDATE erp_endpoints
                 SET config = COALESCE(config, '{}'::jsonb)
                     || jsonb_build_object('agent_last_seen_at', '1970-01-01 00:00:00+00')
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
                 """,
                 (endpoint_id,),
             )
@@ -471,7 +476,7 @@ def touch_heartbeat(endpoint_id: str, device: str = "") -> None:
                         jsonb_set(COALESCE(config, '{}'::jsonb),
                                   '{agent_last_seen_at}', to_jsonb(NOW()::text), true),
                         '{agent_device_name}', to_jsonb(%s::text), true)
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
             """
             params = (device[:60], endpoint_id)
         else:
@@ -480,10 +485,12 @@ def touch_heartbeat(endpoint_id: str, device: str = "") -> None:
                 SET config = jsonb_set(
                         COALESCE(config, '{}'::jsonb),
                         '{agent_last_seen_at}', to_jsonb(NOW()::text), true)
-                WHERE id = %s AND adapter = 'express'
+                WHERE id = %s AND adapter = 'express' AND binding_generation = 0
             """
             params = (endpoint_id,)
         with db.get_cursor(commit=True) as cur:
             cur.execute(sql, params)
+            changed = cur.rowcount
+        return changed == 1
     except Exception as e:
         logger.error(f"touch_heartbeat failed: {e}")

@@ -25,15 +25,19 @@ from services.erp.express_push import agent_store  # noqa: E402
 class FakeCursor:
     """记录 execute · fetchone/fetchall 返预设值。"""
 
-    def __init__(self, one=None, many=None):
+    def __init__(self, one=None, many=None, rowcount=1, one_seq=None):
         self._one = one
+        self._one_seq = list(one_seq or [])
         self._many = many or []
+        self.rowcount = rowcount
         self.executed = []
 
     def execute(self, sql, params=None):
         self.executed.append((sql, params))
 
     def fetchone(self):
+        if self._one_seq:
+            return self._one_seq.pop(0)
         return self._one
 
     def fetchall(self):
@@ -127,7 +131,7 @@ class LeaseAckTests(unittest.TestCase):
                 "lease_expires_at": None,
             }
         ]
-        with _patch_cursor(FakeCursor(many=rows)):
+        with _patch_cursor(FakeCursor(many=rows, one={"id": "ep-1"})):
             out = agent_store.lease_pending("ep-1", "agentA", 5)
         self.assertEqual(out[0]["id"], "log-1")
         self.assertEqual(out[0]["request_body"]["account_set"], "DATAT")

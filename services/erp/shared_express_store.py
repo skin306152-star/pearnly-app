@@ -85,6 +85,7 @@ def fetch_visible_endpoint_rows(
         FROM erp_endpoints
         WHERE (
             user_id = %s
+            AND binding_generation = 0
             AND (tenant_id IS NULL OR tenant_id = %s)
             AND (workspace_client_id IS NULL OR workspace_client_id = %s)
         ) OR (

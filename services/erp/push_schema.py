@@ -268,7 +268,10 @@ def ensure_single_express_endpoint():
                 rows = cur.fetchall() or []
                 for r in rows[1:]:  # rows[0] = 保留(有推送优先 · 再按 last_used 最近)
                     if int(r["n_logs"]) == 0:
-                        cur.execute("DELETE FROM erp_endpoints WHERE id = %s", (r["id"],))
+                        cur.execute(
+                            "DELETE FROM erp_endpoints WHERE id = %s AND binding_generation = 0",
+                            (r["id"],),
+                        )
                         logger.info(
                             "[express-dedup] 删除重复空端点 user=%s id=%s",
                             str(uid)[:8],

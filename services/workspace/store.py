@@ -29,6 +29,11 @@ from services.workspace.seller_routing import (  # noqa: F401,E402
     match_workspace_for_seller,
     update_history_workspace_client_id,
 )
+from services.workspace.endpoint_binding import (  # noqa: F401,E402
+    bind_workspace_endpoint,
+    lock_endpoint_binding,
+    lock_bindable_erp_endpoint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +168,10 @@ def create_workspace_client(
     stype = _norm_subject_type(subject_type)
     try:
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
+            # 新建 workspace 尚无目标行可锁；endpoint 校验先行，随后 INSERT 保持原子。
+            lock_endpoint_binding(cur, erp_endpoint_id)
+            if not lock_bindable_erp_endpoint(cur, erp_endpoint_id, str(user_id), tenant_id):
+                return None
             if stype == "personal":
                 existing = _find_active_personal(cur, str(user_id), tenant_id)
                 if existing:
@@ -441,44 +450,6 @@ def list_workspace_clients_enriched(
         logger.warning(f"list_workspace_clients_enriched failed: {e}")
         # 兜底:退回不带统计的基础列表(不让管理页白屏)
         return list_workspace_clients(user_id, tenant_id=tenant_id, active_only=active_only)
-
-
-def bind_workspace_endpoint(
-    workspace_client_id: int,
-    erp_endpoint_id: Optional[str],
-    user_id: str,
-    tenant_id: Optional[str] = None,
-) -> bool:
-    """把账套主体绑到一个**已有** ERP endpoint(erp_endpoint_id=None 解绑)。
-
-    只绑定 · 绝不创建 ERP 账套(Pearnly 不自动建账套主体)。tenant 隔离。
-    """
-    try:
-        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
-            if tenant_id:
-                cur.execute(
-                    "UPDATE workspace_clients SET erp_endpoint_id = %s, updated_at = NOW() "
-                    "WHERE id = %s AND tenant_id = %s",
-                    (
-                        (str(erp_endpoint_id).strip() if erp_endpoint_id else None),
-                        int(workspace_client_id),
-                        tenant_id,
-                    ),
-                )
-            else:
-                cur.execute(
-                    "UPDATE workspace_clients SET erp_endpoint_id = %s, updated_at = NOW() "
-                    "WHERE id = %s AND user_id = %s AND tenant_id IS NULL",
-                    (
-                        (str(erp_endpoint_id).strip() if erp_endpoint_id else None),
-                        int(workspace_client_id),
-                        str(user_id),
-                    ),
-                )
-            return cur.rowcount > 0
-    except Exception as e:
-        logger.error(f"bind_workspace_endpoint failed: {e}")
-        return False
 
 
 def get_workspace_endpoint_id(

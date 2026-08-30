@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS erp_endpoints (
     config     JSONB NOT NULL DEFAULT '{}'::jsonb,
     enabled    BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    binding_generation BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT erp_endpoints_adapter_chk CHECK (adapter IN (
         'webhook', 'xero', 'flowaccount', 'mrerp', 'mrerp_dms', 'express'))
 );

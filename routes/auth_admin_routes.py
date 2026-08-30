@@ -86,7 +86,7 @@ def admin_cleanup_demo(request: Request):
         _require_super_admin(request)
         from core import db as _db
 
-        deleted = {"users": 0, "ocr_history": 0, "clients": 0}
+        deleted = {"users": 0, "ocr_history": 0, "clients": 0, "erp_endpoints": 0}
         # 超管跨租户清理 demo 账号(含 ocr_history/clients/ocr_cost_log)→ 显式 bypass。
         with _db.get_cursor_rls(bypass=True, commit=True) as cur:
             # 找出要删的用户(demo / demo_plus / 任何 username 以 demo_ 开头)
@@ -116,6 +116,28 @@ def admin_cleanup_demo(request: Request):
                 deleted["clients"] = cur.rowcount
             except Exception as e:
                 logger.warning(f"cleanup clients skip: {e}")
+            try:
+                cur.execute(
+                    "SELECT public.purge_managed_erp_endpoints_for_users(%s::uuid[]) AS deleted",
+                    (ids,),
+                )
+                deleted["erp_endpoints"] = int(cur.fetchone()["deleted"] or 0)
+                cur.execute(
+                    "DELETE FROM erp_endpoints WHERE user_id = ANY(%s::uuid[])",
+                    (ids,),
+                )
+                deleted["erp_endpoints"] += cur.rowcount
+                cur.execute(
+                    "SELECT count(*) AS remaining FROM erp_endpoints "
+                    "WHERE user_id = ANY(%s::uuid[])",
+                    (ids,),
+                )
+                remaining = int(cur.fetchone()["remaining"] or 0)
+                if remaining:
+                    raise RuntimeError(f"{remaining} demo ERP endpoint(s) remain")
+            except Exception as e:
+                logger.error(f"cleanup erp_endpoints failed closed: {e}")
+                raise HTTPException(status_code=503, detail="demo_endpoint_cleanup_failed") from e
             # 其他可能的关联表(安全 try)
             for tbl in [
                 "ocr_cost_log",

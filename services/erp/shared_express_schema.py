@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from core import db
 from core.rls import ERP_SHARED_EXPRESS_SELECT_DDL
+from services.erp.shared_express_managed_schema import managed_foundation_ready
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 
 SHARED_EXPRESS_SESSION_GUC = "app.erp_shared_express_endpoint"
@@ -101,6 +102,8 @@ def ensure_shared_express_foundation() -> None:
 def enable_shared_express_select(cur, tenant_id: str, workspace_client_id: object) -> bool:
     """Bind shared visibility to the validated tenant and cursor workspace."""
     cur.execute(f"SET LOCAL {SHARED_EXPRESS_SESSION_GUC} = 'off'")
+    if not managed_foundation_ready():
+        return False
     tenant_scope = str(tenant_id).strip() if tenant_id is not None else ""
     workspace_scope = str(workspace_client_id).strip() if workspace_client_id is not None else ""
     if not tenant_scope or not workspace_scope:

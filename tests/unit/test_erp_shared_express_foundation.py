@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from services.erp import shared_express_flag, shared_express_schema
+from services.erp import shared_express_flag, shared_express_managed_schema, shared_express_schema
 
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "alembic" / "versions" / "0108_erp_shared_express_foundation.py"
@@ -58,6 +58,13 @@ class SharedExpressFlagTests(unittest.TestCase):
 
 
 class SharedExpressSchemaTests(unittest.TestCase):
+    def setUp(self):
+        self._previous_managed_ready = shared_express_managed_schema._MANAGED_FOUNDATION_READY
+        shared_express_managed_schema._MANAGED_FOUNDATION_READY = True
+
+    def tearDown(self):
+        shared_express_managed_schema._MANAGED_FOUNDATION_READY = self._previous_managed_ready
+
     def test_additive_columns_and_exact_partial_unique(self):
         ddl = _norm(" ".join(shared_express_schema.SHARED_EXPRESS_DDL))
         self.assertIn("erp_endpoints add column if not exists workspace_client_id bigint", ddl)

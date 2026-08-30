@@ -15,6 +15,95 @@ from core import db
 
 logger = logging.getLogger(__name__)
 
+_ERP_ENDPOINT_AUDIT_ACTIONS = frozenset(
+    {
+        "erp.endpoint.enroll",
+        "erp.endpoint.bind",
+        "erp.endpoint.rebind",
+        "erp.endpoint.disable",
+        "erp.endpoint.revoke",
+        "erp.endpoint.enable",
+        "erp.endpoint.rotate_token",
+    }
+)
+_ERP_ENDPOINT_AUDIT_DETAIL_KEYS = frozenset(
+    {
+        "workspace_client_id",
+        "generation_before",
+        "generation_after",
+        "enabled_before",
+        "enabled_after",
+        "shared_scope_before",
+        "shared_scope_after",
+        "profile_changed",
+        "reason",
+    }
+)
+
+
+def insert_operation_log_tx(
+    cur,
+    *,
+    tenant_id: str,
+    actor_user_id: str,
+    actor_username: Optional[str],
+    actor_is_super: bool,
+    action: str,
+    target_type: str,
+    target_id: str,
+    target_name: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    ip: Optional[str] = None,
+    ua: Optional[str] = None,
+) -> None:
+    """Write a required ERP endpoint lifecycle audit on the caller's transaction."""
+    if action not in _ERP_ENDPOINT_AUDIT_ACTIONS or target_type != "erp_endpoint":
+        raise ValueError("unsupported ERP endpoint lifecycle audit")
+    if not str(tenant_id or "").strip() or not str(actor_user_id or "").strip():
+        raise ValueError("ERP endpoint lifecycle audit requires tenant and actor")
+    if not str(target_id or "").strip():
+        raise ValueError("ERP endpoint lifecycle audit requires a target")
+    detail_payload = details or {}
+    if not isinstance(detail_payload, dict):
+        raise ValueError("operation log details must be an object")
+    unexpected = set(detail_payload) - _ERP_ENDPOINT_AUDIT_DETAIL_KEYS
+    if unexpected:
+        raise ValueError("operation log details contain unsupported keys")
+    for key, value in detail_payload.items():
+        if key == "reason":
+            if not isinstance(value, str) or len(value) > 200:
+                raise ValueError("operation log reason must be a short string")
+        elif key == "workspace_client_id":
+            if not isinstance(value, (str, int)) or isinstance(value, bool):
+                raise ValueError("workspace_client_id must be scalar")
+        elif key in {"generation_before", "generation_after"}:
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise ValueError("binding generation must be an integer")
+        elif not isinstance(value, bool):
+            raise ValueError(f"operation log detail {key} must be boolean")
+
+    cur.execute(
+        """
+        INSERT INTO operation_logs (
+            tenant_id, actor_user_id, actor_username, actor_is_super,
+            action, target_type, target_id, target_name, details, ip, ua
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+        """,
+        (
+            str(tenant_id),
+            str(actor_user_id),
+            actor_username,
+            bool(actor_is_super),
+            action,
+            target_type,
+            str(target_id),
+            target_name,
+            _json.dumps(detail_payload, ensure_ascii=False),
+            ip,
+            (ua or "")[:300],
+        ),
+    )
+
 
 def insert_operation_log(
     tenant_id: Optional[str],

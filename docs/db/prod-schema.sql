@@ -4,7 +4,8 @@
 -- 事实源说明见该脚本文件头。这份文件不被任何运行期代码读取或执行;
 -- 它的读者是①灾备重建 ②DDL 覆盖闸(tests/unit/test_schema_ddl_coverage.py)③ PR reviewer。
 --
--- 不含:数据、权限/角色、RLS 策略、触发器、扩展。只有表/列/约束/索引。
+-- 不含:数据、权限/角色、RLS 策略、扩展。包含 managed Express creator-delete 触发器，
+-- 因为它是 endpoint ownership 数据完整性的一部分。
 -- 生成顺序按表名排序,便于 diff;因此 FOREIGN KEY 单独列在末尾而非表内联。
 
 
@@ -764,7 +765,7 @@ CREATE INDEX idx_erp_cli_map_tenant ON public.erp_client_mappings USING btree (t
 
 CREATE TABLE IF NOT EXISTS "erp_endpoints" (
   "id" uuid DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL,
+  "user_id" uuid,
   "name" text NOT NULL,
   "adapter" text NOT NULL,
   "config" jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -790,13 +791,16 @@ CREATE TABLE IF NOT EXISTS "erp_endpoints" (
   CONSTRAINT "erp_endpoints_adapter_chk" CHECK ((adapter = ANY (ARRAY['webhook'::text, 'xero'::text, 'flowaccount'::text, 'mrerp'::text, 'mrerp_dms'::text, 'express'::text]))),
   CONSTRAINT "erp_endpoints_binding_generation_chk" CHECK ((binding_generation >= 0)),
   CONSTRAINT "erp_endpoints_bound_profile_pair_chk" CHECK (((bound_account_set IS NULL) = (bound_profile_key IS NULL))),
+  CONSTRAINT "erp_endpoints_legacy_creator_chk" CHECK (((binding_generation > 0) OR (user_id IS NOT NULL))),
   CONSTRAINT "erp_endpoints_live_profile_pair_chk" CHECK (((live_account_set IS NULL) = (live_profile_key IS NULL))),
+  CONSTRAINT "erp_endpoints_managed_scope_chk" CHECK (((binding_generation = 0) OR ((tenant_id IS NOT NULL) AND (workspace_client_id IS NOT NULL) AND (adapter = 'express'::text)))),
+  CONSTRAINT "erp_endpoints_shared_generation_chk" CHECK ((NOT shared_scope OR binding_generation > 0)),
   CONSTRAINT "erp_endpoints_pkey" PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX idx_erp_endpoints_one_default_per_user ON public.erp_endpoints USING btree (user_id) WHERE (is_default = true);
 CREATE INDEX idx_erp_endpoints_tenant_id ON public.erp_endpoints USING btree (tenant_id);
 CREATE INDEX idx_erp_endpoints_user ON public.erp_endpoints USING btree (user_id, enabled, is_default DESC);
-CREATE UNIQUE INDEX uq_erp_endpoints_user_express ON public.erp_endpoints USING btree (user_id) WHERE (adapter = 'express'::text);
+CREATE UNIQUE INDEX uq_erp_endpoints_user_express ON public.erp_endpoints USING btree (user_id) WHERE ((adapter = 'express'::text) AND (binding_generation = 0));
 CREATE UNIQUE INDEX uq_erp_endpoints_shared_express_workspace ON public.erp_endpoints USING btree (tenant_id, workspace_client_id, adapter) WHERE ((enabled = true) AND (shared_scope = true) AND (adapter = 'express'::text) AND (tenant_id IS NOT NULL) AND (workspace_client_id IS NOT NULL));
 
 CREATE TABLE IF NOT EXISTS "erp_oauth_states" (
@@ -3238,6 +3242,7 @@ ALTER TABLE "erp_client_mappings" ADD CONSTRAINT "erp_client_mappings_client_id_
 ALTER TABLE "erp_client_mappings" ADD CONSTRAINT "erp_client_mappings_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
 ALTER TABLE "erp_client_mappings" ADD CONSTRAINT "erp_client_mappings_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
 ALTER TABLE "erp_endpoints" ADD CONSTRAINT "erp_endpoints_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE "erp_endpoints" ADD CONSTRAINT "erp_endpoints_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
 ALTER TABLE "erp_oauth_tokens" ADD CONSTRAINT "erp_oauth_tokens_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
 ALTER TABLE "erp_oauth_tokens" ADD CONSTRAINT "erp_oauth_tokens_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
 ALTER TABLE "erp_product_mappings" ADD CONSTRAINT "erp_product_mappings_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
@@ -3320,3 +3325,68 @@ ALTER TABLE "vat_report" ADD CONSTRAINT "vat_report_client_id_fkey" FOREIGN KEY 
 ALTER TABLE "work_order_deliverables" ADD CONSTRAINT "work_order_deliverables_work_order_id_fkey" FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT;
 ALTER TABLE "work_order_events" ADD CONSTRAINT "work_order_events_work_order_id_fkey" FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT;
 ALTER TABLE "work_order_items" ADD CONSTRAINT "work_order_items_work_order_id_fkey" FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT;
+
+CREATE OR REPLACE FUNCTION public.preserve_managed_erp_endpoints_on_user_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+BEGIN
+  EXECUTE format(
+    'UPDATE %I.erp_endpoints SET user_id = NULL, updated_at = clock_timestamp() '
+    'WHERE user_id = $1 AND binding_generation > 0',
+    TG_TABLE_SCHEMA
+  ) USING OLD.id;
+  RETURN OLD;
+END
+$pearnly$;
+REVOKE ALL ON FUNCTION public.preserve_managed_erp_endpoints_on_user_delete() FROM PUBLIC;
+
+CREATE TRIGGER erp_endpoints_preserve_managed_creator_delete
+BEFORE DELETE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.preserve_managed_erp_endpoints_on_user_delete();
+
+CREATE OR REPLACE FUNCTION public.prevent_managed_erp_endpoint_creator_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+BEGIN
+  IF OLD.binding_generation > 0
+     AND NEW.user_id IS DISTINCT FROM OLD.user_id
+     AND pg_trigger_depth() = 1
+  THEN
+    RAISE EXCEPTION 'managed ERP endpoint creator is immutable';
+  END IF;
+  RETURN NEW;
+END
+$pearnly$;
+REVOKE ALL ON FUNCTION public.prevent_managed_erp_endpoint_creator_change() FROM PUBLIC;
+
+CREATE TRIGGER erp_endpoints_managed_creator_immutable
+BEFORE UPDATE OF user_id ON public.erp_endpoints
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_managed_erp_endpoint_creator_change();
+
+CREATE OR REPLACE FUNCTION public.purge_managed_erp_endpoints_for_users(p_user_ids uuid[])
+RETURNS bigint
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+DECLARE
+  v_deleted bigint;
+BEGIN
+  IF p_user_ids IS NULL OR cardinality(p_user_ids) > 1000 THEN
+    RAISE EXCEPTION 'managed endpoint cleanup requires at most 1000 user ids';
+  END IF;
+  DELETE FROM public.erp_endpoints
+   WHERE user_id = ANY (p_user_ids) AND binding_generation > 0;
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END
+$pearnly$;
+REVOKE ALL ON FUNCTION public.purge_managed_erp_endpoints_for_users(uuid[]) FROM PUBLIC;

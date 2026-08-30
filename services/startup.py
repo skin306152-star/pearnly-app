@@ -108,6 +108,15 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 shared Express Profile 底座失败(等 alembic 0109): {e}")
 
+    try:
+        from services.erp.shared_express_managed_schema import (
+            ensure_shared_express_managed_foundation,
+        )
+
+        ensure_shared_express_managed_foundation()
+    except Exception as e:
+        logger.warning(f"启动 shared Express managed ownership 失败(等 alembic 0110): {e}")
+
     # B8 RLS 孤儿表 enroll(纯 enroll·建表 ensure 之后、ensure_no_orphan_rls 之前·见 services/rls_boot)。
     # 包 try 与所有兄弟块一致:enroll 批异常绝不连坐后续 schema 块与末步 ensure_no_orphan_rls 自愈守卫。
     try:

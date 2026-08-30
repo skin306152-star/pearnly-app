@@ -10,8 +10,9 @@
 > 基线日期：2026-08-30。规划提交为 `e37bfed7`，F1-B1 默认休眠底座已按 `57fb5480`
 > 精确部署；F1-B2 后端为 `14b141c2`，连同测试隔离修 `be959c05` 经 CI `33253769492`
 > 全绿并精确部署；F1-B3A 为 `f37f824e`，经 CI `33292287719` 全绿并精确部署，生产
-> 45/45 tenant 的 rollout 有效态仍为 OFF。当前源码发布基线为 `f37f824e`，仅 F1-B3B1
-> typed binding schema 与纯 Profile key 在未提交工作树实施；B3B2/B3B3/B3C 锁定。
+> 45/45 tenant 的 rollout 有效态仍为 OFF。F1-B3B1 已按 `3ef91fea` 精确部署；当前仅
+> F1-B3B2a managed ownership/RLS、creator 删除保护与 transaction audit foundation 在未提交
+> 工作树实施；B3B2b/B3B3/B3C 锁定。
 > 每个功能仍须重新绑定自己的 CI、production SHA、
 > Companion 版本及 ERP 报表回查，不能继承任一批次基线当验收。
 
@@ -86,10 +87,14 @@ Express、在一台能访问 Express 的 Windows 电脑安装小助手、邀请�
   `be959c05998f185b7bd978975487a1246ec17f39`，但 45/45 tenant 的 flag 有效态均为 OFF。
 - F1-B3A 共享 Express endpoint 只读清单、安全 DTO 与服务端在线态已按 `f37f824e`、CI
   `33292287719` 精确部署；45/45 tenant flag OFF，未放量。
-- F1-B3B1 正在实施七个 typed binding/agent 字段、三个数据 CHECK、Alembic + startup ensure +
-  fresh baseline 双跑，以及规范化 `account_set + Windows account_dir` 后不可逆、版本化的
-  Profile key 纯函数。它不接 writer、owner API、token、heartbeat 或 route，不能宣称已检测
-  bound/live Profile mismatch。B3B2/B3B3、B3C、网页 UI、测试 tenant 放量与真机仍锁定。
+- F1-B3B1 七个 typed binding/agent 字段、三个数据 CHECK、Alembic + startup ensure + fresh
+  baseline 双跑，以及规范化 `account_set + Windows account_dir` 后不可逆、版本化的 Profile
+  key 纯函数已按 `3ef91fea` 部署。它不接 writer、owner API、token、heartbeat 或 route，不能
+  宣称已检测 bound/live Profile mismatch。
+- F1-B3B2a 当前实施 managed ownership/RLS、creator 删除分流与不可变 creator DB trigger、
+  tenant cascade/cleanup bypass、transaction-local audit helper 和 startup readiness fail-closed；
+  audit 仅底座，不代表真实 lifecycle audit 已接线。B3B2b/B3B3、B3C、网页 UI、测试 tenant
+  放量与真机仍锁定。
 
 主要证据入口：
 
@@ -221,7 +226,7 @@ endpoint 自动合并。
   workspace 的 active shared Express；无 manage 权限只返严格 DTO，在线态用服务器时间和 180 秒
   边界判定；现有可观测异常（如非法 heartbeat 时间、已心跳但缺 account_set）才进入
   `needs_attention`。flag-off 与其它入口仍走原 user-scoped 清单。B3A 不含任何写接口。
-- F1-B3B1 是当前唯一施工批：只增加 `bound_account_set`、`bound_profile_key`、
+- F1-B3B1 已部署：只增加 `bound_account_set`、`bound_profile_key`、
   `live_account_set`、`live_profile_key`、`agent_last_seen_at`、`agent_version` 与
   `binding_generation` 七个 typed 字段，约束 bound/live 各自同空同非空且 generation 非负；
   Alembic archive 与 startup ensure 在 ADD 后都从 catalog 校验同名七列的 type、nullability、
@@ -229,7 +234,7 @@ endpoint 自动合并。
   禁止猜测或回填 Profile。Profile key 只返回 `v1:sha256`，不记录、不返回规范化前后的原始目录。
 - F1-B3B1 明确不含 owner API、token/config、heartbeat、CRUD、RLS、push/log/lease/ack、UI、
   Companion、DMS、MR.ERP、auto_push、bridge 或任何 flag 开启；它不改变运行时共享行为。
-- F1-B3B2(owner manage/binding/token/停用删除保护)、B3B3(live heartbeat/mismatch/legacy isolation)
+- F1-B3B2a(owner deletion guard/managed ownership/RLS/audit foundation)当前实施；B3B2b(owner manage/binding/token lifecycle)、B3B3(live heartbeat/mismatch/legacy isolation)
   与 B3C(manual push/log/Agent lease/ack)均未解锁；B4/B5 也仍未解锁。后续必须建立稳定
   bound/live writer 与协议，再为真实 mismatch 补反证；不得复用当前被 heartbeat 覆盖的单字段假判。
   B4 才交付 Console 自定义角色/邀请 UI、
@@ -246,6 +251,8 @@ B1/B2 已部署仍只代表 F1 的数据与后端前置，不代表 F1 `CODE_VER
 - `erp_endpoints` 增加 tenant/workspace 所有权字段；仅 active shared Express 建上述 partial
   unique `(tenant_id, workspace_client_id, adapter)`，并保留非 Express 与非 active 记录。
 - `erp_push_logs` 不另建状态；补齐/校验 tenant、workspace，`user_id` 继续记录 actor。
+- `app.*` managed RLS GUC 仅是 trusted database role 的 transaction-local routing gate，不是
+  身份认证边界；调用方必须先建立已认证的 tenant/user context。
 - 预计涉及 `services/erp/push_store.py`、`routes/erp_endpoints_routes.py`、
   `routes/erp_push_log_routes.py`、`services/erp/express_push/agent_store.py`、权限解析与迁移文件。
 - Companion：**零改动**，沿用已安装单 Profile 与现有 token。
@@ -460,7 +467,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A 已部署;仅 B3B1 schema+纯 key 实施;B3B2/B3B3/B3C、B4/B5 与真机锁定 |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1 已部署;B3B2a ownership foundation 实施;B3B2b/B3B3/B3C、B4/B5 与真机锁定 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |
@@ -504,5 +511,5 @@ Companion 私有仓及 Windows 发布环境。缺少时对应功能进入 `BLOCK
   验证时间与保留/关闭原因；不得以 `pending`、口头“再决定放量”结束全计划。
 - 无未处理的数据完整性、安全或重复过账 P0/P1。
 
-当前只允许推进 F1-B3B1 typed binding schema 与纯 Profile key；`erp_shared_express_endpoint`
+当前只允许推进 F1-B3B2a managed ownership foundation；`erp_shared_express_endpoint`
 在 B5 测试 tenant 放量前继续全租户关闭。F1-B3B2/B3B3/B3C、F1-B4/B5 及 F2-F7 禁止提前施工。

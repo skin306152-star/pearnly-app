@@ -222,10 +222,12 @@ def ensure_erp_push_rls():
     等系统路径裸 get_cursor 不破;业务连接 SET ROLE pearnly_app 后强制。这两张是 legacy 表无
     CREATE 钩子,故独立 ensure_*_rls(对齐 ensure_bank_recon_rls 范式)。"""
     from core.rls import apply_user_rls
+    from services.erp.shared_express_managed_schema import apply_shared_express_managed_rls
 
     try:
         with db.get_cursor(commit=True) as cur:
-            apply_user_rls(cur, "erp_endpoints", "erp_push_logs")
+            apply_user_rls(cur, "erp_push_logs")
+            apply_shared_express_managed_rls(cur)
     except Exception as e:
         logger.warning(f"ensure_erp_push_rls failed: {e}")
 
@@ -237,14 +239,15 @@ def ensure_single_express_endpoint():
     在推送目标列表里显示成"2 个 Express"。这里自愈清理 + 部分唯一索引锁死源头:
       1. 找出有 >1 express 的用户;保守删除多余的【0 条推送日志】端点(保留有历史/有推送的那条)。
       2. 仍有用户残留多条带日志的 express → 不自动删、不建索引,告警交人工(防误删历史)。
-      3. 无残留 → 建 `WHERE adapter='express'` 部分唯一索引,DB 层堵住并发/多标签再建第二条。
+      3. 无残留 → 建仅约束 legacy(`binding_generation=0`)的部分唯一索引；managed creator
+         endpoint 可与 legacy endpoint 共存，DB 层仍堵住 legacy 并发重复。
     幂等 · 不抛(失败不挡启动)。
     """
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute("""
                 SELECT user_id FROM erp_endpoints
-                WHERE adapter = 'express'
+                WHERE adapter = 'express' AND binding_generation = 0
                 GROUP BY user_id HAVING count(*) > 1
                 """)
             dup_users = [r["user_id"] for r in (cur.fetchall() or [])]
@@ -255,7 +258,7 @@ def ensure_single_express_endpoint():
                            (SELECT count(*) FROM erp_push_logs l
                             WHERE l.endpoint_id = e.id) AS n_logs
                     FROM erp_endpoints e
-                    WHERE e.adapter = 'express' AND e.user_id = %s
+                    WHERE e.adapter = 'express' AND e.binding_generation = 0 AND e.user_id = %s
                     ORDER BY (SELECT count(*) FROM erp_push_logs l
                               WHERE l.endpoint_id = e.id) DESC,
                              e.last_used_at DESC NULLS LAST, e.created_at DESC
@@ -277,15 +280,26 @@ def ensure_single_express_endpoint():
                             str(uid)[:8],
                         )
             cur.execute("""
-                SELECT 1 FROM erp_endpoints WHERE adapter = 'express'
+                SELECT 1 FROM erp_endpoints
+                WHERE adapter = 'express' AND binding_generation = 0
                 GROUP BY user_id HAVING count(*) > 1 LIMIT 1
                 """)
             if cur.fetchone():
                 logger.warning("[express-dedup] 仍有用户存在多条 express · 暂不建唯一索引")
                 return
             cur.execute(
+                "SELECT pg_get_expr(index_meta.indpred, index_meta.indrelid) AS predicate "
+                "FROM pg_index index_meta "
+                "WHERE index_meta.indexrelid = to_regclass('uq_erp_endpoints_user_express')"
+            )
+            index_row = cur.fetchone()
+            predicate = str((index_row or {}).get("predicate") or "").lower()
+            if not predicate or "adapter" not in predicate or "binding_generation" not in predicate:
+                cur.execute("DROP INDEX IF EXISTS uq_erp_endpoints_user_express")
+            cur.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_erp_endpoints_user_express "
-                "ON erp_endpoints (user_id) WHERE adapter = 'express'"
+                "ON erp_endpoints (user_id) "
+                "WHERE adapter = 'express' AND binding_generation = 0"
             )
             logger.info("erp_endpoints · 单 express 部分唯一索引就绪")
     except Exception as e:

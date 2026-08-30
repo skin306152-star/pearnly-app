@@ -199,7 +199,7 @@ CREATE INDEX IF NOT EXISTS idx_email_ingest_seen_uids_tenant_id ON public.email_
 
 CREATE TABLE IF NOT EXISTS "erp_endpoints" (
   "id" uuid DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL,
+  "user_id" uuid,
   "name" text NOT NULL,
   "adapter" text NOT NULL,
   "config" jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -225,13 +225,16 @@ CREATE TABLE IF NOT EXISTS "erp_endpoints" (
   CONSTRAINT "erp_endpoints_adapter_chk" CHECK ((adapter = ANY (ARRAY['webhook'::text, 'xero'::text, 'flowaccount'::text, 'mrerp'::text, 'mrerp_dms'::text, 'express'::text]))),
   CONSTRAINT "erp_endpoints_binding_generation_chk" CHECK ((binding_generation >= 0)),
   CONSTRAINT "erp_endpoints_bound_profile_pair_chk" CHECK (((bound_account_set IS NULL) = (bound_profile_key IS NULL))),
+  CONSTRAINT "erp_endpoints_legacy_creator_chk" CHECK (((binding_generation > 0) OR (user_id IS NOT NULL))),
   CONSTRAINT "erp_endpoints_live_profile_pair_chk" CHECK (((live_account_set IS NULL) = (live_profile_key IS NULL))),
+  CONSTRAINT "erp_endpoints_managed_scope_chk" CHECK (((binding_generation = 0) OR ((tenant_id IS NOT NULL) AND (workspace_client_id IS NOT NULL) AND (adapter = 'express'::text)))),
+  CONSTRAINT "erp_endpoints_shared_generation_chk" CHECK ((NOT shared_scope OR binding_generation > 0)),
   CONSTRAINT "erp_endpoints_pkey" PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_erp_endpoints_one_default_per_user ON public.erp_endpoints USING btree (user_id) WHERE (is_default = true);
 CREATE INDEX IF NOT EXISTS idx_erp_endpoints_tenant_id ON public.erp_endpoints USING btree (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_erp_endpoints_user ON public.erp_endpoints USING btree (user_id, enabled, is_default DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_erp_endpoints_user_express ON public.erp_endpoints USING btree (user_id) WHERE (adapter = 'express'::text);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_erp_endpoints_user_express ON public.erp_endpoints USING btree (user_id) WHERE ((adapter = 'express'::text) AND (binding_generation = 0));
 
 CREATE TABLE IF NOT EXISTS "erp_oauth_states" (
   "state" text NOT NULL,
@@ -656,3 +659,113 @@ CREATE INDEX IF NOT EXISTS idx_users_signup_source ON public.users USING btree (
 CREATE INDEX IF NOT EXISTS idx_users_signup_subnet ON public.users USING btree (signup_ip_subnet, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON public.users USING btree (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_users_username ON public.users USING btree (username);
+
+DO $pearnly$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'erp_endpoints'::regclass
+      AND conname = 'erp_endpoints_user_id_fkey'
+  ) THEN
+    ALTER TABLE erp_endpoints
+      ADD CONSTRAINT erp_endpoints_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'erp_endpoints'::regclass
+      AND conname = 'erp_endpoints_tenant_id_fkey'
+  ) THEN
+    ALTER TABLE erp_endpoints
+      ADD CONSTRAINT erp_endpoints_tenant_id_fkey
+      FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+  END IF;
+END
+$pearnly$;
+
+CREATE OR REPLACE FUNCTION public.purge_managed_erp_endpoints_for_users(p_user_ids uuid[])
+RETURNS bigint
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+DECLARE
+  v_deleted bigint;
+BEGIN
+  IF p_user_ids IS NULL OR cardinality(p_user_ids) > 1000 THEN
+    RAISE EXCEPTION 'managed endpoint cleanup requires at most 1000 user ids';
+  END IF;
+  DELETE FROM public.erp_endpoints
+   WHERE user_id = ANY (p_user_ids) AND binding_generation > 0;
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END
+$pearnly$;
+REVOKE ALL ON FUNCTION public.purge_managed_erp_endpoints_for_users(uuid[]) FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION public.prevent_managed_erp_endpoint_creator_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+BEGIN
+  IF OLD.binding_generation > 0
+     AND NEW.user_id IS DISTINCT FROM OLD.user_id
+     AND pg_trigger_depth() = 1
+  THEN
+    RAISE EXCEPTION 'managed ERP endpoint creator is immutable';
+  END IF;
+  RETURN NEW;
+END
+$pearnly$;
+REVOKE ALL ON FUNCTION public.prevent_managed_erp_endpoint_creator_change() FROM PUBLIC;
+
+DO $pearnly$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'erp_endpoints'::regclass
+      AND tgname = 'erp_endpoints_managed_creator_immutable'
+      AND NOT tgisinternal
+  ) THEN
+    CREATE TRIGGER erp_endpoints_managed_creator_immutable
+    BEFORE UPDATE OF user_id ON public.erp_endpoints
+    FOR EACH ROW
+    EXECUTE FUNCTION public.prevent_managed_erp_endpoint_creator_change();
+  END IF;
+END
+$pearnly$;
+
+CREATE OR REPLACE FUNCTION public.preserve_managed_erp_endpoints_on_user_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $pearnly$
+BEGIN
+  EXECUTE format(
+    'UPDATE %I.erp_endpoints SET user_id = NULL, updated_at = clock_timestamp() '
+    'WHERE user_id = $1 AND binding_generation > 0',
+    TG_TABLE_SCHEMA
+  ) USING OLD.id;
+  RETURN OLD;
+END
+$pearnly$;
+REVOKE ALL ON FUNCTION public.preserve_managed_erp_endpoints_on_user_delete() FROM PUBLIC;
+
+DO $pearnly$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'users'::regclass
+      AND tgname = 'erp_endpoints_preserve_managed_creator_delete'
+      AND NOT tgisinternal
+  ) THEN
+    CREATE TRIGGER erp_endpoints_preserve_managed_creator_delete
+    BEFORE DELETE ON public.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.preserve_managed_erp_endpoints_on_user_delete();
+  END IF;
+END
+$pearnly$;

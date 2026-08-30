@@ -92,6 +92,8 @@ class EnsureSingleExpressTests(unittest.TestCase):
         self.assertEqual(len(deletes), 1)
         self.assertEqual(deletes[0][1], ("dead",))
         self.assertIn("CREATE UNIQUE INDEX", cur.all_sql())
+        self.assertIn("to_regclass", cur.all_sql())
+        self.assertNotIn("'uq_erp_endpoints_user_express'::regclass", cur.all_sql())
 
     def test_keeps_both_when_both_have_logs_and_skips_index(self):
         cur = SeqCursor(

@@ -8,6 +8,7 @@ import uuid
 from unittest import mock
 
 from core import rls
+from services.erp import shared_express_managed_schema
 from services.erp import shared_express_schema, shared_express_store
 from tests.unit._pg_smoke import connect_or_skip
 
@@ -26,6 +27,8 @@ class SharedEndpointReadPgSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.conn = connect_or_skip()
+        cls._previous_managed_ready = shared_express_managed_schema._MANAGED_FOUNDATION_READY
+        shared_express_managed_schema._MANAGED_FOUNDATION_READY = True
         from psycopg2.extras import RealDictCursor
 
         cls.cur = cls.conn.cursor(cursor_factory=RealDictCursor)
@@ -67,6 +70,7 @@ class SharedEndpointReadPgSmokeTests(unittest.TestCase):
             cls.cur.execute("ALTER TABLE erp_endpoints FORCE ROW LEVEL SECURITY")
             cls.conn.commit()
         except Exception:
+            shared_express_managed_schema._MANAGED_FOUNDATION_READY = cls._previous_managed_ready
             cls.conn.rollback()
             cls.cur.close()
             cls.conn.close()
@@ -77,7 +81,9 @@ class SharedEndpointReadPgSmokeTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         if cls.conn is None:
+            shared_express_managed_schema._MANAGED_FOUNDATION_READY = cls._previous_managed_ready
             return
+        shared_express_managed_schema._MANAGED_FOUNDATION_READY = cls._previous_managed_ready
         cls.conn.rollback()
         cls.cur.close()
         cls.conn.close()

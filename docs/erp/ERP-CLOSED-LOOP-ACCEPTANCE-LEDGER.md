@@ -204,10 +204,22 @@ implementation_batches:
     scope: SHARED_EXPRESS_ENDPOINT_READ_SAFE_DTO_AND_SERVER_CONNECTION_STATE
     production_rollout_contract: ALL_TENANTS_FLAG_OFF
   - batch_id: F1-B3B1
-    backend_implementation_complete: false
-    release_state: IMPLEMENTING_UNCOMMITTED
-    source_baseline: f37f824eaf144602438d2b060575d295361c4a25
+    backend_implementation_complete: true
+    release_state: DEPLOYED_EXACT_FLAG_OFF
+    pearnly_commit: 3ef91fea4cdbcb2fc1b05abc40f0fb188b663203
+    ci_run_id: 33296470641
+    ci_result: SUCCESS
+    production_sha: 3ef91fea4cdbcb2fc1b05abc40f0fb188b663203
+    production_verified_at: 2026-08-30T06:31:18Z
+    service_active_enter_timestamp: 2026-08-30T06:30:52Z
     scope: TYPED_BINDING_SCHEMA_AND_VERSIONED_IRREVERSIBLE_PROFILE_KEY
+    production_rollout_contract: ALL_TENANTS_FLAG_OFF
+  - batch_id: F1-B3B2a
+    backend_implementation_complete: false
+    release_state: IMPLEMENTING
+    source_baseline: 3ef91fea4cdbcb2fc1b05abc40f0fb188b663203
+    scope: MANAGED_OWNERSHIP_RLS_CREATOR_DELETE_PROTECTION_TRANSACTIONAL_AUDIT_FOUNDATION
+    audit_wiring_state: FOUNDATION_ONLY_NO_LIFECYCLE_WRITERS
   - batch_id: F1-B3B2
     backend_implementation_complete: false
     release_state: PLANNED_LOCKED
@@ -546,8 +558,9 @@ user_decision:
   accepted_erp_report_evidence_ids: []
 
 open_issues:
-  - B3B1 is an uncommitted schema and pure-key candidate; local targeted/static/mechanical gates and independent review pass, but its seven PostgreSQL tests are local environment skips and still require non-skipped CI before commit release, exact deployment readback and flag-off proof.
-  - B3B2 owner manage/binding/token, B3B3 live heartbeat/mismatch/legacy isolation and B3C manual push/log/Agent remain locked; erp.endpoint.manage, erp.push.operate and erp.log.view are not yet wired to those operations.
+  - B3B2a is an uncommitted managed ownership/RLS, creator-delete protection and transactional audit foundation candidate; local targeted/static gates pass, while its PostgreSQL smoke remains a local environment skip and requires non-skipped CI before release.
+  - B3B2a P2 follow-up: real resolver/console concurrent transfer coverage and canonical membership→role→users→workspace lock-order proof remain open; this batch only proves the managed helper and transfer-shaped lock path reach their barriers without deadlock.
+  - B3B2b owner manage/binding/token lifecycle, B3B3 live heartbeat/mismatch/legacy isolation and B3C manual push/log/Agent remain locked; B3B2a audit is foundation-only and no lifecycle writer is wired.
   - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
   - HIGH separate security microbatch remains unfixed: generic ERP webhook/test SSRF guard validates system_url while the real network sink reads url, and endpoint test does not revalidate every redirect hop. B3B Express state must not call that outbound test.
   - MEDIUM separate reliability microbatch remains unfixed: legacy retry worker does not check endpoint.enabled, so a disabled endpoint may still retry outward. B3B2 must return 409 for nonterminal tasks; full draining and lease semantics remain B3C.
@@ -555,9 +568,9 @@ open_issues:
   - B5 must inventory endpoint conflicts without auto-merge, enable only test tenants, and complete Cowork and ERP owner/employee device plus Express report readback.
   - Companion version, six test contexts, all ERP readbacks, cleanup and explicit user wording remain pending; F1 is not ready for device or acceptance.
 next_action: >-
-  Finish only F1-B3B1 schema/profile-key review and automatic verification on the f37f824e baseline
-  while keeping every tenant flag off. Do not start F1-B3B2/B3B3/B3C, F1-B4/B5 or modify F2-F7
-  until separately unlocked.
+  Finish only F1-B3B2a managed ownership/RLS, creator-delete protection, readiness and audit foundation
+  verification on the 3ef91fea baseline while keeping every tenant flag off. Do not start F1-B3B2b,
+  B3B3/B3C, F1-B4/B5 or modify F2-F7 until separately unlocked.
 ```
 
 ## 7. F2-F7

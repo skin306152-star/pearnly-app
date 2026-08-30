@@ -225,7 +225,7 @@ async function doPush(): Promise<void> {
     for (const id of ids) {
         const outcome = await pushHistory(id, _target);
         if (outcome === 'success') ok++;
-        else if (outcome === 'pending') pending++;
+        else if (outcome === 'waiting') pending++;
         else fail++;
     }
     _pushing = false;

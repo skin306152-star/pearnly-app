@@ -126,6 +126,7 @@ export interface DocDetail {
     payment_status: PaymentStatus;
     stock_applied: boolean;
     dedupe_hit?: boolean;
+    ocr_history_id?: string | null;
 }
 
 // 契约错误:携带 02/05 字典里的 code(purchase.dup_invoice 等),调用方映射 4 语,绝不裸露 code。
@@ -433,6 +434,7 @@ export function normDetail(raw: Raw): DocDetail {
         paid_amount: numOf(doc.paid_amount),
         payment_status: (doc.payment_status as PaymentStatus) || 'unpaid',
         stock_applied: !!doc.stock_applied,
+        ocr_history_id: (doc.ocr_history_id as string) || null,
     };
 }
 

@@ -217,7 +217,7 @@ export async function doFinish() {
         for (const id of pushIds) {
             const outcome = await pushOne(id);
             if (outcome === 'success') erpOk++;
-            else if (outcome === 'pending') erpPending++;
+            else if (outcome === 'waiting') erpPending++;
             else erpFail++;
         }
     } else if (IV.output.erp) {

@@ -59,7 +59,59 @@ export function erpTargetCardsHtml(endpoints: ErpEndpoint[], target: string): st
 
 // 单条推送 POST /api/erp/push。已受理=true:ok=true(success/skipped_dup)或 status='pending'(Express 出站拉取异步入队·非失败);failed/manual=false。对齐后端 counts_as_endpoint_success。
 // postingKind:本批过账去向('stock'|'service')· 仅 Express 销项后端消费,'stock'=商品按库存出库。
-export type PushOutcome = 'success' | 'pending' | 'failed';
+export type PushOutcome = 'success' | 'waiting' | 'failed' | 'needs_action';
+
+export function operationId(): string {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export function pushState(status: string | null | undefined): PushOutcome {
+    const value = String(status || '').toLowerCase();
+    if (value === 'success' || value === 'skipped_dup') return 'success';
+    if (value === 'pending' || value === 'retrying' || value === 'leased') return 'waiting';
+    if (
+        value === 'manual' ||
+        value === 'blocked' ||
+        value === 'needs_mapping' ||
+        value === 'needs_review'
+    )
+        return 'needs_action';
+    return 'failed';
+}
+
+export function aggregatePushState(
+    statuses: Array<string | null | undefined>,
+    fallback?: string | null
+): PushOutcome {
+    const states = statuses.filter(Boolean).map(pushState);
+    if (!states.length) return pushState(fallback);
+    if (states.includes('needs_action')) return 'needs_action';
+    if (states.includes('failed')) return 'failed';
+    if (states.includes('waiting')) return 'waiting';
+    return 'success';
+}
+
+export function pushStateLabel(state: PushOutcome): string {
+    const keys: Record<PushOutcome, string> = {
+        waiting: 'expd-tl-pending',
+        success: 'erp-status-success',
+        failed: 'erp-status-failed',
+        needs_action: 'expd-tl-manual',
+    };
+    return t(keys[state]);
+}
+
+export function pushToastKind(state: PushOutcome): 'success' | 'info' | 'warn' | 'error' {
+    if (state === 'success') return 'success';
+    if (state === 'waiting') return 'info';
+    if (state === 'needs_action') return 'warn';
+    return 'error';
+}
 
 export async function pushHistory(
     historyId: string,
@@ -67,7 +119,10 @@ export async function pushHistory(
     postingKind?: string
 ): Promise<PushOutcome> {
     try {
-        const body: Record<string, unknown> = { history_id: historyId };
+        const body: Record<string, unknown> = {
+            history_id: historyId,
+            operation_id: operationId(),
+        };
         if (target) body.endpoint_id = target;
         if (postingKind) body.posting_kind = postingKind;
         const r = await fetch('/api/erp/push', {
@@ -75,10 +130,21 @@ export async function pushHistory(
             headers: authHeaders(true),
             body: JSON.stringify(body),
         });
-        const d = (await r.json().catch(() => ({}))) as { ok?: boolean; status?: string };
-        if (!r.ok || d.ok === false) return 'failed';
-        if (d.status === 'pending') return 'pending';
-        return d.ok === true ? 'success' : 'failed';
+        const d = (await r.json().catch(() => ({}))) as {
+            ok?: boolean;
+            status?: string;
+            stage?: string;
+            rows?: number;
+        };
+        if (!r.ok) return 'failed';
+        if (d.rows === 0) return 'needs_action';
+        const declared = d.status || d.stage;
+        const state = pushState(declared);
+        if (state === 'needs_action') return state;
+        if (d.ok === false) return 'failed';
+        if (state === 'waiting') return state;
+        if (d.ok === true && (!declared || state === 'success')) return 'success';
+        return 'failed';
     } catch {
         return 'failed';
     }

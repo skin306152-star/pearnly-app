@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pearnly · ERP 推送 / 日志 / 重试 / 批量路由(REFACTOR-WA-B1 · 2026-05-29 R18 从 erp_routes 拆出 · 0 逻辑改)
-
-手动推送 + 推送去重 + 推送日志列表/明细/异常队列/今日统计 + 单条/批量重试 + 批量删。
-⚠️ 铁律 #10:push / retry 是 async 路由调 sync Playwright(via erp_push)· 路由体保留
-asyncio.to_thread。erp_routes 顶部 include_router 聚合 · app.py 单一 include 不变。
-_check_push_access 走 erp_routes_access · _tid 走 route_helpers。
-"""
+"""ERP 手动推送、日志、重试与批量操作路由。"""
 
 from __future__ import annotations
 
@@ -32,8 +26,6 @@ router = APIRouter()
 class ErpPushRequest(BaseModel):
     history_id: str
     endpoint_id: Optional[str] = Field(None, description="不传则用默认端点")
-    # 本批过账去向(录入向导 step① 每批开关)· 仅 Express 消费:'stock'=商品行走真实进销存
-    # (销项 stock_sale 出库结转成本 / 进项 stock_item 建库存品入库)· 缺省/'service' → 非库存(SAFE 默认)。
     posting_kind: Optional[str] = Field(None, description="stock | service · Express 库存过账开关")
 
 
@@ -43,6 +35,18 @@ async def erp_push(req: ErpPushRequest, request: Request):
     user = get_current_user_from_request(request)
     require_erp_portal(user)
     _check_push_access(user)
+
+    from services.erp.shared_express_push import maybe_reserve_manual_push
+
+    managed = await maybe_reserve_manual_push(
+        user=user,
+        request=request,
+        history_id=req.history_id,
+        endpoint_id=req.endpoint_id,
+        posting_kind=req.posting_kind,
+    )
+    if managed is not None:
+        return managed
 
     # 1) 拿历史记录
     history = db.get_ocr_history_detail(user["id"], req.history_id, tenant_id=_tid(user))
@@ -68,9 +72,7 @@ async def erp_push(req: ErpPushRequest, request: Request):
     if not endpoint.get("enabled", True):
         raise HTTPException(400, detail="erp.endpoint_disabled")
 
-    # 批 2 改动 2 (Zihao 2026-05-19 拍板 · v118.34.34) · 推送去重 check.
-    # 同 history × endpoint 已经 success 过 → 写 skipped_dup log + 静默
-    # 返回原成功的 bill_no. 防同张发票被自动 + 手动 + 重试反复推到 MR.ERP.
+    # 同 history × endpoint 已 success 过就返回旧结果，防自动/手动/重试重复入账。
     existing = db.has_recent_successful_push(
         req.history_id,
         endpoint["id"],
@@ -119,9 +121,7 @@ async def erp_push(req: ErpPushRequest, request: Request):
             "endpoint_name": endpoint.get("name"),
         }
 
-    # 3) 推送 · v118.34.10 · asyncio.to_thread keeps push_to_endpoint
-    # (which may call Playwright via push_mrerp once C-1 wires it,
-    # plus uses sync `requests` for webhook adapters) off the event loop.
+    # 3) 推送 · 同步 adapter 必须离开事件循环。
     import asyncio as _asyncio
 
     result = await _asyncio.to_thread(

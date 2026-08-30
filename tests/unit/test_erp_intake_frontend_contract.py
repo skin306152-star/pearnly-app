@@ -29,3 +29,44 @@ def test_erp_review_has_per_line_type_and_discard_action():
 def test_erp_nav_exposes_push_surfaces():
     assert "'integrations'" in read("src/home/nav-presets.ts")
     assert "'push-logs'" in read("src/home/route-table.ts")
+
+
+def test_formal_purchase_and_sales_share_honest_push_contract():
+    push = read("src/home/dms-intake-erp-push.ts")
+    purchase = read("src/home/purchase-detail.ts")
+    sales = read("src/home/sales-record-detail.ts")
+    assert "operation_id: operationId()" in push
+    assert "d.ok === true" in push
+    assert "!r.ok" in push
+    for state in ("waiting", "success", "failed", "needs_action"):
+        assert state in push
+    assert 'id="pur-erp-push"' in purchase
+    assert 'id="srd-push"' in sales
+    assert "pushStateLabel" in purchase
+    assert "pushStateLabel" in sales
+
+
+def test_push_toast_only_uses_success_tone_for_real_success():
+    push = read("src/home/dms-intake-erp-push.ts")
+    assert "if (state === 'success') return 'success'" in push
+    assert "if (state === 'waiting') return 'info'" in push
+    assert "if (state === 'needs_action') return 'warn'" in push
+    assert "return 'error'" in push
+    for name in (
+        "src/home/purchase-detail.ts",
+        "src/home/sales-record-detail.ts",
+        "src/home/sales-records.ts",
+    ):
+        source = read(name)
+        assert "pushToastKind(outcome)" in source
+        assert "['failed', 'needs_action'].includes(outcome) ? 'error' : 'success'" not in source
+
+
+def test_shared_express_card_uses_safe_projection_and_managed_lifecycle():
+    card = read("src/home/dms-intake-erp-cards.ts")
+    assert "connection_state" in card
+    assert "account_set" in card
+    assert "/shared/enroll" in card
+    assert "/shared/profile/confirm" in card
+    assert "expected_generation: generation" in card
+    assert "operation_id: operationId()" in card

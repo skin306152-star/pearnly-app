@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ERP 推送日志查询/明细/异常/统计 DAL(REFACTOR-WA-B1 · 2026-05-29 从 erp/push_store 抽出 · 纯搬家 0 逻辑改)
-
-推送日志列表/明细(含 UI 友好化 friendly_for_ui + 外部引用 derive_external_ref · 失败行附
-异常子类 + 自助修复槽)+ 今日统计 + 批量删。只依赖 db + 纯函数叶子(external_ref /
-push_log_friendly / push_log_meta / push_exception_classify / agent_reporting.fit_*)·
-push_store 顶部 re-import 当 facade · db.X/store.X/本模块.X 单一对象不变。
-"""
+"""ERP push-log list, detail, exception and statistics data access."""
 
 import logging
 import re
@@ -40,14 +34,16 @@ from services.erp.push_exception_classify import (  # noqa: F401
     derive_stock_fix,
 )
 from services.erp.legacy_generation import lock_endpoint_binding, lock_legacy_endpoint
+from services.erp.shared_express_log_access import (
+    enable_managed_log_reader,
+    log_reader_predicate,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def _classify_push_type(row: Dict[str, Any]) -> str:
-    """从一行 push log 判 push_type:身份证订车(id_card)还是发票(invoice)。
-    单一判定源 · list/detail/exceptions 三处共用 · 改判定规则只此一处;
-    dms_id_ocr.recent_dms_customer_ids_by_tail 的 SQL 判定也要同步(体积闸挡它搬来同住)。"""
+    """Classify one log as an identity-card or invoice push."""
     is_id_card = (row.get("trigger") or "") == "id_card" or (
         row.get("endpoint_adapter") or ""
     ).lower() == "mrerp_dms"
@@ -108,26 +104,27 @@ def list_push_logs(
     tenant_id: Optional[str] = None,
     workspace_client_id: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """查询推送日志(P2-B 折叠版),支持按 history/endpoint/status/trigger/adapter 过滤.
-
-    P2-B (Zihao 2026-05-27 · ERP 收尾) · 折叠到每对 (history×endpoint) 最新一条,
-    清「混合手动+自动推」遗留重复行,与 list_push_exceptions 同口径(单一状态源·铁律 #12).
-    NULL-safe:history_id/endpoint_id 任一为空(已删 endpoint 孤儿 log)→ 按行自身
-    id 独立分区,永不被误合并. 状态/trigger/adapter 过滤作用于折叠后的当前态.
-
-    批 3 改动 6 (Zihao 2026-05-19 · v118.34.34) · adapter_filter 按 erp_endpoints.adapter
-    过滤. 已删 endpoint join 不到 row (endpoint_adapter is NULL),自动不命中 adapter filter.
-
-    PO-4 同源 · workspace_client_id 给了 → 限本套账(+ 未归属 NULL 行 · 孤儿行回落仍显示)。
-    None → 与现状逐字节一致。
-    """
+    """Return the newest log per history/endpoint, with optional filters."""
     try:
-        # B8 RLS wave4:erp_push_logs 是 user 隔离(只看 user_id);但本查询 JOIN 的
-        # ocr_history/clients/workspace_clients 是 tenant_or_user 隔离——只穿 user_id 会让
-        # tenant_id 已落库的那些行在 role 上下文不可见 → 富化字段(客户名/账套名/买方名)丢。
-        # 故穿 tenant_id + user_id 双上下文:erp_push_logs 按 user 命中,JOIN 的 tenant 表按
-        # tenant 命中(孤立 tenant_id NULL 行回落 user)。tenant_id 缺省 None 时退化为纯 user。
-        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
+        # JOIN enrichment needs tenant context; legacy logs remain user-scoped.
+        with db.get_cursor_rls(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            workspace_client_id=workspace_client_id,
+        ) as cur:
+            shared = enable_managed_log_reader(
+                cur,
+                user_id=user_id,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+            )
+            reader_sql, reader_params = log_reader_predicate(
+                "l",
+                user_id=user_id,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                shared=shared,
+            )
             # 折叠 CTE:每对 (history×endpoint) 取 created_at 最新一条(id 作 tie-break).
             # NULL-safe:任一 id 为空 → 'solo:'||id 独立分区 → _rn 恒为 1 → 全保留不合并.
             ranked_cte = """
@@ -142,12 +139,12 @@ def list_push_logs(
                             ORDER BY l.created_at DESC, l.id DESC
                         ) AS _rn
                     FROM erp_push_logs l
-                    WHERE l.user_id = %s
+                    WHERE {reader_sql}
                 )
-            """
+            """.format(reader_sql=reader_sql)
             # 过滤作用于「折叠后的当前态」(l._rn = 1) · 字段全 prefix 防 ambiguous.
             outer = ["l._rn = 1"]
-            params: list = [user_id]
+            params: list = list(reader_params)
             if history_id:
                 outer.append("l.history_id = %s")
                 params.append(history_id)

@@ -130,11 +130,21 @@ class AgentLaneCTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 403)
         touch.assert_not_called()
 
-    def test_lease_and_ack_stay_on_generation_zero_auth(self):
-        denied = HTTPException(401, detail="erp.agent_unauthorized")
+    def test_lease_and_ack_fall_back_to_managed_lane_off_legacy_auth(self):
+        denied = erp_agent.managed_agent_queue.ManagedAgentQueueError(
+            "erp.agent_unauthorized", 401
+        )
         with (
             mock.patch.object(erp_agent, "_require_enabled"),
-            mock.patch.object(erp_agent, "_auth_agent", side_effect=denied) as auth,
+            mock.patch.object(
+                erp_agent.agent_store, "authenticate", return_value=None
+            ) as auth,
+            mock.patch.object(
+                erp_agent.managed_agent_queue, "lease_managed", side_effect=denied
+            ) as lease,
+            mock.patch.object(
+                erp_agent.managed_agent_queue, "ack_managed", side_effect=denied
+            ) as ack,
         ):
             with self.assertRaises(HTTPException):
                 asyncio.run(
@@ -147,6 +157,8 @@ class AgentLaneCTests(unittest.TestCase):
                     )
                 )
         self.assertEqual(auth.call_count, 2)
+        lease.assert_called_once()
+        ack.assert_called_once()
 
 
 if __name__ == "__main__":

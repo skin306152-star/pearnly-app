@@ -25,6 +25,7 @@ from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import require_erp_portal
 from services.erp.express_push import account_set_allowed, express_push_enabled
 from services.erp.express_push import agent_store
+from services.erp import shared_express_agent_queue as managed_agent_queue
 
 logger = logging.getLogger("mr-pilot")
 
@@ -46,6 +47,15 @@ def _auth_agent(request: Request) -> Dict[str, Any]:
     if not ep.get("enabled", True):
         raise HTTPException(403, detail="erp.endpoint_disabled")
     return ep
+
+
+def _bearer_token(request: Request) -> str:
+    header = request.headers.get("authorization") or ""
+    return header[7:].strip() if header.lower().startswith("bearer ") else ""
+
+
+def _managed_error(exc: managed_agent_queue.ManagedAgentQueueError) -> HTTPException:
+    return HTTPException(status_code=exc.status, detail=exc.code)
 
 
 def _managed_heartbeat(token: str, body: Dict[str, Any]):
@@ -72,7 +82,6 @@ def _run_agent_heartbeat(token: str, body: Dict[str, Any]):
     if ep and not ep.get("enabled", True):
         raise HTTPException(403, detail="erp.endpoint_disabled")
     if not ep:
-        # Lease and ack still call _auth_agent and remain generation-zero only.
         return _managed_heartbeat(token, body)
     # 优雅退出信号:立即标离线(不写 last_seen=now)→ Pearnly 实时显示断开。
     if body.get("offline"):
@@ -187,21 +196,14 @@ class LeaseRequest(BaseModel):
     agent_id: Optional[str] = None
 
 
-@router.post("/api/erp/agent/lease")
-async def erp_agent_lease(req: LeaseRequest, request: Request):
-    """领取 ≤max 条待推送载荷(置租约 120s)· 账套白名单不符的不返回并告警。"""
-    _require_enabled()
-    ep = _auth_agent(request)
+def _legacy_agent_lease(ep: Dict[str, Any], owner: str, max_n: int) -> Dict[str, Any]:
     cfg = ep.get("config") or {}
     target_set = str(cfg.get("account_set") or "")
-    owner = (req.agent_id or "default").strip() or "default"
-
-    leased = agent_store.lease_pending(str(ep["id"]), owner, req.max)
+    leased = agent_store.lease_pending(str(ep["id"]), owner, max_n)
     jobs: List[Dict[str, Any]] = []
     for row in leased:
         payload = row.get("request_body") or {}
         pset = str(payload.get("account_set") or "")
-        # 账套白名单:载荷账套须 == 本连接配置 account_set(account_set_allowed 已含此判·防串账套)。
         if not account_set_allowed(pset, ep):
             logger.warning(
                 "[express-lease] 账套不符已跳过 · log=%s payload_set=%r target=%r",
@@ -221,6 +223,28 @@ async def erp_agent_lease(req: LeaseRequest, request: Request):
     return {"ok": True, "lease_seconds": 120, "jobs": jobs}
 
 
+def _run_agent_lease(token: str, agent_id: object, max_n: int) -> Dict[str, Any]:
+    ep = agent_store.authenticate(token)
+    if ep:
+        if not ep.get("enabled", True):
+            raise HTTPException(403, detail="erp.endpoint_disabled")
+        owner = (agent_id or "default").strip() or "default"
+        return _legacy_agent_lease(ep, owner, max_n)
+    try:
+        return managed_agent_queue.lease_managed(token, agent_id, max_n)
+    except managed_agent_queue.ManagedAgentQueueError as exc:
+        raise _managed_error(exc) from exc
+
+
+@router.post("/api/erp/agent/lease")
+async def erp_agent_lease(req: LeaseRequest, request: Request):
+    """领取 ≤max 条待推送载荷(置租约 120s)· 账套白名单不符的不返回并告警。"""
+    _require_enabled()
+    return await asyncio.to_thread(
+        _run_agent_lease, _bearer_token(request), req.agent_id, req.max
+    )
+
+
 class AckRequest(BaseModel):
     log_id: str
     result: str = Field(..., description="success | failed")
@@ -235,25 +259,46 @@ class AckRequest(BaseModel):
     meta: Optional[dict] = None
 
 
+def _run_agent_ack(token: str, req: AckRequest) -> Dict[str, Any]:
+    ep = agent_store.authenticate(token)
+    if ep:
+        if not ep.get("enabled", True):
+            raise HTTPException(403, detail="erp.endpoint_disabled")
+        owner = (req.agent_id or "default").strip() or "default"
+        res = agent_store.ack(
+            endpoint_id=str(ep["id"]),
+            log_id=req.log_id,
+            owner=owner,
+            success=(req.result == "success"),
+            express_docnum=req.express_docnum,
+            error=req.error,
+            line_modes=req.line_modes,
+            outcome=req.outcome,
+            meta=req.meta,
+        )
+        if not res.get("ok"):
+            raise HTTPException(409, detail=f"erp.ack_{res.get('reason', 'failed')}")
+        return res
+    try:
+        return managed_agent_queue.ack_managed(
+            token,
+            req.log_id,
+            req.agent_id,
+            success=(req.result == "success"),
+            express_docnum=req.express_docnum,
+            error=req.error,
+            line_modes=req.line_modes,
+            outcome=req.outcome,
+            meta=req.meta,
+        )
+    except managed_agent_queue.ManagedAgentQueueError as exc:
+        raise _managed_error(exc) from exc
+
+
 @router.post("/api/erp/agent/ack")
 async def erp_agent_ack(req: AckRequest, request: Request):
     """回报录入结果 · success 回填 docnum;waiting_lock 重领不烧次数;失败 attempt+1 超 3 转 manual。"""
     _require_enabled()
-    ep = _auth_agent(request)
     if req.result not in ("success", "failed"):
         raise HTTPException(400, detail="erp.bad_ack_result")
-    owner = (req.agent_id or "default").strip() or "default"
-    res = agent_store.ack(
-        endpoint_id=str(ep["id"]),
-        log_id=req.log_id,
-        owner=owner,
-        success=(req.result == "success"),
-        express_docnum=req.express_docnum,
-        error=req.error,
-        line_modes=req.line_modes,
-        outcome=req.outcome,
-        meta=req.meta,
-    )
-    if not res.get("ok"):
-        raise HTTPException(409, detail=f"erp.ack_{res.get('reason', 'failed')}")
-    return res
+    return await asyncio.to_thread(_run_agent_ack, _bearer_token(request), req)

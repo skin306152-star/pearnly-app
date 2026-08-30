@@ -4,7 +4,14 @@ import { BAHT } from './money.js';
 import { injectStyle } from './purchase-common.js';
 import { PURCHASE_LIST_CSS } from './purchase-list-css.js';
 import { setErpIntakeDirection } from './erp-intake.js';
-import { fetchErpEndpoints, pickDefaultTarget, pushHistory } from './dms-intake-erp-push.js';
+import {
+    aggregatePushState,
+    fetchErpEndpoints,
+    pickDefaultTarget,
+    pushHistory,
+    pushStateLabel,
+    pushToastKind,
+} from './dms-intake-erp-push.js';
 import { SALES_RECORDS_CSS } from './sales-records-css.js';
 
 type Segment = 'all' | 'goods' | 'service' | 'unpaid';
@@ -168,7 +175,15 @@ function kindChip(doc: SalesDoc): string {
 function pushButton(doc: SalesDoc): string {
     const status = doc.push_status || 'not_pushed';
     const disabled = status === 'success' ? ' disabled' : '';
-    return `<button class="erp ${status}" data-sr-push="${escapeHtml(doc.id)}"${disabled}>${escapeHtml(t('sr-push-' + status))}</button>`;
+    const state =
+        status === 'not_pushed'
+            ? null
+            : aggregatePushState(
+                  doc.push_endpoints?.map((endpoint) => endpoint.status) || [],
+                  status
+              );
+    const label = state ? pushStateLabel(state) : t('sr-push-not_pushed');
+    return `<button class="erp ${escapeHtml(state || 'not_pushed')}" data-sr-push="${escapeHtml(doc.id)}"${disabled}>${escapeHtml(label)}</button>`;
 }
 
 function rowHtml(doc: SalesDoc): string {
@@ -221,7 +236,7 @@ async function push(doc: SalesDoc, button: HTMLButtonElement): Promise<void> {
         return;
     }
     const outcome = await pushHistory(doc.ocr_history_id, target);
-    showToast(t('sr-push-result-' + outcome), outcome === 'failed' ? 'error' : 'success');
+    showToast(pushStateLabel(outcome), pushToastKind(outcome));
     await load();
 }
 

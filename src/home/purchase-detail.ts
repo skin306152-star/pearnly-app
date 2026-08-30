@@ -6,6 +6,7 @@ import {
     papi,
     openPurchasePdf,
     purchaseErrMsg,
+    authHeaders,
     activeWsId,
     fmtMoney,
     fmtQty,
@@ -18,12 +19,22 @@ import {
     type DocDetail,
     type DocLine,
 } from './purchase-common.js';
+import {
+    fetchErpEndpoints,
+    pickDefaultTarget,
+    pushHistory,
+    pushState,
+    pushStateLabel,
+    pushToastKind,
+    type PushOutcome,
+} from './dms-intake-erp-push.js';
 import { PURCHASE_DETAIL_CSS } from './purchase-detail-css.js';
 import { BAHT } from './money.js';
 
 let pendingId: string | null = null;
 let cur: DocDetail | null = null;
 let billBlobUrl = '';
+let erpState: PushOutcome | null = null;
 
 const ICON = {
     info: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>',
@@ -205,7 +216,12 @@ function actions(d: DocDetail): string {
     if (d.status === 'void') return '';
     if (d.status === 'draft')
         return `<button class="btn" id="pur-edit-btn">${escapeHtml(t('pur-edit'))}</button>`;
-    return `<button class="btn" id="pur-correct-btn">${escapeHtml(t('pur-correct'))}</button><button class="btn danger" id="pur-void-btn">${escapeHtml(t('pur-void'))}</button><button class="btn primary" id="pur-pay-btn2"${d.payment_status === 'paid' ? ' disabled' : ''}>${escapeHtml(t('pur-pay'))}</button>`;
+    const push = d.ocr_history_id
+        ? `<span data-erp-push-state="${escapeHtml(erpState || 'not_pushed')}">${escapeHtml(
+              erpState ? pushStateLabel(erpState) : t('sr-push-not_pushed')
+          )}</span><button class="btn primary" id="pur-erp-push"${erpState === 'success' ? ' disabled' : ''}>${escapeHtml(t('sr-push-not_pushed'))}</button>`
+        : '';
+    return `${push}<button class="btn" id="pur-correct-btn">${escapeHtml(t('pur-correct'))}</button><button class="btn danger" id="pur-void-btn">${escapeHtml(t('pur-void'))}</button><button class="btn primary" id="pur-pay-btn2"${d.payment_status === 'paid' ? ' disabled' : ''}>${escapeHtml(t('pur-pay'))}</button>`;
 }
 
 function shell(d: DocDetail): string {
@@ -285,6 +301,8 @@ function bind(): void {
     if (voidBtn) voidBtn.onclick = doVoid;
     const correctBtn = root.querySelector<HTMLElement>('#pur-correct-btn');
     if (correctBtn) correctBtn.onclick = doCorrect;
+    const erpPush = root.querySelector<HTMLButtonElement>('#pur-erp-push');
+    if (erpPush) erpPush.onclick = () => void pushToErp(erpPush);
     root.querySelectorAll<HTMLElement>('[data-match]').forEach((el) => {
         el.onclick = () => window.openPurchaseMatch?.({}, () => load(cur!.id));
     });
@@ -294,6 +312,44 @@ function bind(): void {
     root.querySelectorAll<HTMLElement>('[data-dl]').forEach((el) => {
         el.onclick = () => downloadDoc(el.dataset.dl as string);
     });
+}
+
+async function loadErpState(historyId: string | null | undefined): Promise<PushOutcome | null> {
+    if (!historyId) return null;
+    try {
+        const response = await fetch(
+            `/api/erp/logs?history_id=${encodeURIComponent(historyId)}&limit=1`,
+            {
+                headers: authHeaders(),
+            }
+        );
+        const body = (await response.json().catch(() => ({}))) as {
+            items?: Array<{ status?: string }>;
+        };
+        if (!response.ok || !body.items?.length) return null;
+        return pushState(body.items[0].status);
+    } catch {
+        return null;
+    }
+}
+
+async function pushToErp(button: HTMLButtonElement): Promise<void> {
+    if (!cur?.ocr_history_id) return;
+    button.disabled = true;
+    const target = pickDefaultTarget(await fetchErpEndpoints(), '');
+    if (!target) {
+        showToast(t('sr-no-endpoint'), 'error');
+        button.disabled = false;
+        return;
+    }
+    erpState = 'waiting';
+    button.previousElementSibling!.textContent = pushStateLabel(erpState);
+    const outcome = await pushHistory(cur.ocr_history_id, target);
+    erpState = outcome;
+    showToast(pushStateLabel(outcome), pushToastKind(outcome));
+    const sec = document.getElementById('page-purchase-detail');
+    if (sec) sec.innerHTML = shell(cur);
+    bind();
 }
 
 async function genCredential(kind: string): Promise<void> {
@@ -364,6 +420,7 @@ async function load(id: string): Promise<void> {
         cur = normDetail(
             (await papi('GET', `/api/purchase/docs/${id}`)) as Record<string, unknown>
         );
+        erpState = await loadErpState(cur.ocr_history_id);
         const sec = document.getElementById('page-purchase-detail');
         if (sec) sec.innerHTML = shell(cur);
         bind();

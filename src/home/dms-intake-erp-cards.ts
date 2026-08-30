@@ -8,6 +8,7 @@
 // ============================================================
 import { esc, authHeaders } from './dms-intake-core.js';
 import { isAgentOffline, startAgentPolling, stopAgentPolling } from './erp-agent-liveness.js';
+import { operationId } from './dms-intake-erp-push.js';
 
 interface ErpCardDef {
     key: string;
@@ -49,6 +50,12 @@ type EpRec = Record<string, unknown> & {
     adapter?: string;
     auto_push?: boolean;
     config?: Record<string, unknown>;
+    shared_scope?: boolean;
+    binding_generation?: number;
+    connection_state?: string;
+    account_set?: string;
+    live_account_set?: string;
+    live_profile_key?: string;
 };
 
 function isEnabled(ep: EpRec | null): boolean {
@@ -58,6 +65,36 @@ function isEnabled(ep: EpRec | null): boolean {
 // 推送方式:发票/汇总表 ERP 看 auto_push。
 function isAutoPush(ep: EpRec): boolean {
     return ep.auto_push === true;
+}
+
+function connectionState(ep: EpRec): string {
+    if (ep.connection_state) return String(ep.connection_state);
+    if (Number(ep.binding_generation || 0) > 0) {
+        if (ep.revoked_at) return 'revoked';
+        if (!isEnabled(ep)) return 'disabled';
+        const seen = ep.agent_last_seen_at
+            ? new Date(String(ep.agent_last_seen_at)).getTime()
+            : NaN;
+        if (!Number.isFinite(seen) || Date.now() - seen >= 180000) return 'offline';
+        if (!ep.live_account_set || !ep.live_profile_key) return 'needs_attention';
+        if (!ep.bound_account_set || !ep.bound_profile_key) return 'unbound';
+        if (
+            ep.live_account_set !== ep.bound_account_set ||
+            ep.live_profile_key !== ep.bound_profile_key
+        )
+            return 'mismatch';
+        return 'online';
+    }
+    return isAgentOffline(ep) ? 'offline' : 'online';
+}
+
+function stateLabel(ep: EpRec): string {
+    const state = connectionState(ep);
+    if (state === 'online') return T('dx-erp-connected');
+    if (state === 'disabled' || state === 'revoked') return T('dx-erp-disabled');
+    if (state === 'offline') return T('dx-erp-offline');
+    if (state === 'unbound') return T('exp-acct-wait-select');
+    return T('expd-tl-manual');
 }
 
 function cardHtml(def: ErpCardDef): string {
@@ -80,7 +117,7 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
     const st = card.querySelector<HTMLElement>('[data-erp-status]');
     const acts = card.querySelector<HTMLElement>('[data-erp-acts]');
     const enabled = isEnabled(ep);
-    const offline = !!ep && enabled && isAgentOffline(ep);
+    const offline = !!ep && enabled && connectionState(ep) === 'offline';
     card.classList.toggle('is-connected', !!ep && enabled);
     card.classList.toggle('is-disabled', !!ep && !enabled);
     card.classList.toggle('is-offline', offline);
@@ -88,13 +125,17 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
     if (st) {
         // 已连接时接上推送方式(自动/手动)· 停用/未连接/离线不显示(此时方式无意义)。
         if (!ep) st.textContent = T('dx-erp-not-connected');
-        else if (!enabled) st.textContent = T('dx-erp-disabled');
-        else if (offline) st.textContent = T('dx-erp-offline');
-        else
+        else {
+            const account = String(
+                ep.account_set || ep.bound_account_set || ep.live_account_set || ''
+            );
             st.textContent =
-                T('dx-erp-connected') +
-                ' · ' +
-                T(isAutoPush(ep) ? 'dx-erp-mode-auto' : 'dx-erp-mode-manual');
+                stateLabel(ep) +
+                (account ? ` · ${account}` : '') +
+                (connectionState(ep) === 'online' && typeof ep.auto_push === 'boolean'
+                    ? ' · ' + T(isAutoPush(ep) ? 'dx-erp-mode-auto' : 'dx-erp-mode-manual')
+                    : '');
+        }
     }
     if (!acts) return;
     if (!ep) {
@@ -103,12 +144,29 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
         )}</button>`;
         return;
     }
-    // 已配置:启用/停用 + 配置。toggle 在前、配置在后(对齐老连接卡按钮顺序)。
+    const mayManage = !!ep.config || ep.binding_generation !== undefined;
+    if (!mayManage) {
+        acts.innerHTML = '';
+        return;
+    }
+    const generation = Number(ep.binding_generation || 0);
+    if (generation === 0 && ep.adapter === 'express') {
+        acts.innerHTML =
+            `<button type="button" class="dx-erp-toggle" data-erp-enroll>${esc(T('exp-done'))}</button>` +
+            `<button type="button" class="dx-erp-cta" data-erp-config>${esc(T('dx-erp-config'))}</button>`;
+        return;
+    }
+    const confirm =
+        ep.adapter === 'express' &&
+        ['unbound', 'mismatch'].includes(connectionState(ep)) &&
+        ep.live_account_set &&
+        ep.live_profile_key
+            ? `<button type="button" class="dx-erp-cta" data-erp-profile-confirm>${esc(T('exp-done'))}</button>`
+            : '';
     acts.innerHTML =
         `<button type="button" class="dx-erp-toggle" data-erp-toggle>${esc(
             T(enabled ? 'dx-erp-disable' : 'dx-erp-enable')
-        )}</button>` +
-        `<button type="button" class="dx-erp-cta" data-erp-config>${esc(T('dx-erp-config'))}</button>`;
+        )}</button>` + confirm;
 }
 
 function openWizardFor(adapter: string, ep: unknown): void {
@@ -129,10 +187,19 @@ async function toggleEndpoint(card: HTMLElement): Promise<void> {
         if (!ok) return;
     }
     try {
-        const r = await fetch(`/api/erp/endpoints/${encodeURIComponent(ep.id)}`, {
-            method: 'PATCH',
+        const generation = Number(ep.binding_generation || 0);
+        const managed = generation > 0 && ep.adapter === 'express';
+        const path = managed
+            ? `/api/erp/endpoints/${encodeURIComponent(ep.id)}/shared/${enabling ? 'enable' : 'disable'}`
+            : `/api/erp/endpoints/${encodeURIComponent(ep.id)}`;
+        const r = await fetch(path, {
+            method: managed ? 'POST' : 'PATCH',
             headers: authHeaders(true),
-            body: JSON.stringify({ enabled: enabling }),
+            body: JSON.stringify(
+                managed
+                    ? { operation_id: operationId(), expected_generation: generation, reason: '' }
+                    : { enabled: enabling }
+            ),
         });
         if (!r.ok) throw new Error('http_' + r.status);
         // 单一状态源:刷新全局端点缓存 → 第四步推送面板/自动推送 picker 立刻反映启停(铁律 #12)。
@@ -143,6 +210,32 @@ async function toggleEndpoint(card: HTMLElement): Promise<void> {
     }
 }
 
+async function enrollEndpoint(card: HTMLElement): Promise<void> {
+    const ep = (card as unknown as { _ep?: EpRec | null })._ep;
+    if (!ep?.id || Number(ep.binding_generation || 0) !== 0) return;
+    const response = await fetch(`/api/erp/endpoints/${encodeURIComponent(ep.id)}/shared/enroll`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({ expected_generation: 0 }),
+    });
+    if (response.ok) window.dispatchEvent(new CustomEvent('pearnly:erp-endpoints-changed'));
+}
+
+async function confirmProfile(card: HTMLElement): Promise<void> {
+    const ep = (card as unknown as { _ep?: EpRec | null })._ep;
+    const generation = Number(ep?.binding_generation || 0);
+    if (!ep?.id || generation < 1) return;
+    const response = await fetch(
+        `/api/erp/endpoints/${encodeURIComponent(ep.id)}/shared/profile/confirm`,
+        {
+            method: 'POST',
+            headers: authHeaders(true),
+            body: JSON.stringify({ expected_generation: generation, confirm: true }),
+        }
+    );
+    if (response.ok) window.dispatchEvent(new CustomEvent('pearnly:erp-endpoints-changed'));
+}
+
 function bindClicks(zone: HTMLElement): void {
     zone.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
@@ -151,6 +244,16 @@ function bindClicks(zone: HTMLElement): void {
         if (target.closest('[data-erp-toggle]')) {
             e.preventDefault();
             void toggleEndpoint(card);
+            return;
+        }
+        if (target.closest('[data-erp-enroll]')) {
+            e.preventDefault();
+            void enrollEndpoint(card);
+            return;
+        }
+        if (target.closest('[data-erp-profile-confirm]')) {
+            e.preventDefault();
+            void confirmProfile(card);
             return;
         }
         if (target.closest('[data-erp-config]')) {

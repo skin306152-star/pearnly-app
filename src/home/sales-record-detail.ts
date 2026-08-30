@@ -2,7 +2,14 @@
 import { PURCHASE_DETAIL_CSS } from './purchase-detail-css.js';
 import { injectPurBase, injectStyle } from './purchase-common.js';
 import { type SalesDoc, type SalesLine, fmtMoney, salesFetch } from './sales-common.js';
-import { fetchErpEndpoints, pickDefaultTarget, pushHistory } from './dms-intake-erp-push.js';
+import {
+    aggregatePushState,
+    fetchErpEndpoints,
+    pickDefaultTarget,
+    pushHistory,
+    pushStateLabel,
+    pushToastKind,
+} from './dms-intake-erp-push.js';
 import { BAHT } from './money.js';
 import { SALES_RECORD_DETAIL_CSS } from './sales-record-detail-css.js';
 
@@ -120,10 +127,17 @@ function timelineCard(doc: SalesDoc): string {
 }
 
 function pushCard(doc: SalesDoc): string {
-    const status = doc.push_status || 'not_pushed';
-    const disabled = !doc.ocr_history_id || status === 'success' ? ' disabled' : '';
-    return `<div class="pushbox"><div class="row"><span>${escapeHtml(t('srd-erp-status'))}</span><strong>${escapeHtml(t('sr-push-' + status))}</strong></div>
-        <button class="btn primary" id="srd-push"${disabled}>${escapeHtml(t('sr-push-' + status))}</button></div>`;
+    const state =
+        doc.push_status === 'not_pushed'
+            ? null
+            : aggregatePushState(
+                  doc.push_endpoints?.map((endpoint) => endpoint.status) || [],
+                  doc.push_status
+              );
+    const disabled = !doc.ocr_history_id || state === 'success' ? ' disabled' : '';
+    const label = state ? pushStateLabel(state) : t('sr-push-not_pushed');
+    return `<div class="pushbox" data-erp-push-state="${escapeHtml(state || 'not_pushed')}"><div class="row"><span>${escapeHtml(t('srd-erp-status'))}</span><strong>${escapeHtml(label)}</strong></div>
+        <button class="btn primary" id="srd-push"${disabled}>${escapeHtml(t('sr-push-not_pushed'))}</button></div>`;
 }
 
 function shell(doc: SalesDoc): string {
@@ -162,7 +176,7 @@ async function pushToErp(): Promise<void> {
     const target = pickDefaultTarget(await fetchErpEndpoints(), '');
     if (!target) return showToast(t('sr-no-endpoint'), 'error');
     const outcome = await pushHistory(current.ocr_history_id, target);
-    showToast(t('sr-push-result-' + outcome), outcome === 'failed' ? 'error' : 'success');
+    showToast(pushStateLabel(outcome), pushToastKind(outcome));
     await load(current.id);
 }
 

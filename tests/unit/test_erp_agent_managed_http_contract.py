@@ -136,7 +136,7 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
                 for fragment in sensitive:
                     self.assertNotIn(fragment, response.text)
 
-    def test_managed_token_cannot_lease_or_ack_through_full_application(self):
+    def test_managed_token_lease_and_stale_ack_use_full_application_routes(self):
         from app import app
 
         token = "exp_11111111-1111-4111-8111-111111111111_CompanionSecret_123"
@@ -149,6 +149,16 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
             mock.patch.object(erp_agent, "_managed_heartbeat") as managed_heartbeat,
             mock.patch.object(erp_agent.agent_store, "lease_pending") as lease_pending,
             mock.patch.object(erp_agent.agent_store, "ack") as ack,
+            mock.patch.object(
+                erp_agent.managed_agent_queue,
+                "lease_managed",
+                return_value={"ok": True, "lease_seconds": 120, "jobs": []},
+            ) as managed_lease,
+            mock.patch.object(
+                erp_agent.managed_agent_queue,
+                "ack_managed",
+                return_value={"ok": False, "stale": True},
+            ) as managed_ack,
         ):
             client = TestClient(app)
             lease_response = client.post(
@@ -166,15 +176,18 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
                 },
             )
 
-        self.assertEqual(lease_response.status_code, 401)
-        self.assertEqual(lease_response.json(), {"detail": "erp.agent_unauthorized"})
-        self.assertNotIn("jobs", lease_response.json())
-        self.assertEqual(ack_response.status_code, 401)
-        self.assertEqual(ack_response.json(), {"detail": "erp.agent_unauthorized"})
+        self.assertEqual(lease_response.status_code, 200)
+        self.assertEqual(
+            lease_response.json(), {"ok": True, "lease_seconds": 120, "jobs": []}
+        )
+        self.assertEqual(ack_response.status_code, 200)
+        self.assertEqual(ack_response.json(), {"ok": False, "stale": True})
         self.assertEqual(authenticate.call_args_list, [mock.call(token), mock.call(token)])
         managed_heartbeat.assert_not_called()
         lease_pending.assert_not_called()
         ack.assert_not_called()
+        managed_lease.assert_called_once_with(token, "managed-agent", 1)
+        managed_ack.assert_called_once()
 
     def test_generation_zero_heartbeat_keeps_legacy_http_contract(self):
         from app import app

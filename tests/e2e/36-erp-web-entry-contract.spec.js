@@ -97,6 +97,7 @@ async function boot(page, entry, state = {}) {
         converts: 0,
         lineCodeCalls: 0,
         erpPushes: 0,
+        erpPushBodies: [],
         salesExports: [],
     });
     await page.addInitScript((portal) => {
@@ -109,7 +110,7 @@ async function boot(page, entry, state = {}) {
         localStorage.setItem(tokenKey, `${portal}-e2e-token`);
         localStorage.setItem(`pearnly_active_workspace_client_id_${portal}`, '1');
     }, entry);
-    await page.route(/\/erp(?:\?.*)?$/, (route) =>
+    await page.route(/\/(?:erp|cowork)(?:\?.*)?$/, (route) =>
         route.fulfill({ status: 200, contentType: 'text/html', body: HOME_HTML })
     );
     await page.route('https://api.qrserver.com/**', (route) =>
@@ -143,6 +144,40 @@ async function boot(page, entry, state = {}) {
             };
         } else if (pathname === '/api/purchase/docs') {
             body = { docs: [], summary: null };
+        } else if (pathname === '/api/purchase/docs/purchase-1') {
+            body = {
+                ok: true,
+                data: {
+                    doc: {
+                        id: 'purchase-1',
+                        doc_kind: 'purchase_invoice',
+                        status: 'posted',
+                        doc_no: 'P-2026-031',
+                        doc_date: '2026-08-20',
+                        has_vat: true,
+                        currency: 'THB',
+                        source: 'upload',
+                        subtotal: 1000,
+                        vat_amount: 70,
+                        grand_total: 1070,
+                        net_payable: 1070,
+                        paid_amount: 0,
+                        payment_status: 'unpaid',
+                        ocr_history_id: 'history-purchase-1',
+                    },
+                    lines: [
+                        {
+                            id: 'line-1',
+                            item_type: 'goods',
+                            description: 'Coffee beans',
+                            qty: 2,
+                            unit_price: 500,
+                            vat_rate: 7,
+                        },
+                    ],
+                    attachments: [],
+                },
+            };
         } else if (pathname === '/api/purchase/categories') {
             body = { categories: [] };
         } else if (pathname === '/api/sales/documents') {
@@ -207,9 +242,12 @@ async function boot(page, entry, state = {}) {
             body = { items: state.erpEndpoints || [] };
         } else if (pathname === '/api/erp/push') {
             state.erpPushes += 1;
+            state.erpPushBodies.push(req.postDataJSON());
+            const response = state.erpPushResponses?.shift() || { ok: true };
             const pending = state.salesDocuments.find((doc) => doc.push_status !== 'success');
-            if (pending) pending.push_status = 'success';
-            body = { ok: true };
+            if (pending)
+                pending.push_status = response.status || (response.ok === true ? 'success' : 'failed');
+            body = response;
         } else if (pathname === '/api/integrations/google/status') {
             body = {
                 ok: true,
@@ -350,6 +388,7 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
         erpEndpoints: [
             { id: 'express-1', name: 'Express ERP', adapter: 'express', is_default: true },
         ],
+        erpPushResponses: [{ ok: true, status: 'pending' }, { ok: true }],
     };
     await boot(erpPage, 'erp', erpState);
     await erpPage.waitForFunction(
@@ -465,6 +504,12 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     await expect(erpPage.locator('#page-sales-records')).toHaveClass(/active/);
     await erpPage.locator('[data-sr-push="sale-line-1"]').click();
     await expect.poll(() => erpState.erpPushes).toBe(1);
+    await expect(erpPage.locator('#mp-toast-wrap .mp-toast.info').last()).toContainText(
+        '待 Agent 录入'
+    );
+    expect(erpState.erpPushBodies[0].operation_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
     await erpPage.locator('[data-sr-doc="sale-line-1"]').click();
     await expect(erpPage.locator('#page-sales-record-detail')).toHaveClass(/active/);
     await expect(erpPage.locator('.srd .ph .t')).toContainText('销售单据详情');
@@ -490,6 +535,22 @@ test('ERP gets sales-system labels and records while POS keeps its invoicing men
     await revealShell(erpPage);
     await erpPage.screenshot({
         path: path.join(OUT, 'sales-record-detail.png'),
+        fullPage: true,
+        animations: 'disabled',
+    });
+    await erpPage.evaluate(() => window.openPurchaseDetail('purchase-1'));
+    await expect(erpPage.locator('#pur-erp-push')).toBeVisible();
+    await expect(erpPage.locator('[data-erp-push-state="not_pushed"]')).toHaveText('推送 ERP');
+    await erpPage.locator('#pur-erp-push').click();
+    await expect.poll(() => erpState.erpPushes).toBe(2);
+    await expect(erpPage.locator('#mp-toast-wrap .mp-toast.success').last()).toContainText('成功');
+    expect(erpState.erpPushBodies[1].history_id).toBe('history-purchase-1');
+    expect(erpState.erpPushBodies[1].operation_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    await revealShell(erpPage);
+    await erpPage.screenshot({
+        path: path.join(OUT, 'purchase-record-detail.png'),
         fullPage: true,
         animations: 'disabled',
     });
@@ -698,6 +759,60 @@ test('ERP sales records remains touch-sized on mobile', async ({ browser }) => {
         animations: 'disabled',
     });
     await page.close();
+});
+
+test('cowork desktop and ERP mobile render the same shared Express status card', async ({
+    browser,
+}) => {
+    const endpoint = {
+        id: 'express-shared-1',
+        name: 'Express Shared',
+        adapter: 'express',
+        enabled: true,
+        shared_scope: true,
+        account_set: 'TEST2026',
+        connection_state: 'online',
+        binding_generation: 1,
+        bound_account_set: 'TEST2026',
+        bound_profile_key: 'profile-1',
+        live_account_set: 'TEST2026',
+        live_profile_key: 'profile-1',
+        agent_last_seen_at: new Date().toISOString(),
+        config: {},
+        last_seen_at: '2026-08-31T10:00:00Z',
+        agent_version: '1.1.64',
+    };
+    const cases = [
+        {
+            entry: 'cowork',
+            viewport: { width: 1280, height: 900 },
+            shot: 'cowork-express-desktop.png',
+        },
+        { entry: 'erp', viewport: { width: 390, height: 844 }, shot: 'erp-express-mobile.png' },
+    ];
+    for (const item of cases) {
+        const page = await browser.newPage({ viewport: item.viewport });
+        await boot(page, item.entry, { erpEndpoints: [endpoint] });
+        if (item.entry === 'erp') {
+            await page.evaluate(() => window.routeTo('purchase'));
+            await page.click('#pur-record-btn');
+        } else {
+            await page.evaluate(() => window.routeTo('dms-intake'));
+            await page.click('[data-task="invoice"]');
+        }
+        const card = page.locator('[data-erp="express"]');
+        await expect(card).toBeVisible();
+        await expect(card.locator('[data-erp-status]')).toContainText('已连接');
+        await expect(card.locator('[data-erp-status]')).toContainText('TEST2026');
+        await expect(card.locator('[data-erp-toggle]')).toHaveCount(1);
+        await revealShell(page);
+        await page.screenshot({
+            path: path.join(OUT, item.shot),
+            fullPage: true,
+            animations: 'disabled',
+        });
+        await page.close();
+    }
 });
 
 test('ERP integration reuses the established LINE binding card with its own bot', async ({

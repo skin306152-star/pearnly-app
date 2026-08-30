@@ -83,6 +83,16 @@
             ],
         },
         {
+            key: 'erp',
+            title: 'mod_erp',
+            codes: [
+                'erp.endpoint.view',
+                'erp.endpoint.manage',
+                'erp.push.operate',
+                'erp.log.view',
+            ],
+        },
+        {
             key: 'acct',
             title: 'mod_acct',
             codes: [
@@ -134,7 +144,7 @@
         { key: 'intake', title: 'mod_intake', codes: ['intake.upload'] },
     ];
     // 连 admin 都没有的提权码 · 自定义角色禁选(后端 roles_store 同样剔除,前端只为显式禁灰)
-    var FORBIDDEN_CODES = ['billing.manage', 'ownership.transfer'];
+    var FORBIDDEN_CODES = ['billing.manage', 'ownership.transfer', 'erp.endpoint.manage'];
     var FIELD_COST = 'field.cost.view';
     var FIELD_PAYROLL = 'field.payroll.view';
     function pcKey(code) {
@@ -144,6 +154,7 @@
     var MOD_ORDER = [
         'sales',
         'purchase',
+        'erp',
         'acct',
         'tax',
         'recon',

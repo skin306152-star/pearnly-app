@@ -41,7 +41,7 @@ FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主�
 - 破坏 git 历史:`push --force` 到 master / `reset --hard` / 删 tag / 删 branch。
 - `push --no-verify` 绕闸:永远不许。
 - 删表 / 删字段 / `DROP`。
-- **其余一切改动**:自己写 → 自己验 → 自己 `git push origin master`(进入 CI 全闸;全绿后精确 SHA 上线),不分高敏低敏、不等任何人在场;改坏了自己 `git revert`,不把红的留在 master。
+- **其余一切改动**:自己写 → 本地风险分层测试(UI可先本地真实浏览器)→ `git push origin master` → 手动 dispatch `manual-deploy.yml` 精确 SHA CD → 回读生产 HEAD/service/ready → 主控在该精确 production SHA 做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK；GitHub CI workflow 当前停用，不因关闭自动闸降低真实验收质量，未完成最终用户验收不得称完成。改坏了自己 `git revert`,不把坏码留在 master。
 
 ## 4. 做法在 skills 里(按需装载,不用背)
 
@@ -58,7 +58,7 @@ FastAPI + 原生 JS/Vite + Supabase Postgres,一个仓库装多个入口壳(主�
 
 机械闸清单 + 逐道自查命令 + 豁免语法:`docs/GATES.md`。棘轮豁免写在 commit message:`RATCHET-EXEMPT: <file> +<N> · <理由>`;新增 `ensure_*` 写 `NEW-DEBT-EXEMPT: <理由>`。
 
-⚠️ **本地 pre-push 钩子 2026-07-31 起已挂上**(`core.hooksPath` = `scripts/git-hooks`)→ 推坏码会当场被拦,不用等 CI。它在 `.git/config` 里,**所有共享 worktree 一起生效**。想提前知道会不会被拦,别等 push:`PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`(不设编码变量会假红),或 `git push --dry-run`(照样触发,不会真推)。装法与影响面:`docs/GATES.md` 顶部「装钩子」。
+⚠️ **本地 pre-push 钩子 2026-07-31 起已挂上**(`core.hooksPath` = `scripts/git-hooks`)→ 本地风险分层闸会当场拦错；GitHub CI workflow `281113573` 已手动停用，push 不再自动触发全量 CI/E2E 或部署。流程是本地分层测试→push→手动 dispatch `manual-deploy.yml` 精确 SHA CD→回读生产 HEAD/service/ready→在该 production SHA 做真实站点/真实环境/ERP report 预验收→Zihao 最终真机 OK。它在 `.git/config` 里,**所有共享 worktree 一起生效**。想提前知道会不会被拦,别等 push:`PYTHONIOENCODING=utf-8 sh scripts/git-hooks/pre-push`(不设编码变量会假红),或 `git push --dry-run`(照样触发,不会真推)。装法与影响面:`docs/GATES.md` 顶部「装钩子」。
 
 ## 5. 文档地图(用 `@` 引用,别通读)
 

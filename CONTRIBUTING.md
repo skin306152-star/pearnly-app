@@ -56,6 +56,7 @@ Pearnly 当前有 4 个屎山文件 · 改一处容易牵连其他:
 
 ---
 
+
 ## 🟡 例外条款 · 暂塞必须留迁出计划
 
 如果**真的**必须暂时塞老文件(罕见 · 比如 90% 改动在老模块上 · 抽出来工作量大于本身改动):
@@ -103,14 +104,14 @@ python -m unittest discover -s tests/unit -p "test_*.py"
 npx playwright test
 ```
 
-全过 → push。任何一个红 → 修了再 push。
+全过 → push → 手动 pinned-SHA CD → 回读生产 HEAD/service/ready → 主控在精确 production SHA 做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK。任何一个红 → 修了再 push；未完成最终用户验收不得称完成。
 
 ---
 
-## 🚀 部署(自动)
+## 🚀 部署（手动 pinned-SHA）
 
-- Pearnly 用 git webhook 自动部署:`git push origin master` → GitHub webhook → 服务器 git pull + restart mrpilot → 15 秒后 prod 生效
-- **每次 push 即上线** · 没有 staging 环境
+- GitHub `CI` workflow 当前停用；`git push origin master` 不自动部署。本地风险分层测试通过后，手动 dispatch `.github/workflows/manual-deploy.yml`，由 pinned SHA 调用现有精确部署端点；生产回读后再做真实站点/真实环境/ERP report 预验收与最终真机 OK。
+- **push 不等于上线** · 手动 CD 后必须回读生产 `git rev-parse HEAD`、服务时间戳和 `/api/ready`。
 - 改动前问自己:这 push 上去能不能马上让所有用户用?
 
 ---
@@ -142,7 +143,8 @@ pearnly_project/                       # FastAPI 后端 + Vite/TypeScript 前端
 ├── CLAUDE.md/                         # 项目宪法目录(28 铁律 · STATE · BACKLOG · TECH_DEBT)
 ├── AGENTS.md                          # 唯一一页入口 · 文档地图
 ├── docs/ · design-preview/ · design-reference/       # 文档 / 设计参考
-└── .github/workflows/ci.yml           # CI(lint · lint-size · lint-ui · lint-agent · unit · vite-build · e2e)
+├── .github/workflows/ci.yml           # 历史 CI 全闸配置（当前 workflow 已停用）
+└── .github/workflows/manual-deploy.yml # 手动 pinned-SHA CD
 ```
 
 ---

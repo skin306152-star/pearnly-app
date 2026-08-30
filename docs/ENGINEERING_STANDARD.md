@@ -3,7 +3,7 @@
 > **这份文档回答一个问题:Pearnly 怎样才算"拿得上台面"。** 从源码到验收每个环节的硬标准 + **靠什么机制保证**(不靠口号靠闸)。
 > 定位:整顿期的"完成定义"权威详版(`REFACTOR_MASTER_PLAN.md` 完成定义段是浓缩版)。AGENTS.md 文档地图指向本文件。
 > 目标基线:**以 Claude 辅助开发的角度,工程卫生(测试/CI/无屎山/可交接)完胜 90% 大厂**;规模/安全纵深等持续逼近。
-> 最后更新:2026-05-29(初版 · 含「去 AI 味」标准)
+> 最后更新:2026-08-30(2026-05-29 初版 · GitHub CI workflow 281113573 当前停用 · 本地风险分层与真实验收保留)
 
 > 状态图例:✅ 已达标 · 🟡 部分 · ⚪ 未开始 · 🔒 机械闸已落(CI/脚本强制)
 
@@ -59,10 +59,10 @@
 ---
 
 ## 3. 流程标准 🟡
-- 分支:在 master 干 / 从 master 开 feature(铁律#14)· 部署 = push master 触发 CI,全闸绿后 deploy job 精确 SHA 上线。
+- 分支:在 master 干 / 从 master 开 feature(铁律#14)· 部署 = 本地风险分层测试(UI可先本地真实浏览器)→ push master → 手动 pinned-SHA CD → 回读生产 HEAD/service/ready → 主控在精确 production SHA 做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK；GitHub CI workflow 当前停用。
 - Commit:Conventional Commits + `· REFACTOR-<id>`(整顿期)+ Co-Authored-By Opus 4.8(🔒 铁律#20)。
 - **Definition of Ready**(开干前):需求清楚 / 影响面已评估 / 高敏走流程(铁律#16)。
-- **Definition of Done**(本文件全部 ✅ 才算真完成):代码过 §1 · 测试过 §5 · CI 过 §6 · 验收过 §8 · 文档更新 §9。
+- **Definition of Done**(本文件全部 ✅ 才算真完成):代码过 §1 · 按风险完成 §5 测试 · 手动 CD 后回读精确 production SHA/服务/ready · 主控在该 SHA 完成真实站点/真实环境/ERP report 预验收 · Zihao 最终真机 OK · 文档更新 §9；GitHub CI 停用不等于跳过测试。
 - 30+ 文件/schema/删字段/关键路径 → 停下报方案(🔒 铁律#16 红线)。
 
 ---
@@ -85,10 +85,10 @@
 ---
 
 ## 6. CI/CD 标准 🟡🔒
-- CI:lint + 安全扫描(bandit/pip-audit/npm audit ✅)+ 全量测试 + build + 覆盖率棘轮 + lint-size,全绿才能合(🔒)。
-- 部署:push → CI 全闸 → deploy job → git-deploy.sh 精确 SHA+flock+restart · 验证生产 HEAD、`/api/version` 与新进程时间戳(铁律#25)。
+- CI:历史 workflow 保留 lint + 安全扫描(bandit/pip-audit/npm audit)+ 全量测试 + build + 覆盖率棘轮 + lint-size 证据；GitHub workflow `281113573` 当前停用。当前要求本地按风险运行 lint/unit/真 PG/HTTP，用户功能另做真实 E2E/真机与 ERP report。
+- 部署:本地风险分层测试 → push → 手动 `manual-deploy.yml` pinned SHA → git-deploy.sh 精确 SHA+flock+restart · 验证生产 HEAD、`/api/ready` 与新进程时间戳 → 主控真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK。
 - 健康检查:`/health` + `/ready` 能真实失败(⚪ B4 · 硬门槛#7)。
-- 回滚:CI 红/E2E 红 → `git revert` + 单独 push · 绝不留红在 master(🔒 铁律#26)。
+- 回滚:本地风险测试红、生产预验收红或最终真机验收红 → `git revert` + 单独 push/手动 CD · 绝不把未通过真实验收的功能称完成。
 - 依赖:锁定(✅ requirements.lock + package-lock)+ Dependabot 周更(✅)。
 
 ---
@@ -102,9 +102,9 @@
 
 ## 8. 验收标准 🟡
 - 固定验收剧本:改完银行对账/收入对账/ERP/充值各跑对应剧本(🟡 `docs/agent/ACCEPTANCE_PLAYBOOKS.md`)。
-- 真账号 E2E 通过才算受影响流程 OK · Zihao 像普通用户点验收。
+- 真账号 E2E/真机通过且绑定候选 production SHA、截图和 ERP report 回查才算受影响流程 OK · Zihao 像普通用户点验收。
 - 改 UI 必写 4 语 release_notes 标准官方语言(🔒 铁律#6)。
-- 上线后 cache_bust 翻新 + CI 真绿 + 用户能访问新版。
+- 上线后 cache_bust 翻新 + 手动 CD run 被接受并完成生产 SHA/ready 回读 + 用户能访问新版。
 
 ---
 

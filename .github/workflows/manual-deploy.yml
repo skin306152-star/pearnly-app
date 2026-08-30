@@ -1,0 +1,63 @@
+name: Manual CD
+
+on:
+    workflow_dispatch:
+        inputs:
+            sha:
+                description: 'Exact 40-character commit SHA currently at origin/master'
+                required: true
+                type: string
+
+permissions:
+    contents: read
+
+concurrency:
+    group: manual-deploy-master
+    cancel-in-progress: false
+
+jobs:
+    deploy:
+        name: deploy (pinned SHA)
+        if: github.ref == 'refs/heads/master'
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - name: Validate SHA and current master
+              env:
+                  DEPLOY_SHA: ${{ inputs.sha }}
+                  API_TOKEN: ${{ github.token }}
+              run: |
+                  set -eu
+                  if [ "${GITHUB_REF}" != "refs/heads/master" ]; then
+                    echo "manual CD is only allowed from master" >&2
+                    exit 1
+                  fi
+                  if ! printf '%s' "$DEPLOY_SHA" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+                    echo "sha must be exactly 40 hexadecimal characters" >&2
+                    exit 1
+                  fi
+                  CURRENT_SHA="$(curl --fail --silent --show-error \
+                    --header "Accept: application/vnd.github+json" \
+                    --header "Authorization: Bearer ${API_TOKEN}" \
+                    --header "X-GitHub-Api-Version: 2022-11-28" \
+                    "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/heads/master" \
+                    | jq -er '.object.sha')"
+                  EXPECTED_SHA="$(printf '%s' "$DEPLOY_SHA" | tr '[:upper:]' '[:lower:]')"
+                  ACTUAL_SHA="$(printf '%s' "$CURRENT_SHA" | tr '[:upper:]' '[:lower:]')"
+                  if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+                    echo "requested SHA is not the current origin/master SHA" >&2
+                    echo "requested: $EXPECTED_SHA" >&2
+                    echo "master:    $ACTUAL_SHA" >&2
+                    exit 1
+                  fi
+
+            - name: Submit production deploy request (accepted is not complete)
+              env:
+                  DEPLOY_SHA: ${{ inputs.sha }}
+                  DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+              run: |
+                  set -eu
+                  curl --fail --silent --show-error --max-time 30 \
+                    --header "X-Internal-Token: ${DEPLOY_TOKEN}" \
+                    "https://pearnly.com/internal/deploy/manual?sha=${DEPLOY_SHA}"
+                  echo "Deploy request accepted; wait for the server deployment to finish and verify it separately."

@@ -10,9 +10,9 @@
 
 | 我要… | 跳到 | 一句话 |
 |---|---|---|
-| 上线代码 | [§2 部署](#2-部署) | `git push origin master` → CI 全闸绿 → **deploy job** 精确部署(≈10 min) |
+| 上线代码 | [§2 部署](#2-部署) | 风险分层验证 → push → 手动 dispatch pinned SHA → 生产回读 → 真实验收 |
 | 撤回刚上线的改动 | [§3 回滚](#3-回滚) | `git revert <hash>` + push(**不要** force / reset) |
-| 看 CI 红没红 | [§4 CI 状态](#4-ci-状态查看) | `gh run list --branch master --limit 5` |
+| 看 CI 状态 | [§4 CI 状态](#4-ci-状态查看) | 当前 CI workflow 已停用；Dependabot 仍保留 |
 | 站点报 500 / 上传炸 | [§6 紧急排查](#6-紧急排查) | **第一反应查磁盘** `df -h /`(铁律 #24) |
 | 确认新码真生效 | [§5 健康检查](#5-健康检查--诊断) | 生产 `git rev-parse HEAD` == 你 push 的 commit(不是看 200) |
 
@@ -26,7 +26,7 @@
 | 服务器 | `root@66.42.49.213` · Vultr **Singapore** · Ubuntu 24.04 · `/opt/mrpilot/` · **SSH 别名 `pearnly-prod`**(key 在 `~/.ssh/id_ed25519_pearnly_prod` · 只 key 登录) |
 | 进程 | systemd unit `mrpilot`(uvicorn `app:app`) |
 | 数据库 | Supabase PostgreSQL(Pooler) |
-| 部署机制 | push → GitHub CI(`unit` + `e2e` 并行 + 全部 FAIL 闸绿)→ **`deploy` job**(仅 master push)带 `sha=${{ github.sha }}` + `secrets.DEPLOY_TOKEN` 调 `GET /internal/deploy/manual` → `/opt/mrpilot/git-deploy.sh`(`TARGET_SHA` 精确守卫 + `flock` 串行化) |
+| 部署机制 | 本地风险分层验证 → push master → 手动 dispatch `.github/workflows/manual-deploy.yml` → 生产回读 → 精确 production SHA 真实站点/真实环境/ERP report → 真机确认；workflow 先用 GitHub API 校验 SHA 等于 `origin/master`，再带 `DEPLOY_TOKEN` 调 `GET /internal/deploy/manual` → `/opt/mrpilot/git-deploy.sh`(`TARGET_SHA` 精确守卫 + `flock` 串行化) |
 | GitHub webhook | **永久停用**(`625195648` · `active=false` · 2026-08-26)· 历史遗留机制 · 不再是部署入口 · 不提供复启命令 |
 | 私库 | `github.com/skin306152-star/pearnly-app`(本地 remote 名 `origin` · 分支 `master` · 服务器 remote 名 `pearnly`) |
 | 密钥 | 生产 `/opt/mrpilot/.env`;部署令牌 repo secret `DEPLOY_TOKEN`(= 服务器 `GITHUB_WEBHOOK_SECRET` 原值) |
@@ -38,37 +38,51 @@ SSH 免密已配(`pearnly-prod`)。只读诊断 Claude 自己跑;**生产写操�
 
 ## 2. 部署
 
-### 正常流程（C 档位 · Claude 写完自测后可直接推 · 铁律 #16）
+### 正常流程（本地分层验证 → production SHA 真实验收）
 
 ```bash
 # 1. 确认在 master(铁律 #14 · 每窗口开工必查)
 git branch --show-current   # 必须 master
 
-# 2. 本地机械闸全绿才推(等价 pre-push · 不用真推)
-PYTHONUTF8=1 sh scripts/git-hooks/pre-push
+# 2. 按改动风险跑本地快速验证；UI 可先用本地浏览器验证
+#    纯 docs 不跑 E2E；后端/RLS 优先 targeted unit + 真实 PG/API；只为对应功能运行本地 focused E2E
 
 # 3. 提交 + 推(显式写 master · 不是当前分支)
 git add <自己的 pathspec>
 git commit -m "<type>(<scope>): <subject> · why 不是 what"
 git push origin master
+
+# 4. 读取刚推送的 master SHA，手动触发仅部署 workflow（不含测试/E2E）
+SHA="$(git rev-parse HEAD)"
+gh api -X POST repos/skin306152-star/pearnly-app/actions/workflows/manual-deploy.yml/dispatches \
+  -f ref=master -f "inputs[sha]=$SHA"
+
+# 5. workflow 显示 request accepted 后，等待服务器完成并按下方 §2 验证生产 SHA
+# 6. 生产回读通过后，在该精确 production SHA 做真实站点/真实环境/ERP report 验收，最后由 Zihao 真机确认
 ```
 
-push 后**不再是 webhook 秒级部署**。新链路(2026-08-26 起):
+push 后由手动 CD workflow 部署。它不接受 push/PR/schedule 触发，不运行 CI、unit 或 E2E：
 
 ```
 git push origin master
-  → GitHub CI 起跑(unit 与 e2e 并行 · lint* 全闸并行 · pg-smoke)
-  → 全部 FAIL 闸 + unit + e2e + pg-smoke 绿
-  → deploy job(master push 专属 · needs 全绿才触发)
-      curl -H "X-Internal-Token: $DEPLOY_TOKEN" \
-           "https://pearnly.com/internal/deploy/manual?sha=${{ github.sha }}"
+  → 主控完成本地风险分层验证（UI 可本地浏览器验证）
+  → 手动 dispatch manual-deploy.yml，输入 40-hex SHA
+  → GitHub API 读取 origin/master，必须与输入 SHA 完全一致
+  → curl -H "X-Internal-Token: $DEPLOY_TOKEN" \
+         "https://pearnly.com/internal/deploy/manual?sha=<输入 SHA>"
+  → workflow 显示 request accepted（只代表请求已受理，不代表部署完成）
   → 服务器 _launch_deploy → git-deploy.sh:
       flock 串行化(锁等待 ≤900s)→ fetch → TARGET_SHA 精确守卫
       → reset --hard 到该 SHA → cp static → pip/playwright 幂等 → systemctl restart → 健康检查
+  → 回读生产 HEAD、systemd、部署日志、health、ready
+  → 在精确 production SHA 做真实站点/真实环境/ERP report 验收
+  → Zihao 完成真机确认
 ```
 
 关键性质:
-- **服务器只部署「CI 验过的那一个 commit」**(`TARGET_SHA = ${{ github.sha }}`);fetch 后发现 master 已被更新的 push 取代 → 记 `SUPERSEDED` 并跳过,不静默部署未审查 commit。
+- **服务器只部署「手动 workflow 校验过的那一个 commit」**(`TARGET_SHA = 输入 SHA`);workflow 在 dispatch 前确认它仍是 `origin/master`，服务器继续做精确 SHA 与 `flock` 守卫。
+- **request accepted ≠ deployment complete**；workflow 绿后必须等待服务器任务完成，再回读部署日志、生产 HEAD、systemd 重启时间、`/api/health` 与 `/api/ready`。
+- 真实站点/真实环境/ERP report 验收必须发生在生产 HEAD 已等于目标 SHA 之后；真机验收由 Zihao 最后确认。
 - **flock 串行化**:同一时刻只有一个 `git-deploy.sh` 在跑,排队的更新 push 等锁不丢。
 - 紧急手动救援可调 `GET /internal/deploy/manual?sha=<40-hex>`(**必须带 SHA · 不带 SHA 已禁止**)。需 Zihao 明确授权。
 - `curl /internal/deploy/log` 看最近部署日志;`/internal/deploy/status` 只读回滚 marker。
@@ -93,9 +107,12 @@ ssh pearnly-prod "df -h /"     # 用量 > 85% 必须先清理再部署,别等 10
 ### 验证（push 后 · 别只看 200）
 
 ```bash
-# 部署被 deploy job 接管 → 线上变码要等 CI 全绿(≈10 min)· 判据 = 生产 HEAD == 你推的 SHA
+# workflow 显示 request accepted 后，等待服务器部署结束，再回读以下结果
 ssh pearnly-prod "git -C /opt/mrpilot rev-parse HEAD"
 ssh pearnly-prod "systemctl show mrpilot -p ActiveEnterTimestamp"   # ≥ 那次部署时间
+ssh pearnly-prod "tail -20 /var/log/mrpilot-deploy.log"              # new HEAD + health check OK
+curl --fail --silent https://pearnly.com/api/health
+curl --fail --silent https://pearnly.com/api/ready
 ```
 
 ---
@@ -111,23 +128,24 @@ git log --oneline -10
 # 2. 生成反向 commit(安全 · 不改历史)
 git revert <bad_hash> --no-edit
 
-# 3. 推上线(正常走 deploy job · 会先跑 CI)
+# 3. 推上线(先按 §2 做本地分层验证，再手动 dispatch pinned SHA)
 git push origin master
 ```
 
 紧急且 revert 冲突时,可临时 checkout 上一个 good commit 的文件,但**不要** force-push master。
 
-### 紧急时:等不及 CI / CI 红着也要部署
+### 紧急时:手动 CD workflow 无法使用
 
 > 🔴 **以下操作必须 Zihao 明确授权后才可执行。** 未经授权不得手动触发部署。
 
-CI 全红时 `deploy` job 不会触发(它 needs 全部 FAIL 闸)。**优先重跑同一 CI run 的 deploy job**:
+正常部署应使用 `.github/workflows/manual-deploy.yml`，它会校验输入 SHA 必须等于当前 `origin/master`。workflow 不可用时，先检查 GitHub Actions 权限、workflow 状态和 `DEPLOY_TOKEN`，不要绕过 SHA 校验。
 
 ```bash
-gh run rerun <RUN_ID> --repo skin306152-star/pearnly-app
+gh workflow run manual-deploy.yml --repo skin306152-star/pearnly-app \
+  --ref master -f sha="$(git rev-parse HEAD)"
 ```
 
-若重跑仍失败且 Zihao 已明确授权,可用手动端点(**必须带显式 40-hex SHA · 绝不允许不带 SHA**):
+若 workflow 仍失败且 Zihao 已明确授权,才可用手动端点(**必须带显式 40-hex SHA · 绝不允许不带 SHA**):
 
 ```bash
 # 手动端点(Zihao 授权后 · 必须带精确 40-hex SHA · DEPLOY_TOKEN 在 gh secret)
@@ -146,13 +164,13 @@ curl -H "X-Internal-Token: $DEPLOY_TOKEN" \
 > 直接用 `gh`(在 PATH · 旧 PowerShell 绝对路径 `C:\Program Files\GitHub CLI\gh.exe` 已失效)。
 
 ```bash
-# 最近 5 个 run(push 后查绿没绿)
-gh run list --repo skin306152-star/pearnly-app --branch master --limit 5
-# 某 run 失败详情
+# 最近 5 个手动 CD run
+gh run list --repo skin306152-star/pearnly-app --workflow manual-deploy.yml --limit 5
+# 某次手动 CD 详情
 gh run view <RUN_ID> --repo skin306152-star/pearnly-app --log-failed
-# 判绿只认 conclusion == success(cancelled 对 gh run watch 也返回 0)
+# 判绿只认 conclusion == success
 gh run view <RUN_ID> --repo skin306152-star/pearnly-app --json status,conclusion --jq '.status + "/" + (.conclusion // "null")'
-# transient 失败(git exit 128 / 网络抖)重跑
+# transient 失败可重跑同一次 pinned-SHA run（仍会重新校验 master）
 gh run rerun <RUN_ID> --repo skin306152-star/pearnly-app
 ```
 
@@ -198,7 +216,7 @@ ssh pearnly-prod "systemctl restart mrpilot"
 
 ### 后端改动「上了但没生效」
 
-部署走 deploy job(≈10 min)不是秒级 → `/api/version`=200 ≠ 新码跑起来。判据:生产 `git rev-parse HEAD` == 你推的精确 SHA,且 `ActiveEnterTimestamp ≥ 部署时间`(铁律 #25)。`/internal/deploy/log` 看部署日志;fetch 撞 GitHub 超时会让 git-deploy 静默留在旧 commit → 优先 `gh run rerun <RUN_ID>` 重跑 deploy job;反复失败再 SSH 带精确 SHA 重跑:`bash /opt/mrpilot/git-deploy.sh <40-hex-SHA>`(**禁止不带 SHA**)。
+不再等待 push 触发 CI；手动 workflow 会先校验 SHA。`/api/version`=200 ≠ 新码跑起来。判据:生产 `git rev-parse HEAD` == 你推的精确 SHA,且 `ActiveEnterTimestamp ≥ 部署时间`。`/internal/deploy/log` 看部署日志；workflow 失败先检查输入 SHA 是否仍为 `origin/master`，不要绕过校验。
 
 ### 删后端字段后 `/api/me` 等 500（铁律 #15）
 
@@ -214,7 +232,7 @@ ssh pearnly-prod "systemctl restart mrpilot"
 
 ---
 
-## 8. 本地机械闸（clone-local hook · 2026-07-31 Zihao 拍板装）
+## 8. 本地机械闸与 CI 状态
 
 - 本 clone 已设 `core.hooksPath=scripts/git-hooks` → 每次 push 本地先跑全套闸,全绿才放行。
 - **是 clone-local 配置**(写在 `.git/config` 不是全局):共享同一 `.git` 的所有 worktree 一起生效;**新 clone 不会自带**,要装:
@@ -227,7 +245,10 @@ git hook run pre-push                # 空跑验证
 
 - 路径按「谁在 push」各自解析(A worktree push 跑 A 的钩子);`git push --dry-run` 也会触发钩子,可拿来空跑。
 - 想要逐 worktree 单独开关:先 `git config extensions.worktreeConfig` 再 `git config --worktree ...`。
-- 详细 31 道闸清单 / 逐道自查命令 / 豁免语法:`docs/GATES.md`。
+- 当前 CI workflow 已由仓库设置停用；`ci.yml` 保留以便未来恢复。Dependabot 配置继续生效。
+- 本地 hook 仍可按风险分层执行；不要把台账/桩契约闸误认为真实 E2E。
+- 恢复 CI：`gh workflow enable CI`（或 `gh workflow enable .github/workflows/ci.yml`），恢复后再检查 `gh run list --workflow CI` 与 branch protection required checks。
+- 详细闸清单 / 逐道自查命令 / 豁免语法:`docs/GATES.md`。
 
 ---
 

@@ -1,11 +1,11 @@
 ---
 name: verification
-description: 改完代码怎么算"验过了" —— 批次边界(什么必须当场验)、机械闸自查、真浏览器 E2E 验收硬门、async 路由 tripwire、push 后盯 CI 到绿的判绿口径。改完任何代码、准备 push、要判断 CI 是否真绿、或想说"验过了"之前用。
+description: 改完代码怎么算"验过了" —— 批次边界(什么必须当场验)、风险分层机械闸、真浏览器 E2E/真机验收硬门、async 路由 tripwire、手动 pinned-SHA CD 后生产回读。改完任何代码、准备 push、要部署或想说"验过了"之前用。
 ---
 
 # 验证闭环
 
-自己做 → 自己检 → 自己验 → 自己盯 CI。不把验证或擦屁股甩给 Zihao 或别的窗口。
+自己做 → 自己检 → 本地风险分层测试(UI可先本地真实浏览器)→ push → 手动 pinned-SHA CD → 回读生产 HEAD/service/ready → 主控真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK。不把验证或擦屁股甩给 Zihao 或别的窗口。GitHub CI 当前停用不改变真实验收硬门。
 
 ## 1. 验证绑批次边界,不攒到最后
 
@@ -28,7 +28,7 @@ description: 改完代码怎么算"验过了" —— 批次边界(什么必须�
   - 只设 `PYTHONIOENCODING` → 它只管本进程的 stdout/stderr;测试里 `subprocess.run(text=True)` 读子进程管道用的是 locale 编码(本机 cp874),子进程照 UTF-8 写、父进程照 cp874 读 → `proc.stderr` 变 `None` → `test_file_crypto` 当场 TypeError
   - 什么都不设 → 子进程 print 中文进 cp874 管道 `UnicodeEncodeError` 退 1 → `test_agent_capability_audit` 假红(`check_ai_smell` / `check_authz_coverage` 同坑)
   - `PYTHONUTF8=1` 是 UTF-8 模式,连 locale 编码一起改,两个方向才对齐;钩子已改成它,守门测试 `tests/unit/test_pre_push_hook_env.py` 拿钩子导出的环境真跑那两个模块
-- 本地钩子当前没挂(原因见 `docs/context-engineering/2026-07-25-claude-md-simplify.md` 遗留表),所以**手跑不是可选项**
+- 本地钩子当前已挂(`core.hooksPath=scripts/git-hooks`)；GitHub CI workflow `281113573` 当前停用，所以按风险手跑对应 lint/unit/真 PG/HTTP，不能把自动闸停用误当作免检。
 
 ## 3. UI / 视觉验收:真浏览器,截图为证
 
@@ -67,22 +67,22 @@ description: 改完代码怎么算"验过了" —— 批次边界(什么必须�
 - 复测必在**重启后的新进程**上:`/api/version` 返 200 ≠ 新码生效,查 `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ push 时间
 - 验真扣费/写库用唯一内容(塞 nonce),防文件指纹缓存命中让复验失真
 
-## 5. push 之后盯 CI 到绿(三个假绿坑)
+## 5. push/手动 CD 之后回读生产（GitHub CI 当前停用）
 
 ```powershell
 gh run list --repo skin306152-star/pearnly-app --branch master --limit 5
 gh run view <RUN_ID> --repo skin306152-star/pearnly-app --log-failed
 ```
 
-1. **`gh run watch` 对 cancelled 也返回 0** → 判绿只认 `conclusion == success`
-2. **多窗口同分支 push 会互掐**:别人的 push 会 cancel 你的 run → 必须确认自己的 commit 是那个绿 run 的祖先
-3. **红了自己查自己修**,不推完就走;修不动就 `git revert` 先让 master 绿
+1. 手动 dispatch `.github/workflows/manual-deploy.yml` 时，输入 SHA 必须是当前 `origin/master` 的 40-hex SHA。
+2. 手动 CD run 绿色只代表部署请求被接受；必须回读生产 `git rev-parse HEAD`、`ActiveEnterTimestamp`、`/api/ready`，必要时检查部署日志。
+3. 用户功能的真实 E2E/真机、截图和 ERP report 回查必须绑定候选 production SHA；不得用关闭自动 CI 代替验收。
 
 ## 5.1 非紧急改动走推送列车
 
-- 没有线上事故、部署阻塞或用户等待时,把同一窗口内相互独立且已验证的低风险改动攒成一批,一次跑闸、一次 push、一次盯 CI。
+- 没有线上事故、部署阻塞或用户等待时,把同一窗口内相互独立且已验证的低风险改动攒成一批，一次跑对应风险分层闸、一次 push、一次手动 pinned-SHA CD。
 - 命中高敏路径、用户可见 UI、schema/路由或真实数据验收时,不为凑批次延迟;该批次独立验证并立即推送。
-- 推送列车不是跳过检查:每批仍先跑本地对应闸,CI 仍跑全量;只减少重复启动和重复等待。
+- 推送列车不是跳过检查：GitHub CI 当前停用，但每批仍先跑本地对应 lint/unit/真 PG/HTTP 检查；用户功能另做真实 E2E/真机验收。
 
 ## 6. 报告口径
 

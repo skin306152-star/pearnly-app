@@ -2,11 +2,11 @@
 
 > **这是唯一的"必读"。** 故意保持一页。坑与红线在 `CLAUDE.md/CLAUDE.md`(轻量版约 90 行),干活的具体做法在 `.claude/skills/*`(按需自动装载,别背),业务概念在 `docs/agent/`。**进窗口先把这页 + STATE 状态卡读完 + 跑一次进度脚本**就能开工。
 > (2026-07-25:CLAUDE.md 由 1470 行瘦身成轻量版 + 8 个 skill,旧全文冻结在 `CLAUDE.md/ARCHIVE_CLAUDE_LEGACY.md`,逐段对照表见 `docs/context-engineering/2026-07-25-claude-md-simplify.md`。)
-> 最后更新:2026-08-26(CI 全闸后精确 SHA 部署 · 旧 webhook 停用 · worker 结束即回收 opencode 进程树)
+> 最后更新:2026-08-30(GitHub CI workflow 281113573 已手动停用 · 本地风险分层验证与真实验收保留 · manual pinned-SHA CD)
 >
-> **🔴 常驻铁律(Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **(2026-08-12 改口径)Zihao 说"收尾"→ 轻收口:四角审查外派 DeepSeek worker、发现只记账进交接账本(次日首批修)、push 前 10 秒机械自检,然后 STATE→交接→清树;simplify 只在批次收口边界跑,收尾只兜当天没扫过的尾巴**(细则=`.claude/skills/wrapup`)。③ **(2026-07-01)任何任务自己做→自己检→自己验证闭环**:凡"视觉/UI 验收"的改动必须真浏览器 E2E + 截图为证(grep 类名/断言 MODAL=true 不算数,见 §3 红线#4);任何 push 后必须自己盯 CI 到绿、红了自己修,不甩给 Zihao/别的窗口。**验证绑批次边界·不攒到最后(2026-07-11·vertical slicing)**:每切完一个可独立验证的批次就地验——命中任一=大批次当场验(高敏路径 登录/OCR/计费/推送/POS 收款/多租户/RLS/迁移 · 用户可见 UI · 新 flag/路由/迁移 · ≥~200 行或一个独立功能单元);小批次(纯格式化/docs/测试-only/无运行时面重构/<~50 行机械改)并到批次末或交付前一起兜。④ **(2026-07-11)动手写码前先做 discovery**:每个功能/派单前先写「场景+对标」——JTBD 真实场景 / RICE·Kano 判实用性(警惕 feature creep)/ 便利性(减摩擦·手机优先·危险操作确认·四态诚实)/ 照抄成熟产品 design pattern(Loyverse·Square…·Jakob's Law),别从代码结构倒推(见 [[design-from-real-scenarios-ref-market-leaders]])。
+> **🔴 常驻铁律(Zihao 拍板 · 任何窗口任何任务都执行)**:① 所有源码去 AI 味 + 注释/路数按大厂走(见 §2.6)② **(2026-08-12 改口径)Zihao 说"收尾"→ 轻收口:四角审查外派 DeepSeek worker、发现只记账进交接账本(次日首批修)、push 前 10 秒机械自检,然后 STATE→交接→清树;simplify 只在批次收口边界跑,收尾只兜当天没扫过的尾巴**(细则=`.claude/skills/wrapup`)。③ **(2026-07-01)任何任务自己做→自己检→自己验证闭环**:流程固定为本地风险分层测试(UI可先做本地真实浏览器)→commit/push→手动 pinned-SHA CD→回读生产 HEAD/service/ready→主控在该精确 production SHA 上做真实站点/真实环境/ERP report 预验收→Zihao 最终真机 OK；未完成最终验收不得称完成。**验证绑批次边界·不攒到最后(2026-07-11·vertical slicing)**:每切完一个可独立验证的批次就地验——命中任一=大批次当场验(高敏路径 登录/OCR/计费/推送/POS 收款/多租户/RLS/迁移 · 用户可见 UI · 新 flag/路由/迁移 · ≥~200 行或一个独立功能单元);小批次(纯格式化/docs/测试-only/无运行时面重构/<~50 行机械改)并到批次末或交付前一起兜。④ **(2026-07-11)动手写码前先做 discovery**:每个功能/派单前先写「场景+对标」——JTBD 真实场景 / RICE·Kano 判实用性(警惕 feature creep)/ 便利性(减摩擦·手机优先·危险操作确认·四态诚实)/ 照抄成熟产品 design pattern(Loyverse·Square…·Jakob's Law),别从代码结构倒推(见 [[design-from-real-scenarios-ref-market-leaders]])。
 > **📐 通用工程标准(大厂级约束基线)**:见全局 `~/.claude/CLAUDE.md` 挂载的《通用工程标准(任意项目通用)》(正本在 `~/.claude/`·所有项目通用)。本项目铁律 = 它的超集 + Pearnly 特例;冲突以本项目为准。
-> **🔒 防屎山闸已切硬门(2026-06-03)**:size+ratchet 进 pre-push 硬拦 + CI `lint-size` fail 模式 + master 禁强推/删除(不要求 PR·保 master push 自动进入 CI 部署链)· 见 [[gates-hardened-post-refactor]]。新增文件触发 ratchet 净增 → commit 写 `RATCHET-EXEMPT: <file> +<N> · <理由>`。**注:`lint-ui`(UI 一致性)已 FAIL 模式(2026-06-05 切硬门·反弹即拦)· 唯 `lint-routes`(新路由契约)仍 warning · 存量 B 类视觉清理 + Wave3 staging 仍 Zihao-gated → 整顿"核心"收官但非全部完结。**
+> **🔒 防屎山闸已切硬门(2026-06-03)**:size+ratchet 进 pre-push 硬拦；GitHub CI workflow `281113573` 已于 2026-08-30 手动停用，`ci.yml` 保留作历史/可恢复配置。新增文件触发 ratchet 净增 → commit 写 `RATCHET-EXEMPT: <file> +<N> · <理由>`。真实用户功能必须在候选 production SHA 上由主控做真实 E2E/真机、截图与 ERP report 回查，不因关闭自动闸降低质量。**
 
 ---
 
@@ -28,7 +28,6 @@
 
 - **▶ 当前主线(2026-07-14 更新)**:**Pearnly AI(TaxOps 月结 Agent · pearnly.com/ai)**——MC3 端到端金标真跑已收官(pp30 四数逐字命中官方),当前推进 SA-3 银行流水倒推销项及后续队列。施工体系=`桌面 pearnly ai\施工体系-Fable5窗口SOP-2026-07-10.md`(主窗策划验收·子代理施工),任务板=`桌面 pearnly ai\Pearnly-AI-进度.md`。**唯一活地图 = `CLAUDE.md/STATE_PEARNLY.md` 顶部状态卡**。历史主线(对话 Agent M1,2026-07-01 全线收官放量 all)见 `docs/agent/MASTER-PLAN.md`;下面 2026-06-03 一段是整顿收官时的历史快照,已不代表当前主线。
 
-
 - **当前打法**:**3 窗口并行 loop**(ADR-011 + `docs/refactor/PARALLEL_LOOP_DISPATCH.md`)· A 后端 / B 前端 / C 文档测试 · 按文件 ownership 切不撞车。整顿封锁期(0 新功能)已于 2026-07-01 解除,现在是正常产品开发;拆巨石的范式全在记忆里([[giant-function-decomposition-playbook]] / [[directory-reorg-playbook]] / [[c9-store-centralization-bankrecon]])。
 - **找下一个 task**:`REFACTOR_MASTER_PLAN.md` 顶部「当前进度看板」。
 - **你的身份**:整顿主控/指挥官 · Zihao 非技术零代码 → 你全包(研究/派工/守门/E2E自测/查CI/上线/更文档)· Zihao 只:① 点权限框 ② 像用户验收 ③ 涉钱/登录拍板。
@@ -42,17 +41,17 @@
    - 目标 = **没有单个源文件 > 500 行**(拆成 50-100 个小模块),**不是**把某个文件写短。
    - "home.js < 200 行"指的是**入口/bootstrap 源文件**,业务全在 `src/home/*`。
    - 成品体积靠 **Vite build + minify**(= 计划 E7),不是手写。**别再问"能不能把 home.js 压到极致"——答案永远是:拆,不压。**
-2. **防屎山靠 CI 机械闸,不靠自律。** check_file_size + check_line_ratchet(行数只降不升)+ CI lint-size。Loop 1 拆完切 fail 模式(铁律 #27)。
+2. **防屎山靠机械闸,不靠自律。** check_file_size + check_line_ratchet(行数只降不升)由本地 pre-push 保留；GitHub CI 当前停用，按风险分层运行 lint/unit/真 PG/HTTP 检查。
 3. **改动三标准**:加新功能=新模块(不进巨石,铁律 #17);改旧功能=先有测试再改;推翻重做=`git rm` 旧的不留 `.deprecated/.legacy` 僵尸(铁律 #7)。
-4. **机械闸唯一清单 = `docs/GATES.md`**(21 道 · pre-push 本地硬拦 + CI 双层 · 逐道自查命令和豁免法都在那页)。别在别处另记一份计数,会漂。
+4. **机械闸唯一清单 = `docs/GATES.md`**(本地 pre-push 与按风险分层的自查命令、豁免法都在那页；GitHub CI 历史 workflow 当前停用)。别在别处另记一份计数,会漂。
 5. **代码像资深工程师写的,不像 AI 生成的**:源码(新旧都要)**去 AI 味** —— 无过度注释/无 emoji/无防御冗余/无泛化命名(`data`/`temp`)/无调试残留(console.log/print)/DRY/用语言惯用法。拆模块时顺手清,I6 收尾审计。**🛡️ 机械闸(2026-06-01 加·别只靠自觉)**:`scripts/check_ai_smell.py` 已挂 pre-push 第 7 道,改前端 src JS 时机械拦【注释里的 emoji】+【console.log 调试残留】(模板内产品 emoji 放行)。它只查本次改动文件——碰到旧模块带 emoji 会拦,顺手清掉再推。**全套大厂标准(源码→产品→流程→审核→测试→CI/CD→验收→安全→文档)= `docs/ENGINEERING_STANDARD.md`**,那是"拿得上台面"的 Definition of Done。
 
 ## 3. 五条最高红线(违反=事故)
 
 1. **workspace_client_id ≠ history.client_id**(账套主体 ≠ 发票买方)· 永不混用同字段 · 见 `docs/agent/BUSINESS_GLOSSARY.md`。
 2. **`erp_push_logs` 是推送状态唯一源**(铁律 #12)· 不建第二套状态表/字段 · 批次态从它派生。
-3. **rows=0 / needs_mapping / failed / blocked / retrying / ERR_* 绝不显示"完成/成功"** · 见 `docs/agent/ERROR_CODES_AND_STATES.md`。
-4. **改完自跑对应真账号 E2E 验过再 push master**(push=进入 CI 全闸;全绿后精确 SHA 部署)· 2026-06-12 起所有改动(含登录/注册/OCR/计费/推送)自做自检即 push,不再分高敏、不等谁在场(铁律 #26)。
+3. **rows=0 / needs*mapping / failed / blocked / retrying / ERR*\* 绝不显示"完成/成功"** · 见 `docs/agent/ERROR_CODES_AND_STATES.md`。
+4. **流程顺序固定**：本地风险分层测试(UI可先本地真实浏览器)→ commit/push → 手动 dispatch `manual-deploy.yml` 做 pinned-SHA CD → 回读生产 HEAD/service/ready → 主控在该精确 production SHA 上做真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK。关闭自动 CI 不等于降低验收质量；未完成最终用户验收不得称完成。
 5. **schema 改动只走 Alembic + 启动 ensure 双跑**(生产不跑 `alembic upgrade` · 见 §5)。
 
 ## 4. 机械闸(改完必跑全绿才 commit)
@@ -71,7 +70,7 @@ sh scripts/git-hooks/pre-push     # Git Bash
 
 - 服务器 `root@66.42.49.213`(Vultr **新加坡** · 2026-06-11 迁同区 · DB RTT 1ms · 只 SSH key 登录) · `/opt/mrpilot/` · systemd `mrpilot` · uvicorn `--workers 2`。⚠️ 老文档里的东京 `45.76.53.194` 是 2026-06 的回滚兜底,**别再往那台推**。
 - DB:Supabase Postgres(Pooler)· **生产不跑 `alembic upgrade`** → schema 靠启动 `ensure_*` 应用 · alembic/versions 仅留档。
-- 部署:**`git push origin master` → CI 全闸绿 → deploy job 带精确 SHA 调 `/internal/deploy/manual`(DEPLOY_TOKEN)→ git-deploy.sh 只部署该 commit(≈10 min · 非秒级)**。旧 GitHub webhook `625195648` 已停用(2026-08-26 · 复启用 §3 的 gh API 命令)· 服务器 TARGET_SHA 守卫 + flock 串行化双保险。验证 = 生产 `git -C /opt/mrpilot rev-parse HEAD` == 你推的 commit + `systemctl show mrpilot -p ActiveEnterTimestamp` ≥ 部署时间。SSH 别名 `pearnly-prod`。详见 `docs/RUNBOOK.md`。
+- 部署:**本地风险分层验证 → `git push origin master` → 手动 dispatch `.github/workflows/manual-deploy.yml`(pinned SHA)→ `/internal/deploy/manual`→ git-deploy.sh → 回读生产 HEAD/service/ready → 主控真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK**。GitHub CI workflow `281113573` 已手动停用，push 不自动部署；Dependabot 保留。服务器 TARGET_SHA 守卫 + flock 串行化双保险。验证通过后才可称功能完成。SSH 别名 `pearnly-prod`。详见 `docs/RUNBOOK.md`。
 - gh CLI:直接 `gh`(已在 PATH · WinGet 装的;旧的 `C:\Program Files\GitHub CLI\gh.exe` 路径已失效)· 例 `gh run list --repo skin306152-star/pearnly-app --branch master`。
 
 ## 5-bis. 入口/路由地图

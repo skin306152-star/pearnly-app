@@ -52,7 +52,7 @@ git add <自己的 pathspec>
 git commit -m "<type>(<scope>): <subject> · why 不是 what"
 git push origin master
 
-# 4. 读取刚推送的 master SHA，手动触发仅部署 workflow（不含测试/E2E）
+# 4. 读取刚推送的 master SHA，手动触发仅部署 workflow（不含测试/E2E）；deploy job 必须核对 GitHub 的 `github.sha`
 SHA="$(git rev-parse HEAD)"
 gh api -X POST repos/skin306152-star/pearnly-app/actions/workflows/manual-deploy.yml/dispatches \
   -f ref=master -f "inputs[sha]=$SHA"

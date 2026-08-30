@@ -70,7 +70,7 @@ sh scripts/git-hooks/pre-push     # Git Bash
 
 - 服务器 `root@66.42.49.213`(Vultr **新加坡** · 2026-06-11 迁同区 · DB RTT 1ms · 只 SSH key 登录) · `/opt/mrpilot/` · systemd `mrpilot` · uvicorn `--workers 2`。⚠️ 老文档里的东京 `45.76.53.194` 是 2026-06 的回滚兜底,**别再往那台推**。
 - DB:Supabase Postgres(Pooler)· **生产不跑 `alembic upgrade`** → schema 靠启动 `ensure_*` 应用 · alembic/versions 仅留档。
-- 部署:**本地风险分层验证 → `git push origin master` → 手动 dispatch `.github/workflows/manual-deploy.yml`(pinned SHA)→ `/internal/deploy/manual`→ git-deploy.sh → 回读生产 HEAD/service/ready → 主控真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK**。GitHub CI workflow `281113573` 已手动停用，push 不自动部署；Dependabot 保留。服务器 TARGET_SHA 守卫 + flock 串行化双保险。验证通过后才可称功能完成。SSH 别名 `pearnly-prod`。详见 `docs/RUNBOOK.md`。
+- 部署:**本地风险分层验证 → `git push origin master` → 手动 dispatch `.github/workflows/manual-deploy.yml`(pinned SHA)→ deploy job 调 `/internal/deploy/manual`→ git-deploy.sh → 回读生产 HEAD/service/ready → 主控真实站点/真实环境/ERP report 预验收 → Zihao 最终真机 OK**。GitHub CI workflow `281113573` 已手动停用，push 不自动部署；Dependabot 保留。服务器 TARGET_SHA 守卫 + flock 串行化双保险。验证通过后才可称功能完成。SSH 别名 `pearnly-prod`。详见 `docs/RUNBOOK.md`。
 - gh CLI:直接 `gh`(已在 PATH · WinGet 装的;旧的 `C:\Program Files\GitHub CLI\gh.exe` 路径已失效)· 例 `gh run list --repo skin306152-star/pearnly-app --branch master`。
 
 ## 5-bis. 入口/路由地图

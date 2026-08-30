@@ -1,10 +1,10 @@
 """HTTP contract tests for the flag-off owner lifecycle boundary."""
 
 from pathlib import Path
+import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -30,7 +30,7 @@ def _body(**extra):
     return value
 
 
-def test_route_registered_in_erp_aggregate_and_registry():
+def _check_route_registered_in_erp_aggregate_and_registry():
     aggregate = (ROOT / "routes" / "erp_routes.py").read_text(encoding="utf-8")
     registry = (ROOT / "docs" / "agent" / "agent_registry.json").read_text(encoding="utf-8")
     assert "erp_shared_express_lifecycle_routes" in aggregate
@@ -38,8 +38,7 @@ def test_route_registered_in_erp_aggregate_and_registry():
     assert '"erp_shared_express_lifecycle_routes": "C"' in registry
 
 
-@pytest.mark.parametrize("path", ["rebind", "enable", "disable", "revoke"])
-def test_flag_off_is_checked_before_endpoint_resolution(path):
+def _check_flag_off_is_checked_before_endpoint_resolution(path):
     user = {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": False}
     body = _body(
         **(
@@ -65,7 +64,7 @@ def test_flag_off_is_checked_before_endpoint_resolution(path):
     assert response.json()["detail"] == "erp.shared_endpoint_unavailable"
 
 
-def test_entry_and_super_admin_are_rejected_after_authentication():
+def _check_entry_and_super_admin_are_rejected_after_authentication():
     for user in (
         {"id": "u1", "tenant_id": "t1", "entry": "pos", "is_super_admin": False},
         {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": True},
@@ -84,7 +83,7 @@ def test_entry_and_super_admin_are_rejected_after_authentication():
         assert response.json()["detail"] == "authz.entrance_scope"
 
 
-def test_models_reject_extra_and_invalid_semantic_confirmation():
+def _check_models_reject_extra_and_invalid_semantic_confirmation():
     user = {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": False}
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
@@ -114,7 +113,7 @@ def test_models_reject_extra_and_invalid_semantic_confirmation():
     assert response.status_code == 422
 
 
-def test_revoke_requires_explicit_confirmation():
+def _check_revoke_requires_explicit_confirmation():
     user = {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": False}
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
@@ -132,7 +131,7 @@ def test_revoke_requires_explicit_confirmation():
     service.assert_not_called()
 
 
-def test_reason_control_character_is_rejected():
+def _check_reason_control_character_is_rejected():
     user = {"id": "u1", "tenant_id": "t1", "entry": "main", "is_super_admin": False}
     with (
         patch.object(route, "get_current_user_from_request", return_value=user),
@@ -147,7 +146,7 @@ def test_reason_control_character_is_rejected():
     assert response.status_code == 422
 
 
-def test_lifecycle_audit_accepts_endpoint_and_action_details():
+def _check_lifecycle_audit_accepts_endpoint_and_action_details():
     store.insert_operation_log_tx(
         Mock(),
         tenant_id="tenant",
@@ -177,3 +176,28 @@ def test_lifecycle_audit_accepts_endpoint_and_action_details():
             "reason": "owner requested",
         },
     )
+
+
+class SharedExpressLifecycleContractTests(unittest.TestCase):
+    def test_route_registered_in_erp_aggregate_and_registry(self):
+        _check_route_registered_in_erp_aggregate_and_registry()
+
+    def test_flag_off_is_checked_before_endpoint_resolution(self):
+        for path in ("rebind", "enable", "disable", "revoke"):
+            with self.subTest(path=path):
+                _check_flag_off_is_checked_before_endpoint_resolution(path)
+
+    def test_entry_and_super_admin_are_rejected_after_authentication(self):
+        _check_entry_and_super_admin_are_rejected_after_authentication()
+
+    def test_models_reject_extra_and_invalid_semantic_confirmation(self):
+        _check_models_reject_extra_and_invalid_semantic_confirmation()
+
+    def test_revoke_requires_explicit_confirmation(self):
+        _check_revoke_requires_explicit_confirmation()
+
+    def test_reason_control_character_is_rejected(self):
+        _check_reason_control_character_is_rejected()
+
+    def test_lifecycle_audit_accepts_endpoint_and_action_details(self):
+        _check_lifecycle_audit_accepts_endpoint_and_action_details()

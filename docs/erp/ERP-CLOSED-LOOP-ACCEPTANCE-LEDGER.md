@@ -268,7 +268,7 @@ implementation_batches:
     readiness: NOT_F1_COMPLETE_NOT_USER_FUNCTION_COMPLETE
     rollout_contract: ALL_TENANTS_FLAG_OFF
     discovery_doc: docs/erp/F1-B3B2B2-OWNER-LIFECYCLE-CAS-DISPATCH.md
-    verification: 49 lifecycle tests; 83 all-PG tests plus 11 subtests; 0 skips; DeepSeek and independent review found no P0/P1.
+    verification: 43 lifecycle unittest (parameter matrix retained via subTest); 83 all-PG tests plus 11 subtests; 0 skips; DeepSeek and independent review found no P0/P1.
     next_action: B3B3 is unblocked; do not micro-release this slice. Keep all tenant flags off until the complete F1 candidate is merged.
   - batch_id: F1-B3B3
     backend_implementation_complete: false
@@ -608,7 +608,7 @@ user_decision:
 open_issues:
   - B3B2b-1 is an internal prerequisite deployment with all tenant flags off: runtime/enrollment SHA a609748955779e2be4935b5cc08c214d57ee881b, release/gate and production SHA 4c871b78d60d69644ce4b5a2505053bab4a42a4e, historical CI 33309634623 13/13 success, production service 2026-08-30T11:53:43Z, ready 200/true, true PG 63/63 with 0 skips, and helper/trigger/policy/ACL/search_path plus 45 flags and 36 endpoint readbacks verified. This is not a usable F1 candidate and must not be called feature-complete. The docs closure commit records this state only and must not be used as a self-referential feature SHA.
   - B3B2a P2 follow-up: real resolver/console concurrent transfer coverage and canonical membership→role→users→workspace lock-order proof remain open; this batch only proves the managed helper and transfer-shaped lock path reach their barriers without deadlock.
-  - B3B2b-2 is `INTERNAL_CODE_VERIFIED_NOT_RELEASED`: 49 lifecycle tests, 83 all-PG tests plus 11 subtests, 0 skips, and no P0/P1 from DeepSeek or independent review. It is not F1 complete or a user-facing feature. B3B3 is now `DISCOVERY_COMPLETE_IMPLEMENTING`; B3C/B4/B5 remain not implemented.
+  - B3B2b-2 is `INTERNAL_CODE_VERIFIED_NOT_RELEASED`: 43 lifecycle unittest (parameter matrix retained via subTest), 83 all-PG tests plus 11 subtests, 0 skips, and no P0/P1 from DeepSeek or independent review. It is not F1 complete or a user-facing feature. B3B3 is now `DISCOVERY_COMPLETE_IMPLEMENTING`; B3C/B4/B5 remain not implemented.
   - B3B1 creates no writers and cannot observe Profile mismatch; bound/live protocol and mismatch counter-evidence remain B3B2/B3B3 work.
   - HIGH separate security microbatch remains unfixed: generic ERP webhook/test SSRF guard validates system_url while the real network sink reads url, and endpoint test does not revalidate every redirect hop. B3B Express state must not call that outbound test.
   - MEDIUM separate reliability microbatch remains unfixed: legacy retry worker does not check endpoint.enabled, so a disabled endpoint may still retry outward. B3B2 must return 409 for nonterminal tasks; full draining and lease semantics remain B3C.

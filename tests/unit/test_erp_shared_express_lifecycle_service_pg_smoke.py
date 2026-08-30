@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import uuid
 import json
+import unittest
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
-
-import pytest
 
 from core.rls import RLS_APP_ROLE, ensure_rls_app_role
 from services.erp import shared_express_lifecycle as service
@@ -244,243 +243,264 @@ class ServiceLifecyclePgSmoke:
             )
 
 
-@pytest.fixture(scope="class")
-def pg_service():
-    obj = ServiceLifecyclePgSmoke()
-    obj.setup()
-    yield obj
-    obj.teardown()
+class ServiceLifecyclePgSmokeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.pg_service = ServiceLifecyclePgSmoke()
+        cls.pg_service.setup()
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.pg_service.teardown()
 
-def test_service_four_actions_use_real_transactions(pg_service):
-    for action, enabled, target, confirm in (
-        ("disable", True, None, False),
-        ("enable", False, None, False),
-        ("rebind", False, TARGET, False),
-        ("revoke", False, None, True),
-    ):
-        response = pg_service.call(action, enabled=enabled, target=target, confirm=confirm)
-        assert response["ok"] is True
-        assert response["generation"] == 2
+    def test_service_four_actions_use_real_transactions(self):
+        pg_service = self.pg_service
+        for action, enabled, target, confirm in (
+            ("disable", True, None, False),
+            ("enable", False, None, False),
+            ("rebind", False, TARGET, False),
+            ("revoke", False, None, True),
+        ):
+            response = pg_service.call(action, enabled=enabled, target=target, confirm=confirm)
+            self.assertTrue(response["ok"])
+            self.assertEqual(response["generation"], 2)
+            row = pg_service._endpoint()
+            self.assertEqual(row["binding_generation"], 2)
+            if action == "revoke":
+                self.assertIsNone(row["workspace_client_id"])
+                self.assertFalse(row["shared_scope"])
+
+    def test_service_audit_failure_rolls_back_endpoint_workspace_and_log(self):
+        pg_service = self.pg_service
+        pg_service.reset()
+        pg_service.prepare(False)
+        pg_service.cur.execute(
+            "CREATE OR REPLACE FUNCTION fail_service_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.details->>'reason' = 'force_failure' THEN RAISE EXCEPTION 'audit failure'; END IF; RETURN NEW; END $$"
+        )
+        pg_service.cur.execute(
+            "CREATE TRIGGER fail_service_audit BEFORE INSERT ON operation_logs FOR EACH ROW EXECUTE FUNCTION fail_service_audit()"
+        )
+        pg_service.conn.commit()
+        with self.assertRaisesRegex(Exception, "audit failure"):
+            pg_service.call("rebind", enabled=False, target=TARGET, reason="force_failure")
+        pg_service.cur.execute("DROP TRIGGER fail_service_audit ON operation_logs")
+        pg_service.cur.execute("DROP FUNCTION fail_service_audit()")
         row = pg_service._endpoint()
-        assert row["binding_generation"] == 2
-        if action == "revoke":
-            assert row["workspace_client_id"] is None and row["shared_scope"] is False
+        self.assertEqual(row["binding_generation"], 1)
+        self.assertEqual(row["workspace_client_id"], WORKSPACE)
+        pg_service.cur.execute(
+            "SELECT erp_endpoint_id FROM workspace_clients WHERE id=%s", (WORKSPACE,)
+        )
+        self.assertEqual(str(pg_service.cur.fetchone()["erp_endpoint_id"]), ENDPOINT)
+        pg_service.cur.execute("SELECT count(*) AS count FROM operation_logs")
+        self.assertEqual(pg_service.cur.fetchone()["count"], 0)
 
+    def test_service_busy_and_wrong_tenant_do_not_partially_write(self):
+        pg_service = self.pg_service
+        pg_service.reset()
+        pg_service.prepare(True)
+        pg_service.cur.execute(
+            "INSERT INTO erp_push_logs VALUES (%s,%s,%s,'pending',NULL,NULL,NULL)",
+            (str(uuid.uuid4()), OWNER, ENDPOINT),
+        )
+        pg_service.conn.commit()
+        user = {"id": OWNER, "tenant_id": TENANT, "username": "owner"}
+        with (
+            patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
+            patch.object(
+                service,
+                "resolve",
+                return_value=SimpleNamespace(
+                    membership_id="m", role_key="owner", has=lambda _: True
+                ),
+            ),
+            patch.object(service, "lifecycle_schema_ready", return_value=True),
+        ):
+            with self.assertRaises(service.HTTPException) as exc:
+                service.change_shared_express_endpoint(
+                    user=user,
+                    endpoint_id=ENDPOINT,
+                    action="disable",
+                    operation_id=str(uuid.uuid4()),
+                    expected_generation=1,
+                    source_workspace_id=WORKSPACE,
+                )
+        self.assertEqual(exc.exception.detail, "erp.endpoint_busy")
+        row = pg_service._endpoint()
+        self.assertTrue(row["enabled"])
+        self.assertEqual(row["binding_generation"], 1)
 
-def test_service_audit_failure_rolls_back_endpoint_workspace_and_log(pg_service):
-    pg_service.reset()
-    pg_service.prepare(False)
-    pg_service.cur.execute(
-        "CREATE OR REPLACE FUNCTION fail_service_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.details->>'reason' = 'force_failure' THEN RAISE EXCEPTION 'audit failure'; END IF; RETURN NEW; END $$"
-    )
-    pg_service.cur.execute(
-        "CREATE TRIGGER fail_service_audit BEFORE INSERT ON operation_logs FOR EACH ROW EXECUTE FUNCTION fail_service_audit()"
-    )
-    pg_service.conn.commit()
-    with pytest.raises(Exception, match="audit failure"):
-        pg_service.call("rebind", enabled=False, target=TARGET, reason="force_failure")
-    pg_service.cur.execute("DROP TRIGGER fail_service_audit ON operation_logs")
-    pg_service.cur.execute("DROP FUNCTION fail_service_audit()")
-    row = pg_service._endpoint()
-    assert row["binding_generation"] == 1 and row["workspace_client_id"] == WORKSPACE
-    pg_service.cur.execute(
-        "SELECT erp_endpoint_id FROM workspace_clients WHERE id=%s", (WORKSPACE,)
-    )
-    assert str(pg_service.cur.fetchone()["erp_endpoint_id"]) == ENDPOINT
-    pg_service.cur.execute("SELECT count(*) AS count FROM operation_logs")
-    assert pg_service.cur.fetchone()["count"] == 0
+        pg_service.reset()
+        user = {
+            "id": OWNER,
+            "tenant_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "username": "owner",
+        }
+        with (
+            patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
+            patch.object(
+                service,
+                "resolve",
+                return_value=SimpleNamespace(
+                    membership_id="m", role_key="owner", has=lambda _: True
+                ),
+            ),
+            patch.object(service, "lifecycle_schema_ready", return_value=True),
+        ):
+            with self.assertRaises(service.HTTPException) as exc:
+                service.change_shared_express_endpoint(
+                    user=user,
+                    endpoint_id=ENDPOINT,
+                    action="disable",
+                    operation_id=str(uuid.uuid4()),
+                    expected_generation=1,
+                    source_workspace_id=WORKSPACE,
+                )
+        self.assertEqual(exc.exception.detail, "authz.not_found")
+        row = pg_service._endpoint()
+        self.assertTrue(row["enabled"])
+        self.assertEqual(row["binding_generation"], 1)
 
+    def test_service_target_conflict_does_not_partially_write(self):
+        pg_service = self.pg_service
+        pg_service.reset()
+        pg_service.prepare(False)
+        pg_service.cur.execute(
+            "UPDATE workspace_clients SET erp_endpoint_id=%s WHERE id=%s",
+            ("44444444-4444-4444-8444-444444444444", TARGET),
+        )
+        pg_service.conn.commit()
+        user = {"id": OWNER, "tenant_id": TENANT, "username": "owner"}
+        with (
+            patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
+            patch.object(
+                service,
+                "resolve",
+                return_value=SimpleNamespace(
+                    membership_id="m", role_key="owner", has=lambda _: True
+                ),
+            ),
+            patch.object(service, "lifecycle_schema_ready", return_value=True),
+        ):
+            with self.assertRaises(service.HTTPException) as exc:
+                service.change_shared_express_endpoint(
+                    user=user,
+                    endpoint_id=ENDPOINT,
+                    action="rebind",
+                    operation_id=str(uuid.uuid4()),
+                    expected_generation=1,
+                    source_workspace_id=WORKSPACE,
+                    target_workspace_id=TARGET,
+                )
+        self.assertEqual(exc.exception.detail, "erp.workspace_endpoint_conflict")
+        row = pg_service._endpoint()
+        self.assertEqual(row["workspace_client_id"], WORKSPACE)
+        self.assertEqual(row["binding_generation"], 1)
+        pg_service.cur.execute(
+            "SELECT erp_endpoint_id FROM workspace_clients WHERE id=%s", (WORKSPACE,)
+        )
+        self.assertEqual(str(pg_service.cur.fetchone()["erp_endpoint_id"]), ENDPOINT)
 
-def test_service_busy_and_wrong_tenant_do_not_partially_write(pg_service):
-    pg_service.reset()
-    pg_service.prepare(True)
-    pg_service.cur.execute(
-        "INSERT INTO erp_push_logs VALUES (%s,%s,%s,'pending',NULL,NULL,NULL)",
-        (str(uuid.uuid4()), OWNER, ENDPOINT),
-    )
-    pg_service.conn.commit()
-    user = {"id": OWNER, "tenant_id": TENANT, "username": "owner"}
-    with (
-        patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
-        patch.object(
-            service,
-            "resolve",
-            return_value=SimpleNamespace(membership_id="m", role_key="owner", has=lambda _: True),
-        ),
-        patch.object(service, "lifecycle_schema_ready", return_value=True),
-    ):
-        with pytest.raises(service.HTTPException) as exc:
-            service.change_shared_express_endpoint(
-                user=user,
-                endpoint_id=ENDPOINT,
-                action="disable",
-                operation_id=str(uuid.uuid4()),
-                expected_generation=1,
-                source_workspace_id=WORKSPACE,
-            )
-    assert exc.value.detail == "erp.endpoint_busy"
-    row = pg_service._endpoint()
-    assert row["enabled"] is True and row["binding_generation"] == 1
+    def test_operation_replay_same_uuid_is_tenant_global(self):
+        pg_service = self.pg_service
+        pg_service.reset()
+        operation_id = str(uuid.uuid4())
+        details = {
+            "operation_id": operation_id,
+            "endpoint_id": ENDPOINT,
+            "action": "disable",
+            "workspace_before": WORKSPACE,
+            "workspace_after": WORKSPACE,
+            "target_workspace_client_id": None,
+            "expected_generation": 1,
+            "generation_after": 2,
+            "enabled_after": False,
+            "shared_scope_after": True,
+            "revoked_after": False,
+            "reason": "tenant-global replay",
+        }
+        pg_service.cur.execute(
+            "INSERT INTO operation_logs (tenant_id, actor_user_id, action, target_type, target_id, details) "
+            "VALUES (%s,%s,'erp.endpoint.disable','erp_endpoint',%s,%s::jsonb)",
+            (TENANT, OWNER, ENDPOINT, json.dumps(details)),
+        )
+        pg_service.conn.commit()
 
-    pg_service.reset()
-    user = {"id": OWNER, "tenant_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "username": "owner"}
-    with (
-        patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
-        patch.object(
-            service,
-            "resolve",
-            return_value=SimpleNamespace(membership_id="m", role_key="owner", has=lambda _: True),
-        ),
-        patch.object(service, "lifecycle_schema_ready", return_value=True),
-    ):
-        with pytest.raises(service.HTTPException) as exc:
-            service.change_shared_express_endpoint(
-                user=user,
-                endpoint_id=ENDPOINT,
-                action="disable",
-                operation_id=str(uuid.uuid4()),
-                expected_generation=1,
-                source_workspace_id=WORKSPACE,
-            )
-    assert exc.value.detail == "authz.not_found"
-    row = pg_service._endpoint()
-    assert row["enabled"] is True and row["binding_generation"] == 1
-
-
-def test_service_target_conflict_does_not_partially_write(pg_service):
-    pg_service.reset()
-    pg_service.prepare(False)
-    pg_service.cur.execute(
-        "UPDATE workspace_clients SET erp_endpoint_id=%s WHERE id=%s",
-        ("44444444-4444-4444-8444-444444444444", TARGET),
-    )
-    pg_service.conn.commit()
-    user = {"id": OWNER, "tenant_id": TENANT, "username": "owner"}
-    with (
-        patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
-        patch.object(
-            service,
-            "resolve",
-            return_value=SimpleNamespace(membership_id="m", role_key="owner", has=lambda _: True),
-        ),
-        patch.object(service, "lifecycle_schema_ready", return_value=True),
-    ):
-        with pytest.raises(service.HTTPException) as exc:
-            service.change_shared_express_endpoint(
-                user=user,
-                endpoint_id=ENDPOINT,
-                action="rebind",
-                operation_id=str(uuid.uuid4()),
-                expected_generation=1,
-                source_workspace_id=WORKSPACE,
-                target_workspace_id=TARGET,
-            )
-    assert exc.value.detail == "erp.workspace_endpoint_conflict"
-    row = pg_service._endpoint()
-    assert row["workspace_client_id"] == WORKSPACE and row["binding_generation"] == 1
-    pg_service.cur.execute(
-        "SELECT erp_endpoint_id FROM workspace_clients WHERE id=%s", (WORKSPACE,)
-    )
-    assert str(pg_service.cur.fetchone()["erp_endpoint_id"]) == ENDPOINT
-
-
-def test_operation_replay_same_uuid_is_tenant_global(pg_service):
-    pg_service.reset()
-    operation_id = str(uuid.uuid4())
-    details = {
-        "operation_id": operation_id,
-        "endpoint_id": ENDPOINT,
-        "action": "disable",
-        "workspace_before": WORKSPACE,
-        "workspace_after": WORKSPACE,
-        "target_workspace_client_id": None,
-        "expected_generation": 1,
-        "generation_after": 2,
-        "enabled_after": False,
-        "shared_scope_after": True,
-        "revoked_after": False,
-        "reason": "tenant-global replay",
-    }
-    pg_service.cur.execute(
-        "INSERT INTO operation_logs (tenant_id, actor_user_id, action, target_type, target_id, details) "
-        "VALUES (%s,%s,'erp.endpoint.disable','erp_endpoint',%s,%s::jsonb)",
-        (TENANT, OWNER, ENDPOINT, json.dumps(details)),
-    )
-    pg_service.conn.commit()
-
-    response = service._operation_replay(
-        pg_service.cur,
-        tenant_id=TENANT,
-        actor_id=OWNER,
-        operation_id=operation_id,
-        endpoint_id=ENDPOINT,
-        action="disable",
-        source_workspace_id=WORKSPACE,
-        target_workspace_id=None,
-        expected_generation=1,
-        reason="tenant-global replay",
-    )
-    assert response["operation_id"] == operation_id
-
-    with pytest.raises(service.LifecycleError, match="operation_id_conflict"):
-        service._operation_replay(
+        response = service._operation_replay(
             pg_service.cur,
             tenant_id=TENANT,
-            actor_id=SECOND_OWNER,
+            actor_id=OWNER,
             operation_id=operation_id,
-            endpoint_id="44444444-4444-4444-8444-444444444444",
+            endpoint_id=ENDPOINT,
             action="disable",
             source_workspace_id=WORKSPACE,
             target_workspace_id=None,
             expected_generation=1,
             reason="tenant-global replay",
         )
+        self.assertEqual(response["operation_id"], operation_id)
 
-
-def test_concurrent_service_cas_has_one_winner(pg_service):
-    import threading
-
-    pg_service.reset()
-    barrier = threading.Barrier(2)
-    outcomes = []
-    operation_id = str(uuid.uuid4())
-
-    def worker(actor):
-        user = {"id": actor, "tenant_id": TENANT, "username": "owner"}
-        barrier.wait(timeout=3)
-        try:
-            response = service.change_shared_express_endpoint(
-                user=user,
-                endpoint_id=ENDPOINT,
-                action="disable",
+        with self.assertRaisesRegex(service.LifecycleError, "operation_id_conflict"):
+            service._operation_replay(
+                pg_service.cur,
+                tenant_id=TENANT,
+                actor_id=SECOND_OWNER,
                 operation_id=operation_id,
-                expected_generation=1,
+                endpoint_id="44444444-4444-4444-8444-444444444444",
+                action="disable",
                 source_workspace_id=WORKSPACE,
+                target_workspace_id=None,
+                expected_generation=1,
+                reason="tenant-global replay",
             )
-            outcomes.append(response["generation"])
-        except service.HTTPException as exc:
-            outcomes.append(exc.detail)
-        except Exception as exc:  # keep real database failures deterministic
-            outcomes.append(f"unexpected:{type(exc).__name__}:{exc}")
 
-    with (
-        patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
-        patch.object(
-            service,
-            "resolve",
-            return_value=SimpleNamespace(membership_id="m", role_key="owner", has=lambda _: True),
-        ),
-        patch.object(service, "lifecycle_schema_ready", return_value=True),
-    ):
-        threads = [
-            threading.Thread(target=worker, args=(actor,)) for actor in (OWNER, SECOND_OWNER)
-        ]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=5)
-    assert len(outcomes) == 2
-    assert set(outcomes) == {2, "erp.operation_id_conflict"}
-    row = pg_service._endpoint()
-    assert row["enabled"] is False and row["binding_generation"] == 2
+    def test_concurrent_service_cas_has_one_winner(self):
+        pg_service = self.pg_service
+        import threading
+
+        pg_service.reset()
+        barrier = threading.Barrier(2)
+        outcomes = []
+        operation_id = str(uuid.uuid4())
+
+        def worker(actor):
+            user = {"id": actor, "tenant_id": TENANT, "username": "owner"}
+            barrier.wait(timeout=3)
+            try:
+                response = service.change_shared_express_endpoint(
+                    user=user,
+                    endpoint_id=ENDPOINT,
+                    action="disable",
+                    operation_id=operation_id,
+                    expected_generation=1,
+                    source_workspace_id=WORKSPACE,
+                )
+                outcomes.append(response["generation"])
+            except service.HTTPException as exc:
+                outcomes.append(exc.detail)
+            except Exception as exc:  # keep real database failures deterministic
+                outcomes.append(f"unexpected:{type(exc).__name__}:{exc}")
+
+        with (
+            patch.object(service.db, "get_cursor_rls", pg_service.service_cursor),
+            patch.object(
+                service,
+                "resolve",
+                return_value=SimpleNamespace(
+                    membership_id="m", role_key="owner", has=lambda _: True
+                ),
+            ),
+            patch.object(service, "lifecycle_schema_ready", return_value=True),
+        ):
+            threads = [
+                threading.Thread(target=worker, args=(actor,)) for actor in (OWNER, SECOND_OWNER)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=5)
+        self.assertEqual(len(outcomes), 2)
+        self.assertEqual(set(outcomes), {2, "erp.operation_id_conflict"})
+        row = pg_service._endpoint()
+        self.assertFalse(row["enabled"])
+        self.assertEqual(row["binding_generation"], 2)

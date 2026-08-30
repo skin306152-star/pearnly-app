@@ -19,7 +19,7 @@
 > 回读通过，45 flags 全 OFF、36 endpoints 全 generation0/shared_scope0。其 readiness 仍为
 > `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`，只是内部前置已部署，不得称功能完成、READY 或通过真机；当前进入
 > F1-B3B2b-2 owner rebind/enable-disable/revoke CAS，discovery 已冻结于
-> `docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md`，实现仍保持所有 tenant flag-off。B3B2b-2 已完成内部代码验证（49 lifecycle、83 全部 PG+11 subtests、0 skip；DeepSeek 与独立审查无 P0/P1），状态为 `INTERNAL_CODE_VERIFIED_NOT_RELEASED`，不代表 F1 或用户功能完成；B3B3 已解锁为 `DISCOVERY_COMPLETE_IMPLEMENTING`，Companion master HEAD=`72a92b8`/version=`1.1.64`，B3C/B4/B5 未实现。
+> `docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md`，实现仍保持所有 tenant flag-off。B3B2b-2 已完成内部代码验证（43 lifecycle unittest，参数矩阵以 subTest 保留；83 全部 PG+11 subtests、0 skip；DeepSeek 与独立审查无 P0/P1），状态为 `INTERNAL_CODE_VERIFIED_NOT_RELEASED`，不代表 F1 或用户功能完成；B3B3 已解锁为 `DISCOVERY_COMPLETE_IMPLEMENTING`，Companion master HEAD=`72a92b8`/version=`1.1.64`，B3C/B4/B5 未实现。
 > 每个功能形成唯一可用 candidate 后直接 production 启用并真实验收，不做长期灰度；每个功能仍须重新绑定自己的本地验证、production SHA、
 > Companion 版本及 ERP 报表回查，不能继承任一批次基线当验收。
 > 当前 `master/origin/master/production=82f03810d3fcb51da8f06a244ca34a8b3b410043`；Manual CD `33314653206` success，ready=true、service=`13:37:09Z`，该部署不含 B3 WIP；CI 已 disabled。B3B2b-2 及后续不再微批发布，完整 F1 candidate 合并后一次 manual CD 再做真实验收。
@@ -481,7 +481,7 @@ Zihao 明确 F7 OK 后全计划才完成。
 | 功能 | 当前状态 | 解锁条件 | 当前动作 |
 |---|---|---|---|
 | F0 规划交付 | `COMPLETE` | 文档机械校验 | 已建立 PO、ledger、STATE 状态卡 |
-| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1/B3B2a/B3B2b-1 均为 `INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`；B3B2b-2=`INTERNAL_CODE_VERIFIED_NOT_RELEASED`（49 lifecycle、83 全部 PG+11 subtests、0 skip；DeepSeek/独立审查无 P0/P1），不代表 F1 或用户功能完成；B3B3=`DISCOVERY_COMPLETE_IMPLEMENTING`，引用 `F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md` 与 Companion master `72a92b8`/`1.1.64`；B3C/B4/B5 未实现，flag 全关，真机锁定 |
+| F1 单 Profile 多员工共享 | `IMPLEMENTING` | F0 complete | B1/B2/B3A/B3B1/B3B2a/B3B2b-1 均为 `INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`；B3B2b-2=`INTERNAL_CODE_VERIFIED_NOT_RELEASED`（43 lifecycle unittest，参数矩阵以 subTest 保留；83 全部 PG+11 subtests、0 skip；DeepSeek/独立审查无 P0/P1），不代表 F1 或用户功能完成；B3B3=`DISCOVERY_COMPLETE_IMPLEMENTING`，引用 `F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md` 与 Companion master `72a92b8`/`1.1.64`；B3C/B4/B5 未实现，flag 全关，真机锁定 |
 | F2 一进程多 Profile | `PLANNED_LOCKED` | F1 `USER_ACCEPTED` | 禁止施工 |
 | F3 LINE 确认并推 ERP | `PLANNED_LOCKED` | F2 `USER_ACCEPTED` | 禁止施工 |
 | F4 Express 离线恢复 | `PLANNED_LOCKED` | F3 `USER_ACCEPTED` | 禁止施工 |

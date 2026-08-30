@@ -64,9 +64,13 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/posting-preview"),
             ("POST", "/api/erp/posting-profile"),
             ("POST", "/api/erp/endpoints/{endpoint_id}/shared/enroll"),
+            ("POST", "/api/erp/endpoints/{endpoint_id}/shared/rebind"),
+            ("POST", "/api/erp/endpoints/{endpoint_id}/shared/enable"),
+            ("POST", "/api/erp/endpoints/{endpoint_id}/shared/disable"),
+            ("POST", "/api/erp/endpoints/{endpoint_id}/shared/revoke"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 30)
+        self.assertEqual(len(router.routes), 34)
 
     def test_app_includes_erp_router(self):
         """防 include_router 漏挂 · app 必须能路由到 erp 推送"""

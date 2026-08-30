@@ -17,7 +17,7 @@
 - **🧱 F1-B3B2a**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;runtime feature SHA=`fd473abd204f3dae864bcd15928333f388c98679`;CI `33301999658` 全绿含 unit/e2e/真 PG smoke/deploy;production exact/readiness/schema 回读通过；仅为 F1 内部前置，F1 未完成。
 - **🛑 B3B2a 运行时边界**:不接 HTTP lifecycle、token/config、heartbeat、push/log/lease/ack、UI、Companion、DMS、MR.ERP、auto/bridge 或独立 SSRF/retry 修复;audit 仅底座未接真实 lifecycle writer。
 - **🧱 F1-B3B2b-1**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;runtime/enrollment=`a609748955779e2be4935b5cc08c214d57ee881b`;release/gate+production=`4c871b78d60d69644ce4b5a2505053bab4a42a4e`;CI `33309634623` 13/13 success;production service=`2026-08-30T11:53:43Z`, `/api/ready`=200/true;PG=63/63,0 skip;45 flags OFF,36 endpoints generation0/shared_scope0。仅为 F1 内部前置，readiness 仍 `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`。
-- **🧱 F1-B3B2b-2**:`INTERNAL_CODE_VERIFIED_NOT_RELEASED`;49 lifecycle tests、83 全部 PG tests+11 subtests、0 skip；DeepSeek 与独立审查均无 P0/P1；仅代码验证，绝不称 F1/用户功能完成。
+- **🧱 F1-B3B2b-2**:`INTERNAL_CODE_VERIFIED_NOT_RELEASED`;43 lifecycle unittest（参数矩阵以 subTest 保留）、83 全部 PG tests+11 subtests、0 skip；DeepSeek 与独立审查均无 P0/P1；仅代码验证，绝不称 F1/用户功能完成。
 - **▶ F1-B3B3**:`DISCOVERY_COMPLETE_IMPLEMENTING`;按 `docs/erp/F1-B3B3-MANAGED-AGENT-LIVE-PROFILE-DISPATCH.md` 继续；Companion master HEAD=`72a92b8`、version=`1.1.64`；B3C/B4/B5 尚未实现。
 - **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批均未实现。
 - **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。

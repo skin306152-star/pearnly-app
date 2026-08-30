@@ -1,10 +1,9 @@
 """Service-level CAS and idempotency tests without a test-only adapter."""
 
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 from uuid import uuid4
-
-import pytest
 
 from services.erp import shared_express_lifecycle as lifecycle
 
@@ -101,7 +100,7 @@ def _fixture(enabled=False):
     return endpoint, source, target
 
 
-def test_enable_cas_returns_safe_response_and_audits_once():
+def _check_enable_cas_returns_safe_response_and_audits_once():
     endpoint, source, target = _fixture()
     cursor = Cursor(endpoint, source, target)
     context = CursorContext(cursor)
@@ -144,7 +143,7 @@ def test_enable_cas_returns_safe_response_and_audits_once():
     assert context.committed
 
 
-def test_stale_generation_is_409_without_audit():
+def _check_stale_generation_is_409_without_audit():
     endpoint, source, target = _fixture(enabled=True)
     cursor = Cursor(endpoint, source, target)
     context = CursorContext(cursor)
@@ -157,7 +156,7 @@ def test_stale_generation_is_409_without_audit():
         patch.object(lifecycle, "endpoint_has_managed_activity", return_value=False),
         patch.object(lifecycle, "insert_operation_log_tx") as audit,
     ):
-        with pytest.raises(lifecycle.HTTPException) as exc:
+        with unittest.TestCase().assertRaises(lifecycle.HTTPException) as exc:
             lifecycle.change_shared_express_endpoint(
                 user={"id": "actor", "tenant_id": "tenant"},
                 endpoint_id=endpoint["id"],
@@ -166,14 +165,13 @@ def test_stale_generation_is_409_without_audit():
                 expected_generation=2,
                 source_workspace_id=1,
             )
-    assert exc.value.status_code == 409
-    assert exc.value.detail == "erp.endpoint_stale_generation"
+    assert exc.exception.status_code == 409
+    assert exc.exception.detail == "erp.endpoint_stale_generation"
     audit.assert_not_called()
     assert context.committed is False
 
 
-@pytest.mark.parametrize(("action", "enabled"), [("enable", True), ("disable", False)])
-def test_same_state_enable_disable_is_idempotent_even_when_busy(action, enabled):
+def _check_same_state_enable_disable_is_idempotent_even_when_busy(action, enabled):
     endpoint, source, target = _fixture(enabled=enabled)
     cursor = Cursor(endpoint, source, target)
     context = CursorContext(cursor)
@@ -201,7 +199,7 @@ def test_same_state_enable_disable_is_idempotent_even_when_busy(action, enabled)
     assert context.committed
 
 
-def test_replay_requires_same_request_shape_and_reconstructs_safe_response():
+def _check_replay_requires_same_request_shape_and_reconstructs_safe_response():
     cursor = Cursor({}, {}, {})
     op = str(uuid4())
     cursor.fetchone = lambda: {
@@ -238,7 +236,7 @@ def test_replay_requires_same_request_shape_and_reconstructs_safe_response():
     assert cursor.sql[0][1] == ("tenant", op)
 
 
-def test_replay_conflicts_across_actors_and_request_shapes():
+def _check_replay_conflicts_across_actors_and_request_shapes():
     op = str(uuid4())
     details = {
         "operation_id": op,
@@ -274,7 +272,7 @@ def test_replay_conflicts_across_actors_and_request_shapes():
     )
     assert response["operation_id"] == op
 
-    with pytest.raises(lifecycle.LifecycleError, match="operation_id_conflict"):
+    with unittest.TestCase().assertRaisesRegex(lifecycle.LifecycleError, "operation_id_conflict"):
         lifecycle._operation_replay(
             replay_cursor("actor-a"),
             tenant_id="tenant",
@@ -289,7 +287,7 @@ def test_replay_conflicts_across_actors_and_request_shapes():
         )
 
 
-def test_duplicate_active_endpoint_pointer_is_rejected_before_mutation():
+def _check_duplicate_active_endpoint_pointer_is_rejected_before_mutation():
     endpoint, source, target = _fixture()
     target["erp_endpoint_id"] = endpoint["id"]
     cursor = Cursor(endpoint, source, target)
@@ -303,7 +301,7 @@ def test_duplicate_active_endpoint_pointer_is_rejected_before_mutation():
         patch.object(lifecycle, "endpoint_has_managed_activity", return_value=False),
         patch.object(lifecycle, "insert_operation_log_tx") as audit,
     ):
-        with pytest.raises(lifecycle.HTTPException) as exc:
+        with unittest.TestCase().assertRaises(lifecycle.HTTPException) as exc:
             lifecycle.change_shared_express_endpoint(
                 user={"id": "actor", "tenant_id": "tenant"},
                 endpoint_id=endpoint["id"],
@@ -312,11 +310,11 @@ def test_duplicate_active_endpoint_pointer_is_rejected_before_mutation():
                 expected_generation=1,
                 source_workspace_id=1,
             )
-    assert exc.value.detail == "erp.endpoint_workspace_conflict"
+    assert exc.exception.detail == "erp.endpoint_workspace_conflict"
     audit.assert_not_called()
 
 
-def test_rebind_allows_target_already_pointing_to_same_endpoint():
+def _check_rebind_allows_target_already_pointing_to_same_endpoint():
     endpoint, source, target = _fixture()
     target["erp_endpoint_id"] = endpoint["id"]
     cursor = Cursor(endpoint, source, target)
@@ -343,7 +341,7 @@ def test_rebind_allows_target_already_pointing_to_same_endpoint():
     assert response["generation"] == 2
 
 
-def test_audit_failure_does_not_commit_lifecycle_transaction():
+def _check_audit_failure_does_not_commit_lifecycle_transaction():
     endpoint, source, target = _fixture()
     cursor = Cursor(endpoint, source, target)
     context = CursorContext(cursor)
@@ -356,7 +354,7 @@ def test_audit_failure_does_not_commit_lifecycle_transaction():
         patch.object(lifecycle, "endpoint_has_managed_activity", return_value=False),
         patch.object(lifecycle, "insert_operation_log_tx", side_effect=RuntimeError("audit down")),
     ):
-        with pytest.raises(RuntimeError, match="audit down"):
+        with unittest.TestCase().assertRaisesRegex(RuntimeError, "audit down"):
             lifecycle.change_shared_express_endpoint(
                 user={"id": "actor", "tenant_id": "tenant"},
                 endpoint_id=endpoint["id"],
@@ -368,7 +366,7 @@ def test_audit_failure_does_not_commit_lifecycle_transaction():
     assert context.committed is False
 
 
-def test_operation_replay_lookup_happens_after_advisory_and_owner_checks():
+def _check_operation_replay_lookup_happens_after_advisory_and_owner_checks():
     endpoint, source, target = _fixture()
     cursor = Cursor(endpoint, source, target)
     context = CursorContext(cursor)
@@ -413,7 +411,7 @@ def test_operation_replay_lookup_happens_after_advisory_and_owner_checks():
     assert events == ["advisory", "replay"]
 
 
-def test_known_operation_conflicts_before_missing_endpoint_visibility_check():
+def _check_known_operation_conflicts_before_missing_endpoint_visibility_check():
     endpoint, source, target = _fixture(enabled=True)
     op = str(uuid4())
     details = {
@@ -446,7 +444,7 @@ def test_known_operation_conflicts_before_missing_endpoint_visibility_check():
         patch.object(lifecycle, "resolve", return_value=authz),
         patch.object(lifecycle, "lock_endpoint_binding"),
     ):
-        with pytest.raises(lifecycle.HTTPException) as exc:
+        with unittest.TestCase().assertRaises(lifecycle.HTTPException) as exc:
             lifecycle.change_shared_express_endpoint(
                 user={"id": "actor", "tenant_id": "tenant"},
                 endpoint_id="22222222-2222-4222-8222-222222222222",
@@ -456,25 +454,60 @@ def test_known_operation_conflicts_before_missing_endpoint_visibility_check():
                 source_workspace_id=1,
                 reason="stop",
             )
-    assert exc.value.status_code == 409
-    assert exc.value.detail == "erp.operation_id_conflict"
+    assert exc.exception.status_code == 409
+    assert exc.exception.detail == "erp.operation_id_conflict"
     assert context.committed is False
     assert not any("UPDATE " in query.upper() for query, _ in cursor.sql)
 
 
-@pytest.mark.parametrize(
-    ("constraint", "expected"),
-    [
-        (
-            "uq_operation_logs_erp_endpoint_lifecycle_operation",
-            "erp.operation_id_conflict",
-        ),
-        ("uq_erp_endpoints_shared_express_workspace", "erp.workspace_endpoint_conflict"),
-        ("unrelated_constraint", None),
-    ],
-)
-def test_unique_violation_mapping_is_constraint_specific(constraint, expected):
+def _check_unique_violation_mapping_is_constraint_specific(constraint, expected):
     error = RuntimeError("duplicate")
     error.pgcode = "23505"
     error.diag = SimpleNamespace(constraint_name=constraint)
     assert lifecycle._integrity_error_code(error) == expected
+
+
+class SharedExpressLifecycleServiceTests(unittest.TestCase):
+    def test_enable_cas_returns_safe_response_and_audits_once(self):
+        _check_enable_cas_returns_safe_response_and_audits_once()
+
+    def test_stale_generation_is_409_without_audit(self):
+        _check_stale_generation_is_409_without_audit()
+
+    def test_same_state_enable_disable_is_idempotent_even_when_busy(self):
+        for action, enabled in (("enable", True), ("disable", False)):
+            with self.subTest(action=action):
+                _check_same_state_enable_disable_is_idempotent_even_when_busy(action, enabled)
+
+    def test_replay_requires_same_request_shape_and_reconstructs_safe_response(self):
+        _check_replay_requires_same_request_shape_and_reconstructs_safe_response()
+
+    def test_replay_conflicts_across_actors_and_request_shapes(self):
+        _check_replay_conflicts_across_actors_and_request_shapes()
+
+    def test_duplicate_active_endpoint_pointer_is_rejected_before_mutation(self):
+        _check_duplicate_active_endpoint_pointer_is_rejected_before_mutation()
+
+    def test_rebind_allows_target_already_pointing_to_same_endpoint(self):
+        _check_rebind_allows_target_already_pointing_to_same_endpoint()
+
+    def test_audit_failure_does_not_commit_lifecycle_transaction(self):
+        _check_audit_failure_does_not_commit_lifecycle_transaction()
+
+    def test_operation_replay_lookup_happens_after_advisory_and_owner_checks(self):
+        _check_operation_replay_lookup_happens_after_advisory_and_owner_checks()
+
+    def test_known_operation_conflicts_before_missing_endpoint_visibility_check(self):
+        _check_known_operation_conflicts_before_missing_endpoint_visibility_check()
+
+    def test_unique_violation_mapping_is_constraint_specific(self):
+        for constraint, expected in (
+            (
+                "uq_operation_logs_erp_endpoint_lifecycle_operation",
+                "erp.operation_id_conflict",
+            ),
+            ("uq_erp_endpoints_shared_express_workspace", "erp.workspace_endpoint_conflict"),
+            ("unrelated_constraint", None),
+        ):
+            with self.subTest(constraint=constraint):
+                _check_unique_violation_mapping_is_constraint_specific(constraint, expected)

@@ -21,7 +21,7 @@ import socket
 import time
 from typing import Optional
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.embedded_worker import EmbeddedWorker
 from services.steward import budget, copy, loop_run, loop_state, registry, store, tools
 from services.steward.registry import ToolContext

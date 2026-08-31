@@ -73,7 +73,7 @@ class DiscardDocTests(unittest.TestCase):
 
 
 class DiscardedInvisibilityTests(unittest.TestCase):
-    """★软删对所有活跃口径隐形:列表/查重/月汇总/明细 的 SQL 均排除 discarded。"""
+    """软删对活跃网页口径隐形:列表和查重均排除 discarded。"""
 
     def test_list_docs_excludes_discarded(self):
         cur = _SqlCur()
@@ -84,23 +84,6 @@ class DiscardedInvisibilityTests(unittest.TestCase):
         cur = _SqlCur()
         docs_svc.find_by_dedupe(cur, tenant_id="t", workspace_client_id=1, dedupe_key="k")
         self.assertIn("status <> 'discarded'", cur.sql[0])
-
-    def test_month_summary_and_detail_posted_only(self):
-        from services.expense import line_qa
-
-        cur = _SqlCur()
-        line_qa.month_summary(cur, tenant_id="t", workspace_client_id=1)
-        line_qa.month_detail(cur, tenant_id="t", workspace_client_id=1)
-        self.assertTrue(
-            all("d.status = 'posted'" in s for s in cur.sql)
-        )  # posted-only → discarded 不入
-
-    def test_recent_line_docs_excludes_discarded(self):
-        from services.purchase import line_docs
-
-        cur = _SqlCur()
-        line_docs.find_recent_line_docs(cur, tenant_id="t", workspace_client_id=1, limit=5)
-        self.assertIn("status IN ('posted', 'draft')", cur.sql[0])  # discarded 不在其中
 
 
 class PostingGuardTests(unittest.TestCase):

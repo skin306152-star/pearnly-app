@@ -1,17 +1,14 @@
 /*
- * Pearnly AI · ai-review-inbox.js · 全所审核收件箱(MC1-b2)编排:三分区聚合页
+ * Pearnly AI · ai-review-inbox.js · 全所审核收件箱(MC1-b2)编排:双分区聚合页
  *
  * 方案:桌面\pearnly ai\设计稿\MC1b-审核队列与签批闭环-方案.md §2 b2。接管 `#/pool`
- * 顶层路由(window.AI.pool = {mount, onLeave},取代此前只有「客户待答」一块的旧实现):
+ * 顶层路由(window.AI.pool = {mount, onLeave}):
  *   ① 待审工单(GET review-queue,到期近→前)+ 签批闭环按钮,状态机在
  *      ai-review-inbox-signoff.js。
  *   ② 异常票据(按 flag_reason 跨工单分组的裁决卡三件套 + 批量/逐张键盘流),状态机在
  *      ai-review-inbox-flagged.js——本文件只管挂载/渲染分发/toast,不重复业务逻辑。
- *   ③ 客户待答:原样委托 ai-client-pool.js(现更名 AI.clientPool,腾出 AI.pool 给本
- *      文件),挂进自己的子容器,零改动零回归。
- *
  * 依赖 window.AI.state/format/api/reviewRender/reviewInboxRender/reviewInboxSignoff/
- * reviewInboxFlagged/clientPool 与全局 at(),排在它们之后、ai.js 之前加载。
+ * reviewInboxFlagged 与全局 at(),排在它之后、ai.js 之前加载。
  */
 (function () {
     'use strict';
@@ -358,7 +355,6 @@
             S.flagged.setFeed(lastQueue.flagged_items || []);
         }
         load();
-        AI.clientPool.mount(api);
     }
 
     function onLeave() {
@@ -367,7 +363,6 @@
             if (S.refreshTimer) clearTimeout(S.refreshTimer);
             S.flagged.closeImage(); // 原图模态挂 document.body,切走路由要主动收
         }
-        if (AI.clientPool) AI.clientPool.onLeave();
     }
 
     window.AI = window.AI || {};

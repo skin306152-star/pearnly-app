@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.ai_gateway.tasks import ProviderOutcome
 from services.steward import attachments, copy, registry, store, tools, tools_doc_qa
 from services.steward.registry import ToolContext

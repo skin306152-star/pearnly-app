@@ -16,8 +16,10 @@ from core.auth import JWT_ALGORITHM, _jwt_secret, get_current_user_from_request
 from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
 from services.auth.entrance import require_erp_portal
-from services.line_binding import line_client, line_webhook_runner
 from services.line_erp import store, webhook
+from services.line_platform import client as line_client
+from services.line_platform import webhook_runner as line_webhook_runner
+from services.line_platform.liff import verify_id_token
 
 router = APIRouter(tags=["line-erp"])
 CHANNEL = "erp"
@@ -53,9 +55,7 @@ def _require_erp_account(request: Request) -> dict:
 
 @router.post("/api/line/erp/liff/auth")
 async def erp_liff_auth(req: LiffAuthIn):
-    from routes.line_liff_routes import _verify_id_token
-
-    claims = _verify_id_token(req.id_token, "LINE_ERP_LIFF_ID")
+    claims = verify_id_token(req.id_token, "LINE_ERP_LIFF_ID")
     line_user_id = (claims or {}).get("sub", "")
     binding = store.get_binding(line_user_id)
     if not binding:

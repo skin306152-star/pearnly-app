@@ -1,10 +1,9 @@
 /*
  * Pearnly AI · ai-review-inbox-render.js · 全所审核收件箱(MC1-b2)纯 HTML 拼装
  *
- * 方案:桌面\pearnly ai\设计稿\MC1b-审核队列与签批闭环-方案.md §2 b2。三分区聚合页
+ * 方案:桌面\pearnly ai\设计稿\MC1b-审核队列与签批闭环-方案.md §2 b2。双分区聚合页
  * 中「待审工单」(工单卡+签批闭环按钮)与「异常票据」(按 flag_reason 跨工单分组的
- * 裁决卡三件套)两块的拼装在本文件;「客户待答」原样复用 ai-client-pool-render.js,
- * 不重拼。零 DOM/网络依赖(同 ai-review-render.js 先例),依赖 window.AI.state/format/
+ * 裁决卡三件套)两块的拼装在本文件。零 DOM/网络依赖(同 ai-review-render.js 先例),依赖 window.AI.state/format/
  * reviewQueue/reviewVerdict 与全局 at(),编排在 ai-review-inbox.js。
  */
 (function (root) {

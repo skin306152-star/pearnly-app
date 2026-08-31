@@ -23,7 +23,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import authz, budget, copy, orchestrator, registry, store, tools, worker
 from services.steward.registry import StewardTool, ToolContext
 from tests.unit._steward_loop_fakes import CurCM as _CurCM
@@ -73,7 +73,7 @@ class FakeCur:
 
     def execute(self, sql, params=()):
         w = self.world
-        if "INSERT INTO line_action_nonces" in sql:
+        if "INSERT INTO action_nonces" in sql:
             token, tid, _ws, uid, ref, ttl = params
             w.nonces[token] = {
                 "tenant_id": str(tid),
@@ -83,7 +83,7 @@ class FakeCur:
                 "expired": int(ttl) <= 0,
             }
             self._ret = None
-        elif "UPDATE line_action_nonces SET consumed_at" in sql:
+        elif "UPDATE action_nonces SET consumed_at" in sql:
             token, tid = params[0], params[1]
             r = w.nonces.get(token)
             hit = (
@@ -520,25 +520,6 @@ class AuthzCardArgRowsTests(unittest.TestCase):
                         copy.authz_arg_rows(name, dict(_LEGACY_CARD["args"]), lang),
                         f"{name} 没登记卡面文案,授权卡会摆原始键",
                     )
-
-
-class MintMinutesTests(unittest.TestCase):
-    def test_mint_supports_minute_ttl(self):
-        from services.line_binding import line_action_nonce
-
-        executed = []
-
-        class Cur:
-            def execute(self, sql, params):
-                executed.append((sql, params))
-
-        token = line_action_nonce.mint(
-            Cur(), tenant_id="t-1", workspace_client_id=0, action_ref="x", ttl_minutes=5
-        )
-        self.assertTrue(token)
-        sql, params = executed[0]
-        self.assertIn("make_interval(mins => %s)", sql)
-        self.assertEqual(params[-1], 5)
 
 
 class BudgetTests(unittest.TestCase):

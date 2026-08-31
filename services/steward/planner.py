@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from services.agent import reply_guard
+from services.steward import reply_guard
 from services.front_desk.interpret import (
     DEGRADED_BAD_OUTPUT,
     DEGRADED_BRAIN_ERROR,

@@ -53,6 +53,19 @@ _CREATE_RE = re.compile(r"create\s+table\s+(?:if\s+not\s+exists\s+)?[\"']?([a-z0
 # 记债时有个透明位置(条目要写清欠的是什么、谁还),不是为了给人塞新债。
 KNOWN_UNCOVERED: Dict[str, str] = {}
 
+# 已从运行时代码断开的旧 Cowork LINE 表。它们暂留生产库只为分批核验后安全删除，
+# 不属于“生产在用的表”，因此不要求把已删除的业务 DDL 重新塞回产品代码。
+RETIRED_TABLES_PENDING_DROP = {
+    "line_client_bind_codes",
+    "line_client_contacts",
+    "line_client_questions",
+    "line_ocr_jobs",
+    "line_pending_actions",
+    "line_pending_entry",
+    "notification_logs",
+    "notification_rules",
+}
+
 
 def snapshot_tables(snapshot_text: str) -> Set[str]:
     return {m.group(1).lower() for m in _CREATE_RE.finditer(snapshot_text)}
@@ -90,7 +103,11 @@ def product_ddl_tables(root: Path = PROJECT_ROOT) -> Set[str]:
 def evaluate(prod: Set[str], covered: Set[str], known: Set[str]) -> List[str]:
     """纯函数,便于用有毒输入做反证。返回违规说明(空 = 通过)。"""
     problems: List[str] = []
-    uncovered = {t for t in prod if t not in covered and t != "alembic_version"}
+    uncovered = {
+        t
+        for t in prod
+        if t not in covered and t != "alembic_version" and t not in RETIRED_TABLES_PENDING_DROP
+    }
     for t in sorted(uncovered - known):
         problems.append(f"新增欠账:表 {t} 在生产存在,但产品代码里没有建表 DDL")
     for t in sorted(known & covered):

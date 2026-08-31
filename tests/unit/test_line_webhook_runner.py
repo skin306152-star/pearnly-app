@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from services.line_binding import line_webhook_runner as runner
+from services.line_platform import webhook_runner as runner
 
 
 class NoticeDeliveryTests(unittest.TestCase):
@@ -15,17 +15,17 @@ class NoticeDeliveryTests(unittest.TestCase):
 
     def test_reply_first_and_no_push_when_reply_lands(self):
         with (
-            mock.patch.object(runner.line_reply, "reply_text_context", return_value=True) as reply,
-            mock.patch.object(runner.line_reply, "push_text_context") as push,
+            mock.patch.object(runner.client, "reply_text", return_value=True) as reply,
+            mock.patch.object(runner.client, "push_text") as push,
         ):
             runner.notify_failed(self._EVENT)
         push.assert_not_called()
-        self.assertIn("ส่งใหม่", reply.call_args.args[1])
+        self.assertIn("ส่งรายการนี้อีกครั้ง", reply.call_args.args[1])
 
     def test_push_fallback_when_reply_token_is_unusable(self):
         with (
-            mock.patch.object(runner.line_reply, "reply_text_context", return_value=False),
-            mock.patch.object(runner.line_reply, "push_text_context") as push,
+            mock.patch.object(runner.client, "reply_text", return_value=False),
+            mock.patch.object(runner.client, "push_text") as push,
         ):
             runner.notify_failed(self._EVENT)
         push.assert_called_once()
@@ -33,28 +33,22 @@ class NoticeDeliveryTests(unittest.TestCase):
 
     def test_unfollow_is_never_answered(self):
         with (
-            mock.patch.object(runner.line_reply, "reply_text_context") as reply,
-            mock.patch.object(runner.line_reply, "push_text_context") as push,
+            mock.patch.object(runner.client, "reply_text") as reply,
+            mock.patch.object(runner.client, "push_text") as push,
         ):
             runner.notify_failed({"type": "unfollow", "source": {"userId": "U1"}})
         reply.assert_not_called()
         push.assert_not_called()
 
     def test_dms_channel_uses_its_own_client(self):
-        with (
-            mock.patch.object(runner.line_client, "reply_text", return_value=True) as reply,
-            mock.patch.object(runner.line_reply, "reply_text_context") as default_reply,
-        ):
+        with mock.patch.object(runner.client, "reply_text", return_value=True) as reply:
             runner.notify_failed(self._EVENT, channel="dms", text="ลองใหม่")
-        default_reply.assert_not_called()
         self.assertEqual(reply.call_args.kwargs["channel"], "dms")
 
     def test_copy_follows_event_language(self):
         for lang, needle in (("en", "send it again"), ("zh", "重新发送"), ("ja", "もう一度")):
             event = dict(self._EVENT, source={"userId": "U1", "language": lang})
-            with mock.patch.object(
-                runner.line_reply, "reply_text_context", return_value=True
-            ) as reply:
+            with mock.patch.object(runner.client, "reply_text", return_value=True) as reply:
                 runner.notify_failed(event)
             self.assertIn(needle, reply.call_args.args[1])
 

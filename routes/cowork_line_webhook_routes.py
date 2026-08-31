@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, Request
 
 from services.cowork_line import webhook as cowork_flow
-from services.line_binding import line_webhook_dedup
+from services.line_platform import webhook_dedup as line_webhook_dedup
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ _handle_event = cowork_flow.handle_event
 async def cowork_line_webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("x-line-signature", "")
-    if not line_client.verify_signature(body, signature, channel="default"):
+    if not line_client.verify_signature(body, signature, channel="cowork"):
         return {"status": "ignored"}
     try:
         payload = json.loads(body.decode("utf-8"))

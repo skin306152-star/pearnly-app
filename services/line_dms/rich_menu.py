@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from typing import Optional
 
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 

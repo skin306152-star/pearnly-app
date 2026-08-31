@@ -24,7 +24,6 @@ _ENROLLS = (
     "ensure_bank_recon_rls",
     "ensure_email_ingest_rls",
     "ensure_sales_rls",
-    "ensure_line_binding_rls",
     "ensure_client_rules_rls",
     "ensure_automation_rls",
     "ensure_etax_rls",

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """管家写工具授权闸(B3 · confirm-first)—— 写操作必须人批,批文一次性、短时效、绑参数。
 
-范式镜像 services/agent/push_confirm.py 的三件套,令牌复用 LINE 侧现成的
-line_action_nonces(mint/consume 原子消费,不另造一张 nonce 表):
+令牌复用平台通用 action nonce 表（mint/consume 原子消费）:
   ① 铸卡 open_request:任务停在 waiting_user,卡上带 token + 工具 + 参数快照;
   ② 决断 decide:批准/拒绝各消费一次 token(双击/重放第二次拿不到),批文落回任务
      payload.authorization,任务据此复跑或收 cancelled;
@@ -105,11 +104,11 @@ def open_request(
     spec = registry.get(tool)
     if spec is None or not registry.requires_authorization(spec):
         raise ValueError(f"steward authz: {tool!r} does not require authorization")
-    from services.line_binding import line_action_nonce
+    from services.security import action_nonce
 
     fp = args_fingerprint(tool, args)
     ref = json.dumps({"kind": REF_KIND, "task_id": str(task_id), "tool": tool, "args_fp": fp})
-    token = line_action_nonce.mint(
+    token = action_nonce.mint(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
@@ -144,11 +143,9 @@ def decide(cur, *, tenant_id: str, token: str, actor: dict, approve: bool) -> di
       ok=True  → task_id + authorization(已含决断人/时间)
       ok=False → http + code(路由层原样抛,错误码即前端契约)
     """
-    from services.line_binding import line_action_nonce as nonce
+    from services.security import action_nonce as nonce
 
-    # ref_kind 过滤进消费的 WHERE:nonce 表与 LINE 数据卡(确认入账/撤销/丢弃 · 涉钱)共用,
-    # 不过滤的话,这里会把同租户 LINE 卡的一次性凭证隔空烧掉(consume 先落 consumed_at,
-    # 之后才验 kind 就晚了)。别家 kind 一律 missing:不消费,也不泄漏存在性。
+    # ref_kind 在原子消费时限定授权类别，避免跨子系统烧掉凭证。
     res = nonce.consume(cur, tenant_id=tenant_id, token=token, ref_kind=REF_KIND)
     if res["status"] == "expired":
         return _err(409, ERR_AUTHZ_EXPIRED)

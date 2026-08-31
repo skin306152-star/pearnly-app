@@ -249,7 +249,6 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_refresh_btn: '刷新',
     riq_sec_workorders: '待审工单',
     riq_sec_flagged: '异常票据',
-    riq_sec_clientpool: '客户待答',
     riq_wo_due: '到期 {date}',
     riq_wo_due_none: '无义务到期日',
     riq_signoff_btn: '复核通过',

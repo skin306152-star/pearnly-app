@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""应用层 feature flag · 对话 Agent 总闸的消费侧(WP2 钥匙闸)。
-
-WP5 调 Agent 前先问 agent_enabled_for(user_id)：False 就回到现状。默认关；开 / 灰度由超管后台
-「全局设置」控制(钥匙闸 fail-closed)。设置读写见 services/platform_settings。
-"""
+"""应用层 feature flags，默认 fail-closed。"""
 
 from __future__ import annotations
 
@@ -12,49 +8,6 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-AGENT_ENABLED_KEY = "agent_enabled"
-# M3 写工具(记账/推 ERP…)子闸:与总闸分开,默认关。开总闸只放只读+确认查询,
-# 写能力要单独开(灰度先行·真机验稳才放量)。复用同一套 platform_settings 灰度机制。
-AGENT_WRITE_KEY = "agent_write_tools"
-# M3 全家桶子闸(撤销/改错工具 + 多笔直分发):与写子闸分开,默认关。
-# 开 → 大脑成为记账域唯一决策者(旧 LLM understand 退出灰度路);关 → defer 交旧路,现状不变。
-AGENT_M3_KEY = "agent_m3_tools"
-# 推 ERP 子闸(唯一 confirm-first 的不可逆写):默认关。关 → 工具对模型不可见,
-# 模型硬调只得到 not_available_yet 观测(引导去 App),线上行为零变化。
-AGENT_PUSH_KEY = "agent_push_erp"
-# LINE 图片意图子闸(LI 框架):默认关。关 → 发图走现状管线逐字节不变;
-# 开 → 图片 OCR 后先过意图分流(services/agent/image_intent),用户明说的目的优先。
-AGENT_IMAGE_KEY = "agent_image_intent"
-# M3 确认握手状态机(LangGraph HITL 范式 · docs/agent/M3-CONFIRM-HANDSHAKE-DESIGN.md):
-# 默认关。开 → 确认卡 15 分钟内打"确认/取消"字样与点按钮同效(resume 闸消费同一 nonce)。
-AGENT_CONFIRM_KEY = "agent_confirm_machine"
-# LINE DMS 身份证推送子闸(LINE-DMS-PUSH-DESIGN):默认关。关 → 身份证图走现状
-# (not_invoice 靶向引导仍在,无副作用);开 → 说过"进 DMS"再发身份证 = 复述+确认后建客户。
-AGENT_DMS_KEY = "agent_dms_push"
-# LINE 对账收件子闸(RECON-3-LINE-PLAN 方案一触发底座):默认关。关 → 说"做银行对账"
-# 得 not_available_yet 诚实拒、文件走现状 OCR;开 → 收件配对→异步对账→完成回推。
-AGENT_RECON_INTAKE_KEY = "agent_recon_intake"
-# 大脑原生 function-calling 子闸(P2):默认关。关 → 手写单行 JSON 协议现状不变;
-# 开 → 决策经 provider 原生工具调用(消 JSON 截断/parse 类 crash),后端不支持自动回落 JSON 路。
-AGENT_NATIVE_FC_KEY = "agent_native_fc"
-# 回复底部 quick-reply chips 子闸(P2):默认关。关 → 纯文本回复现状不变;
-# 开 → agent 回复/安全兜底带 2-3 个可点建议(教育用户能问什么)。
-AGENT_QUICK_CHIPS_KEY = "agent_quick_chips"
-# 跨轮锚点记忆子闸(P2):默认关。关 → 锚点不加载/不采集/不落库,行为逐字节不变;
-# 开 → 「把刚才那张推进 ERP」这类不带票号的口头指代能定位上一轮碰过的单据。
-AGENT_ANCHOR_KEY = "agent_anchor_memory"
-# LINE 语音转写子闸(P2):默认关。关 → 语音消息回 unsupported 现状逐字节不变;
-# 开 → 语音经网关 Gemini 逐字转写(回显原文)后走与打字完全相同的文本路。
-AGENT_VOICE_KEY = "agent_voice_stt"
-# 复合续步子闸(P2):默认关。关 → 记账卡出即终轮现状不变;开 → 一句话「记账+提问」
-# 出卡后继续答剩余问题(跟进文字入口 push·推 ERP/撤销/改错仍即卡即终)。
-AGENT_COMPOUND_KEY = "agent_compound_turn"
-# 用户画像子闸(W3):默认关。关 → 提示词逐字节不变;开 → 高频商家/类目/昨日摘要
-# 拼进上下文(services/agent/user_profile·fail-open),常客不再被反复问类目。
-AGENT_PROFILE_KEY = "agent_user_profile"
-# 知识库问答子闸(W3):默认关。关 → 工具硬调得 not_available_yet 诚实拒;
-# 开 → confirm-first 确认卡,用户点确认才检索+扣 ฿0.50(no_answer 不扣)。
-AGENT_KNOWLEDGE_KEY = "agent_ask_knowledge"
 # M1 客户建档收严子闸(B2 · 见 L2-验收.md 真语料坐实):默认关。关 → 建档/编辑校验
 # 现状逐字节不变;开 → 建档强收泰文注册名(OCR 方向判定的名称锚),编辑不许清空
 # 已登记的泰文名。判定域 = 账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回
@@ -101,11 +54,6 @@ POS_PROVISION_LOCK_KEY = "pos_provision_lock"
 # 开(事务所)= 强制复核签批人∉制单集、冻结授权人∉制单集且须已有有效复核在场。按 tenant
 # 判定(单所整体开/关);消费在 services/workorder/sod.py。
 PEARNLY_AI_SOD_KEY = "pearnly_ai_sod"
-# LINE 待问客户池闸(D2 · 审核队列票挂客户经 LINE 问答回写改判):默认关。关 = 客户绑定码
-# 分支/暂挂/攒批推送/回答拦截全链不生效,webhook 走既有用户绑定码判定现状不变(fail-closed)。
-# 按 tenant 判定(单所整体开/关,与 pearnly_ai_sod 同款);超管在平台后台把该事务所
-# tenant_id 加进 allowlist 即单所灰度。
-PEARNLY_AI_CLIENT_POOL_KEY = "pearnly_ai_client_pool"
 # 工单银行对账逐笔真对平闸(E1 · 佐证层):默认关 fail-closed。关 = reconcile 步 R3 逐字节
 # 维持现状(只判 bank_statement 材料存在性,不跑对平);开 = 有 bank_statement 件时,把流水
 # 与工单事件流的票据逐笔打分对平,产出缺票/未达两张清单进 R3 gate + 证据链(不 stuck、不阻断
@@ -137,17 +85,6 @@ PEARNLY_AI_STMT_REGROUP_KEY = "pearnly_ai_stmt_regroup"
 # 落点 brain_shadow_log(只建议不落账,业务表写路径 grep 为零)。按 tenant 判定(单所整体
 # 开/关,与 pearnly_ai_shadow_draft 同款);消费在 services/workorder/brain_shadow.py。
 PEARNLY_AI_BRAIN_SHADOW_KEY = "pearnly_ai_brain_shadow"
-# LINE 收料暂存闸(LN-1):默认关 fail-closed。关 = webhook 图片/文件消息与绑定码分支
-# 逐字节走现状(对话 Agent/记账 OCR/待问池/单聊客户绑定全不动);开 = 已绑上下文(单聊
-# 客户 contact / 已绑群)发的票据下载落 client_intake_staging 暂存池 + 四语确认回执。
-# 按 tenant 判定;消费在 services/line_binding/line_intake_staging.py(收料)与
-# line_client_bind_intake.py(群绑定形态)。
-PEARNLY_AI_LINE_INTAKE_KEY = "pearnly_ai_line_intake"
-# 工单跑批结果 LINE 通知闸(IN-0c):默认关 fail-closed。关 = advance() 收尾零发送零台账写,
-# 现状不变;开 = 跑完/卡住/缺料时给发起人(该次 run_requested 的 actor)推一条 LINE 提醒。
-# 按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);消费在
-# services/notification/workorder_notify.py。
-PEARNLY_AI_RUN_NOTIFY_KEY = "pearnly_ai_run_notify"
 # 登录入口准入门(各是各的)· 回退开关。关 = 不拦,任何门都通(上线前/回退=现状);
 # 开 = 未被授权该入口的账号从该门登录,按账号密码错误拒登。按 tenant 判定。测稳后 rollout=all。
 ENTRANCE_GATE_KEY = "entrance_gate"
@@ -157,7 +94,7 @@ ENTRANCE_GATE_KEY = "entrance_gate"
 ENTRANCE_API_SCOPE_KEY = "entrance_api_scope"
 # 目标驱动前门闸(FD-0 · 万能投料口):默认关 fail-closed。关 = /api/ai/front-desk/* 四端点
 # 一律 404、#/desk 不渲染(/ai 与今天逐字节一致);开 = 前门总台生效(草稿合同/盘点/确认开工单)。
-# 双闸:pearnly_ai_m1 在场才有效(组合闸,同 pearnly_ai_line_intake 先例)。按 tenant 判定;
+# 双闸:pearnly_ai_m1 在场才有效。按 tenant 判定;
 # 消费在 routes/front_desk_routes.py。默认关,测稳后 rollout=all。
 PEARNLY_AI_FRONT_DESK_KEY = "pearnly_ai_front_desk"
 # 智能管家闸(B2-M1 · /ai 顶部对话入口):默认关 fail-closed。关 = /api/ai/steward/* 五端点
@@ -194,81 +131,6 @@ def _allowlisted(key: str, subject_id: Optional[str], label: str) -> bool:
     except Exception as e:
         logger.warning(f"{label} fail-closed: {e}")
         return False
-
-
-def agent_enabled_for(user_id: Optional[str]) -> bool:
-    """对话 Agent 总闸。"""
-    return _enabled(AGENT_ENABLED_KEY, user_id, "agent_enabled_for")
-
-
-def agent_write_enabled_for(user_id: Optional[str]) -> bool:
-    """写工具(记账等 B 档)子闸。关 = 记账逐字节走旧乐观路。"""
-    return _enabled(AGENT_WRITE_KEY, user_id, "agent_write_enabled_for")
-
-
-def agent_m3_enabled_for(user_id: Optional[str]) -> bool:
-    """M3 全家桶(撤销/改错/多笔直分发)子闸。关 = defer 交旧路,现状不变。"""
-    return _enabled(AGENT_M3_KEY, user_id, "agent_m3_enabled_for")
-
-
-def agent_push_enabled_for(user_id: Optional[str]) -> bool:
-    """推 ERP confirm-first 子闸。关 = 工具不可见,硬调得 not_available_yet。"""
-    return _enabled(AGENT_PUSH_KEY, user_id, "agent_push_enabled_for")
-
-
-def agent_image_enabled_for(user_id: Optional[str]) -> bool:
-    """LINE 图片意图子闸(LI)。关 = 发图走现状管线逐字节不变。"""
-    return _enabled(AGENT_IMAGE_KEY, user_id, "agent_image_enabled_for")
-
-
-def agent_confirm_enabled_for(user_id: Optional[str]) -> bool:
-    """确认握手状态机子闸。关 = 文本"确认"走正常对话轮,按钮卡现状不变。"""
-    return _enabled(AGENT_CONFIRM_KEY, user_id, "agent_confirm_enabled_for")
-
-
-def agent_dms_enabled_for(user_id: Optional[str]) -> bool:
-    """LINE DMS 身份证推送子闸。关 = 身份证图走现状,plan 的 dms 目标如实拒。"""
-    return _enabled(AGENT_DMS_KEY, user_id, "agent_dms_enabled_for")
-
-
-def agent_recon_intake_enabled_for(user_id: Optional[str]) -> bool:
-    """LINE 对账收件子闸。关 = 工具如实拒、文件走现状 OCR。"""
-    return _enabled(AGENT_RECON_INTAKE_KEY, user_id, "agent_recon_intake_enabled_for")
-
-
-def agent_native_fc_enabled_for(user_id: Optional[str]) -> bool:
-    """大脑原生 function-calling 子闸。关 = 手写 JSON 协议现状不变。"""
-    return _enabled(AGENT_NATIVE_FC_KEY, user_id, "agent_native_fc_enabled_for")
-
-
-def agent_quick_chips_enabled_for(user_id: Optional[str]) -> bool:
-    """quick-reply chips 子闸。关 = 纯文本回复现状不变。"""
-    return _enabled(AGENT_QUICK_CHIPS_KEY, user_id, "agent_quick_chips_enabled_for")
-
-
-def agent_anchor_enabled_for(user_id: Optional[str]) -> bool:
-    """跨轮锚点记忆子闸。关 = 锚点全程不流动,现状不变。"""
-    return _enabled(AGENT_ANCHOR_KEY, user_id, "agent_anchor_enabled_for")
-
-
-def agent_voice_enabled_for(user_id: Optional[str]) -> bool:
-    """LINE 语音转写子闸。关 = 语音回 unsupported,现状不变。"""
-    return _enabled(AGENT_VOICE_KEY, user_id, "agent_voice_enabled_for")
-
-
-def agent_compound_enabled_for(user_id: Optional[str]) -> bool:
-    """复合续步子闸。关 = 记账卡出即终轮,现状不变。"""
-    return _enabled(AGENT_COMPOUND_KEY, user_id, "agent_compound_enabled_for")
-
-
-def agent_profile_enabled_for(user_id: Optional[str]) -> bool:
-    """用户画像子闸。关 = 画像不算不拼,提示词现状不变。"""
-    return _enabled(AGENT_PROFILE_KEY, user_id, "agent_profile_enabled_for")
-
-
-def agent_knowledge_enabled_for(user_id: Optional[str]) -> bool:
-    """知识库问答子闸。关 = 工具诚实拒,不出确认卡不扣费。"""
-    return _enabled(AGENT_KNOWLEDGE_KEY, user_id, "agent_knowledge_enabled_for")
 
 
 def pearnly_ai_m1_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
@@ -365,30 +227,10 @@ def pearnly_ai_sod_enabled_for(tenant_id: Optional[str]) -> bool:
     return _enabled(PEARNLY_AI_SOD_KEY, tenant_id, "pearnly_ai_sod_enabled_for")
 
 
-def pearnly_ai_client_pool_enabled_for(tenant_id: Optional[str]) -> bool:
-    """LINE 待问客户池闸。关 = 客户绑定码/暂挂池/攒批推送/回答拦截全链不生效。
-
-    按 tenant 判定(单所整体开/关,与 pearnly_ai_sod 同款);超管在平台后台把该
-    事务所 tenant_id 加进 allowlist 即单所灰度。
-    """
-    return _enabled(PEARNLY_AI_CLIENT_POOL_KEY, tenant_id, "pearnly_ai_client_pool_enabled_for")
-
-
-def pearnly_ai_line_intake_enabled_for(tenant_id: Optional[str]) -> bool:
-    """LINE 收料暂存闸(LN-1)。关 = webhook 图片/文件与群绑定分支逐字节走现状。
-
-    双闸:pearnly_ai_m1 在场才有效。与 client_pool(两独立闸在各自消费层分别判)不同,这是仓库首个
-    flag 内嵌依赖 flag 的组合闸——让每个消费点天然双闸;任一关或异常均 fail-closed。按 tenant 判定(单所整体开/关)。
-    """
-    if not pearnly_ai_m1_enabled_for(tenant_id, None):
-        return False
-    return _enabled(PEARNLY_AI_LINE_INTAKE_KEY, tenant_id, "pearnly_ai_line_intake_enabled_for")
-
-
 def pearnly_ai_front_desk_enabled_for(tenant_id: Optional[str]) -> bool:
     """目标驱动前门闸(FD-0)。关 = 前门四端点 404、总台不渲染,/ai 现状逐字节不变。
 
-    双闸:pearnly_ai_m1 在场才有效(组合闸,同 pearnly_ai_line_intake);任一关或异常均
+    双闸:pearnly_ai_m1 在场才有效;任一关或异常均
     fail-closed。按 tenant 判定(单所整体开/关);超管在平台后台把 tenant_id 加进 allowlist 即灰度。
     """
     if not pearnly_ai_m1_enabled_for(tenant_id, None):
@@ -443,15 +285,6 @@ def pearnly_ai_shadow_draft_enabled_for(tenant_id: Optional[str]) -> bool:
     tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_SHADOW_DRAFT_KEY, tenant_id, "pearnly_ai_shadow_draft_enabled_for")
-
-
-def pearnly_ai_run_notify_enabled_for(tenant_id: Optional[str]) -> bool:
-    """工单跑批结果 LINE 通知闸(IN-0c)。关 = advance() 收尾零发送零台账写。
-
-    按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);超管在平台后台把该
-    事务所 tenant_id 加进 allowlist 即单所灰度。
-    """
-    return _enabled(PEARNLY_AI_RUN_NOTIFY_KEY, tenant_id, "pearnly_ai_run_notify_enabled_for")
 
 
 def pearnly_ai_bank_sales_suggest_enabled_for(tenant_id: Optional[str]) -> bool:

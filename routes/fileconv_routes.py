@@ -9,7 +9,7 @@ K2 Excel,均零服务端状态)——默认回 JSON 摘要(doc_type/status/conse
 
 全组挂 feature flag `pearnly_ai_m1`(闸关 → 404 fail-closed,同 workorder_routes 先例)。
 权限复用 `tax.filing.view`——文件转换是会计工作台工具,权限边界与查看申报工单一致,
-不为它新开一个维度(同 client_pool_routes 复用同一码的先例)。
+不为它新开一个维度。
 """
 
 from __future__ import annotations

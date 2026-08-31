@@ -14,7 +14,6 @@
         folder: 'folder',
         gmail: 'email',
         erp: 'erp',
-        alert: 'alert',
     };
     document.addEventListener('click', function (e) {
         const btn = (e.target as HTMLElement).closest('.int-btn-configure');

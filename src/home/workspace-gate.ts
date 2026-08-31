@@ -289,14 +289,7 @@ window.openSubjectCreate = function (opts?: { onCreated?: (id: number) => void }
     render();
 };
 
-// LIFF 深链直达某单(带套账)→ liffResume 会自动选该单套账并满足门,别弹手选门(防闪/防按错套账)。
-// 读 home.html preboot 设的持久 window 标志,而非 sessionStorage:liffResume 会先删 key,
-// 门判断若在删 key 后才跑就读不到 → 误渲染门(本窗口真踩过的时序竞态)。
-function liffWsPending(): boolean {
-    return !!(window as unknown as { __LIFF_WS__?: string }).__LIFF_WS__;
-}
-
-// 过门收尾公共段:标会话过门→设当前套账→关门壳→(reapplyNav 时)刷导航→刷顶栏套账控件。satisfy 传 true;auto 路(pos_only)传 false 把导航让给 module-nav 分支(避免重复/竞态)。
+// 过门收尾公共段:标会话过门→设当前套账→关门壳→按需刷新导航和顶栏套账控件。
 function passGate(id: number, reapplyNav: boolean): void {
     _markGatePassed();
     if (typeof window.setActiveWorkspaceClientId === 'function')
@@ -306,18 +299,11 @@ function passGate(id: number, reapplyNav: boolean): void {
     if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
 }
 
-// LIFF 深链:该单已定套账 → 直接设为当前 + 满足门(不弹手选)。门壳若已起则摘掉。
-window.satisfyWorkspaceGate = function (id: number) {
-    if (!id) return;
-    passGate(id, true);
-};
-
 // core-boot/module-nav 在用户就绪后调:每次登录强制选套账(任何非超管账号),本会话选过才放行。
 window.enforceWorkspaceGate = function () {
     if (window.PEARNLY_ADMIN_MODE) return; // 超管除外
     if (document.getElementById('onboarding-flow-root')) return; // 新注册向导优先(末步=选套账)
     if (_gateSatisfied) return; // 本会话已选过 → 放行(切模块/onboarding 也调到这,不重弹)
-    if (liffWsPending()) return; // LIFF 深链待自动选套账 → 不弹手选门
     // 进系统后刷新(F5·同一登录会话已过门)→ 放行,用持久 active 进系统,不再弹手选门。
     // 登录(新会话·无此标志)→ 不走这里 → 下面正常弹门强制选套账。
     if (_gatePassedThisSession()) {
@@ -373,10 +359,7 @@ window.autoSatisfyWorkspaceGate = async function () {
 // 关门(暴露给 module-nav:新注册向导接管时顶掉早起的门壳)。
 window.closeWorkspaceGate = close;
 
-if (
-    (window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending &&
-    !liffWsPending()
-) {
+if ((window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending) {
     (window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending =
         false;
     window.showWorkspaceGate();

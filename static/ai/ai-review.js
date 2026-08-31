@@ -23,7 +23,6 @@
             decidedEntries: [], // 已判票(mount 时 entry.decision 已有值),折叠分组只读展示
             idx: 0,
             local: {}, // item_id -> {state: 'pending'|'accepted'|'recalc'|'excluded'|'assigned'|'failed', decision}
-            poolHandle: AI.reviewPool.create(), // D2-S9 · 推 LINE 待问状态机(ai-review-pool.js)
             bulkHandle: AI.reviewBulk.create(), // J-C · 全部按建议处理批量确认状态机(ai-review-bulk.js)
             editing: false,
             editErr: false,
@@ -94,7 +93,6 @@
             editValue: S.editValue,
             editSuggestion: S.editSuggestion,
             editSuggestValues: S.editSuggestValues,
-            pool: S.poolHandle.forItem(entry.item_id),
         });
         injectChrome(container);
         if (S.editing) {
@@ -175,25 +173,6 @@
 
     function setLocal(itemId, patch) {
         S.local[itemId] = Object.assign({}, S.local[itemId], patch);
-    }
-
-    // ============ D2-S9:第四动作「推 LINE 待问」(A/E/X 之外,不串裁决键盘流) ============
-    // 状态机本体在 ai-review-pool.js(单文件<500 铁律拆出),这里只接线当前卡片 + 会话卫哨。
-
-    function togglePoolPicker() {
-        var entry = S.queue[S.idx];
-        if (!entry || S.editing) return;
-        if (S.poolHandle.toggle(entry.item_id)) renderCurrent();
-    }
-
-    function stageToPool(questionType) {
-        var entry = S.queue[S.idx];
-        if (!entry) return;
-        var session = S; // 快照——回调落地时若已切走(S 已指向新会话)一律不认。
-        S.poolHandle.stage(S.api, S.orderId, entry, questionType, function () {
-            if (S !== session) return;
-            if (S.mode === 'card') renderCurrent();
-        });
     }
 
     function decide(action) {
@@ -628,13 +607,6 @@
         }
         var tag = e.target && e.target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-        // 第四动作(D2-S9):Q 切换「推 LINE 待问」选择面板,方向票/金额票通用,
-        // 不占用 A/E/X/P/S 任何既有键位,独立分支不落进下面两套裁决键盘流。
-        if (e.key === 'q' || e.key === 'Q') {
-            e.preventDefault();
-            togglePoolPicker();
-            return;
-        }
         var entry = S.queue[S.idx];
         // 方向不明票:键位切换成 P 进项 / S 销项 / X 非税(assign_kind),不走金额票的 A/E/X。
         if (entry && AI.reviewQueue.isDirectionTicket(entry)) {
@@ -684,8 +656,6 @@
         else if (action === 'rv-dir-purchase') decide('assign_purchase');
         else if (action === 'rv-dir-sales') decide('assign_sales');
         else if (action === 'rv-dir-nontax') decide('assign_nontax');
-        else if (action === 'rv-pool-toggle') togglePoolPicker();
-        else if (action === 'rv-pool-pick') stageToPool(el.getAttribute('data-qtype'));
         else if (action === 'rv-rerun') startRerun();
         else if (action === 'rv-go-intake') {
             window.location.hash = AI.router.buildClientHash(S.clientId, 'intake');

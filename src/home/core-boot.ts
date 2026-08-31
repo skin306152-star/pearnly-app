@@ -122,12 +122,6 @@ function applyLang(lang?: any) {
             window._rerenderExceptions();
         }
     } catch (e) {}
-    // v118.22.2.1 · 智能提醒 chips/列表/日志/弹窗切语言重渲
-    try {
-        if (typeof window._rerenderNotifications === 'function' && currentRoute === 'automation') {
-            window._rerenderNotifications();
-        }
-    } catch (e) {}
     // 历史行
     try {
         if (typeof renderHistoryList === 'function' && currentRoute === 'history') {
@@ -418,30 +412,19 @@ try {
     console.warn('[boot] applyLang failed', e);
 }
 
-// LIFF 深链 resume(home.html preboot 据 sessionStorage 待处理项置)→ 由 purchase-liff.liffResume
-// 独自驱动路由到对应单/待归类;core-boot 不抢默认路由,否则跳 dms-intake 通用页(backlog #5)。
-const _liffResume = !!(window as unknown as { __LIFF_RESUME__?: boolean }).__LIFF_RESUME__;
-
 // hash 路由初始化
 try {
-    if (!_liffResume) {
-        const initialRoute = (location.hash || '#/dms-intake').replace(/^#\//, '');
-        routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'dms-intake');
-    }
+    const initialRoute = (location.hash || '#/dms-intake').replace(/^#\//, '');
+    routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'dms-intake');
 } catch (e) {
     console.warn('[boot] routeTo failed', e);
 }
 
-// LIFF 引导期(?liff=purchase 且尚无 token):整个 home 引导交给 purchase-liff —— 它签 token 后
-// location.replace('/home') 重进走正常流。此处必须不跑 loadAll/路由加载,否则无 token 的
-// /api/me 先 401 → 跳登录页,把还在异步鉴权的 LIFF 流踢走(套账门也在 loadAll 内,一并跳过)。
-const _liffBootstrapping = !!window.__LIFF_BOOTSTRAP__; // home.html 早期置(?liff=purchase 且无 token)
-
 // defer 模块的 loader 注册晚于此处同步执行 → 初始进非首屏路由会空白(只剩侧栏);
 // 微任务后 sibling 已 eval,补调一次。原仅 reconcile 兜底,现泛化到所有路由。
-if (!_liffBootstrapping && !_liffResume) setTimeout(reloadCurrentRoute, 0);
+setTimeout(reloadCurrentRoute, 0);
 
 // 切账套(右上角切换器 / 表单「切换公司」)→ 重载当前模块。单一收口,替代原各页分散订阅。
 window.addEventListener('pearnly:workspace-changed', reloadCurrentRoute);
 
-if (!_liffBootstrapping) loadAll();
+loadAll();

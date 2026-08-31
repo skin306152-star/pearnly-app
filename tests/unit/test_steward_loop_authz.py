@@ -13,7 +13,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import (
     authz,
     brain_entry,

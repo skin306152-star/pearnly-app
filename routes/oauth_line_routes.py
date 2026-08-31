@@ -1,7 +1,7 @@
 """LINE Login OAuth 2.0.
 
 This flow only authenticates a Pearnly account. Cowork LINE membership binding
-uses the separate QR and six-digit code flow and never writes ``line_bindings``.
+uses the separate QR and six-digit code flow and its own identity store.
 
 OAuth state(HMAC 无状态签名)与 Google 登录共用 → services/auth/oauth_state.py。
 """

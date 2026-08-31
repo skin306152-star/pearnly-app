@@ -389,29 +389,8 @@ function initErpLineBinding(sec: HTMLElement, tr: ErpTranslator): void {
             </div>
 
             <!-- 归档交付(Google Drive/Sheets)连接卡已迁至采购导出页(purchase-export · purchase-export-google.ts):
-                 连接就在用到它的地方 · 避免 per-套账 连接态在两处不一致。集成页只留采集/通知。
+                 连接就在用到它的地方 · 避免 per-套账 连接态在两处不一致。集成页只留采集入口。
                  第 3 组「ERP 系统」亦已移除(2026-07-01)· ERP 连接/推送由「录入工作台」上下文卡承接。 -->
-
-            <div class="sec-divider"></div>
-
-            <!-- 第 4 组 · 通知提醒(全业态) -->
-            <div class="integrations-section-title" data-i18n="int-section-automation">通知提醒</div>
-
-            <div class="integration-row" data-int-target="drawer" data-int-anchor="alert">
-                <div class="int-icon ic-alert">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
-                        <path d="M10 21a2 2 0 0 0 4 0"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="auto-alert-title">智能提醒</span></div>
-                    <div class="int-desc" data-i18n="auto-alert-desc">异常 high 或大额发票发生时 · 自动推送到老板/会计的 LINE</div>
-                </div>
-                <div class="int-actions">
-                    <button class="int-btn-configure" data-i18n="btn-configure">配置</button>
-                </div>
-            </div>
         </div>
 `;
     sec.dataset.wbInjected = '1';

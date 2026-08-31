@@ -12,7 +12,7 @@ import unittest
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
-from services.line_binding import line_webhook_dedup as dd
+from services.line_platform import webhook_dedup as dd
 
 
 class _Cursor:

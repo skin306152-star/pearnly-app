@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 

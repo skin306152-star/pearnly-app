@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """Pearnly DMS · 独立 LINE 通道的绑定 / 绑定码 / 会话 DAL(DL-1)。
 
-老会计站 line_bindings 与本包三表完全隔离:DMS 是独立产品、独立 LINE OA,不复用
-line_binding.store 以免两条产品线互相牵连(换绑冲突、RLS、TTL 语义各走各的)。
+DMS 使用独立 LINE OA 与专属表，不复用 Cowork / ERP 的绑定状态。
 
 三张表:
   line_dms_bindings       —— LINE user ↔ (tenant, user) 绑定,line_user_id UNIQUE。

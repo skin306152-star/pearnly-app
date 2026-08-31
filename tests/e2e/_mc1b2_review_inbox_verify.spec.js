@@ -174,9 +174,6 @@ async function wireApi(page, state) {
             if (state.queueError) return route.fulfill({ status: 500, json: { detail: 'boom' } });
             return route.fulfill({ json: state.queueFixture() });
         }
-        if (p === '/api/ai/client-pool' && method === 'GET') {
-            return route.fulfill({ json: { groups: [] } });
-        }
         // getOrder(order_detail):MC2-A3 后收件箱 feed 不再逐单拉它 —— 计数供 N+1 断言。
         if (/^\/api\/workorder\/orders\/[^/]+$/.test(p) && method === 'GET') {
             state.orderDetailCalls += 1;

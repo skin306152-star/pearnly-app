@@ -21,7 +21,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Optional
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 
@@ -43,7 +43,7 @@ _MAX_PREVIEW_ROWS = 20
 FILTER_OPS = ("eq", "ne", "gt", "gte", "lt", "lte", "contains")
 AGGREGATE_OPS = ("sum", "count", "avg")
 
-# 单元格数值噪音:千分位逗号、泰铢符、百分号是排版不是数值,同 services.agent.slots 的
+# 单元格数值噪音:千分位逗号、泰铢符、百分号是排版不是数值,同 services.steward.slots 的
 # _NUM_NOISE 一致做法(两处各写一份是因为定义太小、跨领域共享反而增加一次无谓的 import)。
 _NUM_NOISE = str.maketrans("", "", ", ฿%")
 _AVG_Q = Decimal("0.01")

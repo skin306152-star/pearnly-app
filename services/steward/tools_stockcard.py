@@ -16,7 +16,7 @@ POS 库存冒充事务所记账台账答给会计)。
 
 from __future__ import annotations
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 from services.stockcard import report as report_svc

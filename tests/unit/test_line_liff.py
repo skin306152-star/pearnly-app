@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LINE LIFF 鉴权端点(routes.line_liff_routes)· mock LINE verify + db(阶段三)。
-
-锁:id_token 验签拿 sub · 未绑定拒 403 · 绑定 → 签 Pearnly token。真 LINE verify + LIFF
-webview = 用户验收(需真 channel)。
-"""
+"""Shared LIFF verification and the active DMS editor entry."""
 
 import asyncio
 import os
@@ -11,9 +7,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from routes import line_liff_routes as liff
 from routes import line_dms_booking_edit_routes as dms_edit
-from core.pos_api import PosError
+from services.line_platform import liff
 
 
 class _Resp:
@@ -38,42 +33,15 @@ class VerifyIdTokenTests(unittest.TestCase):
 
     def test_verify_ok(self):
         with mock.patch.object(liff.requests, "post", return_value=_Resp(200, {"sub": "U123"})):
-            self.assertEqual(liff._verify_id_token("tok")["sub"], "U123")
+            self.assertEqual(liff.verify_id_token("tok", "LINE_LIFF_ID")["sub"], "U123")
 
     def test_verify_non200_none(self):
         with mock.patch.object(liff.requests, "post", return_value=_Resp(400, {})):
-            self.assertIsNone(liff._verify_id_token("tok"))
+            self.assertIsNone(liff.verify_id_token("tok", "LINE_LIFF_ID"))
 
     def test_verify_no_channel_none(self):
         os.environ.pop("LINE_LOGIN_CHANNEL_ID", None)
-        self.assertIsNone(liff._verify_id_token("tok"))
-
-
-class LiffAuthRouteTests(unittest.TestCase):
-    def test_unverified_raises_401(self):
-        with mock.patch.object(liff, "_verify_id_token", return_value=None):
-            with self.assertRaises(PosError) as ctx:
-                asyncio.run(liff.api_liff_auth(liff.LiffAuthIn(id_token="bad")))
-        self.assertEqual(ctx.exception.http_status, 401)
-
-    def test_unbound_raises_403(self):
-        with (
-            mock.patch.object(liff, "_verify_id_token", return_value={"sub": "U1"}),
-            mock.patch.object(liff.db, "get_user_by_line_user_id", return_value=None),
-        ):
-            with self.assertRaises(PosError) as ctx:
-                asyncio.run(liff.api_liff_auth(liff.LiffAuthIn(id_token="ok")))
-        self.assertEqual(ctx.exception.http_status, 403)
-
-    def test_bound_issues_token(self):
-        user = {"id": "u1", "username": "bob", "plan": "free", "tenant_id": "t1", "role": "owner"}
-        with (
-            mock.patch.object(liff, "_verify_id_token", return_value={"sub": "U1"}),
-            mock.patch.object(liff.db, "get_user_by_line_user_id", return_value=user),
-            mock.patch.object(liff, "create_access_token", return_value="JWT-XYZ"),
-        ):
-            res = asyncio.run(liff.api_liff_auth(liff.LiffAuthIn(id_token="ok")))
-        self.assertEqual(res["data"]["token"], "JWT-XYZ")
+        self.assertIsNone(liff.verify_id_token("tok", "LINE_LIFF_ID"))
 
     def test_dms_bound_user_gets_dms_scoped_token(self):
         binding = {"line_user_id": "L1", "user_id": "u1", "tenant_id": "t1"}
@@ -86,25 +54,18 @@ class LiffAuthRouteTests(unittest.TestCase):
             "is_active": True,
         }
         with (
-            mock.patch.object(dms_edit, "_verify_id_token", return_value={"sub": "L1"}) as verify,
+            mock.patch.object(dms_edit, "verify_id_token", return_value={"sub": "L1"}) as verify,
             mock.patch("services.line_dms.store.get_binding_by_line_user", return_value=binding),
             mock.patch.object(dms_edit.db, "find_user_by_id", return_value=user),
             mock.patch.object(dms_edit, "create_access_token", return_value="DMS-JWT") as issue,
         ):
-            res = asyncio.run(dms_edit.dms_booking_liff_auth(liff.LiffAuthIn(id_token="ok")))
+            res = asyncio.run(dms_edit.dms_booking_liff_auth(dms_edit.LiffAuthIn(id_token="ok")))
         verify.assert_called_once_with("ok", "LINE_DMS_LIFF_ID")
         self.assertEqual(res["data"]["token"], "DMS-JWT")
         self.assertEqual(issue.call_args.kwargs["entry"], "dms")
 
 
-class LiffEntryRedirectTests(unittest.TestCase):
-    """LIFF 深链入口跳 /home 带参(PO-4):doc → 复核屏该单(待归类已下线)。"""
-
-    def test_purchase_entry_redirects_with_doc(self):
-        res = asyncio.run(liff.liff_purchase_entry("D1", None))
-        self.assertEqual(res.status_code, 302)
-        self.assertEqual(res.headers["location"], "/home?liff=purchase&doc=D1")
-
+class LiffEntryTests(unittest.TestCase):
     def test_dms_booking_entry_serves_built_shell_without_cache(self):
         res = asyncio.run(dms_edit.liff_dms_booking_entry())
         self.assertTrue(Path(res.path).as_posix().endswith("static/dist/dms-booking-edit.html"))

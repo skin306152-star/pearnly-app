@@ -19,7 +19,7 @@ from typing import Optional
 from unittest import mock
 
 from core import db as _core_db  # noqa: F401 —— 先落 core.db,再 import DAL(循环导入)
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import brain_entry, brain_loop, budget, loop_state, store, tools, worker
 from services.steward.registry import ToolContext
 

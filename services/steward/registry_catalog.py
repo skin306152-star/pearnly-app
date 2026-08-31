@@ -14,7 +14,7 @@ registry.py 把本模块的公共名逐个显式 re-export(不用 `import *`),�
 
 from __future__ import annotations
 
-from services.agent.contracts import SlotSpec
+from services.steward.contracts import SlotSpec
 from services.steward.registry_slots import (
     RISK_WRITE,
     StewardTool,

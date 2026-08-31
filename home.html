@@ -6,15 +6,13 @@
 <title>Pearnly</title>
 
 <script>var _ls;try{_ls=decodeURIComponent(location.search);}catch(e){_ls=location.search;}</script>
-<script>/* 入口级会话槽 + canonical 归一(最早 preboot · 早于 main.js 调不到登录口判据): 入口槽只认 pathname/canonical(?canonical=cowork|erp → set pearnly_entry + history.replaceState 把 /home 可见 pathname 归一为 /cowork|/erp)，绝不认另一个标签共享的 pearnly_entry(同 Chrome 多标签不同入口时防误导)。无 token 且不可从 legacy 迁移才跳对应登录门。分支与 src/home/session.ts + src/home/login-url.ts + static/landing/landing.js 同步。*/var _slot='';try{var _cm=_ls.match(/[?&]canonical=(cowork|erp)/);if(_cm){_slot=_cm[1]}else if(location.pathname==='/cowork'||location.pathname==='/erp'){_slot=location.pathname==='/erp'?'erp':'cowork'}else if(location.pathname==='/pos'){_slot='pos'}else if(location.pathname==='/dms'){_slot='dms'}else if(location.pathname==='/ai'){_slot='ai'}else if(location.pathname==='/daily'){_slot='daily'}else{var _tk=(localStorage.getItem('mrpilot_token')||'').split('.')[1];if(_tk){try{var _tp=JSON.parse(atob(_tk.replace(/-/g,'+').replace(/_/g,'/')));if(_tp&&(_tp.entry==='cowork'||_tp.entry==='erp'))_slot=_tp.entry}catch(e){}}}}catch(e){_slot='cowork'}if(_slot==='cowork'||_slot==='erp'){try{localStorage.setItem('pearnly_entry',_slot)}catch(e){}var _sc=(location.search||'').replace(/[?&]canonical=[^&]*/,'').replace(/^&/,'?');if(location.pathname==='/home'){try{history.replaceState(null,'','/'+_slot+_sc+location.hash)}catch(e){}}}var _slotTok=function(){try{return _slot==='cowork'?localStorage.getItem('mrpilot_token_cowork'):_slot==='erp'?localStorage.getItem('mrpilot_token_erp'):localStorage.getItem('mrpilot_token')}catch(e){return null}};var _migratable=function(){if(_slot!=='cowork'&&_slot!=='erp')return false;try{var _l=localStorage.getItem('mrpilot_token');if(!_l)return false;var _p=((_l||'').split('.')[1]||'');if(!_p)return false;var _o=JSON.parse(atob(_p.replace(/-/g,'+').replace(/_/g,'/')));var _e=_o&&_o.entry;return _slot==='cowork'?(_e==='cowork'||_e==='main'):_e==='erp'}catch(e){return false}};if(!_slotTok()&&!_migratable()&&!/[?&]liff=/.test(_ls)){location.replace(_slot==='pos'?'/pos':_slot==='dms'?'/dms':_slot==='ai'?'/ai':_slot==='daily'?'/daily':_slot==='erp'?'/erp':'/cowork')}</script>
-<script>if(/[?&]liff=purchase/.test(_ls))window.__LIFF_BOOTSTRAP__=1;</script>
-<script>try{if(sessionStorage.getItem('pearnly_liff_doc')||sessionStorage.getItem('pearnly_liff_view')==='list'||sessionStorage.getItem('pearnly_liff_inbox'))window.__LIFF_RESUME__=1;var _lw=sessionStorage.getItem('pearnly_liff_ws');if(_lw)window.__LIFF_WS__=_lw;}catch(e){}</script>
+<script>/* 入口级会话槽 + canonical 归一(最早 preboot · 早于 main.js 调不到登录口判据): 入口槽只认 pathname/canonical(?canonical=cowork|erp → set pearnly_entry + history.replaceState 把 /home 可见 pathname 归一为 /cowork|/erp)，绝不认另一个标签共享的 pearnly_entry(同 Chrome 多标签不同入口时防误导)。无 token 且不可从 legacy 迁移才跳对应登录门。分支与 src/home/session.ts + src/home/login-url.ts + static/landing/landing.js 同步。*/var _slot='';try{var _cm=_ls.match(/[?&]canonical=(cowork|erp)/);if(_cm){_slot=_cm[1]}else if(location.pathname==='/cowork'||location.pathname==='/erp'){_slot=location.pathname==='/erp'?'erp':'cowork'}else if(location.pathname==='/pos'){_slot='pos'}else if(location.pathname==='/dms'){_slot='dms'}else if(location.pathname==='/ai'){_slot='ai'}else if(location.pathname==='/daily'){_slot='daily'}else{var _tk=(localStorage.getItem('mrpilot_token')||'').split('.')[1];if(_tk){try{var _tp=JSON.parse(atob(_tk.replace(/-/g,'+').replace(/_/g,'/')));if(_tp&&(_tp.entry==='cowork'||_tp.entry==='erp'))_slot=_tp.entry}catch(e){}}}}catch(e){_slot='cowork'}if(_slot==='cowork'||_slot==='erp'){try{localStorage.setItem('pearnly_entry',_slot)}catch(e){}var _sc=(location.search||'').replace(/[?&]canonical=[^&]*/,'').replace(/^&/,'?');if(location.pathname==='/home'){try{history.replaceState(null,'','/'+_slot+_sc+location.hash)}catch(e){}}}var _slotTok=function(){try{return _slot==='cowork'?localStorage.getItem('mrpilot_token_cowork'):_slot==='erp'?localStorage.getItem('mrpilot_token_erp'):localStorage.getItem('mrpilot_token')}catch(e){return null}};var _migratable=function(){if(_slot!=='cowork'&&_slot!=='erp')return false;try{var _l=localStorage.getItem('mrpilot_token');if(!_l)return false;var _p=((_l||'').split('.')[1]||'');if(!_p)return false;var _o=JSON.parse(atob(_p.replace(/-/g,'+').replace(/_/g,'/')));var _e=_o&&_o.entry;return _slot==='cowork'?(_e==='cowork'||_e==='main'):_e==='erp'}catch(e){return false}};if(!_slotTok()&&!_migratable()){location.replace(_slot==='pos'?'/pos':_slot==='dms'?'/dms':_slot==='ai'?'/ai':_slot==='daily'?'/daily':_slot==='erp'?'/erp':'/cowork')}</script>
 <script>try{if(localStorage.getItem('pearnly_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
 <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1">
 <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1">
 <link rel="stylesheet" href="/static/pearnly-ui.css?v=5">
-<link rel="stylesheet" href="/static/dist/home.css?v=08312045">
+<link rel="stylesheet" href="/static/dist/home.css?v=09010250">
 <style id="wsg-static-css">
 body.workspace-gate-preboot > :not(#workspace-gate-root):not(#mp-toast-wrap):not(script):not(style){visibility:hidden;}
 #workspace-gate-root[data-wsg-boot]{position:fixed;inset:0;z-index:900;display:grid;place-items:center;background:var(--bg,Canvas);color:var(--ink,CanvasText);}
@@ -88,8 +86,6 @@ body.workspace-gate-preboot > :not(#workspace-gate-root):not(#mp-toast-wrap):not
         
     </section>
 
-    <div class="modal-overlay" id="notif-new-modal" style="display:none;"></div>
-
     <div class="modal-overlay" id="pearnly-confirm-modal" style="display:none;"></div>
 
     <div class="modal-overlay" id="archive-token-modal" style="display:none;"></div>
@@ -161,8 +157,6 @@ body.workspace-gate-preboot > :not(#workspace-gate-root):not(#mp-toast-wrap):not
     <div class="modal-mask" id="purchase-pay-mask" style="display:none;"></div>
     <div class="modal-mask" id="purchase-match-mask" style="display:none;"></div>
     <div class="modal-mask" id="purchase-supplier-mask" style="display:none;"></div>
-    <div class="modal-mask" id="purchase-line-mask" style="display:none;"></div>
-
     <section class="page" id="page-sales-invoices"></section>
     <section class="page" id="page-sales-records"></section>
     <section class="page" id="page-sales-record-detail"></section>
@@ -320,7 +314,7 @@ body.workspace-gate-preboot > :not(#workspace-gate-root):not(#mp-toast-wrap):not
 <script src="/static/dist/pre.js?v=12044204" defer></script>
 
 
-<script type="module" src="/static/dist/main.js?v=08312111"></script>
+<script type="module" src="/static/dist/main.js?v=09010250"></script>
 
 <script src="/static/dist/post.js?v=12038606" defer></script>
 

@@ -98,7 +98,7 @@ class AuthzDecisionStackTests(unittest.TestCase):
         from tests.unit.test_steward_authz import _WRITE_TOOL, FakeCur, _World, _task_row
         from services.steward import registry, tools
         from services.steward.registry import StewardTool
-        from services.agent.contracts import ToolResult
+        from services.steward.contracts import ToolResult
 
         self.world = _World(_task_row())
         cur = FakeCur(self.world)

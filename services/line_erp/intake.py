@@ -20,7 +20,7 @@ def generate_and_save_pdf(
         return {"saved": False, "updated": 0}
     try:
         if not content.startswith(b"%PDF"):
-            from services.line_binding.line_client import image_to_pdf_bytes
+            from services.line_platform.client import image_to_pdf_bytes
 
             content = image_to_pdf_bytes(content) or b""
         if not content:

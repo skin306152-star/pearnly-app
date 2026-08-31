@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-"""线 B 批3 · 多轮澄清会话态 + 可学习词典(doc 10 §4.3/§4.4)。"""
+"""可学习费用分类词典。"""
 
 import unittest
-from decimal import Decimal
 from unittest import mock
 
-from services.expense import conversation as conv
-from services.expense.expense_draft import ExpenseDraft
+from services.expense import category_learning as conv
 
 
 class _LearnStore:
@@ -49,59 +47,6 @@ class _FakeCursor:
 
     def fetchall(self):
         return self._all
-
-
-class DraftJsonRoundtripTests(unittest.TestCase):
-    def test_decimal_survives_roundtrip(self):
-        d = ExpenseDraft(amount=Decimal("60.50"), qty=Decimal("3"), category="ค่าอาหาร")
-        back = conv._draft_from_json(conv._draft_to_json(d))
-        self.assertEqual(back.amount, Decimal("60.50"))
-        self.assertEqual(back.qty, Decimal("3"))
-        self.assertEqual(back.category, "ค่าอาหาร")
-
-
-class PendingTests(unittest.TestCase):
-    def test_save_scoped_and_upsert(self):
-        cur = _FakeCursor()
-        conv.save_pending(
-            cur,
-            line_user_id="U1",
-            tenant_id="t1",
-            workspace_client_id=7,
-            draft=ExpenseDraft(category="ค่าอาหาร"),
-            missing="amount",
-        )
-        sql, params = cur.calls[0]
-        self.assertIn("ON CONFLICT (line_user_id) DO UPDATE", sql)
-        self.assertEqual(params[0], "U1")
-        self.assertEqual(params[1], "t1")
-        self.assertEqual(params[2], 7)
-
-    def test_pop_fresh_returns_draft(self):
-        draft_json = conv._draft_to_json(ExpenseDraft(category="ค่าอาหาร"))
-        cur = _FakeCursor(
-            fetchone={
-                "tenant_id": "t1",
-                "workspace_client_id": 7,
-                "draft": draft_json,
-                "missing": "amount",
-                "fresh": True,
-            }
-        )
-        out = conv.pop_pending(cur, line_user_id="U1")
-        self.assertEqual(out["workspace_client_id"], 7)
-        self.assertEqual(out["draft"].category, "ค่าอาหาร")
-        self.assertEqual(out["missing"], "amount")
-        self.assertIn("DELETE FROM line_pending_entry", cur.calls[0][0])
-
-    def test_pop_expired_returns_none(self):
-        cur = _FakeCursor(
-            fetchone={"tenant_id": "t1", "workspace_client_id": 7, "draft": "{}", "fresh": False}
-        )
-        self.assertIsNone(conv.pop_pending(cur, line_user_id="U1"))
-
-    def test_pop_missing_returns_none(self):
-        self.assertIsNone(conv.pop_pending(_FakeCursor(fetchone=None), line_user_id="U1"))
 
 
 class LearnedTests(unittest.TestCase):
@@ -194,41 +139,6 @@ class FindExactTests(unittest.TestCase):
         self.assertIsNone(conv.find_exact(cur, tenant_id="t1", workspace_client_id=7, keyword="  "))
 
 
-class LearnCategoryWriteBackTests(unittest.TestCase):
-    """用户改分类 → 按 税号 + 规范卖家键写回(P2A · 下次同商户优先沿用)。"""
-
-    TREE = [{"id": "c1", "name": "Food", "children": [{"id": "s1", "name": "Drink"}]}]
-
-    def _capture(self, supplier, cid, sid):
-        from services.expense import line_correct_data as lcd
-
-        calls = []
-        with (
-            mock.patch("services.purchase.categories.get_tree", return_value=self.TREE),
-            mock.patch(
-                "services.expense.conversation.learn",
-                side_effect=lambda cur, **kw: calls.append(kw),
-            ),
-        ):
-            lcd.learn_category(object(), tid="t1", ws=7, supplier=supplier, cid=cid, sid=sid)
-        return calls
-
-    def test_writes_tax_and_canonical_seller(self):
-        calls = self._capture({"name": "7-ELEVEN สาขา 1", "tax_id": "0107542000011"}, "c1", "s1")
-        keys = [c["keyword"] for c in calls]
-        self.assertIn("tax:0107542000011", keys)
-        self.assertIn("seller:7-eleven", keys)  # 各写法归一同键
-        self.assertTrue(all(c["category_id"] == "c1" for c in calls))
-        self.assertEqual(calls[0]["category_name"], "Food")  # 名从树解析
-
-    def test_no_category_is_noop(self):
-        with mock.patch("services.expense.conversation.learn") as ln:
-            from services.expense import line_correct_data as lcd
-
-            lcd.learn_category(object(), tid="t1", ws=7, supplier={"name": "x"}, cid=None, sid=None)
-            ln.assert_not_called()
-
-
 class _Store:
     """expense_learned 全模拟:learn 写 + find_exact 精确查 + lookup_learned 全表 fetchall 三合一。"""
 
@@ -269,17 +179,17 @@ class LookupForTextTests(unittest.TestCase):
     TREE = [{"id": "c1", "name": "商品", "children": [{"id": "s1", "name": "饮料"}]}]
 
     def _store_711_goods(self):
-        from services.expense import line_correct_data as lcd
+        from services.purchase import category_learning
 
         store = _Store()
         with mock.patch("services.purchase.categories.get_tree", return_value=self.TREE):
-            lcd.learn_category(
+            category_learning.learn_category(
                 store,
-                tid="t",
-                ws=1,
+                tenant_id="t",
+                workspace_client_id=1,
                 supplier={"name": "7-ELEVEN สาขา 1", "tax_id": ""},
-                cid="c1",
-                sid="s1",
+                category_id="c1",
+                subcategory_id="s1",
             )
         return store
 

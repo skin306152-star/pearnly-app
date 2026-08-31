@@ -14,7 +14,7 @@ import unittest
 from decimal import Decimal
 from unittest import mock
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.ai_gateway.tasks import ProviderOutcome
 from services.fileconv.model import Table
 from services.steward import attachments, copy, registry, store, tools, tools_table

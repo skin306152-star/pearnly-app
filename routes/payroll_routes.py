@@ -77,7 +77,7 @@ async def _read_upload(file: UploadFile) -> bytes:
 
 
 def _load_client(cur, tenant_id: str, workspace_client_id: int) -> dict:
-    """越权/不存在的账套主体一律 404(不泄漏存在性),同 client_pool_routes 先例。"""
+    """越权/不存在的账套主体一律 404，不泄漏存在性。"""
     cur.execute(
         "SELECT id, name, tax_id FROM workspace_clients WHERE id = %s AND tenant_id = %s",
         (workspace_client_id, tenant_id),

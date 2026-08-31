@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 from services.line_dms import booking_qa, cards, menu_cards, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 

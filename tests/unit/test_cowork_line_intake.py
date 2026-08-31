@@ -183,7 +183,9 @@ class IntakeRouteTest(unittest.TestCase):
     def test_liff_auth_uses_active_identity_and_session_nonce(self):
         session = {"state": "draft", "payload": dict(PAYLOAD)}
         with (
-            mock.patch("routes.line_liff_routes._verify_id_token", return_value={"sub": "line-1"}),
+            mock.patch(
+                "routes.cowork_line_intake_routes.verify_id_token", return_value={"sub": "line-1"}
+            ),
             mock.patch.object(
                 routes.identity_store, "resolve_active_identity", return_value=IDENTITY
             ),

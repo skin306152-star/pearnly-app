@@ -81,9 +81,7 @@ PUBLIC_ROUTES = {
     ("POST", "/api/line/webhook"),  # Cowork 默认 channel · LINE signature 验签即凭证
     ("POST", "/api/line/dms/webhook"),  # DMS channel · line_client.verify_signature 验签即凭证
     ("POST", "/api/line/erp/webhook"),  # ERP 独立 channel · ERP secret 验 LINE signature
-    ("POST", "/api/line/liff/auth"),  # LIFF id_token 即凭证(LINE verify 验签)
     ("POST", "/api/line/erp/liff/auth"),  # ERP LIFF id_token + binding + draft session 即凭证
-    ("GET", "/api/line/liff/config"),  # 仅返回公开 LIFF ID(非密)· 前端 liff.init 用
     ("GET", "/api/line/erp/liff/config"),  # 仅返回 ERP OA 的公开 LIFF ID
     ("POST", "/api/cowork-line/intake/liff/auth"),  # Cowork LIFF id_token + 绑定身份 + 草稿即凭证
     ("GET", "/api/cowork-line/intake/liff/config"),  # 仅返回 Cowork OA 的公开 LIFF ID
@@ -97,7 +95,6 @@ PUBLIC_ROUTES = {
         "GET",
         "/api/cowork-line/intake/draft/{draft_id}/records/{history_id}/page/{page}.png",
     ),
-    ("GET", "/liff/purchase/{doc_id}"),  # LIFF 页入口·跳 /home 复核屏(前端 LIFF 鉴权)
     ("GET", "/liff/erp/{draft_id}"),  # ERP LIFF 静态编辑壳;草稿数据仍需专用短期凭证
     ("GET", "/liff/cowork-intake/{draft_id}"),  # Cowork LIFF 静态编辑壳;草稿数据需专用短期凭证
     ("GET", "/liff/dms-booking"),  # DMS LIFF 页面壳;业务数据仍需 JWT + 一次性 nonce

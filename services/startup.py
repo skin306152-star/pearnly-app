@@ -62,14 +62,12 @@ def _boot_schema_ddl() -> None:
         (db.ensure_ocr_feedback_table, "ocr_correction_examples 建表+RLS"),
         (db.ensure_google_sub_column, "google_sub 列"),
         (db.ensure_line_uid_column, "line_uid 列"),
-        (db.ensure_line_binding_columns, "line_bindings.current_workspace_client_id 列"),
         (db.ensure_password_changed_at_column, "password_changed_at 列"),
         (db.ensure_email_codes_table, "email_codes 建表"),
         (db.ensure_gl_vat_task_table, "gl_vat_task 建表"),
         (db.ensure_membership_tables, "membership 建表"),
         (db.ensure_billing_balance_table, "billing_balance_log 建表"),
         (db.ensure_exceptions_tables, "exceptions 建表"),
-        (db.ensure_notification_tables, "notification 建表"),
         (db.ensure_archive_settings_table, "archive_settings 建表+RLS"),
         (db.ensure_erp_retry_columns, "erp_push_logs retry 列"),
         (db.ensure_erp_push_logs_work_order_id_column, "erp_push_logs.work_order_id 列+索引"),
@@ -211,14 +209,10 @@ def _boot_schema_ddl() -> None:
         except Exception as e:
             logger.warning(f"启动 {_label} schema 失败: {e}")
 
-    # LINE 各表幂等建(启动自愈式迁移)。NEW-DEBT-EXEMPT: alembic 留档 0037-0047 同号。
+    # 三条现行 LINE 产品的共用及专属表。
     for _mod, _label in (
-        ("services.line_binding.line_action_nonce", "动作令牌"),
-        ("services.line_binding.line_chat_memory", "对话记忆"),
-        ("services.line_binding.line_message_refs", "消息映射"),
-        ("services.expense.line_voice_quota", "闲聊配额"),
-        ("services.line_binding.line_webhook_dedup", "webhook去重"),
-        ("services.agent.turn_log", "Agent审计"),
+        ("services.security.action_nonce", "通用动作令牌"),
+        ("services.line_platform.webhook_dedup", "webhook去重"),
         ("services.line_dms.login_tickets", "DMS登录票据"),  # alembic 0102 留档
         ("services.line_erp.store", "ERP LINE绑定与会话"),  # alembic 0106 留档
     ):

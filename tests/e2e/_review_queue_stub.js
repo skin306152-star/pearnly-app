@@ -70,7 +70,6 @@ async function wireApi(page, item, orderId) {
             return route.fulfill({ json: { orders: [], count: 0, limit: 1, offset: 0 } });
         if (p === '/api/workorder/review-queue')
             return route.fulfill({ json: queueFixture(item, orderId) });
-        if (p === '/api/ai/client-pool') return route.fulfill({ json: { groups: [] } });
         return route.fulfill({ status: 404, json: { detail: 'not_stubbed:' + p } });
     });
 }

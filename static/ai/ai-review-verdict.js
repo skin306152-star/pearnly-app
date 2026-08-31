@@ -29,7 +29,7 @@
     // 退回原始 flag_reason(总比编个假人话强,与后端 verdict.py 顶注同一约定)。vars 逐
     // 键把 None/undefined 清成空串——verdict.py 的 params 构造器(如 _seller_params 的
     // vendor)有些字段现阶段 OCR 读不出恒为 None,at() 的 replace 不做 falsy 判断,
-    // null 会被 String() 成字面 "null" 糊脸给用户(同 pool_answer_raw 的 `|| ''` 惯例)。
+    // null 会被 String() 成字面 "null" 糊脸给用户,空值统一归一为空字符串。
     function narrativeOf(hint, flagReason) {
         hint = hint || {};
         if (hint.narrative_key) return { key: hint.narrative_key, vars: sanitizeVars(hint.params) };

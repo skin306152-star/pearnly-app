@@ -25,7 +25,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from services.agent import reply_guard
+from services.steward import reply_guard
 from services.front_desk.interpret import (
     DEGRADED_BAD_OUTPUT,
     DEGRADED_BRAIN_ERROR,

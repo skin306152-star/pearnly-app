@@ -267,7 +267,6 @@ Object.assign(window.__AI_I18N_TH__, {
     riq_refresh_btn: 'รีเฟรช',
     riq_sec_workorders: 'งานรอตรวจ',
     riq_sec_flagged: 'รายการผิดปกติ',
-    riq_sec_clientpool: 'รอลูกค้าตอบ',
     riq_wo_due: 'ครบกำหนด {date}',
     riq_wo_due_none: 'ไม่มีวันครบกำหนดยื่น',
     riq_signoff_btn: 'ตรวจทานผ่าน',

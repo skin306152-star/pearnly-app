@@ -20,7 +20,7 @@ from unittest import mock
 from core import (
     db as _core_db,
 )  # noqa: F401 —— 先落 core.db,再 import 下面的 DAL(否则撞 dal_reexports 的循环导入)
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.erp import push_log_queries
 from services.steward import copy, copy_artifacts, registry, tools_brief, tools_close
 from services.steward.registry import ToolContext

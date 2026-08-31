@@ -24,10 +24,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from core import db
 from core.feature_flags import pearnly_ai_m1_enabled_for
-from services.notification import store as notification_store
 from services.platform_settings import store as platform_settings_store
 from services.workorder import api, engine, obligation_engine, store
 
@@ -40,6 +41,10 @@ _SCAN_LIMIT = 20
 _SETTING_KEY = "workorder_auto_open_last_scan"
 
 
+def _bangkok_today():
+    return datetime.now(ZoneInfo("Asia/Bangkok")).date()
+
+
 async def run_tick() -> int:
     """挂点入口(background_loops.run_recovery_tick 周期巡检)。
 
@@ -50,7 +55,7 @@ async def run_tick() -> int:
     再试——本挂点不该拖垮同 tick 里其它恢复队列。
     """
     try:
-        today_iso = notification_store.bangkok_today().isoformat()
+        today_iso = _bangkok_today().isoformat()
         last = platform_settings_store.get_setting(_SETTING_KEY)
         if last and (last.get("value") or {}).get("date") == today_iso:
             return 0

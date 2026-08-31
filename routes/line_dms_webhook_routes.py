@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """Pearnly DMS 独立 LINE OA 的 webhook(DL-1)· POST /api/line/dms/webhook。
 
-与老会计站 webhook(routes/line_webhook_routes)完全隔离:独立 channel profile('dms')、
-独立绑定表(services/line_dms)、独立闸(dms_line)。老 OA 逐字节不受影响。
+与 Cowork、ERP webhook 完全隔离:独立 channel profile('dms')、
+独立绑定表(services/line_dms)、独立闸(dms_line)。
 
 闸 dms_line 关 → 收到事件一律 200 静默零回复(fail-closed);闸开才走绑定/会话逻辑。
-事件处理拆成可直接单测的 async 函数(照 line_webhook_routes._handle_line_event 风格)。
+事件处理拆成可直接单测的 async 函数。
 """
 
 from __future__ import annotations
@@ -16,8 +16,9 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from core.feature_flags import dms_line_enabled_for
-from services.line_binding import line_client, line_webhook_runner
 from services.line_dms import cards, flow, menu_cards, store
+from services.line_platform import client as line_client
+from services.line_platform import webhook_runner as line_webhook_runner
 
 logger = logging.getLogger(__name__)
 

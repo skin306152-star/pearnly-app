@@ -3,7 +3,7 @@
 injected (underscore = not shipped).
 
 Patches (test scaffolding only — product code untouched):
-  * services.line_binding.line_client outbound funcs → record to outbox.jsonl,
+  * services.line_platform.client outbound funcs → record to outbox.jsonl,
     never hit api.line.me (LINE_DMS_CHANNEL_ACCESS_TOKEN is a dummy).
   * services.erp.dms_id_ocr.recognize_id_card → return the id-card dict staged
     in ocr_inject.json, then run the REAL mod-11 checksum flag so the checksum
@@ -43,7 +43,7 @@ def _record(kind: str, **fields) -> None:
 
 
 def _patch_line_client() -> None:
-    from services.line_binding import line_client as lc
+    from services.line_platform import client as lc
 
     def reply_text(reply_token, text, *, channel="default"):
         _record("reply_text", channel=channel, reply_token=reply_token, text=text)

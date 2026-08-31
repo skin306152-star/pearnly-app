@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from services.expense import conversation
+from services.expense import category_learning
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ def add_rule(
     if not resolved:
         return None
     cat_id, sub_id, cat_name, sub_name = resolved
-    conversation.learn(
+    category_learning.learn(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,

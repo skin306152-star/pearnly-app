@@ -11,16 +11,9 @@ import { ONB_CSS } from './onboarding-flow-html.js';
         document.head.appendChild(st);
     }
 
-    function liffWsPending() {
-        // LIFF 深链直达某单(带套账)→ liffResume 会自动选该单套账,别起手选门壳(防闪)。
-        // 读 home.html preboot 设的持久标志(非 sessionStorage:liffResume 会先删 key,时序不可靠)。
-        return !!window.__LIFF_WS__;
-    }
-
     function mountBootGate() {
         if (window.PEARNLY_ADMIN_LAYOUT || window.PEARNLY_ADMIN_MODE) return;
         if (document.getElementById('onboarding-flow-root')) return;
-        if (liffWsPending()) return;
 
         window.__workspaceGateBootPending = true;
         document.body.classList.add('workspace-gate-preboot');

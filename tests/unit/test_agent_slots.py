@@ -2,8 +2,8 @@
 
 import unittest
 
-from services.agent import slots
-from services.agent.contracts import AgentAction, AgentContext, SlotSpec, ToolSpec
+from services.steward import slots
+from services.steward.contracts import AgentAction, AgentContext, SlotSpec, ToolSpec
 
 _CTX = AgentContext(user={"id": "u1"}, tenant_id="t1")
 

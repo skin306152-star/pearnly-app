@@ -2,8 +2,8 @@
 // REFACTOR-WB-C1 (2026-05-29) · 自动化子 tab 切换 switchAutomationTab 从 home.js 抽出为 ES module
 //
 // 来源:home.js 自动化页(v0.6.1)。switchAutomationTab 切 .auto-nav-item / .auto-panel 并按 tab
-//   懒加载对应面板(window._loadEmailIngestPanel / _loadBankReconPanel / _loadLineBotPanel /
-//   _loadNotificationsPanel / _loadFolderWatcherPanel · 均已抽出为 module 经 window 暴露)。
+//   懒加载对应面板(window._loadEmailIngestPanel / _loadBankReconPanel /
+//   _loadFolderWatcherPanel · 均已抽出为 module 经 window 暴露)。
 // 入口 window.switchAutomationTab:erp-integration.js(.auto-nav-item 点击委托)/ folder-watcher.js /
 //   email-ingest.js 经全局 bare 调 · 抽成 defer module 后仍安全(用户点 tab 远晚于模块加载)。
 // 只用 document + window.* · 无 home.js 裸全局依赖。verbatim 搬迁 · 0 改逻辑(仅 prettier)。
@@ -31,14 +31,6 @@ function switchAutomationTab(tabKey: string) {
     // v0.18 · M10 · 银行对账 tab 首次进入时拉数据
     if (tabKey === 'bank' && typeof window._loadBankReconPanel === 'function') {
         window._loadBankReconPanel();
-    }
-    // v0.19 · T1 · LINE Bot tab 首次进入时拉数据
-    if (tabKey === 'linebot' && typeof window._loadLineBotPanel === 'function') {
-        window._loadLineBotPanel();
-    }
-    // v118.22.2 · 智能提醒 tab 首次进入时拉数据
-    if (tabKey === 'alert' && typeof window._loadNotificationsPanel === 'function') {
-        window._loadNotificationsPanel();
     }
     // v95 · 文件夹监听 tab 首次进入时初始化
     if (tabKey === 'folder' && typeof window._loadFolderWatcherPanel === 'function') {

@@ -271,7 +271,6 @@ Object.assign(window.__AI_I18N_JA__, {
     riq_refresh_btn: '更新',
     riq_sec_workorders: '審査待ち案件',
     riq_sec_flagged: '異常票',
-    riq_sec_clientpool: '顧客回答待ち',
     riq_wo_due: '期限 {date}',
     riq_wo_due_none: '申告期限なし',
     riq_signoff_btn: 'レビュー承認',

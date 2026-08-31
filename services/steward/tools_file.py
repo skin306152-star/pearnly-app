@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 from services.cost.usage_context import usage_context

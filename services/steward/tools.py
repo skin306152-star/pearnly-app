@@ -37,7 +37,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import (
     authz,
     erp_push_tool,

@@ -178,8 +178,6 @@ interface Window {
     isMoneyHidden: (u?: AppUser | null) => boolean;
     // integration drawer + automation panel loaders
     openIntegrationDrawer: (tab?: string, title?: string) => void;
-    _loadNotificationsPanel: () => void;
-    _loadLineBotPanel: () => void;
     _loadFolderWatcherPanel: () => void;
     _loadEmailIngestPanel: () => void;
     _loadBankReconPanel: () => void;
@@ -328,7 +326,6 @@ interface Window {
     _entry?: string;
     // 登录口单一事实源(login-url.ts)· pos_only→/pos 其余→/login · 所有跳"重新登录"的点都读它。
     loginUrl?: () => string;
-    satisfyWorkspaceGate?: (id: number) => void;
     closeWorkspaceGate?: () => void;
     openSubjectCreate?: (opts?: { onCreated?: (id: number) => void }) => void;
     // 餐厅 POS · 桌台管理页(owner · 餐厅业态 · 路由 pos-tables · 平铺 section)
@@ -377,7 +374,6 @@ interface Window {
     loadPurchaseDetail?: () => void;
     openPurchaseForm?: (id?: string | null, draft?: unknown) => void;
     openPurchaseDetail?: (id: string) => void;
-    openPurchaseLine?: () => void;
     openPurchasePay?: (doc: unknown, onDone?: () => void) => void;
     openPurchaseMatch?: (line: unknown, onDone?: (res: unknown) => void) => void;
     openPurchaseSupplierPicker?: (onPick: (s: unknown) => void) => void;
@@ -385,7 +381,6 @@ interface Window {
     openSalesExport?: (historyIds: string[]) => void;
     loadPurchaseExport?: () => void;
     loadPurchaseCapture?: () => void;
-    __LIFF_BOOTSTRAP__?: number;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;
@@ -411,7 +406,6 @@ interface Window {
     getHistoryClientFilter?: () => unknown;
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;
-    _rerenderNotifications?: () => void;
     PEARNLY_ADMIN_MODE?: boolean;
     // ── C5 批12 桥(ocr/folder/erp/billing/avatar/workspace/archive/email 遗留边界)──
     _pearnlyFolderUnloadAttached?: boolean;

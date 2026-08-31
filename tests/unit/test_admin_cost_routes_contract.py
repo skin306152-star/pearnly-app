@@ -83,7 +83,7 @@ class AiUsageEndpointTests(unittest.TestCase):
             ),
             mock.patch(
                 "services.cost.ai_usage_store.get_usage_by_task",
-                return_value=[{"task": "line_text_understand", "calls": 1, "cost_thb": 0.1}],
+                return_value=[{"task": "text_understand", "calls": 1, "cost_thb": 0.1}],
             ) as m_task,
             mock.patch(
                 "services.cost.ai_usage_store.get_usage_daily_trend",
@@ -94,7 +94,7 @@ class AiUsageEndpointTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertIn("note", body)
-        self.assertEqual(body["by_task"][0]["task"], "line_text_understand")
+        self.assertEqual(body["by_task"][0]["task"], "text_understand")
         self.assertEqual(body["daily_trend"][0]["day"], "2026-07-09")
         m_task.assert_called_once_with(days=30)
         m_trend.assert_called_once_with(days=30)

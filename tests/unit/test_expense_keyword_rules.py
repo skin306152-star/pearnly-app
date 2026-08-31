@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 
 import core.db  # noqa: F401  单脚本起头须先 import core.db(dal_reexports 循环·app 运行时无此问题)
-from services.expense import conversation, keyword_rules
+from services.expense import category_learning, keyword_rules
 
 
 class FakeCursor:
@@ -141,7 +141,7 @@ class HitCountsTests(unittest.TestCase):
 class LearnSourceGuardTests(unittest.TestCase):
     def test_insert_carries_source_and_guard(self):
         cur = FakeCursor()
-        conversation.learn(
+        category_learning.learn(
             cur,
             tenant_id="t",
             workspace_client_id=6,

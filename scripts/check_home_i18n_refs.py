@@ -81,7 +81,7 @@ else:
 ROOT = Path(__file__).resolve().parent.parent
 BASELINE = ROOT / "scripts" / "home_i18n_refs_baseline.txt"
 
-# /home 的键带连字符和点:dxb-up-title / agent.ok.notifications / set-group-about。
+# /home 的键带连字符和点:dxb-up-title / agent.ok.history / set-group-about。
 # ⚠️ 跟 /ai 那道闸(键只有 [A-Za-z_]\w*)不同,别互抄。
 _KEY = re.compile(r"^[A-Za-z_$][\w.$-]*$")
 

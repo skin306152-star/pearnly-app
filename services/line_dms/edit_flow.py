@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 from services.line_dms import cards, store
 from services.line_dms._out import _CHANNEL, _reply, _thr
 

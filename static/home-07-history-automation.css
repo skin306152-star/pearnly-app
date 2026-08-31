@@ -333,7 +333,6 @@
 .auto-pillar-icon.erp    { background: var(--bg); color: var(--ink-2); }
 .auto-pillar-icon.email  { background: var(--c-faeeda); color: var(--c-854f0b); }
 .auto-pillar-icon.folder { background: var(--c-e1f5ee); color: var(--c-0f6e56); }
-.auto-pillar-icon.alert  { background: var(--c-fbeaf0); color: var(--c-72243e); }
 
 .auto-pillar-head-text {
     flex: 1;

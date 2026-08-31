@@ -1,18 +1,17 @@
 """End-to-end: the OCR exception hook through the unified engine path.
 
 Drives the real _async_run_exception_checks (not the bridge in isolation),
-faking only the database and the LINE notify helper. The engine is the only rule
+faking only the database. The engine is the only rule
 source now (no flag, no legacy path), so the invariants are: engine findings
 land in the existing exception store, confidence_low still fires alongside them,
-and a high-severity finding still triggers the exception_high LINE reminder. No
-database, no network.
+No database or network is used.
 
 The engine ships switched off (exception review was retired 2026-07-26), so the
 behavioural cases force it on and one case pins the shipped-off state as inert.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 from services.exceptions import exception_checks as ec
 from services.exceptions import knowledge_bridge as kb
@@ -36,12 +35,10 @@ class _Recorder:
 
 def _run_hook(*, confidence, fields, total_amount, duplicate=None, engine_on=True):
     rec = _Recorder()
-    notify_high = AsyncMock()
     with (
         patch.object(ec, "_engine_enabled", lambda: engine_on),
         patch.object(ec.db, "insert_exception", rec.insert_exception),
         patch.object(ec.db, "is_exception_whitelisted", lambda *a, **k: False),
-        patch.object(ec, "_notify_exception_high", notify_high),
         patch.object(kb, "_load_ruleset", lambda *a, **k: ClientRuleSet()),
         patch.object(kb, "_resolve_workspace_client_id", lambda *a, **k: None),
         patch.object(
@@ -63,11 +60,11 @@ def _run_hook(*, confidence, fields, total_amount, duplicate=None, engine_on=Tru
                 fields=fields,
             )
         )
-    return rec, notify_high
+    return rec
 
 
 def test_engine_findings_coexist_with_confidence_low():
-    rec, _ = _run_hook(
+    rec = _run_hook(
         confidence="low",
         fields={"seller_tax": _VALID_SELLER, "subtotal": "1000", "vat": "70"},
         total_amount=2000.0,  # != net + vat -> R-VAT-02
@@ -78,27 +75,25 @@ def test_engine_findings_coexist_with_confidence_low():
     assert "math_mismatch" not in codes  # the retired legacy rule code is gone
 
 
-def test_high_finding_triggers_line_reminder():
-    _, notify_high = _run_hook(
+def test_high_finding_is_persisted():
+    rec = _run_hook(
         confidence="high",  # silence confidence_low to isolate the engine finding
         fields={"seller_tax": _VALID_SELLER, "subtotal": "1000", "vat": "70"},
         total_amount=2000.0,
     )
-    fired = [call.kwargs.get("rule_code") for call in notify_high.call_args_list]
-    assert "R-VAT-02" in fired
+    assert "R-VAT-02" in rec.rule_codes()
 
 
 def test_engine_off_is_inert():
     """异常栏 2026-07-26 下线态(EXCEPTIONS_ENGINE 未开):整条钩子早退 ——
-    连 confidence_low 都不写,更不推 LINE。这是当前线上默认。"""
-    rec, notify_high = _run_hook(
+    连 confidence_low 都不写。这是当前线上默认。"""
+    rec = _run_hook(
         confidence="low",
         fields={"seller_tax": _VALID_SELLER, "subtotal": "1000", "vat": "70"},
         total_amount=2000.0,
         engine_on=False,
     )
     assert rec.inserted == []
-    assert notify_high.call_args_list == []
 
 
 def test_engine_enabled_reads_env():
@@ -110,7 +105,7 @@ def test_engine_enabled_reads_env():
 
 
 def test_clean_invoice_writes_nothing():
-    rec, _ = _run_hook(
+    rec = _run_hook(
         confidence="high",
         fields={"seller_tax": _VALID_SELLER, "subtotal": "1000", "vat": "70"},
         total_amount=1070.0,

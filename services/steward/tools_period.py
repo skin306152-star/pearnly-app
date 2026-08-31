@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 from services.workorder import push_coverage

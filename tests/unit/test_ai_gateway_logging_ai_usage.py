@@ -19,7 +19,7 @@ from services.observability import log_context
 def _result(**overrides):
     kw = dict(
         ok=True,
-        task="line_text_understand",
+        task="text_understand",
         schema_version="1",
         data={"x": 1},
         provider="fake",
@@ -43,7 +43,7 @@ class RecordUsageWiringTests(unittest.TestCase):
         self.assertEqual(kw["tenant_id"], "T1")
         self.assertEqual(kw["user_id"], "U1")
         self.assertEqual(kw["trace_id"], "TR1")
-        self.assertEqual(kw["task"], "line_text_understand")
+        self.assertEqual(kw["task"], "text_understand")
         self.assertEqual(kw["model"], "fake-model")
         self.assertEqual(kw["provider"], "fake")
         self.assertEqual(kw["cost_thb"], 0.5)

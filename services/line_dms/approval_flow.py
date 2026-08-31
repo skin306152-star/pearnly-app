@@ -21,7 +21,7 @@ from core import db
 from services.dms_roster import store as roster_store
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 from services.line_dms import _out, approval_cards, approval_store, cards, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 

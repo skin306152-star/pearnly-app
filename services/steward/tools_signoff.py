@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 

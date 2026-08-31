@@ -1,7 +1,7 @@
 /*
  * Pearnly AI · ai-review-bulk.js · 客户页审核队列「全部按建议处理」批量确认状态机(J-C)
  *
- * 拆出独立于 ai-review.js 主状态(单文件<500 铁律,同 ai-review-pool.js 先例):按
+ * 拆出独立于 ai-review.js 主状态(单文件<500 铁律):按
  * flag_reason 分组算出可批量组(复用 AI.reviewVerdict.groupCanBulk/bulkDecisionTemplate,
  * 与收件箱 ai-review-inbox-flagged.js::runGroupBatch 同一份判定单一事实源,不重造),持有
  * busy/错误态,真正落库调用既有 POST .../decisions:batch 端点(AI.api.batchDecisions,与
@@ -38,7 +38,7 @@
 
         // 站内确认框通过才发请求;取消 = 零请求,状态不变。
         // onSettle 在 busy 置位后立即调一次(渲染 busy 态),网络落地再调一次(渲染终态),
-        // 同 ai-review-pool.js::stage 的回调节奏。
+        // 与其余异步裁决回调保持同一节奏。
         function requestConfirm(group) {
             if (st.busyFlag) return;
             st.confirmGroup = group;

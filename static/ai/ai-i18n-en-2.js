@@ -274,7 +274,6 @@ Object.assign(window.__AI_I18N_EN__, {
     riq_refresh_btn: 'Refresh',
     riq_sec_workorders: 'Pending orders',
     riq_sec_flagged: 'Flagged items',
-    riq_sec_clientpool: 'Client answers',
     riq_wo_due: 'Due {date}',
     riq_wo_due_none: 'No obligation due date',
     riq_signoff_btn: 'Approve review',

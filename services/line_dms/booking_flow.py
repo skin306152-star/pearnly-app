@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.session_lock import mrerp_booking_lock
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 from services.line_dms import _out, cards, masters_cache, qa_cards, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _send, _thr
 

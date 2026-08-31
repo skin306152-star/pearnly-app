@@ -1,7 +1,7 @@
 /*
  * Pearnly AI · ai-review-inbox-signoff.js · 工单卡签批闭环状态机(MC1-b2)
  *
- * 拆出独立于 ai-review-inbox.js 主状态(单文件<500 铁律,同 ai-review-pool.js 拆自
+ * 拆出独立于 ai-review-inbox.js 主状态(单文件<500 铁律,
  * ai-review.js 的先例):按 work_order_id 持有签批/冻结/驳回/自审声明/回执五个动作的
  * 忙态与结果,与「异常票据」裁决态平行独立、互不干扰。
  *

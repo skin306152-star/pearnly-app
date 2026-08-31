@@ -78,14 +78,14 @@ class AutoOpenTestBase(unittest.TestCase):
         self.addCleanup(
             self._restore, "pearnly_ai_m1_enabled_for", auto_open.pearnly_ai_m1_enabled_for
         )
-        self.addCleanup(self._restore, "notification_store", auto_open.notification_store)
+        self.addCleanup(self._restore, "_bangkok_today", auto_open._bangkok_today)
         self.addCleanup(self._restore, "platform_settings_store", auto_open.platform_settings_store)
         self.opened_calls = []
         self.appended_events = []
         auto_open.api = mock.Mock(open_order=self._fake_open_order)
         auto_open.store = mock.Mock(append_event=self._fake_append_event)
         auto_open.pearnly_ai_m1_enabled_for = lambda tenant_id, user_id: True
-        auto_open.notification_store = mock.Mock(bangkok_today=lambda: date(2026, 7, 14))
+        auto_open._bangkok_today = lambda: date(2026, 7, 14)
         auto_open.platform_settings_store = _FakeSettingsStore()
 
     def _restore(self, name, value):
@@ -176,7 +176,7 @@ class DayBoundaryDedupeTests(AutoOpenTestBase):
         asyncio.run(auto_open.run_tick())
         self.assertEqual(len(self.opened_calls), 1)
 
-        auto_open.notification_store = mock.Mock(bangkok_today=lambda: date(2026, 7, 15))
+        auto_open._bangkok_today = lambda: date(2026, 7, 15)
         auto_open.db = _FakeDB(rows=[{"tenant_id": "t-2", "workspace_client_id": 2}])
         asyncio.run(auto_open.run_tick())
         self.assertEqual(len(self.opened_calls), 2)

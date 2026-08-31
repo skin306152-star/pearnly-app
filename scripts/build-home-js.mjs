@@ -189,10 +189,8 @@ const BUNDLES = [
             'ai/ai-review-suggest-render.js',
             'ai/ai-review-fold-render.js',
             'ai/ai-review-render.js',
-            'ai/ai-review-pool.js',
             // ai-review-bulk.js(J-C ·「全部按建议处理」批量确认状态机,依赖 AI.reviewQueue/
-            // reviewVerdict/api,均已在上面)只需排在 ai-review.js(挂 S.bulkHandle)之前,
-            // 同 ai-review-pool.js 先例。
+            // reviewVerdict/api,均已在上面)只需排在 ai-review.js(挂 S.bulkHandle)之前。
             'ai/ai-review-bulk.js',
             'ai/ai-review.js',
             'ai/ai-intake-render.js',
@@ -249,10 +247,6 @@ const BUNDLES = [
             'ai/ai-supplier-profiles-render.js',
             'ai/ai-profile.js',
             'ai/ai-profile-panels-actions.js',
-            'ai/ai-client-pool-render.js',
-            // ai-client-pool.js 现更名导出 AI.clientPool(MC1-b2·「客户待答」降级为审核
-            // 收件箱聚合页的第三分区,不再独占 #/pool——见该文件顶注)。
-            'ai/ai-client-pool.js',
             // ai-review-progress.js(MC2-A3 · 裁决后进度轮询状态机纯函数,零依赖)排在
             // ai-review-inbox.js(用它排期轮询)之前即可。
             'ai/ai-review-progress.js',
@@ -263,7 +257,7 @@ const BUNDLES = [
             // -render.js(纯 HTML,依赖 AI.state/format/reviewQueue/reviewVerdict 均已在上面)、
             // -signoff.js(工单卡签批闭环状态机,依赖 AI.api)、-flagged.js(异常票据分组+
             // 批量/逐张裁决状态机,依赖 AI.reviewQueue/reviewVerdict/api)三者互不依赖,
-            // 只需都排在 -inbox.js(编排,依赖前三者 + AI.clientPool,后者已在上面)之前。
+            // 只需都排在 -inbox.js(编排,依赖前三者)之前。
             'ai/ai-review-inbox-item-render.js',
             'ai/ai-review-inbox-render.js',
             'ai/ai-review-inbox-signoff.js',
@@ -271,7 +265,7 @@ const BUNDLES = [
             'ai/ai-review-inbox.js',
             // ai-vatcheck-render.js(N1 · 销项税报告三查纯逻辑+HTML,依赖 AI.state/format)
             // 排在 ai-vatcheck.js(上传/运行/挂载编排)之前,两者都在 ai.js(onRoute 用
-            // AI.vatcheck.mount)之前——同 ai-client-pool 先例(顶层独立视图,不挂客户页下)。
+            // AI.vatcheck.mount)之前(顶层独立视图,不挂客户页下)。
             'ai/ai-vatcheck-render.js',
             'ai/ai-vatcheck.js',
             // ai-fileconv-render.js(K1b · 财务文件转换纯逻辑+HTML,依赖 AI.state/format)

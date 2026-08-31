@@ -7,7 +7,7 @@ OCR 全部经网关(run_task + transport 4 形态)的调用都汇到 log_call,�
 与 ocr_cost_log(services/cost/store.py)口径不同、有重叠(OCR 走 multimodal_to_json 也经
 本表)—— 两表统计口径不一致,不可直接相加,取数见 routes/admin_cost_routes.py 对应端点。
 
-建表 = 懒加载一次性 ensure(照 services/line_binding/line_anchor_store.py 先例 · prod 无
+建表 = 懒加载一次性 ensure（prod 无
 alembic 自动迁移钩子 · alembic/versions/0060_ai_usage.py 只留档)。写入全量 try/except 吞
 异常 —— log_call 是每次网关调用的收尾,这里抛出会连坐已经跑完的 AI 调用主路径。
 

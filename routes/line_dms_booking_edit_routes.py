@@ -16,12 +16,16 @@ from pydantic import BaseModel, Field
 from core import db
 from core.auth import create_access_token
 from core.pos_api import PosError, ok
-from routes.line_liff_routes import LiffAuthIn, _verify_id_token
+from services.line_platform.liff import verify_id_token
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["line-dms-booking-edit"])
 _ROOT = Path(__file__).resolve().parent.parent
+
+
+class LiffAuthIn(BaseModel):
+    id_token: str = ""
 
 
 class DmsBookingSaveIn(BaseModel):
@@ -51,7 +55,7 @@ async def dms_booking_liff_auth(req: LiffAuthIn):
     """Exchange a DMS-channel LIFF identity for a DMS-scoped session."""
     from services.line_dms import store
 
-    claims = await asyncio.to_thread(_verify_id_token, req.id_token, "LINE_DMS_LIFF_ID")
+    claims = await asyncio.to_thread(verify_id_token, req.id_token, "LINE_DMS_LIFF_ID")
     binding = await asyncio.to_thread(store.get_binding_by_line_user, (claims or {}).get("sub"))
     if not binding:
         raise PosError("dms_booking.not_bound", 403, detail="line_not_bound")

@@ -28,12 +28,10 @@ class RunTaskTests(unittest.TestCase):
                 ok=True, data={"intent": "record"}, model="m", input_tokens=10, output_tokens=4
             )
         )
-        res = router.run_task(
-            "line_text_understand", prompt="p", text="t", api_key="k", provider=fp
-        )
+        res = router.run_task("text_understand", prompt="p", text="t", api_key="k", provider=fp)
         self.assertTrue(res.ok)
         self.assertEqual(res.data, {"intent": "record"})
-        self.assertEqual(res.task, "line_text_understand")
+        self.assertEqual(res.task, "text_understand")
         self.assertEqual(res.schema_version, "1")
         self.assertEqual(res.provider, "fake")
         self.assertGreaterEqual(res.latency_ms, 0)
@@ -56,9 +54,7 @@ class RunTaskTests(unittest.TestCase):
     def test_error_kind_passthrough(self):
         for kind in T.ERROR_KINDS:
             fp = FakeProvider(T.ProviderOutcome(ok=False, error_kind=kind))
-            res = router.run_task(
-                "line_text_understand", prompt="p", text="t", api_key="k", provider=fp
-            )
+            res = router.run_task("text_understand", prompt="p", text="t", api_key="k", provider=fp)
             self.assertFalse(res.ok)
             self.assertEqual(res.error_kind, kind)
             self.assertIsNone(res.data)
@@ -117,7 +113,7 @@ class LoggingPrivacyTests(unittest.TestCase):
         fp = FakeProvider(T.ProviderOutcome(ok=True, data={"x": 1}, model="m", input_tokens=3))
         with self.assertLogs("ai_gateway", level="INFO") as cm:
             router.run_task(
-                "line_text_understand",
+                "text_understand",
                 prompt=secret_prompt,
                 text=secret_text,
                 api_key="SECRET_KEY_99",
@@ -129,7 +125,7 @@ class LoggingPrivacyTests(unittest.TestCase):
         self.assertNotIn("SECRET_PROMPT_SYS", blob)
         self.assertNotIn("SECRET_KEY_99", blob)
         self.assertIn("payload_hash=", blob)
-        self.assertIn("task=line_text_understand", blob)
+        self.assertIn("task=text_understand", blob)
 
 
 class CostingTests(unittest.TestCase):

@@ -55,7 +55,7 @@ class DedupTests(unittest.TestCase):
             b'{"webhookEventId":"E9","type":"follow","source":{"userId":"L1"},"replyToken":"rt2"}'
             b"]}"
         )
-        dd = w.line_webhook_runner.line_webhook_dedup
+        dd = w.line_webhook_runner.webhook_dedup
         with mock.patch.dict(os.environ, {"LINE_DMS_CHANNEL_SECRET": "dms-sec"}, clear=False):
             with (
                 mock.patch.object(
@@ -83,7 +83,7 @@ class DedupTests(unittest.TestCase):
             b'{"events":[{"webhookEventId":"E7","type":"message","source":{"userId":"L1"},'
             b'"replyToken":"rt","message":{"type":"text","text":"hi"}}]}'
         )
-        dd = w.line_webhook_runner.line_webhook_dedup
+        dd = w.line_webhook_runner.webhook_dedup
         with mock.patch.dict(os.environ, {"LINE_DMS_CHANNEL_SECRET": "dms-sec"}, clear=False):
             with (
                 mock.patch.object(dd, "claim", return_value=dd.CLAIM_FRESH),

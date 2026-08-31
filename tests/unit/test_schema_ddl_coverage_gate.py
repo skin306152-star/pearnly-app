@@ -35,6 +35,21 @@ class SnapshotIsTheFactSourceTests(unittest.TestCase):
         # 要么是有人拿名单糊闸,两种都得在 review 里被看见。
         self.assertEqual(gate.KNOWN_UNCOVERED, {})
 
+    def test_retired_tables_are_only_the_disconnected_cowork_line_set(self):
+        self.assertEqual(
+            gate.RETIRED_TABLES_PENDING_DROP,
+            {
+                "line_client_bind_codes",
+                "line_client_contacts",
+                "line_client_questions",
+                "line_ocr_jobs",
+                "line_pending_actions",
+                "line_pending_entry",
+                "notification_logs",
+                "notification_rules",
+            },
+        )
+
 
 class ScanScopeTests(unittest.TestCase):
     """扫描范围是这个闸的立身之本:tests/ 里的手抄桩、docs/ 里的快照都不算覆盖
@@ -83,7 +98,8 @@ class PoisonedInputTests(unittest.TestCase):
         # 扫描面又漏了 alembic/sql),闸必须把每一张表逐个点名,而不是安静地绿。
         prod = gate.snapshot_tables(gate.SNAPSHOT.read_text(encoding="utf-8"))
         problems = gate.evaluate(prod, set(), set())
-        self.assertEqual(len(problems), len(prod) - 1)  # alembic_version 不算
+        expected = len(prod - {"alembic_version"} - gate.RETIRED_TABLES_PENDING_DROP)
+        self.assertEqual(len(problems), expected)
         self.assertTrue(any("表 users " in p for p in problems), problems[:3])
 
 

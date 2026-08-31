@@ -31,8 +31,8 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from services.agent import reply_guard
-from services.agent.contracts import ToolResult
+from services.steward import reply_guard
+from services.steward.contracts import ToolResult
 from services.steward import tool_scope
 from services.steward.registry import ToolContext
 

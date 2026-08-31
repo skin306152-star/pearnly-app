@@ -176,8 +176,8 @@ def _printed_total_rounding(fields: dict, lines: list) -> Decimal:
 
 
 def _ocr_payment_method(fields: dict) -> Optional[str]:
-    """OCR 票面付款方式 → 规范码落库(认不出留原文·与卡片 line_ingest 同口径 payment_from_ocr)。无 → None。"""
-    from services.expense.line_classify import payment_from_ocr
+    """OCR 票面付款方式 → 规范码落库；认不出时保留原文。"""
+    from services.purchase.payment_method import payment_from_ocr
 
     return payment_from_ocr(fields.get("payment_method")) or None
 

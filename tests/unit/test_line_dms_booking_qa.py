@@ -15,7 +15,7 @@ from unittest import mock
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-line-dms-qa-32bytes-long")
 
 from services.erp import erp_dms_push  # noqa: E402
-from services.line_binding import line_client  # noqa: E402
+from services.line_platform import client as line_client  # noqa: E402
 from services.line_dms import booking_qa as qa  # noqa: E402
 from services.line_dms import masters_cache  # noqa: E402
 from services.line_dms import qa_cards  # noqa: E402

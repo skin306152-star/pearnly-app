@@ -22,7 +22,7 @@ from urllib.parse import parse_qs
 from core import db
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 from services.line_dms import (
     _out,
     approval_flow,

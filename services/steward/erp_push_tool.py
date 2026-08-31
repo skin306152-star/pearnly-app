@@ -37,7 +37,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.erp.bridge import BridgeError, BridgeUnavailable
 from services.steward import erp_push_trail as trail, tool_scope
 from services.steward.registry import ToolContext

@@ -12,9 +12,9 @@ from fastapi import HTTPException
 from core import db
 from core.feature_flags import erp_line_enabled_for
 from services.intake_bridge import convert as convert_svc
-from services.line_binding import line_client
 from services.line_erp import cards, flow, intake, preview, store
 from services.line_erp.out import make_spawn
+from services.line_platform import client as line_client
 from services.ocr.recognize.core import run_recognition_core
 
 CHANNEL = "erp"

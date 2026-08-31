@@ -19,7 +19,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.excel.erp_money import VAT_RATE, quantize_money, to_money, vat_of
 from services.purchase.totals import vat_from_inclusive
 from services.steward.registry import ToolContext

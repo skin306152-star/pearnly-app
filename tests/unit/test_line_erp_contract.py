@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import line_erp_routes as routes
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 from services.line_erp import cards, flow, preview, store, webhook
 
 
@@ -19,7 +19,7 @@ def _sig(body: bytes, secret: str) -> str:
 
 
 class ErpChannelTests(unittest.TestCase):
-    def test_default_dms_erp_profiles_are_separate(self):
+    def test_cowork_dms_erp_profiles_are_separate(self):
         body = b'{"events":[]}'
         with mock.patch.dict(
             os.environ,
@@ -34,9 +34,7 @@ class ErpChannelTests(unittest.TestCase):
             self.assertFalse(line_client.verify_signature(body, _sig(body, "old"), channel="erp"))
             self.assertFalse(line_client.verify_signature(body, _sig(body, "dms"), channel="erp"))
 
-            self.assertTrue(
-                line_client.verify_signature(body, _sig(body, "old"), channel="default")
-            )
+            self.assertTrue(line_client.verify_signature(body, _sig(body, "old"), channel="cowork"))
             self.assertTrue(line_client.verify_signature(body, _sig(body, "dms"), channel="dms"))
 
     def test_unknown_channel_fails_closed(self):

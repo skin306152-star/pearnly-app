@@ -5,7 +5,7 @@
 拒;planner 解析时枚举外一律归 out_of_scope)。加一个能力 = 加一个 StewardTool + tools.py
 里一个薄封装函数,提示词自动跟着变(catalog() 从本表现生成)。
 
-参数槽复用 services.agent.contracts.SlotSpec —— 接地闸 services/agent/slots.py 逐字节复用
+参数槽复用 services.steward.contracts.SlotSpec,由 services/steward/slots.py 接地。
 (source=user_text 的值必须出现在用户原话里,编造值进 rejected 绝不流到执行)。为什么不直接
 用 manifest.ToolSpec:它的 bucket/confirm/writes/gate 是 LINE 写工具的语义(M1 全只读用不上),
 desc_th 字段名钉死泰文而管家提示词走中文(同 front_desk.interpret 先例,同一个 /ai 面、同一
@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from services.agent.contracts import SlotSpec as SlotSpec  # 再导出:调用方一律 registry.SlotSpec
+from services.steward.contracts import SlotSpec as SlotSpec  # 再导出:调用方一律 registry.SlotSpec
 from services.steward.registry_catalog import (
     ATTACHMENT_TOOLS as ATTACHMENT_TOOLS,
     BANK_RECON_STATUS as BANK_RECON_STATUS,

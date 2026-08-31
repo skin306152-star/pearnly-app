@@ -173,7 +173,6 @@ async function boot(page, { lang = 'zh', hash = '#/' } = {}) {
                 counts: { clients: 0, orders: 0, flagged: 0 },
             });
         }
-        if (p === '/api/ai/client-pool') return fulfillJson(route, { groups: [] });
         return fulfillJson(route, {});
     });
     await page.clock.setFixedTime(new Date(TODAY_FIXED));

@@ -1,6 +1,6 @@
-/* Pearnly AI · ai-review-inbox.css · 全所审核收件箱(MC1-b2)三分区聚合页
- * 吃 ai-theme 令牌 + ai-shell.css 的 .panel/.chip/.btn/.kbd/.toast(ai-client.css)+
- * ai-client-pool.css 的 .cp-section 间距惯例,只补三分区专属结构。 */
+/* Pearnly AI · ai-review-inbox.css · 全所审核收件箱(MC1-b2)双分区聚合页
+ * 吃 ai-theme 令牌 + ai-shell.css 的 .panel/.chip/.btn/.kbd/.toast(ai-client.css),
+ * 只补审核收件箱专属结构。 */
 
 .riq-sec {
   margin-bottom: 22px;

@@ -3,7 +3,7 @@
 
 上半段(validateFile/chipClassForStatus/errKeyFor/previewCounts/resultCounts)零依赖,
 直接 require 断言;下半段(previewTableHtml/resultCardHtml)依赖 at()/AI.state.esc,
-node 里 stub global.at + global.AI(同 test_ai_client_pool_pure.py::
+node 里 stub global.at + global.AI(沿用前端纯函数测试惯例:
 ReviewPoolStateMachineTests 的 global.window=global 先例),断言真出 HTML 字符串
 (逐行 chip/reason/counts 都看得见,不是只测数据结构)。
 """
@@ -99,7 +99,7 @@ class CountsTests(unittest.TestCase):
 
 def _at_stub():
     # 非恒等变换(模拟真有翻译):at(key,{n})=key+':'+n(能在断言里看到值被插值),同
-    # test_ai_client_pool_pure.py 的 '[' + key + ']' 先例(证明真调用了 at,不是原样漏字符串)。
+    # 用 '[' + key + ']' 证明真调用了 at,不是原样漏字符串。
     return """
         global.window = global;
         global.at = function (key, vars) {

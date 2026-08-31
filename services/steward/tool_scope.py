@@ -31,7 +31,7 @@ from typing import Any, Optional
 
 from fastapi import HTTPException
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import attachments, store
 from services.steward.registry import ToolContext
 

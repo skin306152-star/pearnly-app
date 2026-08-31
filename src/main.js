@@ -27,7 +27,7 @@ import './home/page-reconcile.js'; // REFACTOR-WB-C3 · 对账中心骨架运行
 import './home/page-integrations.js'; // REFACTOR-WB-C3 · 集成页骨架运行期注入(home.html section 抽出 · 早于 erp-integration 等模块)
 import './home/page-push-logs.js'; // 推送日志独立页骨架注入(2026-07-01 · 从集成页 Tab2 抽出 · 早于 erp-integration 绑定)
 import './home/page-settings.js'; // REFACTOR-WB-C3 · 设置页骨架运行期注入(home.html section 抽出 · 须早于 recon-subtab-settings DOM-move 及所有 settings 模块)
-import './home/page-automation.js'; // REFACTOR-WB-C3 · 自动化页骨架运行期注入(home.html section 抽出 · 须早于 notifications/folder-watcher/email-ingest/bank-recon 等 panel 模块 + openIntegrationDrawer DOM-move)
+import './home/page-automation.js'; // 自动化页骨架 · 须早于 folder-watcher/email-ingest/bank-recon 与 integration drawer DOM-move
 import './home/page-placeholders.js'; // REFACTOR-WB-C3 · 静态占位页(coming-soon)骨架运行期注入(templates/api-keys/vouchers/cloud)
 import './home/page-dashboard.js'; // REFACTOR-WB-C3 · 首页 section 骨架运行期注入(home.html 空壳 · 须在 dashboard.js 前)
 import './home/toast.js'; // REFACTOR-C1-home-batch6 · Toast/提示条/错误人话化(从 home.js 抽出 · window 桥 showToast/showAlert/hideAlerts/humanizeError/_humanizeBackendError · 被 ~38 模块裸调)
@@ -52,8 +52,6 @@ import './home/billing-export-modal.js'; // 导出区间选择弹窗(window._pic
 import './home/billing.js';
 import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(取代旧 ClientSwitcher)
 import './home/access-log.js'; // REFACTOR-C1 · 客户访问日志 tab(自绑 · owner only)
-import './home/modal-notif-new.js'; // REFACTOR-WB-C3 · 智能提醒新建规则弹窗 inner 注入(home.html 空壳 · 须在 notifications.js 前 · _bindOnce eval 期绑)
-import './home/notifications.js'; // REFACTOR-C1 · 智能提醒(_loadNotificationsPanel)
 import './home/welcome-wizard.js'; // REFACTOR-C1 · 登录后欢迎向导(自绑 · 暂下架)
 import './home/modal-archive-rule.js'; // REFACTOR-WB-C3 · 归档命名规则弹窗 inner 注入(home.html 空壳 · archive-settings.js 文档委托 · 置其前稳妥)
 import './home/modal-archive-token.js'; // REFACTOR-WB-C3 · 归档字段编辑弹窗 inner 注入(archive-settings.js 文档委托 · 置其前稳妥)
@@ -126,7 +124,6 @@ import './home/purchase-suppliers.js'; // 屏4 供应商管理(window.loadPurcha
 import './home/purchase-settings.js'; // 屏5 采购设置(window.loadPurchaseSettings · 默认VAT/进货入库/重复票拦/两级科目/账期/审批)
 import './home/purchase-export.js'; // 外流收拢面板(window.openPurchaseExport · Excel 免授权 / Drive 归档 / Sheet 同步 · 顶部内嵌 Google 连接卡 purchase-export-google.ts)
 import './home/purchase-capture.js'; // 采集屏(window.loadPurchaseCapture · 记一笔采购 · 桌面上传/手工 · 手机拍照/相册/文件/手工 · 智能入口分流)
-import './home/purchase-liff.js'; // Phase 3 LIFF 复核屏入口(/home?liff=purchase&doc= → 签 token → 开 purchase-form · 真验留用户配 LIFF ID)
 // 自动做账 Phase 2 · 屏1 主屏(路由 vouchers)/ 屏2 逐笔审 / 屏3 科目表 / 屏5 设置 / 屏4 出账本(docs/accounting)
 import './home/acct-list.js'; // 屏1 主屏(window.loadAcctList · 北极星+待审行动卡+凭证列表行内展开借贷)
 import './home/acct-review.js'; // 屏2 逐笔审(window.loadAcctReview · 队列逐笔 · 确认/改科目/跳过 · 记忆)
@@ -167,6 +164,6 @@ import './home/automation.js'; // REFACTOR-WB-C1 · 自动化子 tab 切换(wind
 
 if (typeof console !== 'undefined' && typeof console.info === 'function') {
     console.info(
-        '[pearnly] vite bundle loaded · dashboard + billing + workspace-switcher + recon-center + assign-clients + access-log + notifications + recon-batch + welcome-wizard + archive-settings'
+        '[pearnly] vite bundle loaded · dashboard + billing + workspace-switcher + recon-center + assign-clients + access-log + recon-batch + welcome-wizard + archive-settings'
     );
 }

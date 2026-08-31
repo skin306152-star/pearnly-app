@@ -156,10 +156,6 @@ async def run_recovery_tick():
     except Exception as e:
         logger.warning(f"[acct_recovery] tick failed: {e}")
     try:
-        await run_line_ocr_job_tick()
-    except Exception as e:
-        logger.warning(f"[line_ocr_jobs] tick failed: {e}")
-    try:
         from services.workorder import auto_open
 
         await auto_open.run_tick()
@@ -191,12 +187,6 @@ async def run_accounting_posting_failure_tick():
     from services.accounting import posting_failures
 
     await _asyncio.to_thread(posting_failures.retry_due, limit=10)
-
-
-async def run_line_ocr_job_tick():
-    from services.ocr import line_ocr_jobs
-
-    await line_ocr_jobs.process_due(limit=3)
 
 
 async def run_steward_attachment_tick():

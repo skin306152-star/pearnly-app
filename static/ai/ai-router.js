@@ -51,8 +51,7 @@
         var h = split.path;
         if (h === '' || h === '/') return { name: 'dashboard', sub: DEFAULT_SUB };
         if (h === '/board') return { name: 'dashboard', sub: 'board' };
-        // 「待我处理」(D2-S8 客户池·跨客户会计队列):独立顶层路由,不挂在某个客户的
-        // 四视图之下(client-pool 是按客户分组的会计工作队列,不是单客户 tab)。
+        // 「待我处理」审核收件箱:独立顶层路由,不挂在某个客户的五视图之下。
         if (h === '/pool') return { name: 'pool' };
         // 总台(FD-0d · 目标驱动前门):对话式投料+说目标,独立顶层路由。闸
         // (pearnly_ai_front_desk)关时 ai.js 的 onRoute 把这个路由名当未知路由处理

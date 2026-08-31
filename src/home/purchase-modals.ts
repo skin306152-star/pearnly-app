@@ -1,4 +1,4 @@
-// 商户采购 · 屏7 记付款 / 屏8 商品匹配 / 屏9 供应商选择器 / 屏3 LINE 一句话记费用(说明)。
+// 商户采购 · 屏7 记付款 / 屏8 商品匹配 / 屏9 供应商选择器。
 // 照搬设计稿 07/08/09/03。桌面居中 .modal / 手机底部抽屉(媒体查询)。挂 home.html 四个 mask 空壳。
 /* global t, escapeHtml, showToast */
 import {
@@ -330,36 +330,4 @@ window.openPurchaseSupplierPicker = function (onPick) {
         .catch(() => {
             listEl.innerHTML = `<div class="state" style="padding:18px;color:var(--ink3);">${escapeHtml(t('pur-error'))}</div>`;
         });
-};
-
-// ── 屏3 LINE 一句话记费用(说明 + 内嵌一句话)──────────────────────────
-window.openPurchaseLine = function () {
-    const inner = `<div class="purm w480"><div class="mh"><div class="t">${escapeHtml(t('pur-line-title'))}</div><div class="x" data-close>×</div></div>
-        <div class="mb">
-            <div class="step"><span class="n">1</span><div class="tx"><b>${escapeHtml(t('pur-line-s1-b'))}</b>:${escapeHtml(t('pur-line-s1'))}</div></div>
-            <div class="step"><span class="n">2</span><div class="tx"><b>${escapeHtml(t('pur-line-s2-b'))}</b>:${escapeHtml(t('pur-line-s2'))}</div></div>
-            <div class="step"><span class="n">3</span><div class="tx"><b>${escapeHtml(t('pur-line-s3-b'))}</b>:${escapeHtml(t('pur-line-s3'))}</div></div>
-            <div class="field" style="margin-top:6px;"><label>${escapeHtml(t('pur-line-try'))}</label><div class="inp" style="font-weight:400;"><input id="purm-ltext" placeholder="${escapeHtml(t('pur-line-ph'))}"></div></div>
-            <div class="note">${escapeHtml(t('pur-line-note'))}</div>
-        </div>
-        <div class="mf"><button class="btn" data-close>${escapeHtml(t('pur-close'))}</button><button class="btn primary" id="purm-lrec">${escapeHtml(t('pur-line-record'))}</button></div>
-    </div>`;
-    const mask = openMask('purchase-line-mask', inner);
-    if (!mask) return;
-    (mask.querySelector('#purm-lrec') as HTMLElement).onclick = async () => {
-        const text = (mask.querySelector('#purm-ltext') as HTMLInputElement).value.trim();
-        if (!text) {
-            closeMask('purchase-line-mask');
-            return;
-        }
-        try {
-            await papi('POST', '/api/purchase/expense', { text });
-            showToast(t('pur-line-recorded'), 'success');
-            closeMask('purchase-line-mask');
-            if (window.routeTo) window.routeTo('purchase');
-            window.loadPurchaseList?.();
-        } catch (e) {
-            showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
-        }
-    };
 };

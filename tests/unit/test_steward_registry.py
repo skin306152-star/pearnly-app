@@ -13,7 +13,7 @@ import unittest
 from datetime import date, datetime, timedelta, timezone
 from unittest import mock
 
-from services.agent.contracts import SlotSpec
+from services.steward.contracts import SlotSpec
 from services.steward import registry, registry_slots, tools
 
 _SLOT_SOURCES = {"user_text", "anchor", "endpoint_config", "prior_result", "model_freeform"}

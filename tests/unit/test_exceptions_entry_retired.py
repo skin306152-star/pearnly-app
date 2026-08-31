@@ -77,7 +77,7 @@ class FrontendEntryCutTests(unittest.TestCase):
 
 
 class BackendEngineOffTests(unittest.TestCase):
-    """引擎默认不跑:不写 exceptions 表、不推 LINE 高危提醒。"""
+    """引擎默认不跑:不写 exceptions 表。"""
 
     def test_engine_disabled_without_env(self):
         from services.exceptions import exception_checks
@@ -100,7 +100,6 @@ class BackendEngineOffTests(unittest.TestCase):
         self.assertTrue("if not _engine_enabled():" in body, "钩子里的开关早退没了")
         guard_at = body.index("if not _engine_enabled():")
         self.assertLess(guard_at, body.index("db.insert_exception"), "早退晚于写异常表")
-        self.assertLess(guard_at, body.index("_notify_exception_high"), "早退晚于推 LINE")
 
 
 class NotCollateralDamageTests(unittest.TestCase):

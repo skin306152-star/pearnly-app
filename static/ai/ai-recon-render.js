@@ -1,10 +1,10 @@
 /*
  * Pearnly AI · ai-recon-render.js · 银行对账(E2)四清单的纯逻辑 + HTML 拼装
  *
- * 上半段(hasGap/diffState/buildMissingStagePayload)零 DOM/零 i18n 依赖,node
+ * 上半段(hasGap/diffState/listPhase)零 DOM/零 i18n 依赖,node
  * (tests/unit/test_ai_recon_pure.py)直接 require 断言;下半段 HTML 拼装依赖
  * at()/AI.state/AI.format/AI.viewer,只在浏览器根挂载——同 ai-pkg-render.js 的
- * 双段先例。真正的挂载/交互(折叠开关/查看器模态/推 LINE 待问网络调用)在
+ * 双段先例。真正的挂载/交互(折叠开关/查看器模态)在
  * ai-recon.js,排在本文件之后加载。
  *
  * 数据源:services/workorder/api.py::order_detail 的 bank_recon 字段,原样透传
@@ -30,20 +30,6 @@
         return { ok: ok, net: ok ? '0' : (r.diff || {}).net || '0' };
     }
 
-    // 缺票行(有流水无票)→ 推 LINE 待问的 payload。item_id 锚在银行流水件本身
-    // (缺票行没有对应的票据 item,问的就是"这张流水缺哪张票"——见 ai-recon.js/
-    // services/workorder/api.py::_bank_recon 顶注)。question_type 固定 freeform:
-    // 现有四型(direction/amount/drop)语义都对不上"帮我们找这张流水的收据"这句问话,
-    // note 由调用方(ai-recon.js)用 at() 拼好整句传入,本函数只负责打包,不夹带文案。
-    function buildMissingStagePayload(bankItemId, note) {
-        if (!bankItemId) return null;
-        return {
-            item_id: bankItemId,
-            question_type: 'freeform',
-            payload: { supplier: '', invno: '', amount: '', note: note || '' },
-        };
-    }
-
     // 某张清单为空时,到底是「没料可对」还是「对完了确实没有这一类」。四张单全空 = 对账
     // 引擎跑完但手上什么都没有(对账单没传/传了没解析出流水行),那是 idle,该指路去收料;
     // 只要有任意一张单有行,本单的空就是真结论,该说清为什么空。
@@ -63,7 +49,6 @@
     var pure = {
         hasGap: hasGap,
         diffState: diffState,
-        buildMissingStagePayload: buildMissingStagePayload,
         listPhase: listPhase,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
@@ -136,32 +121,10 @@
         return rowShell(txLineText(entry.tx), '<div class="brx-cands">' + cands + '</div>');
     }
 
-    // missingState: {busy, done, errKey} | undefined(按行 idx 独立持有,ai-recon.js 状态机)。
-    function missingRowHtml(entry, idx, missingState) {
-        missingState = missingState || {};
-        var action;
-        if (missingState.done) {
-            action = '<span class="chip s">' + esc(at('rv_pool_done')) + '</span>';
-        } else {
-            action =
-                '<button type="button" class="btn sm" data-action="brx-stage" data-idx="' +
-                idx +
-                '"' +
-                (missingState.busy ? ' disabled' : '') +
-                '>' +
-                esc(missingState.busy ? at('brx_pool_busy') : at('rv_key_pool')) +
-                '</button>';
-        }
-        var err = missingState.errKey
-            ? '<div class="brx-err">' + esc(at(missingState.errKey)) + '</div>'
-            : '';
+    function missingRowHtml(entry) {
         return rowShell(
             txLineText(entry),
-            '<div class="brx-actions">' +
-                viewBtn('bank', entry._bankItemId) +
-                action +
-                '</div>' +
-                err
+            '<div class="brx-actions">' + viewBtn('bank', entry._bankItemId) + '</div>'
         );
     }
 
@@ -237,7 +200,7 @@
         );
     }
 
-    // ui: {open:{auto,review,missing,unmatched}, missing:{idx:{busy,done,errKey}}}
+    // ui: {open:{auto,review,missing,unmatched}}
     function pageHtml(bankRecon, ui, clientId) {
         if (!bankRecon) {
             // 后端把「还没跑到对账」与「跑挂了降级」都收敛成 null(见 api.py::_bank_recon),
@@ -308,12 +271,8 @@
         var bankItemId = (bankRecon.bank_item_ids || [])[0] || null;
 
         var missingRows = missing
-            .map(function (entry, idx) {
-                return missingRowHtml(
-                    Object.assign({ _bankItemId: bankItemId }, entry),
-                    idx,
-                    (ui.missing || {})[idx]
-                );
+            .map(function (entry) {
+                return missingRowHtml(Object.assign({ _bankItemId: bankItemId }, entry));
             })
             .join('');
 
@@ -397,7 +356,6 @@
     root.AI.reconRender = {
         hasGap: hasGap,
         diffState: diffState,
-        buildMissingStagePayload: buildMissingStagePayload,
         pageHtml: pageHtml,
         viewModalHtml: viewModalHtml,
     };

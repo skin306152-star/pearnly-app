@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from services.agent.contracts import AgentAction, AgentContext
+from services.steward.contracts import AgentAction, AgentContext
 from services.steward import attach_turn, attachments, budget, copy, planner, registry, store
 from services.steward.registry import ToolContext
 
@@ -288,7 +288,7 @@ def _ground(
     ctx: ToolContext, tool: str, raw_args: dict, *, text: str, history: list
 ) -> tuple[dict, Optional[str]]:
     """参数接地。返回 (可信参数, 需要追问的字段名)。追问字段非空时参数不可用。"""
-    from services.agent import slots
+    from services.steward import slots
 
     spec = registry.get(tool)
     action = AgentAction(kind="tool", tool=tool, args=dict(raw_args or {}))

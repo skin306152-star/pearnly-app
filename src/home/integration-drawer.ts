@@ -132,7 +132,6 @@ import { mountCoworkLineIdentity } from './cowork-line/identity-panel.js';
         var _panelIds = {
             folder: 'folder',
             email: 'email',
-            alert: 'alert',
             erp: 'erp',
             bank: 'bank',
         };
@@ -159,7 +158,6 @@ import { mountCoworkLineIdentity } from './cowork-line/identity-panel.js';
         var loaders = {
             folder: window._loadFolderWatcherPanel,
             email: window._loadEmailIngestPanel,
-            alert: window._loadNotificationsPanel,
             bank: window._loadBankReconPanel,
         };
         if (loaders[tab as keyof typeof loaders]) {

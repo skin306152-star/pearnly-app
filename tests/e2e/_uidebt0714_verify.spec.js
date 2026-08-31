@@ -175,7 +175,6 @@ test.describe('清单 #2 · 卡住提示条读未决数(不再照总数矛盾于
                     path: '/api/workorder/review-queue',
                     body: queueFixture([group('amount_math_fail', 'crit', 4, 4, 0)]),
                 },
-                { method: 'GET', path: '/api/ai/client-pool', body: { groups: [] } },
             ],
             '#/pool'
         );
@@ -195,7 +194,6 @@ test.describe('清单 #2 · 卡住提示条读未决数(不再照总数矛盾于
                     path: '/api/workorder/review-queue',
                     body: queueFixture([group('amount_math_fail', 'crit', 4, 0, 4)]),
                 },
-                { method: 'GET', path: '/api/ai/client-pool', body: { groups: [] } },
             ],
             '#/pool'
         );

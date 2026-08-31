@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from core.auth import JWT_ALGORITHM, _jwt_secret
 from services.cowork_line import identity_store, intake, session_store
+from services.line_platform.liff import verify_id_token
 
 router = APIRouter(tags=["cowork-line-intake"])
 _ROOT = Path(__file__).resolve().parent.parent
@@ -69,9 +70,7 @@ async def cowork_intake_liff_config():
 
 @router.post("/api/cowork-line/intake/liff/auth")
 async def cowork_intake_liff_auth(req: LiffAuthIn):
-    from routes.line_liff_routes import _verify_id_token
-
-    claims = _verify_id_token(req.id_token, "LINE_COWORK_LIFF_ID")
+    claims = verify_id_token(req.id_token, "LINE_COWORK_LIFF_ID")
     line_user_id = str((claims or {}).get("sub") or "")
     identity = identity_store.resolve_active_identity(line_user_id)
     if not identity:

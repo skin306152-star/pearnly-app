@@ -14,9 +14,8 @@ from typing import Any, Optional
 ERROR_KINDS = ("auth", "quota", "timeout", "parse", "provider")
 
 # task → 规格。risk 仅文档/观测用;model_tier 由 provider 映射具体模型。
-# LINE 对话三通道挂 brain 档(AGENT_BRAIN_MODEL·与 OCR 档独立,OCR 换模型不牵连)。
 TASKS: dict[str, dict] = {
-    "line_text_understand": {
+    "text_understand": {
         "risk": "medium",
         "timeout_s": 18,
         "max_retries": 1,
@@ -27,13 +26,6 @@ TASKS: dict[str, dict] = {
         "risk": "low",
         "timeout_s": 12,
         "max_retries": 1,
-        "model_tier": "brain",
-        "schema_version": "1",
-    },
-    "line_chat_reply": {
-        "risk": "low",
-        "timeout_s": 8,
-        "max_retries": 0,
         "model_tier": "brain",
         "schema_version": "1",
     },

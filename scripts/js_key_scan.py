@@ -12,7 +12,7 @@ check_e2e_stub_contracts 扫的是桩的回包对象,跟词典半点关系没有
 `at(x ? 'a' : 'b')` 和 `at('pre_' + s)` 一起认错)。
 
 上层调用方需要提供的只有一样:键的字符集正则(/ai 是 `[A-Za-z_]\\w*`,/home 的键带连字符
-和点,如 `dxb-up-title` / `agent.ok.notifications`)。
+和点,如 `dxb-up-title` / `agent.ok.history`)。
 
 另有一条 DICT_KEY_DEF 管「词典本尊里哪些字面量是词条键」,与上面两层无关,但同样被两道闸
 共用(check_home_i18n_refs 的定义侧、check_i18n 的语言块对拍)—— 它踩过的坑写在常量上面。

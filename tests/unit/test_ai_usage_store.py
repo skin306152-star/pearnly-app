@@ -115,7 +115,7 @@ class LogAiUsageTests(unittest.TestCase):
         kw = dict(
             tenant_id="tenant-1",
             user_id="user-1",
-            task="line_text_understand",
+            task="text_understand",
             provider="fake",
             model="m",
             status="ok",
@@ -141,7 +141,7 @@ class LogAiUsageTests(unittest.TestCase):
         p = cur.last_params
         self.assertEqual(p[0], "tenant-1")
         self.assertEqual(p[1], "user-1")
-        self.assertEqual(p[2], "line_text_understand")
+        self.assertEqual(p[2], "text_understand")
         self.assertEqual(p[10], 0.123457)  # cost 四舍五入到 6 位
 
     def test_none_tenant_and_user_pass_through_as_none(self):
@@ -184,7 +184,7 @@ class AggregationTests(unittest.TestCase):
         cur = FakeCursor(
             fetchall=[
                 {
-                    "task": "line_text_understand",
+                    "task": "text_understand",
                     "calls": 3,
                     "cost_thb": "1.5",
                     "input_tokens": 100,
@@ -198,7 +198,7 @@ class AggregationTests(unittest.TestCase):
             out,
             [
                 {
-                    "task": "line_text_understand",
+                    "task": "text_understand",
                     "calls": 3,
                     "cost_thb": 1.5,
                     "input_tokens": 100,

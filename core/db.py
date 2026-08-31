@@ -81,7 +81,7 @@ def get_cursor(commit: bool = False):
 #     email_ingest / erp.{oauth,mappings,push} / notification / recon.{vat_recon_tasks,
 #     gl_vat,bank_recon_v2,bank_recon_v1,vat_recon} / archive / rd / cost / exceptions /
 #     clients / billing.{pricing,store,charge,account_status,credits_schema} /
-#     user_settings / ocr_history / line_binding / credits / tenant / audit / team /
+#     user_settings / ocr_history / credits / tenant / audit / team /
 #     membership.{store,schema} / auth.{user_lookup,password,account_merge,email_codes_schema} /
 #     usage / users.columns。
 # ============================================================

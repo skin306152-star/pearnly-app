@@ -59,7 +59,6 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
         app.include_router(oauth_line_routes.router)
         self.client = TestClient(app)
 
-        self.legacy_bind = mock.Mock(return_value=True)
         self.find_login_user = mock.Mock(return_value=dict(_USER))
 
         self._patches = [
@@ -72,9 +71,6 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
             mock.patch.object(oauth_line_routes, "_login_redirect_path", return_value="/home"),
             mock.patch("httpx.AsyncClient", _LineClient),
             mock.patch.object(oauth_line_routes.db, "find_user_by_line_uid", self.find_login_user),
-            mock.patch.object(
-                oauth_line_routes.db, "create_or_update_line_binding", self.legacy_bind
-            ),
             mock.patch.object(oauth_line_routes.db, "update_last_login", return_value=None),
             mock.patch.object(oauth_line_routes.db, "update_user_avatar", return_value=None),
         ]
@@ -93,7 +89,7 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("mrpilot_token", response.text)
-        self.legacy_bind.assert_not_called()
+        self.assertFalse(hasattr(oauth_line_routes.db, "create_or_update_line_binding"))
 
     def test_cowork_login_never_accepts_a_binding_token_or_prompts_for_bot(self):
         response = self.client.get(

@@ -65,7 +65,7 @@ class RouteContractTests(unittest.TestCase):
 
 
 class GatedRouteCase(unittest.IsolatedAsyncioTestCase):
-    """M1 闸 + 权限桩(照 test_client_pool_routes_contract 先例,patch route_helpers
+    """M1 闸 + 权限桩(patch route_helpers
     模块级名——authorize_pearnly_ai 引用的是它们)。余额闸 + 扣费一并打桩:非豁免预检
     走 get_billing_status_combined(否则真库 lookup_error → 503 假红)。"""
 

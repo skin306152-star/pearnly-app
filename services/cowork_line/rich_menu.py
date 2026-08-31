@@ -9,7 +9,7 @@ import urllib.request
 from typing import Any
 
 from services.cowork_line.menu_cards import ACTION_ERP_START
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 

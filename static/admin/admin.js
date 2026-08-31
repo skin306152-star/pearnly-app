@@ -179,9 +179,7 @@
         if (p === '/admin/users' || p === '/admin/users/') return 'users';
         if (p === '/admin/topup' || p === '/admin/topup/') return 'topup';
         if (p === '/admin/monitor' || p === '/admin/monitor/') return 'monitor';
-        if (p === '/admin/settings' || p === '/admin/settings/') return 'settings';
         if (p === '/admin/engine' || p === '/admin/engine/') return 'engine';
-        if (p === '/admin/agent' || p === '/admin/agent/') return 'agent';
         if (p === '/admin/pos' || p === '/admin/pos/') return 'pos';
         if (p === '/admin/pearnly-ai' || p === '/admin/pearnly-ai/') return 'pearnly-ai';
         if (p === '/admin/dms' || p === '/admin/dms/') return 'dms';
@@ -196,9 +194,7 @@
             users: 'page-admin-users',
             topup: 'page-admin-topup',
             monitor: 'page-admin-monitor',
-            settings: 'page-admin-settings',
             engine: 'page-admin-engine',
-            agent: 'page-admin-agent',
             pos: 'page-admin-pos',
             'pearnly-ai': 'page-admin-pearnly-ai',
             dms: 'page-admin-dms',
@@ -218,9 +214,7 @@
         if (route === 'users') _renderUsersPage();
         if (route === 'topup') _renderTopupPage();
         if (route === 'monitor') _renderMonitorPage();
-        if (route === 'settings') _renderSettingsPage();
         if (route === 'engine') _renderEnginePage();
-        if (route === 'agent') _renderAgentPage();
         if (route === 'pos') _renderPosPage();
         if (route === 'pearnly-ai') _renderPearlyAiPage();
         if (route === 'dms') _renderDmsPage();
@@ -315,9 +309,7 @@
                 if (_r === 'users') _renderUsersPage();
                 else if (_r === 'topup') _renderTopupPage();
                 else if (_r === 'monitor') _renderMonitorPage();
-                else if (_r === 'settings') _renderSettingsPage();
                 else if (_r === 'engine') _renderEnginePage();
-                else if (_r === 'agent') _renderAgentPage();
                 else if (_r === 'pos') _renderPosPage();
                 else if (_r === 'pearnly-ai') _renderPearlyAiPage();
                 else if (_r === 'dms') _renderDmsPage();
@@ -3026,116 +3018,7 @@
         });
     }
 
-    // ============ 全局设置(钥匙闸)· WP2 ============
-    function _settingsRolloutWrapSync() {
-        const enabled = !!document.getElementById('adm-set-agent-enabled')?.checked;
-        const wrap = document.getElementById('adm-set-rollout-wrap');
-        if (wrap) wrap.classList.toggle('is-off', !enabled);
-    }
-
-    function _renderAllowlist(rows) {
-        const host = document.getElementById('adm-set-allowlist-list');
-        if (!host) return;
-        if (!rows || !rows.length) {
-            host.innerHTML =
-                '<div class="adm-empty">' + _esc(_t('adm-set-allowlist-empty')) + '</div>';
-            return;
-        }
-        host.innerHTML = rows
-            .map(function (u) {
-                const who = _esc(u.username || u.email || _t('adm-set-allowlist-unknown'));
-                return (
-                    '<div class="adm-set-allow-row">' +
-                    '<span><span class="adm-set-allow-who">' +
-                    who +
-                    '</span> <span class="adm-set-allow-id">' +
-                    _esc(u.user_id) +
-                    '</span></span>' +
-                    '<button class="btn btn-ghost btn-sm" data-adm-allow-remove="' +
-                    _esc(u.user_id) +
-                    '">' +
-                    _esc(_t('adm-set-allowlist-remove')) +
-                    '</button>' +
-                    '</div>'
-                );
-            })
-            .join('');
-        host.querySelectorAll('[data-adm-allow-remove]').forEach(function (btn) {
-            btn.addEventListener('click', async function () {
-                try {
-                    const d = await _adminFetch('/api/admin/platform-settings/allowlist/remove', {
-                        method: 'POST',
-                        body: { user_id: btn.dataset.admAllowRemove },
-                    });
-                    _renderAllowlist(d.allowlist);
-                } catch (e) {
-                    _toast(_t('adm-load-fail'), 'error');
-                }
-            });
-        });
-    }
-
-    async function _renderSettingsPage() {
-        const toggle = document.getElementById('adm-set-agent-enabled');
-        if (!toggle) return;
-        if (!toggle.__bound) {
-            toggle.__bound = true;
-            toggle.addEventListener('change', _settingsRolloutWrapSync);
-            document.getElementById('adm-set-save')?.addEventListener('click', async function () {
-                const rollout =
-                    document.querySelector('input[name="adm-set-rollout"]:checked')?.value ||
-                    'allowlist';
-                try {
-                    await _adminFetch('/api/admin/platform-settings', {
-                        method: 'POST',
-                        body: { enabled: !!toggle.checked, rollout: rollout },
-                    });
-                    _toast(_t('adm-set-saved-toast'), 'success');
-                    _renderSettingsPage();
-                } catch (e) {
-                    _toast(_t('adm-load-fail'), 'error');
-                }
-            });
-            const addBtn = document.getElementById('adm-set-allowlist-add');
-            const input = document.getElementById('adm-set-allowlist-input');
-            addBtn?.addEventListener('click', async function () {
-                const uid = (input?.value || '').trim();
-                if (!uid) return;
-                try {
-                    const d = await _adminFetch('/api/admin/platform-settings/allowlist/add', {
-                        method: 'POST',
-                        body: { user_id: uid },
-                    });
-                    if (input) input.value = '';
-                    _renderAllowlist(d.allowlist);
-                } catch (e) {
-                    _toast(_t('adm-load-fail'), 'error');
-                }
-            });
-        }
-        let d;
-        try {
-            d = await _adminFetch('/api/admin/platform-settings');
-        } catch (e) {
-            _toast(_t('adm-load-fail'), 'error');
-            return;
-        }
-        const ag = d.agent_enabled || {};
-        toggle.checked = !!ag.enabled;
-        const rollout = ag.rollout || 'allowlist';
-        document.querySelectorAll('input[name="adm-set-rollout"]').forEach(function (r) {
-            r.checked = r.value === rollout;
-        });
-        _settingsRolloutWrapSync();
-        const savedEl = document.getElementById('adm-set-saved');
-        if (savedEl)
-            savedEl.textContent = ag.updated_at
-                ? _t('adm-set-saved-at') + ' ' + _adminDate(ag.updated_at, true)
-                : '';
-        _renderAllowlist(d.allowlist);
-    }
-
-    // 通用 KPI 卡片(OCR 引擎页建的,现由 POS / Agent 页共用 —— 别按名字猜归属)
+    // 通用 KPI 卡片(OCR 引擎页建的,现由 POS 页共用 —— 别按名字猜归属)
     function _engKpi(label, value, sub) {
         return (
             '<div class="cost-kpi-card"><div class="cost-kpi-label">' +
@@ -4403,102 +4286,6 @@
         const flagLine = document.getElementById('adm-erp-flag-line');
         if (flagLine) flagLine.textContent = _erpFlagText();
         _renderErpList(d.allowlist);
-    }
-
-    // ============ Agent 助手观测页 ============
-    function _agentBreakTable(titleKey, obj, total) {
-        const keys = Object.keys(obj || {});
-        if (!keys.length) return '';
-        keys.sort(function (a, b) {
-            return (obj[b] || 0) - (obj[a] || 0);
-        });
-        const rows = keys
-            .map(function (k) {
-                const n = obj[k] || 0;
-                const pct = total ? ((n / total) * 100).toFixed(1) : '0.0';
-                return (
-                    '<tr><td>' +
-                    _esc(
-                        _t('adm-agent-dim-' + k) === 'adm-agent-dim-' + k
-                            ? k
-                            : _t('adm-agent-dim-' + k)
-                    ) +
-                    '</td><td>' +
-                    n +
-                    '</td><td>' +
-                    pct +
-                    '%</td></tr>'
-                );
-            })
-            .join('');
-        return (
-            '<div class="cost-section-head" style="margin-top: 16px"><h3>' +
-            _esc(_t(titleKey)) +
-            '</h3></div>' +
-            '<div class="cost-table-wrap"><table class="cost-table"><thead><tr><th>' +
-            [_t('adm-agent-col-dim'), _t('adm-agent-col-count'), '%'].join('</th><th>') +
-            '</th></tr></thead><tbody>' +
-            rows +
-            '</tbody></table></div>'
-        );
-    }
-
-    async function _renderAgentPage() {
-        const kpis = document.getElementById('adm-agent-kpis');
-        if (!kpis) return;
-        try {
-            const d = await _adminFetch('/api/admin/agent/overview?hours=24&days=7');
-            const h = d.health || {};
-            const byKind = h.by_kind || {};
-            let msSum = 0;
-            Object.keys(byKind).forEach(function (k) {
-                msSum += (byKind[k].count || 0) * (byKind[k].avg_ms || 0);
-            });
-            const avgS = h.total ? msSum / h.total / 1000 : 0;
-            kpis.innerHTML =
-                _engKpi(_t('adm-agent-kpi-turns'), String(h.total || 0), '24h') +
-                _engKpi(
-                    _t('adm-agent-kpi-crash'),
-                    ((h.crash_rate || 0) * 100).toFixed(1) + '%',
-                    ((byKind.crash || {}).count || 0) + ' ' + _t('adm-agent-kpi-turns-unit')
-                ) +
-                _engKpi(
-                    _t('adm-agent-kpi-degraded'),
-                    ((h.degraded_rate || 0) * 100).toFixed(1) + '%',
-                    _t('adm-agent-kpi-degraded-sub')
-                ) +
-                _engKpi(_t('adm-agent-kpi-latency'), avgS.toFixed(1) + 's', '');
-            const box = document.getElementById('adm-agent-breakdown');
-            if (box)
-                box.innerHTML =
-                    _agentBreakTable('adm-agent-by-intent', h.by_intent, h.total) +
-                    _agentBreakTable('adm-agent-by-degraded', h.by_degraded, h.total);
-            const f = d.funnel || {};
-            const funnelBox = document.getElementById('adm-agent-funnel');
-            const cv = function (a, b) {
-                return b ? ((a / b) * 100).toFixed(0) + '%' : '–';
-            };
-            if (funnelBox)
-                funnelBox.innerHTML =
-                    _engKpi(_t('adm-agent-funnel-follow'), String(f.follows || 0), '') +
-                    _engKpi(
-                        _t('adm-agent-funnel-bind'),
-                        String(f.binds || 0),
-                        cv(f.binds || 0, f.follows || 0)
-                    ) +
-                    _engKpi(
-                        _t('adm-agent-funnel-used'),
-                        String(f.agent_used || 0),
-                        cv(f.agent_used || 0, f.binds || 0)
-                    ) +
-                    _engKpi(
-                        _t('adm-agent-funnel-recorded'),
-                        String(f.recorded || 0),
-                        cv(f.recorded || 0, f.agent_used || 0)
-                    );
-        } catch (e) {
-            _toast(_t('adm-load-fail'), 'error');
-        }
     }
 
     // ============ 主启动流程 ============

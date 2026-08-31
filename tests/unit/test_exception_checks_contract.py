@@ -7,7 +7,6 @@ REFACTOR-B1 守门测试 · OCR 异常检测 + 智能提醒链从 app.py 抽到 
      (单一来源 · OCR/LINE 上传路由 + history PUT 共用 · 不许各自拷一份漂移)
   2. confidence_low 规则码值不变(DB rule_code 契约 · 发票规则已统一进知识库引擎)
   3. _parse_money 行为契约不变
-  4. line_client 防御式 import(未部署降级 None · 不在 import 期炸)
 """
 
 import unittest
@@ -43,10 +42,6 @@ class ExceptionChecksContractTests(unittest.TestCase):
         self.assertIsNone(exception_checks._parse_money(None))
         self.assertIsNone(exception_checks._parse_money(""))
         self.assertIsNone(exception_checks._parse_money("abc"))
-
-    def test_line_client_defensive_import(self):
-        """line_client 防御式 import · 未部署时 None · 不在 import 期炸(模块属性存在)"""
-        self.assertTrue(hasattr(exception_checks, "line_client"))
 
 
 if __name__ == "__main__":

@@ -96,7 +96,6 @@ async function boot(page) {
         if (p === '/api/workorder/orders')
             return route.fulfill({ json: { orders: [], count: 0, limit: 1, offset: 0 } });
         if (p === '/api/workorder/review-queue') return route.fulfill({ json: queueFixture() });
-        if (p === '/api/ai/client-pool') return route.fulfill({ json: { groups: [] } });
         return route.fulfill({ status: 404, json: { detail: 'not_stubbed:' + p } });
     });
     await page.addInitScript(

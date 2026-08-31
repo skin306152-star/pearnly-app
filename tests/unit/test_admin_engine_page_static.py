@@ -163,7 +163,7 @@ class AdminI18nParityTests(unittest.TestCase):
         self.assertGreater(len(zh), 60)
 
     def test_every_data_i18n_in_engine_section_is_defined(self):
-        section = HTML[HTML.index('id="page-admin-engine"') : HTML.index('id="page-admin-agent"')]
+        section = HTML[HTML.index('id="page-admin-engine"') : HTML.index('id="page-admin-pos"')]
         used = set(re.findall(r'data-i18n="([^"]+)"', section))
         zh = set(re.findall(r"'([a-z0-9-]+)':", _lang_block("zh"), flags=re.I))
         self.assertEqual(set(), used - zh, "页面用到但字典里没有的键")

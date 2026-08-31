@@ -1,5 +1,5 @@
 """
-auth_password_routes.py · 密码找回 / 重置 / 改密 + 邮件 & LINE 发送器
+auth_password_routes.py · 密码找回 / 重置 / 改密 + 邮件 & Cowork LINE 发送器
 
 从 auth_signup.py 抽出(模块化深化 · 2026-06-01 · 纯搬家 0 逻辑改)。
 🔴 高敏:改密码路径(铁律 #26)。auth_signup include 本 router;
@@ -33,15 +33,31 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
-def _send_password_reset_via_line(user: dict, reset_url: str) -> bool:
-    """通过 LINE Bot 推送密码重置链接 · 返回是否成功"""
+def _cowork_line_recipient(user_id: str) -> str:
     try:
-        line_user_id = user.get("line_user_id")
+        from core import db as _db
+
+        with _db.get_cursor() as cur:
+            cur.execute(
+                "SELECT line_user_id FROM cowork_line_identities "
+                "WHERE user_id = %s AND revoked_at IS NULL AND friendship_ready = TRUE "
+                "ORDER BY connected_at DESC LIMIT 1",
+                (str(user_id),),
+            )
+            row = cur.fetchone()
+        return str((row or {}).get("line_user_id") or "")
+    except Exception as exc:
+        logger.warning("Cowork LINE recipient lookup failed: %s", exc)
+        return ""
+
+
+def _send_password_reset_via_line(user: dict, reset_url: str) -> bool:
+    """通过用户已绑定的 Cowork LINE 推送密码重置链接。"""
+    try:
+        from services.line_platform import client as line_client
+
+        line_user_id = _cowork_line_recipient(str(user.get("id") or ""))
         if not line_user_id:
-            return False
-        try:
-            from services.line_binding import line_client
-        except ImportError:
             return False
         msg = (
             "🔑 Pearnly · 密码重置 / Password Reset\n\n"
@@ -51,8 +67,7 @@ def _send_password_reset_via_line(user: dict, reset_url: str) -> bool:
             "❗ 如果不是您本人操作 · 请忽略此消息"
         )
         try:
-            line_client.push_message(line_user_id, msg)
-            return True
+            return line_client.push_text(line_user_id, msg, channel="cowork")
         except Exception as le:
             logger.warning(f"line push fail: {le}")
             return False
@@ -151,7 +166,7 @@ def send_reset_link_for_employee(
             return out
 
         has_email = bool(target.get("email"))
-        has_line = bool(target.get("line_user_id"))
+        has_line = bool(_cowork_line_recipient(str(target["id"])))
         out["has_email"] = has_email
         out["has_line"] = has_line
 
@@ -260,7 +275,7 @@ def forgot_password(req: ForgotPasswordRequest, request: Request):
             with _db.get_cursor(commit=True) as cur:
                 cur.execute(
                     """
-                    SELECT id, username, email, full_name, line_user_id
+                    SELECT id, username, email, full_name
                     FROM users
                     WHERE email_normalized = %s OR LOWER(email) = %s
                     LIMIT 1
@@ -289,7 +304,7 @@ def forgot_password(req: ForgotPasswordRequest, request: Request):
         sent_email = False
 
         # 优先 LINE
-        if user.get("line_user_id"):
+        if _cowork_line_recipient(str(user["id"])):
             sent_line = _send_password_reset_via_line(dict(user), reset_url)
             if sent_line:
                 delivery = "line"

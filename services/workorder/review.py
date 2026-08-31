@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-from services.line_binding import client_pool_vocab, line_client_pool_store
 from services.workorder import api, engine, obligation_engine, review_feed, runner, store, verdict
 
 # review 域 append-only 事件词(单一事实源)。
@@ -46,7 +45,7 @@ SELECT
     wi.flag_reason,
     count(wi.id) AS flagged_count,
     ob.next_due_efiling, ob.next_due_paper,
-    COALESCE(cp.pending_count, 0) AS pool_pending,
+    0 AS pool_pending,
     COALESCE(rj.reject_count, 0) AS reject_count
 FROM work_orders wo
 JOIN workspace_clients wc
@@ -62,13 +61,6 @@ LEFT JOIN LATERAL (
       AND o.status <> %s
 ) ob ON true
 LEFT JOIN LATERAL (
-    SELECT count(*) AS pending_count
-    FROM line_client_questions q
-    WHERE q.tenant_id = wo.tenant_id
-      AND q.workspace_client_id = wo.workspace_client_id
-      AND q.status = ANY(%s)
-) cp ON true
-LEFT JOIN LATERAL (
     SELECT count(*) AS reject_count
     FROM work_order_events e
     WHERE e.tenant_id = wo.tenant_id
@@ -81,7 +73,7 @@ WHERE wo.tenant_id = %s
   AND (%s::bigint IS NULL OR wo.workspace_client_id = %s::bigint)
 GROUP BY wo.id, wo.workspace_client_id, wo.period, wo.status, wo.current_step, wo.updated_at,
          wc.name, wc.tax_id, wi.flag_reason,
-         ob.next_due_efiling, ob.next_due_paper, cp.pending_count, rj.reject_count
+         ob.next_due_efiling, ob.next_due_paper, rj.reject_count
 ORDER BY ob.next_due_efiling NULLS LAST, wo.workspace_client_id, wo.id
 """
 
@@ -100,12 +92,10 @@ def review_queue(
     flagged 按 flag_reason 分组计数/严重度/到期日/客户池 pending/返工标记;再一把批量取回队列内
     工单的事件与 flagged 明细(review_feed),挂 SoD 投影(actor/sod_enforced 决定)并出跨工单
     扁平 flagged item feed(前端纯渲染,不再逐单回放)。severity 传入则只留该严重度。到期近→前。"""
-    line_client_pool_store.ensure_table()  # 保证 line_client_questions 存在(首用自愈)再 JOIN
     cur.execute(
         _QUEUE_SQL,
         (
             obligation_engine.STATUS_NIL,
-            list(client_pool_vocab.ACTIVE_STATUSES),
             EVT_REVIEW_REJECTED,
             tenant_id,
             _QUEUE_STATUSES,

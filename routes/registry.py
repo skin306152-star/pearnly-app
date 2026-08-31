@@ -18,7 +18,6 @@ import os
 from routes.accounting_bank_routes import router as accounting_bank_router
 from routes.accounting_books_routes import router as accounting_books_router
 from routes.accounting_routes import router as accounting_router
-from routes.admin_agent_routes import router as admin_agent_router
 from routes.admin_cost_routes import router as admin_cost_router
 from routes.admin_diagnostics_routes import router as admin_diagnostics_router
 from routes.admin_dms_routes import router as admin_dms_router
@@ -29,14 +28,12 @@ from routes.admin_ocr_engine_routes import router as admin_ocr_engine_router
 from routes.admin_pearnly_ai_routes import router as admin_pearnly_ai_router
 from routes.admin_daily_routes import router as admin_daily_router
 from routes.admin_pos_entitlement_routes import router as admin_pos_entitlement_router
-from routes.admin_settings_routes import router as admin_settings_router
 from routes.admin_users_routes import router as admin_users_router
 from routes.auth_email_code_routes import router as auth_email_code_router
 from routes.bank_recon_routes import router as bank_recon_router
 from routes.billing_routes import router as billing_router
 from routes.categories_routes import router as categories_router
 from routes.client_import_routes import router as client_import_router
-from routes.client_pool_routes import router as client_pool_router
 from routes.clients_routes import router as clients_router
 from routes.companion_installer_routes import router as companion_installer_router
 from routes.console_invite_routes import router as console_invite_router
@@ -65,7 +62,6 @@ from routes.inventory_report_routes import router as inventory_report_router
 from routes.inventory_routes import router as inventory_router
 from routes.line_account_merge_routes import router as line_account_merge_router
 from routes.line_dms_webhook_routes import router as line_dms_webhook_router
-from routes.line_liff_routes import router as line_liff_router
 from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
 from routes.line_dms_credentials_routes import router as line_dms_credentials_router
 from routes.line_dms_portal_routes import router as line_dms_portal_router
@@ -74,7 +70,6 @@ from routes.login_routes import router as login_router
 from routes.me_routes import router as me_router
 from routes.meta_aliases_routes import router as meta_aliases_router
 from routes.modules_routes import router as modules_router
-from routes.notification_routes import router as notification_router
 from routes.oauth_line_routes import router as oauth_line_router
 from routes.oauth_routes import router as oauth_router
 from routes.ocr_export_routes import router as ocr_export_router
@@ -140,7 +135,6 @@ ROUTERS = (
     vat_report_checks_router,  # 销项税报告三查
     fileconv_router,  # 财务文件转换(pearnly_ai_m1 闸)
     payroll_router,  # ภ.ง.ด.1 工资预扣工具卡(pearnly_ai_m1 闸)
-    notification_router,
     clients_router,
     products_router,
     modules_router,  # GET /api/me/modules
@@ -162,7 +156,6 @@ ROUTERS = (
     summary_import_router,  # 汇总表 → 批量建单
     purchase_export_router,  # 进项外流 Excel/Drive/Sheet 导出
     google_oauth_router,  # 集成中心 Google Drive/Sheets 授权
-    line_liff_router,
     line_dms_booking_edit_router,
     line_dms_credentials_router,
     line_dms_portal_router,
@@ -196,7 +189,6 @@ ROUTERS = (
     steward_session_router,  # 管家会话管理(列表/改名/删除 + 附件删除 + 余额 · 同双闸)
     steward_stream_router,  # 管家任务事件 SSE(步骤账本增量 · 同双闸)
     tax_profile_router,  # 税务画像/别名/义务清单(m1 闸)
-    client_pool_router,  # LINE 待问客户池(m1+client_pool 双闸)
     settings_router,
     categories_router,
     pages_router,  # 静态页面 + 公开 meta
@@ -221,9 +213,7 @@ ROUTERS = (
     admin_cost_router,
     tenant_router,
     admin_logs_router,
-    admin_settings_router,  # 平台钥匙闸(对话 Agent 总闸 + 灰度)
     admin_ocr_engine_router,
-    admin_agent_router,
     admin_pos_entitlement_router,
     admin_pearnly_ai_router,
     admin_daily_router,  # Daily 邀请管理(超管)

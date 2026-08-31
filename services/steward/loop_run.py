@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from typing import Callable, Optional
 
-from services.agent.contracts import ToolResult
+from services.steward.contracts import ToolResult
 from services.steward import (
     authz,
     brain_loop,

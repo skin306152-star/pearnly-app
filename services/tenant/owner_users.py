@@ -393,14 +393,6 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                         "DELETE FROM bank_reconcile_sessions WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
                     ),
                     (
-                        "line_bindings",
-                        "DELETE FROM line_bindings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
-                    ),
-                    (
-                        "line_binding_codes",
-                        "DELETE FROM line_binding_codes WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
-                    ),
-                    (
                         "user_settings",
                         "DELETE FROM user_settings WHERE user_id IN (SELECT id FROM users WHERE tenant_id = %s)",
                     ),
@@ -467,8 +459,6 @@ def delete_owner_user_cascade(user_id: str) -> bool:
                         "bank_reconcile_sessions",
                         "DELETE FROM bank_reconcile_sessions WHERE user_id = %s",
                     ),
-                    ("line_bindings", "DELETE FROM line_bindings WHERE user_id = %s"),
-                    ("line_binding_codes", "DELETE FROM line_binding_codes WHERE user_id = %s"),
                     ("user_settings", "DELETE FROM user_settings WHERE user_id = %s"),
                     ("api_keys", "DELETE FROM api_keys WHERE user_id = %s"),
                     ("automation_rules", "DELETE FROM automation_rules WHERE user_id = %s"),

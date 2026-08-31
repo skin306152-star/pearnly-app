@@ -1,7 +1,7 @@
 /*
  * Pearnly AI · ai-review-inbox-item-render.js · 收件箱单张 flagged 件裁决卡 HTML
  *
- * 拆出独立于 ai-review-inbox-render.js(单文件<500 铁律,同 ai-review-pool.js 先例):
+ * 拆出独立于 ai-review-inbox-render.js(单文件<500 铁律):
  * 「异常票据」分组里逐张裁决卡(读值/判据人话/置信度徽标/动作行)的拼装收在这,
  * groupHtml(分组头 + 已判折叠)留在主文件。读值表格复用 ai-review-render.js 的
  * fieldRows(effectiveDecision 走 latest-wins 口径),动作按钮定义表也复用同一份

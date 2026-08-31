@@ -14,7 +14,7 @@ class ErpIntakePdfTests(unittest.TestCase):
 
     @mock.patch("services.ocr_history.mutations.update_ocr_history_pdf_storage", return_value=1)
     @mock.patch("services.ocr.pdf_backfill.generate_and_save_pdf", return_value=("u/p.pdf", 12))
-    @mock.patch("services.line_binding.line_client.image_to_pdf_bytes", return_value=b"%PDF-image")
+    @mock.patch("services.line_platform.client.image_to_pdf_bytes", return_value=b"%PDF-image")
     def test_wraps_line_image_as_pdf_before_backfill(self, convert, save, _update):
         result = intake.generate_and_save_pdf(b"jpeg", [], ["h1"], "u1", "t1")
         self.assertTrue(result["saved"])

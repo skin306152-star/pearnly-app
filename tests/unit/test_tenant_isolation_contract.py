@@ -552,68 +552,7 @@ class BankReconV2TaskIsolationTests(unittest.TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════
-# 表 13 · notification_rules (三层隔离 · 最严格)
 # ════════════════════════════════════════════════════════════════════
-class NotificationRulesIsolationTests(unittest.TestCase):
-
-    def test_list_notification_rules_tenant_mode(self):
-        cur = _Cursor()
-        with _patch_cursor(cur):
-            db.list_notification_rules(USER_A, tenant_id=TENANT_A)
-        sql = _all_sql(cur)
-        self.assertIn("tenant_id = %s", sql)
-        self.assertIn(TENANT_A, [str(p) for p in _all_params(cur)])
-
-    def test_list_notification_rules_user_mode_requires_tenant_null(self):
-        """三层防 NULL 注入: user 模式必须 AND tenant_id IS NULL ·
-        防止误读到 owner 的同 user_id 跨 tenant 规则."""
-        cur = _Cursor()
-        with _patch_cursor(cur):
-            db.list_notification_rules(USER_A, tenant_id=None)
-        sql = _all_sql(cur)
-        self.assertIn("user_id = %s", sql)
-        self.assertIn(
-            "tenant_id IS NULL", sql, "user 模式必须 AND tenant_id IS NULL · 三层防 NULL 注入"
-        )
-
-    def test_get_notification_rule_tenant_mode(self):
-        cur = _Cursor()
-        with _patch_cursor(cur):
-            db.get_notification_rule(42, USER_A, tenant_id=TENANT_A)
-        sql = _all_sql(cur)
-        self.assertIn("tenant_id = %s", sql)
-        self.assertIn("id = %s", sql)
-
-    def test_get_notification_rule_user_mode_requires_tenant_null(self):
-        cur = _Cursor()
-        with _patch_cursor(cur):
-            db.get_notification_rule(42, USER_A, tenant_id=None)
-        sql = _all_sql(cur)
-        self.assertIn("user_id = %s", sql)
-        self.assertIn("tenant_id IS NULL", sql)
-
-    def test_delete_notification_rule_scoped_tenant(self):
-        cur = _Cursor(rowcount=1)
-        with _patch_cursor(cur):
-            db.delete_notification_rule(42, USER_A, tenant_id=TENANT_A)
-        delete_sqls = [s for s, _ in cur.executed if "DELETE FROM notification_rules" in s]
-        self.assertEqual(len(delete_sqls), 1)
-        self.assertIn("tenant_id = %s", delete_sqls[0])
-
-    def test_delete_notification_rule_scoped_user_with_tenant_null(self):
-        cur = _Cursor(rowcount=1)
-        with _patch_cursor(cur):
-            db.delete_notification_rule(42, USER_A, tenant_id=None)
-        delete_sqls = [s for s, _ in cur.executed if "DELETE FROM notification_rules" in s]
-        self.assertEqual(len(delete_sqls), 1)
-        self.assertIn("user_id = %s", delete_sqls[0])
-        self.assertIn(
-            "tenant_id IS NULL",
-            delete_sqls[0],
-            "delete user 模式必须 AND tenant_id IS NULL" "· 防误删 owner 同 user_id 的 tenant 规则",
-        )
-
-
 # ════════════════════════════════════════════════════════════════════
 # 跨租户负向 (用户纪律第 7 条 · "租户 A 不能访问租户 B 数据")
 # ════════════════════════════════════════════════════════════════════
@@ -661,17 +600,6 @@ class CrossTenantNegativeTests(unittest.TestCase):
         with _patch_cursor(cur):
             r = db.get_bank_recon_v2_task(123, USER_B, tenant_id=TENANT_B)
         self.assertIsNone(r)
-
-    def test_get_notification_rule_user_b_cannot_read_user_a_personal_rule(self):
-        """user 模式 (tenant_id=None) 的隔离: user B 不能读 user A 个人规则."""
-        cur = _Cursor(fetchone_results=[None])
-        with _patch_cursor(cur):
-            r = db.get_notification_rule(42, USER_B, tenant_id=None)
-        self.assertIsNone(r)
-        sql = _all_sql(cur)
-        # SQL 必须同时带 user_id 和 tenant_id IS NULL (三层隔离)
-        self.assertIn("user_id = %s", sql)
-        self.assertIn("tenant_id IS NULL", sql)
 
     def test_delete_ocr_history_tenant_b_cannot_delete_tenant_a(self):
         """delete 也是 fail-safe: WHERE 不匹配 → rowcount=0 → 返 False."""
@@ -728,8 +656,6 @@ class DeleteAlwaysScopedContractTests(unittest.TestCase):
             (db.delete_gl_vat_tasks_batch, ([1, 2], USER_A), {}),
             (db.delete_bank_recon_v2_task, (123, USER_A), {}),
             (db.delete_bank_recon_v2_tasks_batch, ([10, 20], USER_A), {}),
-            (db.delete_notification_rule, (42, USER_A, TENANT_A), {}),
-            (db.delete_notification_rule, (42, USER_A, None), {}),
         ]
         for fn, args, kwargs in cases:
             with self.subTest(fn=fn.__name__, tenant=kwargs.get("tenant_id", "n/a")):

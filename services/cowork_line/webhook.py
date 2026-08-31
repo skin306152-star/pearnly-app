@@ -17,7 +17,7 @@ from services.cowork_line import (
     menu_cards,
     session_store,
 )
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 from services.ocr.recognize.core import run_recognition_core  # noqa: F401
 
 logger = logging.getLogger(__name__)

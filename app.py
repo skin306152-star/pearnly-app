@@ -18,16 +18,11 @@ from fastapi.middleware.cors import CORSMiddleware
 # app.db 命名空间(大量测试 monkeypatch app.db.xxx · 路由经 app.db 调 · 必须保留)
 from core import db  # noqa: F401
 
-try:
-    from services.line_binding import line_client  # T1 · LINE Bot(v0.19.0)
-except ImportError:
-    line_client = None  # line_client.py 不在 pearnly 仓库 · 文件需单独部署到服务器
-
 # 路由清单在 routes/registry.py(本文件只装配应用:lifespan/中间件/异常处理/静态挂载)。
 from routes.registry import include_all as include_all_routers
 
 # REFACTOR-B1 · OCR 异常检测链单一来源 re-export(契约 test_exception_checks_contract;
-# 实际消费者已搬到 services/ocr/recognize/* 与 line_image_ocr · app 自身不再直接调)。
+# 实际消费者已搬到 services/ocr/recognize/*，app 自身不再直接调)。
 from services.exceptions.exception_checks import _async_run_exception_checks  # noqa: F401
 from core.route_helpers import (  # 公共鉴权 helper;app 再导出锁单一来源(契约 test_route_helpers_contract/test_tid_helper_single_source)
     _plan_permissions,  # noqa: F401

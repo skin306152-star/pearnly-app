@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LINE 图片路费用归类(从 line_ingest 拆出 · 单一职责 + 控行数 · docs/smart-intake/15)。
+"""票据图片费用归类。
 
 置信驱动的图片分类,优先级:① 用户学习(税号/归一卖家名)② 用户识别关键词(费用数据页可编辑 ·
 Phase 2 灰度)③ 确定性规则(品名 → 商户默认)④ LLM 逐项/整票兜底 ⑤ 关键词兜底 / 太糊留未分类。
@@ -30,7 +30,12 @@ def _category_names(cats: list, cat_id, sub_id) -> tuple[str, str]:
 
 def _dominant_item_category(cats: list, items: list, *, api_key):
     from services.expense import category_ai
-    from services.purchase.line_ingest import _dec  # 复用金额解析(函数级 · 避免顶层循环)
+
+    def _dec(value) -> Decimal:
+        try:
+            return Decimal(str(value or "0").replace(",", ""))
+        except Exception:
+            return Decimal("0")
 
     clean = [
         {"name": str(it.get("name") or "").strip(), "amount": _dec(it.get("amount"))}
@@ -59,10 +64,10 @@ def _dominant_item_category(cats: list, items: list, *, api_key):
 def _learned_category(cur, tenant_id, workspace_client_id, *, tax_id, vendor):
     """用户学习命中:税号键优先(tax:<税号>),其次归一卖家名键(seller:<归一名>)。无命中 → None。
 
-    用户在 LINE 改错或网页详情改过分类后写入(见 line_correct_data / docs.update_draft),此处读出,
+    用户在网页详情改过分类后写入,此处读出,
     优先级最高 —— 规则与 LLM 都不能覆盖用户明确选过的归类。
     """
-    from services.expense import conversation, merchant
+    from services.expense import category_learning, merchant
 
     t = (tax_id or "").strip()
     keys = []
@@ -73,13 +78,13 @@ def _learned_category(cur, tenant_id, workspace_client_id, *, tax_id, vendor):
         keys.append(f"seller:{nv}")
     try:
         for key in keys:
-            hit = conversation.find_exact(
+            hit = category_learning.find_exact(
                 cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, keyword=key
             )
             if hit and hit.get("category_id"):
                 return hit
     except Exception as e:  # noqa: BLE001 — 学习查不到只回落规则,绝不拖垮入账
-        logger.warning("[line_classify] learned lookup skipped: %s", str(e)[:160])
+        logger.warning("[purchase_category] learned lookup skipped: %s", str(e)[:160])
     return None
 
 

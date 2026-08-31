@@ -10,9 +10,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.line_binding import line_rich_menu  # noqa: E402
+from services.cowork_line import rich_menu  # noqa: E402
 
 if __name__ == "__main__":
-    rid = line_rich_menu.setup_default_menu()
+    rid = rich_menu.setup_default_menu()
     print(f"rich menu id: {rid}")
     sys.exit(0 if rid else 1)

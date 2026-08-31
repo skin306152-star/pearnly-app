@@ -53,7 +53,6 @@ BASELINE_ALLOWED = {
     "static/ai/ai-desk.js",
     "static/ai/ai-intake-render.js",
     "static/ai/ai-steward.js",
-    "static/ai/ai-review-render.js",
     "static/pos/pos-cashier.js",
     "static/pos/pos-data.js",
     "static/pos/pos.js",

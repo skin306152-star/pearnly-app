@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional
 
-from services.agent.contracts import SlotSpec
+from services.steward.contracts import SlotSpec
 from services.sales.dates import bangkok_today
 
 # 风险等级(B3 授权闸的判据面):read 直接执行;write 落数据、danger 落数据且难撤销

@@ -103,8 +103,8 @@ class HomeMoneyPrefixSingleExitTests(unittest.TestCase):
         }
         self.assertFalse(offenders, f"฿ 紧跟数字会糊成一团,借 BAHT 或垫 \\u2009:{offenders}")
 
-    def test_the_suffix_spelling_is_confined_to_line_agent_copy(self):
-        """「{total}฿」这种数字在前的写法只许出现在 LINE 对话词条上,不许漏进界面文案。"""
+    def test_the_suffix_spelling_is_confined_to_conversation_copy(self):
+        """「{total}฿」这种数字在前的写法只许出现在对话词条上,不许漏进界面文案。"""
         offenders = []
         for name, src in self.sources:
             for i, line in enumerate(src.splitlines(), 1):

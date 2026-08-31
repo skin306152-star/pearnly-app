@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from services.line_binding import line_client
+from services.line_platform import client as line_client
 
 logger = logging.getLogger(__name__)
 

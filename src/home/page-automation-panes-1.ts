@@ -75,25 +75,6 @@ export const AUTO_HTML_1 = `
                             <span class="auto-nav-label" data-i18n="auto-folder-title">文件夹监听</span>
                         </button>
 
-                        <button class="auto-nav-item" data-auto-tab="linebot">
-                            <span class="auto-nav-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M12 3C6.5 3 2 6.6 2 11c0 2.5 1.5 4.8 3.9 6.3-.2.8-.7 2.5-.8 2.9 0 0-.1.2.1.3s.3 0 .3 0c.3 0 3.2-2.1 3.8-2.5.9.1 1.8.2 2.7.2 5.5 0 10-3.6 10-8S17.5 3 12 3z"/>
-                                </svg>
-                            </span>
-                            <span class="auto-nav-label" data-i18n="auto-linebot-title">LINE Bot</span>
-                            <span class="auto-nav-badge" id="auto-nav-linebot-badge"></span>
-                        </button>
-
-                        <button class="auto-nav-item" data-auto-tab="alert" data-auto-soon="1">
-                            <span class="auto-nav-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
-                                    <path d="M10 21a2 2 0 0 0 4 0"/>
-                                </svg>
-                            </span>
-                            <span class="auto-nav-label" data-i18n="auto-alert-title">智能提醒</span>
-                        </button>
                     </div>
                 </aside>
 

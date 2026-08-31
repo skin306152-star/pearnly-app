@@ -86,7 +86,6 @@ async function boot(page, groups, lang = 'zh') {
         if (p === '/api/workorder/orders') return json({ orders: [], count: 0 });
         if (p === '/api/me') return json({ username: 'reviewer' });
         if (p === '/api/workorder/review-queue') return json(queueFixture(groups));
-        if (p === '/api/ai/client-pool') return json({ groups: [] });
         return json({});
     });
     await page.addInitScript(

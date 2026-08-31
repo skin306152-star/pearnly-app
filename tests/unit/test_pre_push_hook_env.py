@@ -9,8 +9,8 @@
         它 subprocess.run(..., text=True) 读子进程管道,解码用的是 locale 编码(本机
         cp874)。子进程照 UTF-8 写、父进程照 cp874 读 → 读线程 UnicodeDecodeError →
         proc.stderr 变成 None → assertIn(str, None) TypeError。
-    什么都不设   → test_agent_capability_audit 红
-        它的子进程 print 中文进 cp874 管道 → UnicodeEncodeError → 退 1 → 当成闸真红。
+    什么都不设   → UTF-8 输出用例可能红
+        子进程 print 中文进 cp874 管道 → UnicodeEncodeError → 退 1 → 当成闸真红。
 
 也就是说:按当时的钩子在本机推送,会被两条假红轮流拦住;想绕就只能 --no-verify,那等于
 把整排闸一起关掉。PYTHONUTF8=1 是 UTF-8 模式,连 locale 编码一起改,两个方向才对齐。
@@ -39,7 +39,7 @@ HOOK = ROOT / "scripts" / "git-hooks" / "pre-push"
 
 # 两个金丝雀:一个证明「父进程读子进程管道」这条路通,一个证明「子进程打印中文」这条路通。
 # 它们是本机唯一两个对环境编码敏感的模块 —— 换句话说,钩子设错了先在这两条上炸。
-CANARIES = ("tests.unit.test_file_crypto", "tests.unit.test_agent_capability_audit")
+CANARIES = ("tests.unit.test_file_crypto", "tests.unit.test_legacy_cowork_line_removed")
 
 _EXPORT = re.compile(r"^export\s+([A-Z_][A-Z0-9_]*)=(\S*)\s*$", re.M)
 _ENCODING_VARS = ("PYTHONUTF8", "PYTHONIOENCODING")

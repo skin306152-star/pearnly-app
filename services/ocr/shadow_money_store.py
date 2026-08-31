@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """影子双跑落库:B 档(2.5-lite)发票钱字段 vs 3.5 后台复核的逐字段比对结果。
 只存数字与 match 布尔(不重复存图·复用已存原图),量 B 真错率 + 现有闸抓取率。
-建表照 line_agent_anchors 范式(prod 无 alembic 钩子 → 首用 ensure 幂等自愈)+ 租户 RLS。"""
+生产不跑 alembic,因此首用 ensure 幂等自愈并启用租户 RLS。"""
 
 from __future__ import annotations
 

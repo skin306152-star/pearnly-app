@@ -289,8 +289,6 @@ def remove_employee(tenant_id: str, employee_user_id: str) -> bool:
             for sql in [
                 "DELETE FROM ocr_history WHERE user_id = %s",
                 "DELETE FROM erp_push_logs WHERE user_id = %s",
-                "DELETE FROM line_bindings WHERE user_id = %s",
-                "DELETE FROM line_binding_codes WHERE user_id = %s",
                 "DELETE FROM user_settings WHERE user_id = %s",
             ]:
                 try:

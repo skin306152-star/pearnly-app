@@ -1,11 +1,11 @@
-"""Cowork LINE identity and connection-token services."""
+"""Cowork LINE membership identity services."""
 
 from .identity_store import (
     CoworkLineIdentityError,
     bind_identity,
-    consume_connect_token,
+    bind_identity_with_code,
     get_identity_status,
-    issue_connect_token,
+    issue_binding_code,
     resolve_active_identity,
     unbind_identity,
 )
@@ -13,9 +13,9 @@ from .identity_store import (
 __all__ = [
     "CoworkLineIdentityError",
     "bind_identity",
-    "consume_connect_token",
+    "bind_identity_with_code",
     "get_identity_status",
-    "issue_connect_token",
+    "issue_binding_code",
     "resolve_active_identity",
     "unbind_identity",
 ]

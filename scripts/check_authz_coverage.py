@@ -78,6 +78,7 @@ PUBLIC_ROUTES = {
     # 浏览器自动上报(无会话 · 只记一条截断日志后返 204 · body 有上限 · 不读写业务数据)
     ("POST", "/api/csp-report"),
     # webhook(签名校验在实现内:LINE signature / GitHub secret)
+    ("POST", "/api/line/webhook"),  # Cowork 默认 channel · LINE signature 验签即凭证
     ("POST", "/api/line/dms/webhook"),  # DMS channel · line_client.verify_signature 验签即凭证
     ("POST", "/api/line/erp/webhook"),  # ERP 独立 channel · ERP secret 验 LINE signature
     ("POST", "/api/line/liff/auth"),  # LIFF id_token 即凭证(LINE verify 验签)

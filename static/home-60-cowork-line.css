@@ -19,6 +19,94 @@
   background: var(--card);
 }
 
+.cowork-line-panel__setup {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.cowork-line-panel__setup h3,
+.cowork-line-panel__setup p {
+  margin: 0;
+}
+
+.cowork-line-panel__setup p {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cowork-line-panel__steps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.cowork-line-panel__steps section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.cowork-line-panel__steps strong {
+  align-self: stretch;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.cowork-line-panel__qr {
+  width: 180px;
+  height: 180px;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.cowork-line-panel__qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cowork-line-panel__bot-id,
+.cowork-line-panel__code-box > span,
+.cowork-line-panel__expires {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.cowork-line-panel__code-box {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.cowork-line-panel__code {
+  color: var(--ink);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  line-height: 1;
+}
+
+.cowork-line-panel__expires.is-expired {
+  color: var(--danger);
+}
+
 .cowork-line-panel__identity {
   display: flex;
   align-items: center;
@@ -144,6 +232,14 @@
 @media (max-width: 600px) {
   .cowork-line-panel__card {
     padding: 16px;
+  }
+
+  .cowork-line-panel__setup {
+    padding: 16px;
+  }
+
+  .cowork-line-panel__steps {
+    grid-template-columns: 1fr;
   }
 
   .cowork-line-panel__actions {

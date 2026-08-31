@@ -144,29 +144,11 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
         )}</button>`;
         return;
     }
-    const mayManage = !!ep.config || ep.binding_generation !== undefined;
-    if (!mayManage) {
-        acts.innerHTML = '';
-        return;
-    }
-    const generation = Number(ep.binding_generation || 0);
-    if (generation === 0 && ep.adapter === 'express') {
-        acts.innerHTML =
-            `<button type="button" class="dx-erp-toggle" data-erp-enroll>${esc(T('exp-done'))}</button>` +
-            `<button type="button" class="dx-erp-cta" data-erp-config>${esc(T('dx-erp-config'))}</button>`;
-        return;
-    }
-    const confirm =
-        ep.adapter === 'express' &&
-        ['unbound', 'mismatch'].includes(connectionState(ep)) &&
-        ep.live_account_set &&
-        ep.live_profile_key
-            ? `<button type="button" class="dx-erp-cta" data-erp-profile-confirm>${esc(T('exp-done'))}</button>`
-            : '';
     acts.innerHTML =
         `<button type="button" class="dx-erp-toggle" data-erp-toggle>${esc(
             T(enabled ? 'dx-erp-disable' : 'dx-erp-enable')
-        )}</button>` + confirm;
+        )}</button>` +
+        `<button type="button" class="dx-erp-cta" data-erp-config>${esc(T('dx-erp-config'))}</button>`;
 }
 
 function openWizardFor(adapter: string, ep: unknown): void {
@@ -210,32 +192,6 @@ async function toggleEndpoint(card: HTMLElement): Promise<void> {
     }
 }
 
-async function enrollEndpoint(card: HTMLElement): Promise<void> {
-    const ep = (card as unknown as { _ep?: EpRec | null })._ep;
-    if (!ep?.id || Number(ep.binding_generation || 0) !== 0) return;
-    const response = await fetch(`/api/erp/endpoints/${encodeURIComponent(ep.id)}/shared/enroll`, {
-        method: 'POST',
-        headers: authHeaders(true),
-        body: JSON.stringify({ expected_generation: 0 }),
-    });
-    if (response.ok) window.dispatchEvent(new CustomEvent('pearnly:erp-endpoints-changed'));
-}
-
-async function confirmProfile(card: HTMLElement): Promise<void> {
-    const ep = (card as unknown as { _ep?: EpRec | null })._ep;
-    const generation = Number(ep?.binding_generation || 0);
-    if (!ep?.id || generation < 1) return;
-    const response = await fetch(
-        `/api/erp/endpoints/${encodeURIComponent(ep.id)}/shared/profile/confirm`,
-        {
-            method: 'POST',
-            headers: authHeaders(true),
-            body: JSON.stringify({ expected_generation: generation, confirm: true }),
-        }
-    );
-    if (response.ok) window.dispatchEvent(new CustomEvent('pearnly:erp-endpoints-changed'));
-}
-
 function bindClicks(zone: HTMLElement): void {
     zone.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
@@ -244,16 +200,6 @@ function bindClicks(zone: HTMLElement): void {
         if (target.closest('[data-erp-toggle]')) {
             e.preventDefault();
             void toggleEndpoint(card);
-            return;
-        }
-        if (target.closest('[data-erp-enroll]')) {
-            e.preventDefault();
-            void enrollEndpoint(card);
-            return;
-        }
-        if (target.closest('[data-erp-profile-confirm]')) {
-            e.preventDefault();
-            void confirmProfile(card);
             return;
         }
         if (target.closest('[data-erp-config]')) {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from urllib.parse import quote
+import os
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -12,7 +12,7 @@ from core.route_helpers import _log_op
 from services.cowork_line.identity_store import (
     CoworkLineIdentityError,
     get_identity_status,
-    issue_connect_token,
+    issue_binding_code,
     unbind_identity,
 )
 
@@ -35,6 +35,7 @@ def _http_error(exc: CoworkLineIdentityError) -> HTTPException:
         "line_conflict": 409,
         "token_expired": 410,
         "invalid_line_user": 422,
+        "code_unavailable": 503,
     }.get(exc.code, 400)
     return HTTPException(status_code=status_code, detail=f"cowork_line.{exc.code}")
 
@@ -48,25 +49,29 @@ async def cowork_line_identity(request: Request):
         raise _http_error(exc) from exc
 
 
-@router.post("/api/cowork-line/connect/start")
-async def cowork_line_connect_start(request: Request):
+@router.post("/api/cowork-line/binding-code")
+async def cowork_line_binding_code(request: Request):
     user = get_current_user_from_request(request)
     try:
-        issued = await asyncio.to_thread(issue_connect_token, **_identity_args(user))
+        issued = await asyncio.to_thread(issue_binding_code, **_identity_args(user))
     except CoworkLineIdentityError as exc:
         raise _http_error(exc) from exc
-    url = "/api/auth/line/start?entry=cowork&connect_token=" + quote(issued["token"], safe="")
     await asyncio.to_thread(
         _log_op,
         request,
         user,
-        "cowork.line.connect_start",
+        "cowork.line.binding_code",
         "user",
         str(user["id"]),
         None,
         {"expires_at": issued["expires_at"]},
     )
-    return {"url": url}
+    return {
+        **issued,
+        "bot_friend_url": os.environ.get("LINE_BOT_FRIEND_URL")
+        or "https://line.me/R/ti/p/@pearnly",
+        "bot_basic_id": os.environ.get("LINE_BOT_BASIC_ID") or "@pearnly",
+    }
 
 
 @router.delete("/api/cowork-line/identity")

@@ -11,7 +11,7 @@ const BASE_URL = process.env.PEARNLY_E2E_BASE_URL || 'https://pearnly.com';
 test.describe('Cowork LINE 自助绑定', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
 
-    test('状态接口 + 一次性 OAuth 入口 + 旧机器人入口关闭', async ({ browser }) => {
+    test('状态接口 + 六位绑定码入口 + 旧机器人入口关闭', async ({ browser }) => {
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
         await doUiLogin(page);
@@ -31,18 +31,17 @@ test.describe('Cowork LINE 自助绑定', () => {
             expect(typeof statusBody.connected).toBe('boolean');
 
             if (!statusBody.connected) {
-                const start = await apiCtx.post('/api/cowork-line/connect/start');
+                const start = await apiCtx.post('/api/cowork-line/binding-code');
                 const startBody = await start.json().catch(() => ({}));
                 expect(start.status(), JSON.stringify(startBody)).toBe(200);
-                expect(startBody.url).toMatch(
-                    /^\/api\/auth\/line\/start\?entry=cowork&connect_token=clc_/
-                );
+                expect(startBody.code).toMatch(/^\d{6}$/);
+                expect(startBody.bot_friend_url).toMatch(/^https:\/\/line\.me\//);
             }
 
             for (const oldPath of [
                 '/api/line/binding',
-                '/api/line/binding-code',
                 '/api/me/connect-line/start',
+                '/api/cowork-line/connect/start',
             ]) {
                 expect((await apiCtx.get(oldPath)).status(), `${oldPath} 应已关闭`).toBe(404);
             }

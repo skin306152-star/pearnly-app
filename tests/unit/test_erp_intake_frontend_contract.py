@@ -66,8 +66,10 @@ def test_shared_express_card_uses_safe_projection_and_managed_lifecycle():
     card = read("src/home/dms-intake-erp-cards.ts")
     assert "connection_state" in card
     assert "account_set" in card
-    assert "/shared/enroll" in card
-    assert "/shared/profile/confirm" in card
+    assert "data-erp-toggle" in card
+    assert "data-erp-config" in card
+    assert "data-erp-enroll" not in card
+    assert "data-erp-profile-confirm" not in card
     assert "expected_generation: generation" in card
     assert "operation_id: operationId()" in card
 

@@ -19,20 +19,18 @@ def test_cowork_integration_uses_the_identity_panel_without_bot_copy():
 
 def test_cowork_identity_panel_calls_only_the_new_contract():
     source = read("src/home/cowork-line/identity-panel.ts")
-    assert source.count("'/api/cowork-line/identity'") == 2
-    assert "'/api/cowork-line/connect/start'" in source
+    assert source.count("'/api/cowork-line/identity'") == 3
+    assert "'/api/cowork-line/binding-code'" in source
     assert "method: 'POST'" in source
     assert "method: 'DELETE'" in source
     assert "/api/line/binding" not in source
-    assert "binding-code" not in source
+    assert "/api/cowork-line/connect/start" not in source
     assert "subscribeI18n?.('cowork-line-identity'" in source
-    assert "searchParams.get('cowork_line_connect')" in source
-    assert "searchParams.delete('cowork_line_connect')" in source
     assert "friendship_ready" in source
-    assert "friend_required" in source
     assert "https://line.me/R/ti/p/@pearnly" in source
-    assert "重新检查" in source
-    assert "打开 Cowork LINE" in source
+    assert "扫码添加好友" in source
+    assert "绑定码" in source
+    assert "在 LINE 打开" in source
 
 
 def test_drawer_mounts_cowork_identity_instead_of_the_legacy_bot_panel():

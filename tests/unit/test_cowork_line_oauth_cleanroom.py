@@ -6,7 +6,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import oauth_line_routes
-from services.cowork_line import identity_store
 
 
 class _Response:
@@ -44,11 +43,6 @@ class _LineClient:
             )
         return _Response(404, {})
 
-    async def get(self, url, **kwargs):
-        if url.endswith("/friendship/v1/status"):
-            return _Response(200, {"friendFlag": True})
-        return _Response(404, {})
-
 
 _USER = {
     "id": "user-1",
@@ -67,16 +61,6 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
 
         self.legacy_bind = mock.Mock(return_value=True)
         self.find_login_user = mock.Mock(return_value=dict(_USER))
-        self.consume_token = mock.Mock(
-            return_value={
-                "membership_id": "membership-1",
-                "tenant_id": "tenant-1",
-                "user_id": "user-1",
-            }
-        )
-        self.bind_identity = mock.Mock(
-            return_value={"success": True, "conflict": False, "code": None}
-        )
 
         self._patches = [
             mock.patch.object(oauth_line_routes, "_LINE_LOGIN_CHANNEL_ID", "channel-id"),
@@ -93,8 +77,6 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
             ),
             mock.patch.object(oauth_line_routes.db, "update_last_login", return_value=None),
             mock.patch.object(oauth_line_routes.db, "update_user_avatar", return_value=None),
-            mock.patch.object(identity_store, "consume_connect_token", self.consume_token),
-            mock.patch.object(identity_store, "bind_identity", self.bind_identity),
         ]
         for patcher in self._patches:
             patcher.start()
@@ -112,56 +94,8 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("mrpilot_token", response.text)
         self.legacy_bind.assert_not_called()
-        self.consume_token.assert_not_called()
-        self.bind_identity.assert_not_called()
 
-    def test_cowork_connect_state_only_writes_new_identity(self):
-        response = self.client.get(
-            "/api/auth/line/callback?code=code&state=cowork_line:clc_once",
-            follow_redirects=False,
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            response.headers["location"], "/cowork?cowork_line_connect=ok#/integrations"
-        )
-        self.consume_token.assert_called_once_with("clc_once")
-        self.bind_identity.assert_called_once_with(
-            membership_id="membership-1",
-            tenant_id="tenant-1",
-            user_id="user-1",
-            line_user_id="U-cowork",
-            display_name="Pearnly Staff",
-            picture_url="https://example.test/avatar.png",
-            friendship_ready=True,
-        )
-        self.find_login_user.assert_not_called()
-        self.legacy_bind.assert_not_called()
-
-    def test_cowork_connect_conflict_and_expiry_are_not_reported_as_success(self):
-        self.bind_identity.side_effect = identity_store.CoworkLineIdentityError("line_conflict")
-        conflict = self.client.get(
-            "/api/auth/line/callback?code=code&state=cowork_line:clc_conflict",
-            follow_redirects=False,
-        )
-        self.assertEqual(
-            conflict.headers["location"],
-            "/cowork?cowork_line_connect=conflict#/integrations",
-        )
-
-        self.bind_identity.side_effect = None
-        self.bind_identity.reset_mock()
-        self.consume_token.side_effect = identity_store.CoworkLineIdentityError("token_expired")
-        expired = self.client.get(
-            "/api/auth/line/callback?code=code&state=cowork_line:clc_expired",
-            follow_redirects=False,
-        )
-        self.assertEqual(
-            expired.headers["location"],
-            "/cowork?cowork_line_connect=expired#/integrations",
-        )
-
-    def test_start_wraps_connect_token_and_prompts_for_bot_friendship(self):
+    def test_cowork_login_never_accepts_a_binding_token_or_prompts_for_bot(self):
         response = self.client.get(
             "/api/auth/line/start?entry=cowork&connect_token=clc_once",
             follow_redirects=False,
@@ -169,31 +103,9 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 302)
         query = parse_qs(urlparse(response.headers["location"]).query)
-        self.assertEqual(query["state"], ["cowork_line:clc_once"])
-        self.assertEqual(query["bot_prompt"], ["aggressive"])
-        self.assertEqual(self.client.get("/api/me/connect-line/start").status_code, 404)
-
-    def test_normal_login_does_not_prompt_for_cowork_bot(self):
-        response = self.client.get(
-            "/api/auth/line/start?entry=cowork",
-            follow_redirects=False,
-        )
-
-        query = parse_qs(urlparse(response.headers["location"]).query)
+        self.assertNotEqual(query["state"], ["cowork_line:clc_once"])
         self.assertNotIn("bot_prompt", query)
-
-    def test_cowork_connect_keeps_friendship_pending_when_user_did_not_add_bot(self):
-        with mock.patch.object(oauth_line_routes, "_friendship_ready", return_value=False):
-            response = self.client.get(
-                "/api/auth/line/callback?code=code&state=cowork_line:clc_pending",
-                follow_redirects=False,
-            )
-
-        self.assertEqual(
-            response.headers["location"],
-            "/cowork?cowork_line_connect=friend_required#/integrations",
-        )
-        self.assertFalse(self.bind_identity.call_args.kwargs["friendship_ready"])
+        self.assertEqual(self.client.get("/api/me/connect-line/start").status_code, 404)
 
 
 if __name__ == "__main__":

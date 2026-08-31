@@ -37,31 +37,32 @@ def active_membership():
 
 
 class CoworkLineIdentityTests(unittest.TestCase):
-    def test_issue_connect_token_hashes_raw_token_and_uses_dict_rows(self):
-        cursor = FakeCursor([active_membership()])
-        with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
-            issued = identity_store.issue_connect_token(user_id="user-1", tenant_id="tenant-1")
+    def test_issue_binding_code_hashes_six_digits_and_invalidates_older_code(self):
+        cursor = FakeCursor([active_membership(), {"expires_at": "stored"}])
+        with (
+            patch.object(identity_store.db, "get_cursor", cursor_context(cursor)),
+            patch.object(identity_store.secrets, "randbelow", return_value=234567),
+        ):
+            issued = identity_store.issue_binding_code(user_id="user-1", tenant_id="tenant-1")
 
-        self.assertTrue(issued["token"].startswith("clc_"))
+        self.assertEqual(issued["code"], "334567")
         insert = next(
             call for call in cursor.calls if "INSERT INTO cowork_line_connect_tokens" in call[0]
         )
         stored_hash = insert[1][2]
-        self.assertEqual(stored_hash, hashlib.sha256(issued["token"].encode()).hexdigest())
-        self.assertNotIn(issued["token"], repr(cursor.calls))
-        self.assertFalse(
-            any("SELECT 1 FROM cowork_line_identities" in sql for sql, _ in cursor.calls)
-        )
+        self.assertEqual(stored_hash, hashlib.sha256(issued["code"].encode()).hexdigest())
+        self.assertNotIn(issued["code"], repr(cursor.calls))
+        self.assertTrue(any("SET used_at = NOW()" in sql for sql, _ in cursor.calls))
 
-    def test_issue_connect_token_rejects_inactive_membership(self):
+    def test_issue_binding_code_rejects_inactive_membership(self):
         cursor = FakeCursor([None])
         with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
             with self.assertRaisesRegex(
                 identity_store.CoworkLineIdentityError, "membership_inactive"
             ):
-                identity_store.issue_connect_token(user_id="user-1", tenant_id="tenant-1")
+                identity_store.issue_binding_code(user_id="user-1", tenant_id="tenant-1")
 
-    def test_consume_connect_token_is_one_time_and_returns_membership_context(self):
+    def test_binding_code_binds_identity_before_marking_code_used(self):
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
         cursor = FakeCursor(
             [
@@ -71,11 +72,16 @@ class CoworkLineIdentityTests(unittest.TestCase):
                     "tenant_id": "tenant-1",
                     "user_id": "user-1",
                     "expires_at": expires_at,
-                }
+                },
+                None,
             ]
         )
         with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
-            context = identity_store.consume_connect_token("clc_valid")
+            context = identity_store.bind_identity_with_code(
+                code="123456",
+                line_user_id="U-line",
+                display_name="Nok",
+            )
 
         self.assertEqual(
             context,
@@ -85,12 +91,17 @@ class CoworkLineIdentityTests(unittest.TestCase):
                 "user_id": "user-1",
             },
         )
-        self.assertTrue(any("SET used_at = NOW()" in sql for sql, _ in cursor.calls))
+        statements = [sql for sql, _ in cursor.calls]
+        bind_index = next(
+            i for i, sql in enumerate(statements) if "INSERT INTO cowork_line_identities" in sql
+        )
+        used_index = next(i for i, sql in enumerate(statements) if "WHERE id = %s" in sql)
+        self.assertLess(bind_index, used_index)
         select_sql = cursor.calls[0][0]
         self.assertIn("m.status = 'active'", select_sql)
         self.assertIn("u.is_active = TRUE", select_sql)
 
-    def test_consume_expired_token_marks_it_used_and_reports_expired(self):
+    def test_binding_code_conflict_does_not_mark_code_used(self):
         cursor = FakeCursor(
             [
                 {
@@ -98,14 +109,15 @@ class CoworkLineIdentityTests(unittest.TestCase):
                     "membership_id": "membership-1",
                     "tenant_id": "tenant-1",
                     "user_id": "user-1",
-                    "expires_at": datetime.now(timezone.utc) - timedelta(seconds=1),
-                }
+                    "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
+                },
+                {"membership_id": "membership-2", "revoked_at": None},
             ]
         )
         with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
-            with self.assertRaisesRegex(identity_store.CoworkLineIdentityError, "token_expired"):
-                identity_store.consume_connect_token("clc_expired")
-        self.assertTrue(any("SET used_at = NOW()" in sql for sql, _ in cursor.calls))
+            with self.assertRaisesRegex(identity_store.CoworkLineIdentityError, "line_conflict"):
+                identity_store.bind_identity_with_code(code="123456", line_user_id="U-other")
+        self.assertFalse(any("WHERE id = %s" in sql for sql, _ in cursor.calls))
 
     def test_bind_identity_raises_line_conflict_for_another_membership(self):
         cursor = FakeCursor(
@@ -167,20 +179,18 @@ class CoworkLineIdentityTests(unittest.TestCase):
             },
         )
 
-    def test_connect_start_returns_oauth_bridge_url(self):
+    def test_binding_code_route_returns_friend_target(self):
         request = object()
         user = {"id": "user-1", "tenant_id": "tenant-1"}
-        issued = {"token": "clc_a+b/c", "expires_at": "2026-08-31T12:00:00+00:00"}
+        issued = {"code": "123456", "expires_at": "2026-08-31T12:00:00+00:00"}
         with (
             patch.object(routes, "get_current_user_from_request", return_value=user),
-            patch.object(routes, "issue_connect_token", return_value=issued),
+            patch.object(routes, "issue_binding_code", return_value=issued),
             patch.object(routes, "_log_op"),
         ):
-            result = asyncio.run(routes.cowork_line_connect_start(request))
-        self.assertEqual(
-            result,
-            {"url": "/api/auth/line/start?entry=cowork&connect_token=clc_a%2Bb%2Fc"},
-        )
+            result = asyncio.run(routes.cowork_line_binding_code(request))
+        self.assertEqual(result["code"], "123456")
+        self.assertEqual(result["bot_basic_id"], "@pearnly")
 
 
 if __name__ == "__main__":

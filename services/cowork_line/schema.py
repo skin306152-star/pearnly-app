@@ -1,4 +1,4 @@
-"""Idempotent schema bootstrap for the standalone Cowork LINE identity model."""
+"""Idempotent schema bootstrap for Cowork LINE identities and binding codes."""
 
 from __future__ import annotations
 

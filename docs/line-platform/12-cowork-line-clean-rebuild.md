@@ -46,7 +46,7 @@ Pearnly Cowork LINE 不是聊天机器人，也没有采购/销售方向。它�
 
 新身份表：
 
-- `cowork_line_connect_tokens`：一次性、短期、只存 token hash，指向 membership。
+- `cowork_line_connect_tokens`：一次性、短期、只存六位绑定码 hash，指向 membership。
 - `cowork_line_identities`：一 membership 对一个 LINE user；LINE user 全局唯一；带 tenant、绑定/撤销/最近活动时间。
 
 绝不读写旧 `line_bindings / line_binding_codes`，也不复用 DMS/ERP 的绑定表。
@@ -73,11 +73,11 @@ Pearnly Cowork LINE 不是聊天机器人，也没有采购/销售方向。它�
 
 ### 旧 Cowork LINE 必删
 
-- 旧 `/api/line/webhook`、`/api/line/binding*` 与 purchase LIFF 入口。
+- 旧 `/api/line/webhook` 业务实现、`/api/line/binding*` 与 purchase LIFF 入口。
 - `services/line_binding/**` 中 Cowork 聊天、意图、记忆、费用、卡片、群聊、提醒和客户池业务。
 - 旧 LINE 图片→采购/销售/费用分流链、旧语音与文本记账链。
 - 旧 LINE Bot 集成面板、automation 面板、Rich Menu/图卡与教学文案。
-- OAuth 中自动注册/自动写旧绑定/自动欢迎卡分支。
+- OAuth 中 Cowork 自动绑定/自动欢迎卡分支。
 - 对应旧测试、startup ensure、RLS boot、flags 和无引用资产。
 
 旧表只在代码彻底断开、必要数据备份并完成生产验收后，由单独 migration 删除；不能手工 DROP。
@@ -90,9 +90,9 @@ Pearnly Cowork LINE 不是聊天机器人，也没有采购/销售方向。它�
 
 实现：
 
-- 新建 `services/cowork_line/schema.py`、`identity_store.py`、`connect.py`。
+- 新建 `services/cowork_line/schema.py`、`identity_store.py`。
 - 新建 `routes/cowork_line_binding_routes.py`。
-- 新建 `src/home/cowork-line/connect.ts`。
+- 新建 `src/home/cowork-line/identity-panel.ts`。
 - 收窄 `/console` 邀请 UI；成员行只显示 LINE 状态，绑定按钮只对本人出现。
 - 同一提交删除旧 Cowork binding API、旧绑定面板和 OAuth 自动绑定分支。
 
@@ -100,15 +100,14 @@ Pearnly Cowork LINE 不是聊天机器人，也没有采购/销售方向。它�
 
 #### C1.1 · 好友与可用状态补齐
 
-真实场景：成员完成 LINE Login 后会自然认为已经能给 Cowork 发文件；仅保存 LINE 身份、却没有添加官方号，会形成“网页显示成功、LINE 里找不到入口”的假完成。
+真实场景：老板和员工都需要一条不依赖邮箱、容易讲清楚的绑定路径，同时必须保证每个人只绑定自己的 LINE。
 
-对标 LINE 官方 Add friend option：Cowork 连接授权使用 `bot_prompt=aggressive`，授权后服务端读取 friendship status。产品状态只允许：
+绑定流程按用户确认的旧交互恢复：网页显示官方号二维码和六位绑定码；成员扫码添加好友后，在 LINE 对话里发送绑定码。服务端在同一事务内校验 active membership、绑定 LINE 身份并作废绑定码。产品状态只允许：
 
-- 未绑定。
-- 已绑定、待添加好友：提供“去 LINE 添加好友”和“重新检查”。
+- 未绑定/绑定中：提供“扫码添加好友、发送六位绑定码、重新获取绑定码”。
 - 可以使用：提供“打开 Cowork LINE”。
 
-LINE 不允许静默加好友；成员必须确认一次。已有绑定可以重新发起检查，不需要先解绑。好友状态未验证时不得显示“可以使用”。
+LINE 不允许静默加好友；成员必须扫码确认一次。网页轮询绑定状态，收到绑定码后自动切换为“可以使用”。普通 LINE Login 只负责登录，不参与 Cowork 身份绑定。
 
 ### C2 · 上传、OCR、Cowork 编辑器
 

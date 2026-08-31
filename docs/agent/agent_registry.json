@@ -112,6 +112,7 @@
   "knowledge_routes": "B",
   "knowledge_rules_routes": "B",
   "cowork_line_binding_routes": "C",
+  "cowork_line_webhook_routes": "D",
   "line_account_merge_routes": "D",
   "line_dms_webhook_routes": "D",
   "line_dms_booking_edit_routes": "C",

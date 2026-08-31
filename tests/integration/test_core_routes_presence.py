@@ -97,7 +97,8 @@ CORE_ROUTES = {
     ],
     "Cowork LINE身份/cowork-line": [
         "/api/cowork-line/identity",
-        "/api/cowork-line/connect/start",
+        "/api/cowork-line/binding-code",
+        "/api/line/webhook",
     ],
     "改密/password": [
         "/api/me/change_password",

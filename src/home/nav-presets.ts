@@ -72,10 +72,10 @@ export const POS_PRESET: NavPreset = {
     avatarHide: POS_AVATAR_HIDE,
 };
 
-// Cowork 版(entry=cowork · 2026-08-26 拍板 · 协同工作台 canonical):仅 首页 + Pearnly Cowork +
-// 主数据 + 使用教程。底部账号 / 右上账套切换 / 头像保留(avatarHide 沿用会计版收缩)。
+// Cowork 版(entry=cowork · 协同工作台 canonical):首页 + Pearnly Cowork + 主数据 + 集成 +
+// 使用教程。集成恢复 Cowork LINE 主账号绑定入口；底部账号 / 右上账套切换 / 头像保留。
 export const COWORK_PRESET: NavPreset = {
-    show: ['dashboard', 'cowork', 'master', 'clients', 'company', 'guide'],
+    show: ['dashboard', 'cowork', 'master', 'clients', 'company', 'integrations', 'guide'],
     home: 'dashboard',
     avatarHide: FIRM_AVATAR_HIDE,
 };

@@ -108,6 +108,7 @@ export const COWORK_ALLOWED_ROUTES = new Set<string>([
     'reconcile',
     'clients',
     'company',
+    'integrations',
     'guide',
 ]);
 

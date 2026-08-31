@@ -238,8 +238,11 @@ class CoworkErpNavPresetTests(unittest.TestCase):
     def test_cowork_preset_menu_only(self):
         text = _read("src/home/nav-presets.ts")
         self.assertIn("COWORK_PRESET", text)
-        for key in ["'dashboard'", "'cowork'", "'master'", "'guide'"]:
-            self.assertIn(key, text)
+        cowork = text.split("export const COWORK_PRESET", 1)[1].split("export const ERP_PRESET", 1)[
+            0
+        ]
+        for key in ["'dashboard'", "'cowork'", "'master'", "'integrations'", "'guide'"]:
+            self.assertIn(key, cowork)
 
     def test_erp_preset_menu_only_no_guide(self):
         text = _read("src/home/nav-presets.ts")
@@ -270,6 +273,7 @@ class CoworkErpEntryGuardTests(unittest.TestCase):
             "reconcile",
             "clients",
             "company",
+            "integrations",
             "guide",
         ):
             self.assertIn(f"'{route}'", cowork)

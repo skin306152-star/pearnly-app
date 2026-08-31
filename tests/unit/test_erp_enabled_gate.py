@@ -55,7 +55,14 @@ class EnabledGateTests(unittest.TestCase):
         dedup.assert_not_called()
 
     def test_erp_entry_cannot_push_unconfirmed_history(self):
-        user = {"id": "u-test", "tenant_id": "t1", "entry": "erp", "plan": "pro"}
+        user = {
+            "id": "u-test",
+            "tenant_id": "t1",
+            "entry": "erp",
+            "plan": "pro",
+            "role": "owner",
+            "is_active": True,
+        }
         with (
             patch.object(erp_push_log_routes, "get_current_user_from_request", return_value=user),
             patch.object(erp_push_log_routes, "_check_push_access", return_value=None),

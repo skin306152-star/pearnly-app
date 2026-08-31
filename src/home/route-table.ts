@@ -12,6 +12,7 @@ export const VALID_ROUTES = [
     'dashboard',
     'history',
     'integrations',
+    'erp-team',
     'push-logs',
     'templates',
     'api-keys',
@@ -130,6 +131,7 @@ export const ERP_ALLOWED_ROUTES = new Set<string>([
     'clients',
     'company',
     'integrations',
+    'erp-team',
     'push-logs',
 ]);
 
@@ -140,6 +142,7 @@ export const ROUTE_LOADERS: Record<string, string> = {
     history: 'loadHistoryPage',
     'push-logs': 'loadPushLogs',
     clients: 'loadClientsPage',
+    'erp-team': 'loadErpTeam',
     company: 'loadCompanyProfile',
     knowledge: 'loadKnowledgePage',
     inventory: 'loadInventoryPage',

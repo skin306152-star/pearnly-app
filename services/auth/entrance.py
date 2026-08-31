@@ -221,6 +221,10 @@ def require_erp_portal(user: dict, *, also_allowed: Optional[Set[str]] = None) -
     allowed = frozenset(also_allowed or ())
     if entry in _NON_ERP_ENTRANCES and entry not in allowed:
         raise HTTPException(403, detail="authz.entrance_scope")
+    if entry == ERP:
+        from services.erp.team_access import require_active_erp_user
+
+        require_active_erp_user(user)
     return user
 
 
@@ -247,6 +251,12 @@ def login_entrance_allowed(entry: Optional[str], user: dict) -> bool:
                 sorted(ents),
             )
             return False
+        if entry == ERP and tenant_id:
+            from services.erp.team_access import login_allowed
+
+            if not login_allowed(user):
+                logger.info("[entrance] deny ERP team login · user=%s", user.get("id"))
+                return False
         return True
     except (
         Exception

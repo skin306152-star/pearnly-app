@@ -122,6 +122,44 @@ def _disable_other_auto_push(cur, user_id: str, keep_endpoint_id) -> None:
     )
 
 
+def create_erp_endpoint_with_cursor(
+    cur,
+    *,
+    user_id: str,
+    name: str,
+    adapter: str,
+    config: Dict[str, Any],
+    is_default: bool = False,
+    auto_push: bool = False,
+) -> Optional[str]:
+    import json as _json
+
+    is_express = (adapter or "").strip().lower() == "express"
+    if is_express:
+        existing = _existing_express_id(cur, user_id)
+        if existing:
+            return existing
+    if is_default:
+        cur.execute(
+            "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s "
+            "AND binding_generation = 0",
+            (user_id,),
+        )
+    cur.execute(
+        """
+        INSERT INTO erp_endpoints (user_id, name, adapter, config, is_default, auto_push,
+                                   binding_generation)
+        VALUES (%s, %s, %s, %s::jsonb, %s, %s, 0)
+        RETURNING id
+        """,
+        (user_id, name, adapter, _json.dumps(config), is_default, auto_push),
+    )
+    row = cur.fetchone()
+    if auto_push and row:
+        _disable_other_auto_push(cur, user_id, row["id"])
+    return str(row["id"]) if row else None
+
+
 def create_erp_endpoint(
     user_id: str,
     name: str,
@@ -131,41 +169,23 @@ def create_erp_endpoint(
     auto_push: bool = False,
 ) -> Optional[str]:
     """创建端点。如果 is_default=True,会自动取消其他端点的默认状态。返回新 id"""
-    import json as _json
     import traceback as _tb
 
     global _last_create_endpoint_error
     is_express = (adapter or "").strip().lower() == "express"
     try:
         with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
-            # express 单例:已有就复用,绝不建第二条(向导竞态/多标签会重复 POST)。
-            if is_express:
-                existing = _existing_express_id(cur, user_id)
-                if existing:
-                    _last_create_endpoint_error = None
-                    return existing
-            if is_default:
-                cur.execute(
-                    "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s "
-                    "AND binding_generation = 0",
-                    (user_id,),
-                )
-            cur.execute(
-                """
-                INSERT INTO erp_endpoints (user_id, name, adapter, config, is_default, auto_push,
-                                           binding_generation)
-                VALUES (%s, %s, %s, %s::jsonb, %s, %s, 0)
-                RETURNING id
-            """,
-                (user_id, name, adapter, _json.dumps(config), is_default, auto_push),
+            endpoint_id = create_erp_endpoint_with_cursor(
+                cur,
+                user_id=user_id,
+                name=name,
+                adapter=adapter,
+                config=config,
+                is_default=is_default,
+                auto_push=auto_push,
             )
-            row = cur.fetchone()
-            # 自动推送单例(2026-07-01 Zihao 拍板 · 防双推):同一用户只能有一个端点开自动推
-            # → 新端点设自动时,把其它端点的 auto_push 全关掉。手动/停用不受影响。
-            if auto_push and row:
-                _disable_other_auto_push(cur, user_id, row["id"])
             _last_create_endpoint_error = None
-            return str(row["id"]) if row else None
+            return endpoint_id
     except Exception as e:
         # 并发越过上面的查重后撞唯一索引 → 复用已存在的 express,不当失败。
         if is_express:
@@ -180,9 +200,6 @@ def create_erp_endpoint(
         _last_create_endpoint_error = (
             f"{type(e).__name__}: {str(e)[:200]} | " + _tb.format_exc()[-400:]
         )
-        # logger.exception captures the full stack — visible in
-        # journalctl. The module global gives the route a short
-        # version to surface in the 500 response.
         logger.exception("create_erp_endpoint failed")
         return None
 

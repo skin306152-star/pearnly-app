@@ -100,6 +100,7 @@ import './home/sales-products.js'; // 销项 PO-10 · 商品管理(主数据 · 
 import './home/expense-data.js'; // 费用数据(费用科目主数据 · 从采购设置搬入「商品」枢纽 · window.loadExpenseData)
 import './home/sales-account.js'; // 销项 PO-10 · 账套·开票资料(window.loadSalesAccount · 卖方+品牌+模板 · PUT sellers)
 import './home/sales-settings.js'; // 销项 PO-10 · 开票设置弹窗(window.openSalesSettings · GET/PUT /api/sales/settings · §M7)
+import './home/erp-team.js'; // ERP 老板端团队管理 · 成员最小权限 / ERP 分配 / LINE 绑定
 import './home/sales-wizard.js'; // 销项 PO-10 · 开票向导(window.openSalesWizard · 5步 · 接 sellers/products/rd/create+issue · 自含计算/预览/i18n/io)
 import './home/module-nav.js'; // POS PO-A1 配套 · 导航按 GET /api/me/modules 显隐(收银业务组默认隐藏 · inventory/pos 开才显)
 import './home/inventory.js'; // POS PO-A4 · 库存后台主页(屏7 · window.loadInventoryPage · 接 GET /api/inventory/stock · 四态)

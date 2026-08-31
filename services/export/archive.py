@@ -46,7 +46,9 @@ def _subject_name(cur, *, tenant_id, workspace_client_id) -> str:
     return (row and row.get("name")) or f"套账{workspace_client_id}"
 
 
-def _posted_doc_ids(cur, *, tenant_id, workspace_client_id, date_from, date_to) -> list:
+def _posted_doc_ids(
+    cur, *, tenant_id, workspace_client_id, date_from, date_to, created_by=None
+) -> list:
     """范围内已入账(posted)单据 id(草稿/作废不归 · 契约 04 §七B)。"""
     sql = (
         "SELECT id, doc_date FROM purchase_docs "
@@ -59,12 +61,17 @@ def _posted_doc_ids(cur, *, tenant_id, workspace_client_id, date_from, date_to) 
     if date_to:
         sql += " AND doc_date <= %s"
         params.append(date_to)
+    if created_by is not None:
+        sql += " AND created_by = %s"
+        params.append(created_by)
     sql += " ORDER BY doc_date"
     cur.execute(sql, tuple(params))
     return [str(r["id"]) for r in cur.fetchall()]
 
 
-def gather_items(cur, *, tenant_id, workspace_client_id, doc_ids, evidence_mode="api") -> list:
+def gather_items(
+    cur, *, tenant_id, workspace_client_id, doc_ids, evidence_mode="api", created_by=None
+) -> list:
     """doc_ids → 导出 item 列表 {doc,lines,supplier,posting,evidence_url,image_ref}。
 
     evidence_mode='api' → evidence_url 用 bill-image 鉴权端点(Excel 用);
@@ -73,7 +80,11 @@ def gather_items(cur, *, tenant_id, workspace_client_id, doc_ids, evidence_mode=
     items = []
     for did in doc_ids:
         full = docs_svc.get_doc(
-            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=did
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=did,
+            created_by=created_by,
         )
         if not full:
             continue
@@ -107,7 +118,14 @@ def _category_names(cur, *, tenant_id, workspace_client_id) -> dict:
 
 
 def excel_bytes(
-    cur, *, tenant_id, workspace_client_id, date_from=None, date_to=None, lang="th"
+    cur,
+    *,
+    tenant_id,
+    workspace_client_id,
+    date_from=None,
+    date_to=None,
+    lang="th",
+    created_by=None,
 ) -> bytes:
     """同步导出:范围内已入账明细 → xlsx 字节流(零授权兜底)· 列头/枚举值随 lang。"""
     doc_ids = _posted_doc_ids(
@@ -116,6 +134,7 @@ def excel_bytes(
         workspace_client_id=workspace_client_id,
         date_from=date_from,
         date_to=date_to,
+        created_by=created_by,
     )
     items = gather_items(
         cur,
@@ -123,6 +142,7 @@ def excel_bytes(
         workspace_client_id=workspace_client_id,
         doc_ids=doc_ids,
         evidence_mode="api",
+        created_by=created_by,
     )
     cats = _category_names(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     rows = rows_svc.build_export_rows(items, category_names=cats, lang=lang)
@@ -172,13 +192,19 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
     ws = params.get("workspace_client_id")
     date_from, date_to = params.get("date_from"), params.get("date_to")
     lang = params.get("lang") or "th"
+    created_by = params.get("created_by")
 
     with db.get_cursor(commit=False) as cur:
         token = google_oauth.valid_access_token(cur, tenant_id=tid, workspace_client_id=ws)
         if not token:
             return ("__failed__", {"error_code": "google_not_connected"})
         doc_ids = _posted_doc_ids(
-            cur, tenant_id=tid, workspace_client_id=ws, date_from=date_from, date_to=date_to
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            date_from=date_from,
+            date_to=date_to,
+            created_by=created_by,
         )
         done_set = google_store.already_archived_ids(
             cur, tenant_id=tid, workspace_client_id=ws, doc_ids=doc_ids
@@ -199,6 +225,7 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
                     workspace_client_id=ws,
                     doc_ids=[did],
                     evidence_mode="drive",
+                    created_by=created_by,
                 )
                 if not items:
                     skip_n += 1
@@ -230,7 +257,9 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
         except Exception as e:  # noqa: BLE001
             logger.warning("export archive doc %s failed: %s", did, e)
 
-    links = _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang)
+    links = _sync_sheet(
+        tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang, created_by
+    )
     progress_cb(
         {
             "done_n": done_n,
@@ -243,13 +272,20 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
     return ("export_archived_docs", ws)
 
 
-def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="th") -> dict:
+def _sync_sheet(
+    tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="th", created_by=None
+) -> dict:
     """归档后写主体×年 Sheet(全量明细·证据列回链 Drive 夹)。失败返空不阻断。"""
     out = {"sheet_url": "", "drive_url": ""}
     try:
         with db.get_cursor(commit=False) as cur:
             items = gather_items(
-                cur, tenant_id=tid, workspace_client_id=ws, doc_ids=doc_ids, evidence_mode="drive"
+                cur,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                doc_ids=doc_ids,
+                evidence_mode="drive",
+                created_by=created_by,
             )
             arch = {}
             cur.execute(

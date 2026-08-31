@@ -81,6 +81,22 @@ class SalesArchiveTests(unittest.TestCase):
         self.assertEqual(params, ("t1", 11, ["h1"]))
         self.assertEqual(out[0]["id"], "d1")
 
+    def test_sales_query_can_limit_results_to_member_creator(self):
+        cur = mock.MagicMock()
+        cur.fetchall.return_value = []
+
+        sales_archive._sales_docs(
+            cur,
+            tenant_id="t1",
+            workspace_client_id=11,
+            history_ids=["h1"],
+            created_by="u2",
+        )
+
+        sql, params = cur.execute.call_args.args
+        self.assertIn("created_by = %s", sql)
+        self.assertEqual(params, ("t1", 11, ["h1"], "u2"))
+
     def test_export_dispatches_sales_without_entering_purchase_path(self):
         with mock.patch.object(
             sales_archive, "run_sales_export", return_value=("export_archived_docs", 11)

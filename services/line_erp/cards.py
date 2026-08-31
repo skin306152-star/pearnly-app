@@ -64,8 +64,41 @@ def _menu_item(num: str, title: str, description: str, action: str, accent: str)
     }
 
 
-def menu_card() -> dict:
+def menu_card(modes=("purchase", "sales")) -> dict:
     """ERP 专用入口:先锁定采购/销售，再接收票据，不让识别模型猜方向。"""
+    allowed = set(modes or ())
+    items = []
+    if "purchase" in allowed:
+        items.append(
+            _menu_item(
+                "1",
+                "ซื้อ",
+                "บันทึกเอกสารซื้อและเพิ่มสินค้าเข้าสต๊อก",
+                "mode:purchase",
+                "#2f6bff",
+            )
+        )
+    if "sales" in allowed:
+        items.append(
+            _menu_item(
+                "2",
+                "ขาย",
+                "บันทึกเอกสารขายและตัดสินค้าออกจากสต๊อก",
+                "mode:sales",
+                "#f25c6e",
+            )
+        )
+    if not items:
+        items.append(
+            {
+                "type": "text",
+                "text": "บัญชีนี้ยังไม่มีสิทธิ์อัปโหลดเอกสาร กรุณาติดต่อผู้ดูแล",
+                "size": "sm",
+                "color": "#8a8a8a",
+                "wrap": True,
+                "margin": "lg",
+            }
+        )
     return {
         "type": "flex",
         "altText": "เลือกประเภทเอกสาร ERP",
@@ -91,20 +124,7 @@ def menu_card() -> dict:
                         "margin": "xs",
                     },
                     {"type": "separator", "margin": "lg", "color": "#eeeef4"},
-                    _menu_item(
-                        "1",
-                        "ซื้อ",
-                        "บันทึกเอกสารซื้อและเพิ่มสินค้าเข้าสต๊อก",
-                        "mode:purchase",
-                        "#2f6bff",
-                    ),
-                    _menu_item(
-                        "2",
-                        "ขาย",
-                        "บันทึกเอกสารขายและตัดสินค้าออกจากสต๊อก",
-                        "mode:sales",
-                        "#f25c6e",
-                    ),
+                    *items,
                     {
                         "type": "text",
                         "text": "พิมพ์ เมนู เพื่อเลือกใหม่ได้ตลอดเวลา",

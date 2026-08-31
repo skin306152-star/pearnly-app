@@ -396,6 +396,13 @@ export const SIDEBAR_HTML = `
     <div class="nav-item nav-sub-item" data-route="clients"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17v-1.5a3 3 0 00-3-3H5a3 3 0 00-3 3V17"/><circle cx="8" cy="6.5" r="3"/><path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/><path d="M13 3.6a3 3 0 010 5.8"/></svg><span class="nav-label" data-i18n="nav-clients">客户管理</span></div>
     <!-- 公司资料 · 当前账套主体开票/申报信息(行内编辑 · company-profile.ts) -->
     <div class="nav-item nav-sub-item" data-route="company"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M8 17.5v-3h4v3M7 6h.01M13 6h.01M7 9h.01M13 9h.01M7 12h.01M13 12h.01"/></svg><span class="nav-label" data-i18n="nav-company">公司资料</span></div>
+    <div class="nav-item nav-sub-item" data-route="erp-team" id="nav-erp-team" style="display:none;">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="7" cy="6.5" r="2.5"/><circle cx="14" cy="8" r="2"/>
+            <path d="M2.5 16a4.5 4.5 0 019 0M11 15.5a3.5 3.5 0 016.5 0"/>
+        </svg>
+        <span class="nav-label" id="nav-erp-team-label">团队管理</span>
+    </div>
     <!-- POS · Google Sheet 留档(从收银组搬入主数据 · pos&&owner 门控 · module-nav applyPosRoles) -->
     <div class="nav-item nav-sub-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" style="display:none;">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

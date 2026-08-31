@@ -22,6 +22,7 @@ from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import require_erp_portal
 from services.erp import mrerp_xlsx_generator
+from services.erp import team_access
 from services.erp.erp_payload import flatten_history_for_mrerp
 from services.erp.erp_push import load_mrerp_mappings
 
@@ -54,7 +55,11 @@ async def download_mrerp_xlsx_batch(req: MrerpXlsxBatchRequest, request: Request
 
     # 逐张 preflight(与机器人同一道校验)· 合格的进文件,不合格的跳过并记首个错误码。
     # 全不合格 → 422 回首个错误码(缺客户映射 / 发票号超长 / 缺客户等)让用户知道要补什么。
-    details = db.get_ocr_history_details_bulk(user["id"], req.history_ids, tenant_id=tenant_id)
+    details = db.get_ocr_history_details_bulk(
+        user["id"],
+        req.history_ids,
+        tenant_id=team_access.tenant_record_scope(request, user),
+    )
     valid = []
     first_err = None
     for hid in req.history_ids:

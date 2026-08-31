@@ -119,22 +119,44 @@ def _sum_amount_known(rows: list, kind: str) -> Optional[Decimal]:
     return total if has else Decimal("0")
 
 
-def load_context(cur, *, tenant_id: str, workspace_client_id: int, date_to) -> tuple:
+def load_context(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    date_to,
+    created_by: Optional[str] = None,
+) -> tuple:
     """movements + openings 一次装载,供 summary()/card() 共用同一次全表扫描结果。
 
     同一次提问常先答 summary 再钻某个商品的 card(services/steward/tools_stockcard.py 的
     关键词命中路径)——两次各自 load() 是对同一账套同一 date_to 的重复全表扫描,调用方
     装一次传下去即可省掉第二遍。"""
     data = mv_svc.load(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        date_to=date_to,
+        created_by=created_by,
     )
     openings = opening_svc.load_by_key(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        created_by=created_by,
     )
     return data, openings
 
 
-def _display_context(cur, *, tenant_id: str, workspace_client_id: int, date_to, keys: list):
+def _display_context(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    date_to,
+    keys: list,
+    created_by: Optional[str] = None,
+):
     product_ids = [grouping.key_product_id(k) for k in keys if grouping.is_product_key(k)]
     products = mv_svc.product_names(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, product_ids=product_ids
@@ -142,7 +164,11 @@ def _display_context(cur, *, tenant_id: str, workspace_client_id: int, date_to, 
     name_units = {}
     if any(not grouping.is_product_key(k) for k in keys):
         name_units = mv_svc.purchase_units(
-            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            date_to=date_to,
+            created_by=created_by,
         )
     return products, name_units
 
@@ -165,9 +191,14 @@ def summary(
     date_from,
     date_to,
     context: Optional[tuple] = None,
+    created_by: Optional[str] = None,
 ) -> dict:
     data, openings = context or load_context(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        date_to=date_to,
+        created_by=created_by,
     )
 
     keys = sorted(set(data.by_key) | set(openings))
@@ -177,6 +208,7 @@ def summary(
         workspace_client_id=workspace_client_id,
         date_to=date_to,
         keys=keys,
+        created_by=created_by,
     )
 
     out = []
@@ -210,9 +242,14 @@ def card(
     date_from,
     date_to,
     context: Optional[tuple] = None,
+    created_by: Optional[str] = None,
 ) -> Optional[dict]:
     data, openings = context or load_context(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        date_to=date_to,
+        created_by=created_by,
     )
     opening_row = openings.get(key)
     movs = data.by_key.get(key, [])
@@ -225,6 +262,7 @@ def card(
         workspace_client_id=workspace_client_id,
         date_to=date_to,
         keys=[key],
+        created_by=created_by,
     )
 
     carried, final, period_rows = _roll_key(movs, opening_row, date_from, date_to)
@@ -254,6 +292,7 @@ def groups(
     date_from,
     date_to,
     context: Optional[tuple] = None,
+    created_by: Optional[str] = None,
 ) -> list:
     """网页主视图:一次装好 movements/openings,一次批量取商品名/名字轨单位,再逐 key
     纯计算,返回按商品连续排列的完整 13 列表格(每组的期初行 + 期间逐笔 + 该组合计)。
@@ -262,7 +301,11 @@ def groups(
     —— 参考图没有那些交互,报表不做。数字字段一律字符串;金额合计走诚实口径(见
     _sum_amount_known),未知成本不冒充 0。"""
     data, openings = context or load_context(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, date_to=date_to
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        date_to=date_to,
+        created_by=created_by,
     )
 
     keys = sorted(set(data.by_key) | set(openings))
@@ -272,6 +315,7 @@ def groups(
         workspace_client_id=workspace_client_id,
         date_to=date_to,
         keys=keys,
+        created_by=created_by,
     )
 
     out = []

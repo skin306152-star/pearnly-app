@@ -10,6 +10,8 @@
  *  strictFunctionTypes contravariance when migrated modules assign concrete fns. */
 type LegacyBridge = (...args: any[]) => any;
 
+declare module '*.css';
+
 /** i18n lookup; returns the translated string for the active language. */
 declare function t(key: string, ...args: unknown[]): string;
 
@@ -344,6 +346,14 @@ interface Window {
     loadInventoryPage?: () => void;
     // 事务所端 · 商品收发存报表(路由 stock-card · firm 业态专属)
     loadStockCard?: () => void;
+    loadErpTeam?: () => void;
+    _erpTeamAccess?: {
+        is_owner: boolean;
+        is_active: boolean;
+        modules: string[];
+        workspace_client_id?: number | null;
+        erp_system?: string | null;
+    };
     // 收发存 entitlement 探针结果(module-nav 的 applyNavPreset 与 stock-card.ts 的探针
     // 两处都可能先跑到,双写收敛:未知/开通 = undefined,关闭 = true,见 nav-presets.ts)。
     _stockCardDisabled?: boolean;

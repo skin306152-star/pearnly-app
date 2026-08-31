@@ -107,18 +107,32 @@ def upsert_openings(
     return out
 
 
-def list_openings(cur, *, tenant_id: str, workspace_client_id: int) -> list[dict]:
-    cur.execute(
+def list_openings(
+    cur, *, tenant_id: str, workspace_client_id: int, created_by: Optional[str] = None
+) -> list[dict]:
+    sql = (
         f"SELECT {_COLS} FROM stock_card_openings "
-        "WHERE tenant_id = %s AND workspace_client_id = %s ORDER BY as_of_date, created_at",
-        (tenant_id, workspace_client_id),
+        "WHERE tenant_id = %s AND workspace_client_id = %s"
     )
+    params: list = [tenant_id, workspace_client_id]
+    if created_by is not None:
+        sql += " AND created_by = %s"
+        params.append(created_by)
+    sql += " ORDER BY as_of_date, created_at"
+    cur.execute(sql, tuple(params))
     return cur.fetchall()
 
 
-def load_by_key(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
+def load_by_key(
+    cur, *, tenant_id: str, workspace_client_id: int, created_by: Optional[str] = None
+) -> dict:
     """取本账套全部期初,按 grouping key(p:<id> / n:<name>)映射,供 report.py 装配用。"""
-    rows = list_openings(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    rows = list_openings(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        created_by=created_by,
+    )
     out: dict = {}
     for r in rows:
         key = (

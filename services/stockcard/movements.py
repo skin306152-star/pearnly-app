@@ -153,14 +153,30 @@ def _classify_sale(row: dict, out: MovementSet) -> None:
     )
 
 
-def load(cur, *, tenant_id: str, workspace_client_id: int, date_to) -> MovementSet:
+def load(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    date_to,
+    created_by: str | None = None,
+) -> MovementSet:
     """读到 date_to 为止的全部可入账流水(date_from 的切分留给 report.py:同一批流水在
     "期初结转"与"期间明细"两种视图间复用,不必按不同 date_from 重复查库)。"""
     out = MovementSet()
-    cur.execute(_PURCHASE_SQL, (tenant_id, workspace_client_id, date_to))
+    purchase_sql = _PURCHASE_SQL
+    sales_sql = _SALES_SQL
+    purchase_params: list = [tenant_id, workspace_client_id, date_to]
+    sales_params: list = [tenant_id, workspace_client_id, date_to]
+    if created_by is not None:
+        purchase_sql = purchase_sql.replace("ORDER BY", "AND d.created_by = %s ORDER BY", 1)
+        sales_sql = sales_sql.replace("ORDER BY", "AND d.created_by = %s ORDER BY", 1)
+        purchase_params.append(created_by)
+        sales_params.append(created_by)
+    cur.execute(purchase_sql, tuple(purchase_params))
     for row in cur.fetchall():
         _classify_purchase(row, out)
-    cur.execute(_SALES_SQL, (tenant_id, workspace_client_id, date_to))
+    cur.execute(sales_sql, tuple(sales_params))
     for row in cur.fetchall():
         _classify_sale(row, out)
     for movs in out.by_key.values():
@@ -186,18 +202,29 @@ def product_names(cur, *, tenant_id: str, workspace_client_id: int, product_ids:
     return out
 
 
-def purchase_units(cur, *, tenant_id: str, workspace_client_id: int, date_to) -> dict:
+def purchase_units(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    date_to,
+    created_by: str | None = None,
+) -> dict:
     """name_key 轨没有商品主档,单位只能从最近一笔进项行的原始 unit 文本带出(展示性质,
     不参与算价)。取每个清洗名最新一笔 posted 进项行的 unit。"""
-    cur.execute(
+    sql = (
         "SELECT l.description, l.unit, d.doc_date "
         "FROM purchase_lines l "
         "JOIN purchase_docs d ON d.id = l.purchase_doc_id AND d.tenant_id = l.tenant_id "
         "WHERE l.tenant_id = %s AND d.workspace_client_id = %s AND d.status = 'posted' "
         "AND l.product_id IS NULL AND l.unit IS NOT NULL AND d.doc_date <= %s "
-        "ORDER BY d.doc_date, d.created_at",
-        (tenant_id, workspace_client_id, date_to),
+        "ORDER BY d.doc_date, d.created_at"
     )
+    params: list = [tenant_id, workspace_client_id, date_to]
+    if created_by is not None:
+        sql = sql.replace("ORDER BY", "AND d.created_by = %s ORDER BY", 1)
+        params.append(created_by)
+    cur.execute(sql, tuple(params))
     out: dict = {}
     for r in cur.fetchall():
         key = grouping.name_key(r["description"])

@@ -100,6 +100,11 @@ def _check(request: Request, user: dict, code: str) -> tuple[bool, str]:
         return False, "unknown_code"
     if user.get("is_super_admin"):
         return True, ""
+    if user.get("entry") == "erp":
+        from services.erp.team_access import login_allowed
+
+        if not login_allowed(user):
+            return False, "erp_team_revoked"
     # 入口作用域(各是各的):main 会话 token 打不进 pos/ai 码,反之亦然(闸开时)。超管上面已短路
     # 天然豁免;收银员 entry='pos' 与 pos.* 天然匹配不回归;中性横切码短路放行(见 _entrance_scope_deny)。
     ent_reason = _entrance_scope_deny(user, code)

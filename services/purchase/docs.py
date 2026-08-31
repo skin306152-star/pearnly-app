@@ -12,6 +12,7 @@ from typing import Optional
 
 from core.pos_api import PosError
 from services.purchase import field_clean
+from services.purchase import doc_summary
 from services.purchase import item_name
 from services.purchase import ocr_original
 from services.purchase import suppliers as sup_svc
@@ -234,7 +235,9 @@ def _insert_lines(cur, *, tenant_id, doc_id, lines) -> None:
         )
 
 
-def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
+def get_doc(
+    cur, *, tenant_id, workspace_client_id, doc_id, created_by: Optional[str] = None
+) -> Optional[dict]:
     """详情:头 + 行 + 附件 + supplier 完整详情(F2)。不存在/跨套账 → None。
 
     F2:返回 supplier{name,tax_id,branch_type,branch_no,address,phone}(编辑屏回填
@@ -249,7 +252,11 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
         "LEFT JOIN suppliers s ON s.id = d.supplier_id AND s.tenant_id = d.tenant_id "
         "WHERE d.tenant_id = %s AND d.workspace_client_id = %s AND d.id = %s"
     )
-    cur.execute(sql, (tenant_id, workspace_client_id, doc_id))
+    params: list = [tenant_id, workspace_client_id, doc_id]
+    if created_by is not None:
+        sql += " AND d.created_by = %s"
+        params.append(created_by)
+    cur.execute(sql, tuple(params))
     doc = cur.fetchone()
     if doc is None:
         return None
@@ -312,6 +319,7 @@ def list_docs(
     q=None,
     date_from=None,
     date_to=None,
+    created_by: Optional[str] = None,
 ) -> dict:
     """列单据 + 本月 KPI;每行含原票张数，支持日期与供应商/票号筛选。"""
     sql = (
@@ -325,6 +333,9 @@ def list_docs(
         "WHERE d.tenant_id = %s AND d.workspace_client_id = %s AND d.status <> 'discarded'"
     )
     params: list = [tenant_id, workspace_client_id]
+    if created_by is not None:
+        sql += " AND d.created_by = %s"
+        params.append(created_by)
     if kind in _KINDS:
         sql += " AND d.doc_kind = %s"
         params.append(kind)
@@ -347,36 +358,11 @@ def list_docs(
     cur.execute(sql, tuple(params))
     docs = cur.fetchall()
     ocr_original.enrich_list(cur, tenant_id=tenant_id, docs=docs)
-    return {"docs": docs, "summary": _summary(cur, tenant_id, workspace_client_id)}
-
-
-def _summary(cur, tenant_id, workspace_client_id) -> dict:
-    """本月聚合(单表 FILTER · 无 join 无笛卡尔)。未付=应付余额(不限本月)。"""
-    cur.execute(
-        """
-        SELECT
-          COALESCE(SUM(grand_total) FILTER (
-            WHERE doc_kind IN ('purchase_invoice','purchase_order')
-              AND doc_date >= date_trunc('month', CURRENT_DATE)), 0) AS goods_total,
-          COALESCE(SUM(grand_total) FILTER (
-            WHERE doc_kind = 'expense'
-              AND doc_date >= date_trunc('month', CURRENT_DATE)), 0) AS expense_total,
-          COALESCE(SUM(vat_amount) FILTER (
-            WHERE doc_kind = 'purchase_invoice' AND has_vat
-              AND doc_date >= date_trunc('month', CURRENT_DATE)), 0) AS vat_claimable,
-          COALESCE(SUM(net_payable - paid_amount) FILTER (
-            WHERE payment_status <> 'paid'), 0) AS unpaid_total
-        FROM purchase_docs
-        WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'posted'
-        """,
-        (tenant_id, workspace_client_id),
-    )
-    r = cur.fetchone()
     return {
-        "goods_total": r["goods_total"],
-        "expense_total": r["expense_total"],
-        "vat_claimable": r["vat_claimable"],
-        "unpaid_total": r["unpaid_total"],
+        "docs": docs,
+        "summary": doc_summary.summarize(
+            cur, tenant_id, workspace_client_id, created_by=created_by
+        ),
     }
 
 

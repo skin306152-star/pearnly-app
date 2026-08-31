@@ -19,7 +19,9 @@ from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import require_erp_portal
+from services.authz.deps import check_workspace_scope
 from services.erp import erp_push as _erp
+from services.erp import team_access
 from services.erp.express_push import chart_codes
 from services.erp.express_push.posting_kind import normalize as normalize_posting_kind
 
@@ -38,22 +40,25 @@ _EXPRESS_ACC_SLOTS = {
 }
 
 
-def _express_repair_target(user: dict, log_id: str) -> tuple:
+def _express_repair_target(request: Request, user: dict, log_id: str) -> tuple:
     """失败卡自助修复共用的前置:取原日志行 + 它的 Express 端点(顺带校验这条能不能修)。
 
     四张修复卡此前各抄一遍这段查找与四个 HTTPException,detail 串靠人肉保持一致。返回
     (log, endpoint);history 各路自取 —— 绑主体那张是写完才读,不能提前锁死。"""
-    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
+    log = db.get_push_log_detail(
+        user["id"], log_id, tenant_id=team_access.tenant_record_scope(request, user)
+    )
     if not log:
         raise HTTPException(404, detail="erp.log_not_found")
     if not log.get("history_id") or not log.get("endpoint_id"):
         raise HTTPException(400, detail="erp.log_missing_refs")
-    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
+    assigned = team_access.assigned_endpoint_for_request(user, log["endpoint_id"])
+    endpoint = assigned or db.get_erp_endpoint(user["id"], log["endpoint_id"])
     if not endpoint:
         raise HTTPException(404, detail="erp.endpoint_not_found")
     if (endpoint.get("adapter") or "").lower() != "express":
         raise HTTPException(400, detail="erp.not_express_endpoint")
-    return log, endpoint
+    return log, endpoint, assigned is not None
 
 
 async def _repush_and_finalize(log: dict, push_ep: dict, history: dict, *, posting_kind=None):
@@ -98,8 +103,12 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
     require_erp_portal(user)
     _check_push_access(user)
 
-    log, endpoint = _express_repair_target(user, log_id)
-    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=_tid(user))
+    log, endpoint, member_endpoint = _express_repair_target(request, user, log_id)
+    history = db.get_ocr_history_detail(
+        user["id"],
+        log["history_id"],
+        tenant_id=team_access.tenant_record_scope(request, user),
+    )
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
 
@@ -119,6 +128,8 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
             raise HTTPException(400, detail={"code": "erp.account_not_in_chart", "acc": bad})
 
     if req.remember:
+        if member_endpoint:
+            raise HTTPException(403, detail="erp_team.owner_required")
         cfg.update(chosen)
         db.update_erp_endpoint(user["id"], log["endpoint_id"], config=cfg)
         endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"]) or endpoint
@@ -153,18 +164,20 @@ async def erp_express_bind_subject(
     require_erp_portal(user)
     _check_push_access(user)
 
-    log, endpoint = _express_repair_target(user, log_id)
+    log, endpoint, _member_endpoint = _express_repair_target(request, user, log_id)
 
     tid = _tid(user)
+    check_workspace_scope(request, user, req.workspace_client_id)
     wc = db.get_workspace_client(req.workspace_client_id, user["id"], tenant_id=tid)
     if not wc:
         raise HTTPException(404, detail="erp.workspace_client_not_found")
+    scope_tenant_id = team_access.tenant_record_scope(request, user)
     if not db.update_history_workspace_client_id(
-        log["history_id"], req.workspace_client_id, user["id"], tenant_id=tid
+        log["history_id"], req.workspace_client_id, user["id"], tenant_id=scope_tenant_id
     ):
         raise HTTPException(404, detail="erp.history_not_found")
 
-    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=tid)
+    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=scope_tenant_id)
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
 
@@ -214,8 +227,12 @@ async def erp_express_stock_opening(
     require_erp_portal(user)
     _check_push_access(user)
 
-    log, endpoint = _express_repair_target(user, log_id)
-    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=_tid(user))
+    log, endpoint, _member_endpoint = _express_repair_target(request, user, log_id)
+    history = db.get_ocr_history_detail(
+        user["id"],
+        log["history_id"],
+        tenant_id=team_access.tenant_record_scope(request, user),
+    )
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
 
@@ -259,11 +276,13 @@ async def erp_express_posting_kind(
     if not kind:
         raise HTTPException(400, detail="erp.posting_kind_invalid")
 
-    log, endpoint = _express_repair_target(user, log_id)
-    tid = _tid(user)
-    if not db.update_history_posting_kind(log["history_id"], kind, user["id"], tenant_id=tid):
+    log, endpoint, _member_endpoint = _express_repair_target(request, user, log_id)
+    scope_tenant_id = team_access.tenant_record_scope(request, user)
+    if not db.update_history_posting_kind(
+        log["history_id"], kind, user["id"], tenant_id=scope_tenant_id
+    ):
         raise HTTPException(404, detail="erp.history_not_found")
-    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=tid)
+    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=scope_tenant_id)
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
 

@@ -33,6 +33,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(webhook.store, "get_binding", return_value=binding),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook, "_allowed_modes", return_value=("purchase", "sales")),
             mock.patch.object(webhook, "_queue_document") as queue,
         ):
             await webhook.handle_event(
@@ -115,6 +116,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 return_value={"id": "u1", "tenant_id": "t1", "plan": "free"},
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
             mock.patch.object(
                 webhook,
                 "run_recognition_core",
@@ -156,6 +158,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 return_value={"id": "u1", "tenant_id": "t1", "is_active": False},
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook, "_allowed_modes", return_value=("sales",)),
             mock.patch.object(webhook, "run_recognition_core") as recognize,
             mock.patch.object(webhook.store, "clear_session") as clear_session,
         ):
@@ -184,6 +187,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 return_value={"id": "u1", "tenant_id": "t1", "is_active": True},
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
             mock.patch.object(
                 webhook,
                 "draft_records",

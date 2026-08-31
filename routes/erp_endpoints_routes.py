@@ -21,6 +21,7 @@ from services.erp.endpoint_config import (
 from services.erp.endpoint_config import strip_endpoint_for_response as _strip_endpoint_for_response
 from services.erp.express_push.agent_reporting import fit_stock_acc_groups
 from services.erp import shared_express_access
+from services.erp import team_access
 
 logger = logging.getLogger("mr-pilot")
 
@@ -48,8 +49,15 @@ async def erp_endpoints_list(request: Request):
     user = get_current_user_from_request(request)
     require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台复用端点清单 → 窄 allowlist
     _check_push_access(user)
+    assigned = []
+    if user.get("entry") == "erp" and str(user.get("role") or "").lower() != "owner":
+        assigned = team_access.assigned_endpoint_items(
+            str(user.get("tenant_id") or ""), str(user.get("id") or "")
+        )
+        return {"items": assigned}
     if shared_express_access.is_shared_endpoint_read(user):
-        return {"items": shared_express_access.list_shared_endpoint_items(request, user)}
+        shared = shared_express_access.list_shared_endpoint_items(request, user)
+        return {"items": shared}
     items = db.list_erp_endpoints(user["id"])
     return {"items": [_strip_endpoint_for_response(it) for it in items]}
 
@@ -64,6 +72,7 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
     user = get_current_user_from_request(request)
     require_erp_portal(user, also_allowed=(DMS,))  # DMS 录入工作台连接向导建端点 → 窄 allowlist
     _check_push_access(user)
+    team_access.require_endpoint_manager(user)
     p = _plan_permissions(user.get("plan", "free"))
 
     try:

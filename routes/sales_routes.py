@@ -31,6 +31,7 @@ from services.sales import record_enrichment
 from services.sales import render as sales_render
 from services.sales import seller_profile
 from services.sales import settings as settings_svc
+from services.erp import team_access
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/documents", tags=["sales-documents"])
@@ -119,6 +120,21 @@ def _fail(code: str):
     raise HTTPException(_ERR_HTTP.get(code, 400), detail=f"sales.{code}")
 
 
+def _creator_scope(request: Request) -> Optional[str]:
+    return team_access.record_creator_scope(request)
+
+
+def _assert_doc_scope(cur, *, tenant_id: str, doc_id: str, creator: Optional[str]) -> None:
+    if creator is None:
+        return
+    cur.execute(
+        "SELECT 1 FROM sales_documents WHERE tenant_id = %s AND id = %s AND created_by = %s",
+        (tenant_id, doc_id, creator),
+    )
+    if cur.fetchone() is None:
+        _fail("not_found")
+
+
 @router.get("")
 async def api_list_documents(
     request: Request,
@@ -127,10 +143,17 @@ async def api_list_documents(
     q: Optional[str] = None,
 ):
     tid, uid = require_perm_tid(request, "sales.doc.view")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
         rows = doc_svc.list_documents(
-            cur, tenant_id=tid, status=status, client_id=client_id, q=q, workspace_client_id=ws
+            cur,
+            tenant_id=tid,
+            status=status,
+            client_id=client_id,
+            q=q,
+            workspace_client_id=ws,
+            created_by=creator,
         )
         record_enrichment.enrich(cur, rows, tenant_id=str(tid), user_id=str(uid))
     return {"documents": [_doc_out(r) for r in rows]}
@@ -141,13 +164,16 @@ async def api_create_document(req: DocumentIn, request: Request):
     tid, uid = require_perm_tid(request, "sales.doc.create")
     p = _dump(req)
     with db.get_cursor_rls(tid, commit=True) as cur:
+        ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
+        if p.get("seller_workspace_client_id") not in (None, ws):
+            raise HTTPException(404, detail="authz.not_found")
         doc = doc_svc.create_draft(
             cur,
             tenant_id=tid,
             created_by=uid,
             doc_type=p["doc_type"],
             client_id=p["client_id"],
-            seller_workspace_client_id=p["seller_workspace_client_id"],
+            seller_workspace_client_id=ws,
             currency=p["currency"],
             vat_rate=p["vat_rate"],
             wht_rate=p["wht_rate"],
@@ -169,9 +195,16 @@ async def api_create_document(req: DocumentIn, request: Request):
 @router.get("/{doc_id}")
 async def api_get_document(doc_id: str, request: Request):
     tid, uid = require_perm_tid(request, "sales.doc.view")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
-        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id, workspace_client_id=ws)
+        doc = doc_svc.get_document(
+            cur,
+            tenant_id=tid,
+            doc_id=doc_id,
+            workspace_client_id=ws,
+            created_by=creator,
+        )
         if doc:
             record_enrichment.enrich(cur, [doc], tenant_id=str(tid), user_id=str(uid))
     if not doc:
@@ -192,8 +225,9 @@ async def api_document_pdf(
     page=A4|A5|thermal_80|thermal_58(§E1)· copy=original|copy(正/副本 · §E2)。
     """
     tid, _ = require_perm_tid(request, "sales.doc.view")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid) as cur:
-        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id, created_by=creator)
         if not doc:
             _fail("not_found")
         eff_page = page or doc.get("paper_size") or "A4"
@@ -220,9 +254,12 @@ async def api_document_pdf(
 @router.patch("/{doc_id}")
 async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
     tid, _ = require_perm_tid(request, "sales.doc.edit")
+    creator = _creator_scope(request)
     p = _dump(req)
     with db.get_cursor_rls(tid, commit=True) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
+        if p.get("seller_workspace_client_id") not in (None, ws):
+            raise HTTPException(404, detail="authz.not_found")
         err = doc_svc.update_draft(
             cur,
             tenant_id=tid,
@@ -230,7 +267,7 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
             workspace_client_id=ws,
             doc_type=p["doc_type"],
             client_id=p["client_id"],
-            seller_workspace_client_id=p["seller_workspace_client_id"],
+            seller_workspace_client_id=ws,
             currency=p["currency"],
             vat_rate=p["vat_rate"],
             wht_rate=p["wht_rate"],
@@ -245,6 +282,7 @@ async def api_update_document(doc_id: str, req: DocumentIn, request: Request):
             doc_language=p["doc_language"],
             due_date=_opt_date(p.get("due_date")),
             payment_terms=p.get("payment_terms"),
+            created_by=creator,
         )
         if err:
             _fail(err)
@@ -257,6 +295,7 @@ async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
     """正式开出。连号前缀/重置/起始号与审批模式取账套设置(§M7)默认,请求可覆盖前缀/重置/日期。
     审批模式开启(!=none)时草稿不能直开,返 approval_required(走提交→审批)。"""
     tid, _ = require_perm_tid(request, "sales.doc.approve")
+    creator = _creator_scope(request)
     p = _dump(req)
     on = _resolve_issue_date(p.get("issue_date"))
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -273,6 +312,7 @@ async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
             approval_mode=st["approval_mode"],
             workspace_client_id=ws,
             tenant_prefix=st["number_prefix"],
+            created_by=creator,
         )
         if err:
             _fail(err)
@@ -282,9 +322,16 @@ async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
 @router.post("/{doc_id}/void")
 async def api_void_document(doc_id: str, request: Request):
     tid, _ = require_perm_tid(request, "sales.doc.approve")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
-        err = doc_svc.void_document(cur, tenant_id=tid, doc_id=doc_id, workspace_client_id=ws)
+        err = doc_svc.void_document(
+            cur,
+            tenant_id=tid,
+            doc_id=doc_id,
+            workspace_client_id=ws,
+            created_by=creator,
+        )
         if err:
             _fail(err)
     return {"ok": True}
@@ -294,9 +341,16 @@ async def api_void_document(doc_id: str, request: Request):
 async def api_delete_draft(doc_id: str, request: Request):
     """删除草稿(仅草稿可删 · 未占连号)。已开/已作废 → 409 not_draft。"""
     tid, _ = require_perm_tid(request, "sales.doc.delete")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)  # PO-7 · 当前主体
-        err = doc_svc.delete_draft(cur, tenant_id=tid, doc_id=doc_id, workspace_client_id=ws)
+        err = doc_svc.delete_draft(
+            cur,
+            tenant_id=tid,
+            doc_id=doc_id,
+            workspace_client_id=ws,
+            created_by=creator,
+        )
         if err:
             _fail(err)
     return {"ok": True}
@@ -306,7 +360,9 @@ async def api_delete_draft(doc_id: str, request: Request):
 async def api_submit_for_approval(doc_id: str, request: Request):
     """提交审批(§F):草稿/被驳回 → 待审批。任意成员可提交。"""
     tid, _ = require_perm_tid(request, "sales.doc.create")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
+        _assert_doc_scope(cur, tenant_id=tid, doc_id=doc_id, creator=creator)
         err = approval_svc.submit_for_approval(cur, tenant_id=tid, doc_id=doc_id)
         if err:
             _fail(err)
@@ -319,10 +375,12 @@ async def api_approve_document(doc_id: str, req: IssueIn, request: Request):
     """审批通过(§F · 仅 owner/超管):待审批 → 取号开出 + 记审批人。"""
     user = require_perm(request, "sales.doc.approve")
     tid, uid = require_perm_tid(request, "sales.doc.approve")
+    creator = _creator_scope(request)
     p = _dump(req)
     on = _resolve_issue_date(p.get("issue_date"))
     approver = str(user.get("id")) if user.get("id") else uid
     with db.get_cursor_rls(tid, commit=True) as cur:
+        _assert_doc_scope(cur, tenant_id=tid, doc_id=doc_id, creator=creator)
         st = settings_svc.get_settings(cur, tenant_id=tid)
         doc, err = approval_svc.approve(
             cur,
@@ -344,7 +402,9 @@ async def api_approve_document(doc_id: str, req: IssueIn, request: Request):
 async def api_reject_document(doc_id: str, req: RejectIn, request: Request):
     """驳回(§F · 仅 owner/超管):待审批 → 驳回(留理由),改后回到草稿。"""
     tid, _ = require_perm_tid(request, "sales.doc.approve")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
+        _assert_doc_scope(cur, tenant_id=tid, doc_id=doc_id, creator=creator)
         err = approval_svc.reject(
             cur, tenant_id=tid, doc_id=doc_id, reason=_dump(req).get("reason")
         )
@@ -356,9 +416,11 @@ async def api_reject_document(doc_id: str, req: RejectIn, request: Request):
 
 def _make_note(doc_id: str, req: NoteIn, request: Request, note_type: str) -> dict:
     tid, uid = require_perm_tid(request, "sales.doc.approve")
+    creator = _creator_scope(request)
     p = _dump(req)
     on = _resolve_issue_date(p.get("issue_date"))
     with db.get_cursor_rls(tid, commit=True) as cur:
+        _assert_doc_scope(cur, tenant_id=tid, doc_id=doc_id, creator=creator)
         note, err = credit_note.create_note(
             cur,
             tenant_id=tid,
@@ -394,8 +456,10 @@ async def api_debit_note(doc_id: str, req: NoteIn, request: Request):
 async def api_convert_quotation(doc_id: str, req: ConvertIn, request: Request):
     """报价单 → 发票转换(§L3):复制成目标类型草稿,引用原报价单(报价单本身不变)。"""
     tid, uid = require_perm_tid(request, "sales.doc.create")
+    creator = _creator_scope(request)
     target = _dump(req)["target_doc_type"]
     with db.get_cursor_rls(tid, commit=True) as cur:
+        _assert_doc_scope(cur, tenant_id=tid, doc_id=doc_id, creator=creator)
         doc, err = quotation_svc.convert_quotation(
             cur, tenant_id=tid, created_by=uid, quote_id=doc_id, target_doc_type=target
         )
@@ -408,8 +472,9 @@ async def api_convert_quotation(doc_id: str, req: ConvertIn, request: Request):
 async def api_promptpay_qr(doc_id: str, request: Request):
     """PromptPay 付款二维码 PNG(§L1):金额=应付额(partial 取未收余额)。已收款不出。"""
     tid, _ = require_perm_tid(request, "sales.doc.view")
+    creator = _creator_scope(request)
     with db.get_cursor_rls(tid) as cur:
-        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id, created_by=creator)
         if not doc:
             _fail("not_found")
         if (doc.get("payment_status") or "unpaid") == "paid":

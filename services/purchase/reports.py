@@ -17,6 +17,7 @@ def summary(
     workspace_client_id: int,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    created_by: Optional[str] = None,
 ) -> dict:
     """期间汇总。from/to 缺省=不限(全部 posted)。日期闭区间(含端点)。"""
     sql = (
@@ -34,6 +35,9 @@ def summary(
         "WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'posted'"
     )
     params: list = [tenant_id, workspace_client_id]
+    if created_by is not None:
+        sql += " AND created_by = %s"
+        params.append(created_by)
     if date_from:
         sql += " AND doc_date >= %s"
         params.append(date_from)

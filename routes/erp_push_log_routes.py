@@ -16,6 +16,7 @@ from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import DMS, require_erp_portal
+from services.erp import team_access
 from core import workspace_context as wc
 
 logger = logging.getLogger("mr-pilot")
@@ -35,6 +36,16 @@ async def erp_push(req: ErpPushRequest, request: Request):
     user = get_current_user_from_request(request)
     require_erp_portal(user)
     _check_push_access(user)
+    creator_scope = team_access.record_creator_scope(request, user)
+    assigned_endpoint = team_access.assigned_endpoint_for_request(user, req.endpoint_id)
+    effective_endpoint_id = (
+        str(assigned_endpoint["id"]) if assigned_endpoint is not None else req.endpoint_id
+    )
+    member_history = None
+    if creator_scope:
+        member_history = db.get_ocr_history_detail(user["id"], req.history_id)
+        if not member_history:
+            raise HTTPException(404, detail="erp.history_not_found")
 
     from services.erp.shared_express_push import maybe_reserve_manual_push
 
@@ -42,14 +53,16 @@ async def erp_push(req: ErpPushRequest, request: Request):
         user=user,
         request=request,
         history_id=req.history_id,
-        endpoint_id=req.endpoint_id,
+        endpoint_id=effective_endpoint_id,
         posting_kind=req.posting_kind,
     )
     if managed is not None:
         return managed
 
     # 1) 拿历史记录
-    history = db.get_ocr_history_detail(user["id"], req.history_id, tenant_id=_tid(user))
+    history = member_history or db.get_ocr_history_detail(
+        user["id"], req.history_id, tenant_id=_tid(user)
+    )
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
     # ERP 产品只允许推送用户已经确认并生成正式采购/销售单的历史。Cowork 的既有推送
@@ -60,12 +73,12 @@ async def erp_push(req: ErpPushRequest, request: Request):
         raise HTTPException(409, detail="erp.history_not_converted")
 
     # 2) 选 endpoint
-    if req.endpoint_id:
-        endpoint = db.get_erp_endpoint(user["id"], req.endpoint_id)
+    if effective_endpoint_id:
+        endpoint = assigned_endpoint or db.get_erp_endpoint(user["id"], effective_endpoint_id)
         if not endpoint:
             raise HTTPException(404, detail="erp.endpoint_not_found")
     else:
-        endpoint = db.get_default_erp_endpoint(user["id"])
+        endpoint = assigned_endpoint or db.get_default_erp_endpoint(user["id"])
         if not endpoint:
             raise HTTPException(400, detail="erp.no_default_endpoint")
 
@@ -79,25 +92,29 @@ async def erp_push(req: ErpPushRequest, request: Request):
         user["id"],
     )
     if existing:
-        log_id = db.insert_push_log(
-            user_id=user["id"],
-            endpoint_id=endpoint["id"],
-            history_id=req.history_id,
-            invoice_no=history.get("invoice_no"),
-            seller_name=history.get("seller_name"),
-            total_amount=history.get("total_amount"),
-            status="skipped_dup",
-            http_status=200,
-            request_body={
+        log_args = {
+            "endpoint_id": str(endpoint["id"]),
+            "history_id": req.history_id,
+            "invoice_no": history.get("invoice_no"),
+            "seller_name": history.get("seller_name"),
+            "total_amount": history.get("total_amount"),
+            "status": "skipped_dup",
+            "http_status": 200,
+            "request_body": {
                 "adapter": endpoint.get("adapter"),
                 "skipped_reason": "already_success",
                 "prior_log_id": str(existing.get("id")),
             },
-            response_body=existing.get("response_body"),
-            error_msg=None,
-            attempt=1,
-            elapsed_ms=0,
-            trigger="manual",
+            "response_body": existing.get("response_body"),
+            "error_msg": None,
+            "attempt": 1,
+            "elapsed_ms": 0,
+            "trigger": "manual",
+        }
+        log_id = (
+            team_access.insert_assigned_push_log(user=user, **log_args)
+            if assigned_endpoint
+            else db.insert_push_log(user_id=user["id"], **log_args)
         )
         logger.info(
             "[push-dedup] skipped manual push · history=%s endpoint=%s " "(prior log=%s)",
@@ -130,20 +147,24 @@ async def erp_push(req: ErpPushRequest, request: Request):
 
     # 4) 写日志 · P2-D(B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
     final_status = db.classify_push_status(result["success"], result.get("error_msg"))
-    log_id = db.insert_push_log(
-        user_id=user["id"],
-        endpoint_id=endpoint["id"],
-        history_id=req.history_id,
-        invoice_no=history.get("invoice_no"),
-        seller_name=history.get("seller_name"),
-        total_amount=history.get("total_amount"),
-        status=final_status,
-        http_status=result.get("http_status"),
-        request_body=result.get("request_body"),
-        response_body=result.get("response_body"),
-        error_msg=result.get("error_msg"),
-        attempt=1,
-        elapsed_ms=result.get("elapsed_ms", 0),
+    log_args = {
+        "endpoint_id": str(endpoint["id"]),
+        "history_id": req.history_id,
+        "invoice_no": history.get("invoice_no"),
+        "seller_name": history.get("seller_name"),
+        "total_amount": history.get("total_amount"),
+        "status": final_status,
+        "http_status": result.get("http_status"),
+        "request_body": result.get("request_body"),
+        "response_body": result.get("response_body"),
+        "error_msg": result.get("error_msg"),
+        "attempt": 1,
+        "elapsed_ms": result.get("elapsed_ms", 0),
+    }
+    log_id = (
+        team_access.insert_assigned_push_log(user=user, **log_args)
+        if assigned_endpoint
+        else db.insert_push_log(user_id=user["id"], **log_args)
     )
 
     # 5) 更新 endpoint 统计 + history 推送状态(口径见 _counts_as_endpoint_success)。
@@ -177,61 +198,6 @@ async def erp_push(req: ErpPushRequest, request: Request):
     }
 
 
-@router.get("/api/erp/logs/{log_id}/debug-xlsx")
-async def erp_log_debug_xlsx(log_id: str, request: Request):
-    """v27.8.1.5 · 推送失败时下载 Pearnly 这次生成的 xlsx · 用户拖给 ERP 服务方诊断
-    只有同 tenant 用户能下 · 没存 _debug_xlsx_b64 → 404"""
-    user = get_current_user_from_request(request)
-    require_erp_portal(user)
-    tid = _tid(user)
-    try:
-        with db.get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT pl.id, pl.user_id, pl.history_id, pl.request_body, pl.invoice_no,
-                       u.tenant_id::text AS tid
-                FROM push_logs pl
-                LEFT JOIN users u ON u.id = pl.user_id
-                WHERE pl.id = %s LIMIT 1
-            """,
-                (log_id,),
-            )
-            row = cur.fetchone()
-    except Exception as e:
-        raise HTTPException(500, detail=f"db.error:{e}")
-    if not row:
-        raise HTTPException(404, detail="log.not_found")
-    # 同 tenant 才能下
-    if str(row.get("tid") or "") != str(tid or ""):
-        raise HTTPException(403, detail="log.cross_tenant")
-    rb = row.get("request_body") or {}
-    if isinstance(rb, str):
-        try:
-            import json as _json
-
-            rb = _json.loads(rb)
-        except Exception:
-            rb = {}
-    b64 = rb.get("_debug_xlsx_b64") if isinstance(rb, dict) else None
-    if not b64:
-        raise HTTPException(404, detail="log.no_debug_xlsx")
-    import base64 as _b64
-
-    try:
-        xlsx_bytes = _b64.b64decode(b64)
-    except Exception:
-        raise HTTPException(500, detail="log.decode_failed")
-    from fastapi.responses import Response as _Resp
-
-    safe_inv = (row.get("invoice_no") or "unknown").replace("/", "_").replace(" ", "_")[:40]
-    fname = f"pearnly_debug_{safe_inv}_{log_id[:8]}.xlsx"
-    return _Resp(
-        content=xlsx_bytes,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
-    )
-
-
 @router.get("/api/erp/history/{history_id}/push_status")
 async def erp_history_push_status(history_id: str, request: Request):
     """P0-2 · 查询某张发票是否已成功推送到 ERP"""
@@ -239,7 +205,11 @@ async def erp_history_push_status(history_id: str, request: Request):
     require_erp_portal(user)
     _check_push_access(user)
     result = db.list_push_logs(
-        user["id"], history_id=history_id, status_filter="success", limit=1, tenant_id=_tid(user)
+        user["id"],
+        history_id=history_id,
+        status_filter="success",
+        limit=1,
+        tenant_id=team_access.tenant_record_scope(request, user),
     )
     items = result.get("items", [])
     if items:
@@ -290,7 +260,7 @@ async def erp_logs(
         exclude_push_type=(
             exclude_push_type if exclude_push_type in ("id_card", "invoice") else None
         ),
-        tenant_id=_tid(user),
+        tenant_id=team_access.tenant_record_scope(request, user),
         workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
 
@@ -301,7 +271,9 @@ async def erp_log_detail(log_id: str, request: Request):
     user = get_current_user_from_request(request)
     require_erp_portal(user)
     _check_push_access(user)
-    detail = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
+    detail = db.get_push_log_detail(
+        user["id"], log_id, tenant_id=team_access.tenant_record_scope(request, user)
+    )
     if not detail:
         raise HTTPException(404, detail="log.not_found")
     return detail
@@ -315,7 +287,7 @@ async def erp_stats_today(request: Request):
     _check_push_access(user)
     return db.get_push_stats_today(
         user["id"],
-        tenant_id=_tid(user),
+        tenant_id=team_access.tenant_record_scope(request, user),
         workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
 
@@ -326,7 +298,8 @@ async def erp_retry_push(log_id: str, request: Request):
     user = get_current_user_from_request(request)
     require_erp_portal(user)
     _check_push_access(user)
-    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
+    tenant_scope = team_access.tenant_record_scope(request, user)
+    log = db.get_push_log_detail(user["id"], log_id, tenant_id=tenant_scope)
     if not log:
         raise HTTPException(404, detail="log.not_found")
     if log["status"] == "success":
@@ -334,8 +307,9 @@ async def erp_retry_push(log_id: str, request: Request):
     if not log.get("history_id") or not log.get("endpoint_id"):
         raise HTTPException(400, detail="log.missing_refs")
 
-    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=_tid(user))
-    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
+    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=tenant_scope)
+    endpoint = team_access.assigned_endpoint_for_request(user, log["endpoint_id"])
+    endpoint = endpoint or db.get_erp_endpoint(user["id"], log["endpoint_id"])
     if not history:
         raise HTTPException(404, detail="history.not_found")
     if not endpoint:
@@ -400,10 +374,11 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
     skipped = 0  # 已成功 / 关联实体丢失等
     details: List[Dict[str, Any]] = []
     tid = _tid(user)
+    tenant_scope = team_access.tenant_record_scope(request, user)
 
     for log_id in req.log_ids:
         try:
-            log = db.get_push_log_detail(user["id"], log_id, tenant_id=tid)
+            log = db.get_push_log_detail(user["id"], log_id, tenant_id=tenant_scope)
             if not log:
                 skipped += 1
                 details.append({"log_id": log_id, "result": "skipped", "reason": "not_found"})
@@ -417,8 +392,11 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 details.append({"log_id": log_id, "result": "skipped", "reason": "missing_refs"})
                 continue
 
-            history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=tid)
-            endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
+            history = db.get_ocr_history_detail(
+                user["id"], log["history_id"], tenant_id=tenant_scope
+            )
+            endpoint = team_access.assigned_endpoint_for_request(user, log["endpoint_id"])
+            endpoint = endpoint or db.get_erp_endpoint(user["id"], log["endpoint_id"])
             if not history or not endpoint:
                 skipped += 1
                 details.append({"log_id": log_id, "result": "skipped", "reason": "ref_deleted"})

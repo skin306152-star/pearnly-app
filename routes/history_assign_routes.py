@@ -21,7 +21,9 @@ from pydantic import BaseModel, Field
 from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _check_history_access, _tid
+from services.authz.deps import check_workspace_scope
 from services.intake_bridge import mutable_history_access
+from services.erp import team_access
 
 logger = logging.getLogger("mr-pilot")
 
@@ -45,8 +47,11 @@ async def api_assign_workspace(history_id: str, req: AssignWorkspaceRequest, req
     user = get_current_user_from_request(request)
     _check_history_access(user)
     _tenant = _tid(user)
+    scope_tenant_id = team_access.tenant_record_scope(request, user)
     if not _tenant:
         raise HTTPException(400, detail="workspace.required")
+    if user.get("entry") == "erp":
+        check_workspace_scope(request, user, int(req.workspace_client_id))
     ok = mutable_history_access.assign_workspace(
         request, user, _tenant, history_id, req.workspace_client_id
     )
@@ -58,7 +63,10 @@ async def api_assign_workspace(history_id: str, req: AssignWorkspaceRequest, req
                 cur, tenant_id=_tenant, workspace_client_id=int(req.workspace_client_id)
             )
         ok = db.update_history_workspace_client_id(
-            history_id, int(req.workspace_client_id), str(user["id"]), tenant_id=_tenant
+            history_id,
+            int(req.workspace_client_id),
+            str(user["id"]),
+            tenant_id=scope_tenant_id,
         )
     if not ok:
         raise HTTPException(400, detail="history.assign_workspace_failed")
@@ -75,10 +83,11 @@ async def api_assign_client(history_id: str, req: AssignClientRequest, request: 
         if visible is not None and int(req.client_id) not in set(visible):
             raise HTTPException(403, detail="client.no_access")
     tenant_id = _tid(user)
+    scope_tenant_id = team_access.tenant_record_scope(request, user)
     ok = mutable_history_access.assign_client(request, user, tenant_id, history_id, req.client_id)
     if ok is None:
         ok = db.assign_invoice_to_client(
-            str(user["id"]), history_id, req.client_id, tenant_id=tenant_id
+            str(user["id"]), history_id, req.client_id, tenant_id=scope_tenant_id
         )
     if not ok:
         raise HTTPException(400, detail="client.assign_failed")
@@ -91,7 +100,7 @@ async def api_assign_client(history_id: str, req: AssignClientRequest, request: 
             h = db.get_ocr_history_detail(
                 str(user["id"]),
                 history_id,
-                tenant_id=tenant_id,
+                tenant_id=scope_tenant_id,
             )
             if h:
                 _pages = h.get("pages") or []

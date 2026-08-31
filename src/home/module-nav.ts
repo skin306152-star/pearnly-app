@@ -160,6 +160,76 @@ function resolvePreset(
     return original;
 }
 
+interface ErpTeamAccess {
+    is_owner: boolean;
+    is_active: boolean;
+    modules: string[];
+    workspace_client_id?: number | null;
+    erp_system?: string | null;
+}
+
+const ERP_MEMBER_ROUTES: Record<string, Set<string>> = {
+    product: new Set(['stock-card']),
+    purchase: new Set([
+        'purchase',
+        'purchase-form',
+        'purchase-detail',
+        'purchase-export',
+        'purchase-capture',
+    ]),
+    sales: new Set(['sales-records', 'sales-record-detail', 'sales-invoices']),
+};
+
+let erpAccessRequest: Promise<void> | null = null;
+
+function hideErpOwnerAreas(): void {
+    show(qs('[data-collapsible="master"]'), false);
+    show(document.getElementById('nav-erp-team'), false);
+    show(qs('.nav-item[data-route="clients"]'), false);
+    show(qs('.nav-item[data-route="company"]'), false);
+    show(document.getElementById('nav-integrations'), false);
+}
+
+function applyErpMemberAccess(access: ErpTeamAccess): void {
+    window._erpTeamAccess = access;
+    const modules = new Set(access.modules || []);
+    show(qs('.nav-item[data-route="dashboard"]'), false);
+    show(document.getElementById('nav-group-firm-goods'), modules.has('product'));
+    show(qs('[data-collapsible="expense"]'), modules.has('purchase'));
+    show(qs('.nav-item[data-route="purchase"]'), modules.has('purchase'));
+    show(qs('.nav-item[data-route="purchase-suppliers"]'), false);
+    show(qs('.nav-item[data-route="purchase-settings"]'), false);
+    show(qs('[data-collapsible="sales"]'), modules.has('sales'));
+    show(document.getElementById('nav-sales-records'), modules.has('sales'));
+    show(qs('.nav-item[data-route="sales-invoices"]'), modules.has('sales'));
+    show(qs('.nav-item[data-route="sales-account"]'), false);
+    hideErpOwnerAreas();
+
+    const allowed = new Set<string>();
+    modules.forEach((module) => ERP_MEMBER_ROUTES[module]?.forEach((route) => allowed.add(route)));
+    const current = (location.hash || '').replace(/^#\//, '') || 'dashboard';
+    if (!allowed.has(current) && typeof window.routeTo === 'function') {
+        const home = ['product', 'purchase', 'sales']
+            .filter((module) => modules.has(module))
+            .map((module) => [...ERP_MEMBER_ROUTES[module]][0])[0];
+        if (home) window.routeTo(home);
+    }
+}
+
+function loadErpMemberAccess(): void {
+    if (erpAccessRequest) return;
+    erpAccessRequest = apiGet('/api/erp/team/access')
+        .then((body) => {
+            const access = (body && body.data) || body;
+            if (!access || access.is_owner || access.is_active !== true) throw new Error('access');
+            applyErpMemberAccess(access as ErpTeamAccess);
+        })
+        .catch(() => hideErpOwnerAreas())
+        .finally(() => {
+            erpAccessRequest = null;
+        });
+}
+
 function apply(
     modules: Record<string, ModuleFlag>,
     businessType?: string | null,
@@ -223,6 +293,20 @@ function apply(
             applyPosLabels(); // 4 个共用节点改名为 pos 变体(抗语言切换)
         } else if (preset === ERP_PRESET) {
             applyErpLabels();
+            if (emp) {
+                show(document.getElementById('nav-group-firm-goods'), false);
+                show(qs('[data-collapsible="expense"]'), false);
+                show(qs('[data-collapsible="sales"]'), false);
+                hideErpOwnerAreas();
+                loadErpMemberAccess();
+            } else {
+                show(document.getElementById('nav-erp-team'), owner);
+                window._erpTeamAccess = {
+                    is_owner: owner,
+                    is_active: true,
+                    modules: ['product', 'purchase', 'sales'],
+                };
+            }
         }
         lockAvatarShell(preset.avatarHide);
         return;

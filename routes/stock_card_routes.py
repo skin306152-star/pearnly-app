@@ -27,6 +27,7 @@ from core.pos_api import PosError
 from routes.accounting_common import auth_member, gate, resolve_ws
 from services.stockcard import opening as opening_svc
 from services.stockcard import report as report_svc
+from services.erp import team_access
 
 router = APIRouter(prefix="/api/stockcard", tags=["stockcard"])
 
@@ -89,25 +90,34 @@ async def api_report(
     2026-08-27 拍板:删除旧「汇总→单品详情」流程的 /summary、/card、/excluded 路由;旧的
     report.summary()/card() 仍保留给 Steward 内部汇报,但不再驱动网页。参考图没有未入账/
     状态/归并/规则/搜索,全部不做 —— 只额外保留已拍板的期初库存录入(/openings)。"""
-    _, tid = auth_member(request, _C_VIEW)
+    user, tid = auth_member(request, _C_VIEW)
+    creator = team_access.record_creator_scope(request, user)
     d_from = _parse_date(date_from, field="date_from")
     d_to = _parse_date(date_to, field="date_to")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         rows = report_svc.groups(
-            cur, tenant_id=tid, workspace_client_id=ws, date_from=d_from, date_to=d_to
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            date_from=d_from,
+            date_to=d_to,
+            created_by=creator,
         )
     return {"ok": True, "groups": rows}
 
 
 @router.get("/openings")
 async def api_list_openings(request: Request, workspace_client_id: int = Query(...)):
-    _, tid = auth_member(request, _C_VIEW)
+    user, tid = auth_member(request, _C_VIEW)
+    creator = team_access.record_creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        rows = opening_svc.list_openings(cur, tenant_id=tid, workspace_client_id=ws)
+        rows = opening_svc.list_openings(
+            cur, tenant_id=tid, workspace_client_id=ws, created_by=creator
+        )
     return {"ok": True, "rows": [_public_opening(r) for r in rows]}
 
 

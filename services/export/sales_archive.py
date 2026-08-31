@@ -23,7 +23,7 @@ def _subject_name(cur, *, tenant_id, workspace_client_id) -> str:
     return (row and row.get("name")) or f"workspace-{workspace_client_id}"
 
 
-def _sales_docs(cur, *, tenant_id, workspace_client_id, history_ids) -> list[dict]:
+def _sales_docs(cur, *, tenant_id, workspace_client_id, history_ids, created_by=None) -> list[dict]:
     if not history_ids:
         return []
     cur.execute(
@@ -34,23 +34,32 @@ def _sales_docs(cur, *, tenant_id, workspace_client_id, history_ids) -> list[dic
           AND seller_workspace_client_id = %s
           AND status = 'issued'
           AND ocr_history_id = ANY(%s::uuid[])
-        ORDER BY issue_date, id
-        """,
-        (tenant_id, workspace_client_id, [str(value) for value in history_ids]),
+        """
+        + (" AND created_by = %s" if created_by is not None else "")
+        + " ORDER BY issue_date, id",
+        (
+            tenant_id,
+            workspace_client_id,
+            [str(value) for value in history_ids],
+            *([created_by] if created_by is not None else []),
+        ),
     )
     return [dict(row) for row in cur.fetchall()]
 
 
-def _original_pdf(cur, *, tenant_id, history_id) -> bytes | None:
+def _original_pdf(cur, *, tenant_id, history_id, created_by=None) -> bytes | None:
     cur.execute(
         """
         SELECT pdf_storage_path
         FROM ocr_history
         WHERE id = %s::uuid
           AND user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)
+          """
+        + (" AND user_id = %s" if created_by is not None else "")
+        + """
         LIMIT 1
         """,
-        (history_id, tenant_id),
+        (history_id, tenant_id, *([created_by] if created_by is not None else [])),
     )
     row = cur.fetchone()
     if not row or not row.get("pdf_storage_path"):
@@ -64,6 +73,7 @@ def run_sales_export(params: dict, progress_cb=None) -> tuple:
     workspace_client_id = params.get("workspace_client_id")
     history_ids = list(dict.fromkeys(params.get("history_ids") or []))
     lang = params.get("lang") or "th"
+    created_by = params.get("created_by")
 
     with db.get_cursor(commit=False) as cur:
         token = google_oauth.valid_access_token(
@@ -76,6 +86,7 @@ def run_sales_export(params: dict, progress_cb=None) -> tuple:
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
             history_ids=history_ids,
+            created_by=created_by,
         )
         doc_ids = [str(doc["id"]) for doc in docs]
         archived = google_store.already_archived_ids(
@@ -96,7 +107,12 @@ def run_sales_export(params: dict, progress_cb=None) -> tuple:
             continue
         try:
             with db.get_cursor(commit=True) as cur:
-                original = _original_pdf(cur, tenant_id=tenant_id, history_id=doc["ocr_history_id"])
+                original = _original_pdf(
+                    cur,
+                    tenant_id=tenant_id,
+                    history_id=doc["ocr_history_id"],
+                    created_by=created_by,
+                )
                 if not original:
                     skip_n += 1
                     progress_cb({"done_n": done_n, "skip_n": skip_n, "total": len(docs)})

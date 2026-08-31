@@ -177,6 +177,28 @@ def _create_tables(cur) -> None:
     # force=False:console 读/邀请创建走 owner、公开接受页(find_by_token/accept·无登录态)与
     # ownership accept(by-token)裸 owner 绕过不破·policy 仅二道防线。
     apply_tenant_rls(cur, "invitations", "ownership_transfers")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS erp_team_members (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+            workspace_client_id BIGINT NOT NULL REFERENCES workspace_clients(id) ON DELETE CASCADE,
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            modules JSONB NOT NULL DEFAULT '[]'::jsonb,
+            erp_system TEXT,
+            erp_endpoint_id UUID REFERENCES erp_endpoints(id) ON DELETE SET NULL,
+            invited_by UUID NOT NULL REFERENCES users(id),
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (user_id),
+            CHECK (erp_system IS NULL OR erp_system IN ('mrerp', 'express'))
+        )
+        """)
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS ix_erp_team_members_tenant_workspace "
+        "ON erp_team_members (tenant_id, workspace_client_id, created_at)"
+    )
+    apply_tenant_rls(cur, "erp_team_members")
 
 
 def ensure_authz_schema() -> None:

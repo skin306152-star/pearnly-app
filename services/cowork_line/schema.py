@@ -1,4 +1,4 @@
-"""Idempotent schema bootstrap for Cowork LINE identities and binding codes."""
+"""Idempotent schema bootstrap for Cowork LINE identity and workflow state."""
 
 from __future__ import annotations
 
@@ -49,6 +49,22 @@ DDL = (
     ALTER TABLE cowork_line_identities
     ADD COLUMN IF NOT EXISTS friendship_checked_at TIMESTAMPTZ
     """,
+    """
+    CREATE TABLE IF NOT EXISTS cowork_line_sessions (
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        line_user_id TEXT NOT NULL,
+        state TEXT NOT NULL,
+        payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (tenant_id, line_user_id)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_cowork_line_sessions_expiry
+    ON cowork_line_sessions (expires_at)
+    """,
 )
 
 
@@ -60,4 +76,5 @@ def ensure_schema() -> None:
             cur,
             "cowork_line_connect_tokens",
             "cowork_line_identities",
+            "cowork_line_sessions",
         )

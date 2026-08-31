@@ -170,7 +170,13 @@ def create_workspace_client(
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             # 新建 workspace 尚无目标行可锁；endpoint 校验先行，随后 INSERT 保持原子。
             lock_endpoint_binding(cur, erp_endpoint_id)
-            if not lock_bindable_erp_endpoint(cur, erp_endpoint_id, str(user_id), tenant_id):
+            if not lock_bindable_erp_endpoint(
+                cur,
+                erp_endpoint_id,
+                str(user_id),
+                tenant_id,
+                exclude_workspace_client_id=None,
+            ):
                 return None
             if stype == "personal":
                 existing = _find_active_personal(cur, str(user_id), tenant_id)

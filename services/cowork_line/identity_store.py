@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -12,6 +13,7 @@ from psycopg2 import errors
 from core import db
 
 DEFAULT_BIND_CODE_TTL_MINUTES = 10
+logger = logging.getLogger(__name__)
 
 
 class CoworkLineIdentityError(Exception):
@@ -319,9 +321,16 @@ def resolve_active_identity(line_user_id: str) -> dict[str, str] | None:
             """,
             (row["membership_id"],),
         )
-    return {
+    identity = {
         "membership_id": str(row["membership_id"]),
         "tenant_id": str(row["tenant_id"]),
         "user_id": str(row["user_id"]),
         "line_user_id": line_user_id,
     }
+    try:
+        from services.cowork_line.push_recovery import reconcile_stale_legacy_reservations
+
+        reconcile_stale_legacy_reservations(identity)
+    except Exception:
+        logger.exception("Cowork LINE stale MR.ERP reservation reconciliation failed")
+    return identity

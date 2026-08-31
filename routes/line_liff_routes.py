@@ -36,7 +36,7 @@ def _verify_id_token(id_token: str, liff_env: str = "LINE_LIFF_ID") -> Optional[
     分开·别用错频道否则 aud 不匹配验签必败)。无 LIFF_ID 才回退网页登录频道。
     """
     liff_id = os.getenv(liff_env, "").strip()
-    if not liff_id and liff_env == "LINE_DMS_LIFF_ID":
+    if not liff_id and liff_env in {"LINE_DMS_LIFF_ID", "LINE_COWORK_LIFF_ID"}:
         liff_id = os.getenv("LINE_LIFF_ID", "").strip()
     channel_id = (
         liff_id.split("-")[0] if liff_id else os.getenv("LINE_LOGIN_CHANNEL_ID", "").strip()

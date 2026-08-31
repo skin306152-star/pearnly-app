@@ -85,32 +85,34 @@ class ErpIntakeContractTests(unittest.TestCase):
             self.assertIn("NOT EXISTS", sql)
             self.assertEqual(params, (["h1"], "u1"))
 
-    def test_erp_staged_upload_bypasses_legacy_cache_autopush_path(self):
-        user = {
-            "id": "u1",
-            "tenant_id": "t1",
-            "entry": "erp",
-            "plan": "free",
-        }
-        with (
-            mock.patch.object(recognize_core, "_ocr_get_cached") as get_cached,
-            mock.patch.object(
-                recognize_core.db,
-                "get_billing_status_combined",
-                side_effect=RuntimeError("stop after cache decision"),
-            ),
-        ):
-            with self.assertRaises(HTTPException) as ctx:
-                recognize_core.run_recognition_core(
-                    user,
-                    b"image",
-                    SimpleNamespace(filename="invoice.jpg"),
-                    ws_client_id=1,
-                    staged=True,
-                    direction="purchase",
-                )
-        self.assertEqual(ctx.exception.status_code, 503)
-        get_cached.assert_not_called()
+    def test_every_staged_upload_bypasses_legacy_cache_path(self):
+        for entry in ("erp", "cowork"):
+            user = {
+                "id": "u1",
+                "tenant_id": "t1",
+                "entry": entry,
+                "plan": "free",
+            }
+            with (
+                self.subTest(entry=entry),
+                mock.patch.object(recognize_core, "_ocr_get_cached") as get_cached,
+                mock.patch.object(
+                    recognize_core.db,
+                    "get_billing_status_combined",
+                    side_effect=RuntimeError("stop after cache decision"),
+                ),
+            ):
+                with self.assertRaises(HTTPException) as ctx:
+                    recognize_core.run_recognition_core(
+                        user,
+                        b"image",
+                        SimpleNamespace(filename="invoice.jpg"),
+                        ws_client_id=1,
+                        staged=True,
+                        direction="purchase",
+                    )
+                self.assertEqual(ctx.exception.status_code, 503)
+                get_cached.assert_not_called()
 
 
 class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):

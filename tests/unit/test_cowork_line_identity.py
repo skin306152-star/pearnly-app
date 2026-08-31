@@ -179,6 +179,27 @@ class CoworkLineIdentityTests(unittest.TestCase):
             },
         )
 
+    def test_active_identity_reconciles_expired_mrerp_reservations(self):
+        cursor = FakeCursor(
+            [
+                {
+                    "membership_id": "membership-1",
+                    "tenant_id": "tenant-1",
+                    "user_id": "user-1",
+                }
+            ]
+        )
+        with (
+            patch.object(identity_store.db, "get_cursor", cursor_context(cursor)),
+            patch(
+                "services.cowork_line.push_recovery.reconcile_stale_legacy_reservations"
+            ) as reconcile,
+        ):
+            identity = identity_store.resolve_active_identity("U-line")
+
+        self.assertEqual(identity["line_user_id"], "U-line")
+        reconcile.assert_called_once_with(identity)
+
     def test_binding_code_route_returns_friend_target(self):
         request = object()
         user = {"id": "user-1", "tenant_id": "tenant-1"}

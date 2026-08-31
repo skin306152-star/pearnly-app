@@ -140,7 +140,9 @@ def run_recognition_core(
 
     # 4.5. 文件指纹缓存(必须先于余额闸:命中不产生新成本,余额 0 也复用)。
     file_hash = _ocr_content_hash(content)
-    if staged and user.get("entry") == "erp":
+    # 任意交互式草稿都必须生成本次独立 history：缓存命中不会返回 history_ids，
+    # LINE/Cowork 复核流程会因此拿不到可确认草稿。缓存仍用于正式、非草稿入口。
+    if staged:
         cached = None
     else:
         cached = _ocr_get_cached(user, file_hash, workspace_client_id=ws_client_id)
@@ -374,10 +376,10 @@ def run_recognition_core(
     primary_archive_name = _persist["primary_archive_name"]
     primary_category_tag = _persist["primary_category_tag"]
 
+    # 草稿在用户确认前绝不能自动推送。此前只挡 ERP entry，Cowork 草稿仍可能被
+    # 账套 auto_push 提前送出，破坏“预览/编辑/确认”边界。
     auto_pushed = (
-        False
-        if staged and user.get("entry") == "erp"
-        else dispatch_auto_push(history_ids=history_ids, plan=plan, user=user)
+        False if staged else dispatch_auto_push(history_ids=history_ids, plan=plan, user=user)
     )
 
     # 成本日志(pipeline-v1 自带完整成本 · 100% 埋点)。

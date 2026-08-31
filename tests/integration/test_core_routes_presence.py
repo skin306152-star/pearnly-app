@@ -99,6 +99,8 @@ CORE_ROUTES = {
         "/api/cowork-line/identity",
         "/api/cowork-line/binding-code",
         "/api/line/webhook",
+        "/api/cowork-line/intake/liff/config",
+        "/api/cowork-line/intake/draft/{draft_id}",
     ],
     "改密/password": [
         "/api/me/change_password",

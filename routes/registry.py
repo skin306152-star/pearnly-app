@@ -43,6 +43,7 @@ from routes.console_invite_routes import router as console_invite_router
 from routes.console_roles_routes import router as console_roles_router
 from routes.console_team_routes import router as console_team_router
 from routes.cowork_line_binding_routes import router as cowork_line_binding_router
+from routes.cowork_line_intake_routes import router as cowork_line_intake_router
 from routes.cowork_line_webhook_routes import router as cowork_line_webhook_router
 from routes.dms_roster_routes import router as dms_roster_router
 from routes.dms_routes import router as dms_router
@@ -201,6 +202,7 @@ ROUTERS = (
     pages_router,  # 静态页面 + 公开 meta
     me_router,
     cowork_line_binding_router,
+    cowork_line_intake_router,
     cowork_line_webhook_router,
     erp_router,  # ERP 推送
     erp_intake_router,  # ERP 商户 staged OCR 草稿丢弃

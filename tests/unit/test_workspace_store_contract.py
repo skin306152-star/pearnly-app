@@ -88,6 +88,7 @@ class CrudSqlTests(unittest.TestCase):
                 fetchone_seq=[
                     {"id": 1},
                     {"id": "ep-9", "user_id": "u1", "tenant_id": None, "binding_generation": 0},
+                    None,
                 ],
             ),
         ):

@@ -114,6 +114,13 @@ _ENTRY_ASSETS = {
         "/static/erp-line-intake/field-renderer.js",
         "/static/erp-line-intake/erp-line-intake.js",
     ),
+    "static/cowork-line-intake/index.html": (
+        "/static/pearnly-ui.css",
+        "/static/cowork-line-intake/intake.css",
+        "/static/cowork-line-intake/i18n.js",
+        "/static/cowork-line-intake/field-editor.js",
+        "/static/cowork-line-intake/app.js",
+    ),
     "static/daily/daily.html": (
         "/static/daily/daily.webmanifest",
         "/static/dist/daily.css",

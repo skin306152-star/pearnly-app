@@ -9,9 +9,14 @@ from services.erp.legacy_generation import lock_endpoint_binding
 
 
 def lock_bindable_erp_endpoint(
-    cur, endpoint_id: Optional[str], user_id: str, tenant_id: Optional[str]
+    cur,
+    endpoint_id: Optional[str],
+    user_id: str,
+    tenant_id: Optional[str],
+    *,
+    exclude_workspace_client_id: Optional[int] = None,
 ) -> bool:
-    """Lock and validate an actor-owned legacy endpoint for a workspace."""
+    """Lock an actor-owned legacy endpoint and reject an active competing binding."""
     if not endpoint_id:
         return True
     cur.execute(
@@ -32,8 +37,20 @@ def lock_bindable_erp_endpoint(
         return False
     endpoint_tenant = endpoint.get("tenant_id")
     if tenant_id:
-        return endpoint_tenant is None or str(endpoint_tenant) == str(tenant_id)
-    return endpoint_tenant is None
+        if endpoint_tenant is not None and str(endpoint_tenant) != str(tenant_id):
+            return False
+    elif endpoint_tenant is not None:
+        return False
+    params: list = [str(endpoint_id).strip()]
+    occupancy_sql = (
+        "SELECT id FROM workspace_clients WHERE erp_endpoint_id = %s " "AND is_active = TRUE"
+    )
+    if exclude_workspace_client_id is not None:
+        occupancy_sql += " AND id <> %s"
+        params.append(int(exclude_workspace_client_id))
+    occupancy_sql += " ORDER BY id LIMIT 1 FOR UPDATE"
+    cur.execute(occupancy_sql, tuple(params))
+    return cur.fetchone() is None
 
 
 def lock_workspace_client(
@@ -67,7 +84,13 @@ def bind_workspace_endpoint(
             lock_endpoint_binding(cur, erp_endpoint_id)
             if not lock_workspace_client(cur, workspace_client_id, str(user_id), tenant_id):
                 return False
-            if not lock_bindable_erp_endpoint(cur, erp_endpoint_id, str(user_id), tenant_id):
+            if not lock_bindable_erp_endpoint(
+                cur,
+                erp_endpoint_id,
+                str(user_id),
+                tenant_id,
+                exclude_workspace_client_id=workspace_client_id,
+            ):
                 return False
             value = str(erp_endpoint_id).strip() if erp_endpoint_id else None
             if tenant_id:

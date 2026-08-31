@@ -107,7 +107,9 @@ class SharedEnrollmentContractTests(unittest.TestCase):
         source = (ROOT / "services" / "workspace" / "endpoint_binding.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("return endpoint_tenant is None", source)
+        self.assertIn("elif endpoint_tenant is not None", source)
+        self.assertIn("exclude_workspace_client_id", source)
+        self.assertIn("AND is_active = TRUE", source)
         enrollment = (ROOT / "services" / "erp" / "shared_express_enrollment.py").read_text(
             encoding="utf-8"
         )

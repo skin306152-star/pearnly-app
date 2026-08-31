@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from routes.pages_routes import router
 from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
+from routes.cowork_line_intake_routes import router as cowork_line_intake_router
 
 # 全部返回 HTML 外壳的对外路由(/admin 是 301 → 用落地的 /admin/cost)。
 # 2026-08-26 · /login 已退居服务端 302 别名(落 /cowork),不再吐外壳,故不在此清单;
@@ -36,6 +37,7 @@ SHELL_ROUTES = [
     "/terms",
     "/privacy",
     "/liff/dms-booking",
+    "/liff/cowork-intake/x",
 ]
 
 MAX_LINES = 3  # minified 外壳 · 留 3 行余量(实测均为 1 行)
@@ -47,6 +49,7 @@ class PageShellMinifiedTest(unittest.TestCase):
         app = FastAPI()
         app.include_router(router)
         app.include_router(line_dms_booking_edit_router)
+        app.include_router(cowork_line_intake_router)
         cls.client = TestClient(app)
 
     def test_public_routes_serve_minified_shell(self):

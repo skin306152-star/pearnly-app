@@ -160,7 +160,31 @@ def _locked_history(
     return _detail_row(row)
 
 
-def _formal_direction(cur, *, history_id: str, tenant_id: str, workspace_client_id: int) -> str:
+def _confirmed_direction(
+    cur,
+    *,
+    history_id: str,
+    tenant_id: str,
+    workspace_client_id: int,
+    history: Dict[str, Any],
+    entry: str,
+) -> str:
+    """Return the confirmed direction for the caller's product boundary.
+
+    ERP entry still requires a formal purchase/sales document. Cowork intentionally
+    keeps the confirmed document only in ``ocr_history``; its explicit direction was
+    chosen before OCR and persisted with the draft, so no formal document is created.
+    """
+    if entry == "cowork":
+        fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
+        pages = history.get("pages") if isinstance(history.get("pages"), list) else []
+        if not fields and pages and isinstance(pages[0], dict):
+            page_fields = pages[0].get("fields")
+            fields = page_fields if isinstance(page_fields, dict) else {}
+        direction = str(fields.get("direction") or "").strip().lower()
+        if direction not in _DIRECTION_PERMISSIONS:
+            raise HTTPException(409, detail="erp.direction_required")
+        return direction
     cur.execute(
         "SELECT id FROM purchase_docs WHERE tenant_id = %s AND workspace_client_id = %s "
         "AND ocr_history_id = %s AND status = 'posted' LIMIT 1 FOR SHARE",
@@ -277,13 +301,17 @@ def reserve_managed_manual_push(
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
         )
-        direction = _formal_direction(
+        direction = _confirmed_direction(
             cur,
             history_id=history_id,
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
+            history=history,
+            entry=str(user.get("entry") or ""),
         )
-        if any(not authz.has(code) for code in _DIRECTION_PERMISSIONS[direction]):
+        if user.get("entry") != "cowork" and any(
+            not authz.has(code) for code in _DIRECTION_PERMISSIONS[direction]
+        ):
             raise HTTPException(403, detail="authz.forbidden")
 
         active, success = _existing_log(

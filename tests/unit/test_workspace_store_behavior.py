@@ -90,7 +90,11 @@ class CreateTests(unittest.TestCase):
 
     def test_success_trims_and_returns_id(self):
         cur = FakeCursor(
-            fetchone={"id": 11, "user_id": "u1", "tenant_id": None, "binding_generation": 0}
+            fetchone_seq=[
+                {"id": "ep1", "user_id": "u1", "tenant_id": None, "binding_generation": 0},
+                None,
+                {"id": 11},
+            ]
         )
         with patch_cursor(cur):
             wid = ws.create_workspace_client(
@@ -105,6 +109,19 @@ class CreateTests(unittest.TestCase):
         self.assertEqual(p[2], "ACME Co")  # trimmed
         self.assertEqual(p[3], "123")  # tax_id trimmed
         self.assertEqual(p[4], "ep1")  # endpoint trimmed
+
+    def test_create_rejects_endpoint_bound_to_an_active_workspace(self):
+        cur = FakeCursor(
+            fetchone_seq=[
+                {"id": "ep1", "user_id": "u1", "tenant_id": "t1", "binding_generation": 0},
+                {"id": 8},
+            ]
+        )
+        with patch_cursor(cur):
+            self.assertIsNone(ws.create_workspace_client("u1", "t1", "ACME", erp_endpoint_id="ep1"))
+        self.assertNotIn("INSERT INTO workspace_clients", cur.all_sql())
+        self.assertIn("erp_endpoint_id = %s", cur.last_sql)
+        self.assertIn("is_active = TRUE", cur.last_sql)
 
     def test_blank_tax_becomes_none(self):
         cur = FakeCursor(fetchone={"id": 1})
@@ -387,6 +404,7 @@ class BindTests(unittest.TestCase):
             fetchone_seq=[
                 {"id": 1},
                 {"id": "ep9", "user_id": "u1", "tenant_id": None, "binding_generation": 0},
+                None,
             ],
             rowcount=1,
         )
@@ -398,6 +416,21 @@ class BindTests(unittest.TestCase):
         self.assertIn("pg_advisory_xact_lock", cur.calls[0][0])
         self.assertIn("workspace_clients", cur.calls[1][0])
         self.assertIn("erp_endpoints", cur.calls[2][0])
+        self.assertIn("id <> %s", cur.calls[3][0])
+        self.assertEqual(cur.calls[3][1], ("ep9", 1))
+
+    def test_bind_rejects_endpoint_occupied_by_another_active_workspace(self):
+        cur = FakeCursor(
+            fetchone_seq=[
+                {"id": 1},
+                {"id": "ep9", "user_id": "u1", "tenant_id": "t1", "binding_generation": 0},
+                {"id": 2},
+            ],
+            rowcount=1,
+        )
+        with patch_cursor(cur):
+            self.assertFalse(ws.bind_workspace_endpoint(1, "ep9", "u1", "t1"))
+        self.assertNotIn("UPDATE workspace_clients SET erp_endpoint_id", cur.all_sql())
 
     def test_unbind_none(self):
         cur = FakeCursor(fetchone={"id": 1}, rowcount=1)

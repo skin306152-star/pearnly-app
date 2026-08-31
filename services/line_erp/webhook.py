@@ -7,13 +7,11 @@ import secrets
 from types import SimpleNamespace
 from urllib.parse import parse_qs
 
-from fastapi import HTTPException
-
 from core import db
 from core.feature_flags import erp_line_enabled_for
 from services.intake_bridge import convert as convert_svc
 from services.line_binding import line_client
-from services.line_erp import cards, flow, intake, preview, store
+from services.line_erp import cards, draft_view, flow, intake, preview, push as line_push, store
 from services.line_erp.out import make_spawn
 from services.ocr.recognize.core import run_recognition_core
 from services.erp import team_access
@@ -29,33 +27,7 @@ class BatchIncomplete(Exception):
 
 
 _allowed_modes = team_access.binding_line_modes
-
-
-def draft_records(user_id: str, tenant_id: str, draft_id: str, ids: list[str]) -> list[dict]:
-    from services.ocr_history.queries import get_ocr_history_detail
-
-    records = []
-    for history_id in ids:
-        detail = get_ocr_history_detail(user_id, history_id, tenant_id=tenant_id)
-        if detail is None:
-            raise HTTPException(403, detail="line_erp.draft_forbidden")
-        page_numbers = []
-        for index, page in enumerate(detail.get("pages") or []):
-            raw_number = page.get("page_number") if isinstance(page, dict) else None
-            try:
-                page_number = max(0, int(raw_number or index + 1) - 1)
-            except (TypeError, ValueError):
-                page_number = index
-            if page_number not in page_numbers:
-                page_numbers.append(page_number)
-        page_numbers = page_numbers or [0]
-        detail["preview_urls"] = [
-            f"/api/line/erp/draft/{draft_id}/records/{history_id}/page/{page}.png"
-            for page in page_numbers
-        ]
-        detail["preview_url"] = detail["preview_urls"][0]
-        records.append(detail)
-    return records
+draft_records = draft_view.records
 
 
 async def handle_event(ev: dict) -> None:
@@ -395,11 +367,23 @@ async def act_draft(
         result = await _confirm(binding, user, history_id, history_ids, reply_token)
         if not result["ok"]:
             return result
-        text = "ยืนยันเอกสารเรียบร้อยแล้ว"
+        text = (
+            "บันทึกเอกสารและส่งคำสั่งไป ERP แล้ว"
+            if result.get("push_ok")
+            else "บันทึกเอกสารแล้ว แต่ส่ง ERP ไม่สำเร็จ กรุณาตรวจสอบประวัติการส่ง"
+        )
     store.clear_session(binding["tenant_id"], line_user_id)
     if reply_token:
         line_client.reply_text(reply_token, text, channel=CHANNEL)
-    return {"ok": True, "action": action, "history_ids": history_ids}
+    response = {"ok": True, "action": action, "history_ids": history_ids}
+    if action != "discard":
+        response.update(
+            {
+                "push_ok": bool(result.get("push_ok")),
+                "push_results": list(result.get("push_results") or []),
+            }
+        )
+    return response
 
 
 async def _discard(binding: dict, history_ids: list[str]) -> dict:
@@ -497,4 +481,8 @@ async def _confirm(
             "detail": "line_erp.confirm_incomplete",
             "result": exc.result,
         }
-    return {"ok": True}
+    return await line_push.dispatch_confirmed(
+        user=user,
+        binding=binding,
+        history_ids=history_ids,
+    )

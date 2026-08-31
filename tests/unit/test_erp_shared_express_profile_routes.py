@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from routes import erp_shared_express_profile_routes as routes
 
 ROOT = Path(__file__).resolve().parents[2]
-USER = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
+USER = {"id": "owner", "tenant_id": "tenant", "entry": "erp", "role": "owner"}
 
 
 def _request(workspace="101"):

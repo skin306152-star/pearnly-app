@@ -144,7 +144,9 @@ class LoginEntranceAllowedTests(unittest.TestCase):
             mock.patch("core.feature_flags.daily_enabled_for", return_value=daily_on),
             mock.patch("core.feature_flags.erp_portal_enabled_for", return_value=erp_on),
         ):
-            return entrance.login_entrance_allowed(entry, {"tenant_id": "t1", "id": "u1"})
+            return entrance.login_entrance_allowed(
+                entry, {"tenant_id": "t1", "id": "u1", "role": "owner"}
+            )
 
     def test_super_admin_allowed_any_door(self) -> None:
         # 超管连推导都不走(entrance_gate 未 mock 也不该被读)

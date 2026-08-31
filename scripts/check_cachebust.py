@@ -70,6 +70,7 @@ class CacheBustDir(NamedTuple):
 _ENTRY_ASSETS = {
     "home.html": (
         "/static/dist/main.js",
+        "/static/dist/main.css",
         "/static/dist/home.css",
         "/static/dist/pre.js",
         "/static/dist/post.js",

@@ -230,6 +230,78 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             any("UPDATE ocr_history SET staged = FALSE" in sql for sql, _ in cursor.sql)
         )
 
+    async def test_complete_confirm_pushes_each_history_through_assigned_erp(self):
+        binding = {
+            "tenant_id": "t1",
+            "user_id": "u1",
+            "workspace_client_id": 7,
+        }
+        cursor = _Cursor(count=2)
+        records = [
+            {
+                "pages": [
+                    {
+                        "fields": {
+                            "direction": "purchase",
+                            "date": "2026-09-01",
+                            "items": [{"name": name, "qty": "1", "posting_kind": "stock"}],
+                        }
+                    }
+                ]
+            }
+            for name in ("A", "B")
+        ]
+        pushed = mock.AsyncMock(
+            return_value={
+                "ok": True,
+                "push_ok": True,
+                "push_results": [
+                    {"history_id": "h1", "ok": True, "status": "success", "log_id": "l1"},
+                    {"history_id": "h2", "ok": True, "status": "pending", "log_id": "l2"},
+                ],
+            }
+        )
+        with (
+            mock.patch.object(
+                webhook.store,
+                "get_session",
+                return_value={
+                    "state": "draft",
+                    "payload": {"mode": "purchase", "history_ids": ["h1", "h2"]},
+                },
+            ),
+            mock.patch.object(webhook.store, "clear_session") as clear_session,
+            mock.patch.object(
+                webhook.db,
+                "find_user_by_id",
+                return_value={"id": "u1", "tenant_id": "t1", "is_active": True},
+            ),
+            mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
+            mock.patch.object(webhook, "draft_records", return_value=records),
+            mock.patch.object(
+                webhook.convert_svc,
+                "convert_histories",
+                return_value={
+                    "converted": [{"history_id": "h1"}, {"history_id": "h2"}],
+                    "skipped": [],
+                },
+            ),
+            mock.patch.object(webhook.db, "get_cursor_rls", return_value=_Context(cursor)),
+            mock.patch.object(webhook.line_push, "dispatch_confirmed", pushed),
+        ):
+            result = await webhook.act_draft(binding, "line-u1", None, "h1", "confirm")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["push_ok"])
+        self.assertEqual([row["status"] for row in result["push_results"]], ["success", "pending"])
+        pushed.assert_awaited_once_with(
+            user={"id": "u1", "tenant_id": "t1", "is_active": True, "entry": "erp"},
+            binding=binding,
+            history_ids=["h1", "h2"],
+        )
+        clear_session.assert_called_once_with("t1", "line-u1")
+
 
 if __name__ == "__main__":
     unittest.main()

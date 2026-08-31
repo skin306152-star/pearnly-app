@@ -26,7 +26,9 @@ class HistoryUpdatePostingRouteTests(unittest.TestCase):
     def setUp(self):
         self._patches = [
             mock.patch.object(
-                history_routes, "get_current_user_from_request", return_value={"id": "u1"}
+                history_routes,
+                "get_current_user_from_request",
+                return_value={"id": "u1", "tenant_id": "t1"},
             ),
             mock.patch.object(history_routes, "_check_history_access", return_value=7),
             mock.patch.object(history_routes, "_tid", return_value="t1"),

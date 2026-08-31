@@ -18,6 +18,7 @@ os.environ.setdefault("PEARNLY_SKIP_HEAVY_INIT", "1")
 import app  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from routes import erp_push_log_routes  # noqa: E402
+from services.erp import confirmed_push  # noqa: E402
 
 _USER = {"id": "u-test", "plan": "pro"}
 
@@ -73,7 +74,7 @@ class EnabledGateTests(unittest.TestCase):
                 return_value={"invoice_no": "INV-1", "total_amount": "1"},
             ),
             patch.object(
-                erp_push_log_routes.convert_svc,
+                confirmed_push.convert_svc,
                 "history_is_converted",
                 return_value=False,
             ),

@@ -1,17 +1,18 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-31 F2 code verified / Windows 发版外部阻塞
+## 当前状态卡 · 08-31 F2 READY_FOR_DEVICE / 待真机用户验收
 
-- **▶ 当前 task**:Zihao 明确指示越过 F1 真机门继续 F2；F2“一个 Companion 进程管理多个隔离 Profile”代码已验证，状态=`RELEASE_BLOCKED`，绝不冒充上线或真机闭环。
+- **▶ 当前 task**:Zihao 明确指示越过 F1 真机门继续 F2；F2“一个 Companion 进程管理多个隔离 Profile”代码已验证并发布，状态=`READY_FOR_DEVICE`，尚未 `USER_ACCEPTED`，绝不冒充真机闭环。
 - **🎯 F2 结果**:同一安装包/进程/开机项管理 Cowork 与 `/erp` 多个 Express 连接；每 Profile 独立 token、账套、暂停态、heartbeat/lease/ACK；一个公平串行写通道，A 的 401/暂停/离线不阻断 B。
 - **🔐 本地安全**:旧单 Profile 原子迁移为 schema v2；token 仅以 Windows CurrentUser DPAPI 密文落盘；相同物理 account_dir 拒绝；设置重载与退出协作等待当前 DBF 单据安全结束，绝不 `QThread.terminate()` 半路强杀。
 - **🖥 UI**:托盘“Express 连接”可添加、编辑、暂停/恢复、确认移除；显示在线/离线/处理中/需处理/已暂停；中泰文案；变更后只重启唯一 worker。
 - **☁️ 云端裁决**:F1 endpoint/token/heartbeat/lease/ACK 已天然支持同一 companion_id 的多 Profile；未新增 schema、路由或第二套队列。回归 commit=`0c55531e` 已推 origin/master，真 PG 双 endpoint/token 2/2 通过且交叉 ACK 零 mutation。
 - **✅ Companion 验证**:commit=`ceef6be37bc551255d92e9e040297e9bfa0f30e4` 已推 master；69 targeted 通过、1 个仅因本 Mac 无 PySide6 跳过；Ruff/Black/py_compile/diff-check 全绿；DeepSeek 聚焦审查后修 direct-config store 回绑，Sol 审查后修安全停 worker。
-- **🏷 候选版本**:`1.1.65` / tag `v1.1.65` 已推；GitHub release run `33350667135` 在执行任何 step 前被账户 Actions 账单/消费上限拒绝，非代码失败。
-- **🚫 当前线上**:`latest.json` 回读仍为 `1.1.64`；已配置 Windows 兜底机 `lenovo-office` 的 Tailscale/LAN SSH 均超时，因此本轮没有安装包、ProductVersion 或 SHA-256，F2 不能标 `READY_FOR_DEVICE`。
+- **🏷 发布结果**:`1.1.65` / tag `v1.1.65` 已推；GitHub release run `33350667135` 虽被账户 Billing 拒绝，但 Windows 兜底构建、生产服务器与公网制品四方校验已通过，不再阻塞本候选。
+- **📦 制品真值**:installer ProductVersion=`1.1.65`；size=`62863621` bytes；SHA-256=`d5157cc7ea92b681d4b9b8cdc5c7387d68eb30405958d70c053442d3db1c8bd4`；生产与公网下载一致。
+- **🌐 更新入口**:`latest.json.version=1.1.65`，URL=`/static/companion/PearnlyCompanion-Setup.exe?v=v1.1.65-ceef6be`；新 query 已实测 HTTP 200，兼容现有版本判定与后续升级。
 - **🧾 F1 沿袭门**:F1 production candidate=`2dbb7dd0`/manual CD `33329235154`/flag rollout all 仍待老板+员工+Express report 真机证据；本轮只因用户明确指令进入 F2，F1 仍非 `USER_ACCEPTED`。
-- **⏭ 唯一下步**:Zihao 处理 GitHub Billing/Actions spending limit，或开机让 `lenovo-office` 可达；随后重跑相同 tag 构建并回读 `latest.json=1.1.65`、installer ProductVersion/SHA-256，再做同机 Cowork+A 与 `/erp`+B 双账套真机验收。
+- **⏭ 唯一下步**:只执行同一台 Windows 上的 F2 最小真机脚本：Cowork+A 与 `/erp`+B 双账套隔离、暂停不中断、重启持久化、重复目录拒绝、单进程树及旧配置/DPAPI 迁移；等 Zihao 明确 F2 OK。
 - **⏸ F3-F7**:保持 `PLANNED_LOCKED`；F2 真机明确 OK 后才进入 F3 LINE“确认入账并推送 ERP”。
 - **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md` 与 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 

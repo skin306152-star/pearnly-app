@@ -38,7 +38,7 @@ from services.line_dms.rich_menu import (
 _MENU_ICON_BASE = "https://pearnly.com/static/dms/line-icons"
 
 
-def _menu_icon_disc(icon: str, soft: str, size: str, img: str) -> Dict[str, Any]:
+def menu_icon_disc(icon: str, soft: str, size: str, img: str) -> Dict[str, Any]:
     return {
         "type": "box",
         "layout": "vertical",
@@ -59,17 +59,17 @@ THEME_PURPLE = {"accent": "#7656d6", "soft": "#f0ebff", "border": "#e5dcff"}
 THEME_GREEN = {"accent": "#198c6a", "soft": "#e8f7f1", "border": "#d3eee4"}
 
 
-def _menu_item(
+def menu_item(
     num: str,
     icon: str,
     theme: Dict[str, str],
     title: str,
     desc: str,
-    action: Dict[str, Any],
+    action: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
     """整行可点的菜单项：编号圆徽、图标、标题说明和箭头。"""
     accent = theme["accent"]
-    return {
+    row = {
         "type": "box",
         "layout": "horizontal",
         "spacing": "md",
@@ -79,9 +79,8 @@ def _menu_item(
         "borderWidth": "1px",
         "paddingAll": "14px",
         "alignItems": "center",
-        "action": action,
         "contents": [
-            _menu_icon_disc(icon, theme["soft"], "46px", "26px"),
+            menu_icon_disc(icon, theme["soft"], "46px", "26px"),
             {
                 "type": "text",
                 "text": num,
@@ -114,6 +113,11 @@ def _menu_item(
                     },
                 ],
             },
+        ],
+    }
+    if action:
+        row["action"] = action
+        row["contents"].append(
             {
                 "type": "text",
                 "text": "›",
@@ -121,9 +125,9 @@ def _menu_item(
                 "color": accent,
                 "flex": 0,
                 "gravity": "center",
-            },
-        ],
-    }
+            }
+        )
+    return row
 
 
 def menu_card() -> Dict[str, Any]:
@@ -134,7 +138,7 @@ def menu_card() -> Dict[str, Any]:
         "spacing": "md",
         "alignItems": "center",
         "contents": [
-            _menu_icon_disc("menu-head", "#eaf0ff", "40px", "22px"),
+            menu_icon_disc("menu-head", "#eaf0ff", "40px", "22px"),
             {
                 "type": "box",
                 "layout": "vertical",
@@ -166,7 +170,7 @@ def menu_card() -> Dict[str, Any]:
         "contents": [
             head,
             {"type": "separator", "margin": "lg", "color": "#eeeef4"},
-            _menu_item(
+            menu_item(
                 "1",
                 "menu-1",
                 THEME_BLUE,
@@ -174,7 +178,7 @@ def menu_card() -> Dict[str, Any]:
                 TXT_MENU_D1,
                 {"type": "postback", "data": _data(ACT_MENU_CUSTOMER)},
             ),
-            _menu_item(
+            menu_item(
                 "2",
                 "menu-2",
                 THEME_PINK,
@@ -182,7 +186,7 @@ def menu_card() -> Dict[str, Any]:
                 TXT_MENU_D2,
                 {"type": "postback", "data": _data(ACT_MENU_BOOKING)},
             ),
-            _menu_item(
+            menu_item(
                 "3",
                 "menu-3",
                 THEME_PURPLE,
@@ -195,7 +199,7 @@ def menu_card() -> Dict[str, Any]:
                     "altUri": {"desktop": portal_desktop_url()},
                 },
             ),
-            _menu_item(
+            menu_item(
                 "4",
                 "menu-4",
                 THEME_GREEN,

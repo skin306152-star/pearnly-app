@@ -12,7 +12,27 @@ from services.cowork_line import menu_cards, rich_menu
 
 def cells(card: dict) -> list[dict]:
     contents = card["contents"]["body"]["contents"]
-    return [*contents[3]["contents"], *contents[4]["contents"]]
+    return [
+        item
+        for item in contents
+        if item.get("type") == "box"
+        and item.get("layout") == "horizontal"
+        and item.get("cornerRadius") == "14px"
+    ]
+
+
+def texts(value) -> list[str]:
+    if isinstance(value, dict):
+        found = [str(value["text"])] if "text" in value else []
+        for child in value.values():
+            found.extend(texts(child))
+        return found
+    if isinstance(value, list):
+        found = []
+        for child in value:
+            found.extend(texts(child))
+        return found
+    return []
 
 
 class CoworkLineMenuTests(unittest.TestCase):
@@ -36,11 +56,13 @@ class CoworkLineMenuTests(unittest.TestCase):
                     [cell for cell in menu_cells if "action" in cell],
                     [menu_cells[0]],
                 )
+                self.assertTrue(all(soon in texts(cell) for cell in menu_cells[1:]))
+                self.assertIn(
+                    "/static/dms/line-icons/", menu_cells[0]["contents"][0]["contents"][0]["url"]
+                )
+                self.assertEqual(menu_cells[0]["contents"][-1]["text"], "›")
                 self.assertTrue(
-                    all(
-                        soon in [item["text"] for item in cell["contents"]]
-                        for cell in menu_cells[1:]
-                    )
+                    all(cell["contents"][-1].get("text") != "›" for cell in menu_cells[1:])
                 )
 
     def test_unknown_language_falls_back_to_thai(self):

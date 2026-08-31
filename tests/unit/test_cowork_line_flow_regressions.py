@@ -361,6 +361,50 @@ class CoworkLineOcrRegressionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CoworkLineFlexRegressionTests(unittest.TestCase):
+    def test_account_picker_reuses_dms_row_shape_and_hides_internal_state_codes(self):
+        card = flow_cards.account_picker_card(
+            [
+                {
+                    "adapter": "mrerp",
+                    "endpoint_id": "endpoint-1",
+                    "workspace_client_id": 1,
+                    "label": "MR.ERP",
+                    "connection_state": "disabled",
+                    "selectable": False,
+                    "missing": ["endpoint_disabled"],
+                }
+            ],
+            "mrerp",
+            "zh",
+        )
+
+        serialized = json.dumps(card, ensure_ascii=False)
+
+        self.assertNotIn("endpoint_disabled", serialized)
+        self.assertIn("ERP 连接已停用，请到网页端启用", serialized)
+        self.assertIn("/static/dms/line-icons/", serialized)
+        self.assertNotIn("a=cowork_erp_target", serialized)
+
+    def test_preview_reuses_erp_header_and_footer_hierarchy(self):
+        card = flow_cards.preview_card(
+            draft_id="draft-1",
+            fields={"invoice_number": "INV-1", "total_amount": "100.00", "items": []},
+            target={
+                "adapter": "express",
+                "label": "Express · 69EXP",
+                "workspace_name": "บริษัท ทดสอบ จำกัด",
+            },
+            direction="purchase",
+            mode="stock",
+            lang="th",
+        )
+
+        bubble = card["contents"]
+        self.assertEqual(bubble["header"]["backgroundColor"], "#16873E")
+        self.assertEqual(bubble["footer"]["contents"][0]["color"], "#16873E")
+        self.assertEqual(bubble["footer"]["contents"][1]["layout"], "horizontal")
+        self.assertIn("Express · บริษัท ทดสอบ จำกัด", json.dumps(card, ensure_ascii=False))
+
     def test_maximum_chinese_preview_stays_below_line_bubble_limit(self):
         fields = {key: "中" * 300 for key in flow_cards._HEADER_KEYS}
         fields["items"] = []

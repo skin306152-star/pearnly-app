@@ -5,6 +5,12 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import urlencode
 
+from services.line_dms.menu_cards import (
+    THEME_BLUE,
+    menu_icon_disc,
+    menu_item,
+)
+
 ACTION_ERP_START = "cowork_erp_start"
 
 _COPY = {
@@ -15,6 +21,8 @@ _COPY = {
         "start": "ส่งเอกสารเข้า ERP",
         "start_desc": "อัปโหลด ตรวจสอบ และเลือกปลายทาง",
         "soon": "เร็ว ๆ นี้",
+        "soon_desc": "ฟังก์ชันนี้กำลังเตรียมเปิดให้ใช้งาน",
+        "hint": "พิมพ์ เมนู เพื่อเรียกเมนูนี้ได้ตลอดเวลา",
         "display": "ส่งเอกสารเข้า ERP",
     },
     "en": {
@@ -24,6 +32,8 @@ _COPY = {
         "start": "Send document to ERP",
         "start_desc": "Upload, review, and choose a destination",
         "soon": "Coming soon",
+        "soon_desc": "This function is being prepared",
+        "hint": "Type Menu to open this menu at any time",
         "display": "Send document to ERP",
     },
     "zh": {
@@ -33,6 +43,8 @@ _COPY = {
         "start": "上传单据到 ERP",
         "start_desc": "上传、核对并选择推送目标",
         "soon": "即将开放",
+        "soon_desc": "该功能正在准备中",
+        "hint": "随时输入“菜单”即可重新打开",
         "display": "上传单据到 ERP",
     },
     "ja": {
@@ -42,6 +54,8 @@ _COPY = {
         "start": "書類を ERP に送信",
         "start_desc": "アップロード、確認、送信先の選択",
         "soon": "近日公開",
+        "soon_desc": "この機能は準備中です",
+        "hint": "「メニュー」と入力するといつでも再表示できます",
         "display": "書類を ERP に送信",
     },
 }
@@ -55,64 +69,37 @@ def _language(lang: str) -> str:
     return "th"
 
 
-def _cell(number: int, *, active: bool, copy: dict[str, str]) -> dict[str, Any]:
-    cell: dict[str, Any] = {
-        "type": "box",
-        "layout": "vertical",
-        "flex": 1,
-        "paddingAll": "12px",
-        "cornerRadius": "14px",
-        "backgroundColor": "#EEF3FF" if active else "#F2F1F5",
-        "borderWidth": "1px",
-        "borderColor": "#CAD8FF" if active else "#E1DFE7",
-        "contents": [
-            {
-                "type": "text",
-                "text": f"{number:02d}",
-                "size": "xs",
-                "weight": "bold",
-                "color": "#2F6BFF" if active else "#A39DAD",
-            },
-            {
-                "type": "text",
-                "text": copy["start"] if active else copy["soon"],
-                "size": "sm",
-                "weight": "bold",
-                "color": "#202033" if active else "#837D8D",
-                "wrap": True,
-                "margin": "md",
-            },
-            {
-                "type": "text",
-                "text": copy["start_desc"] if active else copy["soon"],
-                "size": "xxs",
-                "color": "#666477" if active else "#AAA5B1",
-                "wrap": True,
-                "margin": "sm",
-            },
-        ],
-    }
-    if active:
-        cell["action"] = {
-            "type": "postback",
-            "data": urlencode({"action": ACTION_ERP_START}),
-            "displayText": copy["display"],
-        }
-    return cell
+_THEME_MUTED = {"accent": "#A39DAD", "soft": "#F2F1F5", "border": "#E1DFE7"}
 
 
 def menu_card(lang: str = "th") -> dict[str, Any]:
     copy = _COPY[_language(lang)]
-    cells = [_cell(index, active=index == 1, copy=copy) for index in range(1, 7)]
+    action = {
+        "type": "postback",
+        "data": urlencode({"action": ACTION_ERP_START}),
+        "displayText": copy["display"],
+    }
     rows = [
-        {
-            "type": "box",
-            "layout": "horizontal",
-            "spacing": "sm",
-            "contents": cells[offset : offset + 3],
-        }
-        for offset in (0, 3)
+        menu_item(
+            "1",
+            "menu-3",
+            THEME_BLUE,
+            copy["start"],
+            copy["start_desc"],
+            action,
+        )
     ]
+    rows.extend(
+        menu_item(
+            str(index),
+            "menu-head",
+            _THEME_MUTED,
+            copy["soon"],
+            copy["soon_desc"],
+            None,
+        )
+        for index in range(2, 7)
+    )
     return {
         "type": "flex",
         "altText": copy["alt"],
@@ -123,17 +110,48 @@ def menu_card(lang: str = "th") -> dict[str, Any]:
                 "layout": "vertical",
                 "paddingAll": "16px",
                 "contents": [
-                    {"type": "text", "text": copy["title"], "size": "lg", "weight": "bold"},
                     {
-                        "type": "text",
-                        "text": copy["subtitle"],
-                        "size": "xs",
-                        "color": "#777486",
-                        "margin": "xs",
+                        "type": "box",
+                        "layout": "horizontal",
+                        "spacing": "md",
+                        "alignItems": "center",
+                        "contents": [
+                            menu_icon_disc("menu-head", "#EAF0FF", "40px", "22px"),
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "flex": 1,
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": copy["title"],
+                                        "size": "sm",
+                                        "weight": "bold",
+                                        "wrap": True,
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": copy["subtitle"],
+                                        "size": "xxs",
+                                        "color": "#8A8A8A",
+                                        "wrap": True,
+                                        "margin": "xs",
+                                    },
+                                ],
+                            },
+                        ],
                     },
                     {"type": "separator", "color": "#ECEAF0", "margin": "lg"},
-                    {**rows[0], "margin": "lg"},
-                    {**rows[1], "margin": "sm"},
+                    *rows,
+                    {
+                        "type": "text",
+                        "text": copy["hint"],
+                        "size": "xxs",
+                        "color": "#AAAAAA",
+                        "align": "center",
+                        "wrap": True,
+                        "margin": "lg",
+                    },
                 ],
             },
         },

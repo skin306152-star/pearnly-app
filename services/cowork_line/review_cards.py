@@ -6,6 +6,7 @@ import math
 import os
 
 from services.cowork_line import flow_cards
+from services.cowork_line.card_reasons import reason_text
 
 
 def _field_value(fields: dict, key: str, *, limit: int = 80) -> str:
@@ -29,7 +30,7 @@ def _field_value(fields: dict, key: str, *, limit: int = 80) -> str:
     return "-"
 
 
-def _kv(label: str, value: str) -> dict:
+def _kv(label: str, value: str, *, accent: str | None = None) -> dict:
     return {
         "type": "box",
         "layout": "horizontal",
@@ -39,15 +40,17 @@ def _kv(label: str, value: str) -> dict:
                 "type": "text",
                 "text": label,
                 "size": "xxs",
-                "color": "#777777",
+                "color": accent or "#777777",
+                "weight": "bold" if accent else "regular",
                 "flex": 2,
                 "wrap": True,
             },
             {
                 "type": "text",
                 "text": value,
-                "size": "xxs",
+                "size": "sm" if accent else "xxs",
                 "weight": "bold",
+                "color": accent or "#1B1B2B",
                 "align": "end",
                 "flex": 3,
                 "wrap": True,
@@ -84,12 +87,19 @@ def preview_card(
     record_count: int = 1,
     preflight: dict | None = None,
 ) -> dict:
+    accent = "#16873E" if direction == "purchase" else "#B11B50"
+    adapter = str(target.get("adapter") or "").lower()
+    erp_name = "MR.ERP" if adapter == "mrerp" else "Express" if adapter == "express" else "ERP"
+    account_name = str(
+        target.get("workspace_name") or target.get("label") or target.get("name") or "-"
+    )
+    target_name = erp_name if account_name == erp_name else f"{erp_name} · {account_name}"
     total_pages = _review_pages(fields)
     page = max(0, min(int(page), total_pages - 1))
     body = [
         _kv(
             flow_cards._t(lang, "target"),
-            str(target.get("label") or target.get("name") or "-"),
+            target_name,
         ),
         _kv(flow_cards._t(lang, "direction"), flow_cards._t(lang, direction)),
         _kv(flow_cards._t(lang, "mode"), flow_cards._t(lang, mode)),
@@ -103,14 +113,21 @@ def preview_card(
                 (
                     flow_cards._t(lang, "ready")
                     if preflight.get("ok")
-                    else f"{flow_cards._t(lang, 'not_ready')}: {reason}"
+                    else (
+                        reason_text(flow_cards._lang(lang), reason)
+                        or flow_cards._t(lang, "not_ready")
+                    )
                 ),
             )
         )
     if page == 0:
         labels = flow_cards._HEADER_LABELS[flow_cards._lang(lang)]
         body.extend(
-            _kv(label, _field_value(fields, key))
+            _kv(
+                label,
+                _field_value(fields, key),
+                accent=accent if key == "total_amount" else None,
+            )
             for key, label in zip(flow_cards._HEADER_KEYS, labels, strict=True)
         )
         body.append(_kv(flow_cards._t(lang, "items"), str(len(_items(fields)))))
@@ -186,53 +203,76 @@ def preview_card(
         )
     footer_contents = []
     if preflight is None or preflight.get("ok"):
-        footer_contents.append(
-            flow_cards._button(
-                flow_cards._t(lang, "confirm"),
-                "cowork_confirm",
-                style="primary",
-                draft=draft_id,
-            )
+        confirm = flow_cards._button(
+            flow_cards._t(lang, "confirm"),
+            "cowork_confirm",
+            style="primary",
+            draft=draft_id,
         )
-    footer_contents.extend(
-        [
-            {
-                "type": "button",
-                "style": "secondary",
-                "height": "sm",
-                "action": {
-                    "type": "uri",
-                    "label": flow_cards._t(lang, "edit")[:20],
-                    "uri": _edit_uri(draft_id),
+        confirm["color"] = accent
+        footer_contents.append(confirm)
+    discard = flow_cards._button(
+        flow_cards._t(lang, "discard"),
+        "cowork_discard",
+        style="link",
+        draft=draft_id,
+    )
+    discard["color"] = "#C53A3A"
+    footer_contents.append(
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "secondary",
+                    "height": "sm",
+                    "action": {
+                        "type": "uri",
+                        "label": flow_cards._t(lang, "edit")[:20],
+                        "uri": _edit_uri(draft_id),
+                    },
                 },
-            },
-            flow_cards._button(
-                flow_cards._t(lang, "discard"),
-                "cowork_discard",
-                draft=draft_id,
-            ),
-        ]
+                discard,
+            ],
+        }
     )
     return {
         "type": "flex",
-        "altText": flow_cards._t(lang, "review"),
+        "altText": f"{flow_cards._t(lang, 'review')} · {flow_cards._t(lang, direction)}",
         "contents": {
             "type": "bubble",
             "size": "mega",
-            "body": {
+            "header": {
                 "type": "box",
                 "layout": "vertical",
+                "backgroundColor": accent,
                 "paddingAll": "16px",
                 "contents": [
                     {
                         "type": "text",
-                        "text": flow_cards._t(lang, "review"),
+                        "text": f"{flow_cards._t(lang, 'review')} · {flow_cards._t(lang, direction)}",
                         "size": "lg",
                         "weight": "bold",
+                        "color": "#FFFFFF",
                         "wrap": True,
                     },
-                    *body,
+                    {
+                        "type": "text",
+                        "text": flow_cards._t(lang, "review_hint"),
+                        "size": "xxs",
+                        "color": "#F4F4F4",
+                        "margin": "xs",
+                        "wrap": True,
+                    },
                 ],
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "paddingAll": "16px",
+                "contents": body,
             },
             "footer": {
                 "type": "box",

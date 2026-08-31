@@ -5,12 +5,27 @@ from __future__ import annotations
 import math
 from urllib.parse import urlencode
 
+from services.cowork_line.card_fields import HEADER_KEYS, HEADER_LABELS
+from services.cowork_line.card_reasons import reason_text
+from services.line_dms.menu_cards import (
+    THEME_BLUE,
+    THEME_GREEN,
+    THEME_PINK,
+    THEME_PURPLE,
+    menu_icon_disc,
+    menu_item,
+)
+
 _COPY = {
     "th": {
         "pick_erp": "เลือก ERP",
+        "pick_erp_subtitle": "เลือกปลายทางสำหรับเอกสารชุดนี้",
         "pick_account": "เลือกชุดบัญชี",
+        "pick_account_subtitle": "ระบบตรวจสอบการเชื่อมต่อก่อนให้เลือก",
         "pick_direction": "เอกสารประเภทใด",
+        "pick_direction_subtitle": "เลือกก่อนอัปโหลด เพื่อให้ลงบัญชีถูกทิศทาง",
         "pick_mode": "เลือกวิธีลงบัญชี",
+        "pick_mode_subtitle": "เลือกวิธีบันทึกเอกสารชุดนี้",
         "purchase": "ซื้อ",
         "sales": "ขาย",
         "stock": "สินค้า / สต๊อก",
@@ -20,6 +35,7 @@ _COPY = {
         "offline": "ออฟไลน์",
         "blocked": "ยังไม่พร้อม",
         "review": "ตรวจสอบเอกสาร",
+        "review_hint": "ตรวจสอบข้อมูล เป้าหมาย ERP และชุดบัญชีก่อนยืนยัน",
         "target": "ERP / ชุดบัญชี",
         "direction": "ทิศทาง",
         "mode": "วิธีลงบัญชี",
@@ -36,12 +52,19 @@ _COPY = {
         "more": "เพิ่มเติม",
         "in_flight": "มีงานกำลังส่ง",
         "account_locked": "Express กำลังใช้งานชุดบัญชี",
+        "account_count": "พร้อมใช้ {count} ชุดบัญชี",
+        "configure_first": "กรุณาตั้งค่าบนเว็บไซต์ก่อนใช้งาน",
+        "connection_ready": "เชื่อมต่อแล้ว พร้อมส่ง",
     },
     "zh": {
         "pick_erp": "选择 ERP",
+        "pick_erp_subtitle": "选择本批单据的推送目标",
         "pick_account": "选择账套",
+        "pick_account_subtitle": "系统已在选择前检查连接状态",
         "pick_direction": "选择单据方向",
+        "pick_direction_subtitle": "上传前先选择，避免单据方向识别错误",
         "pick_mode": "选择过账方式",
+        "pick_mode_subtitle": "选择本批单据的入账方式",
         "purchase": "采购",
         "sales": "销售",
         "stock": "库存商品",
@@ -51,6 +74,7 @@ _COPY = {
         "offline": "小助手离线",
         "blocked": "暂不可推送",
         "review": "复核单据",
+        "review_hint": "确认字段、目标 ERP 和账套后再入账",
         "target": "ERP / 账套",
         "direction": "方向",
         "mode": "过账方式",
@@ -67,12 +91,19 @@ _COPY = {
         "more": "更多",
         "in_flight": "已有任务处理中",
         "account_locked": "Express 正在占用该账套",
+        "account_count": "{count} 个账套可用",
+        "configure_first": "请先在网页端完成配置",
+        "connection_ready": "连接正常，可以推送",
     },
     "en": {
         "pick_erp": "Choose ERP",
+        "pick_erp_subtitle": "Choose where this document batch should be sent",
         "pick_account": "Choose account set",
+        "pick_account_subtitle": "Connection status is checked before selection",
         "pick_direction": "Choose document direction",
+        "pick_direction_subtitle": "Choose before upload to keep posting direction correct",
         "pick_mode": "Choose posting mode",
+        "pick_mode_subtitle": "Choose how this document batch should be posted",
         "purchase": "Purchase",
         "sales": "Sales",
         "stock": "Inventory",
@@ -82,6 +113,7 @@ _COPY = {
         "offline": "Companion offline",
         "blocked": "Not ready",
         "review": "Review document",
+        "review_hint": "Check all fields, the ERP target, and account set before posting",
         "target": "ERP / account set",
         "direction": "Direction",
         "mode": "Posting mode",
@@ -98,12 +130,19 @@ _COPY = {
         "more": "More",
         "in_flight": "A task is in progress",
         "account_locked": "Express is using this account set",
+        "account_count": "{count} account set(s) ready",
+        "configure_first": "Configure this integration on the website first",
+        "connection_ready": "Connected and ready to send",
     },
     "ja": {
         "pick_erp": "ERP を選択",
+        "pick_erp_subtitle": "この書類の送信先を選択してください",
         "pick_account": "帳簿を選択",
+        "pick_account_subtitle": "選択前に接続状態を確認します",
         "pick_direction": "書類方向を選択",
+        "pick_direction_subtitle": "アップロード前に仕入または売上を選択します",
         "pick_mode": "計上方法を選択",
+        "pick_mode_subtitle": "この書類の計上方法を選択してください",
         "purchase": "仕入",
         "sales": "売上",
         "stock": "在庫商品",
@@ -113,6 +152,7 @@ _COPY = {
         "offline": "コンパニオンがオフライン",
         "blocked": "利用不可",
         "review": "書類を確認",
+        "review_hint": "項目、ERP、帳簿を確認してから計上してください",
         "target": "ERP / 帳簿",
         "direction": "方向",
         "mode": "計上方法",
@@ -129,116 +169,14 @@ _COPY = {
         "more": "さらに表示",
         "in_flight": "処理中のタスクがあります",
         "account_locked": "Express が帳簿を使用中です",
+        "account_count": "{count} 個の帳簿を利用できます",
+        "configure_first": "先にウェブ画面で設定してください",
+        "connection_ready": "接続済み、送信できます",
     },
 }
 
-_HEADER_KEYS = (
-    "invoice_number",
-    "date",
-    "document_type",
-    "seller_name",
-    "seller_tax",
-    "seller_branch",
-    "seller_address",
-    "buyer_name",
-    "buyer_tax",
-    "buyer_branch",
-    "buyer_address",
-    "subtotal",
-    "discount",
-    "vat",
-    "wht_amount",
-    "total_amount",
-    "currency",
-    "payment_method",
-    "notes",
-)
-_HEADER_LABELS = {
-    "th": (
-        "เลขที่เอกสาร",
-        "วันที่",
-        "ประเภทเอกสาร",
-        "ผู้ขาย",
-        "เลขภาษีผู้ขาย",
-        "สาขาผู้ขาย",
-        "ที่อยู่ผู้ขาย",
-        "ผู้ซื้อ",
-        "เลขภาษีผู้ซื้อ",
-        "สาขาผู้ซื้อ",
-        "ที่อยู่ผู้ซื้อ",
-        "ก่อนภาษี",
-        "ส่วนลด",
-        "VAT",
-        "หัก ณ ที่จ่าย",
-        "ยอดรวม",
-        "สกุลเงิน",
-        "การชำระเงิน",
-        "หมายเหตุ",
-    ),
-    "zh": (
-        "单据号码",
-        "日期",
-        "单据类型",
-        "卖方",
-        "卖方税号",
-        "卖方分店",
-        "卖方地址",
-        "买方",
-        "买方税号",
-        "买方分店",
-        "买方地址",
-        "未税金额",
-        "折扣",
-        "增值税",
-        "预扣税",
-        "总金额",
-        "币种",
-        "付款方式",
-        "备注",
-    ),
-    "en": (
-        "Invoice no.",
-        "Date",
-        "Document type",
-        "Seller",
-        "Seller tax ID",
-        "Seller branch",
-        "Seller address",
-        "Buyer",
-        "Buyer tax ID",
-        "Buyer branch",
-        "Buyer address",
-        "Subtotal",
-        "Discount",
-        "VAT",
-        "WHT",
-        "Total",
-        "Currency",
-        "Payment",
-        "Notes",
-    ),
-    "ja": (
-        "書類番号",
-        "日付",
-        "書類種別",
-        "売り手",
-        "売り手税番号",
-        "売り手支店",
-        "売り手住所",
-        "買い手",
-        "買い手税番号",
-        "買い手支店",
-        "買い手住所",
-        "小計",
-        "割引",
-        "VAT",
-        "源泉税",
-        "合計",
-        "通貨",
-        "支払方法",
-        "備考",
-    ),
-}
+_HEADER_KEYS = HEADER_KEYS
+_HEADER_LABELS = HEADER_LABELS
 
 
 def _lang(lang: str) -> str:
@@ -295,7 +233,61 @@ def _row(title: str, subtitle: str, action: dict | None = None, *, muted: bool =
     return row
 
 
-def _bubble(title: str, rows: list[dict], alt_text: str | None = None) -> dict:
+_THEME_MUTED = {"accent": "#A39DAD", "soft": "#F2F1F5", "border": "#E1DFE7"}
+
+
+def _choice(
+    number: int,
+    title: str,
+    subtitle: str,
+    action: dict | None,
+    *,
+    theme: dict[str, str],
+    icon: str,
+    muted: bool = False,
+) -> dict:
+    return menu_item(
+        str(number),
+        icon,
+        _THEME_MUTED if muted else theme,
+        title,
+        subtitle,
+        action,
+    )
+
+
+def _bubble(
+    title: str,
+    rows: list[dict],
+    alt_text: str | None = None,
+    *,
+    subtitle: str = "",
+) -> dict:
+    head = {
+        "type": "box",
+        "layout": "horizontal",
+        "spacing": "md",
+        "alignItems": "center",
+        "contents": [
+            menu_icon_disc("menu-head", "#EAF0FF", "40px", "22px"),
+            {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                    {"type": "text", "text": title, "size": "sm", "weight": "bold", "wrap": True},
+                    {
+                        "type": "text",
+                        "text": subtitle or " ",
+                        "size": "xxs",
+                        "color": "#8A8A8A",
+                        "wrap": True,
+                        "margin": "xs",
+                    },
+                ],
+            },
+        ],
+    }
     return {
         "type": "flex",
         "altText": alt_text or title,
@@ -306,8 +298,8 @@ def _bubble(title: str, rows: list[dict], alt_text: str | None = None) -> dict:
                 "layout": "vertical",
                 "paddingAll": "16px",
                 "contents": [
-                    {"type": "text", "text": title, "size": "lg", "weight": "bold", "wrap": True},
-                    {"type": "separator", "margin": "md", "color": "#EEEAF7"},
+                    head,
+                    {"type": "separator", "margin": "lg", "color": "#EEEAF7"},
                     *rows,
                 ],
             },
@@ -316,21 +308,32 @@ def _bubble(title: str, rows: list[dict], alt_text: str | None = None) -> dict:
 
 
 def erp_picker_card(targets: list[dict], lang: str) -> dict:
-    adapters = {str(item.get("adapter") or "").lower() for item in targets}
     rows = []
-    for adapter, label in (("mrerp", "MR.ERP"), ("express", "Express")):
-        count = sum(1 for item in targets if str(item.get("adapter") or "").lower() == adapter)
-        available = adapter in adapters
+    adapters = (("mrerp", "MR.ERP", THEME_PURPLE), ("express", "Express", THEME_BLUE))
+    for number, (adapter, label, theme) in enumerate(adapters, start=1):
+        entries = [item for item in targets if str(item.get("adapter") or "").lower() == adapter]
+        available = bool(entries)
         action = _postback(label, "cowork_erp_type", erp=adapter) if available else None
         rows.append(
-            _row(
+            _choice(
+                number,
                 label,
-                f"{count} account set(s)" if available else _t(lang, "blocked"),
+                (
+                    _t(lang, "account_count").format(count=len(entries))
+                    if available
+                    else _t(lang, "configure_first")
+                ),
                 action,
+                theme=theme,
+                icon="menu-3",
                 muted=not available,
             )
         )
-    return _bubble(_t(lang, "pick_erp"), rows)
+    return _bubble(
+        _t(lang, "pick_erp"),
+        rows,
+        subtitle=_t(lang, "pick_erp_subtitle"),
+    )
 
 
 def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: int = 0) -> dict:
@@ -338,17 +341,18 @@ def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: i
     page_count = max(1, math.ceil(len(targets) / page_size))
     page = max(0, min(int(page), page_count - 1))
     rows = []
-    for item in targets[page * page_size : (page + 1) * page_size]:
+    page_targets = targets[page * page_size : (page + 1) * page_size]
+    for number, item in enumerate(page_targets, start=page * page_size + 1):
         selectable = bool(item.get("selectable"))
-        state = str(item.get("connection_state") or "")
-        detail = state
-        if item.get("missing"):
-            detail = " · ".join(str(value) for value in item["missing"][:3])
+        missing = [str(value) for value in item.get("missing") or []]
+        detail = _t(lang, "connection_ready") if selectable else _t(lang, "blocked")
+        if missing:
+            detail = reason_text(_lang(lang), missing[0]) or _t(lang, "blocked")
         checks = item.get("ready_checks") or {}
         if checks.get("local_account_lock") == "waiting_lock":
-            detail = _t(lang, "account_locked")
+            detail = reason_text(_lang(lang), "account_set_locked")
         elif checks.get("cloud_in_flight"):
-            detail = f"{detail} · {_t(lang, 'in_flight')}"
+            detail = _t(lang, "in_flight")
         action = None
         if selectable:
             action = _postback(
@@ -358,10 +362,13 @@ def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: i
                 workspace=item.get("workspace_client_id"),
             )
         rows.append(
-            _row(
+            _choice(
+                number,
                 str(item.get("label") or item.get("name") or adapter),
-                detail or ("online" if selectable else _t(lang, "blocked")),
+                detail,
                 action,
+                theme=THEME_BLUE if adapter == "express" else THEME_PURPLE,
+                icon="menu-3",
                 muted=not selectable,
             )
         )
@@ -394,23 +401,37 @@ def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: i
                 "contents": navigation,
             }
         )
-    return _bubble(_t(lang, "pick_account"), rows)
+    return _bubble(
+        _t(lang, "pick_account"),
+        rows,
+        subtitle=_t(lang, "pick_account_subtitle"),
+    )
 
 
 def direction_card(lang: str) -> dict:
     rows = [
-        _row(
+        _choice(
+            1,
             _t(lang, "purchase"),
-            "Purchase / ซื้อ",
+            _t(lang, "pick_direction_subtitle"),
             _postback(_t(lang, "purchase"), "cowork_direction", direction="purchase"),
+            theme=THEME_GREEN,
+            icon="menu-head",
         ),
-        _row(
+        _choice(
+            2,
             _t(lang, "sales"),
-            "Sales / ขาย",
+            _t(lang, "pick_direction_subtitle"),
             _postback(_t(lang, "sales"), "cowork_direction", direction="sales"),
+            theme=THEME_PINK,
+            icon="menu-head",
         ),
     ]
-    return _bubble(_t(lang, "pick_direction"), rows)
+    return _bubble(
+        _t(lang, "pick_direction"),
+        rows,
+        subtitle=_t(lang, "pick_direction_subtitle"),
+    )
 
 
 def mode_card(adapter: str, direction: str, lang: str) -> dict:
@@ -418,15 +439,23 @@ def mode_card(adapter: str, direction: str, lang: str) -> dict:
         options = ("stock", "service")
     else:
         options = ("credit",) if direction == "purchase" else ("cash", "credit")
+    themes = (THEME_BLUE, THEME_PURPLE)
     rows = [
-        _row(
+        _choice(
+            index,
             _t(lang, value),
             f"{adapter.upper()} · {_t(lang, direction)}",
             _postback(_t(lang, value), "cowork_posting_mode", mode=value),
+            theme=themes[(index - 1) % len(themes)],
+            icon="menu-head",
         )
-        for value in options
+        for index, value in enumerate(options, start=1)
     ]
-    return _bubble(_t(lang, "pick_mode"), rows)
+    return _bubble(
+        _t(lang, "pick_mode"),
+        rows,
+        subtitle=_t(lang, "pick_mode_subtitle"),
+    )
 
 
 def preview_card(

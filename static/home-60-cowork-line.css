@@ -72,6 +72,38 @@
   min-height: 44px;
 }
 
+.cowork-line-panel__friendship {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+}
+
+.cowork-line-panel__friendship strong {
+  font-size: 14px;
+}
+
+.cowork-line-panel__friendship p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cowork-line-panel__friendship.is-ready {
+  background: var(--success-bg);
+}
+
+.cowork-line-panel__friendship.is-pending {
+  background: var(--warn-bg);
+}
+
+.cowork-line-panel__friendship-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .cowork-line-panel__skeleton {
   display: grid;
   gap: 12px;
@@ -91,6 +123,11 @@
 .cowork-line-status.is-connected {
   background: var(--success-bg);
   color: var(--success);
+}
+
+.cowork-line-status.is-pendingFriend {
+  background: var(--warn-bg);
+  color: var(--warn);
 }
 
 .cowork-line-status.is-disconnected,
@@ -114,6 +151,14 @@
   }
 
   .cowork-line-panel__actions .pu-btn {
+    width: 100%;
+  }
+
+  .cowork-line-panel__friendship-actions {
+    flex-direction: column;
+  }
+
+  .cowork-line-panel__friendship-actions .pu-btn {
     width: 100%;
   }
 }

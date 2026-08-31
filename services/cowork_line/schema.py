@@ -30,6 +30,8 @@ DDL = (
         line_user_id TEXT NOT NULL UNIQUE,
         display_name TEXT,
         picture_url TEXT,
+        friendship_ready BOOLEAN NOT NULL DEFAULT FALSE,
+        friendship_checked_at TIMESTAMPTZ,
         connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         last_seen_at TIMESTAMPTZ,
         revoked_at TIMESTAMPTZ
@@ -38,6 +40,14 @@ DDL = (
     """
     CREATE INDEX IF NOT EXISTS idx_cowork_line_identities_tenant
     ON cowork_line_identities (tenant_id)
+    """,
+    """
+    ALTER TABLE cowork_line_identities
+    ADD COLUMN IF NOT EXISTS friendship_ready BOOLEAN NOT NULL DEFAULT FALSE
+    """,
+    """
+    ALTER TABLE cowork_line_identities
+    ADD COLUMN IF NOT EXISTS friendship_checked_at TIMESTAMPTZ
     """,
 )
 

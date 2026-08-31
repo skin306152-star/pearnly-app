@@ -38,7 +38,7 @@ def active_membership():
 
 class CoworkLineIdentityTests(unittest.TestCase):
     def test_issue_connect_token_hashes_raw_token_and_uses_dict_rows(self):
-        cursor = FakeCursor([active_membership(), None])
+        cursor = FakeCursor([active_membership()])
         with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
             issued = identity_store.issue_connect_token(user_id="user-1", tenant_id="tenant-1")
 
@@ -49,6 +49,9 @@ class CoworkLineIdentityTests(unittest.TestCase):
         stored_hash = insert[1][2]
         self.assertEqual(stored_hash, hashlib.sha256(issued["token"].encode()).hexdigest())
         self.assertNotIn(issued["token"], repr(cursor.calls))
+        self.assertFalse(
+            any("SELECT 1 FROM cowork_line_identities" in sql for sql, _ in cursor.calls)
+        )
 
     def test_issue_connect_token_rejects_inactive_membership(self):
         cursor = FakeCursor([None])
@@ -139,8 +142,17 @@ class CoworkLineIdentityTests(unittest.TestCase):
 
     def test_get_identity_status_uses_member_identity_shape(self):
         connected_at = datetime(2026, 8, 31, tzinfo=timezone.utc)
+        checked_at = datetime(2026, 8, 31, 1, tzinfo=timezone.utc)
         cursor = FakeCursor(
-            [active_membership(), {"display_name": "Nok", "connected_at": connected_at}]
+            [
+                active_membership(),
+                {
+                    "display_name": "Nok",
+                    "connected_at": connected_at,
+                    "friendship_ready": True,
+                    "friendship_checked_at": checked_at,
+                },
+            ]
         )
         with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
             status = identity_store.get_identity_status(user_id="user-1", tenant_id="tenant-1")
@@ -150,6 +162,8 @@ class CoworkLineIdentityTests(unittest.TestCase):
                 "connected": True,
                 "display_name": "Nok",
                 "connected_at": connected_at.isoformat(),
+                "friendship_ready": True,
+                "friendship_checked_at": checked_at.isoformat(),
             },
         )
 

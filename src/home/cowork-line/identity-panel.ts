@@ -1,7 +1,7 @@
 import { authHeaders } from '../dms-intake-core.js';
 
 type Language = 'th' | 'en' | 'zh' | 'ja';
-type Phase = 'loading' | 'connected' | 'disconnected' | 'error';
+type Phase = 'loading' | 'ready' | 'pendingFriend' | 'disconnected' | 'error';
 
 type Copy = {
     productName: string;
@@ -9,6 +9,8 @@ type Copy = {
     manage: string;
     loading: string;
     connected: string;
+    ready: string;
+    pendingFriend: string;
     disconnected: string;
     loadError: string;
     retry: string;
@@ -20,6 +22,14 @@ type Copy = {
     connectedAs: string;
     connectedAt: string;
     connectSuccess: string;
+    friendRequired: string;
+    friendTitle: string;
+    friendDescription: string;
+    addFriend: string;
+    checkFriendship: string;
+    readyTitle: string;
+    readyDescription: string;
+    openLine: string;
     connectConflict: string;
     connectExpired: string;
     disconnect: string;
@@ -36,6 +46,8 @@ const COPY: Record<Language, Copy> = {
         manage: 'จัดการ',
         loading: 'กำลังโหลด…',
         connected: 'เชื่อมต่อแล้ว',
+        ready: 'พร้อมใช้งาน',
+        pendingFriend: 'รอเพิ่มเพื่อน',
         disconnected: 'ยังไม่เชื่อมต่อ',
         loadError: 'โหลดสถานะ LINE ไม่สำเร็จ',
         retry: 'ลองอีกครั้ง',
@@ -47,6 +59,14 @@ const COPY: Record<Language, Copy> = {
         connectedAs: 'เชื่อมต่อในชื่อ',
         connectedAt: 'เชื่อมต่อเมื่อ',
         connectSuccess: 'เชื่อมต่อ LINE สำเร็จ',
+        friendRequired: 'เชื่อมต่อบัญชีแล้ว กรุณาเพิ่ม Pearnly เป็นเพื่อนให้เสร็จ',
+        friendTitle: 'เพิ่ม Pearnly เป็นเพื่อน',
+        friendDescription: 'เพิ่มเพื่อนแล้วกลับมากดตรวจสอบอีกครั้ง',
+        addFriend: 'เพิ่มเพื่อนใน LINE',
+        checkFriendship: 'ตรวจสอบอีกครั้ง',
+        readyTitle: 'LINE พร้อมใช้งาน',
+        readyDescription: 'เปิดห้องแชต Pearnly Cowork LINE ได้ทันที',
+        openLine: 'เปิด Cowork LINE',
         connectConflict: 'LINE นี้เชื่อมต่อกับสมาชิกคนอื่นแล้ว',
         connectExpired: 'ลิงก์เชื่อมต่อหมดอายุ กรุณาลองใหม่',
         disconnect: 'ยกเลิกการเชื่อมต่อ',
@@ -61,6 +81,8 @@ const COPY: Record<Language, Copy> = {
         manage: 'Manage',
         loading: 'Loading…',
         connected: 'Connected',
+        ready: 'Ready',
+        pendingFriend: 'Add friend',
         disconnected: 'Not connected',
         loadError: 'Could not load your LINE status',
         retry: 'Try again',
@@ -72,6 +94,14 @@ const COPY: Record<Language, Copy> = {
         connectedAs: 'Connected as',
         connectedAt: 'Connected on',
         connectSuccess: 'LINE connected',
+        friendRequired: 'Your account is connected. Add Pearnly as a friend to finish setup.',
+        friendTitle: 'Add Pearnly as a friend',
+        friendDescription: 'After adding the account, return here and check again.',
+        addFriend: 'Add friend in LINE',
+        checkFriendship: 'Check again',
+        readyTitle: 'LINE is ready',
+        readyDescription: 'You can open the Pearnly Cowork LINE chat now.',
+        openLine: 'Open Cowork LINE',
         connectConflict: 'This LINE is already connected to another member',
         connectExpired: 'The connection link expired. Please try again.',
         disconnect: 'Disconnect',
@@ -86,6 +116,8 @@ const COPY: Record<Language, Copy> = {
         manage: '管理',
         loading: '加载中…',
         connected: '已连接',
+        ready: '可以使用',
+        pendingFriend: '待添加好友',
         disconnected: '未连接',
         loadError: '无法读取你的 LINE 连接状态',
         retry: '重试',
@@ -97,6 +129,14 @@ const COPY: Record<Language, Copy> = {
         connectedAs: '连接账号',
         connectedAt: '连接时间',
         connectSuccess: 'LINE 连接成功',
+        friendRequired: '账号已绑定，请添加 Pearnly 好友后完成设置。',
+        friendTitle: '添加 Pearnly 为好友',
+        friendDescription: '添加后返回此处，再检查一次好友状态。',
+        addFriend: '去 LINE 添加好友',
+        checkFriendship: '重新检查',
+        readyTitle: 'LINE 已可使用',
+        readyDescription: '现在可以直接打开 Pearnly Cowork LINE 对话。',
+        openLine: '打开 Cowork LINE',
         connectConflict: '该 LINE 已连接其他成员账号',
         connectExpired: '连接已过期，请重新发起。',
         disconnect: '解除连接',
@@ -111,6 +151,8 @@ const COPY: Record<Language, Copy> = {
         manage: '管理',
         loading: '読み込み中…',
         connected: '連携済み',
+        ready: '利用可能',
+        pendingFriend: '友だち追加待ち',
         disconnected: '未連携',
         loadError: 'LINE の連携状態を読み込めませんでした',
         retry: '再試行',
@@ -122,6 +164,14 @@ const COPY: Record<Language, Copy> = {
         connectedAs: '連携アカウント',
         connectedAt: '連携日時',
         connectSuccess: 'LINE を連携しました',
+        friendRequired: 'アカウントを連携しました。Pearnly を友だち追加してください。',
+        friendTitle: 'Pearnly を友だち追加',
+        friendDescription: '追加後、この画面に戻ってもう一度確認してください。',
+        addFriend: 'LINE で友だち追加',
+        checkFriendship: 'もう一度確認',
+        readyTitle: 'LINE を利用できます',
+        readyDescription: 'Pearnly Cowork LINE のトークを開けます。',
+        openLine: 'Cowork LINE を開く',
         connectConflict: 'この LINE は別のメンバーに連携されています',
         connectExpired: '連携リンクの有効期限が切れました。もう一度お試しください。',
         disconnect: '連携を解除',
@@ -134,9 +184,12 @@ const COPY: Record<Language, Copy> = {
 
 type Identity = {
     connected: boolean;
+    friendshipReady: boolean;
     displayName: string;
     connectedAt: string;
 };
+
+const COWORK_LINE_URL = 'https://line.me/R/ti/p/@pearnly';
 
 let phase: Phase = 'loading';
 let identity: Identity | null = null;
@@ -158,6 +211,7 @@ function normalizeIdentity(payload: Record<string, unknown>): Identity {
     const source = (payload.data || payload) as Record<string, unknown>;
     return {
         connected: Boolean(source.connected ?? source.bound),
+        friendshipReady: Boolean(source.friendship_ready),
         displayName: String(source.display_name || source.line_display_name || ''),
         connectedAt: String(source.connected_at || source.bound_at || ''),
     };
@@ -182,14 +236,17 @@ function renderSummary(): void {
     if (!status) return;
     status.className = `auto-status-pill cowork-line-status is-${phase}`;
     status.textContent =
-        phase === 'connected'
-            ? text.connected
-            : phase === 'disconnected'
-              ? text.disconnected
-              : phase === 'error'
-                ? text.loadError
-                : text.loading;
-    row?.classList.toggle('connected', phase === 'connected');
+        phase === 'ready'
+            ? text.ready
+            : phase === 'pendingFriend'
+              ? text.pendingFriend
+              : phase === 'disconnected'
+                ? text.disconnected
+                : phase === 'error'
+                  ? text.loadError
+                  : text.loading;
+    row?.classList.toggle('connected', phase === 'ready');
+    row?.classList.toggle('pending', phase === 'pendingFriend');
 }
 
 function lineIcon(): string {
@@ -213,7 +270,11 @@ function renderDrawer(): void {
         wireDrawerActions();
         return;
     }
-    drawerRoot.innerHTML = `<div class="cowork-line-panel"><p class="cowork-line-panel__intro">${text.intro}</p><div class="cowork-line-panel__card"><div class="cowork-line-panel__identity"><span class="cowork-line-panel__avatar">${lineIcon()}</span><div class="cowork-line-panel__identity-text"><div class="cowork-line-panel__name" data-cowork-line-name></div><div class="cowork-line-panel__meta">${text.connectedAt}: <span data-cowork-line-date></span></div></div></div><div class="cowork-line-panel__actions"><button class="pu-btn pu-btn--danger" type="button" data-cowork-line-action="disconnect">${actionPending ? text.disconnecting : text.disconnect}</button></div></div></div>`;
+    const friendship =
+        phase === 'ready'
+            ? `<div class="cowork-line-panel__friendship is-ready"><strong>${text.readyTitle}</strong><p>${text.readyDescription}</p><a class="pu-btn pu-btn--primary" href="${COWORK_LINE_URL}" target="_blank" rel="noopener">${text.openLine}</a></div>`
+            : `<div class="cowork-line-panel__friendship is-pending"><strong>${text.friendTitle}</strong><p>${text.friendDescription}</p><div class="cowork-line-panel__friendship-actions"><a class="pu-btn pu-btn--primary" href="${COWORK_LINE_URL}" target="_blank" rel="noopener">${text.addFriend}</a><button class="pu-btn pu-btn--outline" type="button" data-cowork-line-action="connect">${actionPending ? text.connecting : text.checkFriendship}</button></div></div>`;
+    drawerRoot.innerHTML = `<div class="cowork-line-panel"><p class="cowork-line-panel__intro">${text.intro}</p><div class="cowork-line-panel__card"><div class="cowork-line-panel__identity"><span class="cowork-line-panel__avatar">${lineIcon()}</span><div class="cowork-line-panel__identity-text"><div class="cowork-line-panel__name" data-cowork-line-name></div><div class="cowork-line-panel__meta">${text.connectedAt}: <span data-cowork-line-date></span></div></div></div>${friendship}<div class="cowork-line-panel__actions"><button class="pu-btn pu-btn--danger" type="button" data-cowork-line-action="disconnect">${actionPending ? text.disconnecting : text.disconnect}</button></div></div></div>`;
     const name = drawerRoot.querySelector<HTMLElement>('[data-cowork-line-name]');
     const date = drawerRoot.querySelector<HTMLElement>('[data-cowork-line-date]');
     if (name) name.textContent = identity?.displayName || text.connectedAs;
@@ -223,15 +284,17 @@ function renderDrawer(): void {
 
 function wireDrawerActions(): void {
     if (!drawerRoot) return;
-    const button = drawerRoot.querySelector<HTMLButtonElement>('[data-cowork-line-action]');
-    if (!button) return;
-    button.disabled = actionPending;
-    button.addEventListener('click', () => {
-        const action = button.dataset.coworkLineAction;
-        if (action === 'retry') void refreshCoworkLineIdentity(true);
-        if (action === 'connect') void connect();
-        if (action === 'disconnect') void disconnect();
-    });
+    drawerRoot
+        .querySelectorAll<HTMLButtonElement>('[data-cowork-line-action]')
+        .forEach((button) => {
+            button.disabled = actionPending;
+            button.addEventListener('click', () => {
+                const action = button.dataset.coworkLineAction;
+                if (action === 'retry') void refreshCoworkLineIdentity(true);
+                if (action === 'connect') void connect();
+                if (action === 'disconnect') void disconnect();
+            });
+        });
 }
 
 async function connect(): Promise<void> {
@@ -270,7 +333,12 @@ async function disconnect(): Promise<void> {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error('disconnect');
-        identity = { connected: false, displayName: '', connectedAt: '' };
+        identity = {
+            connected: false,
+            friendshipReady: false,
+            displayName: '',
+            connectedAt: '',
+        };
         phase = 'disconnected';
         window.showToast?.(copy().disconnectedToast, 'success');
         renderSummary();
@@ -294,7 +362,11 @@ export async function refreshCoworkLineIdentity(force = false): Promise<void> {
             });
             if (!response.ok) throw new Error('identity');
             identity = normalizeIdentity(await response.json());
-            phase = identity.connected ? 'connected' : 'disconnected';
+            phase = identity.connected
+                ? identity.friendshipReady
+                    ? 'ready'
+                    : 'pendingFriend'
+                : 'disconnected';
         } catch {
             identity = null;
             phase = 'error';
@@ -319,11 +391,21 @@ export function initCoworkLineSummary(root: HTMLElement): void {
     if (connectResult) {
         const message = {
             ok: copy().connectSuccess,
+            friend_required: copy().friendRequired,
             conflict: copy().connectConflict,
             expired: copy().connectExpired,
             error: copy().actionError,
         }[connectResult];
-        if (message) window.showToast?.(message, connectResult === 'ok' ? 'success' : 'error');
+        if (message) {
+            window.showToast?.(
+                message,
+                connectResult === 'ok'
+                    ? 'success'
+                    : connectResult === 'friend_required'
+                      ? 'info'
+                      : 'error'
+            );
+        }
         url.searchParams.delete('cowork_line_connect');
         history.replaceState(null, '', url.pathname + url.search + url.hash);
     }

@@ -31,7 +31,7 @@ class _LineClient:
 
     async def post(self, url, **kwargs):
         if url.endswith("/token"):
-            return _Response(200, {"id_token": "id-token"})
+            return _Response(200, {"id_token": "id-token", "access_token": "line-token"})
         if url.endswith("/verify"):
             return _Response(
                 200,
@@ -42,6 +42,11 @@ class _LineClient:
                     "email": "",
                 },
             )
+        return _Response(404, {})
+
+    async def get(self, url, **kwargs):
+        if url.endswith("/friendship/v1/status"):
+            return _Response(200, {"friendFlag": True})
         return _Response(404, {})
 
 
@@ -128,6 +133,7 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
             line_user_id="U-cowork",
             display_name="Pearnly Staff",
             picture_url="https://example.test/avatar.png",
+            friendship_ready=True,
         )
         self.find_login_user.assert_not_called()
         self.legacy_bind.assert_not_called()
@@ -155,7 +161,7 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
             "/cowork?cowork_line_connect=expired#/integrations",
         )
 
-    def test_start_wraps_connect_token_without_bot_prompt(self):
+    def test_start_wraps_connect_token_and_prompts_for_bot_friendship(self):
         response = self.client.get(
             "/api/auth/line/start?entry=cowork&connect_token=clc_once",
             follow_redirects=False,
@@ -164,8 +170,30 @@ class CoworkLineOAuthCleanRoomTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         query = parse_qs(urlparse(response.headers["location"]).query)
         self.assertEqual(query["state"], ["cowork_line:clc_once"])
-        self.assertNotIn("bot_prompt", query)
+        self.assertEqual(query["bot_prompt"], ["aggressive"])
         self.assertEqual(self.client.get("/api/me/connect-line/start").status_code, 404)
+
+    def test_normal_login_does_not_prompt_for_cowork_bot(self):
+        response = self.client.get(
+            "/api/auth/line/start?entry=cowork",
+            follow_redirects=False,
+        )
+
+        query = parse_qs(urlparse(response.headers["location"]).query)
+        self.assertNotIn("bot_prompt", query)
+
+    def test_cowork_connect_keeps_friendship_pending_when_user_did_not_add_bot(self):
+        with mock.patch.object(oauth_line_routes, "_friendship_ready", return_value=False):
+            response = self.client.get(
+                "/api/auth/line/callback?code=code&state=cowork_line:clc_pending",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(
+            response.headers["location"],
+            "/cowork?cowork_line_connect=friend_required#/integrations",
+        )
+        self.assertFalse(self.bind_identity.call_args.kwargs["friendship_ready"])
 
 
 if __name__ == "__main__":

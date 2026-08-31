@@ -66,6 +66,8 @@ async def line_oauth_start(entry: str = "", connect_token: str = ""):
         "scope": "openid profile email",  # v118.28.4.2 · email scope 已通过 · 自动拿邮箱
         "nonce": _secrets.token_urlsafe(16),
     }
+    if connect_token:
+        params["bot_prompt"] = "aggressive"
     url = "https://access.line.me/oauth2/v2.1/authorize?" + _urlencode(params)
     return _RedirectResp(url, status_code=302)
 
@@ -81,7 +83,9 @@ def _cowork_connect_redirect(status: str) -> _RedirectResp:
     return _RedirectResp(f"/cowork?cowork_line_connect={status}#/integrations", status_code=302)
 
 
-def _finish_cowork_connect(connect_token: str, payload: dict) -> _RedirectResp:
+def _finish_cowork_connect(
+    connect_token: str, payload: dict, *, friendship_ready: bool
+) -> _RedirectResp:
     line_user_id = (payload.get("sub") or "").strip()
     if not line_user_id:
         return _cowork_connect_redirect("error")
@@ -97,6 +101,7 @@ def _finish_cowork_connect(connect_token: str, payload: dict) -> _RedirectResp:
             line_user_id=line_user_id,
             display_name=(payload.get("name") or "").strip() or None,
             picture_url=(payload.get("picture") or "").strip() or None,
+            friendship_ready=friendship_ready,
         )
         if not result.get("success"):
             status = "conflict" if result.get("conflict") else "error"
@@ -112,7 +117,26 @@ def _finish_cowork_connect(connect_token: str, payload: dict) -> _RedirectResp:
     except Exception:
         logger.exception("[cowork_line_connect] failed")
         return _cowork_connect_redirect("error")
-    return _cowork_connect_redirect("ok")
+    return _cowork_connect_redirect("ok" if friendship_ready else "friend_required")
+
+
+async def _friendship_ready(client, access_token: str) -> bool:
+    if not access_token:
+        return False
+    try:
+        response = await client.get(
+            "https://api.line.me/friendship/v1/status",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code != 200:
+            logger.warning(
+                "[cowork_line_connect] friendship check failed: %s", response.status_code
+            )
+            return False
+        return response.json().get("friendFlag") is True
+    except Exception:
+        logger.exception("[cowork_line_connect] friendship check failed")
+        return False
 
 
 @router.get("/api/auth/line/callback")
@@ -159,6 +183,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                 return _RedirectResp("/login?oauth_error=line_token_fail", status_code=302)
             tok_data = tr.json()
             id_token = tok_data.get("id_token")
+            line_access_token = tok_data.get("access_token") or ""
             if not id_token:
                 if connect_token:
                     return _cowork_connect_redirect("error")
@@ -181,6 +206,9 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                     return _cowork_connect_redirect("error")
                 return _RedirectResp("/login?oauth_error=line_verify_fail", status_code=302)
             payload = vr.json()
+            friendship_ready = (
+                await _friendship_ready(client, line_access_token) if connect_token else False
+            )
     except Exception as e:
         logger.error(f"[LINE OAuth] callback fetch failed: {e}")
         if connect_token:
@@ -188,7 +216,11 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
         return _RedirectResp("/login?oauth_error=line_fetch_fail", status_code=302)
 
     if connect_token:
-        return _finish_cowork_connect(connect_token, payload)
+        return _finish_cowork_connect(
+            connect_token,
+            payload,
+            friendship_ready=friendship_ready,
+        )
 
     line_uid = payload.get("sub")
     line_name = (payload.get("name") or "").strip()

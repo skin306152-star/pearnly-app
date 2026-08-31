@@ -58,15 +58,6 @@ def issue_connect_token(
         membership = _active_membership(cur, user_id=user_id, tenant_id=tenant_id)
         cur.execute(
             """
-            SELECT 1 FROM cowork_line_identities
-            WHERE membership_id = %s AND revoked_at IS NULL
-            """,
-            (membership["membership_id"],),
-        )
-        if cur.fetchone():
-            raise CoworkLineIdentityError("already_connected")
-        cur.execute(
-            """
             UPDATE cowork_line_connect_tokens
             SET used_at = NOW()
             WHERE membership_id = %s AND used_at IS NULL
@@ -140,6 +131,7 @@ def bind_identity(
     line_user_id: str,
     display_name: str | None = None,
     picture_url: str | None = None,
+    friendship_ready: bool = False,
 ) -> dict[str, Any]:
     if not line_user_id or not line_user_id.strip():
         raise CoworkLineIdentityError("invalid_line_user")
@@ -171,19 +163,30 @@ def bind_identity(
                 """
                 INSERT INTO cowork_line_identities
                     (membership_id, tenant_id, user_id, line_user_id, display_name,
-                     picture_url, connected_at, last_seen_at, revoked_at)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW(), NULL)
+                     picture_url, friendship_ready, friendship_checked_at,
+                     connected_at, last_seen_at, revoked_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), NOW(), NULL)
                 ON CONFLICT (membership_id) DO UPDATE SET
                     tenant_id = EXCLUDED.tenant_id,
                     user_id = EXCLUDED.user_id,
                     line_user_id = EXCLUDED.line_user_id,
                     display_name = EXCLUDED.display_name,
                     picture_url = EXCLUDED.picture_url,
+                    friendship_ready = EXCLUDED.friendship_ready,
+                    friendship_checked_at = NOW(),
                     connected_at = NOW(),
                     last_seen_at = NOW(),
                     revoked_at = NULL
                 """,
-                (membership_id, tenant_id, user_id, line_user_id, display_name, picture_url),
+                (
+                    membership_id,
+                    tenant_id,
+                    user_id,
+                    line_user_id,
+                    display_name,
+                    picture_url,
+                    friendship_ready,
+                ),
             )
     except errors.UniqueViolation:
         raise CoworkLineIdentityError("line_conflict") from None
@@ -195,7 +198,7 @@ def get_identity_status(*, user_id: str, tenant_id: str) -> dict[str, Any]:
         membership = _active_membership(cur, user_id=user_id, tenant_id=tenant_id)
         cur.execute(
             """
-            SELECT display_name, connected_at
+            SELECT display_name, connected_at, friendship_ready, friendship_checked_at
             FROM cowork_line_identities
             WHERE membership_id = %s AND revoked_at IS NULL
             """,
@@ -203,13 +206,23 @@ def get_identity_status(*, user_id: str, tenant_id: str) -> dict[str, Any]:
         )
         row = cur.fetchone()
     if not row:
-        return {"connected": False, "display_name": None, "connected_at": None}
+        return {
+            "connected": False,
+            "display_name": None,
+            "connected_at": None,
+            "friendship_ready": False,
+            "friendship_checked_at": None,
+        }
     timestamp = row["connected_at"]
     connected_at = timestamp.isoformat() if hasattr(timestamp, "isoformat") else timestamp
+    checked = row.get("friendship_checked_at")
+    friendship_checked_at = checked.isoformat() if hasattr(checked, "isoformat") else checked
     return {
         "connected": True,
         "display_name": row["display_name"],
         "connected_at": connected_at,
+        "friendship_ready": bool(row.get("friendship_ready")),
+        "friendship_checked_at": friendship_checked_at,
     }
 
 

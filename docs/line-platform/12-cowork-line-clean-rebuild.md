@@ -98,6 +98,18 @@ Pearnly Cowork LINE 不是聊天机器人，也没有采购/销售方向。它�
 
 真机验收：老板与一名员工各自绑定成功；交叉绑定、停用成员、非成员全部拒绝；DMS/ERP LINE 正常。
 
+#### C1.1 · 好友与可用状态补齐
+
+真实场景：成员完成 LINE Login 后会自然认为已经能给 Cowork 发文件；仅保存 LINE 身份、却没有添加官方号，会形成“网页显示成功、LINE 里找不到入口”的假完成。
+
+对标 LINE 官方 Add friend option：Cowork 连接授权使用 `bot_prompt=aggressive`，授权后服务端读取 friendship status。产品状态只允许：
+
+- 未绑定。
+- 已绑定、待添加好友：提供“去 LINE 添加好友”和“重新检查”。
+- 可以使用：提供“打开 Cowork LINE”。
+
+LINE 不允许静默加好友；成员必须确认一次。已有绑定可以重新发起检查，不需要先解绑。好友状态未验证时不得显示“可以使用”。
+
 ### C2 · 上传、OCR、Cowork 编辑器
 
 目的：LINE 图片/PDF 只形成 Cowork 待编辑记录。
@@ -137,4 +149,3 @@ Pearnly Cowork LINE 不是聊天机器人，也没有采购/销售方向。它�
 2. 新文件：`services/cowork_line/{schema,identity_store,connect}.py`、`routes/cowork_line_binding_routes.py`、`src/home/cowork-line/connect.ts`。
 3. 测试：`tests/unit/test_cowork_line_identity.py`、`tests/integration/test_cowork_line_binding.py`；至少覆盖本人绑定、重复绑定、停用收权、非成员拒绝和 DMS/ERP 路由不变。
 4. 删除：旧 Cowork binding routes、旧 `line-panel.ts`、OAuth 自动写旧绑定分支及对应旧测试；不留兼容入口。
-

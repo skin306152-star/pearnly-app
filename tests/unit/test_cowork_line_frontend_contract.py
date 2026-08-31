@@ -28,6 +28,11 @@ def test_cowork_identity_panel_calls_only_the_new_contract():
     assert "subscribeI18n?.('cowork-line-identity'" in source
     assert "searchParams.get('cowork_line_connect')" in source
     assert "searchParams.delete('cowork_line_connect')" in source
+    assert "friendship_ready" in source
+    assert "friend_required" in source
+    assert "https://line.me/R/ti/p/@pearnly" in source
+    assert "重新检查" in source
+    assert "打开 Cowork LINE" in source
 
 
 def test_drawer_mounts_cowork_identity_instead_of_the_legacy_bot_panel():

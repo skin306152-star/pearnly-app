@@ -282,8 +282,8 @@ def log_notification(
 def already_sent(user_id, tenant_id, template_code: str, event_ref: str) -> bool:
     """去重台账:该用户该期已发过(status='sent')即 True。
 
-    主动触达系(proactive/monthly_report/recall)共用的防重发闸。**查询失败一律 True
-    (当作已发)——花钱/打扰面宁少勿重**:宁可漏一条,不可因抖动重复扣钱/重复骚扰。
+    通知发送方共用的防重发闸。**查询失败一律 True(当作已发)**——花钱/打扰面
+    宁少勿重:宁可漏一条,不可因抖动重复扣钱/重复骚扰。
     """
     try:
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:

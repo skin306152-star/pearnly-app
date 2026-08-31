@@ -62,6 +62,11 @@ class BackgroundLoopsContractTests(unittest.TestCase):
             stage_janitor.run_once = orig
         self.assertEqual(called["n"], 1)
 
+    def test_recovery_tick_has_no_legacy_cowork_line_pushers(self):
+        source = inspect.getsource(bl.run_recovery_tick)
+        for legacy in ("proactive", "monthly_report", "recall", "line_client_dunning"):
+            self.assertNotIn(legacy, source)
+
     def test_startup_uses_single_source_loops(self):
         # REFACTOR-WA-B1 R5:lifespan(起这两条 loop)已抽到 services/startup.py
         from services import startup

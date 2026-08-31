@@ -194,13 +194,6 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
         knowledge_confirm.handle_postback(bound_user, reply_token, action, token, lang)
         return
 
-    # 月报一键退订:幂等置标记 + 确认回执(无令牌·只动本人标记)。
-    if action == line_postback.ACTION_MONTHLY_UNSUB:
-        from services.notification import monthly_report
-
-        monthly_report.handle_unsub(bound_user, reply_token, lang)
-        return
-
     # 主动解绑(确认/取消):令牌目标=用户,确认即解绑,走独立模块。
     if action in (line_postback.ACTION_UNBIND_CONFIRM, line_postback.ACTION_UNBIND_CANCEL):
         from services.line_binding import line_unbind

@@ -160,30 +160,6 @@ async def run_recovery_tick():
     except Exception as e:
         logger.warning(f"[line_ocr_jobs] tick failed: {e}")
     try:
-        from services.notification import proactive
-
-        await proactive.run_tick()
-    except Exception as e:
-        logger.warning(f"[proactive_nudge] tick failed: {e}")
-    try:
-        from services.notification import monthly_report
-
-        await monthly_report.run_tick()
-    except Exception as e:
-        logger.warning(f"[monthly_report] tick failed: {e}")
-    try:
-        from services.notification import recall
-
-        await recall.run_tick()
-    except Exception as e:
-        logger.warning(f"[recall_nudge] tick failed: {e}")
-    try:
-        from services.line_binding import line_client_dunning
-
-        await line_client_dunning.run_tick()
-    except Exception as e:
-        logger.warning(f"[line_client_dunning] tick failed: {e}")
-    try:
         from services.workorder import auto_open
 
         await auto_open.run_tick()

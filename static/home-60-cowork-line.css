@@ -1,0 +1,119 @@
+.cowork-line-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.cowork-line-panel__intro {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cowork-line-panel__card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.cowork-line-panel__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cowork-line-panel__avatar {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.cowork-line-panel__avatar svg {
+  width: 22px;
+  height: 22px;
+}
+
+.cowork-line-panel__identity-text {
+  min-width: 0;
+}
+
+.cowork-line-panel__name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cowork-line-panel__meta {
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.cowork-line-panel__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cowork-line-panel__actions .pu-btn {
+  min-height: 44px;
+}
+
+.cowork-line-panel__skeleton {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.cowork-line-panel__skeleton .pu-skeleton:first-child {
+  width: 45%;
+}
+
+.cowork-line-panel__skeleton .pu-skeleton:last-child {
+  width: 72%;
+}
+
+.cowork-line-status.is-connected {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.cowork-line-status.is-disconnected,
+.cowork-line-status.is-loading {
+  background: var(--line2);
+  color: var(--ink-3);
+}
+
+.cowork-line-status.is-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+@media (max-width: 600px) {
+  .cowork-line-panel__card {
+    padding: 16px;
+  }
+
+  .cowork-line-panel__actions {
+    flex-direction: column;
+  }
+
+  .cowork-line-panel__actions .pu-btn {
+    width: 100%;
+  }
+}

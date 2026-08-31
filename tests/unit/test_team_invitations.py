@@ -53,6 +53,17 @@ class StatusDerivationTests(unittest.TestCase):
 
 
 class CreateGuardTests(unittest.TestCase):
+    def test_line_channel_is_rejected_before_db(self):
+        out = invitations.create_invitation(
+            tenant_id="t",
+            invited_by="u",
+            channel="line",
+            target="LINE contact",
+            role_key="viewer",
+            inviter=_owner(),
+        )
+        self.assertEqual(out, {"error": "invite.channel_not_supported"})
+
     def test_owner_role_rejected_without_db(self):
         out = invitations.create_invitation(
             tenant_id="t",

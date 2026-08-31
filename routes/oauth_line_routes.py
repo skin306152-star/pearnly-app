@@ -1,39 +1,33 @@
-"""oauth_line_routes.py · LINE Login OAuth 2.0 登录 + 「用 LINE 连接」补绑(REFACTOR-B1)
+"""LINE Login OAuth 2.0 and Cowork LINE identity connection.
 
-从 oauth_routes.py 抽出(0 业务逻辑改 · 仅拆文件到 <500):
-    GET /api/me/connect-line/start   已登录用户一键连接 LINE(state 签入 user_id)
-    GET /api/auth/line/start         v118.28.4 LINE Login OAuth 入口
-    GET /api/auth/line/callback      code→id_token→verify · 注册/登录 / 自动绑 line_uid / 补绑分流
+The shared LINE Login flow only authenticates a Pearnly account. Cowork identity
+connection is an explicit, one-time flow carried in a separate OAuth state and
+does not write the legacy ``line_bindings`` store.
 
 OAuth state(HMAC 无状态签名)与 Google 登录共用 → services/auth/oauth_state.py。
-E2E 闸:spec 14(LINE 绑定)间接覆盖。
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import logging
 import os
 import secrets as _secrets
-import time as _time
 from urllib.parse import urlencode as _urlencode
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse as _RedirectResp
 
 from core import db
-from core.auth import create_access_token, get_current_user_from_request
+from core.auth import create_access_token
 from services.auth.entrance import login_entrance_allowed as _login_entrance_allowed
-from services.auth.oauth_state import _OAUTH_STATE_TTL
 from services.auth.oauth_state import gen_oauth_state as _gen_oauth_state
 from services.auth.oauth_state import login_redirect_path as _login_redirect_path
 from services.auth.oauth_state import oauth_entry_context as _oauth_entry_context
 from services.auth.oauth_state import oauth_state_entry as _oauth_state_entry
-from services.auth.oauth_state import oauth_state_secret as _oauth_state_secret
 from services.auth.oauth_state import verify_oauth_state as _verify_oauth_state
+from services.cowork_line import identity_store
 
 logger = logging.getLogger(__name__)
 
@@ -50,57 +44,20 @@ _LINE_LOGIN_CHANNEL_SECRET = os.getenv("LINE_LOGIN_CHANNEL_SECRET", "")
 _LINE_LOGIN_REDIRECT_URI = os.getenv(
     "LINE_LOGIN_REDIRECT_URI", "https://pearnly.com/api/auth/line/callback"
 )
-
-
-# ── 「用 LINE 连接」(已登录用户补绑 LINE)· state 签入 user_id,复用登录 callback,按 state 分流 ──
-def _gen_connect_state(user_id: str) -> str:
-    payload = f"{user_id}~{_secrets.token_urlsafe(8)}~{int(_time.time())}"
-    sig = hmac.new(_oauth_state_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
-    return f"{payload}~{sig}"
-
-
-def _parse_connect_state(s: str):
-    """连接态 state → user_id;非连接态/无效/过期 → None。"""
-    parts = (s or "").split("~")
-    if len(parts) != 4:
-        return None
-    uid, nonce, ts, sig = parts
-    expected = hmac.new(
-        _oauth_state_secret(), f"{uid}~{nonce}~{ts}".encode("utf-8"), hashlib.sha256
-    ).hexdigest()[:32]
-    if not hmac.compare_digest(sig, expected):
-        return None
-    try:
-        if _time.time() - int(ts) >= _OAUTH_STATE_TTL:
-            return None
-    except ValueError:
-        return None
-    return uid
-
-
-@router.get("/api/me/connect-line/start")
-async def connect_line_start(request: Request):
-    """已登录用户(如 Google 登录)一键连接 LINE:返回授权 URL,前端跳转。state 签入当前 user_id。"""
-    user = get_current_user_from_request(request)
-    if not _LINE_LOGIN_CHANNEL_ID:
-        raise HTTPException(status_code=503, detail="line_oauth_not_configured")
-    params = {
-        "response_type": "code",
-        "client_id": _LINE_LOGIN_CHANNEL_ID,
-        "redirect_uri": _LINE_LOGIN_REDIRECT_URI,  # 复用已注册的登录 callback
-        "state": _gen_connect_state(str(user["id"])),
-        "scope": "openid profile",
-        "nonce": _secrets.token_urlsafe(16),
-        "bot_prompt": "aggressive",  # 顺带提示加好友
-    }
-    return {"url": "https://access.line.me/oauth2/v2.1/authorize?" + _urlencode(params)}
+_COWORK_CONNECT_STATE_PREFIX = "cowork_line:"
 
 
 @router.get("/api/auth/line/start")
-async def line_oauth_start(entry: str = ""):
+async def line_oauth_start(entry: str = "", connect_token: str = ""):
     if not _LINE_LOGIN_CHANNEL_ID:
         raise HTTPException(status_code=503, detail="line_oauth_not_configured")
-    state = _gen_oauth_state(_oauth_entry_context(entry) or None)
+    entry_context = _oauth_entry_context(entry)
+    if connect_token:
+        if entry_context != "cowork" or not connect_token.startswith("clc_"):
+            raise HTTPException(status_code=400, detail="cowork_line.invalid_connect_token")
+        state = f"{_COWORK_CONNECT_STATE_PREFIX}{connect_token}"
+    else:
+        state = _gen_oauth_state(entry_context or None)
     params = {
         "response_type": "code",
         "client_id": _LINE_LOGIN_CHANNEL_ID,
@@ -108,89 +65,73 @@ async def line_oauth_start(entry: str = ""):
         "state": state,
         "scope": "openid profile email",  # v118.28.4.2 · email scope 已通过 · 自动拿邮箱
         "nonce": _secrets.token_urlsafe(16),
-        # 登录页提示加 Pearnly Bot 为好友(登录频道已关联 OA·与 Bot 同 provider)。
-        "bot_prompt": "aggressive",
     }
     url = "https://access.line.me/oauth2/v2.1/authorize?" + _urlencode(params)
     return _RedirectResp(url, status_code=302)
 
 
-async def _handle_connect_line(user_id: str, code: str):
-    """已登录用户补绑 LINE:换 code 拿 sub → 绑当前账号 + 绑 Bot + 推欢迎卡 → 回集成页。"""
-    if not code or not _LINE_LOGIN_CHANNEL_ID or not _LINE_LOGIN_CHANNEL_SECRET:
-        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
+def _cowork_connect_token(state: str) -> str:
+    if not state.startswith(_COWORK_CONNECT_STATE_PREFIX):
+        return ""
+    token = state[len(_COWORK_CONNECT_STATE_PREFIX) :]
+    return token if token.startswith("clc_") else ""
+
+
+def _cowork_connect_redirect(status: str) -> _RedirectResp:
+    return _RedirectResp(f"/cowork?cowork_line_connect={status}#/integrations", status_code=302)
+
+
+def _finish_cowork_connect(connect_token: str, payload: dict) -> _RedirectResp:
+    line_user_id = (payload.get("sub") or "").strip()
+    if not line_user_id:
+        return _cowork_connect_redirect("error")
+
     try:
-        import httpx as _httpx
-
-        async with _httpx.AsyncClient(timeout=15) as client:
-            tr = await client.post(
-                "https://api.line.me/oauth2/v2.1/token",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": _LINE_LOGIN_REDIRECT_URI,
-                    "client_id": _LINE_LOGIN_CHANNEL_ID,
-                    "client_secret": _LINE_LOGIN_CHANNEL_SECRET,
-                },
-            )
-            if tr.status_code != 200:
-                return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
-            id_token = tr.json().get("id_token")
-            vr = await client.post(
-                "https://api.line.me/oauth2/v2.1/verify",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                data={"id_token": id_token, "client_id": _LINE_LOGIN_CHANNEL_ID},
-            )
-            if vr.status_code != 200:
-                return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
-            payload = vr.json()
-    except Exception as e:
-        logger.error(f"[line_connect] fetch failed: {e}")
-        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
-
-    sub = payload.get("sub")
-    user = db.find_user_by_id(user_id)
-    if not sub or not user:
-        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
-    try:
-        db.link_line_uid_to_user(user_id, sub)
-        ok = db.create_or_update_line_binding(
-            user_id=user_id,
-            line_user_id=sub,
-            display_name=(payload.get("name") or None),
-            picture_url=(payload.get("picture") or None),
+        membership = identity_store.consume_connect_token(connect_token)
+        if not membership:
+            return _cowork_connect_redirect("expired")
+        result = identity_store.bind_identity(
+            membership_id=str(membership["membership_id"]),
+            tenant_id=str(membership["tenant_id"]),
+            user_id=str(membership["user_id"]),
+            line_user_id=line_user_id,
+            display_name=(payload.get("name") or "").strip() or None,
+            picture_url=(payload.get("picture") or "").strip() or None,
         )
-        if not ok:
-            # 该 LINE 已绑别的 Pearnly 账号 → 诚实提示,不假装成功。
-            return _RedirectResp("/home?line_connect=conflict#integrations", status_code=302)
-        from services.line_binding import line_imagemap, line_reply
-
-        line_reply.push_messages_context(
-            sub,
-            line_imagemap.welcome_messages(user.get("preferred_lang")),
-            tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
-        )
-    except Exception as e:
-        logger.warning(f"[line_connect] 绑定/推送失败: {e}")
-        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
-    return _RedirectResp("/home?line_connect=ok#integrations", status_code=302)
+        if not result.get("success"):
+            status = "conflict" if result.get("conflict") else "error"
+            return _cowork_connect_redirect(status)
+    except identity_store.CoworkLineIdentityError as exc:
+        code = exc.code.removeprefix("cowork_line.")
+        if code in {"already_connected", "line_conflict"}:
+            return _cowork_connect_redirect("conflict")
+        if code in {"membership_inactive", "token_expired", "token_invalid", "token_used"}:
+            return _cowork_connect_redirect("expired")
+        logger.warning("[cowork_line_connect] rejected: %s", code)
+        return _cowork_connect_redirect("error")
+    except Exception:
+        logger.exception("[cowork_line_connect] failed")
+        return _cowork_connect_redirect("error")
+    return _cowork_connect_redirect("ok")
 
 
 @router.get("/api/auth/line/callback")
 async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
+    connect_token = _cowork_connect_token(state)
     if error:
+        if connect_token:
+            return _cowork_connect_redirect("error")
         return _RedirectResp(f"/login?oauth_error={error}", status_code=302)
-    # 「用 LINE 连接」分流:state 签入了 user_id → 补绑当前账号(不走登录建号),回集成页。
-    _connect_uid = _parse_connect_state(state)
-    if _connect_uid:
-        return await _handle_connect_line(_connect_uid, code)
-    if not _verify_oauth_state(state):
+    if not connect_token and not _verify_oauth_state(state):
         return _RedirectResp("/login?oauth_error=invalid_state", status_code=302)
-    _entry_ctx = _oauth_state_entry(state)
+    _entry_ctx = "cowork" if connect_token else _oauth_state_entry(state)
     if not code:
+        if connect_token:
+            return _cowork_connect_redirect("error")
         return _RedirectResp("/login?oauth_error=no_code", status_code=302)
     if not _LINE_LOGIN_CHANNEL_ID or not _LINE_LOGIN_CHANNEL_SECRET:
+        if connect_token:
+            return _cowork_connect_redirect("error")
         return _RedirectResp("/login?oauth_error=line_not_configured", status_code=302)
 
     # code → access_token + id_token
@@ -213,10 +154,14 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                 logger.error(
                     f"[LINE OAuth] token exchange failed {tr.status_code}: {tr.text[:300]}"
                 )
+                if connect_token:
+                    return _cowork_connect_redirect("error")
                 return _RedirectResp("/login?oauth_error=line_token_fail", status_code=302)
             tok_data = tr.json()
             id_token = tok_data.get("id_token")
             if not id_token:
+                if connect_token:
+                    return _cowork_connect_redirect("error")
                 return _RedirectResp("/login?oauth_error=line_no_id_token", status_code=302)
 
             # 用 LINE 的 verify 端点 · 服务端验证 id_token + 拿 payload
@@ -232,11 +177,18 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
                 logger.error(
                     f"[LINE OAuth] id_token verify failed {vr.status_code}: {vr.text[:300]}"
                 )
+                if connect_token:
+                    return _cowork_connect_redirect("error")
                 return _RedirectResp("/login?oauth_error=line_verify_fail", status_code=302)
             payload = vr.json()
     except Exception as e:
         logger.error(f"[LINE OAuth] callback fetch failed: {e}")
+        if connect_token:
+            return _cowork_connect_redirect("error")
         return _RedirectResp("/login?oauth_error=line_fetch_fail", status_code=302)
+
+    if connect_token:
+        return _finish_cowork_connect(connect_token, payload)
 
     line_uid = payload.get("sub")
     line_name = (payload.get("name") or "").strip()
@@ -277,27 +229,6 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     if not _login_entrance_allowed(_entry_ctx or "main", user):
         error_path = "/cowork" if _entry_ctx == "cowork" else "/login"
         return _RedirectResp(f"{error_path}?oauth_error=invalid_credentials", status_code=302)
-
-    # 登录即自动绑定 Bot:登录频道(2010411313)与 Messaging Bot 同一 Provider「Pearnly」→
-    # 登录拿到的 sub == Bot 看到的 userId → 直接写 line_bindings,免手输 6 位码。
-    # best-effort:已绑/冲突/失败都不拦登录。已是好友则 push 欢迎卡+新手轮播(=登录后 LINE 自动弹卡);
-    # 非好友 push 静默失败(用户加好友后发任意消息仍已连上)。
-    try:
-        db.create_or_update_line_binding(
-            user_id=str(user["id"]),
-            line_user_id=line_uid,
-            display_name=line_name or None,
-            picture_url=line_picture or None,
-        )
-        from services.line_binding import line_imagemap, line_reply
-
-        line_reply.push_messages_context(
-            line_uid,
-            line_imagemap.welcome_messages(user.get("preferred_lang")),
-            tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
-        )
-    except Exception as e:
-        logger.warning(f"[line_login] 自动绑定 Bot 跳过(不拦登录): {e}")
 
     # 颁 JWT
     db.update_last_login(str(user["id"]))

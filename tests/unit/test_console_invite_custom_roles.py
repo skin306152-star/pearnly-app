@@ -28,6 +28,10 @@ def _pending_custom_invitation():
 
 
 class RouteRoleNameContractTests(unittest.TestCase):
+    def test_line_invitation_channel_is_removed(self):
+        with self.assertRaises(ValidationError):
+            InvitationCreate(channel="line", target="contact", role_key="viewer")
+
     def test_invitation_model_accepts_existing_custom_role_key_contract(self):
         key = "custom:" + "a" * 40
         self.assertEqual(

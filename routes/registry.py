@@ -42,6 +42,7 @@ from routes.companion_installer_routes import router as companion_installer_rout
 from routes.console_invite_routes import router as console_invite_router
 from routes.console_roles_routes import router as console_roles_router
 from routes.console_team_routes import router as console_team_router
+from routes.cowork_line_binding_routes import router as cowork_line_binding_router
 from routes.dms_roster_routes import router as dms_roster_router
 from routes.dms_routes import router as dms_router
 from routes.daily_routes import router as daily_router
@@ -61,15 +62,12 @@ from routes.import_routes import router as import_router
 from routes.inventory_report_routes import router as inventory_report_router
 from routes.inventory_routes import router as inventory_router
 from routes.line_account_merge_routes import router as line_account_merge_router
-from routes.line_binding_routes import router as line_binding_router
-from routes.line_card_image_routes import router as line_card_image_router
 from routes.line_dms_webhook_routes import router as line_dms_webhook_router
 from routes.line_liff_routes import router as line_liff_router
 from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
 from routes.line_dms_credentials_routes import router as line_dms_credentials_router
 from routes.line_dms_portal_routes import router as line_dms_portal_router
 from routes.line_erp_routes import router as line_erp_router
-from routes.line_webhook_routes import router as line_webhook_router
 from routes.login_routes import router as login_router
 from routes.me_routes import router as me_router
 from routes.meta_aliases_routes import router as meta_aliases_router
@@ -201,7 +199,7 @@ ROUTERS = (
     categories_router,
     pages_router,  # 静态页面 + 公开 meta
     me_router,
-    line_binding_router,
+    cowork_line_binding_router,
     erp_router,  # ERP 推送
     erp_intake_router,  # ERP 商户 staged OCR 草稿丢弃
     erp_agent_router,  # Express Push · 本地 Agent 出站拉取 + token
@@ -237,8 +235,6 @@ ROUTERS = (
     line_account_merge_router,
     oauth_router,
     oauth_line_router,
-    line_webhook_router,
-    line_card_image_router,  # 泰语图卡出图(公开)
     login_router,
     meta_aliases_router,  # /api/version + v1 OCR 别名
     ocr_export_router,

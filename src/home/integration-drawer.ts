@@ -1,6 +1,7 @@
 // REFACTOR-C1-home-batch9g1 · 从 home.js verbatim 抽出(0 逻辑改)
 // 集成页顶 tab 切换 + 集成配置抽屉(window.openIntegrationDrawer/closeIntegrationDrawer/activateIntegrationsLogsTab)
 /* global loadErpLogs, loadErpTodayStats, loadErpEndpoints */
+import { mountCoworkLineIdentity } from './cowork-line/identity-panel.js';
 
 // A4 (v118.34.19 · Zihao 2026-05-19 拍板) · 集成主页面顶部 tab 切换
 // + "看推送日志 →" 链接(从 ERP 卡片 / 也可来自其他地方)
@@ -123,9 +124,12 @@
         if (titleEl) titleEl.textContent = title || '';
         body.innerHTML = '';
 
+        if (tab === 'line') {
+            mountCoworkLineIdentity(body);
+        }
+
         // anchor → data-auto-panel ID 映射(自动化页面里的 panel 名)
         var _panelIds = {
-            line: 'linebot',
             folder: 'folder',
             email: 'email',
             alert: 'alert',
@@ -135,13 +139,15 @@
         var panelId = _panelIds[tab as keyof typeof _panelIds] || tab;
 
         // 把对应的 auto-panel 移入抽屉(DOM move · 保留事件监听)
-        const panel = document.querySelector('.auto-panel[data-auto-panel="' + panelId + '"]');
-        if (panel) {
-            (panel as HTMLElement).style.display = 'block';
-            body.appendChild(panel);
-        } else {
-            body.innerHTML =
-                '<div style="padding:20px;color:var(--ink-3);font-size:13px;">面板未找到</div>';
+        if (tab !== 'line') {
+            const panel = document.querySelector('.auto-panel[data-auto-panel="' + panelId + '"]');
+            if (panel) {
+                (panel as HTMLElement).style.display = 'block';
+                body.appendChild(panel);
+            } else {
+                body.innerHTML =
+                    '<div style="padding:20px;color:var(--ink-3);font-size:13px;">面板未找到</div>';
+            }
         }
 
         // 打开动画
@@ -151,7 +157,6 @@
 
         // 触发数据加载(panel 已在 DOM 里 · loader 按固定 ID 渲染)
         var loaders = {
-            line: window._loadLineBotPanel,
             folder: window._loadFolderWatcherPanel,
             email: window._loadEmailIngestPanel,
             alert: window._loadNotificationsPanel,

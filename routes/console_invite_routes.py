@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """控制台 · 邀请 + 所有权转移 API(批3 · docs/permissions/03)。
 
-POST /api/team/invitations            建邀请(email|line · 角色禁 owner · token 只回一次)
+POST /api/team/invitations            建邮件邀请(角色禁 owner · token 只回一次)
 GET  /api/team/invitations            pending 列表
 DELETE /api/team/invitations/{id}     撤回
 GET  /api/invitations/{token}/preview 公开:接受页渲染数据(租户名/角色/状态)
@@ -9,8 +9,7 @@ POST /api/invitations/{token}/accept  公开:新号注册入组(既有号人话�
 POST /api/ownership/transfer          发起转移(目标须 admin · 24h token)
 POST /api/ownership/transfer/accept   接收方确认(同事务换角色 · 不可逆)
 
-LINE 通道复用改密链路的发消息能力:目标已绑机器人则推送,未绑则由老板复制链接转发
-(invite_url 两种通道都返回,行业标准 copy-link)。
+邀请链接始终返回,老板可复制后通过任意渠道转发。员工加入后自行绑定 LINE。
 """
 
 from __future__ import annotations
@@ -33,7 +32,7 @@ router = APIRouter()
 
 
 class InvitationCreate(BaseModel):
-    channel: str = Field(..., pattern="^(email|line)$")
+    channel: str = Field(..., pattern="^email$")
     target: str = Field(..., min_length=1, max_length=200)
     role_key: str = Field(..., min_length=3, max_length=64)
     scope_mode: str = Field("all", pattern="^(all|assigned)$")
@@ -68,7 +67,7 @@ async def create_invitation(req: InvitationCreate, request: Request):
         raise HTTPException(422, detail="invite.role_not_allowed")
     if req.scope_mode == "assigned" and not req.workspace_ids:
         raise HTTPException(422, detail="team.scope_empty")
-    if req.channel == "email" and "@" not in req.target:
+    if "@" not in req.target:
         raise HTTPException(422, detail="invite.bad_email")
     # 席位 enforce(G1):活跃成员 + 未决邀请 ≥ 套餐席位 → 拦;撤回/移除后可再邀。
     plan = PLAN_CONFIG.get(str(user.get("plan") or ""), PLAN_CONFIG["credits"])
@@ -89,14 +88,12 @@ async def create_invitation(req: InvitationCreate, request: Request):
     if created.get("error"):
         raise HTTPException(422, detail=created["error"])
     url = _invite_url(request, created["token"])
-    sent = False
-    if req.channel == "email":
-        sent = inv_store.send_invite_email(
-            req.target.strip(),
-            url,
-            user.get("company_name") or "Pearnly",
-            created["role_name"],
-        )
+    sent = inv_store.send_invite_email(
+        req.target.strip(),
+        url,
+        user.get("company_name") or "Pearnly",
+        created["role_name"],
+    )
     _log_op(
         request,
         user,

@@ -38,7 +38,6 @@ import './home/permissions.js'; // REFACTOR-C1-home-batch8 · 用户角色原子
 import './home/layout.js'; // REFACTOR-C1-home-batch8 · 顶栏配额chip/配额预警banner/sidebar权限显隐(从 home.js 抽出 · window 桥 renderQuotaBanner/applySidebarVisibility/renderInfoBar · 依赖 permissions.js)
 import './home/recon-drawer.js'; // REFACTOR-C1-home-batch9a · 泰国RD税务API核验/同步(从 home.js 抽出 · window 桥 callRdVerify/callRdSync · drawer-body 事件代理裸调)
 import './home/ocr-fields.js'; // REFACTOR-C1-home-batch9b · OCR多页字段合并+抽屉字段编辑(从 home.js 抽出 · window 桥 mergeFields/onFieldEdit/updateDrawerEditCount · ocr模块+recon-drawer裸调)
-import './home/line-panel.js'; // REFACTOR-C1-home-batch9d · LINE Bot 绑定面板 IIFE(🔴高敏·从 home.js 抽出 · import 自执行暴露 window._loadLineBotPanel · 集成抽屉/automation.js 触发)
 import './home/ocr-results.js'; // REFACTOR-C1-home-batch1 · OCR 结果表+抽屉渲染(从 home.js 抽出 · window 桥 renderResults/openDrawer/closeDrawer)
 import './home/page-history.js'; // REFACTOR-WB-C3 · 历史页骨架运行期注入(home.html section 抽出 · 须在 history-list.js 前 · 顶层自举/bootstrap 守卫调用都在其后)
 import './home/history-list.js'; // REFACTOR-C1-home-batch4 · 发票记录页列表侧(从 home.js 抽出 · 桥 loadHistoryPage 等 · _historyState 共享态留 home.js)

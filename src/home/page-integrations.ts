@@ -1,4 +1,5 @@
 import { authHeaders } from './dms-intake-core.js';
+import { initCoworkLineSummary } from './cowork-line/identity-panel.js';
 
 type ErpTranslator = (th: string, en: string, zh: string, ja: string) => string;
 
@@ -335,26 +336,24 @@ function initErpLineBinding(sec: HTMLElement, tr: ErpTranslator): void {
 
         <!-- 推送日志已抽为左侧栏独立页(page-push-logs · 2026-07-01)· 集成页只留集成卡片 -->
         <div class="card">
-            <!-- 2026-06-10 五-bis · 卡片按归属重排 + 业态显隐:
-                 firm 全显;商户业态(retail/restaurant/…)只显 LINE Bot + 智能提醒(data-firm-only 由 module-nav 控)。
-                 采集渠道(LINE 全业态 · Gmail/文件夹=事务所代收) / 归档交付(Drive/Sheets) / ERP / 通知。
-                 隐藏≠删除:后端配置不动,切回 firm 即复现。 -->
-
             <!-- 第 1 组 · 采集渠道 -->
             <div class="integrations-section-title" data-i18n="integrations-section-channels">采集渠道</div>
 
-            <div class="integration-row" data-int-target="automation" data-int-anchor="line">
+            <div id="cowork-line-integration-row" class="integration-row" data-int-target="drawer" data-int-anchor="line">
                 <div class="int-icon ic-line">
                     <svg viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2C6.48 2 2 5.96 2 10.84c0 4.37 3.55 8.04 8.36 8.74.32.07.77.21.88.49.1.25.07.65.03.91l-.14.86c-.04.25-.2.99.87.54 1.07-.46 5.77-3.4 7.87-5.82C21.32 15.04 22 13.05 22 10.84 22 5.96 17.52 2 12 2z"/>
                     </svg>
                 </div>
                 <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-name-line">LINE Bot</span></div>
-                    <div class="int-desc" data-i18n="int-desc-line">外勤拍照发 LINE · 自动入账 · 单聊群聊都支持</div>
+                    <div class="int-name">
+                        <span data-cowork-line-copy="productName">Pearnly Cowork LINE</span>
+                        <span id="cowork-line-status-summary" class="auto-status-pill cowork-line-status is-loading">加载中…</span>
+                    </div>
+                    <div class="int-desc" data-cowork-line-copy="productDescription">在 LINE 上传、识别、编辑，再选择推送目标</div>
                 </div>
                 <div class="int-actions">
-                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
+                    <button class="int-btn-configure" type="button" data-cowork-line-copy="manage">管理</button>
                 </div>
             </div>
 
@@ -432,4 +431,5 @@ function initErpLineBinding(sec: HTMLElement, tr: ErpTranslator): void {
     } catch (e) {
         /* silent · 初译失败不致命 · 切语言会补 */
     }
+    initCoworkLineSummary(sec);
 })();

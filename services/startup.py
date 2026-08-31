@@ -193,6 +193,13 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 authz schema 失败: {e}")
 
+    try:
+        from services.cowork_line.schema import ensure_schema as ensure_cowork_line_schema
+
+        ensure_cowork_line_schema()
+    except Exception as e:
+        logger.warning(f"启动 Cowork LINE identity schema 失败: {e}")
+
     # 自动做账/报税/一句话记账 schema 双跑(docs accounting·tax-filing·smart-intake)。NEW-DEBT-EXEMPT。
     for _path, _fn, _label in (
         ("services.accounting.schema", "ensure_accounting_schema", "accounting"),
@@ -350,8 +357,7 @@ async def run_startup() -> dict:
         await asyncio.to_thread(ensure_playwright_installed)
     except Exception as e:
         logger.warning(
-            f"[playwright-bootstrap] failed (will surface as "
-            f"ERR_PLAYWRIGHT_MISSING in wizard): {e}"
+            f"[playwright-bootstrap] failed (will surface as ERR_PLAYWRIGHT_MISSING in wizard): {e}"
         )
 
     # v110.7 · 启动确保 users 表有欢迎向导用的 profile 字段(幂等 · 已有字段无影响)
@@ -369,7 +375,7 @@ async def run_startup() -> dict:
             recovered = 0
             for tbl in ["ocr_history", "reconciliation_task", "gl_vat_task"]:
                 try:
-                    cur.execute(f"UPDATE {tbl} SET status='interrupted' " f"WHERE status='running'")
+                    cur.execute(f"UPDATE {tbl} SET status='interrupted' WHERE status='running'")
                     recovered += cur.rowcount or 0
                 except Exception as _inner:
                     logger.warning(f"启动恢复 {tbl} 中断任务失败(表可能不存在): {_inner}")

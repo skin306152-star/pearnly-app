@@ -854,14 +854,6 @@
             .join('');
         $('inviteBody').innerHTML =
             '<div class="field"><label>' +
-            ct('inv_channel') +
-            '</label>' +
-            '<span class="seg" id="iv-ch"><b class="on" data-ch="email">' +
-            ct('inv_email') +
-            '</b><b data-ch="line">' +
-            ct('inv_line') +
-            '</b></span></div>' +
-            '<div class="field"><label id="iv-tlabel">' +
             ct('inv_target_email') +
             '</label><input id="iv-target" placeholder=""></div>' +
             '<div class="field"><label>' +
@@ -887,23 +879,6 @@
             ct('btn_send') +
             '</button></div>';
         $('inviteMask').classList.add('open');
-        var ch = 'email';
-        $('iv-ch')
-            .querySelectorAll('b')
-            .forEach(function (b) {
-                b.onclick = function () {
-                    $('iv-ch')
-                        .querySelectorAll('b')
-                        .forEach(function (x) {
-                            x.classList.remove('on');
-                        });
-                    b.classList.add('on');
-                    ch = b.getAttribute('data-ch');
-                    $('iv-tlabel').textContent = ct(
-                        ch === 'email' ? 'inv_target_email' : 'inv_target_line'
-                    );
-                };
-            });
         $('iv-roles')
             .querySelectorAll('.rolecard')
             .forEach(function (c) {
@@ -964,7 +939,7 @@
                 return parseInt(i.getAttribute('data-ws'), 10);
             });
             api('POST', '/api/team/invitations', {
-                channel: ch,
+                channel: 'email',
                 target: $('iv-target').value.trim(),
                 role_key: role ? role.getAttribute('data-role') : '',
                 scope_mode: sm,
@@ -975,9 +950,7 @@
                         '<div class="field"><label>' +
                         ct('inv_sent') +
                         ' · ' +
-                        (ch === 'email'
-                            ? ct(j.email_sent ? 'inv_email_ok' : 'inv_email_fail')
-                            : ct('inv_line_tip')) +
+                        ct(j.email_sent ? 'inv_email_ok' : 'inv_email_fail') +
                         '</label>' +
                         '<div class="copybox"><span id="iv-url">' +
                         esc(j.invite_url) +

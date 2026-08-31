@@ -179,6 +179,8 @@ def create_invitation(
 
     校验由路由层做完(角色可邀/作用域合法);此处兜底再拦 owner。
     """
+    if channel != "email":
+        return {"error": "invite.channel_not_supported"}
     if not role_key_allowed_for_invitation(tenant_id, role_key):
         return None
     if str(inviter.get("id")) != str(invited_by) or str(inviter.get("tenant_id")) != str(tenant_id):
@@ -218,8 +220,8 @@ def create_invitation(
             """,
             (
                 str(tenant_id),
-                target if channel == "email" else None,
-                target if channel == "line" else None,
+                target,
+                None,
                 role_key,
                 scope_mode,
                 json.dumps(ws_ids),
@@ -232,7 +234,7 @@ def create_invitation(
     return {
         "id": str(row["id"]),
         "token": token,
-        "channel": channel,
+        "channel": "email",
         "target": target,
         "role_key": role_key,
         "role_name": role["role_name"],

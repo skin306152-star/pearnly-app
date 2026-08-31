@@ -4,7 +4,7 @@ from __future__ import annotations
 me_routes.py · 当前用户身份/资料路由(/api/me 家族)
 REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后端搬家
 
-包含 3 路由 + 2 model + 1 helper(verbatim · 一起搬 · 它们彼此是唯一消费者):
+包含当前用户身份、资料与偏好语言路由:
     GET  /api/me            → UserInfo(response_model)· 调 _build_user_info
     GET  /api/v1/me         → 委托 get_me(v1 别名)
     PUT  /api/me/profile    → ProfileUpdate · 更新用户 profile 字段
@@ -18,8 +18,8 @@ REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后�
    全字段集 + _build_user_info 返回 key 集 · 任何字段漂移当场 fail。
 
 留在 app.py(不搬 · 故意):
-    /api/me/lang · /api/me/needs_email · /api/me/line_complete_email · /api/line/binding*
-    —— 这些与 LINE 绑定 / 邮箱验证码基础设施纠缠(send/verify_email_code · LINE webhook)· 留待专项。
+    /api/me/needs_email · /api/me/line_complete_email
+    —— 这些与邮箱验证码基础设施纠缠(send/verify_email_code)· 留待专项。
     _check_user_quota / _calc_trial_days_left / _ensure_user_profile_columns 等留 app.py(OCR/启动用)。
 """
 
@@ -245,6 +245,19 @@ class ProfileUpdate(BaseModel):
     # v118.10 · 让用户在设置页能补全姓名 / 公司名(注册时已变成选填)
     full_name: Optional[str] = None
     company_name: Optional[str] = None
+
+
+class UpdateLangRequest(BaseModel):
+    lang: str
+
+
+@router.post("/api/me/lang")
+async def update_my_lang(payload: UpdateLangRequest, request: Request):
+    """保存网页、邮件与各独立 LINE 产品共用的用户语言偏好。"""
+    user = get_current_user_from_request(request)
+    if not db.update_user_preferred_lang(user["id"], payload.lang):
+        raise HTTPException(status_code=400, detail="profile.unsupported_language")
+    return {"success": True, "lang": payload.lang}
 
 
 @router.put("/api/me/profile")

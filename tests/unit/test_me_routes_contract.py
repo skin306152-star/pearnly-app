@@ -7,7 +7,7 @@ REFACTOR-B1 守门测试 · /api/me 家族从 app.py 抽到 me_routes.py。
 任何后续字段增删改(漂移)当场 fail —— 比"删字段忘改 schema"提前一步拦下。
 
 锁定(防搬迁回归):
-  1. router 注册 3 条路由 path+method 契约不变
+  1. router 注册当前用户身份、资料与偏好语言路由
   2. app.py include_router 真挂上 · /api/me 的 response_model 仍是 me_routes.UserInfo
   3. UserInfo 字段集快照(60 字段)· 防 #15 字段漂移
   4. _build_user_info 返回 key 集快照 · 且 ⊆ UserInfo 字段(防返回前端读不到的 key / 漏返 required)
@@ -94,14 +94,19 @@ class MeRoutesContractTests(unittest.TestCase):
                     got.add((m, r.path))
         self.assertEqual(
             got,
-            {("GET", "/api/me"), ("GET", "/api/v1/me"), ("PUT", "/api/me/profile")},
+            {
+                ("GET", "/api/me"),
+                ("GET", "/api/v1/me"),
+                ("PUT", "/api/me/profile"),
+                ("POST", "/api/me/lang"),
+            },
         )
 
     def test_app_includes_me_router_with_response_model(self):
         import app
 
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
-        for p in ("/api/me", "/api/v1/me", "/api/me/profile"):
+        for p in ("/api/me", "/api/v1/me", "/api/me/profile", "/api/me/lang"):
             self.assertIn(p, paths, f"me route missing from app: {p}")
         # /api/me 的 response_model 必须是 me_routes.UserInfo(防 app 残留旧 model)
         rm = next(r.response_model for r in app.app.routes if getattr(r, "path", None) == "/api/me")

@@ -95,10 +95,9 @@ CORE_ROUTES = {
         "/api/auth/forgot_password",
         "/api/auth/reset_password",
     ],
-    "LINE绑定/line": [
-        "/api/line/binding",
-        "/api/line/binding-code",
-        "/api/line/webhook",
+    "Cowork LINE身份/cowork-line": [
+        "/api/cowork-line/identity",
+        "/api/cowork-line/connect/start",
     ],
     "改密/password": [
         "/api/me/change_password",

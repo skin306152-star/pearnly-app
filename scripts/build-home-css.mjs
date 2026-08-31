@@ -76,6 +76,7 @@ const HOME_CSS = [
     // 事务所端 · 商品收发存报表(2026-08-07)· 只吃全局令牌 + .btn/.modal 原子(home-38/home-05),
     // 类名 .stc-* 全新不覆盖任何存量,排最后即可。
     'home-59-stock-card.css',
+    'home-60-cowork-line.css',
 ];
 
 const ADMIN_CSS = [

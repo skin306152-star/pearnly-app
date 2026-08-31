@@ -19,9 +19,6 @@
   "src/home/history-drawer.ts": {
     "emoji": 1
   },
-  "src/home/line-panel.ts": {
-    "emoji": 1
-  },
   "src/home/purchase-form.ts": {
     "emoji": 1
   },
@@ -32,7 +29,7 @@
     "emoji": 1
   },
   "src/main.js": {
-    "emoji": 4
+    "emoji": 3
   },
   "static/admin/admin.js": {
     "emoji": 1

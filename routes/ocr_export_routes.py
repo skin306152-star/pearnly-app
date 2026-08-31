@@ -253,6 +253,9 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
     其他模板(input_vat / standard / print)继续走 reports_router 的 batch_export
     """
     user = get_current_user_from_request(request)
+    from services.erp import team_access
+
+    creator = team_access.record_creator_scope(request, user)
     if not req.history_ids:
         raise HTTPException(400, detail="export.empty_records")
     if len(req.history_ids) > MAX_BATCH_SIZE:
@@ -265,7 +268,9 @@ async def ocr_export_by_history_ids(req: ExportByHistoryIdsRequest, request: Req
     tenant_id = user.get("tenant_id")
     tenant_id = str(tenant_id) if tenant_id else None
 
-    details = db.get_ocr_history_details_bulk(user_id, req.history_ids, tenant_id)
+    details = db.get_ocr_history_details_bulk(
+        user_id, req.history_ids, None if creator else tenant_id
+    )
     records = []
     hid_by_record: List[str] = []  # 与 records 同序 · 每条对应的 history_id(回查动作用)
     for hid in req.history_ids:

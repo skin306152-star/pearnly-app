@@ -44,6 +44,7 @@ export const NAV_NODES: Record<string, string> = {
     // exceptions 不在此:2026-07-26 下线,由 app-shell-sidebar-html 内联 display:none 恒隐
     // (留在这里会被 applyNavPreset 的 show(el,true) 打开)。
     integrations: '#nav-integrations',
+    team: '#nav-erp-team',
     guide: '[data-collapsible="guide"]', // 使用教程(父栏 → 主题)· 只对会计版有意义
 };
 
@@ -92,6 +93,7 @@ export const ERP_PRESET: NavPreset = {
         'clients',
         'company',
         'integrations',
+        'team',
     ],
     home: 'dashboard',
     avatarHide: FIRM_AVATAR_HIDE,

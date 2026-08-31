@@ -19,8 +19,10 @@ from services.sales import buyer as buyer_mod
 from services.sales import issue_gates
 from services.sales import numbering
 from services.sales import seller_profile
-from services.sales.document_list_lines import attach as _attach_list_lines
-from services.sales.document_cols import _DOC_COLS, _LINE_COLS
+from services.sales.document_access import get_document, lock_for_issue
+from services.sales.document_access import list_documents as list_documents  # noqa: F401
+from services.sales.document_access import status_of as _status_of
+from services.sales.document_access import workspace_and as _ws_and
 from services.sales.document_writes import replace_lines as _replace_lines
 from services.sales.document_writes import write_header_totals as _write_header_totals
 
@@ -49,16 +51,6 @@ DEFAULT_PREFIX = {
 # 取号前的闸(收款 §J3 / 零额)搬去 issue_gates;这里 re-export 保持 doc_svc.* 的既有调用面。
 REQUIRE_PAYMENT = issue_gates.REQUIRE_PAYMENT
 PAYMENT_STATUSES = issue_gates.PAYMENT_STATUSES
-
-
-def _ws_and(workspace_client_id: Optional[int]) -> tuple:
-    """PO-7 主体隔离过滤(按 seller_workspace_client_id)。None→不过滤(向后兼容);
-    给了→限本主体+NULL 未归属行(rollout-safe·PO-8 收口去 IS NULL)。"""
-    if workspace_client_id is None:
-        return "", ()
-    return " AND (seller_workspace_client_id = %s OR seller_workspace_client_id IS NULL)", (
-        int(workspace_client_id),
-    )
 
 
 def _normalize_payment(payment: Optional[dict]) -> dict:
@@ -207,73 +199,6 @@ def create_draft(
     return get_document(cur, tenant_id=tenant_id, doc_id=doc_id)
 
 
-def get_document(
-    cur, *, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
-) -> Optional[dict]:
-    ws_sql, ws_params = _ws_and(workspace_client_id)
-    cur.execute(
-        f"SELECT {_DOC_COLS} FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql}",
-        (tenant_id, doc_id, *ws_params),
-    )
-    doc = cur.fetchone()
-    if not doc:
-        return None
-    doc = dict(doc)
-    cur.execute(
-        f"SELECT {_LINE_COLS} FROM sales_document_lines "
-        "WHERE tenant_id=%s AND document_id=%s ORDER BY line_no",
-        (tenant_id, doc_id),
-    )
-    doc["lines"] = cur.fetchall()
-    return doc
-
-
-def list_documents(
-    cur,
-    *,
-    tenant_id: str,
-    status: Optional[str] = None,
-    client_id: Optional[int] = None,
-    q: Optional[str] = None,
-    limit: int = 100,
-    workspace_client_id: Optional[int] = None,
-) -> list:
-    ws_sql, ws_params = _ws_and(workspace_client_id)
-    sql = f"SELECT {_DOC_COLS} FROM sales_documents WHERE tenant_id=%s{ws_sql}"
-    params: list = [tenant_id, *ws_params]
-    if status:
-        sql += " AND status=%s"
-        params.append(status)
-    if client_id:
-        sql += " AND client_id=%s"
-        params.append(client_id)
-    if q and q.strip():
-        like = f"%{q.strip()}%"
-        sql += " AND (doc_number ILIKE %s OR buyer_name ILIKE %s OR buyer_tax_id ILIKE %s)"
-        params.extend([like, like, like])
-    sql += " ORDER BY created_at DESC LIMIT %s"
-    params.append(limit)
-    cur.execute(sql, params)
-    rows = [dict(row) for row in cur.fetchall()]
-    if not rows:
-        return rows
-    _attach_list_lines(cur, rows, tenant_id=tenant_id)
-    return rows
-
-
-def _status_of(
-    cur, tenant_id: str, doc_id, lock: bool = False, workspace_client_id: Optional[int] = None
-) -> Optional[str]:
-    ws_sql, ws_params = _ws_and(workspace_client_id)
-    cur.execute(
-        f"SELECT status FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql}"
-        + (" FOR UPDATE" if lock else ""),
-        (tenant_id, doc_id, *ws_params),
-    )
-    row = cur.fetchone()
-    return row["status"] if row else None
-
-
 def update_draft(
     cur,
     *,
@@ -297,9 +222,16 @@ def update_draft(
     due_date=None,
     payment_terms=None,
     workspace_client_id: Optional[int] = None,
+    created_by: Optional[str] = None,
 ) -> Optional[str]:
     """改草稿(rejected 单可改 · 改后回草稿态并清驳回理由 §F)。错误码 not_found/not_draft 或 None。"""
-    status = _status_of(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
+    status = _status_of(
+        cur,
+        tenant_id,
+        doc_id,
+        workspace_client_id=workspace_client_id,
+        created_by=created_by,
+    )
     if status is None:
         return "not_found"
     if status not in EDITABLE_STATUSES:
@@ -335,25 +267,6 @@ def update_draft(
     _write_header_totals(cur, tenant_id, doc_id, t)
     _replace_lines(cur, tenant_id, doc_id, t["lines"])
     return None
-
-
-def lock_for_issue(
-    cur, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
-) -> Optional[dict]:
-    """取号前锁行,读出闸校验所需字段(buyer/payment/seller/合计)。供开出/审批通过共用。
-    PO-7:按当前主体过滤(rollout-safe),不能跨主体开别套账的单。
-
-    grand_total 必须在这条 SELECT 里:零额闸拿不到这一列时 row.get 回 None,闸要么放行一切、
-    要么拦死一切 —— 闸能不能成立取决于锁行时读没读它,而不是取决于闸本身写得对不对。"""
-    ws_sql, ws_params = _ws_and(workspace_client_id)
-    cur.execute(
-        "SELECT status, doc_type, seller_workspace_client_id, grand_total, "
-        "buyer_type, buyer_name, buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no, "
-        "payment_status, payment_method, payment_date "
-        f"FROM sales_documents WHERE tenant_id=%s AND id=%s{ws_sql} FOR UPDATE",
-        (tenant_id, doc_id, *ws_params),
-    )
-    return cur.fetchone()
 
 
 def workspace_for_numbering(cur, tenant_id: str, row: dict) -> Optional[int]:
@@ -442,10 +355,17 @@ def issue_document(
     approval_mode: str = "none",
     workspace_client_id: Optional[int] = None,
     tenant_prefix=None,
+    created_by: Optional[str] = None,
 ) -> tuple[Optional[dict], Optional[str]]:
     """正式开出(直开路径 · approval_mode!=none 须走提交→审批 §F)。返回 (doc, error_code);
     买方完整性(§B)/收款(§J)在取号前校验,不过不占号。"""
-    row = lock_for_issue(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
+    row = lock_for_issue(
+        cur,
+        tenant_id,
+        doc_id,
+        workspace_client_id=workspace_client_id,
+        created_by=created_by,
+    )
     if not row:
         return None, "not_found"
     if row["status"] != STATUS_DRAFT:
@@ -466,10 +386,21 @@ def issue_document(
 
 
 def void_document(
-    cur, *, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
+    cur,
+    *,
+    tenant_id: str,
+    doc_id,
+    workspace_client_id: Optional[int] = None,
+    created_by: Optional[str] = None,
 ) -> Optional[str]:
     """作废:留记录、不回收号。返回错误码或 None。"""
-    status = _status_of(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
+    status = _status_of(
+        cur,
+        tenant_id,
+        doc_id,
+        workspace_client_id=workspace_client_id,
+        created_by=created_by,
+    )
     if status is None:
         return "not_found"
     if status == STATUS_VOID:
@@ -484,10 +415,21 @@ def void_document(
 
 
 def delete_draft(
-    cur, *, tenant_id: str, doc_id, workspace_client_id: Optional[int] = None
+    cur,
+    *,
+    tenant_id: str,
+    doc_id,
+    workspace_client_id: Optional[int] = None,
+    created_by: Optional[str] = None,
 ) -> Optional[str]:
     """删除草稿:仅草稿可删(未占连号);已开/已作废不可删。明细行随 FK ON DELETE CASCADE 自动删。"""
-    status = _status_of(cur, tenant_id, doc_id, workspace_client_id=workspace_client_id)
+    status = _status_of(
+        cur,
+        tenant_id,
+        doc_id,
+        workspace_client_id=workspace_client_id,
+        created_by=created_by,
+    )
     if status is None:
         return "not_found"
     if status != STATUS_DRAFT:

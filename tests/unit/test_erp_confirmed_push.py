@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import unittest
+from unittest import mock
+
+from services.erp import confirmed_push
+
+
+class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
+    async def test_member_push_uses_only_owner_assigned_endpoint(self):
+        user = {
+            "id": "member",
+            "tenant_id": "tenant",
+            "entry": "erp",
+            "role": "member",
+        }
+        endpoint = {
+            "id": "assigned",
+            "name": "Owner MR.ERP",
+            "adapter": "mrerp",
+            "enabled": True,
+        }
+        history = {
+            "id": "history",
+            "invoice_no": "INV-1",
+            "seller_name": "Seller",
+            "total_amount": 100,
+        }
+        push_result = {
+            "success": True,
+            "http_status": 200,
+            "request_body": {"adapter": "mrerp"},
+            "response_body": "ok",
+            "error_msg": None,
+            "elapsed_ms": 4,
+        }
+        with (
+            mock.patch.object(
+                confirmed_push.team_access,
+                "assigned_endpoint_for_request",
+                return_value=endpoint,
+            ),
+            mock.patch.object(
+                confirmed_push.shared_express_push,
+                "reserve_managed_manual_push",
+                return_value=None,
+            ),
+            mock.patch.object(
+                confirmed_push.db, "get_ocr_history_detail", return_value=history
+            ) as history_lookup,
+            mock.patch.object(
+                confirmed_push.convert_svc, "history_is_converted", return_value=True
+            ),
+            mock.patch.object(confirmed_push.db, "has_recent_successful_push", return_value=None),
+            mock.patch.object(
+                confirmed_push.erp_push, "push_to_endpoint", return_value=push_result
+            ) as outbound,
+            mock.patch.object(confirmed_push.db, "classify_push_status", return_value="success"),
+            mock.patch.object(
+                confirmed_push.team_access,
+                "insert_assigned_push_log",
+                return_value="log-1",
+            ) as insert_log,
+            mock.patch.object(confirmed_push.db, "insert_push_log") as owner_log,
+            mock.patch.object(confirmed_push.db, "update_endpoint_stats"),
+            mock.patch.object(confirmed_push.db, "update_history_push_status"),
+        ):
+            result = await confirmed_push.dispatch_confirmed_history(
+                user=user,
+                history_id="history",
+                workspace_client_id=7,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["log_id"], "log-1")
+        history_lookup.assert_called_once_with("member", "history")
+        outbound.assert_called_once_with(endpoint, history, posting_kind=None)
+        insert_log.assert_called_once()
+        owner_log.assert_not_called()
+
+    async def test_managed_express_result_returns_without_direct_outbound_push(self):
+        user = {
+            "id": "member",
+            "tenant_id": "tenant",
+            "entry": "erp",
+            "role": "member",
+        }
+        endpoint = {"id": "shared-express", "adapter": "express", "enabled": True}
+        queued = {"ok": True, "status": "pending", "queued": True, "log_id": "log-2"}
+        with (
+            mock.patch.object(
+                confirmed_push.team_access,
+                "assigned_endpoint_for_request",
+                return_value=endpoint,
+            ),
+            mock.patch.object(
+                confirmed_push.db, "get_ocr_history_detail", return_value={"id": "history"}
+            ),
+            mock.patch.object(
+                confirmed_push.shared_express_push,
+                "reserve_managed_manual_push",
+                return_value=queued,
+            ) as reserve,
+            mock.patch.object(confirmed_push.erp_push, "push_to_endpoint") as outbound,
+        ):
+            result = await confirmed_push.dispatch_confirmed_history(
+                user=user,
+                history_id="history",
+                workspace_client_id=7,
+            )
+
+        self.assertEqual(result, queued)
+        self.assertEqual(reserve.call_args.kwargs["endpoint_id"], "shared-express")
+        self.assertEqual(reserve.call_args.kwargs["requested_workspace_id"], 7)
+        outbound.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

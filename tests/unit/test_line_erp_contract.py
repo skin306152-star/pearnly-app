@@ -81,6 +81,12 @@ class ErpFlowTests(unittest.TestCase):
         self.assertIn("mode%3Asales", rendered)
         self.assertNotIn("mode%3Adms", rendered)
 
+    def test_menu_hides_unassigned_sales_mode(self):
+        actions = cards.menu_card(("purchase",))["contents"]["body"]["contents"]
+        rendered = json.dumps(actions, ensure_ascii=False)
+        self.assertIn("mode%3Apurchase", rendered)
+        self.assertNotIn("mode%3Asales", rendered)
+
     def test_sales_preview_uses_buyer_totals_line_items_and_compact_footer(self):
         shaped = preview.from_result(
             {

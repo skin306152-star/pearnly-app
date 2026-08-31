@@ -214,6 +214,27 @@ function _entryGuardRoute(route: string): string {
     if (entry === 'main' && POS_ENTRY_ROUTES.has(route)) return 'dashboard';
     if (entry === 'cowork' && !COWORK_ALLOWED_ROUTES.has(route)) return 'dashboard';
     if (entry === 'erp' && !ERP_ALLOWED_ROUTES.has(route)) return 'dashboard';
+    const team = window._erpTeamAccess;
+    if (entry === 'erp' && team && !team.is_owner) {
+        const routes: Record<string, string[]> = {
+            product: ['stock-card'],
+            purchase: [
+                'purchase',
+                'purchase-form',
+                'purchase-detail',
+                'purchase-export',
+                'purchase-capture',
+            ],
+            sales: ['sales-records', 'sales-record-detail', 'sales-invoices'],
+        };
+        const allowed = new Set<string>();
+        team.modules.forEach((module) => routes[module]?.forEach((item) => allowed.add(item)));
+        if (!allowed.has(route)) {
+            for (const module of ['product', 'purchase', 'sales']) {
+                if (team.modules.includes(module)) return routes[module][0];
+            }
+        }
+    }
     return route;
 }
 

@@ -16,6 +16,7 @@ from core.auth import JWT_ALGORITHM, _jwt_secret, get_current_user_from_request
 from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
 from services.auth.entrance import require_erp_portal
+from services.erp import team_access
 from services.line_erp import store, webhook
 from services.line_platform import client as line_client
 from services.line_platform import webhook_runner as line_webhook_runner
@@ -67,6 +68,9 @@ async def erp_liff_auth(req: LiffAuthIn):
         or str(user.get("tenant_id")) != str(binding.get("tenant_id"))
     ):
         raise HTTPException(403, detail="line_erp.not_bound")
+    user = dict(user)
+    user["entry"] = "erp"
+    team_access.require_active_erp_user(user)
     if not user.get("is_super_admin") and not erp_line_enabled_for(
         binding.get("tenant_id"), binding.get("user_id")
     ):
@@ -200,6 +204,14 @@ def _draft_token(request: Request, draft_id: str) -> tuple[dict, dict, dict]:
         not user
         or not user.get("is_active", True)
         or str(user.get("tenant_id")) != str(binding.get("tenant_id"))
+    ):
+        raise HTTPException(403, detail="line_erp.draft_forbidden")
+    user = dict(user)
+    user["entry"] = "erp"
+    team_access.require_active_erp_user(user)
+    mode = str(payload.get("mode") or "")
+    if mode and not team_access.mode_allowed(
+        str(binding["tenant_id"]), str(binding["user_id"]), mode
     ):
         raise HTTPException(403, detail="line_erp.draft_forbidden")
     return claims, binding, session

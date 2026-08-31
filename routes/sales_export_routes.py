@@ -13,6 +13,7 @@ from core import workspace_context as wc
 from core.pos_api import PosError, ok
 from services.authz.deps import require_perm_tid
 from services.export import google_store
+from services.erp import team_access
 
 router = APIRouter(prefix="/api/sales", tags=["sales-export"])
 
@@ -27,6 +28,7 @@ class SalesExportIn(BaseModel):
 @router.post("/export")
 async def api_sales_export(req: SalesExportIn, request: Request):
     tid, uid = require_perm_tid(request, "sales.doc.view")
+    creator = team_access.record_creator_scope(request)
     if req.format != "drive":
         raise PosError("sales.bad_export_format", 422, detail="bad_format")
 
@@ -41,16 +43,19 @@ async def api_sales_export(req: SalesExportIn, request: Request):
 
     from services.recon_jobs import store as jobs
 
+    params = {
+        "source_type": "sales",
+        "history_ids": list(dict.fromkeys(req.history_ids)),
+        "format": "drive",
+        "lang": req.lang,
+    }
+    if creator:
+        params["created_by"] = creator
     job_id = jobs.enqueue(
         "export",
         user_id=str(uid),
         tenant_id=str(tid),
-        params={
-            "source_type": "sales",
-            "history_ids": list(dict.fromkeys(req.history_ids)),
-            "format": "drive",
-            "lang": req.lang,
-        },
+        params=params,
         workspace_client_id=int(ws),
     )
     if not job_id:

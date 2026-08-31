@@ -28,6 +28,7 @@ from core.auth import get_current_user_from_request
 from routes.history_assign_routes import router as _assign_router
 from core.route_helpers import _check_history_access, _tid, content_disposition
 from services.exceptions.exception_checks import _async_run_exception_checks, _parse_money
+from services.erp import team_access
 from services.intake_bridge import convert as convert_svc, erp_confirmation_access
 from services.intake_bridge import mutable_history_access
 from services.ocr_history.posting_manual import (
@@ -61,10 +62,8 @@ async def history_list(
 ):
     user = get_current_user_from_request(request)
     retention = _check_history_access(user)
-    # 安全限制
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
-    # 白名单收敛(防注入到派生 SQL 分支)
     src = source if source in ("upload", "line", "email") else None
     sts = status if status in ("confirmed", "pending", "failed") else None
     return list_ocr_history(
@@ -73,7 +72,7 @@ async def history_list(
         keyword=keyword.strip() if keyword else None,
         limit=limit,
         offset=offset,
-        tenant_id=_tid(user),
+        tenant_id=team_access.tenant_record_scope(request, user),
         client_id=client_id,  # v118.28.0 · 顶栏客户切换器过滤
         source_filter=src,
         status_filter=sts,
@@ -88,13 +87,10 @@ async def history_list(
 async def history_detail(record_id: str, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
-    # 单条按主键查复核:授权按归属(user_id + tenant)· 不叠加活跃套账软过滤。
-    # 套账过滤是列表的视图收窄,异常单据的 workspace_client_id 常被打成发票对手方
-    # 而非活跃套账,叠加后会把列表里能看到的票挡成 404(与 page.png 同口径)。
     detail = get_ocr_history_detail(
         str(user["id"]),
         record_id,
-        tenant_id=_tid(user),
+        tenant_id=team_access.tenant_record_scope(request, user),
     )
     if not detail:
         raise HTTPException(404, detail="history.not_found")
@@ -111,6 +107,7 @@ async def ocr_commit(req: OcrCommitRequest, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
     tenant_id = _tid(user)
+    team_access.assert_owned_histories(request, user, req.ids)
     guarded = erp_confirmation_access.commit_shared_confirmation(request, user, tenant_id, req.ids)
     if guarded is not None:
         return {"ok": True, "committed": guarded}
@@ -130,7 +127,9 @@ async def ocr_commit(req: OcrCommitRequest, request: Request):
                     "history_ids": unconverted,
                 },
             )
-    n = commit_staged_ocr_history(str(user["id"]), list(req.ids), tenant_id=tenant_id)
+    n = commit_staged_ocr_history(
+        str(user["id"]), list(req.ids), tenant_id=team_access.tenant_record_scope(request, user)
+    )
     return {"ok": True, "committed": n}
 
 
@@ -146,6 +145,7 @@ async def ocr_convert_documents(req: OcrConvertRequest, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
     tenant_id = _tid(user)
+    team_access.assert_owned_histories(request, user, req.history_ids)
     with db.get_cursor_rls(
         tenant_id=tenant_id,
         workspace_client_id=req.workspace_client_id,
@@ -223,10 +223,12 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
     tenant_id = _tid(user)
     ok = mutable_history_access.update_history_pages(request, user, tenant_id, record_id, req.pages)
     if ok is None:
-        ok = update_ocr_history_pages(str(user["id"]), record_id, req.pages, tenant_id=tenant_id)
+        scope_tenant_id = team_access.tenant_record_scope(request, user)
+        ok = update_ocr_history_pages(
+            str(user["id"]), record_id, req.pages, tenant_id=scope_tenant_id
+        )
     if not ok:
         raise HTTPException(404, detail="history.not_found")
-    # v118.18 · 推荐分类「学习」· 用户改了 category 就记忆「seller → category」
     try:
         for p in req.pages or []:
             if p.get("is_duplicate") or p.get("is_copy"):
@@ -244,10 +246,8 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
             break  # 只学主页 · 多页发票其他页是副本不学
     except Exception as _ue:
         logger.warning(f"upsert supplier_category 失败(已忽略): {_ue}")
-    # v118.21.3 · 字段改完后重跑规则 · 让异常自动消失或更新
     rechecked = False
     try:
-        # 取主页字段(跟 OCR 时的 hook 输入一致)
         primary = None
         for p in req.pages or []:
             if p.get("is_duplicate") or p.get("is_copy"):
@@ -259,14 +259,15 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
             seller_name = (f.get("seller_name") or "").strip() or None
             invoice_no = (f.get("invoice_number") or f.get("invoice_no") or "").strip() or None
             total_amount = _parse_money(f.get("total_amount"))
-            # 取 history 的当前 confidence(更新 pages 不会影响 confidence · 复用现值)
-            detail_now = get_ocr_history_detail(str(user["id"]), record_id, tenant_id=_tid(user))
+            detail_now = get_ocr_history_detail(
+                str(user["id"]),
+                record_id,
+                tenant_id=team_access.tenant_record_scope(request, user),
+            )
             confidence = (detail_now or {}).get("confidence")
-            # 1. 删该 history 下所有 pending 异常
             db.delete_pending_exceptions_by_history(
                 record_id, tenant_id=_tid(user), user_id=str(user["id"])
             )
-            # 2. 同步重跑规则(duplicate 不重检 · 因为依赖 OCR 时的指纹比对 · 此处保留为 None)
             await _async_run_exception_checks(
                 history_id=record_id,
                 user_id=str(user["id"]),
@@ -314,7 +315,10 @@ async def history_update_posting(record_id: str, req: HistoryPostingRequest, req
         request, user, tenant_id, record_id, changed
     )
     if result is None:
-        result = update_history_posting_manual(str(user["id"]), record_id, tenant_id, **changed)
+        scope_tenant_id = team_access.tenant_record_scope(request, user)
+        result = update_history_posting_manual(
+            str(user["id"]), record_id, scope_tenant_id, **changed
+        )
     if not result.ok:
         raise HTTPException(404, detail="history.not_found")
     backflow_supplier_profile(
@@ -332,12 +336,12 @@ async def history_update_posting(record_id: str, req: HistoryPostingRequest, req
 async def history_delete(record_id: str, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
-    # v114 · 删除时同步清掉留底的 PDF 文件
     tenant_id = _tid(user)
     guarded = mutable_history_access.delete_histories(request, user, tenant_id, [record_id])
     if guarded is None:
+        scope_tenant_id = team_access.tenant_record_scope(request, user)
         guarded = delete_ocr_history_with_pdf_paths(
-            str(user["id"]), [record_id], tenant_id=tenant_id
+            str(user["id"]), [record_id], tenant_id=scope_tenant_id
         )
     deleted, pdf_paths = guarded
     if deleted == 0:
@@ -380,7 +384,7 @@ async def history_pdf_download(record_id: str, request: Request):
     info = get_history_pdf_info(
         str(user["id"]),
         record_id,
-        tenant_id=_tid(user),
+        tenant_id=team_access.tenant_record_scope(request, user),
     )
     if not info:
         raise HTTPException(404, detail="history.pdf_not_found")
@@ -401,19 +405,12 @@ async def history_pdf_download(record_id: str, request: Request):
 
 @router.get("/api/history/{record_id}/page/{page}.png")
 async def history_page_png(record_id: str, page: int, request: Request):
-    """复核时边看原票边改字段:把留底 PDF 的指定页渲成 PNG 供前端图查看器。
-
-    授权按归属(user_id + tenant)· 不叠加活跃套账过滤:复核中的原图是用户刚上传、
-    自己拥有的记录的视觉辅助;记录的 workspace_client_id 常被打成发票对手方(买/卖方)
-    而非活跃套账,套用列表用的套账软过滤会把刚上传的票挡成 404。归属校验已足够,
-    且用户切套账本就能看到自己全部记录。
-    """
     user = get_current_user_from_request(request)
     _check_history_access(user)
     info = get_history_pdf_info(
         str(user["id"]),
         record_id,
-        tenant_id=_tid(user),
+        tenant_id=team_access.tenant_record_scope(request, user),
     )
     if not info:
         raise HTTPException(404, detail="history.pdf_not_found")
@@ -450,7 +447,8 @@ async def history_batch_delete(req: HistoryBatchDeleteRequest, request: Request)
     tenant_id = _tid(user)
     guarded = mutable_history_access.delete_histories(request, user, tenant_id, list(req.ids))
     if guarded is None:
-        guarded = delete_ocr_history_with_pdf_paths(uid, list(req.ids), tenant_id=tenant_id)
+        scope_tenant_id = team_access.tenant_record_scope(request, user)
+        guarded = delete_ocr_history_with_pdf_paths(uid, list(req.ids), tenant_id=scope_tenant_id)
     deleted, pdf_paths = guarded
     failed = max(0, len(req.ids) - deleted)
     # v114 · 检查每个 PDF 是否还被其他记录引用 · 没人引用才物理删

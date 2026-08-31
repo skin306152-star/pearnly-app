@@ -12,6 +12,7 @@ import unittest
 
 from routes import erp_routes
 from routes import erp_endpoints_routes
+from routes import erp_push_debug_routes
 from routes import erp_push_log_routes
 from routes import erp_routes_access
 from core import route_helpers
@@ -37,7 +38,6 @@ ENDPOINT_PATHS = {
 }
 PUSH_PATHS = {
     ("POST", "/api/erp/push"),
-    ("GET", "/api/erp/logs/{log_id}/debug-xlsx"),
     ("GET", "/api/erp/history/{history_id}/push_status"),
     ("GET", "/api/erp/logs"),
     ("GET", "/api/erp/logs/{log_id}"),
@@ -46,6 +46,7 @@ PUSH_PATHS = {
     ("POST", "/api/erp/logs/batch-retry"),
     ("POST", "/api/erp/logs/batch-delete"),
 }
+PUSH_DEBUG_PATHS = {("GET", "/api/erp/logs/{log_id}/debug-xlsx")}
 CONNECTION_PATHS = {
     ("POST", "/api/erp/test-connection"),
     ("POST", "/api/erp/endpoints/{endpoint_id}/test-connection"),
@@ -58,12 +59,13 @@ CONNECTION_PATHS = {
 class ErpRoutesSplitContractTests(unittest.TestCase):
     def test_aggregated_router_has_all_routes(self):
         got = _paths(erp_routes.router)
-        expected = ENDPOINT_PATHS | PUSH_PATHS | CONNECTION_PATHS
+        expected = ENDPOINT_PATHS | PUSH_PATHS | PUSH_DEBUG_PATHS | CONNECTION_PATHS
         self.assertTrue(expected <= got, f"丢路由: {expected - got}")
 
     def test_submodule_route_subsets(self):
         self.assertEqual(_paths(erp_endpoints_routes.router), ENDPOINT_PATHS)
         self.assertEqual(_paths(erp_push_log_routes.router), PUSH_PATHS)
+        self.assertEqual(_paths(erp_push_debug_routes.router), PUSH_DEBUG_PATHS)
         # connection 组留在 erp_routes,且子路由不重复注册
         self.assertTrue(CONNECTION_PATHS <= _paths(erp_routes.router))
 

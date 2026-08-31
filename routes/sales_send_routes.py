@@ -26,6 +26,7 @@ from services.sales import pdf as pdf_svc
 from services.sales import render as sales_render
 from services.sales import send as send_svc
 from services.sales import share as share_svc
+from services.erp import team_access
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/documents", tags=["sales-send"])
@@ -72,12 +73,13 @@ def _email_content(doc: dict, seller: dict, message: Optional[str]) -> tuple[str
 async def api_send_document(doc_id: str, req: SendIn, request: Request):
     """发送已开票:channel=email 官方代发 PDF;channel=line 出分享链接。各渠道唯一发法,其余拒。"""
     tid, uid = require_perm_tid(request, "sales.doc.approve")
+    creator = team_access.record_creator_scope(request)
     p = req.model_dump() if hasattr(req, "model_dump") else req.dict()
     channel = p["channel"]
     if channel not in ("email", "line"):
         _fail("unsupported_channel", detail=f"sales.unsupported_channel:{channel}")
     with db.get_cursor_rls(tid, commit=True) as cur:
-        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id)
+        doc = doc_svc.get_document(cur, tenant_id=tid, doc_id=doc_id, created_by=creator)
         if not doc:
             _fail("not_found")
         if not doc.get("doc_number"):

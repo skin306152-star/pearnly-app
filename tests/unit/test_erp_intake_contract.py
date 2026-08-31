@@ -52,12 +52,15 @@ class ErpIntakeContractTests(unittest.TestCase):
 
     def test_erp_entry_without_invite_is_rejected(self):
         with self.assertRaises(HTTPException) as ctx:
-            self._authorize({"id": "u1", "tenant_id": "t1", "entry": "erp"}, invited=False)
+            self._authorize(
+                {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"},
+                invited=False,
+            )
         self.assertEqual(ctx.exception.status_code, 404)
         self.assertEqual(ctx.exception.detail, "erp.not_found")
 
     def test_invited_erp_entry_in_same_tenant_is_allowed(self):
-        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"}
         self.assertIs(self._authorize(user), user)
 
     def test_line_declarations_support_mixed_and_reject_missing(self):
@@ -118,7 +121,7 @@ class ErpIntakeContractTests(unittest.TestCase):
 class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
     async def test_erp_commit_rejects_history_without_formal_document(self):
         cur = _Cur()
-        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"}
         with (
             mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
             mock.patch.object(history_routes, "_check_history_access"),
@@ -146,7 +149,7 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_erp_commit_allows_converted_history(self):
         cur = _Cur()
-        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"}
         with (
             mock.patch.object(history_routes, "get_current_user_from_request", return_value=user),
             mock.patch.object(history_routes, "_check_history_access"),
@@ -221,7 +224,7 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
                 detail={"code": "erp.formal_document_required", "history_ids": ["h1"]},
             ),
         )
-        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"}
         for failure in cases:
             with self.subTest(status=failure.status_code):
                 with (
@@ -252,7 +255,7 @@ class ErpWebConfirmTests(unittest.IsolatedAsyncioTestCase):
             "converted": [{"history_id": "h1"}],
             "skipped": [{"history_id": "h2", "reason": "already_converted"}],
         }
-        user = {"id": "u1", "tenant_id": "t1", "entry": "erp"}
+        user = {"id": "u1", "tenant_id": "t1", "entry": "erp", "role": "owner"}
         preflight = history_routes.erp_confirmation_access.ConfirmationPreflight(
             ("purchase", "sales"),
             (),

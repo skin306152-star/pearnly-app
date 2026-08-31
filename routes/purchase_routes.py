@@ -24,6 +24,8 @@ from services.purchase import docs as docs_svc
 from services.purchase import posting as posting_svc
 from services.purchase import reports as reports_svc
 from services.purchase import settings as settings_svc
+from services.purchase import member_scope
+from services.erp import team_access
 
 router = APIRouter(prefix="/api/purchase", tags=["purchase-docs"])
 
@@ -79,6 +81,9 @@ class MatchIn(BaseModel):
     create: Optional[dict] = None
 
 
+_creator_scope = team_access.record_creator_scope
+
+
 @router.post("/docs")
 async def api_create_doc(req: DocIn, request: Request):
     user, tid = auth_member(request, "purchase.doc.create")
@@ -109,7 +114,8 @@ async def api_list_docs(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
 ):
-    _, tid = auth_member(request, "purchase.doc.view")
+    user, tid = auth_member(request, "purchase.doc.view")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -124,6 +130,7 @@ async def api_list_docs(
                 q=q,
                 date_from=date_from,
                 date_to=date_to,
+                created_by=creator,
             )
         )
 
@@ -132,11 +139,18 @@ async def api_list_docs(
 async def api_get_doc(
     doc_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_member(request, "purchase.doc.view")
+    user, tid = auth_member(request, "purchase.doc.view")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        res = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+        res = docs_svc.get_doc(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            doc_id=doc_id,
+            created_by=creator,
+        )
         if res is None:
             raise PosError("purchase.unexpected", 404)
         return ok(res)
@@ -145,9 +159,11 @@ async def api_get_doc(
 @router.put("/docs/{doc_id}")
 async def api_update_doc(doc_id: str, req: DocIn, request: Request):
     user, tid = auth_member(request, "purchase.doc.edit")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
         res = docs_svc.update_draft(
             cur,
@@ -164,9 +180,11 @@ async def api_update_doc(doc_id: str, req: DocIn, request: Request):
 @router.post("/docs/{doc_id}/post")
 async def api_post_doc(doc_id: str, req: PostIn, request: Request):
     user, tid = auth_member(request, "purchase.doc.approve")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
         auto = req.auto_stock_in if req.auto_stock_in is not None else cfg["auto_stock_in"]
         res = posting_svc.post_doc(
@@ -182,10 +200,12 @@ async def api_post_doc(doc_id: str, req: PostIn, request: Request):
 
 @router.post("/docs/{doc_id}/pay")
 async def api_pay_doc(doc_id: str, req: PayIn, request: Request):
-    _, tid = auth_member(request, "purchase.doc.approve")
+    user, tid = auth_member(request, "purchase.doc.approve")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         res = posting_svc.pay_doc(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, amount=req.amount
         )
@@ -195,10 +215,12 @@ async def api_pay_doc(doc_id: str, req: PayIn, request: Request):
 @router.post("/docs/{doc_id}/payment-status")
 async def api_set_payment_status(doc_id: str, req: PaymentStatusIn, request: Request):
     """一键改付款态(列表/卡):paid 付清未付额 / unpaid 撤销付款(PO-5)。"""
-    _, tid = auth_member(request, "purchase.doc.approve")
+    user, tid = auth_member(request, "purchase.doc.approve")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         res = posting_svc.set_payment_status(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, status=req.status
         )
@@ -208,9 +230,11 @@ async def api_set_payment_status(doc_id: str, req: PaymentStatusIn, request: Req
 @router.post("/docs/{doc_id}/void")
 async def api_void_doc(doc_id: str, req: PostIn, request: Request):
     user, tid = auth_member(request, "purchase.doc.approve")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         res = posting_svc.void_doc(
             cur,
             tenant_id=tid,
@@ -228,9 +252,11 @@ async def api_correct_doc(doc_id: str, req: PostIn, request: Request):
     返回新草稿(前端打开编辑)。已结账/已申报期 → acct.period_closed(409)诚实拦,不破账。
     """
     user, tid = auth_member(request, "purchase.doc.approve")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         res = correct_svc.correct_doc(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, created_by=_uid(user)
         )
@@ -241,10 +267,12 @@ async def api_correct_doc(doc_id: str, req: PostIn, request: Request):
 async def api_delete_doc(
     doc_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_member(request, "purchase.doc.delete")
+    user, tid = auth_member(request, "purchase.doc.delete")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         # 级联删单前先查附件 ref(行被 FK CASCADE 删掉就查不到了);delete_doc 抛异常
         # → with 块回滚 + 异常冒泡,下面 purge 永远不会跑到,不会出现「文件没了行还在」。
         refs = attachment_files.collect_doc_refs(
@@ -257,10 +285,12 @@ async def api_delete_doc(
 
 @router.post("/lines/{line_id}/match-product")
 async def api_match_product(line_id: str, req: MatchIn, request: Request):
-    _, tid = auth_member(request, "purchase.doc.edit")
+    user, tid = auth_member(request, "purchase.doc.edit")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_line(cur, tid, ws, line_id, creator)
         res = docs_svc.match_line_product(
             cur,
             tenant_id=tid,
@@ -292,10 +322,12 @@ def _renderer_for(kind: str):
 
 def _gen_credential(request: Request, doc_id: str, ws_override, kind: str):
     """生成凭据(替代收据/扣缴凭证)· owner 限定 · 渲染校验后登记附件。"""
-    _, tid = auth_member(request, "purchase.doc.approve")
+    user, tid = auth_member(request, "purchase.doc.approve")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, ws_override)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         _renderer_for(kind)(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)  # 校验可生成
         att = documents_svc.record_generated(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, kind=kind
@@ -320,12 +352,14 @@ async def api_document_pdf(
     kind: str = Query("substitute_receipt"),
     workspace_client_id: Optional[int] = Query(None),
 ):
-    _, tid = auth_member(request, "purchase.doc.view")
+    user, tid = auth_member(request, "purchase.doc.view")
+    creator = _creator_scope(request, user)
     if documents_svc.get_generated_kind(kind) is None:
         raise PosError("purchase.line_invalid", 422, detail="bad_kind")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         renderer = (
             documents_svc.render_substitute_receipt
             if kind == "substitute_receipt"
@@ -344,9 +378,11 @@ async def api_bill_image(
 ):
     """票图原图(拍票留底)· 鉴权 + 套账边界 · 落盘文件流式返回。idx=第几张(多图相册)。"""
     user, tid = auth_member(request, "purchase.doc.view")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         ref = docs_svc.get_bill_image_ref(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, idx=idx
         )
@@ -376,10 +412,12 @@ async def api_bill_image(
 
 @router.post("/docs/{doc_id}/attachments")
 async def api_add_attachment(doc_id: str, req: AttachmentIn, request: Request):
-    _, tid = auth_member(request, "purchase.doc.edit")
+    user, tid = auth_member(request, "purchase.doc.edit")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        member_scope.assert_doc(cur, tid, ws, doc_id, creator)
         att = documents_svc.add_attachment(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, kind=req.kind, url=req.url
         )
@@ -390,10 +428,12 @@ async def api_add_attachment(doc_id: str, req: AttachmentIn, request: Request):
 async def api_delete_attachment(
     attachment_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_member(request, "purchase.doc.edit")
+    user, tid = auth_member(request, "purchase.doc.edit")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
+        member_scope.assert_attachment(cur, tid, ws, attachment_id, creator)
         ref = documents_svc.delete_attachment(
             cur, tenant_id=tid, workspace_client_id=ws, attachment_id=attachment_id
         )
@@ -443,12 +483,18 @@ async def api_summary(
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
 ):
-    _, tid = auth_member(request, "purchase.doc.view")
+    user, tid = auth_member(request, "purchase.doc.view")
+    creator = _creator_scope(request, user)
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         return ok(
             reports_svc.summary(
-                cur, tenant_id=tid, workspace_client_id=ws, date_from=date_from, date_to=date_to
+                cur,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                date_from=date_from,
+                date_to=date_to,
+                created_by=creator,
             )
         )

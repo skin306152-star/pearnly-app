@@ -17,6 +17,7 @@ from core.pos_api import PosError, ok
 from routes.purchase_common import auth_member, gate, resolve_ws, uid as _uid
 from services.export import archive as archive_svc
 from services.export import google_store
+from services.erp import team_access
 
 router = APIRouter(prefix="/api/purchase", tags=["purchase-export"])
 
@@ -34,6 +35,7 @@ class ExportIn(BaseModel):
 @router.post("/export")
 async def api_export(req: ExportIn, request: Request):
     user, tid = auth_member(request, "purchase.doc.view")
+    creator = team_access.record_creator_scope(request, user)
     fmt = (req.format or "excel").lower()
 
     if fmt == "excel":
@@ -47,6 +49,7 @@ async def api_export(req: ExportIn, request: Request):
                 date_from=req.date_from,
                 date_to=req.date_to,
                 lang=req.lang,
+                created_by=creator,
             )
         return Response(
             content=xlsx,
@@ -67,16 +70,19 @@ async def api_export(req: ExportIn, request: Request):
         # 未授权 → 前端引导去集成中心连 Google 再回来。
         raise PosError("purchase.unexpected", 412, detail="google_not_connected")
 
+    params = {
+        "format": fmt,
+        "date_from": req.date_from,
+        "date_to": req.date_to,
+        "lang": req.lang,
+    }
+    if creator:
+        params["created_by"] = creator
     job_id = jobs.enqueue(
         "export",
         user_id=_uid(user),
         tenant_id=tid,
-        params={
-            "format": fmt,
-            "date_from": req.date_from,
-            "date_to": req.date_to,
-            "lang": req.lang,
-        },
+        params=params,
         workspace_client_id=ws,
     )
     if not job_id:

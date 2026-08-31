@@ -7,12 +7,11 @@ import secrets
 from types import SimpleNamespace
 from urllib.parse import parse_qs
 
-from fastapi import HTTPException
-
 from core import db
 from core.feature_flags import erp_line_enabled_for
+from services.erp import team_access
 from services.intake_bridge import convert as convert_svc
-from services.line_erp import cards, flow, intake, preview, store
+from services.line_erp import cards, draft_view, flow, intake, preview, push as line_push, store
 from services.line_erp.out import make_spawn
 from services.line_platform import client as line_client
 from services.ocr.recognize.core import run_recognition_core
@@ -27,31 +26,8 @@ class BatchIncomplete(Exception):
         self.result = result
 
 
-def draft_records(user_id: str, tenant_id: str, draft_id: str, ids: list[str]) -> list[dict]:
-    from services.ocr_history.queries import get_ocr_history_detail
-
-    records = []
-    for history_id in ids:
-        detail = get_ocr_history_detail(user_id, history_id, tenant_id=tenant_id)
-        if detail is None:
-            raise HTTPException(403, detail="line_erp.draft_forbidden")
-        page_numbers = []
-        for index, page in enumerate(detail.get("pages") or []):
-            raw_number = page.get("page_number") if isinstance(page, dict) else None
-            try:
-                page_number = max(0, int(raw_number or index + 1) - 1)
-            except (TypeError, ValueError):
-                page_number = index
-            if page_number not in page_numbers:
-                page_numbers.append(page_number)
-        page_numbers = page_numbers or [0]
-        detail["preview_urls"] = [
-            f"/api/line/erp/draft/{draft_id}/records/{history_id}/page/{page}.png"
-            for page in page_numbers
-        ]
-        detail["preview_url"] = detail["preview_urls"][0]
-        records.append(detail)
-    return records
+_allowed_modes = team_access.binding_line_modes
+draft_records = draft_view.records
 
 
 async def handle_event(ev: dict) -> None:
@@ -63,10 +39,11 @@ async def handle_event(ev: dict) -> None:
     binding = store.get_binding(line_user_id)
     if binding and not erp_line_enabled_for(binding.get("tenant_id"), binding.get("user_id")):
         return
+    modes = _allowed_modes(binding) if binding else ()
     if ev.get("type") == "follow":
         if reply_token:
             if binding:
-                line_client.reply_messages(reply_token, [cards.menu_card()], channel=CHANNEL)
+                line_client.reply_messages(reply_token, [cards.menu_card(modes)], channel=CHANNEL)
             else:
                 line_client.reply_text(
                     reply_token,
@@ -93,14 +70,31 @@ async def _bind_if_possible(ev: dict, line_user_id: str, reply_token: str | None
     message = ev.get("message") or {}
     if ev.get("type") == "message" and message.get("type") == "text":
         identity = store.consume_code(message.get("text", ""))
-        if identity and erp_line_enabled_for(identity.get("tenant_id"), identity.get("user_id")):
+        if (
+            identity
+            and erp_line_enabled_for(identity.get("tenant_id"), identity.get("user_id"))
+            and team_access.login_allowed(
+                {
+                    "id": identity.get("user_id"),
+                    "tenant_id": identity.get("tenant_id"),
+                    "is_active": True,
+                }
+            )
+        ):
             profile = line_client.get_user_profile(line_user_id, channel=CHANNEL) or {}
             bound = store.bind(identity, line_user_id, profile.get("displayName", ""))
             if reply_token:
                 if bound:
                     line_client.reply_messages(
                         reply_token,
-                        [{"type": "text", "text": "เชื่อมต่อ ERP สำเร็จ"}, cards.menu_card()],
+                        [
+                            {"type": "text", "text": "เชื่อมต่อ ERP สำเร็จ"},
+                            cards.menu_card(
+                                team_access.line_modes(
+                                    str(identity["tenant_id"]), str(identity["user_id"])
+                                )
+                            ),
+                        ],
                         channel=CHANNEL,
                     )
                 else:
@@ -117,7 +111,7 @@ async def _handle_postback(
     action = (params.get("a") or [""])[0]
     if action.startswith("mode:"):
         mode = action.split(":", 1)[1]
-        if mode in flow.MODES:
+        if mode in flow.MODES and mode in _allowed_modes(binding):
             session = store.get_session(binding["tenant_id"], line_user_id) or {}
             if session.get("state") == "ocr_processing":
                 _notify(
@@ -163,11 +157,19 @@ async def _handle_text(
     if text.lower() in _MENU_WORDS:
         store.set_session(binding["tenant_id"], line_user_id, "menu", {})
         if reply_token:
-            line_client.reply_messages(reply_token, [cards.menu_card()], channel=CHANNEL)
+            line_client.reply_messages(
+                reply_token, [cards.menu_card(_allowed_modes(binding))], channel=CHANNEL
+            )
         return
     if text not in ("1", "2"):
         return
     mode = "purchase" if text == "1" else "sales"
+    if mode not in _allowed_modes(binding):
+        if reply_token:
+            line_client.reply_text(
+                reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL
+            )
+        return
     store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
     if reply_token:
         line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
@@ -236,7 +238,7 @@ async def _handle_document(
             )
         return
     mode = (session.get("payload") or {}).get("mode") or ""
-    if mode not in flow.MODES:
+    if mode not in flow.MODES or mode not in _allowed_modes(binding):
         if reply_token:
             line_client.reply_text(
                 reply_token, "กรุณาเลือก 1 ซื้อ หรือ 2 ขาย ก่อนส่งเอกสาร", channel=CHANNEL
@@ -339,6 +341,9 @@ async def act_draft(
                 reply_token, "รายการหมดอายุ กรุณาเปิดรายการใหม่", channel=CHANNEL
             )
         return {"ok": False, "status": 409, "detail": "line_erp.draft_expired"}
+    mode = str(payload.get("mode") or "")
+    if not team_access.mode_allowed(str(binding["tenant_id"]), str(binding["user_id"]), mode):
+        return {"ok": False, "status": 403, "detail": "line_erp.draft_forbidden"}
     user = db.find_user_by_id(binding["user_id"])
     if (
         not user
@@ -362,11 +367,23 @@ async def act_draft(
         result = await _confirm(binding, user, history_id, history_ids, reply_token)
         if not result["ok"]:
             return result
-        text = "ยืนยันเอกสารเรียบร้อยแล้ว"
+        text = (
+            "บันทึกเอกสารและส่งคำสั่งไป ERP แล้ว"
+            if result.get("push_ok")
+            else "บันทึกเอกสารแล้ว แต่ส่ง ERP ไม่สำเร็จ กรุณาตรวจสอบประวัติการส่ง"
+        )
     store.clear_session(binding["tenant_id"], line_user_id)
     if reply_token:
         line_client.reply_text(reply_token, text, channel=CHANNEL)
-    return {"ok": True, "action": action, "history_ids": history_ids}
+    response = {"ok": True, "action": action, "history_ids": history_ids}
+    if action != "discard":
+        response.update(
+            {
+                "push_ok": bool(result.get("push_ok")),
+                "push_results": list(result.get("push_results") or []),
+            }
+        )
+    return response
 
 
 async def _discard(binding: dict, history_ids: list[str]) -> dict:
@@ -464,4 +481,8 @@ async def _confirm(
             "detail": "line_erp.confirm_incomplete",
             "result": exc.result,
         }
-    return {"ok": True}
+    return await line_push.dispatch_confirmed(
+        user=user,
+        binding=binding,
+        history_ids=history_ids,
+    )

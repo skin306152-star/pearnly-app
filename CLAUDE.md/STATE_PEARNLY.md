@@ -2,18 +2,19 @@
 
 ## 当前状态卡 · 08-31 F2 READY_FOR_DEVICE / 待真机用户验收
 
-- **▶ 当前 task**:Zihao 明确指示越过 F1 真机门继续 F2；F2“一个 Companion 进程管理多个隔离 Profile”代码已验证并发布，状态=`READY_FOR_DEVICE`，尚未 `USER_ACCEPTED`，绝不冒充真机闭环。
+- **▶ 当前 task**:F2“一个 Companion 进程管理多个隔离 Profile”候选已升级到 Companion `v1.1.66` / commit=`737b766c8b2dd68372995781a0d14cb69714bfb0`，状态仍为 `READY_FOR_DEVICE`，尚未 `USER_ACCEPTED`，绝不冒充真机闭环。
 - **🎯 F2 结果**:同一安装包/进程/开机项管理 Cowork 与 `/erp` 多个 Express 连接；每 Profile 独立 token、账套、暂停态、heartbeat/lease/ACK；一个公平串行写通道，A 的 401/暂停/离线不阻断 B。
 - **🔐 本地安全**:旧单 Profile 原子迁移为 schema v2；token 仅以 Windows CurrentUser DPAPI 密文落盘；相同物理 account_dir 拒绝；设置重载与退出协作等待当前 DBF 单据安全结束，绝不 `QThread.terminate()` 半路强杀。
-- **🖥 UI**:托盘“Express 连接”可添加、编辑、暂停/恢复、确认移除；显示在线/离线/处理中/需处理/已暂停；中泰文案；变更后只重启唯一 worker。
+- **🖥 UI**:托盘“Express 连接”可添加、编辑、暂停/恢复、确认移除；显示在线/离线/处理中/需处理/已暂停；中泰语言可即时切换、立即持久化并同步管理窗/托盘；变更后只重启唯一 worker。
 - **☁️ 云端裁决**:F1 endpoint/token/heartbeat/lease/ACK 已天然支持同一 companion_id 的多 Profile；未新增 schema、路由或第二套队列。回归 commit=`0c55531e` 已推 origin/master，真 PG 双 endpoint/token 2/2 通过且交叉 ACK 零 mutation。
-- **✅ Companion 验证**:commit=`ceef6be37bc551255d92e9e040297e9bfa0f30e4` 已推 master；69 targeted 通过、1 个仅因本 Mac 无 PySide6 跳过；Ruff/Black/py_compile/diff-check 全绿；DeepSeek 聚焦审查后修 direct-config store 回绑，Sol 审查后修安全停 worker。
-- **🏷 发布结果**:`1.1.65` / tag `v1.1.65` 已推；GitHub release run `33350667135` 虽被账户 Billing 拒绝，但 Windows 兜底构建、生产服务器与公网制品四方校验已通过，不再阻塞本候选。
-- **📦 制品真值**:installer ProductVersion=`1.1.65`；size=`62863621` bytes；SHA-256=`d5157cc7ea92b681d4b9b8cdc5c7387d68eb30405958d70c053442d3db1c8bd4`；生产与公网下载一致。
-- **🌐 更新入口**:`latest.json.version=1.1.65`，URL=`/static/companion/PearnlyCompanion-Setup.exe?v=v1.1.65-ceef6be`；新 query 已实测 HTTP 200，兼容现有版本判定与后续升级。
+- **🔎 现场根因与修复**:`1.1.65` 漏扫并非 Express 不存在：真实入口是桌面 `.lnk`，分别指向 `\\Accserver\d$\ACCOUNT\69EXP` / `70EXP`，旧 locator 不读取快捷方式；`1.1.66` 已加入真实 `.lnk` 发现/解析，并收口中泰即时持久切换。
+- **✅ Companion 验证**:commit=`737b766c8b2dd68372995781a0d14cb69714bfb0` 已推 master；Windows 33 tests 全绿，并已真实解析两条桌面 `.lnk`；本候选未扩大到业务写入或网页/LINE 日常切账套。
+- **🏷 发布结果**:`1.1.66` 已完成 Windows 构建并公开；安装包已放到 Windows 用户 `skin3` 的 Downloads，但尚未覆盖安装，故仍待用户真机验收。
+- **📦 制品真值**:installer ProductVersion=`1.1.66`；size=`62878930` bytes；SHA-256=`ddc1af67ca1781d9618f6dea9250bf82b7aad7fe5bfb1c190c8d4549bcd913a3`。
+- **🌐 更新入口**:`latest.json.version=1.1.66`，URL=`/static/companion/PearnlyCompanion-Setup.exe?v=v1.1.66-737b766`。
 - **🧾 F1 沿袭门**:F1 production candidate=`2dbb7dd0`/manual CD `33329235154`/flag rollout all 仍待老板+员工+Express report 真机证据；本轮只因用户明确指令进入 F2，F1 仍非 `USER_ACCEPTED`。
-- **⏭ 唯一下步**:只执行同一台 Windows 上的 F2 最小真机脚本：Cowork+A 与 `/erp`+B 双账套隔离、暂停不中断、重启持久化、重复目录拒绝、单进程树及旧配置/DPAPI 迁移；等 Zihao 明确 F2 OK。
-- **⏸ F3-F7**:保持 `PLANNED_LOCKED`；F2 真机明确 OK 后才进入 F3 LINE“确认入账并推送 ERP”。
+- **⏭ 唯一下步**:Zihao 在同一台 Windows 从 `skin3\Downloads` 覆盖安装 `v1.1.66`，随后真机验证桌面 `.lnk` 扫描、中泰即时持久切换及 Cowork+A 与 `/erp`+B 双账套隔离；等 Zihao 明确 F2 OK。
+- **⏸ F2 后下一功能**:网页/LINE 日常切公司/账套不在小助手内操作；小助手首次绑定多个 Profile 后常驻。F2 真机明确 OK 后再做网页/LINE 按连接 ID 选目标、预览确认并记住员工上次选择；F3-F7 当前仍 `PLANNED_LOCKED`。
 - **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md` 与 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 
 ---

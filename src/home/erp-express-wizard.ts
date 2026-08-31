@@ -253,6 +253,23 @@
         }
     }
 
+    async function _enableLegacyEndpointForPairing(id: string) {
+        if (!S || !S.ep || S.ep.enabled !== false) return true;
+        if (Number(S.ep.binding_generation || 0) > 0) return false;
+        try {
+            var r = await fetch('/api/erp/endpoints/' + encodeURIComponent(id), {
+                method: 'PATCH',
+                headers: _auth(),
+                body: JSON.stringify({ enabled: true }),
+            });
+            if (!r.ok) return false;
+            S.ep.enabled = true;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function _notice(kind: string, msg: string) {
         var el = $('exp-agent-notice');
         if (el) el.innerHTML = '<div class="exp-notice ' + kind + '">' + _esc(msg) + '</div>';
@@ -307,6 +324,10 @@
         // 下载不再是硬门:已装客户(没点下载)也能直接生成密钥。
         var id = await _ensureEndpoint();
         if (!id) {
+            _notice('danger', _t('exp-token-fail'));
+            return;
+        }
+        if (!(await _enableLegacyEndpointForPairing(id))) {
             _notice('danger', _t('exp-token-fail'));
             return;
         }

@@ -70,3 +70,15 @@ def test_shared_express_card_uses_safe_projection_and_managed_lifecycle():
     assert "/shared/profile/confirm" in card
     assert "expected_generation: generation" in card
     assert "operation_id: operationId()" in card
+
+
+def test_express_pairing_reenables_a_disabled_legacy_endpoint_before_token_issue():
+    wizard = read("src/home/erp-express-wizard.ts")
+    helper = wizard.index("async function _enableLegacyEndpointForPairing")
+    token_flow = wizard.index("async function _genToken")
+    enable_call = wizard.index("await _enableLegacyEndpointForPairing", token_flow)
+    token_issue = wizard.index("'/agent-token'", token_flow)
+    assert helper < token_flow
+    assert "binding_generation || 0" in wizard[helper:token_flow]
+    assert "JSON.stringify({ enabled: true })" in wizard[helper:token_flow]
+    assert enable_call < token_issue

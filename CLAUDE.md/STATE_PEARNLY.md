@@ -1,33 +1,19 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 08-30 F1-B3B3 internal code verification / B3C discovery pending
+## 当前状态卡 · 08-31 F2 code verified / Windows 发版外部阻塞
 
-- **▶ 当前 task**:严格单功能推进 ERP 全闭环;B3B3 已 `INTERNAL_CODE_VERIFIED_NOT_RELEASED`;B3C=`UNBLOCKED_DISCOVERY_PENDING`；B4/B5 仍锁定。
-- **🎯 总目标**:老板网页只配置一次 ERP/小助手和员工权限;员工用个人账号与 LINE 录单、入账、推 ERP、查收发存;Cowork 与 `/erp` 共享底座但绝不串 tenant/单据/状态。
-- **📚 唯一任务板**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`;逐轮证据只记 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
-- **🔒 顺序门**:`F1→F2多Profile→F3 LINE推送→F4离线恢复→F5 Express商品库存→F6 MR.ERP现赊→F7 LINE收发存`;F1-F7 每项 Zihao 真机明确 OK 后才解锁下一项。
-- **✅ F0**:`COMPLETE`;PO、acceptance ledger 与本状态卡已落盘,不作为需真机/用户 OK 的产品功能。
-- **▶ F1 状态**:`IMPLEMENTING`;B1=`57fb5480`、B2=`14b141c2`+测试隔离修=`be959c05` 均已精确部署;F1 仍未到 `CODE_VERIFIED/READY_FOR_DEVICE/USER_ACCEPTED`。
-- **✅ B2 后端范围**:ERP 四权限码与 owner/admin/custom 边界;tenant-flagged custom role 邀请/接受/撤销/scope 并发完整性;flag-on `main/cowork/erp` 确认、编辑、正式单据关联与 actor/workspace/direction 原子门。
-- **🛌 B2 生产证据**:CI `33253769492` 全绿(含真 PG smoke);production HEAD=`be959c05998f185b7bd978975487a1246ec17f39`,service active=`2026-08-29T13:06:04Z`;45/45 tenant 的 `erp_shared_express_endpoint` 有效态均 OFF。
-- **📐 F1 窄边界**:只共享 active Express 手动推送;partial unique 轴=`(tenant_id,workspace_client_id,adapter)`;共享查询/RLS 必须 adapter-gated;MR.ERP/`mrerp_dms` 原样;Companion/auto_push/LINE/多 Profile 不改。
-- **🚩 F1 放量**:`erp_shared_express_endpoint` 继续全租户关闭；形成唯一可用 F1 candidate 后才一次 manual CD、直接 production 启用并真实验收，不做微部署或长期灰度；存量多 endpoint 冲突只阻断并报告,不自动合并，最终 rollout 状态须入 ledger。
-- **🧱 F1-B3A**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;commit/production=`f37f824e`,CI `33292287719` 全绿;45/45 tenant flag OFF;共享 endpoint 只读 DTO/在线态未放量；仅为 F1 内部前置，F1 未完成。
-- **🧱 F1-B3B1**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;commit/origin/production=`3ef91fea4cdbcb2fc1b05abc40f0fb188b663203`;production service active=`2026-08-30T06:30:52Z`;仅 typed binding schema+不可逆 Profile key,无 writer；仅为 F1 内部前置，F1 未完成。
-- **🧱 F1-B3B2a**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;runtime feature SHA=`fd473abd204f3dae864bcd15928333f388c98679`;CI `33301999658` 全绿含 unit/e2e/真 PG smoke/deploy;production exact/readiness/schema 回读通过；仅为 F1 内部前置，F1 未完成。
-- **🛑 B3B2a 运行时边界**:不接 HTTP lifecycle、token/config、heartbeat、push/log/lease/ack、UI、Companion、DMS、MR.ERP、auto/bridge 或独立 SSRF/retry 修复;audit 仅底座未接真实 lifecycle writer。
-- **🧱 F1-B3B2b-1**:`INTERNAL_PREREQUISITE_DEPLOYED_FLAG_OFF`;runtime/enrollment=`a609748955779e2be4935b5cc08c214d57ee881b`;release/gate+production=`4c871b78d60d69644ce4b5a2505053bab4a42a4e`;CI `33309634623` 13/13 success;production service=`2026-08-30T11:53:43Z`, `/api/ready`=200/true;PG=63/63,0 skip;45 flags OFF,36 endpoints generation0/shared_scope0。仅为 F1 内部前置，readiness 仍 `CODE_CANDIDATE_FLAG_OFF_NOT_USABLE_UNTIL_B3B3_AND_B3C`。
-- **🧱 F1-B3B2b-2**:`INTERNAL_CODE_VERIFIED_NOT_RELEASED`;43 lifecycle unittest（参数矩阵以 subTest 保留）、83 全部 PG tests+11 subtests、0 skip；仅代码验证，绝不称 F1/用户功能完成。
-- **🧱 F1-B3B3**:`INTERNAL_CODE_VERIFIED_NOT_RELEASED`;最终 112 targeted unittest + 完整应用 ASGI 覆盖；独立空库 all-PG discover 96 tests/0 skip。managed heartbeat/creator 解耦、tenant+workspace/RLS/ACL、confirm CAS+audit、三组并发、gen0 与 lease-ack 隔离、`clock_timestamp()`、event-loop 均闭环；DeepSeek 最终疑点已反证，Sol 最终无 P0-P2。Companion master `72a92b8`/`1.1.64` 协议不改；B3C 已解锁待 discovery。
-- **⏸ F1-B4/B5**:B4=Console 角色/邀请 UI 与 main/cowork 保存→正式提交→转换成功后推送;B5=冲突清单、测试 tenant 放量、Express 真机/report/owner+员工回归;两批仍锁定。
-- **🧾 F1 验收门**:`/cowork`、`/erp` 各用原 Profile 做 owner 回归+员工采购/销售,Express TEST report 按唯一单号回查;同一候选 production SHA+Companion 版本补证据不加 attempt,用户 OK 后才解锁。
-- **⏸ F2-F7**:`PLANNED_LOCKED`;任何代理不得提前改后项。
-- **📍 发布基线**:`master/origin/master=44c8d1ff`;production exact=`82f03810d3fcb51da8f06a244ca34a8b3b410043` active；production 不含 B3B2b-2/B3B3。CI disabled；在制片段不微部署，合并完整 F1 candidate 后一次 manual CD + 真实验收；状态文档不自引用未提交 SHA。
-- **⚠️ 独立安全微批待修(HIGH)**:generic ERP webhook/test 的 SSRF guard 校验 `system_url`,真实 sink 读取 `url`,endpoint test 未逐跳复验重定向;B3B Express 状态不得调用该 outbound test;B3B1 未修。
-- **⚠️ 独立可靠性微批待修(MEDIUM)**:legacy retry worker 不校验 endpoint.enabled,disabled endpoint 仍可能重试外推;B3B2 对非终态任务先 409,完整 draining/lease 语义归 B3C;B3B1 未修。
-- **⚠️ B3B2b-1 边界**:普通 Express enqueue 的 preflight 无外部副作用，但 promotion race 可能丢队列/写假 history；B3B3 已在内部代码闭环 managed live 与 gen0/lease-ack 隔离，reservation/finalize、drain、managed log/Agent/bridge 仍归 B3C；全 flag OFF 且绝不 READY。
-- **⚠️ 沿袭待办**:ERP LINE 绑定码过期 workspace 导致 `workspace.forbidden`;归 F3 前置核查,不得在 F1 顺手修改。
-- **🧪 当前生产证据**:B3B2b-1 CI 真 PG `63/63`、`0 skip`;生产 helper/trigger/policy/ACL/search_path 回读通过;36 endpoints generation=0/shared_scope=0，所有 tenant flag OFF。B3B3 证据仅属内部未发布代码；F1 仍 `IMPLEMENTING`，未到 READY_FOR_DEVICE/USER_ACCEPTED。
+- **▶ 当前 task**:Zihao 明确指示越过 F1 真机门继续 F2；F2“一个 Companion 进程管理多个隔离 Profile”代码已验证，状态=`RELEASE_BLOCKED`，绝不冒充上线或真机闭环。
+- **🎯 F2 结果**:同一安装包/进程/开机项管理 Cowork 与 `/erp` 多个 Express 连接；每 Profile 独立 token、账套、暂停态、heartbeat/lease/ACK；一个公平串行写通道，A 的 401/暂停/离线不阻断 B。
+- **🔐 本地安全**:旧单 Profile 原子迁移为 schema v2；token 仅以 Windows CurrentUser DPAPI 密文落盘；相同物理 account_dir 拒绝；设置重载与退出协作等待当前 DBF 单据安全结束，绝不 `QThread.terminate()` 半路强杀。
+- **🖥 UI**:托盘“Express 连接”可添加、编辑、暂停/恢复、确认移除；显示在线/离线/处理中/需处理/已暂停；中泰文案；变更后只重启唯一 worker。
+- **☁️ 云端裁决**:F1 endpoint/token/heartbeat/lease/ACK 已天然支持同一 companion_id 的多 Profile；未新增 schema、路由或第二套队列。回归 commit=`0c55531e` 已推 origin/master，真 PG 双 endpoint/token 2/2 通过且交叉 ACK 零 mutation。
+- **✅ Companion 验证**:commit=`ceef6be37bc551255d92e9e040297e9bfa0f30e4` 已推 master；69 targeted 通过、1 个仅因本 Mac 无 PySide6 跳过；Ruff/Black/py_compile/diff-check 全绿；DeepSeek 聚焦审查后修 direct-config store 回绑，Sol 审查后修安全停 worker。
+- **🏷 候选版本**:`1.1.65` / tag `v1.1.65` 已推；GitHub release run `33350667135` 在执行任何 step 前被账户 Actions 账单/消费上限拒绝，非代码失败。
+- **🚫 当前线上**:`latest.json` 回读仍为 `1.1.64`；已配置 Windows 兜底机 `lenovo-office` 的 Tailscale/LAN SSH 均超时，因此本轮没有安装包、ProductVersion 或 SHA-256，F2 不能标 `READY_FOR_DEVICE`。
+- **🧾 F1 沿袭门**:F1 production candidate=`2dbb7dd0`/manual CD `33329235154`/flag rollout all 仍待老板+员工+Express report 真机证据；本轮只因用户明确指令进入 F2，F1 仍非 `USER_ACCEPTED`。
+- **⏭ 唯一下步**:Zihao 处理 GitHub Billing/Actions spending limit，或开机让 `lenovo-office` 可达；随后重跑相同 tag 构建并回读 `latest.json=1.1.65`、installer ProductVersion/SHA-256，再做同机 Cowork+A 与 `/erp`+B 双账套真机验收。
+- **⏸ F3-F7**:保持 `PLANNED_LOCKED`；F2 真机明确 OK 后才进入 F3 LINE“确认入账并推送 ERP”。
+- **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md` 与 `docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`。
 
 ---
 

@@ -109,6 +109,8 @@ Pearnly Cowork LINE 不是聊天机器人，也没有采购/销售方向。它�
 
 LINE 不允许静默加好友；成员必须扫码确认一次。网页轮询绑定状态，收到绑定码后自动切换为“可以使用”。普通 LINE Login 只负责登录，不参与 Cowork 身份绑定。
 
+前端对标以 `/erp#/integrations` 的 Pearnly ERP LINE 为准：保持同一套单列三步、二维码尺寸、六位码、倒计时、“换一个”和自动等待状态；Cowork 只替换产品名称及身份接口，不另创左右分栏绑定界面。
+
 ### C2 · 上传、OCR、Cowork 编辑器
 
 目的：LINE 图片/PDF 只形成 Cowork 待编辑记录。

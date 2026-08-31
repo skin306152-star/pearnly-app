@@ -14,14 +14,16 @@ type Copy = {
     loadError: string;
     retry: string;
     intro: string;
-    setupTitle: string;
     setupDescription: string;
     stepAdd: string;
+    stepAddDescription: string;
     stepCode: string;
+    stepCodeDescription: string;
+    stepWait: string;
+    stepWaitDescription: string;
     scanQr: string;
     openLine: string;
     botId: string;
-    bindingCode: string;
     codeLoading: string;
     codeExpires: string;
     codeExpired: string;
@@ -50,18 +52,20 @@ const COPY: Record<Language, Copy> = {
         loadError: 'โหลดสถานะ LINE ไม่สำเร็จ',
         retry: 'ลองอีกครั้ง',
         intro: 'สมาชิกแต่ละคนเชื่อมต่อ LINE ของตนเองกับบัญชี Pearnly Cowork',
-        setupTitle: 'เชื่อมต่อ Pearnly Cowork LINE',
-        setupDescription: 'สแกนเพื่อเพิ่มเพื่อน แล้วส่งรหัส 6 หลักในห้องแชต',
-        stepAdd: '1. สแกน QR เพื่อเพิ่มเพื่อน',
-        stepCode: '2. ส่งรหัสนี้ใน LINE',
+        setupDescription: 'เชื่อมต่อบัญชีนี้กับ Pearnly Cowork LINE โดยทำตามขั้นตอนด้านล่าง',
+        stepAdd: 'เพิ่ม Pearnly Cowork เป็นเพื่อน',
+        stepAddDescription: 'สแกน QR หรือค้นหาด้วย Bot ID',
+        stepCode: 'ส่งรหัส 6 หลักนี้ให้ Bot',
+        stepCodeDescription: 'รหัสใช้ได้ 10 นาที',
+        stepWait: 'รอให้การเชื่อมต่อเสร็จสิ้น',
+        stepWaitDescription: 'หน้านี้จะอัปเดตอัตโนมัติ',
         scanQr: 'สแกนด้วย LINE',
         openLine: 'เปิดใน LINE',
         botId: 'LINE ID',
-        bindingCode: 'รหัสเชื่อมต่อ',
         codeLoading: 'กำลังสร้างรหัส…',
         codeExpires: 'หมดอายุใน {time}',
         codeExpired: 'รหัสหมดอายุแล้ว',
-        refreshCode: 'ขอรหัสใหม่',
+        refreshCode: 'เปลี่ยนรหัส',
         codeError: 'สร้างรหัสไม่สำเร็จ',
         connectedAs: 'เชื่อมต่อในชื่อ',
         connectedAt: 'เชื่อมต่อเมื่อ',
@@ -84,18 +88,20 @@ const COPY: Record<Language, Copy> = {
         loadError: 'Could not load your LINE status',
         retry: 'Try again',
         intro: 'Each employee connects their own LINE to their Pearnly Cowork account.',
-        setupTitle: 'Connect Pearnly Cowork LINE',
-        setupDescription: 'Scan to add the account, then send the 6-digit code in chat.',
-        stepAdd: '1. Scan the QR code to add friend',
-        stepCode: '2. Send this code in LINE',
+        setupDescription: 'Connect this account to Pearnly Cowork LINE in the steps below.',
+        stepAdd: 'Add Pearnly Cowork as a friend',
+        stepAddDescription: 'Scan the QR code or search by Bot ID.',
+        stepCode: 'Send this 6-digit code to the Bot',
+        stepCodeDescription: 'The code is valid for 10 minutes.',
+        stepWait: 'Wait for binding to finish',
+        stepWaitDescription: 'This page updates automatically.',
         scanQr: 'Scan with LINE',
         openLine: 'Open in LINE',
         botId: 'LINE ID',
-        bindingCode: 'Connection code',
         codeLoading: 'Generating code…',
         codeExpires: 'Expires in {time}',
         codeExpired: 'Code expired',
-        refreshCode: 'Get a new code',
+        refreshCode: 'New code',
         codeError: 'Could not generate a code',
         connectedAs: 'Connected as',
         connectedAt: 'Connected on',
@@ -118,18 +124,20 @@ const COPY: Record<Language, Copy> = {
         loadError: '无法读取你的 LINE 连接状态',
         retry: '重试',
         intro: '每位员工分别把自己的 LINE 绑定到本人的 Pearnly Cowork 账号。',
-        setupTitle: '绑定 Pearnly Cowork LINE',
-        setupDescription: '扫码添加好友，然后在 LINE 对话里发送 6 位绑定码。',
-        stepAdd: '1. 扫码添加好友',
-        stepCode: '2. 在 LINE 发送此绑定码',
+        setupDescription: '按下面步骤，把当前账号绑定到 Pearnly Cowork LINE。',
+        stepAdd: '添加 Pearnly Cowork 为好友',
+        stepAddDescription: '扫描二维码，或在 LINE 搜索下面的 Bot ID。',
+        stepCode: '把这组 6 位数字发给 Bot',
+        stepCodeDescription: '绑定码 10 分钟内有效。',
+        stepWait: '等待绑定完成',
+        stepWaitDescription: '发送成功后，本页会自动显示“已绑定”。',
         scanQr: '使用 LINE 扫码',
         openLine: '在 LINE 打开',
         botId: 'LINE ID',
-        bindingCode: '绑定码',
         codeLoading: '正在生成绑定码…',
         codeExpires: '{time} 后过期',
         codeExpired: '绑定码已过期',
-        refreshCode: '重新获取绑定码',
+        refreshCode: '换一个',
         codeError: '无法生成绑定码',
         connectedAs: '连接账号',
         connectedAt: '连接时间',
@@ -152,18 +160,20 @@ const COPY: Record<Language, Copy> = {
         loadError: 'LINE の連携状態を読み込めませんでした',
         retry: '再試行',
         intro: '従業員ごとに自分の LINE を Pearnly Cowork アカウントへ連携します。',
-        setupTitle: 'Pearnly Cowork LINE を連携',
-        setupDescription: 'QRから友だち追加し、トークで6桁のコードを送信してください。',
-        stepAdd: '1. QRを読み取って友だち追加',
-        stepCode: '2. LINEでこのコードを送信',
+        setupDescription: '次の手順で、このアカウントを Pearnly Cowork LINE に連携します。',
+        stepAdd: 'Pearnly Cowork を友だち追加',
+        stepAddDescription: 'QR コードを読み取るか、Bot ID で検索します。',
+        stepCode: 'この6桁コードを Bot に送信',
+        stepCodeDescription: 'コードの有効期限は10分です。',
+        stepWait: '連携完了を待つ',
+        stepWaitDescription: '送信後、この画面は自動的に更新されます。',
         scanQr: 'LINEで読み取る',
         openLine: 'LINEで開く',
         botId: 'LINE ID',
-        bindingCode: '連携コード',
         codeLoading: 'コードを発行中…',
         codeExpires: '有効期限 {time}',
         codeExpired: 'コードの有効期限が切れました',
-        refreshCode: '新しいコードを取得',
+        refreshCode: '新しいコード',
         codeError: 'コードを発行できませんでした',
         connectedAs: '連携アカウント',
         connectedAt: '連携日時',
@@ -261,11 +271,11 @@ function renderSummary(): void {
 function renderBindingSetup(): string {
     const text = copy();
     const codeContent = codeError
-        ? `<div class="pu-error"><h3 class="pu-error__title">${text.codeError}</h3><button class="pu-btn pu-btn--outline" type="button" data-cowork-line-action="refresh-code">${text.retry}</button></div>`
-        : `<div class="cowork-line-panel__code" data-cowork-line-code>${bindingCode?.code || '••••••'}</div><div class="cowork-line-panel__expires" data-cowork-line-expires>${text.codeLoading}</div><button class="pu-btn pu-btn--outline" type="button" data-cowork-line-action="refresh-code">${text.refreshCode}</button>`;
+        ? `<div class="linebot-error">${text.codeError}</div>`
+        : `<div class="linebot-code" data-cowork-line-code>${bindingCode?.code || '——————'}</div>`;
     const friendUrl = bindingCode?.botFriendUrl || DEFAULT_LINE_URL;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=1&data=${encodeURIComponent(friendUrl)}`;
-    return `<div class="cowork-line-panel__setup"><h3>${text.setupTitle}</h3><p>${text.setupDescription}</p><div class="cowork-line-panel__steps"><section><strong>${text.stepAdd}</strong><div class="cowork-line-panel__qr"><img src="${qrUrl}" alt="${text.scanQr}"></div><div class="cowork-line-panel__bot-id">${text.botId}: <span data-cowork-line-bot-id></span></div><a class="pu-btn pu-btn--outline" href="${friendUrl}" target="_blank" rel="noopener">${text.openLine}</a></section><section><strong>${text.stepCode}</strong><div class="cowork-line-panel__code-box"><span>${text.bindingCode}</span>${codeContent}</div></section></div></div>`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(friendUrl)}`;
+    return `<div class="card linebot-card"><div class="linebot-bind-intro">${text.setupDescription}</div><a class="linebot-open-line" href="${friendUrl}" target="_blank" rel="noopener">${text.openLine}</a><div class="linebot-steps"><div class="linebot-step"><div class="linebot-step-no">1</div><div class="linebot-step-body"><div class="linebot-step-title">${text.stepAdd}</div><div class="linebot-step-desc">${text.stepAddDescription}</div><div class="linebot-qr-wrap"><div class="linebot-qr-box"><img src="${qrUrl}" alt="${text.scanQr}"></div><div class="linebot-bot-id">${text.botId}: <span class="linebot-bot-id-val" data-cowork-line-bot-id></span></div></div></div></div><div class="linebot-step"><div class="linebot-step-no">2</div><div class="linebot-step-body"><div class="linebot-step-title">${text.stepCode}</div><div class="linebot-step-desc">${text.stepCodeDescription}</div><div class="linebot-code-wrap">${codeContent}<button class="btn btn-ghost btn-tiny" type="button" data-cowork-line-action="refresh-code" style="min-height:44px;"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg><span>${codeError ? text.retry : text.refreshCode}</span></button></div><div class="linebot-code-expires" data-cowork-line-expires>${text.codeLoading}</div></div></div><div class="linebot-step"><div class="linebot-step-no">3</div><div class="linebot-step-body"><div class="linebot-step-title">${text.stepWait}</div><div class="linebot-step-desc">${text.stepWaitDescription}</div></div></div></div></div>`;
 }
 
 function renderDrawer(): void {
@@ -281,7 +291,7 @@ function renderDrawer(): void {
         return;
     }
     if (phase !== 'ready') {
-        drawerRoot.innerHTML = `<div class="cowork-line-panel"><p class="cowork-line-panel__intro">${text.intro}</p>${renderBindingSetup()}</div>`;
+        drawerRoot.innerHTML = `<div class="cowork-line-panel">${renderBindingSetup()}</div>`;
         const codeNode = drawerRoot.querySelector<HTMLElement>('[data-cowork-line-code]');
         const botId = drawerRoot.querySelector<HTMLElement>('[data-cowork-line-bot-id]');
         if (codeNode && bindingCode) codeNode.textContent = bindingCode.code;
@@ -325,13 +335,13 @@ function updateCountdown(): void {
     const remaining = bindingCode.expiresAt - Date.now();
     if (remaining <= 0) {
         target.textContent = copy().codeExpired;
-        target.classList.add('is-expired');
+        target.classList.add('expiring');
         return;
     }
     const seconds = Math.floor(remaining / 1000);
     const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
     target.textContent = copy().codeExpires.replace('{time}', time);
-    target.classList.remove('is-expired');
+    target.classList.remove('expiring');
 }
 
 function startCodeTimers(): void {

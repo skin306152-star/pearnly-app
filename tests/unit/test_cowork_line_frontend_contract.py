@@ -28,8 +28,11 @@ def test_cowork_identity_panel_calls_only_the_new_contract():
     assert "subscribeI18n?.('cowork-line-identity'" in source
     assert "friendship_ready" in source
     assert "https://line.me/R/ti/p/@pearnly" in source
-    assert "扫码添加好友" in source
-    assert "绑定码" in source
+    assert 'class="linebot-steps"' in source
+    assert source.count('class="linebot-step-no"') == 3
+    assert "添加 Pearnly Cowork 为好友" in source
+    assert "把这组 6 位数字发给 Bot" in source
+    assert "等待绑定完成" in source
     assert "在 LINE 打开" in source
 
 

@@ -41,7 +41,7 @@ function erpRecords() {
                         ],
                     },
                 },
-                { page_number: 2, fields: { items: [] } },
+                { page_number: 2, fields: { total_amount: '107', items: [] } },
             ],
             preview_urls: [
                 '/api/line/erp/draft/d1/records/h1/page/0.png',
@@ -255,7 +255,14 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
     await page.locator('[data-review-search]').fill('');
     await page.locator('.review-row').first().click();
     await expect(page.locator('.review-original')).toHaveCount(2);
+    await page.locator('[data-field="0:field:total_amount"]').click();
+    await expect(page.locator('[data-review-page="1"]')).toHaveClass(/is-source/);
+    await expect
+        .poll(() => page.locator('[data-review-originals]').evaluate((node) => node.scrollTop))
+        .toBeGreaterThan(0);
     await expect(page.locator('[data-field="0:field:seller_name"]')).toHaveValue('Supplier');
+    await page.locator('[data-field="0:field:seller_name"]').click();
+    await expect(page.locator('[data-review-page="0"]')).toHaveClass(/is-source/);
     await page.locator('[data-field="0:field:seller_name"]').fill('Edited Supplier');
     await page.locator('[data-kind="0:0"]').selectOption('stock');
     await page.locator('[data-review-back]').click();

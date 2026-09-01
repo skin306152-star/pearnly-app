@@ -79,14 +79,21 @@ class SharedEditorSourceTests(unittest.TestCase):
         cowork = (ROOT / "static/cowork-line-intake/index.html").read_text(encoding="utf-8")
         erp = (ROOT / "static/erp-line-intake/index.html").read_text(encoding="utf-8")
         shared = (ROOT / "static/line-intake-review/batch-review.js").read_text(encoding="utf-8")
+        source_page = (ROOT / "static/line-intake-review/source-page.js").read_text(
+            encoding="utf-8"
+        )
         for html in (cowork, erp):
-            self.assertIn("/static/line-intake-review/batch-review.js?v=1", html)
+            self.assertIn("/static/line-intake-review/batch-review.js?v=2", html)
+            self.assertIn("/static/line-intake-review/source-page.js?v=1", html)
             self.assertIn("/static/line-intake-review/liff-runtime.js?v=1", html)
             self.assertIn("data-dialog-title", html)
         self.assertIn("IntersectionObserver", shared)
         self.assertIn("data-review-search", shared)
         self.assertIn("data-filter", shared)
         self.assertIn('data-review-action="confirm"', shared)
+        self.assertIn("fieldPage", source_page)
+        self.assertIn("data-review-page", source_page)
+        self.assertIn("data-source-page", source_page)
         self.assertFalse((ROOT / "static/erp-line-intake/preview.js").exists())
         self.assertFalse((ROOT / "static/erp-line-intake/discard-dialog.js").exists())
 

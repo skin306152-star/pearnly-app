@@ -289,6 +289,7 @@
             if (selectedIndex == null) renderResults();
             else {
                 options.bindDetail(root, selectedIndex, refreshGate);
+                if (window.lineIntakeSourcePage) window.lineIntakeSourcePage.bind(root);
                 hydratePreviews(root);
             }
             refreshGate();

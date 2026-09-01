@@ -37,12 +37,15 @@
         return node.innerHTML;
     }
 
-    function scalarControl(value, path, lang, label) {
+    function scalarControl(value, path, lang, label, sourcePage) {
+        var source = ' data-source-page="' + Number(sourcePage || 0) + '"';
         if (typeof value === 'boolean') {
             return (
                 '<select data-field="' +
                 esc(path) +
-                '"><option value="true"' +
+                '"' +
+                source +
+                '><option value="true"' +
                 (value ? ' selected' : '') +
                 '>' +
                 esc(label(lang, 'true')) +
@@ -55,11 +58,17 @@
         }
         var multiline = /addr|notes/i.test(path);
         return multiline
-            ? '<textarea rows="3" data-field="' + esc(path) + '">' + esc(value) + '</textarea>'
-            : '<input data-field="' + esc(path) + '" value="' + esc(value) + '">';
+            ? '<textarea rows="3" data-field="' +
+                  esc(path) +
+                  '"' +
+                  source +
+                  '>' +
+                  esc(value) +
+                  '</textarea>'
+            : '<input data-field="' + esc(path) + '"' + source + ' value="' + esc(value) + '">';
     }
 
-    function renderFields(fields, recordIndex, lang, label) {
+    function renderFields(fields, recordIndex, lang, label, sourcePage) {
         var keys = ORDER.filter(function (key) {
             return Object.prototype.hasOwnProperty.call(fields, key);
         });
@@ -77,7 +86,13 @@
                         '<label class="field"><span>' +
                         esc(label(lang, key)) +
                         '</span>' +
-                        scalarControl(value, recordIndex + ':' + key, lang, label) +
+                        scalarControl(
+                            value,
+                            recordIndex + ':' + key,
+                            lang,
+                            label,
+                            sourcePage(key)
+                        ) +
                         '</label>'
                     );
                 })
@@ -86,7 +101,7 @@
         );
     }
 
-    function renderItems(fields, recordIndex, lang, label) {
+    function renderItems(fields, recordIndex, lang, label, sourcePage) {
         var items = Array.isArray(fields.items) ? fields.items : [];
         if (!items.length) items.push({ name: '', qty: '', price: '', subtotal: '' });
         return (
@@ -109,7 +124,8 @@
                                         item[key],
                                         recordIndex + ':items:' + itemIndex + ':' + key,
                                         lang,
-                                        label
+                                        label,
+                                        sourcePage(key, itemIndex)
                                     ) +
                                     '</label>'
                                 );

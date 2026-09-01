@@ -2,6 +2,7 @@
     'use strict';
 
     var R = window.lineIntakeBatchReview;
+    var S = window.lineIntakeSourcePage;
     var I = window.coworkIntakeI18n;
     var F = window.coworkFieldEditor;
     var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2);
@@ -255,30 +256,25 @@
     }
 
     function renderOriginals(record) {
-        var urls = R.previewUrls(record);
-        return urls.length
-            ? '<div class="review-originals">' +
-                  urls
-                      .map(function (url) {
-                          return (
-                              '<div class="review-original" data-review-preview="' +
-                              R.escape(url) +
-                              '">' +
-                              R.escape(t('loadingPreview')) +
-                              '</div>'
-                          );
-                      })
-                      .join('') +
-                  '</div>'
-            : '<p class="empty">—</p>';
+        return S.originalsHtml(record, t);
     }
 
     function renderDetail(record, recordIndex) {
         var fields = R.canonicalFields(record);
         return (
             section(t('original'), renderOriginals(record)) +
-            section(t('fields'), F.renderFields(fields, recordIndex, lang, I.label)) +
-            section(t('items'), F.renderItems(fields, recordIndex, lang, I.label))
+            section(
+                t('fields'),
+                F.renderFields(fields, recordIndex, lang, I.label, function (key) {
+                    return S.fieldPage(record, key);
+                })
+            ) +
+            section(
+                t('items'),
+                F.renderItems(fields, recordIndex, lang, I.label, function (_key, itemIndex) {
+                    return S.fieldPage(record, '', itemIndex);
+                })
+            )
         );
     }
 

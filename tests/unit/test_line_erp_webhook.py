@@ -177,7 +177,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 "get_session",
                 return_value={
                     "state": "draft",
-                    "payload": {"history_ids": ["h1", "h2"]},
+                    "payload": {"mode": "purchase", "history_ids": ["h1", "h2"]},
                 },
             ),
             mock.patch.object(webhook.store, "clear_session") as clear_session,
@@ -198,6 +198,8 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                                 "fields": {
                                     "direction": "purchase",
                                     "date": "2026-08-28",
+                                    "seller_name": "Supplier A",
+                                    "total_amount": "100",
                                     "items": [{"name": "A", "qty": "1", "posting_kind": "stock"}],
                                 }
                             }
@@ -209,6 +211,8 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                                 "fields": {
                                     "direction": "purchase",
                                     "date": "2026-08-28",
+                                    "seller_name": "Supplier B",
+                                    "total_amount": "200",
                                     "items": [{"name": "B", "qty": "1", "posting_kind": "service"}],
                                 }
                             }
@@ -244,6 +248,8 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                         "fields": {
                             "direction": "purchase",
                             "date": "2026-09-01",
+                            "seller_name": "Supplier " + name,
+                            "total_amount": "100",
                             "items": [{"name": name, "qty": "1", "posting_kind": "stock"}],
                         }
                     }

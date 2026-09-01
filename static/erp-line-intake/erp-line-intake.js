@@ -2,6 +2,7 @@
     'use strict';
 
     var R = window.lineIntakeBatchReview;
+    var S = window.lineIntakeSourcePage;
     var I = window.erpLineIntakeI18n;
     var F = window.erpLineFieldRenderer;
     var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2);
@@ -118,23 +119,7 @@
     }
 
     function renderOriginals(record) {
-        var urls = R.previewUrls(record);
-        if (!urls.length) return '<p class="hint">—</p>';
-        return (
-            '<div class="review-originals">' +
-            urls
-                .map(function (url) {
-                    return (
-                        '<div class="review-original" data-review-preview="' +
-                        R.escape(url) +
-                        '">' +
-                        R.escape(t('loadingPreview')) +
-                        '</div>'
-                    );
-                })
-                .join('') +
-            '</div>'
-        );
+        return S.originalsHtml(record, t);
     }
 
     function renderDetail(record, recordIndex) {
@@ -147,7 +132,8 @@
                     requiredField(key),
                     recordIndex + ':field:' + key,
                     label,
-                    R.escape
+                    R.escape,
+                    S.fieldPage(record, key)
                 );
             })
             .join('');
@@ -169,7 +155,8 @@
                                 ['name', 'qty'].indexOf(key) >= 0,
                                 recordIndex + ':item:' + itemIndex + ':' + key,
                                 label,
-                                R.escape
+                                R.escape,
+                                S.fieldPage(record, key, itemIndex)
                             );
                         })
                         .join('') +
@@ -179,6 +166,8 @@
                     recordIndex +
                     ':' +
                     itemIndex +
+                    '" data-source-page="' +
+                    S.fieldPage(record, '', itemIndex) +
                     '"><option value="">' +
                     R.escape(t('pick')) +
                     '</option><option value="stock"' +

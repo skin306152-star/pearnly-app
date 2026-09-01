@@ -1,14 +1,17 @@
 (function () {
     'use strict';
 
-    function render(key, value, required, path, label, escapeHtml) {
+    function render(key, value, required, path, label, escapeHtml, sourcePage) {
         var objectValue = value && typeof value === 'object';
         var fieldValue = objectValue ? JSON.stringify(value, null, 2) : value;
+        var source = ' data-source-page="' + Number(sourcePage || 0) + '"';
         var control =
             typeof value === 'boolean'
                 ? '<select data-field="' +
                   escapeHtml(path) +
-                  '"><option value="true"' +
+                  '"' +
+                  source +
+                  '><option value="true"' +
                   (value ? ' selected' : '') +
                   '>true</option><option value="false"' +
                   (!value ? ' selected' : '') +
@@ -17,13 +20,16 @@
                   ? '<textarea data-field="' +
                     escapeHtml(path) +
                     '"' +
+                    source +
                     (required ? ' required' : '') +
                     '>' +
                     escapeHtml(fieldValue) +
                     '</textarea>'
                   : '<input data-field="' +
                     escapeHtml(path) +
-                    '" value="' +
+                    '"' +
+                    source +
+                    ' value="' +
                     escapeHtml(fieldValue == null ? '' : fieldValue) +
                     '"' +
                     (required ? ' required' : '') +

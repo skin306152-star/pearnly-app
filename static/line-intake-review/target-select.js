@@ -84,12 +84,15 @@
             var target = selected();
             if (!target) return null;
             var wanted = String(selection().account_set || target.selected_account_key || '');
-            var row = accountRows().find(function (candidate) {
+            var targetRows = accountRows().filter(function (candidate) {
+                return candidate.target === target;
+            });
+            var row = targetRows.find(function (candidate) {
                 return (
-                    candidate.target === target &&
                     String(candidate.choice.key || candidate.choice.account_set || '') === wanted
                 );
             });
+            if (!row && targetRows.length === 1) row = targetRows[0];
             if (!row) return null;
             if (!selection().account_set) applyAccount(row);
             return row;

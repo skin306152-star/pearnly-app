@@ -149,6 +149,7 @@ class LeaseAckTests(unittest.TestCase):
             res = agent_store.ack("ep-1", "log-1", "agentA", True, express_docnum="RR581231-002")
         self.assertEqual(res["status"], "success")
         self.assertEqual(res["express_docnum"], "RR581231-002")
+        self.assertEqual(res["notification_log_id"], "log-1")
         self.assertTrue(any("status = 'success'" in sql for sql, _ in cur.executed))
 
     def test_ack_records_fallback_line_modes(self):

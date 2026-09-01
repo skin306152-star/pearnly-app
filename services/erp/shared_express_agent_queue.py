@@ -396,7 +396,12 @@ def ack_managed(
             if status in ("success", "manual"):
                 _mirror_history(cur, log.get("history_id"), status)
             if status == "success":
-                return {"ok": True, "status": status, "express_docnum": express_docnum}
+                return {
+                    "ok": True,
+                    "status": status,
+                    "express_docnum": express_docnum,
+                    "notification_log_id": str(log_id),
+                }
             result: Dict[str, Any] = {"ok": True, "status": status, "stage": stage}
             if status == "pending":
                 result["retry"] = True

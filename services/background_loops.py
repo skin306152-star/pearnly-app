@@ -84,6 +84,10 @@ async def run_erp_retry_tick():
                     logger.info(f"[erp_retry] log {log['id']} 关联记录已删 · 停止重试")
                     continue
 
+                from services.erp.retry_target import endpoint_for_retry
+
+                endpoint = endpoint_for_retry(endpoint, log.get("request_body"))
+
                 # 在 worker 线程里跑同步 push(避免阻塞事件循环)
                 result = await _asyncio.to_thread(
                     erp_push.push_to_endpoint,
@@ -114,6 +118,10 @@ async def run_erp_retry_tick():
                 if final_status != "failed":
                     # 重试成功 / 已推送过 · 摘出队列
                     db.clear_retry_schedule(str(log["id"]))
+                    if final_status == "success":
+                        from services.erp.line_push_notification import notify_success
+
+                        await _asyncio.to_thread(notify_success, str(log["id"]))
                     logger.info(f"[erp_retry] log {log['id']} 重试 #{new_count} → {final_status}")
                 else:
                     # 批 1 改动 3 (v118.34.33) · 用户数据错 retry 阶段也要识别 ·
@@ -121,7 +129,7 @@ async def run_erp_retry_tick():
                     if db.is_user_data_error(result.get("error_msg")):
                         db.clear_retry_schedule(str(log["id"]))
                         logger.info(
-                            "[erp_retry] log %s 重试 #%d 命中 user-data 错 · " "停止队列 (err=%r)",
+                            "[erp_retry] log %s 重试 #%d 命中 user-data 错 · 停止队列 (err=%r)",
                             log["id"],
                             new_count,
                             (result.get("error_msg") or "")[:80],

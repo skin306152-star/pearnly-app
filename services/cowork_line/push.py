@@ -70,6 +70,10 @@ def _push_legacy_intent(
             "accepted": False,
             "error_msg": "push_result_unknown",
         }
+    if intent.get("status") == "success":
+        from services.erp.line_push_notification import notify_success
+
+        notify_success(intent["log_id"])
     return {key: value for key, value in intent.items() if key not in {"history", "dispatch"}}
 
 

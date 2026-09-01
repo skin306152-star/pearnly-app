@@ -17,7 +17,7 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core.auth import get_current_user_from_request
@@ -276,27 +276,36 @@ def _run_agent_ack(token: str, req: AckRequest) -> Dict[str, Any]:
         )
         if not res.get("ok"):
             raise HTTPException(409, detail=f"erp.ack_{res.get('reason', 'failed')}")
-        return res
-    try:
-        return managed_agent_queue.ack_managed(
-            token,
-            req.log_id,
-            req.agent_id,
-            success=(req.result == "success"),
-            express_docnum=req.express_docnum,
-            error=req.error,
-            line_modes=req.line_modes,
-            outcome=req.outcome,
-            meta=req.meta,
-        )
-    except managed_agent_queue.ManagedAgentQueueError as exc:
-        raise _managed_error(exc) from exc
+    else:
+        try:
+            res = managed_agent_queue.ack_managed(
+                token,
+                req.log_id,
+                req.agent_id,
+                success=(req.result == "success"),
+                express_docnum=req.express_docnum,
+                error=req.error,
+                line_modes=req.line_modes,
+                outcome=req.outcome,
+                meta=req.meta,
+            )
+        except managed_agent_queue.ManagedAgentQueueError as exc:
+            raise _managed_error(exc) from exc
+    return res
 
 
 @router.post("/api/erp/agent/ack")
-async def erp_agent_ack(req: AckRequest, request: Request):
+async def erp_agent_ack(
+    req: AckRequest, request: Request, background_tasks: BackgroundTasks = None
+):
     """回报录入结果 · success 回填 docnum;waiting_lock 重领不烧次数;失败 attempt+1 超 3 转 manual。"""
     _require_enabled()
     if req.result not in ("success", "failed"):
         raise HTTPException(400, detail="erp.bad_ack_result")
-    return await asyncio.to_thread(_run_agent_ack, _bearer_token(request), req)
+    result = await asyncio.to_thread(_run_agent_ack, _bearer_token(request), req)
+    notification_log_id = result.pop("notification_log_id", None)
+    if notification_log_id and background_tasks is not None:
+        from services.erp.line_push_notification import notify_success
+
+        background_tasks.add_task(notify_success, str(notification_log_id))
+    return result

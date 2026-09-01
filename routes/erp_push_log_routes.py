@@ -16,6 +16,7 @@ from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import DMS, require_erp_portal
 from services.erp import team_access
+from services.erp.retry_target import endpoint_for_retry, request_after_retry
 from core import workspace_context as wc
 
 router = APIRouter()
@@ -158,6 +159,7 @@ async def erp_retry_push(log_id: str, request: Request):
         raise HTTPException(404, detail="history.not_found")
     if not endpoint:
         raise HTTPException(404, detail="erp.endpoint_not_found")
+    endpoint = endpoint_for_retry(endpoint, log.get("request_body"))
 
     # v118.34.10 · asyncio.to_thread keeps push_to_endpoint off the loop.
     import asyncio as _asyncio
@@ -176,11 +178,15 @@ async def erp_retry_push(log_id: str, request: Request):
         response_body=result.get("response_body"),
         error_msg=result.get("error_msg"),
         elapsed_ms=result.get("elapsed_ms", 0),
-        request_body=result.get("request_body"),
+        request_body=request_after_retry(log.get("request_body"), result.get("request_body")),
         final_status=final_status,
     )
     db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
     db.update_history_push_status(log["history_id"], final_status)
+    if final_status == "success":
+        from services.erp.line_push_notification import notify_success
+
+        await _asyncio.to_thread(notify_success, str(log["id"]))
 
     # 用户已亲自重试 · 把原 log 的自动重试队列摘掉(成功/失败/已存在都不再交给 worker)。
     if log.get("next_retry_at"):
@@ -245,6 +251,7 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 skipped += 1
                 details.append({"log_id": log_id, "result": "skipped", "reason": "ref_deleted"})
                 continue
+            endpoint = endpoint_for_retry(endpoint, log.get("request_body"))
 
             # v118.34.10 · asyncio.to_thread keeps push_to_endpoint off the loop.
             import asyncio as _asyncio
@@ -260,11 +267,17 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 response_body=result.get("response_body"),
                 error_msg=result.get("error_msg"),
                 elapsed_ms=result.get("elapsed_ms", 0),
-                request_body=result.get("request_body"),
+                request_body=request_after_retry(
+                    log.get("request_body"), result.get("request_body")
+                ),
                 final_status=final_status,
             )
             db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
             db.update_history_push_status(log["history_id"], final_status)
+            if final_status == "success":
+                from services.erp.line_push_notification import notify_success
+
+                await _asyncio.to_thread(notify_success, str(log["id"]))
             # 跟单个手动重推一样:用户已经亲自管了 · 把原 log 的自动重试队列摘掉
             if log.get("next_retry_at"):
                 db.clear_retry_schedule(log["id"])

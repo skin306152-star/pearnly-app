@@ -75,6 +75,25 @@ class SharedDraftValidationTests(unittest.TestCase):
 
 
 class SharedEditorSourceTests(unittest.TestCase):
+    def test_both_editors_wrap_long_item_names_and_show_queue_state(self):
+        cowork_fields = (ROOT / "static/cowork-line-intake/field-editor.js").read_text(
+            encoding="utf-8"
+        )
+        cowork_css = (ROOT / "static/cowork-line-intake/intake.css").read_text(encoding="utf-8")
+        erp_fields = (ROOT / "static/erp-line-intake/field-renderer.js").read_text(encoding="utf-8")
+        erp_app = (ROOT / "static/erp-line-intake/erp-line-intake.js").read_text(encoding="utf-8")
+        erp_css = (ROOT / "static/erp-line-intake/erp-line-intake.css").read_text(encoding="utf-8")
+        self.assertIn(":items:", cowork_fields)
+        self.assertIn(":item:", erp_fields)
+        for source in (cowork_fields, erp_fields):
+            self.assertIn("textarea", source)
+            self.assertIn("item-field--", source)
+        for css in (cowork_css, erp_css):
+            self.assertIn(".item-field--name", css)
+            self.assertIn("overflow-wrap: anywhere", css)
+        self.assertIn("result.push_ok !== true", erp_app)
+        self.assertIn("waiting ? 'waiting' : 'confirmed'", erp_app)
+
     def test_both_products_use_the_same_batch_runtime_and_old_runtime_is_removed(self):
         cowork = (ROOT / "static/cowork-line-intake/index.html").read_text(encoding="utf-8")
         erp = (ROOT / "static/erp-line-intake/index.html").read_text(encoding="utf-8")

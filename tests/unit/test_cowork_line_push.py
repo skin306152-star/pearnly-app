@@ -50,6 +50,49 @@ class _CursorContext:
 
 
 class CoworkLinePushTest(unittest.IsolatedAsyncioTestCase):
+    def test_retryable_mrerp_failure_is_presented_as_waiting(self):
+        cursor = _Cursor(rowcount=1)
+        intent = {
+            "history_id": "history-1",
+            "log_id": "log-1",
+            "status": "retrying",
+            "accepted": False,
+        }
+        result = {
+            "success": False,
+            "http_status": 503,
+            "request_body": {"adapter": "mrerp"},
+            "response_body": None,
+            "error_msg": "upstream_timeout",
+            "elapsed_ms": 1000,
+        }
+        with (
+            mock.patch.object(
+                push_reservation.db, "get_cursor_rls", return_value=_CursorContext(cursor)
+            ),
+            mock.patch.object(push_reservation, "lock_endpoint_binding"),
+            mock.patch.object(push_reservation, "lock_legacy_endpoint", return_value=True),
+            mock.patch.object(push_reservation.db, "classify_push_status", return_value="failed"),
+            mock.patch.object(
+                push_reservation.db, "counts_as_endpoint_success", return_value=False
+            ),
+            mock.patch.object(push_reservation.db, "is_user_data_error", return_value=False),
+            mock.patch.object(push_reservation.db, "get_erp_retry_delay_sec", return_value=5),
+            mock.patch.object(
+                push_reservation.db, "schedule_log_retry", return_value=True
+            ) as retry,
+        ):
+            finalized = push_reservation.finalize_legacy_intent(
+                IDENTITY, {"id": "endpoint-1"}, intent, result
+            )
+
+        self.assertTrue(finalized)
+        self.assertEqual(intent["status"], "retrying")
+        self.assertTrue(intent["accepted"])
+        retry.assert_called_once_with("log-1", 5)
+        update = next(call for call in cursor.calls if "UPDATE erp_push_logs" in call[0])
+        self.assertIn('"source": "cowork_line"', update[1][2])
+
     def test_reservation_revalidates_active_line_identity_and_both_permissions(self):
         cursor = _Cursor({"role": "member", "invited_by": "owner-1"})
         authz = mock.Mock(

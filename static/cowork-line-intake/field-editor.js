@@ -56,7 +56,7 @@
                 '</option></select>'
             );
         }
-        var multiline = /addr|notes/i.test(path);
+        var multiline = /addr|notes|:items:\d+:name$/i.test(path);
         return multiline
             ? '<textarea rows="3" data-field="' +
                   esc(path) +
@@ -117,7 +117,9 @@
                         keys
                             .map(function (key) {
                                 return (
-                                    '<label class="field"><span>' +
+                                    '<label class="field item-field item-field--' +
+                                    esc(key) +
+                                    '"><span>' +
                                     esc(label(lang, key)) +
                                     '</span>' +
                                     scalarControl(

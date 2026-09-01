@@ -401,7 +401,12 @@ def ack(
                 )
                 _mirror_history_status(cur, log, "success")
                 _bump_created_stock_masters(endpoint_id, line_modes)
-                return {"ok": True, "status": "success", "express_docnum": express_docnum}
+                return {
+                    "ok": True,
+                    "status": "success",
+                    "express_docnum": express_docnum,
+                    "notification_log_id": str(log_id),
+                }
 
             if eff == C.STAGE_WAITING_LOCK:
                 # Express 正占用账套 → 不算失败、不烧次数:保持 pending、放租约,稍后自动重领。

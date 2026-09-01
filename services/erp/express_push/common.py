@@ -392,7 +392,14 @@ _META_STR_KEYS = (
     "stage",
     "error_code",
 )
-_META_BOOL_KEYS = ("created_customer", "created_supplier", "index_requery", "rolled_back")
+_META_BOOL_KEYS = (
+    "created_customer",
+    "created_supplier",
+    "index_requery",
+    "rolled_back",
+    "written",
+    "duplicate_skipped",
+)
 _META_LIST_KEYS = ("tables_written", "created_masters", "cdx_failed_tables")
 _META_MAX_LIST = 40
 

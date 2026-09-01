@@ -7,6 +7,65 @@ from services.erp import confirmed_push
 
 
 class ConfirmedPushTests(unittest.IsolatedAsyncioTestCase):
+    async def test_retryable_first_failure_is_presented_as_waiting(self):
+        user = {"id": "owner", "tenant_id": "tenant", "entry": "erp"}
+        endpoint = {
+            "id": "endpoint-1",
+            "name": "MR.ERP",
+            "adapter": "mrerp",
+            "enabled": True,
+            "config": {"comidyear": "6", "seldb": "1"},
+        }
+        history = {
+            "id": "history",
+            "invoice_no": "INV-1",
+            "seller_name": "Seller",
+            "total_amount": 100,
+        }
+        failure = {
+            "success": False,
+            "http_status": 503,
+            "request_body": {"adapter": "mrerp"},
+            "response_body": None,
+            "error_msg": "upstream_timeout",
+            "elapsed_ms": 1000,
+        }
+        with (
+            mock.patch.object(
+                confirmed_push.team_access, "assigned_endpoint_for_request", return_value=None
+            ),
+            mock.patch.object(
+                confirmed_push.shared_express_push,
+                "reserve_managed_manual_push",
+                return_value=None,
+            ),
+            mock.patch.object(confirmed_push.db, "get_ocr_history_detail", return_value=history),
+            mock.patch.object(
+                confirmed_push.convert_svc, "history_is_converted", return_value=True
+            ),
+            mock.patch.object(confirmed_push.db, "get_erp_endpoint", return_value=endpoint),
+            mock.patch.object(confirmed_push.db, "has_recent_successful_push", return_value=None),
+            mock.patch.object(confirmed_push.erp_push, "push_to_endpoint", return_value=failure),
+            mock.patch.object(confirmed_push.db, "classify_push_status", return_value="failed"),
+            mock.patch.object(confirmed_push.db, "insert_push_log", return_value="log-1") as log,
+            mock.patch.object(confirmed_push.db, "update_endpoint_stats"),
+            mock.patch.object(confirmed_push.db, "update_history_push_status"),
+            mock.patch.object(confirmed_push.db, "is_user_data_error", return_value=False),
+            mock.patch.object(confirmed_push.db, "get_erp_retry_delay_sec", return_value=5),
+            mock.patch.object(confirmed_push.db, "schedule_log_retry", return_value=True) as retry,
+        ):
+            result = await confirmed_push.dispatch_confirmed_history(
+                user=user,
+                history_id="history",
+                endpoint_id="endpoint-1",
+                workspace_client_id=7,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "retrying")
+        self.assertEqual(log.call_args.kwargs["request_body"]["source"], "line_erp")
+        retry.assert_called_once_with("log-1", 5)
+
     async def test_member_push_uses_only_owner_assigned_endpoint(self):
         user = {
             "id": "member",

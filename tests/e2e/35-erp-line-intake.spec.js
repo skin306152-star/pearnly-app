@@ -117,6 +117,7 @@ async function openErp(
         draftRecords = erpRecords(),
         direction = 'purchase',
         adapter = 'express',
+        confirmStatus = 'success',
         draftQuery,
     } = {}
 ) {
@@ -214,10 +215,21 @@ async function openErp(
             return previewResponse(route, previewHeaders);
         }
         requests.push({ method: request.method(), path: pathname, body: request.postData() || '' });
+        const confirmed = pathname.endsWith('/confirm');
         return route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ ok: true, data: { ok: true } }),
+            body: JSON.stringify({
+                ok: true,
+                data: confirmed
+                    ? {
+                          ok: true,
+                          push_ok: confirmStatus !== 'failed',
+                          status: confirmStatus,
+                          push_results: [{ status: confirmStatus }],
+                      }
+                    : { ok: true },
+            }),
         });
     });
     await page.route('**/api/line/erp/draft/d1', async (route) => {
@@ -327,7 +339,7 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
     const page = await browser.newPage({ ...devices['iPhone 13'] });
     const run = await openErp(page);
     await expect(page.locator('.target-locked')).toHaveText('Express');
-    await expect(page.locator('[data-target-account-set]')).toHaveValue('express-1:69');
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('express-1:69::MAIN');
     await expect(page.locator('[data-target-selection="posting_kind"]')).toHaveValue('stock');
     await page.screenshot({
         path: path.join(OUT, 'erp-mobile-target-selection.png'),
@@ -349,6 +361,12 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
     await page.locator('[data-field="0:field:seller_name"]').click();
     await expect(page.locator('[data-review-page="0"]')).toHaveClass(/is-source/);
     await page.locator('[data-field="0:field:seller_name"]').fill('Edited Supplier');
+    const longName = 'SMR Cushion 02 รุ่นพิเศษสำหรับสาขาทดลองชื่อสินค้ายาวมาก';
+    await expect(page.locator('[data-field="0:item:0:name"]')).toHaveJSProperty(
+        'tagName',
+        'TEXTAREA'
+    );
+    await page.locator('[data-field="0:item:0:name"]').fill(longName);
     await page.locator('[data-kind="0:0"]').selectOption('stock');
     await page.locator('[data-review-back]').click();
     await page.locator('.review-row').nth(1).click();
@@ -367,7 +385,7 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
     expect(saved.records.map((record) => record.id)).toEqual(['h1', 'h2']);
     expect(saved.records[0].pages[0].fields.seller_name).toBe('Edited Supplier');
     expect(saved.records[0].pages[0].fields.items[0]).toMatchObject({
-        name: 'Widget',
+        name: longName,
         qty: '1',
         price: '100',
         posting_kind: 'stock',
@@ -388,17 +406,28 @@ test('editor locks the conversation ERP and only switches its account set', asyn
     await openErp(page, { adapter: 'mrerp', direction: 'sales' });
     await expect(page.locator('.target-locked')).toHaveText('MR.ERP');
     await expect(page.locator('[data-target-account-set] option')).toHaveCount(2);
-    await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-1:70');
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-1:70::Client A');
     await expect(page.locator('[data-target-account-set]')).not.toContainText('Express');
     await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
     await page.locator('.review-row').first().click();
     await expect(page.locator('[data-kind]')).toHaveCount(0);
     await page.locator('[data-review-back]').click();
-    await page.locator('[data-target-account-set]').selectOption('mrerp-2:72');
-    await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-2:72');
+    await page.locator('[data-target-account-set]').selectOption('mrerp-2:72::Client B');
+    await expect(page.locator('[data-target-account-set]')).toHaveValue('mrerp-2:72::Client B');
     await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
     await expect(page.locator('[data-kind]')).toHaveCount(0);
     await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
+});
+
+test('retryable ERP result is shown as waiting instead of final failure', async ({ page }) => {
+    await openErp(page, {
+        adapter: 'mrerp',
+        direction: 'purchase',
+        confirmStatus: 'retrying',
+    });
+    await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
+    await page.locator('[data-review-action="confirm"]').click();
+    await expect(page.locator('#state')).toContainText('รับรายการแล้ว กำลังส่งไปยัง ERP');
 });
 
 test('ERP desktop filters anomalies and uses the shared discard dialog', async ({ browser }) => {

@@ -44,10 +44,14 @@ async def dispatch_confirmed(
                 "error_msg": type(exc).__name__,
             }
         results.append({"history_id": history_id, **pushed})
+    statuses = {str(row.get("status") or "failed") for row in results}
     return {
         "ok": True,
         "push_ok": bool(results) and all(row.get("ok") for row in results),
         "push_results": results,
+        "status": (
+            next(iter(statuses)) if len(statuses) == 1 else ("mixed" if results else "failed")
+        ),
     }
 
 

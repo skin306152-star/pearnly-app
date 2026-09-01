@@ -252,6 +252,7 @@ def reserve_managed_batch(
                     raise HTTPException(409, detail="erp.formal_direction_mismatch")
                 request_body = dict(payload)
                 request_body["managed_generation"] = int(endpoint["binding_generation"])
+                request_body["source"] = "cowork_line"
                 cur.execute(
                     "INSERT INTO erp_push_logs "
                     "(user_id,endpoint_id,history_id,invoice_no,seller_name,total_amount,status,"
@@ -430,6 +431,8 @@ def finalize_legacy_intent(
     endpoint_id = str(endpoint["id"])
     status = db.classify_push_status(bool(result.get("success")), result.get("error_msg"))
     request_body = result.get("request_body")
+    request_body = dict(request_body) if isinstance(request_body, dict) else {}
+    request_body["source"] = "cowork_line"
     response_body = result.get("response_body")
     if response_body is not None and not isinstance(response_body, str):
         response_body = json.dumps(response_body, ensure_ascii=False)
@@ -471,14 +474,16 @@ def finalize_legacy_intent(
                 "last_status = %s WHERE id = %s AND binding_generation = 0",
                 ("success" if counter == "success_count" else "failed", endpoint_id),
             )
+        retry_scheduled = False
         if status == "failed" and not db.is_user_data_error(result.get("error_msg")):
             delay = db.get_erp_retry_delay_sec(0)
             if delay is not None:
-                db.schedule_log_retry(intent["log_id"], delay)
+                retry_scheduled = bool(db.schedule_log_retry(intent["log_id"], delay))
+        presented_status = "retrying" if retry_scheduled else status
         intent.update(
             {
-                "status": status,
-                "accepted": status in {"success", "pending", "skipped_dup"},
+                "status": presented_status,
+                "accepted": presented_status in {"success", "pending", "retrying", "skipped_dup"},
                 "error_msg": result.get("error_msg"),
             }
         )

@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from routes import erp_agent
 from routes import erp_shared_express_profile_routes as profile_routes
+from services.erp import line_push_notification
 
 
 def _app(router):
@@ -186,6 +187,42 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
         ack.assert_not_called()
         managed_lease.assert_called_once_with(token, "managed-agent", 1)
         managed_ack.assert_called_once()
+
+    def test_first_success_ack_sends_line_receipt_without_exposing_internal_id(self):
+        with (
+            mock.patch.object(erp_agent, "_require_enabled"),
+            mock.patch.object(
+                erp_agent.agent_store,
+                "authenticate",
+                return_value={"id": "endpoint-1", "enabled": True},
+            ),
+            mock.patch.object(
+                erp_agent.agent_store,
+                "ack",
+                return_value={
+                    "ok": True,
+                    "status": "success",
+                    "notification_log_id": "log-1",
+                },
+            ),
+            mock.patch.object(
+                line_push_notification, "notify_success", return_value=True
+            ) as notify,
+        ):
+            response = self.client.post(
+                "/api/erp/agent/ack",
+                headers={"Authorization": "Bearer token"},
+                json={
+                    "log_id": "log-1",
+                    "result": "success",
+                    "agent_id": "agent-1",
+                    "express_docnum": "HS681224-001",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True, "status": "success"})
+        notify.assert_called_once_with("log-1")
 
     def test_generation_zero_heartbeat_keeps_legacy_http_contract(self):
         from app import app

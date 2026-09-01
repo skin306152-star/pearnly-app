@@ -107,11 +107,23 @@ h2 {
 }
 .item-row {
   display: grid;
-  grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(90px, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 9px;
   padding: 12px;
   border-radius: 10px;
   background: var(--bg);
+}
+.item-field {
+  grid-column: span 3;
+}
+.item-field--name {
+  grid-column: 1 / -1;
+}
+.item-field--name textarea {
+  min-height: 68px;
+  line-height: 1.45;
+  resize: vertical;
+  overflow-wrap: anywhere;
 }
 .dialog__panel h2 {
   font-size: 18px;
@@ -126,5 +138,11 @@ h2 {
   }
   .item-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .item-field {
+    grid-column: span 1;
+  }
+  .item-field--name {
+    grid-column: 1 / -1;
   }
 }

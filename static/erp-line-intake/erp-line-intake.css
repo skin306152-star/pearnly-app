@@ -99,9 +99,34 @@ textarea {
 .item:first-child {
   border-top: 0;
 }
+.item .grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.item-field {
+  grid-column: span 3;
+  min-width: 0;
+}
+.item-field--name {
+  grid-column: 1 / -1;
+}
+.item-field--name textarea {
+  min-height: 68px;
+  line-height: 1.45;
+  resize: vertical;
+  overflow-wrap: anywhere;
+}
 @media (max-width: 600px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+  .item .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .item-field {
+    grid-column: span 1;
+  }
+  .item-field--name {
+    grid-column: 1 / -1;
   }
   .section {
     padding: 15px;

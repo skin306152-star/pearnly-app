@@ -165,7 +165,7 @@
                     if (key !== 'posting_kind' && keys.indexOf(key) < 0) keys.push(key);
                 });
                 var posting = expressTarget()
-                    ? '<div class="field"><label>' +
+                    ? '<div class="field item-field item-field--posting"><label>' +
                       R.escape(t('kind')) +
                       ' *</label><select data-kind="' +
                       recordIndex +
@@ -292,12 +292,32 @@
                           : null;
                   });
         request
-            .then(function () {
-                show(
-                    action === 'save' ? 'saved' : action === 'confirm' ? 'confirmed' : 'discarded'
-                );
-                if (action === 'save') review.render();
-                else form.hidden = true;
+            .then(function (result) {
+                if (action === 'save') {
+                    show('saved');
+                    review.render();
+                    return;
+                }
+                if (action === 'discard') {
+                    form.hidden = true;
+                    show('discarded');
+                    return;
+                }
+                if (!result || result.ok !== true) {
+                    show('failed', 'error');
+                    return;
+                }
+                form.hidden = true;
+                if (result.push_ok !== true) {
+                    show('pushFailed', 'error');
+                    return;
+                }
+                var waiting =
+                    /pending|queued|retrying/.test(result.status || '') ||
+                    (result.push_results || []).some(function (row) {
+                        return /pending|queued|retrying/.test(row.status || '');
+                    });
+                show(waiting ? 'waiting' : 'confirmed');
             })
             .catch(function (error) {
                 show(error.status === 401 || error.status === 403 ? 'expired' : 'failed', 'error');

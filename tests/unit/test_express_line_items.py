@@ -39,12 +39,16 @@ class SanitizePushMetaTests(unittest.TestCase):
                 "companion_version": "1.1.13",
                 "doc_type": "sales",
                 "created_customer": 1,
+                "written": 1,
+                "duplicate_skipped": 0,
                 "tables_written": ["ARTRN", "STCRD", "ISVAT"],
                 "evil": "x" * 9999,  # 非白名单 → 丢
             }
         )
         self.assertEqual(m["companion_version"], "1.1.13")
         self.assertIs(m["created_customer"], True)
+        self.assertIs(m["written"], True)
+        self.assertIs(m["duplicate_skipped"], False)
         self.assertEqual(m["tables_written"], ["ARTRN", "STCRD", "ISVAT"])
         self.assertNotIn("evil", m)
 

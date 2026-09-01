@@ -16,6 +16,13 @@ from services.intake_bridge import convert as convert_svc
 logger = logging.getLogger("mr-pilot")
 
 
+def _request_source(user: dict[str, Any]) -> str:
+    return {
+        "cowork": "cowork_line",
+        "erp": "line_erp",
+    }.get(str(user.get("entry") or ""), "main")
+
+
 async def dispatch_confirmed_history(
     *,
     user: dict[str, Any],
@@ -89,7 +96,7 @@ async def dispatch_confirmed_history(
     endpoint_config = endpoint.get("config") or {}
     if str(endpoint.get("adapter") or "").lower() == "mrerp":
         selected_account = (
-            f"{endpoint_config.get('comidyear') or '6'}:" f"{endpoint_config.get('seldb') or '1'}"
+            f"{endpoint_config.get('comidyear') or '6'}:{endpoint_config.get('seldb') or '1'}"
         )
     else:
         selected_account = str(endpoint_config.get("account_set") or "").strip()
@@ -152,6 +159,9 @@ async def dispatch_confirmed_history(
         posting_kind=posting_kind,
     )
     final_status = db.classify_push_status(result["success"], result.get("error_msg"))
+    request_body = result.get("request_body")
+    request_body = dict(request_body) if isinstance(request_body, dict) else {}
+    request_body["source"] = _request_source(user)
     log_args = {
         "endpoint_id": str(endpoint["id"]),
         "history_id": history_id,
@@ -160,7 +170,7 @@ async def dispatch_confirmed_history(
         "total_amount": history.get("total_amount"),
         "status": final_status,
         "http_status": result.get("http_status"),
-        "request_body": result.get("request_body"),
+        "request_body": request_body,
         "response_body": result.get("response_body"),
         "error_msg": result.get("error_msg"),
         "attempt": 1,
@@ -174,15 +184,23 @@ async def dispatch_confirmed_history(
     db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
     db.update_history_push_status(history_id, final_status)
 
+    retry_scheduled = False
     if final_status == "failed" and log_id and not db.is_user_data_error(result.get("error_msg")):
         first_delay = db.get_erp_retry_delay_sec(0)
         if first_delay is not None:
-            db.schedule_log_retry(str(log_id), first_delay)
+            retry_scheduled = bool(db.schedule_log_retry(str(log_id), first_delay))
+
+    if final_status == "success" and log_id:
+        from services.erp.line_push_notification import notify_success
+
+        await asyncio.to_thread(notify_success, str(log_id))
+
+    presented_status = "retrying" if retry_scheduled else final_status
 
     return {
-        "ok": result["success"] or final_status == "skipped_dup",
+        "ok": bool(result["success"] or final_status == "skipped_dup" or retry_scheduled),
         "log_id": log_id,
-        "status": final_status,
+        "status": presented_status,
         "skipped_dup": final_status == "skipped_dup",
         "http_status": result.get("http_status"),
         "error_msg": result.get("error_msg"),

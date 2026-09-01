@@ -201,7 +201,7 @@ def list_logs_due_for_retry(limit: int = 20) -> List[Dict[str, Any]]:
                 """
                 SELECT l.id, l.user_id, l.endpoint_id, l.history_id,
                        l.invoice_no, l.seller_name, l.total_amount,
-                       l.retry_count, l.max_retries, l.next_retry_at
+                       l.retry_count, l.max_retries, l.next_retry_at, l.request_body
                 FROM erp_push_logs l
                 JOIN erp_endpoints endpoint
                   ON endpoint.id = l.endpoint_id

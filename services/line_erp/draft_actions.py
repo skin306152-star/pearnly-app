@@ -96,6 +96,7 @@ async def act_draft(
             {
                 "push_ok": bool(result.get("push_ok")),
                 "push_results": list(result.get("push_results") or []),
+                "status": str(result.get("status") or "failed"),
             }
         )
     return response

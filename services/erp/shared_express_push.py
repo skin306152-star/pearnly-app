@@ -355,6 +355,10 @@ def reserve_managed_manual_push(
             raise HTTPException(409, detail="erp.formal_direction_mismatch")
         request_body = dict(payload)
         request_body["managed_generation"] = int(endpoint["binding_generation"])
+        request_body["source"] = {
+            "cowork": "cowork_line",
+            "erp": "line_erp",
+        }.get(str(user.get("entry") or ""), "main")
         cur.execute(
             "INSERT INTO erp_push_logs "
             "(user_id,endpoint_id,history_id,invoice_no,seller_name,total_amount,status,http_status,"

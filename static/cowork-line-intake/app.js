@@ -5,6 +5,7 @@
     var S = window.lineIntakeSourcePage;
     var I = window.coworkIntakeI18n;
     var F = window.coworkFieldEditor;
+    var T = window.lineIntakeTargetSelect;
     var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2);
     var state = document.getElementById('state');
     var form = document.getElementById('editor');
@@ -12,6 +13,7 @@
     var draftId = '';
     var busy = false;
     var review = null;
+    var targetSelect = null;
 
     function t(key, values) {
         return I.text(lang, key, values);
@@ -35,220 +37,16 @@
         return model && Array.isArray(model.records) ? model.records : [];
     }
 
-    function targets() {
-        return model && Array.isArray(model.targets) ? model.targets : [];
-    }
-
-    function selection() {
-        return model.selection || (model.selection = {});
-    }
-
-    function targetId(target) {
-        return String(target.endpoint_id || target.id || '');
-    }
-
-    function targetKey(target) {
-        return (
-            targetId(target) +
-            ':' +
-            String(target.workspace_client_id == null ? 'auto' : target.workspace_client_id)
-        );
-    }
-
-    function selectedTarget() {
-        return targets().find(function (target) {
-            return (
-                targetId(target) === String(selection().endpoint_id || '') &&
-                String(target.workspace_client_id == null ? '' : target.workspace_client_id) ===
-                    String(
-                        selection().workspace_client_id == null
-                            ? ''
-                            : selection().workspace_client_id
-                    )
-            );
-        });
-    }
-
-    function isBlocked(target) {
-        return (
-            !target ||
-            target.selectable === false ||
-            target.configured === false ||
-            Boolean(target.block_reason) ||
-            (Array.isArray(target.missing) && target.missing.length > 0)
-        );
-    }
-
-    function targetStatus(target) {
-        var checks = target.ready_checks || {};
-        var connected = checks.erp_connection;
-        if (connected == null) {
-            connected = /online|configured/.test(String(target.connection_state || ''));
-        }
-        var values = [connected ? 'connected' : 'disconnected'];
-        if (checks.companion_online != null) {
-            values.push(checks.companion_online ? 'online' : 'offline');
-        }
-        if (checks.profile_matches != null) {
-            values.push(checks.profile_matches ? 'matched' : 'unmatched');
-        }
-        if (checks.local_account_lock === 'waiting_lock') values.push('occupied');
-        else if (checks.cloud_in_flight) values.push('inFlight');
-        values.push(
-            checks.document_preflight == null
-                ? 'preflightPending'
-                : checks.document_preflight
-                  ? 'available'
-                  : 'occupied'
-        );
-        return values
-            .map(function (key) {
-                return (
-                    '<span class="check ' +
-                    (/disconnected|offline|unmatched|occupied/.test(key) ? 'bad' : '') +
-                    '">' +
-                    R.escape(t(key)) +
-                    '</span>'
-                );
-            })
-            .join('');
-    }
-
     function targetPanel() {
-        var options = targets()
-            .map(function (target) {
-                var workspace =
-                    target.workspace_label ||
-                    target.workspace_name ||
-                    (target.workspace_client_id == null
-                        ? t('autoWorkspace')
-                        : t('workspace') + ' #' + target.workspace_client_id);
-                return (
-                    '<button type="button" class="target-card' +
-                    (selectedTarget() === target ? ' active' : '') +
-                    (isBlocked(target) ? ' blocked' : '') +
-                    '" data-target="' +
-                    R.escape(targetKey(target)) +
-                    '"' +
-                    (isBlocked(target) ? ' aria-disabled="true"' : '') +
-                    '><strong>' +
-                    R.escape(workspace) +
-                    '</strong><span>' +
-                    R.escape(
-                        target.label ||
-                            target.target_label ||
-                            target.name ||
-                            target.adapter ||
-                            t('erp')
-                    ) +
-                    '</span><div class="checks">' +
-                    targetStatus(target) +
-                    '</div></button>'
-                );
-            })
-            .join('');
-        var target = selectedTarget();
-        var adapter = String((target || {}).adapter || selection().adapter || '').toLowerCase();
-        var purchase = selection().direction === 'purchase';
-        var postingMode =
-            adapter === 'express'
-                ? '<label class="field"><span>' +
-                  R.escape(t('mode')) +
-                  '</span><select data-selection="posting_kind"><option value="">—</option><option value="stock"' +
-                  (selection().posting_kind === 'stock' ? ' selected' : '') +
-                  '>' +
-                  R.escape(t('stock')) +
-                  '</option><option value="service"' +
-                  (selection().posting_kind === 'service' ? ' selected' : '') +
-                  '>' +
-                  R.escape(t('service')) +
-                  '</option></select></label>'
-                : '<label class="field"><span>' +
-                  R.escape(t('payment')) +
-                  '</span><select data-selection="payment"><option value="">—</option>' +
-                  (purchase
-                      ? ''
-                      : '<option value="cash"' +
-                        (selection().payment === 'cash' ? ' selected' : '') +
-                        '>' +
-                        R.escape(t('cash')) +
-                        '</option>') +
-                  '<option value="credit"' +
-                  (selection().payment === 'credit' ? ' selected' : '') +
-                  '>' +
-                  R.escape(t('credit')) +
-                  '</option></select></label>';
-        return (
-            '<section class="panel"><h2>' +
-            R.escape(t('target')) +
-            '</h2><div class="target-list">' +
-            (options || '<p class="empty">' + R.escape(t('noTarget')) + '</p>') +
-            '</div><div class="selection-grid"><label class="field"><span>' +
-            R.escape(t('direction')) +
-            '</span><select data-selection="direction"><option value="">—</option><option value="purchase"' +
-            (selection().direction === 'purchase' ? ' selected' : '') +
-            '>' +
-            R.escape(t('purchase')) +
-            '</option><option value="sales"' +
-            (selection().direction === 'sales' ? ' selected' : '') +
-            '>' +
-            R.escape(t('sales')) +
-            '</option></select></label>' +
-            postingMode +
-            '</div>' +
-            (target && isBlocked(target)
-                ? '<p class="block-note">' + R.escape(t('blocked')) + '</p>'
-                : '') +
-            '</section>'
-        );
-    }
-
-    function chooseTarget(key) {
-        var target = targets().find(function (row) {
-            return targetKey(row) === key;
-        });
-        if (!target || isBlocked(target)) return;
-        Object.assign(selection(), {
-            endpoint_id: target.endpoint_id || target.id,
-            workspace_client_id: target.workspace_client_id,
-            adapter: target.adapter,
-            target_label: target.label || target.target_label || target.name,
-            posting_kind: null,
-            payment: null,
-        });
+        return targetSelect.html();
     }
 
     function validSelection() {
-        var target = selectedTarget();
-        var adapter = String((target || {}).adapter || '').toLowerCase();
-        var workspaceReady =
-            selection().workspace_client_id != null ||
-            (target && target.setup_action === 'auto_create_workspace');
-        var modeReady =
-            adapter === 'express'
-                ? Boolean(selection().posting_kind)
-                : selection().direction === 'purchase'
-                  ? selection().payment === 'credit'
-                  : /^(cash|credit)$/.test(selection().payment || '');
-        return Boolean(
-            target && !isBlocked(target) && workspaceReady && selection().direction && modeReady
-        );
+        return targetSelect.valid();
     }
 
     function bindPrefix(root, render) {
-        root.querySelectorAll('[data-target]').forEach(function (button) {
-            button.onclick = function () {
-                chooseTarget(button.dataset.target);
-                render();
-            };
-        });
-        root.querySelectorAll('[data-selection]').forEach(function (element) {
-            element.onchange = function () {
-                selection()[element.dataset.selection] = element.value || null;
-                if (element.dataset.selection === 'direction') selection().payment = null;
-                render();
-            };
-        });
+        targetSelect.bind(root, render);
     }
 
     function section(title, body) {
@@ -288,15 +86,16 @@
     }
 
     function payload() {
+        var selection = targetSelect.selection();
         return {
             records: records(),
-            workspace_client_id: selection().workspace_client_id,
-            endpoint_id: selection().endpoint_id,
-            direction: selection().direction,
-            adapter: selection().adapter,
-            target_label: selection().target_label,
-            posting_kind: selection().posting_kind,
-            payment: selection().payment,
+            workspace_client_id: selection.workspace_client_id,
+            endpoint_id: selection.endpoint_id,
+            direction: selection.direction,
+            adapter: selection.adapter,
+            target_label: selection.target_label,
+            posting_kind: selection.posting_kind,
+            payment: selection.payment,
         };
     }
 
@@ -381,18 +180,25 @@
     }
 
     function buildReview() {
+        targetSelect = T.create({
+            model: function () {
+                return model;
+            },
+            text: t,
+            escape: R.escape,
+        });
         review = R.create({
             root: form,
             records: records,
             direction: function () {
-                return selection().direction || 'purchase';
+                return targetSelect.selection().direction || 'purchase';
             },
             text: t,
             title: function () {
                 return t('title');
             },
             issues: function (record) {
-                return R.documentIssues(record, selection().direction, {
+                return R.documentIssues(record, targetSelect.selection().direction, {
                     requirePostingKind: false,
                 });
             },

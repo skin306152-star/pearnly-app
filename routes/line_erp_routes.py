@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
@@ -17,7 +18,7 @@ from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
 from services.auth.entrance import require_erp_portal
 from services.erp import team_access
-from services.line_erp import store, webhook
+from services.line_erp import store, target_preflight, target_selection, webhook
 from services.line_platform import client as line_client
 from services.line_platform import webhook_runner as line_webhook_runner
 from services.line_platform.liff import verify_id_token
@@ -36,6 +37,13 @@ class DraftUpdateIn(BaseModel):
     records: list[dict] = Field(default_factory=list)
     pages: list[dict] = Field(default_factory=list)
     fields: dict = Field(default_factory=dict)
+    endpoint_id: str = ""
+    workspace_client_id: int | None = None
+    direction: str = ""
+    adapter: str = ""
+    target_label: str = ""
+    posting_kind: str | None = None
+    payment: str | None = None
 
 
 def _draft_secret() -> str:
@@ -250,12 +258,21 @@ async def erp_draft_get(request: Request, draft_id: str):
     claims, binding, session = _draft_token(request, draft_id)
     payload = session.get("payload") or {}
     history_ids = [str(value) for value in payload.get("history_ids") or []]
+    target_result = await asyncio.to_thread(
+        target_preflight.inspect_targets,
+        binding,
+        endpoint_id=str(payload.get("endpoint_id") or "") or None,
+        workspace_client_id=payload.get("workspace_client_id"),
+        refresh=True,
+    )
     return {
         "ok": True,
         "data": {
             "draft_id": draft_id,
             "mode": payload.get("mode"),
             "direction": payload.get("mode"),
+            "targets": target_result["targets"],
+            "selection": target_selection.from_payload(payload),
             "records": webhook.draft_records(
                 str(claims["user_id"]), str(binding["tenant_id"]), draft_id, history_ids
             ),
@@ -272,6 +289,28 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
     ]
     if submitted_ids != expected_ids:
         raise HTTPException(409, detail="line_erp.records_incomplete")
+    payload = session.get("payload") or {}
+    requested = {
+        "endpoint_id": req.endpoint_id,
+        "workspace_client_id": req.workspace_client_id,
+        "direction": req.direction,
+        "adapter": req.adapter,
+        "target_label": req.target_label,
+        "posting_kind": req.posting_kind,
+        "payment": req.payment,
+    }
+    try:
+        _, selection = await asyncio.to_thread(
+            target_selection.normalize,
+            binding,
+            requested,
+            refresh=True,
+        )
+    except target_selection.SelectionError as exc:
+        raise HTTPException(exc.status_code, detail=exc.code) from None
+    if str(payload.get("mode") or "") != selection["direction"]:
+        raise HTTPException(409, detail="line_erp.direction_changed")
+    target_selection.apply_to_records(req.records, selection)
     from services.ocr_history.mutations import update_ocr_history_pages
 
     allowed_ids = set(expected_ids)
@@ -284,6 +323,22 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
             str(claims["user_id"]), history_id, pages, tenant_id=str(binding["tenant_id"])
         ):
             raise HTTPException(409, detail="line_erp.draft_save_failed")
+    try:
+        target_selection.update_scope(binding, expected_ids, selection)
+    except target_selection.SelectionError as exc:
+        raise HTTPException(exc.status_code, detail=exc.code) from None
+    next_payload = {**payload, **selection, "history_ids": expected_ids}
+    store.set_session(
+        str(binding["tenant_id"]),
+        str(claims["line_user_id"]),
+        "editing",
+        next_payload,
+    )
+    target_result = target_preflight.inspect_targets(
+        binding,
+        endpoint_id=selection["endpoint_id"],
+        workspace_client_id=selection["workspace_client_id"],
+    )
     return {
         "ok": True,
         "data": {
@@ -291,6 +346,8 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
             "records": webhook.draft_records(
                 str(claims["user_id"]), str(binding["tenant_id"]), draft_id, expected_ids
             ),
+            "targets": target_result["targets"],
+            "selection": target_selection.from_payload(next_payload),
         },
     }
 

@@ -18,6 +18,8 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
         shared = ROOT / "static" / "line-intake-review"
         cls.runtime = (shared / "liff-runtime.js").read_text(encoding="utf-8")
         cls.review = (shared / "batch-review.js").read_text(encoding="utf-8")
+        cls.target_select = (shared / "target-select.js").read_text(encoding="utf-8")
+        cls.target_select_compact = " ".join(cls.target_select.split())
 
     def test_upload_stays_in_line_chat(self):
         combined = self.html + self.app
@@ -44,10 +46,10 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
             "block_reason",
             "setup_action",
         ):
-            self.assertIn(key, self.app)
+            self.assertIn(key, self.target_select)
         for mode in ("stock", "service", "cash", "credit"):
-            self.assertIn("'" + mode + "'", self.app)
-        self.assertIn("target.workspace_name", self.app)
+            self.assertIn("'" + mode + "'", self.target_select)
+        self.assertIn("target.workspace_name", self.target_select)
 
     def test_line_primary_redirect_restores_scoped_draft(self):
         self.assertIn("direct.get('liff.state')", self.runtime)
@@ -68,9 +70,9 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
         self.assertIn("confirm.disabled = busy || !report.canConfirm", self.review)
 
     def test_mrerp_purchase_only_offers_credit(self):
-        self.assertIn("purchase ? ''", self.app_compact)
-        self.assertIn("selection().payment === 'credit'", self.app)
-        self.assertIn("/^(cash|credit)$/.test", self.app)
+        self.assertIn("purchase ? ''", self.target_select_compact)
+        self.assertIn("selection().payment === 'credit'", self.target_select)
+        self.assertIn("/^(cash|credit)$/.test", self.target_select)
 
     def test_four_languages_are_present(self):
         for language in ("th:", "en:", "zh:", "ja:"):

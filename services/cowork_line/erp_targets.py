@@ -6,7 +6,7 @@ from typing import Any
 
 from core import db
 from services.authz.resolver import resolve
-from services.cowork_line.erp_target_projection import (
+from services.erp.line_target_projection import (
     active_push_state as _active_push_state,
     legacy_target as _legacy_target,
     managed_target as _managed_target,

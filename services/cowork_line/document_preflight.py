@@ -8,6 +8,7 @@ from typing import Any
 from core import db
 from services.erp.express_push.posting_kind import normalize as normalize_posting_kind
 from services.erp.express_push.preflight import preflight_express
+from services.erp.line_document_subject import matches as subject_matches
 from services.erp.shared_express_schema import enable_shared_express_select
 from services.erp.shared_express_store import fetch_visible_endpoint_rows
 
@@ -46,41 +47,6 @@ def _with_manual_fields(history: dict[str, Any], direction: str, payment: str | 
         fields["posting_payment_manual"] = payment
     primary["fields"] = fields
     return prepared
-
-
-def _party(history: dict[str, Any], direction: str) -> tuple[str, str]:
-    from services.erp.erp_payload import flatten_history_for_mrerp
-
-    flat = flatten_history_for_mrerp(history)
-    fields = flat.get("fields") if isinstance(flat.get("fields"), dict) else {}
-    prefix = "seller" if direction == "sales" else "buyer"
-    tax_id = str(fields.get(f"{prefix}_tax") or fields.get(f"{prefix}_tax_id") or "").strip()
-    name = str(fields.get(f"{prefix}_name") or "").strip()
-    return tax_id, name
-
-
-def _subject_matches(
-    identity: dict[str, Any], history: dict[str, Any], direction: str, workspace_id: int
-) -> tuple[bool, str | None]:
-    tax_id, name = _party(history, direction)
-    if not tax_id and not name:
-        return False, "workspace_subject_missing"
-    user_id = str(identity.get("user_id") or "")
-    tenant_id = str(identity.get("tenant_id") or "")
-    if direction == "sales":
-        route = db.match_workspace_for_seller(tax_id, name, user_id, tenant_id)
-    else:
-        route = db.match_workspace_for_buyer(tax_id, name, user_id, tenant_id)
-    if route.get("reason") == "lookup_error":
-        return False, "workspace_lookup_failed"
-    if route.get("action") == "multi":
-        return False, "workspace_ambiguous"
-    routed = route.get("workspace_client_id")
-    if routed is None:
-        return False, "workspace_subject_unmatched"
-    if int(routed) != workspace_id:
-        return False, "workspace_subject_mismatch"
-    return True, None
 
 
 def _managed_endpoint(identity: dict[str, Any], target: dict[str, Any]) -> dict[str, Any] | None:
@@ -165,7 +131,7 @@ def preflight_document(
         return _result(["history_not_found"], checks={"target_ready": True})
     if history.get("workspace_client_id") != workspace_id:
         return _result(["history_workspace_mismatch"], checks={"target_ready": True})
-    subject_ok, subject_error = _subject_matches(identity, history, direction, workspace_id)
+    subject_ok, subject_error = subject_matches(identity, history, direction, workspace_id)
     if not subject_ok:
         return _result(
             [str(subject_error)],

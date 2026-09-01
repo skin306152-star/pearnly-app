@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 from services.erp import target_readiness
-from services.cowork_line import erp_target_projection
+from services.erp import line_target_projection as erp_target_projection
 
 
 class ErpTargetReadinessTests(unittest.TestCase):
@@ -63,7 +63,61 @@ class ErpTargetReadinessTests(unittest.TestCase):
         self.assertTrue(target["selectable"])
         self.assertEqual(target["mode_options"], ["stock", "service"])
         self.assertFalse(target["managed"])
+        self.assertEqual(target["label"], "Express Main · 69EXP")
         self.assertNotIn("agent_token_hash", repr(target))
+
+    def test_mrerp_target_shows_the_mapped_account_set_name(self):
+        endpoint = {
+            "id": "mrerp-1",
+            "name": "MR.ERP",
+            "adapter": "mrerp",
+            "enabled": True,
+            "config": {
+                "username_enc": "cipher",
+                "password_enc": "cipher",
+                "comidyear": "15",
+                "seldb": "2",
+            },
+        }
+        probe = {
+            "ok": True,
+            "companies": [{"label": "Sister Makeup 2026", "comidyear": "15", "seldb": "2"}],
+        }
+        target = erp_target_projection.legacy_target(
+            endpoint,
+            {"id": 7, "name": "Sister Makeup", "erp_endpoint_id": "mrerp-1"},
+            binding_count=1,
+            probe=probe,
+        )
+
+        self.assertEqual(target["label"], "MR.ERP · Sister Makeup 2026")
+        self.assertEqual(target["account_set_label"], "Sister Makeup 2026")
+
+    def test_mrerp_target_blocks_when_saved_account_set_is_no_longer_available(self):
+        endpoint = {
+            "id": "mrerp-1",
+            "adapter": "mrerp",
+            "enabled": True,
+            "config": {
+                "username_enc": "cipher",
+                "password_enc": "cipher",
+                "comidyear": "15",
+                "seldb": "2",
+            },
+        }
+        target = erp_target_projection.legacy_target(
+            endpoint,
+            {"id": 7, "name": "Sister Makeup", "erp_endpoint_id": "mrerp-1"},
+            binding_count=1,
+            probe={
+                "ok": True,
+                "companies": [{"label": "Other", "comidyear": "6", "seldb": "1"}],
+            },
+        )
+
+        self.assertFalse(target["selectable"])
+        self.assertEqual(target["block_reason"], "account_set_unavailable")
+        self.assertFalse(target["ready_checks"]["profile_matches"])
 
     def test_express_heartbeat_is_not_cached_and_offline_target_is_blocked(self):
         now = datetime.now(timezone.utc)

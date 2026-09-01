@@ -4,6 +4,34 @@ from unittest import mock
 from services.line_erp import webhook
 
 
+def _express_selection(mode="purchase"):
+    return {
+        "mode": mode,
+        "direction": mode,
+        "endpoint_id": "ep-1",
+        "workspace_client_id": 7,
+        "adapter": "express",
+        "target_label": "Express · Main",
+        "posting_kind": "stock",
+        "payment": None,
+        "posting_mode": "stock",
+    }
+
+
+def _ready(selection):
+    return {
+        "ready": True,
+        "endpoint_id": selection["endpoint_id"],
+        "workspace_client_id": selection["workspace_client_id"],
+        "user": {"id": "u1", "tenant_id": "t1", "plan": "free"},
+        "target": {
+            "endpoint_id": selection["endpoint_id"],
+            "workspace_client_id": selection["workspace_client_id"],
+            "adapter": selection["adapter"],
+        },
+    }
+
+
 class _Cursor:
     def __init__(self, count=1):
         self.count = count
@@ -28,6 +56,18 @@ class _Context:
 
 
 class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
+    async def test_menu_refreshes_all_erp_targets_before_rendering(self):
+        status = {"ready": True, "any_ready": True, "targets": [], "text": "ready"}
+        with mock.patch.object(
+            webhook, "_target_status", new=mock.AsyncMock(return_value=status)
+        ) as inspect:
+            card = await webhook._menu_card(
+                {"tenant_id": "t1", "user_id": "u1"}, ("purchase", "sales")
+            )
+
+        inspect.assert_awaited_once_with({"tenant_id": "t1", "user_id": "u1"}, refresh=True)
+        self.assertEqual(card["type"], "flex")
+
     async def test_media_event_queues_ocr_instead_of_waiting_for_reply(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
         with (
@@ -101,11 +141,12 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_document_backfills_preview_before_opening_draft(self):
         binding = {"tenant_id": "t1", "user_id": "u1", "workspace_client_id": 7}
+        selection = _express_selection()
         with (
             mock.patch.object(
                 webhook.store,
                 "get_session",
-                return_value={"state": "receiving", "payload": {"mode": "purchase"}},
+                return_value={"state": "receiving", "payload": selection},
             ),
             mock.patch.object(webhook.store, "set_session") as set_session,
             mock.patch.object(webhook.line_client, "download_message_content", return_value=b"pdf"),
@@ -118,13 +159,9 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
             mock.patch.object(
-                webhook.target_preflight,
-                "require_ready",
-                return_value={
-                    "ready": True,
-                    "endpoint_id": "ep-1",
-                    "user": {"id": "u1", "tenant_id": "t1", "plan": "free"},
-                },
+                webhook.target_selection,
+                "normalize",
+                return_value=(_ready(selection), selection),
             ),
             mock.patch.object(
                 webhook,
@@ -154,17 +191,17 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_inactive_bound_user_never_reaches_ocr(self):
         binding = {"tenant_id": "t1", "user_id": "u1", "workspace_client_id": 7}
+        selection = _express_selection("sales")
         with (
             mock.patch.object(
                 webhook.store,
                 "get_session",
-                return_value={"state": "receiving", "payload": {"mode": "sales"}},
+                return_value={"state": "receiving", "payload": selection},
             ),
-            mock.patch.object(webhook.line_client, "download_message_content", return_value=b"x"),
             mock.patch.object(
-                webhook.db,
-                "find_user_by_id",
-                return_value={"id": "u1", "tenant_id": "t1", "is_active": False},
+                webhook.target_selection,
+                "normalize",
+                side_effect=webhook.target_selection.SelectionError("erp_user_inactive"),
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook, "_allowed_modes", return_value=("sales",)),
@@ -180,13 +217,14 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
     async def test_incomplete_confirm_keeps_session_and_rolls_back_batch(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
         cursor = _Cursor()
+        selection = _express_selection()
         with (
             mock.patch.object(
                 webhook.store,
                 "get_session",
                 return_value={
                     "state": "draft",
-                    "payload": {"mode": "purchase", "history_ids": ["h1", "h2"]},
+                    "payload": {**selection, "history_ids": ["h1", "h2"]},
                 },
             ),
             mock.patch.object(webhook.store, "clear_session") as clear_session,
@@ -198,9 +236,9 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
             mock.patch.object(
-                webhook.target_preflight,
-                "require_ready",
-                return_value={"ready": True, "endpoint_id": "ep-1"},
+                webhook.target_selection,
+                "normalize",
+                return_value=(_ready(selection), selection),
             ),
             mock.patch.object(
                 webhook,
@@ -235,6 +273,11 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 ],
             ),
             mock.patch.object(
+                webhook.draft_actions.line_document_subject,
+                "matches",
+                return_value=(True, None),
+            ),
+            mock.patch.object(
                 webhook.convert_svc,
                 "convert_histories",
                 return_value={"converted": [{"history_id": "h1"}], "skipped": []},
@@ -255,6 +298,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             "workspace_client_id": 7,
         }
         cursor = _Cursor(count=2)
+        selection = _express_selection()
         records = [
             {
                 "pages": [
@@ -287,7 +331,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 "get_session",
                 return_value={
                     "state": "draft",
-                    "payload": {"mode": "purchase", "history_ids": ["h1", "h2"]},
+                    "payload": {**selection, "history_ids": ["h1", "h2"]},
                 },
             ),
             mock.patch.object(webhook.store, "clear_session") as clear_session,
@@ -299,11 +343,16 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
             mock.patch.object(
-                webhook.target_preflight,
-                "require_ready",
-                return_value={"ready": True, "endpoint_id": "ep-1"},
+                webhook.target_selection,
+                "normalize",
+                return_value=(_ready(selection), selection),
             ),
             mock.patch.object(webhook, "draft_records", return_value=records),
+            mock.patch.object(
+                webhook.draft_actions.line_document_subject,
+                "matches",
+                return_value=(True, None),
+            ),
             mock.patch.object(
                 webhook.convert_svc,
                 "convert_histories",
@@ -322,9 +371,10 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([row["status"] for row in result["push_results"]], ["success", "pending"])
         pushed.assert_awaited_once_with(
             user={"id": "u1", "tenant_id": "t1", "is_active": True, "entry": "erp"},
-            binding=binding,
             history_ids=["h1", "h2"],
             endpoint_id="ep-1",
+            workspace_client_id=7,
+            posting_kind="stock",
         )
         clear_session.assert_called_once_with("t1", "line-u1")
 

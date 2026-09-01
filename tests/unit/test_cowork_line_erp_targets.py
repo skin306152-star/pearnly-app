@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 from services.cowork_line import document_preflight
-from services.cowork_line import erp_target_projection
+from services.erp import line_target_projection as erp_target_projection
 from services.cowork_line import erp_targets
 
 
@@ -470,7 +470,7 @@ class DocumentPreflightTests(unittest.TestCase):
             patch.object(
                 document_preflight.db, "get_ocr_history_detail", return_value=self.history
             ),
-            patch.object(document_preflight, "_subject_matches", return_value=(True, None)),
+            patch.object(document_preflight, "subject_matches", return_value=(True, None)),
         ):
             result = erp_targets.preflight_document(
                 self.identity, target, "h1", "sales", payment="cash"
@@ -494,7 +494,7 @@ class DocumentPreflightTests(unittest.TestCase):
             patch.object(
                 document_preflight.db, "get_ocr_history_detail", return_value=self.history
             ),
-            patch.object(document_preflight, "_subject_matches", return_value=(True, None)),
+            patch.object(document_preflight, "subject_matches", return_value=(True, None)),
         ):
             result = erp_targets.preflight_document(
                 self.identity, target, "h1", "purchase", payment="cash"
@@ -524,7 +524,7 @@ class DocumentPreflightTests(unittest.TestCase):
             patch.object(
                 document_preflight.db, "get_ocr_history_detail", return_value=self.history
             ),
-            patch.object(document_preflight, "_subject_matches", return_value=(True, None)),
+            patch.object(document_preflight, "subject_matches", return_value=(True, None)),
             patch.object(document_preflight, "_managed_endpoint", return_value=endpoint),
             patch.object(
                 document_preflight, "preflight_express", return_value=canonical

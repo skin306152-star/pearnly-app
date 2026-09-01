@@ -15,9 +15,10 @@ logger = logging.getLogger("mr-pilot")
 async def dispatch_confirmed(
     *,
     user: dict[str, Any],
-    binding: dict[str, Any],
     history_ids: list[str],
     endpoint_id: str,
+    workspace_client_id: int,
+    posting_kind: str | None,
 ) -> dict[str, Any]:
     results = []
     for history_id in history_ids:
@@ -26,7 +27,8 @@ async def dispatch_confirmed(
                 user=user,
                 history_id=history_id,
                 endpoint_id=endpoint_id,
-                workspace_client_id=binding.get("workspace_client_id"),
+                workspace_client_id=workspace_client_id,
+                posting_kind=posting_kind,
             )
         except HTTPException as exc:
             detail = exc.detail

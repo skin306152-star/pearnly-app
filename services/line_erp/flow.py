@@ -4,7 +4,18 @@ from typing import Optional
 
 MODES = frozenset({"purchase", "sales"})
 STATES = frozenset(
-    {"menu", "receiving", "ocr_processing", "draft", "editing", "confirmed", "discarded", "failed"}
+    {
+        "menu",
+        "target",
+        "posting",
+        "receiving",
+        "ocr_processing",
+        "draft",
+        "editing",
+        "confirmed",
+        "discarded",
+        "failed",
+    }
 )
 
 
@@ -15,7 +26,9 @@ def accept_media_mode(mode: Optional[str], requested: str) -> bool:
 
 def next_state(state: str, event: str) -> str:
     transitions = {
-        ("menu", "choose"): "receiving",
+        ("menu", "choose"): "target",
+        ("target", "choose"): "posting",
+        ("posting", "choose"): "receiving",
         ("receiving", "media"): "ocr_processing",
         ("ocr_processing", "ready"): "draft",
         ("draft", "edit"): "editing",

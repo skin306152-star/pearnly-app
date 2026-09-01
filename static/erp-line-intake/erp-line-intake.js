@@ -5,6 +5,7 @@
     var S = window.lineIntakeSourcePage;
     var I = window.erpLineIntakeI18n;
     var F = window.erpLineFieldRenderer;
+    var T = window.lineIntakeTargetSelect;
     var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2);
     var state = document.getElementById('state');
     var form = document.getElementById('editor');
@@ -12,6 +13,7 @@
     var draftId = '';
     var busy = false;
     var review = null;
+    var targetSelect = null;
 
     var COMMON_ORDER = ['invoice_number', 'date', 'document_type'];
     var PURCHASE_ORDER = [
@@ -68,7 +70,24 @@
     }
 
     function direction() {
-        return (model && (model.direction || model.mode)) || 'purchase';
+        return (
+            (targetSelect && targetSelect.selection().direction) ||
+            (model && (model.direction || model.mode)) ||
+            'purchase'
+        );
+    }
+
+    function expressTarget() {
+        return targetSelect && targetSelect.adapter() === 'express';
+    }
+
+    function applyPostingDefault(value) {
+        if (!/^(stock|service)$/.test(value || '')) return;
+        rows().forEach(function (record) {
+            fieldsOf(record).items.forEach(function (item) {
+                item.posting_kind = value;
+            });
+        });
     }
 
     function moveAlias(target, canonical, alias) {
@@ -145,6 +164,27 @@
                 Object.keys(item).forEach(function (key) {
                     if (key !== 'posting_kind' && keys.indexOf(key) < 0) keys.push(key);
                 });
+                var posting = expressTarget()
+                    ? '<div class="field"><label>' +
+                      R.escape(t('kind')) +
+                      ' *</label><select data-kind="' +
+                      recordIndex +
+                      ':' +
+                      itemIndex +
+                      '" data-source-page="' +
+                      S.fieldPage(record, '', itemIndex) +
+                      '"><option value="">' +
+                      R.escape(t('pick')) +
+                      '</option><option value="stock"' +
+                      (item.posting_kind === 'stock' ? ' selected' : '') +
+                      '>' +
+                      R.escape(t('stock')) +
+                      '</option><option value="service"' +
+                      (item.posting_kind === 'service' ? ' selected' : '') +
+                      '>' +
+                      R.escape(t('service')) +
+                      '</option></select></div>'
+                    : '';
                 return (
                     '<div class="item"><div class="grid">' +
                     keys
@@ -160,25 +200,8 @@
                             );
                         })
                         .join('') +
-                    '<div class="field"><label>' +
-                    R.escape(t('kind')) +
-                    ' *</label><select data-kind="' +
-                    recordIndex +
-                    ':' +
-                    itemIndex +
-                    '" data-source-page="' +
-                    S.fieldPage(record, '', itemIndex) +
-                    '"><option value="">' +
-                    R.escape(t('pick')) +
-                    '</option><option value="stock"' +
-                    (item.posting_kind === 'stock' ? ' selected' : '') +
-                    '>' +
-                    R.escape(t('stock')) +
-                    '</option><option value="service"' +
-                    (item.posting_kind === 'service' ? ' selected' : '') +
-                    '>' +
-                    R.escape(t('service')) +
-                    '</option></select></div></div></div>'
+                    posting +
+                    '</div></div>'
                 );
             })
             .join('');
@@ -234,11 +257,21 @@
     }
 
     function save() {
+        var selection = targetSelect.selection();
         return api('/api/line/erp/draft/' + encodeURIComponent(draftId), {
             method: 'PUT',
-            body: JSON.stringify({ records: rows() }),
+            body: JSON.stringify({
+                records: rows(),
+                endpoint_id: selection.endpoint_id,
+                workspace_client_id: selection.workspace_client_id,
+                direction: selection.direction,
+                adapter: selection.adapter,
+                target_label: selection.target_label,
+                posting_kind: selection.posting_kind,
+                payment: selection.payment,
+            }),
         }).then(function (updated) {
-            if (updated && Array.isArray(updated.records)) model.records = updated.records;
+            if (updated) model = Object.assign(model, updated);
             return updated;
         });
     }
@@ -274,6 +307,17 @@
     }
 
     function buildReview() {
+        targetSelect = T.create({
+            model: function () {
+                return model;
+            },
+            text: t,
+            escape: R.escape,
+            lockDirection: true,
+            onChange: function (field, value) {
+                if (field === 'posting_kind') applyPostingDefault(value);
+            },
+        });
         review = R.create({
             root: form,
             records: rows,
@@ -290,7 +334,18 @@
             },
             issues: function (record) {
                 fieldsOf(record);
-                return R.documentIssues(record, direction(), { requirePostingKind: true });
+                return R.documentIssues(record, direction(), {
+                    requirePostingKind: expressTarget(),
+                });
+            },
+            globalReady: function () {
+                return targetSelect.valid();
+            },
+            renderPrefix: function () {
+                return targetSelect.html();
+            },
+            bindPrefix: function (root, render) {
+                targetSelect.bind(root, render);
             },
             renderDetail: renderDetail,
             bindDetail: bindDetail,

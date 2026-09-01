@@ -112,11 +112,55 @@ function previewResponse(route, headers) {
 
 async function openErp(
     page,
-    { putStatus = 200, draftRecords = erpRecords(), direction = 'purchase', draftQuery } = {}
+    {
+        putStatus = 200,
+        draftRecords = erpRecords(),
+        direction = 'purchase',
+        adapter = 'express',
+        draftQuery,
+    } = {}
 ) {
     const requests = [];
     const authBodies = [];
     const previewHeaders = [];
+    const targets = [
+        {
+            endpoint_id: 'express-1',
+            workspace_client_id: 69,
+            workspace_name: 'Sister Makeup',
+            adapter: 'express',
+            label: 'Express · MAIN',
+            selectable: true,
+            configured: true,
+            connection_state: 'online',
+            ready_checks: {
+                erp_connection: true,
+                companion_online: true,
+                profile_matches: true,
+            },
+        },
+        {
+            endpoint_id: 'mrerp-1',
+            workspace_client_id: 70,
+            workspace_name: 'Accounting Client A',
+            adapter: 'mrerp',
+            label: 'MR.ERP · Client A',
+            selectable: true,
+            configured: true,
+            connection_state: 'online',
+            ready_checks: { erp_connection: true },
+        },
+    ];
+    const selectedTarget = targets.find((target) => target.adapter === adapter);
+    const selection = {
+        endpoint_id: selectedTarget.endpoint_id,
+        workspace_client_id: selectedTarget.workspace_client_id,
+        adapter,
+        direction,
+        posting_kind: adapter === 'express' ? 'stock' : null,
+        payment: adapter === 'mrerp' ? (direction === 'sales' ? 'cash' : 'credit') : null,
+        target_label: selectedTarget.label,
+    };
     await installLiff(page);
     await page.route('**/api/line/erp/liff/config', (route) =>
         route.fulfill({
@@ -156,7 +200,7 @@ async function openErp(
                 contentType: 'application/json',
                 body: JSON.stringify(
                     putStatus === 200
-                        ? { ok: true, data: { records: draftRecords } }
+                        ? { ok: true, data: { records: draftRecords, selection, targets } }
                         : { detail: 'save failed' }
                 ),
             });
@@ -164,7 +208,10 @@ async function openErp(
         return route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ ok: true, data: { direction, records: draftRecords } }),
+            body: JSON.stringify({
+                ok: true,
+                data: { direction, records: draftRecords, selection, targets },
+            }),
         });
     });
     const query = draftQuery || '?flow=erp-intake&draft=d1';
@@ -248,6 +295,12 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
 }) => {
     const page = await browser.newPage({ ...devices['iPhone 13'] });
     const run = await openErp(page);
+    await expect(page.locator('.target-card.active')).toContainText('Sister Makeup');
+    await expect(page.locator('[data-target-selection="posting_kind"]')).toHaveValue('stock');
+    await page.screenshot({
+        path: path.join(OUT, 'erp-mobile-target-selection.png'),
+        fullPage: true,
+    });
     await expect(page.locator('.review-row')).toHaveCount(2);
     await expect(page.locator('[data-review-action="confirm"]')).toBeDisabled();
     await page.locator('[data-review-search]').fill('Second Supplier');
@@ -287,9 +340,40 @@ test('ERP mobile list searches, opens multi-page detail, and gates batch confirm
         price: '100',
         posting_kind: 'stock',
     });
+    expect(saved).toMatchObject({
+        endpoint_id: 'express-1',
+        workspace_client_id: 69,
+        direction: 'purchase',
+        adapter: 'express',
+        posting_kind: 'stock',
+    });
     expect(run.authBodies[0]).toMatchObject({ id_token: 'test-id-token', draft_id: 'd1' });
     expect(run.previewHeaders.every((value) => value === 'Bearer test-bearer')).toBe(true);
     await page.close();
+});
+
+test('ERP target can switch freely and MRERP sales uses payment instead of item stock type', async ({
+    page,
+}) => {
+    await openErp(page, { adapter: 'mrerp', direction: 'sales' });
+    await expect(page.locator('.target-card.active')).toContainText('Accounting Client A');
+    await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
+    await page.locator('.review-row').first().click();
+    await expect(page.locator('[data-kind]')).toHaveCount(0);
+    await page.locator('[data-review-back]').click();
+
+    await page.locator('.target-card', { hasText: 'Sister Makeup' }).click();
+    await expect(page.locator('[data-target-selection="posting_kind"]')).toBeVisible();
+    await expect(page.locator('[data-review-action="confirm"]')).toBeDisabled();
+    await page.locator('[data-target-selection="posting_kind"]').selectOption('service');
+    await page.locator('.review-row').first().click();
+    await expect(page.locator('[data-kind]').first()).toHaveValue('service');
+    await page.locator('[data-review-back]').click();
+
+    await page.locator('.target-card', { hasText: 'Accounting Client A' }).click();
+    await page.locator('[data-target-selection="payment"]').selectOption('cash');
+    await expect(page.locator('[data-kind]')).toHaveCount(0);
+    await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
 });
 
 test('ERP desktop filters anomalies and uses the shared discard dialog', async ({ browser }) => {

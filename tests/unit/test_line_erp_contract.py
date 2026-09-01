@@ -231,8 +231,22 @@ class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
                 ],
             }
         ]
+        selection = {
+            "mode": "purchase",
+            "direction": "purchase",
+            "endpoint_id": "ep-1",
+            "workspace_client_id": 7,
+            "adapter": "express",
+            "posting_kind": "stock",
+            "payment": None,
+        }
         with (
             mock.patch.object(webhook, "draft_records", return_value=records),
+            mock.patch.object(
+                webhook.target_selection,
+                "normalize",
+                return_value=({"endpoint_id": "ep-1"}, selection),
+            ),
             mock.patch.object(webhook.db, "get_cursor_rls") as cursor,
         ):
             result = await webhook._confirm(
@@ -242,9 +256,63 @@ class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
                 ["h1"],
                 None,
                 "purchase",
+                selection,
             )
 
         self.assertEqual(result["detail"], "line_erp.posting_kind_required")
+        cursor.assert_not_called()
+
+    async def test_confirm_stops_before_conversion_when_document_company_mismatches_target(self):
+        records = [
+            {
+                "id": "h1",
+                "pages": [
+                    {
+                        "fields": {
+                            "buyer_name": "Different Company",
+                            "seller_name": "Supplier",
+                            "date": "2026-09-01",
+                            "total_amount": "120",
+                            "items": [{"name": "Widget", "qty": "1", "posting_kind": "stock"}],
+                        }
+                    }
+                ],
+            }
+        ]
+        selection = {
+            "mode": "purchase",
+            "direction": "purchase",
+            "endpoint_id": "ep-1",
+            "workspace_client_id": 7,
+            "adapter": "express",
+            "posting_kind": "stock",
+            "payment": None,
+        }
+        with (
+            mock.patch.object(webhook, "draft_records", return_value=records),
+            mock.patch.object(
+                webhook.target_selection,
+                "normalize",
+                return_value=({"endpoint_id": "ep-1"}, selection),
+            ),
+            mock.patch.object(
+                webhook.draft_actions.line_document_subject,
+                "matches",
+                return_value=(False, "workspace_subject_mismatch"),
+            ),
+            mock.patch.object(webhook.db, "get_cursor_rls") as cursor,
+        ):
+            result = await webhook._confirm(
+                {"user_id": "u1", "tenant_id": "t1"},
+                {"id": "u1"},
+                "h1",
+                ["h1"],
+                None,
+                "purchase",
+                selection,
+            )
+
+        self.assertEqual(result["detail"], "line_erp.workspace_subject_mismatch")
         cursor.assert_not_called()
 
 

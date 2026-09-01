@@ -1,4 +1,4 @@
-"""Safe connection and active-push projection for Cowork LINE ERP targets."""
+"""Safe connection and active-push projection shared by LINE ERP flows."""
 
 from __future__ import annotations
 
@@ -21,9 +21,50 @@ def _setup_action(missing: list[str]) -> str | None:
         "companion_not_ready": "check_companion",
         "profile_unconfirmed": "confirm_companion_profile",
         "profile_mismatch": "confirm_companion_profile",
+        "account_set_unavailable": "configure_erp_connection",
         "account_set_locked": "close_express_or_wait",
     }
     return next((actions[code] for code in missing if code in actions), None)
+
+
+def _legacy_account_label(
+    endpoint: dict[str, Any], adapter: str, probe: dict[str, Any] | None
+) -> str:
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    if adapter == "express":
+        return str(config.get("account_set") or "").strip()[:80]
+    if adapter != "mrerp":
+        return ""
+    comidyear = str(config.get("comidyear") or "6").strip()
+    seldb = str(config.get("seldb") or "1").strip()
+    for company in (probe or {}).get("companies") or []:
+        if not isinstance(company, dict):
+            continue
+        if (
+            str(company.get("comidyear") or "").strip() == comidyear
+            and str(company.get("seldb") or "").strip() == seldb
+        ):
+            return str(company.get("label") or "").strip()[:80]
+    return f"{comidyear}/{seldb}"
+
+
+def _mrerp_account_available(endpoint: dict[str, Any], probe: dict[str, Any] | None) -> bool | None:
+    if not probe or not probe.get("ok"):
+        return None
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    selected = (
+        str(config.get("comidyear") or "6").strip(),
+        str(config.get("seldb") or "1").strip(),
+    )
+    companies = [row for row in probe.get("companies") or [] if isinstance(row, dict)]
+    return any(
+        (
+            str(row.get("comidyear") or "").strip(),
+            str(row.get("seldb") or "").strip(),
+        )
+        == selected
+        for row in companies
+    )
 
 
 def managed_target(
@@ -107,20 +148,26 @@ def legacy_target(
     status = target_readiness.endpoint_status({**endpoint, "adapter": adapter}, probe=probe)
     configured = bool(status["configured"])
     missing = list(status["missing"])
+    account_available = _mrerp_account_available(endpoint, probe) if adapter == "mrerp" else None
+    if account_available is False:
+        missing.append("account_set_unavailable")
     if workspace is None:
         if not can_auto_create:
             missing.append("workspace_unbound")
     elif binding_count != 1:
         missing.append("workspace_binding_conflict")
     state = str(status["connection_state"])
+    account_label = _legacy_account_label(endpoint, adapter, probe)
+    endpoint_label = str(
+        endpoint.get("name") or ("Express" if adapter == "express" else "MR.ERP")
+    ).strip()[:80]
     target = {
         "endpoint_id": str(endpoint.get("id") or ""),
         "workspace_client_id": int(workspace["id"]) if workspace else None,
         "workspace_name": str(workspace.get("name") or "")[:200] if workspace else None,
         "adapter": adapter,
-        "label": str(
-            endpoint.get("name") or ("Express" if adapter == "express" else "MR.ERP")
-        ).strip()[:80],
+        "label": f"{endpoint_label} · {account_label}" if account_label else endpoint_label,
+        "account_set_label": account_label or None,
         "connection_state": state,
         "configured": configured,
         "selectable": not missing,
@@ -133,7 +180,7 @@ def legacy_target(
             "workspace_auto_create": workspace is None and can_auto_create,
             "erp_connection": state == "online" or (probe is None and state == "configured"),
             "companion_online": state == "online" if adapter == "express" else None,
-            "profile_matches": None,
+            "profile_matches": account_available,
             "document_preflight": None,
         },
         "missing": missing,

@@ -113,57 +113,6 @@ h2 {
   border-radius: 10px;
   background: var(--bg);
 }
-.target-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.target-card {
-  min-height: 88px;
-  padding: 12px;
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: var(--card);
-  color: inherit;
-}
-.target-card strong,
-.target-card > span {
-  display: block;
-}
-.target-card > span {
-  margin-top: 3px;
-  color: var(--ink2);
-}
-.target-card.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-.target-card.blocked {
-  opacity: 0.68;
-}
-.checks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 9px;
-}
-.check {
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--good-weak);
-  color: var(--good);
-  font-size: 11px;
-}
-.check.bad {
-  background: var(--bad-weak);
-  color: var(--bad);
-}
-.block-note {
-  margin: 12px 0 0;
-  font-size: 13px;
-}
 .dialog__panel h2 {
   font-size: 18px;
 }
@@ -172,8 +121,7 @@ h2 {
     padding-inline: 12px;
   }
   .field-grid,
-  .selection-grid,
-  .target-list {
+  .selection-grid {
     grid-template-columns: 1fr;
   }
   .item-row {

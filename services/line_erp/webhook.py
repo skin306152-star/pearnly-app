@@ -20,7 +20,9 @@ from services.line_erp import (
     preview,
     push as line_push,  # noqa: F401 - compatibility seam for route tests
     store,
+    target_flow,
     target_preflight,
+    target_selection,
 )
 from services.line_erp.out import make_spawn
 from services.line_platform import client as line_client
@@ -47,7 +49,7 @@ async def _target_status(binding: dict, *, refresh: bool = False) -> dict:
 
 async def _menu_card(binding: dict, modes: tuple[str, ...]) -> dict:
     try:
-        status = await _target_status(binding)
+        status = await _target_status(binding, refresh=True)
     except Exception:
         status = {
             "ready": False,
@@ -142,43 +144,20 @@ async def _handle_postback(
     action = (params.get("a") or [""])[0]
     if action.startswith("mode:"):
         mode = action.split(":", 1)[1]
-        if mode in flow.MODES and mode in _allowed_modes(binding):
-            session = store.get_session(binding["tenant_id"], line_user_id) or {}
-            if session.get("state") == "ocr_processing":
-                _notify(
-                    line_user_id,
-                    reply_token,
-                    "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่",
-                )
-                return
-            if session.get("state") in ("draft", "editing"):
-                _notify(
-                    line_user_id,
-                    reply_token,
-                    "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนเริ่มรายการใหม่",
-                )
-                return
-            try:
-                readiness = await asyncio.to_thread(
-                    target_preflight.require_ready,
-                    binding,
-                    refresh=True,
-                )
-            except target_preflight.TargetNotReady as exc:
-                _notify(
-                    line_user_id,
-                    reply_token,
-                    target_preflight.status_text(exc.result),
-                )
-                return
-            store.set_session(
-                binding["tenant_id"],
-                line_user_id,
-                "receiving",
-                {"mode": mode, "endpoint_id": readiness["endpoint_id"]},
-            )
-            if reply_token:
-                line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
+        await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
+    elif action == "target-page":
+        mode = str((params.get("mode") or [""])[0])
+        try:
+            page = int((params.get("page") or ["0"])[0])
+        except ValueError:
+            page = 0
+        await target_flow.show_target_picker(binding, line_user_id, reply_token, mode, page=page)
+    elif action == "target":
+        await target_flow.choose_target(params, binding, line_user_id, reply_token)
+    elif action.startswith("posting:"):
+        await target_flow.choose_posting_mode(
+            action.split(":", 1)[1], binding, line_user_id, reply_token
+        )
     elif action == "discard":
         draft_id = (params.get("draft") or [""])[0]
         await act_draft(binding, line_user_id, reply_token, draft_id, action)
@@ -221,23 +200,7 @@ async def _handle_text(
                 reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL
             )
         return
-    try:
-        readiness = await asyncio.to_thread(
-            target_preflight.require_ready,
-            binding,
-            refresh=True,
-        )
-    except target_preflight.TargetNotReady as exc:
-        _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
-        return
-    store.set_session(
-        binding["tenant_id"],
-        line_user_id,
-        "receiving",
-        {"mode": mode, "endpoint_id": readiness["endpoint_id"]},
-    )
-    if reply_token:
-        line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
+    await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
 
 
 def _notify(line_user_id: str, reply_token: str | None, text: str) -> None:
@@ -250,14 +213,13 @@ def _notify(line_user_id: str, reply_token: str | None, text: str) -> None:
 def _restore_receiving(
     binding: dict,
     line_user_id: str,
-    mode: str,
-    endpoint_id: str | None = None,
+    payload: dict,
 ) -> None:
     store.set_session(
         binding["tenant_id"],
         line_user_id,
         "receiving",
-        {"mode": mode, "endpoint_id": endpoint_id},
+        {key: value for key, value in payload.items() if key != "message_id"},
     )
 
 
@@ -279,6 +241,8 @@ async def _queue_document(
         text = "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่"
     elif session.get("state") in ("draft", "editing"):
         text = "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนส่งเอกสารใหม่"
+    elif session.get("state") in ("target", "posting"):
+        text = "กรุณาเลือกบัญชี ERP และรูปแบบการบันทึกก่อนส่งเอกสาร"
     else:
         text = "กรุณาเลือก 1 ซื้อ หรือ 2 ขาย ก่อนส่งเอกสาร"
     _notify(line_user_id, reply_token, text)
@@ -288,13 +252,12 @@ async def _process_document(message: dict, binding: dict, line_user_id: str) -> 
     session = await asyncio.to_thread(store.get_session, binding["tenant_id"], line_user_id) or {}
     processing_payload = session.get("payload") or {}
     mode = processing_payload.get("mode") or ""
-    endpoint_id = processing_payload.get("endpoint_id")
     try:
         await asyncio.to_thread(line_client.start_loading, line_user_id, 30, channel=CHANNEL)
         await _handle_document(message, binding, line_user_id, None, queued=True)
     except Exception:
         if mode in flow.MODES:
-            _restore_receiving(binding, line_user_id, mode, endpoint_id)
+            _restore_receiving(binding, line_user_id, processing_payload)
         _notify(line_user_id, None, "ดำเนินการไม่สำเร็จ กรุณาส่งเอกสารใหม่")
         raise
 
@@ -314,8 +277,8 @@ async def _handle_document(
                 reply_token, "กำลังอ่านเอกสารอยู่ กรุณารอผลการตรวจสอบสักครู่", channel=CHANNEL
             )
         return
-    mode = (session.get("payload") or {}).get("mode") or ""
-    endpoint_id = (session.get("payload") or {}).get("endpoint_id")
+    session_payload = dict(session.get("payload") or {})
+    mode = session_payload.get("mode") or ""
     if mode not in flow.MODES or mode not in _allowed_modes(binding):
         if reply_token:
             line_client.reply_text(
@@ -323,25 +286,30 @@ async def _handle_document(
             )
         return
     try:
-        readiness = await asyncio.to_thread(
-            target_preflight.require_ready,
+        readiness, selection = await asyncio.to_thread(
+            target_selection.normalize,
             binding,
+            target_selection.from_payload(session_payload),
             refresh=True,
-            expected_endpoint_id=endpoint_id,
         )
-    except target_preflight.TargetNotReady as exc:
-        if exc.result.get("block_reason") == "erp_user_inactive":
+    except target_selection.SelectionError as exc:
+        if exc.code == "erp_user_inactive":
             store.clear_session(binding["tenant_id"], line_user_id)
         else:
-            _restore_receiving(binding, line_user_id, mode, endpoint_id)
-        _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
+            _restore_receiving(binding, line_user_id, session_payload)
+        text = (
+            target_preflight.status_text(exc.readiness)
+            if exc.readiness
+            else "กรุณาเลือกบัญชี ERP และรูปแบบการบันทึกใหม่"
+        )
+        _notify(line_user_id, reply_token, text)
         return
     message_id = message.get("id")
     content = await asyncio.to_thread(
         line_client.download_message_content, message_id, channel=CHANNEL
     )
     if not content:
-        _restore_receiving(binding, line_user_id, mode, endpoint_id)
+        _restore_receiving(binding, line_user_id, selection)
         _notify(line_user_id, reply_token, "อ่านไฟล์ไม่สำเร็จ กรุณาส่งใหม่")
         return
     user = readiness["user"]
@@ -360,7 +328,7 @@ async def _handle_document(
             "ocr_processing",
             {
                 "mode": mode,
-                "endpoint_id": endpoint_id,
+                **selection,
                 "message_id": str(message_id or ""),
             },
             ttl_minutes=15,
@@ -373,19 +341,19 @@ async def _handle_document(
             user,
             content,
             SimpleNamespace(filename=message.get("fileName") or f"line_{message_id}.jpg"),
-            ws_client_id=binding.get("workspace_client_id"),
+            ws_client_id=selection["workspace_client_id"],
             staged=True,
             direction=mode,
-            posting_kind=None,
+            posting_kind=selection.get("posting_kind"),
             source="line_erp",
         )
     except Exception:
-        _restore_receiving(binding, line_user_id, mode, endpoint_id)
+        _restore_receiving(binding, line_user_id, selection)
         _notify(line_user_id, reply_token, "อ่านเอกสารไม่สำเร็จหรือเครดิตไม่พอ กรุณาลองใหม่")
         return
     history_ids = [str(value) for value in result.get("history_ids") or [] if value]
     if not history_ids:
-        _restore_receiving(binding, line_user_id, mode, endpoint_id)
+        _restore_receiving(binding, line_user_id, selection)
         _notify(line_user_id, reply_token, "ไม่พบเอกสารที่อ่านได้ กรุณาส่งไฟล์ใหม่")
         return
     await asyncio.to_thread(
@@ -402,8 +370,7 @@ async def _handle_document(
         line_user_id,
         "draft",
         {
-            "mode": mode,
-            "endpoint_id": readiness["endpoint_id"],
+            **selection,
             "history_ids": history_ids,
             "nonce": nonce,
         },
@@ -447,7 +414,7 @@ async def _confirm(
     history_ids: list[str],
     reply_token: str | None,
     mode: str,
-    endpoint_id: str = "",
+    selection: dict | None = None,
 ) -> dict:
     return await draft_actions.confirm(
         binding,
@@ -456,6 +423,6 @@ async def _confirm(
         history_ids,
         reply_token,
         mode,
-        endpoint_id,
+        selection or {},
         records_loader=draft_records,
     )

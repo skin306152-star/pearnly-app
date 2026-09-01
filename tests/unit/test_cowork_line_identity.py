@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from routes import cowork_line_binding_routes as routes
-from services.cowork_line import identity_store
+from services.cowork_line import friendship, identity_store
 
 
 class FakeCursor:
@@ -189,8 +189,8 @@ class CoworkLineIdentityTests(unittest.TestCase):
                 }
             ]
         )
-        with patch.object(identity_store.db, "get_cursor", cursor_context(cursor)):
-            revoked = identity_store.revoke_identity_by_line_user("U-line")
+        with patch.object(friendship.db, "get_cursor", cursor_context(cursor)):
+            revoked = friendship.revoke_by_line_user("U-line")
 
         self.assertEqual(
             revoked,

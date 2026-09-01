@@ -12,6 +12,7 @@ from core import db  # noqa: F401
 from services.cowork_line import (
     erp_targets,
     flow_cards,
+    friendship,
     identity_store,
     intake,  # noqa: F401
     menu_cards,
@@ -157,14 +158,7 @@ def _session(identity: dict) -> dict:
     )
 
 
-def _set(identity: dict, state: str, payload: dict, ttl_minutes: int = 30) -> None:
-    session_store.set_session(
-        tenant_id=identity["tenant_id"],
-        line_user_id=identity["line_user_id"],
-        state=state,
-        payload=payload,
-        ttl_minutes=ttl_minutes,
-    )
+_set = friendship.set_session
 
 
 def _params(event: dict) -> dict[str, str]:
@@ -182,14 +176,7 @@ async def handle_event(event: dict) -> None:
     reply_token = str(event.get("replyToken") or "") or None
     if source.get("type") != "user" or not line_user_id:
         return
-    if event.get("type") == "unfollow":
-        revoked = await asyncio.to_thread(identity_store.revoke_identity_by_line_user, line_user_id)
-        if revoked:
-            await asyncio.to_thread(
-                session_store.clear_session,
-                tenant_id=revoked["tenant_id"],
-                line_user_id=line_user_id,
-            )
+    if await friendship.disconnect_if_unfollow(str(event.get("type") or ""), line_user_id):
         return
     identity = await asyncio.to_thread(identity_store.resolve_active_identity, line_user_id)
     if event.get("type") == "follow":

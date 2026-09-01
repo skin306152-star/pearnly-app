@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from routes import cowork_line_webhook_routes as webhook
-from services.cowork_line import identity_store, webhook_documents
+from services.cowork_line import friendship, identity_store, webhook_documents
 
 
 def text_event(code="123456", *, source_type="user"):
@@ -17,25 +17,34 @@ def text_event(code="123456", *, source_type="user"):
 
 class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
     async def test_unfollow_revokes_identity_before_resolving_old_binding(self):
+        event = {"type": "unfollow", "source": {"type": "user", "userId": "U-line"}}
+        with (
+            patch.object(
+                webhook.cowork_flow.friendship,
+                "disconnect_if_unfollow",
+                new=AsyncMock(return_value=True),
+            ) as disconnect,
+            patch.object(webhook.identity_store, "resolve_active_identity") as resolve,
+        ):
+            await webhook._handle_event(event)
+
+        disconnect.assert_awaited_once_with("unfollow", "U-line")
+        resolve.assert_not_called()
+
+    async def test_unfollow_clears_session_for_revoked_identity(self):
         revoked = {
             "membership_id": "membership-1",
             "tenant_id": "tenant-1",
             "user_id": "user-1",
         }
-        event = {"type": "unfollow", "source": {"type": "user", "userId": "U-line"}}
         with (
-            patch.object(
-                webhook.identity_store,
-                "revoke_identity_by_line_user",
-                return_value=revoked,
-            ) as revoke,
-            patch.object(webhook.identity_store, "resolve_active_identity") as resolve,
-            patch.object(webhook.cowork_flow.session_store, "clear_session") as clear,
+            patch.object(friendship, "revoke_by_line_user", return_value=revoked) as revoke,
+            patch.object(friendship.session_store, "clear_session") as clear,
         ):
-            await webhook._handle_event(event)
+            handled = await friendship.disconnect_if_unfollow("unfollow", "U-line")
 
+        self.assertTrue(handled)
         revoke.assert_called_once_with("U-line")
-        resolve.assert_not_called()
         clear.assert_called_once_with(tenant_id="tenant-1", line_user_id="U-line")
 
     async def test_unblocked_follow_prompts_for_new_binding_code(self):

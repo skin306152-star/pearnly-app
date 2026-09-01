@@ -39,6 +39,24 @@ def postback_data(value) -> list[str]:
     return found
 
 
+def quick_reply_items(message: dict) -> list[dict]:
+    return list(((message.get("quickReply") or {}).get("items") or []))
+
+
+def action_labels(value) -> list[str]:
+    found = []
+    if isinstance(value, dict):
+        action = value.get("action") or {}
+        if action.get("label"):
+            found.append(str(action["label"]))
+        for child in value.values():
+            found.extend(action_labels(child))
+    elif isinstance(value, list):
+        for child in value:
+            found.extend(action_labels(child))
+    return found
+
+
 class CoworkLineBusyStateRegressionTests(unittest.IsolatedAsyncioTestCase):
     async def test_busy_state_blocks_follow_from_replacing_session(self):
         for state in BUSY_STATES:
@@ -361,29 +379,75 @@ class CoworkLineOcrRegressionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CoworkLineFlexRegressionTests(unittest.TestCase):
-    def test_account_picker_reuses_dms_row_shape_and_hides_internal_state_codes(self):
-        card = flow_cards.account_picker_card(
+    def test_polling_choices_use_quick_replies_and_hide_unavailable_options(self):
+        erp_question = flow_cards.erp_picker_card(
             [
                 {
                     "adapter": "mrerp",
                     "endpoint_id": "endpoint-1",
                     "workspace_client_id": 1,
                     "label": "MR.ERP",
-                    "connection_state": "disabled",
+                    "selectable": True,
+                },
+                {
+                    "adapter": "express",
+                    "endpoint_id": "endpoint-2",
+                    "workspace_client_id": 2,
+                    "label": "Express",
+                    "selectable": False,
+                    "missing": ["companion_offline"],
+                },
+            ],
+            "zh",
+        )
+        erp_items = quick_reply_items(erp_question)
+
+        self.assertEqual(erp_question["type"], "text")
+        self.assertNotIn("contents", erp_question)
+        self.assertEqual([item["action"]["label"] for item in erp_items], ["MR.ERP"])
+        self.assertNotIn("Express", json.dumps(erp_question, ensure_ascii=False))
+
+        account_question = flow_cards.account_picker_card(
+            [
+                {
+                    "adapter": "mrerp",
+                    "endpoint_id": "endpoint-ready",
+                    "workspace_client_id": 1,
+                    "label": "账套 A",
+                    "selectable": True,
+                },
+                {
+                    "adapter": "mrerp",
+                    "endpoint_id": "endpoint-disabled",
+                    "workspace_client_id": 2,
+                    "label": "账套 B",
                     "selectable": False,
                     "missing": ["endpoint_disabled"],
-                }
+                },
             ],
             "mrerp",
             "zh",
         )
+        account_items = quick_reply_items(account_question)
 
-        serialized = json.dumps(card, ensure_ascii=False)
-
+        self.assertEqual([item["action"]["label"] for item in account_items], ["账套 A"])
+        serialized = json.dumps(account_question, ensure_ascii=False)
+        self.assertNotIn("账套 B", serialized)
         self.assertNotIn("endpoint_disabled", serialized)
-        self.assertIn("ERP 连接已停用，请到网页端启用", serialized)
-        self.assertIn("/static/dms/line-icons/", serialized)
-        self.assertNotIn("a=cowork_erp_target", serialized)
+
+    def test_direction_and_posting_mode_are_quick_reply_questions(self):
+        direction = flow_cards.direction_card("zh")
+        mode = flow_cards.mode_card("express", "purchase", "zh")
+
+        self.assertEqual(direction["type"], "text")
+        self.assertEqual(
+            [item["action"]["label"] for item in quick_reply_items(direction)],
+            ["采购", "销售"],
+        )
+        self.assertEqual(
+            [item["action"]["label"] for item in quick_reply_items(mode)],
+            ["库存商品", "服务 / 非库存"],
+        )
 
     def test_preview_reuses_erp_header_and_footer_hierarchy(self):
         card = flow_cards.preview_card(
@@ -400,9 +464,22 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
         )
 
         bubble = card["contents"]
+        self.assertEqual(card["type"], "flex")
+        self.assertNotIn("quickReply", card)
         self.assertEqual(bubble["header"]["backgroundColor"], "#16873E")
         self.assertEqual(bubble["footer"]["contents"][0]["color"], "#16873E")
         self.assertEqual(bubble["footer"]["contents"][1]["layout"], "horizontal")
+        self.assertEqual(
+            action_labels(bubble["footer"]),
+            [
+                flow_cards._t("th", "confirm"),
+                flow_cards._t("th", "edit"),
+                flow_cards._t("th", "discard"),
+            ],
+        )
+        footer_postbacks = postback_data(bubble["footer"])
+        self.assertTrue(any("a=cowork_confirm" in data for data in footer_postbacks))
+        self.assertTrue(any("a=cowork_discard" in data for data in footer_postbacks))
         self.assertIn("Express · บริษัท ทดสอบ จำกัด", json.dumps(card, ensure_ascii=False))
 
     def test_maximum_chinese_preview_stays_below_line_bubble_limit(self):
@@ -471,6 +548,7 @@ class CoworkLineAccountPaginationRegressionTests(unittest.IsolatedAsyncioTestCas
             )
 
         self.assertEqual(len(cards), 2)
+        self.assertTrue(all(len(quick_reply_items(card)) <= flow_cards.QR_LIMIT for card in cards))
         self.assertTrue(any("endpoint=endpoint-13" in data for data in postback_data(cards[1])))
 
 

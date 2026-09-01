@@ -36,34 +36,27 @@ def texts(value) -> list[str]:
 
 
 class CoworkLineMenuTests(unittest.TestCase):
-    def test_each_language_has_six_cells_and_one_action(self):
-        expected_soon = {
+    def test_each_language_shows_only_the_available_entry(self):
+        unavailable_copy = {
             "th": "เร็ว ๆ นี้",
             "en": "Coming soon",
             "zh": "即将开放",
             "ja": "近日公開",
         }
-        for lang, soon in expected_soon.items():
+        for lang, unavailable in unavailable_copy.items():
             with self.subTest(lang=lang):
                 card = menu_cards.menu_card(lang)
                 menu_cells = cells(card)
-                self.assertEqual(len(menu_cells), 6)
+                self.assertEqual(len(menu_cells), 1)
                 self.assertEqual(
                     menu_cells[0]["action"]["data"],
                     "action=cowork_erp_start",
                 )
-                self.assertEqual(
-                    [cell for cell in menu_cells if "action" in cell],
-                    [menu_cells[0]],
-                )
-                self.assertTrue(all(soon in texts(cell) for cell in menu_cells[1:]))
+                self.assertNotIn(unavailable, texts(card))
                 self.assertIn(
                     "/static/dms/line-icons/", menu_cells[0]["contents"][0]["contents"][0]["url"]
                 )
                 self.assertEqual(menu_cells[0]["contents"][-1]["text"], "›")
-                self.assertTrue(
-                    all(cell["contents"][-1].get("text") != "›" for cell in menu_cells[1:])
-                )
 
     def test_unknown_language_falls_back_to_thai(self):
         self.assertEqual(

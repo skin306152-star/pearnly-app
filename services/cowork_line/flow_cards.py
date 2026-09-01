@@ -6,15 +6,9 @@ import math
 from urllib.parse import urlencode
 
 from services.cowork_line.card_fields import HEADER_KEYS, HEADER_LABELS
-from services.cowork_line.card_reasons import reason_text
-from services.line_dms.menu_cards import (
-    THEME_BLUE,
-    THEME_GREEN,
-    THEME_PINK,
-    THEME_PURPLE,
-    menu_icon_disc,
-    menu_item,
-)
+
+QR_LIMIT = 13
+QR_PAGE_SIZE = 11
 
 _COPY = {
     "th": {
@@ -32,8 +26,6 @@ _COPY = {
         "service": "บริการ / ไม่ลงสต๊อก",
         "cash": "เงินสด",
         "credit": "เครดิต",
-        "offline": "ออฟไลน์",
-        "blocked": "ยังไม่พร้อม",
         "review": "ตรวจสอบเอกสาร",
         "review_hint": "ตรวจสอบข้อมูล เป้าหมาย ERP และชุดบัญชีก่อนยืนยัน",
         "target": "ERP / ชุดบัญชี",
@@ -50,11 +42,6 @@ _COPY = {
         "ready": "พร้อมส่ง",
         "not_ready": "ยังส่งไม่ได้",
         "more": "เพิ่มเติม",
-        "in_flight": "มีงานกำลังส่ง",
-        "account_locked": "Express กำลังใช้งานชุดบัญชี",
-        "account_count": "พร้อมใช้ {count} ชุดบัญชี",
-        "configure_first": "กรุณาตั้งค่าบนเว็บไซต์ก่อนใช้งาน",
-        "connection_ready": "เชื่อมต่อแล้ว พร้อมส่ง",
     },
     "zh": {
         "pick_erp": "选择 ERP",
@@ -71,8 +58,6 @@ _COPY = {
         "service": "服务 / 非库存",
         "cash": "现金",
         "credit": "赊购 / 赊销",
-        "offline": "小助手离线",
-        "blocked": "暂不可推送",
         "review": "复核单据",
         "review_hint": "确认字段、目标 ERP 和账套后再入账",
         "target": "ERP / 账套",
@@ -89,11 +74,6 @@ _COPY = {
         "ready": "可以推送",
         "not_ready": "暂不可推送",
         "more": "更多",
-        "in_flight": "已有任务处理中",
-        "account_locked": "Express 正在占用该账套",
-        "account_count": "{count} 个账套可用",
-        "configure_first": "请先在网页端完成配置",
-        "connection_ready": "连接正常，可以推送",
     },
     "en": {
         "pick_erp": "Choose ERP",
@@ -110,8 +90,6 @@ _COPY = {
         "service": "Service / non-stock",
         "cash": "Cash",
         "credit": "Credit",
-        "offline": "Companion offline",
-        "blocked": "Not ready",
         "review": "Review document",
         "review_hint": "Check all fields, the ERP target, and account set before posting",
         "target": "ERP / account set",
@@ -128,11 +106,6 @@ _COPY = {
         "ready": "Ready",
         "not_ready": "Not ready",
         "more": "More",
-        "in_flight": "A task is in progress",
-        "account_locked": "Express is using this account set",
-        "account_count": "{count} account set(s) ready",
-        "configure_first": "Configure this integration on the website first",
-        "connection_ready": "Connected and ready to send",
     },
     "ja": {
         "pick_erp": "ERP を選択",
@@ -149,8 +122,6 @@ _COPY = {
         "service": "サービス / 非在庫",
         "cash": "現金",
         "credit": "掛け",
-        "offline": "コンパニオンがオフライン",
-        "blocked": "利用不可",
         "review": "書類を確認",
         "review_hint": "項目、ERP、帳簿を確認してから計上してください",
         "target": "ERP / 帳簿",
@@ -167,11 +138,6 @@ _COPY = {
         "ready": "送信可能",
         "not_ready": "送信不可",
         "more": "さらに表示",
-        "in_flight": "処理中のタスクがあります",
-        "account_locked": "Express が帳簿を使用中です",
-        "account_count": "{count} 個の帳簿を利用できます",
-        "configure_first": "先にウェブ画面で設定してください",
-        "connection_ready": "接続済み、送信できます",
     },
 }
 
@@ -233,204 +199,71 @@ def _row(title: str, subtitle: str, action: dict | None = None, *, muted: bool =
     return row
 
 
-_THEME_MUTED = {"accent": "#A39DAD", "soft": "#F2F1F5", "border": "#E1DFE7"}
+def _quick_reply_item(label: str, action: str, **params) -> dict:
+    return {"type": "action", "action": _postback(label, action, **params)}
 
 
-def _choice(
-    number: int,
-    title: str,
-    subtitle: str,
-    action: dict | None,
-    *,
-    theme: dict[str, str],
-    icon: str,
-    muted: bool = False,
-) -> dict:
-    return menu_item(
-        str(number),
-        icon,
-        _THEME_MUTED if muted else theme,
-        title,
-        subtitle,
-        action,
-    )
-
-
-def _bubble(
-    title: str,
-    rows: list[dict],
-    alt_text: str | None = None,
-    *,
-    subtitle: str = "",
-) -> dict:
-    head = {
-        "type": "box",
-        "layout": "horizontal",
-        "spacing": "md",
-        "alignItems": "center",
-        "contents": [
-            menu_icon_disc("menu-head", "#EAF0FF", "40px", "22px"),
-            {
-                "type": "box",
-                "layout": "vertical",
-                "flex": 1,
-                "contents": [
-                    {"type": "text", "text": title, "size": "sm", "weight": "bold", "wrap": True},
-                    {
-                        "type": "text",
-                        "text": subtitle or " ",
-                        "size": "xxs",
-                        "color": "#8A8A8A",
-                        "wrap": True,
-                        "margin": "xs",
-                    },
-                ],
-            },
-        ],
-    }
-    return {
-        "type": "flex",
-        "altText": alt_text or title,
-        "contents": {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "paddingAll": "16px",
-                "contents": [
-                    head,
-                    {"type": "separator", "margin": "lg", "color": "#EEEAF7"},
-                    *rows,
-                ],
-            },
-        },
-    }
+def _question(title: str, subtitle: str, items: list[dict]) -> dict:
+    message = {"type": "text", "text": f"{title}\n{subtitle}"}
+    if items:
+        message["quickReply"] = {"items": items}
+    return message
 
 
 def erp_picker_card(targets: list[dict], lang: str) -> dict:
-    rows = []
-    adapters = (("mrerp", "MR.ERP", THEME_PURPLE), ("express", "Express", THEME_BLUE))
-    for number, (adapter, label, theme) in enumerate(adapters, start=1):
-        entries = [item for item in targets if str(item.get("adapter") or "").lower() == adapter]
-        available = bool(entries)
-        action = _postback(label, "cowork_erp_type", erp=adapter) if available else None
-        rows.append(
-            _choice(
-                number,
-                label,
-                (
-                    _t(lang, "account_count").format(count=len(entries))
-                    if available
-                    else _t(lang, "configure_first")
-                ),
-                action,
-                theme=theme,
-                icon="menu-3",
-                muted=not available,
-            )
+    items = []
+    for adapter, label in (("mrerp", "MR.ERP"), ("express", "Express")):
+        available = any(
+            str(target.get("adapter") or "").lower() == adapter and target.get("selectable")
+            for target in targets
         )
-    return _bubble(
+        if available:
+            items.append(_quick_reply_item(label, "cowork_erp_type", erp=adapter))
+    return _question(
         _t(lang, "pick_erp"),
-        rows,
-        subtitle=_t(lang, "pick_erp_subtitle"),
+        _t(lang, "pick_erp_subtitle"),
+        items,
     )
 
 
 def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: int = 0) -> dict:
-    page_size = 8
-    page_count = max(1, math.ceil(len(targets) / page_size))
+    targets = [target for target in targets if target.get("selectable")]
+    page_count = max(1, math.ceil(len(targets) / QR_PAGE_SIZE))
     page = max(0, min(int(page), page_count - 1))
-    rows = []
-    page_targets = targets[page * page_size : (page + 1) * page_size]
-    for number, item in enumerate(page_targets, start=page * page_size + 1):
-        selectable = bool(item.get("selectable"))
-        missing = [str(value) for value in item.get("missing") or []]
-        detail = _t(lang, "connection_ready") if selectable else _t(lang, "blocked")
-        if missing:
-            detail = reason_text(_lang(lang), missing[0]) or _t(lang, "blocked")
-        checks = item.get("ready_checks") or {}
-        if checks.get("local_account_lock") == "waiting_lock":
-            detail = reason_text(_lang(lang), "account_set_locked")
-        elif checks.get("cloud_in_flight"):
-            detail = _t(lang, "in_flight")
-        action = None
-        if selectable:
-            action = _postback(
-                str(item.get("label") or item.get("name") or adapter),
-                "cowork_erp_target",
-                endpoint=item.get("endpoint_id") or item.get("id"),
-                workspace=item.get("workspace_client_id"),
-            )
-        rows.append(
-            _choice(
-                number,
-                str(item.get("label") or item.get("name") or adapter),
-                detail,
-                action,
-                theme=THEME_BLUE if adapter == "express" else THEME_PURPLE,
-                icon="menu-3",
-                muted=not selectable,
-            )
+    start = page * QR_PAGE_SIZE
+    items = [
+        _quick_reply_item(
+            str(item.get("label") or item.get("name") or adapter),
+            "cowork_erp_target",
+            endpoint=item.get("endpoint_id") or item.get("id"),
+            workspace=item.get("workspace_client_id"),
         )
-    navigation = []
+        for item in targets[start : start + QR_PAGE_SIZE]
+    ]
     if page > 0:
-        navigation.append(
-            _button(
-                _t(lang, "prev"),
-                "cowork_erp_type",
-                erp=adapter,
-                page=page - 1,
-            )
+        items.insert(
+            0,
+            _quick_reply_item(_t(lang, "prev"), "cowork_erp_type", erp=adapter, page=page - 1),
         )
     if page + 1 < page_count:
-        navigation.append(
-            _button(
-                _t(lang, "more"),
-                "cowork_erp_type",
-                erp=adapter,
-                page=page + 1,
-            )
+        items.append(
+            _quick_reply_item(_t(lang, "more"), "cowork_erp_type", erp=adapter, page=page + 1)
         )
-    if navigation:
-        rows.append(
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "sm",
-                "margin": "md",
-                "contents": navigation,
-            }
-        )
-    return _bubble(
+    return _question(
         _t(lang, "pick_account"),
-        rows,
-        subtitle=_t(lang, "pick_account_subtitle"),
+        _t(lang, "pick_account_subtitle"),
+        items,
     )
 
 
 def direction_card(lang: str) -> dict:
-    rows = [
-        _choice(
-            1,
-            _t(lang, "purchase"),
-            _t(lang, "pick_direction_subtitle"),
-            _postback(_t(lang, "purchase"), "cowork_direction", direction="purchase"),
-            theme=THEME_GREEN,
-            icon="menu-head",
-        ),
-        _choice(
-            2,
-            _t(lang, "sales"),
-            _t(lang, "pick_direction_subtitle"),
-            _postback(_t(lang, "sales"), "cowork_direction", direction="sales"),
-            theme=THEME_PINK,
-            icon="menu-head",
-        ),
-    ]
-    return _bubble(
+    return _question(
         _t(lang, "pick_direction"),
-        rows,
-        subtitle=_t(lang, "pick_direction_subtitle"),
+        _t(lang, "pick_direction_subtitle"),
+        [
+            _quick_reply_item(_t(lang, "purchase"), "cowork_direction", direction="purchase"),
+            _quick_reply_item(_t(lang, "sales"), "cowork_direction", direction="sales"),
+        ],
     )
 
 
@@ -439,22 +272,13 @@ def mode_card(adapter: str, direction: str, lang: str) -> dict:
         options = ("stock", "service")
     else:
         options = ("credit",) if direction == "purchase" else ("cash", "credit")
-    themes = (THEME_BLUE, THEME_PURPLE)
-    rows = [
-        _choice(
-            index,
-            _t(lang, value),
-            f"{adapter.upper()} · {_t(lang, direction)}",
-            _postback(_t(lang, value), "cowork_posting_mode", mode=value),
-            theme=themes[(index - 1) % len(themes)],
-            icon="menu-head",
-        )
-        for index, value in enumerate(options, start=1)
-    ]
-    return _bubble(
+    return _question(
         _t(lang, "pick_mode"),
-        rows,
-        subtitle=_t(lang, "pick_mode_subtitle"),
+        _t(lang, "pick_mode_subtitle"),
+        [
+            _quick_reply_item(_t(lang, value), "cowork_posting_mode", mode=value)
+            for value in options
+        ],
     )
 
 

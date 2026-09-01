@@ -282,7 +282,7 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
             _reply_text(reply_token, _text(lang, key))
             return
         targets = await asyncio.to_thread(erp_targets.list_targets, identity)
-        if not targets:
+        if not any(target.get("selectable") for target in targets):
             _set(identity, "select_erp", payload)
             _reply_text(reply_token, _text(lang, "configure"))
             return
@@ -311,7 +311,7 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
         targets = [
             item
             for item in await asyncio.to_thread(erp_targets.list_targets, identity)
-            if item.get("adapter") == adapter
+            if item.get("adapter") == adapter and item.get("selectable")
         ]
         if not targets:
             _reply_text(reply_token, _text(lang, "configure"))

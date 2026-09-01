@@ -16,6 +16,38 @@ def text_event(code="123456", *, source_type="user"):
 
 
 class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
+    async def test_menu_hides_all_unavailable_erp_targets(self):
+        identity = {
+            "tenant_id": "tenant-1",
+            "user_id": "user-1",
+            "line_user_id": "U-line",
+        }
+        with (
+            patch.object(webhook.cowork_flow, "_session", return_value={}),
+            patch.object(
+                webhook.cowork_flow.erp_targets,
+                "list_targets",
+                return_value=[{"adapter": "express", "selectable": False}],
+            ),
+            patch.object(webhook.cowork_flow, "_set"),
+            patch.object(webhook.cowork_flow, "_reply_text") as reply_text,
+            patch.object(webhook.cowork_flow, "_reply_card") as reply_card,
+        ):
+            await webhook.cowork_flow._handle_postback(
+                {
+                    "type": "postback",
+                    "replyToken": "reply-1",
+                    "source": {"type": "user", "userId": "U-line"},
+                    "postback": {"data": "action=cowork_erp_start"},
+                },
+                identity,
+                "reply-1",
+                "zh",
+            )
+
+        reply_text.assert_called_once_with("reply-1", webhook.cowork_flow._text("zh", "configure"))
+        reply_card.assert_not_called()
+
     async def test_menu_keyword_replies_through_cowork_channel(self):
         identity = {
             "tenant_id": "tenant-1",

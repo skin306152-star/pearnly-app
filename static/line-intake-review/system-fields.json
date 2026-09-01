@@ -1,0 +1,233 @@
+{
+  "label_aliases": {
+    "amount": "subtotal_item",
+    "buyer_address": "buyer_addr",
+    "buyer_tax_id": "buyer_tax",
+    "customer_name": "buyer_name",
+    "description": "name",
+    "grand_total": "total_amount",
+    "invoice_date": "date",
+    "invoice_no": "invoice_number",
+    "line_total": "subtotal_item",
+    "quantity": "qty",
+    "seller_address": "seller_addr",
+    "seller_tax_id": "seller_tax",
+    "unit_price": "price",
+    "vat_amount": "vat",
+    "vendor": "seller_name"
+  },
+  "labels": {
+    "buyer_addr": {
+      "th": "ที่อยู่ผู้ซื้อ",
+      "en": "Buyer address",
+      "zh": "买方地址",
+      "ja": "買い手住所"
+    },
+    "buyer_branch": {
+      "th": "สาขาผู้ซื้อ",
+      "en": "Buyer branch",
+      "zh": "买方分店",
+      "ja": "買い手支店"
+    },
+    "buyer_name": { "th": "ชื่อผู้ซื้อ", "en": "Buyer", "zh": "买方名称", "ja": "買い手" },
+    "buyer_tax": {
+      "th": "เลขผู้เสียภาษีผู้ซื้อ",
+      "en": "Buyer tax ID",
+      "zh": "买方税号",
+      "ja": "買い手税番号"
+    },
+    "cash_amount": { "th": "รับเงิน", "en": "Cash received", "zh": "实收现金", "ja": "受取現金" },
+    "category": { "th": "หมวดหมู่", "en": "Category", "zh": "分类", "ja": "カテゴリ" },
+    "change_amount": { "th": "เงินทอน", "en": "Change", "zh": "找零", "ja": "釣銭" },
+    "currency": { "th": "สกุลเงิน", "en": "Currency", "zh": "币种", "ja": "通貨" },
+    "date": { "th": "วันที่ ค.ศ.", "en": "Date", "zh": "日期", "ja": "日付" },
+    "date_raw": {
+      "th": "วันที่ตามเอกสาร",
+      "en": "Printed date",
+      "zh": "票面日期",
+      "ja": "印字日付"
+    },
+    "discount": { "th": "ส่วนลด", "en": "Discount", "zh": "折扣", "ja": "割引" },
+    "document_type": {
+      "th": "ประเภทเอกสาร",
+      "en": "Document type",
+      "zh": "单据类型",
+      "ja": "書類種類"
+    },
+    "invoice_number": {
+      "th": "เลขที่เอกสาร",
+      "en": "Document no.",
+      "zh": "单据号",
+      "ja": "書類番号"
+    },
+    "is_copy_or_duplicate": {
+      "th": "สำเนา / เอกสารซ้ำ",
+      "en": "Copy / duplicate",
+      "zh": "副本 / 重复",
+      "ja": "コピー / 重複"
+    },
+    "is_not_invoice": {
+      "th": "ไม่ใช่ใบกำกับภาษี",
+      "en": "Not an invoice",
+      "zh": "非票据",
+      "ja": "請求書ではない"
+    },
+    "name": { "th": "ชื่อรายการ", "en": "Item name", "zh": "项目名称", "ja": "明細名" },
+    "notes": { "th": "หมายเหตุ", "en": "Notes", "zh": "备注", "ja": "備考" },
+    "payment_method": {
+      "th": "วิธีชำระเงิน",
+      "en": "Payment method",
+      "zh": "支付方式",
+      "ja": "支払方法"
+    },
+    "payment_status": {
+      "th": "สถานะการชำระเงิน",
+      "en": "Payment status",
+      "zh": "付款状态",
+      "ja": "支払状況"
+    },
+    "posting_item_type_manual": {
+      "th": "ประเภทสินค้า / ค่าใช้จ่าย",
+      "en": "Goods / expense",
+      "zh": "货品 / 费用",
+      "ja": "商品 / 経費"
+    },
+    "posting_payment_manual": {
+      "th": "วิธีลงบัญชี",
+      "en": "Posting payment",
+      "zh": "入账付款方式",
+      "ja": "計上支払方法"
+    },
+    "price": { "th": "ราคาต่อหน่วย", "en": "Unit price", "zh": "单价", "ja": "単価" },
+    "qty": { "th": "จำนวน", "en": "Quantity", "zh": "数量", "ja": "数量" },
+    "seller_addr": {
+      "th": "ที่อยู่ผู้ขาย",
+      "en": "Seller address",
+      "zh": "卖方地址",
+      "ja": "売り手住所"
+    },
+    "seller_branch": {
+      "th": "สาขาผู้ขาย",
+      "en": "Seller branch",
+      "zh": "卖方分店",
+      "ja": "売り手支店"
+    },
+    "seller_name": { "th": "ชื่อผู้ขาย", "en": "Seller", "zh": "卖方名称", "ja": "売り手" },
+    "seller_tax": {
+      "th": "เลขผู้เสียภาษีผู้ขาย",
+      "en": "Seller tax ID",
+      "zh": "卖方税号",
+      "ja": "売り手税番号"
+    },
+    "subtotal": { "th": "ยอดก่อนภาษี", "en": "Subtotal", "zh": "未税金额", "ja": "小計" },
+    "subtotal_item": { "th": "จำนวนเงิน", "en": "Amount", "zh": "金额", "ja": "金額" },
+    "total_amount": { "th": "ยอดรวม", "en": "Total", "zh": "总金额", "ja": "合計" },
+    "unit": { "th": "หน่วย", "en": "Unit", "zh": "单位", "ja": "単位" },
+    "vat": { "th": "ภาษีมูลค่าเพิ่ม", "en": "VAT", "zh": "增值税", "ja": "VAT" },
+    "wht_amount": {
+      "th": "ภาษีหัก ณ ที่จ่าย",
+      "en": "WHT amount",
+      "zh": "预扣税额",
+      "ja": "源泉税額"
+    },
+    "wht_rate": {
+      "th": "อัตราภาษีหัก ณ ที่จ่าย",
+      "en": "WHT rate",
+      "zh": "预扣税率",
+      "ja": "源泉税率"
+    }
+  },
+  "enum_aliases": {
+    "payment_method": {
+      "bank_transfer": "transfer",
+      "credit_card": "card",
+      "debit_card": "card",
+      "qr_payment": "promptpay",
+      "qrpayment": "promptpay"
+    }
+  },
+  "enums": {
+    "direction": {
+      "purchase": { "th": "ซื้อ", "en": "Purchase", "zh": "采购", "ja": "仕入" },
+      "sales": { "th": "ขาย", "en": "Sales", "zh": "销售", "ja": "売上" }
+    },
+    "document_type": {
+      "credit_note": {
+        "th": "ใบลดหนี้",
+        "en": "Credit note",
+        "zh": "贷项通知单",
+        "ja": "クレジットノート"
+      },
+      "order_evidence": {
+        "th": "หลักฐานการสั่งซื้อ",
+        "en": "Order evidence",
+        "zh": "订单凭证",
+        "ja": "注文証憑"
+      },
+      "other": {
+        "th": "เอกสารอื่น",
+        "en": "Other document",
+        "zh": "其他单据",
+        "ja": "その他の書類"
+      },
+      "payment_evidence": {
+        "th": "หลักฐานการชำระเงิน",
+        "en": "Payment evidence",
+        "zh": "付款凭证",
+        "ja": "支払証憑"
+      },
+      "receipt": { "th": "ใบเสร็จรับเงิน", "en": "Receipt", "zh": "收据", "ja": "領収書" },
+      "simplified_tax_invoice": {
+        "th": "ใบกำกับภาษีอย่างย่อ",
+        "en": "Simplified tax invoice",
+        "zh": "简易税票",
+        "ja": "簡易税務インボイス"
+      },
+      "tax_invoice": {
+        "th": "ใบกำกับภาษีเต็มรูป",
+        "en": "Full tax invoice",
+        "zh": "完整税票",
+        "ja": "正式税務インボイス"
+      }
+    },
+    "payment_method": {
+      "card": { "th": "บัตร", "en": "Card", "zh": "银行卡", "ja": "カード" },
+      "cash": { "th": "เงินสด", "en": "Cash", "zh": "现金", "ja": "現金" },
+      "promptpay": {
+        "th": "พร้อมเพย์ / QR",
+        "en": "PromptPay / QR",
+        "zh": "PromptPay / 二维码",
+        "ja": "PromptPay / QR"
+      },
+      "qr": { "th": "QR", "en": "QR", "zh": "二维码", "ja": "QR" },
+      "transfer": { "th": "โอนเงิน", "en": "Bank transfer", "zh": "银行转账", "ja": "銀行振込" }
+    },
+    "payment_status": {
+      "paid": { "th": "ชำระแล้ว", "en": "Paid", "zh": "已付款", "ja": "支払済み" },
+      "partial": {
+        "th": "ชำระบางส่วน",
+        "en": "Partially paid",
+        "zh": "部分付款",
+        "ja": "一部支払済み"
+      },
+      "unpaid": { "th": "ยังไม่ชำระ", "en": "Unpaid", "zh": "未付款", "ja": "未払い" }
+    },
+    "posting_item_type_manual": {
+      "expense": { "th": "ค่าใช้จ่าย", "en": "Expense", "zh": "费用", "ja": "経費" },
+      "goods": { "th": "สินค้า", "en": "Goods", "zh": "货品", "ja": "商品" }
+    },
+    "posting_kind": {
+      "service": {
+        "th": "บริการ / ไม่ลงสต๊อก",
+        "en": "Service / non-stock",
+        "zh": "服务 / 非库存",
+        "ja": "サービス / 非在庫"
+      },
+      "stock": { "th": "สินค้าในสต๊อก", "en": "Inventory", "zh": "库存商品", "ja": "在庫商品" }
+    },
+    "posting_payment_manual": {
+      "cash": { "th": "เงินสด", "en": "Cash", "zh": "现金", "ja": "現金" },
+      "credit": { "th": "เครดิต", "en": "Credit", "zh": "赊购 / 赊销", "ja": "掛け" }
+    }
+  }
+}

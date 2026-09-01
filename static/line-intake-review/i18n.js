@@ -3,6 +3,11 @@
 
     var copy = {
         th: {
+            additionalField: 'ข้อมูลเพิ่มเติม',
+            unknownValue: 'ค่าระบบที่ไม่รู้จัก',
+            notSpecified: 'ไม่ได้ระบุ',
+            true: 'ใช่',
+            false: 'ไม่ใช่',
             searchPlaceholder: 'ค้นหาเลขที่เอกสาร คู่ค้า หรือวันที่',
             filterAll: 'ทั้งหมด',
             filterReview: 'ต้องตรวจสอบ',
@@ -30,6 +35,11 @@
             previewFailed: 'เปิดภาพต้นฉบับไม่สำเร็จ',
         },
         en: {
+            additionalField: 'Additional information',
+            unknownValue: 'Unrecognized system value',
+            notSpecified: 'Not specified',
+            true: 'Yes',
+            false: 'No',
             searchPlaceholder: 'Search document number, party, or date',
             filterAll: 'All',
             filterReview: 'Needs review',
@@ -57,6 +67,11 @@
             previewFailed: 'Could not open the original',
         },
         zh: {
+            additionalField: '附加信息',
+            unknownValue: '未识别的系统值',
+            notSpecified: '未填写',
+            true: '是',
+            false: '否',
             searchPlaceholder: '搜索单据号、交易方或日期',
             filterAll: '全部',
             filterReview: '待处理异常',
@@ -84,6 +99,11 @@
             previewFailed: '无法打开原始单据',
         },
         ja: {
+            additionalField: '追加情報',
+            unknownValue: '未認識のシステム値',
+            notSpecified: '未指定',
+            true: 'はい',
+            false: 'いいえ',
             searchPlaceholder: '書類番号、取引先、日付を検索',
             filterAll: 'すべて',
             filterReview: '要確認',
@@ -112,16 +132,108 @@
         },
     };
 
+    var EMPTY_CATALOG = { label_aliases: {}, labels: {}, enum_aliases: {}, enums: {} };
+    var catalog = null;
+    var catalogPromise = null;
+
     function format(value, values) {
         return String(value || '').replace(/\{(\w+)\}/g, function (_, key) {
             return values && values[key] != null ? String(values[key]) : '';
         });
     }
 
+    function language(lang) {
+        return ['th', 'en', 'zh', 'ja'].indexOf(lang) >= 0 ? lang : 'th';
+    }
+
+    function localized(row, lang) {
+        if (!row || typeof row !== 'object') return '';
+        return row[language(lang)] || row.en || row.th || '';
+    }
+
+    function normalize(value) {
+        return String(value == null ? '' : value)
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+    }
+
+    function canonicalField(key) {
+        var aliases = (catalog || EMPTY_CATALOG).label_aliases || {};
+        return aliases[key] || key;
+    }
+
+    function enumTable(key) {
+        var fields = (catalog || EMPTY_CATALOG).enums || {};
+        return fields[canonicalField(key)] || null;
+    }
+
+    function canonicalValue(key, value) {
+        var normalized = normalize(value);
+        var aliases = ((catalog || EMPTY_CATALOG).enum_aliases || {})[canonicalField(key)] || {};
+        return aliases[normalized] || normalized;
+    }
+
+    function load() {
+        if (catalog) return Promise.resolve(catalog);
+        if (!catalogPromise) {
+            catalogPromise = fetch('/static/line-intake-review/system-fields.json?v=1')
+                .then(function (response) {
+                    if (!response.ok) throw new Error('system i18n unavailable');
+                    return response.json();
+                })
+                .catch(function () {
+                    return EMPTY_CATALOG;
+                })
+                .then(function (value) {
+                    catalog = value && typeof value === 'object' ? value : EMPTY_CATALOG;
+                    return catalog;
+                });
+        }
+        return catalogPromise;
+    }
+
+    function label(lang, key) {
+        var fields = (catalog || EMPTY_CATALOG).labels || {};
+        return localized(fields[canonicalField(key)], lang) || text(lang, 'additionalField');
+    }
+
+    function options(lang, key, currentValue) {
+        var table = enumTable(key);
+        if (!table) return null;
+        var raw = String(currentValue == null ? '' : currentValue);
+        var current = canonicalValue(key, raw);
+        var rows = Object.keys(table).map(function (value) {
+            return {
+                value: value === current && raw ? raw : value,
+                label: localized(table[value], lang),
+                selected: value === current,
+            };
+        });
+        if (raw && !Object.prototype.hasOwnProperty.call(table, current)) {
+            rows.unshift({ value: raw, label: text(lang, 'unknownValue'), selected: true });
+        }
+        return rows;
+    }
+
+    function enumText(lang, key, value) {
+        var table = enumTable(key);
+        if (!table || value == null || value === '') return value;
+        var row = table[canonicalValue(key, value)];
+        return localized(row, lang) || text(lang, 'unknownValue');
+    }
+
+    function text(lang, key, values) {
+        var table = copy[language(lang)];
+        return format(table[key] || copy.en[key] || key, values);
+    }
+
     window.lineIntakeReviewI18n = {
-        text: function (lang, key, values) {
-            var table = copy[lang] || copy.th;
-            return format(table[key] || copy.en[key] || key, values);
-        },
+        enumText: enumText,
+        label: label,
+        load: load,
+        options: options,
+        text: text,
     };
 })();

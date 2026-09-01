@@ -29,7 +29,13 @@
         'category',
         'notes',
     ];
-    var META = new Set(['items', 'additional_invoices', 'source_refs', 'direction']);
+    var META = new Set([
+        'items',
+        'additional_invoices',
+        'source_refs',
+        'direction',
+        'document_type_source',
+    ]);
 
     function esc(value) {
         var node = document.createElement('div');
@@ -37,8 +43,41 @@
         return node.innerHTML;
     }
 
-    function scalarControl(value, path, lang, label, sourcePage) {
+    function enumControl(options, value, path, lang, source) {
+        var blank =
+            '<option value=""' +
+            (value == null || value === '' ? ' selected' : '') +
+            '>' +
+            esc(window.lineIntakeReviewI18n.text(lang, 'notSpecified')) +
+            '</option>';
+        return (
+            '<select data-field="' +
+            esc(path) +
+            '"' +
+            source +
+            '>' +
+            blank +
+            options
+                .map(function (option) {
+                    return (
+                        '<option value="' +
+                        esc(option.value) +
+                        '"' +
+                        (option.selected ? ' selected' : '') +
+                        '>' +
+                        esc(option.label) +
+                        '</option>'
+                    );
+                })
+                .join('') +
+            '</select>'
+        );
+    }
+
+    function scalarControl(key, value, path, lang, sourcePage) {
         var source = ' data-source-page="' + Number(sourcePage || 0) + '"';
+        var options = window.lineIntakeReviewI18n.options(lang, key, value);
+        if (options) return enumControl(options, value, path, lang, source);
         if (typeof value === 'boolean') {
             return (
                 '<select data-field="' +
@@ -48,11 +87,11 @@
                 '><option value="true"' +
                 (value ? ' selected' : '') +
                 '>' +
-                esc(label(lang, 'true')) +
+                esc(window.lineIntakeReviewI18n.text(lang, 'true')) +
                 '</option><option value="false"' +
                 (!value ? ' selected' : '') +
                 '>' +
-                esc(label(lang, 'false')) +
+                esc(window.lineIntakeReviewI18n.text(lang, 'false')) +
                 '</option></select>'
             );
         }
@@ -86,13 +125,7 @@
                         '<label class="field"><span>' +
                         esc(label(lang, key)) +
                         '</span>' +
-                        scalarControl(
-                            value,
-                            recordIndex + ':' + key,
-                            lang,
-                            label,
-                            sourcePage(key)
-                        ) +
+                        scalarControl(key, value, recordIndex + ':' + key, lang, sourcePage(key)) +
                         '</label>'
                     );
                 })
@@ -123,10 +156,10 @@
                                     esc(label(lang, key)) +
                                     '</span>' +
                                     scalarControl(
+                                        key,
                                         item[key],
                                         recordIndex + ':items:' + itemIndex + ':' + key,
                                         lang,
-                                        label,
                                         sourcePage(key, itemIndex)
                                     ) +
                                     '</label>'

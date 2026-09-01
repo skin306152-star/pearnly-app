@@ -176,40 +176,13 @@
         },
     };
 
-    var labels = {
-        invoice_number: ['เลขที่ใบแจ้งหนี้', 'Invoice no.', '发票号', '請求書番号'],
-        date: ['วันที่', 'Date', '日期', '日付'],
-        document_type: ['ประเภทเอกสาร', 'Document type', '单据类型', '書類種類'],
-        seller_name: ['ผู้ขาย', 'Seller', '卖方', '売り手'],
-        seller_tax: ['เลขผู้เสียภาษีผู้ขาย', 'Seller tax ID', '卖方税号', '売り手税番号'],
-        seller_branch: ['สาขาผู้ขาย', 'Seller branch', '卖方分店', '売り手支店'],
-        seller_addr: ['ที่อยู่ผู้ขาย', 'Seller address', '卖方地址', '売り手住所'],
-        seller_address: ['ที่อยู่ผู้ขาย', 'Seller address', '卖方地址', '売り手住所'],
-        buyer_name: ['ผู้ซื้อ', 'Buyer', '买方', '買い手'],
-        buyer_tax: ['เลขผู้เสียภาษีผู้ซื้อ', 'Buyer tax ID', '买方税号', '買い手税番号'],
-        buyer_branch: ['สาขาผู้ซื้อ', 'Buyer branch', '买方分店', '買い手支店'],
-        buyer_addr: ['ที่อยู่ผู้ซื้อ', 'Buyer address', '买方地址', '買い手住所'],
-        buyer_address: ['ที่อยู่ผู้ซื้อ', 'Buyer address', '买方地址', '買い手住所'],
-        subtotal: ['ยอดก่อนภาษี', 'Subtotal', '小计', '小計'],
-        vat: ['ภาษีมูลค่าเพิ่ม', 'VAT', 'VAT', 'VAT'],
-        total_amount: ['ยอดรวม', 'Total', '总额', '合計'],
-        notes: ['หมายเหตุ', 'Notes', '备注', '備考'],
-        name: ['ชื่อสินค้า', 'Item name', '商品名', '商品名'],
-        qty: ['จำนวน', 'Quantity', '数量', '数量'],
-        unit: ['หน่วย', 'Unit', '单位', '単位'],
-        price: ['ราคาต่อหน่วย', 'Unit price', '单价', '単価'],
-        subtotal_item: ['จำนวนเงิน', 'Amount', '金额', '金額'],
-    };
-    var languageIndex = { th: 0, en: 1, zh: 2, ja: 3 };
-
     window.erpLineIntakeI18n = {
         text: function (lang, key, values) {
             var local = (copy[lang] || copy.th)[key] || copy.en[key];
             return local || window.lineIntakeReviewI18n.text(lang, key, values);
         },
         label: function (lang, key) {
-            var row = labels[key];
-            return row ? row[languageIndex[lang] || 0] : key;
+            return window.lineIntakeReviewI18n.label(lang, key);
         },
     };
 })();

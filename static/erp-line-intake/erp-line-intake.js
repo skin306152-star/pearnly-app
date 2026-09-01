@@ -41,7 +41,13 @@
         'seller_address',
     ];
     var AMOUNT_ORDER = ['subtotal', 'vat', 'total_amount', 'notes'];
-    var HIDDEN_FIELDS = new Set(['items', 'additional_invoices', 'source_refs']);
+    var HIDDEN_FIELDS = new Set([
+        'items',
+        'additional_invoices',
+        'source_refs',
+        'direction',
+        'document_type_source',
+    ]);
 
     function t(key, values) {
         return I.text(lang, key, values);
@@ -150,6 +156,7 @@
                     fields[key],
                     requiredField(key),
                     recordIndex + ':field:' + key,
+                    lang,
                     label,
                     R.escape,
                     S.fieldPage(record, key)
@@ -194,6 +201,7 @@
                                 item[key],
                                 ['name', 'qty'].indexOf(key) >= 0,
                                 recordIndex + ':item:' + itemIndex + ':' + key,
+                                lang,
                                 label,
                                 R.escape,
                                 S.fieldPage(record, key, itemIndex)
@@ -388,14 +396,17 @@
         else show('loading');
     };
     show('loading');
-    window.lineIntakeLiff
-        .boot({
+    Promise.all([
+        window.lineIntakeReviewI18n.load(),
+        window.lineIntakeLiff.boot({
             flow: 'erp-intake',
             configUrl: '/api/line/erp/liff/config',
             authUrl: '/api/line/erp/liff/auth',
             tokenKey: 'erp_line_token',
-        })
-        .then(function (auth) {
+        }),
+    ])
+        .then(function (values) {
+            var auth = values[1];
             draftId = auth.draftId;
             return api('/api/line/erp/draft/' + encodeURIComponent(draftId));
         })

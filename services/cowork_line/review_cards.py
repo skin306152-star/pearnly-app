@@ -7,9 +7,10 @@ import os
 from services.cowork_line import flow_cards
 from services.cowork_line.card_reasons import reason_text
 from services.line_platform.summary_review_card import build_summary_card, postback_action
+from services.line_platform.system_i18n import field_value
 
 
-def _field_value(fields: dict, key: str, *, limit: int = 80) -> str:
+def _field_value(fields: dict, key: str, lang: str, *, limit: int = 80) -> str:
     aliases = {
         "invoice_number": ("invoice_no",),
         "date": ("invoice_date",),
@@ -22,7 +23,7 @@ def _field_value(fields: dict, key: str, *, limit: int = 80) -> str:
     for name in (key, *aliases.get(key, ())):
         value = fields.get(name)
         if value not in (None, "", [], {}):
-            return str(value)[:limit]
+            return field_value(lang, key, value)[:limit]
     return "-"
 
 
@@ -109,7 +110,7 @@ def preview_card(
     body.extend(
         _kv(
             label,
-            _field_value(fields, key),
+            _field_value(fields, key, lang),
             accent=accent if key == "total_amount" else None,
         )
         for key, label in zip(flow_cards._HEADER_KEYS, labels, strict=True)

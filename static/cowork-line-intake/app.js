@@ -226,14 +226,17 @@
         else show('loading');
     };
     show('loading');
-    window.lineIntakeLiff
-        .boot({
+    Promise.all([
+        window.lineIntakeReviewI18n.load(),
+        window.lineIntakeLiff.boot({
             flow: 'cowork-intake',
             configUrl: '/api/cowork-line/intake/liff/config',
             authUrl: '/api/cowork-line/intake/liff/auth',
             tokenKey: 'cowork_line_intake_token',
-        })
-        .then(function (auth) {
+        }),
+    ])
+        .then(function (values) {
+            var auth = values[1];
             draftId = auth.draftId;
             return api('/api/cowork-line/intake/draft/' + encodeURIComponent(draftId));
         })

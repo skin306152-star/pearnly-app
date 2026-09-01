@@ -27,8 +27,13 @@ function erpRecords() {
                     fields: {
                         invoice_no: 'PO-001',
                         invoice_date: '2026-08-28',
+                        document_type: 'simplified_tax_invoice',
+                        document_type_source: 'ocr',
                         seller_name: 'Supplier',
                         seller_tax: '0101',
+                        payment_method: 'card',
+                        payment_status: 'paid',
+                        posting_payment_manual: 'cash',
                         total_amount: '107',
                         items: [
                             {
@@ -79,7 +84,11 @@ function coworkRecords() {
                     fields: {
                         invoice_number: 'CW-001',
                         date: '2026-09-01',
+                        document_type: 'simplified_tax_invoice',
+                        document_type_source: 'ocr',
                         seller_name: 'Cowork Supplier',
+                        payment_method: 'card',
+                        posting_payment_manual: 'cash',
                         total_amount: '320',
                         items: [{ name: '', qty: '2', price: '160', subtotal: '320' }],
                     },
@@ -417,6 +426,55 @@ test('editor locks the conversation ERP and only switches its account set', asyn
     await expect(page.locator('[data-target-selection="payment"]')).toHaveValue('cash');
     await expect(page.locator('[data-kind]')).toHaveCount(0);
     await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
+});
+
+test('both LINE editors localize system fields while preserving stored enum values', async ({
+    browser,
+}) => {
+    const erp = await browser.newPage({ ...devices['iPhone 13'] });
+    await openErp(erp);
+    await erp.locator('.review-row').first().click();
+    const erpDocumentType = erp.locator('[data-field="0:field:document_type"]');
+    await expect(erpDocumentType).toHaveValue('simplified_tax_invoice');
+    await expect(erpDocumentType.locator('option:checked')).toHaveText('ใบกำกับภาษีอย่างย่อ');
+    await expect(erp.locator('[data-field="0:field:payment_method"] option:checked')).toHaveText(
+        'บัตร'
+    );
+    await expect(
+        erp.locator('[data-field="0:field:posting_payment_manual"] option:checked')
+    ).toHaveText('เงินสด');
+    await expect(erp.locator('[data-field*="document_type_source"]')).toHaveCount(0);
+    await expect(erp.locator('body')).not.toContainText('posting_payment_manual');
+    await erp.locator('#lang').selectOption('zh');
+    await expect(erpDocumentType).toHaveValue('simplified_tax_invoice');
+    await expect(erpDocumentType.locator('option:checked')).toHaveText('简易税票');
+    await expect(erp.locator('[data-field="0:field:payment_method"] option:checked')).toHaveText(
+        '银行卡'
+    );
+    await erp.screenshot({ path: path.join(OUT, 'erp-mobile-system-i18n-zh.png'), fullPage: true });
+
+    const cowork = await browser.newPage({ ...devices['iPhone 13'] });
+    await openCowork(cowork);
+    await cowork.locator('.review-row').click();
+    const coworkDocumentType = cowork.locator('[data-field="0:document_type"]');
+    await expect(coworkDocumentType).toHaveValue('simplified_tax_invoice');
+    await expect(coworkDocumentType.locator('option:checked')).toHaveText('ใบกำกับภาษีอย่างย่อ');
+    await expect(cowork.locator('[data-field="0:payment_method"] option:checked')).toHaveText(
+        'บัตร'
+    );
+    await expect(
+        cowork.locator('[data-field="0:posting_payment_manual"] option:checked')
+    ).toHaveText('เงินสด');
+    await expect(cowork.locator('[data-field*="document_type_source"]')).toHaveCount(0);
+    await cowork.locator('#lang').selectOption('ja');
+    await expect(coworkDocumentType).toHaveValue('simplified_tax_invoice');
+    await expect(coworkDocumentType.locator('option:checked')).toHaveText('簡易税務インボイス');
+    await cowork.screenshot({
+        path: path.join(OUT, 'cowork-mobile-system-i18n-ja.png'),
+        fullPage: true,
+    });
+    await erp.close();
+    await cowork.close();
 });
 
 test('retryable ERP result is shown as waiting instead of final failure', async ({ page }) => {

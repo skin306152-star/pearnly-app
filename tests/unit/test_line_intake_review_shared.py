@@ -4,6 +4,7 @@ from pathlib import Path
 
 from services.line_platform.draft_validation import batch_issues, document_issues
 from services.line_platform.summary_review_card import build_summary_card, postback_action
+from services.line_platform.system_i18n import field_label, field_value
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -103,6 +104,7 @@ class SharedEditorSourceTests(unittest.TestCase):
         )
         for html in (cowork, erp):
             self.assertIn("/static/line-intake-review/batch-review.js?v=2", html)
+            self.assertIn("/static/line-intake-review/i18n.js?v=2", html)
             self.assertIn("/static/line-intake-review/source-page.js?v=1", html)
             self.assertIn("/static/line-intake-review/liff-runtime.js?v=1", html)
             self.assertIn("data-dialog-title", html)
@@ -115,6 +117,55 @@ class SharedEditorSourceTests(unittest.TestCase):
         self.assertIn("data-source-page", source_page)
         self.assertFalse((ROOT / "static/erp-line-intake/preview.js").exists())
         self.assertFalse((ROOT / "static/erp-line-intake/discard-dialog.js").exists())
+
+
+class SharedSystemFieldI18nTests(unittest.TestCase):
+    def test_every_system_label_and_enum_has_all_four_languages(self):
+        catalog = json.loads(
+            (ROOT / "static/line-intake-review/system-fields.json").read_text(encoding="utf-8")
+        )
+        for group in (catalog["labels"], *catalog["enums"].values()):
+            for translations in group.values():
+                self.assertEqual(set(translations), {"th", "en", "zh", "ja"})
+                self.assertTrue(all(str(value).strip() for value in translations.values()))
+
+    def test_aliases_and_system_values_are_localized_without_changing_free_text(self):
+        self.assertEqual(field_label("zh", "invoice_no"), "单据号")
+        self.assertEqual(
+            field_value("th", "document_type", "simplified_tax_invoice"),
+            "ใบกำกับภาษีอย่างย่อ",
+        )
+        self.assertEqual(field_value("zh", "payment_method", "card"), "银行卡")
+        self.assertEqual(field_value("ja", "posting_payment_manual", "cash"), "現金")
+        self.assertEqual(field_value("th", "seller_name", "Sister Makeup"), "Sister Makeup")
+
+    def test_unknown_system_value_is_not_exposed_as_an_internal_code(self):
+        translated = field_value("zh", "document_type", "new_internal_type")
+        self.assertEqual(translated, "未识别的系统值")
+        self.assertNotIn("new_internal_type", translated)
+
+    def test_cowork_summary_card_localizes_system_values(self):
+        from services.cowork_line.review_cards import preview_card
+
+        card = preview_card(
+            draft_id="draft-1",
+            fields={
+                "invoice_number": "INV-1",
+                "document_type": "simplified_tax_invoice",
+                "payment_method": "card",
+                "seller_name": "Sister Makeup",
+                "items": [{"name": "Lens"}],
+            },
+            target={"adapter": "mrerp", "workspace_name": "TEST2019"},
+            direction="sales",
+            mode="cash",
+            lang="th",
+        )
+        rendered = json.dumps(card, ensure_ascii=False)
+        self.assertIn("ใบกำกับภาษีอย่างย่อ", rendered)
+        self.assertIn("บัตร", rendered)
+        self.assertIn("Sister Makeup", rendered)
+        self.assertNotIn("simplified_tax_invoice", rendered)
 
 
 if __name__ == "__main__":

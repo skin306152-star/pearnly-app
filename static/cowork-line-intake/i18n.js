@@ -219,53 +219,13 @@
         },
     };
 
-    var labels = {
-        document_type: ['ประเภทเอกสาร', 'Document type', '单据类型', '書類種類'],
-        is_not_invoice: ['ไม่ใช่ใบกำกับภาษี', 'Not an invoice', '非票据', '請求書ではない'],
-        is_copy_or_duplicate: [
-            'สำเนา / เอกสารซ้ำ',
-            'Copy / duplicate',
-            '副本 / 重复',
-            'コピー / 重複',
-        ],
-        invoice_number: ['เลขที่เอกสาร', 'Document no.', '单据号', '書類番号'],
-        date: ['วันที่ ค.ศ.', 'Date', '日期', '日付'],
-        date_raw: ['วันที่ตามเอกสาร', 'Printed date', '票面日期', '印字日付'],
-        seller_name: ['ชื่อผู้ขาย', 'Seller', '卖方名称', '売り手'],
-        seller_tax: ['เลขผู้เสียภาษีผู้ขาย', 'Seller tax ID', '卖方税号', '売り手税番号'],
-        seller_addr: ['ที่อยู่ผู้ขาย', 'Seller address', '卖方地址', '売り手住所'],
-        seller_branch: ['สาขาผู้ขาย', 'Seller branch', '卖方分店', '売り手支店'],
-        buyer_name: ['ชื่อผู้ซื้อ', 'Buyer', '买方名称', '買い手'],
-        buyer_tax: ['เลขผู้เสียภาษีผู้ซื้อ', 'Buyer tax ID', '买方税号', '買い手税番号'],
-        buyer_addr: ['ที่อยู่ผู้ซื้อ', 'Buyer address', '买方地址', '買い手住所'],
-        buyer_branch: ['สาขาผู้ซื้อ', 'Buyer branch', '买方分店', '買い手支店'],
-        subtotal: ['ยอดก่อนภาษี', 'Subtotal', '小计', '小計'],
-        vat: ['ภาษีมูลค่าเพิ่ม', 'VAT', 'VAT', 'VAT'],
-        wht_rate: ['อัตราภาษีหัก ณ ที่จ่าย', 'WHT rate', '预扣税率', '源泉税率'],
-        wht_amount: ['ภาษีหัก ณ ที่จ่าย', 'WHT amount', '预扣税额', '源泉税額'],
-        discount: ['ส่วนลด', 'Discount', '折扣', '割引'],
-        total_amount: ['ยอดสุทธิ', 'Total', '总额', '合計'],
-        cash_amount: ['รับเงิน', 'Cash received', '实收现金', '受取現金'],
-        change_amount: ['เงินทอน', 'Change', '找零', '釣銭'],
-        payment_method: ['วิธีชำระเงิน', 'Payment method', '支付方式', '支払方法'],
-        currency: ['สกุลเงิน', 'Currency', '币种', '通貨'],
-        notes: ['หมายเหตุ', 'Notes', '备注', '備考'],
-        category: ['หมวดหมู่', 'Category', '分类', 'カテゴリ'],
-        name: ['ชื่อรายการ', 'Item name', '项目名称', '明細名'],
-        qty: ['จำนวน', 'Quantity', '数量', '数量'],
-        price: ['ราคาต่อหน่วย', 'Unit price', '单价', '単価'],
-    };
-
     window.coworkIntakeI18n = {
         text: function (lang, key, values) {
             var local = (copy[lang] || copy.th)[key] || copy.en[key];
             return local || window.lineIntakeReviewI18n.text(lang, key, values);
         },
         label: function (lang, key) {
-            var row = labels[key];
-            return row
-                ? row[{ th: 0, en: 1, zh: 2, ja: 3 }[lang] || 0]
-                : (copy[lang] || copy.th)[key] || copy.en[key] || key;
+            return window.lineIntakeReviewI18n.label(lang, key);
         },
     };
 })();

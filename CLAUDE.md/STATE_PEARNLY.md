@@ -1,8 +1,20 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-01 LINE/ERP 推送状态闭环 READY_FOR_DEVICE
+## 当前状态卡 · 09-01 `/erp` 两层 LINE 菜单 READY_FOR_DEVICE
 
-- **▶ 当前 task**:五项现场问题已修并发布：Companion 心跳离线、同套账多 Pearnly 连接、长商品名、重试先失败后成功、LINE 成功无回执。应用=`88c33252`，Companion `v1.1.69`=`96b530ff`。
+- **▶ 当前 task**:纠正 `/erp` 菜单格式；应用逻辑=`359c1e02`，manual CD `33523760620` 成功，生产已运行该 SHA。
+- **💬 对话菜单**:不再用六宫格 Flex；按 DMS 格式显示两张纵向、全宽、整行可点卡片，含专用采购入库/销售出库图标、编号、标题、说明和箭头。
+- **📱 底部 Rich Menu**:独立 2×3 六宫格；仅采购、销售两格有 LINE 点击区，四个占位格无 action。默认菜单=`richmenu-b910b934511b275beafef72f47432603`。
+- **🛡 权限/状态**:对话菜单不再被 ERP 预检红字卡劫持，点选采购/销售后才检测目标；Rich Menu postback 同样校验员工分配的业务方向，不可绕过权限。
+- **✅ 验证**:完整 pre-push 两次全绿（unittest 1108 模块/6 片）；LINE Flex 与 Rich Menu 官方 validator 均 HTTP 200；生产 HEAD/service/health/ready 回读通过。
+- **✅ LINE 回读**:当前 ERP 菜单数=1，尺寸=2500×1686，点击区=2，图片 SHA-256=`0f749fa6c8ab83fa244dcd8a94279f78489389672ecfa4fe2a16e4f5d2eedfcd`，与仓库成品一致。
+- **⏭ 真机验收**:在 Pearnly ERP LINE 展开底部菜单，确认两个有效菜单+四个占位；发送 `menu/เมนู` 确认对话里是两张纵向行卡。用户真机 OK 前不称验收完成。
+
+---
+
+## 历史 · 09-01 LINE/ERP 推送状态闭环 READY_FOR_DEVICE
+
+- **▶ 当时 task**:五项现场问题已修并发布：Companion 心跳离线、同套账多 Pearnly 连接、长商品名、重试先失败后成功、LINE 成功无回执。应用=`88c33252`，Companion `v1.1.69`=`96b530ff`。
 - **🖥 Companion 真因/修复**:`v1.1.68` 在心跳线程同步扫描巨大 UNC Express 目录，超过 180 秒触发 watchdog 重启并把全部 profile 标离线；`v1.1.69` 改后台共享目录扫描，心跳与轮询不再等待。取消“同 Express 目录只能绑定一个 profile”的本地限制，多 profile 写任务仍由单调度器串行。
 - **📱 LINE 编辑器**:Cowork 与 `/erp` 商品名改为全宽多行输入并允许任意长词换行；历史草稿只有一个目标套账时自动补全。对话选定 ERP 后编辑器只切该 ERP 的套账，不出现第二个 ERP。
 - **🔄 状态闭环**:可重试错误对 LIFF 显示“重试中”，不再先报终态失败；人工/后台/批量重试复用原日志里的 ERP、套账和来源，禁止漂到老板当前默认套账；成功只在 `erp_push_logs` 首次转成功时给原 LINE 用户发简要回执。
@@ -11,8 +23,6 @@
 - **✅ 验证/发布**:应用 266 tests + 17 subtests、LIFF Playwright 8/8、完整 pre-push 全绿；manual CD `33504228678` 成功，生产 HEAD/service/health/ready 已回读。Companion macOS 可运行集 472 passed/35 skipped，另 5 项 Windows-only 未在本机执行；Windows release build `33503637528` 成功，安装包 SHA-256=`82f9ad651f9c1578e68af97fa136529091519cf218a626c320a36a9ad633f913`。
 - **⏭ 真机验收**:Windows 安装 `v1.1.69`，同一 Express 套账分别加入 Cowork 与 `/erp` 两个 token，保持 5 分钟确认不离线；各推一张单，核对 LINE 回执的 ERP 生成单号并到对应套账查单。验收前不得称真机闭环。
 - **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`、`docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`、`docs/integrations/mrerp-known-facts.md`。
-
----
 
 ## 历史 · 08-28 DMS LINE 自助凭据同步收官(`a1875461..d12143f3` · CI 33177361906 success · prod 已验)
 

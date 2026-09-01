@@ -4,10 +4,12 @@ import hmac
 import json
 import os
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from routes import line_erp_routes as routes
 from services.line_platform import client as line_client
@@ -74,18 +76,48 @@ class ErpFlowTests(unittest.TestCase):
         self.assertFalse(flow.accept_media_mode(None, "purchase"))
         self.assertTrue(flow.accept_media_mode("purchase", "sales"))
 
-    def test_menu_has_only_purchase_and_sales(self):
-        actions = cards.menu_card()["contents"]["body"]["contents"]
-        rendered = json.dumps(actions, ensure_ascii=False)
+    @staticmethod
+    def _menu_cells(card):
+        grid = next(
+            item
+            for item in card["contents"]["body"]["contents"]
+            if item.get("layout") == "vertical" and item.get("spacing") == "sm"
+        )
+        return [cell for row in grid["contents"] for cell in row["contents"]]
+
+    def test_menu_has_six_cells_with_two_icon_actions(self):
+        card = cards.menu_card()
+        cells = self._menu_cells(card)
+        rendered = json.dumps(cells, ensure_ascii=False)
+        self.assertEqual(len(cells), 6)
         self.assertIn("mode%3Apurchase", rendered)
         self.assertIn("mode%3Asales", rendered)
         self.assertNotIn("mode%3Adms", rendered)
+        self.assertEqual(sum("action" in cell for cell in cells), 2)
+        self.assertEqual(sum(cell["contents"] == [{"type": "filler"}] for cell in cells), 4)
+        self.assertIn("/static/dms/line-icons/erp-purchase.png", rendered)
+        self.assertIn("/static/dms/line-icons/erp-sales.png", rendered)
+        self.assertNotIn("สถานะการเชื่อมต่อ ERP", rendered)
 
     def test_menu_hides_unassigned_sales_mode(self):
-        actions = cards.menu_card(("purchase",))["contents"]["body"]["contents"]
-        rendered = json.dumps(actions, ensure_ascii=False)
+        cells = self._menu_cells(cards.menu_card(("purchase",)))
+        rendered = json.dumps(cells, ensure_ascii=False)
         self.assertIn("mode%3Apurchase", rendered)
         self.assertNotIn("mode%3Asales", rendered)
+        self.assertEqual(sum("action" in cell for cell in cells), 1)
+
+    def test_menu_trigger_words_remain_english_and_thai_only(self):
+        self.assertEqual(webhook._MENU_WORDS, frozenset({"menu", "เมนู"}))
+
+    def test_menu_icons_are_dedicated_transparent_assets(self):
+        root = Path(__file__).resolve().parents[2]
+        for name in ("erp-purchase.png", "erp-sales.png"):
+            with (
+                self.subTest(name=name),
+                Image.open(root / "static" / "dms" / "line-icons" / name) as icon,
+            ):
+                self.assertEqual(icon.size, (96, 96))
+                self.assertEqual(icon.mode, "RGBA")
 
     def test_sales_preview_is_summary_only_and_opens_shared_editor(self):
         shaped = preview.from_result(

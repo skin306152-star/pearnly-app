@@ -38,24 +38,8 @@ draft_records = draft_view.records
 BatchIncomplete = draft_actions.BatchIncomplete
 
 
-async def _target_status(binding: dict, *, refresh: bool = False) -> dict:
-    result = await asyncio.to_thread(
-        target_preflight.inspect_targets,
-        binding,
-        refresh=refresh,
-    )
-    return {**result, "text": target_preflight.status_text(result)}
-
-
-async def _menu_card(binding: dict, modes: tuple[str, ...]) -> dict:
-    try:
-        status = await _target_status(binding, refresh=True)
-    except Exception:
-        status = {
-            "ready": False,
-            "text": "สถานะการเชื่อมต่อ ERP\n• ไม่สามารถตรวจสอบการเชื่อมต่อได้",
-        }
-    return cards.menu_card(modes, status)
+async def _menu_card(_binding: dict, modes: tuple[str, ...]) -> dict:
+    return cards.menu_card(modes)
 
 
 async def handle_event(ev: dict) -> None:

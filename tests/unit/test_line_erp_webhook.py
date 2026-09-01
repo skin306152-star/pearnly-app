@@ -56,16 +56,13 @@ class _Context:
 
 
 class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
-    async def test_menu_refreshes_all_erp_targets_before_rendering(self):
-        status = {"ready": True, "any_ready": True, "targets": [], "text": "ready"}
-        with mock.patch.object(
-            webhook, "_target_status", new=mock.AsyncMock(return_value=status)
-        ) as inspect:
+    async def test_menu_does_not_probe_targets_before_rendering(self):
+        with mock.patch.object(webhook.target_preflight, "inspect_targets") as inspect:
             card = await webhook._menu_card(
                 {"tenant_id": "t1", "user_id": "u1"}, ("purchase", "sales")
             )
 
-        inspect.assert_awaited_once_with({"tenant_id": "t1", "user_id": "u1"}, refresh=True)
+        inspect.assert_not_called()
         self.assertEqual(card["type"], "flex")
 
     async def test_media_event_queues_ocr_instead_of_waiting_for_reply(self):

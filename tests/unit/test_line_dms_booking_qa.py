@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DMS 订车逐问(DL-7 · batch 1/3)状态机单测:8 步逐问 + 支付循环 + 预览。
+"""DMS 订车逐问(DL-7)状态机单测:资料采集 + 支付循环 + 预览。
 
 FakeStore + spy reply/push(照 test_line_dms_booking 范式)· masters 用固定行表,
 masters_cache 与端点解析全 mock,零网络零登录。行表形状 [id, code, name, ...] 与
@@ -133,7 +133,7 @@ class Env:
         return (self.session() or {}).get("payload", {}).get("qa") or {}
 
 
-def _qa(step="slip", **over):
+def _qa(step="place", **over):
     base = {
         "step": step,
         "endpoint_id": "E1",
@@ -166,18 +166,18 @@ def _pushed_text(env):
 
 
 class BookingQaTests(unittest.IsolatedAsyncioTestCase):
-    async def test_start_initializes_payload_and_asks_slip(self):
+    async def test_start_initializes_payload_and_asks_place(self):
         with Env() as env:
             await qa.start(_TID, _LUID, "E1", "C1", "สมชาย ใจดี", "mid-card", "rt")
             sess = env.session()
             self.assertEqual(sess["state"], "booking_qa")
             self.assertGreater(sess["ttl_minutes"], 30)  # 120 分钟,别按默认 30 过期
             p = env.qa_payload()
-            self.assertEqual(p["step"], "slip")
+            self.assertEqual(p["step"], "place")
             self.assertEqual(p["customer"], {"id": "C1", "name": "สมชาย ใจดี"})
             self.assertEqual(p["files"]["id_card_mid"], "mid-card")
             self.assertIsNone(p["files"]["slip_mid"])
-            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_SLIP)
+            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_PLACE)
             # 提成归属开局定死在 qa.advisor,建单执行器只认这一处
             self.assertEqual(p["advisor"], _ADVISOR)
             self.assertEqual(set(sess["payload"]), {"qa"})
@@ -216,7 +216,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
     # ── slip ──────────────────────────────────────────────────────────────
     async def test_slip_image_advances_to_place(self):
         with Env() as env:
-            _seed(env, _qa())
+            _seed(env, _qa("slip"))
             self.assertTrue(await qa.handle_image(_TID, _LUID, "mid-slip", "rt"))
             p = env.qa_payload()
             self.assertEqual(p["files"]["slip_mid"], "mid-slip")
@@ -225,7 +225,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_slip_cash_word_skips_without_slip(self):
         with Env() as env:
-            _seed(env, _qa())
+            _seed(env, _qa("slip"))
             self.assertTrue(await qa.handle_text(_TID, _LUID, "เงินสด", "rt"))
             p = env.qa_payload()
             self.assertIsNone(p["files"]["slip_mid"])
@@ -234,7 +234,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_slip_other_text_reprompts(self):
         with Env() as env:
-            _seed(env, _qa())
+            _seed(env, _qa("slip"))
             self.assertTrue(await qa.handle_text(_TID, _LUID, "hello", "rt"))
             self.assertEqual(env.qa_payload()["step"], "slip")
             self.assertEqual(_replied_text(env), qa_cards.TXT_SLIP_ONLY_IMAGE)
@@ -463,6 +463,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                 env,
                 _qa(
                     "pay_dst",
+                    files={"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
                     pending_channel={
                         "channel": "transfer",
                         "amount": "1000.00",
@@ -574,7 +575,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.qa_payload()["payments"], [])
 
     # ── 支付:transfer 渠道 + 无凭证 → slip_after ──────────────────────────
-    async def test_transfer_without_slip_goes_slip_after(self):
+    async def test_transfer_requests_slip_before_more_payment_question(self):
         with Env() as env:
             _seed(env, _qa("pay_channel"))
             await qa.handle_postback(_TID, _LUID, "qa:pay:transfer", {}, "rt")
@@ -590,23 +591,90 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             await qa.handle_postback(_TID, _LUID, "qa:bank:1", {}, "rt")
             p = env.qa_payload()
-            self.assertEqual(p["step"], "pay_more")
+            self.assertEqual(p["step"], "slip_after")
+            self.assertEqual(p["after_slip"], "pay_more")
             self.assertEqual(p["payments"][0]["channel"], "transfer")
             self.assertEqual(p["payments"][0]["extra"], {"src": "", "dst_id": "1", "dst": "SCB"})
-            # done → 有转账渠道但没凭证 → 补要
-            await qa.handle_postback(_TID, _LUID, "qa:more:done", {}, "rt")
-            self.assertEqual(env.qa_payload()["step"], "slip_after")
             self.assertEqual(_replied_text(env), qa_cards.TXT_NEED_SLIP)
             # 此处打 เงินสด 不放行,仍补要
             await qa.handle_text(_TID, _LUID, "เงินสด", "rt")
             self.assertEqual(env.qa_payload()["step"], "slip_after")
             self.assertEqual(_replied_text(env), qa_cards.TXT_NEED_SLIP)
-            # 收图 → 直接预览
+            # 收图 → 回到「是否还有其它付款方式」,不跳过多渠道出口
             await qa.handle_image(_TID, _LUID, "mid-slip2", "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "pay_more")
+            self.assertNotIn("after_slip", p)
+            self.assertEqual(p["files"]["slip_mid"], "mid-slip2")
+            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_MORE)
+            await qa.handle_postback(_TID, _LUID, "qa:more:done", {}, "rt")
+            self.assertEqual(env.session()["state"], "booking_review")
+
+    async def test_legacy_transfer_without_slip_still_blocks_preview(self):
+        with Env() as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_more",
+                    payments=[{"channel": "transfer", "amount": "1000.00", "extra": {}}],
+                ),
+            )
+            await qa.handle_postback(_TID, _LUID, "qa:more:done", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "slip_after")
+            self.assertEqual(p["after_slip"], "preview")
+            await qa.handle_image(_TID, _LUID, "mid-slip", "rt")
+            self.assertEqual(env.session()["state"], "booking_review")
+
+    async def test_cash_with_legacy_slip_requires_conflict_resolution(self):
+        with Env() as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_more",
+                    files={"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
+                    payments=[{"channel": "cash", "amount": "1000.00"}],
+                ),
+            )
+            await qa.handle_postback(_TID, _LUID, "qa:more:done", {}, "rt")
+            self.assertEqual(env.qa_payload()["step"], "slip_conflict")
+            self.assertEqual(_replied_text(env), qa_cards.TXT_SLIP_CONFLICT)
+            actions = [item["action"]["data"] for item in _replied_items(env)]
+            self.assertEqual(
+                actions,
+                ["qa:slipconflict:add", "qa:slipconflict:remove"],
+            )
+
+    async def test_slip_conflict_can_add_transfer(self):
+        with Env() as env:
+            _seed(
+                env,
+                _qa(
+                    "slip_conflict",
+                    files={"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
+                    payments=[{"channel": "cash", "amount": "1000.00"}],
+                ),
+            )
+            await qa.handle_postback(_TID, _LUID, "qa:slipconflict:add", {}, "rt")
+            p = env.qa_payload()
+            self.assertEqual(p["step"], "pay_amount")
+            self.assertEqual(p["pending_channel"], {"channel": "transfer"})
+            self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_AMOUNT.format(channel="เงินโอน"))
+
+    async def test_slip_conflict_can_remove_slip_and_preview(self):
+        with Env() as env:
+            _seed(
+                env,
+                _qa(
+                    "slip_conflict",
+                    files={"id_card_mid": "mid-card", "slip_mid": "mid-slip"},
+                    payments=[{"channel": "cash", "amount": "1000.00"}],
+                ),
+            )
+            await qa.handle_postback(_TID, _LUID, "qa:slipconflict:remove", {}, "rt")
             sess = env.session()
             self.assertEqual(sess["state"], "booking_review")
-            self.assertEqual(sess["payload"]["qa"]["files"]["slip_mid"], "mid-slip2")
-            self.assertTrue(sess["payload"]["nonce"])
+            self.assertIsNone(sess["payload"]["qa"]["files"]["slip_mid"])
 
     async def test_transfer_blocks_when_company_bank_master_is_empty(self):
         with Env(company_banks=[]) as env:
@@ -782,7 +850,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
     # ── audit / 全局命令 / 态守卫 ─────────────────────────────────────────
     async def test_audit_records_all_inputs_in_order(self):
         with Env() as env:
-            _seed(env, _qa())
+            _seed(env, _qa("slip"))
             await qa.handle_text(_TID, _LUID, "เงินสด", "rt")
             await qa.handle_postback(_TID, _LUID, "qa:place:pl1", {}, "rt")
             await qa.handle_text(_TID, _LUID, "dmax", "rt")
@@ -795,7 +863,7 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             _seed(env, _qa())
             for word in ("เริ่มใหม่", "เมนู", "สวัสดี"):
                 self.assertFalse(await qa.handle_text(_TID, _LUID, word, "rt"))
-            self.assertEqual(env.qa_payload()["step"], "slip")  # 会话未被吃掉
+            self.assertEqual(env.qa_payload()["step"], "place")  # 会话未被吃掉
 
     async def test_handlers_skip_other_states(self):
         with Env() as env:

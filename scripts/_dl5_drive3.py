@@ -72,8 +72,10 @@ def data_values(rec: dict) -> list[str]:
 def wait_data(prefix: str, since: int, timeout: float = 240) -> tuple[dict | None, str]:
     # 逐问发问两种出口都有:图片/后台路径 push,postback 应答路径 reply。
     _, rec = C.wait_outbox(
-        lambda r: r.get("kind") in ("push_messages", "reply_messages")
-        and any(v.startswith(prefix) for v in data_values(r)),
+        lambda r: (
+            r.get("kind") in ("push_messages", "reply_messages")
+            and any(v.startswith(prefix) for v in data_values(r))
+        ),
         since=since,
         timeout=timeout,
     )
@@ -106,8 +108,9 @@ def bind_booking_menu(luid: str = C.LINE_USER_ID, user_id: str = C.USER_ID) -> N
     base = C.outbox_len()
     C.post_webhook([C.ev_text("เมนู", luid)])
     _, menu = C.wait_outbox(
-        lambda r: r.get("kind") == "reply_messages"
-        and "จัดทำใบจอง" in json.dumps(r, ensure_ascii=False),
+        lambda r: (
+            r.get("kind") == "reply_messages" and "จัดทำใบจอง" in json.dumps(r, ensure_ascii=False)
+        ),
         base,
         20,
     )
@@ -147,18 +150,23 @@ def customer_saved(luid: str = C.LINE_USER_ID, user_id: str = C.USER_ID, tag: st
     return base
 
 
-def prepare_customer() -> str:
+def prepare_customer() -> tuple[str, int]:
     base = customer_saved()
     _, prompt = C.wait_outbox(
-        lambda r: r.get("kind") in ("push_text", "push_messages")
-        and "สลิป" in json.dumps(r, ensure_ascii=False),
+        lambda r: (
+            r.get("kind") in ("push_text", "push_messages", "reply_messages")
+            and "สถานที่รับจอง" in json.dumps(r, ensure_ascii=False)
+        ),
         base,
         120,
     )
     if not prompt:
-        raise AssertionError("booking QA slip prompt missing")
+        raise AssertionError("booking QA place prompt missing")
     sess = C.db_session() or {}
-    return str(((sess.get("payload") or {}).get("qa") or {}).get("customer", {}).get("id") or "")
+    customer_id = str(
+        ((sess.get("payload") or {}).get("qa") or {}).get("customer", {}).get("id") or ""
+    )
+    return customer_id, base
 
 
 def latest_button(since: int, prefix: str) -> str:
@@ -181,16 +189,7 @@ def car_keyword() -> str:
 
 
 def qa_common(*, cash: bool = False, slip: bool = True) -> tuple[str, str, dict]:
-    customer_id = prepare_customer()
-    if cash:
-        base = C.outbox_len()
-        C.post_webhook([C.ev_text("เงินสด")])
-    elif slip:
-        base = C.outbox_len()
-        C.post_webhook([C.ev_image()])
-    else:
-        base = C.outbox_len()
-        C.post_webhook([C.ev_text("เงินสด")])
+    customer_id, base = prepare_customer()
     # 基线一律在动作【前】取:问句可能在 post 返回前就落 outbox,后取基线会把它跳过
     # (首版在 place 步就是这么死锁的:等到了问句→重置基线→再等同一条,永远超时)。
     place = latest_button(base, "qa:place:")
@@ -233,12 +232,25 @@ def qa_common(*, cash: bool = False, slip: bool = True) -> tuple[str, str, dict]
             raise AssertionError("company bank choices missing")
         base = C.outbox_len()
         post(next(v for v in data_values(bank_card) if v.startswith("qa:bank:")))
+        _, need_slip = C.wait_outbox(
+            lambda r: "มีช่องทางเงินโอน" in json.dumps(r, ensure_ascii=False),
+            base,
+            120,
+        )
+        if not need_slip:
+            raise AssertionError("transfer slip prompt missing")
+        if not slip:
+            raise AssertionError("transfer correctly blocked before slip")
+        base = C.outbox_len()
+        C.post_webhook([C.ev_image()])
     more = latest_button(base, "qa:more:")
     base = C.outbox_len()
     post("qa:more:done")
     _, preview = C.wait_outbox(
-        lambda r: r.get("kind") in ("push_messages", "reply_messages")
-        and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False),
+        lambda r: (
+            r.get("kind") in ("push_messages", "reply_messages")
+            and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False)
+        ),
         base,
         120,
     )
@@ -339,15 +351,19 @@ def g_cancel() -> None:
         qa_common()
         base = C.outbox_len()
         _, preview = C.wait_outbox(
-            lambda r: r.get("kind") in ("push_messages", "reply_messages")
-            and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False),
+            lambda r: (
+                r.get("kind") in ("push_messages", "reply_messages")
+                and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False)
+            ),
             base - 2,
             30,
         )
         post(next(v for v in data_values(preview) if "action=cancel_booking" in v))
         _, receipt = C.wait_outbox(
-            lambda r: r.get("kind") in ("push_text", "reply_text")
-            and "ทิ้งรายการแล้ว" in r.get("text", ""),
+            lambda r: (
+                r.get("kind") in ("push_text", "reply_text")
+                and "ทิ้งรายการแล้ว" in r.get("text", "")
+            ),
             base,
             60,
         )
@@ -429,9 +445,14 @@ def g_slip_gate() -> None:
         )
         base = C.outbox_len()
         C.post_webhook([C.ev_image()])
+        more = latest_button(base, "qa:more:")
+        base = C.outbox_len()
+        post(more)
         _, preview = C.wait_outbox(
-            lambda r: r.get("kind") in ("push_messages", "reply_messages")
-            and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False),
+            lambda r: (
+                r.get("kind") in ("push_messages", "reply_messages")
+                and "สรุปใบจอง" in json.dumps(r, ensure_ascii=False)
+            ),
             base,
             120,
         )
@@ -447,9 +468,7 @@ def g_slip_gate() -> None:
 
 def g_noise_image() -> None:
     try:
-        cid = prepare_customer()
-        base = C.outbox_len()
-        C.post_webhook([C.ev_text("เงินสด")])
+        cid, base = prepare_customer()
         _, place = C.wait_outbox(
             lambda r: "สถานที่รับจอง" in json.dumps(r, ensure_ascii=False), base, 90
         )
@@ -498,8 +517,10 @@ def g_blocked() -> None:
         logs_before = len(C.db_push_logs(C.USER_ID_NO_ADVISOR))
         base = customer_saved(luid, C.USER_ID_NO_ADVISOR, tag="qa7")
         _, blocked = C.wait_outbox(
-            lambda r: r.get("kind") in ("push_messages", "reply_messages")
-            and "dmstest" in json.dumps(r, ensure_ascii=False),
+            lambda r: (
+                r.get("kind") in ("push_messages", "reply_messages")
+                and "dmstest" in json.dumps(r, ensure_ascii=False)
+            ),
             base,
             120,
         )

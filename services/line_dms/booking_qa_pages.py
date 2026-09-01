@@ -34,6 +34,7 @@ def static_question(step, qa) -> Optional[Dict[str, Any]]:
         "pay_ref": qa_cards.ask_pay_ref(channel),
         "pay_more": qa_cards.ask_more(),
         "slip_after": qa_cards.need_slip(),
+        "slip_conflict": qa_cards.slip_conflict(),
     }.get(step)
 
 

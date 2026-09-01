@@ -535,8 +535,20 @@ test('booking editor exposes every live DMS title option', async ({ page }) => {
     }
 });
 
-test('master-data save errors are actionable on mobile and desktop', async ({ page }) => {
-    const message = '可选项目已更新，请使用 LINE 中的最新预览卡后重试。';
+test('save errors are actionable on mobile and desktop', async ({ page }) => {
+    const scenarios = [
+        {
+            slug: 'master',
+            code: 'dms_booking.invalid_master',
+            message: '可选项目已更新，请使用 LINE 中的最新预览卡后重试。',
+        },
+        {
+            slug: 'slip-conflict',
+            code: 'dms_booking.slip_without_transfer',
+            message: '已附转账凭证，但没有转账付款。请添加转账方式或删除凭证。',
+        },
+    ];
+    let responseError = scenarios[0];
     await page.addInitScript(() => {
         const payload = btoa(
             JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
@@ -555,8 +567,8 @@ test('master-data save errors are actionable on mobile and desktop', async ({ pa
                 body: JSON.stringify({
                     ok: false,
                     error: {
-                        code: 'dms_booking.invalid_master',
-                        detail: 'dms_booking.invalid_master',
+                        code: responseError.code,
+                        detail: responseError.code,
                     },
                 }),
             });
@@ -570,30 +582,34 @@ test('master-data save errors are actionable on mobile and desktop', async ({ pa
         });
     });
 
-    for (const viewport of [
-        { width: 390, height: 844 },
-        { width: 1280, height: 900 },
-    ]) {
-        await page.setViewportSize(viewport);
-        await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=error-${viewport.width}`, {
-            waitUntil: 'domcontentloaded',
-        });
-        await page.waitForSelector('#editor:not([hidden])');
-        await page.waitForSelector('#save:not([disabled])');
-        await page.locator('#save').click();
-        const error = page.locator('#form-error');
-        await expect(error).toBeVisible();
-        await expect(error).toHaveText(message);
-        const state = await error.evaluate((element) => {
-            const style = element.ownerDocument.defaultView.getComputedStyle(element);
-            return { visible: element.getBoundingClientRect().height > 0, color: style.color };
-        });
-        expect(state.visible).toBe(true);
-        expect(state.color).toBeTruthy();
-        await page.screenshot({
-            path: path.join(OUT, `master-error-${viewport.width}.png`),
-            fullPage: true,
-        });
+    for (const scenario of scenarios) {
+        responseError = scenario;
+        for (const viewport of [
+            { width: 390, height: 844 },
+            { width: 1280, height: 900 },
+        ]) {
+            await page.setViewportSize(viewport);
+            await page.goto(
+                `${BASE}/static/dist/dms-booking-edit.html?draft=error-${scenario.slug}-${viewport.width}`,
+                { waitUntil: 'domcontentloaded' }
+            );
+            await page.waitForSelector('#editor:not([hidden])');
+            await page.waitForSelector('#save:not([disabled])');
+            await page.locator('#save').click();
+            const error = page.locator('#form-error');
+            await expect(error).toBeVisible();
+            await expect(error).toHaveText(scenario.message);
+            const state = await error.evaluate((element) => {
+                const style = element.ownerDocument.defaultView.getComputedStyle(element);
+                return { visible: element.getBoundingClientRect().height > 0, color: style.color };
+            });
+            expect(state.visible).toBe(true);
+            expect(state.color).toBeTruthy();
+            await page.screenshot({
+                path: path.join(OUT, `${scenario.slug}-error-${viewport.width}.png`),
+                fullPage: true,
+            });
+        }
     }
 });
 

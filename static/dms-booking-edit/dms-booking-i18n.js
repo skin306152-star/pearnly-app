@@ -18,6 +18,8 @@
             postcodeMissing: 'กรุณาเลือกรหัสไปรษณีย์จากรายการที่กำหนด',
             geoUnavailable: 'ข้อมูลที่อยู่ยังโหลดไม่ได้ กรุณาลองใหม่สักครู่',
             previewSendFailed: 'ส่งสรุปใหม่ไปที่ LINE ไม่สำเร็จ กรุณาลองอีกครั้ง',
+            slipConflict:
+                'มีสลิปโอนเงินแนบอยู่ แต่ไม่มีช่องทางเงินโอน กรุณาเพิ่มช่องทางเงินโอนหรือนำสลิปออก',
             advisor: 'ที่ปรึกษาการขาย (ระบบกำหนด)',
             total: 'ยอดเงินจองรวม',
             addPayment: 'เพิ่มช่องทาง',
@@ -81,6 +83,8 @@
             postcodeMissing: 'Choose a postcode from the list.',
             geoUnavailable: 'Address data is unavailable right now. Try again shortly.',
             previewSendFailed: 'Could not send the revised preview to LINE. Try again.',
+            slipConflict:
+                'A transfer slip is attached, but there is no transfer payment. Add a transfer payment or remove the slip.',
             advisor: 'Sales adviser (system assigned)',
             total: 'Booking deposit total',
             addPayment: 'Add payment method',
@@ -143,6 +147,7 @@
             postcodeMissing: '请从列表中选择邮编。',
             geoUnavailable: '地址数据暂时不可用，请稍后重试。',
             previewSendFailed: '新版预览发送到 LINE 失败，请重试。',
+            slipConflict: '已附转账凭证，但没有转账付款。请添加转账方式或删除凭证。',
             advisor: '销售顾问（系统指定）',
             total: '订金合计',
             addPayment: '添加支付方式',
@@ -207,6 +212,8 @@
             geoUnavailable: '住所データを取得できませんでした。しばらくして再試行してください。',
             previewSendFailed:
                 '新しいプレビューを LINE に送信できませんでした。再試行してください。',
+            slipConflict:
+                '振込票が添付されていますが、振込支払いがありません。振込を追加するか、振込票を削除してください。',
             advisor: '販売担当者（システム指定）',
             total: '予約金合計',
             addPayment: '支払方法を追加',
@@ -260,6 +267,7 @@
         'dms_booking.invalid_zipcode_id': 'postcodeMissing',
         'dms_booking.geo_unavailable': 'geoUnavailable',
         'dms_booking.preview_send_failed': 'previewSendFailed',
+        'dms_booking.slip_without_transfer': 'slipConflict',
     };
     window.DMS_BOOKING_GEO = ['province_id', 'district_id', 'subdistrict_id', 'zipcode_id'];
 })();

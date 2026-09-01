@@ -1099,11 +1099,16 @@
       ]
     },
     "33-dms-booking-edit-mobile.spec.js": {
+      "artifacts": "tests/e2e/_artifacts/dms-booking-edit/*.png",
       "covers": [
         "static/dms-booking-edit/dms-booking-edit.html",
-        "static/dms-booking-edit/dms-booking-edit.css"
+        "static/dms-booking-edit/dms-booking-edit.css",
+        "static/dms-booking-edit/dms-booking-i18n.js"
       ],
-      "only_e2e": ["390px 手机视口下付款删除按钮、金额输入框与附件勾选框的真实浏览器布局和对齐"]
+      "only_e2e": [
+        "390px 手机视口下付款删除按钮、金额输入框与附件勾选框的真实浏览器布局和对齐",
+        "后端返回主档变更或现金与转账凭证冲突时,手机和桌面浏览器均显示对应中文补救指引"
+      ]
     },
     "34-cowork-erp-session-isolation.spec.js": {
       "covers": [

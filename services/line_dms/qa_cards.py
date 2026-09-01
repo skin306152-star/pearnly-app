@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""DMS LINE 订车逐问(DL-7 · batch 1/3)的 Flex 卡与泰语文案(纯函数,零副作用)。
+"""DMS LINE 订车逐问(DL-7)的 Flex 卡与泰语文案(纯函数,零副作用)。
 
 booking_qa 状态机的每步「发问」在这里出消息 dict(文本 + quickReply 结构 + 预览 Flex 卡)。
-文案是业主逐条确认的定稿,集中在本文件顶部常量区,测试按此断言。按钮一律 postback,
+文案集中在本文件顶部常量区,测试按此断言。按钮一律 postback,
 data 用 "qa:<action>[:<value>]" 编码;预览卡的确认/取消复用 cards.ACT_* 常量与 _data
 编码(flow 侧 parse_qs 解析,既有 booking_flow 的确认/取消直接接得上)。
 """
@@ -37,19 +37,19 @@ from services.line_dms.qa_util import row_name as _name
 TXT_ASK_SLIP = (
     "ส่งสลิปโอนเงินจอง (ใบโอนเงิน) ได้เลยครับ · ถ้าลูกค้าจ่ายเงินสด พิมพ์ เงินสด เพื่อข้ามขั้นนี้"
 )
-TXT_ASK_PLACE = "ข้อ 2/8 · สถานที่รับจอง — กดเลือกด้านล่าง"
-TXT_ASK_CAR = "ข้อ 3/8 · รุ่นรถ — พิมพ์ชื่อรุ่นสั้น ๆ เพื่อค้นหา เช่น dmax"
+TXT_ASK_PLACE = "สถานที่รับจอง — กดเลือกด้านล่าง"
+TXT_ASK_CAR = "รุ่นรถ — พิมพ์ชื่อรุ่นสั้น ๆ เพื่อค้นหา เช่น dmax"
 TXT_CAR_PICK = "เลือกรุ่นรถ (พบ {n} รายการ)"
 TXT_CAR_NONE = "ไม่พบรุ่นที่ตรง ลองพิมพ์ใหม่อีกครั้ง"
 TXT_ASK_PAINT = "เลือกสีของ {car}"
 TXT_PAINT_MANY = "มีสีมากกว่านี้ พิมพ์ชื่อสีเพื่อค้นหาได้"
-TXT_ASK_DATE = "ข้อ 4/8 · วันที่คาดว่าจะส่งมอบรถ — กดปุ่มเพื่อเลือกวันที่"
+TXT_ASK_DATE = "วันที่คาดว่าจะส่งมอบรถ — กดปุ่มเพื่อเลือกวันที่"
 BTN_PICK_DATE = "เลือกวันที่"
-TXT_ASK_TERM = "ข้อ 5/8 · เงื่อนไขการขาย — กดเลือกด้านล่าง"
-TXT_ASK_REGIS = "ข้อ 6/8 · จดทะเบียนในนาม — กดเลือกด้านล่าง"
-TXT_ASK_REGIS_NAME = "ข้อ 7/8 · ชื่อผู้จดทะเบียน — กดปุ่มใช้ชื่อตามบัตร หรือพิมพ์ชื่ออื่น"
+TXT_ASK_TERM = "เงื่อนไขการขาย — กดเลือกด้านล่าง"
+TXT_ASK_REGIS = "จดทะเบียนในนาม — กดเลือกด้านล่าง"
+TXT_ASK_REGIS_NAME = "ชื่อผู้จดทะเบียน — กดปุ่มใช้ชื่อตามบัตร หรือพิมพ์ชื่ออื่น"
 BTN_REGIS_NAME_CARD = "ใช้ชื่อตามบัตร"
-TXT_ASK_PAY_CHANNEL = "ข้อ 8/8 · ช่องทางชำระเงินจอง — เลือกช่องทาง"
+TXT_ASK_PAY_CHANNEL = "ช่องทางชำระเงินจอง — เลือกช่องทาง"
 PAY_LABELS = {
     "cash": "เงินสด",
     "transfer": "เงินโอน",
@@ -72,6 +72,11 @@ TXT_ASK_MORE = "มีช่องทางอื่นอีกไหม"
 BTN_MORE_DONE = "ครบแล้ว"
 BTN_MORE_ADD = "เพิ่มช่องทาง"
 TXT_NEED_SLIP = "มีช่องทางเงินโอน กรุณาส่งสลิปโอนเงินก่อนดูสรุปครับ"
+TXT_SLIP_CONFLICT = (
+    "พบสลิปโอนเงินแนบอยู่ แต่ยังไม่มีช่องทางเงินโอน กรุณาเพิ่มเงินโอนหรือลบสลิปก่อนดูสรุปครับ"
+)
+BTN_ADD_TRANSFER = "เพิ่มเงินโอน"
+BTN_REMOVE_SLIP = "ลบสลิปแล้วไปต่อ"
 TXT_PREVIEW_TITLE = "สรุปใบจอง — ตรวจสอบก่อนยืนยัน"
 BTN_CONFIRM = "ยืนยัน"
 BTN_EDIT = "แก้ไข"
@@ -177,7 +182,7 @@ def advisor_block_msg(username: str) -> Dict[str, Any]:
 
 # ── 各步发问 ─────────────────────────────────────────────────────────────
 def ask_slip() -> Dict[str, Any]:
-    """第 1 问:送转账凭证;现金可打字 เงินสด 跳过。"""
+    """旧会话兼容:送转账凭证;现金可打字 เงินสด 跳过。"""
     return _msg(TXT_ASK_SLIP)
 
 
@@ -187,12 +192,12 @@ def slip_only_image() -> Dict[str, Any]:
 
 
 def ask_place(place_books: List[list], page: int = 0) -> Dict[str, Any]:
-    """第 2 问:สถานที่รับจอง 按钮(place_books 主档,分页全量可达)。"""
+    """สถานที่รับจอง 按钮(place_books 主档,分页全量可达)。"""
     return _msg(TXT_ASK_PLACE, _pick_rows(place_books, "place", _name, page))
 
 
 def ask_car() -> Dict[str, Any]:
-    """第 3 问:打字搜车型。"""
+    """打字搜车型。"""
     return _msg(TXT_ASK_CAR)
 
 
@@ -238,7 +243,7 @@ def ask_regis(regis_behalfs: List[list], page: int = 0) -> Dict[str, Any]:
 
 
 def ask_regis_name() -> Dict[str, Any]:
-    """第 8 问:登记人姓名,一个按钮用客户档姓名。"""
+    """登记人姓名,一个按钮用客户档姓名。"""
     return _msg(TXT_ASK_REGIS_NAME, [_qr_item(BTN_REGIS_NAME_CARD, "qa:regisname:card")])
 
 
@@ -284,8 +289,19 @@ def ask_more() -> Dict[str, Any]:
 
 
 def need_slip() -> Dict[str, Any]:
-    """pay_more 收尾时发现转账渠道没凭证 → 补要(或 slip_after 步重发)。"""
+    """转账渠道没凭证 → 补要(或 slip_after 步重发)。"""
     return _msg(TXT_NEED_SLIP)
+
+
+def slip_conflict() -> Dict[str, Any]:
+    """凭证与付款方式矛盾:必须增加转账或删除凭证才能继续。"""
+    return _msg(
+        TXT_SLIP_CONFLICT,
+        [
+            _qr_item(BTN_ADD_TRANSFER, "qa:slipconflict:add"),
+            _qr_item(BTN_REMOVE_SLIP, "qa:slipconflict:remove"),
+        ],
+    )
 
 
 # ── 预览汇总卡 ────────────────────────────────────────────────────────────

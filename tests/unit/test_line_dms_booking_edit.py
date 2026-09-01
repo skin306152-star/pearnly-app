@@ -218,6 +218,19 @@ class BookingEditTests(TestCase):
                 booking_edit.save(self.user, "N1", submitted)
         replace.assert_not_called()
 
+    def test_cash_cannot_keep_transfer_slip(self):
+        submitted = form()
+        submitted["payments"] = [{"channel": "cash", "amount": "12000", "extra": {}}]
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload")
+            )
+            with self.assertRaisesRegex(booking_edit.BookingEditError, "slip_without_transfer"):
+                booking_edit.save(self.user, "N1", submitted)
+        replace.assert_not_called()
+
     def test_push_failure_restores_previous_nonce(self):
         with contextlib.ExitStack() as es:
             for patcher in self.patches():

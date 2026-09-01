@@ -280,10 +280,12 @@ def save(user: dict, nonce: str, submitted: dict) -> str:
         files["id_card_mid"] = None
     if not keep.get("slip", True):
         files["slip_mid"] = None
-    if any(payment["channel"] == "transfer" for payment in qa["payments"]) and not files.get(
-        "slip_mid"
-    ):
+    has_transfer = any(payment["channel"] == "transfer" for payment in qa["payments"])
+    has_slip = bool(files.get("slip_mid"))
+    if has_transfer and not has_slip:
         raise BookingEditError("dms_booking.slip_required")
+    if has_slip and not has_transfer:
+        raise BookingEditError("dms_booking.slip_without_transfer")
     qa["files"] = files
     qa.setdefault("audit", []).append({"step": "browser_edit", "input": "saved"})
     new_nonce = secrets.token_hex(8)

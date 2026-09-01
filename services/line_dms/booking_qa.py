@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
-"""DMS LINE 订车逐问状态机(DL-7):聊天内 8 步逐问替代选车面板。
+"""DMS LINE 订车逐问状态机(DL-7):聊天内逐项采集订车资料。
 
-会话态 "booking_qa"(TTL 见 store._STATE_TTL_MINUTES),payload["qa"] 存进度:step /
-endpoint_id / customer / draft / user_id / files / answers / payments / pending_channel /
-audit / pages(各主档翻页页码)/ car_search(车型搜索命中集 + 页码)/ masters_synced
-(本轮主档已 live 拉取成功,后续复用 12h 缓存)。职责链:slip 凭证 →
-place → car_search → paint → date → term → regis → regis_name →
-pay_channel(可循环多渠道)→ preview(置 booking_review + 轮换 nonce,既有 booking_flow
-的确认/取消直接接得上)。
-
+会话态 booking_qa 存进度、客户、答案、付款、附件和主档缓存状态。
+转账才要凭证;收官置 booking_review 并轮换 nonce。
 主档超过 LINE quick reply 13 项上限时分页:翻页按钮只换页重发当前步(不推进业务 step),
 postback 走内部 token "__page:<n>",永远不进 answers —— 选中真实行才清页码状态。
 
@@ -26,7 +20,14 @@ from services.erp import dms_advisor
 from services.erp import dms_id_ocr as _id_ocr
 from services.erp.mrerp_dms_company_banks import company_bank_label
 from services.erp.mrerp_dms_client_base import to_be_date
-from services.line_dms import booking_qa_pages, booking_qa_sync, commands, qa_cards, store
+from services.line_dms import (
+    booking_qa_pages,
+    booking_qa_payment,
+    booking_qa_sync,
+    commands,
+    qa_cards,
+    store,
+)
 from services.line_dms._out import _send, _thr
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
@@ -62,11 +63,11 @@ async def start(
     user_id="",
     summary=None,
 ) -> None:
-    """客户档落定后开一局逐问:定提成归属 → 初始化 qa(step=slip)→ 发第 1 问。
+    """客户档落定后开一局逐问:定提成归属 → 初始化 qa(step=place)。
     身份证/OCR/客户档由既有 collecting 流程负责,本函数只从「档已落定」接手:
     id_card_mid 只进 files;draft 与 user_id 原样进 qa,建单执行器从 payload["qa"] 读取。
-    顾问(提成归属)在开局就定死:认不出账号的单最终必被 DMS 拒收,答完 8 问再拦等于
-    白占销售 5 分钟。
+    顾问(提成归属)在开局就定死:认不出账号的单最终必被 DMS 拒收,收完资料再拦会
+    白占销售时间。
     """
     ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
     advisor, dms_username = (None, "")
@@ -81,7 +82,7 @@ async def start(
         _send(line_user_id, msg)
         return
     qa = {
-        "step": "slip",
+        "step": "place",
         "endpoint_id": str(endpoint_id or ""),
         "customer": {"id": str(customer_id or ""), "name": customer_name or ""},
         "advisor": advisor,
@@ -95,7 +96,7 @@ async def start(
         "audit": [],
     }
     await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, "slip", reply_token)
+    await send_step(tenant_id, line_user_id, qa, "place", reply_token)
 
 
 # ── 每步发问(内部 · slip_after 复用) ─────────────────────────────────────
@@ -145,8 +146,13 @@ async def handle_image(tenant_id, line_user_id, message_id, reply_token, sess=No
         await _persist(tenant_id, line_user_id, qa)
         await send_step(tenant_id, line_user_id, qa, "place", reply_token)
     else:
+        destination = qa.pop("after_slip", "preview")
+        qa["step"] = "pay_more"
         await _persist(tenant_id, line_user_id, qa)
-        await _to_preview(tenant_id, line_user_id, qa, reply_token)
+        if destination == "pay_more":
+            await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
+        else:
+            await _to_preview(tenant_id, line_user_id, qa, reply_token)
     return True
 
 
@@ -161,6 +167,7 @@ _POSTBACK_ACTIONS = {
     "pay_channel": "pay",
     "pay_dst": "bank",
     "pay_more": "more",
+    "slip_conflict": "slipconflict",
 }
 
 
@@ -204,12 +211,21 @@ async def handle_postback(tenant_id, line_user_id, data, params, reply_token) ->
         await _pick_date(tenant_id, line_user_id, qa, params, reply_token)
     elif action == "regisname":
         await _pick_regis_name(tenant_id, line_user_id, qa, reply_token)
-    elif action == "pay":
-        await _pick_channel(tenant_id, line_user_id, qa, value, reply_token)
+    elif action in {"pay", "more", "slipconflict"}:
+        await booking_qa_payment.handle(
+            action,
+            tenant_id,
+            line_user_id,
+            qa,
+            value,
+            reply_token,
+            persist=_persist,
+            send_step=send_step,
+            reask=_reask,
+            to_preview=_to_preview,
+        )
     elif action == "bank":
         await _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token)
-    elif action == "more":
-        await _pick_more(tenant_id, line_user_id, qa, value, reply_token)
     return True
 
 
@@ -334,6 +350,7 @@ _TEXT_HANDLERS = {
     "pay_ref": _on_pay_ref,
     "pay_more": _reask,
     "slip_after": _on_slip_after,
+    "slip_conflict": _reask,
 }
 
 
@@ -374,6 +391,17 @@ async def _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token) ->
     extra["dst_id"] = str(row[0])
     extra["dst"] = company_bank_label(row)
     complete_channel(qa)
+    if not (qa.get("files") or {}).get("slip_mid"):
+        await booking_qa_payment.request_slip(
+            tenant_id,
+            line_user_id,
+            qa,
+            "pay_more",
+            reply_token,
+            persist=_persist,
+            send_step=send_step,
+        )
+        return
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
 
@@ -426,34 +454,6 @@ async def _pick_regis_name(tenant_id, line_user_id, qa, reply_token) -> None:
     qa["step"] = "pay_channel"
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, "pay_channel", reply_token)
-
-
-async def _pick_channel(tenant_id, line_user_id, qa, value, reply_token) -> None:
-    if value not in qa_cards.PAY_LABELS:
-        await _reask(tenant_id, line_user_id, qa, "", reply_token)
-        return
-    qa["pending_channel"] = {"channel": value}
-    qa["step"] = "pay_amount"
-    await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, "pay_amount", reply_token)
-
-
-async def _pick_more(tenant_id, line_user_id, qa, value, reply_token) -> None:
-    if value == "add":
-        qa["step"] = "pay_channel"  # 回渠道选择,同渠道可重复选(金额各记一条)
-        await _persist(tenant_id, line_user_id, qa)
-        await send_step(tenant_id, line_user_id, qa, "pay_channel", reply_token)
-        return
-    if value != "done":
-        await _reask(tenant_id, line_user_id, qa, "", reply_token)
-        return
-    has_transfer = "transfer" in {p.get("channel") for p in qa.get("payments") or []}
-    if has_transfer and not (qa.get("files") or {}).get("slip_mid"):
-        qa["step"] = "slip_after"  # 声明过转账却没凭证 → 先补要,不能放行看总结
-        await _persist(tenant_id, line_user_id, qa)
-        await send_step(tenant_id, line_user_id, qa, "slip_after", reply_token)
-        return
-    await _to_preview(tenant_id, line_user_id, qa, reply_token)
 
 
 async def _to_preview(tenant_id, line_user_id, qa, reply_token) -> None:

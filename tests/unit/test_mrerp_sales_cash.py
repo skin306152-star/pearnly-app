@@ -43,6 +43,21 @@ def _sheet1_datarow_cells(xlsx: bytes):
     return out
 
 
+def _sheet2_datarows(xlsx: bytes):
+    with zipfile.ZipFile(io.BytesIO(xlsx)) as z:
+        sheet = z.read("xl/worksheets/sheet2.xml").decode("utf-8")
+        shared = z.read("xl/sharedStrings.xml").decode("utf-8")
+    strings = [re.sub(r"<[^>]+>", "", x) for x in re.findall(r"<si>.*?</si>", shared, re.S)]
+    rows = []
+    for row_xml in re.findall(r'<row r="[2-9][0-9]*"[^>]*>(.*?)</row>', sheet, re.S):
+        row = {}
+        for cell in re.finditer(r'<c r="([A-Z]+)[0-9]+"([^>]*)>(?:<v>(.*?)</v>)?</c>', row_xml):
+            col, attrs, value = cell.group(1), cell.group(2), cell.group(3)
+            row[col] = strings[int(value)] if (value and 't="s"' in attrs) else value
+        rows.append(row)
+    return rows
+
+
 class TestSalesCashGenerator(unittest.TestCase):
     def test_produces_four_sheet_zip(self):
         xlsx = gen.generate_xlsx([_HISTORY], _MAPPINGS, sheet_kind="sales_cash")
@@ -64,7 +79,7 @@ class TestSalesCashGenerator(unittest.TestCase):
         self.assertEqual(cells.get("T"), "0")
         self.assertEqual(cells.get("V"), "0")
 
-    def test_discount_is_sent_so_receipts_equal_net_total(self):
+    def test_inclusive_discount_is_allocated_to_line_amount(self):
         history = {
             **_HISTORY,
             "subtotal": "3557.01",
@@ -73,12 +88,61 @@ class TestSalesCashGenerator(unittest.TestCase):
             "total_amount": "3806.00",
             "items": [{"name": "ITEM A", "qty": 1, "unit_price": 4006, "amount": 4006}],
         }
-        cells = _sheet1_datarow_cells(
-            gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
-        )
-        self.assertEqual(cells.get("O"), "200")
+        xlsx = gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
+        cells = _sheet1_datarow_cells(xlsx)
+        details = _sheet2_datarows(xlsx)
+        self.assertEqual(cells.get("O"), "0")
         self.assertEqual(cells.get("R"), "3806")
         self.assertEqual(cells.get("C"), "7 (รวม)")
+        self.assertEqual(details[0].get("G"), "4006")
+        self.assertEqual(details[0].get("H"), "3806")
+
+    def test_exclusive_discount_is_allocated_to_pre_tax_lines(self):
+        history = {
+            **_HISTORY,
+            "subtotal": "90.00",
+            "vat": "6.30",
+            "discount": "10.00",
+            "total_amount": "96.30",
+            "items": [{"name": "ITEM A", "qty": 1, "unit_price": 100, "amount": 100}],
+        }
+        xlsx = gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
+        cells = _sheet1_datarow_cells(xlsx)
+        details = _sheet2_datarows(xlsx)
+        self.assertEqual(cells.get("C"), "7 (แยก)")
+        self.assertEqual(cells.get("O"), "0")
+        self.assertEqual(cells.get("R"), "96.3")
+        self.assertEqual(details[0].get("G"), "100")
+        self.assertEqual(details[0].get("H"), "90")
+
+    def test_discount_allocation_balances_rounding_to_cent(self):
+        history = {
+            **_HISTORY,
+            "subtotal": "93.44",
+            "vat": "6.54",
+            "discount": "0.01",
+            "total_amount": "99.98",
+            "items": [
+                {"name": f"ITEM {index}", "qty": 1, "unit_price": 33.33, "amount": 33.33}
+                for index in range(3)
+            ],
+        }
+        xlsx = gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
+        amounts = [float(row["H"]) for row in _sheet2_datarows(xlsx)]
+        self.assertAlmostEqual(sum(amounts), 99.98, places=2)
+
+    def test_unreconciled_discount_is_not_rewritten(self):
+        history = {
+            **_HISTORY,
+            "subtotal": "3557.01",
+            "vat": "248.99",
+            "discount": "200.00",
+            "total_amount": "3700.00",
+            "items": [{"name": "ITEM A", "qty": 1, "unit_price": 4006, "amount": 4006}],
+        }
+        xlsx = gen.generate_xlsx([history], _MAPPINGS, sheet_kind="sales_cash")
+        self.assertEqual(_sheet1_datarow_cells(xlsx).get("O"), "200")
+        self.assertEqual(_sheet2_datarows(xlsx)[0].get("H"), "4006")
 
     def test_tax_exclusive_items_keep_separate_vat_mode(self):
         history = {

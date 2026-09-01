@@ -317,6 +317,12 @@ window.__DMS_I18N_ZH__ = {
     'dms-op-f-role': '角色',
     'dms-op-role-sales': '销售',
     'dms-op-role-admin': '管理员',
+    'dms-op-f-query': '允许在 LINE 使用查询功能',
+    'dms-op-f-query-help':
+        '仅限已勾选、已启用并完成 LINE 绑定的成员;每次查询都从第三方 DMS 读取最新数据。',
+    'dms-op-col-query': '查询权限',
+    'dms-op-query-enabled': '允许',
+    'dms-op-query-disabled': '未允许',
     // 提成归属(例外通道:默认按 DMS 账号自动匹配,老板可钉死到某位顾问)
     'dms-op-f-advisor': '销售提成归属',
     'dms-op-adv-auto': '自动匹配(按 DMS 账号)',

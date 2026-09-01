@@ -105,6 +105,7 @@ def list_operators(owner_user: dict) -> dict:
                     bound_at.isoformat() if hasattr(bound_at, "isoformat") else bound_at
                 ),
                 "endpoint_ready": r.get("ep_enabled") is True,
+                "can_query_dms": r.get("can_query_dms") is True,
                 # 提成归属:空 = 没钉死 = 走自动匹配。id 给编辑弹窗回显当前选中项。
                 "advisor_id": r.get("advisor_id") or "",
                 "advisor_name": r.get("advisor_name") or "",
@@ -121,6 +122,7 @@ def create_operator(
     dms_password: str,
     dms_role: str,
     dms_advisor_id: Optional[str] = None,
+    can_query_dms: bool = False,
 ) -> dict:
     """建操作员:①老板须已有自己的 mrerp_dms 连接(取模板)②建 member 用户 + 档案(同事务)
     ③给该用户建 mrerp_dms endpoint(凭据加密 · 不写 admin_ 键)。③失败补偿清理 ②,不留半成品。
@@ -158,6 +160,7 @@ def create_operator(
             company_name=owner_user.get("company_name"),
             display_name=display_name,
             dms_role=dms_role,
+            can_query_dms=bool(can_query_dms),
         )
     except Exception as e:
         logger.error(f"[dms_roster] create user/profile failed: {e}")
@@ -202,6 +205,7 @@ def update_operator(
     dms_username: Optional[str] = None,
     dms_password: Optional[str] = None,
     dms_advisor_id: Optional[str] = None,
+    can_query_dms: Optional[bool] = None,
 ) -> dict:
     """改显示名/角色(档案)+ 换 DMS 账密 + 钉/清提成归属(同一次 endpoint 写)。空字段不动。
 
@@ -227,8 +231,14 @@ def update_operator(
         if err:
             return {"error": err}
 
-    if name is not None or role is not None:
-        store.update_profile(tenant_id, user_id, display_name=name, dms_role=role)
+    if name is not None or role is not None or can_query_dms is not None:
+        store.update_profile(
+            tenant_id,
+            user_id,
+            display_name=name,
+            dms_role=role,
+            can_query_dms=can_query_dms,
+        )
 
     new_user = _clean(dms_username) if dms_username is not None else None
     new_pass = dms_password if dms_password is not None else None

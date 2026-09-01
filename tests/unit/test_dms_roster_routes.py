@@ -144,12 +144,14 @@ class RosterGuardTest(unittest.TestCase):
                 "dms_password": "p",
                 "dms_role": "sales",
                 "dms_advisor_id": "9",
+                "can_query_dms": True,
             }
             res = _run(rr.create_operator(_FakeReq(body)))
         self.assertTrue(res["ok"])
         self.assertEqual(captured["dms_role"], "sales")
         self.assertEqual(captured["display_name"], "สมชาย")
         self.assertEqual(captured["dms_advisor_id"], "9")
+        self.assertTrue(captured["can_query_dms"])
 
     def test_update_advisor_field_reaches_service(self):
         captured = {}
@@ -166,6 +168,20 @@ class RosterGuardTest(unittest.TestCase):
         # 空串必须原样穿到 service(那是「清除钉死」,不是「没传」)。
         self.assertEqual(captured["dms_advisor_id"], "")
         self.assertIsNone(captured["dms_username"])
+
+    def test_update_false_query_permission_reaches_service(self):
+        captured = {}
+
+        def _cap(owner, user_id, **kw):
+            captured.update(kw)
+            return {"ok": True}
+
+        with (
+            mock.patch.object(rr, "_dms_authorize", return_value=OWNER),
+            mock.patch.object(rr.roster, "update_operator", side_effect=_cap),
+        ):
+            _run(rr.update_operator("op-1", _FakeReq({"can_query_dms": False})))
+        self.assertIs(captured["can_query_dms"], False)
 
     def test_invalid_advisor_maps_to_400(self):
         with (

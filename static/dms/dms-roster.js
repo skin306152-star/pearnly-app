@@ -176,6 +176,7 @@
             dms_username: user.trim(),
             dms_password: pass,
             dms_role: role,
+            can_query_dms: !!(byId('dms-op-can-query') || {}).checked,
         };
         var advisor = advisorPayload('dms-op-advisor');
         if (advisor) payload.dms_advisor_id = advisor; // 空 = 自动匹配 = 不必钉
@@ -317,6 +318,10 @@
         if (pw) payload.dms_password = pw;
         var advisor = advisorPayload('dms-op-acc-advisor');
         if (advisor !== null) payload.dms_advisor_id = advisor; // 空串 = 清除钉死回自动匹配
+        var queryEl = byId('dms-op-acc-can-query');
+        if (queryEl && queryEl.checked !== (queryEl.getAttribute('data-initial') === '1')) {
+            payload.can_query_dms = queryEl.checked;
+        }
         if (!Object.keys(payload).length) {
             return void showErr(errEl, t('dms-op-edit-nochange'));
         }

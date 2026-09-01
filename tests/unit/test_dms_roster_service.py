@@ -37,10 +37,12 @@ class CreateOperatorTest(unittest.TestCase):
                 dms_username="salesuser",
                 dms_password="pw-plain-123",
                 dms_role="sales",
+                can_query_dms=True,
             )
         self.assertTrue(res.get("ok"))
         self.assertEqual(res["user_id"], "op-9")
         rec.assert_called_once()
+        self.assertTrue(rec.call_args.kwargs["can_query_dms"])
         cfg = ep.call_args.args[3]
         self.assertTrue(cfg["username_enc"].startswith("gAAAAA"))
         self.assertTrue(cfg["password_enc"].startswith("gAAAAA"))
@@ -173,6 +175,7 @@ class ListOperatorsTest(unittest.TestCase):
             "line_name": "Somchai",
             "bound_at": _Dt(),
             "ep_enabled": True,
+            "can_query_dms": True,
         }
         with mock.patch.object(service.store, "list_profiles", return_value=[row]):
             res = service.list_operators(OWNER)
@@ -181,6 +184,28 @@ class ListOperatorsTest(unittest.TestCase):
         self.assertTrue(item["endpoint_ready"])
         self.assertEqual(item["line_bound_at"], "2026-07-19T10:00:00+00:00")
         self.assertEqual(item["dms_role"], "sales")
+        self.assertTrue(item["can_query_dms"])
+
+    def test_update_query_permission_without_credentials(self):
+        with (
+            mock.patch.object(
+                service.store,
+                "get_profile",
+                return_value={"user_id": "op-1", "tenant_id": "tenant-1"},
+            ),
+            mock.patch.object(service.store, "update_profile", return_value=True) as update,
+            mock.patch("core.db.list_erp_endpoints") as endpoints,
+        ):
+            result = service.update_operator(OWNER, "op-1", can_query_dms=True)
+        self.assertTrue(result["ok"])
+        update.assert_called_once_with(
+            "tenant-1",
+            "op-1",
+            display_name=None,
+            dms_role=None,
+            can_query_dms=True,
+        )
+        endpoints.assert_not_called()
 
 
 if __name__ == "__main__":

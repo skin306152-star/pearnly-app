@@ -107,6 +107,15 @@ def build_payload() -> dict:
                 },
                 row=1,
             ),
+            _area(
+                1,
+                {
+                    "type": "postback",
+                    "data": "action=menu_query",
+                    "displayText": "ค้นหาข้อมูล",
+                },
+                row=1,
+            ),
         ],
     }
 

@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 ICON_PATH = ROOT / "static" / "dms" / "line-icons" / "menu-3.png"
 CREDENTIAL_ICON_PATH = ROOT / "static" / "dms" / "line-icons" / "menu-4.png"
+QUERY_ICON_PATH = ROOT / "static" / "dms" / "line-icons" / "menu-5.png"
 MENU_PATH = ROOT / "static" / "brand" / "line-richmenu-dms-v1-2500x1686.png"
 FONT_CANDIDATES = (
     ROOT / "services" / "export" / "fonts" / "Sarabun-Bold.ttf",
@@ -17,6 +18,7 @@ PURPLE = (118, 86, 214)
 GREEN = (25, 140, 106)
 BLUE = (47, 107, 255)
 PINK = (242, 92, 110)
+ORANGE = (194, 106, 22)
 INK = (55, 48, 75)
 MUTED_TEXT = (151, 145, 170)
 MUTED_ICON = (176, 169, 195)
@@ -204,6 +206,30 @@ def draw_lock(draw, center_x, center_y, size, color, width):
     )
 
 
+def draw_search(draw, center_x, center_y, size, color, width):
+    radius = size * 0.27
+    draw.ellipse(
+        (
+            center_x - radius,
+            center_y - radius,
+            center_x + radius,
+            center_y + radius,
+        ),
+        outline=color,
+        width=width,
+    )
+    draw.line(
+        (
+            center_x + radius * 0.72,
+            center_y + radius * 0.72,
+            center_x + size * 0.43,
+            center_y + size * 0.43,
+        ),
+        fill=color,
+        width=width,
+    )
+
+
 def build_icon(path, glyph, color):
     image = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
     glyph(ImageDraw.Draw(image), 48, 48, 88, color, 6)
@@ -233,6 +259,7 @@ def build_menu():
             draw_lock,
             56,
         ),
+        (1, 1, ORANGE, "ค้นหาข้อมูล", "ยอดขายล่าสุดจาก DMS", draw_search, 68),
     )
     for col, row, color, title, subtitle, glyph, title_size in active_cells:
         left, right = COLUMN_EDGES[col], COLUMN_EDGES[col + 1]
@@ -264,7 +291,7 @@ def build_menu():
             top + 640,
         )
 
-    for index in range(1, 3):
+    for index in range(2, 3):
         left, right = COLUMN_EDGES[index], COLUMN_EDGES[index + 1]
         center_x = (left + right) / 2
         rounded_card(
@@ -291,6 +318,7 @@ def main():
     assets = (
         (ICON_PATH, build_icon(ICON_PATH, draw_dashboard, PURPLE)),
         (CREDENTIAL_ICON_PATH, build_icon(CREDENTIAL_ICON_PATH, draw_lock, GREEN)),
+        (QUERY_ICON_PATH, build_icon(QUERY_ICON_PATH, draw_search, ORANGE)),
         (MENU_PATH, build_menu()),
     )
     for path, image in assets:

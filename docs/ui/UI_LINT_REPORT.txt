@@ -285,7 +285,7 @@
      1  static/dms/dms-intake.css
         └ 995: max-width: min(720px, 100%);
      1  static/dms/dms-roster.css
-        └ 187: width: min(420px, 100%);
+        └ 213: width: min(420px, 100%);
      1  static/dms/dms-shell.css
         └ 126: max-width: min(480px, 100%);
      1  static/dms/dms-util.js

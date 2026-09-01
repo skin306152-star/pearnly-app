@@ -52,6 +52,7 @@
             field('dms-op-pass', t('dms-op-f-pass'), 'password', t('dms-op-f-pass-ph')) +
             roleRadio() +
             advisorField('dms-op-advisor', '', t('dms-op-adv-auto')) +
+            queryPermissionField('dms-op-can-query', false) +
             '</div><div class="dms-op-err" id="dms-op-form-err" style="display:none"></div>' +
             '<div class="dms-op-form-actions"><button type="button" class="btn primary" id="dms-op-create">' +
             esc(t('dms-op-add-btn')) +
@@ -93,6 +94,22 @@
             opt('sales', 'dms-op-role-sales') +
             opt('admin', 'dms-op-role-admin') +
             '</div></div>'
+        );
+    }
+
+    function queryPermissionField(id, checked) {
+        return (
+            '<label class="dms-op-query-permission"><input type="checkbox" id="' +
+            id +
+            '"' +
+            (checked ? ' checked' : '') +
+            ' data-initial="' +
+            (checked ? '1' : '0') +
+            '"><span><b>' +
+            esc(t('dms-op-f-query')) +
+            '</b><small>' +
+            esc(t('dms-op-f-query-help')) +
+            '</small></span></label>'
         );
     }
 
@@ -162,6 +179,11 @@
             return '<span class="dms-badge fail">' + esc(t('dms-op-st-inactive')) + '</span>';
         return '<span class="dms-badge ok">' + esc(t('dms-op-st-active')) + '</span>';
     }
+    function queryBadge(enabled) {
+        var key = enabled ? 'dms-op-query-enabled' : 'dms-op-query-disabled';
+        var cls = enabled ? 'ok' : 'pending';
+        return '<span class="dms-badge ' + cls + '">' + esc(t(key)) + '</span>';
+    }
 
     // 归属列:钉死了显示顾问名,没钉显示「自动」(灰),空着会让人以为这单没人拿提成。
     function advisorCell(item) {
@@ -219,6 +241,8 @@
             advisorCell(item) +
             '</div><div class="dms-op-c line">' +
             lineBadge(item) +
+            '</div><div class="dms-op-c query">' +
+            queryBadge(item.can_query_dms) +
             '</div><div class="dms-op-c status">' +
             statusBadge(item.status) +
             '</div><div class="dms-op-c acts">' +
@@ -236,6 +260,8 @@
             esc(t('dms-op-col-advisor')) +
             '</div><div class="dms-op-c line">' +
             esc(t('dms-op-col-line')) +
+            '</div><div class="dms-op-c query">' +
+            esc(t('dms-op-col-query')) +
             '</div><div class="dms-op-c status">' +
             esc(t('dms-op-col-status')) +
             '</div><div class="dms-op-c acts">' +
@@ -317,6 +343,7 @@
                 item.advisor_id || '',
                 item.advisor_name || t('dms-op-adv-auto')
             ) +
+            queryPermissionField('dms-op-acc-can-query', !!item.can_query_dms) +
             '<label class="dms-op-field"><span>' +
             esc(t('dms-op-acc-user')) +
             '</span><input type="text" id="dms-op-acc-user-input" class="dms-bill-input" autocomplete="username" placeholder="' +

@@ -330,6 +330,12 @@ window.__DMS_I18N_EN__ = {
     'dms-op-f-role': 'Role',
     'dms-op-role-sales': 'Sales',
     'dms-op-role-admin': 'Admin',
+    'dms-op-f-query': 'Allow LINE queries',
+    'dms-op-f-query-help':
+        'Only checked, active, LINE-linked members can query. Each request reads the latest data from the third-party DMS.',
+    'dms-op-col-query': 'Query access',
+    'dms-op-query-enabled': 'Allowed',
+    'dms-op-query-disabled': 'Not allowed',
     // Sales credit (auto-matched from the DMS account by default · owner can pin it)
     'dms-op-f-advisor': 'Sales advisor',
     'dms-op-adv-auto': 'Automatic (match by DMS account)',

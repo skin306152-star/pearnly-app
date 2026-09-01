@@ -50,6 +50,15 @@ class DmsMenuCardTests(unittest.TestCase):
             self.assertEqual(self._items()[2]["action"]["uri"], "https://pearnly.com/dms")
             self.assertEqual(self._items()[3]["action"]["uri"], "https://pearnly.com/dms")
 
+    def test_query_permission_adds_fifth_action(self):
+        contents = menu_cards.menu_card(can_query=True)["contents"]["body"]["contents"]
+        items = [item for item in contents if item.get("action")]
+        self.assertEqual(len(items), 5)
+        self.assertEqual(
+            items[4]["action"],
+            {"type": "postback", "data": cards._data(cards.ACT_MENU_QUERY)},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -54,12 +54,12 @@ class DmsRichMenuTests(unittest.TestCase):
                 "https://pearnly.com/home/dms-booking?portal=dms&openExternalBrowser=1",
             )
 
-    def test_payload_has_three_top_row_actions_and_credentials_below(self):
+    def test_payload_has_query_in_fifth_cell(self):
         with patch.dict(os.environ, {"LINE_DMS_LIFF_ID": "DMS-LIFF"}, clear=False):
             payload = rich_menu.build_payload()
         self.assertEqual(payload["size"], {"width": 2500, "height": 1686})
         self.assertLessEqual(len(payload["chatBarText"]), 14)
-        self.assertEqual(len(payload["areas"]), 4)
+        self.assertEqual(len(payload["areas"]), 5)
         self.assertEqual(
             [(a["bounds"]["x"], a["bounds"]["width"]) for a in payload["areas"][:3]],
             [(0, 833), (833, 833), (1666, 834)],
@@ -71,7 +71,7 @@ class DmsRichMenuTests(unittest.TestCase):
         )
         self.assertEqual(
             [a["action"]["type"] for a in payload["areas"]],
-            ["postback", "postback", "uri", "uri"],
+            ["postback", "postback", "uri", "uri", "postback"],
         )
         self.assertEqual(
             payload["areas"][2]["action"]["uri"],
@@ -85,6 +85,11 @@ class DmsRichMenuTests(unittest.TestCase):
             payload["areas"][3]["action"]["uri"],
             "https://pearnly.com/home/dms-booking?credentials=dms&openExternalBrowser=1",
         )
+        self.assertEqual(
+            payload["areas"][4]["bounds"],
+            {"x": 833, "y": 843, "width": 833, "height": 843},
+        )
+        self.assertEqual(payload["areas"][4]["action"]["data"], "action=menu_query")
 
     def _image_path(self):
         tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)

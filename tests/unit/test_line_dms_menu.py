@@ -117,6 +117,7 @@ class _Env:
         p(flow.store, "get_session", side_effect=self.store.get_session)
         p(flow.store, "set_session", side_effect=self.store.set_session)
         p(flow.store, "clear_session", side_effect=self.store.clear_session)
+        p(menu_flow.query_access, "can_query", return_value=False)
         p(flow, "_spawn", side_effect=self.spawned.append)
         self.qa_start = p(menu_flow.booking_qa, "start", new_callable=mock.AsyncMock)
         self.reply = p(flow.line_client, "reply_text")

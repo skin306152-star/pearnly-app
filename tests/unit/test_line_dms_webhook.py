@@ -143,6 +143,7 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(w.store, "get_binding_by_line_user", return_value=None),
             mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.query_access, "can_query", return_value=False),
             mock.patch.object(w.line_client, "reply_text") as reply,
         ):
             await w._handle_dms_event(ev)
@@ -155,6 +156,7 @@ class GateOpenBindTests(unittest.IsolatedAsyncioTestCase):
         with (
             mock.patch.object(w.store, "get_binding_by_line_user", return_value=binding),
             mock.patch.object(w, "dms_line_enabled_for", return_value=True),
+            mock.patch.object(w.query_access, "can_query", return_value=False),
             mock.patch.object(w.line_client, "reply_text") as reply,
             mock.patch.object(w.line_client, "reply_messages") as reply_msgs,
         ):

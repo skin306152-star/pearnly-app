@@ -326,6 +326,12 @@ window.__DMS_I18N_JA__ = {
     'dms-op-f-role': '役割',
     'dms-op-role-sales': '営業',
     'dms-op-role-admin': '管理者',
+    'dms-op-f-query': 'LINEでの照会を許可',
+    'dms-op-f-query-help':
+        'チェック済み・有効・LINE連携済みの担当者のみ利用できます。照会のたびに外部DMSから最新データを取得します。',
+    'dms-op-col-query': '照会権限',
+    'dms-op-query-enabled': '許可',
+    'dms-op-query-disabled': '未許可',
     // 売上の帰属(既定はDMSアカウントで自動照合 · オーナーが手動で固定可)
     'dms-op-f-advisor': '販売担当',
     'dms-op-adv-auto': '自動(DMSアカウントで照合)',

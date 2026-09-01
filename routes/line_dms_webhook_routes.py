@@ -10,13 +10,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
 from core.feature_flags import dms_line_enabled_for
-from services.line_dms import cards, flow, menu_cards, store
+from services.line_dms import cards, flow, menu_cards, query_access, store
 from services.line_platform import client as line_client
 from services.line_platform import webhook_runner as line_webhook_runner
 
@@ -28,15 +29,12 @@ _CHANNEL = "dms"
 _UNBIND_CMD = "ยกเลิกการเชื่อมต่อ"
 
 # 泰语文案(经销商销售员受众 · 简洁不堆 emoji)。
-_MSG_WELCOME = (
-    "ยินดีต้อนรับสู่ Pearnly DMS\n\n"
-    "พิมพ์รหัสเชื่อมต่อ 6 หลักที่ได้จากระบบ เพื่อเริ่มใช้งานผ่าน LINE"
-)
+_MSG_WELCOME = "ยินดีต้อนรับสู่ Pearnly DMS\n\nพิมพ์รหัสเชื่อมต่อ 6 หลักที่ได้จากระบบ เพื่อเริ่มใช้งานผ่าน LINE"
 _MSG_BIND_OK = "เชื่อมต่อสำเร็จแล้ว ตอนนี้ใช้งาน Pearnly DMS ผ่าน LINE ได้เลย"
 _MSG_BIND_BAD = "รหัสไม่ถูกต้องหรือหมดอายุ กรุณาขอรหัสใหม่จากระบบแล้วส่งอีกครั้ง"
 _MSG_UNBOUND = "ยกเลิกการเชื่อมต่อเรียบร้อยแล้ว"
 _MSG_GUIDE = (
-    "พิมพ์รหัสเชื่อมต่อ 6 หลักเพื่อเริ่มใช้งาน " "หรือพิมพ์ ยกเลิกการเชื่อมต่อ เพื่อออกจากระบบ"
+    "พิมพ์รหัสเชื่อมต่อ 6 หลักเพื่อเริ่มใช้งาน หรือพิมพ์ ยกเลิกการเชื่อมต่อ เพื่อออกจากระบบ"
 )
 # 处理失败的回执:失败事件不自动重放,只能请用户重发(重发 = 新 event_id,不会重复建单)。
 _MSG_FAILED = "ข้อความล่าสุดประมวลผลไม่สำเร็จค่ะ กรุณาส่งใหม่อีกครั้งนะคะ"
@@ -81,9 +79,13 @@ async def _handle_dms_event(ev: dict) -> None:
     if ev_type == "follow":
         # 已绑用户加好友 = 回访,直接给功能菜单(波2);未绑仍给绑定码指引。
         if binding:
+            allowed = await asyncio.to_thread(query_access.can_query, binding)
             line_client.reply_messages(
                 reply_token,
-                [{"type": "text", "text": cards.TXT_MENU_GREETING}, menu_cards.menu_card()],
+                [
+                    {"type": "text", "text": cards.TXT_MENU_GREETING},
+                    menu_cards.menu_card(can_query=bool(allowed)),
+                ],
                 channel=_CHANNEL,
             )
         else:

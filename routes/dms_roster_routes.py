@@ -85,6 +85,7 @@ async def create_operator(request: Request):
             dms_password=body.get("dms_password"),
             dms_role=body.get("dms_role"),
             dms_advisor_id=body.get("dms_advisor_id"),
+            can_query_dms=body.get("can_query_dms") is True,
         )
     )
 
@@ -102,6 +103,7 @@ async def update_operator(user_id: str, request: Request):
             dms_username=body.get("dms_username"),
             dms_password=body.get("dms_password"),
             dms_advisor_id=body.get("dms_advisor_id"),
+            can_query_dms=(body.get("can_query_dms") is True) if "can_query_dms" in body else None,
         )
     )
 

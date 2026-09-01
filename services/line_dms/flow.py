@@ -34,6 +34,7 @@ from services.line_dms import (
     menu_flow,
     ocr_review,
     qa_cards,
+    query_flow,
     store,
     text_router,
 )
@@ -110,6 +111,11 @@ async def handle_postback(
         return
     pb = {k: v[0] for k, v in parse_qs(data).items()}
     action = pb.get("action")
+
+    if action in query_flow.QUERY_ACTIONS:
+        sess = await _thr(store.get_session, tenant, line_user_id)
+        await query_flow.handle_postback(binding, line_user_id, reply_token, action, pb, sess)
+        return
 
     # 订车阶段(DL-4a)的预览确认/取消归 booking_flow(客户档写档动作留本文件)。
     if action in booking_flow.BOOKING_ACTIONS:

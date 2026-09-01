@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS dms_operator_profiles (
     display_name text NOT NULL,
     dms_role text NOT NULL CHECK (dms_role IN ('sales', 'admin')),
     status text NOT NULL DEFAULT 'active',
+    can_query_dms boolean NOT NULL DEFAULT false,
     created_at timestamptz DEFAULT now()
 )
 """
@@ -40,6 +41,10 @@ def ensure_tables() -> None:
     with db.get_cursor(commit=True) as cur:
         cur.execute(_PROFILES)
         cur.execute(
+            "ALTER TABLE dms_operator_profiles "
+            "ADD COLUMN IF NOT EXISTS can_query_dms boolean NOT NULL DEFAULT false"
+        )
+        cur.execute(
             "CREATE INDEX IF NOT EXISTS ix_dms_operator_profiles_tenant "
             "ON dms_operator_profiles (tenant_id)"
         )
@@ -51,7 +56,7 @@ def _with_heal(fn):
     try:
         return fn()
     except Exception as e:
-        if TABLE not in str(e):
+        if TABLE not in str(e) and "can_query_dms" not in str(e):
             raise
         ensure_tables()
         return fn()
@@ -65,6 +70,7 @@ def create_operator_records(
     company_name: Optional[str],
     display_name: str,
     dms_role: str,
+    can_query_dms: bool = False,
 ) -> str:
     """同一事务建 member 用户 + 档案行 · 返回新 user_id(异常上抛,由 service 层回滚兜底)。"""
     from core import db
@@ -81,8 +87,9 @@ def create_operator_records(
             )
             cur.execute(
                 "INSERT INTO dms_operator_profiles "
-                "(user_id, tenant_id, display_name, dms_role) VALUES (%s, %s, %s, %s)",
-                (uid, str(tenant_id), display_name, dms_role),
+                "(user_id, tenant_id, display_name, dms_role, can_query_dms) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (uid, str(tenant_id), display_name, dms_role, bool(can_query_dms)),
             )
             return uid
 
@@ -150,7 +157,7 @@ def get_profile(tenant_id: str, user_id: str) -> Optional[dict]:
     def _run():
         with db.get_cursor() as cur:
             cur.execute(
-                "SELECT user_id, tenant_id, display_name, dms_role, status "
+                "SELECT user_id, tenant_id, display_name, dms_role, status, can_query_dms "
                 "FROM dms_operator_profiles WHERE tenant_id = %s AND user_id = %s",
                 (str(tenant_id), str(user_id)),
             )
@@ -172,7 +179,8 @@ def list_profiles(tenant_id: str) -> List[dict]:
         with db.get_cursor() as cur:
             cur.execute(
                 """
-                SELECT p.user_id, p.display_name, p.dms_role, p.status, p.created_at,
+                SELECT p.user_id, p.display_name, p.dms_role, p.status, p.can_query_dms,
+                       p.created_at,
                        u.username,
                        b.display_name AS line_name, b.bound_at, b.line_user_id,
                        e.enabled AS ep_enabled, e.advisor_id, e.advisor_name
@@ -208,6 +216,7 @@ def update_profile(
     *,
     display_name: Optional[str] = None,
     dms_role: Optional[str] = None,
+    can_query_dms: Optional[bool] = None,
 ) -> bool:
     """改显示名/角色(只在给定字段上更新;两者皆空则无操作返 False)。"""
     from core import db
@@ -219,6 +228,9 @@ def update_profile(
     if dms_role is not None:
         sets.append("dms_role = %s")
         vals.append(dms_role)
+    if can_query_dms is not None:
+        sets.append("can_query_dms = %s")
+        vals.append(bool(can_query_dms))
     if not sets:
         return False
     vals.extend([str(tenant_id), str(user_id)])

@@ -74,7 +74,15 @@ class DmsRosterStoreTest(unittest.TestCase):
         mk_cmu.assert_called_once()
         ins = [c for c in cur.calls if "dms_operator_profiles" in c[0]]
         self.assertTrue(ins)
-        self.assertEqual(ins[0][1], ("op-7", "t1", "สมชาย", "sales"))
+        self.assertEqual(ins[0][1], ("op-7", "t1", "สมชาย", "sales", False))
+
+    def test_update_profile_can_toggle_query_permission_only(self):
+        cur = _FakeCur(rowcount=1)
+        with mock.patch("core.db.get_cursor", return_value=_FakeCtx(cur)):
+            self.assertTrue(store.update_profile("t1", "u1", can_query_dms=True))
+        sql, params = cur.calls[0]
+        self.assertIn("can_query_dms = %s", sql)
+        self.assertEqual(params, (True, "t1", "u1"))
 
     def test_with_heal_retries_once_on_missing_table(self):
         seq = {"n": 0}
@@ -89,6 +97,19 @@ class DmsRosterStoreTest(unittest.TestCase):
             self.assertEqual(store._with_heal(fn), "ok")
             mk_ensure.assert_called_once()
         self.assertEqual(seq["n"], 2)
+
+    def test_with_heal_adds_query_column_on_existing_table(self):
+        seq = {"n": 0}
+
+        def fn():
+            seq["n"] += 1
+            if seq["n"] == 1:
+                raise Exception("column p.can_query_dms does not exist")
+            return "ok"
+
+        with mock.patch.object(store, "ensure_tables") as mk_ensure:
+            self.assertEqual(store._with_heal(fn), "ok")
+            mk_ensure.assert_called_once()
 
 
 if __name__ == "__main__":

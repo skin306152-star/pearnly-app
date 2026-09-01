@@ -21,6 +21,8 @@ from services.line_dms import (
     menu_cards,
     menu_flow,
     qa_cards,
+    query_access,
+    query_flow,
     store,
 )
 from services.line_dms._out import _CHANNEL, _reply, _thr
@@ -52,6 +54,9 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
         await edit_flow.handle_text(binding, line_user_id, reply_token, sess, text)
         return
 
+    if await query_flow.handle_text(binding, line_user_id, reply_token, sess, text):
+        return
+
     # 逐问/确认态先于一切文本路(尤其「含数字→手机号」):金额/单字被吃成号码就废一次会话。
     # booking_review 态文本只提醒点确认/丢弃,不覆写会话(确认/取消是 postback 专属)。
     if state == "booking_qa":
@@ -72,7 +77,10 @@ async def route(binding: dict, line_user_id: str, reply_token: str, text: str) -
         return
 
     if not sess:  # 无会话 → 菜单卡引路(取代旧 TXT_INTRO 文本)
-        line_client.reply_messages(reply_token, [menu_cards.menu_card()], channel=_CHANNEL)
+        allowed = await _thr(query_access.can_query, binding)
+        line_client.reply_messages(
+            reply_token, [menu_cards.menu_card(can_query=bool(allowed))], channel=_CHANNEL
+        )
     else:
         _reply(reply_token, _nudge(sess))
 

@@ -12,14 +12,17 @@ from typing import Any, Dict
 from services.line_dms.cards import (
     ACT_MENU_BOOKING,
     ACT_MENU_CUSTOMER,
+    ACT_MENU_QUERY,
     TXT_MENU_D1,
     TXT_MENU_D2,
     TXT_MENU_D3,
     TXT_MENU_D4,
+    TXT_MENU_D5,
     TXT_MENU_ITEM1,
     TXT_MENU_ITEM2,
     TXT_MENU_ITEM3,
     TXT_MENU_ITEM4,
+    TXT_MENU_ITEM5,
     TXT_MENU_HINT,
     TXT_MENU_PICK,
     TXT_MENU_PICK_SUB,
@@ -57,6 +60,7 @@ THEME_BLUE = {"accent": "#2f6bff", "soft": "#eaf0ff", "border": "#dfe7ff"}
 THEME_PINK = {"accent": "#f25c6e", "soft": "#fdecef", "border": "#f9d9de"}
 THEME_PURPLE = {"accent": "#7656d6", "soft": "#f0ebff", "border": "#e5dcff"}
 THEME_GREEN = {"accent": "#198c6a", "soft": "#e8f7f1", "border": "#d3eee4"}
+THEME_ORANGE = {"accent": "#c26a16", "soft": "#fff2e3", "border": "#f5dfc7"}
 
 
 def menu_item(
@@ -130,7 +134,7 @@ def menu_item(
     return row
 
 
-def menu_card() -> Dict[str, Any]:
+def menu_card(can_query: bool = False) -> Dict[str, Any]:
     """入口菜单(照泰方认可的 mockup):标题区 + 四张整行可点的行卡。"""
     head = {
         "type": "box",
@@ -163,64 +167,78 @@ def menu_card() -> Dict[str, Any]:
             },
         ],
     }
+    contents = [
+        head,
+        {"type": "separator", "margin": "lg", "color": "#eeeef4"},
+        menu_item(
+            "1",
+            "menu-1",
+            THEME_BLUE,
+            TXT_MENU_ITEM1,
+            TXT_MENU_D1,
+            {"type": "postback", "data": _data(ACT_MENU_CUSTOMER)},
+        ),
+        menu_item(
+            "2",
+            "menu-2",
+            THEME_PINK,
+            TXT_MENU_ITEM2,
+            TXT_MENU_D2,
+            {"type": "postback", "data": _data(ACT_MENU_BOOKING)},
+        ),
+        menu_item(
+            "3",
+            "menu-3",
+            THEME_PURPLE,
+            TXT_MENU_ITEM3,
+            TXT_MENU_D3,
+            {
+                "type": "uri",
+                "label": TXT_MENU_ITEM3,
+                "uri": portal_external_url(),
+                "altUri": {"desktop": portal_desktop_url()},
+            },
+        ),
+        menu_item(
+            "4",
+            "menu-4",
+            THEME_GREEN,
+            TXT_MENU_ITEM4,
+            TXT_MENU_D4,
+            {
+                "type": "uri",
+                "label": TXT_MENU_ITEM4,
+                "uri": credentials_external_url(),
+                "altUri": {"desktop": credentials_desktop_url()},
+            },
+        ),
+    ]
+    if can_query:
+        contents.append(
+            menu_item(
+                "5",
+                "menu-5",
+                THEME_ORANGE,
+                TXT_MENU_ITEM5,
+                TXT_MENU_D5,
+                {"type": "postback", "data": _data(ACT_MENU_QUERY)},
+            )
+        )
+    contents.append(
+        {
+            "type": "text",
+            "text": TXT_MENU_HINT,
+            "size": "xxs",
+            "color": "#aaaaaa",
+            "align": "center",
+            "wrap": True,
+            "margin": "lg",
+        }
+    )
     body = {
         "type": "box",
         "layout": "vertical",
         "paddingAll": "16px",
-        "contents": [
-            head,
-            {"type": "separator", "margin": "lg", "color": "#eeeef4"},
-            menu_item(
-                "1",
-                "menu-1",
-                THEME_BLUE,
-                TXT_MENU_ITEM1,
-                TXT_MENU_D1,
-                {"type": "postback", "data": _data(ACT_MENU_CUSTOMER)},
-            ),
-            menu_item(
-                "2",
-                "menu-2",
-                THEME_PINK,
-                TXT_MENU_ITEM2,
-                TXT_MENU_D2,
-                {"type": "postback", "data": _data(ACT_MENU_BOOKING)},
-            ),
-            menu_item(
-                "3",
-                "menu-3",
-                THEME_PURPLE,
-                TXT_MENU_ITEM3,
-                TXT_MENU_D3,
-                {
-                    "type": "uri",
-                    "label": TXT_MENU_ITEM3,
-                    "uri": portal_external_url(),
-                    "altUri": {"desktop": portal_desktop_url()},
-                },
-            ),
-            menu_item(
-                "4",
-                "menu-4",
-                THEME_GREEN,
-                TXT_MENU_ITEM4,
-                TXT_MENU_D4,
-                {
-                    "type": "uri",
-                    "label": TXT_MENU_ITEM4,
-                    "uri": credentials_external_url(),
-                    "altUri": {"desktop": credentials_desktop_url()},
-                },
-            ),
-            {
-                "type": "text",
-                "text": TXT_MENU_HINT,
-                "size": "xxs",
-                "color": "#aaaaaa",
-                "align": "center",
-                "wrap": True,
-                "margin": "lg",
-            },
-        ],
+        "contents": contents,
     }
     return {"type": "flex", "altText": TXT_MENU_TITLE, "contents": {"type": "bubble", "body": body}}

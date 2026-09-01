@@ -50,6 +50,31 @@
   display: flex;
   justify-content: flex-end;
 }
+.dms-op-query-permission {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.dms-op-query-permission input {
+  margin-top: 2px;
+  accent-color: var(--brand);
+}
+.dms-op-query-permission span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+.dms-op-query-permission small {
+  color: var(--ink2);
+  line-height: 1.45;
+}
 .dms-op-err {
   margin-top: 10px;
   color: var(--err);
@@ -64,7 +89,7 @@
 }
 .dms-op-row {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1.2fr 1.1fr 0.9fr 2.6fr;
+  grid-template-columns: 1.5fr 0.9fr 1.1fr 1fr 0.8fr 0.8fr 2.5fr;
   align-items: center;
   gap: 10px;
   padding: 12px 8px;
@@ -128,6 +153,7 @@
 .dms-op-c.role,
 .dms-op-c.advisor,
 .dms-op-c.line,
+.dms-op-c.query,
 .dms-op-c.status {
   text-align: center;
 }

@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.line_platform import client as line_client
-from services.line_dms import booking_qa, cards, menu_cards, store
+from services.line_dms import booking_qa, cards, menu_cards, query_access, store
 from services.line_dms._out import _CHANNEL, _push, _reply, _thr
 
 MENU_ACTIONS = frozenset(
@@ -32,7 +32,11 @@ MENU_ACTIONS = frozenset(
 # mode 语义单一落点:customer=只建档收尾;其余(booking/缺省直拍)串联订车。
 # flow 出卡分流与本文件落档分流都引用它,别再散写裸字符串比较。
 MODE_CUSTOMER = "customer"
-_MENU_CHOICES = {"1": cards.ACT_MENU_CUSTOMER, "2": cards.ACT_MENU_BOOKING}
+_MENU_CHOICES = {
+    "1": cards.ACT_MENU_CUSTOMER,
+    "2": cards.ACT_MENU_BOOKING,
+    "5": cards.ACT_MENU_QUERY,
+}
 # 弹菜单/切模式时保留的已收料:重复进菜单不丢已拍的卡/已输的号;id_card_mid 是
 # 订车逐问的身份证附件源,同样保留(客户档落定后 booking_qa.start 要挂附件)。
 _KEEP_KEYS = ("id_card", "id_card_mid", "phone", "endpoint_id", "mode")
@@ -55,7 +59,8 @@ async def open_menu(
     old = (sess or {}).get("payload") or {}
     payload = {k: old.get(k) for k in _KEEP_KEYS if old.get(k)}
     await _thr(store.set_session, binding["tenant_id"], line_user_id, "menu", payload)
-    msgs: list = [menu_cards.menu_card()]
+    allowed = await _thr(query_access.can_query, binding)
+    msgs: list = [menu_cards.menu_card(can_query=bool(allowed))]
     if greet:
         msgs.insert(0, {"type": "text", "text": cards.TXT_MENU_GREETING})
     line_client.reply_messages(reply_token, msgs, channel=_CHANNEL)
@@ -71,7 +76,13 @@ async def handle_choice(
     stripped = text.strip()
     if (sess or {}).get("state") != "menu" or stripped not in _MENU_CHOICES:
         return False
-    await _choose(binding, line_user_id, reply_token, sess, _MENU_CHOICES[stripped])
+    action = _MENU_CHOICES[stripped]
+    if action == cards.ACT_MENU_QUERY:
+        from services.line_dms import query_flow
+
+        await query_flow.open_query(binding, line_user_id, reply_token)
+    else:
+        await _choose(binding, line_user_id, reply_token, sess, action)
     return True
 
 

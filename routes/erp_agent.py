@@ -25,6 +25,10 @@ from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import require_erp_portal
 from services.erp.express_push import account_set_allowed, express_push_enabled
 from services.erp.express_push import agent_store
+from services.erp.express_push.connection_identity import (
+    connection_identity as _connection_identity,
+    endpoint_connection_identity as _endpoint_connection_identity,
+)
 from services.erp import shared_express_agent_queue as managed_agent_queue
 
 logger = logging.getLogger("mr-pilot")
@@ -82,11 +86,20 @@ def _run_agent_heartbeat(token: str, body: Dict[str, Any]):
     if ep and not ep.get("enabled", True):
         raise HTTPException(403, detail="erp.endpoint_disabled")
     if not ep:
-        return _managed_heartbeat(token, body)
+        result = _managed_heartbeat(token, body)
+        if isinstance(result, dict) and result.get("ok"):
+            endpoint_id = str(result.get("endpoint_id") or "")
+            result = {**result, "connection": _endpoint_connection_identity(endpoint_id)}
+        return result
     # 优雅退出信号:立即标离线(不写 last_seen=now)→ Pearnly 实时显示断开。
     if body.get("offline"):
         agent_store.mark_offline(str(ep["id"]))
-        return {"ok": True, "endpoint_id": str(ep["id"]), "connected": False}
+        return {
+            "ok": True,
+            "endpoint_id": str(ep["id"]),
+            "connected": False,
+            "connection": _connection_identity(ep),
+        }
     device = str(body.get("device") or "")
     agent_store.touch_heartbeat(str(ep["id"]), device=device)
     cfg = ep.get("config") or {}
@@ -135,6 +148,7 @@ def _run_agent_heartbeat(token: str, body: Dict[str, Any]):
         "method": cfg.get("method") or "rpa",
         "account_sets_received": stored,
         "accounts_received": accts_stored,
+        "connection": _connection_identity(ep),
     }
 
 

@@ -23,6 +23,29 @@ class _Request:
 
 
 class AgentLaneCTests(unittest.TestCase):
+    def test_connection_identity_uses_login_name_without_exposing_endpoint_config(self):
+        endpoint = {
+            "id": "ep-1",
+            "name": "Cowork Express",
+            "user_id": "owner-1",
+            "config": {"agent_token_hash": "secret"},
+        }
+        with mock.patch(
+            "services.erp.express_push.connection_identity.db.find_user_by_id",
+            return_value={"username": "skin", "email": "owner@example.com"},
+        ):
+            identity = erp_agent._connection_identity(endpoint)
+
+        self.assertEqual(
+            identity,
+            {
+                "endpoint_id": "ep-1",
+                "endpoint_name": "Cowork Express",
+                "pearnly_account": "skin",
+            },
+        )
+        self.assertNotIn("config", identity)
+
     def test_generation_zero_heartbeat_keeps_legacy_response(self):
         endpoint = {"id": "ep-1", "config": {"account_set": "TEST", "method": "rpa"}}
         with (

@@ -268,6 +268,15 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
                 "store_account_sets",
                 side_effect=store_account_sets,
             ) as account_sets_store,
+            mock.patch.object(
+                erp_agent,
+                "_connection_identity",
+                return_value={
+                    "endpoint_id": endpoint["id"],
+                    "endpoint_name": "Express TEST",
+                    "pearnly_account": "owner@example.com",
+                },
+            ),
             mock.patch.object(erp_agent, "_managed_heartbeat") as managed_heartbeat,
         ):
             response = TestClient(app).post(
@@ -287,6 +296,11 @@ class ManagedHeartbeatHttpTests(unittest.TestCase):
                 "method": "rpa",
                 "account_sets_received": 2,
                 "accounts_received": 0,
+                "connection": {
+                    "endpoint_id": endpoint["id"],
+                    "endpoint_name": "Express TEST",
+                    "pearnly_account": "owner@example.com",
+                },
             },
         )
         authenticate.assert_called_once_with(token)

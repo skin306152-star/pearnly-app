@@ -539,7 +539,7 @@ test('restored LIFF draft callback opens the booking editor instead of Cowork lo
     expect(authRequested).toBe(true);
     expect(draftRequested).toBe(true);
     await expect(page).toHaveURL(/\/home\?draft=restored-line-nonce$/);
-    const title = await page.evaluate(() => window.DMS_BOOKING_TEXT.zh.title);
+    const title = await page.evaluate(() => globalThis.DMS_BOOKING_TEXT.zh.title);
     await expect(page.locator('h1')).toHaveText(title);
     await page.screenshot({
         path: path.join(OUT, 'restored-liff-draft-editor-390.png'),

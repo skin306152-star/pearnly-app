@@ -15,12 +15,16 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
         cls.app_compact = " ".join(cls.app.split())
         cls.i18n = (folder / "i18n.js").read_text(encoding="utf-8")
         cls.fields = (folder / "field-editor.js").read_text(encoding="utf-8")
+        shared = ROOT / "static" / "line-intake-review"
+        cls.runtime = (shared / "liff-runtime.js").read_text(encoding="utf-8")
+        cls.review = (shared / "batch-review.js").read_text(encoding="utf-8")
 
     def test_upload_stays_in_line_chat(self):
         combined = self.html + self.app
         self.assertNotIn('type="file"', combined)
         self.assertNotIn("/api/ocr/recognize", combined)
-        self.assertIn("liff.getIDToken()", self.app)
+        self.assertIn("liff.getIDToken()", self.runtime)
+        self.assertIn("window.lineIntakeLiff", self.app)
 
     def test_editor_has_independent_scoped_paths_and_full_actions(self):
         self.assertIn("/api/cowork-line/intake/draft/", self.app)
@@ -46,20 +50,22 @@ class CoworkLineIntakeFrontendContractTest(unittest.TestCase):
         self.assertIn("target.workspace_name", self.app)
 
     def test_line_primary_redirect_restores_scoped_draft(self):
-        self.assertIn("query.get('liff.state')", self.app)
-        self.assertIn("stateUrl.searchParams.get('draft')", self.app)
+        self.assertIn("direct.get('liff.state')", self.runtime)
+        self.assertIn("draftFromLocation", self.runtime)
         self.assertLess(
-            self.app.index("query.get('liff.state')"),
-            self.app.index("location.pathname.match"),
+            self.runtime.index("window.liff.init"),
+            self.runtime.index("draftFromLocation(options.flow)"),
         )
 
     def test_confirm_and_recoverable_errors_are_not_reported_as_complete(self):
         self.assertIn("result.saved !== true", self.app)
-        self.assertIn("form.hidden = false; show('recoverable', 'error')", self.app_compact)
+        self.assertIn("action === 'confirm' && !review.canConfirm()", self.app)
         self.assertIn("result.push_ok !== true", self.app)
         self.assertIn("show('pushFailed', 'error')", self.app)
         self.assertIn("error.status === 409 ? 'recoverable' : 'failed'", self.app)
         self.assertIn("draft_(expired|forbidden)", self.app)
+        self.assertIn('data-review-action="confirm"', self.review)
+        self.assertIn("confirm.disabled = busy || !report.canConfirm", self.review)
 
     def test_mrerp_purchase_only_offers_credit(self):
         self.assertIn("purchase ? ''", self.app_compact)

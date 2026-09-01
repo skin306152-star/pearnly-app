@@ -170,7 +170,7 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             await webhook._handle_event(text_event())
         self.assertIn("其他 Pearnly 成员", reply.call_args.args[1])
 
-    async def test_failed_confirmation_keeps_draft_and_replies(self):
+    async def test_discard_postback_clears_session_after_deleting_draft(self):
         identity = {"tenant_id": "tenant-1", "user_id": "user-1", "line_user_id": "U-line"}
         with (
             patch.object(
@@ -180,18 +180,16 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(
                 webhook_documents.webhook.intake,
-                "confirm_and_push",
-                new=AsyncMock(return_value={"saved": False, "push_ok": False}),
+                "discard",
+                return_value={"ok": True},
             ),
             patch.object(webhook_documents.webhook.session_store, "clear_session") as clear,
             patch.object(webhook_documents.webhook, "_reply_text") as reply,
         ):
-            await webhook_documents.act_draft(
-                identity, "reply-1", "draft-1", "cowork_confirm", "zh"
-            )
+            await webhook_documents.discard_draft(identity, "reply-1", "draft-1", "zh")
 
-        clear.assert_not_called()
-        self.assertIn("预检未通过", reply.call_args.args[1])
+        clear.assert_called_once_with(tenant_id="tenant-1", line_user_id="U-line")
+        self.assertIn("已丢弃", reply.call_args.args[1])
 
 
 if __name__ == "__main__":

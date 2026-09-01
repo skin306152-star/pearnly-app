@@ -163,7 +163,7 @@ async def recognize_document(message: dict, identity: dict, lang: str) -> None:
         await show_preview(
             identity,
             None,
-            {"draft": history_ids[0], "record": "0", "page": "0"},
+            history_ids[0],
             lang,
         )
     except Exception:
@@ -181,13 +181,13 @@ def _record_fields(record: dict) -> dict:
 async def show_preview(
     identity: dict,
     reply_token: str | None,
-    params: dict,
+    draft_id: str,
     lang: str,
 ) -> None:
     session = await asyncio.to_thread(webhook._session, identity)
     payload = dict(session.get("payload") or {})
     history_ids = [str(value) for value in payload.get("history_ids") or []]
-    draft_id = str(params.get("draft") or "")
+    draft_id = str(draft_id or "")
     if session.get("state") not in {"draft", "editing"} or draft_id not in history_ids:
         webhook._notify(identity["line_user_id"], reply_token, webhook._text(lang, "expired"))
         return
@@ -197,11 +197,6 @@ async def show_preview(
         draft_id,
         history_ids,
     )
-    try:
-        record_index = max(0, min(int(params.get("record") or 0), len(records) - 1))
-        page = max(0, int(params.get("page") or 0))
-    except (TypeError, ValueError):
-        record_index, page = 0, 0
     target = {
         "endpoint_id": payload.get("endpoint_id"),
         "workspace_client_id": payload.get("workspace_client_id"),
@@ -210,14 +205,18 @@ async def show_preview(
     }
     card = webhook.flow_cards.preview_card(
         draft_id=draft_id,
-        fields=_record_fields(records[record_index]),
+        fields=_record_fields(records[0]),
         target=target,
         direction=payload["direction"],
         mode=payload["posting_mode"],
         lang=lang,
-        page=page,
-        record_index=record_index,
         record_count=len(records),
+        item_count=sum(
+            len((page.get("fields") or {}).get("items") or [])
+            for record in records
+            for page in record.get("pages") or []
+            if isinstance(page, dict)
+        ),
         preflight=payload.get("document_preflight"),
     )
     if reply_token:
@@ -226,11 +225,10 @@ async def show_preview(
         webhook.line_client.push_messages(identity["line_user_id"], [card], channel=webhook.CHANNEL)
 
 
-async def act_draft(
+async def discard_draft(
     identity: dict,
     reply_token: str | None,
     draft_id: str,
-    action: str,
     lang: str,
 ) -> None:
     session = await asyncio.to_thread(webhook._session, identity)
@@ -239,32 +237,17 @@ async def act_draft(
     if session.get("state") not in {"draft", "editing"} or draft_id not in history_ids:
         webhook._reply_text(reply_token, webhook._text(lang, "expired"))
         return
-    if action == "cowork_discard":
-        result = await asyncio.to_thread(webhook.intake.discard, identity, history_ids)
-        if result.get("ok"):
-            webhook.session_store.clear_session(
-                tenant_id=identity["tenant_id"],
-                line_user_id=identity["line_user_id"],
-            )
-            webhook._reply_text(reply_token, webhook._text(lang, "discarded"))
-        return
-    try:
-        result = await webhook.intake.confirm_and_push(identity, payload)
-    except webhook.intake.CoworkLineIntakeError:
-        webhook._reply_text(reply_token, webhook._text(lang, "preflight_failed"))
-        return
-    if result.get("saved"):
+    result = await asyncio.to_thread(webhook.intake.discard, identity, history_ids)
+    if result.get("ok"):
         webhook.session_store.clear_session(
-            tenant_id=identity["tenant_id"], line_user_id=identity["line_user_id"]
+            tenant_id=identity["tenant_id"],
+            line_user_id=identity["line_user_id"],
         )
-        key = "confirmed" if result.get("push_ok") else "saved_push_issue"
-        webhook._reply_text(reply_token, webhook._text(lang, key))
-    else:
-        webhook._reply_text(reply_token, webhook._text(lang, "preflight_failed"))
+        webhook._reply_text(reply_token, webhook._text(lang, "discarded"))
 
 
 __all__ = [
-    "act_draft",
+    "discard_draft",
     "process_document",
     "queue_document",
     "recognize_document",

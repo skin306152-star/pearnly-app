@@ -87,7 +87,7 @@ class ErpFlowTests(unittest.TestCase):
         self.assertIn("mode%3Apurchase", rendered)
         self.assertNotIn("mode%3Asales", rendered)
 
-    def test_sales_preview_uses_buyer_totals_line_items_and_compact_footer(self):
+    def test_sales_preview_is_summary_only_and_opens_shared_editor(self):
         shaped = preview.from_result(
             {
                 "raw_pages": [
@@ -130,13 +130,17 @@ class ErpFlowTests(unittest.TestCase):
         rendered = json.dumps(card, ensure_ascii=False)
         self.assertIn("ตรวจสอบเอกสารขาย", rendered)
         self.assertIn("Customer A", rendered)
-        self.assertIn("Coffee beans", rendered)
-        self.assertIn("2 × ฿400.00 · สินค้า", rendered)
-        self.assertIn("Delivery", rendered)
-        self.assertIn("1 × ฿200.00 · บริการ", rendered)
+        self.assertIn("รายการสินค้า/บริการ · 2", rendered)
+        self.assertNotIn("Coffee beans", rendered)
+        self.assertNotIn("Delivery", rendered)
+        self.assertNotIn("ยืนยันบันทึก", rendered)
         footer = card["contents"]["footer"]["contents"]
-        self.assertEqual(footer[0]["action"]["label"], "ยืนยันบันทึก")
-        self.assertEqual(footer[1]["layout"], "horizontal")
+        self.assertEqual(
+            [button["action"]["label"] for button in footer],
+            ["ดู / แก้ไขรายละเอียด", "ทิ้งเอกสาร"],
+        )
+        self.assertIn("flow=erp-intake", footer[0]["action"]["uri"])
+        self.assertEqual(footer[1]["action"]["type"], "postback")
 
     def test_purchase_preview_uses_seller_not_buyer(self):
         shaped = preview.from_result(
@@ -208,6 +212,40 @@ class ErpWebhookTests(unittest.TestCase):
         response = TestClient(app).get("/api/line/erp/draft/d1/records/h1/page/1.png")
         self.assertEqual(response.status_code, 200)
         render.assert_called_once_with(b"%PDF", page=2)
+
+
+class ErpBatchConfirmGateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_confirm_stops_before_conversion_when_one_document_has_anomaly(self):
+        records = [
+            {
+                "id": "h1",
+                "pages": [
+                    {
+                        "fields": {
+                            "seller_name": "Supplier",
+                            "date": "2026-09-01",
+                            "total_amount": "120",
+                            "items": [{"name": "Widget", "qty": "1", "posting_kind": ""}],
+                        }
+                    }
+                ],
+            }
+        ]
+        with (
+            mock.patch.object(webhook, "draft_records", return_value=records),
+            mock.patch.object(webhook.db, "get_cursor_rls") as cursor,
+        ):
+            result = await webhook._confirm(
+                {"user_id": "u1", "tenant_id": "t1"},
+                {"id": "u1"},
+                "h1",
+                ["h1"],
+                None,
+                "purchase",
+            )
+
+        self.assertEqual(result["detail"], "line_erp.posting_kind_required")
+        cursor.assert_not_called()
 
 
 if __name__ == "__main__":

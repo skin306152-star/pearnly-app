@@ -121,8 +121,13 @@ async def root():
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(
     liff_state: Annotated[str, Query(alias="liff.state")] = "",
+    flow: Annotated[str, Query()] = "",
+    draft: Annotated[str, Query()] = "",
     next: Annotated[str, Query()] = "",
 ):
+    intake_shell = _line_intake_shell(liff_state, flow, draft)
+    if intake_shell:
+        return intake_shell
     if _is_dms_booking_state(liff_state):
         return _dms_booking_shell()
     # 旧入口退居别名；next 只接受同源绝对路径。
@@ -157,6 +162,25 @@ def _is_dms_booking_state(liff_state: str) -> bool:
     return bool((params.get("draft") or [""])[0].strip())
 
 
+def _line_intake_shell(liff_state: str, flow: str, draft: str) -> FileResponse | None:
+    """Keep LINE's primary redirect intact while selecting the requested intake shell."""
+    selected_flow = str(flow or "").strip()
+    selected_draft = str(draft or "").strip()
+    if not selected_flow:
+        parsed = urlsplit(str(liff_state or "").strip())
+        params = parse_qs(parsed.query or parsed.path.lstrip("?"))
+        selected_flow = (params.get("flow") or [""])[0].strip()
+        selected_draft = (params.get("draft") or [""])[0].strip()
+    if not selected_draft:
+        return None
+    shells = {
+        "cowork-intake": "static/dist/cowork-line-intake.html",
+        "erp-intake": "static/dist/erp-line-intake.html",
+    }
+    path = shells.get(selected_flow)
+    return FileResponse(path, headers=_NO_CACHE) if path else None
+
+
 def _dms_booking_shell() -> FileResponse:
     # LIFF must consume code/state/liff.* on the untouched primary redirect before any URL change.
     return FileResponse("static/dist/dms-booking-edit.html", headers=_NO_CACHE)
@@ -165,7 +189,12 @@ def _dms_booking_shell() -> FileResponse:
 @router.get("/home", response_class=HTMLResponse)
 async def home(
     liff_state: Annotated[str, Query(alias="liff.state")] = "",
+    flow: Annotated[str, Query()] = "",
+    draft: Annotated[str, Query()] = "",
 ):
+    intake_shell = _line_intake_shell(liff_state, flow, draft)
+    if intake_shell:
+        return intake_shell
     if _is_dms_booking_state(liff_state):
         return _dms_booking_shell()
     # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版

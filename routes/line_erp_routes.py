@@ -100,8 +100,8 @@ async def erp_liff_auth(req: LiffAuthIn):
     return {"ok": True, "data": {"token": token, "username": user.get("username") or ""}}
 
 
-@router.get("/liff/erp/{draft_id}")
-async def erp_liff_entry(draft_id: str):
+@router.get("/liff/erp")
+async def erp_liff_entry():
     return FileResponse(
         _ROOT / "static" / "dist" / "erp-line-intake.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},

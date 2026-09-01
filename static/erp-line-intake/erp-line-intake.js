@@ -1,572 +1,343 @@
 (function () {
     'use strict';
-    var L = {
-        th: {
-            title: 'ตรวจสอบเอกสาร ERP',
-            purchaseTitle: 'ตรวจสอบเอกสารซื้อ',
-            salesTitle: 'ตรวจสอบเอกสารขาย',
-            loading: 'กำลังโหลดร่างเอกสาร…',
-            failed: 'โหลดเอกสารไม่สำเร็จ',
-            expired: 'รายการหมดอายุ',
-            preview: 'เอกสารต้นฉบับ',
-            header: 'ข้อมูลหัวเอกสาร',
-            items: 'รายการสินค้า/บริการ',
-            kind: 'ประเภทการลงสต๊อก',
-            pick: 'เลือกประเภท',
-            stock: 'สินค้าในสต๊อก',
-            service: 'บริการ (ไม่กระทบสต๊อก)',
-            save: 'บันทึก',
-            confirm: 'ยืนยันและลงบัญชี',
-            discard: 'ทิ้งฉบับร่าง',
-            saved: 'บันทึกแล้ว',
-            confirmed: 'ยืนยันแล้ว',
-            discarded: 'ทิ้งแล้ว',
-            required: 'กรุณากรอกข้อมูลที่จำเป็นและเลือกประเภทให้ครบทุกรายการ',
-            confirmDiscard: 'ทิ้งฉบับร่างนี้หรือไม่',
-            purchase: 'ซื้อ',
-            sales: 'ขาย',
-        },
-        en: {
-            title: 'Review ERP document',
-            purchaseTitle: 'Review purchase document',
-            salesTitle: 'Review sales document',
-            loading: 'Loading draft…',
-            failed: 'Could not load document',
-            expired: 'Draft expired',
-            preview: 'Original document',
-            header: 'Document fields',
-            items: 'Items',
-            kind: 'Posting kind',
-            pick: 'Choose type',
-            stock: 'Inventory',
-            service: 'Service (non-stock)',
-            save: 'Save',
-            confirm: 'Confirm and post',
-            discard: 'Discard draft',
-            saved: 'Saved',
-            confirmed: 'Confirmed',
-            discarded: 'Discarded',
-            required: 'Complete required fields and choose a type for every item',
-            confirmDiscard: 'Discard this draft?',
-            purchase: 'Purchase',
-            sales: 'Sales',
-        },
-        zh: {
-            title: '复核 ERP 单据',
-            purchaseTitle: '复核采购单据',
-            salesTitle: '复核销售单据',
-            loading: '正在加载草稿…',
-            failed: '无法加载单据',
-            expired: '草稿已过期',
-            preview: '原始票据',
-            header: '票头字段',
-            items: '明细',
-            kind: '过账类型',
-            pick: '选择类型',
-            stock: '库存',
-            service: '服务（不动库存）',
-            save: '保存',
-            confirm: '确认并过账',
-            discard: '丢弃草稿',
-            saved: '已保存',
-            confirmed: '已确认',
-            discarded: '已丢弃',
-            required: '请补齐必填字段并为每条明细选择类型',
-            confirmDiscard: '丢弃这份草稿？',
-            purchase: '采购',
-            sales: '销售',
-        },
-        ja: {
-            title: 'ERP 書類を確認',
-            purchaseTitle: '仕入書類を確認',
-            salesTitle: '売上書類を確認',
-            loading: '下書きを読み込み中…',
-            failed: '書類を読み込めません',
-            expired: '下書きの期限切れ',
-            preview: '原本',
-            header: 'ヘッダー項目',
-            items: '明細',
-            kind: '計上種別',
-            pick: '種別を選択',
-            stock: '在庫',
-            service: 'サービス（在庫なし）',
-            save: '保存',
-            confirm: '確認して計上',
-            discard: '下書きを破棄',
-            saved: '保存しました',
-            confirmed: '確認しました',
-            discarded: '破棄しました',
-            required: '必須項目と全明細の種別を入力してください',
-            confirmDiscard: 'この下書きを破棄しますか？',
-            purchase: '仕入',
-            sales: '売上',
-        },
-    };
-    var M = {
-        invoice_number: {
-            th: 'เลขที่ใบแจ้งหนี้',
-            en: 'Invoice no.',
-            zh: '发票号',
-            ja: '請求書番号',
-        },
-        date: { th: 'วันที่', en: 'Date', zh: '日期', ja: '日付' },
-        seller_name: { th: 'ผู้ขาย', en: 'Seller', zh: '卖方', ja: '売り手' },
-        seller_tax: {
-            th: 'เลขประจำตัวผู้เสียภาษีผู้ขาย',
-            en: 'Seller tax ID',
-            zh: '卖方税号',
-            ja: '売り手税番号',
-        },
-        buyer_name: { th: 'ผู้ซื้อ', en: 'Buyer', zh: '买方', ja: '買い手' },
-        buyer_tax: {
-            th: 'เลขประจำตัวผู้เสียภาษีผู้ซื้อ',
-            en: 'Buyer tax ID',
-            zh: '买方税号',
-            ja: '買い手税番号',
-        },
-        seller_address: {
-            th: 'ที่อยู่ผู้ขาย',
-            en: 'Seller address',
-            zh: '卖方地址',
-            ja: '売り手住所',
-        },
-        buyer_address: {
-            th: 'ที่อยู่ผู้ซื้อ',
-            en: 'Buyer address',
-            zh: '买方地址',
-            ja: '買い手住所',
-        },
-        seller_addr: {
-            th: 'ที่อยู่ผู้ขาย',
-            en: 'Seller address',
-            zh: '卖方地址',
-            ja: '売り手住所',
-        },
-        buyer_addr: {
-            th: 'ที่อยู่ผู้ซื้อ',
-            en: 'Buyer address',
-            zh: '买方地址',
-            ja: '買い手住所',
-        },
-        seller_branch: {
-            th: 'สาขาผู้ขาย',
-            en: 'Seller branch',
-            zh: '卖方分店',
-            ja: '売り手支店',
-        },
-        buyer_branch: {
-            th: 'สาขาผู้ซื้อ',
-            en: 'Buyer branch',
-            zh: '买方分店',
-            ja: '買い手支店',
-        },
-        document_type: {
-            th: 'ประเภทเอกสาร',
-            en: 'Document type',
-            zh: '单据类型',
-            ja: '書類種類',
-        },
-        notes: { th: 'หมายเหตุ', en: 'Notes', zh: '备注', ja: '備考' },
-        subtotal: { th: 'ยอดก่อนภาษี', en: 'Subtotal', zh: '小计', ja: '小計' },
-        vat: { th: 'ภาษีมูลค่าเพิ่ม', en: 'VAT', zh: 'VAT', ja: 'VAT' },
-        total_amount: { th: 'ยอดรวม', en: 'Total', zh: '总额', ja: '合計' },
-        name: { th: 'ชื่อสินค้า', en: 'Item name', zh: '商品名', ja: '商品名' },
-        qty: { th: 'จำนวน', en: 'Quantity', zh: '数量', ja: '数量' },
-        unit: { th: 'หน่วย', en: 'Unit', zh: '单位', ja: '単位' },
-        price: { th: 'ราคาต่อหน่วย', en: 'Unit price', zh: '单价', ja: '単価' },
-        amount: { th: 'จำนวนเงิน', en: 'Amount', zh: '金额', ja: '金額' },
-        description: { th: 'รายละเอียด', en: 'Description', zh: '说明', ja: '摘要' },
-    };
-    var CANCEL = { th: 'ยกเลิก', en: 'Cancel', zh: '取消', ja: 'キャンセル' };
-    function draftFromLocation() {
-        var match = location.pathname.match(/\/liff\/erp\/([^/?#]+)/);
-        if (match && match[1]) return match[1];
-        var query = new URLSearchParams(location.search);
-        var direct = query.get('draft');
-        if (direct) return direct;
-        var state = query.get('liff.state');
-        if (state) {
-            state = state.charAt(0) === '?' ? state.slice(1) : state;
-            return new URLSearchParams(state).get('draft') || '';
-        }
-        return '';
+
+    var R = window.lineIntakeBatchReview;
+    var I = window.erpLineIntakeI18n;
+    var F = window.erpLineFieldRenderer;
+    var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2);
+    var state = document.getElementById('state');
+    var form = document.getElementById('editor');
+    var model = null;
+    var draftId = '';
+    var busy = false;
+    var review = null;
+
+    var COMMON_ORDER = ['invoice_number', 'date', 'document_type'];
+    var PURCHASE_ORDER = [
+        'seller_name',
+        'seller_tax',
+        'seller_branch',
+        'seller_addr',
+        'seller_address',
+        'buyer_name',
+        'buyer_tax',
+        'buyer_branch',
+        'buyer_addr',
+        'buyer_address',
+    ];
+    var SALES_ORDER = [
+        'buyer_name',
+        'buyer_tax',
+        'buyer_branch',
+        'buyer_addr',
+        'buyer_address',
+        'seller_name',
+        'seller_tax',
+        'seller_branch',
+        'seller_addr',
+        'seller_address',
+    ];
+    var AMOUNT_ORDER = ['subtotal', 'vat', 'total_amount', 'notes'];
+    var HIDDEN_FIELDS = new Set(['items', 'additional_invoices', 'source_refs']);
+
+    function t(key, values) {
+        return I.text(lang, key, values);
     }
-    var lang = (localStorage.getItem('pearnly_lang') || 'th').slice(0, 2),
-        state = document.getElementById('state'),
-        form = document.getElementById('editor'),
-        model,
-        busy = false,
-        draft = draftFromLocation();
-    function t(k) {
-        return (L[lang] || L.th)[k] || L.en[k] || k;
+
+    function label(key) {
+        return I.label(lang, key);
     }
-    function label(k) {
-        return (M[k] && M[k][lang]) || k;
+
+    function token() {
+        return sessionStorage.getItem('erp_line_token') || '';
     }
-    function esc(v) {
-        var d = document.createElement('div');
-        d.textContent = v == null ? '' : String(v);
-        return d.innerHTML;
+
+    function api(path, options) {
+        options = options || {};
+        options.headers = Object.assign(
+            { 'Content-Type': 'application/json' },
+            token() ? { Authorization: 'Bearer ' + token() } : {},
+            options.headers || {}
+        );
+        return fetch(path, options).then(window.lineIntakeLiff.responseJson);
     }
-    function dat(x) {
-        return x && x.data !== undefined ? x.data : x;
-    }
+
     function rows() {
-        var x = dat(model);
-        return Array.isArray(x.records) ? x.records : Array.isArray(x.invoices) ? x.invoices : [x];
+        return model && Array.isArray(model.records) ? model.records : [];
     }
+
+    function direction() {
+        return (model && (model.direction || model.mode)) || 'purchase';
+    }
+
     function moveAlias(target, canonical, alias) {
         if (!target[canonical] && target[alias]) target[canonical] = target[alias];
         if (alias !== canonical) delete target[alias];
     }
+
     function fieldsOf(record) {
-        var f = record.fields || (record.pages && record.pages[0] && record.pages[0].fields) || {};
-        moveAlias(f, 'invoice_number', 'invoice_no');
-        moveAlias(f, 'date', 'invoice_date');
-        if (!Array.isArray(f.items) || !f.items.length) {
-            // 空白编辑行只提供人工补录入口，不从票头金额猜数量、单价或行金额。
-            f.items = [{ name: '', qty: '', price: '', subtotal: '', posting_kind: '' }];
+        var fields = R.canonicalFields(record);
+        moveAlias(fields, 'invoice_number', 'invoice_no');
+        moveAlias(fields, 'date', 'invoice_date');
+        if (!Array.isArray(fields.items) || !fields.items.length) {
+            fields.items = [{ name: '', qty: '', price: '', subtotal: '', posting_kind: '' }];
         }
-        if (Array.isArray(f.items)) {
-            f.items.forEach(function (item) {
-                moveAlias(item, 'name', 'description');
-                moveAlias(item, 'qty', 'quantity');
-                moveAlias(item, 'price', 'unit_price');
-                moveAlias(item, 'subtotal', 'amount');
-            });
-        }
-        return f;
+        fields.items.forEach(function (item) {
+            moveAlias(item, 'name', 'description');
+            moveAlias(item, 'qty', 'quantity');
+            moveAlias(item, 'price', 'unit_price');
+            moveAlias(item, 'subtotal', 'amount');
+        });
+        return fields;
     }
-    function api(p, o) {
-        o = o || {};
-        var tok = sessionStorage.getItem('erp_line_token');
-        o.headers = Object.assign(
-            { 'Content-Type': 'application/json' },
-            tok ? { Authorization: 'Bearer ' + tok } : {},
-            o.headers || {}
+
+    function section(title, body) {
+        return '<section class="section"><h2>' + R.escape(title) + '</h2>' + body + '</section>';
+    }
+
+    function preferredKeys(fields) {
+        var preferred = COMMON_ORDER.concat(
+            direction() === 'sales' ? SALES_ORDER : PURCHASE_ORDER,
+            AMOUNT_ORDER
         );
-        return fetch(p, o).then(function (r) {
-            if (!r.ok) {
-                var e = new Error(String(r.status));
-                e.status = r.status;
-                throw e;
-            }
-            return r.json();
-        });
-    }
-    function boot() {
-        return api('/api/line/erp/liff/config').then(function (x) {
-            var id = dat(x).liff_id;
-            if (!id || !window.liff) throw Error('liff_config_missing');
-            return liff.init({ liffId: id }).then(function () {
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                    throw Error('liff_login_required');
-                }
-                var it = liff.getIDToken && liff.getIDToken();
-                if (!it) throw Error('liff_token_missing');
-                return api('/api/line/erp/liff/auth', {
-                    method: 'POST',
-                    body: JSON.stringify({ id_token: it, draft_id: draft }),
-                }).then(function (x) {
-                    var tok = dat(x).token;
-                    if (!tok) throw Error('erp_token_missing');
-                    sessionStorage.setItem('erp_line_token', tok);
-                });
-            });
-        });
-    }
-    function sec(h, b) {
-        return '<section class="section"><h2>' + esc(h) + '</h2>' + b + '</section>';
-    }
-    function fld(k, v, req, ri) {
-        return window.erpLineFieldRenderer.render(k, v, req, ri, label, esc);
-    }
-    function prev(r) {
-        var fallback = r.preview_url || r.original_url || r.source_url || r.pdf_url || '',
-            urls =
-                Array.isArray(r.preview_urls) && r.preview_urls.length
-                    ? r.preview_urls
-                    : fallback
-                      ? [fallback]
-                      : [];
-        return urls.length
-            ? urls
-                  .map(function (u) {
-                      return (
-                          '<div class="preview-holder" data-preview="' +
-                          esc(u) +
-                          '">' +
-                          esc(t('loading')) +
-                          '</div>'
-                      );
-                  })
-                  .join('')
-            : '<p class="hint">—</p>';
-    }
-    function render() {
-        var all = rows(),
-            dir = dat(model).direction || '';
-        var commonOrder = ['invoice_number', 'date', 'document_type'],
-            purchaseOrder = [
-                'seller_name',
-                'seller_tax',
-                'seller_branch',
-                'seller_addr',
-                'seller_address',
-                'buyer_name',
-                'buyer_tax',
-                'buyer_branch',
-                'buyer_addr',
-                'buyer_address',
-            ],
-            salesOrder = [
-                'buyer_name',
-                'buyer_tax',
-                'buyer_branch',
-                'buyer_addr',
-                'buyer_address',
-                'seller_name',
-                'seller_tax',
-                'seller_branch',
-                'seller_addr',
-                'seller_address',
-            ],
-            amountOrder = ['subtotal', 'vat', 'total_amount', 'notes'],
-            preferred = commonOrder.concat(
-                dir === 'sales' ? salesOrder : purchaseOrder,
-                amountOrder
+        return preferred
+            .filter(function (key) {
+                return Object.prototype.hasOwnProperty.call(fields, key);
+            })
+            .concat(
+                Object.keys(fields).filter(function (key) {
+                    return !HIDDEN_FIELDS.has(key) && preferred.indexOf(key) < 0;
+                })
             );
-        form.innerHTML =
-            '<h1>' +
-            t(dir === 'sales' ? 'salesTitle' : dir === 'purchase' ? 'purchaseTitle' : 'title') +
-            '</h1><p class="hint">' +
-            esc(t(dir)) +
-            '</p>' +
-            all
-                .map(function (r, ri) {
-                    var f = fieldsOf(r),
-                        it = Array.isArray(f.items) ? f.items : [],
-                        keys = preferred
-                            .filter(function (k) {
-                                return Object.prototype.hasOwnProperty.call(f, k);
-                            })
-                            .concat(
-                                Object.keys(f).filter(function (k) {
-                                    return k !== 'items' && preferred.indexOf(k) < 0;
-                                })
-                            );
+    }
+
+    function requiredField(key) {
+        return direction() === 'sales'
+            ? ['invoice_number', 'date'].indexOf(key) >= 0
+            : ['seller_name', 'date', 'total_amount'].indexOf(key) >= 0;
+    }
+
+    function renderOriginals(record) {
+        var urls = R.previewUrls(record);
+        if (!urls.length) return '<p class="hint">—</p>';
+        return (
+            '<div class="review-originals">' +
+            urls
+                .map(function (url) {
                     return (
-                        '<article data-record="' +
-                        ri +
+                        '<div class="review-original" data-review-preview="' +
+                        R.escape(url) +
                         '">' +
-                        sec(t('preview'), prev(r)) +
-                        sec(
-                            t('header'),
-                            '<div class="grid">' +
-                                keys
-                                    .map(function (k) {
-                                        return fld(
-                                            k,
-                                            f[k],
-                                            dir === 'sales'
-                                                ? ['invoice_number', 'date'].indexOf(k) >= 0
-                                                : ['seller_name', 'date', 'total_amount'].indexOf(
-                                                      k
-                                                  ) >= 0,
-                                            ri
-                                        );
-                                    })
-                                    .join('') +
-                                '</div>'
-                        ) +
-                        sec(
-                            t('items'),
-                            it.length
-                                ? it
-                                      .map(function (x, ii) {
-                                          return (
-                                              '<div class="item"><div class="grid">' +
-                                              Object.keys(x)
-                                                  .filter(function (k) {
-                                                      return k !== 'posting_kind';
-                                                  })
-                                                  .map(function (k) {
-                                                      return fld(
-                                                          'item.' + ii + '.' + k,
-                                                          x[k],
-                                                          k === 'name' || k === 'qty',
-                                                          ri
-                                                      );
-                                                  })
-                                                  .join('') +
-                                              '<div class="field"><label>' +
-                                              t('kind') +
-                                              ' *</label><select required data-kind="' +
-                                              ri +
-                                              ':' +
-                                              ii +
-                                              '"><option value="">' +
-                                              t('pick') +
-                                              '</option><option value="stock"' +
-                                              (x.posting_kind === 'stock' ? ' selected' : '') +
-                                              '>' +
-                                              t('stock') +
-                                              '</option><option value="service"' +
-                                              (x.posting_kind === 'service' ? ' selected' : '') +
-                                              '>' +
-                                              t('service') +
-                                              '</option></select></div></div></div>'
-                                          );
-                                      })
-                                      .join('')
-                                : '<p class="hint">—</p>'
-                        ) +
-                        '</article>'
+                        R.escape(t('loadingPreview')) +
+                        '</div>'
                     );
                 })
                 .join('') +
-            '<div class="actions"><button class="btn" type="button" data-action="save">' +
-            t('save') +
-            '</button><button class="btn primary" type="button" data-action="confirm">' +
-            t('confirm') +
-            '</button><button class="btn danger" type="button" data-action="discard">' +
-            t('discard') +
-            '</button></div>';
-        form.hidden = false;
-        state.hidden = true;
-        form.querySelectorAll('[data-field]').forEach(function (e) {
-            e.oninput = sync;
-        });
-        form.querySelectorAll('[data-kind]').forEach(function (e) {
-            e.onchange = kind;
-        });
-        form.querySelectorAll('[data-action]').forEach(function (e) {
-            e.onclick = act;
-        });
-        window.erpLinePreviews.hydrate(form, t('preview'), t('failed'));
+            '</div>'
+        );
     }
-    function sync(e) {
-        var p = e.target.dataset.field.split(':'),
-            r = rows()[+p[0]],
-            f = fieldsOf(r),
-            k = p.slice(1).join(':'),
-            m = k.match(/^item\.(\d+)\.(.+)$/);
-        var value = e.target.value;
-        if (e.target.tagName === 'TEXTAREA') {
+
+    function renderDetail(record, recordIndex) {
+        var fields = fieldsOf(record);
+        var fieldGrid = preferredKeys(fields)
+            .map(function (key) {
+                return F.render(
+                    key,
+                    fields[key],
+                    requiredField(key),
+                    recordIndex + ':field:' + key,
+                    label,
+                    R.escape
+                );
+            })
+            .join('');
+        var items = fields.items
+            .map(function (item, itemIndex) {
+                var keys = ['name', 'qty', 'unit', 'price', 'subtotal'].filter(function (key) {
+                    return Object.prototype.hasOwnProperty.call(item, key);
+                });
+                Object.keys(item).forEach(function (key) {
+                    if (key !== 'posting_kind' && keys.indexOf(key) < 0) keys.push(key);
+                });
+                return (
+                    '<div class="item"><div class="grid">' +
+                    keys
+                        .map(function (key) {
+                            return F.render(
+                                key,
+                                item[key],
+                                ['name', 'qty'].indexOf(key) >= 0,
+                                recordIndex + ':item:' + itemIndex + ':' + key,
+                                label,
+                                R.escape
+                            );
+                        })
+                        .join('') +
+                    '<div class="field"><label>' +
+                    R.escape(t('kind')) +
+                    ' *</label><select data-kind="' +
+                    recordIndex +
+                    ':' +
+                    itemIndex +
+                    '"><option value="">' +
+                    R.escape(t('pick')) +
+                    '</option><option value="stock"' +
+                    (item.posting_kind === 'stock' ? ' selected' : '') +
+                    '>' +
+                    R.escape(t('stock')) +
+                    '</option><option value="service"' +
+                    (item.posting_kind === 'service' ? ' selected' : '') +
+                    '>' +
+                    R.escape(t('service')) +
+                    '</option></select></div></div></div>'
+                );
+            })
+            .join('');
+        return (
+            section(t('original'), renderOriginals(record)) +
+            section(t('fields'), '<div class="grid">' + fieldGrid + '</div>') +
+            section(t('items'), items)
+        );
+    }
+
+    function applyField(element) {
+        var parts = element.dataset.field.split(':');
+        var fields = fieldsOf(rows()[Number(parts[0])]);
+        var target = fields;
+        var key = parts[2];
+        if (parts[1] === 'item') {
+            target = fields.items[Number(parts[2])];
+            key = parts[3];
+        }
+        var value = element.value;
+        if (typeof target[key] === 'boolean') value = value === 'true';
+        if (element.tagName === 'TEXTAREA' && target[key] && typeof target[key] === 'object') {
             try {
                 value = JSON.parse(value);
-            } catch (_) {
-                // Invalid JSON keeps the last valid value until the user completes the object.
+            } catch {
                 return;
             }
         }
-        if (m) (f.items || [])[+m[1]][m[2]] = value;
-        else f[k] = value;
+        target[key] = value;
     }
-    function kind(e) {
-        var p = e.target.dataset.kind.split(':'),
-            r = rows()[+p[0]],
-            f = fieldsOf(r);
-        (f.items || [])[+p[1]].posting_kind = e.target.value;
-    }
-    function valid() {
-        var dir = dat(model).direction || 'purchase',
-            bad = rows().some(function (r) {
-                var f = fieldsOf(r),
-                    h =
-                        dir === 'sales'
-                            ? !f.invoice_number || !f.date
-                            : !f.seller_name || !f.date || !f.total_amount;
-                return (
-                    h ||
-                    !Array.isArray(f.items) ||
-                    !f.items.length ||
-                    f.items.some(function (i) {
-                        return !i.name || !i.qty || !['stock', 'service'].includes(i.posting_kind);
-                    })
-                );
-            });
-        if (bad) {
-            state.className = 'state error';
-            state.textContent = t('required');
-            state.hidden = false;
-            return false;
-        }
-        return true;
-    }
-    function act(e) {
-        var a = e.currentTarget.dataset.action;
-        if (busy) return;
-        if (a === 'discard' && !e.confirmed) {
-            return window.erpDiscardDialog.open(
-                t('confirmDiscard'),
-                CANCEL[lang],
-                t('discard'),
-                e,
-                act
-            );
-        }
-        if (!e.confirmed && !valid()) return;
-        var base = '/api/line/erp/draft/' + encodeURIComponent(draft),
-            save = function () {
-                return api(base, {
-                    method: 'PUT',
-                    body: JSON.stringify({ records: rows() }),
-                });
-            },
-            request =
-                a === 'discard'
-                    ? api(base + '/discard', { method: 'POST' })
-                    : a === 'confirm'
-                      ? save().then(function () {
-                            return api(base + '/confirm', { method: 'POST' });
-                        })
-                      : save();
-        busy = true;
-        form.querySelectorAll('[data-action]').forEach(function (button) {
-            button.disabled = true;
+
+    function bindDetail(root, _recordIndex, changed) {
+        root.querySelectorAll('[data-field]').forEach(function (element) {
+            element.oninput = function () {
+                applyField(element);
+                changed();
+            };
         });
+        root.querySelectorAll('[data-kind]').forEach(function (element) {
+            element.onchange = function () {
+                var parts = element.dataset.kind.split(':');
+                fieldsOf(rows()[Number(parts[0])]).items[Number(parts[1])].posting_kind =
+                    element.value;
+                changed();
+            };
+        });
+    }
+
+    function show(key, kind) {
+        state.className = 'state ' + (kind || '');
+        state.textContent = t(key);
+        state.hidden = false;
+    }
+
+    function save() {
+        return api('/api/line/erp/draft/' + encodeURIComponent(draftId), {
+            method: 'PUT',
+            body: JSON.stringify({ records: rows() }),
+        }).then(function (updated) {
+            if (updated && Array.isArray(updated.records)) model.records = updated.records;
+            return updated;
+        });
+    }
+
+    function act(action) {
+        if (busy || (action === 'confirm' && !review.canConfirm())) return;
+        busy = true;
+        review.setBusy(true);
+        var base = '/api/line/erp/draft/' + encodeURIComponent(draftId);
+        var request =
+            action === 'discard'
+                ? api(base + '/discard', { method: 'POST' })
+                : save().then(function () {
+                      return action === 'confirm'
+                          ? api(base + '/confirm', { method: 'POST' })
+                          : null;
+                  });
         request
             .then(function () {
-                state.className = 'state';
-                state.textContent = t(
-                    a === 'save' ? 'saved' : a === 'confirm' ? 'confirmed' : 'discarded'
+                show(
+                    action === 'save' ? 'saved' : action === 'confirm' ? 'confirmed' : 'discarded'
                 );
-                state.hidden = false;
-                if (a !== 'save') form.hidden = true;
+                if (action === 'save') review.render();
+                else form.hidden = true;
             })
-            .catch(function (e) {
-                state.className = 'state error';
-                state.textContent =
-                    e.status === 401 || e.status === 403 ? t('expired') : t('failed');
-                state.hidden = false;
+            .catch(function (error) {
+                show(error.status === 401 || error.status === 403 ? 'expired' : 'failed', 'error');
             })
             .finally(function () {
                 busy = false;
-                form.querySelectorAll('[data-action]').forEach(function (button) {
-                    button.disabled = false;
-                });
+                if (!form.hidden) review.setBusy(false);
             });
     }
+
+    function buildReview() {
+        review = R.create({
+            root: form,
+            records: rows,
+            direction: direction,
+            text: t,
+            title: function () {
+                return t(
+                    direction() === 'sales'
+                        ? 'salesTitle'
+                        : direction() === 'purchase'
+                          ? 'purchaseTitle'
+                          : 'title'
+                );
+            },
+            issues: function (record) {
+                fieldsOf(record);
+                return R.documentIssues(record, direction(), { requirePostingKind: true });
+            },
+            renderDetail: renderDetail,
+            bindDetail: bindDetail,
+            onAction: act,
+            authHeaders: function () {
+                return { Authorization: 'Bearer ' + token() };
+            },
+        });
+        review.render();
+        state.hidden = true;
+    }
+
     document.getElementById('lang').value = lang;
-    document.getElementById('lang').onchange = function (e) {
-        lang = e.target.value;
+    document.getElementById('lang').onchange = function (event) {
+        lang = event.target.value;
         localStorage.setItem('pearnly_lang', lang);
-        if (model) render();
+        if (review) review.render();
+        else show('loading');
     };
-    state.textContent = t('loading');
-    boot()
-        .then(function () {
-            return api('/api/line/erp/draft/' + encodeURIComponent(draft));
+    show('loading');
+    window.lineIntakeLiff
+        .boot({
+            flow: 'erp-intake',
+            configUrl: '/api/line/erp/liff/config',
+            authUrl: '/api/line/erp/liff/auth',
+            tokenKey: 'erp_line_token',
         })
-        .then(function (x) {
-            model = dat(x);
-            render();
+        .then(function (auth) {
+            draftId = auth.draftId;
+            return api('/api/line/erp/draft/' + encodeURIComponent(draftId));
         })
-        .catch(function (e) {
-            state.className = 'state error';
-            state.textContent = e.status === 409 ? t('expired') : t('failed');
-            state.hidden = false;
+        .then(function (value) {
+            model = value;
+            buildReview();
+        })
+        .catch(function (error) {
+            show(error.status === 401 || error.status === 403 ? 'expired' : 'failed', 'error');
         });
 })();

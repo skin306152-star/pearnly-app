@@ -97,8 +97,8 @@ async def cowork_intake_liff_auth(req: LiffAuthIn):
     return {"ok": True, "data": {"token": token}}
 
 
-@router.get("/liff/cowork-intake/{draft_id}")
-async def cowork_intake_liff_entry(draft_id: str):
+@router.get("/liff/cowork-intake")
+async def cowork_intake_liff_entry():
     return FileResponse(
         _ROOT / "static" / "dist" / "cowork-line-intake.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},

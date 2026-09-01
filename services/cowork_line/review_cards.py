@@ -1,12 +1,12 @@
-"""Paged Cowork LINE document review cards."""
+"""Summary-only Cowork LINE document review card."""
 
 from __future__ import annotations
 
-import math
 import os
 
 from services.cowork_line import flow_cards
 from services.cowork_line.card_reasons import reason_text
+from services.line_platform.summary_review_card import build_summary_card, postback_action
 
 
 def _field_value(fields: dict, key: str, *, limit: int = 80) -> str:
@@ -18,10 +18,6 @@ def _field_value(fields: dict, key: str, *, limit: int = 80) -> str:
         "buyer_tax": ("buyer_tax_id",),
         "buyer_address": ("buyer_addr",),
         "vat": ("vat_amount",),
-        "name": ("description", "item_name", "product_name"),
-        "qty": ("quantity",),
-        "price": ("unit_price",),
-        "subtotal": ("amount", "line_total"),
     }
     for name in (key, *aliases.get(key, ())):
         value = fields.get(name)
@@ -63,15 +59,11 @@ def _items(fields: dict) -> list[dict]:
     return [item for item in fields.get("items") or [] if isinstance(item, dict)]
 
 
-def _review_pages(fields: dict) -> int:
-    return 1 + math.ceil(len(_items(fields)) / 6)
-
-
 def _edit_uri(draft_id: str) -> str:
     liff_id = os.getenv("LINE_COWORK_LIFF_ID", "").strip() or os.getenv("LINE_LIFF_ID", "").strip()
     if liff_id:
-        return f"https://liff.line.me/{liff_id}?draft={draft_id}"
-    return f"https://pearnly.com/liff/cowork-intake/{draft_id}"
+        return f"https://liff.line.me/{liff_id}/?flow=cowork-intake&draft={draft_id}"
+    return f"https://pearnly.com/liff/cowork-intake?flow=cowork-intake&draft={draft_id}"
 
 
 def preview_card(
@@ -82,9 +74,8 @@ def preview_card(
     direction: str,
     mode: str,
     lang: str,
-    page: int = 0,
-    record_index: int = 0,
     record_count: int = 1,
+    item_count: int | None = None,
     preflight: dict | None = None,
 ) -> dict:
     accent = "#16873E" if direction == "purchase" else "#B11B50"
@@ -94,15 +85,11 @@ def preview_card(
         target.get("workspace_name") or target.get("label") or target.get("name") or "-"
     )
     target_name = erp_name if account_name == erp_name else f"{erp_name} · {account_name}"
-    total_pages = _review_pages(fields)
-    page = max(0, min(int(page), total_pages - 1))
     body = [
-        _kv(
-            flow_cards._t(lang, "target"),
-            target_name,
-        ),
+        _kv(flow_cards._t(lang, "target"), target_name),
         _kv(flow_cards._t(lang, "direction"), flow_cards._t(lang, direction)),
         _kv(flow_cards._t(lang, "mode"), flow_cards._t(lang, mode)),
+        _kv(flow_cards._t(lang, "documents"), str(max(1, record_count))),
         {"type": "separator", "margin": "md", "color": "#EEEAF7"},
     ]
     if preflight is not None:
@@ -113,176 +100,34 @@ def preview_card(
                 (
                     flow_cards._t(lang, "ready")
                     if preflight.get("ok")
-                    else (
-                        reason_text(flow_cards._lang(lang), reason)
-                        or flow_cards._t(lang, "not_ready")
-                    )
+                    else reason_text(flow_cards._lang(lang), reason)
+                    or flow_cards._t(lang, "not_ready")
                 ),
             )
         )
-    if page == 0:
-        labels = flow_cards._HEADER_LABELS[flow_cards._lang(lang)]
-        body.extend(
-            _kv(
-                label,
-                _field_value(fields, key),
-                accent=accent if key == "total_amount" else None,
-            )
-            for key, label in zip(flow_cards._HEADER_KEYS, labels, strict=True)
+    labels = flow_cards._HEADER_LABELS[flow_cards._lang(lang)]
+    body.extend(
+        _kv(
+            label,
+            _field_value(fields, key),
+            accent=accent if key == "total_amount" else None,
         )
-        body.append(_kv(flow_cards._t(lang, "items"), str(len(_items(fields)))))
-    else:
-        start = (page - 1) * 6
-        for index, item in enumerate(_items(fields)[start : start + 6], start=start + 1):
-            name = _field_value(item, "name")
-            qty = _field_value(item, "qty")
-            price = _field_value(item, "price")
-            amount = _field_value(item, "subtotal")
-            body.append(flow_cards._row(f"{index}. {name}", f"{qty} × {price} = {amount}"))
-    nav = []
-    if page > 0:
-        nav.append(
-            flow_cards._button(
-                flow_cards._t(lang, "prev"),
-                "cowork_preview_page",
-                draft=draft_id,
-                page=page - 1,
-                record=record_index,
-            )
-        )
-    if page + 1 < total_pages:
-        nav.append(
-            flow_cards._button(
-                flow_cards._t(lang, "next"),
-                "cowork_preview_page",
-                draft=draft_id,
-                page=page + 1,
-                record=record_index,
-            )
-        )
-    if nav:
-        body.append(
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "margin": "md",
-                "spacing": "sm",
-                "contents": nav,
-            }
-        )
-    body.append(_kv(flow_cards._t(lang, "page"), f"{page + 1}/{total_pages}"))
-    if record_count > 1:
-        record_nav = []
-        if record_index > 0:
-            record_nav.append(
-                flow_cards._button(
-                    flow_cards._t(lang, "prev"),
-                    "cowork_preview_record",
-                    draft=draft_id,
-                    record=record_index - 1,
-                )
-            )
-        if record_index + 1 < record_count:
-            record_nav.append(
-                flow_cards._button(
-                    flow_cards._t(lang, "next"),
-                    "cowork_preview_record",
-                    draft=draft_id,
-                    record=record_index + 1,
-                )
-            )
-        body.append(_kv("Document", f"{record_index + 1}/{record_count}"))
-        body.append(
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "margin": "sm",
-                "spacing": "sm",
-                "contents": record_nav,
-            }
-        )
-    footer_contents = []
-    if preflight is None or preflight.get("ok"):
-        confirm = flow_cards._button(
-            flow_cards._t(lang, "confirm"),
-            "cowork_confirm",
-            style="primary",
-            draft=draft_id,
-        )
-        confirm["color"] = accent
-        footer_contents.append(confirm)
-    discard = flow_cards._button(
-        flow_cards._t(lang, "discard"),
-        "cowork_discard",
-        style="link",
-        draft=draft_id,
+        for key, label in zip(flow_cards._HEADER_KEYS, labels, strict=True)
     )
-    discard["color"] = "#C53A3A"
-    footer_contents.append(
-        {
-            "type": "box",
-            "layout": "horizontal",
-            "spacing": "sm",
-            "contents": [
-                {
-                    "type": "button",
-                    "style": "secondary",
-                    "height": "sm",
-                    "action": {
-                        "type": "uri",
-                        "label": flow_cards._t(lang, "edit")[:20],
-                        "uri": _edit_uri(draft_id),
-                    },
-                },
-                discard,
-            ],
-        }
+    title = f"{flow_cards._t(lang, 'review')} · {flow_cards._t(lang, direction)}"
+    return build_summary_card(
+        title=title,
+        subtitle=flow_cards._t(lang, "review_hint"),
+        alt_text=title,
+        accent=accent,
+        summary=body,
+        detail_label=flow_cards._t(lang, "items"),
+        detail_count=len(_items(fields)) if item_count is None else item_count,
+        detail_hint=flow_cards._t(lang, "detail_hint"),
+        edit_label=flow_cards._t(lang, "edit"),
+        edit_uri=_edit_uri(draft_id),
+        discard_action=postback_action(flow_cards._t(lang, "discard"), "cowork_discard", draft_id),
     )
-    return {
-        "type": "flex",
-        "altText": f"{flow_cards._t(lang, 'review')} · {flow_cards._t(lang, direction)}",
-        "contents": {
-            "type": "bubble",
-            "size": "mega",
-            "header": {
-                "type": "box",
-                "layout": "vertical",
-                "backgroundColor": accent,
-                "paddingAll": "16px",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": f"{flow_cards._t(lang, 'review')} · {flow_cards._t(lang, direction)}",
-                        "size": "lg",
-                        "weight": "bold",
-                        "color": "#FFFFFF",
-                        "wrap": True,
-                    },
-                    {
-                        "type": "text",
-                        "text": flow_cards._t(lang, "review_hint"),
-                        "size": "xxs",
-                        "color": "#F4F4F4",
-                        "margin": "xs",
-                        "wrap": True,
-                    },
-                ],
-            },
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "paddingAll": "16px",
-                "contents": body,
-            },
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "sm",
-                "paddingAll": "14px",
-                "contents": footer_contents,
-            },
-        },
-    }
 
 
 __all__ = ["preview_card"]

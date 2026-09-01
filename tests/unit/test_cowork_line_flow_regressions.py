@@ -468,18 +468,20 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
         self.assertNotIn("quickReply", card)
         self.assertEqual(bubble["header"]["backgroundColor"], "#16873E")
         self.assertEqual(bubble["footer"]["contents"][0]["color"], "#16873E")
-        self.assertEqual(bubble["footer"]["contents"][1]["layout"], "horizontal")
         self.assertEqual(
             action_labels(bubble["footer"]),
             [
-                flow_cards._t("th", "confirm"),
                 flow_cards._t("th", "edit"),
                 flow_cards._t("th", "discard"),
             ],
         )
         footer_postbacks = postback_data(bubble["footer"])
-        self.assertTrue(any("a=cowork_confirm" in data for data in footer_postbacks))
+        self.assertFalse(any("a=cowork_confirm" in data for data in footer_postbacks))
         self.assertTrue(any("a=cowork_discard" in data for data in footer_postbacks))
+        self.assertIn(
+            "flow=cowork-intake",
+            bubble["footer"]["contents"][0]["action"]["uri"],
+        )
         self.assertIn("Express · บริษัท ทดสอบ จำกัด", json.dumps(card, ensure_ascii=False))
 
     def test_maximum_chinese_preview_stays_below_line_bubble_limit(self):

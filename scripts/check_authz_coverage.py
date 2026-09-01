@@ -92,8 +92,8 @@ PUBLIC_ROUTES = {
         "GET",
         "/api/cowork-line/intake/draft/{draft_id}/records/{history_id}/page/{page}.png",
     ),
-    ("GET", "/liff/erp/{draft_id}"),  # ERP LIFF 静态编辑壳;草稿数据仍需专用短期凭证
-    ("GET", "/liff/cowork-intake/{draft_id}"),  # Cowork LIFF 静态编辑壳;草稿数据需专用短期凭证
+    ("GET", "/liff/erp"),  # ERP LIFF 静态编辑壳;草稿数据仍需专用短期凭证
+    ("GET", "/liff/cowork-intake"),  # Cowork LIFF 静态编辑壳;草稿数据需专用短期凭证
     ("GET", "/liff/dms-booking"),  # DMS LIFF 页面壳;业务数据仍需 JWT + 一次性 nonce
     ("GET", "/login/dms-booking"),  # 同一 LIFF 页面壳;保持在已登记的 /login 路径下
     ("GET", "/home/dms-booking"),  # 同一 LIFF 页面壳;生产 LIFF 的实际登记路径

@@ -130,7 +130,7 @@ async def _handle_postback(
             store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
             if reply_token:
                 line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
-    elif action in ("confirm", "discard"):
+    elif action == "discard":
         draft_id = (params.get("draft") or [""])[0]
         await act_draft(binding, line_user_id, reply_token, draft_id, action)
 
@@ -312,7 +312,9 @@ async def _handle_document(
         "draft",
         {"mode": mode, "history_ids": history_ids, "nonce": nonce},
     )
-    preview_card = cards.preview_card(history_ids[0], mode, preview.from_result(result, mode))
+    preview_data = preview.from_result(result, mode)
+    preview_data["document_count"] = len(history_ids)
+    preview_card = cards.preview_card(history_ids[0], mode, preview_data)
     if reply_token:
         line_client.reply_messages(reply_token, [preview_card], channel=CHANNEL)
     else:
@@ -364,7 +366,7 @@ async def act_draft(
             return result
         text = "ทิ้งเอกสารเรียบร้อยแล้ว"
     else:
-        result = await _confirm(binding, user, history_id, history_ids, reply_token)
+        result = await _confirm(binding, user, history_id, history_ids, reply_token, mode)
         if not result["ok"]:
             return result
         text = (
@@ -414,25 +416,15 @@ async def _confirm(
     draft_id: str,
     history_ids: list[str],
     reply_token: str | None,
+    mode: str,
 ) -> dict:
     records = draft_records(
         str(binding["user_id"]), str(binding["tenant_id"]), draft_id, history_ids
     )
-    missing = []
-    for record in records:
-        pages = record.get("pages") or []
-        fields = (pages[0].get("fields") or {}) if pages and isinstance(pages[0], dict) else {}
-        error = convert_svc.erp_declaration_error(fields)
-        if error:
-            missing.append(error)
-        if not str(fields.get("date") or fields.get("invoice_date") or "").strip():
-            missing.append("no_date")
-        if (
-            fields.get("direction") == "sales"
-            and not str(fields.get("invoice_no") or fields.get("invoice_number") or "").strip()
-        ):
-            missing.append("no_doc_no")
-    if missing:
+    from services.line_platform.draft_validation import batch_issues
+
+    invalid = batch_issues(records, mode, require_posting_kind=True)
+    if invalid:
         text = "กรุณาแก้ไขและเลือกประเภทสินค้า stock หรือบริการ service ให้ครบก่อนยืนยัน"
         if reply_token:
             line_client.reply_text(reply_token, text, channel=CHANNEL)

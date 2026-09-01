@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from routes.pages_routes import router
 from routes.line_dms_booking_edit_routes import router as line_dms_booking_edit_router
 from routes.cowork_line_intake_routes import router as cowork_line_intake_router
+from routes.line_erp_routes import router as line_erp_router
 
 # 全部返回 HTML 外壳的对外路由(/admin 是 301 → 用落地的 /admin/cost)。
 # 2026-08-26 · /login 已退居服务端 302 别名(落 /cowork),不再吐外壳,故不在此清单;
@@ -35,7 +36,8 @@ SHELL_ROUTES = [
     "/terms",
     "/privacy",
     "/liff/dms-booking",
-    "/liff/cowork-intake/x",
+    "/liff/cowork-intake?draft=x",
+    "/liff/erp?draft=x",
 ]
 
 MAX_LINES = 3  # minified 外壳 · 留 3 行余量(实测均为 1 行)
@@ -48,6 +50,7 @@ class PageShellMinifiedTest(unittest.TestCase):
         app.include_router(router)
         app.include_router(line_dms_booking_edit_router)
         app.include_router(cowork_line_intake_router)
+        app.include_router(line_erp_router)
         cls.client = TestClient(app)
 
     def test_public_routes_serve_minified_shell(self):
@@ -69,6 +72,10 @@ class PageShellMinifiedTest(unittest.TestCase):
             with self.subTest(path=path):
                 resp = self.client.get(path, follow_redirects=False)
                 self.assertNotIn("<!--", resp.text, f"{path} 残留 HTML 注释(应被 minify 去除)")
+
+    def test_draft_id_path_routes_were_removed(self):
+        self.assertEqual(self.client.get("/liff/cowork-intake/old-draft").status_code, 404)
+        self.assertEqual(self.client.get("/liff/erp/old-draft").status_code, 404)
 
 
 if __name__ == "__main__":

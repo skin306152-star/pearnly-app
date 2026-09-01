@@ -1,28 +1,36 @@
 (function () {
     'use strict';
 
-    function render(key, value, required, recordIndex, label, escapeHtml) {
+    function render(key, value, required, path, label, escapeHtml) {
         var objectValue = value && typeof value === 'object';
         var fieldValue = objectValue ? JSON.stringify(value, null, 2) : value;
-        var dataKey = recordIndex + ':' + escapeHtml(key);
-        var control = objectValue
-            ? '<textarea data-field="' +
-              dataKey +
-              '"' +
-              (required ? ' required' : '') +
-              '>' +
-              escapeHtml(fieldValue) +
-              '</textarea>'
-            : '<input data-field="' +
-              dataKey +
-              '" value="' +
-              escapeHtml(fieldValue == null ? '' : fieldValue) +
-              '"' +
-              (required ? ' required' : '') +
-              '>';
+        var control =
+            typeof value === 'boolean'
+                ? '<select data-field="' +
+                  escapeHtml(path) +
+                  '"><option value="true"' +
+                  (value ? ' selected' : '') +
+                  '>true</option><option value="false"' +
+                  (!value ? ' selected' : '') +
+                  '>false</option></select>'
+                : objectValue
+                  ? '<textarea data-field="' +
+                    escapeHtml(path) +
+                    '"' +
+                    (required ? ' required' : '') +
+                    '>' +
+                    escapeHtml(fieldValue) +
+                    '</textarea>'
+                  : '<input data-field="' +
+                    escapeHtml(path) +
+                    '" value="' +
+                    escapeHtml(fieldValue == null ? '' : fieldValue) +
+                    '"' +
+                    (required ? ' required' : '') +
+                    '>';
         return (
             '<div class="field"><label>' +
-            escapeHtml(label(key.indexOf('item.') === 0 ? key.split('.').pop() : key)) +
+            escapeHtml(label(key)) +
             (required ? ' *' : '') +
             '</label>' +
             control +

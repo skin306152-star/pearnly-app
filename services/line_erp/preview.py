@@ -20,24 +20,6 @@ def _money(value) -> str:
         return str(value or "-")
 
 
-def _item(row: dict) -> dict:
-    qty = _text(row, "qty", "quantity") or "1"
-    price = _text(row, "price", "unit_price")
-    total = _text(row, "subtotal", "line_total", "amount")
-    if not total and price:
-        try:
-            total = str(Decimal(qty) * Decimal(price))
-        except (InvalidOperation, ValueError):
-            total = ""
-    return {
-        "name": _text(row, "name", "description") or "-",
-        "qty": qty,
-        "price": _money(price) if price else "-",
-        "total": _money(total) if total else "-",
-        "kind": _text(row, "posting_kind"),
-    }
-
-
 def from_result(result: dict, mode: str) -> dict:
     pages = result.get("raw_pages") or []
     page = pages[0] if pages and isinstance(pages[0], dict) else {}
@@ -45,7 +27,13 @@ def from_result(result: dict, mode: str) -> dict:
     if not isinstance(fields, dict):
         fields = {}
     is_purchase = mode == "purchase"
-    items = [_item(row) for row in fields.get("items") or [] if isinstance(row, dict)]
+    item_count = sum(
+        1
+        for raw_page in pages
+        if isinstance(raw_page, dict)
+        for row in (raw_page.get("fields") or {}).get("items") or []
+        if isinstance(row, dict)
+    )
     return {
         "document_no": _text(fields, "invoice_number", "invoice_no"),
         "document_date": _text(fields, "date", "invoice_date"),
@@ -77,6 +65,5 @@ def from_result(result: dict, mode: str) -> dict:
         "subtotal": _money(_text(fields, "subtotal")),
         "vat": _money(_text(fields, "vat", "vat_amount")),
         "total": _money(_text(fields, "total_amount", "grand_total")),
-        "items": items,
-        "item_count": len(items),
+        "item_count": item_count,
     }

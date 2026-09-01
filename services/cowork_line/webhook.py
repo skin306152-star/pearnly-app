@@ -41,9 +41,6 @@ _COPY = {
         "target_changed": "การเชื่อมต่อ ERP เปลี่ยนไป กรุณาเลือกใหม่จากเมนู",
         "read_failed": "อ่านเอกสารไม่สำเร็จ กรุณาส่งใหม่",
         "no_document": "ไม่พบเอกสารที่อ่านได้ กรุณาส่งใหม่",
-        "confirmed": "บันทึกใน Cowork แล้ว และส่งคำสั่งไปยัง ERP แล้ว",
-        "saved_push_issue": "บันทึกใน Cowork แล้ว แต่ ERP ต้องดำเนินการเพิ่มเติม กรุณาดูบันทึกการส่ง",
-        "preflight_failed": "ยังส่งไม่ได้ กรุณาแก้ไข ERP หรือเอกสาร แล้วลองอีกครั้ง",
         "discarded": "ทิ้งเอกสารแล้ว",
         "expired": "รายการหมดอายุ กรุณาเริ่มใหม่จากเมนู",
     },
@@ -61,9 +58,6 @@ _COPY = {
         "target_changed": "ERP 连接状态已变化，请从菜单重新选择。",
         "read_failed": "单据识别失败，请重新上传。",
         "no_document": "没有识别到可用单据，请重新上传。",
-        "confirmed": "已写入 Cowork 识别记录，并已提交 ERP 推送。",
-        "saved_push_issue": "已写入 Cowork 识别记录，但 ERP 需要处理，请查看推送记录。",
-        "preflight_failed": "推送预检未通过，请编辑单据或处理 ERP 连接后重试。",
         "discarded": "单据已丢弃。",
         "expired": "操作已过期，请从菜单重新开始。",
     },
@@ -81,9 +75,6 @@ _COPY = {
         "target_changed": "The ERP connection changed. Choose it again from the menu.",
         "read_failed": "The document could not be read. Send it again.",
         "no_document": "No usable document was found. Send it again.",
-        "confirmed": "Saved to Cowork recognition records and submitted to ERP.",
-        "saved_push_issue": "Saved to Cowork, but ERP needs attention. Check the push log.",
-        "preflight_failed": "Push preflight failed. Edit the document or fix the ERP connection.",
         "discarded": "Document discarded.",
         "expired": "This action expired. Start again from the menu.",
     },
@@ -101,9 +92,6 @@ _COPY = {
         "target_changed": "ERP 接続が変更されました。メニューから選び直してください。",
         "read_failed": "書類を読み取れませんでした。再送してください。",
         "no_document": "有効な書類が見つかりませんでした。再送してください。",
-        "confirmed": "Cowork の認識履歴に保存し、ERP へ送信しました。",
-        "saved_push_issue": "Cowork に保存しましたが、ERP で対応が必要です。送信履歴を確認してください。",
-        "preflight_failed": "送信前チェックに失敗しました。書類または ERP 接続を修正してください。",
         "discarded": "書類を破棄しました。",
         "expired": "操作の有効期限が切れました。メニューから再開してください。",
     },
@@ -290,9 +278,6 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
         "cowork_erp_target": {"select_account"},
         "cowork_direction": {"select_direction"},
         "cowork_posting_mode": {"select_mode"},
-        "cowork_preview_page": {"draft", "editing"},
-        "cowork_preview_record": {"draft", "editing"},
-        "cowork_confirm": {"draft", "editing"},
         "cowork_discard": {"draft", "editing"},
     }
     if action not in expected_states or session.get("state") not in expected_states[action]:
@@ -359,11 +344,8 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
         _set(identity, "receiving", payload)
         _reply_text(reply_token, _text(lang, "upload"))
         return
-    if action in {"cowork_preview_page", "cowork_preview_record"}:
-        await _show_preview(identity, reply_token, params, lang)
-        return
-    if action in {"cowork_confirm", "cowork_discard"}:
-        await _act_draft(identity, reply_token, params.get("draft", ""), action, lang)
+    if action == "cowork_discard":
+        await _discard_draft(identity, reply_token, params.get("draft", ""), lang)
 
 
 async def _require_target(identity: dict, selection: dict) -> dict | None:
@@ -399,22 +381,15 @@ async def _recognize_document(message: dict, identity: dict, lang: str) -> None:
     await recognize_document(message, identity, lang)
 
 
-async def _show_preview(identity: dict, reply_token: str | None, params: dict, lang: str) -> None:
-    from services.cowork_line.webhook_documents import show_preview
-
-    await show_preview(identity, reply_token, params, lang)
-
-
-async def _act_draft(
+async def _discard_draft(
     identity: dict,
     reply_token: str | None,
     draft_id: str,
-    action: str,
     lang: str,
 ) -> None:
-    from services.cowork_line.webhook_documents import act_draft
+    from services.cowork_line.webhook_documents import discard_draft
 
-    await act_draft(identity, reply_token, draft_id, action, lang)
+    await discard_draft(identity, reply_token, draft_id, lang)
 
 
 __all__ = ["handle_event"]

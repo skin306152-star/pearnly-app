@@ -245,12 +245,15 @@
     };
 
     window.coworkIntakeI18n = {
-        text: function (lang, key) {
-            return (copy[lang] || copy.th)[key] || copy.en[key] || key;
+        text: function (lang, key, values) {
+            var local = (copy[lang] || copy.th)[key] || copy.en[key];
+            return local || window.lineIntakeReviewI18n.text(lang, key, values);
         },
         label: function (lang, key) {
             var row = labels[key];
-            return row ? row[{ th: 0, en: 1, zh: 2, ja: 3 }[lang] || 0] : key;
+            return row
+                ? row[{ th: 0, en: 1, zh: 2, ja: 3 }[lang] || 0]
+                : (copy[lang] || copy.th)[key] || copy.en[key] || key;
         },
     };
 })();

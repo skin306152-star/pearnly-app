@@ -62,6 +62,26 @@ class PortalRouteTest(unittest.TestCase):
         self.assertNotIn("location", response.headers)
         self.assertIn("Pearnly DMS", response.text)
 
+    def test_login_routes_explicit_cowork_liff_state_before_legacy_dms_draft(self):
+        response = self.client.get(
+            "/login",
+            params={"liff.state": "/?flow=cowork-intake&draft=cowork-draft"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("location", response.headers)
+        self.assertIn("Pearnly Cowork LINE", response.text)
+        self.assertNotIn("Pearnly DMS", response.text)
+
+    def test_home_routes_restored_cowork_query_to_intake_shell(self):
+        response = self.client.get(
+            "/home",
+            params={"flow": "cowork-intake", "draft": "cowork-draft"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Pearnly Cowork LINE", response.text)
+
     def test_home_serves_liff_dms_portal_shell_without_redirect(self):
         response = self.client.get(
             "/home",

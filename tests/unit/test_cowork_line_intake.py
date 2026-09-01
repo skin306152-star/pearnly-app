@@ -107,6 +107,24 @@ class IntakeServiceTest(unittest.TestCase):
 
 
 class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _ready_records():
+        return [
+            {
+                "id": "history-1",
+                "pages": [
+                    {
+                        "fields": {
+                            "seller_name": "Supplier",
+                            "date": "2026-09-01",
+                            "total_amount": "120",
+                            "items": [{"name": "Service", "qty": "1"}],
+                        }
+                    }
+                ],
+            }
+        ]
+
     async def test_confirm_clears_session_after_atomic_log_and_recognition_commit(self):
         target = {
             "endpoint_id": "endpoint-1",
@@ -131,6 +149,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(intake, "require_draft", return_value=({}, payload)),
             mock.patch.object(intake, "_assert_owned_staged") as staged_precheck,
             mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(intake, "_records", return_value=self._ready_records()),
             mock.patch.object(intake, "_dispatch_confirmed", side_effect=dispatch),
             mock.patch.object(intake.session_store, "clear_session") as clear,
         ):
@@ -159,6 +178,7 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(intake, "require_draft", return_value=({}, payload)),
             mock.patch.object(intake, "_assert_owned_staged"),
             mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(intake, "_records", return_value=self._ready_records()),
             mock.patch.object(
                 intake,
                 "_dispatch_confirmed",
@@ -177,6 +197,33 @@ class IntakeConfirmTest(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(intake.CoworkLineIntakeError) as caught:
                 await intake.confirm_and_push(IDENTITY, {**PAYLOAD, "history_ids": ["other"]})
         self.assertEqual(caught.exception.code, "records_incomplete")
+
+    async def test_confirm_blocks_batch_when_any_document_has_unresolved_fields(self):
+        target = {
+            "endpoint_id": "endpoint-1",
+            "workspace_client_id": 17,
+            "adapter": "mrerp",
+            "label": "MR.ERP",
+            "mode_options": ["cash", "credit"],
+        }
+        payload = {**PAYLOAD, "workspace_client_id": 17}
+        targets = SimpleNamespace(require_target=mock.Mock(return_value=target))
+        with (
+            mock.patch.object(intake, "require_draft", return_value=({}, payload)),
+            mock.patch.object(intake, "_targets_service", return_value=targets),
+            mock.patch.object(
+                intake,
+                "_records",
+                return_value=[{"id": "history-1", "pages": [{"fields": {"items": []}}]}],
+            ),
+            mock.patch.object(intake, "_dispatch_confirmed") as dispatch,
+        ):
+            with self.assertRaises(intake.CoworkLineIntakeError) as caught:
+                await intake.confirm_and_push(IDENTITY, payload)
+
+        self.assertEqual(caught.exception.code, "document_not_ready")
+        self.assertEqual(caught.exception.status_code, 422)
+        dispatch.assert_not_called()
 
 
 class IntakeRouteTest(unittest.TestCase):

@@ -333,6 +333,11 @@ async def confirm_and_push(identity: dict, draft: str | dict) -> dict:
     if supplied is not None and supplied_ids != history_ids:
         raise CoworkLineIntakeError("records_incomplete")
     target, normalized = _validated_selection(identity, _selection(payload))
+    from services.line_platform.draft_validation import batch_issues
+
+    records = _records(identity, draft_id, history_ids)
+    if batch_issues(records, normalized["direction"], require_posting_kind=False):
+        raise CoworkLineIntakeError("document_not_ready", 422)
     target = _preflight_target(identity, target, history_ids, normalized)
     if not target["selectable"]:
         raise CoworkLineIntakeError(str(target.get("block_reason") or "document_not_ready"))

@@ -1,4 +1,4 @@
-/* global window, document, Node */
+/* global window */
 
 const path = require('path');
 const fs = require('fs');
@@ -10,19 +10,17 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const OUT = path.join(__dirname, '_artifacts', 'erp-line-intake');
 fs.mkdirSync(OUT, { recursive: true });
 let server;
-const authBodies = [];
-const previewHeaders = [];
-const requestLog = [];
 
 test.beforeAll(async () => {
     server = await localServer.start(PORT, '/static/erp-line-intake/index.html');
 });
 test.afterAll(() => localServer.stop(server));
 
-function records() {
+function erpRecords() {
     return [
         {
             id: 'h1',
+            filename: 'purchase-batch.pdf',
             pages: [
                 {
                     page_number: 1,
@@ -43,15 +41,19 @@ function records() {
                         ],
                     },
                 },
+                { page_number: 2, fields: { items: [] } },
             ],
-            preview_url: '/api/line/erp/draft/d1/records/h1/page/0.png',
-            preview_urls: ['/api/line/erp/draft/d1/records/h1/page/0.png'],
+            preview_urls: [
+                '/api/line/erp/draft/d1/records/h1/page/0.png',
+                '/api/line/erp/draft/d1/records/h1/page/1.png',
+            ],
         },
         {
             id: 'h2',
+            filename: 'purchase-batch.pdf',
             pages: [
                 {
-                    page_number: 1,
+                    page_number: 3,
                     fields: {
                         invoice_number: 'PO-002',
                         date: '2026-08-28',
@@ -61,25 +63,35 @@ function records() {
                     },
                 },
             ],
-            preview_url: '/api/line/erp/draft/d1/records/h2/page/1.png',
-            preview_urls: ['/api/line/erp/draft/d1/records/h2/page/1.png'],
+            preview_urls: ['/api/line/erp/draft/d1/records/h2/page/2.png'],
         },
     ];
 }
 
-async function open(
-    page,
-    {
-        putStatus = 200,
-        draftRecords = records(),
-        draftQuery = '?draft=d1',
-        direction = 'purchase',
-    } = {}
-) {
-    authBodies.length = 0;
-    previewHeaders.length = 0;
-    requestLog.length = 0;
-    await page.route('https://static.line-scdn.net/**', (r) => r.abort());
+function coworkRecords() {
+    return [
+        {
+            id: 'c1',
+            filename: 'cowork-batch.pdf',
+            pages: [
+                {
+                    page_number: 1,
+                    fields: {
+                        invoice_number: 'CW-001',
+                        date: '2026-09-01',
+                        seller_name: 'Cowork Supplier',
+                        total_amount: '320',
+                        items: [{ name: '', qty: '2', price: '160', subtotal: '320' }],
+                    },
+                },
+            ],
+            preview_urls: ['/api/cowork-line/intake/draft/c1/records/c1/page/0.png'],
+        },
+    ];
+}
+
+async function installLiff(page) {
+    await page.route('https://static.line-scdn.net/**', (route) => route.abort());
     await page.addInitScript(() => {
         window.liff = {
             init: async () => {},
@@ -87,88 +99,174 @@ async function open(
             getIDToken: () => 'test-id-token',
         };
     });
-    await page.route('**/api/line/erp/liff/config', (r) =>
-        r.fulfill({
+}
+
+function previewResponse(route, headers) {
+    headers.push(route.request().headers().authorization || '');
+    return route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="720" height="960"><rect width="100%" height="100%" fill="white"/><rect x="40" y="40" width="640" height="880" rx="16" fill="none" stroke="#d7e4dc" stroke-width="4"/><text x="80" y="120" font-size="34" font-family="sans-serif" fill="#183d2b">Original invoice</text><path d="M80 250h560M80 320h560M80 390h360" stroke="#b7c9bf" stroke-width="10"/></svg>',
+    });
+}
+
+async function openErp(
+    page,
+    { putStatus = 200, draftRecords = erpRecords(), direction = 'purchase', draftQuery } = {}
+) {
+    const requests = [];
+    const authBodies = [];
+    const previewHeaders = [];
+    await installLiff(page);
+    await page.route('**/api/line/erp/liff/config', (route) =>
+        route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({ ok: true, data: { liff_id: 'test-liff' } }),
         })
     );
-    await page.route('**/api/line/erp/liff/auth', async (r) => {
-        authBodies.push(JSON.parse(r.request().postData() || '{}'));
-        return r.fulfill({
+    await page.route('**/api/line/erp/liff/auth', async (route) => {
+        authBodies.push(JSON.parse(route.request().postData() || '{}'));
+        return route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({ ok: true, data: { token: 'test-bearer' } }),
         });
     });
     await page.route('**/api/line/erp/draft/d1/**', async (route) => {
-        const req = route.request();
-        const pathname = new URL(req.url()).pathname;
+        const request = route.request();
+        const pathname = new URL(request.url()).pathname;
         if (/\/records\/[^/]+\/page\/\d+\.png$/.test(pathname)) {
-            previewHeaders.push(req.headers().authorization || '');
-            return route.fulfill({
-                status: 200,
-                contentType: 'image/svg+xml',
-                body: '<svg xmlns="http://www.w3.org/2000/svg" width="720" height="960"><rect width="100%" height="100%" fill="white"/><rect x="40" y="40" width="640" height="880" rx="16" fill="none" stroke="#d7e4dc" stroke-width="4"/><text x="80" y="120" font-size="34" font-family="sans-serif" fill="#183d2b">Original invoice</text><text x="80" y="190" font-size="28" font-family="sans-serif" fill="#456">PO-001 · Supplier</text><path d="M80 250h560M80 320h560M80 390h360" stroke="#b7c9bf" stroke-width="10"/></svg>',
-            });
+            return previewResponse(route, previewHeaders);
         }
-        requestLog.push({ method: req.method(), path: pathname, body: req.postData() || '' });
+        requests.push({ method: request.method(), path: pathname, body: request.postData() || '' });
         return route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ ok: true }),
+            body: JSON.stringify({ ok: true, data: { ok: true } }),
         });
     });
     await page.route('**/api/line/erp/draft/d1', async (route) => {
-        const req = route.request();
-        requestLog.push({
-            method: req.method(),
-            path: new URL(req.url()).pathname,
-            body: req.postData() || '',
-        });
-        if (req.method() === 'PUT') {
+        const request = route.request();
+        const pathname = new URL(request.url()).pathname;
+        requests.push({ method: request.method(), path: pathname, body: request.postData() || '' });
+        if (request.method() === 'PUT') {
             return route.fulfill({
                 status: putStatus,
                 contentType: 'application/json',
-                body: JSON.stringify(putStatus === 200 ? { ok: true } : { detail: 'save failed' }),
+                body: JSON.stringify(
+                    putStatus === 200
+                        ? { ok: true, data: { records: draftRecords } }
+                        : { detail: 'save failed' }
+                ),
             });
         }
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { direction, records: draftRecords } }),
+        });
+    });
+    const query = draftQuery || '?flow=erp-intake&draft=d1';
+    await page.goto(`${BASE}/static/erp-line-intake/index.html${query}`);
+    await expect(page.locator('#editor')).toBeVisible();
+    return { requests, authBodies, previewHeaders };
+}
+
+async function openCowork(page) {
+    const requests = [];
+    const previewHeaders = [];
+    const records = coworkRecords();
+    const selection = {
+        endpoint_id: 'endpoint-1',
+        workspace_client_id: 69,
+        adapter: 'express',
+        direction: 'purchase',
+        posting_kind: 'stock',
+        target_label: 'Express · 69EXP',
+    };
+    const targets = [
+        {
+            endpoint_id: 'endpoint-1',
+            workspace_client_id: 69,
+            adapter: 'express',
+            label: 'Express · 69EXP',
+            selectable: true,
+            configured: true,
+            connection_state: 'online',
+            ready_checks: { erp_connection: true, companion_online: true },
+        },
+    ];
+    await installLiff(page);
+    await page.route('**/api/cowork-line/intake/liff/config', (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { liff_id: 'cowork-liff' } }),
+        })
+    );
+    await page.route('**/api/cowork-line/intake/liff/auth', (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { token: 'cowork-bearer' } }),
+        })
+    );
+    await page.route('**/api/cowork-line/intake/draft/c1/**', async (route) => {
+        const request = route.request();
+        const pathname = new URL(request.url()).pathname;
+        if (/\/records\/[^/]+\/page\/\d+\.png$/.test(pathname)) {
+            return previewResponse(route, previewHeaders);
+        }
+        requests.push({ method: request.method(), path: pathname, body: request.postData() || '' });
         return route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
                 ok: true,
-                data: { direction, records: draftRecords },
+                data: { saved: true, push_ok: true, status: 'success' },
             }),
         });
     });
-    await page.goto(`${BASE}/static/erp-line-intake/index.html${draftQuery}`);
+    await page.route('**/api/cowork-line/intake/draft/c1', async (route) => {
+        const request = route.request();
+        const pathname = new URL(request.url()).pathname;
+        requests.push({ method: request.method(), path: pathname, body: request.postData() || '' });
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data: { records, selection, targets } }),
+        });
+    });
+    await page.goto(`${BASE}/static/cowork-line-intake/index.html?flow=cowork-intake&draft=c1`);
     await expect(page.locator('#editor')).toBeVisible();
+    return { requests, previewHeaders };
 }
 
-test('mobile ERP LINE review blocks incomplete lines and renders all fields', async ({
+test('ERP mobile list searches, opens multi-page detail, and gates batch confirm', async ({
     browser,
 }) => {
     const page = await browser.newPage({ ...devices['iPhone 13'] });
-    await open(page);
-    await expect(page.locator('[data-field="0:seller_name"]')).toHaveValue('Supplier');
-    await expect(page.locator('[data-record]')).toHaveCount(2);
-    await expect.poll(() => previewHeaders.length).toBe(2);
-    expect(authBodies[authBodies.length - 1]).toMatchObject({
-        id_token: 'test-id-token',
-        draft_id: 'd1',
-    });
-    await expect(page.locator('[data-kind="0:0"]')).toBeVisible();
-    await page.screenshot({ path: path.join(OUT, 'mobile-review.png'), fullPage: true });
-    await page.locator('[data-action="confirm"]').click();
-    await expect(page.locator('#state')).toContainText('กรุณา');
+    const run = await openErp(page);
+    await expect(page.locator('.review-row')).toHaveCount(2);
+    await expect(page.locator('[data-review-action="confirm"]')).toBeDisabled();
+    await page.locator('[data-review-search]').fill('Second Supplier');
+    await expect(page.locator('.review-row')).toHaveCount(1);
+    await page.locator('[data-review-search]').fill('');
+    await page.locator('.review-row').first().click();
+    await expect(page.locator('.review-original')).toHaveCount(2);
+    await expect(page.locator('[data-field="0:field:seller_name"]')).toHaveValue('Supplier');
+    await page.locator('[data-field="0:field:seller_name"]').fill('Edited Supplier');
     await page.locator('[data-kind="0:0"]').selectOption('stock');
+    await page.locator('[data-review-back]').click();
+    await page.locator('.review-row').nth(1).click();
     await page.locator('[data-kind="1:0"]').selectOption('service');
-    await page.locator('[data-field="0:seller_name"]').fill('Edited Supplier');
-    await page.locator('[data-action="confirm"]').click();
+    await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
+    await expect(page.locator('[data-review-status]')).toHaveClass(/review-status--ready/);
+    await page.screenshot({ path: path.join(OUT, 'erp-mobile-detail.png'), fullPage: true });
+    await page.locator('[data-review-action="confirm"]').click();
     await expect(page.locator('#state')).toContainText('ยืนยันแล้ว');
-    const writes = requestLog.filter((entry) => entry.method !== 'GET');
+    const writes = run.requests.filter((entry) => entry.method !== 'GET');
     expect(writes.map((entry) => `${entry.method} ${entry.path}`)).toEqual([
         'PUT /api/line/erp/draft/d1',
         'POST /api/line/erp/draft/d1/confirm',
@@ -176,90 +274,107 @@ test('mobile ERP LINE review blocks incomplete lines and renders all fields', as
     const saved = JSON.parse(writes[0].body);
     expect(saved.records.map((record) => record.id)).toEqual(['h1', 'h2']);
     expect(saved.records[0].pages[0].fields.seller_name).toBe('Edited Supplier');
-    expect(saved.records[0].pages[0].fields.invoice_number).toBe('PO-001');
     expect(saved.records[0].pages[0].fields.items[0]).toMatchObject({
         name: 'Widget',
         qty: '1',
         price: '100',
         posting_kind: 'stock',
     });
+    expect(run.authBodies[0]).toMatchObject({ id_token: 'test-id-token', draft_id: 'd1' });
+    expect(run.previewHeaders.every((value) => value === 'Bearer test-bearer')).toBe(true);
     await page.close();
 });
 
-test('desktop supports language switching and discard action', async ({ browser }) => {
+test('ERP desktop filters anomalies and uses the shared discard dialog', async ({ browser }) => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    await open(page);
+    const run = await openErp(page);
     await page.locator('#lang').selectOption('en');
-    await expect(page.locator('h1')).toContainText('Review purchase document');
-    await page.locator('[data-action="discard"]').click();
+    await expect(page.locator('h1')).toContainText('Review purchase documents');
+    await page.locator('[data-filter="review"]').click();
+    await expect(page.locator('.review-row')).toHaveCount(2);
+    await page.locator('[data-review-action="discard"]').click();
     await expect(page.locator('#discard-dialog')).toBeVisible();
-    await page.locator('[data-dialog-cancel]').last().click();
-    expect(requestLog.filter((entry) => entry.method !== 'GET')).toEqual([]);
-    await page.locator('[data-action="discard"]').click();
-    await expect(page.locator('#discard-dialog')).toBeVisible();
+    await page.locator('[data-dialog-cancel-button]').click();
+    expect(run.requests.filter((entry) => entry.method !== 'GET')).toEqual([]);
+    await page.locator('[data-review-action="discard"]').click();
     await page.locator('[data-dialog-confirm]').click();
     await expect(page.locator('#state')).toContainText('Discarded');
+    await page.screenshot({ path: path.join(OUT, 'erp-desktop-discarded.png'), fullPage: true });
+});
+
+test('LIFF state restores the ERP draft only after initialization', async ({ page }) => {
+    const state = encodeURIComponent('/?flow=erp-intake&draft=d1');
+    const run = await openErp(page, { draftQuery: `?liff.state=${state}` });
+    await expect(page.locator('.review-row')).toHaveCount(2);
+    expect(run.authBodies[0].draft_id).toBe('d1');
+});
+
+test('large PDF batches render twenty rows first while search covers unloaded invoices', async ({
+    page,
+}) => {
+    const draftRecords = Array.from({ length: 45 }, (_, index) => ({
+        id: `bulk-${index + 1}`,
+        pages: [
+            {
+                page_number: index + 1,
+                fields: {
+                    invoice_number: `BULK-${String(index + 1).padStart(3, '0')}`,
+                    date: '2026-09-01',
+                    seller_name: `Supplier ${index + 1}`,
+                    total_amount: '100',
+                    items: [{ name: 'Item', qty: '1', posting_kind: 'stock' }],
+                },
+            },
+        ],
+        preview_urls: [`/api/line/erp/draft/d1/records/bulk-${index + 1}/page/0.png`],
+    }));
+    await openErp(page, { draftRecords });
+    await expect(page.locator('.review-row')).toHaveCount(20);
+    await page.locator('[data-review-search]').fill('BULK-045');
+    await expect(page.locator('.review-row')).toHaveCount(1);
+    await expect(page.locator('.review-row')).toContainText('BULK-045');
+});
+
+test('failed ERP save never calls batch confirm', async ({ page }) => {
+    const run = await openErp(page, { putStatus: 409 });
+    await page.locator('.review-row').first().click();
+    await page.locator('[data-kind="0:0"]').selectOption('stock');
+    await page.locator('[data-review-back]').click();
+    await page.locator('.review-row').nth(1).click();
+    await page.locator('[data-kind="1:0"]').selectOption('service');
+    await page.locator('[data-review-action="confirm"]').click();
+    await expect(page.locator('#state')).toContainText('โหลดเอกสารไม่สำเร็จ');
     expect(
-        requestLog
+        run.requests
             .filter((entry) => entry.method !== 'GET')
             .map((entry) => `${entry.method} ${entry.path}`)
-    ).toEqual(['POST /api/line/erp/draft/d1/discard']);
-    await page.screenshot({ path: path.join(OUT, 'desktop-discarded.png'), fullPage: true });
+    ).toEqual(['PUT /api/line/erp/draft/d1']);
 });
 
-test('sales review identifies the buyer first and keeps seller fields editable', async ({
+test('Cowork uses the same list, detail, anomaly gate, and batch action layout', async ({
     browser,
 }) => {
-    const draftRecords = records().slice(0, 1);
-    Object.assign(draftRecords[0].pages[0].fields, {
-        buyer_name: 'Customer A',
-        buyer_tax: '0105559000012',
-        buyer_branch: '00000',
-        buyer_address: 'Bangkok',
-        seller_address: 'Chiang Mai',
-        document_type: 'tax_invoice',
-    });
     const page = await browser.newPage({ ...devices['iPhone 13'] });
-    await open(page, { direction: 'sales', draftRecords });
+    const run = await openCowork(page);
     await page.locator('#lang').selectOption('zh');
-    await expect(page.locator('h1')).toHaveText('复核销售单据');
-    await expect(page.locator('[data-field="0:buyer_name"]')).toHaveValue('Customer A');
-    await expect(page.locator('[data-field="0:seller_name"]')).toHaveValue('Supplier');
-    const buyerComesFirst = await page.evaluate(() => {
-        const buyer = document.querySelector('[data-field="0:buyer_name"]');
-        const seller = document.querySelector('[data-field="0:seller_name"]');
-        return Boolean(buyer.compareDocumentPosition(seller) & Node.DOCUMENT_POSITION_FOLLOWING);
-    });
-    expect(buyerComesFirst).toBe(true);
-    await page.screenshot({ path: path.join(OUT, 'sales-mobile-review.png'), fullPage: true });
-    await page.close();
-});
-
-test('LIFF callback state keeps the ERP draft id', async ({ page }) => {
-    await open(page, { draftQuery: `?liff.state=${encodeURIComponent('?draft=d1')}` });
-    await expect(page.locator('[data-field="0:seller_name"]')).toHaveValue('Supplier');
-});
-
-test('failed draft save never calls confirm', async ({ page }) => {
-    await open(page, { putStatus: 409 });
-    await page.locator('[data-kind="0:0"]').selectOption('stock');
-    await page.locator('[data-kind="1:0"]').selectOption('service');
-    await page.locator('[data-action="confirm"]').click();
-    await expect(page.locator('#state')).toContainText('โหลดเอกสารไม่สำเร็จ');
-    const writes = requestLog.filter((entry) => entry.method !== 'GET');
-    expect(writes.map((entry) => `${entry.method} ${entry.path}`)).toEqual([
-        'PUT /api/line/erp/draft/d1',
+    await expect(page.locator('.review-row')).toHaveCount(1);
+    await expect(page.locator('[data-review-action="confirm"]')).toBeDisabled();
+    await page.locator('.review-row').click();
+    await expect(page.locator('.review-original')).toHaveCount(1);
+    await page.locator('[data-field="0:items:0:name"]').fill('镜片');
+    await expect(page.locator('[data-review-action="confirm"]')).toBeEnabled();
+    await expect(page.locator('[data-review-status]')).toContainText('已就绪');
+    await page.screenshot({ path: path.join(OUT, 'cowork-mobile-detail.png'), fullPage: true });
+    await page.locator('[data-review-action="confirm"]').click();
+    await expect(page.locator('#state')).toContainText('已确认');
+    expect(
+        run.requests
+            .filter((entry) => entry.method !== 'GET')
+            .map((entry) => `${entry.method} ${entry.path}`)
+    ).toEqual([
+        'PUT /api/cowork-line/intake/draft/c1',
+        'POST /api/cowork-line/intake/draft/c1/confirm',
     ]);
-});
-
-test('missing OCR items stay blank and require explicit user entry', async ({ page }) => {
-    const draftRecords = records().slice(0, 1);
-    draftRecords[0].pages[0].fields.items = [];
-    await open(page, { draftRecords });
-    await expect(page.locator('[data-field="0:item.0.qty"]')).toHaveValue('');
-    await expect(page.locator('[data-field="0:item.0.price"]')).toHaveValue('');
-    await expect(page.locator('[data-field="0:item.0.subtotal"]')).toHaveValue('');
-    await page.locator('[data-action="confirm"]').click();
-    await expect(page.locator('#state')).toContainText('กรุณา');
-    expect(requestLog.filter((entry) => entry.method !== 'GET')).toEqual([]);
+    expect(run.previewHeaders).toContain('Bearer cowork-bearer');
+    await page.close();
 });

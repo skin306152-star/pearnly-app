@@ -108,6 +108,29 @@ class ManagedTargetTests(unittest.TestCase):
 
 
 class LegacyTargetTests(unittest.TestCase):
+    def test_legacy_query_includes_mrerp_and_express(self):
+        cursor = Mock()
+        cursor.fetchall.return_value = [
+            {
+                "id": "express-1",
+                "name": "Express",
+                "adapter": "express",
+                "enabled": True,
+            }
+        ]
+
+        specs = erp_targets._legacy_target_specs(
+            cursor,
+            user_id="owner-1",
+            tenant_id="tenant-1",
+            all_workspaces=[],
+            allowed_workspaces=[],
+            can_auto_create=True,
+        )
+
+        self.assertEqual(specs[0][0]["adapter"], "express")
+        self.assertIn("adapter IN ('mrerp', 'express')", cursor.execute.call_args.args[0])
+
     def test_mrerp_requires_credentials_and_keeps_config_private(self):
         target = erp_targets._legacy_target(
             {
@@ -174,6 +197,27 @@ class SelectionTests(unittest.TestCase):
 
         self.assertIs(selected, ready)
         project.assert_called_once_with({"membership_id": "m1"}, lock_endpoint_id="ep-1")
+
+    def test_require_target_forces_fresh_probe_before_ocr_or_push(self):
+        ready = {
+            "endpoint_id": "ep-1",
+            "workspace_client_id": 4,
+            "selectable": True,
+            "missing": [],
+        }
+        with patch.object(erp_targets, "_project_targets", return_value=[ready]) as project:
+            erp_targets.require_target(
+                {"membership_id": "m1"},
+                "ep-1",
+                workspace_client_id=4,
+                refresh_probe=True,
+            )
+
+        project.assert_called_once_with(
+            {"membership_id": "m1"},
+            lock_endpoint_id="ep-1",
+            refresh_probes=True,
+        )
 
     def test_require_target_returns_stable_not_ready_error(self):
         blocked = {

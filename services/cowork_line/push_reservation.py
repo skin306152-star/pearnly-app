@@ -314,7 +314,7 @@ def _prior_success(cur, endpoint_id: str, actor_id: str, history: dict[str, Any]
 def reserve_legacy_batch(
     identity: dict[str, Any], history_ids: list[str], target: dict[str, Any]
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Confirm Cowork rows and reserve MR.ERP outbox rows before external I/O."""
+    """Confirm Cowork rows and reserve legacy ERP outbox rows before external I/O."""
     tenant_id, actor_id = _identity(identity)
     endpoint_id = _uuid(target.get("endpoint_id"), "erp.endpoint_not_found")
     workspace_id = int(target.get("workspace_client_id") or 0)
@@ -335,7 +335,8 @@ def reserve_legacy_batch(
             (endpoint_id, actor_id),
         )
         endpoint = cur.fetchone()
-        if not endpoint or str(endpoint.get("adapter") or "").lower() != "mrerp":
+        adapter = str((endpoint or {}).get("adapter") or "").lower()
+        if not endpoint or adapter not in {"mrerp", "express"}:
             raise HTTPException(409, detail="erp.endpoint_not_ready")
         cur.execute(
             "SELECT id FROM workspace_clients WHERE id = %s AND tenant_id = %s "
@@ -351,7 +352,7 @@ def reserve_legacy_batch(
             if prior:
                 status = "skipped_dup"
                 request_body = {
-                    "adapter": "mrerp",
+                    "adapter": adapter,
                     "source": "cowork_line",
                     "skipped_reason": "already_success",
                     "prior_log_id": str(prior["id"]),
@@ -362,12 +363,12 @@ def reserve_legacy_batch(
             else:
                 status = "retrying"
                 request_body = {
-                    "adapter": "mrerp",
+                    "adapter": adapter,
                     "source": "cowork_line",
                     "reservation": "confirmed_pending_dispatch",
                 }
                 response_body = None
-                error_msg = "COWORK_MRERP_DISPATCH_RESERVED"
+                error_msg = "COWORK_LEGACY_ERP_DISPATCH_RESERVED"
                 lease_owner = LEGACY_RESERVATION_LEASE
             cur.execute(
                 "INSERT INTO erp_push_logs "
@@ -397,7 +398,7 @@ def reserve_legacy_batch(
             )
             row = cur.fetchone()
             if not row:
-                raise RuntimeError("MR.ERP reservation insert returned no row")
+                raise RuntimeError("legacy ERP reservation insert returned no row")
             cur.execute(
                 "UPDATE ocr_history SET staged = FALSE,last_push_status = %s,"
                 "last_pushed_at = clock_timestamp(),updated_at = clock_timestamp() "
@@ -405,7 +406,7 @@ def reserve_legacy_batch(
                 (status, history_id, tenant_id, actor_id),
             )
             if cur.rowcount != 1:
-                raise RuntimeError("MR.ERP confirmation rowcount mismatch")
+                raise RuntimeError("legacy ERP confirmation rowcount mismatch")
             intents.append(
                 {
                     "history": history,

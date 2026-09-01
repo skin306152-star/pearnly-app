@@ -149,7 +149,7 @@ def claim_processing(tenant_id, line_user_id, message_id, ttl_minutes=15):
         cur.execute(
             """UPDATE erp_line_sessions SET
             state='ocr_processing',
-            payload=jsonb_build_object('mode', payload->>'mode', 'message_id', %s),
+            payload=payload || jsonb_build_object('message_id', %s),
             expires_at=%s
             WHERE tenant_id=%s AND line_user_id=%s AND state='receiving'
               AND expires_at>now() AND payload->>'mode' IN ('purchase','sales')

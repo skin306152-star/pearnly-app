@@ -266,7 +266,7 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
             _reply_text(reply_token, _text(lang, key))
             return
         targets = await asyncio.to_thread(erp_targets.list_targets, identity)
-        if not any(target.get("selectable") for target in targets):
+        if not targets:
             _set(identity, "select_erp", payload)
             _reply_text(reply_token, _text(lang, "configure"))
             return
@@ -292,7 +292,7 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
         targets = [
             item
             for item in await asyncio.to_thread(erp_targets.list_targets, identity)
-            if item.get("adapter") == adapter and item.get("selectable")
+            if item.get("adapter") == adapter
         ]
         if not targets:
             _reply_text(reply_token, _text(lang, "configure"))
@@ -348,13 +348,19 @@ async def _handle_postback(event: dict, identity: dict, reply_token: str | None,
         await _discard_draft(identity, reply_token, params.get("draft", ""), lang)
 
 
-async def _require_target(identity: dict, selection: dict) -> dict | None:
+async def _require_target(
+    identity: dict,
+    selection: dict,
+    *,
+    refresh_probe: bool = False,
+) -> dict | None:
     try:
         return await asyncio.to_thread(
             erp_targets.require_target,
             identity,
             str(selection.get("endpoint") or selection.get("endpoint_id") or ""),
             selection.get("workspace") or selection.get("workspace_client_id"),
+            refresh_probe=refresh_probe,
         )
     except Exception:
         logger.info("Cowork LINE target no longer selectable", exc_info=True)

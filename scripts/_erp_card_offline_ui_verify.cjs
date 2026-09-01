@@ -57,6 +57,8 @@ const ago = (ms) => new Date(Date.now() - ms).toISOString();
 
 // 端点响应由 scenario 决定,轮询期间换 scenario 即可模拟小助手上下线。
 let scenario = 'online';
+let endpointListRequests = 0;
+let mrerpProbeRequests = 0;
 function endpoints() {
     const express = {
         id: 'e1',
@@ -95,13 +97,23 @@ async function boot(ctx, lang) {
         localStorage.setItem('mrpilot_lang', lg);
     }, lang);
     await page.route('**/api/**', (route) => {
-        const u = route.request().url();
-        if (u.includes('/api/erp/endpoints'))
+        const u = new URL(route.request().url());
+        if (u.pathname === '/api/erp/endpoints') {
+            endpointListRequests++;
             return route.fulfill({
                 status: 200,
                 contentType: 'application/json',
                 body: JSON.stringify(endpoints()),
             });
+        }
+        if (u.pathname === '/api/erp/endpoints/e2/test-connection') {
+            mrerpProbeRequests++;
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, connection_state: 'online' }),
+            });
+        }
         return route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -161,6 +173,16 @@ async function runLang(ctx, lang, withPolling) {
     console.log(`\n———— 语言 ${lang} ————`);
     scenario = 'online';
     const { page, errs } = await boot(ctx, lang);
+
+    const detected = await page.evaluate(() =>
+        [...document.querySelectorAll('.dx-erp-card')].map((card) => card.dataset.erp)
+    );
+    chk(
+        `[${lang}] 进入 ERP 工作台即同时检测 MR.ERP 与 Express`,
+        detected.length === 2 && detected.includes('mrerp') && detected.includes('express')
+    );
+    chk(`[${lang}] OCR 前已拉取目的 ERP 清单`, endpointListRequests > 0);
+    chk(`[${lang}] OCR 前已主动探测 MR.ERP 连接`, mrerpProbeRequests > 0);
 
     let s = await readCard(page, 'express');
     console.log('  在线:', JSON.stringify(s));

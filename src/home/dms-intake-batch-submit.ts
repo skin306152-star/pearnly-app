@@ -9,6 +9,7 @@ import {
     fetchErpEndpoints,
     pickDefaultTarget,
     erpTargetCardsHtml,
+    isErpTargetReady,
     pushHistory,
     type ErpEndpoint,
 } from './dms-intake-erp-push.js';
@@ -119,16 +120,17 @@ function pushPanelHtml(): string {
     let body: string;
     if (_pushed) {
         body = pushResultHtml(_pushed);
-    } else if (!_endpoints.filter((e) => e.enabled !== false).length) {
+    } else if (!_endpoints.length) {
         body =
             '<div class="dx-erp-empty">' +
             `<h4>${esc(t('dxi-erp-empty-t'))}</h4><p>${esc(t('dxi-erp-empty-d'))}</p>` +
             `<button class="btn" id="dxb-go-int">${esc(t('dxi-erp-empty-btn'))}</button></div>`;
     } else {
+        const pushDisabled = _pushing || !_target;
         body =
             erpTargetCardsHtml(_endpoints, _target) +
             '<div class="dx-foot" style="margin-top:12px"><div class="dx-note"></div>' +
-            `<button class="btn primary" id="dxb-push-go"${_pushing ? ' disabled' : ''}>` +
+            `<button class="btn primary" id="dxb-push-go"${pushDisabled ? ' disabled' : ''}>` +
             `${esc(t(_pushing ? 'dxb-pushing' : 'dxb-push-go'))}</button></div>`;
     }
     return (
@@ -217,6 +219,13 @@ export async function enterBatchSubmit() {
 async function doPush(): Promise<void> {
     const ids = createdIds();
     if (_pushing || !ids.length || !_target) return;
+    _endpoints = await fetchErpEndpoints(true);
+    if (!isErpTargetReady(_endpoints, _target)) {
+        _target = pickDefaultTarget(_endpoints, _target);
+        render();
+        showToast(t('dxi-need-erp'), 'warn');
+        return;
+    }
     _pushing = true;
     render();
     let ok = 0;

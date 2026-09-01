@@ -379,7 +379,7 @@ class CoworkLineOcrRegressionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CoworkLineFlexRegressionTests(unittest.TestCase):
-    def test_polling_choices_use_quick_replies_and_hide_unavailable_options(self):
+    def test_polling_choices_show_unavailable_status_without_selecting_it(self):
         erp_question = flow_cards.erp_picker_card(
             [
                 {
@@ -405,7 +405,9 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
         self.assertEqual(erp_question["type"], "text")
         self.assertNotIn("contents", erp_question)
         self.assertEqual([item["action"]["label"] for item in erp_items], ["MR.ERP"])
-        self.assertNotIn("Express", json.dumps(erp_question, ensure_ascii=False))
+        serialized = json.dumps(erp_question, ensure_ascii=False)
+        self.assertIn("Express", serialized)
+        self.assertIn("小助手离线", serialized)
 
         account_question = flow_cards.account_picker_card(
             [
@@ -432,8 +434,8 @@ class CoworkLineFlexRegressionTests(unittest.TestCase):
 
         self.assertEqual([item["action"]["label"] for item in account_items], ["账套 A"])
         serialized = json.dumps(account_question, ensure_ascii=False)
-        self.assertNotIn("账套 B", serialized)
-        self.assertNotIn("endpoint_disabled", serialized)
+        self.assertIn("账套 B", serialized)
+        self.assertIn("已停用", serialized)
 
     def test_direction_and_posting_mode_are_quick_reply_questions(self):
         direction = flow_cards.direction_card("zh")

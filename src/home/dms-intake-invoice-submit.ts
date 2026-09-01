@@ -8,7 +8,13 @@
 import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, Endpoint } from './dms-intake-invoice.js';
-import { pushHistory } from './dms-intake-erp-push.js';
+import {
+    erpTargetCardsHtml,
+    fetchErpEndpoints,
+    isErpTargetReady,
+    pickDefaultTarget,
+    pushHistory,
+} from './dms-intake-erp-push.js';
 import { renderReview } from './dms-intake-review.js';
 import { postingPreviewContainer, refreshPostingPreview } from './dms-intake-posting-preview.js';
 import {
@@ -47,22 +53,8 @@ function returnToReviewForConfirmation(): void {
     showToast(t('dxi-erp-confirm-required'), 'error');
 }
 async function loadEndpoints() {
-    try {
-        const r = await fetch('/api/erp/endpoints', { headers: authHeaders() });
-        const d = (await r.json().catch(() => ({}))) as { items?: Endpoint[] };
-        IV.endpoints = (d.items || []).filter(
-            (e) => (e.adapter || '').toLowerCase() !== 'mrerp_dms'
-        );
-    } catch {
-        const cached = ((window as unknown as { _erpEndpoints?: Endpoint[] })._erpEndpoints ||
-            []) as Endpoint[];
-        IV.endpoints = cached.filter((e) => (e.adapter || '').toLowerCase() !== 'mrerp_dms');
-    }
-    const enabled = IV.endpoints.filter((e) => e.enabled !== false);
-    if (!IV.target || !enabled.some((e) => String(e.id) === IV.target)) {
-        const def = enabled.find((e) => e.is_default) || enabled[0];
-        IV.target = def ? String(def.id) : '';
-    }
+    IV.endpoints = (await fetchErpEndpoints()) as Endpoint[];
+    IV.target = pickDefaultTarget(IV.endpoints, IV.target);
 }
 function targetName(): string {
     const e = IV.endpoints.find((x) => String(x.id) === IV.target);
@@ -126,29 +118,14 @@ function tplRowHtml() {
     );
 }
 function erpTargetsHtml() {
-    const enabled = IV.endpoints.filter((e) => e.enabled !== false);
-    if (!enabled.length) {
+    if (!IV.endpoints.length) {
         return (
             '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
             `<h4>${esc(t('dxi-erp-empty-t'))}</h4><p>${esc(t('dxi-erp-empty-d'))}</p>` +
             `<button class="btn" id="dx-inv-go-int">${esc(t('dxi-erp-empty-btn'))}</button></div>`
         );
     }
-    // 停用端点不显示(启用/停用是「同批不误投多个 ERP」的闸)· 只在已启用里选一个手动推送目标。
-    const cards = enabled
-        .map((e) => {
-            const on = String(e.id) === IV.target ? ' active' : '';
-            const lg = (e.adapter || '').slice(0, 2).toUpperCase();
-            const meta = (e.is_default ? t('dxi-erp-default') + ' · ' : '') + t('dxi-erp-enabled');
-            return (
-                `<div class="dx-erp${on}" data-iv-erp="${esc(e.id)}">` +
-                `<div class="dx-erp-lg">${esc(lg)}</div>` +
-                `<div class="dx-erp-c"><b>${esc(e.name || e.adapter)}</b><span>${esc(meta)}</span></div>` +
-                '<div class="dx-erp-chk">✓</div></div>'
-            );
-        })
-        .join('');
-    return `<div class="dx-erps">${cards}</div>`;
+    return erpTargetCardsHtml(IV.endpoints, IV.target, 'data-iv-erp');
 }
 function summaryHtml() {
     const item = (lk: string, v: string) =>
@@ -186,8 +163,14 @@ export async function doFinish() {
     if (IV.busy) return;
     if (!(await ensureErpFormalConfirmation())) return;
     // 空选合法(= 仅完成入库);只在选了推送但无可用端点时拦。
-    const enabled = IV.endpoints.filter((e) => e.enabled !== false);
-    if (IV.output.erp && !enabled.length) return showToast(t('dxi-need-erp'), 'warn');
+    if (IV.output.erp) {
+        IV.endpoints = (await fetchErpEndpoints(true)) as Endpoint[];
+        if (!isErpTargetReady(IV.endpoints, IV.target)) {
+            showToast(t('dxi-need-erp'), 'warn');
+            renderSubmit();
+            return;
+        }
+    }
     IV.busy = true;
     renderSubmit();
     // 终态:① 先把复核面改过的字段(已实时写入 IV.results)全部写进各自记录 →

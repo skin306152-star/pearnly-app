@@ -7,8 +7,8 @@
 // 状态来自 /api/erp/endpoints(data.items) · toggle 走 PATCH {enabled} 并刷新全局端点缓存。
 // ============================================================
 import { esc, authHeaders } from './dms-intake-core.js';
-import { isAgentOffline, startAgentPolling, stopAgentPolling } from './erp-agent-liveness.js';
-import { operationId } from './dms-intake-erp-push.js';
+import { startAgentPolling, stopAgentPolling } from './erp-agent-liveness.js';
+import { endpointStateLabel, fetchErpEndpoints, operationId } from './dms-intake-erp-push.js';
 
 interface ErpCardDef {
     key: string;
@@ -56,6 +56,8 @@ type EpRec = Record<string, unknown> & {
     account_set?: string;
     live_account_set?: string;
     live_profile_key?: string;
+    ready?: boolean;
+    block_reason?: string | null;
 };
 
 function isEnabled(ep: EpRec | null): boolean {
@@ -68,33 +70,8 @@ function isAutoPush(ep: EpRec): boolean {
 }
 
 function connectionState(ep: EpRec): string {
-    if (ep.connection_state) return String(ep.connection_state);
-    if (Number(ep.binding_generation || 0) > 0) {
-        if (ep.revoked_at) return 'revoked';
-        if (!isEnabled(ep)) return 'disabled';
-        const seen = ep.agent_last_seen_at
-            ? new Date(String(ep.agent_last_seen_at)).getTime()
-            : NaN;
-        if (!Number.isFinite(seen) || Date.now() - seen >= 180000) return 'offline';
-        if (!ep.live_account_set || !ep.live_profile_key) return 'needs_attention';
-        if (!ep.bound_account_set || !ep.bound_profile_key) return 'unbound';
-        if (
-            ep.live_account_set !== ep.bound_account_set ||
-            ep.live_profile_key !== ep.bound_profile_key
-        )
-            return 'mismatch';
-        return 'online';
-    }
-    return isAgentOffline(ep) ? 'offline' : 'online';
-}
-
-function stateLabel(ep: EpRec): string {
-    const state = connectionState(ep);
-    if (state === 'online') return T('dx-erp-connected');
-    if (state === 'disabled' || state === 'revoked') return T('dx-erp-disabled');
-    if (state === 'offline') return T('dx-erp-offline');
-    if (state === 'unbound') return T('exp-acct-wait-select');
-    return T('expd-tl-manual');
+    if (!isEnabled(ep)) return 'disabled';
+    return String(ep.connection_state || 'offline');
 }
 
 function cardHtml(def: ErpCardDef): string {
@@ -118,7 +95,7 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
     const acts = card.querySelector<HTMLElement>('[data-erp-acts]');
     const enabled = isEnabled(ep);
     const offline = !!ep && enabled && connectionState(ep) === 'offline';
-    card.classList.toggle('is-connected', !!ep && enabled);
+    card.classList.toggle('is-connected', !!ep && ep.ready === true);
     card.classList.toggle('is-disabled', !!ep && !enabled);
     card.classList.toggle('is-offline', offline);
 
@@ -130,7 +107,7 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
                 ep.account_set || ep.bound_account_set || ep.live_account_set || ''
             );
             st.textContent =
-                stateLabel(ep) +
+                endpointStateLabel(ep) +
                 (account ? ` · ${account}` : '') +
                 (connectionState(ep) === 'online' && typeof ep.auto_push === 'boolean'
                     ? ' · ' + T(isAutoPush(ep) ? 'dx-erp-mode-auto' : 'dx-erp-mode-manual')
@@ -218,11 +195,7 @@ async function loadStatus(
 ): Promise<void> {
     let items: EpRec[] | null = null;
     try {
-        const r = await fetch('/api/erp/endpoints', { headers: authHeaders() });
-        if (r.ok) {
-            const data = await r.json();
-            if (Array.isArray(data.items)) items = data.items;
-        }
+        items = (await fetchErpEndpoints()) as EpRec[];
     } catch {
         /* 网络抖动 → 下面按 keepOnError 决定保持还是落未连接 */
     }

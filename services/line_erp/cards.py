@@ -52,9 +52,10 @@ def _menu_item(num: str, title: str, description: str, action: str, accent: str)
     }
 
 
-def menu_card(modes=("purchase", "sales")) -> dict:
+def menu_card(modes=("purchase", "sales"), target_status: dict | None = None) -> dict:
     """ERP 专用入口:先锁定采购/销售，再接收票据，不让识别模型猜方向。"""
-    allowed = set(modes or ())
+    target_ready = target_status is None or bool(target_status.get("ready"))
+    allowed = set(modes or ()) if target_ready else set()
     items = []
     if "purchase" in allowed:
         items.append(
@@ -76,7 +77,18 @@ def menu_card(modes=("purchase", "sales")) -> dict:
                 "#f25c6e",
             )
         )
-    if not items:
+    if not items and not target_ready:
+        items.append(
+            {
+                "type": "text",
+                "text": "ERP ปลายทางยังไม่พร้อม กรุณาให้เจ้าของตรวจสอบการเชื่อมต่อ",
+                "size": "sm",
+                "color": "#B42318",
+                "wrap": True,
+                "margin": "lg",
+            }
+        )
+    elif not items:
         items.append(
             {
                 "type": "text",
@@ -87,6 +99,18 @@ def menu_card(modes=("purchase", "sales")) -> dict:
                 "margin": "lg",
             }
         )
+    status_contents = []
+    if target_status:
+        status_contents = [
+            {
+                "type": "text",
+                "text": str(target_status.get("text") or ""),
+                "size": "xxs",
+                "color": "#16873E" if target_ready else "#B42318",
+                "wrap": True,
+                "margin": "md",
+            }
+        ]
     return {
         "type": "flex",
         "altText": "เลือกประเภทเอกสาร ERP",
@@ -111,6 +135,7 @@ def menu_card(modes=("purchase", "sales")) -> dict:
                         "wrap": True,
                         "margin": "xs",
                     },
+                    *status_contents,
                     {"type": "separator", "margin": "lg", "color": "#eeeef4"},
                     *items,
                     {

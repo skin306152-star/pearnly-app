@@ -38,12 +38,20 @@ def _error_code(exc: Exception) -> str:
 
 
 def _push_legacy_intent(
-    identity: dict[str, Any], endpoint: dict[str, Any], intent: dict[str, Any]
+    identity: dict[str, Any],
+    endpoint: dict[str, Any],
+    intent: dict[str, Any],
+    *,
+    posting_kind: str | None,
 ) -> dict[str, Any]:
     if not intent.get("dispatch"):
         return {key: value for key, value in intent.items() if key not in {"history", "dispatch"}}
     try:
-        result = erp_push.push_to_endpoint(endpoint, intent["history"], posting_kind=None)
+        result = erp_push.push_to_endpoint(
+            endpoint,
+            intent["history"],
+            posting_kind=posting_kind,
+        )
     except Exception as exc:
         result = {
             "success": False,
@@ -81,7 +89,7 @@ def _failure_log(
         "source": "cowork_line",
         "preflight_failure": code[:200],
     }
-    if adapter == "express" and target.get("workspace_client_id") is not None:
+    if adapter == "express" and target.get("managed"):
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 "INSERT INTO erp_push_logs "
@@ -177,7 +185,15 @@ async def dispatch_confirmed(
                 ]
                 committed = 0
         else:
-            results = [_push_legacy_intent(identity, endpoint, intent) for intent in intents]
+            results = [
+                _push_legacy_intent(
+                    identity,
+                    endpoint,
+                    intent,
+                    posting_kind=selection.get("posting_kind"),
+                )
+                for intent in intents
+            ]
     statuses = {str(row["status"]) for row in results}
     response = {
         "results": results,

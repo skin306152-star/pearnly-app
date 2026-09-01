@@ -6,8 +6,12 @@ import { enterSubmit, renderSubmit, doFinish } from './dms-intake-invoice-submit
 import { renderReview, onReviewClick } from './dms-intake-review.js';
 import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
 import { recognizeOne, ctrls, recState } from './dms-intake-invoice-recognize.js';
-import { fetchErpEndpoints } from './dms-intake-erp-push.js';
 import { focusDxErpCards } from './dms-intake-erp-cards.js';
+import {
+    hasReadyExpressTarget,
+    preflightInvoiceErp,
+    probeInvoiceErp,
+} from './dms-intake-invoice-erp.js';
 import { erpIntakeDirection, isErpEntry } from './erp-intake.js';
 
 export type Dict = Record<string, unknown>;
@@ -38,11 +42,14 @@ export interface IvResult {
     from_cache: boolean;
 }
 export interface Endpoint {
-    id?: unknown;
+    id?: string | number;
     adapter?: string;
     name?: string;
     enabled?: boolean;
     is_default?: boolean;
+    connection_state?: string;
+    ready?: boolean;
+    block_reason?: string | null;
 }
 
 export const IV = {
@@ -136,7 +143,7 @@ export function renderInvoiceUpload() {
     IV.view = 'upload';
     const el = $('dx-s-upload');
     if (!el) return;
-    void probeExpressTarget(); // 懒拉端点一次 → 决定「库存/服务」开关显不显(见 sideHtml)
+    void probeInvoiceErp(IV, renderInvoiceUpload);
     const maxF = w.getMaxFiles?.() || 500;
     const maxMb = w.getMaxMbPerFile?.() || 100;
     const fmt = t('dxi-up-formats').replace('{mb}', String(maxMb)).replace('{n}', String(maxF));
@@ -230,24 +237,9 @@ function directionHtml(): string {
     );
 }
 
-// 侧栏「库存 vs 销售·服务」每批开关(step①)· 仅当有启用的 Express 端点时出现(MR.ERP 无此拆分)。
-// 端点直到步骤④才拉,这里 probeExpressTarget 懒拉一次填 IV.endpoints,拉到再重渲染补上开关。
-let _epsProbed = false;
-async function probeExpressTarget() {
-    if (_epsProbed) return;
-    _epsProbed = true;
-    IV.endpoints = await fetchErpEndpoints();
-    if (IV.view === 'upload') renderInvoiceUpload();
-}
-// 复用 isExpressTarget 的判据(adapter==='express'):有任一启用的 Express 端点即给用户选库存。
-function hasEnabledExpressTarget(): boolean {
-    return IV.endpoints.some(
-        (e) => e.enabled !== false && (e.adapter || '').toLowerCase() === 'express'
-    );
-}
 function postingKindHtml(): string {
     if (isErpEntry()) return ''; // ERP 在复核页逐行选择，支持同票库存+服务混合。
-    if (!hasEnabledExpressTarget()) return ''; // 非 Express 目标:隐藏(MR.ERP 不区分库存/服务)
+    if (!hasReadyExpressTarget(IV)) return ''; // 非 Express 目标:隐藏(MR.ERP 不区分库存/服务)
     const opt = (k: 'service' | 'stock', tk: string, dk: string) =>
         choiceHtml(`data-iv-posting="${k}"`, IV.postingKind === k, tk, dk);
     return (
@@ -295,6 +287,11 @@ async function startRecognize() {
     const lockedDirection = isErpEntry() ? erpIntakeDirection() : '';
     if (isErpEntry() && (!lockedDirection || IV.direction !== lockedDirection)) {
         showToast(t('dxi-dir-hint'), 'error');
+        return;
+    }
+    if (isErpEntry() && !(await preflightInvoiceErp(IV))) {
+        showToast(t('dxi-need-erp'), 'warn');
+        focusDxErpCards();
         return;
     }
     const waiting = IV.files.filter((f) => f.status === 'waiting');

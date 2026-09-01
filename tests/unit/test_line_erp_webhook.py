@@ -118,6 +118,15 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
             mock.patch.object(
+                webhook.target_preflight,
+                "require_ready",
+                return_value={
+                    "ready": True,
+                    "endpoint_id": "ep-1",
+                    "user": {"id": "u1", "tenant_id": "t1", "plan": "free"},
+                },
+            ),
+            mock.patch.object(
                 webhook,
                 "run_recognition_core",
                 return_value={
@@ -188,6 +197,11 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
+            mock.patch.object(
+                webhook.target_preflight,
+                "require_ready",
+                return_value={"ready": True, "endpoint_id": "ep-1"},
+            ),
             mock.patch.object(
                 webhook,
                 "draft_records",
@@ -284,6 +298,11 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             ),
             mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
             mock.patch.object(webhook.team_access, "mode_allowed", return_value=True),
+            mock.patch.object(
+                webhook.target_preflight,
+                "require_ready",
+                return_value={"ready": True, "endpoint_id": "ep-1"},
+            ),
             mock.patch.object(webhook, "draft_records", return_value=records),
             mock.patch.object(
                 webhook.convert_svc,
@@ -305,6 +324,7 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             user={"id": "u1", "tenant_id": "t1", "is_active": True, "entry": "erp"},
             binding=binding,
             history_ids=["h1", "h2"],
+            endpoint_id="ep-1",
         )
         clear_session.assert_called_once_with("t1", "line-u1")
 

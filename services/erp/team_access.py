@@ -324,13 +324,19 @@ def _assigned_endpoint_row(
         """
         SELECT ep.id, ep.name, ep.adapter, ep.config, ep.is_default, ep.auto_push,
                ep.enabled, ep.last_used_at, ep.last_status, ep.success_count,
-               ep.failure_count, ep.created_at, ep.updated_at, ep.user_id
+               ep.failure_count, ep.created_at, ep.updated_at, ep.user_id,
+               ep.tenant_id, ep.workspace_client_id, ep.shared_scope,
+               ep.binding_generation, ep.bound_account_set, ep.bound_profile_key,
+               ep.live_account_set, ep.live_profile_key, ep.agent_last_seen_at,
+               ep.agent_version, ep.revoked_at,
+               etm.workspace_client_id AS assigned_workspace_client_id,
+               clock_timestamp() AS server_now
         FROM erp_team_members etm
         JOIN erp_endpoints ep ON ep.id = etm.erp_endpoint_id
         JOIN users owner_user ON owner_user.id = etm.invited_by
         WHERE etm.tenant_id = %s AND etm.user_id = %s AND etm.is_active = TRUE
           AND owner_user.tenant_id = etm.tenant_id AND owner_user.is_active = TRUE
-          AND ep.enabled = TRUE AND ep.adapter = etm.erp_system
+          AND ep.adapter = etm.erp_system
           AND (
                 (ep.binding_generation = 0 AND ep.user_id = etm.invited_by)
              OR (ep.binding_generation > 0 AND ep.adapter = 'express'
@@ -351,6 +357,14 @@ def assigned_endpoint_items(tenant_id: str, user_id: str) -> list[dict[str, Any]
     if not row:
         return []
     item = strip_endpoint_for_response(row)
+    for key in ("bound_profile_key", "live_profile_key"):
+        item.pop(key, None)
+    if str(row.get("adapter") or "").lower() == "express":
+        from services.erp.shared_express_store import safe_endpoint_dto
+
+        safe = safe_endpoint_dto(row, row.get("server_now"))
+        item.update(safe)
+        item.pop("config", None)
     item["is_default"] = True
     item["read_only"] = True
     return [item]

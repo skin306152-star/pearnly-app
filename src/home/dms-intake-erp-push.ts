@@ -5,6 +5,7 @@
 // 只放两条流程都用得上的通用件;各自的输出面板(发票有 Excel 选择)仍留各自模块。
 // ============================================================
 import { esc, authHeaders } from './dms-intake-core.js';
+import { isAgentOffline } from './erp-agent-liveness.js';
 
 function t(k: string): string {
     const w = window as unknown as { t?: (k: string) => string };
@@ -12,42 +13,125 @@ function t(k: string): string {
 }
 
 export interface ErpEndpoint {
-    id: string | number;
+    id?: string | number;
     name?: string;
     adapter?: string;
     enabled?: boolean;
     is_default?: boolean;
+    config?: Record<string, unknown>;
+    connection_state?: string;
+    ready?: boolean;
+    block_reason?: string | null;
 }
 
-// 拉可选 ERP 端点(排除 DMS 客户档)。失败回空,由调用方走空态。
-export async function fetchErpEndpoints(): Promise<ErpEndpoint[]> {
+function expressState(endpoint: ErpEndpoint): string {
+    if (endpoint.enabled === false) return 'disabled';
+    if (endpoint.connection_state) return endpoint.connection_state;
+    return isAgentOffline(endpoint) ? 'offline' : 'online';
+}
+
+async function probeEndpoint(endpoint: ErpEndpoint, refresh: boolean): Promise<ErpEndpoint> {
+    const adapter = String(endpoint.adapter || '').toLowerCase();
+    if (endpoint.enabled === false) {
+        return {
+            ...endpoint,
+            ready: false,
+            connection_state: 'disabled',
+            block_reason: 'endpoint_disabled',
+        };
+    }
+    if (adapter === 'express') {
+        const state = expressState(endpoint);
+        return {
+            ...endpoint,
+            ready: state === 'online',
+            connection_state: state,
+            block_reason: state === 'online' ? null : state,
+        };
+    }
+    if (adapter !== 'mrerp') {
+        return { ...endpoint, ready: true, connection_state: 'online', block_reason: null };
+    }
+    try {
+        const suffix = refresh ? '?refresh=1' : '';
+        const response = await fetch(
+            `/api/erp/endpoints/${encodeURIComponent(String(endpoint.id))}/test-connection${suffix}`,
+            { method: 'POST', headers: authHeaders() }
+        );
+        const result = (await response.json().catch(() => ({}))) as { ok?: boolean };
+        const ready = response.ok && result.ok === true;
+        return {
+            ...endpoint,
+            ready,
+            connection_state: ready ? 'online' : 'offline',
+            block_reason: ready ? null : 'erp_connection_failed',
+        };
+    } catch {
+        return {
+            ...endpoint,
+            ready: false,
+            connection_state: 'offline',
+            block_reason: 'connection_check_failed',
+        };
+    }
+}
+
+// 拉取并检测全部 ERP 端点。不可用端点保留给界面说明原因，但不能被选择或推送。
+export async function fetchErpEndpoints(refresh = false): Promise<ErpEndpoint[]> {
     try {
         const r = await fetch('/api/erp/endpoints', { headers: authHeaders() });
         const d = (await r.json().catch(() => ({}))) as { items?: ErpEndpoint[] };
-        return (d.items || []).filter((e) => (e.adapter || '').toLowerCase() !== 'mrerp_dms');
+        const endpoints = (d.items || []).filter(
+            (e) => (e.adapter || '').toLowerCase() !== 'mrerp_dms'
+        );
+        return await Promise.all(endpoints.map((endpoint) => probeEndpoint(endpoint, refresh)));
     } catch {
         return [];
     }
 }
 
-// 选默认推送目标:已选且仍启用则保留,否则取 is_default,再否则第一个启用端点。
+// 选默认推送目标:只允许当前检测已就绪的端点。
 export function pickDefaultTarget(endpoints: ErpEndpoint[], current: string): string {
-    const enabled = endpoints.filter((e) => e.enabled !== false);
-    if (current && enabled.some((e) => String(e.id) === current)) return current;
-    const def = enabled.find((e) => e.is_default) || enabled[0];
+    const ready = endpoints.filter((e) => e.ready === true);
+    if (current && ready.some((e) => String(e.id) === current)) return current;
+    const def = ready.find((e) => e.is_default) || ready[0];
     return def ? String(def.id) : '';
 }
 
-// 目标卡 HTML(只列启用端点·data-erp-target 供点击委托)。停用端点是「同批不误投多个 ERP」的闸。
-export function erpTargetCardsHtml(endpoints: ErpEndpoint[], target: string): string {
+export function endpointStateLabel(endpoint: ErpEndpoint): string {
+    const state = String(endpoint.connection_state || 'offline');
+    if (state === 'online') return t('dx-erp-connected');
+    if (state === 'disabled' || state === 'revoked') return t('dx-erp-disabled');
+    if (state === 'offline') return t('dx-erp-offline');
+    if (state === 'unbound') return t('dx-erp-profile-unconfirmed');
+    if (state === 'mismatch') return t('dx-erp-profile-mismatch');
+    return t('dx-erp-config-incomplete');
+}
+
+export function isErpTargetReady(endpoints: ErpEndpoint[], target: string): boolean {
+    return endpoints.some((endpoint) => String(endpoint.id) === target && endpoint.ready === true);
+}
+
+export async function ensureErpTargetReady(target: string, refresh = false): Promise<boolean> {
+    if (!target) return false;
+    return isErpTargetReady(await fetchErpEndpoints(refresh), target);
+}
+
+// 全部端点都展示；只有当前已就绪端点提供点击入口。
+export function erpTargetCardsHtml(
+    endpoints: ErpEndpoint[],
+    target: string,
+    targetAttribute = 'data-erp-target'
+): string {
     const cards = endpoints
-        .filter((e) => e.enabled !== false)
         .map((e) => {
             const on = String(e.id) === target ? ' active' : '';
+            const blocked = e.ready === true ? '' : ' is-disabled';
             const lg = (e.adapter || '').slice(0, 2).toUpperCase();
-            const meta = (e.is_default ? t('dxi-erp-default') + ' · ' : '') + t('dxi-erp-enabled');
+            const meta = (e.is_default ? t('dxi-erp-default') + ' · ' : '') + endpointStateLabel(e);
+            const attr = e.ready === true ? ` ${targetAttribute}="${esc(String(e.id))}"` : '';
             return (
-                `<div class="dx-erp${on}" data-erp-target="${esc(String(e.id))}">` +
+                `<div class="dx-erp${on}${blocked}"${attr}>` +
                 `<div class="dx-erp-lg">${esc(lg)}</div>` +
                 `<div class="dx-erp-c"><b>${esc(e.name || e.adapter || 'ERP')}</b>` +
                 `<span>${esc(meta)}</span></div><div class="dx-erp-chk" aria-hidden="true"></div></div>`
@@ -119,6 +203,7 @@ export async function pushHistory(
     postingKind?: string
 ): Promise<PushOutcome> {
     try {
+        if (!(await ensureErpTargetReady(target))) return 'needs_action';
         const body: Record<string, unknown> = {
             history_id: historyId,
             operation_id: operationId(),

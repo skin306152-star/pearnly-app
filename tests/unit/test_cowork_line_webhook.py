@@ -64,7 +64,7 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("6 位绑定码", reply.call_args.args[1])
         self.assertEqual(reply.call_args.kwargs["channel"], "cowork")
 
-    async def test_menu_hides_all_unavailable_erp_targets(self):
+    async def test_menu_shows_unavailable_erp_status_without_selecting_it(self):
         identity = {
             "tenant_id": "tenant-1",
             "user_id": "user-1",
@@ -75,7 +75,14 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             patch.object(
                 webhook.cowork_flow.erp_targets,
                 "list_targets",
-                return_value=[{"adapter": "express", "selectable": False}],
+                return_value=[
+                    {
+                        "adapter": "express",
+                        "label": "Express",
+                        "selectable": False,
+                        "missing": ["companion_offline"],
+                    }
+                ],
             ),
             patch.object(webhook.cowork_flow, "_set"),
             patch.object(webhook.cowork_flow, "_reply_text") as reply_text,
@@ -93,8 +100,11 @@ class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 "zh",
             )
 
-        reply_text.assert_called_once_with("reply-1", webhook.cowork_flow._text("zh", "configure"))
-        reply_card.assert_not_called()
+        reply_text.assert_not_called()
+        reply_card.assert_called_once()
+        card = reply_card.call_args.args[1]
+        self.assertIn("Express", str(card))
+        self.assertNotIn("cowork_erp_type", str(card.get("quickReply") or {}))
 
     async def test_menu_keyword_replies_through_cowork_channel(self):
         identity = {

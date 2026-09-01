@@ -12,6 +12,7 @@ from services.cowork_line.erp_target_projection import (
     managed_target as _managed_target,
 )
 from services.erp.legacy_generation import lock_endpoint_binding
+from services.erp import target_readiness
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_schema import enable_shared_express_select
 
@@ -118,7 +119,7 @@ def _managed_targets(cur, tenant_id: str, workspaces: list[dict[str, Any]]) -> l
     return targets
 
 
-def _legacy_targets(
+def _legacy_target_specs(
     cur,
     *,
     user_id: str,
@@ -126,13 +127,14 @@ def _legacy_targets(
     all_workspaces: list[dict[str, Any]],
     allowed_workspaces: list[dict[str, Any]],
     can_auto_create: bool,
-) -> list[dict[str, Any]]:
+) -> list[tuple[dict[str, Any], dict[str, Any] | None, int, bool]]:
     cur.execute(
         """
-        SELECT id, name, adapter, config, enabled, last_status
+        SELECT id, name, adapter, config, enabled, last_status,
+               binding_generation, clock_timestamp() AS server_now
         FROM erp_endpoints
         WHERE user_id = %s
-          AND adapter = 'mrerp'
+          AND adapter IN ('mrerp', 'express')
           AND binding_generation = 0
           AND (tenant_id IS NULL OR tenant_id = %s)
         ORDER BY is_default DESC, created_at, id
@@ -151,7 +153,7 @@ def _legacy_targets(
         if endpoint_id:
             allowed_by_endpoint.setdefault(endpoint_id, []).append(workspace)
 
-    targets: list[dict[str, Any]] = []
+    specs: list[tuple[dict[str, Any], dict[str, Any] | None, int, bool]] = []
     for endpoint in endpoints:
         endpoint_id = str(endpoint.get("id") or "")
         all_bindings = all_by_endpoint.get(endpoint_id, [])
@@ -159,23 +161,27 @@ def _legacy_targets(
         if all_bindings and not visible_bindings:
             continue
         if not visible_bindings:
-            targets.append(
-                _legacy_target(
+            specs.append(
+                (
                     endpoint,
                     None,
-                    binding_count=len(all_bindings),
-                    can_auto_create=can_auto_create and not all_bindings,
+                    len(all_bindings),
+                    can_auto_create and not all_bindings,
                 )
             )
             continue
-        targets.extend(
-            _legacy_target(endpoint, workspace, binding_count=len(all_bindings))
-            for workspace in visible_bindings
+        specs.extend(
+            (endpoint, workspace, len(all_bindings), False) for workspace in visible_bindings
         )
-    return targets
+    return specs
 
 
-def _project_targets(identity: dict[str, Any], *, lock_endpoint_id: str | None = None):
+def _project_targets(
+    identity: dict[str, Any],
+    *,
+    lock_endpoint_id: str | None = None,
+    refresh_probes: bool = False,
+):
     tenant_id = str(identity.get("tenant_id") or "").strip()
     user_id = str(identity.get("user_id") or "").strip()
     with db.get_cursor_rls(tenant_id=tenant_id or None, user_id=user_id or None) as cur:
@@ -189,19 +195,34 @@ def _project_targets(identity: dict[str, Any], *, lock_endpoint_id: str | None =
             if authz.allows_workspace(int(workspace["id"]))
         ]
         targets = _managed_targets(cur, user["tenant_id"], allowed_workspaces)
-        targets.extend(
-            _legacy_targets(
-                cur,
-                user_id=user["id"],
-                tenant_id=user["tenant_id"],
-                all_workspaces=all_workspaces,
-                allowed_workspaces=allowed_workspaces,
-                can_auto_create=(
-                    authz.has("settings.workspace.manage") and authz.scope_mode != "assigned"
-                ),
+        legacy_specs = _legacy_target_specs(
+            cur,
+            user_id=user["id"],
+            tenant_id=user["tenant_id"],
+            all_workspaces=all_workspaces,
+            allowed_workspaces=allowed_workspaces,
+            can_auto_create=(
+                authz.has("settings.workspace.manage") and authz.scope_mode != "assigned"
+            ),
+        )
+    probes: dict[str, dict[str, Any]] = {}
+    for endpoint, workspace, binding_count, can_auto_create in legacy_specs:
+        endpoint_id = str(endpoint.get("id") or "")
+        if endpoint_id not in probes:
+            probes[endpoint_id] = target_readiness.probe_endpoint(
+                endpoint,
+                refresh=refresh_probes,
+            )
+        targets.append(
+            _legacy_target(
+                endpoint,
+                workspace,
+                binding_count=binding_count,
+                can_auto_create=can_auto_create,
+                probe=probes[endpoint_id],
             )
         )
-        return targets
+    return targets
 
 
 def list_targets(identity: dict[str, Any]) -> list[dict[str, Any]]:
@@ -210,13 +231,20 @@ def list_targets(identity: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def require_target(
-    identity: dict[str, Any], endpoint_id: str, workspace_client_id: int | None = None
+    identity: dict[str, Any],
+    endpoint_id: str,
+    workspace_client_id: int | None = None,
+    *,
+    refresh_probe: bool = False,
 ) -> dict[str, Any]:
     """Re-read and lock a target before a later push flow accepts the selection."""
     endpoint_id = str(endpoint_id or "").strip()
     if not endpoint_id:
         raise CoworkLineErpTargetError("target_not_found")
-    targets = _project_targets(identity, lock_endpoint_id=endpoint_id)
+    project_kwargs: dict[str, Any] = {"lock_endpoint_id": endpoint_id}
+    if refresh_probe:
+        project_kwargs["refresh_probes"] = True
+    targets = _project_targets(identity, **project_kwargs)
     matches = [target for target in targets if target["endpoint_id"] == endpoint_id]
     if workspace_client_id is not None:
         matches = [

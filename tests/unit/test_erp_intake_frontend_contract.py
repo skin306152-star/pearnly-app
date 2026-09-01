@@ -74,6 +74,22 @@ def test_shared_express_card_uses_safe_projection_and_managed_lifecycle():
     assert "operation_id: operationId()" in card
 
 
+def test_erp_target_detection_runs_before_ocr_and_before_push():
+    push = read("src/home/dms-intake-erp-push.ts")
+    invoice = read("src/home/dms-intake-invoice.ts")
+    invoice_erp = read("src/home/dms-intake-invoice-erp.ts")
+    submit = read("src/home/dms-intake-invoice-submit.ts")
+    batch = read("src/home/dms-intake-batch-submit.ts")
+    assert "/test-connection" in push
+    assert "ready: state === 'online'" in push
+    assert "await ensureErpTargetReady(target)" in push
+    assert "await preflightInvoiceErp(IV)" in invoice
+    assert "state.endpoints = await fetchErpEndpoints(true)" in invoice_erp
+    assert "await fetchErpEndpoints(true)" in submit
+    assert "await fetchErpEndpoints(true)" in batch
+    assert ".filter((e) => e.enabled !== false)" not in submit
+
+
 def test_express_pairing_reenables_a_disabled_legacy_endpoint_before_token_issue():
     wizard = read("src/home/erp-express-wizard.ts")
     helper = wizard.index("async function _enableLegacyEndpointForPairing")

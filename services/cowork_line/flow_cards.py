@@ -140,6 +140,57 @@ _COPY = {
 _HEADER_KEYS = HEADER_KEYS
 _HEADER_LABELS = HEADER_LABELS
 
+_REASON_COPY = {
+    "th": {
+        "endpoint_disabled": "ปิดใช้งาน",
+        "endpoint_revoked": "ต้องเชื่อมต่อใหม่",
+        "credentials_missing": "ยังไม่ได้ตั้งค่าบัญชี",
+        "erp_connection_failed": "เชื่อมต่อไม่ได้",
+        "companion_offline": "ผู้ช่วยออฟไลน์",
+        "companion_not_ready": "ผู้ช่วยยังไม่พร้อม",
+        "profile_unconfirmed": "ยังไม่ยืนยันชุดบัญชี",
+        "profile_mismatch": "ชุดบัญชีไม่ตรงกัน",
+        "workspace_unbound": "ยังไม่ได้ผูกบริษัท",
+        "workspace_binding_conflict": "การผูกบริษัทขัดแย้ง",
+    },
+    "zh": {
+        "endpoint_disabled": "已停用",
+        "endpoint_revoked": "需要重新连接",
+        "credentials_missing": "账号密码未配置",
+        "erp_connection_failed": "连接失败",
+        "companion_offline": "小助手离线",
+        "companion_not_ready": "小助手未就绪",
+        "profile_unconfirmed": "账套未确认",
+        "profile_mismatch": "账套不一致",
+        "workspace_unbound": "公司尚未绑定",
+        "workspace_binding_conflict": "公司绑定冲突",
+    },
+    "en": {
+        "endpoint_disabled": "disabled",
+        "endpoint_revoked": "reconnect required",
+        "credentials_missing": "credentials missing",
+        "erp_connection_failed": "connection failed",
+        "companion_offline": "companion offline",
+        "companion_not_ready": "companion not ready",
+        "profile_unconfirmed": "account set unconfirmed",
+        "profile_mismatch": "account set mismatch",
+        "workspace_unbound": "company not linked",
+        "workspace_binding_conflict": "company link conflict",
+    },
+    "ja": {
+        "endpoint_disabled": "無効",
+        "endpoint_revoked": "再接続が必要",
+        "credentials_missing": "認証情報未設定",
+        "erp_connection_failed": "接続失敗",
+        "companion_offline": "アシスタントはオフライン",
+        "companion_not_ready": "アシスタント未準備",
+        "profile_unconfirmed": "帳簿未確認",
+        "profile_mismatch": "帳簿が一致しません",
+        "workspace_unbound": "会社未連携",
+        "workspace_binding_conflict": "会社連携の競合",
+    },
+}
+
 
 def _lang(lang: str) -> str:
     return lang if lang in _COPY else "th"
@@ -147,6 +198,25 @@ def _lang(lang: str) -> str:
 
 def _t(lang: str, key: str) -> str:
     return _COPY[_lang(lang)][key]
+
+
+def _reason(lang: str, target: dict) -> str:
+    if target.get("selectable"):
+        return _t(lang, "ready")
+    code = str(target.get("block_reason") or (target.get("missing") or ["not_ready"])[0])
+    return _REASON_COPY[_lang(lang)].get(code, _t(lang, "not_ready"))
+
+
+def _status_lines(targets: list[dict], lang: str, *, limit: int = 8) -> str:
+    lines = [
+        f"{'✓' if target.get('selectable') else '•'} "
+        f"{str(target.get('label') or target.get('adapter') or 'ERP')[:80]}: "
+        f"{_reason(lang, target)}"
+        for target in targets[:limit]
+    ]
+    if len(targets) > limit:
+        lines.append(f"+{len(targets) - limit}")
+    return "\n".join(lines)
 
 
 def _postback(label: str, action: str, **params) -> dict:
@@ -217,14 +287,18 @@ def erp_picker_card(targets: list[dict], lang: str) -> dict:
             items.append(_quick_reply_item(label, "cowork_erp_type", erp=adapter))
     return _question(
         _t(lang, "pick_erp"),
-        _t(lang, "pick_erp_subtitle"),
+        "\n".join(
+            value
+            for value in (_t(lang, "pick_erp_subtitle"), _status_lines(targets, lang))
+            if value
+        ),
         items,
     )
 
 
 def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: int = 0) -> dict:
-    targets = [target for target in targets if target.get("selectable")]
-    page_count = max(1, math.ceil(len(targets) / QR_PAGE_SIZE))
+    ready_targets = [target for target in targets if target.get("selectable")]
+    page_count = max(1, math.ceil(len(ready_targets) / QR_PAGE_SIZE))
     page = max(0, min(int(page), page_count - 1))
     start = page * QR_PAGE_SIZE
     items = [
@@ -234,7 +308,7 @@ def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: i
             endpoint=item.get("endpoint_id") or item.get("id"),
             workspace=item.get("workspace_client_id"),
         )
-        for item in targets[start : start + QR_PAGE_SIZE]
+        for item in ready_targets[start : start + QR_PAGE_SIZE]
     ]
     if page > 0:
         items.insert(
@@ -247,7 +321,11 @@ def account_picker_card(targets: list[dict], adapter: str, lang: str, *, page: i
         )
     return _question(
         _t(lang, "pick_account"),
-        _t(lang, "pick_account_subtitle"),
+        "\n".join(
+            value
+            for value in (_t(lang, "pick_account_subtitle"), _status_lines(targets, lang))
+            if value
+        ),
         items,
     )
 

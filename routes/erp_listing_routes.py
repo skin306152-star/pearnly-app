@@ -23,6 +23,7 @@ from services.erp import erp_push as _erp
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
 from services.auth.entrance import DMS, require_erp_portal
+from services.erp import target_readiness
 from services.erp._master_data_cache import TTLCache as _EndpointTestCache
 
 logger = logging.getLogger("mr-pilot")
@@ -127,7 +128,7 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
 # health checks. Drives MRERPAdapter.login + select_company at most
 # once per 60s per (user_id, endpoint_id); the wizard / cards UI hits
 # this aggressively, so the cache keeps MR.ERP traffic sane.
-_endpoint_test_cache = _EndpointTestCache(max_size=512, ttl_seconds=60.0)
+_endpoint_test_cache = target_readiness._probe_cache
 
 # 问题 2 (Zihao 2026-05-19 拍板 · v118.34.24) · 客户/商品 listing 缓存 TTL
 # 60s → 600s (10 分钟). 同一 tenant 10 分钟内 listing 基本不变 · 频繁拉
@@ -160,44 +161,24 @@ async def erp_endpoint_test_connection(
     user = get_current_user_from_request(request)
     require_erp_portal(user, also_allowed=(DMS,))
     _check_push_access(user)
-    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    from services.erp import team_access
+
+    ep = team_access.assigned_endpoint_for_request(user, endpoint_id)
+    if ep is None:
+        ep = db.get_erp_endpoint(user["id"], endpoint_id)
     if not ep:
         raise HTTPException(404, detail="erp.endpoint_not_found")
-
-    cache_key = (str(user["id"]), str(endpoint_id))
-    if not refresh:
-        cached = _endpoint_test_cache.get(cache_key)
-        if cached is not None:
-            return {**cached, "cached": True}
-
-    adapter = (ep.get("adapter") or "").strip().lower()
-    config = ep.get("config") or {}
-    # v118.34.2 (2026-05-19) · try/except wrapper mirrors the legacy
-    # route so even a bug in test_mrerp_endpoint can't surface as a 500.
-    # v118.34.10 · asyncio.to_thread keeps Playwright's sync API off
-    # the FastAPI event loop (refuses to start otherwise).
     import asyncio as _asyncio
 
     try:
-        if adapter == "mrerp":
-            result = await _asyncio.to_thread(_erp.test_mrerp_endpoint, config)
-        elif adapter == "mrerp_dms":
-            result = await _asyncio.to_thread(_erp.test_mrerp_dms_endpoint, config)
-        else:
-            # webhook / flowaccount / etc — defer to the existing ping test.
-            legacy = await _asyncio.to_thread(_erp.test_endpoint_connection, adapter, config)
-            result = {
-                "ok": bool(legacy.get("success")),
-                "elapsed_ms": legacy.get("elapsed_ms", 0),
-                "http_status": legacy.get("http_status"),
-                "raw_error": legacy.get("error_msg"),
-                "companies": [],
-                "error_code": None if legacy.get("success") else "ERR_TECHNICAL",
-                "error_friendly": None,
-            }
+        return await _asyncio.to_thread(
+            target_readiness.probe_endpoint,
+            ep,
+            refresh=refresh,
+        )
     except Exception as e:
         logger.exception("erp_endpoint_test_connection helper raised")
-        result = {
+        return {
             "ok": False,
             "elapsed_ms": 0,
             "companies": [],
@@ -210,13 +191,6 @@ async def erp_endpoint_test_connection(
             },
             "raw_error": f"{type(e).__name__}: {str(e)[:300]}",
         }
-
-    from datetime import datetime as _dt
-
-    result["last_tested_at"] = _dt.utcnow().isoformat() + "Z"
-    result["cached"] = False
-    _endpoint_test_cache.set(cache_key, result)
-    return result
 
 
 async def _fetch_listing_with_retry(

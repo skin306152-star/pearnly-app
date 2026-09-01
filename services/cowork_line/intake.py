@@ -159,15 +159,21 @@ def _normalize_selection(target: dict, selection: dict) -> dict:
     }
 
 
-def _validated_selection(identity: dict, selection: dict) -> tuple[dict, dict]:
+def _validated_selection(
+    identity: dict,
+    selection: dict,
+    *,
+    refresh_probe: bool = False,
+) -> tuple[dict, dict]:
     endpoint_id = str(selection.get("endpoint_id") or "").strip()
     workspace_client_id = selection.get("workspace_client_id")
     if not endpoint_id:
         raise CoworkLineIntakeError("target_required", 422)
     try:
-        target = _targets_service().require_target(
-            identity, endpoint_id, workspace_client_id=workspace_client_id
-        )
+        target_kwargs = {"workspace_client_id": workspace_client_id}
+        if refresh_probe:
+            target_kwargs["refresh_probe"] = True
+        target = _targets_service().require_target(identity, endpoint_id, **target_kwargs)
     except Exception as exc:
         if exc.__class__.__name__ != "CoworkLineErpTargetError":
             raise
@@ -332,7 +338,11 @@ async def confirm_and_push(identity: dict, draft: str | dict) -> dict:
     history_ids = _ids(payload)
     if supplied is not None and supplied_ids != history_ids:
         raise CoworkLineIntakeError("records_incomplete")
-    target, normalized = _validated_selection(identity, _selection(payload))
+    target, normalized = _validated_selection(
+        identity,
+        _selection(payload),
+        refresh_probe=True,
+    )
     from services.line_platform.draft_validation import batch_issues
 
     records = _records(identity, draft_id, history_ids)

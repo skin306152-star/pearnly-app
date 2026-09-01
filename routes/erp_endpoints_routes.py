@@ -21,7 +21,7 @@ from services.erp.endpoint_config import (
 from services.erp.endpoint_config import strip_endpoint_for_response as _strip_endpoint_for_response
 from services.erp.express_push.agent_reporting import fit_stock_acc_groups
 from services.erp import shared_express_access
-from services.erp import team_access
+from services.erp import target_readiness, team_access
 
 logger = logging.getLogger("mr-pilot")
 
@@ -184,6 +184,7 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
                 detail=f"erp.create_failed · {str(last)[:200]}",
             )
         ep = db.get_erp_endpoint(user["id"], new_id)
+        target_readiness.clear_probe_cache()
         return _strip_endpoint_for_response(ep) if ep else {"id": new_id}
     except HTTPException:
         raise
@@ -323,6 +324,7 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
     ok = db.update_erp_endpoint(user["id"], endpoint_id, **fields)
     if not ok:
         raise HTTPException(404, detail="erp.endpoint_not_found")
+    target_readiness.clear_probe_cache()
     ep = db.get_erp_endpoint(user["id"], endpoint_id)
     return _strip_endpoint_for_response(ep) if ep else {"ok": True}
 
@@ -335,6 +337,7 @@ async def erp_endpoints_delete(endpoint_id: str, request: Request):
     ok = db.delete_erp_endpoint(user["id"], endpoint_id)
     if not ok:
         raise HTTPException(404, detail="erp.endpoint_not_found")
+    target_readiness.clear_probe_cache()
     return {"ok": True}
 
 

@@ -60,7 +60,7 @@ async def recognize_document(message: dict, identity: dict, lang: str) -> None:
     payload = dict(session.get("payload") or {})
     if session.get("state") != "ocr_processing":
         return
-    target = await webhook._require_target(identity, payload)
+    target = await webhook._require_target(identity, payload, refresh_probe=True)
     if not target:
         webhook.session_store.clear_session(
             tenant_id=identity["tenant_id"], line_user_id=identity["line_user_id"]

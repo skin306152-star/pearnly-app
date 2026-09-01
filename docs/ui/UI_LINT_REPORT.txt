@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 593 个源文件全扫
+# UI 设计合规扫描报告 · 594 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 2(2 文件)
@@ -114,7 +114,7 @@
      1  src/home/app-shell-sidebar-html.ts
         └ 378: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src/home/dms-intake-invoice-submit.ts
-        └ 132: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+        └ 123: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src/home/erp-log-card.ts
         └ 160: statusIcon = '⏭';
      1  src/home/erp-log-detail.ts

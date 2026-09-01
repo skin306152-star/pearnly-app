@@ -7,11 +7,21 @@ import secrets
 from types import SimpleNamespace
 from urllib.parse import parse_qs
 
-from core import db
+from core import db  # noqa: F401 - compatibility seam for route tests
 from core.feature_flags import erp_line_enabled_for
 from services.erp import team_access
-from services.intake_bridge import convert as convert_svc
-from services.line_erp import cards, draft_view, flow, intake, preview, push as line_push, store
+from services.intake_bridge import convert as convert_svc  # noqa: F401 - test seam
+from services.line_erp import (
+    cards,
+    draft_actions,
+    draft_view,
+    flow,
+    intake,
+    preview,
+    push as line_push,  # noqa: F401 - compatibility seam for route tests
+    store,
+    target_preflight,
+)
 from services.line_erp.out import make_spawn
 from services.line_platform import client as line_client
 from services.ocr.recognize.core import run_recognition_core
@@ -21,13 +31,29 @@ _spawn = make_spawn("line_erp.webhook")
 _MENU_WORDS = frozenset({"menu", "เมนู"})
 
 
-class BatchIncomplete(Exception):
-    def __init__(self, result):
-        self.result = result
-
-
 _allowed_modes = team_access.binding_line_modes
 draft_records = draft_view.records
+BatchIncomplete = draft_actions.BatchIncomplete
+
+
+async def _target_status(binding: dict, *, refresh: bool = False) -> dict:
+    result = await asyncio.to_thread(
+        target_preflight.inspect_targets,
+        binding,
+        refresh=refresh,
+    )
+    return {**result, "text": target_preflight.status_text(result)}
+
+
+async def _menu_card(binding: dict, modes: tuple[str, ...]) -> dict:
+    try:
+        status = await _target_status(binding)
+    except Exception:
+        status = {
+            "ready": False,
+            "text": "สถานะการเชื่อมต่อ ERP\n• ไม่สามารถตรวจสอบการเชื่อมต่อได้",
+        }
+    return cards.menu_card(modes, status)
 
 
 async def handle_event(ev: dict) -> None:
@@ -43,7 +69,11 @@ async def handle_event(ev: dict) -> None:
     if ev.get("type") == "follow":
         if reply_token:
             if binding:
-                line_client.reply_messages(reply_token, [cards.menu_card(modes)], channel=CHANNEL)
+                line_client.reply_messages(
+                    reply_token,
+                    [await _menu_card(binding, modes)],
+                    channel=CHANNEL,
+                )
             else:
                 line_client.reply_text(
                     reply_token,
@@ -89,10 +119,11 @@ async def _bind_if_possible(ev: dict, line_user_id: str, reply_token: str | None
                         reply_token,
                         [
                             {"type": "text", "text": "เชื่อมต่อ ERP สำเร็จ"},
-                            cards.menu_card(
+                            await _menu_card(
+                                {**identity, "line_user_id": line_user_id},
                                 team_access.line_modes(
                                     str(identity["tenant_id"]), str(identity["user_id"])
-                                )
+                                ),
                             ),
                         ],
                         channel=CHANNEL,
@@ -127,7 +158,25 @@ async def _handle_postback(
                     "กรุณายืนยัน แก้ไข หรือทิ้งเอกสารปัจจุบันก่อนเริ่มรายการใหม่",
                 )
                 return
-            store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
+            try:
+                readiness = await asyncio.to_thread(
+                    target_preflight.require_ready,
+                    binding,
+                    refresh=True,
+                )
+            except target_preflight.TargetNotReady as exc:
+                _notify(
+                    line_user_id,
+                    reply_token,
+                    target_preflight.status_text(exc.result),
+                )
+                return
+            store.set_session(
+                binding["tenant_id"],
+                line_user_id,
+                "receiving",
+                {"mode": mode, "endpoint_id": readiness["endpoint_id"]},
+            )
             if reply_token:
                 line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
     elif action == "discard":
@@ -158,7 +207,9 @@ async def _handle_text(
         store.set_session(binding["tenant_id"], line_user_id, "menu", {})
         if reply_token:
             line_client.reply_messages(
-                reply_token, [cards.menu_card(_allowed_modes(binding))], channel=CHANNEL
+                reply_token,
+                [await _menu_card(binding, _allowed_modes(binding))],
+                channel=CHANNEL,
             )
         return
     if text not in ("1", "2"):
@@ -170,7 +221,21 @@ async def _handle_text(
                 reply_token, "บัญชีนี้ไม่มีสิทธิ์สำหรับรายการนี้", channel=CHANNEL
             )
         return
-    store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
+    try:
+        readiness = await asyncio.to_thread(
+            target_preflight.require_ready,
+            binding,
+            refresh=True,
+        )
+    except target_preflight.TargetNotReady as exc:
+        _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
+        return
+    store.set_session(
+        binding["tenant_id"],
+        line_user_id,
+        "receiving",
+        {"mode": mode, "endpoint_id": readiness["endpoint_id"]},
+    )
     if reply_token:
         line_client.reply_text(reply_token, "กรุณาส่งรูปภาพหรือ PDF", channel=CHANNEL)
 
@@ -182,8 +247,18 @@ def _notify(line_user_id: str, reply_token: str | None, text: str) -> None:
         line_client.push_text(line_user_id, text, channel=CHANNEL)
 
 
-def _restore_receiving(binding: dict, line_user_id: str, mode: str) -> None:
-    store.set_session(binding["tenant_id"], line_user_id, "receiving", {"mode": mode})
+def _restore_receiving(
+    binding: dict,
+    line_user_id: str,
+    mode: str,
+    endpoint_id: str | None = None,
+) -> None:
+    store.set_session(
+        binding["tenant_id"],
+        line_user_id,
+        "receiving",
+        {"mode": mode, "endpoint_id": endpoint_id},
+    )
 
 
 async def _queue_document(
@@ -211,13 +286,15 @@ async def _queue_document(
 
 async def _process_document(message: dict, binding: dict, line_user_id: str) -> None:
     session = await asyncio.to_thread(store.get_session, binding["tenant_id"], line_user_id) or {}
-    mode = (session.get("payload") or {}).get("mode") or ""
+    processing_payload = session.get("payload") or {}
+    mode = processing_payload.get("mode") or ""
+    endpoint_id = processing_payload.get("endpoint_id")
     try:
         await asyncio.to_thread(line_client.start_loading, line_user_id, 30, channel=CHANNEL)
         await _handle_document(message, binding, line_user_id, None, queued=True)
     except Exception:
         if mode in flow.MODES:
-            _restore_receiving(binding, line_user_id, mode)
+            _restore_receiving(binding, line_user_id, mode, endpoint_id)
         _notify(line_user_id, None, "ดำเนินการไม่สำเร็จ กรุณาส่งเอกสารใหม่")
         raise
 
@@ -238,26 +315,36 @@ async def _handle_document(
             )
         return
     mode = (session.get("payload") or {}).get("mode") or ""
+    endpoint_id = (session.get("payload") or {}).get("endpoint_id")
     if mode not in flow.MODES or mode not in _allowed_modes(binding):
         if reply_token:
             line_client.reply_text(
                 reply_token, "กรุณาเลือก 1 ซื้อ หรือ 2 ขาย ก่อนส่งเอกสาร", channel=CHANNEL
             )
         return
+    try:
+        readiness = await asyncio.to_thread(
+            target_preflight.require_ready,
+            binding,
+            refresh=True,
+            expected_endpoint_id=endpoint_id,
+        )
+    except target_preflight.TargetNotReady as exc:
+        if exc.result.get("block_reason") == "erp_user_inactive":
+            store.clear_session(binding["tenant_id"], line_user_id)
+        else:
+            _restore_receiving(binding, line_user_id, mode, endpoint_id)
+        _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
+        return
     message_id = message.get("id")
     content = await asyncio.to_thread(
         line_client.download_message_content, message_id, channel=CHANNEL
     )
     if not content:
-        _restore_receiving(binding, line_user_id, mode)
+        _restore_receiving(binding, line_user_id, mode, endpoint_id)
         _notify(line_user_id, reply_token, "อ่านไฟล์ไม่สำเร็จ กรุณาส่งใหม่")
         return
-    user = db.find_user_by_id(binding["user_id"])
-    if not user:
-        store.clear_session(binding["tenant_id"], line_user_id)
-        _notify(line_user_id, reply_token, "ไม่พบผู้ใช้ ERP กรุณาติดต่อผู้ดูแล")
-        return
-    user = dict(user)
+    user = readiness["user"]
     if (
         not user.get("is_active", True)
         or str(user.get("tenant_id")) != str(binding.get("tenant_id"))
@@ -271,7 +358,11 @@ async def _handle_document(
             binding["tenant_id"],
             line_user_id,
             "ocr_processing",
-            {"mode": mode, "message_id": str(message_id or "")},
+            {
+                "mode": mode,
+                "endpoint_id": endpoint_id,
+                "message_id": str(message_id or ""),
+            },
             ttl_minutes=15,
         )
         await asyncio.to_thread(line_client.start_loading, line_user_id, 30, channel=CHANNEL)
@@ -289,12 +380,12 @@ async def _handle_document(
             source="line_erp",
         )
     except Exception:
-        _restore_receiving(binding, line_user_id, mode)
+        _restore_receiving(binding, line_user_id, mode, endpoint_id)
         _notify(line_user_id, reply_token, "อ่านเอกสารไม่สำเร็จหรือเครดิตไม่พอ กรุณาลองใหม่")
         return
     history_ids = [str(value) for value in result.get("history_ids") or [] if value]
     if not history_ids:
-        _restore_receiving(binding, line_user_id, mode)
+        _restore_receiving(binding, line_user_id, mode, endpoint_id)
         _notify(line_user_id, reply_token, "ไม่พบเอกสารที่อ่านได้ กรุณาส่งไฟล์ใหม่")
         return
     await asyncio.to_thread(
@@ -310,7 +401,12 @@ async def _handle_document(
         binding["tenant_id"],
         line_user_id,
         "draft",
-        {"mode": mode, "history_ids": history_ids, "nonce": nonce},
+        {
+            "mode": mode,
+            "endpoint_id": readiness["endpoint_id"],
+            "history_ids": history_ids,
+            "nonce": nonce,
+        },
     )
     preview_data = preview.from_result(result, mode)
     preview_data["document_count"] = len(history_ids)
@@ -328,86 +424,20 @@ async def act_draft(
     history_id: str,
     action: str,
 ) -> dict:
-    if not history_id:
-        return {"ok": False, "status": 409, "detail": "line_erp.draft_empty"}
-    session = store.get_session(binding["tenant_id"], line_user_id) or {}
-    payload = session.get("payload") or {}
-    history_ids = [str(value) for value in payload.get("history_ids") or []]
-    if not history_ids and payload.get("history_id"):
-        history_ids = [str(payload["history_id"])]
-    if not history_ids:
-        return {"ok": False, "status": 409, "detail": "line_erp.draft_empty"}
-    if session.get("state") not in ("draft", "editing") or history_id not in history_ids:
-        if reply_token:
-            line_client.reply_text(
-                reply_token, "รายการหมดอายุ กรุณาเปิดรายการใหม่", channel=CHANNEL
-            )
-        return {"ok": False, "status": 409, "detail": "line_erp.draft_expired"}
-    mode = str(payload.get("mode") or "")
-    if not team_access.mode_allowed(str(binding["tenant_id"]), str(binding["user_id"]), mode):
-        return {"ok": False, "status": 403, "detail": "line_erp.draft_forbidden"}
-    user = db.find_user_by_id(binding["user_id"])
-    if (
-        not user
-        or not user.get("is_active", True)
-        or str(user.get("tenant_id")) != str(binding["tenant_id"])
-        or not erp_line_enabled_for(binding.get("tenant_id"), binding.get("user_id"))
-    ):
-        return {"ok": False, "status": 403, "detail": "line_erp.draft_forbidden"}
-    user = dict(user)
-    user["entry"] = "erp"
-    if action == "discard":
-        result = await _discard(binding, history_ids)
-        if not result["ok"]:
-            if reply_token:
-                line_client.reply_text(
-                    reply_token, "ทิ้งเอกสารไม่สำเร็จ กรุณาลองใหม่", channel=CHANNEL
-                )
-            return result
-        text = "ทิ้งเอกสารเรียบร้อยแล้ว"
-    else:
-        result = await _confirm(binding, user, history_id, history_ids, reply_token, mode)
-        if not result["ok"]:
-            return result
-        text = (
-            "บันทึกเอกสารและส่งคำสั่งไป ERP แล้ว"
-            if result.get("push_ok")
-            else "บันทึกเอกสารแล้ว แต่ส่ง ERP ไม่สำเร็จ กรุณาตรวจสอบประวัติการส่ง"
-        )
-    store.clear_session(binding["tenant_id"], line_user_id)
-    if reply_token:
-        line_client.reply_text(reply_token, text, channel=CHANNEL)
-    response = {"ok": True, "action": action, "history_ids": history_ids}
-    if action != "discard":
-        response.update(
-            {
-                "push_ok": bool(result.get("push_ok")),
-                "push_results": list(result.get("push_results") or []),
-            }
-        )
-    return response
+    return await draft_actions.act_draft(
+        binding,
+        line_user_id,
+        reply_token,
+        history_id,
+        action,
+        confirm_action=_confirm,
+        discard_action=_discard,
+        feature_enabled=erp_line_enabled_for,
+    )
 
 
 async def _discard(binding: dict, history_ids: list[str]) -> dict:
-    from core.db import get_cursor_rls
-    from services.ocr import pdf_storage
-    from services.ocr_history.staged import discard_staged_ocr_history_with_pdf_paths
-
-    deleted, pdf_paths = await asyncio.to_thread(
-        discard_staged_ocr_history_with_pdf_paths,
-        str(binding["user_id"]),
-        history_ids,
-        tenant_id=binding["tenant_id"],
-    )
-    if deleted != len(history_ids):
-        return {"ok": False, "status": 409, "detail": "line_erp.discard_incomplete"}
-    for path in set(pdf_paths or []):
-        with get_cursor_rls(bypass=True) as cur:
-            cur.execute("SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (path,))
-            still_used = cur.fetchone() is not None
-        if not still_used:
-            pdf_storage.delete_pdf(path)
-    return {"ok": True}
+    return await draft_actions.discard(binding, history_ids)
 
 
 async def _confirm(
@@ -417,64 +447,15 @@ async def _confirm(
     history_ids: list[str],
     reply_token: str | None,
     mode: str,
+    endpoint_id: str = "",
 ) -> dict:
-    records = draft_records(
-        str(binding["user_id"]), str(binding["tenant_id"]), draft_id, history_ids
-    )
-    from services.line_platform.draft_validation import batch_issues
-
-    invalid = batch_issues(records, mode, require_posting_kind=True)
-    if invalid:
-        text = "กรุณาแก้ไขและเลือกประเภทสินค้า stock หรือบริการ service ให้ครบก่อนยืนยัน"
-        if reply_token:
-            line_client.reply_text(reply_token, text, channel=CHANNEL)
-        return {"ok": False, "status": 409, "detail": "line_erp.posting_kind_required"}
-    try:
-        with db.get_cursor_rls(
-            binding["tenant_id"], user_id=str(binding["user_id"]), commit=True
-        ) as cur:
-            result = convert_svc.convert_histories(
-                cur,
-                tenant_id=binding["tenant_id"],
-                user_id=str(binding["user_id"]),
-                history_ids=history_ids,
-            )
-            converted_ids = {str(row.get("history_id")) for row in result.get("converted") or []}
-            already_ids = {
-                str(row.get("history_id"))
-                for row in result.get("skipped") or []
-                if row.get("reason") == "already_converted"
-            }
-            if set(history_ids) - (converted_ids | already_ids):
-                raise BatchIncomplete(result)
-            cur.execute(
-                "UPDATE ocr_history SET staged = FALSE, updated_at = NOW() "
-                "WHERE id = ANY(%s::uuid[]) AND tenant_id = %s::uuid "
-                "AND user_id = %s::uuid AND staged = TRUE",
-                (history_ids, str(binding["tenant_id"]), str(binding["user_id"])),
-            )
-            cur.execute(
-                "SELECT count(*) AS n FROM ocr_history WHERE id = ANY(%s::uuid[]) "
-                "AND tenant_id = %s::uuid AND user_id = %s::uuid AND staged = FALSE",
-                (history_ids, str(binding["tenant_id"]), str(binding["user_id"])),
-            )
-            if int((cur.fetchone() or {}).get("n") or 0) != len(set(history_ids)):
-                raise BatchIncomplete(result)
-    except BatchIncomplete as exc:
-        if reply_token:
-            line_client.reply_text(
-                reply_token,
-                "ยืนยันไม่สำเร็จ เอกสารยังไม่ถูกบันทึก กรุณาตรวจสอบรายการ",
-                channel=CHANNEL,
-            )
-        return {
-            "ok": False,
-            "status": 409,
-            "detail": "line_erp.confirm_incomplete",
-            "result": exc.result,
-        }
-    return await line_push.dispatch_confirmed(
-        user=user,
-        binding=binding,
-        history_ids=history_ids,
+    return await draft_actions.confirm(
+        binding,
+        user,
+        draft_id,
+        history_ids,
+        reply_token,
+        mode,
+        endpoint_id,
+        records_loader=draft_records,
     )

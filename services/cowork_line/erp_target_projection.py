@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from services.erp import target_readiness
 from services.erp.push_log_meta import _derive_v3_meta
 from services.erp.shared_express_store import safe_endpoint_dto
 
@@ -76,6 +77,7 @@ def managed_target(
         "configured": configured,
         "selectable": not missing,
         "mode_options": ["stock", "service"],
+        "managed": True,
         "ready_checks": {
             "permissions": True,
             "workspace_access": True,
@@ -93,51 +95,44 @@ def managed_target(
     }
 
 
-def _legacy_configured(config: Any) -> bool:
-    if not isinstance(config, dict):
-        return False
-    encrypted = bool(config.get("username_enc") and config.get("password_enc"))
-    plaintext = bool(config.get("username") and config.get("password"))
-    return encrypted or plaintext
-
-
 def legacy_target(
     endpoint: dict[str, Any],
     workspace: dict[str, Any] | None,
     *,
     binding_count: int,
     can_auto_create: bool = False,
+    probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    configured = _legacy_configured(endpoint.get("config"))
-    enabled = endpoint.get("enabled") is True
-    missing: list[str] = []
-    if not enabled:
-        missing.append("endpoint_disabled")
-    if not configured:
-        missing.append("credentials_missing")
+    adapter = str(endpoint.get("adapter") or "mrerp").strip().lower()
+    status = target_readiness.endpoint_status({**endpoint, "adapter": adapter}, probe=probe)
+    configured = bool(status["configured"])
+    missing = list(status["missing"])
     if workspace is None:
         if not can_auto_create:
             missing.append("workspace_unbound")
     elif binding_count != 1:
         missing.append("workspace_binding_conflict")
-    state = "disabled" if not enabled else "configured" if configured else "unconfigured"
+    state = str(status["connection_state"])
     target = {
         "endpoint_id": str(endpoint.get("id") or ""),
         "workspace_client_id": int(workspace["id"]) if workspace else None,
         "workspace_name": str(workspace.get("name") or "")[:200] if workspace else None,
-        "adapter": "mrerp",
-        "label": str(endpoint.get("name") or "MR.ERP").strip()[:80],
+        "adapter": adapter,
+        "label": str(
+            endpoint.get("name") or ("Express" if adapter == "express" else "MR.ERP")
+        ).strip()[:80],
         "connection_state": state,
         "configured": configured,
         "selectable": not missing,
-        "mode_options": ["cash", "credit"],
+        "mode_options": ["stock", "service"] if adapter == "express" else ["cash", "credit"],
+        "managed": False,
         "ready_checks": {
             "permissions": True,
             "workspace_access": workspace is not None,
             "workspace_bound": workspace is not None and binding_count == 1,
             "workspace_auto_create": workspace is None and can_auto_create,
-            "erp_connection": configured and enabled,
-            "companion_online": None,
+            "erp_connection": state == "online" or (probe is None and state == "configured"),
+            "companion_online": state == "online" if adapter == "express" else None,
             "profile_matches": None,
             "document_preflight": None,
         },

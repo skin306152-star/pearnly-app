@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """DMS LINE 订车逐问状态机(DL-7):聊天内逐项采集订车资料。
-
 会话保存客户、答案、付款、附件与主档状态；转账才要凭证，收官轮换 nonce。
 主档超过 LINE 上限时分页，翻页 token 永不写进 answers。
 全局命令交上层路由；金额用 Decimal，每次输入按序记 audit。
@@ -19,6 +18,7 @@ from services.erp.mrerp_dms_company_banks import company_bank_payment_extra
 from services.erp.mrerp_dms_client_base import to_be_date
 from services.line_dms import (
     booking_payments,
+    booking_qa_start,
     booking_qa_pages,
     booking_qa_payment,
     booking_qa_sync,
@@ -28,7 +28,7 @@ from services.line_dms import (
     store,
 )
 from services.line_dms._out import _send, _thr
-from services.line_dms.master_contract import MasterSyncError, build_snapshot
+from services.line_dms.master_contract import MasterSyncError
 from services.line_dms.qa_util import (
     CHANNEL_EXTRA_SHAPE,
     car_label,
@@ -44,7 +44,6 @@ from services.line_dms.qa_util import (
 logger = logging.getLogger(__name__)
 
 _STATE = "booking_qa"
-
 _CASH_WORD = "เงินสด"
 _MAX_REGIS_NAME = 120
 
@@ -62,58 +61,24 @@ async def start(
     user_id="",
     summary=None,
 ) -> None:
-    """客户档落定后开一局逐问:定提成归属 → 初始化 qa(step=place)。
-    身份证/OCR/客户档由既有 collecting 流程负责,本函数只从「档已落定」接手:
-    id_card_mid 只进 files;draft 与 user_id 原样进 qa,建单执行器从 payload["qa"] 读取。
-    顾问(提成归属)在开局就定死:认不出账号的单最终必被 DMS 拒收,收完资料再拦会
-    白占销售时间。
-    """
-    ep = await _thr(_id_ocr.resolve_dms_endpoint, user_id, endpoint_id)
-    advisor, dms_username = (None, "")
-    snapshot = None
-    if ep:
-        try:
-            live_masters = await _thr(
-                masters_cache.get_masters,
-                ep,
-                force_refresh=True,
-                require_complete=True,
-            )
-            snapshot = build_snapshot(live_masters)
-        except MasterSyncError as exc:
-            await _thr(store.clear_session, tenant_id, line_user_id)
-            _send(line_user_id, qa_cards.master_problem(exc.code))
-            return
-        advisor, dms_username = await _thr(
-            dms_advisor.resolve_operator_advisor,
-            ep,
-            masters=live_masters,
-        )
-    if advisor is None:
-        # 开不了单就别留着上一阶段的复述卡会话,否则用户下一句话撞在旧卡上(客户档已落定,不受影响)。
-        await _thr(store.clear_session, tenant_id, line_user_id)
-        msg = qa_cards.no_endpoint() if not ep else qa_cards.advisor_block_msg(dms_username)
-        # 一律 push:顾问解析可能含一次 DMS 慢登录,到这里 reply_token 大概率已过期,
-        # reply 失败 = 拦截理由静默丢失,销售只会看到「没反应」。
-        _send(line_user_id, msg)
-        return
-    qa = {
-        "step": "place",
-        "endpoint_id": str(endpoint_id or ""),
-        "customer": {"id": str(customer_id or ""), "name": customer_name or ""},
-        "advisor": advisor,
-        "draft": dict(draft or {}),
-        "summary": dict(summary or {}),
-        "user_id": str(user_id or ""),
-        "files": {"id_card_mid": id_card_mid or None, "slip_mid": None},
-        "answers": {},
-        "payments": [],
-        "pending_channel": {},
-        "audit": [],
-        "master_snapshot": snapshot,
-    }
-    await _persist(tenant_id, line_user_id, qa)
-    await send_step(tenant_id, line_user_id, qa, "place", reply_token)
+    """客户档落定后，用实时主档与顾问归属开一局订车逐问。"""
+    await booking_qa_start.start(
+        tenant_id,
+        line_user_id,
+        endpoint_id,
+        customer_id,
+        customer_name,
+        id_card_mid,
+        persist=_persist,
+        send_step=send_step,
+        resolve_endpoint=_id_ocr.resolve_dms_endpoint,
+        get_masters=masters_cache.get_masters,
+        resolve_advisor=dms_advisor.resolve_operator_advisor,
+        reply_token=reply_token,
+        draft=draft,
+        user_id=user_id,
+        summary=summary,
+    )
 
 
 # ── 每步发问(内部 · slip_after 复用) ─────────────────────────────────────

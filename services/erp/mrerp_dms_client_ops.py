@@ -19,6 +19,8 @@ from services.erp.mrerp_dms_models import (
     ThaiIdCardPayload,
 )
 from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
+from services.erp.mrerp_dms_master_rows import memo as _memo
+from services.erp.mrerp_dms_master_rows import parse_rows as _parse_bshsd_rows
 from services.erp.mrerp_dms_payments import payment_form_fields
 
 logger = logging.getLogger(__name__)
@@ -53,31 +55,6 @@ def row_by_id(rows: Optional[List[list]], rid: str) -> Optional[list]:
         if row and str(row[0]) == str(rid):
             return row
     return None
-
-
-def _memo(client: Any) -> Dict[tuple, Any]:
-    """会话级取数备忘。client 实例活在一次 DMS 登录会话里(_run_logged_in),期间主档不变;
-    惰性挂在实例上,mixin 因此不依赖 DMSClient.__init__。"""
-    return client.__dict__.setdefault("_bshsd_memo", {})
-
-
-def _parse_bshsd_rows(elemname: str, text: str) -> Optional[List[List[Any]]]:
-    """bshsd 响应 → 行表。空 body / 合法空数组 → [];非空但不可解析 → None。
-
-    「取数失败」与「名册真的一个人都没有」必须分得开:前者可以降级重试,后者只能诚实报错。
-    """
-    if not text.strip():
-        return []
-    try:
-        rows = json.loads(text)
-    except (ValueError, json.JSONDecodeError):
-        rows = None
-    if not isinstance(rows, list):
-        logger.warning(
-            "[dms] bshsd %s: body is not a JSON array; treated as fetch failure", elemname
-        )
-        return None
-    return rows
 
 
 class DMSClientOpsMixin:

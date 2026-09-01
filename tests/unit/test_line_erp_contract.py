@@ -12,8 +12,11 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from routes import line_erp_routes as routes
+from services.cowork_line import flow_cards as cowork_flow_cards
+from services.cowork_line import review_cards as cowork_review_cards
 from services.line_platform import client as line_client
-from services.line_erp import cards, flow, menu_cards, preview, store, webhook
+from services.line_platform.summary_review_card import postback_action
+from services.line_erp import cards, flow, menu_cards, store, webhook
 
 
 def _sig(body: bytes, secret: str) -> str:
@@ -118,78 +121,103 @@ class ErpFlowTests(unittest.TestCase):
                 self.assertEqual(icon.size, (96, 96))
                 self.assertEqual(icon.mode, "RGBA")
 
-    def test_sales_preview_is_summary_only_and_opens_shared_editor(self):
-        shaped = preview.from_result(
-            {
-                "raw_pages": [
-                    {
-                        "fields": {
-                            "invoice_number": "S-2026-18",
-                            "date": "2026-08-28",
-                            "seller_name": "Own Shop",
-                            "buyer_name": "Customer A",
-                            "buyer_tax": "0105555000111",
-                            "subtotal": "1000",
-                            "vat": "70",
-                            "total_amount": "1070",
-                            "items": [
-                                {
-                                    "name": "Coffee beans",
-                                    "qty": "2",
-                                    "price": "400",
-                                    "subtotal": "800",
-                                    "posting_kind": "stock",
-                                },
-                                {
-                                    "name": "Delivery",
-                                    "qty": "1",
-                                    "price": "200",
-                                    "subtotal": "200",
-                                    "posting_kind": "service",
-                                },
-                            ],
-                        }
-                    }
-                ]
-            },
+    def test_sales_preview_is_the_cowork_card_with_erp_actions(self):
+        fields = {
+            "invoice_number": "S-2026-18",
+            "date": "2026-08-28",
+            "document_type": "simplified_tax_invoice",
+            "seller_name": "Own Shop",
+            "buyer_name": "Customer A",
+            "buyer_tax": "0105555000111",
+            "subtotal": "1000",
+            "vat": "70",
+            "total_amount": "1070",
+            "payment_method": "card",
+            "items": [
+                {
+                    "name": "Coffee beans",
+                    "qty": "2",
+                    "price": "400",
+                    "subtotal": "800",
+                    "posting_kind": "stock",
+                },
+                {
+                    "name": "Delivery",
+                    "qty": "1",
+                    "price": "200",
+                    "subtotal": "200",
+                    "posting_kind": "service",
+                },
+            ],
+        }
+        target = {
+            "adapter": "mrerp",
+            "label": "MR.ERP · TEST2020",
+            "workspace_name": "TEST",
+        }
+        card = cards.preview_card(
+            "h1",
             "sales",
+            fields,
+            target=target,
+            posting_mode="cash",
+            item_count=2,
         )
-        self.assertEqual(shaped["party_name"], "Customer A")
-        self.assertEqual(shaped["party_label"], "ผู้ซื้อ")
-        self.assertEqual(shaped["total"], "1,070.00")
-        card = cards.preview_card("h1", "sales", shaped)
+        expected = cowork_review_cards.preview_card(
+            draft_id="h1",
+            fields=fields,
+            target=target,
+            direction="sales",
+            mode="cash",
+            lang="th",
+            item_count=2,
+            edit_uri=cards.edit_uri("h1"),
+            discard_action=postback_action(cowork_flow_cards._t("th", "discard"), "discard", "h1"),
+        )
+
+        self.assertEqual(card, expected)
         rendered = json.dumps(card, ensure_ascii=False)
-        self.assertIn("ตรวจสอบเอกสารขาย", rendered)
-        self.assertIn("Customer A", rendered)
-        self.assertIn("รายการสินค้า/บริการ · 2", rendered)
+        for value in (
+            "ตรวจสอบเอกสาร · ขาย",
+            "ERP / ชุดบัญชี",
+            "MR.ERP · TEST",
+            "วิธีลงบัญชี",
+            "เงินสด",
+            "S-2026-18",
+            "Own Shop",
+            "Customer A",
+            "ใบกำกับภาษีอย่างย่อ",
+            "บัตร",
+            "รายการ · 2",
+        ):
+            self.assertIn(value, rendered)
         self.assertNotIn("Coffee beans", rendered)
         self.assertNotIn("Delivery", rendered)
         self.assertNotIn("ยืนยันบันทึก", rendered)
         footer = card["contents"]["footer"]["contents"]
         self.assertEqual(
             [button["action"]["label"] for button in footer],
-            ["ดู / แก้ไขรายละเอียด", "ทิ้งเอกสาร"],
+            ["ดู / แก้ไขรายละเอียด", "ทิ้ง"],
         )
         self.assertIn("flow=erp-intake", footer[0]["action"]["uri"])
         self.assertEqual(footer[1]["action"]["type"], "postback")
 
-    def test_purchase_preview_uses_seller_not_buyer(self):
-        shaped = preview.from_result(
-            {
-                "raw_pages": [
-                    {
-                        "fields": {
-                            "seller_name": "Supplier A",
-                            "buyer_name": "Own Shop",
-                            "items": [],
-                        }
-                    }
-                ]
-            },
+    def test_purchase_preview_keeps_the_same_full_field_order(self):
+        card = cards.preview_card(
+            "h1",
             "purchase",
+            {
+                "invoice_number": "P-1",
+                "seller_name": "Supplier A",
+                "buyer_name": "Own Shop",
+                "items": [],
+            },
+            target={"adapter": "express", "workspace_name": "TEST"},
+            posting_mode="stock",
         )
-        self.assertEqual(shaped["party_name"], "Supplier A")
-        self.assertEqual(shaped["party_label"], "ผู้ขาย")
+        rendered = json.dumps(card, ensure_ascii=False)
+        self.assertIn("ตรวจสอบเอกสาร · ซื้อ", rendered)
+        self.assertLess(rendered.index("Supplier A"), rendered.index("Own Shop"))
 
     @mock.patch("services.ocr_history.queries.get_ocr_history_detail")
     def test_preview_urls_follow_original_page_numbers(self, detail):

@@ -218,7 +218,15 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 "run_recognition_core",
                 return_value={
                     "history_ids": ["h1"],
-                    "raw_pages": [{"page_number": 1, "fields": {}}],
+                    "raw_pages": [
+                        {
+                            "page_number": 1,
+                            "fields": {
+                                "invoice_number": "P-1",
+                                "items": [{"name": "Widget"}],
+                            },
+                        }
+                    ],
                 },
             ),
             mock.patch.object(
@@ -231,6 +239,11 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 "resolve_history_workspace",
                 return_value=_ready(selection)["target"],
             ) as resolve_workspace,
+            mock.patch.object(
+                webhook.cards,
+                "preview_card",
+                return_value={"type": "flex", "contents": {}},
+            ) as preview_card,
         ):
             await webhook._handle_document(
                 {"id": "m1", "type": "file", "fileName": "invoice.pdf"},
@@ -244,6 +257,15 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set_session.call_args.args[:3], ("t1", "line-u1", "draft"))
         self.assertEqual(payload["history_ids"], ["h1"])
         self.assertTrue(payload["nonce"])
+        preview_card.assert_called_once_with(
+            "h1",
+            "purchase",
+            {"invoice_number": "P-1", "items": [{"name": "Widget"}]},
+            target=_ready(selection)["target"],
+            posting_mode="stock",
+            record_count=1,
+            item_count=1,
+        )
 
     async def test_unbound_cowork_target_resolves_workspace_after_ocr(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}

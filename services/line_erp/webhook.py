@@ -18,7 +18,6 @@ from services.line_erp import (
     flow,
     intake,
     menu_cards,
-    preview,
     push as line_push,  # noqa: F401 - compatibility seam for route tests
     store,
     target_flow,
@@ -402,9 +401,23 @@ async def _handle_document(
             "nonce": nonce,
         },
     )
-    preview_data = preview.from_result(result, mode)
-    preview_data["document_count"] = len(history_ids)
-    preview_card = cards.preview_card(history_ids[0], mode, preview_data)
+    raw_pages = [page for page in result.get("raw_pages") or [] if isinstance(page, dict)]
+    primary = raw_pages[0] if raw_pages else {}
+    fields = primary.get("fields") if isinstance(primary.get("fields"), dict) else {}
+    item_count = sum(
+        len((page.get("fields") or {}).get("items") or [])
+        for page in raw_pages
+        if isinstance(page.get("fields"), dict)
+    )
+    preview_card = cards.preview_card(
+        history_ids[0],
+        mode,
+        fields,
+        target=target,
+        posting_mode=str(selection.get("posting_mode") or ""),
+        record_count=len(history_ids),
+        item_count=item_count,
+    )
     if reply_token:
         line_client.reply_messages(reply_token, [preview_card], channel=CHANNEL)
     else:

@@ -132,6 +132,68 @@ class LegacyTargetTests(unittest.TestCase):
         self.assertEqual(specs[0][0]["adapter"], "express")
         self.assertIn("adapter IN ('mrerp', 'express')", cursor.execute.call_args.args[0])
 
+    def test_same_mrerp_credentials_project_only_the_latest_connection(self):
+        cursor = Mock()
+        cursor.fetchall.return_value = [
+            {
+                "id": "old",
+                "name": "MR.ERP",
+                "adapter": "mrerp",
+                "enabled": True,
+                "is_default": False,
+                "created_at": "2026-08-28T09:21:07Z",
+                "config": {"username": "test01", "password": "same-password"},
+            },
+            {
+                "id": "new",
+                "name": "MR.ERP",
+                "adapter": "mrerp",
+                "enabled": True,
+                "is_default": False,
+                "created_at": "2026-09-01T11:51:06Z",
+                "config": {"username": "test01", "password": "same-password"},
+            },
+        ]
+
+        specs = erp_targets._legacy_target_specs(
+            cursor,
+            user_id="owner-1",
+            tenant_id="tenant-1",
+            all_workspaces=[],
+            allowed_workspaces=[],
+            can_auto_create=True,
+        )
+
+        self.assertEqual([spec[0]["id"] for spec in specs], ["new"])
+
+    def test_different_mrerp_credentials_remain_separate_connections(self):
+        cursor = Mock()
+        cursor.fetchall.return_value = [
+            {
+                "id": "first",
+                "adapter": "mrerp",
+                "created_at": "2026-09-01T10:00:00Z",
+                "config": {"username": "account-a", "password": "secret-a"},
+            },
+            {
+                "id": "second",
+                "adapter": "mrerp",
+                "created_at": "2026-09-01T11:00:00Z",
+                "config": {"username": "account-b", "password": "secret-b"},
+            },
+        ]
+
+        specs = erp_targets._legacy_target_specs(
+            cursor,
+            user_id="owner-1",
+            tenant_id="tenant-1",
+            all_workspaces=[],
+            allowed_workspaces=[],
+            can_auto_create=True,
+        )
+
+        self.assertEqual([spec[0]["id"] for spec in specs], ["first", "second"])
+
     def test_mrerp_requires_credentials_and_keeps_config_private(self):
         target = erp_targets._legacy_target(
             {

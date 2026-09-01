@@ -6,7 +6,10 @@ import os
 
 from services.cowork_line import flow_cards
 from services.cowork_line.card_reasons import reason_text
-from services.line_platform.summary_review_card import build_summary_card, postback_action
+from services.line_platform.summary_review_card import (
+    build_summary_card,
+    postback_action as build_postback_action,
+)
 from services.line_platform.system_i18n import field_value
 
 
@@ -78,6 +81,8 @@ def preview_card(
     record_count: int = 1,
     item_count: int | None = None,
     preflight: dict | None = None,
+    edit_uri: str | None = None,
+    discard_action: dict | None = None,
 ) -> dict:
     accent = "#16873E" if direction == "purchase" else "#B11B50"
     adapter = str(target.get("adapter") or "").lower()
@@ -126,8 +131,9 @@ def preview_card(
         detail_count=len(_items(fields)) if item_count is None else item_count,
         detail_hint=flow_cards._t(lang, "detail_hint"),
         edit_label=flow_cards._t(lang, "edit"),
-        edit_uri=_edit_uri(draft_id),
-        discard_action=postback_action(flow_cards._t(lang, "discard"), "cowork_discard", draft_id),
+        edit_uri=edit_uri or _edit_uri(draft_id),
+        discard_action=discard_action
+        or build_postback_action(flow_cards._t(lang, "discard"), "cowork_discard", draft_id),
     )
 
 

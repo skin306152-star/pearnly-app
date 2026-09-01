@@ -2,11 +2,55 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from services.erp import line_target_projection, target_readiness
 from services.erp.shared_express_flag import erp_shared_express_endpoint_enabled_for
 from services.erp.shared_express_schema import enable_shared_express_select
+
+LegacySpec = tuple[dict[str, Any], dict[str, Any] | None, int, bool]
+
+
+def _mrerp_credential_identity(endpoint: dict[str, Any]) -> tuple[str, str] | None:
+    config = endpoint.get("config") if isinstance(endpoint.get("config"), dict) else {}
+    try:
+        from services.erp.erp_mrerp_listing import _resolve_creds
+
+        username, password, error = _resolve_creds(config)
+    except (ImportError, TypeError, ValueError):
+        return None
+    if error or not username or not password:
+        return None
+    system_url = str(config.get("system_url") or "https://www.mrerp4sme.com")
+    digest = hashlib.sha256(f"{username}\0{password}".encode()).hexdigest()
+    return system_url.rstrip("/").casefold(), digest
+
+
+def _deduplicate_legacy_specs(
+    specs: list[LegacySpec],
+) -> list[LegacySpec]:
+    selected: dict[tuple[Any, ...], tuple[int, tuple[bool, bool, str, str], LegacySpec]] = {}
+    for index, spec in enumerate(specs):
+        endpoint, workspace, *_ = spec
+        adapter = str(endpoint.get("adapter") or "").lower()
+        credential = _mrerp_credential_identity(endpoint) if adapter == "mrerp" else None
+        workspace_id = int(workspace["id"]) if workspace else None
+        key = (
+            (adapter, *credential, workspace_id)
+            if credential
+            else (adapter, str(endpoint.get("id") or ""), workspace_id)
+        )
+        priority = (
+            workspace is not None,
+            bool(endpoint.get("is_default")),
+            str(endpoint.get("created_at") or ""),
+            str(endpoint.get("id") or ""),
+        )
+        current = selected.get(key)
+        if current is None or priority > current[1]:
+            selected[key] = (index if current is None else current[0], priority, spec)
+    return [value[2] for value in sorted(selected.values(), key=lambda value: value[0])]
 
 
 def workspaces(cur, tenant_id: str) -> list[dict[str, Any]]:
@@ -71,10 +115,10 @@ def legacy_target_specs(
     all_workspaces: list[dict[str, Any]],
     allowed_workspaces: list[dict[str, Any]],
     can_auto_create: bool,
-) -> list[tuple[dict[str, Any], dict[str, Any] | None, int, bool]]:
+) -> list[LegacySpec]:
     cur.execute(
         """
-        SELECT id, name, adapter, config, enabled, last_status,
+        SELECT id, name, adapter, config, enabled, last_status, is_default, created_at,
                binding_generation, clock_timestamp() AS server_now
         FROM erp_endpoints
         WHERE user_id = %s
@@ -97,7 +141,7 @@ def legacy_target_specs(
         if endpoint_id:
             allowed_by_endpoint.setdefault(endpoint_id, []).append(workspace)
 
-    specs: list[tuple[dict[str, Any], dict[str, Any] | None, int, bool]] = []
+    specs: list[LegacySpec] = []
     for endpoint in endpoints:
         endpoint_id = str(endpoint.get("id") or "")
         all_bindings = all_by_endpoint.get(endpoint_id, [])
@@ -117,7 +161,7 @@ def legacy_target_specs(
         specs.extend(
             (endpoint, workspace, len(all_bindings), False) for workspace in visible_bindings
         )
-    return specs
+    return _deduplicate_legacy_specs(specs)
 
 
 def collect_target_specs(cur, user: dict[str, Any], authz):

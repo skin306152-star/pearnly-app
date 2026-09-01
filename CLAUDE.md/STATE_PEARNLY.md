@@ -1,17 +1,15 @@
 # 📊 STATE · Pearnly 项目状态
 
-## 当前状态卡 · 09-01 LINE 切套账 + 推送真因 READY_FOR_DEVICE
+## 当前状态卡 · 09-01 LINE/ERP 推送状态闭环 READY_FOR_DEVICE
 
-- **▶ 当前 task**:Cowork 与 `/erp` LINE 复核编辑器统一为“对话先选 ERP、编辑器锁定该 ERP、批次内切目标套账”；应用 commit=`8cc57cdf`，MR.ERP 现金折扣修复=`95149690`，均已在 production descendant `ca099544` 生效。
-- **🎯 MR.ERP 套账**:连接实时探测得到 `TEST2019=6:1`、`TEST2020=15:1`；下拉按年度账套显示，提交时服务端复核并仅投影到本次批次，不改老板默认配置。
-- **🎯 Express 套账**:Companion `v1.1.68` commit=`1239c144` 支持任务级“年度/数据根 → 套账”选择；心跳上报的 49 个有效候选已按 `59EXP/69EXP/70EXP` 分组，任务切换不改全局默认。
-- **🔐 安全边界**:任意路径不可信；MR.ERP 只接受实时账号账套，Express 只接受 Companion 本机发现并上报的根/套账；换套账会清掉旧套账的科目与商品目录，防串账。
-- **✅ MR.ERP 真写回归**:原单 `02000131` 经 TEST2019 正式重推成功，返回 `690524-700723` / `SI690524-700723`；`arse` 现金销售列表按单号回读命中 `24/05/2569`、`3,806.00`，不是仅 HTTP 200。
-- **🔎 MR.ERP 真因**:现金销售导入器不接受“表头折扣 + 已净额收款”；新逻辑仅在金额勾稽成立时把折扣按分币分摊到明细金额、保留原单价、导入表头折扣归零。TEST2019 另留两张诊断单 `690524-303539`、`690524-598370`。
-- **🔎 Express 真因**:`erp.endpoint_changed` 是云端旧判定，已由 `8cc57cdf` 修复；后续 `HS6901-101` 已到本地 Agent，但 `ACCCOD ST01` 对应科目不像存货科目，被写侧安全闸转人工，须由会计选非库存或配置真实存货组，禁止代码猜测绕过。
-- **🖥 Companion 现场**:`v1.1.68` 已发布且曾上报 50 条候选，但目标连接随后优雅离线；`Express TEST` 仍报 `v1.1.67` 且心跳超时。当前不得称 Express 真机闭环。
-- **✅ 验证/发布**:应用 MR.ERP 422 tests + 全 pre-push 绿，manual CD `33495883253` 成功；Companion 471 passed/35 skipped，release `33493512960` 成功，installer SHA-256=`abc6abf00e075138c0b92f796a1e151b51babc903008634380b076e16151abc4`。
-- **⏭ 唯一下步**:Windows 保持 `v1.1.68` 小助手在线；Zihao 在 LINE 真机验证 MR.ERP 两年度与 Express“数据根→套账”切换，再由会计对 `HS6901-101` 选择正确库存口径后重推并回查 Express 单据。
+- **▶ 当前 task**:五项现场问题已修并发布：Companion 心跳离线、同套账多 Pearnly 连接、长商品名、重试先失败后成功、LINE 成功无回执。应用=`88c33252`，Companion `v1.1.69`=`96b530ff`。
+- **🖥 Companion 真因/修复**:`v1.1.68` 在心跳线程同步扫描巨大 UNC Express 目录，超过 180 秒触发 watchdog 重启并把全部 profile 标离线；`v1.1.69` 改后台共享目录扫描，心跳与轮询不再等待。取消“同 Express 目录只能绑定一个 profile”的本地限制，多 profile 写任务仍由单调度器串行。
+- **📱 LINE 编辑器**:Cowork 与 `/erp` 商品名改为全宽多行输入并允许任意长词换行；历史草稿只有一个目标套账时自动补全。对话选定 ERP 后编辑器只切该 ERP 的套账，不出现第二个 ERP。
+- **🔄 状态闭环**:可重试错误对 LIFF 显示“重试中”，不再先报终态失败；人工/后台/批量重试复用原日志里的 ERP、套账和来源，禁止漂到老板当前默认套账；成功只在 `erp_push_logs` 首次转成功时给原 LINE 用户发简要回执。
+- **✅ MR.ERP 外部回读**:OCR 原号 `02000131` 成功后由 MR.ERP 生成 `690524-017412` / `SI690524-017412`；现金销售列表回读命中 `24/05/2569`、`3,806.00`、TEST2019。现场查不到是按 OCR 原号查错，不是只收到 HTTP 200。
+- **✅ Express 外部回读**:`HS6901-101` 写入 `\\Accserver\d$\ACCOUNT\70EXP\TEST`；Companion ACK 含 ARTRN 总额、NXTSEQ 9 行、明细、GL 借贷、VAT 与 CDX 索引写后回读，金额 `6,250.00 + 437.50 = 6,687.50`，不是仅云端成功。
+- **✅ 验证/发布**:应用 266 tests + 17 subtests、LIFF Playwright 8/8、完整 pre-push 全绿；manual CD `33504228678` 成功，生产 HEAD/service/health/ready 已回读。Companion 472 passed/35 skipped/Windows-only 5 在发版机通过，release `33503637528` 成功；安装包 SHA-256=`82f9ad651f9c1578e68af97fa136529091519cf218a626c320a36a9ad633f913`。
+- **⏭ 真机验收**:Windows 安装 `v1.1.69`，同一 Express 套账分别加入 Cowork 与 `/erp` 两个 token，保持 5 分钟确认不离线；各推一张单，核对 LINE 回执的 ERP 生成单号并到对应套账查单。验收前不得称真机闭环。
 - **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`、`docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`、`docs/integrations/mrerp-known-facts.md`。
 
 ---

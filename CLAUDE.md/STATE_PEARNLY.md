@@ -8,7 +8,7 @@
 - **🔄 状态闭环**:可重试错误对 LIFF 显示“重试中”，不再先报终态失败；人工/后台/批量重试复用原日志里的 ERP、套账和来源，禁止漂到老板当前默认套账；成功只在 `erp_push_logs` 首次转成功时给原 LINE 用户发简要回执。
 - **✅ MR.ERP 外部回读**:OCR 原号 `02000131` 成功后由 MR.ERP 生成 `690524-017412` / `SI690524-017412`；现金销售列表回读命中 `24/05/2569`、`3,806.00`、TEST2019。现场查不到是按 OCR 原号查错，不是只收到 HTTP 200。
 - **✅ Express 外部回读**:`HS6901-101` 写入 `\\Accserver\d$\ACCOUNT\70EXP\TEST`；Companion ACK 含 ARTRN 总额、NXTSEQ 9 行、明细、GL 借贷、VAT 与 CDX 索引写后回读，金额 `6,250.00 + 437.50 = 6,687.50`，不是仅云端成功。
-- **✅ 验证/发布**:应用 266 tests + 17 subtests、LIFF Playwright 8/8、完整 pre-push 全绿；manual CD `33504228678` 成功，生产 HEAD/service/health/ready 已回读。Companion 472 passed/35 skipped/Windows-only 5 在发版机通过，release `33503637528` 成功；安装包 SHA-256=`82f9ad651f9c1578e68af97fa136529091519cf218a626c320a36a9ad633f913`。
+- **✅ 验证/发布**:应用 266 tests + 17 subtests、LIFF Playwright 8/8、完整 pre-push 全绿；manual CD `33504228678` 成功，生产 HEAD/service/health/ready 已回读。Companion macOS 可运行集 472 passed/35 skipped，另 5 项 Windows-only 未在本机执行；Windows release build `33503637528` 成功，安装包 SHA-256=`82f9ad651f9c1578e68af97fa136529091519cf218a626c320a36a9ad633f913`。
 - **⏭ 真机验收**:Windows 安装 `v1.1.69`，同一 Express 套账分别加入 Cowork 与 `/erp` 两个 token，保持 5 分钟确认不离线；各推一张单，核对 LINE 回执的 ERP 生成单号并到对应套账查单。验收前不得称真机闭环。
 - **📚 任务板/证据**:`docs/erp/ERP-LINE-COMPANION-CLOSED-LOOP-PO.md`、`docs/erp/ERP-CLOSED-LOOP-ACCEPTANCE-LEDGER.md`、`docs/integrations/mrerp-known-facts.md`。
 

@@ -88,6 +88,36 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
             await webhook._handle_postback(event, binding, "line-u1", "reply")
         begin_mode.assert_awaited_once_with(binding, "line-u1", "reply", "purchase")
 
+    async def test_erp_type_postback_uses_mode_from_current_session(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        event = {"postback": {"data": "a=erp-type&erp=express&page=2"}}
+        with (
+            mock.patch.object(
+                webhook.store,
+                "get_session",
+                return_value={"state": "target", "payload": {"mode": "sales"}},
+            ),
+            mock.patch.object(webhook.target_flow, "show_account_picker") as show,
+        ):
+            await webhook._handle_postback(event, binding, "line-u1", "reply")
+
+        show.assert_awaited_once_with(
+            binding,
+            "line-u1",
+            "reply",
+            "sales",
+            "express",
+            page=2,
+        )
+
+    async def test_old_target_page_postback_restarts_new_picker(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        event = {"postback": {"data": "a=target-page&mode=purchase&page=1"}}
+        with mock.patch.object(webhook.target_flow, "begin_mode") as begin:
+            await webhook._handle_postback(event, binding, "line-u1", "reply")
+
+        begin.assert_awaited_once_with(binding, "line-u1", "reply", "purchase")
+
     async def test_media_event_queues_ocr_instead_of_waiting_for_reply(self):
         binding = {"tenant_id": "t1", "user_id": "u1"}
         with (

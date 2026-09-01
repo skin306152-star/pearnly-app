@@ -138,13 +138,26 @@ async def _handle_postback(
                 )
             return
         await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
-    elif action == "target-page":
-        mode = str((params.get("mode") or [""])[0])
+    elif action == "erp-type":
+        session = store.get_session(binding["tenant_id"], line_user_id) or {}
+        session_mode = str((session.get("payload") or {}).get("mode") or "")
+        mode = str((params.get("mode") or [session_mode])[0])
+        adapter = str((params.get("erp") or [""])[0])
         try:
             page = int((params.get("page") or ["0"])[0])
         except ValueError:
             page = 0
-        await target_flow.show_target_picker(binding, line_user_id, reply_token, mode, page=page)
+        await target_flow.show_account_picker(
+            binding,
+            line_user_id,
+            reply_token,
+            mode,
+            adapter,
+            page=page,
+        )
+    elif action == "target-page":
+        mode = str((params.get("mode") or [""])[0])
+        await target_flow.begin_mode(binding, line_user_id, reply_token, mode)
     elif action == "target":
         await target_flow.choose_target(params, binding, line_user_id, reply_token)
     elif action.startswith("posting:"):

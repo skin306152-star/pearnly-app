@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import math
-from urllib.parse import urlencode
 
 from services.cowork_line.card_fields import HEADER_KEYS, HEADER_LABELS
+from services.line_platform.quick_replies import (
+    postback_action as _postback,
+    question as _question,
+    quick_reply_item as _quick_reply_item,
+)
 
 QR_LIMIT = 13
 QR_PAGE_SIZE = 11
@@ -219,16 +223,6 @@ def _status_lines(targets: list[dict], lang: str, *, limit: int = 8) -> str:
     return "\n".join(lines)
 
 
-def _postback(label: str, action: str, **params) -> dict:
-    data = {"a": action, **{key: value for key, value in params.items() if value is not None}}
-    return {
-        "type": "postback",
-        "label": label[:20],
-        "data": urlencode(data),
-        "displayText": label[:300],
-    }
-
-
 def _button(label: str, action: str, *, style: str = "secondary", **params) -> dict:
     return {
         "type": "button",
@@ -263,17 +257,6 @@ def _row(title: str, subtitle: str, action: dict | None = None, *, muted: bool =
     if action:
         row["action"] = action
     return row
-
-
-def _quick_reply_item(label: str, action: str, **params) -> dict:
-    return {"type": "action", "action": _postback(label, action, **params)}
-
-
-def _question(title: str, subtitle: str, items: list[dict]) -> dict:
-    message = {"type": "text", "text": f"{title}\n{subtitle}"}
-    if items:
-        message["quickReply"] = {"items": items}
-    return message
 
 
 def erp_picker_card(targets: list[dict], lang: str) -> dict:

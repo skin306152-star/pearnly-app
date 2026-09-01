@@ -6,7 +6,7 @@ import asyncio
 from typing import Any
 
 from services.erp import team_access
-from services.line_erp import cards, flow, store, target_preflight, target_selection
+from services.line_erp import flow, selection_messages, store, target_preflight, target_selection
 from services.line_platform import client as line_client
 
 CHANNEL = "erp"
@@ -19,8 +19,27 @@ def _notify(line_user_id: str, reply_token: str | None, text: str) -> None:
         line_client.push_text(line_user_id, text, channel=CHANNEL)
 
 
+def _send_message(line_user_id: str, reply_token: str | None, message: dict) -> None:
+    if reply_token:
+        line_client.reply_messages(reply_token, [message], channel=CHANNEL)
+    else:
+        line_client.push_messages(line_user_id, [message], channel=CHANNEL)
+
+
 def _locked(session: dict[str, Any]) -> bool:
     return session.get("state") in {"draft", "editing"}
+
+
+async def _inspect_targets(
+    binding: dict[str, Any], line_user_id: str, reply_token: str | None
+) -> dict[str, Any] | None:
+    try:
+        return await asyncio.to_thread(target_preflight.inspect_targets, binding, refresh=True)
+    except target_preflight.TargetNotReady as exc:
+        _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
+    except Exception:
+        _notify(line_user_id, reply_token, "ไม่สามารถตรวจสอบ ERP ได้ กรุณาลองใหม่")
+    return None
 
 
 async def show_target_picker(
@@ -28,8 +47,6 @@ async def show_target_picker(
     line_user_id: str,
     reply_token: str | None,
     mode: str,
-    *,
-    page: int = 0,
 ) -> None:
     allowed = team_access.binding_line_modes(binding)
     if mode not in flow.MODES or mode not in allowed:
@@ -39,13 +56,56 @@ async def show_target_picker(
     if session.get("state") == "ocr_processing" or _locked(session):
         _notify(line_user_id, reply_token, "รายการปัจจุบันยังไม่เสร็จ กรุณาดำเนินการให้เรียบร้อย")
         return
-    result = await asyncio.to_thread(target_preflight.inspect_targets, binding, refresh=True)
+    result = await _inspect_targets(binding, line_user_id, reply_token)
+    if result is None:
+        return
     store.set_session(binding["tenant_id"], line_user_id, "target", {"mode": mode})
-    message = cards.target_picker_card(mode, result.get("targets") or [], page=page)
-    if reply_token:
-        line_client.reply_messages(reply_token, [message], channel=CHANNEL)
-    else:
-        line_client.push_messages(line_user_id, [message], channel=CHANNEL)
+    _send_message(
+        line_user_id,
+        reply_token,
+        selection_messages.erp_picker_message(result.get("targets") or [], mode),
+    )
+
+
+async def show_account_picker(
+    binding: dict[str, Any],
+    line_user_id: str,
+    reply_token: str | None,
+    mode: str,
+    adapter: str,
+    *,
+    page: int = 0,
+) -> None:
+    session = store.get_session(binding["tenant_id"], line_user_id) or {}
+    payload = dict(session.get("payload") or {})
+    session_mode = str(payload.get("mode") or "")
+    adapter = str(adapter or "").lower()
+    if (
+        session.get("state") != "target"
+        or mode != session_mode
+        or mode not in team_access.binding_line_modes(binding)
+        or adapter not in {"mrerp", "express"}
+    ):
+        _notify(line_user_id, reply_token, "รายการหมดอายุ กรุณาเลือกประเภทเอกสารใหม่")
+        return
+    result = await _inspect_targets(binding, line_user_id, reply_token)
+    if result is None:
+        return
+    targets = result.get("targets") or []
+    if not any(str(target.get("adapter") or "").lower() == adapter for target in targets):
+        _notify(line_user_id, reply_token, "ERP ปลายทางมีการเปลี่ยนแปลง กรุณาเลือกใหม่")
+        return
+    store.set_session(
+        binding["tenant_id"],
+        line_user_id,
+        "target",
+        {"mode": mode, "adapter": adapter},
+    )
+    _send_message(
+        line_user_id,
+        reply_token,
+        selection_messages.account_picker_message(targets, adapter, mode, page=page),
+    )
 
 
 async def begin_mode(
@@ -80,7 +140,9 @@ async def choose_target(
     reply_token: str | None,
 ) -> None:
     session = store.get_session(binding["tenant_id"], line_user_id) or {}
-    session_mode = str((session.get("payload") or {}).get("mode") or "")
+    session_payload = dict(session.get("payload") or {})
+    session_mode = str(session_payload.get("mode") or "")
+    session_adapter = str(session_payload.get("adapter") or "").lower()
     mode = str((params.get("mode") or [session_mode])[0])
     if (
         session.get("state") != "target"
@@ -107,20 +169,24 @@ async def choose_target(
         _notify(line_user_id, reply_token, target_preflight.status_text(exc.result))
         return
     target = readiness["target"]
+    target_adapter = str(target.get("adapter") or "").lower()
+    if session_adapter and target_adapter != session_adapter:
+        _notify(line_user_id, reply_token, "รายการหมดอายุ กรุณาเลือก ERP ใหม่")
+        return
     payload = {
         "mode": mode,
         "direction": mode,
         "endpoint_id": str(target["endpoint_id"]),
         "workspace_client_id": int(target["workspace_client_id"]),
-        "adapter": str(target.get("adapter") or "").lower(),
+        "adapter": target_adapter,
         "target_label": str(target.get("label") or "")[:200],
     }
     store.set_session(binding["tenant_id"], line_user_id, "posting", payload)
-    message = cards.posting_mode_card(mode, target)
-    if reply_token:
-        line_client.reply_messages(reply_token, [message], channel=CHANNEL)
-    else:
-        line_client.push_messages(line_user_id, [message], channel=CHANNEL)
+    _send_message(
+        line_user_id,
+        reply_token,
+        selection_messages.posting_mode_message(mode, target),
+    )
 
 
 async def choose_posting_mode(
@@ -155,4 +221,10 @@ async def choose_posting_mode(
     _notify(line_user_id, reply_token, "กรุณาส่งรูปภาพหรือ PDF")
 
 
-__all__ = ["begin_mode", "choose_posting_mode", "choose_target", "show_target_picker"]
+__all__ = [
+    "begin_mode",
+    "choose_posting_mode",
+    "choose_target",
+    "show_account_picker",
+    "show_target_picker",
+]

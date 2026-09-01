@@ -18,7 +18,13 @@ from core.feature_flags import erp_line_enabled_for
 from core.workspace_context import WS_HEADER
 from services.auth.entrance import require_erp_portal
 from services.erp import team_access
-from services.line_erp import store, target_preflight, target_selection, webhook
+from services.line_erp import (
+    store,
+    target_preflight,
+    target_selection,
+    webhook,
+    workspace_resolution,
+)
 from services.line_platform import client as line_client
 from services.line_platform import webhook_runner as line_webhook_runner
 from services.line_platform.liff import verify_id_token
@@ -304,7 +310,7 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
         "payment": req.payment,
     }
     try:
-        _, selection = await asyncio.to_thread(
+        readiness, selection = await asyncio.to_thread(
             target_selection.normalize,
             binding,
             requested,
@@ -327,6 +333,29 @@ async def erp_draft_update(request: Request, draft_id: str, req: DraftUpdateIn):
             str(claims["user_id"]), history_id, pages, tenant_id=str(binding["tenant_id"])
         ):
             raise HTTPException(409, detail="line_erp.draft_save_failed")
+    try:
+        target = await asyncio.to_thread(
+            workspace_resolution.resolve_history_workspace,
+            binding,
+            readiness["target"],
+            expected_ids,
+            selection["direction"],
+            provisional_history_assignment=True,
+        )
+        _, selection = await asyncio.to_thread(
+            target_selection.normalize,
+            binding,
+            {
+                **requested,
+                "workspace_client_id": target["workspace_client_id"],
+            },
+        )
+    except (
+        workspace_resolution.WorkspaceResolutionError,
+        target_preflight.TargetNotReady,
+        target_selection.SelectionError,
+    ):
+        raise HTTPException(409, detail="line_erp.workspace_resolution_failed") from None
     try:
         target_selection.update_scope(binding, expected_ids, selection)
     except target_selection.SelectionError as exc:

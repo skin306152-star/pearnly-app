@@ -152,8 +152,9 @@ async def choose_target(
         _notify(line_user_id, reply_token, "รายการหมดอายุ กรุณาเลือกประเภทเอกสารใหม่")
         return
     endpoint_id = str((params.get("endpoint") or [""])[0]).strip()
+    raw_workspace = str((params.get("workspace") or [""])[0]).strip()
     try:
-        workspace_id = int(str((params.get("workspace") or [""])[0]).strip())
+        workspace_id = int(raw_workspace) if raw_workspace else None
     except ValueError:
         _notify(line_user_id, reply_token, "กรุณาเลือกบัญชีและ ERP ใหม่")
         return
@@ -177,7 +178,7 @@ async def choose_target(
         "mode": mode,
         "direction": mode,
         "endpoint_id": str(target["endpoint_id"]),
-        "workspace_client_id": int(target["workspace_client_id"]),
+        "workspace_client_id": target.get("workspace_client_id"),
         "adapter": target_adapter,
         "target_label": str(target.get("label") or "")[:200],
     }

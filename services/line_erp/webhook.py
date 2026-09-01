@@ -24,6 +24,7 @@ from services.line_erp import (
     target_flow,
     target_preflight,
     target_selection,
+    workspace_resolution,
 )
 from services.line_erp.out import make_spawn
 from services.line_platform import client as line_client
@@ -341,6 +342,7 @@ async def _handle_document(
         )
         await asyncio.to_thread(line_client.start_loading, line_user_id, 30, channel=CHANNEL)
     user["entry"] = "erp"
+    provisional_workspace = selection.get("workspace_client_id") is None
     try:
         result = await asyncio.to_thread(
             run_recognition_core,
@@ -370,6 +372,25 @@ async def _handle_document(
         str(user["id"]),
         str(binding["tenant_id"]),
     )
+    try:
+        target = await asyncio.to_thread(
+            workspace_resolution.resolve_history_workspace,
+            binding,
+            readiness["target"],
+            history_ids,
+            mode,
+            provisional_history_assignment=provisional_workspace,
+        )
+    except (workspace_resolution.WorkspaceResolutionError, target_preflight.TargetNotReady):
+        await draft_actions.discard(binding, history_ids)
+        _restore_receiving(binding, line_user_id, selection)
+        _notify(
+            line_user_id,
+            reply_token,
+            "ไม่สามารถจับคู่บริษัทในเอกสารกับบัญชี Pearnly ได้ กรุณาตรวจสอบข้อมูลบริษัท",
+        )
+        return
+    selection["workspace_client_id"] = int(target["workspace_client_id"])
     nonce = secrets.token_urlsafe(24)
     store.set_session(
         binding["tenant_id"],

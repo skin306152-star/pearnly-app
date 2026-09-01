@@ -8,6 +8,48 @@ from services.line_erp import push, target_preflight, target_selection, webhook
 
 
 class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
+    def test_erp_catalogue_uses_the_same_actor_projection_as_cowork(self):
+        user = {"id": "u1", "tenant_id": "t1", "role": "owner"}
+        authz = mock.Mock()
+        authz.has.return_value = True
+        cursor = mock.Mock()
+        context = mock.MagicMock()
+        context.__enter__.return_value = cursor
+        target = {
+            "endpoint_id": "mr",
+            "workspace_client_id": None,
+            "adapter": "mrerp",
+            "selectable": True,
+            "setup_action": "auto_create_workspace",
+        }
+        endpoint = {"id": "mr", "adapter": "mrerp"}
+        specs = [(endpoint, None, 0, True)]
+        with (
+            mock.patch.object(target_preflight, "_active_user", return_value=user),
+            mock.patch.object(target_preflight.db, "get_cursor_rls", return_value=context),
+            mock.patch.object(target_preflight, "resolve", return_value=authz),
+            mock.patch.object(
+                target_preflight.line_target_catalog,
+                "collect_target_specs",
+                return_value=([], specs),
+            ) as collect,
+            mock.patch.object(
+                target_preflight.line_target_catalog,
+                "project_legacy_targets",
+                return_value=[target],
+            ) as project,
+        ):
+            projected_user, targets, endpoints = target_preflight._project_targets(
+                {"user_id": "u1", "tenant_id": "t1"},
+                refresh=True,
+            )
+
+        collect.assert_called_once_with(cursor, user, authz)
+        project.assert_called_once_with([], specs, refresh_probes=True)
+        self.assertIs(projected_user, user)
+        self.assertEqual(targets, [target])
+        self.assertEqual(endpoints, {"mr": endpoint})
+
     def test_express_account_switch_does_not_reuse_previous_account_mapping(self):
         endpoint = {
             "adapter": "express",
@@ -63,6 +105,48 @@ class LineErpTargetPreflightTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(selected["account_set"], "15:1")
+        self.assertEqual(selected["account_config"], {"comidyear": "15", "seldb": "1"})
+
+    def test_selection_accepts_cowork_auto_workspace_target(self):
+        target = {
+            "endpoint_id": "mr",
+            "workspace_client_id": None,
+            "adapter": "mrerp",
+            "label": "MR.ERP · TEST2020",
+            "selectable": True,
+            "setup_action": "auto_create_workspace",
+            "account_choices": [
+                {
+                    "key": "15:1",
+                    "label": "TEST2020",
+                    "comidyear": "15",
+                    "seldb": "1",
+                }
+            ],
+        }
+        with mock.patch.object(
+            target_selection.target_preflight,
+            "require_ready",
+            return_value={"target": target},
+        ) as require:
+            _, selected = target_selection.normalize(
+                {"user_id": "u1", "tenant_id": "t1"},
+                {
+                    "endpoint_id": "mr",
+                    "workspace_client_id": None,
+                    "direction": "sales",
+                    "payment": "credit",
+                    "account_set": "15:1",
+                },
+            )
+
+        require.assert_called_once_with(
+            {"user_id": "u1", "tenant_id": "t1"},
+            endpoint_id="mr",
+            workspace_client_id=None,
+            refresh=False,
+        )
+        self.assertIsNone(selected["workspace_client_id"])
         self.assertEqual(selected["account_config"], {"comidyear": "15", "seldb": "1"})
 
     def test_catalogue_keeps_every_target_and_marks_exact_selection(self):

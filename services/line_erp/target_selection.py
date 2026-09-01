@@ -47,13 +47,13 @@ def normalize(
         raise SelectionError("line_erp.direction_required", 422)
     endpoint_id = str(values.get("endpoint_id") or "").strip()
     workspace_id = values.get("workspace_client_id")
-    if not endpoint_id or workspace_id is None:
+    if not endpoint_id:
         raise SelectionError("line_erp.target_required", 422)
     try:
         readiness = target_preflight.require_ready(
             binding,
             endpoint_id=endpoint_id,
-            workspace_client_id=int(workspace_id),
+            workspace_client_id=(int(workspace_id) if workspace_id is not None else None),
             refresh=refresh,
         )
     except (TypeError, ValueError):
@@ -91,7 +91,11 @@ def normalize(
         raise SelectionError("line_erp.account_set_required", 422)
     normalized = {
         "endpoint_id": str(target["endpoint_id"]),
-        "workspace_client_id": int(target["workspace_client_id"]),
+        "workspace_client_id": (
+            int(target["workspace_client_id"])
+            if target.get("workspace_client_id") is not None
+            else None
+        ),
         "adapter": adapter,
         "target_label": str(target.get("label") or "")[:200],
         "account_root": str(account.get("root_key") or "").strip() or None,

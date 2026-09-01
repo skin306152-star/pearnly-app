@@ -226,6 +226,11 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 "generate_and_save_pdf",
                 return_value={"saved": False, "updated": 0},
             ) as backfill,
+            mock.patch.object(
+                webhook.workspace_resolution,
+                "resolve_history_workspace",
+                return_value=_ready(selection)["target"],
+            ) as resolve_workspace,
         ):
             await webhook._handle_document(
                 {"id": "m1", "type": "file", "fileName": "invoice.pdf"},
@@ -234,10 +239,54 @@ class ErpLineWebhookTests(unittest.IsolatedAsyncioTestCase):
                 "reply",
             )
         backfill.assert_called_once()
+        resolve_workspace.assert_called_once()
         payload = set_session.call_args.args[3]
         self.assertEqual(set_session.call_args.args[:3], ("t1", "line-u1", "draft"))
         self.assertEqual(payload["history_ids"], ["h1"])
         self.assertTrue(payload["nonce"])
+
+    async def test_unbound_cowork_target_resolves_workspace_after_ocr(self):
+        binding = {"tenant_id": "t1", "user_id": "u1"}
+        selection = {**_express_selection(), "workspace_client_id": None}
+        ready = _ready(selection)
+        with (
+            mock.patch.object(
+                webhook.store,
+                "get_session",
+                return_value={"state": "receiving", "payload": selection},
+            ),
+            mock.patch.object(webhook.store, "set_session") as set_session,
+            mock.patch.object(webhook.line_client, "download_message_content", return_value=b"pdf"),
+            mock.patch.object(webhook.line_client, "reply_messages"),
+            mock.patch.object(webhook, "erp_line_enabled_for", return_value=True),
+            mock.patch.object(webhook, "_allowed_modes", return_value=("purchase",)),
+            mock.patch.object(
+                webhook.target_selection,
+                "normalize",
+                return_value=(ready, selection),
+            ),
+            mock.patch.object(
+                webhook,
+                "run_recognition_core",
+                return_value={"history_ids": ["h1"], "raw_pages": []},
+            ) as recognize,
+            mock.patch.object(webhook.intake, "generate_and_save_pdf"),
+            mock.patch.object(
+                webhook.workspace_resolution,
+                "resolve_history_workspace",
+                return_value={**ready["target"], "workspace_client_id": 9},
+            ) as resolve_workspace,
+        ):
+            await webhook._handle_document(
+                {"id": "m1", "type": "file", "fileName": "invoice.pdf"},
+                binding,
+                "line-u1",
+                "reply",
+            )
+
+        self.assertIsNone(recognize.call_args.kwargs["ws_client_id"])
+        self.assertTrue(resolve_workspace.call_args.kwargs["provisional_history_assignment"])
+        self.assertEqual(set_session.call_args.args[3]["workspace_client_id"], 9)
 
     async def test_inactive_bound_user_never_reaches_ocr(self):
         binding = {"tenant_id": "t1", "user_id": "u1", "workspace_client_id": 7}

@@ -178,6 +178,49 @@ class LineErpTargetFlowTests(unittest.IsolatedAsyncioTestCase):
             ["สินค้า / สต๊อก", "บริการ / ไม่ลงสต๊อก"],
         )
 
+    async def test_cowork_auto_workspace_target_can_be_selected_before_ocr(self):
+        target = {
+            **self.target,
+            "workspace_client_id": None,
+            "setup_action": "auto_create_workspace",
+        }
+        with (
+            mock.patch.object(
+                target_flow.store,
+                "get_session",
+                return_value={
+                    "state": "target",
+                    "payload": {"mode": "sales", "adapter": "express"},
+                },
+            ),
+            mock.patch.object(
+                target_flow.team_access,
+                "binding_line_modes",
+                return_value=("sales",),
+            ),
+            mock.patch.object(
+                target_flow.target_preflight,
+                "require_ready",
+                return_value={"target": target},
+            ) as require,
+            mock.patch.object(target_flow.store, "set_session") as save,
+            mock.patch.object(target_flow.line_client, "reply_messages"),
+        ):
+            await target_flow.choose_target(
+                {"mode": ["sales"], "endpoint": ["express-1"]},
+                self.binding,
+                "line-u1",
+                "reply-token",
+            )
+
+        require.assert_called_once_with(
+            self.binding,
+            endpoint_id="express-1",
+            workspace_client_id=None,
+            refresh=True,
+        )
+        self.assertIsNone(save.call_args.args[3]["workspace_client_id"])
+
     async def test_posting_choice_locks_complete_target_snapshot_for_ocr(self):
         requested = {
             "mode": "purchase",

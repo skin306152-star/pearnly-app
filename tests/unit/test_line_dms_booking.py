@@ -175,7 +175,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
             mock.patch(
                 "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB"]],
+                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
             ),
         ):
             result = bf._book_in_session({"id": "E1", "config": {}}, {"qa": qa})
@@ -241,7 +241,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
             mock.patch(
                 "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB"]],
+                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
             ),
         ):
             res = bf._book_in_session(
@@ -288,7 +288,15 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "channel": "transfer",
                     "amount": "5000.00",
-                    "extra": {"src": "SCB", "dst_id": "1", "dst": "SCB"},
+                    "extra": {
+                        "src": "SCB",
+                        "dst_id": "1",
+                        "dst": "SCB · 1234567890123 · ระยอง",
+                        "dst_bank_id": "1",
+                        "dst_bank_name": "SCB",
+                        "dst_branch_name": "ระยอง",
+                        "dst_account_no": "1234567890123",
+                    },
                 },
             ),
         )
@@ -338,7 +346,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
             mock.patch(
                 "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB"]],
+                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
             ),
         ):
             qa = _qa_payload()
@@ -394,7 +402,7 @@ class BookingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(bf.masters_cache, "refresh_from_client"),
             mock.patch(
                 "services.erp.mrerp_dms_company_banks.fetch_company_banks",
-                return_value=[["1", "SCB", "SCB"]],
+                return_value=[["1", "SCB", "SCB", "ระยอง", "1234567890123"]],
             ),
             mock.patch.object(bf, "mrerp_booking_lock", fake_lock),
         ):

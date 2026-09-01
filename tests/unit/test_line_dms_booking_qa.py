@@ -32,7 +32,7 @@ _PAINTS = [["p1", "", "ขาว"], ["p2", "", "ดำ"], ["p3", "", "เทา"
 _PLACES = [["pl1", "", "สาขาบางนา"], ["pl2", "", "สาขารามอินทรา"]]
 _TERMS = [["t1", "", "เงินสด"], ["t2", "", "ผ่อน"]]
 _REGIS = [["r1", "", "บริษัท"], ["r2", "", "บุคคลธรรมดา"]]
-_COMPANY_BANKS = [["1", "SCB", "SCB"]]
+_COMPANY_BANKS = [["1", "SCB", "SCB", "ระยอง", "1234567890123"]]
 
 
 class FakeStore:
@@ -594,7 +594,17 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(p["step"], "slip_after")
             self.assertEqual(p["after_slip"], "pay_more")
             self.assertEqual(p["payments"][0]["channel"], "transfer")
-            self.assertEqual(p["payments"][0]["extra"], {"src": "", "dst_id": "1", "dst": "SCB"})
+            self.assertEqual(
+                p["payments"][0]["extra"],
+                {
+                    "dst_id": "1",
+                    "dst": "SCB · 1234567890123 · ระยอง",
+                    "dst_bank_id": "1",
+                    "dst_bank_name": "SCB",
+                    "dst_branch_name": "ระยอง",
+                    "dst_account_no": "1234567890123",
+                },
+            )
             self.assertEqual(_replied_text(env), qa_cards.TXT_NEED_SLIP)
             # 此处打 เงินสด 不放行,仍补要
             await qa.handle_text(_TID, _LUID, "เงินสด", "rt")
@@ -696,6 +706,35 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(env.qa_payload()["step"], "pay_dst")
             self.assertEqual(env.qa_payload()["payments"], [])
 
+    async def test_transfer_source_is_split_before_persisting(self):
+        with Env() as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_src",
+                    pending_channel={"channel": "transfer", "amount": "1000.00"},
+                ),
+            )
+            await qa.handle_text(_TID, _LUID, "ธนาคาร | 123456789", "rt")
+            self.assertEqual(
+                env.qa_payload()["pending_channel"]["extra"],
+                {"src_bank_name": "ธนาคาร", "src_account_no": "123456789"},
+            )
+            self.assertEqual(env.qa_payload()["step"], "pay_dst")
+
+    async def test_malformed_transfer_source_does_not_advance(self):
+        with Env() as env:
+            _seed(
+                env,
+                _qa(
+                    "pay_src",
+                    pending_channel={"channel": "transfer", "amount": "1000.00"},
+                ),
+            )
+            await qa.handle_text(_TID, _LUID, "ธนาคารเท่านั้น", "rt")
+            self.assertEqual(env.qa_payload()["step"], "pay_src")
+            self.assertEqual(_replied_text(env), qa_cards.TXT_BAD_PAYMENT_DETAIL)
+
     # ── 支付:cheque 补充信息 ──────────────────────────────────────────────
     async def test_cheque_ref(self):
         with Env() as env:
@@ -704,13 +743,16 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.handle_text(_TID, _LUID, "5000", "rt")
             self.assertEqual(env.qa_payload()["step"], "pay_ref")
             self.assertEqual(_replied_text(env), qa_cards.TXT_ASK_CHEQUE_REF)
-            await qa.handle_text(_TID, _LUID, "CHK123 KTB", "rt")
+            await qa.handle_text(_TID, _LUID, "CHK123 | KTB", "rt")
             p = env.qa_payload()
-            self.assertEqual(p["payments"][0]["extra"], {"ref": "CHK123 KTB"})
+            self.assertEqual(
+                p["payments"][0]["extra"],
+                {"cheque_no": "CHK123", "bank_name": "KTB"},
+            )
             self.assertEqual(p["step"], "pay_more")
 
     # ── 支付:多渠道 + Decimal 求和 ────────────────────────────────────────
-    async def test_multi_channel_sum_and_duplicate_channel(self):
+    async def test_duplicate_channel_is_hidden_and_stale_button_cannot_add_it(self):
         with Env() as env:
             _seed(env, _qa("pay_more"))
             await qa.handle_postback(_TID, _LUID, "qa:more:add", {}, "rt")
@@ -718,14 +760,14 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             await qa.handle_postback(_TID, _LUID, "qa:pay:cash", {}, "rt")
             await qa.handle_text(_TID, _LUID, "1,000.50", "rt")  # 泰式千分位也接受
             await qa.handle_postback(_TID, _LUID, "qa:more:add", {}, "rt")
+            actions = [item["action"]["data"] for item in _replied_items(env)]
+            self.assertNotIn("qa:pay:cash", actions)
             await qa.handle_postback(_TID, _LUID, "qa:pay:cash", {}, "rt")
-            await qa.handle_text(_TID, _LUID, "2000", "rt")
             p = env.qa_payload()
-            self.assertEqual(len(p["payments"]), 2)  # 同渠道可重复选,各记一条
-            amounts = [pay["amount"] for pay in p["payments"]]
-            self.assertEqual(amounts, ["1000.50", "2000.00"])
+            self.assertEqual(p["step"], "pay_channel")
+            self.assertEqual(len(p["payments"]), 1)
             total = qa_cards.deposit_total(p["payments"])
-            self.assertEqual(str(total), "3000.50")
+            self.assertEqual(str(total), "1000.50")
 
     # ── 预览卡 ────────────────────────────────────────────────────────────
     async def test_preview_card_full_fields(self):
@@ -833,7 +875,12 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "channel": "transfer",
                         "amount": "1500.00",
-                        "extra": {"dst_id": "1", "dst": "SCB"},
+                        "extra": {
+                            "src_bank_name": "KBank",
+                            "src_account_no": "9988",
+                            "dst_id": "1",
+                            "dst": "SCB · 1234567890123 · ระยอง",
+                        },
                     }
                 ]
             ),
@@ -845,7 +892,10 @@ class BookingQaTests(unittest.IsolatedAsyncioTestCase):
             for row in body
             if row.get("type") == "box"
         )
-        self.assertIn("เงินโอน=1500.00 · SCB", flat)
+        self.assertIn(
+            "เงินโอน=1500.00 · KBank 9988 → SCB · 1234567890123 · ระยอง",
+            flat,
+        )
 
     # ── audit / 全局命令 / 态守卫 ─────────────────────────────────────────
     async def test_audit_records_all_inputs_in_order(self):

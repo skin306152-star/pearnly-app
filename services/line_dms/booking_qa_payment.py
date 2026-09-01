@@ -54,6 +54,9 @@ async def pick_channel(
     if value not in qa_cards.PAY_LABELS:
         await reask(tenant_id, line_user_id, qa, "", reply_token)
         return
+    if value in {payment.get("channel") for payment in qa.get("payments") or []}:
+        await reask(tenant_id, line_user_id, qa, "", reply_token)
+        return
     qa["pending_channel"] = {"channel": value}
     qa["step"] = "pay_amount"
     await persist(tenant_id, line_user_id, qa)
@@ -82,6 +85,9 @@ async def pick_more(
     to_preview,
 ) -> None:
     if value == "add":
+        if len({p.get("channel") for p in qa.get("payments") or []}) >= len(qa_cards.PAY_LABELS):
+            await reask(tenant_id, line_user_id, qa, "", reply_token)
+            return
         qa["step"] = "pay_channel"
         await persist(tenant_id, line_user_id, qa)
         await send_step(tenant_id, line_user_id, qa, "pay_channel", reply_token)

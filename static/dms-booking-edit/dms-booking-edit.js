@@ -123,17 +123,46 @@
             })
             .join('');
     }
+    function paymentField(cls, label, value, wide) {
+        return (
+            '<div class="field ' +
+            (wide ? 'wide' : '') +
+            '"><label>' +
+            t(label) +
+            '</label><input class="' +
+            cls +
+            '" value="' +
+            esc(value || '') +
+            '"></div>'
+        );
+    }
+    function legacySource(x) {
+        if (x.src_bank_name || x.src_account_no) return x;
+        var parts = String(x.src || '')
+            .trim()
+            .split(/\s+/);
+        if (parts.length > 1) {
+            x.src_account_no = parts.pop();
+            x.src_bank_name = parts.join(' ');
+        } else if (/\d/.test(parts[0] || '')) {
+            x.src_account_no = parts[0];
+        } else {
+            x.src_bank_name = parts[0] || '';
+        }
+        return x;
+    }
     function paymentRow(p) {
         p = p || { channel: 'cash', amount: '', extra: {} };
         var x = p.extra || {};
+        if (p.channel === 'transfer') x = legacySource(x);
         var extra =
             p.channel === 'transfer'
                 ? '<div class="extra grid">' +
-                  '<div class="field wide"><label>' +
-                  t('source') +
-                  '</label><input class="src" value="' +
-                  esc(x.src || '') +
-                  '"></div>' +
+                  paymentField('src-bank', 'sourceBank', x.src_bank_name) +
+                  paymentField('src-account', 'sourceAccount', x.src_account_no) +
+                  paymentField('src-name', 'sourceAccountName', x.src_account_name) +
+                  paymentField('src-branch', 'sourceBranch', x.src_branch_name) +
+                  paymentField('src-time', 'transferTime', x.src_time) +
                   '<div class="field wide"><label>' +
                   t('destination') +
                   '</label><select class="dst">' +
@@ -141,11 +170,28 @@
                   '</select></div></div>'
                 : p.channel === 'cash'
                   ? '<div class="extra"></div>'
-                  : '<div class="field extra"><label>' +
-                    t('detail') +
-                    '</label><input class="detail" value="' +
-                    esc(x.detail || x.ref || '') +
-                    '"></div>';
+                  : p.channel === 'cheque'
+                    ? '<div class="extra grid">' +
+                      paymentField('cheque-no', 'chequeNo', x.cheque_no || x.ref) +
+                      paymentField('bank-name', 'bankName', x.bank_name) +
+                      paymentField('cheque-book-no', 'chequeBookNo', x.cheque_book_no) +
+                      '</div>'
+                    : p.channel === 'cashier_cheque'
+                      ? '<div class="extra grid">' +
+                        paymentField('cashier-no', 'cashierNo', x.cashier_no || x.ref) +
+                        paymentField('bank-name', 'bankName', x.bank_name) +
+                        paymentField('cashier-book-no', 'cashierBookNo', x.cashier_book_no) +
+                        '</div>'
+                      : p.channel === 'card'
+                        ? '<div class="extra grid">' +
+                          paymentField('bank-name', 'bankName', x.bank_name) +
+                          paymentField('card-type', 'cardType', x.card_type || x.ref) +
+                          '</div>'
+                        : '<div class="field extra"><label>' +
+                          t('detail') +
+                          '</label><input class="detail" value="' +
+                          esc(x.detail || '') +
+                          '"></div>';
         return (
             '<div class="payment"><div class="field channel"><label>' +
             t('channel') +
@@ -165,12 +211,45 @@
     function renderPayments(rows) {
         document.getElementById('payment-list').innerHTML = (rows || []).map(paymentRow).join('');
         wirePayments();
+        syncChannelOptions();
         total();
+    }
+    function syncChannelOptions() {
+        var selects = Array.from(document.querySelectorAll('.pay-channel'));
+        var add = document.getElementById('add-payment');
+        if (add) add.disabled = selects.length >= 6;
+        selects.forEach(function (selectEl) {
+            var usedElsewhere = new Set(
+                selects
+                    .filter(function (other) {
+                        return other !== selectEl;
+                    })
+                    .map(function (other) {
+                        return other.value;
+                    })
+            );
+            Array.from(selectEl.options).forEach(function (option) {
+                option.disabled = usedElsewhere.has(option.value);
+            });
+        });
+    }
+    function nextChannel() {
+        var used = new Set(
+            Array.from(document.querySelectorAll('.pay-channel')).map(function (el) {
+                return el.value;
+            })
+        );
+        return ['cash', 'transfer', 'cheque', 'cashier_cheque', 'card', 'other'].find(
+            function (channel) {
+                return !used.has(channel);
+            }
+        );
     }
     function wirePayments() {
         document.querySelectorAll('.payment').forEach(function (row) {
             row.querySelector('.remove').onclick = function () {
                 row.remove();
+                syncChannelOptions();
                 total();
             };
             row.querySelector('.amount').oninput = total;
@@ -182,6 +261,7 @@
                 };
                 row.outerHTML = paymentRow(old);
                 wirePayments();
+                syncChannelOptions();
                 total();
             };
         });
@@ -339,9 +419,15 @@
         form.hidden = false;
         renderPayments(model.form.payments);
         document.getElementById('add-payment').onclick = function () {
+            var channel = nextChannel();
+            if (!channel) return;
             var list = document.getElementById('payment-list');
-            list.insertAdjacentHTML('beforeend', paymentRow());
+            list.insertAdjacentHTML(
+                'beforeend',
+                paymentRow({ channel: channel, amount: '', extra: {} })
+            );
             wirePayments();
+            syncChannelOptions();
             total();
         };
         document.getElementById('car_id').onchange = loadPaints;
@@ -426,10 +512,25 @@
             var ch = row.querySelector('.pay-channel').value,
                 x = {};
             if (ch === 'transfer') {
-                x.src = row.querySelector('.src').value.trim();
+                x.src_bank_name = row.querySelector('.src-bank').value.trim();
+                x.src_account_no = row.querySelector('.src-account').value.trim();
+                x.src_account_name = row.querySelector('.src-name').value.trim();
+                x.src_branch_name = row.querySelector('.src-branch').value.trim();
+                x.src_time = row.querySelector('.src-time').value.trim();
                 x.dst_id = row.querySelector('.dst').value;
-            } else if (ch !== 'cash') {
-                x[ch === 'other' ? 'detail' : 'ref'] = row.querySelector('.detail').value.trim();
+            } else if (ch === 'cheque') {
+                x.cheque_no = row.querySelector('.cheque-no').value.trim();
+                x.bank_name = row.querySelector('.bank-name').value.trim();
+                x.cheque_book_no = row.querySelector('.cheque-book-no').value.trim();
+            } else if (ch === 'cashier_cheque') {
+                x.cashier_no = row.querySelector('.cashier-no').value.trim();
+                x.bank_name = row.querySelector('.bank-name').value.trim();
+                x.cashier_book_no = row.querySelector('.cashier-book-no').value.trim();
+            } else if (ch === 'card') {
+                x.bank_name = row.querySelector('.bank-name').value.trim();
+                x.card_type = row.querySelector('.card-type').value.trim();
+            } else if (ch === 'other') {
+                x.detail = row.querySelector('.detail').value.trim();
             }
             return { channel: ch, amount: row.querySelector('.amount').value, extra: x };
         });

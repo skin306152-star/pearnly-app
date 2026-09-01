@@ -88,6 +88,34 @@ const PREFIX_DRAFT = {
     },
 };
 
+const PAYMENT_DRAFT = {
+    ...DRAFT,
+    form: {
+        ...DRAFT.form,
+        payments: [
+            {
+                channel: 'transfer',
+                amount: '1000.00',
+                extra: {
+                    src_bank_name: 'KBank',
+                    src_account_no: '111222333',
+                    src_account_name: 'Customer',
+                    src_branch_name: 'Bangkok',
+                    src_time: '15:06',
+                    dst_id: '2',
+                },
+            },
+        ],
+    },
+    masters: {
+        ...DRAFT.masters,
+        company_banks: [
+            { id: '2', label: 'BBL · Bbl 987654321 · ระยอง' },
+            { id: '1', label: 'SCB · 1234567890123 · ระยอง' },
+        ],
+    },
+};
+
 const GEO_DRAFT = {
     ...DRAFT,
     form: {
@@ -486,6 +514,59 @@ test('mobile payment and attachment controls stay aligned', async ({ page }) => 
     expect(Math.abs(switches[0].x - switches[1].x)).toBeLessThanOrEqual(1);
 
     await page.screenshot({ path: path.join(OUT, 'mobile-controls.png'), fullPage: true });
+});
+
+test('payment editor keeps bank, account and company destination as separate fields', async ({
+    page,
+}) => {
+    let submitted;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+        const payload = btoa(
+            JSON.stringify({ entry: 'dms', exp: Math.floor(Date.now() / 1000) + 3600 })
+        )
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        localStorage.setItem('mrpilot_token', `e2e.${payload}.sig`);
+        localStorage.setItem('pearnly_lang', 'zh');
+    });
+    await page.route('**/api/line/dms-booking/**', async (route) => {
+        if (route.request().method() === 'POST') {
+            submitted = route.request().postDataJSON();
+            return route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, data: { saved: true } }),
+            });
+        }
+        const data = route.request().url().includes('/draft') ? PAYMENT_DRAFT : [];
+        return route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, data }),
+        });
+    });
+
+    await page.goto(`${BASE}/static/dist/dms-booking-edit.html?draft=payment-fields`);
+    await page.waitForSelector('#editor:not([hidden])');
+    await expect(page.locator('.src-bank')).toHaveValue('KBank');
+    await expect(page.locator('.src-account')).toHaveValue('111222333');
+    await expect(page.locator('.dst')).toHaveValue('2');
+    await expect(page.locator('.dst option:checked')).toHaveText('BBL · Bbl 987654321 · ระยอง');
+    await expect(page.locator('[data-t="loading"]')).toBeHidden();
+    await page.locator('#save').click();
+    await expect.poll(() => submitted).toBeTruthy();
+    expect(submitted.form.payments[0]).toEqual({
+        channel: 'transfer',
+        amount: '1000.00',
+        extra: {
+            src_bank_name: 'KBank',
+            src_account_no: '111222333',
+            src_account_name: 'Customer',
+            src_branch_name: 'Bangkok',
+            src_time: '15:06',
+            dst_id: '2',
+        },
+    });
 });
 
 test('restored LIFF draft callback opens the booking editor instead of Cowork login', async ({

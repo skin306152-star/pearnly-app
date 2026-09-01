@@ -36,7 +36,7 @@ MASTERS = {
     "cars": [["C1", "DMAX", "X-Series"]],
     "term_sales": [["T1", "T", "Finance"]],
     "regis_behalfs": [["R1", "R", "Person"]],
-    "company_banks": [["B1", "SCB", "SCB 123"]],
+    "company_banks": [["B1", "SCB", "SCB", "Rayong", "1234567890123"]],
 }
 
 
@@ -79,7 +79,14 @@ def form():
             {
                 "channel": "transfer",
                 "amount": "12,000",
-                "extra": {"src": "KBANK 99", "dst_id": "B1"},
+                "extra": {
+                    "src_bank_name": "KBANK",
+                    "src_account_no": "99",
+                    "src_account_name": "Customer",
+                    "src_branch_name": "Bangkok",
+                    "src_time": "15:06",
+                    "dst_id": "B1",
+                },
             }
         ],
         "keep_files": {"id_card": True, "slip": True},
@@ -138,7 +145,22 @@ class BookingEditTests(TestCase):
         self.assertEqual(qa["draft"]["zipcode"], "10230")
         self.assertEqual(qa["answers"]["car"]["label"], "DMAX X-Series")
         self.assertEqual(qa["payments"][0]["amount"], "12000.00")
-        self.assertEqual(qa["payments"][0]["extra"]["dst"], "SCB 123")
+        self.assertEqual(
+            qa["payments"][0]["extra"],
+            {
+                "src_bank_name": "KBANK",
+                "src_account_no": "99",
+                "src_account_name": "Customer",
+                "src_branch_name": "Bangkok",
+                "src_time": "15:06",
+                "dst_id": "B1",
+                "dst": "SCB · 1234567890123 · Rayong",
+                "dst_bank_id": "B1",
+                "dst_bank_name": "SCB",
+                "dst_branch_name": "Rayong",
+                "dst_account_no": "1234567890123",
+            },
+        )
         self.assertIn("District", qa["summary"]["address"])
         self.assertIn("10230", qa["summary"]["address"])
         self.assertTrue(qa["customer_dirty"])
@@ -161,6 +183,50 @@ class BookingEditTests(TestCase):
 
         fetch.assert_called_once_with({"id": "E1"}, force_refresh=True)
         self.assertEqual(out["masters"]["prefixes"], [{"id": "17", "label": "Mr"}])
+        self.assertEqual(
+            out["masters"]["company_banks"],
+            [{"id": "B1", "label": "SCB · 1234567890123 · Rayong"}],
+        )
+
+    def test_payment_only_edit_does_not_mark_customer_for_master_overwrite(self):
+        submitted = form()
+        submitted["customer"] = booking_edit._form(QA)["customer"]
+        submitted["customer"].update(
+            {
+                "province_name": "Bangkok",
+                "district_name": "District",
+                "subdistrict_name": "Subdistrict",
+                "zipcode": "10230",
+            }
+        )
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            replace = es.enter_context(
+                mock.patch.object(booking_edit.store, "replace_review_payload", return_value=True)
+            )
+            es.enter_context(mock.patch.object(booking_edit, "_send"))
+            booking_edit.save(self.user, "N1", submitted)
+        self.assertFalse(replace.call_args.args[3]["qa"]["customer_dirty"])
+
+    def test_duplicate_payment_channel_is_rejected(self):
+        submitted = form()
+        submitted["payments"].append(
+            {
+                "channel": "transfer",
+                "amount": "1",
+                "extra": {
+                    "src_bank_name": "SCB",
+                    "src_account_no": "1",
+                    "dst_id": "B1",
+                },
+            }
+        )
+        with contextlib.ExitStack() as es:
+            for patcher in self.patches():
+                es.enter_context(patcher)
+            with self.assertRaisesRegex(booking_edit.BookingEditError, "duplicate_payment"):
+                booking_edit.save(self.user, "N1", submitted)
 
     def test_paints_forces_fresh_masters(self):
         """颜色下拉同 load:按当前 DMS 主档映射,不吃 12h 快照。"""

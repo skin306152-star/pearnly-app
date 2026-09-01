@@ -28,7 +28,7 @@ def static_question(step, qa) -> Optional[Dict[str, Any]]:
         "car_search": qa_cards.ask_car(),
         "date": qa_cards.ask_date(date.today()),
         "regis_name": qa_cards.ask_regis_name(),
-        "pay_channel": qa_cards.ask_pay_channel(),
+        "pay_channel": qa_cards.ask_pay_channel(qa.get("payments") or []),
         "pay_amount": qa_cards.ask_amount(qa_cards.PAY_LABELS.get(channel, "")),
         "pay_src": qa_cards.ask_pay_src(),
         "pay_ref": qa_cards.ask_pay_ref(channel),

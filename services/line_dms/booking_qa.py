@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 """DMS LINE 订车逐问状态机(DL-7):聊天内逐项采集订车资料。
 
-会话态 booking_qa 存进度、客户、答案、付款、附件和主档缓存状态。
-转账才要凭证;收官置 booking_review 并轮换 nonce。
-主档超过 LINE quick reply 13 项上限时分页:翻页按钮只换页重发当前步(不推进业务 step),
-postback 走内部 token "__page:<n>",永远不进 answers —— 选中真实行才清页码状态。
-
-全局命令(เริ่มใหม่/เมนู)不由本模块吃:handle_* 先 commands.classify,命中即返 False,交上层路由接管。金额一律 Decimal;每次用户输入按序记 audit 供追单对账。
+会话保存客户、答案、付款、附件与主档状态；转账才要凭证，收官轮换 nonce。
+主档超过 LINE 上限时分页，翻页 token 永不写进 answers。
+全局命令交上层路由；金额用 Decimal，每次输入按序记 audit。
 """
 
 from __future__ import annotations
@@ -18,9 +15,10 @@ from typing import Any, Dict, Optional
 
 from services.erp import dms_advisor
 from services.erp import dms_id_ocr as _id_ocr
-from services.erp.mrerp_dms_company_banks import company_bank_label
+from services.erp.mrerp_dms_company_banks import company_bank_payment_extra
 from services.erp.mrerp_dms_client_base import to_be_date
 from services.line_dms import (
+    booking_payments,
     booking_qa_pages,
     booking_qa_payment,
     booking_qa_sync,
@@ -46,7 +44,6 @@ logger = logging.getLogger(__name__)
 _STATE = "booking_qa"
 
 _CASH_WORD = "เงินสด"
-_SKIP_WORD = "-"
 _MAX_REGIS_NAME = 120
 
 
@@ -307,8 +304,12 @@ async def _on_pay_amount(tenant_id, line_user_id, qa, text, reply_token) -> None
 
 
 async def _on_pay_src(tenant_id, line_user_id, qa, text, reply_token) -> None:
+    detail = booking_payments.parse_payment_detail("transfer", text)
+    if detail is None:
+        _send(line_user_id, qa_cards.bad_payment_detail(), reply_token)
+        return
     extra = qa["pending_channel"].setdefault("extra", {})
-    extra["src"] = "" if text.strip() == _SKIP_WORD else text.strip()
+    extra.update(detail)
     qa["step"] = "pay_dst"
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, "pay_dst", reply_token)
@@ -316,9 +317,13 @@ async def _on_pay_src(tenant_id, line_user_id, qa, text, reply_token) -> None:
 
 async def _on_pay_ref(tenant_id, line_user_id, qa, text, reply_token) -> None:
     pending = qa["pending_channel"]
+    channel = str(pending.get("channel") or "")
+    detail = booking_payments.parse_payment_detail(channel, text)
+    if detail is None:
+        _send(line_user_id, qa_cards.bad_payment_detail(), reply_token)
+        return
     extra = pending.setdefault("extra", {})
-    slot = "detail" if CHANNEL_EXTRA_SHAPE.get(pending.get("channel")) == "detail" else "ref"
-    extra[slot] = text.strip()
+    extra.update(detail)
     complete_channel(qa)
     await _persist(tenant_id, line_user_id, qa)
     await send_step(tenant_id, line_user_id, qa, "pay_more", reply_token)
@@ -388,8 +393,7 @@ async def _pick_company_bank(tenant_id, line_user_id, qa, value, reply_token) ->
         return
     (qa.get("pages") or {}).pop("company_banks", None)
     extra = qa["pending_channel"].setdefault("extra", {})
-    extra["dst_id"] = str(row[0])
-    extra["dst"] = company_bank_label(row)
+    extra.update(company_bank_payment_extra(row))
     complete_channel(qa)
     if not (qa.get("files") or {}).get("slip_mid"):
         await booking_qa_payment.request_slip(

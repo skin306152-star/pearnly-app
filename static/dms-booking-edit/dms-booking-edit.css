@@ -120,6 +120,13 @@ input[readonly] {
   padding: 12px 0;
   border-top: 1px solid var(--line);
 }
+.payment .extra {
+  grid-column: 1 / -2;
+}
+.payment .extra.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .payment:first-child {
   border-top: 0;
   padding-top: 0;
@@ -141,6 +148,9 @@ input[readonly] {
   border: 1px solid color-mix(in srgb, var(--good) 35%, var(--card));
   border-radius: 10px;
   font-weight: 700;
+}
+.add:disabled {
+  opacity: 0.5;
 }
 .file-row {
   display: flex;
@@ -251,6 +261,9 @@ input[readonly] {
   }
   .payment .extra {
     grid-column: 1 / -1;
+  }
+  .payment .extra.grid {
+    grid-template-columns: 1fr;
   }
   .payment .remove {
     position: static;

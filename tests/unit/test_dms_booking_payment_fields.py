@@ -77,19 +77,40 @@ class TestPaymentFormFields(unittest.TestCase):
         self.assertEqual(fields["txtmoneycash"], "5000.00")
         self.assertEqual(fields["txtearnestmoney"], "5000.00")
 
-    def test_transfer_src_dst_verbatim(self):
+    def test_transfer_structured_fields_land_in_exact_dms_inputs(self):
         fields = payment_form_fields(
             (
                 {
                     "channel": "transfer",
                     "amount": "2000.50",
-                    "extra": {"src": "ACC-SRC", "dst": "ACC-DST"},
+                    "extra": {
+                        "src_account_name": "CUSTOMER",
+                        "src_account_no": "ACC-SRC",
+                        "src_bank_name": "SCB",
+                        "src_bank_id": "7",
+                        "src_branch_name": "Bangkok",
+                        "src_time": "15:06",
+                        "dst_business_name": "Pearnly",
+                        "dst_account_no": "ACC-DST",
+                        "dst_bank_name": "BBL",
+                        "dst_bank_id": "2",
+                        "dst_branch_name": "Rayong",
+                    },
                 },
             )
         )
         self.assertEqual(fields["txtmoneytfmon"], "2000.50")
         self.assertEqual(fields["txtaccountnumtffrom"], "ACC-SRC")
+        self.assertEqual(fields["txtowneraccnametffrom"], "CUSTOMER")
+        self.assertEqual(fields["txtbanknametffrom"], "SCB")
+        self.assertEqual(fields["banktffromval"], "7")
+        self.assertEqual(fields["txtbranchnametffrom"], "Bangkok")
+        self.assertEqual(fields["txttimetffrom"], "15:06")
         self.assertEqual(fields["txtaccountnumtfmon"], "ACC-DST")
+        self.assertEqual(fields["txtbusinessnametfmon"], "Pearnly")
+        self.assertEqual(fields["txtbanknametfmon"], "BBL")
+        self.assertEqual(fields["banktfmonval"], "2")
+        self.assertEqual(fields["txtbranchnametfmon"], "Rayong")
         self.assertEqual(fields["txtearnestmoney"], "2000.50")
 
     def test_transfer_dash_src_skipped(self):
@@ -98,7 +119,7 @@ class TestPaymentFormFields(unittest.TestCase):
                 {
                     "channel": "transfer",
                     "amount": "1000",
-                    "extra": {"src": "-", "dst": "ACC-DST"},
+                    "extra": {"src": "-", "dst_account_no": "ACC-DST"},
                 },
             )
         )
@@ -106,55 +127,77 @@ class TestPaymentFormFields(unittest.TestCase):
         self.assertEqual(fields["txtaccountnumtfmon"], "ACC-DST")
         self.assertEqual(fields["txtmoneytfmon"], "1000.00")
 
-    def test_same_channel_sums_decimals(self):
-        fields = payment_form_fields(
-            (
-                {"channel": "cash", "amount": "1000.50", "extra": {}},
-                {"channel": "cash", "amount": "2000", "extra": {}},
-            )
-        )
-        self.assertEqual(fields["txtmoneycash"], "3000.50")
-        self.assertEqual(fields["txtearnestmoney"], "3000.50")
-
-    def test_multi_entry_text_joined(self):
+    def test_legacy_combined_transfer_source_is_split_safely(self):
         fields = payment_form_fields(
             (
                 {
                     "channel": "transfer",
                     "amount": "1000",
-                    "extra": {"src": "SRC-A", "dst": "DST-A"},
-                },
-                {
-                    "channel": "transfer",
-                    "amount": "1500.75",
-                    "extra": {"src": "SRC-B", "dst": "DST-B"},
+                    "extra": {"src": "ธนาคาร 123456789"},
                 },
             )
         )
-        self.assertEqual(fields["txtmoneytfmon"], "2500.75")
-        self.assertEqual(fields["txtaccountnumtffrom"], "SRC-A / SRC-B")
-        self.assertEqual(fields["txtaccountnumtfmon"], "DST-A / DST-B")
+        self.assertEqual(fields["txtbanknametffrom"], "ธนาคาร")
+        self.assertEqual(fields["txtaccountnumtffrom"], "123456789")
+
+    def test_legacy_bank_name_is_never_written_into_account_number(self):
+        fields = payment_form_fields(
+            ({"channel": "transfer", "amount": "1000", "extra": {"src": "SCB"}},)
+        )
+        self.assertEqual(fields["txtbanknametffrom"], "SCB")
+        self.assertNotIn("txtaccountnumtffrom", fields)
+
+    def test_duplicate_channel_raises_instead_of_merging_two_business_events(self):
+        with self.assertRaisesRegex(ValueError, "duplicate payment channel"):
+            payment_form_fields(
+                (
+                    {"channel": "cash", "amount": "1000.50", "extra": {}},
+                    {"channel": "cash", "amount": "2000", "extra": {}},
+                )
+            )
 
     def test_all_six_channels(self):
         pays = (
             {"channel": "cash", "amount": "100", "extra": {}},
-            {"channel": "transfer", "amount": "200", "extra": {"src": "S", "dst": "D"}},
-            {"channel": "cheque", "amount": "300", "extra": {"ref": "CHQ1"}},
-            {"channel": "cashier_cheque", "amount": "400", "extra": {"ref": "CCQ1"}},
-            {"channel": "card", "amount": "500", "extra": {"ref": "CARD1"}},
+            {
+                "channel": "transfer",
+                "amount": "200",
+                "extra": {"src_bank_name": "SCB", "src_account_no": "S", "dst_account_no": "D"},
+            },
+            {
+                "channel": "cheque",
+                "amount": "300",
+                "extra": {"cheque_no": "CHQ1", "bank_name": "KBank", "cheque_book_no": "B1"},
+            },
+            {
+                "channel": "cashier_cheque",
+                "amount": "400",
+                "extra": {"cashier_no": "CCQ1", "bank_name": "BBL", "cashier_book_no": "B2"},
+            },
+            {
+                "channel": "card",
+                "amount": "500",
+                "extra": {"bank_name": "SCB", "card_type": "VISA"},
+            },
             {"channel": "other", "amount": "600", "extra": {"detail": "cash on delivery"}},
         )
         fields = payment_form_fields(pays)
         self.assertEqual(fields["txtmoneycash"], "100.00")
         self.assertEqual(fields["txtmoneytfmon"], "200.00")
         self.assertEqual(fields["txtaccountnumtffrom"], "S")
+        self.assertEqual(fields["txtbanknametffrom"], "SCB")
         self.assertEqual(fields["txtaccountnumtfmon"], "D")
         self.assertEqual(fields["txtmoneycheque"], "300.00")
         self.assertEqual(fields["txtchequeno"], "CHQ1")
+        self.assertEqual(fields["txtbanknamecheque"], "KBank")
+        self.assertEqual(fields["txtbooknocheque"], "B1")
         self.assertEqual(fields["txtmoneycashiercq"], "400.00")
         self.assertEqual(fields["txtcashiercqno"], "CCQ1")
+        self.assertEqual(fields["txtbanknamecashiercq"], "BBL")
+        self.assertEqual(fields["txtbooknocashiercq"], "B2")
         self.assertEqual(fields["txtmoneycddbc"], "500.00")
-        self.assertEqual(fields["txttypenamecddbc"], "CARD1")
+        self.assertEqual(fields["txtbanknamecddbc"], "SCB")
+        self.assertEqual(fields["txttypenamecddbc"], "VISA")
         self.assertEqual(fields["txtmoneyother"], "600.00")
         self.assertEqual(fields["txtdetailother"], "cash on delivery")
         self.assertEqual(fields["txtearnestmoney"], "2100.00")

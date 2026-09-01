@@ -29,6 +29,7 @@ from services.line_dms.cards import (
     _summary_rows,
 )
 from services.erp.mrerp_dms_company_banks import company_bank_label
+from services.line_dms.booking_payments import payment_preview_detail
 from services.line_dms.qa_util import CHANNEL_EXTRA_SHAPE
 from services.line_dms.qa_util import car_label as _car_label
 from services.line_dms.qa_util import row_name as _name
@@ -60,14 +61,17 @@ PAY_LABELS = {
 }
 TXT_ASK_AMOUNT = "ยอดเงิน ({channel}) — พิมพ์จำนวนเงิน เช่น 5000"
 TXT_BAD_AMOUNT = "จำนวนเงินไม่ถูกต้อง พิมพ์เป็นตัวเลข เช่น 5000 หรือ 5,000.50"
-TXT_ASK_PAY_SRC = "บัญชีต้นทาง (ธนาคาร + เลขบัญชี) — พิมพ์ หรือพิมพ์ - เพื่อข้าม"
+TXT_ASK_PAY_SRC = (
+    "บัญชีต้นทาง — พิมพ์ ธนาคาร | เลขบัญชี เช่น SCB | 1234567890 หรือพิมพ์ - เพื่อข้าม"
+)
 TXT_ASK_PAY_DST = "บัญชีปลายทาง (บัญชีบริษัท) — กดเลือกจากธนาคารของบริษัทด้านล่าง"
 TXT_NO_COMPANY_BANK = (
     "ยังไม่มีข้อมูลธนาคารของบริษัท กรุณาให้ผู้ดูแลตั้งค่าใน DMS แล้วลองใหม่อีกครั้ง"
 )
-TXT_ASK_CHEQUE_REF = "เลขที่เช็ค + ธนาคาร — พิมพ์"
-TXT_ASK_CARD_REF = "ธนาคาร/ประเภทบัตร — พิมพ์"
+TXT_ASK_CHEQUE_REF = "พิมพ์ เลขที่เช็ค | ธนาคาร เช่น 123456 | SCB"
+TXT_ASK_CARD_REF = "พิมพ์ ธนาคาร | ประเภทบัตร เช่น SCB | VISA"
 TXT_ASK_OTHER_REF = "รายละเอียดช่องทาง — พิมพ์"
+TXT_BAD_PAYMENT_DETAIL = "รูปแบบไม่ถูกต้อง กรุณาพิมพ์ข้อมูลทั้ง 2 ช่องโดยคั่นด้วย |"
 TXT_ASK_MORE = "มีช่องทางอื่นอีกไหม"
 BTN_MORE_DONE = "ครบแล้ว"
 BTN_MORE_ADD = "เพิ่มช่องทาง"
@@ -247,10 +251,16 @@ def ask_regis_name() -> Dict[str, Any]:
     return _msg(TXT_ASK_REGIS_NAME, [_qr_item(BTN_REGIS_NAME_CARD, "qa:regisname:card")])
 
 
-def ask_pay_channel() -> Dict[str, Any]:
-    """支付渠道六按钮(固定顺序照业主确认的 PAY_LABELS)。"""
+def ask_pay_channel(payments: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """只展示尚未使用的渠道；DMS 每个渠道只有一组固定字段。"""
+    used = {str(payment.get("channel") or "") for payment in payments or []}
     return _msg(
-        TXT_ASK_PAY_CHANNEL, [_qr_item(label, f"qa:pay:{ch}") for ch, label in PAY_LABELS.items()]
+        TXT_ASK_PAY_CHANNEL,
+        [
+            _qr_item(label, f"qa:pay:{channel}")
+            for channel, label in PAY_LABELS.items()
+            if channel not in used
+        ],
     )
 
 
@@ -260,6 +270,10 @@ def ask_amount(channel_label: str) -> Dict[str, Any]:
 
 def bad_amount() -> Dict[str, Any]:
     return _msg(TXT_BAD_AMOUNT)
+
+
+def bad_payment_detail() -> Dict[str, Any]:
+    return _msg(TXT_BAD_PAYMENT_DETAIL)
 
 
 def ask_pay_src() -> Dict[str, Any]:
@@ -405,11 +419,7 @@ def preview_card(qa: Dict[str, Any], nonce: str) -> Dict[str, Any]:
     ]
     for p in payments:
         label = PAY_LABELS.get(p.get("channel") or "", p.get("channel") or "")
-        value = str(p.get("amount") or "")
-        if p.get("channel") == "transfer":
-            bank = str((p.get("extra") or {}).get("dst") or "")
-            value = " · ".join(part for part in (value, bank) if part)
-        rows.append(_kv_row(label, value))
+        rows.append(_kv_row(label, payment_preview_detail(p)))
     rows.append(_kv_row(LBL_TOTAL, f"{deposit_total(payments):,.2f}"))
     rows.append({"type": "separator", "margin": "sm"})
     rows.append(_kv_row(LBL_ATTACH_CARD, VAL_ATTACHED if files.get("id_card_mid") else "—"))

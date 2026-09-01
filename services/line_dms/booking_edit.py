@@ -5,22 +5,16 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Iterable
 
 from services.erp import dms_id_ocr
 from services.erp.erp_dms_intake import _run_logged_in, geo_mrerp_dms
 from services.erp.dms_id_validate import is_valid_thai_id, normalize_thai_id
 from services.erp.dms_masters_cache import get_masters, get_paints
-from services.line_dms import qa_cards, store
+from services.erp.mrerp_dms_company_banks import company_bank_label
+from services.line_dms import booking_payments, qa_cards, store
 from services.line_dms._out import _send
-from services.line_dms.qa_util import (
-    CHANNEL_EXTRA_SHAPE,
-    car_label,
-    find_row,
-    parse_amount,
-    row_name,
-)
+from services.line_dms.qa_util import car_label, find_row, row_name
 
 MASTER_FIELDS = {
     "place": "place_books",
@@ -50,6 +44,9 @@ CUSTOMER_FIELDS = (
     "subdistrict_name",
     "zipcode_id",
     "zipcode",
+)
+CUSTOMER_DIRTY_FIELDS = tuple(
+    field for field in CUSTOMER_FIELDS if not field.endswith("_name") and field != "zipcode"
 )
 
 
@@ -118,7 +115,7 @@ def load(user: dict, nonce: str) -> dict:
             "paints": _options(get_paints(endpoint, car_id, masters)) if car_id else [],
             "terms": _options(masters.get("term_sales") or []),
             "regis": _options(masters.get("regis_behalfs") or []),
-            "company_banks": _options(masters.get("company_banks") or []),
+            "company_banks": _options(masters.get("company_banks") or [], company_bank_label),
             "prefixes": _options(prefix_rows or []),
         },
     }
@@ -212,42 +209,23 @@ def _pick(masters: dict, key: str, rid: Any) -> dict:
 
 
 def _payments(rows: list, masters: dict) -> list[dict]:
-    if not rows:
-        raise BookingEditError("dms_booking.payment_required")
-    banks = masters.get("company_banks") or []
-    clean = []
-    for item in rows[:12]:
-        channel = str(item.get("channel") or "")
-        if channel not in CHANNEL_EXTRA_SHAPE:
-            raise BookingEditError("dms_booking.invalid_payment")
-        amount = parse_amount(str(item.get("amount") or ""))
-        if amount is None:
-            raise BookingEditError("dms_booking.invalid_amount")
-        extra = dict(item.get("extra") or {})
-        if channel == "transfer":
-            bank = find_row(banks, str(extra.get("dst_id") or ""))
-            if bank is None:
-                raise BookingEditError("dms_booking.invalid_bank")
-            extra = {
-                "src": str(extra.get("src") or "").strip(),
-                "dst_id": str(bank[0]),
-                "dst": row_name(bank),
-            }
-        elif CHANNEL_EXTRA_SHAPE[channel] in ("ref", "detail"):
-            slot = "detail" if channel == "other" else "ref"
-            extra = {slot: _required(extra.get(slot), "dms_booking.payment_detail_required")}
-        else:
-            extra = {}
-        clean.append({"channel": channel, "amount": f"{Decimal(amount):.2f}", "extra": extra})
-    return clean
+    try:
+        return booking_payments.normalize_editor_payments(rows, masters)
+    except booking_payments.PaymentValidationError as exc:
+        raise BookingEditError(exc.code) from exc
 
 
 def save(user: dict, nonce: str, submitted: dict) -> str:
     binding, payload, endpoint = _review(user, nonce)
     qa = dict(payload.get("qa") or {})
+    original_customer = _form(qa)["customer"]
     # 保存校验按当前 DMS 主档判(称谓/地点/车型/条件/登记/银行都可能被 12h 快照带偏)。
     masters = get_masters(endpoint, force_refresh=True)
     customer = _customer(dict(submitted.get("customer") or {}))
+    customer_changed = any(
+        str(customer.get(field) or "") != str(original_customer.get(field) or "")
+        for field in CUSTOMER_DIRTY_FIELDS
+    )
     customer.update(_customer_master_labels(endpoint, customer))
     raw_answers = dict(submitted.get("answers") or {})
     car = _pick(masters, "car", raw_answers.get("car_id"))
@@ -263,7 +241,7 @@ def save(user: dict, nonce: str, submitted: dict) -> str:
     qa["draft"] = {**(qa.get("draft") or {}), **customer}
     qa["customer"] = {**(qa.get("customer") or {}), "name": customer["name"]}
     qa["summary"] = qa_cards._fallback_summary(qa)
-    qa["customer_dirty"] = True
+    qa["customer_dirty"] = bool(qa.get("customer_dirty")) or customer_changed
     qa["answers"] = {
         "place": _pick(masters, "place", raw_answers.get("place_id")),
         "car": car,

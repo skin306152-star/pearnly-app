@@ -16,6 +16,26 @@ def text_event(code="123456", *, source_type="user"):
 
 
 class CoworkLineWebhookTests(unittest.IsolatedAsyncioTestCase):
+    async def test_menu_keyword_replies_through_cowork_channel(self):
+        identity = {
+            "tenant_id": "tenant-1",
+            "user_id": "user-1",
+            "line_user_id": "U-line",
+        }
+        with (
+            patch.object(
+                webhook.identity_store,
+                "resolve_active_identity",
+                return_value=identity,
+            ),
+            patch.object(webhook.cowork_flow, "_session", return_value={}),
+            patch.object(webhook.cowork_flow, "_set"),
+            patch.object(webhook.line_client, "reply_messages", return_value=True) as reply,
+        ):
+            await webhook._handle_event(text_event("菜单"))
+
+        self.assertEqual(reply.call_args.kwargs["channel"], "cowork")
+
     async def test_valid_code_binds_membership_and_replies_success(self):
         membership = {
             "membership_id": "membership-1",

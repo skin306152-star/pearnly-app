@@ -23,7 +23,7 @@ IMAGE_PATH = (
 WIDTH, HEIGHT = 2500, 1686
 ROW_HEIGHT = 843
 COLUMN_EDGES = (0, 833, 1666, 2500)
-CHANNEL = "default"
+CHANNEL = "cowork"
 
 
 def build_payload() -> dict[str, Any]:

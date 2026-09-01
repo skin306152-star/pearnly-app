@@ -21,7 +21,7 @@ from services.line_platform import client as line_client
 from services.ocr.recognize.core import run_recognition_core  # noqa: F401
 
 logger = logging.getLogger(__name__)
-CHANNEL = "default"
+CHANNEL = "cowork"
 _MENU_WORDS = frozenset({"menu", "菜单", "菜單", "เมนู", "メニュー"})
 _BUSY_STATES = frozenset({"ocr_processing", "draft", "editing"})
 

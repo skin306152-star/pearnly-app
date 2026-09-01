@@ -122,7 +122,7 @@ class CoworkLineMenuTests(unittest.TestCase):
         self.assertEqual(
             events,
             [
-                ("create", "default"),
+                ("create", "cowork"),
                 ("upload", "NEW"),
                 ("default", "NEW"),
                 ("delete", "OLD"),

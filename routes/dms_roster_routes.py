@@ -9,6 +9,7 @@ owner 自身操作)。写侧沿用 request.json() 手取(同 dms_routes 风格),
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
@@ -68,7 +69,8 @@ async def list_roster_advisors(request: Request):
     统一 4xx 会被前端吞成一句「加载失败」。
     """
     owner = _require_owner(request)
-    return roster.list_advisors(owner)
+    # 缓存冷时会登录 DMS 并使用 Playwright 同步 API，不能占用 ASGI 事件循环。
+    return await asyncio.to_thread(roster.list_advisors, owner)
 
 
 @router.post("/api/dms/operators")

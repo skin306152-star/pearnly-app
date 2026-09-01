@@ -110,6 +110,23 @@ class RosterGuardTest(unittest.TestCase):
             res = _run(rr.list_roster_advisors(object()))
         self.assertEqual(res["advisors"][0]["id"], "9")
 
+    def test_advisors_runs_blocking_dms_fetch_off_event_loop(self):
+        payload = {"ok": True, "advisors": [{"id": "9", "name": "阿明"}]}
+
+        async def fake_to_thread(fn, *args):
+            self.assertIs(fn, rr.roster.list_advisors)
+            self.assertEqual(args, (OWNER,))
+            return payload
+
+        with (
+            mock.patch.object(rr, "_dms_authorize", return_value=OWNER),
+            mock.patch.object(rr.asyncio, "to_thread", side_effect=fake_to_thread) as to_thread,
+        ):
+            res = _run(rr.list_roster_advisors(object()))
+
+        self.assertEqual(res, payload)
+        to_thread.assert_awaited_once()
+
     def test_create_passes_body_through(self):
         captured = {}
 
